@@ -1,0 +1,34 @@
+[package]
+name = "gse-prototype"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "gse-prototype"
+path = "src/main.rs"
+
+[dependencies]
+tracing = "0.1"
+tracing-subscriber = "0.3"
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+statrs = "0.16"
+once_cell = "1.19"
+
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Gdi",
+]
+
+[profile.release]
+opt-level = 3
+lto = true
