@@ -30,5 +30,8 @@ features = [
 ]
 
 [profile.release]
-opt-level = 3
-lto = true
+opt-level = "z"      # サイズ優先の最適化
+lto = true           # Link Time Optimization (不要コード削除)
+codegen-units = 1    # 並列コンパイル数を1にしてサイズ圧縮
+panic = "abort"     # パニック時の巻き戻しコードを削除
+strip = true         # デバッグ情報を完全に削除 (これが最も効果大)

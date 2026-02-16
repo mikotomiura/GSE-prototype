@@ -26,7 +26,18 @@ mod tests {
     }
 
     /// Rule-based classification logic (mirrored from src/inference/rules.rs)
-    fn classify_state(flight_time_ms: u64, backspace_count: u32) -> FlowState {
+    fn classify_state(
+        flight_time_ms: u64,
+        backspace_count: u32,
+        pause_after_delete_ms: Option<u64>,
+    ) -> FlowState {
+        // F6: Pause-after-Delete hesitation
+        if let Some(ms) = pause_after_delete_ms {
+            if ms >= 2000 {
+                return FlowState::Stuck;
+            }
+        }
+
         if flight_time_ms > 500 || backspace_count > 5 {
             FlowState::Stuck
         } else if flight_time_ms < 100 && backspace_count < 2 {
@@ -118,7 +129,7 @@ mod tests {
             backspace_count: 0,
         };
         assert_eq!(
-            classify_state(metrics.flight_time_ms, metrics.backspace_count),
+            classify_state(metrics.flight_time_ms, metrics.backspace_count, None),
             FlowState::Flow
         );
     }
@@ -131,7 +142,7 @@ mod tests {
             backspace_count: 1,
         };
         assert_eq!(
-            classify_state(metrics.flight_time_ms, metrics.backspace_count),
+            classify_state(metrics.flight_time_ms, metrics.backspace_count, None),
             FlowState::Stuck
         );
     }
@@ -144,7 +155,7 @@ mod tests {
             backspace_count: 10,
         };
         assert_eq!(
-            classify_state(metrics.flight_time_ms, metrics.backspace_count),
+            classify_state(metrics.flight_time_ms, metrics.backspace_count, None),
             FlowState::Stuck
         );
     }
@@ -157,7 +168,7 @@ mod tests {
             backspace_count: 2,
         };
         assert_eq!(
-            classify_state(metrics.flight_time_ms, metrics.backspace_count),
+            classify_state(metrics.flight_time_ms, metrics.backspace_count, None),
             FlowState::Incubation
         );
     }
@@ -225,7 +236,7 @@ mod tests {
         let mut rule_states = Vec::new();
 
         for flight_time_ms in observations {
-            let rule_state = classify_state(flight_time_ms, 0);
+            let rule_state = classify_state(flight_time_ms, 0, None);
             rule_states.push(rule_state);
             hmm.update(flight_time_ms as f64);
         }
@@ -258,7 +269,7 @@ mod tests {
         let mut rule_states = Vec::new();
 
         for (flight_time_ms, backspace_count) in observations {
-            let rule_state = classify_state(flight_time_ms, backspace_count);
+            let rule_state = classify_state(flight_time_ms, backspace_count, None);
             rule_states.push(rule_state);
             hmm.update(flight_time_ms as f64);
         }
@@ -289,7 +300,7 @@ mod tests {
         // After some typing in the 5-second window, backspace count should still matter
         let time_1sec_after = window_start_backspaces;
         assert_eq!(
-            classify_state(100, time_1sec_after),
+            classify_state(100, time_1sec_after, None),
             FlowState::Incubation,
             "3 backspaces with 100ms flight time should be INCUBATION"
         );
@@ -297,7 +308,7 @@ mod tests {
         // After 5+ seconds, backspaces should be cleared (simulated by count reset)
         let time_6sec_after = 0;
         assert_eq!(
-            classify_state(100, time_6sec_after),
+            classify_state(100, time_6sec_after, None),
             FlowState::Flow,
             "After 5-second window decay, 100ms flight time with 0 backspaces should be FLOW"
         );
@@ -327,14 +338,14 @@ mod tests {
     #[test]
     fn test_edge_case_zero_flight_time() {
         // Extremely fast successive keystrokes (edge case)
-        let state = classify_state(0, 0);
+        let state = classify_state(0, 0, None);
         assert_eq!(state, FlowState::Flow, "Zero flight time should be FLOW");
     }
 
     #[test]
     fn test_edge_case_very_large_values() {
         // Handle extreme values gracefully
-        let state = classify_state(10000, 100);
+        let state = classify_state(10000, 100, None);
         assert_eq!(state, FlowState::Stuck, "Very large values should be STUCK");
         
         let mut hmm = SimpleHMM::new();

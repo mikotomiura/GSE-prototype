@@ -109,14 +109,15 @@ impl HMM {
     /// 4. Normalize to sum to 1.0
     ///
     /// # Arguments
-    /// * `observation` - Flight time in milliseconds (time between key presses)
+    /// * `flight_time` - Flight time in milliseconds (time between key presses)
+    /// * `backspace_count` - Number of backspaces in the recent window (may include hesitation effect)
     ///
     /// # Returns
     /// The most likely cognitive state after incorporating the new observation
-    pub fn update(&mut self, observation: f64) -> FlowState {
-        // Calculate observation probabilities for each state
-        // Using Gaussian distribution: P(x | state) = (1 / (σ√(2π))) * e^(-(x-μ)² / (2σ²))
-        let obs_probs = self.calculate_observation_probs(observation);
+    pub fn update(&mut self, flight_time: f64, backspace_count: u32) -> FlowState {
+        // Calculate observation probabilities for each state using both flight time
+        // and backspace frequency (naive-bayes style multiplication)
+        let obs_probs = self.calculate_observation_probs(flight_time, backspace_count);
 
         // Forward algorithm: multiply by transition matrix and observation probs
         let mut new_state_probs = [0.0; 3];
@@ -159,19 +160,32 @@ impl HMM {
     ///
     /// # Returns
     /// Array of observation probabilities [P(obs|FLOW), P(obs|INCUBATION), P(obs|STUCK)]
-    fn calculate_observation_probs(&self, observation: f64) -> [f64; 3] {
-        // State parameters: (mean, std_dev)
-        let params = [
-            (50.0, 30.0),      // FLOW: fast, consistent typing
-            (250.0, 100.0),    // INCUBATION: moderate delays
-            (1000.0, 500.0),   // STUCK: long delays
+    fn calculate_observation_probs(&self, flight_time: f64, backspace_count: u32) -> [f64; 3] {
+        // Flight time parameters per state: (mean, std_dev)
+        let ft_params = [
+            (50.0, 30.0),      // FLOW
+            (250.0, 100.0),    // INCUBATION
+            (1000.0, 500.0),   // STUCK
+        ];
+
+        // Backspace frequency modeled as a continuous proxy (use gaussian on count)
+        // Means and std devs chosen so that STUCK favors higher backspace counts
+        let bs_params = [
+            (0.3, 0.7),   // FLOW: very few deletes
+            (1.0, 1.0),   // INCUBATION: occasional deletes
+            (3.5, 1.5),   // STUCK: frequent deletes/edits
         ];
 
         let mut probs = [0.0; 3];
-        for (idx, &(mean, std_dev)) in params.iter().enumerate() {
-            probs[idx] = Self::gaussian_pdf(observation, mean, std_dev);
-            // Clamp to avoid numerical issues
-            probs[idx] = probs[idx].max(MIN_OBSERVATION_PROB);
+        for idx in 0..3 {
+            let (ft_mean, ft_std) = ft_params[idx];
+            let (bs_mean, bs_std) = bs_params[idx];
+
+            let p_ft = Self::gaussian_pdf(flight_time, ft_mean, ft_std).max(MIN_OBSERVATION_PROB);
+            let p_bs = Self::gaussian_pdf(backspace_count as f64, bs_mean, bs_std).max(MIN_OBSERVATION_PROB);
+
+            // Naive Bayes style: multiply independent observation likelihoods
+            probs[idx] = p_ft * p_bs;
         }
 
         probs
@@ -218,7 +232,7 @@ mod tests {
     #[test]
     fn test_observation_prob_calculation() {
         let hmm = HMM::new();
-        let probs = hmm.calculate_observation_probs(50.0); // Fast typing
+        let probs = hmm.calculate_observation_probs(50.0, 0); // Fast typing
         // FLOW should have highest probability for fast typing
         assert!(probs[0] > probs[1]); // FLOW > INCUBATION
         assert!(probs[0] > probs[2]); // FLOW > STUCK
@@ -228,7 +242,7 @@ mod tests {
     fn test_update_with_fast_typing() {
         let mut hmm = HMM::new();
         // Simulate fast typing (40ms - typical FLOW state)
-        let state = hmm.update(40.0);
+        let state = hmm.update(40.0, 0);
         assert_eq!(state, FlowState::Flow);
         let (flow, _, _) = hmm.state_probs();
         assert!(flow > 0.5);
@@ -238,7 +252,7 @@ mod tests {
     fn test_update_with_long_pause() {
         let mut hmm = HMM::new();
         // Simulate long pause (2000ms - typical STUCK state)
-        let state = hmm.update(2000.0);
+        let state = hmm.update(2000.0, 0);
         assert_eq!(state, FlowState::Stuck);
         let (_, _, stuck) = hmm.state_probs();
         assert!(stuck > 0.5);
@@ -247,7 +261,7 @@ mod tests {
     #[test]
     fn test_probability_normalization() {
         let mut hmm = HMM::new();
-        hmm.update(150.0);
+        hmm.update(150.0, 0);
         let (flow, incubation, stuck) = hmm.state_probs();
         let sum = flow + incubation + stuck;
         assert!((sum - 1.0).abs() < 1e-9); // Safely close to 1.0

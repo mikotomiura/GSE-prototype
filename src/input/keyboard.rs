@@ -20,6 +20,9 @@ static LAST_KEY_TIME: Mutex<Option<Instant>> = Mutex::new(None);
 // Static variable to track backspace key press times (for 5-second sliding window)
 static BACKSPACE_TIMES: Mutex<VecDeque<Instant>> = Mutex::new(VecDeque::new());
 
+// Static variable to store the last backspace press time (for F6 pause-after-delete)
+static LAST_BACKSPACE_PRESS: Mutex<Option<Instant>> = Mutex::new(None);
+
 // Static variable for HMM instance (lazy initialization with once_cell)
 static HMM_INSTANCE: Lazy<Mutex<HMM>> = Lazy::new(|| {
     Mutex::new(HMM::new())
@@ -52,6 +55,11 @@ unsafe extern "system" fn keyboard_proc(
                 match BACKSPACE_TIMES.lock() {
                     Ok(mut guard) => {
                         guard.push_back(current_time);
+
+                        // Record last backspace press for F6 (pause-after-delete)
+                        if let Ok(mut lb) = LAST_BACKSPACE_PRESS.lock() {
+                            *lb = Some(current_time);
+                        }
 
                         // Remove timestamps older than 5 seconds
                         while let Some(&oldest_time) = guard.front() {
@@ -88,15 +96,33 @@ unsafe extern "system" fn keyboard_proc(
                             }
                         };
 
+                        // Compute pause-after-delete (F6): time since last backspace press to this key
+                        let pause_after_delete_ms_opt = match LAST_BACKSPACE_PRESS.lock() {
+                            Ok(guard) => guard.map(|t| current_time.duration_since(t).as_millis() as u64),
+                            Err(_) => {
+                                error!("Failed to acquire LAST_BACKSPACE_PRESS lock");
+                                None
+                            }
+                        };
+
+                        // Hesitation if pause after delete > 2000ms
+                        let hesitation = match pause_after_delete_ms_opt {
+                            Some(ms) if ms >= 2000 => true,
+                            _ => false,
+                        };
+
+                        // For HMM, include hesitation as an extra backspace signal (simple proxy)
+                        let backspace_count_for_hmm = backspace_count + if hesitation { 1 } else { 0 };
+
                         // --- PHASE 2: Rule-based classification ---
-                        let rule_state = classify_state(flight_time_ms, backspace_count);
+                        let rule_state = classify_state(flight_time_ms, backspace_count, pause_after_delete_ms_opt);
 
                         // --- PHASE 3: HMM-based probabilistic classification ---
                         // Optimize: Single lock for both update and read operations
                         let (hmm_state, flow_prob, incubation_prob, stuck_prob) = {
                             let mut hmm = HMM_INSTANCE.lock()
                                 .expect("HMM mutex poisoned - critical system failure");
-                            let state = hmm.update(flight_time_ms as f64);
+                            let state = hmm.update(flight_time_ms as f64, backspace_count_for_hmm);
                             let (flow, incub, stuck) = hmm.state_probs();
                             (state, flow, incub, stuck)
                         };
