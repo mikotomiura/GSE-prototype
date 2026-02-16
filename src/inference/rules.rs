@@ -70,14 +70,14 @@ mod tests {
 
     #[test]
     fn test_flow_state() {
-        assert_eq!(classify_state(50, 0), FlowState::Flow);
-        assert_eq!(classify_state(99, 1), FlowState::Flow);
+        assert_eq!(classify_state(50, 0, None), FlowState::Flow);
+        assert_eq!(classify_state(99, 1, None), FlowState::Flow);
     }
 
     #[test]
     fn test_incubation_state() {
-        assert_eq!(classify_state(250, 2), FlowState::Incubation);
-        assert_eq!(classify_state(150, 1), FlowState::Incubation);
+        assert_eq!(classify_state(250, 2, None), FlowState::Incubation);
+        assert_eq!(classify_state(150, 1, None), FlowState::Incubation);
     }
 
     #[test]
