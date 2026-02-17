@@ -6,14 +6,13 @@
 //! - INCUBATION: Light yellow fade (alpha=25)
 //! - STUCK: White fog (alpha=76)
 
-use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, GetMonitorInfoW, MonitorFromPoint, GetSystemMetrics,
+    CreateWindowExW, GetSystemMetrics,
     WS_EX_LAYERED, WS_EX_TRANSPARENT, WS_EX_TOPMOST, WS_POPUP,
     SetLayeredWindowAttributes, SM_CXSCREEN, SM_CYSCREEN,
-    MONITORINFO, MONITOR_DEFAULTTOPRIMARY, LWA_ALPHA, LWA_COLORKEY,
+    LWA_ALPHA,
 };
-use windows::Win32::Graphics::Gdi::RGB;
 use windows::core::w;
 use tracing::{info, error};
 
@@ -54,18 +53,11 @@ pub fn create_overlay_window() -> Result<HWND, String> {
             None,                            // Menu (none)
             None,                            // Instance (not used for built-in class)
             None,                            // Creation parameters
-        );
-
-        if hwnd.is_invalid() {
-            error!("Failed to create overlay window");
-            return Err("CreateWindowExW failed".to_string());
-        }
+        )
+        .map_err(|e| format!("CreateWindowExW failed: {}", e))?;
 
         // Initialize as fully transparent
-        if !set_overlay_alpha(hwnd, 0, 0x000000).is_ok() {
-            error!("Failed to initialize overlay transparency");
-            return Err("SetLayeredWindowAttributes failed".to_string());
-        }
+        set_overlay_alpha(hwnd, 0, 0x000000)?;
 
         info!("Overlay window created successfully: width={}px, height={}px", screen_width, screen_height);
         Ok(hwnd)
@@ -89,11 +81,10 @@ pub fn set_overlay_alpha(hwnd: HWND, alpha: u8, color: u32) -> Result<(), String
         }
 
         // Extract RGB components from color
-        let rgb_color = RGB(
-            (color & 0xFF) as u8,              // Blue
-            ((color >> 8) & 0xFF) as u8,       // Green
-            ((color >> 16) & 0xFF) as u8,      // Red
-        );
+        let r = ((color >> 16) & 0xFF) as u8;
+        let g = ((color >> 8) & 0xFF) as u8;
+        let b = (color & 0xFF) as u8;
+        let rgb_color = windows::Win32::Foundation::COLORREF(r as u32 | ((g as u32) << 8) | ((b as u32) << 16));
 
         // SetLayeredWindowAttributes sets the transparency key
         // LWA_ALPHA: Apply the alpha value
@@ -104,10 +95,8 @@ pub fn set_overlay_alpha(hwnd: HWND, alpha: u8, color: u32) -> Result<(), String
             LWA_ALPHA  // Use alpha blending (with alpha=0 for full transparency)
         };
 
-        if SetLayeredWindowAttributes(hwnd, rgb_color, alpha, flags).as_bool() == false {
-            error!("SetLayeredWindowAttributes failed");
-            return Err("SetLayeredWindowAttributes failed".to_string());
-        }
+        SetLayeredWindowAttributes(hwnd, rgb_color, alpha, flags)
+            .map_err(|e| format!("SetLayeredWindowAttributes failed: {}", e))?;
 
         info!("Overlay alpha set: alpha={}, color=0x{:06X}", alpha, color);
         Ok(())

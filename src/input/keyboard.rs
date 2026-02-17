@@ -5,13 +5,15 @@ use tracing::{info, warn, error};
 use once_cell::sync::Lazy;
 use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowsHookExW, UnhookWindowsHookEx, CallNextHookEx, WH_KEYBOARD_LL,
-    WM_KEYDOWN, KBDLLHOOKSTRUCT, VK_BACK,
+    WM_KEYDOWN, KBDLLHOOKSTRUCT,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::VK_BACK;
+use windows::Win32::Foundation::{WPARAM, LPARAM, LRESULT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use crate::inference::rules::{classify_state, FlowState};
 use crate::inference::hmm::HMM;
 
-// Static variable to store the hook handle
+// Static variable to store the hook handle (stored as isize, converted to/from HHOOK)
 static HOOK_HANDLE: Mutex<Option<isize>> = Mutex::new(None);
 
 // Static variable to store the last key press time
@@ -39,13 +41,13 @@ const MIN_FLIGHT_TIME_FOR_INPUT: u64 = 10;
 /// This function is called by Windows for every keyboard event
 unsafe extern "system" fn keyboard_proc(
     n_code: i32,
-    w_param: usize,
-    l_param: isize,
-) -> isize {
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
     if n_code >= 0 {
         // Only process on WM_KEYDOWN events
-        if w_param == WM_KEYDOWN as usize {
-            let kb_struct = &*(l_param as *const KBDLLHOOKSTRUCT);
+        if w_param.0 == WM_KEYDOWN as usize {
+            let kb_struct = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
             let current_time = Instant::now();
             let vk_code = kb_struct.vkCode;
 
@@ -140,7 +142,7 @@ unsafe extern "system" fn keyboard_proc(
                                 );
                                 // Update overlay if state has changed
                                 if let Ok(mut last_state) = LAST_STATE.lock() {
-                                    if last_state != Some(FlowState::Flow) {
+                                    if *last_state != Some(FlowState::Flow) {
                                         crate::update_overlay_from_state(FlowState::Flow);
                                         *last_state = Some(FlowState::Flow);
                                     }
@@ -155,7 +157,7 @@ unsafe extern "system" fn keyboard_proc(
                                 );
                                 // Update overlay if state has changed
                                 if let Ok(mut last_state) = LAST_STATE.lock() {
-                                    if last_state != Some(FlowState::Incubation) {
+                                    if *last_state != Some(FlowState::Incubation) {
                                         crate::update_overlay_from_state(FlowState::Incubation);
                                         *last_state = Some(FlowState::Incubation);
                                     }
@@ -170,7 +172,7 @@ unsafe extern "system" fn keyboard_proc(
                                 );
                                 // Update overlay if state has changed
                                 if let Ok(mut last_state) = LAST_STATE.lock() {
-                                    if last_state != Some(FlowState::Stuck) {
+                                    if *last_state != Some(FlowState::Stuck) {
                                         crate::update_overlay_from_state(FlowState::Stuck);
                                         *last_state = Some(FlowState::Stuck);
                                     }
@@ -190,9 +192,10 @@ unsafe extern "system" fn keyboard_proc(
     // Always call the next hook in the chain
     let hook_handle = HOOK_HANDLE.lock().unwrap();
     if let Some(handle) = *hook_handle {
-        CallNextHookEx(handle, n_code, w_param, l_param)
+        let hhook = windows::Win32::UI::WindowsAndMessaging::HHOOK(handle as *mut std::ffi::c_void);
+        CallNextHookEx(hhook, n_code, w_param, l_param)
     } else {
-        CallNextHookEx(0, n_code, w_param, l_param)
+        CallNextHookEx(None, n_code, w_param, l_param)
     }
 }
 
@@ -201,7 +204,8 @@ unsafe extern "system" fn keyboard_proc(
 pub fn install_hook() -> Result<(), String> {
     unsafe {
         // Get the module handle for the current executable
-        let hmodule = GetModuleHandleW(None);
+        let hmodule = GetModuleHandleW(None)
+            .map_err(|e| format!("Failed to get module handle: {}", e))?;
 
         // Install the hook
         let hook_handle = SetWindowsHookExW(
@@ -209,13 +213,11 @@ pub fn install_hook() -> Result<(), String> {
             Some(keyboard_proc),
             hmodule,
             0, // Thread ID 0 means global hook
-        );
+        )
+        .map_err(|e| format!("SetWindowsHookExW failed: {}", e))?;
 
-        if hook_handle == 0 {
-            return Err("SetWindowsHookExW failed".to_string());
-        }
-
-        *HOOK_HANDLE.lock().unwrap() = Some(hook_handle);
+        // Store as isize for compatibility with static initialization
+        *HOOK_HANDLE.lock().unwrap() = Some(hook_handle.0 as isize);
         Ok(())
     }
 }
@@ -225,7 +227,8 @@ pub fn uninstall_hook() {
     let mut hook_guard = HOOK_HANDLE.lock().unwrap();
     if let Some(handle) = *hook_guard {
         unsafe {
-            let _ = UnhookWindowsHookEx(handle);
+            let hhook = windows::Win32::UI::WindowsAndMessaging::HHOOK(handle as *mut std::ffi::c_void);
+            let _ = UnhookWindowsHookEx(hhook);
         }
         *hook_guard = None;
     }

@@ -1,7 +1,7 @@
 use tracing::{info, error, Level};
 use tracing_subscriber::FmtSubscriber;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetMessageW, TranslateMessage, DispatchMessageW, MSG, PostQuitMessageW,
+    GetMessageW, TranslateMessage, DispatchMessageW, MSG, PostQuitMessage,
     RegisterClassW, CreateWindowExW, WS_OVERLAPPEDWINDOW, WM_DESTROY, WM_QUIT,
     CW_USEDEFAULT, WNDCLASSW, CS_VREDRAW, CS_HREDRAW, DefWindowProcW, IDC_ARROW,
     LoadCursorW,
@@ -26,7 +26,7 @@ static HWND_OVERLAY_STATIC: AtomicIsize = AtomicIsize::new(0);
 pub fn update_overlay_from_state(state: inference::rules::FlowState) {
     let overlay_hwnd_value = HWND_OVERLAY_STATIC.load(Ordering::SeqCst);
     if overlay_hwnd_value != 0 {
-        let overlay_hwnd = HWND(overlay_hwnd_value);
+        let overlay_hwnd = HWND(overlay_hwnd_value as *mut std::ffi::c_void);
         if let Err(e) = ui::overlay::update_overlay(overlay_hwnd, state) {
             error!("Failed to update overlay: {}", e);
         }
@@ -41,7 +41,7 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     match msg {
         WM_DESTROY => {
-            PostQuitMessageW(0);
+            PostQuitMessage(0);
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -50,12 +50,8 @@ unsafe extern "system" fn window_proc(
 
 fn create_message_window() -> Result<HWND, String> {
     unsafe {
-        let hmodule = GetModuleHandleW(None);
-        
-        // Safety check: Verify module handle is valid
-        if hmodule.is_invalid() {
-            return Err("Failed to get module handle".to_string());
-        }
+        let hmodule = GetModuleHandleW(None)
+            .map_err(|e| format!("Failed to get module handle: {}", e))?;
 
         let class_name = w!("GSEPrototypeClass");
 
@@ -64,9 +60,9 @@ fn create_message_window() -> Result<HWND, String> {
             lpfnWndProc: Some(window_proc),
             cbClsExtra: 0,
             cbWndExtra: 0,
-            hInstance: hmodule,
+            hInstance: hmodule.into(),
             hIcon: Default::default(),
-            hCursor: LoadCursorW(None, IDC_ARROW).ok(),
+            hCursor: LoadCursorW(None, IDC_ARROW).unwrap_or_default(),
             hbrBackground: Default::default(),
             lpszMenuName: windows::core::PCWSTR::null(),
             lpszClassName: class_name,
@@ -87,13 +83,10 @@ fn create_message_window() -> Result<HWND, String> {
             None,
             hmodule,
             None,
-        );
+        )
+        .map_err(|e| format!("CreateWindowExW failed: {}", e))?;
 
-        if hwnd.0 == 0 {
-            return Err("CreateWindowExW failed".to_string());
-        }
-
-        HWND_STATIC.store(hwnd.0, Ordering::SeqCst);
+        HWND_STATIC.store(hwnd.0 as isize, Ordering::SeqCst);
         Ok(hwnd)
     }
 }
@@ -107,6 +100,9 @@ fn main() {
 
     info!("GSE Core Initialized");
 
+    // Note: TSF (Text Services Framework) integration is planned for future releases
+    // For now, the keyboard hook provides sufficient input monitoring
+    
     // Create hidden window for message loop
     let _hwnd = match create_message_window() {
         Ok(hwnd) => {
@@ -133,7 +129,7 @@ fn main() {
     // Create overlay window for visual feedback
     match ui::overlay::create_overlay_window() {
         Ok(overlay_hwnd) => {
-            HWND_OVERLAY_STATIC.store(overlay_hwnd.0, Ordering::SeqCst);
+            HWND_OVERLAY_STATIC.store(overlay_hwnd.0 as isize, Ordering::SeqCst);
             info!("Overlay window created successfully");
         }
         Err(e) => {
