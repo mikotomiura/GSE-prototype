@@ -1,15 +1,34 @@
 pub mod analysis;
 pub mod input;
+pub mod logger;
 pub mod sensors;
 
-use std::collections::HashMap;
-use std::thread;
-use crossbeam_channel;
-use tauri::State;
-use crate::analysis::{engine::{CognitiveState, CognitiveStateEngine}, features::FeatureExtractor};
+use crate::analysis::{
+    engine::{CognitiveState, CognitiveStateEngine},
+    features::FeatureExtractor,
+};
+use crate::logger::{LogEntry, SessionLogger};
 use crate::sensors::SensorManager;
+use crossbeam_channel::{self, Sender};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use tauri::{Manager, State};
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// ---------------------------------------------------------------------------
+// ログ状態 (quit_app からも参照できるよう Tauri state で管理)
+// ---------------------------------------------------------------------------
+
+struct LogState {
+    tx: Sender<LogEntry>,
+    path: String,
+}
+
+// ---------------------------------------------------------------------------
+// Tauri コマンド
+// ---------------------------------------------------------------------------
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -19,7 +38,6 @@ fn greet(name: &str) -> String {
 fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f64> {
     let probs = state.get_current_state();
     let mut map = HashMap::new();
-    // Convert enum keys to string for JSON serialization
     for (k, v) in probs {
         let key_str = match k {
             CognitiveState::Flow => "flow",
@@ -31,70 +49,225 @@ fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f6
     map
 }
 
+/// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
-fn quit_app() {
-    std::process::exit(0);
+fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .path
+        .clone()
 }
+
+/// アプリ終了。終了前に以下を順に実行する:
+///   1. セッションログを閉じる (LogEntry::End を送信)
+///   2. behavioral_gt.py でラベリング分析を実行 (Python が PATH にある場合)
+///   3. セッションフォルダを Explorer で開く
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>) {
+    // ログ終了マーカーを送信
+    let session_path = {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+        let _ = guard.tx.try_send(LogEntry::End);
+        guard.path.clone()
+    };
+
+    let app_handle = app.clone();
+
+    // バックグラウンドスレッドで分析→フォルダ表示→アプリ終了
+    thread::spawn(move || {
+        // ロガースレッドにファイルを閉じる時間を与える
+        thread::sleep(std::time::Duration::from_millis(400));
+
+        // behavioral_gt.py を探して実行
+        match find_behavioral_gt() {
+            Some(script) => {
+                tracing::info!(
+                    "Auto-analysis: python {:?} {}",
+                    script,
+                    session_path
+                );
+                match std::process::Command::new("python")
+                    .args([script.to_str().unwrap_or(""), &session_path])
+                    .spawn()
+                {
+                    Ok(_) => tracing::info!("behavioral_gt.py launched"),
+                    Err(e) => tracing::warn!("Failed to launch behavioral_gt.py: {}", e),
+                }
+                // Python 分析に少し時間を与えてから Explorer を開く
+                thread::sleep(std::time::Duration::from_millis(1500));
+            }
+            None => {
+                tracing::warn!(
+                    "behavioral_gt.py not found. Skipping auto-analysis. \
+                     Run manually: python analysis/behavioral_gt.py {}",
+                    session_path
+                );
+            }
+        }
+
+        // セッションフォルダを Explorer で開く
+        if let Some(folder) = Path::new(&session_path).parent() {
+            tracing::info!("Opening session folder: {:?}", folder);
+            let _ = std::process::Command::new("explorer")
+                .arg(folder)
+                .spawn();
+        }
+
+        thread::sleep(std::time::Duration::from_millis(200));
+        app_handle.exit(0);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// behavioral_gt.py の場所を探す
+// ---------------------------------------------------------------------------
+
+/// 実行ファイルの上位ディレクトリを最大5段階遡って analysis/behavioral_gt.py を探す。
+/// 開発時は CWD が gse-prototype-v2/GSE-Next なので ./analysis/ が見つかる。
+fn find_behavioral_gt() -> Option<PathBuf> {
+    // まず CWD 基準で探す
+    let cwd_candidate = PathBuf::from("analysis/behavioral_gt.py");
+    if cwd_candidate.exists() {
+        return Some(cwd_candidate);
+    }
+
+    // 次に実行ファイルの上位ディレクトリを遡って探す
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent()?.to_path_buf();
+        for _ in 0..5 {
+            let candidate = dir.join("analysis").join("behavioral_gt.py");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+            if let Some(parent) = dir.parent() {
+                dir = parent.to_path_buf();
+            } else {
+                break;
+            }
+        }
+    }
+
+    None
+}
+
+// ---------------------------------------------------------------------------
+// アプリ起動
+// ---------------------------------------------------------------------------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize Sensing Layer
-    let (tx, rx) = crossbeam_channel::unbounded();
+    tracing_subscriber::fmt::init();
 
-    // Initialize Inference Engine
+    // セッションロガー起動
+    let log_path = logger::default_log_path();
+    let log_path_str = log_path.to_string_lossy().to_string();
+    tracing::info!("Session log: {}", log_path_str);
+
+    let (_session_logger, log_tx) = SessionLogger::start(log_path);
+
+    // LogState を Arc<Mutex> でラップして Tauri state に渡す
+    let log_state = Arc::new(Mutex::new(LogState {
+        tx: log_tx.clone(),
+        path: log_path_str,
+    }));
+
+    // キーストローク入力チャネル
+    let (tx, rx) = crossbeam_channel::bounded(64);
+
+    // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
-    let engine_for_monitor = engine.clone(); // Clone for IME monitor
+    let engine_for_monitor = engine.clone();
+    let log_tx_analysis = log_tx;
 
-    // Start Analysis Thread
+    // 分析スレッド
     thread::spawn(move || {
-        println!("Analysis thread started");
+        tracing::info!("Analysis thread started");
         let mut extractor = FeatureExtractor::new(600);
-        
+
         while let Ok(event) = rx.recv() {
+            if engine_for_thread.get_paused() {
+                continue;
+            }
+
             extractor.process_event(event);
-            
+
+            // キーイベントをログ記録
+            let _ = log_tx_analysis.try_send(LogEntry::Key {
+                vk_code: event.vk_code,
+                timestamp: event.timestamp,
+                is_press: event.is_press,
+            });
+
             if event.is_press {
-                let ft = extractor.calculate_flight_time_median();
-                if ft > 0.0 {
-                    // Update HMM
-                    engine_for_thread.update(ft);
-                    
-                    // Optional logging
-                    println!("FT: {:.2}, State: {:?}", ft, engine_for_thread.get_current_state());
-                }
+                let features = extractor.calculate_features();
+                engine_for_thread.update(&features, Some(event.vk_code));
+
+                // 特徴量 + 状態確率をログ記録
+                let state_probs = engine_for_thread.get_current_state();
+                let p_flow = state_probs
+                    .get(&CognitiveState::Flow)
+                    .copied()
+                    .unwrap_or(0.0);
+                let p_inc = state_probs
+                    .get(&CognitiveState::Incubation)
+                    .copied()
+                    .unwrap_or(0.0);
+                let p_stuck = state_probs
+                    .get(&CognitiveState::Stuck)
+                    .copied()
+                    .unwrap_or(0.0);
+
+                let _ = log_tx_analysis.try_send(LogEntry::Feat {
+                    timestamp: event.timestamp,
+                    f1: features.f1_flight_time_median,
+                    f2: features.f2_flight_time_variance,
+                    f3: features.f3_correction_rate,
+                    f4: features.f4_burst_length,
+                    f5: features.f5_pause_count,
+                    f6: features.f6_pause_after_del_rate,
+                    p_flow,
+                    p_inc,
+                    p_stuck,
+                });
             }
         }
     });
 
-    // Start IME Monitor Thread
+    // IME モニタースレッド
     thread::spawn(move || {
-        println!("IME Monitor thread started");
+        tracing::info!("IME Monitor thread started");
         let monitor = input::ime::ImeMonitor::new();
         loop {
             let active = monitor.is_candidate_window_open();
-            // println!("IME Active: {}", active);
             engine_for_monitor.set_paused(active);
-            thread::sleep(std::time::Duration::from_millis(500));
+            if active {
+                engine_for_monitor.force_flow_state();
+            }
+            thread::sleep(std::time::Duration::from_millis(100));
         }
     });
 
-    // Start Input Hook
+    // キーボードフック開始
     input::hook::init_hook(tx);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            use tauri::{WebviewWindowBuilder, WebviewUrl};
-
-            // Initialize Sensors (Phase 4)
             let sensor_manager = SensorManager::new(app.handle().clone());
-            sensor_manager.start_monitoring();
-
+            app.manage(sensor_manager);
+            let sensor_state: State<SensorManager<tauri::Wry>> = app.state();
+            sensor_state.start_monitoring();
             Ok(())
         })
-        .manage(engine) // Manage the engine state for commands
-        .invoke_handler(tauri::generate_handler![greet, get_cognitive_state, quit_app])
+        .manage(engine)
+        .manage(log_state)
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            get_cognitive_state,
+            quit_app,
+            get_session_file,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

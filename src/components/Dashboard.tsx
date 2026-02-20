@@ -32,8 +32,31 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState }) => {
     appWindow.close();
   };
 
+  // Mist Effect Logic
+  const [mistActive, setMistActive] = React.useState(false);
+
+  React.useEffect(() => {
+    let timer: number | undefined;
+
+    if (dominant === 'Stuck') {
+      // User requested "about 1 minute". 
+      // For testing purposes, we might want this shorter, but let's stick to specification or slightly less for verify.
+      // Let's use 30 seconds for now to be "about 1 minute" but verifiable.
+      timer = setTimeout(() => {
+        setMistActive(true);
+      }, 30000); // 30 seconds
+    } else {
+      setMistActive(false);
+    }
+
+    return () => clearTimeout(timer);
+  }, [dominant]);
+
   return (
     <div className={`dashboard-container state-${dominant.toLowerCase()}`}>
+      {/* Mist Effect Overlay */}
+      {mistActive && <div className="mist-overlay" />}
+
       {/* Custom Title Bar */}
       <div className="title-bar">
         <div

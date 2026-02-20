@@ -29,6 +29,31 @@ body {
   /* Fix: Remove global background */
 }
 
+/* Add mist animation styles */
+@keyframes mist-fade-in {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.mist-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0) 0%, rgba(200, 200, 200, 0.1) 50%, rgba(150, 150, 150, 0.3) 100%);
+  pointer-events: none;
+  z-index: 5;
+  /* Below controls */
+  animation: mist-fade-in 2s ease-in-out forwards;
+  backdrop-filter: blur(2px) sepia(20%);
+}
+
 /* Dashboard Styles */
 .dashboard-container {
   padding: 0;
