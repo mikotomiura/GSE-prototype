@@ -85,26 +85,53 @@ Baselines are calibrated for Surface Pro 8 with Japanese (IME) input patterns.
 
 ---
 
-## Stuck Score (S_stuck)
+## Latent Axes — Friction & Engagement
 
-The six normalized features are combined into a single stuck score:
+Instead of a single scalar score, the engine computes two independent axes from the six normalized features.
 
-```
-S_stuck = 0.30·φ(F1) + 0.10·φ(F2) + 0.15·φ(F3)
-        + 0.15·(1 − φ(F4)) + 0.15·φ(F5) + 0.15·φ(F6)
-```
+### X-axis: Friction (0 = smooth → 1 = stuck)
 
-EWMA smoothing (α = 0.3) is applied before the HMM step to suppress keystroke-level jitter:
+Features that indicate typing struggle, weighted to sum to 1.0:
 
 ```
-S_t = 0.3 · S_raw + 0.7 · S_{t−1}
+X = 0.30·φ(F3) + 0.25·φ(F6) + 0.25·φ(F1) + 0.20·φ(F5)
 ```
+
+### Y-axis: Engagement (0 = passive → 1 = immersed)
+
+Features that indicate productive output flow, weighted to sum to 1.0:
+
+```
+Y = 0.40·φ(F4) + 0.35·(1 − φ(F1)) + 0.25·(1 − φ(F5))
+```
+
+Both axes are EWMA-smoothed (α = 0.3) independently before the HMM step:
+
+```
+X_t = 0.3 · X_raw + 0.7 · X_{t−1}
+Y_t = 0.3 · Y_raw + 0.7 · Y_{t−1}
+```
+
+**Why two axes?** Incubation (thoughtful pause) and Stuck (frustrated blockage) both show low engagement, but differ in friction. A 1-D score conflates them; the Friction × Engagement plane separates them cleanly:
+
+| Region | Friction | Engagement | Likely State |
+| --- | --- | --- | --- |
+| Low F, High E | Low | High | **Flow** |
+| Low F, Low E | Low | Low | **Incubation** |
+| High F, Low E | High | Low | **Stuck** |
 
 ---
 
 ## HMM Inference Engine
 
-S_stuck [0, 1] is discretized into 11 observation bins and fed into a 3-state Hidden Markov Model.
+The smoothed (X, Y) pair is discretized into a 5 × 5 grid (25 natural observation bins) and fed into a 3-state Hidden Markov Model. A 26th penalty bin handles the Backspace streak override.
+
+```
+x_bin = floor(X × 5).min(4)      # Friction bin  [0..4]
+y_bin = floor(Y × 5).min(4)      # Engagement bin [0..4]
+obs   = x_bin × 5 + y_bin        # Natural bin    [0..24]
+obs   = 25                        # Penalty bin    (streak ≥ 5)
+```
 
 ### Transition Matrix A (literature-backed, used as fixed smoothing filter in Phase 1)
 
@@ -119,22 +146,38 @@ Sources:
 - **Incubation persistence (0.82):** Sio & Ormerod (2009) meta-analysis. Expected duration = 5.6 s.
 - **Stuck persistence (0.80):** Hall et al. (2024). Expected duration = 5.0 s.
 
-### Emission Matrix B (3 states × 11 bins)
+### Emission Matrix B (3 states × 26 bins)
+
+Each row represents P(obs | state) over the 5 × 5 Friction × Engagement grid plus one penalty bin.
 
 ```
-Flow:       [0.35, 0.25, 0.15, 0.10, 0.07, 0.05, 0.02, 0.01, 0.0,  0.0,  0.0 ]
-Incubation: [0.02, 0.03, 0.05, 0.08, 0.10, 0.15, 0.20, 0.20, 0.10, 0.06, 0.01]
-Stuck:      [0.0,  0.0,  0.01, 0.02, 0.05, 0.10, 0.20, 0.30, 0.20, 0.10, 0.99]
+// Grid axes: x = Friction [0..4], y = Engagement [0..4], obs = x*5 + y
+
+//                 x=0    x=1    x=2    x=3    x=4  │ penalty
+//                (lo F) (lo F) (mid)  (hi F) (hi F)│  [25]
+Flow:
+  y=0 (lo E)    0.01   0.01   0.00   0.00   0.00  │  0.00
+  y=1           0.02   0.02   0.01   0.00   0.00  │
+  y=2           0.05   0.05   0.03   0.00   0.00  │
+  y=3           0.16   0.14   0.06   0.00   0.00  │
+  y=4 (hi E)    0.20   0.16   0.08   0.00   0.00  │
+
+Incubation:
+  y=0 (lo E)    0.15   0.14   0.10   0.05   0.04  │  0.01
+  y=1           0.10   0.10   0.08   0.04   0.03  │
+  y=2           0.04   0.04   0.03   0.01   0.01  │
+  y=3           0.01   0.01   0.01   0.00   0.00  │
+  y=4 (hi E)    0.00   0.00   0.00   0.00   0.00  │
+
+Stuck:
+  y=0 (lo E)    0.00   0.00   0.02   0.10   0.16  │  0.99
+  y=1           0.00   0.00   0.04   0.16   0.22  │
+  y=2           0.00   0.00   0.02   0.07   0.12  │
+  y=3           0.00   0.00   0.00   0.02   0.05  │
+  y=4 (hi E)    0.00   0.00   0.00   0.00   0.02  │
 ```
 
-Bin 10 (S_stuck ≥ 0.91) is the **Backspace streak penalty bin** (≥ 5 consecutive Backspaces → forced bin 10 → P(Stuck) ≈ 1).
-
-### Fallback Rule (Phase 1, low confidence)
-
-If `max(P) < 0.4`, the engine falls back to a hysteresis rule:
-- `S_stuck ≥ 0.50` for 5 s → STUCK
-- `S_stuck < 0.30` for 3 s → FLOW
-- Otherwise → INCUBATION
+Penalty bin 25 is activated when **≥ 5 consecutive Backspaces** are detected, forcing P(Stuck) ≈ 1 regardless of axis values.
 
 ---
 
@@ -192,7 +235,7 @@ GSE-Next/
 ├── src-tauri/                     # Backend (Rust/Tauri 2.0)
 │   ├── src/
 │   │   ├── analysis/
-│   │   │   ├── engine.rs          # CognitiveStateEngine — HMM, S_stuck, EWMA
+│   │   │   ├── engine.rs          # CognitiveStateEngine — HMM, Friction/Engagement axes, EWMA
 │   │   │   └── features.rs        # FeatureExtractor — F1–F6, phi(), 30s window
 │   │   ├── input/
 │   │   │   ├── hook.rs            # WH_KEYBOARD_LL + WinEvent IME hook
@@ -263,6 +306,14 @@ The global keyboard hook (`WH_KEYBOARD_LL`) requires that the app run at the sam
 ---
 
 ## Changelog
+
+### v2.3 — 2-Axis HMM Observation Model (Friction × Engagement)
+
+- **Refactored observation model:** replaced single `S_stuck` scalar with two independent axes — **Friction** (X) and **Engagement** (Y) — enabling clean separation of Incubation vs. Stuck.
+- **25+1 bin grid:** 5 × 5 natural bins (obs = x\_bin × 5 + y\_bin) + dedicated penalty bin (obs = 25) for backspace streak ≥ 5.
+- **Per-axis EWMA:** `axes_ewma: (f64, f64)` smooths X and Y independently (α = 0.3 maintained).
+- **Redesigned emission matrix:** 3 × 26 replaces former 3 × 11; Flow peaks at (low X, high Y), Incubation at (low X, low Y), Stuck at (high X, low Y).
+- **Preserved safety mechanisms:** backspace streak ≥ 5 penalty and HMM transition-based jitter suppression unchanged.
 
 ### v2.2 — Overlay, Sensors, Session Logger
 

@@ -14,65 +14,103 @@ pub enum CognitiveState {
 pub struct CognitiveStateEngine {
     // Manual HMM parameters
     transitions: Arc<[f64; 9]>,
-    emissions: Arc<[f64; 33]>,
+
+    // 3 states × 26 observation bins
+    //   obs = x_bin * 5 + y_bin  (0..24 natural bins)
+    //   obs = 25                  (backspace streak penalty bin)
+    //
+    // X-axis (Friction):   0 = low friction  … 4 = high friction
+    // Y-axis (Engagement): 0 = low engagement … 4 = high engagement
+    emissions: Arc<[f64; 78]>,
 
     current_state_probs: Arc<Mutex<[f64; 3]>>,
     pub is_paused: Arc<Mutex<bool>>,
     pub backspace_streak: Arc<Mutex<u32>>,
 
-    // GPT advice: EWMA平滑化でS_stuckのジッタ抑制
-    // α=0.3: 新値30%、前値70%のブレンド
-    s_stuck_ewma: Arc<Mutex<f64>>,
+    // 2-axis EWMA: (X = Friction, Y = Engagement)
+    // α = 0.3: 新値30%、前値70%のブレンド
+    axes_ewma: Arc<Mutex<(f64, f64)>>,
 }
 
 impl CognitiveStateEngine {
     pub fn new() -> Self {
         // Literature-backed transition probabilities (as a Smoothing Filter for Phase 1)
-        // FLOW -> FLOW: 0.92
-        // Source: Csikszentmihalyi (1990). Flow duration average ~mins.
-        //         1/(1-0.92) = 12.5s (conservative lower bound).
+        // FLOW -> FLOW: 0.92  (Csikszentmihalyi 1990; 1/(1-0.92)=12.5s)
         // FLOW -> INCUBATION: 0.07
-        // Source: Hall et al. (2024). Derived from pause frequency in writing tasks.
         // FLOW -> STUCK: 0.01
-        // Source: Hall et al. (2024). Direct transition from high-speed to stuck is rare.
-
-        // INCUBATION -> INCUBATION: 0.82
-        // Source: Sio & Ormerod (2009). Meta-analysis of incubation duration.
-        //         1/(1-0.82) = 5.6s (~3x minimum pause).
+        // INCUBATION -> INCUBATION: 0.82  (Sio & Ormerod 2009; 1/(1-0.82)=5.6s)
         // INCUBATION -> FLOW: 0.10
-        // Source: High probability of returning to flow after a burst.
         // INCUBATION -> STUCK: 0.08
-        // Source: Probability of incubation turning into a block.
-
-        // STUCK -> STUCK: 0.80 (旧0.85 → 0.80: Stuckから抜け出しやすく)
-        //         1/(1-0.80) = 5.0s — 回復に5秒かかる程度が妥当。
-        // STUCK -> INCUBATION: 0.15 (旧0.13)
-        // STUCK -> FLOW: 0.05 (旧0.02: 直接Flowへの回復も許容)
+        // STUCK -> STUCK: 0.80  (Hall et al. 2024; 1/(1-0.80)=5.0s)
+        // STUCK -> INCUBATION: 0.15
+        // STUCK -> FLOW: 0.05
         let transitions = [0.92, 0.07, 0.01, 0.10, 0.82, 0.08, 0.05, 0.15, 0.80];
 
-        // Emissions (B) 3x11  S_stuck=[0,1] を 11ビンにマッピング
+        // Emissions B: 3 states × 26 bins
         //
-        // 設計方針:
-        //   Flow        : 低ビン(0-5)に集中。普通のタイピング(S_stuck≈0.1-0.2)は確実にFlow。
-        //   Incubation  : 中〜高ビン(3-9)に分布。思考ポーズ・Idle状態をカバー。
-        //   Stuck       : 高ビン(5-9)のみ。S_stuck が0.5以上の明確なシグナルのみ検知。
-        //                 Bin10 は Backspace連打ペナルティ専用 (0.99 で強制Stuck)。
+        // Grid layout: obs = x_bin * 5 + y_bin
         //
-        // 旧実装の問題: Stuck が bin4-5 でピーク → S_stuck=0.4でもStuck誘導 → 普通入力が誤判定
-        // 新実装:       Stuck を bin6-8 にシフト → 明確な遅さ/修正過多のみ判定
+        //        x→  0(lo F)  1      2      3      4(hi F)
+        //  y↓
+        //  0(lo E)   [0]     [5]   [10]   [15]   [20]
+        //  1         [1]     [6]   [11]   [16]   [21]
+        //  2         [2]     [7]   [12]   [17]   [22]
+        //  3         [3]     [8]   [13]   [18]   [23]
+        //  4(hi E)   [4]     [9]   [14]   [19]   [24]
+        //  penalty   [25]
+        //
+        // Flow:       peaks at low Friction (x=0,1) × high Engagement (y=3,4)
+        // Incubation: peaks at low-mid Friction (x=0,1,2) × low Engagement (y=0,1)
+        // Stuck:      peaks at high Friction (x=3,4) × low Engagement (y=0,1)
+        //
+        // Penalty bin (obs=25): backspace_streak ≥ 5 → near-certain Stuck.
+        // Each state's non-penalty bins sum to ≈1.0; HMM normalizes anyway.
         #[rustfmt::skip]
-        let emissions = [
-            // Flow: 低ビン集中 (合計 ≈ 1.0)
-            0.35, 0.25, 0.15, 0.10, 0.07, 0.05, 0.02, 0.01, 0.0, 0.0, 0.0,
-            // Incubation: 中〜高ビンに広く分布 (合計 = 1.0)
-            0.02, 0.03, 0.05, 0.08, 0.10, 0.15, 0.20, 0.20, 0.10, 0.06, 0.01,
-            // Stuck: 高ビンのみ (Bin10 = Backspace強制Stuck)
-            0.0, 0.0, 0.01, 0.02, 0.05, 0.10, 0.20, 0.30, 0.20, 0.10, 0.99,
+        let emissions: [f64; 78] = [
+            // ── Flow (State 0) ─────────────────────────── non-penalty sum = 1.00
+            //  x=0 (low F)    y: 0     1     2     3     4
+                               0.01, 0.02, 0.05, 0.16, 0.20,
+            //  x=1            y: 0     1     2     3     4
+                               0.01, 0.02, 0.05, 0.14, 0.16,
+            //  x=2            y: 0     1     2     3     4
+                               0.00, 0.01, 0.03, 0.06, 0.08,
+            //  x=3            y: 0     1     2     3     4
+                               0.00, 0.00, 0.00, 0.00, 0.00,
+            //  x=4 (high F)   y: 0     1     2     3     4
+                               0.00, 0.00, 0.00, 0.00, 0.00,
+            //  penalty bin
+                               0.00,
+
+            // ── Incubation (State 1) ──────────────────── non-penalty sum = 1.00
+            //  x=0 (low F)    y: 0     1     2     3     4
+                               0.15, 0.10, 0.04, 0.01, 0.00,
+            //  x=1            y: 0     1     2     3     4
+                               0.14, 0.10, 0.04, 0.01, 0.00,
+            //  x=2            y: 0     1     2     3     4
+                               0.10, 0.08, 0.03, 0.01, 0.00,
+            //  x=3            y: 0     1     2     3     4
+                               0.05, 0.04, 0.01, 0.00, 0.00,
+            //  x=4 (high F)   y: 0     1     2     3     4
+                               0.04, 0.03, 0.01, 0.00, 0.00,
+            //  penalty bin
+                               0.01,
+
+            // ── Stuck (State 2) ───────────────── non-penalty sum = 1.00 (+0.99)
+            //  x=0 (low F)    y: 0     1     2     3     4
+                               0.00, 0.00, 0.00, 0.00, 0.00,
+            //  x=1            y: 0     1     2     3     4
+                               0.00, 0.00, 0.00, 0.00, 0.00,
+            //  x=2            y: 0     1     2     3     4
+                               0.02, 0.04, 0.02, 0.00, 0.00,
+            //  x=3            y: 0     1     2     3     4
+                               0.10, 0.16, 0.07, 0.02, 0.00,
+            //  x=4 (high F)   y: 0     1     2     3     4
+                               0.16, 0.22, 0.12, 0.05, 0.02,
+            //  penalty bin  (backspace streak ≥5 → near-certain Stuck)
+                               0.99,
         ];
 
-        // 初期事前確率を修正:
-        // 旧: [0.5, 0.4, 0.1] → Incubationが初期から高く、誤検知の原因
-        // 新: [0.7, 0.2, 0.1] → Flowを優位にし、実際のタイピングパターンで検知
+        // 初期事前確率: Flow優位で開始
         let initial_probs = [0.7, 0.2, 0.1];
 
         Self {
@@ -81,7 +119,8 @@ impl CognitiveStateEngine {
             current_state_probs: Arc::new(Mutex::new(initial_probs)),
             is_paused: Arc::new(Mutex::new(false)),
             backspace_streak: Arc::new(Mutex::new(0)),
-            s_stuck_ewma: Arc::new(Mutex::new(0.0)),
+            // (0.0, 1.0) = 低Friction・高Engagement = Flow領域で初期化
+            axes_ewma: Arc::new(Mutex::new((0.0, 1.0))),
         }
     }
 
@@ -100,10 +139,10 @@ impl CognitiveStateEngine {
             Ok(mut p) => *p = flow_probs,
             Err(poisoned) => *poisoned.into_inner() = flow_probs,
         }
-        // IME切り替え時にEWMAをリセット: 日本語入力中の誤差を引き継がない
-        match self.s_stuck_ewma.lock() {
-            Ok(mut e) => *e = 0.0,
-            Err(poisoned) => *poisoned.into_inner() = 0.0,
+        // IME切り替え時にEWMAをリセット: (低Friction, 高Engagement) = Flow領域
+        match self.axes_ewma.lock() {
+            Ok(mut e) => *e = (0.0, 1.0),
+            Err(poisoned) => *poisoned.into_inner() = (0.0, 1.0),
         }
     }
 
@@ -131,35 +170,42 @@ impl CognitiveStateEngine {
         }
     }
 
-    /// B-3: S_stuck (Stuckスコア) を算出する
+    /// X軸 (Friction / 摩擦) と Y軸 (Engagement / 没入度) を算出する。
+    /// 返値はそれぞれ [0.0, 1.0] にクランプ済み。
     ///
-    /// ベータ値はSurface Pro / 日本語入力ユーザーの実測値に合わせてキャリブレーション済み:
-    ///   F1: 250ms  (旧150ms) — 普通のタイピング速度の中央値
-    ///   F2: 2000ms²(旧1000)  — FT分散の許容範囲を拡大
-    ///   F3: 10%   (旧5%)    — 修正率10%以下は正常範囲
-    ///   F4: 2文字 (旧5文字)  — バースト長2未満のみStuck判定対象
-    ///   F5: 3回   (旧2回)   — 30秒に3回以下のポーズは正常
-    ///   F6: 15%   (旧10%)  — 削除後停止率15%以下は正常
-    fn calculate_s_stuck(&self, features: &Features) -> f64 {
+    /// X (Friction) — 高いほど「つまずき」を表す。重み合計 = 1.0
+    ///   0.30 × φ(F3: 修正率)
+    ///   0.25 × φ(F6: 削除後停止率)
+    ///   0.25 × φ(F1: Flight Time)
+    ///   0.20 × φ(F5: ポーズ回数)
+    ///
+    /// Y (Engagement) — 高いほど「滑らかな出力」を表す。重み合計 = 1.0
+    ///   0.40 × φ(F4: バースト長)
+    ///   0.35 × (1 − φ(F1))   … 短いFT = 高エンゲージ
+    ///   0.25 × (1 − φ(F5))   … 少ないポーズ = 高エンゲージ
+    fn calculate_latent_axes(&self, features: &Features) -> (f64, f64) {
         const BETA_F1: f64 = 250.0; // 標準FT中央値 (ms)
-        const BETA_F2: f64 = 2000.0; // 標準FT分散
         const BETA_F3: f64 = 0.10; // 標準修正率 (10%)
-        const BETA_F4: f64 = 2.0; // 標準バースト長 (文字数) — 2文字未満がStuck
+        const BETA_F4: f64 = 2.0; // 標準バースト長 (文字数)
         const BETA_F5: f64 = 3.0; // 標準ポーズ回数 (3回/30s)
         const BETA_F6: f64 = 0.15; // 標準削除後停止率 (15%)
 
         let phi1 = phi(features.f1_flight_time_median, BETA_F1);
-        let phi2 = phi(features.f2_flight_time_variance, BETA_F2);
         let phi3 = phi(features.f3_correction_rate, BETA_F3);
-        let phi4_inv = 1.0 - phi(features.f4_burst_length, BETA_F4);
+        let phi4 = phi(features.f4_burst_length, BETA_F4);
         let phi5 = phi(features.f5_pause_count, BETA_F5);
         let phi6 = phi(features.f6_pause_after_del_rate, BETA_F6);
 
-        // 重み合計 1.0
-        0.30 * phi1 + 0.10 * phi2 + 0.15 * phi3 + 0.15 * phi6 + 0.15 * phi4_inv + 0.15 * phi5
+        // X: Friction (高いほど「つまずき」)  重み合計 = 1.0
+        let x = (0.30 * phi3 + 0.25 * phi6 + 0.25 * phi1 + 0.20 * phi5).clamp(0.0, 1.0);
+
+        // Y: Engagement (高いほど「滑らかな出力」)  重み合計 = 1.0
+        let y = (0.40 * phi4 + 0.35 * (1.0 - phi1) + 0.25 * (1.0 - phi5)).clamp(0.0, 1.0);
+
+        (x, y)
     }
 
-    /// B-5: HMM Update
+    /// B-5: HMM Update (2軸 Friction × Engagement、25+1ビン モデル)
     pub fn update(&self, features: &Features, vk_code: Option<u32>) {
         if self.get_paused() {
             return;
@@ -171,6 +217,7 @@ impl CognitiveStateEngine {
         }
 
         // --- Backspace Streak Logic ---
+        // 5回以上の連続Backspaceを「大きな修正＝Stuck」とする安全装置
         let streak = match self.backspace_streak.lock() {
             Ok(mut s) => {
                 if vk_code == Some(0x08) {
@@ -191,32 +238,35 @@ impl CognitiveStateEngine {
                 *s
             }
         };
-        // 3回は単なるタイポ修正の可能性があるため、5回以上を「大きな修正＝Stuck」とする
         let apply_backspace_penalty = streak >= 5;
 
-        let raw_s_stuck = self.calculate_s_stuck(features);
+        let (raw_x, raw_y) = self.calculate_latent_axes(features);
 
-        // GPT advice: EWMA平滑化 (α = 0.3)
-        // 瞬間的なスパイク（3回のスペースなど）による誤検知を抑制
+        // EWMA平滑化 (α = 0.3): 各軸を独立に平滑化
         // s_t = 0.3 * raw_t + 0.7 * s_{t-1}
-        let s_stuck = match self.s_stuck_ewma.lock() {
+        let (x, y) = match self.axes_ewma.lock() {
             Ok(mut ewma) => {
-                *ewma = 0.3 * raw_s_stuck + 0.7 * (*ewma);
-                *ewma
+                ewma.0 = 0.3 * raw_x + 0.7 * ewma.0;
+                ewma.1 = 0.3 * raw_y + 0.7 * ewma.1;
+                (ewma.0, ewma.1)
             }
             Err(poisoned) => {
                 let mut ewma = poisoned.into_inner();
-                *ewma = 0.3 * raw_s_stuck + 0.7 * (*ewma);
-                *ewma
+                ewma.0 = 0.3 * raw_x + 0.7 * ewma.0;
+                ewma.1 = 0.3 * raw_y + 0.7 * ewma.1;
+                (ewma.0, ewma.1)
             }
         };
 
-        // S_stuck [0, 1] → 観測ビン [0, 10]
-        let mut obs = ((s_stuck * 10.0) as usize).min(10);
+        // (X, Y) → 5×5 グリッド → 観測インデックス [0..24]
+        let x_bin = (x * 5.0).floor().min(4.0) as usize;
+        let y_bin = (y * 5.0).floor().min(4.0) as usize;
+        let mut obs = x_bin * 5 + y_bin;
 
-        // Streak Override
+        // Backspace Streak Override → ペナルティビン (obs=25)
+        // 高Friction・低Engagementの極端ケースとして強制マップ
         if apply_backspace_penalty {
-            obs = 10;
+            obs = 25;
         }
 
         // A-3: Mutex ポイズニング対策
@@ -239,7 +289,8 @@ impl CognitiveStateEngine {
                 trans_sum += old_probs[i] * t_prob;
             }
 
-            let e_prob = self.emissions[j * 11 + obs];
+            // 3 states × 26 bins: index = j * 26 + obs
+            let e_prob = self.emissions[j * 26 + obs];
             new_probs[j] = trans_sum * e_prob;
             sum_prob += new_probs[j];
         }
