@@ -30,6 +30,12 @@ pub struct CognitiveStateEngine {
     // 2-axis EWMA: (X = Friction, Y = Engagement)
     // α = 0.3: 新値30%、前値70%のブレンド
     axes_ewma: Arc<Mutex<(f64, f64)>>,
+
+    // Hysteresis layer: slow EMA of reported probabilities.
+    // Prevents instant state flips (e.g. Cold-Start after window reset).
+    // α = 0.25 for normal updates (~4s time-constant).
+    // α = 0.50 for backspace-penalty bin (faster Stuck response).
+    display_probs: Arc<Mutex<[f64; 3]>>,
 }
 
 impl CognitiveStateEngine {
@@ -122,6 +128,8 @@ impl CognitiveStateEngine {
             // (0.3, 0.5) = 中立領域で初期化 (obs=7; Flow/Inc/Stuck がほぼ均等な観測ビン)
             // (0.0, 1.0) で開始すると初回更新で p_flow=1.0 に固定されるため変更
             axes_ewma: Arc::new(Mutex::new((0.3, 0.5))),
+            // display_probs は initial_probs と同値で初期化
+            display_probs: Arc::new(Mutex::new(initial_probs)),
         }
     }
 
@@ -137,6 +145,11 @@ impl CognitiveStateEngine {
     pub fn force_flow_state(&self) {
         let flow_probs = [0.98, 0.01, 0.01];
         match self.current_state_probs.lock() {
+            Ok(mut p) => *p = flow_probs,
+            Err(poisoned) => *poisoned.into_inner() = flow_probs,
+        }
+        // display_probs も即座にリセット (ヒステリシス層もクリア)
+        match self.display_probs.lock() {
             Ok(mut p) => *p = flow_probs,
             Err(poisoned) => *poisoned.into_inner() = flow_probs,
         }
@@ -281,9 +294,10 @@ impl CognitiveStateEngine {
         let n_states = 3;
 
         // Forward Algorithm Step
-        // ε-floor: 放射確率の最小値を保証し、単一観測で状態確率が完全に0になることを防ぐ
-        // これにより p_flow=1.0 への飽和 (確率の吸収状態) を抑制する
-        const EMISSION_FLOOR: f64 = 0.01;
+        // ε-floor: 放射確率の最小値を保証し、単一観測で状態確率が完全に0になることを防ぐ。
+        // 0.04 (旧: 0.01) に引き上げることで「段階的天井」クラスタリングを緩和する。
+        // 最大 p ≈ 0.88–0.90 程度に収まり、状態間の確率変化が滑らかになる。
+        const EMISSION_FLOOR: f64 = 0.04;
 
         let mut sum_prob = 0.0;
 
@@ -309,11 +323,36 @@ impl CognitiveStateEngine {
         // 合計が0になった場合は以前の確率を維持する (フォールバック)
 
         *current = new_probs;
+
+        // ── Hysteresis Layer ──────────────────────────────────────────────
+        // display_probs に遅い EMA を適用し、ウィンドウリセット時の
+        // Cold-Start 瞬間遷移 (Stuck→Flow in 1ms) を防ぐ。
+        //
+        // α=0.25 (通常): 時定数 ≈ 4 更新 ≈ 4 秒
+        // α=0.50 (ペナルティ): Backspace 連続時は素早く Stuck に収束
+        let display_alpha = if apply_backspace_penalty { 0.50 } else { 0.25 };
+
+        let mut display = match self.display_probs.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let mut disp_sum = 0.0;
+        for i in 0..n_states {
+            display[i] = display_alpha * new_probs[i] + (1.0 - display_alpha) * display[i];
+            disp_sum += display[i];
+        }
+        if disp_sum > 0.0 {
+            for v in display.iter_mut() {
+                *v /= disp_sum;
+            }
+        }
     }
 
     pub fn get_current_state(&self) -> HashMap<CognitiveState, f64> {
-        // A-3: Mutex ポイズニング対策
-        let probs = match self.current_state_probs.lock() {
+        // display_probs (ヒステリシス層) を返す。
+        // 生の current_state_probs は瞬間値; display_probs は遅い EMA により
+        // 短期スパイクを平滑化した値。UI・ログはこちらを使用する。
+        let probs = match self.display_probs.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
         };

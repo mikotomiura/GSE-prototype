@@ -127,7 +127,15 @@ impl FeatureExtractor {
     /// - F1: 直近の既知フライトタイムをそのまま使用 (データなしは None)
     /// - F4: 0.0 (バーストなし = 低Engagement シグナル)
     /// - F5: silence_secs / 2.0 (2秒ごとに1ポーズとして換算)
-    /// - F3, F6: 0.0 (サイレンス中は修正・削除なし)
+    /// - F3: 0→0.40 (30s超で線形増加。出力できない = 摩擦の代理変数)
+    /// - F6: 0→0.50 (20s超で線形増加。停止凝視 = 削除後停止の代理変数)
+    ///
+    /// # Inc→Stuck 遷移パス
+    /// F3/F6 の合成値により X(Friction) を上昇させ、
+    /// 50s 無入力時に obs が x_bin=3 (Stuck 領域) へ到達する。
+    ///   20s: X≈0.25 → Inc     (低Friction低Engagement = 熟考)
+    ///   40s: X≈0.58 → 境界域  (中Friction低Engagement = 停滞兆候)
+    ///   50s: X≈0.75 → Stuck   (高Friction低Engagement = 詰まり)
     ///
     /// silence_secs が 2 未満の場合は None を返す (短すぎる無音はスキップ)。
     pub fn make_silence_observation(&self, silence_secs: f64) -> Option<Features> {
@@ -144,13 +152,29 @@ impl FeatureExtractor {
         // サイレンス時間 → F5 (ポーズ回数): 2秒ごとに1カウント、最大20
         let f5 = (silence_secs / 2.0).floor().min(20.0);
 
+        // F6 合成: 20s超で増加開始 → 50s で 0.50 に到達
+        // phi(0.50, 0.15) = (0.50-0.15)/0.30 = 1.17 → clamped 1.0 (高Friction寄与)
+        let f6 = if silence_secs > 20.0 {
+            ((silence_secs - 20.0) / 60.0).min(0.50)
+        } else {
+            0.0
+        };
+
+        // F3 合成: 30s超で増加開始 → 70s で 0.40 に到達
+        // phi(0.40, 0.10) = (0.40-0.10)/0.20 = 1.50 → clamped 1.0 (高Friction寄与)
+        let f3 = if silence_secs > 30.0 {
+            ((silence_secs - 30.0) / 100.0).min(0.40)
+        } else {
+            0.0
+        };
+
         Some(Features {
             f1_flight_time_median: f1,
             f2_flight_time_variance: 0.0,
-            f3_correction_rate: 0.0,
+            f3_correction_rate: f3,
             f4_burst_length: 0.0,
             f5_pause_count: f5,
-            f6_pause_after_del_rate: 0.0,
+            f6_pause_after_del_rate: f6,
         })
     }
 

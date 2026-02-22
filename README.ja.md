@@ -1,343 +1,444 @@
-# GSE-Next — Generative Struggle Engine
+# GSE-Next — Generative Struggle Engine（プロトタイプ v2）
 
-[🇺🇸 English](./README.md) | [🇯🇵 日本語](./README.ja.md)
+> **Windows 11 上でキーストローク動的特徴からリアルタイムに認知状態を推定するシステム**
+> クラウド依存なし・ユーザー介入なしで、手動チューニングされた隠れマルコフモデル（HMM）を用いて
+> 書き手の精神状態を **Flow / Incubation / Stuck** に分類します。
 
-**GSE-Next** は Windows 向けのリアルタイム認知状態推定システムです。全アプリケーションのキーストローク動的特徴を監視し、ユーザーが **Flow（集中・生産性）**・**Incubation（思考的休止）**・**Stuck（停滞・フラストレーション）** のいずれの状態にあるかを推定します。Stuck 状態が持続した場合、アンビエントな視覚フィードバックで状態変化を促します。
-
-コーディング・執筆などの創造的作業中に、キーストロークのマイクロ行動が認知状態の代理変数として機能するかを研究する *Generative Struggle Engine* プロジェクトの研究プロトタイプです。
-
----
-
-## アーキテクチャ概要
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  Windows (グローバル)                    │
-│   WH_KEYBOARD_LL フック    WinEvent フック (IME)         │
-└────────────┬────────────────────────┬───────────────────┘
-             │ InputEvent             │ IME_ACTIVE フラグ
-             ▼                        ▼
-┌────────────────────────┐   ┌────────────────────┐
-│  hook.rs (フックスレッド)│   │ ime.rs (IMEスレッド)│
-└────────────┬───────────┘   └────────────────────┘
-             │ crossbeam チャネル
-             ▼
-┌──────────────────────────────────────────────────┐
-│           分析スレッド (lib.rs)                   │
-│                                                  │
-│  ┌─────────────────┐    ┌──────────────────────┐ │
-│  │  features.rs    │    │    engine.rs         │ │
-│  │  特徴量抽出      │───▶│  CognitiveStateEngine│ │
-│  │  F1〜F6 (30秒)  │    │  HMM フォワードパス  │ │
-│  └─────────────────┘    └──────────────────────┘ │
-│                                    │              │
-│  ┌─────────────────┐               │              │
-│  │  logger.rs      │◀──────────────┘              │
-│  │  NDJSON ライター │   feat イベント              │
-│  └─────────────────┘                              │
-└──────────────────────────────────────────────────┘
-             │ Arc<Mutex<[f64;3]>>
-             ▼  (500ms ごとに Tauri IPC でポーリング)
-┌──────────────────────────────────────────────────┐
-│           フロントエンド (React / TypeScript)     │
-│                                                  │
-│  App.tsx ──▶ Dashboard.tsx  (確率バー, Mist UI)  │
-│          └──▶ Overlay.tsx   (Nudge / Wall UI)    │
-└──────────────────────────────────────────────────┘
-```
+[🇺🇸 English README is here](README.md)
 
 ---
 
-## 技術スタック
+## 目次
 
-| レイヤー | 技術 | バージョン |
+1. [研究動機](#研究動機)
+2. [認知状態モデル](#認知状態モデル)
+3. [システムアーキテクチャ](#システムアーキテクチャ)
+4. [フォルダ構成](#フォルダ構成)
+5. [特徴量抽出（F1–F6）](#特徴量抽出f1f6)
+6. [HMM エンジン](#hmm-エンジン)
+7. [ヒステリシスと安定性修正（v2.1）](#ヒステリシスと安定性修正v21)
+8. [IME 検出](#ime-検出)
+9. [ログと分析](#ログと分析)
+10. [ビルド手順](#ビルド手順)
+11. [学術的参考文献](#学術的参考文献)
+
+---
+
+## 研究動機
+
+ライター、プログラマー、知識労働者は **Flow（滑らかな高出力）**・**Incubation（意識的な停止と潜在的処理）**・**Stuck（認知的行き詰まり、非生産的ループ）** の三状態を交互に経験します。これらの状態をリアルタイムで把握できれば、アンビエント音楽・ナッジ・UI ディミングなど、タスクを中断しないまま認知的足場（metacognitive scaffolding）を提供するアダプティブツールが実現できます。
+
+既存のアプローチはウェアラブルデバイス・カメラ・明示的自己報告を必要とします。本プロトタイプは OS から既に取得可能な**キーストロークタイミング情報のみ**を使用するため、追加ハードウェアなしで任意の Windows デバイスに展開可能です。
+
+---
+
+## 認知状態モデル
+
+三状態は認知科学の確立された文献に基づいて定義されています。
+
+| 状態 | 定義 | 行動シグネチャ |
 | --- | --- | --- |
-| フロントエンド | React + TypeScript + Vite | React 19, TS 5.8, Vite 7 |
-| バックエンド | Rust + Tauri | Tauri 2.0 |
-| Windows API | `windows` クレート (Win32 + WinRT) | v0.58 |
-| 非同期ランタイム | Tokio | v1 |
-| スレッド間通信 | crossbeam-channel | v0.5 |
-| ロギング | tracing + カスタム NDJSON ロガー | — |
-| 推論エンジン | ONNX Runtime (ort) | 2.0.0-rc.0（予約済） |
+| **Flow** | 内発的に動機付けられた、努力なき課題への没入（Csikszentmihalyi, 1990） | 短いキー間隔、低修正率、長い連続バースト |
+| **Incubation** | 潜在的な問題再構成を可能にする意図的停止（Sio & Ormerod, 2009） | 2 秒以上の沈黙 → 高速バーストの出現 |
+| **Stuck** | 行き詰まりから抜け出せない固執状態（Ohlsson, 1992） | 短バースト→削除→停止のループ、文字純増 ≤ 0 |
 
 ---
 
-## 特徴量抽出 — F1〜F6
-
-すべての特徴量は、キーイベントごとに **30 秒スライディングウィンドウ** で計算されます。
-
-| 特徴量 | 名称 | 定義 | ベースライン β |
-| --- | --- | --- | --- |
-| **F1** | Median Flight Time（中央 Flight Time） | 直近 5 イベントの押下間隔の移動平均（ms） | 250 ms |
-| **F2** | Flight Time Variance（分散） | ウィンドウ内 FT の分散 | 2000 ms² |
-| **F3** | Correction Rate（修正率） | (Backspace + Delete) / 全押下数 | 10 % |
-| **F4** | Burst Length（バースト長） | 連続入力（FT < 200 ms）の平均文字数 | 2 文字 |
-| **F5** | Pause Count（ポーズ回数） | 2000 ms 以上の押下間隔の数 | 3 回 / 30 s |
-| **F6** | Pause-After-Delete Rate（削除後停止率） | Backspace/Delete 直後に ≥ 2 s 停止する割合 | 15 % |
-
-**正規化:** 各特徴量は個人ベースライン正規化関数 φ で変換します:
+## システムアーキテクチャ
 
 ```
-φ(x, β) = clamp((x − β) / (2β), 0.0, 1.0)
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Windows 11（Surface Pro 8）                  │
+│                                                                      │
+│  ┌─────────────┐   WH_KEYBOARD_LL    ┌──────────────────────────┐  │
+│  │ 任意のアプリ │ ─────────────────── │  フックスレッド（Rust）   │  │
+│  │ （フォアグラ │                     │  SetWindowsHookExW       │  │
+│  │  ウンド）   │                     │  WinEvent IME モニター   │  │
+│  └─────────────┘                     └──────────┬───────────────┘  │
+│                                                 │ crossbeam channel │
+│                                      ┌──────────▼───────────────┐  │
+│                                      │  分析スレッド（Rust）     │  │
+│                                      │                          │  │
+│                                      │  FeatureExtractor        │  │
+│                                      │    F1 フライトタイム中央値│  │
+│                                      │    F2 フライトタイム分散 │  │
+│                                      │    F3 修正率             │  │
+│                                      │    F4 バースト長         │  │
+│                                      │    F5 ポーズ回数         │  │
+│                                      │    F6 削除後停止率       │  │
+│                                      │                          │  │
+│                                      │  CognitiveStateEngine    │  │
+│                                      │    潜在軸（X, Y）        │  │
+│                                      │    EWMA 平滑化           │  │
+│                                      │    HMM 前向きアルゴリズム│  │
+│                                      │    ヒステリシス EMA 層   │  │
+│                                      └──────────┬───────────────┘  │
+│                                                 │ Tauri IPC         │
+│                                      ┌──────────▼───────────────┐  │
+│                                      │  React/TS ダッシュボード  │  │
+│                                      │  フローティングオーバーレイ│  │
+│                                      │  霧エフェクト（Stuck 時） │  │
+│                                      └──────────────────────────┘  │
+│                                                 │                   │
+│                                      ┌──────────▼───────────────┐  │
+│                                      │  SessionLogger（Rust）   │  │
+│                                      │  NDJSON → Documents/     │  │
+│                                      │  GSE-sessions/           │  │
+│                                      └──────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-ベースライン値は Surface Pro 8 + 日本語 IME 入力パターンに合わせてキャリブレーション済みです。
+### スレッドモデル
+
+```
+メインスレッド（Tauri イベントループ）
+    │
+    ├─ フックスレッド       ← WH_KEYBOARD_LL メッセージループ + WinEvent IME コールバック
+    │       │ crossbeam::channel (bounded 64, ノンブロッキング送信)
+    ├─ 分析スレッド         ← recv_timeout(1 s) でキーイベントと沈黙の両方で HMM 更新
+    │       │ Arc<Mutex<CognitiveStateEngine>> (Tauri managed state)
+    ├─ IME モニタースレッド ← 100ms ごとに is_candidate_window_open() をポーリング
+    │
+    └─ ロガースレッド       ← bounded channel(512) → NDJSON ファイル (BufWriter)
+```
 
 ---
 
-## 潜在軸 — Friction（摩擦）& Engagement（没入度）
-
-単一スカラースコアの代わりに、6 つの正規化特徴量から 2 つの独立した軸を算出します。
-
-### X 軸: Friction（0 = スムーズ → 1 = 停滞）
-
-タイピングの「つまずき」を示す特徴量の加重和（重み合計 1.0）:
+## フォルダ構成
 
 ```
-X = 0.30·φ(F3) + 0.25·φ(F6) + 0.25·φ(F1) + 0.20·φ(F5)
-```
-
-### Y 軸: Engagement（0 = 受動的 → 1 = 没入）
-
-生産的な出力フローを示す特徴量の加重和（重み合計 1.0）:
-
-```
-Y = 0.40·φ(F4) + 0.35·(1 − φ(F1)) + 0.25·(1 − φ(F5))
-```
-
-HMM 更新前に各軸を独立に EWMA 平滑化（α = 0.3）します:
-
-```
-X_t = 0.3 · X_raw + 0.7 · X_{t−1}
-Y_t = 0.3 · Y_raw + 0.7 · Y_{t−1}
-```
-
-**なぜ 2 軸か？** Incubation（思考ポーズ）と Stuck（停滞）はともに低エンゲージメントですが、Friction で区別できます。1 次元スコアではこれらを混同しやすい一方、Friction × Engagement 平面では明確に分離できます:
-
-| 領域 | Friction | Engagement | 推定状態 |
-| --- | --- | --- | --- |
-| 低 F・高 E | 低い | 高い | **Flow** |
-| 低 F・低 E | 低い | 低い | **Incubation** |
-| 高 F・低 E | 高い | 低い | **Stuck** |
-
----
-
-## HMM 推論エンジン
-
-平滑化後の (X, Y) を 5 × 5 グリッド（25 の自然観測ビン）に離散化し、3 状態 HMM に入力します。26 番目のペナルティビンが Backspace 連打の強制オーバーライドを担当します。
-
-```
-x_bin = floor(X × 5).min(4)      # Friction ビン  [0..4]
-y_bin = floor(Y × 5).min(4)      # Engagement ビン [0..4]
-obs   = x_bin × 5 + y_bin        # 自然ビン    [0..24]
-obs   = 25                        # ペナルティビン (streak ≥ 5)
-```
-
-### 遷移行列 A（文献根拠あり、Phase 1 では固定パラメータの平滑化フィルタとして使用）
-
-|  | → Flow | → Incubation | → Stuck |
-| --- | --- | --- | --- |
-| **Flow** | 0.92 | 0.07 | 0.01 |
-| **Incubation** | 0.10 | 0.82 | 0.08 |
-| **Stuck** | 0.05 | 0.15 | 0.80 |
-
-文献根拠:
-
-- **Flow 持続率 (0.92):** Csikszentmihalyi (1990)。期待継続時間 = 1/(1−0.92) = 12.5 秒。
-- **Incubation 持続率 (0.82):** Sio & Ormerod (2009) メタ分析。期待継続時間 = 5.6 秒。
-- **Stuck 持続率 (0.80):** Hall et al. (2024)。期待継続時間 = 5.0 秒。
-
-### 放出行列 B（3 状態 × 26 ビン）
-
-各行は P(obs | state) を Friction × Engagement の 5×5 グリッド + ペナルティビンで表します。
-
-```
-// グリッド: x = Friction [0..4], y = Engagement [0..4], obs = x*5 + y
-
-//                 x=0    x=1    x=2    x=3    x=4  │ penalty
-//                (低F)  (低F)  (中)   (高F)  (高F) │  [25]
-Flow:
-  y=0 (低E)     0.01   0.01   0.00   0.00   0.00  │  0.00
-  y=1           0.02   0.02   0.01   0.00   0.00  │
-  y=2           0.05   0.05   0.03   0.00   0.00  │
-  y=3           0.16   0.14   0.06   0.00   0.00  │
-  y=4 (高E)     0.20   0.16   0.08   0.00   0.00  │
-
-Incubation:
-  y=0 (低E)     0.15   0.14   0.10   0.05   0.04  │  0.01
-  y=1           0.10   0.10   0.08   0.04   0.03  │
-  y=2           0.04   0.04   0.03   0.01   0.01  │
-  y=3           0.01   0.01   0.01   0.00   0.00  │
-  y=4 (高E)     0.00   0.00   0.00   0.00   0.00  │
-
-Stuck:
-  y=0 (低E)     0.00   0.00   0.02   0.10   0.16  │  0.99
-  y=1           0.00   0.00   0.04   0.16   0.22  │
-  y=2           0.00   0.00   0.02   0.07   0.12  │
-  y=3           0.00   0.00   0.00   0.02   0.05  │
-  y=4 (高E)     0.00   0.00   0.00   0.00   0.02  │
-```
-
-ペナルティビン 25 は **5 回以上の連続 Backspace** 検出時に有効化され、軸の値によらず P(Stuck) ≈ 1 を強制します。
-
----
-
-## IME ガード（日本語入力対応）
-
-日本語 IME 変換中の誤 Stuck 判定を防ぐ 3 段階検出:
-
-1. **WinEvent フック（主要）** — `SetWinEventHook` で `EVENT_OBJECT_IME_CHANGE/SHOW/HIDE` をグローバル監視。`IME_ACTIVE` アトミックフラグを設定。ローマ字→ひらがな変換フェーズもカバー。
-2. **EnumWindows スキャン（副次）** — IME 候補ウィンドウのクラス名（`CandidateUI_UIElement`, `IME`, `*Candidate*`）で可視ウィンドウを検索。
-3. **UIAutomation（最終手段）** — フォーカス要素のロケール・クラス名を確認。
-
-IME アクティブ中: キーストローク分析を一時停止（`set_paused(true)`）し、EWMA をリセットして状態汚染を防止。
-
----
-
-## 視覚フィードバック
-
-### Dashboard（360×480 px、常時最前面）
-
-- Flow / Incubation / Stuck の確率をリアルタイムにバー表示
-- 優位状態のラベルとカラーコーディング（緑 / 黄 / 赤）
-- **Mist（霧）エフェクト**: Stuck が 30 秒以上支配的 → 半透明の赤いオーバーレイがフェードイン
-
-### Overlay ウィンドウ（フルスクリーン、透過）
-
-- **Nudge レイヤー**: `stuck > 0.6` → 赤いビネット表示、透明度 = (stuck − 0.6) / 0.3
-- **Wall レイヤー**: Stuck が 30 秒持続 → 全画面オーバーレイ "Time to Move!" — デバイスを物理的に動かすまでブロック（WinRT 加速度センサーで検出）
-
----
-
-## セッションログ
-
-各セッションは NDJSON 形式で `Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson` に保存されます。
-
-```jsonc
-{"type":"meta","session_start":1771605721400}
-{"type":"key","t":1771605742429,"vk":162,"press":true}
-{"type":"feat","t":1771605742778,"f1":312.0,"f2":1820.0,"f3":0.08,"f4":3.2,"f5":1.0,"f6":0.0,
-              "p_flow":0.82,"p_inc":0.14,"p_stuck":0.04}
-```
-
-アプリ終了時（`quit_app` コマンド）にロガーをフラッシュし、`behavioral_gt.py` を自動実行してセッションの後処理ラベリングを行います。
-
----
-
-## ファイル構成
-
-```text
 GSE-Next/
-├── src/                           # フロントエンド (React/TypeScript)
+├── analysis/
+│   ├── behavioral_gt.py       # セッション後行動ルールベース GT ラベリング
+│   └── hmm_sensitivity.py     # HMM パラメータ感度分析
+│
+├── src/                       # React / TypeScript フロントエンド
 │   ├── components/
-│   │   ├── Dashboard.tsx          # メインウィジェット、確率バー、Mist エフェクト
-│   │   └── Overlay.tsx            # Nudge ビネット + Wall ブロッキングオーバーレイ
-│   ├── App.tsx                    # ルート: 状態ポーリング、Wall タイマー、センサーイベント
-│   ├── App.css                    # スタイリング、アニメーション、カラーパレット
-│   └── main.tsx                   # React エントリーポイント
-├── src-tauri/                     # バックエンド (Rust/Tauri 2.0)
+│   │   ├── Dashboard.tsx      # 状態確率バー + 霧エフェクトオーバーレイ
+│   │   └── Overlay.tsx        # 透過常時最前面ウィンドウシェル
+│   ├── App.tsx
+│   └── main.tsx
+│
+├── src-tauri/                 # Rust / Tauri 2.0 バックエンド
+│   ├── capabilities/
+│   │   └── default.json       # Tauri 2.0 ケイパビリティ宣言
 │   ├── src/
 │   │   ├── analysis/
-│   │   │   ├── engine.rs          # CognitiveStateEngine — HMM, Friction/Engagement 軸, EWMA
-│   │   │   └── features.rs        # FeatureExtractor — F1〜F6, φ(), 30 秒ウィンドウ
+│   │   │   ├── engine.rs      # HMM エンジン + ヒステリシス層（display_probs EMA）
+│   │   │   ├── features.rs    # F1–F6 特徴量抽出 + 沈黙合成
+│   │   │   └── mod.rs
 │   │   ├── input/
-│   │   │   ├── hook.rs            # WH_KEYBOARD_LL + WinEvent IME フック
-│   │   │   └── ime.rs             # ImeMonitor — 3 段階 IME 検出
-│   │   ├── lib.rs                 # Tauri セットアップ、コマンドハンドラ、スレッド生成
-│   │   ├── logger.rs              # NDJSON セッションロガー（バックグラウンドスレッド）
-│   │   ├── sensors.rs             # WinRT 加速度センサー + ジオロケーション（60 Hz）
-│   │   └── main.rs                # バイナリエントリーポイント
-│   ├── capabilities/default.json  # Tauri 2.0 パーミッション宣言
-│   ├── tauri.conf.json            # ウィンドウ設定、バンドル設定
-│   └── Cargo.toml                 # Rust 依存関係
-├── analysis/                      # Python 後処理スクリプト
-│   ├── behavioral_gt.py           # 行動的代理変数ラベリング（F6 ベース）
-│   └── hmm_sensitivity.py         # HMM パラメータ感度分析
+│   │   │   ├── hook.rs        # WH_KEYBOARD_LL フック + WinEvent IME 検出
+│   │   │   ├── ime.rs         # ImeMonitor（EnumWindows + UIAutomation フォールバック）
+│   │   │   └── mod.rs
+│   │   ├── lib.rs             # Tauri セットアップ、スレッド管理、IPC コマンド
+│   │   ├── logger.rs          # 非同期 NDJSON セッションロガー
+│   │   ├── main.rs
+│   │   └── sensors.rs         # 加速度センサー + ジオロケーター（WinRT）
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+│
+├── index.html
 ├── package.json
-├── vite.config.ts
-└── tsconfig.json
+├── tsconfig.json
+└── vite.config.ts
 ```
 
 ---
 
-## ビルドと実行
+## 特徴量抽出（F1–F6）
+
+全特徴量は生のキーストロークイベントの **30 秒スライディングウィンドウ**で計算され、キー押下ごとに更新されます。無入力中（沈黙）は `make_silence_observation()` が 1 秒ごとに合成観測値を生成し、HMM の継続更新を行います。
+
+| 特徴量 | 記号 | 定義 | 認知的意味 |
+| --- | --- | --- | --- |
+| フライトタイム中央値 | **F1** | キー離し→次キー押下間隔（ms）の直近 5 サンプル中央値 | タイピング速度 — 低いほど Flow |
+| フライトタイム分散 | **F2** | ウィンドウ内フライトタイムの分散 | リズムの一貫性 |
+| 修正率 | **F3** | (Backspace + Delete 押下数) / 全押下数 | エラー頻度 — 高いほど Stuck |
+| バースト長 | **F4** | 連続キー入力チャンク（間隔 < 200 ms）の平均文字数 | 出力流暢性 — 高いほど Flow |
+| ポーズ回数 | **F5** | ウィンドウ内でキー間隔 ≥ 2 000 ms の回数 | 熟考頻度 |
+| 削除後停止率 | **F6** | Backspace/Delete 直後 ≥ 2 s 間隔が生じた割合 | 修正後フリーズ — 高いほど Stuck |
+
+### 正規化関数 φ(x, β)
+
+各生特徴量は片側線形正規化によって [0, 1] へマッピングされます。
+
+```
+φ(x, β) = clamp( (x − β) / (κ · β), 0.0, 1.0 )     κ = 2.0
+```
+
+β は集団中央値の推定値（固定参照値）。β 未満で 0.0、3β で 1.0 となります。
+これは暗黙的に σ = κ·β とした片側 z-スコアと等価です。
+
+---
+
+## HMM エンジン
+
+### 潜在軸：Friction（摩擦）× Engagement（没入度）
+
+6 つの正規化特徴量を 2 つの解釈可能な潜在軸に射影したうえで離散化します。
+
+```
+X（Friction）   = 0.30·φ(F3) + 0.25·φ(F6) + 0.25·φ(F1) + 0.20·φ(F5)
+Y（Engagement） = 0.40·φ(F4) + 0.35·(1 − φ(F1)) + 0.25·(1 − φ(F5))
+```
+
+両軸は指数加重移動平均（α = 0.30）で平滑化されます。
+
+```
+ewma_t = 0.30 · raw_t + 0.70 · ewma_{t−1}
+```
+
+### 観測ビン
+
+(X, Y) ∈ [0,1]² を 5×5 グリッド（25 ビン）+ 1 ペナルティビン（obs=25；Backspace 5 連続以上）に離散化します。
+
+```
+摩擦 X →    0(低)   1      2      3      4(高)
+没入度 Y ↓
+4(高)      [Flow]  [Flow]  [   ]  [   ]  [    ]
+3          [Flow]  [Flow]  [   ]  [   ]  [    ]
+2          [    ]  [    ]  [ ? ]  [Stk]  [Stk ]
+1          [Inc ]  [Inc ]  [Inc]  [Stk]  [Stk ]
+0(低)      [Inc ]  [Inc ]  [ ? ]  [Stk]  [Stk ]
+```
+
+### HMM 前向きアルゴリズム（1 ステップ）
+
+各更新で信念ベクトル **π** = [p_Flow, p_Inc, p_Stuck] を 1 ステップ伝播させます。
+
+```
+π'_j = ( Σ_i  π_i · A[i,j] ) · ( B[j, obs] + ε )    j ∈ {0, 1, 2}
+π'   ← π' / Σ_j π'_j                                  （正規化）
+```
+
+- **A** = 3×3 遷移行列（行 = 遷移元、列 = 遷移先）
+- **B** = 3×26 放射行列（状態 × 観測ビン）
+- **ε** = 0.04（放射フロア；確率吸収を防ぎ、クラスタリングを緩和）
+
+### 遷移行列 A
+
+| 遷移元 \ 先 | Flow | Incubation | Stuck |
+| --- | --- | --- | --- |
+| **Flow** | 0.80 | 0.13 | 0.07 |
+| **Incubation** | 0.12 | 0.80 | 0.08 |
+| **Stuck** | 0.06 | 0.18 | 0.76 |
+
+Flow 自己遷移 0.80 → 平均滞在時間 ≈ 5 秒。
+Incubation 0.80 → Sio & Ormerod（2009）の知見（熟考期間は数秒〜数分）に対応。
+Stuck 0.76 → 高い固執傾向（Ohlsson, 1992）に対応。
+
+---
+
+## ヒステリシスと安定性修正（v2.1）
+
+セッションログの分析から三つの病理的挙動が確認され、修正されました。
+
+---
+
+### 修正 ①：Cold-Start ヒステリシス（Stuck→Flow ウィンドウリセットスパイク）
+
+**問題：** t = 255.2 s に 30 秒ウィンドウが大量 Backspace 区間を過ぎると、削除イベントがウィンドウ外に出て新ウィンドウの特徴量が Flow に見えます。結果：`p_stuck = 0.994 → p_flow = 0.48` が 1 ミリ秒で発生。
+
+**根本原因：** `get_current_state()` が時間的慣性のない生 HMM 信念（点推定値）を直接返していた。
+
+**修正：** 生 HMM 信念と並行して補助確率ベクトル `display_probs` を維持し、遅い EMA で追跡します。
+
+```
+display_t = α · raw_t + (1 − α) · display_{t−1}
+
+α = 0.25  （通常更新 → 時定数 τ ≈ 4 更新 ≈ 4 秒）
+α = 0.50  （Backspace ペナルティビン → 素早い Stuck 収束）
+```
+
+`get_current_state()` は `display_probs` を返します。真の状態遷移は約 4 秒の持続的エビデンスを必要とするため、UI やログへの即時反映が防止されます。
+
+ウィンドウリセットシナリオのシミュレーション：
+
+| Tick | 生 p_flow | display p_stuck |
+| --- | --- | --- |
+| 0（リセット前） | 0.01 | **0.994** |
+| 1（Flow シグナル） | 0.48 | 0.748 |
+| 2 | 0.52 | 0.563 |
+| 3 | 0.54 | 0.424 |
+| 4 | 0.56 | 0.319 |
+
+---
+
+### 修正 ②：確率の離散クラスタリング（段階的天井）
+
+**問題：** 放射フロア ε = 0.01 の状態で HMM が特定の固定点確率に収束していた。
+
+- `p_flow` → 0.9734（フレームの 39.1% に集中）
+- `p_inc` → 0.9381
+- `p_stuck` → 0.9944
+
+これらのクラスターは、特定状態が支配的な観測ビンにおいて放射確率の比率が固有の固定点を決定することで生じます。ε = 0.01 では比率が極端（例：0.20:0.01:0.01 = 20:1:1）となり、確率質量がほぼ一点に集中します。
+
+**修正：** 放射フロアを 0.01 → **0.04** に引き上げました。これは放射ドメインにおいてラプラス加算平滑化と同等の効果をもたらします。各状態の最大到達確率は 0.88〜0.90 程度に低下し、競合状態にも意味のある確率質量が残ります。
+
+---
+
+### 修正 ③：Inc→Stuck 沈黙遷移（50 秒無入力で Inc に留まる）
+
+**問題：** 長時間の沈黙（≥ 50 秒）が Incubation に分類され続けた。`make_silence_observation()` は F5（ポーズ回数）のみを設定しており、F5 単独では X（摩擦）の最大値が：
+
+```
+X_max（F5 のみ） = 0.20 · φ(F5) = 0.20 · 1.0 = 0.20 → x_bin = 1（Incubation）
+```
+
+Stuck 支配ビン（x_bin ≥ 3、X ≥ 0.60）には F3 または F6 なしには到達不可能でした。
+
+**認知的根拠：** 長時間の出力沈黙は意図的な Incubation と意味的に等価ではありません。30 秒を超えてタイピングせずに画面を眺める行動は「熟考」よりも「詰まり」に近いと解釈できます。極端な沈黙中に摩擦を合成することは、この認知的遷移を反映するものです。
+
+**修正：** `make_silence_observation()` に沈黙時間に応じて線形増加する合成摩擦値を追加しました。
+
+```rust
+// F6：20 秒超で開始 → 80 秒で 0.50 に到達
+F6_synthetic = clamp((silence_secs − 20) / 60,  0.0, 0.50)
+
+// F3：30 秒超で開始 → 130 秒で 0.40 に到達
+F3_synthetic = clamp((silence_secs − 30) / 100, 0.0, 0.40)
+```
+
+X の時系列（F5 が φ = 1.0 に飽和、典型的 F1）：
+
+| 沈黙時間 | F3_合成 | F6_合成 | X（摩擦） | x_bin | 領域 |
+| --- | --- | --- | --- | --- | --- |
+| 20 秒 | 0.00 | 0.00 | ≈ 0.20 | 1 | Incubation |
+| 30 秒 | 0.00 | 0.17 | ≈ 0.30 | 1 | Incubation |
+| 40 秒 | 0.10 | 0.33 | ≈ 0.52 | 2 | 境界域 |
+| 50 秒 | 0.20 | 0.50 | ≈ 0.75 | 3 | **Stuck** |
+
+EWMA 平滑化（α = 0.30）後、Stuck 観測はさらに約 5 秒かけて反映されます。ヒステリシス層と合わせると、Stuck ラベルは持続的高摩擦沈黙の約 9 秒後に確認されます。
+
+---
+
+## IME 検出
+
+日本語（その他の CJK）入力では組み立て段階（ローマ字→かな変換）で生のキーイベントが最終文字に対応しません。これらのイベントを解析すると特徴量ベクトルが破損します。三つの相補的検出層を使用します。
+
+| 層 | 手法 | 備考 |
+| --- | --- | --- |
+| **主** | `SetWinEventHook`（EVENT\_OBJECT\_IME\_CHANGE/SHOW/HIDE） | クロスプロセス。DLL インジェクション不要。候補リスト表示前のローマ字→かな変換段階から検出可能 |
+| **副** | `EnumWindows` による "CandidateUI" / "IME" ウィンドウクラス検索 | 候補選択段階をカバー |
+| **三次** | UIAutomation `GetFocusedElement` | IME ウィンドウにフォーカスがある場合のみ有効 |
+
+**ステールフラグ回復：** WinEvent フラグが立っているが副・三次の両方が候補ウィンドウを確認できない場合、フラグをリセットして永続的な分析停止を防ぎます。
+
+**MSCTFIME UI は明示的に除外：** このクラスは TSF 言語バー（タスクバーの A/あ インジケーター）に属し、日本語 IME が読み込まれている場合は常時表示されます。含めると恒久的な誤検知が発生します。
+
+グローバル TSF フック（`ITfThreadMgr`）は使用しません — プロセス境界を越えると UIPI によってブロックされます。
+
+---
+
+## ログと分析
+
+セッションごとにタイムスタンプ付き NDJSON ファイルが生成されます。
+
+```
+%USERPROFILE%\Documents\GSE-sessions\gse_YYYYMMDD_HHMMSS.ndjson
+```
+
+レコードタイプ：
+
+```jsonc
+// セッションメタデータ
+{"type":"meta","session_start":1740000000000}
+
+// 生キーストロークイベント
+{"type":"key","t":1740000001234,"vk":65,"press":true}
+
+// 特徴量スナップショット + HMM 状態確率（キー押下または沈黙ティックごと）
+{"type":"feat","t":1740000001235,
+ "f1":145.20,"f2":312.00,"f3":0.0800,"f4":6.50,"f5":1.0,"f6":0.0000,
+ "p_flow":0.7123,"p_inc":0.2100,"p_stuck":0.0777}
+
+{"type":"meta","session_end":1740000060000}
+```
+
+### セッション後グラウンドトゥルースラベリング
+
+```bash
+python analysis/behavioral_gt.py gse_YYYYMMDD_HHMMSS.ndjson
+```
+
+30 秒スライディングウィンドウ（1 秒ステップ）でラベルを付与します。
+
+| ラベル | 行動ルール |
+| --- | --- |
+| **FLOW** | median(FT) < 200 ms かつ correction\_rate < 0.15 かつ STUCK/INC でない |
+| **INCUBATION** | Pause(≥2 s) → Burst(≥5 文字 FT<200 ms) → diff\_chars ≥ 3（30 秒以内） |
+| **STUCK** | 「Burst(≤3 文字) → Delete(≥1) → Pause(≥2 s)」のループ ≥ 3 回（60 秒内）かつ diff\_chars ≤ 0 |
+| **UNKNOWN** | 条件を満たさない、または複数ラベルが競合 |
+
+---
+
+## ビルド手順
 
 ### 前提条件
 
-- Node.js v18 以上
-- Rust (stable)
-- Windows SDK（Visual Studio Build Tools に含まれる）
+| ツール | バージョン |
+| --- | --- |
+| Rust | 1.77+（`rustup update stable`） |
+| Node.js | 20+ |
+| Tauri CLI v2 | `cargo install tauri-cli --version "^2"` |
 
-### コマンド
+### 開発実行
 
 ```bash
-# Node 依存関係のインストール
+cd GSE-Next
 npm install
-
-# 開発モード（ホットリロード）
 npm run tauri dev
-
-# 本番ビルド
-npm run tauri build
 ```
 
-出力: `src-tauri/target/release/gse-next.exe`
-
----
-
-## 既知の問題
-
-### コンパイル時のメモリ枯渇
-
-**症状:** `rustc` が `memory allocation failed` または `STATUS_STACK_BUFFER_OVERRUN` でクラッシュする。
-
-**原因:** `windows` クレート v0.58 のコンパイルは非常にメモリを消費します。
-
-**回避策:**
+### リリースビルド
 
 ```bash
-RUST_MIN_STACK=67108864 cargo build -j 1
-# 開発モードの場合:
-RUST_MIN_STACK=67108864 npm run tauri dev
+npm run tauri build
+# インストーラー: src-tauri/target/release/bundle/
 ```
 
-または Windows の仮想メモリ（ページファイル）を増やす:
-*システムのプロパティ → 詳細設定 → パフォーマンス設定 → 仮想メモリ*
+### セッション後分析
 
-### 管理者権限について
-
-グローバルキーボードフック（`WH_KEYBOARD_LL`）は、対象アプリケーションと同等以上の整合性レベルが必要です。昇格されたウィンドウへのフックには GSE-Next を管理者として実行してください。
+```bash
+python analysis/behavioral_gt.py "%USERPROFILE%\Documents\GSE-sessions\gse_YYYYMMDD_HHMMSS.ndjson"
+```
 
 ---
 
-## 変更履歴
+## 学術的参考文献
 
-### v2.3 — 2軸 HMM 観測モデル（Friction × Engagement）
+1. **Csikszentmihalyi, M.**（1990）. *Flow: The Psychology of Optimal Experience*. Harper & Row.
+   — Flow 認知状態の定義とその行動的相関の基盤。
 
-- **観測モデルをリファクタリング:** 単一スカラー `S_stuck` を廃止し、独立した 2 軸 — **Friction**（X）と **Engagement**（Y）— に移行。Incubation と Stuck の識別精度が向上。
-- **25+1 ビングリッド:** 5 × 5 の自然ビン（obs = x\_bin × 5 + y\_bin）+ Backspace 連打専用ペナルティビン（obs = 25、連打 ≥ 5 回で発動）。
-- **軸別 EWMA:** `axes_ewma: (f64, f64)` で X・Y を独立に平滑化（α = 0.3 は維持）。
-- **放出行列を再設計:** 3 × 11 から 3 × 26 へ。Flow は（低X・高Y）、Incubation は（低X・低Y）、Stuck は（高X・低Y）にピーク。
-- **安全装置を維持:** Backspace 連打 ≥ 5 のペナルティと、遷移行列ベースのジッタ抑制は変更なし。
+2. **Csikszentmihalyi, M.**（1996）. *Creativity: Flow and the Psychology of Discovery and Invention*. HarperCollins.
+   — 創造的・生成的ライティング課題へのフロー理論の拡張。
 
-### v2.2 — Overlay・センサー・セッションロガー
+3. **Sio, U. N., & Ormerod, T. C.**（2009）. Does incubation enhance problem solving? A meta-analytic review. *Psychological Bulletin, 135*(1), 94–120.
+   — Incubation 状態の自己遷移確率（0.80）と Pause→Burst 行動シグネチャの実証的根拠。
 
-- `Overlay.tsx` を追加（Nudge ビネット + Wall レイヤー）
-- `sensors.rs` を追加（WinRT 加速度センサーによる Wall アンロック）
-- `logger.rs` を追加（NDJSON セッションログ）
-- `analysis/` ディレクトリを追加（`behavioral_gt.py`, `hmm_sensitivity.py`）
-- 終了時: `quit_app` が `behavioral_gt.py` を自動実行しセッションフォルダを開く
+4. **Ohlsson, S.**（1992）. Information-processing explanations of insight and related phenomena. In M. T. Keane & K. J. Gilhooly（Eds.）, *Advances in the Psychology of Thinking*（pp. 1–44）. Harvester Wheatsheaf.
+   — Stuck 状態モデルと高い自己遷移確率の基盤となる行き詰まり・固執理論。
 
-### v2.1 — IME ガード & HMM 安定性修正
+5. **Rabiner, L. R.**（1989）. A tutorial on hidden Markov models and selected applications in speech recognition. *Proceedings of the IEEE, 77*(2), 257–286.
+   — `CognitiveStateEngine::update()` で使用する HMM 前向きアルゴリズムの定式化。
 
-- **IME 修正:** UIAutomation 単体から 3 段階（WinEvent + EnumWindows + UIAutomation）検出へ変更。日本語変換中の誤 Stuck 判定を解消。
-- **EWMA 平滑化**（α=0.3）を S_stuck に適用し、瞬間的なキーストロークスパイクを抑制。
-- **HMM チューニング:** 初期 Flow 事前確率を 0.50→0.70 に引き上げ、Incubation 事前確率を 0.40→0.20 に引き下げ。
-- **Mutex 安全性:** 全 `unwrap()` をポイズニング対応パターンマッチに置き換え。
+6. **Dhakal, V., Feit, A. M., Kristensson, P. O., & Oulasvirta, A.**（2018）. Observations on typing from 136 million keystrokes. *Proceedings of CHI 2018*.
+   — φ 正規化の参照値（β）に使用するフライトタイムと修正率の集団ベースライン値。
 
-### v2.0 — GSE-Next 初回リリース
+7. **Salthouse, T. A.**（1986）. Perceptual, cognitive, and motoric aspects of transcription typing. *Psychological Bulletin, 99*(3), 303–319.
+   — フライトタイムの分解と熟練タイピングにおける予測的処理。F1・F4 特徴量設計の根拠。
 
-- プロトタイプ v1 から Tauri 2.0 に移植
-- 個人ベースライン正規化付き 6 特徴量抽出（F1〜F6）を実装
-- 文献根拠のある遷移行列を持つ HMM を実装
-- グローバルキーボードフック + WinEvent IME 検出を実装
+8. **Microsoft Corporation.**（2023）. *WinEvent Hooks*. Windows Developer Documentation（MSDN）.
+   — `SetWinEventHook`、`EVENT_OBJECT_IME_CHANGE/SHOW/HIDE` 定数、および `WINEVENT_OUTOFCONTEXT` フラグ。DLL インジェクションなしのクロスプロセス IME 検出に使用。
+
+---
+
+## ライセンス
+
+研究プロトタイプ。All rights reserved.
+
+---
+
+*最終更新：2026-02-22*
