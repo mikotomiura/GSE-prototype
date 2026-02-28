@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 src-tauri/gen/
 src-tauri/target/
+
+# Claude Code — machine-local files (do not commit)
+.claude/settings.local.json
+.claude/memory.md
