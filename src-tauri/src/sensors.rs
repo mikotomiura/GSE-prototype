@@ -6,122 +6,110 @@ use windows::{
     },
     Foundation::TypedEventHandler,
 };
+use std::sync::{mpsc, Mutex};
 use std::thread;
-use std::time::Duration;
 
 pub struct SensorManager<R: Runtime> {
     app: AppHandle<R>,
+    /// Senders are held here so that dropping `SensorManager` signals all
+    /// sensor threads to exit cleanly (recv() returns Err when sender drops).
+    _stop_senders: Mutex<Vec<mpsc::Sender<()>>>,
 }
 
 impl<R: Runtime> SensorManager<R> {
     pub fn new(app: AppHandle<R>) -> Self {
-        Self { app }
+        Self { app, _stop_senders: Mutex::new(Vec::new()) }
     }
 
     pub fn start_monitoring(&self) {
+        // --- Accelerometer Thread ---
         let app_handle = self.app.clone();
+        let (accel_stop_tx, accel_stop_rx) = mpsc::channel::<()>();
 
-        // Accelerometer Thread
         thread::spawn(move || {
-            // Initialize WinRT/COM for this thread
             unsafe {
-                let _ = windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED);
+                let _ = windows::Win32::System::WinRT::RoInitialize(
+                    windows::Win32::System::WinRT::RO_INIT_MULTITHREADED,
+                );
             }
-            
-            // Attempt to get default accelerometer
-            let accel_result = Accelerometer::GetDefault();
-            match accel_result {
-                Ok(accel) => {
-                    tracing::info!("Accelerometer detected.");
-                    // Set Report Interval (approx 60Hz -> 16ms)
-                    let min_interval = accel.MinimumReportInterval().unwrap_or(16);
-                    let target_interval = std::cmp::max(min_interval, 16);
-                    let _ = accel.SetReportInterval(target_interval);
 
-                    // Subscribe to ReadingChanged
-                    // We need to keep the event token or the object alive? 
-                    // In Rust windows crate, the handler is kept alive by the object? 
-                    // Actually, we usually need to keep the object alive.
-                    
-                    let app_clone = app_handle.clone();
-                    let handler = TypedEventHandler::new(move |_, args: &Option<windows::Devices::Sensors::AccelerometerReadingChangedEventArgs>| {
-                        if let Some(args) = args {
-                            if let Ok(reading) = args.Reading() {
-                                if let Ok(vals) = reading.AccelerationX() { // Just checking one for now or all
-                                    let x = reading.AccelerationX().unwrap_or(0.0);
-                                    let y = reading.AccelerationY().unwrap_or(0.0);
-                                    let z = reading.AccelerationZ().unwrap_or(0.0);
-                                    
-                                    // Simple magnitude check for "Move"
-                                    let magnitude = (x*x + y*y + z*z).sqrt();
-                                    
-                                    // 1.0 is gravity. Significant movement > 1.2 or < 0.8
-                                    if (magnitude - 1.0).abs() > 0.2 {
-                                        let _ = app_clone.emit("sensor-accelerometer", "move");
-                                    }
-                                }
-                            }
-                        }
-                        Ok(())
-                    });
-
-                    if let Ok(_token) = accel.ReadingChanged(&handler) {
-                        // Keep thread alive to hold the reference? 
-                        // The `accel` object needs to be kept alive.
-                        loop {
-                            thread::sleep(Duration::from_secs(1));
-                        }
-                    }
-                }
-                _ => {
+            let accel = match Accelerometer::GetDefault() {
+                Ok(a) => a,
+                Err(_) => {
                     tracing::warn!("No Accelerometer found (Fallback mode).");
+                    return;
                 }
+            };
+
+            tracing::info!("Accelerometer detected.");
+            let min_interval = accel.MinimumReportInterval().unwrap_or(16);
+            let _ = accel.SetReportInterval(std::cmp::max(min_interval, 16));
+
+            let handler = TypedEventHandler::new(move |_, args: &Option<windows::Devices::Sensors::AccelerometerReadingChangedEventArgs>| {
+                let Some(args) = args else { return Ok(()); };
+                let Ok(reading) = args.Reading() else { return Ok(()); };
+
+                let x = reading.AccelerationX().unwrap_or(0.0);
+                let y = reading.AccelerationY().unwrap_or(0.0);
+                let z = reading.AccelerationZ().unwrap_or(0.0);
+
+                // 1.0g = gravity at rest. Significant movement: deviation > 0.2g
+                let magnitude = (x * x + y * y + z * z).sqrt();
+                if (magnitude - 1.0).abs() > 0.2 {
+                    let _ = app_handle.emit("sensor-accelerometer", "move");
+                }
+                Ok(())
+            });
+
+            if let Ok(_token) = accel.ReadingChanged(&handler) {
+                // Block until SensorManager is dropped (sender side goes away).
+                // Uses zero CPU — no periodic wakeups unlike thread::sleep loop.
+                let _ = accel_stop_rx.recv();
             }
         });
 
-        // Geolocator Thread
+        self._stop_senders.lock().unwrap().push(accel_stop_tx);
+
+        // --- Geolocator Thread ---
         let app_handle_geo = self.app.clone();
+        let (geo_stop_tx, geo_stop_rx) = mpsc::channel::<()>();
+
         thread::spawn(move || {
             unsafe {
-                let _ = windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED);
+                let _ = windows::Win32::System::WinRT::RoInitialize(
+                    windows::Win32::System::WinRT::RO_INIT_MULTITHREADED,
+                );
             }
 
-            let geolocator = Geolocator::new();
-            if let Ok(geo) = geolocator {
-                 // Request Access (might block or return async?)
-                 // RequestAccessAsync returns IAsyncOperation. We should wait for it.
-                 // For simplicity in this non-async thread, we might skip explicit request if getting position works?
-                 // But usually we need it.
-                 
-                 // Using polling for simplicity if async await is hard in vanilla thread.
-                 // Or we can just try to subscribe.
-                 
-                let app_clone = app_handle_geo.clone();
-                let handler = TypedEventHandler::new(move |_, args: &Option<windows::Devices::Geolocation::PositionChangedEventArgs>| {
-                    if let Some(args) = args {
-                        if let Ok(pos) = args.Position() {
-                             if let Ok(coord) = pos.Coordinate() {
-                                 if let Ok(point) = coord.Point() {
-                                     if let Ok(geo_pos) = point.Position() {
-                                         // Emit minimal data
-                                         let payload = format!("{{ \"lat\": {}, \"lng\": {} }}", geo_pos.Latitude, geo_pos.Longitude);
-                                         let _ = app_clone.emit("sensor-geolocation", payload);
-                                     }
-                                 }
-                             }
-                        }
-                    }
-                    Ok(())
-                });
+            let geo = match Geolocator::new() {
+                Ok(g) => g,
+                Err(_) => {
+                    tracing::warn!("Geolocator not available.");
+                    return;
+                }
+            };
 
-                 if let Ok(_token) = geo.PositionChanged(&handler) {
-                     loop {
-                         thread::sleep(Duration::from_secs(5));
-                     }
-                 }
-            } else {
-                tracing::warn!("Geolocator not available.");
+            let handler = TypedEventHandler::new(move |_, args: &Option<windows::Devices::Geolocation::PositionChangedEventArgs>| {
+                let Some(args) = args else { return Ok(()); };
+                let Ok(pos)     = args.Position()      else { return Ok(()); };
+                let Ok(coord)   = pos.Coordinate()     else { return Ok(()); };
+                let Ok(point)   = coord.Point()         else { return Ok(()); };
+                let Ok(geo_pos) = point.Position()      else { return Ok(()); };
+
+                let payload = format!(
+                    "{{ \"lat\": {}, \"lng\": {} }}",
+                    geo_pos.Latitude, geo_pos.Longitude
+                );
+                let _ = app_handle_geo.emit("sensor-geolocation", payload);
+                Ok(())
+            });
+
+            if let Ok(_token) = geo.PositionChanged(&handler) {
+                // Block until SensorManager is dropped.
+                let _ = geo_stop_rx.recv();
             }
         });
+
+        self._stop_senders.lock().unwrap().push(geo_stop_tx);
     }
 }
