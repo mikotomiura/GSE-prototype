@@ -127,7 +127,7 @@ GSE-Next/
 ├── src/                       # React / TypeScript frontend
 │   ├── components/
 │   │   ├── Dashboard.tsx      # State probability bars, session stopwatch, keyboard status, Monk Mode
-│   │   └── Overlay.tsx        # Nudge (red mist) + Wall (full-screen block)
+│   │   └── Overlay.tsx        # Nudge (red mist) + Wall (full-screen block) + typing warning banner
 │   ├── App.tsx                # Intervention state machine (Lv1 → Lv2 escalation)
 │   └── main.tsx
 │
@@ -506,7 +506,7 @@ When the HMM detects a Stuck state, the system provides graduated intervention t
 | Level | Name | Trigger | Visual Effect | User Interaction |
 | --- | --- | --- | --- | --- |
 | **Lv1** | Nudge | p\_stuck > 0.60 | Red vignette (mist) around screen edges | Click-through (transparent to input) |
-| **Lv2** | Wall | p\_stuck > 0.70 for 30 s (**bypassed when Monk Mode is ON**) | Full-screen blocking overlay with message | Blocks all input until unlocked |
+| **Lv2** | Wall | p\_stuck > 0.70 for 30 s (**bypassed when Monk Mode is ON**) | Full-screen blocking overlay with message; red warning banner on any keyboard input | Blocks all input until unlocked |
 
 ### Nudge (Lv1): Ambient Friction Cue
 
