@@ -67,11 +67,31 @@ function App() {
   }, [cognitiveState.stuck, isWallActive]);
 
   // 4. Sensor Integration (Unlock Logic)
+  //    Wall解除後にメインウィンドウをフォーカス:
+  //    オーバーレイが透過に戻っても、ユーザーがクリックしないと
+  //    メインウィンドウに操作が戻らないため、自動でフォーカスする。
   useEffect(() => {
     const unlisten = listen("sensor-accelerometer", (event) => {
       if (event.payload === "move") {
         setIsWallActive(false);
+        // メインウィンドウ側でのみフォーカスを取り直す
+        if (windowLabel !== "overlay") {
+          currentWindow.setFocus().catch(() => {});
+        }
       }
+    });
+
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [windowLabel, currentWindow]);
+
+  // 5. Monk Mode: Dashboard の "Monk Mode" ボタンから wall-activate を受け取り Wall を起動。
+  //    両ウィンドウ(main/overlay)がこのイベントをリッスンし isWallActive=true にする。
+  //    overlayウィンドウ側でWallが発動、メインウィンドウ側は状態同期のみ。
+  useEffect(() => {
+    const unlisten = listen("wall-activate", () => {
+      setIsWallActive(true);
     });
 
     return () => {

@@ -51,6 +51,21 @@ fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f6
     map
 }
 
+/// 最後のキー押下からの経過ミリ秒を返す (Dashboard キーボードアクティビティ表示用)
+/// キーが一度も押されていない場合は 0 を返す。
+#[tauri::command]
+fn get_keyboard_idle_ms() -> u64 {
+    let last = crate::input::hook::last_key_ms();
+    if last == 0 {
+        return 0;
+    }
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    now_ms.saturating_sub(last)
+}
+
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
@@ -356,6 +371,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
+            get_keyboard_idle_ms,
             quit_app,
             get_session_file,
             wall_server::start_wall_server,

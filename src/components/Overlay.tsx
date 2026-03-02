@@ -23,6 +23,14 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
         document.body.style.background = 'transparent';
     }, []);
 
+    // マウント直後に即座にクリック透過を有効化 (初期状態保証)
+    // React の useEffect は最初のレンダー後に実行されるため、起動時に
+    // オーバーレイが一瞬クリックをブロックしてウィンドウをドラッグ不能にする問題を防ぐ。
+    useEffect(() => {
+        currentWindow.setIgnoreCursorEvents(true).catch(() => {});
+    // currentWindow は useMemo で安定しているが lint 警告を避けるため含める
+    }, [currentWindow]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // isWallActive に応じてクリック透過をトグル
     // Lv1 (nudge): クリック透過 → ユーザーは下のウィンドウを操作可能
     // Lv2 (wall):  クリックブロック → QRコードをスキャンするまで操作不可
