@@ -294,6 +294,27 @@ body {
   margin-bottom: 0 !important;
 }
 
+/* Wall typing warning banner */
+.wall-typing-warning {
+  margin-top: 1.2rem;
+  padding: 0.65rem 1.6rem;
+  background: rgba(248, 113, 113, 0.92);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  animation: warn-fade 2.5s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes warn-fade {
+  0%   { opacity: 0; transform: scale(0.9); }
+  12%  { opacity: 1; transform: scale(1); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @keyframes bounce {
 
   0%,

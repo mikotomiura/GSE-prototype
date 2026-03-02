@@ -4,16 +4,11 @@ use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use qrcode::QrCode;
 use tauri::{Emitter, Runtime, State};
 use tiny_http::{Header, Response, Server};
-
-// Safety fallback: force-unlock if user never returns (prevents permanent lock).
-// Primary unlock is driven by the smartphone: the phone page auto-sends /unlock
-// when the 2-minute countdown reaches 0:00.
-const FALLBACK_TIMEOUT_SECS: u64 = 300; // 5 minutes
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -91,21 +86,11 @@ fn server_loop<R: Runtime>(
     shutdown: Arc<AtomicBool>,
     app: tauri::AppHandle<R>,
 ) {
-    let start = Instant::now();
-    let fallback_timeout = Duration::from_secs(FALLBACK_TIMEOUT_SECS);
-
     let port = server.server_addr().to_ip().map(|addr| addr.port()).unwrap_or(0);
     let local_ip = detect_local_ip();
     let server_url = format!("http://{}:{}", local_ip, port);
 
     loop {
-        // Safety fallback: if wall has been active for too long, force unlock.
-        if start.elapsed() > fallback_timeout {
-            tracing::info!("WallServer: {}s fallback timeout — force-unlocking", FALLBACK_TIMEOUT_SECS);
-            let _ = app.emit("sensor-accelerometer", "move");
-            break;
-        }
-
         if shutdown.load(Ordering::Acquire) { break; }
 
         match server.recv_timeout(Duration::from_secs(1)) {
@@ -191,9 +176,8 @@ fn build_timer_html(server_url: &str, token: &str) -> String {
 }
 
 // Phone page: 2-minute countdown timer.
-// Primary unlock: phone timer auto-calls /unlock at 0:00 (synchronized with PC wall server).
-// User can also tap "Return Early" to unlock before the timer completes.
-// 5-minute server-side fallback handles network failures.
+// Unlock condition: phone timer auto-calls /unlock at 0:00 (only unlock path).
+// No early exit — Monk Mode on the PC is the escape hatch if Wall is unwanted.
 const TIMER_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -210,7 +194,6 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
 .progress-fill{height:100%;background:#4ade80;border-radius:5px;transition:width 0.5s linear;width:0%;}
 .status{font-size:0.9rem;margin:0.5rem 0;min-height:3.5em;opacity:0.8;line-height:1.6}
 .icon{font-size:3rem;margin-bottom:0.6rem}
-.done-btn{display:block;padding:0.9rem 2.2rem;font-size:1.05rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;margin-top:0.8rem;}
 .complete{color:#4ade80;font-weight:700}
 </style>
 </head>
@@ -220,8 +203,7 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
 <p class="sub">Take a 2-minute break from your keyboard.<br>Your PC unlocks automatically when the timer ends.</p>
 <div class="timer" id="timer">2:00</div>
 <div class="progress-bg"><div class="progress-fill" id="progress"></div></div>
-<p class="status" id="status">Walk away and relax.<br>Or tap below to return early.</p>
-<button class="done-btn" id="doneBtn">Return Early — Unlock Now</button>
+<p class="status" id="status">Walk away and relax.<br>Your PC unlocks when the timer ends.</p>
 <script>
 (function(){
   var DURATION=120;
@@ -229,12 +211,10 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
   var scanTime=Date.now(),done=false;
   var timerEl=document.getElementById('timer'),progressEl=document.getElementById('progress');
   var statusEl=document.getElementById('status'),iconEl=document.getElementById('icon');
-  var doneBtn=document.getElementById('doneBtn');
 
   function doUnlock(){
     if(done)return;
     done=true;
-    doneBtn.style.display='none';
     iconEl.textContent='\u2705';
     statusEl.innerHTML='<span class="complete">Unlocked!</span><br>You can return to your computer.';
     fetch(SERVER+'/unlock?token='+TOKEN,{method:'POST'}).catch(function(){});
@@ -255,7 +235,6 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
     }
   }
 
-  doneBtn.addEventListener('click',doUnlock);
   tick();
 })();
 </script>

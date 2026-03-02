@@ -524,7 +524,7 @@ If p\_stuck remains above 0.70 for 30 consecutive seconds, the system escalates 
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-The Wall is unlocked by the **smartphone timer**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code on their phone, which opens a 2-minute countdown page. When the timer reaches 0:00, the phone automatically POSTs to `/unlock`, the server emits `"sensor-accelerometer"` with `"move"` payload, and the Wall dismisses. The user can also tap "Return Early" on the phone page to unlock before the 2 minutes are up. A 5-minute server-side safety fallback force-unlocks if the connection fails. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
+The Wall is unlocked **exclusively by the smartphone timer**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code, which opens a 2-minute countdown page on their phone. When the timer reaches 0:00, the phone automatically POSTs to `/unlock`, the server emits `"sensor-accelerometer"` with `"move"` payload, and the Wall dismisses. There is no early-exit button and no PC-side fallback timer — the 2-minute wait is intentional. If the user does not want the Wall to engage at all, they can enable **Monk Mode** from the Dashboard beforehand. Any keyboard input detected while the Wall is active triggers a **warning banner** on the overlay. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
 
 ### Monk Mode (Wall Suppression Toggle)
 

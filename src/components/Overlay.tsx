@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -15,7 +15,13 @@ interface WallServerInfo {
 const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
     const [nudgeOpacity, setNudgeOpacity] = useState(0);
     const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
+    const [showTypingWarning, setShowTypingWarning] = useState(false);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
+
+    // Wall発動中のキーボード打鍵検知に使うref群
+    const wallStartTimeRef = useRef<number>(0);
+    const lastWarnedKeyAtRef = useRef<number>(0);
+    const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 透過背景を設定（overlay ウィンドウ用）
     useEffect(() => {
@@ -48,6 +54,44 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
             invoke("stop_wall_server").catch(console.error);
             setWallServerInfo(null);
         }
+    }, [isWallActive]);
+
+    // Wall発動時刻を記録し、Wall解除時にリセット
+    useEffect(() => {
+        if (isWallActive) {
+            wallStartTimeRef.current = Date.now();
+            lastWarnedKeyAtRef.current = 0;
+            setShowTypingWarning(false);
+        }
+    }, [isWallActive]);
+
+    // Wall発動中のキーボード打鍵検知: 打鍵を検知したら警告バナーを2.5秒表示
+    // lastKeyAt = Date.now() - idle が wallStartTime より後なら Wall後の打鍵
+    // 同一バーストへの重複警告を防ぐため1秒のデバウンスを設ける
+    useEffect(() => {
+        if (!isWallActive) {
+            setShowTypingWarning(false);
+            return;
+        }
+        const interval = setInterval(async () => {
+            try {
+                const idle = await invoke<number>("get_keyboard_idle_ms");
+                const lastKeyAt = Date.now() - idle;
+                if (
+                    lastKeyAt > wallStartTimeRef.current &&
+                    lastKeyAt > lastWarnedKeyAtRef.current + 1000
+                ) {
+                    lastWarnedKeyAtRef.current = lastKeyAt;
+                    setShowTypingWarning(true);
+                    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+                    warningTimerRef.current = setTimeout(() => setShowTypingWarning(false), 2500);
+                }
+            } catch (_) {}
+        }, 300);
+        return () => {
+            clearInterval(interval);
+            if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+        };
     }, [isWallActive]);
 
     useEffect(() => {
@@ -87,6 +131,12 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
                     ) : (
                         <div className="scramble-animation">
                             <span>QR生成中...</span>
+                        </div>
+                    )}
+                    {/* Wall発動中の打鍵警告バナー */}
+                    {showTypingWarning && (
+                        <div className="wall-typing-warning">
+                            ⚠ キーボードは使えません！
                         </div>
                     )}
                 </div>
