@@ -184,6 +184,9 @@ fn build_shake_html(server_url: &str, token: &str) -> String {
     SHAKE_HTML_TEMPLATE.replace("__SERVER_URL__", server_url).replace("__TOKEN__", token)
 }
 
+// NOTE: DeviceMotionEvent requires HTTPS on iOS 13+ and Android Chrome 74+.
+// Plain HTTP (local network) prevents sensor access. We use a tap-counter
+// instead — works on all browsers over HTTP, no permissions required.
 const SHAKE_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -192,73 +195,69 @@ const SHAKE_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <title>GSE - Unlock</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#f8fafc;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:1.5rem;text-align:center;user-select:none;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#f8fafc;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem;text-align:center;user-select:none;-webkit-user-select:none;}
 h1{font-size:1.4rem;margin-bottom:0.5rem}
-.sub{font-size:0.95rem;opacity:0.7;margin-bottom:1.5rem}
-.progress-bg{width:80%;max-width:280px;height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin:1rem 0;}
-.progress-fill{height:100%;background:#4ade80;border-radius:10px;transition:width 0.3s ease;width:0%;}
-.btn{padding:0.9rem 2.2rem;font-size:1.1rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;}
-.btn:disabled{opacity:0.4;cursor:not-allowed}
-.status{font-size:1rem;margin:0.8rem 0;min-height:2.5em;opacity:0.85}
+.sub{font-size:0.95rem;opacity:0.7;margin-bottom:1rem}
+.progress-bg{width:80%;max-width:280px;height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin:0.8rem 0;}
+.progress-fill{height:100%;background:#4ade80;border-radius:10px;transition:width 0.2s ease;width:0%;}
+.status{font-size:1rem;margin:0.5rem 0;min-height:2.5em;opacity:0.85}
 .icon{font-size:3rem;margin-bottom:0.8rem}
 .done{color:#4ade80;font-size:1.5rem;font-weight:700}
+.start-btn{padding:0.9rem 2.2rem;font-size:1.1rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;margin-top:0.5rem;}
+.tap-btn{display:none;width:180px;height:180px;border-radius:50%;background:#4ade80;color:#0f172a;border:none;font-size:1.6rem;font-weight:700;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;margin-top:1rem;-webkit-tap-highlight-color:rgba(0,0,0,0);touch-action:manipulation;}
+.tap-btn:active{opacity:0.75;transform:scale(0.93);}
+.tap-count{font-size:1rem;margin-top:0.3rem;opacity:0.75;}
 </style>
 </head>
 <body>
-<div class="icon" id="icon">📱</div>
-<h1>Shake or Walk to Unlock</h1>
-<p class="sub">Move your phone to dismiss the Wall on your computer</p>
+<div class="icon" id="icon">🚶</div>
+<h1>Stand Up to Unlock</h1>
+<p class="sub">Stand up and tap the button 10 times</p>
 <div class="progress-bg"><div class="progress-fill" id="progress"></div></div>
-<p class="status" id="status">Tap the button to start</p>
-<button class="btn" id="startBtn">Start</button>
+<p class="status" id="status">Press Start when you are standing</p>
+<button class="start-btn" id="startBtn">Start</button>
+<button class="tap-btn" id="tapBtn">
+  TAP
+  <span class="tap-count" id="tapCount">0 / 10</span>
+</button>
 <script>
 (function(){
-  var THRESHOLD=3.0,REQUIRED=8,WINDOW=5000;
+  var REQUIRED=10;
   var SERVER='__SERVER_URL__',TOKEN='__TOKEN__';
-  var shakes=[],unlocked=false;
+  var count=0,unlocked=false;
   var statusEl=document.getElementById('status'),progressEl=document.getElementById('progress');
-  var iconEl=document.getElementById('icon'),btnEl=document.getElementById('startBtn');
-
-  function update(){
-    var now=Date.now();
-    shakes=shakes.filter(function(t){return now-t<WINDOW});
-    progressEl.style.width=Math.min(100,(shakes.length/REQUIRED)*100)+'%';
-    if(shakes.length>=REQUIRED&&!unlocked) doUnlock();
-  }
+  var iconEl=document.getElementById('icon');
+  var startBtn=document.getElementById('startBtn'),tapBtn=document.getElementById('tapBtn');
+  var tapCountEl=document.getElementById('tapCount');
 
   function doUnlock(){
     unlocked=true;
+    tapBtn.style.display='none';
+    iconEl.textContent='\u2705';
     statusEl.textContent='Unlocked! Return to your computer.';
     statusEl.className='status done';
-    iconEl.textContent='\u2705';
-    btnEl.style.display='none';
-    fetch(SERVER+'/unlock?token='+TOKEN,{method:'POST'});
+    progressEl.style.width='100%';
+    fetch(SERVER+'/unlock?token='+TOKEN,{method:'POST'}).catch(function(){});
   }
 
-  function onMotion(e){
+  function onTap(e){
     if(unlocked)return;
-    var a=e.accelerationIncludingGravity;
-    if(!a||a.x===null)return;
-    var mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
-    if(Math.abs(mag-9.81)>THRESHOLD) shakes.push(Date.now());
-    update();
+    e.preventDefault();
+    count++;
+    tapCountEl.textContent=count+' / '+REQUIRED;
+    progressEl.style.width=Math.min(100,(count/REQUIRED)*100)+'%';
+    statusEl.textContent='Keep going! '+count+' of '+REQUIRED;
+    if(count>=REQUIRED) doUnlock();
   }
 
-  btnEl.addEventListener('click',function(){
-    if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
-      DeviceMotionEvent.requestPermission().then(function(p){
-        if(p==='granted') startListening();
-        else statusEl.textContent='Permission denied.';
-      });
-    } else startListening();
+  startBtn.addEventListener('click',function(){
+    startBtn.style.display='none';
+    tapBtn.style.display='flex';
+    statusEl.textContent='Tap the button '+REQUIRED+' times!';
   });
 
-  function startListening(){
-    window.addEventListener('devicemotion',onMotion);
-    btnEl.disabled=true;
-    btnEl.textContent='Detecting...';
-    statusEl.textContent='Shake your phone or walk around!';
-  }
+  tapBtn.addEventListener('touchstart',onTap,{passive:false});
+  tapBtn.addEventListener('click',onTap);
 })();
 </script>
 </body>
