@@ -126,7 +126,7 @@ GSE-Next/
 │
 ├── src/                       # React / TypeScript frontend
 │   ├── components/
-│   │   ├── Dashboard.tsx      # State probability bars + session info
+│   │   ├── Dashboard.tsx      # State probability bars, session stopwatch, keyboard status, Monk Mode
 │   │   └── Overlay.tsx        # Nudge (red mist) + Wall (full-screen block)
 │   ├── App.tsx                # Intervention state machine (Lv1 → Lv2 escalation)
 │   └── main.tsx
@@ -506,7 +506,7 @@ When the HMM detects a Stuck state, the system provides graduated intervention t
 | Level | Name | Trigger | Visual Effect | User Interaction |
 | --- | --- | --- | --- | --- |
 | **Lv1** | Nudge | p\_stuck > 0.60 | Red vignette (mist) around screen edges | Click-through (transparent to input) |
-| **Lv2** | Wall | p\_stuck > 0.70 for 30 s | Full-screen blocking overlay with message | Blocks all input until unlocked |
+| **Lv2** | Wall | p\_stuck > 0.70 for 30 s **or Monk Mode button** | Full-screen blocking overlay with message | Blocks all input until unlocked |
 
 ### Nudge (Lv1): Ambient Friction Cue
 
@@ -525,6 +525,21 @@ If p\_stuck remains above 0.70 for 30 consecutive seconds, the system escalates 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
 The Wall is unlocked via **PC-side keyboard idle detection**, with a smartphone QR code providing visual feedback. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and displays a QR code. Simultaneously, `server_loop` begins polling `LAST_KEY_MS` — an `AtomicU64` updated on every keystroke in `hook_callback`. After **2 minutes of no keyboard input** (measured from `max(wall_start_ms, last_key_ms)` to prevent instant-unlock if already idle), the server emits `"sensor-accelerometer"` with `"move"` payload and the Wall dismisses. A 5-minute safety fallback force-unlocks if the user never returns. The QR code page shows a synchronized 2-minute countdown timer and a manual "Done" button as a backup. This approach is device-agnostic and requires no HTTPS — the unlock signal comes from the PC itself.
+
+### Monk Mode (Manual Wall Trigger)
+
+The Dashboard includes a **"Monk Mode — Force Break"** button that immediately activates the Wall, bypassing the 30-second threshold. Clicking it emits a `wall-activate` event (Tauri frontend broadcast) which both windows receive; the overlay window sets `isWallActive = true` and the full Wall sequence starts instantly. This allows users to intentionally enforce a break at any time, independent of the HMM's Stuck probability.
+
+### Dashboard Session Indicators
+
+The Dashboard panel shows two live indicators alongside the state bars:
+
+| Indicator | Source | Display |
+| --- | --- | --- |
+| **Session** | `Date.now()` on mount | Stopwatch (`M:SS` or `H:MM:SS`) |
+| **Keyboard** | `get_keyboard_idle_ms()` (reads `LAST_KEY_MS` atomic) | `Active` if idle < 3 s, else `Idle Xs` |
+
+The `get_keyboard_idle_ms` Tauri command returns `now_ms − LAST_KEY_MS`, where `LAST_KEY_MS` is the `AtomicU64` updated on every keystroke in `hook_callback`. This surfaces the same idle measurement used by the Wall server's auto-unlock logic.
 
 ### Design Rationale
 
@@ -641,4 +656,4 @@ Research prototype. All rights reserved.
 
 ---
 
-*Last updated: 2026-03-02*
+*Last updated: 2026-03-03*

@@ -127,7 +127,7 @@ GSE-Next/
 │
 ├── src/                       # React / TypeScript フロントエンド
 │   ├── components/
-│   │   ├── Dashboard.tsx      # 状態確率バー + セッション情報
+│   │   ├── Dashboard.tsx      # 状態確率バー、セッションストップウォッチ、キーボード状態、Monk Mode
 │   │   └── Overlay.tsx        # Nudge（赤い霧）+ Wall（全画面遮断）
 │   ├── App.tsx                # 介入ステートマシン（Lv1 → Lv2 エスカレーション）
 │   └── main.tsx
@@ -506,7 +506,7 @@ HMM が Stuck 状態を検出すると、Tauri の透過マルチウィンドウ
 | レベル | 名称 | トリガー | 視覚効果 | ユーザー操作 |
 | --- | --- | --- | --- | --- |
 | **Lv1** | Nudge | p\_stuck > 0.60 | 画面端の赤いビネット（霧） | クリックスルー（入力に対して透過） |
-| **Lv2** | Wall | p\_stuck > 0.70 が 30 秒持続 | 全画面遮断オーバーレイ + メッセージ | 解除まで全入力をブロック |
+| **Lv2** | Wall | p\_stuck > 0.70 が 30 秒持続、**または Monk Mode ボタン** | 全画面遮断オーバーレイ + メッセージ | 解除まで全入力をブロック |
 
 ### Nudge（Lv1）：環境的摩擦キュー
 
@@ -525,6 +525,21 @@ p\_stuck が 0.70 を 30 秒間連続で超えた場合、システムは Wall �
 > *"Time to Move! Please stand up and walk around to unlock."*
 
 Wall の解除には **PC 側のキーボードアイドル検知**を使用し、スマートフォン QRコードは視覚的フィードバックを提供します。Wall が発動すると `start_wall_server` がローカル HTTP サーバー（`tiny_http`）を起動して QRコードを表示すると同時に、`server_loop` が `LAST_KEY_MS`（`hook_callback` でキー入力ごとに更新される `AtomicU64`）の監視を開始します。**2分間キー入力がなければ**（Wall 発動前からアイドル状態だった場合の即時解除を防ぐため `max(wall_start_ms, last_key_ms)` から計測）、サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行し Wall が解除されます。ユーザーが戻ってこない場合に備えた 5 分間の強制解除フォールバックも備えています。スマートフォン側ページには 2 分間のカウントダウンタイマーと、バックアップとして手動解除ボタンが表示されます。HTTPS 不要・PC ハードウェア不要で、あらゆる Windows 環境で動作します。
+
+### Monk Mode（手動 Wall 発動）
+
+Dashboard に **「Monk Mode — Force Break」** ボタンを追加しました。クリックすると Wall が即座に発動し、30 秒の閾値を待たずに強制休憩を開始します。`wall-activate` イベント（Tauri フロントエンドブロードキャスト）を全ウィンドウに送信し、オーバーレイウィンドウが `isWallActive = true` を受け取って Wall シーケンスを開始します。HMM の Stuck 確率に関わらず、ユーザーが任意のタイミングで休憩を強制できます。
+
+### Dashboard セッションインジケーター
+
+Dashboard には状態バーに加えて、以下のライブインジケーターが表示されます。
+
+| インジケーター | データソース | 表示内容 |
+| --- | --- | --- |
+| **Session** | マウント時の `Date.now()` | ストップウォッチ（`M:SS` または `H:MM:SS`） |
+| **Keyboard** | `get_keyboard_idle_ms()`（`LAST_KEY_MS` アトミック読み取り） | アイドル < 3 s: `Active`、それ以上: `Idle Xs` |
+
+`get_keyboard_idle_ms` Tauri コマンドは `now_ms − LAST_KEY_MS` を返します。`LAST_KEY_MS` は `hook_callback` でキー入力ごとに更新される `AtomicU64` であり、Wall サーバーの自動解除ロジックと同じアイドル計測値です。
 
 ### 設計の根拠
 
@@ -641,4 +656,4 @@ python analysis/behavioral_gt.py "%USERPROFILE%\Documents\GSE-sessions\gse_YYYYM
 
 ---
 
-*最終更新：2026-03-02*
+*最終更新：2026-03-03*
