@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -74,6 +74,18 @@ pub fn is_ime_open() -> bool {
 /// Uses `AcqRel` / `Acquire` ordering so the `IME_OPEN` write is visible to the
 /// polling thread before it reads the dirty flag.
 pub static IME_STATE_DIRTY: AtomicBool = AtomicBool::new(false);
+
+/// Unix epoch millisecond timestamp of the most recent keypress.
+/// Updated by `hook_callback` on every key event (both press and release).
+/// Read by `wall_server::server_loop` to detect keyboard idle for automatic Wall unlock.
+/// Relaxed ordering is sufficient: we only need approximate recency, not strict causality.
+pub static LAST_KEY_MS: AtomicU64 = AtomicU64::new(0);
+
+/// Returns the Unix epoch millisecond timestamp of the last keypress.
+/// Returns 0 if no key has been pressed since startup.
+pub fn last_key_ms() -> u64 {
+    LAST_KEY_MS.load(Ordering::Relaxed)
+}
 
 // Wrapper to make HHOOK Send+Sync for lazy_static
 struct ThreadSafeHook(#[allow(dead_code)] HHOOK);
@@ -221,6 +233,9 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis() as u64;
+
+            // Track last key time for Wall idle detection (Relaxed: approximate recency only)
+            LAST_KEY_MS.store(timestamp, Ordering::Relaxed);
 
             // ---------------------------------------------------------------------------
             // IME mode tracking via VK_DBE_* keys.

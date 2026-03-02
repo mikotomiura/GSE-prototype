@@ -10,6 +10,12 @@ use qrcode::QrCode;
 use tauri::{Emitter, Runtime, State};
 use tiny_http::{Header, Response, Server};
 
+// PC-side idle detection: auto-unlock when no keyboard input for this duration.
+const KEYBOARD_IDLE_MS: u64 = 120_000; // 2 minutes
+
+// Safety fallback: force-unlock if user never returns (prevents permanent lock).
+const FALLBACK_TIMEOUT_SECS: u64 = 300; // 5 minutes
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -56,12 +62,20 @@ pub fn start_wall_server<R: Runtime>(
     let qr_svg = generate_qr_data_url(&url)?;
     let info = WallServerInfo { qr_svg, url: url.clone() };
 
+    // Capture wall activation timestamp for idle detection:
+    // effective idle = max(last_key_ms, wall_start_ms) to prevent immediate
+    // unlock if the user was already idle before the wall activated.
+    let wall_start_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_clone = shutdown.clone();
     let server_arc = Arc::new(server);
 
     thread::spawn(move || {
-        server_loop(server_arc, token, shutdown_clone, app);
+        server_loop(server_arc, token, shutdown_clone, app, wall_start_ms);
     });
 
     *state.stop_flag.lock().unwrap() = Some(shutdown);
@@ -85,22 +99,43 @@ fn server_loop<R: Runtime>(
     token: String,
     shutdown: Arc<AtomicBool>,
     app: tauri::AppHandle<R>,
+    wall_start_ms: u64,
 ) {
     let start = Instant::now();
-    let fallback_timeout = Duration::from_secs(60);
+    let fallback_timeout = Duration::from_secs(FALLBACK_TIMEOUT_SECS);
 
     let port = server.server_addr().to_ip().map(|addr| addr.port()).unwrap_or(0);
     let local_ip = detect_local_ip();
     let server_url = format!("http://{}:{}", local_ip, port);
 
     loop {
+        // Safety fallback: if wall has been active for too long, force unlock.
         if start.elapsed() > fallback_timeout {
-            tracing::info!("WallServer: 60s timeout — auto-unlocking wall");
+            tracing::info!("WallServer: {}s fallback timeout — force-unlocking", FALLBACK_TIMEOUT_SECS);
             let _ = app.emit("sensor-accelerometer", "move");
             break;
         }
 
         if shutdown.load(Ordering::Acquire) { break; }
+
+        // PC-side keyboard idle detection (primary unlock mechanism).
+        // effective_last = max(last_key_ms, wall_start_ms):
+        //   Prevents instant unlock if user was already idle before wall activated.
+        //   Resets the idle clock on each keypress after wall activation.
+        let last_key = crate::input::hook::last_key_ms();
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let effective_last = last_key.max(wall_start_ms);
+        if now_ms.saturating_sub(effective_last) >= KEYBOARD_IDLE_MS {
+            tracing::info!(
+                "WallServer: keyboard idle for {}s — user stepped away, unlocking",
+                KEYBOARD_IDLE_MS / 1000
+            );
+            let _ = app.emit("sensor-accelerometer", "move");
+            break;
+        }
 
         match server.recv_timeout(Duration::from_secs(1)) {
             Ok(Some(request)) => {
@@ -122,7 +157,7 @@ fn dispatch_request<R: Runtime>(
     let url = request.url().to_string();
 
     if url.starts_with("/shake") && extract_token(&url) == token {
-        let html = build_shake_html(server_url, token);
+        let html = build_timer_html(server_url, token);
         let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap();
         let _ = request.respond(Response::from_string(html).with_header(header));
     } else if url.starts_with("/unlock") && extract_token(&url) == token {
@@ -180,84 +215,80 @@ fn generate_qr_data_url(url: &str) -> Result<String, String> {
 // HTML
 // ---------------------------------------------------------------------------
 
-fn build_shake_html(server_url: &str, token: &str) -> String {
-    SHAKE_HTML_TEMPLATE.replace("__SERVER_URL__", server_url).replace("__TOKEN__", token)
+fn build_timer_html(server_url: &str, token: &str) -> String {
+    TIMER_HTML_TEMPLATE.replace("__SERVER_URL__", server_url).replace("__TOKEN__", token)
 }
 
-// NOTE: DeviceMotionEvent requires HTTPS on iOS 13+ and Android Chrome 74+.
-// Plain HTTP (local network) prevents sensor access. We use a tap-counter
-// instead — works on all browsers over HTTP, no permissions required.
-const SHAKE_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
+// Phone page: 2-minute countdown timer.
+// Primary unlock is PC-side keyboard idle detection (no HTTPS required).
+// The phone timer provides visual feedback and a manual "Done" backup button.
+const TIMER_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>GSE - Unlock</title>
+<title>GSE - Break Time</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#f8fafc;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem;text-align:center;user-select:none;-webkit-user-select:none;}
-h1{font-size:1.4rem;margin-bottom:0.5rem}
-.sub{font-size:0.95rem;opacity:0.7;margin-bottom:1rem}
-.progress-bg{width:80%;max-width:280px;height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin:0.8rem 0;}
-.progress-fill{height:100%;background:#4ade80;border-radius:10px;transition:width 0.2s ease;width:0%;}
-.status{font-size:1rem;margin:0.5rem 0;min-height:2.5em;opacity:0.85}
-.icon{font-size:3rem;margin-bottom:0.8rem}
-.done{color:#4ade80;font-size:1.5rem;font-weight:700}
-.start-btn{padding:0.9rem 2.2rem;font-size:1.1rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;margin-top:0.5rem;}
-.tap-btn{display:none;width:180px;height:180px;border-radius:50%;background:#4ade80;color:#0f172a;border:none;font-size:1.6rem;font-weight:700;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;margin-top:1rem;-webkit-tap-highlight-color:rgba(0,0,0,0);touch-action:manipulation;}
-.tap-btn:active{opacity:0.75;transform:scale(0.93);}
-.tap-count{font-size:1rem;margin-top:0.3rem;opacity:0.75;}
+h1{font-size:1.4rem;margin-bottom:0.4rem}
+.sub{font-size:0.9rem;opacity:0.65;margin-bottom:0.8rem;line-height:1.5}
+.timer{font-size:5rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:0.04em;margin:0.3rem 0;color:#4ade80;}
+.progress-bg{width:80%;max-width:280px;height:10px;background:rgba(255,255,255,0.12);border-radius:5px;overflow:hidden;margin:0.6rem 0;}
+.progress-fill{height:100%;background:#4ade80;border-radius:5px;transition:width 0.5s linear;width:0%;}
+.status{font-size:0.9rem;margin:0.5rem 0;min-height:3.5em;opacity:0.8;line-height:1.6}
+.icon{font-size:3rem;margin-bottom:0.6rem}
+.done-btn{display:none;padding:0.9rem 2.2rem;font-size:1.05rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;margin-top:0.8rem;}
+.complete{color:#4ade80;font-weight:700}
 </style>
 </head>
 <body>
 <div class="icon" id="icon">🚶</div>
-<h1>Stand Up to Unlock</h1>
-<p class="sub">Stand up and tap the button 10 times</p>
+<h1>Take a Break!</h1>
+<p class="sub">Step away from your keyboard.<br>Your PC will unlock automatically in 2 minutes.</p>
+<div class="timer" id="timer">2:00</div>
 <div class="progress-bg"><div class="progress-fill" id="progress"></div></div>
-<p class="status" id="status">Press Start when you are standing</p>
-<button class="start-btn" id="startBtn">Start</button>
-<button class="tap-btn" id="tapBtn">
-  TAP
-  <span class="tap-count" id="tapCount">0 / 10</span>
-</button>
+<p class="status" id="status">The keyboard hook on your PC detects when you're away.<br>No action needed — just step away.</p>
+<button class="done-btn" id="doneBtn">I'm Done — Unlock Now</button>
 <script>
 (function(){
-  var REQUIRED=10;
+  var DURATION=120;
   var SERVER='__SERVER_URL__',TOKEN='__TOKEN__';
-  var count=0,unlocked=false;
-  var statusEl=document.getElementById('status'),progressEl=document.getElementById('progress');
-  var iconEl=document.getElementById('icon');
-  var startBtn=document.getElementById('startBtn'),tapBtn=document.getElementById('tapBtn');
-  var tapCountEl=document.getElementById('tapCount');
+  var scanTime=Date.now(),done=false;
+  var timerEl=document.getElementById('timer'),progressEl=document.getElementById('progress');
+  var statusEl=document.getElementById('status'),iconEl=document.getElementById('icon');
+  var doneBtn=document.getElementById('doneBtn');
 
   function doUnlock(){
-    unlocked=true;
-    tapBtn.style.display='none';
+    if(done)return;
+    done=true;
+    doneBtn.style.display='none';
     iconEl.textContent='\u2705';
-    statusEl.textContent='Unlocked! Return to your computer.';
-    statusEl.className='status done';
-    progressEl.style.width='100%';
+    statusEl.innerHTML='<span class="complete">Unlocked!</span><br>You can return to your computer.';
     fetch(SERVER+'/unlock?token='+TOKEN,{method:'POST'}).catch(function(){});
   }
 
-  function onTap(e){
-    if(unlocked)return;
-    e.preventDefault();
-    count++;
-    tapCountEl.textContent=count+' / '+REQUIRED;
-    progressEl.style.width=Math.min(100,(count/REQUIRED)*100)+'%';
-    statusEl.textContent='Keep going! '+count+' of '+REQUIRED;
-    if(count>=REQUIRED) doUnlock();
+  function tick(){
+    if(done)return;
+    var elapsed=(Date.now()-scanTime)/1000;
+    var remaining=Math.max(0,DURATION-elapsed);
+    var mins=Math.floor(remaining/60);
+    var secs=Math.floor(remaining%60);
+    timerEl.textContent=mins+':'+(secs<10?'0':'')+secs;
+    progressEl.style.width=Math.min(100,(elapsed/DURATION)*100)+'%';
+    if(remaining<=0){
+      timerEl.textContent='0:00';
+      progressEl.style.width='100%';
+      iconEl.textContent='\u2705';
+      statusEl.textContent='Time\'s up! Your PC should unlock when you return. Or tap below.';
+      doneBtn.style.display='inline-block';
+    } else {
+      setTimeout(tick,500);
+    }
   }
 
-  startBtn.addEventListener('click',function(){
-    startBtn.style.display='none';
-    tapBtn.style.display='flex';
-    statusEl.textContent='Tap the button '+REQUIRED+' times!';
-  });
-
-  tapBtn.addEventListener('touchstart',onTap,{passive:false});
-  tapBtn.addEventListener('click',onTap);
+  doneBtn.addEventListener('click',doUnlock);
+  tick();
 })();
 </script>
 </body>

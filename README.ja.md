@@ -524,7 +524,7 @@ p\_stuck が 0.70 を 30 秒間連続で超えた場合、システムは Wall �
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-Wall の解除には**スマートフォン QRコード + 身体的な動き**を使用します。Wall が発動すると `Overlay.tsx` が `start_wall_server` を呼び出し、ローカル HTTP サーバー（`tiny_http`）を起動して一回限りのセキュアトークンを生成し、`/shake?token=TOKEN` へのリンクが埋め込まれた QRコードを表示します。ユーザーがスマートフォンでスキャンすると、DeviceMotion API を用いた HTML ページが配信され、振動や歩行を検知します。5 秒以内に重力以上（3 m/s² 超）の加速度イベントが 8 回検知されると、スマートフォンが `/unlock?token=TOKEN` に POST し、サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行して Wall が解除されます。60 秒経過しても未解除の場合は自動的に解除されます（フォールバック）。PC 側に特別なハードウェアは不要で、モーションセンサーを備えた任意のスマートフォンで動作します。
+Wall の解除には **PC 側のキーボードアイドル検知**を使用し、スマートフォン QRコードは視覚的フィードバックを提供します。Wall が発動すると `start_wall_server` がローカル HTTP サーバー（`tiny_http`）を起動して QRコードを表示すると同時に、`server_loop` が `LAST_KEY_MS`（`hook_callback` でキー入力ごとに更新される `AtomicU64`）の監視を開始します。**2分間キー入力がなければ**（Wall 発動前からアイドル状態だった場合の即時解除を防ぐため `max(wall_start_ms, last_key_ms)` から計測）、サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行し Wall が解除されます。ユーザーが戻ってこない場合に備えた 5 分間の強制解除フォールバックも備えています。スマートフォン側ページには 2 分間のカウントダウンタイマーと、バックアップとして手動解除ボタンが表示されます。HTTPS 不要・PC ハードウェア不要で、あらゆる Windows 環境で動作します。
 
 ### 設計の根拠
 
