@@ -539,7 +539,7 @@ The Dashboard panel shows two live indicators alongside the state bars:
 | **Session** | `Date.now()` on mount | Stopwatch (`M:SS` or `H:MM:SS`) |
 | **Keyboard** | `get_keyboard_idle_ms()` (reads `LAST_KEY_MS` atomic) | `Active` if idle < 3 s, else `Idle Xs` |
 
-The `get_keyboard_idle_ms` Tauri command returns `now_ms − LAST_KEY_MS`, where `LAST_KEY_MS` is the `AtomicU64` updated on every keystroke in `hook_callback`. This surfaces the same idle measurement used by the Wall server's auto-unlock logic.
+The `get_keyboard_idle_ms` Tauri command returns `now_ms − LAST_KEY_MS`, where `LAST_KEY_MS` is the `AtomicU64` updated on every keystroke in `hook_callback`. This is used for dashboard display only — Wall unlock is driven by the phone timer, not PC-side idle detection.
 
 ### Design Rationale
 

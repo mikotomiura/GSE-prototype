@@ -539,7 +539,7 @@ Dashboard には状態バーに加えて、以下のライブインジケータ�
 | **Session** | マウント時の `Date.now()` | ストップウォッチ（`M:SS` または `H:MM:SS`） |
 | **Keyboard** | `get_keyboard_idle_ms()`（`LAST_KEY_MS` アトミック読み取り） | アイドル < 3 s: `Active`、それ以上: `Idle Xs` |
 
-`get_keyboard_idle_ms` Tauri コマンドは `now_ms − LAST_KEY_MS` を返します。`LAST_KEY_MS` は `hook_callback` でキー入力ごとに更新される `AtomicU64` であり、Wall サーバーの自動解除ロジックと同じアイドル計測値です。
+`get_keyboard_idle_ms` Tauri コマンドは `now_ms − LAST_KEY_MS` を返します。`LAST_KEY_MS` は `hook_callback` でキー入力ごとに更新される `AtomicU64` です。この値は Dashboard 表示専用であり、Wall の解除はスマートフォンのタイマーが担うため、PC 側のアイドル検知は Wall ロジックには使用されません。
 
 ### 設計の根拠
 
