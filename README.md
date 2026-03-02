@@ -506,7 +506,7 @@ When the HMM detects a Stuck state, the system provides graduated intervention t
 | Level | Name | Trigger | Visual Effect | User Interaction |
 | --- | --- | --- | --- | --- |
 | **Lv1** | Nudge | p\_stuck > 0.60 | Red vignette (mist) around screen edges | Click-through (transparent to input) |
-| **Lv2** | Wall | p\_stuck > 0.70 for 30 s **or Monk Mode button** | Full-screen blocking overlay with message | Blocks all input until unlocked |
+| **Lv2** | Wall | p\_stuck > 0.70 for 30 s (**bypassed when Monk Mode is ON**) | Full-screen blocking overlay with message | Blocks all input until unlocked |
 
 ### Nudge (Lv1): Ambient Friction Cue
 
@@ -524,11 +524,11 @@ If p\_stuck remains above 0.70 for 30 consecutive seconds, the system escalates 
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-The Wall is unlocked via **PC-side keyboard idle detection**, with a smartphone QR code providing visual feedback. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and displays a QR code. Simultaneously, `server_loop` begins polling `LAST_KEY_MS` — an `AtomicU64` updated on every keystroke in `hook_callback`. After **2 minutes of no keyboard input** (measured from `max(wall_start_ms, last_key_ms)` to prevent instant-unlock if already idle), the server emits `"sensor-accelerometer"` with `"move"` payload and the Wall dismisses. A 5-minute safety fallback force-unlocks if the user never returns. The QR code page shows a synchronized 2-minute countdown timer and a manual "Done" button as a backup. This approach is device-agnostic and requires no HTTPS — the unlock signal comes from the PC itself.
+The Wall is unlocked by the **smartphone timer**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code on their phone, which opens a 2-minute countdown page. When the timer reaches 0:00, the phone automatically POSTs to `/unlock`, the server emits `"sensor-accelerometer"` with `"move"` payload, and the Wall dismisses. The user can also tap "Return Early" on the phone page to unlock before the 2 minutes are up. A 5-minute server-side safety fallback force-unlocks if the connection fails. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
 
-### Monk Mode (Manual Wall Trigger)
+### Monk Mode (Wall Suppression Toggle)
 
-The Dashboard includes a **"Monk Mode — Force Break"** button that immediately activates the Wall, bypassing the 30-second threshold. Clicking it emits a `wall-activate` event (Tauri frontend broadcast) which both windows receive; the overlay window sets `isWallActive = true` and the full Wall sequence starts instantly. This allows users to intentionally enforce a break at any time, independent of the HMM's Stuck probability.
+The Dashboard provides a **Monk Mode** toggle that disables automatic Wall activation. When Monk Mode is **ON**, the LV2 Wall timer is bypassed — the system continues estimating cognitive state and showing Nudge overlays, but the full-screen Wall intervention is suppressed. Toggling the button emits a `monk-mode-changed` boolean event (Tauri frontend broadcast) which both windows receive and use to sync their `isMonkMode` state. The LV2 timer condition becomes `p_stuck > 0.70 && !isMonkMode`. This allows users to enter a focused, uninterrupted deep work session without risk of forced breaks.
 
 ### Dashboard Session Indicators
 

@@ -24,6 +24,7 @@ function App() {
     stuck: 0.8,
   });
   const [isWallActive, setIsWallActive] = useState(false);
+  const [isMonkMode, setIsMonkMode] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // D-1: getCurrentWindow() を useMemo でメモ化し不要な再生成を防止
@@ -49,7 +50,7 @@ function App() {
   //    D-3: Lv2 (Ambient Fade/Wall) は stuck>LV2_STUCK_THRESHOLD が LV2_TIMER_MS 継続で発動
   //    useRef でタイマー参照を保持し、ポーリング更新のたびにリセットされる問題を修正
   useEffect(() => {
-    if (cognitiveState.stuck > LV2_STUCK_THRESHOLD && !isWallActive) {
+    if (cognitiveState.stuck > LV2_STUCK_THRESHOLD && !isWallActive && !isMonkMode) {
       // 閾値超過中かつタイマー未設定のときのみ新規タイマーを立てる
       if (!timerRef.current) {
         timerRef.current = setTimeout(() => {
@@ -58,13 +59,13 @@ function App() {
         }, LV2_TIMER_MS);
       }
     } else {
-      // 閾値を下回った or Wall 解除 → タイマーキャンセル
+      // 閾値を下回った or Wall 解除 or Monk Mode ON → タイマーキャンセル
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     }
-  }, [cognitiveState.stuck, isWallActive]);
+  }, [cognitiveState.stuck, isWallActive, isMonkMode]);
 
   // 4. Sensor Integration (Unlock Logic)
   //    Wall解除後にメインウィンドウをフォーカス:
@@ -86,12 +87,12 @@ function App() {
     };
   }, [windowLabel, currentWindow]);
 
-  // 5. Monk Mode: Dashboard の "Monk Mode" ボタンから wall-activate を受け取り Wall を起動。
-  //    両ウィンドウ(main/overlay)がこのイベントをリッスンし isWallActive=true にする。
-  //    overlayウィンドウ側でWallが発動、メインウィンドウ側は状態同期のみ。
+  // 5. Monk Mode: Dashboard のトグルから monk-mode-changed を受け取り isMonkMode を更新。
+  //    両ウィンドウ(main/overlay)がこのイベントをリッスンし状態を同期する。
+  //    Monk Mode ON 時は LV2 Wall タイマーが無効化される。
   useEffect(() => {
-    const unlisten = listen("wall-activate", () => {
-      setIsWallActive(true);
+    const unlisten = listen("monk-mode-changed", (event) => {
+      setIsMonkMode(event.payload as boolean);
     });
 
     return () => {
@@ -115,7 +116,7 @@ function App() {
 
   // Default to Main Dashboard
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} />
+    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} />
   );
 }
 

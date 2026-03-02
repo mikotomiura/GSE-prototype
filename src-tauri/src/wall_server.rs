@@ -10,10 +10,9 @@ use qrcode::QrCode;
 use tauri::{Emitter, Runtime, State};
 use tiny_http::{Header, Response, Server};
 
-// PC-side idle detection: auto-unlock when no keyboard input for this duration.
-const KEYBOARD_IDLE_MS: u64 = 120_000; // 2 minutes
-
 // Safety fallback: force-unlock if user never returns (prevents permanent lock).
+// Primary unlock is driven by the smartphone: the phone page auto-sends /unlock
+// when the 2-minute countdown reaches 0:00.
 const FALLBACK_TIMEOUT_SECS: u64 = 300; // 5 minutes
 
 // ---------------------------------------------------------------------------
@@ -62,20 +61,12 @@ pub fn start_wall_server<R: Runtime>(
     let qr_svg = generate_qr_data_url(&url)?;
     let info = WallServerInfo { qr_svg, url: url.clone() };
 
-    // Capture wall activation timestamp for idle detection:
-    // effective idle = max(last_key_ms, wall_start_ms) to prevent immediate
-    // unlock if the user was already idle before the wall activated.
-    let wall_start_ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64;
-
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_clone = shutdown.clone();
     let server_arc = Arc::new(server);
 
     thread::spawn(move || {
-        server_loop(server_arc, token, shutdown_clone, app, wall_start_ms);
+        server_loop(server_arc, token, shutdown_clone, app);
     });
 
     *state.stop_flag.lock().unwrap() = Some(shutdown);
@@ -99,7 +90,6 @@ fn server_loop<R: Runtime>(
     token: String,
     shutdown: Arc<AtomicBool>,
     app: tauri::AppHandle<R>,
-    wall_start_ms: u64,
 ) {
     let start = Instant::now();
     let fallback_timeout = Duration::from_secs(FALLBACK_TIMEOUT_SECS);
@@ -117,25 +107,6 @@ fn server_loop<R: Runtime>(
         }
 
         if shutdown.load(Ordering::Acquire) { break; }
-
-        // PC-side keyboard idle detection (primary unlock mechanism).
-        // effective_last = max(last_key_ms, wall_start_ms):
-        //   Prevents instant unlock if user was already idle before wall activated.
-        //   Resets the idle clock on each keypress after wall activation.
-        let last_key = crate::input::hook::last_key_ms();
-        let now_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
-        let effective_last = last_key.max(wall_start_ms);
-        if now_ms.saturating_sub(effective_last) >= KEYBOARD_IDLE_MS {
-            tracing::info!(
-                "WallServer: keyboard idle for {}s — user stepped away, unlocking",
-                KEYBOARD_IDLE_MS / 1000
-            );
-            let _ = app.emit("sensor-accelerometer", "move");
-            break;
-        }
 
         match server.recv_timeout(Duration::from_secs(1)) {
             Ok(Some(request)) => {
@@ -220,8 +191,9 @@ fn build_timer_html(server_url: &str, token: &str) -> String {
 }
 
 // Phone page: 2-minute countdown timer.
-// Primary unlock is PC-side keyboard idle detection (no HTTPS required).
-// The phone timer provides visual feedback and a manual "Done" backup button.
+// Primary unlock: phone timer auto-calls /unlock at 0:00 (synchronized with PC wall server).
+// User can also tap "Return Early" to unlock before the timer completes.
+// 5-minute server-side fallback handles network failures.
 const TIMER_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -238,18 +210,18 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
 .progress-fill{height:100%;background:#4ade80;border-radius:5px;transition:width 0.5s linear;width:0%;}
 .status{font-size:0.9rem;margin:0.5rem 0;min-height:3.5em;opacity:0.8;line-height:1.6}
 .icon{font-size:3rem;margin-bottom:0.6rem}
-.done-btn{display:none;padding:0.9rem 2.2rem;font-size:1.05rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;margin-top:0.8rem;}
+.done-btn{display:block;padding:0.9rem 2.2rem;font-size:1.05rem;background:#4ade80;color:#0f172a;border:none;border-radius:10px;cursor:pointer;font-weight:700;margin-top:0.8rem;}
 .complete{color:#4ade80;font-weight:700}
 </style>
 </head>
 <body>
 <div class="icon" id="icon">🚶</div>
 <h1>Take a Break!</h1>
-<p class="sub">Step away from your keyboard.<br>Your PC will unlock automatically in 2 minutes.</p>
+<p class="sub">Take a 2-minute break from your keyboard.<br>Your PC unlocks automatically when the timer ends.</p>
 <div class="timer" id="timer">2:00</div>
 <div class="progress-bg"><div class="progress-fill" id="progress"></div></div>
-<p class="status" id="status">The keyboard hook on your PC detects when you're away.<br>No action needed — just step away.</p>
-<button class="done-btn" id="doneBtn">I'm Done — Unlock Now</button>
+<p class="status" id="status">Walk away and relax.<br>Or tap below to return early.</p>
+<button class="done-btn" id="doneBtn">Return Early — Unlock Now</button>
 <script>
 (function(){
   var DURATION=120;
@@ -277,11 +249,7 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
     timerEl.textContent=mins+':'+(secs<10?'0':'')+secs;
     progressEl.style.width=Math.min(100,(elapsed/DURATION)*100)+'%';
     if(remaining<=0){
-      timerEl.textContent='0:00';
-      progressEl.style.width='100%';
-      iconEl.textContent='\u2705';
-      statusEl.textContent='Time\'s up! Your PC should unlock when you return. Or tap below.';
-      doneBtn.style.display='inline-block';
+      doUnlock();
     } else {
       setTimeout(tick,500);
     }

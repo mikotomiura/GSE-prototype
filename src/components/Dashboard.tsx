@@ -9,9 +9,10 @@ interface DashboardProps {
     stuck: number;
   };
   onQuit: () => void;
+  isMonkMode: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -62,9 +63,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit }) => {
       ? 'Active'
       : `Idle ${Math.floor(keyIdleMs / 1000)}s`;
 
-  const handleMonkMode = () => {
-    // 全ウィンドウに wall-activate を broadcast → overlayウィンドウがWallを発動
-    emit("wall-activate").catch(() => {});
+  const handleMonkModeToggle = () => {
+    // Monk Mode トグル: ON/OFF を broadcast → 両ウィンドウが isMonkMode を同期
+    // ON 時は LV2 Wall タイマーが無効化される
+    emit("monk-mode-changed", !isMonkMode).catch(() => {});
   };
 
   return (
@@ -124,9 +126,15 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit }) => {
         </div>
       </div>
 
-      {/* Monk Mode ボタン: 手動でWallを即時発動 */}
-      <button className="monk-mode-button" onClick={handleMonkMode}>
-        Monk Mode — Force Break
+      {/* Monk Mode トグル: ON=Wall無効, OFF=通常 */}
+      <button
+        className={`monk-mode-toggle ${isMonkMode ? 'on' : 'off'}`}
+        onClick={handleMonkModeToggle}
+      >
+        <span>{isMonkMode ? 'Monk Mode: ON' : 'Monk Mode: OFF'}</span>
+        <span className="monk-mode-label">
+          {isMonkMode ? 'Wall intervention disabled' : 'Wall intervention active'}
+        </span>
       </button>
 
       <div className="info-box">

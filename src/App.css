@@ -23,8 +23,6 @@ body {
   margin: 0;
   padding: 0;
   width: 100vw;
-  height: 100vh;
-  overflow: hidden;
 }
 
 /* Dashboard Styles */
@@ -34,7 +32,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  height: 100vh;
+  min-height: 100vh;
   box-sizing: border-box;
 }
 
@@ -178,25 +176,49 @@ body {
   color: var(--color-incubation);
 }
 
-/* Monk Mode button */
-.monk-mode-button {
+/* Monk Mode toggle (ON = Wall disabled, OFF = normal) */
+.monk-mode-toggle {
   width: 100%;
   max-width: 400px;
   padding: 0.7rem 1rem;
-  background: rgba(248, 113, 113, 0.10);
-  border: 1px solid rgba(248, 113, 113, 0.35);
   border-radius: 8px;
-  color: var(--color-stuck);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
-  letter-spacing: 0.03em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
 }
 
-.monk-mode-button:hover {
-  background: rgba(248, 113, 113, 0.22);
-  border-color: rgba(248, 113, 113, 0.6);
+.monk-mode-toggle.off {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.monk-mode-toggle.off:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.monk-mode-toggle.on {
+  background: rgba(250, 204, 21, 0.15);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  color: var(--color-incubation);
+}
+
+.monk-mode-toggle.on:hover {
+  background: rgba(250, 204, 21, 0.25);
+  border-color: rgba(250, 204, 21, 0.75);
+}
+
+.monk-mode-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
 }
 
 /* Overlay Styles */
