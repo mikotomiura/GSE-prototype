@@ -84,8 +84,8 @@ The three states are grounded in established cognitive science literature:
 │                                      └──────────┬───────────────┘  │
 │                                                 │ unlock            │
 │                                      ┌──────────┴───────────────┐  │
-│                                      │  Accelerometer (WinRT)   │  │
-│                                      │  Physical motion → unlock │  │
+│                                      │  Wall Server (tiny_http) │  │
+│                                      │  QR code → smartphone    │  │
 │                                      └──────────────────────────┘  │
 │                                                 │                   │
 │                                      ┌──────────▼───────────────┐  │
@@ -111,7 +111,7 @@ Main Thread (Tauri event loop)
     ├─ IME Polling Thread     ← recv_timeout(100 ms) wake; ImmGetOpenStatus + VK_DBE_* fallback
     │
     ├─ Logger Thread          ← bounded channel(512) → NDJSON file (BufWriter)
-    └─ Sensor Thread          ← Accelerometer (WinRT) → Wall unlock event
+    └─ Wall Server Thread     ← tiny_http; QR code served to smartphone for Wall unlock
 ```
 
 ---
@@ -146,7 +146,7 @@ GSE-Next/
 │   │   ├── lib.rs             # Tauri setup, thread orchestration, IPC commands
 │   │   ├── logger.rs          # Async NDJSON session logger
 │   │   ├── main.rs
-│   │   └── sensors.rs         # Accelerometer + Geolocator (WinRT sensors)
+│   │   └── wall_server.rs     # HTTP server + QR code; smartphone-based Wall unlock
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 │
@@ -524,7 +524,7 @@ If p\_stuck remains above 0.70 for 30 consecutive seconds, the system escalates 
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-The Wall is unlocked by the **accelerometer** (via WinRT `Windows.Devices.Sensors.Accelerometer`). When sufficient physical motion is detected, a `"sensor-accelerometer"` event with `"move"` payload triggers the Wall to dismiss and reset the intervention timer.
+The Wall is unlocked via a **smartphone QR code**. When the Wall activates, `Overlay.tsx` calls `start_wall_server`, which starts a local HTTP server (`tiny_http`) and generates a QR code pointing to `/unlock`. The user scans the QR code with their phone; the server emits a `"sensor-accelerometer"` event with `"move"` payload, dismissing the Wall and resetting the intervention timer. This approach is device-agnostic — no accelerometer hardware required.
 
 ### Design Rationale
 
@@ -641,4 +641,4 @@ Research prototype. All rights reserved.
 
 ---
 
-*Last updated: 2026-02-27*
+*Last updated: 2026-03-02*

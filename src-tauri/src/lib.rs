@@ -1,14 +1,14 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
-pub mod sensors;
+pub mod wall_server;
 
 use crate::analysis::{
     engine::{CognitiveState, CognitiveStateEngine},
     features::FeatureExtractor,
 };
 use crate::logger::{LogEntry, SessionLogger};
-use crate::sensors::SensorManager;
+use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, RecvTimeoutError, Sender};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tauri::{Manager, State};
+use tauri::State;
 
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
@@ -350,20 +350,16 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            let sensor_manager = SensorManager::new(app.handle().clone());
-            app.manage(sensor_manager);
-            let sensor_state: State<SensorManager<tauri::Wry>> = app.state();
-            sensor_state.start_monitoring();
-            Ok(())
-        })
         .manage(engine)
         .manage(log_state)
+        .manage(WallServerState::new())
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
             quit_app,
             get_session_file,
+            wall_server::start_wall_server,
+            wall_server::stop_wall_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

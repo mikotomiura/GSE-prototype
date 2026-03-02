@@ -1,13 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 
 interface OverlayProps {
     stuckProb: number;
     isWallActive: boolean;
 }
 
+interface WallServerInfo {
+    url: string;
+    qr_svg: string;
+}
+
 const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
     const [nudgeOpacity, setNudgeOpacity] = useState(0);
+    const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
 
     // 透過背景を設定（overlay ウィンドウ用）
@@ -18,10 +25,22 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
 
     // isWallActive に応じてクリック透過をトグル
     // Lv1 (nudge): クリック透過 → ユーザーは下のウィンドウを操作可能
-    // Lv2 (wall):  クリックブロック → 物理的に動くまで操作不可
+    // Lv2 (wall):  クリックブロック → QRコードをスキャンするまで操作不可
     useEffect(() => {
         currentWindow.setIgnoreCursorEvents(!isWallActive);
     }, [isWallActive, currentWindow]);
+
+    // Wall発動/解除に連動してWall Serverを起動/停止する
+    useEffect(() => {
+        if (isWallActive) {
+            invoke<WallServerInfo>("start_wall_server")
+                .then(info => setWallServerInfo(info))
+                .catch(e => console.error("Failed to start wall server:", e));
+        } else {
+            invoke("stop_wall_server").catch(console.error);
+            setWallServerInfo(null);
+        }
+    }, [isWallActive]);
 
     useEffect(() => {
         // Nudge Logic: visual feedback starts at 0.6 stuck probability
@@ -46,11 +65,21 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
             {isWallActive && (
                 <div className="wall-layer">
                     <h1>Time to Move!</h1>
-                    <p>Please stand up and walk around to unlock.</p>
-                    <div className="scramble-animation">
-                        {/* Abstract visual or icon */}
-                        <span>🚶‍♂️ 🏃‍♂️ 🚶‍♂️</span>
-                    </div>
+                    <p>スマートフォンでQRコードをスキャンして解除</p>
+                    {wallServerInfo ? (
+                        <>
+                            {/* サーバー生成のSVG QRコードをそのまま埋め込む */}
+                            <div
+                                className="qr-code"
+                                dangerouslySetInnerHTML={{ __html: wallServerInfo.qr_svg }}
+                            />
+                            <p className="wall-url">{wallServerInfo.url}</p>
+                        </>
+                    ) : (
+                        <div className="scramble-animation">
+                            <span>QR生成中...</span>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -36,15 +36,14 @@ windows = { version = "0.58", features = [
     "Win32_UI_Accessibility",
     "Win32_System_Com",
     "Win32_System_Variant",
-    "Win32_System_WinRT",
-    # WinRT for Sensors
-    "Devices_Sensors",
-    "Devices_Geolocation",
-    "Foundation",
 ] }
 
 # Inference Engines (ONNX Runtime — disabled: HMM is hand-coded, no inference needed yet)
 # ort = { version = "2.0.0-rc.0", features = ["load-dynamic"] }
+
+# Wall Server: QRコードによるスマートフォン連携Wall解除
+tiny_http = "0.12"
+qrcode = "0.14"
 
 # Utilities
 crossbeam-channel = "0.5"

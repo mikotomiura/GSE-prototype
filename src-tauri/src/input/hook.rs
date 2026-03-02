@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -89,18 +89,21 @@ unsafe impl Sync for ThreadSafeWinEventHook {}
 lazy_static! {
     static ref HOOK_HANDLE: Mutex<Option<ThreadSafeHook>> = Mutex::new(None);
     static ref WINEVENT_HOOK_HANDLE: Mutex<Option<ThreadSafeWinEventHook>> = Mutex::new(None);
-    static ref EVENT_SENDER: Mutex<Option<Sender<InputEvent>>> = Mutex::new(None);
-    /// Wake channel for the IME open polling thread.
-    /// Signalled on every keypress so the polling thread can update IME state
-    /// within ~5ms rather than waiting for the next 100ms polling cycle.
-    static ref POLL_WAKE_TX: Mutex<Option<Sender<()>>> = Mutex::new(None);
 }
+
+/// Lock-free sender for keystroke events → analysis thread.
+/// Set exactly once in `init_hook` before the hook thread starts.
+/// OnceLock eliminates even theoretical blocking in the hook callback.
+static EVENT_SENDER: OnceLock<Sender<InputEvent>> = OnceLock::new();
+
+/// Lock-free wake signal sender for the IME open polling thread.
+/// Set exactly once via `set_poll_wake_sender` before `init_hook`.
+static POLL_WAKE_TX: OnceLock<Sender<()>> = OnceLock::new();
 
 /// Store the polling thread's wake channel sender.
 /// Must be called before `init_hook` so the sender is ready when the hook fires.
 pub fn set_poll_wake_sender(tx: Sender<()>) {
-    let mut s = POLL_WAKE_TX.lock().unwrap();
-    *s = Some(tx);
+    let _ = POLL_WAKE_TX.set(tx);
 }
 
 /// WinEvent callback for cross-process IME composition detection.
@@ -129,10 +132,8 @@ unsafe extern "system" fn win_event_callback(
             IME_STATE_DIRTY.store(true, Ordering::Release);
             // Wake the polling thread immediately so the ImeState log entry is
             // emitted within ~5ms of the composition start event.
-            if let Ok(guard) = (*POLL_WAKE_TX).try_lock() {
-                if let Some(tx) = guard.as_ref() {
-                    let _ = tx.try_send(());
-                }
+            if let Some(tx) = POLL_WAKE_TX.get() {
+                let _ = tx.try_send(());
             }
         }
         // Composition ended: user pressed Enter (confirm) or Escape (cancel)
@@ -144,11 +145,8 @@ unsafe extern "system" fn win_event_callback(
 }
 
 pub fn init_hook(sender: Sender<InputEvent>) {
-    // Store sender in global state for use in hook callback
-    {
-        let mut s = (*EVENT_SENDER).lock().unwrap();
-        *s = Some(sender);
-    }
+    // Store sender in global state for use in hook callback (lock-free OnceLock)
+    let _ = EVENT_SENDER.set(sender);
 
     // Spawn dedicated hook thread
     // Both WH_KEYBOARD_LL and WinEvent hooks require a message loop to function.
@@ -287,11 +285,9 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                 is_press,
             };
 
-            // Non-blocking send of keystroke event to analysis thread
-            if let Ok(guard) = (*EVENT_SENDER).try_lock() {
-                if let Some(sender) = guard.as_ref() {
-                    let _ = sender.try_send(event);
-                }
+            // Non-blocking send of keystroke event to analysis thread (lock-free)
+            if let Some(sender) = EVENT_SENDER.get() {
+                let _ = sender.try_send(event);
             }
 
             // Wake the IME polling thread on every keypress, and also on VK_DBE_* key-up.
@@ -308,10 +304,8 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                     | VK_KANJI
             );
             if is_press || (is_release && is_ime_mode_key) {
-                if let Ok(guard) = (*POLL_WAKE_TX).try_lock() {
-                    if let Some(tx) = guard.as_ref() {
-                        let _ = tx.try_send(());
-                    }
+                if let Some(tx) = POLL_WAKE_TX.get() {
+                    let _ = tx.try_send(());
                 }
             }
         }

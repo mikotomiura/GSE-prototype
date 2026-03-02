@@ -85,8 +85,8 @@
 │                                      └──────────┬───────────────┘  │
 │                                                 │ unlock            │
 │                                      ┌──────────┴───────────────┐  │
-│                                      │  加速度センサー（WinRT） │  │
-│                                      │  身体の動き → Wall 解除  │  │
+│                                      │  Wall Server（tiny_http）│  │
+│                                      │  QRコード → スマートフォン│  │
 │                                      └──────────────────────────┘  │
 │                                                 │                   │
 │                                      ┌──────────▼───────────────┐  │
@@ -112,7 +112,7 @@
     ├─ IME ポーリングスレッド   ← recv_timeout(100ms) ウェイク; ImmGetOpenStatus + VK_DBE_* フォールバック
     │
     ├─ ロガースレッド           ← bounded channel(512) → NDJSON ファイル (BufWriter)
-    └─ センサースレッド         ← 加速度センサー (WinRT) → Wall 解除イベント
+    └─ Wall サーバースレッド    ← tiny_http; スマートフォンへ QRコードを配信し Wall を解除
 ```
 
 ---
@@ -147,7 +147,7 @@ GSE-Next/
 │   │   ├── lib.rs             # Tauri セットアップ、スレッド管理、IPC コマンド
 │   │   ├── logger.rs          # 非同期 NDJSON セッションロガー
 │   │   ├── main.rs
-│   │   └── sensors.rs         # 加速度センサー + ジオロケーター（WinRT）
+│   │   └── wall_server.rs     # HTTP サーバー + QRコード；スマートフォン連携 Wall 解除
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 │
@@ -524,7 +524,7 @@ p\_stuck が 0.70 を 30 秒間連続で超えた場合、システムは Wall �
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-Wall の解除には**加速度センサー**（WinRT `Windows.Devices.Sensors.Accelerometer`）を使用します。十分な身体の動きが検出されると、`"sensor-accelerometer"` イベントが `"move"` ペイロードとともに発行され、Wall が解除されて介入タイマーがリセットされます。
+Wall の解除には**スマートフォン QRコード**を使用します。Wall が発動すると `Overlay.tsx` が `start_wall_server` を呼び出し、ローカル HTTP サーバー（`tiny_http`）を起動して `/unlock` エンドポイントへの QRコードを生成します。ユーザーがスマートフォンでスキャンしてアクセスすると、サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行し、Wall が解除されて介入タイマーがリセットされます。加速度センサーハードウェアへの依存が不要なため、任意の Windows デバイスで動作します。
 
 ### 設計の根拠
 
@@ -641,4 +641,4 @@ python analysis/behavioral_gt.py "%USERPROFILE%\Documents\GSE-sessions\gse_YYYYM
 
 ---
 
-*最終更新：2026-02-27*
+*最終更新：2026-03-02*
