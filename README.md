@@ -524,7 +524,7 @@ If p\_stuck remains above 0.70 for 30 consecutive seconds, the system escalates 
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-The Wall is unlocked via a **smartphone QR code**. When the Wall activates, `Overlay.tsx` calls `start_wall_server`, which starts a local HTTP server (`tiny_http`) and generates a QR code pointing to `/unlock`. The user scans the QR code with their phone; the server emits a `"sensor-accelerometer"` event with `"move"` payload, dismissing the Wall and resetting the intervention timer. This approach is device-agnostic — no accelerometer hardware required.
+The Wall is unlocked via a **smartphone QR code + physical movement**. When the Wall activates, `Overlay.tsx` calls `start_wall_server`, which starts a local HTTP server (`tiny_http`), generates a secure one-time token, and displays a QR code pointing to `/shake?token=TOKEN`. The user scans the QR code; the server delivers an HTML page using the DeviceMotion API that detects shaking or walking. After 8 qualifying motion events (acceleration > 3 m/s² above gravity) within 5 seconds, the smartphone POSTs to `/unlock?token=TOKEN`, and the server emits a `"sensor-accelerometer"` event with `"move"` payload, dismissing the Wall. A 60-second fallback auto-unlocks if no motion is detected. This approach requires no PC hardware — any smartphone with motion sensors suffices.
 
 ### Design Rationale
 

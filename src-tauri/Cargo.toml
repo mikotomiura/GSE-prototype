@@ -44,6 +44,7 @@ windows = { version = "0.58", features = [
 # Wall Server: QRコードによるスマートフォン連携Wall解除
 tiny_http = "0.12"
 qrcode = "0.14"
+base64 = "0.22"
 
 # Utilities
 crossbeam-channel = "0.5"

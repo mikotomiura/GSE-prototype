@@ -524,7 +524,7 @@ p\_stuck が 0.70 を 30 秒間連続で超えた場合、システムは Wall �
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-Wall の解除には**スマートフォン QRコード**を使用します。Wall が発動すると `Overlay.tsx` が `start_wall_server` を呼び出し、ローカル HTTP サーバー（`tiny_http`）を起動して `/unlock` エンドポイントへの QRコードを生成します。ユーザーがスマートフォンでスキャンしてアクセスすると、サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行し、Wall が解除されて介入タイマーがリセットされます。加速度センサーハードウェアへの依存が不要なため、任意の Windows デバイスで動作します。
+Wall の解除には**スマートフォン QRコード + 身体的な動き**を使用します。Wall が発動すると `Overlay.tsx` が `start_wall_server` を呼び出し、ローカル HTTP サーバー（`tiny_http`）を起動して一回限りのセキュアトークンを生成し、`/shake?token=TOKEN` へのリンクが埋め込まれた QRコードを表示します。ユーザーがスマートフォンでスキャンすると、DeviceMotion API を用いた HTML ページが配信され、振動や歩行を検知します。5 秒以内に重力以上（3 m/s² 超）の加速度イベントが 8 回検知されると、スマートフォンが `/unlock?token=TOKEN` に POST し、サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行して Wall が解除されます。60 秒経過しても未解除の場合は自動的に解除されます（フォールバック）。PC 側に特別なハードウェアは不要で、モーションセンサーを備えた任意のスマートフォンで動作します。
 
 ### 設計の根拠
 

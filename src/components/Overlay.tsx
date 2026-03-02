@@ -68,10 +68,11 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
                     <p>スマートフォンでQRコードをスキャンして解除</p>
                     {wallServerInfo ? (
                         <>
-                            {/* サーバー生成のSVG QRコードをそのまま埋め込む */}
-                            <div
+                            {/* base64エンコードされたSVG QRコードをimg要素で表示 */}
+                            <img
                                 className="qr-code"
-                                dangerouslySetInnerHTML={{ __html: wallServerInfo.qr_svg }}
+                                src={wallServerInfo.qr_svg}
+                                alt="QR Code"
                             />
                             <p className="wall-url">{wallServerInfo.url}</p>
                         </>
