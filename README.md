@@ -21,9 +21,10 @@
 10. [1Hz Timer-Driven Inference & Synthetic Friction (v2.4)](#1hz-timer-driven-inference--synthetic-friction-v24)
 11. [Intervention UI: Nudge & Wall (v2.5)](#intervention-ui-nudge--wall-v25)
 12. [Session Start Screen & Engine Reset (v2.6)](#session-start-screen--engine-reset-v26)
-13. [Logging & Analysis](#logging--analysis)
-14. [Build Instructions](#build-instructions)
-15. [Academic References](#academic-references)
+13. [Frontend–Backend Initial State Sync (v2.7)](#frontendbackend-initial-state-sync-v27)
+14. [Logging & Analysis](#logging--analysis)
+15. [Build Instructions](#build-instructions)
+16. [Academic References](#academic-references)
 
 ---
 
@@ -208,7 +209,7 @@ ewma_t = 0.30 · raw_t + 0.70 · ewma_{t−1}
 
 ### Observation Bins
 
-(X, Y) ∈ [0,1]² is discretized into a 5×5 grid (25 bins) plus one penalty bin (obs = 25, triggered by ≥ 5 consecutive Backspace presses):
+(X, Y) ∈ [0,1]² is discretized into a 5×5 grid (25 bins) plus one penalty bin (obs = 25, triggered by ≥ 8 consecutive Backspace presses):
 
 ```
 Cognitive Friction X →  0(low)   1      2      3      4(high)
@@ -237,11 +238,11 @@ At each update, the belief vector **π** = [p_Flow, p_Inc, p_Stuck] is propagate
 
 | From \ To | Flow | Incubation | Stuck |
 |---|---|---|---|
-| **Flow** | 0.80 | 0.13 | 0.07 |
+| **Flow** | 0.75 | 0.17 | 0.08 |
 | **Incubation** | 0.12 | 0.80 | 0.08 |
 | **Stuck** | 0.06 | 0.18 | 0.76 |
 
-Flow self-transition 0.80 → mean dwell ≈ 5 s.
+Flow self-transition 0.75 → mean dwell ≈ 4 s (reduced from 0.80 to mitigate "Flow gravity" — the tendency to stay in Flow even when friction rises).
 Incubation 0.80 → consistent with Sio & Ormerod (2009): incubation typically lasts seconds to minutes.
 Stuck 0.76 → consistent with high perseveration tendency (Ohlsson, 1992).
 
@@ -267,23 +268,24 @@ Standard HMMs cannot model state duration distributions explicitly (they assume 
 ```
 display_t = α · raw_t + (1 − α) · display_{t−1}
 
-α = 0.25  (normal updates → time-constant τ ≈ 4 updates ≈ 4 s)
-α = 0.50  (backspace-penalty bin → rapid Stuck onset)
+α = 0.40  (normal updates → time-constant τ ≈ 2.5 updates ≈ 2.5 s)
+α = 0.60  (backspace-penalty bin during active typing → rapid Stuck onset)
+α = 0.50  (backspace-penalty bin during silence → moderate Stuck onset)
 ```
 
-`get_current_state()` returns `display_probs`. A genuine state change now requires approximately 4 seconds of sustained evidence to register in the UI and log.
+`get_current_state()` returns `display_probs`. A genuine state change now requires approximately 2.5 seconds of sustained evidence to register in the UI and log.
 
-Simulation of the window-reset scenario:
+Simulation of the window-reset scenario (α = 0.40, raw p\_stuck ≈ 0 after reset):
 
 | Tick | raw p_flow | display p_stuck |
 |---|---|---|
 | 0 (before reset) | 0.01 | **0.994** |
-| 1 (reset, flow signal) | 0.48 | 0.748 |
-| 2 | 0.52 | 0.563 |
-| 3 | 0.54 | 0.424 |
-| 4 | 0.56 | 0.319 |
+| 1 (reset, flow signal) | 0.48 | 0.596 |
+| 2 | 0.52 | 0.358 |
+| 3 | 0.54 | 0.215 |
+| 4 | 0.56 | 0.129 |
 
-The Stuck display probability decays gracefully over ~4 seconds rather than collapsing instantly.
+The Stuck display probability decays gracefully over ~2.5 seconds rather than collapsing instantly.
 
 ---
 
@@ -521,7 +523,7 @@ The overlay window is set to **click-through** mode via Tauri's `setIgnoreCursor
 
 ### Wall (Lv2): Forced Break
 
-If p\_stuck remains above 0.70 for 30 consecutive seconds, the system escalates to a Wall — a full-screen blocking overlay that requires **physical movement** to dismiss. The overlay displays:
+If p\_stuck accumulates above 0.70 for a total of 30 seconds (cumulative, not consecutive — partial recovery below 0.50 causes 2× speed decay; the 0.50–0.70 range freezes the timer), the system escalates to a Wall — a full-screen blocking overlay that requires **physical movement** to dismiss. The overlay displays:
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
@@ -561,7 +563,7 @@ Previous versions started keystroke detection and HMM inference immediately on a
 
 A **Start Screen** is shown on app launch. Detection does not begin until the user clicks "開始する" (Start). On click, `invoke("start_session")` calls the Rust backend which:
 
-1. **Resets `CognitiveStateEngine`**: returns all HMM state to initial priors `[0.5, 0.3, 0.2]`, clearing `display_probs`, `axes_ewma`, and `backspace_streak`
+1. **Resets `CognitiveStateEngine`**: returns all HMM state to Flow-biased initial priors `[0.80, 0.15, 0.05]` (most users start sessions in a fluent state), clearing `display_probs`, `axes_ewma`, and `backspace_streak`
 2. **Flushes `FeatureExtractor`**: an `Arc<AtomicBool>` signal is set; the analysis thread clears all keystroke buffers and drains any queued key events
 3. **Logs session boundary**: `LogEntry::SessionStart { timestamp }` is written to the NDJSON log
 
@@ -575,6 +577,28 @@ The React session timer starts from the click moment (not from app launch).
 | Session timer starts at app launch | Session timer starts when user clicks "Start" |
 | HMM may be dirty from pre-session keystrokes | HMM always starts clean from initial priors |
 | No session boundary in log | `session_start` marker in NDJSON log |
+
+---
+
+## Frontend–Backend Initial State Sync (v2.7)
+
+### Background
+
+After the parameter tuning that updated the backend's initial priors from `[0.5, 0.3, 0.2]` to `[0.80, 0.15, 0.05]`, the React `useState` initial value remained at `{flow: 0.5, incubation: 0.3, stuck: 0.2}`. This caused a visible probability jump (flicker) immediately after the first `get_cognitive_state` poll returned data aligned with the new priors.
+
+### Resolution
+
+The `cognitiveState` initial value in `App.tsx` is synchronized with the backend's `initial_probs`:
+
+```tsx
+const [cognitiveState, setCognitiveState] = useState<CognitiveStateRaw>({
+  flow: 0.80,
+  incubation: 0.15,
+  stuck: 0.05,
+});
+```
+
+The UI now displays consistent values from launch to the first data poll (~500 ms), eliminating the cold-start flicker.
 
 ---
 
