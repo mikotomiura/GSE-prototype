@@ -122,8 +122,13 @@ impl CognitiveStateEngine {
                                0.990,
         ];
 
-        // 初期事前確率: バランス型で開始 (Flow偏重を排除)
-        let initial_probs = [0.5, 0.3, 0.2];
+        // 初期事前確率: Flow 優先で開始。
+        // セッション開始直後はほぼ全員 Flow 状態でタイピングを始めるため、
+        // バランス型 [0.5, 0.3, 0.2] では Inc=30% が最初から表示され
+        // コールドスタート時に誤ってIncubation状態が見えてしまう。
+        // [0.80, 0.15, 0.05] にすることで初期 Inc=15% に抑え、
+        // さらに display_probs α=0.40 の高速収束と組み合わせてノイズを低減する。
+        let initial_probs = [0.80, 0.15, 0.05];
 
         Self {
             transitions: Arc::new(transitions),
@@ -131,9 +136,10 @@ impl CognitiveStateEngine {
             current_state_probs: Arc::new(Mutex::new(initial_probs)),
             is_paused: Arc::new(Mutex::new(false)),
             backspace_streak: Arc::new(Mutex::new(0)),
-            // (0.3, 0.5) = 中立領域で初期化 (obs=7; Flow/Inc/Stuck がほぼ均等な観測ビン)
-            // (0.0, 1.0) で開始すると初回更新で p_flow=1.0 に固定されるため変更
-            axes_ewma: Arc::new(Mutex::new((0.3, 0.5))),
+            // (0.1, 0.8) = Flow 方向で初期化 (obs=4; low Friction × high Engagement)
+            // 旧 (0.3, 0.5) では obs=7 (中立) から始まり初回観測がやや Inc 寄りだった。
+            // (0.0, 1.0) は最初の更新で p_flow=1.0 に固定されるため避ける。
+            axes_ewma: Arc::new(Mutex::new((0.1, 0.8))),
             // display_probs は initial_probs と同値で初期化
             display_probs: Arc::new(Mutex::new(initial_probs)),
         }
@@ -142,7 +148,7 @@ impl CognitiveStateEngine {
     /// セッション開始時に全内部状態を初期値にリセットする。
     /// start_session Tauri コマンドから呼ばれる。
     pub fn reset(&self) {
-        let initial_probs = [0.5, 0.3, 0.2];
+        let initial_probs = [0.80, 0.15, 0.05];
         match self.current_state_probs.lock() {
             Ok(mut p) => *p = initial_probs,
             Err(poisoned) => *poisoned.into_inner() = initial_probs,
@@ -152,8 +158,8 @@ impl CognitiveStateEngine {
             Err(poisoned) => *poisoned.into_inner() = initial_probs,
         }
         match self.axes_ewma.lock() {
-            Ok(mut e) => *e = (0.3, 0.5),
-            Err(poisoned) => *poisoned.into_inner() = (0.3, 0.5),
+            Ok(mut e) => *e = (0.1, 0.8),
+            Err(poisoned) => *poisoned.into_inner() = (0.1, 0.8),
         }
         match self.backspace_streak.lock() {
             Ok(mut s) => *s = 0,
@@ -409,12 +415,12 @@ impl CognitiveStateEngine {
         *current = new_probs;
 
         // ── Hysteresis Layer ──────────────────────────────────────────────
-        // display_probs に遅い EMA を適用し、ウィンドウリセット時の
+        // display_probs に EMA を適用し、ウィンドウリセット時の
         // Cold-Start 瞬間遷移 (Stuck→Flow in 1ms) を防ぐ。
         //
-        // α=0.25 (通常): 時定数 ≈ 4 更新 ≈ 4 秒
-        // α=0.50 (ペナルティ): Backspace 連続時は素早く Stuck に収束
-        let display_alpha = if apply_backspace_penalty { 0.50 } else { 0.25 };
+        // α=0.40 (通常): 時定数 ≈ 2.5 更新 ≈ 2.5 秒 (旧 α=0.25 → 4秒 より高速)
+        // α=0.60 (ペナルティ): Backspace 連続時は素早く Stuck に収束 (旧 0.50)
+        let display_alpha = if apply_backspace_penalty { 0.60 } else { 0.40 };
 
         let mut display = match self.display_probs.lock() {
             Ok(g) => g,
@@ -486,14 +492,14 @@ impl CognitiveStateEngine {
 
         *current = new_probs;
 
-        // display_probs: ペナルティなので α=0.50 で素早く Stuck に収束
+        // display_probs: ペナルティなので α=0.60 で素早く Stuck に収束
         let mut display = match self.display_probs.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
         };
         let mut disp_sum = 0.0;
         for i in 0..n_states {
-            display[i] = 0.50 * new_probs[i] + 0.50 * display[i];
+            display[i] = 0.60 * new_probs[i] + 0.40 * display[i];
             disp_sum += display[i];
         }
         if disp_sum > 0.0 {
