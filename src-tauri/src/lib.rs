@@ -71,6 +71,14 @@ fn get_keyboard_idle_ms() -> u64 {
     now_ms.saturating_sub(last)
 }
 
+/// 最後のキー押下時刻を UNIX エポックミリ秒で返す (advice.md §D)
+/// JS 側で Date.now() - idle_ms として逆算するより精度が高い。
+/// キーが一度も押されていない場合は 0 を返す。
+#[tauri::command]
+fn get_last_keypress_timestamp() -> u64 {
+    crate::input::hook::last_key_ms()
+}
+
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
@@ -350,7 +358,9 @@ pub fn run() {
                     if let Some(sf) = extractor.make_silence_observation(silence_secs) {
                         // サイレンス中も現在のIMEモードを使用
                         let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
-                        engine_for_thread.update(&sf, ime_open);
+                        // update_silence(): EWMA を更新しない (advice.md §F)
+                        // 合成特徴量 (f1=2000ms 等) による EWMA ドリフトを防ぐ
+                        engine_for_thread.update_silence(&sf, ime_open);
                         last_engine_update = Instant::now();
 
                         let state_probs = engine_for_thread.get_current_state();
@@ -452,6 +462,7 @@ pub fn run() {
             greet,
             get_cognitive_state,
             get_keyboard_idle_ms,
+            get_last_keypress_timestamp,
             start_session,
             quit_app,
             get_session_file,

@@ -75,8 +75,9 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
         }
         const interval = setInterval(async () => {
             try {
-                const idle = await invoke<number>("get_keyboard_idle_ms");
-                const lastKeyAt = Date.now() - idle;
+                // get_last_keypress_timestamp() は Rust の LAST_KEY_MS をエポックmsで直接返す。
+                // Date.now() - idle_ms の逆算より精度が高い (advice.md §D)
+                const lastKeyAt = await invoke<number>("get_last_keypress_timestamp");
                 if (
                     lastKeyAt > wallStartTimeRef.current &&
                     lastKeyAt > lastWarnedKeyAtRef.current + 1000

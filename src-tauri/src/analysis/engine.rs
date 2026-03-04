@@ -71,49 +71,55 @@ impl CognitiveStateEngine {
         //
         // Penalty bin (obs=25): backspace_streak ≥ 5 → near-certain Stuck.
         // Each state's non-penalty bins sum to ≈1.0; HMM normalizes anyway.
+        // Emission Floor ポリシー変更 (advice.md §E):
+        // 旧実装では全ビンに動的に EMISSION_FLOOR=0.05 を加算していたため、
+        // ペナルティビン (Stuck=0.99) のシャープさが 0.99/0.05≈20x に薄まっていた。
+        // 新実装では 0.00 を一律 0.001 に置き換えて静的テーブルに焼き込み、
+        // 動的加算を廃止する。これにより ペナルティ比が 0.99/0.001≈990x に強化される。
+        // HMM 正規化が行われるため合計値の厳密な 1.0 は不要。
         #[rustfmt::skip]
         let emissions: [f64; 78] = [
-            // ── Flow (State 0) ─────────────────────────── non-penalty sum ≈ 0.85
-            //  x=0 (low F)    y: 0     1     2     3     4
-                               0.01, 0.02, 0.05, 0.12, 0.14,
-            //  x=1            y: 0     1     2     3     4
-                               0.01, 0.02, 0.05, 0.12, 0.13,
-            //  x=2            y: 0     1     2     3     4
-                               0.00, 0.01, 0.03, 0.06, 0.08,
-            //  x=3            y: 0     1     2     3     4
-                               0.00, 0.00, 0.00, 0.00, 0.00,
-            //  x=4 (high F)   y: 0     1     2     3     4
-                               0.00, 0.00, 0.00, 0.00, 0.00,
-            //  penalty bin
-                               0.00,
+            // ── Flow (State 0) ─────────────────────────── non-penalty sum ≈ 0.86
+            //  x=0 (low F)    y: 0      1      2      3      4
+                               0.010, 0.020, 0.050, 0.120, 0.140,
+            //  x=1            y: 0      1      2      3      4
+                               0.010, 0.020, 0.050, 0.120, 0.130,
+            //  x=2            y: 0      1      2      3      4
+                               0.001, 0.010, 0.030, 0.060, 0.080,
+            //  x=3            y: 0      1      2      3      4
+                               0.001, 0.001, 0.001, 0.001, 0.001,
+            //  x=4 (high F)   y: 0      1      2      3      4
+                               0.001, 0.001, 0.001, 0.001, 0.001,
+            //  penalty bin (BS streak ≥5 → near-zero Flow)
+                               0.001,
 
             // ── Incubation (State 1) ──────────────────── non-penalty sum ≈ 1.07
-            //  x=0 (low F)    y: 0     1     2     3     4
-                               0.15, 0.10, 0.04, 0.03, 0.02,
-            //  x=1            y: 0     1     2     3     4
-                               0.14, 0.10, 0.04, 0.03, 0.02,
-            //  x=2            y: 0     1     2     3     4
-                               0.10, 0.08, 0.03, 0.01, 0.00,
-            //  x=3            y: 0     1     2     3     4
-                               0.05, 0.04, 0.01, 0.00, 0.00,
-            //  x=4 (high F)   y: 0     1     2     3     4
-                               0.04, 0.03, 0.01, 0.00, 0.00,
+            //  x=0 (low F)    y: 0      1      2      3      4
+                               0.150, 0.100, 0.040, 0.030, 0.020,
+            //  x=1            y: 0      1      2      3      4
+                               0.140, 0.100, 0.040, 0.030, 0.020,
+            //  x=2            y: 0      1      2      3      4
+                               0.100, 0.080, 0.030, 0.010, 0.001,
+            //  x=3            y: 0      1      2      3      4
+                               0.050, 0.040, 0.010, 0.001, 0.001,
+            //  x=4 (high F)   y: 0      1      2      3      4
+                               0.040, 0.030, 0.010, 0.001, 0.001,
             //  penalty bin
-                               0.01,
+                               0.010,
 
-            // ── Stuck (State 2) ───────────────── non-penalty sum = 1.00 (+0.99)
-            //  x=0 (low F)    y: 0     1     2     3     4
-                               0.00, 0.00, 0.00, 0.00, 0.00,
-            //  x=1            y: 0     1     2     3     4
-                               0.00, 0.00, 0.00, 0.00, 0.00,
-            //  x=2            y: 0     1     2     3     4
-                               0.02, 0.04, 0.02, 0.00, 0.00,
-            //  x=3            y: 0     1     2     3     4
-                               0.10, 0.16, 0.07, 0.02, 0.00,
-            //  x=4 (high F)   y: 0     1     2     3     4
-                               0.16, 0.22, 0.12, 0.05, 0.02,
+            // ── Stuck (State 2) ───────────────────────── non-penalty sum ≈ 1.01
+            //  x=0 (low F)    y: 0      1      2      3      4
+                               0.001, 0.001, 0.001, 0.001, 0.001,
+            //  x=1            y: 0      1      2      3      4
+                               0.001, 0.001, 0.001, 0.001, 0.001,
+            //  x=2            y: 0      1      2      3      4
+                               0.020, 0.040, 0.020, 0.001, 0.001,
+            //  x=3            y: 0      1      2      3      4
+                               0.100, 0.160, 0.070, 0.020, 0.001,
+            //  x=4 (high F)   y: 0      1      2      3      4
+                               0.160, 0.220, 0.120, 0.050, 0.020,
             //  penalty bin  (backspace streak ≥5 → near-certain Stuck)
-                               0.99,
+                               0.990,
         ];
 
         // 初期事前確率: バランス型で開始 (Flow偏重を排除)
@@ -375,11 +381,8 @@ impl CognitiveStateEngine {
         let n_states = 3;
 
         // Forward Algorithm Step
-        // ε-floor: 放射確率の最小値を保証し、単一観測で状態確率が完全に0になることを防ぐ。
-        // 0.05 (旧: 0.04) に引き上げることでFlow Gravityをさらに緩和する。
-        // 最大 p ≈ 0.85–0.89 程度に収まり、状態間の確率変化が滑らかになる。
-        const EMISSION_FLOOR: f64 = 0.05;
-
+        // ε-floor は静的テーブルに焼き込み済み (全ビン最小値 = 0.001)。
+        // 動的加算は廃止: ペナルティビンの比率が 20x → 990x に向上。
         let mut sum_prob = 0.0;
 
         for j in 0..n_states {
@@ -390,7 +393,7 @@ impl CognitiveStateEngine {
             }
 
             // 3 states × 26 bins: index = j * 26 + obs
-            let e_prob = self.emissions[j * 26 + obs] + EMISSION_FLOOR;
+            let e_prob = self.emissions[j * 26 + obs];
             new_probs[j] = trans_sum * e_prob;
             sum_prob += new_probs[j];
         }
@@ -420,6 +423,77 @@ impl CognitiveStateEngine {
         let mut disp_sum = 0.0;
         for i in 0..n_states {
             display[i] = display_alpha * new_probs[i] + (1.0 - display_alpha) * display[i];
+            disp_sum += display[i];
+        }
+        if disp_sum > 0.0 {
+            for v in display.iter_mut() {
+                *v /= disp_sum;
+            }
+        }
+    }
+
+    /// サイレンス（完全無入力）時の HMM 更新 (advice.md §F)。
+    ///
+    /// 通常の update() と異なり、axes_ewma を更新しない。
+    /// サイレンス特徴量 (f1=2000ms 等の合成値) で EWMA を更新すると、
+    /// 純粋な思考停止期間でも Friction が不自然に高くなり Stuck 誤判定が起きる。
+    ///
+    /// Backspace ペナルティが pending の場合（streak ≥ 5）のみ obs=25 で HMM を更新する。
+    /// それ以外は早期リターンして状態を凍結する（EWMA も HMM も変化しない）。
+    pub fn update_silence(&self, _features: &Features, _ime_open: bool) {
+        if self.get_paused() {
+            return;
+        }
+
+        let apply_backspace_penalty = match self.backspace_streak.lock() {
+            Ok(s) => *s >= 5,
+            Err(poisoned) => *poisoned.into_inner() >= 5,
+        };
+
+        // 純粋なアイドル: EWMA も HMM も更新しない（状態を凍結）
+        if !apply_backspace_penalty {
+            return;
+        }
+
+        // Backspace ペナルティビン (obs=25) で HMM のみ更新 (EWMA はスキップ)
+        let obs = 25_usize;
+
+        let mut current = match self.current_state_probs.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        let old_probs = *current;
+        let mut new_probs = [0.0; 3];
+        let n_states = 3;
+        let mut sum_prob = 0.0;
+
+        for j in 0..n_states {
+            let mut trans_sum = 0.0;
+            for i in 0..n_states {
+                trans_sum += old_probs[i] * self.transitions[i * n_states + j];
+            }
+            let e_prob = self.emissions[j * 26 + obs];
+            new_probs[j] = trans_sum * e_prob;
+            sum_prob += new_probs[j];
+        }
+
+        if sum_prob > 0.0 {
+            for j in 0..n_states {
+                new_probs[j] /= sum_prob;
+            }
+        }
+
+        *current = new_probs;
+
+        // display_probs: ペナルティなので α=0.50 で素早く Stuck に収束
+        let mut display = match self.display_probs.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let mut disp_sum = 0.0;
+        for i in 0..n_states {
+            display[i] = 0.50 * new_probs[i] + 0.50 * display[i];
             disp_sum += display[i];
         }
         if disp_sum > 0.0 {

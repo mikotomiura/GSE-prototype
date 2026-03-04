@@ -22,12 +22,15 @@ pub struct WallServerInfo {
 
 pub struct WallServerState {
     stop_flag: std::sync::Mutex<Option<Arc<AtomicBool>>>,
+    /// 動的に追加したファイアウォールルール名。stop 時に削除する (advice.md §B)
+    firewall_rule: std::sync::Mutex<Option<String>>,
 }
 
 impl WallServerState {
     pub fn new() -> Self {
         Self {
             stop_flag: std::sync::Mutex::new(None),
+            firewall_rule: std::sync::Mutex::new(None),
         }
     }
 }
@@ -41,8 +44,12 @@ pub fn start_wall_server<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: State<WallServerState>,
 ) -> Result<WallServerInfo, String> {
+    // 前回サーバーを停止し、既存のファイアウォールルールを削除
     if let Some(flag) = state.stop_flag.lock().unwrap().take() {
         flag.store(true, Ordering::Release);
+    }
+    if let Some(rule) = state.firewall_rule.lock().unwrap().take() {
+        remove_firewall_rule(&rule);
     }
 
     let server = Server::http("0.0.0.0:0").map_err(|e| format!("HTTP bind failed: {}", e))?;
@@ -50,6 +57,12 @@ pub fn start_wall_server<R: Runtime>(
     let local_ip = detect_local_ip();
     let token = generate_token();
     let url = format!("http://{}:{}/shake?token={}", local_ip, port, token);
+
+    // Windowsファイアウォールにインバウンド許可ルールを追加 (advice.md §B)
+    // netsh は管理者権限が必要。権限不足の場合は警告を出して続行する。
+    let rule_name = format!("GSE-WallServer-{}", port);
+    add_firewall_rule(port, &rule_name);
+    *state.firewall_rule.lock().unwrap() = Some(rule_name);
 
     tracing::info!("WallServer: started on {}:{} (token={}...)", local_ip, port, &token[..8]);
 
@@ -73,6 +86,9 @@ pub fn start_wall_server<R: Runtime>(
 pub fn stop_wall_server(state: State<WallServerState>) {
     if let Some(flag) = state.stop_flag.lock().unwrap().take() {
         flag.store(true, Ordering::Release);
+    }
+    if let Some(rule) = state.firewall_rule.lock().unwrap().take() {
+        remove_firewall_rule(&rule);
     }
 }
 
@@ -156,6 +172,64 @@ fn generate_token() -> String {
     let mut h2 = RandomState::new().build_hasher();
     h2.write_u64(v1 ^ std::process::id() as u64);
     format!("{:016x}{:016x}", v1, h2.finish())
+}
+
+/// Windows Defender ファイアウォールにインバウンド TCP 許可ルールを追加する (advice.md §B)
+/// netsh advfirewall は管理者権限が必要。権限不足でも Err を返さず警告ログのみ出す。
+fn add_firewall_rule(port: u16, rule_name: &str) {
+    let result = std::process::Command::new("netsh")
+        .args([
+            "advfirewall", "firewall", "add", "rule",
+            &format!("name={}", rule_name),
+            "protocol=TCP",
+            "dir=in",
+            "action=allow",
+            &format!("localport={}", port),
+        ])
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            tracing::info!("WallServer: firewall rule '{}' added for port {}", rule_name, port);
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            tracing::warn!(
+                "WallServer: firewall rule add failed (admin required?): {}",
+                stderr.trim()
+            );
+            tracing::warn!(
+                "To allow smartphone access manually: \
+                 netsh advfirewall firewall add rule name={} protocol=TCP dir=in action=allow localport={}",
+                rule_name, port
+            );
+        }
+        Err(e) => {
+            tracing::warn!("WallServer: could not run netsh: {}", e);
+        }
+    }
+}
+
+/// Windows Defender ファイアウォールから GSE ルールを削除する
+fn remove_firewall_rule(rule_name: &str) {
+    let result = std::process::Command::new("netsh")
+        .args([
+            "advfirewall", "firewall", "delete", "rule",
+            &format!("name={}", rule_name),
+        ])
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            tracing::info!("WallServer: firewall rule '{}' removed", rule_name);
+        }
+        Ok(_) => {
+            tracing::debug!("WallServer: firewall rule '{}' not found (already removed?)", rule_name);
+        }
+        Err(e) => {
+            tracing::warn!("WallServer: could not remove firewall rule: {}", e);
+        }
+    }
 }
 
 fn generate_qr_data_url(url: &str) -> Result<String, String> {

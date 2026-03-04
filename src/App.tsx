@@ -13,8 +13,10 @@ interface CognitiveStateRaw {
 }
 
 // Lv1トリガー閾値: NudgeはOverlay.tsxで stuck>0.6 時に表示
-// Lv2トリガー閾値: Wallは stuck>0.7 が 30秒継続した際に表示
+// Lv2トリガー閾値: Wallは stuck>0.7 の累積時間が 30秒に達した際に表示 (advice.md §C)
+// LV2_SLACK_THRESHOLD: 0.5 未満に落ちた場合のみ累積タイマーを減衰させる
 const LV2_STUCK_THRESHOLD = 0.7;
+const LV2_SLACK_THRESHOLD = 0.5;
 const LV2_TIMER_MS = 30_000;
 
 function App() {
@@ -26,7 +28,9 @@ function App() {
   const [isWallActive, setIsWallActive] = useState(false);
   const [isMonkMode, setIsMonkMode] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
+  const stuckAccumMsRef = useRef<number>(0);
+  const lastStuckTickRef = useRef<number>(Date.now());
 
   // D-1: getCurrentWindow() を useMemo でメモ化し不要な再生成を防止
   const currentWindow = useMemo(() => getCurrentWindow(), []);
@@ -49,26 +53,34 @@ function App() {
     return () => clearInterval(interval);
   }, [isStarted, windowLabel]);
 
-  // 3. Intervention Layer ロジック
+  // 3. Intervention Layer ロジック (advice.md §C 累積タイマー)
   //    D-2: Lv1 (Nudge) は Overlay.tsx 側で stuck>0.6 時に即時表示済み
-  //    D-3: Lv2 (Ambient Fade/Wall) は stuck>LV2_STUCK_THRESHOLD が LV2_TIMER_MS 継続で発動
-  //    useRef でタイマー参照を保持し、ポーリング更新のたびにリセットされる問題を修正
+  //    D-3: Lv2 (Wall) は stuck>LV2_STUCK_THRESHOLD の累積時間が LV2_TIMER_MS に達したら発動
+  //    「連続 30 秒」ではなく「累積 30 秒」: 一瞬閾値を下回っても即リセットされない。
+  //    stuck < LV2_SLACK_THRESHOLD に落ちた場合のみ累積を 2× 速度で減衰させる。
+  //    0.5 ≤ stuck ≤ 0.7 の範囲は「遊び」として累積を凍結（増加も減衰もしない）。
   useEffect(() => {
-    if (cognitiveState.stuck > LV2_STUCK_THRESHOLD && !isWallActive && !isMonkMode) {
-      // 閾値超過中かつタイマー未設定のときのみ新規タイマーを立てる
-      if (!timerRef.current) {
-        timerRef.current = setTimeout(() => {
-          timerRef.current = null;
-          setIsWallActive(true);
-        }, LV2_TIMER_MS);
-      }
-    } else {
-      // 閾値を下回った or Wall 解除 or Monk Mode ON → タイマーキャンセル
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
+    const now = Date.now();
+    const elapsed = now - lastStuckTickRef.current;
+    lastStuckTickRef.current = now;
+
+    // Wall 発動中 or Monk Mode ON: 累積リセット
+    if (isWallActive || isMonkMode) {
+      stuckAccumMsRef.current = 0;
+      return;
     }
+
+    if (cognitiveState.stuck > LV2_STUCK_THRESHOLD) {
+      stuckAccumMsRef.current = Math.min(stuckAccumMsRef.current + elapsed, LV2_TIMER_MS);
+      if (stuckAccumMsRef.current >= LV2_TIMER_MS) {
+        stuckAccumMsRef.current = 0;
+        setIsWallActive(true);
+      }
+    } else if (cognitiveState.stuck < LV2_SLACK_THRESHOLD) {
+      // 閾値を大きく下回った場合: 2× 速度で減衰
+      stuckAccumMsRef.current = Math.max(0, stuckAccumMsRef.current - elapsed * 2);
+    }
+    // LV2_SLACK_THRESHOLD ≤ stuck ≤ LV2_STUCK_THRESHOLD: 凍結（変化なし）
   }, [cognitiveState.stuck, isWallActive, isMonkMode]);
 
   // 4. Sensor Integration (Unlock Logic)
