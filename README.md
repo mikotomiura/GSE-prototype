@@ -232,7 +232,7 @@ At each update, the belief vector **π** = [p_Flow, p_Inc, p_Stuck] is propagate
 ```
 
 - **A** = 3×3 transition matrix (rows = from, cols = to)
-- **B** = 3×26 emission matrix (state × observation bin); minimum value = 0.001 (static floor baked into the table, prevents probability absorption)
+- **B** = 3×26 emission matrix (state × observation bin); minimum value = 0.01 (static floor baked into the table, prevents probability absorption)
 
 ### Transition Matrix A
 
@@ -298,7 +298,7 @@ The Stuck display probability decays gracefully over ~2.5 seconds rather than co
 
 These clusters arise because for observation bins dominated by one state, the ratio of emission probabilities determines a unique fixed point. With ε = 0.05 the penalty-bin ratio is only 0.99/0.05 ≈ 20×, blunting the Backspace-streak Stuck signal significantly.
 
-**Fix:** Dynamic additive floor removed. Emission values of exactly 0.00 are replaced with a static **0.001** baked into the emission table. The penalty-bin ratio improves to 0.99/0.001 ≈ 990×, sharply increasing Stuck sensitivity to repeated Backspace bursts. Maximum attainable probability per state now saturates near 0.88–0.90, leaving meaningful mass for competing states.
+**Fix:** Dynamic additive floor removed. Emission values of exactly 0.00 are replaced with a static **0.01** baked into the emission table. The penalty-bin ratio improves to 0.99/0.01 ≈ 99×, sharply increasing Stuck sensitivity to repeated Backspace bursts. Maximum attainable probability per state now saturates near 0.88–0.90, leaving meaningful mass for competing states.
 
 ---
 
@@ -624,11 +624,11 @@ Six independent bugs and reliability gaps were identified and resolved, aligned 
 
 ---
 
-### Fix ③: Backspace Streak — Atomic Decoupling
+### Fix ③: Backspace Streak — Atomic Decoupling & Penalty Race Fix
 
-**Problem:** `backspace_streak` was stored as `Arc<Mutex<u32>>`. Every keystroke (including at 10+ keys/sec) acquired and released the mutex twice (once in `register_keystroke`, once in `update()`), adding unnecessary lock overhead.
+**Problem:** `backspace_streak` was stored as `Arc<Mutex<u32>>`. Every keystroke (including at 10+ keys/sec) acquired and released the mutex twice (once in `register_keystroke`, once in `update()`), adding unnecessary lock overhead. A secondary race condition also existed: if BS×8 set the streak to the penalty threshold and the next non-BS key immediately reset it to 0 before `update()` ran, the penalty was silently dropped.
 
-**Fix:** Changed to `Arc<AtomicU32>`. `register_keystroke` uses `fetch_add` / `store`; `update()` and `update_silence()` use `load(Ordering::Relaxed)`. Lock-free and marginally lower latency on the hot path.
+**Fix:** Changed to `Arc<AtomicU32>`. A new `has_pending_penalty: Arc<AtomicBool>` flag is set by `register_keystroke` when the streak reaches ≥ 8 and is consumed (via `swap(false, AcqRel)`) by `update()` — surviving any streak reset in between. `is_paused` was similarly converted from `Arc<Mutex<bool>>` to `Arc<AtomicBool>`. All three atomics eliminate mutex overhead on the hot path.
 
 ---
 
