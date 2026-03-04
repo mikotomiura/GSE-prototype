@@ -334,15 +334,16 @@ impl CognitiveStateEngine {
         // 非BSキーが押されたときのみ行う。こうすることで、5回以上のBackspace連打後
         // に停止した場合でも次の silence observation で再びペナルティビンが適用され、
         // p_stuck が 0.52 → 0.68 → 0.76 と段階的に上昇して閾値(0.6)を超えられる。
+        // 閾値 8: 通常編集の BS 5回程度では誤発動しないよう引き上げ
         let (apply_backspace_penalty, streak) = match self.backspace_streak.lock() {
             Ok(s) => {
                 let val = *s;
-                (val >= 5, val)
+                (val >= 8, val)
             }
             Err(poisoned) => {
                 let s = poisoned.into_inner();
                 let val = *s;
-                (val >= 5, val)
+                (val >= 8, val)
             }
         };
         let _ = streak; // suppress unused warning (streak value used only for threshold check)
@@ -442,27 +443,38 @@ impl CognitiveStateEngine {
     ///
     /// 通常の update() と異なり、axes_ewma を更新しない。
     /// サイレンス特徴量 (f1=2000ms 等の合成値) で EWMA を更新すると、
-    /// 純粋な思考停止期間でも Friction が不自然に高くなり Stuck 誤判定が起きる。
+    /// ユーザーが次にタイピング再開したときに EWMA が高Friction側に偏ったまま
+    /// となり、最初の数回の更新が不正確になる（EWMA汚染）。
     ///
-    /// Backspace ペナルティが pending の場合（streak ≥ 5）のみ obs=25 で HMM を更新する。
-    /// それ以外は早期リターンして状態を凍結する（EWMA も HMM も変化しない）。
-    pub fn update_silence(&self, _features: &Features, _ime_open: bool) {
+    /// HMM は silence 特徴量 (raw X/Y) で正常に更新する。
+    /// これにより Incubation = 「手を止めて考えている状態」が正しく上昇する。
+    /// Backspace ペナルティ (streak ≥ 8) は obs=25 に上書きする。
+    pub fn update_silence(&self, features: &Features, ime_open: bool) {
         if self.get_paused() {
             return;
         }
 
-        let apply_backspace_penalty = match self.backspace_streak.lock() {
-            Ok(s) => *s >= 5,
-            Err(poisoned) => *poisoned.into_inner() >= 5,
-        };
-
-        // 純粋なアイドル: EWMA も HMM も更新しない（状態を凍結）
-        if !apply_backspace_penalty {
+        if features.f1_flight_time_median <= 0.0 {
             return;
         }
 
-        // Backspace ペナルティビン (obs=25) で HMM のみ更新 (EWMA はスキップ)
-        let obs = 25_usize;
+        // Backspace ペナルティ判定 (閾値 8: 通常編集の5回BS誤検知を防ぐ)
+        let apply_backspace_penalty = match self.backspace_streak.lock() {
+            Ok(s) => *s >= 8,
+            Err(poisoned) => *poisoned.into_inner() >= 8,
+        };
+
+        // サイレンス特徴量から観測ビンを計算 (EWMA は更新しない)
+        // axes_ewma を読まず raw_x/raw_y をそのままビン変換する。
+        // Incubation 上昇 (pause中の自然な状態遷移) は維持しつつ EWMA 汚染を防ぐ。
+        let obs = if apply_backspace_penalty {
+            25
+        } else {
+            let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
+            let x_bin = (raw_x * 5.0).floor().min(4.0) as usize;
+            let y_bin = (raw_y * 5.0).floor().min(4.0) as usize;
+            x_bin * 5 + y_bin
+        };
 
         let mut current = match self.current_state_probs.lock() {
             Ok(g) => g,
@@ -479,8 +491,7 @@ impl CognitiveStateEngine {
             for i in 0..n_states {
                 trans_sum += old_probs[i] * self.transitions[i * n_states + j];
             }
-            let e_prob = self.emissions[j * 26 + obs];
-            new_probs[j] = trans_sum * e_prob;
+            new_probs[j] = trans_sum * self.emissions[j * 26 + obs];
             sum_prob += new_probs[j];
         }
 
@@ -492,14 +503,17 @@ impl CognitiveStateEngine {
 
         *current = new_probs;
 
-        // display_probs: ペナルティなので α=0.60 で素早く Stuck に収束
+        // display_probs EMA
+        // ペナルティ α=0.50: nudge 閾値到達に 2 更新 (2s) 必要 (α=0.60 の即発動を緩和)
+        // 通常 α=0.40: silence での Incubation 上昇を自然なペースで反映
+        let display_alpha = if apply_backspace_penalty { 0.50 } else { 0.40 };
         let mut display = match self.display_probs.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
         };
         let mut disp_sum = 0.0;
         for i in 0..n_states {
-            display[i] = 0.60 * new_probs[i] + 0.40 * display[i];
+            display[i] = display_alpha * new_probs[i] + (1.0 - display_alpha) * display[i];
             disp_sum += display[i];
         }
         if disp_sum > 0.0 {
