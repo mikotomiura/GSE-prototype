@@ -33,6 +33,17 @@ impl WallServerState {
             firewall_rule: std::sync::Mutex::new(None),
         }
     }
+
+    /// WallServerを停止し、ファイアウォールルールを削除する。
+    /// quit_app から呼ばれてリソースを確実にクリーンアップする。
+    pub fn stop(&self) {
+        if let Some(flag) = self.stop_flag.lock().unwrap_or_else(|p| p.into_inner()).take() {
+            flag.store(true, Ordering::Release);
+        }
+        if let Some(rule) = self.firewall_rule.lock().unwrap_or_else(|p| p.into_inner()).take() {
+            remove_firewall_rule(&rule);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

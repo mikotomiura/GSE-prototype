@@ -22,9 +22,10 @@
 11. [Intervention UI: Nudge & Wall (v2.5)](#intervention-ui-nudge--wall-v25)
 12. [Session Start Screen & Engine Reset (v2.6)](#session-start-screen--engine-reset-v26)
 13. [Frontend–Backend Initial State Sync (v2.7)](#frontendbackend-initial-state-sync-v27)
-14. [Logging & Analysis](#logging--analysis)
-15. [Build Instructions](#build-instructions)
-16. [Academic References](#academic-references)
+14. [Security & Reliability Hardening (v2.8)](#security--reliability-hardening-v28)
+15. [Logging & Analysis](#logging--analysis)
+16. [Build Instructions](#build-instructions)
+17. [Academic References](#academic-references)
 
 ---
 
@@ -166,7 +167,7 @@ All features are computed over a **30-second sliding window** of raw keystroke e
 
 | Feature | Symbol | Definition | Cognitive Signal |
 |---|---|---|---|
-| Flight Time Median | **F1** | Median of key-release → key-press intervals (ms), last 5 samples | Typing speed — lower = Flow |
+| Flight Time Median | **F1** | Median of key-release → key-press intervals (ms) within 30-second window | Typing speed — lower = Flow |
 | Flight Time Variance | **F2** | Variance of flight times within 30-second window | Rhythmic consistency |
 | Correction Rate | **F3** | (Backspace + Delete presses) / total presses | Error frequency — higher = Stuck |
 | Burst Length | **F4** | Mean length of consecutive keystroke runs (inter-key gap < 200 ms) | Output fluency — higher = Flow |
@@ -226,13 +227,12 @@ Productive Silence Y ↓
 At each update, the belief vector **π** = [p_Flow, p_Inc, p_Stuck] is propagated by a single Forward Algorithm step:
 
 ```
-π'_j = ( Σ_i  π_i · A[i,j] ) · ( B[j, obs] + ε )    for j ∈ {0, 1, 2}
-π'   ← π' / Σ_j π'_j                                  (normalize to sum = 1)
+π'_j = ( Σ_i  π_i · A[i,j] ) · B[j, obs]    for j ∈ {0, 1, 2}
+π'   ← π' / Σ_j π'_j                         (normalize to sum = 1)
 ```
 
 - **A** = 3×3 transition matrix (rows = from, cols = to)
-- **B** = 3×26 emission matrix (state × observation bin)
-- **ε** = 0.04 (emission floor, prevents probability absorption, reduces clustering)
+- **B** = 3×26 emission matrix (state × observation bin); minimum value = 0.001 (static floor baked into the table, prevents probability absorption)
 
 ### Transition Matrix A
 
@@ -291,14 +291,14 @@ The Stuck display probability decays gracefully over ~2.5 seconds rather than co
 
 ### Fix ②: Probability Discrete Clustering (step-wise ceilings)
 
-**Problem:** With emission floor ε = 0.01 the HMM converged to fixed-point probabilities:
+**Problem:** With dynamic emission floor ε = 0.05 added to every bin at runtime, the HMM converged to fixed-point probabilities:
 - `p_flow` clustering at 0.9734 (39.1% of frames)
 - `p_inc` clustering at 0.9381
 - `p_stuck` clustering at 0.9944
 
-These clusters arise because for observation bins dominated by one state, the ratio of emission probabilities determines a unique fixed point. With ε = 0.01 the ratios are extreme (e.g. 0.20 : 0.01 : 0.01 = 20:1:1), concentrating almost all probability mass.
+These clusters arise because for observation bins dominated by one state, the ratio of emission probabilities determines a unique fixed point. With ε = 0.05 the penalty-bin ratio is only 0.99/0.05 ≈ 20×, blunting the Backspace-streak Stuck signal significantly.
 
-**Fix:** Emission floor raised from 0.01 to **0.04**. This adds equal additive smoothing to all state likelihoods for a given observation, effectively applying Laplace (additive) smoothing in the emission domain. Maximum attainable probability per state now saturates near 0.88–0.90, leaving meaningful probability mass for competing states and enabling smoother probability trajectories.
+**Fix:** Dynamic additive floor removed. Emission values of exactly 0.00 are replaced with a static **0.001** baked into the emission table. The penalty-bin ratio improves to 0.99/0.001 ≈ 990×, sharply increasing Stuck sensitivity to repeated Backspace bursts. Maximum attainable probability per state now saturates near 0.88–0.90, leaving meaningful mass for competing states.
 
 ---
 
@@ -602,6 +602,60 @@ The UI now displays consistent values from launch to the first data poll (~500 m
 
 ---
 
+## Security & Reliability Hardening (v2.8)
+
+Six independent bugs and reliability gaps were identified and resolved, aligned with the macOS reference implementation.
+
+---
+
+### Fix ①: F1 30-Second Window (Feature Consistency Bug)
+
+**Problem:** `F1` (flight-time median) was computed from the full accumulated `flight_times` buffer (up to 600 events, ~10 min of history), while `F2`–`F6` were computed from a 30-second sliding window. This inconsistency caused F1 to respond far more slowly to recent typing rhythm changes than the other features, systematically biasing the HMM observation toward past behaviour.
+
+**Fix:** `F1` is now computed from the same 30-second `window_fts` vector used for `F2`, ensuring all six features reflect the same temporal scope.
+
+---
+
+### Fix ②: Pre-Session Event Drain (`SessionActive` gate)
+
+**Problem:** The analysis thread processed keystrokes from app launch, before the user clicked "開始する". Keystrokes typed while navigating the start screen (e.g. alt-tab, window focus) entered the feature buffer and subtly biased the initial HMM prior.
+
+**Fix:** A `SessionActive(Arc<AtomicBool>)` flag is introduced, initialized to `false`. The analysis thread drains (discards) all incoming key events via `try_recv()` until `start_session` sets the flag to `true`. The bounded channel (cap = 64) is also kept from overflowing during the pre-session phase.
+
+---
+
+### Fix ③: Backspace Streak — Atomic Decoupling
+
+**Problem:** `backspace_streak` was stored as `Arc<Mutex<u32>>`. Every keystroke (including at 10+ keys/sec) acquired and released the mutex twice (once in `register_keystroke`, once in `update()`), adding unnecessary lock overhead.
+
+**Fix:** Changed to `Arc<AtomicU32>`. `register_keystroke` uses `fetch_add` / `store`; `update()` and `update_silence()` use `load(Ordering::Relaxed)`. Lock-free and marginally lower latency on the hot path.
+
+---
+
+### Fix ④: Channel-Based Logger Shutdown
+
+**Problem:** `quit_app` used `thread::sleep(400 ms)` to give the logger thread time to flush and close the NDJSON file before proceeding to Python post-processing. This was a race: under load the flush could take longer than 400 ms, corrupting the session file.
+
+**Fix:** `SessionLogger::start()` now returns a `Receiver<()>` (`shutdown_rx`) in addition to the `Sender<LogEntry>`. When `LogEntry::End` is processed and the file is flushed, the logger thread sends `()` on this channel. `quit_app` waits on `shutdown_rx.recv_timeout(2000 ms)` — a correct, bounded synchronization instead of a blind sleep.
+
+---
+
+### Fix ⑤: WallServer Cleanup on Quit
+
+**Problem:** `quit_app` did not stop the WallServer. On app exit the HTTP server thread kept running and the dynamically-added Windows Firewall rule (`GSE-WallServer-<port>`) was left in place.
+
+**Fix:** Added `WallServerState::stop()` which signals the server thread and calls `netsh` to remove the firewall rule. `quit_app` now calls `wall.stop()` as its first action.
+
+---
+
+### Fix ⑥: CSP & Hook Status API
+
+**Content Security Policy:** `tauri.conf.json` `csp` was `null` (no restrictions). Changed to `"default-src 'self'; style-src 'self' 'unsafe-inline'"`, restricting all resource loads to same-origin and limiting inline styles.
+
+**`get_hook_status` command:** Added for macOS API compatibility. The macOS version requires an explicit system permission prompt before the keyboard hook can be installed; this command exposes that status to the frontend. On Windows no prompt is needed, so the command unconditionally returns `true`.
+
+---
+
 ## Logging & Analysis
 
 Every session produces a timestamped NDJSON file:
@@ -714,4 +768,4 @@ Research prototype. All rights reserved.
 
 ---
 
-*Last updated: 2026-03-04*
+*Last updated: 2026-03-05*

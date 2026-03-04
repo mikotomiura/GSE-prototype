@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::analysis::features::{phi, Features};
@@ -25,7 +26,7 @@ pub struct CognitiveStateEngine {
 
     current_state_probs: Arc<Mutex<[f64; 3]>>,
     pub is_paused: Arc<Mutex<bool>>,
-    pub backspace_streak: Arc<Mutex<u32>>,
+    pub backspace_streak: Arc<AtomicU32>,
 
     // 2-axis EWMA: (X = Friction, Y = Engagement)
     // α = 0.3: 新値30%、前値70%のブレンド
@@ -135,7 +136,7 @@ impl CognitiveStateEngine {
             emissions: Arc::new(emissions),
             current_state_probs: Arc::new(Mutex::new(initial_probs)),
             is_paused: Arc::new(Mutex::new(false)),
-            backspace_streak: Arc::new(Mutex::new(0)),
+            backspace_streak: Arc::new(AtomicU32::new(0)),
             // (0.1, 0.8) = Flow 方向で初期化 (obs=4; low Friction × high Engagement)
             // 旧 (0.3, 0.5) では obs=7 (中立) から始まり初回観測がやや Inc 寄りだった。
             // (0.0, 1.0) は最初の更新で p_flow=1.0 に固定されるため避ける。
@@ -161,10 +162,7 @@ impl CognitiveStateEngine {
             Ok(mut e) => *e = (0.1, 0.8),
             Err(poisoned) => *poisoned.into_inner() = (0.1, 0.8),
         }
-        match self.backspace_streak.lock() {
-            Ok(mut s) => *s = 0,
-            Err(poisoned) => *poisoned.into_inner() = 0,
-        }
+        self.backspace_streak.store(0, Ordering::Release);
         // is_paused もリセット: IME変換中に「開始する」が押された場合に
         // 停止状態が残留してキーストロークが全破棄されるのを防ぐ。
         // IMEモニタースレッドが100ms以内に正しい状態に戻すが、
@@ -204,23 +202,12 @@ impl CognitiveStateEngine {
 
     /// 全キー押下時に呼び出し、Backspaceストリークをリアルタイムでカウントする。
     /// 1Hz gate の外側（全打鍵）で呼ぶことで、高速Backspace連打を正確に検知する。
+    /// AtomicU32 を使用してロックなしに安全に更新する。
     pub fn register_keystroke(&self, vk_code: u32) {
-        match self.backspace_streak.lock() {
-            Ok(mut s) => {
-                if vk_code == 0x08 {
-                    *s += 1;
-                } else {
-                    *s = 0;
-                }
-            }
-            Err(poisoned) => {
-                let mut s = poisoned.into_inner();
-                if vk_code == 0x08 {
-                    *s += 1;
-                } else {
-                    *s = 0;
-                }
-            }
+        if vk_code == 0x08 {
+            self.backspace_streak.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.backspace_streak.store(0, Ordering::Relaxed);
         }
     }
 
@@ -335,18 +322,8 @@ impl CognitiveStateEngine {
         // に停止した場合でも次の silence observation で再びペナルティビンが適用され、
         // p_stuck が 0.52 → 0.68 → 0.76 と段階的に上昇して閾値(0.6)を超えられる。
         // 閾値 8: 通常編集の BS 5回程度では誤発動しないよう引き上げ
-        let (apply_backspace_penalty, streak) = match self.backspace_streak.lock() {
-            Ok(s) => {
-                let val = *s;
-                (val >= 8, val)
-            }
-            Err(poisoned) => {
-                let s = poisoned.into_inner();
-                let val = *s;
-                (val >= 8, val)
-            }
-        };
-        let _ = streak; // suppress unused warning (streak value used only for threshold check)
+        let streak = self.backspace_streak.load(Ordering::Relaxed);
+        let apply_backspace_penalty = streak >= 8;
 
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
 
@@ -459,10 +436,7 @@ impl CognitiveStateEngine {
         }
 
         // Backspace ペナルティ判定 (閾値 8: 通常編集の5回BS誤検知を防ぐ)
-        let apply_backspace_penalty = match self.backspace_streak.lock() {
-            Ok(s) => *s >= 8,
-            Err(poisoned) => *poisoned.into_inner() >= 8,
-        };
+        let apply_backspace_penalty = self.backspace_streak.load(Ordering::Relaxed) >= 8;
 
         // サイレンス特徴量から観測ビンを計算 (EWMA は更新しない)
         // axes_ewma を読まず raw_x/raw_y をそのままビン変換する。

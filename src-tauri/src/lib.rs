@@ -9,7 +9,7 @@ use crate::analysis::{
 };
 use crate::logger::{LogEntry, SessionLogger};
 use crate::wall_server::WallServerState;
-use crossbeam_channel::{self, RecvTimeoutError, Sender};
+use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,12 +25,18 @@ use tauri::State;
 struct LogState {
     tx: Sender<LogEntry>,
     path: String,
+    /// ロガースレッドが End を処理し終えたときに通知される受信端
+    shutdown_rx: Receiver<()>,
 }
 
 /// 分析スレッドへのリセットシグナル。
 /// start_session コマンドが `true` にセットすると、分析スレッドが
 /// FeatureExtractor をクリアして `false` に戻す。
 struct ResetSignal(Arc<AtomicBool>);
+
+/// セッションアクティブフラグ。
+/// start_session が呼ばれるまで分析スレッドは打鍵イベントをドレインする。
+struct SessionActive(Arc<AtomicBool>);
 
 // ---------------------------------------------------------------------------
 // Tauri コマンド
@@ -39,6 +45,13 @@ struct ResetSignal(Arc<AtomicBool>);
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+/// macOS版との互換性維持のため提供。
+/// Windows版ではシステム権限プロンプトが不要なため常に `true` を返す。
+#[tauri::command]
+fn get_hook_status() -> bool {
+    true
 }
 
 #[tauri::command]
@@ -89,15 +102,19 @@ fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
 }
 
 /// 「開始する」ボタン押下時に呼ばれる。
-/// 1. CognitiveStateEngine を初期状態にリセット
-/// 2. 分析スレッドの FeatureExtractor リセットを要求 (AtomicBool シグナル)
-/// 3. LogEntry::SessionStart をログに記録
+/// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
+/// 2. CognitiveStateEngine を初期状態にリセット
+/// 3. 分析スレッドの FeatureExtractor リセットを要求 (AtomicBool シグナル)
+/// 4. LogEntry::SessionStart をログに記録
 #[tauri::command]
 fn start_session(
     engine: State<CognitiveStateEngine>,
+    session_active: State<SessionActive>,
     reset_signal: State<ResetSignal>,
     log: State<Arc<Mutex<LogState>>>,
 ) {
+    // セッションを有効化してからリセットシグナルを送る
+    session_active.0.store(true, Ordering::Release);
     engine.reset();
     reset_signal.0.store(true, Ordering::Release);
     let now = SystemTime::now()
@@ -109,24 +126,33 @@ fn start_session(
 }
 
 /// アプリ終了。終了前に以下を順に実行する:
-///   1. セッションログを閉じる (LogEntry::End を送信)
-///   2. behavioral_gt.py でラベリング分析を実行 (Python が PATH にある場合)
-///   3. セッションフォルダを Explorer で開く
+///   1. WallServer を停止 (ファイアウォールルール削除)
+///   2. セッションログを閉じる (LogEntry::End を送信)
+///   3. shutdown_rx でロガー完了を待機 (固定 sleep の代わり)
+///   4. behavioral_gt.py でラベリング分析を実行 (Python が PATH にある場合)
+///   5. セッションフォルダを Explorer で開く
 #[tauri::command]
-fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>) {
-    // ログ終了マーカーを送信
-    let session_path = {
+fn quit_app(
+    app: tauri::AppHandle,
+    log: State<Arc<Mutex<LogState>>>,
+    wall: State<WallServerState>,
+) {
+    // WallServer を先に停止してファイアウォールルールを削除
+    wall.stop();
+
+    // ログ終了マーカーを送信し、shutdown_rx を取得
+    let (session_path, shutdown_rx) = {
         let guard = log.lock().unwrap_or_else(|p| p.into_inner());
         let _ = guard.tx.try_send(LogEntry::End);
-        guard.path.clone()
+        (guard.path.clone(), guard.shutdown_rx.clone())
     };
 
     let app_handle = app.clone();
 
     // バックグラウンドスレッドで分析→フォルダ表示→アプリ終了
     thread::spawn(move || {
-        // ロガースレッドにファイルを閉じる時間を与える
-        thread::sleep(std::time::Duration::from_millis(400));
+        // ロガースレッドのファイルクローズを channel で安全に待機 (最大2秒)
+        let _ = shutdown_rx.recv_timeout(Duration::from_millis(2000));
 
         // behavioral_gt.py を探して実行
         match find_behavioral_gt() {
@@ -213,12 +239,13 @@ pub fn run() {
     let log_path_str = log_path.to_string_lossy().to_string();
     tracing::info!("Session log: {}", log_path_str);
 
-    let (_session_logger, log_tx) = SessionLogger::start(log_path);
+    let (_session_logger, log_tx, log_shutdown_rx) = SessionLogger::start(log_path);
 
     // LogState を Arc<Mutex> でラップして Tauri state に渡す
     let log_state = Arc::new(Mutex::new(LogState {
         tx: log_tx.clone(),
         path: log_path_str,
+        shutdown_rx: log_shutdown_rx,
     }));
 
     // キーストローク入力チャネル
@@ -227,6 +254,10 @@ pub fn run() {
     // セッション開始リセットシグナル (start_session → 分析スレッド)
     let should_reset = Arc::new(AtomicBool::new(false));
     let should_reset_for_thread = should_reset.clone();
+
+    // セッションアクティブフラグ (start_session まで false → 分析スレッドがドレイン)
+    let session_active = Arc::new(AtomicBool::new(false));
+    let session_active_for_thread = session_active.clone();
 
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
@@ -255,6 +286,15 @@ pub fn run() {
         let mut last_engine_update = Instant::now() - Duration::from_secs(1);
 
         loop {
+            // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
+            // これにより、セッション開始前の打鍵がエンジンに影響しない。
+            // また、bounded channel (cap=64) があふれてフックスレッドがブロックするのを防ぐ。
+            if !session_active_for_thread.load(Ordering::Acquire) {
+                while rx.try_recv().is_ok() {}
+                thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+
             // start_session コマンドによるリセット要求をチェック
             if should_reset_for_thread.load(Ordering::Acquire) {
                 should_reset_for_thread.store(false, Ordering::Release);
@@ -458,11 +498,13 @@ pub fn run() {
         .manage(log_state)
         .manage(WallServerState::new())
         .manage(ResetSignal(should_reset))
+        .manage(SessionActive(session_active))
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,
+            get_hook_status,
             start_session,
             quit_app,
             get_session_file,

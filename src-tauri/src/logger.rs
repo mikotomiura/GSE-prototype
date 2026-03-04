@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crossbeam_channel::{bounded, Sender};
+use crossbeam_channel::{bounded, Receiver, Sender};
 
 /// ログエントリの種別
 #[derive(Debug)]
@@ -50,10 +50,12 @@ pub struct SessionLogger {
 }
 
 impl SessionLogger {
-    /// ロガーを開始し、ログエントリ送信用の `Sender` を返す。
+    /// ロガーを開始し、ログエントリ送信用の `Sender` とシャットダウン通知用の `Receiver` を返す。
     /// `Sender` を Clone して複数スレッドから送信可能。
-    pub fn start(log_path: PathBuf) -> (Self, Sender<LogEntry>) {
+    /// `shutdown_rx` は `LogEntry::End` 処理完了後に値を受信する。
+    pub fn start(log_path: PathBuf) -> (Self, Sender<LogEntry>, Receiver<()>) {
         let (tx, rx) = bounded::<LogEntry>(512);
+        let (shutdown_tx, shutdown_rx) = bounded::<()>(1);
         let path_clone = log_path.clone();
 
         let handle = thread::spawn(move || {
@@ -137,6 +139,7 @@ impl SessionLogger {
                         );
                         break;
                     }
+
                 }
 
                 // バッファを定期フラッシュ (エラー握りつぶし)
@@ -144,6 +147,8 @@ impl SessionLogger {
             }
 
             let _ = writer.flush();
+            // ファイルを閉じ終えたことを quit_app に通知する
+            let _ = shutdown_tx.send(());
             tracing::info!("SessionLogger: session closed");
         });
 
@@ -152,7 +157,7 @@ impl SessionLogger {
             _handle: handle,
         };
 
-        (logger, tx)
+        (logger, tx, shutdown_rx)
     }
 }
 
