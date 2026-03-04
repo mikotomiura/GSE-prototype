@@ -262,10 +262,13 @@ pub fn run() {
 
             match rx.recv_timeout(Duration::from_millis(1000)) {
                 Ok(event) => {
-                    if engine_for_thread.get_paused() {
-                        continue;
-                    }
-
+                    // IMEポーズ中でも last_event_time と extractor は常に更新する。
+                    // 理由:
+                    //   1. ポーズ解除後すぐに F1 > 0 になる (flight_times が蓄積済み)
+                    //   2. silence_secs が「日本語タイピング中の無入力時間」として
+                    //      正しく計測され、ポーズ解除直後に巨大な silence_secs で
+                    //      Stuck 判定が誤発動するのを防ぐ
+                    //   3. ポーズ中の打鍵もログ記録して後処理で参照可能にする
                     last_event_time = Instant::now();
                     extractor.process_event(event);
 
@@ -275,6 +278,13 @@ pub fn run() {
                         timestamp: event.timestamp,
                         is_press: event.is_press,
                     });
+
+                    // IMEポーズ中は HMM 更新とストリークカウントをスキップ。
+                    // IME 変換中の打鍵 (ローマ字・ナビゲーションキー・変換取消BS) は
+                    // テキスト編集の打鍵ではないため、認知状態推定に含めない。
+                    if engine_for_thread.get_paused() {
+                        continue;
+                    }
 
                     if event.is_press {
                         // 全打鍵でBackspaceストリークをカウント（1Hz gate の外側）。
@@ -386,8 +396,29 @@ pub fn run() {
     thread::spawn(move || {
         tracing::info!("IME Monitor thread started");
         let monitor = input::ime::ImeMonitor::new();
+        // IME_ACTIVE が true になった時刻。8 秒以上続いたら EVENT_OBJECT_IME_HIDE
+        // 取りこぼしと判断してフラグを自動リセットする。
+        let mut ime_active_since: Option<Instant> = None;
         loop {
             let active = monitor.is_candidate_window_open();
+
+            // Safety valve: EVENT_OBJECT_IME_HIDE はフォーカス変更やクラッシュ時に
+            // 取りこぼすことがある。IME_ACTIVE が 8 秒以上 true のままなら stale と
+            // みなしてリセット。実際の IME 変換は数秒以内に確定/キャンセルされる。
+            if active {
+                let since = ime_active_since.get_or_insert_with(Instant::now);
+                if since.elapsed() > Duration::from_secs(8) {
+                    tracing::warn!("IME_ACTIVE stale for >8s — auto-resetting");
+                    input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
+                    ime_active_since = None;
+                    engine_for_monitor.set_paused(false);
+                    thread::sleep(std::time::Duration::from_millis(100));
+                    continue;
+                }
+            } else {
+                ime_active_since = None;
+            }
+
             engine_for_monitor.set_paused(active);
             if active {
                 engine_for_monitor.force_flow_state();

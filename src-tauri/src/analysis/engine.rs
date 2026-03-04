@@ -318,21 +318,18 @@ impl CognitiveStateEngine {
 
         // --- Backspace Streak Logic ---
         // register_keystroke() が全打鍵でカウントを更新済み。
-        // ここでは現在値を読み取り、ペナルティ適用後にリセットするのみ。
+        // ストリークはここでリセットしない。リセットは register_keystroke() で
+        // 非BSキーが押されたときのみ行う。こうすることで、5回以上のBackspace連打後
+        // に停止した場合でも次の silence observation で再びペナルティビンが適用され、
+        // p_stuck が 0.52 → 0.68 → 0.76 と段階的に上昇して閾値(0.6)を超えられる。
         let (apply_backspace_penalty, streak) = match self.backspace_streak.lock() {
-            Ok(mut s) => {
+            Ok(s) => {
                 let val = *s;
-                if val >= 5 {
-                    *s = 0; // ペナルティ適用後リセット: Stuck張り付き防止
-                }
                 (val >= 5, val)
             }
             Err(poisoned) => {
-                let mut s = poisoned.into_inner();
+                let s = poisoned.into_inner();
                 let val = *s;
-                if val >= 5 {
-                    *s = 0;
-                }
                 (val >= 5, val)
             }
         };

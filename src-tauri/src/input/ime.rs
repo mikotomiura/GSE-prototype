@@ -73,7 +73,11 @@ impl ImeMonitor {
                 if let Ok(element) = auto.GetFocusedElement() {
                     if let Ok(class_name) = element.CurrentClassName() {
                         let name = class_name.to_string();
-                        if name.contains("Candidate") || name.contains("Ime") {
+                        // Check for "Candidate" only; do NOT include "Ime" — WebView2
+                        // accessibility elements may expose class names containing "Ime"
+                        // (e.g. ImeMode, ImeInputMode), which would cause a false-positive
+                        // that permanently pauses analysis when the Tauri window has focus.
+                        if name.contains("Candidate") {
                             found = true;
                         }
                     }
@@ -116,6 +120,13 @@ impl ImeMonitor {
 ///   - "MSCTFIME UI" : This is the TSF language bar (A/あ indicator on the taskbar).
 ///     It is ALWAYS visible on systems with Japanese IME loaded, even during normal
 ///     Latin text entry. Including it caused the engine to be permanently paused.
+///
+///   - `class == "IME"` (exact match) : This is a background system window created by the
+///     OS for every IMM32-aware application. It is ALWAYS visible (WS_VISIBLE set) on
+///     systems with Japanese IME, even when NOT composing. Including it causes a permanent
+///     false-positive that pauses all keystroke analysis indefinitely.
+///     Only substring matches ("CandidateUI", "Candidate") are used to catch the real
+///     candidate popup windows while excluding this always-on system window.
 fn is_ime_candidate_window_visible() -> bool {
     // The callback sets *lparam to true and stops enumeration when an IME window is found.
     unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -131,10 +142,12 @@ fn is_ime_candidate_window_visible() -> bool {
 
             // Match visible IME candidate windows only.
             // Do NOT include "MSCTFIME" - that is the always-visible language bar.
-            if class.contains("CandidateUI")
-                || class == "IME"
-                || class.contains("Candidate")
-            {
+            // Do NOT include `class == "IME"` - that is a background system window
+            // created by the OS for every IMM32-aware application; it is ALWAYS
+            // visible (WS_VISIBLE set) on systems with Japanese IME, even when NOT
+            // composing. Including it causes a permanent false-positive that would
+            // pause all keystroke analysis indefinitely.
+            if class.contains("CandidateUI") || class.contains("Candidate") {
                 // Signal found via lparam (pointer to bool on caller's stack)
                 *(lparam.0 as *mut bool) = true;
                 return BOOL(0); // Stop enumeration
