@@ -19,9 +19,9 @@ const LV2_TIMER_MS = 30_000;
 
 function App() {
   const [cognitiveState, setCognitiveState] = useState<CognitiveStateRaw>({
-    flow: 0.1,
-    incubation: 0.1,
-    stuck: 0.8,
+    flow: 0.5,
+    incubation: 0.3,
+    stuck: 0.2,
   });
   const [isWallActive, setIsWallActive] = useState(false);
   const [isMonkMode, setIsMonkMode] = useState(false);

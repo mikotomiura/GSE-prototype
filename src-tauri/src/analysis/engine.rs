@@ -153,6 +153,14 @@ impl CognitiveStateEngine {
             Ok(mut s) => *s = 0,
             Err(poisoned) => *poisoned.into_inner() = 0,
         }
+        // is_paused もリセット: IME変換中に「開始する」が押された場合に
+        // 停止状態が残留してキーストロークが全破棄されるのを防ぐ。
+        // IMEモニタースレッドが100ms以内に正しい状態に戻すが、
+        // その間のキーストロークが失われないよう先にリセットする。
+        match self.is_paused.lock() {
+            Ok(mut p) => *p = false,
+            Err(poisoned) => *poisoned.into_inner() = false,
+        }
     }
 
     pub fn set_paused(&self, paused: bool) {

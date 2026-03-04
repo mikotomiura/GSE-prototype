@@ -253,8 +253,11 @@ pub fn run() {
                 extractor = FeatureExtractor::new(600);
                 last_event_time = Instant::now();
                 last_engine_update = Instant::now() - Duration::from_secs(1);
-                // 待機中のキーイベント (起動直後の誤入力等) を破棄
-                while rx.try_recv().is_ok() {}
+                // NOTE: チャンネルをドレインしない。
+                // ドレインすると、reset_signal確認まで最大1000msの間に
+                // ユーザーが入力したセッション開始後のキーストロークまで消去してしまう。
+                // FeatureExtractorは再生成済みなので、古いイベントが残っていても
+                // 30秒窓で自然に希釈される。
             }
 
             match rx.recv_timeout(Duration::from_millis(1000)) {
@@ -282,41 +285,47 @@ pub fn run() {
                         // HMMとEMAは1Hz前提で設計されているため、これより高頻度で呼ぶと
                         // 時間が加速したように振る舞う（Time Dilation）。
                         if last_engine_update.elapsed() >= Duration::from_secs(1) {
-                            last_engine_update = Instant::now();
-
                             // IMEモード（あ/A）はポーリングスレッドが100ms毎に更新するAtomicBoolを読む。
                             let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
 
                             let features = extractor.calculate_features();
-                            engine_for_thread.update(&features, ime_open);
 
-                            // 特徴量 + 状態確率をログ記録
-                            let state_probs = engine_for_thread.get_current_state();
-                            let p_flow = state_probs
-                                .get(&CognitiveState::Flow)
-                                .copied()
-                                .unwrap_or(0.0);
-                            let p_inc = state_probs
-                                .get(&CognitiveState::Incubation)
-                                .copied()
-                                .unwrap_or(0.0);
-                            let p_stuck = state_probs
-                                .get(&CognitiveState::Stuck)
-                                .copied()
-                                .unwrap_or(0.0);
+                            // F1=0 はFlightTimeデータ不足（セッション開始直後のリセット後など）。
+                            // この場合はゲートを進めず次の打鍵で再試行する。
+                            // ゲートを進めてしまうと次の1秒間も更新できず、
+                            // 「開始する」直後にキーを打っても1秒以上無反応に見える問題が起きる。
+                            if features.f1_flight_time_median > 0.0 {
+                                last_engine_update = Instant::now();
+                                engine_for_thread.update(&features, ime_open);
 
-                            let _ = log_tx_analysis.try_send(LogEntry::Feat {
-                                timestamp: event.timestamp,
-                                f1: features.f1_flight_time_median,
-                                f2: features.f2_flight_time_variance,
-                                f3: features.f3_correction_rate,
-                                f4: features.f4_burst_length,
-                                f5: features.f5_pause_count,
-                                f6: features.f6_pause_after_del_rate,
-                                p_flow,
-                                p_inc,
-                                p_stuck,
-                            });
+                                // 特徴量 + 状態確率をログ記録
+                                let state_probs = engine_for_thread.get_current_state();
+                                let p_flow = state_probs
+                                    .get(&CognitiveState::Flow)
+                                    .copied()
+                                    .unwrap_or(0.0);
+                                let p_inc = state_probs
+                                    .get(&CognitiveState::Incubation)
+                                    .copied()
+                                    .unwrap_or(0.0);
+                                let p_stuck = state_probs
+                                    .get(&CognitiveState::Stuck)
+                                    .copied()
+                                    .unwrap_or(0.0);
+
+                                let _ = log_tx_analysis.try_send(LogEntry::Feat {
+                                    timestamp: event.timestamp,
+                                    f1: features.f1_flight_time_median,
+                                    f2: features.f2_flight_time_variance,
+                                    f3: features.f3_correction_rate,
+                                    f4: features.f4_burst_length,
+                                    f5: features.f5_pause_count,
+                                    f6: features.f6_pause_after_del_rate,
+                                    p_flow,
+                                    p_inc,
+                                    p_stuck,
+                                });
+                            }
                         }
                     }
                 }
