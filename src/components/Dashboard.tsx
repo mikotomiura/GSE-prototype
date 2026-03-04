@@ -71,7 +71,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
 
   return (
     <div className={`dashboard-container state-${dominant.toLowerCase()}`}>
-      <h2>Cognitive State Engine</h2>
+      <h2>Generative Struggle Engine</h2>
 
       {/* セッション情報バー: ストップウォッチ + キーボード状態 */}
       <div className="session-bar">

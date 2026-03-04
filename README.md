@@ -20,9 +20,10 @@
 9. [IME Mode Detection: Robust Multi-Layer Architecture (v2.3)](#ime-mode-detection-robust-multi-layer-architecture-v23)
 10. [1Hz Timer-Driven Inference & Synthetic Friction (v2.4)](#1hz-timer-driven-inference--synthetic-friction-v24)
 11. [Intervention UI: Nudge & Wall (v2.5)](#intervention-ui-nudge--wall-v25)
-12. [Logging & Analysis](#logging--analysis)
-13. [Build Instructions](#build-instructions)
-14. [Academic References](#academic-references)
+12. [Session Start Screen & Engine Reset (v2.6)](#session-start-screen--engine-reset-v26)
+13. [Logging & Analysis](#logging--analysis)
+14. [Build Instructions](#build-instructions)
+15. [Academic References](#academic-references)
 
 ---
 
@@ -547,6 +548,36 @@ This graduated intervention is grounded in the insight that cognitive blocks oft
 
 ---
 
+## Session Start Screen & Engine Reset (v2.6)
+
+### Problem
+
+Previous versions started keystroke detection and HMM inference immediately on app launch. This caused two issues:
+
+1. **Dirty warm-up data**: Keystrokes during app startup fed the HMM before a meaningful session began
+2. **Misleading initial display**: The hardcoded `useState` initial value (`stuck: 0.8`) showed "Stuck: 80%" before any real inference had occurred
+
+### Solution: Explicit Session Boundary
+
+A **Start Screen** is shown on app launch. Detection does not begin until the user clicks "開始する" (Start). On click, `invoke("start_session")` calls the Rust backend which:
+
+1. **Resets `CognitiveStateEngine`**: returns all HMM state to initial priors `[0.5, 0.3, 0.2]`, clearing `display_probs`, `axes_ewma`, and `backspace_streak`
+2. **Flushes `FeatureExtractor`**: an `Arc<AtomicBool>` signal is set; the analysis thread clears all keystroke buffers and drains any queued key events
+3. **Logs session boundary**: `LogEntry::SessionStart { timestamp }` is written to the NDJSON log
+
+The React session timer starts from the click moment (not from app launch).
+
+### Benefits
+
+| Before (v2.5) | After (v2.6) |
+|---|---|
+| Detection starts immediately on launch | Detection starts on explicit user action |
+| Session timer starts at app launch | Session timer starts when user clicks "Start" |
+| HMM may be dirty from pre-session keystrokes | HMM always starts clean from initial priors |
+| No session boundary in log | `session_start` marker in NDJSON log |
+
+---
+
 ## Logging & Analysis
 
 Every session produces a timestamped NDJSON file:
@@ -558,8 +589,11 @@ Every session produces a timestamped NDJSON file:
 Record types:
 
 ```jsonc
-// Session metadata
+// Session metadata (written at file creation)
 {"type":"meta","session_start":1740000000000}
+
+// User clicked "開始する" — explicit session boundary marker (v2.6)
+{"type":"session_start","t":1740000000500}
 
 // Raw keystroke event
 {"type":"key","t":1740000001234,"vk":65,"press":true}
@@ -656,4 +690,4 @@ Research prototype. All rights reserved.
 
 ---
 
-*Last updated: 2026-03-03*
+*Last updated: 2026-03-04*

@@ -133,6 +133,28 @@ impl CognitiveStateEngine {
         }
     }
 
+    /// セッション開始時に全内部状態を初期値にリセットする。
+    /// start_session Tauri コマンドから呼ばれる。
+    pub fn reset(&self) {
+        let initial_probs = [0.5, 0.3, 0.2];
+        match self.current_state_probs.lock() {
+            Ok(mut p) => *p = initial_probs,
+            Err(poisoned) => *poisoned.into_inner() = initial_probs,
+        }
+        match self.display_probs.lock() {
+            Ok(mut p) => *p = initial_probs,
+            Err(poisoned) => *poisoned.into_inner() = initial_probs,
+        }
+        match self.axes_ewma.lock() {
+            Ok(mut e) => *e = (0.3, 0.5),
+            Err(poisoned) => *poisoned.into_inner() = (0.3, 0.5),
+        }
+        match self.backspace_streak.lock() {
+            Ok(mut s) => *s = 0,
+            Err(poisoned) => *poisoned.into_inner() = 0,
+        }
+    }
+
     pub fn set_paused(&self, paused: bool) {
         match self.is_paused.lock() {
             Ok(mut p) => *p = paused,

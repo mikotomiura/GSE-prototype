@@ -221,6 +221,65 @@ body {
   opacity: 0.6;
 }
 
+/* Start Screen */
+.start-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 2rem;
+  text-align: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.start-header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.start-description {
+  font-size: 0.95rem;
+  opacity: 0.65;
+  margin: 0;
+  max-width: 320px;
+  line-height: 1.7;
+}
+
+.start-button {
+  padding: 0.9rem 3.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: #0f172a;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 24px rgba(74, 222, 128, 0.35);
+  letter-spacing: 0.05em;
+}
+
+.start-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 32px rgba(74, 222, 128, 0.5);
+}
+
+.start-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 12px rgba(74, 222, 128, 0.3);
+}
+
+.start-hint {
+  font-size: 0.75rem;
+  opacity: 0.35;
+  margin: 0;
+  letter-spacing: 0.03em;
+}
+
 /* Overlay Styles */
 .overlay-root {
   width: 100vw;

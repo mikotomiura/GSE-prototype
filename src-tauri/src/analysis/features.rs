@@ -68,6 +68,14 @@ impl FeatureExtractor {
         }
     }
 
+    /// セッション開始時にバッファをクリアする。
+    /// start_session コマンドから分析スレッドへの AtomicBool シグナル経由で呼ばれる。
+    pub fn reset(&mut self) {
+        self.buffer.clear();
+        self.flight_times.clear();
+        self.last_release_time = None;
+    }
+
     pub fn process_event(&mut self, event: InputEvent) {
         if self.buffer.len() >= self.capacity {
             self.buffer.pop_front();

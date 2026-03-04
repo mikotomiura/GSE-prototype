@@ -12,7 +12,7 @@ use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, RecvTimeoutError, Sender};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -26,6 +26,11 @@ struct LogState {
     tx: Sender<LogEntry>,
     path: String,
 }
+
+/// 分析スレッドへのリセットシグナル。
+/// start_session コマンドが `true` にセットすると、分析スレッドが
+/// FeatureExtractor をクリアして `false` に戻す。
+struct ResetSignal(Arc<AtomicBool>);
 
 // ---------------------------------------------------------------------------
 // Tauri コマンド
@@ -73,6 +78,26 @@ fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
         .unwrap_or_else(|p| p.into_inner())
         .path
         .clone()
+}
+
+/// 「開始する」ボタン押下時に呼ばれる。
+/// 1. CognitiveStateEngine を初期状態にリセット
+/// 2. 分析スレッドの FeatureExtractor リセットを要求 (AtomicBool シグナル)
+/// 3. LogEntry::SessionStart をログに記録
+#[tauri::command]
+fn start_session(
+    engine: State<CognitiveStateEngine>,
+    reset_signal: State<ResetSignal>,
+    log: State<Arc<Mutex<LogState>>>,
+) {
+    engine.reset();
+    reset_signal.0.store(true, Ordering::Release);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+    let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
 }
 
 /// アプリ終了。終了前に以下を順に実行する:
@@ -191,6 +216,10 @@ pub fn run() {
     // キーストローク入力チャネル
     let (tx, rx) = crossbeam_channel::bounded(64);
 
+    // セッション開始リセットシグナル (start_session → 分析スレッド)
+    let should_reset = Arc::new(AtomicBool::new(false));
+    let should_reset_for_thread = should_reset.clone();
+
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
@@ -218,6 +247,16 @@ pub fn run() {
         let mut last_engine_update = Instant::now() - Duration::from_secs(1);
 
         loop {
+            // start_session コマンドによるリセット要求をチェック
+            if should_reset_for_thread.load(Ordering::Acquire) {
+                should_reset_for_thread.store(false, Ordering::Release);
+                extractor = FeatureExtractor::new(600);
+                last_event_time = Instant::now();
+                last_engine_update = Instant::now() - Duration::from_secs(1);
+                // 待機中のキーイベント (起動直後の誤入力等) を破棄
+                while rx.try_recv().is_ok() {}
+            }
+
             match rx.recv_timeout(Duration::from_millis(1000)) {
                 Ok(event) => {
                     if engine_for_thread.get_paused() {
@@ -368,10 +407,12 @@ pub fn run() {
         .manage(engine)
         .manage(log_state)
         .manage(WallServerState::new())
+        .manage(ResetSignal(should_reset))
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
             get_keyboard_idle_ms,
+            start_session,
             quit_app,
             get_session_file,
             wall_server::start_wall_server,
