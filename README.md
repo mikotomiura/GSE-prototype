@@ -24,9 +24,10 @@
 13. [Frontend–Backend Initial State Sync (v2.7)](#frontendbackend-initial-state-sync-v27)
 14. [Security & Reliability Hardening (v2.8)](#security--reliability-hardening-v28)
 15. [Centralized State Management & Phone Connection Badge (v2.9)](#centralized-state-management--phone-connection-badge-v29)
-16. [Logging & Analysis](#logging--analysis)
-17. [Build Instructions](#build-instructions)
-18. [Academic References](#academic-references)
+16. [EWMA Drift Prevention & Lv2 Timer Stability (v2.10)](#ewma-drift-prevention--lv2-timer-stability-v210)
+17. [Logging & Analysis](#logging--analysis)
+18. [Build Instructions](#build-instructions)
+19. [Academic References](#academic-references)
 
 ---
 
@@ -705,6 +706,42 @@ The Overlay now subscribes to the `wall-phone-connected` Tauri event. When the u
 > Phone connected — Zen Timer running
 
 This provides immediate visual feedback that the QR scan was successful and the 2-minute countdown has started on the phone.
+
+---
+
+## EWMA Drift Prevention & Lv2 Timer Stability (v2.10)
+
+### Silence-Specific HMM Update (`update_silence`)
+
+During keyboard inactivity (silence ticks), the standard `update()` method would feed extreme idle-period features into the EWMA smoother, causing it to drift toward high-Friction values. This produced false Stuck/Incubation readings even when the user had merely paused briefly.
+
+**Fix:** A new `update_silence()` method in `engine.rs` performs HMM transition and emission updates **without modifying the EWMA axes**. It reads the current EWMA position (frozen) for observation binning, preserving HMM state detection while eliminating drift:
+
+```rust
+pub fn update_silence(&self, features: &Features, ime_open: bool) {
+    // Read EWMA without updating — prevents drift
+    let (x, y) = *self.axes_ewma.lock().unwrap();
+    // HMM forward step uses frozen EWMA position for observation
+    // ...
+}
+```
+
+### Ref Mirror Pattern for Lv2 Timer
+
+Previously, `isWallActive` and `isMonkMode` were included in the unified polling `useEffect`'s dependency array. This caused the `setInterval` to be torn down and recreated whenever these values changed, introducing timing gaps in the Lv2 cumulative timer.
+
+**Fix:** State values are mirrored into refs, and the interval reads from refs instead:
+
+```tsx
+const isWallActiveRef = useRef(isWallActive);
+const isMonkModeRef = useRef(isMonkMode);
+useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
+useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
+
+// Dependency array: only [isStarted, windowLabel] — no teardown on Wall/Monk toggle
+```
+
+This ensures the 500 ms interval runs continuously without interruption, and `Date.now()`-based elapsed calculations remain accurate across Wall activation and Monk Mode toggles.
 
 ---
 

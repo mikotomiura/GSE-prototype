@@ -25,9 +25,10 @@
 13. [フロントエンド・バックエンド初期状態同期（v2.7）](#フロントエンドバックエンド初期状態同期v27)
 14. [セキュリティと信頼性の強化（v2.8）](#セキュリティと信頼性の強化v28)
 15. [状態管理の集約とスマートフォン接続バッジ（v2.9）](#状態管理の集約とスマートフォン接続バッジv29)
-16. [ログと分析](#ログと分析)
-17. [ビルド手順](#ビルド手順)
-18. [学術的参考文献](#学術的参考文献)
+16. [EWMAドリフト防止とLv2タイマー安定化（v2.10）](#ewmaドリフト防止とlv2タイマー安定化v210)
+17. [ログと分析](#ログと分析)
+18. [ビルド手順](#ビルド手順)
+19. [学術的参考文献](#学術的参考文献)
 
 ---
 
@@ -705,6 +706,42 @@ Overlay が `wall-phone-connected` Tauri イベントを購読するようにな
 > Phone connected — Zen Timer running
 
 QRスキャンが成功し、スマートフォン上で 2 分間のカウントダウンが開始されたことを即座に視覚的にフィードバックします。
+
+---
+
+## EWMAドリフト防止とLv2タイマー安定化（v2.10）
+
+### サイレンス専用HMM更新（`update_silence`）
+
+キーボード無入力（サイレンスティック）時に通常の `update()` メソッドを使用すると、極端なアイドル期間の特徴量がEWMAスムーザーに供給され、高Friction方向にドリフトしていました。これにより、短い休止でも誤ったStuck/Incubation判定が発生していました。
+
+**修正：** `engine.rs` に新しい `update_silence()` メソッドを追加。**EWMAを更新せずに**HMMの遷移・放出更新を行います。現在のEWMA位置（凍結）を観測ビンの計算に使用し、HMM状態検出を維持しつつドリフトを排除します：
+
+```rust
+pub fn update_silence(&self, features: &Features, ime_open: bool) {
+    // EWMA を更新せず読み取りのみ — ドリフト防止
+    let (x, y) = *self.axes_ewma.lock().unwrap();
+    // HMM フォワードステップは凍結EWMA位置で観測を計算
+    // ...
+}
+```
+
+### Lv2タイマーのRefミラーパターン
+
+従来、`isWallActive` と `isMonkMode` は統合ポーリング `useEffect` の依存配列に含まれていました。これらの値が変化するたびに `setInterval` が破棄・再作成され、Lv2累積タイマーにタイミングギャップが生じていました。
+
+**修正：** ステート値をRefにミラーリングし、interval内ではRefから読み取ります：
+
+```tsx
+const isWallActiveRef = useRef(isWallActive);
+const isMonkModeRef = useRef(isMonkMode);
+useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
+useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
+
+// 依存配列: [isStarted, windowLabel] のみ — Wall/Monkトグルで破棄されない
+```
+
+これにより500msインターバルが中断なく連続実行され、Wall発動やMonk Modeトグル時も `Date.now()` ベースの経過時間計算が正確に維持されます。
 
 ---
 

@@ -33,6 +33,12 @@ function App() {
   // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
   const stuckAccumMsRef = useRef<number>(0);
   const lastStuckTickRef = useRef<number>(Date.now());
+  // Ref mirrors: setInterval 内からステート最新値を参照するため
+  // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
+  const isWallActiveRef = useRef(isWallActive);
+  const isMonkModeRef = useRef(isMonkMode);
+  useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
+  useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
 
   // D-1: getCurrentWindow() を useMemo でメモ化し不要な再生成を防止
   const currentWindow = useMemo(() => getCurrentWindow(), []);
@@ -48,9 +54,11 @@ function App() {
   // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + Lv2 累積タイマー
   //    単一の setInterval 内で Promise.all で並行取得し、同じブロック内で
   //    Date.now() ベースの正確な elapsed を用いて Lv2 タイマーを更新する。
-  //    これにより React のレンダリング間隔に依存しない堅牢なタイマーを実現。
+  //    isWallActive/isMonkMode は Ref 経由で参照し、依存配列に含めない。
+  //    これにより interval の破棄・再作成が発生せず、タイマー精度が向上する。
   useEffect(() => {
     if (windowLabel !== "overlay" && !isStarted) return;
+    lastStuckTickRef.current = Date.now();
 
     const interval = setInterval(async () => {
       try {
@@ -66,27 +74,28 @@ function App() {
         const elapsed = now - lastStuckTickRef.current;
         lastStuckTickRef.current = now;
 
-        // Wall 発動中 or Monk Mode ON: 累積リセット
-        if (isWallActive || isMonkMode) {
-          stuckAccumMsRef.current = 0;
-        } else if (state.stuck > LV2_STUCK_THRESHOLD) {
-          stuckAccumMsRef.current = Math.min(stuckAccumMsRef.current + elapsed, LV2_TIMER_MS);
-          if (stuckAccumMsRef.current >= LV2_TIMER_MS) {
-            stuckAccumMsRef.current = 0;
-            setIsWallActive(true);
+        if (!isWallActiveRef.current && !isMonkModeRef.current) {
+          if (state.stuck > LV2_STUCK_THRESHOLD) {
+            stuckAccumMsRef.current += elapsed;
+            if (stuckAccumMsRef.current >= LV2_TIMER_MS) {
+              stuckAccumMsRef.current = 0;
+              setIsWallActive(true);
+            }
+          } else if (state.stuck < LV2_SLACK_THRESHOLD) {
+            // 閾値を大きく下回った場合: 2× 速度で減衰
+            stuckAccumMsRef.current = Math.max(0, stuckAccumMsRef.current - elapsed * 2);
           }
-        } else if (state.stuck < LV2_SLACK_THRESHOLD) {
-          // 閾値を大きく下回った場合: 2× 速度で減衰
-          stuckAccumMsRef.current = Math.max(0, stuckAccumMsRef.current - elapsed * 2);
+          // LV2_SLACK_THRESHOLD ≤ stuck ≤ LV2_STUCK_THRESHOLD: 凍結（変化なし）
+        } else {
+          stuckAccumMsRef.current = 0;
         }
-        // LV2_SLACK_THRESHOLD ≤ stuck ≤ LV2_STUCK_THRESHOLD: 凍結（変化なし）
       } catch (e) {
         console.error("Failed to fetch state:", e);
       }
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isStarted, windowLabel, isWallActive, isMonkMode]);
+  }, [isStarted, windowLabel]);
 
   // 4. Sensor Integration (Unlock Logic)
   //    Wall解除後にメインウィンドウをフォーカス:
