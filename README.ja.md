@@ -24,9 +24,10 @@
 12. [セッション開始画面とエンジンリセット（v2.6）](#セッション開始画面とエンジンリセットv26)
 13. [フロントエンド・バックエンド初期状態同期（v2.7）](#フロントエンドバックエンド初期状態同期v27)
 14. [セキュリティと信頼性の強化（v2.8）](#セキュリティと信頼性の強化v28)
-15. [ログと分析](#ログと分析)
-16. [ビルド手順](#ビルド手順)
-17. [学術的参考文献](#学術的参考文献)
+15. [状態管理の集約とスマートフォン接続バッジ（v2.9）](#状態管理の集約とスマートフォン接続バッジv29)
+16. [ログと分析](#ログと分析)
+17. [ビルド手順](#ビルド手順)
+18. [学術的参考文献](#学術的参考文献)
 
 ---
 
@@ -130,9 +131,9 @@ GSE-Next/
 │
 ├── src/                       # React / TypeScript フロントエンド
 │   ├── components/
-│   │   ├── Dashboard.tsx      # 状態確率バー、セッションストップウォッチ、キーボード状態、Monk Mode
-│   │   └── Overlay.tsx        # Nudge（赤い霧）+ Wall（全画面遮断）+ 打鍵警告バナー
-│   ├── App.tsx                # 介入ステートマシン（Lv1 → Lv2 エスカレーション）
+│   │   ├── Dashboard.tsx      # 状態確率バー、セッションストップウォッチ、キーボード状態、Monk Mode、フック警告
+│   │   └── Overlay.tsx        # Nudge（赤い霧）+ Wall（全画面遮断）+ 打鍵警告バナー + スマホ接続バッジ
+│   ├── App.tsx                # 集約状態ポーリング + 介入ステートマシン（Lv1 → Lv2 エスカレーション）
 │   └── main.tsx
 │
 ├── src-tauri/                 # Rust / Tauri 2.0 バックエンド
@@ -653,6 +654,43 @@ macOS 版リファレンス実装との照合により、6 件のバグおよび
 **Content Security Policy：** `tauri.conf.json` の `csp` が `null`（制限なし）でした。`"default-src 'self'; style-src 'self' 'unsafe-inline'"` に変更し、リソースロードをオリジン内に制限しました。
 
 **`get_hook_status` コマンド追加：** macOS 版との API 互換性のために追加。macOS ではキーボードフック前にシステム権限プロンプトが必要であり、このコマンドでその状態をフロントエンドに伝えます。Windows では権限プロンプト不要のため、常に `true` を返します。
+
+---
+
+## 状態管理の集約とスマートフォン接続バッジ（v2.9）
+
+### App.tsx での集約ポーリング
+
+従来、`Dashboard.tsx` は内部で独自の `setInterval` を使い `get_keyboard_idle_ms` をポーリングしていました。これは単一情報源の原則に反し、コンポーネント間でポーリングロジックが重複していました。
+
+**修正：** すべてのバックエンドポーリング（`get_keyboard_idle_ms`、`get_hook_status`）を `App.tsx` に集約し、子コンポーネントへ Props として渡すように変更しました：
+
+```tsx
+// App.tsx — 集約ポーリング（1 Hz）
+const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
+const [hookActive, setHookActive] = useState(true);
+
+// Props として Dashboard に渡す
+<Dashboard keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} ... />
+```
+
+`Dashboard.tsx` は `invoke()` 呼び出しや `setInterval` ポーリングを一切含まない純粋な表示コンポーネントとなりました。
+
+### フックステータス警告バナー
+
+`hookActive === false` の場合、Dashboard の上部に警告バナーが表示されます：
+
+> ⚠ Input Monitoring 権限が必要です
+
+Windows では `get_hook_status` が常に `true` を返すため、このバナーは実際には表示されません。macOS 版ではキーボードフック設置前にシステム権限の許可が必要であり、コードベース統合のために存在します。
+
+### スマートフォン接続バッジ（Overlay）
+
+Overlay が `wall-phone-connected` Tauri イベントを購読するようになりました。ユーザーのスマートフォンが QRコードをスキャンして Wall Server に接続すると、Wall オーバーレイ内にバッジが表示されます：
+
+> Phone connected — Zen Timer running
+
+QRスキャンが成功し、スマートフォン上で 2 分間のカウントダウンが開始されたことを即座に視覚的にフィードバックします。
 
 ---
 

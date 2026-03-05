@@ -23,9 +23,10 @@
 12. [Session Start Screen & Engine Reset (v2.6)](#session-start-screen--engine-reset-v26)
 13. [Frontend–Backend Initial State Sync (v2.7)](#frontendbackend-initial-state-sync-v27)
 14. [Security & Reliability Hardening (v2.8)](#security--reliability-hardening-v28)
-15. [Logging & Analysis](#logging--analysis)
-16. [Build Instructions](#build-instructions)
-17. [Academic References](#academic-references)
+15. [Centralized State Management & Phone Connection Badge (v2.9)](#centralized-state-management--phone-connection-badge-v29)
+16. [Logging & Analysis](#logging--analysis)
+17. [Build Instructions](#build-instructions)
+18. [Academic References](#academic-references)
 
 ---
 
@@ -129,9 +130,9 @@ GSE-Next/
 │
 ├── src/                       # React / TypeScript frontend
 │   ├── components/
-│   │   ├── Dashboard.tsx      # State probability bars, session stopwatch, keyboard status, Monk Mode
-│   │   └── Overlay.tsx        # Nudge (red mist) + Wall (full-screen block) + typing warning banner
-│   ├── App.tsx                # Intervention state machine (Lv1 → Lv2 escalation)
+│   │   ├── Dashboard.tsx      # State probability bars, session stopwatch, keyboard status, Monk Mode, hook warning
+│   │   └── Overlay.tsx        # Nudge (red mist) + Wall (full-screen block) + typing warning + phone connection badge
+│   ├── App.tsx                # Centralized state polling + intervention state machine (Lv1 → Lv2 escalation)
 │   └── main.tsx
 │
 ├── src-tauri/                 # Rust / Tauri 2.0 backend
@@ -653,6 +654,43 @@ Six independent bugs and reliability gaps were identified and resolved, aligned 
 **Content Security Policy:** `tauri.conf.json` `csp` was `null` (no restrictions). Changed to `"default-src 'self'; style-src 'self' 'unsafe-inline'"`, restricting all resource loads to same-origin and limiting inline styles.
 
 **`get_hook_status` command:** Added for macOS API compatibility. The macOS version requires an explicit system permission prompt before the keyboard hook can be installed; this command exposes that status to the frontend. On Windows no prompt is needed, so the command unconditionally returns `true`.
+
+---
+
+## Centralized State Management & Phone Connection Badge (v2.9)
+
+### Centralized Polling in App.tsx
+
+Previously, `Dashboard.tsx` polled `get_keyboard_idle_ms` internally via its own `setInterval`. This violated the principle of single-source-of-truth state management and duplicated polling logic across components.
+
+**Fix:** All backend polling (`get_keyboard_idle_ms`, `get_hook_status`) is now performed in `App.tsx` and passed to child components as props:
+
+```tsx
+// App.tsx — centralized polling (1 Hz)
+const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
+const [hookActive, setHookActive] = useState(true);
+
+// Passed as props to Dashboard
+<Dashboard keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} ... />
+```
+
+`Dashboard.tsx` no longer contains any `invoke()` calls or `setInterval` polling — it is a pure presentational component receiving all data via props.
+
+### Hook Status Warning Banner
+
+When `hookActive === false`, a warning banner is displayed at the top of the Dashboard:
+
+> ⚠ Input Monitoring 権限が必要です
+
+On Windows, `get_hook_status` always returns `true`, so this banner is never shown. The code exists for codebase unification with the macOS version, where system permission is required before the keyboard hook can be installed.
+
+### Phone Connection Badge (Overlay)
+
+The Overlay now subscribes to the `wall-phone-connected` Tauri event. When the user's smartphone connects to the Wall Server (by scanning the QR code), a badge is displayed inside the Wall overlay:
+
+> Phone connected — Zen Timer running
+
+This provides immediate visual feedback that the QR scan was successful and the 2-minute countdown has started on the phone.
 
 ---
 

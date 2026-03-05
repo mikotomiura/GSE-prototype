@@ -28,6 +28,8 @@ function App() {
   const [isWallActive, setIsWallActive] = useState(false);
   const [isMonkMode, setIsMonkMode] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
+  const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
+  const [hookActive, setHookActive] = useState(true);
   // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
   const stuckAccumMsRef = useRef<number>(0);
   const lastStuckTickRef = useRef<number>(Date.now());
@@ -49,6 +51,24 @@ function App() {
         console.error("Failed to fetch state:", e);
       }
     }, 500);
+
+    return () => clearInterval(interval);
+  }, [isStarted, windowLabel]);
+
+  // 2b. Poll keyboard idle & hook status (Every 1000ms)
+  useEffect(() => {
+    if (windowLabel !== "overlay" && !isStarted) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const idle = await invoke<number>("get_keyboard_idle_ms");
+        setKeyboardIdleMs(idle);
+      } catch (_) {}
+      try {
+        const active = await invoke<boolean>("get_hook_status");
+        setHookActive(active);
+      } catch (_) {}
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [isStarted, windowLabel]);
@@ -161,7 +181,7 @@ function App() {
 
   // Default to Main Dashboard
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} />
+    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} />
   );
 }
 

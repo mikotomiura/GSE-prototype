@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { emit } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
 
 interface DashboardProps {
   cognitiveState: {
@@ -10,29 +9,18 @@ interface DashboardProps {
   };
   onQuit: () => void;
   isMonkMode: boolean;
+  keyboardIdleMs: number;
+  hookActive: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
 
-  // キーボードアイドル時間 (ms)
-  const [keyIdleMs, setKeyIdleMs] = useState(0);
-
   useEffect(() => {
     const interval = setInterval(() => {
       setSessionSeconds(Math.floor((Date.now() - sessionStartRef.current) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const idle = await invoke<number>("get_keyboard_idle_ms");
-        setKeyIdleMs(idle);
-      } catch (_) {}
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -55,13 +43,13 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   };
 
   // 3秒以内に打鍵があれば "Active"、それ以上なら経過秒数を表示
-  const keyIsActive = keyIdleMs > 0 && keyIdleMs < 3000;
+  const keyIsActive = keyboardIdleMs > 0 && keyboardIdleMs < 3000;
   const keyStatusLabel =
-    keyIdleMs === 0
+    keyboardIdleMs === 0
       ? '---'
       : keyIsActive
       ? 'Active'
-      : `Idle ${Math.floor(keyIdleMs / 1000)}s`;
+      : `Idle ${Math.floor(keyboardIdleMs / 1000)}s`;
 
   const handleMonkModeToggle = () => {
     // Monk Mode トグル: ON/OFF を broadcast → 両ウィンドウが isMonkMode を同期
@@ -72,6 +60,13 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   return (
     <div className={`dashboard-container state-${dominant.toLowerCase()}`}>
       <h2>Generative Struggle Engine</h2>
+
+      {/* Input Monitoring 権限警告 (macOS向け。Windowsでは hookActive は常に true) */}
+      {!hookActive && (
+        <div className="hook-warning-banner">
+          ⚠ Input Monitoring 権限が必要です
+        </div>
+      )}
 
       {/* セッション情報バー: ストップウォッチ + キーボード状態 */}
       <div className="session-bar">

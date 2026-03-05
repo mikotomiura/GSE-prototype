@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 interface OverlayProps {
     stuckProb: number;
@@ -16,6 +17,7 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
     const [nudgeOpacity, setNudgeOpacity] = useState(0);
     const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
     const [showTypingWarning, setShowTypingWarning] = useState(false);
+    const [phoneConnected, setPhoneConnected] = useState(false);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
 
     // Wall発動中のキーボード打鍵検知に使うref群
@@ -27,6 +29,16 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
     useEffect(() => {
         document.documentElement.style.background = 'transparent';
         document.body.style.background = 'transparent';
+    }, []);
+
+    // スマートフォン接続イベントの購読
+    useEffect(() => {
+        const unlisten = listen("wall-phone-connected", () => {
+            setPhoneConnected(true);
+        });
+        return () => {
+            unlisten.then((f) => f());
+        };
     }, []);
 
     // マウント直後に即座にクリック透過を有効化 (初期状態保証)
@@ -132,6 +144,12 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
                     ) : (
                         <div className="scramble-animation">
                             <span>QR生成中...</span>
+                        </div>
+                    )}
+                    {/* スマートフォン接続バッジ */}
+                    {phoneConnected && (
+                        <div className="phone-connected-badge">
+                            Phone connected — Zen Timer running
                         </div>
                     )}
                     {/* Wall発動中の打鍵警告バナー */}
