@@ -10,7 +10,7 @@ interface DashboardProps {
   onQuit: () => void;
   isMonkMode: boolean;
   keyboardIdleMs: number;
-  hookActive: boolean;
+  hookActive: boolean | null;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive }) => {
@@ -62,7 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
       <h2>Generative Struggle Engine</h2>
 
       {/* Input Monitoring 権限警告 (macOS向け。Windowsでは hookActive は常に true) */}
-      {!hookActive && (
+      {hookActive === false && (
         <div className="hook-warning-banner">
           ⚠ Input Monitoring 権限が必要です
         </div>

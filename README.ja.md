@@ -659,19 +659,33 @@ macOS 版リファレンス実装との照合により、6 件のバグおよび
 
 ## 状態管理の集約とスマートフォン接続バッジ（v2.9）
 
-### App.tsx での集約ポーリング
+### App.tsx での統合ポーリングとタイマー
 
-従来、`Dashboard.tsx` は内部で独自の `setInterval` を使い `get_keyboard_idle_ms` をポーリングしていました。これは単一情報源の原則に反し、コンポーネント間でポーリングロジックが重複していました。
+従来の `App.tsx` は 3 つの独立した `useEffect` を使用していました：認知状態ポーリング（500ms）、キーボードアイドル＋フックステータスポーリング（1000ms）、Lv2 Wall 累積タイマー（React レンダーに依存）。これにより以下の問題がありました：
 
-**修正：** すべてのバックエンドポーリング（`get_keyboard_idle_ms`、`get_hook_status`）を `App.tsx` に集約し、子コンポーネントへ Props として渡すように変更しました：
+1. **冗長なポーリング**: `get_hook_status` は実行中に変わらない静的な値であるにもかかわらず毎秒ポーリングされていた
+2. **タイマードリフト**: Lv2 累積タイマーが `useEffect` の依存配列トリガーに依存しており、経過時間の計算が React のレンダリング間隔に左右されていた
+
+**修正：** 3 つのフックを単一のアーキテクチャに統合しました：
+
+- **`hookActive`**（`boolean | null`、初期値 `null`）は**マウント時に 1 回だけ**取得（ポーリングなし）：
 
 ```tsx
-// App.tsx — 集約ポーリング（1 Hz）
-const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
-const [hookActive, setHookActive] = useState(true);
+useEffect(() => {
+  invoke<boolean>("get_hook_status")
+    .then((active) => setHookActive(active))
+    .catch(() => setHookActive(true)); // エラー時は楽観的に true
+}, []);
+```
 
-// Props として Dashboard に渡す
-<Dashboard keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} ... />
+- **単一の 500ms `setInterval`** 内で `Promise.all` により `get_cognitive_state` と `get_keyboard_idle_ms` を並行取得し、同ブロック内で `Date.now()` ベースの Lv2 タイマーを計算：
+
+```tsx
+const [state, idle] = await Promise.all([
+  invoke<CognitiveStateRaw>("get_cognitive_state"),
+  invoke<number>("get_keyboard_idle_ms"),
+]);
+// Lv2 タイマーを Date.now() ベースで同ブロック内で計算 — レンダー依存のドリフトなし
 ```
 
 `Dashboard.tsx` は `invoke()` 呼び出しや `setInterval` ポーリングを一切含まない純粋な表示コンポーネントとなりました。

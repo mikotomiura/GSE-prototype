@@ -659,19 +659,33 @@ Six independent bugs and reliability gaps were identified and resolved, aligned 
 
 ## Centralized State Management & Phone Connection Badge (v2.9)
 
-### Centralized Polling in App.tsx
+### Unified Polling & Timer in App.tsx
 
-Previously, `Dashboard.tsx` polled `get_keyboard_idle_ms` internally via its own `setInterval`. This violated the principle of single-source-of-truth state management and duplicated polling logic across components.
+Previously, `App.tsx` used three independent `useEffect` hooks: one for cognitive state polling (500 ms), one for keyboard idle + hook status polling (1000 ms), and one for the Lv2 Wall cumulative timer (triggered by React render). This caused two problems:
 
-**Fix:** All backend polling (`get_keyboard_idle_ms`, `get_hook_status`) is now performed in `App.tsx` and passed to child components as props:
+1. **Redundant polling**: `get_hook_status` was polled every second despite being a static value (always `true` on Windows; set once at permission grant on macOS).
+2. **Timer drift**: The Lv2 cumulative timer relied on `useEffect` dependency triggers, making its elapsed-time calculation dependent on React's rendering interval rather than wall-clock time.
+
+**Fix:** The three hooks are consolidated into a single architecture:
+
+- **`hookActive`** (`boolean | null`, initial `null`) is fetched **once on mount** — not polled:
 
 ```tsx
-// App.tsx — centralized polling (1 Hz)
-const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
-const [hookActive, setHookActive] = useState(true);
+useEffect(() => {
+  invoke<boolean>("get_hook_status")
+    .then((active) => setHookActive(active))
+    .catch(() => setHookActive(true)); // optimistic fallback
+}, []);
+```
 
-// Passed as props to Dashboard
-<Dashboard keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} ... />
+- **A single 500 ms `setInterval`** fetches `get_cognitive_state` and `get_keyboard_idle_ms` via `Promise.all`, then computes the Lv2 timer in the same block using `Date.now()`-based elapsed time:
+
+```tsx
+const [state, idle] = await Promise.all([
+  invoke<CognitiveStateRaw>("get_cognitive_state"),
+  invoke<number>("get_keyboard_idle_ms"),
+]);
+// Lv2 timer computed here with Date.now() — no render-dependency drift
 ```
 
 `Dashboard.tsx` no longer contains any `invoke()` calls or `setInterval` polling — it is a pure presentational component receiving all data via props.

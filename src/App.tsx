@@ -29,7 +29,7 @@ function App() {
   const [isMonkMode, setIsMonkMode] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
-  const [hookActive, setHookActive] = useState(true);
+  const [hookActive, setHookActive] = useState<boolean | null>(null);
   // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
   const stuckAccumMsRef = useRef<number>(0);
   const lastStuckTickRef = useRef<number>(Date.now());
@@ -38,70 +38,55 @@ function App() {
   const currentWindow = useMemo(() => getCurrentWindow(), []);
   const windowLabel = currentWindow.label;
 
-  // 2. Poll Cognitive State (Every 500ms)
-  //    オーバーレイウィンドウは常時ポーリング。メインウィンドウはセッション開始後のみ。
+  // 2. Hook status: マウント時に1回だけ取得（実行中に変わらない値）
+  useEffect(() => {
+    invoke<boolean>("get_hook_status")
+      .then((active) => setHookActive(active))
+      .catch(() => setHookActive(true)); // エラー時は楽観的に true
+  }, []);
+
+  // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + Lv2 累積タイマー
+  //    単一の setInterval 内で Promise.all で並行取得し、同じブロック内で
+  //    Date.now() ベースの正確な elapsed を用いて Lv2 タイマーを更新する。
+  //    これにより React のレンダリング間隔に依存しない堅牢なタイマーを実現。
   useEffect(() => {
     if (windowLabel !== "overlay" && !isStarted) return;
 
     const interval = setInterval(async () => {
       try {
-        const state = await invoke<CognitiveStateRaw>("get_cognitive_state");
+        const [state, idle] = await Promise.all([
+          invoke<CognitiveStateRaw>("get_cognitive_state"),
+          invoke<number>("get_keyboard_idle_ms"),
+        ]);
         setCognitiveState(state);
+        setKeyboardIdleMs(idle);
+
+        // --- Lv2 累積タイマー (同ブロック内で Date.now() ベース算出) ---
+        const now = Date.now();
+        const elapsed = now - lastStuckTickRef.current;
+        lastStuckTickRef.current = now;
+
+        // Wall 発動中 or Monk Mode ON: 累積リセット
+        if (isWallActive || isMonkMode) {
+          stuckAccumMsRef.current = 0;
+        } else if (state.stuck > LV2_STUCK_THRESHOLD) {
+          stuckAccumMsRef.current = Math.min(stuckAccumMsRef.current + elapsed, LV2_TIMER_MS);
+          if (stuckAccumMsRef.current >= LV2_TIMER_MS) {
+            stuckAccumMsRef.current = 0;
+            setIsWallActive(true);
+          }
+        } else if (state.stuck < LV2_SLACK_THRESHOLD) {
+          // 閾値を大きく下回った場合: 2× 速度で減衰
+          stuckAccumMsRef.current = Math.max(0, stuckAccumMsRef.current - elapsed * 2);
+        }
+        // LV2_SLACK_THRESHOLD ≤ stuck ≤ LV2_STUCK_THRESHOLD: 凍結（変化なし）
       } catch (e) {
         console.error("Failed to fetch state:", e);
       }
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isStarted, windowLabel]);
-
-  // 2b. Poll keyboard idle & hook status (Every 1000ms)
-  useEffect(() => {
-    if (windowLabel !== "overlay" && !isStarted) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const idle = await invoke<number>("get_keyboard_idle_ms");
-        setKeyboardIdleMs(idle);
-      } catch (_) {}
-      try {
-        const active = await invoke<boolean>("get_hook_status");
-        setHookActive(active);
-      } catch (_) {}
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isStarted, windowLabel]);
-
-  // 3. Intervention Layer ロジック (advice.md §C 累積タイマー)
-  //    D-2: Lv1 (Nudge) は Overlay.tsx 側で stuck>0.6 時に即時表示済み
-  //    D-3: Lv2 (Wall) は stuck>LV2_STUCK_THRESHOLD の累積時間が LV2_TIMER_MS に達したら発動
-  //    「連続 30 秒」ではなく「累積 30 秒」: 一瞬閾値を下回っても即リセットされない。
-  //    stuck < LV2_SLACK_THRESHOLD に落ちた場合のみ累積を 2× 速度で減衰させる。
-  //    0.5 ≤ stuck ≤ 0.7 の範囲は「遊び」として累積を凍結（増加も減衰もしない）。
-  useEffect(() => {
-    const now = Date.now();
-    const elapsed = now - lastStuckTickRef.current;
-    lastStuckTickRef.current = now;
-
-    // Wall 発動中 or Monk Mode ON: 累積リセット
-    if (isWallActive || isMonkMode) {
-      stuckAccumMsRef.current = 0;
-      return;
-    }
-
-    if (cognitiveState.stuck > LV2_STUCK_THRESHOLD) {
-      stuckAccumMsRef.current = Math.min(stuckAccumMsRef.current + elapsed, LV2_TIMER_MS);
-      if (stuckAccumMsRef.current >= LV2_TIMER_MS) {
-        stuckAccumMsRef.current = 0;
-        setIsWallActive(true);
-      }
-    } else if (cognitiveState.stuck < LV2_SLACK_THRESHOLD) {
-      // 閾値を大きく下回った場合: 2× 速度で減衰
-      stuckAccumMsRef.current = Math.max(0, stuckAccumMsRef.current - elapsed * 2);
-    }
-    // LV2_SLACK_THRESHOLD ≤ stuck ≤ LV2_STUCK_THRESHOLD: 凍結（変化なし）
-  }, [cognitiveState.stuck, isWallActive, isMonkMode]);
+  }, [isStarted, windowLabel, isWallActive, isMonkMode]);
 
   // 4. Sensor Integration (Unlock Logic)
   //    Wall解除後にメインウィンドウをフォーカス:
