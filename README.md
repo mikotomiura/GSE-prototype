@@ -691,21 +691,18 @@ const [state, idle] = await Promise.all([
 
 `Dashboard.tsx` no longer contains any `invoke()` calls or `setInterval` polling — it is a pure presentational component receiving all data via props.
 
-### Hook Status Warning Banner
+### Permission Warning Banner (Dashboard)
 
-When `hookActive === false`, a warning banner is displayed at the top of the Dashboard:
+When `hookActive === false`, a rich permission banner (class `permission-banner`) is displayed at the top of the Dashboard with step-by-step instructions for granting Input Monitoring access via System Settings. On Windows, `get_hook_status` always returns `true`, so this banner is never shown. The code exists for codebase unification with the macOS version.
 
-> ⚠ Input Monitoring 権限が必要です
+### Wall Unlock Screen (Overlay)
 
-On Windows, `get_hook_status` always returns `true`, so this banner is never shown. The code exists for codebase unification with the macOS version, where system permission is required before the keyboard hook can be installed.
+The Wall overlay (displayed when `isWallActive` is true) provides a user-friendly unlock flow ported from the macOS version:
 
-### Phone Connection Badge (Overlay)
-
-The Overlay now subscribes to the `wall-phone-connected` Tauri event. When the user's smartphone connects to the Wall Server (by scanning the QR code), a badge is displayed inside the Wall overlay:
-
-> Phone connected — Zen Timer running
-
-This provides immediate visual feedback that the QR scan was successful and the 2-minute countdown has started on the phone.
+- **QR container** (`qr-container`): wraps the QR code image with a camera hint ("Open camera app and point at QR code") and the server URL
+- **Network troubleshooting hint** (`wall-network-hint`): reminds the user to ensure PC and phone are on the same Wi-Fi
+- **Phone connection badge**: when the smartphone connects to the Wall Server, a "Phone connected — Zen Timer running" badge appears
+- **Typing warning**: if the user attempts to type during the Wall, a warning banner is shown for 2.5 seconds
 
 ---
 

@@ -130,22 +130,25 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
             {isWallActive && (
                 <div className="wall-layer">
                     <h1>Time to Move!</h1>
-                    <p>スマートフォンでQRコードをスキャンして解除</p>
+                    <p>Scan the QR code with your phone to unlock</p>
+
                     {wallServerInfo ? (
-                        <>
-                            {/* base64エンコードされたSVG QRコードをimg要素で表示 */}
-                            <img
-                                className="qr-code"
-                                src={wallServerInfo.qr_svg}
-                                alt="QR Code"
-                            />
-                            <p className="wall-url">{wallServerInfo.url}</p>
-                        </>
-                    ) : (
-                        <div className="scramble-animation">
-                            <span>QR生成中...</span>
+                        <div className="qr-container">
+                            <img src={wallServerInfo.qr_svg} alt="QR Code" className="qr-code" />
+                            <p className="qr-hint">
+                                Open camera app and point at QR code
+                            </p>
+                            {wallServerInfo.url && (
+                                <p className="qr-url">{wallServerInfo.url}</p>
+                            )}
                         </div>
+                    ) : (
+                        <p className="qr-loading">Starting unlock server...</p>
                     )}
+
+                    <p className="wall-network-hint">
+                        PCとスマホが同じWi-Fiに接続されていることを確認してください
+                    </p>
                     {/* スマートフォン接続バッジ */}
                     {phoneConnected && (
                         <div className="phone-connected-badge">

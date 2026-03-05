@@ -691,21 +691,18 @@ const [state, idle] = await Promise.all([
 
 `Dashboard.tsx` は `invoke()` 呼び出しや `setInterval` ポーリングを一切含まない純粋な表示コンポーネントとなりました。
 
-### フックステータス警告バナー
+### 権限警告バナー（Dashboard）
 
-`hookActive === false` の場合、Dashboard の上部に警告バナーが表示されます：
+`hookActive === false` の場合、Dashboard の上部にリッチな権限バナー（クラス `permission-banner`）が表示され、System Settings での Input Monitoring 権限付与手順をステップバイステップで案内します。Windows では `get_hook_status` が常に `true` を返すため表示されません。macOS版とのコードベース統合のために存在します。
 
-> ⚠ Input Monitoring 権限が必要です
+### Wall 解除画面（Overlay）
 
-Windows では `get_hook_status` が常に `true` を返すため、このバナーは実際には表示されません。macOS 版ではキーボードフック設置前にシステム権限の許可が必要であり、コードベース統合のために存在します。
+Wall 発動時（`isWallActive` が true）に表示されるオーバーレイは、macOS版から移植されたユーザーフレンドリーな解除フローを提供します：
 
-### スマートフォン接続バッジ（Overlay）
-
-Overlay が `wall-phone-connected` Tauri イベントを購読するようになりました。ユーザーのスマートフォンが QRコードをスキャンして Wall Server に接続すると、Wall オーバーレイ内にバッジが表示されます：
-
-> Phone connected — Zen Timer running
-
-QRスキャンが成功し、スマートフォン上で 2 分間のカウントダウンが開始されたことを即座に視覚的にフィードバックします。
+- **QRコンテナ** (`qr-container`)：QRコード画像をカメラヒント（「Open camera app and point at QR code」）とサーバーURLと共にラップ
+- **ネットワークトラブルシューティングヒント** (`wall-network-hint`)：PCとスマホが同じWi-Fiに接続されていることを確認するよう案内
+- **スマートフォン接続バッジ**：スマートフォンが Wall Server に接続すると「Phone connected — Zen Timer running」バッジを表示
+- **打鍵警告**：Wall 中にユーザーがタイピングを試みると、2.5秒間警告バナーを表示
 
 ---
 

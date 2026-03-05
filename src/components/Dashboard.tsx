@@ -63,8 +63,17 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
 
       {/* Input Monitoring 権限警告 (macOS向け。Windowsでは hookActive は常に true) */}
       {hookActive === false && (
-        <div className="hook-warning-banner">
-          ⚠ Input Monitoring 権限が必要です
+        <div className="permission-banner">
+          <span className="permission-icon">⚠️</span>
+          <div className="permission-text">
+            <strong>Input Monitoring 権限が必要です</strong>
+            <p>
+              System Settings が自動で開かれました。<br />
+              <em>プライバシーとセキュリティ › 入力監視</em> で
+              <strong> gse-next </strong>にチェックを入れ、
+              アプリを再起動してください。
+            </p>
+          </div>
         </div>
       )}
 
