@@ -59,6 +59,8 @@ pub fn is_typing_key(vk_code: u32) -> bool {
         0x41..=0x5A
         // Digits 0-9
         | 0x30..=0x39
+        // Numpad keys (0-9, multiply, add, separator, subtract, decimal, divide)
+        | 0x60..=0x6F
         // Symbol / punctuation keys (OEM)
         | 0xBA..=0xC0
         | 0xDB..=0xDF

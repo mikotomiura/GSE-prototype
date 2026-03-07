@@ -165,7 +165,7 @@ GSE-Next/
 
 ## Feature Extraction (F1, F3–F6)
 
-All features are computed over a **30-second sliding window** of raw keystroke events, updated on every key press. Key repeat events and non-typing keys (arrow keys, function keys, IME mode keys) are excluded from flight time calculation. During silence (no input), a synthetic observation is generated every 1 second via `make_silence_observation()` to keep the HMM running.
+All features are computed over a **30-second sliding window** of raw keystroke events, updated on every key press. Non-typing keys and auto-repeat events are filtered at two layers: at the keyboard hook (before entering the bounded channel) and within the feature extractor's flight time calculation. During silence (no input), a synthetic observation is generated every 1 second via `make_silence_observation()` to keep the HMM running.
 
 | Feature | Symbol | Definition | Cognitive Signal |
 |---|---|---|---|
@@ -760,11 +760,16 @@ F2 (Flight Time Variance) was not used in either the Cognitive Friction (X) or P
 
 ---
 
-### Fix ②: Key Repeat & Non-Typing Key Filtering
+### Fix ②: Key Repeat & Non-Typing Key Filtering (Hook + Feature Extractor)
 
-**Problem:** Key repeat events (holding a key down) inflated flight time calculations with artificial zero-interval entries. Non-typing keys (arrow keys, function keys, IME mode keys) introduced noise unrelated to typing rhythm.
+**Problem:** Key repeat events (holding a key down) inflated flight time calculations with artificial zero-interval entries. Non-typing keys (arrow keys, function keys, IME mode keys) introduced noise unrelated to typing rhythm. All raw key events consumed bounded channel capacity (64 slots) regardless of analytical relevance.
 
-**Fix:** `calculate_features()` now tracks held keys via a `HashSet<u32>`. If a key-DOWN arrives while the same VK is already held, it is flagged as a repeat and excluded from flight time calculation. A new `is_typing_key()` filter restricts flight time computation to A–Z, 0–9, OEM symbol keys, Backspace, Enter, Space, Tab, and Delete.
+**Fix:** Two-layer filtering ensures only clean typing data reaches the HMM:
+
+1. **Hook-level gate** (`hook_callback`): `is_typing_key()` and `PRESSED_KEYS: Mutex<HashSet<u32>>` filter events *before* they enter the crossbeam channel. Non-typing keys and auto-repeat events are never sent to `EVENT_SENDER`, reducing channel traffic and eliminating noise at the source. `LAST_KEY_MS` (idle detection) and `POLL_WAKE_TX` (IME polling wake) remain unconditional for all keys.
+2. **Feature extractor** (`calculate_features()`): In-window `held_keys` tracking and `is_typing_key()` provide a second defense layer for flight time calculation, guarding against any edge cases in buffered data.
+
+`is_typing_key()` covers A–Z, 0–9, Numpad keys (0x60–0x6F), OEM symbol keys, Backspace, Enter, Space, Tab, and Delete.
 
 ---
 

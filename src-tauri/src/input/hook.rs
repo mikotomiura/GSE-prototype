@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
@@ -28,7 +29,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
-use crate::analysis::features::InputEvent;
+use crate::analysis::features::{is_typing_key, InputEvent};
 
 // IME WinEvent constants (winuser.h, Windows 8+)
 // These fire in ANY foreground process - no DLL injection needed with WINEVENT_OUTOFCONTEXT
@@ -101,6 +102,10 @@ unsafe impl Sync for ThreadSafeWinEventHook {}
 lazy_static! {
     static ref HOOK_HANDLE: Mutex<Option<ThreadSafeHook>> = Mutex::new(None);
     static ref WINEVENT_HOOK_HANDLE: Mutex<Option<ThreadSafeWinEventHook>> = Mutex::new(None);
+    /// Tracks currently held keys to detect and filter auto-repeat events.
+    /// WH_KEYBOARD_LL callbacks are serialized on a single thread, so the lock
+    /// is never contended — acquisition cost is negligible (~ns).
+    static ref PRESSED_KEYS: Mutex<HashSet<u32>> = Mutex::new(HashSet::new());
 }
 
 /// Lock-free sender for keystroke events → analysis thread.
@@ -294,15 +299,33 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                 }
             }
 
-            let event = InputEvent {
-                vk_code,
-                timestamp,
-                is_press,
-            };
+            // ---------------------------------------------------------------------------
+            // Hook-level filtering: only send typing keys (non-repeat) to the
+            // analysis thread.  LAST_KEY_MS and POLL_WAKE_TX above remain
+            // unconditional so that idle detection and IME polling still work
+            // for ALL keys.
+            // ---------------------------------------------------------------------------
+            if is_typing_key(vk_code) {
+                let mut is_repeat = false;
+                if let Ok(mut held) = PRESSED_KEYS.lock() {
+                    if is_press {
+                        // If already in the set → auto-repeat; skip send
+                        is_repeat = !held.insert(vk_code);
+                    } else {
+                        held.remove(&vk_code);
+                    }
+                }
 
-            // Non-blocking send of keystroke event to analysis thread (lock-free)
-            if let Some(sender) = EVENT_SENDER.get() {
-                let _ = sender.try_send(event);
+                if !is_repeat {
+                    let event = InputEvent {
+                        vk_code,
+                        timestamp,
+                        is_press,
+                    };
+                    if let Some(sender) = EVENT_SENDER.get() {
+                        let _ = sender.try_send(event);
+                    }
+                }
             }
 
             // Wake the IME polling thread on every keypress, and also on VK_DBE_* key-up.
