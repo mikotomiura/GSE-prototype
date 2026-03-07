@@ -27,7 +27,7 @@ pub struct CognitiveStateEngine {
     current_state_probs: Arc<Mutex<[f64; 3]>>,
     pub is_paused: Arc<AtomicBool>,
     pub backspace_streak: Arc<AtomicU32>,
-    // ペナルティ保留フラグ: streak >= 8 に達した瞬間にtrueになり、
+    // ペナルティ保留フラグ: streak >= 14 に達した瞬間にtrueになり、
     // update() で消費されるまで保持される。
     // register_keystroke() で streak をリセットしてもペナルティは取りこぼさない。
     has_pending_penalty: Arc<AtomicBool>,
@@ -74,7 +74,7 @@ impl CognitiveStateEngine {
         // Incubation: peaks at low-mid Friction (x=0,1,2) × low Engagement (y=0,1)
         // Stuck:      peaks at high Friction (x=3,4) × low Engagement (y=0,1)
         //
-        // Penalty bin (obs=25): backspace_streak ≥ 8 → near-certain Stuck.
+        // Penalty bin (obs=25): backspace_streak ≥ 14 → near-certain Stuck.
         //
         // 全ビンに最小値 0.01 を設定し、確率の完全消滅を防止。
         // 旧実装の EMISSION_FLOOR (+0.05 一律加算) を廃止:
@@ -122,7 +122,7 @@ impl CognitiveStateEngine {
                                0.10, 0.16, 0.07, 0.02, 0.01,
             //  x=4 (high F)   y: 0     1     2     3     4
                                0.16, 0.22, 0.12, 0.05, 0.02,
-            //  penalty bin  (backspace streak ≥5 → near-certain Stuck)
+            //  penalty bin  (backspace streak ≥14 → near-certain Stuck)
                                0.99,
         ];
 
@@ -174,36 +174,17 @@ impl CognitiveStateEngine {
         self.is_paused.store(paused, Ordering::Release);
     }
 
-    /// IME active時に強制的にFlow状態にする (Stuck表示を消す)
-    /// EWMA もリセットして誤った蓄積値が残らないようにする
-    pub fn force_flow_state(&self) {
-        let flow_probs = [0.98, 0.01, 0.01];
-        match self.current_state_probs.lock() {
-            Ok(mut p) => *p = flow_probs,
-            Err(poisoned) => *poisoned.into_inner() = flow_probs,
-        }
-        // display_probs も即座にリセット (ヒステリシス層もクリア)
-        match self.display_probs.lock() {
-            Ok(mut p) => *p = flow_probs,
-            Err(poisoned) => *poisoned.into_inner() = flow_probs,
-        }
-        // IME切り替え時にEWMAをリセット: (低Friction, 高Engagement) = Flow領域
-        match self.axes_ewma.lock() {
-            Ok(mut e) => *e = (0.0, 1.0),
-            Err(poisoned) => *poisoned.into_inner() = (0.0, 1.0),
-        }
-    }
-
     /// 全キー押下時に呼び出し、Backspaceストリークをリアルタイムでカウントする。
     /// 1Hz gate の外側（全打鍵）で呼ぶことで、高速Backspace連打を正確に検知する。
     ///
-    /// streak >= 8 に達した時点で has_pending_penalty フラグを立てる。
+    /// streak >= 14 に達した時点で has_pending_penalty フラグを立てる。
+    /// 閾値14はIMEの正常操作範囲（8-12連打）を超えた連打のみ検出する。
     /// 非BSキーで streak がリセットされても、フラグは update() で消費されるまで保持される。
-    /// これにより「BS×6 → 即Enter」のようなケースでもペナルティを取りこぼさない。
+    /// これにより「BS×12 → 即Enter」のようなケースでもペナルティを取りこぼさない。
     pub fn register_keystroke(&self, vk_code: u32) {
         if vk_code == 0x08 {
             let new_streak = self.backspace_streak.fetch_add(1, Ordering::Relaxed) + 1;
-            if new_streak >= 8 {
+            if new_streak >= 14 {
                 self.has_pending_penalty.store(true, Ordering::Release);
             }
         } else {
@@ -253,12 +234,14 @@ impl CognitiveStateEngine {
         const BETA_CODING_F6: f64 = 0.08;  // Pause-after-delete rate
 
         // β_writing: reference values for Japanese IME writing input
-        // Japanese romaji→kana composition is slower than direct ASCII entry.
-        // Correction pattern differs: kanji selection uses arrow keys, not Backspace.
-        const BETA_WRITING_F1: f64 = 220.0; // Flight Time median (ms) — slower
-        const BETA_WRITING_F3: f64 = 0.08;  // Correction rate — slightly lower (IME handles errors)
-        const BETA_WRITING_F4: f64 = 2.0;   // Burst length — shorter (composition in segments)
-        const BETA_WRITING_F5: f64 = 4.0;   // Pause count — more pauses for thinking/selection
+        // Calibrated from real session data (Mac/Windows, 2026-03).
+        // Typical Japanese typing: F1=100-130ms, F3=3-10%, F4=2.8-3.5, F5=1-4.
+        // β must be at or below the typical range so phi() produces non-zero values,
+        // otherwise all phi→0 and the observation bin collapses to a single Flow bin.
+        const BETA_WRITING_F1: f64 = 100.0; // Flight Time median (ms) — at lower bound of typical range
+        const BETA_WRITING_F3: f64 = 0.10;  // Correction rate (10%) — IME normal correction 3-15%
+        const BETA_WRITING_F4: f64 = 2.5;   // Burst length — shorter (composition in segments)
+        const BETA_WRITING_F5: f64 = 1.0;   // Pause count — low threshold for sensitivity
         const BETA_WRITING_F6: f64 = 0.12;  // Pause-after-delete rate
 
         let (beta_f1, beta_f3, beta_f4, beta_f5, beta_f6) = if ime_open {
@@ -300,11 +283,12 @@ impl CognitiveStateEngine {
         }
 
         // --- Backspace Streak Logic ---
-        // register_keystroke() が streak >= 8 到達時に has_pending_penalty を true に設定済み。
+        // register_keystroke() が streak >= 14 到達時に has_pending_penalty を true に設定済み。
         // ここではフラグを消費（swap false）し、ペナルティビン（obs=25）を適用する。
-        // streak のリセットは register_keystroke 側で非BSキー入力時に行われるため、
-        // ここでは streak をリセットしない（二重リセット防止）。
-        let apply_backspace_penalty = self.has_pending_penalty.swap(false, Ordering::AcqRel);
+        // IMEガード: ime_open=true 時はペナルティを無効化。IME変換修正のBS連打は
+        // 認知的Stuckではなく正常操作のため。
+        let pending = self.has_pending_penalty.swap(false, Ordering::AcqRel);
+        let apply_backspace_penalty = pending && !ime_open;
 
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
 
@@ -400,25 +384,37 @@ impl CognitiveStateEngine {
     }
 
     /// 無入力期間（サイレンス）用のHMM更新。
-    /// 通常の `update()` と異なり、EWMA を更新しない。
-    /// これにより、無入力時にEWMAが高Friction方向にドリフトすることを防ぐ。
-    /// HMMの遷移確率による状態更新は行うため、長時間無入力→Incubation/Stuck 検出は維持される。
-    pub fn update_silence(&self, features: &Features, ime_open: bool) {
+    /// 通常の `update()` (α=0.3) より低い α=0.15 で EWMA を緩やかに更新する。
+    /// 深い沈黙 (≥15s) では α=0.25 に引き上げ、Stuck領域への到達を加速する。
+    ///
+    /// EWMA を完全凍結すると observation bin が固定され、HMM が遷移確率のみに依存して
+    /// Stuck に到達できない（均衡点固着問題）。摩擦フロア付きの特徴量で緩やかに
+    /// EWMA を更新することで、沈黙の深刻度を observation bin に反映する。
+    pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) {
         if self.get_paused() {
             return;
         }
 
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
 
-        // EWMA を更新せず、現在の EWMA 値を読み取るのみ
+        // 動的α: 沈黙の深さに応じてEWMA応答を加速
+        let alpha = if silence_secs >= 15.0 { 0.25 } else { 0.15 };
+
+        // EWMA を緩やかに更新
         let (x, y) = match self.axes_ewma.lock() {
-            Ok(ewma) => *ewma,
-            Err(poisoned) => *poisoned.into_inner(),
+            Ok(mut ewma) => {
+                ewma.0 = alpha * raw_x + (1.0 - alpha) * ewma.0;
+                ewma.1 = alpha * raw_y + (1.0 - alpha) * ewma.1;
+                (ewma.0, ewma.1)
+            }
+            Err(poisoned) => {
+                let mut ewma = poisoned.into_inner();
+                ewma.0 = alpha * raw_x + (1.0 - alpha) * ewma.0;
+                ewma.1 = alpha * raw_y + (1.0 - alpha) * ewma.1;
+                (ewma.0, ewma.1)
+            }
         };
 
-        // サイレンス観測のビン計算には現在のEWMA位置を使用
-        // （raw値はサイレンスの極端値なので、EWMA位置の方がHMM観測として適切）
-        let _ = (raw_x, raw_y); // raw値は使用しない（ドリフト防止）
         let x_bin = (x * 5.0).floor().min(4.0) as usize;
         let y_bin = (y * 5.0).floor().min(4.0) as usize;
         let obs = x_bin * 5 + y_bin;

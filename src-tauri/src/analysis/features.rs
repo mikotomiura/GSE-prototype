@@ -7,13 +7,12 @@ pub struct InputEvent {
     pub is_press: bool,
 }
 
-/// B-1: 6特徴量を格納する構造体 (設計書 01_sensing.md)
+/// B-1: 5特徴量を格納する構造体
+/// F2 (Flight Time 分散) は HMM の潜在軸計算で未使用のため除去済み。
 #[derive(Debug, Clone)]
 pub struct Features {
     /// F1: Flight Time 中央値 (ms)
     pub f1_flight_time_median: f64,
-    /// F2: Flight Time 分散
-    pub f2_flight_time_variance: f64,
     /// F3: 修正率 = (BS + Del) / 全キー数
     pub f3_correction_rate: f64,
     /// F4: バースト長 = 連続FT<200ms の平均文字数
@@ -28,7 +27,6 @@ impl Default for Features {
     fn default() -> Self {
         Self {
             f1_flight_time_median: 0.0,
-            f2_flight_time_variance: 0.0,
             f3_correction_rate: 0.0,
             f4_burst_length: 0.0,
             f5_pause_count: 0.0,
@@ -51,11 +49,31 @@ pub fn phi(x: f64, beta: f64) -> f64 {
 const VK_BACK: u32 = 0x08;
 const VK_DELETE: u32 = 0x2E;
 
+/// タイピングリズムに関連するキーかどうかを判定する。
+/// Flight Time 計算の対象を限定し、矢印キー・ファンクションキー・IMEモードキー等の
+/// ノイズを除外する。
+pub fn is_typing_key(vk_code: u32) -> bool {
+    matches!(
+        vk_code,
+        // Letters A-Z
+        0x41..=0x5A
+        // Digits 0-9
+        | 0x30..=0x39
+        // Symbol / punctuation keys (OEM)
+        | 0xBA..=0xC0
+        | 0xDB..=0xDF
+        // Editing keys
+        | 0x08  // Backspace
+        | 0x0D  // Enter
+        | 0x20  // Space
+        | 0x09  // Tab
+        | 0x2E  // Delete
+    )
+}
+
 pub struct FeatureExtractor {
     buffer: VecDeque<InputEvent>,
     capacity: usize,
-    last_release_time: Option<u64>,
-    flight_times: VecDeque<u64>, // Store recent flight times for median calc
 }
 
 impl FeatureExtractor {
@@ -63,17 +81,12 @@ impl FeatureExtractor {
         Self {
             buffer: VecDeque::with_capacity(capacity),
             capacity,
-            last_release_time: None,
-            flight_times: VecDeque::with_capacity(capacity), // Keep same size roughly
         }
     }
 
     /// セッション開始時にバッファをクリアする。
-    /// start_session コマンドから分析スレッドへの AtomicBool シグナル経由で呼ばれる。
     pub fn reset(&mut self) {
         self.buffer.clear();
-        self.flight_times.clear();
-        self.last_release_time = None;
     }
 
     pub fn process_event(&mut self, event: InputEvent) {
@@ -81,49 +94,9 @@ impl FeatureExtractor {
             self.buffer.pop_front();
         }
         self.buffer.push_back(event);
-
-        if event.is_press {
-            if let Some(release_time) = self.last_release_time {
-                if event.timestamp >= release_time {
-                    let flight_time = event.timestamp - release_time;
-                    // Filter outliers (e.g. > 2000ms is likely a pause, not typing rhythm)
-                    if flight_time < 2000 {
-                        self.add_flight_time(flight_time);
-                    }
-                }
-            }
-        } else {
-            self.last_release_time = Some(event.timestamp);
-        }
     }
 
-    fn add_flight_time(&mut self, ft: u64) {
-        if self.flight_times.len() >= self.capacity {
-            self.flight_times.pop_front();
-        }
-        self.flight_times.push_back(ft);
-    }
-
-    // [DO NOT MODIFY] 中央値計算 - 現状の実装は正しい
-    pub fn calculate_flight_time_median(&self) -> f64 {
-        if self.flight_times.is_empty() {
-            return 0.0;
-        }
-
-        let mut sorted: Vec<u64> = self.flight_times.iter().cloned().collect();
-        sorted.sort_unstable();
-
-        let len = sorted.len();
-        if len % 2 == 0 {
-            let mid1 = sorted[len / 2 - 1];
-            let mid2 = sorted[len / 2];
-            (mid1 as f64 + mid2 as f64) / 2.0
-        } else {
-            sorted[len / 2] as f64
-        }
-    }
-
-    /// B-1: 直近30秒のバッファから6特徴量を算出する
+    /// B-1: 直近30秒のバッファから5特徴量を算出する
     pub fn calculate_features(&self) -> Features {
         if self.buffer.is_empty() {
             return Features::default();
@@ -141,47 +114,50 @@ impl FeatureExtractor {
             return Features::default();
         }
 
-        // --- ウィンドウ内のフライトタイムを計算 (F1, F2共用) ---
+        // --- ウィンドウ内のフライトタイムを計算 (F1) ---
+        // キーリピートと非タイピングキーを除外して正確なタイピングリズムを測定する。
+        // リピート検出: 同一VKのKeyDownが連続（KeyUpなし）→ リピート
         let mut window_fts: Vec<f64> = Vec::new();
         let mut last_release: Option<u64> = None;
+        let mut held_keys: std::collections::HashSet<u32> = std::collections::HashSet::new();
+
         for event in &events {
             if event.is_press {
-                if let Some(rel) = last_release {
-                    if event.timestamp >= rel {
-                        let ft = (event.timestamp - rel) as f64;
-                        if ft < 2000.0 {
-                            window_fts.push(ft);
+                let is_repeat = held_keys.contains(&event.vk_code);
+                if !is_repeat {
+                    held_keys.insert(event.vk_code);
+                }
+                // Flight time: only non-repeat, typing keys
+                if !is_repeat && is_typing_key(event.vk_code) {
+                    if let Some(rel) = last_release {
+                        if event.timestamp >= rel {
+                            let ft = (event.timestamp - rel) as f64;
+                            if ft < 2000.0 {
+                                window_fts.push(ft);
+                            }
                         }
                     }
                 }
             } else {
-                last_release = Some(event.timestamp);
+                held_keys.remove(&event.vk_code);
+                if is_typing_key(event.vk_code) {
+                    last_release = Some(event.timestamp);
+                }
             }
         }
 
         // --- F1: Flight Time 中央値 (30秒ウィンドウ内) ---
-        // バグ修正: 旧実装は全履歴バッファの中央値を使用していたが、
-        // F2-F6 と同じ30秒ウィンドウを適用することで一貫性を確保する。
+        // F2 除去済みのため in-place ソート (clone不要)
         let f1 = if window_fts.is_empty() {
             0.0
         } else {
-            let mut sorted = window_fts.clone();
-            sorted.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            let len = sorted.len();
+            window_fts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let len = window_fts.len();
             if len % 2 == 0 {
-                (sorted[len / 2 - 1] + sorted[len / 2]) / 2.0
+                (window_fts[len / 2 - 1] + window_fts[len / 2]) / 2.0
             } else {
-                sorted[len / 2]
+                window_fts[len / 2]
             }
-        };
-
-        // --- F2: Flight Time 分散 ---
-        let f2 = if window_fts.len() > 1 {
-            let mean = window_fts.iter().sum::<f64>() / window_fts.len() as f64;
-            window_fts.iter().map(|ft| (ft - mean).powi(2)).sum::<f64>()
-                / window_fts.len() as f64
-        } else {
-            0.0
         };
 
         // --- キー押下イベントのみ抽出 ---
@@ -268,7 +244,6 @@ impl FeatureExtractor {
 
         Features {
             f1_flight_time_median: f1,
-            f2_flight_time_variance: f2,
             f3_correction_rate: f3,
             f4_burst_length: f4,
             f5_pause_count: f5,
@@ -278,40 +253,32 @@ impl FeatureExtractor {
 
     /// サイレンス期間（無入力）の合成観測値を生成する。
     /// silence_secs < 2.0 の場合は None を返す（ポーズとして認識しない）。
-    /// HMM の無入力期間更新 (lib.rs の recv_timeout パス) で使用される。
     pub fn make_silence_observation(&self, silence_secs: f64) -> Option<Features> {
-        // 2秒未満の無入力はポーズとして扱わない
         if silence_secs < 2.0 {
             return None;
         }
 
-        // F1 に大きな値（2000ms）を使う。
-        //
-        // 理由: engine.update() は f1 <= 0.0 で早期リターンするため 0 は不可。
-        //   calculate_flight_time_median() の実測値（例: 112ms）を使うと
-        //   phi1 = phi(112, 150) = 0.0 となり Y_silence = 0.35*1.0 + 0.25*1.0 = 0.60。
-        //   Y=0.60 は y_bin=3 (Flow優位ビン) に落ち、EWMA平衡点が 0.60 に固定されて
-        //   沈黙中も Flow が維持され続ける（Incubation に遷移しない）。
-        //
-        //   f1=2000ms とすると phi1 = 1.0 → (1-phi1) = 0 → Y = 0.25*(1-phi5)。
-        //   phi5 が増えるほど Y→0 となり、4-5秒の沈黙で y_bin が Incubation 領域に入る。
-        //   「現在タイピングしていない = Flight Time が事実上無限大」と解釈する。
+        // F1=2000ms: 「現在タイピングしていない = Flight Time が事実上無限大」
         let f1 = 2000.0_f64;
 
-        // F5（ポーズ回数）: 沈黙の長さを反映。
-        // F5定義: 「2秒以上の無入力回数」→ silence_secs / 2.0 で近似。
-        // → Y = 0.25*(1-phi5): 沈黙が伸びるほど低下 → Incubation 領域へ引き寄せる。
-
         // Synthetic Friction（合成摩擦値）:
-        // F5 だけでは Friction 軸 X が最大 0.45 に留まり x_bin=2 止まり。
-        // Incubation 領域（x=0..2）から Stuck 領域（x=3,4）へ遷移できない。
-        // 長期沈黙時に F6/F3 を漸増させ、Friction を引き上げて Stuck 判定を可能にする。
-        let f6_synthetic = ((silence_secs - 20.0) / 60.0).clamp(0.0, 0.50);
-        let f3_synthetic = ((silence_secs - 30.0) / 100.0).clamp(0.0, 0.40);
+        // 早期オンセット + フロア値で、沈黙開始後のStuck到達を高速化。
+        // f6: 8秒から開始、10秒以上でフロア0.15を保証、33秒で0.50到達
+        // f3: 15秒から開始、10秒以上でフロア0.20を保証、47秒で0.40到達
+        let f6_synthetic = if silence_secs >= 10.0 {
+            (((silence_secs - 8.0) / 50.0).clamp(0.0, 0.50)).max(0.15)
+        } else {
+            ((silence_secs - 8.0) / 50.0).clamp(0.0, 0.50)
+        };
+
+        let f3_synthetic = if silence_secs >= 10.0 {
+            (((silence_secs - 15.0) / 80.0).clamp(0.0, 0.40)).max(0.20)
+        } else {
+            ((silence_secs - 15.0) / 80.0).clamp(0.0, 0.40)
+        };
 
         Some(Features {
             f1_flight_time_median: f1,
-            f2_flight_time_variance: 0.0,
             f3_correction_rate: f3_synthetic,
             f4_burst_length: 0.0,
             f5_pause_count: silence_secs / 2.0,

@@ -19,7 +19,6 @@ pub enum LogEntry {
     Feat {
         timestamp: u64,
         f1: f64,
-        f2: f64,
         f3: f64,
         f4: f64,
         f5: f64,
@@ -102,7 +101,6 @@ impl SessionLogger {
                     LogEntry::Feat {
                         timestamp,
                         f1,
-                        f2,
                         f3,
                         f4,
                         f5,
@@ -113,8 +111,8 @@ impl SessionLogger {
                     } => {
                         let _ = writeln!(
                             writer,
-                            r#"{{"type":"feat","t":{},"f1":{:.2},"f2":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4}}}"#,
-                            timestamp, f1, f2, f3, f4, f5, f6, p_flow, p_inc, p_stuck,
+                            r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4}}}"#,
+                            timestamp, f1, f3, f4, f5, f6, p_flow, p_inc, p_stuck,
                         );
                     }
                     LogEntry::ImeState { timestamp, on } => {
