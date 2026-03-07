@@ -885,10 +885,11 @@ Record types:
 // Raw keystroke event
 {"type":"key","t":1740000001234,"vk":65,"press":true}
 
-// Feature snapshot + HMM state probabilities (after each key press or silence tick)
+// Feature snapshot + HMM state probabilities + diagnostics (1 Hz)
 {"type":"feat","t":1740000001235,
  "f1":145.20,"f3":0.0800,"f4":6.50,"f5":1.0,"f6":0.0000,
- "p_flow":0.7123,"p_inc":0.2100,"p_stuck":0.0777}
+ "p_flow":0.7123,"p_inc":0.2100,"p_stuck":0.0777,
+ "raw_x":0.1234,"raw_y":0.7890,"ewma_x":0.1100,"ewma_y":0.8012,"obs":4,"alpha":0.30}
 
 {"type":"meta","session_end":1740000060000}
 ```

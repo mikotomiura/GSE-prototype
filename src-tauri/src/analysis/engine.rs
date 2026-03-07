@@ -4,6 +4,18 @@ use std::sync::{Arc, Mutex};
 
 use crate::analysis::features::{phi, Features};
 
+/// HMM 更新時の内部診断データ。
+/// ログに書き出してセッション後分析・HMM チューニングに使用する。
+#[derive(Debug, Clone)]
+pub struct UpdateDiagnostics {
+    pub raw_x: f64,
+    pub raw_y: f64,
+    pub ewma_x: f64,
+    pub ewma_y: f64,
+    pub obs: usize,
+    pub alpha: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CognitiveState {
     Flow,
@@ -272,9 +284,9 @@ impl CognitiveStateEngine {
     ///
     /// `ime_open`: true = Japanese IME is in Japanese-input mode (あ/カ).
     /// Used to select context-appropriate β values in `calculate_latent_axes`.
-    pub fn update(&self, features: &Features, ime_open: bool) {
+    pub fn update(&self, features: &Features, ime_open: bool) -> Option<UpdateDiagnostics> {
         if self.get_paused() {
-            return;
+            return None;
         }
 
         // F1がゼロ（データ不足）の場合はスキップ。
@@ -282,7 +294,7 @@ impl CognitiveStateEngine {
         if features.f1_flight_time_median <= 0.0
             && !self.has_pending_penalty.load(Ordering::Acquire)
         {
-            return;
+            return None;
         }
 
         // --- Backspace Streak Logic ---
@@ -359,6 +371,7 @@ impl CognitiveStateEngine {
         // 合計が0になった場合は以前の確率を維持する (フォールバック)
 
         *current = new_probs;
+        drop(current); // MutexGuard 早期解放 — display_probs ロック前にデッドロックリスクを排除
 
         // ── Hysteresis Layer ──────────────────────────────────────────────
         // display_probs に EMA を適用し、ウィンドウリセット時の
@@ -384,6 +397,15 @@ impl CognitiveStateEngine {
                 *v /= disp_sum;
             }
         }
+
+        Some(UpdateDiagnostics {
+            raw_x,
+            raw_y,
+            ewma_x: x,
+            ewma_y: y,
+            obs,
+            alpha: 0.3,
+        })
     }
 
     /// 無入力期間（サイレンス）用のHMM更新。
@@ -393,9 +415,9 @@ impl CognitiveStateEngine {
     /// EWMA を完全凍結すると observation bin が固定され、HMM が遷移確率のみに依存して
     /// Stuck に到達できない（均衡点固着問題）。摩擦フロア付きの特徴量で緩やかに
     /// EWMA を更新することで、沈黙の深刻度を observation bin に反映する。
-    pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) {
+    pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) -> Option<UpdateDiagnostics> {
         if self.get_paused() {
-            return;
+            return None;
         }
 
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
@@ -452,6 +474,7 @@ impl CognitiveStateEngine {
         }
 
         *current = new_probs;
+        drop(current); // MutexGuard 早期解放
 
         // Hysteresis Layer (通常のα=0.40)
         let mut display = match self.display_probs.lock() {
@@ -468,6 +491,15 @@ impl CognitiveStateEngine {
                 *v /= disp_sum;
             }
         }
+
+        Some(UpdateDiagnostics {
+            raw_x,
+            raw_y,
+            ewma_x: x,
+            ewma_y: y,
+            obs,
+            alpha,
+        })
     }
 
     pub fn get_current_state(&self) -> HashMap<CognitiveState, f64> {

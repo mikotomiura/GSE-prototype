@@ -386,12 +386,12 @@ pub fn run() {
             // 特徴量計算: バッファの実データを優先し、空の場合のみ合成サイレンス特徴量を使用
             let mut features = extractor.calculate_features();
 
-            let log_features = if features.f1_flight_time_median > 0.0
+            let (log_features, diag_opt) = if features.f1_flight_time_median > 0.0
                 && silence_secs < 5.0
             {
                 // 通常パス: バッファに実データあり + 直近タイピング中 → α=0.3 で更新
-                engine_for_thread.update(&features, ime_open);
-                features
+                let d = engine_for_thread.update(&features, ime_open);
+                (features, d)
             } else if features.f1_flight_time_median > 0.0 {
                 // 沈黙パス (バッファに実データあり): 5秒以上沈黙中
                 // 古いウィンドウデータを α=0.3 で連続入力すると Incubation にロックインするため、
@@ -406,12 +406,12 @@ pub fn run() {
                     features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
                     features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
                 }
-                engine_for_thread.update_silence(&features, ime_open, silence_secs);
-                features
+                let d = engine_for_thread.update_silence(&features, ime_open, silence_secs);
+                (features, d)
             } else if let Some(sf) = extractor.make_silence_observation(silence_secs) {
                 // 合成サイレンスパス: バッファ空 → 合成特徴量で α=0.15 更新
-                engine_for_thread.update_silence(&sf, ime_open, silence_secs);
-                sf
+                let d = engine_for_thread.update_silence(&sf, ime_open, silence_secs);
+                (sf, d)
             } else {
                 // silence < 2s かつ f1=0 (データ不足) → スキップ
                 continue;
@@ -437,6 +437,11 @@ pub fn run() {
                 .unwrap_or_default()
                 .as_millis() as u64;
 
+            let (raw_x, raw_y, ewma_x, ewma_y, obs, alpha) = match &diag_opt {
+                Some(d) => (d.raw_x, d.raw_y, d.ewma_x, d.ewma_y, d.obs, d.alpha),
+                None => (0.0, 0.0, 0.0, 0.0, 0, 0.0),
+            };
+
             let _ = log_tx_analysis.try_send(LogEntry::Feat {
                 timestamp: now_ts,
                 f1: log_features.f1_flight_time_median,
@@ -447,6 +452,12 @@ pub fn run() {
                 p_flow,
                 p_inc,
                 p_stuck,
+                raw_x,
+                raw_y,
+                ewma_x,
+                ewma_y,
+                obs,
+                alpha,
             });
         }
     });
