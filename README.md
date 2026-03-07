@@ -824,6 +824,14 @@ F2 (Flight Time Variance) was not used in either the Cognitive Friction (X) or P
 
 ---
 
+### Fix ⑩: `register_keystroke` Cross-Platform Decoupling
+
+**Problem:** `CognitiveStateEngine::register_keystroke()` contained `if vk_code == 0x08` — a Windows-specific virtual key code (`VK_BACK`). On macOS the Delete key is `0x33` (`kVK_Delete`), making the Backspace streak logic non-functional on that platform.
+
+**Fix:** Changed `register_keystroke(vk_code: u32)` → `register_keystroke(is_backspace: bool)`. The OS-specific key code check is now performed at the call site in `lib.rs` (`event.vk_code == 0x08`), keeping the engine fully platform-agnostic. No mathematical or model behavior is changed.
+
+---
+
 ## Logging & Analysis
 
 Every session produces a timestamped NDJSON file:

@@ -181,8 +181,11 @@ impl CognitiveStateEngine {
     /// 閾値14はIMEの正常操作範囲（8-12連打）を超えた連打のみ検出する。
     /// 非BSキーで streak がリセットされても、フラグは update() で消費されるまで保持される。
     /// これにより「BS×12 → 即Enter」のようなケースでもペナルティを取りこぼさない。
-    pub fn register_keystroke(&self, vk_code: u32) {
-        if vk_code == 0x08 {
+    ///
+    /// `is_backspace` の判定は呼び出し元（OS固有のフック処理）で行う。
+    /// Windows: vk_code == 0x08 (VK_BACK), macOS: keycode == 0x33 (kVK_Delete)
+    pub fn register_keystroke(&self, is_backspace: bool) {
+        if is_backspace {
             let new_streak = self.backspace_streak.fetch_add(1, Ordering::Relaxed) + 1;
             if new_streak >= 14 {
                 self.has_pending_penalty.store(true, Ordering::Release);

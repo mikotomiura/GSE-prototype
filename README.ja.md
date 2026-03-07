@@ -824,6 +824,14 @@ F2（フライトタイム分散）は Cognitive Friction (X) および Producti
 
 ---
 
+### 修正 ⑩：`register_keystroke` のクロスプラットフォーム分離
+
+**問題：** `CognitiveStateEngine::register_keystroke()` 内で `if vk_code == 0x08` という Windows 固有の仮想キーコード（`VK_BACK`）判定を行っていました。macOS では Delete キーが `0x33`（`kVK_Delete`）であるため、そのままではBackspaceストリークロジックが機能しません。
+
+**修正：** `register_keystroke(vk_code: u32)` → `register_keystroke(is_backspace: bool)` に変更しました。OS 固有のキーコード判定は `lib.rs` の呼び出し元（`event.vk_code == 0x08`）で行い、推論エンジンを完全にプラットフォーム非依存にしました。数学的・モデル的な動作変更はありません。
+
+---
+
 ## ログと分析
 
 セッションごとにタイムスタンプ付き NDJSON ファイルが生成されます。

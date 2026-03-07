@@ -349,7 +349,8 @@ pub fn run() {
                         }
 
                         // Backspaceストリークカウント（1Hz gate の外側で全打鍵）
-                        engine_for_thread.register_keystroke(event.vk_code);
+                        // OS固有のVKコード判定はここで行い、engine には bool を渡す
+                        engine_for_thread.register_keystroke(event.vk_code == 0x08);
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {
