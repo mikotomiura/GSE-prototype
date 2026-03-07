@@ -309,22 +309,21 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                 let mut is_repeat = false;
                 if let Ok(mut held) = PRESSED_KEYS.lock() {
                     if is_press {
-                        // If already in the set → auto-repeat; skip send
+                        // If already in the set → auto-repeat
                         is_repeat = !held.insert(vk_code);
                     } else {
                         held.remove(&vk_code);
                     }
                 }
 
-                if !is_repeat {
-                    let event = InputEvent {
-                        vk_code,
-                        timestamp,
-                        is_press,
-                    };
-                    if let Some(sender) = EVENT_SENDER.get() {
-                        let _ = sender.try_send(event);
-                    }
+                let event = InputEvent {
+                    vk_code,
+                    timestamp,
+                    is_press,
+                    is_repeat,
+                };
+                if let Some(sender) = EVENT_SENDER.get() {
+                    let _ = sender.try_send(event);
                 }
             }
 

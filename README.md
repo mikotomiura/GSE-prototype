@@ -26,9 +26,10 @@
 15. [Centralized State Management & Phone Connection Badge (v2.9)](#centralized-state-management--phone-connection-badge-v29)
 16. [EWMA Drift Prevention & Lv2 Timer Stability (v2.10)](#ewma-drift-prevention--lv2-timer-stability-v210)
 17. [Analysis Engine Parity & Silence Detection (v2.11)](#analysis-engine-parity--silence-detection-v211)
-18. [Logging & Analysis](#logging--analysis)
-19. [Build Instructions](#build-instructions)
-20. [Academic References](#academic-references)
+18. [Hook-Level Repeat Event Forwarding (v2.12)](#hook-level-repeat-event-forwarding-v212)
+19. [Logging & Analysis](#logging--analysis)
+20. [Build Instructions](#build-instructions)
+21. [Academic References](#academic-references)
 
 ---
 
@@ -165,7 +166,7 @@ GSE-Next/
 
 ## Feature Extraction (F1, F3–F6)
 
-All features are computed over a **30-second sliding window** of raw keystroke events, updated on every key press. Non-typing keys and auto-repeat events are filtered at two layers: at the keyboard hook (before entering the bounded channel) and within the feature extractor's flight time calculation. During silence (no input), a synthetic observation is generated every 1 second via `make_silence_observation()` to keep the HMM running.
+All features are computed over a **30-second sliding window** of raw keystroke events, updated on every key press. Non-typing keys are filtered at the keyboard hook (before entering the bounded channel). Auto-repeat events (key held down) are forwarded through the channel with an `is_repeat` flag: F1 (flight time) and F4 (burst length) ignore repeats to preserve typing rhythm accuracy, while F3 (correction rate), F5, and F6 include them so that long-press deletions (e.g., holding Backspace) are correctly reflected in Stuck detection. During silence (no input), a synthetic observation is generated every 1 second via `make_silence_observation()` to keep the HMM running.
 
 | Feature | Symbol | Definition | Cognitive Signal |
 |---|---|---|---|
@@ -764,10 +765,10 @@ F2 (Flight Time Variance) was not used in either the Cognitive Friction (X) or P
 
 **Problem:** Key repeat events (holding a key down) inflated flight time calculations with artificial zero-interval entries. Non-typing keys (arrow keys, function keys, IME mode keys) introduced noise unrelated to typing rhythm. All raw key events consumed bounded channel capacity (64 slots) regardless of analytical relevance.
 
-**Fix:** Two-layer filtering ensures only clean typing data reaches the HMM:
+**Fix:** Two-layer filtering ensures clean typing data reaches the HMM:
 
-1. **Hook-level gate** (`hook_callback`): `is_typing_key()` and `PRESSED_KEYS: Mutex<HashSet<u32>>` filter events *before* they enter the crossbeam channel. Non-typing keys and auto-repeat events are never sent to `EVENT_SENDER`, reducing channel traffic and eliminating noise at the source. `LAST_KEY_MS` (idle detection) and `POLL_WAKE_TX` (IME polling wake) remain unconditional for all keys.
-2. **Feature extractor** (`calculate_features()`): In-window `held_keys` tracking and `is_typing_key()` provide a second defense layer for flight time calculation, guarding against any edge cases in buffered data.
+1. **Hook-level gate** (`hook_callback`): `is_typing_key()` filters non-typing keys *before* they enter the crossbeam channel. `PRESSED_KEYS: Mutex<HashSet<u32>>` detects auto-repeat events and tags them with `is_repeat: true` in the `InputEvent` struct (v2.12). Repeat events are forwarded to the analysis thread so that long-press deletions (e.g., holding Backspace) contribute to F3/F5/F6 and trigger the Backspace streak penalty. `LAST_KEY_MS` (idle detection) and `POLL_WAKE_TX` (IME polling wake) remain unconditional for all keys.
+2. **Feature extractor** (`calculate_features()`): F1 (flight time) and F4 (burst length) skip events where `is_repeat == true`, preserving typing rhythm accuracy. F3, F5, and F6 include repeat events to accurately reflect deletion volume.
 
 `is_typing_key()` covers A–Z, 0–9, Numpad keys (0x60–0x6F), OEM symbol keys, Backspace, Enter, Space, Tab, and Delete.
 
@@ -834,6 +835,33 @@ F2 (Flight Time Variance) was not used in either the Cognitive Friction (X) or P
 **Problem:** `CognitiveStateEngine::register_keystroke()` contained `if vk_code == 0x08` — a Windows-specific virtual key code (`VK_BACK`). On macOS the Delete key is `0x33` (`kVK_Delete`), making the Backspace streak logic non-functional on that platform.
 
 **Fix:** Changed `register_keystroke(vk_code: u32)` → `register_keystroke(is_backspace: bool)`. The OS-specific key code check is now performed at the call site in `lib.rs` (`event.vk_code == 0x08`), keeping the engine fully platform-agnostic. No mathematical or model behavior is changed.
+
+---
+
+## Hook-Level Repeat Event Forwarding (v2.12)
+
+### Problem
+
+The v2.11 hook-level gate discarded auto-repeat events (key held down) entirely, preventing them from reaching the analysis thread. This caused a critical gap in Stuck detection: **holding Backspace to bulk-delete text** — a strong signal of cognitive struggle — was invisible to the engine. The Backspace streak counter (`register_keystroke`) never incremented beyond 1 for a long-press, so the ≥14 consecutive BS penalty never fired.
+
+### Fix
+
+`InputEvent` now carries an `is_repeat: bool` field. The hook's `PRESSED_KEYS` set still detects auto-repeat, but instead of discarding the event, it tags it with `is_repeat: true` and sends it through the channel.
+
+**Feature-level handling:**
+
+| Feature | Repeat events | Rationale |
+|---|---|---|
+| **F1** (Flight Time) | Ignored (`continue`) | Repeats inject artificial zero-interval entries that distort typing rhythm |
+| **F3** (Correction Rate) | Included | Each repeated BS/Del is a real deletion — omitting them understates correction rate |
+| **F4** (Burst Length) | Ignored (`continue`) | Repeats inflate burst length without representing intentional sequential keystrokes |
+| **F5** (Pause Count) | Included | During a long-press, the user is active — gaps between repeats correctly shrink F5 |
+| **F6** (Del-Pause Rate) | Included | Repeated BS fills the gap after the initial press, so F6 only fires when the user truly stops |
+
+**Analysis thread handling:**
+
+- `register_keystroke()`: Repeat events are counted. Holding Backspace now increments the streak counter and fires the ≥14 BS penalty.
+- Silence-break protection (`presses_since_silence`): Repeat events are excluded — automatic key repetition does not constitute intentional typing resumption after silence.
 
 ---
 

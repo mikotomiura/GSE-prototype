@@ -5,6 +5,7 @@ pub struct InputEvent {
     pub vk_code: u32,
     pub timestamp: u64, // ms
     pub is_press: bool,
+    pub is_repeat: bool,
 }
 
 /// B-1: 5特徴量を格納する構造体
@@ -118,19 +119,17 @@ impl FeatureExtractor {
 
         // --- ウィンドウ内のフライトタイムを計算 (F1) ---
         // キーリピートと非タイピングキーを除外して正確なタイピングリズムを測定する。
-        // リピート検出: 同一VKのKeyDownが連続（KeyUpなし）→ リピート
+        // リピート判定はフック層の is_repeat フラグを使用する。
         let mut window_fts: Vec<f64> = Vec::new();
         let mut last_release: Option<u64> = None;
-        let mut held_keys: std::collections::HashSet<u32> = std::collections::HashSet::new();
 
         for event in &events {
+            if event.is_repeat {
+                continue;
+            }
             if event.is_press {
-                let is_repeat = held_keys.contains(&event.vk_code);
-                if !is_repeat {
-                    held_keys.insert(event.vk_code);
-                }
                 // Flight time: only non-repeat, typing keys
-                if !is_repeat && is_typing_key(event.vk_code) {
+                if is_typing_key(event.vk_code) {
                     if let Some(rel) = last_release {
                         if event.timestamp >= rel {
                             let ft = (event.timestamp - rel) as f64;
@@ -140,11 +139,8 @@ impl FeatureExtractor {
                         }
                     }
                 }
-            } else {
-                held_keys.remove(&event.vk_code);
-                if is_typing_key(event.vk_code) {
-                    last_release = Some(event.timestamp);
-                }
+            } else if is_typing_key(event.vk_code) {
+                last_release = Some(event.timestamp);
             }
         }
 
@@ -181,11 +177,15 @@ impl FeatureExtractor {
         };
 
         // --- F4: バースト長 = 連続FT<200ms のチャンクの平均文字数 ---
+        // リピートイベントを除外して真のタイピングバーストを測定する。
         let mut burst_lengths: Vec<usize> = Vec::new();
         let mut current_burst: usize = 0;
         let mut last_rel_for_burst: Option<u64> = None;
 
         for event in &events {
+            if event.is_repeat {
+                continue;
+            }
             if event.is_press {
                 if let Some(rel) = last_rel_for_burst {
                     let ft = event.timestamp.saturating_sub(rel);

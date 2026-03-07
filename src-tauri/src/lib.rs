@@ -334,21 +334,25 @@ pub fn run() {
                     }
 
                     if event.is_press {
-                        // Silence-break protection:
+                        // Silence-break protection (non-repeat only):
+                        // 自動リピートは意図的な復帰ではないため、沈黙復帰カウントに含めない。
                         // 10秒以上の沈黙後、3打鍵以上の連続入力で初めて
                         // last_event_time をリセットし「タイピング復帰」と判定する。
-                        if last_event_time.elapsed() > Duration::from_secs(10) {
-                            presses_since_silence += 1;
-                            if presses_since_silence >= 3 {
+                        if !event.is_repeat {
+                            if last_event_time.elapsed() > Duration::from_secs(10) {
+                                presses_since_silence += 1;
+                                if presses_since_silence >= 3 {
+                                    last_event_time = Instant::now();
+                                    presses_since_silence = 0;
+                                }
+                            } else {
                                 last_event_time = Instant::now();
                                 presses_since_silence = 0;
                             }
-                        } else {
-                            last_event_time = Instant::now();
-                            presses_since_silence = 0;
                         }
 
                         // Backspaceストリークカウント（1Hz gate の外側で全打鍵）
+                        // リピートイベントも含める: BS長押しによる一気消しでペナルティを発動させる
                         // OS固有のVKコード判定はここで行い、engine には bool を渡す
                         engine_for_thread.register_keystroke(event.vk_code == 0x08);
                     }
