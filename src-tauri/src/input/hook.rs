@@ -316,11 +316,13 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                     }
                 }
 
+                let is_backspace = vk_code == 0x08 || vk_code == 0x2E;
                 let event = InputEvent {
                     vk_code,
                     timestamp,
                     is_press,
                     is_repeat,
+                    is_backspace,
                 };
                 if let Some(sender) = EVENT_SENDER.get() {
                     let _ = sender.try_send(event);

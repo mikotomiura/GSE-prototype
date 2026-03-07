@@ -27,9 +27,10 @@
 16. [EWMA Drift Prevention & Lv2 Timer Stability (v2.10)](#ewma-drift-prevention--lv2-timer-stability-v210)
 17. [Analysis Engine Parity & Silence Detection (v2.11)](#analysis-engine-parity--silence-detection-v211)
 18. [Hook-Level Repeat Event Forwarding (v2.12)](#hook-level-repeat-event-forwarding-v212)
-19. [Logging & Analysis](#logging--analysis)
-20. [Build Instructions](#build-instructions)
-21. [Academic References](#academic-references)
+19. [Cross-Platform InputEvent Semantic Extension (v2.13)](#cross-platform-inputevent-semantic-extension-v213)
+20. [Logging & Analysis](#logging--analysis)
+21. [Build Instructions](#build-instructions)
+22. [Academic References](#academic-references)
 
 ---
 
@@ -862,6 +863,40 @@ The v2.11 hook-level gate discarded auto-repeat events (key held down) entirely,
 
 - `register_keystroke()`: Repeat events are counted. Holding Backspace now increments the streak counter and fires the ≥14 BS penalty.
 - Silence-break protection (`presses_since_silence`): Repeat events are excluded — automatic key repetition does not constitute intentional typing resumption after silence.
+
+---
+
+## Cross-Platform InputEvent Semantic Extension (v2.13)
+
+### Problem
+
+v2.11 Fix ⑩ decoupled `register_keystroke()` from OS-specific key codes by changing its signature from `register_keystroke(vk_code: u32)` to `register_keystroke(is_backspace: bool)`. However, the decoupling was incomplete — the caller in `lib.rs` still hardcoded `event.vk_code == 0x08` (Windows `VK_BACK`), and the shared analysis core (`features.rs`) still contained OS-specific constants `VK_BACK = 0x08` and `VK_DELETE = 0x2E` used in F3 (correction rate) and F6 (delete-after-pause rate) calculations.
+
+### Fix
+
+Added `is_backspace: bool` to the `InputEvent` struct as a semantic flag that abstracts OS-specific deletion key detection:
+
+```rust
+pub struct InputEvent {
+    pub vk_code: u32,
+    pub timestamp: u64,
+    pub is_press: bool,
+    pub is_repeat: bool,
+    pub is_backspace: bool, // NEW: set by hook layer
+}
+```
+
+**Changes by layer:**
+
+| Layer | File | Change |
+| --- | --- | --- |
+| **Hook (OS-specific)** | `hook.rs` | Sets `is_backspace = vk_code == 0x08 \|\| vk_code == 0x2E` (Windows: `VK_BACK` or `VK_DELETE`) when creating `InputEvent` |
+| **Analysis core (OS-agnostic)** | `features.rs` | Removed `const VK_BACK` / `const VK_DELETE`. F3 and F6 now use `event.is_backspace` instead of `event.vk_code == VK_BACK \|\| event.vk_code == VK_DELETE` |
+| **Orchestration** | `lib.rs` | `register_keystroke(event.is_backspace)` replaces `register_keystroke(event.vk_code == 0x08)` |
+
+**macOS equivalent:** The hook layer would set `is_backspace = keycode == 0x33 || keycode == 0x75` (`kVK_Delete` or `kVK_ForwardDelete`).
+
+With this change, `features.rs` and `lib.rs` have zero OS-specific key code references. The shared analysis core is fully platform-agnostic — it only reads semantic boolean flags set by the OS-specific hook layer. No mathematical or behavioral changes; this is a pure architectural refactor.
 
 ---
 

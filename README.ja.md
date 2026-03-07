@@ -28,9 +28,10 @@
 16. [EWMAドリフト防止とLv2タイマー安定化（v2.10）](#ewmaドリフト防止とlv2タイマー安定化v210)
 17. [分析エンジンパリティと沈黙検出（v2.11）](#分析エンジンパリティと沈黙検出v211)
 18. [フックレベルのリピートイベント転送（v2.12）](#フックレベルのリピートイベント転送v212)
-19. [ログと分析](#ログと分析)
-20. [ビルド手順](#ビルド手順)
-21. [学術的参考文献](#学術的参考文献)
+19. [クロスプラットフォーム InputEvent 意味論的拡張（v2.13）](#クロスプラットフォーム-inputevent-意味論的拡張v213)
+20. [ログと分析](#ログと分析)
+21. [ビルド手順](#ビルド手順)
+22. [学術的参考文献](#学術的参考文献)
 
 ---
 
@@ -862,6 +863,40 @@ v2.11 のフックレベルゲートはオートリピートイベント（キ�
 
 - `register_keystroke()`：リピートイベントをカウント。Backspace 長押しでストリークカウンターが増加し、14 連続 BS ペナルティが発動する。
 - 沈黙ブレーク保護（`presses_since_silence`）：リピートイベントは除外 — 自動キーリピートは沈黙後の意図的なタイピング復帰とは見なさない。
+
+---
+
+## クロスプラットフォーム InputEvent 意味論的拡張（v2.13）
+
+### 問題
+
+v2.11 修正 ⑩ では `register_keystroke()` のシグネチャを `register_keystroke(vk_code: u32)` から `register_keystroke(is_backspace: bool)` に変更し、OS 固有のキーコードから分離しました。しかし分離は不完全でした — `lib.rs` の呼び出し元は依然として `event.vk_code == 0x08`（Windows の `VK_BACK`）をハードコードしており、共有分析コア（`features.rs`）にも OS 固有の定数 `VK_BACK = 0x08` と `VK_DELETE = 0x2E` が残存し、F3（修正率）と F6（削除後停止率）の計算で使用されていました。
+
+### 修正
+
+`InputEvent` 構造体に `is_backspace: bool` を意味論的フラグとして追加し、OS 固有の削除キー判定を抽象化しました：
+
+```rust
+pub struct InputEvent {
+    pub vk_code: u32,
+    pub timestamp: u64,
+    pub is_press: bool,
+    pub is_repeat: bool,
+    pub is_backspace: bool, // 新規: フック層で設定
+}
+```
+
+**レイヤー別の変更：**
+
+| レイヤー | ファイル | 変更内容 |
+| --- | --- | --- |
+| **フック（OS固有）** | `hook.rs` | `InputEvent` 生成時に `is_backspace = vk_code == 0x08 \|\| vk_code == 0x2E`（Windows: `VK_BACK` または `VK_DELETE`）を設定 |
+| **分析コア（OS非依存）** | `features.rs` | `const VK_BACK` / `const VK_DELETE` を削除。F3 と F6 は `event.vk_code == VK_BACK \|\| event.vk_code == VK_DELETE` の代わりに `event.is_backspace` を使用 |
+| **オーケストレーション** | `lib.rs` | `register_keystroke(event.vk_code == 0x08)` を `register_keystroke(event.is_backspace)` に変更 |
+
+**macOS 対応：** フック層で `is_backspace = keycode == 0x33 || keycode == 0x75`（`kVK_Delete` または `kVK_ForwardDelete`）を設定します。
+
+この変更により、`features.rs` と `lib.rs` には OS 固有のキーコード参照がゼロになりました。共有分析コアは完全にプラットフォーム非依存となり、OS 固有のフック層が設定した意味論的ブールフラグのみを参照します。数学的・動作的変更はなく、純粋なアーキテクチャリファクタリングです。
 
 ---
 
