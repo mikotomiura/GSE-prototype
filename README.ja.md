@@ -463,7 +463,7 @@ IME ポーリングスレッド
 |---|---|---|---|
 | `IME_OPEN` | フック（VK_DBE_* ↑↓, WinEvent）、ポーリングスレッド | 分析スレッド | 現在の IME モード |
 | `IME_STATE_DIRTY` | フック（VK_DBE_* ↑↓, WinEvent 作文開始） | ポーリングスレッド（`.swap(false)`） | ログ emit のトリガー |
-| `IME_ACTIVE` | WinEvent フック（作文開始/終了） | ImeMonitor（100ms ポーリング） | 候補ウィンドウ停止 |
+| `IME_ACTIVE` | WinEvent フック（作文開始/終了） | ImeMonitor（100ms ポーリング） | 候補ウィンドウ停止 + ログ送出 |
 
 ### `Option<bool>` 初期状態
 
@@ -826,7 +826,7 @@ F2（フライトタイム分散）は Cognitive Friction (X) および Producti
 
 **問題：** IME候補ウィンドウが検出されると `force_flow_state()` が呼び出されて表示をFlowに保っていました。このメソッドは `display_probs`、`axes_ewma`、HMM信念を破壊的に上書きし、エンジンの蓄積された認知状態を完全に消去していました。候補ウィンドウが閉じた後、エンジンは状態をゼロから再構築する必要がありました。
 
-**修正：** `force_flow_state()` を完全に除去しました。IMEモニタースレッドは `engine.set_paused(active)` のみを呼び出すようになり、状態を破壊せずにHMM更新を一時停止します。候補ウィンドウが閉じると、保存された状態から推論が再開されます。
+**修正：** `force_flow_state()` を完全に除去しました。IMEモニタースレッドは `engine.set_paused(active)` のみを呼び出すようになり、状態を破壊せずにHMM更新を一時停止します。候補ウィンドウが閉じると、分析スレッドがキーストロークバッファをクリア（`extractor.reset()`）してポーズ前の stale なフライトタイムによる F1 汚染を防止し、保存された HMM 状態からサイレンスパス経由で推論が再開されます。ImeMonitor スレッドは `IME_ACTIVE` 状態変化時に `LogEntry::ImeState` を送出し、事後分析を可能にします。
 
 ---
 

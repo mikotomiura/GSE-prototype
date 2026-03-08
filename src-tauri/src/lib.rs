@@ -268,6 +268,7 @@ pub fn run() {
     let engine_for_thread = engine.clone();
     let engine_for_monitor = engine.clone();
     let log_tx_ime_poll = log_tx.clone();
+    let log_tx_for_monitor = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -290,6 +291,8 @@ pub fn run() {
         let mut last_event_time = Instant::now();
         let mut next_engine_update = Instant::now();
         let mut presses_since_silence: u32 = 0;
+        // IME ポーズ→復帰時にバッファをクリアするための追跡フラグ
+        let mut was_paused = false;
 
         loop {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
@@ -329,8 +332,21 @@ pub fn run() {
                     });
 
                     // IMEポーズ中は last_event_time の更新とストリークカウントをスキップ
-                    if engine_for_thread.get_paused() {
+                    let currently_paused = engine_for_thread.get_paused();
+                    if currently_paused {
+                        was_paused = true;
                         continue;
+                    }
+
+                    // ポーズ→復帰遷移: バッファをクリアして stale なフライトタイムを排除。
+                    // ポーズ中に蓄積した打鍵間隔（数十秒）が F1 を汚染し
+                    // Flow→Incubation 急降下を引き起こすのを防止する。
+                    if was_paused {
+                        was_paused = false;
+                        extractor.reset();
+                        last_event_time = Instant::now();
+                        presses_since_silence = 0;
+                        tracing::debug!("IME pause ended — buffer cleared for clean restart");
                     }
 
                     if event.is_press {
@@ -377,7 +393,17 @@ pub fn run() {
             }
 
             if engine_for_thread.get_paused() {
+                was_paused = true;
                 continue;
+            }
+
+            // 1Hz ゲートでのポーズ→復帰遷移検出（タイムアウトパス）
+            if was_paused {
+                was_paused = false;
+                extractor.reset();
+                last_event_time = Instant::now();
+                presses_since_silence = 0;
+                tracing::debug!("IME pause ended (1Hz gate) — buffer cleared for clean restart");
             }
 
             let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
@@ -469,6 +495,8 @@ pub fn run() {
         // IME_ACTIVE が true になった時刻。8 秒以上続いたら EVENT_OBJECT_IME_HIDE
         // 取りこぼしと判断してフラグを自動リセットする。
         let mut ime_active_since: Option<Instant> = None;
+        // IME_ACTIVE 変更検出: 状態が変化した際に ImeState ログを送出
+        let mut last_active: Option<bool> = None;
         loop {
             let active = monitor.is_candidate_window_open();
 
@@ -482,11 +510,37 @@ pub fn run() {
                     input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
                     ime_active_since = None;
                     engine_for_monitor.set_paused(false);
+                    last_active = Some(false);
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
+                    let ime_on = input::hook::IME_OPEN.load(Ordering::Relaxed);
+                    let _ = log_tx_for_monitor.try_send(logger::LogEntry::ImeState {
+                        timestamp: ts,
+                        on: ime_on,
+                        active: false,
+                    });
                     thread::sleep(std::time::Duration::from_millis(100));
                     continue;
                 }
             } else {
                 ime_active_since = None;
+            }
+
+            // IME_ACTIVE 状態変化時にログを送出（初回は必ず emit）
+            if last_active.map_or(true, |prev| prev != active) {
+                last_active = Some(active);
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let ime_on = input::hook::IME_OPEN.load(Ordering::Relaxed);
+                let _ = log_tx_for_monitor.try_send(logger::LogEntry::ImeState {
+                    timestamp: ts,
+                    on: ime_on,
+                    active,
+                });
             }
 
             // IME候補ウィンドウ表示中はHMM推論を一時停止する。

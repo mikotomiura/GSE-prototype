@@ -463,7 +463,7 @@ IME Polling Thread
 |---|---|---|---|
 | `IME_OPEN` | hook (VK_DBE_* ↑↓, WinEvent), polling thread | analysis thread | Current IME mode |
 | `IME_STATE_DIRTY` | hook (VK_DBE_* ↑↓, WinEvent composition start) | polling thread (`.swap(false)`) | Triggers log emission |
-| `IME_ACTIVE` | WinEvent hook (composition start/end) | ImeMonitor (100ms poll) | Candidate window pause |
+| `IME_ACTIVE` | WinEvent hook (composition start/end) | ImeMonitor (100ms poll) | Candidate window pause + log emission |
 
 ### `Option<bool>` Initial State
 
@@ -826,7 +826,7 @@ F2 (Flight Time Variance) was not used in either the Cognitive Friction (X) or P
 
 **Problem:** When the IME candidate window was detected, `force_flow_state()` was called to hold the display at Flow. This method destructively overwrote `display_probs`, `axes_ewma`, and HMM beliefs — completely erasing the engine's accumulated cognitive state. After the candidate window closed, the engine had to rebuild state from scratch.
 
-**Fix:** `force_flow_state()` was removed entirely. The IME monitor thread now only calls `engine.set_paused(active)`, which suspends HMM updates without destroying state. When the candidate window closes, inference resumes from the preserved state.
+**Fix:** `force_flow_state()` was removed entirely. The IME monitor thread now only calls `engine.set_paused(active)`, which suspends HMM updates without destroying state. When the candidate window closes, the analysis thread clears the keystroke buffer (`extractor.reset()`) to prevent stale pre-pause flight times from contaminating F1, then inference resumes from the preserved HMM state via the silence path. The ImeMonitor thread also emits `LogEntry::ImeState` on each `IME_ACTIVE` state change for post-hoc analysis.
 
 ---
 
