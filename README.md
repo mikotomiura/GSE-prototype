@@ -322,13 +322,13 @@ The Stuck-dominant bins require x_bin ≥ 3 (X ≥ 0.60), which was unreachable 
 **Fix:** `make_silence_observation()` now generates synthetic friction values with early onset and guaranteed floor values:
 
 ```rust
-// F6: onset at 8 s, floor 0.15 at ≥10 s, reaches 0.50 at ~33 s
-F6_synthetic = if silence ≥ 10s { max(clamp((s−8)/50, 0, 0.50), 0.15) }
-              else              { clamp((s−8)/50, 0, 0.50) }
+// F6: onset at 8 s, floor 0.15 at ≥10 s, reaches 0.45 at ~35 s
+F6_synthetic = if silence ≥ 10s { max(clamp((s−8)/60, 0, 0.45), 0.15) }
+              else              { clamp((s−8)/60, 0, 0.45) }
 
-// F3: onset at 15 s, floor 0.20 at ≥10 s, reaches 0.40 at ~47 s
-F3_synthetic = if silence ≥ 10s { max(clamp((s−15)/80, 0, 0.40), 0.20) }
-              else              { clamp((s−15)/80, 0, 0.40) }
+// F3: onset at 15 s, floor 0.20 at ≥10 s, reaches 0.35 at ~50 s
+F3_synthetic = if silence ≥ 10s { max(clamp((s−15)/100, 0, 0.35), 0.20) }
+              else              { clamp((s−15)/100, 0, 0.35) }
 ```
 
 Resulting X trajectory (with F5 saturated at φ = 1.0, typical F1):
@@ -337,10 +337,11 @@ Resulting X trajectory (with F5 saturated at φ = 1.0, typical F1):
 |---|---|---|---|---|---|
 | 8 s | 0.00 | 0.00 | ≈ 0.20 | 1 | Incubation |
 | 10 s | 0.20 | 0.15 | ≈ 0.34 | 1 | Incubation |
-| 20 s | 0.20 | 0.24 | ≈ 0.38 | 1 | Boundary |
-| 33 s | 0.23 | 0.50 | ≈ 0.64 | 3 | **Stuck** |
+| 20 s | 0.20 | 0.20 | ≈ 0.35 | 1 | Boundary |
+| 35 s | 0.20 | 0.45 | ≈ 0.53 | 2 | Boundary |
+| 50 s | 0.35 | 0.45 | ≈ 0.68 | 3 | **Stuck** |
 
-The early onset (8 s for F6, 15 s for F3) and guaranteed floor values at ≥10 s ensure that the HMM begins transitioning toward Stuck significantly earlier than the original thresholds (20 s / 30 s). Combined with the EWMA and hysteresis layers, the Stuck label is confirmed after ~15 s of sustained silence.
+The early onset (8 s for F6, 15 s for F3) and guaranteed floor values at ≥10 s ensure that the HMM begins transitioning toward Stuck, but with a gentler gradient that provides adequate time for Lv1 Nudge intervention before Lv2 Wall activation (5–8 s gap vs. the previous ~1 s). Combined with the 3-stage EWMA α and hysteresis layers, the Stuck label is confirmed after ~20–25 s of sustained silence.
 
 ---
 
@@ -718,11 +719,17 @@ The Wall overlay (displayed when `isWallActive` is true) provides a user-friendl
 
 During keyboard inactivity (silence ticks), the standard `update()` method (α=0.30) would feed extreme idle-period features into the EWMA smoother too aggressively, causing rapid drift toward high-Friction values.
 
-**Fix:** A dedicated `update_silence()` method in `engine.rs` performs HMM transition and emission updates with a **reduced EWMA learning rate** (α=0.15 normal, α=0.25 for deep silence ≥15 s). This allows the EWMA to respond to sustained silence without the aggressive drift of the normal α=0.30:
+**Fix:** A dedicated `update_silence()` method in `engine.rs` performs HMM transition and emission updates with a **3-stage reduced EWMA learning rate** (α=0.15 for initial silence, α=0.18 for ≥15 s, α=0.25 for deep silence ≥25 s). The intermediate α=0.18 gear ensures the Nudge zone (p_stuck 0.60–0.70) is traversed gradually, providing 5–8 seconds of Lv1 intervention before Lv2 Wall activation:
 
 ```rust
 pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) {
-    let alpha = if silence_secs >= 15.0 { 0.25 } else { 0.15 };
+    let alpha = if silence_secs >= 25.0 {
+        0.25  // fully stuck — accelerated response
+    } else if silence_secs >= 15.0 {
+        0.18  // intermediate gear for gradual Nudge-zone traversal
+    } else {
+        0.15  // initial silence
+    };
     // EWMA update with reduced α — responds to silence without aggressive drift
     ewma.0 = alpha * raw_x + (1.0 - alpha) * ewma.0;
     ewma.1 = alpha * raw_y + (1.0 - alpha) * ewma.1;
@@ -1013,4 +1020,4 @@ Research prototype. All rights reserved.
 
 ---
 
-*Last updated: 2026-03-07*
+*Last updated: 2026-03-08*

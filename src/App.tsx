@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import Dashboard from "./components/Dashboard";
 import Overlay from "./components/Overlay";
 import "./App.css";
@@ -57,7 +57,7 @@ function App() {
   //    isWallActive/isMonkMode は Ref 経由で参照し、依存配列に含めない。
   //    これにより interval の破棄・再作成が発生せず、タイマー精度が向上する。
   useEffect(() => {
-    if (windowLabel !== "overlay" && !isStarted) return;
+    if (!isStarted) return;
     lastStuckTickRef.current = Date.now();
 
     const interval = setInterval(async () => {
@@ -91,6 +91,8 @@ function App() {
         }
       } catch (e) {
         console.error("Failed to fetch state:", e);
+        setCognitiveState({ flow: 1.0, incubation: 0.0, stuck: 0.0 });
+        stuckAccumMsRef.current = 0;
       }
     }, 500);
 
@@ -130,6 +132,13 @@ function App() {
     };
   }, []);
 
+  // 6. Overlay: セッション開始イベントを購読し isStarted を同期
+  useEffect(() => {
+    if (windowLabel !== "overlay") return;
+    const unlisten = listen("session-started", () => setIsStarted(true));
+    return () => { unlisten.then((f) => f()); };
+  }, [windowLabel]);
+
   // Render based on Window Label
   if (windowLabel === "overlay") {
     return (
@@ -151,6 +160,7 @@ function App() {
       console.error("Failed to start session:", e);
     }
     setIsStarted(true);
+    emit("session-started");
   };
 
   // セッション未開始時はスタート画面を表示

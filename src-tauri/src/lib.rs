@@ -401,8 +401,8 @@ pub fn run() {
                     features.f5_pause_count += silence_secs / 2.0;
                 }
                 if silence_secs >= 8.0 {
-                    let f6_floor = ((silence_secs - 8.0) / 25.0).clamp(0.0, 0.50);
-                    let f3_floor = ((silence_secs - 10.0) / 30.0).clamp(0.0, 0.40);
+                    let f6_floor = ((silence_secs - 8.0) / 45.0).clamp(0.0, 0.45);
+                    let f3_floor = ((silence_secs - 10.0) / 50.0).clamp(0.0, 0.35);
                     features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
                     features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
                 }

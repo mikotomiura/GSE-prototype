@@ -423,7 +423,13 @@ impl CognitiveStateEngine {
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
 
         // 動的α: 沈黙の深さに応じてEWMA応答を加速
-        let alpha = if silence_secs >= 15.0 { 0.25 } else { 0.15 };
+        let alpha = if silence_secs >= 25.0 {
+            0.25  // 完全に固まった状態
+        } else if silence_secs >= 15.0 {
+            0.18  // Nudge 領域を緩やかに推移させるための中間ギア
+        } else {
+            0.15  // 初期サイレンス
+        };
 
         // EWMA を緩やかに更新
         let (x, y) = match self.axes_ewma.lock() {

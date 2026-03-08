@@ -262,18 +262,18 @@ impl FeatureExtractor {
 
         // Synthetic Friction（合成摩擦値）:
         // 早期オンセット + フロア値で、沈黙開始後のStuck到達を高速化。
-        // f6: 8秒から開始、10秒以上でフロア0.15を保証、33秒で0.50到達
-        // f3: 15秒から開始、10秒以上でフロア0.20を保証、47秒で0.40到達
+        // f6: 8秒から開始、10秒以上でフロア0.15を保証、~35秒で0.45到達
+        // f3: 15秒から開始、10秒以上でフロア0.20を保証、~50秒で0.35到達
         let f6_synthetic = if silence_secs >= 10.0 {
-            (((silence_secs - 8.0) / 50.0).clamp(0.0, 0.50)).max(0.15)
+            (((silence_secs - 8.0) / 60.0).clamp(0.0, 0.45)).max(0.15)
         } else {
-            ((silence_secs - 8.0) / 50.0).clamp(0.0, 0.50)
+            ((silence_secs - 8.0) / 60.0).clamp(0.0, 0.45)
         };
 
         let f3_synthetic = if silence_secs >= 10.0 {
-            (((silence_secs - 15.0) / 80.0).clamp(0.0, 0.40)).max(0.20)
+            (((silence_secs - 15.0) / 100.0).clamp(0.0, 0.35)).max(0.20)
         } else {
-            ((silence_secs - 15.0) / 80.0).clamp(0.0, 0.40)
+            ((silence_secs - 15.0) / 100.0).clamp(0.0, 0.35)
         };
 
         Some(Features {

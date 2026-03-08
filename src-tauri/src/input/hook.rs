@@ -325,7 +325,9 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                     is_backspace,
                 };
                 if let Some(sender) = EVENT_SENDER.get() {
-                    let _ = sender.try_send(event);
+                    if let Err(e) = sender.try_send(event) {
+                        tracing::warn!("InputEvent dropped (channel full): {}", e);
+                    }
                 }
             }
 
