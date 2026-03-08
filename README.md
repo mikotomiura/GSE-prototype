@@ -399,10 +399,10 @@ IME mode changes are logged as a new record type:
 
 ```jsonc
 // IME mode switch: user pressed VK_DBE_HIRAGANA (→ Japanese writing mode)
-{"type":"ime_state","t":1740000001234,"on":true}
+{"type":"ime_state","t":1740000001234,"on":true,"active":false}
 
 // IME mode switch: user pressed VK_DBE_ALPHANUMERIC (→ alphanumeric/coding mode)
-{"type":"ime_state","t":1740000005678,"on":false}
+{"type":"ime_state","t":1740000005678,"on":false,"active":false}
 ```
 
 ---
@@ -453,7 +453,7 @@ IME Polling Thread
     │  recv_timeout(100ms)   ← wakes within 1ms of keypress signal
     │  sleep(5ms)            ← allows IME engine to settle
     │  read IME_STATE_DIRTY  ← check if state changed
-    │  emit LogEntry::ImeState { timestamp: SystemTime::now(), on }
+    │  emit LogEntry::ImeState { timestamp: SystemTime::now(), on, active }
     └─ timestamp is always ≥5ms after the triggering keystroke
 ```
 

@@ -272,7 +272,8 @@ fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    let _ = log_tx.try_send(LogEntry::ImeState { timestamp: ts, on });
+    let active = crate::input::hook::IME_ACTIVE.load(Ordering::Relaxed);
+    let _ = log_tx.try_send(LogEntry::ImeState { timestamp: ts, on, active });
     tracing::debug!(
         "IME open: {} (polling)",
         if on { "ON (あ)" } else { "OFF (A)" }

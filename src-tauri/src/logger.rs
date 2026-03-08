@@ -39,6 +39,7 @@ pub enum LogEntry {
     ImeState {
         timestamp: u64,
         on: bool,
+        active: bool,
     },
     /// ユーザーが「開始する」を押した時刻 (セッション境界マーカー)
     SessionStart { timestamp: u64 },
@@ -128,11 +129,11 @@ impl SessionLogger {
                             raw_x, raw_y, ewma_x, ewma_y, obs, alpha,
                         );
                     }
-                    LogEntry::ImeState { timestamp, on } => {
+                    LogEntry::ImeState { timestamp, on, active } => {
                         let _ = writeln!(
                             writer,
-                            r#"{{"type":"ime_state","t":{},"on":{}}}"#,
-                            timestamp, on,
+                            r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
+                            timestamp, on, active,
                         );
                     }
                     LogEntry::SessionStart { timestamp } => {

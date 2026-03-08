@@ -399,10 +399,10 @@ IME モードの変化は新しいレコードタイプとしてログ記録さ�
 
 ```jsonc
 // IME モード切替: ユーザーが VK_DBE_HIRAGANA を押した（→ 日本語執筆モード）
-{"type":"ime_state","t":1740000001234,"on":true}
+{"type":"ime_state","t":1740000001234,"on":true,"active":false}
 
 // IME モード切替: ユーザーが VK_DBE_ALPHANUMERIC を押した（→ 英数/コーディングモード）
-{"type":"ime_state","t":1740000005678,"on":false}
+{"type":"ime_state","t":1740000005678,"on":false,"active":false}
 ```
 
 ---
@@ -453,7 +453,7 @@ IME ポーリングスレッド
     │  recv_timeout(100ms)   ← キープレス信号から 1ms 以内に起床
     │  sleep(5ms)            ← IME エンジンの状態反映を待機
     │  IME_STATE_DIRTY 読み取り ← 状態変化を確認
-    │  LogEntry::ImeState { timestamp: SystemTime::now(), on } を emit
+    │  LogEntry::ImeState { timestamp: SystemTime::now(), on, active } を emit
     └─ タイムスタンプはトリガーキーストロークの ≥5ms 後を保証
 ```
 
