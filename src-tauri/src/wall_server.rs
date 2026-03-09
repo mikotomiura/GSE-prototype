@@ -140,6 +140,10 @@ fn dispatch_request<R: Runtime>(
     let url = request.url().to_string();
 
     if url.starts_with("/shake") && extract_token(&url) == token {
+        // スマートフォンがQRコードをスキャンして接続 → フロントエンドに通知
+        tracing::info!("WallServer: phone connected via /shake");
+        let _ = app.emit("wall-phone-connected", ());
+
         let html = build_timer_html(server_url, token);
         let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap();
         let _ = request.respond(Response::from_string(html).with_header(header));
@@ -260,8 +264,9 @@ fn build_timer_html(server_url: &str, token: &str) -> String {
     TIMER_HTML_TEMPLATE.replace("__SERVER_URL__", server_url).replace("__TOKEN__", token)
 }
 
-// Phone page: 2-minute countdown timer.
-// Unlock condition: phone timer auto-calls /unlock at 0:00 (only unlock path).
+// Phone page: 2-minute countdown timer with manual unlock button.
+// Unlock condition: user must tap "Unlock Wall" button AFTER timer reaches 0:00.
+// Auto-unlock is intentionally disabled — conscious user action is required.
 // No early exit — Monk Mode on the PC is the escape hatch if Wall is unwanted.
 const TIMER_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html lang="en">
@@ -280,30 +285,50 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
 .status{font-size:0.9rem;margin:0.5rem 0;min-height:3.5em;opacity:0.8;line-height:1.6}
 .icon{font-size:3rem;margin-bottom:0.6rem}
 .complete{color:#4ade80;font-weight:700}
+.unlock-btn{display:none;margin-top:1rem;padding:1rem 2.5rem;font-size:1.2rem;font-weight:700;color:#0f172a;background:#4ade80;border:none;border-radius:12px;cursor:pointer;transition:transform 0.1s,opacity 0.2s;-webkit-tap-highlight-color:transparent;}
+.unlock-btn:active{transform:scale(0.95);opacity:0.85}
+.unlock-btn.visible{display:inline-block;animation:fadeIn 0.3s ease-out}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
-<div class="icon" id="icon">🚶</div>
+<div class="icon" id="icon">&#x1F6B6;</div>
 <h1>Take a Break!</h1>
-<p class="sub">Take a 2-minute break from your keyboard.<br>Your PC unlocks automatically when the timer ends.</p>
+<p class="sub">Take a 2-minute break from your keyboard.<br>Tap the button below when the timer ends.</p>
 <div class="timer" id="timer">2:00</div>
 <div class="progress-bg"><div class="progress-fill" id="progress"></div></div>
-<p class="status" id="status">Walk away and relax.<br>Your PC unlocks when the timer ends.</p>
+<p class="status" id="status">Walk away and relax.<br>Come back when the timer ends.</p>
+<button class="unlock-btn" id="unlockBtn" onclick="doUnlock()">Unlock Wall</button>
 <script>
 (function(){
   var DURATION=120;
   var SERVER='__SERVER_URL__',TOKEN='__TOKEN__';
-  var scanTime=Date.now(),done=false;
+  var scanTime=Date.now(),done=false,timerDone=false;
   var timerEl=document.getElementById('timer'),progressEl=document.getElementById('progress');
   var statusEl=document.getElementById('status'),iconEl=document.getElementById('icon');
+  var unlockBtn=document.getElementById('unlockBtn');
 
-  function doUnlock(){
-    if(done)return;
+  // Screen Wake Lock: スマホ画面の自動消灯を防止
+  (function requestWakeLock(){
+    if('wakeLock' in navigator){
+      navigator.wakeLock.request('screen').catch(function(){});
+      // ページが再表示された際にも再取得
+      document.addEventListener('visibilitychange',function(){
+        if(document.visibilityState==='visible'){
+          navigator.wakeLock.request('screen').catch(function(){});
+        }
+      });
+    }
+  })();
+
+  window.doUnlock=function(){
+    if(done||!timerDone)return;
     done=true;
     iconEl.textContent='\u2705';
+    unlockBtn.style.display='none';
     statusEl.innerHTML='<span class="complete">Unlocked!</span><br>You can return to your computer.';
     fetch(SERVER+'/unlock?token='+TOKEN,{method:'POST'}).catch(function(){});
-  }
+  };
 
   function tick(){
     if(done)return;
@@ -313,11 +338,14 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
     var secs=Math.floor(remaining%60);
     timerEl.textContent=mins+':'+(secs<10?'0':'')+secs;
     progressEl.style.width=Math.min(100,(elapsed/DURATION)*100)+'%';
-    if(remaining<=0){
-      doUnlock();
-    } else {
-      setTimeout(tick,500);
+    if(remaining<=0&&!timerDone){
+      timerDone=true;
+      timerEl.textContent='0:00';
+      progressEl.style.width='100%';
+      statusEl.innerHTML='Ready to unlock!<br>Tap the button below.';
+      unlockBtn.classList.add('visible');
     }
+    if(!done){setTimeout(tick,500);}
   }
 
   tick();

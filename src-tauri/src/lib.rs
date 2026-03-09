@@ -253,7 +253,7 @@ pub fn run() {
     }));
 
     // キーストローク入力チャネル
-    let (tx, rx) = crossbeam_channel::bounded(64);
+    let (tx, rx) = crossbeam_channel::bounded::<crate::analysis::features::InputEvent>(64);
 
     // セッション開始リセットシグナル (start_session → 分析スレッド)
     let should_reset = Arc::new(AtomicBool::new(false));
@@ -321,9 +321,6 @@ pub fn run() {
             // イベント受信 (タイムアウトは次の1Hzマークまで)
             match rx.recv_timeout(timeout.max(Duration::from_millis(1))) {
                 Ok(event) => {
-                    // バッファに追加 (IMEポーズ中でも常に)
-                    extractor.process_event(event);
-
                     // キーイベントをログ記録（全打鍵を記録、推論頻度とは独立）
                     let _ = log_tx_analysis.try_send(LogEntry::Key {
                         vk_code: event.vk_code,
@@ -331,12 +328,17 @@ pub fn run() {
                         is_press: event.is_press,
                     });
 
-                    // IMEポーズ中は last_event_time の更新とストリークカウントをスキップ
+                    // IMEポーズ中はバッファ蓄積を含め全処理をスキップ。
+                    // 候補選択中のキーストローク（矢印・Enter・Space等）がバッファを汚染するのを防止。
+                    // unpause 時に extractor.reset() で再開するため、蓄積しても無駄である。
                     let currently_paused = engine_for_thread.get_paused();
                     if currently_paused {
                         was_paused = true;
                         continue;
                     }
+
+                    // バッファに追加 (非ポーズ時のみ)
+                    extractor.process_event(event);
 
                     // ポーズ→復帰遷移: バッファをクリアして stale なフライトタイムを排除。
                     // ポーズ中に蓄積した打鍵間隔（数十秒）が F1 を汚染し

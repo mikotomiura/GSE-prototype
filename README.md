@@ -30,9 +30,10 @@
 19. [Cross-Platform InputEvent Semantic Extension (v2.13)](#cross-platform-inputevent-semantic-extension-v213)
 20. [Stuck Friction Limiter Release (v2.18)](#stuck-friction-limiter-release-v218)
 21. [macOS Parity Sync (v2.19)](#macos-parity-sync-v219)
-22. [Logging & Analysis](#logging--analysis)
-23. [Build Instructions](#build-instructions)
-24. [Academic References](#academic-references)
+22. [IME Pause Event Discard & Zen Timer Manual Unlock (v2.20)](#ime-pause-event-discard--zen-timer-manual-unlock-v220)
+23. [Logging & Analysis](#logging--analysis)
+24. [Build Instructions](#build-instructions)
+25. [Academic References](#academic-references)
 
 ---
 
@@ -538,7 +539,7 @@ If p\_stuck accumulates above 0.70 for a total of 30 seconds (cumulative, not co
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-The Wall is unlocked **exclusively by the smartphone timer**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code, which opens a 2-minute countdown page on their phone. When the timer reaches 0:00, the phone automatically POSTs to `/unlock`, the server emits `"sensor-accelerometer"` with `"move"` payload, and the Wall dismisses. There is no early-exit button and no PC-side fallback timer — the 2-minute wait is intentional. If the user does not want the Wall to engage at all, they can enable **Monk Mode** from the Dashboard beforehand. Any keyboard input detected while the Wall is active triggers a **warning banner** on the overlay. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
+The Wall is unlocked **exclusively by the smartphone**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code, which opens a 2-minute countdown page on their phone. When the phone connects, a `wall-phone-connected` event is emitted to the frontend, displaying a "Phone connected — Zen Timer running" badge. When the timer reaches 0:00, an **"Unlock Wall" button** appears — the user must **manually tap** the button to POST to `/unlock`, which emits `"sensor-accelerometer"` with `"move"` payload and dismisses the Wall. The phone page also requests `navigator.wakeLock` to prevent screen dimming during the countdown. There is no early-exit button and no PC-side fallback timer — the 2-minute wait plus conscious tap is intentional. If the user does not want the Wall to engage at all, they can enable **Monk Mode** from the Dashboard beforehand. Any keyboard input detected while the Wall is active triggers a **warning banner** on the overlay. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
 
 ### Monk Mode (Wall Suppression Toggle)
 
@@ -971,6 +972,34 @@ Changed from per-write `flush()` to 5-second idle timeout buffering via `recv_ti
 ### `is_typing_key` Migration (`features.rs` → `hook.rs`)
 
 The `is_typing_key()` function (containing Windows-specific virtual key codes) was moved from `features.rs` to `hook.rs` as a local function. Since the hook already filters non-typing keys before the channel, the redundant checks in `calculate_features()` were removed. `features.rs` now contains zero OS-specific references, completing the platform-agnostic analysis core goal from v2.13.
+
+---
+
+## IME Pause Event Discard & Zen Timer Manual Unlock (v2.20)
+
+Two improvements ported from the macOS reference implementation to improve buffer hygiene and intervention UX.
+
+### IME Pause Event Discard (`lib.rs`)
+
+Previously, `extractor.process_event()` was called unconditionally — even during IME pause (candidate window visible). Since the buffer is cleared via `extractor.reset()` when the pause ends, all events accumulated during the pause were discarded anyway. This wasted CPU cycles and unnecessarily grew the buffer.
+
+**Fix:** The `process_event()` call is now skipped entirely when `engine.get_paused()` returns `true`. Raw key events are still logged to the NDJSON file (logging is independent of feature extraction). When the pause ends, the existing `extractor.reset()` + clean restart path remains unchanged.
+
+### Zen Timer Manual Unlock (`wall_server.rs`)
+
+The smartphone timer page previously auto-POSTed to `/unlock` when the 2-minute countdown reached 0:00. This allowed users to simply wait at their desk without actually taking a break.
+
+**Fix:** When the timer reaches 0:00, an **"Unlock Wall" button** appears instead of auto-unlocking. The user must consciously tap the button to dismiss the Wall. This ensures at least a minimal intentional action after the break period.
+
+### Phone Connection Event (`wall_server.rs`)
+
+The Overlay frontend already listened for `wall-phone-connected` events (to show the "Phone connected" badge), but the backend never emitted this event.
+
+**Fix:** `app.emit("wall-phone-connected", ())` is now called when the phone first connects via the `/shake` endpoint (QR code scan). The connection badge now displays correctly.
+
+### Screen Wake Lock (`wall_server.rs`)
+
+The smartphone timer page now requests `navigator.wakeLock.request('screen')` to prevent the phone screen from dimming during the countdown. The lock is re-acquired on `visibilitychange` events. Non-supporting browsers fall back silently.
 
 ---
 
