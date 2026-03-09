@@ -413,13 +413,13 @@ pub fn run() {
             let mut features = extractor.calculate_features();
 
             let (log_features, diag_opt) = if features.f1_flight_time_median > 0.0
-                && silence_secs < 5.0
+                && silence_secs < 2.0
             {
                 // 通常パス: バッファに実データあり + 直近タイピング中 → α=0.3 で更新
                 let d = engine_for_thread.update(&features, ime_open);
                 (features, d)
             } else if features.f1_flight_time_median > 0.0 {
-                // 沈黙パス (バッファに実データあり): 5秒以上沈黙中
+                // 沈黙パス (バッファに実データあり): 2秒以上沈黙中
                 // 古いウィンドウデータを α=0.3 で連続入力すると Incubation にロックインするため、
                 // α=0.15 の update_silence を使用する。
                 // F5 に進行中の沈黙を加算し、摩擦フロアを適用する。
@@ -427,8 +427,8 @@ pub fn run() {
                     features.f5_pause_count += silence_secs / 2.0;
                 }
                 if silence_secs >= 8.0 {
-                    let f6_floor = ((silence_secs - 8.0) / 45.0).clamp(0.0, 0.45);
-                    let f3_floor = ((silence_secs - 10.0) / 50.0).clamp(0.0, 0.35);
+                    let f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
+                    let f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
                     features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
                     features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
                 }

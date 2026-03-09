@@ -28,9 +28,10 @@
 17. [Analysis Engine Parity & Silence Detection (v2.11)](#analysis-engine-parity--silence-detection-v211)
 18. [Hook-Level Repeat Event Forwarding (v2.12)](#hook-level-repeat-event-forwarding-v212)
 19. [Cross-Platform InputEvent Semantic Extension (v2.13)](#cross-platform-inputevent-semantic-extension-v213)
-20. [Logging & Analysis](#logging--analysis)
-21. [Build Instructions](#build-instructions)
-22. [Academic References](#academic-references)
+20. [Stuck Friction Limiter Release (v2.18)](#stuck-friction-limiter-release-v218)
+21. [Logging & Analysis](#logging--analysis)
+22. [Build Instructions](#build-instructions)
+23. [Academic References](#academic-references)
 
 ---
 
@@ -322,26 +323,26 @@ The Stuck-dominant bins require x_bin ≥ 3 (X ≥ 0.60), which was unreachable 
 **Fix:** `make_silence_observation()` now generates synthetic friction values with early onset and guaranteed floor values:
 
 ```rust
-// F6: onset at 8 s, floor 0.15 at ≥10 s, reaches 0.45 at ~35 s
-F6_synthetic = if silence ≥ 10s { max(clamp((s−8)/60, 0, 0.45), 0.15) }
-              else              { clamp((s−8)/60, 0, 0.45) }
+// F6: onset at 10 s, floor 0.15 at ≥10 s, reaches 1.0 at ~50 s
+F6_synthetic = if silence ≥ 10s { max(clamp((s−10)/40, 0, 1.0), 0.15) }
+              else              { clamp((s−10)/40, 0, 1.0) }
 
-// F3: onset at 15 s, floor 0.20 at ≥10 s, reaches 0.35 at ~50 s
-F3_synthetic = if silence ≥ 10s { max(clamp((s−15)/100, 0, 0.35), 0.20) }
-              else              { clamp((s−15)/100, 0, 0.35) }
+// F3: onset at 15 s, floor 0.20 at ≥10 s, reaches 1.0 at ~65 s
+F3_synthetic = if silence ≥ 10s { max(clamp((s−15)/50, 0, 1.0), 0.20) }
+              else              { clamp((s−15)/50, 0, 1.0) }
 ```
 
 Resulting X trajectory (with F5 saturated at φ = 1.0, typical F1):
 
 | Silence | F3_syn | F6_syn | X (Friction) | x_bin | Region |
 |---|---|---|---|---|---|
-| 8 s | 0.00 | 0.00 | ≈ 0.20 | 1 | Incubation |
 | 10 s | 0.20 | 0.15 | ≈ 0.34 | 1 | Incubation |
-| 20 s | 0.20 | 0.20 | ≈ 0.35 | 1 | Boundary |
-| 35 s | 0.20 | 0.45 | ≈ 0.53 | 2 | Boundary |
-| 50 s | 0.35 | 0.45 | ≈ 0.68 | 3 | **Stuck** |
+| 20 s | 0.20 | 0.25 | ≈ 0.36 | 1 | Boundary |
+| 30 s | 0.30 | 0.50 | ≈ 0.58 | 2 | Boundary |
+| 40 s | 0.50 | 0.75 | ≈ 0.76 | 3 | **Stuck** |
+| 50 s | 0.70 | 1.00 | ≈ 0.90 | 4 | **Deep Stuck** |
 
-The early onset (8 s for F6, 15 s for F3) and guaranteed floor values at ≥10 s ensure that the HMM begins transitioning toward Stuck, but with a gentler gradient that provides adequate time for Lv1 Nudge intervention before Lv2 Wall activation (5–8 s gap vs. the previous ~1 s). Combined with the 3-stage EWMA α and hysteresis layers, the Stuck label is confirmed after ~20–25 s of sustained silence.
+The early onset (10 s for F6, 15 s for F3) and guaranteed floor values at ≥10 s ensure that the HMM begins transitioning toward Stuck. The friction cap is released to 1.0 (from 0.45/0.35) to allow full traversal of x_bin range, enabling Nudge and Wall interventions. Combined with the 3-stage EWMA α and hysteresis layers, the Stuck label is confirmed after ~25–30 s of sustained silence.
 
 ---
 
@@ -505,7 +506,7 @@ This decoupling ensures exactly **one HMM forward step per second**, making the 
 
 ### Synthetic Friction
 
-When the 1 Hz timer fires during extended silence, `make_silence_observation()` generates **synthetic friction** — artificial F3 (correction rate) and F6 (pause-after-delete rate) values that ramp up linearly with silence duration. This mechanism ensures that prolonged inactivity (≥ 50 s) transitions the HMM from Incubation to Stuck, reflecting the cognitive shift from deliberate pause to unproductive stalling. See **Fix ③** in the Hysteresis section above for the detailed derivation and trajectory table.
+When the 1 Hz timer fires during extended silence, `make_silence_observation()` generates **synthetic friction** — artificial F3 (correction rate) and F6 (pause-after-delete rate) values that ramp up linearly with silence duration. The friction cap is released to 1.0 (v2.18), enabling full x_bin traversal so that prolonged inactivity (≥ 30 s) transitions the HMM from Incubation to Stuck, reflecting the cognitive shift from deliberate pause to unproductive stalling. See **Fix ③** in the Hysteresis section above for the detailed derivation and trajectory table.
 
 ---
 
@@ -907,6 +908,42 @@ With this change, `features.rs` and `lib.rs` have zero OS-specific key code refe
 
 ---
 
+## Stuck Friction Limiter Release (v2.18)
+
+### Problem
+
+Log analysis revealed that `p_stuck` was structurally capped at ~5%, making it impossible to reach the Nudge threshold (p_stuck > 0.60) or Wall threshold (p_stuck > 0.70). Two root causes were identified:
+
+1. **Friction cap too low:** The `clamp` upper bounds for synthetic friction (F6: 0.45, F3: 0.35) prevented X (Cognitive Friction) from reaching x_bin ≥ 3 (Stuck-dominant emission region).
+2. **Silence path onset too late:** The normal update path (α=0.30) continued for 5 seconds of silence, repeatedly feeding stale window data into the HMM and locking it into Incubation.
+
+### Fix 1: Friction Limiter Release (`lib.rs`, `features.rs`)
+
+The `clamp` upper bound for both friction features was released from 0.45/0.35 to **1.0**, and divisors were reduced for faster ramp-up:
+
+| Parameter | Before | After |
+|---|---|---|
+| f6_floor (lib.rs) | `(s−8)/45`, cap 0.45 | `(s−8)/30`, cap 1.0 |
+| f3_floor (lib.rs) | `(s−10)/50`, cap 0.35 | `(s−10)/40`, cap 1.0 |
+| f6_synthetic (features.rs) | `(s−8)/60`, cap 0.45 | `(s−10)/40`, cap 1.0 |
+| f3_synthetic (features.rs) | `(s−15)/100`, cap 0.35 | `(s−15)/50`, cap 1.0 |
+
+The `max(0.15)` / `max(0.20)` floor guarantees at ≥10 s are preserved.
+
+### Fix 2: Silence Path Early Onset (`lib.rs`)
+
+The threshold for switching from the normal path (α=0.30) to the silence path (α=0.15) was lowered from **5 seconds** to **2 seconds**. This prevents stale buffer data from reinforcing Incubation during early silence.
+
+### Fix 3: Emission Cliff Smoothing (`engine.rs`)
+
+Incubation (State 1) x=1 row y=1 emission probability was reduced from **0.10** to **0.08**, smoothing the sharp transition between Flow-favorable and Incubation-favorable observation bins.
+
+### Effect
+
+Stuck is now reachable at ~30 s of sustained silence (previously ~50 s), enabling both Nudge and Wall interventions to fire as designed.
+
+---
+
 ## Logging & Analysis
 
 Every session produces a timestamped NDJSON file:
@@ -1020,4 +1057,4 @@ Research prototype. All rights reserved.
 
 ---
 
-*Last updated: 2026-03-08*
+*Last updated: 2026-03-09*
