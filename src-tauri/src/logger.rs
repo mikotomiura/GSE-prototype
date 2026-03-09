@@ -2,9 +2,9 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
 
 /// ログエントリの種別
 #[derive(Debug)]
@@ -90,72 +90,92 @@ impl SessionLogger {
 
             tracing::info!("SessionLogger: writing to {:?}", path_clone);
 
-            while let Ok(entry) = rx.recv() {
-                match entry {
-                    LogEntry::Key {
-                        vk_code,
-                        timestamp,
-                        is_press,
-                    } => {
-                        let _ = writeln!(
-                            writer,
-                            r#"{{"type":"key","t":{},"vk":{},"press":{}}}"#,
-                            timestamp,
-                            vk_code,
-                            is_press,
-                        );
-                    }
-                    LogEntry::Feat {
-                        timestamp,
-                        f1,
-                        f3,
-                        f4,
-                        f5,
-                        f6,
-                        p_flow,
-                        p_inc,
-                        p_stuck,
-                        raw_x,
-                        raw_y,
-                        ewma_x,
-                        ewma_y,
-                        obs,
-                        alpha,
-                    } => {
-                        let _ = writeln!(
-                            writer,
-                            r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4},"raw_x":{:.4},"raw_y":{:.4},"ewma_x":{:.4},"ewma_y":{:.4},"obs":{},"alpha":{:.2}}}"#,
-                            timestamp, f1, f3, f4, f5, f6, p_flow, p_inc, p_stuck,
-                            raw_x, raw_y, ewma_x, ewma_y, obs, alpha,
-                        );
-                    }
-                    LogEntry::ImeState { timestamp, on, active } => {
-                        let _ = writeln!(
-                            writer,
-                            r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
-                            timestamp, on, active,
-                        );
-                    }
-                    LogEntry::SessionStart { timestamp } => {
-                        let _ = writeln!(
-                            writer,
-                            r#"{{"type":"session_start","t":{}}}"#,
-                            timestamp,
-                        );
-                    }
-                    LogEntry::End => {
-                        let _ = writeln!(
-                            writer,
-                            r#"{{"type":"meta","session_end":{}}}"#,
-                            now_ms()
-                        );
-                        break;
-                    }
+            let flush_interval = Duration::from_secs(5);
+            let mut last_flush = Instant::now();
+            let mut dirty = false;
 
+            loop {
+                let timeout = flush_interval.saturating_sub(last_flush.elapsed());
+                match rx.recv_timeout(timeout) {
+                    Ok(entry) => {
+                        match entry {
+                            LogEntry::Key {
+                                vk_code,
+                                timestamp,
+                                is_press,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"key","t":{},"vk":{},"press":{}}}"#,
+                                    timestamp,
+                                    vk_code,
+                                    is_press,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::Feat {
+                                timestamp,
+                                f1,
+                                f3,
+                                f4,
+                                f5,
+                                f6,
+                                p_flow,
+                                p_inc,
+                                p_stuck,
+                                raw_x,
+                                raw_y,
+                                ewma_x,
+                                ewma_y,
+                                obs,
+                                alpha,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4},"raw_x":{:.4},"raw_y":{:.4},"ewma_x":{:.4},"ewma_y":{:.4},"obs":{},"alpha":{:.2}}}"#,
+                                    timestamp, f1, f3, f4, f5, f6, p_flow, p_inc, p_stuck,
+                                    raw_x, raw_y, ewma_x, ewma_y, obs, alpha,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ImeState { timestamp, on, active } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
+                                    timestamp, on, active,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::SessionStart { timestamp } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"session_start","t":{}}}"#,
+                                    timestamp,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::End => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"meta","session_end":{}}}"#,
+                                    now_ms()
+                                );
+                                break;
+                            }
+                        }
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        // 5秒間アイドル → バッファフラッシュ
+                    }
+                    Err(RecvTimeoutError::Disconnected) => break,
                 }
 
-                // バッファを定期フラッシュ (エラー握りつぶし)
-                let _ = writer.flush();
+                // 5秒間隔でバッファフラッシュ (I/O負荷軽減)
+                if dirty && last_flush.elapsed() >= flush_interval {
+                    let _ = writer.flush();
+                    last_flush = Instant::now();
+                    dirty = false;
+                }
             }
 
             let _ = writer.flush();

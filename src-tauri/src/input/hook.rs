@@ -29,7 +29,31 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
-use crate::analysis::features::{is_typing_key, InputEvent};
+use crate::analysis::features::InputEvent;
+
+/// タイピングリズムに関連するキーかどうかを判定する（Windows固有のVKコード）。
+/// Flight Time 計算の対象を限定し、矢印キー・ファンクションキー・IMEモードキー等の
+/// ノイズを除外する。フック層でフィルタリングし、分析コア (features.rs) を OS 非依存に保つ。
+fn is_typing_key(vk_code: u32) -> bool {
+    matches!(
+        vk_code,
+        // Letters A-Z
+        0x41..=0x5A
+        // Digits 0-9
+        | 0x30..=0x39
+        // Numpad keys (0-9, multiply, add, separator, subtract, decimal, divide)
+        | 0x60..=0x6F
+        // Symbol / punctuation keys (OEM)
+        | 0xBA..=0xC0
+        | 0xDB..=0xDF
+        // Editing keys
+        | 0x08  // Backspace
+        | 0x0D  // Enter
+        | 0x20  // Space
+        | 0x09  // Tab
+        | 0x2E  // Delete
+    )
+}
 
 // IME WinEvent constants (winuser.h, Windows 8+)
 // These fire in ANY foreground process - no DLL injection needed with WINEVENT_OUTOFCONTEXT

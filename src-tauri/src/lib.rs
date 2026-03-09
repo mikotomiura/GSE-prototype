@@ -427,8 +427,12 @@ pub fn run() {
                     features.f5_pause_count += silence_secs / 2.0;
                 }
                 if silence_secs >= 8.0 {
-                    let f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
-                    let f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
+                    let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
+                    let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
+                    if silence_secs >= 10.0 {
+                        f6_floor = f6_floor.max(0.15);
+                        f3_floor = f3_floor.max(0.20);
+                    }
                     features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
                     features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
                 }

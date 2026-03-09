@@ -29,9 +29,10 @@
 18. [Hook-Level Repeat Event Forwarding (v2.12)](#hook-level-repeat-event-forwarding-v212)
 19. [Cross-Platform InputEvent Semantic Extension (v2.13)](#cross-platform-inputevent-semantic-extension-v213)
 20. [Stuck Friction Limiter Release (v2.18)](#stuck-friction-limiter-release-v218)
-21. [Logging & Analysis](#logging--analysis)
-22. [Build Instructions](#build-instructions)
-23. [Academic References](#academic-references)
+21. [macOS Parity Sync (v2.19)](#macos-parity-sync-v219)
+22. [Logging & Analysis](#logging--analysis)
+23. [Build Instructions](#build-instructions)
+24. [Academic References](#academic-references)
 
 ---
 
@@ -941,6 +942,35 @@ Incubation (State 1) x=1 row y=1 emission probability was reduced from **0.10** 
 ### Effect
 
 Stuck is now reachable at ~30 s of sustained silence (previously ~50 s), enabling both Nudge and Wall interventions to fire as designed.
+
+---
+
+## macOS Parity Sync (v2.19)
+
+Four changes from the macOS reference implementation were ported to achieve full cross-platform parity.
+
+### Emission Table Sync (`engine.rs`)
+
+Friction-boundary tuning at x=2 and x=3 bins was applied to strengthen Stuck detection at moderate friction levels:
+
+| Position | Before | After | Effect |
+|---|---|---|---|
+| Flow x=2 y=3 (obs=13) | 0.06 | 0.01 | Reduce Flow claim at moderate friction |
+| Incubation x=2 y=3 (obs=13) | 0.01 | 0.02 | Slight Incubation increase |
+| Stuck x=2 y=3 (obs=13) | 0.01 | 0.05 | Stronger Stuck at moderate friction |
+| Stuck x=3 y=3 (obs=18) | 0.02 | 0.07 | Stronger Stuck at high friction |
+
+### Friction Floor Minimum Guarantee (`lib.rs`)
+
+When `silence_secs >= 10.0` in the buffer-present silence path, explicit floor values `f6_floor.max(0.15)` and `f3_floor.max(0.20)` are now enforced, matching the guarantees in `make_silence_observation()`.
+
+### Logger Flush Optimization (`logger.rs`)
+
+Changed from per-write `flush()` to 5-second idle timeout buffering via `recv_timeout`. `BufWriter`'s internal buffer is now utilized during high-frequency logging, significantly reducing I/O overhead. Final flush on `LogEntry::End` ensures zero data loss.
+
+### `is_typing_key` Migration (`features.rs` → `hook.rs`)
+
+The `is_typing_key()` function (containing Windows-specific virtual key codes) was moved from `features.rs` to `hook.rs` as a local function. Since the hook already filters non-typing keys before the channel, the redundant checks in `calculate_features()` were removed. `features.rs` now contains zero OS-specific references, completing the platform-agnostic analysis core goal from v2.13.
 
 ---
 

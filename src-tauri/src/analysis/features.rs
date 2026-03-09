@@ -47,30 +47,6 @@ pub fn phi(x: f64, beta: f64) -> f64 {
     ((x - beta) / (KAPPA * beta)).clamp(0.0, 1.0)
 }
 
-/// タイピングリズムに関連するキーかどうかを判定する。
-/// Flight Time 計算の対象を限定し、矢印キー・ファンクションキー・IMEモードキー等の
-/// ノイズを除外する。
-pub fn is_typing_key(vk_code: u32) -> bool {
-    matches!(
-        vk_code,
-        // Letters A-Z
-        0x41..=0x5A
-        // Digits 0-9
-        | 0x30..=0x39
-        // Numpad keys (0-9, multiply, add, separator, subtract, decimal, divide)
-        | 0x60..=0x6F
-        // Symbol / punctuation keys (OEM)
-        | 0xBA..=0xC0
-        | 0xDB..=0xDF
-        // Editing keys
-        | 0x08  // Backspace
-        | 0x0D  // Enter
-        | 0x20  // Space
-        | 0x09  // Tab
-        | 0x2E  // Delete
-    )
-}
-
 pub struct FeatureExtractor {
     buffer: VecDeque<InputEvent>,
     capacity: usize,
@@ -115,8 +91,9 @@ impl FeatureExtractor {
         }
 
         // --- ウィンドウ内のフライトタイムを計算 (F1) ---
-        // キーリピートと非タイピングキーを除外して正確なタイピングリズムを測定する。
+        // キーリピートを除外して正確なタイピングリズムを測定する。
         // リピート判定はフック層の is_repeat フラグを使用する。
+        // 注: 非タイピングキーはフック層 (hook.rs) で既にフィルタ済み。
         let mut window_fts: Vec<f64> = Vec::new();
         let mut last_release: Option<u64> = None;
 
@@ -125,18 +102,15 @@ impl FeatureExtractor {
                 continue;
             }
             if event.is_press {
-                // Flight time: only non-repeat, typing keys
-                if is_typing_key(event.vk_code) {
-                    if let Some(rel) = last_release {
-                        if event.timestamp >= rel {
-                            let ft = (event.timestamp - rel) as f64;
-                            if ft < 2000.0 {
-                                window_fts.push(ft);
-                            }
+                if let Some(rel) = last_release {
+                    if event.timestamp >= rel {
+                        let ft = (event.timestamp - rel) as f64;
+                        if ft < 2000.0 {
+                            window_fts.push(ft);
                         }
                     }
                 }
-            } else if is_typing_key(event.vk_code) {
+            } else {
                 last_release = Some(event.timestamp);
             }
         }
