@@ -130,9 +130,8 @@ Main Thread (Tauri event loop)
 
 ```
 GSE-Next/
-├── analysis/
-│   ├── behavioral_gt.py       # Post-session behavioral GT labeling
-│   └── hmm_sensitivity.py     # Parameter sensitivity analysis
+├── analysis/                   # Planned for Phase 2+
+│   └── (planned: behavioral_gt.py, hmm_sensitivity.py)
 │
 ├── src/                       # React / TypeScript frontend
 │   ├── components/
@@ -1034,9 +1033,7 @@ Record types:
 
 ### Post-session Ground-Truth Labeling
 
-```bash
-python analysis/behavioral_gt.py gse_YYYYMMDD_HHMMSS.ndjson
-```
+> **Note:** `behavioral_gt.py` is planned for Phase 2+. The labeling rules below describe the design specification.
 
 Labels are assigned per 30-second sliding window (1-second step):
 
@@ -1076,9 +1073,7 @@ npm run tauri build
 
 ### Post-session Analysis
 
-```bash
-python analysis/behavioral_gt.py "%USERPROFILE%\Documents\GSE-sessions\gse_YYYYMMDD_HHMMSS.ndjson"
-```
+> **Note:** `behavioral_gt.py` is planned for Phase 2+. See the "Post-session Ground-Truth Labeling" section above for labeling rule specifications.
 
 ---
 

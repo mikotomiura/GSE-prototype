@@ -131,9 +131,8 @@
 
 ```
 GSE-Next/
-├── analysis/
-│   ├── behavioral_gt.py       # セッション後行動ルールベース GT ラベリング
-│   └── hmm_sensitivity.py     # HMM パラメータ感度分析
+├── analysis/                   # Phase 2以降で実装予定
+│   └── (計画中: behavioral_gt.py, hmm_sensitivity.py)
 │
 ├── src/                       # React / TypeScript フロントエンド
 │   ├── components/
@@ -1034,9 +1033,7 @@ macOS 版で実装済みの 2 つの改善を Windows 版に移植し、バッ�
 
 ### セッション後グラウンドトゥルースラベリング
 
-```bash
-python analysis/behavioral_gt.py gse_YYYYMMDD_HHMMSS.ndjson
-```
+> **注:** `behavioral_gt.py` は Phase 2 以降で実装予定。以下はラベリングルールの設計仕様である。
 
 30 秒スライディングウィンドウ（1 秒ステップ）でラベルを付与します。
 
@@ -1076,9 +1073,7 @@ npm run tauri build
 
 ### セッション後分析
 
-```bash
-python analysis/behavioral_gt.py "%USERPROFILE%\Documents\GSE-sessions\gse_YYYYMMDD_HHMMSS.ndjson"
-```
+> **注:** `behavioral_gt.py` は Phase 2 以降で実装予定。ラベリングルールの設計仕様は上記「セッション後グラウンドトゥルースラベリング」セクションを参照。
 
 ---
 
