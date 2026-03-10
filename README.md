@@ -31,9 +31,10 @@
 20. [Stuck Friction Limiter Release (v2.18)](#stuck-friction-limiter-release-v218)
 21. [macOS Parity Sync (v2.19)](#macos-parity-sync-v219)
 22. [IME Pause Event Discard & Zen Timer Manual Unlock (v2.20)](#ime-pause-event-discard--zen-timer-manual-unlock-v220)
-23. [Logging & Analysis](#logging--analysis)
-24. [Build Instructions](#build-instructions)
-25. [Academic References](#academic-references)
+23. [Zen Timer Early Unlock Button (v2.21)](#zen-timer-early-unlock-button-v221)
+24. [Logging & Analysis](#logging--analysis)
+25. [Build Instructions](#build-instructions)
+26. [Academic References](#academic-references)
 
 ---
 
@@ -538,7 +539,7 @@ If p\_stuck accumulates above 0.70 for a total of 30 seconds (cumulative, not co
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
-The Wall is unlocked **exclusively by the smartphone**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code, which opens a 2-minute countdown page on their phone. When the phone connects, a `wall-phone-connected` event is emitted to the frontend, displaying a "Phone connected — Zen Timer running" badge. When the timer reaches 0:00, an **"Unlock Wall" button** appears — the user must **manually tap** the button to POST to `/unlock`, which emits `"sensor-accelerometer"` with `"move"` payload and dismisses the Wall. The phone page also requests `navigator.wakeLock` to prevent screen dimming during the countdown. There is no early-exit button and no PC-side fallback timer — the 2-minute wait plus conscious tap is intentional. If the user does not want the Wall to engage at all, they can enable **Monk Mode** from the Dashboard beforehand. Any keyboard input detected while the Wall is active triggers a **warning banner** on the overlay. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
+The Wall is unlocked **exclusively by the smartphone**. When the Wall activates, `start_wall_server` launches a local HTTP server (`tiny_http`) and generates a QR code. The user scans the QR code, which opens a 2-minute countdown page on their phone. When the phone connects, a `wall-phone-connected` event is emitted to the frontend, displaying a "Phone connected — Zen Timer running" badge. When the timer reaches 0:00, an **"Unlock Wall" button** appears — the user must **manually tap** the button to POST to `/unlock`, which emits `"sensor-accelerometer"` with `"move"` payload and dismisses the Wall. A subdued **early-unlock button** is also available during the countdown for situations where the user needs to return to work immediately. The phone page also requests `navigator.wakeLock` to prevent screen dimming during the countdown. There is no PC-side fallback timer. If the user does not want the Wall to engage at all, they can enable **Monk Mode** from the Dashboard beforehand. Any keyboard input detected while the Wall is active triggers a **warning banner** on the overlay. This approach requires no HTTPS — the unlock signal travels over the local network from phone to PC.
 
 ### Monk Mode (Wall Suppression Toggle)
 
@@ -999,6 +1000,19 @@ The Overlay frontend already listened for `wall-phone-connected` events (to show
 ### Screen Wake Lock (`wall_server.rs`)
 
 The smartphone timer page now requests `navigator.wakeLock.request('screen')` to prevent the phone screen from dimming during the countdown. The lock is re-acquired on `visibilitychange` events. Non-supporting browsers fall back silently.
+
+---
+
+## Zen Timer Early Unlock Button (v2.21)
+
+The Zen Timer phone page now includes a subdued **early-unlock button** ("早期解除する") that is always visible during the 2-minute countdown. This allows users to dismiss the Wall immediately when they need to return to work urgently, without waiting for the full timer to expire.
+
+- **Primary flow (unchanged):** When the timer reaches 0:00, a prominent green "Unlock Wall" button appears. The early-unlock button is hidden at that point.
+- **Early unlock flow (new):** Tapping the subdued button at any time during the countdown calls the same `/unlock` endpoint and dismisses the Wall.
+- **Double-unlock prevention:** A shared `done` flag ensures `/unlock` is POSTed exactly once regardless of which button is tapped.
+- **Visual hierarchy:** The early-unlock button uses a transparent background with a faint border — intentionally less prominent than the primary button to encourage completing the full break.
+
+This change is confined to the `TIMER_HTML_TEMPLATE` string in `wall_server.rs` (HTML/CSS/JS only). No Rust logic, server routing, or frontend code was modified.
 
 ---
 

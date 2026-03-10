@@ -264,10 +264,10 @@ fn build_timer_html(server_url: &str, token: &str) -> String {
     TIMER_HTML_TEMPLATE.replace("__SERVER_URL__", server_url).replace("__TOKEN__", token)
 }
 
-// Phone page: 2-minute countdown timer with manual unlock button.
-// Unlock condition: user must tap "Unlock Wall" button AFTER timer reaches 0:00.
-// Auto-unlock is intentionally disabled — conscious user action is required.
-// No early exit — Monk Mode on the PC is the escape hatch if Wall is unwanted.
+// Phone page: 2-minute countdown timer with manual unlock.
+// Primary unlock: "Unlock Wall" button appears after timer reaches 0:00.
+// Early unlock: "早期解除する" button is always visible for immediate unlock.
+// Monk Mode on the PC is the escape hatch if Wall is unwanted entirely.
 const TIMER_HTML_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -288,6 +288,8 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
 .unlock-btn{display:none;margin-top:1rem;padding:1rem 2.5rem;font-size:1.2rem;font-weight:700;color:#0f172a;background:#4ade80;border:none;border-radius:12px;cursor:pointer;transition:transform 0.1s,opacity 0.2s;-webkit-tap-highlight-color:transparent;}
 .unlock-btn:active{transform:scale(0.95);opacity:0.85}
 .unlock-btn.visible{display:inline-block;animation:fadeIn 0.3s ease-out}
+.early-unlock-btn{margin-top:1.5rem;padding:0.6rem 1.5rem;font-size:0.85rem;font-weight:500;color:rgba(248,250,252,0.5);background:transparent;border:1px solid rgba(248,250,252,0.2);border-radius:8px;cursor:pointer;transition:color 0.2s,border-color 0.2s,transform 0.1s;-webkit-tap-highlight-color:transparent;}
+.early-unlock-btn:active{transform:scale(0.95);color:rgba(248,250,252,0.8);border-color:rgba(248,250,252,0.4)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
@@ -299,6 +301,7 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
 <div class="progress-bg"><div class="progress-fill" id="progress"></div></div>
 <p class="status" id="status">Walk away and relax.<br>Come back when the timer ends.</p>
 <button class="unlock-btn" id="unlockBtn" onclick="doUnlock()">Unlock Wall</button>
+<button class="early-unlock-btn" id="earlyUnlockBtn" onclick="doEarlyUnlock()">&#x1F513; &#x65E9;&#x671F;&#x89E3;&#x9664;&#x3059;&#x308B;</button>
 <script>
 (function(){
   var DURATION=120;
@@ -307,6 +310,7 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
   var timerEl=document.getElementById('timer'),progressEl=document.getElementById('progress');
   var statusEl=document.getElementById('status'),iconEl=document.getElementById('icon');
   var unlockBtn=document.getElementById('unlockBtn');
+  var earlyUnlockBtn=document.getElementById('earlyUnlockBtn');
 
   // Screen Wake Lock: スマホ画面の自動消灯を防止
   (function requestWakeLock(){
@@ -321,13 +325,23 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
     }
   })();
 
-  window.doUnlock=function(){
-    if(done||!timerDone)return;
+  function finishUnlock(){
     done=true;
     iconEl.textContent='\u2705';
     unlockBtn.style.display='none';
+    earlyUnlockBtn.style.display='none';
     statusEl.innerHTML='<span class="complete">Unlocked!</span><br>You can return to your computer.';
     fetch(SERVER+'/unlock?token='+TOKEN,{method:'POST'}).catch(function(){});
+  }
+
+  window.doUnlock=function(){
+    if(done||!timerDone)return;
+    finishUnlock();
+  };
+
+  window.doEarlyUnlock=function(){
+    if(done)return;
+    finishUnlock();
   };
 
   function tick(){
@@ -344,6 +358,7 @@ h1{font-size:1.4rem;margin-bottom:0.4rem}
       progressEl.style.width='100%';
       statusEl.innerHTML='Ready to unlock!<br>Tap the button below.';
       unlockBtn.classList.add('visible');
+      earlyUnlockBtn.style.display='none';
     }
     if(!done){setTimeout(tick,500);}
   }
