@@ -65,6 +65,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Task
 
 ## Step 5: 実装
 
+【refactor 固有】: 実装開始前に `test-runner` を起動し、全テストがグリーンであることを確認する。グリーンでなければ先に修正する。
+
 tasklist を順番に実施する。各完了後にチェックボックスを更新する。
 
 【fix 固有】: 修正前に回帰テストを追加する（TDD アプローチ）。
