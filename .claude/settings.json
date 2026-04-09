@@ -14,8 +14,8 @@
       {
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "完了前に自己検証してください: (1) 変更したファイルのテストは実行したか? (2) 既存の規約 (rust-standards / typescript-standards) から逸脱していないか? (3) 未対応の TODO コメントを残していないか? (4) エラーハンドリング (anyhow::Result) は適切か? (5) `.steering/[現在のタスク]/tasklist.md` のチェックを更新したか? 問題があれば修正してから完了としてください。"
+            "type": "command",
+            "command": "bash -c 'CHANGED=$(git diff --name-only 2>/dev/null | wc -l); if [ \"$CHANGED\" -gt 0 ]; then echo \"完了前に自己検証してください: (1) 変更したファイルのテストは実行したか? (2) 既存の規約 (rust-standards / typescript-standards) から逸脱していないか? (3) 未対応の TODO コメントを残していないか? (4) エラーハンドリング (anyhow::Result) は適切か? (5) .steering/[現在のタスク]/tasklist.md のチェックを更新したか? 問題があれば修正してから完了としてください。\"; fi'"
           }
         ]
       }

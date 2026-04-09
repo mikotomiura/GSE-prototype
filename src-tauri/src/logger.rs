@@ -201,20 +201,47 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
-/// Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson のパスを生成する
+/// セッションログの保存先パスを生成する。
+/// 優先順位:
+///   1. 環境変数 GSE_DATASET → $GSE_DATASET/raw/P000/
+///   2. 実行ファイルの兄弟ディレクトリ ../gse-dataset/raw/P000/
+///   3. フォールバック: ~/Documents/GSE-sessions/
 pub fn default_log_path() -> PathBuf {
-    // Tauri の path API を使わず標準環境変数で取得 (lib.rs の setup 前に呼べるように)
+    let dir = if let Ok(dataset) = std::env::var("GSE_DATASET") {
+        PathBuf::from(dataset).join("raw").join("P000")
+    } else if let Ok(exe) = std::env::current_exe() {
+        // 開発時: target/debug/gse-prototype.exe → ../../.. = src-tauri → ../../../.. の兄弟
+        // Tauri 開発ビルド: src-tauri/target/debug/ から 3 つ上が src-tauri、さらに 1 つ上がプロジェクトルート
+        let mut candidate = None;
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        // 最大 5 階層上まで gse-dataset を探す
+        for _ in 0..5 {
+            if let Some(ref d) = dir {
+                let sibling = d.join("gse-dataset").join("raw").join("P000");
+                if sibling.exists() {
+                    candidate = Some(sibling);
+                    break;
+                }
+                dir = d.parent().map(|p| p.to_path_buf());
+            }
+        }
+        candidate.unwrap_or_else(|| fallback_log_dir())
+    } else {
+        fallback_log_dir()
+    };
+
+    let ts = chrono_like_filename();
+    dir.join(format!("gse_{}.ndjson", ts))
+}
+
+/// フォールバック: ~/Documents/GSE-sessions/
+fn fallback_log_dir() -> PathBuf {
     let base = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .unwrap_or_else(|_| ".".to_string());
-
-    let dir = PathBuf::from(base)
+    PathBuf::from(base)
         .join("Documents")
-        .join("GSE-sessions");
-
-    // タイムスタンプ付きファイル名
-    let ts = chrono_like_filename();
-    dir.join(format!("gse_{}.ndjson", ts))
+        .join("GSE-sessions")
 }
 
 /// chrono 非依存のタイムスタンプ文字列生成 (標準ライブラリのみ)
