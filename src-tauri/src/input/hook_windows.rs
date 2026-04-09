@@ -1,0 +1,235 @@
+// Windows keyboard hook via WH_KEYBOARD_LL + WinEvent for cross-process IME detection.
+
+use std::collections::HashSet;
+use std::sync::atomic::Ordering;
+use std::sync::Mutex;
+use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use lazy_static::lazy_static;
+use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT, MSG,
+    WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+};
+
+use super::{
+    EVENT_SENDER, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, LAST_KEY_MS, POLL_WAKE_TX,
+    VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA, VK_DBE_SBCSCHAR,
+    VK_KANJI,
+};
+use crate::analysis::features::InputEvent;
+
+/// タイピングリズムに関連するキーかどうかを判定する（Windows固有のVKコード）。
+fn is_typing_key(vk_code: u32) -> bool {
+    matches!(
+        vk_code,
+        0x41..=0x5A       // Letters A-Z
+        | 0x30..=0x39     // Digits 0-9
+        | 0x60..=0x6F     // Numpad keys
+        | 0xBA..=0xC0     // Symbol / punctuation keys (OEM)
+        | 0xDB..=0xDF
+        | 0x08            // Backspace
+        | 0x0D            // Enter
+        | 0x20            // Space
+        | 0x09            // Tab
+        | 0x2E            // Delete
+    )
+}
+
+// IME WinEvent constants (winuser.h, Windows 8+)
+const EVENT_OBJECT_IME_CHANGE: u32 = 0x8016;
+const EVENT_OBJECT_IME_SHOW: u32 = 0x8017;
+const EVENT_OBJECT_IME_HIDE: u32 = 0x8018;
+const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
+const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
+
+// Wrapper to make HHOOK Send+Sync for lazy_static
+struct ThreadSafeHook(#[allow(dead_code)] HHOOK);
+unsafe impl Send for ThreadSafeHook {}
+unsafe impl Sync for ThreadSafeHook {}
+
+struct ThreadSafeWinEventHook(#[allow(dead_code)] HWINEVENTHOOK);
+unsafe impl Send for ThreadSafeWinEventHook {}
+unsafe impl Sync for ThreadSafeWinEventHook {}
+
+lazy_static! {
+    static ref HOOK_HANDLE: Mutex<Option<ThreadSafeHook>> = Mutex::new(None);
+    static ref WINEVENT_HOOK_HANDLE: Mutex<Option<ThreadSafeWinEventHook>> = Mutex::new(None);
+    static ref PRESSED_KEYS: Mutex<HashSet<u32>> = Mutex::new(HashSet::new());
+}
+
+/// WinEvent callback for cross-process IME composition detection.
+unsafe extern "system" fn win_event_callback(
+    _hook: HWINEVENTHOOK,
+    event: u32,
+    _hwnd: HWND,
+    _id_object: i32,
+    _id_child: i32,
+    _id_event_thread: u32,
+    _dwms_event_time: u32,
+) {
+    match event {
+        EVENT_OBJECT_IME_SHOW | EVENT_OBJECT_IME_CHANGE => {
+            IME_ACTIVE.store(true, Ordering::Relaxed);
+            IME_OPEN.store(true, Ordering::Release);
+            IME_STATE_DIRTY.store(true, Ordering::Release);
+            if let Some(tx) = POLL_WAKE_TX.get() {
+                let _ = tx.try_send(());
+            }
+        }
+        EVENT_OBJECT_IME_HIDE => {
+            IME_ACTIVE.store(false, Ordering::Relaxed);
+        }
+        _ => {}
+    }
+}
+
+/// Install WH_KEYBOARD_LL + WinEvent hooks and run the message loop.
+/// Called from `init_hook()` in the shared `hook.rs`.
+pub(super) fn start() {
+    thread::spawn(|| {
+        unsafe {
+            // --- Step 1: Install low-level keyboard hook ---
+            let hook_id =
+                SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_callback), HINSTANCE::default(), 0);
+
+            match hook_id {
+                Ok(h) => {
+                    {
+                        let mut handle = (*HOOK_HANDLE).lock().unwrap();
+                        *handle = Some(ThreadSafeHook(h));
+                    }
+                    tracing::info!("Keyboard hook installed");
+                }
+                Err(e) => {
+                    tracing::error!("Failed to install keyboard hook: {:?}", e);
+                    return;
+                }
+            }
+
+            // --- Step 2: Install WinEvent hook for cross-process IME composition ---
+            let ime_hook = SetWinEventHook(
+                EVENT_OBJECT_IME_CHANGE,
+                EVENT_OBJECT_IME_HIDE,
+                HMODULE::default(),
+                Some(win_event_callback),
+                0,
+                0,
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+            );
+
+            if ime_hook.is_invalid() {
+                tracing::warn!("Failed to install IME WinEvent hook");
+            } else {
+                tracing::info!("IME WinEvent hook installed (cross-process IME detection active)");
+                let mut handle = (*WINEVENT_HOOK_HANDLE).lock().unwrap();
+                *handle = Some(ThreadSafeWinEventHook(ime_hook));
+            }
+
+            // --- Step 3: Message loop ---
+            let mut msg = MSG::default();
+            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                DispatchMessageW(&msg);
+            }
+        }
+    });
+}
+
+unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code >= 0 {
+        let event_type = wparam.0 as u32;
+        let is_press = event_type == WM_KEYDOWN || event_type == WM_SYSKEYDOWN;
+        let is_release = event_type == WM_KEYUP || event_type == WM_SYSKEYUP;
+
+        if is_press || is_release {
+            let vk_code = (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode;
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+
+            LAST_KEY_MS.store(timestamp, Ordering::Relaxed);
+
+            // IME mode tracking via VK_DBE_* keys.
+            if is_press {
+                match vk_code {
+                    VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => {
+                        IME_OPEN.store(false, Ordering::Release);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => {
+                        IME_OPEN.store(true, Ordering::Release);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    VK_KANJI => {
+                        let current = IME_OPEN.load(Ordering::Relaxed);
+                        IME_OPEN.store(!current, Ordering::Release);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    _ => {}
+                }
+            }
+
+            // Surface Type Cover: VK_DBE_HIRAGANA fires ONLY as key-UP.
+            if is_release {
+                match vk_code {
+                    VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => {
+                        IME_OPEN.store(true, Ordering::Release);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => {
+                        IME_OPEN.store(false, Ordering::Release);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    _ => {}
+                }
+            }
+
+            // Send typing keys to analysis thread (filter repeats + non-typing keys).
+            if is_typing_key(vk_code) {
+                let mut is_repeat = false;
+                if let Ok(mut held) = PRESSED_KEYS.lock() {
+                    if is_press {
+                        is_repeat = !held.insert(vk_code);
+                    } else {
+                        held.remove(&vk_code);
+                    }
+                }
+
+                let is_backspace = vk_code == 0x08 || vk_code == 0x2E;
+                let event = InputEvent {
+                    vk_code,
+                    timestamp,
+                    is_press,
+                    is_repeat,
+                    is_backspace,
+                };
+                if let Some(sender) = EVENT_SENDER.get() {
+                    if let Err(e) = sender.try_send(event) {
+                        tracing::warn!("InputEvent dropped (channel full): {}", e);
+                    }
+                }
+            }
+
+            // Wake IME polling thread.
+            let is_ime_mode_key = matches!(
+                vk_code,
+                VK_DBE_ALPHANUMERIC
+                    | VK_DBE_KATAKANA
+                    | VK_DBE_HIRAGANA
+                    | VK_DBE_SBCSCHAR
+                    | VK_DBE_DBCSCHAR
+                    | VK_KANJI
+            );
+            if is_press || (is_release && is_ime_mode_key) {
+                if let Some(tx) = POLL_WAKE_TX.get() {
+                    let _ = tx.try_send(());
+                }
+            }
+        }
+    }
+
+    CallNextHookEx(None, code, wparam, lparam)
+}

@@ -243,10 +243,10 @@ impl CognitiveStateEngine {
         // β_coding: reference values for alphanumeric / coding input
         // Source: Dhakal et al. (2018) general population medians, coding-adjusted.
         const BETA_CODING_F1: f64 = 150.0; // Flight Time median (ms)
-        const BETA_CODING_F3: f64 = 0.06;  // Correction rate (6%)
-        const BETA_CODING_F4: f64 = 5.0;   // Burst length (chars)
-        const BETA_CODING_F5: f64 = 2.0;   // Pause count (per 30 s)
-        const BETA_CODING_F6: f64 = 0.08;  // Pause-after-delete rate
+        const BETA_CODING_F3: f64 = 0.06; // Correction rate (6%)
+        const BETA_CODING_F4: f64 = 5.0; // Burst length (chars)
+        const BETA_CODING_F5: f64 = 2.0; // Pause count (per 30 s)
+        const BETA_CODING_F6: f64 = 0.08; // Pause-after-delete rate
 
         // β_writing: reference values for Japanese IME writing input
         // Calibrated from real session data (Mac/Windows, 2026-03).
@@ -254,15 +254,27 @@ impl CognitiveStateEngine {
         // β must be at or below the typical range so phi() produces non-zero values,
         // otherwise all phi→0 and the observation bin collapses to a single Flow bin.
         const BETA_WRITING_F1: f64 = 100.0; // Flight Time median (ms) — at lower bound of typical range
-        const BETA_WRITING_F3: f64 = 0.10;  // Correction rate (10%) — IME normal correction 3-15%
-        const BETA_WRITING_F4: f64 = 2.5;   // Burst length — shorter (composition in segments)
-        const BETA_WRITING_F5: f64 = 1.0;   // Pause count — low threshold for sensitivity
-        const BETA_WRITING_F6: f64 = 0.12;  // Pause-after-delete rate
+        const BETA_WRITING_F3: f64 = 0.10; // Correction rate (10%) — IME normal correction 3-15%
+        const BETA_WRITING_F4: f64 = 2.5; // Burst length — shorter (composition in segments)
+        const BETA_WRITING_F5: f64 = 1.0; // Pause count — low threshold for sensitivity
+        const BETA_WRITING_F6: f64 = 0.12; // Pause-after-delete rate
 
         let (beta_f1, beta_f3, beta_f4, beta_f5, beta_f6) = if ime_open {
-            (BETA_WRITING_F1, BETA_WRITING_F3, BETA_WRITING_F4, BETA_WRITING_F5, BETA_WRITING_F6)
+            (
+                BETA_WRITING_F1,
+                BETA_WRITING_F3,
+                BETA_WRITING_F4,
+                BETA_WRITING_F5,
+                BETA_WRITING_F6,
+            )
         } else {
-            (BETA_CODING_F1, BETA_CODING_F3, BETA_CODING_F4, BETA_CODING_F5, BETA_CODING_F6)
+            (
+                BETA_CODING_F1,
+                BETA_CODING_F3,
+                BETA_CODING_F4,
+                BETA_CODING_F5,
+                BETA_CODING_F6,
+            )
         };
 
         let phi1 = phi(features.f1_flight_time_median, beta_f1);
@@ -415,7 +427,12 @@ impl CognitiveStateEngine {
     /// EWMA を完全凍結すると observation bin が固定され、HMM が遷移確率のみに依存して
     /// Stuck に到達できない（均衡点固着問題）。摩擦フロア付きの特徴量で緩やかに
     /// EWMA を更新することで、沈黙の深刻度を observation bin に反映する。
-    pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) -> Option<UpdateDiagnostics> {
+    pub fn update_silence(
+        &self,
+        features: &Features,
+        ime_open: bool,
+        silence_secs: f64,
+    ) -> Option<UpdateDiagnostics> {
         if self.get_paused() {
             return None;
         }
@@ -424,11 +441,11 @@ impl CognitiveStateEngine {
 
         // 動的α: 沈黙の深さに応じてEWMA応答を加速
         let alpha = if silence_secs >= 25.0 {
-            0.25  // 完全に固まった状態
+            0.25 // 完全に固まった状態
         } else if silence_secs >= 15.0 {
-            0.18  // Nudge 領域を緩やかに推移させるための中間ギア
+            0.18 // Nudge 領域を緩やかに推移させるための中間ギア
         } else {
-            0.15  // 初期サイレンス
+            0.15 // 初期サイレンス
         };
 
         // EWMA を緩やかに更新

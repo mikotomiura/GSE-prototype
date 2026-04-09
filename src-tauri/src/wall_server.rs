@@ -22,7 +22,8 @@ pub struct WallServerInfo {
 
 pub struct WallServerState {
     stop_flag: std::sync::Mutex<Option<Arc<AtomicBool>>>,
-    /// 動的に追加したファイアウォールルール名。stop 時に削除する (advice.md §B)
+    /// 動的に追加したファイアウォールルール名。stop 時に削除する (Windows のみ)
+    #[cfg(target_os = "windows")]
     firewall_rule: std::sync::Mutex<Option<String>>,
 }
 
@@ -30,6 +31,7 @@ impl WallServerState {
     pub fn new() -> Self {
         Self {
             stop_flag: std::sync::Mutex::new(None),
+            #[cfg(target_os = "windows")]
             firewall_rule: std::sync::Mutex::new(None),
         }
     }
@@ -37,10 +39,21 @@ impl WallServerState {
     /// WallServerを停止し、ファイアウォールルールを削除する。
     /// quit_app から呼ばれてリソースを確実にクリーンアップする。
     pub fn stop(&self) {
-        if let Some(flag) = self.stop_flag.lock().unwrap_or_else(|p| p.into_inner()).take() {
+        if let Some(flag) = self
+            .stop_flag
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
+        {
             flag.store(true, Ordering::Release);
         }
-        if let Some(rule) = self.firewall_rule.lock().unwrap_or_else(|p| p.into_inner()).take() {
+        #[cfg(target_os = "windows")]
+        if let Some(rule) = self
+            .firewall_rule
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
+        {
             remove_firewall_rule(&rule);
         }
     }
@@ -55,30 +68,45 @@ pub fn start_wall_server<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: State<WallServerState>,
 ) -> Result<WallServerInfo, String> {
-    // 前回サーバーを停止し、既存のファイアウォールルールを削除
+    // 前回サーバーを停止
     if let Some(flag) = state.stop_flag.lock().unwrap().take() {
         flag.store(true, Ordering::Release);
     }
+    #[cfg(target_os = "windows")]
     if let Some(rule) = state.firewall_rule.lock().unwrap().take() {
         remove_firewall_rule(&rule);
     }
 
     let server = Server::http("0.0.0.0:0").map_err(|e| format!("HTTP bind failed: {}", e))?;
-    let port = server.server_addr().to_ip().map(|addr| addr.port()).ok_or("Failed to get port")?;
+    let port = server
+        .server_addr()
+        .to_ip()
+        .map(|addr| addr.port())
+        .ok_or("Failed to get port")?;
     let local_ip = detect_local_ip();
     let token = generate_token();
     let url = format!("http://{}:{}/shake?token={}", local_ip, port, token);
 
-    // Windowsファイアウォールにインバウンド許可ルールを追加 (advice.md §B)
-    // netsh は管理者権限が必要。権限不足の場合は警告を出して続行する。
-    let rule_name = format!("GSE-WallServer-{}", port);
-    add_firewall_rule(port, &rule_name);
-    *state.firewall_rule.lock().unwrap() = Some(rule_name);
+    // Windowsファイアウォールにインバウンド許可ルールを追加
+    #[cfg(target_os = "windows")]
+    {
+        let rule_name = format!("GSE-WallServer-{}", port);
+        add_firewall_rule(port, &rule_name);
+        *state.firewall_rule.lock().unwrap() = Some(rule_name);
+    }
 
-    tracing::info!("WallServer: started on {}:{} (token={}...)", local_ip, port, &token[..8]);
+    tracing::info!(
+        "WallServer: started on {}:{} (token={}...)",
+        local_ip,
+        port,
+        &token[..8]
+    );
 
     let qr_svg = generate_qr_data_url(&url)?;
-    let info = WallServerInfo { qr_svg, url: url.clone() };
+    let info = WallServerInfo {
+        qr_svg,
+        url: url.clone(),
+    };
 
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_clone = shutdown.clone();
@@ -98,6 +126,7 @@ pub fn stop_wall_server(state: State<WallServerState>) {
     if let Some(flag) = state.stop_flag.lock().unwrap().take() {
         flag.store(true, Ordering::Release);
     }
+    #[cfg(target_os = "windows")]
     if let Some(rule) = state.firewall_rule.lock().unwrap().take() {
         remove_firewall_rule(&rule);
     }
@@ -113,12 +142,18 @@ fn server_loop<R: Runtime>(
     shutdown: Arc<AtomicBool>,
     app: tauri::AppHandle<R>,
 ) {
-    let port = server.server_addr().to_ip().map(|addr| addr.port()).unwrap_or(0);
+    let port = server
+        .server_addr()
+        .to_ip()
+        .map(|addr| addr.port())
+        .unwrap_or(0);
     let local_ip = detect_local_ip();
     let server_url = format!("http://{}:{}", local_ip, port);
 
     loop {
-        if shutdown.load(Ordering::Acquire) { break; }
+        if shutdown.load(Ordering::Acquire) {
+            break;
+        }
 
         match server.recv_timeout(Duration::from_secs(1)) {
             Ok(Some(request)) => {
@@ -154,19 +189,35 @@ fn dispatch_request<R: Runtime>(
 
         let cors = Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap();
         let ct = Header::from_bytes("Content-Type", "application/json").unwrap();
-        let _ = request.respond(Response::from_string(r#"{"status":"unlocked"}"#).with_header(cors).with_header(ct));
+        let _ = request.respond(
+            Response::from_string(r#"{"status":"unlocked"}"#)
+                .with_header(cors)
+                .with_header(ct),
+        );
     } else if request.method() == &tiny_http::Method::Options {
         let cors1 = Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap();
         let cors2 = Header::from_bytes("Access-Control-Allow-Methods", "POST, OPTIONS").unwrap();
         let cors3 = Header::from_bytes("Access-Control-Allow-Headers", "Content-Type").unwrap();
-        let _ = request.respond(Response::from_string("").with_header(cors1).with_header(cors2).with_header(cors3));
+        let _ = request.respond(
+            Response::from_string("")
+                .with_header(cors1)
+                .with_header(cors2)
+                .with_header(cors3),
+        );
     } else {
-        let _ = request.respond(Response::from_string("Not Found").with_status_code(tiny_http::StatusCode(404)));
+        let _ = request.respond(
+            Response::from_string("Not Found").with_status_code(tiny_http::StatusCode(404)),
+        );
     }
 }
 
 fn extract_token(url: &str) -> &str {
-    url.split("token=").nth(1).unwrap_or("").split('&').next().unwrap_or("")
+    url.split("token=")
+        .nth(1)
+        .unwrap_or("")
+        .split('&')
+        .next()
+        .unwrap_or("")
 }
 
 // ---------------------------------------------------------------------------
@@ -175,12 +226,18 @@ fn extract_token(url: &str) -> &str {
 
 fn detect_local_ip() -> String {
     UdpSocket::bind("0.0.0.0:0")
-        .and_then(|socket| { socket.connect("8.8.8.8:80")?; Ok(socket.local_addr()?.ip().to_string()) })
+        .and_then(|socket| {
+            socket.connect("8.8.8.8:80")?;
+            Ok(socket.local_addr()?.ip().to_string())
+        })
         .unwrap_or_else(|_| "127.0.0.1".to_string())
 }
 
 fn generate_token() -> String {
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos() as u64;
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
     let mut h1 = RandomState::new().build_hasher();
     h1.write_u64(nanos);
     let v1 = h1.finish();
@@ -189,12 +246,16 @@ fn generate_token() -> String {
     format!("{:016x}{:016x}", v1, h2.finish())
 }
 
-/// Windows Defender ファイアウォールにインバウンド TCP 許可ルールを追加する (advice.md §B)
+/// Windows Defender ファイアウォールにインバウンド TCP 許可ルールを追加する
 /// netsh advfirewall は管理者権限が必要。権限不足でも Err を返さず警告ログのみ出す。
+#[cfg(target_os = "windows")]
 fn add_firewall_rule(port: u16, rule_name: &str) {
     let result = std::process::Command::new("netsh")
         .args([
-            "advfirewall", "firewall", "add", "rule",
+            "advfirewall",
+            "firewall",
+            "add",
+            "rule",
             &format!("name={}", rule_name),
             "protocol=TCP",
             "dir=in",
@@ -205,7 +266,11 @@ fn add_firewall_rule(port: u16, rule_name: &str) {
 
     match result {
         Ok(output) if output.status.success() => {
-            tracing::info!("WallServer: firewall rule '{}' added for port {}", rule_name, port);
+            tracing::info!(
+                "WallServer: firewall rule '{}' added for port {}",
+                rule_name,
+                port
+            );
         }
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -226,10 +291,14 @@ fn add_firewall_rule(port: u16, rule_name: &str) {
 }
 
 /// Windows Defender ファイアウォールから GSE ルールを削除する
+#[cfg(target_os = "windows")]
 fn remove_firewall_rule(rule_name: &str) {
     let result = std::process::Command::new("netsh")
         .args([
-            "advfirewall", "firewall", "delete", "rule",
+            "advfirewall",
+            "firewall",
+            "delete",
+            "rule",
             &format!("name={}", rule_name),
         ])
         .output();
@@ -239,7 +308,10 @@ fn remove_firewall_rule(rule_name: &str) {
             tracing::info!("WallServer: firewall rule '{}' removed", rule_name);
         }
         Ok(_) => {
-            tracing::debug!("WallServer: firewall rule '{}' not found (already removed?)", rule_name);
+            tracing::debug!(
+                "WallServer: firewall rule '{}' not found (already removed?)",
+                rule_name
+            );
         }
         Err(e) => {
             tracing::warn!("WallServer: could not remove firewall rule: {}", e);
@@ -250,10 +322,16 @@ fn remove_firewall_rule(rule_name: &str) {
 fn generate_qr_data_url(url: &str) -> Result<String, String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
     let code = QrCode::new(url.as_bytes()).map_err(|e| format!("QR encode failed: {}", e))?;
-    let svg = code.render::<qrcode::render::svg::Color>().min_dimensions(200, 200)
+    let svg = code
+        .render::<qrcode::render::svg::Color>()
+        .min_dimensions(200, 200)
         .dark_color(qrcode::render::svg::Color("#000000"))
-        .light_color(qrcode::render::svg::Color("#ffffff")).build();
-    Ok(format!("data:image/svg+xml;base64,{}", STANDARD.encode(svg.as_bytes())))
+        .light_color(qrcode::render::svg::Color("#ffffff"))
+        .build();
+    Ok(format!(
+        "data:image/svg+xml;base64,{}",
+        STANDARD.encode(svg.as_bytes())
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +339,9 @@ fn generate_qr_data_url(url: &str) -> Result<String, String> {
 // ---------------------------------------------------------------------------
 
 fn build_timer_html(server_url: &str, token: &str) -> String {
-    TIMER_HTML_TEMPLATE.replace("__SERVER_URL__", server_url).replace("__TOKEN__", token)
+    TIMER_HTML_TEMPLATE
+        .replace("__SERVER_URL__", server_url)
+        .replace("__TOKEN__", token)
 }
 
 // Phone page: 2-minute countdown timer with manual unlock.

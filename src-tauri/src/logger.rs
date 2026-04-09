@@ -97,23 +97,39 @@ impl SessionLogger {
             loop {
                 let timeout = flush_interval.saturating_sub(last_flush.elapsed());
                 match rx.recv_timeout(timeout) {
-                    Ok(entry) => {
-                        match entry {
-                            LogEntry::Key {
-                                vk_code,
-                                timestamp,
-                                is_press,
-                            } => {
-                                let _ = writeln!(
-                                    writer,
-                                    r#"{{"type":"key","t":{},"vk":{},"press":{}}}"#,
-                                    timestamp,
-                                    vk_code,
-                                    is_press,
-                                );
-                                dirty = true;
-                            }
-                            LogEntry::Feat {
+                    Ok(entry) => match entry {
+                        LogEntry::Key {
+                            vk_code,
+                            timestamp,
+                            is_press,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"key","t":{},"vk":{},"press":{}}}"#,
+                                timestamp, vk_code, is_press,
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::Feat {
+                            timestamp,
+                            f1,
+                            f3,
+                            f4,
+                            f5,
+                            f6,
+                            p_flow,
+                            p_inc,
+                            p_stuck,
+                            raw_x,
+                            raw_y,
+                            ewma_x,
+                            ewma_y,
+                            obs,
+                            alpha,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4},"raw_x":{:.4},"raw_y":{:.4},"ewma_x":{:.4},"ewma_y":{:.4},"obs":{},"alpha":{:.2}}}"#,
                                 timestamp,
                                 f1,
                                 f3,
@@ -129,41 +145,35 @@ impl SessionLogger {
                                 ewma_y,
                                 obs,
                                 alpha,
-                            } => {
-                                let _ = writeln!(
-                                    writer,
-                                    r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4},"raw_x":{:.4},"raw_y":{:.4},"ewma_x":{:.4},"ewma_y":{:.4},"obs":{},"alpha":{:.2}}}"#,
-                                    timestamp, f1, f3, f4, f5, f6, p_flow, p_inc, p_stuck,
-                                    raw_x, raw_y, ewma_x, ewma_y, obs, alpha,
-                                );
-                                dirty = true;
-                            }
-                            LogEntry::ImeState { timestamp, on, active } => {
-                                let _ = writeln!(
-                                    writer,
-                                    r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
-                                    timestamp, on, active,
-                                );
-                                dirty = true;
-                            }
-                            LogEntry::SessionStart { timestamp } => {
-                                let _ = writeln!(
-                                    writer,
-                                    r#"{{"type":"session_start","t":{}}}"#,
-                                    timestamp,
-                                );
-                                dirty = true;
-                            }
-                            LogEntry::End => {
-                                let _ = writeln!(
-                                    writer,
-                                    r#"{{"type":"meta","session_end":{}}}"#,
-                                    now_ms()
-                                );
-                                break;
-                            }
+                            );
+                            dirty = true;
                         }
-                    }
+                        LogEntry::ImeState {
+                            timestamp,
+                            on,
+                            active,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
+                                timestamp, on, active,
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::SessionStart { timestamp } => {
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"session_start","t":{}}}"#,
+                                timestamp,
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::End => {
+                            let _ =
+                                writeln!(writer, r#"{{"type":"meta","session_end":{}}}"#, now_ms());
+                            break;
+                        }
+                    },
                     Err(RecvTimeoutError::Timeout) => {
                         // 5秒間アイドル → バッファフラッシュ
                     }
@@ -239,9 +249,7 @@ fn fallback_log_dir() -> PathBuf {
     let base = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(base)
-        .join("Documents")
-        .join("GSE-sessions")
+    PathBuf::from(base).join("Documents").join("GSE-sessions")
 }
 
 /// chrono 非依存のタイムスタンプ文字列生成 (標準ライブラリのみ)

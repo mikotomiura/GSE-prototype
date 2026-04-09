@@ -82,7 +82,9 @@ impl FeatureExtractor {
         let cutoff = last_ts.saturating_sub(30_000);
 
         // 直近30秒のイベントを収集
-        let events: Vec<&InputEvent> = self.buffer.iter()
+        let events: Vec<&InputEvent> = self
+            .buffer
+            .iter()
             .filter(|e| e.timestamp >= cutoff)
             .collect();
 
@@ -120,7 +122,8 @@ impl FeatureExtractor {
         let f1 = if window_fts.is_empty() {
             0.0
         } else {
-            window_fts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            window_fts
+                .sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let len = window_fts.len();
             if len % 2 == 0 {
                 (window_fts[len / 2 - 1] + window_fts[len / 2]) / 2.0
@@ -130,16 +133,12 @@ impl FeatureExtractor {
         };
 
         // --- キー押下イベントのみ抽出 ---
-        let press_events: Vec<&&InputEvent> = events.iter()
-            .filter(|e| e.is_press)
-            .collect();
+        let press_events: Vec<&&InputEvent> = events.iter().filter(|e| e.is_press).collect();
 
         let total_keys = press_events.len();
 
         // --- F3: 修正率 = (BS + Del) / 全キー押下数 ---
-        let correction_keys = press_events.iter()
-            .filter(|e| e.is_backspace)
-            .count();
+        let correction_keys = press_events.iter().filter(|e| e.is_backspace).count();
 
         let f3 = if total_keys > 0 {
             correction_keys as f64 / total_keys as f64
@@ -186,22 +185,24 @@ impl FeatureExtractor {
         };
 
         // --- F5: ポーズ回数 = 連続キー押下間で2秒以上の間隔の数 ---
-        let press_ts: Vec<u64> = events.iter()
+        let press_ts: Vec<u64> = events
+            .iter()
             .filter(|e| e.is_press)
             .map(|e| e.timestamp)
             .collect();
 
-        let f5 = press_ts.windows(2)
+        let f5 = press_ts
+            .windows(2)
             .filter(|w| w[1].saturating_sub(w[0]) >= 2000)
             .count() as f64;
 
         // --- F6: 削除後停止率 = BS/Del直後に2秒以上停止する割合 ---
-        let del_count = press_events.iter()
-            .filter(|e| e.is_backspace)
-            .count();
+        let del_count = press_events.iter().filter(|e| e.is_backspace).count();
 
         // 連続するキー押下ペアで、先頭がBS/Del かつ間隔>=2sのものを数える
-        let del_followed_by_pause = press_ts.windows(2).zip(press_events.windows(2))
+        let del_followed_by_pause = press_ts
+            .windows(2)
+            .zip(press_events.windows(2))
             .filter(|(ts_win, ev_win)| {
                 let is_del = ev_win[0].is_backspace;
                 let long_pause = ts_win[1].saturating_sub(ts_win[0]) >= 2000;

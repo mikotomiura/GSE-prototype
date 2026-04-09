@@ -1,6 +1,8 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
+#[cfg(target_os = "macos")]
+pub mod sensors;
 pub mod wall_server;
 
 use crate::analysis::{
@@ -48,10 +50,19 @@ fn greet(name: &str) -> String {
 }
 
 /// macOS版との互換性維持のため提供。
-/// Windows版ではシステム権限プロンプトが不要なため常に `true` を返す。
+/// フック（キーボード監視）が有効かどうかを返す。
+/// Windows: システム権限プロンプトが不要なため常に true。
+/// macOS: Input Monitoring 権限が付与されているかを HOOK_ACTIVE で確認。
 #[tauri::command]
 fn get_hook_status() -> bool {
-    true
+    #[cfg(target_os = "windows")]
+    {
+        true
+    }
+    #[cfg(target_os = "macos")]
+    {
+        crate::input::hook::HOOK_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 #[tauri::command]
@@ -95,10 +106,7 @@ fn get_last_keypress_timestamp() -> u64 {
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
-    log.lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .path
-        .clone()
+    log.lock().unwrap_or_else(|p| p.into_inner()).path.clone()
 }
 
 /// 「開始する」ボタン押下時に呼ばれる。
@@ -136,11 +144,7 @@ fn start_session(
 ///   4. behavioral_gt.py でラベリング分析を実行 (Python が PATH にある場合)
 ///   5. セッションフォルダを Explorer で開く
 #[tauri::command]
-fn quit_app(
-    app: tauri::AppHandle,
-    log: State<Arc<Mutex<LogState>>>,
-    wall: State<WallServerState>,
-) {
+fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State<WallServerState>) {
     // WallServer を先に停止してファイアウォールルールを削除
     wall.stop();
 
@@ -161,11 +165,7 @@ fn quit_app(
         // behavioral_gt.py を探して実行
         match find_behavioral_gt() {
             Some(script) => {
-                tracing::info!(
-                    "Auto-analysis: python {:?} {}",
-                    script,
-                    session_path
-                );
+                tracing::info!("Auto-analysis: python {:?} {}", script, session_path);
                 match std::process::Command::new("python")
                     .args([script.to_str().unwrap_or(""), &session_path])
                     .spawn()
@@ -185,12 +185,17 @@ fn quit_app(
             }
         }
 
-        // セッションフォルダを Explorer で開く
+        // セッションフォルダをファイルマネージャで開く
         if let Some(folder) = Path::new(&session_path).parent() {
             tracing::info!("Opening session folder: {:?}", folder);
-            let _ = std::process::Command::new("explorer")
-                .arg(folder)
-                .spawn();
+            #[cfg(target_os = "windows")]
+            {
+                let _ = std::process::Command::new("explorer").arg(folder).spawn();
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open").arg(folder).spawn();
+            }
         }
 
         thread::sleep(std::time::Duration::from_millis(200));
@@ -414,40 +419,40 @@ pub fn run() {
             // 特徴量計算: バッファの実データを優先し、空の場合のみ合成サイレンス特徴量を使用
             let mut features = extractor.calculate_features();
 
-            let (log_features, diag_opt) = if features.f1_flight_time_median > 0.0
-                && silence_secs < 2.0
-            {
-                // 通常パス: バッファに実データあり + 直近タイピング中 → α=0.3 で更新
-                let d = engine_for_thread.update(&features, ime_open);
-                (features, d)
-            } else if features.f1_flight_time_median > 0.0 {
-                // 沈黙パス (バッファに実データあり): 2秒以上沈黙中
-                // 古いウィンドウデータを α=0.3 で連続入力すると Incubation にロックインするため、
-                // α=0.15 の update_silence を使用する。
-                // F5 に進行中の沈黙を加算し、摩擦フロアを適用する。
-                if silence_secs >= 2.0 {
-                    features.f5_pause_count += silence_secs / 2.0;
-                }
-                if silence_secs >= 8.0 {
-                    let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
-                    let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
-                    if silence_secs >= 10.0 {
-                        f6_floor = f6_floor.max(0.15);
-                        f3_floor = f3_floor.max(0.20);
+            let (log_features, diag_opt) =
+                if features.f1_flight_time_median > 0.0 && silence_secs < 2.0 {
+                    // 通常パス: バッファに実データあり + 直近タイピング中 → α=0.3 で更新
+                    let d = engine_for_thread.update(&features, ime_open);
+                    (features, d)
+                } else if features.f1_flight_time_median > 0.0 {
+                    // 沈黙パス (バッファに実データあり): 2秒以上沈黙中
+                    // 古いウィンドウデータを α=0.3 で連続入力すると Incubation にロックインするため、
+                    // α=0.15 の update_silence を使用する。
+                    // F5 に進行中の沈黙を加算し、摩擦フロアを適用する。
+                    if silence_secs >= 2.0 {
+                        features.f5_pause_count += silence_secs / 2.0;
                     }
-                    features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
-                    features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
-                }
-                let d = engine_for_thread.update_silence(&features, ime_open, silence_secs);
-                (features, d)
-            } else if let Some(sf) = extractor.make_silence_observation(silence_secs) {
-                // 合成サイレンスパス: バッファ空 → 合成特徴量で α=0.15 更新
-                let d = engine_for_thread.update_silence(&sf, ime_open, silence_secs);
-                (sf, d)
-            } else {
-                // silence < 2s かつ f1=0 (データ不足) → スキップ
-                continue;
-            };
+                    if silence_secs >= 8.0 {
+                        let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
+                        let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
+                        if silence_secs >= 10.0 {
+                            f6_floor = f6_floor.max(0.15);
+                            f3_floor = f3_floor.max(0.20);
+                        }
+                        features.f6_pause_after_del_rate =
+                            features.f6_pause_after_del_rate.max(f6_floor);
+                        features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
+                    }
+                    let d = engine_for_thread.update_silence(&features, ime_open, silence_secs);
+                    (features, d)
+                } else if let Some(sf) = extractor.make_silence_observation(silence_secs) {
+                    // 合成サイレンスパス: バッファ空 → 合成特徴量で α=0.15 更新
+                    let d = engine_for_thread.update_silence(&sf, ime_open, silence_secs);
+                    (sf, d)
+                } else {
+                    // silence < 2s かつ f1=0 (データ不足) → スキップ
+                    continue;
+                };
 
             // 特徴量 + 状態確率をログ記録
             let state_probs = engine_for_thread.get_current_state();
