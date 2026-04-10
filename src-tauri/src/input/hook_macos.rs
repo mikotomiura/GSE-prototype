@@ -408,8 +408,25 @@ pub fn start() {
             );
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(2));
+                // Fast path: preflight check (may return stale cached false on macOS 13+)
                 if unsafe { CGPreflightListenEventAccess() } {
-                    tracing::info!("Input Monitoring permission granted — installing CGEventTap.");
+                    tracing::info!("Input Monitoring permission granted (preflight) — installing CGEventTap.");
+                    break;
+                }
+                // Slow path: CGPreflightListenEventAccess() caches false per-process
+                // on macOS 13+. Try creating a real CGEventTap as the definitive test.
+                let probe = CGEventTap::new(
+                    CGEventTapLocation::Session,
+                    CGEventTapPlacement::TailAppendEventTap,
+                    CGEventTapOptions::ListenOnly,
+                    vec![CGEventType::KeyDown],
+                    |_proxy, _event_type, _event| None,
+                );
+                if probe.is_ok() {
+                    tracing::info!(
+                        "Input Monitoring permission granted (tap probe succeeded, \
+                         preflight returned stale false) — installing CGEventTap."
+                    );
                     break;
                 }
             }
