@@ -1087,10 +1087,22 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
 ### macOS — Install
 
 1. Open the downloaded `.dmg` and drag **gse-next** to **Applications**
-2. On first launch, macOS Gatekeeper will block it:
+
+2. **Remove the quarantine attribute (required)**
+
+   macOS Gatekeeper blocks unsigned apps with a "damaged and can't be opened" error. This is not a real corruption — the app is simply not code-signed. Run the following command in Terminal to remove the quarantine flag:
+
+   ```bash
+   xattr -cr /Applications/gse-next.app
+   ```
+
+   > **Why this happens:** The app is built without an Apple Developer ID signature. macOS 10.15+ quarantines all unsigned downloaded apps. The `xattr -cr` command strips the `com.apple.quarantine` extended attribute so Gatekeeper no longer blocks it.
+
+3. **If you still see a Gatekeeper warning on first launch:**
    - Open **System Settings → Privacy & Security**
    - Scroll down to the blocked app notice → click **"Open Anyway"**
-3. **Grant Input Monitoring permission (required)**
+
+4. **Grant Input Monitoring permission (required)**
    - **System Settings → Privacy & Security → Input Monitoring**
    - Enable the toggle for **gse-next**
    - Restart the app
