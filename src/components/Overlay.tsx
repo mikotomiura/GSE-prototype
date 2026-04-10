@@ -112,6 +112,19 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
         }
     }, [stuckProb, isWallActive]);
 
+    // Layer 4: macOS で overlay の透過が失敗した場合のフォールバック。
+    // nudge も wall も不要な間は hide() してメインウィンドウを隠さない。
+    // nudge/wall が必要になったら show() で再表示する。
+    // macOS で透過が正常動作している場合は無駄な呼び出しだが副作用はない。
+    useEffect(() => {
+        const shouldBeVisible = nudgeOpacity > 0 || isWallActive;
+        if (shouldBeVisible) {
+            currentWindow.show().catch(() => {});
+        } else {
+            currentWindow.hide().catch(() => {});
+        }
+    }, [nudgeOpacity, isWallActive, currentWindow]);
+
     return (
         <div className="overlay-root">
             {/* Nudge Layer (Red Vignette) */}

@@ -6,6 +6,8 @@
   "permissions": [
     "core:default",
     "core:window:allow-set-ignore-cursor-events",
-    "core:window:allow-show"
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-maximize"
   ]
 }

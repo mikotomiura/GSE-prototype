@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tauri::State;
+use tauri::{Manager, State};
 
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
@@ -116,6 +116,7 @@ fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
 /// 4. LogEntry::SessionStart をログに記録
 #[tauri::command]
 fn start_session(
+    app: tauri::AppHandle,
     engine: State<CognitiveStateEngine>,
     session_active: State<SessionActive>,
     reset_signal: State<ResetSignal>,
@@ -135,6 +136,37 @@ fn start_session(
         .as_millis() as u64;
     let guard = log.lock().unwrap_or_else(|p| p.into_inner());
     let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
+
+    // Overlay ウィンドウを動的に生成する。
+    // tauri.conf.json に静的定義すると macOS で visible:false と maximized:true が
+    // 競合し、不透明なオーバーレイが起動直後にメインウィンドウを覆う問題が発生する。
+    // セッション開始時に初めて生成することで、この問題を根本的に回避する。
+    //
+    // Layer 3: 生成 → maximize → show の3ステップに分離。
+    // .maximized(true) をビルダーに含めると macOS で表示タイミングの競合が起きる可能性があるため、
+    // visible(false) で非表示のまま生成した後、明示的に maximize() → show() を呼ぶ。
+    if app.get_webview_window("overlay").is_none() {
+        match tauri::WebviewWindowBuilder::new(
+            &app,
+            "overlay",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("GSE Overlay")
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .build()
+        {
+            Ok(win) => {
+                let _ = win.maximize();
+                let _ = win.show();
+                tracing::info!("Overlay window created");
+            }
+            Err(e) => tracing::warn!("Failed to create overlay window: {}", e),
+        }
+    }
 }
 
 /// アプリ終了。終了前に以下を順に実行する:

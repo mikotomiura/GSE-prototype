@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { listen, emit } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import Dashboard from "./components/Dashboard";
 import Overlay from "./components/Overlay";
 import "./App.css";
@@ -27,7 +27,11 @@ function App() {
   });
   const [isWallActive, setIsWallActive] = useState(false);
   const [isMonkMode, setIsMonkMode] = useState(false);
-  const [isStarted, setIsStarted] = useState(false);
+  // Overlay ウィンドウは start_session 時に動的生成されるため、
+  // overlay なら最初からセッション開始済みとして扱う。
+  const currentWindow = useMemo(() => getCurrentWindow(), []);
+  const windowLabel = currentWindow.label;
+  const [isStarted, setIsStarted] = useState(windowLabel === "overlay");
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
   const [hookActive, setHookActive] = useState<boolean | null>(null);
   // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
@@ -40,9 +44,7 @@ function App() {
   useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
   useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
 
-  // D-1: getCurrentWindow() を useMemo でメモ化し不要な再生成を防止
-  const currentWindow = useMemo(() => getCurrentWindow(), []);
-  const windowLabel = currentWindow.label;
+  // D-1: currentWindow / windowLabel は isStarted 初期値算出のため上方で宣言済み
 
   // 2. Hook status: マウント時に1回だけ取得（実行中に変わらない値）
   useEffect(() => {
@@ -132,19 +134,8 @@ function App() {
     };
   }, []);
 
-  // 6. Overlay: セッション開始イベントを購読し isStarted を同期
-  useEffect(() => {
-    if (windowLabel !== "overlay") return;
-    const unlisten = listen("session-started", () => setIsStarted(true));
-    return () => { unlisten.then((f) => f()); };
-  }, [windowLabel]);
-
-  // 7. Overlay: セッション開始時にウィンドウを表示 (初期状態 visible:false)
-  useEffect(() => {
-    if (windowLabel === "overlay" && isStarted) {
-      currentWindow.show().catch(() => {});
-    }
-  }, [windowLabel, isStarted, currentWindow]);
+  // 6-7. (削除) Overlay は start_session 時に Rust 側で動的生成されるため、
+  // session-started イベント購読と window.show() は不要。
 
   // Render based on Window Label
   if (windowLabel === "overlay") {
@@ -168,7 +159,6 @@ function App() {
       return;
     }
     setIsStarted(true);
-    emit("session-started");
   };
 
   // セッション未開始時はスタート画面を表示
