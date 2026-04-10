@@ -25,12 +25,6 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
     const lastWarnedKeyAtRef = useRef<number>(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // 透過背景を設定（overlay ウィンドウ用）
-    useEffect(() => {
-        document.documentElement.style.background = 'transparent';
-        document.body.style.background = 'transparent';
-    }, []);
-
     // スマートフォン接続イベントの購読
     useEffect(() => {
         const unlisten = listen("wall-phone-connected", () => {

@@ -139,6 +139,13 @@ function App() {
     return () => { unlisten.then((f) => f()); };
   }, [windowLabel]);
 
+  // 7. Overlay: セッション開始時にウィンドウを表示 (初期状態 visible:false)
+  useEffect(() => {
+    if (windowLabel === "overlay" && isStarted) {
+      currentWindow.show().catch(() => {});
+    }
+  }, [windowLabel, isStarted, currentWindow]);
+
   // Render based on Window Label
   if (windowLabel === "overlay") {
     return (

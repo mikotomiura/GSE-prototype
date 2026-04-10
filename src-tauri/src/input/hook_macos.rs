@@ -433,10 +433,16 @@ pub fn start() {
                 HOOK_ACTIVE.store(true, Ordering::Relaxed);
                 tracing::info!("CGEventTap installed (macOS keyboard hook active)");
 
-                let loop_source = tap
-                    .mach_port
-                    .create_runloop_source(0)
-                    .expect("Failed to create CFRunLoop source from CGEventTap");
+                let loop_source = match tap.mach_port.create_runloop_source(0) {
+                    Some(source) => source,
+                    None => {
+                        tracing::error!(
+                            "Failed to create CFRunLoop source from CGEventTap"
+                        );
+                        HOOK_ACTIVE.store(false, Ordering::Relaxed);
+                        return;
+                    }
+                };
 
                 let run_loop = CFRunLoop::get_current();
                 run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
