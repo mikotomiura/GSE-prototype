@@ -14,6 +14,8 @@
 - **主要技術**: Tauri 2.0 + Rust (Backend) + React/TypeScript (Frontend)
 - **ターゲット**: Windows 11 (Surface Pro 8 + Type Cover)
 - **チーム規模**: 小規模 (2-3人)
+- **GitHubリポジトリ**: https://github.com/mikotomiura/GSE-prototype
+- **データセット**: https://github.com/mikotomiura/gse-dataset.git
 
 ## 参照すべきドキュメント
 
