@@ -46,11 +46,24 @@ function App() {
 
   // D-1: currentWindow / windowLabel は isStarted 初期値算出のため上方で宣言済み
 
-  // 2. Hook status: マウント時に1回だけ取得（実行中に変わらない値）
+  // 2. Hook status: 2秒毎にポーリングし、有効になったら停止（権限が後から付与された場合に対応）
   useEffect(() => {
     invoke<boolean>("get_hook_status")
       .then((active) => setHookActive(active))
       .catch(() => setHookActive(false)); // エラー時は悲観的に false（権限バナーを表示）
+
+    const interval = setInterval(() => {
+      invoke<boolean>("get_hook_status")
+        .then((active) => {
+          if (active) {
+            setHookActive(true);
+            clearInterval(interval); // 有効になったらポーリング停止
+          }
+        })
+        .catch(() => {}); // エラー時はポーリング継続
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + Lv2 累積タイマー

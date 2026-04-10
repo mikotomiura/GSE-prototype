@@ -401,14 +401,18 @@ pub fn start() {
                  Opening System Settings > Privacy & Security > Input Monitoring..."
             );
             unsafe { CGRequestListenEventAccess() };
-            // CGRequestListenEventAccess returns false and opens System Settings.
-            // The app must be restarted after the user grants access.
-            // HOOK_ACTIVE remains false — the frontend will show a permission banner.
-            tracing::warn!(
-                "Please grant Input Monitoring access to gse-next in System Settings, \
-                 then restart the app."
+            // CGRequestListenEventAccess opens System Settings and returns false.
+            // Poll until the user grants access — no app restart needed.
+            tracing::info!(
+                "Polling for Input Monitoring permission every 2 seconds..."
             );
-            return;
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                if unsafe { CGPreflightListenEventAccess() } {
+                    tracing::info!("Input Monitoring permission granted — installing CGEventTap.");
+                    break;
+                }
+            }
         }
 
         // --- Step 3: Permission granted — install CGEventTap ---
@@ -436,9 +440,7 @@ pub fn start() {
                 let loop_source = match tap.mach_port.create_runloop_source(0) {
                     Ok(source) => source,
                     Err(_) => {
-                        tracing::error!(
-                            "Failed to create CFRunLoop source from CGEventTap"
-                        );
+                        tracing::error!("Failed to create CFRunLoop source from CGEventTap");
                         HOOK_ACTIVE.store(false, Ordering::Relaxed);
                         return;
                     }
@@ -456,7 +458,9 @@ pub fn start() {
             Err(_) => {
                 tracing::error!(
                     "CGEventTap creation failed even though preflight returned true. \
-                     This may indicate a sandboxing or TCC database issue."
+                     This may indicate a macOS TCC database issue. \
+                     Try removing gse-next from Input Monitoring in System Settings, \
+                     then re-adding it, or restart your Mac."
                 );
             }
         }

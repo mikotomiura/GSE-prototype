@@ -70,8 +70,8 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
             <p>
               System Settings が自動で開かれました。<br />
               <em>プライバシーとセキュリティ › 入力監視</em> で
-              <strong> gse-next </strong>にチェックを入れ、
-              アプリを再起動してください。
+              <strong> gse-next </strong>にチェックを入れてください。
+              権限が付与されると自動的に検知が開始されます。
             </p>
           </div>
         </div>
