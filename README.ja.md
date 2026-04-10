@@ -34,8 +34,9 @@
 22. [IMEポーズ中イベント破棄とZen Timer手動解除（v2.20）](#imeポーズ中イベント破棄とzen-timer手動解除v220)
 23. [Zen Timer早期解除ボタン（v2.21）](#zen-timer早期解除ボタンv221)
 24. [ログと分析](#ログと分析)
-25. [ビルド手順](#ビルド手順)
-26. [学術的参考文献](#学術的参考文献)
+25. [インストール](#インストール)
+26. [ビルド手順](#ビルド手順)
+27. [学術的参考文献](#学術的参考文献)
 
 ---
 
@@ -1057,6 +1058,56 @@ Zen Timer のスマートフォンページに、2 分間のカウントダウ�
 | **INCUBATION** | Pause(≥2 s) → Burst(≥5 文字 FT<200 ms) → diff\_chars ≥ 3（30 秒以内） |
 | **STUCK** | 「Burst(≤3 文字) → Delete(≥1) → Pause(≥2 s)」のループ ≥ 3 回（60 秒内）かつ diff\_chars ≤ 0 |
 | **UNKNOWN** | 条件を満たさない、または複数ラベルが競合 |
+
+---
+
+## インストール
+
+**Windows** および **macOS（Apple Silicon）** 向けのビルド済みインストーラーは、バージョンタグを push するたびに GitHub Actions が自動生成・公開します。
+
+### ダウンロード
+
+**[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** ページからお使いのプラットフォームのファイルをダウンロードしてください：
+
+| プラットフォーム | ファイル | 備考 |
+|---|---|---|
+| Windows | `gse-next_X.Y.Z_x64-setup.exe` | NSIS インストーラー |
+| macOS（Apple Silicon） | `gse-next_X.Y.Z_aarch64.dmg` | ディスクイメージ |
+
+### Windows — インストール手順
+
+1. ダウンロードした `.exe` を実行
+2. SmartScreen が表示された場合 → **「詳細情報」** → **「実行」** をクリック
+3. インストーラーの指示に従う。スタートメニューから起動
+
+### macOS — インストール手順
+
+1. ダウンロードした `.dmg` を開き、**gse-next** を **Applications** フォルダへドラッグ
+2. 初回起動時に Gatekeeper によりブロックされる：
+   - **システム設定 → プライバシーとセキュリティ** を開く
+   - 下部に表示される「"gse-next"はブロックされました」の横にある **「このまま開く」** をクリック
+3. **Input Monitoring 権限を許可（必須）**
+   - **システム設定 → プライバシーとセキュリティ → Input Monitoring**
+   - **gse-next** のトグルをオンにする
+   - アプリを再起動
+
+> Input Monitoring 権限がないとキーボードフックが起動できず、認知状態エンジンが動作しません。
+
+### リリース手順（メンテナー向け）
+
+```bash
+# 1. 3つのファイルのバージョンを統一
+#    - package.json              "version": "X.Y.Z"
+#    - src-tauri/tauri.conf.json "version": "X.Y.Z"
+#    - src-tauri/Cargo.toml      version = "X.Y.Z"
+
+# 2. コミット・タグ・プッシュ
+git add -A
+git commit -m "chore: bump version to vX.Y.Z"
+git tag vX.Y.Z
+git push && git push --tags
+# GitHub Actions が両プラットフォームをビルドし、リリースを自動公開します。
+```
 
 ---
 

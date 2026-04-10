@@ -33,8 +33,9 @@
 22. [IME Pause Event Discard & Zen Timer Manual Unlock (v2.20)](#ime-pause-event-discard--zen-timer-manual-unlock-v220)
 23. [Zen Timer Early Unlock Button (v2.21)](#zen-timer-early-unlock-button-v221)
 24. [Logging & Analysis](#logging--analysis)
-25. [Build Instructions](#build-instructions)
-26. [Academic References](#academic-references)
+25. [Installation](#installation)
+26. [Build Instructions](#build-instructions)
+27. [Academic References](#academic-references)
 
 ---
 
@@ -1057,6 +1058,56 @@ Labels are assigned per 30-second sliding window (1-second step):
 | **INCUBATION** | Pause(≥ 2 s) → Burst(≥ 5 chars at FT < 200 ms) → diff\_chars ≥ 3 within 30 s |
 | **STUCK** | ≥ 3× (Burst(≤ 3 chars) → Delete(≥ 1) → Pause(≥ 2 s)) in 60 s AND diff\_chars ≤ 0 |
 | **UNKNOWN** | No condition met, or multiple labels conflict |
+
+---
+
+## Installation
+
+Pre-built installers for **Windows** and **macOS (Apple Silicon)** are published automatically via GitHub Actions on every version tag.
+
+### Download
+
+Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and download the file for your platform:
+
+| Platform | File | Notes |
+|---|---|---|
+| Windows | `gse-next_X.Y.Z_x64-setup.exe` | NSIS installer |
+| macOS (Apple Silicon) | `gse-next_X.Y.Z_aarch64.dmg` | Disk image |
+
+### Windows — Install
+
+1. Run the downloaded `.exe`
+2. If Windows SmartScreen appears → click **"More info"** → **"Run anyway"**
+3. Follow the installer. Launch from the Start menu.
+
+### macOS — Install
+
+1. Open the downloaded `.dmg` and drag **gse-next** to **Applications**
+2. On first launch, macOS Gatekeeper will block it:
+   - Open **System Settings → Privacy & Security**
+   - Scroll down to the blocked app notice → click **"Open Anyway"**
+3. **Grant Input Monitoring permission (required)**
+   - **System Settings → Privacy & Security → Input Monitoring**
+   - Enable the toggle for **gse-next**
+   - Restart the app
+
+> Without Input Monitoring permission the keyboard hook cannot activate and the cognitive state engine will not run.
+
+### Release Workflow (for maintainers)
+
+```bash
+# 1. Bump version in all three files
+#    - package.json              "version": "X.Y.Z"
+#    - src-tauri/tauri.conf.json "version": "X.Y.Z"
+#    - src-tauri/Cargo.toml      version = "X.Y.Z"
+
+# 2. Commit, tag, and push
+git add -A
+git commit -m "chore: bump version to vX.Y.Z"
+git tag vX.Y.Z
+git push && git push --tags
+# GitHub Actions builds both platforms and publishes the release automatically.
+```
 
 ---
 
