@@ -175,6 +175,7 @@ function App() {
   if (!isStarted) {
     return (
       <div className="start-screen">
+        <img src="/doe.svg" alt="GSE Logo" className="start-logo" />
         <div className="start-header">
           <h1>Generative Struggle Engine</h1>
           <p className="start-description">
