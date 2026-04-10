@@ -1,0 +1,119 @@
+name: CI / Release
+
+on:
+  push:
+    branches: [main, "feature/*"]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_BUILD_JOBS: 2
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── ブランチ push / PR: 高速チェック ─────────────────────────
+  check:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: cargo check
+        working-directory: src-tauri
+
+  # ── タグ push: Windows ビルド ────────────────────────────────
+  build-windows:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build Tauri app
+        run: npx tauri build --bundles msi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── タグ push: macOS ビルド ──────────────────────────────────
+  build-macos:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build Tauri app
+        run: npx tauri build --bundles dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── GitHub Release 作成（片方成功でも実行）──────────────────
+  release:
+    needs: [build-windows, build-macos]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      always() &&
+      (needs.build-windows.result == 'success' || needs.build-macos.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows artifacts
+        if: ${{ needs.build-windows.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-msi
+          path: artifacts/
+
+      - name: Download macOS artifacts
+        if: ${{ needs.build-macos.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: false
