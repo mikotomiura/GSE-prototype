@@ -44,7 +44,7 @@
 
 ライター、プログラマー、知識労働者は **Flow（滑らかな高出力）**・**Incubation（意識的な停止と潜在的処理）**・**Stuck（認知的行き詰まり、非生産的ループ）** の三状態を交互に経験します。これらの状態をリアルタイムで把握できれば、アンビエント音楽・ナッジ・UI ディミングなど、タスクを中断しないまま認知的足場（metacognitive scaffolding）を提供するアダプティブツールが実現できます。
 
-既存のアプローチはウェアラブルデバイス・カメラ・明示的自己報告を必要とします。本プロトタイプは OS から既に取得可能な**キーストロークタイミング情報のみ**を使用するため、追加ハードウェアなしで任意の Windows デバイスに展開可能です。
+既存のアプローチはウェアラブルデバイス・カメラ・明示的自己報告を必要とします。本プロトタイプは OS から既に取得可能な**キーストロークタイミング情報のみ**を使用するため、追加ハードウェアなしで任意の Windows・macOS デバイスに展開可能です。
 
 ---
 
@@ -64,12 +64,12 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         Windows 11（Surface Pro 8）                  │
+│                     Windows 11 / macOS（Apple Silicon）              │
 │                                                                      │
-│  ┌─────────────┐   WH_KEYBOARD_LL    ┌──────────────────────────┐  │
+│  ┌─────────────┐   OS キーボード API  ┌──────────────────────────┐  │
 │  │ 任意のアプリ │ ─────────────────── │  フックスレッド（Rust）   │  │
-│  │ （フォアグラ │                     │  SetWindowsHookExW       │  │
-│  │  ウンド）   │                     │  WinEvent IME モニター   │  │
+│  │ （フォアグラ │                     │  Win: WH_KEYBOARD_LL     │  │
+│  │  ウンド）   │                     │  Mac: CGEventTap         │  │
 │  └─────────────┘                     └──────────┬───────────────┘  │
 │                                                 │ crossbeam channel │
 │                                      ┌──────────▼───────────────┐  │
@@ -114,7 +114,7 @@
 ```
 メインスレッド（Tauri イベントループ）
     │
-    ├─ フックスレッド           ← WH_KEYBOARD_LL メッセージループ + WinEvent IME コールバック
+    ├─ フックスレッド           ← Win: WH_KEYBOARD_LL + WinEvent IME / Mac: CGEventTap + CFRunLoop
     │       │ crossbeam::channel (bounded 64, ノンブロッキング送信)
     │       │ bounded(1) ウェイクチャンネル → IME ポーリングスレッド
     ├─ 分析スレッド             ← recv_timeout(1 s) → 1 Hz タイマーゲート; HMM 更新 ≤ 1回/秒
@@ -132,7 +132,7 @@
 ## フォルダ構成
 
 ```
-GSE-Next/
+GSE-prototype/
 ├── analysis/                   # Phase 2以降で実装予定
 │   └── (計画中: behavioral_gt.py, hmm_sensitivity.py)
 │
@@ -149,11 +149,15 @@ GSE-Next/
 │   ├── src/
 │   │   ├── analysis/
 │   │   │   ├── engine.rs      # HMM エンジン + ヒステリシス層（display_probs EMA）
-│   │   │   ├── features.rs    # F1, F3–F6 特徴量抽出 + 沈黙合成
+│   │   │   ├── features.rs    # F1, F3–F6 特徴量抽出 + 沈黙合成（OS 非依存）
 │   │   │   └── mod.rs
 │   │   ├── input/
-│   │   │   ├── hook.rs        # WH_KEYBOARD_LL フック + WinEvent IME 検出
-│   │   │   ├── ime.rs         # ImeMonitor（EnumWindows + UIAutomation フォールバック）
+│   │   │   ├── hook.rs        # プラットフォーム振り分け（Windows / macOS 実装を選択）
+│   │   │   ├── hook_windows.rs # WH_KEYBOARD_LL フック + WinEvent IME 検出
+│   │   │   ├── hook_macos.rs  # CGEventTap + CFRunLoop キーボードフック
+│   │   │   ├── ime.rs         # IME モニター振り分け
+│   │   │   ├── ime_windows.rs # ImeMonitor（EnumWindows + UIAutomation フォールバック）
+│   │   │   ├── ime_macos.rs   # macOS IME 状態検出
 │   │   │   └── mod.rs
 │   │   ├── lib.rs             # Tauri セットアップ、スレッド管理、IPC コマンド
 │   │   ├── logger.rs          # 非同期 NDJSON セッションロガー
@@ -1118,13 +1122,12 @@ git push && git push --tags
 | ツール | バージョン |
 | --- | --- |
 | Rust | 1.77+（`rustup update stable`） |
-| Node.js | 20+ |
+| Node.js | 22+ |
 | Tauri CLI v2 | `cargo install tauri-cli --version "^2"` |
 
 ### 開発実行
 
 ```bash
-cd GSE-Next
 npm install
 npm run tauri dev
 ```

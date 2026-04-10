@@ -43,7 +43,7 @@
 
 Writers, programmers, and knowledge workers alternate between states of **flow** (effortless, high-output), **incubation** (deliberate pause, sub-conscious processing), and **stuck** (cognitive block, unproductive looping). Real-time awareness of these states could enable adaptive tools—ambient music, nudges, or UI dimming—to scaffold metacognition without disrupting the task itself.
 
-Existing approaches require wearables, cameras, or explicit self-report. This prototype uses only **keystroke timing** (already available from the OS), making it deployable on any Windows device without additional hardware.
+Existing approaches require wearables, cameras, or explicit self-report. This prototype uses only **keystroke timing** (already available from the OS), making it deployable on any Windows or macOS device without additional hardware.
 
 ---
 
@@ -63,12 +63,12 @@ The three states are grounded in established cognitive science literature:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         Windows 11 (Surface Pro 8)                  │
+│                     Windows 11 / macOS (Apple Silicon)              │
 │                                                                      │
-│  ┌─────────────┐   WH_KEYBOARD_LL    ┌──────────────────────────┐  │
+│  ┌─────────────┐   OS keyboard API   ┌──────────────────────────┐  │
 │  │  Any App    │ ─────────────────── │   Hook Thread (Rust)     │  │
-│  │ (foreground)│                     │  SetWindowsHookExW       │  │
-│  └─────────────┘                     │  WinEvent IME monitor    │  │
+│  │ (foreground)│                     │  Win: WH_KEYBOARD_LL     │  │
+│  └─────────────┘                     │  Mac: CGEventTap         │  │
 │                                      └──────────┬───────────────┘  │
 │                                                 │ crossbeam channel │
 │                                      ┌──────────▼───────────────┐  │
@@ -113,7 +113,7 @@ The three states are grounded in established cognitive science literature:
 ```
 Main Thread (Tauri event loop)
     │
-    ├─ Hook Thread            ← WH_KEYBOARD_LL message loop + WinEvent IME callbacks
+    ├─ Hook Thread            ← Win: WH_KEYBOARD_LL + WinEvent IME / Mac: CGEventTap + CFRunLoop
     │       │ crossbeam::channel (bounded 64, non-blocking send)
     │       │ bounded(1) wake channel → IME Polling Thread
     ├─ Analysis Thread        ← recv_timeout(1 s) → 1 Hz timer gate; HMM update ≤ 1×/sec
@@ -131,7 +131,7 @@ Main Thread (Tauri event loop)
 ## Folder Structure
 
 ```
-GSE-Next/
+GSE-prototype/
 ├── analysis/                   # Planned for Phase 2+
 │   └── (planned: behavioral_gt.py, hmm_sensitivity.py)
 │
@@ -148,11 +148,15 @@ GSE-Next/
 │   ├── src/
 │   │   ├── analysis/
 │   │   │   ├── engine.rs      # HMM + hysteresis layer (display_probs EMA)
-│   │   │   ├── features.rs    # F1, F3–F6 extraction + silence synthesis
+│   │   │   ├── features.rs    # F1, F3–F6 extraction + silence synthesis (OS-agnostic)
 │   │   │   └── mod.rs
 │   │   ├── input/
-│   │   │   ├── hook.rs        # WH_KEYBOARD_LL hook + WinEvent IME detection
-│   │   │   ├── ime.rs         # ImeMonitor (EnumWindows + UIAutomation fallback)
+│   │   │   ├── hook.rs        # Platform dispatch (selects Windows or macOS impl)
+│   │   │   ├── hook_windows.rs # WH_KEYBOARD_LL + WinEvent IME detection
+│   │   │   ├── hook_macos.rs  # CGEventTap + CFRunLoop keyboard hook
+│   │   │   ├── ime.rs         # IME monitor dispatch
+│   │   │   ├── ime_windows.rs # ImeMonitor (EnumWindows + UIAutomation fallback)
+│   │   │   ├── ime_macos.rs   # macOS IME state detection
 │   │   │   └── mod.rs
 │   │   ├── lib.rs             # Tauri setup, thread orchestration, IPC commands
 │   │   ├── logger.rs          # Async NDJSON session logger
@@ -1118,13 +1122,12 @@ git push && git push --tags
 | Tool | Version |
 |---|---|
 | Rust | 1.77+ (`rustup update stable`) |
-| Node.js | 20+ |
+| Node.js | 22+ |
 | Tauri CLI v2 | `cargo install tauri-cli --version "^2"` |
 
 ### Development
 
 ```bash
-cd GSE-Next
 npm install
 npm run tauri dev
 ```
