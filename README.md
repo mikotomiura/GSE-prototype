@@ -1,4 +1,4 @@
-# GSE-Next — Generative Struggle Engine (Prototype v2)
+# GSE (Generative Struggle Engine)
 
 > **Real-time cognitive state estimation from keystroke dynamics on Windows 11**
 > Classifies the writer's mental state into **Flow / Incubation / Stuck** using a hand-tuned Hidden Markov Model, without any cloud dependency or user-facing interruption.

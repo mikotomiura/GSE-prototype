@@ -1,4 +1,4 @@
-# GSE-Next — Generative Struggle Engine（プロトタイプ v2）
+# GSE (Generative Struggle Engine)
 
 > **Windows 11 上でキーストローク動的特徴からリアルタイムに認知状態を推定するシステム**
 > クラウド依存なし・ユーザー介入なしで、手動チューニングされた隠れマルコフモデル（HMM）を用いて
