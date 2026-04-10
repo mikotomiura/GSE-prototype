@@ -5,7 +5,6 @@
   "windows": ["main", "overlay"],
   "permissions": [
     "core:default",
-    "opener:default",
     "core:window:allow-set-ignore-cursor-events"
   ]
 }

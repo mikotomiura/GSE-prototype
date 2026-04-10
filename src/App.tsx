@@ -48,7 +48,7 @@ function App() {
   useEffect(() => {
     invoke<boolean>("get_hook_status")
       .then((active) => setHookActive(active))
-      .catch(() => setHookActive(true)); // エラー時は楽観的に true
+      .catch(() => setHookActive(false)); // エラー時は悲観的に false（権限バナーを表示）
   }, []);
 
   // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + Lv2 累積タイマー
@@ -158,6 +158,7 @@ function App() {
       await invoke("start_session");
     } catch (e) {
       console.error("Failed to start session:", e);
+      return;
     }
     setIsStarted(true);
     emit("session-started");
