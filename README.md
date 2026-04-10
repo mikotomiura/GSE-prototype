@@ -1,6 +1,6 @@
 # GSE (Generative Struggle Engine)
 
-> **Real-time cognitive state estimation from keystroke dynamics on Windows 11**
+> **Real-time cognitive state estimation from keystroke dynamics on Windows and macOS**
 > Classifies the writer's mental state into **Flow / Incubation / Stuck** using a hand-tuned Hidden Markov Model, without any cloud dependency or user-facing interruption.
 
 [🇯🇵 日本語版 README はこちら](README.ja.md)
