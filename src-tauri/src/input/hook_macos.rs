@@ -406,9 +406,9 @@ pub fn start() {
             );
         }
 
-        let mut retry_count: u32 = 0;
+        let mut consecutive_failures: u32 = 0;
 
-        // --- Step 3: Unified tap creation loop ---
+        // --- Step 3: Resilient tap creation loop (never gives up) ---
         //
         // Whether permission was pre-granted or we're waiting for the user,
         // we use the same loop: try to create the REAL tap (with full callback
@@ -418,6 +418,11 @@ pub fn start() {
         // 旧実装ではプローブ用 CGEventTap を作成→ドロップ→本番タップ再作成していたが、
         // core-graphics クレートの Drop が CGEventTap リソースを完全に解放しないため、
         // 本番タップの作成が失敗する問題があった。この unified loop で根本解決する。
+        //
+        // 自動復旧: CFRunLoop が終了した場合（macOS がタップを無効化した場合）は
+        // スレッドを終了せず、ループ先頭に戻ってタップを再作成する。
+        // これにより、スリープ復帰・権限変更・システム負荷での一時的な無効化から
+        // 自動的に復旧する。
         //
         // Use TailAppendEventTap (not HeadInsertEventTap) with ListenOnly.
         // HeadInsert is designed for *active* taps that modify events; pairing it
@@ -437,51 +442,82 @@ pub fn start() {
 
             match tap {
                 Ok(tap) => {
-                    HOOK_ACTIVE.store(true, Ordering::Relaxed);
-                    tracing::info!("CGEventTap installed (macOS keyboard hook active)");
+                    // タップ作成成功 → 連続失敗カウンタをリセット
+                    consecutive_failures = 0;
 
                     let loop_source = match tap.mach_port.create_runloop_source(0) {
                         Ok(source) => source,
                         Err(_) => {
-                            tracing::error!("Failed to create CFRunLoop source from CGEventTap");
+                            tracing::error!(
+                                "Failed to create CFRunLoop source from CGEventTap, \
+                                 retrying in 2s..."
+                            );
                             HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                            return;
+                            LAST_KEY_MS.store(0, Ordering::Relaxed);
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            continue; // ← return ではなく continue で再試行
                         }
                     };
 
                     let run_loop = CFRunLoop::get_current();
                     run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
+
+                    // タップを有効化してから HOOK_ACTIVE をセット
                     tap.enable();
+                    HOOK_ACTIVE.store(true, Ordering::Relaxed);
+                    tracing::info!("CGEventTap installed (macOS keyboard hook active)");
+
                     CFRunLoop::run_current();
 
                     // CFRunLoopRun returned — tap was disabled or invalidated.
+                    // スレッドを終了せず、ループ先頭に戻ってタップを再作成する。
                     HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                    tracing::warn!("CGEventTap CFRunLoop exited unexpectedly.");
-                    return;
+                    LAST_KEY_MS.store(0, Ordering::Relaxed);
+                    tracing::warn!(
+                        "CGEventTap CFRunLoop exited (tap invalidated by macOS). \
+                         Re-creating in 2s..."
+                    );
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    // loop continues → re-create tap
                 }
                 Err(_) => {
-                    if already_granted {
-                        // Preflight said yes but tap creation failed.
-                        // macOS 13+ では TCC 伝播に数秒かかる場合があるため、
-                        // 即座に諦めず最大5回 (10秒) リトライする。
-                        retry_count += 1;
-                        if retry_count >= 5 {
-                            tracing::error!(
-                                "CGEventTap creation failed 5 times even though preflight \
-                                 returned true. This may indicate a macOS TCC database issue. \
-                                 Try removing gse-next from Input Monitoring in System Settings, \
-                                 then re-adding it, or restart your Mac."
+                    consecutive_failures += 1;
+
+                    // Backoff strategy:
+                    //   1-5回: 2秒間隔 (TCC 伝播待ち / 権限付与待ち)
+                    //   6-20回: 5秒間隔 (長めの権限待ち)
+                    //   21回以降: 10秒間隔 (CPU 節約しつつ永続的にリトライ)
+                    let sleep_secs = if consecutive_failures <= 5 {
+                        if already_granted {
+                            tracing::warn!(
+                                "CGEventTap creation failed (attempt {}, preflight=true), \
+                                 retrying in 2s...",
+                                consecutive_failures
                             );
-                            return;
                         }
-                        tracing::warn!(
-                            "CGEventTap creation failed (attempt {}/5, preflight=true), \
-                             retrying in 2s...",
-                            retry_count
-                        );
-                    }
-                    // Permission not yet granted, or retrying — sleep and retry.
-                    std::thread::sleep(std::time::Duration::from_secs(2));
+                        2
+                    } else if consecutive_failures <= 20 {
+                        if consecutive_failures == 6 {
+                            tracing::warn!(
+                                "CGEventTap creation still failing after 5 attempts. \
+                                 Continuing to retry every 5s. If permission is granted, \
+                                 try removing gse-next from Input Monitoring and re-adding it."
+                            );
+                        }
+                        5
+                    } else {
+                        if consecutive_failures == 21 {
+                            tracing::error!(
+                                "CGEventTap creation failed 20+ times. Slowing retries to 10s. \
+                                 This may indicate a macOS TCC database issue. \
+                                 Try: (1) Remove gse-next from Input Monitoring, then re-add \
+                                 (2) Restart your Mac (3) tccutil reset ListenEvent"
+                            );
+                        }
+                        10
+                    };
+
+                    std::thread::sleep(std::time::Duration::from_secs(sleep_secs));
                 }
             }
         }

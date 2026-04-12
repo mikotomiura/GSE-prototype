@@ -47,22 +47,21 @@ function App() {
 
   // D-1: currentWindow / windowLabel は isStarted 初期値算出のため上方で宣言済み
 
-  // 2. Hook status: 2秒毎にポーリングし、有効になったら停止（権限が後から付与された場合に対応）
+  // 2. Hook status: 継続的にポーリング（タップ無効化→自動復旧に追従）
+  //    macOS では CGEventTap がスリープ復帰・権限変更時に無効化されることがある。
+  //    バックエンドが自動復旧するため、フロントエンドも状態変化を継続監視する。
+  //    旧実装では active 検知後にポーリングを停止していたが、inactive への遷移を
+  //    検知できなかった。常時 3 秒間隔でポーリングを継続する。
   useEffect(() => {
     invoke<boolean>("get_hook_status")
       .then((active) => setHookActive(active))
-      .catch(() => setHookActive(false)); // エラー時は悲観的に false（権限バナーを表示）
+      .catch(() => setHookActive(false));
 
     const interval = setInterval(() => {
       invoke<boolean>("get_hook_status")
-        .then((active) => {
-          if (active) {
-            setHookActive(true);
-            clearInterval(interval); // 有効になったらポーリング停止
-          }
-        })
-        .catch(() => {}); // エラー時はポーリング継続
-    }, 2000);
+        .then((active) => setHookActive(active))
+        .catch(() => {});
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
