@@ -383,10 +383,10 @@ fn update_compose_state(vk: u32) {
 ///
 /// Permission flow:
 /// 1. Check `CGPreflightListenEventAccess()` — fast, no side-effects.
-/// 2. If not granted, call `CGRequestListenEventAccess()` — opens System Settings
-///    automatically to the Input Monitoring pane and returns false.
-///    The user must grant access and restart the app.
-/// 3. If granted, create CGEventTap and run CFRunLoop.
+/// 2. If not granted, call `CGRequestListenEventAccess()` — opens System Settings.
+/// 3. Unified loop: try creating the REAL tap directly. If it fails, sleep and retry.
+///    This eliminates the probe-then-real two-step pattern that caused resource leaks
+///    when the probe CGEventTap was dropped without proper cleanup.
 ///
 /// `HOOK_ACTIVE` is set to true only after a successful tap installation.
 pub fn start() {
@@ -401,84 +401,88 @@ pub fn start() {
                  Opening System Settings > Privacy & Security > Input Monitoring..."
             );
             unsafe { CGRequestListenEventAccess() };
-            // CGRequestListenEventAccess opens System Settings and returns false.
-            // Poll until the user grants access — no app restart needed.
             tracing::info!(
                 "Polling for Input Monitoring permission every 2 seconds..."
             );
-            loop {
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                // Fast path: preflight check (may return stale cached false on macOS 13+)
-                if unsafe { CGPreflightListenEventAccess() } {
-                    tracing::info!("Input Monitoring permission granted (preflight) — installing CGEventTap.");
-                    break;
-                }
-                // Slow path: CGPreflightListenEventAccess() caches false per-process
-                // on macOS 13+. Try creating a real CGEventTap as the definitive test.
-                let probe = CGEventTap::new(
-                    CGEventTapLocation::Session,
-                    CGEventTapPlacement::TailAppendEventTap,
-                    CGEventTapOptions::ListenOnly,
-                    vec![CGEventType::KeyDown],
-                    |_proxy, _event_type, _event| None,
-                );
-                if probe.is_ok() {
-                    tracing::info!(
-                        "Input Monitoring permission granted (tap probe succeeded, \
-                         preflight returned stale false) — installing CGEventTap."
-                    );
-                    break;
-                }
-            }
         }
 
-        // --- Step 3: Permission granted — install CGEventTap ---
+        let mut retry_count: u32 = 0;
+
+        // --- Step 3: Unified tap creation loop ---
+        //
+        // Whether permission was pre-granted or we're waiting for the user,
+        // we use the same loop: try to create the REAL tap (with full callback
+        // and both KeyDown+KeyUp events). If it fails, permission hasn't been
+        // granted yet; sleep and retry.
+        //
+        // 旧実装ではプローブ用 CGEventTap を作成→ドロップ→本番タップ再作成していたが、
+        // core-graphics クレートの Drop が CGEventTap リソースを完全に解放しないため、
+        // 本番タップの作成が失敗する問題があった。この unified loop で根本解決する。
         //
         // Use TailAppendEventTap (not HeadInsertEventTap) with ListenOnly.
         // HeadInsert is designed for *active* taps that modify events; pairing it
         // with ListenOnly is unreliable on macOS 13+ and may silently drop events.
         // TailAppend is the correct placement for passive (listen-only) monitors.
-        let tap = CGEventTap::new(
-            CGEventTapLocation::Session,
-            CGEventTapPlacement::TailAppendEventTap,
-            CGEventTapOptions::ListenOnly,
-            vec![CGEventType::KeyDown, CGEventType::KeyUp],
-            |_proxy, event_type, event| {
-                handle_event(event_type, event);
-                None // ListenOnly: return None (event is not modified)
-            },
-        );
+        loop {
+            let tap = CGEventTap::new(
+                CGEventTapLocation::Session,
+                CGEventTapPlacement::TailAppendEventTap,
+                CGEventTapOptions::ListenOnly,
+                vec![CGEventType::KeyDown, CGEventType::KeyUp],
+                |_proxy, event_type, event| {
+                    handle_event(event_type, event);
+                    None // ListenOnly: return None (event is not modified)
+                },
+            );
 
-        match tap {
-            Ok(tap) => {
-                HOOK_ACTIVE.store(true, Ordering::Relaxed);
-                tracing::info!("CGEventTap installed (macOS keyboard hook active)");
+            match tap {
+                Ok(tap) => {
+                    HOOK_ACTIVE.store(true, Ordering::Relaxed);
+                    tracing::info!("CGEventTap installed (macOS keyboard hook active)");
 
-                let loop_source = match tap.mach_port.create_runloop_source(0) {
-                    Ok(source) => source,
-                    Err(_) => {
-                        tracing::error!("Failed to create CFRunLoop source from CGEventTap");
-                        HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                        return;
+                    let loop_source = match tap.mach_port.create_runloop_source(0) {
+                        Ok(source) => source,
+                        Err(_) => {
+                            tracing::error!("Failed to create CFRunLoop source from CGEventTap");
+                            HOOK_ACTIVE.store(false, Ordering::Relaxed);
+                            return;
+                        }
+                    };
+
+                    let run_loop = CFRunLoop::get_current();
+                    run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
+                    tap.enable();
+                    CFRunLoop::run_current();
+
+                    // CFRunLoopRun returned — tap was disabled or invalidated.
+                    HOOK_ACTIVE.store(false, Ordering::Relaxed);
+                    tracing::warn!("CGEventTap CFRunLoop exited unexpectedly.");
+                    return;
+                }
+                Err(_) => {
+                    if already_granted {
+                        // Preflight said yes but tap creation failed.
+                        // macOS 13+ では TCC 伝播に数秒かかる場合があるため、
+                        // 即座に諦めず最大5回 (10秒) リトライする。
+                        retry_count += 1;
+                        if retry_count >= 5 {
+                            tracing::error!(
+                                "CGEventTap creation failed 5 times even though preflight \
+                                 returned true. This may indicate a macOS TCC database issue. \
+                                 Try removing gse-next from Input Monitoring in System Settings, \
+                                 then re-adding it, or restart your Mac."
+                            );
+                            return;
+                        }
+                        tracing::warn!(
+                            "CGEventTap creation failed (attempt {}/5, preflight=true), \
+                             retrying in 2s...",
+                            retry_count
+                        );
                     }
-                };
-
-                let run_loop = CFRunLoop::get_current();
-                run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
-                tap.enable();
-                CFRunLoop::run_current();
-
-                // CFRunLoopRun returned — tap was disabled or invalidated.
-                HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                tracing::warn!("CGEventTap CFRunLoop exited unexpectedly.");
-            }
-            Err(_) => {
-                tracing::error!(
-                    "CGEventTap creation failed even though preflight returned true. \
-                     This may indicate a macOS TCC database issue. \
-                     Try removing gse-next from Input Monitoring in System Settings, \
-                     then re-adding it, or restart your Mac."
-                );
+                    // Permission not yet granted, or retrying — sleep and retry.
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                }
             }
         }
     });

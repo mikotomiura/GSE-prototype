@@ -28,3 +28,6 @@ src-tauri/target/
 # Claude Code — machine-local files (do not commit)
 .claude/settings.local.json
 .claude/memory.md
+
+#個人用ファイル
+issue.md

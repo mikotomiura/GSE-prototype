@@ -34,6 +34,7 @@ function App() {
   const [isStarted, setIsStarted] = useState(windowLabel === "overlay");
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
   const [hookActive, setHookActive] = useState<boolean | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
   const stuckAccumMsRef = useRef<number>(0);
   const lastStuckTickRef = useRef<number>(Date.now());
@@ -165,10 +166,12 @@ function App() {
   };
 
   const handleStart = async () => {
+    setStartError(null);
     try {
       await invoke("start_session");
     } catch (e) {
       console.error("Failed to start session:", e);
+      setStartError("セッション開始に失敗しました。アプリを再起動してください。");
       return;
     }
     setIsStarted(true);
@@ -188,6 +191,11 @@ function App() {
         <button className="start-button" onClick={handleStart}>
           開始する
         </button>
+        {startError && (
+          <p className="start-error" style={{ color: '#ff6b6b', marginTop: '0.5rem', fontSize: '0.9rem' }}>
+            {startError}
+          </p>
+        )}
         <p className="start-hint">
           自然にタイピングを始めると、検知が動作します。
         </p>

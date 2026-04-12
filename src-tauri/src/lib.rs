@@ -137,35 +137,16 @@ fn start_session(
     let guard = log.lock().unwrap_or_else(|p| p.into_inner());
     let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
 
-    // Overlay ウィンドウを動的に生成する。
-    // tauri.conf.json に静的定義すると macOS で visible:false と maximized:true が
-    // 競合し、不透明なオーバーレイが起動直後にメインウィンドウを覆う問題が発生する。
-    // セッション開始時に初めて生成することで、この問題を根本的に回避する。
-    //
-    // Layer 3: 生成 → maximize → show の3ステップに分離。
-    // .maximized(true) をビルダーに含めると macOS で表示タイミングの競合が起きる可能性があるため、
-    // visible(false) で非表示のまま生成した後、明示的に maximize() → show() を呼ぶ。
-    if app.get_webview_window("overlay").is_none() {
-        match tauri::WebviewWindowBuilder::new(
-            &app,
-            "overlay",
-            tauri::WebviewUrl::App("index.html".into()),
-        )
-        .title("GSE Overlay")
-        .decorations(false)
-        .transparent(true)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .visible(false)
-        .build()
-        {
-            Ok(win) => {
-                let _ = win.maximize();
-                let _ = win.show();
-                tracing::info!("Overlay window created");
-            }
-            Err(e) => tracing::warn!("Failed to create overlay window: {}", e),
-        }
+    // setup() で事前生成されたオーバーレイウィンドウを maximize → show する。
+    // ウィンドウ生成自体は setup() (メインスレッド) で行うことで、
+    // Windows での tokio ワーカースレッドからの WebviewWindowBuilder::build()
+    // デッドロックを回避する。
+    if let Some(win) = app.get_webview_window("overlay") {
+        let _ = win.maximize();
+        let _ = win.show();
+        tracing::info!("Overlay window shown");
+    } else {
+        tracing::error!("Overlay window not found — setup() may have failed");
     }
 }
 
@@ -611,6 +592,33 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            // Overlay ウィンドウを setup() で事前生成する (hidden, non-maximized)。
+            // setup() はメインスレッドで実行されるため、Windows での
+            // WebviewWindowBuilder::build() デッドロックを回避できる。
+            //
+            // macOS では visible(false) + maximized(true) の同時指定で
+            // 不透明なオーバーレイが表示される問題があったが、ここでは
+            // maximized を指定せず visible(false) のみで生成する。
+            // maximize() + show() は start_session で制御された順序で実行される。
+            match tauri::WebviewWindowBuilder::new(
+                app,
+                "overlay",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("GSE Overlay")
+            .decorations(false)
+            .transparent(true)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .visible(false)
+            .build()
+            {
+                Ok(_) => tracing::info!("Overlay window pre-created (hidden)"),
+                Err(e) => tracing::error!("Failed to pre-create overlay window: {}", e),
+            }
+            Ok(())
+        })
         .manage(engine)
         .manage(log_state)
         .manage(WallServerState::new())

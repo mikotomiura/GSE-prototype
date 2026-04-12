@@ -17,6 +17,8 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
+  // hookActive=false が続いた秒数 (権限バナーの段階的メッセージ表示に使用)
+  const [hookWaitingSec, setHookWaitingSec] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -24,6 +26,19 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // hookActive=false の間、経過秒数をカウントする。
+  // 30秒経過後に「アプリ再起動」ガイダンスを追加表示する。
+  useEffect(() => {
+    if (hookActive !== false) {
+      setHookWaitingSec(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setHookWaitingSec(s => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [hookActive]);
 
   const getMaxState = () => {
     const { flow, incubation, stuck } = cognitiveState;
@@ -73,6 +88,11 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
               <strong> gse-next </strong>にチェックを入れてください。
               権限が付与されると自動的に検知が開始されます。
             </p>
+            {hookWaitingSec >= 30 && (
+              <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                権限が付与済みでも検知が開始されない場合は、<strong>アプリを再起動</strong>してください。
+              </p>
+            )}
           </div>
         </div>
       )}
