@@ -1084,6 +1084,17 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
 2. If Windows SmartScreen appears → click **"More info"** → **"Run anyway"**
 3. Follow the installer. Launch from the Start menu.
 
+> **If you see "This file has been blocked by application control policy":**
+>
+> This means Windows 11 **Smart App Control (SAC)** is blocking the unsigned installer. Unlike SmartScreen, there is no "Run anyway" button.
+>
+> **To resolve:**
+> 1. Open **Settings** → **Privacy & Security** → **Windows Security** → **App & browser control**
+> 2. Click **Smart App Control settings**
+> 3. Select **Off**
+>
+> ⚠️ **Warning:** Once SAC is turned off, it cannot be re-enabled (Windows limitation). If you prefer not to disable SAC, contact the developer for a code-signed build.
+
 ### macOS — Install
 
 1. Open the downloaded `.dmg` and drag **gse-next** to **Applications**
