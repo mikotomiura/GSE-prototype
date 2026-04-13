@@ -92,10 +92,11 @@ jobs:
           APP=$(find src-tauri/target/release/bundle -name "*.app" -type d | head -1)
           if [ -n "$APP" ]; then
             echo "Re-signing with entitlements: $APP"
-            # Sign the main binary with entitlements + hardened runtime options
-            codesign --force --sign - --entitlements src-tauri/Entitlements.plist --options runtime "$APP/Contents/MacOS/"*
-            # Sign the top-level .app bundle
-            codesign --force --sign - --entitlements src-tauri/Entitlements.plist --options runtime "$APP"
+            # Ad-hoc signing: --options runtime は使用しない。
+            # Hardened Runtime は Developer ID 署名を前提としており、
+            # ad-hoc 署名との組み合わせで TCC (Input Monitoring) の
+            # 権限チェックが過度に厳格になる問題が確認されている。
+            codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP"
             echo "Verifying signature..."
             codesign --verify --deep --strict "$APP" && echo "Signature OK" || echo "Signature verification failed"
             echo "Embedded entitlements:"

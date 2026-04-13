@@ -114,6 +114,18 @@ fn get_diagnostics() -> HashMap<String, String> {
     diag.insert("os".into(), std::env::consts::OS.to_string());
     diag.insert("arch".into(), std::env::consts::ARCH.to_string());
     diag.insert("version".into(), env!("CARGO_PKG_VERSION").to_string());
+    // macOS: Input Monitoring 権限の TCC 状態を診断に含める。
+    // CGPreflightListenEventAccess() が true でも CGEventTap が動作しない場合、
+    // コード署名と TCC データベースの不一致が原因と判断できる。
+    #[cfg(target_os = "macos")]
+    {
+        #[link(name = "ApplicationServices", kind = "framework")]
+        extern "C" {
+            fn CGPreflightListenEventAccess() -> bool;
+        }
+        let preflight = unsafe { CGPreflightListenEventAccess() };
+        diag.insert("input_monitoring_granted".into(), preflight.to_string());
+    }
     diag
 }
 
