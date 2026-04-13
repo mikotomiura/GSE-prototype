@@ -4,7 +4,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
 use core_graphics::event::{
@@ -27,7 +27,7 @@ extern "C" {
     fn CGRequestListenEventAccess() -> bool;
 }
 
-use super::HOOK_ACTIVE;
+use super::{CALLBACK_COUNT, HOOK_ACTIVE};
 
 // ---------------------------------------------------------------------------
 // macOS typing key filter (raw CGKeyCode)
@@ -165,6 +165,9 @@ fn macos_vk_to_vk(mac_vk: u64) -> u32 {
 // CGEventTap callback
 // ---------------------------------------------------------------------------
 fn handle_event(event_type: CGEventType, event: &CGEvent) {
+    // 診断用: コールバック到達カウンタ。0 のままなら「イベントが届いていない」。
+    CALLBACK_COUNT.fetch_add(1, Ordering::Relaxed);
+
     let is_press = matches!(event_type, CGEventType::KeyDown);
     let is_release = matches!(event_type, CGEventType::KeyUp);
 
@@ -422,14 +425,14 @@ pub fn start() {
         // これにより、スリープ復帰・権限変更・システム負荷での一時的な無効化から
         // 自動的に復旧する。
         //
-        // Use TailAppendEventTap (not HeadInsertEventTap) with ListenOnly.
-        // HeadInsert is designed for *active* taps that modify events; pairing it
-        // with ListenOnly is unreliable on macOS 13+ and may silently drop events.
-        // TailAppend is the correct placement for passive (listen-only) monitors.
+        // HeadInsertEventTap + ListenOnly: イベントチェーンの先頭で受動的に傍受。
+        // rdev クレート等の実績ある実装と同じ組み合わせ。
+        // 旧実装では TailAppendEventTap を使用していたが、macOS 13+ で
+        // ListenOnly タップにイベントが配信されない問題が確認されたため変更。
         loop {
             let tap = CGEventTap::new(
                 CGEventTapLocation::Session,
-                CGEventTapPlacement::TailAppendEventTap,
+                CGEventTapPlacement::HeadInsertEventTap,
                 CGEventTapOptions::ListenOnly,
                 vec![CGEventType::KeyDown, CGEventType::KeyUp],
                 |_proxy, event_type, event| {
@@ -460,9 +463,12 @@ pub fn start() {
                     let run_loop = CFRunLoop::get_current();
                     run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
 
-                    // タップを有効化してから HOOK_ACTIVE をセット
+                    // タップを有効化してから HOOK_ACTIVE をセット。
+                    // 50ms 待機でカーネルレベルのタップ活性化を確実にする。
                     tap.enable();
-                    HOOK_ACTIVE.store(true, Ordering::Relaxed);
+                    thread::sleep(Duration::from_millis(50));
+                    HOOK_ACTIVE.store(true, Ordering::Release);
+                    CALLBACK_COUNT.store(0, Ordering::Relaxed);
                     tracing::info!("CGEventTap installed (macOS keyboard hook active)");
 
                     CFRunLoop::run_current();

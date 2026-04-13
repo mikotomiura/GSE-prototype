@@ -75,6 +75,11 @@ pub static JIS_KEYBOARD_SEEN: AtomicBool = AtomicBool::new(false);
 /// macOS: CGEventTap インストール成功時に true。
 pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+/// macOS: CGEventTap コールバックが呼ばれた回数（診断用）。
+/// 0 のままなら「タップは作成されたがイベントが届いていない」ことを示す。
+#[cfg(target_os = "macos")]
+pub static CALLBACK_COUNT: AtomicU64 = AtomicU64::new(0);
+
 // ---------------------------------------------------------------------------
 // Lock-free channels — shared between platforms
 // ---------------------------------------------------------------------------

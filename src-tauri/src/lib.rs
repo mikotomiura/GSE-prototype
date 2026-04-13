@@ -125,6 +125,12 @@ fn get_diagnostics() -> HashMap<String, String> {
         }
         let preflight = unsafe { CGPreflightListenEventAccess() };
         diag.insert("input_monitoring_granted".into(), preflight.to_string());
+        diag.insert(
+            "callback_count".into(),
+            crate::input::hook::CALLBACK_COUNT
+                .load(Ordering::Relaxed)
+                .to_string(),
+        );
     }
     diag
 }
