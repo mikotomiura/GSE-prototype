@@ -12,6 +12,7 @@ use crate::analysis::{
 use crate::logger::{LogEntry, SessionLogger};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
+#[allow(unused_imports)]
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -475,6 +476,7 @@ pub fn run() {
 
             // イベント受信 (タイムアウトは次の1Hzマークまで)
             match rx.recv_timeout(timeout.max(Duration::from_millis(1))) {
+                #[allow(unused_mut)]
                 Ok(mut event) => {
                     // Windows: 分析スレッド側でリピート検出。
                     // フックコールバックは CLAUDE.md 制約 (3) により Atomic + channel のみ

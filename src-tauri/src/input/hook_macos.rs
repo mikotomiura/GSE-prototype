@@ -5,7 +5,7 @@
 //   10回連続失敗後に Accessibility 権限へ自動フォールバックする。
 // Runs on a dedicated thread with its own CFRunLoop, mirroring the Windows WH_KEYBOARD_LL design.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -574,7 +574,7 @@ pub fn start() {
                     //   6-20回: 5秒間隔 (長めの権限待ち)
                     //   21回以降: 10秒間隔 (CPU 節約しつつ永続的にリトライ)
                     let sleep_secs = if consecutive_failures <= 5 {
-                        if consecutive_failures == 1 || already_granted {
+                        if consecutive_failures == 1 || im_granted {
                             tracing::warn!(
                                 "CGEventTap creation failed via {} (attempt {}), retrying in 2s...",
                                 mode_label, consecutive_failures
