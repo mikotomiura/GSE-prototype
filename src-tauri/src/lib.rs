@@ -568,24 +568,29 @@ pub fn run() {
         }
     });
 
-    // IME open ポーリングスレッド (wake-on-keystroke + VK_DBE_* fallback)
-    //
-    // wake チャネル (bounded 1):
-    //   フックコールバックがキー押下ごとに非ブロッキング try_send → ポーリングスレッドが
-    //   recv_timeout(100ms) で即起床 → 5ms 待機後に ImmGetOpenStatus または
-    //   IME_STATE_DIRTY フラグで状態を確認。
-    //   同一ミリ秒 flapping 不可能（LogEntry::ImeState はポーリングスレッドのタイムスタンプ）。
-    //   アイドル時最大ラグ 100ms → アクティブ打鍵時最大ラグ ~5ms。
-    let (poll_wake_tx, poll_wake_rx) = crossbeam_channel::bounded::<()>(1);
-    input::hook::set_poll_wake_sender(poll_wake_tx);
-    input::ime::spawn_ime_open_polling_thread(log_tx_ime_poll, poll_wake_rx);
-
-    // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
-    input::hook::init_hook(tx);
+    // キーボードフック・IME ポーリングの Sender を setup() に渡すために保持。
+    // フックは Tauri 初期化完了後 (setup() 内) でインストールする。
+    // Tauri の run() がウィンドウシステム・tokio ランタイム・WebView2 を初期化するため、
+    // それ以前にフックをインストールすると、初期化過程でフックが無効化される。
+    let hook_tx = tx;
+    let ime_poll_log_tx = log_tx_ime_poll;
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .setup(move |app| {
+            // --- キーボードフック・IME ポーリングの初期化 ---
+            // Tauri の setup() はメインスレッドで、Tauri ランタイム初期化完了後に実行される。
+            // ウィンドウシステムが完全に初期化された後にフックをインストールすることで、
+            // Tauri 初期化がフックを無効化する問題を回避する。
+
+            // IME open ポーリングスレッド (wake-on-keystroke + VK_DBE_* fallback)
+            let (poll_wake_tx, poll_wake_rx) = crossbeam_channel::bounded::<()>(1);
+            input::hook::set_poll_wake_sender(poll_wake_tx);
+            input::ime::spawn_ime_open_polling_thread(ime_poll_log_tx, poll_wake_rx);
+
+            // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
+            input::hook::init_hook(hook_tx);
+
             // Overlay ウィンドウを setup() で事前生成する (hidden, non-maximized)。
             // setup() はメインスレッドで実行されるため、Windows での
             // WebviewWindowBuilder::build() デッドロックを回避できる。

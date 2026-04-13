@@ -1105,15 +1105,17 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
    - *"gse-next" is damaged and can't be opened*
    - *Apple could not verify "gse-next" is free of malware*
 
-   **Open Terminal and run this command before launching the app:**
+   **Open Terminal and run these two commands before launching the app:**
 
    ```bash
    xattr -dr com.apple.quarantine /Applications/gse-next.app
+   codesign --force --deep --sign - /Applications/gse-next.app
    ```
 
-   > **Why this happens:** macOS 10.15+ quarantines all unsigned downloaded apps. The `-dr` flag recursively removes only the `com.apple.quarantine` attribute from the .app bundle and all files inside it, while preserving the code signature and other attributes.
-   >
-   > **Important:** Do NOT use `xattr -cr` (recursive clear of ALL attributes) — it may invalidate the code signature, causing Input Monitoring permission to fail silently.
+   - The first command removes the quarantine flag from all files in the app bundle.
+   - The second command re-signs the app with a local ad-hoc signature. This is required on macOS 14+ (Sonoma/Sequoia) because Gatekeeper validates the code signature even after quarantine removal.
+
+   > **Important:** Do NOT use `xattr -cr` (recursive clear of ALL attributes) — it removes all extended attributes and may invalidate the code signature.
 
 3. **If you still see a Gatekeeper warning after step 2:**
    - **Right-click** (or Control-click) the app → select **"Open"** → click **"Open"** in the dialog
