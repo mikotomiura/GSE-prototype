@@ -96,6 +96,27 @@ fn get_last_keypress_timestamp() -> u64 {
     crate::input::hook::last_key_ms()
 }
 
+/// 診断情報を返す (バグ報告・トラブルシューティング用)
+/// hook_active, last_key_ms, OS, arch, version を含む。
+#[tauri::command]
+fn get_diagnostics() -> HashMap<String, String> {
+    let mut diag = HashMap::new();
+    diag.insert(
+        "hook_active".into(),
+        crate::input::hook::HOOK_ACTIVE
+            .load(Ordering::Relaxed)
+            .to_string(),
+    );
+    diag.insert(
+        "last_key_ms".into(),
+        crate::input::hook::last_key_ms().to_string(),
+    );
+    diag.insert("os".into(), std::env::consts::OS.to_string());
+    diag.insert("arch".into(), std::env::consts::ARCH.to_string());
+    diag.insert("version".into(), env!("CARGO_PKG_VERSION").to_string());
+    diag
+}
+
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
@@ -653,6 +674,7 @@ pub fn run() {
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,
             get_hook_status,
+            get_diagnostics,
             start_session,
             quit_app,
             get_session_file,

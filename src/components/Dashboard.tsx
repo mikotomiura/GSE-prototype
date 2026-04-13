@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
+
+interface DiagnosticInfo {
+  hook_active: string;
+  last_key_ms: string;
+  os: string;
+  arch: string;
+  version: string;
+}
 
 interface DashboardProps {
   cognitiveState: {
@@ -19,6 +28,8 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   const [sessionSeconds, setSessionSeconds] = useState(0);
   // hookActive=false が続いた秒数 (権限バナーの段階的メッセージ表示に使用)
   const [hookWaitingSec, setHookWaitingSec] = useState(0);
+  // 診断情報 (トラブルシューティング用)
+  const [diagnostics, setDiagnostics] = useState<DiagnosticInfo | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -95,6 +106,15 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
                     権限が付与済みでも検知が開始されない場合は、<strong>アプリを再起動</strong>してください。
                   </p>
                 )}
+                {hookWaitingSec >= 60 && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                    それでも解決しない場合はターミナルで以下を実行してください:<br />
+                    <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
+                      xattr -dr com.apple.quarantine /Applications/gse-next.app
+                    </code><br />
+                    その後アプリを再起動してください。
+                  </p>
+                )}
               </>
             ) : (
               <>
@@ -108,7 +128,31 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
                     セキュリティソフトがキーボードフックをブロックしている可能性があります。
                   </p>
                 )}
+                {hookWaitingSec >= 30 && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                    Smart App Control が有効な場合:<br />
+                    <em>設定 › プライバシーとセキュリティ › Windows セキュリティ ›
+                    アプリとブラウザーコントロール</em> で確認してください。
+                  </p>
+                )}
               </>
+            )}
+            {hookWaitingSec >= 20 && !diagnostics && (
+              <button
+                style={{ marginTop: '0.5rem', fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer' }}
+                onClick={() => {
+                  invoke<DiagnosticInfo>("get_diagnostics")
+                    .then(d => setDiagnostics(d))
+                    .catch(() => {});
+                }}
+              >
+                診断情報を表示
+              </button>
+            )}
+            {diagnostics && (
+              <pre style={{ marginTop: '0.5rem', fontSize: '0.75rem', opacity: 0.8, textAlign: 'left' }}>
+                {Object.entries(diagnostics).map(([k, v]) => `${k}: ${v}`).join('\n')}
+              </pre>
             )}
           </div>
         </div>

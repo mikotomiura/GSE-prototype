@@ -58,6 +58,13 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 7
+      - name: Upload portable exe (SAC bypass)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: src-tauri/target/release/gse-next.exe
+          if-no-files-found: warn
+          retention-days: 7
 
   # ── タグ push: macOS ビルド ──────────────────────────────────
   build-macos:
@@ -80,14 +87,19 @@ jobs:
         run: npx tauri build --bundles dmg
         env:
           APPLE_SIGNING_IDENTITY: "-"  # Ad-hoc signing (no Apple Developer certificate)
-      - name: Re-sign app bundle for Gatekeeper compatibility
+      - name: Re-sign app bundle with entitlements
         run: |
           APP=$(find src-tauri/target/release/bundle -name "*.app" -type d | head -1)
           if [ -n "$APP" ]; then
-            echo "Re-signing: $APP"
-            codesign --force --deep --sign - "$APP"
+            echo "Re-signing with entitlements: $APP"
+            # Sign the main binary with entitlements + hardened runtime options
+            codesign --force --sign - --entitlements src-tauri/Entitlements.plist --options runtime "$APP/Contents/MacOS/"*
+            # Sign the top-level .app bundle
+            codesign --force --sign - --entitlements src-tauri/Entitlements.plist --options runtime "$APP"
             echo "Verifying signature..."
             codesign --verify --deep --strict "$APP" && echo "Signature OK" || echo "Signature verification failed"
+            echo "Embedded entitlements:"
+            codesign -d --entitlements - "$APP" 2>&1 || true
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -108,12 +120,20 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Windows artifacts
+      - name: Download Windows NSIS artifacts
         if: ${{ needs.build-windows.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: windows-nsis
           path: artifacts/
+
+      - name: Download Windows portable artifacts
+        if: ${{ needs.build-windows.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: artifacts/
+        continue-on-error: true
 
       - name: Download macOS artifacts
         if: ${{ needs.build-macos.result == 'success' }}

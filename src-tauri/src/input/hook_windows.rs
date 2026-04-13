@@ -10,8 +10,8 @@ use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPAR
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT,
-    MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
+    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT, MSG,
+    PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
     WM_SYSKEYUP,
 };
 
@@ -125,10 +125,7 @@ pub(super) fn start() {
                     HINSTANCE(h.0 as *mut _)
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "GetModuleHandleW failed ({:?}), falling back to NULL",
-                        e
-                    );
+                    tracing::warn!("GetModuleHandleW failed ({:?}), falling back to NULL", e);
                     HINSTANCE::default()
                 }
             }
@@ -137,12 +134,7 @@ pub(super) fn start() {
         loop {
             unsafe {
                 // --- Step 1: Install low-level keyboard hook ---
-                let hook_id = SetWindowsHookExW(
-                    WH_KEYBOARD_LL,
-                    Some(hook_callback),
-                    hinstance,
-                    0,
-                );
+                let hook_id = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_callback), hinstance, 0);
 
                 match hook_id {
                     Ok(h) => {

@@ -401,9 +401,7 @@ pub fn start() {
                  Opening System Settings > Privacy & Security > Input Monitoring..."
             );
             unsafe { CGRequestListenEventAccess() };
-            tracing::info!(
-                "Polling for Input Monitoring permission every 2 seconds..."
-            );
+            tracing::info!("Polling for Input Monitoring permission every 2 seconds...");
         }
 
         let mut consecutive_failures: u32 = 0;
