@@ -1099,21 +1099,25 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
 
 1. Open the downloaded `.dmg` and drag **gse-next** to **Applications**
 
-2. **Remove the quarantine attribute (required)**
+2. **Remove the quarantine attribute (required — run BEFORE first launch)**
 
-   macOS Gatekeeper blocks unsigned apps with a "damaged and can't be opened" error. This is not a real corruption — the app is simply not code-signed. Run the following command in Terminal to remove the quarantine flag:
+   The app is not signed with an Apple Developer ID, so macOS Gatekeeper will block it. You may see one of these messages:
+   - *"gse-next" is damaged and can't be opened*
+   - *Apple could not verify "gse-next" is free of malware*
+
+   **Open Terminal and run this command before launching the app:**
 
    ```bash
    xattr -d com.apple.quarantine /Applications/gse-next.app
    ```
 
-   > **Why this happens:** The app is built without an Apple Developer ID signature. macOS 10.15+ quarantines all unsigned downloaded apps. This command removes only the quarantine attribute while preserving the code signature, which is important for Input Monitoring permission to work correctly.
+   > **Why this happens:** macOS 10.15+ quarantines all unsigned downloaded apps. This command removes only the quarantine attribute while preserving the code signature, which is important for Input Monitoring permission to work correctly.
    >
    > **Important:** Do NOT use `xattr -cr` (recursive clear) — it removes all extended attributes and may invalidate the code signature, causing Input Monitoring permission to fail silently.
 
-3. **If you still see a Gatekeeper warning on first launch:**
-   - Open **System Settings → Privacy & Security**
-   - Scroll down to the blocked app notice → click **"Open Anyway"**
+3. **If you still see a Gatekeeper warning after step 2:**
+   - **Right-click** (or Control-click) the app → select **"Open"** → click **"Open"** in the dialog
+   - Or: Open **System Settings → Privacy & Security** → scroll down to the blocked app notice → click **"Open Anyway"**
 
 4. **Grant Input Monitoring permission (required)**
    - **System Settings → Privacy & Security → Input Monitoring**

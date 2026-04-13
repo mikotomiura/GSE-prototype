@@ -8,10 +8,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use lazy_static::lazy_static;
 use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT, MSG,
-    WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    CallNextHookEx, DispatchMessageW, GetMessageW, PeekMessageW, SetWindowsHookExW, HHOOK,
+    KBDLLHOOKSTRUCT, MSG, PM_NOREMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
+    WM_SYSKEYUP,
 };
 
 use super::{
@@ -97,13 +99,43 @@ pub(super) fn start() {
     thread::spawn(|| {
         let mut consecutive_failures: u32 = 0;
 
+        // --- Step 0: メッセージキューの事前初期化 ---
+        // WH_KEYBOARD_LL はインストールスレッドにメッセージキューを要求する。
+        // PeekMessageW を呼ぶことでキューが確実に作成される。
+        // これを省略すると、一部の Windows 11 環境でフックが
+        // インストールされてもコールバックが呼ばれない問題が起きる。
+        unsafe {
+            let mut msg = MSG::default();
+            let _ = PeekMessageW(&mut msg, None, 0, 0, PM_NOREMOVE);
+        }
+        tracing::info!("Hook thread message queue initialized");
+
+        // --- Step 0b: モジュールハンドル取得 ---
+        // HINSTANCE::default() (NULL) の代わりに実モジュールハンドルを使用する。
+        // Windows 11 の一部環境で NULL を渡すとフックが無効になるケースがある。
+        let hinstance = unsafe {
+            match GetModuleHandleW(None) {
+                Ok(h) => {
+                    tracing::info!("Module handle obtained: {:?}", h.0);
+                    HINSTANCE(h.0 as *mut _)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "GetModuleHandleW failed ({:?}), falling back to NULL",
+                        e
+                    );
+                    HINSTANCE::default()
+                }
+            }
+        };
+
         loop {
             unsafe {
                 // --- Step 1: Install low-level keyboard hook ---
                 let hook_id = SetWindowsHookExW(
                     WH_KEYBOARD_LL,
                     Some(hook_callback),
-                    HINSTANCE::default(),
+                    hinstance,
                     0,
                 );
 
