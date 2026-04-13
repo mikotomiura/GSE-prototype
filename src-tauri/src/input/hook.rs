@@ -1,4 +1,6 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+#[cfg(target_os = "macos")]
+use std::sync::atomic::AtomicU32;
 use std::sync::OnceLock;
 
 use crossbeam_channel::Sender;
@@ -79,6 +81,11 @@ pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// 0 のままなら「タップは作成されたがイベントが届いていない」ことを示す。
 #[cfg(target_os = "macos")]
 pub static CALLBACK_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// macOS: CGEventTap 作成の連続失敗回数（診断用）。
+/// TCC 権限が付与されていない、またはコード署名の問題を示す。
+#[cfg(target_os = "macos")]
+pub static CONSECUTIVE_TAP_FAILURES: AtomicU32 = AtomicU32::new(0);
 
 // ---------------------------------------------------------------------------
 // Lock-free channels — shared between platforms

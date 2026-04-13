@@ -131,8 +131,93 @@ fn get_diagnostics() -> HashMap<String, String> {
                 .load(Ordering::Relaxed)
                 .to_string(),
         );
+        diag.insert(
+            "consecutive_tap_failures".into(),
+            crate::input::hook::CONSECUTIVE_TAP_FAILURES
+                .load(Ordering::Relaxed)
+                .to_string(),
+        );
+
+        // バンドルパス: .app まで遡って報告
+        if let Ok(exe) = std::env::current_exe() {
+            let bundle_path = exe
+                .ancestors()
+                .find(|p| p.extension().map_or(false, |e| e == "app"))
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| exe.to_string_lossy().to_string());
+            diag.insert("bundle_path".into(), bundle_path);
+        }
+
+        // quarantine xattr の有無
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(app_path) = exe
+                .ancestors()
+                .find(|p| p.extension().map_or(false, |e| e == "app"))
+            {
+                let has_quarantine = std::process::Command::new("xattr")
+                    .args(["-p", "com.apple.quarantine"])
+                    .arg(app_path)
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false);
+                diag.insert("quarantine_present".into(), has_quarantine.to_string());
+            }
+        }
+
+        // コード署名の有効性
+        if let Ok(exe) = std::env::current_exe() {
+            let codesign_ok = std::process::Command::new("codesign")
+                .args(["--verify", "--strict"])
+                .arg(&exe)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            diag.insert("codesign_valid".into(), codesign_ok.to_string());
+        }
     }
     diag
+}
+
+/// macOS: Input Monitoring の TCC エントリをリセットし、System Settings を再度開く。
+/// ユーザーが権限を付与しても CGEventTap が作成できない場合の最終手段。
+/// tccutil reset ListenEvent は全アプリの Input Monitoring をリセットする点に注意。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn reset_input_monitoring() -> String {
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn CGRequestListenEventAccess() -> bool;
+    }
+
+    let output = std::process::Command::new("tccutil")
+        .args(["reset", "ListenEvent"])
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => {
+            tracing::info!("TCC ListenEvent reset successful, re-requesting permission...");
+            unsafe {
+                CGRequestListenEventAccess();
+            }
+            "TCC reset successful. System Settings should open.".into()
+        }
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr).to_string();
+            tracing::warn!("tccutil failed: {}", stderr);
+            format!("tccutil failed: {}", stderr)
+        }
+        Err(e) => {
+            tracing::error!("Failed to run tccutil: {}", e);
+            format!("Failed to run tccutil: {}", e)
+        }
+    }
+}
+
+/// Windows: reset_input_monitoring のスタブ（no-op）。
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn reset_input_monitoring() -> String {
+    "Not applicable on this platform".into()
 }
 
 /// 現在のセッションログファイルのパスを返す (UI表示用)
@@ -693,6 +778,7 @@ pub fn run() {
             get_last_keypress_timestamp,
             get_hook_status,
             get_diagnostics,
+            reset_input_monitoring,
             start_session,
             quit_app,
             get_session_file,

@@ -87,19 +87,30 @@ jobs:
         run: npx tauri build --bundles dmg
         env:
           APPLE_SIGNING_IDENTITY: "-"  # Ad-hoc signing (no Apple Developer certificate)
-      - name: Re-sign app bundle with entitlements
+      - name: Re-sign app bundle with entitlements (layered, no --deep)
         run: |
           APP=$(find src-tauri/target/release/bundle -name "*.app" -type d | head -1)
           if [ -n "$APP" ]; then
-            echo "Re-signing with entitlements: $APP"
-            # Ad-hoc signing: --options runtime は使用しない。
-            # Hardened Runtime は Developer ID 署名を前提としており、
-            # ad-hoc 署名との組み合わせで TCC (Input Monitoring) の
-            # 権限チェックが過度に厳格になる問題が確認されている。
-            codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP"
-            echo "Verifying signature..."
-            codesign --verify --deep --strict "$APP" && echo "Signature OK" || echo "Signature verification failed"
-            echo "Embedded entitlements:"
+            BINARY="$APP/Contents/MacOS/gse-next"
+            ENTITLEMENTS="src-tauri/Entitlements.plist"
+
+            # レイヤード署名: --deep は Apple 非推奨。
+            # ネスト署名の不整合が TCC の権限拒否を引き起こす可能性があるため、
+            # 内部バイナリ → 外部バンドルの順に個別署名する。
+            # --options runtime は ad-hoc 署名では使用しない（TCC 過剰検証の原因）。
+            echo "=== Signing inner binary ==="
+            codesign --force --sign - --entitlements "$ENTITLEMENTS" "$BINARY"
+
+            echo "=== Signing app bundle ==="
+            codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP"
+
+            echo "=== Verification ==="
+            codesign --verify --strict "$APP" && echo "Signature OK" || echo "Signature verification failed"
+
+            echo "=== CDHash (for TCC debugging) ==="
+            codesign -dvvv "$APP" 2>&1 | grep -E "CDHash|Identifier|TeamIdentifier" || true
+
+            echo "=== Embedded entitlements ==="
             codesign -d --entitlements - "$APP" 2>&1 || true
           fi
       - uses: actions/upload-artifact@v4

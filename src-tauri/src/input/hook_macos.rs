@@ -27,7 +27,7 @@ extern "C" {
     fn CGRequestListenEventAccess() -> bool;
 }
 
-use super::{CALLBACK_COUNT, HOOK_ACTIVE};
+use super::{CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, HOOK_ACTIVE};
 
 // ---------------------------------------------------------------------------
 // macOS typing key filter (raw CGKeyCode)
@@ -445,6 +445,7 @@ pub fn start() {
                 Ok(tap) => {
                     // タップ作成成功 → 連続失敗カウンタをリセット
                     consecutive_failures = 0;
+                    CONSECUTIVE_TAP_FAILURES.store(0, Ordering::Relaxed);
 
                     let loop_source = match tap.mach_port.create_runloop_source(0) {
                         Ok(source) => source,
@@ -486,6 +487,7 @@ pub fn start() {
                 }
                 Err(_) => {
                     consecutive_failures += 1;
+                    CONSECUTIVE_TAP_FAILURES.store(consecutive_failures, Ordering::Relaxed);
 
                     // Backoff strategy:
                     //   1-5回: 2秒間隔 (TCC 伝播待ち / 権限付与待ち)

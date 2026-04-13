@@ -8,6 +8,12 @@ interface DiagnosticInfo {
   os: string;
   arch: string;
   version: string;
+  input_monitoring_granted?: string;
+  callback_count?: string;
+  consecutive_tap_failures?: string;
+  bundle_path?: string;
+  quarantine_present?: string;
+  codesign_valid?: string;
 }
 
 interface DashboardProps {
@@ -30,6 +36,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   const [hookWaitingSec, setHookWaitingSec] = useState(0);
   // 診断情報 (トラブルシューティング用)
   const [diagnostics, setDiagnostics] = useState<DiagnosticInfo | null>(null);
+  // TCC リセット実行結果メッセージ
+  const [resetResult, setResetResult] = useState<string | null>(null);
+  // 診断コピー済みフラグ
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -39,7 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   }, []);
 
   // hookActive=false の間、経過秒数をカウントする。
-  // 30秒経過後に「アプリ再起動」ガイダンスを追加表示する。
+  // 30秒経過後に段階的ガイダンスを追加表示する。
   useEffect(() => {
     if (hookActive !== false) {
       setHookWaitingSec(0);
@@ -50,6 +60,15 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
     }, 1000);
     return () => clearInterval(interval);
   }, [hookActive]);
+
+  // macOS: 30秒経過で自動的に診断情報を取得（60s の条件分岐メッセージに必要）
+  useEffect(() => {
+    if (hookWaitingSec === 30 && !diagnostics) {
+      invoke<DiagnosticInfo>("get_diagnostics")
+        .then(d => setDiagnostics(d))
+        .catch(() => {});
+    }
+  }, [hookWaitingSec, diagnostics]);
 
   const getMaxState = () => {
     const { flow, incubation, stuck } = cognitiveState;
@@ -103,17 +122,54 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
                 </p>
                 {hookWaitingSec >= 30 && (
                   <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                    権限が付与済みでも検知が開始されない場合は、<strong>アプリを再起動</strong>してください。
+                    gse-next が既にチェック済みの場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
+                    アップデート後はセキュリティ署名が変わるため、再設定が必要です。
                   </p>
                 )}
-                {hookWaitingSec >= 60 && (
+                {hookWaitingSec >= 60 && diagnostics?.codesign_valid === 'false' && (
                   <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                    それでも解決しない場合はターミナルで以下を実行してください:<br />
+                    コード署名が無効です。ターミナルで以下を実行してください:<br />
+                    <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
+                      codesign --force --sign - /Applications/gse-next.app
+                    </code><br />
+                    その後アプリを再起動してください。
+                  </p>
+                )}
+                {hookWaitingSec >= 60 && diagnostics?.quarantine_present === 'true' && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                    quarantine 属性が残っています。ターミナルで以下を実行してください:<br />
                     <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
                       xattr -dr com.apple.quarantine /Applications/gse-next.app
                     </code><br />
                     その後アプリを再起動してください。
                   </p>
+                )}
+                {hookWaitingSec >= 60 && (!diagnostics || (diagnostics?.codesign_valid !== 'false' && diagnostics?.quarantine_present !== 'true')) && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                    それでも解決しない場合は、<strong>アプリを再起動</strong>してください。
+                  </p>
+                )}
+                {hookWaitingSec >= 90 && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <button
+                      style={{ fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer', marginRight: '0.5rem' }}
+                      onClick={() => {
+                        invoke<string>("reset_input_monitoring")
+                          .then(msg => setResetResult(msg))
+                          .catch(e => setResetResult(`Error: ${e}`));
+                      }}
+                    >
+                      権限をリセット
+                    </button>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                      (全アプリの入力監視権限がリセットされます)
+                    </span>
+                    {resetResult && (
+                      <p style={{ marginTop: '0.3rem', fontSize: '0.75rem', opacity: 0.8 }}>
+                        {resetResult}
+                      </p>
+                    )}
+                  </div>
                 )}
               </>
             ) : (
@@ -150,9 +206,23 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
               </button>
             )}
             {diagnostics && (
-              <pre style={{ marginTop: '0.5rem', fontSize: '0.75rem', opacity: 0.8, textAlign: 'left' }}>
-                {Object.entries(diagnostics).map(([k, v]) => `${k}: ${v}`).join('\n')}
-              </pre>
+              <div style={{ marginTop: '0.5rem' }}>
+                <pre style={{ fontSize: '0.75rem', opacity: 0.8, textAlign: 'left', margin: 0 }}>
+                  {Object.entries(diagnostics).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                </pre>
+                <button
+                  style={{ marginTop: '0.3rem', fontSize: '0.75rem', padding: '2px 8px', cursor: 'pointer' }}
+                  onClick={() => {
+                    const text = Object.entries(diagnostics).map(([k, v]) => `${k}: ${v}`).join('\n');
+                    navigator.clipboard.writeText(text).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }).catch(() => {});
+                  }}
+                >
+                  {copied ? 'Copied!' : '診断情報をコピー'}
+                </button>
+              </div>
             )}
           </div>
         </div>
