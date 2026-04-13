@@ -47,7 +47,11 @@ const EVENT_OBJECT_IME_HIDE: u32 = 0x8018;
 const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
 
-// Wrapper to make HHOOK Send+Sync for lazy_static
+// Wrapper to make HHOOK Send+Sync for lazy_static.
+// SAFETY: HHOOK / HWINEVENTHOOK はインストールスレッドでのみ操作される。
+// lazy_static Mutex で排他制御されており、他スレッドからの直接操作は行わない。
+// これらのハンドルをインストールスレッド以外から UnhookWindowsHookEx 等で
+// 操作してはならない。
 struct ThreadSafeHook(#[allow(dead_code)] HHOOK);
 unsafe impl Send for ThreadSafeHook {}
 unsafe impl Sync for ThreadSafeHook {}
@@ -104,6 +108,8 @@ pub(super) fn start() {
         // PeekMessageW を呼ぶことでキューが確実に作成される。
         // これを省略すると、一部の Windows 11 環境でフックが
         // インストールされてもコールバックが呼ばれない問題が起きる。
+        // SAFETY: PeekMessageW は zeroed MSG 構造体で安全に呼び出せる。
+        // メッセージキューの事前初期化のみが目的。
         unsafe {
             let mut msg = MSG::default();
             let _ = PeekMessageW(&mut msg, None, 0, 0, PM_NOREMOVE);
@@ -113,6 +119,7 @@ pub(super) fn start() {
         // --- Step 0b: モジュールハンドル取得 ---
         // HINSTANCE::default() (NULL) の代わりに実モジュールハンドルを使用する。
         // Windows 11 の一部環境で NULL を渡すとフックが無効になるケースがある。
+        // SAFETY: GetModuleHandleW(None) は現在のプロセスモジュールハンドルを返す。常に安全。
         let hinstance = unsafe {
             match GetModuleHandleW(None) {
                 Ok(h) => {
@@ -143,7 +150,8 @@ pub(super) fn start() {
                     Ok(h) => {
                         consecutive_failures = 0;
                         {
-                            let mut handle = (*HOOK_HANDLE).lock().unwrap();
+                            let mut handle =
+                                (*HOOK_HANDLE).lock().unwrap_or_else(|p| p.into_inner());
                             *handle = Some(ThreadSafeHook(h));
                         }
 
@@ -164,7 +172,9 @@ pub(super) fn start() {
                             tracing::info!(
                                 "IME WinEvent hook installed (cross-process IME detection active)"
                             );
-                            let mut handle = (*WINEVENT_HOOK_HANDLE).lock().unwrap();
+                            let mut handle = (*WINEVENT_HOOK_HANDLE)
+                                .lock()
+                                .unwrap_or_else(|p| p.into_inner());
                             *handle = Some(ThreadSafeWinEventHook(ime_hook));
                         }
 
@@ -297,9 +307,12 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             }
 
             // Send typing keys to analysis thread (filter repeats + non-typing keys).
+            // CLAUDE.md 制約 (3): フックコールバック内は Atomic + channel send のみ。
+            // Mutex::lock() はブロッキングのため禁止。try_lock() で非ブロッキング取得し、
+            // 取得失敗時はリピート判定をスキップする（安全側に倒す）。
             if is_typing_key(vk_code) {
                 let mut is_repeat = false;
-                if let Ok(mut held) = PRESSED_KEYS.lock() {
+                if let Ok(mut held) = PRESSED_KEYS.try_lock() {
                     if is_press {
                         is_repeat = !held.insert(vk_code);
                     } else {
