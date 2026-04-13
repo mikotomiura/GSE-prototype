@@ -1,6 +1,5 @@
 // Windows keyboard hook via WH_KEYBOARD_LL + WinEvent for cross-process IME detection.
 
-use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use std::thread;
@@ -63,7 +62,6 @@ unsafe impl Sync for ThreadSafeWinEventHook {}
 lazy_static! {
     static ref HOOK_HANDLE: Mutex<Option<ThreadSafeHook>> = Mutex::new(None);
     static ref WINEVENT_HOOK_HANDLE: Mutex<Option<ThreadSafeWinEventHook>> = Mutex::new(None);
-    static ref PRESSED_KEYS: Mutex<HashSet<u32>> = Mutex::new(HashSet::new());
 }
 
 /// WinEvent callback for cross-process IME composition detection.
@@ -306,26 +304,17 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                 }
             }
 
-            // Send typing keys to analysis thread (filter repeats + non-typing keys).
+            // Send typing keys to analysis thread (filter non-typing keys).
             // CLAUDE.md 制約 (3): フックコールバック内は Atomic + channel send のみ。
-            // Mutex::lock() はブロッキングのため禁止。try_lock() で非ブロッキング取得し、
-            // 取得失敗時はリピート判定をスキップする（安全側に倒す）。
+            // リピート検出は分析スレッド側で HashSet を使って実行する。
+            // フックコールバックからは is_repeat = false 固定で全イベントを送信。
             if is_typing_key(vk_code) {
-                let mut is_repeat = false;
-                if let Ok(mut held) = PRESSED_KEYS.try_lock() {
-                    if is_press {
-                        is_repeat = !held.insert(vk_code);
-                    } else {
-                        held.remove(&vk_code);
-                    }
-                }
-
                 let is_backspace = vk_code == 0x08 || vk_code == 0x2E;
                 let event = InputEvent {
                     vk_code,
                     timestamp,
                     is_press,
-                    is_repeat,
+                    is_repeat: false, // 分析スレッドで判定 (§4.1 Atomic flags 設計準拠)
                     is_backspace,
                 };
                 if let Some(sender) = EVENT_SENDER.get() {

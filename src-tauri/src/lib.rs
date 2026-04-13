@@ -12,7 +12,7 @@ use crate::analysis::{
 use crate::logger::{LogEntry, SessionLogger};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -304,6 +304,13 @@ pub fn run() {
         let mut presses_since_silence: u32 = 0;
         // IME ポーズ→復帰時にバッファをクリアするための追跡フラグ
         let mut was_paused = false;
+        // Windows リピートキー検出用 (分析スレッドのローカル状態 — Mutex 不要)。
+        // macOS は CGEventTap の KEYBOARD_EVENT_AUTOREPEAT フィールドでフック層で検出するが、
+        // Windows の WH_KEYBOARD_LL にはリピートフラグがないため、
+        // 押下中キーの HashSet で Press/Release ペアを追跡して検出する。
+        // CLAUDE.md 制約 (3) 準拠: フックコールバック内から Mutex を排除。
+        #[cfg(target_os = "windows")]
+        let mut pressed_keys: HashSet<u32> = HashSet::new();
 
         loop {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
@@ -319,6 +326,8 @@ pub fn run() {
                 last_event_time = Instant::now();
                 next_engine_update = Instant::now();
                 presses_since_silence = 0;
+                #[cfg(target_os = "windows")]
+                pressed_keys.clear();
             }
 
             // 動的タイムアウト: 次の1Hzマークまでの残り時間
@@ -331,7 +340,23 @@ pub fn run() {
 
             // イベント受信 (タイムアウトは次の1Hzマークまで)
             match rx.recv_timeout(timeout.max(Duration::from_millis(1))) {
-                Ok(event) => {
+                Ok(mut event) => {
+                    // Windows: 分析スレッド側でリピート検出。
+                    // フックコールバックは CLAUDE.md 制約 (3) により Atomic + channel のみ
+                    // のため、is_repeat = false 固定で送信される。ここで HashSet を使って
+                    // Press/Release ペアを追跡し、リピートを判定する。
+                    // macOS: フック層の CGEventTap AUTOREPEAT フラグで既に判定済み。
+                    #[cfg(target_os = "windows")]
+                    {
+                        if event.is_press {
+                            if !pressed_keys.insert(event.vk_code) {
+                                event.is_repeat = true;
+                            }
+                        } else {
+                            pressed_keys.remove(&event.vk_code);
+                        }
+                    }
+
                     // キーイベントをログ記録（全打鍵を記録、推論頻度とは独立）
                     let _ = log_tx_analysis.try_send(LogEntry::Key {
                         vk_code: event.vk_code,

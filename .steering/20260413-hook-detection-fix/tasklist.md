@@ -43,8 +43,15 @@
 - [x] cargo check 成功確認
 
 ## レビュー
-- [ ] code-reviewer によるレビュー（未実施 — 手順違反）
-- [ ] security-checker によるレビュー（未実施 — 手順違反）
+- [x] code-reviewer によるレビュー（1回目: CRITICAL/HIGH 指摘 → 修正、2回目: 全パス）
+- [x] security-checker によるレビュー（既存の wall_server.rs 問題を検出、今回スコープ外）
+
+## 実装 (v0.1.12 — PRESSED_KEYS Mutex 完全除去)
+- [x] hook_windows.rs: PRESSED_KEYS (Mutex<HashSet>) をフックコールバックから完全除去
+- [x] lib.rs: 分析スレッドに pressed_keys HashSet 追加 (cfg(windows) ガード)
+- [x] ci.yml: macOS ビルドに codesign 再署名ステップ追加
+- [x] code-reviewer で CLAUDE.md 完全準拠を確認
+- [x] cargo check 成功確認
 
 ## ドキュメント
 - [x] README.md / README.ja.md 更新
