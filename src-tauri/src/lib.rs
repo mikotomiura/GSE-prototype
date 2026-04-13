@@ -114,7 +114,7 @@ fn get_diagnostics() -> HashMap<String, String> {
     diag.insert("os".into(), std::env::consts::OS.to_string());
     diag.insert("arch".into(), std::env::consts::ARCH.to_string());
     diag.insert("version".into(), env!("CARGO_PKG_VERSION").to_string());
-    // macOS: Input Monitoring 権限の TCC 状態を診断に含める。
+    // macOS: Input Monitoring / Accessibility 権限の TCC 状態を診断に含める。
     // CGPreflightListenEventAccess() が true でも CGEventTap が動作しない場合、
     // コード署名と TCC データベースの不一致が原因と判断できる。
     #[cfg(target_os = "macos")]
@@ -122,9 +122,15 @@ fn get_diagnostics() -> HashMap<String, String> {
         #[link(name = "ApplicationServices", kind = "framework")]
         extern "C" {
             fn CGPreflightListenEventAccess() -> bool;
+            fn AXIsProcessTrusted() -> bool;
         }
+        // SAFETY: CGPreflightListenEventAccess / AXIsProcessTrusted は
+        // pure read-only の TCC チェック。メモリ安全性への影響なし。
         let preflight = unsafe { CGPreflightListenEventAccess() };
+        let ax_trusted = unsafe { AXIsProcessTrusted() };
+
         diag.insert("input_monitoring_granted".into(), preflight.to_string());
+        diag.insert("ax_is_trusted".into(), ax_trusted.to_string());
         diag.insert(
             "callback_count".into(),
             crate::input::hook::CALLBACK_COUNT
@@ -137,19 +143,24 @@ fn get_diagnostics() -> HashMap<String, String> {
                 .load(Ordering::Relaxed)
                 .to_string(),
         );
+        diag.insert(
+            "using_accessibility_fallback".into(),
+            crate::input::hook::USING_ACCESSIBILITY_FALLBACK
+                .load(Ordering::Relaxed)
+                .to_string(),
+        );
 
-        // バンドルパス: .app まで遡って報告
+        // current_exe() を1回だけ呼び出して再利用する
         if let Ok(exe) = std::env::current_exe() {
+            // バンドルパス: .app まで遡って報告
             let bundle_path = exe
                 .ancestors()
                 .find(|p| p.extension().map_or(false, |e| e == "app"))
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|| exe.to_string_lossy().to_string());
             diag.insert("bundle_path".into(), bundle_path);
-        }
 
-        // quarantine xattr の有無
-        if let Ok(exe) = std::env::current_exe() {
+            // quarantine xattr の有無
             if let Some(app_path) = exe
                 .ancestors()
                 .find(|p| p.extension().map_or(false, |e| e == "app"))
@@ -162,10 +173,8 @@ fn get_diagnostics() -> HashMap<String, String> {
                     .unwrap_or(false);
                 diag.insert("quarantine_present".into(), has_quarantine.to_string());
             }
-        }
 
-        // コード署名の有効性
-        if let Ok(exe) = std::env::current_exe() {
+            // コード署名の有効性
             let codesign_ok = std::process::Command::new("codesign")
                 .args(["--verify", "--strict"])
                 .arg(&exe)
@@ -196,6 +205,8 @@ fn reset_input_monitoring() -> String {
     match output {
         Ok(o) if o.status.success() => {
             tracing::info!("TCC ListenEvent reset successful, re-requesting permission...");
+            // SAFETY: CGRequestListenEventAccess は副作用として System Settings ダイアログを
+            // 表示するのみ。メモリ安全性への影響なし。
             unsafe {
                 CGRequestListenEventAccess();
             }
@@ -203,8 +214,8 @@ fn reset_input_monitoring() -> String {
         }
         Ok(o) => {
             let stderr = String::from_utf8_lossy(&o.stderr).to_string();
-            tracing::warn!("tccutil failed: {}", stderr);
-            format!("tccutil failed: {}", stderr)
+            tracing::warn!("tccutil failed (exit={}): {}", o.status, stderr);
+            "TCC reset failed. Try running in Terminal: tccutil reset ListenEvent".into()
         }
         Err(e) => {
             tracing::error!("Failed to run tccutil: {}", e);

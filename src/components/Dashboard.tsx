@@ -9,8 +9,10 @@ interface DiagnosticInfo {
   arch: string;
   version: string;
   input_monitoring_granted?: string;
+  ax_is_trusted?: string;
   callback_count?: string;
   consecutive_tap_failures?: string;
+  using_accessibility_fallback?: string;
   bundle_path?: string;
   quarantine_present?: string;
   codesign_valid?: string;
@@ -62,8 +64,9 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   }, [hookActive]);
 
   // macOS: 30秒経過で自動的に診断情報を取得（60s の条件分岐メッセージに必要）
+  // === 30 ではなく >= 30 を使用（タイマー tick 飛び対策）
   useEffect(() => {
-    if (hookWaitingSec === 30 && !diagnostics) {
+    if (hookWaitingSec >= 30 && !diagnostics) {
       invoke<DiagnosticInfo>("get_diagnostics")
         .then(d => setDiagnostics(d))
         .catch(() => {});
@@ -113,47 +116,68 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
           <div className="permission-text">
             {navigator.platform.startsWith('Mac') ? (
               <>
-                <strong>Input Monitoring 権限が必要です</strong>
-                <p>
-                  System Settings が自動で開かれました。<br />
-                  <em>プライバシーとセキュリティ › 入力監視</em> で
-                  <strong> gse-next </strong>にチェックを入れてください。
-                  権限が付与されると自動的に検知が開始されます。
-                </p>
-                {hookWaitingSec >= 30 && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                    gse-next が既にチェック済みの場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
-                    アップデート後はセキュリティ署名が変わるため、再設定が必要です。
-                  </p>
-                )}
-                {hookWaitingSec >= 60 && diagnostics?.codesign_valid === 'false' && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                    コード署名が無効です。ターミナルで以下を実行してください:<br />
-                    <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
-                      codesign --force --sign - /Applications/gse-next.app
-                    </code><br />
-                    その後アプリを再起動してください。
-                  </p>
-                )}
-                {hookWaitingSec >= 60 && diagnostics?.quarantine_present === 'true' && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                    quarantine 属性が残っています。ターミナルで以下を実行してください:<br />
-                    <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
-                      xattr -dr com.apple.quarantine /Applications/gse-next.app
-                    </code><br />
-                    その後アプリを再起動してください。
-                  </p>
-                )}
-                {hookWaitingSec >= 60 && (!diagnostics || (diagnostics?.codesign_valid !== 'false' && diagnostics?.quarantine_present !== 'true')) && (
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                    それでも解決しない場合は、<strong>アプリを再起動</strong>してください。
-                  </p>
+                {diagnostics?.using_accessibility_fallback === 'true' ? (
+                  <>
+                    <strong>Accessibility 権限が必要です</strong>
+                    <p>
+                      入力監視の権限取得に失敗したため、アクセシビリティ権限に切り替えました。<br />
+                      <em>System Settings › プライバシーとセキュリティ › アクセシビリティ</em> で
+                      <strong> gse-next </strong>にチェックを入れてください。
+                    </p>
+                    {hookWaitingSec >= 30 && (
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                        gse-next が既にチェック済みの場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <strong>Input Monitoring 権限が必要です</strong>
+                    <p>
+                      System Settings が自動で開かれました。<br />
+                      <em>プライバシーとセキュリティ › 入力監視</em> で
+                      <strong> gse-next </strong>にチェックを入れてください。
+                      権限が付与されると自動的に検知が開始されます。
+                    </p>
+                    {hookWaitingSec >= 30 && (
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                        gse-next が既にチェック済みの場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
+                        アップデート後はセキュリティ署名が変わるため、再設定が必要です。
+                      </p>
+                    )}
+                    {hookWaitingSec >= 60 && (() => {
+                      if (diagnostics?.codesign_valid === 'false') return (
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                          コード署名が無効です。ターミナルで以下を実行してください:<br />
+                          <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
+                            codesign --force --sign - /Applications/gse-next.app
+                          </code><br />
+                          その後アプリを再起動してください。
+                        </p>
+                      );
+                      if (diagnostics?.quarantine_present === 'true') return (
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                          quarantine 属性が残っています。ターミナルで以下を実行してください:<br />
+                          <code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
+                            xattr -dr com.apple.quarantine /Applications/gse-next.app
+                          </code><br />
+                          その後アプリを再起動してください。
+                        </p>
+                      );
+                      return (
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                          約20秒後にアクセシビリティ権限へ自動切替されます。それまでお待ちください。
+                        </p>
+                      );
+                    })()}
+                  </>
                 )}
                 {hookWaitingSec >= 90 && (
                   <div style={{ marginTop: '0.5rem' }}>
                     <button
                       style={{ fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer', marginRight: '0.5rem' }}
                       onClick={() => {
+                        if (!window.confirm('全アプリの入力監視権限がリセットされます。続行しますか？')) return;
                         invoke<string>("reset_input_monitoring")
                           .then(msg => setResetResult(msg))
                           .catch(e => setResetResult(`Error: ${e}`));
@@ -161,9 +185,6 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
                     >
                       権限をリセット
                     </button>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
-                      (全アプリの入力監視権限がリセットされます)
-                    </span>
                     {resetResult && (
                       <p style={{ marginTop: '0.3rem', fontSize: '0.75rem', opacity: 0.8 }}>
                         {resetResult}

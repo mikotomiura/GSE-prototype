@@ -87,6 +87,12 @@ pub static CALLBACK_COUNT: AtomicU64 = AtomicU64::new(0);
 #[cfg(target_os = "macos")]
 pub static CONSECUTIVE_TAP_FAILURES: AtomicU32 = AtomicU32::new(0);
 
+/// macOS: Input Monitoring 失敗時に Accessibility 権限へフォールバックしたかどうか。
+/// ad-hoc 署名では Input Monitoring の TCC CDHash 認証が不安定なため、
+/// 10回連続失敗後に CGEventTapOptions::Default（Accessibility 権限）へ切り替える。
+#[cfg(target_os = "macos")]
+pub static USING_ACCESSIBILITY_FALLBACK: AtomicBool = AtomicBool::new(false);
+
 // ---------------------------------------------------------------------------
 // Lock-free channels — shared between platforms
 // ---------------------------------------------------------------------------

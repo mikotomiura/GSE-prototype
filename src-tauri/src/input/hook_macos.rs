@@ -1,5 +1,8 @@
 // macOS keyboard hook via CGEventTap.
-// Uses kCGEventTapOptionListenOnly → requires Input Monitoring permission only.
+// Primary: kCGEventTapOptionListenOnly → requires Input Monitoring permission.
+// Fallback: kCGEventTapOptionDefault → requires Accessibility permission.
+//   ad-hoc 署名では Input Monitoring の TCC CDHash 認証が不安定なため、
+//   10回連続失敗後に Accessibility 権限へ自動フォールバックする。
 // Runs on a dedicated thread with its own CFRunLoop, mirroring the Windows WH_KEYBOARD_LL design.
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,9 +28,12 @@ use crate::analysis::features::InputEvent;
 extern "C" {
     fn CGPreflightListenEventAccess() -> bool;
     fn CGRequestListenEventAccess() -> bool;
+    // Accessibility permission check.
+    // Returns true if this process is trusted for Accessibility.
+    fn AXIsProcessTrusted() -> bool;
 }
 
-use super::{CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, HOOK_ACTIVE};
+use super::{CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, HOOK_ACTIVE, USING_ACCESSIBILITY_FALLBACK};
 
 // ---------------------------------------------------------------------------
 // macOS typing key filter (raw CGKeyCode)
@@ -387,14 +393,18 @@ fn update_compose_state(vk: u32) {
 /// Permission flow:
 /// 1. Check `CGPreflightListenEventAccess()` — fast, no side-effects.
 /// 2. If not granted, call `CGRequestListenEventAccess()` — opens System Settings.
-/// 3. Unified loop: try creating the REAL tap directly. If it fails, sleep and retry.
-///    This eliminates the probe-then-real two-step pattern that caused resource leaks
-///    when the probe CGEventTap was dropped without proper cleanup.
+/// 3. Unified loop: try creating the tap directly. If it fails, sleep and retry.
+/// 4. **Accessibility fallback**: After 10 consecutive ListenOnly failures,
+///    switch to `CGEventTapOptions::Default` (requires Accessibility permission).
+///    ad-hoc 署名では Input Monitoring の TCC CDHash 認証が不安定なため、
+///    異なる TCC パスを試すことで権限取得の成功率を向上させる。
 ///
 /// `HOOK_ACTIVE` is set to true only after a successful tap installation.
 pub fn start() {
     thread::spawn(|| {
         // --- Step 1: Check current permission status ---
+        // SAFETY: CGPreflightListenEventAccess は pure read-only の TCC チェック。
+        // メモリ安全性への影響なし。
         let already_granted = unsafe { CGPreflightListenEventAccess() };
 
         if !already_granted {
@@ -403,41 +413,85 @@ pub fn start() {
                 "Input Monitoring permission not granted. \
                  Opening System Settings > Privacy & Security > Input Monitoring..."
             );
+            // SAFETY: CGRequestListenEventAccess はシステムダイアログ表示のみ。
+            // メモリ安全性への影響なし。
             unsafe { CGRequestListenEventAccess() };
             tracing::info!("Polling for Input Monitoring permission every 2 seconds...");
         }
 
         let mut consecutive_failures: u32 = 0;
+        let mut use_accessibility = false;
 
         // --- Step 3: Resilient tap creation loop (never gives up) ---
         //
-        // Whether permission was pre-granted or we're waiting for the user,
-        // we use the same loop: try to create the REAL tap (with full callback
-        // and both KeyDown+KeyUp events). If it fails, permission hasn't been
-        // granted yet; sleep and retry.
-        //
-        // 旧実装ではプローブ用 CGEventTap を作成→ドロップ→本番タップ再作成していたが、
-        // core-graphics クレートの Drop が CGEventTap リソースを完全に解放しないため、
-        // 本番タップの作成が失敗する問題があった。この unified loop で根本解決する。
-        //
-        // 自動復旧: CFRunLoop が終了した場合（macOS がタップを無効化した場合）は
-        // スレッドを終了せず、ループ先頭に戻ってタップを再作成する。
-        // これにより、スリープ復帰・権限変更・システム負荷での一時的な無効化から
-        // 自動的に復旧する。
+        // ListenOnly (Input Monitoring) → 10回失敗後 → Default (Accessibility) にフォールバック。
         //
         // HeadInsertEventTap + ListenOnly: イベントチェーンの先頭で受動的に傍受。
         // rdev クレート等の実績ある実装と同じ組み合わせ。
-        // 旧実装では TailAppendEventTap を使用していたが、macOS 13+ で
-        // ListenOnly タップにイベントが配信されない問題が確認されたため変更。
+        //
+        // Default (Accessibility fallback): 同じ HeadInsertEventTap だが active tap として作成。
+        // コールバックは event.clone() を返してイベントを変更せずに通過させる。
+        // Input Monitoring とは異なる TCC カテゴリ (kTCCServiceAccessibility) を使用するため、
+        // ad-hoc 署名の CDHash 問題を回避できる可能性がある。
+        //
+        // 自動復旧: CFRunLoop が終了した場合はループ先頭に戻ってタップを再作成する。
         loop {
+            // --- Accessibility fallback trigger ---
+            if !use_accessibility && consecutive_failures >= 10 {
+                tracing::warn!(
+                    "Input Monitoring (ListenOnly) failed {} times. \
+                     Switching to Accessibility permission fallback (Default tap)...",
+                    consecutive_failures
+                );
+                use_accessibility = true;
+                USING_ACCESSIBILITY_FALLBACK.store(true, Ordering::Release);
+                // SAFETY: AXIsProcessTrusted は pure read-only チェック。
+                let ax_trusted = unsafe { AXIsProcessTrusted() };
+                if !ax_trusted {
+                    tracing::info!(
+                        "Accessibility permission not granted. \
+                         Opening System Settings > Accessibility..."
+                    );
+                    if let Err(e) = std::process::Command::new("open")
+                        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+                        .spawn()
+                    {
+                        tracing::warn!("Failed to open System Settings: {}", e);
+                    }
+                }
+                // リセットして Accessibility モードでのリトライを開始
+                consecutive_failures = 0;
+                CONSECUTIVE_TAP_FAILURES.store(0, Ordering::Relaxed);
+            }
+
+            let mode_label = if use_accessibility { "Accessibility" } else { "Input Monitoring" };
+
+            let tap_options = if use_accessibility {
+                CGEventTapOptions::Default
+            } else {
+                CGEventTapOptions::ListenOnly
+            };
+
+            // Accessibility fallback では event を pass-through するため clone が必要。
+            // use_accessibility を closure に move (Copy) でキャプチャする。
+            let ax_mode = use_accessibility;
             let tap = CGEventTap::new(
                 CGEventTapLocation::Session,
                 CGEventTapPlacement::HeadInsertEventTap,
-                CGEventTapOptions::ListenOnly,
+                tap_options,
                 vec![CGEventType::KeyDown, CGEventType::KeyUp],
-                |_proxy, event_type, event| {
+                move |_proxy, event_type, event| {
                     handle_event(event_type, event);
-                    None // ListenOnly: return None (event is not modified)
+                    if ax_mode {
+                        // Default tap: イベントをそのまま通過させる（変更しない）。
+                        // None を返すとイベントが消費（抑制）されてしまう。
+                        // core-graphics の CGEvent::clone() は内部で CGEventCreateCopy() を呼び、
+                        // O(1) のリファレンスカウント操作のみでブロッキングなし。
+                        // &CGEvent → Option<CGEvent> 変換のため clone は API 制約上不可避。
+                        Some(event.clone())
+                    } else {
+                        None // ListenOnly: 戻り値は無視される
+                    }
                 },
             );
 
@@ -457,11 +511,12 @@ pub fn start() {
                             HOOK_ACTIVE.store(false, Ordering::Relaxed);
                             LAST_KEY_MS.store(0, Ordering::Relaxed);
                             std::thread::sleep(std::time::Duration::from_secs(2));
-                            continue; // ← return ではなく continue で再試行
+                            continue;
                         }
                     };
 
                     let run_loop = CFRunLoop::get_current();
+                    // SAFETY: kCFRunLoopDefaultMode は CoreFoundation 定数。常に有効。
                     run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
 
                     // タップを有効化してから HOOK_ACTIVE をセット。
@@ -470,12 +525,14 @@ pub fn start() {
                     thread::sleep(Duration::from_millis(50));
                     HOOK_ACTIVE.store(true, Ordering::Release);
                     CALLBACK_COUNT.store(0, Ordering::Relaxed);
-                    tracing::info!("CGEventTap installed (macOS keyboard hook active)");
+                    tracing::info!(
+                        "CGEventTap installed via {} (macOS keyboard hook active)",
+                        mode_label
+                    );
 
                     CFRunLoop::run_current();
 
                     // CFRunLoopRun returned — tap was disabled or invalidated.
-                    // スレッドを終了せず、ループ先頭に戻ってタップを再作成する。
                     HOOK_ACTIVE.store(false, Ordering::Relaxed);
                     LAST_KEY_MS.store(0, Ordering::Relaxed);
                     tracing::warn!(
@@ -483,7 +540,6 @@ pub fn start() {
                          Re-creating in 2s..."
                     );
                     std::thread::sleep(std::time::Duration::from_secs(2));
-                    // loop continues → re-create tap
                 }
                 Err(_) => {
                     consecutive_failures += 1;
@@ -494,30 +550,28 @@ pub fn start() {
                     //   6-20回: 5秒間隔 (長めの権限待ち)
                     //   21回以降: 10秒間隔 (CPU 節約しつつ永続的にリトライ)
                     let sleep_secs = if consecutive_failures <= 5 {
-                        if already_granted {
+                        if consecutive_failures == 1 || already_granted {
                             tracing::warn!(
-                                "CGEventTap creation failed (attempt {}, preflight=true), \
-                                 retrying in 2s...",
-                                consecutive_failures
+                                "CGEventTap creation failed via {} (attempt {}), retrying in 2s...",
+                                mode_label, consecutive_failures
                             );
                         }
                         2
                     } else if consecutive_failures <= 20 {
                         if consecutive_failures == 6 {
                             tracing::warn!(
-                                "CGEventTap creation still failing after 5 attempts. \
-                                 Continuing to retry every 5s. If permission is granted, \
-                                 try removing gse-next from Input Monitoring and re-adding it."
+                                "CGEventTap creation still failing via {} after 5 attempts. \
+                                 Retrying every 5s. Try toggling the permission off then on.",
+                                mode_label
                             );
                         }
                         5
                     } else {
                         if consecutive_failures == 21 {
                             tracing::error!(
-                                "CGEventTap creation failed 20+ times. Slowing retries to 10s. \
-                                 This may indicate a macOS TCC database issue. \
-                                 Try: (1) Remove gse-next from Input Monitoring, then re-add \
-                                 (2) Restart your Mac (3) tccutil reset ListenEvent"
+                                "CGEventTap creation failed 20+ times via {}. Slowing to 10s. \
+                                 Try: tccutil reset ListenEvent → restart app",
+                                mode_label
                             );
                         }
                         10
