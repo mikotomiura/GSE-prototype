@@ -69,9 +69,10 @@ pub static IME_COMPOSING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 pub static JIS_KEYBOARD_SEEN: AtomicBool = AtomicBool::new(false);
 
-/// true when CGEventTap is successfully installed (macOS only).
-/// Read by `get_hook_status` Tauri command to report permission state.
-#[cfg(target_os = "macos")]
+/// true when the keyboard hook is successfully installed.
+/// Read by `get_hook_status` Tauri command to report hook state.
+/// Windows: SetWindowsHookExW 成功時に true、フック無効化時に false。
+/// macOS: CGEventTap インストール成功時に true。
 pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------

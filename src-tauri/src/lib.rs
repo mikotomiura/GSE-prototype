@@ -49,20 +49,13 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-/// macOS版との互換性維持のため提供。
 /// フック（キーボード監視）が有効かどうかを返す。
-/// Windows: システム権限プロンプトが不要なため常に true。
-/// macOS: Input Monitoring 権限が付与されているかを HOOK_ACTIVE で確認。
+/// 両プラットフォーム共通: HOOK_ACTIVE フラグで実際のフック状態を確認。
+/// Windows: SetWindowsHookExW 成功時に true。フック無効化時に false → 自動復旧。
+/// macOS: CGEventTap インストール成功時に true。権限未付与時は false。
 #[tauri::command]
 fn get_hook_status() -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        true
-    }
-    #[cfg(target_os = "macos")]
-    {
-        crate::input::hook::HOOK_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-    }
+    crate::input::hook::HOOK_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 #[tauri::command]

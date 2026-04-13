@@ -76,22 +76,39 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
     <div className={`dashboard-container state-${dominant.toLowerCase()}`}>
       <h2>Generative Struggle Engine</h2>
 
-      {/* Input Monitoring 権限警告 (macOS向け。Windowsでは hookActive は常に true) */}
+      {/* キーボードフック状態警告 (両プラットフォーム共通) */}
       {hookActive === false && (
         <div className="permission-banner">
           <span className="permission-icon">⚠️</span>
           <div className="permission-text">
-            <strong>Input Monitoring 権限が必要です</strong>
-            <p>
-              System Settings が自動で開かれました。<br />
-              <em>プライバシーとセキュリティ › 入力監視</em> で
-              <strong> gse-next </strong>にチェックを入れてください。
-              権限が付与されると自動的に検知が開始されます。
-            </p>
-            {hookWaitingSec >= 30 && (
-              <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                権限が付与済みでも検知が開始されない場合は、<strong>アプリを再起動</strong>してください。
-              </p>
+            {navigator.platform.startsWith('Mac') ? (
+              <>
+                <strong>Input Monitoring 権限が必要です</strong>
+                <p>
+                  System Settings が自動で開かれました。<br />
+                  <em>プライバシーとセキュリティ › 入力監視</em> で
+                  <strong> gse-next </strong>にチェックを入れてください。
+                  権限が付与されると自動的に検知が開始されます。
+                </p>
+                {hookWaitingSec >= 30 && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                    権限が付与済みでも検知が開始されない場合は、<strong>アプリを再起動</strong>してください。
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <strong>キーボード検知の初期化に失敗しました</strong>
+                <p>
+                  キーボードフックのインストールに失敗しました。自動的に再試行しています。
+                </p>
+                {hookWaitingSec >= 10 && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                    解決しない場合は、<strong>アプリを再起動</strong>してください。
+                    セキュリティソフトがキーボードフックをブロックしている可能性があります。
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

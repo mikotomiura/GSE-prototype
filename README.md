@@ -708,7 +708,7 @@ const [state, idle] = await Promise.all([
 
 ### Permission Warning Banner (Dashboard)
 
-When `hookActive === false`, a rich permission banner (class `permission-banner`) is displayed at the top of the Dashboard with step-by-step instructions for granting Input Monitoring access via System Settings. On Windows, `get_hook_status` always returns `true`, so this banner is never shown. The code exists for codebase unification with the macOS version.
+When `hookActive === false`, a rich permission banner (class `permission-banner`) is displayed at the top of the Dashboard. On macOS, it shows step-by-step instructions for granting Input Monitoring access via System Settings. On Windows, it shows a keyboard hook initialization failure message with troubleshooting guidance. Both platforms report actual hook state via `get_hook_status` (backed by the `HOOK_ACTIVE` flag), with automatic retry and recovery.
 
 ### Wall Unlock Screen (Overlay)
 
@@ -1104,10 +1104,12 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
    macOS Gatekeeper blocks unsigned apps with a "damaged and can't be opened" error. This is not a real corruption — the app is simply not code-signed. Run the following command in Terminal to remove the quarantine flag:
 
    ```bash
-   xattr -cr /Applications/gse-next.app
+   xattr -d com.apple.quarantine /Applications/gse-next.app
    ```
 
-   > **Why this happens:** The app is built without an Apple Developer ID signature. macOS 10.15+ quarantines all unsigned downloaded apps. The `xattr -cr` command strips the `com.apple.quarantine` extended attribute so Gatekeeper no longer blocks it.
+   > **Why this happens:** The app is built without an Apple Developer ID signature. macOS 10.15+ quarantines all unsigned downloaded apps. This command removes only the quarantine attribute while preserving the code signature, which is important for Input Monitoring permission to work correctly.
+   >
+   > **Important:** Do NOT use `xattr -cr` (recursive clear) — it removes all extended attributes and may invalidate the code signature, causing Input Monitoring permission to fail silently.
 
 3. **If you still see a Gatekeeper warning on first launch:**
    - Open **System Settings → Privacy & Security**
@@ -1119,6 +1121,13 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
    - Restart the app
 
 > Without Input Monitoring permission the keyboard hook cannot activate and the cognitive state engine will not run.
+
+> **Troubleshooting — Input Monitoring not working after granting permission:**
+>
+> 1. **Remove and re-add**: In Input Monitoring settings, uncheck gse-next, then re-check it. Restart the app.
+> 2. **Reset TCC database**: Open Terminal and run `tccutil reset ListenEvent`. Then re-grant Input Monitoring permission and restart the app.
+> 3. **Re-apply quarantine removal**: If you used `xattr -cr` previously, re-copy the app from the DMG and use `xattr -d com.apple.quarantine` instead.
+> 4. **Restart your Mac**: Some TCC changes require a full reboot to take effect.
 
 ### Release Workflow (for maintainers)
 

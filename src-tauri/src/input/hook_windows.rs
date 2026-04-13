@@ -15,7 +15,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    EVENT_SENDER, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, LAST_KEY_MS, POLL_WAKE_TX,
+    EVENT_SENDER, HOOK_ACTIVE, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, LAST_KEY_MS, POLL_WAKE_TX,
     VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA, VK_DBE_SBCSCHAR,
     VK_KANJI,
 };
@@ -88,50 +88,115 @@ unsafe extern "system" fn win_event_callback(
 
 /// Install WH_KEYBOARD_LL + WinEvent hooks and run the message loop.
 /// Called from `init_hook()` in the shared `hook.rs`.
+///
+/// 自動復旧: メッセージループが終了した場合（Windows がフックを無効化した場合）は
+/// スレッドを終了せず、ループ先頭に戻ってフックを再インストールする。
+/// フックのインストール失敗時もバックオフ付きでリトライを継続する。
+/// これにより、スリープ復帰・セキュリティソフトの一時的なブロック等から自動復旧する。
 pub(super) fn start() {
     thread::spawn(|| {
-        unsafe {
-            // --- Step 1: Install low-level keyboard hook ---
-            let hook_id =
-                SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_callback), HINSTANCE::default(), 0);
+        let mut consecutive_failures: u32 = 0;
 
-            match hook_id {
-                Ok(h) => {
-                    {
-                        let mut handle = (*HOOK_HANDLE).lock().unwrap();
-                        *handle = Some(ThreadSafeHook(h));
+        loop {
+            unsafe {
+                // --- Step 1: Install low-level keyboard hook ---
+                let hook_id = SetWindowsHookExW(
+                    WH_KEYBOARD_LL,
+                    Some(hook_callback),
+                    HINSTANCE::default(),
+                    0,
+                );
+
+                match hook_id {
+                    Ok(h) => {
+                        consecutive_failures = 0;
+                        {
+                            let mut handle = (*HOOK_HANDLE).lock().unwrap();
+                            *handle = Some(ThreadSafeHook(h));
+                        }
+
+                        // --- Step 2: Install WinEvent hook for cross-process IME composition ---
+                        let ime_hook = SetWinEventHook(
+                            EVENT_OBJECT_IME_CHANGE,
+                            EVENT_OBJECT_IME_HIDE,
+                            HMODULE::default(),
+                            Some(win_event_callback),
+                            0,
+                            0,
+                            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+                        );
+
+                        if ime_hook.is_invalid() {
+                            tracing::warn!("Failed to install IME WinEvent hook");
+                        } else {
+                            tracing::info!(
+                                "IME WinEvent hook installed (cross-process IME detection active)"
+                            );
+                            let mut handle = (*WINEVENT_HOOK_HANDLE).lock().unwrap();
+                            *handle = Some(ThreadSafeWinEventHook(ime_hook));
+                        }
+
+                        // フック成功 → HOOK_ACTIVE を true に
+                        HOOK_ACTIVE.store(true, Ordering::Relaxed);
+                        tracing::info!("Keyboard hook installed");
+
+                        // --- Step 3: Message loop ---
+                        let mut msg = MSG::default();
+                        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                            DispatchMessageW(&msg);
+                        }
+
+                        // メッセージループ終了 = フック無効化
+                        // スレッドを終了せず、ループ先頭に戻ってフックを再インストール
+                        HOOK_ACTIVE.store(false, Ordering::Relaxed);
+                        LAST_KEY_MS.store(0, Ordering::Relaxed);
+                        tracing::warn!(
+                            "Keyboard hook message loop exited (hook invalidated). \
+                             Re-installing in 2s..."
+                        );
+                        thread::sleep(std::time::Duration::from_secs(2));
+                        // loop continues → re-install hook
                     }
-                    tracing::info!("Keyboard hook installed");
+                    Err(e) => {
+                        consecutive_failures += 1;
+                        HOOK_ACTIVE.store(false, Ordering::Relaxed);
+
+                        // バックオフ戦略 (macOS と同様):
+                        //   1-5回: 2秒間隔
+                        //   6-20回: 5秒間隔
+                        //   21回以降: 10秒間隔 (CPU 節約)
+                        let sleep_secs = if consecutive_failures <= 5 {
+                            tracing::error!(
+                                "Failed to install keyboard hook (attempt {}): {:?}",
+                                consecutive_failures,
+                                e
+                            );
+                            2
+                        } else if consecutive_failures <= 20 {
+                            if consecutive_failures == 6 {
+                                tracing::error!(
+                                    "Keyboard hook installation still failing after 5 attempts. \
+                                     Continuing to retry every 5s. \
+                                     Check if antivirus software is blocking keyboard hooks."
+                                );
+                            }
+                            5
+                        } else {
+                            if consecutive_failures == 21 {
+                                tracing::error!(
+                                    "Keyboard hook installation failed 20+ times. \
+                                     Slowing retries to 10s. \
+                                     Try: (1) Restart the app as administrator \
+                                     (2) Temporarily disable antivirus \
+                                     (3) Restart your PC"
+                                );
+                            }
+                            10
+                        };
+
+                        thread::sleep(std::time::Duration::from_secs(sleep_secs));
+                    }
                 }
-                Err(e) => {
-                    tracing::error!("Failed to install keyboard hook: {:?}", e);
-                    return;
-                }
-            }
-
-            // --- Step 2: Install WinEvent hook for cross-process IME composition ---
-            let ime_hook = SetWinEventHook(
-                EVENT_OBJECT_IME_CHANGE,
-                EVENT_OBJECT_IME_HIDE,
-                HMODULE::default(),
-                Some(win_event_callback),
-                0,
-                0,
-                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
-            );
-
-            if ime_hook.is_invalid() {
-                tracing::warn!("Failed to install IME WinEvent hook");
-            } else {
-                tracing::info!("IME WinEvent hook installed (cross-process IME detection active)");
-                let mut handle = (*WINEVENT_HOOK_HANDLE).lock().unwrap();
-                *handle = Some(ThreadSafeWinEventHook(ime_hook));
-            }
-
-            // --- Step 3: Message loop ---
-            let mut msg = MSG::default();
-            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-                DispatchMessageW(&msg);
             }
         }
     });
