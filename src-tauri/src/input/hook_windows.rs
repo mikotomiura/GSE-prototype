@@ -11,8 +11,8 @@ use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPAR
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, PeekMessageW, SetWindowsHookExW, HHOOK,
-    KBDLLHOOKSTRUCT, MSG, PM_NOREMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN,
+    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT,
+    MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
     WM_SYSKEYUP,
 };
 
@@ -172,10 +172,22 @@ pub(super) fn start() {
                         HOOK_ACTIVE.store(true, Ordering::Relaxed);
                         tracing::info!("Keyboard hook installed");
 
-                        // --- Step 3: Message loop ---
-                        let mut msg = MSG::default();
-                        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-                            DispatchMessageW(&msg);
+                        // --- Step 3: Message loop (PeekMessageW ポーリング) ---
+                        // GetMessageW (ブロッキング) ではなく PeekMessageW (ノンブロッキング)
+                        // を使用する。WH_KEYBOARD_LL のコールバックはメッセージ処理中に
+                        // 呼び出されるが、Tauri のマルチスレッド環境では GetMessageW が
+                        // フックメッセージを正しく処理しないケースが確認されている。
+                        // PeekMessageW ポーリングはスタンドアロン診断テストで実証済み。
+                        loop {
+                            let mut msg = MSG::default();
+                            if PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                                if msg.message == WM_QUIT {
+                                    break;
+                                }
+                                let _ = DispatchMessageW(&msg);
+                            } else {
+                                thread::sleep(std::time::Duration::from_millis(1));
+                            }
                         }
 
                         // メッセージループ終了 = フック無効化

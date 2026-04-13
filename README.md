@@ -1108,12 +1108,12 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
    **Open Terminal and run this command before launching the app:**
 
    ```bash
-   xattr -d com.apple.quarantine /Applications/gse-next.app
+   xattr -dr com.apple.quarantine /Applications/gse-next.app
    ```
 
-   > **Why this happens:** macOS 10.15+ quarantines all unsigned downloaded apps. This command removes only the quarantine attribute while preserving the code signature, which is important for Input Monitoring permission to work correctly.
+   > **Why this happens:** macOS 10.15+ quarantines all unsigned downloaded apps. The `-dr` flag recursively removes only the `com.apple.quarantine` attribute from the .app bundle and all files inside it, while preserving the code signature and other attributes.
    >
-   > **Important:** Do NOT use `xattr -cr` (recursive clear) — it removes all extended attributes and may invalidate the code signature, causing Input Monitoring permission to fail silently.
+   > **Important:** Do NOT use `xattr -cr` (recursive clear of ALL attributes) — it may invalidate the code signature, causing Input Monitoring permission to fail silently.
 
 3. **If you still see a Gatekeeper warning after step 2:**
    - **Right-click** (or Control-click) the app → select **"Open"** → click **"Open"** in the dialog
@@ -1130,7 +1130,7 @@ Go to **[Releases](https://github.com/mikotomiura/GSE-prototype/releases)** and 
 >
 > 1. **Remove and re-add**: In Input Monitoring settings, uncheck gse-next, then re-check it. Restart the app.
 > 2. **Reset TCC database**: Open Terminal and run `tccutil reset ListenEvent`. Then re-grant Input Monitoring permission and restart the app.
-> 3. **Re-apply quarantine removal**: If you used `xattr -cr` previously, re-copy the app from the DMG and use `xattr -d com.apple.quarantine` instead.
+> 3. **Re-apply quarantine removal**: If you used `xattr -cr` previously, re-copy the app from the DMG and use `xattr -dr com.apple.quarantine /Applications/gse-next.app` instead.
 > 4. **Restart your Mac**: Some TCC changes require a full reboot to take effect.
 
 ### Release Workflow (for maintainers)

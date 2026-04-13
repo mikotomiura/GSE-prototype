@@ -1108,10 +1108,10 @@ Zen Timer のスマートフォンページに、2 分間のカウントダウ�
    **アプリを開く前に、ターミナルで以下のコマンドを実行してください：**
 
    ```bash
-   xattr -d com.apple.quarantine /Applications/gse-next.app
+   xattr -dr com.apple.quarantine /Applications/gse-next.app
    ```
 
-   > **なぜこうなるのか：** macOS 10.15 (Catalina) 以降、ダウンロードされた未署名アプリには `com.apple.quarantine` 属性が付与され、Gatekeeper がブロックします。このコマンドは隔離属性のみを除去し、コード署名を保持します。Input Monitoring 権限が正しく機能するためにコード署名の保持が重要です。
+   > **なぜこうなるのか：** macOS 10.15 (Catalina) 以降、ダウンロードされた未署名アプリには `com.apple.quarantine` 属性が付与され、Gatekeeper がブロックします。`-dr` フラグは .app バンドル内の全ファイルから `com.apple.quarantine` 属性のみを再帰的に除去し、コード署名やその他の属性を保持します。
    >
    > **重要：** `xattr -cr`（再帰的に全属性を削除）は使用しないでください。コード署名が無効化され、Input Monitoring 権限が正しく動作しなくなる可能性があります。
 
@@ -1130,7 +1130,7 @@ Zen Timer のスマートフォンページに、2 分間のカウントダウ�
 >
 > 1. **再付与**: Input Monitoring 設定で gse-next のチェックを外し、再度チェックしてアプリを再起動
 > 2. **TCC データベースリセット**: ターミナルで `tccutil reset ListenEvent` を実行後、再度 Input Monitoring 権限を付与してアプリを再起動
-> 3. **隔離属性の再削除**: 以前 `xattr -cr` を使用した場合は、DMG からアプリを再コピーし `xattr -d com.apple.quarantine` を使用してください
+> 3. **隔離属性の再削除**: 以前 `xattr -cr` を使用した場合は、DMG からアプリを再コピーし `xattr -dr com.apple.quarantine /Applications/gse-next.app` を使用してください
 > 4. **Mac を再起動**: 一部の TCC 変更は完全な再起動が必要です
 
 ### リリース手順（メンテナー向け）
