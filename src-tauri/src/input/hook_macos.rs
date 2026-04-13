@@ -394,7 +394,9 @@ fn update_compose_state(vk: u32) {
 /// 1. Check `CGPreflightListenEventAccess()` — fast, no side-effects.
 /// 2. If not granted, call `CGRequestListenEventAccess()` — opens System Settings.
 /// 3. Unified loop: try creating the tap directly. If it fails, sleep and retry.
-/// 4. **Accessibility fallback**: After 10 consecutive ListenOnly failures,
+/// 4. **Smart permission detection**: At startup, if Input Monitoring is denied
+///    but Accessibility is granted, skip ListenOnly and use Default tap directly.
+/// 5. **Accessibility fallback**: If ListenOnly fails 3 times consecutively,
 ///    switch to `CGEventTapOptions::Default` (requires Accessibility permission).
 ///    ad-hoc 署名では Input Monitoring の TCC CDHash 認証が不安定なため、
 ///    異なる TCC パスを試すことで権限取得の成功率を向上させる。
@@ -402,25 +404,40 @@ fn update_compose_state(vk: u32) {
 /// `HOOK_ACTIVE` is set to true only after a successful tap installation.
 pub fn start() {
     thread::spawn(|| {
-        // --- Step 1: Check current permission status ---
-        // SAFETY: CGPreflightListenEventAccess は pure read-only の TCC チェック。
-        // メモリ安全性への影響なし。
-        let already_granted = unsafe { CGPreflightListenEventAccess() };
+        // --- Step 1: Smart permission detection ---
+        // 両方の権限を起動時にチェックし、最適なパスを即座に選択する。
+        // SAFETY: CGPreflightListenEventAccess / AXIsProcessTrusted は
+        // pure read-only の TCC チェック。メモリ安全性への影響なし。
+        let im_granted = unsafe { CGPreflightListenEventAccess() };
+        let ax_trusted = unsafe { AXIsProcessTrusted() };
 
-        if !already_granted {
-            // --- Step 2: Request permission (opens System Settings) ---
-            tracing::warn!(
-                "Input Monitoring permission not granted. \
-                 Opening System Settings > Privacy & Security > Input Monitoring..."
+        // スマート権限検出:
+        // Input Monitoring が拒否されているが Accessibility が付与済みなら、
+        // ListenOnly の無駄な失敗を待たず、即座に Default tap を使用する。
+        // ad-hoc 署名では Input Monitoring の TCC CDHash 認証が不安定なため、
+        // Accessibility が使えるなら最初からそちらを選ぶ。
+        let mut use_accessibility = if !im_granted && ax_trusted {
+            tracing::info!(
+                "Input Monitoring denied but Accessibility granted. \
+                 Using Default tap (Accessibility) directly — skipping ListenOnly."
             );
-            // SAFETY: CGRequestListenEventAccess はシステムダイアログ表示のみ。
-            // メモリ安全性への影響なし。
-            unsafe { CGRequestListenEventAccess() };
-            tracing::info!("Polling for Input Monitoring permission every 2 seconds...");
-        }
+            USING_ACCESSIBILITY_FALLBACK.store(true, Ordering::Release);
+            true
+        } else {
+            if !im_granted {
+                // --- Step 2: Request Input Monitoring permission ---
+                tracing::warn!(
+                    "Input Monitoring permission not granted. \
+                     Opening System Settings > Privacy & Security > Input Monitoring..."
+                );
+                // SAFETY: CGRequestListenEventAccess はシステムダイアログ表示のみ。
+                unsafe { CGRequestListenEventAccess() };
+                tracing::info!("Polling for Input Monitoring permission...");
+            }
+            false
+        };
 
         let mut consecutive_failures: u32 = 0;
-        let mut use_accessibility = false;
 
         // --- Step 3: Resilient tap creation loop (never gives up) ---
         //
@@ -437,7 +454,9 @@ pub fn start() {
         // 自動復旧: CFRunLoop が終了した場合はループ先頭に戻ってタップを再作成する。
         loop {
             // --- Accessibility fallback trigger ---
-            if !use_accessibility && consecutive_failures >= 10 {
+            // 3回失敗で切替。input_monitoring_granted=false の場合、
+            // ListenOnly が成功する可能性はゼロなので早期に切り替える。
+            if !use_accessibility && consecutive_failures >= 3 {
                 tracing::warn!(
                     "Input Monitoring (ListenOnly) failed {} times. \
                      Switching to Accessibility permission fallback (Default tap)...",
@@ -481,15 +500,20 @@ pub fn start() {
                 tap_options,
                 vec![CGEventType::KeyDown, CGEventType::KeyUp],
                 move |_proxy, event_type, event| {
-                    handle_event(event_type, event);
                     if ax_mode {
-                        // Default tap: イベントをそのまま通過させる（変更しない）。
-                        // None を返すとイベントが消費（抑制）されてしまう。
+                        // Default (active) tap: panic 時にイベントが消費されてシステム全体の
+                        // キー入力が無応答になるリスクを回避するため catch_unwind で保護する。
+                        // ListenOnly では戻り値が無視されるため不要。
+                        let cloned = event.clone();
+                        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            handle_event(event_type, event);
+                        }));
                         // core-graphics の CGEvent::clone() は内部で CGEventCreateCopy() を呼び、
                         // O(1) のリファレンスカウント操作のみでブロッキングなし。
                         // &CGEvent → Option<CGEvent> 変換のため clone は API 制約上不可避。
-                        Some(event.clone())
+                        Some(cloned)
                     } else {
+                        handle_event(event_type, event);
                         None // ListenOnly: 戻り値は無視される
                     }
                 },
