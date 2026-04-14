@@ -538,8 +538,10 @@ pub fn run() {
             // step() 本体は analysis/loop_step.rs に抽出済み。
             // リピート検出・IME ポーズ分岐・silence-break protection・
             // 1Hz ゲート・沈黙 3 状態機構・Feat 生成をすべて担う。
+            // tick_now を 1 度だけ取り step に渡す（code-reviewer 指摘: タイミング一貫性）。
+            let tick_now = now_ms();
             let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
-            let out = step(&mut state, &engine_for_thread, input, now_ms(), ime_open);
+            let out = step(&mut state, &engine_for_thread, input, tick_now, ime_open);
 
             // 中立記録型 → LogEntry 変換（architecture-rules ルール 6 遵守のため、
             // LogEntry への変換は analysis/ の外で行う）

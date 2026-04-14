@@ -25,9 +25,16 @@ use crate::analysis::features::{phi, Features};
 
 /// HMM エンジンの挙動バージョン。
 ///
-/// 遷移行列・放出行列・EWMA α・ヒステリシス α・摩擦フロア閾値など
-/// `update()` / `update_silence()` の出力を変えうる変更を行った際は
-/// SemVer で bump する。
+/// **このファイル内の以下の変更では必ず bump すること**:
+/// - `INITIAL_PROBS` / `INITIAL_AXES_EWMA` / `BACKSPACE_PENALTY_THRESHOLD`
+/// - `transition_matrix` / `emission_matrix` / `initial_probabilities` の値
+/// - `update()` / `update_silence()` の内部 α 値・ヒステリシス α
+/// - `update_silence()` の silence_secs → α 閾値
+/// また `analysis/features.rs` の `phi` / `make_silence_observation` /
+/// `calculate_features` の数値挙動変更、`analysis/loop_step.rs` の摩擦フロア
+/// 変更も bump 対象。
+///
+/// SemVer 運用:
 ///
 /// - MAJOR: 既存セッションログの確率列が大幅に変わる（状態優勢の逆転等）
 /// - MINOR: 確率列は動くが同じラベル付けになる範囲の調整

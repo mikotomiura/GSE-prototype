@@ -15,7 +15,7 @@
 //!
 //! # 挙動不変性
 //!
-//! 現行 `lib.rs:494-742` と 1:1 マップされる:
+//! 旧 `lib.rs` 分析スレッド本体と 1:1 マップされる:
 //!
 //! - イベント受信 → リピート検出 (Windows のみ) → Key ログ記録 → pause 判定
 //! - pause 中: `was_paused=true` にセットして 1Hz ゲートを skip
@@ -47,14 +47,12 @@ pub struct AnalysisState {
     pub presses_since_silence: u32,
     /// IME ポーズ→復帰遷移検出用。
     pub was_paused: bool,
-    /// Windows リピートキー検出用 HashSet。
+    /// Windows リピートキー検出用 HashSet（判断 14 参照）。
     ///
-    /// CLAUDE.md 制約 (3) によりフックコールバック内で Mutex を使えないため、
-    /// 分析スレッド側の HashSet で Press/Release ペアを追跡する。
-    /// macOS では CGEventTap の `AUTOREPEAT` フラグがフック層で判定するため、
-    /// 本フィールドは空のまま使用されない。
-    ///
-    /// フィールドとしては全プラットフォーム共通で保持する（判断 14）。
+    /// Windows の `WH_KEYBOARD_LL` にはリピートフラグがないため Press/Release
+    /// ペアを追跡して検出する。macOS は CGEventTap の AUTOREPEAT フラグで
+    /// フック層が判定するため本フィールドは空のまま使用されない。
+    /// フィールド cfg 分岐は cfg 伝播の破綻リスクを避けるため適用しない。
     pub pressed_keys: HashSet<u32>,
 }
 

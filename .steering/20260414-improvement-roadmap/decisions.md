@@ -218,6 +218,25 @@
 
 ---
 
+## 判断 15: code-reviewer HIGH 2 件のうち 1 件を意図的に適用しない（2026-04-15 追記）
+
+**判断**: P0-1/P0-2 リファクタ後の code-reviewer レビューで以下 2 件の HIGH 指摘を受けた:
+
+1. `lib.rs` の `now_ms()` 呼び出しを `tick_now` 変数化する → **適用した**（コスメ改善）
+2. `step()` が `input=None + gate 未到達` で busy-wait する可能性 → **適用しない**
+
+HIGH 2 を適用しない根拠:
+- `crossbeam_channel::recv_timeout(Err(Timeout))` は指定した timeout の全期間を必ず待機してから返る（spurious wakeup なし）。
+- そのため `input=None` が返った時点で `now_ms ≈ current + remaining_ms = next_engine_update_ms`。`step()` 内の gate 条件 `now_ms < next_engine_update_ms` は false となり、gate は必ず発火する。
+- 「input=None + gate 未到達」という組合せは発生しない。busy-wait リスクは理論上存在しない。
+- 旧コードは `timeout.max(Duration::from_millis(1))` で下限 1ms を設定しており、新コードも同じ。振る舞い等価。
+
+レビュアーの推奨案（`max(5)` への引き上げ）を適用すると latency 特性が変わり、「振る舞い不変」のリファクタ原則に反する。よって適用しない。
+
+**影響**: リファクタは振る舞い保存。ゴールデンスナップショット (P0-10) 生成時に挙動等価を byte-equal で最終検証する。
+
+---
+
 ## 記録されないべき判断（参考）
 
 以下は判断として記録する価値がない（自明または根拠が弱い）ため決定木から除外した:
