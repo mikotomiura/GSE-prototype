@@ -112,7 +112,10 @@ pub struct KeyRecord {
 /// 1Hz 推論 1 サイクルの中立記録型。
 ///
 /// ゴールデンスナップショット (P0-10) の byte-equal 比較対象。
-#[derive(Debug, Clone, PartialEq)]
+/// `Serialize` / `Deserialize` は `gse-replay` CLI が JSON snapshot を
+/// 読み書きするために付与している。フィールド名は snake_case を維持し、
+/// snapshot JSON の可読性と `grep` 容易性を確保する。
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FeatSnapshot {
     pub timestamp: u64,
     pub f1: f64,

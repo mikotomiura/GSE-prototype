@@ -237,6 +237,25 @@ HIGH 2 を適用しない根拠:
 
 ---
 
+## 判断 16: Replay CLI は src-tauri 内 bin で実装、workspace 化は Phase 3 再検討（2026-04-15 追記）
+
+**判断**: P0-4 `gse-replay` を `src-tauri/src/bin/replay.rs` として実装する (v1 採用)。Cargo workspace 化 + `analysis` 独立クレート化 (v2 案) は本ロードマップ内では実施しない。
+
+**根拠**:
+- Phase 0 の目的は「測定基盤を最短で作る」こと（原則 C）。v2 は 1-2 日規模の再編成が必要で Phase 0 期間内完了が困難。
+- v2 のメリット（ビルド高速化 / architecture-rules のコンパイル時強制）は現状の grep + code-reviewer でも達成できている（実際に R0 サイクル 2 で検出済み）。
+- `default-run = "gse-next"` の追加だけで Tauri dev は無変更、リスク低。
+
+**代替案 (v2)**: Cargo workspace 化し `crates/analysis/` + `crates/replay-cli/` に物理分離。
+**却下理由**: 工数倍増 / Phase 1/2a を遅らせる / gen/ フォルダ配置再整備リスク。
+
+**将来タスク**: Phase 3 (LR 統合) 着手時に改めて workspace 化の ROI を再評価する。その時点で:
+- ML パイプライン (Python + Rust) の再利用性が具体課題になる
+- analysis を pure Rust crate として切り出すメリットが顕在化する
+- workspace 化による CI 高速化も意味が出る
+
+---
+
 ## 記録されないべき判断（参考）
 
 以下は判断として記録する価値がない（自明または根拠が弱い）ため決定木から除外した:
