@@ -5,10 +5,7 @@ pub mod logger;
 pub mod sensors;
 pub mod wall_server;
 
-use crate::analysis::{
-    engine::{CognitiveState, CognitiveStateEngine},
-    features::FeatureExtractor,
-};
+use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
 use crate::logger::{LogEntry, SessionLogger};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
@@ -249,7 +246,11 @@ fn reset_accessibility() -> String {
         }
         Ok(o) => {
             let stderr = String::from_utf8_lossy(&o.stderr).to_string();
-            tracing::warn!("tccutil Accessibility reset failed (exit={}): {}", o.status, stderr);
+            tracing::warn!(
+                "tccutil Accessibility reset failed (exit={}): {}",
+                o.status,
+                stderr
+            );
             "TCC Accessibility reset failed. Try: tccutil reset Accessibility".into()
         }
         Err(e) => {
@@ -492,20 +493,22 @@ pub fn run() {
     //   3回以上の連続打鍵が確認されて初めて「タイピング復帰」と判定する。
     //   これにより沈黙中に蓄積した Stuck 状態が1打鍵で消失する問題を防止する。
     thread::spawn(move || {
+        use crate::analysis::loop_step::{step, AnalysisState, LoopInput};
+
         tracing::info!("Analysis thread started");
-        let mut extractor = FeatureExtractor::new(600);
-        let mut last_event_time = Instant::now();
-        let mut next_engine_update = Instant::now();
-        let mut presses_since_silence: u32 = 0;
-        // IME ポーズ→復帰時にバッファをクリアするための追跡フラグ
-        let mut was_paused = false;
-        // Windows リピートキー検出用 (分析スレッドのローカル状態 — Mutex 不要)。
-        // macOS は CGEventTap の KEYBOARD_EVENT_AUTOREPEAT フィールドでフック層で検出するが、
-        // Windows の WH_KEYBOARD_LL にはリピートフラグがないため、
-        // 押下中キーの HashSet で Press/Release ペアを追跡して検出する。
-        // CLAUDE.md 制約 (3) 準拠: フックコールバック内から Mutex を排除。
-        #[cfg(target_os = "windows")]
-        let mut pressed_keys: HashSet<u32> = HashSet::new();
+
+        // 壁時計 ms を統一時刻表現として使用する (判断 13)。
+        // step() 内部の silence 計算・1Hz ゲート進行・Feat ログ timestamp、
+        // さらに gse-replay が NDJSON の `t` を再生する際の基準まで、
+        // すべて同じ表現で揃えることで production と replay の挙動を一致させる。
+        let now_ms = || -> u64 {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64
+        };
+
+        let mut state = AnalysisState::new(now_ms(), 600);
 
         loop {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
@@ -517,228 +520,55 @@ pub fn run() {
 
             // start_session コマンドによるリセット要求をチェック
             if should_reset_for_thread.swap(false, Ordering::AcqRel) {
-                extractor = FeatureExtractor::new(600);
-                last_event_time = Instant::now();
-                next_engine_update = Instant::now();
-                presses_since_silence = 0;
-                #[cfg(target_os = "windows")]
-                pressed_keys.clear();
+                state.reset(now_ms(), 600);
             }
 
-            // 動的タイムアウト: 次の1Hzマークまでの残り時間
-            let now = Instant::now();
-            let timeout = if next_engine_update > now {
-                next_engine_update - now
-            } else {
-                Duration::from_millis(0)
-            };
+            // 動的タイムアウト: 次の 1Hz マークまでの残り時間
+            let current = now_ms();
+            let remaining_ms = state.next_engine_update_ms.saturating_sub(current);
+            let timeout = Duration::from_millis(remaining_ms.max(1));
 
-            // イベント受信 (タイムアウトは次の1Hzマークまで)
-            match rx.recv_timeout(timeout.max(Duration::from_millis(1))) {
-                #[allow(unused_mut)]
-                Ok(mut event) => {
-                    // Windows: 分析スレッド側でリピート検出。
-                    // フックコールバックは CLAUDE.md 制約 (3) により Atomic + channel のみ
-                    // のため、is_repeat = false 固定で送信される。ここで HashSet を使って
-                    // Press/Release ペアを追跡し、リピートを判定する。
-                    // macOS: フック層の CGEventTap AUTOREPEAT フラグで既に判定済み。
-                    #[cfg(target_os = "windows")]
-                    {
-                        if event.is_press {
-                            if !pressed_keys.insert(event.vk_code) {
-                                event.is_repeat = true;
-                            }
-                        } else {
-                            pressed_keys.remove(&event.vk_code);
-                        }
-                    }
-
-                    // キーイベントをログ記録（全打鍵を記録、推論頻度とは独立）
-                    let _ = log_tx_analysis.try_send(LogEntry::Key {
-                        vk_code: event.vk_code,
-                        timestamp: event.timestamp,
-                        is_press: event.is_press,
-                    });
-
-                    // IMEポーズ中はバッファ蓄積を含め全処理をスキップ。
-                    // 候補選択中のキーストローク（矢印・Enter・Space等）がバッファを汚染するのを防止。
-                    // unpause 時に extractor.reset() で再開するため、蓄積しても無駄である。
-                    let currently_paused = engine_for_thread.get_paused();
-                    if currently_paused {
-                        was_paused = true;
-                        continue;
-                    }
-
-                    // バッファに追加 (非ポーズ時のみ)
-                    extractor.process_event(event);
-
-                    // ポーズ→復帰遷移: バッファをクリアして stale なフライトタイムを排除。
-                    // ポーズ中に蓄積した打鍵間隔（数十秒）が F1 を汚染し
-                    // Flow→Incubation 急降下を引き起こすのを防止する。
-                    if was_paused {
-                        was_paused = false;
-                        extractor.reset();
-                        last_event_time = Instant::now();
-                        presses_since_silence = 0;
-                        tracing::debug!("IME pause ended — buffer cleared for clean restart");
-                    }
-
-                    if event.is_press {
-                        // Silence-break protection (non-repeat only):
-                        // 自動リピートは意図的な復帰ではないため、沈黙復帰カウントに含めない。
-                        // 10秒以上の沈黙後、3打鍵以上の連続入力で初めて
-                        // last_event_time をリセットし「タイピング復帰」と判定する。
-                        if !event.is_repeat {
-                            if last_event_time.elapsed() > Duration::from_secs(10) {
-                                presses_since_silence += 1;
-                                if presses_since_silence >= 3 {
-                                    last_event_time = Instant::now();
-                                    presses_since_silence = 0;
-                                }
-                            } else {
-                                last_event_time = Instant::now();
-                                presses_since_silence = 0;
-                            }
-                        }
-
-                        // Backspaceストリークカウント（1Hz gate の外側で全打鍵）
-                        // リピートイベントも含める: BS長押しによる一気消しでペナルティを発動させる
-                        // is_backspace はフック層で OS 固有キーコードから判定済み
-                        engine_for_thread.register_keystroke(event.is_backspace);
-                    }
-                }
-                Err(RecvTimeoutError::Timeout) => {
-                    // タイムアウト = 1Hzマーク到達 → フォールスルーして推論へ
-                }
+            // イベント受信 (タイムアウトは次の 1Hz マークまで)
+            let input = match rx.recv_timeout(timeout) {
+                Ok(event) => Some(LoopInput::Key(event)),
+                Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => break,
-            }
-
-            // ── 独立 1Hz ゲート ──────────────────────────────────────
-            let now = Instant::now();
-            if now < next_engine_update {
-                continue;
-            }
-
-            // 絶対時刻ベースインクリメント (累積ドリフト防止)
-            // スレッドスタール後のキャッチアップ: 大幅に遅れた場合は現在時刻にリセット
-            next_engine_update += Duration::from_secs(1);
-            if next_engine_update < now {
-                next_engine_update = now + Duration::from_secs(1);
-            }
-
-            if engine_for_thread.get_paused() {
-                was_paused = true;
-                continue;
-            }
-
-            // 1Hz ゲートでのポーズ→復帰遷移検出（タイムアウトパス）
-            if was_paused {
-                was_paused = false;
-                extractor.reset();
-                last_event_time = Instant::now();
-                presses_since_silence = 0;
-                tracing::debug!("IME pause ended (1Hz gate) — buffer cleared for clean restart");
-            }
-
-            let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
-            let silence_secs = last_event_time.elapsed().as_secs_f64();
-
-            // 特徴量計算: バッファの実データを優先し、空の場合のみ合成サイレンス特徴量を使用
-            let mut features = extractor.calculate_features();
-
-            // ── 沈黙 3 状態機構 (Silence 3-State Mechanism) ────────────────
-            // 1Hz ゲートの推論パスは、バッファの有無と沈黙秒数に応じて 3 つに分岐する。
-            // 各パスで使用する EWMA α と摩擦フロア適用有無が異なる。
-            // 詳細は docs/architecture.md §4.7「沈黙 3 状態機構」を参照。
-            //
-            //   TypingPath     : バッファあり + silence < 2s      → update()        α=0.3
-            //   TransitionPath : バッファあり + silence ≥ 2s      → update_silence() α=0.15〜0.25
-            //                    摩擦フロア F6≥8s / F3≥10s を適用
-            //   SilencePath    : バッファ空 (f1=0)                → update_silence() α=0.15〜0.25
-            //                    make_silence_observation() で合成特徴量生成
-            //                    摩擦フロア F6≥10s / F3≥15s (TransitionPath と閾値が異なる)
-            //
-            // 2 つのフロア閾値の不統一は、統合リスクを避けるため意図的に維持している。
-            let (log_features, diag_opt) =
-                if features.f1_flight_time_median > 0.0 && silence_secs < 2.0 {
-                    // === TypingPath: バッファ実データあり + 直近タイピング中 ===
-                    let d = engine_for_thread.update(&features, ime_open);
-                    (features, d)
-                } else if features.f1_flight_time_median > 0.0 {
-                    // === TransitionPath: バッファ実データあり + 2 秒以上沈黙中 ===
-                    // 古いウィンドウデータを α=0.3 で連続入力すると Incubation にロックインするため、
-                    // α=0.15 の update_silence を使用する。
-                    // F5 に進行中の沈黙を加算し、摩擦フロアを適用する。
-                    if silence_secs >= 2.0 {
-                        features.f5_pause_count += silence_secs / 2.0;
-                    }
-                    // TUNE: TransitionPath 用摩擦フロア
-                    //   F6: onset 8s / ramp 30s / floor 0.15 (≥ 10s)
-                    //   F3: onset 10s / ramp 40s / floor 0.20 (≥ 10s)
-                    if silence_secs >= 8.0 {
-                        let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
-                        let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
-                        if silence_secs >= 10.0 {
-                            f6_floor = f6_floor.max(0.15);
-                            f3_floor = f3_floor.max(0.20);
-                        }
-                        features.f6_pause_after_del_rate =
-                            features.f6_pause_after_del_rate.max(f6_floor);
-                        features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
-                    }
-                    let d = engine_for_thread.update_silence(&features, ime_open, silence_secs);
-                    (features, d)
-                } else if let Some(sf) = extractor.make_silence_observation(silence_secs) {
-                    // === SilencePath: バッファ空 → 合成特徴量で update_silence ===
-                    let d = engine_for_thread.update_silence(&sf, ime_open, silence_secs);
-                    (sf, d)
-                } else {
-                    // silence < 2s かつ f1=0 (データ不足) → スキップ
-                    continue;
-                };
-
-            // 特徴量 + 状態確率をログ記録
-            let state_probs = engine_for_thread.get_current_state();
-            let p_flow = state_probs
-                .get(&CognitiveState::Flow)
-                .copied()
-                .unwrap_or(0.0);
-            let p_inc = state_probs
-                .get(&CognitiveState::Incubation)
-                .copied()
-                .unwrap_or(0.0);
-            let p_stuck = state_probs
-                .get(&CognitiveState::Stuck)
-                .copied()
-                .unwrap_or(0.0);
-
-            let now_ts = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64;
-
-            let (raw_x, raw_y, ewma_x, ewma_y, obs, alpha) = match &diag_opt {
-                Some(d) => (d.raw_x, d.raw_y, d.ewma_x, d.ewma_y, d.obs, d.alpha),
-                None => (0.0, 0.0, 0.0, 0.0, 0, 0.0),
             };
 
-            let _ = log_tx_analysis.try_send(LogEntry::Feat {
-                timestamp: now_ts,
-                f1: log_features.f1_flight_time_median,
-                f3: log_features.f3_correction_rate,
-                f4: log_features.f4_burst_length,
-                f5: log_features.f5_pause_count,
-                f6: log_features.f6_pause_after_del_rate,
-                p_flow,
-                p_inc,
-                p_stuck,
-                raw_x,
-                raw_y,
-                ewma_x,
-                ewma_y,
-                obs,
-                alpha,
-            });
+            // step() 本体は analysis/loop_step.rs に抽出済み。
+            // リピート検出・IME ポーズ分岐・silence-break protection・
+            // 1Hz ゲート・沈黙 3 状態機構・Feat 生成をすべて担う。
+            let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
+            let out = step(&mut state, &engine_for_thread, input, now_ms(), ime_open);
+
+            // 中立記録型 → LogEntry 変換（architecture-rules ルール 6 遵守のため、
+            // LogEntry への変換は analysis/ の外で行う）
+            if let Some(k) = out.key {
+                let _ = log_tx_analysis.try_send(LogEntry::Key {
+                    vk_code: k.vk_code,
+                    timestamp: k.timestamp,
+                    is_press: k.is_press,
+                });
+            }
+            if let Some(f) = out.feat {
+                let _ = log_tx_analysis.try_send(LogEntry::Feat {
+                    timestamp: f.timestamp,
+                    f1: f.f1,
+                    f3: f.f3,
+                    f4: f.f4,
+                    f5: f.f5,
+                    f6: f.f6,
+                    p_flow: f.p_flow,
+                    p_inc: f.p_inc,
+                    p_stuck: f.p_stuck,
+                    raw_x: f.raw_x,
+                    raw_y: f.raw_y,
+                    ewma_x: f.ewma_x,
+                    ewma_y: f.ewma_y,
+                    obs: f.obs,
+                    alpha: f.alpha,
+                });
+            }
         }
     });
 
