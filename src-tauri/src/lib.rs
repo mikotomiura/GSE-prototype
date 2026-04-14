@@ -266,6 +266,31 @@ fn reset_accessibility() -> String {
     "Not applicable on this platform".into()
 }
 
+/// macOS: System Settings の Accessibility ペインを直接開く。
+/// ad-hoc 署名ではプログラムによる権限プロンプトが動作しないため、
+/// ユーザーに手動で「+」ボタンからアプリを追加してもらう。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn open_accessibility_settings() -> String {
+    match std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .spawn()
+    {
+        Ok(_) => "System Settings opened.".into(),
+        Err(e) => {
+            tracing::warn!("Failed to open System Settings: {}", e);
+            format!("Failed to open: {}", e)
+        }
+    }
+}
+
+/// Windows: open_accessibility_settings のスタブ（no-op）。
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn open_accessibility_settings() -> String {
+    "Not applicable on this platform".into()
+}
+
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
@@ -827,6 +852,7 @@ pub fn run() {
             get_diagnostics,
             reset_input_monitoring,
             reset_accessibility,
+            open_accessibility_settings,
             start_session,
             quit_app,
             get_session_file,

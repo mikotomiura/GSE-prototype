@@ -119,23 +119,34 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
               <>
                 {diagnostics?.using_accessibility_fallback === 'true' ? (
                   <>
-                    <strong>Accessibility 権限が必要です</strong>
-                    <p>
-                      入力監視の権限取得に失敗したため、アクセシビリティ権限に切り替えました。<br />
-                      <em>System Settings › プライバシーとセキュリティ › アクセシビリティ</em> で
-                      <strong> gse-next </strong>にチェックを入れてください。
+                    <strong>Accessibility 権限を手動で追加してください</strong>
+                    <p style={{ marginTop: '0.3rem' }}>
+                      ad-hoc 署名のため自動付与が動作しません。以下の手順で手動追加してください:
                     </p>
-                    {diagnostics?.ax_is_trusted === 'false' && diagnostics?.input_monitoring_granted === 'false' && (
-                      <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                        入力監視・アクセシビリティの両方が未許可です。
-                        アプリが表示するシステムダイアログで<strong>「システム設定を開く」</strong>を押し、
-                        gse-next のトグルをオンにしてください。
-                        ダイアログが表示されない場合は、約30秒後に再表示されます。
-                      </p>
-                    )}
+                    <ol style={{ margin: '0.5rem 0', paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
+                      <li>
+                        下のボタンで System Settings を開く
+                        <br />
+                        <button
+                          style={{ fontSize: '0.8rem', padding: '4px 12px', cursor: 'pointer', marginTop: '4px' }}
+                          onClick={() => {
+                            invoke<string>("open_accessibility_settings")
+                              .catch(e => setResetAxResult(`System Settings を開けませんでした: ${e}`));
+                          }}
+                        >
+                          System Settings を開く
+                        </button>
+                      </li>
+                      <li>左下の<strong>「+」ボタン</strong>をクリック</li>
+                      <li><code style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
+                        {diagnostics?.bundle_path || '/Applications/gse-next.app'}
+                      </code> を選択して「開く」</li>
+                      <li><strong>gse-next のトグルがオン</strong>になっていることを確認</li>
+                    </ol>
                     {hookWaitingSec >= 30 && (
                       <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
-                        gse-next が既にチェック済みの場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
+                        gse-next が既にリストにある場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
+                        アップデート後は署名が変わるため再設定が必要です。
                       </p>
                     )}
                   </>
