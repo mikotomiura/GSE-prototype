@@ -37,26 +37,57 @@ extern "C" {
     fn AXIsProcessTrustedWithOptions(options: core_foundation::base::CFTypeRef) -> bool;
 }
 
-/// Prompt the user for Accessibility permission via the native macOS dialog.
-/// Creates a CFDictionary with { kAXTrustedCheckOptionPrompt: true } and calls
-/// AXIsProcessTrustedWithOptions. Returns whether accessibility is currently granted.
-///
-/// This is superior to opening System Settings via URL because:
-/// - Shows a clear native dialog explaining what the app needs
-/// - Automatically adds the app to the Accessibility list in System Settings
-/// - Works reliably with ad-hoc signed apps (identified by bundle path)
-fn ax_prompt_for_trust() -> bool {
+// GCD: メインスレッドへの dispatch に使用。
+// AXIsProcessTrustedWithOptions のネイティブダイアログは NSApplication の
+// ランループ (= メインスレッド) でのみ表示される。バックグラウンドの
+// フックスレッドから直接呼ぶとダイアログが表示されない。
+// ime_macos.rs の TIS クエリと同じパターン。
+#[link(name = "System", kind = "dylib")]
+extern "C" {
+    #[allow(non_upper_case_globals)]
+    static _dispatch_main_q: std::ffi::c_void;
+    fn dispatch_sync_f(
+        queue: *const std::ffi::c_void,
+        context: *mut std::ffi::c_void,
+        work: unsafe extern "C" fn(*mut std::ffi::c_void),
+    );
+}
+
+struct AxPromptCtx {
+    result: bool,
+}
+
+/// GCD メインスレッド上で AXIsProcessTrustedWithOptions を実行するコールバック。
+unsafe extern "C" fn ax_prompt_main_thread(ctx: *mut std::ffi::c_void) {
     use core_foundation::base::TCFType;
     use core_foundation::boolean::CFBoolean;
     use core_foundation::dictionary::CFDictionary;
     use core_foundation::string::CFString;
 
+    let ctx = &mut *(ctx as *mut AxPromptCtx);
     let key = CFString::new("AXTrustedCheckOptionPrompt");
     let value = CFBoolean::true_value();
     let dict = CFDictionary::from_CFType_pairs(&[(key.as_CFType(), value.as_CFType())]);
-    // SAFETY: AXIsProcessTrustedWithOptions は CoreFoundation CFDictionaryRef を受け取り、
-    // システムダイアログの表示 + TCC 状態の read-only チェックのみ行う。
-    unsafe { AXIsProcessTrustedWithOptions(dict.as_CFTypeRef()) }
+    ctx.result = AXIsProcessTrustedWithOptions(dict.as_CFTypeRef());
+}
+
+/// Accessibility 権限をネイティブダイアログでプロンプトする。
+/// GCD dispatch_sync_f でメインスレッドに dispatch する。
+/// フックスレッド (バックグラウンド) から呼ぶため deadlock しない。
+fn ax_prompt_for_trust() -> bool {
+    let mut ctx = AxPromptCtx { result: false };
+    // SAFETY: dispatch_sync_f はメインキューにブロッキング dispatch する。
+    // フックスレッドから呼ぶため deadlock しない (メインスレッドからは呼ばないこと)。
+    // _dispatch_main_q は libSystem の公開グローバル変数。
+    // ctx はスタック上に存在し、dispatch_sync_f は完了まで返らないため有効。
+    unsafe {
+        dispatch_sync_f(
+            &_dispatch_main_q as *const _ as *const std::ffi::c_void,
+            &mut ctx as *mut AxPromptCtx as *mut std::ffi::c_void,
+            ax_prompt_main_thread,
+        );
+    }
+    ctx.result
 }
 
 use super::{CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, HOOK_ACTIVE, USING_ACCESSIBILITY_FALLBACK};
@@ -500,8 +531,16 @@ pub fn start() {
                 if !ax_trusted {
                     tracing::info!(
                         "Accessibility permission not granted. \
-                         Native prompt dialog shown to user."
+                         Native prompt dialog shown. Also opening System Settings as fallback."
                     );
+                    // ネイティブダイアログが抑制された場合のフォールバック:
+                    // System Settings の Accessibility ペインを直接開く。
+                    if let Err(e) = std::process::Command::new("open")
+                        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+                        .spawn()
+                    {
+                        tracing::warn!("Failed to open System Settings: {}", e);
+                    }
                 }
                 // リセットして Accessibility モードでのリトライを開始
                 consecutive_failures = 0;
