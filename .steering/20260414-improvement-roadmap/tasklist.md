@@ -14,26 +14,26 @@
 ## Phase 0: Replay & Guard（2-3 週間）
 
 ### 実装
-- [ ] P0-1: 分析ループ本体を `analysis/loop_step.rs` に `step()` 関数として抽出
-  - [ ] `AnalysisState` 構造体定義（`extractor`, `last_event_time_ms`, `next_engine_update_ms`, `presses_since_silence`, `was_paused`, `pressed_keys`）
-  - [ ] `LoopInput` enum 定義（`Key` / `ImeState`）
-  - [ ] `StepOutput` 構造体定義（`log_entries`, `feat: Option<FeatSnapshot>`）
-  - [ ] `step(state, engine, input, now_ms, ime_open) -> StepOutput` 実装
-  - [ ] `Instant` を ms-based 時刻へ変換する基準時刻設計
-- [ ] P0-2: `lib.rs` の分析スレッドを `step()` を呼ぶ薄いラッパーに書き換え
-  - [ ] `Instant::now()` を ms に変換して渡す
-  - [ ] `input::hook::IME_OPEN.load()` を引数化
-  - [ ] 挙動が変わらないこと手動確認（実アプリ起動→数セッション）
-- [ ] P0-3: `analysis/` に `Tauri` / `input::hook` グローバル直接依存がないことを確認
-- [ ] P0-4: `src-tauri/src/bin/replay.rs` 新設
-  - [ ] NDJSON パーサ（`serde_json` + `LogEntry` enum の `Deserialize` 実装）
-  - [ ] タイムスタンプ順イベント列化
-  - [ ] 1 秒刻み仮想時刻ループ
-  - [ ] `FeatSnapshot` JSON 出力
-  - [ ] `--snapshot <path>` で byte-equal（f64 誤差 1e-9）比較
-  - [ ] `[bin]` エントリを `Cargo.toml` に追加
-- [ ] P0-5: `engine.rs` に `pub const HMM_VERSION: &str = "0.2.0";` 追加
-- [ ] P0-6: `logger.rs` の meta エントリに `hmm_version` フィールド追加
+- [x] P0-1: 分析ループ本体を `analysis/loop_step.rs` に `step()` 関数として抽出
+  - [x] `AnalysisState` 構造体定義
+  - [x] `LoopInput` enum 定義（`Key` / `ImeActivate`）
+  - [x] `StepOutput` 構造体定義（中立記録型 `KeyRecord` / `FeatSnapshot`、判断 12）
+  - [x] `step(state, engine, input, now_ms, ime_open) -> StepOutput` 実装
+  - [x] u64 ms 時刻統一（判断 13）
+- [x] P0-2: `lib.rs` の分析スレッドを `step()` を呼ぶ薄いラッパーに書き換え
+  - [x] `SystemTime` ベース u64 ms で渡す
+  - [x] `input::hook::IME_OPEN.load()` を引数化
+  - [ ] 挙動が変わらないこと実機セッション手動確認（**次サイクル**）
+- [x] P0-3: `analysis/` に `Tauri` / `input::hook` グローバル直接依存がないことを確認（grep 済み）
+- [x] P0-4: `src-tauri/src/bin/replay.rs` 新設
+  - [x] NDJSON パーサ（独立 `ReplayEvent` enum）
+  - [x] タイムスタンプ順イベント列化
+  - [x] 1 秒刻み仮想時刻ループ（`ENGINE_TICK_MS` 定数、判断 M1）
+  - [x] `FeatSnapshot` JSON 出力（`serde_json` + `float_roundtrip` feature）
+  - [x] `--snapshot <path>` で byte-equal 比較
+  - [x] `[[bin]]` + `default-run = "gse-next"` 追加
+- [x] P0-5: `engine.rs` に `pub const HMM_VERSION: &str = "0.2.0";` 追加
+- [x] P0-6: `logger.rs` の meta エントリに `hmm_version` フィールド追加
 - [x] P0-7: 沈黙 3 状態のコメントリネーム
   - [x] `lib.rs:649-682` の 3 分岐にラベルコメント（TypingPath / TransitionPath / SilencePath）
   - [x] `features.rs:230` の `make_silence_observation` コメント更新
@@ -41,11 +41,12 @@
 - [x] P0-9: `// TUNE:` マーカーを `engine.rs` / `features.rs` の全チューニング定数に付与
   - [x] 遷移行列、放出行列、β 値、EWMA α、ヒステリシス α、Synthetic Friction 閾値
   - [x] 併せて `INITIAL_PROBS` / `INITIAL_AXES_EWMA` / `BACKSPACE_PENALTY_THRESHOLD` をモジュール定数へ抽出（重複リテラル解消）
-- [ ] P0-10: ゴールデンスナップショット 3 件作成
-  - [ ] `tests/fixtures/flow.ndjson`（Flow 主体 10 分）
-  - [ ] `tests/fixtures/incubation.ndjson`（Incubation 主体 10 分）
-  - [ ] `tests/fixtures/stuck.ndjson`（Stuck + BS ペナルティ含む 10 分）
-  - [ ] 初回 `gse-replay` 実行結果を `tests/snapshots/*.json` として保存
+- [~] P0-10: ゴールデンスナップショット（本サイクルは最小合成 1 件、実データ 3 件は次サイクル）
+  - [x] `tests/fixtures/minimal.ndjson`（合成 30 秒、BS 含む、CLI 検証用）
+  - [x] `tests/snapshots/minimal.json`（15 FeatSnapshot、bit-equal 一致確認済み）
+  - [ ] `tests/fixtures/flow.ndjson`（Flow 主体 10 分、**次サイクル**）
+  - [ ] `tests/fixtures/incubation.ndjson`（Incubation 主体 10 分、**次サイクル**）
+  - [ ] `tests/fixtures/stuck.ndjson`（Stuck + BS ペナルティ含む 10 分、**次サイクル**）
 
 ### テスト
 - [x] T0-1: `features.rs` に `#[cfg(test)]` モジュール追加 — **19 本追加**
@@ -96,6 +97,35 @@
 - **レビュー**: R0-1, R0-2（HIGH + 軽微 MEDIUM）, R0-3
 - **ドキュメント**: D0-1
 - **次サイクル繰越**: P0-1〜P0-6, P0-10, T0-3, 残 MEDIUM 3 件, D0-2, D0-3
+
+### 次サイクル（Phase 0 loop_step 抽出 + Replay CLI）2026-04-15 完了項目
+- **実装**: P0-1 (analysis/loop_step.rs 抽出), P0-2 (lib.rs 薄ラッパー化),
+  P0-3 (analysis/ 純粋性検証), P0-4 (bin/replay.rs CLI + float_roundtrip feature),
+  P0-5/P0-6 (HMM_VERSION 定数 + meta ログ), P0-10 部分 (最小合成 fixture 1 件 +
+  snapshot、byte-equal 15 件一致確認済み)
+- **レビュー**: R0 cycle 2 (P0-1/P0-2 向け code-reviewer + security-checker 並列、
+  HIGH 1 適用 + 1 false-positive 記録 + MEDIUM 3), R0 cycle 3 (P0-4 向け
+  code-reviewer + security-checker 並列、HIGH 2 件対応 [1 適用 + 1 判断 17
+  として次回統一タスク化] + MEDIUM 3 件適用 [M1/M4/S1]、MEDIUM 2 件 [M2/M3]
+  はユーザー判断でスキップ)
+- **決定記録**: 判断 12-17 (中立記録型 / u64 ms 統一 / pressed_keys cfg なし /
+  code-reviewer HIGH 2 false-positive 根拠 / v2 workspace 化を Phase 3 再検討 /
+  anyhow 全面採用は別タスク)
+- **コミット**: 9ccfe6c, e8d82e2, 109669e, 8a92ec3, 2ef3427, d094a37 (計 6 本)
+
+### Phase 0 さらなる次サイクル繰越
+- **P0-10 実データ**: Flow / Incubation / Stuck 主体 10 分 × 3 件の NDJSON 切り出し
+  は `gse-dataset` が 2 行しかないため物理的に不可能。Phase 1 GT 収集後に着手する
+  （判断: 本サイクル成果は最小合成 fixture でカバー、T0-3 も合わせて繰越）。
+- **T0-3**: P0-10 実データ完成後にゴールデン回帰テストを cargo test 内に組み込む。
+- **D0-2**: `docs/development-guidelines.md` に「リプレイ CLI を回帰保護の中心に」
+  方針追記 (小規模、次の小サイクルで消化可)。
+- **D0-3**: `README.md` に `gse-replay` 使用例と `hmm_version` bump 規約を追加。
+- **実機確認**: メタログに hmm_version が記録されることを実機セッションで確認
+  (Tauri アプリ起動 → セッション録る → NDJSON 目視)。
+- **残 MEDIUM 3 件** (前サイクル繰越): F4 バースト長 / F6 pause-after-delete /
+  30s cutoff / 2000ms FT cap のテストカバレッジ、update()/update_silence() の
+  挙動テスト — これらは Phase 1 に先行して消化するか、Phase 1 と並列実施可。
 
 ---
 
