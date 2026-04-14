@@ -31,6 +31,32 @@ extern "C" {
     // Accessibility permission check.
     // Returns true if this process is trusted for Accessibility.
     fn AXIsProcessTrusted() -> bool;
+    // Accessibility permission check with options.
+    // Pass a CFDictionary with { kAXTrustedCheckOptionPrompt: true } to show
+    // a native system dialog that adds the app to the Accessibility list.
+    fn AXIsProcessTrustedWithOptions(options: core_foundation::base::CFTypeRef) -> bool;
+}
+
+/// Prompt the user for Accessibility permission via the native macOS dialog.
+/// Creates a CFDictionary with { kAXTrustedCheckOptionPrompt: true } and calls
+/// AXIsProcessTrustedWithOptions. Returns whether accessibility is currently granted.
+///
+/// This is superior to opening System Settings via URL because:
+/// - Shows a clear native dialog explaining what the app needs
+/// - Automatically adds the app to the Accessibility list in System Settings
+/// - Works reliably with ad-hoc signed apps (identified by bundle path)
+fn ax_prompt_for_trust() -> bool {
+    use core_foundation::base::TCFType;
+    use core_foundation::boolean::CFBoolean;
+    use core_foundation::dictionary::CFDictionary;
+    use core_foundation::string::CFString;
+
+    let key = CFString::new("AXTrustedCheckOptionPrompt");
+    let value = CFBoolean::true_value();
+    let dict = CFDictionary::from_CFType_pairs(&[(key.as_CFType(), value.as_CFType())]);
+    // SAFETY: AXIsProcessTrustedWithOptions は CoreFoundation CFDictionaryRef を受け取り、
+    // システムダイアログの表示 + TCC 状態の read-only チェックのみ行う。
+    unsafe { AXIsProcessTrustedWithOptions(dict.as_CFTypeRef()) }
 }
 
 use super::{CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, HOOK_ACTIVE, USING_ACCESSIBILITY_FALLBACK};
@@ -464,19 +490,18 @@ pub fn start() {
                 );
                 use_accessibility = true;
                 USING_ACCESSIBILITY_FALLBACK.store(true, Ordering::Release);
-                // SAFETY: AXIsProcessTrusted は pure read-only チェック。
-                let ax_trusted = unsafe { AXIsProcessTrusted() };
+                // ネイティブダイアログで Accessibility 権限をプロンプトする。
+                // AXIsProcessTrustedWithOptions は:
+                //   1. ネイティブのシステムダイアログを表示
+                //   2. アプリを Accessibility リストに自動追加
+                //   3. ユーザーに「システム設定を開く」ボタンを提供
+                // URL scheme で System Settings を開く方式より確実。
+                let ax_trusted = ax_prompt_for_trust();
                 if !ax_trusted {
                     tracing::info!(
                         "Accessibility permission not granted. \
-                         Opening System Settings > Accessibility..."
+                         Native prompt dialog shown to user."
                     );
-                    if let Err(e) = std::process::Command::new("open")
-                        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                        .spawn()
-                    {
-                        tracing::warn!("Failed to open System Settings: {}", e);
-                    }
                 }
                 // リセットして Accessibility モードでのリトライを開始
                 consecutive_failures = 0;
@@ -568,6 +593,36 @@ pub fn start() {
                 Err(_) => {
                     consecutive_failures += 1;
                     CONSECUTIVE_TAP_FAILURES.store(consecutive_failures, Ordering::Relaxed);
+
+                    // --- 定期リプロンプト (Accessibility フォールバック中、10回ごと) ---
+                    // macOS はダイアログ表示を頻繁すぎると抑制する可能性があるため、
+                    // 10回間隔 (約30-50秒) で再プロンプトする。抑制されても
+                    // AXIsProcessTrustedWithOptions は現在の trust 状態を返すだけで副作用なし。
+                    if use_accessibility && consecutive_failures > 0 && consecutive_failures % 10 == 0 {
+                        // SAFETY: AXIsProcessTrusted は pure read-only チェック。
+                        let ax_now = unsafe { AXIsProcessTrusted() };
+                        if !ax_now {
+                            tracing::info!(
+                                "Re-prompting for Accessibility permission (attempt {})",
+                                consecutive_failures
+                            );
+                            ax_prompt_for_trust();
+                        }
+
+                        // Input Monitoring が別途付与された場合、ListenOnly に復帰する。
+                        // CGPreflightListenEventAccess は副作用ゼロの read-only チェック。
+                        let im_now = unsafe { CGPreflightListenEventAccess() };
+                        if im_now {
+                            tracing::info!(
+                                "Input Monitoring now granted! \
+                                 Switching back from Accessibility fallback."
+                            );
+                            use_accessibility = false;
+                            USING_ACCESSIBILITY_FALLBACK.store(false, Ordering::Release);
+                            consecutive_failures = 0;
+                            CONSECUTIVE_TAP_FAILURES.store(0, Ordering::Relaxed);
+                        }
+                    }
 
                     // Backoff strategy:
                     //   1-5回: 2秒間隔 (TCC 伝播待ち / 権限付与待ち)

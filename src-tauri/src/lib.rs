@@ -232,6 +232,40 @@ fn reset_input_monitoring() -> String {
     "Not applicable on this platform".into()
 }
 
+/// macOS: Accessibility の TCC エントリをリセットする。
+/// Accessibility フォールバックモードで権限付与が失敗した場合の回復手段。
+/// tccutil reset Accessibility は全アプリの Accessibility をリセットする点に注意。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn reset_accessibility() -> String {
+    let output = std::process::Command::new("tccutil")
+        .args(["reset", "Accessibility"])
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => {
+            tracing::info!("TCC Accessibility reset successful");
+            "TCC Accessibility reset successful. The app will re-prompt for permission.".into()
+        }
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr).to_string();
+            tracing::warn!("tccutil Accessibility reset failed (exit={}): {}", o.status, stderr);
+            "TCC Accessibility reset failed. Try: tccutil reset Accessibility".into()
+        }
+        Err(e) => {
+            tracing::error!("Failed to run tccutil: {}", e);
+            format!("Failed to run tccutil: {}", e)
+        }
+    }
+}
+
+/// Windows: reset_accessibility のスタブ（no-op）。
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn reset_accessibility() -> String {
+    "Not applicable on this platform".into()
+}
+
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
@@ -792,6 +826,7 @@ pub fn run() {
             get_hook_status,
             get_diagnostics,
             reset_input_monitoring,
+            reset_accessibility,
             start_session,
             quit_app,
             get_session_file,

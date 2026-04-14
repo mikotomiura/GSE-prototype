@@ -40,6 +40,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   const [diagnostics, setDiagnostics] = useState<DiagnosticInfo | null>(null);
   // TCC リセット実行結果メッセージ
   const [resetResult, setResetResult] = useState<string | null>(null);
+  const [resetAxResult, setResetAxResult] = useState<string | null>(null);
   // 診断コピー済みフラグ
   const [copied, setCopied] = useState(false);
 
@@ -124,6 +125,14 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
                       <em>System Settings › プライバシーとセキュリティ › アクセシビリティ</em> で
                       <strong> gse-next </strong>にチェックを入れてください。
                     </p>
+                    {diagnostics?.ax_is_trusted === 'false' && diagnostics?.input_monitoring_granted === 'false' && (
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
+                        入力監視・アクセシビリティの両方が未許可です。
+                        アプリが表示するシステムダイアログで<strong>「システム設定を開く」</strong>を押し、
+                        gse-next のトグルをオンにしてください。
+                        ダイアログが表示されない場合は、約30秒後に再表示されます。
+                      </p>
+                    )}
                     {hookWaitingSec >= 30 && (
                       <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
                         gse-next が既にチェック済みの場合は、<strong>一度オフにしてからオンに戻して</strong>ください。
@@ -183,11 +192,29 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
                           .catch(e => setResetResult(`Error: ${e}`));
                       }}
                     >
-                      権限をリセット
+                      入力監視をリセット
                     </button>
+                    {diagnostics?.using_accessibility_fallback === 'true' && (
+                      <button
+                        style={{ fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer', marginRight: '0.5rem' }}
+                        onClick={() => {
+                          if (!window.confirm('全アプリのアクセシビリティ権限がリセットされます。続行しますか？')) return;
+                          invoke<string>("reset_accessibility")
+                            .then(msg => setResetAxResult(msg))
+                            .catch(e => setResetAxResult(`Error: ${e}`));
+                        }}
+                      >
+                        アクセシビリティをリセット
+                      </button>
+                    )}
                     {resetResult && (
                       <p style={{ marginTop: '0.3rem', fontSize: '0.75rem', opacity: 0.8 }}>
                         {resetResult}
+                      </p>
+                    )}
+                    {resetAxResult && (
+                      <p style={{ marginTop: '0.3rem', fontSize: '0.75rem', opacity: 0.8 }}>
+                        {resetAxResult}
                       </p>
                     )}
                   </div>
