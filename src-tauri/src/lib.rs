@@ -646,19 +646,35 @@ pub fn run() {
             // 特徴量計算: バッファの実データを優先し、空の場合のみ合成サイレンス特徴量を使用
             let mut features = extractor.calculate_features();
 
+            // ── 沈黙 3 状態機構 (Silence 3-State Mechanism) ────────────────
+            // 1Hz ゲートの推論パスは、バッファの有無と沈黙秒数に応じて 3 つに分岐する。
+            // 各パスで使用する EWMA α と摩擦フロア適用有無が異なる。
+            // 詳細は docs/architecture.md §4.7「沈黙 3 状態機構」を参照。
+            //
+            //   TypingPath     : バッファあり + silence < 2s      → update()        α=0.3
+            //   TransitionPath : バッファあり + silence ≥ 2s      → update_silence() α=0.15〜0.25
+            //                    摩擦フロア F6≥8s / F3≥10s を適用
+            //   SilencePath    : バッファ空 (f1=0)                → update_silence() α=0.15〜0.25
+            //                    make_silence_observation() で合成特徴量生成
+            //                    摩擦フロア F6≥10s / F3≥15s (TransitionPath と閾値が異なる)
+            //
+            // 2 つのフロア閾値の不統一は、統合リスクを避けるため意図的に維持している。
             let (log_features, diag_opt) =
                 if features.f1_flight_time_median > 0.0 && silence_secs < 2.0 {
-                    // 通常パス: バッファに実データあり + 直近タイピング中 → α=0.3 で更新
+                    // === TypingPath: バッファ実データあり + 直近タイピング中 ===
                     let d = engine_for_thread.update(&features, ime_open);
                     (features, d)
                 } else if features.f1_flight_time_median > 0.0 {
-                    // 沈黙パス (バッファに実データあり): 2秒以上沈黙中
+                    // === TransitionPath: バッファ実データあり + 2 秒以上沈黙中 ===
                     // 古いウィンドウデータを α=0.3 で連続入力すると Incubation にロックインするため、
                     // α=0.15 の update_silence を使用する。
                     // F5 に進行中の沈黙を加算し、摩擦フロアを適用する。
                     if silence_secs >= 2.0 {
                         features.f5_pause_count += silence_secs / 2.0;
                     }
+                    // TUNE: TransitionPath 用摩擦フロア
+                    //   F6: onset 8s / ramp 30s / floor 0.15 (≥ 10s)
+                    //   F3: onset 10s / ramp 40s / floor 0.20 (≥ 10s)
                     if silence_secs >= 8.0 {
                         let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
                         let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
@@ -673,7 +689,7 @@ pub fn run() {
                     let d = engine_for_thread.update_silence(&features, ime_open, silence_secs);
                     (features, d)
                 } else if let Some(sf) = extractor.make_silence_observation(silence_secs) {
-                    // 合成サイレンスパス: バッファ空 → 合成特徴量で α=0.15 更新
+                    // === SilencePath: バッファ空 → 合成特徴量で update_silence ===
                     let d = engine_for_thread.update_silence(&sf, ime_open, silence_secs);
                     (sf, d)
                 } else {

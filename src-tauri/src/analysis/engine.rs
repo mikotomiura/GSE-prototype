@@ -4,6 +4,45 @@ use std::sync::{Arc, Mutex};
 
 use crate::analysis::features::{phi, Features};
 
+// ============================================================================
+// TUNE: HMM チューニング定数
+// ============================================================================
+//
+// 意図的な HMM チューニングでこれらを変更する際は、
+//   1. `#[cfg(test)] mod tests` のスナップショットテストも更新する
+//   2. 変更根拠を `.steering/` に記録する
+// これら以外の α 値・閾値もソース内に散在する。
+// 全チューニングポイントの列挙は `grep -rn "TUNE:" src-tauri/src/` で確認可能
+// （`analysis/` 以外に `lib.rs` の TransitionPath 摩擦フロアも含む）。
+//
+// **EWMA α 系の定数化ポリシー**:
+//   通常 update() の α=0.3、update_silence() の 0.15/0.18/0.25、
+//   ヒステリシス層の 0.40/0.60 はモジュール定数として抽出しない。
+//   理由: IEEE 754 において `(1.0 - α)` はリテラル相補値と bit-equal に
+//   ならない（例: `1.0 - 0.3 ≠ 0.7`）。定数化すると compute 経路の
+//   浮動小数点結果が ULP レベルで変わり、既存セッションログの再現性を
+//   損なう。これらは `// TUNE:` マーカーコメントで列挙可能にするのみとする。
+
+/// TUNE: 初期事前確率 [Flow, Incubation, Stuck]
+///
+/// Flow 優勢で開始することで、セッション開始直後のサイレンス観測（f1=2000）
+/// による過渡的な Incubation 方向への引き込みを吸収する。
+/// HMM は数秒以内に実データに収束する。
+const INITIAL_PROBS: [f64; 3] = [0.80, 0.15, 0.05];
+
+/// TUNE: 潜在軸 (X=Friction, Y=Engagement) の初期 EWMA 値
+///
+/// (0.1, 0.8) = Flow 領域 (obs=4 付近、Flow 優勢ビン)。
+/// `INITIAL_PROBS` と整合的な開始位置。
+const INITIAL_AXES_EWMA: (f64, f64) = (0.1, 0.8);
+
+/// TUNE: Backspace 連打によるペナルティビン (obs=25) 発動閾値
+///
+/// IME の正常な変換修正操作（通常 8-12 連打）を超える値として 14 を設定。
+/// この値以上で `has_pending_penalty` フラグが立ち、次回 `update()` で
+/// observation を obs=25 に強制し、Stuck 方向へ強く引く。
+const BACKSPACE_PENALTY_THRESHOLD: u32 = 14;
+
 /// HMM 更新時の内部診断データ。
 /// ログに書き出してセッション後分析・HMM チューニングに使用する。
 #[derive(Debug, Clone)]
@@ -57,7 +96,7 @@ pub struct CognitiveStateEngine {
 
 impl CognitiveStateEngine {
     pub fn new() -> Self {
-        // Transition probabilities
+        // TUNE: 遷移確率行列 (row-major, 3×3)
         // FLOW -> FLOW: 0.75  (escape time 1/(1-0.75)=4s; reduced from 0.80 to mitigate Flow Gravity)
         // FLOW -> INCUBATION: 0.17
         // FLOW -> STUCK: 0.08
@@ -69,7 +108,7 @@ impl CognitiveStateEngine {
         // STUCK -> STUCK: 0.76  (Hall et al. 2024)
         let transitions = [0.75, 0.17, 0.08, 0.12, 0.80, 0.08, 0.06, 0.18, 0.76];
 
-        // Emissions B: 3 states × 26 bins
+        // TUNE: 放出確率行列 B (3 states × 26 bins)
         //
         // Grid layout: obs = x_bin * 5 + y_bin
         //
@@ -138,44 +177,33 @@ impl CognitiveStateEngine {
                                0.99,
         ];
 
-        // 初期事前確率: Flow優勢で開始 (セッション開始直後のフリッカー防止)
-        // 最初の1-2秒はサイレンス観測(f1=2000)が流入し Incubation 方向に引っ張るが、
-        // Flow優勢の事前確率がこの過渡的ノイズを吸収する。
-        // HMM は実際の打鍵データで数秒以内に実態に収束する。
-        let initial_probs = [0.80, 0.15, 0.05];
-
         Self {
             transitions: Arc::new(transitions),
             emissions: Arc::new(emissions),
-            current_state_probs: Arc::new(Mutex::new(initial_probs)),
+            current_state_probs: Arc::new(Mutex::new(INITIAL_PROBS)),
             is_paused: Arc::new(AtomicBool::new(false)),
             backspace_streak: Arc::new(AtomicU32::new(0)),
             has_pending_penalty: Arc::new(AtomicBool::new(false)),
-            // (0.1, 0.8) = Flow領域で初期化 (obs=4; Flow優勢ビン)
-            // 初期確率 [0.80, 0.15, 0.05] と整合的な開始位置。
-            // セッション開始直後のサイレンス観測(f1=2000)による過渡ノイズを吸収する。
-            axes_ewma: Arc::new(Mutex::new((0.1, 0.8))),
-            // display_probs は initial_probs と同値で初期化
-            display_probs: Arc::new(Mutex::new(initial_probs)),
+            axes_ewma: Arc::new(Mutex::new(INITIAL_AXES_EWMA)),
+            // display_probs は INITIAL_PROBS と同値で初期化
+            display_probs: Arc::new(Mutex::new(INITIAL_PROBS)),
         }
     }
 
     /// HMM確率・EWMA・backspace_streakを初期値に戻す。
     /// セッション開始時に呼び出され、前回セッションの状態をリセットする。
     pub fn reset(&self) {
-        let initial_probs = [0.80, 0.15, 0.05];
-
         match self.current_state_probs.lock() {
-            Ok(mut p) => *p = initial_probs,
-            Err(poisoned) => *poisoned.into_inner() = initial_probs,
+            Ok(mut p) => *p = INITIAL_PROBS,
+            Err(poisoned) => *poisoned.into_inner() = INITIAL_PROBS,
         }
         match self.display_probs.lock() {
-            Ok(mut p) => *p = initial_probs,
-            Err(poisoned) => *poisoned.into_inner() = initial_probs,
+            Ok(mut p) => *p = INITIAL_PROBS,
+            Err(poisoned) => *poisoned.into_inner() = INITIAL_PROBS,
         }
         match self.axes_ewma.lock() {
-            Ok(mut e) => *e = (0.1, 0.8),
-            Err(poisoned) => *poisoned.into_inner() = (0.1, 0.8),
+            Ok(mut e) => *e = INITIAL_AXES_EWMA,
+            Err(poisoned) => *poisoned.into_inner() = INITIAL_AXES_EWMA,
         }
         self.backspace_streak.store(0, Ordering::Relaxed);
         self.has_pending_penalty.store(false, Ordering::Release);
@@ -199,7 +227,7 @@ impl CognitiveStateEngine {
     pub fn register_keystroke(&self, is_backspace: bool) {
         if is_backspace {
             let new_streak = self.backspace_streak.fetch_add(1, Ordering::Relaxed) + 1;
-            if new_streak >= 14 {
+            if new_streak >= BACKSPACE_PENALTY_THRESHOLD {
                 self.has_pending_penalty.store(true, Ordering::Release);
             }
         } else {
@@ -240,7 +268,7 @@ impl CognitiveStateEngine {
     /// Both sets are population-level estimates; future work can adapt them per-session
     /// using EWMA updates (update only the matching β when IME state is known).
     fn calculate_latent_axes(&self, features: &Features, ime_open: bool) -> (f64, f64) {
-        // β_coding: reference values for alphanumeric / coding input
+        // TUNE: β_coding — reference values for alphanumeric / coding input
         // Source: Dhakal et al. (2018) general population medians, coding-adjusted.
         const BETA_CODING_F1: f64 = 150.0; // Flight Time median (ms)
         const BETA_CODING_F3: f64 = 0.06; // Correction rate (6%)
@@ -248,7 +276,7 @@ impl CognitiveStateEngine {
         const BETA_CODING_F5: f64 = 2.0; // Pause count (per 30 s)
         const BETA_CODING_F6: f64 = 0.08; // Pause-after-delete rate
 
-        // β_writing: reference values for Japanese IME writing input
+        // TUNE: β_writing — reference values for Japanese IME writing input
         // Calibrated from real session data (Mac/Windows, 2026-03).
         // Typical Japanese typing: F1=100-130ms, F3=3-10%, F4=2.8-3.5, F5=1-4.
         // β must be at or below the typical range so phi() produces non-zero values,
@@ -319,8 +347,9 @@ impl CognitiveStateEngine {
 
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
 
-        // EWMA平滑化 (α = 0.3): 各軸を独立に平滑化
+        // TUNE: EWMA 平滑化 α = 0.3 (通常 update)
         // s_t = 0.3 * raw_t + 0.7 * s_{t-1}
+        // 注: IEEE 754 の (1.0 - 0.3) ≠ 0.7 のため、定数抽出せずリテラル維持。
         let (x, y) = match self.axes_ewma.lock() {
             Ok(mut ewma) => {
                 ewma.0 = 0.3 * raw_x + 0.7 * ewma.0;
@@ -389,10 +418,11 @@ impl CognitiveStateEngine {
         // display_probs に EMA を適用し、ウィンドウリセット時の
         // Cold-Start 瞬間遷移 (Stuck→Flow in 1ms) を防ぐ。
         //
-        // α=0.40 (通常): 時定数 ≈ 2.5 更新 ≈ 2.5 秒
-        //   emission floor 削除 (0.05→0.01) で HMM 応答が鋭くなったため、
-        //   旧 α=0.25 (4秒) から引き上げて表示の追従速度を改善。
-        // α=0.60 (ペナルティ): Backspace 連続時は素早く Stuck に収束
+        // TUNE: ヒステリシス α
+        //   α=0.40 (通常): 時定数 ≈ 2.5 更新 ≈ 2.5 秒
+        //     emission floor 削除 (0.05→0.01) で HMM 応答が鋭くなったため、
+        //     旧 α=0.25 (4秒) から引き上げて表示の追従速度を改善。
+        //   α=0.60 (ペナルティ): Backspace 連続時は素早く Stuck に収束
         let display_alpha = if apply_backspace_penalty { 0.60 } else { 0.40 };
 
         let mut display = match self.display_probs.lock() {
@@ -439,13 +469,16 @@ impl CognitiveStateEngine {
 
         let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
 
-        // 動的α: 沈黙の深さに応じてEWMA応答を加速
+        // TUNE: サイレンス時の動的 EWMA α — 沈黙深さに応じて段階的加速
+        //   α=0.15: silence < 15s   (初期サイレンス、緩やかに推移)
+        //   α=0.18: 15s ≤ silence < 25s  (中間ギア、Nudge 領域)
+        //   α=0.25: silence ≥ 25s   (完全に固まった状態、Stuck 領域へ加速)
         let alpha = if silence_secs >= 25.0 {
-            0.25 // 完全に固まった状態
+            0.25
         } else if silence_secs >= 15.0 {
-            0.18 // Nudge 領域を緩やかに推移させるための中間ギア
+            0.18
         } else {
-            0.15 // 初期サイレンス
+            0.15
         };
 
         // EWMA を緩やかに更新
@@ -499,7 +532,7 @@ impl CognitiveStateEngine {
         *current = new_probs;
         drop(current); // MutexGuard 早期解放
 
-        // Hysteresis Layer (通常のα=0.40)
+        // TUNE: ヒステリシス α=0.40 (update_silence は常に通常値)
         let mut display = match self.display_probs.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -538,5 +571,198 @@ impl CognitiveStateEngine {
         map.insert(CognitiveState::Incubation, probs[1]);
         map.insert(CognitiveState::Stuck, probs[2]);
         map
+    }
+}
+
+// ============================================================================
+// Unit tests (diagnostic — snapshot tests for tuning parameters)
+// ============================================================================
+//
+// これらのテストは「意図しないパラメータドリフト」を検出するために存在する。
+// 意図的な HMM チューニングでパラメータを変更した際は、テストも合わせて更新する。
+// テスト更新を伴うチューニングは `.steering/` に根拠を残すこと。
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::Ordering;
+
+    // ---------- Transition / Emission / Initial Probs Snapshots ----------
+
+    #[test]
+    fn transition_matrix_snapshot() {
+        // 9 要素 (行優先): Flow/Incubation/Stuck からの遷移確率。
+        // 各行の合計 = 1.0 であることも同時に検証する。
+        let e = CognitiveStateEngine::new();
+        let t = e.transitions.as_ref();
+        let expected: [f64; 9] = [
+            0.75, 0.17, 0.08, // Flow →
+            0.12, 0.80, 0.08, // Incubation →
+            0.06, 0.18, 0.76, // Stuck →
+        ];
+        for (i, (a, b)) in t.iter().zip(expected.iter()).enumerate() {
+            assert!(
+                (a - b).abs() < 1e-9,
+                "transitions[{}] drift: got {}, expected {}",
+                i,
+                a,
+                b
+            );
+        }
+        // 行和 = 1.0 の確認
+        for row in 0..3 {
+            let sum: f64 = t[row * 3..(row + 1) * 3].iter().sum();
+            assert!(
+                (sum - 1.0).abs() < 1e-9,
+                "transition row {} does not sum to 1.0: {}",
+                row,
+                sum
+            );
+        }
+    }
+
+    #[test]
+    fn emission_matrix_snapshot() {
+        // 3 states × 26 bins = 78 要素。
+        // ドリフト検出のため全値を固定比較する。
+        // 意図的チューニング時はここも更新。
+        let e = CognitiveStateEngine::new();
+        let em = e.emissions.as_ref();
+        #[rustfmt::skip]
+        let expected: [f64; 78] = [
+            // Flow (state 0), bins 0..25
+            0.01, 0.02, 0.08, 0.12, 0.14,
+            0.01, 0.02, 0.08, 0.12, 0.13,
+            0.01, 0.01, 0.02, 0.01, 0.08,
+            0.01, 0.01, 0.01, 0.01, 0.01,
+            0.01, 0.01, 0.01, 0.01, 0.01,
+            0.01, // penalty bin
+            // Incubation (state 1)
+            0.15, 0.10, 0.04, 0.03, 0.02,
+            0.14, 0.08, 0.04, 0.03, 0.02,
+            0.10, 0.08, 0.03, 0.02, 0.01,
+            0.05, 0.04, 0.01, 0.01, 0.01,
+            0.04, 0.03, 0.01, 0.01, 0.01,
+            0.01, // penalty bin
+            // Stuck (state 2)
+            0.01, 0.01, 0.01, 0.01, 0.01,
+            0.01, 0.01, 0.01, 0.01, 0.01,
+            0.02, 0.04, 0.04, 0.05, 0.01,
+            0.10, 0.16, 0.05, 0.07, 0.01,
+            0.16, 0.22, 0.12, 0.05, 0.02,
+            0.99, // penalty bin: near-certain Stuck
+        ];
+        for (i, (a, b)) in em.iter().zip(expected.iter()).enumerate() {
+            assert!(
+                (a - b).abs() < 1e-9,
+                "emissions[{}] drift: got {}, expected {}",
+                i,
+                a,
+                b
+            );
+        }
+    }
+
+    #[test]
+    fn initial_probabilities_snapshot() {
+        // 初期事前確率 [Flow, Incubation, Stuck] = [0.80, 0.15, 0.05]
+        // Flow 優勢で開始することでセッション開始直後のフリッカーを防止する。
+        let e = CognitiveStateEngine::new();
+        let probs = e.current_state_probs.lock().unwrap();
+        assert!((probs[0] - 0.80).abs() < 1e-9, "Flow prior drifted");
+        assert!((probs[1] - 0.15).abs() < 1e-9, "Incubation prior drifted");
+        assert!((probs[2] - 0.05).abs() < 1e-9, "Stuck prior drifted");
+        // 確率の合計 = 1.0
+        let sum: f64 = probs.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9, "initial probs do not sum to 1.0");
+    }
+
+    #[test]
+    fn emission_penalty_bin_near_certain_stuck() {
+        // ペナルティビン (obs=25) は Stuck:Flow 比 ≈ 99× の鋭い応答を維持する。
+        // EMISSION_FLOOR (+0.05) 廃止後の設計意図を確認。
+        let e = CognitiveStateEngine::new();
+        let em = e.emissions.as_ref();
+        // 各 state の penalty bin index = state * 26 + 25
+        let flow_penalty = em[25];
+        let inc_penalty = em[26 + 25];
+        let stuck_penalty = em[52 + 25];
+        assert!((flow_penalty - 0.01).abs() < 1e-9);
+        assert!((inc_penalty - 0.01).abs() < 1e-9);
+        assert!((stuck_penalty - 0.99).abs() < 1e-9);
+        // Stuck:Flow 比 ≈ 99
+        assert!((stuck_penalty / flow_penalty - 99.0).abs() < 1e-6);
+    }
+
+    // ---------- register_keystroke() ----------
+
+    #[test]
+    fn register_keystroke_non_backspace_resets_streak() {
+        let e = CognitiveStateEngine::new();
+        e.register_keystroke(true); // BS
+        e.register_keystroke(true); // BS
+        e.register_keystroke(true); // BS
+        assert_eq!(e.backspace_streak.load(Ordering::Relaxed), 3);
+        e.register_keystroke(false); // non-BS
+        assert_eq!(e.backspace_streak.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn register_keystroke_streak_at_13_does_not_trigger_penalty() {
+        // 境界値: 13 連打ではフラグが立たない
+        let e = CognitiveStateEngine::new();
+        for _ in 0..13 {
+            e.register_keystroke(true);
+        }
+        assert_eq!(e.backspace_streak.load(Ordering::Relaxed), 13);
+        assert!(!e.has_pending_penalty.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn register_keystroke_streak_at_14_triggers_pending_penalty() {
+        // 閾値: 14 連打到達でフラグが立つ
+        let e = CognitiveStateEngine::new();
+        for _ in 0..14 {
+            e.register_keystroke(true);
+        }
+        assert_eq!(e.backspace_streak.load(Ordering::Relaxed), 14);
+        assert!(e.has_pending_penalty.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn register_keystroke_penalty_flag_persists_through_non_bs() {
+        // BS×14 で立ったフラグは、非 BS キーでストリークがリセットされても保持される
+        // （次の update() で消費されるまで）。
+        let e = CognitiveStateEngine::new();
+        for _ in 0..14 {
+            e.register_keystroke(true);
+        }
+        assert!(e.has_pending_penalty.load(Ordering::Acquire));
+        e.register_keystroke(false); // non-BS → streak リセット
+        assert_eq!(e.backspace_streak.load(Ordering::Relaxed), 0);
+        // フラグは依然立っている
+        assert!(e.has_pending_penalty.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn reset_clears_all_state() {
+        // reset() は全ての可変状態を初期値に戻す
+        let e = CognitiveStateEngine::new();
+        for _ in 0..14 {
+            e.register_keystroke(true);
+        }
+        e.set_paused(true);
+        assert!(e.has_pending_penalty.load(Ordering::Acquire));
+        assert!(e.get_paused());
+
+        e.reset();
+
+        assert_eq!(e.backspace_streak.load(Ordering::Relaxed), 0);
+        assert!(!e.has_pending_penalty.load(Ordering::Acquire));
+        assert!(!e.get_paused());
+        let probs = e.current_state_probs.lock().unwrap();
+        assert!((probs[0] - 0.80).abs() < 1e-9);
+        assert!((probs[1] - 0.15).abs() < 1e-9);
+        assert!((probs[2] - 0.05).abs() < 1e-9);
     }
 }

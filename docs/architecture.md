@@ -175,6 +175,49 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **インターフェース**: `log()` → channel 送信、`flush()`, `close()`
 - **状態管理**: バッファリングチャネル（512 エントリ）、5 秒間隔フラッシュ
 
+### 4.7 沈黙 3 状態機構（Silence 3-State Mechanism）
+
+1Hz 推論ゲートにおける特徴量計算と HMM 更新は、**バッファの状態と沈黙秒数に応じて 3 つのパス**に分岐する。各パスで使用する EWMA α・摩擦フロア適用有無・呼び出す engine メソッドが異なる。分散実装 (`lib.rs` 分析スレッド + `features.rs::make_silence_observation` + `engine.rs::update_silence`) のため、全体像を以下に集約する。
+
+#### 3 パスの定義
+
+| パス名 | 発動条件 | engine 呼び出し | EWMA α | 摩擦フロア |
+|--------|---------|----------------|--------|-----------|
+| **TypingPath** | バッファ実データあり (f1 > 0) かつ `silence < 2s` | `update()` | 0.3 | なし |
+| **TransitionPath** | バッファ実データあり (f1 > 0) かつ `silence ≥ 2s` | `update_silence()` | 0.15 / 0.18 / 0.25 | F6 onset 8s / F3 onset 10s（≥10s でフロア 0.15 / 0.20） |
+| **SilencePath** | バッファ空 (f1 = 0) かつ `silence ≥ 2s` | `update_silence()` | 0.15 / 0.18 / 0.25 | F6 onset 10s / F3 onset 15s（≥10s でフロア 0.15 / 0.20） |
+
+いずれの条件にも該当しない（`silence < 2s` かつ `f1 = 0`、データ不足）場合は推論スキップ。
+
+#### TransitionPath と SilencePath のフロア閾値差
+
+両パスは似て非なる摩擦フロアを持つ:
+
+| パラメータ | TransitionPath (`lib.rs` 分析スレッド内ブランチ) | SilencePath (`features.rs::make_silence_observation`) |
+|------------|-----------------------------------|--------------------------------------|
+| F6 onset | **8s** | **10s** |
+| F6 ramp | 30s | 40s |
+| F6 floor (≥10s) | 0.15 | 0.15 |
+| F3 onset | **10s** | **15s** |
+| F3 ramp | 40s | 50s |
+| F3 floor (≥10s) | 0.20 | 0.20 |
+
+TransitionPath が先行するのは、「直近まで実データがあったユーザーが沈黙に入った」状況を「完全な無入力のユーザー」より早く Stuck 方向へ引くため。
+
+#### 意図的に統合していない理由
+
+2 つのパスは実装上似ており統合の誘惑があるが、GSE では**明示的に統合を避けている**:
+
+1. **統合リスク > 保守利益**: 既存の挙動はゴールデンセッションで動作確認済み。統合リファクタは微妙な挙動変化のリスクが大きい
+2. **責務の違い**: TransitionPath は「打鍵を見た直後の沈黙」、SilencePath は「純粋な無入力」を扱う。閾値差はこの意味論の違いを反映している
+3. **原則 D (Keep What Works, Rename What's Confusing)**: コード削減自体を目的化しない。名前と文書で可読性を確保する
+
+統合しない判断の詳細根拠は `.steering/20260414-improvement-roadmap/decisions.md` §3 を参照。
+
+#### 拡張時の注意
+
+Phase 2a（Synthetic Friction 再設計）では、TransitionPath と SilencePath の両方にゲート条件（直前の φ(F3) / φ(F6) に基づく文脈判定）を追加する計画がある。その際も**両パスの閾値は独立に維持する**こと。統合してはならない。
+
 ## 5. データフロー
 
 ### フロー 1: キーストローク → 状態推定（1Hz サイクル）
