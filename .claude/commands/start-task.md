@@ -31,14 +31,39 @@ cp .steering/_template/tasklist.md "$TASK_DIR/"
 
 Edit ツールで背景・ゴール・スコープ外を記入する。
 
+### Step 3.5: /reimagine 適用判断
+
+以下のいずれかに該当するか確認する（ユーザーに問う）:
+
+- アーキテクチャや重要な設計判断を伴う
+- 公開 API / 外部インターフェースを定義する
+- 再現や原因特定が難しいバグ
+- 複数の実装案が考えられ、最良案が自明でない
+
+**該当する → 推奨**: `/implement` の Step 3 完了後に `/reimagine` を実行してください。  
+**該当しない → 不要**: 自明な実装・小さなリファクタ・ドキュメント更新では不要です。
+
+ユーザーの回答を `requirement.md` 末尾に Edit で追記:
+
+```markdown
+## 運用メモ
+- /reimagine 適用: Yes / No
+- 理由: [ユーザーの回答]
+```
+
 ### Step 4: 完了通知
 
 ```
 .steering/[DATE]-[task-name]/ を作成しました。
-次: /implement を実行してください。
+次: タスク種別に応じて以下を実行してください:
+- 新機能追加 → /add-feature
+- バグ修正   → /fix-bug
+- リファクタリング → /refactor
+（/reimagine 適用 Yes の場合は各コマンドの Step 3 完了後に /reimagine を実行）
 ```
 
 ## 制約
 
 - ヒアリングは 3 問で完結させる。詳細化は design.md で行う
 - タスク名はユーザーに決めさせる
+- /reimagine 適用判断の記録を省略しない

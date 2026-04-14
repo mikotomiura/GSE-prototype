@@ -32,16 +32,20 @@ git log --oneline -10
 git branch --show-current
 ```
 
-## 進行中の .steering/ タスク
+## 進行中の .steering/ タスク（ディレクトリ一覧）
 
 ```bash
-find .steering -name "tasklist.md" -newer .steering/_setup-progress.md 2>/dev/null | head -5
+ls .steering/ | grep -v '^_' | grep -v '^README'
 ```
 
-## 未完了チェックボックス数
+## 未完了チェックボックス（件数と内容）
 
 ```bash
-grep -r "- \[ \]" .steering/ --include="tasklist.md" | wc -l
+grep -r "- \[ \]" .steering/ --include="tasklist.md" -l 2>/dev/null
+```
+
+```bash
+grep -r "- \[ \]" .steering/ --include="tasklist.md" 2>/dev/null | head -10
 ```
 
 ## 変更ファイルの統計

@@ -5,48 +5,52 @@
 ### 全体図
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Tauri 2.0 App                        │
-│                                                         │
-│  ┌──────────────┐    ┌──────────────┐                   │
-│  │ Main Window  │    │   Overlay    │   React 19 / TS   │
-│  │ (Dashboard)  │◄──►│  (Nudge/Wall)│   500ms polling   │
-│  └──────┬───────┘    └──────┬───────┘                   │
-│         │    Tauri IPC      │    Tauri Events           │
-│ ════════╪═══════════════════╪═══════════════════════════│
-│         ▼                   ▼                           │
-│  ┌──────────────────────────────────┐     Rust Backend  │
-│  │         Tauri Commands           │                   │
-│  │  get_cognitive_state, start_*    │                   │
-│  └──────────────┬───────────────────┘                   │
-│                 │                                       │
-│    ┌────────────▼────────────┐                          │
-│    │    Analysis Thread      │  1Hz timer-driven        │
-│    │  ┌──────────────────┐   │                          │
-│    │  │ FeatureExtractor │   │  30s rolling window      │
-│    │  │  F1,F3,F4,F5,F6  │   │  5 features → 2 axes    │
-│    │  └────────┬─────────┘   │                          │
-│    │  ┌────────▼─────────┐   │                          │
-│    │  │   HMM Engine     │   │  3×26 emission matrix    │
-│    │  │  Forward Algo    │   │  EWMA + hysteresis       │
-│    │  └──────────────────┘   │                          │
-│    └────────────▲────────────┘                          │
-│                 │ crossbeam channel                     │
-│    ┌────────────┴────────────┐                          │
-│    │     Hook Thread         │  WH_KEYBOARD_LL          │
-│    │  InputEvent generation  │  Atomic flags             │
-│    └─────────────────────────┘                          │
-│                                                         │
-│    ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  │
-│    │ IME Monitor │  │ IME Polling │  │   Logger     │  │
-│    │  WinEvent   │  │ ImmGet*     │  │  NDJSON 5s   │  │
-│    └─────────────┘  └─────────────┘  └──────────────┘  │
-│                                                         │
-│    ┌─────────────────────────────────┐                  │
-│    │        Wall Server              │  tiny_http       │
-│    │  QR → Phone → Zen Timer → POST  │  local network   │
-│    └─────────────────────────────────┘                  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                       Tauri 2.0 App                          │
+│                                                              │
+│  ┌──────────────┐    ┌──────────────┐                        │
+│  │ Main Window  │    │   Overlay    │   React 19 / TS        │
+│  │ (Dashboard)  │◄──►│  (Nudge/Wall)│   500ms polling        │
+│  └──────┬───────┘    └──────┬───────┘                        │
+│         │    Tauri IPC      │    Tauri Events                │
+│ ════════╪═══════════════════╪════════════════════════════════│
+│         ▼                   ▼                                │
+│  ┌──────────────────────────────────┐        Rust Backend    │
+│  │         Tauri Commands           │                        │
+│  │  get_cognitive_state, start_*    │                        │
+│  │  [macOS] reset_tcc, open_ax_*   │                        │
+│  └──────────────┬───────────────────┘                        │
+│                 │                                            │
+│    ┌────────────▼────────────┐                               │
+│    │    Analysis Thread      │  1Hz timer-driven             │
+│    │  ┌──────────────────┐   │                               │
+│    │  │ FeatureExtractor │   │  30s rolling window           │
+│    │  │  F1,F3,F4,F5,F6  │   │  5 features → 2 axes         │
+│    │  └────────┬─────────┘   │                               │
+│    │  ┌────────▼─────────┐   │                               │
+│    │  │   HMM Engine     │   │  3×26 emission matrix         │
+│    │  │  Forward Algo    │   │  EWMA + hysteresis            │
+│    │  └──────────────────┘   │                               │
+│    └────────────▲────────────┘                               │
+│                 │ crossbeam channel                          │
+│    ┌────────────┴────────────────────────────────┐           │
+│    │            Hook Thread (Platform)            │           │
+│    │  Win: WH_KEYBOARD_LL + WinEvent             │           │
+│    │  mac: CGEventTap + CFRunLoop                │           │
+│    │  InputEvent generation / Atomic flags        │           │
+│    └─────────────────────────────────────────────┘           │
+│                                                              │
+│    ┌─────────────────┐  ┌─────────────────┐  ┌───────────┐  │
+│    │   IME Monitor   │  │   IME Polling   │  │  Logger   │  │
+│    │ Win: WinEvent   │  │ Win: ImmGet*    │  │ NDJSON 5s │  │
+│    │ mac: (hook内)   │  │ mac: TIS + GCD  │  │           │  │
+│    └─────────────────┘  └─────────────────┘  └───────────┘  │
+│                                                              │
+│    ┌─────────────────────────────────┐                       │
+│    │        Wall Server              │  tiny_http            │
+│    │  QR → Phone → Zen Timer → POST  │  local network        │
+│    └─────────────────────────────────┘                       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### 採用したパターン
@@ -59,11 +63,13 @@
 
 | レイヤー | 技術 | バージョン | 選定理由 |
 |---|---|---|---|
-| フレームワーク | Tauri | 2.0 | 軽量デスクトップアプリ、Rust バックエンド + Web フロントエンド |
-| バックエンド言語 | Rust | stable | パフォーマンス、メモリ安全性、Windows API バインディング |
+| フレームワーク | Tauri | 2.0 (macos-private-api) | 軽量デスクトップアプリ、Rust バックエンド + Web フロントエンド |
+| バックエンド言語 | Rust | stable | パフォーマンス、メモリ安全性、OS API バインディング |
 | フロントエンド | React + TypeScript | 19.1 / 5.8 | 宣言的 UI、型安全 |
 | ビルドツール | Vite | 7.0 | 高速 HMR、Tauri との統合 |
-| Windows API | windows crate | 0.58+ | 公式 Rust バインディング、winapi の後継 |
+| Windows API | windows crate | 0.58+ | 公式 Rust バインディング（Windows のみ） |
+| macOS 入力 | core-graphics + core-foundation | 0.24 / 0.10 | CGEventTap + TIS API（macOS のみ） |
+| macOS フレームワーク | ApplicationServices, Carbon, System | OS 提供 | TCC 権限チェック、GCD dispatch、TIS 入力ソースクエリ |
 | スレッド間通信 | crossbeam-channel | 0.5 | 高性能 MPMC チャネル |
 | HTTP サーバー | tiny_http | 0.12 | 最小限の HTTP サーバー（Wall 用） |
 | QR コード | qrcode + base64 | 0.14 / 0.22 | SVG QR コード生成 |
@@ -79,24 +85,36 @@ GSE は 6 つのスレッド/タスクで構成される。
 | スレッド | 責務 | 通信方式 | 優先度 |
 |---|---|---|---|
 | **Main (Tauri)** | UI イベントループ、IPC ハンドラ | Mutex<Engine> 読み取り | 通常 |
-| **Hook** | WH_KEYBOARD_LL + WinEvent | crossbeam Sender, Atomic flags | 高（OS 制約） |
+| **Hook** | Win: WH_KEYBOARD_LL + WinEvent / mac: CGEventTap + CFRunLoop | crossbeam Sender, Atomic flags | 高（OS 制約） |
 | **Analysis** | 1Hz 特徴量抽出 + HMM 推論 | crossbeam Receiver, Mutex<Engine> 書込 | 通常 |
-| **IME Monitor** | 候補ウィンドウ検出 | Atomic IME_ACTIVE | 低 |
-| **IME Polling** | IME ON/OFF 検出 | Atomic IME_OPEN | 低 |
+| **IME Monitor** | Win: 候補ウィンドウ検出 / mac: フック内で処理（別スレッド不要） | Atomic IME_ACTIVE | 低 |
+| **IME Polling** | Win: ImmGet\* / mac: TIS ポーリング (GCD メインキュー経由) | Atomic IME_OPEN | 低 |
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
 
 Wall Server は Lv2 介入時にのみ起動する一時的なスレッド。
+
+**macOS 固有のスレッド動作:**
+- Hook Thread: CGEventTap を CFRunLoop に登録し、専用スレッドで CFRunLoopRun() をブロッキング実行。タップ無効化時は自動再作成ループ（3 秒ポーリング）
+- IME Polling: macOS では JIS 物理キー検出（フック内、高速）と TIS ポーリング（dispatch_sync_f でメイン GCD キューへ dispatch）のデュアルパス
+- IME Monitor: macOS では CGEventTap コールバック内の状態機械で処理するため、専用スレッド不要
 
 ### スレッド間データフロー
 
 ```
 Hook Thread ──InputEvent──► crossbeam channel ──► Analysis Thread
+     │  Win: WH_KEYBOARD_LL callback                  │
+     │  mac: CGEventTap callback (CGKeyCode→VK変換)   │
      │                                                │
      ├── Atomic LAST_KEY_MS ──────────────────────────►│ (idle 検出)
      ├── Atomic IME_OPEN ─────────────────────────────►│ (β 切替)
+     │  [mac] IME_COMPOSING ──────────────────────────►│ (変換中検出)
      │                                                │
 IME Monitor ── Atomic IME_ACTIVE ─────────────────────►│ (pause 検出)
+     │  Win: WinEvent + EnumWindows + UIAutomation     │
+     │  mac: (CGEventTap 内で処理 — 別スレッド不要)     │
 IME Polling ── Atomic IME_OPEN ───────────────────────►│
+     │  Win: ImmGetOpenStatus                          │
+     │  mac: TIS via dispatch_sync_f → main GCD queue  │
      │                                                │
      │                                   Mutex<Engine> │
      │                                        │        │
@@ -111,17 +129,23 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 ### 4.1 input::hook — キーボードフック
 
 - **責務**: OS レベルのキー入力捕捉、IME モード変更検出
-- **依存先**: windows crate, crossbeam-channel
+- **依存先**: Win: windows crate / mac: core-graphics, core-foundation, ApplicationServices (FFI)
 - **インターフェース**: `InputEvent` 構造体を Sender 経由で送信
-- **状態管理**: グローバル Atomic 変数（IME_OPEN, IME_ACTIVE, LAST_KEY_MS）
+- **状態管理**: グローバル Atomic 変数
+  - 共通: IME_OPEN, IME_ACTIVE, LAST_KEY_MS, HOOK_ACTIVE
+  - macOS 追加: IME_COMPOSING, JIS_KEYBOARD_SEEN, CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, USING_ACCESSIBILITY_FALLBACK
 - **設計判断**: Relaxed ordering for LAST_KEY_MS（近似的な直近値で十分）、Acquire/Release for IME 状態（スレッド間可視性保証）
+- **プラットフォーム振り分け**: `hook.rs` が共有アトミック変数と `#[cfg(target_os)] + #[path]` で `hook_windows.rs` / `hook_macos.rs` に振り分け
+- **macOS 固有**: CGKeyCode → Windows VK マッピングテーブルにより、analysis 層は両プラットフォームで同一の VK コードを受け取る
 
 ### 4.2 input::ime — IME 管理
 
 - **責務**: IME ON/OFF 状態の正確な追跡、候補ウィンドウ検出
-- **依存先**: windows crate (ImmGetOpenStatus, EnumWindows, UIAutomation)
+- **依存先**: Win: windows crate (ImmGetOpenStatus, EnumWindows, UIAutomation) / mac: Carbon (TIS\*), System (GCD dispatch_sync_f)
 - **インターフェース**: Atomic フラグ更新、LogEntry::ImeState 発行
 - **状態管理**: ポーリングスレッドが wake_rx で駆動（フック発火時）、100ms フォールバック
+- **プラットフォーム振り分け**: `ime.rs` が `#[cfg(target_os)] + #[path]` で `ime_windows.rs` / `ime_macos.rs` に振り分け
+- **macOS 固有**: デュアルパス検出 — Path A: JIS 物理キー検出（CGEventTap 内、\~5ms）/ Path B: ANSI キーボード TIS ポーリング（GCD メインキュー経由、100ms 間隔）。TIS API は HIToolbox 制約によりメインスレッド必須
 
 ### 4.3 analysis::features — 特徴量抽出
 
@@ -142,7 +166,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **責務**: Lv2 介入の HTTP サーバー + QR コード生成 + スマートフォン連携
 - **依存先**: tiny_http, qrcode, base64
 - **インターフェース**: `start()` → WallServerInfo, `stop()`
-- **状態管理**: サーバースレッドのライフサイクル、Windows Defender ファイアウォールルール
+- **状態管理**: サーバースレッドのライフサイクル、Win: Windows Defender ファイアウォールルール / mac: 追加管理不要（ユーザースコープポートバインド）
 
 ### 4.6 logger — セッションロガー
 
@@ -156,8 +180,8 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 ### フロー 1: キーストローク → 状態推定（1Hz サイクル）
 
 1. ユーザーがキーを押す
-2. Hook Thread が WH_KEYBOARD_LL コールバックで受信
-3. InputEvent を生成し crossbeam channel へ send
+2. Hook Thread がコールバックで受信（Win: WH_KEYBOARD_LL / mac: CGEventTap）
+3. InputEvent を生成し crossbeam channel へ send（macOS: CGKeyCode → VK 変換後）
 4. Analysis Thread が recv_timeout で受信（1Hz ゲートまでバッファ）
 5. 1Hz タイマー発火: FeatureExtractor が 5 特徴量を算出
 6. IME_OPEN を参照し適切な β を選択
@@ -172,7 +196,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 1. Frontend が p_stuck > 0.70 の累積時間を追跡（stuckAccumMsRef）
 2. 累積 30 秒到達で start_wall_server を invoke
-3. Rust が tiny_http サーバーを起動、ファイアウォールルール追加
+3. Rust が tiny_http サーバーを起動（Win: ファイアウォールルール追加 / mac: 追加設定不要）
 4. QR コード SVG + URL を Frontend に返却
 5. Frontend が Wall オーバーレイを表示（全画面ロック）
 6. ユーザーがスマートフォンで QR をスキャン
@@ -185,16 +209,77 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 | システム | 連携方式 | 認証 | 失敗時の挙動 |
 |---|---|---|---|
-| Windows Keyboard Hook | WH_KEYBOARD_LL (SetWindowsHookEx) | なし（OS 権限） | フック登録失敗 → 推定不能、アプリは起動 |
-| Windows IME API | ImmGetOpenStatus, WinEvent | なし | フォールバック検出（VK_DBE_* → polling） |
+| Win: Keyboard Hook | WH_KEYBOARD_LL (SetWindowsHookEx) | なし（OS 権限） | フック登録失敗 → 推定不能、アプリは起動 |
+| mac: CGEventTap | core-graphics CGEventTap | TCC Input Monitoring or Accessibility | 権限未付与 → ポーリング再試行、10 回失敗で Accessibility フォールバック |
+| Win: IME API | ImmGetOpenStatus, WinEvent | なし | フォールバック検出（VK_DBE_\* → polling） |
+| mac: TIS API | TISCopyCurrentKeyboardInputSource (Carbon) | なし | dispatch_sync_f で main GCD queue に dispatch（HIToolbox 制約） |
+| mac: TCC System | CGPreflight/CGRequest, AXIsProcessTrusted | OS 権限 | tccutil reset でリカバリ可能。Dashboard に TCC リセットボタンあり |
 | Wall Server (Phone) | HTTP (tiny_http) on random port | ランダムトークン | サーバー起動失敗 → Wall なしで継続 |
-| Windows Defender Firewall | netsh advfirewall (子プロセス) | 管理者権限不要（ユーザースコープ） | ルール追加失敗 → スマートフォン接続不可 |
+| Win: Defender Firewall | netsh advfirewall (子プロセス) | 管理者権限不要（ユーザースコープ） | ルール追加失敗 → スマートフォン接続不可 |
 | ファイルシステム | std::fs (NDJSON ログ) | なし | 書き込み失敗 → ログドロップ、推定継続 |
 | 学習データ収集 (将来) | HTTPS エンドポイント (未定) | オプトイン同意 + 匿名化 | セッション終了後バッチ送信。送信失敗 → ローカル保持、次回リトライ |
 
-## 7. 設計上の制約とトレードオフ
+## 7. プラットフォーム抽象化
 
-### 採用しなかった選択肢
+### 振り分けパターン
+
+`input/` モジュールは `#[cfg(target_os)] + #[path]` 属性で OS 固有実装を振り分ける。
+
+```
+hook.rs (共有アトミック変数 + platform dispatch)
+  ├── #[cfg(windows)]  → hook_windows.rs   (WH_KEYBOARD_LL + WinEvent)
+  └── #[cfg(macos)]    → hook_macos.rs     (CGEventTap + CFRunLoop + IME 状態機械)
+
+ime.rs (platform dispatch)
+  ├── #[cfg(windows)]  → ime_windows.rs    (ImmGet* + WinEvent + UIAutomation)
+  └── #[cfg(macos)]    → ime_macos.rs      (TIS ポーリング + GCD dispatch)
+
+sensors.rs (#[cfg(macos)] のみ)
+  └── sensors_macos.rs  (SensorManager stub — CoreMotion 予約)
+```
+
+### キーコードの統一
+
+`hook_macos.rs` 内で CGKeyCode を Windows VK コードに変換する。analysis 層（features.rs, engine.rs）は VK コードのみを扱い、プラットフォーム非依存を維持する。
+
+### macOS TCC 権限フロー
+
+macOS ではキーボードイベント傍受に TCC (Transparency, Consent, and Control) 権限が必要。
+
+```
+App起動
+  │
+  ▼
+CGPreflightListenEventAccess()
+  ├── true → CGEventTap (ListenOnly) 作成 → 成功 → Hook Active
+  │
+  └── false → CGRequestListenEventAccess()
+              → システム設定 (Input Monitoring) を開く
+              → ポーリングで Preflight 再チェック
+              │
+              └── ListenOnly タップ 10回連続失敗 (ad-hoc署名CDHash不安定)
+                   │
+                   ▼
+                  AXIsProcessTrustedWithOptions(prompt: true)
+                  → GCD dispatch_sync_f でメインスレッドへ dispatch
+                  → Accessibility ダイアログ表示
+                  │
+                  ├── 付与 → CGEventTap (Default) 作成 → Hook Active
+                  │         USING_ACCESSIBILITY_FALLBACK = true
+                  │
+                  └── 未付与 → Dashboard に手動設定ボタン表示
+                              → open_accessibility_settings() で
+                                System Settings を直接オープン
+```
+
+**Tauri コマンド（macOS のみ）:**
+- `reset_input_monitoring()` — tccutil reset でリセット後、CGRequestListenEventAccess() を再発行
+- `reset_accessibility()` — tccutil reset で Accessibility エントリをリセット
+- `open_accessibility_settings()` — `x-apple.systempreferences:` URL スキームでシステム設定を直接オープン
+
+## 8. 設計上の制約とトレードオフ
+
+### 採用しなかった選択肢（Windows）
 
 - **ITfThreadMgr グローバルフック**: UIPI によりブロックされるため、SetWindowsHookEx + WinEvent の組み合わせを採用
 - **winapi crate**: メンテナンス停止。公式の windows crate (v0.58+) を採用
@@ -202,13 +287,21 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **tauri-plugin-store**: 現時点では設定永続化の必要が薄いため未導入（将来導入予定）
 - **Clean Architecture**: モジュール数が少なく、厳格なレイヤー分離は過剰。直接的なモジュール構成を採用
 
+### macOS 固有の設計判断
+
+- **CGKeyCode → VK マッピング**: hook_macos.rs 内に変換テーブルを持つ。analysis 層をプラットフォーム非依存に保つための意図的な設計。マッピング精度はキーボードレイアウト（JIS/ANSI/ISO）に依存
+- **GCD dispatch_sync_f**: TIS API と AXIsProcessTrustedWithOptions はメインスレッド必須（HIToolbox/AppKit 制約）。フックスレッドから dispatch_sync_f でメインキューへ同期 dispatch する。メインスレッドからの呼び出しはデッドロックするため禁止
+- **IME 状態機械**: macOS では WinEvent に相当する IME イベント通知がないため、CGEventTap コールバック内の状態機械で IME_COMPOSING を追跡。シフトなし英字 → かな文字列の変換パターンを検出
+- **macos-private-api**: Tauri の macos-private-api feature はオーバーレイウィンドウ動作に必要。この feature はプライベート API を使用するため、Mac App Store 配布には非対応
+- **デュアル権限フォールバック**: ad-hoc 署名では TCC CDHash が不安定なため、Input Monitoring → Accessibility の自動フォールバックを実装。開発ビルドでの実用性を確保
+
 ### 許容する技術的負債
 
 - **グローバル Atomic 変数**: Hook コールバックの制約（クロージャ不可）により、IME_OPEN / IME_ACTIVE / LAST_KEY_MS がグローバル。将来的にスレッドローカルストレージへの移行を検討
 - **手動チューニング HMM**: パラメータがハードコーディング。ML モデル移行時にコンフィグファイル化が必要
 - **Frontend ポーリング**: 500ms ポーリングは Tauri イベントプッシュに置換可能だが、現状のレイテンシ要件を満たしている
 
-## 8. 拡張ポイント
+## 9. 拡張ポイント
 
 ### ML モデル移行（計画済み）
 

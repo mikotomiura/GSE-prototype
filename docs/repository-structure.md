@@ -26,11 +26,17 @@ GSE-prototype/
 │   │   ├── lib.rs                #     アプリセットアップ, スレッド起動, IPC ハンドラ
 │   │   ├── logger.rs             #     NDJSON セッションロガー
 │   │   ├── wall_server.rs        #     Lv2 Wall HTTP サーバー + QR + Zen Timer
-│   │   ├── input/                #     入力キャプチャ層
-│   │   │   ├── mod.rs            #       モジュールエクスポート
-│   │   │   ├── hook.rs           #       WH_KEYBOARD_LL フック + WinEvent
-│   │   │   └── ime.rs            #       IME 状態検出 (ImmGet*, EnumWindows)
-│   │   └── analysis/             #     認知状態推定層
+│   │   ├── sensors.rs            #     macOS センサーモジュール dispatch (#[cfg] gated)
+│   │   ├── sensors_macos.rs      #     macOS: SensorManager stub (CoreMotion 予約)
+│   │   ├── input/                #     入力キャプチャ層 (プラットフォーム固有コード)
+│   │   │   ├── mod.rs            #       モジュールエクスポート + platform dispatch
+│   │   │   ├── hook.rs           #       共有アトミック変数 + #[cfg] 振り分け
+│   │   │   ├── hook_windows.rs   #       Windows: WH_KEYBOARD_LL + WinEvent フック
+│   │   │   ├── hook_macos.rs     #       macOS: CGEventTap + CFRunLoop + IME 状態機械 + TCC
+│   │   │   ├── ime.rs            #       IME platform dispatch (#[cfg] + #[path])
+│   │   │   ├── ime_windows.rs    #       Windows: ImmGet* + WinEvent + UIAutomation
+│   │   │   └── ime_macos.rs      #       macOS: TIS ポーリング + GCD dispatch
+│   │   └── analysis/             #     認知状態推定層 (プラットフォーム非依存)
 │   │       ├── mod.rs            #       モジュールエクスポート
 │   │       ├── features.rs       #       5 特徴量抽出 (30s ローリングウィンドウ)
 │   │       └── engine.rs         #       HMM エンジン (Forward Algorithm)
@@ -85,9 +91,10 @@ GSE-prototype/
 
 #### `src-tauri/src/input/`
 
-- **目的**: OS レベルの入力キャプチャ
-- **置くべきもの**: キーボードフック、IME 状態検出、InputEvent 定義
+- **目的**: OS レベルの入力キャプチャ（プラットフォーム固有コードの格納先）
+- **置くべきもの**: キーボードフック、IME 状態検出、InputEvent 定義、プラットフォーム固有キーコードマッピング、TCC 権限管理（macOS）
 - **置くべきでないもの**: 特徴量計算、状態推定ロジック
+- **プラットフォーム振り分け**: `hook.rs` / `ime.rs` が `#[cfg(target_os)] + #[path]` で `*_windows.rs` / `*_macos.rs` に振り分け
 
 #### `src-tauri/src/analysis/`
 
@@ -116,6 +123,7 @@ GSE-prototype/
 | 種類 | 規則 | 例 |
 |---|---|---|
 | Rust ソース | snake_case.rs | `wall_server.rs`, `features.rs` |
+| Rust プラットフォーム固有 | {module}\_{platform}.rs | `hook_windows.rs`, `hook_macos.rs`, `ime_macos.rs` |
 | Rust モジュール | ディレクトリ + mod.rs | `input/mod.rs` |
 | React コンポーネント | PascalCase.tsx | `Dashboard.tsx`, `Overlay.tsx` |
 | TypeScript ユーティリティ | camelCase.ts | （現在なし） |
@@ -134,7 +142,11 @@ Frontend (src/)
 lib.rs (Tauri commands, thread orchestration)
     │
     ├──► input::hook    (OS キャプチャ)
+    │    ├── hook_windows.rs  (Win: WH_KEYBOARD_LL)
+    │    └── hook_macos.rs    (mac: CGEventTap + IME 状態機械)
     ├──► input::ime     (IME 検出)
+    │    ├── ime_windows.rs   (Win: WinEvent + ImmGet*)
+    │    └── ime_macos.rs     (mac: TIS + GCD)
     ├──► analysis::features (特徴量抽出)
     ├──► analysis::engine   (HMM 推論)
     ├──► logger         (セッションログ)
@@ -143,7 +155,7 @@ lib.rs (Tauri commands, thread orchestration)
 
 - **依存方向**: lib.rs が各モジュールを統合。モジュール間の直接依存は最小限。
 - **循環参照**: 禁止。input → analysis の方向のみ（features.rs の型を hook.rs が利用するケースなし）。
-- **OS 固有コード**: `input/` モジュールに閉じ込める。`analysis/` は純粋な計算。
+- **OS 固有コード**: `input/` モジュール + `sensors*.rs` に閉じ込める。`analysis/` は純粋な計算（プラットフォーム非依存）。`hook_macos.rs` 内の CGKeyCode → Windows VK マッピングにより、analysis 層は両プラットフォームで同一の VK コードを受け取る。
 
 ## 5. 新規ファイル追加時のルール
 
@@ -152,10 +164,11 @@ lib.rs (Tauri commands, thread orchestration)
 3. **命名規則**: 上記表に従う。
 4. **mod.rs 更新**: Rust ファイル追加時は対応する mod.rs の pub mod を更新。
 5. **ドキュメント更新**: アーキテクチャに影響する変更は `docs/architecture.md` を更新。
+6. **プラットフォーム固有ファイル**: `{module}_{platform}.rs` の命名規則に従い、対応する dispatch ファイル（hook.rs, ime.rs）に `#[cfg] + #[path]` を追加。
 
 ## 6. 禁止パターン
 
-- ❌ `analysis/` 内で Windows API を直接呼ぶ（OS 依存コードは `input/` に閉じる）
+- ❌ `analysis/` 内で Windows API または macOS フレームワークを直接呼ぶ（OS 依存コードは `input/` + `sensors/` に閉じる）
 - ❌ フックコールバック内でブロッキング操作を行う（チャネル send + Atomic store のみ）
 - ❌ `src/` (Frontend) にビジネスロジックを置く（状態推定は Rust 側で完結）
 - ❌ `winapi` crate を使用する（`windows` crate v0.58+ のみ）

@@ -6,8 +6,9 @@
 
 - **エラーハンドリング**: アプリケーションレベルでは `anyhow::Result` を使用。ライブラリ的なモジュールでは `thiserror` を検討。
 - **ログ**: `tracing` クレートを使用（`tracing::info!`, `tracing::warn!`, `tracing::error!`）。`println!` や `eprintln!` は使わない。
-- **unsafe ブロック**: Win32 API 呼び出しに限定し、ラッパー構造体内に隔離する。unsafe の理由をコメントで明記する。
+- **unsafe ブロック**: Win32 API / macOS フレームワーク FFI 呼び出しに限定し、ラッパー構造体または関数内に隔離する。unsafe の理由をコメントで明記する。
 - **Windows API**: `windows` crate (v0.58+) のみ使用。`winapi` crate は禁止。
+- **macOS API**: `core-graphics` (0.24) + `core-foundation` (0.10) を使用。低レベル FFI は `#[link]` で直接宣言（ApplicationServices, Carbon, System）。
 - **命名**: Rust 標準の snake_case。型は PascalCase。定数は SCREAMING_SNAKE_CASE。
 - **フォーマット**: `cargo fmt` に従う。
 
@@ -23,6 +24,23 @@
 - **書くべき場面**: HMM パラメータの根拠（論文参照）、unsafe の安全性説明、非自明なアルゴリズム選択の理由
 - **書くべきでない場面**: コードから明らかな処理内容、TODO を放置（修正するか Issue にする）
 - **フォーマット**: `//` で単行。ブロックコメントは `///` (doc comment) のみ。
+
+### プラットフォーム別開発環境
+
+- **Windows**: Windows 11, Visual Studio Build Tools (C++ workload — windows crate のコンパイルに必要)
+- **macOS**: macOS 13 Ventura 以降, Xcode Command Line Tools
+  - TCC 権限はバイナリ変更時にリセットが必要 (`tccutil reset ListenEvent [bundle-id]`)
+  - ad-hoc 署名では CDHash が不安定で Input Monitoring が機能しない場合あり
+  - quarantine 属性 (`com.apple.quarantine`) が未署名ビルドをブロックする場合は `xattr -cr` で除去
+- **共通**: Rust stable, Node.js (Frontend), `cargo tauri dev` で開発
+
+### プラットフォーム固有コーディングガイド
+
+- **条件コンパイル**: `#[cfg(target_os = "windows")]` / `#[cfg(target_os = "macos")]` で分岐
+- **モジュール振り分け**: `#[path = "hook_macos.rs"]` で OS 固有実装ファイルを指定
+- **共有状態**: 共通ファイル (hook.rs) にアトミック変数、プラットフォーム固有ロジックは `*_{platform}.rs` に配置
+- **キーコード統一**: macOS CGKeyCode は hook 層で Windows VK コードに変換。analysis 層は VK コードのみ扱う
+- **GCD dispatch ルール**: TIS API, AXIsProcessTrustedWithOptions など macOS メインスレッド必須 API は `dispatch_sync_f` でメイン GCD キューへ dispatch。メインスレッドからの dispatch_sync_f 呼び出しはデッドロックするため禁止
 
 ## 2. Git ワークフロー
 
@@ -69,19 +87,38 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 
 ### テストの方針
 
-- `analysis/` モジュールは OS 非依存なので、通常の `#[cfg(test)]` + `cargo test` で検証可能
+- `analysis/` モジュールは OS 非依存なので、通常の `#[cfg(test)]` + `cargo test` で両 OS 共通に検証可能
 - `input/` モジュールは OS フックに依存するため、統合テストは実機で手動確認
 - セッションログ (NDJSON) の事後分析スクリプトが実質的な回帰テストとして機能
+
+### macOS 固有のテスト考慮事項
+
+- **CGKeyCode → VK マッピング**: 純粋関数のため `cargo test` で単体テスト可能
+- **IME 状態機械**: モックイベントで単体テスト可能
+- **TCC 権限テスト**: OS システムダイアログのため自動化不可。手動テスト手順を `.steering/` に記録
+- **macOS フックの実機テスト**: `cargo tauri dev` でアプリを起動し、Dashboard の診断パネル（hook_active, callback_count, consecutive_tap_failures, using_accessibility_fallback）で動作確認
+
+### CI/CD パイプライン（目標）
+
+現時点では CI/CD 未構成。目標構成:
+
+- **GitHub Actions**: matrix ビルド（windows-latest, macos-latest）
+- **Windows ジョブ**: `cargo build`, `cargo clippy`, `cargo test`（analysis/ 単体テスト）
+- **macOS ジョブ**: 同上 + TCC 権限テストは自動化不可（手動検証）
+- **Frontend ジョブ**: `npm ci && npm run build`
+- **将来**: `cargo tauri build` によるディストリビューションアーティファクト生成
 
 ## 4. レビュー基準
 
 ### 必須チェック
 
-- [ ] `cargo build` が成功する
+- [ ] `cargo build` が成功する（Windows + macOS 両方でビルド可能）
 - [ ] `cargo clippy` の警告がない（または理由付きで `#[allow]`）
-- [ ] フックコールバック内にブロッキング処理がない
+- [ ] フックコールバック内にブロッキング処理がない（Windows WH_KEYBOARD_LL / macOS CGEventTap 共通制約）
 - [ ] unsafe ブロックに安全性コメントがある
-- [ ] windows crate のみ使用（winapi 不使用）
+- [ ] Windows: `windows` crate のみ使用（winapi 禁止）/ macOS: `core-graphics` + `core-foundation` + 必要な `#[link]` 宣言
+- [ ] macOS: GCD メインキュー必須 API（TIS\*, AXIsProcessTrustedWithOptions）は `dispatch_sync_f` を使用
+- [ ] プラットフォーム固有コードは `input/` + `sensors/` に閉じている（`analysis/` に OS API なし）
 
 ### 推奨チェック
 
@@ -94,7 +131,7 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 
 ### 厳守事項
 
-- **フックコールバック**: Atomic 操作 + channel send のみ。Mutex ロック、I/O、メモリアロケーション禁止。
+- **フックコールバック**: Atomic 操作 + channel send のみ。Mutex ロック、I/O、メモリアロケーション禁止。Windows (WH_KEYBOARD_LL) と macOS (CGEventTap) で同一制約。
 - **1Hz ゲート**: Analysis スレッドの recv_timeout で実現。累積ドリフトを防止するため絶対時刻ベースで管理。
 - **EWMA 計算**: f64 演算のみ。ヒープアロケーションなし。
 
@@ -113,6 +150,7 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 - [ ] ライセンスは MIT / Apache-2.0 互換か？
 - [ ] コンパイル時間への影響は許容範囲か？（Rust の場合特に重要）
 - [ ] `windows` crate の feature flags は必要最小限か？
+- [ ] macOS 依存: `Cargo.toml` の `[target.'cfg(target_os = "macos")'.dependencies]` に追加し、ビルド対象外プラットフォームに影響しないことを確認
 
 ## 7. セキュリティ指針
 
@@ -123,15 +161,18 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
   - VK コードの匿名化（キー種別カテゴリへの変換等）
   - 送信先・保存期間の明示
   - 送信タイミングはセッション終了後のバッチ処理（リアルタイム送信禁止）
-- **Wall Server**: ランダムトークンによるアクセス制御。ローカルネットワークのみ。ファイアウォールルールでポートを動的管理。
+- **Wall Server**: ランダムトークンによるアクセス制御。ローカルネットワークのみ。Win: ファイアウォールルールでポートを動的管理 / mac: 追加管理不要。
+- **macOS TCC 権限**: Input Monitoring / Accessibility 権限は最小限の範囲でリクエストする。`tccutil reset` コマンドによるリカバリパスを維持する。
 - **Tauri CSP**: `default-src 'self'; style-src 'self' 'unsafe-inline'` — 外部リソースの読み込みを禁止。
 
 ## 8. 禁止事項
 
 - ❌ `winapi` crate の使用（`windows` crate v0.58+ のみ）
-- ❌ フックコールバック内でのブロッキング操作
+- ❌ フックコールバック内でのブロッキング操作（Windows WH_KEYBOARD_LL / macOS CGEventTap 共通）
 - ❌ グローバル TSF フック（ITfThreadMgr）の使用（UIPI でブロック）
 - ❌ キーストロークの文字内容（Unicode テキスト）の記録
 - ❌ リアルタイム推定中のセッションデータ外部送信（学習データ収集はセッション終了後にオプトインで許可）
 - ❌ `println!` / `eprintln!` の使用（`tracing` を使う）
 - ❌ `any` 型の多用（TypeScript）
+- ❌ `analysis/` モジュール内での macOS フレームワーク（core-graphics, Carbon 等）の直接呼び出し
+- ❌ メインスレッド上での `dispatch_sync_f` 呼び出し（デッドロックの原因）

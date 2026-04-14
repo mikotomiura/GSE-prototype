@@ -12,10 +12,8 @@
 - **名称**: GSE (Generative Struggle Engine)
 - **目的**: キーストローク動態から認知状態 (Flow/Incubation/Stuck) を推定し、段階的介入で「生産的苦闘」を守る不便益 HCI フレームワーク
 - **主要技術**: Tauri 2.0 + Rust (Backend) + React/TypeScript (Frontend)
-- **ターゲット**: Windows 11 (Surface Pro 8 + Type Cover)
+- **ターゲット**: Windows 11 + macOS 13+
 - **チーム規模**: 小規模 (2-3人)
-- **GitHubリポジトリ**: https://github.com/mikotomiura/GSE-prototype
-- **データセット**: https://github.com/mikotomiura/gse-dataset.git
 
 ## 参照すべきドキュメント
 
@@ -32,12 +30,15 @@
 ## 技術的制約（厳守）
 
 1. **Windows API**: `windows` crate (v0.58+) のみ。`winapi` は禁止
-2. **unsafe**: Win32 API 呼び出しに限定し、ラッパー構造体内に隔離
-3. **フックコールバック**: Atomic 操作 + channel send のみ。ブロッキング禁止
-4. **グローバル TSF フック禁止**: UIPI でブロックされる。SetWindowsHookEx + WinEvent を使用
-5. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
-6. **エラーハンドリング**: `anyhow::Result` を使用
-7. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
+2. **macOS API**: `core-graphics` + `core-foundation`。低レベル FFI は `#[link]` 宣言
+3. **unsafe**: Win32 API / macOS FFI 呼び出しに限定し、ラッパー構造体内に隔離
+4. **フックコールバック**: Atomic 操作 + channel send のみ。ブロッキング禁止（Win/mac 共通）
+5. **GCD dispatch_sync_f**: メインスレッドからの呼び出し禁止（デッドロック）
+6. **TCC 権限**: Input Monitoring → Accessibility のフォールバックチェーンを維持
+7. **グローバル TSF フック禁止**: UIPI でブロックされる（Windows のみ）
+8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
+9. **エラーハンドリング**: `anyhow::Result` を使用
+10. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
 
 ## 作業記録の運用ルール（重要）
 
@@ -91,14 +92,15 @@
 - `.steering/` への記録を省略しない
 - 50% を超えてもセッションを続けない
 - 曖昧な指示に対して推測で実装しない（質問する）
-- `analysis/` 内で Windows API を直接呼ばない（OS 依存は `input/` に閉じる）
+- `analysis/` 内で Windows API / macOS フレームワークを直接呼ばない（OS 依存は `input/` に閉じる）
 
 ## セッション開始時の行動指針
 
 1. **`/start-task`** で作業記録を初期化する
 2. **`/implement`** で実装を進める（feat / fix / refactor をモード選択）
 3. **必要な docs/ を先に読む** — 闇雲にコードを読まず、まずドキュメントで文脈を把握
-4. **サブエージェントを積極的に活用** する（下記参照）
+4. **Skill 参照**: 該当する Skill があれば `.claude/skills/` を確認してから着手
+5. **サブエージェントを積極的に活用** する（下記参照）
 
 ## サブエージェント活用ルール
 
@@ -125,12 +127,11 @@
 | コマンド | 用途 |
 |---|---|
 | `/start-task` | 新規タスクの開始（.steering/ 初期化） |
-| `/implement` | 実装ワークフロー（feat / fix / refactor を統合） |
+| `/add-feature` | 新機能追加ワークフロー |
+| `/fix-bug` | バグ修正ワークフロー（TDD 順序: テスト先行） |
+| `/refactor` | リファクタリングワークフロー（振る舞いを変えない・交互実行） |
+| `/reimagine` | 破壊と構築（設計深化・確証バイアス排除、実装着手前専用） |
 | `/review-changes` | 変更レビュー（動的 git 取得 + エージェント並列） |
 | `/finish-task` | タスク完了処理（steering 最終化・テスト・コミット） |
 | `/smart-compact` | 50% 超えた時の中間圧縮（設計判断・進捗を保持したまま /compact） |
 
-## コンテキスト管理
-
-- **50% ルール**: 使用率 50% 超で次の区切りに `/smart-compact` を実行する
-  - タスクが切り替わる場合は `/compact` ではなく `/clear`

@@ -4,7 +4,7 @@
 
 - **プロダクト名**: GSE (Generative Struggle Engine)
 - **解決する課題**: 知識労働者がキーボード作業中に「行き詰まり（Stuck）」状態に陥った際、自覚なく長時間停滞し続ける問題。従来の生産性ツールは作業量の最大化を目指すが、GSE は認知的な行き詰まりの検出と適切なタイミングでの介入により「生産的苦闘（Productive Struggle）」を保護する。
-- **ターゲットユーザー**: Windows 11 上で日常的にキーボード作業を行う知識労働者（メール、企画書、ドキュメント作成、コーディング等）
+- **ターゲットユーザー**: Windows 11 および macOS（13 Ventura 以降）上で日常的にキーボード作業を行う知識労働者（メール、企画書、ドキュメント作成、コーディング等）
 - **コアバリュー**: 不便益（Fubeneki）に基づく HCI フレームワーク — あえて不便を導入することで、ユーザー自身の認知的回復（Incubation）を促進する
 
 ## 2. コア機能一覧
@@ -12,29 +12,36 @@
 ### 機能 1: キーストロークセンシング
 
 - **概要**: OS レベルのキーボードフックにより、すべてのキー入力イベントをリアルタイム収集する
-- **入力**: 物理キーボード入力（WH_KEYBOARD_LL フック経由）
+- **入力**: 物理キーボード入力（Windows: WH_KEYBOARD_LL / macOS: CGEventTap）
 - **出力**: InputEvent ストリーム（vk_code, timestamp, is_press, is_repeat, is_backspace）
 - **振る舞い**:
   - 専用スレッドでフックを実行し、メインスレッドをブロックしない
   - crossbeam チャネル経由で分析スレッドへイベントを送信
   - オートリピートキーを識別しフィルタリング可能にする
+  - macOS: Input Monitoring 権限（kCGEventTapOptionListenOnly）を優先し、10 回連続失敗後に Accessibility 権限（kCGEventTapOptionDefault）へ自動フォールバック
+  - macOS: CGKeyCode を Windows VK コードにマッピングし、analysis 層のプラットフォーム非依存性を維持
 - **エラー条件**:
-  - フック登録失敗時: tracing::error でログ出力、アプリは起動するが推定不能状態
+  - Windows フック登録失敗時: tracing::error でログ出力、アプリは起動するが推定不能状態
+  - macOS TCC 権限未付与時: システム設定ダイアログを表示し、ポーリングでタップ再作成を試行
+  - macOS ad-hoc 署名時: TCC CDHash 不安定のため Input Monitoring が機能しない場合あり → Accessibility フォールバック
   - チャネル満杯時: try_send でイベントをドロップ、warn ログ出力
 
 ### 機能 2: IME 状態検出
 
 - **概要**: 日本語 IME の ON/OFF 状態および変換候補ウィンドウの表示状態を検出する
-- **入力**: Windows IME API (ImmGetOpenStatus, VK_DBE_*, WinEvent)
-- **出力**: IME_OPEN（日本語/英数切替）、IME_ACTIVE（候補ウィンドウ表示）のアトミックフラグ
+- **入力**: Windows: IME API (ImmGetOpenStatus, VK_DBE_\*, WinEvent) / macOS: CGEventTap 状態機械 + TIS (Text Input Source) ポーリング
+- **出力**: IME_OPEN（日本語/英数切替）、IME_ACTIVE（候補ウィンドウ表示）のアトミックフラグ。macOS では追加で IME_COMPOSING（ローマ字→かな変換中）
 - **振る舞い**:
-  - 多層検出戦略: WinEvent フック（主）→ EnumWindows（副）→ UIAutomation（補助）
+  - Windows: 多層検出戦略 — WinEvent フック（主）→ EnumWindows（副）→ UIAutomation（補助）
+  - macOS: デュアルパス検出 — Path A: JIS キーボード物理キー検出（英数/かなキー、高速 \~5ms）→ Path B: ANSI キーボード TIS ポーリング（GCD メインキュー経由、100ms 間隔）
+  - macOS: CGEventTap コールバック内の状態機械でインライン変換（下線テキスト）を追跡
   - IME 状態に応じてベースラインを動的切替（coding β vs writing β）
   - IME 変換中はバックスペースペナルティを抑制
 - **エラー条件**:
-  - ImmGetContext が NULL: VK_DBE_* ダーティフラグへフォールバック
+  - Windows: ImmGetContext が NULL → VK_DBE_\* ダーティフラグへフォールバック
   - IME_ACTIVE の検出漏れ: 8 秒安全弁で自動リセット
   - IME ポーリングスレッド起動失敗: IME 状態検出なしで継続（ベースラインは coding β 固定）
+  - macOS: TIS クエリは GCD メインキュー必須（dispatch_sync_f）。メインスレッド以外から直接呼ぶと不正な結果を返す
 
 ### 機能 3: 認知状態推定（HMM エンジン）
 
@@ -146,13 +153,38 @@
   2. 変換候補選択中は IME_ACTIVE がセットされる
   3. IME 変換中のバックスペースはペナルティから除外される
   4. 変換確定後、通常の特徴量計算が再開される
+- **代替フロー（macOS）**:
+  - 1a. JIS キーボード: 英数/かな物理キーで即座にモード切替を検出（\~5ms）
+  - 1b. ANSI キーボード: TIS ポーリングによるメニューバー入力ソース切替の検出にフォールバック（100ms 間隔）
+  - 2a. macOS: CGEventTap 内の状態機械でインライン変換（IME_COMPOSING）を追跡
 - **事後条件**: IME 状態遷移がセッションログに記録される
+
+### UC-4: macOS TCC 権限セットアップ
+
+- **アクター**: macOS ユーザー（初回起動）
+- **前提条件**: GSE アプリケーションを初めて起動する。TCC 権限は未付与
+- **トリガー**: アプリケーション起動時のフック初期化
+- **基本フロー**:
+  1. CGPreflightListenEventAccess() が false を返す
+  2. CGRequestListenEventAccess() がシステム設定を開く（Input Monitoring）
+  3. ユーザーがシステム設定で GSE に Input Monitoring 権限を付与する
+  4. CGEventTap が kCGEventTapOptionListenOnly で作成される
+  5. フックがアクティブになり、キーストローク収集が開始される
+- **代替フロー**:
+  - 3a. Input Monitoring を拒否 → Accessibility 権限チェックへ移行
+  - 3b. ad-hoc 署名で CDHash 不安定 → ListenOnly タップが 10 回連続失敗
+  - 4a. ListenOnly 失敗 → AXIsProcessTrustedWithOptions ダイアログ（GCD メインキュー経由）を表示
+  - 4b. ユーザーが Accessibility 権限を付与 → kCGEventTapOptionDefault でタップ作成
+  - 5a. Dashboard の「システム設定を開く」ボタンから手動で Accessibility を付与
+  - 5b. Dashboard の TCC リセットボタンで権限状態をリセットし再試行
+- **事後条件**: 権限状態（Input Monitoring / Accessibility / フォールバック使用中）が Dashboard に表示される
 
 ## 4. 機能要件
 
 ### 必須機能
 
-- キーストロークのリアルタイム収集（WH_KEYBOARD_LL）
+- キーストロークのリアルタイム収集（Windows: WH_KEYBOARD_LL / macOS: CGEventTap）
+- macOS TCC 権限管理（Input Monitoring / Accessibility の自動検出・フォールバック・リセット）
 - 3 状態認知推定（Flow / Incubation / Stuck）の 1Hz 更新
 - 日本語 IME 対応（文脈依存ベースライン切替）
 - Lv1 Nudge 介入（視覚フィードバック）
@@ -184,7 +216,7 @@
 - **キーストロークデータ**: VK コードのみ記録（文字内容は記録しない）
 - **セッションログ（運用時）**: ローカルファイルシステムに保存。リアルタイム推定中の外部送信なし
 - **セッションログ（学習データ収集）**: ML モデル学習目的の外部送信はオプトイン + 匿名化 + セッション終了後バッチのみ許可
-- **Wall Server**: ローカルネットワーク内のみ（Windows Defender ファイアウォールルール動的管理）
+- **Wall Server**: ローカルネットワーク内のみ（Windows: Defender ファイアウォールルール動的管理 / macOS: ユーザースコープポートバインドのため追加のファイアウォール管理不要）
 - **Wall Server トークン**: ランダム生成トークンによるアクセス制御
 
 ### 可用性
@@ -194,6 +226,6 @@
 
 ### ユーザビリティ
 
-- **対応デバイス**: Windows 11（Surface Pro 8 + Type Cover が主ターゲット）
+- **対応デバイス**: Windows 11（Surface Pro 8 + Type Cover）/ macOS 13 Ventura 以降（MacBook Pro/Air — JIS / ANSI 両キーボード対応）
 - **UI**: ダッシュボードウィンドウ + オーバーレイウィンドウの 2 ウィンドウ構成
 - **操作**: セッション開始/終了とMonk Mode 切替のみ（設定項目を最小化）

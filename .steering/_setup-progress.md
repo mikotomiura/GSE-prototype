@@ -1,4 +1,4 @@
-# Claude Code 環境構築進捗
+# Claude Code 環境構築進捗（再構築）
 
 > このファイルは構築の進捗を記録する。各 setup-* コマンドが完了するたびに更新される。
 > セッションを跨いだ継続のための引き継ぎ情報として機能する。
@@ -8,94 +8,88 @@
 - **名称**: GSE (Generative Struggle Engine)
 - **目的**: キーストローク動態からFlow/Incubation/Stuckの3状態認知推定を行い、段階的介入(Lv1 Nudge → Lv4 The Wall + Physical Anchor)でユーザーの「生産的苦闘」を守る、不便益に基づくHCIフレームワーク
 - **技術スタック**: Tauri 2.0 + Rust (Backend: KB Hook, HMM, ONNX Runtime) + React/TypeScript (Frontend) + Python/PyTorch (ML学習) + Flutter (ストレッチゴール: Physical Anchor Outdoor)
+- **ターゲット**: Windows 11 (Surface Pro 8 + Type Cover) + macOS (Accessibility/Input Monitoring)
 - **チーム規模**: 小規模 (2-3人)
 - **重視する品質特性**: 正確性（認知状態推定の精度、誤判定の最小化）
-- **構築開始日**: 2026-04-09
-- **備考**: 個人プロジェクトとして継続中。提案書・技術設計書はdocs/内のPDFを参照。
+- **初回構築日**: 2026-04-09
+- **再構築開始日**: 2026-04-14
+- **再構築理由**: 全体的な品質向上（macOS対応反映、実運用知見の織り込み、Hooks強化）
 
 ## 構築進捗
 
 - [x] **Phase 0: Bootstrap** (このコマンド)
-  - 完了日時: 2026-04-09
-  - 備考: 環境チェック完了、ディレクトリ構造作成済み、追記モード
+  - 完了日時: 2026-04-14
+  - 備考: 上書きモードで再構築。既存構築物を評価し品質向上ポイントを特定済み
 - [x] **Phase 1: /setup-docs** — 永続ドキュメント
-  - 完了日時: 2026-04-09
-  - 作成ファイル:
-    - docs/functional-design.md
-    - docs/architecture.md
-    - docs/repository-structure.md
-    - docs/development-guidelines.md
-    - docs/glossary.md
+  - 完了日時: 2026-04-14
+  - 更新ファイル:
+    - docs/functional-design.md (200→232行: macOS UC-4追加、Feature 1/2にプラットフォーム振り分け)
+    - docs/architecture.md (226→318行: Section 7 プラットフォーム抽象化+TCC権限フロー追加)
+    - docs/repository-structure.md (164→176行: input/展開、sensors追加、命名規則拡張)
+    - docs/development-guidelines.md (138→178行: macOS開発環境、コーディングガイド、CI/CD目標、テストロードマップ追加)
+    - docs/glossary.md (81→94行: macOS技術用語9語、略語3語、禁止用語2語追加)
   - 主要な決定事項:
-    - セキュリティ方針: リアルタイム運用中はローカル保存のみ、ML学習データ収集はオプトイン+匿名化+セッション終了後バッチ送信
-    - アーキテクチャパターン: マルチスレッド・イベント駆動+レイヤードモジュール構成（Clean Architecture は過剰として不採用）
-    - テスト方針: analysis/ モジュールの単体テストを優先。input/ は実機手動確認
+    - マージ方式で更新（既存構造を維持しつつmacOS対応を追記）
+    - CGKeyCode→VKマッピングによるanalysis層のプラットフォーム非依存性を全ドキュメントで統一記載
+    - TCC権限フロー（Preflight→Request→Accessibilityフォールバック）をfunctional-design+architectureで整合
 - [x] **Phase 2: /setup-claude-md** — CLAUDE.md と .steering
-  - 完了日時: 2026-04-09
-  - 作成ファイル:
-    - CLAUDE.md (132 行)
-    - .steering/README.md
-    - .steering/_template/requirement.md
-    - .steering/_template/design.md
-    - .steering/_template/tasklist.md
-    - .steering/_template/blockers.md
-    - .steering/_template/decisions.md
-  - .gitignore 更新: なし（Git 追跡する方針）
+  - 完了日時: 2026-04-14
+  - 更新ファイル:
+    - CLAUDE.md (137→134行: macOS制約3項目追加、重複セクション削除、GitHubリンク削除、Skill参照追加)
+  - 既存維持: .steering/README.md, .steering/_template/ × 5ファイル（品質十分のため変更なし）
+  - 品質向上ポイント: マルチプラットフォーム技術的制約、重複削除による軽量化
 - [x] **Phase 3: /setup-skills** — Skill 群
-  - 完了日時: 2026-04-09
-  - 作成 Skill:
-    - rust-standards (SKILL.md, examples.md)
-    - typescript-standards (SKILL.md, patterns.md)
-    - git-workflow (SKILL.md, checklist.md)
-    - hook-constraints (SKILL.md, anti-patterns.md)
-    - architecture-rules (SKILL.md, decision-tree.md)
-    - data-privacy (SKILL.md, anonymization.md)
-    - ml-workflow (SKILL.md, migration-guide.md)
-    - hmm-analysis (SKILL.md, parameter-reference.md)
-    - intervention-design (SKILL.md, state-machine.md)
-    - physical-anchor (SKILL.md, flutter-integration.md)
-    - project-status (SKILL.md, 動的型)
-  - 静的 Skill 数: 10
-  - 動的 Skill 数: 1
+  - 完了日時: 2026-04-14
+  - 既存 Skill (引き継ぎ): architecture-rules, data-privacy, git-workflow, hmm-analysis,
+    intervention-design, ml-workflow, physical-anchor, rust-standards, typescript-standards
+  - 更新 Skill:
+    - hook-constraints (SKILL.md: Win+macOS 両対応に拡張 / anti-patterns.md: macOS パターン4件追加)
+    - project-status (SKILL.md: .steering タスク表示を改善)
+  - 動的 Skill 数: 1 (project-status)
+  - 全 Skill 数: 11
 - [x] **Phase 4: /setup-agents** — サブエージェント群
-  - 完了日時: 2026-04-10
+  - 完了日時: 2026-04-14
   - 作成エージェント:
-    - file-finder (sonnet) — ファイル発見・分類
-    - dependency-checker (sonnet) — 依存関係・循環参照調査
-    - impact-analyzer (sonnet) — 変更影響範囲分析
-    - code-reviewer (opus) — コード品質・規約レビュー
-    - test-analyzer (sonnet) — テスト失敗原因・カバレッジ分析
-    - security-checker (opus) — セキュリティ・プライバシー監査
-    - test-runner (haiku) — テスト実行・結果要約
-    - build-executor (haiku) — ビルド実行・結果要約
-    - log-analyzer (sonnet) — ログ抽出・パターン分析
+    - file-finder (sonnet)
+    - dependency-checker (sonnet)
+    - impact-analyzer (sonnet)
+    - code-reviewer (opus)
+    - test-analyzer (sonnet)
+    - security-checker (opus)
+    - test-runner (haiku)
+    - build-executor (haiku)
+    - log-analyzer (sonnet)
+  - 品質向上ポイント: GSE固有Skill参照 (rust-standards, typescript-standards, hook-constraints, data-privacy, hmm-analysis, intervention-design) を各エージェントに反映済み
 - [x] **Phase 5: /setup-commands** — ワークフローコマンド群
-  - 完了日時: 2026-04-10
-  - 設計変更: スキル指示の7コマンドから4コマンドに再設計（重複排除・動的化）
+  - 完了日時: 2026-04-14
   - 作成コマンド:
-    - /start-task (簡素化: 3問ヒアリング)
-    - /implement (feat/fix/refactor を統合)
-    - /review-changes (動的 git 取得)
-    - /finish-task (骨格版)
-  - 廃止: /add-feature, /fix-bug, /refactor, /smart-compact
+    - /start-task (Step 3.5 追加: /reimagine 適用判断)
+    - /add-feature (新規: 機能追加ワークフロー)
+    - /fix-bug (新規: TDD 順序・バグ理解ステップ付き)
+    - /refactor (新規: 全グリーン前提・交互実行)
+    - /reimagine (新規: 破壊と構築)
+    - /review-changes (変更なし)
+    - /finish-task (変更なし)
+    - /smart-compact (変更なし)
+    - /implement → 廃止（/add-feature・/fix-bug・/refactor に分割）
+  - 品質向上ポイント: /implement を3分割し各コマンドを単一責任化。/reimagine を追加しデータフロー整合
 - [x] **Phase 6: /setup-hooks** — Hook 群
-  - 完了日時: 2026-04-10
+  - 完了日時: 2026-04-14
   - 作成 Hook:
-    - SessionStart: .claude/hooks/session-start.sh (Branch/Commit/Changed/Tasks)
-    - Stop: 自己検証プロンプト (anyhow::Result / スキル名明示)
-    - PostToolUse: cargo fmt --quiet (Edit/Write 後、2>/dev/null 抑制済み)
-  - settings.json: 新規作成 (.claude/settings.json)
+    - SessionStart: .claude/hooks/session-start.sh (変更なし・動作確認済み)
+    - Stop: .claude/hooks/stop-check.sh (新規: cargo clippy + tsc --noEmit を実行し問題時のみ出力)
+    - PostToolUse: cargo fmt --quiet (変更なし)
+  - settings.json: Stop Hook をインライン bash から stop-check.sh 呼び出しに更新
+  - 品質向上ポイント達成: cargo clippy (Rust 変更時) + tsc --noEmit (TS 変更時) の自動トリガー追加
 - [x] **Phase 7: /verify-setup** — 整合性検証
-  - 完了日時: 2026-04-10
-  - 検証結果: WARNINGS
-  - 修正が必要な項目: 3 件 (すべて LOW)
-    - code-reviewer.md に intervention-design Skill 参照を追記
-    - verify-setup.md の Step 6 を 4 コマンド構成に更新
-    - project-status に補足ファイル追加 (任意)
+  - 完了日時: 2026-04-14
+  - 検証結果: HEALTHY
+  - 修正が必要な項目: 0件 (LOW 1件: 相互参照マップの /implement 表記を /add-feature 等に随時更新)
+  - 前回の WARNING 3件: すべて解消確認済み
 
 ## 次に実行すべきコマンド
 
-`/setup-hooks`
+`/verify-setup`
 
 ## 各コマンド実行前のチェックリスト
 
@@ -106,41 +100,62 @@
 3. 前のコマンドが完了し、`/clear` でセッションがリセットされているか
 4. このファイル (`.steering/_setup-progress.md`) を Read で読んで進捗を確認したか
 
+## 前回構築からの品質向上ポイント（全Phase共通）
+
+1. **macOS 対応の反映**: Accessibility/Input Monitoring 対応を docs・skills に反映
+2. **Commands の明確化**: `/implement` の feat/fix/refactor モード選択フローを改善
+3. **Hooks の強化**: cargo clippy、TypeScript lint の自動トリガー追加
+4. **Cross-platform 記述**: Windows 限定だった記述をマルチプラットフォーム対応に更新
+5. **実運用知見の反映**: 4日間の開発で判明した改善点を各構築物に織り込む
+
+## 前回の検証で報告された問題（Phase 7 で解消確認）
+
+1. code-reviewer.md に intervention-design Skill 参照を追記
+2. verify-setup.md の Step 6 を 4 コマンド構成に更新
+3. project-status に補足ファイル追加（任意）
+
 ## 構築物の相互参照マップ
 
 このセクションは各 setup-* コマンドが完了するたびに更新される。
 
-### Skill リスト
-- rust-standards — Rust コーディング規約
-- typescript-standards — TypeScript/React 規約
-- git-workflow — コミット・ブランチ・バージョニング
-- hook-constraints — フックコールバック制約
-- architecture-rules — レイヤー依存・モジュール配置
-- data-privacy — キーストロークデータ・ML収集プライバシー
-- ml-workflow — HMM チューニング・ONNX 移行
-- hmm-analysis — F1-F6特徴量・潜在軸・観測ビン・EWMA
-- intervention-design — Nudge/Wall/ZenTimer/MonkMode
-- physical-anchor — Flutter連携・歩数/距離/速度計測
-- project-status (動的) — git状態・進捗リアルタイム取得
+### Skill リスト (11個)
+- architecture-rules
+- data-privacy
+- git-workflow
+- hmm-analysis
+- hook-constraints (Win+macOS 両対応)
+- intervention-design
+- ml-workflow
+- physical-anchor
+- project-status (動的)
+- rust-standards
+- typescript-standards
 
 ### Skill → Agent 参照
 - rust-standards → code-reviewer
 - typescript-standards → code-reviewer
-- hook-constraints → code-reviewer, test-analyzer
-- architecture-rules → impact-analyzer, code-reviewer, security-checker
-- data-privacy → security-checker
+- hook-constraints → code-reviewer, test-analyzer, log-analyzer
+- architecture-rules → code-reviewer, impact-analyzer, security-checker
+- data-privacy → code-reviewer, security-checker
+- intervention-design → code-reviewer
 - git-workflow → dependency-checker
 - hmm-analysis → test-analyzer, log-analyzer
-- intervention-design → code-reviewer（wall_server.rs / Overlay.tsx レビュー時）
 
 ### Agent → Command 参照
-- file-finder, impact-analyzer → /implement (調査フェーズ)
-- code-reviewer, security-checker → /implement (レビューフェーズ), /review-changes
-- test-runner, build-executor → /implement (検証フェーズ), /finish-task
-- test-analyzer → /implement (fix モード), /finish-task
-- log-analyzer → /implement (デバッグ用途)
+- file-finder → /implement (Step 2)
+- impact-analyzer → /implement (Step 2)
+- log-analyzer → /implement (Step 2, fix 固有)
+- code-reviewer → /implement (Step 7), /review-changes, /finish-task
+- security-checker → /implement (Step 7, 外部入力時), /review-changes
+- test-runner → /implement (Step 5 refactor開始前・交互実行, Step 6), /finish-task
+- test-analyzer → /implement (Step 6, 失敗時)
+
+### Command → Command 参照
+- /start-task → /implement (完了後に実行)
+- /implement → /reimagine (Step 3.5, 条件付き), /finish-task (Step 8)
+- /finish-task → /review-changes (Step 3)
 
 ### Hook → Command 参照
-- SessionStart Hook → 全コマンドのセッション開始時に動作
-- Stop Hook → 全コマンドのターン終了時に動作 (自己検証強制)
-- PostToolUse Hook → /implement, /fix-bug 等の実装系コマンドで cargo fmt 自動実行
+- SessionStart Hook (.claude/hooks/session-start.sh) → 全コマンドのセッション開始時に動作
+- Stop Hook (.claude/hooks/stop-check.sh) → 全コマンドのターン終了時に動作（変更あり時のみ cargo clippy + tsc 実行）
+- PostToolUse Hook (cargo fmt) → /add-feature, /fix-bug, /refactor 等の実装系で動作
