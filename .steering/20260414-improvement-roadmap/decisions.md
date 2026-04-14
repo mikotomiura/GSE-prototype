@@ -175,6 +175,49 @@
 
 ---
 
+## 判断 12: loop_step.rs は analysis/ → logger 依存を避け、中立記録型を返す（2026-04-15 追記）
+
+**判断**: P0-1 `analysis/loop_step.rs` の `StepOutput` は `logger::LogEntry` を直接含めず、`KeyRecord` / `FeatSnapshot` / `ImeStateRecord` の中立な記録型ベクタを返す。`lib.rs` 側で `LogEntry` へ変換して送信する。
+
+**根拠**:
+- `architecture-rules` ルール 6「循環参照禁止」: 依存方向は `lib.rs → analysis` / `lib.rs → logger` の Y 字で、`analysis → logger` は禁止。
+- design.md §0.1 の当初案 `log_entries: Vec<LogEntry>` はこのルールに抵触する。
+- 中立記録型は `gse-replay` CLI (P0-4) でも直接再利用でき、`logger::LogEntry` への依存を replay 側でも避けられる。
+- `FeatSnapshot` はゴールデンスナップショット (P0-10) の JSON 比較対象にもなるため、`serde::Serialize` を付与できる位置（`analysis/`）に置くほうが自然。
+
+**代替案**: `LogEntry` を `logger` から `lib.rs` 直下もしくは新規 `types` モジュールに移す。
+**却下理由**: 既存コード広域への破壊的変更。中立記録型を別建てする方が局所的。
+
+---
+
+## 判断 13: step() は Instant を捨て u64 ms で時刻管理する（2026-04-15 追記）
+
+**判断**: `AnalysisState` は `last_event_time_ms: u64` / `next_engine_update_ms: u64` を持ち、`step(..., now_ms: u64, ...)` として呼び出す。`lib.rs` 側は `Instant` 基準時刻を保持し差分を ms に変換する。
+
+**根拠**:
+- P0-4 `gse-replay` CLI は NDJSON の `t` (ms) しか持たず、`Instant` を再現できない。replay と production で同一の時刻表現を使うのが原則 A (Replay-as-Truth) の要請。
+- `elapsed() > Duration::from_secs(10)` の境界は ms 精度で等価 (`diff_ms > 10_000`)。
+- `as_secs_f64()` は `(diff_ms as f64) / 1000.0` で再現可能。サブ ms 誤差は存在するが、P0-10 でスナップショットを新規生成するため既存挙動との byte-equal 問題は発生しない（新しい baseline として固定される）。
+
+**代替案**: `now: Instant` をそのまま渡し、ms 変換は LogEntry::Feat の timestamp 生成のみに限定 (impact-analyzer 推奨案)。
+**却下理由**: replay 側が Instant を合成できないため、production コードと replay コードで時刻計算経路が分岐する。これはまさに loop_step 抽出の目的（同一関数で動かす）を損なう。
+
+---
+
+## 判断 14: AnalysisState.pressed_keys は cross-platform で保持する（2026-04-15 追記）
+
+**判断**: Windows 専用のキーリピート検出に使う `pressed_keys: HashSet<u32>` を、`AnalysisState` のフィールドとしては `#[cfg(target_os = "windows")]` を付けず全プラットフォームで保持する。使用する分岐（Press/Release での insert/remove）のみ `#[cfg(windows)]` でガードする。
+
+**根拠**:
+- `#[cfg(...)]` をフィールドに付けると、構造体コンストラクタ・mem::take・Debug 実装・テストコードの各所で `#[cfg]` 分岐が必要になり、cfg 伝播の破綻でコンパイルエラーが頻出する（impact-analyzer リスク 3）。
+- 未使用 `HashSet` のメモリオーバーヘッドは数十バイトで無視できる。
+- `gse-replay` CLI は OS に依存せず同じ state 型を使えるため、replay 再現性の観点でもメリットがある。
+
+**代替案**: `#[cfg(target_os = "windows")] pub pressed_keys: HashSet<u32>` のフィールド cfg 分岐。
+**却下理由**: 保守負荷が大きい割に得るものが少ない（数十バイトのメモリ節約）。
+
+---
+
 ## 記録されないべき判断（参考）
 
 以下は判断として記録する価値がない（自明または根拠が弱い）ため決定木から除外した:

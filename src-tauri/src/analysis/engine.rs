@@ -23,6 +23,20 @@ use crate::analysis::features::{phi, Features};
 //   浮動小数点結果が ULP レベルで変わり、既存セッションログの再現性を
 //   損なう。これらは `// TUNE:` マーカーコメントで列挙可能にするのみとする。
 
+/// HMM エンジンの挙動バージョン。
+///
+/// 遷移行列・放出行列・EWMA α・ヒステリシス α・摩擦フロア閾値など
+/// `update()` / `update_silence()` の出力を変えうる変更を行った際は
+/// SemVer で bump する。
+///
+/// - MAJOR: 既存セッションログの確率列が大幅に変わる（状態優勢の逆転等）
+/// - MINOR: 確率列は動くが同じラベル付けになる範囲の調整
+/// - PATCH: ログ形式のみの変更（数値挙動不変）
+///
+/// `logger.rs` の session_start meta エントリに書き出され、
+/// `gse-replay` がゴールデンスナップショットと突き合わせる際に検証する。
+pub const HMM_VERSION: &str = "0.2.0";
+
 /// TUNE: 初期事前確率 [Flow, Incubation, Stuck]
 ///
 /// Flow 優勢で開始することで、セッション開始直後のサイレンス観測（f1=2000）

@@ -81,11 +81,15 @@ impl SessionLogger {
             let mut writer = BufWriter::new(file);
 
             // セッション開始メタデータ
+            // hmm_version は engine.rs の HMM_VERSION 定数。
+            // gse-replay がゴールデンスナップショットと突き合わせる際に
+            // 同一バージョンであることを検証する。
             let session_start = now_ms();
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{}}}"#,
-                session_start
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}"}}"#,
+                session_start,
+                crate::analysis::engine::HMM_VERSION,
             );
 
             tracing::info!("SessionLogger: writing to {:?}", path_clone);
