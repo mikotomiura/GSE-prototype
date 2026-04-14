@@ -32,7 +32,16 @@ use std::process::ExitCode;
 
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
-use gse_next_lib::analysis::loop_step::{step, AnalysisState, FeatSnapshot, LoopInput};
+use gse_next_lib::analysis::loop_step::{
+    step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
+};
+
+/// 入力 NDJSON のサイズ上限 (500 MB)。
+///
+/// `BufReader::lines()` + `Vec<ReplayEvent>` 蓄積で読むため、
+/// 上限なしだとメモリ枯渇で OOM する可能性がある (security-checker MEDIUM 指摘)。
+/// 10 分セッションの NDJSON は通常 数 MB なので 500 MB は十分広いバッファ。
+const MAX_SESSION_BYTES: u64 = 500 * 1024 * 1024;
 
 /// NDJSON の 1 行を表す Deserialize 専用 enum。
 ///
@@ -62,7 +71,11 @@ enum ReplayEvent {
     /// の開閉（engine pause 用）。
     #[serde(rename = "ime_state")]
     ImeState { t: u64, on: bool, active: bool },
-    /// 既存 Feat エントリ。replay は自前で再生成するため読み飛ばす。
+    /// 既存セッションの Feat エントリ。
+    ///
+    /// replay は FeatSnapshot 列を step() 再実行で自前生成するため、本
+    /// variant は入力からの読み飛ばし専用（`timestamp()` も `None` を返し
+    /// 時刻順ソートから除外される）。内容検証はしない (`serde_json::Value`)。
     #[serde(rename = "feat")]
     Feat(#[allow(dead_code)] serde_json::Value),
 }
@@ -202,6 +215,17 @@ fn main() -> ExitCode {
 
 /// NDJSON を読み込み、step() を再実行して FeatSnapshot 列を返す。
 fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
+    // ファイルサイズガード (OOM 防止、security-checker MEDIUM)
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+
     let file = File::open(session_path)
         .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
     let reader = BufReader::new(file);
@@ -278,9 +302,20 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             if let Some(f) = out.feat {
                 snapshots.push(f);
             }
-            // 無限ループ防止: step() が next_engine_update_ms を進めなかった場合
+            // 無限ループ防止セーフティガード: step() が next_engine_update_ms を
+            // 進めなかった場合（通常は engine pause で gate スキップ時）。
+            // 通常運用では発生しないが、step() の実装に回帰があった際は
+            // tracing::error + debug_assert でバグとして可視化する。
             if state.next_engine_update_ms == tick_ms {
-                state.next_engine_update_ms = tick_ms + 1000;
+                tracing::error!(
+                    tick_ms = tick_ms,
+                    "step() did not advance next_engine_update_ms — forcing +ENGINE_TICK_MS"
+                );
+                debug_assert!(
+                    false,
+                    "step() must advance next_engine_update_ms on each gate tick"
+                );
+                state.next_engine_update_ms = tick_ms + ENGINE_TICK_MS;
             }
         }
 

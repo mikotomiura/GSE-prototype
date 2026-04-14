@@ -32,6 +32,13 @@ use std::collections::HashSet;
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
 use crate::analysis::features::{FeatureExtractor, InputEvent};
 
+/// 1Hz 推論ゲートの周期 (ms)。
+///
+/// production は `SystemTime::now()` ベースでこの周期ごとに `step()` 内で
+/// gate を発火させる。replay は仮想時刻を同じ周期で進める。
+/// HMM 挙動の一部を構成するため、変更時は `engine::HMM_VERSION` を bump する。
+pub const ENGINE_TICK_MS: u64 = 1000;
+
 /// 分析ループのローカル状態。
 ///
 /// `step()` をまたいで保持されるミュータブル状態をまとめたもの。
@@ -249,9 +256,9 @@ pub fn step(
 
     // 絶対時刻ベースインクリメント (累積ドリフト防止)。
     // スレッドスタール後のキャッチアップ: 大幅に遅れた場合は現在時刻にリセット。
-    state.next_engine_update_ms += 1000;
+    state.next_engine_update_ms += ENGINE_TICK_MS;
     if state.next_engine_update_ms < now_ms {
-        state.next_engine_update_ms = now_ms + 1000;
+        state.next_engine_update_ms = now_ms + ENGINE_TICK_MS;
     }
 
     if engine.get_paused() {
