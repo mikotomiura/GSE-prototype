@@ -137,10 +137,21 @@ fn usage() -> String {
 }
 
 fn main() -> ExitCode {
+    // 最小 tracing subscriber (stderr 出力、INFO 以上)。
+    // rust-standards ルール 3 準拠: 警告・エラー系は tracing 経由で出す。
+    // ただし CLI の「人向け結果メッセージ」(usage / OK 一致 / MISMATCH 差分) は
+    // ログではなくコマンド出力として writeln!(stderr, ...) に残す。
+    // `try_init` は既に subscriber が登録済みでもエラーにならない。
+    let _ = tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_target(false)
+        .without_time()
+        .try_init();
+
     let args = match parse_args() {
         Ok(a) => a,
         Err(msg) => {
-            eprintln!("{}", msg);
+            let _ = writeln!(std::io::stderr(), "{}", msg);
             return ExitCode::from(2);
         }
     };
@@ -148,18 +159,18 @@ fn main() -> ExitCode {
     let snapshots = match run_replay(&args.session_path) {
         Ok(s) => s,
         Err(msg) => {
-            eprintln!("replay failed: {}", msg);
+            tracing::error!("replay failed: {}", msg);
             return ExitCode::from(1);
         }
     };
 
     match args.snapshot_path {
         None => {
-            // stdout に JSON 配列を出力
+            // stdout に JSON 配列を出力（データ出力、ログではない）
             let json = match serde_json::to_string_pretty(&snapshots) {
                 Ok(s) => s,
                 Err(e) => {
-                    eprintln!("failed to serialize snapshots: {}", e);
+                    tracing::error!("failed to serialize snapshots: {}", e);
                     return ExitCode::from(1);
                 }
             };
@@ -172,11 +183,16 @@ fn main() -> ExitCode {
             // 既存スナップショットと比較
             match compare_snapshots(&snapshots, &path) {
                 Ok(()) => {
-                    eprintln!("OK: {} snapshots match {}", snapshots.len(), path.display());
+                    let _ = writeln!(
+                        std::io::stderr(),
+                        "OK: {} snapshots match {}",
+                        snapshots.len(),
+                        path.display()
+                    );
                     ExitCode::SUCCESS
                 }
                 Err(msg) => {
-                    eprintln!("MISMATCH: {}", msg);
+                    let _ = writeln!(std::io::stderr(), "MISMATCH: {}", msg);
                     ExitCode::from(1)
                 }
             }
@@ -211,9 +227,10 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
     // hmm_version 検証（不一致は WARN のみ、exit はしない）
     if let Some(v) = &meta_hmm_version {
         if v != HMM_VERSION {
-            eprintln!(
-                "WARN: session hmm_version = {}, current engine = {}. snapshots may not be comparable.",
-                v, HMM_VERSION
+            tracing::warn!(
+                "session hmm_version = {}, current engine = {}. snapshots may not be comparable.",
+                v,
+                HMM_VERSION
             );
         }
     }

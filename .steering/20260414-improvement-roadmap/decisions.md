@@ -256,6 +256,22 @@ HIGH 2 を適用しない根拠:
 
 ---
 
+## 判断 17: anyhow 全面導入は本ロードマップのスコープ外（2026-04-15 追記）
+
+**判断**: P0-4 `replay.rs` のエラー型は既存パターンに合わせ `Result<_, String>` を使用する。code-reviewer が HIGH で指摘した `anyhow::Result` 全面採用は本ロードマップでは適用しない。
+
+**根拠**:
+- `src-tauri/Cargo.toml` に `anyhow` は未追加、`lib.rs` の Tauri コマンド群 (`reset_accessibility` / `get_cognitive_state` 等) もすべて `Result<_, String>` パターンを使っている。replay.rs にだけ anyhow を導入するのは整合性を崩す。
+- CLAUDE.md の「エラーハンドリング: anyhow::Result」は将来方針であり、現状の実装規約ではない（grep 結果 0 件）。
+- anyhow 移行は crate 全域（lib.rs の全 Tauri コマンド + wall_server 等）に一貫して適用すべきで、独立タスクとして別サイクルで実施するのが妥当。
+
+**代替案**: 本コミットで anyhow を `[dependencies]` に追加し replay.rs だけ移行。
+**却下理由**: 整合性が取れず、将来 lib.rs を移行する際に二重修正になる。
+
+**将来タスク**: エラーハンドリング統一タスクを別 steering で立ち上げる（`src-tauri/src/` 全域を `anyhow::Result` + `anyhow::Context` に統一、Tauri コマンドの戻り値は `Result<T, String>` を維持して境界で変換）。
+
+---
+
 ## 記録されないべき判断（参考）
 
 以下は判断として記録する価値がない（自明または根拠が弱い）ため決定木から除外した:
