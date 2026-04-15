@@ -53,4 +53,36 @@ Windows 実機での検証中に発見したブロッカー・回避策を記録
 
 ## 実機で発見したブロッカー
 
-(空 — 実機検証後に追記)
+### BL-1 [2026-04-16] セッション NDJSON の保存先が Documents ではなく gse-dataset/raw 配下
+
+- **症状**: Windows 実機で Dashboard のセッション終了後、steering 想定の `%USERPROFILE%\Documents\GSE-sessions\gse_*.ndjson` ではなく **`C:\gse-dataset\raw\P000\gse_*.ndjson`** に書き出された
+- **再現手順**: 毎回再現。`npm run tauri dev` → ラベリング → セッション終了 → dir Documents → 空、dir gse-dataset/raw/P000 → 新ファイル
+- **根本原因**: 未解明。`logger.rs` が何らかの方法で gse-dataset の raw パスに書いている (ハードコード / 環境変数 / dirs crate の Windows 挙動差？)。Mac 側挙動との差分未調査
+- **暫定回避策**: Stage E は該当パスから直接読む (steering 手順の `$SESSION` 変数定義を調整)。完了ログに明記
+- **影響範囲**: Windows 固有 (macOS では Documents に書かれている実績あり)
+- **恒久対応**:
+  - Option A: Windows でも Documents に戻すよう `logger.rs` の path 解決を修正
+  - Option B: 現状の `gse-dataset/raw/` 保存を「開発者マシン限定の仕様」として docs に明文化 (gitignore で raw/ は保護済み)
+  - 判断は Windows 側で継続的に GT 収集する運用次第。Phase 2a 着手前に別タスクで決定
+
+### BL-2 [2026-04-16] gse-replay --metrics が label 近接の feat を全取りこぼしする
+
+- **症状**: `gse_20260415_144120.ndjson` は user_label 6件 (Flow 4 / Inc 1 / Stuck 1)、元 NDJSON の feat 96件を保持。python で時刻差分を計測すると全ラベルが ±500ms 以内に feat を持つ。にもかかわらず `gse-replay --metrics` は 6 件全てを `no FeatSnapshot within ±1000ms` 警告で脱落させ、confusion matrix 全 0・per-class support=0 を返す
+- **再現手順**:
+  1. `C:\gse-dataset\raw\P000\gse_20260415_144120.ndjson` を入力として
+  2. `cargo run --bin gse-replay --target x86_64-pc-windows-msvc -- <session> --metrics`
+  3. warnings が 6 件出る
+- **根本原因**: 調査中。疑い2つ:
+  1. `gse-replay` は元 NDJSON の feat を**破棄して step() 再実行で自前生成する**設計 (replay.rs:4)。再生成 feat 列が label 時刻とアライメントしていない可能性
+  2. または Mac/Windows で step() 再実行結果が異なる (タイムスタンプ精度 / イベント順序)
+- **補足**: `detection_lead_ms_median` は +26315ms で計算される → 再生成 feat 列自体は存在し argmax も効いている。LABEL_MATCH_WINDOW_MS=1000 の近接判定のみが全滅している点が奇妙
+- **暫定回避策**: 当セッションの metrics JSON は all-zero のまま commit (dataset repo `534893a`)、aggregate で all-zero session として扱う
+- **影響範囲**: 現時点では Windows onboarding セッションで確認。Mac 側 baseline (`gse_20260415_080921.metrics.json`) は Stuck support=2 で正常動作しており、両 OS 差分の可能性あり
+- **恒久対応**: 別タスク `20260416-metrics-label-alignment-bug/` 等で調査。Phase 2a Go/No-Go 判定前に fix 必須 (retrospective の MEDIUM M2 と別物だが優先度 HIGH に昇格)
+
+### BL-3 [2026-04-16] SSH 認証未セットアップ — gse-dataset は HTTPS でクローン
+
+- **症状**: `ssh -T git@github.com` が `Permission denied (publickey)`
+- **暫定回避策**: `git clone https://...` で HTTPS 経由クローン。push も HTTPS で動作確認済み
+- **影響範囲**: 本機のみ (ユーザー環境依存)
+- **恒久対応**: ユーザー判断。Windows 実機で継続運用するなら SSH 鍵を `ssh-keygen` で生成し GitHub に追加推奨
