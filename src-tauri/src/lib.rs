@@ -6,17 +6,22 @@ pub mod sensors;
 pub mod wall_server;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
-use crate::logger::{LogEntry, SessionLogger};
+use crate::logger::{LogEntry, SessionLogger, UserLabelKind};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
 #[allow(unused_imports)]
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
+
+// Phase 1 Ground Truth: 2 秒デバウンス用タイムスタンプ（epoch ms）。
+// Tauri コマンド経路とグローバルホットキー経路の両方から参照される。
+static LAST_LABEL_MS: AtomicU64 = AtomicU64::new(0);
+const LABEL_DEBOUNCE_MS: u64 = 2000;
 
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
@@ -296,6 +301,68 @@ fn open_accessibility_settings() -> String {
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
     log.lock().unwrap_or_else(|p| p.into_inner()).path.clone()
+}
+
+/// Phase 1 Ground Truth ラベル記録の共通処理。
+///
+/// Tauri コマンド (`record_user_label`) と OS グローバルホットキーの
+/// 両経路から呼ばれる。サーバー側で timestamp を付与し 2 秒デバウンスを適用する。
+/// 成功時は記録した timestamp (epoch ms) を返す。
+fn record_label_internal(log: &Arc<Mutex<LogState>>, label: UserLabelKind) -> Result<u64, String> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis() as u64;
+    // compare_exchange で「now 書き込みに勝ったスレッドだけ通す」race-free デバウンス。
+    // Tauri コマンド経路とホットキー経路が同時発火してもログ重複しない。
+    loop {
+        let last = LAST_LABEL_MS.load(Ordering::Relaxed);
+        if now.saturating_sub(last) < LABEL_DEBOUNCE_MS {
+            return Err("debounced (<2s since last label)".to_string());
+        }
+        if LAST_LABEL_MS
+            .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            break;
+        }
+    }
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::UserLabel {
+            timestamp: now,
+            label,
+            recovered_at: None,
+        })
+        .map_err(|e| format!("log channel full: {}", e))?;
+    tracing::info!("user_label recorded: {} @ {}", label.as_str(), now);
+    Ok(now)
+}
+
+/// Phase 1 Ground Truth ラベル記録の Tauri コマンド。
+///
+/// `label` は "flow" / "incubation" / "stuck" のみ許可。それ以外は `Err`。
+/// 成功時は `user_label_recorded` Tauri イベントを emit し、
+/// Dashboard counter widget のリアルタイム更新に使う。
+#[tauri::command]
+fn record_user_label(
+    app: tauri::AppHandle,
+    label: String,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let kind = UserLabelKind::parse(&label).ok_or_else(|| format!("invalid label: {:?}", label))?;
+    let timestamp = record_label_internal(&*log, kind)?;
+    if let Err(e) = app.emit(
+        "user_label_recorded",
+        serde_json::json!({
+            "label": kind.as_str(),
+            "timestamp": timestamp,
+        }),
+    ) {
+        tracing::warn!("user_label_recorded emit failed: {}", e);
+    }
+    Ok(())
 }
 
 /// 「開始する」ボタン押下時に呼ばれる。
@@ -644,8 +711,50 @@ pub fn run() {
     let hook_tx = tx;
     let ime_poll_log_tx = log_tx_ime_poll;
 
+    // Phase 1 Ground Truth: グローバルホットキーのハンドラが使うための LogState clone。
+    // プラグインのハンドラ(Fn)は Send + Sync が必要なので、Arc<Mutex<LogState>> を
+    // move で持ち込む。
+    let log_state_for_shortcut = log_state.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(move |app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    #[cfg(target_os = "macos")]
+                    let mods = Modifiers::SUPER | Modifiers::SHIFT | Modifiers::ALT;
+                    #[cfg(not(target_os = "macos"))]
+                    let mods = Modifiers::CONTROL | Modifiers::SHIFT | Modifiers::ALT;
+                    let label = if shortcut.matches(mods, Code::KeyF) {
+                        UserLabelKind::Flow
+                    } else if shortcut.matches(mods, Code::KeyI) {
+                        UserLabelKind::Incubation
+                    } else if shortcut.matches(mods, Code::KeyS) {
+                        UserLabelKind::Stuck
+                    } else {
+                        return;
+                    };
+                    match record_label_internal(&log_state_for_shortcut, label) {
+                        Ok(ts) => {
+                            let _ = app.emit(
+                                "user_label_recorded",
+                                serde_json::json!({
+                                    "label": label.as_str(),
+                                    "timestamp": ts,
+                                }),
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("shortcut label recording failed: {}", e);
+                        }
+                    }
+                })
+                .build(),
+        )
         .setup(move |app| {
             // --- キーボードフック・IME ポーリングの初期化 ---
             // Tauri の setup() はメインスレッドで、Tauri ランタイム初期化完了後に実行される。
@@ -659,6 +768,27 @@ pub fn run() {
 
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);
+
+            // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
+            // macOS: Cmd+Shift+Option+F/I/S、Windows/Linux: Ctrl+Shift+Alt+F/I/S。
+            // 失敗は warn に落として起動を継続する(録画ラベリングなしでも運用可)。
+            {
+                use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+                #[cfg(target_os = "macos")]
+                let mods = Modifiers::SUPER | Modifiers::SHIFT | Modifiers::ALT;
+                #[cfg(not(target_os = "macos"))]
+                let mods = Modifiers::CONTROL | Modifiers::SHIFT | Modifiers::ALT;
+                let shortcuts = [
+                    Shortcut::new(Some(mods), Code::KeyF),
+                    Shortcut::new(Some(mods), Code::KeyI),
+                    Shortcut::new(Some(mods), Code::KeyS),
+                ];
+                for sc in shortcuts {
+                    if let Err(e) = app.global_shortcut().register(sc) {
+                        tracing::warn!("global_shortcut register failed: {}", e);
+                    }
+                }
+            }
 
             // Overlay ウィンドウを setup() で事前生成する (hidden, non-maximized)。
             // setup() はメインスレッドで実行されるため、Windows での
@@ -704,6 +834,7 @@ pub fn run() {
             start_session,
             quit_app,
             get_session_file,
+            record_user_label,
             wall_server::start_wall_server,
             wall_server::stop_wall_server,
         ])

@@ -6,6 +6,54 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
 
+/// ユーザーが付与する Ground Truth ラベルの種別
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserLabelKind {
+    Flow,
+    Incubation,
+    Stuck,
+}
+
+impl UserLabelKind {
+    /// NDJSON に書き込む時の文字列表現
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Flow => "flow",
+            Self::Incubation => "incubation",
+            Self::Stuck => "stuck",
+        }
+    }
+
+    /// `Tauri コマンド`引数 (String) から安全に変換。未知ラベルは `None`。
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "flow" => Some(Self::Flow),
+            "incubation" => Some(Self::Incubation),
+            "stuck" => Some(Self::Stuck),
+            _ => None,
+        }
+    }
+}
+
+/// `LogEntry::UserLabel` の NDJSON 1 行を生成する純粋関数。
+/// `writeln!` の format に直接持たせるとテストしにくいため分離してある。
+fn format_user_label_line(
+    timestamp: u64,
+    label: UserLabelKind,
+    recovered_at: Option<u64>,
+) -> String {
+    let recovered = match recovered_at {
+        Some(t) => t.to_string(),
+        None => "null".to_string(),
+    };
+    format!(
+        r#"{{"type":"user_label","t":{},"label":"{}","recovered_at":{}}}"#,
+        timestamp,
+        label.as_str(),
+        recovered,
+    )
+}
+
 /// ログエントリの種別
 #[derive(Debug)]
 pub enum LogEntry {
@@ -43,6 +91,14 @@ pub enum LogEntry {
     },
     /// ユーザーが「開始する」を押した時刻 (セッション境界マーカー)
     SessionStart { timestamp: u64 },
+    /// Ground Truth ユーザーラベル (Phase 1)
+    /// `recovered_at` はログ記録時は常に `None`。
+    /// `gse-replay --metrics` 実行時にオフライン純粋関数で後付け計算される。
+    UserLabel {
+        timestamp: u64,
+        label: UserLabelKind,
+        recovered_at: Option<u64>,
+    },
     /// セッション終了マーカー
     End,
 }
@@ -172,6 +228,18 @@ impl SessionLogger {
                             );
                             dirty = true;
                         }
+                        LogEntry::UserLabel {
+                            timestamp,
+                            label,
+                            recovered_at,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_user_label_line(timestamp, label, recovered_at),
+                            );
+                            dirty = true;
+                        }
                         LogEntry::End => {
                             let _ =
                                 writeln!(writer, r#"{{"type":"meta","session_end":{}}}"#, now_ms());
@@ -286,4 +354,85 @@ fn chrono_like_filename() -> String {
     let year = 100 * b + d - 4800 + m_cal / 10;
 
     format!("{:04}{:02}{:02}_{:02}{:02}{:02}", year, month, day, h, m, s)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_label_kind_parse_valid() {
+        assert_eq!(UserLabelKind::parse("flow"), Some(UserLabelKind::Flow));
+        assert_eq!(
+            UserLabelKind::parse("incubation"),
+            Some(UserLabelKind::Incubation)
+        );
+        assert_eq!(UserLabelKind::parse("stuck"), Some(UserLabelKind::Stuck));
+    }
+
+    #[test]
+    fn user_label_kind_parse_rejects_unknown() {
+        assert_eq!(UserLabelKind::parse(""), None);
+        assert_eq!(UserLabelKind::parse("Flow"), None); // case-sensitive
+        assert_eq!(UserLabelKind::parse("focused"), None);
+        assert_eq!(UserLabelKind::parse("flow "), None); // trailing space
+    }
+
+    #[test]
+    fn user_label_kind_as_str_roundtrip() {
+        for k in [
+            UserLabelKind::Flow,
+            UserLabelKind::Incubation,
+            UserLabelKind::Stuck,
+        ] {
+            assert_eq!(UserLabelKind::parse(k.as_str()), Some(k));
+        }
+    }
+
+    #[test]
+    fn user_label_line_flow_without_recovered() {
+        let line = format_user_label_line(1_700_000_000_000, UserLabelKind::Flow, None);
+        assert_eq!(
+            line,
+            r#"{"type":"user_label","t":1700000000000,"label":"flow","recovered_at":null}"#
+        );
+    }
+
+    #[test]
+    fn user_label_line_incubation_without_recovered() {
+        let line = format_user_label_line(42, UserLabelKind::Incubation, None);
+        assert_eq!(
+            line,
+            r#"{"type":"user_label","t":42,"label":"incubation","recovered_at":null}"#
+        );
+    }
+
+    #[test]
+    fn user_label_line_stuck_with_recovered() {
+        let line = format_user_label_line(1000, UserLabelKind::Stuck, Some(1500));
+        assert_eq!(
+            line,
+            r#"{"type":"user_label","t":1000,"label":"stuck","recovered_at":1500}"#
+        );
+    }
+
+    #[test]
+    fn user_label_line_stuck_without_recovered() {
+        let line = format_user_label_line(1000, UserLabelKind::Stuck, None);
+        assert_eq!(
+            line,
+            r#"{"type":"user_label","t":1000,"label":"stuck","recovered_at":null}"#
+        );
+    }
+
+    #[test]
+    fn user_label_line_flow_with_recovered_is_accepted_but_unusual() {
+        // `gse-replay --metrics` は Stuck にしか recovered_at を埋めないが、
+        // フォーマッタ自体は label の種類に関係なく数値を受け入れる設計。
+        let line = format_user_label_line(1, UserLabelKind::Flow, Some(2));
+        assert_eq!(
+            line,
+            r#"{"type":"user_label","t":1,"label":"flow","recovered_at":2}"#
+        );
+    }
 }

@@ -30,6 +30,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-opener = "2"
+# Phase 1: Ground Truth ラベリング用のグローバルホットキー
+# (Cmd/Ctrl+Shift+Alt+F/I/S → record_user_label)
+tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 # `float_roundtrip`: gse-replay のゴールデンスナップショットで f64 の
 # JSON → parse → JSON のラウンドトリップを bit-equal に保証するため有効化。

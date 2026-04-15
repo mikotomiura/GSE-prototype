@@ -8,6 +8,8 @@
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-show",
     "core:window:allow-hide",
-    "core:window:allow-maximize"
+    "core:window:allow-maximize",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister"
   ]
 }
