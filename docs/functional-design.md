@@ -98,7 +98,10 @@
 
 - **概要**: キーストロークイベントと HMM 状態を NDJSON 形式で永続化する
 - **入力**: InputEvent、特徴量、IME 状態、セッションイベント、UserLabel (Phase 1)
-- **出力**: `~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson`
+- **出力**: セッションログの保存先は環境変数 `GSE_DATASET` で制御する (logger.rs `default_log_path` の 2 段優先):
+  1. `GSE_DATASET` 設定時: `$GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson` (開発者マシンでは `gse-dataset` リポジトリに直接書き込む運用)
+  2. 未設定時 (fallback): `~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson`
+  - どちらに解決されたかは `tracing::info!` で起動時に出力 (`resolved_log_dir`, `source`)
 - **振る舞い**:
   - バウンドチャネル（512 エントリ）でバッファリング
   - バックグラウンドスレッドが 5 秒間隔でディスクにフラッシュ
@@ -221,7 +224,7 @@
 ### UC-GT2: オフラインで GT 付きセッションの精度を評価する (Phase 1)
 
 - **アクター**: 開発者
-- **前提条件**: UserLabel を含む NDJSON が `~/Documents/GSE-sessions/` に存在
+- **前提条件**: UserLabel を含む NDJSON が `$GSE_DATASET/raw/P000/` (env 設定時) または `~/Documents/GSE-sessions/` (fallback) に存在
 - **トリガー**: Phase 2a Go/No-Go 判定前の集計、またはパラメータ調整後の再評価
 - **基本フロー**:
   1. `cargo run --bin gse-replay -- <session.ndjson> --metrics` を実行

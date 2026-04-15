@@ -60,8 +60,14 @@ pub window_title: String,    // 作業内容の推定に使える: 禁止
 
 ### ルール 2: セッションログ (NDJSON) のリアルタイム外部送信禁止
 
-運用中（セッション中）のログは、ローカルファイルシステムのみに保存する。
-`~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson`
+運用中（セッション中）のログは、ローカルファイルシステムのみに保存する。保存先は
+`logger::default_log_path()` が環境変数 `GSE_DATASET` の有無で 2 段決定する:
+
+1. `GSE_DATASET` 設定時: `$GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson`
+2. 未設定時 (fallback): `~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson`
+
+どちらの経路でも**ローカル FS のみ**であり、リアルタイム外部送信は禁止。どのパスに
+解決されたかは起動時の `tracing::info!` (`resolved_log_dir`, `source`) で常時可視化される。
 
 ```rust
 // ❌ 禁止（セッション中にリアルタイムで外部送信）

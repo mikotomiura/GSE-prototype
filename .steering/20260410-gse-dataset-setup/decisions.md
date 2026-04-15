@@ -21,12 +21,18 @@
 - 生ログに VK コードが含まれるため、コードリポジトリに混ぜない
 - Phase 2 (5名データ収集) で被験者データを含むため private 必須
 
-## Decision 3: logger.rs のデフォルトパスを gse-dataset に変更
+## Decision 3: logger.rs のデフォルトパスを gse-dataset に変更 (初版: 2026-04-10、2026-04-16 に revise)
 
-**判断**: `~/Documents/GSE-sessions/` → `gse-dataset/raw/P000/` に直接保存するよう変更。
+**当初判断 (2026-04-10)**: `~/Documents/GSE-sessions/` → `gse-dataset/raw/P000/` に直接保存。環境変数 `GSE_DATASET` → 兄弟ディレクトリ自動検出 → フォールバック の 3 段優先。
 
-**根拠**: import_sessions.py による手動インポートの手間を排除。
-環境変数 `GSE_DATASET` → 兄弟ディレクトリ自動検出 → フォールバック の優先順位。
+**Revise (2026-04-16、Phase 0.5 close-out)**: 兄弟ディレクトリ自動検出 (exe から最大 5 階層上を走査して `gse-dataset/raw/P000/` を優先するマジック) を**撤廃**。CI / 別開発マシン / Tauri bundle 配布先で予期しないパスに書き込むリスクがあったため、env `GSE_DATASET` + fallback の 2 段に簡素化した。
+
+- `logger.rs:291-317` の自動探索コードを削除
+- `default_log_path()` に `tracing::info!(resolved_log_dir, source)` を追加して保存先を常時可視化
+- 開発者は shell rc / PowerShell `$PROFILE` で `GSE_DATASET` を一度だけ明示的に設定する運用に移行 (`docs/development-guidelines.md §10.2` 参照)
+- 自動 import の手間は変わらず (env 設定後は以前と同じく dataset に直接書く)
+
+**Refs**: `.steering/20260415-windows-onboarding/blockers.md` BL-1 Closed、`.steering/20260416-replay-feat-alignment-bug/decisions.md` D1 (同じ logger.rs 領域の別負債)
 
 ## Decision 4: Stop hook を command 型に変更
 

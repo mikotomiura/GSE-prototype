@@ -100,7 +100,7 @@ SessionMetrics
   - dataset の Windows metrics JSON も fix 後値で上書き push 済み
 - [ ] macOS 側で `git pull` + `aggregate_metrics.py` で Windows 分集約確認 (Stage F)
 - [ ] Mac baseline (`gse_20260415_080921.ndjson`) を fix 後 CLI で再計算して dataset metrics を更新 (Mac 端末でしか実行不能)
-- [ ] BL-1 (ログ保存先 `C:\gse-dataset\raw\P000\` vs `Documents\GSE-sessions\`) を `logger.rs` の仕様として docs に明文化するか、macOS と同じ挙動に揃えるかを決定
+- [x] BL-1 (ログ保存先) **Closed 2026-04-16**: logger.rs の自動 sibling 探索を撤廃、env `GSE_DATASET` + fallback の 2 段に簡素化、tracing::info で可観測化。詳細は `.steering/20260415-windows-onboarding/blockers.md` BL-1 Closed エントリ参照
 - [ ] Windows 側で継続的に GT ラベル付きセッションを収集 (n>=5 目標)
 - [ ] Stage H (sync-session.ps1 雛形) は Phase 2a 着手前に別タスクで検討
 - [ ] MEDIUM 分離タスク候補: `20260416-replay-input-validation/` (NaN/Inf float バリデーション) と `20260416-replay-single-pass-collector/` (NDJSON 1 パス化)

@@ -262,13 +262,21 @@ NDJSON は端末ローカル保持、git 経路を使わない。
 ### 10.2 各端末でのワークフロー
 
 ```bash
+# 0) 初回のみ: セッションログの保存先を gse-dataset 側に向ける (任意、推奨)
+#    shell rc (bash: ~/.bashrc, zsh: ~/.zshrc, PowerShell: $PROFILE) に永続化推奨
+export GSE_DATASET=/path/to/gse-dataset   # macOS/Linux
+# PowerShell: [Environment]::SetEnvironmentVariable('GSE_DATASET', 'C:\gse-dataset', 'User')
+# → 未設定の場合は ~/Documents/GSE-sessions/ に fallback
+
 # 1) セッション取得 (macOS/Windows どちらでも)
 npm run tauri dev  # Dashboard で作業、⌘⇧⌥ F/I/S (macOS) / Ctrl+Shift+Alt+F/I/S でラベル
-# → ~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson
+# → $GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson (env 設定時)
+#    または ~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson (fallback)
+# 起動時 tracing log で resolved_log_dir と source を確認できる
 
 # 2) メトリクス算出 + gse-dataset に配置
 cd src-tauri
-SESSION=~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson
+SESSION=$GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson  # or Documents 下
 cargo run --bin gse-replay -- $SESSION --metrics --json \
   > /path/to/gse-dataset/metrics/P000/<macos|windows>/$(basename $SESSION .ndjson).metrics.json
 

@@ -53,17 +53,17 @@ Windows 実機での検証中に発見したブロッカー・回避策を記録
 
 ## 実機で発見したブロッカー
 
-### BL-1 [2026-04-16] セッション NDJSON の保存先が Documents ではなく gse-dataset/raw 配下
+### BL-1 [2026-04-16] セッション NDJSON の保存先が Documents ではなく gse-dataset/raw 配下 — **CLOSED 2026-04-16**
 
-- **症状**: Windows 実機で Dashboard のセッション終了後、steering 想定の `%USERPROFILE%\Documents\GSE-sessions\gse_*.ndjson` ではなく **`C:\gse-dataset\raw\P000\gse_*.ndjson`** に書き出された
-- **再現手順**: 毎回再現。`npm run tauri dev` → ラベリング → セッション終了 → dir Documents → 空、dir gse-dataset/raw/P000 → 新ファイル
-- **根本原因**: 未解明。`logger.rs` が何らかの方法で gse-dataset の raw パスに書いている (ハードコード / 環境変数 / dirs crate の Windows 挙動差？)。Mac 側挙動との差分未調査
-- **暫定回避策**: Stage E は該当パスから直接読む (steering 手順の `$SESSION` 変数定義を調整)。完了ログに明記
-- **影響範囲**: Windows 固有 (macOS では Documents に書かれている実績あり)
-- **恒久対応**:
-  - Option A: Windows でも Documents に戻すよう `logger.rs` の path 解決を修正
-  - Option B: 現状の `gse-dataset/raw/` 保存を「開発者マシン限定の仕様」として docs に明文化 (gitignore で raw/ は保護済み)
-  - 判断は Windows 側で継続的に GT 収集する運用次第。Phase 2a 着手前に別タスクで決定
+- **当初症状**: Windows 実機で Dashboard のセッション終了後、steering 想定の `%USERPROFILE%\Documents\GSE-sessions\gse_*.ndjson` ではなく **`C:\gse-dataset\raw\P000\gse_*.ndjson`** に書き出された
+- **調査で判明した真相 (2026-04-16)**: `logger.rs:291-317` の `default_log_path()` が commit `0889d7f` 以降、意図的に 3 段優先 (env `GSE_DATASET` → exe 兄弟を最大 5 階層上まで自動探索 → fallback `Documents/GSE-sessions/`) で実装されていた。Windows 実機は `C:\GSE-prototype` と `C:\gse-dataset` が兄弟関係にあるため自動探索経路に落ち、Documents を経由せずに dataset 直接書き込みとなった
+- **恒久対応 (本 commit で完了)**:
+  - logger.rs の自動探索 (sibling 5 階層走査) を**削除**、env `GSE_DATASET` + fallback の 2 段に簡素化
+  - `tracing::info!(resolved_log_dir, source)` を `default_log_path()` に追加、起動時にログ保存先を常時可視化
+  - 開発者は shell rc / PowerShell `$PROFILE` で `GSE_DATASET` を明示的に設定 (`docs/development-guidelines.md §10.2` 参照)
+  - 更新済み docs: `docs/functional-design.md:97-108, 224`、`docs/development-guidelines.md:264-280`、`.claude/skills/data-privacy/SKILL.md:61-68`
+- **影響範囲**: Windows / macOS 共通 (暗黙動作を取り除き、env 設定の有無で挙動が一意に決まる)
+- **Refs**: `.steering/20260416-replay-feat-alignment-bug/decisions.md` D1 で同じ logger.rs 領域の負債が Phase 0.5 で消化されたことを記録
 
 ### BL-2 [2026-04-16] gse-replay --metrics が label 近接の feat を全取りこぼしする
 
