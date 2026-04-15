@@ -150,9 +150,73 @@ struct LoggedFeatDto {
     alpha: f64,
 }
 
-impl From<LoggedFeatDto> for FeatSnapshot {
-    fn from(d: LoggedFeatDto) -> Self {
-        FeatSnapshot {
+/// `LoggedFeatDto` → `FeatSnapshot` の安全な変換。
+///
+/// rust-standards Skill: `anyhow::Result` ではなく `Result<_, String>` を使う
+/// (既存 `collect_user_labels` / `collect_logged_feats` と対称、bin crate 層での
+/// 軽量エラー通知)。
+///
+/// 検証ルール (security-checker M3 対応、`decisions.md` D8 で詳細化):
+/// - `p_flow`, `p_inc`, `p_stuck`: `is_finite()` かつ `[0.0, 1.0]`
+/// - 確率和 `p_flow + p_inc + p_stuck`: `[0.98, 1.02]` (logger `{:.4}` 丸め誤差許容)
+/// - `alpha`: `is_finite()` かつ `[0.0, 1.0]`
+/// - `f1, f3, f4, f5, f6, raw_x, raw_y, ewma_x, ewma_y`: `is_finite()` かつ非負
+///
+/// NaN が `argmax_class` の `>=` 比較を全て false にして silent に Stuck 誤分類を
+/// 招いていた問題 (`metrics.rs:270-277`) を入力側で止める。
+impl TryFrom<LoggedFeatDto> for FeatSnapshot {
+    type Error = String;
+
+    fn try_from(d: LoggedFeatDto) -> Result<Self, Self::Error> {
+        // 確率の範囲検証
+        for (name, p) in [
+            ("p_flow", d.p_flow),
+            ("p_inc", d.p_inc),
+            ("p_stuck", d.p_stuck),
+        ] {
+            if !p.is_finite() {
+                return Err(format!("{} is not finite (NaN/Inf): {}", name, p));
+            }
+            if !(0.0..=1.0).contains(&p) {
+                return Err(format!("{} out of range [0.0, 1.0]: {}", name, p));
+            }
+        }
+
+        // 確率和検証 (4 桁丸め誤差許容)
+        let sum = d.p_flow + d.p_inc + d.p_stuck;
+        if !sum.is_finite() || !(0.98..=1.02).contains(&sum) {
+            return Err(format!(
+                "probability sum out of range [0.98, 1.02]: p_flow={} p_inc={} p_stuck={} sum={}",
+                d.p_flow, d.p_inc, d.p_stuck, sum
+            ));
+        }
+
+        // alpha
+        if !d.alpha.is_finite() || !(0.0..=1.0).contains(&d.alpha) {
+            return Err(format!("alpha out of range [0.0, 1.0]: {}", d.alpha));
+        }
+
+        // 特徴量: is_finite + 非負
+        for (name, v) in [
+            ("f1", d.f1),
+            ("f3", d.f3),
+            ("f4", d.f4),
+            ("f5", d.f5),
+            ("f6", d.f6),
+            ("raw_x", d.raw_x),
+            ("raw_y", d.raw_y),
+            ("ewma_x", d.ewma_x),
+            ("ewma_y", d.ewma_y),
+        ] {
+            if !v.is_finite() {
+                return Err(format!("{} is not finite (NaN/Inf): {}", name, v));
+            }
+            if v < 0.0 {
+                return Err(format!("{} is negative: {}", name, v));
+            }
+        }
+
+        Ok(FeatSnapshot {
             timestamp: d.timestamp,
             f1: d.f1,
             f3: d.f3,
@@ -168,7 +232,7 @@ impl From<LoggedFeatDto> for FeatSnapshot {
             ewma_y: d.ewma_y,
             obs: d.obs,
             alpha: d.alpha,
-        }
+        })
     }
 }
 
@@ -449,6 +513,7 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
     // (内容はプライバシーのため出さない)。security-checker MEDIUM 指摘対応。
     let mut parse_failed_lines: u64 = 0;
     let mut feat_decode_failed: u64 = 0;
+    let mut feat_validation_failed: u64 = 0;
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
@@ -462,14 +527,29 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
             }
         };
         if let ReplayEvent::Feat(val) = ev {
-            match serde_json::from_value::<LoggedFeatDto>(val) {
-                Ok(dto) => out.push(dto.into()),
+            let dto: LoggedFeatDto = match serde_json::from_value(val) {
+                Ok(d) => d,
                 Err(_) => {
                     feat_decode_failed += 1;
                     continue;
                 }
+            };
+            // M3: TryFrom で NaN/Inf/範囲外を reject、汚染を metrics 前段で止める
+            match FeatSnapshot::try_from(dto) {
+                Ok(f) => out.push(f),
+                Err(_) => {
+                    feat_validation_failed += 1;
+                    continue;
+                }
             }
         }
+    }
+    if feat_validation_failed > 0 {
+        tracing::warn!(
+            skipped = feat_validation_failed,
+            "collect_logged_feats: feat entries failed NaN/Inf/range validation \
+             (see FeatSnapshot::try_from rules — prevents silent argmax corruption)"
+        );
     }
     if parse_failed_lines > 0 {
         tracing::warn!(
@@ -713,7 +793,7 @@ mod tests {
             _ => panic!("expected ReplayEvent::Feat variant"),
         };
         let dto: LoggedFeatDto = serde_json::from_value(val).expect("parse LoggedFeatDto");
-        let feat: FeatSnapshot = dto.into();
+        let feat: FeatSnapshot = dto.try_into().expect("valid dto converts to FeatSnapshot");
         assert_eq!(feat.timestamp, 1_700_000_001_000);
         assert!((feat.f1 - 140.0).abs() < 1e-9);
         assert!((feat.p_flow - 0.85).abs() < 1e-9);
@@ -826,11 +906,106 @@ mod tests {
             ),
         };
         let dto: LoggedFeatDto = serde_json::from_value(val).expect("LoggedFeatDto from_value");
-        let feat: FeatSnapshot = dto.into();
+        let feat: FeatSnapshot = dto.try_into().expect("valid schema_dto converts");
         assert_eq!(feat.timestamp, 1_700_000_042_000);
         assert!((feat.f1 - 120.5).abs() < 1e-9);
         assert!((feat.p_flow - 0.6).abs() < 1e-9);
         assert_eq!(feat.obs, 11);
         assert!((feat.alpha - 0.2).abs() < 1e-9);
+    }
+
+    // =========================================================================
+    // M3: TryFrom validation tests (security-checker MEDIUM)
+    // =========================================================================
+
+    /// Helper: 合法な LoggedFeatDto を返す。各テストで異常値だけ差し替える。
+    fn valid_dto() -> LoggedFeatDto {
+        LoggedFeatDto {
+            timestamp: 1_700_000_000_000,
+            f1: 140.0,
+            f3: 0.0,
+            f4: 4.0,
+            f5: 0.0,
+            f6: 0.0,
+            p_flow: 0.85,
+            p_inc: 0.10,
+            p_stuck: 0.05,
+            raw_x: 0.0,
+            raw_y: 0.6,
+            ewma_x: 0.07,
+            ewma_y: 0.74,
+            obs: 3,
+            alpha: 0.3,
+        }
+    }
+
+    /// M3: NaN が確率フィールドに入った場合は Err で reject。
+    /// `argmax_class` が NaN で silent に Stuck を選ぶ問題を入力側で止める。
+    #[test]
+    fn nan_probability_rejected() {
+        let mut dto = valid_dto();
+        dto.p_flow = f64::NAN;
+        let err = FeatSnapshot::try_from(dto).expect_err("NaN must be rejected");
+        assert!(
+            err.contains("p_flow") && err.contains("not finite"),
+            "error should mention field + not finite: {}",
+            err
+        );
+    }
+
+    /// M3: Inf が特徴量に入った場合は Err で reject。
+    #[test]
+    fn inf_feature_rejected() {
+        let mut dto = valid_dto();
+        dto.f4 = f64::INFINITY;
+        let err = FeatSnapshot::try_from(dto).expect_err("Inf must be rejected");
+        assert!(
+            err.contains("f4") && err.contains("not finite"),
+            "error should mention f4 + not finite: {}",
+            err
+        );
+    }
+
+    /// M3: 確率和が許容範囲 [0.98, 1.02] を外れた場合は Err。
+    /// 4 桁丸め誤差 (logger の {:.4}) は許容、本質的な壊れ値のみ reject。
+    #[test]
+    fn prob_sum_out_of_range_rejected() {
+        let mut dto = valid_dto();
+        // 和が 1.5 になる壊れ値 (明確に範囲外)
+        dto.p_flow = 0.5;
+        dto.p_inc = 0.5;
+        dto.p_stuck = 0.5;
+        let err = FeatSnapshot::try_from(dto).expect_err("sum=1.5 must be rejected");
+        assert!(
+            err.contains("probability sum") && err.contains("1.5"),
+            "error should mention probability sum: {}",
+            err
+        );
+    }
+
+    /// M3: alpha が `[0, 1]` を外れた場合は Err。
+    #[test]
+    fn alpha_out_of_range_rejected() {
+        let mut dto = valid_dto();
+        dto.alpha = 1.5;
+        let err = FeatSnapshot::try_from(dto).expect_err("alpha=1.5 must be rejected");
+        assert!(
+            err.contains("alpha") && err.contains("1.5"),
+            "error should mention alpha out of range: {}",
+            err
+        );
+    }
+
+    /// M3: 丸め誤差レベル (sum=0.99 等) は許容される (回帰保護)。
+    #[test]
+    fn rounding_error_tolerated() {
+        let mut dto = valid_dto();
+        // logger の {:.4} で端数が 0.9999 や 1.0001 になるケースを許容
+        dto.p_flow = 0.8499;
+        dto.p_inc = 0.1000;
+        dto.p_stuck = 0.0500;
+        // sum = 0.9999 → [0.98, 1.02] 内、通るべき
+        let feat = FeatSnapshot::try_from(dto).expect("rounding-level sum must be tolerated");
+        assert!((feat.p_flow - 0.8499).abs() < 1e-9);
     }
 }
