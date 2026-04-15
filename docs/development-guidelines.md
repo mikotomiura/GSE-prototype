@@ -287,6 +287,24 @@ git commit -m "data(P000-<os>): add $(date +%Y-%m-%d) sessions"
 git push
 ```
 
+**ショートカット (推奨)**: 上記 Step 2 + 3 は `scripts/sync-session.*` で 1 コマンド化されている:
+
+```bash
+# macOS / Linux
+./scripts/sync-session.sh ~/Documents/GSE-sessions/gse_*.ndjson
+./scripts/sync-session.sh $GSE_DATASET/raw/P000/gse_*.ndjson --no-commit  # dry-run
+
+# Windows (実行ポリシー拒否時は -ExecutionPolicy Bypass を追加)
+pwsh -NoProfile -File scripts\sync-session.ps1 `
+    -SessionPath C:\gse-dataset\raw\P000\gse_*.ndjson
+pwsh -NoProfile -File scripts\sync-session.ps1 `
+    -SessionPath ... -NoCommit  # dry-run
+```
+
+両 script は同じ I/O 契約 (位置引数 1 / `--output-dir` / `--no-commit` / exit code 0-3) に揃えてある。
+内部で `gse-replay --metrics --json` → `validate_schema.py` → `git add/commit/push` を順に実行し、
+各 Step の exit code を伝搬する。
+
 ### 10.3 Schema 管理 (機械生成)
 
 NDJSON スキーマは gse-prototype の Rust 型 (`src-tauri/src/schema_dto.rs`) が
