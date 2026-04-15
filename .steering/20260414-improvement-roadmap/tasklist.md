@@ -76,8 +76,8 @@
 
 ### ドキュメント
 - [x] D0-1: `docs/architecture.md` §4.7 沈黙 3 状態セクション完成
-- [ ] D0-2: `docs/development-guidelines.md` に「リプレイ CLI を回帰保護の中心とする」方針追記（Replay CLI 実装サイクルで実施）
-- [ ] D0-3: `README.md` に `gse-replay` の使用例と `hmm_version` bump 規約を追加（同上）
+- [x] D0-2: `docs/development-guidelines.md` に「リプレイ CLI を回帰保護の中心とする」(Replay-as-Truth) 方針追記（使い方・HMM_VERSION bump 手順込み）
+- [x] D0-3: `README.md` / `README.ja.md` 両方に `gse-replay` 使用例と `hmm_version` bump 規約を追加（meta エントリへの hmm_version 付与も明記）
 
 ### Go/No-Go（Phase 1 へ進む条件）
 - [ ] `cargo run --bin gse-replay tests/fixtures/flow.ndjson --snapshot tests/snapshots/flow.json` が一致

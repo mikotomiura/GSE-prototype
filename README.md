@@ -1032,8 +1032,8 @@ Every session produces a timestamped NDJSON file:
 Record types:
 
 ```jsonc
-// Session metadata (written at file creation)
-{"type":"meta","session_start":1740000000000}
+// Session metadata (written at file creation, includes HMM engine version)
+{"type":"meta","session_start":1740000000000,"hmm_version":"0.2.0"}
 
 // User clicked "開始する" — explicit session boundary marker (v2.6)
 {"type":"session_start","t":1740000000500}
@@ -1049,6 +1049,32 @@ Record types:
 
 {"type":"meta","session_end":1740000060000}
 ```
+
+### Session Replay CLI (`gse-replay`)
+
+An offline CLI that re-runs `analysis::loop_step::step()` over a session
+NDJSON and emits the resulting `FeatSnapshot` stream. It is the foundation
+for unit tests, regression tests, Ground-Truth evaluation, and parameter
+tuning.
+
+```bash
+# Generate a snapshot (first time)
+cargo run --bin gse-replay -- path/to/session.ndjson > tests/snapshots/mysession.json
+
+# Regression check (CI / manual — exit 0 on byte-equal match)
+cargo run --bin gse-replay -- path/to/session.ndjson --snapshot tests/snapshots/mysession.json
+```
+
+**HMM_VERSION bump policy**: `analysis::engine::HMM_VERSION` follows SemVer.
+Bump it and regenerate the snapshots whenever any of the following change:
+
+- Values in `transition_matrix` / `emission_matrix` / `initial_probabilities`
+- Internal α values / hysteresis α in `update()` / `update_silence()`
+- Friction-floor thresholds inside `loop_step::step()`
+- Numeric behavior of `features::phi` / `make_silence_observation` / `calculate_features`
+
+Because each session NDJSON's `meta` entry embeds `hmm_version`, `gse-replay`
+detects a mismatch against the built-in `engine::HMM_VERSION` and emits a WARN.
 
 ### Post-session Ground-Truth Labeling
 

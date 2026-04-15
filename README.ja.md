@@ -1032,8 +1032,8 @@ Zen Timer のスマートフォンページに、2 分間のカウントダウ�
 レコードタイプ：
 
 ```jsonc
-// セッションメタデータ（ファイル作成時に書き込み）
-{"type":"meta","session_start":1740000000000}
+// セッションメタデータ（ファイル作成時に書き込み、HMM エンジンバージョンを含む）
+{"type":"meta","session_start":1740000000000,"hmm_version":"0.2.0"}
 
 // ユーザーが「開始する」をクリック — セッション境界マーカー（v2.6）
 {"type":"session_start","t":1740000000500}
@@ -1049,6 +1049,31 @@ Zen Timer のスマートフォンページに、2 分間のカウントダウ�
 
 {"type":"meta","session_end":1740000060000}
 ```
+
+### セッションリプレイ CLI (`gse-replay`)
+
+NDJSON セッションを入力に `analysis::loop_step::step()` を再実行して
+`FeatSnapshot` 列を生成するオフライン CLI。単体テスト・回帰テスト・
+GT 評価・パラメータチューニングの基盤として使う。
+
+```bash
+# スナップショット生成（初回）
+cargo run --bin gse-replay -- path/to/session.ndjson > tests/snapshots/mysession.json
+
+# 回帰検証（CI / 手動、byte-equal で一致すれば exit 0）
+cargo run --bin gse-replay -- path/to/session.ndjson --snapshot tests/snapshots/mysession.json
+```
+
+**HMM_VERSION の bump 規約**: `analysis::engine::HMM_VERSION` は SemVer。
+以下の変更時は必ず bump してスナップショットを再生成する:
+
+- `transition_matrix` / `emission_matrix` / `initial_probabilities` の値
+- `update()` / `update_silence()` の内部 α 値・ヒステリシス α
+- `loop_step::step()` の摩擦フロア閾値
+- `features::phi` / `make_silence_observation` / `calculate_features` の数値挙動
+
+セッション NDJSON の meta エントリに `hmm_version` が埋め込まれるため、
+`gse-replay` は engine::HMM_VERSION と不一致を検出して WARN を出す。
 
 ### セッション後グラウンドトゥルースラベリング
 

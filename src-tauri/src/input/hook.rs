@@ -1,6 +1,6 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 #[cfg(target_os = "macos")]
 use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
 
 use crossbeam_channel::Sender;

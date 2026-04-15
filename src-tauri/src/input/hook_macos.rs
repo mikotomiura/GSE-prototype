@@ -547,7 +547,11 @@ pub fn start() {
                 CONSECUTIVE_TAP_FAILURES.store(0, Ordering::Relaxed);
             }
 
-            let mode_label = if use_accessibility { "Accessibility" } else { "Input Monitoring" };
+            let mode_label = if use_accessibility {
+                "Accessibility"
+            } else {
+                "Input Monitoring"
+            };
 
             let tap_options = if use_accessibility {
                 CGEventTapOptions::Default
@@ -637,7 +641,10 @@ pub fn start() {
                     // macOS はダイアログ表示を頻繁すぎると抑制する可能性があるため、
                     // 10回間隔 (約30-50秒) で再プロンプトする。抑制されても
                     // AXIsProcessTrustedWithOptions は現在の trust 状態を返すだけで副作用なし。
-                    if use_accessibility && consecutive_failures > 0 && consecutive_failures % 10 == 0 {
+                    if use_accessibility
+                        && consecutive_failures > 0
+                        && consecutive_failures % 10 == 0
+                    {
                         // SAFETY: AXIsProcessTrusted は pure read-only チェック。
                         let ax_now = unsafe { AXIsProcessTrusted() };
                         if !ax_now {
@@ -671,7 +678,8 @@ pub fn start() {
                         if consecutive_failures == 1 || im_granted {
                             tracing::warn!(
                                 "CGEventTap creation failed via {} (attempt {}), retrying in 2s...",
-                                mode_label, consecutive_failures
+                                mode_label,
+                                consecutive_failures
                             );
                         }
                         2

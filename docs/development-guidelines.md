@@ -73,22 +73,47 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 
 ## 3. テスト方針
 
-### 現状
+### 基本原則: リプレイ CLI を回帰保護の中心に据える (Replay-as-Truth)
 
-現時点では自動テストは未整備。HMM パラメータは手動チューニングとセッションログによる事後検証で品質を担保している。
+GSE はゴールデンセッション NDJSON を入力に `gse-replay` CLI で `analysis::loop_step::step()` を再実行し、`FeatSnapshot` 列の **byte-equal 一致** をもって回帰保護する。リプレイ CLI 1 本で以下の 5 役を兼ねる:
 
-### 目標
+1. 単体テスト (`cargo test` 内の `analysis::features` / `analysis::engine` のピンポイント検証)
+2. 統合テスト（沈黙 3 状態機構・Silence-break protection・1Hz ゲート進行の end-to-end 挙動）
+3. 回帰テスト（チューニング変更が既存セッション挙動に与える影響を数値で検出）
+4. Ground Truth 評価（Phase 1 以降、UserLabel 付きセッションでの precision/recall 算出）
+5. パラメータチューニング（同一セッションを異なる定数で再実行し差分を見る）
+
+詳細は `.steering/20260414-improvement-roadmap/design.md` §0.2 および本ガイドラインで規定する。
+
+### 使い方
+
+```bash
+# スナップショット生成（初回のみ）
+cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson > tests/snapshots/minimal.json
+
+# 回帰検証（CI / 手動）
+cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json
+# → "OK: N snapshots match ..." で exit 0、差分時は "MISMATCH: ..." で exit 1
+```
+
+### 範囲区分
 
 | 種類 | 範囲 | 優先度 | 備考 |
 |---|---|---|---|
-| 単体テスト | analysis::features, analysis::engine | 高 | 純粋な計算ロジック。OS 依存なし |
-| 統合テスト | lib.rs のスレッド連携 | 中 | crossbeam channel のモック可能 |
-| E2E テスト | Tauri アプリ全体 | 低 | OS フックの自動テストは困難 |
+| 単体テスト | `analysis::features` / `analysis::engine` | 高 | 純粋な計算ロジック。両 OS 共通 |
+| リプレイ回帰 | `analysis::loop_step::step()` + ゴールデン NDJSON | **最高** | Phase 0 以降の回帰保護の背骨 |
+| 統合テスト | `lib.rs` のスレッド連携 | 中 | crossbeam channel のモック可能だがコスト高。リプレイで代替 |
+| E2E テスト | Tauri アプリ全体 | 低 | OS フックの自動テストは困難。実機手動 |
 
 ### テストの方針
 
 - `analysis/` モジュールは OS 非依存なので、通常の `#[cfg(test)]` + `cargo test` で両 OS 共通に検証可能
 - `input/` モジュールは OS フックに依存するため、統合テストは実機で手動確認
+- **HMM 挙動を変える変更（遷移行列・放出行列・α 値・摩擦フロア等）を加えた際は**:
+  1. `analysis::engine::HMM_VERSION` を SemVer で bump（MAJOR/MINOR/PATCH は engine.rs 冒頭コメント参照）
+  2. `gse-replay` でゴールデンスナップショットを再生成
+  3. 差分が**意図通り**であることを `.steering/` に記録
+  4. 無関係な差分が出たら変更を見直す（意図せぬ副作用の検知）
 - セッションログ (NDJSON) の事後分析スクリプトが実質的な回帰テストとして機能
 
 ### macOS 固有のテスト考慮事項
