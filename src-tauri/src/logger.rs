@@ -283,34 +283,33 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
-/// セッションログの保存先パスを生成する。
-/// 優先順位:
-///   1. 環境変数 GSE_DATASET → $GSE_DATASET/raw/P000/
-///   2. 実行ファイルの兄弟ディレクトリ ../gse-dataset/raw/P000/
-///   3. フォールバック: ~/Documents/GSE-sessions/
+/// セッションログの保存先パスを決定する。
+///
+/// ## 優先順位 (2 段、明示的制御)
+/// 1. 環境変数 `GSE_DATASET` が設定されていれば `$GSE_DATASET/raw/P000/`
+/// 2. そうでなければ fallback `~/Documents/GSE-sessions/`
+///
+/// ## 以前の挙動との差分
+/// 旧実装は exe の兄弟を最大 5 階層上まで走査して `gse-dataset/raw/P000/` を
+/// 暗黙的に優先していたが、CI・別開発マシン・Tauri bundle 配布先で予期しないパス
+/// に書き込むリスクがあったため、20260416 に env + fallback の 2 段に簡素化した。
+/// 開発者が `gse-dataset` リポジトリに書きたい場合は shell rc / PowerShell
+/// `$PROFILE` で `GSE_DATASET` を明示的に設定する (docs/development-guidelines.md §Session データ管理 参照)。
+///
+/// ## 可観測性
+/// 決定したディレクトリは `tracing::info!` で常時出力する。どのセッションが
+/// どこに書かれたかが運用ログから即確認できる。
 pub fn default_log_path() -> PathBuf {
     let dir = if let Ok(dataset) = std::env::var("GSE_DATASET") {
         PathBuf::from(dataset).join("raw").join("P000")
-    } else if let Ok(exe) = std::env::current_exe() {
-        // 開発時: target/debug/gse-prototype.exe → ../../.. = src-tauri → ../../../.. の兄弟
-        // Tauri 開発ビルド: src-tauri/target/debug/ から 3 つ上が src-tauri、さらに 1 つ上がプロジェクトルート
-        let mut candidate = None;
-        let mut dir = exe.parent().map(|p| p.to_path_buf());
-        // 最大 5 階層上まで gse-dataset を探す
-        for _ in 0..5 {
-            if let Some(ref d) = dir {
-                let sibling = d.join("gse-dataset").join("raw").join("P000");
-                if sibling.exists() {
-                    candidate = Some(sibling);
-                    break;
-                }
-                dir = d.parent().map(|p| p.to_path_buf());
-            }
-        }
-        candidate.unwrap_or_else(|| fallback_log_dir())
     } else {
         fallback_log_dir()
     };
+    tracing::info!(
+        resolved_log_dir = %dir.display(),
+        source = if std::env::var("GSE_DATASET").is_ok() { "GSE_DATASET env" } else { "fallback (Documents/GSE-sessions)" },
+        "session log path resolved"
+    );
 
     let ts = chrono_like_filename();
     dir.join(format!("gse_{}.ndjson", ts))
