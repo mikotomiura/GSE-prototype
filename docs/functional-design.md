@@ -225,7 +225,7 @@
 - **トリガー**: Phase 2a Go/No-Go 判定前の集計、またはパラメータ調整後の再評価
 - **基本フロー**:
   1. `cargo run --bin gse-replay -- <session.ndjson> --metrics` を実行
-  2. `run_replay` が step() を仮想時刻で再実行し FeatSnapshot 列を生成
+  2. `collect_logged_feats` が NDJSON の `{"type":"feat",...}` 行を `FeatSnapshot` 列として抽出 (production wall-clock の真値を使用)
   3. `collect_user_labels` が NDJSON を 2 度目に読み UserLabel を抽出
   4. `compute_session_metrics` が混同行列 / F1 / 検出リード / Stuck 回復を算出
   5. pretty-print または `--json` で出力

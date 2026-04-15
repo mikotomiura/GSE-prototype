@@ -1,0 +1,7 @@
+{"type":"meta","session_start":1700000000000,"hmm_version":"0.2.0"}
+{"type":"session_start","t":1700000000000}
+{"type":"feat","t":1700000001000,"f1":140.0,"f3":0.0,"f4":4.0,"f5":0.0,"f6":0.0,"p_flow":0.85,"p_inc":0.10,"p_stuck":0.05,"raw_x":0.0,"raw_y":0.6,"ewma_x":0.07,"ewma_y":0.74,"obs":3,"alpha":0.3}
+{"type":"feat","t":1700000002000,"f1":140.0,"f3":0.0,"f4":6.0,"f5":0.0,"f6":0.0,"p_flow":0.88,"p_inc":0.08,"p_stuck":0.04,"raw_x":0.0,"raw_y":0.65,"ewma_x":0.05,"ewma_y":0.72,"obs":3,"alpha":0.3}
+{"type":"feat","t":1700000003000,"f1":140.0,"f3":0.0,"f4":5.0,"f5":0.0,"f6":0.0,"p_flow":0.90,"p_inc":0.07,"p_stuck":0.03,"raw_x":0.0,"raw_y":0.70,"ewma_x":0.04,"ewma_y":0.71,"obs":3,"alpha":0.3}
+{"type":"user_label","t":1700000002100,"label":"flow","recovered_at":null}
+{"type":"meta","session_end":1700000003500}

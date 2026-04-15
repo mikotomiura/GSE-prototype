@@ -78,7 +78,11 @@ Windows 実機での検証中に発見したブロッカー・回避策を記録
 - **補足**: `detection_lead_ms_median` は +26315ms で計算される → 再生成 feat 列自体は存在し argmax も効いている。LABEL_MATCH_WINDOW_MS=1000 の近接判定のみが全滅している点が奇妙
 - **暫定回避策**: 当セッションの metrics JSON は all-zero のまま commit (dataset repo `534893a`)、aggregate で all-zero session として扱う
 - **影響範囲**: 現時点では Windows onboarding セッションで確認。Mac 側 baseline (`gse_20260415_080921.metrics.json`) は Stuck support=2 で正常動作しており、両 OS 差分の可能性あり
-- **恒久対応**: 別タスク `20260416-metrics-label-alignment-bug/` 等で調査。Phase 2a Go/No-Go 判定前に fix 必須 (retrospective の MEDIUM M2 と別物だが優先度 HIGH に昇格)
+- **恒久対応**: [.steering/20260416-replay-feat-alignment-bug/](../20260416-replay-feat-alignment-bug/) で **調査 + fix 完了** (2026-04-16)。
+  - 原因: `gse-replay --metrics` が step() 再生成 feat を使っており、IME pause の auto-reset (production の 8s safety) を再現できなかった。本質的には clock semantic mismatch (logged feat は wall-clock、regen feat は virtual clock)
+  - 修正: `collect_logged_feats` 追加、`--metrics` は logged feat を source of truth とする設計に切替
+  - 効果: `gse_20260415_144120.ndjson` で warnings 6 → 0、Macro F1 0.000 → 0.722、Stuck F1 0 → 1.0
+  - 後続: M3 (NaN/Inf 入力検証) / M4 (NDJSON 2 パス統合) は別タスク
 
 ### BL-3 [2026-04-16] SSH 認証未セットアップ — gse-dataset は HTTPS でクローン
 

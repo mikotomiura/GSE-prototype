@@ -298,7 +298,7 @@ Phase 2a（Synthetic Friction 再設計）では、TransitionPath と SilencePat
 
 1. 開発者が `cargo run --bin gse-replay -- <session.ndjson> --metrics [--json]` を実行
 2. `parse_args` が `--metrics` / `--snapshot` の排他、`--json` が `--metrics` 必須を検証
-3. `run_replay` が NDJSON を読み、step() を仮想時刻で再実行して FeatSnapshot 列を生成
+3. `collect_logged_feats` が NDJSON を読み `{"type":"feat",...}` 行を `FeatSnapshot` として抽出 (production が wall-clock で書いた値を source of truth とする)
 4. `collect_user_labels` が NDJSON を 2 度目に開き `{"type":"user_label",...}` 行を抽出
 5. `analysis::metrics::compute_session_metrics` が以下を算出:
    - `nearest_feat` で各ラベルに対応する FeatSnapshot を取得 (±1 秒窓)
@@ -308,6 +308,8 @@ Phase 2a（Synthetic Friction 再設計）では、TransitionPath と SilencePat
    - Stuck ラベルは `compute_recovered_at` で p_flow > 0.5 到達時刻を探す
 6. `format_pretty` または `serde_json::to_string_pretty(&metrics)` で出力
 7. 開発者が出力を `gse-dataset/metrics/P000/<os>/` にコピーして commit (UC-GT3)
+
+> **Note (2026-04-16)**: フロー 4 step 3 は以前 `run_replay` による step() 再実行で FeatSnapshot 列を生成していたが、virtual-clock tick と label の wall-clock 時刻が揃わず label 近接の feat を取りこぼすバグ (`.steering/20260416-replay-feat-alignment-bug/`) が顕在化。`collect_logged_feats` に切替済み。`run_replay` は `--snapshot` / デフォルト JSON 出力 (step() 決定論検証) 用途に残している。
 
 ### フロー 5: JSON Schema 生成と CI drift 検知 (Phase 1)
 

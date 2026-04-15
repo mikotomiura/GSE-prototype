@@ -95,8 +95,12 @@ SessionMetrics
 - **合計**: 約 30 分 (ユーザー操作待ち除く)
 
 ## 次アクション
+- [x] BL-2 (feat アライメント) を別タスクで調査 + fix 完了: `.steering/20260416-replay-feat-alignment-bug/` (2026-04-16)
+  - warnings 6→0、Macro F1 0.000→0.722、Stuck F1 0→1.0
+  - dataset の Windows metrics JSON も fix 後値で上書き push 済み
 - [ ] macOS 側で `git pull` + `aggregate_metrics.py` で Windows 分集約確認 (Stage F)
-- [ ] blockers.md の BL-2 (feat アライメント) を別タスクで調査 — Phase 2a Go/No-Go 判定前に fix 必要性を評価
-- [ ] BL-1 (ログ保存先) を `logger.rs` の仕様として docs に明文化するか、macOS と同じ挙動に揃えるかを決定
+- [ ] Mac baseline (`gse_20260415_080921.ndjson`) を fix 後 CLI で再計算して dataset metrics を更新 (Mac 端末でしか実行不能)
+- [ ] BL-1 (ログ保存先 `C:\gse-dataset\raw\P000\` vs `Documents\GSE-sessions\`) を `logger.rs` の仕様として docs に明文化するか、macOS と同じ挙動に揃えるかを決定
 - [ ] Windows 側で継続的に GT ラベル付きセッションを収集 (n>=5 目標)
 - [ ] Stage H (sync-session.ps1 雛形) は Phase 2a 着手前に別タスクで検討
+- [ ] MEDIUM 分離タスク候補: `20260416-replay-input-validation/` (NaN/Inf float バリデーション) と `20260416-replay-single-pass-collector/` (NDJSON 1 パス化)

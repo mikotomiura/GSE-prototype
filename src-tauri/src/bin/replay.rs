@@ -76,9 +76,11 @@ enum ReplayEvent {
     ImeState { t: u64, on: bool, active: bool },
     /// 既存セッションの Feat エントリ。
     ///
-    /// replay は FeatSnapshot 列を step() 再実行で自前生成するため、本
-    /// variant は入力からの読み飛ばし専用（`timestamp()` も `None` を返し
-    /// 時刻順ソートから除外される）。内容検証はしない (`serde_json::Value`)。
+    /// `run_replay` (snapshot 検証経路) では step() 再実行で自前生成するため、
+    /// 本 variant は読み飛ばし専用 (`timestamp()` も `None` を返し時刻順ソート
+    /// から除外)。metrics 経路では `collect_logged_feats()` 側で `LoggedFeatDto`
+    /// を使って別途構造化パースする (clock semantic mismatch 対策、
+    /// `.steering/20260416-replay-feat-alignment-bug/decisions.md` D1 参照)。
     #[serde(rename = "feat")]
     Feat(#[allow(dead_code)] serde_json::Value),
     /// Phase 1 Ground Truth ラベル。`--metrics` で評価対象として突き合わせる。
@@ -106,6 +108,66 @@ impl ReplayEvent {
             // timestamp() から None を返して時刻順ソートから除外し、
             // metrics 算出経路で別途抽出する。
             ReplayEvent::UserLabel { .. } => None,
+        }
+    }
+}
+
+/// NDJSON の `{"type":"feat", ...}` 行を `FeatSnapshot` に変換する DTO。
+///
+/// metrics 経路 (`--metrics`) で production が wall-clock で書いた feat 行を
+/// そのまま source of truth として使うための変換型。`run_replay` の step()
+/// 再生成は virtual-clock grid のため label と時刻軸が一致せず、metrics の
+/// nearest_feat 判定で大量に取りこぼす bug (decisions.md D1) の fix 用。
+///
+/// ## 同期対象
+///
+/// フィールド一式は `src-tauri/src/schema_dto.rs` の `LogEntryDto::Feat`
+/// (L63-79) と一致させる必要がある。`logger::LogEntry::Feat` に新フィールド
+/// が追加されたら schema_dto.rs と本 DTO の両方を更新する。同期漏れは:
+/// - schema drift check (emit_schema vs `schema/current.json`) で schema_dto 側は検知可能
+/// - 本 DTO 側は serde のデフォルト挙動で「未知フィールドは無視」する
+///   (`#[serde(deny_unknown_fields)]` は forward-compat のため **付けない**)
+/// - 必要ならテスト層1 (`logged_feat_dto_parses_schema_dto_feat_shape`) で
+///   schema_dto::LogEntryDto::Feat が生成するサンプル文字列を本 DTO で
+///   受けて round-trip すること。
+#[derive(Debug, serde::Deserialize)]
+struct LoggedFeatDto {
+    #[serde(rename = "t")]
+    timestamp: u64,
+    f1: f64,
+    f3: f64,
+    f4: f64,
+    f5: f64,
+    f6: f64,
+    p_flow: f64,
+    p_inc: f64,
+    p_stuck: f64,
+    raw_x: f64,
+    raw_y: f64,
+    ewma_x: f64,
+    ewma_y: f64,
+    obs: usize,
+    alpha: f64,
+}
+
+impl From<LoggedFeatDto> for FeatSnapshot {
+    fn from(d: LoggedFeatDto) -> Self {
+        FeatSnapshot {
+            timestamp: d.timestamp,
+            f1: d.f1,
+            f3: d.f3,
+            f4: d.f4,
+            f5: d.f5,
+            f6: d.f6,
+            p_flow: d.p_flow,
+            p_inc: d.p_inc,
+            p_stuck: d.p_stuck,
+            raw_x: d.raw_x,
+            raw_y: d.raw_y,
+            ewma_x: d.ewma_x,
+            ewma_y: d.ewma_y,
+            obs: d.obs,
+            alpha: d.alpha,
         }
     }
 }
@@ -217,18 +279,11 @@ fn main() -> ExitCode {
         }
     };
 
-    let snapshots = match run_replay(&args.session_path) {
-        Ok(s) => s,
-        Err(msg) => {
-            tracing::error!("replay failed: {}", msg);
-            return ExitCode::from(1);
-        }
-    };
-
+    // metrics 経路は logged feat (production wall-clock) + user_label を使う。
+    // run_replay の step() 再生成 (virtual clock) は clock semantic が label と
+    // 揃わず label 取りこぼしを起こすため、snapshot 検証以外には使わない
+    // (decisions.md D1)。
     if args.metrics {
-        // Phase 1 Task 2: GT ラベル × 推定確率の突き合わせメトリクス算出。
-        // UserLabel は run_replay では使わないため、セッション NDJSON を再度開いて抽出する
-        // (ファイルサイズは MAX_SESSION_BYTES でガード済み)。
         let labels = match collect_user_labels(&args.session_path) {
             Ok(v) => v,
             Err(msg) => {
@@ -236,7 +291,14 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        let metrics = compute_session_metrics(&labels, &snapshots);
+        let feats = match collect_logged_feats(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect logged feats: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let metrics = compute_session_metrics(&labels, &feats);
         let stdout = std::io::stdout();
         let mut lock = stdout.lock();
         if args.json {
@@ -254,6 +316,16 @@ fn main() -> ExitCode {
         }
         return ExitCode::SUCCESS;
     }
+
+    // snapshot 経路 (デフォルト JSON 出力 / --snapshot 比較) は run_replay で
+    // step() 再実行し決定論を検証する。こちらは従来通り。
+    let snapshots = match run_replay(&args.session_path) {
+        Ok(s) => s,
+        Err(msg) => {
+            tracing::error!("replay failed: {}", msg);
+            return ExitCode::from(1);
+        }
+    };
 
     match args.snapshot_path {
         None => {
@@ -311,6 +383,9 @@ fn collect_user_labels(session_path: &PathBuf) -> Result<Vec<UserLabelEvent>, St
         .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
     let reader = BufReader::new(file);
     let mut out: Vec<UserLabelEvent> = Vec::new();
+    // silent skip の可視化 (security-checker MEDIUM 指摘、collect_logged_feats と同方針)
+    let mut parse_failed_lines: u64 = 0;
+    let mut unknown_label_count: u64 = 0;
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
@@ -318,9 +393,10 @@ fn collect_user_labels(session_path: &PathBuf) -> Result<Vec<UserLabelEvent>, St
         }
         let ev: ReplayEvent = match serde_json::from_str(&line) {
             Ok(v) => v,
-            // collect_user_labels は run_replay の後に呼ばれる。同じ NDJSON を
-            // run_replay が通過しているので parse error はここでは起きない前提。
-            Err(_) => continue,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
         };
         if let ReplayEvent::UserLabel { t, label, .. } = ev {
             if let Some(lc) = LabelClass::parse(&label) {
@@ -328,10 +404,93 @@ fn collect_user_labels(session_path: &PathBuf) -> Result<Vec<UserLabelEvent>, St
                     timestamp: t,
                     label: lc,
                 });
+            } else {
+                unknown_label_count += 1;
             }
         }
     }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            skipped = parse_failed_lines,
+            "collect_user_labels: NDJSON lines failed to parse as ReplayEvent"
+        );
+    }
+    if unknown_label_count > 0 {
+        tracing::warn!(
+            skipped = unknown_label_count,
+            "collect_user_labels: user_label entries with unknown label class (forward-compat skip)"
+        );
+    }
     out.sort_by_key(|l| l.timestamp);
+    Ok(out)
+}
+
+/// Phase 1: NDJSON の `{"type":"feat", ...}` 行を `FeatSnapshot` 列として抽出する。
+///
+/// `run_replay` が step() 再実行で生成する virtual-clock feat と異なり、production
+/// が wall-clock で書いた feat 行をそのまま source of truth として使う。user_label
+/// との時刻軸を揃えるのが目的 (`decisions.md` D1)。未知 type / parse error は
+/// silent skip (`collect_user_labels` と同方針)。
+fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<FeatSnapshot> = Vec::new();
+    // silent skip を可視化する: parse 失敗行数をカウントし件数のみ warn で出す
+    // (内容はプライバシーのため出さない)。security-checker MEDIUM 指摘対応。
+    let mut parse_failed_lines: u64 = 0;
+    let mut feat_decode_failed: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Feat(val) = ev {
+            match serde_json::from_value::<LoggedFeatDto>(val) {
+                Ok(dto) => out.push(dto.into()),
+                Err(_) => {
+                    feat_decode_failed += 1;
+                    continue;
+                }
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            skipped = parse_failed_lines,
+            "collect_logged_feats: NDJSON lines failed to parse as ReplayEvent"
+        );
+    }
+    if feat_decode_failed > 0 {
+        tracing::warn!(
+            skipped = feat_decode_failed,
+            "collect_logged_feats: feat entries failed to decode as LoggedFeatDto \
+             (possible schema drift vs schema_dto::LogEntryDto::Feat)"
+        );
+    }
+    if out.is_empty() {
+        tracing::warn!(
+            "collect_logged_feats: no feat entries found — metrics will have zero support. \
+             Verify session NDJSON was generated by hmm_version >= 0.2.0 with Phase 1 feat logging."
+        );
+    }
+    out.sort_by_key(|f| f.timestamp);
     Ok(out)
 }
 
@@ -516,4 +675,162 @@ fn compare_snapshots(actual: &[FeatSnapshot], expected_path: &PathBuf) -> Result
     }
 
     Ok(())
+}
+
+// =============================================================================
+// Tests — `.steering/20260416-replay-feat-alignment-bug/` Phase A 回帰テスト
+// =============================================================================
+// 層 1 (unit):       `LoggedFeatDto` の serde デシリアライズ + FeatSnapshot 変換
+// 層 2 (integration): 合成 NDJSON (tests/fixtures/phase1_minimal.ndjson) で
+//                     `collect_logged_feats` + `compute_session_metrics` を通して
+//                     warnings 空 + support=1 を確認
+// 層 3 (回帰):         実データから key を除去した fixture
+//                     (tests/fixtures/phase1_ime_heavy.ndjson) で warnings < 2
+//                     かつ confusion matrix 合計 ≥ 4 を確認。将来 metrics 経路を
+//                     regen に戻す変更が入ったら CI で落とす役割。
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn fixture_path(name: &str) -> PathBuf {
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("tests");
+        p.push("fixtures");
+        p.push(name);
+        p
+    }
+
+    /// 層 1: NDJSON の 1 行文字列を `LoggedFeatDto` にデシリアライズし、
+    /// `FeatSnapshot` への変換でフィールドが一致することを確認する。
+    /// schema_dto.rs の LogEntryDto::Feat と本 DTO が乖離したら落ちる。
+    #[test]
+    fn logged_feat_dto_deserialize_matches_ndjson() {
+        let line = r#"{"type":"feat","t":1700000001000,"f1":140.0,"f3":0.0,"f4":4.0,"f5":0.0,"f6":0.0,"p_flow":0.85,"p_inc":0.10,"p_stuck":0.05,"raw_x":0.0,"raw_y":0.6,"ewma_x":0.07,"ewma_y":0.74,"obs":3,"alpha":0.3}"#;
+        let ev: ReplayEvent = serde_json::from_str(line).expect("parse ReplayEvent");
+        let val = match ev {
+            ReplayEvent::Feat(v) => v,
+            _ => panic!("expected ReplayEvent::Feat variant"),
+        };
+        let dto: LoggedFeatDto = serde_json::from_value(val).expect("parse LoggedFeatDto");
+        let feat: FeatSnapshot = dto.into();
+        assert_eq!(feat.timestamp, 1_700_000_001_000);
+        assert!((feat.f1 - 140.0).abs() < 1e-9);
+        assert!((feat.p_flow - 0.85).abs() < 1e-9);
+        assert!((feat.p_inc - 0.10).abs() < 1e-9);
+        assert!((feat.p_stuck - 0.05).abs() < 1e-9);
+        assert_eq!(feat.obs, 3);
+        assert!((feat.alpha - 0.3).abs() < 1e-9);
+    }
+
+    /// 層 2: 合成 NDJSON fixture で `collect_logged_feats` +
+    /// `compute_session_metrics` のパスを通す。warnings 空 + flow support=1 を
+    /// 期待する (label と feat が ±100ms で揃っている設計)。
+    #[test]
+    fn collect_logged_feats_plus_metrics_matches_minimal_fixture() {
+        let path = fixture_path("phase1_minimal.ndjson");
+        let labels = collect_user_labels(&path).expect("collect_user_labels");
+        let feats = collect_logged_feats(&path).expect("collect_logged_feats");
+        assert_eq!(feats.len(), 3, "minimal fixture has 3 feat lines");
+        assert_eq!(labels.len(), 1, "minimal fixture has 1 user_label line");
+        let m = compute_session_metrics(&labels, &feats);
+        assert_eq!(m.total_labels, 1);
+        assert!(
+            m.warnings.is_empty(),
+            "warnings should be empty on aligned fixture, got {:?}",
+            m.warnings
+        );
+        // Flow label @t=2100 の最近傍 feat @t=2000 で p_flow=0.88 → argmax flow → tp=1
+        let flow_metrics = m
+            .per_class
+            .iter()
+            .find(|c| c.class == LabelClass::Flow)
+            .expect("flow per_class");
+        assert_eq!(flow_metrics.support, 1);
+    }
+
+    /// 層 3 (実データ回帰): key 行を除去した real fixture で alignment を確認する。
+    /// 元 `gse_20260415_144120.ndjson` は 6 labels × 96 feat (wall-clock 1Hz)。
+    /// 全ラベルが ±500ms 以内に feat を持つため warnings は **0 (第一 assert)** が
+    /// 期待。将来 regen 経路に戻る / IME auto-reset semantics が再度ずれる regression
+    /// があれば warnings > 0 で落ちる。
+    /// - fix 前 (regen): warnings=6 / matched=0
+    /// - fix 後 (logged): warnings=0 / matched=6 (Phase D-2 実測、2026-04-16)
+    /// matched 閾値は 6 件全マッチを要件に格上げ (code-reviewer M5 対応)。
+    #[test]
+    fn real_ime_heavy_fixture_warnings_minimal_and_matches_most_labels() {
+        const EXPECTED_LABELS: usize = 6;
+        const EXPECTED_MIN_FEATS: usize = 90; // 元 96 件、fixture 切り出しで微減許容
+        const EXPECTED_MATCHED_LABELS: u32 = 6; // 全 label が ±1000ms 内に logged feat を持つ
+
+        let path = fixture_path("phase1_ime_heavy.ndjson");
+        let labels = collect_user_labels(&path).expect("collect_user_labels");
+        let feats = collect_logged_feats(&path).expect("collect_logged_feats");
+        assert_eq!(labels.len(), EXPECTED_LABELS);
+        assert!(
+            feats.len() >= EXPECTED_MIN_FEATS,
+            "expected ~96 logged feats, got {}",
+            feats.len()
+        );
+        let m = compute_session_metrics(&labels, &feats);
+        assert_eq!(m.total_labels, EXPECTED_LABELS as u32);
+        // 第一 assert: warnings 0 (alignment 完全成立が要件)
+        assert!(
+            m.warnings.is_empty(),
+            "expected warnings == 0 on aligned real fixture (regression would indicate \
+             regen feat path re-introduced or IME pause semantics changed), got {}: {:?}",
+            m.warnings.len(),
+            m.warnings
+        );
+        let matched: u32 = m.confusion.matrix.iter().flatten().sum();
+        assert_eq!(
+            matched, EXPECTED_MATCHED_LABELS,
+            "expected all {} labels matched into confusion matrix, got {}",
+            EXPECTED_MATCHED_LABELS, matched
+        );
+    }
+
+    /// 層 1 拡張 (M2 対応): `schema_dto::LogEntryDto::Feat` が生成する JSON を
+    /// `LoggedFeatDto` で受けて round-trip する。両者のフィールド定義が drift
+    /// したら serde が落とす or 無視で値が 0 になるため CI で検知できる。
+    /// (obs: schema_dto は u64 / LoggedFeatDto は usize で型差あり。serde_json は
+    /// u64 → usize の範囲内変換を許すため実用上問題ない点も同時に担保)。
+    #[test]
+    fn logged_feat_dto_round_trips_schema_dto_feat_shape() {
+        use gse_next_lib::schema_dto::LogEntryDto;
+        let src = LogEntryDto::Feat {
+            t: 1_700_000_042_000,
+            f1: 120.5,
+            f3: 0.125,
+            f4: 7.0,
+            f5: 2.5,
+            f6: 0.333,
+            p_flow: 0.6,
+            p_inc: 0.25,
+            p_stuck: 0.15,
+            raw_x: 0.1,
+            raw_y: 0.8,
+            ewma_x: 0.05,
+            ewma_y: 0.7,
+            obs: 11,
+            alpha: 0.2,
+        };
+        let json = serde_json::to_string(&src).expect("serialize LogEntryDto::Feat");
+        let ev: ReplayEvent =
+            serde_json::from_str(&json).expect("parse as ReplayEvent (type=feat)");
+        let val = match ev {
+            ReplayEvent::Feat(v) => v,
+            _ => panic!(
+                "expected ReplayEvent::Feat from schema_dto::LogEntryDto::Feat, json = {}",
+                json
+            ),
+        };
+        let dto: LoggedFeatDto = serde_json::from_value(val).expect("LoggedFeatDto from_value");
+        let feat: FeatSnapshot = dto.into();
+        assert_eq!(feat.timestamp, 1_700_000_042_000);
+        assert!((feat.f1 - 120.5).abs() < 1e-9);
+        assert!((feat.p_flow - 0.6).abs() < 1e-9);
+        assert_eq!(feat.obs, 11);
+        assert!((feat.alpha - 0.2).abs() < 1e-9);
+    }
 }
