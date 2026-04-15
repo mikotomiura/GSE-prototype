@@ -94,6 +94,10 @@
 - 曖昧な指示に対して推測で実装しない（質問する）
 - `analysis/` 内で Windows API / macOS フレームワークを直接呼ばない（OS 依存は `input/` に閉じる）
 
+## Hook による自動強制（重要）
+
+`.claude/settings.json` の PreToolUse hook が、上記「技術的制約 (1)(8)」と「禁止事項」の一部を機械的にブロックする。Edit/Write が `BLOCKED:` 出力で拒否された場合、メッセージに従って修正してから再試行すること。詳細は `docs/development-guidelines.md` §9 を参照。
+
 ## セッション開始時の行動指針
 
 1. **`/start-task`** で作業記録を初期化する

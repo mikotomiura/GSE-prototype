@@ -201,3 +201,28 @@ cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/sna
 - ❌ `any` 型の多用（TypeScript）
 - ❌ `analysis/` モジュール内での macOS フレームワーク（core-graphics, Carbon 等）の直接呼び出し
 - ❌ メインスレッド上での `dispatch_sync_f` 呼び出し（デッドロックの原因）
+
+## 9. Claude Code Hooks (自動強制ガード)
+
+`.claude/settings.json` で設定された hook が、本ガイドラインの一部を **PreToolUse 段階で機械的にブロック** する。新規参加者が「なぜ Edit/Write が拒否されたか」を理解するための仕様メモ。
+
+### 強制ブロック (PreToolUse)
+
+| Hook | 対象 | ブロック条件 |
+|---|---|---|
+| `pre-edit-steering.sh` | `src-tauri/src/**/*.rs` / `src/**/*.ts(x)` | 直近 7 日内に `.steering/[YYYYMMDD]-*/` が無い、または `requirement.md` / `design.md` / `tasklist.md` のいずれかが欠落 → ブロック。`/start-task` 実行で解消。 |
+| `pre-edit-banned.sh` | `*.rs` (tests/ 除く) | `println!` / `eprintln!` の混入 → ブロック (本ガイドライン §8) |
+| `pre-edit-banned.sh` | `Cargo.toml` | `winapi` crate の追加 → ブロック (§8) |
+| `pre-edit-banned.sh` | `src-tauri/src/analysis/**/*.rs` | `use windows::` / `use core_graphics::` / `use core_foundation::` / `use objc2::` / `use cocoa::` → ブロック (§8 - OS 依存は input/ または sensors*.rs に閉じる) |
+
+### リマインダ (UserPromptSubmit)
+
+毎ターン、CLAUDE.md 精読 + `/reimagine`・`/start-task` 想起のリマインダが注入される。
+
+### 後段チェック (Stop)
+
+`stop-check.sh` がターン終了時に `cargo clippy` (Rust 変更時) と `tsc --noEmit` (TS 変更時) を実行し、エラーがあれば出力。
+
+### Hook 自体を編集する場合
+
+`.claude/hooks/*.sh` の修正後は手動で `bash .claude/hooks/<script>.sh < <test-input.json>` で動作確認すること。テストは `.steering/20260415-dev-env-setup/setup-log.md` を参照。
