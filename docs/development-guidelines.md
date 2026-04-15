@@ -305,6 +305,27 @@ pwsh -NoProfile -File scripts\sync-session.ps1 `
 内部で `gse-replay --metrics --json` → `validate_schema.py` → `git add/commit/push` を順に実行し、
 各 Step の exit code を伝搬する。
 
+#### 10.2.1 PowerShell 5.1 script を書くときの注意 (2026-04-16 判明)
+
+`scripts/sync-session.ps1` 実装中に、以下の挙動を複数回踏んだ。将来 `scripts/*.ps1`
+を追加・編集する際に同じ落とし穴を避けるための記録:
+
+- **`$PSCommandPath` / `$PSScriptRoot` / `$MyInvocation.MyCommand.Path` / `$env:TEMP` / `$env:TMP` が null/空**
+  になる invocation パスが存在する (Git Bash → `powershell.exe` ブリッジで特に顕著)。
+  → repo root や temp path は**パラメータ化**して呼び出し元から明示的に受け取る。
+  例: `[string]$RepoRoot = $(if ($env:GSE_PROTOTYPE_ROOT) { $env:GSE_PROTOTYPE_ROOT } else { 'C:\GSE-prototype' })`
+- **`$LASTEXITCODE` が CmdletBinding + 変数代入の組合せで消費され null 化**する。
+  → native cmd の成否判定は **LASTEXITCODE に頼らず、出力ファイルのサイズ + `ConvertFrom-Json` での parseability 検証** を推奨。
+- **`Join-Path $a $b` が条件により空を返す**事例あり。
+  → `-Path` / `-ChildPath` の名前付き引数指定か、もっとシンプルに文字列結合 `"$a\$b"` で回避。
+- **変数 interpolation が初回アクセスまで null に見える**ケースあり。
+  → 使う前に 1 度 `Write-Host "[debug] var=$var"` で pre-access してから本体で参照する。
+- **`> $file` リダイレクト出力は UTF-16 BOM でエンコードされる** (git diff に BOM が混入)。
+  → 変数にキャプチャしてから `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))` で UTF-8 NoBOM へ書く。
+
+これらは `scripts/sync-session.ps1` 内のコメントにも併記済み。bash 側 (`sync-session.sh`) は
+`set -euo pipefail` + `bash -n` 構文チェックで十分堅牢 (同種の問題は発生せず)。
+
 ### 10.3 Schema 管理 (機械生成)
 
 NDJSON スキーマは gse-prototype の Rust 型 (`src-tauri/src/schema_dto.rs`) が
