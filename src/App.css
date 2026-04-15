@@ -451,3 +451,27 @@ body {
   100% { opacity: 0; }
 }
 
+
+/* Phase 1 Ground Truth: Dashboard counter widget */
+.gt-counter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+.gt-counter-label {
+  font-weight: 600;
+}
+
+.gt-counter-hint {
+  margin-left: auto;
+  opacity: 0.7;
+  font-size: 0.8rem;
+}

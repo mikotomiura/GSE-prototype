@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { invoke } from "@tauri-apps/api/core";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 
 interface DiagnosticInfo {
   hook_active: string;
@@ -17,6 +17,9 @@ interface DiagnosticInfo {
   quarantine_present?: string;
   codesign_valid?: string;
 }
+
+/** Phase 1 Ground Truth ラベルの種別 (backend の UserLabelKind と同期)。 */
+type LabelKind = "flow" | "incubation" | "stuck";
 
 interface DashboardProps {
   cognitiveState: {
@@ -43,6 +46,14 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   const [resetAxResult, setResetAxResult] = useState<string | null>(null);
   // 診断コピー済みフラグ
   const [copied, setCopied] = useState(false);
+  // Phase 1 Ground Truth: ラベル累積カウンタ (Flow / Incubation / Stuck)
+  // Backend の `user_label_recorded` イベントを購読してインクリメント。
+  // セッション跨ぎでは Dashboard 再マウント時にリセットされる。
+  const [labelCounts, setLabelCounts] = useState<Record<LabelKind, number>>({
+    flow: 0,
+    incubation: 0,
+    stuck: 0,
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -63,6 +74,29 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
     }, 1000);
     return () => clearInterval(interval);
   }, [hookActive]);
+
+  // Phase 1 Ground Truth: backend が発火する `user_label_recorded` を購読。
+  // payload.label は LabelKind union で型付け（Rust 側でバリデーション済み）。
+  // 未知値が来た場合はフォールスルーで既存 state を返す。
+  useEffect(() => {
+    const unlistenPromise = listen<{ label: LabelKind; timestamp: number }>(
+      "user_label_recorded",
+      (event) => {
+        setLabelCounts((prev) => {
+          const key = event.payload.label;
+          if (key in prev) {
+            return { ...prev, [key]: prev[key] + 1 };
+          }
+          return prev;
+        });
+      }
+    );
+    return () => {
+      unlistenPromise
+        .then((fn) => fn())
+        .catch((e) => console.error("user_label_recorded unlisten failed:", e));
+    };
+  }, []);
 
   // macOS: 30秒経過で自動的に診断情報を取得（60s の条件分岐メッセージに必要）
   // === 30 ではなく >= 30 を使用（タイマー tick 飛び対策）
@@ -338,6 +372,17 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
           </div>
           <span>{(cognitiveState.stuck * 100).toFixed(1)}%</span>
         </div>
+      </div>
+
+      {/* Phase 1 Ground Truth: 読み取り専用ラベルカウンタ + ショートカット hint */}
+      <div className="gt-counter" role="status" aria-label="Ground Truth labels">
+        <span className="gt-counter-label">GT:</span>
+        <span>Flow {labelCounts.flow}</span>
+        <span>Inc {labelCounts.incubation}</span>
+        <span>Stuck {labelCounts.stuck}</span>
+        <span className="gt-counter-hint">
+          {navigator.userAgent.includes("Mac") ? "⌘⇧⌥" : "Ctrl+Shift+Alt"} F/I/S
+        </span>
       </div>
 
       {/* Monk Mode トグル: ON=Wall無効, OFF=通常 */}
