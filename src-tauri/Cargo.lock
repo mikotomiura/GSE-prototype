@@ -1366,6 +1366,7 @@ dependencies = [
  "crossbeam-channel",
  "lazy_static",
  "qrcode",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "tauri",

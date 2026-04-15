@@ -49,6 +49,16 @@ jobs:
       - name: Snapshot regression (gse-replay --snapshot)
         run: cargo run --bin gse-replay --target ${{ matrix.target }} -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json
         working-directory: src-tauri
+      # Schema drift check (Phase 1 dataset-repo-setup):
+      # schema_dto.rs から emit_schema で再生成した JSON Schema が
+      # コミット済み schema/current.json と一致することを保証する。
+      # drift があれば CI FAIL し、gse-dataset 側同期が必要と通知される。
+      - name: Schema drift check (NDJSON JSON Schema)
+        shell: bash
+        run: |
+          cargo run --bin emit_schema --target ${{ matrix.target }} > /tmp/emitted-schema.json
+          diff -u schema/current.json /tmp/emitted-schema.json
+        working-directory: src-tauri
 
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────
   frontend-check:

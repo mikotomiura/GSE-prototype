@@ -1,0 +1,261 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LogEntryDto",
+  "description": "NDJSON 1 行の種別を表す tagged union。`type` フィールドでバリアントを識別する。 logger::LogEntry の NDJSON 出力と同じ shape。",
+  "oneOf": [
+    {
+      "description": "セッション境界マーカー。 - 開始: `{\"type\":\"meta\",\"session_start\":<ms>,\"hmm_version\":\"<semver>\"}` - 終了: `{\"type\":\"meta\",\"session_end\":<ms>}`\n\n**排他制約 (schema では表現されていない producer 側の事実上のルール)**: 実際の `logger.rs` は上記 2 形状のどちらか一方しか emit しない。 具体的には: - start: `session_start` と `hmm_version` が Some、`session_end` は None - end:   `session_end` が Some、他 2 つは None 「3 つとも Some」「3 つとも None」「start と end を同時に」は不正だが schemars の tagged enum では 2 形状を別 variant にすると同一 tag 衝突が 発生するため、スキーマ上は loose にして Option 3 つを並列にしている。 validator 側の追加チェックを入れたい場合は外部 JSON Logic で補う。",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "hmm_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_end": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "session_start": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "meta"
+          ]
+        }
+      }
+    },
+    {
+      "description": "ユーザーが「開始する」ボタンを押した時刻。",
+      "type": "object",
+      "required": [
+        "t",
+        "type"
+      ],
+      "properties": {
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "session_start"
+          ]
+        }
+      }
+    },
+    {
+      "description": "キーストロークイベント (raw VK コード + 押下/離上)。",
+      "type": "object",
+      "required": [
+        "press",
+        "t",
+        "type",
+        "vk"
+      ],
+      "properties": {
+        "press": {
+          "type": "boolean"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "key"
+          ]
+        },
+        "vk": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      }
+    },
+    {
+      "description": "1Hz ゲートで吐かれる特徴量 + HMM 状態確率 + 診断データ。\n\n**obs の型について**: `logger::LogEntry::Feat` 本体では `obs: usize` だが、 schema 上は `u64` に格上げしている。理由: - `usize` は 32-bit ターゲットで u32 に縮む可能性があり、schema の `uint64` 指定と実 NDJSON 数値表現の間に乖離が生まれる - 実運用では obs は 0..=25 の小さな整数しか入らないため u64 で十分安全 - 将来 usize → u64 の意図的格上げを logger 側に反映する場合でも schema は不変",
+      "type": "object",
+      "required": [
+        "alpha",
+        "ewma_x",
+        "ewma_y",
+        "f1",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "obs",
+        "p_flow",
+        "p_inc",
+        "p_stuck",
+        "raw_x",
+        "raw_y",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "alpha": {
+          "type": "number",
+          "format": "double"
+        },
+        "ewma_x": {
+          "type": "number",
+          "format": "double"
+        },
+        "ewma_y": {
+          "type": "number",
+          "format": "double"
+        },
+        "f1": {
+          "type": "number",
+          "format": "double"
+        },
+        "f3": {
+          "type": "number",
+          "format": "double"
+        },
+        "f4": {
+          "type": "number",
+          "format": "double"
+        },
+        "f5": {
+          "type": "number",
+          "format": "double"
+        },
+        "f6": {
+          "type": "number",
+          "format": "double"
+        },
+        "obs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "p_flow": {
+          "type": "number",
+          "format": "double"
+        },
+        "p_inc": {
+          "type": "number",
+          "format": "double"
+        },
+        "p_stuck": {
+          "type": "number",
+          "format": "double"
+        },
+        "raw_x": {
+          "type": "number",
+          "format": "double"
+        },
+        "raw_y": {
+          "type": "number",
+          "format": "double"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "feat"
+          ]
+        }
+      }
+    },
+    {
+      "description": "IME 入力モード/候補ウィンドウ状態の切替。",
+      "type": "object",
+      "required": [
+        "active",
+        "on",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "ime_state"
+          ]
+        }
+      }
+    },
+    {
+      "description": "Phase 1 Ground Truth ユーザーラベル。 `recovered_at` はログ記録時は常に null、`gse-replay --metrics` で後付け算出。",
+      "type": "object",
+      "required": [
+        "label",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/definitions/UserLabelKindDto"
+        },
+        "recovered_at": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "user_label"
+          ]
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "UserLabelKindDto": {
+      "description": "Ground Truth ラベルの種別。NDJSON 文字列は \"flow\" / \"incubation\" / \"stuck\"。",
+      "type": "string",
+      "enum": [
+        "flow",
+        "incubation",
+        "stuck"
+      ]
+    }
+  }
+}

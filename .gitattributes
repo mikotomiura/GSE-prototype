@@ -1,0 +1,7 @@
+# Phase 1 dataset-repo-setup: 機械生成 schema の改行正規化を LF に固定。
+# Windows runner で git checkout 時に CRLF 変換されると emit_schema の diff が
+# 常時 FAIL する (CI drift check が flaky になる) ため、該当ファイルを明示的に
+# LF 固定する。
+src-tauri/schema/current.json text eol=lf
+tests/snapshots/*.json text eol=lf
+tests/fixtures/*.ndjson text eol=lf

@@ -231,3 +231,57 @@ cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSO
 ### Hook 自体を編集する場合
 
 `.claude/hooks/*.sh` の修正後は手動で `bash .claude/hooks/<script>.sh < <test-input.json>` で動作確認すること。テストは `.steering/20260415-dev-env-setup/setup-log.md` を参照。
+
+## 10. Session データ管理 (gse-dataset 連携)
+
+セッション NDJSON は **プライバシー観点から本リポジトリには絶対にコミットしない**。
+データは別リポジトリ [mikotomiura/gse-dataset](https://github.com/mikotomiura/gse-dataset)
+(private) で管理する。
+
+### 10.1 共有の主役: `metrics.json`
+
+Phase 1 方針 (`.steering/20260415-dataset-repo-setup/`) により、端末間で共有する
+アーティファクトは `gse-replay --metrics --json` の出力のみ。生 NDJSON / anonymized
+NDJSON は端末ローカル保持、git 経路を使わない。
+
+- metrics.json は ~1 KB/session、集計値と中央値のみで個人情報を含まない
+- Phase 2a Go/No-Go 判定 (Stuck precision 平均 ≥ 0.6) はこの集計で行う
+- anonymized NDJSON の git 管理化は Phase 2 (ML 訓練データ準備) 時に再判断
+
+### 10.2 各端末でのワークフロー
+
+```bash
+# 1) セッション取得 (macOS/Windows どちらでも)
+npm run tauri dev  # Dashboard で作業、⌘⇧⌥ F/I/S (macOS) / Ctrl+Shift+Alt+F/I/S でラベル
+# → ~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson
+
+# 2) メトリクス算出 + gse-dataset に配置
+cd src-tauri
+SESSION=~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson
+cargo run --bin gse-replay -- $SESSION --metrics --json \
+  > /path/to/gse-dataset/metrics/P000/<macos|windows>/$(basename $SESSION .ndjson).metrics.json
+
+# 3) gse-dataset で commit + push
+cd /path/to/gse-dataset
+git add metrics/
+git commit -m "data(P000-<os>): add $(date +%Y-%m-%d) sessions"
+git push
+```
+
+### 10.3 Schema 管理 (機械生成)
+
+NDJSON スキーマは gse-prototype の Rust 型 (`src-tauri/src/schema_dto.rs`) が
+単一の真実。`cargo run --bin emit_schema` で `src-tauri/schema/current.json` に
+出力し、gse-dataset 側の `schema/current.json` に同じ内容をコピーする。
+
+- schema/v1.json / v2.json / … の手書きバージョニング方式は **廃止**
+- CI (`.github/workflows/ci.yml` の `check` ジョブ) が `emit_schema` の現在出力と
+  `src-tauri/schema/current.json` を diff して drift を機械的にブロックする
+- `schema_dto.rs` を更新したら: (1) `cargo run --bin emit_schema > schema/current.json`
+  (2) gse-dataset 側にコピー (3) 両 repo を同期 commit
+
+### 10.4 プライバシー原則
+
+- `raw/` ディレクトリは gse-dataset 側の `.gitignore` で永続的に除外
+- 外部被験者 P001+ のデータは暗号化ローカル保管、GitHub (private 含む) 経路を使わない
+- `anonymize.py` はスクリプトとして存在するが、Phase 1 では出力を commit しない

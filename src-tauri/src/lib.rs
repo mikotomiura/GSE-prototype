@@ -1,6 +1,7 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
+pub mod schema_dto;
 #[cfg(target_os = "macos")]
 pub mod sensors;
 pub mod wall_server;

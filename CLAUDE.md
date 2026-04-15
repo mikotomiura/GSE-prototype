@@ -62,6 +62,10 @@
 
 テンプレートは `.steering/_template/` を参照。
 
+## データ repo (gse-dataset) 連携
+
+セッション NDJSON は本リポジトリに **コミットしない**。共有アーティファクトは `gse-replay --metrics --json` 出力のみで [mikotomiura/gse-dataset](https://github.com/mikotomiura/gse-dataset) (private) の `metrics/P*/<os>/` に置く。NDJSON Schema は `src-tauri/src/schema_dto.rs` から `cargo run --bin emit_schema` で機械生成 (CI が drift 検知)。詳細は `docs/development-guidelines.md §10`。
+
 ## コミットメッセージ規約
 
 ```
