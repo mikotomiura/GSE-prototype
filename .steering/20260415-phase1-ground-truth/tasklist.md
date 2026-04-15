@@ -38,7 +38,7 @@
 
 ## 完了処理
 - [x] decisions.md に `/reimagine` v2 採用根拠を記録（D1〜D4）
-- [ ] git commit: `feat(gt): backend user label logging + global shortcut (Phase 1 task 1/3)`
+- [x] git commit: `feat(gt): backend user label logging + global shortcut (Phase 1 task 1/3)` — `461e920`
 
 ## 本タスクのスコープ外（他タスクへ）
 

@@ -278,17 +278,23 @@ fn argmax_class(f: &FeatSnapshot) -> LabelClass {
 }
 
 /// ラベル周辺 ±window_ms の FeatSnapshot を走査し、
-/// ラベルと同じクラスが argmax になった最初の時刻を探す。
-/// 戻り値 = feat_ts - label_ts (正 = HMM がラベルより先行)。
+/// ラベルと同じクラスが argmax になった中で **ラベル時刻に最も近い** feat を返す。
+/// 戻り値 = label_ts - feat_ts (正 = HMM がラベルより先行 / 負 = 遅延)。
+///
+/// 初版は `find()` で先頭ヒット (窓内の最小 timestamp) を拾っていたが、
+/// それはラベルから遠い偶発的な同クラス出現を拾う問題があった。
+/// 実データ (gse_20260415_080214) で lead 中央値が +50s と窓端付近に貼り付き、
+/// M1 指摘として顕在化。`min_by_key(abs_diff)` に変更して「ラベル時刻に最も近い
+/// 同クラス feat」に再定義する (2026-04-15, decisions.md D9)。
 fn detection_lead_ms(lbl: &UserLabelEvent, feats: &[FeatSnapshot], window_ms: u64) -> Option<i64> {
     let lo = lbl.timestamp.saturating_sub(window_ms);
     let hi = lbl.timestamp.saturating_add(window_ms);
     let hit = feats
         .iter()
         .filter(|f| f.timestamp >= lo && f.timestamp <= hi)
-        .find(|f| argmax_class(f) == lbl.label)?;
-    // 負 = HMM が後追い（ラグ）、正 = 先行（リード）を意味する定義。
-    // 「HMM がラベルより先行」→ feat が早い → feat_ts < label_ts → 差は正にしたい
+        .filter(|f| argmax_class(f) == lbl.label)
+        .min_by_key(|f| abs_diff(f.timestamp, lbl.timestamp))?;
+    // 正 = HMM がラベルより先行 (feat が早い → label_ts - feat_ts が正)。
     Some(lbl.timestamp as i64 - hit.timestamp as i64)
 }
 
@@ -510,12 +516,16 @@ mod tests {
 
     #[test]
     fn detection_lead_positive_when_hmm_leads() {
-        // ラベル t=5000、同クラス argmax は t=3000 → HMM が 2000ms 先行 → +2000
+        // ラベル t=5000。ラベル時刻の feat は Flow で不一致、同クラス (Stuck) argmax
+        // は t=3000 のみ → HMM が 2000ms 先行 → +2000
         let labels = vec![UserLabelEvent {
             timestamp: 5000,
             label: LabelClass::Stuck,
         }];
-        let feats = vec![feat(3000, 0.1, 0.2, 0.7), feat(5000, 0.1, 0.2, 0.7)];
+        let feats = vec![
+            feat(3000, 0.1, 0.2, 0.7),   // Stuck (同クラス)
+            feat(5000, 0.9, 0.05, 0.05), // Flow (不一致)
+        ];
         let m = compute_session_metrics(&labels, &feats);
         assert_eq!(m.detection_lead_ms_median, Some(2000));
     }
@@ -552,6 +562,24 @@ mod tests {
         assert_eq!(LabelClass::parse("stuck"), Some(LabelClass::Stuck));
         assert_eq!(LabelClass::parse("FLOW"), None);
         assert_eq!(LabelClass::parse(""), None);
+    }
+
+    #[test]
+    fn detection_lead_picks_nearest_not_first() {
+        // ラベル t=5000、窓内に同クラス argmax が 3 点 (t=1000/4800/60000)。
+        // 旧実装は t=1000 (先頭ヒット) を拾い lead=+4000 と過大評価。
+        // 新実装は t=4800 (abs_diff=200) を選び lead=+200。
+        let labels = vec![UserLabelEvent {
+            timestamp: 5000,
+            label: LabelClass::Stuck,
+        }];
+        let feats = vec![
+            feat(1000, 0.1, 0.2, 0.7),
+            feat(4800, 0.1, 0.2, 0.7),
+            feat(60_000, 0.1, 0.2, 0.7),
+        ];
+        let m = compute_session_metrics(&labels, &feats);
+        assert_eq!(m.detection_lead_ms_median, Some(200));
     }
 
     #[test]

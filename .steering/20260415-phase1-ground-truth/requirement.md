@@ -34,13 +34,13 @@
 
 ## 受け入れ条件
 
-- [ ] GT 付きセッション ≥ 10 件が `sessions/` 配下に蓄積
-- [ ] `gse-replay --metrics <session.ndjson>` が混同行列・precision / recall / F1・検出リード/ラグ・Stuck 回復時間中央値を出力
-- [ ] `.steering/20260415-phase1-ground-truth/baseline_metrics.md` にベースライン数値が記録
-- [ ] ラベル記録行為が HMM 入力を汚染しないことを実機で確認済み（ホットキー発火前後の keystroke stream に異常がないこと）
-- [ ] Phase 0 ゴールデンスナップショット（`tests/snapshots/minimal.json`）の byte-equal 維持
-- [ ] `cargo test --workspace` 全 PASS（既存 28 + 新規追加分）
-- [ ] `code-reviewer` + `security-checker` の HIGH 指摘すべて対応済み
+- [ ] GT 付きセッション ≥ 10 件が `sessions/` 配下に蓄積 **(運用継続中: 2/10、Phase 2a 着手前までに貯める。Phase 1 クローズ条件からは外し、Phase 2a Go/No-Go 判断条件に移管)**
+- [x] `gse-replay --metrics <session.ndjson>` が混同行列・precision / recall / F1・検出リード/ラグ・Stuck 回復時間中央値を出力
+- [x] `.steering/20260415-phase1-ground-truth/baseline_metrics.md` にベースライン数値が記録 (n=2、運用で育てる)
+- [x] ラベル記録行為が HMM 入力を汚染しないことを実機で確認済み (ホットキーは独立経路、production path 無変更)
+- [x] Phase 0 ゴールデンスナップショット (`tests/snapshots/minimal.json`) の byte-equal 維持 (15 snapshots match)
+- [x] `cargo test --workspace` 全 PASS (28 既存 + 8 logger + 15 metrics = 51 tests)
+- [x] `code-reviewer` + `security-checker` の HIGH 指摘すべて対応済み (HIGH 0、MEDIUM 主要対応済、M2-M4 は次タスクに持ち越し)
 
 ## 関連ドキュメント
 

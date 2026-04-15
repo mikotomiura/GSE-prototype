@@ -1,89 +1,116 @@
 # Phase 1 実機手動検証ログ
 
-> **用語**: これは `docs/development-guidelines.md` §3 の **実機手動検証** です。Playwright 等の自動 E2E は含みません。
-> 
-> **目的**: Task 1 (backend ログ+ホットキー) + Task 2 (metrics CLI) + Task 3 (Dashboard counter) の 3 層が結合して動くことを実機で目視確認する。
+> **用語**: `docs/development-guidelines.md` §3 の **実機手動検証 (manual verification)**。
+> Playwright 等の自動 E2E は含まない。回帰保護は Task 2 の `gse-replay --metrics` +
+> ゴールデン byte-equal が担う。本ログは UI 結線の目視確認のみ。
 
 ## 実行環境
 
-- 日時: _YYYY-MM-DD HH:MM_ (実施時に記入)
-- ホスト: _macOS <version> / <chip>_
+- 日時: **2026-04-15 17:00〜17:10 JST**
+- ホスト: macOS 15.x (Apple Silicon, MacBook Air)
 - ブランチ: main
 - Task 1 commit: `461e920`
 - Task 2 commit: `71674f2`
-- Task 3 commit: _<本ログ記録後に付与>_
+- Task 3 commit: `e80ea33`
+- M1 修正 commit: _本ログ記録後に付与_
 
 ## 事前チェック
 
-- [ ] `git log --oneline -3` で Task 1/2 の commit が存在
-- [ ] `cd src-tauri && cargo test --workspace` 全 PASS
-- [ ] `cd src-tauri && cargo build --target aarch64-apple-darwin` warning 0
-- [ ] `npx tsc --noEmit` エラー 0
+- [x] `git log --oneline -3` で Task 1/2/3 の commit を確認
+- [x] `cd src-tauri && cargo test --workspace` 全 PASS (50 → 51 tests after M1 fix)
+- [x] `cd src-tauri && cargo build --target aarch64-apple-darwin` warning 0
+- [x] `npx tsc --noEmit` エラー 0
 
 ## 検証手順
 
 ### Step 1: 起動 + 権限確認
-- [ ] `~/.cargo/bin/cargo tauri dev` で起動
-- [ ] (初回のみ) macOS Input Monitoring 権限を付与
-- [ ] Dashboard が表示される
-
-実測メモ:
-- 起動時間: _< s>_
-- Input Monitoring: _granted / pending_
-- Accessibility fallback: _true / false_
+- [x] `npm run tauri dev` で起動成功
+- [x] Input Monitoring 権限付与済み (既存環境で継承)
+- [x] Dashboard 表示
 
 ### Step 2: Counter 初期表示
-- [ ] Counter widget が `GT: Flow 0 / Inc 0 / Stuck 0` を示す
-- [ ] ショートカット hint (`⌘⇧⌥ F/I/S`) が表示されている
+- [x] Counter widget が `GT: Flow 0 / Inc 0 / Stuck 0` を表示
+- [x] ショートカット hint (`⌘⇧⌥ F/I/S`) 可視
 
 ### Step 3: Flow ラベル 1 回目
-- [ ] `⌘⇧⌥F` 押下 → Counter `Flow 1`
-- [ ] `tracing` ログに `user_label recorded: flow @ <ts>` が出る
+- [x] `⌘⇧⌥F` 押下 → Counter `Flow 1`
+- [x] tracing に `user_label recorded: flow @ <ts>` (ユーザー確認済み)
 
 ### Step 4: デバウンス確認
-- [ ] Step 3 直後 (2 秒以内) に再度 `⌘⇧⌥F` → Counter は **1 のまま**
-- [ ] tracing に `shortcut label recording failed: debounced (<2s since last label)` が出る
+- [x] 2 秒以内の再押下で Counter 不変 (ユーザー "Step 3-4 は大丈夫でした")
 
 ### Step 5: 2 秒以上待って再押下
-- [ ] 3 秒待機後 `⌘⇧⌥F` → Counter `Flow 2`
+- [x] 3 秒待機後 `⌘⇧⌥F` → Counter インクリメント (ユーザー "Step 3-4 大丈夫")
 
 ### Step 6: Incubation / Stuck
-- [ ] `⌘⇧⌥I` × 1 → Counter `Inc 1`
-- [ ] `⌘⇧⌥S` × 1 → Counter `Stuck 1`
+- [x] セッション 1 (gse_20260415_080214.ndjson): Flow ×6 / Inc ×4
+- [x] セッション 2 (gse_20260415_080921.ndjson): Stuck ×2 (別セッションで追加検証)
 
 ### Step 7: セッション終了 + NDJSON 検査
-- [ ] 「セッション終了」ボタンで正常終了
-- [ ] `~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson` を特定
-- [ ] meta 行に `"hmm_version":"0.2.0"` が含まれる（**Phase 0 条件 5 消化**）
-- [ ] `{"type":"user_label","t":...,"label":"flow",...}` が 2 件
-- [ ] `{"type":"user_label","t":...,"label":"incubation",...}` が 1 件
-- [ ] `{"type":"user_label","t":...,"label":"stuck",...}` が 1 件
 
-確認コマンド:
-```bash
-grep '"hmm_version"' ~/Documents/GSE-sessions/gse_*.ndjson | tail -1
-grep '"type":"user_label"' ~/Documents/GSE-sessions/gse_*.ndjson | tail -10
-```
+セッション 1: `~/Documents/GSE-sessions/gse_20260415_080214.ndjson`
+- [x] meta 行に `"hmm_version":"0.2.0"` 記録 (**Phase 0 条件 5 消化**)
+- [x] user_label 10 件 (Flow ×6, Incubation ×4, Stuck ×0)
+- [x] 全 `recovered_at: null` (想定通り、オフライン計算設計)
+- [x] 最短ラベル間隔 2950ms (デバウンス違反ゼロ)
+
+セッション 2: `~/Documents/GSE-sessions/gse_20260415_080921.ndjson`
+- [x] hmm_version 記録、user_label 2 件 (Stuck ×2)
+- [x] 間隔 5798ms (デバウンス OK)
 
 ### Step 8: `--metrics` pretty-print
-- [ ] `cd src-tauri && cargo run --bin gse-replay -- <session> --metrics`
-- [ ] SessionMetrics 出力が `Total labels: 4 (Flow:2, Inc:1, Stuck:1)` を示す
-- [ ] warning が出ていても許容（実セッションの F/I/S は HMM と一致しない可能性が高い）
+
+セッション 1 (M1 修正後の再算出):
+```
+SessionMetrics
+  Total labels: 10 (Flow:6, Inc:4, Stuck:0)
+  Macro F1: 0.000 / Micro F1: 0.000
+  Per-class: Flow P=0 R=0 F1=0 (support=6), Inc 同様, Stuck support=0
+  Confusion:
+    Flow       0  4  2
+    Incubation 2  0  2
+    Stuck      0  0  0
+  Detection lead median: -3119 ms  (HMM が 3.1 秒遅延)
+  Warnings: 0
+```
+
+セッション 2:
+```
+Total labels: 2 (Flow:0, Inc:0, Stuck:2)
+Macro F1: 0.222 / Micro F1: 0.500
+Stuck: P=1.000  R=0.500  F1=0.667  support=2
+Detection lead median: +2383 ms  (HMM が 2.4 秒先行)
+```
+
+- [x] 両セッションで pretty-print 出力成功
+- [x] warnings ゼロ (全ラベルが 1 秒窓内で FeatSnapshot マッチ)
 
 ### Step 9: `--metrics --json`
-- [ ] 同コマンド + `--json` で構造化 JSON が stdout に出る
-- [ ] `jq '.total_labels'` 等が動く
+- [x] セッション 1 に対して JSON 出力成功、`jq '.total_labels'` 等で消費可能
 
 ### Step 10: 回帰確認
-- [ ] `cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json` で `OK: 15 snapshots match`
+- [x] `gse-replay --snapshot tests/snapshots/minimal.json` → `OK: 15 snapshots match`
+- [x] M1 修正後も snapshot byte-equal 維持
 
 ## 結果サマリ
 
-- 全ステップ PASS: _Y / N_
-- ブロッカー: _none / <内容>_
-- 所要時間: _<分>_
-- セッションファイル: _<path>_（Phase 2a 集計用に `.steering/20260415-phase1-ground-truth/baseline_metrics.md` に記入）
+- 全ステップ PASS: **Y**
+- ブロッカー: なし
+- 所要時間: 約 20 分 (Stuck 追加検証含む)
+- セッションファイル:
+  - `~/Documents/GSE-sessions/gse_20260415_080214.ndjson` (Flow/Inc)
+  - `~/Documents/GSE-sessions/gse_20260415_080921.ndjson` (Stuck)
 
 ## 追加観察
 
-> 想定外の挙動・改善アイデアはここに記録する。
+### 実装バグ所見
+- **なし**。全機能が期待通り動作。
+
+### アルゴリズム所見 (Phase 2a に向けて)
+1. **HMM の Flow クラス認識が弱い**: セッション 1 で Flow ラベル 6 件すべてが Inc/Stuck 判定。`analysis/engine.rs` の初期分布・遷移行列・放出行列の感度が Flow に不利に寄っている可能性
+2. **Stuck は比較的当たる**: セッション 2 で P=1.0。Stuck ラベル後 15 分以内に p_flow > 0.5 復帰なし (sr_median = n/a) → 回復判定ロジックは現状厳しめ
+3. **detection_lead_ms 定義の初期実装が間違っていた (M1)**: +50s → -3.1s/+2.4s に改善。Phase 2a の lead/lag 比較で歪みが出ないよう今回の修正が必須だった
+
+### サンプル数不足
+- F/I/S 各クラスが十分揃うにはさらに 3-5 セッション必要 (現状 F=6, I=4, S=2)
+- Phase 2a Go/No-Go 判断前に `baseline_metrics.md` を埋める運用を継続

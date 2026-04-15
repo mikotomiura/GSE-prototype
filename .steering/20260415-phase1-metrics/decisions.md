@@ -89,6 +89,21 @@ design.md §Open 点: 「同じクラスが出た最初の時刻」と「確率�
 - u64 版: `a + (b - a) / 2`（sort 後 a<=b 保証、(b-a) も a+... も u64 範囲内）
 - i64 版: `i128` 経由で `(a + b) / 2` を計算してから i64 キャスト（両端 i64::MIN / i64::MAX 両立時も安全）
 
+## D9: detection_lead_ms を「最近傍の同クラス feat」に再定義
+
+### 背景
+初版は `find()` で窓内の先頭ヒット (最小 timestamp) を拾っていた。2026-04-15 の初回実機セッション (`gse_20260415_080214.ndjson`) で metrics 算出したところ lead 中央値が +50,174 ms と窓端 (±60 秒) 付近に貼り付き、code-reviewer M1 で指摘。
+
+### 症状
+ラベル時刻から遠い偶発的な同クラス出現を拾うため、ラベル付近の真の lead/lag を反映しない。Phase 2a の baseline 比較で歪んだ基準値を使う危険あり。
+
+### 決着
+`min_by_key(abs_diff(f.timestamp, label.timestamp))` に変更。ラベル時刻に最も近い同クラス feat を選ぶ。回帰テスト `detection_lead_picks_nearest_not_first` を追加し、窓内 3 点のうち最近傍 (abs_diff=200) を選ぶことを担保。
+
+### 影響
+- 初回実機データの lead 中央値は再算出で大きく改善する見込み (baseline_metrics.md で記録)
+- M1 指摘解消、Phase 2a の Go/No-Go 判断基準が信頼できる数値になる
+
 ## D6: タスクリスト項目のうち実装規模に照らして省略したもの
 
 - **D-M1 / D-M2 (docs/README 更新)**: 実施済み（development-guidelines.md §3、README.md / README.ja.md のリプレイ CLI セクションに `--metrics` サンプル追加）
