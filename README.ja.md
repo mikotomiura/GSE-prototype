@@ -1079,9 +1079,51 @@ cargo run --bin gse-replay -- path/to/session.ndjson --metrics --json   # 構造
 セッション NDJSON の meta エントリに `hmm_version` が埋め込まれるため、
 `gse-replay` は engine::HMM_VERSION と不一致を検出して WARN を出す。
 
-### セッション後グラウンドトゥルースラベリング
+### リアルタイム Ground Truth ラベリング (Phase 1、実装済み)
 
-> **注:** `behavioral_gt.py` は Phase 2 以降で実装予定。以下はラベリングルールの設計仕様である。
+作業中に自覚した認知状態をリアルタイムでラベル付けできる機能を Phase 1 で
+搭載しました。ラベル記録は production HMM path を一切変更せず、既存 NDJSON に
+追記する形で行われ、オフラインで定量評価できます。
+
+**ショートカット** (`tauri-plugin-global-shortcut` で登録、2 秒デバウンス):
+
+| macOS | Windows / Linux | ラベル |
+|---|---|---|
+| `⌘ + Shift + Option + F` | `Ctrl + Shift + Alt + F` | Flow |
+| `⌘ + Shift + Option + I` | `Ctrl + Shift + Alt + I` | Incubation |
+| `⌘ + Shift + Option + S` | `Ctrl + Shift + Alt + S` | Stuck |
+
+押下で `~/Documents/GSE-sessions/gse_*.ndjson` に
+`{"type":"user_label","t":<ms>,"label":"flow|incubation|stuck","recovered_at":null}`
+が追記され、`user_label_recorded` Tauri イベントで Dashboard の counter widget が
+リアルタイム更新されます。Rust 側は `AtomicU64::compare_exchange` ループで
+2 秒デバウンスを race-free に実装しており、ホットキー経路と Tauri コマンド経路の
+同時発火による重複記録が構造的に排除されます。
+
+**オフライン評価**: `gse-replay --metrics` で混同行列・per-class precision/recall/F1・
+macro/micro F1・検出リード/ラグ中央値・Stuck 回復時間中央値を算出します (FeatSnapshot
+列に対する純粋関数)。
+
+### クロス端末のデータ repo (`gse-dataset`)
+
+セッション NDJSON は **本 repo にコミットしません**。共有するのは
+`--metrics --json` の出力のみで、~1 KB/session の集計値のみ含み VK コードや
+個別キーストローク timestamp を含みません。収集プロトコルは
+[`mikotomiura/gse-dataset`](https://github.com/mikotomiura/gse-dataset) (private)
+を、端末間ワークフローは
+[`docs/development-guidelines.md §10`](docs/development-guidelines.md)
+を参照してください。
+
+NDJSON スキーマは Rust 型 (`src-tauri/src/schema_dto.rs`) から **機械生成** されます
+(`cargo run --bin emit_schema`)。CI が毎 push で生成物と `src-tauri/schema/current.json`
+を diff し、schema drift を構造的にブロックします。
+
+### (旧仕様) 行動ベース自動ラベラ — Phase 2 以降の予定
+
+> **注:** 上記のリアルタイムラベリングが現行実装です。以下の行動ベース自動ラベラ
+> (`behavioral_gt.py`、Phase 2 以降で実装予定) は 30 秒ウィンドウでキーストローク
+> 特徴量からラベルを算出する補完的な機能で、上記の主観ラベルを置き換えるものでは
+> ありません。
 
 30 秒スライディングウィンドウ（1 秒ステップ）でラベルを付与します。
 

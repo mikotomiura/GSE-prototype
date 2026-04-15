@@ -174,8 +174,43 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **依存先**: serde_json
 - **インターフェース**: `log()` → channel 送信、`flush()`, `close()`
 - **状態管理**: バッファリングチャネル（512 エントリ）、5 秒間隔フラッシュ
+- **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 
-### 4.7 沈黙 3 状態機構（Silence 3-State Mechanism）
+### 4.7 Ground Truth ラベリング経路 (Phase 1)
+
+- **責務**: ユーザーの主観的認知状態を NDJSON に記録し、Dashboard にリアルタイム可視化する
+- **コンポーネント**:
+  - `lib.rs::record_label_internal` — 共通ヘルパー。2 秒デバウンスを `AtomicU64::compare_exchange` で race-free に実装 (Tauri コマンド経路とグローバルホットキー経路の衝突を構造的に排除)
+  - `lib.rs::record_user_label` — Tauri コマンド。`UserLabelKind::parse` で whitelist バリデーション (flow / incubation / stuck のみ)
+  - `tauri-plugin-global-shortcut` プラグイン — `⌘⇧⌥ F/I/S` (macOS) / `Ctrl+Shift+Alt+F/I/S` (他) を登録、`setup()` で `app.global_shortcut().register()`
+  - Dashboard `listen<{label, timestamp}>("user_label_recorded", ...)` — Tauri event を購読して counter state 更新
+- **プライバシー制約**: UserLabel は `{flow, incubation, stuck}` の 3 値 enum + サーバー側 timestamp のみ。キーストローク文字内容は一切含まない
+
+### 4.8 analysis::metrics — GT × FeatSnapshot 集計 (Phase 1)
+
+- **責務**: UserLabel と HMM 推定結果を突き合わせ、混同行列・F1・中央値を算出する純粋関数群
+- **インターフェース**:
+  - `compute_session_metrics(labels: &[UserLabelEvent], feats: &[FeatSnapshot]) -> SessionMetrics`
+  - `compute_recovered_at(stuck_ts, feats, window_ms, p_flow_threshold) -> Option<u64>` — Stuck ラベル後に p_flow > 0.5 に達する最初の時刻を返す (オフライン後付け算出)
+  - `format_pretty(m: &SessionMetrics) -> String`
+- **計算ロジック**:
+  - `argmax_class` のタイブレークは Flow > Incubation > Stuck の固定順
+  - `nearest_feat` は ±1 秒窓でラベル時刻に最も近い FeatSnapshot を取得
+  - `detection_lead_ms` は ±60 秒窓で同クラス argmax の最近傍 feat との差 (正 = HMM 先行)
+  - Macro F1 は固定分母 3 (scikit-learn 互換)、Micro F1 = accuracy (matched labels のみ)
+- **consume 側**: `bin/replay.rs::main` が `--metrics` フラグ検知時に呼ぶ
+
+### 4.9 schema_dto + emit_schema — JSON Schema 生成 (Phase 1)
+
+- **責務**: NDJSON 形式の JSON Schema を Rust 型から機械生成し、gse-dataset repo との drift を CI で検知
+- **コンポーネント**:
+  - `schema_dto::LogEntryDto` — `LogEntry` の `schemars::JsonSchema` 派生専用ミラー型 (production path 不干渉)
+  - `bin/emit_schema` — `schema_for!(LogEntryDto)` の出力を stdout に pretty JSON で吐く
+  - `src-tauri/schema/current.json` — 機械生成ゴールデンコピー (手編集禁止、`.gitattributes` で LF 固定)
+  - CI ジョブ `check` が `emit_schema > /tmp/emitted.json && diff schema/current.json /tmp/emitted.json` で drift 検知
+- **gse-dataset 同期**: 手動コピー (`cp src-tauri/schema/current.json /path/to/gse-dataset/schema/current.json`)
+
+### 4.10 沈黙 3 状態機構（Silence 3-State Mechanism）
 
 1Hz 推論ゲートにおける特徴量計算と HMM 更新は、**バッファの状態と沈黙秒数に応じて 3 つのパス**に分岐する。各パスで使用する EWMA α・摩擦フロア適用有無・呼び出す engine メソッドが異なる。分散実装 (`lib.rs` 分析スレッド + `features.rs::make_silence_observation` + `engine.rs::update_silence`) のため、全体像を以下に集約する。
 
@@ -248,6 +283,43 @@ Phase 2a（Synthetic Friction 再設計）では、TransitionPath と SilencePat
 9. POST /unlock → Rust が Tauri イベント発火
 10. Frontend が Wall オーバーレイを解除、stop_wall_server を invoke
 
+### フロー 3: Ground Truth ラベル記録 (Phase 1)
+
+1. ユーザーがホットキー (`⌘⇧⌥ F/I/S` on macOS) を押す
+2. `tauri-plugin-global-shortcut` のハンドラが fire、modifier + Code マッチで `UserLabelKind` を決定
+3. `record_label_internal(log, label)` を呼び出し、`AtomicU64::compare_exchange` で 2 秒デバウンス (Tauri コマンド経路と同じヘルパーを共有)
+4. デバウンス通過時: `SystemTime::now()` で timestamp 付与、`log_tx.try_send(LogEntry::UserLabel { timestamp, label, recovered_at: None })`
+5. logger スレッドが 5 秒フラッシュ間隔で NDJSON に書き出し (`format_user_label_line`)
+6. `app.emit("user_label_recorded", {label, timestamp})` で Tauri event 発火
+7. Dashboard の `listen<...>` ハンドラが state 更新 → counter widget 再レンダリング
+8. デバウンス失敗時: `tracing::warn!("debounced")` のみ、UI 変化なし
+
+### フロー 4: `gse-replay --metrics` によるオフライン集計 (Phase 1)
+
+1. 開発者が `cargo run --bin gse-replay -- <session.ndjson> --metrics [--json]` を実行
+2. `parse_args` が `--metrics` / `--snapshot` の排他、`--json` が `--metrics` 必須を検証
+3. `run_replay` が NDJSON を読み、step() を仮想時刻で再実行して FeatSnapshot 列を生成
+4. `collect_user_labels` が NDJSON を 2 度目に開き `{"type":"user_label",...}` 行を抽出
+5. `analysis::metrics::compute_session_metrics` が以下を算出:
+   - `nearest_feat` で各ラベルに対応する FeatSnapshot を取得 (±1 秒窓)
+   - `argmax_class` で推定クラスを決定 (Flow > Inc > Stuck のタイブレーク)
+   - 混同行列に加算、警告は `warnings` Vec に集約
+   - `detection_lead_ms` を ±60 秒窓内の最近傍同クラス feat で計算
+   - Stuck ラベルは `compute_recovered_at` で p_flow > 0.5 到達時刻を探す
+6. `format_pretty` または `serde_json::to_string_pretty(&metrics)` で出力
+7. 開発者が出力を `gse-dataset/metrics/P000/<os>/` にコピーして commit (UC-GT3)
+
+### フロー 5: JSON Schema 生成と CI drift 検知 (Phase 1)
+
+1. 開発者が `logger::LogEntry` を変更 (例: Phase 2b で `ImeShadow` バリアント追加)
+2. `schema_dto::LogEntryDto` を同期して mirror 型を更新
+3. `cargo run --bin emit_schema > src-tauri/schema/current.json` で生成物を更新
+4. gse-dataset 側に `cp src-tauri/schema/current.json /path/to/gse-dataset/schema/current.json`
+5. 両 repo で commit + push
+6. CI (`.github/workflows/ci.yml` の `check` ジョブ) が両 OS で `emit_schema` を走らせ、
+   `diff src-tauri/schema/current.json /tmp/emitted.json` で drift を検知
+7. drift がある場合 CI FAIL — 開発者が forgot-sync を発見して対応
+
 ## 6. 外部システム連携
 
 | システム | 連携方式 | 認証 | 失敗時の挙動 |
@@ -260,7 +332,11 @@ Phase 2a（Synthetic Friction 再設計）では、TransitionPath と SilencePat
 | Wall Server (Phone) | HTTP (tiny_http) on random port | ランダムトークン | サーバー起動失敗 → Wall なしで継続 |
 | Win: Defender Firewall | netsh advfirewall (子プロセス) | 管理者権限不要（ユーザースコープ） | ルール追加失敗 → スマートフォン接続不可 |
 | ファイルシステム | std::fs (NDJSON ログ) | なし | 書き込み失敗 → ログドロップ、推定継続 |
-| 学習データ収集 (将来) | HTTPS エンドポイント (未定) | オプトイン同意 + 匿名化 | セッション終了後バッチ送信。送信失敗 → ローカル保持、次回リトライ |
+| Win: Global Shortcut | `tauri-plugin-global-shortcut` (RegisterHotKey) | Capabilities 2 件 | 登録失敗 → `tracing::warn!` で継続、GT ラベリングなしでも動作維持 |
+| mac: Global Shortcut | `tauri-plugin-global-shortcut` (Carbon RegisterEventHotKey) | Capabilities 2 件 | 同上 |
+| **gse-dataset repo** (Phase 1) | git push/pull (`metrics/P*/<os>/*.metrics.json`) | GitHub 認証 | push 失敗 → ローカル保持、次回同期。生 NDJSON は絶対に repo に置かない |
+| **JSON Schema sync** (Phase 1) | 手動コピー (`cp src-tauri/schema/current.json gse-dataset/schema/`) | — | CI drift check が両 repo の非整合を機械的にブロック |
+| 学習データ収集 (Phase 2+) | 未定 (gse-dataset 経由 or 別) | オプトイン同意 + 匿名化 | Phase 2 ML 訓練時に設計再検討 |
 
 ## 7. プラットフォーム抽象化
 

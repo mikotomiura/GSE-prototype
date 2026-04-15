@@ -20,14 +20,27 @@ GSE-prototype/
 │   ├── tauri.conf.json           #   Tauri アプリ設定 (ウィンドウ, CSP, 識別子)
 │   ├── build.rs                  #   Tauri ビルドスクリプト
 │   ├── capabilities/             #   Tauri 2.0 パーミッション定義
-│   │   └── default.json          #     デフォルト権限 (main + overlay)
+│   │   └── default.json          #     デフォルト権限 (main + overlay + global-shortcut)
+│   ├── schema/                   #   NDJSON JSON Schema (機械生成ゴールデン、Phase 1)
+│   │   ├── current.json          #     emit_schema bin の出力 (手編集禁止)
+│   │   └── README.md             #     sync プロトコル
+│   ├── tests/                    #   テストフィクスチャとスナップショット
+│   │   ├── fixtures/             #     ゴールデンセッション NDJSON
+│   │   └── snapshots/            #     gse-replay --snapshot 比較用 JSON
 │   ├── src/                      #   Rust ソースコード
 │   │   ├── main.rs               #     エントリポイント (lib.rs へ委譲)
 │   │   ├── lib.rs                #     アプリセットアップ, スレッド起動, IPC ハンドラ
+│   │   │                         #       + record_user_label / global-shortcut (Phase 1)
 │   │   ├── logger.rs             #     NDJSON セッションロガー
+│   │   │                         #       + UserLabelKind enum / LogEntry::UserLabel (Phase 1)
+│   │   ├── schema_dto.rs         #     [NEW Phase 1] LogEntry ミラー DTO (schemars 派生専用)
 │   │   ├── wall_server.rs        #     Lv2 Wall HTTP サーバー + QR + Zen Timer
-│   │   ├── sensors.rs            #     macOS センサーモジュール dispatch (#[cfg] gated)
+│   │   ├── sensors.rs            #     センサーモジュール dispatch (#[cfg] gated)
 │   │   ├── sensors_macos.rs      #     macOS: SensorManager stub (CoreMotion 予約)
+│   │   ├── sensors_windows.rs    #     Windows: WinRT Inclinometer
+│   │   ├── bin/                  #     サブコマンド実装
+│   │   │   ├── replay.rs         #       gse-replay: セッション再実行 + --snapshot / --metrics
+│   │   │   └── emit_schema.rs    #       [NEW Phase 1] schema_dto → JSON Schema stdout
 │   │   ├── input/                #     入力キャプチャ層 (プラットフォーム固有コード)
 │   │   │   ├── mod.rs            #       モジュールエクスポート + platform dispatch
 │   │   │   ├── hook.rs           #       共有アトミック変数 + #[cfg] 振り分け
@@ -39,7 +52,9 @@ GSE-prototype/
 │   │   └── analysis/             #     認知状態推定層 (プラットフォーム非依存)
 │   │       ├── mod.rs            #       モジュールエクスポート
 │   │       ├── features.rs       #       5 特徴量抽出 (30s ローリングウィンドウ)
-│   │       └── engine.rs         #       HMM エンジン (Forward Algorithm)
+│   │       ├── engine.rs         #       HMM エンジン (Forward Algorithm)
+│   │       ├── loop_step.rs      #       1Hz ゲート + FeatSnapshot 生成
+│   │       └── metrics.rs        #       [NEW Phase 1] UserLabel × FeatSnapshot 集計
 │   ├── icons/                    #   アプリアイコン (各サイズ)
 │   ├── gen/                      #   Tauri 自動生成ファイル (スキーマ)
 │   └── .cargo/config.toml        #   Cargo ビルド設定
@@ -99,8 +114,28 @@ GSE-prototype/
 #### `src-tauri/src/analysis/`
 
 - **目的**: キーストローク分析と認知状態推定
-- **置くべきもの**: 特徴量抽出、HMM エンジン、将来の ML 推論
-- **置くべきでないもの**: OS API 呼び出し、入力イベント捕捉
+- **置くべきもの**: 特徴量抽出、HMM エンジン、`loop_step`、`metrics` (Phase 1 GT 集計)、将来の ML 推論
+- **置くべきでないもの**: OS API 呼び出し、入力イベント捕捉、タイムスタンプ生成 (`SystemTime` は `lib.rs` で付与)
+
+#### `src-tauri/src/schema_dto.rs` (Phase 1)
+
+- **目的**: NDJSON JSON Schema を機械生成するための DTO ミラー型
+- **置くべきもの**: `LogEntry` を schemars 派生可能な形にミラーした型 (`LogEntryDto`)
+- **置くべきでないもの**: 実際の NDJSON 書き込みロジック (`logger.rs::writeln!` が本体、DTO は派生専用)
+- **production path 不干渉**: `logger.rs::LogEntry` 本体には `Serialize` を派生させない (float フォーマット固定のゴールデン保護)
+
+#### `src-tauri/src/bin/` (Phase 1)
+
+- **目的**: サブコマンドとして独立して動作する実行バイナリ
+- **`replay.rs`**: ゴールデンセッション NDJSON を再実行する `gse-replay` CLI (`--snapshot` / `--metrics` / `--json`)
+- **`emit_schema.rs`**: `schema_dto::LogEntryDto` から JSON Schema を stdout に吐く (CI drift check が consume)
+
+#### `src-tauri/schema/` (Phase 1)
+
+- **目的**: 機械生成 JSON Schema のゴールデンコピー
+- **`current.json`**: `emit_schema` の最新出力、手編集禁止
+- **CI 連携**: `.github/workflows/ci.yml` の `check` ジョブが diff で drift 検知
+- **gse-dataset 連携**: 本ファイルを gse-dataset repo の `schema/current.json` に手動コピーする (`docs/development-guidelines.md §10` 参照)
 
 ### `docs/`
 
@@ -137,9 +172,10 @@ GSE-prototype/
 ```
 Frontend (src/)
     │
-    │ Tauri IPC (invoke / listen)
+    │ Tauri IPC (invoke / listen / emit user_label_recorded)
     ▼
 lib.rs (Tauri commands, thread orchestration)
+    │   + record_user_label コマンド / global-shortcut プラグイン (Phase 1)
     │
     ├──► input::hook    (OS キャプチャ)
     │    ├── hook_windows.rs  (Win: WH_KEYBOARD_LL)
@@ -149,8 +185,15 @@ lib.rs (Tauri commands, thread orchestration)
     │    └── ime_macos.rs     (mac: TIS + GCD)
     ├──► analysis::features (特徴量抽出)
     ├──► analysis::engine   (HMM 推論)
-    ├──► logger         (セッションログ)
+    ├──► analysis::loop_step (1Hz ゲート + FeatSnapshot)
+    ├──► analysis::metrics  (Phase 1: GT × FeatSnapshot 集計、gse-replay --metrics で使用)
+    ├──► logger         (セッションログ, UserLabel バリアント含む)
     └──► wall_server    (Lv2 介入)
+
+schema_dto (Phase 1, production path と独立)
+    │
+    ▼
+bin/emit_schema ──► schema/current.json (CI drift check ─── gse-dataset 同期)
 ```
 
 - **依存方向**: lib.rs が各モジュールを統合。モジュール間の直接依存は最小限。

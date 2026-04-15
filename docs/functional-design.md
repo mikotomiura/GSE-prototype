@@ -97,15 +97,38 @@
 ### 機能 6: セッションログ記録
 
 - **概要**: キーストロークイベントと HMM 状態を NDJSON 形式で永続化する
-- **入力**: InputEvent、特徴量、IME 状態、セッションイベント
+- **入力**: InputEvent、特徴量、IME 状態、セッションイベント、UserLabel (Phase 1)
 - **出力**: `~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson`
 - **振る舞い**:
   - バウンドチャネル（512 エントリ）でバッファリング
   - バックグラウンドスレッドが 5 秒間隔でディスクにフラッシュ
   - セッション開始/終了のメタレコードで囲む
+  - meta 行に `hmm_version` (SemVer) を埋め込み、gse-replay で検証
 - **将来拡張**: セッション終了後にオプトインでログを匿名化・外部送信する学習データ収集パス
 - **エラー条件**:
   - ディスク書き込み失敗: ログをドロップし warn 出力、推定は継続
+
+### 機能 7: Ground Truth (GT) ラベリング + 集計 (Phase 1)
+
+- **概要**: HMM の自動推定とユーザーの主観的認知状態のズレを定量化するため、作業中にリアルタイムで「自覚しているクラス」をラベル付けし、オフラインで混同行列・F1・中央値を算出する
+- **入力経路**:
+  - **ホットキー**: macOS `⌘⇧⌥ F/I/S`、Windows/Linux `Ctrl+Shift+Alt+F/I/S`
+  - **Tauri コマンド**: `record_user_label(label: "flow" | "incubation" | "stuck")`
+  - 両経路とも `record_label_internal` を経由し、**`AtomicU64::compare_exchange` による race-free な 2 秒デバウンス** を適用
+- **出力**:
+  - NDJSON エントリ: `{"type":"user_label","t":<ms>,"label":"flow|incubation|stuck","recovered_at":null}`
+  - Tauri イベント: `user_label_recorded` (payload: `{label, timestamp}`) — Dashboard counter widget が購読
+- **集計 CLI (`gse-replay --metrics`)**:
+  - 入力: GT 付きセッション NDJSON
+  - 出力: `SessionMetrics` (混同行列 / per-class precision/recall/F1 / macro F1 / micro F1 / detection_lead_ms 中央値 / Stuck recovery 中央値)
+  - `--json` フラグで構造化 JSON (gse-dataset repo の `metrics/` へ配置する共有アーティファクト)
+- **振る舞い上の制約**:
+  - **Production path (engine / features / hook / ime / loop_step) 無変更**: /reimagine v2 で「汚染源を発生させない」方針を採用。Task 1-3 は既存の HMM 挙動・snapshot を 1 bit も動かさない
+  - `recovered_at` はログ記録時は常に `null` で、`--metrics` 実行時にオフラインで純粋関数により後付け算出 (閾値変更で過去ログを再解析可能)
+- **UI**: Dashboard に読み取り専用 counter widget (`Flow N / Inc N / Stuck N` + ショートカット hint)
+- **エラー条件**:
+  - デバウンス違反 (2 秒以内の再押下): `tracing::warn!("shortcut label recording failed: debounced")` で記録、ユーザーへの通知なし (意図的)
+  - `record_user_label` が未知ラベル受信: `Err("invalid label: ...")` を返す (whitelist 3 値のみ許可)
 
 ## 3. ユースケース
 
@@ -178,6 +201,54 @@
   - 5a. Dashboard の「システム設定を開く」ボタンから手動で Accessibility を付与
   - 5b. Dashboard の TCC リセットボタンで権限状態をリセットし再試行
 - **事後条件**: 権限状態（Input Monitoring / Accessibility / フォールバック使用中）が Dashboard に表示される
+
+### UC-GT1: 開発者が自身の作業セッションにラベルを付ける (Phase 1)
+
+- **アクター**: 開発者自身 (被験者 ID P000)
+- **前提条件**: GSE アプリが起動中、Input Monitoring 権限付与済み、セッション開始済み
+- **トリガー**: 作業しながら自覚的な認知状態の切替を感じた瞬間 (例: Flow に入った / Stuck に陥った)
+- **基本フロー**:
+  1. ユーザーが `⌘⇧⌥ F` (macOS) / `Ctrl+Shift+Alt+F` (Windows) を押す (Flow を自覚した場合)
+  2. global-shortcut プラグインが `record_label_internal` を呼び、`compare_exchange` デバウンスを通過
+  3. `log_tx.try_send(LogEntry::UserLabel { label: Flow, timestamp, recovered_at: None })`
+  4. `user_label_recorded` Tauri イベントが emit され、Dashboard counter が `Flow N → N+1` に更新
+  5. 2 秒以上空けて異なる状態を自覚したら `⌘⇧⌥ I` (Inc) / `⌘⇧⌥ S` (Stuck) を押す
+  6. セッション終了で NDJSON に全ラベルが確定保存される
+- **代替フロー**:
+  - 2a. 2 秒以内に再押下: `compare_exchange` が失敗 → `tracing::warn!("debounced")` で破棄、Counter 不変
+- **事後条件**: NDJSON ファイルに `{"type":"user_label",...}` 行が 1 つ以上記録される
+
+### UC-GT2: オフラインで GT 付きセッションの精度を評価する (Phase 1)
+
+- **アクター**: 開発者
+- **前提条件**: UserLabel を含む NDJSON が `~/Documents/GSE-sessions/` に存在
+- **トリガー**: Phase 2a Go/No-Go 判定前の集計、またはパラメータ調整後の再評価
+- **基本フロー**:
+  1. `cargo run --bin gse-replay -- <session.ndjson> --metrics` を実行
+  2. `run_replay` が step() を仮想時刻で再実行し FeatSnapshot 列を生成
+  3. `collect_user_labels` が NDJSON を 2 度目に読み UserLabel を抽出
+  4. `compute_session_metrics` が混同行列 / F1 / 検出リード / Stuck 回復を算出
+  5. pretty-print または `--json` で出力
+- **代替フロー**:
+  - 1a. `--metrics --snapshot` を同時指定 → Usage エラーで exit 2
+  - 5a. `--json` 指定時: 構造化 JSON を stdout に出力
+- **事後条件**: `SessionMetrics` を人間または機械 (`aggregate_metrics.py`) が消費できる形で標準出力に得る
+
+### UC-GT3: 端末間で metrics を共有し Phase 2a 判定する (Phase 1)
+
+- **アクター**: 開発者 (macOS 端末 + Windows 端末を跨ぐ)
+- **前提条件**: UC-GT2 の `--metrics --json` 出力が手元にある、`gse-dataset` repo を clone 済み
+- **トリガー**: 複数セッションが溜まり、Phase 2a 着手の Go/No-Go を判定したい
+- **基本フロー**:
+  1. 各端末で `--metrics --json` 出力を `gse-dataset/metrics/P000/<macos|windows>/*.metrics.json` に配置
+  2. `gse-dataset` で `git commit && git push`
+  3. 他端末で `git pull`
+  4. `python scripts/aggregate_metrics.py` で全体集計: セッション数 / Macro F1 平均 / per-class 平均 / Stuck precision 平均
+  5. `Phase 2a Go/No-Go (Stuck precision >= 0.6, n >= 5)` の判定行を確認
+- **代替フロー**:
+  - 4a. `n < 5`: `INCONCLUSIVE` が出力される → セッション収集を継続
+  - 4b. 破損 metrics.json がある: `aggregate_metrics.py` が `sys.stderr` に WARN を出しスキップ、`skipped` リストに記録
+- **事後条件**: 複数端末のデータが単一の集計値に統合され、`baseline_metrics.md` への転記元になる
 
 ## 4. 機能要件
 

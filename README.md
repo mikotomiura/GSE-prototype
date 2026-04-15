@@ -1080,9 +1080,51 @@ Bump it and regenerate the snapshots whenever any of the following change:
 Because each session NDJSON's `meta` entry embeds `hmm_version`, `gse-replay`
 detects a mismatch against the built-in `engine::HMM_VERSION` and emits a WARN.
 
-### Post-session Ground-Truth Labeling
+### Real-time Ground Truth Labeling (Phase 1, shipped)
 
-> **Note:** `behavioral_gt.py` is planned for Phase 2+. The labeling rules below describe the design specification.
+GSE ships with live Ground Truth (GT) capture that lets you annotate the cognitive
+state you subjectively experience while working. Labels never modify the production
+HMM path — they are appended to the same NDJSON log for offline evaluation.
+
+**Hotkeys** (registered via `tauri-plugin-global-shortcut`, 2-second debounce):
+
+| Shortcut (macOS) | Shortcut (Windows / Linux) | Label |
+|---|---|---|
+| `⌘ + Shift + Option + F` | `Ctrl + Shift + Alt + F` | Flow |
+| `⌘ + Shift + Option + I` | `Ctrl + Shift + Alt + I` | Incubation |
+| `⌘ + Shift + Option + S` | `Ctrl + Shift + Alt + S` | Stuck |
+
+Each press writes `{"type":"user_label","t":<ms>,"label":"flow|incubation|stuck","recovered_at":null}`
+to `~/Documents/GSE-sessions/gse_*.ndjson` and fires a `user_label_recorded` Tauri
+event so the Dashboard counter widget updates in real time. The Rust backend uses
+an `AtomicU64::compare_exchange` loop to make the 2-second debounce race-free
+between hotkey and Tauri-command entry points.
+
+**Offline evaluation** with `gse-replay --metrics` yields confusion matrix,
+per-class precision/recall/F1, macro/micro F1, detection lead/lag median, and
+Stuck recovery median (computed as a pure function over the FeatSnapshot stream).
+
+### Cross-device dataset repo (`gse-dataset`)
+
+Session NDJSON is **never** committed to this repo. Share the `--metrics --json`
+output instead — it contains only aggregates (no VK codes, no per-keystroke
+timestamps) and fits in ~1 KB per session. See
+[`mikotomiura/gse-dataset`](https://github.com/mikotomiura/gse-dataset) (private)
+for the collection protocol and
+[`docs/development-guidelines.md §10`](docs/development-guidelines.md) for the
+cross-device workflow.
+
+The NDJSON schema itself is **machine-generated** from the Rust types
+(`src-tauri/src/schema_dto.rs`) via `cargo run --bin emit_schema`. CI diffs the
+emitted output against `src-tauri/schema/current.json` on every push to block
+schema drift structurally.
+
+### (Legacy) Behavioral auto-labeler spec — Phase 2+
+
+> **Note:** The real-time labeling above is what ships today. The behavioral
+> auto-labeler (`behavioral_gt.py`, planned for Phase 2+) would compute labels
+> per 30-second sliding window from keystroke features — complementary, not a
+> replacement for the subjective labels captured above.
 
 Labels are assigned per 30-second sliding window (1-second step):
 

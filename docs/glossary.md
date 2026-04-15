@@ -18,6 +18,8 @@
 | ゼンタイマー | Zen Timer | Wall 発動時にスマートフォン上で起動する 2 分カウントダウン。身体的休息を促す | 「Zen Timer 完了後に手動アンロック」 |
 | モンクモード | Monk Mode | Wall 介入を無効化するトグル。Nudge のみ有効になる | 「Monk Mode 有効時は Wall が発動しない」 |
 | フィジカルアンカー | Physical Anchor | 将来の Lv3/Lv4 介入。身体的活動（散歩等）を促す Flutter アプリ連携 | 「Physical Anchor は stretch goal」 |
+| グラウンドトゥルース | Ground Truth (GT) | ユーザー自身が主観的に付与する認知状態ラベル。HMM 推定の正解データとして機能 (Phase 1) | 「Phase 1 で GT 付きセッションを収集」 |
+| ユーザーラベル | UserLabel | GT の実体。`{Flow, Incubation, Stuck}` の 3 値 enum + timestamp として NDJSON に記録 | 「`⌘⇧⌥F` を押すと UserLabel が記録される」 |
 
 ## 技術用語
 
@@ -54,6 +56,18 @@
 | IME_COMPOSING | — | macOS 固有のアトミックフラグ。ローマ字→かな変換中（インライン下線テキスト）を示す。CGEventTap 内の状態機械で更新 | IME_ACTIVE |
 | JIS_KEYBOARD_SEEN | — | macOS 固有のアトミックフラグ。JIS 物理 IME キーが検出された時点で true になり、TIS ポーリングを無効化する | TIS |
 | USING_ACCESSIBILITY_FALLBACK | — | macOS 固有のアトミックフラグ。Input Monitoring から Accessibility へフォールバックしたことを示す | CGEventTap, TCC |
+| FeatSnapshot | — | 1Hz ゲートで生成される特徴量 + HMM 状態確率のスナップショット (`analysis::loop_step::FeatSnapshot`)。NDJSON `feat` レコード + gse-replay 回帰比較の基本単位 | 1Hz ゲート, snapshot |
+| 混同行列 | Confusion Matrix | `[正解×推定]` の 3×3 行列 (`analysis::metrics::ConfusionMatrix`)。正解ラベルクラス × HMM argmax クラスの件数を格納 | UserLabel, F1 |
+| Macro F1 | — | 各クラスの F1 を単純平均した値。固定分母 3 (scikit-learn 互換)。クラス不均衡に強くない代わりに minority class を重視 | 混同行列 |
+| Micro F1 | — | 総 TP / 総 labels。多クラスでは accuracy と一致。GSE では分母は matched labels のみ (警告行きは除外) | 混同行列 |
+| detection_lead_ms | — | UserLabel 時刻 - 最近傍同クラス argmax feat の時刻。正 = HMM 先行、負 = 遅延 (±60 秒窓内の最近傍を採用) | UserLabel, FeatSnapshot |
+| recovered_at | — | Stuck ラベル後に p_flow > 0.5 に達する最初の FeatSnapshot 時刻。ログ記録時は null、`gse-replay --metrics` 実行時にオフラインで純粋関数算出 | compute_recovered_at |
+| hmm_version | — | `analysis::engine::HMM_VERSION` の SemVer 値 (現行 `0.2.0`)。meta NDJSON エントリに埋まる、gse-replay が版不一致を WARN | HMM, schema |
+| schema_dto | — | `logger::LogEntry` の `schemars::JsonSchema` 派生専用ミラー型 (`schema_dto::LogEntryDto`)。production path に影響させず JSON Schema を機械生成するための DTO | emit_schema, current.json |
+| metrics.json | — | `gse-replay --metrics --json` の出力 (1 KB/session)。gse-dataset repo の `metrics/P*/<os>/` に配置する共有アーティファクト | aggregate_metrics, UC-GT3 |
+| gse-dataset | — | セッションメトリクスの集約データ repo (`mikotomiura/gse-dataset`, private)。生 NDJSON は絶対に置かず、`metrics/` と機械生成 schema のみ tracked | metrics.json, schema sync |
+| 被験者 ID | Participant ID | データ repo での匿名化識別子。`P000` (開発者自身) / `P001-P005` (Phase 2+ 外部被験者) | IRB, consent |
+| Phase 2a Go/No-Go | — | `aggregate_metrics.py` が出力する判定。Stuck precision 平均 ≥ 0.6 かつ n ≥ 5 で GO、未満は INCONCLUSIVE | metrics.json, baseline_metrics.md |
 
 ## 略語
 

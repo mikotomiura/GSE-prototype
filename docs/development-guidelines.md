@@ -105,10 +105,21 @@ cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSO
 
 | 種類 | 範囲 | 優先度 | 備考 |
 |---|---|---|---|
-| 単体テスト | `analysis::features` / `analysis::engine` | 高 | 純粋な計算ロジック。両 OS 共通 |
-| リプレイ回帰 | `analysis::loop_step::step()` + ゴールデン NDJSON | **最高** | Phase 0 以降の回帰保護の背骨 |
+| 単体テスト | `analysis::features` / `analysis::engine` / `analysis::metrics` / `logger` | 高 | 純粋な計算ロジック。両 OS 共通 |
+| リプレイ回帰 | `analysis::loop_step::step()` + ゴールデン NDJSON (`--snapshot`) | **最高** | Phase 0 以降の回帰保護の背骨 |
+| GT メトリクス | `analysis::metrics` + UserLabel 付き NDJSON (`--metrics` / `--metrics --json`) | 高 | Phase 1 以降、GT セッションの定量評価 (混同行列 / F1 / 中央値)。`--snapshot` と排他 |
+| Schema drift check | `emit_schema` 出力 vs `src-tauri/schema/current.json` の byte-equal | **最高** | Phase 1、gse-dataset との schema 整合を機械的にブロック |
 | 統合テスト | `lib.rs` のスレッド連携 | 中 | crossbeam channel のモック可能だがコスト高。リプレイで代替 |
 | E2E テスト | Tauri アプリ全体 | 低 | OS フックの自動テストは困難。実機手動 |
+
+### `gse-replay` サブコマンドの使い分け (Phase 1)
+
+- **`gse-replay <s>`**: FeatSnapshot 列を JSON 配列で stdout に出す (ゴールデン生成用)
+- **`gse-replay <s> --snapshot <golden.json>`**: ゴールデンと byte-equal 比較、差分で exit 1
+- **`gse-replay <s> --metrics`**: UserLabel × FeatSnapshot の集計を pretty-print 出力
+- **`gse-replay <s> --metrics --json`**: 同じ集計を構造化 JSON で出力 (gse-dataset 共有用)
+- **`--metrics` と `--snapshot` は排他** (用途が異なる、両指定で exit 2)
+- **`--json` は `--metrics` 併用必須** (生 snapshot 出力には使わない)
 
 ### テストの方針
 
