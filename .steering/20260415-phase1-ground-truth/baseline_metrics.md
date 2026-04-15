@@ -11,9 +11,16 @@
 
 | Date | Session file | Labels (F/I/S) | Macro F1 | Micro F1 | Stuck recovery median (s) | Detection lead median (ms) | Warnings | Note |
 |---|---|---|---|---|---|---|---|---|
-| 2026-04-15 | `gse_20260415_080214.ndjson` | 6/4/0 | 0.000 | 0.000 | n/a | -3119 | 0 | 初回実機検証 (macOS)。F/I ラベリングのみ、HMM 全誤判定。※`replay-feat-alignment-bug` fix 前に記録。NDJSON が入手できれば再計算推奨 |
-| 2026-04-15 | `gse_20260415_080921.ndjson` | 0/0/2 | 0.222 | 0.500 | n/a | +2383 | 0 | Stuck 単独検証 (macOS)。1/2 件一致、HMM が 2.4s 先行。※同上 fix 前記録 |
 | 2026-04-15 | `gse_20260415_144120.ndjson` | 4/1/1 | 0.722 | 0.667 | n/a | -93 | 0 | 初 Windows セッション (JIS、日本語 IME 混在)。Stuck/Inc 完全一致、Flow 2/4 件正解。`replay-feat-alignment-bug` **fix 後**の値 |
+
+### 再計算待ち (macOS、dataset から削除済み)
+
+`replay-feat-alignment-bug` fix 前に regen feat で計算されていた macOS metrics 2 件を 2026-04-16 に dataset repo から削除 (`gse-dataset` commit で記録)。Mac 端末で fix 後 CLI (`gse-prototype main 293b158+` の `gse-replay --metrics --json`) で再生成して dataset に上書き push するまで、macOS 分は集計対象外。
+
+| Session file (再計算待ち) | pre-fix 値 (参考、信頼性不明) | 備考 |
+|---|---|---|
+| `gse_20260415_080214.ndjson` | Macro F1 0.000 / Micro F1 0.000 / lead -3119ms | 初回実機検証、F/I ラベリング、HMM 全誤判定。Mac raw NDJSON は Mac 端末の `~/Documents/GSE-sessions/` にのみ存在 |
+| `gse_20260415_080921.ndjson` | Macro F1 0.222 / Micro F1 0.500 / lead +2383ms、Stuck P=R=F1 で confusion [[0,0,0],[0,0,0],[0,1,1]] | Stuck 単独検証。IME active が 8s 未満だったと思われ、再計算しても値は近い可能性が高いが未検証 |
 
 ### fix 前の参考値 (20260415_144120、regen feat)
 `gse-replay --metrics` が step() 再生成 feat を使っていた時期の値。`.steering/20260416-replay-feat-alignment-bug/decisions.md` D1 で clock semantic mismatch と判明したため廃棄。Phase 2a 判定には下行の fix 後値を使う。
@@ -26,13 +33,15 @@
 
 > 10 件溜まった時点で更新。Phase 2a 着手可否の根拠として使う。
 
-- セッション件数: 3 / 10 (macOS 2 + Windows 1)
-- Flow ラベル総数: 10
-- Incubation ラベル総数: 5
-- Stuck ラベル総数: 3
-- Stuck precision 平均: 1.0（n=3 = macOS 1.0 × 2 + Windows 1.0 × 1、Phase 2a Go 条件: **≥ 0.6**、達成中）
-- Stuck recall 平均: 0.667（macOS 0.5 + Windows 1.0）
-- Stuck recovery median 全体: n/a（3 件とも 15 分以内に p_flow > 0.5 未到達）
+- セッション件数 (fix 後集計対象): 1 / 10 (Windows 1)
+- 再計算待ち (macOS): 2 件 (Mac 端末で上書き push 後に合流)
+- Flow ラベル総数 (fix 後): 4
+- Incubation ラベル総数 (fix 後): 1
+- Stuck ラベル総数 (fix 後): 1
+- Stuck precision 平均 (fix 後): 1.0 (n=1、Phase 2a Go 条件: **≥ 0.6**、サンプル不足のため暫定)
+- Stuck recall 平均 (fix 後): 1.0 (n=1)
+- Stuck recovery median 全体: n/a
+- **Phase 2a Go/No-Go 判定は Mac 再計算 + 継続収集で n≧5 まで保留**
 
 ## 観察メモ
 
