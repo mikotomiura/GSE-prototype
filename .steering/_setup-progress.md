@@ -74,13 +74,17 @@
     - /implement → 廃止（/add-feature・/fix-bug・/refactor に分割）
   - 品質向上ポイント: /implement を3分割し各コマンドを単一責任化。/reimagine を追加しデータフロー整合
 - [x] **Phase 6: /setup-hooks** — Hook 群
-  - 完了日時: 2026-04-14
+  - 完了日時: 2026-04-14 / 拡張: 2026-04-15
   - 作成 Hook:
     - SessionStart: .claude/hooks/session-start.sh (変更なし・動作確認済み)
-    - Stop: .claude/hooks/stop-check.sh (新規: cargo clippy + tsc --noEmit を実行し問題時のみ出力)
+    - Stop: .claude/hooks/stop-check.sh (cargo clippy + tsc --noEmit を実行し問題時のみ出力)
     - PostToolUse: cargo fmt --quiet (変更なし)
-  - settings.json: Stop Hook をインライン bash から stop-check.sh 呼び出しに更新
-  - 品質向上ポイント達成: cargo clippy (Rust 変更時) + tsc --noEmit (TS 変更時) の自動トリガー追加
+    - **UserPromptSubmit (2026-04-15 追加)**: リマインダ層 — 毎ターン CLAUDE.md 精読 + /reimagine + /start-task を 2 行で注入
+    - **PreToolUse (2026-04-15 追加)**: 強制ブロック層
+      - .claude/hooks/pre-edit-steering.sh — src-tauri/src/ または src/ 編集時、直近7日内 .steering/[YYYYMMDD]-*/ に requirement.md/design.md/tasklist.md 全揃いをチェック (欠落でブロック)
+      - .claude/hooks/pre-edit-banned.sh — println!/eprintln! (制約8) / winapi crate (制約1) / analysis/ への OS 依存 import (禁止事項) を検出してブロック
+  - 動作テスト (2026-04-15): 7/7 ケース合格 (docs通過, steering揃いで通過, 必須欠落でブロック, println!/winapi/analysis 違反を全てブロック, tracing は通過)
+  - macOS の /tmp -> /private/tmp symlink 対策で realpath 正規化を追加
 - [x] **Phase 7: /verify-setup** — 整合性検証
   - 完了日時: 2026-04-14
   - 検証結果: HEALTHY

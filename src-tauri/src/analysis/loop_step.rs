@@ -177,6 +177,7 @@ pub fn step(
 
     // ── イベント処理 ───────────────────────────────────────────────
     match input {
+        #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
         Some(LoopInput::Key(mut event)) => {
             // Windows: 分析スレッド側でリピート検出。
             // フックコールバックは is_repeat=false 固定で送信されるため、
