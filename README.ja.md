@@ -1062,6 +1062,10 @@ cargo run --bin gse-replay -- path/to/session.ndjson > tests/snapshots/mysession
 
 # 回帰検証（CI / 手動、byte-equal で一致すれば exit 0）
 cargo run --bin gse-replay -- path/to/session.ndjson --snapshot tests/snapshots/mysession.json
+
+# GT メトリクス算出（Phase 1、UserLabel 付きセッション向け）
+cargo run --bin gse-replay -- path/to/session.ndjson --metrics          # pretty-print
+cargo run --bin gse-replay -- path/to/session.ndjson --metrics --json   # 構造化 JSON
 ```
 
 **HMM_VERSION の bump 規約**: `analysis::engine::HMM_VERSION` は SemVer。

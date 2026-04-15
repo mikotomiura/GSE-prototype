@@ -94,6 +94,11 @@ cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson > tests/snapshots/mi
 # 回帰検証（CI / 手動）
 cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json
 # → "OK: N snapshots match ..." で exit 0、差分時は "MISMATCH: ..." で exit 1
+
+# GT メトリクス算出（Phase 1 Task 2、UserLabel 付きセッション向け）
+cargo run --bin gse-replay -- <session.ndjson> --metrics         # pretty-print
+cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSON
+# --metrics と --snapshot は排他。--json は --metrics 併用時のみ有効。
 ```
 
 ### 範囲区分

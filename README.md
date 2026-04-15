@@ -1063,6 +1063,10 @@ cargo run --bin gse-replay -- path/to/session.ndjson > tests/snapshots/mysession
 
 # Regression check (CI / manual — exit 0 on byte-equal match)
 cargo run --bin gse-replay -- path/to/session.ndjson --snapshot tests/snapshots/mysession.json
+
+# GT metrics (Phase 1, UserLabel-annotated sessions)
+cargo run --bin gse-replay -- path/to/session.ndjson --metrics          # pretty-print
+cargo run --bin gse-replay -- path/to/session.ndjson --metrics --json   # structured JSON
 ```
 
 **HMM_VERSION bump policy**: `analysis::engine::HMM_VERSION` follows SemVer.

@@ -35,6 +35,9 @@ use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::loop_step::{
     step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
 };
+use gse_next_lib::analysis::metrics::{
+    compute_session_metrics, format_pretty, LabelClass, UserLabelEvent,
+};
 
 /// 入力 NDJSON のサイズ上限 (500 MB)。
 ///
@@ -78,6 +81,15 @@ enum ReplayEvent {
     /// 時刻順ソートから除外される）。内容検証はしない (`serde_json::Value`)。
     #[serde(rename = "feat")]
     Feat(#[allow(dead_code)] serde_json::Value),
+    /// Phase 1 Ground Truth ラベル。`--metrics` で評価対象として突き合わせる。
+    /// `--snapshot` / デフォルト (snapshot 出力) の経路では読み飛ばす。
+    #[serde(rename = "user_label")]
+    UserLabel {
+        t: u64,
+        label: String,
+        #[allow(dead_code)]
+        recovered_at: Option<u64>,
+    },
 }
 
 impl ReplayEvent {
@@ -90,6 +102,10 @@ impl ReplayEvent {
             ReplayEvent::Key { t, .. } => Some(*t),
             ReplayEvent::ImeState { t, .. } => Some(*t),
             ReplayEvent::Feat(_) => None,
+            // UserLabel は再実行対象ではない (ゲート進行を動かさない)。
+            // timestamp() から None を返して時刻順ソートから除外し、
+            // metrics 算出経路で別途抽出する。
+            ReplayEvent::UserLabel { .. } => None,
         }
     }
 }
@@ -106,6 +122,8 @@ fn is_backspace(vk: u32) -> bool {
 struct Args {
     session_path: PathBuf,
     snapshot_path: Option<PathBuf>,
+    metrics: bool,
+    json: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -125,6 +143,31 @@ fn parse_args() -> Result<Args, String> {
         snapshot_path = Some(PathBuf::from(path));
     }
 
+    // --metrics / --json フラグを検出・除去（Phase 1 Task 2）
+    // --snapshot と同じ position+remove パターンで揃え、位置引数が偶然
+    // --metrics と一致するパスを持っても誤って食わないようにする。
+    let metrics = if let Some(pos) = args.iter().position(|a| a == "--metrics") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+    let json = if let Some(pos) = args.iter().position(|a| a == "--json") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
+    // --metrics と --snapshot は排他（役割が完全に異なる）
+    if metrics && snapshot_path.is_some() {
+        return Err("--metrics and --snapshot are mutually exclusive".to_string());
+    }
+    // --json は --metrics 併用時のみ意味を持つ
+    if json && !metrics {
+        return Err("--json requires --metrics".to_string());
+    }
+
     if args.len() != 1 {
         return Err(format!(
             "expected 1 positional argument (session.ndjson), got {}",
@@ -135,6 +178,8 @@ fn parse_args() -> Result<Args, String> {
     Ok(Args {
         session_path: PathBuf::from(args.into_iter().next().unwrap()),
         snapshot_path,
+        metrics,
+        json,
     })
 }
 
@@ -142,9 +187,12 @@ fn usage() -> String {
     String::from(
         "gse-replay — NDJSON セッションを再実行し FeatSnapshot 列を生成\n\n\
          USAGE:\n    \
-         gse-replay <session.ndjson> [--snapshot <golden.json>]\n\n\
+         gse-replay <session.ndjson> [--snapshot <golden.json>]\n    \
+         gse-replay <session.ndjson> --metrics [--json]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
+         --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
+         --json              --metrics の出力を JSON で標準出力へ\n    \
          -h, --help          このヘルプを表示\n",
     )
 }
@@ -176,6 +224,36 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+
+    if args.metrics {
+        // Phase 1 Task 2: GT ラベル × 推定確率の突き合わせメトリクス算出。
+        // UserLabel は run_replay では使わないため、セッション NDJSON を再度開いて抽出する
+        // (ファイルサイズは MAX_SESSION_BYTES でガード済み)。
+        let labels = match collect_user_labels(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect user labels: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let metrics = compute_session_metrics(&labels, &snapshots);
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        if args.json {
+            match serde_json::to_string_pretty(&metrics) {
+                Ok(s) => {
+                    let _ = writeln!(lock, "{}", s);
+                }
+                Err(e) => {
+                    tracing::error!("failed to serialize metrics: {}", e);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            let _ = write!(lock, "{}", format_pretty(&metrics));
+        }
+        return ExitCode::SUCCESS;
+    }
 
     match args.snapshot_path {
         None => {
@@ -211,6 +289,50 @@ fn main() -> ExitCode {
             }
         }
     }
+}
+
+/// Phase 1 Task 2: NDJSON から `{"type":"user_label", ...}` 行のみを抽出する。
+///
+/// `run_replay` は step() 再実行に関係するイベントのみ処理するため、UserLabel は
+/// 読み飛ばされる。metrics 経路では別途抽出する (ファイルを 2 回読むがサイズ上限
+/// 500MB + 通常セッション数 MB のため実害なし)。未知 label は警告にせず黙ってスキップ
+/// する (将来の互換性のため)。
+fn collect_user_labels(session_path: &PathBuf) -> Result<Vec<UserLabelEvent>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<UserLabelEvent> = Vec::new();
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            // collect_user_labels は run_replay の後に呼ばれる。同じ NDJSON を
+            // run_replay が通過しているので parse error はここでは起きない前提。
+            Err(_) => continue,
+        };
+        if let ReplayEvent::UserLabel { t, label, .. } = ev {
+            if let Some(lc) = LabelClass::parse(&label) {
+                out.push(UserLabelEvent {
+                    timestamp: t,
+                    label: lc,
+                });
+            }
+        }
+    }
+    out.sort_by_key(|l| l.timestamp);
+    Ok(out)
 }
 
 /// NDJSON を読み込み、step() を再実行して FeatSnapshot 列を返す。
@@ -321,8 +443,9 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
 
         // イベント処理
         match ev {
-            ReplayEvent::Meta { .. } | ReplayEvent::Feat(_) => {
-                // Meta / Feat はゲート進行済み、追加処理不要
+            ReplayEvent::Meta { .. } | ReplayEvent::Feat(_) | ReplayEvent::UserLabel { .. } => {
+                // Meta / Feat / UserLabel はゲート進行済み、追加処理不要
+                // (UserLabel は metrics 経路で collect_user_labels 側で抽出)
             }
             ReplayEvent::SessionStart { t } => {
                 // 本番の start_session リセットを再現
