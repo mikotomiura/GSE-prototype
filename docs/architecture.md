@@ -220,28 +220,26 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 #### 3 パスの定義
 
-| パス名 | 発動条件 | engine 呼び出し | EWMA α | 摩擦フロア |
+| パス名 | 発動条件 | engine 呼び出し | EWMA α | 摩擦フロア (Phase 2a) |
 |--------|---------|----------------|--------|-----------|
-| **TypingPath** | バッファ実データあり (f1 > 0) かつ `silence < 2s` | `update()` | 0.3 | なし |
-| **TransitionPath** | バッファ実データあり (f1 > 0) かつ `silence ≥ 2s` | `update_silence()` | 0.15 / 0.18 / 0.25 | F6 onset 8s / F3 onset 10s（≥10s でフロア 0.15 / 0.20） |
-| **SilencePath** | バッファ空 (f1 = 0) かつ `silence ≥ 2s` | `update_silence()` | 0.15 / 0.18 / 0.25 | F6 onset 10s / F3 onset 15s（≥10s でフロア 0.15 / 0.20） |
+| **TypingPath** | バッファ実データあり (f1 > 0) かつ `silence < 2s` | `update()` | 0.3 | なし。`pre_silence_features` をキャプチャ |
+| **TransitionPath** | バッファ実データあり (f1 > 0) かつ `silence ≥ 2s` | `update_silence()` | 0.15 / 0.18 / 0.25 | 文脈あり: `ctx × time_scale` (線形、onset 8s / ramp 30s)。文脈なし: 従来フロア |
+| **SilencePath** | バッファ空 (f1 = 0) かつ `silence ≥ 2s` | `update_silence()` | 0.15 / 0.18 / 0.25 | 文脈あり: `ctx + t(1-ctx)ctx` (非線形、onset 2s / ramp 30s)。文脈なし: 従来フロア |
 
 いずれの条件にも該当しない（`silence < 2s` かつ `f1 = 0`、データ不足）場合は推論スキップ。
 
 #### TransitionPath と SilencePath のフロア閾値差
 
-両パスは似て非なる摩擦フロアを持つ:
+Phase 2a で**比例キャリーフォワード方式**を導入。TypingPath 通過時に `pre_silence_features` をキャプチャし、沈黙中の F3/F6 合成に直前の摩擦文脈を反映する。文脈なし時 (セッション冒頭) は従来の時間ベースランプにフォールバック。
 
-| パラメータ | TransitionPath (`lib.rs` 分析スレッド内ブランチ) | SilencePath (`features.rs::make_silence_observation`) |
+| パラメータ | TransitionPath (`loop_step.rs`) | SilencePath (`features.rs::make_silence_observation`) |
 |------------|-----------------------------------|--------------------------------------|
-| F6 onset | **8s** | **10s** |
-| F6 ramp | 30s | 40s |
-| F6 floor (≥10s) | 0.15 | 0.15 |
-| F3 onset | **10s** | **15s** |
-| F3 ramp | 40s | 50s |
-| F3 floor (≥10s) | 0.20 | 0.20 |
+| **文脈あり式** | `ctx × time_scale` (線形) | `ctx + time_scale × (1-ctx) × ctx` (非線形増幅) |
+| onset | **8s** | **2s** |
+| ramp | 30s | 30s |
+| **フォールバック** (文脈なし) | F6 onset 8s / F3 onset 10s (≥10s でフロア 0.15/0.20) | F6 onset 10s / F3 onset 15s (≥10s でフロア 0.15/0.20) |
 
-TransitionPath が先行するのは、「直近まで実データがあったユーザーが沈黙に入った」状況を「完全な無入力のユーザー」より早く Stuck 方向へ引くため。
+TransitionPath はバッファに実データがあるため onset を遅め (8s) にし、線形でバッファ値を補完するフロアとして適用。SilencePath はバッファ空のため onset を早め (2s) にし、非線形増幅で長時間沈黙の Stuck 移行を加速する。
 
 #### 意図的に統合していない理由
 
@@ -255,7 +253,7 @@ TransitionPath が先行するのは、「直近まで実データがあった�
 
 #### 拡張時の注意
 
-Phase 2a（Synthetic Friction 再設計）では、TransitionPath と SilencePath の両方にゲート条件（直前の φ(F3) / φ(F6) に基づく文脈判定）を追加する計画がある。その際も**両パスの閾値は独立に維持する**こと。統合してはならない。
+Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 0.3.0)。`pre_silence_features` を TypingPath でキャプチャし、TransitionPath / SilencePath で F3/F6 文脈フロアとして使用する。両パスの式・onset は**独立に維持する**こと（統合禁止）。設計詳細は `.steering/20260416-phase2a-synthetic-friction/design.md` を参照。
 
 ## 5. データフロー
 
