@@ -35,7 +35,7 @@ TASK_DIR=""
 for i in 0 1 2 3 4 5 6 7; do
     DATE=$(date -v-${i}d +%Y%m%d 2>/dev/null || date -d "$i days ago" +%Y%m%d 2>/dev/null)
     [ -z "$DATE" ] && continue
-    FOUND=$(ls -1d "${REPO_ROOT_REAL}/.steering/${DATE}-"* 2>/dev/null | tail -1)
+    FOUND=$(ls -1td "${REPO_ROOT_REAL}/.steering/${DATE}-"* 2>/dev/null | head -1)
     if [ -n "$FOUND" ]; then
         TASK_DIR="$FOUND"
         break
@@ -60,4 +60,6 @@ if [ -n "$MISSING" ]; then
     exit 2
 fi
 
+TASK_NAME=$(basename "$TASK_DIR")
+echo "[guard] PASS: steering ($TASK_NAME, 3/3 files) -> $REL"
 exit 0

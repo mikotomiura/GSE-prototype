@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[REMINDER] (1) CLAUDE.md「セッション開始時の行動指針」+ commands/skills/sub-agent ルールを精読 (2) 設計判断・複数案ある実装は /reimagine、実装着手前は /start-task で必須3ファイル作成'"
+            "command": "bash .claude/hooks/preflight.sh"
           }
         ]
       }
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo fmt --quiet 2>/dev/null || true"
+            "command": "bash .claude/hooks/post-fmt.sh"
           }
         ]
       },
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo fmt --quiet 2>/dev/null || true"
+            "command": "bash .claude/hooks/post-fmt.sh"
           }
         ]
       }

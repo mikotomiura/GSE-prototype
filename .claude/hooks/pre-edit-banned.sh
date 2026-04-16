@@ -43,4 +43,5 @@ if echo "$REL" | grep -qE '^src-tauri/src/analysis/.*\.rs$'; then
     fi
 fi
 
+echo "[guard] PASS: banned patterns ($REL)"
 exit 0

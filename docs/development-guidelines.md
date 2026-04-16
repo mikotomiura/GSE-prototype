@@ -220,9 +220,28 @@ cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSO
 
 ## 9. Claude Code Hooks (自動強制ガード)
 
-`.claude/settings.json` で設定された hook が、本ガイドラインの一部を **PreToolUse 段階で機械的にブロック** する。新規参加者が「なぜ Edit/Write が拒否されたか」を理解するための仕様メモ。
+`.claude/settings.json` で設定された hook が 3 層構造で動作する。全層の出力はユーザーと Claude の双方に明示される。
 
-### 強制ブロック (PreToolUse)
+### Preflight 層 (UserPromptSubmit)
+
+毎ターン `preflight.sh` が自動実行し、プロジェクト状態を 2 行で表示:
+
+```
+[preflight] task: 20260416-hook-visibility-improvement (3/3) | reimagine: applied
+[preflight] git: 2 uncommitted
+```
+
+チェック項目:
+- `.steering/` タスクディレクトリの存在と必須 3 ファイル (requirement.md, design.md, tasklist.md)
+- `design.md` がテンプレートのままかどうか
+- `/reimagine` 適用状態 (design-v1.md の有無 + requirement.md の運用メモ)
+- 未コミット変更数
+
+Preflight 層は **BLOCK しない** (WARNING のみ)。プロンプト送信自体をブロックすると作業不能になるため。
+
+### Guard 層 (PreToolUse) — 強制ブロック
+
+Edit/Write/MultiEdit 時に 2 つの guard スクリプトが順に実行。パス時は `[guard] PASS` を明示表示、違反時は `BLOCKED` で編集を拒否:
 
 | Hook | 対象 | ブロック条件 |
 |---|---|---|
@@ -231,13 +250,10 @@ cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSO
 | `pre-edit-banned.sh` | `Cargo.toml` | `winapi` crate の追加 → ブロック (§8) |
 | `pre-edit-banned.sh` | `src-tauri/src/analysis/**/*.rs` | `use windows::` / `use core_graphics::` / `use core_foundation::` / `use objc2::` / `use cocoa::` → ブロック (§8 - OS 依存は input/ または sensors*.rs に閉じる) |
 
-### リマインダ (UserPromptSubmit)
+### Report 層 (PostToolUse / Stop)
 
-毎ターン、CLAUDE.md 精読 + `/reimagine`・`/start-task` 想起のリマインダが注入される。
-
-### 後段チェック (Stop)
-
-`stop-check.sh` がターン終了時に `cargo clippy` (Rust 変更時) と `tsc --noEmit` (TS 変更時) を実行し、エラーがあれば出力。
+- **PostToolUse**: `post-fmt.sh` が Edit/Write 後に `cargo fmt` を実行。フォーマット変更があった場合のみ `[fmt] cargo fmt applied` を表示
+- **Stop**: `stop-check.sh` がセッション終了時に `cargo clippy` (Rust 変更時) と `tsc --noEmit` (TS 変更時) を実行し、エラーがあれば出力
 
 ### Hook 自体を編集する場合
 

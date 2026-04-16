@@ -100,7 +100,13 @@
 
 ## Hook による自動強制（重要）
 
-`.claude/settings.json` の PreToolUse hook が、上記「技術的制約 (1)(8)」と「禁止事項」の一部を機械的にブロックする。Edit/Write が `BLOCKED:` 出力で拒否された場合、メッセージに従って修正してから再試行すること。詳細は `docs/development-guidelines.md` §9 を参照。
+Hook は 3 層構造で動作する。全層の出力がユーザーに明示される:
+
+1. **Preflight 層** (`UserPromptSubmit`): 毎ターン `preflight.sh` がタスク状態・git 状態・reimagine 適用状態を表示
+2. **Guard 層** (`PreToolUse`): Edit/Write 時に `[guard] PASS` または `BLOCKED` を明示
+3. **Report 層** (`PostToolUse` / `Stop`): cargo fmt 適用報告、clippy/tsc チェック結果
+
+Edit/Write が `BLOCKED:` 出力で拒否された場合、メッセージに従って修正してから再試行すること。詳細は `docs/development-guidelines.md` §9 を参照。
 
 ## セッション開始時の行動指針
 
