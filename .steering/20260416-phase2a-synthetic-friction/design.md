@@ -186,3 +186,11 @@ X 軸で F6 の重みは 0.25。F6=0 vs F6=0.30 で X 軸に 0.25×φ(0.30) の�
 - 実行回数: 1 回目
 - 採用: v2 (比例キャリーフォワード)
 - 根拠: (1) 新定数ゼロで n=10 データへの過学習リスク回避 (2) 連続関数で閾値の崖なし (3) engine.rs 変更なし=ONNX 化パスがクリーン (4) F6 弁別力でタイポ≠Stuck を自然解決 (5) --scatter は defer (別タスク)
+
+## 次フェーズ
+
+**Phase 2b: IME Shadow Features (Windows のみ)** が次の作業対象。
+- ロードマップ: `.steering/20260414-improvement-roadmap/design.md:354-407`
+- 内容: IME 変換中の行動ログ (Composition Dwell Time, Candidate Navigation Count, Abandon Rate)
+- HMM に触らない (ログのみ)。macOS は TCC 制約により保留
+- Phase 3 (LR 判断ゲート) は GT ≥ 50 件が前提のため、GT 蓄積と並行して 2b を進める
