@@ -86,6 +86,9 @@ pub enum LogEntryDto {
         label: UserLabelKindDto,
         recovered_at: Option<u64>,
     },
+    /// 事後レビュー用ブックマークマーカー。認知状態ラベルではなく、
+    /// 「ここを後で見返したい」という意図のみを記録する。
+    ReviewMarker { t: u64 },
 }
 
 /// Ground Truth ラベルの種別。NDJSON 文字列は "flow" / "incubation" / "stuck"。

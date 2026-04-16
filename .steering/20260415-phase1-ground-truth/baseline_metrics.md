@@ -12,15 +12,15 @@
 | Date | Session file | Labels (F/I/S) | Macro F1 | Micro F1 | Stuck recovery median (s) | Detection lead median (ms) | Warnings | Note |
 |---|---|---|---|---|---|---|---|---|
 | 2026-04-15 | `gse_20260415_144120.ndjson` | 4/1/1 | 0.722 | 0.667 | n/a | -93 | 0 | 初 Windows セッション (JIS、日本語 IME 混在)。Stuck/Inc 完全一致、Flow 2/4 件正解。`replay-feat-alignment-bug` **fix 後**の値 |
+| 2026-04-16 | `gse_20260416_060712.ndjson` | 7/4/1 | 0.000 | 0.000 | 1005 | -1699 | 0 | macOS。Flow 全て Inc に誤判定、Stuck 1件も Flow に。HMM が Flow を選択できない傾向 |
+| 2026-04-16 | `gse_20260416_062509.ndjson` | 7/2/2 | 0.061 | 0.091 | n/a | -3583 | 0 | macOS。Flow 1/7 のみ正解、Stuck 0/2。Inc も全 miss |
+| 2026-04-16 | `gse_20260416_063443.ndjson` | 2/3/0 | 0.444 | 0.600 | n/a | +184 | 0 | macOS。**最良結果**。Flow 1/2、Inc 2/3 正解。lead +184ms (HMM がわずかに先行) |
+| 2026-04-16 | `gse_20260416_064130.ndjson` | 3/5/0 | 0.243 | 0.375 | n/a | -224 | 0 | macOS。Flow 2/3 正解だが Inc 1/5 のみ。Inc→Flow 誤判定が多い |
+| 2026-04-16 | `gse_20260416_065241.ndjson` | 4/5/0 | 0.095 | 0.111 | n/a | -696 | 0 | macOS。Flow/Inc とも大半 Stuck に誤判定。HMM の Stuck 偏り傾向が顕著 |
 
-### 再計算待ち (macOS、dataset から削除済み)
+### 除外済みセッション (macOS 初回 2 件)
 
-`replay-feat-alignment-bug` fix 前に regen feat で計算されていた macOS metrics 2 件を 2026-04-16 に dataset repo から削除 (`gse-dataset` commit で記録)。Mac 端末で fix 後 CLI (`gse-prototype main 293b158+` の `gse-replay --metrics --json`) で再生成して dataset に上書き push するまで、macOS 分は集計対象外。
-
-| Session file (再計算待ち) | pre-fix 値 (参考、信頼性不明) | 備考 |
-|---|---|---|
-| `gse_20260415_080214.ndjson` | Macro F1 0.000 / Micro F1 0.000 / lead -3119ms | 初回実機検証、F/I ラベリング、HMM 全誤判定。Mac raw NDJSON は Mac 端末の `~/Documents/GSE-sessions/` にのみ存在 |
-| `gse_20260415_080921.ndjson` | Macro F1 0.222 / Micro F1 0.500 / lead +2383ms、Stuck P=R=F1 で confusion [[0,0,0],[0,0,0],[0,1,1]] | Stuck 単独検証。IME active が 8s 未満だったと思われ、再計算しても値は近い可能性が高いが未検証 |
+2026-04-15 の macOS 初回 2 セッション (`gse_20260415_080214`, `gse_20260415_080921`) は fix 後再計算でも F1=0.000 だったため集計対象から除外。gse-dataset からも削除済み (2026-04-16)。観察メモは下記に残す。
 
 ### fix 前の参考値 (20260415_144120、regen feat)
 `gse-replay --metrics` が step() 再生成 feat を使っていた時期の値。`.steering/20260416-replay-feat-alignment-bug/decisions.md` D1 で clock semantic mismatch と判明したため廃棄。Phase 2a 判定には下行の fix 後値を使う。
@@ -33,15 +33,18 @@
 
 > 10 件溜まった時点で更新。Phase 2a 着手可否の根拠として使う。
 
-- セッション件数 (fix 後集計対象): 1 / 10 (Windows 1)
-- 再計算待ち (macOS): 2 件 (Mac 端末で上書き push 後に合流)
-- Flow ラベル総数 (fix 後): 4
-- Incubation ラベル総数 (fix 後): 1
-- Stuck ラベル総数 (fix 後): 1
-- Stuck precision 平均 (fix 後): 1.0 (n=1、Phase 2a Go 条件: **≥ 0.6**、サンプル不足のため暫定)
-- Stuck recall 平均 (fix 後): 1.0 (n=1)
-- Stuck recovery median 全体: n/a
-- **Phase 2a Go/No-Go 判定は Mac 再計算 + 継続収集で n≧5 まで保留**
+- セッション件数 (集計対象): 6 / 10 (Windows 1, macOS 5)
+- 除外: macOS 初回 2 件 (F1=0.000、gse-dataset から削除済み)
+- Flow ラベル総数: 27 (Win 4 + Mac 23)
+- Incubation ラベル総数: 19 (Win 1 + Mac 18)
+- Stuck ラベル総数: 4 (Win 1 + Mac 3)
+- Macro F1 平均: 0.261 (range 0.000–0.722)
+- Micro F1 平均: 0.307 (range 0.000–0.667)
+- Stuck precision 平均: 0.167 (1/6 セッションで正解、Phase 2a Go 条件: **≥ 0.6**、**未達**)
+- Stuck recall 平均: 0.333 (Stuck ラベル 4 件中 HMM 正解 1 件のみ = Windows の 1 件)
+- Stuck recovery median 全体: 1005 ms (n=1, macOS session 1 のみ)
+- Detection lead median 全体: -696 ms (6 セッション中央値)
+- **Phase 2a Go/No-Go: Stuck precision 0.167 で Go 条件 (≥0.6) に大幅未達。HMM チューニングが先に必要**
 
 ## 観察メモ
 

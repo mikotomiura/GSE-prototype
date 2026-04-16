@@ -14,4 +14,4 @@
 - [x] security-checker — (code-reviewer で同時確認、コマンドインジェクションリスクなし)
 
 ## 完了処理
-- [ ] git commit + push + tag v0.1.21
+- [x] git commit + push + tag v0.1.21 (commit 9e0b21b, tag v0.1.21 作成済み)

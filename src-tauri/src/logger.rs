@@ -99,6 +99,10 @@ pub enum LogEntry {
         label: UserLabelKind,
         recovered_at: Option<u64>,
     },
+    /// 事後レビュー用ブックマークマーカー (Phase 1 GT 改善)
+    /// ユーザーが「ここを後で見返したい」と思った瞬間を記録する。
+    /// 認知状態の判断は含まない (UserLabel とは意味論が異なる)。
+    ReviewMarker { timestamp: u64 },
     /// セッション終了マーカー
     End,
 }
@@ -237,6 +241,14 @@ impl SessionLogger {
                                 writer,
                                 "{}",
                                 format_user_label_line(timestamp, label, recovered_at),
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::ReviewMarker { timestamp } => {
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"review_marker","t":{}}}"#,
+                                timestamp,
                             );
                             dirty = true;
                         }

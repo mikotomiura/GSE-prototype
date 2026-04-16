@@ -36,7 +36,8 @@ use gse_next_lib::analysis::loop_step::{
     step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
 };
 use gse_next_lib::analysis::metrics::{
-    compute_session_metrics, format_pretty, LabelClass, UserLabelEvent,
+    compute_range_metrics, compute_session_metrics, format_pretty, LabelClass, RangeLabel,
+    UserLabelEvent,
 };
 
 /// 入力 NDJSON のサイズ上限 (500 MB)。
@@ -92,6 +93,13 @@ enum ReplayEvent {
         #[allow(dead_code)]
         recovered_at: Option<u64>,
     },
+    /// 事後レビュー用ブックマークマーカー。`--segment` でハイライト表示に使う。
+    /// `--snapshot` / `--metrics` の経路では読み飛ばす。
+    #[serde(rename = "review_marker")]
+    ReviewMarker {
+        #[allow(dead_code)]
+        t: u64,
+    },
 }
 
 impl ReplayEvent {
@@ -108,6 +116,7 @@ impl ReplayEvent {
             // timestamp() から None を返して時刻順ソートから除外し、
             // metrics 算出経路で別途抽出する。
             ReplayEvent::UserLabel { .. } => None,
+            ReplayEvent::ReviewMarker { .. } => None,
         }
     }
 }
@@ -250,6 +259,10 @@ struct Args {
     snapshot_path: Option<PathBuf>,
     metrics: bool,
     json: bool,
+    /// --segment: セッションを活動境界で分割し .segments.txt を生成
+    segment: bool,
+    /// --segments <path>: .segments.txt を読み込み範囲マッチングでメトリクス算出
+    segments_path: Option<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -289,9 +302,45 @@ fn parse_args() -> Result<Args, String> {
     if metrics && snapshot_path.is_some() {
         return Err("--metrics and --snapshot are mutually exclusive".to_string());
     }
-    // --json は --metrics 併用時のみ意味を持つ
-    if json && !metrics {
-        return Err("--json requires --metrics".to_string());
+    // --segment フラグ
+    let segment = if let Some(pos) = args.iter().position(|a| a == "--segment") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
+    // --segments <path> フラグ
+    let segments_path = if let Some(pos) = args.iter().position(|a| a == "--segments") {
+        if pos + 1 >= args.len() {
+            return Err("--segments requires a path argument".to_string());
+        }
+        let path = args.remove(pos + 1);
+        args.remove(pos);
+        Some(PathBuf::from(path))
+    } else {
+        None
+    };
+
+    // --json は --metrics または --segments 併用時のみ意味を持つ
+    if json && !metrics && segments_path.is_none() {
+        return Err("--json requires --metrics or --segments".to_string());
+    }
+
+    // 排他チェック: --metrics / --segment / --segments / --snapshot は全て排他
+    let mode_count = [
+        metrics,
+        segment,
+        segments_path.is_some(),
+        snapshot_path.is_some(),
+    ]
+    .iter()
+    .filter(|&&v| v)
+    .count();
+    if mode_count > 1 {
+        return Err(
+            "--metrics, --segment, --segments, --snapshot are mutually exclusive".to_string(),
+        );
     }
 
     if args.len() != 1 {
@@ -306,6 +355,8 @@ fn parse_args() -> Result<Args, String> {
         snapshot_path,
         metrics,
         json,
+        segment,
+        segments_path,
     })
 }
 
@@ -314,11 +365,15 @@ fn usage() -> String {
         "gse-replay — NDJSON セッションを再実行し FeatSnapshot 列を生成\n\n\
          USAGE:\n    \
          gse-replay <session.ndjson> [--snapshot <golden.json>]\n    \
-         gse-replay <session.ndjson> --metrics [--json]\n\n\
+         gse-replay <session.ndjson> --metrics [--json]\n    \
+         gse-replay <session.ndjson> --segment\n    \
+         gse-replay <session.ndjson> --segments <segments.txt> [--json]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
-         --json              --metrics の出力を JSON で標準出力へ\n    \
+         --segment           活動境界で分割した .segments.txt を生成\n    \
+         --segments <path>   .segments.txt を読み込み範囲マッチングでメトリクス算出\n    \
+         --json              --metrics / --segments の出力を JSON で標準出力へ\n    \
          -h, --help          このヘルプを表示\n",
     )
 }
@@ -363,6 +418,63 @@ fn main() -> ExitCode {
             }
         };
         let metrics = compute_session_metrics(&labels, &feats);
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        if args.json {
+            match serde_json::to_string_pretty(&metrics) {
+                Ok(s) => {
+                    let _ = writeln!(lock, "{}", s);
+                }
+                Err(e) => {
+                    tracing::error!("failed to serialize metrics: {}", e);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            let _ = write!(lock, "{}", format_pretty(&metrics));
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // --segment 経路: セッションを活動境界で分割し .segments.txt を stdout に出力
+    if args.segment {
+        let feats = match collect_logged_feats(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect logged feats: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let markers = collect_review_markers(&args.session_path);
+        let key_timestamps = collect_key_timestamps(&args.session_path);
+        let segments = build_segments(&feats, &key_timestamps, &markers);
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        let _ = write!(
+            lock,
+            "{}",
+            format_segments_txt(&args.session_path, &segments)
+        );
+        return ExitCode::SUCCESS;
+    }
+
+    // --segments 経路: .segments.txt を読み込み範囲マッチングでメトリクス算出
+    if let Some(ref seg_path) = args.segments_path {
+        let feats = match collect_logged_feats(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect logged feats: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let range_labels = match parse_segments_file(seg_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to parse segments file: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let metrics = compute_range_metrics(&range_labels, &feats);
         let stdout = std::io::stdout();
         let mut lock = stdout.lock();
         if args.json {
@@ -682,9 +794,13 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
 
         // イベント処理
         match ev {
-            ReplayEvent::Meta { .. } | ReplayEvent::Feat(_) | ReplayEvent::UserLabel { .. } => {
-                // Meta / Feat / UserLabel はゲート進行済み、追加処理不要
+            ReplayEvent::Meta { .. }
+            | ReplayEvent::Feat(_)
+            | ReplayEvent::UserLabel { .. }
+            | ReplayEvent::ReviewMarker { .. } => {
+                // Meta / Feat / UserLabel / ReviewMarker はゲート進行済み、追加処理不要
                 // (UserLabel は metrics 経路で collect_user_labels 側で抽出)
+                // (ReviewMarker は --segment 経路でセグメントハイライトに使用)
             }
             ReplayEvent::SessionStart { t } => {
                 // 本番の start_session リセットを再現
@@ -764,6 +880,274 @@ fn compare_snapshots(actual: &[FeatSnapshot], expected_path: &PathBuf) -> Result
 // 層 2 (integration): 合成 NDJSON (tests/fixtures/phase1_minimal.ndjson) で
 //                     `collect_logged_feats` + `compute_session_metrics` を通して
 //                     warnings 空 + support=1 を確認
+// ── Segment 関連関数 (Phase 1 GT 改善) ────────────────────────────────
+
+/// セグメント: 活動境界 (沈黙 ≥ SILENCE_BOUNDARY_SEC) で分割された区間。
+struct Segment {
+    start_ms: u64,
+    end_ms: u64,
+    feat_count: u32,
+    silence_sec: f64,
+    correction_rate: f64,
+    avg_flight_time_ms: f64,
+    has_marker: bool,
+}
+
+/// 沈黙がこの秒数以上続いたらセグメント境界とみなす。
+const SILENCE_BOUNDARY_SEC: f64 = 5.0;
+
+/// NDJSON から review_marker の timestamp 一覧を抽出する。
+fn collect_review_markers(path: &PathBuf) -> Vec<u64> {
+    // MAX_SESSION_BYTES ガード (collect_logged_feats と同じ NDJSON を読むため同一上限)
+    if let Ok(meta) = std::fs::metadata(path) {
+        if meta.len() > MAX_SESSION_BYTES {
+            tracing::warn!("session file too large for review marker scan, skipping");
+            return Vec::new();
+        }
+    }
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return Vec::new(),
+    };
+    let reader = BufReader::new(file);
+    let mut markers = Vec::new();
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        if line.contains("\"review_marker\"") {
+            if let Ok(ev) = serde_json::from_str::<ReplayEvent>(&line) {
+                if let ReplayEvent::ReviewMarker { t } = ev {
+                    markers.push(t);
+                }
+            }
+        }
+    }
+    markers
+}
+
+/// NDJSON から key press イベントのタイムスタンプ一覧を抽出する。
+/// セグメント境界検出に使用 (feat は 1Hz 固定なので沈黙検出に使えない)。
+fn collect_key_timestamps(path: &PathBuf) -> Vec<u64> {
+    // MAX_SESSION_BYTES ガード
+    if let Ok(meta) = std::fs::metadata(path) {
+        if meta.len() > MAX_SESSION_BYTES {
+            tracing::warn!("session file too large for key timestamp scan, skipping");
+            return Vec::new();
+        }
+    }
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return Vec::new(),
+    };
+    let reader = BufReader::new(file);
+    let mut timestamps = Vec::new();
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        if line.contains("\"key\"") {
+            if let Ok(ev) = serde_json::from_str::<ReplayEvent>(&line) {
+                if let ReplayEvent::Key { t, press, .. } = ev {
+                    if press {
+                        timestamps.push(t);
+                    }
+                }
+            }
+        }
+    }
+    timestamps.sort_unstable();
+    timestamps
+}
+
+/// キーストロークの沈黙 (≥ SILENCE_BOUNDARY_SEC) で区間を分割し、
+/// 各区間に含まれる FeatSnapshot の統計をセグメントとして返す。
+fn build_segments(feats: &[FeatSnapshot], key_timestamps: &[u64], markers: &[u64]) -> Vec<Segment> {
+    if feats.is_empty() || key_timestamps.is_empty() {
+        return Vec::new();
+    }
+
+    // キーストローク沈黙で区間境界を検出
+    let boundary_ms = (SILENCE_BOUNDARY_SEC * 1000.0) as u64;
+    let mut boundaries: Vec<(u64, u64)> = Vec::new(); // (start, end) of each active interval
+    let mut seg_start = key_timestamps[0];
+
+    for i in 1..key_timestamps.len() {
+        let gap = key_timestamps[i].saturating_sub(key_timestamps[i - 1]);
+        if gap >= boundary_ms {
+            // 前セグメントを閉じる
+            boundaries.push((seg_start, key_timestamps[i - 1]));
+            seg_start = key_timestamps[i];
+        }
+    }
+    // 最後のセグメント
+    boundaries.push((seg_start, *key_timestamps.last().unwrap()));
+
+    // 各区間に feat を割り当て
+    let mut segments = Vec::new();
+    for (start, end) in &boundaries {
+        let seg_feats: Vec<&FeatSnapshot> = feats
+            .iter()
+            .filter(|f| f.timestamp >= *start && f.timestamp <= *end)
+            .collect();
+        segments.push(make_segment(*start, *end, &seg_feats, markers));
+    }
+
+    segments
+}
+
+fn make_segment(start_ms: u64, end_ms: u64, feats: &[&FeatSnapshot], markers: &[u64]) -> Segment {
+    let feat_count = feats.len() as u32; // feat snapshots in range (1Hz → ≈ active seconds)
+    let duration_sec = (end_ms.saturating_sub(start_ms)) as f64 / 1000.0;
+    let silence_sec = duration_sec - feat_count as f64; // approx
+    let silence_sec = if silence_sec < 0.0 { 0.0 } else { silence_sec };
+
+    // Correction rate: average f3 across feats
+    let correction_rate = if feats.is_empty() {
+        0.0
+    } else {
+        feats.iter().map(|f| f.f3).sum::<f64>() / feats.len() as f64
+    };
+
+    // Average flight time
+    let avg_flight_time_ms = if feats.is_empty() {
+        0.0
+    } else {
+        feats.iter().map(|f| f.f1).sum::<f64>() / feats.len() as f64
+    };
+
+    let has_marker = markers.iter().any(|&m| m >= start_ms && m <= end_ms);
+
+    Segment {
+        start_ms,
+        end_ms,
+        feat_count,
+        silence_sec,
+        correction_rate,
+        avg_flight_time_ms,
+        has_marker,
+    }
+}
+
+/// .segments.txt 形式の文字列を生成する。
+fn format_segments_txt(session_path: &PathBuf, segments: &[Segment]) -> String {
+    let mut out = String::new();
+    let session_name = session_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let total_keys: u32 = segments.iter().map(|s| s.feat_count).sum();
+
+    out.push_str(&format!("# Session: {}\n", session_name));
+    out.push_str(&format!(
+        "# Segments: {}  |  Total feat snapshots: {}\n",
+        segments.len(),
+        total_keys,
+    ));
+    out.push_str("#\n");
+    out.push_str("# Label: F=Flow  I=Incubation  S=Stuck  ?=Unknown  -=Skip\n");
+    out.push_str("# Edit the Label column, then save.\n");
+    out.push_str("# Timestamps are absolute epoch ms (used by --segments parser).\n");
+    out.push_str("#\n");
+    out.push_str(
+        "# Seg  Start_ms         End_ms           Feats  Silence  CorrRate  AvgFT    Label\n",
+    );
+
+    for (i, seg) in segments.iter().enumerate() {
+        let marker = if seg.has_marker { "*" } else { " " };
+        out.push_str(&format!(
+            "{}{:>3}  {:>16}  {:>16}  {:>5}  {:>6.1}s  {:>7.1}%  {:>5.0}ms   ?\n",
+            marker,
+            i + 1,
+            seg.start_ms,
+            seg.end_ms,
+            seg.feat_count,
+            seg.silence_sec,
+            seg.correction_rate * 100.0,
+            seg.avg_flight_time_ms,
+        ));
+    }
+
+    out
+}
+
+/// .segments.txt をパースし RangeLabel 列を返す。
+fn parse_segments_file(path: &PathBuf) -> Result<Vec<RangeLabel>, String> {
+    // サイズガード: segments ファイルは通常数 KB、10 MB を上限とする
+    const MAX_SEGMENTS_BYTES: u64 = 10 * 1024 * 1024;
+    let meta =
+        std::fs::metadata(path).map_err(|e| format!("cannot stat {}: {}", path.display(), e))?;
+    if meta.len() > MAX_SEGMENTS_BYTES {
+        return Err(format!(
+            "{} is {} bytes, exceeds limit {} bytes",
+            path.display(),
+            meta.len(),
+            MAX_SEGMENTS_BYTES,
+        ));
+    }
+
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read {}: {}", path.display(), e))?;
+
+    let mut labels = Vec::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        // コメント行・空行をスキップ
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        // マーカー `*` をスキップ
+        let trimmed = trimmed.trim_start_matches('*').trim();
+
+        // フィールド分割: Seg Start_ms End_ms Feats Silence CorrRate AvgFT Label
+        let fields: Vec<&str> = trimmed.split_whitespace().collect();
+        if fields.len() < 8 {
+            continue; // ヘッダー行やフィールド不足行をスキップ
+        }
+
+        let label_str = fields[7];
+        let label = match label_str {
+            "F" => LabelClass::Flow,
+            "I" => LabelClass::Incubation,
+            "S" => LabelClass::Stuck,
+            "?" | "-" => continue, // Unknown/Skip
+            _ => continue,
+        };
+
+        // start_ms / end_ms のパース — 非数値行 (ヘッダー等) は continue でスキップ
+        let start_ms: u64 = match fields[1].parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let end_ms: u64 = match fields[2].parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if start_ms > end_ms {
+            tracing::warn!(
+                "segment has start_ms ({}) > end_ms ({}), skipping",
+                start_ms,
+                end_ms
+            );
+            continue;
+        }
+
+        labels.push(RangeLabel {
+            start_ms,
+            end_ms,
+            label,
+        });
+    }
+
+    Ok(labels)
+}
+
 // 層 3 (回帰):         実データから key を除去した fixture
 //                     (tests/fixtures/phase1_ime_heavy.ndjson) で warnings < 2
 //                     かつ confusion matrix 合計 ≥ 4 を確認。将来 metrics 経路を

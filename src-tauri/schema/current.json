@@ -245,6 +245,27 @@
           ]
         }
       }
+    },
+    {
+      "description": "事後レビュー用ブックマークマーカー。認知状態ラベルではなく、 「ここを後で見返したい」という意図のみを記録する。",
+      "type": "object",
+      "required": [
+        "t",
+        "type"
+      ],
+      "properties": {
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "review_marker"
+          ]
+        }
+      }
     }
   ],
   "definitions": {

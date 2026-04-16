@@ -198,7 +198,11 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   - `nearest_feat` は ±1 秒窓でラベル時刻に最も近い FeatSnapshot を取得
   - `detection_lead_ms` は ±60 秒窓で同クラス argmax の最近傍 feat との差 (正 = HMM 先行)
   - Macro F1 は固定分母 3 (scikit-learn 互換)、Micro F1 = accuracy (matched labels のみ)
-- **consume 側**: `bin/replay.rs::main` が `--metrics` フラグ検知時に呼ぶ
+- **範囲ラベル (Phase 1 GT 改善)**:
+  - `RangeLabel { start_ms, end_ms, label }` — セグメント区間全体にラベルを適用
+  - `compute_range_metrics(range_labels, feats)` — 区間内の全 feat と比較し confusion matrix を構築。1 ラベルから N 個の feat-label ペアが生成され、統計検出力が点ラベルの約 30 倍
+  - detection_lead / stuck_recovery は範囲ラベルでは算出しない (区間全体がラベルのため)
+- **consume 側**: `bin/replay.rs::main` が `--metrics` / `--segments` フラグ検知時に呼ぶ
 
 ### 4.9 schema_dto + emit_schema — JSON Schema 生成 (Phase 1)
 

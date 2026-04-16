@@ -29,4 +29,4 @@
 
 ## 完了処理
 - [x] code-reviewer / security-checker レビュー結果を decisions.md に追記
-- [ ] git commit（ユーザー承認後）
+- [x] git commit（commit 20a15b2 で統合）

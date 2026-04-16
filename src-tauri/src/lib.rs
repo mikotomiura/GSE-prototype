@@ -24,6 +24,10 @@ use tauri::{Emitter, Manager, State};
 static LAST_LABEL_MS: AtomicU64 = AtomicU64::new(0);
 const LABEL_DEBOUNCE_MS: u64 = 2000;
 
+// ReviewMarker: 1 秒デバウンス (連打防止)。UserLabel とは独立。
+static LAST_MARKER_MS: AtomicU64 = AtomicU64::new(0);
+const MARKER_DEBOUNCE_MS: u64 = 1000;
+
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
@@ -730,6 +734,27 @@ pub fn run() {
                     let mods = Modifiers::SUPER | Modifiers::SHIFT | Modifiers::ALT;
                     #[cfg(not(target_os = "macos"))]
                     let mods = Modifiers::CONTROL | Modifiers::SHIFT | Modifiers::ALT;
+                    // ReviewMarker は認知状態ラベルではなくブックマーク。
+                    // UserLabel とは別経路で処理する。
+                    if shortcut.matches(mods, Code::KeyR) {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        // 1 秒デバウンス (連打防止)
+                        let last = LAST_MARKER_MS.load(std::sync::atomic::Ordering::Relaxed);
+                        if now.saturating_sub(last) < MARKER_DEBOUNCE_MS {
+                            return;
+                        }
+                        LAST_MARKER_MS.store(now, std::sync::atomic::Ordering::Relaxed);
+                        let _ = log_state_for_shortcut
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .tx
+                            .try_send(logger::LogEntry::ReviewMarker { timestamp: now });
+                        tracing::info!("review marker recorded at {}", now);
+                        return;
+                    }
                     let label = if shortcut.matches(mods, Code::KeyF) {
                         UserLabelKind::Flow
                     } else if shortcut.matches(mods, Code::KeyI) {
@@ -783,6 +808,7 @@ pub fn run() {
                     Shortcut::new(Some(mods), Code::KeyF),
                     Shortcut::new(Some(mods), Code::KeyI),
                     Shortcut::new(Some(mods), Code::KeyS),
+                    Shortcut::new(Some(mods), Code::KeyR), // Review marker
                 ];
                 for sc in shortcuts {
                     if let Err(e) = app.global_shortcut().register(sc) {

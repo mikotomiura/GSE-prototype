@@ -370,6 +370,81 @@ fn median_u64(values: &mut [u64]) -> Option<u64> {
     }
 }
 
+// ── Range-based labeling (Phase 1 GT 改善) ────────────────────────────
+
+/// 範囲ラベル: セグメント [start_ms, end_ms] に対するラベル。
+/// 区間内の全 FeatSnapshot と比較することで、1 ラベルから多数の
+/// feat-label ペアが生成され、統計検出力が大幅に向上する。
+#[derive(Debug, Clone, Copy)]
+pub struct RangeLabel {
+    pub start_ms: u64,
+    pub end_ms: u64,
+    pub label: LabelClass,
+}
+
+/// 範囲ラベルを用いたメトリクス算出。
+///
+/// 各 RangeLabel の [start, end] 区間内に含まれる全 feat に対して
+/// argmax を取り、confusion matrix を構築する。
+/// detection_lead / stuck_recovery は範囲ラベルでは算出しない
+/// (区間全体がラベルなので「検出タイミング」の概念がない)。
+pub fn compute_range_metrics(
+    range_labels: &[RangeLabel],
+    feats: &[FeatSnapshot],
+) -> SessionMetrics {
+    let mut warnings: Vec<String> = Vec::new();
+    let mut confusion = [[0u32; 3]; 3];
+    let mut total_segments = 0u32;
+
+    if range_labels.is_empty() {
+        warnings.push("no range labels found".to_string());
+    }
+    if feats.is_empty() && !range_labels.is_empty() {
+        warnings.push("no feat snapshots found".to_string());
+    }
+
+    for rl in range_labels {
+        let feats_in_range: Vec<&FeatSnapshot> = feats
+            .iter()
+            .filter(|f| f.timestamp >= rl.start_ms && f.timestamp <= rl.end_ms)
+            .collect();
+
+        if feats_in_range.is_empty() {
+            warnings.push(format!(
+                "segment [{}, {}] has no FeatSnapshot",
+                rl.start_ms, rl.end_ms,
+            ));
+            continue;
+        }
+
+        for f in &feats_in_range {
+            let predicted = argmax_class(f);
+            confusion[rl.label.index()][predicted.index()] += 1;
+        }
+        total_segments += 1;
+    }
+
+    let per_class = [
+        per_class_metrics(LabelClass::Flow, &confusion),
+        per_class_metrics(LabelClass::Incubation, &confusion),
+        per_class_metrics(LabelClass::Stuck, &confusion),
+    ];
+
+    let macro_f1 = per_class.iter().map(|c| c.f1).sum::<f64>() / per_class.len() as f64;
+    let micro_f1 = compute_micro_f1(&confusion);
+
+    SessionMetrics {
+        total_labels: total_segments,
+        confusion: ConfusionMatrix { matrix: confusion },
+        per_class,
+        macro_f1,
+        micro_f1,
+        detection_lead_ms_median: None,
+        stuck_recovery_ms_median: None,
+        warnings,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -637,5 +712,80 @@ mod tests {
         assert!(s.contains("Total labels: 1"));
         assert!(s.contains("Confusion"));
         assert!(s.contains("Warnings: 0"));
+    }
+
+    // ── RangeLabel / compute_range_metrics tests ────────────────────
+
+    #[test]
+    fn range_metrics_counts_all_feats_in_range() {
+        let feats = vec![
+            feat(1000, 0.9, 0.05, 0.05), // Flow argmax
+            feat(2000, 0.8, 0.1, 0.1),   // Flow argmax
+            feat(3000, 0.1, 0.6, 0.3),   // Inc argmax
+        ];
+        let range_labels = vec![RangeLabel {
+            start_ms: 1000,
+            end_ms: 3000,
+            label: LabelClass::Flow,
+        }];
+        let m = compute_range_metrics(&range_labels, &feats);
+        assert_eq!(m.total_labels, 1); // 1 segment
+                                       // confusion: Flow truth vs [2 Flow pred, 1 Inc pred, 0 Stuck pred]
+        assert_eq!(m.confusion.matrix[0][0], 2); // Flow→Flow
+        assert_eq!(m.confusion.matrix[0][1], 1); // Flow→Inc
+        assert_eq!(m.confusion.matrix[0][2], 0); // Flow→Stuck
+    }
+
+    #[test]
+    fn range_metrics_multiple_segments() {
+        let feats = vec![
+            feat(1000, 0.9, 0.05, 0.05), // Flow
+            feat(2000, 0.8, 0.1, 0.1),   // Flow
+            feat(5000, 0.1, 0.1, 0.8),   // Stuck
+            feat(6000, 0.1, 0.2, 0.7),   // Stuck
+        ];
+        let range_labels = vec![
+            RangeLabel {
+                start_ms: 1000,
+                end_ms: 2000,
+                label: LabelClass::Flow,
+            },
+            RangeLabel {
+                start_ms: 5000,
+                end_ms: 6000,
+                label: LabelClass::Stuck,
+            },
+        ];
+        let m = compute_range_metrics(&range_labels, &feats);
+        assert_eq!(m.total_labels, 2);
+        assert_eq!(m.confusion.matrix[0][0], 2); // Flow→Flow correct
+        assert_eq!(m.confusion.matrix[2][2], 2); // Stuck→Stuck correct
+        assert!(m.micro_f1 > 0.99); // perfect
+    }
+
+    #[test]
+    fn range_metrics_empty_segment_warns() {
+        let feats = vec![feat(1000, 0.9, 0.05, 0.05)];
+        let range_labels = vec![RangeLabel {
+            start_ms: 5000,
+            end_ms: 6000,
+            label: LabelClass::Flow,
+        }];
+        let m = compute_range_metrics(&range_labels, &feats);
+        assert_eq!(m.total_labels, 0); // skipped
+        assert!(!m.warnings.is_empty());
+    }
+
+    #[test]
+    fn range_metrics_no_detection_lead() {
+        let feats = vec![feat(1000, 0.9, 0.05, 0.05)];
+        let range_labels = vec![RangeLabel {
+            start_ms: 1000,
+            end_ms: 1000,
+            label: LabelClass::Flow,
+        }];
+        let m = compute_range_metrics(&range_labels, &feats);
+        assert!(m.detection_lead_ms_median.is_none());
+        assert!(m.stuck_recovery_ms_median.is_none());
     }
 }

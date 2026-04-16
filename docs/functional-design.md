@@ -129,6 +129,12 @@
   - **Production path (engine / features / hook / ime / loop_step) 無変更**: /reimagine v2 で「汚染源を発生させない」方針を採用。Task 1-3 は既存の HMM 挙動・snapshot を 1 bit も動かさない
   - `recovered_at` はログ記録時は常に `null` で、`--metrics` 実行時にオフラインで純粋関数により後付け算出 (閾値変更で過去ログを再解析可能)
 - **UI**: Dashboard に読み取り専用 counter widget (`Flow N / Inc N / Stuck N` + ショートカット hint)
+- **事後レビュー方式 (Phase 1 GT 改善)**:
+  - **レビューマーカー**: `⌘⇧⌥R` (macOS) / `Ctrl+Shift+Alt+R` で「後で見返したい」ブックマークを記録 (1 秒デバウンス)。NDJSON: `{"type":"review_marker","t":<ms>}`
+  - **`gse-replay --segment`**: セッションをキーストローク沈黙 (≥ 5s) で自動分割し `.segments.txt` を生成。各セグメントの活動指標 (feat 数, silence, correction rate, avg FT) を表示
+  - **`.segments.txt` 編集**: ユーザーがテキストエディタで各セグメントに F/I/S ラベルを記入。`*` マーカーでレビューマーカー所属セグメントをハイライト
+  - **`gse-replay --segments <file>`**: 範囲マッチングで confusion matrix を構築。1 セグメント内の全 feat を評価するため、点ラベルの約 30 倍の統計検出力
+  - **設計意図**: リアルタイム hotkey 方式の観察者効果 (Flow 阻害) と Stuck 自覚遅延を解消する。事後レビューにより「ここで詰まっていた」を振り返り認識で正確にラベル付けできる
 - **エラー条件**:
   - デバウンス違反 (2 秒以内の再押下): `tracing::warn!("shortcut label recording failed: debounced")` で記録、ユーザーへの通知なし (意図的)
   - `record_user_label` が未知ラベル受信: `Err("invalid label: ...")` を返す (whitelist 3 値のみ許可)
