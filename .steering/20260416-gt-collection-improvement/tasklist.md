@@ -21,7 +21,7 @@
 ### T3: metrics.rs に RangeLabel + 範囲マッチング
 - [x] RangeLabel 型定義 (start_ms, end_ms, label: LabelClass)
 - [x] compute_range_metrics() 関数: 範囲内全 feat と label を比較して confusion matrix 構築
-- [ ] format_pretty 拡張 (範囲ラベル件数の表示) → 既存の format_pretty がそのまま使える (SessionMetrics 型は同一)
+- [x] format_pretty 拡張 → 不要 (既存の format_pretty がそのまま使える、SessionMetrics 型は同一)
 
 ### T4: replay.rs に --segment モード (セグメントファイル生成)
 - [x] Args に segment フラグ追加、parse_args() 拡張

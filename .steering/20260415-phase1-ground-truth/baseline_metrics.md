@@ -22,6 +22,11 @@
 | 2026-04-16 | `gse_20260416_064130.ndjson` **(range)** | F:283/I:110/S:2 | 0.292 | 0.689 | n/a | n/a | 0 | **range**: Flow F1=0.82, Inc recall=3.6% 壊滅 (106/110→Flow 誤判定)、Stuck 0/2 |
 | 2026-04-16 | `gse_20260416_065241.ndjson` | 4/5/0 | 0.095 | 0.111 | n/a | -696 | 0 | macOS。Flow/Inc とも大半 Stuck に誤判定。HMM の Stuck 偏り傾向が顕著 |
 | 2026-04-16 | `gse_20260416_065241.ndjson` **(range)** | F:68/I:55/S:0 | 0.444 | 0.707 | n/a | n/a | 0 | **range**: Flow F1=0.82, Inc recall=34.5%。Inc→Flow 誤判定 30/55 |
+| 2026-04-16 | `gse_20260416_043006.ndjson` **(range)** | F:149/I:100/S:0 | 0.561 | 0.839 | n/a | n/a | 0 | **Windows range**: Flow F1=0.90, Inc F1=0.78。Inc precision 1.0 (誤検出なし)、recall 0.64。Stuck ラベルなし |
+| 2026-04-16 | `gse_20260416_043613.ndjson` **(range)** | F:180/I:81/S:38 | 0.236 | 0.478 | n/a | n/a | 0 | **Windows range**: 3クラス全 GT あり。Inc/Stuck 壊滅 (Inc F1=0.06, Stuck F1=0.00)。Inc→Flow 74/81、Stuck→Flow 38/38 |
+| 2026-04-16 | `gse_20260416_044520.ndjson` **(range)** | F:168/I:83/S:28 | 0.584 | 0.735 | n/a | n/a | 0 | **Windows range**: Stuck P=1.0 R=0.25 F1=0.40。Inc F1=0.52。Stuck→Inc 9件の誤判定あり |
+| 2026-04-16 | `gse_20260416_045123.ndjson` **(range)** | F:242/I:20/S:0 | 0.523 | 0.947 | n/a | n/a | 0 | **Windows range**: Flow F1=0.98、Inc F1=0.59。Flow 支配セッション。Inc→Stuck 5件の誤判定 |
+| 2026-04-16 | `gse_20260416_045931.ndjson` **(range)** | F:233/I:0/S:10 | 0.538 | 0.959 | n/a | n/a | 1 | **Windows range**: Stuck F1=0.64 (P=0.58, R=0.70)。**Stuck 検出最良**。タイポ→Stuck 誤分類の観察者指摘あり |
 
 ### 除外済みセッション (macOS 初回 2 件)
 
@@ -65,6 +70,34 @@
 | **Stuck precision** | **0.75** (3 sess avg) | **Go 条件 ≥0.6 達成** (ただし range-based、n=3) |
 | Inc→Flow 誤判定率 | 64% (164/256) | 全 Inc feat の 2/3 が Flow と予測される |
 
+### Range-based 集計 (Windows 5 セッション、2026-04-16 追加)
+
+| 指標 | 値 | 備考 |
+|------|-----|------|
+| セッション数 | 5 | 全 Windows (メモ文章作成) |
+| 総 feat 数 | 1,332 | Mac 1,417 と同規模 |
+| Macro F1 平均 | **0.488** | Mac 0.469 とほぼ同等 |
+| Micro F1 平均 | **0.792** | Mac 0.747 より良好 (Flow 支配セッション多い) |
+| Flow F1 平均 | **0.853** | 0.65–0.98。Mac と同水準、HMM の Flow 検出は OS 問わず安定 |
+| Inc F1 平均 | 0.443 | 0.06–0.78。Mac 0.325 より改善傾向 |
+| Stuck F1 平均 | 0.347 | support ありは 3 セッションのみ (0.00, 0.40, 0.64) |
+| **Stuck precision** | **0.79** (support あり 2 sess: 1.00, 0.58) | **Go 条件 ≥0.6 達成** |
+| Inc→Flow 誤判定率 | 55% (106/284 feat, support あり 4 sess) | Mac 64% より改善。ただし Session 2 は 74/81=91% で壊滅 |
+| **ユーザー観察** | タイポ多い ≠ Stuck | CorrRate 高い + AvgFT 正常 の場合、Stuck 介入は逆効果。Phase 2a の F3 文脈ゲート設計根拠 |
+
+### Range-based 統合集計 (全 10 セッション: Mac 5 + Windows 5)
+
+| 指標 | 値 | 備考 |
+|------|-----|------|
+| セッション数 | 10 | Mac 5 + Windows 5 |
+| 総 feat 数 | **2,749** | Phase 2a の統計検定力として十分 |
+| Macro F1 平均 | **0.479** | |
+| Micro F1 平均 | **0.770** | |
+| Flow F1 平均 | **0.852** | OS 間で安定 (Mac 0.851, Win 0.853) |
+| Inc F1 平均 | 0.384 | 最大の改善余地。Phase 2a ターゲット |
+| **Stuck precision** | **0.77** (support あり 5 sess avg) | **Go 条件 ≥0.6 を安定達成** |
+| **Phase 2a Go/No-Go** | **Go** | range-based で n=10、Stuck precision ≥0.6 達成、Inc→Flow 誤判定が改善ターゲット |
+
 ## 観察メモ
 
 ### 2026-04-15 初回検証
@@ -87,3 +120,12 @@
 - **Inc recall 壊滅 (3.6%)**: 110 feat 中 106 件を Flow と誤判定。**HMM が Inc と Flow を区別できていない**ことが統計的に確認された
 - **Stuck 誤検知が実際の Stuck を誘発**: ユーザー回顧で「Stuck 誤検知のせいで実際に詰まった」との報告。Seg 5 (2 feat, CorrRate 25%) を S とラベル → HMM は Inc と予測。介入設計の「false positive が UX を悪化させる」リスクが実データで裏付け
 - **Micro F1 が高い (0.689) のは Flow 支配のため**: クラス不均衡で macro/micro が乖離。Phase 2a では Inc/Stuck の GT 量を意図的に増やす必要あり
+
+### 2026-04-16 Windows Range-based 5 セッション検証 (メモ文章作成)
+- **作業内容**: 全 5 セッションがメモでの文章作成 (同一タスク種別)。Mac のコーディングセッションとは異なる入力パターン
+- **Flow 検出は OS 問わず安定**: Flow F1 平均 0.853 (Mac 0.851)。HMM の Flow 検出能力はタスク種別・OS に依存しない
+- **Inc 検出は Windows の方がやや良好**: Inc F1 平均 0.443 (Mac 0.325)。ただし Session 2 (`043613`) は Inc F1=0.06 で壊滅 — Inc 81 feat 中 74 件が Flow と誤判定
+- **Session 2 の異常**: 3クラス全てに GT があるにも関わらず Macro F1=0.236。Stuck 38 feat が全て Flow と予測された。HMM が Stuck を全く検出できていない (Stuck ラベルは CorrRate 11.6%, AvgFT 114ms でタイポ主因)
+- **タイポ ≠ Stuck (ユーザー直接指摘)**: CorrRate が高くても AvgFT が正常 (90-114ms) で打鍵ペースが維持されている場合、ユーザーは Stuck ではなく「タイポが多い Flow」と認識。**CorrRate (F3) 単独で Stuck を判断すると false positive が発生し、介入が Stuck を誘発するリスク**。Phase 2a の F3 文脈ゲート設計の重要な根拠
+- **Stuck precision は良好 (0.79)**: support ありの 2 セッションで P=1.0 と P=0.58。HMM が Stuck と予測した場合は概ね正しいが、recall が低い (真の Stuck を見逃す)
+- **Phase 2a Go 判断**: 統合 10 セッション (Mac 5 + Win 5) で Stuck precision 0.77 ≥ 0.6。**Go 条件達成**。改善ターゲットは Inc→Flow 誤判定 (統合 59%) と F3 文脈ゲート

@@ -25,4 +25,4 @@
 - [x] `docs/development-guidelines.md` §9 更新（Preflight/Guard/Report 層の詳細）
 
 ## 完了処理
-- [ ] git commit
+- [x] git commit (ee15a5b feat(hooks): 3-layer preflight dashboard)
