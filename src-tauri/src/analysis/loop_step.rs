@@ -30,7 +30,7 @@
 use std::collections::HashSet;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
-use crate::analysis::features::{FeatureExtractor, InputEvent};
+use crate::analysis::features::{FeatureExtractor, Features, InputEvent};
 
 /// 1Hz 推論ゲートの周期 (ms)。
 ///
@@ -61,6 +61,12 @@ pub struct AnalysisState {
     /// フック層が判定するため本フィールドは空のまま使用されない。
     /// フィールド cfg 分岐は cfg 伝播の破綻リスクを避けるため適用しない。
     pub pressed_keys: HashSet<u32>,
+    /// Phase 2a: 沈黙開始直前の features スナップショット。
+    ///
+    /// TypingPath を通るたびに上書き保存し、TransitionPath / SilencePath で
+    /// 摩擦フロアの文脈として参照する（比例キャリーフォワード方式）。
+    /// セッション境界 (`reset()`) で `None` にクリアする。
+    pub pre_silence_features: Option<Features>,
 }
 
 impl AnalysisState {
@@ -75,6 +81,7 @@ impl AnalysisState {
             presses_since_silence: 0,
             was_paused: false,
             pressed_keys: HashSet::new(),
+            pre_silence_features: None,
         }
     }
 
@@ -85,6 +92,7 @@ impl AnalysisState {
         self.next_engine_update_ms = now_ms;
         self.presses_since_silence = 0;
         self.pressed_keys.clear();
+        self.pre_silence_features = None;
         // was_paused はそのまま保持（セッション境界でも pause 状態は engine 側が管理）
     }
 }
@@ -229,6 +237,8 @@ pub fn step(
                         if state.presses_since_silence >= 3 {
                             state.last_event_time_ms = now_ms;
                             state.presses_since_silence = 0;
+                            // Phase 2a: 長沈黙からの復帰時に古い文脈をクリア
+                            state.pre_silence_features = None;
                         }
                     } else {
                         state.last_event_time_ms = now_ms;
@@ -283,6 +293,8 @@ pub fn step(
     // 詳細は docs/architecture.md §4.7。
     let (log_features, diag_opt) = if features.f1_flight_time_median > 0.0 && silence_secs < 2.0 {
         // === TypingPath: バッファ実データあり + 直近タイピング中 ===
+        // Phase 2a: 沈黙用の文脈をキャプチャ（比例キャリーフォワード方式）
+        state.pre_silence_features = Some(features);
         let d = engine.update(&features, ime_open);
         (features, d)
     } else if features.f1_flight_time_median > 0.0 {
@@ -292,22 +304,38 @@ pub fn step(
         if silence_secs >= 2.0 {
             features.f5_pause_count += silence_secs / 2.0;
         }
-        // TUNE: TransitionPath 用摩擦フロア
-        //   F6: onset 8s / ramp 30s / floor 0.15 (≥ 10s)
-        //   F3: onset 10s / ramp 40s / floor 0.20 (≥ 10s)
+        // Phase 2a: 文脈ベース摩擦フロア（比例キャリーフォワード方式）
+        // 直前 TypingPath の F3/F6 を文脈として使い、時間に比例して増幅する。
+        // 文脈なし時は従来の時間ベースランプにフォールバック。
+        // TUNE: TransitionPath onset 8s / ramp 30s — 線形式 (ctx × time_scale)。
+        //   SilencePath (features.rs) は onset 2s の非線形式を使う。
+        //   TransitionPath はバッファに実データがあるため onset を遅くし、
+        //   バッファ値の F3/F6 を補完するフロアとして線形に適用する。
         if silence_secs >= 8.0 {
-            let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
-            let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
-            if silence_secs >= 10.0 {
-                f6_floor = f6_floor.max(0.15);
-                f3_floor = f3_floor.max(0.20);
+            if let Some(ref ctx) = state.pre_silence_features {
+                let time_scale = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
+                let f6_floor = ctx.f6_pause_after_del_rate.clamp(0.0, 1.0) * time_scale;
+                let f3_floor = ctx.f3_correction_rate.clamp(0.0, 1.0) * time_scale;
+                features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
+                features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
+            } else {
+                // フォールバック: 従来の時間ベースランプ
+                let mut f6_floor = ((silence_secs - 8.0) / 30.0).clamp(0.0, 1.0);
+                let mut f3_floor = ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0);
+                if silence_secs >= 10.0 {
+                    f6_floor = f6_floor.max(0.15);
+                    f3_floor = f3_floor.max(0.20);
+                }
+                features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
+                features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
             }
-            features.f6_pause_after_del_rate = features.f6_pause_after_del_rate.max(f6_floor);
-            features.f3_correction_rate = features.f3_correction_rate.max(f3_floor);
         }
         let d = engine.update_silence(&features, ime_open, silence_secs);
         (features, d)
-    } else if let Some(sf) = state.extractor.make_silence_observation(silence_secs) {
+    } else if let Some(sf) = state
+        .extractor
+        .make_silence_observation(silence_secs, state.pre_silence_features.as_ref())
+    {
         // === SilencePath: バッファ空 → 合成特徴量で update_silence ===
         let d = engine.update_silence(&sf, ime_open, silence_secs);
         (sf, d)

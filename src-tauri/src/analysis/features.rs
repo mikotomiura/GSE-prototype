@@ -11,7 +11,7 @@ pub struct InputEvent {
 
 /// B-1: 5特徴量を格納する構造体
 /// F2 (Flight Time 分散) は HMM の潜在軸計算で未使用のため除去済み。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Features {
     /// F1: Flight Time 中央値 (ms)
     pub f1_flight_time_median: f64,
@@ -232,12 +232,23 @@ impl FeatureExtractor {
 
     /// 沈黙 3 状態機構の **SilencePath** 用合成観測値を生成する（バッファ空時に使用）。
     ///
-    /// 呼び出し元: `lib.rs` 分析スレッドの SilencePath ブランチ（バッファ空時）。
+    /// 呼び出し元: `loop_step.rs` の SilencePath ブランチ（バッファ空時）。
     /// TransitionPath（バッファあり + 沈黙）は独自の摩擦フロアを持ち、
-    /// 本関数を呼ばない — 閾値の不一致は設計上の分離（詳細は lib.rs のコメント参照）。
+    /// 本関数を呼ばない — 閾値の不一致は設計上の分離（詳細は loop_step.rs のコメント参照）。
+    ///
+    /// # Phase 2a: 比例キャリーフォワード方式
+    ///
+    /// `pre_silence` が `Some` の場合、直前のタイピング特徴量 (F3/F6) を文脈として
+    /// 沈黙中の合成摩擦値に比例反映する。クリーンなタイピング後は摩擦 ≈ 0、
+    /// 修正の多いタイピング後は高い摩擦がキャリーフォワードされる。
+    /// `pre_silence` が `None` の場合（セッション冒頭等）は従来の時間ベースランプにフォールバック。
     ///
     /// `silence_secs < 2.0` の場合は None を返す（ポーズとして認識しない）。
-    pub fn make_silence_observation(&self, silence_secs: f64) -> Option<Features> {
+    pub fn make_silence_observation(
+        &self,
+        silence_secs: f64,
+        pre_silence: Option<&Features>,
+    ) -> Option<Features> {
         if silence_secs < 2.0 {
             return None;
         }
@@ -245,24 +256,42 @@ impl FeatureExtractor {
         // TUNE: F1 = 2000 ms — 「現在タイピングしていない = Flight Time が事実上無限大」の意味付け
         let f1 = 2000.0_f64;
 
-        // TUNE: Synthetic Friction — SilencePath 用合成摩擦値ランプ
-        // 早期オンセット + フロア値で、沈黙開始後の Stuck 到達を高速化する。
-        //   F6: onset 10s / ramp 40s / floor 0.15 (≥ 10s 時)  → ~50s で 1.0 到達
-        //   F3: onset 15s / ramp 50s / floor 0.20 (≥ 10s 時)  → ~65s で 1.0 到達
-        // 注: `lib.rs` の TransitionPath ブランチ（分析スレッド内）にも類似ロジックがあり、
-        //     閾値 (F6 onset 8s / F3 onset 10s) が本関数と異なる。統合せず 3 状態機構として
-        //     共存させる判断の詳細は `docs/architecture.md §4.7` および
-        //     `.steering/20260414-improvement-roadmap/decisions.md` 判断 3 を参照。
-        let f6_synthetic = if silence_secs >= 10.0 {
-            (((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0)).max(0.15)
-        } else {
-            ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0)
-        };
-
-        let f3_synthetic = if silence_secs >= 10.0 {
-            (((silence_secs - 15.0) / 50.0).clamp(0.0, 1.0)).max(0.20)
-        } else {
-            ((silence_secs - 15.0) / 50.0).clamp(0.0, 1.0)
+        let (f3_synthetic, f6_synthetic) = match pre_silence {
+            Some(ctx) => {
+                // Phase 2a: 比例キャリーフォワード
+                // 直前の F3/F6 を基準に、時間とともに緩やかに増幅する。
+                // 式: ctx_val + time_scale × (1.0 - ctx_val) × ctx_val
+                //   ctx_val=0 → 常に 0 (摩擦なし → 沈黙中も摩擦なし)
+                //   ctx_val=0.5, t=1.0 → 0.75 (中程度 → 緩やかに増加)
+                //   ctx_val=1.0 → 常に 1.0 (最大摩擦 → そのまま維持)
+                // TUNE: time_scale ramp = 30s (onset 2s、32s で 1.0)
+                // 注: TransitionPath (loop_step.rs) は onset 8s の線形式 (ctx × time_scale) を使う。
+                //   SilencePath はバッファ空のため onset を早め (2s) にし、非線形増幅で
+                //   長時間沈黙の Stuck 移行を加速する。TransitionPath はバッファデータが
+                //   あるため onset を遅め (8s) に抑え、線形でバッファ値を補完する設計。
+                let time_scale = ((silence_secs - 2.0) / 30.0).clamp(0.0, 1.0);
+                let f3_ctx = ctx.f3_correction_rate.clamp(0.0, 1.0);
+                let f6_ctx = ctx.f6_pause_after_del_rate.clamp(0.0, 1.0);
+                let f3 = (f3_ctx + time_scale * (1.0 - f3_ctx) * f3_ctx).clamp(0.0, 1.0);
+                let f6 = (f6_ctx + time_scale * (1.0 - f6_ctx) * f6_ctx).clamp(0.0, 1.0);
+                (f3, f6)
+            }
+            None => {
+                // フォールバック: 従来の時間ベースランプ (セッション冒頭等の文脈なし時)
+                //   F6: onset 10s / ramp 40s / floor 0.15 (≥ 10s 時)
+                //   F3: onset 15s / ramp 50s / floor 0.20 (≥ 10s 時)
+                let f6_fb = if silence_secs >= 10.0 {
+                    (((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0)).max(0.15)
+                } else {
+                    ((silence_secs - 10.0) / 40.0).clamp(0.0, 1.0)
+                };
+                let f3_fb = if silence_secs >= 10.0 {
+                    (((silence_secs - 15.0) / 50.0).clamp(0.0, 1.0)).max(0.20)
+                } else {
+                    ((silence_secs - 15.0) / 50.0).clamp(0.0, 1.0)
+                };
+                (f3_fb, f6_fb)
+            }
         };
 
         Some(Features {
@@ -337,21 +366,24 @@ mod tests {
     }
 
     // ---------- make_silence_observation() ----------
+    // Phase 2a: pre_silence=None のテストはフォールバック互換、
+    //           pre_silence=Some のテストは比例キャリーフォワード検証。
 
     fn extractor() -> FeatureExtractor {
         FeatureExtractor::new(600)
     }
 
+    // --- フォールバック (pre_silence=None): 従来の時間ベースランプと同一 ---
+
     #[test]
     fn silence_below_2s_returns_none() {
-        assert!(extractor().make_silence_observation(1.9).is_none());
-        assert!(extractor().make_silence_observation(0.0).is_none());
+        assert!(extractor().make_silence_observation(1.9, None).is_none());
+        assert!(extractor().make_silence_observation(0.0, None).is_none());
     }
 
     #[test]
     fn silence_at_2s_has_no_friction_floors() {
-        // 2s 時点では F3/F6 ともフロアなし、F5 は累積（2/2=1.0）
-        let f = extractor().make_silence_observation(2.0).unwrap();
+        let f = extractor().make_silence_observation(2.0, None).unwrap();
         assert!(approx_eq(f.f1_flight_time_median, 2000.0));
         assert!(approx_eq(f.f3_correction_rate, 0.0));
         assert!(approx_eq(f.f4_burst_length, 0.0));
@@ -361,18 +393,14 @@ mod tests {
 
     #[test]
     fn silence_just_before_10s_has_no_floors() {
-        // 10s 直前では floor が効かない（閾値境界確認）
-        let f = extractor().make_silence_observation(9.99).unwrap();
+        let f = extractor().make_silence_observation(9.99, None).unwrap();
         assert!(approx_eq(f.f6_pause_after_del_rate, 0.0));
         assert!(approx_eq(f.f3_correction_rate, 0.0));
     }
 
     #[test]
     fn silence_at_10s_applies_both_floors() {
-        // 10s 到達で F6 フロア 0.15 / F3 フロア 0.20 が適用される。
-        // ランプ自体は F6=10s/ F3=15s から立ち上がるため、
-        // 10s 時点では「フロアのみ」が効いている状態。
-        let f = extractor().make_silence_observation(10.0).unwrap();
+        let f = extractor().make_silence_observation(10.0, None).unwrap();
         assert!(approx_eq(f.f6_pause_after_del_rate, 0.15));
         assert!(approx_eq(f.f3_correction_rate, 0.20));
         assert!(approx_eq(f.f5_pause_count, 5.0));
@@ -381,9 +409,7 @@ mod tests {
 
     #[test]
     fn silence_at_30s_f6_ramps_past_floor() {
-        // 30s: F6 = max((30-10)/40, 0.15) = 0.5
-        //      F3 = max((30-15)/50, 0.20) = 0.3
-        let f = extractor().make_silence_observation(30.0).unwrap();
+        let f = extractor().make_silence_observation(30.0, None).unwrap();
         assert!(approx_eq(f.f6_pause_after_del_rate, 0.5));
         assert!(approx_eq(f.f3_correction_rate, 0.3));
         assert!(approx_eq(f.f5_pause_count, 15.0));
@@ -391,18 +417,98 @@ mod tests {
 
     #[test]
     fn silence_at_50s_f6_saturates_f3_near_saturation() {
-        // 50s: F6 = max((50-10)/40, 0.15) = 1.0（飽和）
-        //      F3 = max((50-15)/50, 0.20) = 0.7
-        let f = extractor().make_silence_observation(50.0).unwrap();
+        let f = extractor().make_silence_observation(50.0, None).unwrap();
         assert!(approx_eq(f.f6_pause_after_del_rate, 1.0));
         assert!(approx_eq(f.f3_correction_rate, 0.7));
     }
 
     #[test]
     fn silence_at_100s_both_saturate() {
-        let f = extractor().make_silence_observation(100.0).unwrap();
+        let f = extractor().make_silence_observation(100.0, None).unwrap();
         assert!(approx_eq(f.f6_pause_after_del_rate, 1.0));
         assert!(approx_eq(f.f3_correction_rate, 1.0));
+    }
+
+    // --- 比例キャリーフォワード (pre_silence=Some) ---
+
+    fn clean_features() -> Features {
+        Features {
+            f1_flight_time_median: 95.0,
+            f3_correction_rate: 0.02,
+            f4_burst_length: 5.0,
+            f5_pause_count: 0.0,
+            f6_pause_after_del_rate: 0.00,
+        }
+    }
+
+    fn high_friction_features() -> Features {
+        Features {
+            f1_flight_time_median: 300.0,
+            f3_correction_rate: 0.40,
+            f4_burst_length: 2.0,
+            f5_pause_count: 3.0,
+            f6_pause_after_del_rate: 0.30,
+        }
+    }
+
+    #[test]
+    fn context_clean_typing_keeps_friction_near_zero() {
+        // クリーンなタイピング後の沈黙 → F3/F6 ≈ 0
+        let ctx = clean_features();
+        let f = extractor()
+            .make_silence_observation(10.0, Some(&ctx))
+            .unwrap();
+        // F3: 0.02 + (8/30) × 0.98 × 0.02 ≈ 0.025
+        assert!(f.f3_correction_rate < 0.03);
+        // F6: 0.0 + anything × 0 = 0.0
+        assert!(approx_eq(f.f6_pause_after_del_rate, 0.0));
+    }
+
+    #[test]
+    fn context_high_friction_carries_forward() {
+        // 高摩擦タイピング後の沈黙 → F3/F6 が高い値をキャリーフォワード
+        let ctx = high_friction_features();
+        let f = extractor()
+            .make_silence_observation(10.0, Some(&ctx))
+            .unwrap();
+        // F3: 0.40 + (8/30) × 0.60 × 0.40 ≈ 0.464
+        assert!(f.f3_correction_rate > 0.40);
+        assert!(f.f3_correction_rate < 0.50);
+        // F6: 0.30 + (8/30) × 0.70 × 0.30 ≈ 0.356
+        assert!(f.f6_pause_after_del_rate > 0.30);
+        assert!(f.f6_pause_after_del_rate < 0.40);
+    }
+
+    #[test]
+    fn context_at_max_time_scale_amplifies() {
+        // 32s (time_scale=1.0): 最大増幅
+        let ctx = high_friction_features();
+        let f = extractor()
+            .make_silence_observation(32.0, Some(&ctx))
+            .unwrap();
+        // F3: 0.40 + 1.0 × 0.60 × 0.40 = 0.64
+        assert!((f.f3_correction_rate - 0.64).abs() < 0.001);
+        // F6: 0.30 + 1.0 × 0.70 × 0.30 = 0.51
+        assert!((f.f6_pause_after_del_rate - 0.51).abs() < 0.001);
+    }
+
+    #[test]
+    fn context_at_2s_equals_raw_context_values() {
+        // 2s (time_scale=0.0): 増幅なし、文脈値そのまま
+        let ctx = high_friction_features();
+        let f = extractor()
+            .make_silence_observation(2.0, Some(&ctx))
+            .unwrap();
+        assert!(approx_eq(f.f3_correction_rate, 0.40));
+        assert!(approx_eq(f.f6_pause_after_del_rate, 0.30));
+    }
+
+    #[test]
+    fn context_below_2s_still_returns_none() {
+        let ctx = high_friction_features();
+        assert!(extractor()
+            .make_silence_observation(1.5, Some(&ctx))
+            .is_none());
     }
 
     // ---------- calculate_features() ----------

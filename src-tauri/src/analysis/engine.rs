@@ -42,7 +42,7 @@ use crate::analysis::features::{phi, Features};
 ///
 /// `logger.rs` の session_start meta エントリに書き出され、
 /// `gse-replay` がゴールデンスナップショットと突き合わせる際に検証する。
-pub const HMM_VERSION: &str = "0.2.0";
+pub const HMM_VERSION: &str = "0.3.0";
 
 /// TUNE: 初期事前確率 [Flow, Incubation, Stuck]
 ///
