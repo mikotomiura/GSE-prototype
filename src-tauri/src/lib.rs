@@ -751,6 +751,20 @@ pub fn run() {
                 }
             }
 
+            // Phase 2b: IME_SHADOW_READY の直接ポーリング
+            // is_candidate_window_open() 内の safety valve が IME_ACTIVE を即座に
+            // リセットするため、Monitor が active→false 遷移を観測できないケースがある。
+            // WinEvent IME_HIDE は正しく READY を set するので、遷移に依存せず
+            // READY フラグを毎ポーリングでチェックする。
+            #[cfg(target_os = "windows")]
+            if !active && input::hook::IME_SHADOW_READY.load(Ordering::Acquire) {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                emit_ime_shadow(&log_tx_for_monitor, ts);
+            }
+
             // IME候補ウィンドウ表示中はHMM推論を一時停止する。
             // 確率はリセットせず直前の状態を維持する。
             // 候補選択中の認知状態（Incubation等）を破壊しない。

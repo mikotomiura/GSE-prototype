@@ -117,6 +117,16 @@ NDJSON 出力:
 3. **Stale リセット emit** (MEDIUM): `emit_ime_shadow` に stale 経路を追加 — `READY=false` でも `START_MS > 0` なら独自に dwell 計算して emit
 4. **既知の制約コメント** (MEDIUM): フックのグローバル性・WinEvent タイミングずれを hook_windows.rs に記録
 
+## デバッグ: safety valve によるデータ欠損 (実機テストで発見)
+
+`ime_windows.rs::is_candidate_window_open()` 内の safety valve が、WinEvent IME_SHOW で
+`IME_ACTIVE=true` にした直後に EnumWindows/UIAutomation で候補ウィンドウを確認できない場合、
+`IME_ACTIVE` を即座に false にリセットしていた。この結果 Monitor は active→false 遷移を
+一度も観測できず、`emit_ime_shadow` が呼ばれなかった。
+
+**修正**: Monitor ループ内で `IME_SHADOW_READY` フラグを毎ポーリング直接チェックする
+独立パスを追加。active 遷移検出に依存しない emit 経路を確保した。
+
 ## ロールバック計画
 
 全変更は単一コミット。git revert で即座に戻せる。
