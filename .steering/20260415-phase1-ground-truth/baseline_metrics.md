@@ -13,10 +13,15 @@
 |---|---|---|---|---|---|---|---|---|
 | 2026-04-15 | `gse_20260415_144120.ndjson` | 4/1/1 | 0.722 | 0.667 | n/a | -93 | 0 | 初 Windows セッション (JIS、日本語 IME 混在)。Stuck/Inc 完全一致、Flow 2/4 件正解。`replay-feat-alignment-bug` **fix 後**の値 |
 | 2026-04-16 | `gse_20260416_060712.ndjson` | 7/4/1 | 0.000 | 0.000 | 1005 | -1699 | 0 | macOS。Flow 全て Inc に誤判定、Stuck 1件も Flow に。HMM が Flow を選択できない傾向 |
+| 2026-04-16 | `gse_20260416_060712.ndjson` **(range)** | F:215/I:0/S:5 | 0.591 | 0.791 | n/a | n/a | 0 | **range**: Flow F1=0.88, Stuck F1=0.89。point F1=0.000 から劇的改善。Inc ラベルなし |
 | 2026-04-16 | `gse_20260416_062509.ndjson` | 7/2/2 | 0.061 | 0.091 | n/a | -3583 | 0 | macOS。Flow 1/7 のみ正解、Stuck 0/2。Inc も全 miss |
+| 2026-04-16 | `gse_20260416_062509.ndjson` **(range)** | F:163/I:23/S:11 | 0.572 | 0.817 | n/a | n/a | 0 | **range**: Flow F1=0.91, Inc F1=0.54, Stuck F1=0.27。3クラス全てに GT あり |
 | 2026-04-16 | `gse_20260416_063443.ndjson` | 2/3/0 | 0.444 | 0.600 | n/a | +184 | 0 | macOS。**最良結果**。Flow 1/2、Inc 2/3 正解。lead +184ms (HMM がわずかに先行) |
+| 2026-04-16 | `gse_20260416_063443.ndjson` **(range)** | F:190/I:68/S:0 | 0.446 | 0.729 | n/a | n/a | 0 | **range**: Flow F1=0.83, Inc F1=0.51。Inc recall 52.9% で他セッションより良好 |
 | 2026-04-16 | `gse_20260416_064130.ndjson` | 3/5/0 | 0.243 | 0.375 | n/a | -224 | 0 | macOS。Flow 2/3 正解だが Inc 1/5 のみ。Inc→Flow 誤判定が多い |
+| 2026-04-16 | `gse_20260416_064130.ndjson` **(range)** | F:283/I:110/S:2 | 0.292 | 0.689 | n/a | n/a | 0 | **range**: Flow F1=0.82, Inc recall=3.6% 壊滅 (106/110→Flow 誤判定)、Stuck 0/2 |
 | 2026-04-16 | `gse_20260416_065241.ndjson` | 4/5/0 | 0.095 | 0.111 | n/a | -696 | 0 | macOS。Flow/Inc とも大半 Stuck に誤判定。HMM の Stuck 偏り傾向が顕著 |
+| 2026-04-16 | `gse_20260416_065241.ndjson` **(range)** | F:68/I:55/S:0 | 0.444 | 0.707 | n/a | n/a | 0 | **range**: Flow F1=0.82, Inc recall=34.5%。Inc→Flow 誤判定 30/55 |
 
 ### 除外済みセッション (macOS 初回 2 件)
 
@@ -46,6 +51,20 @@
 - Detection lead median 全体: -696 ms (6 セッション中央値)
 - **Phase 2a Go/No-Go: Stuck precision 0.167 で Go 条件 (≥0.6) に大幅未達。HMM チューニングが先に必要**
 
+### Range-based 集計 (macOS 5 セッション)
+
+| 指標 | 値 | 備考 |
+|------|-----|------|
+| セッション数 | 5 | 全 macOS |
+| 総 feat 数 | 1,417 | point-based 50 ラベル → 28 倍の GT 量 |
+| Macro F1 平均 | **0.469** | point 0.261 → +0.208 |
+| Micro F1 平均 | **0.747** | point 0.307 → +0.440 |
+| Flow F1 平均 | **0.851** | 全セッションで 0.82–0.91。HMM は Flow 検出が得意 |
+| Inc F1 平均 | 0.325 | 0.06–0.54 とばらつき大。**Inc→Flow 誤判定が最大の弱点** |
+| Stuck F1 平均 | 0.231 | support ありは 3 セッションのみ (0.00, 0.27, 0.89) |
+| **Stuck precision** | **0.75** (3 sess avg) | **Go 条件 ≥0.6 達成** (ただし range-based、n=3) |
+| Inc→Flow 誤判定率 | 64% (164/256) | 全 Inc feat の 2/3 が Flow と予測される |
+
 ## 観察メモ
 
 ### 2026-04-15 初回検証
@@ -60,3 +79,11 @@
 - **Flow 半分誤判定 (2/4 件 → Inc と予測)**: HMM が Flow と Inc を取り違えやすい傾向が Mac 初回検証と同じ → Phase 2a で Synthetic Friction 再設計の必要性を再確認
 - **Detection lead median = -93ms**: 実質同期。Mac の -3119ms や +2383ms より中央に寄っており、日本語入力特有のリズムかサンプリング差か n の増加で見極め
 - **clock semantic mismatch 学習**: retrospective の「実機データで算出系をすぐ回す」が正解だった。合成テストでは再現困難な IME pause auto-reset 問題を実データ 1 件で抽出できた
+
+### 2026-04-16 Range-based segment 初回検証 (gse_20260416_064130)
+- **手順**: `--segment` で 8 セグメント生成 → 回顧ラベル付与 (F:3, I:3, S:1, Skip:1) → `--segments` で range metrics 算出
+- **統計検定力**: point-based 8 点 → range-based 395 feat。同一セッションで桁違いの GT 量
+- **Flow 検出は良好 (F1=0.82)**: 283 feat 中 268 正解 (recall 94.7%)。HMM は安定打鍵の Flow 検出が得意
+- **Inc recall 壊滅 (3.6%)**: 110 feat 中 106 件を Flow と誤判定。**HMM が Inc と Flow を区別できていない**ことが統計的に確認された
+- **Stuck 誤検知が実際の Stuck を誘発**: ユーザー回顧で「Stuck 誤検知のせいで実際に詰まった」との報告。Seg 5 (2 feat, CorrRate 25%) を S とラベル → HMM は Inc と予測。介入設計の「false positive が UX を悪化させる」リスクが実データで裏付け
+- **Micro F1 が高い (0.689) のは Flow 支配のため**: クラス不均衡で macro/micro が乖離。Phase 2a では Inc/Stuck の GT 量を意図的に増やす必要あり
