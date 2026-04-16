@@ -16,9 +16,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    EVENT_SENDER, HOOK_ACTIVE, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, LAST_KEY_MS, POLL_WAKE_TX,
-    VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA, VK_DBE_SBCSCHAR,
-    VK_KANJI,
+    EVENT_SENDER, HOOK_ACTIVE, IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSITION_START_MS,
+    IME_OPEN, IME_SHADOW_ABANDON, IME_SHADOW_DWELL_MS, IME_SHADOW_READY, IME_STATE_DIRTY,
+    LAST_KEY_MS, POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA,
+    VK_DBE_KATAKANA, VK_DBE_SBCSCHAR, VK_KANJI,
 };
 use crate::analysis::features::InputEvent;
 
@@ -79,11 +80,44 @@ unsafe extern "system" fn win_event_callback(
             IME_ACTIVE.store(true, Ordering::Relaxed);
             IME_OPEN.store(true, Ordering::Release);
             IME_STATE_DIRTY.store(true, Ordering::Release);
+            // Phase 2b: IME 変換セッション開始時刻を記録
+            // IME_SHOW で初期化。IME_CHANGE は通常 IME_SHOW の後に飛ぶが、
+            // IME によっては IME_SHOW なしに IME_CHANGE のみ発火する場合がある。
+            // その際は defensive fallback として START_MS=0 なら現在時刻を store。
+            if event == EVENT_OBJECT_IME_SHOW {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                IME_COMPOSITION_START_MS.store(now, Ordering::Relaxed);
+                // 前回セッションのカウンターをリセット
+                IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
+                IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
+            } else if IME_COMPOSITION_START_MS.load(Ordering::Relaxed) == 0 {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                IME_COMPOSITION_START_MS.store(now, Ordering::Relaxed);
+                IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
+                IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
+            }
             if let Some(tx) = POLL_WAKE_TX.get() {
                 let _ = tx.try_send(());
             }
         }
         EVENT_OBJECT_IME_HIDE => {
+            // Phase 2b: dwell 計算 → shadow ready シグナル
+            let start = IME_COMPOSITION_START_MS.load(Ordering::Relaxed);
+            if start > 0 {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                IME_SHADOW_DWELL_MS.store(now.saturating_sub(start), Ordering::Relaxed);
+                IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
+                IME_SHADOW_READY.store(true, Ordering::Release);
+            }
             IME_ACTIVE.store(false, Ordering::Relaxed);
         }
         _ => {}
@@ -276,6 +310,25 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                         let current = IME_OPEN.load(Ordering::Relaxed);
                         IME_OPEN.store(!current, Ordering::Release);
                         IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    _ => {}
+                }
+            }
+
+            // Phase 2b: IME 変換中のナビゲーション・放棄をカウント
+            // 既知の制約: WH_KEYBOARD_LL はシステムグローバルなため、IME_ACTIVE 中に
+            // 別ウィンドウで押された矢印/ESC もカウントされる。8s stale valve で緩和。
+            // WinEvent IME_SHOW と hook_callback のタイミングずれにより、変換セッション
+            // 最初の 1-2 キーが拾えない場合がある。Phase 2b は shadow-only なので許容。
+            if is_press && IME_ACTIVE.load(Ordering::Relaxed) {
+                match vk_code {
+                    0x25 | 0x26 | 0x27 | 0x28 => {
+                        // VK_LEFT/UP/RIGHT/DOWN — 候補ナビゲーション
+                        IME_CANDIDATE_NAV_COUNT.fetch_add(1, Ordering::Relaxed);
+                    }
+                    0x1B => {
+                        // VK_ESCAPE — 変換放棄
+                        IME_SHADOW_ABANDON.store(true, Ordering::Relaxed);
                     }
                     _ => {}
                 }

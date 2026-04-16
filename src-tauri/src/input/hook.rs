@@ -1,6 +1,4 @@
-#[cfg(target_os = "macos")]
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 
 use crossbeam_channel::Sender;
@@ -56,6 +54,38 @@ pub static LAST_KEY_MS: AtomicU64 = AtomicU64::new(0);
 pub fn last_key_ms() -> u64 {
     LAST_KEY_MS.load(Ordering::Relaxed)
 }
+
+// ---------------------------------------------------------------------------
+// Windows-specific atomics — IME Shadow Features (Phase 2b)
+// ---------------------------------------------------------------------------
+
+/// IME 変換ウィンドウ表示時刻 (epoch ms)。WinEvent IME_SHOW で store。
+#[cfg(target_os = "windows")]
+pub static IME_COMPOSITION_START_MS: AtomicU64 = AtomicU64::new(0);
+
+/// 計算済み IME 変換滞在時間 (ms)。WinEvent IME_HIDE で store。
+#[cfg(target_os = "windows")]
+pub static IME_SHADOW_DWELL_MS: AtomicU64 = AtomicU64::new(0);
+
+/// IME 変換中の候補ナビゲーション回数 (矢印キー)。hook_callback で fetch_add。
+#[cfg(target_os = "windows")]
+pub static IME_CANDIDATE_NAV_COUNT: AtomicU32 = AtomicU32::new(0);
+
+/// IME 変換中に ESC で放棄したかどうか。hook_callback で store(true)。
+#[cfg(target_os = "windows")]
+pub static IME_SHADOW_ABANDON: AtomicBool = AtomicBool::new(false);
+
+/// IME Shadow データの emit 準備完了フラグ。WinEvent IME_HIDE で store(true, Release)。
+/// IME Monitor スレッドが swap(false, AcqRel) で読み取り、LogEntry::ImeShadow を送出。
+///
+/// **Ordering 設計**: READY の Release store は、先行する DWELL_MS / NAV_COUNT /
+/// ABANDON への Relaxed store をすべて可視にするフェンスとして機能する。
+/// Monitor 側の AcqRel swap の Acquire 部分がこの Release と対になり、
+/// READY=true が見えた時点で他の shadow atomics も最新値が保証される。
+/// 100ms ポーリング間隔のため、高速な連続 IME セッションではデータロスの
+/// 可能性があるが、Phase 2b は shadow-only データ収集段階のため許容する。
+#[cfg(target_os = "windows")]
+pub static IME_SHADOW_READY: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
 // macOS-specific atomics

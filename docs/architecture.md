@@ -133,8 +133,9 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **インターフェース**: `InputEvent` 構造体を Sender 経由で送信
 - **状態管理**: グローバル Atomic 変数
   - 共通: IME_OPEN, IME_ACTIVE, LAST_KEY_MS, HOOK_ACTIVE
+  - Windows 追加 (Phase 2b): IME_COMPOSITION_START_MS, IME_SHADOW_DWELL_MS, IME_CANDIDATE_NAV_COUNT, IME_SHADOW_ABANDON, IME_SHADOW_READY
   - macOS 追加: IME_COMPOSING, JIS_KEYBOARD_SEEN, CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, USING_ACCESSIBILITY_FALLBACK
-- **設計判断**: Relaxed ordering for LAST_KEY_MS（近似的な直近値で十分）、Acquire/Release for IME 状態（スレッド間可視性保証）
+- **設計判断**: Relaxed ordering for LAST_KEY_MS（近似的な直近値で十分）、Acquire/Release for IME 状態（スレッド間可視性保証）。Phase 2b の IME Shadow atomics は IME_SHADOW_READY の Release/Acquire がフェンスとして機能し、他の shadow atomics の Relaxed store を可視にする
 - **プラットフォーム振り分け**: `hook.rs` が共有アトミック変数と `#[cfg(target_os)] + #[path]` で `hook_windows.rs` / `hook_macos.rs` に振り分け
 - **macOS 固有**: CGKeyCode → Windows VK マッピングテーブルにより、analysis 層は両プラットフォームで同一の VK コードを受け取る
 
@@ -175,6 +176,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **インターフェース**: `log()` → channel 送信、`flush()`, `close()`
 - **状態管理**: バッファリングチャネル（512 エントリ）、5 秒間隔フラッシュ
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
+- **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
 
 ### 4.7 Ground Truth ラベリング経路 (Phase 1)
 

@@ -266,6 +266,43 @@
           ]
         }
       }
+    },
+    {
+      "description": "IME 変換セッションの影ログ (Phase 2b, Windows のみ)。 `dwell_ms` は IME 候補ウィンドウ表示〜非表示の時間、 `nav` は変換中の矢印キー押下回数、`abandon` は ESC による変換放棄。",
+      "type": "object",
+      "required": [
+        "abandon",
+        "dwell_ms",
+        "nav",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "abandon": {
+          "type": "boolean"
+        },
+        "dwell_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "nav": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "ime_shadow"
+          ]
+        }
+      }
     }
   ],
   "definitions": {

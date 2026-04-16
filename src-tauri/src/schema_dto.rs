@@ -89,6 +89,15 @@ pub enum LogEntryDto {
     /// 事後レビュー用ブックマークマーカー。認知状態ラベルではなく、
     /// 「ここを後で見返したい」という意図のみを記録する。
     ReviewMarker { t: u64 },
+    /// IME 変換セッションの影ログ (Phase 2b, Windows のみ)。
+    /// `dwell_ms` は IME 候補ウィンドウ表示〜非表示の時間、
+    /// `nav` は変換中の矢印キー押下回数、`abandon` は ESC による変換放棄。
+    ImeShadow {
+        t: u64,
+        dwell_ms: u64,
+        nav: u32,
+        abandon: bool,
+    },
 }
 
 /// Ground Truth ラベルの種別。NDJSON 文字列は "flow" / "incubation" / "stuck"。

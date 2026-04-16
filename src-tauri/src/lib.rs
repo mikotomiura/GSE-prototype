@@ -510,6 +510,47 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 2b: IME Shadow Features (Windows のみ)
+// ---------------------------------------------------------------------------
+
+/// IME Shadow の Atomic データを読み取り、LogEntry::ImeShadow を送出する。
+/// IME Monitor スレッドの active→false 遷移時に呼ばれる。
+///
+/// 2 つの経路で emit が発生する:
+/// 1. 正常: WinEvent IME_HIDE が到着し IME_SHADOW_READY=true → dwell は事前計算済み
+/// 2. Stale: IME_HIDE が取りこぼされ 8s タイムアウト → START_MS > 0 なら独自に dwell 計算
+#[cfg(target_os = "windows")]
+fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    if input::hook::IME_SHADOW_READY.swap(false, Ordering::AcqRel) {
+        // 正常経路: IME_HIDE で dwell 計算済み
+        let dwell_ms = input::hook::IME_SHADOW_DWELL_MS.swap(0, Relaxed);
+        let candidate_nav_count = input::hook::IME_CANDIDATE_NAV_COUNT.swap(0, Relaxed);
+        let abandon = input::hook::IME_SHADOW_ABANDON.swap(false, Relaxed);
+        let _ = log_tx.try_send(LogEntry::ImeShadow {
+            timestamp,
+            dwell_ms,
+            candidate_nav_count,
+            abandon,
+        });
+    } else {
+        // Stale 経路: IME_HIDE が来なかった場合のフォールバック
+        let start = input::hook::IME_COMPOSITION_START_MS.swap(0, Relaxed);
+        if start > 0 {
+            let dwell_ms = timestamp.saturating_sub(start);
+            let candidate_nav_count = input::hook::IME_CANDIDATE_NAV_COUNT.swap(0, Relaxed);
+            let abandon = input::hook::IME_SHADOW_ABANDON.swap(false, Relaxed);
+            let _ = log_tx.try_send(LogEntry::ImeShadow {
+                timestamp,
+                dwell_ms,
+                candidate_nav_count,
+                abandon,
+            });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // アプリ起動
 // ---------------------------------------------------------------------------
 
@@ -679,6 +720,9 @@ pub fn run() {
                         on: ime_on,
                         active: false,
                     });
+                    // Phase 2b: stale リセット時も shadow データを emit
+                    #[cfg(target_os = "windows")]
+                    emit_ime_shadow(&log_tx_for_monitor, ts);
                     thread::sleep(std::time::Duration::from_millis(100));
                     continue;
                 }
@@ -688,6 +732,7 @@ pub fn run() {
 
             // IME_ACTIVE 状態変化時にログを送出（初回は必ず emit）
             if last_active.map_or(true, |prev| prev != active) {
+                let was_active = last_active.unwrap_or(false);
                 last_active = Some(active);
                 let ts = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -699,6 +744,11 @@ pub fn run() {
                     on: ime_on,
                     active,
                 });
+                // Phase 2b: active→false 遷移時に IME Shadow データを emit
+                #[cfg(target_os = "windows")]
+                if was_active && !active {
+                    emit_ime_shadow(&log_tx_for_monitor, ts);
+                }
             }
 
             // IME候補ウィンドウ表示中はHMM推論を一時停止する。

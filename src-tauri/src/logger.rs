@@ -54,6 +54,19 @@ fn format_user_label_line(
     )
 }
 
+/// `LogEntry::ImeShadow` の NDJSON 1 行を生成する純粋関数。
+fn format_ime_shadow_line(
+    timestamp: u64,
+    dwell_ms: u64,
+    candidate_nav_count: u32,
+    abandon: bool,
+) -> String {
+    format!(
+        r#"{{"type":"ime_shadow","t":{},"dwell_ms":{},"nav":{},"abandon":{}}}"#,
+        timestamp, dwell_ms, candidate_nav_count, abandon,
+    )
+}
+
 /// ログエントリの種別
 #[derive(Debug)]
 pub enum LogEntry {
@@ -103,6 +116,14 @@ pub enum LogEntry {
     /// ユーザーが「ここを後で見返したい」と思った瞬間を記録する。
     /// 認知状態の判断は含まない (UserLabel とは意味論が異なる)。
     ReviewMarker { timestamp: u64 },
+    /// IME 変換セッションの影ログ (Phase 2b, Windows のみ)。
+    /// HMM には統合しない。Phase 3 のデータ判断材料として蓄積。
+    ImeShadow {
+        timestamp: u64,
+        dwell_ms: u64,
+        candidate_nav_count: u32,
+        abandon: bool,
+    },
     /// セッション終了マーカー
     End,
 }
@@ -249,6 +270,24 @@ impl SessionLogger {
                                 writer,
                                 r#"{{"type":"review_marker","t":{}}}"#,
                                 timestamp,
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::ImeShadow {
+                            timestamp,
+                            dwell_ms,
+                            candidate_nav_count,
+                            abandon,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_ime_shadow_line(
+                                    timestamp,
+                                    dwell_ms,
+                                    candidate_nav_count,
+                                    abandon
+                                ),
                             );
                             dirty = true;
                         }
@@ -433,6 +472,33 @@ mod tests {
         assert_eq!(
             line,
             r#"{"type":"user_label","t":1000,"label":"stuck","recovered_at":null}"#
+        );
+    }
+
+    #[test]
+    fn ime_shadow_line_normal_completion() {
+        let line = format_ime_shadow_line(1_700_000_000_000, 1234, 3, false);
+        assert_eq!(
+            line,
+            r#"{"type":"ime_shadow","t":1700000000000,"dwell_ms":1234,"nav":3,"abandon":false}"#
+        );
+    }
+
+    #[test]
+    fn ime_shadow_line_abandoned() {
+        let line = format_ime_shadow_line(42, 500, 0, true);
+        assert_eq!(
+            line,
+            r#"{"type":"ime_shadow","t":42,"dwell_ms":500,"nav":0,"abandon":true}"#
+        );
+    }
+
+    #[test]
+    fn ime_shadow_line_zero_dwell_and_nav() {
+        let line = format_ime_shadow_line(1000, 0, 0, false);
+        assert_eq!(
+            line,
+            r#"{"type":"ime_shadow","t":1000,"dwell_ms":0,"nav":0,"abandon":false}"#
         );
     }
 
