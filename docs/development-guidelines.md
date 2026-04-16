@@ -305,6 +305,19 @@ pwsh -NoProfile -File scripts\sync-session.ps1 `
 内部で `gse-replay --metrics --json` → `validate_schema.py` → `git add/commit/push` を順に実行し、
 各 Step の exit code を伝搬する。
 
+**バッチ同期 (複数セッションを一括処理)**: `scripts/sync-all.*` で fallback → raw コピー + 全未処理ファイルの metrics 生成 + 1 commit/push をまとめて行える:
+
+```bash
+# macOS / Linux
+./scripts/sync-all.sh                    # fallback → raw → metrics → commit+push
+./scripts/sync-all.sh --no-commit        # dry-run
+./scripts/sync-all.sh --fallback /path   # fallback ディレクトリを指定
+
+# Windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\sync-all.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\sync-all.ps1 -NoCommit
+```
+
 #### 10.2.1 PowerShell 5.1 script を書くときの注意 (2026-04-16 判明)
 
 `scripts/sync-session.ps1` 実装中に、以下の挙動を複数回踏んだ。将来 `scripts/*.ps1`
