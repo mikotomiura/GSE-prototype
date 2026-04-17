@@ -339,10 +339,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\sync-all.ps1 -No
 `scripts/sync-session.ps1` 実装中に、以下の挙動を複数回踏んだ。将来 `scripts/*.ps1`
 を追加・編集する際に同じ落とし穴を避けるための記録:
 
-- **`$PSCommandPath` / `$PSScriptRoot` / `$MyInvocation.MyCommand.Path` / `$env:TEMP` / `$env:TMP` が null/空**
+- **`$PSCommandPath` / `$PSScriptRoot` / `$MyInvocation.MyCommand.Path` / `$PSHOME` / `$env:TEMP` / `$env:TMP` が null/空**
   になる invocation パスが存在する (Git Bash → `powershell.exe` ブリッジで特に顕著)。
   → repo root や temp path は**パラメータ化**して呼び出し元から明示的に受け取る。
   例: `[string]$RepoRoot = $(if ($env:GSE_PROTOTYPE_ROOT) { $env:GSE_PROTOTYPE_ROOT } else { 'C:\GSE-prototype' })`
+  → `$PSHOME` も空になる事象を 2026-04-17 に `sync-all.ps1` が子 PS を起動する際にも確認。
+    → 子 PS の解決は `Get-Command pwsh` → `$PSHOME\pwsh.exe` → `$PSHOME\powershell.exe` →
+    `$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe` (x64 前提) の順で回避。
 - **`$LASTEXITCODE` が CmdletBinding + 変数代入の組合せで消費され null 化**する。
   → native cmd の成否判定は **LASTEXITCODE に頼らず、出力ファイルのサイズ + `ConvertFrom-Json` での parseability 検証** を推奨。
 - **`Join-Path $a $b` が条件により空を返す**事例あり。

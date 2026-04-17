@@ -105,9 +105,18 @@ foreach ($f in $rawFiles) {
         continue
     }
     Write-Host "  processing: $basename"
-    # 現在のホストと同じ PowerShell で子プロセスを起動
-    $psExe = "$PSHOME\powershell.exe"
-    if (Test-Path "$PSHOME\pwsh.exe") { $psExe = "$PSHOME\pwsh.exe" }
+    # §10.2.1 quirk: Git Bash → powershell.exe ブリッジ経由で $PSHOME も空になる。
+    # 解決順:
+    #   1. Get-Command で pwsh (PS 7) が取れれば親と同世代の PS を使う
+    #   2. $PSHOME が取れていれば powershell.exe / pwsh.exe を優先
+    #   3. 最後の砦として $env:windir 下の Windows PowerShell 5.1 (x64 前提。arm64 対応時は要再検討)
+    # ブリッジ経由 ($PSHOME 空) の場合、親が pwsh 7 でも子は 5.1 に落ちる可能性がある点に注意。
+    $psExe = $null
+    $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($pwshCmd)                                                          { $psExe = $pwshCmd.Source }
+    elseif ($PSHOME -and (Test-Path -LiteralPath "$PSHOME\pwsh.exe"))      { $psExe = "$PSHOME\pwsh.exe" }
+    elseif ($PSHOME -and (Test-Path -LiteralPath "$PSHOME\powershell.exe")) { $psExe = "$PSHOME\powershell.exe" }
+    else { $psExe = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" }
     & $psExe -NoProfile -ExecutionPolicy Bypass -File $syncScript `
         -SessionPath $f.FullName `
         -DatasetRoot $DatasetRoot `
