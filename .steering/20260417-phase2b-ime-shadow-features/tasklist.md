@@ -60,4 +60,5 @@
 - [x] docs/architecture.md §4.6 に LogEntry::ImeShadow バリアント追記
 
 ## 完了処理
-- [ ] /finish-task
+- [x] 実機検証: 5 セッション / 148 件の ime_shadow emit 確認 (gse_20260417_03-04時台)
+- [x] /finish-task

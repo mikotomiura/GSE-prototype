@@ -132,3 +132,23 @@ NDJSON 出力:
 全変更は単一コミット。git revert で即座に戻せる。
 HMM パラメータ・既存 LogEntry には一切変更がないため、revert 後の
 データ互換性問題は発生しない。
+
+## 実機検証結果 (2026-04-17)
+
+`e05cb19` 適用後のバイナリで 5 セッション収録 (03:23〜04:00 JST)。
+fallback `~/Documents/GSE-sessions/` への出力を grep で確認:
+
+| Session | ime_shadow 件数 |
+|---|---|
+| gse_20260417_032318.ndjson | 68 |
+| gse_20260417_033257.ndjson | 37 |
+| gse_20260417_034221.ndjson | 6 |
+| gse_20260417_035000.ndjson | 21 |
+| gse_20260417_040056.ndjson | 16 |
+| **合計** | **148** |
+
+サンプル: `{"type":"ime_shadow","t":1776398481654,"dwell_ms":448,"nav":0,"abandon":false}`
+
+dwell_ms レンジ 22ms〜1520ms と妥当。全 5 セッションで emit 発生を確認し、
+`fix(hook): emit IME Shadow via direct READY polling` (e05cb19) で導入した
+独立ポーリング経路が safety valve 経路下でも動作していることを実証。
