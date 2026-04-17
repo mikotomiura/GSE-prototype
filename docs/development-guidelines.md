@@ -334,6 +334,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\sync-all.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\sync-all.ps1 -NoCommit
 ```
 
+バッチ同期の **Step 0** として `scripts/check_schema_parity.py` が自動で走り、
+gse-prototype 側 `src-tauri/schema/current.json` と gse-dataset 側
+`schema/current.json` の JSON 意味同値を検証する。ドリフト検出時は
+Step 1 以降に進まず、修復コマンド例を出力して停止する。詳細は §10.3 を参照。
+
 #### 10.2.1 PowerShell 5.1 script を書くときの注意 (2026-04-16 判明)
 
 `scripts/sync-session.ps1` 実装中に、以下の挙動を複数回踏んだ。将来 `scripts/*.ps1`
@@ -365,10 +370,47 @@ NDJSON スキーマは gse-prototype の Rust 型 (`src-tauri/src/schema_dto.rs`
 出力し、gse-dataset 側の `schema/current.json` に同じ内容をコピーする。
 
 - schema/v1.json / v2.json / … の手書きバージョニング方式は **廃止**
-- CI (`.github/workflows/ci.yml` の `check` ジョブ) が `emit_schema` の現在出力と
-  `src-tauri/schema/current.json` を diff して drift を機械的にブロックする
+- **tier-1 check**: CI (`.github/workflows/ci.yml` の `check` ジョブ) が
+  `emit_schema` の現在出力と `src-tauri/schema/current.json` を diff して
+  repo 内 drift を機械的にブロック
+- **tier-2 check**: `scripts/check_schema_parity.py` が
+  `src-tauri/schema/current.json` と gse-dataset 側 `schema/current.json` の
+  cross-repo drift をバッチ同期の Step 0 で検出 (詳細は §10.3.1)
 - `schema_dto.rs` を更新したら: (1) `cargo run --bin emit_schema > schema/current.json`
   (2) gse-dataset 側にコピー (3) 両 repo を同期 commit
+
+#### 10.3.1 バッチ同期時の cross-repo drift guard (2026-04-17 導入)
+
+tier-1 CI check は repo 内の drift のみ対象で、`src-tauri/schema/current.json`
+→ `gse-dataset/schema/current.json` のコピー忘れは検知できない。
+2026-04-16 の Phase 2b 実装でこの第 3 ステップが抜け、翌日のバッチ同期で初めて
+顕在化した事例を受け、pre-flight check を導入した。
+
+- 実装: `scripts/check_schema_parity.py` (Python 3.9+ 依存、標準ライブラリのみ)
+- 呼出し: `scripts/sync-all.ps1` / `scripts/sync-all.sh` が Step 0 として呼ぶ
+  - Windows: `python` が PATH にある前提 (python.org 版または `py -3` alias)
+  - macOS/Linux: `python3` → `python` の順にフォールバック
+- 比較粒度: JSON 意味同値 (`json.load` + キーソート正規化)
+  - CRLF/LF 差異・キー順序揺れは drift 扱いしない (false positive 回避)
+  - variant (tagged enum の `type` 値 + `const` 単一値) の missing / extra を個別列挙
+- 単体テスト: `scripts/tests/test_check_schema_parity.py` (unittest, 12 ケース)
+- Exit code:
+  - `0` parity OK / `1` drift 検出 / `2` prototype 側 schema 不在
+  - `3` dataset 側 schema 不在 / `4` I/O or JSON parse エラー
+- `--machine-readable` オプション:
+  - stdout 最終行に `HELPER_EXITCODE=<n>` (0..4) を必ず出力
+  - PowerShell 5.1 の `-File` invocation では `$LASTEXITCODE` が不安定なため、
+    shell 側はこのセンチネルを regex で parse して exit code を確定する
+  - bash 側は `|| rc=$?` で直接取れるのでセンチネル依存なし (使っても害なし)
+
+手動で helper を単体実行することも可:
+```
+python scripts/check_schema_parity.py --dataset C:/gse-dataset
+python scripts/check_schema_parity.py --dataset C:/gse-dataset --machine-readable
+```
+
+ロジックを Python 1 本に集約しているため、将来の拡張 (tier-1 への応用・
+variant 互換性判定など) は helper 側のみ編集する。ps1/sh は薄い呼出しラッパ。
 
 ### 10.4 プライバシー原則
 

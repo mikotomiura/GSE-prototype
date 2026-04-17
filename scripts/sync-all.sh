@@ -57,6 +57,32 @@ fi
 
 mkdir -p "$RAW_DIR" "$METRICS_DIR"
 
+# === Step 0: schema parity pre-flight (gse-prototype vs gse-dataset) ===
+# Python helper に実ロジックを集約 (scripts/check_schema_parity.py)。
+# 詳細は .steering/20260417-schema-drift-guard/design.md を参照。
+PARITY_SCRIPT="$REPO_ROOT/scripts/check_schema_parity.py"
+if [[ ! -f "$PARITY_SCRIPT" ]]; then
+    echo "[sync-all] ERROR: check_schema_parity.py not found at $PARITY_SCRIPT" >&2
+    exit 4
+fi
+PYTHON_BIN=""
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+else
+    echo "[sync-all] ERROR: neither python3 nor python found on PATH" >&2
+    exit 4
+fi
+echo "[sync-all] Step 0/3: verifying schema parity (gse-prototype <-> gse-dataset)"
+# set -e 環境下では `if ! cmd; then rc=$?` が 0 を拾うため、|| で rc を保全する
+parity_rc=0
+"$PYTHON_BIN" "$PARITY_SCRIPT" --dataset "$DATASET_ROOT" || parity_rc=$?
+if [[ "$parity_rc" -ne 0 ]]; then
+    echo "[sync-all] schema parity check failed (exit $parity_rc) — aborting before any file copy." >&2
+    exit "$parity_rc"
+fi
+
 # === Step 1: fallback → raw コピー (重複スキップ) ===
 COPIED=0
 if [[ -d "$FALLBACK_DIR" ]]; then
@@ -76,6 +102,11 @@ else
 fi
 
 # === Step 2: metrics 未生成ファイルを検出して sync-session 実行 ===
+# set -e 下での rc 取得パターンに注意:
+#   OK: `cmd || rc=$?`          (||/else 経由なら $? は cmd 自身の exit code)
+#   NG: `if ! cmd; then rc=$?`  (if! の形は then 内 $? が 0 化する事象あり)
+# 以降の `if GSE_DATASET=... cmd; then ... else rc=$?` は if/else の else 側で
+# $? を取る形なので正常動作する (Step 0 の || パターンと等価安全)。
 PROCESSED=0
 FAILED=0
 echo "[sync-all] Step 2/3: generating metrics for unprocessed sessions"

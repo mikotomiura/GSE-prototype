@@ -43,6 +43,7 @@ param(
 
 $EXIT_OK           = 0
 $EXIT_CARGO        = 1
+$EXIT_SCHEMA_DRIFT = 2
 $EXIT_GIT          = 3
 $EXIT_PRECONDITION = 4
 
@@ -72,6 +73,41 @@ foreach ($d in @($rawDir, $metricsDir)) {
     if (-not (Test-Path -LiteralPath $d)) {
         New-Item -ItemType Directory -Path $d -Force | Out-Null
     }
+}
+
+# === Step 0: schema parity pre-flight (gse-prototype vs gse-dataset) ===
+# Python helper 1 本に実ロジックを集約し、ps1/sh の間で logic drift しないようにする。
+# 詳細は .steering/20260417-schema-drift-guard/design.md を参照。
+# §10.2.1 quirk: 変数補間が初回アクセスで null に見える事象対策として
+# RepoRoot を pre-access してから format 演算子で結合する (両方やらないと再発する)。
+Write-Host "[sync-all] (pre-access) RepoRoot=[$RepoRoot]" -ForegroundColor DarkGray
+$parityScript = '{0}\scripts\check_schema_parity.py' -f $RepoRoot
+Write-Host "[sync-all] parity script: $parityScript" -ForegroundColor DarkGray
+if (-not (Test-Path -LiteralPath $parityScript)) {
+    Write-Warning "check_schema_parity.py not found at $parityScript"
+    exit $EXIT_PRECONDITION
+}
+Write-Step "Step 0/3: verifying schema parity (gse-prototype <-> gse-dataset)"
+# §10.2.1 quirk 検証結果 (2026-04-17):
+#   - .ps1 に [CmdletBinding()] + param() があると `& python ...` の stdout が
+#     自動化ストリーム経由で吸われ、@() 捕捉しても空配列になる事象あり。
+#   - 回避: 各引数を "$var" でクオートする (クオート無しだと PS 5.1 が null 化)
+#   - exit code は helper の --machine-readable が stdout 最終行に出す
+#     HELPER_EXITCODE=<n> を parse (PS の $LASTEXITCODE は -File では不安定)
+Write-Host "[sync-all] (pre-access) DatasetRoot=[$DatasetRoot] parityScript=[$parityScript]" -ForegroundColor DarkGray
+$parityLines = @(& python "$parityScript" --dataset "$DatasetRoot" --machine-readable 2>&1)
+foreach ($line in $parityLines) { Write-Host $line }
+$parityJoined = ($parityLines | Out-String)
+$parityRc = 4   # default: invalid args / I/O error
+if ($parityJoined -match 'HELPER_EXITCODE=(\d+)') {
+    $parityRc = [int]$Matches[1]
+} else {
+    Write-Warning "helper output unparseable (no HELPER_EXITCODE sentinel) - aborting conservatively. Check if python is on PATH or the helper crashed."
+    $parityRc = 1
+}
+if ($parityRc -ne 0) {
+    Write-Warning "schema parity check failed (exit $parityRc) - aborting before any file copy."
+    exit $parityRc
 }
 
 # === Step 1: fallback → raw コピー (重複スキップ) ===

@@ -34,3 +34,6 @@ issue.md
 .claude/commands/commands_setup
 docs/[提案プロジェクト詳細資料]GSE_proposal.docx.pdf
 docs/[提案プロジェクト補足資料]GSE技術設計書.docx.pdf
+# Python
+__pycache__/
+*.pyc
