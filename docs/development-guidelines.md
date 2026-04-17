@@ -387,9 +387,18 @@ tier-1 CI check は repo 内の drift のみ対象で、`src-tauri/schema/curren
 顕在化した事例を受け、pre-flight check を導入した。
 
 - 実装: `scripts/check_schema_parity.py` (Python 3.9+ 依存、標準ライブラリのみ)
-- 呼出し: `scripts/sync-all.ps1` / `scripts/sync-all.sh` が Step 0 として呼ぶ
+- 呼出し箇所は 2 段の多層防御:
+  - **tier-2 (バッチ同期時)**: `scripts/sync-all.ps1` / `scripts/sync-all.sh`
+    が Step 0 として実行。既に閉じた過去タスクの drift もここで catch する。
+  - **tier-3 (タスク閉じ時)**: `.claude/commands/finish-task.md` Step 3 が
+    並列検査として実行。`schema_dto.rs` / `current.json` を touch した
+    タスクのクローズ時点で検出する (2026-04-17 導入)。tier-3 の呼出しは
+    `/add-feature` / `/fix-bug` / `/refactor` → `/finish-task` の延長で
+    自動的に走る。drift 検出時は Step 4 (commit 提案) に進まず停止する。
+- Python 環境前提 (tier-2 / tier-3 共通):
   - Windows: `python` が PATH にある前提 (python.org 版または `py -3` alias)
   - macOS/Linux: `python3` → `python` の順にフォールバック
+  - tier-3 (bash / Git Bash) 側は OS を問わず `python3` があればそれを優先
 - 比較粒度: JSON 意味同値 (`json.load` + キーソート正規化)
   - CRLF/LF 差異・キー順序揺れは drift 扱いしない (false positive 回避)
   - variant (tagged enum の `type` 値 + `const` 単一値) の missing / extra を個別列挙

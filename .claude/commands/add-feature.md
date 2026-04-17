@@ -77,6 +77,9 @@ tasklist を順番に実施する。各完了後にチェックボックスを�
 
 `/finish-task` を実行する。
 
+> `schema_dto.rs` / `current.json` を touch した場合、finish-task Step 3 の
+> schema parity check で停止する可能性がある (詳細: `docs/development-guidelines.md` §10.3.1 tier-3 guard)。
+
 ---
 
 ## 制約
