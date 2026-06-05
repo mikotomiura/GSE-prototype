@@ -12,12 +12,29 @@ interface CognitiveStateRaw {
   stuck: number;
 }
 
-// Lv1トリガー閾値: NudgeはOverlay.tsxで stuck>0.6 時に表示
-// Lv2トリガー閾値: Wallは stuck>0.7 の累積時間が 30秒に達した際に表示 (advice.md §C)
-// LV2_SLACK_THRESHOLD: 0.5 未満に落ちた場合のみ累積タイマーを減衰させる
-const LV2_STUCK_THRESHOLD = 0.7;
-const LV2_SLACK_THRESHOLD = 0.5;
-const LV2_TIMER_MS = 30_000;
+type InterventionAction = "none" | "nudge" | "wall" | "defer";
+
+interface InterventionDecision {
+  action: InterventionAction;
+  need_score: number;
+  opportunity_score: number;
+  p_stuck: number;
+  idle_ms: number;
+  wall_accum_ms: number;
+  reason: string;
+  suppressed_by: string[];
+}
+
+const DEFAULT_INTERVENTION_DECISION: InterventionDecision = {
+  action: "none",
+  need_score: 0,
+  opportunity_score: 0,
+  p_stuck: 0,
+  idle_ms: 0,
+  wall_accum_ms: 0,
+  reason: "safe_default",
+  suppressed_by: [],
+};
 
 function App() {
   const [cognitiveState, setCognitiveState] = useState<CognitiveStateRaw>({
@@ -25,6 +42,9 @@ function App() {
     incubation: 0.15,
     stuck: 0.05,
   });
+  const [interventionDecision, setInterventionDecision] = useState<InterventionDecision>(
+    DEFAULT_INTERVENTION_DECISION
+  );
   const [isWallActive, setIsWallActive] = useState(false);
   const [isMonkMode, setIsMonkMode] = useState(false);
   // Overlay ウィンドウは start_session 時に動的生成されるため、
@@ -35,9 +55,6 @@ function App() {
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
   const [hookActive, setHookActive] = useState<boolean | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  // advice.md §C: 累積タイマー (連続ではなく累積 30 秒で Wall 発動)
-  const stuckAccumMsRef = useRef<number>(0);
-  const lastStuckTickRef = useRef<number>(Date.now());
   // Ref mirrors: setInterval 内からステート最新値を参照するため
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
   const isWallActiveRef = useRef(isWallActive);
@@ -66,48 +83,36 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + Lv2 累積タイマー
+  // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + intervention decision
   //    単一の setInterval 内で Promise.all で並行取得し、同じブロック内で
-  //    Date.now() ベースの正確な elapsed を用いて Lv2 タイマーを更新する。
-  //    isWallActive/isMonkMode は Ref 経由で参照し、依存配列に含めない。
+  //    Rust 側の Opportunity 判定結果を UI に反映する。
+  //    isWallActive/isMonkMode は Ref 経由で Rust に渡し、依存配列に含めない。
   //    これにより interval の破棄・再作成が発生せず、タイマー精度が向上する。
   useEffect(() => {
     if (!isStarted) return;
-    lastStuckTickRef.current = Date.now();
 
     const interval = setInterval(async () => {
       try {
-        const [state, idle] = await Promise.all([
+        const [state, idle, decision] = await Promise.all([
           invoke<CognitiveStateRaw>("get_cognitive_state"),
           invoke<number>("get_keyboard_idle_ms"),
+          invoke<InterventionDecision>("get_intervention_decision", {
+            windowLabel,
+            isMonkMode: isMonkModeRef.current,
+            isWallActive: isWallActiveRef.current,
+          }),
         ]);
         setCognitiveState(state);
         setKeyboardIdleMs(idle);
+        setInterventionDecision(decision);
 
-        // --- Lv2 累積タイマー (同ブロック内で Date.now() ベース算出) ---
-        const now = Date.now();
-        const elapsed = now - lastStuckTickRef.current;
-        lastStuckTickRef.current = now;
-
-        if (!isWallActiveRef.current && !isMonkModeRef.current) {
-          if (state.stuck > LV2_STUCK_THRESHOLD) {
-            stuckAccumMsRef.current += elapsed;
-            if (stuckAccumMsRef.current >= LV2_TIMER_MS) {
-              stuckAccumMsRef.current = 0;
-              setIsWallActive(true);
-            }
-          } else if (state.stuck < LV2_SLACK_THRESHOLD) {
-            // 閾値を大きく下回った場合: 2× 速度で減衰
-            stuckAccumMsRef.current = Math.max(0, stuckAccumMsRef.current - elapsed * 2);
-          }
-          // LV2_SLACK_THRESHOLD ≤ stuck ≤ LV2_STUCK_THRESHOLD: 凍結（変化なし）
-        } else {
-          stuckAccumMsRef.current = 0;
+        if (decision.action === "wall" && !isWallActiveRef.current) {
+          setIsWallActive(true);
         }
       } catch (e) {
         console.error("Failed to fetch state:", e);
         setCognitiveState({ flow: 1.0, incubation: 0.0, stuck: 0.0 });
-        stuckAccumMsRef.current = 0;
+        setInterventionDecision(DEFAULT_INTERVENTION_DECISION);
       }
     }, 500);
 
@@ -154,7 +159,7 @@ function App() {
   if (windowLabel === "overlay") {
     return (
       <Overlay
-        stuckProb={cognitiveState.stuck}
+        interventionDecision={interventionDecision}
         isWallActive={isWallActive}
       />
     );
@@ -184,7 +189,7 @@ function App() {
         <div className="start-header">
           <h1>Generative Struggle Engine</h1>
           <p className="start-description">
-            キーストロークを解析し、あなたの認知状態をリアルタイムで推定します。
+            キーストロークを解析し、介入判断に必要な作業状態をリアルタイムで推定します。
           </p>
         </div>
         <button className="start-button" onClick={handleStart}>

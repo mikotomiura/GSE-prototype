@@ -98,6 +98,19 @@ pub enum LogEntryDto {
         nav: u32,
         abandon: bool,
     },
+    /// MVP Opportunity 判定ログ。
+    /// Need/Opportunity と抑制理由を後から検証するための固定カテゴリ記録。
+    InterventionDecision {
+        t: u64,
+        action: InterventionActionDto,
+        need_score: f64,
+        opportunity_score: f64,
+        p_stuck: f64,
+        idle_ms: u64,
+        wall_accum_ms: u64,
+        reason: String,
+        suppressed_by: Vec<String>,
+    },
 }
 
 /// Ground Truth ラベルの種別。NDJSON 文字列は "flow" / "incubation" / "stuck"。
@@ -107,4 +120,14 @@ pub enum UserLabelKindDto {
     Flow,
     Incubation,
     Stuck,
+}
+
+/// 介入ポリシーの出力種別。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InterventionActionDto {
+    None,
+    Nudge,
+    Wall,
+    Defer,
 }

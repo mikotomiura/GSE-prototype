@@ -303,9 +303,82 @@
           ]
         }
       }
+    },
+    {
+      "description": "MVP Opportunity 判定ログ。 Need/Opportunity と抑制理由を後から検証するための固定カテゴリ記録。",
+      "type": "object",
+      "required": [
+        "action",
+        "idle_ms",
+        "need_score",
+        "opportunity_score",
+        "p_stuck",
+        "reason",
+        "suppressed_by",
+        "t",
+        "type",
+        "wall_accum_ms"
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/InterventionActionDto"
+        },
+        "idle_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "need_score": {
+          "type": "number",
+          "format": "double"
+        },
+        "opportunity_score": {
+          "type": "number",
+          "format": "double"
+        },
+        "p_stuck": {
+          "type": "number",
+          "format": "double"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "suppressed_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "intervention_decision"
+          ]
+        },
+        "wall_accum_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     }
   ],
   "definitions": {
+    "InterventionActionDto": {
+      "description": "介入ポリシーの出力種別。",
+      "type": "string",
+      "enum": [
+        "none",
+        "nudge",
+        "wall",
+        "defer"
+      ]
+    },
     "UserLabelKindDto": {
       "description": "Ground Truth ラベルの種別。NDJSON 文字列は \"flow\" / \"incubation\" / \"stuck\"。",
       "type": "string",

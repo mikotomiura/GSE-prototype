@@ -67,6 +67,33 @@ fn format_ime_shadow_line(
     )
 }
 
+/// `LogEntry::InterventionDecision` の NDJSON 1 行を生成する純粋関数。
+fn format_intervention_decision_line(
+    timestamp: u64,
+    action: &str,
+    need_score: f64,
+    opportunity_score: f64,
+    p_stuck: f64,
+    idle_ms: u64,
+    wall_accum_ms: u64,
+    reason: &str,
+    suppressed_by: &[String],
+) -> String {
+    let suppressed = serde_json::to_string(suppressed_by).unwrap_or_else(|_| "[]".to_string());
+    format!(
+        r#"{{"type":"intervention_decision","t":{},"action":"{}","need_score":{:.4},"opportunity_score":{:.4},"p_stuck":{:.4},"idle_ms":{},"wall_accum_ms":{},"reason":"{}","suppressed_by":{}}}"#,
+        timestamp,
+        action,
+        need_score,
+        opportunity_score,
+        p_stuck,
+        idle_ms,
+        wall_accum_ms,
+        reason,
+        suppressed,
+    )
+}
+
 /// ログエントリの種別
 #[derive(Debug)]
 pub enum LogEntry {
@@ -123,6 +150,19 @@ pub enum LogEntry {
         dwell_ms: u64,
         candidate_nav_count: u32,
         abandon: bool,
+    },
+    /// MVP Opportunity 判定ログ。
+    /// 固定カテゴリ文字列と数値のみ。本文・Unicode 文字・ウィンドウタイトルは含めない。
+    InterventionDecision {
+        timestamp: u64,
+        action: String,
+        need_score: f64,
+        opportunity_score: f64,
+        p_stuck: f64,
+        idle_ms: u64,
+        wall_accum_ms: u64,
+        reason: String,
+        suppressed_by: Vec<String>,
     },
     /// セッション終了マーカー
     End,
@@ -287,6 +327,34 @@ impl SessionLogger {
                                     dwell_ms,
                                     candidate_nav_count,
                                     abandon
+                                ),
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::InterventionDecision {
+                            timestamp,
+                            action,
+                            need_score,
+                            opportunity_score,
+                            p_stuck,
+                            idle_ms,
+                            wall_accum_ms,
+                            reason,
+                            suppressed_by,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_intervention_decision_line(
+                                    timestamp,
+                                    &action,
+                                    need_score,
+                                    opportunity_score,
+                                    p_stuck,
+                                    idle_ms,
+                                    wall_accum_ms,
+                                    &reason,
+                                    &suppressed_by
                                 ),
                             );
                             dirty = true;
@@ -499,6 +567,25 @@ mod tests {
         assert_eq!(
             line,
             r#"{"type":"ime_shadow","t":1000,"dwell_ms":0,"nav":0,"abandon":false}"#
+        );
+    }
+
+    #[test]
+    fn intervention_decision_line_defer_with_suppression() {
+        let line = format_intervention_decision_line(
+            1_700_000_000_000,
+            "defer",
+            0.78,
+            0.32,
+            0.78,
+            4200,
+            12_000,
+            "high_need_but_low_opportunity",
+            &["recent_dismiss".to_string()],
+        );
+        assert_eq!(
+            line,
+            r#"{"type":"intervention_decision","t":1700000000000,"action":"defer","need_score":0.7800,"opportunity_score":0.3200,"p_stuck":0.7800,"idle_ms":4200,"wall_accum_ms":12000,"reason":"high_need_but_low_opportunity","suppressed_by":["recent_dismiss"]}"#
         );
     }
 
