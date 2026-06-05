@@ -3,9 +3,9 @@
 ## 1. プロジェクト概要
 
 - **プロダクト名**: GSE (Generative Struggle Engine)
-- **解決する課題**: 知識労働者がキーボード作業中に「行き詰まり（Stuck）」状態に陥った際、自覚なく長時間停滞し続ける問題。従来の生産性ツールは作業量の最大化を目指すが、GSE は認知的な行き詰まりの検出と適切なタイミングでの介入により「生産的苦闘（Productive Struggle）」を保護する。
+- **解決する課題**: 知識労働者がキーボード作業中に作業停滞へ入り、自覚なく長時間停滞し続ける問題。従来の生産性ツールは作業量の最大化を目指すが、GSE は PC 操作に現れる行動的シグナルから介入判断に必要な作業上の状態を推定し、適切なタイミングでの介入により「生産的苦闘（Productive Struggle）」を保護する。
 - **ターゲットユーザー**: Windows 11 および macOS（13 Ventura 以降）上で日常的にキーボード作業を行う知識労働者（メール、企画書、ドキュメント作成、コーディング等）
-- **コアバリュー**: 不便益（Fubeneki）に基づく HCI フレームワーク — あえて不便を導入することで、ユーザー自身の認知的回復（Incubation）を促進する
+- **コアバリュー**: 不便益（Fubeneki）に基づく HCI フレームワーク — あえて不便を導入することで、ユーザー自身の作業再編・休止・回復を促進する。GSE は脳内の認知状態を直接読むのではなく、行動的シグナルから Need と Opportunity を分離して介入判断を行う。
 
 ## 2. コア機能一覧
 
@@ -43,11 +43,11 @@
   - IME ポーリングスレッド起動失敗: IME 状態検出なしで継続（ベースラインは coding β 固定）
   - macOS: TIS クエリは GCD メインキュー必須（dispatch_sync_f）。メインスレッド以外から直接呼ぶと不正な結果を返す
 
-### 機能 3: 認知状態推定（HMM エンジン）
+### 機能 3: 作業状態推定（HMM ベースライン）
 
-- **概要**: キーストローク特徴量から 3 つの認知状態（Flow / Incubation / Stuck）の確率をリアルタイム推定する
+- **概要**: キーストローク特徴量から、介入判断に必要な作業上の停滞・摩擦・継続の兆候をリアルタイム推定する。現行 HMM の Flow / Incubation / Stuck 確率は、脳内状態の直接分類ではなく、行動シグナル由来の参考スコアとして扱う。
 - **入力**: 5 つのキーストローク特徴量（F1: Flight Time, F3: Correction Rate, F4: Burst Length, F5: Pause Count, F6: Pause-After-Delete Rate）
-- **出力**: 3 状態の確率分布 {p_flow, p_incubation, p_stuck}（1Hz 更新）
+- **出力**: {p_flow, p_incubation, p_stuck}（1Hz 更新）。MVP では `p_stuck` を Need 層の `stuck_likelihood` として利用する。
 - **振る舞い**:
   - 30 秒ローリングウィンドウで特徴量を算出
   - 特徴量 → 潜在軸（X: Cognitive Friction, Y: Engagement）→ 26 観測ビンへ量子化
@@ -59,17 +59,26 @@
   - コールドスタート: Flow 寄りの初期確率 [0.80, 0.15, 0.05] で安定起動
   - 長時間無入力: 段階的 α 調整（0.15 → 0.18 → 0.25）で緩やかに遷移
 
-### 機能 4: 段階的介入
+### 機能 4: Opportunity 判定 + 段階的介入
 
-- **概要**: 推定された認知状態に応じて段階的な介入を実施する
+- **概要**: Need（介入が必要そうか）と Opportunity（今介入してよいか）を分離し、`InterventionDecision` に従って段階的な介入を実施する。
+- **MVP 入力**: `p_stuck`, `idle_ms`, F3/F4/F6, `cooldown`, `daily_cap`, `recent_dismiss`, `Monk Mode`, Wall 累積時間
+- **MVP 出力**: `none` / `nudge` / `wall` / `defer`
+- **初期パラメータ**:
+  - Nudge Need: `p_stuck >= 0.60`
+  - Wall Need: `p_stuck >= 0.70` が累積 30 秒
+  - Nudge cooldown: 10 分、daily cap: 6 回/日
+  - Wall cooldown: 60 分、daily cap: 1 回/日
+  - recent dismiss 抑制: 20 分
+  - away idle: 180 秒以上で Wall 抑制
 
 #### Lv1: Nudge（視覚的ヒント）
-- **トリガー**: p_stuck > 0.60
-- **振る舞い**: オーバーレイウィンドウに赤いビネット効果を表示
-- **解除条件**: p_stuck ≤ 0.60 で自動消失
+- **トリガー**: `InterventionDecision.action == "nudge"`
+- **振る舞い**: オーバーレイウィンドウ右端に小さなサイドカードを表示
+- **解除条件**: `InterventionDecision.action != "nudge"` で自動消失
 
 #### Lv2: Wall（作業ブロック）
-- **トリガー**: p_stuck > 0.70 が累積 30 秒以上
+- **トリガー**: `InterventionDecision.action == "wall"`
 - **振る舞い**:
   - メインウィンドウを全画面ロック
   - QR コードを表示し、スマートフォンでスキャンを促す
@@ -84,20 +93,20 @@
 
 ### 機能 5: セッション管理
 
-- **概要**: 分析セッションのライフサイクルを管理する
+- **概要**: 分析セッションのライフサイクルと Opportunity policy state を管理する
 - **入力**: ユーザーの「開始する」ボタン押下
 - **出力**: セッション開始/終了イベント、NDJSON セッションログ
 - **振る舞い**:
   - セッション開始時: HMM エンジンリセット、ロガー初期化
-  - セッション中: 1Hz で認知状態を更新、500ms で UI ポーリング
+  - セッション中: 1Hz で作業状態スコアを更新、500ms で UI が `InterventionDecision` をポーリング
   - セッション終了時: ログファイルクローズ、Wall Server 停止
 - **エラー条件**:
   - IPC 失敗時: 認知状態を安全なデフォルト値にリセット（flow=1.0, stuck=0.0）
 
 ### 機能 6: セッションログ記録
 
-- **概要**: キーストロークイベントと HMM 状態を NDJSON 形式で永続化する
-- **入力**: InputEvent、特徴量、IME 状態、セッションイベント、UserLabel (Phase 1)
+- **概要**: キーストロークイベント、作業状態スコア、介入判断を NDJSON 形式で永続化する
+- **入力**: InputEvent、特徴量、IME 状態、`InterventionDecision`、セッションイベント、UserLabel (Phase 1)
 - **出力**: セッションログの保存先は環境変数 `GSE_DATASET` で制御する (logger.rs `default_log_path` の 2 段優先):
   1. `GSE_DATASET` 設定時: `$GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson` (開発者マシンでは `gse-dataset` リポジトリに直接書き込む運用)
   2. 未設定時 (fallback): `~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson`
@@ -107,6 +116,7 @@
   - バックグラウンドスレッドが 5 秒間隔でディスクにフラッシュ
   - セッション開始/終了のメタレコードで囲む
   - meta 行に `hmm_version` (SemVer) を埋め込み、gse-replay で検証
+  - `intervention_decision` 行に action / need_score / opportunity_score / suppressed_by を記録し、介入しすぎ・defer・dismiss の事後分析に使う
 - **将来拡張**: セッション終了後にオプトインでログを匿名化・外部送信する学習データ収集パス
 - **エラー条件**:
   - ディスク書き込み失敗: ログをドロップし warn 出力、推定は継続
@@ -162,7 +172,7 @@
 - **トリガー**: ユーザーが行き詰まり状態に陥る（長時間の修正・削除の繰り返し、長い休止）
 - **基本フロー**:
   1. キーストローク特徴量が Stuck 領域に移行する
-  2. p_stuck が 0.60 を超え、Nudge（赤ビネット）が表示される
+  2. Need と Opportunity が閾値を満たし、Nudge（右端サイドカード）が表示される
   3. ユーザーが作業を継続し、p_stuck が 0.70 を超える
   4. 累積 30 秒経過後、Wall が起動する
   5. ユーザーがスマートフォンで QR コードをスキャンする

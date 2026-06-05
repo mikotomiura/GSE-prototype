@@ -103,6 +103,9 @@ enum ReplayEvent {
     /// Phase 2b IME Shadow Features。replay では読み飛ばす。
     #[serde(rename = "ime_shadow")]
     ImeShadow(#[allow(dead_code)] serde_json::Value),
+    /// MVP Opportunity 判定ログ。replay では読み飛ばす。
+    #[serde(rename = "intervention_decision")]
+    InterventionDecision(#[allow(dead_code)] serde_json::Value),
 }
 
 impl ReplayEvent {
@@ -121,6 +124,7 @@ impl ReplayEvent {
             ReplayEvent::UserLabel { .. } => None,
             ReplayEvent::ReviewMarker { .. } => None,
             ReplayEvent::ImeShadow(_) => None,
+            ReplayEvent::InterventionDecision(_) => None,
         }
     }
 }
@@ -802,7 +806,8 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::Feat(_)
             | ReplayEvent::UserLabel { .. }
             | ReplayEvent::ReviewMarker { .. }
-            | ReplayEvent::ImeShadow(_) => {
+            | ReplayEvent::ImeShadow(_)
+            | ReplayEvent::InterventionDecision(_) => {
                 // Meta / Feat / UserLabel / ReviewMarker はゲート進行済み、追加処理不要
                 // (UserLabel は metrics 経路で collect_user_labels 側で抽出)
                 // (ReviewMarker は --segment 経路でセグメントハイライトに使用)

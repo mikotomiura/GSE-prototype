@@ -1,8 +1,7 @@
 # GSE (Generative Struggle Engine)
 
-> **Windows・macOS 上でキーストローク動的特徴からリアルタイムに認知状態を推定するシステム**
-> クラウド依存なし・ユーザー介入なしで、手動チューニングされた隠れマルコフモデル（HMM）を用いて
-> 書き手の精神状態を **Flow / Incubation / Stuck** に分類します。
+> **Windows・macOS 上で、PC 操作に現れる行動的シグナルから作業状態と介入タイミングを推定するシステム**
+> GSE はユーザーの脳内状態を直接読むものではありません。キーストローク動態から介入判断に必要な作業上の状態を推定し、必要性とタイミングを分けて判断します。
 
 [🇺🇸 English README is here](README.md)
 
@@ -11,7 +10,7 @@
 ## 目次
 
 1. [研究動機](#研究動機)
-2. [認知状態モデル](#認知状態モデル)
+2. [作業状態と Opportunity モデル](#作業状態と-opportunity-モデル)
 3. [システムアーキテクチャ](#システムアーキテクチャ)
 4. [フォルダ構成](#フォルダ構成)
 5. [特徴量抽出（F1, F3–F6）](#特徴量抽出f1-f3f6)
@@ -42,21 +41,24 @@
 
 ## 研究動機
 
-ライター、プログラマー、知識労働者は **Flow（滑らかな高出力）**・**Incubation（意識的な停止と潜在的処理）**・**Stuck（認知的行き詰まり、非生産的ループ）** の三状態を交互に経験します。これらの状態をリアルタイムで把握できれば、アンビエント音楽・ナッジ・UI ディミングなど、タスクを中断しないまま認知的足場（metacognitive scaffolding）を提供するアダプティブツールが実現できます。
+ライター、プログラマー、知識労働者は、滑らかな出力、有用な停止、非生産的なループを行き来します。GSE はそれらを直接観測可能な脳内状態ではなく、PC 操作に現れる作業上の行動パターンとして扱います。目的は **Need**（介入が必要そうか）と **Opportunity**（今なら邪魔になりにくいか）を分離し、生産的苦闘を守ることです。
 
-既存のアプローチはウェアラブルデバイス・カメラ・明示的自己報告を必要とします。本プロトタイプは OS から既に取得可能な**キーストロークタイミング情報のみ**を使用するため、追加ハードウェアなしで任意の Windows・macOS デバイスに展開可能です。
+既存のアプローチはウェアラブルデバイス・カメラ・明示的自己報告を必要とすることが多いです。本プロトタイプは OS から既に取得可能な**キーストロークタイミング情報**を起点にし、生テキストをログに残さず、行動特徴量と介入判断のみを記録します。
 
 ---
 
-## 認知状態モデル
+## 作業状態と Opportunity モデル
 
-三状態は認知科学の確立された文献に基づいて定義されています。
+GSE v2 は 4 層の解釈モデルを採用します。
 
-| 状態 | 定義 | 行動シグネチャ |
+| 層 | 役割 | MVP 実装 |
 | --- | --- | --- |
-| **Flow** | 内発的に動機付けられた、努力なき課題への没入（Csikszentmihalyi, 1990） | 短いキー間隔、低修正率、長い連続バースト |
-| **Incubation** | 潜在的な問題再構成を可能にする意図的停止（Sio & Ormerod, 2009） | **高い $P(\text{Burst} \mid \text{Pause})$**: 2 秒以上の沈黙 → 高速バーストの出現 |
-| **Stuck** | 行き詰まりから抜け出せない固執状態（Ohlsson, 1992） | **高い $P(\text{Pause} \mid \text{Delete})$**: 削除→停止の固執ループ、文字純増ほぼゼロ |
+| 行動シグナル | 本文なしで観測できる操作特徴 | F1/F3/F4/F5/F6 |
+| 作業状態推定 | 摩擦・停滞らしさなどの作業上のスコア | 現行 HMM 確率、`p_stuck` を Need として利用 |
+| Opportunity 判定 | 今介入してよいか | idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode |
+| 介入ポリシー | 何を出すか | `none` / `nudge` / `wall` / `defer` |
+
+従来の Flow / Incubation / Stuck HMM は行動的ベースラインとして残しますが、その出力はユーザーの内面を直接多クラス分類したものではなく、作業パターンの参考スコアとして扱います。
 
 ---
 
@@ -92,7 +94,7 @@
 │                                      ┌──────────▼───────────────┐  │
 │                                      │  React/TS フロントエンド  │  │
 │                                      │  ダッシュボード+オーバーレイ│  │
-│                                      │  Lv1 Nudge（赤い霧）     │  │
+│                                      │  Lv1 Nudge（サイドカード）│  │
 │                                      │  Lv2 Wall （全画面遮断） │  │
 │                                      └──────────┬───────────────┘  │
 │                                                 │ unlock            │
@@ -120,6 +122,7 @@
     ├─ 分析スレッド             ← recv_timeout(1 s) → 1 Hz タイマーゲート; HMM 更新 ≤ 1回/秒
     │       │ Arc<Mutex<CognitiveStateEngine>> (Tauri managed state)
     │       │ 合成摩擦: 沈黙 ≥ 8 s → F6/F3 を Stuck 方向へ漸増
+    │       │ LatestFeatState → InterventionDecision（Need + Opportunity）
     ├─ IME モニタースレッド     ← 100ms ごとに is_candidate_window_open() をポーリング（作文停止）
     ├─ IME ポーリングスレッド   ← recv_timeout(100ms) ウェイク; ImmGetOpenStatus + VK_DBE_* フォールバック
     │
@@ -139,8 +142,8 @@ GSE-prototype/
 ├── src/                       # React / TypeScript フロントエンド
 │   ├── components/
 │   │   ├── Dashboard.tsx      # 状態確率バー、セッションストップウォッチ、キーボード状態、Monk Mode、フック警告
-│   │   └── Overlay.tsx        # Nudge（赤い霧）+ Wall（全画面遮断）+ 打鍵警告バナー + スマホ接続バッジ
-│   ├── App.tsx                # 集約状態ポーリング + 介入ステートマシン（Lv1 → Lv2 エスカレーション）
+│   │   └── Overlay.tsx        # 優しいサイドカード Nudge + Wall + 打鍵警告バナー + スマホ接続バッジ
+│   ├── App.tsx                # 集約状態ポーリング + InterventionDecision 駆動 UI
 │   └── main.tsx
 │
 ├── src-tauri/                 # Rust / Tauri 2.0 バックエンド
@@ -150,6 +153,7 @@ GSE-prototype/
 │   │   ├── analysis/
 │   │   │   ├── engine.rs      # HMM エンジン + ヒステリシス層（display_probs EMA）
 │   │   │   ├── features.rs    # F1, F3–F6 特徴量抽出 + 沈黙合成（OS 非依存）
+│   │   │   ├── intervention.rs # Need + Opportunity + Policy 判定エンジン
 │   │   │   └── mod.rs
 │   │   ├── input/
 │   │   │   ├── hook.rs        # プラットフォーム振り分け（Windows / macOS 実装を選択）
@@ -519,28 +523,28 @@ if last_state.map_or(true, |prev| prev != current) { emit(); last_state = Some(c
 
 ## 介入 UI：Nudge & Wall（v2.5）
 
-HMM が Stuck 状態を検出すると、Tauri の透過マルチウィンドウオーバーレイシステムを通じて段階的な介入を提供します。
+介入ポリシーが十分な Need と妥当な Opportunity の両方を検出すると、Tauri の透過マルチウィンドウオーバーレイシステムを通じて段階的な介入を提供します。
 
 ### 二段階介入
 
 | レベル | 名称 | トリガー | 視覚効果 | ユーザー操作 |
 | --- | --- | --- | --- | --- |
-| **Lv1** | Nudge | p\_stuck > 0.60 | 画面端の赤いビネット（霧） | クリックスルー（入力に対して透過） |
-| **Lv2** | Wall | p\_stuck > 0.70 が 30 秒持続（**Monk Mode ON 時はバイパス**） | 全画面遮断オーバーレイ + メッセージ；キーボード入力時に赤い警告バナー | 解除まで全入力をブロック |
+| **Lv1** | Nudge | `InterventionDecision.action == "nudge"` | 右端から小さく現れるサイドカード | クリックスルー（入力に対して透過） |
+| **Lv2** | Wall | `InterventionDecision.action == "wall"`（**Monk Mode ON 時は抑制**） | 全画面遮断オーバーレイ + メッセージ；キーボード入力時に赤い警告バナー | 解除まで全入力をブロック |
 
-### Nudge（Lv1）：環境的摩擦キュー
+### Nudge（Lv1）：優しいサイドキュー
 
-Nudge レイヤーは半透明の赤いビネットオーバーレイを描画し、その不透明度は Stuck 確率に線形でスケールします：
+Nudge レイヤーは画面全体を霧やビネットで覆うのではなく、右端の周辺視野に入る小さなカードとして表示されます。Opportunity 層が介入可能と判断した時だけ表示され、不透明度はポリシーの Need score に応じて変化します：
 
 ```text
-opacity = clamp((p_stuck − 0.60) / 0.30, 0.0, 1.0)
+opacity = clamp((need_score − 0.60) / 0.30, 0.2, 1.0)
 ```
 
-オーバーレイウィンドウは Tauri の `setIgnoreCursorEvents(true)` により**クリックスルー**モードに設定され、ユーザーは作業を継続しながら周辺視野で視覚的キューを受け取ることができます。
+オーバーレイウィンドウは Tauri の `setIgnoreCursorEvents(true)` により**クリックスルー**モードに設定され、ユーザーは作業を継続しながら周辺視野で「いま区切りかもしれない」という穏やかなキューを受け取れます。Need が高くても active typing、cooldown、daily cap、recent dismiss、away idle などで受容性が低い場合、ポリシーは `defer` を返し Nudge は表示しません。
 
 ### Wall（Lv2）：強制休憩
 
-p\_stuck が 0.70 を累積で 30 秒超えた場合（連続ではなく累積——0.50 未満に回復すると 2 倍速で減衰し、0.50〜0.70 の範囲ではタイマーが凍結）、システムは Wall にエスカレートします — **身体的な動き**がなければ解除できない全画面遮断オーバーレイです。以下のメッセージが表示されます：
+Need が高い状態で Wall accumulator が 30 秒に達し（累積、回復時は減衰）、Opportunity 制約も通過した場合、ポリシーは `InterventionDecision.action == "wall"` を返します。システムは Wall にエスカレートし、**身体的な動き**がなければ解除できない全画面遮断オーバーレイを表示します：
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
@@ -548,7 +552,7 @@ Wall の解除は**スマートフォンからの手動操作のみ**によっ�
 
 ### Monk Mode（Wall 抑制トグル）
 
-Dashboard には **Monk Mode** トグルが用意されており、自動 Wall 発動を無効化できます。Monk Mode が **ON** の時、LV2 Wall タイマーはバイパスされます — システムは認知状態推定と Nudge オーバーレイの表示を継続しますが、全画面 Wall 介入は抑制されます。ボタンを押すと `monk-mode-changed` ブール値イベント（Tauri フロントエンドブロードキャスト）が発行され、両ウィンドウが受信して `isMonkMode` 状態を同期します。LV2 タイマーの条件は `p_stuck > 0.70 && !isMonkMode` となります。強制休憩なしに深い集中作業を継続したい場合に使用します。
+Dashboard には **Monk Mode** トグルが用意されており、自動 Wall 発動を無効化できます。Monk Mode が **ON** の時、介入ポリシーは `wall` action を抑制しつつ、Need、Opportunity、`nudge` / `defer` 判断は継続します。ボタンを押すと `monk-mode-changed` ブール値イベント（Tauri フロントエンドブロードキャスト）が発行され、両ウィンドウが受信して `isMonkMode` 状態を同期します。強制休憩なしに深い集中作業を継続したい場合に使用します。
 
 ### Dashboard セッションインジケーター
 
@@ -563,7 +567,7 @@ Dashboard には状態バーに加えて、以下のライブインジケータ�
 
 ### 設計の根拠
 
-この段階的介入は、認知的ブロックが書き手の「行き詰まっている」という自覚の欠如（メタ認知の失敗）により持続するという知見に基づいています。Nudge は中断なく穏やかな気づきを提供し、Wall は身体的なコンテキストスイッチを強制します。研究によれば、これは問題の再構造化を促進します（Sio & Ormerod, 2009）。
+この段階的介入は、作業上のブロックが書き手の「行き詰まっている」という自覚の欠如（メタ認知の失敗）により持続するという知見に基づいています。Nudge は作業面を覆わずに穏やかな気づきを提供し、Wall は身体的なコンテキストスイッチを強制します。研究によれば、これは問題の再構造化を促進します（Sio & Ormerod, 2009）。
 
 ---
 

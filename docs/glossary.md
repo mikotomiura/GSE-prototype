@@ -7,19 +7,27 @@
 
 | 用語 (日本語) | 用語 (英語) | 定義 | 使用例 |
 |---|---|---|---|
-| 認知状態 | Cognitive State | ユーザーの知的作業における内的状態。GSE では Flow / Incubation / Stuck の 3 状態を定義 | 「認知状態を 1Hz で推定する」 |
-| フロー | Flow | 集中し滑らかにアウトプットが出ている状態。短い打鍵間隔、長いバースト、低い修正率が特徴 (Csikszentmihalyi 1990) | 「p_flow > 0.8 のとき Flow と判定」 |
-| インキュベーション | Incubation | 意識的思考を離れ、無意識的に問題を処理している休止状態。生産的な沈黙 (Sio & Ormerod 2009) | 「長い休止でも Incubation なら介入しない」 |
-| スタック | Stuck | 問題解決が行き詰まり、同じアプローチを繰り返している状態。高い修正率、削除後の長い休止が特徴 (Ohlsson 1992) | 「p_stuck > 0.6 で Nudge を発動」 |
+| 作業状態 | Work State | PC 操作に現れる行動的シグナルから推定する作業上の状態。脳内状態の直接分類ではなく、介入判断に必要な状態表現 | 「作業状態スコアを 1Hz で更新する」 |
+| 認知状態 | Cognitive State | ユーザーの知的作業における内的状態。GSE では直接読める対象として扱わず、UserLabel や説明概念として限定的に使う | 「認知状態を直接読むとは主張しない」 |
+| フロー | Flow | 滑らかにアウトプットが出ている行動パターンの説明語。現行 HMM の `p_flow` は flow-like continuation の参考スコア | 「p_flow は Flow 断定ではなく参考スコア」 |
+| インキュベーション | Incubation | 生産的な沈黙・熟考に近い行動パターンの説明語。現行 HMM の `p_incubation` は incubation-like pause の参考スコア | 「長い休止は Incubation と断定せず介入を defer する」 |
+| スタック | Stuck | 作業停滞・摩擦が強い可能性を表す説明語。現行 HMM の `p_stuck` は Need 層の `stuck_likelihood` として使う | 「p_stuck が高くても Opportunity が低ければ介入しない」 |
 | 生産的苦闘 | Productive Struggle | 困難に取り組むプロセス自体に学習・成長の価値がある状態。GSE が保護する対象 | 「生産的苦闘を阻害しない介入設計」 |
 | 不便益 | Fubeneki | あえて不便を導入することで得られる便益。GSE の理論的基盤 | 「Wall は不便益に基づく介入」 |
-| ナッジ | Nudge (Lv1) | p_stuck > 0.60 で発動する軽度介入。赤いビネット効果をオーバーレイ表示 | 「Nudge が表示されたがユーザーは作業を継続した」 |
-| ウォール | Wall (Lv2) | p_stuck > 0.70 が累積 30 秒で発動する強制介入。全画面ロック + スマートフォンアンロック | 「Wall が発動し Zen Timer が開始された」 |
+| ナッジ | Nudge (Lv1) | `InterventionDecision.action == "nudge"` で発動する軽度介入。右端から小さく現れるサイドカードとして表示 | 「Nudge が表示されたがユーザーは作業を継続した」 |
+| ウォール | Wall (Lv2) | `InterventionDecision.action == "wall"` で発動する強制介入。全画面ロック + スマートフォンアンロック | 「Wall が発動し Zen Timer が開始された」 |
 | ゼンタイマー | Zen Timer | Wall 発動時にスマートフォン上で起動する 2 分カウントダウン。身体的休息を促す | 「Zen Timer 完了後に手動アンロック」 |
 | モンクモード | Monk Mode | Wall 介入を無効化するトグル。Nudge のみ有効になる | 「Monk Mode 有効時は Wall が発動しない」 |
 | フィジカルアンカー | Physical Anchor | 将来の Lv3/Lv4 介入。身体的活動（散歩等）を促す Flutter アプリ連携 | 「Physical Anchor は stretch goal」 |
 | グラウンドトゥルース | Ground Truth (GT) | ユーザー自身が主観的に付与する認知状態ラベル。HMM 推定の正解データとして機能 (Phase 1) | 「Phase 1 で GT 付きセッションを収集」 |
 | ユーザーラベル | UserLabel | GT の実体。`{Flow, Incubation, Stuck}` の 3 値 enum + timestamp として NDJSON に記録 | 「`⌘⇧⌥F` を押すと UserLabel が記録される」 |
+| Need | Need | 介入が必要そうかを表す層。MVP では主に `p_stuck` を `stuck_likelihood` として利用する | 「Need は高いが Opportunity が低い」 |
+| Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode で判定する | 「Opportunity が低いため defer する」 |
+| 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
+| defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |
+| daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Wall daily cap により defer」 |
+| cooldown | cooldown | 介入後の再介入禁止時間。Nudge は 10 分、Wall は 60 分を MVP 初期値とする | 「cooldown 中なので Nudge を抑制」 |
+| recent dismiss | recent dismiss | 直近で介入が拒否された事実。MVP 初期値では 20 分間、同種介入を抑制する | 「recent dismiss により defer」 |
 
 ## 技術用語
 
@@ -57,6 +65,8 @@
 | JIS_KEYBOARD_SEEN | — | macOS 固有のアトミックフラグ。JIS 物理 IME キーが検出された時点で true になり、TIS ポーリングを無効化する | TIS |
 | USING_ACCESSIBILITY_FALLBACK | — | macOS 固有のアトミックフラグ。Input Monitoring から Accessibility へフォールバックしたことを示す | CGEventTap, TCC |
 | FeatSnapshot | — | 1Hz ゲートで生成される特徴量 + HMM 状態確率のスナップショット (`analysis::loop_step::FeatSnapshot`)。NDJSON `feat` レコード + gse-replay 回帰比較の基本単位 | 1Hz ゲート, snapshot |
+| LatestFeatState | — | 直近の FeatSnapshot を Tauri state として保持する構造。`get_intervention_decision` が F3/F4/F6 を読む | InterventionDecision |
+| InterventionPolicyState | — | cooldown / daily cap / recent dismiss / Wall 累積時間 / last decision を保持する Rust 側ポリシー状態 | InterventionDecision |
 | 混同行列 | Confusion Matrix | `[正解×推定]` の 3×3 行列 (`analysis::metrics::ConfusionMatrix`)。正解ラベルクラス × HMM argmax クラスの件数を格納 | UserLabel, F1 |
 | Macro F1 | — | 各クラスの F1 を単純平均した値。固定分母 3 (scikit-learn 互換)。クラス不均衡に強くない代わりに minority class を重視 | 混同行列 |
 | Micro F1 | — | 総 TP / 総 labels。多クラスでは accuracy と一致。GSE では分母は matched labels のみ (警告行きは除外) | 混同行列 |
@@ -64,6 +74,7 @@
 | recovered_at | — | Stuck ラベル後に p_flow > 0.5 に達する最初の FeatSnapshot 時刻。ログ記録時は null、`gse-replay --metrics` 実行時にオフラインで純粋関数算出 | compute_recovered_at |
 | hmm_version | — | `analysis::engine::HMM_VERSION` の SemVer 値 (現行 `0.2.0`)。meta NDJSON エントリに埋まる、gse-replay が版不一致を WARN | HMM, schema |
 | schema_dto | — | `logger::LogEntry` の `schemars::JsonSchema` 派生専用ミラー型 (`schema_dto::LogEntryDto`)。production path に影響させず JSON Schema を機械生成するための DTO | emit_schema, current.json |
+| intervention_decision | — | MVP Opportunity の NDJSON ログ種別。action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by を含む | InterventionDecision, schema |
 | metrics.json | — | `gse-replay --metrics --json` の出力 (1 KB/session)。gse-dataset repo の `metrics/P*/<os>/` に配置する共有アーティファクト | aggregate_metrics, UC-GT3 |
 | gse-dataset | — | セッションメトリクスの集約データ repo (`mikotomiura/gse-dataset`, private)。生 NDJSON は絶対に置かず、`metrics/` と機械生成 schema のみ tracked | metrics.json, schema sync |
 | 被験者 ID | Participant ID | データ repo での匿名化識別子。`P000` (開発者自身) / `P001-P005` (Phase 2+ 外部被験者) | IRB, consent |

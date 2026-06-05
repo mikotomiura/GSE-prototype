@@ -17,7 +17,8 @@
 │         ▼                   ▼                                │
 │  ┌──────────────────────────────────┐        Rust Backend    │
 │  │         Tauri Commands           │                        │
-│  │  get_cognitive_state, start_*    │                        │
+│  │  get_cognitive_state, get_*      │                        │
+│  │  get_intervention_decision       │                        │
 │  │  [macOS] reset_tcc, open_ax_*   │                        │
 │  └──────────────┬───────────────────┘                        │
 │                 │                                            │
@@ -30,6 +31,10 @@
 │    │  ┌────────▼─────────┐   │                               │
 │    │  │   HMM Engine     │   │  3×26 emission matrix         │
 │    │  │  Forward Algo    │   │  EWMA + hysteresis            │
+│    │  └────────┬─────────┘   │                               │
+│    │  ┌────────▼─────────┐   │                               │
+│    │  │ Intervention     │   │  Need + Opportunity + Policy  │
+│    │  │ Policy State     │   │  cooldown / cap / defer       │
 │    │  └──────────────────┘   │                               │
 │    └────────────▲────────────┘                               │
 │                 │ crossbeam channel                          │
@@ -86,7 +91,7 @@ GSE は 6 つのスレッド/タスクで構成される。
 |---|---|---|---|
 | **Main (Tauri)** | UI イベントループ、IPC ハンドラ | Mutex<Engine> 読み取り | 通常 |
 | **Hook** | Win: WH_KEYBOARD_LL + WinEvent / mac: CGEventTap + CFRunLoop | crossbeam Sender, Atomic flags | 高（OS 制約） |
-| **Analysis** | 1Hz 特徴量抽出 + HMM 推論 | crossbeam Receiver, Mutex<Engine> 書込 | 通常 |
+| **Analysis** | 1Hz 特徴量抽出 + HMM 推論、最新 FeatSnapshot 更新 | crossbeam Receiver, Mutex<Engine> 書込 | 通常 |
 | **IME Monitor** | Win: 候補ウィンドウ検出 / mac: フック内で処理（別スレッド不要） | Atomic IME_ACTIVE | 低 |
 | **IME Polling** | Win: ImmGet\* / mac: TIS ポーリング (GCD メインキュー経由) | Atomic IME_OPEN | 低 |
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
@@ -121,6 +126,7 @@ IME Polling ── Atomic IME_OPEN ───────────────
      │                                        ▼        │
      │                                  Main Thread ──► Frontend (IPC)
      │                                                │
+Analysis Thread ── LatestFeatState ──► Tauri Command ──► analysis::intervention
 Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (.ndjson)
 ```
 
@@ -157,19 +163,31 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 ### 4.4 analysis::engine — HMM エンジン
 
-- **責務**: 特徴量 → 認知状態確率の推定
+- **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う
 - **依存先**: analysis::features
 - **インターフェース**: `update()`, `update_silence()`, `register_keystroke()`, `state_probs()`
 - **状態管理**: HMM 内部状態（forward 確率、EWMA 軸値、display_probs）を Mutex で保護
 
-### 4.5 wall_server — Wall 介入サーバー
+### 4.5 analysis::intervention — Opportunity MVP
+
+- **責務**: Need (`p_stuck`) と Opportunity (`idle_ms`, F3/F4/F6, cooldown, daily cap, recent dismiss, Monk Mode) を統合し、`none` / `nudge` / `wall` / `defer` を返す
+- **依存先**: なし（純粋な計算）。OS API、Tauri、logger には依存しない
+- **インターフェース**:
+  - `InterventionPolicyState::decide(input) -> DecisionResult`
+  - `InterventionPolicyState::record_dismiss(action, now_ms)`
+  - `InterventionDecision` は Tauri IPC で Frontend に返され、NDJSON `intervention_decision` としても記録される
+- **状態管理**: Tauri state の `InterventionState(Arc<Mutex<InterventionPolicyState>>)` が cooldown / daily cap / Wall 累積時間 / last decision を保持する
+- **MVP パラメータ**: Nudge `p_stuck >= 0.60`, Wall `p_stuck >= 0.70` 累積 30 秒, Nudge cooldown 10 分, Wall cooldown 60 分, Nudge cap 6/day, Wall cap 1/day
+- **設計判断**: Main Window の `get_intervention_decision` 呼び出しだけが policy state を進める。Overlay Window は `last_decision` を読み取るだけにし、2 つの WebView による cooldown / cap の二重進行を防ぐ
+
+### 4.6 wall_server — Wall 介入サーバー
 
 - **責務**: Lv2 介入の HTTP サーバー + QR コード生成 + スマートフォン連携
 - **依存先**: tiny_http, qrcode, base64
 - **インターフェース**: `start()` → WallServerInfo, `stop()`
 - **状態管理**: サーバースレッドのライフサイクル、Win: Windows Defender ファイアウォールルール / mac: 追加管理不要（ユーザースコープポートバインド）
 
-### 4.6 logger — セッションロガー
+### 4.7 logger — セッションロガー
 
 - **責務**: イベント + 状態の NDJSON 永続化
 - **依存先**: serde_json
@@ -177,8 +195,9 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **状態管理**: バッファリングチャネル（512 エントリ）、5 秒間隔フラッシュ
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
+- **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
 
-### 4.7 Ground Truth ラベリング経路 (Phase 1)
+### 4.8 Ground Truth ラベリング経路 (Phase 1)
 
 - **責務**: ユーザーの主観的認知状態を NDJSON に記録し、Dashboard にリアルタイム可視化する
 - **コンポーネント**:
@@ -188,7 +207,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   - Dashboard `listen<{label, timestamp}>("user_label_recorded", ...)` — Tauri event を購読して counter state 更新
 - **プライバシー制約**: UserLabel は `{flow, incubation, stuck}` の 3 値 enum + サーバー側 timestamp のみ。キーストローク文字内容は一切含まない
 
-### 4.8 analysis::metrics — GT × FeatSnapshot 集計 (Phase 1)
+### 4.9 analysis::metrics — GT × FeatSnapshot 集計 (Phase 1)
 
 - **責務**: UserLabel と HMM 推定結果を突き合わせ、混同行列・F1・中央値を算出する純粋関数群
 - **インターフェース**:
@@ -206,7 +225,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   - detection_lead / stuck_recovery は範囲ラベルでは算出しない (区間全体がラベルのため)
 - **consume 側**: `bin/replay.rs::main` が `--metrics` / `--segments` フラグ検知時に呼ぶ
 
-### 4.9 schema_dto + emit_schema — JSON Schema 生成 (Phase 1)
+### 4.10 schema_dto + emit_schema — JSON Schema 生成 (Phase 1)
 
 - **責務**: NDJSON 形式の JSON Schema を Rust 型から機械生成し、gse-dataset repo との drift を CI で検知
 - **コンポーネント**:
@@ -216,7 +235,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   - CI ジョブ `check` が `emit_schema > /tmp/emitted.json && diff schema/current.json /tmp/emitted.json` で drift 検知
 - **gse-dataset 同期**: 手動コピー (`cp src-tauri/schema/current.json /path/to/gse-dataset/schema/current.json`)
 
-### 4.10 沈黙 3 状態機構（Silence 3-State Mechanism）
+### 4.11 沈黙 3 状態機構（Silence 3-State Mechanism）
 
 1Hz 推論ゲートにおける特徴量計算と HMM 更新は、**バッファの状態と沈黙秒数に応じて 3 つのパス**に分岐する。各パスで使用する EWMA α・摩擦フロア適用有無・呼び出す engine メソッドが異なる。分散実装 (`lib.rs` 分析スレッド + `features.rs::make_silence_observation` + `engine.rs::update_silence`) のため、全体像を以下に集約する。
 
@@ -274,18 +293,21 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
 11. Frontend が 500ms ポーリングで get_cognitive_state を呼び出し
 12. ダッシュボード/オーバーレイに反映
 
-### フロー 2: Lv2 Wall 介入
+### フロー 2: Opportunity 判定と Lv2 Wall 介入
 
-1. Frontend が p_stuck > 0.70 の累積時間を追跡（stuckAccumMsRef）
-2. 累積 30 秒到達で start_wall_server を invoke
-3. Rust が tiny_http サーバーを起動（Win: ファイアウォールルール追加 / mac: 追加設定不要）
-4. QR コード SVG + URL を Frontend に返却
-5. Frontend が Wall オーバーレイを表示（全画面ロック）
-6. ユーザーがスマートフォンで QR をスキャン
-7. スマートフォンブラウザが /shake にアクセス → Zen Timer HTML を受信
-8. 2 分タイマー完了後、ユーザーが「Unlock Wall」をタップ
-9. POST /unlock → Rust が Tauri イベント発火
-10. Frontend が Wall オーバーレイを解除、stop_wall_server を invoke
+1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
+2. Main Window が 500ms ごとに `get_intervention_decision` を invoke
+3. Rust が `p_stuck` / `idle_ms` / F3/F4/F6 / cooldown / daily cap / Monk Mode を `analysis::intervention` に渡す
+4. `InterventionPolicyState` が Need + Opportunity + Policy を評価し、`none` / `nudge` / `wall` / `defer` を返す
+5. `intervention_decision` を NDJSON に記録（action / need_score / opportunity_score / suppressed_by）
+6. action が `wall` の場合、Frontend が Wall オーバーレイを表示し `start_wall_server` を invoke
+7. Rust が tiny_http サーバーを起動（Win: ファイアウォールルール追加 / mac: 追加設定不要）
+8. QR コード SVG + URL を Frontend に返却
+9. ユーザーがスマートフォンで QR をスキャン
+10. スマートフォンブラウザが /shake にアクセス → Zen Timer HTML を受信
+11. 2 分タイマー完了後、ユーザーが「Unlock Wall」をタップ
+12. POST /unlock → Rust が Tauri イベント発火
+13. Frontend が Wall オーバーレイを解除、stop_wall_server を invoke
 
 ### フロー 3: Ground Truth ラベル記録 (Phase 1)
 

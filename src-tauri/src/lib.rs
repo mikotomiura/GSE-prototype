@@ -7,6 +7,10 @@ pub mod sensors;
 pub mod wall_server;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
+use crate::analysis::intervention::{
+    InterventionAction, InterventionDecision, InterventionInput, InterventionPolicyState,
+};
+use crate::analysis::loop_step::FeatSnapshot;
 use crate::logger::{LogEntry, SessionLogger, UserLabelKind};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
@@ -48,6 +52,15 @@ struct ResetSignal(Arc<AtomicBool>);
 /// start_session が呼ばれるまで分析スレッドは打鍵イベントをドレインする。
 struct SessionActive(Arc<AtomicBool>);
 
+/// 直近の 1Hz Feat スナップショット。
+/// Opportunity MVP は Need を `p_stuck` から取り、Opportunity の補助情報として
+/// F3/F4/F6 と idle_ms を読む。OS API はここに入れず、analysis 出力のみを保持する。
+struct LatestFeatState(Arc<Mutex<Option<FeatSnapshot>>>);
+
+/// MVP Opportunity のポリシー状態。
+/// cooldown / daily cap / recent dismiss / Wall 累積時間を保持する。
+struct InterventionState(Arc<Mutex<InterventionPolicyState>>);
+
 // ---------------------------------------------------------------------------
 // Tauri コマンド
 // ---------------------------------------------------------------------------
@@ -81,6 +94,87 @@ fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f6
     map
 }
 
+#[tauri::command]
+fn get_intervention_decision(
+    window_label: String,
+    is_monk_mode: bool,
+    is_wall_active: bool,
+    engine: State<CognitiveStateEngine>,
+    latest_feat: State<LatestFeatState>,
+    intervention: State<InterventionState>,
+    log: State<Arc<Mutex<LogState>>>,
+) -> InterventionDecision {
+    // overlay WebView は表示専用。main 側ポーリングだけが policy state を進める。
+    if window_label == "overlay" {
+        return intervention
+            .0
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .last_decision();
+    }
+
+    let now = epoch_ms();
+    let p_stuck = engine
+        .get_current_state()
+        .get(&CognitiveState::Stuck)
+        .copied()
+        .unwrap_or(0.0);
+    let idle_ms = get_keyboard_idle_ms();
+    let latest = latest_feat
+        .0
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone();
+    let (f3, f4, f6) = latest
+        .map(|f| (f.f3, f.f4, f.f6))
+        .unwrap_or((0.0, 0.0, 0.0));
+
+    let input = InterventionInput {
+        now_ms: now,
+        p_stuck,
+        f3_correction_rate: f3,
+        f4_burst_length: f4,
+        f6_pause_after_del_rate: f6,
+        idle_ms,
+        monk_mode: is_monk_mode,
+        wall_active: is_wall_active,
+    };
+
+    let mut guard = intervention.0.lock().unwrap_or_else(|p| p.into_inner());
+    let result = guard.decide(input);
+    if result.should_log {
+        let _ = log.lock().unwrap_or_else(|p| p.into_inner()).tx.try_send(
+            LogEntry::InterventionDecision {
+                timestamp: now,
+                action: result.decision.action.as_str().to_string(),
+                need_score: result.decision.need_score,
+                opportunity_score: result.decision.opportunity_score,
+                p_stuck: result.decision.p_stuck,
+                idle_ms: result.decision.idle_ms,
+                wall_accum_ms: result.decision.wall_accum_ms,
+                reason: result.decision.reason.clone(),
+                suppressed_by: result.decision.suppressed_by.clone(),
+            },
+        );
+    }
+    result.decision
+}
+
+#[tauri::command]
+fn record_intervention_dismiss(
+    action: String,
+    intervention: State<InterventionState>,
+) -> Result<(), String> {
+    let action = InterventionAction::parse(&action)
+        .ok_or_else(|| format!("invalid intervention action: {:?}", action))?;
+    intervention
+        .0
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .record_dismiss(action, epoch_ms());
+    Ok(())
+}
+
 /// 最後のキー押下からの経過ミリ秒を返す (Dashboard キーボードアクティビティ表示用)
 /// キーが一度も押されていない場合は 0 を返す。
 #[tauri::command]
@@ -102,6 +196,13 @@ fn get_keyboard_idle_ms() -> u64 {
 #[tauri::command]
 fn get_last_keypress_timestamp() -> u64 {
     crate::input::hook::last_key_ms()
+}
+
+fn epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 /// 診断情報を返す (バグ報告・トラブルシューティング用)
@@ -381,6 +482,8 @@ fn start_session(
     engine: State<CognitiveStateEngine>,
     session_active: State<SessionActive>,
     reset_signal: State<ResetSignal>,
+    latest_feat: State<LatestFeatState>,
+    intervention: State<InterventionState>,
     log: State<Arc<Mutex<LogState>>>,
 ) {
     // リセットシグナルを先にセットしてからセッションを有効化する。
@@ -395,6 +498,8 @@ fn start_session(
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
+    *latest_feat.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
+    *intervention.0.lock().unwrap_or_else(|p| p.into_inner()) = InterventionPolicyState::new(now);
     let guard = log.lock().unwrap_or_else(|p| p.into_inner());
     let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
 
@@ -583,6 +688,14 @@ pub fn run() {
     let session_active = Arc::new(AtomicBool::new(false));
     let session_active_for_thread = session_active.clone();
 
+    let initial_now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let latest_feat = Arc::new(Mutex::new(None));
+    let latest_feat_for_thread = latest_feat.clone();
+    let intervention_state = Arc::new(Mutex::new(InterventionPolicyState::new(initial_now)));
+
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
@@ -666,6 +779,9 @@ pub fn run() {
                 });
             }
             if let Some(f) = out.feat {
+                *latest_feat_for_thread
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner()) = Some(f.clone());
                 let _ = log_tx_analysis.try_send(LogEntry::Feat {
                     timestamp: f.timestamp,
                     f1: f.f1,
@@ -912,9 +1028,13 @@ pub fn run() {
         .manage(WallServerState::new())
         .manage(ResetSignal(should_reset))
         .manage(SessionActive(session_active))
+        .manage(LatestFeatState(latest_feat))
+        .manage(InterventionState(intervention_state))
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
+            get_intervention_decision,
+            record_intervention_dismiss,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,
             get_hook_status,

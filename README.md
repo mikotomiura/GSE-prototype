@@ -1,7 +1,7 @@
 # GSE (Generative Struggle Engine)
 
-> **Real-time cognitive state estimation from keystroke dynamics on Windows and macOS**
-> Classifies the writer's mental state into **Flow / Incubation / Stuck** using a hand-tuned Hidden Markov Model, without any cloud dependency or user-facing interruption.
+> **Privacy-preserving work-state and intervention timing from PC behavior on Windows and macOS**
+> GSE does not read the user's mind. It estimates task-relevant behavioral signals from keystroke dynamics and decides when a gentle or stronger intervention is likely to help.
 
 [🇯🇵 日本語版 README はこちら](README.ja.md)
 
@@ -10,7 +10,7 @@
 ## Table of Contents
 
 1. [Motivation](#motivation)
-2. [Cognitive State Model](#cognitive-state-model)
+2. [Work State & Opportunity Model](#work-state--opportunity-model)
 3. [Architecture Overview](#architecture-overview)
 4. [Folder Structure](#folder-structure)
 5. [Feature Extraction (F1, F3–F6)](#feature-extraction-f1-f3f6)
@@ -41,21 +41,24 @@
 
 ## Motivation
 
-Writers, programmers, and knowledge workers alternate between states of **flow** (effortless, high-output), **incubation** (deliberate pause, sub-conscious processing), and **stuck** (cognitive block, unproductive looping). Real-time awareness of these states could enable adaptive tools—ambient music, nudges, or UI dimming—to scaffold metacognition without disrupting the task itself.
+Writers, programmers, and knowledge workers often move between fluent output, useful pauses, and unproductive loops. GSE treats those as task-level behavioral patterns, not as directly observable mental states. The goal is to protect productive struggle by separating **Need** ("intervention may be useful") from **Opportunity** ("this is a low-cost moment to intervene").
 
-Existing approaches require wearables, cameras, or explicit self-report. This prototype uses only **keystroke timing** (already available from the OS), making it deployable on any Windows or macOS device without additional hardware.
+Existing approaches often require wearables, cameras, or explicit self-report. This prototype starts from **keystroke timing** already available from the OS, keeps raw text out of logs, and records only behavioral features and intervention decisions.
 
 ---
 
-## Cognitive State Model
+## Work State & Opportunity Model
 
-The three states are grounded in established cognitive science literature:
+GSE v2 uses a four-layer interpretation model:
 
-| State | Definition | Behavioral Signature |
+| Layer | Role | MVP implementation |
 |---|---|---|
-| **Flow** | Effortless, intrinsically motivated task engagement (Csikszentmihalyi, 1990) | Short inter-key intervals, low correction rate, long continuous bursts |
-| **Incubation** | Deliberate pause enabling sub-conscious problem restructuring (Sio & Ormerod, 2009) | **High $P(\text{Burst} \mid \text{Pause})$**: Extended silence (≥2 s) followed by rapid output burst |
-| **Stuck** | Perseverative failure to escape an impasse (Ohlsson, 1992) | **High $P(\text{Pause} \mid \text{Delete})$**: Perseverative delete-pause loops with near-zero character gain |
+| Behavioral signal | What can be observed without text content | F1/F3/F4/F5/F6 keystroke features |
+| Work-state estimate | Task-level signals such as friction and stuck likelihood | Current HMM probabilities, with `p_stuck` used as Need |
+| Opportunity judgment | Whether intervention is welcome or low-cost now | idle, post-burst pause, cooldown, daily cap, recent dismiss, Monk Mode |
+| Intervention policy | What to do | `none` / `nudge` / `wall` / `defer` |
+
+The legacy Flow / Incubation / Stuck HMM remains useful as a behavioral baseline, but its outputs are treated as work-pattern scores rather than direct multi-class classification of the user's inner cognitive state.
 
 ---
 
@@ -91,7 +94,7 @@ The three states are grounded in established cognitive science literature:
 │                                      ┌──────────▼───────────────┐  │
 │                                      │   React/TS Frontend      │  │
 │                                      │   Dashboard + Overlay    │  │
-│                                      │   Lv1 Nudge (red mist)   │  │
+│                                      │   Lv1 Nudge (side card)  │  │
 │                                      │   Lv2 Wall  (full block) │  │
 │                                      └──────────┬───────────────┘  │
 │                                                 │ unlock            │
@@ -119,6 +122,7 @@ Main Thread (Tauri event loop)
     ├─ Analysis Thread        ← recv_timeout(1 s) → 1 Hz timer gate; HMM update ≤ 1×/sec
     │       │ Arc<Mutex<CognitiveStateEngine>> (Tauri managed state)
     │       │ Synthetic Friction: silence ≥ 8 s → ramps F6/F3 toward Stuck
+    │       │ LatestFeatState → InterventionDecision (Need + Opportunity)
     ├─ IME Monitor Thread     ← polls is_candidate_window_open() every 100 ms (composition pause)
     ├─ IME Polling Thread     ← recv_timeout(100 ms) wake; ImmGetOpenStatus + VK_DBE_* fallback
     │
@@ -138,8 +142,8 @@ GSE-prototype/
 ├── src/                       # React / TypeScript frontend
 │   ├── components/
 │   │   ├── Dashboard.tsx      # State probability bars, session stopwatch, keyboard status, Monk Mode, hook warning
-│   │   └── Overlay.tsx        # Nudge (red mist) + Wall (full-screen block) + typing warning + phone connection badge
-│   ├── App.tsx                # Centralized state polling + intervention state machine (Lv1 → Lv2 escalation)
+│   │   └── Overlay.tsx        # Gentle side-card Nudge + Wall + typing warning + phone connection badge
+│   ├── App.tsx                # Centralized polling + InterventionDecision-driven UI
 │   └── main.tsx
 │
 ├── src-tauri/                 # Rust / Tauri 2.0 backend
@@ -149,6 +153,7 @@ GSE-prototype/
 │   │   ├── analysis/
 │   │   │   ├── engine.rs      # HMM + hysteresis layer (display_probs EMA)
 │   │   │   ├── features.rs    # F1, F3–F6 extraction + silence synthesis (OS-agnostic)
+│   │   │   ├── intervention.rs # Need + Opportunity + Policy decision engine
 │   │   │   └── mod.rs
 │   │   ├── input/
 │   │   │   ├── hook.rs        # Platform dispatch (selects Windows or macOS impl)
@@ -519,28 +524,28 @@ When the 1 Hz timer fires during extended silence, `make_silence_observation()` 
 
 ## Intervention UI: Nudge & Wall (v2.5)
 
-When the HMM detects a Stuck state, the system provides graduated intervention through Tauri's transparent multi-window overlay system.
+When the intervention policy detects both sufficient Need and a valid Opportunity, the system provides graduated intervention through Tauri's transparent multi-window overlay system.
 
 ### Two-Level Intervention
 
 | Level | Name | Trigger | Visual Effect | User Interaction |
 | --- | --- | --- | --- | --- |
-| **Lv1** | Nudge | p\_stuck > 0.60 | Red vignette (mist) around screen edges | Click-through (transparent to input) |
-| **Lv2** | Wall | p\_stuck > 0.70 for 30 s (**bypassed when Monk Mode is ON**) | Full-screen blocking overlay with message; red warning banner on any keyboard input | Blocks all input until unlocked |
+| **Lv1** | Nudge | `InterventionDecision.action == "nudge"` | Small side card that slides in from the right edge | Click-through (transparent to input) |
+| **Lv2** | Wall | `InterventionDecision.action == "wall"` (**suppressed when Monk Mode is ON**) | Full-screen blocking overlay with message; red warning banner on any keyboard input | Blocks all input until unlocked |
 
-### Nudge (Lv1): Ambient Friction Cue
+### Nudge (Lv1): Gentle Side Cue
 
-The Nudge layer renders a semi-transparent red vignette overlay whose opacity scales linearly with the Stuck probability:
+The Nudge layer renders a compact card near the right edge of the screen instead of covering the full display with a mist or vignette. It only appears when the Opportunity layer allows intervention, and its opacity scales with the policy's Need score:
 
 ```text
-opacity = clamp((p_stuck − 0.60) / 0.30, 0.0, 1.0)
+opacity = clamp((need_score − 0.60) / 0.30, 0.2, 1.0)
 ```
 
-The overlay window is set to **click-through** mode via Tauri's `setIgnoreCursorEvents(true)`, allowing the user to continue working while receiving a peripheral visual cue that they may be stuck.
+The overlay window is set to **click-through** mode via Tauri's `setIgnoreCursorEvents(true)`, allowing the user to continue working while receiving a peripheral cue that they may be at a breakpoint. If the Need score is high but the current moment is not receptive (active typing, cooldown, daily cap, recent dismiss, away idle), the policy returns `defer` and no Nudge is shown.
 
 ### Wall (Lv2): Forced Break
 
-If p\_stuck accumulates above 0.70 for a total of 30 seconds (cumulative, not consecutive — partial recovery below 0.50 causes 2× speed decay; the 0.50–0.70 range freezes the timer), the system escalates to a Wall — a full-screen blocking overlay that requires **physical movement** to dismiss. The overlay displays:
+If the policy's Wall accumulator reaches 30 seconds while need remains high (cumulative, with recovery decay) and the Opportunity constraints allow escalation, the system emits `InterventionDecision.action == "wall"` — a full-screen blocking overlay that requires **physical movement** to dismiss. The overlay displays:
 
 > *"Time to Move! Please stand up and walk around to unlock."*
 
@@ -548,7 +553,7 @@ The Wall is unlocked **exclusively by the smartphone**. When the Wall activates,
 
 ### Monk Mode (Wall Suppression Toggle)
 
-The Dashboard provides a **Monk Mode** toggle that disables automatic Wall activation. When Monk Mode is **ON**, the LV2 Wall timer is bypassed — the system continues estimating cognitive state and showing Nudge overlays, but the full-screen Wall intervention is suppressed. Toggling the button emits a `monk-mode-changed` boolean event (Tauri frontend broadcast) which both windows receive and use to sync their `isMonkMode` state. The LV2 timer condition becomes `p_stuck > 0.70 && !isMonkMode`. This allows users to enter a focused, uninterrupted deep work session without risk of forced breaks.
+The Dashboard provides a **Monk Mode** toggle that disables automatic Wall activation. When Monk Mode is **ON**, the intervention policy suppresses `wall` actions while continuing to compute Need, Opportunity, and possible `nudge` / `defer` decisions. Toggling the button emits a `monk-mode-changed` boolean event (Tauri frontend broadcast) which both windows receive and use to sync their `isMonkMode` state. This allows users to enter a focused, uninterrupted deep work session without risk of forced breaks.
 
 ### Dashboard Session Indicators
 
@@ -563,7 +568,7 @@ The `get_keyboard_idle_ms` Tauri command returns `now_ms − LAST_KEY_MS`, where
 
 ### Design Rationale
 
-This graduated intervention is grounded in the insight that cognitive blocks often persist because the writer lacks awareness of being stuck (metacognitive failure). The Nudge provides gentle awareness without disruption; the Wall enforces a physical context switch, which research suggests facilitates problem restructuring (Sio & Ormerod, 2009).
+This graduated intervention is grounded in the insight that work blocks often persist because the writer lacks awareness of being stuck (metacognitive failure). The Nudge provides gentle awareness without covering the working surface; the Wall enforces a physical context switch, which research suggests facilitates problem restructuring (Sio & Ormerod, 2009).
 
 ---
 

@@ -4,8 +4,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 interface OverlayProps {
-    stuckProb: number;
+    interventionDecision: InterventionDecision;
     isWallActive: boolean;
+}
+
+type InterventionAction = "none" | "nudge" | "wall" | "defer";
+
+interface InterventionDecision {
+    action: InterventionAction;
+    need_score: number;
+    opportunity_score: number;
+    p_stuck: number;
+    idle_ms: number;
+    wall_accum_ms: number;
+    reason: string;
+    suppressed_by: string[];
 }
 
 interface WallServerInfo {
@@ -13,7 +26,7 @@ interface WallServerInfo {
     qr_svg: string;
 }
 
-const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
+const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive }) => {
     const [nudgeOpacity, setNudgeOpacity] = useState(0);
     const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
     const [showTypingWarning, setShowTypingWarning] = useState(false);
@@ -102,15 +115,16 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
     }, [isWallActive]);
 
     useEffect(() => {
-        // Nudge Logic: visual feedback starts at 0.6 stuck probability
-        if (stuckProb > 0.6 && !isWallActive) {
-            // Map 0.6-0.9 to 0.0-1.0 opacity
-            const opacity = Math.min(1, (stuckProb - 0.6) / 0.3);
+        if (interventionDecision.action === "nudge" && !isWallActive) {
+            const opacity = Math.min(
+                1,
+                Math.max(0.2, (interventionDecision.need_score - 0.6) / 0.3)
+            );
             setNudgeOpacity(opacity);
         } else {
             setNudgeOpacity(0);
         }
-    }, [stuckProb, isWallActive]);
+    }, [interventionDecision, isWallActive]);
 
     // Layer 4: macOS で overlay の透過が失敗した場合のフォールバック。
     // nudge も wall も不要な間は hide() してメインウィンドウを隠さない。
@@ -127,11 +141,19 @@ const Overlay: React.FC<OverlayProps> = ({ stuckProb, isWallActive }) => {
 
     return (
         <div className="overlay-root">
-            {/* Nudge Layer (Red Vignette) */}
-            <div
-                className="nudge-layer"
-                style={{ opacity: nudgeOpacity }}
-            ></div>
+            <aside
+                className="nudge-card"
+                style={{
+                    opacity: nudgeOpacity,
+                    transform: nudgeOpacity > 0 ? "translateX(0)" : "translateX(120%)",
+                }}
+            >
+                <div className="nudge-card-accent"></div>
+                <div className="nudge-card-copy">
+                    <span className="nudge-card-kicker">Pause point</span>
+                    <strong>One breath. Next move.</strong>
+                </div>
+            </aside>
 
             {/* The Wall (Blocking Layer) */}
             {isWallActive && (
