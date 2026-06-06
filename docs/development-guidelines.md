@@ -99,6 +99,12 @@ cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/sna
 cargo run --bin gse-replay -- <session.ndjson> --metrics         # pretty-print
 cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSON
 # --metrics と --snapshot は排他。--json は --metrics 併用時のみ有効。
+
+# v2 介入ポリシーのオフライン反実仮想評価（gse-v2-intervention-eval）
+cargo run --bin gse-replay -- <session.ndjson> --intervention        # pretty-print
+cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化 JSON
+# logged feat を decide() で時刻順ステップし HIR/Precision/DC/Burden を算出。
+# --metrics/--segment/--segments/--snapshot と相互排他。--json は併用時のみ有効。
 ```
 
 ### 範囲区分
@@ -118,8 +124,12 @@ cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSO
 - **`gse-replay <s> --snapshot <golden.json>`**: ゴールデンと byte-equal 比較、差分で exit 1
 - **`gse-replay <s> --metrics`**: UserLabel × FeatSnapshot の集計を pretty-print 出力
 - **`gse-replay <s> --metrics --json`**: 同じ集計を構造化 JSON で出力 (gse-dataset 共有用)
-- **`--metrics` と `--snapshot` は排他** (用途が異なる、両指定で exit 2)
-- **`--json` は `--metrics` 併用必須** (生 snapshot 出力には使わない)
+- **`gse-replay <s> --intervention [--json]`**: v2 介入ポリシーを反実仮想リプレイし
+  HIR/Precision/DC/Burden を算出 (gse-v2-intervention-eval、`analysis::intervention_eval`)。
+  logged feat の p_stuck/f3/f4/f6 で `decide()` を時刻順ステップ、GT は point label を
+  forward-fill で区間化。**screening 用途**（GT 仮定依存、詳細は steering の decisions.md/results.md）
+- **モード系フラグ (`--metrics` / `--segment` / `--segments` / `--snapshot` / `--intervention`) は相互排他** (両指定で exit 2)
+- **`--json` は `--metrics` / `--segments` / `--intervention` 併用必須** (生 snapshot 出力には使わない)
 
 ### テストの方針
 
