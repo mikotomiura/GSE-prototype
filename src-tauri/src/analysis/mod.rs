@@ -1,5 +1,6 @@
 pub mod engine;
 pub mod features;
 pub mod intervention;
+pub mod intervention_eval;
 pub mod loop_step;
 pub mod metrics;

@@ -72,6 +72,12 @@
 | Micro F1 | — | 総 TP / 総 labels。多クラスでは accuracy と一致。GSE では分母は matched labels のみ (警告行きは除外) | 混同行列 |
 | detection_lead_ms | — | UserLabel 時刻 - 最近傍同クラス argmax feat の時刻。正 = HMM 先行、負 = 遅延 (±60 秒窓内の最近傍を採用) | UserLabel, FeatSnapshot |
 | recovered_at | — | Stuck ラベル後に p_flow > 0.5 に達する最初の FeatSnapshot 時刻。ログ記録時は null、`gse-replay --metrics` 実行時にオフラインで純粋関数算出 | compute_recovered_at |
+| PROTECT / STALL | — | 介入評価の GT 二値化。PROTECT = 旧 Flow/Incubation（守るべき状態）、STALL = 旧 Stuck（介入候補）。`gse-replay --intervention` で point label を forward-fill 区間化して使う | HIR, intervention_eval |
+| ACT / HOLD | — | 介入評価の decision 二値化。ACT = {nudge, wall}（介入する）、HOLD = {none, defer}（控える） | HIR, InterventionDecision |
+| HIR | Harmful Intervention Rate | 有害介入率 = ACT∩PROTECT / labeled-ACT。PROTECT 区間に介入してしまった割合。v2 介入評価の最重要・安全性指標 (`analysis::intervention_eval`) | PROTECT/STALL, intervention_eval |
+| DC | Defer Correctness | defer 正答率 = W 秒以内に p_flow>0.5 へ回復した defer 区間 / 全 defer 区間。見送り判断が自己回復で支持された割合 | recovered_at, ACT/HOLD |
+| Burden | — | 介入評価の過介入代理 = ACT 回数 / セッション分 | HIR |
+| intervention_eval | — | v2 介入ポリシーのオフライン反実仮想評価モジュール (`analysis::intervention_eval`)。`gse-replay --intervention` から呼ばれ HIR/Precision/DC/Burden を算出。screening 用途 | HIR, DC, intervention_decision |
 | hmm_version | — | `analysis::engine::HMM_VERSION` の SemVer 値 (現行 `0.2.0`)。meta NDJSON エントリに埋まる、gse-replay が版不一致を WARN | HMM, schema |
 | schema_dto | — | `logger::LogEntry` の `schemars::JsonSchema` 派生専用ミラー型 (`schema_dto::LogEntryDto`)。production path に影響させず JSON Schema を機械生成するための DTO | emit_schema, current.json |
 | intervention_decision | — | MVP Opportunity の NDJSON ログ種別。action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by を含む | InterventionDecision, schema |

@@ -32,6 +32,9 @@ use std::process::ExitCode;
 
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
+use gse_next_lib::analysis::intervention_eval::{
+    compute_intervention_metrics, format_intervention_pretty, DEFAULT_DEFER_RECOVERY_WINDOW_MS,
+};
 use gse_next_lib::analysis::loop_step::{
     step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
 };
@@ -271,6 +274,8 @@ struct Args {
     segment: bool,
     /// --segments <path>: .segments.txt を読み込み範囲マッチングでメトリクス算出
     segments_path: Option<PathBuf>,
+    /// --intervention: v2 介入ポリシーをオフライン反実仮想リプレイし HIR/DC 等を算出
+    intervention: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -330,24 +335,34 @@ fn parse_args() -> Result<Args, String> {
         None
     };
 
-    // --json は --metrics または --segments 併用時のみ意味を持つ
-    if json && !metrics && segments_path.is_none() {
-        return Err("--json requires --metrics or --segments".to_string());
+    // --intervention フラグ
+    let intervention = if let Some(pos) = args.iter().position(|a| a == "--intervention") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
+    // --json は --metrics / --segments / --intervention 併用時のみ意味を持つ
+    if json && !metrics && segments_path.is_none() && !intervention {
+        return Err("--json requires --metrics, --segments, or --intervention".to_string());
     }
 
-    // 排他チェック: --metrics / --segment / --segments / --snapshot は全て排他
+    // 排他チェック: --metrics / --segment / --segments / --snapshot / --intervention は全て排他
     let mode_count = [
         metrics,
         segment,
         segments_path.is_some(),
         snapshot_path.is_some(),
+        intervention,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot are mutually exclusive".to_string(),
+            "--metrics, --segment, --segments, --snapshot, --intervention are mutually exclusive"
+                .to_string(),
         );
     }
 
@@ -365,6 +380,7 @@ fn parse_args() -> Result<Args, String> {
         json,
         segment,
         segments_path,
+        intervention,
     })
 }
 
@@ -375,13 +391,15 @@ fn usage() -> String {
          gse-replay <session.ndjson> [--snapshot <golden.json>]\n    \
          gse-replay <session.ndjson> --metrics [--json]\n    \
          gse-replay <session.ndjson> --segment\n    \
-         gse-replay <session.ndjson> --segments <segments.txt> [--json]\n\n\
+         gse-replay <session.ndjson> --segments <segments.txt> [--json]\n    \
+         gse-replay <session.ndjson> --intervention [--json]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
          --segment           活動境界で分割した .segments.txt を生成\n    \
          --segments <path>   .segments.txt を読み込み範囲マッチングでメトリクス算出\n    \
-         --json              --metrics / --segments の出力を JSON で標準出力へ\n    \
+         --intervention      v2 介入ポリシーを反実仮想リプレイし HIR/Precision/DC/Burden を算出\n    \
+         --json              --metrics / --segments / --intervention の出力を JSON で標準出力へ\n    \
          -h, --help          このヘルプを表示\n",
     )
 }
@@ -497,6 +515,49 @@ fn main() -> ExitCode {
             }
         } else {
             let _ = write!(lock, "{}", format_pretty(&metrics));
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // --intervention 経路: v2 介入ポリシーをオフライン反実仮想リプレイ。
+    // metrics 経路と同じく logged feat (wall-clock) を使い、decide() を時刻順に
+    // ステップして HIR/Precision/DC/Burden を算出する (decisions.md D1)。
+    if args.intervention {
+        let feats = match collect_logged_feats(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect logged feats: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let labels = match collect_user_labels(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect user labels: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let key_press_ts = collect_key_timestamps(&args.session_path);
+        let metrics = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &key_press_ts,
+            DEFAULT_DEFER_RECOVERY_WINDOW_MS,
+        );
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        if args.json {
+            match serde_json::to_string_pretty(&metrics) {
+                Ok(s) => {
+                    let _ = writeln!(lock, "{}", s);
+                }
+                Err(e) => {
+                    tracing::error!("failed to serialize intervention metrics: {}", e);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            let _ = write!(lock, "{}", format_intervention_pretty(&metrics));
         }
         return ExitCode::SUCCESS;
     }
