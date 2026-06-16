@@ -19,8 +19,18 @@
 | ゼンタイマー | Zen Timer | Wall 発動時にスマートフォン上で起動する 2 分カウントダウン。身体的休息を促す | 「Zen Timer 完了後に手動アンロック」 |
 | モンクモード | Monk Mode | Wall 介入を無効化するトグル。Nudge のみ有効になる | 「Monk Mode 有効時は Wall が発動しない」 |
 | フィジカルアンカー | Physical Anchor | 将来の Lv3/Lv4 介入。身体的活動（散歩等）を促す Flutter アプリ連携 | 「Physical Anchor は stretch goal」 |
-| グラウンドトゥルース | Ground Truth (GT) | ユーザー自身が主観的に付与する認知状態ラベル。HMM 推定の正解データとして機能 (Phase 1) | 「Phase 1 で GT 付きセッションを収集」 |
-| ユーザーラベル | UserLabel | GT の実体。`{Flow, Incubation, Stuck}` の 3 値 enum + timestamp として NDJSON に記録 | 「`⌘⇧⌥F` を押すと UserLabel が記録される」 |
+| グラウンドトゥルース | Ground Truth (GT) | ユーザー自身が主観的に付与する認知状態ラベル。**v0.3 (D-13) 以降、較正スモーク段ではこの語を使わず criterion label と呼ぶ** (測定法が較正で成立して初めて妥当性を語れるため)。GT は核検証フェーズ通過後にのみ正当化される | 「この段階のラベルは GT ではなく criterion label」 |
+| 主観参照ラベル | criterion label | 較正スモークで収集する主観ラベル。GT を名乗らず「妥当性検証の参照基準候補」と位置づける。実体は Q1 摩擦 / Q2 前進の 2 軸 (各 1–5) | 「criterion label を順序 C-index で X/Y と照合」 |
+| ユーザーラベル | UserLabel | criterion label の実体。NDJSON では `realtime_label` (Q1/Q2) として記録。旧 `{Flow, Incubation, Stuck}` 3 値 enum から 2 軸スライダーへ移行 (v0.3 §4) | 「ランダムプローブ回答が realtime_label として記録される」 |
+| ランダムプローブ | random probe | モデル出力と無関係にセッションごと ≤2回/30分、一様ランダムな時点で表示する Q1/Q2 の問い。較正スモークの**主データ源**。backend が時刻を生成し `probe_assignment` で監査記録 (v0.3 §4) | 「ランダムプローブの直前 30 秒を分析窓にする」 |
+| 時間隔離 | time isolation | 申告は未来の打鍵を汚染するが過去は汚染しないという性質を使い、分析窓を申告**前** (プローブ t に対し t−31s〜t−1s) に限定して P1 汚染を構造的に解く設計 (v0.3 §4.2) | 「時間隔離窓 t−31s〜t−1s の特徴量だけ使う」 |
+| 自己マーカー | self marker | 被験者が「今 Stuck だ」と思った瞬間に押す任意ホットキー。希少な深い Stuck を拾う**副データ** (Precision・事例用)。Recall 分母には混ぜない (v0.3 §4.1) | 「self_marker は分母に入れず事例探索に使う」 |
+| コンテキストビーコン | context_beacon | 内容非由来の cue (5分ごとランダムな色・図形、ログは ID のみ)。エピソード的目印になるが状態のヒントを漏らさない。波形 cue の confound を断つための比較条件 (v0.3 §5) | 「context_beacon は意味を持たない記号」 |
+| 較正スモーク | calibration smoke | n=3〜5 で測定法 (ラベル方式) が成立するかを先に検証する研究フェーズ。効果量推定・破綻検出に限定し、確証主張はしない (v0.3 §3, §11) | 「較正スモークで測定法ゲートを通してから核検証へ」 |
+| 尺度理解テスト | scale comprehension test | 本番前に 8 ビネット (2×2 象限×2) で Q1/Q2 が独立 2 軸として理解されているか検査する事前ゲート (PreReg-1) | 「尺度理解テストに合格してから本番データを取る」 |
+| 2段ゲート | two-stage gate | 「測定法の失敗」と「モデルの失敗」を別々の Go/No-Go で事前宣言する反証可能化の仕組み。測定法ゲート → モデルゲートの順 (v0.3 §7) | 「測定法ゲートを通過しない限りモデル評価に進まない」 |
+| 順序一致度 | C-index (concordance index) | 「X が大きい区間ほど主観 Q1 も大きい」という順位の一致割合。0.5 が偶然・1.0 が完全一致・0.5 未満は逆方向。順序尺度と相性が良く方向を保つ。`\|r\|≥0.30` の代替 (v0.3 §7) | 「被験者内 C-index 中央値 ≥0.65 で Go 候補」 |
+| 前向き固定 holdout | prospective fixed holdout | 各人の最初の 2 セッションで β を較正・凍結し、残りで完全固定評価する設計。「今日較正→明日使用」の実運用に一致。LOSO/LOUO の時間リークを避ける (v0.3 §8) | 「前向き固定 holdout で forking paths を排除」 |
 | Need | Need | 介入が必要そうかを表す層。MVP では主に `p_stuck` を `stuck_likelihood` として利用する | 「Need は高いが Opportunity が低い」 |
 | Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode で判定する | 「Opportunity が低いため defer する」 |
 | 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
