@@ -47,6 +47,16 @@
   scope 外の cross-subsystem 影響が出る(handoff「新規 idle 検出を作らない・既存再利用」とも整合)。
   `scheduled_ts` / 分析窓 / `session_elapsed_ms` は実時刻ベースで idle に汚染されない。
 
+## DB-8 ウォームアップ guard: 窓がセッション内に収まるまで発火しない(厳密ジャッジ追補)
+- **判断**: `ProbeConfig.min_session_elapsed_ms`(既定 31_000ms)を追加し、`session_elapsed < 31s`
+  の候補を thinning する。これで分析窓 `[t−31s, t−1s]` の始端が必ず `session_start` 以降になる。
+- **根拠**: guard が無いと、セッション開始 31s 以内に発火したプローブの窓が `session_start` を
+  下回り、**開始前(drain/idle 期間)の打鍵データが窓に混入**する。較正の核は「クリーンな測定窓」
+  であり、混入は Task D の C-index を静かに汚染する。発生確率 ≈ 1−e^(−31/900) ≈ 3.4%/session で
+  30–50 session 規模のスモークでは無視できない(各人 ~16–20 件しか要らないため相対的に大きい)。
+- **影響**: 既定挙動の変更は「最初の 31s はプローブを出さない」のみで望ましい方向。gap/cap/away の
+  既存テストには影響なし(warm-up は冒頭 31s のみ)。新規テスト `no_probe_until_window_fits_in_session`。
+
 ## DB-5 schema_dto.rs / current.json は touch しない
 - **判断**: logger は Task A で `ProbeAssignment` を既にハンドル済(`logger.rs:780`)。B は producer 配線のみ。
 - **根拠**: schema は A で確定。B での schema 変更は不要 → finish-task の tier-3 parity guard に当たらない。

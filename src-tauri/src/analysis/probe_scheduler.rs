@@ -76,6 +76,11 @@ pub struct ProbeConfig {
     pub cap_count: usize,
     /// 離席とみなす idle しきい値 (ms)。既定 180_000 (intervention.rs AWAY_IDLE_MS と一致)。
     pub away_idle_ms: u64,
+    /// ウォームアップ: セッション開始からこの時間が経つまでプローブを発火しない (ms)。
+    /// 既定はランダムプローブ窓の全長 31_000ms。これにより分析窓 `[t−31s, t−1s]` の始端が
+    /// 必ず `session_start` 以降になり、セッション開始前の打鍵データが窓に混入しない
+    /// (測定窓の妥当性。DB-8)。
+    pub min_session_elapsed_ms: u64,
 }
 
 impl Default for ProbeConfig {
@@ -85,7 +90,8 @@ impl Default for ProbeConfig {
             gap_min_ms: 8 * 60 * 1000,                   // 8 分
             cap_window_ms: 30 * 60 * 1000,               // 30 分
             cap_count: 2,
-            away_idle_ms: 180_000, // 3 分
+            away_idle_ms: 180_000,          // 3 分
+            min_session_elapsed_ms: 31_000, // ランダムプローブ窓 (t−31s) の全長
         }
     }
 }
@@ -168,6 +174,10 @@ impl ProbeScheduler {
             .retain(|&t| now_ms.saturating_sub(t) < cap_window);
 
         let away = idle_ms >= self.config.away_idle_ms;
+        // ウォームアップ: 窓 [t−31s, t−1s] がセッション内に完全に収まる前は発火しない
+        // (始端が session_start を下回り、開始前の打鍵が窓に混入するのを防ぐ。DB-8)。
+        let too_early =
+            now_ms.saturating_sub(self.session_start_ms) < self.config.min_session_elapsed_ms;
         let gap_ok = self
             .last_fire_ms
             .is_none_or(|last| now_ms.saturating_sub(last) >= self.config.gap_min_ms);
@@ -179,7 +189,7 @@ impl ProbeScheduler {
         self.next_candidate_ms =
             now_ms.saturating_add(Self::sample_interval_ms(&mut self.rng, &self.config));
 
-        if away || !gap_ok || !cap_ok {
+        if away || too_early || !gap_ok || !cap_ok {
             return None; // 棄却 (thin)
         }
 
@@ -342,5 +352,41 @@ mod tests {
                 "no fire to check elapsed"
             );
         }
+    }
+
+    #[test]
+    fn no_probe_until_window_fits_in_session() {
+        // DB-8 ウォームアップ: session_elapsed < 31s では発火せず、発火したプローブの
+        // 分析窓始端は必ず session_start 以降 (開始前データの混入なし)。
+        // gap/cap/away を無効化し候補を毎秒到来させて guard 単体を検証する。
+        let config = ProbeConfig {
+            lambda_per_ms: 1.0 / 1000.0, // 平均 1s 間隔 → 候補が頻繁に到来
+            gap_min_ms: 0,
+            cap_window_ms: 1,
+            cap_count: usize::MAX,
+            away_idle_ms: u64::MAX,
+            min_session_elapsed_ms: 31_000,
+        };
+        let mut sched = ProbeScheduler::from_seed(5, config, SESSION_START);
+        let mut now = SESSION_START;
+        let mut fired_any = false;
+        while now < SESSION_START + 5 * MIN {
+            if let Some(f) = sched.poll(now, 0) {
+                fired_any = true;
+                assert!(
+                    f.session_elapsed_ms >= 31_000,
+                    "fired too early: session_elapsed_ms={}",
+                    f.session_elapsed_ms
+                );
+                assert!(
+                    f.window_start_ms >= SESSION_START,
+                    "analysis window precedes session_start ({} < {})",
+                    f.window_start_ms,
+                    SESSION_START
+                );
+            }
+            now += 1000;
+        }
+        assert!(fired_any, "expected fires after the warm-up period");
     }
 }
