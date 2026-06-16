@@ -30,6 +30,11 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use gse_next_lib::analysis::calibration_eval::{
+    compute_calibration_metrics, format_calibration_pretty, AggSpec, ProbeRecord, ProbeSourceKind,
+    QuadrantKind, SessionData, SkipReasonKind, TrackKind, VignetteRecord,
+    HOLDOUT_CALIBRATION_SESSIONS,
+};
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::intervention_eval::{
@@ -49,6 +54,13 @@ use gse_next_lib::analysis::metrics::{
 /// 上限なしだとメモリ枯渇で OOM する可能性がある (security-checker MEDIUM 指摘)。
 /// 10 分セッションの NDJSON は通常 数 MB なので 500 MB は十分広いバッファ。
 const MAX_SESSION_BYTES: u64 = 500 * 1024 * 1024;
+
+/// `--calibration` で受け付ける 1 被験者あたりのセッションファイル数の上限。
+///
+/// 各ファイルは `MAX_SESSION_BYTES` で保護されるが、ファイル**数**が無制限だと
+/// `500MB × 数 × 2 パス` のリソースを消費しうる (security-checker MEDIUM 指摘)。
+/// 実運用では 1 被験者 10 セッション程度なので 64 は十分広い。
+const MAX_CALIBRATION_FILES: usize = 64;
 
 /// NDJSON の 1 行を表す Deserialize 専用 enum。
 ///
@@ -109,6 +121,57 @@ enum ReplayEvent {
     /// MVP Opportunity 判定ログ。replay では読み飛ばす。
     #[serde(rename = "intervention_decision")]
     InterventionDecision(#[allow(dead_code)] serde_json::Value),
+    /// v0.3 較正スモーク: セッション宣言。`--calibration` 経路で track を抽出する。
+    /// snapshot/run_replay 経路では `timestamp()==None` で読み飛ばす。
+    #[serde(rename = "session_meta")]
+    SessionMeta {
+        track: String,
+        #[allow(dead_code)]
+        task_kind: String,
+        #[allow(dead_code)]
+        monk_mode: bool,
+        #[allow(dead_code)]
+        intervention_enabled: bool,
+        #[allow(dead_code)]
+        ts: u64,
+    },
+    /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。`--calibration` で件数を数える。
+    #[serde(rename = "probe_assignment")]
+    ProbeAssignment {
+        #[allow(dead_code)]
+        probe_id: String,
+        #[allow(dead_code)]
+        scheduled_ts: u64,
+        #[allow(dead_code)]
+        session_elapsed_ms: u64,
+    },
+    /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。`--calibration` で ProbeRecord 化する。
+    #[serde(rename = "realtime_label")]
+    RealtimeLabel {
+        #[allow(dead_code)]
+        probe_id: Option<String>,
+        source: String,
+        q1_friction: Option<u8>,
+        q2_progress: Option<u8>,
+        answered: bool,
+        skip_reason: String,
+        latency_ms: u64,
+        analysis_window_start_ms: u64,
+        analysis_window_end_ms: u64,
+        #[allow(dead_code)]
+        ts: u64,
+    },
+    /// v0.3 較正スモーク: 尺度理解テスト回答。`--calibration` で VignetteRecord 化する。
+    #[serde(rename = "vignette_response")]
+    VignetteResponse {
+        #[allow(dead_code)]
+        vignette_id: String,
+        expected_quadrant: String,
+        q1_friction: u8,
+        q2_progress: u8,
+        #[allow(dead_code)]
+        ts: u64,
+    },
 }
 
 impl ReplayEvent {
@@ -128,6 +191,12 @@ impl ReplayEvent {
             ReplayEvent::ReviewMarker { .. } => None,
             ReplayEvent::ImeShadow(_) => None,
             ReplayEvent::InterventionDecision(_) => None,
+            // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
+            // run_replay (snapshot 経路) の時刻順ソートからは除外する (UserLabel と同方針)。
+            ReplayEvent::SessionMeta { .. } => None,
+            ReplayEvent::ProbeAssignment { .. } => None,
+            ReplayEvent::RealtimeLabel { .. } => None,
+            ReplayEvent::VignetteResponse { .. } => None,
         }
     }
 }
@@ -276,6 +345,11 @@ struct Args {
     segments_path: Option<PathBuf>,
     /// --intervention: v2 介入ポリシーをオフライン反実仮想リプレイし HIR/DC 等を算出
     intervention: bool,
+    /// --calibration: v0.3 較正解析 (時間隔離窓 C-index / 2段ゲート / MNAR / ビネット)。
+    /// 1 被験者の複数セッションを受けるため、追加の positional を `calibration_extra` に積む。
+    calibration: bool,
+    /// `--calibration` の 2 個目以降の positional (1 被験者のセッション時刻順)。
+    calibration_extra: Vec<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -343,44 +417,65 @@ fn parse_args() -> Result<Args, String> {
         false
     };
 
-    // --json は --metrics / --segments / --intervention 併用時のみ意味を持つ
-    if json && !metrics && segments_path.is_none() && !intervention {
-        return Err("--json requires --metrics, --segments, or --intervention".to_string());
+    // --calibration フラグ (v0.3 較正解析)
+    let calibration = if let Some(pos) = args.iter().position(|a| a == "--calibration") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
+    // --json は --metrics / --segments / --intervention / --calibration 併用時のみ意味を持つ
+    if json && !metrics && segments_path.is_none() && !intervention && !calibration {
+        return Err(
+            "--json requires --metrics, --segments, --intervention, or --calibration".to_string(),
+        );
     }
 
-    // 排他チェック: --metrics / --segment / --segments / --snapshot / --intervention は全て排他
+    // 排他チェック: 全モードは相互排他
     let mode_count = [
         metrics,
         segment,
         segments_path.is_some(),
         snapshot_path.is_some(),
         intervention,
+        calibration,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration are mutually exclusive"
                 .to_string(),
         );
     }
 
-    if args.len() != 1 {
+    // positional 引数の検証。--calibration は 1 被験者の複数セッションを受けるため ≥1 個、
+    // それ以外のモードは従来どおり厳密に 1 個。
+    if args.is_empty() {
+        return Err("expected at least 1 positional argument (session.ndjson)".to_string());
+    }
+    if !calibration && args.len() != 1 {
         return Err(format!(
             "expected 1 positional argument (session.ndjson), got {}",
             args.len()
         ));
     }
+    let mut positional_iter = args.into_iter();
+    let session_path = PathBuf::from(positional_iter.next().unwrap());
+    let calibration_extra: Vec<PathBuf> = positional_iter.map(PathBuf::from).collect();
 
     Ok(Args {
-        session_path: PathBuf::from(args.into_iter().next().unwrap()),
+        session_path,
         snapshot_path,
         metrics,
         json,
         segment,
         segments_path,
         intervention,
+        calibration,
+        calibration_extra,
     })
 }
 
@@ -392,14 +487,16 @@ fn usage() -> String {
          gse-replay <session.ndjson> --metrics [--json]\n    \
          gse-replay <session.ndjson> --segment\n    \
          gse-replay <session.ndjson> --segments <segments.txt> [--json]\n    \
-         gse-replay <session.ndjson> --intervention [--json]\n\n\
+         gse-replay <session.ndjson> --intervention [--json]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
          --segment           活動境界で分割した .segments.txt を生成\n    \
          --segments <path>   .segments.txt を読み込み範囲マッチングでメトリクス算出\n    \
          --intervention      v2 介入ポリシーを反実仮想リプレイし HIR/Precision/DC/Burden を算出\n    \
-         --json              --metrics / --segments / --intervention の出力を JSON で標準出力へ\n    \
+         --calibration       v0.3 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット)。1 被験者の複数セッションを時刻順に渡す\n    \
+         --json              --metrics / --segments / --intervention / --calibration の出力を JSON で標準出力へ\n    \
          -h, --help          このヘルプを表示\n",
     )
 }
@@ -558,6 +655,69 @@ fn main() -> ExitCode {
             }
         } else {
             let _ = write!(lock, "{}", format_intervention_pretty(&metrics));
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // --calibration 経路: v0.3 較正解析 (Task D)。1 被験者の複数セッション NDJSON を時刻順に受け、
+    // 時間隔離窓で X/Y を集約 → 被験者内 C-index → holdout → MNAR → ビネット → 二軸性を算出する。
+    // frontend を起動せず NDJSON のみを読む。被験者横断の最終ゲートは Task E。
+    if args.calibration {
+        let mut paths: Vec<PathBuf> = Vec::with_capacity(1 + args.calibration_extra.len());
+        paths.push(args.session_path.clone());
+        paths.extend(args.calibration_extra.iter().cloned());
+
+        // ファイル数の上限 (各ファイルは MAX_SESSION_BYTES でも保護されるが、数の暴走を防ぐ)。
+        if paths.len() > MAX_CALIBRATION_FILES {
+            let _ = writeln!(
+                std::io::stderr(),
+                "too many calibration sessions: {} exceeds limit {}",
+                paths.len(),
+                MAX_CALIBRATION_FILES
+            );
+            return ExitCode::from(2);
+        }
+        // 前向き holdout には main セッション 3 本以上が要る (先頭 2 = 較正)。
+        if paths.len() < HOLDOUT_CALIBRATION_SESSIONS + 1 {
+            tracing::warn!(
+                sessions = paths.len(),
+                "calibration: prospective-holdout C-index requires ≥{} sessions (first {} are calibration); \
+                 eval set will be empty",
+                HOLDOUT_CALIBRATION_SESSIONS + 1,
+                HOLDOUT_CALIBRATION_SESSIONS
+            );
+        }
+
+        let mut sessions: Vec<SessionData> = Vec::with_capacity(paths.len());
+        for p in &paths {
+            match load_calibration_session(p) {
+                Ok(s) => sessions.push(s),
+                Err(msg) => {
+                    tracing::error!(
+                        "failed to load calibration session {}: {}",
+                        p.display(),
+                        msg
+                    );
+                    return ExitCode::from(1);
+                }
+            }
+        }
+        // 既定の窓集約スペック (ewma の中央値, 設計判断 A)。
+        let report = compute_calibration_metrics(&sessions, AggSpec::default());
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        if args.json {
+            match serde_json::to_string_pretty(&report) {
+                Ok(s) => {
+                    let _ = writeln!(lock, "{}", s);
+                }
+                Err(e) => {
+                    tracing::error!("failed to serialize calibration report: {}", e);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            let _ = write!(lock, "{}", format_calibration_pretty(&report));
         }
         return ExitCode::SUCCESS;
     }
@@ -755,6 +915,174 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
     Ok(out)
 }
 
+/// Task D: 1 セッション NDJSON から較正解析の入力 `SessionData` を構築する。
+///
+/// 1 パスで session_meta(track) / probe_assignment(件数) / realtime_label(ProbeRecord) /
+/// vignette_response(VignetteRecord) を抽出し、X/Y の源となる FeatSnapshot は既存
+/// `collect_logged_feats` を再利用する (計 2 パス、`--metrics` 経路と同じ前提)。
+/// 未知 source / quadrant / parse 失敗は silent skip (件数のみ warn、内容はプライバシーのため出さない)。
+fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+
+    let mut track = TrackKind::Main; // session_meta がなければ main 既定
+    let mut session_meta_seen = false;
+    let mut session_start_ms: Option<u64> = None; // session_meta.ts (時刻単調性検証用)
+    let mut probes: Vec<ProbeRecord> = Vec::new();
+    let mut vignettes: Vec<VignetteRecord> = Vec::new();
+    let mut random_probe_assignment_count: usize = 0;
+
+    let mut parse_failed_lines: u64 = 0;
+    let mut unknown_enum_lines: u64 = 0;
+    // producer は q を 1..=5 に clamp するが reader は信頼せず再検証する (security-checker MEDIUM)。
+    // 手編集/破損 NDJSON で範囲外 q が集計値を静かに歪めるのを防ぐ。
+    let mut out_of_range_lines: u64 = 0;
+
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        match ev {
+            ReplayEvent::SessionMeta { track: t, ts, .. } => {
+                // 複数あれば最初の宣言を採用 (通常はセッション先頭に 1 件)。
+                if !session_meta_seen {
+                    match TrackKind::parse(&t) {
+                        Some(tk) => track = tk,
+                        None => unknown_enum_lines += 1,
+                    }
+                    session_start_ms = Some(ts);
+                    session_meta_seen = true;
+                }
+            }
+            ReplayEvent::ProbeAssignment { .. } => {
+                // probe_assignment は一様ランダムプローブの監査記録 (Recall 分母の定義)。
+                random_probe_assignment_count += 1;
+            }
+            ReplayEvent::RealtimeLabel {
+                source,
+                q1_friction,
+                q2_progress,
+                answered,
+                skip_reason,
+                latency_ms,
+                analysis_window_start_ms,
+                analysis_window_end_ms,
+                ..
+            } => {
+                let Some(source) = ProbeSourceKind::parse(&source) else {
+                    unknown_enum_lines += 1;
+                    continue;
+                };
+                let Some(skip_reason) = SkipReasonKind::parse(&skip_reason) else {
+                    unknown_enum_lines += 1;
+                    continue;
+                };
+                // 回答済みは q1/q2 が 1..=5 必須 (producer 不変条件)。範囲外/欠落は破損とみなし skip。
+                // skip 回答 (answered=false) は q=None が正常なので検証しない。
+                if answered {
+                    let q_valid = matches!(q1_friction, Some(q) if (1..=5).contains(&q))
+                        && matches!(q2_progress, Some(q) if (1..=5).contains(&q));
+                    if !q_valid {
+                        out_of_range_lines += 1;
+                        continue;
+                    }
+                }
+                probes.push(ProbeRecord {
+                    source,
+                    answered,
+                    q1_friction,
+                    q2_progress,
+                    skip_reason,
+                    latency_ms,
+                    window_start_ms: analysis_window_start_ms,
+                    window_end_ms: analysis_window_end_ms,
+                });
+            }
+            ReplayEvent::VignetteResponse {
+                expected_quadrant,
+                q1_friction,
+                q2_progress,
+                ..
+            } => {
+                let Some(expected) = QuadrantKind::parse(&expected_quadrant) else {
+                    unknown_enum_lines += 1;
+                    continue;
+                };
+                // ビネット q1/q2 も 1..=5 を再検証 (破損 NDJSON で象限推論が歪むのを防ぐ)。
+                if !(1..=5).contains(&q1_friction) || !(1..=5).contains(&q2_progress) {
+                    out_of_range_lines += 1;
+                    continue;
+                }
+                vignettes.push(VignetteRecord {
+                    expected,
+                    q1_friction,
+                    q2_progress,
+                });
+            }
+            // 較正に無関係な type は読み飛ばす。
+            _ => {}
+        }
+    }
+
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            skipped = parse_failed_lines,
+            "load_calibration_session: NDJSON lines failed to parse as ReplayEvent"
+        );
+    }
+    if unknown_enum_lines > 0 {
+        tracing::warn!(
+            skipped = unknown_enum_lines,
+            "load_calibration_session: entries with unknown enum value (forward-compat skip)"
+        );
+    }
+    if out_of_range_lines > 0 {
+        tracing::warn!(
+            skipped = out_of_range_lines,
+            "load_calibration_session: entries with q1/q2 out of 1..=5 (corrupt/hand-edited NDJSON skip)"
+        );
+    }
+    if !session_meta_seen {
+        tracing::warn!(
+            session = %session_path.display(),
+            "load_calibration_session: no session_meta found — assuming track=main"
+        );
+    }
+
+    // X/Y の源 = 記録済み feat (wall-clock)。既存コレクタを再利用する。
+    let feats = collect_logged_feats(session_path)?;
+
+    Ok(SessionData {
+        track,
+        probes,
+        vignettes,
+        feats,
+        random_probe_assignment_count,
+        session_start_ms,
+        skipped_parse: parse_failed_lines,
+        skipped_unknown_enum: unknown_enum_lines,
+        skipped_out_of_range: out_of_range_lines,
+    })
+}
+
 /// NDJSON を読み込み、step() を再実行して FeatSnapshot 列を返す。
 fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
     // ファイルサイズガード (OOM 防止、security-checker MEDIUM)
@@ -868,10 +1196,16 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::UserLabel { .. }
             | ReplayEvent::ReviewMarker { .. }
             | ReplayEvent::ImeShadow(_)
-            | ReplayEvent::InterventionDecision(_) => {
+            | ReplayEvent::InterventionDecision(_)
+            | ReplayEvent::SessionMeta { .. }
+            | ReplayEvent::ProbeAssignment { .. }
+            | ReplayEvent::RealtimeLabel { .. }
+            | ReplayEvent::VignetteResponse { .. } => {
                 // Meta / Feat / UserLabel / ReviewMarker はゲート進行済み、追加処理不要
                 // (UserLabel は metrics 経路で collect_user_labels 側で抽出)
                 // (ReviewMarker は --segment 経路でセグメントハイライトに使用)
+                // (v0.3 較正 variant は --calibration 経路の collect_calibration_session で抽出)
+                // これらは timestamp()==None で ordered から除外されるが、match の網羅性のため列挙する。
             }
             ReplayEvent::SessionStart { t } => {
                 // 本番の start_session リセットを再現
@@ -1462,5 +1796,99 @@ mod tests {
         // sum = 0.9999 → [0.98, 1.02] 内、通るべき
         let feat = FeatSnapshot::try_from(dto).expect("rounding-level sum must be tolerated");
         assert!((feat.p_flow - 0.8499).abs() < 1e-9);
+    }
+
+    // =========================================================================
+    // Task D: --calibration 抽出経路の統合テスト (合成 NDJSON fixture)
+    // =========================================================================
+
+    /// `load_calibration_session` が新 4 type を正しく抽出することを確認する。
+    #[test]
+    fn load_calibration_session_extracts_new_variants() {
+        let s3 = load_calibration_session(&fixture_path("calib_subject_s3_eval.ndjson"))
+            .expect("load s3");
+        assert_eq!(s3.track, TrackKind::Main);
+        assert_eq!(s3.probes.len(), 3, "s3 has 3 realtime_label probes");
+        assert_eq!(
+            s3.random_probe_assignment_count, 3,
+            "s3 has 3 probe_assignment audit records"
+        );
+        assert!(s3.vignettes.is_empty(), "s3 has no vignettes");
+        assert_eq!(s3.feats.len(), 6, "s3 has 6 feat lines");
+        // 全 probe が random_probe・回答済み。
+        assert!(s3
+            .probes
+            .iter()
+            .all(|p| p.source == ProbeSourceKind::RandomProbe && p.answered));
+
+        let s1 =
+            load_calibration_session(&fixture_path("calib_subject_s1.ndjson")).expect("load s1");
+        assert_eq!(s1.vignettes.len(), 8, "s1 carries the 8 vignettes");
+        assert_eq!(s1.probes.len(), 1);
+    }
+
+    /// 3 セッション (s1/s2 = 較正・s3 = 評価) を `--calibration` 相当で通し、
+    /// 抽出 → 窓集約 → 被験者内 C-index → holdout → ビネット採点を end-to-end 検証する。
+    /// s3 は X(ewma) を q1 に単調対応させてあり C-index = 1.0 になる (決定論)。
+    #[test]
+    fn calibration_pipeline_end_to_end_strong_concordance() {
+        let sessions = vec![
+            load_calibration_session(&fixture_path("calib_subject_s1.ndjson")).unwrap(),
+            load_calibration_session(&fixture_path("calib_subject_s2.ndjson")).unwrap(),
+            load_calibration_session(&fixture_path("calib_subject_s3_eval.ndjson")).unwrap(),
+        ];
+        let report = compute_calibration_metrics(&sessions, AggSpec::default());
+
+        // holdout: 先頭 2 (s1/s2) = 較正、s3 = 評価。
+        assert_eq!(report.main_session_count, 3);
+        assert_eq!(report.calibration_session_count, 2);
+        assert_eq!(report.evaluation_session_count, 1);
+
+        // 評価セッション s3 の X↔Q1: ewma_x=(0.1,0.5,0.9) ↔ q1=(1,3,5) → 完全一致。
+        assert_eq!(report.cindex.x_q1_pooled, Some(1.0));
+        // Y↔Q2: ewma_y=(0.9,0.5,0.1) ↔ q2=(5,3,1) → 完全一致。
+        assert_eq!(report.cindex.y_q2_pooled, Some(1.0));
+
+        // 測定法: 全 5 random probe (s1:1 + s2:1 + s3:3) が回答済み。
+        assert_eq!(report.measurement.random_probe_total, 5);
+        assert_eq!(report.measurement.random_probe_answered, 5);
+        assert!((report.measurement.answer_rate - 1.0).abs() < 1e-9);
+
+        // ビネット (s1 の 8 問) はすべて想定象限。
+        assert_eq!(report.vignette.total, 8);
+        assert_eq!(report.vignette.matched, 8);
+        assert!(report.vignette.passed);
+
+        // 無回答なし → MNAR 上下限は点推定と一致。
+        assert_eq!(report.mnar.point, Some(1.0));
+        assert_eq!(report.mnar.lower, Some(1.0));
+        assert_eq!(report.mnar.upper, Some(1.0));
+
+        // Recall は withheld。
+        assert!(!report.recall.reported);
+
+        // JSON シリアライズが通る (metrics.json 出力経路)。
+        let json = serde_json::to_string(&report).expect("serialize CalibrationReport");
+        assert!(json.contains("\"schema\":\"calibration/v0.3\""));
+    }
+
+    /// exploratory セッションは主指標から除外される (§1.3)。
+    #[test]
+    fn calibration_excludes_exploratory_track() {
+        // s3 を exploratory 扱いにするため、track を書き換えた SessionData を直接合成する。
+        let mut s3 =
+            load_calibration_session(&fixture_path("calib_subject_s3_eval.ndjson")).unwrap();
+        s3.track = TrackKind::Exploratory;
+        let sessions = vec![
+            load_calibration_session(&fixture_path("calib_subject_s1.ndjson")).unwrap(),
+            load_calibration_session(&fixture_path("calib_subject_s2.ndjson")).unwrap(),
+            s3,
+        ];
+        let report = compute_calibration_metrics(&sessions, AggSpec::default());
+        assert_eq!(report.exploratory_session_count, 1);
+        assert_eq!(report.main_session_count, 2);
+        // main は s1/s2 のみ → 両方較正に取られ評価集合は空。
+        assert_eq!(report.evaluation_session_count, 0);
+        assert_eq!(report.cindex.x_q1_pooled, None);
     }
 }

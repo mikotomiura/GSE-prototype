@@ -50,15 +50,19 @@
 - [x] 尺度ビネット 8 問の初回フロー → `vignette_response`(PreReg-1 ゲート表示)
 - [x] cross-review 対応(送信成功後遷移=MNAR 回避・Wall 非共存)。security clean・cargo112緑・tsc緑
 
-## Task D — オフライン解析 gse-replay 拡張(A + 実データ後)
-- [ ] probe_id 起点の時間隔離窓抽出(t−31s..t−1s, X/Y 集約)
-- [ ] 被験者内 方向付き C-index(§7)
-- [ ] 2 段ゲート判定(測定法ゲート→モデルゲート, PreReg-2/4)
-- [ ] MNAR 上下限(全高摩擦/全低摩擦, PreReg-7)
-- [ ] ビネット採点(PreReg-1)→ `metrics.json`
-- [ ] ※ 既存 `metrics.rs` の confusion/recall は流用せず C-index 系を別パスで追加(D-14)
+## Task D — オフライン解析 gse-replay 拡張(A 後・合成 fixture 先行)✅ 完了(2026-06-17, PR #5)
+- [x] probe_id 起点の時間隔離窓抽出(t−31s..t−1s, X/Y 集約・既定 ewma 中央値・AggSpec 差替可)
+- [x] 被験者内 方向付き C-index(§7・X↔Q1/Y↔Q2)
+- [x] 2 段ゲート判定(測定法ゲート→モデルゲート, PreReg-2/4・純関数 model_gate/measurement_gate)
+- [x] MNAR 上下限(全高摩擦/全低摩擦, PreReg-7・母数=窓X有り)
+- [x] ビネット採点(PreReg-1)+ 二軸性(PreReg-8)→ `CalibrationReport`(`--calibration --json`)
+- [x] ※ 既存 `metrics.rs` の confusion/recall は流用せず C-index 系を別パスで追加(D-14)
+- [x] 合成 NDJSON fixture + 単体/統合テスト 154 件緑・snapshot 回帰維持・cross-review 対応済
+> 新セッション用プロンプト: `next-session-prompt-taskE.md`(このフォルダ内)
+> 被験者**横断**の最終ゲート orchestration と実データ評価は Task E(D は純関数 + 1被験者 CLI まで)
 
 ## Task E — 通し検証
+- [ ] 被験者横断 cohort orchestration(P*/ 走査 → 被験者別 calibration → 横断ゲート → cohort Go/Kill)
 - [ ] 自己ドッグフードで end-to-end 1 本(合成 or 実セッション)
 - [ ] 3–5 名スモーク → PreReg ゲート判定(Go / Kill / INCONCLUSIVE)
 
