@@ -2,22 +2,24 @@
 
 > 用途: 新しいセッションの最初にこのファイルの「プロンプト本文」を貼り付ける。
 > 新セッションは CLAUDE.md / MEMORY.md を自動ロードする前提。
-> 背景: A(schema, main merge済)/ B(scheduler, feature/probe-scheduler)/ C(frontend, feature/probe-collect)/
->        **D(オフライン解析, feature/probe-analysis, PR #5・C にスタック)** 実装・cross-review 済。
+> 背景: A(schema, main merge済 PR#4)/ B(scheduler)/ C(frontend)/ **D(オフライン解析)** 実装・cross-review 済。
 >        実装順 A→(B∥C)→D→**E**。次は最後の **E = 通し検証**。
 
 ---
 
 ## ⚠️ 着手前の前提確認(ブランチ整理)
 
-D 時点でブランチは **A→B→C→D のスタック**になっている(B/C/D は未マージのローカル/PR):
-- `feature/probe-scheduler`(B)・`feature/probe-collect`(C, B にスタック)・`feature/probe-analysis`(D, PR #5, C にスタック)
-- main には A(PR#4)のみ。
+**2026-06-17 時点の実状**: PR #5(D)は **`feature/probe-collect` を base にマージ済**(main ではない)。よって:
+- `main` = **A のみ**(PR#4)。
+- `feature/probe-collect` = **A+B+C+D が統合された tip**(B scheduler + C frontend + D 解析が全部入り)。
+- B/C/D はまだ **main に届いていない**(`feature/probe-collect → main` の PR が未作成)。
 
-E は **A+B+C+D が統合されたツリー**が必要(自己ドッグフードで実アプリを動かすため B scheduler + C frontend + D 解析を全て使う)。最初に状態を確認し、いずれかを選ぶ:
-1. **推奨**: B→C→D の PR を順にレビュー/マージして main を A+B+C+D に統合 → main から `feature/probe-e2e` を分岐。
-2. マージ前に進めるなら、統合済みの **`feature/probe-analysis`(= A+B+C+D 全部入り)から `feature/probe-e2e` を分岐**。
-※ どちらかをユーザーに確認してから着手する(推測でマージしない)。
+E は A+B+C+D 統合ツリーが必要(自己ドッグフードで実アプリを動かす)。着手前に状態を確認し選ぶ:
+1. **推奨**: `feature/probe-collect → main` の PR を出してマージ(差分 = B+C+D。A は main 済)→ **main から `feature/probe-e2e` を分岐**。以降は通常の main 起点に戻る。
+2. 先に進めるなら **`feature/probe-collect`(= A+B+C+D 統合 tip)から `feature/probe-e2e` を分岐**。
+※ どちらにするか・`feature/probe-collect → main` を今出すかをユーザーに確認してから着手する(勝手にマージしない)。
+※ 作業ツリーに未コミットの infra(Codex bridge)+ docs 変更が残存する。Task D の docs 追記分もそこに混在
+   (PR #5 未収録)。E で docs を touch/commit する際は混在に注意し、E 関連ファイルのみ選択 add する。
 
 ---
 
