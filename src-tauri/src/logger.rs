@@ -35,6 +35,173 @@ impl UserLabelKind {
     }
 }
 
+/// v0.3 較正スモークのセッション系列 (track)。`main` = 本系列、`exploratory` = 探索系列。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Track {
+    Main,
+    Exploratory,
+}
+
+impl Track {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Main => "main",
+            Self::Exploratory => "exploratory",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "main" => Some(Self::Main),
+            "exploratory" => Some(Self::Exploratory),
+            _ => None,
+        }
+    }
+}
+
+/// v0.3 較正スモークの課題種別 (task_kind)。session_meta で宣言する。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskKind {
+    Argumentative,
+    Correspondence,
+    Creative,
+    VibeCoding,
+}
+
+impl TaskKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Argumentative => "argumentative",
+            Self::Correspondence => "correspondence",
+            Self::Creative => "creative",
+            Self::VibeCoding => "vibe_coding",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "argumentative" => Some(Self::Argumentative),
+            "correspondence" => Some(Self::Correspondence),
+            "creative" => Some(Self::Creative),
+            "vibe_coding" => Some(Self::VibeCoding),
+            _ => None,
+        }
+    }
+}
+
+/// `realtime_label` の出所 (source)。`random_probe` = backend が割当てたランダムプローブ、
+/// `self_marker` = ユーザー自発の hotkey マーカー (副データ)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbeSource {
+    RandomProbe,
+    SelfMarker,
+}
+
+impl ProbeSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::RandomProbe => "random_probe",
+            Self::SelfMarker => "self_marker",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "random_probe" => Some(Self::RandomProbe),
+            "self_marker" => Some(Self::SelfMarker),
+            _ => None,
+        }
+    }
+}
+
+/// `realtime_label` の skip 理由 (skip_reason)。`none` = 回答済み(skip でない)、
+/// `dont_remember` = 直前の状態を思い出せない、`dismissed` = プローブを閉じた。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkipReason {
+    None,
+    DontRemember,
+    Dismissed,
+}
+
+impl SkipReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::DontRemember => "dont_remember",
+            Self::Dismissed => "dismissed",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "none" => Some(Self::None),
+            "dont_remember" => Some(Self::DontRemember),
+            "dismissed" => Some(Self::Dismissed),
+            _ => None,
+        }
+    }
+}
+
+/// `vignette_response` の想定象限 (expected_quadrant)。尺度理解テストの正解ラベル。
+/// `UserLabelKind` とは別物 (`idle` を含み、認知状態 GT ではなく教示の正解)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpectedQuadrant {
+    Flow,
+    Stuck,
+    Incubation,
+    Idle,
+}
+
+impl ExpectedQuadrant {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Flow => "flow",
+            Self::Stuck => "stuck",
+            Self::Incubation => "incubation",
+            Self::Idle => "idle",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "flow" => Some(Self::Flow),
+            "stuck" => Some(Self::Stuck),
+            "incubation" => Some(Self::Incubation),
+            "idle" => Some(Self::Idle),
+            _ => None,
+        }
+    }
+}
+
+/// `realtime_label` の (source, probe_id) を結合して不変条件を型で保証する。
+/// `source=self_marker ⇒ probe_id=null` を構造的に表現する: `SelfMarker` は
+/// probe_id を持てず、`RandomProbe` は必ず probe_id を持つ。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeRef {
+    /// backend 割当のランダムプローブ。`probe_assignment` の probe_id と対応する。
+    RandomProbe { probe_id: String },
+    /// ユーザー自発の hotkey マーカー。probe_id は持たない。
+    SelfMarker,
+}
+
+impl ProbeRef {
+    /// NDJSON の `source` 文字列。
+    fn source(&self) -> ProbeSource {
+        match self {
+            Self::RandomProbe { .. } => ProbeSource::RandomProbe,
+            Self::SelfMarker => ProbeSource::SelfMarker,
+        }
+    }
+
+    /// NDJSON の `probe_id`。`SelfMarker` は常に `None`。
+    fn probe_id(&self) -> Option<&str> {
+        match self {
+            Self::RandomProbe { probe_id } => Some(probe_id.as_str()),
+            Self::SelfMarker => None,
+        }
+    }
+}
+
 /// `LogEntry::UserLabel` の NDJSON 1 行を生成する純粋関数。
 /// `writeln!` の format に直接持たせるとテストしにくいため分離してある。
 fn format_user_label_line(
@@ -91,6 +258,132 @@ fn format_intervention_decision_line(
         wall_accum_ms,
         reason,
         suppressed,
+    )
+}
+
+/// 数値 (1..=5 等) の `Option<u8>` を NDJSON 値 (`数値` または `null`) に変換する。
+fn json_opt_u8(v: Option<u8>) -> String {
+    match v {
+        Some(n) => n.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+/// 不透明 ID の `Option<&str>` を NDJSON 値 (`"..."` または `null`) に変換する。
+/// JSON injection を防ぐため必ず `serde_json` でエスケープする (プライバシー境界:
+/// 値は生成済み不透明 ID のみで本文を含まない前提だが、escape は defense in depth)。
+fn json_opt_str(v: Option<&str>) -> String {
+    match v {
+        Some(s) => serde_json::to_string(s).unwrap_or_else(|_| "null".to_string()),
+        None => "null".to_string(),
+    }
+}
+
+/// `LogEntry::SessionMeta` の NDJSON 1 行を生成する純粋関数。
+fn format_session_meta_line(
+    timestamp: u64,
+    track: Track,
+    task_kind: TaskKind,
+    monk_mode: bool,
+    intervention_enabled: bool,
+) -> String {
+    format!(
+        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","monk_mode":{},"intervention_enabled":{},"ts":{}}}"#,
+        track.as_str(),
+        task_kind.as_str(),
+        monk_mode,
+        intervention_enabled,
+        timestamp,
+    )
+}
+
+/// `LogEntry::ProbeAssignment` の NDJSON 1 行を生成する純粋関数。
+fn format_probe_assignment_line(
+    probe_id: &str,
+    scheduled_ts: u64,
+    session_elapsed_ms: u64,
+) -> String {
+    format!(
+        r#"{{"type":"probe_assignment","probe_id":{},"scheduled_ts":{},"session_elapsed_ms":{}}}"#,
+        json_opt_str(Some(probe_id)),
+        scheduled_ts,
+        session_elapsed_ms,
+    )
+}
+
+/// `LogEntry::RealtimeLabel` の NDJSON 1 行を生成する純粋関数。
+/// 不変条件 (skip⇒q1/q2=null, answered⇒1..=5, self_marker⇒probe_id=null) は
+/// `LogEntry::realtime_label_*` コンストラクタ側で保証する。本関数は安全網として
+/// `debug_assert!` で検証してから整形する。
+#[allow(clippy::too_many_arguments)]
+fn format_realtime_label_line(
+    timestamp: u64,
+    probe_id: Option<&str>,
+    source: ProbeSource,
+    q1_friction: Option<u8>,
+    q2_progress: Option<u8>,
+    answered: bool,
+    skip_reason: SkipReason,
+    latency_ms: u64,
+    analysis_window_start_ms: u64,
+    analysis_window_end_ms: u64,
+) -> String {
+    debug_assert_eq!(
+        answered,
+        q1_friction.is_some(),
+        "realtime_label: answered と q1_friction の有無が不一致"
+    );
+    debug_assert_eq!(
+        q1_friction.is_some(),
+        q2_progress.is_some(),
+        "realtime_label: q1/q2 の有無が不一致"
+    );
+    debug_assert!(
+        q1_friction.is_none_or(|v| (1..=5).contains(&v)),
+        "realtime_label: q1_friction が 1..=5 外"
+    );
+    debug_assert!(
+        q2_progress.is_none_or(|v| (1..=5).contains(&v)),
+        "realtime_label: q2_progress が 1..=5 外"
+    );
+    debug_assert!(
+        !(matches!(source, ProbeSource::SelfMarker) && probe_id.is_some()),
+        "realtime_label: self_marker は probe_id を持てない"
+    );
+    format!(
+        r#"{{"type":"realtime_label","probe_id":{},"source":"{}","q1_friction":{},"q2_progress":{},"answered":{},"skip_reason":"{}","latency_ms":{},"analysis_window_start_ms":{},"analysis_window_end_ms":{},"ts":{}}}"#,
+        json_opt_str(probe_id),
+        source.as_str(),
+        json_opt_u8(q1_friction),
+        json_opt_u8(q2_progress),
+        answered,
+        skip_reason.as_str(),
+        latency_ms,
+        analysis_window_start_ms,
+        analysis_window_end_ms,
+        timestamp,
+    )
+}
+
+/// `LogEntry::VignetteResponse` の NDJSON 1 行を生成する純粋関数。
+fn format_vignette_response_line(
+    timestamp: u64,
+    vignette_id: &str,
+    expected_quadrant: ExpectedQuadrant,
+    q1_friction: u8,
+    q2_progress: u8,
+) -> String {
+    debug_assert!(
+        (1..=5).contains(&q1_friction) && (1..=5).contains(&q2_progress),
+        "vignette_response: q1/q2 が 1..=5 外"
+    );
+    format!(
+        r#"{{"type":"vignette_response","vignette_id":{},"expected_quadrant":"{}","q1_friction":{},"q2_progress":{},"ts":{}}}"#,
+        json_opt_str(Some(vignette_id)),
+        expected_quadrant.as_str(),
+        q1_friction,
+        q2_progress,
+        timestamp,
     )
 }
 
@@ -164,8 +457,113 @@ pub enum LogEntry {
         reason: String,
         suppressed_by: Vec<String>,
     },
+    /// v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。
+    /// 数値・固定カテゴリのみ。`ts` で timestamp を持つ (既存 `t` とは別命名・§14 準拠)。
+    SessionMeta {
+        timestamp: u64,
+        track: Track,
+        task_kind: TaskKind,
+        monk_mode: bool,
+        intervention_enabled: bool,
+    },
+    /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。
+    /// 「モデル非依存・一様ランダム」を後から検証するため scheduled/shown を両方残す。
+    /// `probe_id` は backend 生成の不透明 ID (本文非由来)。
+    ProbeAssignment {
+        probe_id: String,
+        scheduled_ts: u64,
+        session_elapsed_ms: u64,
+    },
+    /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
+    /// 不変条件は `realtime_label_answered` / `realtime_label_skipped` で保証する:
+    /// skip⇒q1/q2=None、answered⇒q1/q2=Some(1..=5)、self_marker⇒probe_id=None。
+    /// 直接構築せずコンストラクタ経由を推奨 (writer 側 `debug_assert!` が安全網)。
+    RealtimeLabel {
+        timestamp: u64,
+        probe_id: Option<String>,
+        source: ProbeSource,
+        q1_friction: Option<u8>,
+        q2_progress: Option<u8>,
+        answered: bool,
+        skip_reason: SkipReason,
+        latency_ms: u64,
+        analysis_window_start_ms: u64,
+        analysis_window_end_ms: u64,
+    },
+    /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット 8 問)。
+    /// 常に回答あり (q1/q2 は 1..=5)。`expected_quadrant` は教示の正解ラベル。
+    VignetteResponse {
+        timestamp: u64,
+        vignette_id: String,
+        expected_quadrant: ExpectedQuadrant,
+        q1_friction: u8,
+        q2_progress: u8,
+    },
     /// セッション終了マーカー
     End,
+}
+
+impl LogEntry {
+    /// `RealtimeLabel` (回答あり) を不変条件を満たして構築する。
+    /// q1/q2 は `1..=5` に clamp、`answered=true`、`skip_reason=None` を設定する。
+    /// `probe`/`source` の整合 (self_marker⇒probe_id=null) は `ProbeRef` が型で保証する。
+    #[allow(clippy::too_many_arguments)]
+    pub fn realtime_label_answered(
+        timestamp: u64,
+        probe: &ProbeRef,
+        q1_friction: u8,
+        q2_progress: u8,
+        latency_ms: u64,
+        analysis_window_start_ms: u64,
+        analysis_window_end_ms: u64,
+    ) -> Self {
+        LogEntry::RealtimeLabel {
+            timestamp,
+            probe_id: probe.probe_id().map(str::to_string),
+            source: probe.source(),
+            q1_friction: Some(q1_friction.clamp(1, 5)),
+            q2_progress: Some(q2_progress.clamp(1, 5)),
+            answered: true,
+            skip_reason: SkipReason::None,
+            latency_ms,
+            analysis_window_start_ms,
+            analysis_window_end_ms,
+        }
+    }
+
+    /// `RealtimeLabel` (skip) を不変条件を満たして構築する。
+    /// `q1/q2=None`、`answered=false` を設定する。`skip_reason` は `None` を許さず
+    /// `DontRemember` / `Dismissed` のみ受ける (skip なのに理由 none は不整合のため)。
+    pub fn realtime_label_skipped(
+        timestamp: u64,
+        probe: &ProbeRef,
+        skip_reason: SkipReason,
+        latency_ms: u64,
+        analysis_window_start_ms: u64,
+        analysis_window_end_ms: u64,
+    ) -> Self {
+        let skip_reason = match skip_reason {
+            SkipReason::None => {
+                tracing::warn!(
+                    "realtime_label_skipped: skip_reason=None は不整合のため Dismissed に正規化 (呼び出し側バグの可能性)"
+                );
+                SkipReason::Dismissed
+            }
+            other => other,
+        };
+        LogEntry::RealtimeLabel {
+            timestamp,
+            probe_id: probe.probe_id().map(str::to_string),
+            source: probe.source(),
+            q1_friction: None,
+            q2_progress: None,
+            answered: false,
+            skip_reason,
+            latency_ms,
+            analysis_window_start_ms,
+            analysis_window_end_ms,
+        }
+    }
 }
 
 /// NDJSON形式でセッションデータを書き込むロガー。
@@ -355,6 +753,92 @@ impl SessionLogger {
                                     wall_accum_ms,
                                     &reason,
                                     &suppressed_by
+                                ),
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::SessionMeta {
+                            timestamp,
+                            track,
+                            task_kind,
+                            monk_mode,
+                            intervention_enabled,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_session_meta_line(
+                                    timestamp,
+                                    track,
+                                    task_kind,
+                                    monk_mode,
+                                    intervention_enabled
+                                ),
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::ProbeAssignment {
+                            probe_id,
+                            scheduled_ts,
+                            session_elapsed_ms,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_probe_assignment_line(
+                                    &probe_id,
+                                    scheduled_ts,
+                                    session_elapsed_ms
+                                ),
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::RealtimeLabel {
+                            timestamp,
+                            probe_id,
+                            source,
+                            q1_friction,
+                            q2_progress,
+                            answered,
+                            skip_reason,
+                            latency_ms,
+                            analysis_window_start_ms,
+                            analysis_window_end_ms,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_realtime_label_line(
+                                    timestamp,
+                                    probe_id.as_deref(),
+                                    source,
+                                    q1_friction,
+                                    q2_progress,
+                                    answered,
+                                    skip_reason,
+                                    latency_ms,
+                                    analysis_window_start_ms,
+                                    analysis_window_end_ms,
+                                ),
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::VignetteResponse {
+                            timestamp,
+                            vignette_id,
+                            expected_quadrant,
+                            q1_friction,
+                            q2_progress,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_vignette_response_line(
+                                    timestamp,
+                                    &vignette_id,
+                                    expected_quadrant,
+                                    q1_friction,
+                                    q2_progress
                                 ),
                             );
                             dirty = true;
@@ -598,5 +1082,368 @@ mod tests {
             line,
             r#"{"type":"user_label","t":1,"label":"flow","recovered_at":2}"#
         );
+    }
+
+    // ---- v0.3 較正スモーク: 付随 enum の round-trip ----
+
+    #[test]
+    fn new_enums_as_str_roundtrip() {
+        for t in [Track::Main, Track::Exploratory] {
+            assert_eq!(Track::parse(t.as_str()), Some(t));
+        }
+        for k in [
+            TaskKind::Argumentative,
+            TaskKind::Correspondence,
+            TaskKind::Creative,
+            TaskKind::VibeCoding,
+        ] {
+            assert_eq!(TaskKind::parse(k.as_str()), Some(k));
+        }
+        for s in [ProbeSource::RandomProbe, ProbeSource::SelfMarker] {
+            assert_eq!(ProbeSource::parse(s.as_str()), Some(s));
+        }
+        for r in [
+            SkipReason::None,
+            SkipReason::DontRemember,
+            SkipReason::Dismissed,
+        ] {
+            assert_eq!(SkipReason::parse(r.as_str()), Some(r));
+        }
+        for q in [
+            ExpectedQuadrant::Flow,
+            ExpectedQuadrant::Stuck,
+            ExpectedQuadrant::Incubation,
+            ExpectedQuadrant::Idle,
+        ] {
+            assert_eq!(ExpectedQuadrant::parse(q.as_str()), Some(q));
+        }
+    }
+
+    #[test]
+    fn new_enums_parse_rejects_unknown() {
+        assert_eq!(Track::parse("Main"), None); // case-sensitive
+        assert_eq!(TaskKind::parse("coding"), None);
+        assert_eq!(ProbeSource::parse(""), None);
+        assert_eq!(SkipReason::parse("skip"), None);
+        assert_eq!(ExpectedQuadrant::parse("focused"), None);
+    }
+
+    // ---- session_meta ----
+
+    #[test]
+    fn session_meta_line_main_vibe_coding() {
+        let line = format_session_meta_line(
+            1_700_000_000_000,
+            Track::Main,
+            TaskKind::VibeCoding,
+            false,
+            true,
+        );
+        assert_eq!(
+            line,
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"ts":1700000000000}"#
+        );
+    }
+
+    #[test]
+    fn session_meta_line_exploratory_monk_mode() {
+        let line =
+            format_session_meta_line(42, Track::Exploratory, TaskKind::Argumentative, true, false);
+        assert_eq!(
+            line,
+            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","monk_mode":true,"intervention_enabled":false,"ts":42}"#
+        );
+    }
+
+    // ---- probe_assignment ----
+
+    #[test]
+    fn probe_assignment_line_basic() {
+        let line = format_probe_assignment_line("p-001", 1_700_000_000_000, 95_000);
+        assert_eq!(
+            line,
+            r#"{"type":"probe_assignment","probe_id":"p-001","scheduled_ts":1700000000000,"session_elapsed_ms":95000}"#
+        );
+    }
+
+    #[test]
+    fn probe_assignment_line_escapes_probe_id() {
+        // probe_id は生成済み不透明 ID の想定だが、escape で JSON injection を防ぐ。
+        let line = format_probe_assignment_line("a\"b", 1, 2);
+        assert_eq!(
+            line,
+            r#"{"type":"probe_assignment","probe_id":"a\"b","scheduled_ts":1,"session_elapsed_ms":2}"#
+        );
+    }
+
+    // ---- realtime_label ----
+
+    #[test]
+    fn realtime_label_line_answered_random_probe() {
+        let entry = LogEntry::realtime_label_answered(
+            1_700_000_000_000,
+            &ProbeRef::RandomProbe {
+                probe_id: "p-001".to_string(),
+            },
+            3,
+            4,
+            2500,
+            1_699_999_969_000,
+            1_699_999_999_000,
+        );
+        let LogEntry::RealtimeLabel {
+            timestamp,
+            probe_id,
+            source,
+            q1_friction,
+            q2_progress,
+            answered,
+            skip_reason,
+            latency_ms,
+            analysis_window_start_ms,
+            analysis_window_end_ms,
+        } = entry
+        else {
+            panic!("expected RealtimeLabel");
+        };
+        let line = format_realtime_label_line(
+            timestamp,
+            probe_id.as_deref(),
+            source,
+            q1_friction,
+            q2_progress,
+            answered,
+            skip_reason,
+            latency_ms,
+            analysis_window_start_ms,
+            analysis_window_end_ms,
+        );
+        assert_eq!(
+            line,
+            r#"{"type":"realtime_label","probe_id":"p-001","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":2500,"analysis_window_start_ms":1699999969000,"analysis_window_end_ms":1699999999000,"ts":1700000000000}"#
+        );
+    }
+
+    #[test]
+    fn realtime_label_answered_clamps_q_to_1_5() {
+        let entry = LogEntry::realtime_label_answered(
+            1,
+            &ProbeRef::SelfMarker,
+            0, // → 1
+            9, // → 5
+            0,
+            0,
+            0,
+        );
+        let LogEntry::RealtimeLabel {
+            q1_friction,
+            q2_progress,
+            ..
+        } = entry
+        else {
+            panic!("expected RealtimeLabel");
+        };
+        assert_eq!(q1_friction, Some(1));
+        assert_eq!(q2_progress, Some(5));
+    }
+
+    #[test]
+    fn realtime_label_self_marker_has_null_probe_id() {
+        let entry = LogEntry::realtime_label_answered(1, &ProbeRef::SelfMarker, 2, 2, 0, 0, 0);
+        let LogEntry::RealtimeLabel {
+            probe_id, source, ..
+        } = entry
+        else {
+            panic!("expected RealtimeLabel");
+        };
+        assert_eq!(probe_id, None);
+        assert_eq!(source, ProbeSource::SelfMarker);
+        // フォーマット時に probe_id が null になる。
+        let line = format_realtime_label_line(
+            1,
+            None,
+            ProbeSource::SelfMarker,
+            Some(2),
+            Some(2),
+            true,
+            SkipReason::None,
+            0,
+            0,
+            0,
+        );
+        assert!(line.contains(r#""probe_id":null"#));
+        assert!(line.contains(r#""source":"self_marker""#));
+    }
+
+    #[test]
+    fn realtime_label_skipped_has_null_q_and_reason() {
+        let entry = LogEntry::realtime_label_skipped(
+            7,
+            &ProbeRef::RandomProbe {
+                probe_id: "p-9".to_string(),
+            },
+            SkipReason::DontRemember,
+            800,
+            0,
+            0,
+        );
+        let LogEntry::RealtimeLabel {
+            probe_id,
+            q1_friction,
+            q2_progress,
+            answered,
+            skip_reason,
+            ..
+        } = entry
+        else {
+            panic!("expected RealtimeLabel");
+        };
+        assert_eq!(probe_id.as_deref(), Some("p-9"));
+        assert_eq!(q1_friction, None);
+        assert_eq!(q2_progress, None);
+        assert!(!answered);
+        assert_eq!(skip_reason, SkipReason::DontRemember);
+
+        let line = format_realtime_label_line(
+            7,
+            Some("p-9"),
+            ProbeSource::RandomProbe,
+            None,
+            None,
+            false,
+            SkipReason::DontRemember,
+            800,
+            0,
+            0,
+        );
+        assert_eq!(
+            line,
+            r#"{"type":"realtime_label","probe_id":"p-9","source":"random_probe","q1_friction":null,"q2_progress":null,"answered":false,"skip_reason":"dont_remember","latency_ms":800,"analysis_window_start_ms":0,"analysis_window_end_ms":0,"ts":7}"#
+        );
+    }
+
+    #[test]
+    fn realtime_label_skipped_rejects_reason_none() {
+        // skip なのに skip_reason=None は不整合 → Dismissed に正規化する。
+        let entry =
+            LogEntry::realtime_label_skipped(1, &ProbeRef::SelfMarker, SkipReason::None, 0, 0, 0);
+        let LogEntry::RealtimeLabel { skip_reason, .. } = entry else {
+            panic!("expected RealtimeLabel");
+        };
+        assert_eq!(skip_reason, SkipReason::Dismissed);
+    }
+
+    // ---- vignette_response ----
+
+    #[test]
+    fn vignette_response_line_basic() {
+        let line =
+            format_vignette_response_line(1_700_000_000_000, "v1", ExpectedQuadrant::Flow, 2, 5);
+        assert_eq!(
+            line,
+            r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"flow","q1_friction":2,"q2_progress":5,"ts":1700000000000}"#
+        );
+    }
+
+    #[test]
+    fn vignette_response_line_idle_quadrant() {
+        let line = format_vignette_response_line(99, "v8", ExpectedQuadrant::Idle, 1, 1);
+        assert_eq!(
+            line,
+            r#"{"type":"vignette_response","vignette_id":"v8","expected_quadrant":"idle","q1_friction":1,"q2_progress":1,"ts":99}"#
+        );
+    }
+
+    /// 付随 enum の `as_str()` 値を **リテラルで固定**する。`schema_dto.rs` の DTO enum は
+    /// `#[serde(rename_all = "snake_case")]` で同じ文字列を生成するが、両側は手書きのため
+    /// CI の schema drift check (= DTO 側 emit_schema vs current.json) では logger 側 `as_str`
+    /// のタイポ (例 "vibecoding") を検知できない。NDJSON 実出力と schema の整合を守る砦。
+    #[test]
+    fn new_enum_as_str_matches_schema_snake_case() {
+        assert_eq!(Track::Main.as_str(), "main");
+        assert_eq!(Track::Exploratory.as_str(), "exploratory");
+        assert_eq!(TaskKind::Argumentative.as_str(), "argumentative");
+        assert_eq!(TaskKind::Correspondence.as_str(), "correspondence");
+        assert_eq!(TaskKind::Creative.as_str(), "creative");
+        assert_eq!(TaskKind::VibeCoding.as_str(), "vibe_coding");
+        assert_eq!(ProbeSource::RandomProbe.as_str(), "random_probe");
+        assert_eq!(ProbeSource::SelfMarker.as_str(), "self_marker");
+        assert_eq!(SkipReason::None.as_str(), "none");
+        assert_eq!(SkipReason::DontRemember.as_str(), "dont_remember");
+        assert_eq!(SkipReason::Dismissed.as_str(), "dismissed");
+        assert_eq!(ExpectedQuadrant::Flow.as_str(), "flow");
+        assert_eq!(ExpectedQuadrant::Stuck.as_str(), "stuck");
+        assert_eq!(ExpectedQuadrant::Incubation.as_str(), "incubation");
+        assert_eq!(ExpectedQuadrant::Idle.as_str(), "idle");
+    }
+
+    /// writer ループの match アーム経由 (LogEntry → 実ファイル) の end-to-end テスト。
+    /// format 関数の単体テストでは捕捉できない **アーム内の引数取り違え** (例: monk_mode と
+    /// intervention_enabled の入れ替え) を read-back で守る。
+    #[test]
+    fn writer_loop_emits_new_variants_to_file() {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "gse_probe_schema_test_{}.ndjson",
+            std::process::id()
+        ));
+        let (_logger, tx, shutdown_rx) = SessionLogger::start(path.clone());
+
+        tx.send(LogEntry::SessionMeta {
+            timestamp: 1000,
+            track: Track::Main,
+            task_kind: TaskKind::VibeCoding,
+            monk_mode: false,
+            intervention_enabled: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::ProbeAssignment {
+            probe_id: "p-1".to_string(),
+            scheduled_ts: 2000,
+            session_elapsed_ms: 1000,
+        })
+        .unwrap();
+        tx.send(LogEntry::realtime_label_answered(
+            3000,
+            &ProbeRef::RandomProbe {
+                probe_id: "p-1".to_string(),
+            },
+            3,
+            4,
+            500,
+            2969,
+            2999,
+        ))
+        .unwrap();
+        tx.send(LogEntry::VignetteResponse {
+            timestamp: 4000,
+            vignette_id: "v1".to_string(),
+            expected_quadrant: ExpectedQuadrant::Stuck,
+            q1_friction: 5,
+            q2_progress: 1,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+
+        // End 処理 (flush + close) 完了を待つ。
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let contents = fs::read_to_string(&path).expect("read back log file");
+        let _ = fs::remove_file(&path);
+
+        assert!(contents.contains(
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"ts":1000}"#
+        ), "session_meta 行が不正 (引数取り違えの可能性):\n{contents}");
+        assert!(contents.contains(
+            r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000}"#
+        ), "probe_assignment 行が不正:\n{contents}");
+        assert!(contents.contains(
+            r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":500,"analysis_window_start_ms":2969,"analysis_window_end_ms":2999,"ts":3000}"#
+        ), "realtime_label 行が不正:\n{contents}");
+        assert!(contents.contains(
+            r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"ts":4000}"#
+        ), "vignette_response 行が不正:\n{contents}");
     }
 }
