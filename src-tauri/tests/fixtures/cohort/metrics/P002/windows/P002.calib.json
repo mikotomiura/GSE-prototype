@@ -1,0 +1,34 @@
+{
+  "schema": "calibration/v0.3",
+  "included_in_primary": true,
+  "session_count": 10,
+  "main_session_count": 10,
+  "exploratory_session_count": 0,
+  "calibration_session_count": 2,
+  "evaluation_session_count": 8,
+  "agg": { "source": "ewma", "stat": "median" },
+  "measurement": {
+    "random_probe_total": 24,
+    "random_probe_answered": 22,
+    "answer_rate": 0.9166666666666666,
+    "latency_median_ms": 2900,
+    "valid_count": 22,
+    "no_answer_rate": 0.08333333333333333,
+    "dont_remember_count": 0,
+    "random_probe_assigned": 24,
+    "assigned_without_label": 0,
+    "per_subject_pass": true
+  },
+  "cindex": {
+    "x_q1_pooled": 0.73,
+    "x_q1_session_median": 0.72,
+    "y_q2_pooled": 0.66,
+    "y_q2_session_median": 0.65,
+    "eval_pair_source_count": 22
+  },
+  "mnar": { "point": 0.73, "lower": 0.58, "upper": 0.85, "no_answer_rate": 0.08, "caution": false, "invalid": false },
+  "vignette": { "total": 8, "matched": 8, "passed": true },
+  "bidimensionality": { "flow": 5, "stuck": 4, "incubation": 4, "idle": 2, "ambiguous": 0, "incubation_fraction": 0.26, "off_diagonal_fraction": 0.4, "verifiable": true },
+  "recall": { "reported": false, "positive_episode_count": 5, "reason": "point estimate withheld (PreReg-6)" },
+  "notes": []
+}

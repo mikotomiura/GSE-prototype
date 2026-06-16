@@ -35,11 +35,11 @@ GSE-prototype/
 │   │   │                         #       + UserLabelKind enum / LogEntry::UserLabel (Phase 1)
 │   │   ├── schema_dto.rs         #     [NEW Phase 1] LogEntry ミラー DTO (schemars 派生専用)
 │   │   ├── wall_server.rs        #     Lv2 Wall HTTP サーバー + QR + Zen Timer
-│   │   ├── sensors.rs            #     センサーモジュール dispatch (#[cfg] gated)
+│   │   ├── sensors.rs            #     センサーモジュール dispatch (#[cfg(macos)] gated)
 │   │   ├── sensors_macos.rs      #     macOS: SensorManager stub (CoreMotion 予約)
-│   │   ├── sensors_windows.rs    #     Windows: WinRT Inclinometer
 │   │   ├── bin/                  #     サブコマンド実装
-│   │   │   ├── replay.rs         #       gse-replay: セッション再実行 + --snapshot / --metrics
+│   │   │   ├── replay.rs         #       gse-replay: セッション再実行 + --snapshot / --metrics / --calibration
+│   │   │   ├── cohort.rs         #       [v0.3 Task E] gse-cohort: 被験者横断コホート判定 (calib JSON 集約)
 │   │   │   └── emit_schema.rs    #       [NEW Phase 1] schema_dto → JSON Schema stdout
 │   │   ├── input/                #     入力キャプチャ層 (プラットフォーム固有コード)
 │   │   │   ├── mod.rs            #       モジュールエクスポート + platform dispatch
@@ -54,7 +54,12 @@ GSE-prototype/
 │   │       ├── features.rs       #       5 特徴量抽出 (30s ローリングウィンドウ)
 │   │       ├── engine.rs         #       HMM エンジン (Forward Algorithm)
 │   │       ├── loop_step.rs      #       1Hz ゲート + FeatSnapshot 生成
-│   │       └── metrics.rs        #       [NEW Phase 1] UserLabel × FeatSnapshot 集計
+│   │       ├── intervention.rs   #       Opportunity MVP (Need/Opportunity → none/nudge/wall/defer)
+│   │       ├── intervention_eval.rs #    v2 介入ポリシーのオフライン反実仮想評価 (HIR/Precision/DC/Burden)
+│   │       ├── probe_scheduler.rs #      [v0.3] ランダム時点プローブの純スケジューリング (Poisson+thinning)
+│   │       ├── metrics.rs        #       [Phase 1] UserLabel × FeatSnapshot 集計
+│   │       ├── calibration_eval.rs #     [v0.3] 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット採点)
+│   │       └── cohort.rs         #       [v0.3 Task E] 被験者横断コホート判定 (純関数・gate 再利用・read-model DTO)
 │   ├── icons/                    #   アプリアイコン (各サイズ)
 │   ├── gen/                      #   Tauri 自動生成ファイル (スキーマ)
 │   └── .cargo/config.toml        #   Cargo ビルド設定
@@ -68,22 +73,31 @@ GSE-prototype/
 │   └── *.pdf                     #   提案書・技術設計書 (原本)
 │
 ├── .claude/                      # Claude Code 設定
-│   ├── CLAUDE.md                 #   プロジェクト指示ファイル
 │   ├── commands/                 #   スラッシュコマンド定義
 │   ├── settings.local.json       #   ローカル設定
-│   ├── agents/                   #   サブエージェント (Phase 4 で構築)
-│   ├── skills/                   #   スキル (Phase 3 で構築)
-│   └── hooks/                    #   フック (Phase 6 で構築)
+│   ├── agents/                   #   サブエージェント
+│   ├── skills/                   #   スキル
+│   └── hooks/                    #   フック
+│
+├── .codex/                       # Codex CLI 連携設定 (config.toml, agents/, hooks/, hooks.json)
+├── .agents/                      # 共有エージェント定義 (skills/)
+├── scripts/                      # 同期・検証スクリプト (sync-session.*, sync-all.*, check_schema_parity.py 等)
 │
 ├── .steering/                    # 作業記録
-│   └── _setup-progress.md        #   環境構築進捗
+│   ├── _setup-progress.md        #   環境構築進捗
+│   └── _template/                #   タスク用 5 ファイルテンプレート
 │
+├── .github/                      # GitHub Actions ワークフロー (ci.yml 等)
+├── .vscode/                      # エディタ設定
+├── dist/                         # Vite/Tauri ビルド出力 (生成物、git 管理外)
 ├── public/                       # 静的ファイル (Vite が配信)
 ├── index.html                    # SPA エントリポイント
 ├── package.json                  # npm 依存関係・スクリプト
 ├── tsconfig.json                 # TypeScript 設定
 ├── tsconfig.node.json            # Vite 用 TypeScript 設定
 ├── vite.config.ts                # Vite ビルド設定
+├── CLAUDE.md                     # Claude Code への指示 (リポジトリ直下、ポインタ型)
+├── AGENTS.md                     # Codex CLI への指示
 ├── README.md                     # プロジェクト概要 (英語)
 ├── README.ja.md                  # プロジェクト概要 (日本語)
 ├── advice.md                     # 開発メモ・チューニング記録
@@ -114,7 +128,7 @@ GSE-prototype/
 #### `src-tauri/src/analysis/`
 
 - **目的**: キーストローク分析と認知状態推定
-- **置くべきもの**: 特徴量抽出、HMM エンジン、`loop_step`、`metrics` (Phase 1 GT 集計)、将来の ML 推論
+- **置くべきもの**: 特徴量抽出、HMM エンジン、`loop_step`、`intervention` (Opportunity MVP)、`intervention_eval` (オフライン評価)、`probe_scheduler` (v0.3 純スケジューリング)、`metrics` (Phase 1 GT 集計)、`calibration_eval` (v0.3 較正解析: C-index/2段ゲート/MNAR)、将来の ML 推論
 - **置くべきでないもの**: OS API 呼び出し、入力イベント捕捉、タイムスタンプ生成 (`SystemTime` は `lib.rs` で付与)
 
 #### `src-tauri/src/schema_dto.rs` (Phase 1)
@@ -127,7 +141,8 @@ GSE-prototype/
 #### `src-tauri/src/bin/` (Phase 1)
 
 - **目的**: サブコマンドとして独立して動作する実行バイナリ
-- **`replay.rs`**: ゴールデンセッション NDJSON を再実行する `gse-replay` CLI (`--snapshot` / `--metrics` / `--json`)
+- **`replay.rs`**: ゴールデンセッション NDJSON を再実行する `gse-replay` CLI (`--snapshot` / `--metrics` / `--calibration` / `--json`)
+- **`cohort.rs`**: 被験者別 calibration レポート JSON を集約する `gse-cohort` CLI (v0.3 Task E)。`metrics/P*/<os>/*.calib.json` を走査し `analysis::cohort::cohort_verdict` でコホート Go/Kill/INCONCLUSIVE を出す
 - **`emit_schema.rs`**: `schema_dto::LogEntryDto` から JSON Schema を stdout に吐く (CI drift check が consume)
 
 #### `src-tauri/schema/` (Phase 1)
@@ -186,8 +201,13 @@ lib.rs (Tauri commands, thread orchestration)
     ├──► analysis::features (特徴量抽出)
     ├──► analysis::engine   (HMM 推論)
     ├──► analysis::loop_step (1Hz ゲート + FeatSnapshot)
+    ├──► analysis::intervention (Opportunity MVP: Need/Opportunity → none/nudge/wall/defer)
+    ├──► analysis::intervention_eval (gse-replay --intervention で使用、オフライン評価)
+    ├──► analysis::probe_scheduler (v0.3: 純スケジューリング、起動/emit は lib.rs 側)
     ├──► analysis::metrics  (Phase 1: GT × FeatSnapshot 集計、gse-replay --metrics で使用)
-    ├──► logger         (セッションログ, UserLabel バリアント含む)
+    ├──► analysis::calibration_eval (v0.3: 較正解析、gse-replay --calibration で使用、オフライン)
+    ├──► analysis::cohort   (v0.3 Task E: 被験者横断判定、gse-cohort で使用、calibration_eval の gate 再利用)
+    ├──► logger         (セッションログ, UserLabel / probe_assignment 等のバリアント含む)
     └──► wall_server    (Lv2 介入)
 
 schema_dto (Phase 1, production path と独立)

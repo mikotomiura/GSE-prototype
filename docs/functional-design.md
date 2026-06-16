@@ -123,7 +123,11 @@
 
 ### 機能 7: Ground Truth (GT) ラベリング + 集計 (Phase 1)
 
-- **概要**: HMM の自動推定とユーザーの主観的認知状態のズレを定量化するため、作業中にリアルタイムで「自覚しているクラス」をラベル付けし、オフラインで混同行列・F1・中央値を算出する
+> **v0.3 較正での位置づけ (重要・優先順位の逆転)**: v0.3 較正スモーク (D-13 以降) では、**主データ源は「ランダム時点プローブ」** (モデル出力非依存に一様ランダムな時点で Q1 摩擦 / Q2 前進を 1–5 で問う `realtime_label`) であり、本節で説明する**ホットキー方式の自覚ラベル (3 値 `user_label`) は補助データに降格**する (希少な深い Stuck を拾う self-marker 用途、Recall 分母には混ぜない)。この段階のラベルは "GT" ではなく **criterion label** と呼ぶ。詳細・preregistration は `docs/preregistration-v0.3.md` と `docs/glossary.md` を参照。
+>
+> **尺度理解テスト (ビネット) は現行スコープでは延期**: schema (`vignette_response`) と format 関数は実装済みだが、初回スモークの最小核スコープからは外され、比較条件を実装した段で発効する (PreReg-1/3 の扱い、`.steering/20260612-retro-labeling-and-corner-intervention/design.md` 参照)。
+
+- **概要**: HMM の自動推定とユーザーの主観的認知状態のズレを定量化するため、作業中にリアルタイムで「自覚しているクラス」をラベル付けし、オフラインで混同行列・F1・中央値を算出する (下記はホットキー方式の仕様。v0.3 較正の主データはプローブ方式 — 上記注記参照)
 - **入力経路**:
   - **ホットキー**: macOS `⌘⇧⌥ F/I/S`、Windows/Linux `Ctrl+Shift+Alt+F/I/S`
   - **Tauri コマンド**: `record_user_label(label: "flow" | "incubation" | "stuck")`
@@ -148,6 +152,51 @@
 - **エラー条件**:
   - デバウンス違反 (2 秒以内の再押下): `tracing::warn!("shortcut label recording failed: debounced")` で記録、ユーザーへの通知なし (意図的)
   - `record_user_label` が未知ラベル受信: `Err("invalid label: ...")` を返す (whitelist 3 値のみ許可)
+
+### 2.x v0.3 較正解析 (`gse-replay --calibration`) — オフライン
+
+v0.3 較正スモークで収集した criterion label (`realtime_label`) と記録済み `feat` を突き合わせ、
+測定法とモデルの妥当性を**オフラインで**評価する。frontend は起動しない (NDJSON 解析のみ)。
+methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 §4.2/§6.4/§7/§8/§9/§10 に凍結。
+
+- **CLI (`gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]`)**:
+  - 入力: **1 被験者**の複数セッション NDJSON を**時刻順**に渡す (先頭 2 = 較正・残り = 評価 = 前向き holdout §8)。
+  - 出力: `CalibrationReport` (測定法統計 / 被験者内 C-index / MNAR 上下限 / ビネット採点 / 二軸性 / Recall)。
+    `--json` で構造化出力 (gse-dataset の `metrics/P*/<os>/` へ置く共有アーティファクト・集計値のみ §10)。
+- **算出内容**:
+  - **時間隔離窓** (t−31s..t−1s): 各 `realtime_label` の `analysis_window_[start/end]_ms` 内の `feat` を集め
+    X (認知摩擦) / Y (エンゲージメント) を集約 (既定: `ewma` の中央値・`AggSpec` で差替可)。probe 後窓は使わない (D-8)。
+  - **方向付き 順序 C-index**: 集約 X ↔ Q1 摩擦 / Y ↔ Q2 前進 の順位一致割合 (0.5=偶然/1.0=完全/<0.5=逆)。
+    評価セッションの回答済みランダムプローブのみ (§7・`|r|≥0.30` は廃止)。
+  - **2段ゲート**: 測定法ゲート (回答率≥80% / latency 中央値≤10s / 有効≥20件) → モデルゲート
+    (C-index 中央値≥0.65 & 全員>0.55=Go / ≤0.55 or 2人以上≤0.50=Kill / 他=INCONCLUSIVE)。被験者横断の最終判定は別途。
+  - **MNAR 上下限**: 未回答を全高摩擦(5)/全低摩擦(1) と置いた C-index 範囲を併報。被験者除外しない (無回答率 >20%注意/>30%不成立)。
+  - **ビネット採点** (PreReg-1): `(q1,q2)→象限推論` で expected_quadrant との一致率 (6/8 で個人通過)。
+  - **Recall は点推定を出さない** (PreReg-6: 独立陽性<30件で検出力なし)。
+- **振る舞い上の制約**:
+  - 既存 `metrics.rs` の confusion/precision/recall は v0.2 流のため**流用しない** (D-14)。C-index 系は独立パス (`calibration_eval`)。
+  - `track=exploratory` のセッションは主指標 (ゲート/C-index) に混ぜない (確証/探索の隔離 §1.3)。
+  - 解析は `analysis/` に閉じ OS API を呼ばない。`schema_dto.rs` は不変 (A 凍結)。
+  - 被験者**横断**の最終 Go/Kill 判定 (コホート全体) は下記 `gse-cohort` (Task E)。
+
+### 2.x+1 v0.3 被験者横断判定 (`gse-cohort`) — オフライン (Task E)
+
+`gse-replay --calibration` が**被験者ごと**に出力した `CalibrationReport` (per-被験者 metrics.json) を
+**複数被験者ぶん集約**し、PreReg ゲートでコホート全体の Go/Kill/INCONCLUSIVE を判定する。
+
+- **CLI (`gse-cohort <dataset-root> [--suffix <s>] [--compact]`)**:
+  - 入力: `<root>/metrics/P*/<os>/*.calib.json` (既定 suffix `.calib.json`) を走査。被験者 ID = `P*` ディレクトリ名。
+    **NDJSON 生ログは走査しない** (プライバシー §10)。入力は集計済み calibration レポート JSON のみ。
+  - 出力: `CohortReport` (JSON) — コホート vignette/測定法/モデルゲート結果 + 最終判定 + 被験者別サマリ + notes。
+- **判定 (凍結純関数 `model_gate`/`measurement_gate` を再利用・再実装しない)**:
+  - **ゲート駆動 = 各被験者の C-index 中央値** (`x_q1_session_median`・PreReg-4 文言準拠)。`pooled` は参考併記。
+  - モデルゲート母数 = 主指標対象 & session_median 有 & PreReg-5 充足 (eval≥6 & probe≥16/人) & PreReg-2 被験者要件充足。
+  - 最終判定の優先順位 (PreReg §2): 主指標0名/提示プローブ0件→`DataInsufficient` → PreReg-1 尺度理解未達→`Inconclusive`
+    → PreReg-2 測定法 Kill→`Kill` → PreReg-5 充足者0→`DataInsufficient` → モデルゲート結果。
+  - **無理に Go と言わない**: PreReg-5 充足が一部被験者のみなら model Go でも `Inconclusive` (データ拡充) に留める (§11)。
+  - MNAR (PreReg-7)・二軸性 (PreReg-8) は notes + 機械可読カウントで報告併走。
+- **振る舞い上の制約**: D (`calibration_eval.rs`)・`replay.rs`・`schema_dto.rs` は不変。`analysis/cohort.rs` (純関数) と
+  `bin/cohort.rs` (I/O) に分離。閾値定数は `calibration_eval` を唯一の真実源とする。
 
 ## 3. ユースケース
 
@@ -219,6 +268,7 @@
   - 4b. ユーザーが Accessibility 権限を付与 → kCGEventTapOptionDefault でタップ作成
   - 5a. Dashboard の「システム設定を開く」ボタンから手動で Accessibility を付与
   - 5b. Dashboard の TCC リセットボタンで権限状態をリセットし再試行
+  - 5c. ad-hoc 署名ビルドでは CDHash 不安定のため、システム設定で**権限を一度オフにしてから再度オンに戻す**手動操作が必要になる場合がある (Dashboard が再トグル手順を案内)。自動回復はシームレスではない点に注意
 - **事後条件**: 権限状態（Input Monitoring / Accessibility / フォールバック使用中）が Dashboard に表示される
 
 ### UC-GT1: 開発者が自身の作業セッションにラベルを付ける (Phase 1)

@@ -1,4 +1,5 @@
 pub mod calibration_eval;
+pub mod cohort;
 pub mod engine;
 pub mod features;
 pub mod intervention;
