@@ -43,10 +43,12 @@
 - [x] 自己マーカー hotkey(source=self_marker・副データ)= Ctrl+Shift+Alt+M
 - [x] seed を tracing 記録し一様性監査を再現可能化(DB-6)。schema 不変(DB-5)。test 108緑・clippy 緑・build 緑
 
-## Task C — frontend 収集(A 後 / B と並行)
-- [ ] `session_meta` 宣言 UI(task_kind 一打・セッション開始)
-- [ ] プローブカード(Q1摩擦/Q2前進スライダー・skip理由・latency 計測)→ `realtime_label`
-- [ ] 尺度ビネット 8 問の初回フロー → `vignette_response`
+## Task C — frontend 収集(A 後 / B と並行)✅ 完了(2026-06-16)
+> 実装記録: `.steering/20260616-probe-collect/`(DC-1..DC-8)。commit ae452d7。branch feature/probe-collect(B にスタック)。
+- [x] `session_meta` 宣言 UI(start 画面 task_kind セレクタ)→ `record_session_meta`
+- [x] プローブカード(Overlay・Q1摩擦/Q2前進スライダー・skip理由・latency)→ `realtime_label`(probe_id 再検証=#7)
+- [x] 尺度ビネット 8 問の初回フロー → `vignette_response`(PreReg-1 ゲート表示)
+- [x] cross-review 対応(送信成功後遷移=MNAR 回避・Wall 非共存)。security clean・cargo112緑・tsc緑
 
 ## Task D — オフライン解析 gse-replay 拡張(A + 実データ後)
 - [ ] probe_id 起点の時間隔離窓抽出(t−31s..t−1s, X/Y 集約)
