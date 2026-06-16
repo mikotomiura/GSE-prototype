@@ -126,6 +126,8 @@
 > **v0.3 較正での位置づけ (重要・優先順位の逆転)**: v0.3 較正スモーク (D-13 以降) では、**主データ源は「ランダム時点プローブ」** (モデル出力非依存に一様ランダムな時点で Q1 摩擦 / Q2 前進を 1–5 で問う `realtime_label`) であり、本節で説明する**ホットキー方式の自覚ラベル (3 値 `user_label`) は補助データに降格**する (希少な深い Stuck を拾う self-marker 用途、Recall 分母には混ぜない)。この段階のラベルは "GT" ではなく **criterion label** と呼ぶ。詳細・preregistration は `docs/preregistration-v0.3.md` と `docs/glossary.md` を参照。
 >
 > **尺度理解テスト (ビネット) は現行スコープでは延期**: schema (`vignette_response`) と format 関数は実装済みだが、初回スモークの最小核スコープからは外され、比較条件を実装した段で発効する (PreReg-1/3 の扱い、`.steering/20260612-retro-labeling-and-corner-intervention/design.md` 参照)。
+>
+> **較正モード blind dashboard (測定独立性)**: v0.3 較正セッションの既定メイン画面は **blind/minimal** にする (`App` の `calibrationMode` state、既定 ON・Start 画面のトグルで切替)。被験者にモデル出力 (推定状態 / Flow・Incubation・Stuck 確率 / p_stuck・X/Y / GT counter / 状態色) を**一切見せない**ことで、主観回答 (criterion label) のアンカリング汚染を防ぐ。較正中に表示してよいのはセッション経過時間 / Keyboard・Hook 状態 / Monk Mode (介入状態) / 終了ボタン / 権限警告のみ。`ProbeCard`/`VignetteTest` は overlay で従来どおり動作。frontend のみの分岐 (backend/schema 不変、`cognitiveState` は取得するが非表示)。`.steering/20260617-calibration-blind-dashboard/` 参照。
 
 - **概要**: HMM の自動推定とユーザーの主観的認知状態のズレを定量化するため、作業中にリアルタイムで「自覚しているクラス」をラベル付けし、オフラインで混同行列・F1・中央値を算出する (下記はホットキー方式の仕様。v0.3 較正の主データはプローブ方式 — 上記注記参照)
 - **入力経路**:
@@ -142,7 +144,8 @@
 - **振る舞い上の制約**:
   - **Production path (engine / features / hook / ime / loop_step) 無変更**: /reimagine v2 で「汚染源を発生させない」方針を採用。Task 1-3 は既存の HMM 挙動・snapshot を 1 bit も動かさない
   - `recovered_at` はログ記録時は常に `null` で、`--metrics` 実行時にオフラインで純粋関数により後付け算出 (閾値変更で過去ログを再解析可能)
-- **UI**: Dashboard に読み取り専用 counter widget (`Flow N / Inc N / Stuck N` + ショートカット hint)
+- **UI**: Dashboard に読み取り専用 counter widget (`Flow N / Inc N / Stuck N` + ショートカット hint)。
+  ただし **v0.3 較正モード (`calibrationMode`、既定 ON) ではこの counter・推定状態・確率バー・状態説明を非表示**にする (下記「較正モード blind dashboard」)。
 - **事後レビュー方式 (Phase 1 GT 改善)**:
   - **レビューマーカー**: `⌘⇧⌥R` (macOS) / `Ctrl+Shift+Alt+R` で「後で見返したい」ブックマークを記録 (1 秒デバウンス)。NDJSON: `{"type":"review_marker","t":<ms>}`
   - **`gse-replay --segment`**: セッションをキーストローク沈黙 (≥ 5s) で自動分割し `.segments.txt` を生成。各セグメントの活動指標 (feat 数, silence, correction rate, avg FT) を表示

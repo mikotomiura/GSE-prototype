@@ -69,6 +69,9 @@ function App() {
   const [taskKind, setTaskKind] = useState<TaskKind>("argumentative");
   const [interventionEnabled, setInterventionEnabled] = useState(false);
   const [showVignette, setShowVignette] = useState(false);
+  // v0.3 較正モード: 既定 ON。較正中はメイン画面からモデル出力 (推定状態/確率/GT) を隠し、
+  // 主観回答 (criterion label) の測定独立性を守る。デバッグ/通常用途では OFF にできる。
+  const [calibrationMode, setCalibrationMode] = useState(true);
   // Ref mirrors: setInterval 内からステート最新値を参照するため
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
   const isWallActiveRef = useRef(isWallActive);
@@ -251,6 +254,14 @@ function App() {
             />{" "}
             介入を有効にする (較正中は既定オフ)
           </label>
+          <label style={{ display: "block", marginTop: "0.4rem", fontSize: "0.82rem" }}>
+            <input
+              type="checkbox"
+              checked={calibrationMode}
+              onChange={(e) => setCalibrationMode(e.target.checked)}
+            />{" "}
+            較正モード (モデル出力を非表示・既定オン)
+          </label>
         </div>
 
         <button className="start-button" onClick={handleStart}>
@@ -275,9 +286,9 @@ function App() {
     );
   }
 
-  // Default to Main Dashboard
+  // Default to Main Dashboard (較正モード時は blind/minimal 表示)
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} />
+    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} />
   );
 }
 
