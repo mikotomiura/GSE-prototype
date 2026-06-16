@@ -961,7 +961,14 @@ pub fn run() {
                             return;
                         }
                         LAST_SELF_MARKER_MS.store(now, std::sync::atomic::Ordering::Relaxed);
-                        let (ws, we) = crate::analysis::probe_scheduler::self_marker_window(now);
+                        // DB-8 を self_marker にも適用: 窓始端を session_start でクランプし、
+                        // 開始前/前セッションの打鍵が分析窓に混入するのを防ぐ。
+                        let session_start =
+                            SESSION_START_MS.load(std::sync::atomic::Ordering::Acquire);
+                        let (ws, we) = crate::analysis::probe_scheduler::self_marker_window_clamped(
+                            now,
+                            session_start,
+                        );
                         let _ = app.emit(
                             "probe_triggered",
                             serde_json::json!({

@@ -35,6 +35,20 @@ pub fn self_marker_window(t_ms: u64) -> (u64, u64) {
     (t_ms.saturating_sub(35_000), t_ms.saturating_sub(5_000))
 }
 
+/// `self_marker_window` を `session_start` でクランプした版 (DB-8 を self_marker に適用)。
+/// セッション開始直後 (`t−35s < session_start`) でも窓始端が `session_start` を下回らず、
+/// 開始前/前セッションの打鍵が窓に混入しない。`session_start_ms==0` (セッション外) では
+/// クランプしない (epoch 0 まで窓を広げないため)。
+pub fn self_marker_window_clamped(t_ms: u64, session_start_ms: u64) -> (u64, u64) {
+    let (ws, we) = self_marker_window(t_ms);
+    let ws = if session_start_ms > 0 {
+        ws.max(session_start_ms)
+    } else {
+        ws
+    };
+    (ws, we)
+}
+
 /// backend 生成の不透明プローブ ID (DB-3)。
 ///
 /// 唯一のコンストラクタ [`ProbeId::generate`] は seeded RNG から `[A-Za-z0-9_-]`
@@ -130,6 +144,15 @@ pub struct ProbeScheduler {
 impl ProbeScheduler {
     /// 本番用: RNG を注入して生成する (`StdRng::from_entropy()` 等)。
     pub fn new(mut rng: StdRng, config: ProbeConfig, session_start_ms: u64) -> Self {
+        // 設定健全性チェック: lambda は有限正値、cap_count は 1 以上であること。
+        // 不正値だと指数間隔が inf/NaN になったり永久に発火しなくなる (cross-review 指摘)。
+        // 本番は ProbeConfig::default() 固定なので debug ビルドでの早期検出に留める。
+        debug_assert!(
+            config.lambda_per_ms.is_finite() && config.lambda_per_ms > 0.0,
+            "lambda_per_ms must be finite and > 0, got {}",
+            config.lambda_per_ms
+        );
+        debug_assert!(config.cap_count >= 1, "cap_count must be >= 1");
         let first = session_start_ms.saturating_add(Self::sample_interval_ms(&mut rng, &config));
         Self {
             rng,
@@ -324,6 +347,27 @@ mod tests {
         let (s, e) = self_marker_window(SESSION_START);
         assert_eq!(s, SESSION_START - 35_000);
         assert_eq!(e, SESSION_START - 5_000);
+    }
+
+    #[test]
+    fn self_marker_window_clamped_to_session_start() {
+        // セッション開始直後 (t−35s < session_start): 窓始端は session_start にクランプ。
+        let t = SESSION_START + 10_000; // 開始 10s 後
+        assert_eq!(
+            self_marker_window_clamped(t, SESSION_START),
+            (SESSION_START, t - 5_000)
+        );
+        // 十分経過後 (t−35s ≥ session_start): クランプされず通常窓。
+        let t2 = SESSION_START + 60_000;
+        assert_eq!(
+            self_marker_window_clamped(t2, SESSION_START),
+            (t2 - 35_000, t2 - 5_000)
+        );
+        // セッション外 (session_start==0): クランプしない (epoch 0 まで広げない)。
+        assert_eq!(
+            self_marker_window_clamped(100_000, 0),
+            self_marker_window(100_000)
+        );
     }
 
     #[test]

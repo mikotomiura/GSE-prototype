@@ -57,6 +57,33 @@
 - **影響**: 既定挙動の変更は「最初の 31s はプローブを出さない」のみで望ましい方向。gap/cap/away の
   既存テストには影響なし(warm-up は冒頭 31s のみ)。新規テスト `no_probe_until_window_fits_in_session`。
 
+## DB-9 self_marker 窓も session_start でクランプ(cross-review: Claude HIGH)
+- **判断**: `self_marker_window_clamped(t, session_start)` を追加し、hotkey 経路でも窓始端を
+  `session_start` でクランプする(セッション外 `==0` は非クランプ)。
+- **根拠**: DB-8 のウォームアップは scheduler(random_probe)にのみ適用され、self_marker hotkey は
+  ノーガードだった。開始 35s 以内に M を押すと窓 `[t−35s, t−5s]` が `session_start` を下回り、
+  random_probe と同じ混入が起きる。Claude/Codex cross-review で Claude が指摘(Codex は未検出)。
+- **テスト**: `self_marker_window_clamped_to_session_start`。
+
+## DB-10 ProbeConfig 健全性 debug_assert(cross-review: Codex MEDIUM)
+- **判断**: `ProbeScheduler::new` に `lambda_per_ms` 有限正値・`cap_count≥1` の `debug_assert` を追加。
+- **根拠**: 不正設定(0/負/NaN lambda, cap_count=0)で指数間隔が inf/NaN になる、または永久に
+  発火しない。本番は `default()` 固定で安全だが、将来の設定注入に対する debug 早期検出。Codex 指摘。
+
+## DB-11 cross-review の不採用/受容判断(根拠付き)
+- **post-session firing / SESSION_START_MS 非リセット(両者 HIGH)**: 本アプリに stop_session は無く、
+  セッション終了は quit(プロセス終了)のみ→スレッドも die するため発火継続は起こらない。同一 ms 再開始は
+  UI 上ほぼ不可能。**現モデルでは実害なし**として受容(将来 stop を足すなら 0 リセット必須と明記)。
+- **poll の長時間ギャップ catch-up(Codex HIGH)**: スリープ等の長欠落中の候補は idle≥180s で
+  どのみち away thinning される。away 解除直後の候補も away で棄却→再抽選。**away 除外が包含**するため受容。
+- **ProbeAssignment に shown_ts が無い(Codex MEDIUM)**: shown/answered は Task C の `realtime_label.ts`
+  (probe_id で join)で追える設計。schema は Task A 凍結。**設計どおり**として受容。
+- **Task A 不変条件が pub variant で迂回可(Codex HIGH)**: Task A decisions TA-2 で既知・受容済み
+  (構築子経由運用 + debug_assert)。merged 範囲につき本タスクでは変更しない。
+- **vignette_id の String 受容(Codex MEDIUM)**: Task C の責務(受領 ID を再検証)。申し送り。
+- **is_none_or MSRV(Codex LOW)**: 現ツールチェインでコンパイル済(clippy も is_none_or を提案)。
+  `rust-version` 未固定。MSRV を固定するなら別途。
+
 ## DB-5 schema_dto.rs / current.json は touch しない
 - **判断**: logger は Task A で `ProbeAssignment` を既にハンドル済(`logger.rs:780`)。B は producer 配線のみ。
 - **根拠**: schema は A で確定。B での schema 変更は不要 → finish-task の tier-3 parity guard に当たらない。
