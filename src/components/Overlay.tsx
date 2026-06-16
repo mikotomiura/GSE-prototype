@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import ProbeCard from "./ProbeCard";
 
 interface OverlayProps {
     interventionDecision: InterventionDecision;
@@ -31,6 +32,8 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
     const [showTypingWarning, setShowTypingWarning] = useState(false);
     const [phoneConnected, setPhoneConnected] = useState(false);
+    // Task C: プローブカード表示中フラグ。表示中は cursor events を受け付け、overlay を可視化する。
+    const [probeActive, setProbeActive] = useState(false);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
 
     // Wall発動中のキーボード打鍵検知に使うref群
@@ -60,8 +63,16 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     // Lv1 (nudge): クリック透過 → ユーザーは下のウィンドウを操作可能
     // Lv2 (wall):  クリックブロック → QRコードをスキャンするまで操作不可
     useEffect(() => {
-        currentWindow.setIgnoreCursorEvents(!isWallActive);
-    }, [isWallActive, currentWindow]);
+        // Wall またはプローブカード表示中はクリックを受け付ける (それ以外は透過のまま)。
+        // Wall が OR の支配項なので、プローブ消滅時も Wall 中はブロックが維持される。
+        currentWindow.setIgnoreCursorEvents(!(isWallActive || probeActive));
+    }, [isWallActive, probeActive, currentWindow]);
+
+    // Wall 発動時はプローブカードを畳む (介入中は自然作業のサンプリングでなく UI も衝突するため)。
+    // ProbeCard はアンマウントされ onActiveChange(false) を呼ばないので probeActive を明示リセット。
+    useEffect(() => {
+        if (isWallActive) setProbeActive(false);
+    }, [isWallActive]);
 
     // Wall発動/解除に連動してWall Serverを起動/停止する
     useEffect(() => {
@@ -131,16 +142,20 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     // nudge/wall が必要になったら show() で再表示する。
     // macOS で透過が正常動作している場合は無駄な呼び出しだが副作用はない。
     useEffect(() => {
-        const shouldBeVisible = nudgeOpacity > 0 || isWallActive;
+        const shouldBeVisible = nudgeOpacity > 0 || isWallActive || probeActive;
         if (shouldBeVisible) {
             currentWindow.show().catch(() => {});
         } else {
             currentWindow.hide().catch(() => {});
         }
-    }, [nudgeOpacity, isWallActive, currentWindow]);
+    }, [nudgeOpacity, isWallActive, probeActive, currentWindow]);
 
     return (
         <div className="overlay-root">
+            {/* Task C: v0.3 較正のプローブ回答カード (probe_triggered を listen)。
+                Wall 発動中は表示しない (上の effect で probeActive もリセット)。 */}
+            {!isWallActive && <ProbeCard onActiveChange={setProbeActive} />}
+
             <aside
                 className="nudge-card"
                 style={{

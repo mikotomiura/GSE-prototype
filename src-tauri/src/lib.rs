@@ -11,7 +11,10 @@ use crate::analysis::intervention::{
     InterventionAction, InterventionDecision, InterventionInput, InterventionPolicyState,
 };
 use crate::analysis::loop_step::FeatSnapshot;
-use crate::logger::{LogEntry, SessionLogger, UserLabelKind};
+use crate::logger::{
+    ExpectedQuadrant, LogEntry, ProbeRef, ProbeSource, SessionLogger, SkipReason, TaskKind, Track,
+    UserLabelKind,
+};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
 #[allow(unused_imports)]
@@ -476,6 +479,165 @@ fn record_user_label(
     ) {
         tracing::warn!("user_label_recorded emit failed: {}", e);
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Task C: v0.3 較正スモークの収集 command 群 (frontend → logger)
+// すべて数値・固定カテゴリ・不透明 ID のみを記録する (data-privacy)。
+// ---------------------------------------------------------------------------
+
+/// 受領した不透明 ID (vignette_id 等) の検証。本文/ウィンドウタイトル由来の文字列が
+/// ID に混入するのを境界で遮断する (`[A-Za-z0-9_-]`・1..=16 文字)。
+fn is_valid_opaque_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 16
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// 受領した (source, probe_id) を検証して `ProbeRef` を構築する (DC-3 / cross-review #7)。
+/// random_probe ⇒ probe_id は Some かつ `ProbeId::is_valid`、self_marker ⇒ probe_id は None。
+fn build_probe_ref(source: &str, probe_id: Option<String>) -> Result<ProbeRef, String> {
+    let source =
+        ProbeSource::parse(source).ok_or_else(|| format!("invalid source: {:?}", source))?;
+    match source {
+        ProbeSource::RandomProbe => {
+            let id = probe_id.ok_or_else(|| "random_probe requires probe_id".to_string())?;
+            if !crate::analysis::probe_scheduler::ProbeId::is_valid(&id) {
+                return Err("invalid probe_id format".to_string());
+            }
+            Ok(ProbeRef::RandomProbe { probe_id: id })
+        }
+        ProbeSource::SelfMarker => {
+            if probe_id.is_some() {
+                return Err("self_marker must not carry a probe_id".to_string());
+            }
+            Ok(ProbeRef::SelfMarker)
+        }
+    }
+}
+
+/// v0.3 較正: セッション開始宣言を記録する (§3・§14)。固定カテゴリのみ許可。
+#[tauri::command]
+fn record_session_meta(
+    track: String,
+    task_kind: String,
+    monk_mode: bool,
+    intervention_enabled: bool,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
+    let task_kind =
+        TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::SessionMeta {
+            timestamp: epoch_ms(),
+            track,
+            task_kind,
+            monk_mode,
+            intervention_enabled,
+        })
+        .map_err(|e| format!("log channel full: {}", e))?;
+    tracing::info!(
+        "session_meta recorded: track={} task_kind={}",
+        track.as_str(),
+        task_kind.as_str()
+    );
+    Ok(())
+}
+
+/// v0.3 較正: プローブ回答 (回答あり) を realtime_label として記録する (§4)。
+/// 窓 (analysis_window_*) は probe_triggered から受領した値をそのまま転記する (DB-4)。
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+fn record_realtime_answer(
+    probe_id: Option<String>,
+    source: String,
+    q1_friction: u8,
+    q2_progress: u8,
+    latency_ms: u64,
+    window_start_ms: u64,
+    window_end_ms: u64,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let probe = build_probe_ref(&source, probe_id)?;
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::realtime_label_answered(
+            epoch_ms(),
+            &probe,
+            q1_friction,
+            q2_progress,
+            latency_ms,
+            window_start_ms,
+            window_end_ms,
+        ))
+        .map_err(|e| format!("log channel full: {}", e))?;
+    Ok(())
+}
+
+/// v0.3 較正: プローブ skip を realtime_label として記録する (§4・§10 MNAR)。
+#[tauri::command]
+fn record_realtime_skip(
+    probe_id: Option<String>,
+    source: String,
+    skip_reason: String,
+    latency_ms: u64,
+    window_start_ms: u64,
+    window_end_ms: u64,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let probe = build_probe_ref(&source, probe_id)?;
+    let skip_reason = SkipReason::parse(&skip_reason)
+        .ok_or_else(|| format!("invalid skip_reason: {:?}", skip_reason))?;
+    if matches!(skip_reason, SkipReason::None) {
+        return Err("skip_reason must be dont_remember or dismissed".to_string());
+    }
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::realtime_label_skipped(
+            epoch_ms(),
+            &probe,
+            skip_reason,
+            latency_ms,
+            window_start_ms,
+            window_end_ms,
+        ))
+        .map_err(|e| format!("log channel full: {}", e))?;
+    Ok(())
+}
+
+/// v0.3 較正: 尺度理解テスト (ビネット) 回答を記録する (§6・§14)。
+/// vignette_id は不透明 ID のみ・q1/q2 は構築子で 1..=5 clamp (DC-4)。
+#[tauri::command]
+fn record_vignette_response(
+    vignette_id: String,
+    expected_quadrant: String,
+    q1_friction: u8,
+    q2_progress: u8,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let quadrant = ExpectedQuadrant::parse(&expected_quadrant)
+        .ok_or_else(|| format!("invalid expected_quadrant: {:?}", expected_quadrant))?;
+    if !is_valid_opaque_id(&vignette_id) {
+        return Err("invalid vignette_id format".to_string());
+    }
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::vignette_response(
+            epoch_ms(),
+            vignette_id,
+            quadrant,
+            q1_friction,
+            q2_progress,
+        ))
+        .map_err(|e| format!("log channel full: {}", e))?;
     Ok(())
 }
 
@@ -1180,6 +1342,10 @@ pub fn run() {
             quit_app,
             get_session_file,
             record_user_label,
+            record_session_meta,
+            record_realtime_answer,
+            record_realtime_skip,
+            record_vignette_response,
             wall_server::start_wall_server,
             wall_server::stop_wall_server,
         ])

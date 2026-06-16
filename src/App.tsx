@@ -4,7 +4,17 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import Dashboard from "./components/Dashboard";
 import Overlay from "./components/Overlay";
+import VignetteTest from "./components/VignetteTest";
+import type { TaskKind } from "./probeTypes";
 import "./App.css";
+
+// Task C: session_meta の task_kind 宣言 (start 画面のセレクタ)。
+const TASK_KINDS: { value: TaskKind; label: string }[] = [
+  { value: "argumentative", label: "論述" },
+  { value: "correspondence", label: "通信文" },
+  { value: "creative", label: "創作" },
+  { value: "vibe_coding", label: "vibe coding" },
+];
 
 interface CognitiveStateRaw {
   flow: number;
@@ -55,6 +65,10 @@ function App() {
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
   const [hookActive, setHookActive] = useState<boolean | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  // Task C: session_meta 宣言 + ビネット導線。
+  const [taskKind, setTaskKind] = useState<TaskKind>("argumentative");
+  const [interventionEnabled, setInterventionEnabled] = useState(false);
+  const [showVignette, setShowVignette] = useState(false);
   // Ref mirrors: setInterval 内からステート最新値を参照するため
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
   const isWallActiveRef = useRef(isWallActive);
@@ -178,8 +192,24 @@ function App() {
       setStartError("セッション開始に失敗しました。アプリを再起動してください。");
       return;
     }
+    // Task C: セッション開始宣言を記録 (track は較正スモークでは main 固定)。
+    try {
+      await invoke("record_session_meta", {
+        track: "main",
+        taskKind,
+        monkMode: isMonkMode,
+        interventionEnabled,
+      });
+    } catch (e) {
+      console.error("record_session_meta failed:", e);
+    }
     setIsStarted(true);
   };
+
+  // Task C: 尺度理解テスト (ビネット) フロー
+  if (!isStarted && showVignette) {
+    return <VignetteTest onComplete={() => setShowVignette(false)} />;
+  }
 
   // セッション未開始時はスタート画面を表示
   if (!isStarted) {
@@ -192,8 +222,46 @@ function App() {
             キーストロークを解析し、介入判断に必要な作業状態をリアルタイムで推定します。
           </p>
         </div>
+
+        {/* Task C: session_meta の task_kind 宣言 */}
+        <div style={{ margin: "1rem 0" }}>
+          <div style={{ fontSize: "0.85rem", marginBottom: "0.4rem" }}>今回の作業種別:</div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
+            {TASK_KINDS.map((tk) => (
+              <button
+                key={tk.value}
+                onClick={() => setTaskKind(tk.value)}
+                style={{
+                  padding: "0.4rem 0.8rem",
+                  cursor: "pointer",
+                  borderRadius: "6px",
+                  border: taskKind === tk.value ? "2px solid #4caf50" : "1px solid #888",
+                  background: taskKind === tk.value ? "rgba(76,175,80,0.15)" : "transparent",
+                }}
+              >
+                {tk.label}
+              </button>
+            ))}
+          </div>
+          <label style={{ display: "block", marginTop: "0.6rem", fontSize: "0.82rem" }}>
+            <input
+              type="checkbox"
+              checked={interventionEnabled}
+              onChange={(e) => setInterventionEnabled(e.target.checked)}
+            />{" "}
+            介入を有効にする (較正中は既定オフ)
+          </label>
+        </div>
+
         <button className="start-button" onClick={handleStart}>
           開始する
+        </button>
+        <button
+          className="start-button"
+          onClick={() => setShowVignette(true)}
+          style={{ background: "transparent", border: "1px solid #888", marginTop: "0.5rem" }}
+        >
+          尺度理解テスト (初回)
         </button>
         {startError && (
           <p className="start-error" style={{ color: '#ff6b6b', marginTop: '0.5rem', fontSize: '0.9rem' }}>

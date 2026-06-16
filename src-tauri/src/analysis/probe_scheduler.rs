@@ -75,6 +75,13 @@ impl ProbeId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// 受領した不透明 ID が backend 生成形式 (`[A-Za-z0-9_-]`・長さ `LEN`) かを検証する (DC-3 / #7)。
+    /// frontend から戻ってきた `probe_id` を realtime_label command で再検証するのに使う
+    /// (本文/タイトル由来文字列の混入を境界で遮断・data-privacy)。
+    pub fn is_valid(s: &str) -> bool {
+        s.len() == Self::LEN && s.bytes().all(|b| Self::ALPHABET.contains(&b))
+    }
 }
 
 /// スケジューラ制約 (v0.3 §4.3)。既定値は設計書の値。
@@ -333,6 +340,23 @@ mod tests {
         let mut r1 = StdRng::seed_from_u64(99);
         let mut r2 = StdRng::seed_from_u64(99);
         assert_eq!(ProbeId::generate(&mut r1), ProbeId::generate(&mut r2));
+    }
+
+    #[test]
+    fn probe_id_is_valid_accepts_generated_rejects_malformed() {
+        // 生成した ID は常に valid。
+        let mut rng = StdRng::seed_from_u64(123);
+        for _ in 0..100 {
+            assert!(ProbeId::is_valid(ProbeId::generate(&mut rng).as_str()));
+        }
+        // 長さ違い・不正文字・空・本文混入は reject (DC-3 / #7)。
+        assert!(ProbeId::is_valid("ABCDEFGHIJKLMNOP")); // 16 文字・全て alphabet
+        assert!(!ProbeId::is_valid("")); // 空
+        assert!(!ProbeId::is_valid("short")); // 長さ不足
+        assert!(!ProbeId::is_valid("ABCDEFGHIJKLMNOPQ")); // 17 文字
+        assert!(!ProbeId::is_valid("ABCDEFGHIJKLMNO.")); // '.' は alphabet 外
+        assert!(!ProbeId::is_valid("ABCDEFGHIJKLMN あ")); // マルチバイト混入
+        assert!(!ProbeId::is_valid("'; DROP TABLE--xx")); // 本文/インジェクション様
     }
 
     #[test]

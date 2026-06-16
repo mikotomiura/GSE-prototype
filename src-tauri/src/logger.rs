@@ -564,6 +564,25 @@ impl LogEntry {
             analysis_window_end_ms,
         }
     }
+
+    /// `VignetteResponse` を不変条件を満たして構築する (q1/q2 を `1..=5` clamp)。
+    /// 直接構築だと clamp されない (writer 側 `debug_assert!` は release で無効) ため、
+    /// producer はこの構築子経由を使う (DC-4 / cross-review)。
+    pub fn vignette_response(
+        timestamp: u64,
+        vignette_id: String,
+        expected_quadrant: ExpectedQuadrant,
+        q1_friction: u8,
+        q2_progress: u8,
+    ) -> Self {
+        LogEntry::VignetteResponse {
+            timestamp,
+            vignette_id,
+            expected_quadrant,
+            q1_friction: q1_friction.clamp(1, 5),
+            q2_progress: q2_progress.clamp(1, 5),
+        }
+    }
 }
 
 /// NDJSON形式でセッションデータを書き込むロガー。
@@ -1352,6 +1371,22 @@ mod tests {
             line,
             r#"{"type":"vignette_response","vignette_id":"v8","expected_quadrant":"idle","q1_friction":1,"q2_progress":1,"ts":99}"#
         );
+    }
+
+    #[test]
+    fn vignette_response_constructor_clamps_q_to_1_5() {
+        // DC-4: 構築子経由で q1/q2 が 1..=5 に clamp される (0→1, 9→5)。
+        let entry = LogEntry::vignette_response(7, "v3".to_string(), ExpectedQuadrant::Stuck, 0, 9);
+        let LogEntry::VignetteResponse {
+            q1_friction,
+            q2_progress,
+            ..
+        } = entry
+        else {
+            panic!("expected VignetteResponse");
+        };
+        assert_eq!(q1_friction, 1);
+        assert_eq!(q2_progress, 5);
     }
 
     /// 付随 enum の `as_str()` 値を **リテラルで固定**する。`schema_dto.rs` の DTO enum は
