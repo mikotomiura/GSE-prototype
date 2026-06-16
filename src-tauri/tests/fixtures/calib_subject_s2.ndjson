@@ -1,0 +1,6 @@
+{"type":"meta","session_start":2000,"hmm_version":"calib-test"}
+{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":2000}
+{"type":"feat","t":20000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.4000,"raw_y":0.5000,"ewma_x":0.4000,"ewma_y":0.5000,"obs":5,"alpha":0.30}
+{"type":"feat","t":30000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.4000,"raw_y":0.5000,"ewma_x":0.4000,"ewma_y":0.5000,"obs":5,"alpha":0.30}
+{"type":"probe_assignment","probe_id":"s2p1","scheduled_ts":35000,"session_elapsed_ms":33000}
+{"type":"realtime_label","probe_id":"s2p1","source":"random_probe","q1_friction":4,"q2_progress":2,"answered":true,"skip_reason":"none","latency_ms":3000,"analysis_window_start_ms":10000,"analysis_window_end_ms":40000,"ts":40000}

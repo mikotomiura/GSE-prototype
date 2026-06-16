@@ -1,0 +1,14 @@
+{"type":"meta","session_start":3000,"hmm_version":"calib-test"}
+{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":3000}
+{"type":"feat","t":20000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.1000,"raw_y":0.9000,"ewma_x":0.1000,"ewma_y":0.9000,"obs":5,"alpha":0.30}
+{"type":"feat","t":30000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.1000,"raw_y":0.9000,"ewma_x":0.1000,"ewma_y":0.9000,"obs":5,"alpha":0.30}
+{"type":"probe_assignment","probe_id":"s3p1","scheduled_ts":35000,"session_elapsed_ms":32000}
+{"type":"realtime_label","probe_id":"s3p1","source":"random_probe","q1_friction":1,"q2_progress":5,"answered":true,"skip_reason":"none","latency_ms":1500,"analysis_window_start_ms":10000,"analysis_window_end_ms":40000,"ts":40000}
+{"type":"feat","t":60000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.5000,"raw_y":0.5000,"ewma_x":0.5000,"ewma_y":0.5000,"obs":5,"alpha":0.30}
+{"type":"feat","t":70000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.5000,"raw_y":0.5000,"ewma_x":0.5000,"ewma_y":0.5000,"obs":5,"alpha":0.30}
+{"type":"probe_assignment","probe_id":"s3p2","scheduled_ts":65000,"session_elapsed_ms":62000}
+{"type":"realtime_label","probe_id":"s3p2","source":"random_probe","q1_friction":3,"q2_progress":3,"answered":true,"skip_reason":"none","latency_ms":2500,"analysis_window_start_ms":50000,"analysis_window_end_ms":80000,"ts":80000}
+{"type":"feat","t":100000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.9000,"raw_y":0.1000,"ewma_x":0.9000,"ewma_y":0.1000,"obs":5,"alpha":0.30}
+{"type":"feat","t":110000,"f1":100.00,"f3":0.1000,"f4":2.00,"f5":0.0,"f6":0.1000,"p_flow":0.3400,"p_inc":0.3300,"p_stuck":0.3300,"raw_x":0.9000,"raw_y":0.1000,"ewma_x":0.9000,"ewma_y":0.1000,"obs":5,"alpha":0.30}
+{"type":"probe_assignment","probe_id":"s3p3","scheduled_ts":105000,"session_elapsed_ms":102000}
+{"type":"realtime_label","probe_id":"s3p3","source":"random_probe","q1_friction":5,"q2_progress":1,"answered":true,"skip_reason":"none","latency_ms":4000,"analysis_window_start_ms":90000,"analysis_window_end_ms":120000,"ts":120000}
