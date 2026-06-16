@@ -4,3 +4,4 @@ pub mod intervention;
 pub mod intervention_eval;
 pub mod loop_step;
 pub mod metrics;
+pub mod probe_scheduler;

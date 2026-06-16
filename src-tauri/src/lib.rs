@@ -32,6 +32,14 @@ const LABEL_DEBOUNCE_MS: u64 = 2000;
 static LAST_MARKER_MS: AtomicU64 = AtomicU64::new(0);
 const MARKER_DEBOUNCE_MS: u64 = 1000;
 
+// Task B: 自己マーカー hotkey (Ctrl+Shift+Alt+M) の 1 秒デバウンス (MARKER_DEBOUNCE_MS を共用)。
+static LAST_SELF_MARKER_MS: AtomicU64 = AtomicU64::new(0);
+
+// Task B: プローブスケジューラがセッション開始時刻 (epoch ms) を読むための共有値。
+// start_session が Release で store し、専用プローブスレッドが Acquire で読む。
+// 0 = セッション未開始。値が変わったらスレッドはスケジューラを再初期化する。
+static SESSION_START_MS: AtomicU64 = AtomicU64::new(0);
+
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
@@ -503,6 +511,10 @@ fn start_session(
     let guard = log.lock().unwrap_or_else(|p| p.into_inner());
     let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
 
+    // Task B: プローブスケジューラへセッション開始時刻を共有する。
+    // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
+    SESSION_START_MS.store(now, Ordering::Release);
+
     // setup() で事前生成されたオーバーレイウィンドウを maximize → show する。
     // ウィンドウ生成自体は setup() (メインスレッド) で行うことで、
     // Windows での tokio ワーカースレッドからの WebviewWindowBuilder::build()
@@ -702,6 +714,7 @@ pub fn run() {
     let engine_for_monitor = engine.clone();
     let log_tx_ime_poll = log_tx.clone();
     let log_tx_for_monitor = log_tx.clone();
+    let log_tx_probe = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -935,6 +948,32 @@ pub fn run() {
                         tracing::info!("review marker recorded at {}", now);
                         return;
                     }
+                    // Task B: 自己マーカー (副データ)。被験者が「今 Stuck」と感じた瞬間に押す。
+                    // probe_id=null・source=self_marker で probe_triggered を emit する。
+                    // realtime_label のログ自体は Task C の回答コマンドが行う (B は窓を確定して渡すまで)。
+                    if shortcut.matches(mods, Code::KeyM) {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let last = LAST_SELF_MARKER_MS.load(std::sync::atomic::Ordering::Relaxed);
+                        if now.saturating_sub(last) < MARKER_DEBOUNCE_MS {
+                            return;
+                        }
+                        LAST_SELF_MARKER_MS.store(now, std::sync::atomic::Ordering::Relaxed);
+                        let (ws, we) = crate::analysis::probe_scheduler::self_marker_window(now);
+                        let _ = app.emit(
+                            "probe_triggered",
+                            serde_json::json!({
+                                "probe_id": serde_json::Value::Null,
+                                "source": "self_marker",
+                                "analysis_window_start_ms": ws,
+                                "analysis_window_end_ms": we,
+                            }),
+                        );
+                        tracing::info!("self marker probe_triggered at {}", now);
+                        return;
+                    }
                     let label = if shortcut.matches(mods, Code::KeyF) {
                         UserLabelKind::Flow
                     } else if shortcut.matches(mods, Code::KeyI) {
@@ -975,6 +1014,93 @@ pub fn run() {
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);
 
+            // Task B: ランダム時点プローブの専用スケジューラスレッド (DB-2)。
+            // 1Hz Analysis Thread はレイテンシ要件があり AppHandle も持たないため、
+            // emit と logger 送信の両方が要るプローブ駆動は専用スレッドに分離する。
+            // IME Monitor 風の sleep ポーリングで 1Hz 駆動 (wake 信号は不要)。
+            // scheduler 純ロジックは analysis/probe_scheduler.rs (OS API 非依存)。
+            {
+                use crate::analysis::probe_scheduler::{ProbeConfig, ProbeScheduler};
+                let app_handle = app.handle().clone();
+                let probe_log_tx = log_tx_probe;
+                thread::spawn(move || {
+                    tracing::info!("Probe scheduler thread started");
+                    let now_ms = || -> u64 {
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64
+                    };
+                    let mut scheduler: Option<ProbeScheduler> = None;
+                    let mut active_session_start: u64 = 0;
+                    loop {
+                        thread::sleep(Duration::from_millis(1000));
+                        let session_start = SESSION_START_MS.load(Ordering::Acquire);
+                        if session_start == 0 {
+                            // セッション未開始: スケジューラを破棄して待機。
+                            scheduler = None;
+                            active_session_start = 0;
+                            continue;
+                        }
+                        if session_start != active_session_start {
+                            // 新セッション検出 (DB-6)。entropy から u64 seed を引いて
+                            // seed_from_u64 で初期化し、seed を tracing に記録する。本番は
+                            // 非決定論的でありつつ「この seed でこの scheduled_ts 系列が出た」
+                            // ことを後から再現でき、一様性監査 (D-14) が成立する。NDJSON schema は
+                            // Task A で凍結のため seed は trace ログにのみ残す (schema 不変)。
+                            active_session_start = session_start;
+                            let seed: u64 = rand::random();
+                            tracing::info!(
+                                "probe scheduler seed={} for session_start={}",
+                                seed,
+                                session_start
+                            );
+                            scheduler = Some(ProbeScheduler::from_seed(
+                                seed,
+                                ProbeConfig::default(),
+                                session_start,
+                            ));
+                        }
+                        let now = now_ms();
+                        // idle は get_keyboard_idle_ms と同じ計算 (last_key==0 は 0)。
+                        let last_key = crate::input::hook::last_key_ms();
+                        let idle = if last_key == 0 {
+                            0
+                        } else {
+                            now.saturating_sub(last_key)
+                        };
+                        let Some(sched) = scheduler.as_mut() else {
+                            continue;
+                        };
+                        if let Some(fired) = sched.poll(now, idle) {
+                            // (2) probe_assignment ログ (一様性の監査用・scheduled_ts)。
+                            let _ = probe_log_tx.try_send(LogEntry::ProbeAssignment {
+                                probe_id: fired.probe_id.as_str().to_string(),
+                                scheduled_ts: fired.scheduled_ts,
+                                session_elapsed_ms: fired.session_elapsed_ms,
+                            });
+                            // (3) frontend へ emit (回答カード表示は Task C)。
+                            if let Err(e) = app_handle.emit(
+                                "probe_triggered",
+                                serde_json::json!({
+                                    "probe_id": fired.probe_id.as_str(),
+                                    "source": "random_probe",
+                                    "analysis_window_start_ms": fired.window_start_ms,
+                                    "analysis_window_end_ms": fired.window_end_ms,
+                                }),
+                            ) {
+                                tracing::warn!("probe_triggered emit failed: {}", e);
+                            }
+                            tracing::info!(
+                                "probe fired: {} at {}",
+                                fired.probe_id.as_str(),
+                                fired.scheduled_ts
+                            );
+                        }
+                    }
+                });
+            }
+
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
             // macOS: Cmd+Shift+Option+F/I/S、Windows/Linux: Ctrl+Shift+Alt+F/I/S。
             // 失敗は warn に落として起動を継続する(録画ラベリングなしでも運用可)。
@@ -989,6 +1115,7 @@ pub fn run() {
                     Shortcut::new(Some(mods), Code::KeyI),
                     Shortcut::new(Some(mods), Code::KeyS),
                     Shortcut::new(Some(mods), Code::KeyR), // Review marker
+                    Shortcut::new(Some(mods), Code::KeyM), // Task B: 自己マーカー (self_marker)
                 ];
                 for sc in shortcuts {
                     if let Err(e) = app.global_shortcut().register(sc) {
