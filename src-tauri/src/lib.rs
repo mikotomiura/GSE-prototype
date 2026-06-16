@@ -11,7 +11,10 @@ use crate::analysis::intervention::{
     InterventionAction, InterventionDecision, InterventionInput, InterventionPolicyState,
 };
 use crate::analysis::loop_step::FeatSnapshot;
-use crate::logger::{LogEntry, SessionLogger, UserLabelKind};
+use crate::logger::{
+    ExpectedQuadrant, LogEntry, ProbeRef, ProbeSource, SessionLogger, SkipReason, TaskKind, Track,
+    UserLabelKind,
+};
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
 #[allow(unused_imports)]
@@ -31,6 +34,19 @@ const LABEL_DEBOUNCE_MS: u64 = 2000;
 // ReviewMarker: 1 秒デバウンス (連打防止)。UserLabel とは独立。
 static LAST_MARKER_MS: AtomicU64 = AtomicU64::new(0);
 const MARKER_DEBOUNCE_MS: u64 = 1000;
+
+// Task B: 自己マーカー hotkey (Ctrl+Shift+Alt+M) の 1 秒デバウンス (MARKER_DEBOUNCE_MS を共用)。
+static LAST_SELF_MARKER_MS: AtomicU64 = AtomicU64::new(0);
+
+// Task B: プローブスケジューラがセッション開始時刻 (epoch ms) を読むための共有値。
+// start_session が Release で store し、専用プローブスレッドが Acquire で読む。
+// 0 = セッション未開始。値が変わったらスレッドはスケジューラを再初期化する。
+static SESSION_START_MS: AtomicU64 = AtomicU64::new(0);
+
+// Task C: セッションが宣言する介入の有効/無効 (session_meta.intervention_enabled)。
+// record_session_meta が設定し、get_intervention_decision が抑止判断に使う。
+// main/overlay の両ウィンドウが同コマンドを叩くため単一情報源で抑止される (cross-review)。
+static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
@@ -111,6 +127,13 @@ fn get_intervention_decision(
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .last_decision();
+    }
+
+    // Task C: セッションが介入無効を宣言した場合は policy を進めず none を返す。
+    // 無効時は last_decision が safe_default のまま据え置かれ overlay も none を表示する
+    // (較正中の介入混入を防ぐ。cross-review: 宣言と実挙動の乖離解消)。
+    if !INTERVENTION_ENABLED.load(Ordering::Acquire) {
+        return InterventionDecision::safe_default();
     }
 
     let now = epoch_ms();
@@ -471,6 +494,173 @@ fn record_user_label(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Task C: v0.3 較正スモークの収集 command 群 (frontend → logger)
+// すべて数値・固定カテゴリ・不透明 ID のみを記録する (data-privacy)。
+// ---------------------------------------------------------------------------
+
+/// 受領した不透明 ID (vignette_id 等) の検証。本文/ウィンドウタイトル由来の文字列が
+/// ID に混入するのを境界で遮断する (`[A-Za-z0-9_-]`・1..=16 文字)。
+fn is_valid_opaque_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 16
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// 受領した (source, probe_id) を検証して `ProbeRef` を構築する (DC-3 / cross-review #7)。
+/// random_probe ⇒ probe_id は Some かつ `ProbeId::is_valid`、self_marker ⇒ probe_id は None。
+fn build_probe_ref(source: &str, probe_id: Option<String>) -> Result<ProbeRef, String> {
+    let source =
+        ProbeSource::parse(source).ok_or_else(|| format!("invalid source: {:?}", source))?;
+    match source {
+        ProbeSource::RandomProbe => {
+            let id = probe_id.ok_or_else(|| "random_probe requires probe_id".to_string())?;
+            if !crate::analysis::probe_scheduler::ProbeId::is_valid(&id) {
+                return Err("invalid probe_id format".to_string());
+            }
+            Ok(ProbeRef::RandomProbe { probe_id: id })
+        }
+        ProbeSource::SelfMarker => {
+            if probe_id.is_some() {
+                return Err("self_marker must not carry a probe_id".to_string());
+            }
+            Ok(ProbeRef::SelfMarker)
+        }
+    }
+}
+
+/// v0.3 較正: セッション開始宣言を記録する (§3・§14)。固定カテゴリのみ許可。
+#[tauri::command]
+fn record_session_meta(
+    track: String,
+    task_kind: String,
+    monk_mode: bool,
+    intervention_enabled: bool,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
+    let task_kind =
+        TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+    // 介入の有効/無効をプロセス全体へ反映 (両ウィンドウの get_intervention_decision が参照)。
+    INTERVENTION_ENABLED.store(intervention_enabled, Ordering::Release);
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::SessionMeta {
+            timestamp: epoch_ms(),
+            track,
+            task_kind,
+            monk_mode,
+            intervention_enabled,
+        })
+        .map_err(|e| format!("log channel full: {}", e))?;
+    tracing::info!(
+        "session_meta recorded: track={} task_kind={}",
+        track.as_str(),
+        task_kind.as_str()
+    );
+    Ok(())
+}
+
+/// v0.3 較正: プローブ回答 (回答あり) を realtime_label として記録する (§4)。
+/// 窓 (analysis_window_*) は probe_triggered から受領した値をそのまま転記する (DB-4)。
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+fn record_realtime_answer(
+    probe_id: Option<String>,
+    source: String,
+    q1_friction: u8,
+    q2_progress: u8,
+    latency_ms: u64,
+    window_start_ms: u64,
+    window_end_ms: u64,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let probe = build_probe_ref(&source, probe_id)?;
+    if window_end_ms < window_start_ms {
+        return Err("window_end_ms must be >= window_start_ms".to_string());
+    }
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::realtime_label_answered(
+            epoch_ms(),
+            &probe,
+            q1_friction,
+            q2_progress,
+            latency_ms,
+            window_start_ms,
+            window_end_ms,
+        ))
+        .map_err(|e| format!("log channel full: {}", e))?;
+    Ok(())
+}
+
+/// v0.3 較正: プローブ skip を realtime_label として記録する (§4・§10 MNAR)。
+#[tauri::command]
+fn record_realtime_skip(
+    probe_id: Option<String>,
+    source: String,
+    skip_reason: String,
+    latency_ms: u64,
+    window_start_ms: u64,
+    window_end_ms: u64,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let probe = build_probe_ref(&source, probe_id)?;
+    if window_end_ms < window_start_ms {
+        return Err("window_end_ms must be >= window_start_ms".to_string());
+    }
+    let skip_reason = SkipReason::parse(&skip_reason)
+        .ok_or_else(|| format!("invalid skip_reason: {:?}", skip_reason))?;
+    if matches!(skip_reason, SkipReason::None) {
+        return Err("skip_reason must be dont_remember or dismissed".to_string());
+    }
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::realtime_label_skipped(
+            epoch_ms(),
+            &probe,
+            skip_reason,
+            latency_ms,
+            window_start_ms,
+            window_end_ms,
+        ))
+        .map_err(|e| format!("log channel full: {}", e))?;
+    Ok(())
+}
+
+/// v0.3 較正: 尺度理解テスト (ビネット) 回答を記録する (§6・§14)。
+/// vignette_id は不透明 ID のみ・q1/q2 は構築子で 1..=5 clamp (DC-4)。
+#[tauri::command]
+fn record_vignette_response(
+    vignette_id: String,
+    expected_quadrant: String,
+    q1_friction: u8,
+    q2_progress: u8,
+    log: State<'_, Arc<Mutex<LogState>>>,
+) -> Result<(), String> {
+    let quadrant = ExpectedQuadrant::parse(&expected_quadrant)
+        .ok_or_else(|| format!("invalid expected_quadrant: {:?}", expected_quadrant))?;
+    if !is_valid_opaque_id(&vignette_id) {
+        return Err("invalid vignette_id format".to_string());
+    }
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::vignette_response(
+            epoch_ms(),
+            vignette_id,
+            quadrant,
+            q1_friction,
+            q2_progress,
+        ))
+        .map_err(|e| format!("log channel full: {}", e))?;
+    Ok(())
+}
+
 /// 「開始する」ボタン押下時に呼ばれる。
 /// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
 /// 2. CognitiveStateEngine を初期状態にリセット
@@ -502,6 +692,10 @@ fn start_session(
     *intervention.0.lock().unwrap_or_else(|p| p.into_inner()) = InterventionPolicyState::new(now);
     let guard = log.lock().unwrap_or_else(|p| p.into_inner());
     let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
+
+    // Task B: プローブスケジューラへセッション開始時刻を共有する。
+    // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
+    SESSION_START_MS.store(now, Ordering::Release);
 
     // setup() で事前生成されたオーバーレイウィンドウを maximize → show する。
     // ウィンドウ生成自体は setup() (メインスレッド) で行うことで、
@@ -702,6 +896,7 @@ pub fn run() {
     let engine_for_monitor = engine.clone();
     let log_tx_ime_poll = log_tx.clone();
     let log_tx_for_monitor = log_tx.clone();
+    let log_tx_probe = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -935,6 +1130,39 @@ pub fn run() {
                         tracing::info!("review marker recorded at {}", now);
                         return;
                     }
+                    // Task B: 自己マーカー (副データ)。被験者が「今 Stuck」と感じた瞬間に押す。
+                    // probe_id=null・source=self_marker で probe_triggered を emit する。
+                    // realtime_label のログ自体は Task C の回答コマンドが行う (B は窓を確定して渡すまで)。
+                    if shortcut.matches(mods, Code::KeyM) {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let last = LAST_SELF_MARKER_MS.load(std::sync::atomic::Ordering::Relaxed);
+                        if now.saturating_sub(last) < MARKER_DEBOUNCE_MS {
+                            return;
+                        }
+                        LAST_SELF_MARKER_MS.store(now, std::sync::atomic::Ordering::Relaxed);
+                        // DB-8 を self_marker にも適用: 窓始端を session_start でクランプし、
+                        // 開始前/前セッションの打鍵が分析窓に混入するのを防ぐ。
+                        let session_start =
+                            SESSION_START_MS.load(std::sync::atomic::Ordering::Acquire);
+                        let (ws, we) = crate::analysis::probe_scheduler::self_marker_window_clamped(
+                            now,
+                            session_start,
+                        );
+                        let _ = app.emit(
+                            "probe_triggered",
+                            serde_json::json!({
+                                "probe_id": serde_json::Value::Null,
+                                "source": "self_marker",
+                                "analysis_window_start_ms": ws,
+                                "analysis_window_end_ms": we,
+                            }),
+                        );
+                        tracing::info!("self marker probe_triggered at {}", now);
+                        return;
+                    }
                     let label = if shortcut.matches(mods, Code::KeyF) {
                         UserLabelKind::Flow
                     } else if shortcut.matches(mods, Code::KeyI) {
@@ -975,6 +1203,93 @@ pub fn run() {
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);
 
+            // Task B: ランダム時点プローブの専用スケジューラスレッド (DB-2)。
+            // 1Hz Analysis Thread はレイテンシ要件があり AppHandle も持たないため、
+            // emit と logger 送信の両方が要るプローブ駆動は専用スレッドに分離する。
+            // IME Monitor 風の sleep ポーリングで 1Hz 駆動 (wake 信号は不要)。
+            // scheduler 純ロジックは analysis/probe_scheduler.rs (OS API 非依存)。
+            {
+                use crate::analysis::probe_scheduler::{ProbeConfig, ProbeScheduler};
+                let app_handle = app.handle().clone();
+                let probe_log_tx = log_tx_probe;
+                thread::spawn(move || {
+                    tracing::info!("Probe scheduler thread started");
+                    let now_ms = || -> u64 {
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64
+                    };
+                    let mut scheduler: Option<ProbeScheduler> = None;
+                    let mut active_session_start: u64 = 0;
+                    loop {
+                        thread::sleep(Duration::from_millis(1000));
+                        let session_start = SESSION_START_MS.load(Ordering::Acquire);
+                        if session_start == 0 {
+                            // セッション未開始: スケジューラを破棄して待機。
+                            scheduler = None;
+                            active_session_start = 0;
+                            continue;
+                        }
+                        if session_start != active_session_start {
+                            // 新セッション検出 (DB-6)。entropy から u64 seed を引いて
+                            // seed_from_u64 で初期化し、seed を tracing に記録する。本番は
+                            // 非決定論的でありつつ「この seed でこの scheduled_ts 系列が出た」
+                            // ことを後から再現でき、一様性監査 (D-14) が成立する。NDJSON schema は
+                            // Task A で凍結のため seed は trace ログにのみ残す (schema 不変)。
+                            active_session_start = session_start;
+                            let seed: u64 = rand::random();
+                            tracing::info!(
+                                "probe scheduler seed={} for session_start={}",
+                                seed,
+                                session_start
+                            );
+                            scheduler = Some(ProbeScheduler::from_seed(
+                                seed,
+                                ProbeConfig::default(),
+                                session_start,
+                            ));
+                        }
+                        let now = now_ms();
+                        // idle は get_keyboard_idle_ms と同じ計算 (last_key==0 は 0)。
+                        let last_key = crate::input::hook::last_key_ms();
+                        let idle = if last_key == 0 {
+                            0
+                        } else {
+                            now.saturating_sub(last_key)
+                        };
+                        let Some(sched) = scheduler.as_mut() else {
+                            continue;
+                        };
+                        if let Some(fired) = sched.poll(now, idle) {
+                            // (2) probe_assignment ログ (一様性の監査用・scheduled_ts)。
+                            let _ = probe_log_tx.try_send(LogEntry::ProbeAssignment {
+                                probe_id: fired.probe_id.as_str().to_string(),
+                                scheduled_ts: fired.scheduled_ts,
+                                session_elapsed_ms: fired.session_elapsed_ms,
+                            });
+                            // (3) frontend へ emit (回答カード表示は Task C)。
+                            if let Err(e) = app_handle.emit(
+                                "probe_triggered",
+                                serde_json::json!({
+                                    "probe_id": fired.probe_id.as_str(),
+                                    "source": "random_probe",
+                                    "analysis_window_start_ms": fired.window_start_ms,
+                                    "analysis_window_end_ms": fired.window_end_ms,
+                                }),
+                            ) {
+                                tracing::warn!("probe_triggered emit failed: {}", e);
+                            }
+                            tracing::info!(
+                                "probe fired: {} at {}",
+                                fired.probe_id.as_str(),
+                                fired.scheduled_ts
+                            );
+                        }
+                    }
+                });
+            }
+
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
             // macOS: Cmd+Shift+Option+F/I/S、Windows/Linux: Ctrl+Shift+Alt+F/I/S。
             // 失敗は warn に落として起動を継続する(録画ラベリングなしでも運用可)。
@@ -989,6 +1304,7 @@ pub fn run() {
                     Shortcut::new(Some(mods), Code::KeyI),
                     Shortcut::new(Some(mods), Code::KeyS),
                     Shortcut::new(Some(mods), Code::KeyR), // Review marker
+                    Shortcut::new(Some(mods), Code::KeyM), // Task B: 自己マーカー (self_marker)
                 ];
                 for sc in shortcuts {
                     if let Err(e) = app.global_shortcut().register(sc) {
@@ -1046,9 +1362,59 @@ pub fn run() {
             quit_app,
             get_session_file,
             record_user_label,
+            record_session_meta,
+            record_realtime_answer,
+            record_realtime_skip,
+            record_vignette_response,
             wall_server::start_wall_server,
             wall_server::stop_wall_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod task_c_command_tests {
+    use super::*;
+
+    #[test]
+    fn build_probe_ref_random_requires_valid_id() {
+        // 有効な 16 文字 → RandomProbe。
+        assert_eq!(
+            build_probe_ref("random_probe", Some("ABCDEFGHIJKLMNOP".to_string())),
+            Ok(ProbeRef::RandomProbe {
+                probe_id: "ABCDEFGHIJKLMNOP".to_string()
+            })
+        );
+        // 不正形式 (短い / 文字種違反) → Err。
+        assert!(build_probe_ref("random_probe", Some("short".to_string())).is_err());
+        assert!(build_probe_ref("random_probe", Some("bad.char12345678".to_string())).is_err());
+        // probe_id 欠落 → Err。
+        assert!(build_probe_ref("random_probe", None).is_err());
+    }
+
+    #[test]
+    fn build_probe_ref_self_marker_rejects_probe_id() {
+        assert_eq!(
+            build_probe_ref("self_marker", None),
+            Ok(ProbeRef::SelfMarker)
+        );
+        // self_marker が probe_id を持つのは不整合 → Err (#7 / DC-3)。
+        assert!(build_probe_ref("self_marker", Some("ABCDEFGHIJKLMNOP".to_string())).is_err());
+    }
+
+    #[test]
+    fn build_probe_ref_rejects_unknown_source() {
+        assert!(build_probe_ref("bogus", None).is_err());
+    }
+
+    #[test]
+    fn is_valid_opaque_id_accepts_ids_rejects_junk() {
+        assert!(is_valid_opaque_id("v1"));
+        assert!(is_valid_opaque_id("v8"));
+        assert!(!is_valid_opaque_id("")); // 空
+        assert!(!is_valid_opaque_id("has space")); // 空白
+        assert!(!is_valid_opaque_id("toolong-toolong-x")); // 17 文字 (>16)
+        assert!(!is_valid_opaque_id("本文")); // マルチバイト/本文
+    }
 }

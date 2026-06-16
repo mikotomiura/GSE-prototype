@@ -10,29 +10,65 @@
 
 ## フェーズ 1: 立て付け確定(ユーザー判断 → docs 反映)
 - [x] **Lv2 = ソフトのみで確定**(2026-06-12 承認)。walk-hard は実装しない(D-5)
-- [ ] スモークの主張を「探索的＋測定法較正」に降格する方針の合意
-- [ ] ※ 2026-06-12 時点: **設計レビューで一旦停止**。以降フェーズは未着手(指示待ち)
-- [ ] PreReg-1..5 を `docs/` に新規ドキュメントとして登録・凍結
-- [ ] glossary 改訂: Wall(Lv2) の定義、cue_condition/segment_origin 等の新語追加
-- [ ] `intervention-design` Skill のルール 1/7(クリックブロック前提)を更新
+- [x] スモークの主張を「探索的＋測定法較正」に降格する方針の合意
+- [x] codex 第2次独立評価で Part B を上書き(D-8〜D-13)
+- [x] **改善版 v0.3 設計書を起草** → `.idea/GSE_事後ラベリングシステム設計書_v0.3.md`
+- [x] **v0.3 をユーザーがレビュー → 納得**(2026-06-16「v0.3 でとりあえず OK」= 実装契約として確定)
 
-## フェーズ 2: スキーマ拡張(別タスク /start-task → /add-feature)
-- [ ] `LogEntry` + `schema_dto.rs` に 6 バリアント + 付随 enum を同期追加(B-5)
-- [ ] producer 側で不変条件を強制(dont_remember⇒null, q1>=4⇒stuck_kind)
-- [ ] emit_schema 再生成 → current.json 更新 → CI drift 緑(/finish-task の schema check)
+## フェーズ 1.5: 実装前の凍結(現タスク内・Step 0)
+- [x] PreReg-1..8(v0.3 §15)を `docs/preregistration-v0.3.md` に凍結
+- [x] glossary 改訂(criterion label / random probe / time isolation / context_beacon / C-index / 2段ゲート / 前向き holdout 等を追加、GT 行に D-13 注記)
+- [ ] `intervention-design` Skill のクリックブロック前提(ルール 1/7)を更新 ※介入 UI 着手時に実施(プラミング先のため後送り)
+- [ ] glossary の Wall(Lv2) 定義を「ソフトコーナー companion」へ改訂 ※同上(D-5・介入 UI タスクで)
 
-## フェーズ 3: 解析パイプライン(別タスク)
-- [ ] gse-replay に retro_label 取り込み + 順序混合モデル出力(B-6)
-- [ ] 対照区間 3 層化 + 包含確率記録(B-4/B-8)
-- [ ] dismiss_kind 内訳・⏸率を metrics.json に追加
+---
 
-## フェーズ 4: コーナー介入 UI 実装(別タスク /add-feature)
-- [ ] `intervention/CornerCompanion` + stages(Peek/Pause/Walk)+ EdgeVignette + useInterventionStage(C-4)
-- [ ] `.wall-layer` 全画面廃止、setIgnoreCursorEvents 常時 true 化
-- [ ] record_intervention_dismiss 拡張(dismiss_kind/level/latency_ms)+ InterventionDismiss ログ
-- [ ] モダン CSS(spring overshoot / glass / grid 展開 / vignette / prefers-reduced-motion)(C-5)
-- [ ] code-reviewer + data-privacy + intervention-design Skill で検証
+# 初回較正スモーク = 最小核・計測プラミング先(D-14 / 2026-06-16 確定)
 
-## フェーズ 5: 測定法較正研究(確証分析の前提)
-- [ ] cue 3 条件(feature_waveform / temporal_only / realtime_bridge)の一致率測定
-- [ ] PreReg ゲート判定 → Go なら核検証、No-Go なら設計差し戻し
+> スコープ: IN=核データ収集+オフライン解析 / OUT=比較条件(beacon・波形cue)・統制課題・介入UI・Recall点推定
+> 実装順: A(全ブロッカー)→ (B ∥ C)→ D → E
+
+## Task A — schema 拡張(別タスク /start-task → /add-feature)【全ブロッカー】✅ 完了(2026-06-16)
+> 新セッション用プロンプト: `next-session-prompt-taskA.md`(このフォルダ内)
+> 実装記録: `.steering/20260616-probe-schema/`
+- [x] `schema_dto.rs` + `LogEntry` に `session_meta` / `probe_assignment` / `realtime_label` / `vignette_response` を同期追加(§14)
+- [x] producer 不変条件を強制(skip⇒q1/q2=null、source=self_marker⇒probe_id=null 等。ProbeRef で型保証 + clamp)
+- [x] emit_schema 再生成 → `schema/current.json` 更新 → drift 緑(byte-equal)。lib test 97 緑・新規 clippy 警告ゼロ
+
+## Task B — backend プローブ scheduler(A 後 / C と並行)✅ 完了(2026-06-16)
+> 実装記録: `.steering/20260616-probe-scheduler/`(decisions DB-1..DB-7)。commit 7d0f4d5。
+- [x] rolling thinning(λ≈2回/30分・gap≥8分・cap≤2回/30分・離席は適格から除外)で一様ランダム時刻生成
+      → `analysis/probe_scheduler.rs`(純粋・seeded・Poisson 指数間隔+thinning, DB-1)
+- [x] `probe_assignment` ログ(scheduled_ts / session_elapsed_ms)+ フロントへ emit(`probe_triggered`, DB-4)
+- [x] 自己マーカー hotkey(source=self_marker・副データ)= Ctrl+Shift+Alt+M
+- [x] seed を tracing 記録し一様性監査を再現可能化(DB-6)。schema 不変(DB-5)。test 108緑・clippy 緑・build 緑
+
+## Task C — frontend 収集(A 後 / B と並行)✅ 完了(2026-06-16)
+> 実装記録: `.steering/20260616-probe-collect/`(DC-1..DC-8)。commit ae452d7。branch feature/probe-collect(B にスタック)。
+- [x] `session_meta` 宣言 UI(start 画面 task_kind セレクタ)→ `record_session_meta`
+- [x] プローブカード(Overlay・Q1摩擦/Q2前進スライダー・skip理由・latency)→ `realtime_label`(probe_id 再検証=#7)
+- [x] 尺度ビネット 8 問の初回フロー → `vignette_response`(PreReg-1 ゲート表示)
+- [x] cross-review 対応(送信成功後遷移=MNAR 回避・Wall 非共存)。security clean・cargo112緑・tsc緑
+
+## Task D — オフライン解析 gse-replay 拡張(A 後・合成 fixture 先行)✅ 完了(2026-06-17, PR #5)
+- [x] probe_id 起点の時間隔離窓抽出(t−31s..t−1s, X/Y 集約・既定 ewma 中央値・AggSpec 差替可)
+- [x] 被験者内 方向付き C-index(§7・X↔Q1/Y↔Q2)
+- [x] 2 段ゲート判定(測定法ゲート→モデルゲート, PreReg-2/4・純関数 model_gate/measurement_gate)
+- [x] MNAR 上下限(全高摩擦/全低摩擦, PreReg-7・母数=窓X有り)
+- [x] ビネット採点(PreReg-1)+ 二軸性(PreReg-8)→ `CalibrationReport`(`--calibration --json`)
+- [x] ※ 既存 `metrics.rs` の confusion/recall は流用せず C-index 系を別パスで追加(D-14)
+- [x] 合成 NDJSON fixture + 単体/統合テスト 154 件緑・snapshot 回帰維持・cross-review 対応済
+> 新セッション用プロンプト: `next-session-prompt-taskE.md`(このフォルダ内)
+> 被験者**横断**の最終ゲート orchestration と実データ評価は Task E(D は純関数 + 1被験者 CLI まで)
+
+## Task E — 通し検証
+- [ ] 被験者横断 cohort orchestration(P*/ 走査 → 被験者別 calibration → 横断ゲート → cohort Go/Kill)
+- [ ] 自己ドッグフードで end-to-end 1 本(合成 or 実セッション)
+- [ ] 3–5 名スモーク → PreReg ゲート判定(Go / Kill / INCONCLUSIVE)
+
+---
+
+## 後続(プラミング後・別タスク)
+- [ ] コーナー段階介入 UI(Phase4・design Part C)+ `intervention_dismiss` を同一コンポーネントで合流(D-5/D-6)
+- [ ] 比較条件: `context_beacon` + 波形 cue ラベル(PreReg-3 再現性)
+- [ ] 統制課題 `task_checkpoint`(機能ラベル / それまでは「未評価」と明記)

@@ -85,7 +85,7 @@
 
 ## 3. スレッドモデル
 
-GSE は 6 つのスレッド/タスクで構成される。
+GSE は 7 つのスレッド/タスクで構成される。
 
 | スレッド | 責務 | 通信方式 | 優先度 |
 |---|---|---|---|
@@ -95,6 +95,9 @@ GSE は 6 つのスレッド/タスクで構成される。
 | **IME Monitor** | Win: 候補ウィンドウ検出 / mac: フック内で処理（別スレッド不要） | Atomic IME_ACTIVE | 低 |
 | **IME Polling** | Win: ImmGet\* / mac: TIS ポーリング (GCD メインキュー経由) | Atomic IME_OPEN | 低 |
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
+| **Probe Scheduler** | v0.3 較正: ランダム時点プローブの一様時刻生成 (Poisson+thinning) → `probe_assignment` ログ + `probe_triggered` emit。純ロジックは `analysis/probe_scheduler.rs` (OS API 非依存) | Atomic SESSION_START_MS 読取, LogEntry Sender, AppHandle emit | 低 |
+
+純スケジューリング (指数間隔・thinning・窓計算・不透明 ProbeId 生成) は `analysis/probe_scheduler.rs` に隔離し OS API を呼ばない。スレッド起動・実時刻取得・emit・hotkey 配線は `lib.rs` 側に閉じる (architecture-rules)。
 
 Wall Server は Lv2 介入時にのみ起動する一時的なスレッド。
 

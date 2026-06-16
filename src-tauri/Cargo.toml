@@ -17,6 +17,13 @@ default-run = "gse-next"
 name = "gse-replay"
 path = "src/bin/replay.rs"
 
+# Task E: 被験者横断 (cohort) 較正判定 CLI。gse-replay --calibration が出力した
+# per-被験者 calibration レポート JSON を gse-dataset ツリーから集約し、凍結純関数
+# model_gate/measurement_gate を再利用してコホート Go/Kill/INCONCLUSIVE を判定する。
+[[bin]]
+name = "gse-cohort"
+path = "src/bin/cohort.rs"
+
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
@@ -50,6 +57,9 @@ base64 = "0.22"
 
 # Utilities
 crossbeam-channel = "0.5"
+# Task B: ランダム時点プローブの一様ランダム時刻生成 (analysis/probe_scheduler.rs)。
+# StdRng を seed 注入して決定論テスト可能にする。lock に 0.8.5 が既存。
+rand = "0.8"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 
