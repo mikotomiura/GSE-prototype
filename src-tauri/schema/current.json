@@ -366,9 +366,201 @@
           "minimum": 0.0
         }
       }
+    },
+    {
+      "description": "v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。 timestamp は既存の `t` と別命名の `ts` (§14 設計準拠)。",
+      "type": "object",
+      "required": [
+        "intervention_enabled",
+        "monk_mode",
+        "task_kind",
+        "track",
+        "ts",
+        "type"
+      ],
+      "properties": {
+        "intervention_enabled": {
+          "type": "boolean"
+        },
+        "monk_mode": {
+          "type": "boolean"
+        },
+        "task_kind": {
+          "$ref": "#/definitions/TaskKindDto"
+        },
+        "track": {
+          "$ref": "#/definitions/TrackDto"
+        },
+        "ts": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "session_meta"
+          ]
+        }
+      }
+    },
+    {
+      "description": "v0.3 較正スモーク: ランダムプローブ割当の監査記録。 `probe_id` は backend 生成の不透明 ID (本文非由来)。",
+      "type": "object",
+      "required": [
+        "probe_id",
+        "scheduled_ts",
+        "session_elapsed_ms",
+        "type"
+      ],
+      "properties": {
+        "probe_id": {
+          "type": "string"
+        },
+        "scheduled_ts": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "session_elapsed_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "probe_assignment"
+          ]
+        }
+      }
+    },
+    {
+      "description": "v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。\n\n**不変条件 (schema では緩く、producer 側で強制)**: - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null - `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5 - `source=self_marker` ⇒ `probe_id` は null\n\n`logger.rs` の `LogEntry::realtime_label_answered` / `..._skipped` コンストラクタが これらを保証する。schemars は Option を緩く出すため validator 側で補検証する。",
+      "type": "object",
+      "required": [
+        "analysis_window_end_ms",
+        "analysis_window_start_ms",
+        "answered",
+        "latency_ms",
+        "skip_reason",
+        "source",
+        "ts",
+        "type"
+      ],
+      "properties": {
+        "analysis_window_end_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "analysis_window_start_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "answered": {
+          "type": "boolean"
+        },
+        "latency_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "probe_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "q1_friction": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "q2_progress": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "skip_reason": {
+          "$ref": "#/definitions/SkipReasonDto"
+        },
+        "source": {
+          "$ref": "#/definitions/ProbeSourceDto"
+        },
+        "ts": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "realtime_label"
+          ]
+        }
+      }
+    },
+    {
+      "description": "v0.3 較正スモーク: 尺度理解テスト回答 (ビネット)。常に回答あり (q1/q2 は 1..=5)。 `expected_quadrant` は教示の正解ラベル (`UserLabelKindDto` とは別物で `idle` を含む)。",
+      "type": "object",
+      "required": [
+        "expected_quadrant",
+        "q1_friction",
+        "q2_progress",
+        "ts",
+        "type",
+        "vignette_id"
+      ],
+      "properties": {
+        "expected_quadrant": {
+          "$ref": "#/definitions/ExpectedQuadrantDto"
+        },
+        "q1_friction": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "q2_progress": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "ts": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "vignette_response"
+          ]
+        },
+        "vignette_id": {
+          "type": "string"
+        }
+      }
     }
   ],
   "definitions": {
+    "ExpectedQuadrantDto": {
+      "description": "`vignette_response` の想定象限。教示の正解ラベル (`idle` を含む)。",
+      "type": "string",
+      "enum": [
+        "flow",
+        "stuck",
+        "incubation",
+        "idle"
+      ]
+    },
     "InterventionActionDto": {
       "description": "介入ポリシーの出力種別。",
       "type": "string",
@@ -377,6 +569,41 @@
         "nudge",
         "wall",
         "defer"
+      ]
+    },
+    "ProbeSourceDto": {
+      "description": "`realtime_label` の出所。`random_probe` = backend 割当、`self_marker` = 自発 hotkey。",
+      "type": "string",
+      "enum": [
+        "random_probe",
+        "self_marker"
+      ]
+    },
+    "SkipReasonDto": {
+      "description": "`realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip。",
+      "type": "string",
+      "enum": [
+        "none",
+        "dont_remember",
+        "dismissed"
+      ]
+    },
+    "TaskKindDto": {
+      "description": "v0.3 較正スモークの課題種別 (session_meta)。",
+      "type": "string",
+      "enum": [
+        "argumentative",
+        "correspondence",
+        "creative",
+        "vibe_coding"
+      ]
+    },
+    "TrackDto": {
+      "description": "v0.3 較正スモークのセッション系列。`main` = 本系列、`exploratory` = 探索系列。",
+      "type": "string",
+      "enum": [
+        "main",
+        "exploratory"
       ]
     },
     "UserLabelKindDto": {

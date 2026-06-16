@@ -111,6 +111,52 @@ pub enum LogEntryDto {
         reason: String,
         suppressed_by: Vec<String>,
     },
+    /// v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。
+    /// timestamp は既存の `t` と別命名の `ts` (§14 設計準拠)。
+    SessionMeta {
+        track: TrackDto,
+        task_kind: TaskKindDto,
+        monk_mode: bool,
+        intervention_enabled: bool,
+        ts: u64,
+    },
+    /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。
+    /// `probe_id` は backend 生成の不透明 ID (本文非由来)。
+    ProbeAssignment {
+        probe_id: String,
+        scheduled_ts: u64,
+        session_elapsed_ms: u64,
+    },
+    /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
+    ///
+    /// **不変条件 (schema では緩く、producer 側で強制)**:
+    /// - skip (`answered=false`) ⇒ `q1_friction`/`q2_progress` は null
+    /// - `answered=true` ⇒ `q1_friction`/`q2_progress` は 1..=5
+    /// - `source=self_marker` ⇒ `probe_id` は null
+    ///
+    /// `logger.rs` の `LogEntry::realtime_label_answered` / `..._skipped` コンストラクタが
+    /// これらを保証する。schemars は Option を緩く出すため validator 側で補検証する。
+    RealtimeLabel {
+        probe_id: Option<String>,
+        source: ProbeSourceDto,
+        q1_friction: Option<u8>,
+        q2_progress: Option<u8>,
+        answered: bool,
+        skip_reason: SkipReasonDto,
+        latency_ms: u64,
+        analysis_window_start_ms: u64,
+        analysis_window_end_ms: u64,
+        ts: u64,
+    },
+    /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット)。常に回答あり (q1/q2 は 1..=5)。
+    /// `expected_quadrant` は教示の正解ラベル (`UserLabelKindDto` とは別物で `idle` を含む)。
+    VignetteResponse {
+        vignette_id: String,
+        expected_quadrant: ExpectedQuadrantDto,
+        q1_friction: u8,
+        q2_progress: u8,
+        ts: u64,
+    },
 }
 
 /// Ground Truth ラベルの種別。NDJSON 文字列は "flow" / "incubation" / "stuck"。
@@ -130,4 +176,49 @@ pub enum InterventionActionDto {
     Nudge,
     Wall,
     Defer,
+}
+
+/// v0.3 較正スモークのセッション系列。`main` = 本系列、`exploratory` = 探索系列。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TrackDto {
+    Main,
+    Exploratory,
+}
+
+/// v0.3 較正スモークの課題種別 (session_meta)。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskKindDto {
+    Argumentative,
+    Correspondence,
+    Creative,
+    VibeCoding,
+}
+
+/// `realtime_label` の出所。`random_probe` = backend 割当、`self_marker` = 自発 hotkey。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProbeSourceDto {
+    RandomProbe,
+    SelfMarker,
+}
+
+/// `realtime_label` の skip 理由。`none` = 回答済み、`dont_remember` / `dismissed` = skip。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SkipReasonDto {
+    None,
+    DontRemember,
+    Dismissed,
+}
+
+/// `vignette_response` の想定象限。教示の正解ラベル (`idle` を含む)。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpectedQuadrantDto {
+    Flow,
+    Stuck,
+    Incubation,
+    Idle,
 }
