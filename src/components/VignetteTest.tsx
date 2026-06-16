@@ -47,8 +47,11 @@ const VignetteTest: React.FC<VignetteTestProps> = ({ onComplete }) => {
   const [q2, setQ2] = useState(3);
   const [matches, setMatches] = useState(0);
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false); // 送信中フラグ (二重送信防止)
 
   const next = async () => {
+    if (submitting) return; // 二重送信防止
+    setSubmitting(true);
     const v = VIGNETTES[index];
     // 記録成功後にのみ次へ進む (失敗時は留まり再送可能に・データ欠損回避)。
     try {
@@ -58,20 +61,20 @@ const VignetteTest: React.FC<VignetteTestProps> = ({ onComplete }) => {
         q1Friction: q1,
         q2Progress: q2,
       });
+      if (inferQuadrant(q1, q2) === v.quadrant) {
+        setMatches((m) => m + 1);
+      }
+      setQ1(3);
+      setQ2(3);
+      if (index + 1 >= VIGNETTES.length) {
+        setDone(true);
+      } else {
+        setIndex(index + 1);
+      }
     } catch (e) {
       console.error("record_vignette_response failed (not advancing):", e);
-      return;
-    }
-
-    if (inferQuadrant(q1, q2) === v.quadrant) {
-      setMatches((m) => m + 1);
-    }
-    setQ1(3);
-    setQ2(3);
-    if (index + 1 >= VIGNETTES.length) {
-      setDone(true);
-    } else {
-      setIndex(index + 1);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -142,7 +145,12 @@ const VignetteTest: React.FC<VignetteTestProps> = ({ onComplete }) => {
       </blockquote>
       {slider("Q1. どれだけ詰まっていた感覚?", q1, setQ1, "詰まってない", "とても詰まった")}
       {slider("Q2. どれだけ前に進んでいる感覚?", q2, setQ2, "進んでない", "とても進んだ")}
-      <button className="start-button" onClick={next} style={{ marginTop: "1rem" }}>
+      <button
+        className="start-button"
+        onClick={next}
+        disabled={submitting}
+        style={{ marginTop: "1rem" }}
+      >
         {index + 1 >= VIGNETTES.length ? "完了" : "次へ"}
       </button>
     </div>

@@ -43,6 +43,11 @@ static LAST_SELF_MARKER_MS: AtomicU64 = AtomicU64::new(0);
 // 0 = セッション未開始。値が変わったらスレッドはスケジューラを再初期化する。
 static SESSION_START_MS: AtomicU64 = AtomicU64::new(0);
 
+// Task C: セッションが宣言する介入の有効/無効 (session_meta.intervention_enabled)。
+// record_session_meta が設定し、get_intervention_decision が抑止判断に使う。
+// main/overlay の両ウィンドウが同コマンドを叩くため単一情報源で抑止される (cross-review)。
+static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
+
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
@@ -122,6 +127,13 @@ fn get_intervention_decision(
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .last_decision();
+    }
+
+    // Task C: セッションが介入無効を宣言した場合は policy を進めず none を返す。
+    // 無効時は last_decision が safe_default のまま据え置かれ overlay も none を表示する
+    // (較正中の介入混入を防ぐ。cross-review: 宣言と実挙動の乖離解消)。
+    if !INTERVENTION_ENABLED.load(Ordering::Acquire) {
+        return InterventionDecision::safe_default();
     }
 
     let now = epoch_ms();
@@ -530,6 +542,8 @@ fn record_session_meta(
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
         TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+    // 介入の有効/無効をプロセス全体へ反映 (両ウィンドウの get_intervention_decision が参照)。
+    INTERVENTION_ENABLED.store(intervention_enabled, Ordering::Release);
     log.lock()
         .unwrap_or_else(|p| p.into_inner())
         .tx
@@ -564,6 +578,9 @@ fn record_realtime_answer(
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
     let probe = build_probe_ref(&source, probe_id)?;
+    if window_end_ms < window_start_ms {
+        return Err("window_end_ms must be >= window_start_ms".to_string());
+    }
     log.lock()
         .unwrap_or_else(|p| p.into_inner())
         .tx
@@ -592,6 +609,9 @@ fn record_realtime_skip(
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
     let probe = build_probe_ref(&source, probe_id)?;
+    if window_end_ms < window_start_ms {
+        return Err("window_end_ms must be >= window_start_ms".to_string());
+    }
     let skip_reason = SkipReason::parse(&skip_reason)
         .ok_or_else(|| format!("invalid skip_reason: {:?}", skip_reason))?;
     if matches!(skip_reason, SkipReason::None) {
@@ -1351,4 +1371,50 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod task_c_command_tests {
+    use super::*;
+
+    #[test]
+    fn build_probe_ref_random_requires_valid_id() {
+        // 有効な 16 文字 → RandomProbe。
+        assert_eq!(
+            build_probe_ref("random_probe", Some("ABCDEFGHIJKLMNOP".to_string())),
+            Ok(ProbeRef::RandomProbe {
+                probe_id: "ABCDEFGHIJKLMNOP".to_string()
+            })
+        );
+        // 不正形式 (短い / 文字種違反) → Err。
+        assert!(build_probe_ref("random_probe", Some("short".to_string())).is_err());
+        assert!(build_probe_ref("random_probe", Some("bad.char12345678".to_string())).is_err());
+        // probe_id 欠落 → Err。
+        assert!(build_probe_ref("random_probe", None).is_err());
+    }
+
+    #[test]
+    fn build_probe_ref_self_marker_rejects_probe_id() {
+        assert_eq!(
+            build_probe_ref("self_marker", None),
+            Ok(ProbeRef::SelfMarker)
+        );
+        // self_marker が probe_id を持つのは不整合 → Err (#7 / DC-3)。
+        assert!(build_probe_ref("self_marker", Some("ABCDEFGHIJKLMNOP".to_string())).is_err());
+    }
+
+    #[test]
+    fn build_probe_ref_rejects_unknown_source() {
+        assert!(build_probe_ref("bogus", None).is_err());
+    }
+
+    #[test]
+    fn is_valid_opaque_id_accepts_ids_rejects_junk() {
+        assert!(is_valid_opaque_id("v1"));
+        assert!(is_valid_opaque_id("v8"));
+        assert!(!is_valid_opaque_id("")); // 空
+        assert!(!is_valid_opaque_id("has space")); // 空白
+        assert!(!is_valid_opaque_id("toolong-toolong-x")); // 17 文字 (>16)
+        assert!(!is_valid_opaque_id("本文")); // マルチバイト/本文
+    }
 }

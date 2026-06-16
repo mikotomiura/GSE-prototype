@@ -47,6 +47,21 @@
 - **security-checker**: CRITICAL/HIGH/MEDIUM なし。三重防御(型 + 境界再検証 + 出力エスケープ)で
   本文/タイトル/Unicode が NDJSON に到達する経路なしを確認。
 
+## DC-9 Codex cross-review 対応(Task C)
+- **二重送信防止(Codex#1)**: ProbeCard / VignetteTest に `submitting` フラグを足し、送信中はボタン
+  disable + 早期 return。await-before-clear(DC-6)で表示が残る間の連打による重複記録を防ぐ。
+- **window 整合(Codex#2 + code-reviewer 両者)**: `record_realtime_answer/skip` で
+  `window_end_ms < window_start_ms` を Err 返却。q1/q2 は構築子 clamp 済(範囲は維持)。
+- **intervention_enabled の実挙動配線(Codex#3)**: 宣言だけで挙動に効かない乖離を解消。
+  `static INTERVENTION_ENABLED`(record_session_meta が設定)を `get_intervention_decision` が参照し、
+  無効時は policy を進めず `safe_default`(none)を返す。main が last_decision を更新しないため
+  overlay も none を表示 = **両ウィンドウ単一情報源で抑止**。較正中の介入混入を実際に止められる。
+- **command 検証テスト(Codex#6)**: `build_probe_ref`(random/self_marker/不正 source/不正 id)と
+  `is_valid_opaque_id` の単体テストを lib.rs に追加(Tauri 非依存)。
+- **受容**: ビネット matches/done の state race は React batching で整合(Codex#4・誤検知寄り)。
+  error の `{:?}` echo は console/Tauri error のみで NDJSON 非到達(Codex#5・security clean 済)。
+  React 受信/UI のテストはテスト基盤未導入につき Task E 手動スモークで担保。
+
 ## DC-5 schema_dto.rs / current.json は touch しない
 - **判断**: session_meta/realtime_label/vignette_response は Task A で確定済。C は producer 配線のみ。
 - **根拠**: finish-task の tier-3 parity guard を回避(DB-5 と同方針)。

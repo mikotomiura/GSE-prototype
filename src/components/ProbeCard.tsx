@@ -19,6 +19,7 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   const [probe, setProbe] = useState<ActiveProbe | null>(null);
   const [q1, setQ1] = useState(3); // 摩擦 (1=詰まってない .. 5=とても詰まった)
   const [q2, setQ2] = useState(3); // 前進 (1=まったく進んでない .. 5=とても進んだ)
+  const [submitting, setSubmitting] = useState(false); // 送信中フラグ (二重送信防止)
   // listen コールバックは古い closure を捕捉するため、表示中判定は ref で行う。
   const probeRef = useRef<ActiveProbe | null>(null);
 
@@ -60,6 +61,8 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   // 送信成功後にのみカードを閉じる。失敗 (例: log channel full) 時はカードを残し、
   // 較正データを静かに失わない (MNAR バイアス回避)。
   const submitAnswer = async () => {
+    if (submitting) return; // 二重送信防止
+    setSubmitting(true);
     try {
       await invoke("record_realtime_answer", {
         ...commonArgs(),
@@ -69,15 +72,21 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
       setProbe(null);
     } catch (e) {
       console.error("record_realtime_answer failed (keeping card for retry):", e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const submitSkip = async (reason: SkipReason) => {
+    if (submitting) return; // 二重送信防止
+    setSubmitting(true);
     try {
       await invoke("record_realtime_skip", { ...commonArgs(), skipReason: reason });
       setProbe(null);
     } catch (e) {
       console.error("record_realtime_skip failed (keeping card for retry):", e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -137,11 +146,16 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
       {slider(q2, setQ2, "進んでない", "とても進んだ")}
 
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.9rem" }}>
-        <button onClick={submitAnswer} style={{ flex: 1, padding: "0.5rem", cursor: "pointer" }}>
+        <button
+          onClick={submitAnswer}
+          disabled={submitting}
+          style={{ flex: 1, padding: "0.5rem", cursor: "pointer" }}
+        >
           回答する
         </button>
         <button
           onClick={() => submitSkip("dont_remember")}
+          disabled={submitting}
           style={{ padding: "0.5rem", cursor: "pointer" }}
           title="直前の状態を思い出せない"
         >
@@ -149,6 +163,7 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
         </button>
         <button
           onClick={() => submitSkip("dismissed")}
+          disabled={submitting}
           style={{ padding: "0.5rem", cursor: "pointer" }}
           title="今は答えない"
         >
