@@ -35,10 +35,13 @@
 - [x] producer 不変条件を強制(skip⇒q1/q2=null、source=self_marker⇒probe_id=null 等。ProbeRef で型保証 + clamp)
 - [x] emit_schema 再生成 → `schema/current.json` 更新 → drift 緑(byte-equal)。lib test 97 緑・新規 clippy 警告ゼロ
 
-## Task B — backend プローブ scheduler(A 後 / C と並行)
-- [ ] rolling thinning(λ≈2回/30分・gap≥8分・cap≤2回/30分・離席は適格から除外)で一様ランダム時刻生成
-- [ ] `probe_assignment` ログ(scheduled_ts / session_elapsed_ms)+ フロントへ emit
-- [ ] 自己マーカー hotkey(source=self_marker・副データ)
+## Task B — backend プローブ scheduler(A 後 / C と並行)✅ 完了(2026-06-16)
+> 実装記録: `.steering/20260616-probe-scheduler/`(decisions DB-1..DB-7)。commit 7d0f4d5。
+- [x] rolling thinning(λ≈2回/30分・gap≥8分・cap≤2回/30分・離席は適格から除外)で一様ランダム時刻生成
+      → `analysis/probe_scheduler.rs`(純粋・seeded・Poisson 指数間隔+thinning, DB-1)
+- [x] `probe_assignment` ログ(scheduled_ts / session_elapsed_ms)+ フロントへ emit(`probe_triggered`, DB-4)
+- [x] 自己マーカー hotkey(source=self_marker・副データ)= Ctrl+Shift+Alt+M
+- [x] seed を tracing 記録し一様性監査を再現可能化(DB-6)。schema 不変(DB-5)。test 108緑・clippy 緑・build 緑
 
 ## Task C — frontend 収集(A 後 / B と並行)
 - [ ] `session_meta` 宣言 UI(task_kind 一打・セッション開始)
