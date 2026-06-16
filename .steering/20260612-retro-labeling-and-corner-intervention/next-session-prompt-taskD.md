@@ -41,8 +41,11 @@ session_meta / vignette_response 記録) は実装済。D は記録された NDJ
 2. /reimagine を Step 3 後に実行(下記「設計判断」が複数案ありうるため推奨)。
 3. /add-feature で実装。
 4. 調査は file-finder + dependency-checker(replay.rs の既存パイプライン・出力 JSON 形を確認)。
-   実装後は code-reviewer + test-runner を並行起動。さらに **codex cross-review**(scripts/run-codex-review.sh は
-   working-tree diff 前提のため、コミット範囲は手動で codex 実行: A/B/C と同手順)を回す。
+   実装後は code-reviewer + test-runner を並行起動。
+5. /finish-task で完了。**Step 3 で /cross-review(Claude code-reviewer ∥ Codex codex-review)が
+   自動起動=タスク完了ごとに必須**(2026-06-16 ポリシー・CLAUDE.md 項6 / finish-task.md)。
+   commit 前の working-tree diff をレビューする。jq は python 化済(scripts/run-codex-review.sh)で追加導入不要。
+   安全ゲート(proprietary/機密/予算/codex 不在)でブロックされた場合のみ Claude 単独へ縮退し理由を明記。
 
 実装スコープ(Task D のみ。E は含めない):
 - (1) replay.rs に consumption variant 追加: probe_assignment / realtime_label / session_meta /
