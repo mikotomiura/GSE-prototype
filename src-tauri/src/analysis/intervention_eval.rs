@@ -24,7 +24,8 @@
 use serde::Serialize;
 
 use crate::analysis::intervention::{
-    InterventionAction, InterventionInput, InterventionPolicyState,
+    InterventionAction, InterventionInput, InterventionPolicyState, InterventionThresholds,
+    OpportunityReason,
 };
 use crate::analysis::loop_step::FeatSnapshot;
 use crate::analysis::metrics::{
@@ -38,6 +39,19 @@ use crate::analysis::metrics::{
 /// Stuck 回復と同じ既定値 (15 分) を流用する。セッション長 (1.5–8.5 分) では実質
 /// 「session 末尾までに p_flow>0.5 へ回復したか」を測る (decisions.md D5)。
 pub const DEFAULT_DEFER_RECOVERY_WINDOW_MS: u64 = DEFAULT_RECOVERY_WINDOW_MS;
+
+/// `nudge_need` 閾値 sweep の既定点 (0.50–0.90, 0.05 刻み, 9 点)。
+///
+/// ⚠️ 下限 0.50 は DC 不変条件 (`evaluate_defer_runs` doc) を守るための厳格な境界。
+/// defer は `need >= nudge_need` のときのみ生じるため、`nudge_need >= 0.50` なら
+/// run 内 feat は `p_flow <= 1 - nudge_need <= 0.50` で回復閾値 (`> 0.5`) を満たさず、
+/// 回復は構造上 run の後に限られる。0.50 未満へ下げると本不変条件が破れる
+/// (起点を run 終端の次 feat へ要変更)。
+pub const DEFAULT_SWEEP_NUDGE_NEED: [f64; 9] =
+    [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90];
+
+/// sweep 下限。これ未満の `nudge_need` は DC 不変条件を壊すため拒否する。
+pub const MIN_SWEEP_NUDGE_NEED: f64 = 0.50;
 
 /// 二値化した decision。ACT={nudge, wall} / HOLD={none, defer}。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,6 +107,80 @@ pub struct BinaryConfusion {
     pub tp: u32,
 }
 
+impl BinaryConfusion {
+    /// 4 セルの総和 (この confusion に載った labeled decision 数)。
+    fn total(&self) -> u32 {
+        self.tn + self.fp + self.fn_ + self.tp
+    }
+
+    /// 別の confusion を要素ごとに足し込む (セッション横断プール用)。
+    /// `saturating_add` で非現実的データ量での overflow panic も防ぐ
+    /// (`intervention.rs` の累積と非対称にしない)。
+    fn merge(&mut self, other: &BinaryConfusion) {
+        self.tn = self.tn.saturating_add(other.tn);
+        self.fp = self.fp.saturating_add(other.fp);
+        self.fn_ = self.fn_.saturating_add(other.fn_);
+        self.tp = self.tp.saturating_add(other.tp);
+    }
+}
+
+/// 評価のために `decide()` の結果から保持する 1 decision 分。
+///
+/// production が捨てている `opportunity_reason` を reason 別層別化のために保持する
+/// (`feats[i]` と 1:1 対応)。need_score / opportunity_score / suppressed_by は現行の
+/// 成果物 (reason 別 HIR + 閾値 sweep) では消費されず、保持すると dead-field となり
+/// clippy を汚すため敢えて持たない。将来 suppressor 別 defer correctness (plan Phase 2)
+/// が要れば `decide()` から自明に再取得できる (decisions.md 参照)。
+#[derive(Debug, Clone, Copy)]
+struct EvalDecision {
+    ts: u64,
+    action: InterventionAction,
+    opportunity_reason: OpportunityReason,
+}
+
+/// opportunity reason ごとに層別化した混同行列と派生指標。
+///
+/// 全 labeled decision を `opportunity_reason` で 1 つの bucket に振り分けるため、
+/// 各 reason の `confusion` を足し合わせると全体の `binary_confusion` に一致する
+/// (保存則。テストで検証)。HIR=0.647 の「犯人 reason」を特定するのが主目的。
+#[derive(Debug, Clone, Serialize)]
+pub struct ReasonStratum {
+    pub reason: OpportunityReason,
+    /// この reason に属する labeled decision の混同行列。
+    pub confusion: BinaryConfusion,
+    /// この reason の ACT 総数 (labeled + unlabeled)。発火ボリュームの目安。
+    pub act_count: u32,
+    /// labeled-ACT 数 (= fp+tp、HIR/Precision の分母)。
+    pub act_labeled: u32,
+    /// 有害介入率 = fp/(fp+tp)。labeled-ACT が 0 なら `None`。
+    pub hir: Option<f64>,
+    /// Precision = tp/(tp+fp)。labeled-ACT が 0 なら `None`。
+    pub precision: Option<f64>,
+}
+
+impl ReasonStratum {
+    /// 混同行列と ACT 総数から派生指標を埋めて構築する。
+    fn from_parts(reason: OpportunityReason, confusion: BinaryConfusion, act_count: u32) -> Self {
+        let act_labeled = confusion.fp + confusion.tp;
+        let (hir, precision) = if act_labeled > 0 {
+            (
+                Some(confusion.fp as f64 / act_labeled as f64),
+                Some(confusion.tp as f64 / act_labeled as f64),
+            )
+        } else {
+            (None, None)
+        };
+        Self {
+            reason,
+            confusion,
+            act_count,
+            act_labeled,
+            hir,
+            precision,
+        }
+    }
+}
+
 /// 介入評価の集計結果 (`--intervention --json` で出力)。
 #[derive(Debug, Clone, Serialize)]
 pub struct InterventionMetrics {
@@ -116,6 +204,10 @@ pub struct InterventionMetrics {
     pub hir: Option<f64>,
     /// Precision = tp / (tp+fp)。labeled-ACT が 0 なら `None`。
     pub precision: Option<f64>,
+    /// STALL recall = tp / (tp+fn)。STALL labeled が 0 なら `None`。
+    pub recall: Option<f64>,
+    /// opportunity reason 別の混同行列・HIR 分解 (enum 固定順で決定的)。
+    pub reason_breakdown: Vec<ReasonStratum>,
     /// defer 区間 (連続する defer の run) の総数。
     pub defer_runs: u32,
     /// W 秒以内に p_flow>0.5 へ回復した defer 区間数。
@@ -147,6 +239,8 @@ impl InterventionMetrics {
             act_unlabeled: 0,
             hir: None,
             precision: None,
+            recall: None,
+            reason_breakdown: Vec::new(),
             defer_runs: 0,
             defer_recovered: 0,
             dc: None,
@@ -237,6 +331,7 @@ pub fn compute_intervention_metrics(
     point_labels: &[UserLabelEvent],
     key_press_ts: &[u64],
     recovery_window_ms: u64,
+    thresholds: &InterventionThresholds,
 ) -> InterventionMetrics {
     let mut warnings: Vec<String> = Vec::new();
 
@@ -264,8 +359,9 @@ pub fn compute_intervention_metrics(
     // ── decide() を時刻順にステップ ──────────────────────────────────
     // `decisions[i]` は `feats[i]` に 1:1 対応する (同一ループで push)。
     // evaluate_defer_runs はこの対応を前提に feats を timestamp で再走査する。
-    let mut policy = InterventionPolicyState::new(first_ts);
-    let mut decisions: Vec<(u64, InterventionAction)> = Vec::with_capacity(feats.len());
+    // 注入 thresholds で policy を構築する (production は既定値、sweep は sweep 値)。
+    let mut policy = InterventionPolicyState::new_with_thresholds(first_ts, *thresholds);
+    let mut decisions: Vec<EvalDecision> = Vec::with_capacity(feats.len());
     for f in feats {
         let input = InterventionInput {
             now_ms: f.timestamp,
@@ -277,32 +373,58 @@ pub fn compute_intervention_metrics(
             monk_mode: false,
             wall_active: false,
         };
-        let action = policy.decide(input).decision.action;
-        decisions.push((f.timestamp, action));
+        let decision = policy.decide(input).decision;
+        decisions.push(EvalDecision {
+            ts: f.timestamp,
+            action: decision.action,
+            opportunity_reason: decision.opportunity_reason,
+        });
     }
 
-    // ── action 内訳 & decision×GT 混同行列 ───────────────────────────
+    // ── action 内訳 & decision×GT 混同行列 (全体 + reason 別) ─────────
     let mut counts = ActionCounts::default();
     let mut cm = BinaryConfusion::default();
     let mut labeled_decisions = 0u32;
     let mut act_unlabeled = 0u32;
+    // reason 別アキュムレータ (OpportunityReason::ALL 固定順で index 付け)。
+    let mut reason_cm = [BinaryConfusion::default(); OpportunityReason::ALL.len()];
+    let mut reason_act = [0u32; OpportunityReason::ALL.len()];
 
-    for &(ts, action) in &decisions {
-        match action {
+    for d in &decisions {
+        match d.action {
             InterventionAction::None => counts.none += 1,
             InterventionAction::Nudge => counts.nudge += 1,
             InterventionAction::Wall => counts.wall += 1,
             InterventionAction::Defer => counts.defer += 1,
         }
-        let act = binarize_action(action);
-        match range_class_at(ts, &ranges).map(binarize_label) {
+        let act = binarize_action(d.action);
+        let ridx = reason_index(d.opportunity_reason);
+        if act == DecisionBinary::Act {
+            reason_act[ridx] += 1;
+        }
+        match range_class_at(d.ts, &ranges).map(binarize_label) {
             Some(gt) => {
                 labeled_decisions += 1;
+                // 全体と reason 別の同じセルを 1 回の分類で両方加算する
+                // (保存則: 各 labeled decision はちょうど 1 reason bucket に入る)。
+                let rc = &mut reason_cm[ridx];
                 match (gt, act) {
-                    (GtBinary::Protect, DecisionBinary::Hold) => cm.tn += 1,
-                    (GtBinary::Protect, DecisionBinary::Act) => cm.fp += 1,
-                    (GtBinary::Stall, DecisionBinary::Hold) => cm.fn_ += 1,
-                    (GtBinary::Stall, DecisionBinary::Act) => cm.tp += 1,
+                    (GtBinary::Protect, DecisionBinary::Hold) => {
+                        cm.tn += 1;
+                        rc.tn += 1;
+                    }
+                    (GtBinary::Protect, DecisionBinary::Act) => {
+                        cm.fp += 1;
+                        rc.fp += 1;
+                    }
+                    (GtBinary::Stall, DecisionBinary::Hold) => {
+                        cm.fn_ += 1;
+                        rc.fn_ += 1;
+                    }
+                    (GtBinary::Stall, DecisionBinary::Act) => {
+                        cm.tp += 1;
+                        rc.tp += 1;
+                    }
                 }
             }
             None => {
@@ -326,6 +448,21 @@ pub fn compute_intervention_metrics(
     } else {
         None
     };
+    let stall_labeled = cm.fn_ + cm.tp;
+    let recall = if stall_labeled > 0 {
+        Some(cm.tp as f64 / stall_labeled as f64)
+    } else {
+        None
+    };
+
+    // reason 別層別化を enum 固定順で構築 (決定的)。空 reason は省く
+    // (全 reason を回しても和は不変なので保存則テストは成立する)。
+    let reason_breakdown: Vec<ReasonStratum> = OpportunityReason::ALL
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| reason_cm[*i].total() > 0 || reason_act[*i] > 0)
+        .map(|(i, &r)| ReasonStratum::from_parts(r, reason_cm[i], reason_act[i]))
+        .collect();
 
     // ── defer 区間 (連続 run) の回復判定 → DC ────────────────────────
     let (defer_runs, defer_recovered) = evaluate_defer_runs(&decisions, feats, recovery_window_ms);
@@ -363,6 +500,8 @@ pub fn compute_intervention_metrics(
         act_unlabeled,
         hir,
         precision,
+        recall,
+        reason_breakdown,
         defer_runs,
         defer_recovered,
         dc,
@@ -373,18 +512,33 @@ pub fn compute_intervention_metrics(
     }
 }
 
+/// `OpportunityReason` を `OpportunityReason::ALL` 内の固定 index へ写す。
+/// reason 別アキュムレータの添字付けに使う (O(8))。
+fn reason_index(r: OpportunityReason) -> usize {
+    // ALL は全 variant を網羅するので position は必ず Some。サイレント縮退ではない
+    // ことを debug_assert で明示する (保存則の根拠を unwrap_or で隠さない)。
+    OpportunityReason::ALL
+        .iter()
+        .position(|&x| x == r)
+        .unwrap_or_else(|| {
+            debug_assert!(false, "OpportunityReason::ALL must contain every variant");
+            0
+        })
+}
+
 /// 連続する defer decision を 1 区間として数え、各区間先頭 (defer onset) から
 /// `window_ms` 以内に p_flow>0.5 へ回復したかを判定する。
 /// 戻り値 = (defer 区間数, 回復した区間数)。
 ///
 /// 回復起点は run 先頭の timestamp (= defer を初めて下した時刻)。`compute_recovered_at`
 /// は起点以降を走査するため run 内 feat も候補に入るが、defer は `need=p_stuck >=
-/// NUDGE_NEED_THRESHOLD(0.60)` のときのみ生じる (intervention.rs の分岐順) ため、
-/// run 内 feat は必ず `p_flow <= 1 - 0.60 = 0.40 < 0.5` で回復閾値を満たさない。
-/// よって回復は構造上 run の **後** に限られる (NUDGE_NEED_THRESHOLD を 0.50 未満へ
-/// 下げた場合のみ本不変条件は破れる — その際は起点を run 終端の次 feat へ要変更)。
+/// nudge_need` のときのみ生じる (intervention.rs の分岐順) ため、`nudge_need >= 0.50`
+/// なら run 内 feat は必ず `p_flow <= 1 - nudge_need <= 0.50` で回復閾値 (`> 0.5`) を
+/// 満たさない。よって回復は構造上 run の **後** に限られる。sweep は `nudge_need` を
+/// 0.50–0.90 に限定しこの不変条件を守る (0.50 未満へ下げた場合のみ破れ、その際は
+/// 起点を run 終端の次 feat へ要変更。`DEFAULT_SWEEP_NUDGE_NEED` / `MIN_SWEEP_NUDGE_NEED`)。
 fn evaluate_defer_runs(
-    decisions: &[(u64, InterventionAction)],
+    decisions: &[EvalDecision],
     feats: &[FeatSnapshot],
     window_ms: u64,
 ) -> (u32, u32) {
@@ -392,15 +546,15 @@ fn evaluate_defer_runs(
     let mut recovered = 0u32;
     let mut i = 0;
     while i < decisions.len() {
-        if decisions[i].1 != InterventionAction::Defer {
+        if decisions[i].action != InterventionAction::Defer {
             i += 1;
             continue;
         }
         // run の先頭
-        let run_start_ts = decisions[i].0;
+        let run_start_ts = decisions[i].ts;
         runs += 1;
         // run を消費
-        while i < decisions.len() && decisions[i].1 == InterventionAction::Defer {
+        while i < decisions.len() && decisions[i].action == InterventionAction::Defer {
             i += 1;
         }
         if compute_recovered_at(run_start_ts, feats, window_ms, DEFAULT_P_FLOW_THRESHOLD).is_some()
@@ -451,6 +605,20 @@ pub fn format_intervention_pretty(m: &InterventionMetrics) -> String {
         Some(v) => out.push_str(&format!("  Precision: {:.3}\n", v)),
         None => out.push_str("  Precision: n/a (no labeled ACT)\n"),
     }
+    match m.recall {
+        Some(v) => out.push_str(&format!(
+            "  STALL recall: {:.3}  (tp / {} STALL-labeled)\n",
+            v,
+            m.binary_confusion.fn_ + m.binary_confusion.tp,
+        )),
+        None => out.push_str("  STALL recall: n/a (no STALL labeled)\n"),
+    }
+    if !m.reason_breakdown.is_empty() {
+        out.push_str(&format!(
+            "{}\n",
+            format_reason_breakdown(&m.reason_breakdown)
+        ));
+    }
     if m.act_unlabeled > 0 {
         out.push_str(&format!(
             "  (note: {} ACT decisions fell outside GT coverage)\n",
@@ -472,6 +640,269 @@ pub fn format_intervention_pretty(m: &InterventionMetrics) -> String {
     out.push_str(&format!("  Warnings: {}\n", m.warnings.len()));
     for w in &m.warnings {
         out.push_str(&format!("    - {}\n", w));
+    }
+    out
+}
+
+/// reason 別 HIR 分解の pretty テーブル (`--intervention` / `--sweep` 共用)。
+fn format_reason_breakdown(strata: &[ReasonStratum]) -> String {
+    let mut out = String::new();
+    out.push_str("  By opportunity reason (labeled cells; fp = ACT∩PROTECT = harmful):\n");
+    out.push_str("    reason                    ACT   fp   tp    HIR   Prec\n");
+    let fmt_opt = |v: Option<f64>| {
+        v.map(|x| format!("{:.3}", x))
+            .unwrap_or_else(|| "  n/a".to_string())
+    };
+    for s in strata {
+        out.push_str(&format!(
+            "    {:<22} {:>4} {:>4} {:>4}  {:>5} {:>5}\n",
+            s.reason.as_str(),
+            s.act_count,
+            s.confusion.fp,
+            s.confusion.tp,
+            fmt_opt(s.hir),
+            fmt_opt(s.precision),
+        ));
+    }
+    out
+}
+
+// =============================================================================
+// threshold sweep (Phase 0) — production を一切変えず nudge_need を振って計測する
+// =============================================================================
+
+/// sweep の 1 セッション分入力 (所有データ。bin 層が NDJSON から構築して渡す)。
+pub struct SweepInput {
+    pub feats: Vec<FeatSnapshot>,
+    pub point_labels: Vec<UserLabelEvent>,
+    pub key_press_ts: Vec<u64>,
+}
+
+/// sweep の 1 閾値点における (セッション横断) プール済み指標。
+#[derive(Debug, Clone, Serialize)]
+pub struct SweepPoint {
+    /// この点で用いた `nudge_need` 閾値。
+    pub nudge_need: f64,
+    pub total_decisions: u32,
+    pub act_count: u32,
+    pub binary_confusion: BinaryConfusion,
+    pub act_labeled: u32,
+    pub hir: Option<f64>,
+    pub precision: Option<f64>,
+    pub recall: Option<f64>,
+    pub defer_runs: u32,
+    pub defer_recovered: u32,
+    pub dc: Option<f64>,
+    /// プール対象セッションの総分数 (burden の分母)。
+    pub total_minutes: f64,
+    pub burden_per_min: f64,
+    /// この閾値点での reason 別分解 (プール済み)。
+    pub reason_breakdown: Vec<ReasonStratum>,
+}
+
+/// `nudge_need` threshold sweep レポート (`--sweep` で出力)。
+#[derive(Debug, Clone, Serialize)]
+pub struct InterventionSweepReport {
+    pub sessions: u32,
+    pub recovery_window_ms: u64,
+    pub sweep_points: Vec<SweepPoint>,
+    pub warnings: Vec<String>,
+}
+
+/// `nudge_need` を sweep し、各点で全セッションを独立評価して指標をプールする。
+///
+/// production の判定ロジックは不変で、`nudge_need` のみを注入閾値で差し替える
+/// (他閾値は既定固定)。各セッションは独自の `InterventionPolicyState` で評価され
+/// (cooldown / cap は session/day 単位)、混同行列・カウントを生の整数で足し合わせる。
+///
+/// ⚠️ `MIN_SWEEP_NUDGE_NEED` 未満の点は DC 不変条件を壊すため評価せず warning に記録する。
+pub fn compute_intervention_sweep(
+    sessions: &[SweepInput],
+    sweep_nudge_need: &[f64],
+    recovery_window_ms: u64,
+) -> InterventionSweepReport {
+    let mut warnings: Vec<String> = Vec::new();
+    let base = InterventionThresholds::default();
+    let mut sweep_points: Vec<SweepPoint> = Vec::with_capacity(sweep_nudge_need.len());
+
+    // 検定力の可視化: 個別セッションの no-feat / no-label warning はプールで捨てるため、
+    // 集約 warning を 1 行ずつ立てる (利用者が検定力ゼロに気づけるように)。flood は避ける。
+    let n_sessions = sessions.len();
+    let sessions_no_feats = sessions.iter().filter(|s| s.feats.is_empty()).count();
+    let sessions_no_labels = sessions
+        .iter()
+        .filter(|s| s.point_labels.is_empty())
+        .count();
+    if sessions_no_feats > 0 {
+        warnings.push(format!(
+            "{}/{} session(s) had no feat snapshots (excluded from all metrics)",
+            sessions_no_feats, n_sessions
+        ));
+    }
+    if sessions_no_labels > 0 {
+        warnings.push(format!(
+            "{}/{} session(s) had no user_label GT (HIR/Precision/Recall unsupported for those; \
+             DC/Burden still pooled)",
+            sessions_no_labels, n_sessions
+        ));
+    }
+
+    for &nn in sweep_nudge_need {
+        if nn < MIN_SWEEP_NUDGE_NEED {
+            warnings.push(format!(
+                "skipped nudge_need={:.2}: below MIN_SWEEP_NUDGE_NEED={:.2} \
+                 (would break DC defer-run invariant)",
+                nn, MIN_SWEEP_NUDGE_NEED
+            ));
+            continue;
+        }
+        let thresholds = InterventionThresholds {
+            nudge_need: nn,
+            ..base
+        };
+
+        let mut cm = BinaryConfusion::default();
+        let mut act_count = 0u32;
+        let mut total_decisions = 0u32;
+        let mut defer_runs = 0u32;
+        let mut defer_recovered = 0u32;
+        let mut total_minutes = 0.0f64;
+        let mut reason_cm = [BinaryConfusion::default(); OpportunityReason::ALL.len()];
+        let mut reason_act = [0u32; OpportunityReason::ALL.len()];
+
+        for s in sessions {
+            let m = compute_intervention_metrics(
+                &s.feats,
+                &s.point_labels,
+                &s.key_press_ts,
+                recovery_window_ms,
+                &thresholds,
+            );
+            cm.merge(&m.binary_confusion);
+            act_count = act_count.saturating_add(m.act_count);
+            total_decisions = total_decisions.saturating_add(m.total_decisions);
+            defer_runs = defer_runs.saturating_add(m.defer_runs);
+            defer_recovered = defer_recovered.saturating_add(m.defer_recovered);
+            total_minutes += m.session_duration_ms as f64 / 60_000.0;
+            for st in &m.reason_breakdown {
+                let i = reason_index(st.reason);
+                reason_cm[i].merge(&st.confusion);
+                reason_act[i] = reason_act[i].saturating_add(st.act_count);
+            }
+        }
+
+        let act_labeled = cm.fp + cm.tp;
+        let (hir, precision) = if act_labeled > 0 {
+            (
+                Some(cm.fp as f64 / act_labeled as f64),
+                Some(cm.tp as f64 / act_labeled as f64),
+            )
+        } else {
+            (None, None)
+        };
+        let stall_labeled = cm.fn_ + cm.tp;
+        let recall = if stall_labeled > 0 {
+            Some(cm.tp as f64 / stall_labeled as f64)
+        } else {
+            None
+        };
+        let dc = if defer_runs > 0 {
+            Some(defer_recovered as f64 / defer_runs as f64)
+        } else {
+            None
+        };
+        let burden_per_min = if total_minutes > 0.0 {
+            act_count as f64 / total_minutes
+        } else {
+            0.0
+        };
+        let reason_breakdown: Vec<ReasonStratum> = OpportunityReason::ALL
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| reason_cm[*i].total() > 0 || reason_act[*i] > 0)
+            .map(|(i, &r)| ReasonStratum::from_parts(r, reason_cm[i], reason_act[i]))
+            .collect();
+
+        sweep_points.push(SweepPoint {
+            nudge_need: nn,
+            total_decisions,
+            act_count,
+            binary_confusion: cm,
+            act_labeled,
+            hir,
+            precision,
+            recall,
+            defer_runs,
+            defer_recovered,
+            dc,
+            total_minutes,
+            burden_per_min,
+            reason_breakdown,
+        });
+    }
+
+    // 全閾値点で labeled-ACT が 0 なら HIR/Precision は全点 n/a = 検定力ゼロ。明示する。
+    if !sweep_points.is_empty() && sweep_points.iter().all(|p| p.act_labeled == 0) {
+        warnings.push(
+            "no labeled ACT at any swept threshold — HIR/Precision unsupported \
+             (zero statistical power; verify GT coverage)"
+                .to_string(),
+        );
+    }
+
+    InterventionSweepReport {
+        sessions: sessions.len() as u32,
+        recovery_window_ms,
+        sweep_points,
+        warnings,
+    }
+}
+
+/// sweep の pretty-print 出力 (`--sweep` サブコマンド)。
+pub fn format_intervention_sweep_pretty(r: &InterventionSweepReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "InterventionSweep (nudge_need; pooled over {} session(s), recovery window {}ms)\n",
+        r.sessions, r.recovery_window_ms,
+    ));
+    out.push_str(
+        "  other thresholds fixed at production defaults; lower=ACT more / higher=ACT fewer\n",
+    );
+    out.push_str("    nn     ACT   fp   tp    HIR   Prec Recall     DC  Burden/min\n");
+    let fmt_opt = |v: Option<f64>| {
+        v.map(|x| format!("{:.3}", x))
+            .unwrap_or_else(|| "  n/a".to_string())
+    };
+    for p in &r.sweep_points {
+        out.push_str(&format!(
+            "    {:.2} {:>5} {:>4} {:>4}  {:>5} {:>5} {:>5}  {:>5}  {:>9.3}\n",
+            p.nudge_need,
+            p.act_count,
+            p.binary_confusion.fp,
+            p.binary_confusion.tp,
+            fmt_opt(p.hir),
+            fmt_opt(p.precision),
+            fmt_opt(p.recall),
+            fmt_opt(p.dc),
+            p.burden_per_min,
+        ));
+    }
+    // reason 別分解は production 既定 nudge_need 点で 1 つ提示する。
+    // magic number 0.60 を埋め込まず Default から引くことで、const 変更時に表示が嘘にならない。
+    let default_nn = InterventionThresholds::default().nudge_need;
+    if let Some(def) = r
+        .sweep_points
+        .iter()
+        .find(|p| (p.nudge_need - default_nn).abs() < 1e-9)
+    {
+        out.push_str(&format!(
+            "\n  Reason breakdown at nudge_need={:.2} (production default):\n",
+            default_nn
+        ));
+        out.push_str(&format_reason_breakdown(&def.reason_breakdown));
+    }
+    for w in &r.warnings {
+        out.push_str(&format!("  warning: {}\n", w));
     }
     out
 }
@@ -590,7 +1021,13 @@ mod tests {
         // 各 feat の 3s 前に press → idle=3000 → short_pause + post_burst → Nudge
         let presses = vec![7_000u64, 8_000];
         let labels = vec![ulabel(10_000, LabelClass::Flow)]; // 全区間 Flow=PROTECT
-        let m = compute_intervention_metrics(&feats, &labels, &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         assert_eq!(m.act_count, 2, "both feats should ACT (nudge)");
         assert_eq!(m.action_counts.nudge, 2);
         assert_eq!(m.binary_confusion.fp, 2, "ACT∩PROTECT = harmful");
@@ -605,7 +1042,13 @@ mod tests {
         let feats = vec![feat_full(10_000, 0.20, 0.66, 0.05, 6.0, 0.0)];
         let presses = vec![7_000u64];
         let labels = vec![ulabel(10_000, LabelClass::Stuck)];
-        let m = compute_intervention_metrics(&feats, &labels, &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         assert_eq!(m.act_count, 1);
         assert_eq!(m.hir, Some(0.0));
         assert_eq!(m.precision, Some(1.0));
@@ -625,7 +1068,13 @@ mod tests {
         ];
         let presses = vec![9_500u64]; // feat[0] の 500ms 前
         let labels = vec![ulabel(10_000, LabelClass::Stuck)];
-        let m = compute_intervention_metrics(&feats, &labels, &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         assert_eq!(m.action_counts.defer, 1, "first feat should defer");
         assert_eq!(m.defer_runs, 1);
         assert_eq!(m.defer_recovered, 1);
@@ -640,7 +1089,13 @@ mod tests {
         ];
         let presses = vec![9_500u64, 10_500];
         let labels = vec![ulabel(10_000, LabelClass::Stuck)];
-        let m = compute_intervention_metrics(&feats, &labels, &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         assert!(m.defer_runs >= 1);
         assert_eq!(m.defer_recovered, 0);
         assert_eq!(m.dc, Some(0.0));
@@ -657,7 +1112,13 @@ mod tests {
             feat_full(120_000, 0.20, 0.66, 0.05, 6.0, 0.0),
         ];
         let presses = vec![57_000u64, 117_000];
-        let m = compute_intervention_metrics(&feats, &[], &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &[],
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         assert_eq!(m.session_duration_ms, 60_000); // last - first = 120k-60k
         assert_eq!(m.act_count, 2);
         // 60s セッション → 2 ACT / 1 min = 2.0
@@ -670,7 +1131,13 @@ mod tests {
         // 実 13 セッションの 0-label セッションで通る経路。
         let feats = vec![feat_full(10_000, 0.20, 0.66, 0.05, 6.0, 0.0)];
         let presses = vec![7_000u64]; // idle 3s → nudge
-        let m = compute_intervention_metrics(&feats, &[], &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &[],
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         assert_eq!(m.act_count, 1);
         assert_eq!(m.act_unlabeled, 1);
         assert_eq!(m.labeled_decisions, 0);
@@ -680,7 +1147,8 @@ mod tests {
 
     #[test]
     fn empty_feats_yields_warning_no_panic() {
-        let m = compute_intervention_metrics(&[], &[], &[], 60_000);
+        let m =
+            compute_intervention_metrics(&[], &[], &[], 60_000, &InterventionThresholds::default());
         assert_eq!(m.total_decisions, 0);
         assert!(m.hir.is_none());
         assert!(m.dc.is_none());
@@ -694,7 +1162,13 @@ mod tests {
             feat_full(11_000, 0.80, 0.10, 0.0, 5.0, 0.0),
         ];
         let presses = vec![9_500u64];
-        let m = compute_intervention_metrics(&feats, &[], &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &[],
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         // GT 無し → HIR/Precision は n/a だが DC は出る
         assert!(m.hir.is_none());
         assert_eq!(m.gt_coverage, 0.0);
@@ -707,11 +1181,143 @@ mod tests {
         let feats = vec![feat_full(10_000, 0.20, 0.66, 0.05, 6.0, 0.0)];
         let presses = vec![7_000u64];
         let labels = vec![ulabel(10_000, LabelClass::Flow)];
-        let m = compute_intervention_metrics(&feats, &labels, &presses, 60_000);
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
         let s = format_intervention_pretty(&m);
         assert!(s.contains("InterventionMetrics"));
         assert!(s.contains("HIR"));
         assert!(s.contains("DC"));
         assert!(s.contains("Burden"));
+    }
+
+    // ── reason 別層別化 / recall / sweep ─────────────────────────────
+
+    /// reason 別 confusion の総和が全体 confusion に一致する (保存則)。
+    /// 各 labeled decision はちょうど 1 reason bucket に入るので必ず成立する。
+    #[test]
+    fn reason_breakdown_sums_to_global_confusion() {
+        let feats = vec![
+            feat_full(10_000, 0.20, 0.66, 0.05, 6.0, 0.0), // short+post_burst → nudge (ACT)
+            feat_full(11_000, 0.10, 0.72, 0.05, 5.0, 0.0), // active_typing → defer (HOLD)
+            feat_full(12_000, 0.80, 0.05, 0.0, 5.0, 0.0),  // 低 need → none (HOLD)
+        ];
+        // idle: feat0=10000-7000=3000(short), feat1=11000-10500=500(active), feat2=12000-11800=200(active)
+        let presses = vec![7_000u64, 10_500, 11_800];
+        let labels = vec![
+            ulabel(10_000, LabelClass::Flow),
+            ulabel(11_500, LabelClass::Stuck),
+        ];
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
+        let g = m.binary_confusion;
+        let (mut tn, mut fp, mut fnv, mut tp) = (0u32, 0u32, 0u32, 0u32);
+        for s in &m.reason_breakdown {
+            tn += s.confusion.tn;
+            fp += s.confusion.fp;
+            fnv += s.confusion.fn_;
+            tp += s.confusion.tp;
+        }
+        assert_eq!((tn, fp, fnv, tp), (g.tn, g.fp, g.fn_, g.tp));
+        // post_burst_pause で発火した nudge が PROTECT に乗り fp=1 として層別化される
+        assert!(m
+            .reason_breakdown
+            .iter()
+            .any(|s| s.reason == OpportunityReason::PostBurstPause
+                && s.confusion.fp == 1
+                && s.hir == Some(1.0)));
+    }
+
+    /// STALL recall = tp/(tp+fn)。
+    #[test]
+    fn recall_is_tp_over_stall_labeled() {
+        let feats = vec![
+            feat_full(10_000, 0.20, 0.66, 0.05, 6.0, 0.0), // post_burst nudge (ACT)
+            feat_full(11_000, 0.10, 0.05, 0.0, 5.0, 0.0),  // 低 need none (HOLD)
+        ];
+        let presses = vec![7_000u64];
+        let labels = vec![ulabel(10_000, LabelClass::Stuck)]; // 全区間 Stuck
+        let m = compute_intervention_metrics(
+            &feats,
+            &labels,
+            &presses,
+            60_000,
+            &InterventionThresholds::default(),
+        );
+        assert_eq!(m.binary_confusion.tp, 1);
+        assert_eq!(m.binary_confusion.fn_, 1);
+        assert_eq!(m.recall, Some(0.5));
+    }
+
+    /// nudge_need を上げると pooled ACT は単調非増加 (sweep の健全性)。
+    #[test]
+    fn sweep_act_count_monotonic_in_nudge_need() {
+        // 全 feat short+post_burst (高 opportunity)、need を 0.62/0.68/0.74 に並べる。
+        let feats = vec![
+            feat_full(10_000, 0.20, 0.62, 0.05, 6.0, 0.0),
+            feat_full(11_000, 0.20, 0.68, 0.05, 6.0, 0.0),
+            feat_full(12_000, 0.20, 0.74, 0.05, 6.0, 0.0),
+        ];
+        let presses = vec![7_000u64]; // 各 feat の idle = 3000/4000/5000ms (全て short_pause)
+        let sessions = vec![SweepInput {
+            feats,
+            point_labels: Vec::new(),
+            key_press_ts: presses,
+        }];
+        let report = compute_intervention_sweep(&sessions, &DEFAULT_SWEEP_NUDGE_NEED, 60_000);
+        assert_eq!(report.sweep_points.len(), DEFAULT_SWEEP_NUDGE_NEED.len());
+        let acts: Vec<u32> = report.sweep_points.iter().map(|p| p.act_count).collect();
+        for w in acts.windows(2) {
+            assert!(
+                w[1] <= w[0],
+                "act_count must be non-increasing as nudge_need rises: {:?}",
+                acts
+            );
+        }
+        // 下限 0.50 では 3 件全て発火、上端 0.90 では 0 件 (全 need < 0.90)。
+        assert_eq!(acts.first(), Some(&3));
+        assert_eq!(acts.last(), Some(&0));
+    }
+
+    /// MIN_SWEEP_NUDGE_NEED 未満の点は DC 不変条件保護のため skip + warning。
+    #[test]
+    fn sweep_skips_below_min_threshold() {
+        let feats = vec![feat_full(10_000, 0.20, 0.66, 0.05, 6.0, 0.0)];
+        let presses = vec![7_000u64];
+        let sessions = vec![SweepInput {
+            feats,
+            point_labels: Vec::new(),
+            key_press_ts: presses,
+        }];
+        let report = compute_intervention_sweep(&sessions, &[0.40, 0.60], 60_000);
+        assert_eq!(report.sweep_points.len(), 1); // 0.40 は評価せず
+        assert_eq!(report.sweep_points[0].nudge_need, 0.60);
+        assert!(report.warnings.iter().any(|w| w.contains("0.40")));
+    }
+
+    /// DC 不変条件の前提を 2 定数の関係で固定する: sweep 下限 `MIN_SWEEP_NUDGE_NEED` で
+    /// run 内 feat の p_flow は `1 - MIN_SWEEP_NUDGE_NEED` 以下、これが回復閾値
+    /// `DEFAULT_P_FLOW_THRESHOLD` (strict `>`) を満たさないこと。将来どちらかが動いて
+    /// `1 - MIN > THRESH` になると不変条件が静かに破れるため、ここで早期に落とす。
+    #[test]
+    // 定数同士の比較なのは意図どおり (const をまたいだ静的ガード)。clippy の
+    // assertions_on_constants はこの用途では誤検出なので明示的に許可する。
+    #[allow(clippy::assertions_on_constants)]
+    fn dc_invariant_threshold_floor_holds() {
+        assert!(
+            1.0 - MIN_SWEEP_NUDGE_NEED <= DEFAULT_P_FLOW_THRESHOLD,
+            "DC invariant broken: run-internal p_flow ({}) could exceed recovery threshold ({})",
+            1.0 - MIN_SWEEP_NUDGE_NEED,
+            DEFAULT_P_FLOW_THRESHOLD
+        );
     }
 }
