@@ -1,105 +1,53 @@
 ---
 description: >
   バグ修正のワークフロー。TDD 順序（回帰テスト先行）で修正する。
+  implementation-workflow Skill の共通骨格をバグ修正固有の制約で上書きして実行する。
   /start-task で作業ディレクトリを作成した後に実行する。
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Task
 ---
 
 # /fix-bug
 
-## Step 0: バグの理解（1 問ずつ）
+## 前提条件
 
-ユーザーから以下を聞き、`.steering/[現在のタスク]/requirement.md` に追記する:
+- [ ] `/start-task` で作業ディレクトリ作成済み
+
+## 実行フロー
+
+### Step 1: implementation-workflow Skill の読み込み
+
+`.claude/skills/implementation-workflow/SKILL.md` を Read で読む。
+
+### Step 2: バグ固有の前処理（1 問ずつ聞く）
+
+ユーザーから以下を収集し `.steering/[現在のタスク]/requirement.md` に追記する:
+
 1. 再現手順は?
 2. 期待される動作と実際の動作は?
 3. エラーメッセージ・ログはあるか?
 
----
+ログがある場合は `log-analyzer` を起動して原因の手がかりを得る。
 
-## Step 1: 文脈把握
+### Step 3: Skill 共通骨格の実行（以下のオーバーライド付き）
 
-以下を Read で読む:
-- `.steering/[現在のタスク]/requirement.md`
-- `docs/architecture.md`（バグが発生しているモジュールに関係する箇所）
+Skill の Step A〜I を実行するが、`/fix-bug` では以下を上書き:
 
----
+| 上書き対象 | 内容 |
+|---|---|
+| Step C（設計） | バグの根本原因・修正方針を design.md に記録してから承認を求める。原因未特定のまま進まない |
+| Step E 開始前 | **回帰テストを先に追加**（TDD 順序）。このテストは現時点で失敗するはず |
+| Step E 本体 | **最小限の変更で修正**。広範囲のリファクタは別タスクに分離 |
+| Step F | Step E で追加した回帰テストを含む全テストが通ることを確認 |
 
-## Step 2: 調査（並列実行）
+`/reimagine 適用: Yes` なら Step C の設計承認後に `/reimagine` を実行してから Step D へ。
 
-以下を同時に起動する:
-- **file-finder**: バグが発生しているファイルと関連する実装を特定
-- **impact-analyzer**: 修正による波及範囲を分析
-- **log-analyzer**: ログがある場合のみ起動（エラーパターンを抽出）
+### Step 4: 完了処理
 
----
-
-## Step 3: 設計と承認
-
-原因を特定し `.steering/[現在のタスク]/design.md` に記入:
-- バグの根本原因
-- 修正方針（最小限の変更で直す）
-- テスト戦略
-
-**ユーザーに承認を求める。原因が特定できないまま修正しない。**
-
----
-
-## Step 3.5: /reimagine の適用（条件付き）
-
-`requirement.md` の `## 運用メモ` を確認する:
-- **`/reimagine 適用: Yes`** → ここで `/reimagine` を実行してから Step 4 へ進む
-- **`/reimagine 適用: No`** → そのまま Step 4 へ進む
-
-`## 運用メモ` がない場合はユーザーに確認する。
-
----
-
-## Step 4: tasklist 作成
-
-`.steering/[現在のタスク]/tasklist.md` に実装ステップを列挙する。
-**最初の項目は必ず「回帰テストの追加」にする。**
-
----
-
-## Step 5: 実装（TDD 順序）
-
-**順序厳守**: 修正コードを書く前に、バグを再現する回帰テストを追加する。
-テストが赤いことを確認してから修正コードを書く。
-
-tasklist を順番に実施する。各完了後にチェックボックスを更新する。
-
-バグ修正の範疇を超えるリファクタリングは混ぜない（別タスクに分離する）。
-
----
-
-## Step 6: テスト
-
-`test-runner` を起動する。Step 5 で追加した回帰テストを含む全テストが通ることを確認する。
-失敗があれば `test-analyzer` で原因を分析し、修正後に再実行する。
-
----
-
-## Step 7: レビュー（並列実行）
-
-`code-reviewer` を起動する。外部入力に関わる修正の場合は `security-checker` も並列起動する。
-- HIGH 指摘: すべて対応する
-- MEDIUM 指摘: ユーザーに確認する
-
----
-
-## Step 8: 完了
-
-`/finish-task` を実行する。
-
-> `schema_dto.rs` / `current.json` を touch した場合、finish-task Step 3 の
-> schema parity check で停止する可能性がある (詳細: `docs/development-guidelines.md` §10.3.1 tier-3 guard)。
-
----
+> 「バグ修正が完了しました。`/finish-task` を実行してください。」
 
 ## 制約
 
 - 原因が特定できないまま修正しない
 - 回帰テストを追加せずに修正に入らない（TDD 順序厳守）
 - バグ修正の範疇を超えるリファクタリングを混ぜない
-- Step 6 の全テスト通過前に Step 7 に進まない
-- Step 7 の HIGH 指摘を残したまま完了しない
+- Skill の Step G の HIGH 指摘を残したまま完了しない

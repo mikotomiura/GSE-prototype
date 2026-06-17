@@ -33,6 +33,19 @@
             "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/pre-edit-banned.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/codex-budget-guard.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/secrets-pre-filter.sh\""
+          }
+        ]
       }
     ],
     "Stop": [
@@ -41,6 +54,10 @@
           {
             "type": "command",
             "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/stop-check.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/token-report-stop.sh\""
           }
         ]
       }
@@ -57,6 +74,15 @@
       },
       {
         "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.claude/hooks/post-fmt.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "MultiEdit",
         "hooks": [
           {
             "type": "command",

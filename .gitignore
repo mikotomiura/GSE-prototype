@@ -29,6 +29,11 @@ src-tauri/target/
 .claude/settings.local.json
 .claude/memory.md
 
+# Steering runtime artifacts (token logging / locks — generated per session, not versioned)
+.steering/_token_log.md
+.steering/_token_log.last_key
+.steering/_token_log.md.lock
+
 #個人用ファイル
 issue.md
 .claude/commands/commands_setup

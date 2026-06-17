@@ -30,7 +30,11 @@ allowed-tools: Read, Write, Edit, Bash(git *), Bash(python scripts/check_schema_
 
 以下を並列で起動する:
 
-- **`/review-changes`** を実行 (code-reviewer + security-checker 統合レビュー)
+- **`/cross-review`** を実行 (**必須**): code-reviewer (Claude) ∥ codex-review (Codex) の独立 2 系統を
+  並列起動し、一致/乖離を分類した統合レポートを返す。**codex review はタスク完了ごとに必須**
+  (ユーザー方針 2026-06-16)。proprietary/機密混入・予算超過・codex/jq 不在で Codex が使えない場合のみ
+  code-reviewer 単独へ自動フォールバックし、**skip 理由を完了報告に明記**する (gate は /cross-review 内で fail-closed)。
+- **`security-checker`** を起動 (外部入力・認証・データ保存に関わる変更時。/cross-review に含まれないため別途)
 - **`test-runner`** を起動 (cargo test / frontend test の回帰検証)
 - **schema parity check** (下記のサブブロックを Bash ツールで実行)
 
@@ -130,7 +134,10 @@ type: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
 
 ## 制約
 
-- テスト失敗・CRITICAL/HIGH 指摘を残したまま完了しない
+- テスト失敗・CRITICAL/HIGH 指摘 (code-reviewer / security-checker / **codex のいずれか**。
+  特に **両者一致の指摘**) を残したまま完了しない
+- **codex review (`/cross-review`) を省略しない**。安全ゲート (proprietary/機密/予算/jq・codex 不在) で
+  ブロックされた場合のみ Claude 単独へ縮退し、**理由を完了報告に明記**する
 - **Step 3 の schema parity check が失敗した状態で Step 4 に進まない**
   (helper の出力に従って修復 → 再度 /finish-task を実走する)
 - ユーザー承認なしで commit しない
