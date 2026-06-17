@@ -27,7 +27,7 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use gse_next_lib::analysis::calibration_eval::{
@@ -39,9 +39,9 @@ use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::intervention::InterventionThresholds;
 use gse_next_lib::analysis::intervention_eval::{
-    compute_intervention_metrics, compute_intervention_sweep, format_intervention_pretty,
-    format_intervention_sweep_pretty, SweepInput, DEFAULT_DEFER_RECOVERY_WINDOW_MS,
-    DEFAULT_SWEEP_NUDGE_NEED,
+    compute_intervention_metrics, compute_intervention_sweep, compute_nudge_diagnostic,
+    format_intervention_pretty, format_intervention_sweep_pretty, format_nudge_diagnostic_pretty,
+    SweepInput, DEFAULT_DEFER_RECOVERY_WINDOW_MS, DEFAULT_SWEEP_NUDGE_NEED,
 };
 use gse_next_lib::analysis::loop_step::{
     step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
@@ -354,7 +354,10 @@ struct Args {
     /// --sweep: nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標をプール出力 (Phase 0)。
     /// `--calibration` と同様に 1 被験者の複数セッションを受ける。
     sweep: bool,
-    /// `--calibration` / `--sweep` の 2 個目以降の positional (セッション時刻順)。
+    /// --nudge-diag: ACT decision を reason×GT で層別し特徴量分布を出す (FP/TP 分離診断)。
+    /// `--sweep` と同様に複数セッションを受ける。
+    nudge_diag: bool,
+    /// `--calibration` / `--sweep` / `--nudge-diag` の 2 個目以降の positional (セッション時刻順)。
     extra_sessions: Vec<PathBuf>,
 }
 
@@ -439,10 +442,25 @@ fn parse_args() -> Result<Args, String> {
         false
     };
 
-    // --json は --metrics / --segments / --intervention / --calibration / --sweep 併用時のみ意味を持つ
-    if json && !metrics && segments_path.is_none() && !intervention && !calibration && !sweep {
+    // --nudge-diag フラグ (ACT を reason×GT で層別した特徴量診断)
+    let nudge_diag = if let Some(pos) = args.iter().position(|a| a == "--nudge-diag") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
+    // --json は --metrics / --segments / --intervention / --calibration / --sweep / --nudge-diag 併用時のみ意味を持つ
+    if json
+        && !metrics
+        && segments_path.is_none()
+        && !intervention
+        && !calibration
+        && !sweep
+        && !nudge_diag
+    {
         return Err(
-            "--json requires --metrics, --segments, --intervention, --calibration, or --sweep"
+            "--json requires --metrics, --segments, --intervention, --calibration, --sweep, or --nudge-diag"
                 .to_string(),
         );
     }
@@ -456,23 +474,24 @@ fn parse_args() -> Result<Args, String> {
         intervention,
         calibration,
         sweep,
+        nudge_diag,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag are mutually exclusive"
                 .to_string(),
         );
     }
 
-    // positional 引数の検証。--calibration / --sweep は複数セッションを受けるため ≥1 個、
+    // positional 引数の検証。--calibration / --sweep / --nudge-diag は複数セッションを受けるため ≥1 個、
     // それ以外のモードは従来どおり厳密に 1 個。
     if args.is_empty() {
         return Err("expected at least 1 positional argument (session.ndjson)".to_string());
     }
-    if !calibration && !sweep && args.len() != 1 {
+    if !calibration && !sweep && !nudge_diag && args.len() != 1 {
         return Err(format!(
             "expected 1 positional argument (session.ndjson), got {}",
             args.len()
@@ -492,6 +511,7 @@ fn parse_args() -> Result<Args, String> {
         intervention,
         calibration,
         sweep,
+        nudge_diag,
         extra_sessions,
     })
 }
@@ -506,7 +526,8 @@ fn usage() -> String {
          gse-replay <session.ndjson> --segments <segments.txt> [--json]\n    \
          gse-replay <session.ndjson> --intervention [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
-         gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n\n\
+         gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
@@ -515,9 +536,52 @@ fn usage() -> String {
          --intervention      v2 介入ポリシーを反実仮想リプレイし HIR/Precision/Recall/DC/Burden + reason 別分解を算出\n    \
          --calibration       v0.3 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット)。1 被験者の複数セッションを時刻順に渡す\n    \
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
-         --json              --metrics / --segments / --intervention / --calibration / --sweep の出力を JSON で標準出力へ\n    \
+         --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
+         --json              --metrics / --segments / --intervention / --calibration / --sweep / --nudge-diag の出力を JSON で標準出力へ\n    \
          -h, --help          このヘルプを表示\n",
     )
+}
+
+/// `--sweep` / `--nudge-diag` 共通: positional セッション群を `SweepInput` 列に読み込む。
+/// ファイル数が `MAX_CALIBRATION_FILES` を超えたら `Err(ExitCode::from(2))`、
+/// 各セッションの読み込み失敗は `Err(ExitCode::from(1))` を返す (stderr / tracing へ出力済み)。
+fn collect_sweep_inputs(
+    session_path: &Path,
+    extra_sessions: &[PathBuf],
+) -> Result<Vec<SweepInput>, ExitCode> {
+    let mut paths: Vec<PathBuf> = Vec::with_capacity(1 + extra_sessions.len());
+    paths.push(session_path.to_path_buf());
+    paths.extend(extra_sessions.iter().cloned());
+
+    // ファイル数の上限 (calibration と同じ安全キャップを流用)。
+    if paths.len() > MAX_CALIBRATION_FILES {
+        let _ = writeln!(
+            std::io::stderr(),
+            "too many sessions: {} exceeds limit {}",
+            paths.len(),
+            MAX_CALIBRATION_FILES
+        );
+        return Err(ExitCode::from(2));
+    }
+
+    let mut sessions: Vec<SweepInput> = Vec::with_capacity(paths.len());
+    for p in &paths {
+        let feats = collect_logged_feats(p).map_err(|msg| {
+            tracing::error!("failed to collect logged feats {}: {}", p.display(), msg);
+            ExitCode::from(1)
+        })?;
+        let point_labels = collect_user_labels(p).map_err(|msg| {
+            tracing::error!("failed to collect user labels {}: {}", p.display(), msg);
+            ExitCode::from(1)
+        })?;
+        let key_press_ts = collect_key_timestamps(p);
+        sessions.push(SweepInput {
+            feats,
+            point_labels,
+            key_press_ts,
+        });
+    }
+    Ok(sessions)
 }
 
 fn main() -> ExitCode {
@@ -683,45 +747,10 @@ fn main() -> ExitCode {
     // HIR/Precision/Recall/DC/Burden を全セッションでプール出力する (Phase 0、production 不変)。
     // --calibration と同じく複数セッションを受け、各セッションを独立評価してプールする。
     if args.sweep {
-        let mut paths: Vec<PathBuf> = Vec::with_capacity(1 + args.extra_sessions.len());
-        paths.push(args.session_path.clone());
-        paths.extend(args.extra_sessions.iter().cloned());
-
-        // ファイル数の上限 (calibration と同じ安全キャップを流用)。
-        if paths.len() > MAX_CALIBRATION_FILES {
-            let _ = writeln!(
-                std::io::stderr(),
-                "too many sweep sessions: {} exceeds limit {}",
-                paths.len(),
-                MAX_CALIBRATION_FILES
-            );
-            return ExitCode::from(2);
-        }
-
-        let mut sessions: Vec<SweepInput> = Vec::with_capacity(paths.len());
-        for p in &paths {
-            let feats = match collect_logged_feats(p) {
-                Ok(v) => v,
-                Err(msg) => {
-                    tracing::error!("failed to collect logged feats {}: {}", p.display(), msg);
-                    return ExitCode::from(1);
-                }
-            };
-            let point_labels = match collect_user_labels(p) {
-                Ok(v) => v,
-                Err(msg) => {
-                    tracing::error!("failed to collect user labels {}: {}", p.display(), msg);
-                    return ExitCode::from(1);
-                }
-            };
-            let key_press_ts = collect_key_timestamps(p);
-            sessions.push(SweepInput {
-                feats,
-                point_labels,
-                key_press_ts,
-            });
-        }
-
+        let sessions = match collect_sweep_inputs(&args.session_path, &args.extra_sessions) {
+            Ok(s) => s,
+            Err(code) => return code,
+        };
         let report = compute_intervention_sweep(
             &sessions,
             &DEFAULT_SWEEP_NUDGE_NEED,
@@ -741,6 +770,32 @@ fn main() -> ExitCode {
             }
         } else {
             let _ = write!(lock, "{}", format_intervention_sweep_pretty(&report));
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // --nudge-diag 経路: ACT decision を reason×GT で層別し決定時の特徴量分布 (min/median/max) を
+    // プール出力する (Phase 0、production 不変)。FP(GT=PROTECT) と TP(GT=STALL) の分離可能性を診断する。
+    if args.nudge_diag {
+        let sessions = match collect_sweep_inputs(&args.session_path, &args.extra_sessions) {
+            Ok(s) => s,
+            Err(code) => return code,
+        };
+        let diag = compute_nudge_diagnostic(&sessions, &InterventionThresholds::default());
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        if args.json {
+            match serde_json::to_string_pretty(&diag) {
+                Ok(s) => {
+                    let _ = writeln!(lock, "{}", s);
+                }
+                Err(e) => {
+                    tracing::error!("failed to serialize nudge diagnostic: {}", e);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            let _ = write!(lock, "{}", format_nudge_diagnostic_pretty(&diag));
         }
         return ExitCode::SUCCESS;
     }
