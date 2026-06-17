@@ -37,9 +37,15 @@ interface DashboardProps {
    * 既定 false (通常 / デバッグ表示)。
    */
   calibrationMode?: boolean;
+  /**
+   * セッションが介入を有効化しているか (session_meta.intervention_enabled)。
+   * false のとき backend は全介入を gate するため Monk Mode (Wall mute) は no-op。
+   * → 効かない操作を見せないよう、false のとき Monk Mode トグルを非表示にする。既定 false。
+   */
+  interventionEnabled?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive, calibrationMode = false }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive, calibrationMode = false, interventionEnabled = false }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -406,16 +412,20 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
         </>
       )}
 
-      {/* Monk Mode トグル: ON=Wall無効, OFF=通常 */}
-      <button
-        className={`monk-mode-toggle ${isMonkMode ? 'on' : 'off'}`}
-        onClick={handleMonkModeToggle}
-      >
-        <span>{isMonkMode ? 'Monk Mode: ON' : 'Monk Mode: OFF'}</span>
-        <span className="monk-mode-label">
-          {isMonkMode ? 'Wall intervention disabled' : 'Wall intervention active'}
-        </span>
-      </button>
+      {/* Monk Mode トグル: ON=Wall無効, OFF=通常。
+          介入無効セッションでは backend が全介入を gate し no-op になるため非表示にする
+          (効かない操作を見せない・interventionEnabled=true のときのみ表示)。 */}
+      {interventionEnabled && (
+        <button
+          className={`monk-mode-toggle ${isMonkMode ? 'on' : 'off'}`}
+          onClick={handleMonkModeToggle}
+        >
+          <span>{isMonkMode ? 'Monk Mode: ON' : 'Monk Mode: OFF'}</span>
+          <span className="monk-mode-label">
+            {isMonkMode ? 'Wall intervention disabled' : 'Wall intervention active'}
+          </span>
+        </button>
+      )}
 
       {!calibrationMode && (
         <div className="info-box">
