@@ -288,7 +288,7 @@ function App() {
 
   // Default to Main Dashboard (較正モード時は blind/minimal 表示)
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} />
+    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} interventionEnabled={interventionEnabled} />
   );
 }
 

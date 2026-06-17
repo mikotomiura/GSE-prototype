@@ -17,7 +17,7 @@
 | ナッジ | Nudge (Lv1) | `InterventionDecision.action == "nudge"` で発動する軽度介入。右端から小さく現れるサイドカードとして表示 | 「Nudge が表示されたがユーザーは作業を継続した」 |
 | ウォール | Wall (Lv2) | `InterventionDecision.action == "wall"` で発動する強制介入。全画面ロック + スマートフォンアンロック | 「Wall が発動し Zen Timer が開始された」 |
 | ゼンタイマー | Zen Timer | Wall 発動時にスマートフォン上で起動する 2 分カウントダウン。身体的休息を促す | 「Zen Timer 完了後に手動アンロック」 |
-| モンクモード | Monk Mode | Wall 介入を無効化するトグル。Nudge のみ有効になる | 「Monk Mode 有効時は Wall が発動しない」 |
+| モンクモード | Monk Mode | 実行中トグルで **Lv2 Wall のみ**を無効化 (Nudge は出る)。セッションの `intervention_enabled` (マスタ ON/OFF) とは別物で、後者が false なら全介入が gate され Monk Mode は no-op (UI は介入有効時のみ表示) | 「Monk Mode 有効時は Wall が発動しない」 |
 | 早期解除 | Early Unlock | Wall 発動中に Zen Timer 完了を待たず即時解除するボタン。緊急時用 (`wall_server.rs`) | 「Early Unlock ボタンで即時に Wall を解く」 |
 | フィジカルアンカー | Physical Anchor | 将来の Lv3/Lv4 介入。身体的活動（散歩等）を促す Flutter アプリ連携 | 「Physical Anchor は stretch goal」 |
 | グラウンドトゥルース | Ground Truth (GT) | ユーザー自身が主観的に付与する認知状態ラベル。**v0.3 (D-13) 以降、較正スモーク段ではこの語を使わず criterion label と呼ぶ** (測定法が較正で成立して初めて妥当性を語れるため)。GT は核検証フェーズ通過後にのみ正当化される | 「この段階のラベルは GT ではなく criterion label」 |
@@ -45,6 +45,7 @@
 | データ不足判定 | DataInsufficient | コホート判定の値の 1 つ。主指標被験者0名・提示プローブ0件・PreReg-5 最低要件 (eval≥6/probe≥16) 充足者なしのとき、無理に Go/Kill とせず「データ拡充が必要」と正直に報告する状態 (v0.3 §11 主張限界) | 「PreReg-5 未達なので DataInsufficient」 |
 | Need | Need | 介入が必要そうかを表す層。MVP では主に `p_stuck` を `stuck_likelihood` として利用する | 「Need は高いが Opportunity が低い」 |
 | Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode で判定する | 「Opportunity が低いため defer する」 |
+| アウェイアイドル | away_idle | `idle_ms ≥ 180秒` で**介入を全停止**するサプレッション (席を離れたら黙る=不便益)。一次抑制は idle 閾値そのもの。加えて放置で p_stuck も低下するため二重に介入は出ない (idle≠Stuck) | 「10分放置で介入が出ないのは away_idle で正常」 |
 | 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
 | defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |
 | daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Wall daily cap により defer」 |

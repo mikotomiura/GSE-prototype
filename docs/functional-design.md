@@ -70,7 +70,22 @@
   - Nudge cooldown: 10 分、daily cap: 6 回/日
   - Wall cooldown: 60 分、daily cap: 1 回/日
   - recent dismiss 抑制: 20 分
-  - away idle: 180 秒以上で Wall 抑制
+  - away idle: 180 秒以上で**介入全停止**（Wall だけでなく Nudge も `none` 化、`suppressed_by:["away_idle"]`）
+
+- **発火/非発火の要点（期待ギャップ防止・実機 smoke フィードバック反映）**:
+  - **Opportunity ゲート**: Need が高くても「今が好機か」を別途判定する。好機は **2〜30 秒の小休止**
+    (短 2-8s が最良、中 8-30s が次点)。**能動タイプ中 (<2s) は減点され `defer`**（タイプを止めずに苦闘継続中は割り込まない）。
+  - **席を離れたら黙る (不便益)**: `idle_ms ≥ 180s` で `away_idle` により介入を出さない。NDJSON では
+    `suppressed_by:["away_idle"]` で識別する（`reason` は need 依存で、放置中は p_stuck 低下により
+    `below_need_threshold` になることが多い）。
+  - **idle ≠ Stuck**: キーボードを放置すると `p_stuck` はむしろ低下する（無打鍵は idle 観測でモデル上「停滞」ではない）。
+    したがって「**長時間放置すれば介入が出る**」という挙動は**設計外**。介入は *作業に没入したまま苦闘している*
+    （高 `p_stuck` × 小休止）状況を対象とする。
+  - **2 つの介入制御の役割差**:
+    - `session_meta.intervention_enabled`: セッション開始時の**マスタ ON/OFF**。`false` なら backend が
+      全 `get_intervention_decision` を `none` で gate（較正の既定）。
+    - **Monk Mode**: 実行中トグルで **Lv2 Wall のみ**を無効化（Nudge は出る）。`intervention_enabled=false` 時は
+      no-op のため UI でトグルを表示しない（介入有効時のみ表示）。
 
 #### Lv1: Nudge（視覚的ヒント）
 - **トリガー**: `InterventionDecision.action == "nudge"`
