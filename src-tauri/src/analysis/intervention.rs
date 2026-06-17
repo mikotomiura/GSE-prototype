@@ -47,6 +47,81 @@ impl InterventionAction {
     }
 }
 
+/// Opportunity 層の加点理由を機械可読化した enum。
+///
+/// production の `calculate_opportunity` が返す reason 文字列の**単一真実源**。
+/// `as_str()` は現行文字列を byte 一致で再生する (既存 NDJSON ログ・IPC・テストの
+/// `reason` 文字列を不変に保つため)。`InterventionDecision` には `#[serde(skip)]`
+/// で載せるので NDJSON schema にも IPC JSON にも出ず in-memory のみ。評価層
+/// (`intervention_eval`) が reason 別の HIR/Precision 層別化に使う。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpportunityReason {
+    LowOpportunity,
+    ShortPause,
+    MediumPause,
+    LongPause,
+    ActiveTyping,
+    PostBurstPause,
+    CorrectionAfterPause,
+    ActiveCorrectionLoop,
+}
+
+impl OpportunityReason {
+    /// production の reason 文字列を byte 一致で再生する (単一真実源)。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LowOpportunity => "low_opportunity",
+            Self::ShortPause => "short_pause",
+            Self::MediumPause => "medium_pause",
+            Self::LongPause => "long_pause",
+            Self::ActiveTyping => "active_typing",
+            Self::PostBurstPause => "post_burst_pause",
+            Self::CorrectionAfterPause => "correction_after_pause",
+            Self::ActiveCorrectionLoop => "active_correction_loop",
+        }
+    }
+
+    /// 評価層が reason 別層別化を固定順 (決定的 JSON 出力) で反復するための全 variant。
+    pub const ALL: [OpportunityReason; 8] = [
+        Self::LowOpportunity,
+        Self::ShortPause,
+        Self::MediumPause,
+        Self::LongPause,
+        Self::ActiveTyping,
+        Self::PostBurstPause,
+        Self::CorrectionAfterPause,
+        Self::ActiveCorrectionLoop,
+    ];
+}
+
+/// sweep / オフライン評価のために注入可能にした float 閾値群。
+///
+/// `Default` は現行のモジュール const と**完全同値**であり、production
+/// (`InterventionPolicyState::new`) は既定値で動くため挙動は不変。評価層のみ
+/// sweep 値で `new_with_thresholds` を呼ぶ。duration / cap / pause band 系 const は
+/// 本タスクの sweep 対象外なので据え置く。
+#[derive(Debug, Clone, Copy)]
+pub struct InterventionThresholds {
+    pub nudge_need: f64,
+    pub wall_need: f64,
+    pub wall_slack: f64,
+    pub nudge_opportunity: f64,
+    pub wall_opportunity: f64,
+}
+
+impl Default for InterventionThresholds {
+    fn default() -> Self {
+        Self {
+            nudge_need: NUDGE_NEED_THRESHOLD,
+            wall_need: WALL_NEED_THRESHOLD,
+            wall_slack: WALL_SLACK_THRESHOLD,
+            nudge_opportunity: NUDGE_OPPORTUNITY_THRESHOLD,
+            wall_opportunity: WALL_OPPORTUNITY_THRESHOLD,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct InterventionDecision {
     pub action: InterventionAction,
@@ -57,6 +132,11 @@ pub struct InterventionDecision {
     pub wall_accum_ms: u64,
     pub reason: String,
     pub suppressed_by: Vec<String>,
+    /// Opportunity 層の加点理由 (機械可読)。`#[serde(skip)]` で NDJSON schema /
+    /// IPC JSON には出さず in-memory のみ。評価層の reason 別層別化に使う。
+    /// production 出力は従来どおり `reason: String` を使う。
+    #[serde(skip)]
+    pub opportunity_reason: OpportunityReason,
 }
 
 impl InterventionDecision {
@@ -70,6 +150,7 @@ impl InterventionDecision {
             wall_accum_ms: 0,
             reason: "safe_default".to_string(),
             suppressed_by: Vec::new(),
+            opportunity_reason: OpportunityReason::LowOpportunity,
         }
     }
 }
@@ -107,10 +188,18 @@ pub struct InterventionPolicyState {
     last_decision: InterventionDecision,
     last_log_key: Option<String>,
     last_log_at_ms: Option<u64>,
+    /// 注入された閾値。production は既定値 (= 現行 const)。評価層のみ sweep 値。
+    thresholds: InterventionThresholds,
 }
 
 impl InterventionPolicyState {
+    /// production 既定。閾値は現行 const と同値の `InterventionThresholds::default()`。
     pub fn new(now_ms: u64) -> Self {
+        Self::new_with_thresholds(now_ms, InterventionThresholds::default())
+    }
+
+    /// 評価 / sweep 用。既定以外の閾値を注入する。production からは呼ばない。
+    pub fn new_with_thresholds(now_ms: u64, thresholds: InterventionThresholds) -> Self {
         Self {
             day_index: day_index(now_ms),
             nudge_count_today: 0,
@@ -125,6 +214,7 @@ impl InterventionPolicyState {
             last_decision: InterventionDecision::safe_default(),
             last_log_key: None,
             last_log_at_ms: None,
+            thresholds,
         }
     }
 
@@ -157,6 +247,7 @@ impl InterventionPolicyState {
                 wall_accum_ms: 0,
                 reason: "wall_active".to_string(),
                 suppressed_by: Vec::new(),
+                opportunity_reason: OpportunityReason::LowOpportunity,
             };
             let should_log = self.should_log(input.now_ms, &decision);
             self.last_decision = decision.clone();
@@ -176,15 +267,17 @@ impl InterventionPolicyState {
         let mut candidate = if input.idle_ms >= AWAY_IDLE_MS {
             suppressed_by.push("away_idle".to_string());
             InterventionAction::None
-        } else if need_score < NUDGE_NEED_THRESHOLD {
+        } else if need_score < self.thresholds.nudge_need {
             InterventionAction::None
-        } else if need_score >= WALL_NEED_THRESHOLD && self.wall_accum_ms >= WALL_ACCUMULATION_MS {
-            if opportunity_score >= WALL_OPPORTUNITY_THRESHOLD {
+        } else if need_score >= self.thresholds.wall_need
+            && self.wall_accum_ms >= WALL_ACCUMULATION_MS
+        {
+            if opportunity_score >= self.thresholds.wall_opportunity {
                 InterventionAction::Wall
             } else {
                 InterventionAction::Defer
             }
-        } else if opportunity_score >= NUDGE_OPPORTUNITY_THRESHOLD {
+        } else if opportunity_score >= self.thresholds.nudge_opportunity {
             InterventionAction::Nudge
         } else {
             InterventionAction::Defer
@@ -206,7 +299,8 @@ impl InterventionPolicyState {
             candidate,
             need_score,
             opportunity_score,
-            &opportunity_reason,
+            opportunity_reason,
+            &self.thresholds,
         );
         self.record_activation(candidate, input.now_ms);
 
@@ -219,6 +313,7 @@ impl InterventionPolicyState {
             wall_accum_ms: self.wall_accum_ms,
             reason,
             suppressed_by,
+            opportunity_reason,
         };
         let should_log = self.should_log(input.now_ms, &decision);
         self.current_action = candidate;
@@ -252,9 +347,9 @@ impl InterventionPolicyState {
         }
 
         let p_stuck = clean_score(input.p_stuck);
-        if p_stuck >= WALL_NEED_THRESHOLD {
+        if p_stuck >= self.thresholds.wall_need {
             self.wall_accum_ms = self.wall_accum_ms.saturating_add(elapsed_ms);
-        } else if p_stuck < WALL_SLACK_THRESHOLD {
+        } else if p_stuck < self.thresholds.wall_slack {
             self.wall_accum_ms = self
                 .wall_accum_ms
                 .saturating_sub(elapsed_ms.saturating_mul(2));
@@ -325,7 +420,7 @@ impl InterventionPolicyState {
     fn should_log(&mut self, now_ms: u64, decision: &InterventionDecision) -> bool {
         let interesting = decision.action != InterventionAction::None
             || !decision.suppressed_by.is_empty()
-            || decision.need_score >= NUDGE_NEED_THRESHOLD;
+            || decision.need_score >= self.thresholds.nudge_need;
         if !interesting {
             return false;
         }
@@ -352,22 +447,22 @@ impl InterventionPolicyState {
     }
 }
 
-fn calculate_opportunity(input: &InterventionInput) -> (f64, String) {
+fn calculate_opportunity(input: &InterventionInput) -> (f64, OpportunityReason) {
     let mut score: f64 = 0.0;
-    let mut reason = "low_opportunity";
+    let mut reason = OpportunityReason::LowOpportunity;
 
     if (SHORT_PAUSE_MIN_MS..=SHORT_PAUSE_MAX_MS).contains(&input.idle_ms) {
         score += 0.45;
-        reason = "short_pause";
+        reason = OpportunityReason::ShortPause;
     } else if input.idle_ms > SHORT_PAUSE_MAX_MS && input.idle_ms <= MEDIUM_PAUSE_MAX_MS {
         score += 0.35;
-        reason = "medium_pause";
+        reason = OpportunityReason::MediumPause;
     } else if input.idle_ms < SHORT_PAUSE_MIN_MS {
         score -= 0.20;
-        reason = "active_typing";
+        reason = OpportunityReason::ActiveTyping;
     } else if input.idle_ms < AWAY_IDLE_MS {
         score += 0.15;
-        reason = "long_pause";
+        reason = OpportunityReason::LongPause;
     }
 
     if (SHORT_PAUSE_MIN_MS..=SHORT_PAUSE_MAX_MS).contains(&input.idle_ms)
@@ -376,7 +471,7 @@ fn calculate_opportunity(input: &InterventionInput) -> (f64, String) {
         && input.f6_pause_after_del_rate < 0.30
     {
         score += 0.25;
-        reason = "post_burst_pause";
+        reason = OpportunityReason::PostBurstPause;
     }
 
     let correction_context =
@@ -386,29 +481,30 @@ fn calculate_opportunity(input: &InterventionInput) -> (f64, String) {
         && input.idle_ms <= MEDIUM_PAUSE_MAX_MS
     {
         score += 0.15;
-        reason = "correction_after_pause";
+        reason = OpportunityReason::CorrectionAfterPause;
     } else if correction_context && input.idle_ms < SHORT_PAUSE_MIN_MS {
         score -= 0.20;
-        reason = "active_correction_loop";
+        reason = OpportunityReason::ActiveCorrectionLoop;
     }
 
-    (score.clamp(0.0, 1.0), reason.to_string())
+    (score.clamp(0.0, 1.0), reason)
 }
 
 fn reason_for(
     action: InterventionAction,
     need_score: f64,
     opportunity_score: f64,
-    opportunity_reason: &str,
+    opportunity_reason: OpportunityReason,
+    thresholds: &InterventionThresholds,
 ) -> String {
     match action {
-        InterventionAction::None if need_score < NUDGE_NEED_THRESHOLD => {
+        InterventionAction::None if need_score < thresholds.nudge_need => {
             "below_need_threshold".to_string()
         }
         InterventionAction::None => "suppressed_or_away".to_string(),
-        InterventionAction::Nudge => opportunity_reason.to_string(),
+        InterventionAction::Nudge => opportunity_reason.as_str().to_string(),
         InterventionAction::Wall => "sustained_stuck".to_string(),
-        InterventionAction::Defer if opportunity_score < NUDGE_OPPORTUNITY_THRESHOLD => {
+        InterventionAction::Defer if opportunity_score < thresholds.nudge_opportunity => {
             "high_need_but_low_opportunity".to_string()
         }
         InterventionAction::Defer => "suppressed".to_string(),
@@ -448,6 +544,32 @@ mod tests {
             monk_mode: false,
             wall_active: false,
         }
+    }
+
+    /// 既定閾値が現行 const と byte 一致であること (production 不変の機械的保証)。
+    /// 誰かが `Default` を const から切り離して別値をハードコードしたら落ちる。
+    #[test]
+    fn default_thresholds_equal_production_consts() {
+        let t = InterventionThresholds::default();
+        assert_eq!(t.nudge_need, NUDGE_NEED_THRESHOLD);
+        assert_eq!(t.wall_need, WALL_NEED_THRESHOLD);
+        assert_eq!(t.wall_slack, WALL_SLACK_THRESHOLD);
+        assert_eq!(t.nudge_opportunity, NUDGE_OPPORTUNITY_THRESHOLD);
+        assert_eq!(t.wall_opportunity, WALL_OPPORTUNITY_THRESHOLD);
+    }
+
+    /// OpportunityReason::as_str が production の reason 文字列を再生すること。
+    #[test]
+    fn opportunity_reason_as_str_matches_legacy_strings() {
+        use OpportunityReason::*;
+        assert_eq!(LowOpportunity.as_str(), "low_opportunity");
+        assert_eq!(ShortPause.as_str(), "short_pause");
+        assert_eq!(MediumPause.as_str(), "medium_pause");
+        assert_eq!(LongPause.as_str(), "long_pause");
+        assert_eq!(ActiveTyping.as_str(), "active_typing");
+        assert_eq!(PostBurstPause.as_str(), "post_burst_pause");
+        assert_eq!(CorrectionAfterPause.as_str(), "correction_after_pause");
+        assert_eq!(ActiveCorrectionLoop.as_str(), "active_correction_loop");
     }
 
     #[test]
