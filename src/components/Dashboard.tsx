@@ -335,7 +335,9 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
         </div>
         <div className="session-item">
           <span className="session-label">Keyboard</span>
-          <span className={`session-value kbd-status ${keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
+          {/* 較正中は状態パレット (flow=緑/incubation=黄) を避け中立色にする。
+              打鍵状態の色が推定状態の色記号と誤連想されるのを防ぐ (測定独立性・security LOW)。 */}
+          <span className={`session-value kbd-status ${calibrationMode ? 'kbd-neutral' : keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
             {keyStatusLabel}
           </span>
         </div>

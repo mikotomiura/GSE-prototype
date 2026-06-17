@@ -23,11 +23,19 @@
   `state-calibration` に置換。`.state-calibration` は状態色を持たない。
 - **根拠**: テキスト/数値だけでなく色によるアンカリングも測定独立性を壊すため (data-privacy)。
 
+## CD-5 review LOW 対応: 較正中の打鍵状態色を中立化
+- **判断**: security-checker LOW 指摘 (kbd-active=flow緑 / kbd-idle=incubation黄 が状態パレットと同一で
+  色による状態アンカリングを誘発しうる) に対応し、較正中は `kbd-neutral` (--color-text) を適用。
+- **根拠**: CD-4 (コンテナ状態色の中立化) と同じ「間接的な色アンカリング防止」方針の一貫適用。値自体は
+  keyboardIdleMs でモデル出力ではないが、色記号の誤連想を断つ。
+
 ## 受容 / 申し送り
-- **独立レビューが infra 都合で未実施**: code-reviewer / security-checker サブエージェントが
-  **529 Overloaded で複数回失敗**、かつ Codex 側は **jq 不在**で /cross-review がゲートされた。
-  → インライン自己レビュー (typescript-standards / data-privacy 基準) を実施し HIGH なし・`npm run build`
-  (tsc) 緑を確認。API 復旧後に /cross-review を再試行することを推奨 (品質ゲートの失敗ではなく基盤不在)。
+- **独立レビュー実施済 (API 復旧後に再試行して成功)**: 初回は code-reviewer/security-checker が
+  **529 Overloaded で複数回失敗**・Codex 側は **jq 不在**でゲートされたため一旦インライン自己レビューで
+  コミットしたが、API 復旧後に **code-reviewer + security-checker を再実行**。
+  - code-reviewer: HIGH/MEDIUM なし。LOW 2 件 (dominant 計算・inline style) は任意・現状維持。
+  - security-checker: PASS。HIGH/MEDIUM なし。LOW 1 件 (打鍵状態色) → CD-5 で対応済。
+  - Codex (/cross-review) は引き続き jq 不在でスキップ ([[project-codex-review-needs-jq]])。
 - **cargo 検証省略**: Rust 無変更のため回帰なし (frontend のみ)。
 - **GUI 手動確認は実機**: blind 表示・ProbeCard 回答・VignetteTest・nudge/wall 非表示 (interventionEnabled=false)
   は headless 不可のため実機手動。design.md テスト戦略に明記。

@@ -246,6 +246,11 @@ body {
   color: var(--color-incubation);
 }
 
+/* 較正モード: 打鍵状態を状態パレット外の中立色にする (色による状態アンカリング防止)。 */
+.kbd-neutral {
+  color: var(--color-text);
+}
+
 /* Monk Mode toggle (ON = Wall disabled, OFF = normal) */
 .monk-mode-toggle {
   width: 100%;
