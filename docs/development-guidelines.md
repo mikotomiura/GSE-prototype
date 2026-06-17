@@ -149,15 +149,16 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
 - **TCC 権限テスト**: OS システムダイアログのため自動化不可。手動テスト手順を `.steering/` に記録
 - **macOS フックの実機テスト**: `cargo tauri dev` でアプリを起動し、Dashboard の診断パネル（hook_active, callback_count, consecutive_tap_failures, using_accessibility_fallback）で動作確認
 
-### CI/CD パイプライン（目標）
+### CI/CD パイプライン
 
-現時点では CI/CD 未構成。目標構成:
+GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `feature/*`)・`pull_request` (main)・`v*` タグで起動する:
 
-- **GitHub Actions**: matrix ビルド（windows-latest, macos-latest）
-- **Windows ジョブ**: `cargo build`, `cargo clippy`, `cargo test`（analysis/ 単体テスト）
-- **macOS ジョブ**: 同上 + TCC 権限テストは自動化不可（手動検証）
-- **Frontend ジョブ**: `npm ci && npm run build`
-- **将来**: `cargo tauri build` によるディストリビューションアーティファクト生成
+- **`check` ジョブ**: matrix ビルド (windows / macOS target)。`cargo build` → `cargo test --workspace` → スナップショット回帰 (`gse-replay --snapshot`) → schema drift check (`emit_schema` vs `schema/current.json`)
+- **`frontend-check` ジョブ**: `npm ci` → TypeScript 型チェック → Vite production ビルド
+- **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Tauri アプリをビルドし NSIS / portable exe / DMG をアーティファクト化 (macOS は entitlements 付き再署名)
+- **`release` ジョブ**: 両ビルド成功後に GitHub Release を作成
+
+> **運用上の注意**: GitHub Actions の無料枠 (3000 時間) を超過したため、現状はクラウド CI が利用できず、**ローカル検証で代替**している (`cargo test --workspace` / `gse-replay --snapshot` / `emit_schema` diff を手元で実行)。TCC 権限テストは元々自動化不可で実機手動検証。
 
 ## 4. レビュー基準
 
@@ -214,7 +215,8 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
   - 送信タイミングはセッション終了後のバッチ処理（リアルタイム送信禁止）
 - **Wall Server**: ランダムトークンによるアクセス制御。ローカルネットワークのみ。Win: ファイアウォールルールでポートを動的管理 / mac: 追加管理不要。
 - **macOS TCC 権限**: Input Monitoring / Accessibility 権限は最小限の範囲でリクエストする。`tccutil reset` コマンドによるリカバリパスを維持する。
-- **Tauri CSP**: `default-src 'self'; style-src 'self' 'unsafe-inline'` — 外部リソースの読み込みを禁止。
+- **Tauri CSP**: `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'` (`src-tauri/tauri.conf.json`) — 外部リソースの読み込みを禁止。`img-src` の `data:` は QR コード等のインライン画像のため許可。
+- **Tauri capabilities (権限管理)**: Tauri 2.0 では v1 allowlist を使わず `src-tauri/capabilities/default.json` で権限を宣言する (main + overlay + global-shortcut)。新しい IPC コマンドやプラグイン権限を足すときはここを編集する。
 
 ## 8. 禁止事項
 

@@ -1,151 +1,117 @@
-# GSE (Generative Struggle Engine)
+# GSE (Generative Struggle Engine) — CLAUDE.md
 
 ## このファイルについて
 
 このファイルは Claude Code がセッション開始時に自動で読み込む指示書です。
-詳細な情報は `docs/` 配下の各ドキュメントを参照してください。
-このファイルの目的は **Claude が探索を始める起点を示すこと** であり、
-プロジェクトの全情報を含むことではありません。
+**Claude Code 固有の動作プロトコル** に集中して書きます。
 
-## プロジェクト概要
+- プロジェクト共通の情報 (概要 / アーキテクチャ / 技術制約 / 規約 / テスト / git) は
+  `@docs/agent-shared.md` を参照してください。Codex CLI も同じファイルを読みます。
+- Codex CLI 固有の動作 (sandbox / approval / rescue) は `AGENTS.md` を見てください。
 
-- **名称**: GSE (Generative Struggle Engine)
-- **目的**: キーストローク動態から認知状態 (Flow/Incubation/Stuck) を推定し、段階的介入で「生産的苦闘」を守る不便益 HCI フレームワーク
-- **主要技術**: Tauri 2.0 + Rust (Backend) + React/TypeScript (Frontend)
-- **ターゲット**: Windows 11 + macOS 13+
-- **チーム規模**: 小規模 (2-3人)
+目的は **Claude が探索を始める起点を示すこと** であり、全情報を含むことではありません。
 
-## 参照すべきドキュメント
+## 共通コンテキスト
 
-作業内容に応じて、必要なドキュメントを Read で読んでください:
+@docs/agent-shared.md
 
-| ファイル | いつ読むか |
+(プロジェクト概要・アーキテクチャ・技術制約・規約・テスト方針・git ワークフロー・
+公式 Skill 一覧 (`@docs/external-skills.md`) はここから参照されます)
+
+## セッション開始時の行動規範
+
+タスク/セッション開始時、メインエージェントは以下を **必ずこの順** で実行してください。
+全部自分でやろうとしないこと。
+
+1. **コマンド選定**: 今回の作業に該当するスラッシュコマンド (`/start-task`, `/add-feature`,
+   `/fix-bug`, `/refactor`, `/review-changes` 等) があれば **必ずそれを起動する**。
+   該当コマンドを使わずに作業を始めない。実装系タスクは必ず `/start-task` が先。
+2. **docs/ の先読み**: 闇雲にコードを読まず、`@docs/agent-shared.md` のリンクハブから
+   該当 docs を先に読んで文脈を把握する。
+3. **Skill 参照**: 実装・レビュー・テスト等、該当する Skill があれば
+   `.claude/skills/[name]/SKILL.md` を Read で参照してから手を動かす。
+   GSE 固有領域には専用 Skill がある (下記)。公式 Skill で済む領域は自前を作らない。
+4. **サブエージェントへの委譲**: 以下はメインではなくサブエージェントで実行する。
+   - 複数ファイル横断の探索 → `file-finder`、影響範囲調査 → `impact-analyzer`、
+     依存関係 → `dependency-checker`
+   - レビュー → `code-reviewer` + `security-checker` を **並列**起動
+   - テスト → `test-runner`、ビルド → `build-executor`、ログ解析 → `log-analyzer`
+   独立した調査・レビューは 1 メッセージで並列に投げる。
+5. **破壊と構築**: 設計判断・アーキテクチャ選択・難しいバグなど高難度タスクでは
+   `/reimagine` をプラン段階で起動し、初回案を破棄して再生成した案と比較する (実装着手前専用)。
+6. **Codex 併用**: 設計の第二意見は `codex-consult` (任意)、2 回以上詰まった実装の rescue は
+   `codex-rescue` (要明示承認)。**diff の独立レビュー `/cross-review` は各タスク完了時に必須**
+   (`/finish-task` Step 3 で code-reviewer と並んで起動。code-reviewer/security-checker だけで
+   完了しない)。安全ゲート (proprietary/機密混入・予算超過・codex/jq 不在) でブロックされた場合のみ
+   Claude 単独へ縮退し、**skip 理由を完了報告に明記**する。
+   `docs/external-skills.md` で送信「禁止」の出力・NDJSON 生ログを Codex 入力に含めない。
+
+## GSE 固有 Skill (必須参照)
+
+| Skill | いつ参照するか |
 |---|---|
-| `docs/functional-design.md` | 機能の意図・要件・ユースケースを確認したい時 |
-| `docs/architecture.md` | アーキテクチャ・スレッドモデル・データフローを確認したい時 |
-| `docs/repository-structure.md` | ファイル配置・命名規則・モジュール依存方向を確認したい時 |
-| `docs/development-guidelines.md` | コーディング規約・テスト方針・レビュー基準を確認したい時 |
-| `docs/glossary.md` | 用語の正確な定義を確認したい時（禁止用語の確認も含む） |
+| `architecture-rules` | `*.rs` 追加 / モジュール境界 / mod.rs 更新 / Tauri コマンド追加 |
+| `rust-standards` | `src-tauri/src/` の Rust を書く (unsafe / windows crate / anyhow / tracing) |
+| `typescript-standards` | `src/` の `*.tsx`/`*.ts` を書く (Tauri IPC / any 禁止) |
+| `hook-constraints` | `hook_*.rs` / `ime_*.rs` のコールバック内 / Atomic フラグ操作 |
+| `hmm-analysis` | `features.rs` / `engine.rs` の特徴量・遷移/放出行列・量子化 |
+| `ml-workflow` | HMM チューニング根拠 / ONNX 移行 / Python 学習スクリプト |
+| `intervention-design` | Nudge / Wall / Zen Timer / `wall_server.rs` |
+| `data-privacy` | `logger.rs` / `hook.rs` / `wall_server.rs` / 外部送信・ML データ収集 |
+| `git-workflow` | コミット / ブランチ / バージョン / `.steering/` 記録 |
+| `physical-anchor` | Lv3/Lv4 Physical Anchor / Flutter 連携 |
+| `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
 
-## 技術的制約（厳守）
-
-1. **Windows API**: `windows` crate (v0.58+) のみ。`winapi` は禁止
-2. **macOS API**: `core-graphics` + `core-foundation`。低レベル FFI は `#[link]` 宣言
-3. **unsafe**: Win32 API / macOS FFI 呼び出しに限定し、ラッパー構造体内に隔離
-4. **フックコールバック**: Atomic 操作 + channel send のみ。ブロッキング禁止（Win/mac 共通）
-5. **GCD dispatch_sync_f**: メインスレッドからの呼び出し禁止（デッドロック）
-6. **TCC 権限**: Input Monitoring → Accessibility のフォールバックチェーンを維持
-7. **グローバル TSF フック禁止**: UIPI でブロックされる（Windows のみ）
-8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
-9. **エラーハンドリング**: `anyhow::Result` を使用
-10. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
-
-## 作業記録の運用ルール（重要）
+## 作業記録の運用ルール (重要)
 
 **すべての実装作業は `.steering/` 配下に記録を残してください。**
 
-### ディレクトリ命名規則
-
-```
-.steering/[YYYYMMDD]-[task-name]/
-```
-
-### 各タスクで作成するファイル
-
-| ファイル | 必須/任意 | 内容 |
-|---|---|---|
-| `requirement.md` | 必須 | 背景、ゴール、受け入れ条件 |
-| `design.md` | 必須 | 実装アプローチ、変更対象、テスト戦略 |
-| `tasklist.md` | 必須 | チェックボックス形式のタスクリスト |
-| `blockers.md` | 任意 | ブロッカーと対処方法 |
-| `decisions.md` | 任意 | 重要な設計判断と根拠 |
-
-テンプレートは `.steering/_template/` を参照。
-
-## データ repo (gse-dataset) 連携
-
-セッション NDJSON は本リポジトリに **コミットしない**。共有アーティファクトは `gse-replay --metrics --json` 出力のみで [mikotomiura/gse-dataset](https://github.com/mikotomiura/gse-dataset) (private) の `metrics/P*/<os>/` に置く。NDJSON Schema は `src-tauri/src/schema_dto.rs` から `cargo run --bin emit_schema` で機械生成 (CI が drift 検知)。詳細は `docs/development-guidelines.md §10`。
-
-## コミットメッセージ規約
-
-```
-[type]([scope]): [短い説明]
-```
-
-- type: feat, fix, refactor, docs, chore, test
-- scope: engine, hook, ime, wall, frontend, logger 等
+- ディレクトリ: `.steering/[YYYYMMDD]-[task-name]/`
+- 必須: `requirement.md` (背景・ゴール・受け入れ条件) / `design.md` (アプローチ・変更対象・
+  テスト戦略) / `tasklist.md` (チェックボックス)
+- 任意: `blockers.md` (詰まりと解決) / `decisions.md` (設計判断と根拠)
+- 作成は `/start-task` で自動化、最終化は `/finish-task`。テンプレートは `.steering/_template/`。
 
 ## モデル選択ルール
 
 | タスク種別 | モデル | 理由 |
 |---|---|---|
-| Plan Mode、設計判断 | Opus | 推論深度が必要 |
+| Plan Mode、設計判断、`/reimagine` | Opus | 推論深度が必要 |
 | 実装、テスト、リファクタ | Sonnet | バランス最良 |
 | リネーム、フォーマット | Haiku | 速度優先 |
 
 ## コンテキスト管理ルール
 
-1. **50% ルール**: 使用率 50% 超で次の区切りに `/smart-compact`
-2. **タスク切り替え時は `/clear`**: 文脈が変わるなら `/compact` ではなく `/clear`
-3. **Plan → Execute の徹底**: 複雑なタスクでは Plan Mode (Opus) → 実装 (Sonnet)
+1. **`/context` を見る習慣**: セッション開始時・実装前・compact 前に使用率を確認する。
+2. **タスク切り替え時は `/clear`**: 文脈が変わるなら `/compact` ではなく `/clear`。
+   (本機は 1M context モデル。区切りごとの惰性的な圧縮より、タスク境界での `/clear` を優先)
+3. **長大化したら `/smart-compact`**: 単一タスクが長引き使用率が高くなってきたら、設計判断・
+   進捗を保持したまま `/smart-compact` で中間圧縮する。
+4. **Plan → Execute の徹底**: 複雑なタスクは Plan Mode (Opus) で計画承認 → Sonnet で実装。
 
 ## 禁止事項
 
 - 既存のテストを無断で削除しない
 - ドキュメント化されていない設計判断を勝手に変更しない
 - `.steering/` への記録を省略しない
-- 50% を超えてもセッションを続けない
-- 曖昧な指示に対して推測で実装しない（質問する）
-- `analysis/` 内で Windows API / macOS フレームワークを直接呼ばない（OS 依存は `input/` に閉じる）
+- 曖昧な指示に対して推測で実装しない (質問する)
+- `analysis/` 内で Windows API / macOS フレームワークを直接呼ばない (OS 依存は `input/` に閉じる)
+- `winapi` crate / `println!` / `eprintln!` / `any` 型を使わない (詳細は `@docs/agent-shared.md`)
 
-## Hook による自動強制（重要）
+## Hook による自動強制
 
-Hook は 3 層構造で動作する。全層の出力がユーザーに明示される:
+Hook は 3 層で動作し、全層の出力がユーザーに明示される (Windows は git-bash 必須):
 
-1. **Preflight 層** (`UserPromptSubmit`): 毎ターン `preflight.sh` がタスク状態・git 状態・reimagine 適用状態を表示
-2. **Guard 層** (`PreToolUse`): Edit/Write 時に `[guard] PASS` または `BLOCKED` を明示
-3. **Report 層** (`PostToolUse` / `Stop`): cargo fmt 適用報告、clippy/tsc チェック結果
+1. **Preflight** (`UserPromptSubmit`): 毎ターン タスク状態・git 状態を表示
+2. **Guard** (`PreToolUse`): Edit/Write 時に `[guard] PASS` または `BLOCKED:` を明示
+3. **Report** (`PostToolUse` / `Stop`): cargo fmt 適用報告、clippy/tsc 結果
 
-Edit/Write が `BLOCKED:` 出力で拒否された場合、メッセージに従って修正してから再試行すること。詳細は `docs/development-guidelines.md` §9 を参照。
+`BLOCKED:` で拒否されたらメッセージに従い修正して再試行。詳細は `docs/development-guidelines.md` §9。
 
-## セッション開始時の行動指針
+## 利用可能なコマンド / サブエージェント
 
-1. **`/start-task`** で作業記録を初期化する
-2. **`/implement`** で実装を進める（feat / fix / refactor をモード選択）
-3. **必要な docs/ を先に読む** — 闇雲にコードを読まず、まずドキュメントで文脈を把握
-4. **Skill 参照**: 該当する Skill があれば `.claude/skills/` を確認してから着手
-5. **サブエージェントを積極的に活用** する（下記参照）
-
-## サブエージェント活用ルール
-
-**並列化できる調査・検証は積極的にサブエージェントへ委譲すること。**
-
-| フェーズ | 使うべきエージェント | タイミング |
-|---|---|---|
-| 調査 | `file-finder` | 変更対象ファイルの特定 |
-| 調査 | `dependency-checker` | 依存関係・影響範囲の把握 |
-| 調査 | `impact-analyzer` | 変更の波及先を分析 |
-| 実装後 | `code-reviewer` | コード品質・規約違反の検出 |
-| 実装後 | `test-analyzer` | テストカバレッジ・不足の指摘 |
-| 実装後 | `security-checker` | セキュリティ上の問題検出 |
-| 検証 | `test-runner` | テスト実行 |
-| 検証 | `build-executor` | ビルド確認 |
-| デバッグ | `log-analyzer` | ログ解析 |
-
-- **独立した調査は並列実行**: 例えば `file-finder` と `dependency-checker` は同時に走らせる
-- **レビュー系も並列実行**: `code-reviewer` + `security-checker` を同時に走らせる
-- 自分で全部やるより、サブエージェントに委譲して結果を統合する方が速く正確
-
-## 利用可能なコマンド一覧
-
-| コマンド | 用途 |
-|---|---|
-| `/start-task` | 新規タスクの開始（.steering/ 初期化） |
-| `/add-feature` | 新機能追加ワークフロー |
-| `/fix-bug` | バグ修正ワークフロー（TDD 順序: テスト先行） |
-| `/refactor` | リファクタリングワークフロー（振る舞いを変えない・交互実行） |
-| `/reimagine` | 破壊と構築（設計深化・確証バイアス排除、実装着手前専用） |
-| `/review-changes` | 変更レビュー（動的 git 取得 + エージェント並列） |
-| `/finish-task` | タスク完了処理（steering 最終化・テスト・コミット） |
-| `/smart-compact` | 50% 超えた時の中間圧縮（設計判断・進捗を保持したまま /compact） |
-
+- **コマンド**: `/start-task` `/add-feature` `/fix-bug` `/refactor` `/reimagine`
+  `/review-changes` `/smart-compact` `/finish-task` (詳細は `.claude/commands/`)
+- **サブエージェント**: 収集=`file-finder` `dependency-checker` `impact-analyzer` /
+  レビュー=`code-reviewer` `test-analyzer` `security-checker` /
+  実行=`test-runner` `build-executor` `log-analyzer` (詳細は `.claude/agents/`)

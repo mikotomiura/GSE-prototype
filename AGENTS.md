@@ -1,151 +1,67 @@
-# GSE (Generative Struggle Engine)
+# AGENTS.md — Codex CLI 指示
 
 ## このファイルについて
 
-このファイルは Codex がセッション開始時に自動で読み込む指示書です。
-詳細な情報は `docs/` 配下の各ドキュメントを参照してください。
-このファイルの目的は **Codex が探索を始める起点を示すこと** であり、
-プロジェクトの全情報を含むことではありません。
+このファイルは OpenAI Codex CLI (`codex` コマンド) がセッション開始時に読み込みます。
+**Codex CLI 固有の動作プロトコル** に集中して書きます。
 
-## プロジェクト概要
+- プロジェクト共通の情報 (概要 / アーキテクチャ / 技術制約 / 規約 / テスト / git) は
+  `@docs/agent-shared.md` を参照してください。Claude Code も同じファイルを読みます。
+- Claude Code 固有の動作 (Plan mode / Skill / `.steering` ワークフロー) は `CLAUDE.md` を見てください。
 
-- **名称**: GSE (Generative Struggle Engine)
-- **目的**: キーストローク動態から認知状態 (Flow/Incubation/Stuck) を推定し、段階的介入で「生産的苦闘」を守る不便益 HCI フレームワーク
-- **主要技術**: Tauri 2.0 + Rust (Backend) + React/TypeScript (Frontend)
-- **ターゲット**: Windows 11 + macOS 13+
-- **チーム規模**: 小規模 (2-3人)
+## 共通コンテキスト
 
-## 参照すべきドキュメント
+@docs/agent-shared.md
 
-作業内容に応じて、必要なドキュメントを Read で読んでください:
+## サンドボックス既定
 
-| ファイル | いつ読むか |
-|---|---|
-| `docs/functional-design.md` | 機能の意図・要件・ユースケースを確認したい時 |
-| `docs/architecture.md` | アーキテクチャ・スレッドモデル・データフローを確認したい時 |
-| `docs/repository-structure.md` | ファイル配置・命名規則・モジュール依存方向を確認したい時 |
-| `docs/development-guidelines.md` | コーディング規約・テスト方針・レビュー基準を確認したい時 |
-| `docs/glossary.md` | 用語の正確な定義を確認したい時（禁止用語の確認も含む） |
+- **既定**: `read-only` — レビュー / 調査用途。書き込み禁止。
+- **`workspace-write`** — `codex-rescue` 経由かつ git worktree 隔離
+  (`.worktrees/codex-rescue-*`) でのみ許可。
+- **`danger-full-access`** — 使用禁止。
 
-## 技術的制約（厳守）
+詳細は `.codex/config.toml` (Phase 5 で正式化)。
 
-1. **Windows API**: `windows` crate (v0.58+) のみ。`winapi` は禁止
-2. **macOS API**: `core-graphics` + `core-foundation`。低レベル FFI は `#[link]` 宣言
-3. **unsafe**: Win32 API / macOS FFI 呼び出しに限定し、ラッパー構造体内に隔離
-4. **フックコールバック**: Atomic 操作 + channel send のみ。ブロッキング禁止（Win/mac 共通）
-5. **GCD dispatch_sync_f**: メインスレッドからの呼び出し禁止（デッドロック）
-6. **TCC 権限**: Input Monitoring → Accessibility のフォールバックチェーンを維持
-7. **グローバル TSF フック禁止**: UIPI でブロックされる（Windows のみ）
-8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
-9. **エラーハンドリング**: `anyhow::Result` を使用
-10. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
+## 承認モード
 
-## 作業記録の運用ルール（重要）
+- 既定: `untrusted` — 全シェルコマンドが事前承認を要求する。
+- バッチ実行 (`/cross-review` 等) では Claude Code 側で `--ask-for-approval=on-failure` に切替可。
 
-**すべての実装作業は `.steering/` 配下に記録を残してください。**
+## モデル設定
 
-### ディレクトリ命名規則
+- 既定モデル: `gpt-5.5`、reasoning effort 既定: `medium`
+- レビュー特化タスクでは `-c model_reasoning_effort=xhigh` を Skill から指定可。
 
-```
-.steering/[YYYYMMDD]-[task-name]/
-```
+## 出力形式
 
-### 各タスクで作成するファイル
+- バッチ呼び出しは `--json` 必須 (Skill / hook が `jq` でパースする前提)。
+- 最終応答のみ取り出す:
+  `jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text'`
 
-| ファイル | 必須/任意 | 内容 |
-|---|---|---|
-| `requirement.md` | 必須 | 背景、ゴール、受け入れ条件 |
-| `design.md` | 必須 | 実装アプローチ、変更対象、テスト戦略 |
-| `tasklist.md` | 必須 | チェックボックス形式のタスクリスト |
-| `blockers.md` | 任意 | ブロッカーと対処方法 |
-| `decisions.md` | 任意 | 重要な設計判断と根拠 |
+## Rescue モード (codex-rescue Skill 経由のみ)
 
-テンプレートは `.steering/_template/` を参照。
-
-## データ repo (gse-dataset) 連携
-
-セッション NDJSON は本リポジトリに **コミットしない**。共有アーティファクトは `gse-replay --metrics --json` 出力のみで [mikotomiura/gse-dataset](https://github.com/mikotomiura/gse-dataset) (private) の `metrics/P*/<os>/` に置く。NDJSON Schema は `src-tauri/src/schema_dto.rs` から `cargo run --bin emit_schema` で機械生成 (CI が drift 検知)。詳細は `docs/development-guidelines.md §10`。
-
-## コミットメッセージ規約
-
-```
-[type]([scope]): [短い説明]
-```
-
-- type: feat, fix, refactor, docs, chore, test
-- scope: engine, hook, ime, wall, frontend, logger 等
-
-## モデル選択ルール
-
-| タスク種別 | モデル | 理由 |
-|---|---|---|
-| Plan Mode、設計判断 | Opus | 推論深度が必要 |
-| 実装、テスト、リファクタ | Sonnet | バランス最良 |
-| リネーム、フォーマット | Haiku | 速度優先 |
-
-## コンテキスト管理ルール
-
-1. **50% ルール**: 使用率 50% 超で次の区切りに `/smart-compact`
-2. **タスク切り替え時は `/clear`**: 文脈が変わるなら `/compact` ではなく `/clear`
-3. **Plan → Execute の徹底**: 複雑なタスクでは Plan Mode (Opus) → 実装 (Sonnet)
+1. メイン worktree から `git worktree add .worktrees/codex-rescue-<ts> HEAD`
+2. その worktree で `codex exec --sandbox workspace-write --ask-for-approval`
+3. 完了 diff をメイン worktree の Claude が review、merge は人間判断
 
 ## 禁止事項
 
-- 既存のテストを無断で削除しない
-- ドキュメント化されていない設計判断を勝手に変更しない
-- `.steering/` への記録を省略しない
-- 50% を超えてもセッションを続けない
-- 曖昧な指示に対して推測で実装しない（質問する）
-- `analysis/` 内で Windows API / macOS フレームワークを直接呼ばない（OS 依存は `input/` に閉じる）
+- 機密情報 (`.env`, `*.pem`, `*.key`, `*credentials*`) を入力に含める
+- **NDJSON セッションログ・キーストローク内容** を入力に含める (`data-privacy` Skill 参照)
+- `docs/external-skills.md` で「外部 LLM への送信」が「禁止」の Skill 出力 / 中間生成物を入力に含める
+- メイン worktree への直接書き込み (rescue は必ず別 worktree で)
+- 同時に複数 codex セッションを動かす (`~/.codex/config.toml` の race condition 回避)
 
-## Hook による自動強制（重要）
+## 技術的制約
 
-Hook は 3 層構造で動作する。全層の出力がユーザーに明示される:
+`@docs/agent-shared.md` の「技術的制約 (厳守)」に従うこと
+(windows crate のみ / unsafe 隔離 / フックは非ブロッキング / `analysis/` で OS API 禁止 等)。
 
-1. **Preflight 層** (`UserPromptSubmit`): 毎ターン `preflight.sh` がタスク状態・git 状態・reimagine 適用状態を表示
-2. **Guard 層** (`PreToolUse`): Edit/Write 時に `[guard] PASS` または `BLOCKED` を明示
-3. **Report 層** (`PostToolUse` / `Stop`): cargo fmt 適用報告、clippy/tsc チェック結果
+## 関連ファイル (Phase 5 で生成)
 
-Edit/Write が `BLOCKED:` 出力で拒否された場合、メッセージに従って修正してから再試行すること。詳細は `docs/development-guidelines.md` §9 を参照。
-
-## セッション開始時の行動指針
-
-1. **`/start-task`** で作業記録を初期化する
-2. **`/implement`** で実装を進める（feat / fix / refactor をモード選択）
-3. **必要な docs/ を先に読む** — 闇雲にコードを読まず、まずドキュメントで文脈を把握
-4. **Skill 参照**: 該当する Skill があれば `.Codex/skills/` を確認してから着手
-5. **サブエージェントを積極的に活用** する（下記参照）
-
-## サブエージェント活用ルール
-
-**並列化できる調査・検証は積極的にサブエージェントへ委譲すること。**
-
-| フェーズ | 使うべきエージェント | タイミング |
-|---|---|---|
-| 調査 | `file-finder` | 変更対象ファイルの特定 |
-| 調査 | `dependency-checker` | 依存関係・影響範囲の把握 |
-| 調査 | `impact-analyzer` | 変更の波及先を分析 |
-| 実装後 | `code-reviewer` | コード品質・規約違反の検出 |
-| 実装後 | `test-analyzer` | テストカバレッジ・不足の指摘 |
-| 実装後 | `security-checker` | セキュリティ上の問題検出 |
-| 検証 | `test-runner` | テスト実行 |
-| 検証 | `build-executor` | ビルド確認 |
-| デバッグ | `log-analyzer` | ログ解析 |
-
-- **独立した調査は並列実行**: 例えば `file-finder` と `dependency-checker` は同時に走らせる
-- **レビュー系も並列実行**: `code-reviewer` + `security-checker` を同時に走らせる
-- 自分で全部やるより、サブエージェントに委譲して結果を統合する方が速く正確
-
-## 利用可能なコマンド一覧
-
-| コマンド | 用途 |
-|---|---|
-| `/start-task` | 新規タスクの開始（.steering/ 初期化） |
-| `/add-feature` | 新機能追加ワークフロー |
-| `/fix-bug` | バグ修正ワークフロー（TDD 順序: テスト先行） |
-| `/refactor` | リファクタリングワークフロー（振る舞いを変えない・交互実行） |
-| `/reimagine` | 破壊と構築（設計深化・確証バイアス排除、実装着手前専用） |
-| `/review-changes` | 変更レビュー（動的 git 取得 + エージェント並列） |
-| `/finish-task` | タスク完了処理（steering 最終化・テスト・コミット） |
-| `/smart-compact` | 50% 超えた時の中間圧縮（設計判断・進捗を保持したまま /compact） |
-
+- `.codex/config.toml` — Codex CLI 設定 (モデル / sandbox 既定)
+- `.codex/budget.json` — 日次トークン予算
+- `scripts/secrets-filter.sh` — 機密 + proprietary 入力フィルタ
+- `.claude/skills/codex-consult/SKILL.md` — 設計相談 (Plan mode で第二意見)
+- `.claude/skills/codex-review/SKILL.md` — diff レビュー (read-only)
+- `.claude/skills/codex-rescue/SKILL.md` — rescue (workspace-write + worktree 隔離 + 明示承認)

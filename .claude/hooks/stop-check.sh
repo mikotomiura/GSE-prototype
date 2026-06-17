@@ -1,32 +1,32 @@
 #!/bin/bash
-# Stop hook - 完了前品質チェック (cargo clippy + tsc)
-# 変更ファイルがある場合のみ実行し、問題があれば Claude に通知する
+# Stop hook (Report 層) - セッション終了時の静的解析
+# 問題があった時のみ [stop] WARN を 1 行出す。詳細はユーザーが手動で実行する前提。
 
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+MANIFEST="${REPO_ROOT}/src-tauri/Cargo.toml"
+
+# 変更ファイルが無ければスキップ
 CHANGED=$(git diff --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
 if [ "$CHANGED" -eq 0 ]; then
-  exit 0
+    exit 0
 fi
 
-OUTPUT=""
-
-# Rust: cargo clippy (変更された .rs ファイルがある場合)
+# Rust: cargo clippy (変更された .rs ファイルがある場合のみ)
 if git diff --name-only HEAD 2>/dev/null | grep -q '\.rs$'; then
-  CLIPPY=$(cargo clippy --manifest-path src-tauri/Cargo.toml --quiet 2>&1 | grep -E "^error|^warning\[" | head -15)
-  if [ -n "$CLIPPY" ]; then
-    OUTPUT="${OUTPUT}[cargo clippy]\n${CLIPPY}\n"
-  fi
+    if [ -f "$MANIFEST" ]; then
+        if ! cargo clippy --manifest-path "$MANIFEST" --quiet -- -D warnings >/dev/null 2>&1; then
+            echo "[stop] WARN: cargo clippy reported issues. Run 'cargo clippy' to inspect."
+        fi
+    fi
 fi
 
-# TypeScript: tsc --noEmit (変更された .ts/.tsx ファイルがある場合)
+# TypeScript: tsc --noEmit (変更された .ts/.tsx ファイルがある場合のみ)
 if git diff --name-only HEAD 2>/dev/null | grep -qE '\.(ts|tsx)$'; then
-  TSC=$(npx tsc --noEmit --pretty false 2>&1 | grep -E "error TS" | head -10)
-  if [ -n "$TSC" ]; then
-    OUTPUT="${OUTPUT}[tsc]\n${TSC}\n"
-  fi
+    if [ -f "${REPO_ROOT}/tsconfig.json" ] && command -v npx >/dev/null 2>&1; then
+        if ! (cd "$REPO_ROOT" && npx --no-install tsc --noEmit >/dev/null 2>&1); then
+            echo "[stop] WARN: tsc reported type errors. Run 'npx tsc --noEmit' to inspect."
+        fi
+    fi
 fi
 
-if [ -n "$OUTPUT" ]; then
-  echo "=== 品質チェック結果 ==="
-  printf "%b" "$OUTPUT"
-  echo "上記の問題を修正してから完了としてください。"
-fi
+exit 0

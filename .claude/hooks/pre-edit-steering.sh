@@ -43,8 +43,8 @@ for i in 0 1 2 3 4 5 6 7; do
 done
 
 if [ -z "$TASK_DIR" ]; then
-    echo "BLOCKED: 実装ファイル ($REL) を編集する前に /start-task でタスクを開始してください。" >&2
-    echo "直近7日内に .steering/[YYYYMMDD]-*/ が見つかりません。" >&2
+    echo "[guard] BLOCKED: 実装ファイル ($REL) を編集する前に /start-task でタスクを開始してください。" >&2
+    echo "[guard]          直近7日内に .steering/[YYYYMMDD]-*/ が見つかりません。" >&2
     exit 2
 fi
 
@@ -55,8 +55,8 @@ MISSING=""
 [ ! -f "$TASK_DIR/tasklist.md" ] && MISSING="$MISSING tasklist.md"
 
 if [ -n "$MISSING" ]; then
-    echo "BLOCKED: $TASK_DIR に以下の必須ファイルがありません:$MISSING" >&2
-    echo "/start-task のテンプレートに従って作成してから実装に入ってください。" >&2
+    echo "[guard] BLOCKED: $TASK_DIR に以下の必須ファイルがありません:$MISSING" >&2
+    echo "[guard]          /start-task のテンプレートに従って作成してから実装に入ってください。" >&2
     exit 2
 fi
 

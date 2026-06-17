@@ -22,7 +22,7 @@ REL=${TARGET_REAL#${REPO_ROOT_REAL}/}
 # .rs ファイル: println!/eprintln! 禁止 (tests/ は許容)
 if echo "$REL" | grep -qE '\.rs$' && ! echo "$REL" | grep -qE '(^src-tauri/tests/|test.*\.rs$|tests\.rs$)'; then
     if echo "$NEW_CONTENT" | grep -qE '(^|[^a-zA-Z_])(println!|eprintln!)'; then
-        echo "BLOCKED ($REL): println!/eprintln! は禁止です (CLAUDE.md 制約8)。tracing::{info,warn,error,debug} を使ってください。" >&2
+        echo "[guard] BLOCKED ($REL): println!/eprintln! は禁止です (CLAUDE.md 制約8)。tracing::{info,warn,error,debug} を使ってください。" >&2
         exit 2
     fi
 fi
@@ -30,7 +30,7 @@ fi
 # Cargo.toml: winapi crate 禁止
 if echo "$REL" | grep -qE 'Cargo\.toml$'; then
     if echo "$NEW_CONTENT" | grep -qE '^\s*winapi\s*=' || echo "$NEW_CONTENT" | grep -qE '"winapi"'; then
-        echo "BLOCKED ($REL): winapi crate は禁止です (CLAUDE.md 制約1)。windows crate (v0.58+) を使ってください。" >&2
+        echo "[guard] BLOCKED ($REL): winapi crate は禁止です (CLAUDE.md 制約1)。windows crate (v0.58+) を使ってください。" >&2
         exit 2
     fi
 fi
@@ -38,7 +38,7 @@ fi
 # analysis/ 配下: OS 依存 API のインポート禁止 (CLAUDE.md 禁止事項)
 if echo "$REL" | grep -qE '^src-tauri/src/analysis/.*\.rs$'; then
     if echo "$NEW_CONTENT" | grep -qE '^\s*use\s+(windows|core_graphics|core_foundation|objc2|cocoa)(::|;)'; then
-        echo "BLOCKED ($REL): analysis/ 内で OS 依存 API (windows/core_graphics/core_foundation/objc2/cocoa) の使用は禁止です。OS 依存は input/ または sensors*.rs に閉じてください。" >&2
+        echo "[guard] BLOCKED ($REL): analysis/ 内で OS 依存 API (windows/core_graphics/core_foundation/objc2/cocoa) の使用は禁止です。OS 依存は input/ または sensors*.rs に閉じてください。" >&2
         exit 2
     fi
 fi

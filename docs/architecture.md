@@ -199,6 +199,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
 - **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
+- **v0.3 較正バリアント**: `LogEntry::ProbeAssignment` (プローブ時刻の監査記録) と `LogEntry::ReviewMarker` は production で emit される。一方 `LogEntry::SessionMeta` (track/task_kind 宣言) / `LogEntry::RealtimeLabel` (Q1/Q2 プローブ回答) / `LogEntry::VignetteResponse` (尺度理解テスト) は **schema (`schema_dto`) と format 関数・テストには存在するが、現行 production パスではまだ emit されない** (UI 経路が未配線、機能 7 注記参照)。schema drift check の対象には含まれる
 
 ### 4.8 Ground Truth ラベリング経路 (Phase 1)
 
@@ -206,7 +207,10 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **コンポーネント**:
   - `lib.rs::record_label_internal` — 共通ヘルパー。2 秒デバウンスを `AtomicU64::compare_exchange` で race-free に実装 (Tauri コマンド経路とグローバルホットキー経路の衝突を構造的に排除)
   - `lib.rs::record_user_label` — Tauri コマンド。`UserLabelKind::parse` で whitelist バリデーション (flow / incubation / stuck のみ)
-  - `tauri-plugin-global-shortcut` プラグイン — `⌘⇧⌥ F/I/S` (macOS) / `Ctrl+Shift+Alt+F/I/S` (他) を登録、`setup()` で `app.global_shortcut().register()`
+  - `tauri-plugin-global-shortcut` プラグイン — 以下のホットキーを `setup()` で `app.global_shortcut().register()`:
+    - `⌘⇧⌥ F/I/S` (macOS) / `Ctrl+Shift+Alt+F/I/S` (他) — 3 値の自覚ラベル (`user_label`)
+    - `⌘⇧⌥ R` / `Ctrl+Shift+Alt+R` — レビューマーカー (`review_marker`、1 秒デバウンス)
+    - `⌘⇧⌥ M` / `Ctrl+Shift+Alt+M` — 自己マーカー (v0.3、`probe_triggered` を `source: "self_marker"` で emit。希少な深い Stuck の副データ)
   - Dashboard `listen<{label, timestamp}>("user_label_recorded", ...)` — Tauri event を購読して counter state 更新
 - **プライバシー制約**: UserLabel は `{flow, incubation, stuck}` の 3 値 enum + サーバー側 timestamp のみ。キーストローク文字内容は一切含まない
 
@@ -339,6 +343,21 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
 7. 開発者が出力を `gse-dataset/metrics/P000/<os>/` にコピーして commit (UC-GT3)
 
 > **Note (2026-04-16)**: フロー 4 step 3 は以前 `run_replay` による step() 再実行で FeatSnapshot 列を生成していたが、virtual-clock tick と label の wall-clock 時刻が揃わず label 近接の feat を取りこぼすバグ (`.steering/20260416-replay-feat-alignment-bug/`) が顕在化。`collect_logged_feats` に切替済み。`run_replay` は `--snapshot` / デフォルト JSON 出力 (step() 決定論検証) 用途に残している。
+
+### フロー 4b: `gse-replay --calibration` による v0.3 較正解析 (Task D・オフライン)
+
+1. 開発者が `cargo run --bin gse-replay -- <s1.ndjson> [s2.ndjson ...] --calibration [--json]` を実行 (1 被験者の複数セッションを時刻順)
+2. `parse_args` が全モード排他と `--calibration` の可変長 positional (≤`MAX_CALIBRATION_FILES`)・`--json` 条件を検証
+3. 各ファイルで `load_calibration_session` が 1 パスで `session_meta`(track) / `probe_assignment`(件数) / `realtime_label`(→`ProbeRecord`) / `vignette_response`(→`VignetteRecord`) を抽出 (未知 enum・範囲外 q1/q2 は件数のみ warn で skip)、X/Y 源の `feat` は `collect_logged_feats` を再利用
+4. `analysis::calibration_eval::compute_calibration_metrics` が以下を算出:
+   - **時間隔離窓** (t−31s..t−1s) の `feat` を `AggSpec`(既定 ewma 中央値) で X/Y 集約 (probe 後窓は不使用 D-8)
+   - **前向き holdout**: 先頭 2 セッション = 較正・残り = 評価 (§8)。C-index は評価セッションのみ
+   - **方向付き C-index** (X↔Q1 / Y↔Q2)、**2段ゲート**、**MNAR 上下限**、**ビネット採点**、**二軸性**、Recall は withheld
+   - `track=exploratory` は主指標から除外 (§1.3)
+5. `format_calibration_pretty` または `serde_json::to_string_pretty(&report)` で出力 → `gse-dataset/metrics/P*/<os>/`
+6. 被験者**横断**の最終 Go/Kill 判定 (`model_gate`/`measurement_gate` は純関数として実装済) と実データ評価は Task E
+
+> **Note**: 既存 `metrics.rs` の confusion/precision/recall は v0.2 流のため流用せず (D-14)、C-index 系は独立モジュール `calibration_eval.rs` に実装。`ReplayEvent` に較正 4 variant を追加したが `timestamp()==None` で snapshot 経路 (`run_replay`) からは除外され、既存スナップショット回帰に影響しない。
 
 ### フロー 5: JSON Schema 生成と CI drift 検知 (Phase 1)
 
