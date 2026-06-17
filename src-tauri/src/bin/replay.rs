@@ -39,9 +39,10 @@ use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::intervention::InterventionThresholds;
 use gse_next_lib::analysis::intervention_eval::{
-    compute_intervention_metrics, compute_intervention_sweep, compute_nudge_diagnostic,
-    format_intervention_pretty, format_intervention_sweep_pretty, format_nudge_diagnostic_pretty,
-    SweepInput, DEFAULT_DEFER_RECOVERY_WINDOW_MS, DEFAULT_SWEEP_NUDGE_NEED,
+    compute_correction_floor_report, compute_intervention_metrics, compute_intervention_sweep,
+    compute_nudge_diagnostic, format_correction_floor_pretty, format_intervention_pretty,
+    format_intervention_sweep_pretty, format_nudge_diagnostic_pretty, SweepInput,
+    DEFAULT_DEFER_RECOVERY_WINDOW_MS, DEFAULT_SWEEP_NUDGE_NEED,
 };
 use gse_next_lib::analysis::loop_step::{
     step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
@@ -357,7 +358,10 @@ struct Args {
     /// --nudge-diag: ACT decision を reason×GT で層別し特徴量分布を出す (FP/TP 分離診断)。
     /// `--sweep` と同様に複数セッションを受ける。
     nudge_diag: bool,
-    /// `--calibration` / `--sweep` / `--nudge-diag` の 2 個目以降の positional (セッション時刻順)。
+    /// --corr-floor: correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (Step 2)。
+    /// `--sweep` と同様に複数セッションを受ける。
+    corr_floor: bool,
+    /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
 }
 
@@ -450,7 +454,15 @@ fn parse_args() -> Result<Args, String> {
         false
     };
 
-    // --json は --metrics / --segments / --intervention / --calibration / --sweep / --nudge-diag 併用時のみ意味を持つ
+    // --corr-floor フラグ (correction_after_pause veto floor の counterfactual)
+    let corr_floor = if let Some(pos) = args.iter().position(|a| a == "--corr-floor") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
+    // --json は集計系モード併用時のみ意味を持つ
     if json
         && !metrics
         && segments_path.is_none()
@@ -458,9 +470,10 @@ fn parse_args() -> Result<Args, String> {
         && !calibration
         && !sweep
         && !nudge_diag
+        && !corr_floor
     {
         return Err(
-            "--json requires --metrics, --segments, --intervention, --calibration, --sweep, or --nudge-diag"
+            "--json requires --metrics, --segments, --intervention, --calibration, --sweep, --nudge-diag, or --corr-floor"
                 .to_string(),
         );
     }
@@ -475,23 +488,24 @@ fn parse_args() -> Result<Args, String> {
         calibration,
         sweep,
         nudge_diag,
+        corr_floor,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag, --corr-floor are mutually exclusive"
                 .to_string(),
         );
     }
 
-    // positional 引数の検証。--calibration / --sweep / --nudge-diag は複数セッションを受けるため ≥1 個、
-    // それ以外のモードは従来どおり厳密に 1 個。
+    // positional 引数の検証。--calibration / --sweep / --nudge-diag / --corr-floor は複数セッションを
+    // 受けるため ≥1 個、それ以外のモードは従来どおり厳密に 1 個。
     if args.is_empty() {
         return Err("expected at least 1 positional argument (session.ndjson)".to_string());
     }
-    if !calibration && !sweep && !nudge_diag && args.len() != 1 {
+    if !calibration && !sweep && !nudge_diag && !corr_floor && args.len() != 1 {
         return Err(format!(
             "expected 1 positional argument (session.ndjson), got {}",
             args.len()
@@ -512,6 +526,7 @@ fn parse_args() -> Result<Args, String> {
         calibration,
         sweep,
         nudge_diag,
+        corr_floor,
         extra_sessions,
     })
 }
@@ -527,7 +542,8 @@ fn usage() -> String {
          gse-replay <session.ndjson> --intervention [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
-         gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n\n\
+         gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
+         gse-replay <s1.ndjson> [s2.ndjson ...] --corr-floor [--json]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
@@ -537,7 +553,8 @@ fn usage() -> String {
          --calibration       v0.3 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット)。1 被験者の複数セッションを時刻順に渡す\n    \
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
-         --json              --metrics / --segments / --intervention / --calibration / --sweep / --nudge-diag の出力を JSON で標準出力へ\n    \
+         --corr-floor        correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (production 不変)\n    \
+         --json              集計系モード (--metrics/--segments/--intervention/--calibration/--sweep/--nudge-diag/--corr-floor) の出力を JSON へ\n    \
          -h, --help          このヘルプを表示\n",
     )
 }
@@ -796,6 +813,32 @@ fn main() -> ExitCode {
             }
         } else {
             let _ = write!(lock, "{}", format_nudge_diagnostic_pretty(&diag));
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // --corr-floor 経路: correction_after_pause veto floor (f4/f6) の counterfactual 候補
+    // (baseline / f4 / f6 / both) を全セッションでプール評価し HIR/recall を比較する (production 不変)。
+    if args.corr_floor {
+        let sessions = match collect_sweep_inputs(&args.session_path, &args.extra_sessions) {
+            Ok(s) => s,
+            Err(code) => return code,
+        };
+        let report = compute_correction_floor_report(&sessions, DEFAULT_DEFER_RECOVERY_WINDOW_MS);
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        if args.json {
+            match serde_json::to_string_pretty(&report) {
+                Ok(s) => {
+                    let _ = writeln!(lock, "{}", s);
+                }
+                Err(e) => {
+                    tracing::error!("failed to serialize correction floor report: {}", e);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            let _ = write!(lock, "{}", format_correction_floor_pretty(&report));
         }
         return ExitCode::SUCCESS;
     }

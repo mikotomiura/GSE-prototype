@@ -50,6 +50,49 @@ ACT=34 全件 `correction_after_pause`。GT 群別の決定時特徴量 (min / m
 - **(b)** blunt な nudge_need=0.80 を採用 (Phase 0 で HIR 0.647→0.357 と既測、recall 0.073→0.055)。
 - **(c)** GT/回復窓を見直し「FP がどれだけ真の害か」を再評価してから判断。
 
+---
+
+# Step 2 結果 — correction_after_pause veto floor の counterfactual
+
+`gse-replay <13 sessions> --corr-floor`（production 不変・veto を注入 thresholds で評価）。
+
+veto = `correction_after_pause` の nudge を `f4 < floor` または `f6 < floor` で defer に落とす。
+floor 候補は診断の TP 下限 (f4=2.38 / f6=0.37)。
+
+| candidate | nudge | fp | tp | HIR | Prec | Recall | DC | Burden/min |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| baseline | 34 | 22 | 12 | 0.647 | 0.353 | 0.073 | 0.933 | 0.520 |
+| **f4≥2.38** | 25 | **13** | **12** | **0.520** | 0.480 | **0.073** | 0.933 | 0.383 |
+| f6≥0.37 | 24 | 13 | 11 | 0.542 | 0.458 | 0.067 | 0.933 | 0.367 |
+| f4≥2.38 OR f6≥0.37 | 24 | 13 | 11 | 0.542 | 0.458 | 0.067 | 0.933 | 0.367 |
+
+## 結論: f4≥2.38 が Pareto 最適
+
+- **f4≥2.38**: 22 FP のうち **9 件を除去 (→13)、TP は 12 のまま維持 (recall 不変 0.073)**。
+  HIR 0.647→**0.520**、burden 0.520→0.383、DC 0.933 維持。**TP ゼロコストの予測が実証された。**
+- f6≥0.37 / both は **TP を 1 件落とす** (12→11, recall 0.073→0.067)。診断の TP f6 下限「0.37」は
+  2 桁丸めで、実値が 0.37 をわずかに下回る TP が 1 件あり veto に掛かった。FP 除去数は f4 と同じ
+  9 件なので、f6/both は **f4 に対し純粋に劣る**（同じ FP を切り TP を 1 余分に失う）。
+- both が f6 と同値 = f4<2.38 の FP は f6<0.37 の部分集合。
+
+## 閾値変更候補 (Step 2 成果、≤3)
+
+1. **【推奨】correction_after_pause に `f4 ≥ 2.38` ゲートを追加**: HIR 0.647→0.520・burden -26%・
+   **recall/TP/DC 全て不変**。keystroke 側で唯一見つかった「害だけを減らす」レバー。
+2. 候補 1 + nudge_need 微増 (例 0.65): さらに HIR を削るが recall が落ち始める (Phase 0 sweep 参照)。段階適用。
+3. （却下）f6 floor / both: f4 単独に劣後 (TP を無駄に失う)。
+
+## 重要な留保 (production 採用前に必須認識)
+- **過学習リスク**: floor 2.38 は P000 の **TP 最小値そのもの**で、この 13 session に最大限フィット。
+  新データで f4<2.38 の TP が出れば recall を削る。production 採用時は (a) やや保守的な floor
+  (例 2.0) にする、(b) ラベル付き session 増加後に再校正、のいずれかを推奨。
+- 残る 13 FP は f4/f6 では切れない真の overlap 領域。screening であり verdict ではない (forward-fill GT,
+  単一被験者, n 小)。FP の一部は GT ドリフト由来の可能性 (§ Step1 留保)。
+- **production 採用は別ステップ**: floor を既定に入れる = 挙動変更 → policy/HMM_VERSION 検討 +
+  golden snapshot 再生成 + decisions.md 記録が必要。本タスクは counterfactual の試算までで、採用は承認後。
+
 ## 生成物
-- `--nudge-diag` モード (reason×GT 特徴量診断、production 不変、reusable)。
+- `--nudge-diag` モード (reason×GT 特徴量診断)。
+- `--corr-floor` モード (veto floor counterfactual、baseline/f4/f6/both 比較)。
+- `InterventionThresholds.correction_f4_floor / correction_f6_floor` (既定 None = production 不変、採用時の注入口)。
 - 本 results.md。

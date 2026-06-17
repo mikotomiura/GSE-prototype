@@ -108,6 +108,14 @@ pub struct InterventionThresholds {
     pub wall_slack: f64,
     pub nudge_opportunity: f64,
     pub wall_opportunity: f64,
+    /// 評価用 correction_after_pause veto フロア (既定 `None` = production 不変)。
+    /// `Some(fl)` のとき、`correction_after_pause` の Nudge を `f4 < fl` なら抑制する。
+    /// `correction_f6_floor` と **OR** で評価し、どちらか下回れば defer に落とす。
+    /// 由来: P000 診断で TP の f4 下限 = 2.38 / f6 下限 = 0.37 (両方を満たすのが TP)、
+    /// FP のみが低裾に居るため、この OR veto は TP ゼロコストで FP 低裾だけ切る候補。
+    pub correction_f4_floor: Option<f64>,
+    /// 評価用 correction_after_pause veto フロア (既定 `None`)。`f6 < fl` で抑制。
+    pub correction_f6_floor: Option<f64>,
 }
 
 impl Default for InterventionThresholds {
@@ -118,6 +126,8 @@ impl Default for InterventionThresholds {
             wall_slack: WALL_SLACK_THRESHOLD,
             nudge_opportunity: NUDGE_OPPORTUNITY_THRESHOLD,
             wall_opportunity: WALL_OPPORTUNITY_THRESHOLD,
+            correction_f4_floor: None,
+            correction_f6_floor: None,
         }
     }
 }
@@ -291,6 +301,29 @@ impl InterventionPolicyState {
         } else if candidate == InterventionAction::Nudge {
             self.apply_nudge_suppressions(input.now_ms, &mut suppressed_by);
             if !suppressed_by.is_empty() {
+                candidate = InterventionAction::Defer;
+            }
+        }
+
+        // 評価用 correction_after_pause veto (既定 None = production 不変)。
+        // TP は f4>=2.38 かつ f6>=0.37 を満たすため、OR veto は TP ゼロコストで
+        // FP 低裾のみ抑制する候補 (Step 2 counterfactual)。既定では両 floor が None で
+        // 条件は常に false となり candidate は不変。
+        // ⚠️ 不変条件: この veto は `record_activation` より**前**に置くこと。さもないと
+        // veto で defer に落とした nudge が nudge_count を増やし cooldown/cap を誤って消費する。
+        if candidate == InterventionAction::Nudge
+            && opportunity_reason == OpportunityReason::CorrectionAfterPause
+        {
+            let below_f4 = self
+                .thresholds
+                .correction_f4_floor
+                .is_some_and(|fl| input.f4_burst_length < fl);
+            let below_f6 = self
+                .thresholds
+                .correction_f6_floor
+                .is_some_and(|fl| input.f6_pause_after_del_rate < fl);
+            if below_f4 || below_f6 {
+                suppressed_by.push("correction_floor".to_string());
                 candidate = InterventionAction::Defer;
             }
         }
@@ -579,6 +612,38 @@ mod tests {
         assert_eq!(result.decision.action, InterventionAction::Nudge);
         assert!(result.decision.opportunity_score >= NUDGE_OPPORTUNITY_THRESHOLD);
         assert_eq!(result.decision.reason, "post_burst_pause");
+    }
+
+    /// correction_after_pause で f6 が floor 未満なら veto で defer (Step 2 評価用)。
+    #[test]
+    fn correction_floor_veto_defers_low_f6_nudge() {
+        let t = InterventionThresholds {
+            correction_f6_floor: Some(0.37),
+            ..InterventionThresholds::default()
+        };
+        let mut policy = InterventionPolicyState::new_with_thresholds(0, t);
+        // f3=0.25 (correction context) + short pause + f6=0.0 (< floor) → correction_after_pause を veto
+        let mut inp = input(10_000, 0.66, 3_000);
+        inp.f3_correction_rate = 0.25;
+        inp.f6_pause_after_del_rate = 0.0;
+        let r = policy.decide(inp);
+        assert_eq!(r.decision.action, InterventionAction::Defer);
+        assert!(r
+            .decision
+            .suppressed_by
+            .contains(&"correction_floor".to_string()));
+    }
+
+    /// 既定 (floor None) では同じ入力が Nudge のまま = production 不変。
+    #[test]
+    fn correction_floor_default_off_keeps_nudge() {
+        let mut policy = InterventionPolicyState::new(0);
+        let mut inp = input(10_000, 0.66, 3_000);
+        inp.f3_correction_rate = 0.25;
+        inp.f6_pause_after_del_rate = 0.0;
+        let r = policy.decide(inp);
+        assert_eq!(r.decision.action, InterventionAction::Nudge);
+        assert_eq!(r.decision.reason, "correction_after_pause");
     }
 
     #[test]

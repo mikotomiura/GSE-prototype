@@ -21,11 +21,14 @@
 - [x] LOW 対応 (group_idx 共通化 / GT coverage 0 warning / ALL 網羅性テスト)
 
 ## チェックポイント (ユーザー承認)
-- [ ] Step 1 の結論と Step 2 候補方針を提示 → 承認後に Step 2 / push・PR 判断
+- [x] Step 1 の結論提示 → ユーザーが Step 2 (f4/f6 floor 試算) を選択
 
-## Step 2 (承認後)
-- [ ] tweak 候補 ≤3 を injectable 化 → counterfactual HIR/recall 試算
-- [ ] 採用判断 → production 変更 (要れば policy version / golden 再生成)
+## Step 2 (実施済み)
+- [x] tweak 候補を injectable 化 (InterventionThresholds.correction_f4/f6_floor, 既定 None)
+- [x] `--corr-floor` で counterfactual HIR/recall 試算 → **f4≥2.38 が Pareto 最適** (FP 22→13, TP/recall 不変)
+- [x] 候補 ≤3 を results.md に提示 + 過学習留保
+- [ ] production 採用判断 (要 policy version / golden 再生成) → **ユーザー承認待ち**
 
 ## 完了処理
-- [ ] design/decisions/results 最終化 / commit / PR
+- [x] design/results 最終化 / Step 1 commit (1ce1d6f)
+- [ ] Step 2 commit / push / PR (方針確定後)

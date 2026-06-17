@@ -1132,6 +1132,206 @@ pub fn format_nudge_diagnostic_pretty(d: &NudgeDiagnostic) -> String {
     out
 }
 
+// =============================================================================
+// correction_after_pause veto floor の counterfactual 評価 (Step 2)
+// =============================================================================
+// P000 診断で TP の下限は f4=2.38 / f6=0.37。FP のみが低裾に居るため、
+// 「correction_after_pause を f4<floor OR f6<floor なら veto」は TP ゼロコストで
+// FP 低裾だけ切る候補。各候補を全セッションでプール評価し HIR/recall を試算する。
+// production は既定 (floor None) で不変。
+
+/// f4 floor 候補 (P000 TP の f4 下限)。
+pub const CORRECTION_F4_FLOOR_CANDIDATE: f64 = 2.38;
+/// f6 floor 候補 (P000 TP の f6 下限)。
+pub const CORRECTION_F6_FLOOR_CANDIDATE: f64 = 0.37;
+
+/// correction floor 候補 1 つの pooled 結果行。
+#[derive(Debug, Clone, Serialize)]
+pub struct CorrectionFloorRow {
+    pub label: String,
+    pub f4_floor: Option<f64>,
+    pub f6_floor: Option<f64>,
+    pub nudge: u32,
+    pub binary_confusion: BinaryConfusion,
+    pub act_labeled: u32,
+    pub hir: Option<f64>,
+    pub precision: Option<f64>,
+    pub recall: Option<f64>,
+    pub defer_runs: u32,
+    pub dc: Option<f64>,
+    pub burden_per_min: f64,
+}
+
+/// correction floor counterfactual レポート (`--corr-floor` で出力)。
+#[derive(Debug, Clone, Serialize)]
+pub struct CorrectionFloorReport {
+    pub sessions: u32,
+    pub recovery_window_ms: u64,
+    pub rows: Vec<CorrectionFloorRow>,
+    pub warnings: Vec<String>,
+}
+
+/// 1 候補 (thresholds) を全セッションでプール評価して 1 行を作る。
+fn pool_correction_floor_row(
+    label: &str,
+    thresholds: &InterventionThresholds,
+    sessions: &[SweepInput],
+    recovery_window_ms: u64,
+) -> CorrectionFloorRow {
+    let mut cm = BinaryConfusion::default();
+    let mut nudge = 0u32;
+    let mut act_count = 0u32;
+    let mut defer_runs = 0u32;
+    let mut defer_recovered = 0u32;
+    let mut total_minutes = 0.0f64;
+    for s in sessions {
+        let m = compute_intervention_metrics(
+            &s.feats,
+            &s.point_labels,
+            &s.key_press_ts,
+            recovery_window_ms,
+            thresholds,
+        );
+        cm.merge(&m.binary_confusion);
+        nudge = nudge.saturating_add(m.action_counts.nudge);
+        act_count = act_count.saturating_add(m.act_count);
+        defer_runs = defer_runs.saturating_add(m.defer_runs);
+        defer_recovered = defer_recovered.saturating_add(m.defer_recovered);
+        total_minutes += m.session_duration_ms as f64 / 60_000.0;
+    }
+    let act_labeled = cm.fp + cm.tp;
+    let (hir, precision) = if act_labeled > 0 {
+        (
+            Some(cm.fp as f64 / act_labeled as f64),
+            Some(cm.tp as f64 / act_labeled as f64),
+        )
+    } else {
+        (None, None)
+    };
+    let stall_labeled = cm.fn_ + cm.tp;
+    let recall = if stall_labeled > 0 {
+        Some(cm.tp as f64 / stall_labeled as f64)
+    } else {
+        None
+    };
+    let dc = if defer_runs > 0 {
+        Some(defer_recovered as f64 / defer_runs as f64)
+    } else {
+        None
+    };
+    let burden_per_min = if total_minutes > 0.0 {
+        act_count as f64 / total_minutes
+    } else {
+        0.0
+    };
+    CorrectionFloorRow {
+        label: label.to_string(),
+        f4_floor: thresholds.correction_f4_floor,
+        f6_floor: thresholds.correction_f6_floor,
+        nudge,
+        binary_confusion: cm,
+        act_labeled,
+        hir,
+        precision,
+        recall,
+        defer_runs,
+        dc,
+        burden_per_min,
+    }
+}
+
+/// baseline + f4-floor + f6-floor + both(OR) の 4 候補を counterfactual 評価する。
+/// production は変えず、注入 thresholds で decide を再実行してプールする。
+pub fn compute_correction_floor_report(
+    sessions: &[SweepInput],
+    recovery_window_ms: u64,
+) -> CorrectionFloorReport {
+    let base = InterventionThresholds::default();
+    let candidates: [(&str, InterventionThresholds); 4] = [
+        ("baseline", base),
+        (
+            "f4>=2.38",
+            InterventionThresholds {
+                correction_f4_floor: Some(CORRECTION_F4_FLOOR_CANDIDATE),
+                ..base
+            },
+        ),
+        (
+            "f6>=0.37",
+            InterventionThresholds {
+                correction_f6_floor: Some(CORRECTION_F6_FLOOR_CANDIDATE),
+                ..base
+            },
+        ),
+        (
+            "f4>=2.38|f6>=0.37",
+            InterventionThresholds {
+                correction_f4_floor: Some(CORRECTION_F4_FLOOR_CANDIDATE),
+                correction_f6_floor: Some(CORRECTION_F6_FLOOR_CANDIDATE),
+                ..base
+            },
+        ),
+    ];
+    let rows = candidates
+        .iter()
+        .map(|(label, t)| pool_correction_floor_row(label, t, sessions, recovery_window_ms))
+        .collect();
+    let mut warnings: Vec<String> = Vec::new();
+    let no_labels = sessions
+        .iter()
+        .filter(|s| s.point_labels.is_empty())
+        .count();
+    if no_labels > 0 {
+        warnings.push(format!(
+            "{}/{} session(s) had no user_label GT (HIR/recall pooled only over labeled sessions)",
+            no_labels,
+            sessions.len()
+        ));
+    }
+    CorrectionFloorReport {
+        sessions: sessions.len() as u32,
+        recovery_window_ms,
+        rows,
+        warnings,
+    }
+}
+
+/// correction floor レポートの pretty-print 出力 (`--corr-floor` サブコマンド)。
+pub fn format_correction_floor_pretty(r: &CorrectionFloorReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "CorrectionFloorReport (correction_after_pause veto, pooled over {} session(s), W={}ms)\n",
+        r.sessions, r.recovery_window_ms,
+    ));
+    out.push_str("  veto = drop correction_after_pause nudge when f4<floor OR f6<floor\n");
+    out.push_str("  ⚠️ floors are P000 IN-SAMPLE TP minima — \"TP zero-cost\" is partly tautological; re-validate on holdout / new subjects before adopting\n");
+    out.push_str(
+        "    candidate              nudge   fp   tp    HIR   Prec Recall     DC  Burden/min\n",
+    );
+    let fmt_opt = |v: Option<f64>| {
+        v.map(|x| format!("{:.3}", x))
+            .unwrap_or_else(|| "  n/a".to_string())
+    };
+    for row in &r.rows {
+        out.push_str(&format!(
+            "    {:<20} {:>5} {:>4} {:>4}  {:>5} {:>5} {:>5}  {:>5}  {:>9.3}\n",
+            row.label,
+            row.nudge,
+            row.binary_confusion.fp,
+            row.binary_confusion.tp,
+            fmt_opt(row.hir),
+            fmt_opt(row.precision),
+            fmt_opt(row.recall),
+            fmt_opt(row.dc),
+            row.burden_per_min,
+        ));
+    }
+    for w in &r.warnings {
+        out.push_str(&format!("  warning: {}\n", w));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1604,5 +1804,37 @@ mod tests {
         assert_eq!(idxs.len(), 8, "reason_index must be unique per variant");
         let strs: HashSet<&str> = OpportunityReason::ALL.iter().map(|r| r.as_str()).collect();
         assert_eq!(strs.len(), 8, "as_str must be unique per variant");
+    }
+
+    /// correction floor counterfactual: f6 floor が低 f6 の FP nudge を veto し、
+    /// nudge 数と fp が baseline より減ること。
+    #[test]
+    fn correction_floor_report_reduces_nudges() {
+        let feats = vec![
+            feat_full(10_000, 0.20, 0.66, 0.25, 5.0, 0.0), // correction, f6=0.0 → veto 対象 (GT=Flow=fp)
+            feat_full(11_000, 0.10, 0.80, 0.25, 5.0, 0.50), // correction, f6=0.50 → 残す (GT=Stuck=tp)
+        ];
+        let presses = vec![7_000u64];
+        let labels = vec![
+            ulabel(10_000, LabelClass::Flow),
+            ulabel(10_500, LabelClass::Stuck),
+        ];
+        let sessions = vec![SweepInput {
+            feats,
+            point_labels: labels,
+            key_press_ts: presses,
+        }];
+        let r = compute_correction_floor_report(&sessions, 60_000);
+        assert_eq!(r.rows.len(), 4);
+        let baseline = r.rows.iter().find(|x| x.label == "baseline").unwrap();
+        let f6 = r.rows.iter().find(|x| x.label == "f6>=0.37").unwrap();
+        assert_eq!(baseline.nudge, 2);
+        assert!(
+            f6.nudge < baseline.nudge,
+            "f6 floor should veto the low-f6 nudge"
+        );
+        assert!(f6.binary_confusion.fp < baseline.binary_confusion.fp);
+        // TP は f6=0.50>=floor なので維持される
+        assert_eq!(f6.binary_confusion.tp, baseline.binary_confusion.tp);
     }
 }
