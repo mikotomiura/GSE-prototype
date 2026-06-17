@@ -162,6 +162,10 @@ v0.3 較正スモークで収集した criterion label (`realtime_label`) と記
 測定法とモデルの妥当性を**オフラインで**評価する。frontend は起動しない (NDJSON 解析のみ)。
 methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 §4.2/§6.4/§7/§8/§9/§10 に凍結。
 
+> **実行手順 (自己ドッグフード→3-5名スモーク)**: 収集→解析→cohort 判定の運用は
+> `docs/calibration-smoke-runbook.md` を参照。`scripts/run-calibration-cohort.sh` が
+> `raw/P*/` → `gse-replay --calibration` → `metrics/Pxxx/<os>/*.calib.json` → `gse-cohort` を 1 コマンドで回す。
+
 - **CLI (`gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]`)**:
   - 入力: **1 被験者**の複数セッション NDJSON を**時刻順**に渡す (先頭 2 = 較正・残り = 評価 = 前向き holdout §8)。
   - 出力: `CalibrationReport` (測定法統計 / 被験者内 C-index / MNAR 上下限 / ビネット採点 / 二軸性 / Recall)。
