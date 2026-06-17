@@ -31,9 +31,15 @@ interface DashboardProps {
   isMonkMode: boolean;
   keyboardIdleMs: number;
   hookActive: boolean | null;
+  /**
+   * v0.3 較正モード。true のときメイン画面からモデル出力 (推定状態 / Flow・Incubation・Stuck
+   * 確率 / GT カウンタ / 状態説明) を隠し、主観回答の測定独立性を守る (アンカリング防止)。
+   * 既定 false (通常 / デバッグ表示)。
+   */
+  calibrationMode?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive, calibrationMode = false }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -141,7 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   };
 
   return (
-    <div className={`dashboard-container state-${dominant.toLowerCase()}`}>
+    <div className={`dashboard-container ${calibrationMode ? 'state-calibration' : `state-${dominant.toLowerCase()}`}`}>
       <h2>Generative Struggle Engine</h2>
 
       {/* キーボードフック状態警告 (両プラットフォーム共通) */}
@@ -329,61 +335,76 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
         </div>
         <div className="session-item">
           <span className="session-label">Keyboard</span>
-          <span className={`session-value kbd-status ${keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
+          {/* 較正中は状態パレット (flow=緑/incubation=黄) を避け中立色にする。
+              打鍵状態の色が推定状態の色記号と誤連想されるのを防ぐ (測定独立性・security LOW)。 */}
+          <span className={`session-value kbd-status ${calibrationMode ? 'kbd-neutral' : keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
             {keyStatusLabel}
           </span>
         </div>
       </div>
 
-      <div className="state-card">
-        <h3>Current State: <span className="dominant-state">{dominant}</span></h3>
-      </div>
-
-      <div className="metrics-container">
-        <div className="metric-row">
-          <label>Flow</label>
-          <div className="progress-bar-bg">
-            <div
-              className="progress-bar-fill flow"
-              style={{ width: `${cognitiveState.flow * 100}%` }}
-            ></div>
-          </div>
-          <span>{(cognitiveState.flow * 100).toFixed(1)}%</span>
+      {/* v0.3 較正モード: モデル出力 (推定状態/確率/GT/状態説明) は測定独立性のため非表示。 */}
+      {calibrationMode ? (
+        <div className="calibration-notice" role="status">
+          <span className="calibration-notice-badge">較正モード</span>
+          <p>
+            主観回答の独立性を保つため、推定状態 (Flow / Incubation / Stuck) は表示していません。
+            画面の問いに、今の感覚のまま回答してください。
+          </p>
         </div>
-
-        <div className="metric-row">
-          <label>Incubation</label>
-          <div className="progress-bar-bg">
-            <div
-              className="progress-bar-fill incubation"
-              style={{ width: `${cognitiveState.incubation * 100}%` }}
-            ></div>
+      ) : (
+        <>
+          <div className="state-card">
+            <h3>Current State: <span className="dominant-state">{dominant}</span></h3>
           </div>
-          <span>{(cognitiveState.incubation * 100).toFixed(1)}%</span>
-        </div>
 
-        <div className="metric-row">
-          <label>Stuck</label>
-          <div className="progress-bar-bg">
-            <div
-              className="progress-bar-fill stuck"
-              style={{ width: `${cognitiveState.stuck * 100}%` }}
-            ></div>
+          <div className="metrics-container">
+            <div className="metric-row">
+              <label>Flow</label>
+              <div className="progress-bar-bg">
+                <div
+                  className="progress-bar-fill flow"
+                  style={{ width: `${cognitiveState.flow * 100}%` }}
+                ></div>
+              </div>
+              <span>{(cognitiveState.flow * 100).toFixed(1)}%</span>
+            </div>
+
+            <div className="metric-row">
+              <label>Incubation</label>
+              <div className="progress-bar-bg">
+                <div
+                  className="progress-bar-fill incubation"
+                  style={{ width: `${cognitiveState.incubation * 100}%` }}
+                ></div>
+              </div>
+              <span>{(cognitiveState.incubation * 100).toFixed(1)}%</span>
+            </div>
+
+            <div className="metric-row">
+              <label>Stuck</label>
+              <div className="progress-bar-bg">
+                <div
+                  className="progress-bar-fill stuck"
+                  style={{ width: `${cognitiveState.stuck * 100}%` }}
+                ></div>
+              </div>
+              <span>{(cognitiveState.stuck * 100).toFixed(1)}%</span>
+            </div>
           </div>
-          <span>{(cognitiveState.stuck * 100).toFixed(1)}%</span>
-        </div>
-      </div>
 
-      {/* Phase 1 Ground Truth: 読み取り専用ラベルカウンタ + ショートカット hint */}
-      <div className="gt-counter" role="status" aria-label="Ground Truth labels">
-        <span className="gt-counter-label">GT:</span>
-        <span>Flow {labelCounts.flow}</span>
-        <span>Inc {labelCounts.incubation}</span>
-        <span>Stuck {labelCounts.stuck}</span>
-        <span className="gt-counter-hint">
-          {navigator.userAgent.includes("Mac") ? "⌘⇧⌥" : "Ctrl+Shift+Alt"} F/I/S
-        </span>
-      </div>
+          {/* Phase 1 Ground Truth: 読み取り専用ラベルカウンタ + ショートカット hint */}
+          <div className="gt-counter" role="status" aria-label="Ground Truth labels">
+            <span className="gt-counter-label">GT:</span>
+            <span>Flow {labelCounts.flow}</span>
+            <span>Inc {labelCounts.incubation}</span>
+            <span>Stuck {labelCounts.stuck}</span>
+            <span className="gt-counter-hint">
+              {navigator.userAgent.includes("Mac") ? "⌘⇧⌥" : "Ctrl+Shift+Alt"} F/I/S
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Monk Mode トグル: ON=Wall無効, OFF=通常 */}
       <button
@@ -396,10 +417,12 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
         </span>
       </button>
 
-      <div className="info-box">
-        <p>Type naturally. The engine analyzes your keystroke dynamics.</p>
-        <p><strong>Incubation</strong> suggests pausing. <strong>Stuck</strong> suggests moving.</p>
-      </div>
+      {!calibrationMode && (
+        <div className="info-box">
+          <p>Type naturally. The engine analyzes your keystroke dynamics.</p>
+          <p><strong>Incubation</strong> suggests pausing. <strong>Stuck</strong> suggests moving.</p>
+        </div>
+      )}
 
       <button className="quit-button" onClick={onQuit}>
         セッション終了

@@ -34,6 +34,7 @@
 | 想定象限 | ExpectedQuadrant | 尺度理解テスト (ビネット) の正解ラベル enum (`logger::ExpectedQuadrant`)。`flow` / `stuck` / `incubation` / `idle` の 4 値。Q1/Q2 の 2 軸とは別物 (教示の正解) | 「ビネット回答を ExpectedQuadrant と照合し理解度を測る」 |
 | コンテキストビーコン | context_beacon | 内容非由来の cue (5分ごとランダムな色・図形、ログは ID のみ)。エピソード的目印になるが状態のヒントを漏らさない。波形 cue の confound を断つための比較条件 (v0.3 §5) | 「context_beacon は意味を持たない記号」 |
 | 較正スモーク | calibration smoke | n=3〜5 で測定法 (ラベル方式) が成立するかを先に検証する研究フェーズ。効果量推定・破綻検出に限定し、確証主張はしない (v0.3 §3, §11) | 「較正スモークで測定法ゲートを通してから核検証へ」 |
+| 較正モード (blind dashboard) | calibration mode | 較正セッション中、被験者にモデル出力 (推定状態/Flow・Incubation・Stuck 確率/p_stuck/GT counter/状態色) を**一切見せない**メイン画面表示モード (`App.calibrationMode`、既定 ON)。主観回答のアンカリング汚染を防ぎ測定独立性を守る。frontend 表示分岐のみ (backend/schema 不変) | 「較正モードでは推定状態を出さない」 |
 | 尺度理解テスト | scale comprehension test | 本番前に 8 ビネット (2×2 象限×2) で Q1/Q2 が独立 2 軸として理解されているか検査する事前ゲート (PreReg-1) | 「尺度理解テストに合格してから本番データを取る」 |
 | 2段ゲート | two-stage gate | 「測定法の失敗」と「モデルの失敗」を別々の Go/No-Go で事前宣言する反証可能化の仕組み。測定法ゲート → モデルゲートの順 (v0.3 §7) | 「測定法ゲートを通過しない限りモデル評価に進まない」 |
 | 順序一致度 | C-index (concordance index) | 「X が大きい区間ほど主観 Q1 も大きい」という順位の一致割合。0.5 が偶然・1.0 が完全一致・0.5 未満は逆方向。順序尺度と相性が良く方向を保つ。`\|r\|≥0.30` の代替 (v0.3 §7) | 「被験者内 C-index 中央値 ≥0.65 で Go 候補」 |

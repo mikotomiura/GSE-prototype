@@ -117,6 +117,41 @@ body {
   text-align: center;
 }
 
+/* v0.3 較正モード: 状態色を出さない中立コンテナ (アンカリング防止)。 */
+.dashboard-container.state-calibration {
+  background-color: var(--color-bg);
+}
+
+/* 較正中のメイン画面に出す中立注記 (モデル出力は含めない)。 */
+.calibration-notice {
+  width: 100%;
+  max-width: 420px;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.calibration-notice-badge {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.calibration-notice p {
+  margin: 0;
+  line-height: 1.6;
+}
+
 .quit-button {
   margin-top: 1rem;
   width: 100%;
@@ -209,6 +244,11 @@ body {
 
 .kbd-idle {
   color: var(--color-incubation);
+}
+
+/* 較正モード: 打鍵状態を状態パレット外の中立色にする (色による状態アンカリング防止)。 */
+.kbd-neutral {
+  color: var(--color-text);
 }
 
 /* Monk Mode toggle (ON = Wall disabled, OFF = normal) */
