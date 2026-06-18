@@ -907,6 +907,431 @@ pub fn format_intervention_sweep_pretty(r: &InterventionSweepReport) -> String {
     out
 }
 
+// =============================================================================
+// Nudge FP/TP 診断 — ACT decision を (reason × GT) で層別し特徴量分布を出す
+// =============================================================================
+// 目的: correction_after_pause の FP 群 (GT=PROTECT) と TP 群 (GT=STALL) が
+// 決定時の特徴量 (p_stuck / f3 / f4 / f6 / idle_ms) で分離できるかを診断する。
+// production を変えず (既定 thresholds で decide を再実行し特徴量を読むだけ)。
+
+/// 特徴量 1 種の min/median/max (FP/TP 分離の手掛かり)。
+#[derive(Debug, Clone, Copy, Serialize, Default)]
+pub struct MinMedMax {
+    pub min: f64,
+    pub median: f64,
+    pub max: f64,
+}
+
+fn min_med_max(mut xs: Vec<f64>) -> MinMedMax {
+    if xs.is_empty() {
+        return MinMedMax::default();
+    }
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = xs.len();
+    let median = if n % 2 == 1 {
+        xs[n / 2]
+    } else {
+        (xs[n / 2 - 1] + xs[n / 2]) / 2.0
+    };
+    MinMedMax {
+        min: xs[0],
+        median,
+        max: xs[n - 1],
+    }
+}
+
+/// ACT decision の GT 群。PROTECT=有害(FP)母集団 / STALL=有益(TP)母集団 / Unlabeled=GT 圏外。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GtGroup {
+    Protect,
+    Stall,
+    Unlabeled,
+}
+
+impl GtGroup {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Protect => "protect(fp)",
+            Self::Stall => "stall(tp)",
+            Self::Unlabeled => "unlabeled",
+        }
+    }
+    fn index(self) -> usize {
+        match self {
+            Self::Protect => 0,
+            Self::Stall => 1,
+            Self::Unlabeled => 2,
+        }
+    }
+    const ALL: [GtGroup; 3] = [Self::Protect, Self::Stall, Self::Unlabeled];
+}
+
+/// reason × GT 群ごとの ACT decision の特徴量サマリ。
+#[derive(Debug, Clone, Serialize)]
+pub struct NudgeDiagnosticGroup {
+    pub reason: OpportunityReason,
+    pub gt: GtGroup,
+    pub count: u32,
+    pub p_stuck: MinMedMax,
+    pub f3: MinMedMax,
+    pub f4: MinMedMax,
+    pub f6: MinMedMax,
+    pub idle_ms: MinMedMax,
+}
+
+/// Nudge FP/TP 診断レポート (`--nudge-diag` で出力)。
+#[derive(Debug, Clone, Serialize)]
+pub struct NudgeDiagnostic {
+    pub sessions: u32,
+    pub total_act: u32,
+    pub groups: Vec<NudgeDiagnosticGroup>,
+    pub warnings: Vec<String>,
+}
+
+/// 特徴量ベクタの群別アキュムレータ。
+#[derive(Default)]
+struct FeatAccum {
+    p_stuck: Vec<f64>,
+    f3: Vec<f64>,
+    f4: Vec<f64>,
+    f6: Vec<f64>,
+    idle_ms: Vec<f64>,
+}
+
+/// (reason, gt) を診断アキュムレータの平坦化 index へ写す。push 側・集計側で
+/// 同じ式を共有し、添字算出の暗黙前提を 1 箇所に閉じる。
+fn group_idx(reason: OpportunityReason, gt: GtGroup) -> usize {
+    reason_index(reason) * GtGroup::ALL.len() + gt.index()
+}
+
+/// 各セッションで decide を再実行し、ACT decision を (reason × GT) で層別して
+/// 決定時の特徴量サマリ (min/median/max) を pooled で算出する。production 不変。
+pub fn compute_nudge_diagnostic(
+    sessions: &[SweepInput],
+    thresholds: &InterventionThresholds,
+) -> NudgeDiagnostic {
+    let mut warnings: Vec<String> = Vec::new();
+    let n_reason = OpportunityReason::ALL.len();
+    // index = reason_index * 3 + gt.index()
+    let mut acc: Vec<FeatAccum> = (0..n_reason * GtGroup::ALL.len())
+        .map(|_| FeatAccum::default())
+        .collect();
+    let mut total_act = 0u32;
+
+    for s in sessions {
+        if s.feats.is_empty() {
+            continue;
+        }
+        let first_ts = s.feats.first().map(|f| f.timestamp).unwrap_or(0);
+        let last_ts = s.feats.last().map(|f| f.timestamp).unwrap_or(first_ts);
+        let ranges = derive_ranges_from_points(&s.point_labels, first_ts, last_ts);
+        let mut policy = InterventionPolicyState::new_with_thresholds(first_ts, *thresholds);
+        for f in &s.feats {
+            let idle = idle_ms_at(f.timestamp, &s.key_press_ts);
+            let input = InterventionInput {
+                now_ms: f.timestamp,
+                p_stuck: f.p_stuck,
+                f3_correction_rate: f.f3,
+                f4_burst_length: f.f4,
+                f6_pause_after_del_rate: f.f6,
+                idle_ms: idle,
+                monk_mode: false,
+                wall_active: false,
+            };
+            let decision = policy.decide(input).decision;
+            if binarize_action(decision.action) != DecisionBinary::Act {
+                continue;
+            }
+            total_act += 1;
+            let gt = match range_class_at(f.timestamp, &ranges).map(binarize_label) {
+                Some(GtBinary::Protect) => GtGroup::Protect,
+                Some(GtBinary::Stall) => GtGroup::Stall,
+                None => GtGroup::Unlabeled,
+            };
+            let a = &mut acc[group_idx(decision.opportunity_reason, gt)];
+            a.p_stuck.push(f.p_stuck);
+            a.f3.push(f.f3);
+            a.f4.push(f.f4);
+            a.f6.push(f.f6);
+            a.idle_ms.push(idle as f64);
+        }
+    }
+
+    let mut groups: Vec<NudgeDiagnosticGroup> = Vec::new();
+    for &reason in OpportunityReason::ALL.iter() {
+        for gt in GtGroup::ALL {
+            let a = &acc[group_idx(reason, gt)];
+            let count = a.p_stuck.len() as u32;
+            if count == 0 {
+                continue;
+            }
+            groups.push(NudgeDiagnosticGroup {
+                reason,
+                gt,
+                count,
+                p_stuck: min_med_max(a.p_stuck.clone()),
+                f3: min_med_max(a.f3.clone()),
+                f4: min_med_max(a.f4.clone()),
+                f6: min_med_max(a.f6.clone()),
+                idle_ms: min_med_max(a.idle_ms.clone()),
+            });
+        }
+    }
+    if total_act == 0 {
+        warnings.push(
+            "no ACT decisions found — nothing to diagnose (verify thresholds and GT coverage)"
+                .to_string(),
+        );
+    } else if !groups.iter().any(|g| g.gt != GtGroup::Unlabeled) {
+        // ACT はあるが全て GT 圏外 → FP/TP 分離が出せない (検定力ゼロ)。
+        warnings.push(
+            "GT coverage 0 for ACT decisions — FP/TP split unavailable (all ACT fell outside \
+             labeled ranges)"
+                .to_string(),
+        );
+    }
+
+    NudgeDiagnostic {
+        sessions: sessions.len() as u32,
+        total_act,
+        groups,
+        warnings,
+    }
+}
+
+/// 診断の pretty-print 出力 (`--nudge-diag` サブコマンド)。
+pub fn format_nudge_diagnostic_pretty(d: &NudgeDiagnostic) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "NudgeDiagnostic (ACT decisions by reason×GT, pooled over {} session(s); ACT={})\n",
+        d.sessions, d.total_act,
+    ));
+    out.push_str("  each feature cell = min / median / max\n");
+    out.push_str(
+        "  reason                 gt            n   p_stuck            f3                 f4                 f6                 idle_ms\n",
+    );
+    let f = |m: &MinMedMax| format!("{:.2}/{:.2}/{:.2}", m.min, m.median, m.max);
+    let fi = |m: &MinMedMax| format!("{:.0}/{:.0}/{:.0}", m.min, m.median, m.max);
+    for g in &d.groups {
+        out.push_str(&format!(
+            "  {:<22} {:<11} {:>3}   {:<17}  {:<17}  {:<17}  {:<17}  {}\n",
+            g.reason.as_str(),
+            g.gt.as_str(),
+            g.count,
+            f(&g.p_stuck),
+            f(&g.f3),
+            f(&g.f4),
+            f(&g.f6),
+            fi(&g.idle_ms),
+        ));
+    }
+    for w in &d.warnings {
+        out.push_str(&format!("  warning: {}\n", w));
+    }
+    out
+}
+
+// =============================================================================
+// correction_after_pause veto floor の counterfactual 評価 (Step 2)
+// =============================================================================
+// P000 診断で TP の下限は f4=2.38 / f6=0.37。FP のみが低裾に居るため、
+// 「correction_after_pause を f4<floor OR f6<floor なら veto」は TP ゼロコストで
+// FP 低裾だけ切る候補。各候補を全セッションでプール評価し HIR/recall を試算する。
+// production は既定 (floor None) で不変。
+
+/// f4 floor 候補 (P000 TP の f4 下限)。
+pub const CORRECTION_F4_FLOOR_CANDIDATE: f64 = 2.38;
+/// f6 floor 候補 (P000 TP の f6 下限)。
+pub const CORRECTION_F6_FLOOR_CANDIDATE: f64 = 0.37;
+
+/// correction floor 候補 1 つの pooled 結果行。
+#[derive(Debug, Clone, Serialize)]
+pub struct CorrectionFloorRow {
+    pub label: String,
+    pub f4_floor: Option<f64>,
+    pub f6_floor: Option<f64>,
+    pub nudge: u32,
+    pub binary_confusion: BinaryConfusion,
+    pub act_labeled: u32,
+    pub hir: Option<f64>,
+    pub precision: Option<f64>,
+    pub recall: Option<f64>,
+    pub defer_runs: u32,
+    pub dc: Option<f64>,
+    pub burden_per_min: f64,
+}
+
+/// correction floor counterfactual レポート (`--corr-floor` で出力)。
+#[derive(Debug, Clone, Serialize)]
+pub struct CorrectionFloorReport {
+    pub sessions: u32,
+    pub recovery_window_ms: u64,
+    pub rows: Vec<CorrectionFloorRow>,
+    pub warnings: Vec<String>,
+}
+
+/// 1 候補 (thresholds) を全セッションでプール評価して 1 行を作る。
+fn pool_correction_floor_row(
+    label: &str,
+    thresholds: &InterventionThresholds,
+    sessions: &[SweepInput],
+    recovery_window_ms: u64,
+) -> CorrectionFloorRow {
+    let mut cm = BinaryConfusion::default();
+    let mut nudge = 0u32;
+    let mut act_count = 0u32;
+    let mut defer_runs = 0u32;
+    let mut defer_recovered = 0u32;
+    let mut total_minutes = 0.0f64;
+    for s in sessions {
+        let m = compute_intervention_metrics(
+            &s.feats,
+            &s.point_labels,
+            &s.key_press_ts,
+            recovery_window_ms,
+            thresholds,
+        );
+        cm.merge(&m.binary_confusion);
+        nudge = nudge.saturating_add(m.action_counts.nudge);
+        act_count = act_count.saturating_add(m.act_count);
+        defer_runs = defer_runs.saturating_add(m.defer_runs);
+        defer_recovered = defer_recovered.saturating_add(m.defer_recovered);
+        total_minutes += m.session_duration_ms as f64 / 60_000.0;
+    }
+    let act_labeled = cm.fp + cm.tp;
+    let (hir, precision) = if act_labeled > 0 {
+        (
+            Some(cm.fp as f64 / act_labeled as f64),
+            Some(cm.tp as f64 / act_labeled as f64),
+        )
+    } else {
+        (None, None)
+    };
+    let stall_labeled = cm.fn_ + cm.tp;
+    let recall = if stall_labeled > 0 {
+        Some(cm.tp as f64 / stall_labeled as f64)
+    } else {
+        None
+    };
+    let dc = if defer_runs > 0 {
+        Some(defer_recovered as f64 / defer_runs as f64)
+    } else {
+        None
+    };
+    let burden_per_min = if total_minutes > 0.0 {
+        act_count as f64 / total_minutes
+    } else {
+        0.0
+    };
+    CorrectionFloorRow {
+        label: label.to_string(),
+        f4_floor: thresholds.correction_f4_floor,
+        f6_floor: thresholds.correction_f6_floor,
+        nudge,
+        binary_confusion: cm,
+        act_labeled,
+        hir,
+        precision,
+        recall,
+        defer_runs,
+        dc,
+        burden_per_min,
+    }
+}
+
+/// baseline + f4-floor + f6-floor + both(OR) の 4 候補を counterfactual 評価する。
+/// production は変えず、注入 thresholds で decide を再実行してプールする。
+pub fn compute_correction_floor_report(
+    sessions: &[SweepInput],
+    recovery_window_ms: u64,
+) -> CorrectionFloorReport {
+    let base = InterventionThresholds::default();
+    let candidates: [(&str, InterventionThresholds); 4] = [
+        ("baseline", base),
+        (
+            "f4>=2.38",
+            InterventionThresholds {
+                correction_f4_floor: Some(CORRECTION_F4_FLOOR_CANDIDATE),
+                ..base
+            },
+        ),
+        (
+            "f6>=0.37",
+            InterventionThresholds {
+                correction_f6_floor: Some(CORRECTION_F6_FLOOR_CANDIDATE),
+                ..base
+            },
+        ),
+        (
+            "f4>=2.38|f6>=0.37",
+            InterventionThresholds {
+                correction_f4_floor: Some(CORRECTION_F4_FLOOR_CANDIDATE),
+                correction_f6_floor: Some(CORRECTION_F6_FLOOR_CANDIDATE),
+                ..base
+            },
+        ),
+    ];
+    let rows = candidates
+        .iter()
+        .map(|(label, t)| pool_correction_floor_row(label, t, sessions, recovery_window_ms))
+        .collect();
+    let mut warnings: Vec<String> = Vec::new();
+    let no_labels = sessions
+        .iter()
+        .filter(|s| s.point_labels.is_empty())
+        .count();
+    if no_labels > 0 {
+        warnings.push(format!(
+            "{}/{} session(s) had no user_label GT (HIR/recall pooled only over labeled sessions)",
+            no_labels,
+            sessions.len()
+        ));
+    }
+    CorrectionFloorReport {
+        sessions: sessions.len() as u32,
+        recovery_window_ms,
+        rows,
+        warnings,
+    }
+}
+
+/// correction floor レポートの pretty-print 出力 (`--corr-floor` サブコマンド)。
+pub fn format_correction_floor_pretty(r: &CorrectionFloorReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "CorrectionFloorReport (correction_after_pause veto, pooled over {} session(s), W={}ms)\n",
+        r.sessions, r.recovery_window_ms,
+    ));
+    out.push_str("  veto = drop correction_after_pause nudge when f4<floor OR f6<floor\n");
+    out.push_str("  ⚠️ floors are P000 IN-SAMPLE TP minima — \"TP zero-cost\" is partly tautological; re-validate on holdout / new subjects before adopting\n");
+    out.push_str(
+        "    candidate              nudge   fp   tp    HIR   Prec Recall     DC  Burden/min\n",
+    );
+    let fmt_opt = |v: Option<f64>| {
+        v.map(|x| format!("{:.3}", x))
+            .unwrap_or_else(|| "  n/a".to_string())
+    };
+    for row in &r.rows {
+        out.push_str(&format!(
+            "    {:<20} {:>5} {:>4} {:>4}  {:>5} {:>5} {:>5}  {:>5}  {:>9.3}\n",
+            row.label,
+            row.nudge,
+            row.binary_confusion.fp,
+            row.binary_confusion.tp,
+            fmt_opt(row.hir),
+            fmt_opt(row.precision),
+            fmt_opt(row.recall),
+            fmt_opt(row.dc),
+            row.burden_per_min,
+        ));
+    }
+    for w in &r.warnings {
+        out.push_str(&format!("  warning: {}\n", w));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1319,5 +1744,97 @@ mod tests {
             1.0 - MIN_SWEEP_NUDGE_NEED,
             DEFAULT_P_FLOW_THRESHOLD
         );
+    }
+
+    // ── Nudge FP/TP 診断 ─────────────────────────────────────────────
+
+    /// correction_after_pause の ACT を GT 群 (Protect=fp / Stall=tp) で分離し、
+    /// p_stuck median が群で異なることを確認する。
+    #[test]
+    fn nudge_diagnostic_splits_fp_and_tp_by_gt() {
+        let feats = vec![
+            // correction_after_pause (f3>=0.20) + short pause、need 0.62 → nudge、GT=Flow → fp
+            feat_full(10_000, 0.20, 0.62, 0.25, 5.0, 0.0),
+            // 同 reason、need 0.80 → nudge、GT=Stuck → tp
+            feat_full(11_000, 0.10, 0.80, 0.25, 5.0, 0.0),
+        ];
+        let presses = vec![7_000u64]; // feat0 idle=3000, feat1 idle=4000 (どちらも short)
+        let labels = vec![
+            ulabel(10_000, LabelClass::Flow),
+            ulabel(10_500, LabelClass::Stuck),
+        ];
+        let sessions = vec![SweepInput {
+            feats,
+            point_labels: labels,
+            key_press_ts: presses,
+        }];
+        let d = compute_nudge_diagnostic(&sessions, &InterventionThresholds::default());
+        assert_eq!(d.total_act, 2);
+        let protect = d.groups.iter().find(|g| {
+            g.reason == OpportunityReason::CorrectionAfterPause && g.gt == GtGroup::Protect
+        });
+        let stall = d.groups.iter().find(|g| {
+            g.reason == OpportunityReason::CorrectionAfterPause && g.gt == GtGroup::Stall
+        });
+        assert_eq!(protect.map(|g| g.count), Some(1));
+        assert_eq!(stall.map(|g| g.count), Some(1));
+        // p_stuck median は protect(0.62) < stall(0.80)
+        assert!(protect.unwrap().p_stuck.median < stall.unwrap().p_stuck.median);
+    }
+
+    #[test]
+    fn nudge_diagnostic_empty_no_panic() {
+        let d = compute_nudge_diagnostic(&[], &InterventionThresholds::default());
+        assert_eq!(d.total_act, 0);
+        assert!(d.groups.is_empty());
+        assert!(d.warnings.iter().any(|w| w.contains("no ACT")));
+    }
+
+    /// `OpportunityReason::ALL` の網羅性ガード: `reason_index` が各 variant に
+    /// 一意の index を割り当て、全 8 種を被覆すること (variant 追加時に ALL 更新を
+    /// 忘れると診断/層別が index 0 へサイレント縮退するのを早期に落とす)。
+    #[test]
+    fn opportunity_reason_all_is_complete_and_unique() {
+        use std::collections::HashSet;
+        assert_eq!(OpportunityReason::ALL.len(), 8);
+        let idxs: HashSet<usize> = OpportunityReason::ALL
+            .iter()
+            .map(|&r| reason_index(r))
+            .collect();
+        assert_eq!(idxs.len(), 8, "reason_index must be unique per variant");
+        let strs: HashSet<&str> = OpportunityReason::ALL.iter().map(|r| r.as_str()).collect();
+        assert_eq!(strs.len(), 8, "as_str must be unique per variant");
+    }
+
+    /// correction floor counterfactual: f6 floor が低 f6 の FP nudge を veto し、
+    /// nudge 数と fp が baseline より減ること。
+    #[test]
+    fn correction_floor_report_reduces_nudges() {
+        let feats = vec![
+            feat_full(10_000, 0.20, 0.66, 0.25, 5.0, 0.0), // correction, f6=0.0 → veto 対象 (GT=Flow=fp)
+            feat_full(11_000, 0.10, 0.80, 0.25, 5.0, 0.50), // correction, f6=0.50 → 残す (GT=Stuck=tp)
+        ];
+        let presses = vec![7_000u64];
+        let labels = vec![
+            ulabel(10_000, LabelClass::Flow),
+            ulabel(10_500, LabelClass::Stuck),
+        ];
+        let sessions = vec![SweepInput {
+            feats,
+            point_labels: labels,
+            key_press_ts: presses,
+        }];
+        let r = compute_correction_floor_report(&sessions, 60_000);
+        assert_eq!(r.rows.len(), 4);
+        let baseline = r.rows.iter().find(|x| x.label == "baseline").unwrap();
+        let f6 = r.rows.iter().find(|x| x.label == "f6>=0.37").unwrap();
+        assert_eq!(baseline.nudge, 2);
+        assert!(
+            f6.nudge < baseline.nudge,
+            "f6 floor should veto the low-f6 nudge"
+        );
+        assert!(f6.binary_confusion.fp < baseline.binary_confusion.fp);
+        // TP は f6=0.50>=floor なので維持される
+        assert_eq!(f6.binary_confusion.tp, baseline.binary_confusion.tp);
     }
 }
