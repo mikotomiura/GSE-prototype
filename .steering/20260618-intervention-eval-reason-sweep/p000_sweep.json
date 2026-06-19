@@ -1,0 +1,1141 @@
+{
+  "sessions": 13,
+  "recovery_window_ms": 900000,
+  "sweep_points": [
+    {
+      "nudge_need": 0.5,
+      "total_decisions": 3925,
+      "act_count": 40,
+      "binary_confusion": {
+        "tn": 3428,
+        "fp": 28,
+        "fn": 152,
+        "tp": 12
+      },
+      "act_labeled": 40,
+      "hir": 0.7,
+      "precision": 0.3,
+      "recall": 0.07317073170731707,
+      "defer_runs": 19,
+      "defer_recovered": 18,
+      "dc": 0.9473684210526315,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.6120845380559735,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 197,
+            "fp": 28,
+            "fn": 21,
+            "tp": 12
+          },
+          "act_count": 40,
+          "act_labeled": 40,
+          "hir": 0.7,
+          "precision": 0.3
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.55,
+      "total_decisions": 3925,
+      "act_count": 38,
+      "binary_confusion": {
+        "tn": 3430,
+        "fp": 26,
+        "fn": 152,
+        "tp": 12
+      },
+      "act_labeled": 38,
+      "hir": 0.6842105263157895,
+      "precision": 0.3157894736842105,
+      "recall": 0.07317073170731707,
+      "defer_runs": 17,
+      "defer_recovered": 16,
+      "dc": 0.9411764705882353,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.5814803111531749,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 199,
+            "fp": 26,
+            "fn": 21,
+            "tp": 12
+          },
+          "act_count": 38,
+          "act_labeled": 38,
+          "hir": 0.6842105263157895,
+          "precision": 0.3157894736842105
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.6,
+      "total_decisions": 3925,
+      "act_count": 34,
+      "binary_confusion": {
+        "tn": 3434,
+        "fp": 22,
+        "fn": 152,
+        "tp": 12
+      },
+      "act_labeled": 34,
+      "hir": 0.6470588235294118,
+      "precision": 0.35294117647058826,
+      "recall": 0.07317073170731707,
+      "defer_runs": 15,
+      "defer_recovered": 14,
+      "dc": 0.9333333333333333,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.5202718573475775,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 203,
+            "fp": 22,
+            "fn": 21,
+            "tp": 12
+          },
+          "act_count": 34,
+          "act_labeled": 34,
+          "hir": 0.6470588235294118,
+          "precision": 0.35294117647058826
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.65,
+      "total_decisions": 3925,
+      "act_count": 32,
+      "binary_confusion": {
+        "tn": 3435,
+        "fp": 21,
+        "fn": 153,
+        "tp": 11
+      },
+      "act_labeled": 32,
+      "hir": 0.65625,
+      "precision": 0.34375,
+      "recall": 0.06707317073170732,
+      "defer_runs": 13,
+      "defer_recovered": 13,
+      "dc": 1.0,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.4896676304447788,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 204,
+            "fp": 21,
+            "fn": 22,
+            "tp": 11
+          },
+          "act_count": 32,
+          "act_labeled": 32,
+          "hir": 0.65625,
+          "precision": 0.34375
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.7,
+      "total_decisions": 3925,
+      "act_count": 31,
+      "binary_confusion": {
+        "tn": 3436,
+        "fp": 20,
+        "fn": 153,
+        "tp": 11
+      },
+      "act_labeled": 31,
+      "hir": 0.6451612903225806,
+      "precision": 0.3548387096774194,
+      "recall": 0.06707317073170732,
+      "defer_runs": 13,
+      "defer_recovered": 13,
+      "dc": 1.0,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.4743655169933795,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 205,
+            "fp": 20,
+            "fn": 22,
+            "tp": 11
+          },
+          "act_count": 31,
+          "act_labeled": 31,
+          "hir": 0.6451612903225806,
+          "precision": 0.3548387096774194
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.75,
+      "total_decisions": 3925,
+      "act_count": 25,
+      "binary_confusion": {
+        "tn": 3440,
+        "fp": 16,
+        "fn": 155,
+        "tp": 9
+      },
+      "act_labeled": 25,
+      "hir": 0.64,
+      "precision": 0.36,
+      "recall": 0.054878048780487805,
+      "defer_runs": 13,
+      "defer_recovered": 13,
+      "dc": 1.0,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.38255283628498343,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 209,
+            "fp": 16,
+            "fn": 24,
+            "tp": 9
+          },
+          "act_count": 25,
+          "act_labeled": 25,
+          "hir": 0.64,
+          "precision": 0.36
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.8,
+      "total_decisions": 3925,
+      "act_count": 14,
+      "binary_confusion": {
+        "tn": 3451,
+        "fp": 5,
+        "fn": 155,
+        "tp": 9
+      },
+      "act_labeled": 14,
+      "hir": 0.35714285714285715,
+      "precision": 0.6428571428571429,
+      "recall": 0.054878048780487805,
+      "defer_runs": 11,
+      "defer_recovered": 11,
+      "dc": 1.0,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.21422958831959074,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 220,
+            "fp": 5,
+            "fn": 24,
+            "tp": 9
+          },
+          "act_count": 14,
+          "act_labeled": 14,
+          "hir": 0.35714285714285715,
+          "precision": 0.6428571428571429
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.85,
+      "total_decisions": 3925,
+      "act_count": 10,
+      "binary_confusion": {
+        "tn": 3453,
+        "fp": 3,
+        "fn": 157,
+        "tp": 7
+      },
+      "act_labeled": 10,
+      "hir": 0.3,
+      "precision": 0.7,
+      "recall": 0.042682926829268296,
+      "defer_runs": 11,
+      "defer_recovered": 11,
+      "dc": 1.0,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.15302113451399338,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 222,
+            "fp": 3,
+            "fn": 26,
+            "tp": 7
+          },
+          "act_count": 10,
+          "act_labeled": 10,
+          "hir": 0.3,
+          "precision": 0.7
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    },
+    {
+      "nudge_need": 0.9,
+      "total_decisions": 3925,
+      "act_count": 5,
+      "binary_confusion": {
+        "tn": 3454,
+        "fp": 2,
+        "fn": 161,
+        "tp": 3
+      },
+      "act_labeled": 5,
+      "hir": 0.4,
+      "precision": 0.6,
+      "recall": 0.018292682926829267,
+      "defer_runs": 3,
+      "defer_recovered": 3,
+      "dc": 1.0,
+      "total_minutes": 65.35045000000001,
+      "burden_per_min": 0.07651056725699669,
+      "reason_breakdown": [
+        {
+          "reason": "low_opportunity",
+          "confusion": {
+            "tn": 93,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "short_pause",
+          "confusion": {
+            "tn": 241,
+            "fp": 0,
+            "fn": 6,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "medium_pause",
+          "confusion": {
+            "tn": 321,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "long_pause",
+          "confusion": {
+            "tn": 529,
+            "fp": 0,
+            "fn": 0,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "active_typing",
+          "confusion": {
+            "tn": 1750,
+            "fp": 0,
+            "fn": 92,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "post_burst_pause",
+          "confusion": {
+            "tn": 110,
+            "fp": 0,
+            "fn": 7,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        },
+        {
+          "reason": "correction_after_pause",
+          "confusion": {
+            "tn": 223,
+            "fp": 2,
+            "fn": 30,
+            "tp": 3
+          },
+          "act_count": 5,
+          "act_labeled": 5,
+          "hir": 0.4,
+          "precision": 0.6
+        },
+        {
+          "reason": "active_correction_loop",
+          "confusion": {
+            "tn": 187,
+            "fp": 0,
+            "fn": 26,
+            "tp": 0
+          },
+          "act_count": 0,
+          "act_labeled": 0,
+          "hir": null,
+          "precision": null
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
