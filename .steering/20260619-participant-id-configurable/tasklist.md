@@ -38,7 +38,7 @@
 - [x] code-reviewer (HIGH なし、MEDIUM 3件対応) + security-checker (CRITICAL/HIGH/MEDIUM なし) 並列
 - [x] /cross-review → jq 不在で Codex 系統 skip、Claude 単独レビューで代替 (理由明記)
 - [x] cargo test --workspace 緑 (200: 188 lib + 12 bin) / snapshot 15/15 byte-equal / schema drift なし
-- [ ] /finish-task
+- [x] /finish-task (commit 6fa5bba)
 
 ### code-reviewer MEDIUM 対応 (D4 addendum 参照)
 - [x] MEDIUM-1: `persist_id_to`/`load_id_from` を path 引数化し env 非依存の往復テスト追加
