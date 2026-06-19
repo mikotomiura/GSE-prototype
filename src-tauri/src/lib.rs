@@ -951,7 +951,19 @@ pub fn run() {
 
             // イベント受信 (タイムアウトは次の 1Hz マークまで)
             let input = match rx.recv_timeout(timeout) {
-                Ok(event) => Some(LoopInput::Key(event)),
+                Ok(event) => {
+                    // ペーストイベント (Ctrl+V / Cmd+V) を NDJSON に回数記録する。
+                    // フック層が VK + 修飾キー状態のみから is_paste を立てており、
+                    // クリップボードの中身には一切触れていない (data-privacy 準拠)。
+                    // LogEntry 変換を analysis/ の外 (本スレッド) で行うことで
+                    // architecture-rules ルール6 (LogEntry 依存を analysis/ に持ち込まない) を守る。
+                    if event.is_paste {
+                        let _ = log_tx_analysis.try_send(LogEntry::Paste {
+                            timestamp: event.timestamp,
+                        });
+                    }
+                    Some(LoopInput::Key(event))
+                }
                 Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => break,
             };

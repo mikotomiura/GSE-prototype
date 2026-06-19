@@ -7,6 +7,11 @@ pub struct InputEvent {
     pub is_press: bool,
     pub is_repeat: bool,
     pub is_backspace: bool,
+    /// ペーストショートカット (Ctrl+V / Cmd+V) の押下フラグ。
+    /// `input/` のフック層が修飾キー状態 (Windows: Atomic 追跡 / macOS: CGEvent flags) から
+    /// 判定して立てる。**クリップボードの中身には一切触れない** (回数記録のみ、data-privacy 準拠)。
+    /// FeatureExtractor は本フラグを読まないため FeatSnapshot に影響しない。
+    pub is_paste: bool,
 }
 
 /// B-1: 5特徴量を格納する構造体
@@ -520,6 +525,7 @@ mod tests {
             is_press: true,
             is_repeat: false,
             is_backspace: false,
+            is_paste: false,
         }
     }
 
@@ -530,6 +536,7 @@ mod tests {
             is_press: false,
             is_repeat: false,
             is_backspace: false,
+            is_paste: false,
         }
     }
 
@@ -540,6 +547,7 @@ mod tests {
             is_press: true,
             is_repeat: false,
             is_backspace: true,
+            is_paste: false,
         }
     }
 

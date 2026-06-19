@@ -903,6 +903,7 @@ pub struct InputEvent {
     pub is_press: bool,
     pub is_repeat: bool,
     pub is_backspace: bool, // NEW: set by hook layer
+    pub is_paste: bool,     // later: Ctrl+V/Cmd+V flag (count only; clipboard content never read)
 }
 ```
 

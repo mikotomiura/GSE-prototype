@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT, MSG,
     PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
@@ -355,12 +356,26 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             // フックコールバックからは is_repeat = false 固定で全イベントを送信。
             if is_typing_key(vk_code) {
                 let is_backspace = vk_code == 0x08 || vk_code == 0x2E;
+                // ペースト検出: V(0x56) 押下時に Ctrl が「今まさに」押されていれば Ctrl+V とみなす。
+                // 判定の瞬間に GetAsyncKeyState(VK_CONTROL) で実状態を読むことで、左右 Ctrl の
+                // 区別や WH_KEYBOARD_LL のフォーカス越境による up 取りこぼし (Atomic 固着) を回避し、
+                // macOS の per-event CGEvent flags 読みと検出セマンティクスを揃える。
+                // GetAsyncKeyState は alloc/lock/blocking を伴わない軽量カーネル読み取りのため
+                // hook-constraints (コールバック内は非ブロッキングのみ) に抵触しない。
+                // クリップボードの中身には一切触れず、VK + 修飾キー状態のみで判定する。
+                let is_paste = is_press && vk_code == 0x56 && {
+                    // SAFETY: GetAsyncKeyState は任意の仮想キーコードに対し安全に呼べる純粋な
+                    // 状態読み取り。0x11 = VK_CONTROL。最上位ビット (0x8000) が押下中を示す。
+                    let ctrl = unsafe { GetAsyncKeyState(0x11) };
+                    (ctrl as u16 & 0x8000) != 0
+                };
                 let event = InputEvent {
                     vk_code,
                     timestamp,
                     is_press,
                     is_repeat: false, // 分析スレッドで判定 (§4.1 Atomic flags 設計準拠)
                     is_backspace,
+                    is_paste,
                 };
                 if let Some(sender) = EVENT_SENDER.get() {
                     if let Err(e) = sender.try_send(event) {

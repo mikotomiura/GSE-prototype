@@ -902,6 +902,7 @@ pub struct InputEvent {
     pub is_press: bool,
     pub is_repeat: bool,
     pub is_backspace: bool, // 新規: フック層で設定
+    pub is_paste: bool,     // 後日追加: Ctrl+V/Cmd+V フラグ (回数のみ・中身は読まない)
 }
 ```
 

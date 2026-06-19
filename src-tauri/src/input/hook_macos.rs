@@ -11,8 +11,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
 use core_graphics::event::{
-    CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
-    EventField,
+    CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
+    CGEventType, EventField,
 };
 
 use super::{
@@ -338,12 +338,20 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
             // macOS: kVK_Delete(Backspace) = 0x33, kVK_ForwardDelete = 0x75
             // OS 固有キーコードからフラグを生成し、共通コアにはフラグのみ渡す。
             let is_backspace = mac_vk == 0x33 || mac_vk == 0x75;
+            // ペースト検出: V(0x56) 押下時に Command 修飾が立っていれば Cmd+V とみなす。
+            // 修飾キーは FlagsChanged で来るため Atomic 追跡できないが、各 KeyDown が運ぶ
+            // CGEvent::get_flags() を読めば現在の Command 状態が分かる。
+            // クリップボードの中身には一切触れず、VK + 修飾フラグのみで判定する。
+            let is_paste = is_press
+                && vk_code == 0x56
+                && event.get_flags().contains(CGEventFlags::CGEventFlagCommand);
             if let Err(e) = sender.try_send(InputEvent {
                 vk_code,
                 timestamp,
                 is_press,
                 is_repeat,
                 is_backspace,
+                is_paste,
             }) {
                 tracing::warn!("InputEvent dropped (channel full): {}", e);
             }

@@ -52,6 +52,11 @@ pub enum LogEntryDto {
     SessionStart { t: u64 },
     /// キーストロークイベント (raw VK コード + 押下/離上)。
     Key { t: u64, vk: u32, press: bool },
+    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻。
+    /// AI 依存度指標 (D4) 向けに**回数**を記録するための行。1 ペースト = 1 行。
+    /// VK + 修飾キー状態のみから検出し、**クリップボードの中身は一切記録しない**
+    /// (data-privacy 準拠)。回数は行数で、時系列は `t` で算出する。
+    Paste { t: u64 },
     /// 1Hz ゲートで吐かれる特徴量 + HMM 状態確率 + 診断データ。
     ///
     /// **obs の型について**: `logger::LogEntry::Feat` 本体では `obs: usize` だが、
