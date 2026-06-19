@@ -2,7 +2,11 @@
 
 > `feedback_handoff_prompt_in_steering` 方針に従い、次タスクの開始プロンプトを CLAUDE.md 制約込みで固定。
 > 本タスク `20260619-participant-id-configurable` の **Part 2 (自動生成 + 永続化)** を実装する。
-> Part 1 (env 受け取り) は実装完了・レビュー済み・全テスト緑だが **未コミット** (main 作業ツリーに 3 変更)。
+> Part 1 (env 受け取り) は実装完了・レビュー済み・全テスト緑。
+>
+> **【2026-06-19 更新】Part 1 はコミット済み**: ブランチ `feature/participant-id-configurable`
+> の `4c9cd7b` に foundation commit 済み。次セッションは **このブランチをチェックアウトして
+> Part 2 を積む**だけ (下記「着手前に git 整理」の foundation commit 手順は完了済み)。
 
 ---
 
