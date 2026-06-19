@@ -905,30 +905,115 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
+/// 参加者 ID 未設定時の既定値 (従来挙動を不変に保つ)
+const DEFAULT_PARTICIPANT_ID: &str = "P000";
+
+/// 参加者 ID として許可する最大長 (ディレクトリ名の暴走防止)
+const MAX_PARTICIPANT_ID_LEN: usize = 64;
+
+/// Windows の予約デバイス名 (大文字小文字無視で比較)。allowlist は通過するが、
+/// ディレクトリ名に使うと `create_dir_all` が `ERROR_INVALID_NAME` で失敗し、
+/// 原因の分かりにくいセッションログ欠落を招くため拒否する (本機の主ターゲットは Windows 11)。
+const WINDOWS_RESERVED_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// 参加者 ID が保存先パスの構成要素として安全かを検証する。
+///
+/// allowlist 方式: ASCII 英数字 + `_` + `-` のみ、長さ 1..=64。
+/// これにより `.`(→`..`)・`/`・`\`・`:`・空白・null・改行・`~`・`$` 等を一括拒否し、
+/// パストラバーサル / パス注入を構造的に防ぐ。参加者 ID 規約 (`P000`/`P003` 等) は
+/// 完全にカバーされる。加えて Windows 予約デバイス名 (`CON`/`NUL` 等) を拒否する。
+/// 検証は呼び出し側で trim 済みの値に対して行う。
+fn is_valid_participant_id(id: &str) -> bool {
+    if id.is_empty() || id.len() > MAX_PARTICIPANT_ID_LEN {
+        return false;
+    }
+    if !id
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return false;
+    }
+    let upper = id.to_ascii_uppercase();
+    !WINDOWS_RESERVED_NAMES.contains(&upper.as_str())
+}
+
+/// 候補列 (優先順) から最初の妥当な参加者 ID を選ぶ純粋関数。
+///
+/// env に依存しないため単体テスト可能。各候補は前後空白を trim してから検証し、
+/// 妥当ならそれを返す。すべて未設定 / 不正なら `DEFAULT_PARTICIPANT_ID`。
+fn select_participant_id(candidates: &[Option<&str>]) -> String {
+    for raw in candidates.iter().flatten() {
+        let id = raw.trim();
+        if is_valid_participant_id(id) {
+            return id.to_string();
+        }
+    }
+    DEFAULT_PARTICIPANT_ID.to_string()
+}
+
+/// 参加者 ID を環境変数から解決する。
+///
+/// ## 優先順位 (3 段)
+/// 1. `GSE_PARTICIPANT_ID` — logger 用の主変数 (明示上書き)
+/// 2. `GSE_PID` — 既存 sync スクリプト (`metrics/$PID/`) と共有。1 変数で raw/metrics を揃える
+/// 3. いずれも未設定 → `P000` (従来挙動不変)
+///
+/// 不正値 (`is_valid_participant_id` 不合格) は次候補へフォールバックし、`tracing::warn!`
+/// で可視化する (生値はログに出さない)。
+fn resolve_participant_id() -> String {
+    let primary = std::env::var("GSE_PARTICIPANT_ID").ok();
+    let secondary = std::env::var("GSE_PID").ok();
+
+    // warn 出力と実際の採用 (select_participant_id) は同一述語 `is_valid_participant_id`
+    // に依存する。判定基準を変えるときは両者がズレないよう同関数のみを変更すること。
+    for (key, val) in [("GSE_PARTICIPANT_ID", &primary), ("GSE_PID", &secondary)] {
+        if let Some(raw) = val {
+            if !is_valid_participant_id(raw.trim()) {
+                tracing::warn!(
+                    env_key = key,
+                    "participant id from env rejected (must be [A-Za-z0-9_-], 1..=64 chars); falling back"
+                );
+            }
+        }
+    }
+
+    select_participant_id(&[primary.as_deref(), secondary.as_deref()])
+}
+
 /// セッションログの保存先パスを決定する。
 ///
 /// ## 優先順位 (2 段、明示的制御)
-/// 1. 環境変数 `GSE_DATASET` が設定されていれば `$GSE_DATASET/raw/P000/`
+/// 1. 環境変数 `GSE_DATASET` が設定されていれば `$GSE_DATASET/raw/<participant_id>/`
 /// 2. そうでなければ fallback `~/Documents/GSE-sessions/`
+///
+/// 参加者 ID は `resolve_participant_id()` が `GSE_PARTICIPANT_ID` → `GSE_PID` → `P000`
+/// の順で解決する。env 未設定時は `P000` で従来挙動を不変に保つ。fallback 経路
+/// (`~/Documents/GSE-sessions/`) は従来どおり参加者 ID を含まない。
 ///
 /// ## 以前の挙動との差分
 /// 旧実装は exe の兄弟を最大 5 階層上まで走査して `gse-dataset/raw/P000/` を
 /// 暗黙的に優先していたが、CI・別開発マシン・Tauri bundle 配布先で予期しないパス
 /// に書き込むリスクがあったため、20260416 に env + fallback の 2 段に簡素化した。
+/// 20260619 に参加者 ID を `P000` 固定から env 可変へ拡張 (複数参加者のデータ収集対応)。
 /// 開発者が `gse-dataset` リポジトリに書きたい場合は shell rc / PowerShell
 /// `$PROFILE` で `GSE_DATASET` を明示的に設定する (docs/development-guidelines.md §Session データ管理 参照)。
 ///
 /// ## 可観測性
-/// 決定したディレクトリは `tracing::info!` で常時出力する。どのセッションが
-/// どこに書かれたかが運用ログから即確認できる。
+/// 決定したディレクトリと参加者 ID は `tracing::info!` で常時出力する。どのセッションが
+/// どの参加者 ID でどこに書かれたかが運用ログから即確認できる。
 pub fn default_log_path() -> PathBuf {
+    let participant_id = resolve_participant_id();
     let dir = if let Ok(dataset) = std::env::var("GSE_DATASET") {
-        PathBuf::from(dataset).join("raw").join("P000")
+        PathBuf::from(dataset).join("raw").join(&participant_id)
     } else {
         fallback_log_dir()
     };
     tracing::info!(
         resolved_log_dir = %dir.display(),
+        participant_id = %participant_id,
         source = if std::env::var("GSE_DATASET").is_ok() { "GSE_DATASET env" } else { "fallback (Documents/GSE-sessions)" },
         "session log path resolved"
     );
@@ -1480,5 +1565,96 @@ mod tests {
         assert!(contents.contains(
             r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"ts":4000}"#
         ), "vignette_response 行が不正:\n{contents}");
+    }
+
+    // --- 参加者 ID 解決 / バリデーション ---
+
+    #[test]
+    fn participant_id_accepts_canonical_and_extended() {
+        // 参加者 ID 規約 (P000/P003 等) と allowlist 内の拡張形を許可
+        assert!(is_valid_participant_id("P000"));
+        assert!(is_valid_participant_id("P003"));
+        assert!(is_valid_participant_id("P123"));
+        assert!(is_valid_participant_id("pilot_01"));
+        assert!(is_valid_participant_id("a-b_C9"));
+    }
+
+    #[test]
+    fn participant_id_rejects_empty() {
+        assert!(!is_valid_participant_id(""));
+    }
+
+    #[test]
+    fn participant_id_rejects_path_traversal() {
+        // パストラバーサル / パス区切りは構造的に拒否
+        assert!(!is_valid_participant_id("."));
+        assert!(!is_valid_participant_id(".."));
+        assert!(!is_valid_participant_id("../secret"));
+        assert!(!is_valid_participant_id("..\\secret"));
+        assert!(!is_valid_participant_id("a/b"));
+        assert!(!is_valid_participant_id("a\\b"));
+        assert!(!is_valid_participant_id("P000/../P001"));
+    }
+
+    #[test]
+    fn participant_id_rejects_special_chars() {
+        assert!(!is_valid_participant_id("P 000")); // 空白
+        assert!(!is_valid_participant_id("P\0")); // null
+        assert!(!is_valid_participant_id("P000\n")); // 改行
+        assert!(!is_valid_participant_id("P:000")); // ドライブ/コロン
+        assert!(!is_valid_participant_id("~")); // ホーム展開記号
+        assert!(!is_valid_participant_id("$HOME")); // 変数展開記号
+    }
+
+    #[test]
+    fn participant_id_length_boundary() {
+        let max = "P".repeat(MAX_PARTICIPANT_ID_LEN);
+        assert!(is_valid_participant_id(&max)); // 64 は OK
+        let over = "P".repeat(MAX_PARTICIPANT_ID_LEN + 1);
+        assert!(!is_valid_participant_id(&over)); // 65 は NG
+    }
+
+    #[test]
+    fn participant_id_rejects_windows_reserved_names() {
+        // 大文字小文字を問わず予約デバイス名は拒否
+        for name in ["CON", "con", "Nul", "PRN", "aux", "COM1", "lpt9"] {
+            assert!(!is_valid_participant_id(name), "{name} は拒否されるべき");
+        }
+        // 予約名を部分に含むだけ (完全一致でない) なら許可
+        assert!(is_valid_participant_id("CON1"));
+        assert!(is_valid_participant_id("CONSOLE"));
+        assert!(is_valid_participant_id("P_CON"));
+        assert!(is_valid_participant_id("COM10")); // 予約は COM1..=COM9 のみ
+    }
+
+    #[test]
+    fn select_participant_id_prefers_primary() {
+        assert_eq!(select_participant_id(&[Some("P001"), Some("P002")]), "P001");
+    }
+
+    #[test]
+    fn select_participant_id_falls_back_to_secondary() {
+        // 主が未設定 / 不正なら副候補へ
+        assert_eq!(select_participant_id(&[None, Some("P002")]), "P002");
+        assert_eq!(
+            select_participant_id(&[Some("../bad"), Some("P002")]),
+            "P002"
+        );
+    }
+
+    #[test]
+    fn select_participant_id_defaults_to_p000() {
+        // すべて未設定 / 不正なら既定 P000 (従来挙動不変)
+        assert_eq!(select_participant_id(&[None, None]), DEFAULT_PARTICIPANT_ID);
+        assert_eq!(
+            select_participant_id(&[Some(""), Some("..")]),
+            DEFAULT_PARTICIPANT_ID
+        );
+    }
+
+    #[test]
+    fn select_participant_id_trims_whitespace() {
+        // 前後空白は trim してから検証
+        assert_eq!(select_participant_id(&[Some("  P005  ")]), "P005");
     }
 }

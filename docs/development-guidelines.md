@@ -296,11 +296,19 @@ export GSE_DATASET=/path/to/gse-dataset   # macOS/Linux
 # PowerShell: [Environment]::SetEnvironmentVariable('GSE_DATASET', 'C:\gse-dataset', 'User')
 # → 未設定の場合は ~/Documents/GSE-sessions/ に fallback
 
+# 0.5) 複数参加者のデータ収集時のみ: 参加者 ID を設定 (任意、未設定なら P000)
+export GSE_PARTICIPANT_ID=P003   # logger の主変数。raw/<id>/ を切替
+# 既存 sync スクリプトと共有する GSE_PID を設定済みなら logger もそれを読む
+# (解決順: GSE_PARTICIPANT_ID → GSE_PID → P000)。GSE_PID を 1 つ設定すれば
+# raw/(logger) と metrics/(sync) の両方が同じ ID で揃う。
+# ID は [A-Za-z0-9_-] のみ・1..=64 文字 (パストラバーサル防止)。不正値・Windows 予約名
+# (CON/NUL 等) は拒否され P000 へフォールバックする。
+
 # 1) セッション取得 (macOS/Windows どちらでも)
 npm run tauri dev  # Dashboard で作業、⌘⇧⌥ F/I/S (macOS) / Ctrl+Shift+Alt+F/I/S でラベル
-# → $GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson (env 設定時)
+# → $GSE_DATASET/raw/<participant_id>/gse_YYYYMMDD_HHMMSS.ndjson (env 設定時、既定 P000)
 #    または ~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson (fallback)
-# 起動時 tracing log で resolved_log_dir と source を確認できる
+# 起動時 tracing log で resolved_log_dir / participant_id / source を確認できる
 
 # 2) メトリクス算出 + gse-dataset に配置
 cd src-tauri
