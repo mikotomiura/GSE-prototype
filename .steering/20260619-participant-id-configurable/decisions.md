@@ -58,3 +58,26 @@ ID→被験者の対応表を研究者が別管理する必要があり、`metri
 
 **解決順 (実装)**: 永続化値(valid) → `GSE_PARTICIPANT_ID`(valid) → `GSE_PID`(valid)
 → 自動生成+永続化 → (P000 は生成/書込失敗時の最終フォールバックのみ)。
+
+## D4 addendum: Part 2 実装中の判断 (2026-06-19、レビュー駆動)
+
+実装と code-reviewer/security-checker レビューを経て確定した補足判断:
+
+- **A. `anyhow` 不採用 → `std::io::Result`**: handoff は `persist_id` を `anyhow::Result` と
+  していたが、`anyhow` は本 lib (`gse-next`) の依存ではない (`replay.rs` もコメントで言及のみ・
+  実体は `Result<_, String>`)。新規 crate 追加禁止の制約に従い `std::io::Result` で伝播する。
+  規約 (rust-standards ルール4「エラーを握りつぶさず伝播」) の意図は満たす。
+- **B. `Resolution { Existing, Generated }` 型で「env を永続化しない」を構造保証**: 純粋関数
+  `resolve_with_store` の戻り値を 2 値に分け、`Generated` のみ呼び出し側が `persist_id`。
+  env / 永続化値由来は `Existing` で再永続化しない (D4 ③) ことを型レベルで担保する。
+- **C. アトミック書込 (MEDIUM-2 対応)**: `persist_id_to` は同一ディレクトリの一時ファイル
+  (`participant_id.tmp.<pid>`) へ書いてから `fs::rename` で差し替える。途中クラッシュ / 同時起動で
+  ファイルが空 / 部分書き込みになり、次回 `load` が「空→再生成」に倒れて端末 ID が変わる事故
+  (D4「再起動でも不変」違反) を防ぐ。`fs::rename` は Windows/Unix とも既存を置換しアトミック。
+- **D. 永続化 I/O を path 引数化 (MEDIUM-1 対応)**: `persist_id_to(path,..)` / `load_id_from(path)`
+  を分離し、env / home を汚さず一時ファイルで往復テスト可能にした。env 差し替えはプロセス共有で
+  並列テストとレースするため採らず、FS 往復テストに留める (reviewer 合意)。
+- **E. ファイルモード厳密化は見送り (LOW)**: security-checker LOW 指摘の `~/.gse/participant_id`
+  を 0o600 にする件は、内容が不透明ランダム ID のみ (本文・PII 非由来、data-privacy ルール1 準拠) で
+  実害が極小、かつ主ターゲット Windows は ACL 継承でユーザー専用のため見送る。macOS で厳密化が
+  必要になれば `OpenOptions::mode(0o600)` を追加する (将来の任意対応)。

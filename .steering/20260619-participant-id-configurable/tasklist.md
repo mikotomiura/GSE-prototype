@@ -27,17 +27,24 @@
 - [x] docs/development-guidelines.md §10.2 に GSE_PARTICIPANT_ID/GSE_PID 設定手順を追記
 - [ ] glossary への用語追加 (不要: 既存用語の範囲内)
 
-## Part 2: 自動生成 + 永続化 (D4、次セッションで実装)
-- [ ] env 受け取り (Part 1) を feature ブランチで foundation commit
-- [ ] `generate_participant_id()` — `P` + 12桁ランダム hex (rand 0.8、既存依存)
-- [ ] `load_persisted_id()` / `persist_id()` — `~/.gse/participant_id` (USERPROFILE/HOME 起点)
-- [ ] `resolve_participant_id()` を新フローに更新 (永続化値 → env → 自動生成+永続化 → P000)
-- [ ] 純粋関数 `resolve_with_store(persisted, env1, env2, generated)` に分離しテスト可能化
-- [ ] 単体テスト追加 (生成 ID 形式/検証通過/解決順/env は永続化しない)
-- [ ] docs/development-guidelines.md に自動生成 + リセット手順を追記
-- [ ] code-reviewer + security-checker 並列 / /cross-review (jq 不在なら skip 明記)
-- [ ] cargo test / snapshot byte-equal / schema drift なし
+## Part 2: 自動生成 + 永続化 (D4、2026-06-19 実装完了)
+- [x] env 受け取り (Part 1) を feature ブランチで foundation commit (4c9cd7b)
+- [x] `generate_participant_id()` — `P` + 12桁ランダム hex (rand 0.8、既存依存)
+- [x] `load_persisted_id()` / `persist_id()` — `~/.gse/participant_id` (USERPROFILE/HOME 起点)
+- [x] `resolve_participant_id()` を新フローに更新 (永続化値 → env → 自動生成+永続化 → P000)
+- [x] 純粋関数 `resolve_with_store(persisted, env1, env2, generated) -> Resolution` に分離しテスト可能化
+- [x] 単体テスト追加 (first_valid_id×4 / 生成形式×2 / 解決順×5 / env は永続化しない / 永続化往復×1)
+- [x] docs/development-guidelines.md §10.2 に自動生成 + リセット手順を追記
+- [x] code-reviewer (HIGH なし、MEDIUM 3件対応) + security-checker (CRITICAL/HIGH/MEDIUM なし) 並列
+- [x] /cross-review → jq 不在で Codex 系統 skip、Claude 単独レビューで代替 (理由明記)
+- [x] cargo test --workspace 緑 (200: 188 lib + 12 bin) / snapshot 15/15 byte-equal / schema drift なし
 - [ ] /finish-task
+
+### code-reviewer MEDIUM 対応 (D4 addendum 参照)
+- [x] MEDIUM-1: `persist_id_to`/`load_id_from` を path 引数化し env 非依存の往復テスト追加
+- [x] MEDIUM-2: `persist_id_to` を tmp+rename のアトミック書込に変更 (空/部分書込で ID 変化を防止)
+- [x] MEDIUM-3: 衝突確率コメントを定量化 (N²/2⁴⁹)
+- [ ] LOW: `~/.gse/participant_id` のファイルモード厳密化 (0o600) は不透明 ID・非 PII のため見送り (D4 addendum)
 
 ## Part 3: sync スクリプト追従 (Part 2 マージ後・別 /start-task 推奨)
 - [ ] sync-session.{sh,ps1}: PID を `raw/<PID>/` パスから導出 (fallback GSE_PID→~/.gse→P000)

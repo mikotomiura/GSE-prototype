@@ -59,3 +59,22 @@ ID は path-traversal/injection 防止のため allowlist バリデーション�
 
 単一ファイルの局所変更。問題時は `default_log_path()` を `.join("P000")` に戻すだけ
 (ヘルパー削除)。データ破壊リスクなし (書き込み先ディレクトリ選択のみ)。
+
+## Part 2 実装メモ (2026-06-19、D4: 自動生成 + 永続化)
+
+Part 1 の env 解決を、永続化値 → env → 自動生成 → P000 の新フローへ拡張した
+(設計判断の詳細は decisions.md D4 / D4 addendum)。
+
+- 新ヘルパー (logger.rs、すべて OS 非依存): `generate_participant_id()` (`P`+12桁hex)、
+  `participant_id_store_path()` (`~/.gse/participant_id`)、`load_id_from(path)` /
+  `persist_id_to(path,id)` (path 引数化・env 非依存・テスト可能)、その薄いラッパー
+  `load_persisted_id()` / `persist_id()`、純粋関数 `resolve_with_store(..) -> Resolution`。
+  Part 1 の `select_participant_id` は `first_valid_id(..) -> Option<String>` に置換
+  (P000 既定は呼び出し側 `resolve_participant_id` が担当)。
+- 永続化はアトミック (tmp+rename)。env 値は永続化しない (`Resolution::Existing` で型保証)。
+- テスト: env / home を汚さないため純粋関数 + 一時ファイル経由で検証 (実 `~/.gse` は触らない)。
+  `resolve_participant_id` 自体の env 結線は env 並列レース回避のため単体テスト対象外
+  (FS 往復は `persist_and_load_roundtrip_without_env` でカバー)。
+- 検証: `cargo test --workspace` 200 緑 / `gse-replay --snapshot` 15/15 byte-equal /
+  `emit_schema` drift なし / clippy 新規警告なし。
+- スコープ外 (Part 3 / 別タスク): sync スクリプトの自動生成 ID 追従、ID→被験者 対応表運用。
