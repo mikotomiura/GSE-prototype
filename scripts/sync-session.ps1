@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     GSE セッション NDJSON を gse-dataset にメトリクス化して同期する (Windows)。
 
@@ -21,8 +21,15 @@
     gse-dataset リポジトリのルート (default: env $GSE_DATASET、未設定なら C:\gse-dataset)
 
 .PARAMETER ParticipantId
-    被験者 ID (default: env $GSE_PID、未設定なら P000)
-    PowerShell 自動変数 $PID と衝突するため $ParticipantId 命名
+    被験者 ID の明示指定 (任意)。下記の解決順で使われる。
+    PowerShell 自動変数 $PID と衝突するため $ParticipantId 命名。
+
+    参加者 ID 解決順 (raw 構造を真実源とし logger Part 2 の自動生成 ID に追従):
+      1. パス導出: SessionPath が .../raw/<PID>/gse_*.ndjson なら親ディレクトリ名 <PID>
+      2. -ParticipantId / env $GSE_PID (allowlist 通過時)
+      3. ~/.gse/participant_id (logger の永続化先、allowlist 通過時)
+      4. P000 (最終 fallback)
+    詳細: .steering/20260619-sync-auto-participant-id/decisions.md
 
 .PARAMETER NoCommit
     指定時は Step 3 の commit/push をスキップ (dry-run)
@@ -47,7 +54,8 @@ param(
 
     [string]$OutputDir,
     [string]$DatasetRoot = $(if ($env:GSE_DATASET) { $env:GSE_DATASET } else { 'C:\gse-dataset' }),
-    [string]$ParticipantId = $(if ($env:GSE_PID) { $env:GSE_PID } else { 'P000' }),
+    # 既定は env $GSE_PID または空。空のまま P000 へ即決せず、本体で永続化値 fallback を通す。
+    [string]$ParticipantId = $(if ($env:GSE_PID) { $env:GSE_PID } else { '' }),
     [string]$RepoRoot = $(if ($env:GSE_PROTOTYPE_ROOT) { $env:GSE_PROTOTYPE_ROOT } else { 'C:\GSE-prototype' }),
     [switch]$NoCommit
 )
@@ -59,11 +67,63 @@ $EXIT_GIT    = 3
 
 function Write-Step([string]$Message) { Write-Host "[sync-session] $Message" -ForegroundColor Cyan }
 
+# === 参加者 ID ヘルパー (logger is_valid_participant_id と挙動を一致させる) ===
+# allowlist: ASCII 英数字 + _ + - のみ・長さ 1..=64、かつ Windows 予約デバイス名を拒否
+# (大小無視)。logger.rs:918-942 と完全一致。
+$script:GseReservedIds = @('CON','PRN','AUX','NUL',
+    'COM1','COM2','COM3','COM4','COM5','COM6','COM7','COM8','COM9',
+    'LPT1','LPT2','LPT3','LPT4','LPT5','LPT6','LPT7','LPT8','LPT9')
+
+function Test-ValidParticipantId([string]$Id) {
+    if ([string]::IsNullOrEmpty($Id)) { return $false }
+    # \A..\z で末尾改行も許さない (PS の ^..$ は末尾 \n を許すため logger と挙動が乖離する)。
+    if (-not [regex]::IsMatch($Id, '\A[A-Za-z0-9_-]{1,64}\z')) { return $false }
+    if ($script:GseReservedIds -contains $Id.ToUpperInvariant()) { return $false }
+    return $true
+}
+
+function Get-PidFromPath([string]$Path) {
+    # .../raw/<PID>/gse_*.ndjson の <PID> を返す。祖父名が厳密に 'raw' のときのみ。
+    $parent = Split-Path -Leaf (Split-Path -Parent $Path)
+    $grand  = Split-Path -Leaf (Split-Path -Parent (Split-Path -Parent $Path))
+    if ($grand -eq 'raw' -and (Test-ValidParticipantId $parent)) { return $parent }
+    return $null
+}
+
+function Get-PersistedParticipantId {
+    # logger の永続化先 ~/.gse/participant_id を読む (基点 USERPROFILE → HOME)。
+    $base = if ($env:USERPROFILE) { $env:USERPROFILE } elseif ($env:HOME) { $env:HOME } else { $null }
+    if (-not $base) { return $null }
+    # §10.2.1: Join-Path 空返し回避のため文字列結合で組む
+    $f = "$base\.gse\participant_id"
+    if (-not (Test-Path -LiteralPath $f)) { return $null }
+    try {
+        $raw = (Get-Content -LiteralPath $f -Raw -ErrorAction Stop).Trim()
+    } catch { return $null }
+    if (Test-ValidParticipantId $raw) { return $raw }
+    return $null
+}
+
 # === 前提チェック ===
 if (-not (Test-Path -LiteralPath $SessionPath)) {
     Write-Warning "session not found: $SessionPath"
     exit $EXIT_CARGO
 }
+
+# === 参加者 ID 解決 (パス導出 → -ParticipantId/GSE_PID → 永続化 → P000) ===
+$pidSource = ''
+$derivedPid = Get-PidFromPath $SessionPath
+if ($derivedPid) {
+    $ParticipantId = $derivedPid; $pidSource = 'raw-path'
+} elseif ($ParticipantId -and (Test-ValidParticipantId $ParticipantId)) {
+    $pidSource = 'GSE_PID'
+} else {
+    $persistedPid = Get-PersistedParticipantId
+    if ($persistedPid) { $ParticipantId = $persistedPid; $pidSource = 'persisted' }
+    else { $ParticipantId = 'P000'; $pidSource = 'default' }
+}
+Write-Step "participant id: $ParticipantId (source: $pidSource)"
+
 if (-not $OutputDir) {
     $OutputDir = Join-Path $DatasetRoot "metrics\$ParticipantId\windows"
 }
