@@ -314,9 +314,11 @@ export GSE_PARTICIPANT_ID=P003   # logger の主変数。raw/<id>/ を切替
 rm ~/.gse/participant_id          # macOS/Linux
 # PowerShell: Remove-Item $HOME\.gse\participant_id
 #
-# 注意: 自動生成 ID は不透明なため、ID→被験者の対応表は研究者が別途管理する。また現状の
-# sync スクリプト (sync-session/sync-all) は GSE_PID 前提で metrics/<id>/ を決めるため、
-# 自動生成 ID には未追従 (raw と metrics で ID が乖離し得る)。追従は別タスクで対応予定。
+# 注意: 自動生成 ID は不透明なため、ID→被験者の対応表は研究者が別途管理する。
+# sync スクリプト (sync-session/sync-all) は自動生成 ID に追従済み (2026-06-19):
+# raw/<id>/ のディレクトリ名から PID を導出して metrics/<id>/ に対応付けるため、
+# raw と metrics の ID は構造的に一致する (GSE_PID 設定は不要)。詳細は下記バッチ同期と
+# .steering/20260619-sync-auto-participant-id/ を参照。
 
 # 1) セッション取得 (macOS/Windows どちらでも)
 npm run tauri dev  # Dashboard で作業、⌘⇧⌥ F/I/S (macOS) / Ctrl+Shift+Alt+F/I/S でラベル
@@ -355,7 +357,7 @@ pwsh -NoProfile -File scripts\sync-session.ps1 `
 内部で `gse-replay --metrics --json` → `validate_schema.py` → `git add/commit/push` を順に実行し、
 各 Step の exit code を伝搬する。
 
-**バッチ同期 (複数セッションを一括処理)**: `scripts/sync-all.*` で fallback → raw コピー + 全未処理ファイルの metrics 生成 + 1 commit/push をまとめて行える:
+**バッチ同期 (複数セッションを一括処理)**: `scripts/sync-all.*` で fallback → raw コピー + 全未処理ファイルの metrics 生成 + 1 commit/push をまとめて行える。`raw/*/` を **participant ごとに反復**し、各ディレクトリ名 (= PID) から `metrics/<PID>/` を決めるため、複数被験者の raw を 1 回でそれぞれ正しい metrics に振り分けられる (ディレクトリ名は logger と同じ allowlist `[A-Za-z0-9_-]`,1..=64 + Windows 予約名拒否 で検証し、不正名はスキップ)。fallback dir の平坦な NDJSON は端末ローカルの PID (`GSE_PID` → `~/.gse/participant_id` → `P000`) で `raw/<id>/` にコピーされる:
 
 ```bash
 # macOS / Linux
@@ -393,6 +395,13 @@ Step 1 以降に進まず、修復コマンド例を出力して停止する。�
   → 使う前に 1 度 `Write-Host "[debug] var=$var"` で pre-access してから本体で参照する。
 - **`> $file` リダイレクト出力は UTF-16 BOM でエンコードされる** (git diff に BOM が混入)。
   → 変数にキャプチャしてから `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))` で UTF-8 NoBOM へ書く。
+- **非 ASCII (日本語コメント等) を含む `.ps1` は UTF-8 BOM 付きで保存する** (2026-06-19 判明)。
+  PS 5.1 は BOM 無しスクリプトを `[Text.Encoding]::Default` (本機は **CP932/Shift-JIS**) で読むため、
+  日本語のバイト列が誤って `#>` を生成し `<# .. #>` comment-based help を途中で閉じる等の parse 破壊が
+  起こる (`powershell.exe -File` 実行も同経路で壊れる)。「どの日本語を書くか」で parse 可否が変わる
+  脆さなので、ソース `.ps1` は UTF-8 BOM で保存し UTF-8 読みを強制する (これは上記 ① の*出力ファイル*の
+  UTF-16 BOM とは別物。ソースの UTF-8 BOM は必須対応)。検証: `[Management.Automation.Language.Parser]::ParseFile(...)`
+  が errors 0 を返すこと。
 
 これらは `scripts/sync-session.ps1` 内のコメントにも併記済み。bash 側 (`sync-session.sh`) は
 `set -euo pipefail` + `bash -n` 構文チェックで十分堅牢 (同種の問題は発生せず)。

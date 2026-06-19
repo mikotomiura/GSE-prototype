@@ -1,12 +1,14 @@
-<#
+﻿<#
 .SYNOPSIS
     GSE セッション NDJSON を一括で gse-dataset に同期する (Windows)。
 
 .DESCRIPTION
     処理:
-      1. fallback ディレクトリの未同期 NDJSON を raw/P000/ にコピー
-      2. raw 内で metrics 未生成のファイルに sync-session.ps1 -NoCommit を実行
-      3. まとめて 1 commit + push
+      1. fallback ディレクトリの未同期 NDJSON を raw/<local-pid>/ にコピー
+         (local-pid = GSE_PID → ~/.gse/participant_id → P000。fallback dir は端末ローカル)
+      2. raw\*\ を participant ごとに反復し、metrics 未生成のファイルに sync-session.ps1
+         -NoCommit を実行 (PID は raw のディレクトリ名 = パス導出で解決)
+      3. まとめて 1 commit + push (全 participant を一括 add)
 
 .PARAMETER FallbackDir
     セッション NDJSON の fallback ディレクトリ。
@@ -16,7 +18,8 @@
     gse-dataset リポジトリのルート (default: env $GSE_DATASET、未設定なら C:\gse-dataset)
 
 .PARAMETER ParticipantId
-    被験者 ID (default: env $GSE_PID、未設定なら P000)
+    fallback コピー先の被験者 ID 明示指定 (任意、default: env $GSE_PID)。raw 配下の既存
+    ファイルはディレクトリ名から PID を導出するため、この値には依存しない。
 
 .PARAMETER NoCommit
     指定時は Step 3 の commit/push をスキップ (dry-run)
@@ -29,14 +32,15 @@
 
 .NOTES
     関連: scripts/sync-session.ps1、docs/development-guidelines.md §10.2
-    Exit codes: 0=OK, 1=cargo fail, 3=git fail
+    Exit codes: 0=OK, 1=cargo fail, 2=schema drift, 3=git fail, 4=precondition
 #>
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
     [string]$FallbackDir = $(if ($env:USERPROFILE) { "$env:USERPROFILE\Documents\GSE-sessions" } else { '' }),
     [string]$DatasetRoot = $(if ($env:GSE_DATASET) { $env:GSE_DATASET } else { 'C:\gse-dataset' }),
-    [string]$ParticipantId = $(if ($env:GSE_PID) { $env:GSE_PID } else { 'P000' }),
+    # 既定は env $GSE_PID または空。空のまま P000 へ即決せず、本体で永続化値 fallback を通す。
+    [string]$ParticipantId = $(if ($env:GSE_PID) { $env:GSE_PID } else { '' }),
     [string]$RepoRoot = $(if ($env:GSE_PROTOTYPE_ROOT) { $env:GSE_PROTOTYPE_ROOT } else { 'C:\GSE-prototype' }),
     [switch]$NoCommit
 )
@@ -49,6 +53,31 @@ $EXIT_PRECONDITION = 4
 
 function Write-Step([string]$Message) { Write-Host "[sync-all] $Message" -ForegroundColor Cyan }
 
+# === 参加者 ID ヘルパー (logger is_valid_participant_id と一致。sync-session.ps1 と同一実装) ===
+$script:GseReservedIds = @('CON','PRN','AUX','NUL',
+    'COM1','COM2','COM3','COM4','COM5','COM6','COM7','COM8','COM9',
+    'LPT1','LPT2','LPT3','LPT4','LPT5','LPT6','LPT7','LPT8','LPT9')
+
+function Test-ValidParticipantId([string]$Id) {
+    if ([string]::IsNullOrEmpty($Id)) { return $false }
+    if (-not [regex]::IsMatch($Id, '\A[A-Za-z0-9_-]{1,64}\z')) { return $false }
+    if ($script:GseReservedIds -contains $Id.ToUpperInvariant()) { return $false }
+    return $true
+}
+
+function Get-PersistedParticipantId {
+    # logger の永続化先 ~/.gse/participant_id を読む (基点 USERPROFILE → HOME)。
+    $base = if ($env:USERPROFILE) { $env:USERPROFILE } elseif ($env:HOME) { $env:HOME } else { $null }
+    if (-not $base) { return $null }
+    $f = "$base\.gse\participant_id"
+    if (-not (Test-Path -LiteralPath $f)) { return $null }
+    try {
+        $raw = (Get-Content -LiteralPath $f -Raw -ErrorAction Stop).Trim()
+    } catch { return $null }
+    if (Test-ValidParticipantId $raw) { return $raw }
+    return $null
+}
+
 # PS 5.1 quirk: pre-access variables (see docs/development-guidelines.md §10.2.1)
 Write-Host "[sync-all] repo root: $RepoRoot" -ForegroundColor DarkGray
 Write-Host "[sync-all] dataset root: $DatasetRoot" -ForegroundColor DarkGray
@@ -59,8 +88,16 @@ if (-not (Test-Path -LiteralPath $DatasetRoot)) {
     exit $EXIT_PRECONDITION
 }
 
-$rawDir     = "$DatasetRoot\raw\$ParticipantId"
-$metricsDir = "$DatasetRoot\metrics\$ParticipantId\windows"
+# ローカル PID (fallback dir のファイル帰属先): -ParticipantId/GSE_PID → 永続化 → P000 (パス導出は使わない、D4)
+if ($ParticipantId -and (Test-ValidParticipantId $ParticipantId)) {
+    $localPid = $ParticipantId
+} else {
+    $persistedPid = Get-PersistedParticipantId
+    if ($persistedPid) { $localPid = $persistedPid } else { $localPid = 'P000' }
+}
+Write-Host "[sync-all] local participant id (fallback copy target): $localPid" -ForegroundColor DarkGray
+
+$rawDir     = "$DatasetRoot\raw\$localPid"
 $syncScript = "$RepoRoot\scripts\sync-session.ps1"
 
 if (-not (Test-Path -LiteralPath $syncScript)) {
@@ -68,11 +105,9 @@ if (-not (Test-Path -LiteralPath $syncScript)) {
     exit $EXIT_PRECONDITION
 }
 
-# ディレクトリ作成
-foreach ($d in @($rawDir, $metricsDir)) {
-    if (-not (Test-Path -LiteralPath $d)) {
-        New-Item -ItemType Directory -Path $d -Force | Out-Null
-    }
+# fallback コピー先 raw ディレクトリのみ事前作成 (各 participant の metrics は Step 2 で作る)
+if (-not (Test-Path -LiteralPath $rawDir)) {
+    New-Item -ItemType Directory -Path $rawDir -Force | Out-Null
 }
 
 # === Step 0: schema parity pre-flight (gse-prototype vs gse-dataset) ===
@@ -113,7 +148,7 @@ if ($parityRc -ne 0) {
 # === Step 1: fallback → raw コピー (重複スキップ) ===
 $copied = 0
 if ($FallbackDir -and (Test-Path -LiteralPath $FallbackDir)) {
-    Write-Step "Step 1/3: copying unsynced NDJSON from $FallbackDir"
+    Write-Step "Step 1/3: copying unsynced NDJSON from $FallbackDir -> raw\$localPid\"
     $fallbackFiles = Get-ChildItem -Path $FallbackDir -Filter 'gse_*.ndjson' -File -ErrorAction SilentlyContinue
     foreach ($f in $fallbackFiles) {
         $destPath = "$rawDir\$($f.Name)"
@@ -128,42 +163,62 @@ if ($FallbackDir -and (Test-Path -LiteralPath $FallbackDir)) {
     Write-Step "Step 1/3: fallback dir not found ($FallbackDir) — skipping"
 }
 
-# === Step 2: metrics 未生成ファイルを検出して sync-session 実行 ===
-$processed = 0
-$failed    = 0
-Write-Step "Step 2/3: generating metrics for unprocessed sessions"
-$rawFiles = Get-ChildItem -Path $rawDir -Filter 'gse_*.ndjson' -File -ErrorAction SilentlyContinue
-foreach ($f in $rawFiles) {
-    $basename    = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
-    $metricsFile = "$metricsDir\$basename.metrics.json"
-    if (Test-Path -LiteralPath $metricsFile) {
-        Write-Host "  skip (already has metrics): $basename"
+# === Step 2: raw\*\ を participant ごとに反復し metrics 未生成ファイルを sync-session 実行 ===
+# §10.2.1 quirk: Git Bash → powershell.exe ブリッジ経由で $PSHOME も空になる。
+# 子 PS の解決順 (1 度だけ行いループ外に出す):
+#   1. Get-Command で pwsh (PS 7) が取れれば親と同世代の PS を使う
+#   2. $PSHOME が取れていれば powershell.exe / pwsh.exe を優先
+#   3. 最後の砦として $env:windir 下の Windows PowerShell 5.1 (x64 前提。arm64 対応時は要再検討)
+# ブリッジ経由 ($PSHOME 空) の場合、親が pwsh 7 でも子は 5.1 に落ちる可能性がある点に注意。
+$psExe = $null
+$pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+if ($pwshCmd)                                                          { $psExe = $pwshCmd.Source }
+elseif ($PSHOME -and (Test-Path -LiteralPath "$PSHOME\pwsh.exe"))      { $psExe = "$PSHOME\pwsh.exe" }
+elseif ($PSHOME -and (Test-Path -LiteralPath "$PSHOME\powershell.exe")) { $psExe = "$PSHOME\powershell.exe" }
+else { $psExe = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" }
+
+$processed   = 0
+$failed      = 0
+$touchedPids = @()   # 処理済み participant id (commit scope 決定用)。$PID 自動変数衝突回避で $pName を使う
+Write-Step "Step 2/3: generating metrics for unprocessed sessions (per participant)"
+$participantDirs = Get-ChildItem -Path "$DatasetRoot\raw" -Directory -ErrorAction SilentlyContinue
+foreach ($pdir in $participantDirs) {
+    $pName = $pdir.Name
+    if (-not (Test-ValidParticipantId $pName)) {
+        Write-Warning "  skipping raw dir with invalid participant id: $pName"
         continue
     }
-    Write-Host "  processing: $basename"
-    # §10.2.1 quirk: Git Bash → powershell.exe ブリッジ経由で $PSHOME も空になる。
-    # 解決順:
-    #   1. Get-Command で pwsh (PS 7) が取れれば親と同世代の PS を使う
-    #   2. $PSHOME が取れていれば powershell.exe / pwsh.exe を優先
-    #   3. 最後の砦として $env:windir 下の Windows PowerShell 5.1 (x64 前提。arm64 対応時は要再検討)
-    # ブリッジ経由 ($PSHOME 空) の場合、親が pwsh 7 でも子は 5.1 に落ちる可能性がある点に注意。
-    $psExe = $null
-    $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
-    if ($pwshCmd)                                                          { $psExe = $pwshCmd.Source }
-    elseif ($PSHOME -and (Test-Path -LiteralPath "$PSHOME\pwsh.exe"))      { $psExe = "$PSHOME\pwsh.exe" }
-    elseif ($PSHOME -and (Test-Path -LiteralPath "$PSHOME\powershell.exe")) { $psExe = "$PSHOME\powershell.exe" }
-    else { $psExe = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" }
-    & $psExe -NoProfile -ExecutionPolicy Bypass -File $syncScript `
-        -SessionPath $f.FullName `
-        -DatasetRoot $DatasetRoot `
-        -ParticipantId $ParticipantId `
-        -RepoRoot $RepoRoot `
-        -NoCommit
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "  FAILED: $basename (exit $LASTEXITCODE)"
-        $failed++
-    } else {
-        $processed++
+    $metricsDir = "$DatasetRoot\metrics\$pName\windows"
+    if (-not (Test-Path -LiteralPath $metricsDir)) {
+        New-Item -ItemType Directory -Path $metricsDir -Force | Out-Null
+    }
+    $rawFiles = Get-ChildItem -Path $pdir.FullName -Filter 'gse_*.ndjson' -File -ErrorAction SilentlyContinue
+    foreach ($f in $rawFiles) {
+        $basename    = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
+        $metricsFile = "$metricsDir\$basename.metrics.json"
+        if (Test-Path -LiteralPath $metricsFile) {
+            Write-Host "  skip (already has metrics): $pName/$basename"
+            continue
+        }
+        Write-Host "  processing: $pName/$basename"
+        # PID は sync-session.ps1 が SessionPath (.../raw/<pName>/) から導出する。
+        # -ParticipantId は渡さず、raw のディレクトリ名を真実源とする (raw と metrics を一致させる)。
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File $syncScript `
+            -SessionPath $f.FullName `
+            -DatasetRoot $DatasetRoot `
+            -RepoRoot $RepoRoot `
+            -NoCommit
+        # §10.2.1: $LASTEXITCODE は -File 経由で不安定なため、子の成否は出力ファイルの実在で
+        # 確認する (sync-session.ps1 が cargo の成否を LASTEXITCODE で判定しないのと同じ方針)。
+        # 取りこぼした子を $processed++ して空 metrics を commit する事故を防ぐ。
+        $childOk = (Test-Path -LiteralPath $metricsFile) -and ((Get-Item -LiteralPath $metricsFile).Length -gt 0)
+        if ($childOk) {
+            $processed++
+            $touchedPids += $pName
+        } else {
+            Write-Warning "  FAILED: $pName/$basename (exit $LASTEXITCODE, metrics produced: $childOk)"
+            $failed++
+        }
     }
 }
 Write-Step "Step 2/3 done ($processed processed, $failed failed)"
@@ -188,13 +243,26 @@ if ($NoCommit) {
 Write-Step "Step 3/3: committing to $DatasetRoot"
 Push-Location -LiteralPath $DatasetRoot
 try {
-    & git add "raw/$ParticipantId/" "metrics/$ParticipantId/"
-    if ($LASTEXITCODE -ne 0) { exit $EXIT_GIT }
+    # 触れた PID (処理済み + コピー先) のみ stage する。不正名でスキップした raw dir は
+    # commit しない (構造ガードの趣旨。`--` で先頭ハイフン PID のオプション誤認も防ぐ)。
+    $allPids = @($touchedPids)
+    if ($copied -gt 0) { $allPids += $localPid }
+    $uniquePids = @($allPids | Sort-Object -Unique)
+    foreach ($p in $uniquePids) {
+        & git add -- "raw/$p/" "metrics/$p/"
+        if ($LASTEXITCODE -ne 0) { exit $EXIT_GIT }
+    }
 
     $date        = Get-Date -Format 'yyyy-MM-dd'
-    $pidLower    = $ParticipantId.ToLower()
     $total       = $copied + $processed
-    $commitMsg   = "data($pidLower-windows): batch sync $date ($total files)"
+    # commit scope: 触れた PID が 1 件ならその ID、複数なら multi
+    if ($uniquePids.Count -le 1) {
+        $scopePid = if ($uniquePids.Count -eq 1) { $uniquePids[0] } else { $localPid }
+        $scope    = $scopePid.ToLower()
+    } else {
+        $scope = 'multi'
+    }
+    $commitMsg   = "data($scope-windows): batch sync $date ($total files)"
     & git commit -m $commitMsg
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "git commit failed (maybe nothing to commit?)"
