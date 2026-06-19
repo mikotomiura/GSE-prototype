@@ -296,11 +296,33 @@ export GSE_DATASET=/path/to/gse-dataset   # macOS/Linux
 # PowerShell: [Environment]::SetEnvironmentVariable('GSE_DATASET', 'C:\gse-dataset', 'User')
 # → 未設定の場合は ~/Documents/GSE-sessions/ に fallback
 
+# 0.5) 参加者 ID は既定で自動付与される (env 設定は任意)
+# env を何も設定しなくても、初回起動時に端末ごとに一意な不透明 ID
+# (P + 12桁hex、例 Pa3f9c2e1b7d0) が自動生成され ~/.gse/participant_id に永続化される。
+# 以降の起動は同じ ID を再利用するため、複数被験者が各自の端末で操作しても P000 に衝突しない。
+#
+# 研究者が ID を明示割当したい場合のみ env で上書きする (env 値は永続化されない):
+export GSE_PARTICIPANT_ID=P003   # logger の主変数。raw/<id>/ を切替
+# 既存 sync スクリプトと共有する GSE_PID を設定済みなら logger もそれを読む。
+#
+# 解決順: 永続化値 (~/.gse/participant_id) → GSE_PARTICIPANT_ID → GSE_PID
+#         → 自動生成+永続化 → P000 (生成/書込失敗時のみ)。
+# ID は [A-Za-z0-9_-] のみ・1..=64 文字 (パストラバーサル防止)。不正値・Windows 予約名
+# (CON/NUL 等) は拒否され次候補へフォールバックする。
+#
+# リセット (別 ID で採り直す): 永続化ファイルを削除すると次回起動で再生成される。
+rm ~/.gse/participant_id          # macOS/Linux
+# PowerShell: Remove-Item $HOME\.gse\participant_id
+#
+# 注意: 自動生成 ID は不透明なため、ID→被験者の対応表は研究者が別途管理する。また現状の
+# sync スクリプト (sync-session/sync-all) は GSE_PID 前提で metrics/<id>/ を決めるため、
+# 自動生成 ID には未追従 (raw と metrics で ID が乖離し得る)。追従は別タスクで対応予定。
+
 # 1) セッション取得 (macOS/Windows どちらでも)
 npm run tauri dev  # Dashboard で作業、⌘⇧⌥ F/I/S (macOS) / Ctrl+Shift+Alt+F/I/S でラベル
-# → $GSE_DATASET/raw/P000/gse_YYYYMMDD_HHMMSS.ndjson (env 設定時)
+# → $GSE_DATASET/raw/<participant_id>/gse_YYYYMMDD_HHMMSS.ndjson (env 設定時、既定 P000)
 #    または ~/Documents/GSE-sessions/gse_YYYYMMDD_HHMMSS.ndjson (fallback)
-# 起動時 tracing log で resolved_log_dir と source を確認できる
+# 起動時 tracing log で resolved_log_dir / participant_id / source を確認できる
 
 # 2) メトリクス算出 + gse-dataset に配置
 cd src-tauri

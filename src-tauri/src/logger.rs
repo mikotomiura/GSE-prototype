@@ -1,10 +1,11 @@
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
+use rand::Rng;
 
 /// ユーザーが付与する Ground Truth ラベルの種別
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -905,30 +906,259 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
+/// 参加者 ID 未設定時の既定値 (従来挙動を不変に保つ)
+const DEFAULT_PARTICIPANT_ID: &str = "P000";
+
+/// 参加者 ID として許可する最大長 (ディレクトリ名の暴走防止)
+const MAX_PARTICIPANT_ID_LEN: usize = 64;
+
+/// Windows の予約デバイス名 (大文字小文字無視で比較)。allowlist は通過するが、
+/// ディレクトリ名に使うと `create_dir_all` が `ERROR_INVALID_NAME` で失敗し、
+/// 原因の分かりにくいセッションログ欠落を招くため拒否する (本機の主ターゲットは Windows 11)。
+const WINDOWS_RESERVED_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// 参加者 ID が保存先パスの構成要素として安全かを検証する。
+///
+/// allowlist 方式: ASCII 英数字 + `_` + `-` のみ、長さ 1..=64。
+/// これにより `.`(→`..`)・`/`・`\`・`:`・空白・null・改行・`~`・`$` 等を一括拒否し、
+/// パストラバーサル / パス注入を構造的に防ぐ。参加者 ID 規約 (`P000`/`P003` 等) は
+/// 完全にカバーされる。加えて Windows 予約デバイス名 (`CON`/`NUL` 等) を拒否する。
+/// 検証は呼び出し側で trim 済みの値に対して行う。
+fn is_valid_participant_id(id: &str) -> bool {
+    if id.is_empty() || id.len() > MAX_PARTICIPANT_ID_LEN {
+        return false;
+    }
+    if !id
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return false;
+    }
+    let upper = id.to_ascii_uppercase();
+    !WINDOWS_RESERVED_NAMES.contains(&upper.as_str())
+}
+
+/// 候補列 (優先順) から最初の妥当な参加者 ID を返す純粋関数。
+///
+/// env / 永続化値に依存しないため単体テスト可能。各候補は前後空白を trim してから
+/// `is_valid_participant_id` で検証し、最初に妥当だったものを返す。妥当な候補が
+/// なければ `None` (呼び出し側が自動生成 / 既定値に委ねる)。
+fn first_valid_id(candidates: &[Option<&str>]) -> Option<String> {
+    for raw in candidates.iter().flatten() {
+        let id = raw.trim();
+        if is_valid_participant_id(id) {
+            return Some(id.to_string());
+        }
+    }
+    None
+}
+
+/// 端末ごとに一意な不透明参加者 ID を自動生成する。
+///
+/// 形式は `P` + 12 桁ランダム hex (48 bit, 例 `Pa3f9c2e1b7d0`)。常に
+/// `is_valid_participant_id` を通過し (ASCII 英数字のみ・13 文字)、sync スクリプトの
+/// `P*` glob とも互換。値はキーストローク等の本文に一切由来しない (プライバシー境界:
+/// data-privacy Skill — 自動付与 ID は不透明で被験者本人も内容を推定できない)。
+fn generate_participant_id() -> String {
+    // 48 bit (= 12 hex 桁) を thread_rng (CSPRNG) から引く。誕生日衝突は端末数 N に対し
+    // 約 N²/2⁴⁹ で、研究運用の N (≤ 数百規模) では実用上無視できる (桁を変える際の判断材料)。
+    let bits: u64 = rand::thread_rng().gen::<u64>() & 0x0000_FFFF_FFFF_FFFF;
+    format!("P{bits:012x}")
+}
+
+/// 自動生成した参加者 ID を永続化するファイルのパス `~/.gse/participant_id`。
+///
+/// 基点は `USERPROFILE` → `HOME` の順 (`fallback_log_dir` と同流儀)。どちらも未設定で
+/// home が解決できなければ `None` を返す (永続化不能 → 呼び出し側が `P000` fallback)。
+fn participant_id_store_path() -> Option<PathBuf> {
+    let base = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()?;
+    Some(PathBuf::from(base).join(".gse").join("participant_id"))
+}
+
+/// 指定パスから参加者 ID を読み出す純粋ヘルパー (I/O は `path` に対してのみ・env 非依存)。
+///
+/// ファイルが無い / 読めない / 値が不正なら `None`。値は trim してから
+/// `is_valid_participant_id` で検証する (破損・手編集による不正値 = path injection を防ぐ)。
+/// env / home に依存しないため一時ファイルで単体テスト可能。
+fn load_id_from(path: &Path) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+    let id = raw.trim();
+    if is_valid_participant_id(id) {
+        Some(id.to_string())
+    } else {
+        if !id.is_empty() {
+            tracing::warn!("persisted participant id rejected (invalid format); will regenerate");
+        }
+        None
+    }
+}
+
+/// 参加者 ID を指定パスへ **アトミックに** 書く純粋ヘルパー (env 非依存・テスト可能)。
+///
+/// 同一ディレクトリの一時ファイルへ書いてから `fs::rename` で差し替える。これにより
+/// 途中クラッシュ / 同時起動で `path` 自身が空 / 部分書き込みになることを防ぎ、次回の
+/// `load_id_from` が「空 → 再生成」に倒れて端末 ID が変わる事故を回避する
+/// (D4「再起動でも ID 不変」を守る)。親ディレクトリが無ければ作成する。
+fn persist_id_to(path: &Path, id: &str) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    // 一時名に pid を含め、並行起動どうしの一時ファイル衝突を避ける。
+    // 同一ボリューム内 rename のため `fs::rename` はアトミック (Windows/Unix とも既存を置換)。
+    let tmp = path.with_file_name(format!("participant_id.tmp.{}", std::process::id()));
+    fs::write(&tmp, id)?;
+    fs::rename(&tmp, path).inspect_err(|_| {
+        // rename 失敗時は一時ファイルを残さない (掃除はベストエフォート)。
+        let _ = fs::remove_file(&tmp);
+    })
+}
+
+/// 永続化済みの参加者 ID を読み出す。home (`USERPROFILE`/`HOME`) 不明なら `None`。
+fn load_persisted_id() -> Option<String> {
+    load_id_from(&participant_id_store_path()?)
+}
+
+/// 自動生成した参加者 ID を `~/.gse/participant_id` に永続化する。
+///
+/// home 不明 / 書込失敗は `Err` を返し、呼び出し側が `P000` fallback に倒す。`anyhow` は
+/// 本 crate (lib) の依存ではないため (replay.rs と同方針)、std の `io::Result` で伝播する。
+fn persist_id(id: &str) -> std::io::Result<()> {
+    let path = participant_id_store_path().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "no home directory (USERPROFILE/HOME) to persist participant id",
+        )
+    })?;
+    persist_id_to(&path, id)
+}
+
+/// `resolve_with_store` の判定結果。
+///
+/// `Existing` = 永続化値 / env 由来で **再永続化しない** (D4 ③: env は永続化しない)。
+/// `Generated` = 新規生成のため呼び出し側が永続化を試みる。両者を型で区別することで
+/// 「env を誤って永続ストアに書く」事故を構造的に防ぐ。
+#[derive(Debug, PartialEq, Eq)]
+enum Resolution {
+    Existing(String),
+    Generated(String),
+}
+
+/// 参加者 ID の解決順を表す純粋関数 (I/O 非依存・テスト可能)。
+///
+/// 優先順 (D4): 永続化値 → `GSE_PARTICIPANT_ID` → `GSE_PID` → 自動生成。
+/// 永続化値 / env のいずれかが妥当ならそれを `Existing` で返す (再永続化しない)。
+/// すべて未設定 / 不正なら `generated` を `Generated` で返す (呼び出し側が永続化)。
+fn resolve_with_store(
+    persisted: Option<&str>,
+    env_primary: Option<&str>,
+    env_secondary: Option<&str>,
+    generated: &str,
+) -> Resolution {
+    match first_valid_id(&[persisted, env_primary, env_secondary]) {
+        Some(id) => Resolution::Existing(id),
+        None => Resolution::Generated(generated.to_string()),
+    }
+}
+
+/// 参加者 ID を解決する (D4: 完全自動生成 + ローカル永続化)。
+///
+/// ## 解決順
+/// 1. 永続化値 `~/.gse/participant_id` (妥当な場合) — 端末ごとに安定し再起動でも不変
+/// 2. `GSE_PARTICIPANT_ID` (研究者の明示上書き、永続化はしない)
+/// 3. `GSE_PID` (既存 sync スクリプト `metrics/$PID/` と共有、永続化はしない)
+/// 4. 自動生成 `P`+12桁hex → `~/.gse/participant_id` に永続化 (env 未設定でも P000 衝突しない)
+/// 5. 生成値の書込失敗時のみ `P000` (永続化不能時の安定 fallback)
+///
+/// env 由来の値は永続ストアに書かない (override に徹する)。不正な env 値は
+/// `tracing::warn!` で可視化して次候補へフォールバックする (生値はログに出さない)。
+/// リセットは `~/.gse/participant_id` を削除すると次回起動で再生成される。
+fn resolve_participant_id() -> String {
+    let persisted = load_persisted_id();
+    let env_primary = std::env::var("GSE_PARTICIPANT_ID").ok();
+    let env_secondary = std::env::var("GSE_PID").ok();
+
+    // warn 出力と実際の採用 (first_valid_id) は同一述語 `is_valid_participant_id` に
+    // 依存する。判定基準を変えるときは両者がズレないよう同関数のみを変更すること。
+    for (key, val) in [
+        ("GSE_PARTICIPANT_ID", &env_primary),
+        ("GSE_PID", &env_secondary),
+    ] {
+        if let Some(raw) = val {
+            if !is_valid_participant_id(raw.trim()) {
+                tracing::warn!(
+                    env_key = key,
+                    "participant id from env rejected (must be [A-Za-z0-9_-], 1..=64 chars); falling back"
+                );
+            }
+        }
+    }
+
+    let generated = generate_participant_id();
+    match resolve_with_store(
+        persisted.as_deref(),
+        env_primary.as_deref(),
+        env_secondary.as_deref(),
+        &generated,
+    ) {
+        Resolution::Existing(id) => id,
+        Resolution::Generated(id) => match persist_id(&id) {
+            Ok(()) => {
+                tracing::info!(
+                    participant_id = %id,
+                    "generated and persisted new participant id (~/.gse/participant_id)"
+                );
+                id
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "failed to persist generated participant id; using P000 fallback"
+                );
+                DEFAULT_PARTICIPANT_ID.to_string()
+            }
+        },
+    }
+}
+
 /// セッションログの保存先パスを決定する。
 ///
 /// ## 優先順位 (2 段、明示的制御)
-/// 1. 環境変数 `GSE_DATASET` が設定されていれば `$GSE_DATASET/raw/P000/`
+/// 1. 環境変数 `GSE_DATASET` が設定されていれば `$GSE_DATASET/raw/<participant_id>/`
 /// 2. そうでなければ fallback `~/Documents/GSE-sessions/`
+///
+/// 参加者 ID は `resolve_participant_id()` が 永続化値 `~/.gse/participant_id` →
+/// `GSE_PARTICIPANT_ID` → `GSE_PID` → 自動生成 (`P`+12桁hex, 永続化) → `P000` の順で
+/// 解決する。env 未設定でも端末ごとに一意な ID が自動付与・永続化されるため、複数被験者が
+/// 各自の端末で操作しても `P000` には衝突しない。fallback 経路 (`~/Documents/GSE-sessions/`)
+/// は従来どおり参加者 ID を含まない。
 ///
 /// ## 以前の挙動との差分
 /// 旧実装は exe の兄弟を最大 5 階層上まで走査して `gse-dataset/raw/P000/` を
 /// 暗黙的に優先していたが、CI・別開発マシン・Tauri bundle 配布先で予期しないパス
 /// に書き込むリスクがあったため、20260416 に env + fallback の 2 段に簡素化した。
+/// 20260619 に参加者 ID を `P000` 固定から env 可変へ拡張 (Part 1)、さらに完全自動生成 +
+/// `~/.gse/participant_id` 永続化へ拡張した (Part 2 / D4。複数参加者のデータ収集対応)。
 /// 開発者が `gse-dataset` リポジトリに書きたい場合は shell rc / PowerShell
 /// `$PROFILE` で `GSE_DATASET` を明示的に設定する (docs/development-guidelines.md §Session データ管理 参照)。
 ///
 /// ## 可観測性
-/// 決定したディレクトリは `tracing::info!` で常時出力する。どのセッションが
-/// どこに書かれたかが運用ログから即確認できる。
+/// 決定したディレクトリと参加者 ID は `tracing::info!` で常時出力する。どのセッションが
+/// どの参加者 ID でどこに書かれたかが運用ログから即確認できる。
 pub fn default_log_path() -> PathBuf {
+    let participant_id = resolve_participant_id();
     let dir = if let Ok(dataset) = std::env::var("GSE_DATASET") {
-        PathBuf::from(dataset).join("raw").join("P000")
+        PathBuf::from(dataset).join("raw").join(&participant_id)
     } else {
         fallback_log_dir()
     };
     tracing::info!(
         resolved_log_dir = %dir.display(),
+        participant_id = %participant_id,
         source = if std::env::var("GSE_DATASET").is_ok() { "GSE_DATASET env" } else { "fallback (Documents/GSE-sessions)" },
         "session log path resolved"
     );
@@ -1480,5 +1710,201 @@ mod tests {
         assert!(contents.contains(
             r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"ts":4000}"#
         ), "vignette_response 行が不正:\n{contents}");
+    }
+
+    // --- 参加者 ID 解決 / バリデーション ---
+
+    #[test]
+    fn participant_id_accepts_canonical_and_extended() {
+        // 参加者 ID 規約 (P000/P003 等) と allowlist 内の拡張形を許可
+        assert!(is_valid_participant_id("P000"));
+        assert!(is_valid_participant_id("P003"));
+        assert!(is_valid_participant_id("P123"));
+        assert!(is_valid_participant_id("pilot_01"));
+        assert!(is_valid_participant_id("a-b_C9"));
+    }
+
+    #[test]
+    fn participant_id_rejects_empty() {
+        assert!(!is_valid_participant_id(""));
+    }
+
+    #[test]
+    fn participant_id_rejects_path_traversal() {
+        // パストラバーサル / パス区切りは構造的に拒否
+        assert!(!is_valid_participant_id("."));
+        assert!(!is_valid_participant_id(".."));
+        assert!(!is_valid_participant_id("../secret"));
+        assert!(!is_valid_participant_id("..\\secret"));
+        assert!(!is_valid_participant_id("a/b"));
+        assert!(!is_valid_participant_id("a\\b"));
+        assert!(!is_valid_participant_id("P000/../P001"));
+    }
+
+    #[test]
+    fn participant_id_rejects_special_chars() {
+        assert!(!is_valid_participant_id("P 000")); // 空白
+        assert!(!is_valid_participant_id("P\0")); // null
+        assert!(!is_valid_participant_id("P000\n")); // 改行
+        assert!(!is_valid_participant_id("P:000")); // ドライブ/コロン
+        assert!(!is_valid_participant_id("~")); // ホーム展開記号
+        assert!(!is_valid_participant_id("$HOME")); // 変数展開記号
+    }
+
+    #[test]
+    fn participant_id_length_boundary() {
+        let max = "P".repeat(MAX_PARTICIPANT_ID_LEN);
+        assert!(is_valid_participant_id(&max)); // 64 は OK
+        let over = "P".repeat(MAX_PARTICIPANT_ID_LEN + 1);
+        assert!(!is_valid_participant_id(&over)); // 65 は NG
+    }
+
+    #[test]
+    fn participant_id_rejects_windows_reserved_names() {
+        // 大文字小文字を問わず予約デバイス名は拒否
+        for name in ["CON", "con", "Nul", "PRN", "aux", "COM1", "lpt9"] {
+            assert!(!is_valid_participant_id(name), "{name} は拒否されるべき");
+        }
+        // 予約名を部分に含むだけ (完全一致でない) なら許可
+        assert!(is_valid_participant_id("CON1"));
+        assert!(is_valid_participant_id("CONSOLE"));
+        assert!(is_valid_participant_id("P_CON"));
+        assert!(is_valid_participant_id("COM10")); // 予約は COM1..=COM9 のみ
+    }
+
+    #[test]
+    fn first_valid_id_prefers_first() {
+        assert_eq!(
+            first_valid_id(&[Some("P001"), Some("P002")]).as_deref(),
+            Some("P001")
+        );
+    }
+
+    #[test]
+    fn first_valid_id_skips_invalid_to_next() {
+        // 先頭が未設定 / 不正なら後続へ
+        assert_eq!(
+            first_valid_id(&[None, Some("P002")]).as_deref(),
+            Some("P002")
+        );
+        assert_eq!(
+            first_valid_id(&[Some("../bad"), Some("P002")]).as_deref(),
+            Some("P002")
+        );
+    }
+
+    #[test]
+    fn first_valid_id_none_when_all_absent_or_invalid() {
+        // すべて未設定 / 不正なら None (呼び出し側が自動生成 / P000 に委ねる)
+        assert_eq!(first_valid_id(&[None, None]), None);
+        assert_eq!(first_valid_id(&[Some(""), Some("..")]), None);
+    }
+
+    #[test]
+    fn first_valid_id_trims_whitespace() {
+        // 前後空白は trim してから検証
+        assert_eq!(first_valid_id(&[Some("  P005  ")]).as_deref(), Some("P005"));
+    }
+
+    // --- 自動生成 (Part 2 / D4) ---
+
+    #[test]
+    fn generated_id_has_expected_format() {
+        let id = generate_participant_id();
+        // `P` + 12 桁 hex = 13 文字。allowlist を必ず通過する。
+        assert_eq!(id.len(), 13, "P + 12 hex = 13 文字: {id}");
+        assert!(id.starts_with('P'), "先頭は P: {id}");
+        assert!(
+            id[1..].bytes().all(|b| b.is_ascii_hexdigit()),
+            "P 以降は hex のみ: {id}"
+        );
+        assert!(
+            is_valid_participant_id(&id),
+            "生成 ID は is_valid_participant_id を通過する: {id}"
+        );
+    }
+
+    #[test]
+    fn generated_id_is_not_constant() {
+        // 乱数由来であること (定数フォールバックの退行検知)。48bit から複数引いて
+        // 全て同一になる確率は無視できる。
+        let ids: std::collections::HashSet<String> =
+            (0..50).map(|_| generate_participant_id()).collect();
+        assert!(ids.len() > 1, "生成 ID が乱数化されていない: {ids:?}");
+    }
+
+    // --- 解決順 (Part 2 / D4): 永続化値 → env → 自動生成 ---
+
+    #[test]
+    fn resolve_with_store_prefers_persisted_over_env_and_generated() {
+        let r = resolve_with_store(Some("Pstored"), Some("P001"), Some("P002"), "Pgenerated");
+        assert_eq!(r, Resolution::Existing("Pstored".to_string()));
+    }
+
+    #[test]
+    fn resolve_with_store_env_primary_over_secondary_and_generated() {
+        // 永続化値が無ければ GSE_PARTICIPANT_ID → GSE_PID の順。
+        let r = resolve_with_store(None, Some("P001"), Some("P002"), "Pgenerated");
+        assert_eq!(r, Resolution::Existing("P001".to_string()));
+        let r = resolve_with_store(None, Some("../bad"), Some("P002"), "Pgenerated");
+        assert_eq!(r, Resolution::Existing("P002".to_string()));
+    }
+
+    #[test]
+    fn resolve_with_store_env_is_not_persisted() {
+        // env 由来の値は `Existing` で返る = 呼び出し側は永続化しない (D4 ③)。
+        // `Generated` でないことを型レベルで保証する。
+        let r = resolve_with_store(None, Some("P003"), None, "Pgenerated");
+        assert_eq!(r, Resolution::Existing("P003".to_string()));
+        assert!(
+            !matches!(r, Resolution::Generated(_)),
+            "env 値は Generated にならない (永続化対象でない)"
+        );
+    }
+
+    #[test]
+    fn resolve_with_store_generates_when_all_absent_or_invalid() {
+        // 永続化値も env も無い / 不正 → 自動生成 ID を Generated で返す (永続化対象)。
+        let r = resolve_with_store(None, None, None, "Pgenerated");
+        assert_eq!(r, Resolution::Generated("Pgenerated".to_string()));
+        let r = resolve_with_store(Some("  "), Some("../x"), Some(""), "Pgenerated");
+        assert_eq!(r, Resolution::Generated("Pgenerated".to_string()));
+    }
+
+    #[test]
+    fn resolve_with_store_skips_invalid_persisted_to_env() {
+        // 永続化値が壊れていても env が妥当ならそちらを採用 (再永続化はしない)。
+        let r = resolve_with_store(Some("../evil"), Some("P007"), None, "Pgenerated");
+        assert_eq!(r, Resolution::Existing("P007".to_string()));
+    }
+
+    // --- 永続化 I/O 往復 (Part 2 / D4): env を触らず一時ファイルで結線を検証 ---
+
+    #[test]
+    fn persist_and_load_roundtrip_without_env() {
+        // env / home を汚さないため、明示パス経由の `persist_id_to`/`load_id_from` で
+        // 「生成 → 永続 → 再読込で同一 ID」「不在 → None」「不正値 → reject」「上書き」を検証する。
+        let mut dir = std::env::temp_dir();
+        dir.push(format!("gse_pid_roundtrip_{}", std::process::id()));
+        let path = dir.join("participant_id");
+
+        // 生成 ID を永続化し、再読込で同一値が返る (= D4「再起動でも不変」の核)。
+        let id = generate_participant_id();
+        persist_id_to(&path, &id).expect("persist should succeed");
+        assert_eq!(load_id_from(&path).as_deref(), Some(id.as_str()));
+
+        // 上書き (atomic rename) で値が更新される。
+        persist_id_to(&path, "P000").expect("overwrite should succeed");
+        assert_eq!(load_id_from(&path).as_deref(), Some("P000"));
+
+        // 手編集で不正値が混入しても trim 後に reject → None (path injection 防御の往復確認)。
+        fs::write(&path, "../evil").expect("write bad value");
+        assert_eq!(load_id_from(&path), None);
+
+        // ファイル不在は None。
+        fs::remove_file(&path).expect("remove");
+        assert_eq!(load_id_from(&path), None);
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
