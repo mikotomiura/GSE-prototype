@@ -93,6 +93,27 @@
       }
     },
     {
+      "description": "ペーストイベント (Ctrl+V / Cmd+V) の発生時刻。 AI 依存度指標 (D4) 向けに**回数**を記録するための行。1 ペースト = 1 行。 VK + 修飾キー状態のみから検出し、**クリップボードの中身は一切記録しない** (data-privacy 準拠)。回数は行数で、時系列は `t` で算出する。",
+      "type": "object",
+      "required": [
+        "t",
+        "type"
+      ],
+      "properties": {
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "paste"
+          ]
+        }
+      }
+    },
+    {
       "description": "1Hz ゲートで吐かれる特徴量 + HMM 状態確率 + 診断データ。\n\n**obs の型について**: `logger::LogEntry::Feat` 本体では `obs: usize` だが、 schema 上は `u64` に格上げしている。理由: - `usize` は 32-bit ターゲットで u32 に縮む可能性があり、schema の `uint64` 指定と実 NDJSON 数値表現の間に乖離が生まれる - 実運用では obs は 0..=25 の小さな整数しか入らないため u64 で十分安全 - 将来 usize → u64 の意図的格上げを logger 側に反映する場合でも schema は不変",
       "type": "object",
       "required": [

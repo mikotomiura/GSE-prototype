@@ -397,6 +397,10 @@ pub enum LogEntry {
         timestamp: u64,
         is_press: bool,
     },
+    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻。
+    /// AI 依存度指標 (D4) 向けに回数を記録する。1 ペースト = 1 行。
+    /// VK + 修飾キー状態のみから検出し、クリップボードの中身は一切記録しない。
+    Paste { timestamp: u64 },
     /// 特徴量 + HMM状態確率 + 診断データ (分析スレッドから)
     Feat {
         timestamp: u64,
@@ -651,6 +655,10 @@ impl SessionLogger {
                                 r#"{{"type":"key","t":{},"vk":{},"press":{}}}"#,
                                 timestamp, vk_code, is_press,
                             );
+                            dirty = true;
+                        }
+                        LogEntry::Paste { timestamp } => {
+                            let _ = writeln!(writer, r#"{{"type":"paste","t":{}}}"#, timestamp);
                             dirty = true;
                         }
                         LogEntry::Feat {
@@ -1710,6 +1718,53 @@ mod tests {
         assert!(contents.contains(
             r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"ts":4000}"#
         ), "vignette_response 行が不正:\n{contents}");
+    }
+
+    /// ペーストイベントが NDJSON に「時刻のみ」で記録され、クリップボードの中身に
+    /// 相当するフィールド (text/content/data 等) が一切出力されないことを read-back で保証する
+    /// (data-privacy: 回数のみ・中身禁止)。
+    #[test]
+    fn writer_loop_emits_paste_event_count_only() {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "gse_paste_schema_test_{}.ndjson",
+            std::process::id()
+        ));
+        let (_logger, tx, shutdown_rx) = SessionLogger::start(path.clone());
+
+        tx.send(LogEntry::Paste { timestamp: 1234 }).unwrap();
+        tx.send(LogEntry::Paste { timestamp: 5678 }).unwrap();
+        tx.send(LogEntry::End).unwrap();
+
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let contents = fs::read_to_string(&path).expect("read back log file");
+        let _ = fs::remove_file(&path);
+
+        // 1 ペースト = 1 行・時刻のみ。回数は行数で算出できる。
+        assert!(
+            contents.contains(r#"{"type":"paste","t":1234}"#),
+            "paste 行が不正:\n{contents}"
+        );
+        assert!(
+            contents.contains(r#"{"type":"paste","t":5678}"#),
+            "paste 行が不正:\n{contents}"
+        );
+        let paste_lines = contents
+            .lines()
+            .filter(|l| l.contains(r#""type":"paste""#))
+            .count();
+        assert_eq!(paste_lines, 2, "ペースト回数=行数が一致しない:\n{contents}");
+
+        // クリップボードの中身に相当するキーが NDJSON に存在しないこと (中身記録禁止)。
+        for forbidden in ["text", "content", "data", "clipboard", "payload"] {
+            assert!(
+                !contents.contains(forbidden),
+                "paste ログに中身相当フィールド '{forbidden}' が混入:\n{contents}"
+            );
+        }
     }
 
     // --- 参加者 ID 解決 / バリデーション ---

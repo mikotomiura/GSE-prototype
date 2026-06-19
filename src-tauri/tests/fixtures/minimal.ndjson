@@ -19,6 +19,7 @@
 {"type":"key","t":1700000001820,"vk":32,"press":false}
 {"type":"key","t":1700000001960,"vk":87,"press":true}
 {"type":"key","t":1700000002040,"vk":87,"press":false}
+{"type":"paste","t":1700000002100}
 {"type":"key","t":1700000015000,"vk":79,"press":true}
 {"type":"key","t":1700000015080,"vk":79,"press":false}
 {"type":"key","t":1700000015220,"vk":82,"press":true}

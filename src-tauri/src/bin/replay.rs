@@ -90,6 +90,14 @@ enum ReplayEvent {
     /// キーストローク。vk_code は Windows 規約 (macOS 側はフック層で変換済み)。
     #[serde(rename = "key")]
     Key { t: u64, vk: u32, press: bool },
+    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻マーカー。
+    /// features/HMM には未使用のため replay では読み飛ばす (`timestamp()==None`)。
+    /// 本 variant が無いと NDJSON に paste 行があるとき deserialize でエラーになる。
+    #[serde(rename = "paste")]
+    Paste {
+        #[allow(dead_code)]
+        t: u64,
+    },
     /// IME 状態変化。`on` は IME モード（β 切替用）、`active` は候補ウィンドウ
     /// の開閉（engine pause 用）。
     #[serde(rename = "ime_state")]
@@ -186,6 +194,8 @@ impl ReplayEvent {
             ReplayEvent::Meta { session_start, .. } => *session_start,
             ReplayEvent::SessionStart { t } => Some(*t),
             ReplayEvent::Key { t, .. } => Some(*t),
+            // Paste は記録専用 (回数集計用)。step() 再実行に影響しないため除外する。
+            ReplayEvent::Paste { .. } => None,
             ReplayEvent::ImeState { t, .. } => Some(*t),
             ReplayEvent::Feat(_) => None,
             // UserLabel は再実行対象ではない (ゲート進行を動かさない)。
@@ -1377,6 +1387,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
         match ev {
             ReplayEvent::Meta { .. }
             | ReplayEvent::Feat(_)
+            | ReplayEvent::Paste { .. }
             | ReplayEvent::UserLabel { .. }
             | ReplayEvent::ReviewMarker { .. }
             | ReplayEvent::ImeShadow(_)
@@ -1385,6 +1396,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::ProbeAssignment { .. }
             | ReplayEvent::RealtimeLabel { .. }
             | ReplayEvent::VignetteResponse { .. } => {
+                // Paste は回数記録専用で features/HMM に未使用 → 追加処理なし。
                 // Meta / Feat / UserLabel / ReviewMarker はゲート進行済み、追加処理不要
                 // (UserLabel は metrics 経路で collect_user_labels 側で抽出)
                 // (ReviewMarker は --segment 経路でセグメントハイライトに使用)
@@ -1402,6 +1414,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
                     is_press: press,
                     is_repeat: false, // step() が pressed_keys で検出する
                     is_backspace: is_backspace(vk),
+                    is_paste: false, // replay は key 行から再構成。paste は別 variant で記録済み
                 };
                 let out = step(
                     &mut state,
@@ -1774,6 +1787,29 @@ mod tests {
         assert!((feat.p_stuck - 0.05).abs() < 1e-9);
         assert_eq!(feat.obs, 3);
         assert!((feat.alpha - 0.3).abs() < 1e-9);
+    }
+
+    /// ペーストイベント行 (`{"type":"paste","t":...}`) が deserialize でき、
+    /// `timestamp()==None` で snapshot 再実行の時刻順ソートから除外されることを確認する。
+    /// 本 variant が無いと paste 行を含む NDJSON で gse-replay が parse エラーになる。
+    #[test]
+    fn paste_event_parses_and_is_skipped_from_replay() {
+        let line = r#"{"type":"paste","t":1700000005000}"#;
+        let ev: ReplayEvent = serde_json::from_str(line).expect("parse ReplayEvent::Paste");
+        assert!(
+            matches!(
+                ev,
+                ReplayEvent::Paste {
+                    t: 1_700_000_005_000
+                }
+            ),
+            "expected ReplayEvent::Paste, got {ev:?}"
+        );
+        assert_eq!(
+            ev.timestamp(),
+            None,
+            "paste は再実行に使わないため timestamp()==None で除外する"
+        );
     }
 
     /// 層 2: 合成 NDJSON fixture で `collect_logged_feats` +
