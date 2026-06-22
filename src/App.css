@@ -395,6 +395,7 @@ body {
 
 .nudge-card-accent {
   background: linear-gradient(180deg, #38bdf8, #4ade80);
+  grid-row: 1 / -1; /* copy + dismiss の 2 行をまたいで左帯を伸ばす */
 }
 
 .nudge-card-copy {
@@ -403,6 +404,33 @@ body {
   justify-content: center;
   gap: 0.2rem;
   padding: 0.85rem 1rem;
+}
+
+/* dismiss 4択 (WBS 0.8)。card 全体は pointer-events:none だが、ここだけ受け付ける。 */
+.nudge-card-dismiss {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0 1rem 0.85rem;
+  pointer-events: auto;
+}
+
+.nudge-dismiss-btn {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.32rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.9);
+  color: #1e293b;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.nudge-dismiss-btn:hover {
+  background: #e2e8f0;
+  border-color: rgba(100, 116, 139, 0.7);
 }
 
 .nudge-card-kicker {

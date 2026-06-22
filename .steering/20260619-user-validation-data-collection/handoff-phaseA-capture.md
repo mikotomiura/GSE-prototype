@@ -1,3 +1,8 @@
+> ⚠️ **SUPERSEDED (2026-06-23)**: 本 handoff の **A3 (成果物スナップショット機構) は廃案**。
+> WBS v2 / codex-review v0.4 §4.2 が (b)=「diff量÷総打鍵数」を廃止し、`manual_contribution_ratio`
+> 等 (キーストローク由来カウンタ、成果物不要) に置換したため。A2 は `dismiss_reason` 4択を中核に存続。
+> 後継タスク: `.steering/20260623-capture-schema-freeze/`。詳細は同 `decisions.md` の SUPERSEDE 注記。
+
 # 次セッション開始プロンプト — Phase A: 捕捉完全性 (capture completeness)
 
 > `feedback_handoff_prompt_in_steering` 方針に従い、CLAUDE.md 制約込みで固定。

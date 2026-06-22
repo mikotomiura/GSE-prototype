@@ -12,8 +12,8 @@ use crate::analysis::intervention::{
 };
 use crate::analysis::loop_step::FeatSnapshot;
 use crate::logger::{
-    ExpectedQuadrant, LogEntry, ProbeRef, ProbeSource, SessionLogger, SkipReason, TaskKind, Track,
-    UserLabelKind,
+    Condition, DismissReason, ExpectedQuadrant, LabelPool, LogEntry, ProbeRef, ProbeSource,
+    SessionLogger, SkipReason, TaskKind, Track, UserLabelKind,
 };
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
@@ -186,15 +186,31 @@ fn get_intervention_decision(
 #[tauri::command]
 fn record_intervention_dismiss(
     action: String,
+    reason: Option<String>,
     intervention: State<InterventionState>,
+    log: State<Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
-    let action = InterventionAction::parse(&action)
+    let parsed_action = InterventionAction::parse(&action)
         .ok_or_else(|| format!("invalid intervention action: {:?}", action))?;
+    let now = epoch_ms();
+    // 既存: 介入抑制 (cooldown / recent_dismiss) のためメモリ状態を更新する。
     intervention
         .0
         .lock()
         .unwrap_or_else(|p| p.into_inner())
-        .record_dismiss(action, epoch_ms());
+        .record_dismiss(parsed_action, now);
+    // 追加 (WBS 0.8 / v0.4 §9): ユーザー応答側を NDJSON へ固定カテゴリで残す。
+    // 理由は省略可 (フェード/無選択 = silent)。未知値はエラーにして黙って捨てない。
+    let reason = parse_dismiss_reason(reason.as_deref())?;
+    log.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .tx
+        .try_send(LogEntry::InterventionResponse {
+            timestamp: now,
+            action: parsed_action.as_str().to_string(),
+            reason,
+        })
+        .map_err(|e| format!("log channel full: {}", e))?;
     Ok(())
 }
 
@@ -530,6 +546,38 @@ fn build_probe_ref(source: &str, probe_id: Option<String>) -> Result<ProbeRef, S
     }
 }
 
+/// 省略可の固定カテゴリ文字列を `Condition` に検証する (capture-schema-freeze)。
+/// `None` / 空文字 → `None` (未指定)。未知値は黙って捨てず `Err`。
+fn parse_optional_condition(s: Option<&str>) -> Result<Option<Condition>, String> {
+    match s {
+        None | Some("") => Ok(None),
+        Some(s) => Condition::parse(s)
+            .map(Some)
+            .ok_or_else(|| format!("invalid condition: {:?}", s)),
+    }
+}
+
+/// 省略可の固定カテゴリ文字列を `LabelPool` に検証する (capture-schema-freeze)。
+fn parse_optional_label_pool(s: Option<&str>) -> Result<Option<LabelPool>, String> {
+    match s {
+        None | Some("") => Ok(None),
+        Some(s) => LabelPool::parse(s)
+            .map(Some)
+            .ok_or_else(|| format!("invalid label_pool: {:?}", s)),
+    }
+}
+
+/// 介入応答の dismiss 理由を検証する (capture-schema-freeze 0.8)。
+/// `None` / 空文字 → `Silent` (理由未選択でフェード相当)。未知値は `Err`。
+fn parse_dismiss_reason(s: Option<&str>) -> Result<DismissReason, String> {
+    match s {
+        None | Some("") => Ok(DismissReason::Silent),
+        Some(s) => {
+            DismissReason::parse(s).ok_or_else(|| format!("invalid dismiss reason: {:?}", s))
+        }
+    }
+}
+
 /// v0.3 較正: セッション開始宣言を記録する (§3・§14)。固定カテゴリのみ許可。
 #[tauri::command]
 fn record_session_meta(
@@ -537,11 +585,16 @@ fn record_session_meta(
     task_kind: String,
     monk_mode: bool,
     intervention_enabled: bool,
+    condition: Option<String>,
+    label_pool: Option<String>,
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
         TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+    // 省略可。指定時のみ固定カテゴリへ検証し、未知値はエラーにする (黙って捨てない)。
+    let condition = parse_optional_condition(condition.as_deref())?;
+    let label_pool = parse_optional_label_pool(label_pool.as_deref())?;
     // 介入の有効/無効をプロセス全体へ反映 (両ウィンドウの get_intervention_decision が参照)。
     INTERVENTION_ENABLED.store(intervention_enabled, Ordering::Release);
     log.lock()
@@ -553,6 +606,8 @@ fn record_session_meta(
             task_kind,
             monk_mode,
             intervention_enabled,
+            condition,
+            label_pool,
         })
         .map_err(|e| format!("log channel full: {}", e))?;
     tracing::info!(
@@ -952,14 +1007,24 @@ pub fn run() {
             // イベント受信 (タイムアウトは次の 1Hz マークまで)
             let input = match rx.recv_timeout(timeout) {
                 Ok(event) => {
-                    // ペーストイベント (Ctrl+V / Cmd+V) を NDJSON に回数記録する。
-                    // フック層が VK + 修飾キー状態のみから is_paste を立てており、
-                    // クリップボードの中身には一切触れていない (data-privacy 準拠)。
-                    // LogEntry 変換を analysis/ の外 (本スレッド) で行うことで
-                    // architecture-rules ルール6 (LogEntry 依存を analysis/ に持ち込まない) を守る。
+                    // ペーストイベント (Ctrl+V / Cmd+V) を NDJSON に記録する。
+                    // フック層は VK + 修飾キー状態のみから is_paste を立てる。
+                    // (b) 自力解決率 (v0.4 manual_contribution_ratio) 向けに、フック外 (本スレッド)
+                    // でクリップボードの**文字数のみ**を**同期**取得する (CD1)。中身は
+                    // clipboard_char_count 内で数えた直後に破棄され、保存・送信しない (data-privacy)。
+                    //
+                    // 同期読みにする理由 (cross-review HIGH 対応・CD5 改訂): クリップボード読みを
+                    // 別スレッドへ逃がすと (1) ペースト連打で thread が無制限に積まれる、
+                    // (2) 直後に session End が来ると paste 行が無音で欠落する race、
+                    // (3) 検出〜読取の間にクリップボードが変わる TOCTOU 窓が広がる、の 3 つを招く。
+                    // 研究用の捕捉では「正確さ > 数 ms のレイテンシ」。同期読みなら 3 問題とも消え、
+                    // 代償は稀なクリップボード競合時の僅かな 1Hz tick 遅延のみ (30s 窓では無視可能)。
+                    // LogEntry 変換を analysis/ の外で行い architecture-rules ルール6 を守る。
                     if event.is_paste {
+                        let external_paste_chars = crate::input::clipboard::clipboard_char_count();
                         let _ = log_tx_analysis.try_send(LogEntry::Paste {
                             timestamp: event.timestamp,
+                            external_paste_chars,
                         });
                     }
                     Some(LoopInput::Key(event))
@@ -1428,5 +1493,52 @@ mod task_c_command_tests {
         assert!(!is_valid_opaque_id("has space")); // 空白
         assert!(!is_valid_opaque_id("toolong-toolong-x")); // 17 文字 (>16)
         assert!(!is_valid_opaque_id("本文")); // マルチバイト/本文
+    }
+
+    // --- capture-schema-freeze: 固定カテゴリ検証 (IPC 境界) ---
+
+    #[test]
+    fn parse_optional_condition_accepts_known_rejects_unknown() {
+        assert_eq!(parse_optional_condition(None), Ok(None)); // 省略
+        assert_eq!(parse_optional_condition(Some("")), Ok(None)); // 空文字 = 省略扱い
+        assert_eq!(
+            parse_optional_condition(Some("blind_calibration")),
+            Ok(Some(Condition::BlindCalibration))
+        );
+        assert_eq!(
+            parse_optional_condition(Some("nudge")),
+            Ok(Some(Condition::Nudge))
+        );
+        // 未知値は黙って捨てず Err。
+        assert!(parse_optional_condition(Some("bogus")).is_err());
+        assert!(parse_optional_condition(Some("BLIND_CALIBRATION")).is_err()); // 大文字は別物
+    }
+
+    #[test]
+    fn parse_optional_label_pool_accepts_known_rejects_unknown() {
+        assert_eq!(parse_optional_label_pool(None), Ok(None));
+        assert_eq!(parse_optional_label_pool(Some("")), Ok(None));
+        assert_eq!(
+            parse_optional_label_pool(Some("calibration_blind")),
+            Ok(Some(LabelPool::CalibrationBlind))
+        );
+        assert!(parse_optional_label_pool(Some("pool")).is_err());
+    }
+
+    #[test]
+    fn parse_dismiss_reason_defaults_silent_rejects_unknown() {
+        // 省略/空 = silent (フェード相当)。
+        assert_eq!(parse_dismiss_reason(None), Ok(DismissReason::Silent));
+        assert_eq!(parse_dismiss_reason(Some("")), Ok(DismissReason::Silent));
+        assert_eq!(
+            parse_dismiss_reason(Some("not_stuck")),
+            Ok(DismissReason::NotStuck)
+        );
+        assert_eq!(
+            parse_dismiss_reason(Some("want_to_struggle")),
+            Ok(DismissReason::WantToStruggle)
+        );
+        // 未知値は Err (黙って silent に倒さない)。
+        assert!(parse_dismiss_reason(Some("whatever")).is_err());
     }
 }

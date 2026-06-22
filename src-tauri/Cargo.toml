@@ -57,6 +57,13 @@ base64 = "0.22"
 
 # Utilities
 crossbeam-channel = "0.5"
+# capture-schema-freeze (CD1): ペースト時にクリップボードの**文字数のみ**を取得するため
+# (external_paste_chars / (b) manual_contribution_ratio)。中身は数えて即破棄し保存・送信しない。
+# 両 OS の clipboard API (Win32 / NSPasteboard) を安全に抽象化し、unsafe を自前で書かないため採用。
+# OS 依存は input/clipboard.rs に隔離する (architecture-rules: OS API は input/ に閉じる)。
+# default-features = false で `image-data` を無効化し、画像デコーダ (`image` crate 等) を
+# 推移依存から外す。本用途は get_text() のみで画像機能は不要 (攻撃面・ビルド時間の削減)。
+arboard = { version = "3", default-features = false }
 # Task B: ランダム時点プローブの一様ランダム時刻生成 (analysis/probe_scheduler.rs)。
 # StdRng を seed 注入して決定論テスト可能にする。lock に 0.8.5 が既存。
 rand = "0.8"

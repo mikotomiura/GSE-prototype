@@ -52,11 +52,16 @@ pub enum LogEntryDto {
     SessionStart { t: u64 },
     /// キーストロークイベント (raw VK コード + 押下/離上)。
     Key { t: u64, vk: u32, press: bool },
-    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻。
-    /// AI 依存度指標 (D4) 向けに**回数**を記録するための行。1 ペースト = 1 行。
-    /// VK + 修飾キー状態のみから検出し、**クリップボードの中身は一切記録しない**
-    /// (data-privacy 準拠)。回数は行数で、時系列は `t` で算出する。
-    Paste { t: u64 },
+    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻と文字数。
+    /// AI 依存度指標 (D4) 向けに**回数** (行数) を、(b) 自力解決率 (v0.4 §4.2
+    /// `manual_contribution_ratio`) 向けに `external_paste_chars` (ペースト**文字数=整数のみ**)
+    /// を記録する。1 ペースト = 1 行。VK + 修飾キー状態から検出し、クリップボードは
+    /// **長さのみ取得して中身は即破棄**する (**中身は一切記録しない**・data-privacy CD1)。
+    /// 旧フィクスチャ互換のため `external_paste_chars` は省略可 (取得不能時も `null`)。
+    Paste {
+        t: u64,
+        external_paste_chars: Option<u64>,
+    },
     /// 1Hz ゲートで吐かれる特徴量 + HMM 状態確率 + 診断データ。
     ///
     /// **obs の型について**: `logger::LogEntry::Feat` 本体では `obs: usize` だが、
@@ -116,13 +121,25 @@ pub enum LogEntryDto {
         reason: String,
         suppressed_by: Vec<String>,
     },
+    /// 介入提示に対するユーザー応答 (dismiss 理由)。`intervention_decision` (判定側) とは別の
+    /// 「ユーザー応答側」ログ (WBS 0.8 / v0.4 §9)。Need 誤りと Opportunity 誤りを分離する。
+    /// 固定カテゴリ + 時刻のみ。本文・Unicode 文字は含まない。
+    InterventionResponse {
+        t: u64,
+        action: InterventionActionDto,
+        reason: DismissReasonDto,
+    },
     /// v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。
     /// timestamp は既存の `t` と別命名の `ts` (§14 設計準拠)。
+    /// `condition` = 実験条件 (WBS 0.11)、`label_pool` = ラベルプール (WBS 0.4)。
+    /// 旧フィクスチャ互換のため両者とも省略可 (`null`)。
     SessionMeta {
         track: TrackDto,
         task_kind: TaskKindDto,
         monk_mode: bool,
         intervention_enabled: bool,
+        condition: Option<ConditionDto>,
+        label_pool: Option<LabelPoolDto>,
         ts: u64,
     },
     /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。
@@ -226,4 +243,37 @@ pub enum ExpectedQuadrantDto {
     Stuck,
     Incubation,
     Idle,
+}
+
+/// `intervention_response` の dismiss 理由 (WBS 0.8 / v0.4 §9)。
+/// `not_stuck` = Need 誤り、`want_to_struggle` = Opportunity 誤り、`just_close` = 単に閉じる、
+/// `silent` = 理由未選択 (フェードアウト)。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DismissReasonDto {
+    NotStuck,
+    WantToStruggle,
+    JustClose,
+    Silent,
+}
+
+/// `session_meta` の実験条件 (WBS 0.11)。Phase 1b=`blind_calibration`、Phase 2 AB/BA=`a`/`b`、
+/// Phase 3 MRT=`nudge`/`defer`、それ以外=`baseline`。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConditionDto {
+    BlindCalibration,
+    A,
+    B,
+    Nudge,
+    Defer,
+    Baseline,
+}
+
+/// `session_meta` のラベルプール (WBS 0.4)。X1 判定には `calibration_blind` のみ使用。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LabelPoolDto {
+    CalibrationBlind,
+    PostIntervention,
 }

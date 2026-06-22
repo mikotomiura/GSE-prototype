@@ -54,6 +54,15 @@
 
 ## D7: (a)(b)(c) 精密定義と (b) diff量の供給源 = 案A (ユーザー承認 2026-06-20)
 
+> ⚠️ **(b) 定義は SUPERSEDED (2026-06-23) — codex-review v0.4 §4.2 / WBS v2**:
+> 「diff量 ÷ 総打鍵数」を**廃止**。Backspace/削除/写経で総打鍵が膨らみ自力解決を測れないため。
+> 新主指標 = `manual_contribution_ratio = manual_insert_chars/(manual_insert_chars+external_paste_chars)`
+> と `productive_manual_recovery_rate`。**いずれもキーストローク由来カウンタで算出 → 成果物 (案A) 不要**。
+> 帰結: 案A・第4入力「diff量」join (本 D7 末尾) は不要。代わりに content-free な文字数カウンタ
+> (`external_paste_chars` 等) を NDJSON に捕捉する。(a) も Ctrl/Cmd+V 回数は補助指標へ降格 (v0.4 §4.1)。
+> 後継タスク: `.steering/20260623-capture-schema-freeze/`。D1-D6 は不変。
+
+
 提案書の定義を真実源として確定 (文献番号は提案書体系):
 - **(a) AI依存度**: GSE Editor のクリップボード監視ログ等から、**1 セッションあたりの AI 参照
   (ペースト) 回数**を自動計測し、導入前後での依存低下を比較。

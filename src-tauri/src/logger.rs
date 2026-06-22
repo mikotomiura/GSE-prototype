@@ -174,6 +174,100 @@ impl ExpectedQuadrant {
     }
 }
 
+/// 介入応答の dismiss 理由 (dismiss_reason)。Need 誤りと Opportunity 誤りを分離する (v0.4 §9)。
+/// `not_stuck` = 詰まっていない (Need 誤り)、`want_to_struggle` = 今はもがきたい (Opportunity 誤り)、
+/// `just_close` = 単に閉じる、`silent` = 理由を選ばず閉じた/フェードアウト。本文は含まない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DismissReason {
+    NotStuck,
+    WantToStruggle,
+    JustClose,
+    Silent,
+}
+
+impl DismissReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotStuck => "not_stuck",
+            Self::WantToStruggle => "want_to_struggle",
+            Self::JustClose => "just_close",
+            Self::Silent => "silent",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "not_stuck" => Some(Self::NotStuck),
+            "want_to_struggle" => Some(Self::WantToStruggle),
+            "just_close" => Some(Self::JustClose),
+            "silent" => Some(Self::Silent),
+            _ => None,
+        }
+    }
+}
+
+/// セッションの実験条件 (condition)。Phase 1b 較正=`blind_calibration`、Phase 2 AB/BA=`a`/`b`、
+/// Phase 3 MRT=`nudge`/`defer`、それ以外=`baseline`。固定カテゴリのみ。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Condition {
+    BlindCalibration,
+    A,
+    B,
+    Nudge,
+    Defer,
+    Baseline,
+}
+
+impl Condition {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::BlindCalibration => "blind_calibration",
+            Self::A => "a",
+            Self::B => "b",
+            Self::Nudge => "nudge",
+            Self::Defer => "defer",
+            Self::Baseline => "baseline",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "blind_calibration" => Some(Self::BlindCalibration),
+            "a" => Some(Self::A),
+            "b" => Some(Self::B),
+            "nudge" => Some(Self::Nudge),
+            "defer" => Some(Self::Defer),
+            "baseline" => Some(Self::Baseline),
+            _ => None,
+        }
+    }
+}
+
+/// ラベルプール (label_pool)。`calibration_blind` = blind 較正で集めたラベル (X1 判定に使用)、
+/// `post_intervention` = 介入可視環境で集めたラベル (合算せず別管理)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelPool {
+    CalibrationBlind,
+    PostIntervention,
+}
+
+impl LabelPool {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CalibrationBlind => "calibration_blind",
+            Self::PostIntervention => "post_intervention",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "calibration_blind" => Some(Self::CalibrationBlind),
+            "post_intervention" => Some(Self::PostIntervention),
+            _ => None,
+        }
+    }
+}
+
 /// `realtime_label` の (source, probe_id) を結合して不変条件を型で保証する。
 /// `source=self_marker ⇒ probe_id=null` を構造的に表現する: `SelfMarker` は
 /// probe_id を持てず、`RandomProbe` は必ず probe_id を持つ。
@@ -280,6 +374,43 @@ fn json_opt_str(v: Option<&str>) -> String {
     }
 }
 
+/// `Option<u64>` を NDJSON 値 (`<n>` または `null`) に変換する。
+fn json_opt_u64(v: Option<u64>) -> String {
+    match v {
+        Some(n) => n.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+/// `LogEntry::Paste` の NDJSON 1 行を生成する純粋関数。
+/// `external_paste_chars` は**ペースト文字数 (整数) のみ**で、クリップボードの中身は含まない
+/// (data-privacy: 長さは内容ではない)。取得不能時は `null`。
+fn format_paste_line(timestamp: u64, external_paste_chars: Option<u64>) -> String {
+    format!(
+        r#"{{"type":"paste","t":{},"external_paste_chars":{}}}"#,
+        timestamp,
+        json_opt_u64(external_paste_chars),
+    )
+}
+
+/// `LogEntry::InterventionResponse` の NDJSON 1 行を生成する純粋関数。
+/// 介入提示に対するユーザー応答 (dismiss 理由) を固定カテゴリで記録する。
+/// `intervention_decision` (判定側) とは別の「ユーザー応答側」ログ。本文は含まない。
+/// `action` は呼び出し側で `InterventionAction::as_str()` を通した検証済み固定値のみが渡る
+/// (schema 上は `InterventionActionDto` enum と一致)。自由文字列は来ない。
+fn format_intervention_response_line(
+    timestamp: u64,
+    action: &str,
+    reason: DismissReason,
+) -> String {
+    format!(
+        r#"{{"type":"intervention_response","t":{},"action":{},"reason":"{}"}}"#,
+        timestamp,
+        json_opt_str(Some(action)),
+        reason.as_str(),
+    )
+}
+
 /// `LogEntry::SessionMeta` の NDJSON 1 行を生成する純粋関数。
 fn format_session_meta_line(
     timestamp: u64,
@@ -287,13 +418,17 @@ fn format_session_meta_line(
     task_kind: TaskKind,
     monk_mode: bool,
     intervention_enabled: bool,
+    condition: Option<Condition>,
+    label_pool: Option<LabelPool>,
 ) -> String {
     format!(
-        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","monk_mode":{},"intervention_enabled":{},"ts":{}}}"#,
+        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","monk_mode":{},"intervention_enabled":{},"condition":{},"label_pool":{},"ts":{}}}"#,
         track.as_str(),
         task_kind.as_str(),
         monk_mode,
         intervention_enabled,
+        json_opt_str(condition.map(|c| c.as_str())),
+        json_opt_str(label_pool.map(|p| p.as_str())),
         timestamp,
     )
 }
@@ -397,10 +532,15 @@ pub enum LogEntry {
         timestamp: u64,
         is_press: bool,
     },
-    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻。
-    /// AI 依存度指標 (D4) 向けに回数を記録する。1 ペースト = 1 行。
-    /// VK + 修飾キー状態のみから検出し、クリップボードの中身は一切記録しない。
-    Paste { timestamp: u64 },
+    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻と文字数。
+    /// AI 依存度指標 (D4) 向けに回数を、(b) 自力解決率 (v0.4 §4.2 `manual_contribution_ratio`)
+    /// 向けに `external_paste_chars` (ペースト**文字数=整数のみ**) を記録する。1 ペースト = 1 行。
+    /// VK + 修飾キー状態から検出し、クリップボードは**長さのみ取得して中身は即破棄**する
+    /// (data-privacy: 長さは内容ではない。CD1)。取得不能時は `None`。
+    Paste {
+        timestamp: u64,
+        external_paste_chars: Option<u64>,
+    },
     /// 特徴量 + HMM状態確率 + 診断データ (分析スレッドから)
     Feat {
         timestamp: u64,
@@ -462,14 +602,25 @@ pub enum LogEntry {
         reason: String,
         suppressed_by: Vec<String>,
     },
+    /// 介入提示に対するユーザー応答 (dismiss 理由)。`intervention_decision` (判定側) とは別の
+    /// 「ユーザー応答側」ログ。Need 誤りと Opportunity 誤りを分離する (WBS 0.8 / v0.4 §9)。
+    /// 固定カテゴリ + 時刻のみ。本文・Unicode 文字は含めない。
+    InterventionResponse {
+        timestamp: u64,
+        action: String,
+        reason: DismissReason,
+    },
     /// v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。
     /// 数値・固定カテゴリのみ。`ts` で timestamp を持つ (既存 `t` とは別命名・§14 準拠)。
+    /// `condition` = 実験条件 (WBS 0.11)、`label_pool` = ラベルプール (WBS 0.4)。いずれも省略可。
     SessionMeta {
         timestamp: u64,
         track: Track,
         task_kind: TaskKind,
         monk_mode: bool,
         intervention_enabled: bool,
+        condition: Option<Condition>,
+        label_pool: Option<LabelPool>,
     },
     /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。
     /// 「モデル非依存・一様ランダム」を後から検証するため scheduled/shown を両方残す。
@@ -657,8 +808,15 @@ impl SessionLogger {
                             );
                             dirty = true;
                         }
-                        LogEntry::Paste { timestamp } => {
-                            let _ = writeln!(writer, r#"{{"type":"paste","t":{}}}"#, timestamp);
+                        LogEntry::Paste {
+                            timestamp,
+                            external_paste_chars,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_paste_line(timestamp, external_paste_chars),
+                            );
                             dirty = true;
                         }
                         LogEntry::Feat {
@@ -785,12 +943,26 @@ impl SessionLogger {
                             );
                             dirty = true;
                         }
+                        LogEntry::InterventionResponse {
+                            timestamp,
+                            action,
+                            reason,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                "{}",
+                                format_intervention_response_line(timestamp, &action, reason),
+                            );
+                            dirty = true;
+                        }
                         LogEntry::SessionMeta {
                             timestamp,
                             track,
                             task_kind,
                             monk_mode,
                             intervention_enabled,
+                            condition,
+                            label_pool,
                         } => {
                             let _ = writeln!(
                                 writer,
@@ -800,7 +972,9 @@ impl SessionLogger {
                                     track,
                                     task_kind,
                                     monk_mode,
-                                    intervention_enabled
+                                    intervention_enabled,
+                                    condition,
+                                    label_pool
                                 ),
                             );
                             dirty = true;
@@ -1389,27 +1563,104 @@ mod tests {
 
     #[test]
     fn session_meta_line_main_vibe_coding() {
+        // condition / label_pool 省略時は null を出す (旧フィクスチャ互換)。
         let line = format_session_meta_line(
             1_700_000_000_000,
             Track::Main,
             TaskKind::VibeCoding,
             false,
             true,
+            None,
+            None,
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"ts":1700000000000}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":null,"label_pool":null,"ts":1700000000000}"#
         );
     }
 
     #[test]
     fn session_meta_line_exploratory_monk_mode() {
-        let line =
-            format_session_meta_line(42, Track::Exploratory, TaskKind::Argumentative, true, false);
+        let line = format_session_meta_line(
+            42,
+            Track::Exploratory,
+            TaskKind::Argumentative,
+            true,
+            false,
+            None,
+            None,
+        );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","monk_mode":true,"intervention_enabled":false,"ts":42}"#
+            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","monk_mode":true,"intervention_enabled":false,"condition":null,"label_pool":null,"ts":42}"#
         );
+    }
+
+    #[test]
+    fn session_meta_line_with_condition_and_label_pool() {
+        let line = format_session_meta_line(
+            7,
+            Track::Main,
+            TaskKind::Creative,
+            false,
+            true,
+            Some(Condition::BlindCalibration),
+            Some(LabelPool::CalibrationBlind),
+        );
+        assert_eq!(
+            line,
+            r#"{"type":"session_meta","track":"main","task_kind":"creative","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","ts":7}"#
+        );
+    }
+
+    // ---- paste / intervention_response ----
+
+    #[test]
+    fn paste_line_with_and_without_chars() {
+        assert_eq!(
+            format_paste_line(1234, Some(42)),
+            r#"{"type":"paste","t":1234,"external_paste_chars":42}"#
+        );
+        assert_eq!(
+            format_paste_line(5678, None),
+            r#"{"type":"paste","t":5678,"external_paste_chars":null}"#
+        );
+    }
+
+    #[test]
+    fn intervention_response_line_basic() {
+        assert_eq!(
+            format_intervention_response_line(99, "nudge", DismissReason::WantToStruggle),
+            r#"{"type":"intervention_response","t":99,"action":"nudge","reason":"want_to_struggle"}"#
+        );
+    }
+
+    #[test]
+    fn new_enums_roundtrip() {
+        for r in [
+            DismissReason::NotStuck,
+            DismissReason::WantToStruggle,
+            DismissReason::JustClose,
+            DismissReason::Silent,
+        ] {
+            assert_eq!(DismissReason::parse(r.as_str()), Some(r));
+        }
+        for c in [
+            Condition::BlindCalibration,
+            Condition::A,
+            Condition::B,
+            Condition::Nudge,
+            Condition::Defer,
+            Condition::Baseline,
+        ] {
+            assert_eq!(Condition::parse(c.as_str()), Some(c));
+        }
+        for p in [LabelPool::CalibrationBlind, LabelPool::PostIntervention] {
+            assert_eq!(LabelPool::parse(p.as_str()), Some(p));
+        }
+        assert_eq!(DismissReason::parse("nope"), None);
+        assert_eq!(Condition::parse(""), None);
+        assert_eq!(LabelPool::parse("pool"), None);
     }
 
     // ---- probe_assignment ----
@@ -1668,6 +1919,14 @@ mod tests {
             task_kind: TaskKind::VibeCoding,
             monk_mode: false,
             intervention_enabled: true,
+            condition: Some(Condition::BlindCalibration),
+            label_pool: Some(LabelPool::CalibrationBlind),
+        })
+        .unwrap();
+        tx.send(LogEntry::InterventionResponse {
+            timestamp: 1500,
+            action: "nudge".to_string(),
+            reason: DismissReason::NotStuck,
         })
         .unwrap();
         tx.send(LogEntry::ProbeAssignment {
@@ -1707,8 +1966,14 @@ mod tests {
         let _ = fs::remove_file(&path);
 
         assert!(contents.contains(
-            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"ts":1000}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","ts":1000}"#
         ), "session_meta 行が不正 (引数取り違えの可能性):\n{contents}");
+        assert!(
+            contents.contains(
+                r#"{"type":"intervention_response","t":1500,"action":"nudge","reason":"not_stuck"}"#
+            ),
+            "intervention_response 行が不正:\n{contents}"
+        );
         assert!(contents.contains(
             r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000}"#
         ), "probe_assignment 行が不正:\n{contents}");
@@ -1732,8 +1997,16 @@ mod tests {
         ));
         let (_logger, tx, shutdown_rx) = SessionLogger::start(path.clone());
 
-        tx.send(LogEntry::Paste { timestamp: 1234 }).unwrap();
-        tx.send(LogEntry::Paste { timestamp: 5678 }).unwrap();
+        tx.send(LogEntry::Paste {
+            timestamp: 1234,
+            external_paste_chars: Some(42),
+        })
+        .unwrap();
+        tx.send(LogEntry::Paste {
+            timestamp: 5678,
+            external_paste_chars: None,
+        })
+        .unwrap();
         tx.send(LogEntry::End).unwrap();
 
         shutdown_rx
@@ -1743,13 +2016,13 @@ mod tests {
         let contents = fs::read_to_string(&path).expect("read back log file");
         let _ = fs::remove_file(&path);
 
-        // 1 ペースト = 1 行・時刻のみ。回数は行数で算出できる。
+        // 1 ペースト = 1 行・時刻 + 文字数のみ。回数は行数で算出できる。
         assert!(
-            contents.contains(r#"{"type":"paste","t":1234}"#),
+            contents.contains(r#"{"type":"paste","t":1234,"external_paste_chars":42}"#),
             "paste 行が不正:\n{contents}"
         );
         assert!(
-            contents.contains(r#"{"type":"paste","t":5678}"#),
+            contents.contains(r#"{"type":"paste","t":5678,"external_paste_chars":null}"#),
             "paste 行が不正:\n{contents}"
         );
         let paste_lines = contents
@@ -1759,6 +2032,7 @@ mod tests {
         assert_eq!(paste_lines, 2, "ペースト回数=行数が一致しない:\n{contents}");
 
         // クリップボードの中身に相当するキーが NDJSON に存在しないこと (中身記録禁止)。
+        // external_paste_chars は文字数 (整数) のみで中身ではない (どの forbidden 部分文字列も含まない)。
         for forbidden in ["text", "content", "data", "clipboard", "payload"] {
             assert!(
                 !contents.contains(forbidden),

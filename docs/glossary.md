@@ -32,6 +32,11 @@
 | トラック | Track | 較正スモークのセッション種別 enum (`logger::Track`)。`main` (本作業) / `exploratory` (探索)。`session_meta` に記録 | 「session_meta の track を main に設定」 |
 | 課題種別 | TaskKind | 較正スモークの作業内容分類 enum (`logger::TaskKind`)。`argumentative` / `correspondence` / `creative` / `vibe_coding`。`session_meta` に記録 | 「TaskKind=vibe_coding で β を coding 寄りに」 |
 | 想定象限 | ExpectedQuadrant | 尺度理解テスト (ビネット) の正解ラベル enum (`logger::ExpectedQuadrant`)。`flow` / `stuck` / `incubation` / `idle` の 4 値。Q1/Q2 の 2 軸とは別物 (教示の正解) | 「ビネット回答を ExpectedQuadrant と照合し理解度を測る」 |
+| 介入応答 | InterventionResponse | 介入提示に対するユーザー側の応答を残す NDJSON 行 (`intervention_response`)。判定側 `intervention_decision` とは別の「ユーザー応答側」ログ。固定カテゴリ + 時刻のみ (WBS 0.8 / v0.4 §9) | 「Nudge dismiss を intervention_response として記録」 |
+| dismiss 理由 | DismissReason | 介入を閉じた理由の固定カテゴリ enum (`logger::DismissReason`)。`not_stuck` (詰まってない=Need 誤り) / `want_to_struggle` (今はもがきたい=Opportunity 誤り) / `just_close` / `silent` (理由未選択)。Need 誤りと Opportunity 誤りを分離する (WBS 0.8 / v0.4 §9) | 「dismiss_reason=not_stuck は Need 過検出の証拠」 |
+| 実験条件 | Condition | セッションの実験条件 enum (`logger::Condition`、`session_meta.condition`)。`blind_calibration` (Phase 1b) / `a` / `b` (Phase 2 AB/BA) / `nudge` / `defer` (Phase 3 MRT) / `baseline` | 「condition=blind_calibration の較正セッション」 |
+| ラベルプール | LabelPool | ラベルの収集環境を区別する enum (`logger::LabelPool`、`session_meta.label_pool`)。`calibration_blind` (blind 較正・X1 判定に使用) / `post_intervention` (介入可視・合算しない) | 「X1 判定は calibration_blind プールのみ」 |
+| ペースト文字数 | external_paste_chars | ペースト時のクリップボード**文字数 (整数) のみ**を記録する `paste` 行のフィールド。中身は数えた直後に破棄し保存・送信しない。(b) 自力解決率 `manual_contribution_ratio` の分母 (v0.4 §4.2 / CD1) | 「external_paste_chars で外部貼り付け量を測る」 |
 | コンテキストビーコン | context_beacon | 内容非由来の cue (5分ごとランダムな色・図形、ログは ID のみ)。エピソード的目印になるが状態のヒントを漏らさない。波形 cue の confound を断つための比較条件 (v0.3 §5) | 「context_beacon は意味を持たない記号」 |
 | 較正スモーク | calibration smoke | n=3〜5 で測定法 (ラベル方式) が成立するかを先に検証する研究フェーズ。効果量推定・破綻検出に限定し、確証主張はしない (v0.3 §3, §11) | 「較正スモークで測定法ゲートを通してから核検証へ」 |
 | 較正モード (blind dashboard) | calibration mode | 較正セッション中、被験者にモデル出力 (推定状態/Flow・Incubation・Stuck 確率/p_stuck/GT counter/状態色) を**一切見せない**メイン画面表示モード (`App.calibrationMode`、既定 ON)。主観回答のアンカリング汚染を防ぎ測定独立性を守る。frontend 表示分岐のみ (backend/schema 不変) | 「較正モードでは推定状態を出さない」 |

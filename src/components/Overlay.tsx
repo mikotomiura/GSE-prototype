@@ -11,6 +11,10 @@ interface OverlayProps {
 
 type InterventionAction = "none" | "nudge" | "wall" | "defer";
 
+// 介入応答 (dismiss) の固定カテゴリ。Need 誤りと Opportunity 誤りを分離する (WBS 0.8 / v0.4 §9)。
+// Rust 側 `DismissReason` (logger.rs) と文字列を一致させること。
+type DismissReason = "not_stuck" | "want_to_struggle" | "just_close" | "silent";
+
 interface InterventionDecision {
     action: InterventionAction;
     need_score: number;
@@ -34,7 +38,19 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [phoneConnected, setPhoneConnected] = useState(false);
     // Task C: プローブカード表示中フラグ。表示中は cursor events を受け付け、overlay を可視化する。
     const [probeActive, setProbeActive] = useState(false);
+    // Nudge を dismiss 済みか。同一 nudge の再表示を防ぐ。action が nudge 以外に変わると解除。
+    const [nudgeDismissed, setNudgeDismissed] = useState(false);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
+
+    // Nudge に対するユーザー応答 (dismiss 理由) を NDJSON へ記録する (WBS 0.8)。
+    // 固定カテゴリのみを送る。中身・本文は一切送らない。
+    const handleNudgeDismiss = (reason: DismissReason) => {
+        setNudgeDismissed(true);
+        setNudgeOpacity(0);
+        invoke("record_intervention_dismiss", { action: "nudge", reason }).catch((e) =>
+            console.error("record_intervention_dismiss failed:", e)
+        );
+    };
 
     // Wall発動中のキーボード打鍵検知に使うref群
     const wallStartTimeRef = useRef<number>(0);
@@ -63,10 +79,13 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     // Lv1 (nudge): クリック透過 → ユーザーは下のウィンドウを操作可能
     // Lv2 (wall):  クリックブロック → QRコードをスキャンするまで操作不可
     useEffect(() => {
-        // Wall またはプローブカード表示中はクリックを受け付ける (それ以外は透過のまま)。
-        // Wall が OR の支配項なので、プローブ消滅時も Wall 中はブロックが維持される。
-        currentWindow.setIgnoreCursorEvents(!(isWallActive || probeActive));
-    }, [isWallActive, probeActive, currentWindow]);
+        // Wall / プローブカード / Nudge (dismiss 4択) 表示中はクリックを受け付ける
+        // (それ以外は透過のまま)。Nudge は dismiss 理由ボタンを押せるよう表示中のみ
+        // 一時的にクリックを受ける (ProbeCard と同方針)。Wall が OR の支配項。
+        currentWindow.setIgnoreCursorEvents(
+            !(isWallActive || probeActive || nudgeOpacity > 0)
+        );
+    }, [isWallActive, probeActive, nudgeOpacity, currentWindow]);
 
     // Wall 発動時はプローブカードを畳む (介入中は自然作業のサンプリングでなく UI も衝突するため)。
     // ProbeCard はアンマウントされ onActiveChange(false) を呼ばないので probeActive を明示リセット。
@@ -127,15 +146,22 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
 
     useEffect(() => {
         if (interventionDecision.action === "nudge" && !isWallActive) {
+            // 既に dismiss 済みなら再表示しない (同一 nudge の押下後にちらつかせない)。
+            if (nudgeDismissed) {
+                setNudgeOpacity(0);
+                return;
+            }
             const opacity = Math.min(
                 1,
                 Math.max(0.2, (interventionDecision.need_score - 0.6) / 0.3)
             );
             setNudgeOpacity(opacity);
         } else {
+            // nudge 以外に遷移したら dismiss 状態を解除し、次の nudge を表示可能にする。
             setNudgeOpacity(0);
+            if (nudgeDismissed) setNudgeDismissed(false);
         }
-    }, [interventionDecision, isWallActive]);
+    }, [interventionDecision, isWallActive, nudgeDismissed]);
 
     // Layer 4: macOS で overlay の透過が失敗した場合のフォールバック。
     // nudge も wall も不要な間は hide() してメインウィンドウを隠さない。
@@ -167,6 +193,31 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 <div className="nudge-card-copy">
                     <span className="nudge-card-kicker">Pause point</span>
                     <strong>One breath. Next move.</strong>
+                </div>
+                {/* dismiss 4択 (WBS 0.8): Need 誤り / Opportunity 誤り / 単に閉じる を分離記録。
+                    「無言(silent)」はボタンを押さずフェードした場合に相当し UI には出さない。 */}
+                <div className="nudge-card-dismiss">
+                    <button
+                        type="button"
+                        className="nudge-dismiss-btn"
+                        onClick={() => handleNudgeDismiss("not_stuck")}
+                    >
+                        詰まってない
+                    </button>
+                    <button
+                        type="button"
+                        className="nudge-dismiss-btn"
+                        onClick={() => handleNudgeDismiss("want_to_struggle")}
+                    >
+                        今はもがきたい
+                    </button>
+                    <button
+                        type="button"
+                        className="nudge-dismiss-btn"
+                        onClick={() => handleNudgeDismiss("just_close")}
+                    >
+                        閉じる
+                    </button>
                 </div>
             </aside>
 
