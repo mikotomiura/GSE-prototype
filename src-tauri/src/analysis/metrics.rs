@@ -94,7 +94,346 @@ pub struct SessionMetrics {
     pub detection_lead_ms_median: Option<i64>,
     /// Stuck → p_flow > 0.5 到達までの時間の中央値（ms）。
     pub stuck_recovery_ms_median: Option<u64>,
+    /// v0.4 アウトカム指標 (a)AI依存度 / (b)自力解決率。`--metrics` 経路で算出して
+    /// 付与する。HMM 精度メトリクス (上記) とは独立で、key/paste 行が無い経路
+    /// (`compute_range_metrics` 等) では `None`。additive・後方互換 (既存利用側不変)。
+    pub outcome: Option<OutcomeMetrics>,
     pub warnings: Vec<String>,
+}
+
+// ── v0.4 Outcome metrics (a)AI依存度 / (b)自力解決率 ────────────────────────
+//
+// 設計: `.steering/20260623-outcome-metrics/design.md` (v2 採用)。
+// 「Stuck エピソード」を基盤抽象にし、その上に (a)(b) を載せる。トリガは
+// `StuckTrigger` で外出しし (既定 = p_stuck 閾値)、研究設計フォークをコードに
+// 焼き込まない。すべて content-free (vk コード / 文字数 / 確率のみ。Unicode 内容に
+// 触れない = data-privacy ルール1)。
+
+/// Stuck 候補の判定トリガ。既定は `PStuckThreshold` (全セッションで算出可能)。
+/// `UserLabel` / `InterventionFired` は再処理で切替可能だが既定にしない
+/// (`.steering/20260623-outcome-metrics/decisions.md` CD-OM1)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StuckTrigger {
+    /// `p_stuck >= p_stuck_trigger` の feat を Stuck とみなす (既定)。
+    PStuckThreshold,
+    /// `user_label == stuck` を Stuck とみなす (GT。較正セッションのみ)。
+    UserLabel,
+    /// 介入発火 (`intervention_decision.action != none`) を Stuck とみなす。
+    InterventionFired,
+}
+
+/// アウトカム指標の算出パラメータ。既定値は研究設計上の暫定値であり、
+/// 再処理で調整可能 (metrics.rs の「閾値変更時に過去セッションを再処理するだけで
+/// 再計算できる」哲学に従う)。ユーザー承認 2026-06-23。
+#[derive(Debug, Clone, Copy)]
+pub struct OutcomeConfig {
+    /// Stuck 候補の判定トリガ。
+    pub trigger: StuckTrigger,
+    /// `PStuckThreshold` 時の閾値。Wall トリガ (p_stuck>0.70) より緩め = 候補を広く拾い
+    /// 回復判定で絞る。
+    pub p_stuck_trigger: f64,
+    /// 連続 Stuck feat をひとつのエピソードに統合する最大間隙 (ms)。
+    /// 1 ローリングウィンドウ = 30s。瞬間的な p_stuck 低下を同一エピソードに吸収する。
+    pub merge_gap_ms: u64,
+    /// エピソード後、回復 (p_flow>0.5) を探す窓 (ms)。handoff 指定の 5 分。
+    pub recovery_window_ms: u64,
+    /// 「net_diff 正進行」とみなす回復窓内 manual_insert_chars 純増の下限 (文字)。
+    /// 既定 1 = 最小解釈 (純増 1 文字以上で前進)。ユーザー承認 2026-06-23。
+    pub net_diff_min: u64,
+    /// 「large paste」とみなす external_paste_chars の下限 (文字)。
+    pub large_threshold: u64,
+    /// 「after_stuck」= エピソード後この窓 (ms) 内の paste を stuck 起因とみなす。
+    pub after_window_ms: u64,
+}
+
+impl Default for OutcomeConfig {
+    fn default() -> Self {
+        Self {
+            trigger: StuckTrigger::PStuckThreshold,
+            p_stuck_trigger: 0.60,
+            merge_gap_ms: 30_000,
+            recovery_window_ms: 5 * 60 * 1000,
+            net_diff_min: 1,
+            large_threshold: 50,
+            after_window_ms: 120_000,
+        }
+    }
+}
+
+/// content-free な paste イベント (文字数のみ。中身は持たない)。
+#[derive(Debug, Clone, Copy)]
+pub struct PasteEvent {
+    pub timestamp: u64,
+    pub chars: u64,
+}
+
+/// content-free な key press (vk コードのみ。data-privacy ルール1 で記録許可)。
+#[derive(Debug, Clone, Copy)]
+pub struct KeyPress {
+    pub timestamp: u64,
+    pub vk: u32,
+}
+
+/// Stuck エピソード = `p_stuck >= 閾値` (または他トリガ) が `merge_gap_ms` 以内の
+/// 中断を挟んで連続する区間。`end_ms` 以降に回復を探す。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct StuckEpisode {
+    pub start_ms: u64,
+    pub end_ms: u64,
+}
+
+/// v0.4 アウトカム指標。すべて数値のみ (本文・キーストローク内容を含まない)。
+/// 算出不能 (分母 0) の比率は `None` (NaN を出さない)。
+#[derive(Debug, Clone, Serialize)]
+pub struct OutcomeMetrics {
+    // ── (b) 自力解決率 ──
+    /// 文字生成キー press − backspace/delete press (0 下限)。content-free な近似 (proxy)。
+    /// **注意 (cross-review AGREE-3)**: NDJSON の key 行は修飾キー同時押し状態を持たないため、
+    /// `Ctrl+V` / `Cmd+V` の `V` (0x56) も 1 文字として計上される。external paste 1 回ごとに
+    /// manual を +1 程度過大評価し、`manual_contribution_ratio` を僅かに manual 寄りに偏らせる。
+    /// 解析時は外れ値として扱う前提 (capture-schema-freeze CD5 A3 と同様の注意)。
+    pub manual_insert_chars: u64,
+    /// external_paste_chars の総和 (capture 済 paste のみ)。
+    pub external_paste_chars_total: u64,
+    /// `manual / (manual + paste)`。分母 0 → None。
+    pub manual_contribution_ratio: Option<f64>,
+    /// 回復エピソードのうち「external paste 無し かつ net_diff 正進行」で回復した割合。
+    /// 分母 = 回復したエピソード数。回復 0 → None。
+    pub productive_manual_recovery_rate: Option<f64>,
+    // ── (a) AI依存度 ──
+    /// capture 済 external paste (external_paste_chars が Some) の件数。
+    pub external_paste_count: u32,
+    /// 文字数欠落 (旧 NDJSON, capture-schema-freeze 以前) のため outcome 集計から
+    /// 除外した paste の件数。これが大きいセッションは manual_contribution_ratio が
+    /// manual 寄りに偏るため、研究者が偏りに気づけるよう数値で残す
+    /// (code-reviewer MEDIUM 対応・収集時に算出して付与)。
+    pub excluded_paste_count: u32,
+    /// `external_paste_chars >= large_threshold` の paste 割合。paste 0 → None。
+    pub large_paste_rate: Option<f64>,
+    /// エピソード後 after_window 内に paste があったエピソードの割合。episode 0 → None。
+    pub paste_after_stuck_rate: Option<f64>,
+    /// 回復窓内に paste 無しで回復したエピソードの割合 (分母 = 全エピソード)。episode 0 → None。
+    pub self_recovery_without_paste: Option<f64>,
+    /// 補助指標: 1 時間あたりの external paste 回数。span 0 → None。
+    pub paste_count_per_hour: Option<f64>,
+    // ── 透明性のための内訳 ──
+    pub stuck_episode_count: u32,
+    pub recovered_episode_count: u32,
+}
+
+/// vk コードが「文字生成キー」(印字可能文字を生む) かを content-free に判定する。
+/// Windows VK 規約 (macOS はフック層で変換済み)。Unicode 内容には一切触れない。
+/// 含む: 英数 (0x30-0x39, 0x41-0x5A) / Space / Enter / Tab / テンキー (0x60-0x6F) /
+/// OEM 句読点 (0xBA-0xC0, 0xDB-0xDF, 0xE2)。除外: 修飾・ナビゲーション・ファンクション・
+/// backspace/delete。エピソード/比率の分子分母を安定させるための保守的集合
+/// (`.steering/20260623-outcome-metrics/decisions.md` CD-OM2)。
+pub fn is_text_producing(vk: u32) -> bool {
+    matches!(vk,
+        0x30..=0x39   // '0'-'9'
+        | 0x41..=0x5A // 'A'-'Z'
+        | 0x20        // VK_SPACE
+        | 0x0D        // VK_RETURN (改行も文字)
+        | 0x09        // VK_TAB
+        | 0x60..=0x6F // テンキー 0-9 と * + . - / separator
+        | 0xBA..=0xC0 // OEM_1..OEM_3 (; = , - . / `)
+        | 0xDB..=0xDF // OEM_4..OEM_8 ([ \ ] ')
+        | 0xE2        // OEM_102 (\ / <>)
+    )
+}
+
+/// backspace / delete か (replay.rs `is_backspace` と同義。文字を減らすキー)。
+pub fn is_backspace(vk: u32) -> bool {
+    vk == 0x08 || vk == 0x2E // VK_BACK / VK_DELETE
+}
+
+/// feat 列を Stuck エピソードに分割する。**現状 `PStuckThreshold` のみ実装** している。
+/// `feats` は timestamp 昇順を仮定。`merge_gap_ms` 以内の中断は同一エピソードに統合。
+///
+/// `UserLabel` / `InterventionFired` は feat だけでは判定できず (ラベル時刻列・介入発火列を
+/// 要する) 将来拡張のため予約済み。それらが指定された場合は p_stuck の結果を黙って返さず
+/// **空を返す** (cross-review AGREE-1: 仕様前走り防止)。トリガ別の時刻列から組む共通部は
+/// `episodes_from_sorted_ts` に切り出してあり、将来 `segment_episodes_from_ts(&label_ts, cfg)`
+/// 等を足せる。
+pub fn segment_stuck_episodes(feats: &[FeatSnapshot], cfg: &OutcomeConfig) -> Vec<StuckEpisode> {
+    if cfg.trigger != StuckTrigger::PStuckThreshold {
+        return Vec::new();
+    }
+    let stuck_ts: Vec<u64> = feats
+        .iter()
+        .filter(|f| f.p_stuck >= cfg.p_stuck_trigger)
+        .map(|f| f.timestamp)
+        .collect();
+    episodes_from_sorted_ts(&stuck_ts, cfg.merge_gap_ms)
+}
+
+/// 昇順タイムスタンプ列を merge_gap で統合してエピソード化する (トリガ非依存の共通部)。
+fn episodes_from_sorted_ts(sorted_ts: &[u64], merge_gap_ms: u64) -> Vec<StuckEpisode> {
+    let mut episodes = Vec::new();
+    let mut iter = sorted_ts.iter().copied();
+    if let Some(first) = iter.next() {
+        let mut start = first;
+        let mut prev = first;
+        for ts in iter {
+            if ts.saturating_sub(prev) <= merge_gap_ms {
+                prev = ts;
+            } else {
+                episodes.push(StuckEpisode {
+                    start_ms: start,
+                    end_ms: prev,
+                });
+                start = ts;
+                prev = ts;
+            }
+        }
+        episodes.push(StuckEpisode {
+            start_ms: start,
+            end_ms: prev,
+        });
+    }
+    episodes
+}
+
+/// 窓 `[lo, hi]` 内の manual_insert_chars 純増 = 文字生成キー press − backspace press
+/// (0 下限)。content-free。
+fn manual_insert_chars_in(keys: &[KeyPress], lo: u64, hi: u64) -> u64 {
+    let mut text = 0u64;
+    let mut back = 0u64;
+    for k in keys {
+        if k.timestamp >= lo && k.timestamp <= hi {
+            if is_backspace(k.vk) {
+                back += 1;
+            } else if is_text_producing(k.vk) {
+                text += 1;
+            }
+        }
+    }
+    text.saturating_sub(back)
+}
+
+/// 窓 `[lo, hi]` 内に paste が 1 件以上あるか。
+fn has_paste_in(pastes: &[PasteEvent], lo: u64, hi: u64) -> bool {
+    pastes
+        .iter()
+        .any(|p| p.timestamp >= lo && p.timestamp <= hi)
+}
+
+/// v0.4 アウトカム指標を算出する純粋関数。
+/// `feats` は回復判定 (p_flow>0.5) と session span に使う。`episodes` は
+/// `segment_stuck_episodes` 等で得た Stuck 候補区間。すべて timestamp 昇順を仮定。
+pub fn compute_outcome_metrics(
+    episodes: &[StuckEpisode],
+    pastes: &[PasteEvent],
+    keys: &[KeyPress],
+    feats: &[FeatSnapshot],
+    cfg: &OutcomeConfig,
+) -> OutcomeMetrics {
+    // (b) セッション全体の manual_insert_chars / paste 総和。
+    // 破損/巨大値での u64 wrap を防ぐため saturating で畳む (cross-review CLAUDE-1)。
+    let manual_insert_chars = manual_insert_chars_in(keys, u64::MIN, u64::MAX);
+    let external_paste_chars_total: u64 = pastes
+        .iter()
+        .fold(0u64, |acc, p| acc.saturating_add(p.chars));
+    let denom = manual_insert_chars.saturating_add(external_paste_chars_total);
+    let manual_contribution_ratio = if denom > 0 {
+        Some(manual_insert_chars as f64 / denom as f64)
+    } else {
+        None
+    };
+
+    // (a) paste 集計
+    let external_paste_count = pastes.len() as u32;
+    let large_paste_count = pastes
+        .iter()
+        .filter(|p| p.chars >= cfg.large_threshold)
+        .count() as u32;
+    let large_paste_rate = ratio(large_paste_count, external_paste_count);
+
+    // エピソード単位の集計
+    let episode_count = episodes.len() as u32;
+    let mut paste_after_stuck = 0u32;
+    let mut self_recovery_no_paste = 0u32;
+    let mut recovered_count = 0u32;
+    let mut productive_recovery = 0u32;
+
+    for ep in episodes {
+        // after_stuck 窓内の paste
+        if has_paste_in(
+            pastes,
+            ep.end_ms,
+            ep.end_ms.saturating_add(cfg.after_window_ms),
+        ) {
+            paste_after_stuck += 1;
+        }
+
+        // 回復 (p_flow>0.5) を end_ms 以降 recovery_window 内に探す (既存プリミティブ再利用)
+        if let Some(rec_ts) = compute_recovered_at(
+            ep.end_ms,
+            feats,
+            cfg.recovery_window_ms,
+            DEFAULT_P_FLOW_THRESHOLD,
+        ) {
+            recovered_count += 1;
+            // 回復までの間 [end_ms, rec_ts] に paste が無いか
+            let no_paste = !has_paste_in(pastes, ep.end_ms, rec_ts);
+            if no_paste {
+                self_recovery_no_paste += 1;
+                // net_diff 正進行 (manual 純増 >= net_diff_min) かつ paste 無し
+                if manual_insert_chars_in(keys, ep.end_ms, rec_ts) >= cfg.net_diff_min {
+                    productive_recovery += 1;
+                }
+            }
+        }
+    }
+
+    let paste_after_stuck_rate = ratio(paste_after_stuck, episode_count);
+    let self_recovery_without_paste = ratio(self_recovery_no_paste, episode_count);
+    let productive_manual_recovery_rate = ratio(productive_recovery, recovered_count);
+
+    // 補助: paste_count_per_hour (feat 列の span をセッション時間とみなす)
+    let paste_count_per_hour = match (feats.first(), feats.last()) {
+        (Some(f0), Some(f1)) if f1.timestamp > f0.timestamp => {
+            let hours = (f1.timestamp - f0.timestamp) as f64 / 3_600_000.0;
+            if hours > 0.0 {
+                Some(external_paste_count as f64 / hours)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    OutcomeMetrics {
+        manual_insert_chars,
+        external_paste_chars_total,
+        manual_contribution_ratio,
+        productive_manual_recovery_rate,
+        external_paste_count,
+        // 収集時にしか分からないため compute では 0。`--metrics` 経路 (replay.rs) が
+        // collect_paste_events の戻り値で上書きする。
+        excluded_paste_count: 0,
+        large_paste_rate,
+        paste_after_stuck_rate,
+        self_recovery_without_paste,
+        paste_count_per_hour,
+        stuck_episode_count: episode_count,
+        recovered_episode_count: recovered_count,
+    }
+}
+
+/// `num / den` を比率で返す。den == 0 → None (NaN を出さない)。
+fn ratio(num: u32, den: u32) -> Option<f64> {
+    if den > 0 {
+        Some(num as f64 / den as f64)
+    } else {
+        None
+    }
+}
+
+/// Option<f64> の比率を pretty 出力用に整形 (None → "n/a")。
+fn fmt_opt_ratio(v: Option<f64>) -> String {
+    v.map(|x| format!("{:.3}", x))
+        .unwrap_or_else(|| "n/a".to_string())
 }
 
 /// Stuck ラベル時刻以降、`p_flow > threshold` に達する最初の FeatSnapshot 時刻を返す。
@@ -186,6 +525,9 @@ pub fn compute_session_metrics(
         micro_f1,
         detection_lead_ms_median: median_i64(&mut leads),
         stuck_recovery_ms_median: median_u64(&mut recoveries),
+        // outcome は key/paste 行を要するため compute_session_metrics では計算しない。
+        // `--metrics` 経路 (replay.rs) が compute_outcome_metrics の結果を後から付与する。
+        outcome: None,
         warnings,
     }
 }
@@ -237,6 +579,37 @@ pub fn format_pretty(m: &SessionMetrics) -> String {
     match m.stuck_recovery_ms_median {
         Some(v) => out.push_str(&format!("  Stuck recovery median: {} ms\n", v)),
         None => out.push_str("  Stuck recovery median: n/a\n"),
+    }
+    if let Some(o) = &m.outcome {
+        out.push_str("  Outcome metrics (v0.4):\n");
+        out.push_str(&format!(
+            "    Stuck episodes: {} (recovered: {})\n",
+            o.stuck_episode_count, o.recovered_episode_count
+        ));
+        out.push_str(&format!(
+            "    manual_insert_chars: {}  external_paste_chars: {}  external_paste_count: {} (excluded: {})\n",
+            o.manual_insert_chars, o.external_paste_chars_total, o.external_paste_count, o.excluded_paste_count
+        ));
+        out.push_str(&format!(
+            "    manual_contribution_ratio: {}\n",
+            fmt_opt_ratio(o.manual_contribution_ratio)
+        ));
+        out.push_str(&format!(
+            "    productive_manual_recovery_rate: {}\n",
+            fmt_opt_ratio(o.productive_manual_recovery_rate)
+        ));
+        out.push_str(&format!(
+            "    self_recovery_without_paste: {}  paste_after_stuck_rate: {}\n",
+            fmt_opt_ratio(o.self_recovery_without_paste),
+            fmt_opt_ratio(o.paste_after_stuck_rate)
+        ));
+        out.push_str(&format!(
+            "    large_paste_rate: {}  paste_count_per_hour: {}\n",
+            fmt_opt_ratio(o.large_paste_rate),
+            o.paste_count_per_hour
+                .map(|v| format!("{:.2}", v))
+                .unwrap_or_else(|| "n/a".to_string())
+        ));
     }
     out.push_str(&format!("  Warnings: {}\n", m.warnings.len()));
     for w in &m.warnings {
@@ -441,6 +814,7 @@ pub fn compute_range_metrics(
         micro_f1,
         detection_lead_ms_median: None,
         stuck_recovery_ms_median: None,
+        outcome: None,
         warnings,
     }
 }
@@ -712,6 +1086,215 @@ mod tests {
         assert!(s.contains("Total labels: 1"));
         assert!(s.contains("Confusion"));
         assert!(s.contains("Warnings: 0"));
+    }
+
+    // ── v0.4 Outcome metrics tests ───────────────────────────────────
+
+    fn kp(timestamp: u64, vk: u32) -> KeyPress {
+        KeyPress { timestamp, vk }
+    }
+    fn pe(timestamp: u64, chars: u64) -> PasteEvent {
+        PasteEvent { timestamp, chars }
+    }
+
+    #[test]
+    fn text_producing_and_backspace_classification() {
+        assert!(is_text_producing(0x41)); // 'A'
+        assert!(is_text_producing(0x30)); // '0'
+        assert!(is_text_producing(0x20)); // Space
+        assert!(is_text_producing(0xBC)); // OEM_COMMA
+        assert!(!is_text_producing(0x08)); // Backspace は文字生成ではない
+        assert!(!is_text_producing(0x10)); // Shift (修飾)
+        assert!(!is_text_producing(0x25)); // Left arrow (ナビゲーション)
+        assert!(is_backspace(0x08)); // VK_BACK
+        assert!(is_backspace(0x2E)); // VK_DELETE
+        assert!(!is_backspace(0x41));
+    }
+
+    #[test]
+    fn segment_merges_within_gap_and_splits_beyond() {
+        let cfg = OutcomeConfig {
+            merge_gap_ms: 30_000,
+            ..OutcomeConfig::default()
+        };
+        // stuck @1000,2000,3000 (連続) → 1 エピソード。@100_000 は gap>30s → 別エピソード。
+        let feats = vec![
+            feat(1000, 0.1, 0.2, 0.7),
+            feat(2000, 0.1, 0.2, 0.7),
+            feat(3000, 0.1, 0.2, 0.7),
+            feat(5000, 0.8, 0.1, 0.1), // not stuck (dip < gap, absorbed only if両端 stuck)
+            feat(100_000, 0.1, 0.2, 0.7),
+        ];
+        let eps = segment_stuck_episodes(&feats, &cfg);
+        assert_eq!(eps.len(), 2);
+        assert_eq!(
+            eps[0],
+            StuckEpisode {
+                start_ms: 1000,
+                end_ms: 3000
+            }
+        );
+        assert_eq!(
+            eps[1],
+            StuckEpisode {
+                start_ms: 100_000,
+                end_ms: 100_000
+            }
+        );
+    }
+
+    #[test]
+    fn segment_absorbs_short_dip_within_gap() {
+        let cfg = OutcomeConfig {
+            merge_gap_ms: 30_000,
+            ..OutcomeConfig::default()
+        };
+        // stuck @1000, dip @2000(not stuck), stuck @3000。stuck 間隙 2000ms <= gap → 統合。
+        let feats = vec![
+            feat(1000, 0.1, 0.2, 0.7),
+            feat(2000, 0.8, 0.1, 0.1),
+            feat(3000, 0.1, 0.2, 0.7),
+        ];
+        let eps = segment_stuck_episodes(&feats, &cfg);
+        assert_eq!(eps.len(), 1);
+        assert_eq!(
+            eps[0],
+            StuckEpisode {
+                start_ms: 1000,
+                end_ms: 3000
+            }
+        );
+    }
+
+    #[test]
+    fn manual_insert_chars_nets_backspace_and_floors_at_zero() {
+        // 文字3 - backspace1 = 2
+        let keys = vec![kp(1, 0x41), kp(2, 0x42), kp(3, 0x43), kp(4, 0x08)];
+        assert_eq!(manual_insert_chars_in(&keys, u64::MIN, u64::MAX), 2);
+        // backspace 過多でも 0 下限 (NaN/underflow 無し)
+        let keys2 = vec![kp(1, 0x41), kp(2, 0x08), kp(3, 0x08)];
+        assert_eq!(manual_insert_chars_in(&keys2, u64::MIN, u64::MAX), 0);
+        // 修飾キーは数えない
+        let keys3 = vec![kp(1, 0x10), kp(2, 0x11), kp(3, 0x41)];
+        assert_eq!(manual_insert_chars_in(&keys3, u64::MIN, u64::MAX), 1);
+    }
+
+    #[test]
+    fn segment_reserved_trigger_returns_empty_not_pstuck() {
+        // UserLabel / InterventionFired は未実装 → p_stuck の結果を黙って返さず空 (AGREE-1)。
+        let feats = vec![feat(1000, 0.1, 0.2, 0.7), feat(2000, 0.1, 0.2, 0.7)];
+        for trigger in [StuckTrigger::UserLabel, StuckTrigger::InterventionFired] {
+            let cfg = OutcomeConfig {
+                trigger,
+                ..OutcomeConfig::default()
+            };
+            assert!(
+                segment_stuck_episodes(&feats, &cfg).is_empty(),
+                "reserved trigger {trigger:?} must not masquerade as p_stuck episodes"
+            );
+        }
+        // 既定 (PStuckThreshold) は従来通りエピソードを返す
+        let cfg = OutcomeConfig::default();
+        assert_eq!(segment_stuck_episodes(&feats, &cfg).len(), 1);
+    }
+
+    #[test]
+    fn outcome_paste_chars_total_saturates_no_overflow() {
+        // 破損 NDJSON 由来の巨大 chars でも wrap せず None/誤正値を出さない (CLAUDE-1)。
+        let cfg = OutcomeConfig::default();
+        let pastes = vec![pe(1, u64::MAX), pe(2, 100)];
+        let o = compute_outcome_metrics(&[], &pastes, &[], &[], &cfg);
+        assert_eq!(o.external_paste_chars_total, u64::MAX); // saturated, not wrapped
+                                                            // manual=0, paste=MAX → ratio = 0 / MAX = 0.0 (NaN でない)
+        let r = o.manual_contribution_ratio.unwrap();
+        assert!(!r.is_nan());
+        assert!(r.abs() < 1e-9);
+    }
+
+    #[test]
+    fn outcome_empty_session_no_nan_all_none() {
+        let cfg = OutcomeConfig::default();
+        let o = compute_outcome_metrics(&[], &[], &[], &[], &cfg);
+        assert_eq!(o.manual_insert_chars, 0);
+        assert_eq!(o.external_paste_count, 0);
+        assert!(o.manual_contribution_ratio.is_none());
+        assert!(o.productive_manual_recovery_rate.is_none());
+        assert!(o.large_paste_rate.is_none());
+        assert!(o.paste_after_stuck_rate.is_none());
+        assert!(o.self_recovery_without_paste.is_none());
+        assert!(o.paste_count_per_hour.is_none());
+        assert_eq!(o.stuck_episode_count, 0);
+    }
+
+    #[test]
+    fn outcome_self_recovery_without_paste_and_productive() {
+        let cfg = OutcomeConfig::default();
+        // Stuck @10_000-11_000、その後 manual で打鍵し p_flow>0.5 に回復 (paste 無し)。
+        let feats = vec![
+            feat(10_000, 0.1, 0.2, 0.7),
+            feat(11_000, 0.1, 0.2, 0.7),
+            feat(20_000, 0.8, 0.1, 0.1), // 回復 (recovery_window 5分内)
+        ];
+        let episodes = segment_stuck_episodes(&feats, &cfg);
+        assert_eq!(episodes.len(), 1);
+        // 回復までの間 (11_000..20_000) に文字キー3つ → net_diff=3 >= 1
+        let keys = vec![kp(12_000, 0x41), kp(13_000, 0x42), kp(14_000, 0x43)];
+        let o = compute_outcome_metrics(&episodes, &[], &keys, &feats, &cfg);
+        assert_eq!(o.stuck_episode_count, 1);
+        assert_eq!(o.recovered_episode_count, 1);
+        assert_eq!(o.self_recovery_without_paste, Some(1.0));
+        assert_eq!(o.productive_manual_recovery_rate, Some(1.0));
+        assert_eq!(o.paste_after_stuck_rate, Some(0.0));
+        // manual のみ → manual_contribution_ratio = 1.0
+        assert_eq!(o.manual_contribution_ratio, Some(1.0));
+    }
+
+    #[test]
+    fn outcome_paste_in_recovery_window_excludes_self_recovery() {
+        let cfg = OutcomeConfig::default();
+        let feats = vec![
+            feat(10_000, 0.1, 0.2, 0.7),
+            feat(11_000, 0.1, 0.2, 0.7),
+            feat(20_000, 0.8, 0.1, 0.1), // 回復
+        ];
+        let episodes = segment_stuck_episodes(&feats, &cfg);
+        // 回復までの間に paste (60 chars, large) → self_recovery 不成立・after_stuck 成立
+        let pastes = vec![pe(15_000, 60)];
+        let keys = vec![kp(16_000, 0x41)];
+        let o = compute_outcome_metrics(&episodes, &pastes, &keys, &feats, &cfg);
+        assert_eq!(o.recovered_episode_count, 1);
+        assert_eq!(o.self_recovery_without_paste, Some(0.0));
+        assert_eq!(o.productive_manual_recovery_rate, Some(0.0)); // 回復1・productive0
+        assert_eq!(o.paste_after_stuck_rate, Some(1.0)); // end(11_000)+120s 内に paste(15_000)
+        assert_eq!(o.external_paste_count, 1);
+        assert_eq!(o.large_paste_rate, Some(1.0)); // 60 >= 50
+                                                   // manual=1, paste=60 → ratio = 1/61
+        let r = o.manual_contribution_ratio.unwrap();
+        assert!((r - 1.0 / 61.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn outcome_large_paste_rate_threshold_boundary() {
+        let cfg = OutcomeConfig::default(); // large_threshold = 50
+        let pastes = vec![pe(1, 49), pe(2, 50), pe(3, 100)];
+        let o = compute_outcome_metrics(&[], &pastes, &[], &[], &cfg);
+        assert_eq!(o.external_paste_count, 3);
+        // 50 と 100 が large (>=50) → 2/3
+        assert_eq!(o.large_paste_rate, Some(2.0 / 3.0));
+        assert_eq!(o.external_paste_chars_total, 199);
+    }
+
+    #[test]
+    fn outcome_not_recovered_episode_productive_denominator_excludes_it() {
+        let cfg = OutcomeConfig::default();
+        // Stuck だが回復窓内に p_flow>0.5 が来ない → recovered=0 → productive=None
+        let feats = vec![feat(10_000, 0.1, 0.2, 0.7), feat(11_000, 0.1, 0.2, 0.7)];
+        let episodes = segment_stuck_episodes(&feats, &cfg);
+        assert_eq!(episodes.len(), 1);
+        let o = compute_outcome_metrics(&episodes, &[], &[], &feats, &cfg);
+        assert_eq!(o.recovered_episode_count, 0);
+        assert!(o.productive_manual_recovery_rate.is_none());
+        assert_eq!(o.self_recovery_without_paste, Some(0.0)); // 分母=全エピソード1
     }
 
     // ── RangeLabel / compute_range_metrics tests ────────────────────

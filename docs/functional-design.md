@@ -341,6 +341,29 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
   - 4b. 破損 metrics.json がある: `aggregate_metrics.py` が `sys.stderr` に WARN を出しスキップ、`skipped` リストに記録
 - **事後条件**: 複数端末のデータが単一の集計値に統合され、`baseline_metrics.md` への転記元になる
 
+### UC-OM1: 捕捉済み NDJSON から v0.4 アウトカム指標を算出する (Phase B / WBS 0.10)
+
+- **アクター**: 開発者 / 研究者
+- **前提条件**: capture-schema-freeze 以降の NDJSON (`external_paste_chars` / `key` / `feat` を含む) が手元にある
+- **トリガー**: M3 Y 価値検証の (a) AI依存度・(b) 自力解決率を `metrics.json` に載せたい
+- **基本フロー**:
+  1. `gse-replay --metrics --json` が `collect_logged_feats` / `collect_paste_events` / `collect_key_events`
+     で content-free な時系列 (p_stuck feat / paste 文字数 / key vk) を収集
+  2. `segment_stuck_episodes` が `p_stuck >= 0.60` の連続区間を merge-gap で統合し **Stuck エピソード**化
+  3. `compute_outcome_metrics` が各エピソードについて回復 (p_flow>0.5)・paste 有無・net_diff 正進行を判定し、
+     (b) `manual_contribution_ratio` / `productive_manual_recovery_rate`、
+     (a) `external_paste_count` / `large_paste_rate` / `paste_after_stuck_rate` /
+     `self_recovery_without_paste` / `paste_count_per_hour` (補助) を算出
+  4. `SessionMetrics.outcome` (additive・後方互換) として既存メトリクスと同じ `metrics.json` に出力
+- **代替フロー**:
+  - 1a. 旧 NDJSON で `external_paste_chars` 欠落の paste: outcome から除外し `excluded_paste_count` に件数を残す
+  - 3a. paste/key/エピソードが 0 件: 各比率は `None` (NaN を出さない)
+- **事後条件**: `metrics.json` に**数値のみ** (キーストローク/クリップボード内容を一切含まない) で
+  (a)(b) 指標が載り、後から閾値を変えて再処理・再計算できる
+- **備考**: Stuck 候補トリガは `StuckTrigger` enum で将来 `UserLabel` / `InterventionFired` へ拡張する
+  設計だが、**現状は `PStuckThreshold` (既定) のみ実装**。予約バリアントを指定した場合は p_stuck の
+  結果を返さず空エピソードになる。詳細・根拠は `.steering/20260623-outcome-metrics/decisions.md`
+
 ## 4. 機能要件
 
 ### 必須機能
