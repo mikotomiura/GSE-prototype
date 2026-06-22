@@ -196,12 +196,21 @@ function App() {
       return;
     }
     // Task C: セッション開始宣言を記録 (track は較正スモークでは main 固定)。
+    // condition / label_pool (WBS 0.11 / 0.4): blind 較正中は calibration_blind プールとして
+    // 記録し、X1 判定が calibration_blind のみを使えるようにする。介入可視時は
+    // post_intervention プール。いずれも固定カテゴリのみ。
+    // NOTE: Phase 2 AB/BA (a|b) と Phase 3 MRT (nudge|defer) の condition 配線は
+    // それぞれの割付実装時に行う (本タスクは enum 凍結のみ。decisions CD8)。
+    const condition = calibrationMode ? "blind_calibration" : "baseline";
+    const labelPool = calibrationMode ? "calibration_blind" : "post_intervention";
     try {
       await invoke("record_session_meta", {
         track: "main",
         taskKind,
         monkMode: isMonkMode,
         interventionEnabled,
+        condition,
+        labelPool,
       });
     } catch (e) {
       console.error("record_session_meta failed:", e);

@@ -90,13 +90,18 @@ enum ReplayEvent {
     /// キーストローク。vk_code は Windows 規約 (macOS 側はフック層で変換済み)。
     #[serde(rename = "key")]
     Key { t: u64, vk: u32, press: bool },
-    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻マーカー。
+    /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻マーカーと文字数。
     /// features/HMM には未使用のため replay では読み飛ばす (`timestamp()==None`)。
     /// 本 variant が無いと NDJSON に paste 行があるとき deserialize でエラーになる。
+    /// `external_paste_chars` は新フィールド。旧フィクスチャ (フィールド無し) 互換のため
+    /// `#[serde(default)]` で欠落を許容する (None になる)。
     #[serde(rename = "paste")]
     Paste {
         #[allow(dead_code)]
         t: u64,
+        #[allow(dead_code)]
+        #[serde(default)]
+        external_paste_chars: Option<u64>,
     },
     /// IME 状態変化。`on` は IME モード（β 切替用）、`active` は候補ウィンドウ
     /// の開閉（engine pause 用）。
@@ -133,6 +138,10 @@ enum ReplayEvent {
     /// MVP Opportunity 判定ログ。replay では読み飛ばす。
     #[serde(rename = "intervention_decision")]
     InterventionDecision(#[allow(dead_code)] serde_json::Value),
+    /// 介入応答 (dismiss 理由) ログ。features/HMM 未使用のため replay では読み飛ばす。
+    /// 本 variant が無いと NDJSON に intervention_response 行があるとき deserialize でエラーになる。
+    #[serde(rename = "intervention_response")]
+    InterventionResponse(#[allow(dead_code)] serde_json::Value),
     /// v0.3 較正スモーク: セッション宣言。`--calibration` 経路で track を抽出する。
     /// snapshot/run_replay 経路では `timestamp()==None` で読み飛ばす。
     #[serde(rename = "session_meta")]
@@ -144,6 +153,13 @@ enum ReplayEvent {
         monk_mode: bool,
         #[allow(dead_code)]
         intervention_enabled: bool,
+        // 新フィールド (WBS 0.11 / 0.4)。旧フィクスチャ互換のため `#[serde(default)]`。
+        #[allow(dead_code)]
+        #[serde(default)]
+        condition: Option<String>,
+        #[allow(dead_code)]
+        #[serde(default)]
+        label_pool: Option<String>,
         #[allow(dead_code)]
         ts: u64,
     },
@@ -205,6 +221,7 @@ impl ReplayEvent {
             ReplayEvent::ReviewMarker { .. } => None,
             ReplayEvent::ImeShadow(_) => None,
             ReplayEvent::InterventionDecision(_) => None,
+            ReplayEvent::InterventionResponse(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
             // run_replay (snapshot 経路) の時刻順ソートからは除外する (UserLabel と同方針)。
             ReplayEvent::SessionMeta { .. } => None,
@@ -1392,6 +1409,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::ReviewMarker { .. }
             | ReplayEvent::ImeShadow(_)
             | ReplayEvent::InterventionDecision(_)
+            | ReplayEvent::InterventionResponse(_)
             | ReplayEvent::SessionMeta { .. }
             | ReplayEvent::ProbeAssignment { .. }
             | ReplayEvent::RealtimeLabel { .. }
@@ -1789,26 +1807,44 @@ mod tests {
         assert!((feat.alpha - 0.3).abs() < 1e-9);
     }
 
-    /// ペーストイベント行 (`{"type":"paste","t":...}`) が deserialize でき、
-    /// `timestamp()==None` で snapshot 再実行の時刻順ソートから除外されることを確認する。
+    /// ペーストイベント行が deserialize でき、`timestamp()==None` で snapshot 再実行の
+    /// 時刻順ソートから除外されることを確認する。
     /// 本 variant が無いと paste 行を含む NDJSON で gse-replay が parse エラーになる。
+    /// 旧形式 (`external_paste_chars` 無し) と新形式の両方を後方互換で受理する。
     #[test]
     fn paste_event_parses_and_is_skipped_from_replay() {
-        let line = r#"{"type":"paste","t":1700000005000}"#;
-        let ev: ReplayEvent = serde_json::from_str(line).expect("parse ReplayEvent::Paste");
+        // 旧フィクスチャ形式: external_paste_chars 欠落 → serde default で None。
+        let legacy = r#"{"type":"paste","t":1700000005000}"#;
+        let ev: ReplayEvent =
+            serde_json::from_str(legacy).expect("parse legacy ReplayEvent::Paste");
         assert!(
             matches!(
                 ev,
                 ReplayEvent::Paste {
-                    t: 1_700_000_005_000
+                    t: 1_700_000_005_000,
+                    external_paste_chars: None,
                 }
             ),
-            "expected ReplayEvent::Paste, got {ev:?}"
+            "expected legacy ReplayEvent::Paste with None, got {ev:?}"
         );
         assert_eq!(
             ev.timestamp(),
             None,
-            "paste は再実行に使わないため timestamp()==None で除外する"
+            "paste は timestamp()==None で除外する"
+        );
+
+        // 新形式: external_paste_chars あり。
+        let new = r#"{"type":"paste","t":42,"external_paste_chars":7}"#;
+        let ev: ReplayEvent = serde_json::from_str(new).expect("parse new ReplayEvent::Paste");
+        assert!(
+            matches!(
+                ev,
+                ReplayEvent::Paste {
+                    t: 42,
+                    external_paste_chars: Some(7),
+                }
+            ),
+            "expected ReplayEvent::Paste with Some(7), got {ev:?}"
         );
     }
 

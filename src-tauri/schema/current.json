@@ -93,13 +93,21 @@
       }
     },
     {
-      "description": "ペーストイベント (Ctrl+V / Cmd+V) の発生時刻。 AI 依存度指標 (D4) 向けに**回数**を記録するための行。1 ペースト = 1 行。 VK + 修飾キー状態のみから検出し、**クリップボードの中身は一切記録しない** (data-privacy 準拠)。回数は行数で、時系列は `t` で算出する。",
+      "description": "ペーストイベント (Ctrl+V / Cmd+V) の発生時刻と文字数。 AI 依存度指標 (D4) 向けに**回数** (行数) を、(b) 自力解決率 (v0.4 §4.2 `manual_contribution_ratio`) 向けに `external_paste_chars` (ペースト**文字数=整数のみ**) を記録する。1 ペースト = 1 行。VK + 修飾キー状態から検出し、クリップボードは **長さのみ取得して中身は即破棄**する (**中身は一切記録しない**・data-privacy CD1)。 旧フィクスチャ互換のため `external_paste_chars` は省略可 (取得不能時も `null`)。",
       "type": "object",
       "required": [
         "t",
         "type"
       ],
       "properties": {
+        "external_paste_chars": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "t": {
           "type": "integer",
           "format": "uint64",
@@ -389,7 +397,36 @@
       }
     },
     {
-      "description": "v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。 timestamp は既存の `t` と別命名の `ts` (§14 設計準拠)。",
+      "description": "介入提示に対するユーザー応答 (dismiss 理由)。`intervention_decision` (判定側) とは別の 「ユーザー応答側」ログ (WBS 0.8 / v0.4 §9)。Need 誤りと Opportunity 誤りを分離する。 固定カテゴリ + 時刻のみ。本文・Unicode 文字は含まない。",
+      "type": "object",
+      "required": [
+        "action",
+        "reason",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/InterventionActionDto"
+        },
+        "reason": {
+          "$ref": "#/definitions/DismissReasonDto"
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "intervention_response"
+          ]
+        }
+      }
+    },
+    {
+      "description": "v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。 timestamp は既存の `t` と別命名の `ts` (§14 設計準拠)。 `condition` = 実験条件 (WBS 0.11)、`label_pool` = ラベルプール (WBS 0.4)。 旧フィクスチャ互換のため両者とも省略可 (`null`)。",
       "type": "object",
       "required": [
         "intervention_enabled",
@@ -400,8 +437,28 @@
         "type"
       ],
       "properties": {
+        "condition": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConditionDto"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "intervention_enabled": {
           "type": "boolean"
+        },
+        "label_pool": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LabelPoolDto"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "monk_mode": {
           "type": "boolean"
@@ -572,6 +629,28 @@
     }
   ],
   "definitions": {
+    "ConditionDto": {
+      "description": "`session_meta` の実験条件 (WBS 0.11)。Phase 1b=`blind_calibration`、Phase 2 AB/BA=`a`/`b`、 Phase 3 MRT=`nudge`/`defer`、それ以外=`baseline`。",
+      "type": "string",
+      "enum": [
+        "blind_calibration",
+        "a",
+        "b",
+        "nudge",
+        "defer",
+        "baseline"
+      ]
+    },
+    "DismissReasonDto": {
+      "description": "`intervention_response` の dismiss 理由 (WBS 0.8 / v0.4 §9)。 `not_stuck` = Need 誤り、`want_to_struggle` = Opportunity 誤り、`just_close` = 単に閉じる、 `silent` = 理由未選択 (フェードアウト)。",
+      "type": "string",
+      "enum": [
+        "not_stuck",
+        "want_to_struggle",
+        "just_close",
+        "silent"
+      ]
+    },
     "ExpectedQuadrantDto": {
       "description": "`vignette_response` の想定象限。教示の正解ラベル (`idle` を含む)。",
       "type": "string",
@@ -590,6 +669,14 @@
         "nudge",
         "wall",
         "defer"
+      ]
+    },
+    "LabelPoolDto": {
+      "description": "`session_meta` のラベルプール (WBS 0.4)。X1 判定には `calibration_blind` のみ使用。",
+      "type": "string",
+      "enum": [
+        "calibration_blind",
+        "post_intervention"
       ]
     },
     "ProbeSourceDto": {
