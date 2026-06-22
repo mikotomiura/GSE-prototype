@@ -38,5 +38,5 @@
 - [x] code-reviewer + security-checker 並列 (CRITICAL/HIGH なし・中身非漏洩を確認)
 - [x] レビュー指摘対応 (CD5 スレッド逃がし / CD6 arboard default-features=false / clipboard warn)
 - [x] docs 更新 (glossary に新 5 用語追加)
-- [ ] /finish-task で /cross-review (jq 不在なら Claude 単独・理由明記)
-- [ ] git commit (Refs 付き)
+- [x] /finish-task で /cross-review (jq 導入後 Claude ∥ Codex 両系統正常完了。HIGH=A1/A2/A3 を同期読みで解消、A5 テスト追加、A4 文書化)
+- [x] git commit (Refs 付き、`0043380`)
