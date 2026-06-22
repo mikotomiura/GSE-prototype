@@ -48,7 +48,8 @@ use gse_next_lib::analysis::loop_step::{
     step, AnalysisState, FeatSnapshot, LoopInput, ENGINE_TICK_MS,
 };
 use gse_next_lib::analysis::metrics::{
-    compute_range_metrics, compute_session_metrics, format_pretty, LabelClass, RangeLabel,
+    compute_outcome_metrics, compute_range_metrics, compute_session_metrics, format_pretty,
+    segment_stuck_episodes, KeyPress, LabelClass, OutcomeConfig, PasteEvent, RangeLabel,
     UserLabelEvent,
 };
 
@@ -667,7 +668,35 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        let metrics = compute_session_metrics(&labels, &feats);
+        let mut metrics = compute_session_metrics(&labels, &feats);
+        // v0.4 アウトカム指標 (a)(b) を付与する。key/paste 行を別途収集し、p_stuck
+        // エピソード上で算出する (`.steering/20260623-outcome-metrics/`)。収集が失敗した
+        // 場合は outcome を **None のまま**にする (cross-review AGREE-2): 「実測ゼロ」と
+        // 「データ無し」を混同させない。HMM 精度メトリクスは独立に出力される。
+        let cfg = OutcomeConfig::default();
+        match (
+            collect_paste_events(&args.session_path),
+            collect_key_events(&args.session_path),
+        ) {
+            (Ok((pastes, excluded_paste_count)), Ok(keys)) => {
+                let episodes = segment_stuck_episodes(&feats, &cfg);
+                let mut outcome = compute_outcome_metrics(&episodes, &pastes, &keys, &feats, &cfg);
+                outcome.excluded_paste_count = excluded_paste_count;
+                metrics.outcome = Some(outcome);
+            }
+            (paste_res, key_res) => {
+                if let Err(msg) = &paste_res {
+                    tracing::warn!("collect_paste_events failed, outcome omitted: {}", msg);
+                }
+                if let Err(msg) = &key_res {
+                    tracing::warn!("collect_key_events failed, outcome omitted: {}", msg);
+                }
+                metrics
+                    .warnings
+                    .push("outcome metrics omitted: paste/key collection failed".to_string());
+                // metrics.outcome は None のまま
+            }
+        }
         let stdout = std::io::stdout();
         let mut lock = stdout.lock();
         if args.json {
@@ -1123,6 +1152,120 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
         );
     }
     out.sort_by_key(|f| f.timestamp);
+    Ok(out)
+}
+
+/// v0.4: NDJSON の `{"type":"paste", ...}` 行から `PasteEvent` 列を抽出する。
+///
+/// `external_paste_chars` が Some の paste 行のみ収集する (capture-schema-freeze 以降)。
+/// 旧 NDJSON (フィールド欠落 → None) の paste は文字数不明のため outcome 集計から除外する
+/// (`.steering/20260623-outcome-metrics/decisions.md` CD-OM3)。中身は一切読まない (数値のみ)。
+/// 戻り値 = (capture 済 paste 列, 文字数欠落で除外した paste 件数)。後者は
+/// `OutcomeMetrics.excluded_paste_count` に載せ、偏りの透明性を確保する。
+fn collect_paste_events(session_path: &PathBuf) -> Result<(Vec<PasteEvent>, u32), String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<PasteEvent> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut paste_without_chars: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Paste {
+            t,
+            external_paste_chars,
+        } = ev
+        {
+            match external_paste_chars {
+                Some(chars) => out.push(PasteEvent {
+                    timestamp: t,
+                    chars,
+                }),
+                None => paste_without_chars += 1,
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            skipped = parse_failed_lines,
+            "collect_paste_events: NDJSON lines failed to parse as ReplayEvent"
+        );
+    }
+    if paste_without_chars > 0 {
+        tracing::warn!(
+            skipped = paste_without_chars,
+            "collect_paste_events: paste entries without external_paste_chars \
+             (pre-capture-schema-freeze NDJSON — excluded from outcome metrics)"
+        );
+    }
+    out.sort_by_key(|p| p.timestamp);
+    // u32 で十分 (MAX_SESSION_BYTES 配下の paste 行数は u32 を超えない)。
+    Ok((out, paste_without_chars.min(u32::MAX as u64) as u32))
+}
+
+/// v0.4: NDJSON の `{"type":"key", ...}` 行から press イベントを `KeyPress` 列として抽出する。
+///
+/// `vk` コードのみ保持し (data-privacy ルール1 で記録許可)、Unicode 内容には触れない。
+/// 文字生成キー判定 / backspace 判定は `analysis/metrics.rs` 側の純粋関数で行う。
+fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<KeyPress> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Key { t, vk, press } = ev {
+            if press {
+                out.push(KeyPress { timestamp: t, vk });
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            skipped = parse_failed_lines,
+            "collect_key_events: NDJSON lines failed to parse as ReplayEvent"
+        );
+    }
+    out.sort_by_key(|k| k.timestamp);
     Ok(out)
 }
 
@@ -1783,6 +1926,68 @@ mod tests {
         p.push("fixtures");
         p.push(name);
         p
+    }
+
+    /// v0.4 Outcome metrics の Replay-as-Truth 回帰: outcome_metrics.ndjson を
+    /// collector → segment → compute_outcome_metrics に通し、固定値を検証する。
+    /// fixture 設計: 2 エピソード (10000-11000 / 200000-201000)、ep1 は manual のみで
+    /// 回復、ep2 は paste(60 chars) 後に回復。t=50000 の paste は chars 欠落 (旧 NDJSON)
+    /// のため outcome から除外される (null 耐性)。
+    #[test]
+    fn outcome_metrics_golden_fixture_fixed_values() {
+        let path = fixture_path("outcome_metrics.ndjson");
+        let feats = collect_logged_feats(&path).expect("collect_logged_feats");
+        let (pastes, excluded) = collect_paste_events(&path).expect("collect_paste_events");
+        let keys = collect_key_events(&path).expect("collect_key_events");
+        // chars 欠落 paste (t=50000) は除外され、capture 済 paste(t=205000) のみ
+        assert_eq!(
+            pastes.len(),
+            1,
+            "only paste with external_paste_chars counted"
+        );
+        assert_eq!(excluded, 1, "one chars-less paste (t=50000) excluded");
+        assert_eq!(keys.len(), 3, "three char key presses");
+
+        let cfg = OutcomeConfig::default();
+        let episodes = segment_stuck_episodes(&feats, &cfg);
+        assert_eq!(episodes.len(), 2, "two stuck episodes (gap > merge_gap)");
+
+        let mut o = compute_outcome_metrics(&episodes, &pastes, &keys, &feats, &cfg);
+        o.excluded_paste_count = excluded;
+        assert_eq!(o.excluded_paste_count, 1);
+        assert_eq!(o.stuck_episode_count, 2);
+        assert_eq!(o.recovered_episode_count, 2);
+        assert_eq!(o.manual_insert_chars, 3);
+        assert_eq!(o.external_paste_chars_total, 60);
+        assert_eq!(o.external_paste_count, 1);
+        // manual=3, paste=60 → 3/63
+        assert!((o.manual_contribution_ratio.unwrap() - 3.0 / 63.0).abs() < 1e-9);
+        // recovered=2、productive=1 (ep1 のみ) → 0.5
+        assert_eq!(o.productive_manual_recovery_rate, Some(0.5));
+        // self_recovery=1 (ep1)、分母=全エピソード2 → 0.5
+        assert_eq!(o.self_recovery_without_paste, Some(0.5));
+        // paste_after_stuck=1 (ep2 のみ・ep1 の窓には入らない) → 0.5
+        assert_eq!(o.paste_after_stuck_rate, Some(0.5));
+        // large_paste_rate: 60 >= 50 → 1.0
+        assert_eq!(o.large_paste_rate, Some(1.0));
+        // paste_count_per_hour: span 200000ms=0.05556h, 1 paste → 18.0/h
+        assert!((o.paste_count_per_hour.unwrap() - 18.0).abs() < 1e-6);
+    }
+
+    /// 旧 NDJSON (paste/key 行が無い既存 fixture) でも collector が panic せず空を返し、
+    /// outcome が全 None / 0 になることを確認する (null 耐性・後方互換)。
+    #[test]
+    fn outcome_metrics_legacy_fixture_no_panic() {
+        let path = fixture_path("phase1_minimal.ndjson");
+        let feats = collect_logged_feats(&path).expect("collect_logged_feats");
+        let (pastes, _excluded) = collect_paste_events(&path).expect("collect_paste_events");
+        let keys = collect_key_events(&path).expect("collect_key_events");
+        let cfg = OutcomeConfig::default();
+        let episodes = segment_stuck_episodes(&feats, &cfg);
+        let o = compute_outcome_metrics(&episodes, &pastes, &keys, &feats, &cfg);
+        assert_eq!(o.external_paste_count, 0);
+        assert!(o.manual_contribution_ratio.is_none() || o.external_paste_chars_total == 0);
+        assert!(!o.paste_count_per_hour.map(|v| v.is_nan()).unwrap_or(false));
     }
 
     /// 層 1: NDJSON の 1 行文字列を `LoggedFeatDto` にデシリアライズし、
