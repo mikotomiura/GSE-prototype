@@ -158,7 +158,7 @@ fn get_intervention_decision(
         let idle_ms = get_keyboard_idle_ms();
         let decision = {
             let mut guard = intervention.0.lock().unwrap_or_else(|p| p.into_inner());
-            guard.force_wall_decision(idle_ms)
+            guard.force_wall_decision(now, idle_ms)
         };
         let _ = log.lock().unwrap_or_else(|p| p.into_inner()).tx.try_send(
             LogEntry::InterventionDecision {

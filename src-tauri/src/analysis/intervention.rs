@@ -236,12 +236,15 @@ impl InterventionPolicyState {
     /// `force_wall` コマンド経由でのみ呼ばれ、Wall→QR→スマホ解除→介入応答捕捉の
     /// end-to-end 検証に使う。`reason="debug_force"` で通常判定と区別でき、解析時に除外可能。
     ///
-    /// 通常判定経路 (`decide`) は一切変更しない。**cooldown/daily-cap/`current_action` には触れない**:
-    /// App が `isWallActive=true` にすると次 tick から `decide` の `wall_active` 分岐が
-    /// `current_action=Wall` を設定・維持し、解除後の通常 `decide` が `current_action=candidate`
-    /// に戻す。よって force 専用の状態変更は不要で、cooldown/cap を一切汚染しない。
-    /// overlay ウィンドウは `last_decision()` 経由で wall を拾うため last_decision のみ更新する。
-    pub fn force_wall_decision(&mut self, idle_ms: u64) -> InterventionDecision {
+    /// 通常判定経路 (`decide`) は変更しない。状態への作用は以下の 2 つのみ:
+    /// - `last_wall_at_ms = now_ms`: 実 Wall 同様 **cooldown を開始**する。これを立てないと解除直後に
+    ///   p_stuck が高いまま wall_accum が再び溜まり**即再発火**する (ユーザー報告の修正・#22 D2 から方針変更)。
+    /// - `last_decision = wall`: overlay ウィンドウが `last_decision()` 経由で wall を拾うため。
+    ///
+    /// **意図的に触れない**もの: `wall_count_today` (daily_cap は forced では消費しない=実 Wall の 1日上限を
+    /// 食わない) と `current_action` (App が isWallActive→次 tick の `wall_active` 分岐で Wall に設定・維持し、
+    /// 解除後の通常 `decide` が candidate に戻す)。
+    pub fn force_wall_decision(&mut self, now_ms: u64, idle_ms: u64) -> InterventionDecision {
         let decision = InterventionDecision {
             action: InterventionAction::Wall,
             need_score: 0.0,
@@ -256,6 +259,11 @@ impl InterventionPolicyState {
             // ここは placeholder (値は解析に使われない)。
             opportunity_reason: OpportunityReason::LowOpportunity,
         };
+        // forced wall も実 Wall と同様に cooldown を開始する。さもないと解除直後に p_stuck が
+        // 高いままだと wall_accum が再び溜まって**即座に再発火**する (ユーザー報告)。
+        // last_wall_at_ms を立てれば apply_wall_suppressions の cooldown で抑止される。
+        // (#22 では cooldown 非汚染としていたが、再発火回避を優先して方針変更。)
+        self.last_wall_at_ms = Some(now_ms);
         self.last_decision = decision.clone();
         decision
     }
@@ -729,18 +737,23 @@ mod tests {
     }
 
     #[test]
-    fn force_wall_decision_returns_wall_and_updates_last_decision() {
+    fn force_wall_decision_returns_wall_and_starts_cooldown() {
         let mut policy = InterventionPolicyState::new(0);
-        let d = policy.force_wall_decision(1234);
+        let d = policy.force_wall_decision(0, 1234);
         assert_eq!(d.action, InterventionAction::Wall);
         assert_eq!(d.reason, "debug_force");
         assert_eq!(d.idle_ms, 1234);
         // overlay ウィンドウが拾えるよう last_decision も wall になる。
         assert_eq!(policy.last_decision().action, InterventionAction::Wall);
-        // cooldown/cap を汚染しない: 直後でも通常経路の実 Wall が daily_cap/cooldown で抑制されず発火する。
+        // forced wall は cooldown を開始する → 解除直後に p_stuck が高くても即再発火しない
+        // (cooldown で抑止される)。ユーザー報告の「解除後また Wall」回避。
         policy.decide(input(0, 0.75, 3_000));
-        let real = policy.decide(input(WALL_ACCUMULATION_MS + 1, 0.75, 3_000));
-        assert_eq!(real.decision.action, InterventionAction::Wall);
+        let after = policy.decide(input(WALL_ACCUMULATION_MS + 1, 0.75, 3_000));
+        assert_ne!(after.decision.action, InterventionAction::Wall);
+        assert!(after
+            .decision
+            .suppressed_by
+            .contains(&"cooldown".to_string()));
     }
 
     #[test]

@@ -368,7 +368,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     {/* Wall発動中の打鍵警告バナー */}
                     {showTypingWarning && (
                         <div className="wall-typing-warning">
-                            ⚠ キーボードは使えません！
+                            いまは手を止めて、ひと休みしましょう
                         </div>
                     )}
                 </div>
