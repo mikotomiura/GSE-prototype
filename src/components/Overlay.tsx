@@ -5,11 +5,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import ProbeCard from "./ProbeCard";
 
-// プローブ単独表示時にオーバーレイ窓を縮小する右上ボックス (logical px)。
-// カード (~360px) を収め、これ以外の画面領域は OS レベルでクリック透過になる。
+// プローブ/Nudge 単独表示時にオーバーレイ窓を縮小する右上ボックス (logical px)。
+// カード (~360px) を収め、これ以外の画面領域は OS レベルでクリック透過になる
+// (被験者は作業を続けられる)。nudge も同じ box を再利用し非ブロック化する。
 const PROBE_BOX_W = 390;
 const PROBE_BOX_H = 430;
 const PROBE_BOX_MARGIN = 12;
+
+// Nudge は応答 (dismiss ボタン) があるまで消えない。無応答が続いたらこの時間で
+// 自動フェード = silent 記録 (HCI: 自動消滅でユーザーが応答できない問題の回避 + CD7 silent 送出)。
+const NUDGE_TIMEOUT_MS = 60_000;
 
 interface OverlayProps {
     interventionDecision: InterventionDecision;
@@ -39,7 +44,9 @@ interface WallServerInfo {
 }
 
 const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive }) => {
-    const [nudgeOpacity, setNudgeOpacity] = useState(0);
+    // Nudge は「表示中か」を真偽で持つ (live action から切り離す)。一度出たら応答/タイムアウト
+    // まで保持し、p_stuck 振動で action が変わっても消さない (= 勝手に消えるバグの修正)。
+    const [nudgeVisible, setNudgeVisible] = useState(false);
     const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
     const [showTypingWarning, setShowTypingWarning] = useState(false);
     const [phoneConnected, setPhoneConnected] = useState(false);
@@ -47,16 +54,25 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [probeActive, setProbeActive] = useState(false);
     // Nudge を dismiss 済みか。同一 nudge の再表示を防ぐ。action が nudge 以外に変わると解除。
     const [nudgeDismissed, setNudgeDismissed] = useState(false);
+    // 無応答フェードアウト (silent) 用タイマー。
+    const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
 
-    // Nudge に対するユーザー応答 (dismiss 理由) を NDJSON へ記録する (WBS 0.8)。
+    // Nudge を閉じてユーザー応答 (dismiss 理由) を NDJSON へ記録する (WBS 0.8)。
     // 固定カテゴリのみを送る。中身・本文は一切送らない。
     const handleNudgeDismiss = (reason: DismissReason) => {
+        if (nudgeTimerRef.current) {
+            clearTimeout(nudgeTimerRef.current);
+            nudgeTimerRef.current = null;
+        }
         setNudgeDismissed(true);
-        setNudgeOpacity(0);
-        invoke("record_intervention_dismiss", { action: "nudge", reason }).catch((e) =>
-            console.error("record_intervention_dismiss failed:", e)
-        );
+        setNudgeVisible(false);
+        invoke("record_intervention_dismiss", { action: "nudge", reason }).catch((e) => {
+            console.error("record_intervention_dismiss failed:", e);
+            // 記録失敗時は dismissed を戻し、次 tick で再表示→再試行できるようにする
+            // (永久ブロック回避。backend に dismiss が届かず action=nudge が残るケースの保険)。
+            setNudgeDismissed(false);
+        });
     };
 
     // Wall発動中のキーボード打鍵検知に使うref群
@@ -86,15 +102,16 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
 
     // オーバーレイ窓の表示モードを (wall / probe / nudge) から決める統合 effect。
     //   - Wall:            全画面 + クリックブロック (QR スキャンまで操作不可・現状維持)
-    //   - プローブ単独:     右上の小ボックスに縮小 + カード以外は OS レベルでクリック透過
-    //                       (被験者は作業を続けながら任意のタイミングで回答できる)
-    //   - Nudge / 同時表示: 全画面 + クリックブロック (nudge は top:42% 配置のため box 化しない)
+    //   - プローブ/Nudge:   右上の小ボックスに縮小 + カード以外は OS レベルでクリック透過
+    //                       (被験者は作業を続けながら任意のタイミングで応答できる=非ブロック)
+    //   - Wall+他 同時:     全画面 (Wall 優先)
     //   - いずれも無し:     hide()
     // box 化が失敗した環境では安全側 (全画面 + ブロック=現状挙動) にフォールバックする。
     useEffect(() => {
         const win = currentWindow;
-        const visible = isWallActive || probeActive || nudgeOpacity > 0;
-        const probeOnly = probeActive && nudgeOpacity <= 0 && !isWallActive;
+        const visible = isWallActive || probeActive || nudgeVisible;
+        // Wall 以外 (probe / nudge) は右上の小 box にして非ブロック化する。
+        const widgetOnly = (probeActive || nudgeVisible) && !isWallActive;
         let cancelled = false;
 
         // 全画面を「明示的にモニタ全域へ復元してから maximize」する。box 化で縮小済みの窓を
@@ -129,7 +146,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             try {
                 await win.show();
                 if (cancelled) return;
-                if (probeOnly) {
+                if (widgetOnly) {
                     // 右上小ボックス化 → カード外は他アプリへクリックが通る (非ブロック)。
                     const mon = await currentMonitor();
                     if (cancelled) return;
@@ -153,7 +170,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     }
                     await win.setIgnoreCursorEvents(false);
                 } else {
-                    // Wall / Nudge / 同時表示: 全画面 + クリックブロック (現状維持)。
+                    // Wall (単独 or 他と同時): 全画面 + クリックブロック。
                     await applyFullscreenBlock();
                 }
             } catch (e) {
@@ -171,12 +188,19 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         })();
 
         return () => { cancelled = true; };
-    }, [isWallActive, probeActive, nudgeOpacity, currentWindow]);
+    }, [isWallActive, probeActive, nudgeVisible, currentWindow]);
 
-    // Wall 発動時はプローブカードを畳む (介入中は自然作業のサンプリングでなく UI も衝突するため)。
+    // Wall 発動時はプローブカード・Nudge を畳む (Wall が支配)。
     // ProbeCard はアンマウントされ onActiveChange(false) を呼ばないので probeActive を明示リセット。
     useEffect(() => {
-        if (isWallActive) setProbeActive(false);
+        if (isWallActive) {
+            setProbeActive(false);
+            if (nudgeTimerRef.current) {
+                clearTimeout(nudgeTimerRef.current);
+                nudgeTimerRef.current = null;
+            }
+            setNudgeVisible(false);
+        }
     }, [isWallActive]);
 
     // Wall発動/解除に連動してWall Serverを起動/停止する
@@ -230,24 +254,41 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         };
     }, [isWallActive]);
 
+    // Nudge は「一度出たら応答 (dismiss) かタイムアウトまで保持」する。
+    // live action が none/defer/wall に変わっても消さない (= ボタンを押す前に勝手に消える問題の修正)。
     useEffect(() => {
-        if (interventionDecision.action === "nudge" && !isWallActive) {
-            // 既に dismiss 済みなら再表示しない (同一 nudge の押下後にちらつかせない)。
-            if (nudgeDismissed) {
-                setNudgeOpacity(0);
-                return;
-            }
-            const opacity = Math.min(
-                1,
-                Math.max(0.2, (interventionDecision.need_score - 0.6) / 0.3)
-            );
-            setNudgeOpacity(opacity);
-        } else {
-            // nudge 以外に遷移したら dismiss 状態を解除し、次の nudge を表示可能にする。
-            setNudgeOpacity(0);
-            if (nudgeDismissed) setNudgeDismissed(false);
+        // probe 表示中は nudge を出さない (同じ box に重ねない・MEDIUM 対応)。probe 応答後に出る。
+        const isNudge =
+            interventionDecision.action === "nudge" && !isWallActive && !probeActive;
+        if (isNudge && !nudgeVisible && !nudgeDismissed) {
+            // 新規 nudge を表示。無応答が続いたら NUDGE_TIMEOUT_MS で silent としてフェードアウト。
+            setNudgeVisible(true);
+            if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+            nudgeTimerRef.current = setTimeout(() => {
+                nudgeTimerRef.current = null;
+                setNudgeVisible(false);
+                setNudgeDismissed(true);
+                invoke("record_intervention_dismiss", { action: "nudge", reason: "silent" }).catch(
+                    (e) => {
+                        console.error("record_intervention_dismiss (silent) failed:", e);
+                        setNudgeDismissed(false); // 永久ブロック回避 (再試行可能に)
+                    }
+                );
+            }, NUDGE_TIMEOUT_MS);
+        } else if (!isNudge && !nudgeVisible && nudgeDismissed) {
+            // dismiss / silent はいずれも record_intervention_dismiss を送り、backend の record_dismiss が
+            // current_action をリセット + recent_dismiss を立てるため action は nudge を離れる (defer)。
+            // それを検知して dismissed を解除し、次の nudge (cooldown 後) を再表示可能にする。
+            setNudgeDismissed(false);
         }
-    }, [interventionDecision, isWallActive, nudgeDismissed]);
+    }, [interventionDecision, isWallActive, probeActive, nudgeVisible, nudgeDismissed]);
+
+    // アンマウント時にタイマーを掃除する。
+    useEffect(() => {
+        return () => {
+            if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+        };
+    }, []);
 
     return (
         <div className="overlay-root">
@@ -256,10 +297,11 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             {!isWallActive && <ProbeCard onActiveChange={setProbeActive} />}
 
             <aside
-                className="nudge-card"
+                className={`nudge-card ${nudgeVisible ? "nudge-card-visible" : ""}`}
                 style={{
-                    opacity: nudgeOpacity,
-                    transform: nudgeOpacity > 0 ? "translateX(0)" : "translateX(120%)",
+                    opacity: nudgeVisible ? 1 : 0,
+                    transform: nudgeVisible ? "translateY(0)" : "translateY(12px)",
+                    pointerEvents: nudgeVisible ? "auto" : "none",
                 }}
             >
                 <div className="nudge-card-accent"></div>
@@ -294,9 +336,9 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 </div>
             </aside>
 
-            {/* The Wall (Blocking Layer) */}
+            {/* The Wall (Blocking Layer) — 即時不透明でなく数秒かけてゆっくり減光 (穏やかな onset)。 */}
             {isWallActive && (
-                <div className="wall-layer">
+                <div className="wall-layer wall-dim-in">
                     <h1>Time to Move!</h1>
                     <p>Scan the QR code with your phone to unlock</p>
 

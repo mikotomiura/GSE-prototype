@@ -736,6 +736,54 @@ fn record_realtime_skip(
     Ok(())
 }
 
+/// 「今とても詰まっている」ワンタップ自己ラベルの単一実装。
+/// Dashboard ボタン (`record_self_marker` コマンド)・D ホットキーの両経路がこれを呼び、
+/// **`LAST_SELF_MARKER_MS` デバウンスを共有**して多重記録を防ぐ (M カード式マーカーとも共有)。
+/// 多段カード (M) と違いカードを出さず即記録する (ESM 単一・低負荷)。
+/// `source=self_marker`・Stuck 象限 (q1_friction=5/q2_progress=1) の自己申告ラベル。
+/// 窓は self_marker_window_clamped (直前 ~30s、session_start でクランプ)。本文は含まない。
+/// 戻り値: 記録したら true、デバウンス/送信失敗で false。
+fn record_self_marker_inner(now: u64, tx: &Sender<LogEntry>) -> bool {
+    // ボタン(IPC スレッド)と D/M ホットキー(別スレッド)が同時に呼びうるため、
+    // load+store では二重記録の race がある。compare_exchange で原子的に「枠を予約」する
+    // (LAST_LABEL_MS と同流儀)。CAS 失敗 = 他経路が先に取った → スキップ。
+    let last = LAST_SELF_MARKER_MS.load(Ordering::Relaxed);
+    if now.saturating_sub(last) < MARKER_DEBOUNCE_MS {
+        return false;
+    }
+    if LAST_SELF_MARKER_MS
+        .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+        .is_err()
+    {
+        return false;
+    }
+    let session_start = SESSION_START_MS.load(Ordering::Acquire);
+    let (ws, we) = crate::analysis::probe_scheduler::self_marker_window_clamped(now, session_start);
+    if let Err(e) = tx.try_send(LogEntry::realtime_label_answered(
+        now,
+        &ProbeRef::SelfMarker,
+        5, // q1_friction: とても詰まった
+        1, // q2_progress: まったく進んでいない
+        0, // latency_ms: ワンタップ (即時)
+        ws,
+        we,
+    )) {
+        tracing::warn!("self marker send failed (label dropped): {}", e);
+        return false;
+    }
+    tracing::info!("self marker (one-tap stuck) recorded at {}", now);
+    true
+}
+
+/// 「今とても詰まっている」ワンタップ自己ラベル (Dashboard ボタン経路)。
+/// D ホットキーと同じ `record_self_marker_inner` を呼びデバウンスを共有する。
+/// 戻り値: 実際に記録したら true、デバウンスで弾かれたら false (UI 側は true の時だけ確認表示)。
+#[tauri::command]
+fn record_self_marker(log: State<'_, Arc<Mutex<LogState>>>) -> Result<bool, String> {
+    let tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    Ok(record_self_marker_inner(epoch_ms(), &tx))
+}
+
 /// v0.3 較正: 尺度理解テスト (ビネット) 回答を記録する (§6・§14)。
 /// vignette_id は不透明 ID のみ・q1/q2 は構築子で 1..=5 clamp (DC-4)。
 #[tauri::command]
@@ -1289,6 +1337,17 @@ pub fn run() {
                         tracing::info!("self marker probe_triggered at {}", now);
                         return;
                     }
+                    // ワンタップ「今とても詰まっている」self_marker。カードを出さず即記録する
+                    // (M=カード式と別)。Stuck 象限 (q1=5/q2=1)。ボタン経路と共通の inner を呼び
+                    // デバウンス (LAST_SELF_MARKER_MS) を共有する。
+                    if shortcut.matches(mods, Code::KeyD) {
+                        let tx = log_state_for_shortcut
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .clone_log_tx();
+                        record_self_marker_inner(epoch_ms(), &tx);
+                        return;
+                    }
                     let label = if shortcut.matches(mods, Code::KeyF) {
                         UserLabelKind::Flow
                     } else if shortcut.matches(mods, Code::KeyI) {
@@ -1430,7 +1489,8 @@ pub fn run() {
                     Shortcut::new(Some(mods), Code::KeyI),
                     Shortcut::new(Some(mods), Code::KeyS),
                     Shortcut::new(Some(mods), Code::KeyR), // Review marker
-                    Shortcut::new(Some(mods), Code::KeyM), // Task B: 自己マーカー (self_marker)
+                    Shortcut::new(Some(mods), Code::KeyM), // Task B: 自己マーカー (self_marker, カード式)
+                    Shortcut::new(Some(mods), Code::KeyD), // ワンタップ「今詰まっている」self_marker
                 ];
                 for sc in shortcuts {
                     if let Err(e) = app.global_shortcut().register(sc) {
@@ -1492,6 +1552,7 @@ pub fn run() {
             record_session_meta,
             record_realtime_answer,
             record_realtime_skip,
+            record_self_marker,
             record_vignette_response,
             wall_server::start_wall_server,
             wall_server::stop_wall_server,
