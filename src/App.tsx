@@ -76,6 +76,10 @@ function App() {
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
   const isWallActiveRef = useRef(isWallActive);
   const isMonkModeRef = useRef(isMonkMode);
+  // Wall を「1 エピソードにつき 1 回だけ」起動するためのエッジ検出フラグ。
+  // 解除 (sensor-accelerometer) 後も判定が "wall" のまま lingering する
+  // (特に overlay は last_decision を読む) ため、これが無いと毎ポーリングで再起動してしまう。
+  const wallHandledRef = useRef(false);
   useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
   useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
 
@@ -123,8 +127,17 @@ function App() {
         setKeyboardIdleMs(idle);
         setInterventionDecision(decision);
 
-        if (decision.action === "wall" && !isWallActiveRef.current) {
-          setIsWallActive(true);
+        // Wall は新エピソードの立ち上がり (非 wall → wall) でのみ起動する。
+        // 解除後も判定が "wall" のまま続く (overlay は last_decision を読むため lingering)
+        // ケースで毎回再発火していたのを、wallHandledRef のエッジ検出で防ぐ。
+        if (decision.action === "wall") {
+          if (!isWallActiveRef.current && !wallHandledRef.current) {
+            wallHandledRef.current = true;
+            setIsWallActive(true);
+          }
+        } else {
+          // 判定が wall を離れたら次のエピソードを許可する (cooldown 明け等)。
+          wallHandledRef.current = false;
         }
       } catch (e) {
         console.error("Failed to fetch state:", e);
@@ -296,8 +309,14 @@ function App() {
   }
 
   // Default to Main Dashboard (較正モード時は blind/minimal 表示)
+  // onBack: アプリを終了せずスタート画面へ戻る (作業種別の変更・尺度理解テスト・再開のため)。
+  //   戻る瞬間に Wall が出ていたら overlay が残らないよう介入もクリアする。
+  const handleBack = () => {
+    setIsWallActive(false);
+    setIsStarted(false);
+  };
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} interventionEnabled={interventionEnabled} />
+    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} onBack={handleBack} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} interventionEnabled={interventionEnabled} />
   );
 }
 

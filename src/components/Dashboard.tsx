@@ -28,6 +28,8 @@ interface DashboardProps {
     stuck: number;
   };
   onQuit: () => void;
+  /** アプリを終了せずスタート画面へ戻る (設定変更・尺度理解テスト・再開のため)。 */
+  onBack?: () => void;
   isMonkMode: boolean;
   keyboardIdleMs: number;
   hookActive: boolean | null;
@@ -45,7 +47,7 @@ interface DashboardProps {
   interventionEnabled?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMode, keyboardIdleMs, hookActive, calibrationMode = false, interventionEnabled = false }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, isMonkMode, keyboardIdleMs, hookActive, calibrationMode = false, interventionEnabled = false }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -474,9 +476,18 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
         </button>
       )}
 
-      <button className="quit-button" onClick={onQuit}>
-        セッション終了
-      </button>
+      {/* ナビ: アプリ終了 (quit_app) とは別に、スタート画面へ戻る導線を用意する
+          (作業種別の変更・尺度理解テスト・再開のため。アプリは終了しない)。 */}
+      <div className="dashboard-nav">
+        {onBack && (
+          <button className="back-button" onClick={onBack}>
+            ← 戻る
+          </button>
+        )}
+        <button className="quit-button" onClick={onQuit}>
+          セッション終了
+        </button>
+      </div>
     </div>
   );
 };
