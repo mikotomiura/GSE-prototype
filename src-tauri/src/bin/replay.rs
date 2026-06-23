@@ -2053,6 +2053,33 @@ mod tests {
         );
     }
 
+    /// `intervention_response` 行 (Phase A2 の Wall 応答 + 旧 Nudge dismiss) が deserialize でき、
+    /// `timestamp()==None` で snapshot 再実行のソートから除外されることを確認する。
+    /// `ReplayEvent::InterventionResponse(Value)` の catch-all により、新 reason 値
+    /// (early_unlock/completed/idle_timeout) や新フィールド (elapsed_ms) を後方互換で受理する。
+    #[test]
+    fn intervention_response_parses_and_is_skipped_from_replay() {
+        // 旧形式 (Nudge dismiss): elapsed_ms 欠落・既存 reason。
+        let legacy =
+            r#"{"type":"intervention_response","t":1500,"action":"nudge","reason":"not_stuck"}"#;
+        let ev: ReplayEvent =
+            serde_json::from_str(legacy).expect("parse legacy intervention_response");
+        assert!(
+            matches!(ev, ReplayEvent::InterventionResponse(_)),
+            "expected ReplayEvent::InterventionResponse, got {ev:?}"
+        );
+        assert_eq!(ev.timestamp(), None, "intervention_response は除外する");
+
+        // 新形式 (Wall 早期解除): action=wall・新 reason・elapsed_ms あり。
+        let wall = r#"{"type":"intervention_response","t":67890,"action":"wall","reason":"early_unlock","elapsed_ms":45000}"#;
+        let ev: ReplayEvent = serde_json::from_str(wall).expect("parse wall intervention_response");
+        assert!(
+            matches!(ev, ReplayEvent::InterventionResponse(_)),
+            "expected ReplayEvent::InterventionResponse, got {ev:?}"
+        );
+        assert_eq!(ev.timestamp(), None);
+    }
+
     /// 層 2: 合成 NDJSON fixture で `collect_logged_feats` +
     /// `compute_session_metrics` のパスを通す。warnings 空 + flow support=1 を
     /// 期待する (label と feat が ±100ms で揃っている設計)。

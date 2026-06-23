@@ -52,11 +52,19 @@ static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
 
-struct LogState {
+pub(crate) struct LogState {
     tx: Sender<LogEntry>,
     path: String,
     /// ロガースレッドが End を処理し終えたときに通知される受信端
     shutdown_rx: Receiver<()>,
+}
+
+impl LogState {
+    /// サーバスレッド (wall_server) に渡すためロガー Sender を clone して返す。
+    /// 生の `tx` を公開せず「スレッドへ move する用途の clone」だけを意図として露出する。
+    pub(crate) fn clone_log_tx(&self) -> Sender<LogEntry> {
+        self.tx.clone()
+    }
 }
 
 /// 分析スレッドへのリセットシグナル。
@@ -209,6 +217,8 @@ fn record_intervention_dismiss(
             timestamp: now,
             action: parsed_action.as_str().to_string(),
             reason,
+            // Nudge dismiss は経過時間を持たない (Wall 応答のみ elapsed_ms を埋める)。
+            elapsed_ms: None,
         })
         .map_err(|e| format!("log channel full: {}", e))?;
     Ok(())
