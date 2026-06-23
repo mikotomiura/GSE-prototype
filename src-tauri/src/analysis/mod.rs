@@ -1,3 +1,4 @@
+pub mod anonymize;
 pub mod calibration_eval;
 pub mod cohort;
 pub mod engine;
