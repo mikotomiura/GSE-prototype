@@ -373,6 +373,24 @@ body {
   /* pointer-events handled by layers */
 }
 
+/* ランダムプローブ回答カード: 右上から「ぴょこっと」スライドイン (被験者を驚かせない)。
+   ⚠️ ProbeCard.tsx の inline style に transform/opacity を追加しないこと
+   (この keyframe と競合してアニメーションが壊れる)。 */
+.probe-card-pop {
+  animation: probe-pop-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes probe-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) translateX(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .nudge-card {
   position: absolute;
   right: 24px;
