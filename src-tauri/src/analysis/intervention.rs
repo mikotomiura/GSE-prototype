@@ -232,6 +232,34 @@ impl InterventionPolicyState {
         self.last_decision.clone()
     }
 
+    /// デバッグ用: HMM 状態に依らず Wall 決定を強制する。
+    /// `force_wall` コマンド経由でのみ呼ばれ、Wall→QR→スマホ解除→介入応答捕捉の
+    /// end-to-end 検証に使う。`reason="debug_force"` で通常判定と区別でき、解析時に除外可能。
+    ///
+    /// 通常判定経路 (`decide`) は一切変更しない。**cooldown/daily-cap/`current_action` には触れない**:
+    /// App が `isWallActive=true` にすると次 tick から `decide` の `wall_active` 分岐が
+    /// `current_action=Wall` を設定・維持し、解除後の通常 `decide` が `current_action=candidate`
+    /// に戻す。よって force 専用の状態変更は不要で、cooldown/cap を一切汚染しない。
+    /// overlay ウィンドウは `last_decision()` 経由で wall を拾うため last_decision のみ更新する。
+    pub fn force_wall_decision(&mut self, idle_ms: u64) -> InterventionDecision {
+        let decision = InterventionDecision {
+            action: InterventionAction::Wall,
+            need_score: 0.0,
+            opportunity_score: 1.0,
+            p_stuck: 0.0,
+            idle_ms,
+            wall_accum_ms: 0,
+            reason: "debug_force".to_string(),
+            suppressed_by: Vec::new(),
+            // opportunity_reason は #[serde(skip)] で NDJSON/IPC に出ない in-memory 専用。
+            // forced wall に対応する variant は無く、強制の真の標識は reason="debug_force"。
+            // ここは placeholder (値は解析に使われない)。
+            opportunity_reason: OpportunityReason::LowOpportunity,
+        };
+        self.last_decision = decision.clone();
+        decision
+    }
+
     pub fn record_dismiss(&mut self, action: InterventionAction, now_ms: u64) {
         if matches!(action, InterventionAction::Nudge | InterventionAction::Wall) {
             self.last_dismiss_at_ms = Some(now_ms);
@@ -247,6 +275,11 @@ impl InterventionPolicyState {
 
         if input.wall_active {
             self.wall_accum_ms = 0;
+            // wall_active 分岐は早期 return し update_wall_accumulation を通らないため、
+            // ここで last_tick_ms を進めておく。さもないと Wall 解除後の次 tick で
+            // elapsed = (Wall 表示全期間) となり wall_accum が一気に閾値超え → 即時再発火する
+            // (cross-review HIGH-A。force_wall で顕在化した既存バグ)。
+            self.last_tick_ms = Some(input.now_ms);
             self.current_action = InterventionAction::Wall;
             let decision = InterventionDecision {
                 action: InterventionAction::Wall,
@@ -672,6 +705,42 @@ mod tests {
         let result = policy.decide(next);
         assert_ne!(result.decision.action, InterventionAction::Wall);
         assert_eq!(result.decision.wall_accum_ms, 0);
+    }
+
+    #[test]
+    fn wall_active_advances_last_tick_no_accum_blowup_on_dismiss() {
+        // HIGH-A 回帰: Wall が長時間 active → 解除直後の通常 decide で wall_accum が
+        // Wall 全期間ぶん一気に積まれて即時再発火しないこと。
+        let mut p = InterventionPolicyState::new(0);
+        p.decide(input(0, 0.10, 0)); // last_tick = 0
+        let mut wa = input(1_000, 0.95, 0);
+        wa.wall_active = true;
+        p.decide(wa); // Wall active, last_tick → 1_000
+        let mut wa2 = input(301_000, 0.95, 0); // 5 分後もまだ Wall active
+        wa2.wall_active = true;
+        p.decide(wa2); // last_tick → 301_000
+                       // 解除: wall_active=false, 高 stuck, last_tick から 1 秒後
+        let d = p.decide(input(302_000, 0.95, 1_000));
+        assert!(
+            d.decision.wall_accum_ms < WALL_ACCUMULATION_MS,
+            "wall_accum blew up after dismiss: {}",
+            d.decision.wall_accum_ms
+        );
+    }
+
+    #[test]
+    fn force_wall_decision_returns_wall_and_updates_last_decision() {
+        let mut policy = InterventionPolicyState::new(0);
+        let d = policy.force_wall_decision(1234);
+        assert_eq!(d.action, InterventionAction::Wall);
+        assert_eq!(d.reason, "debug_force");
+        assert_eq!(d.idle_ms, 1234);
+        // overlay ウィンドウが拾えるよう last_decision も wall になる。
+        assert_eq!(policy.last_decision().action, InterventionAction::Wall);
+        // cooldown/cap を汚染しない: 直後でも通常経路の実 Wall が daily_cap/cooldown で抑制されず発火する。
+        policy.decide(input(0, 0.75, 3_000));
+        let real = policy.decide(input(WALL_ACCUMULATION_MS + 1, 0.75, 3_000));
+        assert_eq!(real.decision.action, InterventionAction::Wall);
     }
 
     #[test]
