@@ -152,6 +152,32 @@ body {
   line-height: 1.6;
 }
 
+/* 自己ラベル「今詰まっている」ボタン。常時表示。押下後 1.5s だけ確認表示に変わる。 */
+.self-stuck-button {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text);
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.self-stuck-button:hover {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.65);
+}
+
+.self-stuck-button.marked {
+  background: rgba(74, 222, 128, 0.18);
+  border-color: rgba(74, 222, 128, 0.6);
+  color: var(--color-flow);
+}
+
 /* デバッグ: Wall 強制発動ボタン (較正モードのみ表示)。本番介入色と紛れないよう破線・控えめ。 */
 .debug-force-wall-button {
   width: 100%;
@@ -411,23 +437,25 @@ body {
   }
 }
 
+/* Nudge カード: 非ブロックの右上 box 窓内に表示。急な onset を避け、ゆっくりフェード+わずかに上昇
+   (HCI: 緩やかな出現で周辺に留め、注意を奪わない)。応答ボタンを押すまで保持される。 */
 .nudge-card {
   position: absolute;
-  right: 24px;
-  top: 42%;
-  width: min(320px, calc(100vw - 48px));
+  right: 16px;
+  top: 16px;
+  width: min(340px, calc(100vw - 32px));
   min-height: 86px;
   display: grid;
   grid-template-columns: 4px 1fr;
   overflow: hidden;
-  border-radius: 8px;
-  background: rgba(248, 250, 252, 0.92);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.95);
   color: #172033;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24);
-  transition: opacity 0.28s ease, transform 0.36s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.22);
+  /* HCI: 出現は減速イージングで ~325ms (400ms の flow 上限内・急な onset を避ける)。 */
+  transition: opacity 0.325s ease-out, transform 0.325s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
-  pointer-events: none;
   z-index: 10;
 }
 
@@ -496,6 +524,26 @@ body {
   z-index: 20;
   pointer-events: auto;
   transition: opacity 0.3s ease;
+}
+
+/* Wall を即時不透明でなく数秒かけてゆっくり減光する (穏やかな onset・段階的減光)。
+   HCI: 急な全画面占有 (Demand-attention) を緩やかな Make-aware 遷移に寄せる。
+   レイヤー opacity ではなく **背景の暗さ (background/backdrop)** をランプさせることで、
+   QR コード/コンテンツは最初から見えており解除手段を常に確保する (cross-review HIGH)。
+   forwards で終端 (=.wall-layer の base 値) を保持する。 */
+.wall-dim-in {
+  animation: wall-dim-in-kf 3.5s ease-out forwards;
+}
+
+@keyframes wall-dim-in-kf {
+  from {
+    background-color: rgba(15, 23, 42, 0);
+    backdrop-filter: blur(0px);
+  }
+  to {
+    background-color: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(20px);
+  }
 }
 
 .wall-layer h1 {

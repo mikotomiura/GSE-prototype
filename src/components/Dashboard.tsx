@@ -49,6 +49,8 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
+  // 「今詰まっている」自己ラベル記録直後の確認フラッシュ。
+  const [stuckMarked, setStuckMarked] = useState(false);
   // hookActive=false が続いた秒数 (権限バナーの段階的メッセージ表示に使用)
   const [hookWaitingSec, setHookWaitingSec] = useState(0);
   // 診断情報 (トラブルシューティング用)
@@ -433,6 +435,27 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
           <p><strong>Incubation</strong> suggests pausing. <strong>Stuck</strong> suggests moving.</p>
         </div>
       )}
+
+      {/* 自己ラベル: 「今とても詰まっている」をワンタップで記録 (source=self_marker)。
+          ホットキー Ctrl+Shift+Alt+D でも同じ。X 軸較正の正解ラベルになる (本文は記録しない)。 */}
+      <button
+        className={`self-stuck-button ${stuckMarked ? 'marked' : ''}`}
+        disabled={stuckMarked}
+        aria-label="今とても詰まっていると感じたら記録する自己ラベル"
+        onClick={() => {
+          invoke<boolean>("record_self_marker")
+            .then((recorded) => {
+              // デバウンスで弾かれた (false) ときは確認表示を出さない。
+              if (!recorded) return;
+              setStuckMarked(true);
+              setTimeout(() => setStuckMarked(false), 1500);
+            })
+            .catch((e) => console.error("record_self_marker failed:", e));
+        }}
+        title="今とても詰まっていると感じたら押す (Ctrl+Shift+Alt+D)"
+      >
+        {stuckMarked ? '✓ 記録しました' : '🔴 今とても詰まっている'}
+      </button>
 
       {/* デバッグ: Wall を HMM と切り離して強制発動する (dev ビルドのみ表示)。
           Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。
