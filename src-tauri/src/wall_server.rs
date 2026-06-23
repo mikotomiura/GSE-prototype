@@ -1,14 +1,32 @@
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 use std::net::UdpSocket;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crossbeam_channel::Sender;
 use qrcode::QrCode;
 use tauri::{Emitter, Runtime, State};
 use tiny_http::{Header, Response, Server};
+
+use crate::analysis::intervention::InterventionAction;
+use crate::logger::{DismissReason, LogEntry};
+use crate::LogState;
+
+/// Zen タイマーの長さ (ms)。HTML テンプレートの `DURATION=120` (秒) と
+/// intervention-design Rule4 (120秒) に一致させる。`/shake`〜`/unlock` の経過が
+/// この値未満なら早期解除 (非順守)、以上なら通常解除 (順守) と判定する。
+const ZEN_TIMER_MS: u64 = 120_000;
+
+/// 現在時刻 (UNIX エポックからの ms)。
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -64,9 +82,10 @@ impl WallServerState {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn start_wall_server<R: Runtime>(
+pub(crate) fn start_wall_server<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: State<WallServerState>,
+    log: State<Arc<Mutex<LogState>>>,
 ) -> Result<WallServerInfo, String> {
     // 前回サーバーを停止
     if let Some(flag) = state.stop_flag.lock().unwrap().take() {
@@ -112,8 +131,13 @@ pub fn start_wall_server<R: Runtime>(
     let shutdown_clone = shutdown.clone();
     let server_arc = Arc::new(server);
 
+    // logger 送信ハンドルを clone してサーバスレッドへ渡す (/unlock 応答記録用)。
+    let log_tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
+    // Wall 提示 (phone scan = /shake) 時刻を保持し、/unlock で経過時間を算出する。
+    let shake_at = Arc::new(AtomicU64::new(0));
+
     thread::spawn(move || {
-        server_loop(server_arc, token, shutdown_clone, app);
+        server_loop(server_arc, token, shutdown_clone, app, log_tx, shake_at);
     });
 
     *state.stop_flag.lock().unwrap() = Some(shutdown);
@@ -122,7 +146,7 @@ pub fn start_wall_server<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn stop_wall_server(state: State<WallServerState>) {
+pub(crate) fn stop_wall_server(state: State<WallServerState>) {
     if let Some(flag) = state.stop_flag.lock().unwrap().take() {
         flag.store(true, Ordering::Release);
     }
@@ -141,6 +165,8 @@ fn server_loop<R: Runtime>(
     token: String,
     shutdown: Arc<AtomicBool>,
     app: tauri::AppHandle<R>,
+    log_tx: Sender<LogEntry>,
+    shake_at: Arc<AtomicU64>,
 ) {
     let port = server
         .server_addr()
@@ -157,7 +183,15 @@ fn server_loop<R: Runtime>(
 
         match server.recv_timeout(Duration::from_secs(1)) {
             Ok(Some(request)) => {
-                dispatch_request(request, &token, &server_url, &shutdown, &app);
+                dispatch_request(
+                    request,
+                    &token,
+                    &server_url,
+                    &shutdown,
+                    &app,
+                    &log_tx,
+                    &shake_at,
+                );
             }
             Ok(None) => {}
             Err(_) => break,
@@ -171,21 +205,76 @@ fn dispatch_request<R: Runtime>(
     server_url: &str,
     shutdown: &Arc<AtomicBool>,
     app: &tauri::AppHandle<R>,
+    log_tx: &Sender<LogEntry>,
+    shake_at: &Arc<AtomicU64>,
 ) {
     let url = request.url().to_string();
 
     if url.starts_with("/shake") && extract_token(&url) == token {
-        // スマートフォンがQRコードをスキャンして接続 → フロントエンドに通知
+        // /shake はページ取得 (GET) で、token は QR URL 自体が運ぶ設計 (/unlock の POST と非対称)。
+        // スマートフォンがQRコードをスキャンして接続 → フロントエンドに通知。
+        // phone scan = Zen タイマー起点。shake_at (受信時刻) は HTML 側 scanTime (描画時刻) と
+        // 転送+描画ぶん (δ: 数十〜数百ms) だけずれる。server elapsed = phone_elapsed + δ + 往復遅延 で
+        // 常に phone より大きいため通常解除判定は堅牢。境界の扱いは decisions.md D3 参照。
+        //
+        // 毎 /shake で上書きする (最新優先)。ページ再読込/再スキャンでは HTML 側 scanTime も
+        // リセットされ phone タイマーが 2:00 から再開するため、最新 /shake を基準にするのが
+        // 「今ユーザーが見ているタイマー」と一致して正しい (最初の /shake を保持すると逆に
+        // 再読込後の早期解除を completed と誤判定する)。詳細は decisions.md D8。
         tracing::info!("WallServer: phone connected via /shake");
+        shake_at.store(now_ms(), Ordering::Release);
         let _ = app.emit("wall-phone-connected", ());
 
         let html = build_timer_html(server_url, token);
         let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8").unwrap();
         let _ = request.respond(Response::from_string(html).with_header(header));
-    } else if url.starts_with("/unlock") && extract_token(&url) == token {
+    } else if url.starts_with("/unlock")
+        && request.method() == &tiny_http::Method::Post
+        && extract_token(&url) == token
+    {
+        // POST 限定 (intervention-design Rule6)。実フォン JS は常に method:'POST'。
+        // 本タスクで /unlock に LogEntry 副作用を足したため、誤った GET 等で phantom な
+        // intervention_response が出ないようメソッドを検証する (捕捉データの純度確保)。
         tracing::info!("WallServer: unlock signal received from smartphone");
-        let _ = app.emit("sensor-accelerometer", "move");
-        shutdown.store(true, Ordering::Release);
+
+        // 二度押し/fetch リトライ/複数端末で /unlock が複数回届いても重複記録しない。
+        // shutdown を compare_exchange で false→true にできた「最初の解除」だけが記録・通知する。
+        // 二回目以降も解除済みレスポンス (200) は返す (UX 不変)。
+        let first_unlock = shutdown
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok();
+        if first_unlock {
+            let _ = app.emit("sensor-accelerometer", "move");
+
+            // 介入応答 (Wall 解除) を NDJSON に content-free で捕捉する (Phase A2)。
+            // /shake からの経過時間で早期解除 (非順守) / 通常解除 (順守) を判定する。
+            // JS は doUnlock() を 120s 後のみ・doEarlyUnlock() を 120s 前のみ許可するため、
+            // server 側 elapsed が押下ボタンを一意に決定する (client 値は信頼しない)。
+            let now = now_ms();
+            let shake = shake_at.load(Ordering::Acquire);
+            let (reason, elapsed_ms) = if shake != 0 {
+                let elapsed = now.saturating_sub(shake);
+                let reason = if elapsed < ZEN_TIMER_MS {
+                    DismissReason::EarlyUnlock
+                } else {
+                    DismissReason::Completed
+                };
+                (reason, Some(elapsed))
+            } else {
+                // /shake を経ず (通常フロー外) に /unlock。順守を主張できないため早期解除扱い。
+                // elapsed_ms=None が「フロー外」を示し、後段は Some を持つ実 early_unlock と区別できる。
+                tracing::warn!("WallServer: /unlock without prior /shake (elapsed unknown)");
+                (DismissReason::EarlyUnlock, None)
+            };
+            // try_send で非ブロッキング。channel full/disconnected でも解除レスポンスは返す
+            // (研究捕捉 < ユーザー解除の確実性)。本文・キーストロークは一切含めない (data-privacy)。
+            let _ = log_tx.try_send(LogEntry::InterventionResponse {
+                timestamp: now,
+                action: InterventionAction::Wall.as_str().to_string(),
+                reason,
+                elapsed_ms,
+            });
+        }
 
         let cors = Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap();
         let ct = Header::from_bytes("Content-Type", "application/json").unwrap();

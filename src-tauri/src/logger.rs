@@ -174,15 +174,27 @@ impl ExpectedQuadrant {
     }
 }
 
-/// 介入応答の dismiss 理由 (dismiss_reason)。Need 誤りと Opportunity 誤りを分離する (v0.4 §9)。
+/// 介入応答の理由 (reason)。`InterventionResponse` の理由カテゴリ (本文は含まない)。
+///
+/// **Nudge dismiss** (Need 誤りと Opportunity 誤りを分離・v0.4 §9):
 /// `not_stuck` = 詰まっていない (Need 誤り)、`want_to_struggle` = 今はもがきたい (Opportunity 誤り)、
-/// `just_close` = 単に閉じる、`silent` = 理由を選ばず閉じた/フェードアウト。本文は含まない。
+/// `just_close` = 単に閉じる、`silent` = 理由を選ばず閉じた/フェードアウト。
+///
+/// **Wall 応答** (Phase A2・⏸/順守の捕捉):
+/// `early_unlock` = 2分タイマー完走前に解除 (非順守)、`completed` = 2分完走後に解除 (順守)、
+/// `idle_timeout` = 長時間アイドルによる自動解除 (enum 予約のみ・現状未配線)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DismissReason {
     NotStuck,
     WantToStruggle,
     JustClose,
     Silent,
+    /// Wall: 2分タイマー完走前の早期解除 (非順守)。
+    EarlyUnlock,
+    /// Wall: 2分タイマー完走後の通常解除 (順守)。
+    Completed,
+    /// Wall: 長時間アイドルによる自動解除。enum 予約のみ (現状未配線・将来用)。
+    IdleTimeout,
 }
 
 impl DismissReason {
@@ -192,6 +204,9 @@ impl DismissReason {
             Self::WantToStruggle => "want_to_struggle",
             Self::JustClose => "just_close",
             Self::Silent => "silent",
+            Self::EarlyUnlock => "early_unlock",
+            Self::Completed => "completed",
+            Self::IdleTimeout => "idle_timeout",
         }
     }
 
@@ -201,6 +216,9 @@ impl DismissReason {
             "want_to_struggle" => Some(Self::WantToStruggle),
             "just_close" => Some(Self::JustClose),
             "silent" => Some(Self::Silent),
+            "early_unlock" => Some(Self::EarlyUnlock),
+            "completed" => Some(Self::Completed),
+            "idle_timeout" => Some(Self::IdleTimeout),
             _ => None,
         }
     }
@@ -394,21 +412,33 @@ fn format_paste_line(timestamp: u64, external_paste_chars: Option<u64>) -> Strin
 }
 
 /// `LogEntry::InterventionResponse` の NDJSON 1 行を生成する純粋関数。
-/// 介入提示に対するユーザー応答 (dismiss 理由) を固定カテゴリで記録する。
+/// 介入提示に対するユーザー応答 (理由) を固定カテゴリで記録する。
 /// `intervention_decision` (判定側) とは別の「ユーザー応答側」ログ。本文は含まない。
 /// `action` は呼び出し側で `InterventionAction::as_str()` を通した検証済み固定値のみが渡る
 /// (schema 上は `InterventionActionDto` enum と一致)。自由文字列は来ない。
+/// `elapsed_ms` は `Some` の時のみ出力する。`None` (Nudge dismiss) では従来出力と byte 同一
+/// (後方互換)。schema_dto は `skip_serializing_if = Option::is_none` 相当で一致させる。
 fn format_intervention_response_line(
     timestamp: u64,
     action: &str,
     reason: DismissReason,
+    elapsed_ms: Option<u64>,
 ) -> String {
-    format!(
-        r#"{{"type":"intervention_response","t":{},"action":{},"reason":"{}"}}"#,
-        timestamp,
-        json_opt_str(Some(action)),
-        reason.as_str(),
-    )
+    match elapsed_ms {
+        Some(ms) => format!(
+            r#"{{"type":"intervention_response","t":{},"action":{},"reason":"{}","elapsed_ms":{}}}"#,
+            timestamp,
+            json_opt_str(Some(action)),
+            reason.as_str(),
+            ms,
+        ),
+        None => format!(
+            r#"{{"type":"intervention_response","t":{},"action":{},"reason":"{}"}}"#,
+            timestamp,
+            json_opt_str(Some(action)),
+            reason.as_str(),
+        ),
+    }
 }
 
 /// `LogEntry::SessionMeta` の NDJSON 1 行を生成する純粋関数。
@@ -602,13 +632,15 @@ pub enum LogEntry {
         reason: String,
         suppressed_by: Vec<String>,
     },
-    /// 介入提示に対するユーザー応答 (dismiss 理由)。`intervention_decision` (判定側) とは別の
-    /// 「ユーザー応答側」ログ。Need 誤りと Opportunity 誤りを分離する (WBS 0.8 / v0.4 §9)。
-    /// 固定カテゴリ + 時刻のみ。本文・Unicode 文字は含めない。
+    /// 介入提示に対するユーザー応答 (reason)。`intervention_decision` (判定側) とは別の
+    /// 「ユーザー応答側」ログ。Nudge dismiss は Need/Opportunity 誤りを分離 (WBS 0.8 / v0.4 §9)、
+    /// Wall は早期解除/通常解除(順守) を区別 (Phase A2)。固定カテゴリ + 時刻のみ。本文は含めない。
+    /// `elapsed_ms` は Wall 提示(/shake)〜解除(/unlock) の経過時間。Nudge dismiss では `None`。
     InterventionResponse {
         timestamp: u64,
         action: String,
         reason: DismissReason,
+        elapsed_ms: Option<u64>,
     },
     /// v0.3 較正スモーク: セッション開始宣言 (track / task_kind / Monk・介入トグル)。
     /// 数値・固定カテゴリのみ。`ts` で timestamp を持つ (既存 `t` とは別命名・§14 準拠)。
@@ -947,11 +979,14 @@ impl SessionLogger {
                             timestamp,
                             action,
                             reason,
+                            elapsed_ms,
                         } => {
                             let _ = writeln!(
                                 writer,
                                 "{}",
-                                format_intervention_response_line(timestamp, &action, reason),
+                                format_intervention_response_line(
+                                    timestamp, &action, reason, elapsed_ms
+                                ),
                             );
                             dirty = true;
                         }
@@ -1629,9 +1664,34 @@ mod tests {
 
     #[test]
     fn intervention_response_line_basic() {
+        // Nudge dismiss (elapsed_ms=None) は従来出力と byte 同一 (後方互換)。
         assert_eq!(
-            format_intervention_response_line(99, "nudge", DismissReason::WantToStruggle),
+            format_intervention_response_line(99, "nudge", DismissReason::WantToStruggle, None),
             r#"{"type":"intervention_response","t":99,"action":"nudge","reason":"want_to_struggle"}"#
+        );
+    }
+
+    #[test]
+    fn intervention_response_line_wall_with_elapsed() {
+        // Wall 早期解除 (elapsed_ms=Some) は経過時間を含む。
+        assert_eq!(
+            format_intervention_response_line(
+                12345,
+                "wall",
+                DismissReason::EarlyUnlock,
+                Some(45_000)
+            ),
+            r#"{"type":"intervention_response","t":12345,"action":"wall","reason":"early_unlock","elapsed_ms":45000}"#
+        );
+        // Wall 通常解除 (順守)。
+        assert_eq!(
+            format_intervention_response_line(
+                67890,
+                "wall",
+                DismissReason::Completed,
+                Some(121_500)
+            ),
+            r#"{"type":"intervention_response","t":67890,"action":"wall","reason":"completed","elapsed_ms":121500}"#
         );
     }
 
@@ -1642,6 +1702,9 @@ mod tests {
             DismissReason::WantToStruggle,
             DismissReason::JustClose,
             DismissReason::Silent,
+            DismissReason::EarlyUnlock,
+            DismissReason::Completed,
+            DismissReason::IdleTimeout,
         ] {
             assert_eq!(DismissReason::parse(r.as_str()), Some(r));
         }
@@ -1927,6 +1990,14 @@ mod tests {
             timestamp: 1500,
             action: "nudge".to_string(),
             reason: DismissReason::NotStuck,
+            elapsed_ms: None,
+        })
+        .unwrap();
+        tx.send(LogEntry::InterventionResponse {
+            timestamp: 1600,
+            action: "wall".to_string(),
+            reason: DismissReason::Completed,
+            elapsed_ms: Some(122_345),
         })
         .unwrap();
         tx.send(LogEntry::ProbeAssignment {
@@ -1972,7 +2043,13 @@ mod tests {
             contents.contains(
                 r#"{"type":"intervention_response","t":1500,"action":"nudge","reason":"not_stuck"}"#
             ),
-            "intervention_response 行が不正:\n{contents}"
+            "intervention_response (nudge) 行が不正:\n{contents}"
+        );
+        assert!(
+            contents.contains(
+                r#"{"type":"intervention_response","t":1600,"action":"wall","reason":"completed","elapsed_ms":122345}"#
+            ),
+            "intervention_response (wall) 行が不正:\n{contents}"
         );
         assert!(contents.contains(
             r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000}"#
