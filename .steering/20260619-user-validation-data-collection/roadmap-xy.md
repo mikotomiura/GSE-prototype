@@ -22,9 +22,9 @@
 | `context_beacon` / `task_checkpoint` / 波形cue | X (比較条件・延期) | ❌ 未 (次段・D-14) |
 | ペースト回数捕捉 (`paste`) | Y(a) | ✅ 実装済 (未マージ feature/clipboard-paste-count、実機未検証) |
 | 介入判定ログ (`intervention_decision`) | Y | ✅ |
-| Wall/Zen/早期解除 (`wall_server`) | Y 介入 | ✅ UI / ⚠️ **ユーザー応答(⏸/early-unlock/順守)のNDJSON記録は未確認=おそらく無** |
-| (a)(b) 指標算出 | Y | ❌ (#5) |
-| **成果物スナップショット (diff量=案A 前提)** | Y(b) | ❌ **捕捉機構が存在しない** |
+| Wall/Zen/早期解除 (`wall_server`) | Y 介入 | ✅ UI + ⏸/early-unlock/順守 の NDJSON 記録済 (#20 A2) |
+| (a)(b) 指標算出 | Y | ✅ #19 (manual_contribution_ratio / productive_manual_recovery_rate) |
+| ~~成果物スナップショット (diff量=案A 前提)~~ | Y(b) | 🚫 **SUPERSEDED (D7)** — (b)はキーストローク・カウンタ化で diff量/成果物 不要 |
 | (c)自己効力感・NASA-TLX (アンケート) | Y | ❌ 外部フォーム (#3 周辺) |
 | anonymize / package / DuckDB join | Y パイプライン | ❌ (#3/#4/#6) |
 | Physical Anchor / 散歩 (Lv3/Lv4 歩行介入) | Y 介入実体 | ❌ 未 (Wall が "walk away" と言うのみ) |
@@ -37,19 +37,26 @@
 
 ## 3. 実装ロードマップ (A→F)
 
+> 🚫 **本節 §3 は一部 STALE (2026-06-24 訂正)**: A3「成果物スナップショット/diff量」は
+> `decisions.md` D7 SUPERSEDED (2026-06-23 codex-review v0.4 §4.2) により**廃止**。(b) はキーストローク・
+> カウンタ (`manual_contribution_ratio` 等) で算出し成果物不要。捕捉は A1(#18)+A2(#20) で実質完了、
+> (b)算出は #19 で完了。下記 A3 / Phase B の「diff量・案A 依存」記述は無効。詳細は D7 と
+> memory `project-a3-artifact-superseded`。
+
 ### Phase A — 捕捉完全性 (パイロット前・不可逆ギャップ閉鎖) ★最優先
 - **A1** Y(a): #2 ペースト捕捉の検証。**macOS のコンパイル＋テストは CI で可** (§6)。残るは Win/mac
   実機での Ctrl+V/Cmd+V 挙動の手動確認 → main マージ。
 - **A2** Y受容: 介入応答イベントの NDJSON 記録 (Wall提示/⏸押下/early-unlock/Zen完了/順守)。
   ⏸押下数は設計書で「GSE 思想の実証データ」と明記＝独立指標。未ログなら新 variant (schema 同期手順要)。
-- **A3** Y(b): **成果物スナップショット機構 (案A 前提)**。session start/end で作業対象を保存
-  (coding=作業ディレクトリ git snapshot/diff、文章=テキスト保存)。**中身は raw NDJSON 同様 暗号化ローカルのみ**、
-  metrics には数値 diff量 だけ。要設計: 成果物⇔session 紐付け、track別取得法、被験者端末での保存/暗号化。
-- 根拠: A1-A3 は「録り損ねたら終わり」。全てに優先。
+- ~~**A3** Y(b): 成果物スナップショット機構 (案A 前提)~~ 🚫 **SUPERSEDED (D7)**: 廃止。(b) は
+  キーストローク・カウンタ (manual_insert_chars / external_paste_chars) で算出するため成果物・diff量・
+  暗号化保存は不要。A1(#18)+A2(#20) で捕捉完了。
+- 根拠: A1-A2 は「録り損ねたら終わり」。A3 は (b) 再定義により不要化。
 
-### Phase B — Y アウトカム指標算出 (#5)  依存= A3
-- (a) session 単位ペースト回数・導入前後比較 / (b) diff量÷総打鍵数＋Mehta KS[11]補助 → `metrics.json`。
-- `handoff-ab-metrics.md` がこれ。**A3 を前提として取り込むよう改訂が必要** (diff量供給=A3 成果物)。
+### Phase B — Y アウトカム指標算出  ✅ 完了 (#19)
+- (a) session 単位ペースト回数 / (b) `manual_contribution_ratio` + `productive_manual_recovery_rate`
+  (キーストローク・カウンタ由来) → `gse-replay --metrics`。**diff量÷総打鍵数 は廃止 (D7)**。Mehta KS は
+  既存打鍵データで算出可。`handoff-ab-metrics.md` は diff量前提の旧版 (SUPERSEDED)。
 
 ### Phase C — データパイプライン (#3/#4/#6＋アンケート取り込み)
 - `anonymize.py` / `package-session` (anonymize→age暗号化) / (c)・NASA-TLX の survey CSV /
@@ -79,7 +86,7 @@
 
 1. **X と Y を同一セッションで取るか分離か** (プローブ割り込みが Y を交絡)。
 2. **Y の前後比較設計** (pre=GSEなし vs post=GSEあり。PreReg-5: 最初2回β較正→凍結→8回前向き)。
-3. **A3 成果物取得法** (track別: coding=git / 文章=テキスト、保存・暗号化フロー)。
+3. ~~**A3 成果物取得法**~~ 🚫 **SUPERSEDED (D7)** — 成果物/diff量 廃止につきフォーク消滅。
 4. **Phase E 散歩** = (i)実装 / (ii)WoZ / (iii)次段 のどれか。
 
 ## 6. ビルド / CI / 検証経路 (2026-06-20 訂正)
