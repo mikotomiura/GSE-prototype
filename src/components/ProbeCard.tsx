@@ -116,12 +116,15 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
 
   return (
     <div
-      className="probe-card"
+      className="probe-card probe-card-pop"
       style={{
         position: "fixed",
-        right: "1.5rem",
-        bottom: "1.5rem",
+        right: "1.25rem",
+        top: "1.25rem",
         width: "320px",
+        // box モード窓 (PROBE_BOX_H) からはみ出して回答ボタンが透過領域に隠れるのを防ぐ。
+        maxHeight: "calc(100vh - 2.5rem)",
+        overflowY: "auto",
         padding: "1rem 1.2rem",
         background: "rgba(28, 30, 38, 0.97)",
         color: "#f2f2f4",

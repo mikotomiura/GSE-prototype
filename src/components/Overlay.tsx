@@ -1,8 +1,15 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, currentMonitor } from "@tauri-apps/api/window";
+import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import ProbeCard from "./ProbeCard";
+
+// プローブ単独表示時にオーバーレイ窓を縮小する右上ボックス (logical px)。
+// カード (~360px) を収め、これ以外の画面領域は OS レベルでクリック透過になる。
+const PROBE_BOX_W = 390;
+const PROBE_BOX_H = 430;
+const PROBE_BOX_MARGIN = 12;
 
 interface OverlayProps {
     interventionDecision: InterventionDecision;
@@ -70,21 +77,100 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     // マウント直後に即座にクリック透過を有効化 (初期状態保証)
     // React の useEffect は最初のレンダー後に実行されるため、起動時に
     // オーバーレイが一瞬クリックをブロックしてウィンドウをドラッグ不能にする問題を防ぐ。
+    // 表示モード (透過/ブロック・サイズ) の真の権威は下の統合 effect で、これより後に走り
+    // 最終状態を確定する (本 effect は初回ドラッグ可能性の保証のみ)。
     useEffect(() => {
         currentWindow.setIgnoreCursorEvents(true).catch(() => {});
     // currentWindow は useMemo で安定しているが lint 警告を避けるため含める
     }, [currentWindow]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // isWallActive に応じてクリック透過をトグル
-    // Lv1 (nudge): クリック透過 → ユーザーは下のウィンドウを操作可能
-    // Lv2 (wall):  クリックブロック → QRコードをスキャンするまで操作不可
+    // オーバーレイ窓の表示モードを (wall / probe / nudge) から決める統合 effect。
+    //   - Wall:            全画面 + クリックブロック (QR スキャンまで操作不可・現状維持)
+    //   - プローブ単独:     右上の小ボックスに縮小 + カード以外は OS レベルでクリック透過
+    //                       (被験者は作業を続けながら任意のタイミングで回答できる)
+    //   - Nudge / 同時表示: 全画面 + クリックブロック (nudge は top:42% 配置のため box 化しない)
+    //   - いずれも無し:     hide()
+    // box 化が失敗した環境では安全側 (全画面 + ブロック=現状挙動) にフォールバックする。
     useEffect(() => {
-        // Wall / プローブカード / Nudge (dismiss 4択) 表示中はクリックを受け付ける
-        // (それ以外は透過のまま)。Nudge は dismiss 理由ボタンを押せるよう表示中のみ
-        // 一時的にクリックを受ける (ProbeCard と同方針)。Wall が OR の支配項。
-        currentWindow.setIgnoreCursorEvents(
-            !(isWallActive || probeActive || nudgeOpacity > 0)
-        );
+        const win = currentWindow;
+        const visible = isWallActive || probeActive || nudgeOpacity > 0;
+        const probeOnly = probeActive && nudgeOpacity <= 0 && !isWallActive;
+        let cancelled = false;
+
+        // 全画面を「明示的にモニタ全域へ復元してから maximize」する。box 化で縮小済みの窓を
+        // maximize() だけに頼ると WM 次第で小窓のまま復帰しないため (Wall が小窓 QR で解除不能=
+        // 被験者ロックの回避)。physical 座標で扱い DPI 二重変換を避ける。
+        const applyFullscreenBlock = async () => {
+            const mon = await currentMonitor();
+            if (cancelled) return;
+            if (mon) {
+                await win.setPosition(new PhysicalPosition(mon.position.x, mon.position.y));
+                if (cancelled) return;
+                await win.setSize(new PhysicalSize(mon.size.width, mon.size.height));
+                if (cancelled) return;
+            }
+            await win.maximize();
+            if (cancelled) return;
+            await win.setIgnoreCursorEvents(false);
+        };
+
+        (async () => {
+            // 非表示は独立処理。hide 失敗時に全画面ブロックへ転落させない (= 何も出ていないのに
+            // 画面が操作不能になる事故の回避)。最悪でも透過に留める。
+            if (!visible) {
+                try {
+                    await win.hide();
+                } catch (e) {
+                    console.warn("overlay hide failed:", e);
+                    try { await win.setIgnoreCursorEvents(true); } catch { /* noop */ }
+                }
+                return;
+            }
+            try {
+                await win.show();
+                if (cancelled) return;
+                if (probeOnly) {
+                    // 右上小ボックス化 → カード外は他アプリへクリックが通る (非ブロック)。
+                    const mon = await currentMonitor();
+                    if (cancelled) return;
+                    // 非 maximize 窓では no-op。失敗時も box 化を続行 (失敗すれば下の catch で全画面へ)。
+                    await win.unmaximize().catch((e) => console.warn("unmaximize failed:", e));
+                    if (cancelled) return;
+                    const scale = mon?.scaleFactor ?? 1;
+                    await win.setSize(
+                        new PhysicalSize(Math.round(PROBE_BOX_W * scale), Math.round(PROBE_BOX_H * scale))
+                    );
+                    if (cancelled) return;
+                    if (mon) {
+                        // 右上 (画面外に出ないよう clamp)。
+                        const x = Math.max(
+                            mon.position.x,
+                            mon.position.x + mon.size.width - Math.round((PROBE_BOX_W + PROBE_BOX_MARGIN) * scale)
+                        );
+                        const y = mon.position.y + Math.round(PROBE_BOX_MARGIN * scale);
+                        await win.setPosition(new PhysicalPosition(x, y));
+                        if (cancelled) return;
+                    }
+                    await win.setIgnoreCursorEvents(false);
+                } else {
+                    // Wall / Nudge / 同時表示: 全画面 + クリックブロック (現状維持)。
+                    await applyFullscreenBlock();
+                }
+            } catch (e) {
+                // 既にこの effect がキャンセル済み (新 state へ遷移済み) なら何もしない。
+                // stale な effect が全画面ブロックで新モードを上書きする race を防ぐ。
+                if (cancelled) return;
+                // box 化に失敗しても被験者が操作不能にならないよう全画面=現状挙動へ倒す。
+                console.warn("overlay window mode failed, falling back to fullscreen:", e);
+                try {
+                    await applyFullscreenBlock();
+                } catch (e2) {
+                    console.error("overlay fullscreen fallback also failed:", e2);
+                }
+            }
+        })();
+
+        return () => { cancelled = true; };
     }, [isWallActive, probeActive, nudgeOpacity, currentWindow]);
 
     // Wall 発動時はプローブカードを畳む (介入中は自然作業のサンプリングでなく UI も衝突するため)。
@@ -162,19 +248,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             if (nudgeDismissed) setNudgeDismissed(false);
         }
     }, [interventionDecision, isWallActive, nudgeDismissed]);
-
-    // Layer 4: macOS で overlay の透過が失敗した場合のフォールバック。
-    // nudge も wall も不要な間は hide() してメインウィンドウを隠さない。
-    // nudge/wall が必要になったら show() で再表示する。
-    // macOS で透過が正常動作している場合は無駄な呼び出しだが副作用はない。
-    useEffect(() => {
-        const shouldBeVisible = nudgeOpacity > 0 || isWallActive || probeActive;
-        if (shouldBeVisible) {
-            currentWindow.show().catch(() => {});
-        } else {
-            currentWindow.hide().catch(() => {});
-        }
-    }, [nudgeOpacity, isWallActive, probeActive, currentWindow]);
 
     return (
         <div className="overlay-root">
