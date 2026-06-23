@@ -8,10 +8,22 @@ description: >
   - バージョン番号 (vX.XX) を付与するとき
   - .steering/ への作業記録を残すとき（Refs: の書き方）
   - main ブランチへのマージ前チェックリストを確認するとき
+  - git/Bash などターミナル系のツールを呼ぶとき（ツール呼び出し書式 antml:invoke の確認・冒頭§参照）
 allowed-tools: Bash(git *), Read, Glob
 ---
 
 # Git ワークフロー規約
+
+## ⚠️ 最重要・ツール呼び出し書式 (Bash/git 操作の前に必ず確認)
+
+git/Bash を含む**すべてのツール呼び出しは `antml:invoke` / `antml:parameter` という `antml:` 接頭辞付き
+タグで出すこと**。`court` や 接頭辞なしの `invoke`、`parameter` で書くと**ハーネスがパースできず
+"malformed / could not be parsed" でツールが実行されない**(2026-06-24 に多発・ユーザー強い指摘)。
+
+- 開始タグ: `antml:invoke name="Bash"` / 引数: `antml:parameter name="command"` / 閉じ: `/antml:invoke`。
+- **散文の直後の最初のツール呼び出しで誤記しやすい**。git コマンドを出す直前に書式を確認してから出力する。
+- 1 ターンで連続失敗したら、書式を確認し直してから再送する (盲目的に再試行しない)。
+- 関連メモリ: `feedback-tool-call-tag-format`。
 
 ## このスキルの目的
 
