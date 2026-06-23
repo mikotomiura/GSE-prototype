@@ -152,6 +152,26 @@ body {
   line-height: 1.6;
 }
 
+/* デバッグ: Wall 強制発動ボタン (較正モードのみ表示)。本番介入色と紛れないよう破線・控えめ。 */
+.debug-force-wall-button {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.55rem 1rem;
+  background: rgba(248, 113, 113, 0.10);
+  border: 1px dashed rgba(248, 113, 113, 0.5);
+  border-radius: 8px;
+  color: var(--color-stuck);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.debug-force-wall-button:hover {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.8);
+}
+
 .quit-button {
   margin-top: 1rem;
   width: 100%;

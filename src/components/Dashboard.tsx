@@ -434,6 +434,23 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, isMonkMod
         </div>
       )}
 
+      {/* デバッグ: Wall を HMM と切り離して強制発動する (dev ビルドのみ表示)。
+          Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。
+          `import.meta.env.DEV` gate により release/pilot バンドルからは完全に除去され、
+          被験者セッションへの混入リスクをゼロにする (cross-review HIGH-B)。
+          強制発動は NDJSON に reason="debug_force" で残り、解析時にも除外できる。 */}
+      {import.meta.env.DEV && (
+        <button
+          className="debug-force-wall-button"
+          onClick={() =>
+            invoke("force_wall").catch((e) => console.error("force_wall failed:", e))
+          }
+          title="HMM を介さず Wall を強制発動 (動作確認用・reason=debug_force でログ)"
+        >
+          🧱 Wall 強制発動 (デバッグ)
+        </button>
+      )}
+
       <button className="quit-button" onClick={onQuit}>
         セッション終了
       </button>

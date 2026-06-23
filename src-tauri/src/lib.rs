@@ -48,6 +48,11 @@ static SESSION_START_MS: AtomicU64 = AtomicU64::new(0);
 // main/overlay の両ウィンドウが同コマンドを叩くため単一情報源で抑止される (cross-review)。
 static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 
+// デバッグ用: 次回の get_intervention_decision (main) で Wall を一度だけ強制発動するフラグ。
+// `force_wall` コマンドが true にし、main ウィンドウの判定が swap で消費する (ワンショット)。
+// 通常は false のまま = 既存挙動と完全同一 (pilot 非汚染)。
+static FORCE_WALL: AtomicBool = AtomicBool::new(false);
+
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
@@ -118,6 +123,14 @@ fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f6
     map
 }
 
+/// デバッグ用: 次回の `get_intervention_decision` (main) で Wall を強制発動する。
+/// Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。較正/開発時に
+/// Dashboard のデバッグボタンからのみ呼ぶ。フラグを立てるだけで挙動は判定側がワンショット消費する。
+#[tauri::command]
+fn force_wall() {
+    FORCE_WALL.store(true, Ordering::Release);
+}
+
 #[tauri::command]
 fn get_intervention_decision(
     window_label: String,
@@ -135,6 +148,32 @@ fn get_intervention_decision(
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .last_decision();
+    }
+
+    // デバッグ強制 Wall (main ウィンドウのみ・ワンショット)。HMM 状態や介入トグルに依らず
+    // 一度だけ action=wall を返す。App が isWallActive=true にすると次 tick から既存の
+    // wall_active 分岐が Wall を維持する。reason="debug_force" でログし解析時に除外可能。
+    if FORCE_WALL.swap(false, Ordering::AcqRel) {
+        let now = epoch_ms();
+        let idle_ms = get_keyboard_idle_ms();
+        let decision = {
+            let mut guard = intervention.0.lock().unwrap_or_else(|p| p.into_inner());
+            guard.force_wall_decision(idle_ms)
+        };
+        let _ = log.lock().unwrap_or_else(|p| p.into_inner()).tx.try_send(
+            LogEntry::InterventionDecision {
+                timestamp: now,
+                action: decision.action.as_str().to_string(),
+                need_score: decision.need_score,
+                opportunity_score: decision.opportunity_score,
+                p_stuck: decision.p_stuck,
+                idle_ms: decision.idle_ms,
+                wall_accum_ms: decision.wall_accum_ms,
+                reason: decision.reason.clone(),
+                suppressed_by: decision.suppressed_by.clone(),
+            },
+        );
+        return decision;
     }
 
     // Task C: セッションが介入無効を宣言した場合は policy を進めず none を返す。
@@ -1437,6 +1476,7 @@ pub fn run() {
             greet,
             get_cognitive_state,
             get_intervention_decision,
+            force_wall,
             record_intervention_dismiss,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,
