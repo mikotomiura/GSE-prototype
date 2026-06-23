@@ -153,6 +153,15 @@ const VignetteTest: React.FC<VignetteTestProps> = ({ onComplete }) => {
       >
         {index + 1 >= VIGNETTES.length ? "完了" : "次へ"}
       </button>
+      {/* テストを途中でやめてスタート画面に戻る導線。 */}
+      <button
+        className="back-button"
+        onClick={onComplete}
+        disabled={submitting}
+        style={{ marginTop: "0.6rem", maxWidth: "560px" }}
+      >
+        ← 戻る (中断)
+      </button>
     </div>
   );
 };
