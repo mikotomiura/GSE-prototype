@@ -55,10 +55,17 @@ backend（logger.rs/lib.rs）変更時は `rust-standards`/`data-privacy`/`hook-
 - 回帰テスト追加（consumer 耐障害 or 文言分岐）。`cargo test --workspace` パス。HMM 不変なら
   `gse-replay --snapshot` は現状維持で確認（schema_dto.rs を触らないこと）。
 
-### 4【研究運用】被験者の起動方法を確定し end-to-end スモークテスト
-- 本番ビルド配布（`tauri build`）か dev 配布かを決定（盲検は `VITE_GSE_DEBUG` 既定 OFF で起動方法に依存せず守られる）。
-- 決めたビルドで: セッション開始→プローブ/Nudge 表示→各ボタンで確実に閉じ `record_*` が NDJSON に残る、
-  第2週でモデル出力が出ない、を実機確認。
+### 4【リビルド & 検証】実装後に必ずリビルドして実機確認（最重要・修正の効果は再ビルド後にのみ反映）
+- **実装が終わったら必ずリビルドする**。フロント変更は `npm run tauri dev` で即確認、配布検証は本番ビルド。
+- **GitHub に Windows/macOS のビルド CI あり**（`.github/workflows/ci.yml` = "CI / Release"）:
+  - Windows: `npx tauri build --bundles nsis` → 成果物 `windows-nsis` / `windows-portable`。
+  - macOS: `npx tauri build --bundles dmg` → entitlements 再署名 → 成果物 `macos-dmg`。
+  - push / タグで両 OS のバイナリが出る。**被験者配布はこの CI 成果物（本番ビルド）を使う**のが堅牢。
+  - ⚠ #1 の最有力原因（macOS Documents/TCC 権限で `File::create` 失敗）は **CI ビルドの .app/.dmg でこそ顕在化**
+    しやすい（dev 実行と TCC 文脈が異なる）。**必ず本番ビルドでスモークテスト**して fail-loud が効くか確認する。
+- **被験者の起動方法を確定**（CI 本番バイナリ配布を推奨。盲検は `VITE_GSE_DEBUG` 既定 OFF で起動方法非依存に守られる）。
+- 本番ビルドで end-to-end スモークテスト: セッション開始→プローブ/Nudge 表示→各ボタンで確実に閉じ
+  `record_*` が NDJSON に残る／ログ書込失敗時に fail-loud 通知が出る／第2週でモデル出力が出ない、を実機確認（両 OS 望ましい）。
 
 ### 5【完了処理】
 - code-reviewer + security-checker（logger.rs 変更で必須）→ `/finish-task` で `/cross-review`。
