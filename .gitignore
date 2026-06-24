@@ -43,3 +43,10 @@ docs/[提案プロジェクト補足資料]GSE技術設計書.docx.pdf
 # Python
 __pycache__/
 *.pyc
+
+# Disposable analysis DB / exports (scripts/build_analysis_db.py, decisions.md D5)
+# Source of truth is the files in gse-dataset; analysis.db is regenerate-able.
+analysis.db
+*.duckdb
+cross_section.csv
+cross_section.parquet

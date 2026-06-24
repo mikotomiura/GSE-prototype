@@ -1,0 +1,28 @@
+{
+  "total_labels": 1,
+  "confusion": { "matrix": [[1, 0, 0], [0, 0, 0], [0, 0, 0]] },
+  "per_class": [
+    { "class": "flow", "precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 1 },
+    { "class": "incubation", "precision": 0.0, "recall": 0.0, "f1": 0.0, "support": 0 },
+    { "class": "stuck", "precision": 0.0, "recall": 0.0, "f1": 0.0, "support": 0 }
+  ],
+  "macro_f1": 0.3333333333333333,
+  "micro_f1": 1.0,
+  "detection_lead_ms_median": null,
+  "stuck_recovery_ms_median": null,
+  "outcome": {
+    "manual_insert_chars": 40,
+    "external_paste_chars_total": 0,
+    "manual_contribution_ratio": 1.0,
+    "productive_manual_recovery_rate": null,
+    "external_paste_count": 0,
+    "excluded_paste_count": 0,
+    "large_paste_rate": null,
+    "paste_after_stuck_rate": null,
+    "self_recovery_without_paste": null,
+    "paste_count_per_hour": 0.0,
+    "stuck_episode_count": 0,
+    "recovered_episode_count": 0
+  },
+  "warnings": []
+}
