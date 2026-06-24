@@ -33,6 +33,39 @@ npm run build
 npm run tauri dev      # もしくは cargo tauri build で配布ビルド
 ```
 
+### 1.1 起動モード: 被験者 vs 研究者デバッグ (二重 gate)
+
+デバッグ機能（プローブ/Nudge 強制表示・第2週モデル出力表示）は **2 つのフラグ**で守られる。
+**被験者はフラグなしで起動 = 完全ブラインド**、**研究者だけが両方を足す**という非対称になる。
+
+| フラグ | 種別 | 効果 |
+|---|---|---|
+| `VITE_GSE_DEBUG=1` | Vite **ビルド時** env (フロント JS に焼き込み) | デバッグボタン描画・第2週モデル出力表示 |
+| `GSE_DEBUG=1` | **実行時** env (Rust backend が `ensure_debug_enabled` で読む) | `force_wall`/`force_nudge`/`debug_force_probe` を許可。未設定だと DevTools から直接 invoke しても Err で拒否 |
+
+- **被験者配布 (本番)**: CI 本番バイナリ (.app/.dmg/nsis) を**フラグなしでそのまま起動**。盲検は両 env 既定 OFF で守られる。
+- **研究者デバッグ (dev)**: 同一コマンドで両方渡す (vite/cargo 両プロセスが継承):
+  ```bash
+  VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
+  ```
+- **本番ビルドでスモーク**: `VITE_GSE_DEBUG=1 npm run tauri build` でビルド → 起動時に `GSE_DEBUG=1` を渡す。
+  - ⚠ macOS の `open App.app` は env を渡さない。実体を直接実行するか launchctl を使う:
+    ```bash
+    GSE_DEBUG=1 "App.app/Contents/MacOS/<bin>"      # 直接実行
+    # または: launchctl setenv GSE_DEBUG 1 してから起動
+    ```
+  - Windows は起動前のシェルで `set GSE_DEBUG=1` (or System 環境変数)。
+
+### 1.2 デバッグトリガと fail-loud バナーの確認 (#1 検証)
+
+研究者デバッグ起動 (§1.1) の Dashboard には以下が出る:
+- **📝 プローブ強制表示 / 💡 Nudge 強制表示 / 🧱 Wall 強制発動** ボタン。プローブ → 回答/skip →
+  `record_realtime_*`、Nudge → dismiss → `record_intervention_dismiss` の経路を能動的にテストできる。
+  強制発火は `reason="debug_force"` で NDJSON に残り、解析時に除外可能。
+- **fail-loud バナー**: ログ書込先が temp フォールバック / 無効に縮退した場合、Dashboard 上部に警告
+  バナーが常時表示される (静かな全損の撲滅)。**本番 .app/.dmg は dev と TCC 文脈が異なるため、
+  macOS Documents 権限未付与の repro はこの本番ビルドでこそ顕在化しやすい** → 必ず本番でスモークする。
+
 ---
 
 ## 2. Phase A — 自己ドッグフード (1名・end-to-end 検証)
@@ -96,5 +129,12 @@ mv /c/gse-dataset/raw/P000/gse_2026XXXX_*.ndjson /c/gse-dataset/raw/P001/
 
 ## 4. トラブルシュート
 - プローブが出ない: probe_scheduler は warm-up ガードあり。短すぎるセッションでは発火しない。十分な作業時間を確保。
+  研究者は §1.1 のデバッグ起動で **📝 プローブ強制表示** ボタンを使えば即座に出せる。
+- デバッグボタンを押しても効かない / `debug command disabled` エラー: `GSE_DEBUG=1` 未設定 (§1.1)。
+  本番 .app は `open` で env が渡らない点に注意 (実体直接実行 or `launchctl setenv`)。
+- **fail-loud バナーが出る** (「ログを一時フォルダに保存しています」/「ログを保存できません」):
+  primary 書込先に書けず temp フォールバック or 無効化されている。原因は `GSE_DATASET` の誤指定 /
+  未マウント、または **macOS の Documents アクセス権限未付与** (本番 .app の TCC)。バナーの保存先パスを
+  確認し、権限付与 or `GSE_DATASET` 修正後に再起動する。temp に落ちたデータも回収可能。
 - `raw/P*/` が見つからない: `GSE_DATASET` 未設定 (fallback の Documents 下に出ている)。`--root` で明示するか env 設定。
 - 権限 (キャプチャ無効): Dashboard の権限バナー / 診断に従う (macOS Input Monitoring / Accessibility)。

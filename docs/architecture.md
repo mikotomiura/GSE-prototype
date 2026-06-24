@@ -196,6 +196,14 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **依存先**: serde_json
 - **インターフェース**: `log()` → channel 送信、`flush()`, `close()`
 - **状態管理**: バッファリングチャネル（512 エントリ）、5 秒間隔フラッシュ
+- **耐障害化 + fail-loud (#1 層2)**: `SessionLogger::start` は **spawn 前に書込先を同期確定**する（`open_log_target`）。
+  primary（`GSE_DATASET/raw/<id>` or `~/Documents/GSE-sessions`）が `File::create` 失敗時は **temp**
+  （`$TMPDIR/GSE-sessions/<pid>_<name>`）へフォールバックし、それも失敗したら `io::sink()` へ縮退する。
+  いずれの場合も consumer スレッドは生かし続け、channel を Disconnected にしない（= `record_*` IPC が
+  Err を返してプローブ/Nudge カードが閉じなくなる #1 を構造的に防ぐ）。書込先の状態は
+  `LogStatus { Ok | Fallback | Disabled }` として返され、`get_log_status` IPC 経由で Dashboard が
+  **fail-loud バナー**を常時表示する（静かな全損を撲滅）。NDJSON はキーストローク動態を含むため unix では
+  `file=0600` に制限する。詳細は `data-privacy` Skill / `.steering/20260626-phase1-card-repro-backend-fix/`。
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
 - **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない

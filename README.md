@@ -1255,6 +1255,29 @@ npm run tauri build
 # Installer: src-tauri/target/release/bundle/
 ```
 
+### Debug / Researcher Mode (dual gate)
+
+Debug features (force-show probe/Nudge cards, week-2 model output) are guarded by **two flags**.
+Participants launch **with no flags** (fully blind); researchers add both:
+
+| Flag | Kind | Effect |
+|---|---|---|
+| `VITE_GSE_DEBUG=1` | Vite **build-time** env (baked into frontend) | Renders debug buttons; shows week-2 model output |
+| `GSE_DEBUG=1` | **runtime** env (read by Rust backend) | Enables `force_wall` / `force_nudge` / `debug_force_probe`; otherwise rejected even via DevTools |
+
+```bash
+# Researcher debug run (both processes inherit the env)
+VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
+
+# Production smoke test: build with VITE_GSE_DEBUG, launch with GSE_DEBUG
+VITE_GSE_DEBUG=1 npm run tauri build
+GSE_DEBUG=1 "App.app/Contents/MacOS/<bin>"   # macOS: `open` does NOT pass env; run the binary directly
+```
+
+Participant distribution = CI production binary launched normally (no flags). See
+`docs/calibration-smoke-runbook.md` §1.1–1.2 for the full smoke-test procedure and the log
+fail-loud banner.
+
 ### Post-session Analysis
 
 > **Note:** `behavioral_gt.py` is planned for Phase 2+. See the "Post-session Ground-Truth Labeling" section above for labeling rule specifications.
