@@ -20,6 +20,9 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   const [q1, setQ1] = useState(3); // 摩擦 (1=詰まってない .. 5=とても詰まった)
   const [q2, setQ2] = useState(3); // 前進 (1=まったく進んでない .. 5=とても進んだ)
   const [submitting, setSubmitting] = useState(false); // 送信中フラグ (二重送信防止)
+  // 記録失敗時のインラインエラー文言。null = エラーなし。失敗時はカードを保持し
+  // これを表示してボタン再押下でリトライさせる (較正データを静かに失わない + 死んだボタン化を防ぐ)。
+  const [error, setError] = useState<string | null>(null);
   // listen コールバックは古い closure を捕捉するため、表示中判定は ref で行う。
   const probeRef = useRef<ActiveProbe | null>(null);
 
@@ -42,6 +45,7 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
       setProbe({ ...event.payload, shownAt: Date.now() });
       setQ1(3);
       setQ2(3);
+      setError(null); // 新規プローブ表示で前回のエラー表示をクリア。
     });
     return () => {
       unlisten.then((f) => f());
@@ -63,6 +67,7 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   const submitAnswer = async () => {
     if (submitting) return; // 二重送信防止
     setSubmitting(true);
+    setError(null);
     try {
       await invoke("record_realtime_answer", {
         ...commonArgs(),
@@ -72,6 +77,7 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
       setProbe(null);
     } catch (e) {
       console.error("record_realtime_answer failed (keeping card for retry):", e);
+      setError("記録に失敗しました。もう一度お試しください。");
     } finally {
       setSubmitting(false);
     }
@@ -80,16 +86,20 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   const submitSkip = async (reason: SkipReason) => {
     if (submitting) return; // 二重送信防止
     setSubmitting(true);
+    setError(null);
     try {
       await invoke("record_realtime_skip", { ...commonArgs(), skipReason: reason });
       setProbe(null);
     } catch (e) {
       console.error("record_realtime_skip failed (keeping card for retry):", e);
+      setError("記録に失敗しました。もう一度お試しください。");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // 注: この 1–5 スライダーは F3 リアルタイムプローブ (Q1摩擦/Q2前進) であり、X1 較正の
+  // 正解ラベル。4 件法化した自作 TSE 尺度 (F2-C/F5・Form 側) とは別系統なので偶数化しない (FD10)。
   const slider = (
     value: number,
     setValue: (v: number) => void,
@@ -173,6 +183,21 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
           ✕
         </button>
       </div>
+
+      {/* 記録失敗時のインラインエラー。死んだボタンに見せず、再押下でリトライ可能と伝える。 */}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            marginTop: "0.6rem",
+            fontSize: "0.78rem",
+            color: "#ffb4b4",
+            lineHeight: 1.4,
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   );
 };

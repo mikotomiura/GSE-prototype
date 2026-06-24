@@ -21,6 +21,14 @@ interface DiagnosticInfo {
 /** Phase 1 Ground Truth ラベルの種別 (backend の UserLabelKind と同期)。 */
 type LabelKind = "flow" | "incubation" | "stuck";
 
+/** ログ書込先の状態 DTO (backend `get_log_status` / LogStatusDto と同期・#1 層2 fail-loud)。 */
+interface LogStatusDto {
+  ok: boolean;
+  mode: "ok" | "fallback" | "disabled";
+  message: string;
+  actual_path: string | null;
+}
+
 interface DashboardProps {
   cognitiveState: {
     flow: number;
@@ -70,12 +78,31 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
     incubation: 0,
     stuck: 0,
   });
+  // #1 層2 fail-loud: ログ書込先の状態。ok 以外なら警告バナーを常時表示し「静かな全損」を防ぐ。
+  const [logStatus, setLogStatus] = useState<LogStatusDto | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setSessionSeconds(Math.floor((Date.now() - sessionStartRef.current) / 1000));
     }, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // #1 層2 fail-loud: 起動時にログ書込先の状態を取得 (被験者にもバナーを見せて無通知の全損を撲滅)。
+  // 取得自体が失敗した場合も握り潰さず、状態不明の警告バナーを出す (fail-loud の一貫性)。
+  useEffect(() => {
+    invoke<LogStatusDto>("get_log_status")
+      .then((s) => setLogStatus(s))
+      .catch((e) => {
+        console.error("get_log_status failed:", e);
+        setLogStatus({
+          ok: false,
+          mode: "disabled",
+          message:
+            "ログの状態を確認できませんでした。記録が失われている可能性があります。研究者に連絡してください。",
+          actual_path: null,
+        });
+      });
   }, []);
 
   // hookActive=false の間、経過秒数をカウントする。
@@ -156,9 +183,41 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
     emit("monk-mode-changed", !isMonkMode).catch(() => {});
   };
 
+  // デバッグ表示ゲート。被験者には一切のデバッグ/モデル出力を見せない。
+  // ⚠ import.meta.env.DEV ではなく明示的な VITE_GSE_DEBUG=1 で判定する: 起動方法
+  // (`npm run tauri dev` か `tauri build` 本番バイナリか) に依存せず、被験者は既定で常にブラインド。
+  // 研究者がデバッグ時のみ `VITE_GSE_DEBUG=1 npm run tauri dev` (または .env.local) で有効化する。
+  const debugView = import.meta.env.VITE_GSE_DEBUG === "1";
+
+  // Phase 1 較正: モデル出力 (推定状態/確率/GT/状態説明) は被験者へ一切見せない (v0.4 §5.2 minimal dashboard)。
+  // 第1週 (calibrationMode=true) は常時ブラインド。第2週 (calibrationMode=false) も
+  // プローブ回答のアンカリングを避けるためブラインドにし、debugView 時のみデバッグ用に表示する。
+  const showModelOutput = !calibrationMode && debugView;
+
   return (
-    <div className={`dashboard-container ${calibrationMode ? 'state-calibration' : `state-${dominant.toLowerCase()}`}`}>
+    <div className={`dashboard-container ${showModelOutput ? `state-${dominant.toLowerCase()}` : 'state-calibration'}`}>
       <h2>Generative Struggle Engine</h2>
+
+      {/* #1 層2 fail-loud: ログ書込先が ok でない (temp フォールバック / 無効) ときの警告バナー。
+          静かなデータ全損を撲滅するため被験者にも常時表示する。生のキー内容は含まない。 */}
+      {logStatus && !logStatus.ok && (
+        <div className="permission-banner" role="alert">
+          <span className="permission-icon">⚠️</span>
+          <div className="permission-text">
+            <strong>
+              {logStatus.mode === "disabled"
+                ? "ログを保存できません"
+                : "ログを一時フォルダに保存しています"}
+            </strong>
+            <p style={{ marginTop: "0.3rem" }}>{logStatus.message}</p>
+            {logStatus.actual_path && (
+              <p style={{ marginTop: "0.2rem", fontSize: "0.85em", opacity: 0.8 }}>
+                保存先: {logStatus.actual_path}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* キーボードフック状態警告 (両プラットフォーム共通) */}
       {hookActive === false && (
@@ -347,14 +406,15 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
           <span className="session-label">Keyboard</span>
           {/* 較正中は状態パレット (flow=緑/incubation=黄) を避け中立色にする。
               打鍵状態の色が推定状態の色記号と誤連想されるのを防ぐ (測定独立性・security LOW)。 */}
-          <span className={`session-value kbd-status ${calibrationMode ? 'kbd-neutral' : keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
+          <span className={`session-value kbd-status ${!showModelOutput ? 'kbd-neutral' : keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
             {keyStatusLabel}
           </span>
         </div>
       </div>
 
-      {/* v0.3 較正モード: モデル出力 (推定状態/確率/GT/状態説明) は測定独立性のため非表示。 */}
-      {calibrationMode ? (
+      {/* Phase 1 較正: モデル出力 (推定状態/確率/GT/状態説明) は測定独立性のため非表示。
+          第2週もアンカリング回避のためブラインド。表示は開発ビルド (showModelOutput) のみ。 */}
+      {!showModelOutput ? (
         <div className="calibration-notice" role="status">
           <span className="calibration-notice-badge">較正モード</span>
           <p>
@@ -431,7 +491,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
         </button>
       )}
 
-      {!calibrationMode && (
+      {showModelOutput && (
         <div className="info-box">
           <p>Type naturally. The engine analyzes your keystroke dynamics.</p>
           <p><strong>Incubation</strong> suggests pausing. <strong>Stuck</strong> suggests moving.</p>
@@ -459,12 +519,12 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
         {stuckMarked ? '✓ 記録しました' : '🔴 今とても詰まっている'}
       </button>
 
-      {/* デバッグ: Wall を HMM と切り離して強制発動する (dev ビルドのみ表示)。
+      {/* デバッグ: Wall を HMM と切り離して強制発動する (debugView=VITE_GSE_DEBUG のみ表示)。
           Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。
-          `import.meta.env.DEV` gate により release/pilot バンドルからは完全に除去され、
-          被験者セッションへの混入リスクをゼロにする (cross-review HIGH-B)。
+          showModelOutput と同じ debugView gate で、起動方法に依存せず被験者バンドルから除外する
+          (`npm run tauri dev` で被験者が回す場合でもボタンは出ない。cross-review HIGH-B 強化)。
           強制発動は NDJSON に reason="debug_force" で残り、解析時にも除外できる。 */}
-      {import.meta.env.DEV && (
+      {debugView && (
         <button
           className="debug-force-wall-button"
           onClick={() =>
@@ -473,6 +533,35 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
           title="HMM を介さず Wall を強制発動 (動作確認用・reason=debug_force でログ)"
         >
           🧱 Wall 強制発動 (デバッグ)
+        </button>
+      )}
+
+      {/* デバッグ (#1 repro): プローブカード / Nudge を即時に出す。card→回答/skip→record_realtime_*
+          と nudge→dismiss→record_intervention_dismiss の経路を能動的に検証する。force_wall と同じ
+          debugView gate で被験者バンドルから除外する。reason="debug_force" でログに残り解析時に除外可。 */}
+      {debugView && (
+        <button
+          className="debug-force-wall-button"
+          onClick={() =>
+            invoke("debug_force_probe").catch((e) =>
+              console.error("debug_force_probe failed:", e)
+            )
+          }
+          title="プローブカードを即時表示 (動作確認用・record_realtime_* 経路の検証)"
+        >
+          📝 プローブ強制表示 (デバッグ)
+        </button>
+      )}
+
+      {debugView && (
+        <button
+          className="debug-force-wall-button"
+          onClick={() =>
+            invoke("force_nudge").catch((e) => console.error("force_nudge failed:", e))
+          }
+          title="Nudge を即時表示 (動作確認用・record_intervention_dismiss 経路の検証)"
+        >
+          💡 Nudge 強制表示 (デバッグ)
         </button>
       )}
 

@@ -268,6 +268,27 @@ impl InterventionPolicyState {
         decision
     }
 
+    /// デバッグ用: 強制 Nudge 判定を返す (`force_wall_decision` の Nudge 版)。
+    /// `get_intervention_decision` の overlay 分岐がワンショットで消費し、その場で overlay へ**直接返す**。
+    /// `force_wall_decision` と違い `last_decision` も cooldown も**更新しない** (真のワンショット):
+    /// Wall は overlay が `last_decision()` 経由で拾う必要があるため更新必須だが、Nudge は overlay 分岐が
+    /// 戻り値を直接返し且つ Overlay 側が `nudgeVisible` を保持するため、`last_decision` に残すと後続 poll で
+    /// もう一度 nudge を返してしまう。`&self` で副作用なし (`reason="debug_force"` で解析時に除外可能)。
+    pub fn force_nudge_decision(&self, idle_ms: u64) -> InterventionDecision {
+        InterventionDecision {
+            action: InterventionAction::Nudge,
+            need_score: 0.0,
+            opportunity_score: 1.0,
+            p_stuck: 0.0,
+            idle_ms,
+            wall_accum_ms: 0,
+            reason: "debug_force".to_string(),
+            suppressed_by: Vec::new(),
+            // opportunity_reason は #[serde(skip)] で NDJSON/IPC に出ない in-memory 専用 placeholder。
+            opportunity_reason: OpportunityReason::LowOpportunity,
+        }
+    }
+
     pub fn record_dismiss(&mut self, action: InterventionAction, now_ms: u64) {
         if matches!(action, InterventionAction::Nudge | InterventionAction::Wall) {
             self.last_dismiss_at_ms = Some(now_ms);
@@ -754,6 +775,23 @@ mod tests {
             .decision
             .suppressed_by
             .contains(&"cooldown".to_string()));
+    }
+
+    #[test]
+    fn force_nudge_decision_is_pure_one_shot() {
+        // #1 層2: debug 強制 Nudge は overlay 分岐が戻り値を直接返すため、last_decision も
+        // cooldown も汚さない (真のワンショット)。force_wall と異なり副作用を持たないこと。
+        let mut policy = InterventionPolicyState::new(0);
+        let before = policy.last_decision().action;
+        let d = policy.force_nudge_decision(4321);
+        assert_eq!(d.action, InterventionAction::Nudge);
+        assert_eq!(d.reason, "debug_force");
+        assert_eq!(d.idle_ms, 4321);
+        // last_decision は据え置き (後続 overlay poll で nudge が再出現しない)。
+        assert_eq!(policy.last_decision().action, before);
+        // cooldown も汚さない → 直後の通常判定が debug の影響を受けない。
+        let after = policy.decide(input(1_000, 0.10, 0));
+        assert_eq!(after.decision.action, InterventionAction::None);
     }
 
     #[test]

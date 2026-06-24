@@ -54,25 +54,45 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [probeActive, setProbeActive] = useState(false);
     // Nudge を dismiss 済みか。同一 nudge の再表示を防ぐ。action が nudge 以外に変わると解除。
     const [nudgeDismissed, setNudgeDismissed] = useState(false);
+    // dismiss 記録 (record_intervention_dismiss) が失敗したときのインラインエラー文言。
+    // null = エラーなし。失敗時はカードを保持してこれを表示し、ボタン再押下でリトライさせる
+    // (= 旧実装の「失敗→dismissed 解除→即再表示」無限ループを廃止)。
+    const [nudgeError, setNudgeError] = useState<string | null>(null);
+    // dismiss 送信中フラグ (ボタン disable 用)。
+    const [nudgeSubmitting, setNudgeSubmitting] = useState(false);
+    // dismiss 送信の相互排他ガード (手動ボタン経路と silent タイマー経路の二重送信を防ぐ)。
+    // state はタイマー closure 内で stale になるため ref で同期的に判定する。
+    const dismissInFlightRef = useRef(false);
     // 無応答フェードアウト (silent) 用タイマー。
     const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
 
     // Nudge を閉じてユーザー応答 (dismiss 理由) を NDJSON へ記録する (WBS 0.8)。
     // 固定カテゴリのみを送る。中身・本文は一切送らない。
-    const handleNudgeDismiss = (reason: DismissReason) => {
+    // 記録成功時のみカードを閉じる。失敗時はカードを保持してインラインエラーを出し、
+    // ボタン再押下でリトライさせる (較正データを静かに失わない + 無限再表示ループを断つ)。
+    const handleNudgeDismiss = async (reason: DismissReason) => {
+        if (dismissInFlightRef.current) return; // 二重送信防止 (silent タイマーとも相互排他)
         if (nudgeTimerRef.current) {
             clearTimeout(nudgeTimerRef.current);
             nudgeTimerRef.current = null;
         }
-        setNudgeDismissed(true);
-        setNudgeVisible(false);
-        invoke("record_intervention_dismiss", { action: "nudge", reason }).catch((e) => {
+        dismissInFlightRef.current = true;
+        setNudgeSubmitting(true);
+        setNudgeError(null);
+        try {
+            await invoke("record_intervention_dismiss", { action: "nudge", reason });
+            setNudgeDismissed(true);
+            setNudgeVisible(false);
+        } catch (e) {
             console.error("record_intervention_dismiss failed:", e);
-            // 記録失敗時は dismissed を戻し、次 tick で再表示→再試行できるようにする
-            // (永久ブロック回避。backend に dismiss が届かず action=nudge が残るケースの保険)。
-            setNudgeDismissed(false);
-        });
+            // 失敗時はカードを保持し、インラインエラー + リトライ (ボタン再押下) に倒す。
+            // 旧実装の setNudgeDismissed(false) による「失敗→即再表示」無限ループは廃止。
+            setNudgeError("記録に失敗しました。もう一度お試しください。");
+        } finally {
+            dismissInFlightRef.current = false;
+            setNudgeSubmitting(false);
+        }
     };
 
     // Wall発動中のキーボード打鍵検知に使うref群
@@ -200,6 +220,10 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 nudgeTimerRef.current = null;
             }
             setNudgeVisible(false);
+            // Wall 割込みで畳む際、保持していたエラー/送信中フラグも掃除する (次サイクルへ持ち越さない)。
+            setNudgeError(null);
+            setNudgeSubmitting(false);
+            dismissInFlightRef.current = false;
         }
     }, [isWallActive]);
 
@@ -263,17 +287,33 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         if (isNudge && !nudgeVisible && !nudgeDismissed) {
             // 新規 nudge を表示。無応答が続いたら NUDGE_TIMEOUT_MS で silent としてフェードアウト。
             setNudgeVisible(true);
+            setNudgeError(null); // 新規表示でエラー表示をクリア。
             if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
             nudgeTimerRef.current = setTimeout(() => {
                 nudgeTimerRef.current = null;
-                setNudgeVisible(false);
-                setNudgeDismissed(true);
-                invoke("record_intervention_dismiss", { action: "nudge", reason: "silent" }).catch(
-                    (e) => {
+                // 記録成功時のみ閉じる。失敗時はカードを保持しエラー表示 + リトライ
+                // (旧実装の setNudgeDismissed(false) による無限再表示ループを廃止)。
+                // 手動ボタン経路と同じ相互排他ガードを通し、二重送信 (silent + 手動) を防ぐ。
+                void (async () => {
+                    if (dismissInFlightRef.current) return;
+                    dismissInFlightRef.current = true;
+                    setNudgeSubmitting(true);
+                    try {
+                        await invoke("record_intervention_dismiss", {
+                            action: "nudge",
+                            reason: "silent",
+                        });
+                        setNudgeDismissed(true);
+                        setNudgeVisible(false);
+                    } catch (e) {
                         console.error("record_intervention_dismiss (silent) failed:", e);
-                        setNudgeDismissed(false); // 永久ブロック回避 (再試行可能に)
+                        // 失敗時はカード保持。ユーザーは手動 dismiss ボタンでリトライ可能 (回復経路)。
+                        setNudgeError("記録に失敗しました。もう一度お試しください。");
+                    } finally {
+                        dismissInFlightRef.current = false;
+                        setNudgeSubmitting(false);
                     }
-                );
+                })();
             }, NUDGE_TIMEOUT_MS);
         } else if (!isNudge && !nudgeVisible && nudgeDismissed) {
             // dismiss / silent はいずれも record_intervention_dismiss を送り、backend の record_dismiss が
@@ -315,6 +355,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     <button
                         type="button"
                         className="nudge-dismiss-btn"
+                        disabled={nudgeSubmitting}
                         onClick={() => handleNudgeDismiss("not_stuck")}
                     >
                         詰まってない
@@ -322,6 +363,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     <button
                         type="button"
                         className="nudge-dismiss-btn"
+                        disabled={nudgeSubmitting}
                         onClick={() => handleNudgeDismiss("want_to_struggle")}
                     >
                         今はもがきたい
@@ -329,11 +371,18 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     <button
                         type="button"
                         className="nudge-dismiss-btn"
+                        disabled={nudgeSubmitting}
                         onClick={() => handleNudgeDismiss("just_close")}
                     >
                         閉じる
                     </button>
                 </div>
+                {/* 記録失敗時のインラインエラー。死んだボタンに見せず、再押下でリトライ可能と伝える。 */}
+                {nudgeError && (
+                    <div className="nudge-card-error" role="alert">
+                        {nudgeError}
+                    </div>
+                )}
             </aside>
 
             {/* The Wall (Blocking Layer) — 即時不透明でなく数秒かけてゆっくり減光 (穏やかな onset)。 */}

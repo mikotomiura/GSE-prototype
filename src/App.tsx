@@ -16,6 +16,47 @@ const TASK_KINDS: { value: TaskKind; label: string }[] = [
   { value: "vibe_coding", label: "vibe coding" },
 ];
 
+// Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / decisions FD2)。
+// 介入有効化・較正モード・condition・label_pool を 1 つの選択にまとめ、不整合な組合せ
+// (例: 介入 ON なのに calibration_blind プール) を構造的に表現不能にする。各 condition /
+// label_pool 文字列は backend の Condition / LabelPool enum (logger.rs) と同期。
+type PhaseWeek = "week1_blind" | "week2_intervention";
+
+interface WeekConfig {
+  value: PhaseWeek;
+  label: string;
+  description: string;
+  /** session_meta.intervention_enabled。false で backend が全介入を gate (lib.rs safe_default)。 */
+  interventionEnabled: boolean;
+  /** 較正モード = モデル出力を非表示にし主観回答の測定独立性を守る。 */
+  calibrationMode: boolean;
+  /** backend Condition enum と同期 (blind_calibration / baseline)。 */
+  condition: "blind_calibration" | "baseline";
+  /** backend LabelPool enum と同期。X1 判定は calibration_blind のみ使用。 */
+  labelPool: "calibration_blind" | "post_intervention";
+}
+
+const PHASE_WEEKS: WeekConfig[] = [
+  {
+    value: "week1_blind",
+    label: "第1週 (blind 較正)",
+    description: "介入は発火せず推定状態も非表示。X1 較正ラベルを収集 (calibration_blind)。",
+    interventionEnabled: false,
+    calibrationMode: true,
+    condition: "blind_calibration",
+    labelPool: "calibration_blind",
+  },
+  {
+    value: "week2_intervention",
+    label: "第2週 (介入)",
+    description: "Wall + 2分タイマーが実発火。介入下のラベルを別プールで収集 (post_intervention)。",
+    interventionEnabled: true,
+    calibrationMode: false,
+    condition: "baseline",
+    labelPool: "post_intervention",
+  },
+];
+
 interface CognitiveStateRaw {
   flow: number;
   incubation: number;
@@ -67,11 +108,17 @@ function App() {
   const [startError, setStartError] = useState<string | null>(null);
   // Task C: session_meta 宣言 + ビネット導線。
   const [taskKind, setTaskKind] = useState<TaskKind>("argumentative");
-  const [interventionEnabled, setInterventionEnabled] = useState(false);
   const [showVignette, setShowVignette] = useState(false);
-  // v0.3 較正モード: 既定 ON。較正中はメイン画面からモデル出力 (推定状態/確率/GT) を隠し、
-  // 主観回答 (criterion label) の測定独立性を守る。デバッグ/通常用途では OFF にできる。
-  const [calibrationMode, setCalibrationMode] = useState(true);
+  // Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / FD2)。既定は第1週 (blind 較正)。
+  // 介入有効化・較正モード・condition・label_pool はこの 1 選択から派生し、開始後はスタート
+  // 画面を離れるためセッション中は変更できない (実質ロック)。
+  const [phaseWeek, setPhaseWeek] = useState<PhaseWeek>("week1_blind");
+  // phaseWeek は PhaseWeek 型で PHASE_WEEKS を必ず網羅するため find は非 undefined。
+  // 黙った `?? PHASE_WEEKS[0]` フォールバックは（万一の不整合時に）week1 blind 較正へ
+  // 静かに倒れて汚染を隠すため使わない。不変条件を型で表明し、破れれば下の分割代入で fail-loud に落とす（FD7 思想）。
+  const weekConfig = PHASE_WEEKS.find((w) => w.value === phaseWeek)!;
+  // 派生値: Dashboard 表示制御と session_meta 記録に使う。週セレクタが唯一の真実源。
+  const { interventionEnabled, calibrationMode } = weekConfig;
   // Ref mirrors: setInterval 内からステート最新値を参照するため
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
   const isWallActiveRef = useRef(isWallActive);
@@ -208,25 +255,29 @@ function App() {
       setStartError("セッション開始に失敗しました。アプリを再起動してください。");
       return;
     }
-    // Task C: セッション開始宣言を記録 (track は較正スモークでは main 固定)。
-    // condition / label_pool (WBS 0.11 / 0.4): blind 較正中は calibration_blind プールとして
-    // 記録し、X1 判定が calibration_blind のみを使えるようにする。介入可視時は
-    // post_intervention プール。いずれも固定カテゴリのみ。
+    // Task C / tasklist #A: セッション開始宣言を記録 (track は較正スモークでは main 固定)。
+    // condition / label_pool (WBS 0.11 / 0.4) は週セレクタ (weekConfig) が一括決定する。
+    // 第1週=blind_calibration / calibration_blind (X1 判定はこのプールのみ使用)、
+    // 第2週=baseline / post_intervention (合算せず別管理)。組合せは型で固定済み。
     // NOTE: Phase 2 AB/BA (a|b) と Phase 3 MRT (nudge|defer) の condition 配線は
     // それぞれの割付実装時に行う (本タスクは enum 凍結のみ。decisions CD8)。
-    const condition = calibrationMode ? "blind_calibration" : "baseline";
-    const labelPool = calibrationMode ? "calibration_blind" : "post_intervention";
     try {
       await invoke("record_session_meta", {
         track: "main",
         taskKind,
         monkMode: isMonkMode,
         interventionEnabled,
-        condition,
-        labelPool,
+        condition: weekConfig.condition,
+        labelPool: weekConfig.labelPool,
       });
     } catch (e) {
+      // 週セレクタが運ぶ condition/label_pool は X1 プール分離 (FD3) の真値タグであり、
+      // intervention_enabled は backend のグローバル介入ゲートを設定する。記録に失敗した
+      // まま Dashboard へ進むと、タグ欠落かつ INTERVENTION_ENABLED が前セッションの値の
+      // ままになり blind 較正が汚染されうる。ここで停止しユーザーに再開を促す。
       console.error("record_session_meta failed:", e);
+      setStartError("セッション情報の記録に失敗しました。もう一度開始してください。");
+      return;
     }
     setIsStarted(true);
   };
@@ -268,22 +319,32 @@ function App() {
               </button>
             ))}
           </div>
-          <label style={{ display: "block", marginTop: "0.6rem", fontSize: "0.82rem" }}>
-            <input
-              type="checkbox"
-              checked={interventionEnabled}
-              onChange={(e) => setInterventionEnabled(e.target.checked)}
-            />{" "}
-            介入を有効にする (較正中は既定オフ)
-          </label>
-          <label style={{ display: "block", marginTop: "0.4rem", fontSize: "0.82rem" }}>
-            <input
-              type="checkbox"
-              checked={calibrationMode}
-              onChange={(e) => setCalibrationMode(e.target.checked)}
-            />{" "}
-            較正モード (モデル出力を非表示・既定オン)
-          </label>
+          {/* tasklist #A: Phase 1 2 相プロトコルの週セレクタ。介入 ON/OFF・較正モード・
+              condition・label_pool を 1 つの選択にまとめ、不整合な組合せを選べなくする。 */}
+          <div style={{ marginTop: "1rem" }}>
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.4rem" }}>今回の実施週:</div>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
+              {PHASE_WEEKS.map((w) => (
+                <button
+                  key={w.value}
+                  onClick={() => setPhaseWeek(w.value)}
+                  aria-pressed={phaseWeek === w.value}
+                  style={{
+                    padding: "0.4rem 0.8rem",
+                    cursor: "pointer",
+                    borderRadius: "6px",
+                    border: phaseWeek === w.value ? "2px solid #4caf50" : "1px solid #888",
+                    background: phaseWeek === w.value ? "rgba(76,175,80,0.15)" : "transparent",
+                  }}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            <p style={{ marginTop: "0.5rem", fontSize: "0.78rem", opacity: 0.8 }}>
+              {weekConfig.description}
+            </p>
+          </div>
         </div>
 
         <button className="start-button" onClick={handleStart}>
