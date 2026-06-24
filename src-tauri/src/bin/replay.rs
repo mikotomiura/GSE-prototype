@@ -88,9 +88,20 @@ enum ReplayEvent {
     /// リセットして「session 境界」を再現するために使う。
     #[serde(rename = "session_start")]
     SessionStart { t: u64 },
-    /// キーストローク。vk_code は Windows 規約 (macOS 側はフック層で変換済み)。
+    /// キーストローク。raw ログは `vk` (Windows 規約 VK コード、macOS 側はフック層で変換済み)
+    /// を持つ。transfer-pipeline (#27) の `gse-package` が匿名化した NDJSON は本文再構成を
+    /// 防ぐため `vk` を落とし `category` (KeyCategory 文字列) を持つ。replay は **両対応**で
+    /// 同じ特徴量を再計算する (D6 Replay-as-Truth)。どちらも省略可だが、実際の行は片方を持つ。
+    /// 両方欠落 / 未知 category の行は不正として読み飛ばす (`resolve_key_vk` が `None`)。
     #[serde(rename = "key")]
-    Key { t: u64, vk: u32, press: bool },
+    Key {
+        t: u64,
+        #[serde(default)]
+        vk: Option<u32>,
+        #[serde(default)]
+        category: Option<String>,
+        press: bool,
+    },
     /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻マーカーと文字数。
     /// features/HMM には未使用のため replay では読み飛ばす (`timestamp()==None`)。
     /// 本 variant が無いと NDJSON に paste 行があるとき deserialize でエラーになる。
@@ -363,6 +374,56 @@ impl TryFrom<LoggedFeatDto> for FeatSnapshot {
 /// Windows 規約 0x08 (VK_BACK) / 0x2E (VK_DELETE) が true。
 fn is_backspace(vk: u32) -> bool {
     vk == 0x08 || vk == 0x2E
+}
+
+/// 匿名化 NDJSON の `category` (KeyCategory 文字列) を **代表 VK コード**へ逆写像する。
+///
+/// `gse-package` の匿名化は個々の VK を `KeyCategory` に潰すため (本文再構成不能化)、
+/// replay 側で特徴量を再計算するには代表 VK を 1 つ復元すればよい。特徴量に効くのは
+/// is_backspace (F3/F6) と文字生成キー区分・(Windows) リピート検出のみで、いずれも
+/// **category 単位**で決まるため、同じ category に再分類される代表値で raw と同じ
+/// 特徴量が再現する。
+///
+/// 不変条件: 任意の既知 category `c` について
+/// `KeyCategory::from_vk(category_representative_vk(c).unwrap()).as_str() == c`。
+/// `category_representative_vk_roundtrips` テストが lib の `KeyCategory::from_vk` で drift を検出する。
+/// 未知 category は `None` (forward-compat、呼び出し側で件数を warn してスキップ)。
+///
+/// **`is_text_producing` との関係 (decisions.md D-RC3)**: 10 個の非 `other` category は
+/// 代表 VK が is_text_producing も raw と一致する (text-producing = alphabetic/numeric/space/enter)。
+/// `other` のみ raw 側に text-producing キー (OEM 句読点/Tab/テンキー演算子) と非 text-producing が
+/// 混在するが、匿名化で区別が失われるため代表 `0x07` は **非 text-producing 側に倒す** (保守的)。
+/// これは `--metrics` のみに影響し run_replay 特徴量 (D6) には無影響。
+fn category_representative_vk(category: &str) -> Option<u32> {
+    // anonymize.rs `KeyCategory::from_vk` の逆。各 category の代表 VK を 1 つ選ぶ。
+    let vk = match category {
+        "alphabetic" => 0x41, // 'A' (0x41..=0x5A) — text-producing
+        "numeric" => 0x30,    // '0' (0x30..=0x39) — text-producing
+        "backspace" => 0x08,  // VK_BACK — is_backspace
+        "delete" => 0x2E,     // VK_DELETE — is_backspace
+        "space" => 0x20,      // VK_SPACE — text-producing
+        "enter" => 0x0D,      // VK_RETURN — text-producing
+        "navigation" => 0x25, // VK_LEFT (0x21..=0x28)
+        "modifier" => 0x10,   // VK_SHIFT
+        "function" => 0x70,   // VK_F1 (0x70..=0x7B)
+        "escape" => 0x1B,     // VK_ESCAPE
+        // from_vk の既定 (どのレンジにも入らず Other へ) かつ !is_text_producing。
+        // raw の Other には text-producing キーも混在するが匿名化で復元不可 (D-RC3)。
+        "other" => 0x07,
+        _ => return None,
+    };
+    Some(vk)
+}
+
+/// `key` イベントの実効 VK コードを解決する (raw / 匿名化 両対応)。
+///
+/// - raw ログ: `vk` をそのまま使う。
+/// - 匿名化ログ: `category` を `category_representative_vk` で代表 VK へ逆写像する。
+///
+/// `vk` を優先し (両方ある異常入力でも raw を尊重)、無ければ `category`、
+/// どちらも解決できなければ `None`。
+fn resolve_key_vk(vk: Option<u32>, category: Option<&str>) -> Option<u32> {
+    vk.or_else(|| category.and_then(category_representative_vk))
 }
 
 /// コマンドライン引数をパース。
@@ -1224,8 +1285,18 @@ fn collect_paste_events(session_path: &PathBuf) -> Result<(Vec<PasteEvent>, u32)
 
 /// v0.4: NDJSON の `{"type":"key", ...}` 行から press イベントを `KeyPress` 列として抽出する。
 ///
-/// `vk` コードのみ保持し (data-privacy ルール1 で記録許可)、Unicode 内容には触れない。
-/// 文字生成キー判定 / backspace 判定は `analysis/metrics.rs` 側の純粋関数で行う。
+/// raw は `vk` を保持し (data-privacy ルール1 で記録許可)、匿名化 NDJSON は `category` を
+/// 代表 VK へ逆写像する (`resolve_key_vk`)。Unicode 内容には触れない。
+///
+/// **backspace/delete 判定 (`metrics::is_backspace`) は raw と完全一致**する (backspace/delete
+/// は専用 category)。一方 **文字生成キー判定 (`metrics::is_text_producing`) は匿名化データで
+/// やや過小評価**しうる: `KeyCategory` の粒度は `is_text_producing` より粗く、OEM 句読点
+/// (0xBA-0xC0/0xDB-0xDF/0xE2)・Tab(0x09)・テンキー演算子(0x6A-0x6F) を `Other` に畳み込むため、
+/// これらは匿名化後 text-producing と判別できない (代表 VK 0x07 = 非 text-producing)。これは
+/// #27 の匿名化設計に内在する不可逆な損失で replay 側では復元不可。`--metrics` の
+/// manual_insert_chars 系のみに影響し、**`--snapshot` / 特徴量再計算 (D6) には無影響**
+/// (run_replay は is_text_producing を使わない)。詳細は
+/// `.steering/20260624-replay-category/decisions.md` D-RC3。
 fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
@@ -1241,6 +1312,7 @@ fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
     let reader = BufReader::new(file);
     let mut out: Vec<KeyPress> = Vec::new();
     let mut parse_failed_lines: u64 = 0;
+    let mut unresolved_keys: u64 = 0;
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
@@ -1253,9 +1325,21 @@ fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
                 continue;
             }
         };
-        if let ReplayEvent::Key { t, vk, press } = ev {
+        if let ReplayEvent::Key {
+            t,
+            vk,
+            category,
+            press,
+        } = ev
+        {
             if press {
-                out.push(KeyPress { timestamp: t, vk });
+                match resolve_key_vk(vk, category.as_deref()) {
+                    Some(resolved_vk) => out.push(KeyPress {
+                        timestamp: t,
+                        vk: resolved_vk,
+                    }),
+                    None => unresolved_keys += 1,
+                }
             }
         }
     }
@@ -1263,6 +1347,12 @@ fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
         tracing::warn!(
             skipped = parse_failed_lines,
             "collect_key_events: NDJSON lines failed to parse as ReplayEvent"
+        );
+    }
+    if unresolved_keys > 0 {
+        tracing::warn!(
+            skipped = unresolved_keys,
+            "collect_key_events: key entries with neither vk nor a known category were skipped"
         );
     }
     out.sort_by_key(|k| k.timestamp);
@@ -1514,6 +1604,8 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
     let engine = CognitiveStateEngine::new();
     let mut ime_open = false;
     let mut snapshots: Vec<FeatSnapshot> = Vec::new();
+    // vk も category も解決できなかった不正 key 行の件数 (内容は出さず件数のみ warn)。
+    let mut unresolved_keys: u64 = 0;
 
     // 各イベントの前に、そのイベントの時刻までゲートを進める
     for ev in ordered {
@@ -1568,13 +1660,28 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
                 // 本番の start_session リセットを再現
                 state.reset(t, 600);
             }
-            ReplayEvent::Key { t, vk, press } => {
+            ReplayEvent::Key {
+                t,
+                vk,
+                category,
+                press,
+            } => {
+                // raw は vk、匿名化は category。代表 VK を解決して従来通り step する。
+                let resolved_vk = match resolve_key_vk(vk, category.as_deref()) {
+                    Some(v) => v,
+                    None => {
+                        // vk も category も無い / 未知 category の不正 key 行。特徴量を汚さない
+                        // よう step せずスキップする (ゲートは前段で進行済み)。件数は後段で warn。
+                        unresolved_keys += 1;
+                        continue;
+                    }
+                };
                 let event = InputEvent {
-                    vk_code: vk,
+                    vk_code: resolved_vk,
                     timestamp: t,
                     is_press: press,
                     is_repeat: false, // step() が pressed_keys で検出する
-                    is_backspace: is_backspace(vk),
+                    is_backspace: is_backspace(resolved_vk),
                     is_paste: false, // replay は key 行から再構成。paste は別 variant で記録済み
                 };
                 let out = step(
@@ -1602,6 +1709,14 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
                 }
             }
         }
+    }
+
+    if unresolved_keys > 0 {
+        tracing::warn!(
+            skipped = unresolved_keys,
+            "run_replay: key entries with neither vk nor a known category were skipped \
+             (malformed or future KeyCategory — features unaffected)"
+        );
     }
 
     Ok(snapshots)
@@ -2378,5 +2493,263 @@ mod tests {
         // main は s1/s2 のみ → 両方較正に取られ評価集合は空。
         assert_eq!(report.evaluation_session_count, 0);
         assert_eq!(report.cindex.x_q1_pooled, None);
+    }
+
+    // =========================================================================
+    // replay-category: 匿名化 NDJSON (key の vk→category) の Replay-as-Truth (D6)
+    // =========================================================================
+    use gse_next_lib::analysis::anonymize::{anonymize_ndjson, find_session_start, KeyCategory};
+
+    /// `category_representative_vk` は `KeyCategory::from_vk` の正しい逆である。
+    /// 全 category について「代表 VK を from_vk に通すと同じ category 文字列へ戻る」ことと、
+    /// is_backspace 判定が backspace/delete のみ true になることを検証する。drift 防止の要。
+    #[test]
+    fn category_representative_vk_roundtrips() {
+        let categories = [
+            "alphabetic",
+            "numeric",
+            "backspace",
+            "delete",
+            "space",
+            "enter",
+            "navigation",
+            "modifier",
+            "function",
+            "escape",
+            "other",
+        ];
+        for cat in categories {
+            let vk = category_representative_vk(cat).unwrap_or_else(|| {
+                panic!("known category {cat} must resolve to a representative vk")
+            });
+            // 逆写像の不変条件: from_vk(repr(c)) == c
+            assert_eq!(
+                KeyCategory::from_vk(vk).as_str(),
+                cat,
+                "representative vk 0x{vk:02X} for {cat} must re-categorize to {cat}"
+            );
+            // is_backspace は backspace/delete のみ true
+            let expect_bs = cat == "backspace" || cat == "delete";
+            assert_eq!(
+                is_backspace(vk),
+                expect_bs,
+                "is_backspace mismatch for category {cat}"
+            );
+            // is_text_producing 不変条件 (D-RC3): text-producing category は
+            // alphabetic/numeric/space/enter のみ。`other` は保守的に非 text-producing。
+            let expect_text = matches!(cat, "alphabetic" | "numeric" | "space" | "enter");
+            assert_eq!(
+                gse_next_lib::analysis::metrics::is_text_producing(vk),
+                expect_text,
+                "is_text_producing mismatch for category {cat}"
+            );
+        }
+        // 未知 category は None (forward-compat)
+        assert_eq!(category_representative_vk("future_category"), None);
+    }
+
+    /// `ReplayEvent::Key` が raw (`vk`) と匿名化 (`category`) の両 JSON 形をデシリアライズし、
+    /// `resolve_key_vk` が双方で妥当な VK を返すことを確認する。
+    #[test]
+    fn replay_event_key_accepts_vk_and_category() {
+        // raw 形
+        let raw = r#"{"type":"key","t":1700000000200,"vk":72,"press":true}"#;
+        match serde_json::from_str::<ReplayEvent>(raw).expect("parse raw key") {
+            ReplayEvent::Key {
+                t,
+                vk,
+                category,
+                press,
+            } => {
+                assert_eq!(t, 1_700_000_000_200);
+                assert_eq!(vk, Some(72));
+                assert_eq!(category, None);
+                assert!(press);
+                assert_eq!(resolve_key_vk(vk, category.as_deref()), Some(72));
+            }
+            other => panic!("expected Key, got {other:?}"),
+        }
+
+        // 匿名化形 (backspace は is_backspace を保持)
+        let anon = r#"{"type":"key","t":1300,"category":"backspace","press":true}"#;
+        match serde_json::from_str::<ReplayEvent>(anon).expect("parse anon key") {
+            ReplayEvent::Key {
+                t,
+                vk,
+                category,
+                press,
+            } => {
+                assert_eq!(t, 1300);
+                assert_eq!(vk, None);
+                assert_eq!(category.as_deref(), Some("backspace"));
+                assert!(press);
+                let resolved = resolve_key_vk(vk, category.as_deref()).expect("resolve category");
+                assert!(
+                    is_backspace(resolved),
+                    "backspace category keeps is_backspace"
+                );
+            }
+            other => panic!("expected Key, got {other:?}"),
+        }
+    }
+
+    /// FeatSnapshot 列を timestamp を 0 に潰して比較可能にする (相対化で timestamp のみ差が出るため)。
+    fn snapshots_without_timestamp(snaps: &[FeatSnapshot]) -> Vec<FeatSnapshot> {
+        snaps
+            .iter()
+            .map(|f| {
+                let mut f = f.clone();
+                f.timestamp = 0;
+                f
+            })
+            .collect()
+    }
+
+    /// **核心テスト (D6 Replay-as-Truth)**: raw を replay した FeatSnapshot と、その raw を
+    /// production の `anonymize_ndjson` (= gse-package が適用する変換) で匿名化した NDJSON を
+    /// replay した FeatSnapshot が、timestamp を除く全特徴量で一致する。
+    ///
+    /// 匿名化は絶対 epoch を session_start 相対へ一律オフセットするため timestamp のみ定数分
+    /// ずれるが、特徴量はイベント間隔のみに依存するため値は不変。
+    #[test]
+    fn replay_anonymized_matches_raw_features() {
+        let raw_path = fixture_path("minimal.ndjson");
+        let raw_snaps = run_replay(&raw_path).expect("replay raw minimal");
+        assert!(!raw_snaps.is_empty(), "raw replay must produce snapshots");
+
+        // raw を実 anonymizer で匿名化 (gse-package と同一の変換)。
+        let raw_text = std::fs::read_to_string(&raw_path).expect("read raw fixture");
+        let session_start = find_session_start(&raw_text).expect("minimal has meta.session_start");
+        assert!(
+            session_start > 0,
+            "session_start offset must be non-trivial"
+        );
+        let (anon_text, skipped) = anonymize_ndjson(&raw_text, session_start);
+        assert_eq!(skipped, 0, "no lines should fail to anonymize");
+        assert!(
+            !anon_text.contains("\"vk\""),
+            "anonymized NDJSON must not contain raw vk"
+        );
+        assert!(
+            anon_text.contains("\"category\""),
+            "anonymized NDJSON must carry category"
+        );
+
+        // 一時ファイルに書いて replay (run_replay はパス入力)。
+        let anon_path =
+            std::env::temp_dir().join(format!("gse_replay_anon_{}.ndjson", std::process::id()));
+        std::fs::write(&anon_path, &anon_text).expect("write anon temp");
+        let anon_snaps = run_replay(&anon_path).expect("replay anonymized minimal");
+        let _ = std::fs::remove_file(&anon_path);
+        assert!(
+            !anon_snaps.is_empty(),
+            "anonymized replay must produce snapshots"
+        );
+
+        // 特徴量値が一致 (timestamp は相対化で異なるため除外)。
+        assert_eq!(
+            snapshots_without_timestamp(&raw_snaps),
+            snapshots_without_timestamp(&anon_snaps),
+            "anonymized replay must reproduce raw feature values (D6 Replay-as-Truth)"
+        );
+        // timestamp は実際に session_start 分ずれていること (相対化が起きた証拠)。
+        // raw は絶対 epoch・anon は相対なので raw >= anon が不変 (checked_sub で underflow を明示防御)。
+        assert_eq!(
+            raw_snaps[0].timestamp.checked_sub(anon_snaps[0].timestamp),
+            Some(session_start),
+            "raw and anonymized timestamps differ exactly by session_start offset"
+        );
+    }
+
+    /// **全 category を網羅した特徴量等価性**: 各 KeyCategory を 1 つずつ含む raw fixture
+    /// (`category_coverage.ndjson`: alphabetic/numeric/space/enter/OEM 句読点/Tab/テンキー演算子/
+    /// navigation/modifier/function/escape/backspace/delete) を replay した特徴量と、その匿名化版を
+    /// replay した特徴量が timestamp を除いて完全一致する。run_replay は is_text_producing を使わず
+    /// is_backspace + リピート検出のみに依存するため、`Other` に畳まれる OEM 句読点等を含めても
+    /// 特徴量は不変であることを保証する (D6 の核心)。
+    #[test]
+    fn replay_anonymized_matches_raw_features_all_categories() {
+        let raw_path = fixture_path("category_coverage.ndjson");
+        let raw_snaps = run_replay(&raw_path).expect("replay raw category_coverage");
+        assert!(!raw_snaps.is_empty());
+
+        let raw_text = std::fs::read_to_string(&raw_path).expect("read raw");
+        let ss = find_session_start(&raw_text).expect("session_start");
+        let (anon_text, skipped) = anonymize_ndjson(&raw_text, ss);
+        assert_eq!(skipped, 0);
+        assert!(!anon_text.contains("\"vk\""));
+
+        let anon_path =
+            std::env::temp_dir().join(format!("gse_replay_anon_cov_{}.ndjson", std::process::id()));
+        std::fs::write(&anon_path, &anon_text).expect("write anon temp");
+        let anon_snaps = run_replay(&anon_path).expect("replay anonymized category_coverage");
+        let _ = std::fs::remove_file(&anon_path);
+
+        assert_eq!(
+            snapshots_without_timestamp(&raw_snaps),
+            snapshots_without_timestamp(&anon_snaps),
+            "feature values must match across all key categories incl. Other-folded keys"
+        );
+    }
+
+    /// **`--metrics` 経路の既知の制約を明示・回帰ロックする (D-RC3)**。匿名化は `is_text_producing`
+    /// より粗い `KeyCategory` を使うため、OEM 句読点・Tab・テンキー演算子 (= raw では text-producing
+    /// だが匿名化で `Other`) が匿名化後に text-producing と判別できず、`collect_key_events` →
+    /// manual_insert 系がちょうどその件数だけ過小評価される。これは #27 の匿名化設計に内在し
+    /// replay では復元不可。**backspace/delete 判定は完全一致**することも併せて確認する。
+    #[test]
+    fn anonymized_metrics_text_producing_undercounts_other_folded_keys() {
+        use gse_next_lib::analysis::metrics::{is_backspace, is_text_producing};
+
+        let raw_path = fixture_path("category_coverage.ndjson");
+        let raw_keys = collect_key_events(&raw_path).expect("collect raw keys");
+
+        let raw_text = std::fs::read_to_string(&raw_path).expect("read raw");
+        let ss = find_session_start(&raw_text).expect("session_start");
+        let (anon_text, _n) = anonymize_ndjson(&raw_text, ss);
+        let anon_path = std::env::temp_dir().join(format!(
+            "gse_replay_anon_metrics_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&anon_path, &anon_text).expect("write anon temp");
+        let anon_keys = collect_key_events(&anon_path).expect("collect anon keys");
+        let _ = std::fs::remove_file(&anon_path);
+
+        // press イベント数は不変 (両方 14 キー press)。
+        assert_eq!(raw_keys.len(), anon_keys.len());
+
+        let raw_text_keys = raw_keys.iter().filter(|k| is_text_producing(k.vk)).count();
+        let anon_text_keys = anon_keys.iter().filter(|k| is_text_producing(k.vk)).count();
+        // raw の text-producing: A,0,numpad7,space,enter,comma,Tab,numpad* = 8。
+        // 匿名化後: alphabetic,numeric,numeric(numpad7),space,enter = 5
+        //   (comma/Tab/numpad* は Other → 0x07 → 非 text-producing)。差 = 3。
+        assert_eq!(raw_text_keys, 8, "raw text-producing key count");
+        assert_eq!(
+            anon_text_keys, 5,
+            "anonymized undercounts the 3 Other-folded text keys (comma/Tab/numpad*)"
+        );
+
+        // backspace/delete 判定は完全一致 (専用 category)。raw に backspace+delete = 2。
+        let raw_bs = raw_keys.iter().filter(|k| is_backspace(k.vk)).count();
+        let anon_bs = anon_keys.iter().filter(|k| is_backspace(k.vk)).count();
+        assert_eq!(raw_bs, 2, "backspace + delete in fixture");
+        assert_eq!(anon_bs, raw_bs, "backspace/delete classification is exact");
+    }
+
+    /// コミット済み (人手検査用) golden `minimal.anon.ndjson` が実 `anonymize_ndjson` 出力と byte 一致する
+    /// ことを保証する drift-guard。匿名化ロジックが変わったら落ちて再生成を促す。
+    #[test]
+    fn anonymized_minimal_fixture_matches_anonymizer() {
+        let raw_text = std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read raw");
+        let session_start = find_session_start(&raw_text).expect("session_start");
+        let (anon_text, _skipped) = anonymize_ndjson(&raw_text, session_start);
+        let committed =
+            std::fs::read_to_string(fixture_path("minimal.anon.ndjson")).expect("read anon golden");
+        // 改行差 (CRLF/LF) を吸収して比較する。
+        assert_eq!(
+            anon_text.replace("\r\n", "\n"),
+            committed.replace("\r\n", "\n"),
+            "committed minimal.anon.ndjson is stale; regenerate from minimal.ndjson via anonymize_ndjson"
+        );
     }
 }
