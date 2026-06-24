@@ -156,11 +156,16 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
     emit("monk-mode-changed", !isMonkMode).catch(() => {});
   };
 
+  // デバッグ表示ゲート。被験者には一切のデバッグ/モデル出力を見せない。
+  // ⚠ import.meta.env.DEV ではなく明示的な VITE_GSE_DEBUG=1 で判定する: 起動方法
+  // (`npm run tauri dev` か `tauri build` 本番バイナリか) に依存せず、被験者は既定で常にブラインド。
+  // 研究者がデバッグ時のみ `VITE_GSE_DEBUG=1 npm run tauri dev` (または .env.local) で有効化する。
+  const debugView = import.meta.env.VITE_GSE_DEBUG === "1";
+
   // Phase 1 較正: モデル出力 (推定状態/確率/GT/状態説明) は被験者へ一切見せない (v0.4 §5.2 minimal dashboard)。
-  // 第1週 (calibrationMode=true) は従来どおり常時ブラインド。第2週 (calibrationMode=false) も
-  // プローブ回答のアンカリングを避けるためブラインドにし、開発ビルド (import.meta.env.DEV) でのみ
-  // デバッグ用に表示する (force_wall と同方式)。pilot/release バンドルからは完全に除去される。
-  const showModelOutput = !calibrationMode && import.meta.env.DEV;
+  // 第1週 (calibrationMode=true) は常時ブラインド。第2週 (calibrationMode=false) も
+  // プローブ回答のアンカリングを避けるためブラインドにし、debugView 時のみデバッグ用に表示する。
+  const showModelOutput = !calibrationMode && debugView;
 
   return (
     <div className={`dashboard-container ${showModelOutput ? `state-${dominant.toLowerCase()}` : 'state-calibration'}`}>
@@ -466,12 +471,12 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
         {stuckMarked ? '✓ 記録しました' : '🔴 今とても詰まっている'}
       </button>
 
-      {/* デバッグ: Wall を HMM と切り離して強制発動する (dev ビルドのみ表示)。
+      {/* デバッグ: Wall を HMM と切り離して強制発動する (debugView=VITE_GSE_DEBUG のみ表示)。
           Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。
-          `import.meta.env.DEV` gate により release/pilot バンドルからは完全に除去され、
-          被験者セッションへの混入リスクをゼロにする (cross-review HIGH-B)。
+          showModelOutput と同じ debugView gate で、起動方法に依存せず被験者バンドルから除外する
+          (`npm run tauri dev` で被験者が回す場合でもボタンは出ない。cross-review HIGH-B 強化)。
           強制発動は NDJSON に reason="debug_force" で残り、解析時にも除外できる。 */}
-      {import.meta.env.DEV && (
+      {debugView && (
         <button
           className="debug-force-wall-button"
           onClick={() =>

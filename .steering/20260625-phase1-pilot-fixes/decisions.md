@@ -13,10 +13,15 @@
 - **採用**: A（ユーザー確定）
 - **理由**: アンカリングを完全排除＋V2 Need 整合＋v0.4 minimal dashboard 整合。
   DEV ビルドではデバッグ用に従来表示を温存。
-- **実装**: `Dashboard.tsx` に `const showModelOutput = !calibrationMode && import.meta.env.DEV;`
-  を導入し、state className / kbd-status / モデル出力分岐 / info-box の 4 箇所を切替。
-  blind notice（「較正モード」）は両週で再利用（Phase 1 全体が較正フェーズのため文言は妥当）。
-- **トレードオフ**: 第2週でも被験者は推定状態を一切見られない（pilot バンドル）。
+- **実装（改訂後）**: `Dashboard.tsx` に `const debugView = import.meta.env.VITE_GSE_DEBUG === "1";`
+  と `const showModelOutput = !calibrationMode && debugView;` を導入し、state className /
+  kbd-status / モデル出力分岐 / info-box の 4 箇所を切替。blind notice（「較正モード」）は両週で再利用。
+- **DEV → VITE_GSE_DEBUG への改訂 (2026-06-25, ユーザー確定)**: 当初 `import.meta.env.DEV` gate
+  だったが、被験者の起動方法が未定（`npm run tauri dev` で回す可能性）。DEV gate だと dev 実行時に
+  第2週のモデル出力が被験者に漏れ盲検が静かに破れる。**起動方法に依存せず既定で常にブラインド**にするため
+  明示フラグ `VITE_GSE_DEBUG=1` 限定に変更。研究者は `VITE_GSE_DEBUG=1 npm run tauri dev`（or `.env.local`）で
+  デバッグ表示。同じ `debugView` を `force_wall` デバッグボタンにも適用（dev 実行時の被験者露出を塞ぐ）。
+- **トレードオフ**: 開発時もデフォルトでは状態が見えない（VITE_GSE_DEBUG を明示する必要）。
 - **影響範囲**: `src/components/Dashboard.tsx` のみ。HMM/schema 不変。
 - **見直しタイミング**: Phase 2 以降で被験者へ状態提示する設計に移る場合。
 
