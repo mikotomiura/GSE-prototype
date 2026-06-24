@@ -33,6 +33,15 @@ name = "gse-package"
 path = "src/bin/package.rs"
 required-features = ["package"]
 
+# pilot-pipeline-runbook (D-PP1): 研究者端末で受領した P###_<session>.age を age 復号し
+# 匿名化 NDJSON を取り出す自己完結 CLI (gse-package の鏡像)。`--keygen` で鍵ペア生成も担う。
+# gse-package と同じ `package` feature gate で age 依存を default ビルドから隔離する
+# (cargo build --features package --bin gse-unpack で生成)。
+[[bin]]
+name = "gse-unpack"
+path = "src/bin/unpack.rs"
+required-features = ["package"]
+
 [features]
 # gse-package bin 専用。age 暗号化を有効化する。default ビルド (Tauri アプリ) には載らない。
 package = ["dep:age"]
