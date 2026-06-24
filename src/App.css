@@ -537,6 +537,19 @@ body {
   border-color: rgba(100, 116, 139, 0.7);
 }
 
+.nudge-dismiss-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 記録失敗時のインラインエラー。死んだボタンに見せず、再押下でリトライ可能と伝える。 */
+.nudge-card-error {
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #fca5a5;
+}
+
 .nudge-card-kicker {
   font-size: 0.68rem;
   font-weight: 700;
