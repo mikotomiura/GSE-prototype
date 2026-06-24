@@ -21,6 +21,14 @@ interface DiagnosticInfo {
 /** Phase 1 Ground Truth ラベルの種別 (backend の UserLabelKind と同期)。 */
 type LabelKind = "flow" | "incubation" | "stuck";
 
+/** ログ書込先の状態 DTO (backend `get_log_status` / LogStatusDto と同期・#1 層2 fail-loud)。 */
+interface LogStatusDto {
+  ok: boolean;
+  mode: "ok" | "fallback" | "disabled";
+  message: string;
+  actual_path: string | null;
+}
+
 interface DashboardProps {
   cognitiveState: {
     flow: number;
@@ -70,12 +78,31 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
     incubation: 0,
     stuck: 0,
   });
+  // #1 層2 fail-loud: ログ書込先の状態。ok 以外なら警告バナーを常時表示し「静かな全損」を防ぐ。
+  const [logStatus, setLogStatus] = useState<LogStatusDto | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setSessionSeconds(Math.floor((Date.now() - sessionStartRef.current) / 1000));
     }, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // #1 層2 fail-loud: 起動時にログ書込先の状態を取得 (被験者にもバナーを見せて無通知の全損を撲滅)。
+  // 取得自体が失敗した場合も握り潰さず、状態不明の警告バナーを出す (fail-loud の一貫性)。
+  useEffect(() => {
+    invoke<LogStatusDto>("get_log_status")
+      .then((s) => setLogStatus(s))
+      .catch((e) => {
+        console.error("get_log_status failed:", e);
+        setLogStatus({
+          ok: false,
+          mode: "disabled",
+          message:
+            "ログの状態を確認できませんでした。記録が失われている可能性があります。研究者に連絡してください。",
+          actual_path: null,
+        });
+      });
   }, []);
 
   // hookActive=false の間、経過秒数をカウントする。
@@ -170,6 +197,27 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
   return (
     <div className={`dashboard-container ${showModelOutput ? `state-${dominant.toLowerCase()}` : 'state-calibration'}`}>
       <h2>Generative Struggle Engine</h2>
+
+      {/* #1 層2 fail-loud: ログ書込先が ok でない (temp フォールバック / 無効) ときの警告バナー。
+          静かなデータ全損を撲滅するため被験者にも常時表示する。生のキー内容は含まない。 */}
+      {logStatus && !logStatus.ok && (
+        <div className="permission-banner" role="alert">
+          <span className="permission-icon">⚠️</span>
+          <div className="permission-text">
+            <strong>
+              {logStatus.mode === "disabled"
+                ? "ログを保存できません"
+                : "ログを一時フォルダに保存しています"}
+            </strong>
+            <p style={{ marginTop: "0.3rem" }}>{logStatus.message}</p>
+            {logStatus.actual_path && (
+              <p style={{ marginTop: "0.2rem", fontSize: "0.85em", opacity: 0.8 }}>
+                保存先: {logStatus.actual_path}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* キーボードフック状態警告 (両プラットフォーム共通) */}
       {hookActive === false && (
@@ -485,6 +533,35 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
           title="HMM を介さず Wall を強制発動 (動作確認用・reason=debug_force でログ)"
         >
           🧱 Wall 強制発動 (デバッグ)
+        </button>
+      )}
+
+      {/* デバッグ (#1 repro): プローブカード / Nudge を即時に出す。card→回答/skip→record_realtime_*
+          と nudge→dismiss→record_intervention_dismiss の経路を能動的に検証する。force_wall と同じ
+          debugView gate で被験者バンドルから除外する。reason="debug_force" でログに残り解析時に除外可。 */}
+      {debugView && (
+        <button
+          className="debug-force-wall-button"
+          onClick={() =>
+            invoke("debug_force_probe").catch((e) =>
+              console.error("debug_force_probe failed:", e)
+            )
+          }
+          title="プローブカードを即時表示 (動作確認用・record_realtime_* 経路の検証)"
+        >
+          📝 プローブ強制表示 (デバッグ)
+        </button>
+      )}
+
+      {debugView && (
+        <button
+          className="debug-force-wall-button"
+          onClick={() =>
+            invoke("force_nudge").catch((e) => console.error("force_nudge failed:", e))
+          }
+          title="Nudge を即時表示 (動作確認用・record_intervention_dismiss 経路の検証)"
+        >
+          💡 Nudge 強制表示 (デバッグ)
         </button>
       )}
 

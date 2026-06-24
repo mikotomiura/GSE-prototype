@@ -12,8 +12,8 @@ use crate::analysis::intervention::{
 };
 use crate::analysis::loop_step::FeatSnapshot;
 use crate::logger::{
-    Condition, DismissReason, ExpectedQuadrant, LabelPool, LogEntry, ProbeRef, ProbeSource,
-    SessionLogger, SkipReason, TaskKind, Track, UserLabelKind,
+    Condition, DismissReason, ExpectedQuadrant, LabelPool, LogEntry, LogStatus, ProbeRef,
+    ProbeSource, SessionLogger, SkipReason, TaskKind, Track, UserLabelKind,
 };
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
@@ -53,6 +53,11 @@ static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 // 通常は false のまま = 既存挙動と完全同一 (pilot 非汚染)。
 static FORCE_WALL: AtomicBool = AtomicBool::new(false);
 
+// デバッグ用: 次回の get_intervention_decision (overlay) で Nudge を一度だけ強制表示するフラグ。
+// `force_nudge` コマンドが true にし、overlay ウィンドウの判定が swap で消費する (ワンショット)。
+// overlay 自身が消費するため main の decide() 上書きと race しない。通常は false = 既存挙動と同一。
+static FORCE_NUDGE: AtomicBool = AtomicBool::new(false);
+
 // ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
@@ -89,6 +94,43 @@ struct LatestFeatState(Arc<Mutex<Option<FeatSnapshot>>>);
 /// MVP Opportunity のポリシー状態。
 /// cooldown / daily cap / recent dismiss / Wall 累積時間を保持する。
 struct InterventionState(Arc<Mutex<InterventionPolicyState>>);
+
+/// ログ書込先の状態 (fail-loud バナー用)。`run()` が SessionLogger::start の `LogStatus` から
+/// 構築して managed state に保持し、`get_log_status` コマンドがフロントへ返す。
+struct LogStatusState(LogStatus);
+
+/// フロントへ返すログ状態 DTO (#1 層2 fail-loud)。`ok=false` ならバナーを常時表示する。
+/// data-privacy: キーストローク内容は含めない。パスは診断のため含める (本文ではない)。
+#[derive(serde::Serialize, Clone)]
+struct LogStatusDto {
+    ok: bool,
+    /// "ok" | "fallback" | "disabled"
+    mode: String,
+    /// 被験者/研究者に見せる固定和文メッセージ (mode に応じて切替)。
+    message: String,
+    /// 実際に書いている / 書こうとしたパス (診断用・null 許容)。
+    actual_path: Option<String>,
+}
+
+/// `try_send` 失敗を Full / Disconnected で区別した診断メッセージに変換する (#1 層2 誤誘導ラベル是正)。
+/// crossbeam の `TrySendError` は両者を Display で区別するが、従来コマンドは両方 "log channel full"
+/// で潰しており **disconnected (consumer 死亡 = ログファイル作成失敗)** を full と誤表示していた。
+///
+/// NOTE: 本修正で consumer は `File::create` 失敗でも死なず (logger.rs `open_log_target` の sink 縮退)、
+/// Disconnected は原則発生しない。万一 Disconnected が出たら consumer スレッドの異常終了 ≒
+/// プログラミングエラーなので、コマンドは敢えて `Err` を上流 (フロント) に伝え **fail-loud** とする
+/// (カードは閉じず・診断文言で原因が分かる)。これは「静かに握り潰さない」#1 の設計意図と一致する。
+fn log_send_error<T>(e: crossbeam_channel::TrySendError<T>) -> String {
+    match e {
+        crossbeam_channel::TrySendError::Full(_) => {
+            "log channel full (consumer backlog)".to_string()
+        }
+        crossbeam_channel::TrySendError::Disconnected(_) => {
+            "log channel disconnected (logger thread died — likely log file create failure)"
+                .to_string()
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Tauri コマンド
@@ -131,6 +173,78 @@ fn force_wall() {
     FORCE_WALL.store(true, Ordering::Release);
 }
 
+/// デバッグ用: 次回の `get_intervention_decision` (overlay) で Nudge を一度だけ強制表示する。
+/// nudge→dismiss→`record_intervention_dismiss` の経路を能動的に検証するため (#1 repro)。
+/// `force_wall` と同方式のワンショットフラグ。Dashboard の debugView gate からのみ呼ぶ。
+#[tauri::command]
+fn force_nudge() {
+    FORCE_NUDGE.store(true, Ordering::Release);
+}
+
+/// デバッグ用: スケジューラ発火と同じ `probe_triggered`(source=random_probe) を即時 emit する。
+/// card→回答/skip→`record_realtime_*` の経路を能動的に検証するため (#1 repro)。Dashboard の
+/// debugView gate からのみ呼ぶ。`ProbeId::generate` で型安全に有効 ID を作る (本文混入を排除・data-privacy)。
+#[tauri::command]
+fn debug_force_probe(app: tauri::AppHandle) -> Result<(), String> {
+    use crate::analysis::probe_scheduler::ProbeId;
+    use rand::SeedableRng;
+
+    let now = epoch_ms();
+    let session_start = SESSION_START_MS.load(Ordering::Acquire);
+    if session_start == 0 {
+        tracing::warn!("debug_force_probe called before session start (ignored)");
+        return Err("session not started".to_string());
+    }
+    // 直近 ~30s 窓を session_start でクランプ (self_marker と同じ窓ロジック)。
+    let (ws, we) = crate::analysis::probe_scheduler::self_marker_window_clamped(now, session_start);
+    // デバッグ専用: now を seed に有効 ID を型安全生成。同一 ms に連打すると ID 衝突しうるが
+    // debugView gate 下の動作確認用途のため実害なし。
+    let mut rng = rand::rngs::StdRng::seed_from_u64(now);
+    let probe_id = ProbeId::generate(&mut rng);
+    app.emit(
+        "probe_triggered",
+        serde_json::json!({
+            "probe_id": probe_id.as_str(),
+            "source": "random_probe",
+            "analysis_window_start_ms": ws,
+            "analysis_window_end_ms": we,
+        }),
+    )
+    .map_err(|e| format!("probe_triggered emit failed: {}", e))?;
+    tracing::info!("debug_force_probe emitted at {}", now);
+    Ok(())
+}
+
+/// ログ書込先の状態をフロントへ返す (#1 層2 fail-loud)。起動時にフロントが取得し、
+/// `ok=false` なら「ログがどこに / 書けていない」旨の警告バナーを常時表示する。
+#[tauri::command]
+fn get_log_status(status: State<'_, LogStatusState>) -> LogStatusDto {
+    match &status.0 {
+        LogStatus::Ok => LogStatusDto {
+            ok: true,
+            mode: "ok".to_string(),
+            message: String::new(),
+            actual_path: None,
+        },
+        LogStatus::Fallback { actual, .. } => LogStatusDto {
+            ok: false,
+            mode: "fallback".to_string(),
+            message: "ログの保存先に書き込めなかったため一時フォルダに保存しています。\
+                      データは残りますが、研究者に連絡してください。"
+                .to_string(),
+            actual_path: Some(actual.to_string_lossy().to_string()),
+        },
+        LogStatus::Disabled { .. } => LogStatusDto {
+            ok: false,
+            mode: "disabled".to_string(),
+            message: "ログを保存できません（記録が失われます）。\
+                      作業を続ける前に研究者に連絡してください。"
+                .to_string(),
+            actual_path: None,
+        },
+    }
+}
+
 #[tauri::command]
 fn get_intervention_decision(
     window_label: String,
@@ -143,6 +257,33 @@ fn get_intervention_decision(
 ) -> InterventionDecision {
     // overlay WebView は表示専用。main 側ポーリングだけが policy state を進める。
     if window_label == "overlay" {
+        // デバッグ強制 Nudge。**consumer は overlay 分岐**である点が FORCE_WALL と非対称:
+        //   - FORCE_WALL  → main (非 overlay) 分岐で消費 (下記)。App が isWallActive を立て持続。
+        //   - FORCE_NUDGE → overlay 分岐 (ここ) で消費。overlay が自分の poll で nudge を直接返すため
+        //     main の decide() 上書きと race しない。Overlay 側が nudgeVisible を保持し持続させる。
+        // どちらもワンショット (swap)・reason="debug_force" でログし解析時に除外可能。
+        if FORCE_NUDGE.swap(false, Ordering::AcqRel) {
+            let now = epoch_ms();
+            let idle_ms = get_keyboard_idle_ms();
+            let decision = {
+                let guard = intervention.0.lock().unwrap_or_else(|p| p.into_inner());
+                guard.force_nudge_decision(idle_ms)
+            };
+            let _ = log.lock().unwrap_or_else(|p| p.into_inner()).tx.try_send(
+                LogEntry::InterventionDecision {
+                    timestamp: now,
+                    action: decision.action.as_str().to_string(),
+                    need_score: decision.need_score,
+                    opportunity_score: decision.opportunity_score,
+                    p_stuck: decision.p_stuck,
+                    idle_ms: decision.idle_ms,
+                    wall_accum_ms: decision.wall_accum_ms,
+                    reason: decision.reason.clone(),
+                    suppressed_by: decision.suppressed_by.clone(),
+                },
+            );
+            return decision;
+        }
         return intervention
             .0
             .lock()
@@ -259,7 +400,7 @@ fn record_intervention_dismiss(
             // Nudge dismiss は経過時間を持たない (Wall 応答のみ elapsed_ms を埋める)。
             elapsed_ms: None,
         })
-        .map_err(|e| format!("log channel full: {}", e))?;
+        .map_err(log_send_error)?;
     Ok(())
 }
 
@@ -529,7 +670,7 @@ fn record_label_internal(log: &Arc<Mutex<LogState>>, label: UserLabelKind) -> Re
             label,
             recovered_at: None,
         })
-        .map_err(|e| format!("log channel full: {}", e))?;
+        .map_err(log_send_error)?;
     tracing::info!("user_label recorded: {} @ {}", label.as_str(), now);
     Ok(now)
 }
@@ -658,7 +799,7 @@ fn record_session_meta(
             condition,
             label_pool,
         })
-        .map_err(|e| format!("log channel full: {}", e))?;
+        .map_err(log_send_error)?;
     tracing::info!(
         "session_meta recorded: track={} task_kind={}",
         track.as_str(),
@@ -697,7 +838,7 @@ fn record_realtime_answer(
             window_start_ms,
             window_end_ms,
         ))
-        .map_err(|e| format!("log channel full: {}", e))?;
+        .map_err(log_send_error)?;
     Ok(())
 }
 
@@ -732,7 +873,7 @@ fn record_realtime_skip(
             window_start_ms,
             window_end_ms,
         ))
-        .map_err(|e| format!("log channel full: {}", e))?;
+        .map_err(log_send_error)?;
     Ok(())
 }
 
@@ -809,7 +950,7 @@ fn record_vignette_response(
             q1_friction,
             q2_progress,
         ))
-        .map_err(|e| format!("log channel full: {}", e))?;
+        .map_err(log_send_error)?;
     Ok(())
 }
 
@@ -1014,12 +1155,21 @@ pub fn run() {
     let log_path_str = log_path.to_string_lossy().to_string();
     tracing::info!("Session log: {}", log_path_str);
 
-    let (_session_logger, log_tx, log_shutdown_rx) = SessionLogger::start(log_path);
+    let (session_logger, log_tx, log_shutdown_rx, log_status) = SessionLogger::start(log_path);
+    // 実際の書込先 (fallback 時は temp パス) を採用する。
+    let resolved_log_path_str = session_logger.log_path.to_string_lossy().to_string();
+    if log_status != LogStatus::Ok {
+        tracing::error!(
+            "Session log status is not Ok: {:?} (intended {})",
+            log_status,
+            log_path_str
+        );
+    }
 
     // LogState を Arc<Mutex> でラップして Tauri state に渡す
     let log_state = Arc::new(Mutex::new(LogState {
         tx: log_tx.clone(),
-        path: log_path_str,
+        path: resolved_log_path_str,
         shutdown_rx: log_shutdown_rx,
     }));
 
@@ -1532,11 +1682,15 @@ pub fn run() {
         .manage(SessionActive(session_active))
         .manage(LatestFeatState(latest_feat))
         .manage(InterventionState(intervention_state))
+        .manage(LogStatusState(log_status))
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
             get_intervention_decision,
             force_wall,
+            force_nudge,
+            debug_force_probe,
+            get_log_status,
             record_intervention_dismiss,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,
@@ -1564,6 +1718,22 @@ pub fn run() {
 #[cfg(test)]
 mod task_c_command_tests {
     use super::*;
+
+    // #1 層2: 誤誘導ラベル是正 — Full と Disconnected を文言で区別すること。
+    #[test]
+    fn log_send_error_distinguishes_full_and_disconnected() {
+        let (tx, rx) = crossbeam_channel::bounded::<u8>(1);
+        tx.try_send(0).unwrap(); // 容量 1 を満杯にする
+        let full = tx.try_send(1).unwrap_err();
+        let full_msg = log_send_error(full);
+        assert!(full_msg.contains("full"), "got: {}", full_msg);
+        assert!(!full_msg.contains("disconnected"), "got: {}", full_msg);
+
+        drop(rx); // receiver を落として Disconnected を作る
+        let disc = tx.try_send(2).unwrap_err();
+        let disc_msg = log_send_error(disc);
+        assert!(disc_msg.contains("disconnected"), "got: {}", disc_msg);
+    }
 
     #[test]
     fn build_probe_ref_random_requires_valid_id() {
