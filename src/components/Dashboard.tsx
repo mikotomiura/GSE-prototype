@@ -156,8 +156,14 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
     emit("monk-mode-changed", !isMonkMode).catch(() => {});
   };
 
+  // Phase 1 較正: モデル出力 (推定状態/確率/GT/状態説明) は被験者へ一切見せない (v0.4 §5.2 minimal dashboard)。
+  // 第1週 (calibrationMode=true) は従来どおり常時ブラインド。第2週 (calibrationMode=false) も
+  // プローブ回答のアンカリングを避けるためブラインドにし、開発ビルド (import.meta.env.DEV) でのみ
+  // デバッグ用に表示する (force_wall と同方式)。pilot/release バンドルからは完全に除去される。
+  const showModelOutput = !calibrationMode && import.meta.env.DEV;
+
   return (
-    <div className={`dashboard-container ${calibrationMode ? 'state-calibration' : `state-${dominant.toLowerCase()}`}`}>
+    <div className={`dashboard-container ${showModelOutput ? `state-${dominant.toLowerCase()}` : 'state-calibration'}`}>
       <h2>Generative Struggle Engine</h2>
 
       {/* キーボードフック状態警告 (両プラットフォーム共通) */}
@@ -347,14 +353,15 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
           <span className="session-label">Keyboard</span>
           {/* 較正中は状態パレット (flow=緑/incubation=黄) を避け中立色にする。
               打鍵状態の色が推定状態の色記号と誤連想されるのを防ぐ (測定独立性・security LOW)。 */}
-          <span className={`session-value kbd-status ${calibrationMode ? 'kbd-neutral' : keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
+          <span className={`session-value kbd-status ${!showModelOutput ? 'kbd-neutral' : keyIsActive ? 'kbd-active' : 'kbd-idle'}`}>
             {keyStatusLabel}
           </span>
         </div>
       </div>
 
-      {/* v0.3 較正モード: モデル出力 (推定状態/確率/GT/状態説明) は測定独立性のため非表示。 */}
-      {calibrationMode ? (
+      {/* Phase 1 較正: モデル出力 (推定状態/確率/GT/状態説明) は測定独立性のため非表示。
+          第2週もアンカリング回避のためブラインド。表示は開発ビルド (showModelOutput) のみ。 */}
+      {!showModelOutput ? (
         <div className="calibration-notice" role="status">
           <span className="calibration-notice-badge">較正モード</span>
           <p>
@@ -431,7 +438,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
         </button>
       )}
 
-      {!calibrationMode && (
+      {showModelOutput && (
         <div className="info-box">
           <p>Type naturally. The engine analyzes your keystroke dynamics.</p>
           <p><strong>Incubation</strong> suggests pausing. <strong>Stuck</strong> suggests moving.</p>
