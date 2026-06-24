@@ -1,0 +1,4 @@
+participant_id,session_id,os,phase
+P101,sess_a,windows,pre
+P101,sess_b,windows,post
+P102,sess_c,macos,pre

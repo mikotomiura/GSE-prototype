@@ -1,0 +1,6 @@
+participant_id,phase,gse_total,nasa_tlx_total
+P101,pre,22,65
+P101,post,31,48
+P102,pre,25,60
+P103,pre,20,70
+P103,post,28,55

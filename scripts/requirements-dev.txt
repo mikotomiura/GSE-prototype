@@ -1,0 +1,10 @@
+# 解析専用 (analysis-only) Python 依存。
+#
+# これらは GSE アプリ (Tauri/Rust) のランタイム依存では一切なく、研究者が
+# `scripts/` の解析ハーネスをローカルで動かすためだけのもの。配布バイナリには載らない。
+#
+#   pip install -r scripts/requirements-dev.txt
+#
+# DuckDB join ハーネス (#6 / decisions.md D5)。NDJSON/JSON/CSV/Parquet を直接クエリでき、
+# ファイル真実源を崩さず分析だけ DB 化する用途。`analysis.db` は使い捨て・再生成可能。
+duckdb==1.5.4
