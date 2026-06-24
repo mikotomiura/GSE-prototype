@@ -31,19 +31,19 @@
 - **選択肢**:
   - A: フロント (VITE_GSE_DEBUG gate) のみ。backend は常時登録（既存 `force_wall` と同水準）
   - B: backend も `#[cfg(debug_assertions)]` で二重ゲート
-- **採用**: A
-- **理由**: フロントの `VITE_GSE_DEBUG` は **Vite ビルド時 env** で、Rust の `debug_assertions`
-  （dev/release）とは独立。研究者のスモークテストは**本番（release）ビルド**で行う想定
-  （next-session-prompt §4）で、そのとき `VITE_GSE_DEBUG=1` でビルドすればボタンを出せるが release では
-  `debug_assertions` が OFF。B にすると「ボタンは出るが invoke が失敗」する不整合が起き、本番スモークの
-  デバッグトリガが使えなくなる。Tauri IPC は同一アプリ WebView 内からのみ到達可能で外部ネットワークから
-  叩けないため、これはセキュリティ境界ではなくデータ整合性（`reason="debug_force"` で解析除外可能）の話。
-  既存 `force_wall` と同設計を踏襲し一貫性を保つ。
-- **トレードオフ**: 被験者が能動的に DevTools を開けば debug 介入を発火しデータ汚染しうる（解析側で
-  reason により除外可能）。盲検は `VITE_GSE_DEBUG` 既定 OFF で守られる（前タスク decisions 判断2）。
-- **影響範囲**: `lib.rs` invoke_handler・`Dashboard.tsx` debugView gate。
-- **見直しタイミング**: 被験者の DevTools 操作によるデータ汚染が実際に観測された場合、または本番スモークで
-  デバッグトリガが不要になった場合は B（cfg ゲート）へ移行する。
+- **採用**: A → **改訂 C（cross-review 反映・2026-06-26）= フロント gate ＋ ランタイム env gate の二重化**
+- **理由（当初 A）**: フロントの `VITE_GSE_DEBUG` は **Vite ビルド時 env** で Rust の `debug_assertions`
+  とは独立。研究者のスモークは**本番（release）ビルド**想定で、`#[cfg(debug_assertions)]`（案 B）にすると
+  「ボタンは出るが invoke が失敗」する不整合が起きる。
+- **改訂 C の理由**: code-reviewer(MEDIUM) と Codex(HIGH) が **両者一致**で「backend がフロント gate のみで
+  無制限。被験者が DevTools から直接 invoke でき実験ログ汚染」と指摘。`debug_assertions` は上記の不整合が
+  あるため使えないが、**ランタイム env `GSE_DEBUG=1`** を backend で要求すれば release ビルドでも成立し、
+  二重 gate になる（`ensure_debug_enabled()` を `force_wall`/`force_nudge`/`debug_force_probe` に適用）。
+  Err を返すため DevTools に拒否理由が出る。研究者はスモーク時に `GSE_DEBUG=1` 環境変数も設定する。
+- **トレードオフ**: 研究者は `VITE_GSE_DEBUG=1`（ビルド時）と `GSE_DEBUG=1`（実行時 env）の **2 つ**を
+  設定する必要がある。被験者は両方未設定で完全にブラインド＋backend でも拒否。
+- **影響範囲**: `lib.rs`（`ensure_debug_enabled` + 3 コマンド・invoke_handler）・`Dashboard.tsx` debugView gate。
+- **見直しタイミング**: 二重 gate でも汚染が起きる場合は session_meta の condition と連動した拒否を検討。
 
 ## 判断 3: NDJSON ログファイルを unix で 0600 / ディレクトリ 0700 に制限
 

@@ -33,8 +33,10 @@
 - [x] code-reviewer ＋ security-checker（logger.rs 変更で必須）並列 → HIGH/CRITICAL なし
 - [x] 指摘対応: force_nudge 真ワンショット化 / consumer ウィンドウ非対称コメント / 0600・0700 権限 /
       get_log_status catch の fail-loud / debug probe ID 衝突コメント（MEDIUM/LOW を全て対応 or 文書化）
-- [x] force_nudge_decision 回帰テスト追加（計 221 件パス）
-- [ ] /cross-review（/finish-task Step 3）
+- [x] force_nudge_decision 回帰テスト追加
+- [x] /cross-review: Codex パス取得成功（commit 後に `main...HEAD` で実行）。両者一致 HIGH = backend
+      debug gate → 対応。Codex HIGH/MEDIUM（temp 衝突・親 dir chmod 副作用・テスト不足）→ 対応。
+      計 222 件パス
 
 ## 完了処理
 - [x] decisions.md 作成（判断1 スコープ / 判断2 ゲート方針 / 判断3 権限）

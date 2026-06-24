@@ -14,8 +14,10 @@
      縮退にしたため、channel が Disconnected にならず #1（カードが閉じない）は原因側で解消。Full でも
      誤誘導ラベル是正で `console.error` が「full」/「disconnected」を区別表示するので診断は容易。
 - **残作業（研究者）**:
-  1. **本番（release）ビルド**で `VITE_GSE_DEBUG=1` を有効化しスモーク: プローブ/Nudge を強制表示 →
-     各ボタンで確実に閉じ `record_*` が NDJSON に残る／ログ書込失敗時に fail-loud バナーが出る、を確認。
+  1. **本番（release）ビルド**で `VITE_GSE_DEBUG=1`（ビルド時）＋ `GSE_DEBUG=1`（実行時 env）の
+     **両方**を有効化しスモーク: プローブ/Nudge を強制表示 → 各ボタンで確実に閉じ `record_*` が NDJSON に
+     残る／ログ書込失敗時に fail-loud バナーが出る、を確認。
+     （cross-review で backend にも `GSE_DEBUG` env gate を追加したため env も必須・decisions 判断2 C 参照）
   2. もし repro でカードのインラインエラーが出たら `console.error` の文言を共有（「full」なら真の backlog
      対策＝容量/drain を別タスクで、「disconnected」なら本修正が直撃）。
   3. macOS は Documents/TCC 文脈が dev と異なるため **本番 .app/.dmg でこそ** fail-loud（temp フォールバック

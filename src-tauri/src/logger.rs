@@ -839,18 +839,15 @@ fn open_log_target(primary: &Path) -> (Box<dyn Write + Send>, PathBuf, LogStatus
 }
 
 /// 親ディレクトリを作成してから NDJSON ファイルを作成する。
-/// NDJSON はキーストローク動態 (VK コード列) を含むため、unix では **所有者のみ** に制限する
-/// (dir=0700 / file=0600)。`$TMPDIR` が共有ディレクトリに上書きされた環境でも他ユーザーが
-/// 打鍵ログを読めないようにする (security-checker / data-privacy ルール 2)。
+/// NDJSON はキーストローク動態 (VK コード列) を含むため、unix では **ファイルを所有者のみ** に
+/// 制限する (file=0600)。`$TMPDIR` が共有ディレクトリに上書きされた環境でも他ユーザーが打鍵ログの
+/// **内容**を読めない (data-privacy ルール 2)。
+/// NOTE: 親ディレクトリの権限は変更しない。`$GSE_DATASET/raw/<id>` 等のユーザー指定・共有前提の
+/// 既存ディレクトリを 0700 へ締めると研究者/別プロセスのアクセスを壊す副作用があるため
+/// (cross-review 指摘)。内容保護は file=0600 で足り、ディレクトリ一覧 (ファイル名) は機微でない。
 fn create_file_at(path: &Path) -> io::Result<File> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            // 既存ディレクトリの権限が緩い場合も 0700 へ締める (ベストエフォート)。
-            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
-        }
     }
     #[cfg(unix)]
     {
@@ -871,13 +868,16 @@ fn create_file_at(path: &Path) -> io::Result<File> {
     }
 }
 
-/// temp フォールバック先 (`$TMPDIR/GSE-sessions/<filename>`)。primary のファイル名を流用する。
+/// temp フォールバック先 (`$TMPDIR/GSE-sessions/<pid>_<filename>`)。primary のファイル名に
+/// プロセス ID を前置し、同秒起動 (ファイル名は秒粒度) や残骸との衝突で既存フォールバックを
+/// truncate 上書きするのを防ぐ (cross-review 指摘)。
 fn temp_fallback_path(primary: &Path) -> PathBuf {
     let name = primary
         .file_name()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("gse_session.ndjson"));
-    std::env::temp_dir().join("GSE-sessions").join(name)
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "gse_session.ndjson".to_string());
+    let unique = format!("{}_{}", std::process::id(), name);
+    std::env::temp_dir().join("GSE-sessions").join(unique)
 }
 
 /// NDJSON形式でセッションデータを書き込むロガー。
@@ -1571,6 +1571,48 @@ mod tests {
         assert!(actual.exists(), "fallback file should exist: {:?}", actual);
 
         // 後始末
+        let _ = fs::remove_file(&actual);
+        let _ = fs::remove_file(&blocker);
+    }
+
+    #[test]
+    fn start_falls_back_keeps_channel_alive_and_writes_entries() {
+        // #1 層2 回帰: primary が書けなくても (a) channel が Disconnected にならず send が成功し続け
+        // (= カードが閉じる)、(b) fallback ファイルに実エントリが書かれること。
+        let blocker =
+            std::env::temp_dir().join(format!("gse_start_blocker_{}.tmp", std::process::id()));
+        {
+            let mut f = File::create(&blocker).unwrap();
+            writeln!(f, "x").unwrap();
+        }
+        // blocker(ファイル) 配下を primary にして File::create を失敗させる。
+        let primary = blocker
+            .join("sub")
+            .join(format!("gse_start_fb_{}.ndjson", std::process::id()));
+
+        let (logger, tx, shutdown_rx, status) = SessionLogger::start(primary.clone());
+        assert!(
+            matches!(status, LogStatus::Fallback { .. }),
+            "expected Fallback, got {:?}",
+            status
+        );
+        // channel は生存 → send は成功する (Disconnected にならない = #1 解消)。
+        tx.send(LogEntry::SessionStart { timestamp: 4242 })
+            .expect("channel must stay connected on fallback");
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        // 実際の書込先 (= fallback) に SessionStart 行が残る。
+        let actual = logger.log_path.clone();
+        assert_eq!(actual, temp_fallback_path(&primary));
+        let contents = fs::read_to_string(&actual).expect("read back fallback log");
+        assert!(
+            contents.contains(r#"{"type":"session_start","t":4242}"#),
+            "fallback file missing entry:\n{contents}"
+        );
+
         let _ = fs::remove_file(&actual);
         let _ = fs::remove_file(&blocker);
     }

@@ -88,4 +88,10 @@
   - `get_log_status` 取得失敗時もバナーを出す（fail-loud の一貫性）。
   - `debug_force_probe` の同一 ms ID 衝突をコメント化。
 - 判断は decisions.md（判断1 スコープ / 判断2 ゲート方針 / 判断3 権限）に記録。
-- **残作業（研究者）**: 本番ビルドでの実機 repro / スモークテスト（blockers.md 参照）。
+- **cross-review（Codex 取得成功）反映**（commit 後に `main...HEAD` で実行）:
+  - backend debug gate `ensure_debug_enabled()`（env `GSE_DEBUG=1`）を 3 debug コマンドに追加
+    （両者一致指摘・判断2 を C に改訂）。
+  - `temp_fallback_path` に pid 前置（同秒衝突での truncate 上書き回避）。
+  - `create_file_at` の親ディレクトリ 0700 chmod を撤去（共有 dir 破壊の副作用回避。内容保護は file=0600）。
+  - `start()` フォールバック統合テスト追加（channel 生存＋fallback 書込検証）。計 222 件パス。
+- **残作業（研究者）**: 本番ビルドでの実機 repro / スモークテスト（`VITE_GSE_DEBUG=1`＋`GSE_DEBUG=1`・blockers.md 参照）。

@@ -168,17 +168,33 @@ fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f6
 /// デバッグ用: 次回の `get_intervention_decision` (main) で Wall を強制発動する。
 /// Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。較正/開発時に
 /// Dashboard のデバッグボタンからのみ呼ぶ。フラグを立てるだけで挙動は判定側がワンショット消費する。
+/// デバッグ専用コマンドのバックエンド側ゲート (defense-in-depth・cross-review 両者一致指摘)。
+/// フロントの `VITE_GSE_DEBUG` 表示 gate に加え、ランタイム env `GSE_DEBUG=1` を要求する。
+/// 被験者が DevTools から直接 invoke しても env 未設定なら拒否され、実験ログ汚染を防ぐ。
+/// `VITE_GSE_DEBUG` はビルド時フロント env で Rust からは読めないため、研究者はスモーク時に
+/// `GSE_DEBUG=1` も設定する (二重 gate)。Err で返すため DevTools に拒否理由が表示される。
+fn ensure_debug_enabled() -> Result<(), String> {
+    match std::env::var("GSE_DEBUG") {
+        Ok(v) if v == "1" => Ok(()),
+        _ => Err("debug command disabled (set GSE_DEBUG=1 to enable)".to_string()),
+    }
+}
+
 #[tauri::command]
-fn force_wall() {
+fn force_wall() -> Result<(), String> {
+    ensure_debug_enabled()?;
     FORCE_WALL.store(true, Ordering::Release);
+    Ok(())
 }
 
 /// デバッグ用: 次回の `get_intervention_decision` (overlay) で Nudge を一度だけ強制表示する。
 /// nudge→dismiss→`record_intervention_dismiss` の経路を能動的に検証するため (#1 repro)。
 /// `force_wall` と同方式のワンショットフラグ。Dashboard の debugView gate からのみ呼ぶ。
 #[tauri::command]
-fn force_nudge() {
+fn force_nudge() -> Result<(), String> {
+    ensure_debug_enabled()?;
     FORCE_NUDGE.store(true, Ordering::Release);
+    Ok(())
 }
 
 /// デバッグ用: スケジューラ発火と同じ `probe_triggered`(source=random_probe) を即時 emit する。
@@ -189,6 +205,7 @@ fn debug_force_probe(app: tauri::AppHandle) -> Result<(), String> {
     use crate::analysis::probe_scheduler::ProbeId;
     use rand::SeedableRng;
 
+    ensure_debug_enabled()?;
     let now = epoch_ms();
     let session_start = SESSION_START_MS.load(Ordering::Acquire);
     if session_start == 0 {
