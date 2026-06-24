@@ -50,3 +50,16 @@ analysis.db
 *.duckdb
 cross_section.csv
 cross_section.parquet
+
+# age secret keys (gse-unpack --keygen, pilot-runbook §2) — never commit private keys.
+# Public keys (age1...) are safe to distribute; only the secret identity is sensitive.
+*age-identity*
+*.agekey
+age-identity.txt
+# Decrypted plaintext / participant artifacts must stay local (data-privacy / D-PP1).
+# raw + decrypted session NDJSON and age ciphertext are never versioned in this repo.
+# Pattern requires a digit right after P (covers P12_/P003_/P9001_ — any participant id
+# gse-package accepts) while NOT matching committed fixtures like phase1_*.ndjson under
+# case-insensitive Windows git. *.age already covers every ciphertext regardless of id width.
+*.age
+P[0-9]*_*.ndjson
