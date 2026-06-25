@@ -1688,6 +1688,13 @@ pub fn run() {
             .transparent(true)
             .always_on_top(true)
             .skip_taskbar(true)
+            // 非フォーカス (key にならない) overlay 窓では、WKWebView の acceptsFirstMouse が
+            // 既定 false のため、カード上のクリックがボタンへ届かず「初回クリック扱い」で
+            // 毎回握りつぶされる (macOS。WRY WryWebView の挙動)。これがカード無反応の真因。
+            // ignoresMouseEvents (setIgnoreCursorEvents) とは独立した別ゲートなので、ここで
+            // accept_first_mouse(true) を有効化して非アクティブ窓のクリックを webview へ通す。
+            // フォーカスは奪わない (key 化しない) ため非ブロック設計は維持される。
+            .accept_first_mouse(true)
             .visible(false)
             .build()
             {
