@@ -5,10 +5,12 @@
 //   10回連続失敗後に Accessibility 権限へ自動フォールバックする。
 // Runs on a dedicated thread with its own CFRunLoop, mirroring the Windows WH_KEYBOARD_LL design.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use core_foundation::base::TCFType;
+use core_foundation::mach_port::CFMachPortRef;
 use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
 use core_graphics::event::{
     CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
@@ -36,6 +38,47 @@ extern "C" {
     // a native system dialog that adds the app to the Accessibility list.
     fn AXIsProcessTrustedWithOptions(options: core_foundation::base::CFTypeRef) -> bool;
 }
+
+// CGEventTapEnable: tap の有効/無効を切り替える CoreGraphics API。
+// core-graphics 0.24 では crate 非公開 (public は CGEventTap::enable() のみで tap 実体が要る)
+// のため、callback から失効した tap を即再有効化する目的で自前宣言する (F4)。
+// TODO: core-graphics が CGEventTap::enable() 以外 (port 単独の再有効化 API) を公開したら
+//       自前 extern を撤去して crate 側へ差し替える。
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventTapEnable(tap: CFMachPortRef, enable: bool);
+}
+
+/// 現在有効な CGEventTap の mach port (CFMachPortRef を `*mut c_void` として保持)。
+///
+/// tap 生成・有効化後に格納し、runloop 退出 (失効) 時に null クリアする。callback が
+/// `TapDisabledByTimeout`/`ByUserInput` を受けたとき、この port を読んで
+/// `CGEventTapEnable(port, true)` で**作り直さず即再有効化**する (F4 主修正)。
+///
+/// スレッド安全性は 2 つの性質を**別々の根拠**で担保する:
+/// - **可視性**: `store(Release)` / `load(Acquire)` で書き込みが callback 側へ可視になる
+///   (`Ordering` が保証するのはここまで。ライフタイム安全性の根拠ではない)。
+/// - **ライフタイム安全性 (UAF 回避)**: 書き込み (hook スレッド本体) と読み出し (callback) は
+///   同一 hook スレッド上で起き、callback は `CFRunLoop::run_current()` 実行中にのみ動作する
+///   (Apple: イベントは「tap source を追加した run loop を回すスレッド」上の callback へ届く)。
+///   port の store は run_current の前、null クリアは run_current から戻った後で行うため、
+///   本体と callback は**時間的に排他** (本体が run_current でブロック中だけ callback が走る)。
+///   よって port が指す `tap.mach_port` は callback 実行中 (格納〜null クリアの間) 常に生存する。
+/// `AtomicPtr` は安全な共有セルとして用いる。
+static TAP_PORT: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
+
+/// 直近で normal イベントを 1 件も挟まずに連続して tap 再有効化した回数 (F4)。
+///
+/// 病的ケース (tap を有効化してもカーネルが即再 disable する) で callback が
+/// 再有効化を無限に繰り返すスラッシングを防ぐための上限カウンタ。normal イベントが
+/// 1 件でも届けば tap 健全とみなして 0 にリセットし、tap 生成時にも 0 に戻す。
+/// 上限超過後は再有効化を諦める — `LAST_KEY_MS` は保持されるため idle は増加し続け
+/// away に倒れる (離席誤発火を起こさない fail-safe な縮退)。
+static CONSECUTIVE_REENABLES: AtomicU32 = AtomicU32::new(0);
+
+/// `CONSECUTIVE_REENABLES` の上限。event-driven な disable では 100 連続 (間に
+/// normal イベント 0 件) は「恒常的に再 disable されている」ことを意味する。
+const MAX_CONSECUTIVE_REENABLES: u32 = 100;
 
 // GCD: メインスレッドへの dispatch に使用。
 // AXIsProcessTrustedWithOptions のネイティブダイアログは NSApplication の
@@ -228,6 +271,35 @@ fn macos_vk_to_vk(mac_vk: u64) -> u32 {
 // CGEventTap callback
 // ---------------------------------------------------------------------------
 fn handle_event(event_type: CGEventType, event: &CGEvent) {
+    // F4: tap が OS 都合 (重い処理 / ユーザー入力割り込み) で無効化されたら
+    // **作り直さず即再有効化**する。これらの disabled イベントは event mask に
+    // 関わらず callback へ届く。CGEventType は PartialEq 未実装のため matches! で判定。
+    if matches!(
+        event_type,
+        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput
+    ) {
+        // スラッシング防止: normal イベントを挟まず連続再有効化した回数が上限未満の
+        // ときだけ再有効化する。上限超過後は諦める (LAST_KEY_MS 保持 → idle 増加 →
+        // away に倒れる fail-safe な縮退)。
+        let n = CONSECUTIVE_REENABLES.fetch_add(1, Ordering::Relaxed);
+        if n < MAX_CONSECUTIVE_REENABLES {
+            let port = TAP_PORT.load(Ordering::Acquire);
+            if !port.is_null() {
+                // SAFETY: port は同一 hook スレッドで格納/null クリアされる有効な
+                // CFMachPortRef (null チェック済み)。CGEventTapEnable は Apple 推奨の
+                // 軽量な再有効化呼び出しで、tap の runloop スレッド (= この callback) から
+                // 呼ぶのが正しい。ブロッキング I/O・ヒープ確保・ログは行わない。
+                unsafe {
+                    CGEventTapEnable(port as CFMachPortRef, true);
+                }
+            }
+        }
+        return;
+    }
+
+    // normal イベント到達 = tap 健全 → 連続再有効化カウンタをリセット。
+    CONSECUTIVE_REENABLES.store(0, Ordering::Relaxed);
+
     // 診断用: コールバック到達カウンタ。0 のままなら「イベントが届いていない」。
     CALLBACK_COUNT.fetch_add(1, Ordering::Relaxed);
 
@@ -609,7 +681,14 @@ pub fn start() {
                                  retrying in 2s..."
                             );
                             HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                            LAST_KEY_MS.store(0, Ordering::Relaxed);
+                            // F4: LAST_KEY_MS は最後の物理打鍵時刻 (セッション非依存)。
+                            // OS 都合の一時失効はキーボード活動と無関係なので 0 に倒さず保持し、
+                            // idle/away の連続性を保つ (離席中のプローブ誤発火を防ぐ)。
+                            // 防衛的: この tap は使わず作り直すため TAP_PORT を null クリアし
+                            // (stale port を callback が触らないよう不変条件を経路非依存にする)、
+                            // 連続再有効化カウンタもリセットする。
+                            TAP_PORT.store(std::ptr::null_mut(), Ordering::Release);
+                            CONSECUTIVE_REENABLES.store(0, Ordering::Relaxed);
                             std::thread::sleep(std::time::Duration::from_secs(2));
                             continue;
                         }
@@ -624,7 +703,15 @@ pub fn start() {
                     tap.enable();
                     thread::sleep(Duration::from_millis(50));
                     HOOK_ACTIVE.store(true, Ordering::Release);
+                    // F4: callback (TapDisabled*) から即再有効化できるよう mach port を公開する。
+                    // tap はこの loop iteration の間 (run_current 中) 生存しており、退出時に
+                    // null クリアするため callback が stale port を触ることはない。
+                    TAP_PORT.store(
+                        tap.mach_port.as_concrete_TypeRef() as *mut std::ffi::c_void,
+                        Ordering::Release,
+                    );
                     CALLBACK_COUNT.store(0, Ordering::Relaxed);
+                    CONSECUTIVE_REENABLES.store(0, Ordering::Relaxed);
                     tracing::info!(
                         "CGEventTap installed via {} (macOS keyboard hook active)",
                         mode_label
@@ -634,7 +721,12 @@ pub fn start() {
 
                     // CFRunLoopRun returned — tap was disabled or invalidated.
                     HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                    LAST_KEY_MS.store(0, Ordering::Relaxed);
+                    // F4: LAST_KEY_MS は 0 に倒さない (上の理由と同じ)。失効前の最終打鍵時刻を
+                    // 保持することで Dashboard idle カウンタの突然の 0 リセット・離席判定の崩れ・
+                    // ランダムプローブの離席中誤発火を防ぐ。
+                    // TAP_PORT は無効化された tap を指したままなので null クリアし、
+                    // 次の callback が stale port へ CGEventTapEnable を呼ばないようにする。
+                    TAP_PORT.store(std::ptr::null_mut(), Ordering::Release);
                     tracing::warn!(
                         "CGEventTap CFRunLoop exited (tap invalidated by macOS). \
                          Re-creating in 2s..."
