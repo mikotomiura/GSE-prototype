@@ -1561,7 +1561,9 @@ pub fn run() {
             // IME Monitor 風の sleep ポーリングで 1Hz 駆動 (wake 信号は不要)。
             // scheduler 純ロジックは analysis/probe_scheduler.rs (OS API 非依存)。
             {
-                use crate::analysis::probe_scheduler::{ProbeConfig, ProbeScheduler};
+                use crate::analysis::probe_scheduler::{
+                    driver_idle_ms, ProbeConfig, ProbeScheduler,
+                };
                 let app_handle = app.handle().clone();
                 let probe_log_tx = log_tx_probe;
                 thread::spawn(move || {
@@ -1603,13 +1605,15 @@ pub fn run() {
                             ));
                         }
                         let now = now_ms();
-                        // idle は get_keyboard_idle_ms と同じ計算 (last_key==0 は 0)。
+                        // idle 計算は driver_idle_ms (純ロジック) に委譲。F4: last_key==0 は
+                        // 「idle 不明」として away_idle_ms に倒し、離席中の誤発火を防ぐ
+                        // (Dashboard 表示用 get_keyboard_idle_ms とは意図的に挙動が異なる)。
                         let last_key = crate::input::hook::last_key_ms();
-                        let idle = if last_key == 0 {
-                            0
-                        } else {
-                            now.saturating_sub(last_key)
-                        };
+                        // away_idle_ms は scheduler と同じ ProbeConfig::default() を参照。
+                        // 将来 away_idle_ms をユーザー設定で可変にするなら sched 側の config から
+                        // 引くよう差し替える (現フェーズは default 固定のため静的取得で一貫する)。
+                        let idle =
+                            driver_idle_ms(now, last_key, ProbeConfig::default().away_idle_ms);
                         let Some(sched) = scheduler.as_mut() else {
                             continue;
                         };

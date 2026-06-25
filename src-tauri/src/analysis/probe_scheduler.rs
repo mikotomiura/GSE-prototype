@@ -35,6 +35,29 @@ pub fn self_marker_window(t_ms: u64) -> (u64, u64) {
     (t_ms.saturating_sub(35_000), t_ms.saturating_sub(5_000))
 }
 
+/// プローブ駆動側が「最終打鍵時刻 (`last_key_ms`)」から idle を求める純ロジック (F4)。
+///
+/// `last_key_ms == 0` は **「idle 不明」** を表す: (a) セッション開始前で一度も打鍵がない、
+/// または (b) 何らかの経路で最終打鍵時刻が失われた状態。このとき `away_idle_ms` を返し、
+/// [`ProbeScheduler::poll`] 側で **away (離席) 扱い → プローブ抑止** に倒す。
+///
+/// 狙い (多層防御): macOS の CGEventTap が OS 都合で一時失効し `LAST_KEY_MS` が
+/// 0 リセットされても (本来 `hook_macos.rs` 側で保持するが)、駆動側でも離席中の
+/// プローブ誤発火を防ぐ保険となる。通常時 (`last_key_ms > 0`) は `now − last_key` を返す。
+///
+/// `away_idle_ms` ちょうどを返すことで away に倒せるのは、[`ProbeScheduler::poll`] の
+/// away 判定が `idle_ms >= away_idle_ms` (境界を含む) だからである (両者は同じ閾値前提)。
+///
+/// 注意: Dashboard 表示用の `get_keyboard_idle_ms` (lib.rs) はこの保守化を適用せず
+/// `last==0 → 0` を維持する (表示としては「未打鍵 = idle 0」が自然なため。設計判断)。
+pub fn driver_idle_ms(now_ms: u64, last_key_ms: u64, away_idle_ms: u64) -> u64 {
+    if last_key_ms == 0 {
+        // idle 不明 → away 寄り (プローブを発火させない)。
+        return away_idle_ms;
+    }
+    now_ms.saturating_sub(last_key_ms)
+}
+
 /// `self_marker_window` を `session_start` でクランプした版 (DB-8 を self_marker に適用)。
 /// セッション開始直後 (`t−35s < session_start`) でも窓始端が `session_start` を下回らず、
 /// 開始前/前セッションの打鍵が窓に混入しない。`session_start_ms==0` (セッション外) では
@@ -310,6 +333,102 @@ mod tests {
             "away (idle≥180s) must thin all probes, got {}",
             fires.len()
         );
+    }
+
+    #[test]
+    fn driver_idle_treats_zero_last_key_as_away() {
+        // F4: last_key==0 (未打鍵 or 失効で不明) は away_idle_ms を返し、
+        // poll 側で away (idle≥away_idle_ms) と判定されてプローブが抑止される。
+        let away = ProbeConfig::default().away_idle_ms;
+        assert_eq!(driver_idle_ms(SESSION_START + 10_000, 0, away), away);
+        assert!(driver_idle_ms(SESSION_START + 10_000, 0, away) >= away);
+    }
+
+    #[test]
+    fn driver_idle_normal_growth() {
+        // 通常時 (last_key>0) は now−last_key がそのまま idle になる。
+        let away = ProbeConfig::default().away_idle_ms;
+        let last = SESSION_START;
+        assert_eq!(driver_idle_ms(SESSION_START + 5_000, last, away), 5_000);
+        assert_eq!(driver_idle_ms(SESSION_START + 200_000, last, away), 200_000);
+        // now < last_key (時計巻き戻し等) でも saturating で 0、パニックしない。
+        assert_eq!(
+            driver_idle_ms(SESSION_START, SESSION_START + 1_000, away),
+            0
+        );
+    }
+
+    #[test]
+    fn away_series_with_transient_zero_last_key_never_fires() {
+        // F4 回帰: 離席中 (idle≥away) に OS フック失効で last_key が周期的に 0 へ
+        // リセットされても、driver_idle_ms が 0 を away に倒すためプローブは発火しない。
+        // 旧ロジック (last_key==0 → idle=0) なら 0 リセット時に「在席」と誤判定し発火する。
+        // 候補を毎秒到来させ gap/cap を無効化し、away ゲート単体を厳しく検証する。
+        let config = ProbeConfig {
+            lambda_per_ms: 1.0 / 1000.0, // 平均 1s 間隔 → 候補が頻繁に到来
+            gap_min_ms: 0,
+            cap_window_ms: 1,
+            cap_count: usize::MAX,
+            away_idle_ms: 180_000,
+            min_session_elapsed_ms: 0,
+        };
+        let mut sched = ProbeScheduler::from_seed(7, config, SESSION_START);
+        // ずっと離席を表す古い last_key (session_start より away+60s 前)。
+        let away_last_key = SESSION_START.saturating_sub(config.away_idle_ms + 60_000);
+        let mut now = SESSION_START;
+        let end = SESSION_START + 30 * MIN;
+        let mut tick = 0u64;
+        let mut fired = 0usize;
+        while now <= end {
+            // 100 tick ごとに last_key を 0 にリセット (tap 再インストールを模擬)。
+            let last_key = if tick % 100 == 0 { 0 } else { away_last_key };
+            let idle = driver_idle_ms(now, last_key, config.away_idle_ms);
+            if sched.poll(now, idle).is_some() {
+                fired += 1;
+            }
+            now += 1000;
+            tick += 1;
+        }
+        assert_eq!(
+            fired, 0,
+            "away 中は last_key の一時的 0 リセットがあってもプローブは発火してはならない"
+        );
+    }
+
+    #[test]
+    fn poll_thins_at_exactly_away_threshold() {
+        // driver_idle_ms が away_idle_ms ちょうどを返す前提 (poll の `>=` 境界) を固定する。
+        // idle == away_idle_ms で発火しないことを保証 (この等値が崩れると保守化が無効になる)。
+        let config = ProbeConfig {
+            lambda_per_ms: 1.0 / 1000.0,
+            gap_min_ms: 0,
+            cap_window_ms: 1,
+            cap_count: usize::MAX,
+            away_idle_ms: 180_000,
+            min_session_elapsed_ms: 0,
+        };
+        let mut sched = ProbeScheduler::from_seed(11, config, SESSION_START);
+        let mut now = SESSION_START;
+        for _ in 0..600 {
+            assert!(
+                sched.poll(now, config.away_idle_ms).is_none(),
+                "idle == away_idle_ms は away 扱いで発火してはならない"
+            );
+            now += 1000;
+        }
+    }
+
+    #[test]
+    fn present_then_transient_zero_does_not_fire() {
+        // 保守設計の明文化: 在席中 (idle < away) に last_key が一時的に 0 化しても、
+        // driver_idle_ms は 0 を away に倒すためその tick では発火しない。
+        // (在席なのに 1 プローブ抑止される側の誤りは「離席中発火」より研究的に無害。decisions.md D2)
+        let away = ProbeConfig::default().away_idle_ms;
+        // 在席相当 (5 秒前に打鍵)。
+        let present_last_key = SESSION_START + 100_000 - 5_000;
+        let now = SESSION_START + 100_000;
+        assert!(driver_idle_ms(now, present_last_key, away) < away); // 通常は在席
+        assert_eq!(driver_idle_ms(now, 0, away), away); // 0 化した瞬間は away 側
     }
 
     #[test]
