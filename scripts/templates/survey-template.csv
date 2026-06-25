@@ -1,0 +1,3 @@
+participant_id,phase,gse_total,nasa_tlx_total,walk_done,returned_to_work,inconvenience_benefit_accepted
+P999,pre,22,65,,,
+P999,post,29,52,1,4,4

@@ -21,9 +21,13 @@ Google Form の実列名は未確定。実フォーム確定時に追従する�
 | `phase` | `pre` / `post` (必須・join キー) |
 | `gse_total` | (c) 一般性自己効力感 GSE 合計 (10-40, D3) |
 | `nasa_tlx_total` | NASA-TLX 合計 (任意) |
+| `walk_done` / `returned_to_work` / `inconvenience_benefit_accepted` | (D8 WoZ) 散歩受容の post 自己申告 (本 fixture では省略。正準スキーマは `scripts/templates/`) |
 
 ⚠️ **実名・メール等の PII 列は禁止**。混入時はハーネスが exit 6 で停止する
 (data-privacy / decisions.md D1。実名↔P-ID 対応表は repo 外)。
+
+> この fixture は join の 4 象限検証用に最小列のみ持つ。運用で配る正準 survey スキーマ
+> (D8 WoZ 列込み) と配置規約は `scripts/templates/README.md` / `docs/pilot-runbook.md` 参照。
 
 ## 被験者構成 (4 象限を網羅)
 
