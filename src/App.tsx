@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import Dashboard from "./components/Dashboard";
 import Overlay from "./components/Overlay";
+import CardWindow from "./components/CardWindow";
 import VignetteTest from "./components/VignetteTest";
 import type { TaskKind } from "./probeTypes";
 import "./App.css";
@@ -233,6 +234,11 @@ function App() {
   // session-started イベント購読と window.show() は不要。
 
   // Render based on Window Label
+  // card 窓: 介入カード (Probe / Nudge) 専用の不透明小窓。透明 overlay 窓だと macOS で
+  // クリックが webview に届かないため分離した (overlay は Wall 専用)。
+  if (windowLabel === "card") {
+    return <CardWindow />;
+  }
   if (windowLabel === "overlay") {
     return (
       <Overlay

@@ -197,6 +197,13 @@ fn force_nudge() -> Result<(), String> {
     Ok(())
 }
 
+/// DIAG TEMP: フロント (特に card 窓) から stdout へ可視化ログを出すための診断コマンド。
+/// card 窓の React が生きているか・show が走ったか・成否を端末で確認する。検証後に削除する。
+#[tauri::command]
+fn card_dbg(msg: String) {
+    tracing::info!("[CARD] {}", msg);
+}
+
 /// デバッグ用: スケジューラ発火と同じ `probe_triggered`(source=random_probe) を即時 emit する。
 /// card→回答/skip→`record_realtime_*` の経路を能動的に検証するため (#1 repro)。Dashboard の
 /// debugView gate からのみ呼ぶ。`ProbeId::generate` で型安全に有効 ID を作る (本文混入を排除・data-privacy)。
@@ -280,6 +287,8 @@ fn get_intervention_decision(
         //     main の decide() 上書きと race しない。Overlay 側が nudgeVisible を保持し持続させる。
         // どちらもワンショット (swap)・reason="debug_force" でログし解析時に除外可能。
         if FORCE_NUDGE.swap(false, Ordering::AcqRel) {
+            // DIAG TEMP: overlay のポーリングが force_nudge を消費した証跡。検証後削除。
+            tracing::info!("[DIAG] force_nudge consumed by overlay poll");
             let now = epoch_ms();
             let idle_ms = get_keyboard_idle_ms();
             let decision = {
@@ -1018,6 +1027,16 @@ fn start_session(
     } else {
         tracing::error!("Overlay window not found — setup() may have failed");
     }
+
+    // card 窓を画面外のまま show して webview の JS を起こす (隠れ窓だと JS が休眠し
+    // probe_triggered を取りこぼすため)。以後 CardWindow.tsx が画面外/右上へ出し入れする。
+    // 初期位置は -20000,-20000 (画面外) なので show してもユーザーには見えない。
+    if let Some(card) = app.get_webview_window("card") {
+        let _ = card.show();
+        tracing::info!("Card window shown off-screen (JS wake)");
+    } else {
+        tracing::error!("Card window not found — setup() may have failed");
+    }
 }
 
 /// アプリ終了。終了前に以下を順に実行する:
@@ -1688,18 +1707,44 @@ pub fn run() {
             .transparent(true)
             .always_on_top(true)
             .skip_taskbar(true)
-            // 非フォーカス (key にならない) overlay 窓では、WKWebView の acceptsFirstMouse が
-            // 既定 false のため、カード上のクリックがボタンへ届かず「初回クリック扱い」で
-            // 毎回握りつぶされる (macOS。WRY WryWebView の挙動)。これがカード無反応の真因。
-            // ignoresMouseEvents (setIgnoreCursorEvents) とは独立した別ゲートなので、ここで
-            // accept_first_mouse(true) を有効化して非アクティブ窓のクリックを webview へ通す。
-            // フォーカスは奪わない (key 化しない) ため非ブロック設計は維持される。
-            .accept_first_mouse(true)
             .visible(false)
             .build()
             {
                 Ok(_) => tracing::info!("Overlay window pre-created (hidden)"),
                 Err(e) => tracing::error!("Failed to pre-create overlay window: {}", e),
+            }
+
+            // 介入カード (Probe / Nudge) 専用の **不透明な小窓**。
+            // 透明 always_on_top overlay 窓は macOS でマウスイベントを webview へ一切配送せず
+            // カードのボタンが押せない (DIAG 計器で pointer/click=0 を実測)。透明窓そのものが
+            // クリックを素通りさせるのが真因。不透明窓なら標準でクリックが届く。
+            // overlay (全画面透明・Wall 用) とは分離し、card は常にカードサイズの小窓。
+            // - accept_first_mouse(true): 非アクティブ窓 (フォーカス非奪取) でも初回クリックを受ける。
+            // - focused(false): フォーカスを奪わない (非ブロック設計の維持)。
+            // - 表示/非表示と位置はフロント (CardWindow.tsx) が制御する。
+            match tauri::WebviewWindowBuilder::new(
+                app,
+                "card",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("GSE Card")
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .accept_first_mouse(true)
+            .resizable(false)
+            .inner_size(380.0, 480.0)
+            // 画面外の初期位置。隠れ窓 (orderOut) は macOS で webview の JS が休眠し
+            // Tauri イベントを取りこぼす (実測: probe_triggered が card 窓に届かない) ため、
+            // hide() せず「常に show のまま画面外へ退避」する方式にする。start_session で
+            // 一度 show して JS を起こし、以後 CardWindow.tsx が画面外/右上を出し入れする。
+            .position(-20000.0, -20000.0)
+            .focused(false)
+            .visible(false)
+            .build()
+            {
+                Ok(_) => tracing::info!("Card window pre-created (hidden, opaque)"),
+                Err(e) => tracing::error!("Failed to pre-create card window: {}", e),
             }
             Ok(())
         })
@@ -1728,6 +1773,7 @@ pub fn run() {
             reset_accessibility,
             open_accessibility_settings,
             start_session,
+            card_dbg,
             quit_app,
             get_session_file,
             record_user_label,

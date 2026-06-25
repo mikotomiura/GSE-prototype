@@ -3,7 +3,6 @@ import { getCurrentWindow, currentMonitor } from "@tauri-apps/api/window";
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import ProbeCard from "./ProbeCard";
 
 // プローブ/Nudge 単独表示時にオーバーレイ窓を縮小する右上ボックス (logical px)。
 // カード (~360px) を収め、これ以外の画面領域は OS レベルでクリック透過になる
@@ -60,6 +59,9 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [nudgeError, setNudgeError] = useState<string | null>(null);
     // dismiss 送信中フラグ (ボタン disable 用)。
     const [nudgeSubmitting, setNudgeSubmitting] = useState(false);
+    // DIAG TEMP: クリック/ポインタが webview(DOM) に届いているかの計器。検証後に削除する。
+    const [diagPointer, setDiagPointer] = useState(0);
+    const [diagClick, setDiagClick] = useState(0);
     // dismiss 送信の相互排他ガード (手動ボタン経路と silent タイマー経路の二重送信を防ぐ)。
     // state はタイマー closure 内で stale になるため ref で同期的に判定する。
     const dismissInFlightRef = useRef(false);
@@ -332,12 +334,16 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
 
     return (
         <div className="overlay-root">
-            {/* Task C: v0.3 較正のプローブ回答カード (probe_triggered を listen)。
-                Wall 発動中は表示しない (上の effect で probeActive もリセット)。 */}
-            {!isWallActive && <ProbeCard onActiveChange={setProbeActive} />}
+            {/* Probe カードは不透明な専用 card 窓 (CardWindow.tsx) に移設した
+                (透明 overlay 窓では macOS でクリックが webview に届かないため)。
+                overlay は Wall (全画面ブロック) と Nudge を担当する。 */}
 
             <aside
                 className={`nudge-card ${nudgeVisible ? "nudge-card-visible" : ""}`}
+                onPointerDown={() => {
+                    setDiagPointer((n) => n + 1);
+                    console.log("[DIAG] nudge card pointerDown");
+                }}
                 style={{
                     opacity: nudgeVisible ? 1 : 0,
                     transform: nudgeVisible ? "translateY(0)" : "translateY(12px)",
@@ -348,6 +354,20 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 <div className="nudge-card-copy">
                     <span className="nudge-card-kicker">Pause point</span>
                     <strong>One breath. Next move.</strong>
+                </div>
+                {/* DIAG TEMP: クリック到達計器。検証後に削除する。 */}
+                <div
+                    style={{
+                        margin: "0.3rem 0",
+                        padding: "0.3rem 0.5rem",
+                        background: "#7c3aed",
+                        color: "#fff",
+                        fontWeight: 700,
+                        borderRadius: "6px",
+                        textAlign: "center",
+                    }}
+                >
+                    DIAG pointer:{diagPointer} / click:{diagClick}
                 </div>
                 {/* dismiss 4択 (WBS 0.8): Need 誤り / Opportunity 誤り / 単に閉じる を分離記録。
                     「無言(silent)」はボタンを押さずフェードした場合に相当し UI には出さない。 */}
@@ -372,7 +392,12 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                         type="button"
                         className="nudge-dismiss-btn"
                         disabled={nudgeSubmitting}
-                        onClick={() => handleNudgeDismiss("just_close")}
+                        onClick={() => {
+                            // DIAG TEMP: onClick 発火計測。検証後に削除する。
+                            setDiagClick((n) => n + 1);
+                            console.log("[DIAG] nudge 閉じる onClick fired");
+                            void handleNudgeDismiss("just_close");
+                        }}
                     >
                         閉じる
                     </button>

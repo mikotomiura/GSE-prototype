@@ -20,6 +20,12 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   const [q1, setQ1] = useState(3); // 摩擦 (1=詰まってない .. 5=とても詰まった)
   const [q2, setQ2] = useState(3); // 前進 (1=まったく進んでない .. 5=とても進んだ)
   const [submitting, setSubmitting] = useState(false); // 送信中フラグ (二重送信防止)
+  // DIAG TEMP: クリック/ポインタが webview(DOM) に届いているかを白黒つける計器。
+  // pointerDown = カード上の任意のポインタ押下、click = 「回答する」ボタンの onClick。
+  // 数字が増えれば DOM まで届いている (原因は記録/ロジック側)、増えなければ届いていない
+  // (= ウィンドウ構造のクリック配送問題)。検証後に削除する。
+  const [diagPointer, setDiagPointer] = useState(0);
+  const [diagClick, setDiagClick] = useState(0);
   // 記録失敗時のインラインエラー文言。null = エラーなし。失敗時はカードを保持し
   // これを表示してボタン再押下でリトライさせる (較正データを静かに失わない + 死んだボタン化を防ぐ)。
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +133,10 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   return (
     <div
       className="probe-card probe-card-pop"
+      onPointerDown={() => {
+        setDiagPointer((n) => n + 1);
+        console.log("[DIAG] probe card pointerDown");
+      }}
       style={{
         position: "fixed",
         right: "1.25rem",
@@ -148,6 +158,21 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
         直前の30秒について教えてください
       </div>
 
+      {/* DIAG TEMP: クリック到達計器。検証後に削除する。 */}
+      <div
+        style={{
+          margin: "0 0 0.6rem",
+          padding: "0.3rem 0.5rem",
+          background: "#7c3aed",
+          color: "#fff",
+          fontWeight: 700,
+          borderRadius: "6px",
+          textAlign: "center",
+        }}
+      >
+        DIAG pointer:{diagPointer} / click:{diagClick}
+      </div>
+
       <div style={{ fontSize: "0.82rem", marginBottom: "0.1rem" }}>
         Q1. どれだけ詰まっていた感覚ですか?
       </div>
@@ -160,7 +185,12 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
 
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.9rem" }}>
         <button
-          onClick={submitAnswer}
+          onClick={() => {
+            // DIAG TEMP: onClick が発火したか (= クリックがボタンに届いたか) を計測。
+            setDiagClick((n) => n + 1);
+            console.log("[DIAG] probe 回答する onClick fired");
+            void submitAnswer();
+          }}
           disabled={submitting}
           style={{ flex: 1, padding: "0.5rem", cursor: "pointer" }}
         >

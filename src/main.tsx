@@ -4,8 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 
 // Layer 2: React マウント前にウィンドウ別の背景制御。
-// overlay ウィンドウでは index.html のインライン背景 (#0f172a) を透過に切り替える。
-// main ウィンドウでは #0f172a のままにし、CSS/React 依存なしで黒画面を防止する。
+// overlay 窓 (Wall 用・透明全画面) は透過に。card 窓 (probe/nudge 用・不透明小窓) と
+// main 窓は index.html の #0f172a のまま (CSS/React 依存なしで黒画面を防止)。
 // getCurrentWindow() は __TAURI_INTERNALS__ を参照する同期 API なので安全。
 if (getCurrentWindow().label === "overlay") {
   document.body.style.backgroundColor = "transparent";
