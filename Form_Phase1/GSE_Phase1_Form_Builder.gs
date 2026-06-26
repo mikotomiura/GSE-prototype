@@ -48,6 +48,13 @@ var PUBKEY_SOURCE_INFO =
   "配布パッケージ同梱の pubkey.txt（age 公開鍵）。" +
   "暗号化はこの公開鍵だけで完結し、復号は研究者しかできません。";
 
+// 守秘同意書（NDA）の入手・署名・返送方法。GSE は未公開のため、署名返送を **アプリ配布の前提** とする（D8）。
+// ⚠ 実際の配布方法（添付PDF / 署名リンク / 返送先メール等）に合わせて研究者が書き換える。
+var NDA_SIGN_INFO =
+  "（守秘同意書の入手先と返送方法をここに記入。" +
+  "例: 本メールに PDF を添付 → 署名（記名）して mmiura.network@gmail.com へ返送、" +
+  "または電子署名リンク。未成年の方は保護者の署名も必要です）";
+
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
 // F2-C(事前) と F5(事後) で matched 再測定するため、両者が必ず byte 一致するよう
 // 単一定数として一元定義する（code-reviewer LOW: 二重定義による pre/post 不一致事故を構造的に防止）。
@@ -105,7 +112,13 @@ function buildForm() {
     "・開いているウィンドウのタイトル\n\n" +
     "▼ データの扱い\n" +
     "お名前・メールアドレスは、ログとは別に保管され、匿名の参加者IDでのみ結びつけられます。" +
-    "対応表は共有されません。いつでも理由を告げずに参加を撤回でき、提出済みデータの削除を求められます。"
+    "対応表は共有されません。いつでも理由を告げずに参加を撤回でき、提出済みデータの削除を求められます。\n\n" +
+    "▼ 秘密保持のお願い\n" +
+    "GSE は未公開のソフトウェアです。検証中に知り得た画面・介入の挙動・仕組み等を第三者に口外しないよう" +
+    "お願いします。適格と判定された方には、別途「守秘同意書」をお送りし、署名のご返送をアプリ配布の条件と" +
+    "させていただきます（協力者の方には正式な秘密保持契約書をお願いする場合があります）。\n\n" +
+    "▼ お問い合わせ先\n" +
+    "研究・データに関するご質問は mmiura.network@gmail.com までご連絡ください。"
   );
   form.setCollectEmail(false); // メールはF1設問で別途収集
   form.setShowLinkToRespondAgain(false);
@@ -132,6 +145,33 @@ function buildForm() {
   q2.setTitle("操作ログ（本文を除く）の記録と研究利用に同意します。");
   q2.setChoices([q2.createChoice("同意する")]);
   q2.setRequired(true);
+
+  // Q2b: 任意性・撤回の自由（インフォームド・コンセントの明示）
+  var qVoluntary = form.addCheckboxItem();
+  qVoluntary.setTitle(
+    "参加は任意であり、いつでも理由を告げずに撤回でき、提出済みデータの削除を求められること、" +
+    "撤回によって不利益を受けないことを理解しました。"
+  );
+  qVoluntary.setChoices([qVoluntary.createChoice("理解した")]);
+  qVoluntary.setRequired(true);
+
+  // Q2c: 匿名管理・公表範囲
+  var qAnon = form.addCheckboxItem();
+  qAnon.setTitle(
+    "氏名・メールは匿名の参加者ID（P-ID）で管理され、実名との対応表は共有されないこと、" +
+    "研究の公表時は匿名の集計のみが用いられることに同意します。"
+  );
+  qAnon.setChoices([qAnon.createChoice("同意する")]);
+  qAnon.setRequired(true);
+
+  // Q2d: 秘密保持（守秘同意書への署名了承）。onF1Submit はこの項目も適格判定に使う（キーワード「口外」）。
+  var qConfidential = form.addCheckboxItem();
+  qConfidential.setTitle(
+    "検証中に知り得た GSE（未公開ソフトウェア）の情報を第三者に口外せず、別途お送りする守秘同意書" +
+    "（協力者の場合は秘密保持契約書）に署名することに同意します。"
+  );
+  qConfidential.setChoices([qConfidential.createChoice("同意する")]);
+  qConfidential.setRequired(true);
 
   // Q3: 年齢（分岐あり）
   var q3 = form.addMultipleChoiceItem();
@@ -849,7 +889,7 @@ function buildRosterTab_(ss) {
   var header = [
     "P-ID", "氏名/ニックネーム", "メール", "OS", "条件(baseline/intervention)",
     "F1同意日", "F2事前", "セッション数", "F4回答(計)", "F5事後",
-    "Dropbox提出", "撤回/除外", "備考",
+    "Dropbox提出", "NDA署名", "撤回/除外", "備考",
   ];
   // 行1: 機密注意バナー（data-privacy / pilot-runbook §0）。
   sh.getRange(1, 1).setValue(
@@ -1063,8 +1103,8 @@ function onF1Submit(e) {
         Logger.log("📝 通知メールの下書きを作成しました → " + maskEmail_(a.email) + "（Gmail 下書きで内容確認後に送信）");
       }
     } catch (mailErr) {
-      // 備考列(13)に未通知フラグを立てる（dedup で再発番されないため、ここを研究者が拾って手動通知）。
-      sheet.getRange(appendedRow, 13).setValue("⚠通知未作成-要手動送信: " + mailErr);
+      // 備考列(14)に未通知フラグを立てる（dedup で再発番されないため、ここを研究者が拾って手動通知）。
+      sheet.getRange(appendedRow, 14).setValue("⚠通知未作成-要手動送信: " + mailErr);
       Logger.log("❌ 通知作成に失敗（P-ID は発番済 " + pid + "）。備考に未通知フラグを記録: " + mailErr);
     }
   } finally {
@@ -1101,9 +1141,11 @@ function f1Answers_(response) {
   }
   var consent1 = find(function (t) { return has(t, "説明を読み"); });
   var consent2 = find(function (t) { return has(t, "記録と研究利用に同意"); });
+  var confidential = find(function (t) { return has(t, "口外"); }); // Q2d 秘密保持
   return {
     consent1: asArray_(consent1),
     consent2: asArray_(consent2),
+    confidential: asArray_(confidential),
     age: find(function (t) { return has(t, "年齢"); }),
     guardian: find(function (t) { return has(t, "保護者同意フォーム"); }),
     ime: find(function (t) { return has(t, "日本語入力") && has(t, "IME"); }),
@@ -1128,6 +1170,7 @@ function trim_(v) {
 function isEligibleF1_(a) {
   if (a.consent1.indexOf("説明を理解した") === -1) return { eligible: false, reason: "説明理解(Q1)未チェック" };
   if (a.consent2.indexOf("同意する") === -1) return { eligible: false, reason: "記録同意(Q2)未チェック" };
+  if (a.confidential.indexOf("同意する") === -1) return { eligible: false, reason: "秘密保持(Q2d)未同意" };
 
   if (a.age === "18歳未満") {
     if (a.guardian !== "提出済み") return { eligible: false, reason: "未成年で保護者同意(Q4)未提出" };
@@ -1143,8 +1186,9 @@ function isEligibleF1_(a) {
   return { eligible: true, reason: "" };
 }
 
-// 通知メール本文テンプレート。P-ID と次ステップ（アプリ入手・gse-package・pubkey.txt・Dropbox）を案内。
-// pilot-runbook §3（被験者 3 ステップ）と整合させる。
+// 通知メール本文テンプレート。P-ID と最初のステップ（守秘同意書への署名）を案内する。
+// GSE は未公開のため、署名のご返送を確認してからアプリ一式を配布する（D8・NDA→配布の順）。
+// アプリ入手後の手順（gse-package / Dropbox）は配布時の案内に回し、ここでは予告に留める。
 function f1EmailBody_(pid) {
   return [
     "GSE ユーザー検証へのご参加ありがとうございます。スクリーニングの結果、ご参加いただけます。",
@@ -1153,27 +1197,19 @@ function f1EmailBody_(pid) {
     "    " + pid,
     "    ※ 以降のフォーム回答・ログ提出すべてでこの P-ID を使います。実名は使いません。",
     "",
-    "■ 次のステップ",
-    "  1) アプリ一式の入手",
-    "     " + APP_DOWNLOAD_INFO,
-    "     （gse 本体アプリ + gse-package + pubkey.txt の 3 点）",
+    "■ 最初のステップ：守秘同意書へのご署名（アプリ配布の前提）",
+    "  GSE は未公開のソフトウェアです。検証中に知り得た情報を口外しないことへのご同意として、",
+    "  守秘同意書にご署名のうえご返送ください。",
+    "    " + NDA_SIGN_INFO,
+    "  ※ ご署名のご返送を確認しだい、アプリ一式（gse 本体・gse-package・pubkey.txt）と詳しい手順を",
+    "    改めてお送りします。",
     "",
-    "  2) いつも通り作業（セッション収集）",
-    "     アプリを起動して執筆・思考作業をすると、セッションログが端末に生成されます。",
-    "",
-    "  3) ログの匿名化 + 暗号化（1 コマンド）",
-    "     生成された raw ログに対し、ターミナルで次を実行してください:",
-    "",
+    "■ このあとの流れ（署名確認後・予告）",
+    "  1) アプリ一式を受け取り、いつも通り作業（セッションログが端末に生成されます）",
+    "  2) ログを 1 コマンドで匿名化 + 暗号化:",
     "       gse-package --input <生成された.ndjson> --participant " + pid + " --recipient pubkey.txt",
-    "",
-    "     → " + pid + "_*.age という暗号化ファイルが同じフォルダに出ます。",
-    "     ※ pubkey.txt は " + PUBKEY_SOURCE_INFO,
-    "     ※ 元の生ログは送らないでください（手元に残すだけ）。",
-    "",
-    "  4) Dropbox で提出",
-    "     下記の Dropbox ファイルリクエストに、" + pid + "_*.age をドラッグ&ドロップするだけです:",
-    "       " + (DROPBOX_FILE_REQUEST_URL || "（研究者が URL を案内します）"),
-    "     （提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。）",
+    "     → " + pid + "_*.age（暗号化ファイル）ができます。元の生ログは送りません。",
+    "  3) Dropbox ファイルリクエストに " + pid + "_*.age を提出（提出者同士は互いに見えません）",
     "",
     "ご不明点があればこのメールにご返信ください。どうぞよろしくお願いいたします。",
   ].join("\n");
@@ -1182,13 +1218,13 @@ function f1EmailBody_(pid) {
 // ロスターに新規参加者行を追加する（ヘッダ行を動的に探し、列順に整合させる）。
 function appendRosterRow_(sheet, p) {
   // 列順: P-ID(1) 氏名(2) メール(3) OS(4) 条件(5) F1同意日(6) F2事前(7) セッション数(8)
-  //       F4回答(計)(9) F5事後(10) Dropbox提出(11) 撤回/除外(12) 備考(13)
+  //       F4回答(計)(9) F5事後(10) Dropbox提出(11) NDA署名(12) 撤回/除外(13) 備考(14)
   var consent = p.consentDate
     ? Utilities.formatDate(p.consentDate, Session.getScriptTimeZone(), "yyyy-MM-dd")
     : "";
   sheet.appendRow([
     p.pid, p.name || "", p.email || "", p.os || "", p.condition || DEFAULT_CONDITION,
-    consent, "", "", "", "", "", "", "自動発番(onF1Submit)",
+    consent, "", "", "", "", "", "未署名", "", "自動発番(onF1Submit)",
   ]);
 }
 
@@ -1310,7 +1346,7 @@ function countByPid_(key, props) {
 }
 
 // 進捗ダッシュボードタブを（再）描画。完了率・未提出者・MNAR 観点の無回答フラグ。
-// 撤回/除外（col 12 に値あり）の参加者は集計から除外する。
+// 撤回/除外（col 13 に値あり）の参加者は集計から除外する。
 function buildDashboardTab_(ss) {
   var roster = ss.getSheetByName("参加者ロスター");
   var sh = ss.getSheetByName("進捗ダッシュボード") || ss.insertSheet("進捗ダッシュボード");
@@ -1325,11 +1361,13 @@ function buildDashboardTab_(ss) {
   var n = active.length;
   var f2done = active.filter(function (d) { return d.f2; }).length;
   var f5done = active.filter(function (d) { return d.f5; }).length;
+  var ndaDone = active.filter(function (d) { return d.ndaSigned; }).length;
   var sessSum = active.reduce(function (s, d) { return s + (Number(d.sessions) || 0); }, 0);
   var avgSess = n > 0 ? (sessSum / n).toFixed(1) : "0";
 
   rows.push(["指標", "値", "備考"]);
   rows.push(["登録参加者（撤回/除外を除く）", n, "撤回/除外: " + (data.length - n) + " 名"]);
+  rows.push(["NDA 署名済（配布の前提）", ndaDone + " / " + n, n > 0 ? pct_(ndaDone, n) : "—"]);
   rows.push(["F2 事前 完了", f2done + " / " + n, n > 0 ? pct_(f2done, n) : "—"]);
   rows.push(["F5 事後 完了", f5done + " / " + n, n > 0 ? pct_(f5done, n) : "—"]);
   rows.push(["平均セッション数（F4 由来）", avgSess, "セッション総数 " + sessSum]);
@@ -1343,6 +1381,7 @@ function buildDashboardTab_(ss) {
   var flagged = 0;
   active.forEach(function (d) {
     var flags = [];
+    if (!d.ndaSigned) flags.push("NDA未署名(配布前提)");
     if (!d.f2) flags.push("F2未提出");
     // セッションあり（F4回答あり）なのに F5 未 → 終了したのに事後未回答（脱落 MNAR 候補）
     if (Number(d.sessions) > 0 && !d.f5) flags.push("セッション有/F5未(MNAR候補)");
@@ -1370,15 +1409,15 @@ function pct_(a, b) {
   return b > 0 ? Math.round((a / b) * 100) + "%" : "—";
 }
 
-// ロスターを構造化して読む。返り値: [{pid,name,os,condition,f2,sessions,f5,excluded}]。
-// ⚠ 列オフセット（[6]=F2事前/[7]=セッション数/[9]=F5/[11]=撤回）は buildRosterTab_ の header と
-//   appendRosterRow_ の列順に固定依存する。ロスターの列順を変えたら 3 箇所すべてを同時に直すこと。
+// ロスターを構造化して読む。返り値: [{pid,name,os,condition,f2,sessions,f5,ndaSigned,excluded}]。
+// ⚠ 列オフセット（[6]=F2事前/[7]=セッション数/[9]=F5/[11]=NDA署名/[12]=撤回）は buildRosterTab_ の
+//   header と appendRosterRow_ の列順に固定依存する。列順を変えたら 3 箇所すべてを同時に直すこと。
 function readRoster_(sheet) {
   if (!sheet) return [];
   var hr = rosterHeaderRow_(sheet);
   var last = sheet.getLastRow();
   if (!hr || last <= hr) return [];
-  var vals = sheet.getRange(hr + 1, 1, last - hr, 13).getValues();
+  var vals = sheet.getRange(hr + 1, 1, last - hr, 14).getValues();
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var pid = String(vals[i][0]).trim();
@@ -1391,7 +1430,8 @@ function readRoster_(sheet) {
       f2: !!String(vals[i][6]).trim(), // F2事前(col7)
       sessions: vals[i][7], // セッション数(col8)
       f5: !!String(vals[i][9]).trim(), // F5事後(col10)
-      excluded: !!String(vals[i][11]).trim(), // 撤回/除外(col12)
+      ndaSigned: String(vals[i][11]).trim().indexOf("署名済") !== -1, // NDA署名(col12)
+      excluded: !!String(vals[i][12]).trim(), // 撤回/除外(col13)
     });
   }
   return out;
@@ -1418,16 +1458,22 @@ function applyRosterValidation_(ss) {
     .build();
   sheet.getRange(startRow, 4, nRows, 1).setDataValidation(osRule); // OS(col4)
 
+  var ndaRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["未署名", "送付済", "署名済"], true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(startRow, 12, nRows, 1).setDataValidation(ndaRule); // NDA署名(col12)
+
   var exclRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["撤回", "除外"], true)
     .setAllowInvalid(true) // 空欄（=有効参加者）を許容
     .build();
-  sheet.getRange(startRow, 12, nRows, 1).setDataValidation(exclRule); // 撤回/除外(col12)
+  sheet.getRange(startRow, 13, nRows, 1).setDataValidation(exclRule); // 撤回/除外(col13)
 
   // 撤回/除外に値がある行をグレーアウト（条件付き書式）。既存ルールは置き換える。
-  var range = sheet.getRange(startRow, 1, nRows, 13);
+  var range = sheet.getRange(startRow, 1, nRows, 14);
   var rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied("=$L" + startRow + '<>""') // L列=12列目=撤回/除外
+    .whenFormulaSatisfied("=$M" + startRow + '<>""') // M列=13列目=撤回/除外
     .setBackground("#e0e0e0")
     .setFontColor("#9e9e9e")
     .setRanges([range])
