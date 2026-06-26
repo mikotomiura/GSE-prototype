@@ -540,7 +540,9 @@ function buildF5() {
   addSectionHeader(form,
     "一般性自己効力感（再測定・F2-B と同じ項目）",
     "以下のそれぞれの質問について、あなたはどの程度自信がありますか？\n" +
-    "1: 全く当てはまらない　2: 当てはまらない　3: まあ当てはまる　4: 全くその通り"
+    "1: 全く当てはまらない　2: 当てはまらない　3: まあ当てはまる　4: 全くその通り\n\n" +
+    "※ 出典: Schwarzer, R., & Jerusalem, M. (1995) Generalized Self-Efficacy Scale; " +
+    "日本語版 Ito, K., Schwarzer, R., & Jerusalem, M. (2005) Japanese Adaptation of the General Self-Efficacy Scale.（F2-B と同一・byte 一致）"
   );
 
   var gsesItems = [
@@ -605,8 +607,11 @@ function buildF5() {
   // ---- NASA-TLX short（介入害の同時監視, v0.4 §4.4 / 文献[11]）----
   // 介入で AI 依存が下がっても負荷・フラストレーションが上がればプロダクト失敗。Phase 末に簡易測定。
   addSectionHeader(form,
-    "作業負荷（NASA-TLX 簡易版）",
-    "Phase 1 全体を通じての感覚でお答えください。\n1: 非常に低い　〜　5: 非常に高い"
+    "作業負荷（修正 NASA-TLX・1–5 件法の短縮版）",
+    "Phase 1 全体を通じての感覚でお答えください。\n1: 非常に低い　〜　5: 非常に高い\n\n" +
+    "※ 出典: Hart, S. G., & Staveland, L. E. (1988) Development of NASA-TLX (Task Load Index).\n" +
+    "※ 本研究では原版（0–100 / 20 段階・6 次元・重み付け）ではなく、精神的要求 / 努力 / フラストレーションの " +
+    "3 次元を 1–5 件法に短縮した修正版として使用します（重み付けなし・記述的観察用、設計企画書 v0.4 §4.4）。"
   );
 
   var tlxItems = [
