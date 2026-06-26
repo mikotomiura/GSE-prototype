@@ -1,6 +1,9 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
+// macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
+#[cfg(target_os = "macos")]
+mod overlay_panel;
 pub mod schema_dto;
 #[cfg(target_os = "macos")]
 pub mod sensors;
@@ -197,13 +200,6 @@ fn force_nudge() -> Result<(), String> {
     Ok(())
 }
 
-/// DIAG TEMP: フロント (特に card 窓) から stdout へ可視化ログを出すための診断コマンド。
-/// card 窓の React が生きているか・show が走ったか・成否を端末で確認する。検証後に削除する。
-#[tauri::command]
-fn card_dbg(msg: String) {
-    tracing::info!("[CARD] {}", msg);
-}
-
 /// デバッグ用: スケジューラ発火と同じ `probe_triggered`(source=random_probe) を即時 emit する。
 /// card→回答/skip→`record_realtime_*` の経路を能動的に検証するため (#1 repro)。Dashboard の
 /// debugView gate からのみ呼ぶ。`ProbeId::generate` で型安全に有効 ID を作る (本文混入を排除・data-privacy)。
@@ -287,8 +283,6 @@ fn get_intervention_decision(
         //     main の decide() 上書きと race しない。Overlay 側が nudgeVisible を保持し持続させる。
         // どちらもワンショット (swap)・reason="debug_force" でログし解析時に除外可能。
         if FORCE_NUDGE.swap(false, Ordering::AcqRel) {
-            // DIAG TEMP: overlay のポーリングが force_nudge を消費した証跡。検証後削除。
-            tracing::info!("[DIAG] force_nudge consumed by overlay poll");
             let now = epoch_ms();
             let idle_ms = get_keyboard_idle_ms();
             let decision = {
@@ -980,6 +974,34 @@ fn record_vignette_response(
     Ok(())
 }
 
+/// overlay (macOS は NSPanel) のクリック受理を切り替える (decisions D9)。
+/// `interactive=true` でカード/Wall がクリックを捕捉、`false` で背後アプリへ透過。
+/// macOS は `ignoresMouseEvents` を panel に Rust 権威で設定する (JS の setIgnoreCursorEvents は
+/// NSPanel 化窓で実効しないため)。非 macOS は従来の set_ignore_cursor_events に委譲 (Windows 非回帰)。
+#[tauri::command]
+fn set_overlay_interactive(app: tauri::AppHandle, interactive: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if let Err(e) = crate::overlay_panel::set_panel_interactive(&app, interactive) {
+            tracing::error!("set_panel_interactive failed: {}", e);
+            return Err(e);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        match app.get_webview_window("overlay") {
+            Some(win) => win
+                .set_ignore_cursor_events(!interactive)
+                .map_err(|e| e.to_string())?,
+            // macOS 経路 (get_webview_panel 失敗) と成否契約を揃える: overlay 窓が無い
+            // (setup 失敗等) と box/Wall のクリックブロックが無音で効かなくなるため可視化する
+            // (code-reviewer 指摘)。Windows 非回帰のため Err には倒さず warn に留める。
+            None => tracing::warn!("set_overlay_interactive: overlay window not found"),
+        }
+    }
+    Ok(())
+}
+
 /// 「開始する」ボタン押下時に呼ばれる。
 /// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
 /// 2. CognitiveStateEngine を初期状態にリセット
@@ -1016,26 +1038,19 @@ fn start_session(
     // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
     SESSION_START_MS.store(now, Ordering::Release);
 
-    // setup() で事前生成されたオーバーレイウィンドウを maximize → show する。
+    // setup() で事前生成されたオーバーレイウィンドウを show する (サイズ制御は Overlay.tsx)。
     // ウィンドウ生成自体は setup() (メインスレッド) で行うことで、
     // Windows での tokio ワーカースレッドからの WebviewWindowBuilder::build()
     // デッドロックを回避する。
     if let Some(win) = app.get_webview_window("overlay") {
-        let _ = win.maximize();
+        // macOS: overlay は NSPanel 化済み (decisions D7)。`maximize()` は内部で `setStyleMask:` を
+        // 呼び、panel に載る WKWebView の contentLayoutRect オブザーバ解除に失敗して NSRangeException で
+        // クラッシュする (実機確認・D8)。全画面化は Overlay.tsx 側が明示 setSize/setPosition (モニタ全域)
+        // で行うため、ここでは show() のみ (JS を起こす目的)。透明窓なので一瞬の表示は不可視。
         let _ = win.show();
         tracing::info!("Overlay window shown");
     } else {
         tracing::error!("Overlay window not found — setup() may have failed");
-    }
-
-    // card 窓を画面外のまま show して webview の JS を起こす (隠れ窓だと JS が休眠し
-    // probe_triggered を取りこぼすため)。以後 CardWindow.tsx が画面外/右上へ出し入れする。
-    // 初期位置は -20000,-20000 (画面外) なので show してもユーザーには見えない。
-    if let Some(card) = app.get_webview_window("card") {
-        let _ = card.show();
-        tracing::info!("Card window shown off-screen (JS wake)");
-    } else {
-        tracing::error!("Card window not found — setup() may have failed");
     }
 }
 
@@ -1456,7 +1471,12 @@ pub fn run() {
     // move で持ち込む。
     let log_state_for_shortcut = log_state.clone();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // macOS: overlay 窓を非アクティブ NSPanel 化するためのプラグイン (decisions D7)。
+    // crate 自体が macОS 限定依存のため登録も cfg ゲートする。
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -1696,7 +1716,8 @@ pub fn run() {
             // macOS では visible(false) + maximized(true) の同時指定で
             // 不透明なオーバーレイが表示される問題があったが、ここでは
             // maximized を指定せず visible(false) のみで生成する。
-            // maximize() + show() は start_session で制御された順序で実行される。
+            // start_session で show() し、サイズ制御 (全画面/box) は Overlay.tsx が明示 setSize で行う
+            // (macOS で NSPanel 化後は maximize() が WKWebView をクラッシュさせるため。D8)。
             match tauri::WebviewWindowBuilder::new(
                 app,
                 "overlay",
@@ -1707,6 +1728,11 @@ pub fn run() {
             .transparent(true)
             .always_on_top(true)
             .skip_taskbar(true)
+            // 非アクティブ (key にならない) overlay 窓ではクリックがボタンへ届かず握りつぶされる
+            // (macOS。WKWebView の acceptsFirstMouse 既定 false)。下の to_panel() による非アクティブ
+            // NSPanel 化と併せ、Pluely の Tauri 2.x レシピに倣い acceptFirstMouse も有効化する
+            // (decisions D7)。フォーカスは奪わない (非ブロック設計を維持)。
+            .accept_first_mouse(true)
             .visible(false)
             .build()
             {
@@ -1714,37 +1740,15 @@ pub fn run() {
                 Err(e) => tracing::error!("Failed to pre-create overlay window: {}", e),
             }
 
-            // 介入カード (Probe / Nudge) 専用の **不透明な小窓**。
-            // 透明 always_on_top overlay 窓は macOS でマウスイベントを webview へ一切配送せず
-            // カードのボタンが押せない (DIAG 計器で pointer/click=0 を実測)。透明窓そのものが
-            // クリックを素通りさせるのが真因。不透明窓なら標準でクリックが届く。
-            // overlay (全画面透明・Wall 用) とは分離し、card は常にカードサイズの小窓。
-            // - accept_first_mouse(true): 非アクティブ窓 (フォーカス非奪取) でも初回クリックを受ける。
-            // - focused(false): フォーカスを奪わない (非ブロック設計の維持)。
-            // - 表示/非表示と位置はフロント (CardWindow.tsx) が制御する。
-            match tauri::WebviewWindowBuilder::new(
-                app,
-                "card",
-                tauri::WebviewUrl::App("index.html".into()),
-            )
-            .title("GSE Card")
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .accept_first_mouse(true)
-            .resizable(false)
-            .inner_size(380.0, 480.0)
-            // 画面外の初期位置。隠れ窓 (orderOut) は macOS で webview の JS が休眠し
-            // Tauri イベントを取りこぼす (実測: probe_triggered が card 窓に届かない) ため、
-            // hide() せず「常に show のまま画面外へ退避」する方式にする。start_session で
-            // 一度 show して JS を起こし、以後 CardWindow.tsx が画面外/右上を出し入れする。
-            .position(-20000.0, -20000.0)
-            .focused(false)
-            .visible(false)
-            .build()
-            {
-                Ok(_) => tracing::info!("Card window pre-created (hidden, opaque)"),
-                Err(e) => tracing::error!("Failed to pre-create card window: {}", e),
+            // macOS: overlay 窓を非アクティブ NSPanel 化する (decisions D7)。
+            // 透明 overlay 窓は非 key 窓のためクリックを webview へルーティングせず、カードの
+            // ボタンが押せなかった (真因)。NSWindowStyleMaskNonActivatingPanel + canBecomeKeyWindow
+            // により、フォーカスを奪わずにクリックを webview へ配送する (Spotlight/Raycast 方式)。
+            #[cfg(target_os = "macos")]
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                if let Err(e) = crate::overlay_panel::convert_overlay_to_panel(&overlay) {
+                    tracing::error!("Failed to convert overlay to NSPanel: {}", e);
+                }
             }
             Ok(())
         })
@@ -1773,7 +1777,7 @@ pub fn run() {
             reset_accessibility,
             open_accessibility_settings,
             start_session,
-            card_dbg,
+            set_overlay_interactive,
             quit_app,
             get_session_file,
             record_user_label,

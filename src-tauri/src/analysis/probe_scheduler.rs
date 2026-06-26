@@ -69,6 +69,13 @@ pub fn self_marker_window_clamped(t_ms: u64, session_start_ms: u64) -> (u64, u64
     } else {
         ws
     };
+    // 窓終端も始端以上にクランプする。セッションが窓終端オフセット (t−5s) より若い
+    // (`t − session_start < 5s`) と、終端 `t−5s` が `session_start` を下回り `we < ws` に
+    // 反転する。この反転窓は `record_realtime_*` の検証 (`we >= ws`) で弾かれ、ラベルが
+    // 静かに失われる (debug_force_probe を起動直後に叩く・起動 5s 以内に M/D 自己マーカーを
+    // 押す等)。セッション内に収まらない窓は `[ws, ws]` (ゼロ幅) に畳む = 「有効な開始前
+    // データなし」を正しく表す。実スケジューラは 31s ウォームアップがあり到達しない。
+    let we = we.max(ws);
     (ws, we)
 }
 
@@ -511,6 +518,33 @@ mod tests {
             self_marker_window_clamped(100_000, 0),
             self_marker_window(100_000)
         );
+    }
+
+    #[test]
+    fn self_marker_window_clamped_never_inverts_within_5s_of_start() {
+        // 回帰: 起動 5s 以内のマーカー/プローブで終端 `t−5s` が session_start を下回り
+        // `we < ws` に反転 → record_realtime_* の `we >= ws` 検証でラベルが失われていた。
+        // 終端を始端以上にクランプし、ゼロ幅以上を保証する。
+        for elapsed in [0u64, 1, 1_000, 4_334, 4_999] {
+            let t = SESSION_START + elapsed;
+            let (ws, we) = self_marker_window_clamped(t, SESSION_START);
+            assert_eq!(
+                ws, SESSION_START,
+                "始端は session_start にクランプ (elapsed={elapsed})"
+            );
+            assert!(
+                we >= ws,
+                "窓が反転してはならない (elapsed={elapsed}): ws={ws} we={we}"
+            );
+            // 5s 未満は開始前データなし → ゼロ幅に畳む。
+            assert_eq!(we, SESSION_START, "ゼロ幅に畳む (elapsed={elapsed})");
+        }
+        // ちょうど 5s: 終端が session_start に一致 (ゼロ幅境界)。
+        let (ws, we) = self_marker_window_clamped(SESSION_START + 5_000, SESSION_START);
+        assert_eq!((ws, we), (SESSION_START, SESSION_START));
+        // 5s 超: 通常どおり終端が前進する (非ゼロ幅)。
+        let (ws, we) = self_marker_window_clamped(SESSION_START + 6_000, SESSION_START);
+        assert_eq!((ws, we), (SESSION_START, SESSION_START + 1_000));
     }
 
     #[test]

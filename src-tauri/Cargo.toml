@@ -105,6 +105,12 @@ lazy_static = "1.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = { version = "0.24", features = ["highsierra"] }
 core-foundation = "0.10"
+# overlay 窓を非アクティブ NSPanel 化し、フォーカスを奪わずクリックを webview へ配送する
+# (透明 overlay 窓のクリック無反応の真因対処。decisions D7)。crates.io 未掲載のため git 固定。
+# v2 ブランチ = 既存窓を `WebviewWindowExt::to_panel()` で変換する API。
+# rev 固定: ブランチ追従だと `cargo update` でレビューなしに HEAD へ滑る (サプライチェーン)。
+# 更新は意図的なレビュー対象にするため明示 rev で pin する (v2 branch の検証済みコミット)。
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", rev = "18ffb9a201fbf6fedfaa382fd4b92315ea30ab1a" }
 
 # Reduce debug build artifact size to avoid filling disk.
 # debug=1 keeps line-number tables (enough for panic backtraces) but omits

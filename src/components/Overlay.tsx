@@ -3,6 +3,7 @@ import { getCurrentWindow, currentMonitor } from "@tauri-apps/api/window";
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import ProbeCard from "./ProbeCard";
 
 // プローブ/Nudge 単独表示時にオーバーレイ窓を縮小する右上ボックス (logical px)。
 // カード (~360px) を収め、これ以外の画面領域は OS レベルでクリック透過になる
@@ -10,6 +11,12 @@ import { listen } from "@tauri-apps/api/event";
 const PROBE_BOX_W = 390;
 const PROBE_BOX_H = 430;
 const PROBE_BOX_MARGIN = 12;
+
+// overlay のクリック受理切替。macOS では NSPanel 化窓で JS の setIgnoreCursorEvents が実効しない
+// ため、Rust 権威の set_overlay_interactive コマンド経由で ignoresMouseEvents を設定する (D9)。
+// interactive=true: カード/Wall がクリックを捕捉 / false: 背後アプリへ透過。
+const setOverlayInteractive = (interactive: boolean): Promise<unknown> =>
+    invoke("set_overlay_interactive", { interactive });
 
 // Nudge は応答 (dismiss ボタン) があるまで消えない。無応答が続いたらこの時間で
 // 自動フェード = silent 記録 (HCI: 自動消滅でユーザーが応答できない問題の回避 + CD7 silent 送出)。
@@ -59,9 +66,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [nudgeError, setNudgeError] = useState<string | null>(null);
     // dismiss 送信中フラグ (ボタン disable 用)。
     const [nudgeSubmitting, setNudgeSubmitting] = useState(false);
-    // DIAG TEMP: クリック/ポインタが webview(DOM) に届いているかの計器。検証後に削除する。
-    const [diagPointer, setDiagPointer] = useState(0);
-    const [diagClick, setDiagClick] = useState(0);
     // dismiss 送信の相互排他ガード (手動ボタン経路と silent タイマー経路の二重送信を防ぐ)。
     // state はタイマー closure 内で stale になるため ref で同期的に判定する。
     const dismissInFlightRef = useRef(false);
@@ -118,9 +122,9 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     // 表示モード (透過/ブロック・サイズ) の真の権威は下の統合 effect で、これより後に走り
     // 最終状態を確定する (本 effect は初回ドラッグ可能性の保証のみ)。
     useEffect(() => {
-        currentWindow.setIgnoreCursorEvents(true).catch(() => {});
-    // currentWindow は useMemo で安定しているが lint 警告を避けるため含める
-    }, [currentWindow]); // eslint-disable-line react-hooks/exhaustive-deps
+        // 初回マウント時に透過を保証 (Rust 権威の set_overlay_interactive 経由)。
+        setOverlayInteractive(false).catch(() => {});
+    }, []);
 
     // オーバーレイ窓の表示モードを (wall / probe / nudge) から決める統合 effect。
     //   - Wall:            全画面 + クリックブロック (QR スキャンまで操作不可・現状維持)
@@ -136,9 +140,11 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         const widgetOnly = (probeActive || nudgeVisible) && !isWallActive;
         let cancelled = false;
 
-        // 全画面を「明示的にモニタ全域へ復元してから maximize」する。box 化で縮小済みの窓を
-        // maximize() だけに頼ると WM 次第で小窓のまま復帰しないため (Wall が小窓 QR で解除不能=
-        // 被験者ロックの回避)。physical 座標で扱い DPI 二重変換を避ける。
+        // 全画面化は「モニタ全域へ明示 setPosition + setSize」で行う。physical 座標で扱い DPI 二重
+        // 変換を避ける。**maximize() は使わない**: macOS で overlay は NSPanel 化済み (decisions D7) で、
+        // maximize() が内部で setStyleMask: を呼ぶと WKWebView の contentLayoutRect オブザーバ解除に
+        // 失敗して NSRangeException でクラッシュする (実機確認・D8)。明示サイズはタスクバーごと全被覆=
+        // Wall の全ブロック意図にも合致する。
         const applyFullscreenBlock = async () => {
             const mon = await currentMonitor();
             if (cancelled) return;
@@ -148,20 +154,21 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 await win.setSize(new PhysicalSize(mon.size.width, mon.size.height));
                 if (cancelled) return;
             }
-            await win.maximize();
-            if (cancelled) return;
-            await win.setIgnoreCursorEvents(false);
+            await setOverlayInteractive(true);
         };
 
         (async () => {
-            // 非表示は独立処理。hide 失敗時に全画面ブロックへ転落させない (= 何も出ていないのに
-            // 画面が操作不能になる事故の回避)。最悪でも透過に留める。
+            // idle (何も表示しない) でも **hide() しない** (decisions D10)。macOS で NSPanel/overlay を
+            // orderOut (hide) すると webview の JS が休眠し、probe_triggered を取りこぼして
+            // カードが出ない (実機の診断ログで setOverlayInteractive(true) 不到達=リスナー休眠を確認)。
+            // 代わりに「画面に出したまま透明 + クリック透過 (ignoresMouseEvents=true)」にして JS を生かす。
+            // overlay の中身は idle 時すべて非表示 (ProbeCard=null / Nudge=opacity0 / Wall 非描画) なので
+            // 透明窓として不可視・無害。被験者のクリックは背後アプリへ透過する。
             if (!visible) {
                 try {
-                    await win.hide();
+                    await setOverlayInteractive(false);
                 } catch (e) {
-                    console.warn("overlay hide failed:", e);
-                    try { await win.setIgnoreCursorEvents(true); } catch { /* noop */ }
+                    console.warn("overlay idle (transparent click-through) failed:", e);
                 }
                 return;
             }
@@ -170,10 +177,9 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 if (cancelled) return;
                 if (widgetOnly) {
                     // 右上小ボックス化 → カード外は他アプリへクリックが通る (非ブロック)。
+                    // unmaximize() は使わない (maximize と同じく NSPanel + WKWebView でクラッシュ。D8)。
+                    // 全画面状態からの復帰も下の明示 setSize で box サイズへ直接縮小すれば足りる。
                     const mon = await currentMonitor();
-                    if (cancelled) return;
-                    // 非 maximize 窓では no-op。失敗時も box 化を続行 (失敗すれば下の catch で全画面へ)。
-                    await win.unmaximize().catch((e) => console.warn("unmaximize failed:", e));
                     if (cancelled) return;
                     const scale = mon?.scaleFactor ?? 1;
                     await win.setSize(
@@ -190,7 +196,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                         await win.setPosition(new PhysicalPosition(x, y));
                         if (cancelled) return;
                     }
-                    await win.setIgnoreCursorEvents(false);
+                    await setOverlayInteractive(true);
                 } else {
                     // Wall (単独 or 他と同時): 全画面 + クリックブロック。
                     await applyFullscreenBlock();
@@ -199,7 +205,13 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 // 既にこの effect がキャンセル済み (新 state へ遷移済み) なら何もしない。
                 // stale な effect が全画面ブロックで新モードを上書きする race を防ぐ。
                 if (cancelled) return;
-                // box 化に失敗しても被験者が操作不能にならないよう全画面=現状挙動へ倒す。
+                // box 化失敗時は probe/nudge でも全画面ブロック (interactive=true) へ倒す。
+                // 一見 widgetOnly は非ブロック (setOverlayInteractive(false)) へ倒す方が穏当に見えるが
+                // (cross-review/Codex 指摘)、それは窓全体 ignoresMouseEvents=true でカード自体も
+                // クリック不能=死んだボタン・較正ラベル静的損失 (本タスクで直した元バグそのもの) に
+                // 戻る。較正データ正確性を最優先する研究ツールでは、背後を一時ブロックしてでもカードを
+                // 回答可能に保つ方を採る (カードは ✕ で dismiss でき必ず復帰する)。box 化失敗は capability
+                // 付与 (D11) 後はほぼ起きない縮退路。意味を変えずに「非ブロックへ倒す」改変をしないこと。
                 console.warn("overlay window mode failed, falling back to fullscreen:", e);
                 try {
                     await applyFullscreenBlock();
@@ -334,16 +346,14 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
 
     return (
         <div className="overlay-root">
-            {/* Probe カードは不透明な専用 card 窓 (CardWindow.tsx) に移設した
-                (透明 overlay 窓では macOS でクリックが webview に届かないため)。
-                overlay は Wall (全画面ブロック) と Nudge を担当する。 */}
+            {/* Task C: v0.3 較正のプローブ回答カード (probe_triggered を listen)。
+                Wall 発動中は表示しない (上の effect で probeActive もリセット)。
+                overlay 窓は tauri-nspanel で非アクティブ Panel 化しクリックを webview へ配送する
+                (透明窓でもクリックが届く・フォーカスは奪わない。decisions D7)。 */}
+            {!isWallActive && <ProbeCard onActiveChange={setProbeActive} />}
 
             <aside
                 className={`nudge-card ${nudgeVisible ? "nudge-card-visible" : ""}`}
-                onPointerDown={() => {
-                    setDiagPointer((n) => n + 1);
-                    console.log("[DIAG] nudge card pointerDown");
-                }}
                 style={{
                     opacity: nudgeVisible ? 1 : 0,
                     transform: nudgeVisible ? "translateY(0)" : "translateY(12px)",
@@ -354,20 +364,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 <div className="nudge-card-copy">
                     <span className="nudge-card-kicker">Pause point</span>
                     <strong>One breath. Next move.</strong>
-                </div>
-                {/* DIAG TEMP: クリック到達計器。検証後に削除する。 */}
-                <div
-                    style={{
-                        margin: "0.3rem 0",
-                        padding: "0.3rem 0.5rem",
-                        background: "#7c3aed",
-                        color: "#fff",
-                        fontWeight: 700,
-                        borderRadius: "6px",
-                        textAlign: "center",
-                    }}
-                >
-                    DIAG pointer:{diagPointer} / click:{diagClick}
                 </div>
                 {/* dismiss 4択 (WBS 0.8): Need 誤り / Opportunity 誤り / 単に閉じる を分離記録。
                     「無言(silent)」はボタンを押さずフェードした場合に相当し UI には出さない。 */}
@@ -392,12 +388,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                         type="button"
                         className="nudge-dismiss-btn"
                         disabled={nudgeSubmitting}
-                        onClick={() => {
-                            // DIAG TEMP: onClick 発火計測。検証後に削除する。
-                            setDiagClick((n) => n + 1);
-                            console.log("[DIAG] nudge 閉じる onClick fired");
-                            void handleNudgeDismiss("just_close");
-                        }}
+                        onClick={() => handleNudgeDismiss("just_close")}
                     >
                         閉じる
                     </button>
