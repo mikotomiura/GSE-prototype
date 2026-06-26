@@ -1026,6 +1026,25 @@ Zen Timer のスマートフォンページに、2 分間のカウントダウ�
 
 ---
 
+## macOS 介入オーバーレイのクリック受理修正とプローブ窓クランプ（v2.22）
+
+macOS 固有のオーバーレイ不具合 2 件と、較正ラベルを静かに失っていた OS 非依存の窓クランプ不具合を修正した。
+
+**オーバーレイのクリック透過（macOS）。** プローブ/Nudge カードは表示されるがボタンが効かず、クリックが背後アプリへ素通りしていた。真因は複合だが、即時の引き金は Tauri capability の不足だった。
+
+- **capability（主因）:** overlay 窓に `core:window:allow-set-size` / `allow-set-position` が無く、box 縮小の `setSize` が `setOverlayInteractive(true)` の**前に** permission 例外を投げ、`ignoresMouseEvents` が解除されないままだった。2 権限を追加し、不要になった `allow-hide` / `allow-maximize` を除去。
+- **NSPanel 化:** overlay を非アクティブ `NSPanel`（`tauri-nspanel`・Floating level）へ変換し、key 窓にならなくてもクリックが WKWebView へ配送されるようにした。新規 `src-tauri/src/overlay_panel.rs`。
+- **クリック受理は Rust 権威:** JS の `setIgnoreCursorEvents` は NSPanel 化窓で実効しないため、`set_overlay_interactive` が `set_ignore_mouse_events` + `resign_key_window` を直接呼ぶ。
+- **フォーカス非奪取:** `show()` が panel を key 化して前面エディタのタイピングフォーカスを奪うため、`resign_key_window()` で即座に key を返す。`isKeyWindow=false` を確認。
+- **idle で hide しない:** hide すると webview の JS が休眠し `probe_triggered` を取りこぼすため、透明＋クリック透過で表示したまま生かす。
+- **NSPanel で maximize 禁止:** `maximize()` / `unmaximize()` は `setStyleMask:` 経由でクラッシュ（NSRangeException）。全画面化は明示 `setSize` / `setPosition` で行う。
+
+**プローブ窓クランプ（OS 非依存）。** プローブ/マーカーがセッション開始 5 秒以内に発火すると、`record_realtime_*` が `window_end_ms must be >= window_start_ms` でラベルを弾いていた。`self_marker_window_clamped` が窓**始端**だけを `session_start` にクランプし、終端を `t − 5 秒` のまま残したため、セッションが 5 秒より若いと反転していた。終端も（`we = we.max(ws)`）クランプしてゼロ幅窓に畳む（＝「開始前データなし」を正しく表現）よう修正。実スケジューラのプローブは 31 秒ウォームアップで非該当、M/D 自己マーカーの起動直後ラベル損失も同時に解消。回帰テスト追加。
+
+変更箇所（backend）: `overlay_panel.rs`（新規）/ `lib.rs` / `analysis/probe_scheduler.rs` / `capabilities/default.json`。frontend: `Overlay.tsx`。検証: lib テスト 228 件パス、リプレイ snapshot 不変（HMM 不変）、実機スモーク。`docs/verification-runbook.md` §2 参照。
+
+---
+
 ## ログと分析
 
 セッションごとにタイムスタンプ付き NDJSON ファイルが生成されます。
@@ -1252,6 +1271,12 @@ npm run tauri dev
 npm run tauri build
 # インストーラー: src-tauri/target/release/bundle/
 ```
+
+### リリース前・マージ前の検証
+
+`docs/verification-runbook.md` を上から実行する — 自動回帰（§1: `cargo test` / `gse-replay --snapshot` /
+`emit_schema` / `tsc`）、macOS 機能検証（§2: overlay クリック受理・プローブ記録着地・Wall・IME）、
+Windows 差分（§3）、Google Form ビルダー（§4）。被験者スモークは `docs/calibration-smoke-runbook.md` を参照。
 
 ### セッション後分析
 
