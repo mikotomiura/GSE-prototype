@@ -1,6 +1,9 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
+// macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
+#[cfg(target_os = "macos")]
+mod overlay_panel;
 pub mod schema_dto;
 #[cfg(target_os = "macos")]
 pub mod sensors;
@@ -971,6 +974,34 @@ fn record_vignette_response(
     Ok(())
 }
 
+/// overlay (macOS は NSPanel) のクリック受理を切り替える (decisions D9)。
+/// `interactive=true` でカード/Wall がクリックを捕捉、`false` で背後アプリへ透過。
+/// macOS は `ignoresMouseEvents` を panel に Rust 権威で設定する (JS の setIgnoreCursorEvents は
+/// NSPanel 化窓で実効しないため)。非 macOS は従来の set_ignore_cursor_events に委譲 (Windows 非回帰)。
+#[tauri::command]
+fn set_overlay_interactive(app: tauri::AppHandle, interactive: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if let Err(e) = crate::overlay_panel::set_panel_interactive(&app, interactive) {
+            tracing::error!("set_panel_interactive failed: {}", e);
+            return Err(e);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        match app.get_webview_window("overlay") {
+            Some(win) => win
+                .set_ignore_cursor_events(!interactive)
+                .map_err(|e| e.to_string())?,
+            // macOS 経路 (get_webview_panel 失敗) と成否契約を揃える: overlay 窓が無い
+            // (setup 失敗等) と box/Wall のクリックブロックが無音で効かなくなるため可視化する
+            // (code-reviewer 指摘)。Windows 非回帰のため Err には倒さず warn に留める。
+            None => tracing::warn!("set_overlay_interactive: overlay window not found"),
+        }
+    }
+    Ok(())
+}
+
 /// 「開始する」ボタン押下時に呼ばれる。
 /// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
 /// 2. CognitiveStateEngine を初期状態にリセット
@@ -1007,12 +1038,15 @@ fn start_session(
     // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
     SESSION_START_MS.store(now, Ordering::Release);
 
-    // setup() で事前生成されたオーバーレイウィンドウを maximize → show する。
+    // setup() で事前生成されたオーバーレイウィンドウを show する (サイズ制御は Overlay.tsx)。
     // ウィンドウ生成自体は setup() (メインスレッド) で行うことで、
     // Windows での tokio ワーカースレッドからの WebviewWindowBuilder::build()
     // デッドロックを回避する。
     if let Some(win) = app.get_webview_window("overlay") {
-        let _ = win.maximize();
+        // macOS: overlay は NSPanel 化済み (decisions D7)。`maximize()` は内部で `setStyleMask:` を
+        // 呼び、panel に載る WKWebView の contentLayoutRect オブザーバ解除に失敗して NSRangeException で
+        // クラッシュする (実機確認・D8)。全画面化は Overlay.tsx 側が明示 setSize/setPosition (モニタ全域)
+        // で行うため、ここでは show() のみ (JS を起こす目的)。透明窓なので一瞬の表示は不可視。
         let _ = win.show();
         tracing::info!("Overlay window shown");
     } else {
@@ -1437,7 +1471,12 @@ pub fn run() {
     // move で持ち込む。
     let log_state_for_shortcut = log_state.clone();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // macOS: overlay 窓を非アクティブ NSPanel 化するためのプラグイン (decisions D7)。
+    // crate 自体が macОS 限定依存のため登録も cfg ゲートする。
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -1677,7 +1716,8 @@ pub fn run() {
             // macOS では visible(false) + maximized(true) の同時指定で
             // 不透明なオーバーレイが表示される問題があったが、ここでは
             // maximized を指定せず visible(false) のみで生成する。
-            // maximize() + show() は start_session で制御された順序で実行される。
+            // start_session で show() し、サイズ制御 (全画面/box) は Overlay.tsx が明示 setSize で行う
+            // (macOS で NSPanel 化後は maximize() が WKWebView をクラッシュさせるため。D8)。
             match tauri::WebviewWindowBuilder::new(
                 app,
                 "overlay",
@@ -1688,11 +1728,27 @@ pub fn run() {
             .transparent(true)
             .always_on_top(true)
             .skip_taskbar(true)
+            // 非アクティブ (key にならない) overlay 窓ではクリックがボタンへ届かず握りつぶされる
+            // (macOS。WKWebView の acceptsFirstMouse 既定 false)。下の to_panel() による非アクティブ
+            // NSPanel 化と併せ、Pluely の Tauri 2.x レシピに倣い acceptFirstMouse も有効化する
+            // (decisions D7)。フォーカスは奪わない (非ブロック設計を維持)。
+            .accept_first_mouse(true)
             .visible(false)
             .build()
             {
                 Ok(_) => tracing::info!("Overlay window pre-created (hidden)"),
                 Err(e) => tracing::error!("Failed to pre-create overlay window: {}", e),
+            }
+
+            // macOS: overlay 窓を非アクティブ NSPanel 化する (decisions D7)。
+            // 透明 overlay 窓は非 key 窓のためクリックを webview へルーティングせず、カードの
+            // ボタンが押せなかった (真因)。NSWindowStyleMaskNonActivatingPanel + canBecomeKeyWindow
+            // により、フォーカスを奪わずにクリックを webview へ配送する (Spotlight/Raycast 方式)。
+            #[cfg(target_os = "macos")]
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                if let Err(e) = crate::overlay_panel::convert_overlay_to_panel(&overlay) {
+                    tracing::error!("Failed to convert overlay to NSPanel: {}", e);
+                }
             }
             Ok(())
         })
@@ -1721,6 +1777,7 @@ pub fn run() {
             reset_accessibility,
             open_accessibility_settings,
             start_session,
+            set_overlay_interactive,
             quit_app,
             get_session_file,
             record_user_label,
