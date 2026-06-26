@@ -53,13 +53,11 @@ var TSE_ANCHOR_INSTRUCTION =
 function buildForm() {
   var form = FormApp.openById(FORM_ID);
 
-  // 既存設問を全削除
+  // 既存設問を全削除（分岐ナビゲーションを先に解除する clearForm 経由）。
+  // 直接 deleteItem で末尾から消すと、まだ go-to-page 参照されているページを
+  // 先に削除して "Invalid data updating form" になる（buildForm 再実行時の典型エラー）。
   if (CLEAR_EXISTING) {
-    var items = form.getItems();
-    for (var i = items.length - 1; i >= 0; i--) {
-      form.deleteItem(items[i]);
-    }
-    // 既存セクション（ページ区切り）も含めて削除済み
+    clearForm(form);
   }
 
   // フォーム基本設定
@@ -509,12 +507,10 @@ function buildF5() {
   // #C: 事前作成フォームを固定 ID で再利用 (F1 と同方式)。
   var form = FormApp.openById(F5_FORM_ID);
   // openById は同一フォームを再利用するため、再実行時の設問重複を防ぐべく既存設問を全削除する
-  // (create 方式には不要だったが openById では必須)。
+  // (create 方式には不要だったが openById では必須)。clearForm でナビゲーションを先に解除して
+  // "Invalid data updating form" を回避する（F5 自体は分岐を持たないが buildForm と同一経路に統一）。
   if (CLEAR_EXISTING) {
-    var items = form.getItems();
-    for (var i = items.length - 1; i >= 0; i--) {
-      form.deleteItem(items[i]);
-    }
+    clearForm(form);
   }
   form.setTitle("GSE ユーザー検証 Phase1 – F5 事後アンケート");
   form.setDescription(
@@ -654,6 +650,44 @@ function buildAllSupportForms() {
   buildF4();
   buildF5();
   Logger.log("🎉 F2〜F5 全フォーム作成完了。上記の編集URLをスプレッドシート等に保存してください。");
+}
+
+
+// ============================================================
+// ヘルパー: 既存設問の安全な全削除（分岐ナビゲーション対応）
+// ============================================================
+// buildForm を 2 回目以降に実行すると、F1 フォームが持つ分岐
+// （Q3/Q4/Q6/Q7 の go-to-page 選択肢・ページの setGoToPage(SUBMIT)）が原因で
+// 末尾からの deleteItem が "Invalid data updating form" を投げる
+// （まだ参照されているページを先に削除してナビゲーションが orphan 化するため）。
+// 対策: 削除の前に全ナビゲーション参照を解除（選択肢を plain 化・ページを CONTINUE 化）し、
+// クロス参照を断ってから削除する。
+function clearForm(form) {
+  var items = form.getItems();
+
+  // 1) 分岐ナビゲーションを解除（go-to-page 参照を断つ）
+  for (var i = 0; i < items.length; i++) {
+    var type = items[i].getType();
+    try {
+      if (type === FormApp.ItemType.MULTIPLE_CHOICE) {
+        var mc = items[i].asMultipleChoiceItem();
+        mc.setChoices(mc.getChoices().map(function (c) { return mc.createChoice(c.getValue()); }));
+      } else if (type === FormApp.ItemType.LIST) {
+        var li = items[i].asListItem();
+        li.setChoices(li.getChoices().map(function (c) { return li.createChoice(c.getValue()); }));
+      } else if (type === FormApp.ItemType.PAGE_BREAK) {
+        items[i].asPageBreakItem().setGoToPage(FormApp.PageNavigationType.CONTINUE);
+      }
+    } catch (e) {
+      // ナビゲーションを持たない項目（Checkbox/Scale/Text 等）はスキップ
+    }
+  }
+
+  // 2) ナビゲーション解除後に末尾から全削除（安全に消える）
+  var remaining = form.getItems();
+  for (var j = remaining.length - 1; j >= 0; j--) {
+    form.deleteItem(remaining[j]);
+  }
 }
 
 
