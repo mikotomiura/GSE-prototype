@@ -19,6 +19,11 @@ var FORM_ID = "1iNJthNn6myw7mmuKV6NEnpLHFRt5BTFQBOuCsroCtyI"; // F1 参加同意
 var F5_FORM_ID = "1I-X1B8F-tQk7aEAdqderOLhjobeHct48KU23NWwfhlY";
 var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 
+// セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
+// 共有フォルダ (/scl/fo/) は提出者同士がファイル名で互いに見えるため不可 (pilot-runbook D6)。
+// buildManagementSheet() がシート「リンク集」の既定値に使う（シート側で手動上書きも可）。
+var DROPBOX_FILE_REQUEST_URL = "https://www.dropbox.com/request/5oak4xpqjt19zx8zvh03";
+
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
 // F2-C(事前) と F5(事後) で matched 再測定するため、両者が必ず byte 一致するよう
 // 単一定数として一元定義する（code-reviewer LOW: 二重定義による pre/post 不一致事故を構造的に防止）。
@@ -770,7 +775,7 @@ function buildLinksTab_(ss, props) {
     ["項目", "値 / URL", "種別", "備考"],
     [
       "Dropbox File Request URL",
-      prevDropbox || "（Dropbox で File Request を作成し、ここに URL を貼る）",
+      prevDropbox || DROPBOX_FILE_REQUEST_URL || "（Dropbox で File Request を作成し、ここに URL を貼る）",
       "手動",
       "P###_*.age の提出先。受領者(研究者)のみ閲覧可・提出者同士は互いに見えない",
     ],
