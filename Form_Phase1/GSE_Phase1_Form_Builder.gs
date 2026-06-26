@@ -814,13 +814,13 @@ function buildRosterTab_(ss) {
   if (ss.getSheetByName("参加者ロスター")) return;
   var sh = ss.insertSheet("参加者ロスター");
   var header = [
-    "P-ID", "氏名/ニックネーム", "メール", "OS", "条件(condition)",
+    "P-ID", "氏名/ニックネーム", "メール", "OS", "条件(baseline/intervention)",
     "F1同意日", "F2事前", "セッション数", "F4回答(計)", "F5事後",
     "Dropbox提出", "撤回/除外", "備考",
   ];
   sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
   sh.setFrozenRows(1);
-  sh.getRange(2, 1, 1, 5).setValues([["P001", "", "", "", "baseline"]]);
+  // 例データは入れない（addParticipant() が P001 から連番自動採番するため）。
   sh.setColumnWidth(1, 70);
   sh.setColumnWidth(2, 150);
   sh.setColumnWidth(3, 210);
@@ -837,6 +837,56 @@ function buildSubmissionTab_(ss) {
   sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
   sh.setFrozenRows(1);
   sh.getRange(2, 1, 1, 2).setValues([["P001", "ses_20260628_001"]]);
+}
+
+
+// ============================================================
+// 参加者 ID（P-ID）の連番自動採番
+// ============================================================
+// 手動割当の取り違え（pilot-runbook 警告）を防ぐため、管理シート「参加者ロスター」の
+// 既存 P-ID を走査して **次の一意な連番** を発行する。形式 = P + 3桁ゼロ埋め（P001, P002, …）。
+// 英数字16字以下を保ち、logger(is_valid_participant_id) と gse-package(package.rs) の両
+// バリデータを満たす（`_`/`-` は gse-package で不可なので使わない）。
+//
+// 使い方: Apps Script エディタで関数 addParticipant を選んで実行 → ロスターに新規行＋P-ID 採番。
+//   氏名/メール/OS/条件 等は発行後にシートへ手入力する。
+function nextParticipantId_(sheet) {
+  var max = 0;
+  var last = sheet.getLastRow();
+  if (last >= 2) {
+    var ids = sheet.getRange(2, 1, last - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      var m = String(ids[i][0]).match(/^P(\d+)$/);
+      if (m) {
+        var n = parseInt(m[1], 10);
+        if (n > max) max = n;
+      }
+    }
+  }
+  var next = max + 1;
+  var num = next < 1000 ? ("000" + next).slice(-3) : String(next); // 3桁ゼロ埋め（1000以上は桁増）
+  return "P" + num;
+}
+
+// ロスターに新規参加者行を追加し、次の一意 P-ID を自動採番する。採番した P-ID を返す。
+function addParticipant() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (!ssId) {
+    Logger.log("❌ 管理シート未作成。先に buildManagementSheet() を実行してください。");
+    return null;
+  }
+  var ss = SpreadsheetApp.openById(ssId);
+  var sheet = ss.getSheetByName("参加者ロスター");
+  if (!sheet) {
+    Logger.log("❌ 「参加者ロスター」タブが見つかりません。buildManagementSheet() を実行してください。");
+    return null;
+  }
+  var pid = nextParticipantId_(sheet);
+  sheet.appendRow([pid]); // P-ID 列のみ。氏名/メール/OS/条件 等は手入力。
+  Logger.log("✅ 参加者を追加: " + pid + "（氏名・メール・OS・条件をシートに手入力してください）");
+  Logger.log("🔗 " + ss.getUrl());
+  return pid;
 }
 
 
