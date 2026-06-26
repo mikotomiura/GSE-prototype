@@ -48,12 +48,6 @@ var PUBKEY_SOURCE_INFO =
   "配布パッケージ同梱の pubkey.txt（age 公開鍵）。" +
   "暗号化はこの公開鍵だけで完結し、復号は研究者しかできません。";
 
-// 守秘同意書（NDA）の入手・署名・返送方法。GSE は未公開のため、署名返送を **アプリ配布の前提** とする（D8）。
-// ⚠ 実際の配布方法（添付PDF / 署名リンク / 返送先メール等）に合わせて研究者が書き換える。
-var NDA_SIGN_INFO =
-  "（守秘同意書の入手先と返送方法をここに記入。" +
-  "例: 本メールに PDF を添付 → 署名（記名）して mmiura.network@gmail.com へ返送、" +
-  "または電子署名リンク。未成年の方は保護者の署名も必要です）";
 
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
 // F2-C(事前) と F5(事後) で matched 再測定するため、両者が必ず byte 一致するよう
@@ -164,11 +158,13 @@ function buildForm() {
   qAnon.setChoices([qAnon.createChoice("同意する")]);
   qAnon.setRequired(true);
 
-  // Q2d: 秘密保持（守秘同意書への署名了承）。onF1Submit はこの項目も適格判定に使う（キーワード「口外」）。
+  // Q2d: 秘密保持（高位の同意）。具体の守秘事項と記名署名はフォーム末尾セクションで行う。
+  // onF1Submit はこの項目を適格判定に使う（キーワード「口外」。"署名"/"守秘事項" は末尾項目と
+  // 照合衝突するため、ここの文言には入れない）。
   var qConfidential = form.addCheckboxItem();
   qConfidential.setTitle(
-    "検証中に知り得た GSE（未公開ソフトウェア）の情報を第三者に口外せず、別途お送りする守秘同意書" +
-    "（協力者の場合は秘密保持契約書）に署名することに同意します。"
+    "検証中に知り得た GSE（未公開ソフトウェア）の情報を第三者に口外しないことに同意します" +
+    "（詳しい内容はこのフォームの最後でご確認・ご記名いただきます）。"
   );
   qConfidential.setChoices([qConfidential.createChoice("同意する")]);
   qConfidential.setRequired(true);
@@ -259,6 +255,35 @@ function buildForm() {
   q9.setTitle("お名前またはニックネーム（対応表管理用）");
   q9.setHelpText("公開されません。研究者の内部管理にのみ使用します。");
   q9.setRequired(true);
+
+  // ============================================================
+  // 守秘同意（軽量・F1 内で記名署名して成立。D8/D9）
+  // ============================================================
+  // ※ このセクションは適格者のみが到達する（不適格分岐は手前で SUBMIT 終了するため）。
+  //   記名（氏名入力）を署名に代え、これをもって被験者の守秘同意の成立とする。正式 NDA（押印・
+  //   損害賠償）は協力者にのみ別途。全文は Form_Phase1/守秘同意書_被験者向け.md と byte 一致させること。
+  addSectionHeader(form,
+    "守秘事項のご確認とご署名",
+    "GSE は未公開のソフトウェアです。以下の守秘事項をご確認のうえ、ご署名（お名前の入力）をお願いします。\n\n" +
+    "【守秘事項】\n" +
+    "・検証中に知り得た GSE の画面・介入の挙動・仕組み・未公開機能・不具合等を、第三者に口外・公開・" +
+    "再配布しません。\n" +
+    "・配布されたアプリ・ファイルを第三者に再配布しません。\n" +
+    "・この義務は検証終了後も、情報が公知になるまで継続します。\n" +
+    "・すでに公知の情報、ご自身が以前から正当に知っていた情報、独自に得た情報、法令上開示が必要な情報は" +
+    "対象外です。\n" +
+    "・本守秘はあなたのデータやプライバシーを制限するものではありません（データの扱いは上記説明のとおり）。"
+  );
+
+  var ndaAgree = form.addCheckboxItem();
+  ndaAgree.setTitle("上記の守秘事項に同意します。");
+  ndaAgree.setChoices([ndaAgree.createChoice("同意する")]);
+  ndaAgree.setRequired(true);
+
+  var ndaSign = form.addTextItem();
+  ndaSign.setTitle("ご署名（お名前を入力してください。これを署名に代えます）");
+  ndaSign.setHelpText("未成年の方は保護者のお名前も併記してください（例: 本人氏名／保護者氏名）。");
+  ndaSign.setRequired(true);
 
   // ============================================================
   // セクション分岐を設定
@@ -1076,6 +1101,10 @@ function onF1Submit(e) {
     }
 
     // 4) P-ID 発番 + ロスター行追加
+    //    守秘同意は F1 内で記名署名して成立（D9）。末尾の「守秘事項に同意」チェック + 記名があれば
+    //    NDA署名列を「署名済(F1)」にする（無ければ「未署名」で手動フォロー）。
+    var ndaStatus =
+      a.ndaSignature && a.ndaAgree.indexOf("同意する") !== -1 ? "署名済(F1)" : "未署名";
     var pid = nextParticipantId_(sheet);
     appendRosterRow_(sheet, {
       pid: pid,
@@ -1084,6 +1113,7 @@ function onF1Submit(e) {
       os: a.os,
       condition: DEFAULT_CONDITION,
       consentDate: e.response.getTimestamp(),
+      nda: ndaStatus,
     });
     var appendedRow = sheet.getLastRow(); // 通知失敗時に備考へフラグするため行を控える
     SpreadsheetApp.flush(); // ロック解放前に書き込みを確定させる
@@ -1141,11 +1171,15 @@ function f1Answers_(response) {
   }
   var consent1 = find(function (t) { return has(t, "説明を読み"); });
   var consent2 = find(function (t) { return has(t, "記録と研究利用に同意"); });
-  var confidential = find(function (t) { return has(t, "口外"); }); // Q2d 秘密保持
+  var confidential = find(function (t) { return has(t, "口外"); }); // Q2d 秘密保持（高位同意）
+  var ndaAgree = find(function (t) { return has(t, "守秘事項"); }); // 末尾: 守秘事項に同意チェック
+  var ndaSignature = find(function (t) { return has(t, "署名に代え"); }); // 末尾: 記名署名
   return {
     consent1: asArray_(consent1),
     consent2: asArray_(consent2),
     confidential: asArray_(confidential),
+    ndaAgree: asArray_(ndaAgree),
+    ndaSignature: trim_(ndaSignature),
     age: find(function (t) { return has(t, "年齢"); }),
     guardian: find(function (t) { return has(t, "保護者同意フォーム"); }),
     ime: find(function (t) { return has(t, "日本語入力") && has(t, "IME"); }),
@@ -1186,30 +1220,34 @@ function isEligibleF1_(a) {
   return { eligible: true, reason: "" };
 }
 
-// 通知メール本文テンプレート。P-ID と最初のステップ（守秘同意書への署名）を案内する。
-// GSE は未公開のため、署名のご返送を確認してからアプリ一式を配布する（D8・NDA→配布の順）。
-// アプリ入手後の手順（gse-package / Dropbox）は配布時の案内に回し、ここでは予告に留める。
+// 通知メール本文テンプレート。守秘同意は F1 内で記名署名済み（D9）のため、本メールでは P-ID と
+// アプリ入手以降の手順を案内する。pilot-runbook §3（被験者 3 ステップ）と整合させる。
 function f1EmailBody_(pid) {
   return [
-    "GSE ユーザー検証へのご参加ありがとうございます。スクリーニングの結果、ご参加いただけます。",
+    "GSE ユーザー検証へのご参加ありがとうございます。スクリーニングと守秘事項へのご署名を確認しました。",
+    "ご参加いただけます。",
     "",
     "■ あなたの参加者ID（P-ID）",
     "    " + pid,
     "    ※ 以降のフォーム回答・ログ提出すべてでこの P-ID を使います。実名は使いません。",
     "",
-    "■ 最初のステップ：守秘同意書へのご署名（アプリ配布の前提）",
-    "  GSE は未公開のソフトウェアです。検証中に知り得た情報を口外しないことへのご同意として、",
-    "  守秘同意書にご署名のうえご返送ください。",
-    "    " + NDA_SIGN_INFO,
-    "  ※ ご署名のご返送を確認しだい、アプリ一式（gse 本体・gse-package・pubkey.txt）と詳しい手順を",
-    "    改めてお送りします。",
+    "■ 次のステップ",
+    "  1) アプリ一式の入手",
+    "     " + APP_DOWNLOAD_INFO,
+    "     （gse 本体アプリ + gse-package + pubkey.txt の 3 点）",
     "",
-    "■ このあとの流れ（署名確認後・予告）",
-    "  1) アプリ一式を受け取り、いつも通り作業（セッションログが端末に生成されます）",
-    "  2) ログを 1 コマンドで匿名化 + 暗号化:",
+    "  2) いつも通り作業（セッション収集）",
+    "     アプリを起動して執筆・思考作業をすると、セッションログが端末に生成されます。",
+    "",
+    "  3) ログの匿名化 + 暗号化（1 コマンド）",
     "       gse-package --input <生成された.ndjson> --participant " + pid + " --recipient pubkey.txt",
     "     → " + pid + "_*.age（暗号化ファイル）ができます。元の生ログは送りません。",
-    "  3) Dropbox ファイルリクエストに " + pid + "_*.age を提出（提出者同士は互いに見えません）",
+    "     ※ pubkey.txt は " + PUBKEY_SOURCE_INFO,
+    "",
+    "  4) Dropbox で提出",
+    "     下記の Dropbox ファイルリクエストに、" + pid + "_*.age をドラッグ&ドロップするだけです:",
+    "       " + (DROPBOX_FILE_REQUEST_URL || "（研究者が URL を案内します）"),
+    "     （提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。）",
     "",
     "ご不明点があればこのメールにご返信ください。どうぞよろしくお願いいたします。",
   ].join("\n");
@@ -1224,7 +1262,7 @@ function appendRosterRow_(sheet, p) {
     : "";
   sheet.appendRow([
     p.pid, p.name || "", p.email || "", p.os || "", p.condition || DEFAULT_CONDITION,
-    consent, "", "", "", "", "", "未署名", "", "自動発番(onF1Submit)",
+    consent, "", "", "", "", "", p.nda || "未署名", "", "自動発番(onF1Submit)",
   ]);
 }
 
