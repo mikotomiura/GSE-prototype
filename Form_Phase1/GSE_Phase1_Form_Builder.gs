@@ -48,6 +48,12 @@ var PUBKEY_SOURCE_INFO =
   "配布パッケージ同梱の pubkey.txt（age 公開鍵）。" +
   "暗号化はこの公開鍵だけで完結し、復号は研究者しかできません。";
 
+// 被験者に渡してよい「公開用リンク集」スプレッドシート（フォーム URL を集約した閲覧専用シート）。
+// ⚠ 実名↔P-ID 対応表を含む【運用管理シート（MGMT_SHEET）とは別物】。こちらは PII を一切含まない、
+//   閲覧専用で共有してよいシートであること。空文字なら通知メールでは個別フォーム URL のみ案内する。
+var PUBLIC_LINKS_URL =
+  "https://docs.google.com/spreadsheets/d/18vs0qbEaNYCOlh8fdVJUBDYekN323lpixOr9NDPH2hs/edit?usp=sharing";
+
 
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
 // F2-C(事前) と F5(事後) で matched 再測定するため、両者が必ず byte 一致するよう
@@ -1123,7 +1129,11 @@ function onF1Submit(e) {
     //    ロスター行は確定済みなので、ここで例外が出ると findRosterByEmail_ により再提出が
     //    冪等スキップされ被験者が永久に通知未達になりうる。失敗を備考列に可視化して手動回復可能にする。
     var subject = F1_EMAIL_SUBJECT;
-    var body = f1EmailBody_(pid);
+    var body = f1EmailBody_(pid, {
+      f2: formPublishedUrl_(props, "F2"),
+      f4: formPublishedUrl_(props, "F4"),
+      f5: formPublishedUrl_(props, "F5"),
+    });
     try {
       if (AUTO_SEND) {
         MailApp.sendEmail(a.email, subject, body);
@@ -1220,9 +1230,27 @@ function isEligibleF1_(a) {
   return { eligible: true, reason: "" };
 }
 
+// Script Properties に記録済みのフォーム公開 URL（回答 URL）を返す。未記録なら空文字。
+function formPublishedUrl_(props, key) {
+  var raw = props.getProperty("FORMURL_" + key);
+  if (!raw) return "";
+  try {
+    return JSON.parse(raw).publishedUrl || "";
+  } catch (e) {
+    return "";
+  }
+}
+
 // 通知メール本文テンプレート。守秘同意は F1 内で記名署名済み（D9）のため、本メールでは P-ID と
-// アプリ入手以降の手順を案内する。pilot-runbook §3（被験者 3 ステップ）と整合させる。
-function f1EmailBody_(pid) {
+// アプリ入手以降の手順、各アンケート(F2/F4/F5)の回答タイミング、公開リンク集を案内する。
+// pilot-runbook §3（被験者 3 ステップ）/ 設問草案（F2/F4/F5 の頻度）と整合させる。
+// formUrls = {f2, f4, f5}（各フォームの回答 URL。未生成なら空でリンク集へ誘導）。
+function f1EmailBody_(pid, formUrls) {
+  formUrls = formUrls || {};
+  // URL があれば「ラベル: URL」、無ければラベルのみ（リンク集を案内）。
+  function link(label, url) {
+    return url ? label + "\n      " + url : label + "\n      （下の「すべてのリンク集」からアクセスしてください）";
+  }
   return [
     "GSE ユーザー検証へのご参加ありがとうございます。スクリーニングと守秘事項へのご署名を確認しました。",
     "ご参加いただけます。",
@@ -1231,23 +1259,29 @@ function f1EmailBody_(pid) {
     "    " + pid,
     "    ※ 以降のフォーム回答・ログ提出すべてでこの P-ID を使います。実名は使いません。",
     "",
-    "■ 次のステップ",
+    "■ アプリの準備と提出（毎セッション）",
     "  1) アプリ一式の入手",
     "     " + APP_DOWNLOAD_INFO,
     "     （gse 本体アプリ + gse-package + pubkey.txt の 3 点）",
-    "",
-    "  2) いつも通り作業（セッション収集）",
-    "     アプリを起動して執筆・思考作業をすると、セッションログが端末に生成されます。",
-    "",
-    "  3) ログの匿名化 + 暗号化（1 コマンド）",
+    "  2) いつも通り作業すると、セッションログが端末に生成されます。",
+    "  3) ログを 1 コマンドで匿名化 + 暗号化:",
     "       gse-package --input <生成された.ndjson> --participant " + pid + " --recipient pubkey.txt",
-    "     → " + pid + "_*.age（暗号化ファイル）ができます。元の生ログは送りません。",
-    "     ※ pubkey.txt は " + PUBKEY_SOURCE_INFO,
-    "",
-    "  4) Dropbox で提出",
-    "     下記の Dropbox ファイルリクエストに、" + pid + "_*.age をドラッグ&ドロップするだけです:",
+    "     → " + pid + "_*.age ができます（元の生ログは送りません）。pubkey.txt は " + PUBKEY_SOURCE_INFO,
+    "  4) Dropbox ファイルリクエストに " + pid + "_*.age を提出:",
     "       " + (DROPBOX_FILE_REQUEST_URL || "（研究者が URL を案内します）"),
     "     （提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。）",
+    "",
+    "■ アンケートのご回答（いずれも冒頭の「参加者ID(P-ID)」に " + pid + " を入力してください）",
+    "  ● F2 事前アンケート … 検証を【始める前に1回だけ】",
+    "      " + link("回答ページ", formUrls.f2),
+    "  ● F4 セッション後アンケート … 【各セッションの終了ごとに毎回】（ログ提出の確認も兼ねます）",
+    "      " + link("回答ページ", formUrls.f4),
+    "  ● F5 事後アンケート … 【全セッション終了後に1回だけ】",
+    "      " + link("回答ページ", formUrls.f5),
+    "  ※ セッション中の「途中の問い（プローブ）」はアプリ内に表示されます。フォーム回答は不要です。",
+    "",
+    "■ すべてのリンク集（公開用・ブックマーク推奨）",
+    "    " + (PUBLIC_LINKS_URL || "（研究者がリンク集を別途ご案内します）"),
     "",
     "ご不明点があればこのメールにご返信ください。どうぞよろしくお願いいたします。",
   ].join("\n");
