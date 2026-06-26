@@ -1027,6 +1027,25 @@ This change is confined to the `TIMER_HTML_TEMPLATE` string in `wall_server.rs` 
 
 ---
 
+## macOS Overlay Click-Through Fix & Probe Window Clamp (v2.22)
+
+Two macOS-specific defects in the intervention overlay were fixed, plus a latent cross-platform window-clamp bug that silently dropped calibration labels.
+
+**Overlay click-through (macOS).** Probe/Nudge cards rendered but their buttons were unclickable — clicks passed through to the app behind. The root cause was a stack of issues; the immediate trigger was a missing Tauri capability:
+
+- **Capability (primary):** the overlay window lacked `core:window:allow-set-size` / `allow-set-position`. The box-resize `setSize` threw a permission exception *before* `setOverlayInteractive(true)` ran, so `ignoresMouseEvents` was never cleared. Both were added; the now-dead `allow-hide` / `allow-maximize` were removed.
+- **NSPanel conversion:** the overlay is converted to a non-activating `NSPanel` (`tauri-nspanel`, Floating level) so clicks route to the WKWebView even though the window never becomes key. New file `src-tauri/src/overlay_panel.rs`.
+- **Rust-authoritative click acceptance:** JS `setIgnoreCursorEvents` has no effect on an NSPanel-converted window, so `set_overlay_interactive` calls `set_ignore_mouse_events` + `resign_key_window` directly.
+- **No focus theft:** `show()` makes the panel key (stealing the editor's typing focus); `resign_key_window()` immediately returns the key. Verified `isKeyWindow=false`.
+- **idle no longer hides the overlay:** hiding put the webview JS to sleep and dropped `probe_triggered`; the overlay now stays visible-but-transparent + click-through.
+- **No maximize on NSPanel:** `maximize()` / `unmaximize()` crash (NSRangeException via `setStyleMask:`); full-screen uses explicit `setSize` / `setPosition`.
+
+**Probe window clamp (cross-platform).** `record_realtime_*` rejected labels with `window_end_ms must be >= window_start_ms` whenever a probe/marker fired within 5 s of session start. `self_marker_window_clamped` clamped only the window **start** to `session_start`, leaving the end at `t − 5 s`, which inverted when the session was younger than 5 s. Fixed by clamping the end too (`we = we.max(ws)`), collapsing to a zero-width window (correctly representing "no pre-session data"). Real scheduler probes are unaffected (31 s warm-up); the M/D self-marker's startup-window loss is also fixed. Regression test added.
+
+Backend touch points: `overlay_panel.rs` (new), `lib.rs`, `analysis/probe_scheduler.rs`, `capabilities/default.json`. Frontend: `Overlay.tsx`. Verified: 228 lib tests pass, replay snapshot unchanged (HMM invariant), real-machine smoke. See `docs/verification-runbook.md` §2.
+
+---
+
 ## Logging & Analysis
 
 Every session produces a timestamped NDJSON file:
@@ -1277,6 +1296,11 @@ GSE_DEBUG=1 "App.app/Contents/MacOS/<bin>"   # macOS: `open` does NOT pass env; 
 Participant distribution = CI production binary launched normally (no flags). See
 `docs/calibration-smoke-runbook.md` §1.1–1.2 for the full smoke-test procedure and the log
 fail-loud banner.
+
+**Verification before release/merge:** run `docs/verification-runbook.md` top-to-bottom —
+automated regression (§1: `cargo test` / `gse-replay --snapshot` / `emit_schema` / `tsc`),
+macOS functional checks (§2: overlay click-through, probe record landing, Wall, IME),
+Windows diffs (§3), and the Google Form builder (§4).
 
 ### Post-session Analysis
 
