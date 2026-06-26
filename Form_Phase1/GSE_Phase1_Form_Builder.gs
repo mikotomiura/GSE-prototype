@@ -779,7 +779,13 @@ function buildLinksTab_(ss, props) {
       "手動",
       "P###_*.age の提出先。受領者(研究者)のみ閲覧可・提出者同士は互いに見えない",
     ],
-    ["研究者 公開鍵 (pubkey.txt) 配布先", prevPubkey || "", "手動", "被験者へ配る age 公開鍵の置き場"],
+    [
+      "被験者へ配る age 公開鍵 (pubkey.txt) の置き場",
+      prevPubkey || "",
+      "手動",
+      "被験者が .age 暗号化(gse-package --recipient)に使う age 公開鍵。配布 zip に同梱 or DL リンクを記入。" +
+        "公開鍵は配布して安全。※ 秘密鍵 ~/.gse/age-identity.txt は共有・コミット厳禁",
+    ],
     ["", "", "", ""],
     ["フォーム", "タイトル", "編集URL", "回答URL"],
   ];
