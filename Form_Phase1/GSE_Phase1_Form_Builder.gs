@@ -219,6 +219,7 @@ function buildForm() {
     q7.createChoice("その他（Linux等）", secOSIneligible),
   ]);
 
+  recordFormUrl("F1", form, "F1 同意・スクリーニング");
   Logger.log("✅ F1 同意・スクリーニング 設問投入完了");
 
 
@@ -343,6 +344,7 @@ function buildF2() {
     item.setRequired(true);
   });
 
+  recordFormUrl("F2", form, "F2 事前アンケート（ベースライン）");
   Logger.log("✅ F2 事前アンケート作成完了");
   Logger.log("🔗 編集URL: " + form.getEditUrl());
   Logger.log("🔗 回答URL: " + form.getPublishedUrl());
@@ -502,6 +504,7 @@ function buildF4() {
   s5.setTitle("気づいた点・困った点（任意）");
   s5.setRequired(false);
 
+  recordFormUrl("F4", form, "F4 セッション後アンケート");
   Logger.log("✅ F4 セッション後アンケート作成完了");
   Logger.log("🔗 編集URL: " + form.getEditUrl());
   Logger.log("🔗 回答URL: " + form.getPublishedUrl());
@@ -648,6 +651,7 @@ function buildF5() {
   e2detail.setTitle("不安があった場合、具体的にどの点が気になりましたか？（任意）");
   e2detail.setRequired(false);
 
+  recordFormUrl("F5", form, "F5 事後アンケート");
   Logger.log("✅ F5 事後アンケート作成完了");
   Logger.log("🔗 編集URL: " + form.getEditUrl());
   Logger.log("🔗 回答URL: " + form.getPublishedUrl());
@@ -663,8 +667,165 @@ function buildAllSupportForms() {
   buildF2(); // 事前ベースライン
   buildF4(); // セッション後
   buildF5(); // 事後（固定 ID 再利用）
-  Logger.log("🎉 F2 / F4 / F5 作成完了。上記の編集URLをスプレッドシート等に保存してください。");
+  Logger.log("🎉 F2 / F4 / F5 作成完了。次に buildManagementSheet() で管理シートに URL を集約してください。");
   Logger.log("ℹ️ F3（プローブ申告）は in-app ProbeCard が正規ルートのため除外。フォールバックが必要な時のみ buildF3 を単独実行。");
+}
+
+
+// ============================================================
+// 運用管理スプレッドシート（フォーム URL 集約 + 参加者ロスター + 提出トラッキング）
+// ============================================================
+// P-ID を単一キーに forms / NDJSON(P###) / Dropbox(P###_*.age) / metrics を ID 連携する
+// 研究運用の中枢シート。実名↔P-ID 対応表を含むため **repo 外・研究者のみ**がアクセスする
+// (data-privacy / docs/pilot-runbook.md §0)。
+//
+// 実行順:
+//   1. buildForm()          … F1（固定 ID 再利用）
+//   2. buildAllSupportForms() … F2 / F4 / F5（各 build が URL を Script Properties に記録）
+//   3. buildManagementSheet() … 管理シートを新規作成し URL を自動集約（シート ID は保持し再利用）
+//   4. Dropbox で File Request を作成し、その URL を「リンク集」タブのセルに貼る（手動・下記）
+//   ※ 一括は setupPhase1Forms() でも可。ただし実行時間/クォータに当たったら各ステップを単独実行。
+//
+// 【Dropbox File Request 作成手順（研究者・手動）】GAS からは作成不可（外部サービス）。
+//   a. dropbox.com → 左メニュー「ファイルリクエスト」→「ファイルリクエストを作成」。
+//   b. タイトル=「GSE Phase1 セッションログ提出 (.age)」、保存先フォルダ=例 /GSE-Phase1/submissions/。
+//   c. 作成後の **リクエスト URL** をコピー → 管理シート「リンク集」タブの該当セルに貼る。
+//   d. 被験者にはこの URL のみ渡す（pilot-runbook §3 Step 3）。受領者(研究者)だけが中身を見られ、
+//      提出者同士は互いのファイルを見られない。提出物は P###_*.age（暗号化済）のみ。
+//   e. ID 連携: ファイル名の先頭 P### がフォーム回答(P-ID)・NDJSON(P###)・metrics/P###/ と突合する
+//      単一キー。実名↔P### の対応表は本シート「参加者ロスター」（repo 外・研究者のみ）で管理する。
+
+var MGMT_SHEET_PROP = "GSE_MGMT_SHEET_ID";
+
+// 各 build 関数末尾から呼ぶ。作成/更新したフォームの URL を Script Properties に記録する。
+function recordFormUrl(key, form, label) {
+  PropertiesService.getScriptProperties().setProperty(
+    "FORMURL_" + key,
+    JSON.stringify({
+      label: label,
+      title: form.getTitle(),
+      editUrl: form.getEditUrl(),
+      publishedUrl: form.getPublishedUrl(),
+    })
+  );
+}
+
+// F1〜F5 を作成し管理シートまで一気通貫で作る（一貫運用の入口）。
+// ⚠ 1 実行で全部走るため、実行時間/クォータに当たったら各 build を単独実行 → 最後に
+//    buildManagementSheet() を回すこと（URL は Script Properties に残るので集約は成功する）。
+function setupPhase1Forms() {
+  buildForm();
+  buildAllSupportForms();
+  var url = buildManagementSheet();
+  Logger.log("🎉 Phase1 フォーム一式 + 管理シート 作成完了: " + url);
+}
+
+// 管理シートを新規作成 or 既存を更新し、URL を返す。
+function buildManagementSheet() {
+  var props = PropertiesService.getScriptProperties();
+  var ss = null;
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (ssId) {
+    try {
+      ss = SpreadsheetApp.openById(ssId);
+    } catch (e) {
+      ss = null; // 削除済み等 → 作り直す
+    }
+  }
+  if (!ss) {
+    ss = SpreadsheetApp.create("GSE Phase1 運用管理シート");
+    props.setProperty(MGMT_SHEET_PROP, ss.getId());
+  }
+
+  buildLinksTab_(ss, props); // 毎回 URL を再集約（手動入力セルは保持）
+  buildRosterTab_(ss); // 既存があれば作らない（入力データを破壊しない）
+  buildSubmissionTab_(ss); // 同上
+
+  ["シート1", "Sheet1"].forEach(function (n) {
+    var s = ss.getSheetByName(n);
+    if (s && ss.getSheets().length > 1) ss.deleteSheet(s);
+  });
+
+  Logger.log("✅ 管理シート作成/更新完了");
+  Logger.log("🔗 " + ss.getUrl());
+  return ss.getUrl();
+}
+
+// --- タブ: リンク集（フォーム URL を自動集約 + Dropbox File Request URL は手動セル）---
+function buildLinksTab_(ss, props) {
+  var sh = ss.getSheetByName("リンク集") || ss.insertSheet("リンク集", 0);
+  // Dropbox URL など手動入力済みの値を退避してから再描画する（毎回上書きで消さない）。
+  var prevDropbox = "";
+  var prevPubkey = "";
+  try {
+    prevDropbox = sh.getRange(4, 2).getValue();
+    prevPubkey = sh.getRange(5, 2).getValue();
+  } catch (e) {
+    /* 初回は空 */
+  }
+  sh.clear();
+  var rows = [
+    ["GSE Phase1 リンク集", "", "", ""],
+    ["", "", "", ""],
+    ["項目", "値 / URL", "種別", "備考"],
+    [
+      "Dropbox File Request URL",
+      prevDropbox || "（Dropbox で File Request を作成し、ここに URL を貼る）",
+      "手動",
+      "P###_*.age の提出先。受領者(研究者)のみ閲覧可・提出者同士は互いに見えない",
+    ],
+    ["研究者 公開鍵 (pubkey.txt) 配布先", prevPubkey || "", "手動", "被験者へ配る age 公開鍵の置き場"],
+    ["", "", "", ""],
+    ["フォーム", "タイトル", "編集URL", "回答URL"],
+  ];
+  ["F1", "F2", "F4", "F5"].forEach(function (k) {
+    var raw = props.getProperty("FORMURL_" + k);
+    if (raw) {
+      var o = JSON.parse(raw);
+      rows.push([k + "｜" + o.label, o.title, o.editUrl, o.publishedUrl]);
+    } else {
+      rows.push([k, "（未生成 — build" + k + " を実行）", "", ""]);
+    }
+  });
+  rows.push(["F3（廃止）", "in-app ProbeCard が正規ルート。フォールバック専用", "", ""]);
+  sh.getRange(1, 1, rows.length, 4).setValues(rows);
+  sh.getRange(1, 1).setFontWeight("bold").setFontSize(14);
+  sh.getRange(3, 1, 1, 4).setFontWeight("bold");
+  sh.getRange(7, 1, 1, 4).setFontWeight("bold");
+  sh.setColumnWidth(1, 240);
+  sh.setColumnWidth(2, 340);
+  sh.setColumnWidth(3, 320);
+  sh.setColumnWidth(4, 320);
+}
+
+// --- タブ: 参加者ロスター（P-ID 対応表 + 進捗）。再実行で入力を破壊しない ---
+function buildRosterTab_(ss) {
+  if (ss.getSheetByName("参加者ロスター")) return;
+  var sh = ss.insertSheet("参加者ロスター");
+  var header = [
+    "P-ID", "氏名/ニックネーム", "メール", "OS", "条件(condition)",
+    "F1同意日", "F2事前", "セッション数", "F4回答(計)", "F5事後",
+    "Dropbox提出", "撤回/除外", "備考",
+  ];
+  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
+  sh.setFrozenRows(1);
+  sh.getRange(2, 1, 1, 5).setValues([["P001", "", "", "", "baseline"]]);
+  sh.setColumnWidth(1, 70);
+  sh.setColumnWidth(2, 150);
+  sh.setColumnWidth(3, 210);
+}
+
+// --- タブ: セッション提出トラッキング（per-session）。再実行で入力を破壊しない ---
+function buildSubmissionTab_(ss) {
+  if (ss.getSheetByName("セッション提出トラッキング")) return;
+  var sh = ss.insertSheet("セッション提出トラッキング");
+  var header = [
+    "P-ID", "セッションID", "日付", "OS",
+    "NDJSON生成", ".age提出(Dropbox)", "metrics生成", "F4回答", "備考",
+  ];
+  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
+  sh.setFrozenRows(1);
+  sh.getRange(2, 1, 1, 2).setValues([["P001", "ses_20260628_001"]]);
 }
 
 
