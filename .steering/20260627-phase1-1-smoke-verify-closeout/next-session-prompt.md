@@ -1,71 +1,82 @@
-# 次セッション用 開始プロンプト（#1 本番スモーク検証 → 後追い → クローズ）
+# 次セッション用 開始プロンプト（macOS フック失効 → idle/away 誤リセット ＆ ランダムプローブ誤発火の修正）
 
 > このファイル本文を新しいセッションの最初に貼る。GSE-prototype 用。
-> 前タスク `20260626-phase1-card-repro-backend-fix`（#1 backend 層2）はコミット済・**PR #31 マージ済**。
-> 起動方法/fail-loud の docs も **PR #32 マージ済**。本タスクはその実機検証とクローズ。
+> 前タスク `20260627-phase1-1-smoke-verify-closeout`（#1 backend 層2 のスモーク検証＆クローズアウト）は完了。
+> 機械的検証（cargo test / gse-replay / tsc）グリーン、起動方法 A＋C 確定、事後アンケート GAS 実装済み確認。
+> 本タスクはそこで発見した **F4（Phase1 前倒し確定分）** の修正。
 
 ---
 
 ## 依頼
-PR #31 でマージ済みの **#1（プローブ/Nudge カードのボタン無反応・出っぱなし）backend 層2 修正**を、
-**本番ビルドの実機スモーク**で検証し、結果に応じて後追い修正して **#1 をクローズ**する。
-実装/検証系なので **`/start-task`**（task-name=`phase1-1-smoke-verify-closeout`、本ディレクトリを利用）で
-steering を起こす。**ブランチは新規**（後追い修正があれば `fix/phase1-1-...`、検証/記録のみなら `chore/...`）。
-backend を再修正する場合は `rust-standards`/`data-privacy`/`hook-constraints` 参照、`logger.rs` 変更なら
-security-checker 必須。
+macOS で待機中に CGEventTap が OS により失効 → 再インストール時に `LAST_KEY_MS=0` リセットされ、
+**(1) Dashboard の idle カウンタが 0 に戻る、(2) idle/away 判定が壊れる、(3) 離席中にランダムプローブが
+誤発火して空回答/汚染データになる** 問題を根治する。
+実装系なので **`/start-task`**（task-name=`macos-tap-idle-away-fix`、または本クローズアウト dir を引き継ぎ）で
+steering を起こす。**`/fix-bug`**（TDD: 回帰テスト先行）で進める。`*.rs` は `architecture-rules`/`rust-standards`/
+`hook-constraints` 必須参照。`input/` の OS フック変更のため `hook-constraints` Skill を必ず読む。
 
-## 背景（確定事実）
-- **#1 症状**: プローブ/Nudge カードのボタンを押しても `record_*` が静かに失敗し、カードが閉じず出っぱなし。
-- **根本（静的調査で確定）**: 3 コマンド共通の唯一の失敗点 = log channel `try_send`。最有力 =
-  **Disconnected**（`File::create` 失敗で consumer スレッド死亡 → 以後 channel Disconnected → 全 record 失敗）。
-  最有力原因 = **macOS の Documents/TCC 権限**（本番 .app）または `GSE_DATASET` 誤指定。
-- **PR #31 で実装済（マージ済）**:
-  - consumer 耐障害化: `SessionLogger::start` を spawn 前同期 open（primary→**temp フォールバック**→`io::sink()` 縮退）。
-    consumer を死なせず **channel を Disconnected にしない** → 「出っぱなし」を構造的に解消。
-  - fail-loud: `LogStatus` ＋ `get_log_status` IPC → Dashboard が書込先の警告バナーを常時表示。NDJSON は unix で 0600。
-  - 誤誘導ラベル是正: `log_send_error` で Full/Disconnected を区別。
-  - 再現性確保: `debug_force_probe`(📝) / `force_nudge`(💡)。**二重 gate**（`VITE_GSE_DEBUG=1` ビルド時＋`GSE_DEBUG=1` 実行時）。
-  - 層1（フロント・先行マージ）: 失敗時カード保持＋インラインエラー＋リトライ（死んだボタン/無限再表示は解消済）。
-- **未検証 = 実機本番スモークのみ**（Claude は実キーボードフック＋OS 権限＋実セッションを再現できない＝前タスク blockers B1）。
+## 確定済みの根本原因（前タスクで特定）
+- `get_keyboard_idle_ms()`（`lib.rs:427`）＝`now - LAST_KEY_MS`。**`LAST_KEY_MS==0` で 0 を返す**（`:429`）。
+- `LAST_KEY_MS` が 0 にストアされるのは **OS がフックを失効させ再インストールする時のみ**:
+  - macOS: `hook_macos.rs:637`（CGEventTap 失効・CFRunLoop 退出）/ `:612`（runloop source 生成失敗）
+  - Windows: `hook_windows.rs:231`（メッセージループ退出＝`WM_QUIT` のみ＝**アプリ終了時だけ**）
+- macOS の tap は **`KeyDown`/`KeyUp` のみ登録**（`hook_macos.rs:577`）で、`kCGEventTapDisabledByTimeout`/
+  `ByUserInput` を受けて `CGEventTapEnable(tap,true)` で**再有効化する標準ハンドラが無い** →
+  失効時にタップ丸ごと作り直し＋2秒 sleep＋`LAST_KEY_MS=0` に倒れている。
+- **ランダムプローブ誤発火（同根）**: 駆動側 `last_key==0 → idle=0`（`lib.rs:1608`）。離席中に tap 再インストール
+  されると idle が 0 リセット → `away=false`（`probe_scheduler.rs:206`、`away_idle_ms=180_000`）→
+  離席中にプローブ発火。
+- **Windows は本症状なし（厳密確認済み）**: メッセージループは `WM_QUIT` でしか抜けず待機中に
+  `WH_KEYBOARD_LL` は外れない → `LAST_KEY_MS` 保持 → away 正常。Windows の別ギャップ（callback timeout の
+  silent unhook → stale `HOOK_ACTIVE`・`last_key` 凍結、検出/復旧なし）は**症状が逆**で発生確率低 → 本タスク対象外、Phase2。
 
 ## やること（着手順）
-### 1【本番ビルド & 起動】（研究者作業・最重要。dev では TCC 文脈が異なり repro しにくい）
-- `VITE_GSE_DEBUG=1 npm run tauri build` で本番ビルド → 起動時に `GSE_DEBUG=1` を渡す。
-  - macOS: `open App.app` は env を渡さない → `GSE_DEBUG=1 "App.app/Contents/MacOS/<bin>"` 直接実行 or `launchctl setenv`。
-  - Windows: 起動前シェルで `set GSE_DEBUG=1`（or System 環境変数）。両 OS で確認できると望ましい。
-- 手順詳細は `docs/calibration-smoke-runbook.md` §1.1–1.2。
+### 1【macOS フック失効の軽量復旧】（主修正）
+- `hook_macos.rs` の tap 登録に `kCGEventTapDisabledByTimeout` / `kCGEventTapDisabledByUserInput` を含め、
+  callback でこれらを受けたら **タップを作り直さず即 `CGEventTapEnable(tap, true)` で再有効化**する。
+  作り直し＋2秒 sleep の重い経路は「本当に invalidate された時」だけに限定する。
+  ※ `core-graphics` 0.23 の API 表面（`CGEventTapEnable` 相当 / `CGEventType` の disabled バリアント）を
+    ソースで確認。`CGEventType` は `PartialEq` 未実装なので `matches!` を使う（既知 gotcha）。
+- `hook-constraints` 厳守: callback 内は Atomic＋channel のみ、ブロッキング禁止。再有効化呼び出しの可否を確認
+  （callback 内で安全に呼べるか、別経路が要るか）。
 
-### 2【スモーク実行 & 結果確定】（devtools 文字列のみ扱う・NDJSON 生ログ/キー内容は扱わない）
-- **📝プローブ強制表示** → Q1/Q2 回答 or skip → **カードが確実に閉じ**、NDJSON に `realtime_label` 行が残るか。
-- **💡Nudge強制表示** → dismiss → カードが閉じ `intervention_response` 行が残るか。
-- **fail-loud バナーの有無**（「一時フォルダに保存」/「保存できません」）と、出た場合の保存先パス。
-- 失敗が出る場合は devtools `console.error` の文字列（**"...full" か "...disconnected" か**）を確定。
+### 2【idle/away を OS 都合の失効で壊さない】（研究妥当性の核）
+- **OS 都合の一時失効では `LAST_KEY_MS=0` にしない**。`hook_macos.rs:637`/`:612`（必要なら `:231` も）で、
+  「セッション境界の真リセット」と「OS 都合の一時失効」を区別する。後者では `LAST_KEY_MS` を保持し、
+  idle/away が連続性を保つようにする。
+- 代替案として `last_key==0` の sentinel を「idle 不明」として扱い、プローブ駆動側で**不明時は away 寄り
+  （発火しない）に倒す**保守的設計も検討（`lib.rs:1608` / `get_keyboard_idle_ms`）。ただしセッション開始直後の
+  挙動が変わるため**設計判断（decisions に記録）**。憶測で確定せずトレードオフを明記。
 
-### 3【結果に応じた後追い修正】
-- **全 OK**（カード閉じる・記録残る・バナー無し）→ #1 を**クローズ**。blockers B1 を解除、steering に検証結果を記録。
-- **fail-loud バナー出現**（temp フォールバック/disabled）→ 原因を特定し恒久対処:
-  GSE_DATASET 誤指定なら設定ガイド、**macOS Documents/TCC** なら entitlements/Info.plist と起動時権限導線を確認・改善。
-- **console.error が "full"**（真の backlog・前タスク未対応分）→ 容量/drain 律速を是正（realtime_label を落とさない方針維持）。
-  → backend 変更時は回帰テスト先行・`cargo test --workspace`・`gse-replay --snapshot` 現状維持（schema_dto.rs を触らない）。
+### 3【テスト（TDD 先行）】
+- `probe_scheduler` は純ロジックなので、**idle が途中で 0 に戻る系列でも away 中は発火しない**ことを
+  検証する回帰テストを追加（now/idle を直接渡せる既存 `simulate` 系を活用）。
+- フック層（OS API）は `cargo test` で直接検証困難 → ロジックを純関数に切り出してテスト可能にするか、
+  最低限「`LAST_KEY_MS` 保持/リセットの分岐」を単体化する。
+- `cargo test --workspace` パス。**HMM 不変**（features/engine を触らない）なら
+  `gse-replay --snapshot tests/snapshots/minimal.json` 現状一致を確認。`schema_dto.rs` を触らない。
 
-### 4【任意・小・別件だが効果大】cross-review の Codex 縮退の恒久対処
-- `scripts/run-codex-review.sh` の実行権限欠如で Codex が `Permission denied` 縮退する。`git add --chmod=+x`
-  ＋ secrets-filter の自己ブロック回避（wrapper の diff を `--cached` 化）。memory `cross-review-codex-self-block` 参照。
+### 4【リビルド & 実機検証（研究者作業）】
+- `smoke-test-runbook.md` 準拠で本番ビルド起動。**長時間 Idle で idle カウンタが 0 に戻らない**こと、
+  `hook_macos.rs:638` の "CGEventTap CFRunLoop exited" warn が（失効頻度として）減ることを確認。
+- 離席（3分以上 idle）中にランダムプローブが発火しないことを確認（デバッグでは時間がかかるため、
+  必要なら `away_idle_ms` を一時的に短縮した検証ビルドで確認し、本番値に戻す）。
 
-### 5【クローズ処理】
-- code-reviewer（backend 触れば security-checker）→ `/finish-task` で `/cross-review`（Codex 権限を直してから）。
-- 後追い修正があれば PR。検証のみなら steering 更新＋ chore コミット。
+### 5【完了処理】
+- code-reviewer ＋ security-checker（`input/` フック変更）→ `/finish-task` で `/cross-review`。
+- ブランチ: 新規 `fix/macos-tap-idle-away`（#1 とは別 PR で良い）。
 
 ## 真実源（先に読む）
-- `.steering/20260626-phase1-card-repro-backend-fix/`（design 実装結果・decisions 判断1/2/3・blockers B1）。
-- `docs/calibration-smoke-runbook.md`（§1.1 二重 gate 起動・§1.2 デバッグトリガ&バナー・§4 トラブルシュート）。
-- `src-tauri/src/logger.rs`（`open_log_target`/`LogStatus`/`create_file_at` 0600）。
-- `src-tauri/src/lib.rs`（`ensure_debug_enabled`/`get_log_status`/`debug_force_probe`/`force_nudge`/`log_send_error`）。
-- `src/components/Dashboard.tsx`（fail-loud バナー・debug ボタン・debugView gate）。
+- 本クローズアウト dir `phase2-followups.md`（F4 全文・Windows 厳密調査・ランダムプローブ同根の記述）。
+- `src-tauri/src/input/hook_macos.rs`（230 handle_event / 573-642 tap 作成・失効・再インストール・`LAST_KEY_MS=0`）。
+- `src-tauri/src/input/hook_windows.rs`（169-238 ループ・`WM_QUIT` のみ退出・`:231` reset）。
+- `src-tauri/src/lib.rs`（427 `get_keyboard_idle_ms`・1567- プローブ駆動スレッド・1608 idle 計算）。
+- `src-tauri/src/analysis/probe_scheduler.rs`（195 poll・206 away・107-118 ProbeConfig）。
 
 ## 制約
-- NDJSON 生ログ・キーストローク内容を外部 LLM/クラウドに送らない（devtools エラー文字列・集計のみ扱う）。
-- 実機 repro/ビルド/スモークは研究者（ユーザー）作業。Claude は結果を受けて判断・修正・記録する。
-- HMM 挙動を変えない（変えるなら HMM_VERSION bump＋ゴールデン再生成）。`schema_dto.rs` を触らない。
-- diff に無関係な未ステージ変更（budget.json/scripts/docs削除/MEMO）を混ぜない（現在 working tree に残置）。
-- スモークで #1 が解消し切らない場合、原因未特定のまま憶測修正しない（console.error/バナーで確定してから）。
+- NDJSON 生ログ・キーストローク内容を外部 LLM/クラウドに送らない（data-privacy）。
+- `analysis/` で OS API を直接呼ばない（OS 依存は `input/` に閉じる）。`winapi`/`println!`/`eprintln!` 禁止、`tracing` のみ。
+- 既存テストを無断削除しない。HMM 挙動を変えるなら `HMM_VERSION` bump＋ゴールデン再生成（本タスクは HMM 不変が前提）。
+- diff に未関係な未ステージ変更（budget.json/scripts/docs削除/MEMO/advice.md）を混ぜない。
+- フック層の OS 都合復旧は推測で広げず、F4 のスコープ（macOS tap 再有効化＋idle 非リセット＋プローブ away 健全化）に限定。
+  Windows silent-unhook 検出は Phase2（本タスク対象外）。
