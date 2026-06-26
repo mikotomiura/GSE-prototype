@@ -207,7 +207,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
 - **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
-- **v0.3 較正バリアント**: `LogEntry::ProbeAssignment` (プローブ時刻の監査記録) と `LogEntry::ReviewMarker` は production で emit される。一方 `LogEntry::SessionMeta` (track/task_kind 宣言) / `LogEntry::RealtimeLabel` (Q1/Q2 プローブ回答) / `LogEntry::VignetteResponse` (尺度理解テスト) は **schema (`schema_dto`) と format 関数・テストには存在するが、現行 production パスではまだ emit されない** (UI 経路が未配線、機能 7 注記参照)。schema drift check の対象には含まれる
+- **v0.3 較正バリアント**: `LogEntry::ProbeAssignment` (プローブ時刻の監査記録) / `LogEntry::ReviewMarker` / `LogEntry::SessionMeta` (track/task_kind 宣言・セッション開始 UI) / `LogEntry::RealtimeLabel` (Q1/Q2 プローブ回答・**アプリ内 ProbeCard 経由**で `record_realtime_answer` から emit) は production で emit される (NDJSON で着地を確認済み)。一方 `LogEntry::VignetteResponse` (尺度理解テスト) は **schema (`schema_dto`) と format 関数・テストには存在するが、UI 経路が未配線でまだ emit されない**。いずれも schema drift check の対象に含まれる
 
 ### 4.8 Ground Truth ラベリング経路 (Phase 1)
 
