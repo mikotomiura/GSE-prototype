@@ -24,6 +24,28 @@ var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 // buildManagementSheet() がシート「リンク集」の既定値に使う（シート側で手動上書きも可）。
 var DROPBOX_FILE_REQUEST_URL = "https://www.dropbox.com/request/5oak4xpqjt19zx8zvh03";
 
+// ============================================================
+// 被験者管理の自動化（F1 提出トリガ → P-ID 自動発番 + 通知メール下書き）の設定
+// ============================================================
+// 自動メール送信の可否。研究倫理上の誤送信リスクを避けるため **既定は false（下書き作成）**。
+// false: GmailApp.createDraft で下書きを作り、研究者が内容確認後に手動送信する（ユーザー決定 2026-06-27）。
+// true : MailApp.sendEmail で適格判定後にそのまま自動送信する（明示承認時のみ true にする）。
+var AUTO_SEND = false;
+
+// condition（実験条件）の既定値。Phase1 は単群・対照なし(FD1)のため全員 baseline 固定
+// （ユーザー決定 2026-06-27）。将来 AB 設計を入れる場合はロスターのドロップダウンで手動上書き。
+var DEFAULT_CONDITION = "baseline";
+
+// 通知メールの件名・配布情報。PII ではないので .gs に置いてよい（フォームID/Dropbox URL/公開鍵置き場と同様）。
+// ⚠ アプリ入手先・公開鍵(pubkey.txt)の入手先は配布実態に合わせて研究者が書き換える。
+var F1_EMAIL_SUBJECT = "【GSE ユーザー検証】参加者ID（P-ID）と次のステップのご案内";
+var APP_DOWNLOAD_INFO =
+  "（アプリ本体 gse + gse-package + pubkey.txt の入手先をここに記入。" +
+  "例: 配布 zip の DL リンク、または研究者から直接受領）";
+var PUBKEY_SOURCE_INFO =
+  "配布パッケージ同梱の pubkey.txt（age 公開鍵）。" +
+  "暗号化はこの公開鍵だけで完結し、復号は研究者しかできません。";
+
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
 // F2-C(事前) と F5(事後) で matched 再測定するため、両者が必ず byte 一致するよう
 // 単一定数として一元定義する（code-reviewer LOW: 二重定義による pre/post 不一致事故を構造的に防止）。
@@ -703,11 +725,14 @@ function buildAllSupportForms() {
 var MGMT_SHEET_PROP = "GSE_MGMT_SHEET_ID";
 
 // 各 build 関数末尾から呼ぶ。作成/更新したフォームの URL を Script Properties に記録する。
+// id も保存する: refreshRosterStatus() が destination sheet を介さず
+// FormApp.openById(id).getResponses() で回答を直接読むため（後方互換: キー追加のみ）。
 function recordFormUrl(key, form, label) {
   PropertiesService.getScriptProperties().setProperty(
     "FORMURL_" + key,
     JSON.stringify({
       label: label,
+      id: form.getId(),
       title: form.getTitle(),
       editUrl: form.getEditUrl(),
       publishedUrl: form.getPublishedUrl(),
@@ -745,6 +770,8 @@ function buildManagementSheet() {
   buildLinksTab_(ss, props); // 毎回 URL を再集約（手動入力セルは保持）
   buildRosterTab_(ss); // 既存があれば作らない（入力データを破壊しない）
   buildSubmissionTab_(ss); // 同上
+  applyRosterValidation_(ss); // 毎回: condition/OS/撤回 のドロップダウン・条件付き書式
+  buildDashboardTab_(ss); // 毎回: 進捗ダッシュボード（集計式は再描画）
 
   ["シート1", "Sheet1"].forEach(function (n) {
     var s = ss.getSheetByName(n);
@@ -810,6 +837,10 @@ function buildLinksTab_(ss, props) {
 }
 
 // --- タブ: 参加者ロスター（P-ID 対応表 + 進捗）。再実行で入力を破壊しない ---
+// 行1: 機密バナー（実名↔P-ID 対応表は研究者のみ・共有禁止）。行2: ヘッダ。行3+: データ。
+// nextParticipantId_ は col A を /^P\d+$/ で走査するためバナー/ヘッダ行は無視され影響しない。
+// 新規ヘルパ（appendRosterRow_ / refreshRosterStatus）は rosterHeaderRow_() で
+// 「P-ID」ヘッダ行を動的に探すため、行構成に依存しない。
 function buildRosterTab_(ss) {
   if (ss.getSheetByName("参加者ロスター")) return;
   var sh = ss.insertSheet("参加者ロスター");
@@ -818,12 +849,35 @@ function buildRosterTab_(ss) {
     "F1同意日", "F2事前", "セッション数", "F4回答(計)", "F5事後",
     "Dropbox提出", "撤回/除外", "備考",
   ];
-  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight("bold");
-  sh.setFrozenRows(1);
+  // 行1: 機密注意バナー（data-privacy / pilot-runbook §0）。
+  sh.getRange(1, 1).setValue(
+    "⚠ 実名・メール↔P-ID 対応表（研究者のみ）。共有・コミット禁止。" +
+    "外部送信は P-ID を単一キーにした集計値(metrics.json)・数値尺度(survey.csv)のみ。"
+  );
+  sh.getRange(1, 1, 1, header.length).merge();
+  sh.getRange(1, 1)
+    .setFontWeight("bold")
+    .setFontColor("#ffffff")
+    .setBackground("#b71c1c")
+    .setWrap(true);
+  // 行2: ヘッダ。
+  sh.getRange(2, 1, 1, header.length).setValues([header]).setFontWeight("bold");
+  sh.setFrozenRows(2);
   // 例データは入れない（addParticipant() が P001 から連番自動採番するため）。
   sh.setColumnWidth(1, 70);
   sh.setColumnWidth(2, 150);
   sh.setColumnWidth(3, 210);
+}
+
+// ロスターの「P-ID」ヘッダがある行番号を返す（バナー有無に依存しないため動的探索）。
+// 見つからなければ 0（未構築）。データは返り値 + 1 行目から始まる。
+function rosterHeaderRow_(sheet) {
+  var last = sheet.getLastRow();
+  var scan = Math.min(last, 5); // ヘッダは先頭付近にしか無い
+  for (var r = 1; r <= scan; r++) {
+    if (String(sheet.getRange(r, 1).getValue()).trim() === "P-ID") return r;
+  }
+  return 0;
 }
 
 // --- タブ: セッション提出トラッキング（per-session）。再実行で入力を破壊しない ---
@@ -852,9 +906,12 @@ function buildSubmissionTab_(ss) {
 //   氏名/メール/OS/条件 等は発行後にシートへ手入力する。
 function nextParticipantId_(sheet) {
   var max = 0;
+  // ヘッダ行を動的に探し、その次行以降の col A を走査する（onF1Submit/appendRosterRow_ と
+  // 探索方式を統一。ロスター行1の機密バナー等で行構成が変わっても破綻しない）。
+  var hr = rosterHeaderRow_(sheet);
   var last = sheet.getLastRow();
-  if (last >= 2) {
-    var ids = sheet.getRange(2, 1, last - 1, 1).getValues();
+  if (hr && last > hr) {
+    var ids = sheet.getRange(hr + 1, 1, last - hr, 1).getValues();
     for (var i = 0; i < ids.length; i++) {
       var m = String(ids[i][0]).match(/^P(\d+)$/);
       if (m) {
@@ -887,6 +944,540 @@ function addParticipant() {
   Logger.log("✅ 参加者を追加: " + pid + "（氏名・メール・OS・条件をシートに手入力してください）");
   Logger.log("🔗 " + ss.getUrl());
   return pid;
+}
+
+
+// ============================================================
+// Task 1: F1 提出トリガ → 適格判定 → P-ID 自動発番 → 通知メール下書き
+// ============================================================
+// 運用:
+//   1. buildForm() / buildManagementSheet() を実行済みにする（ロスターが必要）。
+//   2. installF1Trigger() を一度だけ実行 → F1 フォームに onFormSubmit トリガが付く。
+//      初回は Gmail 送信 + Spreadsheet + Forms のスコープ承認が出る。
+//   3. 以後、被験者が F1 を提出するたび onF1Submit(e) が自動実行される。
+//      適格者 → P-ID 発番 + ロスター転記 + 通知メール「下書き」作成（AUTO_SEND=false 既定）。
+//      不適格/非同意/二重 → 発番せずログのみ。
+//
+// ★ F1 はメール設問(setCollectEmail(false))のため、送信先は Q8（連絡先メール）の回答値のみを使う。
+//   実名↔P-ID の対応表はロスター（repo 外・研究者のみ）に閉じ、外部へは出さない（data-privacy）。
+
+// F1 フォームに installable な onFormSubmit トリガを設定する（二重作成防止に既存を全削除）。
+function installF1Trigger() {
+  removeF1Triggers();
+  // forForm は Form オブジェクトを渡す（文字列 ID は環境差があるため openById で明示的に解決）。
+  ScriptApp.newTrigger("onF1Submit")
+    .forForm(FormApp.openById(FORM_ID))
+    .onFormSubmit()
+    .create();
+  Logger.log("✅ onF1Submit トリガを F1 フォームに設定しました（FORM_ID=" + FORM_ID + "）");
+  Logger.log("ℹ️ AUTO_SEND=" + AUTO_SEND + "（false=下書き作成 / true=自動送信）");
+}
+
+// onF1Submit に紐づく既存トリガを全削除（再設定・解除用）。
+function removeF1Triggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var removed = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "onF1Submit") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      removed++;
+    }
+  }
+  if (removed > 0) Logger.log("🧹 既存 onF1Submit トリガを " + removed + " 件削除しました");
+}
+
+// F1 提出ハンドラ（installable onFormSubmit トリガから呼ばれる）。
+function onF1Submit(e) {
+  if (!e || !e.response) {
+    Logger.log("❌ onF1Submit: response が取得できません（手動実行ではなくトリガ経由で呼んでください）");
+    return;
+  }
+  var a = f1Answers_(e.response); // {consent1, consent2, age, guardian, ime, os, email, name}
+
+  // 1) 適格性判定（不適格・非同意は発番しない）
+  var verdict = isEligibleF1_(a);
+  if (!verdict.eligible) {
+    Logger.log("⛔ F1 提出: 適格外のため発番しません（理由: " + verdict.reason + "）");
+    return;
+  }
+
+  // 2) 管理シート / ロスター取得
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (!ssId) {
+    Logger.log("❌ 管理シート未作成。先に buildManagementSheet() を実行してください（発番中止）");
+    return;
+  }
+  var ss = SpreadsheetApp.openById(ssId);
+  var sheet = ss.getSheetByName("参加者ロスター");
+  if (!sheet) {
+    Logger.log("❌ 「参加者ロスター」タブが見つかりません（発番中止）");
+    return;
+  }
+
+  // 3-5) 発番〜行追加〜通知を排他する。F1 がほぼ同時に複数提出されるとトリガが並行実行され、
+  //      両方が同じ max を読んで同一 P-ID を重複発番しうる（GAS トリガはシリアライズ非保証）。
+  //      重複 P-ID は突合の根幹を壊すため LockService で発番区間を直列化する。
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    Logger.log("❌ ロック取得に失敗（他処理が長時間ロック中）。今回は発番を見送ります: " + lockErr);
+    return;
+  }
+  try {
+    // 3) 冪等性: 同一メールが既にロスターにあれば二重発番しない
+    var existing = findRosterByEmail_(sheet, a.email);
+    if (existing) {
+      Logger.log("♻️ 既発番のためスキップ: " + maskEmail_(a.email) + " → " + existing + "（再送が必要なら手動対応）");
+      return;
+    }
+
+    // 4) P-ID 発番 + ロスター行追加
+    var pid = nextParticipantId_(sheet);
+    appendRosterRow_(sheet, {
+      pid: pid,
+      name: a.name,
+      email: a.email,
+      os: a.os,
+      condition: DEFAULT_CONDITION,
+      consentDate: e.response.getTimestamp(),
+    });
+    var appendedRow = sheet.getLastRow(); // 通知失敗時に備考へフラグするため行を控える
+    SpreadsheetApp.flush(); // ロック解放前に書き込みを確定させる
+    Logger.log("✅ P-ID 発番: " + pid + "（" + a.os + " / " + maskEmail_(a.email) + "）");
+
+    // 5) 通知メール（既定は下書き作成）。
+    //    ロスター行は確定済みなので、ここで例外が出ると findRosterByEmail_ により再提出が
+    //    冪等スキップされ被験者が永久に通知未達になりうる。失敗を備考列に可視化して手動回復可能にする。
+    var subject = F1_EMAIL_SUBJECT;
+    var body = f1EmailBody_(pid);
+    try {
+      if (AUTO_SEND) {
+        MailApp.sendEmail(a.email, subject, body);
+        Logger.log("📧 通知メールを自動送信しました → " + maskEmail_(a.email));
+      } else {
+        GmailApp.createDraft(a.email, subject, body);
+        Logger.log("📝 通知メールの下書きを作成しました → " + maskEmail_(a.email) + "（Gmail 下書きで内容確認後に送信）");
+      }
+    } catch (mailErr) {
+      // 備考列(13)に未通知フラグを立てる（dedup で再発番されないため、ここを研究者が拾って手動通知）。
+      sheet.getRange(appendedRow, 13).setValue("⚠通知未作成-要手動送信: " + mailErr);
+      Logger.log("❌ 通知作成に失敗（P-ID は発番済 " + pid + "）。備考に未通知フラグを記録: " + mailErr);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// メールアドレスをログ用にマスクする（PII 最小化。Apps Script 実行ログはクラウドに残るため）。
+// 例: user@example.com → u***@example.com。
+function maskEmail_(email) {
+  var s = String(email);
+  var at = s.indexOf("@");
+  if (at <= 0) return "***";
+  return s.charAt(0) + "***" + s.substring(at);
+}
+
+// F1 回答を設問タイトルのキーワード照合で取り出す（title 完全一致は脆いため部分一致で頑健化）。
+// 不適格分岐は連絡先セクション到達前に SUBMIT するため、email/name が無い回答もあり得る（空で返す）。
+// ⚠ 制約: find() は最初に一致した設問を採用する。下記キーワード（"OS"/"メールアドレス"/"お名前"/
+//   "年齢" 等）を **F1 の別設問に重複させない**こと。特に "OS" を含む設問や "メールアドレス" を
+//   含む別設問（確認用メール等）を F1 に追加すると、適格判定・送信先が取り違わる。
+//   設問を増やす場合は buildForm() のタイトルとここの照合キーワードを必ず同時に見直す。
+function f1Answers_(response) {
+  var items = response.getItemResponses();
+  function find(predicate) {
+    for (var i = 0; i < items.length; i++) {
+      var title = String(items[i].getItem().getTitle());
+      if (predicate(title)) return items[i].getResponse();
+    }
+    return null;
+  }
+  function has(title, kw) {
+    return title.indexOf(kw) !== -1;
+  }
+  var consent1 = find(function (t) { return has(t, "説明を読み"); });
+  var consent2 = find(function (t) { return has(t, "記録と研究利用に同意"); });
+  return {
+    consent1: asArray_(consent1),
+    consent2: asArray_(consent2),
+    age: find(function (t) { return has(t, "年齢"); }),
+    guardian: find(function (t) { return has(t, "保護者同意フォーム"); }),
+    ime: find(function (t) { return has(t, "日本語入力") && has(t, "IME"); }),
+    os: find(function (t) { return has(t, "OS"); }),
+    email: trim_(find(function (t) { return has(t, "メールアドレス"); })),
+    name: trim_(find(function (t) { return has(t, "お名前"); })),
+  };
+}
+
+// チェックボックス回答（配列）を正規化。null/単値も配列にして includes 判定しやすくする。
+function asArray_(v) {
+  if (v === null || v === undefined) return [];
+  return Array.isArray(v) ? v : [v];
+}
+
+function trim_(v) {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+
+// 適格性判定。Q1理解 ∧ Q2同意 ∧ (18歳以上 ∨ (18歳未満 ∧ 保護者提出済)) ∧ IME=はい ∧ OS∈{Win,mac} ∧ email。
+// 返り値 {eligible: bool, reason: string}。
+function isEligibleF1_(a) {
+  if (a.consent1.indexOf("説明を理解した") === -1) return { eligible: false, reason: "説明理解(Q1)未チェック" };
+  if (a.consent2.indexOf("同意する") === -1) return { eligible: false, reason: "記録同意(Q2)未チェック" };
+
+  if (a.age === "18歳未満") {
+    if (a.guardian !== "提出済み") return { eligible: false, reason: "未成年で保護者同意(Q4)未提出" };
+  } else if (a.age !== "18歳以上") {
+    return { eligible: false, reason: "年齢(Q3)未回答" };
+  }
+
+  if (a.ime !== "はい") return { eligible: false, reason: "IME利用(Q6)が「はい」でない" };
+  if (a.os !== "Windows" && a.os !== "macOS") return { eligible: false, reason: "対象外OS(Q7): " + a.os };
+  // 送信先の安全策（多層防御）: F1 Q8 は requireTextIsEmail 済だが、設問取り違え/空を弾く。
+  if (!a.email || a.email.indexOf("@") <= 0) return { eligible: false, reason: "連絡先メール(Q8)が空 or 不正形式" };
+
+  return { eligible: true, reason: "" };
+}
+
+// 通知メール本文テンプレート。P-ID と次ステップ（アプリ入手・gse-package・pubkey.txt・Dropbox）を案内。
+// pilot-runbook §3（被験者 3 ステップ）と整合させる。
+function f1EmailBody_(pid) {
+  return [
+    "GSE ユーザー検証へのご参加ありがとうございます。スクリーニングの結果、ご参加いただけます。",
+    "",
+    "■ あなたの参加者ID（P-ID）",
+    "    " + pid,
+    "    ※ 以降のフォーム回答・ログ提出すべてでこの P-ID を使います。実名は使いません。",
+    "",
+    "■ 次のステップ",
+    "  1) アプリ一式の入手",
+    "     " + APP_DOWNLOAD_INFO,
+    "     （gse 本体アプリ + gse-package + pubkey.txt の 3 点）",
+    "",
+    "  2) いつも通り作業（セッション収集）",
+    "     アプリを起動して執筆・思考作業をすると、セッションログが端末に生成されます。",
+    "",
+    "  3) ログの匿名化 + 暗号化（1 コマンド）",
+    "     生成された raw ログに対し、ターミナルで次を実行してください:",
+    "",
+    "       gse-package --input <生成された.ndjson> --participant " + pid + " --recipient pubkey.txt",
+    "",
+    "     → " + pid + "_*.age という暗号化ファイルが同じフォルダに出ます。",
+    "     ※ pubkey.txt は " + PUBKEY_SOURCE_INFO,
+    "     ※ 元の生ログは送らないでください（手元に残すだけ）。",
+    "",
+    "  4) Dropbox で提出",
+    "     下記の Dropbox ファイルリクエストに、" + pid + "_*.age をドラッグ&ドロップするだけです:",
+    "       " + (DROPBOX_FILE_REQUEST_URL || "（研究者が URL を案内します）"),
+    "     （提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。）",
+    "",
+    "ご不明点があればこのメールにご返信ください。どうぞよろしくお願いいたします。",
+  ].join("\n");
+}
+
+// ロスターに新規参加者行を追加する（ヘッダ行を動的に探し、列順に整合させる）。
+function appendRosterRow_(sheet, p) {
+  // 列順: P-ID(1) 氏名(2) メール(3) OS(4) 条件(5) F1同意日(6) F2事前(7) セッション数(8)
+  //       F4回答(計)(9) F5事後(10) Dropbox提出(11) 撤回/除外(12) 備考(13)
+  var consent = p.consentDate
+    ? Utilities.formatDate(p.consentDate, Session.getScriptTimeZone(), "yyyy-MM-dd")
+    : "";
+  sheet.appendRow([
+    p.pid, p.name || "", p.email || "", p.os || "", p.condition || DEFAULT_CONDITION,
+    consent, "", "", "", "", "", "", "自動発番(onF1Submit)",
+  ]);
+}
+
+// ロスターのメール列(col 3)を走査し、同一メール（trim/小文字比較）の P-ID を返す。無ければ null。
+function findRosterByEmail_(sheet, email) {
+  var target = String(email).trim().toLowerCase();
+  if (!target) return null;
+  var hr = rosterHeaderRow_(sheet);
+  if (!hr) return null;
+  var last = sheet.getLastRow();
+  if (last <= hr) return null;
+  var rows = sheet.getRange(hr + 1, 1, last - hr, 3).getValues(); // P-ID, 氏名, メール
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][2]).trim().toLowerCase() === target) return rows[i][0];
+  }
+  return null;
+}
+
+
+// ============================================================
+// Task 2: 管理シートでの被験者管理（回答取り込み・ダッシュボード・検証）
+// ============================================================
+
+// F2/F4/F5 の回答を P-ID キーで集計し、ロスターの該当列を自動更新する。
+// 手動実行 or 時間トリガ（installRosterRefreshTrigger）で回す。destination sheet は不要
+// （FormApp.openById(id).getResponses() で直接読む。id は recordFormUrl が保存済み）。
+function refreshRosterStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (!ssId) {
+    Logger.log("❌ 管理シート未作成。先に buildManagementSheet() を実行してください");
+    return;
+  }
+  var ss = SpreadsheetApp.openById(ssId);
+  var sheet = ss.getSheetByName("参加者ロスター");
+  if (!sheet) {
+    Logger.log("❌ 「参加者ロスター」タブが見つかりません");
+    return;
+  }
+  var hr = rosterHeaderRow_(sheet);
+  var last = sheet.getLastRow();
+  if (!hr || last <= hr) {
+    Logger.log("ℹ️ ロスターに参加者がいません（先に F1 提出 or addParticipant）");
+    return;
+  }
+
+  // フォーム別 P-ID 集計を作る
+  var f2 = countByPid_("F2", props); // {pid: {count, latest}}
+  var f4 = countByPid_("F4", props); // セッションIDも集計
+  var f5 = countByPid_("F5", props);
+
+  var nRows = last - hr;
+  var pids = sheet.getRange(hr + 1, 1, nRows, 1).getValues();
+  // 既存値を読み、必要列だけ書き換える（F2事前=7, セッション数=8, F4回答計=9, F5事後=10）
+  var out = sheet.getRange(hr + 1, 7, nRows, 4).getValues();
+  for (var i = 0; i < nRows; i++) {
+    var pid = String(pids[i][0]).trim();
+    if (!/^P\d+$/.test(pid)) continue;
+    out[i][0] = f2[pid] ? f2[pid].latest : ""; // F2事前: 最新提出日
+    out[i][1] = f4[pid] ? f4[pid].sessions : ""; // セッション数: F4 の distinct session_id 数
+    out[i][2] = f4[pid] ? f4[pid].count : ""; // F4回答(計)
+    out[i][3] = f5[pid] ? "○" : ""; // F5事後
+  }
+  sheet.getRange(hr + 1, 7, nRows, 4).setValues(out);
+
+  buildDashboardTab_(ss); // 集計後にダッシュボードを再描画
+  Logger.log("✅ ロスター状態を更新しました（F2/F4/F5 を P-ID で集計）");
+}
+
+// 指定フォーム(FORMURL_<key> の id)の回答を P-ID で集計する。
+// 返り値: {pid: {count, latest(yyyy-MM-dd), sessions(distinct session_id 数)}}。
+function countByPid_(key, props) {
+  var raw = props.getProperty("FORMURL_" + key);
+  var acc = {};
+  if (!raw) return acc;
+  var meta = JSON.parse(raw);
+  if (!meta.id) {
+    Logger.log("⚠️ " + key + ": form id 未記録（build" + key + " を再実行すると id が保存されます）");
+    return acc;
+  }
+  var form;
+  try {
+    form = FormApp.openById(meta.id);
+  } catch (e) {
+    Logger.log("⚠️ " + key + ": フォームを開けません（id=" + meta.id + "）: " + e);
+    return acc;
+  }
+  var responses = form.getResponses();
+  var tz = Session.getScriptTimeZone();
+  for (var i = 0; i < responses.length; i++) {
+    var r = responses[i];
+    var pid = "";
+    var sessionId = "";
+    var itemResps = r.getItemResponses();
+    for (var j = 0; j < itemResps.length; j++) {
+      var title = String(itemResps[j].getItem().getTitle());
+      if (title.indexOf("参加者ID") !== -1 || title.indexOf("P-ID") !== -1) {
+        pid = String(itemResps[j].getResponse()).trim().toUpperCase();
+      } else if (title.indexOf("セッションID") !== -1) {
+        sessionId = String(itemResps[j].getResponse()).trim();
+      }
+    }
+    if (!/^P\d+$/.test(pid)) continue; // 不正/空 P-ID は集計しない
+    if (!acc[pid]) acc[pid] = { count: 0, latest: "", _latestMs: 0, sessions: 0, _sids: {} };
+    acc[pid].count++;
+    // 最新提出日は timestamp の数値(ms)で比較し、表示時のみ整形する
+    // （文字列 "yyyy-MM-dd" 比較は TZ 跨ぎで日付が丸まり誤判定しうるため）。
+    var ms = r.getTimestamp().getTime();
+    if (ms >= acc[pid]._latestMs) {
+      acc[pid]._latestMs = ms;
+      acc[pid].latest = Utilities.formatDate(r.getTimestamp(), tz, "yyyy-MM-dd");
+    }
+    if (sessionId && !acc[pid]._sids[sessionId]) {
+      acc[pid]._sids[sessionId] = true;
+      acc[pid].sessions++;
+    }
+  }
+  return acc;
+}
+
+// 進捗ダッシュボードタブを（再）描画。完了率・未提出者・MNAR 観点の無回答フラグ。
+// 撤回/除外（col 12 に値あり）の参加者は集計から除外する。
+function buildDashboardTab_(ss) {
+  var roster = ss.getSheetByName("参加者ロスター");
+  var sh = ss.getSheetByName("進捗ダッシュボード") || ss.insertSheet("進捗ダッシュボード");
+  sh.clear();
+
+  var rows = [];
+  rows.push(["GSE Phase1 進捗ダッシュボード", "", ""]);
+  rows.push(["（自動生成タブ・手動編集禁止。refreshRosterStatus 実行で全再描画されます）", "", ""]);
+
+  var data = readRoster_(roster);
+  var active = data.filter(function (d) { return !d.excluded; });
+  var n = active.length;
+  var f2done = active.filter(function (d) { return d.f2; }).length;
+  var f5done = active.filter(function (d) { return d.f5; }).length;
+  var sessSum = active.reduce(function (s, d) { return s + (Number(d.sessions) || 0); }, 0);
+  var avgSess = n > 0 ? (sessSum / n).toFixed(1) : "0";
+
+  rows.push(["指標", "値", "備考"]);
+  rows.push(["登録参加者（撤回/除外を除く）", n, "撤回/除外: " + (data.length - n) + " 名"]);
+  rows.push(["F2 事前 完了", f2done + " / " + n, n > 0 ? pct_(f2done, n) : "—"]);
+  rows.push(["F5 事後 完了", f5done + " / " + n, n > 0 ? pct_(f5done, n) : "—"]);
+  rows.push(["平均セッション数（F4 由来）", avgSess, "セッション総数 " + sessSum]);
+  rows.push(["", "", ""]);
+
+  // 未提出者・無回答フラグ（MNAR 観点）
+  // ⚠ 実名はこのタブに出さない（PII 露出面の最小化）。突合は P-ID のみで行い、
+  //   実名↔P-ID はロスタータブ（機密バナー付き・研究者のみ）に閉じる。
+  rows.push(["⚠ 要フォロー（未提出 / 無回答フラグ）", "", ""]);
+  rows.push(["P-ID", "フラグ", "セッション数"]);
+  var flagged = 0;
+  active.forEach(function (d) {
+    var flags = [];
+    if (!d.f2) flags.push("F2未提出");
+    // セッションあり（F4回答あり）なのに F5 未 → 終了したのに事後未回答（脱落 MNAR 候補）
+    if (Number(d.sessions) > 0 && !d.f5) flags.push("セッション有/F5未(MNAR候補)");
+    // F2提出済みなのにセッション 0 → 開始したが収集に至らず（早期脱落 MNAR 候補）
+    if (d.f2 && Number(d.sessions) === 0) flags.push("F2済/セッション0(早期脱落候補)");
+    if (flags.length > 0) {
+      rows.push([d.pid, flags.join(", "), Number(d.sessions) || 0]); // 実名は出さず P-ID のみ
+      flagged++;
+    }
+  });
+  if (flagged === 0) rows.push(["（なし）", "", ""]);
+  rows.push(["", "", ""]);
+  rows.push(["最終更新", Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm"),
+    "refreshRosterStatus() で更新"]);
+
+  sh.getRange(1, 1, rows.length, 3).setValues(rows);
+  sh.getRange(1, 1).setFontWeight("bold").setFontSize(14);
+  sh.getRange(3, 1, 1, 3).setFontWeight("bold");
+  sh.setColumnWidth(1, 280);
+  sh.setColumnWidth(2, 160);
+  sh.setColumnWidth(3, 320);
+}
+
+function pct_(a, b) {
+  return b > 0 ? Math.round((a / b) * 100) + "%" : "—";
+}
+
+// ロスターを構造化して読む。返り値: [{pid,name,os,condition,f2,sessions,f5,excluded}]。
+// ⚠ 列オフセット（[6]=F2事前/[7]=セッション数/[9]=F5/[11]=撤回）は buildRosterTab_ の header と
+//   appendRosterRow_ の列順に固定依存する。ロスターの列順を変えたら 3 箇所すべてを同時に直すこと。
+function readRoster_(sheet) {
+  if (!sheet) return [];
+  var hr = rosterHeaderRow_(sheet);
+  var last = sheet.getLastRow();
+  if (!hr || last <= hr) return [];
+  var vals = sheet.getRange(hr + 1, 1, last - hr, 13).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var pid = String(vals[i][0]).trim();
+    if (!/^P\d+$/.test(pid)) continue;
+    out.push({
+      pid: pid,
+      name: vals[i][1],
+      os: vals[i][3],
+      condition: vals[i][4],
+      f2: !!String(vals[i][6]).trim(), // F2事前(col7)
+      sessions: vals[i][7], // セッション数(col8)
+      f5: !!String(vals[i][9]).trim(), // F5事後(col10)
+      excluded: !!String(vals[i][11]).trim(), // 撤回/除外(col12)
+    });
+  }
+  return out;
+}
+
+// ロスターのデータ検証: condition/OS/撤回 にドロップダウン、撤回/除外 行をグレーアウト。
+function applyRosterValidation_(ss) {
+  var sheet = ss.getSheetByName("参加者ロスター");
+  if (!sheet) return;
+  var hr = rosterHeaderRow_(sheet);
+  if (!hr) return;
+  var startRow = hr + 1;
+  var nRows = 500; // 入力余地を見込んで広めに検証範囲を張る
+
+  var condRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["baseline", "intervention"], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(startRow, 5, nRows, 1).setDataValidation(condRule); // 条件(col5)
+
+  var osRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["Windows", "macOS"], true)
+    .setAllowInvalid(true) // 既存記録を弾かないよう許容
+    .build();
+  sheet.getRange(startRow, 4, nRows, 1).setDataValidation(osRule); // OS(col4)
+
+  var exclRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["撤回", "除外"], true)
+    .setAllowInvalid(true) // 空欄（=有効参加者）を許容
+    .build();
+  sheet.getRange(startRow, 12, nRows, 1).setDataValidation(exclRule); // 撤回/除外(col12)
+
+  // 撤回/除外に値がある行をグレーアウト（条件付き書式）。既存ルールは置き換える。
+  var range = sheet.getRange(startRow, 1, nRows, 13);
+  var rule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied("=$L" + startRow + '<>""') // L列=12列目=撤回/除外
+    .setBackground("#e0e0e0")
+    .setFontColor("#9e9e9e")
+    .setRanges([range])
+    .build();
+  sheet.setConditionalFormatRules([rule]);
+}
+
+// P-ID の形式・重複を検証してログに警告する（手動実行）。条件付き書式での着色も行う。
+function validateRoster() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (!ssId) {
+    Logger.log("❌ 管理シート未作成。先に buildManagementSheet() を実行してください");
+    return;
+  }
+  var ss = SpreadsheetApp.openById(ssId);
+  var sheet = ss.getSheetByName("参加者ロスター");
+  var hr = rosterHeaderRow_(sheet);
+  var last = sheet.getLastRow();
+  if (!hr || last <= hr) {
+    Logger.log("ℹ️ ロスターに参加者がいません");
+    return;
+  }
+  var pids = sheet.getRange(hr + 1, 1, last - hr, 1).getValues();
+  var seen = {};
+  var issues = 0;
+  for (var i = 0; i < pids.length; i++) {
+    var pid = String(pids[i][0]).trim();
+    if (!pid) continue;
+    if (!/^P\d{3,}$/.test(pid)) {
+      Logger.log("⚠️ 不正な P-ID 形式（行 " + (hr + 1 + i) + "）: '" + pid + "'（期待: P + 3桁以上）");
+      issues++;
+    }
+    if (seen[pid]) {
+      Logger.log("⚠️ P-ID 重複（行 " + (hr + 1 + i) + "）: " + pid);
+      issues++;
+    }
+    seen[pid] = true;
+  }
+  Logger.log(issues === 0 ? "✅ ロスター検証 OK（形式・重複に問題なし）" : "⚠️ ロスター検証: " + issues + " 件の問題");
+}
+
+// refreshRosterStatus() を定期実行する時間トリガを設定する（任意・既存を置換）。
+function installRosterRefreshTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "refreshRosterStatus") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("refreshRosterStatus").timeBased().everyHours(6).create();
+  Logger.log("✅ refreshRosterStatus を 6 時間ごとに自動実行するトリガを設定しました");
 }
 
 
