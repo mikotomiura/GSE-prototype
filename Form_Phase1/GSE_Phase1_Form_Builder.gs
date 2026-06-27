@@ -66,6 +66,8 @@ var SHORT_URL_F1 = "https://x.gd/k8nAi"; // F1 参加同意・スクリーニン
 var SHORT_URL_F2 = "https://x.gd/fpstM"; // F2 事前アンケート（始める前に1回）
 var SHORT_URL_F4 = "https://x.gd/kK8i7"; // F4 セッション後アンケート（毎セッション）
 var SHORT_URL_F5 = "https://x.gd/b4hRB"; // F5 事後アンケート（全終了後に1回）
+// key(F1/F2/F4/F5) → 短縮回答URL の対応表。管理シート「リンク集」タブの回答URL列に短縮版を載せるのに使う。
+var SHORT_FORM_URLS = { F1: SHORT_URL_F1, F2: SHORT_URL_F2, F4: SHORT_URL_F4, F5: SHORT_URL_F5 };
 
 
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
@@ -925,15 +927,17 @@ function buildLinksTab_(ss, props) {
         "公開鍵は配布して安全。※ 秘密鍵 ~/.gse/age-identity.txt は共有・コミット厳禁",
     ],
     ["", "", "", ""],
-    ["フォーム", "タイトル", "編集URL", "回答URL"],
+    ["フォーム", "タイトル", "編集URL", "回答URL(短縮)"],
   ];
   ["F1", "F2", "F4", "F5"].forEach(function (k) {
     var raw = props.getProperty("FORMURL_" + k);
+    // 回答URL列は被験者に配る短縮版(x.gd)を載せる。短縮未設定なら publishedUrl にフォールバック。
+    var shortUrl = SHORT_FORM_URLS[k] || "";
     if (raw) {
       var o = JSON.parse(raw);
-      rows.push([k + "｜" + o.label, o.title, o.editUrl, o.publishedUrl]);
+      rows.push([k + "｜" + o.label, o.title, o.editUrl, shortUrl || o.publishedUrl]);
     } else {
-      rows.push([k, "（未生成 — build" + k + " を実行）", "", ""]);
+      rows.push([k, "（未生成 — build" + k + " を実行）", "", shortUrl]);
     }
   });
   rows.push(["F3（廃止）", "in-app ProbeCard が正規ルート。フォールバック専用", "", ""]);
