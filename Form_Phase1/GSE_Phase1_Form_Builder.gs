@@ -23,8 +23,8 @@ var F5_FORM_ID = "1I-X1B8F-tQk7aEAdqderOLhjobeHct48KU23NWwfhlY";
 // ⚠ 被験者に配った短縮URLが指すフォームを「正本」とし、その【編集用フォームID】
 //   (docs.google.com/forms/d/<ここ>/edit の <ここ>) を記入すること。
 //   空のままだと buildF2/F4 はエラーメッセージを出して停止する（量産防止のガード）。
-var F2_FORM_ID = ""; // TODO: F2 正本フォーム（短縮URL x.gd/fpstM の遷移先）の編集IDを記入
-var F4_FORM_ID = ""; // TODO: F4 正本フォーム（短縮URL x.gd/kK8i7 の遷移先）の編集IDを記入
+var F2_FORM_ID = "1rIgGukudblKEMIef8EkC_KmjUBumrpoLkIew5w6kRWY"; // F2 事前アンケート（被験者配布 x.gd/fpstM の正本・編集ID）
+var F4_FORM_ID = "1Q4Iy2r7Uswth9zVOpV81jIKOdKj5dJSW2L-ScKaurqU"; // F4 セッション後アンケート（被験者配布 x.gd/kK8i7 の正本・編集ID）
 var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 
 // セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
@@ -63,8 +63,8 @@ var PUBKEY_SOURCE_INFO =
 // 被験者に渡してよい「公開用リンク集」スプレッドシート（フォーム URL を集約した閲覧専用シート）。
 // ⚠ 実名↔P-ID 対応表を含む【運用管理シート（MGMT_SHEET）とは別物】。こちらは PII を一切含まない、
 //   閲覧専用で共有してよいシートであること。空文字なら通知メールでは個別フォーム URL のみ案内する。
-var PUBLIC_LINKS_URL =
-  "https://docs.google.com/spreadsheets/d/18vs0qbEaNYCOlh8fdVJUBDYekN323lpixOr9NDPH2hs/edit?usp=sharing";
+// 短縮版 x.gd/qcpwX のリダイレクト先 = spreadsheet 18vs0qbEa…（既存と同一シート・検証済 2026-06-27）。
+var PUBLIC_LINKS_URL = "https://x.gd/qcpwX";
 
 // 被験者に案内する各フォームの「回答用」短縮 URL（x.gd）。いずれも viewform を短縮したもので、
 // 編集 URL ではない（2026-06-27 リダイレクト先を全件検証済み）。メール本文(f1EmailBody_)の
