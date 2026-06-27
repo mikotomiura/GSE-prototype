@@ -23,8 +23,8 @@ var F5_FORM_ID = "1I-X1B8F-tQk7aEAdqderOLhjobeHct48KU23NWwfhlY";
 // ⚠ 被験者に配った短縮URLが指すフォームを「正本」とし、その【編集用フォームID】
 //   (docs.google.com/forms/d/<ここ>/edit の <ここ>) を記入すること。
 //   空のままだと buildF2/F4 はエラーメッセージを出して停止する（量産防止のガード）。
-var F2_FORM_ID = "1rIgGukudblKEMIef8EkC_KmjUBumrpoLkIew5w6kRWY"; // F2 事前アンケート（被験者配布 x.gd/fpstM の正本・編集ID）
-var F4_FORM_ID = "1Q4Iy2r7Uswth9zVOpV81jIKOdKj5dJSW2L-ScKaurqU"; // F4 セッション後アンケート（被験者配布 x.gd/kK8i7 の正本・編集ID）
+var F2_FORM_ID = "1rIgGukudblKEMIef8EkC_KmjUBumrpoLkIew5w6kRWY"; // F2 事前アンケート（被験者配布 x.gd/m3q89 の正本・編集ID）
+var F4_FORM_ID = "1Q4Iy2r7Uswth9zVOpV81jIKOdKj5dJSW2L-ScKaurqU"; // F4 セッション後アンケート（被験者配布 x.gd/3qba4 の正本・編集ID）
 var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 
 // セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
@@ -71,8 +71,8 @@ var PUBLIC_LINKS_URL = "https://x.gd/qcpwX";
 // F2/F4/F5 案内に優先利用し、空文字なら formPublishedUrl_ の動的取得にフォールバックする。
 // ⚠ FORM_ID / F5_FORM_ID は openById 用の内部IDで別物。短縮URLでこれらを置換しないこと。
 var SHORT_URL_F1 = "https://x.gd/k8nAi"; // F1 参加同意・スクリーニング（募集・公開リンク集用）
-var SHORT_URL_F2 = "https://x.gd/fpstM"; // F2 事前アンケート（始める前に1回）
-var SHORT_URL_F4 = "https://x.gd/kK8i7"; // F4 セッション後アンケート（毎セッション）
+var SHORT_URL_F2 = "https://x.gd/m3q89"; // F2 事前アンケート（始める前に1回。正本フォーム F2_FORM_ID を指す）
+var SHORT_URL_F4 = "https://x.gd/3qba4"; // F4 セッション後アンケート（毎回。正本フォーム F4_FORM_ID を指す）
 var SHORT_URL_F5 = "https://x.gd/b4hRB"; // F5 事後アンケート（全終了後に1回）
 // key(F1/F2/F4/F5) → 短縮回答URL の対応表。管理シート「リンク集」タブの回答URL列に短縮版を載せるのに使う。
 var SHORT_FORM_URLS = { F1: SHORT_URL_F1, F2: SHORT_URL_F2, F4: SHORT_URL_F4, F5: SHORT_URL_F5 };
