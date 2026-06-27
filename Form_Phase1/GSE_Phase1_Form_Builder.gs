@@ -23,8 +23,8 @@ var F5_FORM_ID = "1I-X1B8F-tQk7aEAdqderOLhjobeHct48KU23NWwfhlY";
 // ⚠ 被験者に配った短縮URLが指すフォームを「正本」とし、その【編集用フォームID】
 //   (docs.google.com/forms/d/<ここ>/edit の <ここ>) を記入すること。
 //   空のままだと buildF2/F4 はエラーメッセージを出して停止する（量産防止のガード）。
-var F2_FORM_ID = "1rIgGukudblKEMIef8EkC_KmjUBumrpoLkIew5w6kRWY"; // F2 事前アンケート（被験者配布 x.gd/fpstM の正本・編集ID）
-var F4_FORM_ID = "1Q4Iy2r7Uswth9zVOpV81jIKOdKj5dJSW2L-ScKaurqU"; // F4 セッション後アンケート（被験者配布 x.gd/kK8i7 の正本・編集ID）
+var F2_FORM_ID = "1rIgGukudblKEMIef8EkC_KmjUBumrpoLkIew5w6kRWY"; // F2 事前アンケート（被験者配布 x.gd/m3q89 の正本・編集ID）
+var F4_FORM_ID = "1Q4Iy2r7Uswth9zVOpV81jIKOdKj5dJSW2L-ScKaurqU"; // F4 セッション後アンケート（被験者配布 x.gd/3qba4 の正本・編集ID）
 var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 
 // セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
@@ -71,8 +71,8 @@ var PUBLIC_LINKS_URL = "https://x.gd/qcpwX";
 // F2/F4/F5 案内に優先利用し、空文字なら formPublishedUrl_ の動的取得にフォールバックする。
 // ⚠ FORM_ID / F5_FORM_ID は openById 用の内部IDで別物。短縮URLでこれらを置換しないこと。
 var SHORT_URL_F1 = "https://x.gd/k8nAi"; // F1 参加同意・スクリーニング（募集・公開リンク集用）
-var SHORT_URL_F2 = "https://x.gd/fpstM"; // F2 事前アンケート（始める前に1回）
-var SHORT_URL_F4 = "https://x.gd/kK8i7"; // F4 セッション後アンケート（毎セッション）
+var SHORT_URL_F2 = "https://x.gd/m3q89"; // F2 事前アンケート（始める前に1回。正本フォーム F2_FORM_ID を指す）
+var SHORT_URL_F4 = "https://x.gd/3qba4"; // F4 セッション後アンケート（毎回。正本フォーム F4_FORM_ID を指す）
 var SHORT_URL_F5 = "https://x.gd/b4hRB"; // F5 事後アンケート（全終了後に1回）
 // key(F1/F2/F4/F5) → 短縮回答URL の対応表。管理シート「リンク集」タブの回答URL列に短縮版を載せるのに使う。
 var SHORT_FORM_URLS = { F1: SHORT_URL_F1, F2: SHORT_URL_F2, F4: SHORT_URL_F4, F5: SHORT_URL_F5 };
@@ -1200,17 +1200,19 @@ function onF1Submit(e) {
     //    冪等スキップされ被験者が永久に通知未達になりうる。失敗を備考列に可視化して手動回復可能にする。
     var subject = F1_EMAIL_SUBJECT;
     // 回答 URL は短縮版(x.gd)を優先し、未設定なら Script Properties の publishedUrl にフォールバック。
-    var body = f1EmailBody_(pid, {
+    var urls = {
       f2: SHORT_URL_F2 || formPublishedUrl_(props, "F2"),
       f4: SHORT_URL_F4 || formPublishedUrl_(props, "F4"),
       f5: SHORT_URL_F5 || formPublishedUrl_(props, "F5"),
-    });
+    };
+    var body = f1EmailBody_(pid, urls); // プレーンテキスト（HTML 非対応クライアント向けフォールバック）
+    var htmlBody = f1EmailHtml_(pid, urls); // スマホ/PC でレスポンシブ表示する HTML 版
     try {
       if (AUTO_SEND) {
-        MailApp.sendEmail(a.email, subject, body);
+        MailApp.sendEmail(a.email, subject, body, { htmlBody: htmlBody });
         Logger.log("📧 通知メールを自動送信しました → " + maskEmail_(a.email));
       } else {
-        GmailApp.createDraft(a.email, subject, body);
+        GmailApp.createDraft(a.email, subject, body, { htmlBody: htmlBody });
         Logger.log("📝 通知メールの下書きを作成しました → " + maskEmail_(a.email) + "（Gmail 下書きで内容確認後に送信）");
       }
     } catch (mailErr) {
@@ -1354,6 +1356,78 @@ function f1EmailBody_(pid, formUrls) {
     "    " + (PUBLIC_LINKS_URL || "（研究者がリンク集を別途ご案内します）"),
     "",
     "ご不明点があればこのメールにご返信ください。どうぞよろしくお願いいたします。",
+  ].join("\n");
+}
+
+// 通知メールの HTML 版（スマホ/PC でレスポンシブに綺麗に表示）。f1EmailBody_(プレーンテキスト)を
+// フォールバックとして併送する（{htmlBody:} 未対応クライアント向け）。メールクライアントは <style>/
+// 外部CSS/メディアクエリを制限するため、レイアウトは max-width:600px + インライン CSS のみで組む
+// （スマホは画面幅に収まり、PC は中央 600px で表示される）。
+function f1EmailHtml_(pid, formUrls) {
+  formUrls = formUrls || {};
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  // APP_DOWNLOAD_INFO はプレーンテキスト用（先頭スペース整形）なので、各行を trim して <br> 連結。
+  var appInfoHtml = String(APP_DOWNLOAD_INFO).split("\n").map(function (l) {
+    return esc(l.replace(/^\s+/, ""));
+  }).join("<br>");
+
+  var H3 = "margin:28px 0 10px;font-size:17px;font-weight:700;color:#1a3a5c;border-left:4px solid #2f6db5;padding-left:10px;";
+  var P = "margin:8px 0;font-size:15px;line-height:1.7;color:#333333;";
+  var SMALL = "font-size:13px;color:#777777;line-height:1.6;";
+  var CODE = "display:block;background:#f6f8fa;border:1px solid #e1e4e8;border-radius:6px;padding:12px;margin:8px 0;font-family:Menlo,Consolas,monospace;font-size:13px;color:#24292e;white-space:pre-wrap;word-break:break-all;";
+  var BTN = "display:inline-block;margin-top:6px;padding:10px 18px;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;";
+
+  function surveyRow(emoji, title, freq, url) {
+    var btn = url
+      ? '<a href="' + esc(url) + '" style="' + BTN + 'background:#2f6db5;">回答ページを開く</a>'
+      : '<span style="' + SMALL + '">（下の「すべてのリンク集」からアクセスしてください）</span>';
+    return '<div style="margin:14px 0;padding:14px;background:#f7f9fc;border-radius:8px;">' +
+      '<div style="font-size:15px;font-weight:700;color:#1a3a5c;">' + emoji + " " + esc(title) + '</div>' +
+      '<div style="' + SMALL + 'margin:4px 0 2px;">' + esc(freq) + '</div>' + btn + '</div>';
+  }
+
+  return [
+    '<div style="margin:0;padding:0;background:#eef2f6;padding:16px 0;">',
+    '<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,\'Helvetica Neue\',Arial,sans-serif;">',
+    '<div style="background:#1a3a5c;padding:22px 24px;">',
+    '<div style="color:#ffffff;font-size:18px;font-weight:700;">GSE ユーザー検証</div>',
+    '<div style="color:#a9c4e0;font-size:13px;margin-top:4px;">参加者ID（P-ID）と次のステップのご案内</div>',
+    '</div>',
+    '<div style="padding:24px;">',
+    '<p style="' + P + '">GSE ユーザー検証へのご参加ありがとうございます。スクリーニングと守秘事項へのご署名を確認しました。ご参加いただけます。</p>',
+    '<div style="margin:18px 0;padding:18px;background:#eaf2fb;border:1px solid #c5dcf2;border-radius:8px;text-align:center;">',
+    '<div style="' + SMALL + '">あなたの参加者ID（P-ID）</div>',
+    '<div style="font-size:26px;font-weight:800;color:#1a3a5c;letter-spacing:2px;margin-top:4px;">' + esc(pid) + '</div>',
+    '<div style="' + SMALL + 'margin-top:6px;">以降のフォーム回答・ログ提出すべてでこの P-ID を使います（実名は使いません）。</div>',
+    '</div>',
+    '<div style="' + H3 + '">アプリの準備と提出（毎セッション）</div>',
+    '<p style="' + P + '"><b>1) アプリ一式の入手</b><br>' + appInfoHtml + '</p>',
+    '<p style="' + P + '"><b>2)</b> いつも通り作業すると、セッションログが端末に生成されます。</p>',
+    '<p style="' + P + '"><b>3)</b> ログを 1 コマンドで匿名化＋暗号化:</p>',
+    '<code style="' + CODE + '">gse-package --input &lt;生成された.ndjson&gt; --participant ' + esc(pid) + ' --recipient pubkey.txt</code>',
+    '<p style="' + SMALL + '">→ ' + esc(pid) + '_*.age ができます（元の生ログは送りません）。pubkey.txt は ' + esc(PUBKEY_SOURCE_INFO) + '</p>',
+    '<p style="' + P + '"><b>4)</b> Dropbox ファイルリクエストに ' + esc(pid) + '_*.age を提出:</p>',
+    (DROPBOX_FILE_REQUEST_URL
+      ? '<a href="' + esc(DROPBOX_FILE_REQUEST_URL) + '" style="' + BTN + 'background:#0061ff;">Dropbox 提出ページを開く</a>'
+      : '<span style="' + SMALL + '">（研究者が URL を案内します）</span>'),
+    '<p style="' + SMALL + '">提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。</p>',
+    '<div style="' + H3 + '">アンケートのご回答</div>',
+    '<p style="' + SMALL + '">いずれも冒頭の「参加者ID（P-ID）」に <b>' + esc(pid) + '</b> を入力してください。</p>',
+    surveyRow("📋", "F2 事前アンケート", "検証を始める前に 1 回だけ", formUrls.f2),
+    surveyRow("📝", "F4 セッション後アンケート", "各セッションの終了ごとに毎回（ログ提出の確認も兼ねます）", formUrls.f4),
+    surveyRow("✅", "F5 事後アンケート", "全セッション終了後に 1 回だけ", formUrls.f5),
+    '<p style="' + SMALL + '">※ セッション中の「途中の問い（プローブ）」はアプリ内に表示されます。フォーム回答は不要です。</p>',
+    '<div style="' + H3 + '">すべてのリンク集</div>',
+    (PUBLIC_LINKS_URL
+      ? '<a href="' + esc(PUBLIC_LINKS_URL) + '" style="' + BTN + 'background:#5a6b7b;">リンク集を開く（ブックマーク推奨）</a>'
+      : '<span style="' + SMALL + '">（研究者がリンク集を別途ご案内します）</span>'),
+    '<p style="' + P + 'margin-top:24px;">ご不明点があればこのメールにご返信ください。どうぞよろしくお願いいたします。</p>',
+    '</div>',
+    '<div style="padding:16px 24px;background:#f4f6f8;' + SMALL + 'text-align:center;">GSE ユーザー検証 事務局</div>',
+    '</div>',
+    '</div>'
   ].join("\n");
 }
 
