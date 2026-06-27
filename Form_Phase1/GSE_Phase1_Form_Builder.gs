@@ -22,7 +22,8 @@ var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 // セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
 // 共有フォルダ (/scl/fo/) は提出者同士がファイル名で互いに見えるため不可 (pilot-runbook D6)。
 // buildManagementSheet() がシート「リンク集」の既定値に使う（シート側で手動上書きも可）。
-var DROPBOX_FILE_REQUEST_URL = "https://www.dropbox.com/request/5oak4xpqjt19zx8zvh03";
+// 短縮版 x.gd/PHtwA のリダイレクト先 = https://www.dropbox.com/request/5oak4xpqjt19zx8zvh03（同一）。
+var DROPBOX_FILE_REQUEST_URL = "https://x.gd/PHtwA";
 
 // ============================================================
 // 被験者管理の自動化（F1 提出トリガ → P-ID 自動発番 + 通知メール下書き）の設定
@@ -42,10 +43,13 @@ var DEFAULT_CONDITION = "baseline";
 // ⚠ アプリ入手先・公開鍵(pubkey.txt)の入手先は配布実態に合わせて研究者が書き換える。
 var F1_EMAIL_SUBJECT = "【GSE ユーザー検証】参加者ID（P-ID）と次のステップのご案内";
 var APP_DOWNLOAD_INFO =
-  "（アプリ本体 gse + gse-package + pubkey.txt の入手先をここに記入。" +
-  "例: 配布 zip の DL リンク、または研究者から直接受領）";
+  "アプリ一式は研究者が用意した Google Drive（閲覧専用）からまとめて入手できます: https://x.gd/6crxj\n" +
+  "       ・Windows: gse-next.exe（インストール不要のポータブル版。x64-setup.exe ではなくこちらを使用）\n" +
+  "       ・macOS(Apple Silicon): gse-next_0.1.21_aarch64.dmg\n" +
+  "       ・暗号化ツール gse-package(.exe) と公開鍵 pubkey.txt（全員共通）も同じフォルダに同梱\n" +
+  "       初回セッションは研究者が同席し、起動・権限付与・初回警告の確認まで一緒に行います";
 var PUBKEY_SOURCE_INFO =
-  "配布パッケージ同梱の pubkey.txt（age 公開鍵）。" +
+  "配布フォルダ同梱の pubkey.txt（研究者の age 公開鍵・全員共通）。" +
   "暗号化はこの公開鍵だけで完結し、復号は研究者しかできません。";
 
 // 被験者に渡してよい「公開用リンク集」スプレッドシート（フォーム URL を集約した閲覧専用シート）。
@@ -53,6 +57,15 @@ var PUBKEY_SOURCE_INFO =
 //   閲覧専用で共有してよいシートであること。空文字なら通知メールでは個別フォーム URL のみ案内する。
 var PUBLIC_LINKS_URL =
   "https://docs.google.com/spreadsheets/d/18vs0qbEaNYCOlh8fdVJUBDYekN323lpixOr9NDPH2hs/edit?usp=sharing";
+
+// 被験者に案内する各フォームの「回答用」短縮 URL（x.gd）。いずれも viewform を短縮したもので、
+// 編集 URL ではない（2026-06-27 リダイレクト先を全件検証済み）。メール本文(f1EmailBody_)の
+// F2/F4/F5 案内に優先利用し、空文字なら formPublishedUrl_ の動的取得にフォールバックする。
+// ⚠ FORM_ID / F5_FORM_ID は openById 用の内部IDで別物。短縮URLでこれらを置換しないこと。
+var SHORT_URL_F1 = "https://x.gd/k8nAi"; // F1 参加同意・スクリーニング（募集・公開リンク集用）
+var SHORT_URL_F2 = "https://x.gd/fpstM"; // F2 事前アンケート（始める前に1回）
+var SHORT_URL_F4 = "https://x.gd/kK8i7"; // F4 セッション後アンケート（毎セッション）
+var SHORT_URL_F5 = "https://x.gd/b4hRB"; // F5 事後アンケート（全終了後に1回）
 
 
 // 自作尺度「作業再開感・自己調整感」(#D / FD9・ユーザー承認 2026-06-24)。
@@ -354,6 +367,31 @@ function buildF2() {
 
   // ---- F2-A: 属性・AI利用習慣 ----
   addSectionHeader(form, "F2-A｜属性・AI 利用習慣", "");
+
+  // 人口統計属性（年代・職業）。サンプル特性の記述用に匿名（P-ID 紐付け）で記録する。
+  // F1 Q3「年齢」は 18歳以上/未満の適格判定分岐用で年代を残さないため、ここで年代を取得する。
+  var d1 = form.addMultipleChoiceItem();
+  d1.setTitle("年代を教えてください。");
+  d1.setChoices([
+    d1.createChoice("18〜19歳"),
+    d1.createChoice("20代"),
+    d1.createChoice("30代"),
+    d1.createChoice("40代"),
+    d1.createChoice("50代"),
+    d1.createChoice("60代以上"),
+  ]);
+  d1.setRequired(true);
+
+  var d2 = form.addMultipleChoiceItem();
+  d2.setTitle("ご職業を教えてください。");
+  d2.setChoices([
+    d2.createChoice("学生"),
+    d2.createChoice("会社員・公務員"),
+    d2.createChoice("専門職（研究・士業・医療など）"),
+    d2.createChoice("自営業・フリーランス"),
+    d2.createChoice("その他"),
+  ]);
+  d2.setRequired(true);
 
   var a1 = form.addCheckboxItem();
   a1.setTitle("主に行う作業の種類（複数選択可）");
@@ -1129,10 +1167,11 @@ function onF1Submit(e) {
     //    ロスター行は確定済みなので、ここで例外が出ると findRosterByEmail_ により再提出が
     //    冪等スキップされ被験者が永久に通知未達になりうる。失敗を備考列に可視化して手動回復可能にする。
     var subject = F1_EMAIL_SUBJECT;
+    // 回答 URL は短縮版(x.gd)を優先し、未設定なら Script Properties の publishedUrl にフォールバック。
     var body = f1EmailBody_(pid, {
-      f2: formPublishedUrl_(props, "F2"),
-      f4: formPublishedUrl_(props, "F4"),
-      f5: formPublishedUrl_(props, "F5"),
+      f2: SHORT_URL_F2 || formPublishedUrl_(props, "F2"),
+      f4: SHORT_URL_F4 || formPublishedUrl_(props, "F4"),
+      f5: SHORT_URL_F5 || formPublishedUrl_(props, "F5"),
     });
     try {
       if (AUTO_SEND) {
@@ -1262,7 +1301,6 @@ function f1EmailBody_(pid, formUrls) {
     "■ アプリの準備と提出（毎セッション）",
     "  1) アプリ一式の入手",
     "     " + APP_DOWNLOAD_INFO,
-    "     （gse 本体アプリ + gse-package + pubkey.txt の 3 点）",
     "  2) いつも通り作業すると、セッションログが端末に生成されます。",
     "  3) ログを 1 コマンドで匿名化 + 暗号化:",
     "       gse-package --input <生成された.ndjson> --participant " + pid + " --recipient pubkey.txt",
