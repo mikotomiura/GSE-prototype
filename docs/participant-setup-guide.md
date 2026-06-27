@@ -94,6 +94,9 @@
    gse-package.exe --input "%USERPROFILE%\Documents\GSE-sessions\gse_<日時>.ndjson" --participant P001 --recipient pubkey.txt
    ```
    → `P001_*.age`（暗号化済みファイル）ができます。
+   - 💡 **セッションID** は、このログファイル名 `gse_◯◯◯.ndjson` の **`◯◯◯`（日時）部分** です
+     （例: `gse_20260302_075721.ndjson` なら `20260302_075721`）。**F4 アンケート（§5）で入力**します
+     （アプリ画面には表示されないので、提出するファイル名から読み取ってください）。
 
 2. **Dropbox ファイルリクエスト** <https://x.gd/PHtwA> を開き、できた `P001_*.age` を提出します。
    （提出した人どうしはお互いのファイルを見られません。中身は研究者だけが開けます。）
