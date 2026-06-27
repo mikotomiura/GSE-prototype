@@ -17,6 +17,14 @@ var FORM_ID = "1iNJthNn6myw7mmuKV6NEnpLHFRt5BTFQBOuCsroCtyI"; // F1 参加同意
 // F5 事後アンケート (buildF5): ユーザー作成済みフォームを固定 ID で再利用する (#C)。
 // FormApp.create だと実行ごとに別フォームが量産されるため、F1 と同じ openById 方式に統一。
 var F5_FORM_ID = "1I-X1B8F-tQk7aEAdqderOLhjobeHct48KU23NWwfhlY";
+// F2 事前アンケート (buildF2) / F4 セッション後アンケート (buildF4) も固定 ID で再利用する。
+// 旧 FormApp.create は実行ごとにフォームを量産し、被験者に配った短縮URL(x.gd)が指すフォームと、
+// 集計が読むフォーム(FORMURL_F2/F4)がズレて「回答が管理シートに記録されない」不具合の原因だった。
+// ⚠ 被験者に配った短縮URLが指すフォームを「正本」とし、その【編集用フォームID】
+//   (docs.google.com/forms/d/<ここ>/edit の <ここ>) を記入すること。
+//   空のままだと buildF2/F4 はエラーメッセージを出して停止する（量産防止のガード）。
+var F2_FORM_ID = ""; // TODO: F2 正本フォーム（短縮URL x.gd/fpstM の遷移先）の編集IDを記入
+var F4_FORM_ID = ""; // TODO: F4 正本フォーム（短縮URL x.gd/kK8i7 の遷移先）の編集IDを記入
 var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
 
 // セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
@@ -352,7 +360,17 @@ function buildForm() {
 // F2: 事前アンケート（別フォーム作成）
 // ============================================================
 function buildF2() {
-  var form = FormApp.create("GSE ユーザー検証 Phase1 – F2 事前アンケート（ベースライン）");
+  // 固定 ID で再利用 (F1/F5 と同方式)。create 量産による「集計フォームのズレ＝記録されない」を防ぐ。
+  if (!F2_FORM_ID) {
+    Logger.log("❌ F2_FORM_ID 未設定。正本フォーム（被験者配布の短縮URL先）の編集IDを定数に記入してください");
+    return;
+  }
+  var form = FormApp.openById(F2_FORM_ID);
+  // openById は同一フォーム再利用のため再実行時の設問重複を防ぐべく既存設問を全削除する。
+  if (CLEAR_EXISTING) {
+    clearForm(form);
+  }
+  form.setTitle("GSE ユーザー検証 Phase1 – F2 事前アンケート（ベースライン）");
   form.setDescription(
     "検証開始前に一度だけ回答してください。\n" +
     "参加者ID（P-ID）は研究者からメールで通知されます。回答欄に入力してください。"
@@ -566,7 +584,17 @@ function buildF3() {
 // F4: セッション後アンケート
 // ============================================================
 function buildF4() {
-  var form = FormApp.create("GSE ユーザー検証 Phase1 – F4 セッション後アンケート");
+  // 固定 ID で再利用 (F1/F5 と同方式)。create 量産による「集計フォームのズレ＝記録されない」を防ぐ。
+  if (!F4_FORM_ID) {
+    Logger.log("❌ F4_FORM_ID 未設定。正本フォーム（被験者配布の短縮URL先）の編集IDを定数に記入してください");
+    return;
+  }
+  var form = FormApp.openById(F4_FORM_ID);
+  // openById は同一フォーム再利用のため再実行時の設問重複を防ぐべく既存設問を全削除する。
+  if (CLEAR_EXISTING) {
+    clearForm(form);
+  }
+  form.setTitle("GSE ユーザー検証 Phase1 – F4 セッション後アンケート");
   form.setDescription(
     "各執筆セッション終了後にご回答ください。5問以内で終わります。\n" +
     "Dropbox へのログ提出もこのタイミングで行ってください。"
@@ -1392,8 +1420,8 @@ function refreshRosterStatus() {
 
   var nRows = last - hr;
   var pids = sheet.getRange(hr + 1, 1, nRows, 1).getValues();
-  // 既存値を読み、必要列だけ書き換える（F2事前=7, セッション数=8, F4回答計=9, F5事後=10）
-  var out = sheet.getRange(hr + 1, 7, nRows, 4).getValues();
+  // 既存値を読み、必要列だけ書き換える（F2事前=7, セッション数=8, F4回答計=9, F5事後=10, Dropbox提出=11）
+  var out = sheet.getRange(hr + 1, 7, nRows, 5).getValues();
   for (var i = 0; i < nRows; i++) {
     var pid = String(pids[i][0]).trim();
     if (!/^P\d+$/.test(pid)) continue;
@@ -1401,8 +1429,10 @@ function refreshRosterStatus() {
     out[i][1] = f4[pid] ? f4[pid].sessions : ""; // セッション数: F4 の distinct session_id 数
     out[i][2] = f4[pid] ? f4[pid].count : ""; // F4回答(計)
     out[i][3] = f5[pid] ? "○" : ""; // F5事後
+    // Dropbox提出: F4 の自己申告「提出済み」数 / F4 回答総数（真の提出確認は研究者が Dropbox を参照）。
+    out[i][4] = f4[pid] ? f4[pid].dropboxDone + "/" + f4[pid].count + "（F4自己申告）" : "";
   }
-  sheet.getRange(hr + 1, 7, nRows, 4).setValues(out);
+  sheet.getRange(hr + 1, 7, nRows, 5).setValues(out);
 
   buildDashboardTab_(ss); // 集計後にダッシュボードを再描画
   Logger.log("✅ ロスター状態を更新しました（F2/F4/F5 を P-ID で集計）");
@@ -1432,6 +1462,7 @@ function countByPid_(key, props) {
     var r = responses[i];
     var pid = "";
     var sessionId = "";
+    var dropboxAns = ""; // F4 の「Dropbox に提出しましたか？」自己申告（F2/F5 では空のまま）
     var itemResps = r.getItemResponses();
     for (var j = 0; j < itemResps.length; j++) {
       var title = String(itemResps[j].getItem().getTitle());
@@ -1439,11 +1470,14 @@ function countByPid_(key, props) {
         pid = String(itemResps[j].getResponse()).trim().toUpperCase();
       } else if (title.indexOf("セッションID") !== -1) {
         sessionId = String(itemResps[j].getResponse()).trim();
+      } else if (title.indexOf("Dropbox") !== -1 && title.indexOf("提出しましたか") !== -1) {
+        dropboxAns = String(itemResps[j].getResponse()).trim();
       }
     }
     if (!/^P\d+$/.test(pid)) continue; // 不正/空 P-ID は集計しない
-    if (!acc[pid]) acc[pid] = { count: 0, latest: "", _latestMs: 0, sessions: 0, _sids: {} };
+    if (!acc[pid]) acc[pid] = { count: 0, latest: "", _latestMs: 0, sessions: 0, _sids: {}, dropboxDone: 0 };
     acc[pid].count++;
+    if (dropboxAns.indexOf("提出済み") !== -1) acc[pid].dropboxDone++; // 自己申告ベースの提出済みセッション数
     // 最新提出日は timestamp の数値(ms)で比較し、表示時のみ整形する
     // （文字列 "yyyy-MM-dd" 比較は TZ 跨ぎで日付が丸まり誤判定しうるため）。
     var ms = r.getTimestamp().getTime();
