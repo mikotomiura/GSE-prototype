@@ -128,7 +128,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build Tauri app
-        run: npx tauri build --bundles dmg
+        # `--features package` is required on macOS: the .app bundler copies *every*
+        # `[[bin]]` of the crate into Contents/MacOS/, including `gse-package` / `gse-unpack`
+        # which are gated behind `required-features = ["package"]`. Without the flag those
+        # binaries are never built and bundling fails ("Failed to copy binary ... does not
+        # exist"). The `age` isolation design (Cargo.toml) is preserved — only the release
+        # build opts in; the default `gse-next` binary still does not link `age`.
+        run: npx tauri build --bundles dmg --features package
         env:
           APPLE_SIGNING_IDENTITY: "-"  # Ad-hoc signing (no Apple Developer certificate)
       - name: Re-sign app bundle with entitlements (layered, no --deep)
