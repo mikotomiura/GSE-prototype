@@ -609,11 +609,12 @@ function buildF4() {
   pid.setRequired(true);
 
   // セッション番号
-  // ログ突合キーは F3 と同形式のセッションIDで統一する（"s03" 等の略記はログの session_id と
-  // 一致せず join が壊れるため）。
+  // ログ突合キーはログファイル名 gse_<YYYYMMDD_HHMMSS>.ndjson の日時部分に統一する（独自表記や
+  // "s03" 等の略記はログと一致せず join が壊れるため、提出ファイル名の日時をそのまま入力してもらう）。
+  // ※ アプリ画面にセッションID表示は無いため「エディタ画面に表示」という旧文言は実態と不一致だった。
   var snum = form.addTextItem();
-  snum.setTitle("セッションID（エディタ画面に表示されている ID。F3 と同じ形式）");
-  snum.setHelpText("例: ses_20260624_001。ログとの突合に使用します。");
+  snum.setTitle("セッションID（提出するログファイル名 gse_◯◯◯.ndjson の ◯◯◯ 部分）");
+  snum.setHelpText("例: gse_20260302_075721.ndjson なら「20260302_075721」。ログとの突合に使用します。");
   snum.setRequired(true);
 
   // S1: 集中度
