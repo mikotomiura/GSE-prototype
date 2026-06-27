@@ -1,0 +1,792 @@
+# GSE — 設計・実装の変遷（Design History）
+
+> 認知状態推定エンジンの**バージョン別変遷（v2.1 – v2.22）**を記録したものです。
+> ヒステリシス・安定性修正、IME 検出の作り直し、Nudge/Wall 介入 UI、セキュリティ・信頼性
+> 強化、クロスプラットフォーム・パリティ、macOS オーバーレイ対応などを含みます。
+>
+> 本編 [README.ja](../README.ja.md) を簡潔に保つため、詳細はこのファイルへ分離しました。
+> **現行**のアーキテクチャ・機能概要は README を参照してください。本ファイルは各実装に至った
+> 経緯のアーカイブです。
+
+[← README に戻る](../README.ja.md) · [English](design-history.md)
+
+---
+
+## ヒステリシスと安定性修正（v2.1）
+
+セッションログの分析から三つの病理的挙動が確認され、修正されました。
+
+---
+
+### 修正 ①：Cold-Start ヒステリシス（Stuck→Flow ウィンドウリセットスパイク）
+
+**理論的注記：HSMMに対するO(1)代替手法**
+標準HMMは状態継続時間分布を明示的にモデル化できません（幾何分布的な減衰を仮定）。Hidden Semi-Markov Model（HSMM）はIncubationとStuckの非幾何的な継続時間をモデル化するために理論的に最適ですが、$O(T^2)$の計算複雑度をもたらし、継続時間パラメータの推定に大量データを必要とします（$n=1$環境での過学習）。以下に導入するEMAヒステリシス層は、HSMMのオーバーヘッドなしに最小状態滞在時間を強制する$O(1)$の計算的工夫であり、エッジ推論に理想的です。
+
+**問題：** t = 255.2 s に 30 秒ウィンドウが大量 Backspace 区間を過ぎると、削除イベントがウィンドウ外に出て新ウィンドウの特徴量が Flow に見えます。結果：`p_stuck = 0.994 → p_flow = 0.48` が 1 ミリ秒で発生。
+
+**根本原因：** `get_current_state()` が時間的慣性のない生 HMM 信念（点推定値）を直接返していた。
+
+**修正：** 生 HMM 信念と並行して補助確率ベクトル `display_probs` を維持し、遅い EMA で追跡します。
+
+```
+display_t = α · raw_t + (1 − α) · display_{t−1}
+
+α = 0.40  （通常更新 → 時定数 τ ≈ 2.5 更新 ≈ 2.5 秒）
+α = 0.60  （タイピング中の Backspace ペナルティビン → 素早い Stuck 収束）
+α = 0.50  （沈黙中の Backspace ペナルティビン → 中程度の Stuck 収束）
+```
+
+`get_current_state()` は `display_probs` を返します。真の状態遷移は約 2.5 秒の持続的エビデンスを必要とするため、UI やログへの即時反映が防止されます。
+
+ウィンドウリセットシナリオのシミュレーション（α = 0.40、リセット後 raw p\_stuck ≈ 0）：
+
+| Tick | 生 p_flow | display p_stuck |
+| --- | --- | --- |
+| 0（リセット前） | 0.01 | **0.994** |
+| 1（Flow シグナル） | 0.48 | 0.596 |
+| 2 | 0.52 | 0.358 |
+| 3 | 0.54 | 0.215 |
+| 4 | 0.56 | 0.129 |
+
+---
+
+### 修正 ②：確率の離散クラスタリング（段階的天井）
+
+**問題：** 動的放射フロア ε = 0.05 を全ビンに加算する実装で HMM が特定の固定点確率に収束していた。
+
+- `p_flow` → 0.9734（フレームの 39.1% に集中）
+- `p_inc` → 0.9381
+- `p_stuck` → 0.9944
+
+これらのクラスターは、特定状態が支配的な観測ビンにおいて放射確率の比率が固有の固定点を決定することで生じます。ε = 0.05 ではペナルティビンの比率が 0.99/0.05 ≈ 20× に留まり、Backspace 連打の Stuck シグナルが大きく薄まっていました。
+
+**修正：** 動的加算フロアを廃止。0.00 のビン値を静的な **0.01** に置き換え、放射テーブルに焼き込みました。ペナルティビンの比率は 0.99/0.01 ≈ 99× に向上し、Backspace 連打に対する Stuck 検知が大幅に強化されました。各状態の最大到達確率は 0.88〜0.90 程度に低下し、競合状態にも意味のある確率質量が残ります。
+
+---
+
+### 修正 ③：Inc→Stuck 沈黙遷移（50 秒無入力で Inc に留まる）
+
+**問題：** 長時間の沈黙（≥ 50 秒）が Incubation に分類され続けた。`make_silence_observation()` は F5（ポーズ回数）のみを設定しており、F5 単独では X（摩擦）の最大値が：
+
+```
+X_max（F5 のみ） = 0.20 · φ(F5) = 0.20 · 1.0 = 0.20 → x_bin = 1（Incubation）
+```
+
+Stuck 支配ビン（x_bin ≥ 3、X ≥ 0.60）には F3 または F6 なしには到達不可能でした。
+
+**認知的根拠：** 長時間の出力沈黙は意図的な Incubation と意味的に等価ではありません。30 秒を超えてタイピングせずに画面を眺める行動は「熟考」よりも「詰まり」に近いと解釈できます。極端な沈黙中に摩擦を合成することは、この認知的遷移を反映するものです。
+
+**修正：** `make_silence_observation()` に早期オンセットとフロア値を持つ合成摩擦値を追加しました。
+
+```rust
+// F6：10秒で開始、≥10秒でフロア0.15保証、~50秒で1.0到達
+F6_synthetic = if silence ≥ 10s { max(clamp((s−10)/40, 0, 1.0), 0.15) }
+              else              { clamp((s−10)/40, 0, 1.0) }
+
+// F3：15秒で開始、≥10秒でフロア0.20保証、~65秒で1.0到達
+F3_synthetic = if silence ≥ 10s { max(clamp((s−15)/50, 0, 1.0), 0.20) }
+              else              { clamp((s−15)/50, 0, 1.0) }
+```
+
+X の時系列（F5 が φ = 1.0 に飽和、典型的 F1）：
+
+| 沈黙時間 | F3_合成 | F6_合成 | X（摩擦） | x_bin | 領域 |
+| --- | --- | --- | --- | --- | --- |
+| 10 秒 | 0.20 | 0.15 | ≈ 0.34 | 1 | Incubation |
+| 20 秒 | 0.20 | 0.25 | ≈ 0.36 | 1 | 境界域 |
+| 30 秒 | 0.30 | 0.50 | ≈ 0.58 | 2 | 境界域 |
+| 40 秒 | 0.50 | 0.75 | ≈ 0.76 | 3 | **Stuck** |
+| 50 秒 | 0.70 | 1.00 | ≈ 0.90 | 4 | **Deep Stuck** |
+
+早期オンセット（F6: 10秒、F3: 15秒）と≥10秒でのフロア値保証により、Stuck方向への遷移が開始されます。摩擦上限が1.0に解放（v2.18、従来は0.45/0.35）されたことで x_bin の全範囲を走破可能となり、Nudge および Wall 介入が確実に発動します。3段階 EWMA α とヒステリシス層を合わせると、Stuck ラベルは持続的沈黙の約25-30秒後に確認されます。
+
+---
+
+## IME 検出とコンテキスト対応ベースライン（v2.2）
+
+日本語 IME 入力は特徴量分析に二つの課題をもたらします。
+
+1. **候補選択フェーズ**（スペース → 漢字候補リスト表示中）：ナビゲーションキー（矢印・Enter）が特徴量ベクトルを汚染する
+2. **入力モードコンテキスト**（あモード vs Aモード）：日本語執筆とASCIIコーディングではフライトタイムの基準値が大きく異なる
+
+### 候補ウィンドウ検出によるポーズ
+
+漢字候補リストが表示されている間は分析を一時停止し、表示状態を Flow に保ちます。二つの検出層を使用します。
+
+| 層 | 手法 | 備考 |
+| --- | --- | --- |
+| **主** | `EnumWindows` による "CandidateUI" / "IME" ウィンドウクラス検索 | 直接クロスプロセス ウィンドウスキャン。フック不要 |
+| **副** | UIAutomation `GetFocusedElement` | フォーカスが IME 候補パネルにある場合のフォールバック |
+
+グローバル TSF フック（`ITfThreadMgr`）は使用しません — プロセス境界を越えると UIPI によってブロックされます。
+
+**MSCTFIME UI は明示的に除外：** このクラスは TSF 言語バー（タスクバーの A/あ インジケーター）に属し、日本語 IME が読み込まれている場合は常時表示されます。含めると恒久的な誤検知が発生します。
+
+### VK\_DBE\_\* キーによる IME モード検出（v2.2）
+
+**`VK_PROCESSKEY` が機能しない理由：** `WH_KEYBOARD_LL` は IME エンジンが入力を処理する前に発火します。変換中に押されたキーは `VK_PROCESSKEY`（0xE5）ではなく生のキーコード（`VK_A`、`VK_I` など）としてフックに届きます。これは設計上の動作で、ローレベルフックは IME レイヤーより下にあります。
+
+**機能するもの：** Windows は IME モード切替キー — `VK_DBE_ALPHANUMERIC`（0xF0）、`VK_DBE_HIRAGANA`（0xF2）、`VK_DBE_KATAKANA`（0xF1）など — を IME 処理前に `WH_KEYBOARD_LL` に届けます。これらはハードウェアレベルの入力モード切替キーだからです。**実証確認：** セッションログ `gse_20260222_074741.ndjson` の分析で `VK_DBE_ALPHANUMERIC`（vk = 240）が14回観測され、モード切替キーが確実にフックに届くことが実証されました。
+
+フックスレッドは `IME_OPEN: AtomicBool` を管理します。
+
+| VK コード | 値 | `IME_OPEN` への効果 |
+| --- | --- | --- |
+| `VK_DBE_ALPHANUMERIC`（0xF0） | 英数直接入力（A）に切替 | → `false` |
+| `VK_DBE_SBCSCHAR`（0xF3） | 半角文字モード | → `false` |
+| `VK_DBE_HIRAGANA`（0xF2） | ひらがなモード（あ） | → `true` |
+| `VK_DBE_KATAKANA`（0xF1） | カタカナモード（カ） | → `true` |
+| `VK_DBE_DBCSCHAR`（0xF4） | 全角文字モード | → `true` |
+| `VK_KANJI`（0x19） | 半角/全角トグル | → 反転 |
+
+**制限：** 初期状態は `false`（英数）と仮定します。セッション中に最初のモード切替キーが押された後から正確になります。
+
+### コンテキスト別 β（デュアルベースライン）
+
+`φ(x, β)` 正規化関数は現在の IME モードに応じて異なる参照値を使用し、系統的バイアスを補正します。
+
+| コンテキスト | `IME_OPEN` | β\_F1（ms） | β\_F3 | β\_F4 | β\_F5 | β\_F6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **β\_coding**（Aモード） | `false` | 150 | 0.06 | 5.0 | 2.0 | 0.08 |
+| **β\_writing**（あ/カモード） | `true` | 100 | 0.10 | 2.5 | 1.0 | 0.12 |
+
+**重要性：** 150ms のフライトタイムで打つコーダーは β\_coding 基準では Flow に見えますが、β\_writing 基準で評価すると誤って Stuck に分類されます（逆も同様）。コンテキスト切替によりこの系統的誤分類が解消されます。
+
+IME モードの変化は新しいレコードタイプとしてログ記録されます。
+
+```jsonc
+// IME モード切替: ユーザーが VK_DBE_HIRAGANA を押した（→ 日本語執筆モード）
+{"type":"ime_state","t":1740000001234,"on":true,"active":false}
+
+// IME モード切替: ユーザーが VK_DBE_ALPHANUMERIC を押した（→ 英数/コーディングモード）
+{"type":"ime_state","t":1740000005678,"on":false,"active":false}
+```
+
+---
+
+## IME モード検出：堅牢な多層アーキテクチャ（v2.3）
+
+v2.2 では `VK_DBE_*` キー追跡による IME モード検出を実装しました。Surface Pro 8 Type Cover での実機テストにより、さらに三つの障害モードが発見され、検出パイプラインの全面的な再設計が必要となりました。
+
+### 発見・修正されたバグ
+
+**バグ 1 — 同一ミリ秒フラッピング**（ログ `gse_20260225_142614.ndjson`）:
+分析スレッドが `ImeState` ログエントリをトリガーキーストロークと全く同じミリ秒に emit しており、同一タイムスタンプで `on:true` + `on:false` のペアが生じていました。根本原因：分析スレッドがキーストロークイベントのタイムスタンプと同期して IME 状態を計算していた。
+
+**バグ 2 — `ImmGetContext` によるゼロ検出**（ログ `gse_20260225_153634.ndjson`）:
+ポーリングのみのアプローチで `ImmGetContext(foreground_hwnd)` を呼び出すと、Windows 10/11 上のクロスプロセスウィンドウでは常に NULL が返りました。結果として `ime_state` エントリがゼロになりました。
+
+**バグ 3 — Surface Type Cover キーボードの非対称性**（ログ `gse_20260225_162114.ndjson`）:
+このキーボードでは `VK_DBE_HIRAGANA`（0xF2）は**key-UP のみ**発火し、`VK_DBE_ALPHANUMERIC`（0xF0）は**key-DOWN のみ**発火します（常に同一ミリ秒にペアで到達）。v2.2 の `is_press` のみのハンドラーではひらがなキーを完全に見逃していました。
+
+**バグ 4 — 初回状態が emit されない**:
+`last_state: bool = false`、`IME_OPEN` 初期値 `false` の状態で `VK_DBE_ALPHANUMERIC` を押すと `IME_OPEN = false`（変化なし）が設定され、`false != false` が `false` に評価されるため emit が発生しませんでした。
+
+### v2.3 アーキテクチャ：三層検出システム
+
+```
+Layer 1（主）: ImmGetOpenStatus ポーリング
+  └─ ImmGetContext が非 NULL を返す場合のみ有効（自プロセスのウィンドウのみ、稀）
+
+Layer 2（フォールバック）: IME_STATE_DIRTY フラグ経由 VK_DBE_* アトミック追跡
+  ├─ hook_callback が key-DOWN・key-UP 両方で IME_OPEN + IME_STATE_DIRTY を設定
+  └─ Surface Type Cover の非対称性に対応（VK_DBE_HIRAGANA は key-UP のみ）
+
+Layer 3（推論）: WinEvent EVENT_OBJECT_IME_CHANGE/SHOW
+  └─ 作文は日本語モードのときのみ開始可能 → クロスプロセスで IME_OPEN=true を推論
+```
+
+### アンチフラッピング保証
+
+`LogEntry::ImeState` はキーボードフック・分析スレッドからは一切 emit されず、**IME ポーリングスレッドからのみ** emit されます。処理フローは以下の通りです。
+
+```
+hook_callback（key-DOWN または key-UP）
+    │  atomic store: IME_OPEN = new_state
+    │  atomic store: IME_STATE_DIRTY = true
+    └─ bounded(1) ウェイクチャンネルに try_send(()) （ノンブロッキング、満杯なら破棄）
+
+IME ポーリングスレッド
+    │  recv_timeout(100ms)   ← キープレス信号から 1ms 以内に起床
+    │  sleep(5ms)            ← IME エンジンの状態反映を待機
+    │  IME_STATE_DIRTY 読み取り ← 状態変化を確認
+    │  LogEntry::ImeState { timestamp: SystemTime::now(), on, active } を emit
+    └─ タイムスタンプはトリガーキーストロークの ≥5ms 後を保証
+```
+
+### キーアトミック（`hook.rs`）
+
+| アトミック | 書き込み元 | 読み取り元 | 用途 |
+|---|---|---|---|
+| `IME_OPEN` | フック（VK_DBE_* ↑↓, WinEvent）、ポーリングスレッド | 分析スレッド | 現在の IME モード |
+| `IME_STATE_DIRTY` | フック（VK_DBE_* ↑↓, WinEvent 作文開始） | ポーリングスレッド（`.swap(false)`） | ログ emit のトリガー |
+| `IME_ACTIVE` | WinEvent フック（作文開始/終了） | ImeMonitor（100ms ポーリング） | 候補ウィンドウ停止 + ログ送出 |
+
+### `Option<bool>` 初期状態
+
+ポーリングスレッドは `last_state: Option<bool> = None`（`bool = false` ではない）で追跡します。比較ロジック：
+
+```rust
+if last_state.map_or(true, |prev| prev != current) { emit(); last_state = Some(current); }
+```
+
+これにより、初期状態が `false` であっても `true` であっても、**初回検出は必ず emit** されます。
+
+### 実機での動作確認
+
+ログ `gse_20260225_172338.ndjson` で修正が確認されました。
+
+| 確認項目 | 結果 |
+|---|---|
+| 検出された `ime_state` エントリ数 | **9件**（v2.2: 0件） |
+| 同一タイムスタンプフラッピング | **なし** |
+| キー → ime\_state 最小ラグ | **5ms**（VK\_DBE\_* パス） |
+| WinEvent 作文推論ラグ | **約 23〜38ms** |
+| on/false 交互遷移パターン | **正常** |
+
+---
+
+## 1Hz タイマー駆動推論と合成摩擦（v2.4）
+
+### キーストロークイベントからの分離
+
+初期実装では HMM はキーストロークごとに同期的に更新されていました。これにより EMA ヒステリシス層（τ ≈ 4 秒）の挙動が不安定になりました：高速タイピング中（10+ キー/秒）は α = 0.25 の更新が 1 秒あたり何度も蓄積され、沈黙中はまったく更新されませんでした。
+
+**修正：** 分析スレッドに `Instant` ベースの絶対時間スケジューリングによる**独立 1 Hz タイマーゲート**を導入しました。`next_engine_update` タイムスタンプは各 HMM ステップ後に正確に 1 秒進みます。`recv_timeout` の待ち時間は次回スケジュール時刻までの残り時間として動的に計算されます：
+
+- **キーストローク到着：** イベントはバッファリングされ特徴量が抽出されます。HMM ステップは `Instant::now() >= next_engine_update` の場合にのみ実行されます。
+- **タイムアウト（入力なし）：** `make_silence_observation()` により合成沈黙観測値が生成され、HMM に入力されます。
+- **クロックドリフト保護：** `next_engine_update` が `now` より過去になった場合（例：システムスリープ後）、`now + 1s` にリセットされバースト的なキャッチアップを防止します。
+
+この分離により **1 秒あたり正確に 1 回の HMM 前向きステップ**が保証され、EMA 時定数 τ = 1/α ≈ 4 更新 = **4 秒**がタイピング速度に依存せず数学的に正確に機能します。
+
+### 合成摩擦（Synthetic Friction）
+
+1 Hz タイマーが長時間の沈黙中に発火すると、`make_silence_observation()` は**合成摩擦**を生成します — 沈黙時間に応じて線形に増加する人工的な F3（修正率）と F6（削除後停止率）の値です。摩擦上限は1.0に解放（v2.18）されており、長時間の無活動（≥ 30 秒）で HMM が Incubation から Stuck へ遷移し、意図的な熟考から非生産的な停滞への認知的変化を反映します。詳細な導出と遷移軌跡の表は、上記ヒステリシスセクションの**修正 ③**を参照してください。
+
+---
+
+## 介入 UI：Nudge & Wall（v2.5）
+
+介入ポリシーが十分な Need と妥当な Opportunity の両方を検出すると、Tauri の透過マルチウィンドウオーバーレイシステムを通じて段階的な介入を提供します。
+
+### 二段階介入
+
+| レベル | 名称 | トリガー | 視覚効果 | ユーザー操作 |
+| --- | --- | --- | --- | --- |
+| **Lv1** | Nudge | `InterventionDecision.action == "nudge"` | 右端から小さく現れるサイドカード | クリックスルー（入力に対して透過） |
+| **Lv2** | Wall | `InterventionDecision.action == "wall"`（**Monk Mode ON 時は抑制**） | 全画面遮断オーバーレイ + メッセージ；キーボード入力時に赤い警告バナー | 解除まで全入力をブロック |
+
+### Nudge（Lv1）：優しいサイドキュー
+
+Nudge レイヤーは画面全体を霧やビネットで覆うのではなく、右端の周辺視野に入る小さなカードとして表示されます。Opportunity 層が介入可能と判断した時だけ表示され、不透明度はポリシーの Need score に応じて変化します：
+
+```text
+opacity = clamp((need_score − 0.60) / 0.30, 0.2, 1.0)
+```
+
+オーバーレイウィンドウは Tauri の `setIgnoreCursorEvents(true)` により**クリックスルー**モードに設定され、ユーザーは作業を継続しながら周辺視野で「いま区切りかもしれない」という穏やかなキューを受け取れます。Need が高くても active typing、cooldown、daily cap、recent dismiss、away idle などで受容性が低い場合、ポリシーは `defer` を返し Nudge は表示しません。
+
+### Wall（Lv2）：強制休憩
+
+Need が高い状態で Wall accumulator が 30 秒に達し（累積、回復時は減衰）、Opportunity 制約も通過した場合、ポリシーは `InterventionDecision.action == "wall"` を返します。システムは Wall にエスカレートし、**身体的な動き**がなければ解除できない全画面遮断オーバーレイを表示します：
+
+> *"Time to Move! Please stand up and walk around to unlock."*
+
+Wall の解除は**スマートフォンからの手動操作のみ**によって行われます。Wall が発動すると `start_wall_server` がローカル HTTP サーバー（`tiny_http`）を起動して QRコードを生成します。ユーザーがスマートフォンで QRコードをスキャンすると 2 分間のカウントダウンページが開き、フロントエンドに `wall-phone-connected` イベントが発行されて「Phone connected — Zen Timer running」バッジが表示されます。タイマーが 0:00 になると**「Unlock Wall」ボタン**が表示され、ユーザーが**手動でタップ**して初めて `/unlock` エンドポイントに POST リクエストが送信されます。サーバーが `"sensor-accelerometer"` イベントを `"move"` ペイロードで発行し Wall が解除されます。カウントダウン中にすぐ作業に戻る必要がある場合のために、控えめなデザインの**早期解除ボタン**も常時表示されます。スマホページは `navigator.wakeLock` を要求してカウントダウン中の画面消灯を防止します。PC 側フォールバックタイマーは存在しません。Wall を発動させたくない場合は事前に Dashboard の **Monk Mode** を有効化します。Wall 発動中にキーボード入力が検知された場合、オーバーレイに**警告バナー**が表示されます。HTTPS 不要で、スマートフォンと PC が同じローカルネットワーク上にあれば動作します。
+
+### Monk Mode（Wall 抑制トグル）
+
+Dashboard には **Monk Mode** トグルが用意されており、自動 Wall 発動を無効化できます。Monk Mode が **ON** の時、介入ポリシーは `wall` action を抑制しつつ、Need、Opportunity、`nudge` / `defer` 判断は継続します。ボタンを押すと `monk-mode-changed` ブール値イベント（Tauri フロントエンドブロードキャスト）が発行され、両ウィンドウが受信して `isMonkMode` 状態を同期します。強制休憩なしに深い集中作業を継続したい場合に使用します。
+
+### Dashboard セッションインジケーター
+
+Dashboard には状態バーに加えて、以下のライブインジケーターが表示されます。
+
+| インジケーター | データソース | 表示内容 |
+| --- | --- | --- |
+| **Session** | マウント時の `Date.now()` | ストップウォッチ（`M:SS` または `H:MM:SS`） |
+| **Keyboard** | `get_keyboard_idle_ms()`（`LAST_KEY_MS` アトミック読み取り） | アイドル < 3 s: `Active`、それ以上: `Idle Xs` |
+
+`get_keyboard_idle_ms` Tauri コマンドは `now_ms − LAST_KEY_MS` を返します。`LAST_KEY_MS` は `hook_callback` でキー入力ごとに更新される `AtomicU64` です。この値は Dashboard 表示専用であり、Wall の解除はスマートフォンのタイマーが担うため、PC 側のアイドル検知は Wall ロジックには使用されません。
+
+### 設計の根拠
+
+この段階的介入は、作業上のブロックが書き手の「行き詰まっている」という自覚の欠如（メタ認知の失敗）により持続するという知見に基づいています。Nudge は作業面を覆わずに穏やかな気づきを提供し、Wall は身体的なコンテキストスイッチを強制します。研究によれば、これは問題の再構造化を促進します（Sio & Ormerod, 2009）。
+
+---
+
+## セッション開始画面とエンジンリセット（v2.6）
+
+### 問題
+
+以前のバージョンはアプリ起動直後からキーストローク検知と HMM 推論を開始していました。これにより二つの問題が生じていました：
+
+1. **ウォームアップノイズ**: 作業開始前のアプリ操作（クリック・ナビゲーション）が HMM に流れ込んでいた
+2. **誤解を招く初期表示**: `useState` 初期値のハードコーディングにより、実際の推論前から「Stuck: 80%」が表示されていた
+
+### 解決策：明示的なセッション境界
+
+アプリ起動時に**開始画面**を表示し、ユーザーが「開始する」をクリックするまで検知を開始しません。クリック時に `invoke("start_session")` が Rust バックエンドを呼び出し：
+
+1. **エンジンリセット**: `CognitiveStateEngine::reset()` で HMM 状態を Flow 優先の初期事前分布 `[0.80, 0.15, 0.05]`（多くのユーザーはセッション開始時に流暢な状態にある）に戻す（`display_probs`・`axes_ewma`・`backspace_streak` をクリア）
+2. **Extractor フラッシュ**: `Arc<AtomicBool>` シグナルを設定し、分析スレッドが `FeatureExtractor` のバッファをクリアしてキューのキーイベントを破棄
+3. **セッション境界ログ記録**: `LogEntry::SessionStart { timestamp }` を NDJSON ログに書き込む
+
+React のセッションタイマーがこの瞬間から開始（アプリ起動時刻ではない）。
+
+### 改善効果
+
+| v2.5 以前 | v2.6 以降 |
+| --- | --- |
+| アプリ起動直後から検知開始 | ユーザーの明示的なアクションで検知開始 |
+| セッションタイマーがアプリ起動時から開始 | セッションタイマーが「開始する」押下時から開始 |
+| 起動前後のキーストロークで HMM が汚染される可能性 | HMM は常に初期事前分布からクリーンな状態で開始 |
+| ログにセッション境界なし | NDJSON ログに `session_start` マーカー記録 |
+
+---
+
+## フロントエンド・バックエンド初期状態同期（v2.7）
+
+### 背景
+
+バックエンドの初期事前分布を `[0.5, 0.3, 0.2]` から `[0.80, 0.15, 0.05]` に更新するパラメータチューニングが行われた後も、React の `useState` 初期値は `{flow: 0.5, incubation: 0.3, stuck: 0.2}` のままでした。これにより、最初の `get_cognitive_state` ポーリングが返す値（新しい事前分布に合わせた値）との間でUIが視覚的にジャンプする「起動時フリッカー」が発生していました。
+
+### 修正
+
+`App.tsx` の `cognitiveState` 初期値をバックエンドの `initial_probs` と同期しました：
+
+```tsx
+const [cognitiveState, setCognitiveState] = useState<CognitiveStateRaw>({
+  flow: 0.80,
+  incubation: 0.15,
+  stuck: 0.05,
+});
+```
+
+アプリ起動から最初のデータポーリング（約 500ms）までの間、UIは一貫した値を表示するようになり、コールドスタート時のフリッカーが解消されました。
+
+---
+
+## セキュリティと信頼性の強化（v2.8）
+
+macOS 版リファレンス実装との照合により、6 件のバグおよび信頼性上の問題を特定・修正しました。
+
+---
+
+### 修正 ①：F1 の 30 秒ウィンドウ適用（特徴量整合性バグ）
+
+**問題：** `F1`（フライトタイム中央値）は全蓄積バッファ（最大 600 件 ≈ 約 10 分分）から計算されていた一方、`F2`〜`F6` は 30 秒スライディングウィンドウから計算されていました。この不整合により F1 は直近のタイピングリズム変化への応答が他の特徴量より著しく遅く、HMM 観測が過去の行動に偏る問題が生じていました。
+
+**修正：** `F1` を他の特徴量と共用の `window_fts`（30 秒ウィンドウ内のフライトタイムベクタ）から計算するよう変更し、全特徴量の時間スコープを統一しました。
+
+---
+
+### 修正 ②：セッション前イベントドレイン（`SessionActive` ゲート）
+
+**問題：** 分析スレッドはアプリ起動直後からキーストロークを処理しており、ユーザーが「開始する」を押す前の操作（ウィンドウ切替・ナビゲーションキー等）が特徴量バッファに流れ込み、HMM の初期状態を微妙にバイアスさせていました。
+
+**修正：** `SessionActive(Arc<AtomicBool>)` フラグを導入（初期値 `false`）。分析スレッドはセッション開始前、`try_recv()` で全受信イベントをドレイン（破棄）します。`start_session` 呼び出し時に `true` に設定され、以降は通常処理を開始します。bounded チャネル（cap = 64）のオーバーフロー防止にも寄与します。
+
+---
+
+### 修正 ③：Backspace ストリークの Atomic 化とペナルティ競合修正
+
+**問題：** `backspace_streak` が `Arc<Mutex<u32>>` で管理されており、10+ キー/秒の高速タイピング時にも毎キーストロークでミューテックスのロック・アンロックが発生していました。また、BS×8 でストリークがペナルティ閾値に達した直後、非 BS キーによってリセットされると `update()` 実行前にストリークが 0 になり、ペナルティが取りこぼされる競合状態も存在しました。
+
+**修正：** `Arc<AtomicU32>` に変更。新たに `has_pending_penalty: Arc<AtomicBool>` フラグを導入し、ストリークがペナルティ閾値に達した時点で `register_keystroke` が `true` を設定。`update()` が `swap(false, AcqRel)` でフラグを消費するまで、ストリークがリセットされてもペナルティは保持されます。`is_paused` も同様に `Arc<Mutex<bool>>` から `Arc<AtomicBool>` に変換し、全 3 つのアトミックでホットパスのミューテックスオーバーヘッドを排除しました。
+
+---
+
+### 修正 ④：チャネルベースのロガーシャットダウン
+
+**問題：** `quit_app` は `thread::sleep(400 ms)` でロガースレッドのファイルフラッシュ・クローズを待機していました。負荷時にはフラッシュが 400 ms を超える可能性があり、セッションファイルが破損するリスクがありました。
+
+**修正：** `SessionLogger::start()` が `Sender<LogEntry>` に加えて `Receiver<()>`（`shutdown_rx`）を返すように変更。`LogEntry::End` 処理・フラッシュ完了後にロガースレッドが `()` を送信します。`quit_app` は固定スリープの代わりに `shutdown_rx.recv_timeout(2000 ms)` で待機し、正確なファイルクローズを保証します。
+
+---
+
+### 修正 ⑤：終了時の WallServer クリーンアップ
+
+**問題：** `quit_app` が WallServer を停止せずにアプリを終了していたため、HTTP サーバースレッドが稼働し続け、動的に追加した Windows Defender ファイアウォールルール（`GSE-WallServer-<port>`）が残存していました。
+
+**修正：** `WallServerState::stop()` を追加。サーバースレッドに停止シグナルを送り、`netsh` でファイアウォールルールを削除します。`quit_app` の冒頭で `wall.stop()` を呼び出すよう変更しました。
+
+---
+
+### 修正 ⑥：CSP 強化と `get_hook_status` コマンド
+
+**Content Security Policy：** `tauri.conf.json` の `csp` が `null`（制限なし）でした。`"default-src 'self'; style-src 'self' 'unsafe-inline'"` に変更し、リソースロードをオリジン内に制限しました。
+
+**`get_hook_status` コマンド追加：** macOS 版との API 互換性のために追加。macOS ではキーボードフック前にシステム権限プロンプトが必要であり、このコマンドでその状態をフロントエンドに伝えます。Windows では権限プロンプト不要のため、常に `true` を返します。
+
+---
+
+## 状態管理の集約とスマートフォン接続バッジ（v2.9）
+
+### App.tsx での統合ポーリングとタイマー
+
+従来の `App.tsx` は 3 つの独立した `useEffect` を使用していました：認知状態ポーリング（500ms）、キーボードアイドル＋フックステータスポーリング（1000ms）、Lv2 Wall 累積タイマー（React レンダーに依存）。これにより以下の問題がありました：
+
+1. **冗長なポーリング**: `get_hook_status` は実行中に変わらない静的な値であるにもかかわらず毎秒ポーリングされていた
+2. **タイマードリフト**: Lv2 累積タイマーが `useEffect` の依存配列トリガーに依存しており、経過時間の計算が React のレンダリング間隔に左右されていた
+
+**修正：** 3 つのフックを単一のアーキテクチャに統合しました：
+
+- **`hookActive`**（`boolean | null`、初期値 `null`）は**マウント時に 1 回だけ**取得（ポーリングなし）：
+
+```tsx
+useEffect(() => {
+  invoke<boolean>("get_hook_status")
+    .then((active) => setHookActive(active))
+    .catch(() => setHookActive(true)); // エラー時は楽観的に true
+}, []);
+```
+
+- **単一の 500ms `setInterval`** 内で `Promise.all` により `get_cognitive_state` と `get_keyboard_idle_ms` を並行取得し、同ブロック内で `Date.now()` ベースの Lv2 タイマーを計算：
+
+```tsx
+const [state, idle] = await Promise.all([
+  invoke<CognitiveStateRaw>("get_cognitive_state"),
+  invoke<number>("get_keyboard_idle_ms"),
+]);
+// Lv2 タイマーを Date.now() ベースで同ブロック内で計算 — レンダー依存のドリフトなし
+```
+
+`Dashboard.tsx` は `invoke()` 呼び出しや `setInterval` ポーリングを一切含まない純粋な表示コンポーネントとなりました。
+
+### 権限警告バナー（Dashboard）
+
+`hookActive === false` の場合、Dashboard の上部にリッチな権限バナー（クラス `permission-banner`）が表示されます。macOS では Input Monitoring 権限付与手順をステップバイステップで案内し、Windows ではキーボードフックの初期化失敗時にエラーメッセージと対処法を表示します。両プラットフォームとも `get_hook_status` は実際のフック状態（`HOOK_ACTIVE` フラグ）を返します。
+
+### Wall 解除画面（Overlay）
+
+Wall 発動時（`isWallActive` が true）に表示されるオーバーレイは、macOS版から移植されたユーザーフレンドリーな解除フローを提供します：
+
+- **QRコンテナ** (`qr-container`)：QRコード画像をカメラヒント（「Open camera app and point at QR code」）とサーバーURLと共にラップ
+- **ネットワークトラブルシューティングヒント** (`wall-network-hint`)：PCとスマホが同じWi-Fiに接続されていることを確認するよう案内
+- **スマートフォン接続バッジ**：スマートフォンが Wall Server に接続すると「Phone connected — Zen Timer running」バッジを表示
+- **打鍵警告**：Wall 中にユーザーがタイピングを試みると、2.5秒間警告バナーを表示
+
+---
+
+## EWMAドリフト防止とLv2タイマー安定化（v2.10）
+
+### サイレンス専用HMM更新（`update_silence`）
+
+キーボード無入力（サイレンスティック）時に通常の `update()` メソッド（α=0.30）を使用すると、極端なアイドル期間の特徴量がEWMAスムーザーに過度に供給され、高Friction方向に急速にドリフトしていました。
+
+**修正：** `engine.rs` の `update_silence()` メソッドは**3段階の低減EWMA学習率**（初期沈黙 α=0.15、≥15秒 α=0.18、深い沈黙 ≥25秒 α=0.25）でHMMの遷移・放出更新を行います。中間ギア α=0.18 により Nudge 領域（p_stuck 0.60-0.70）を緩やかに推移し、Lv1 介入から Lv2 Wall 発動まで 5-8秒の猶予を確保します：
+
+```rust
+pub fn update_silence(&self, features: &Features, ime_open: bool, silence_secs: f64) {
+    let alpha = if silence_secs >= 25.0 {
+        0.25  // 完全に固まった状態
+    } else if silence_secs >= 15.0 {
+        0.18  // Nudge 領域を緩やかに推移させるための中間ギア
+    } else {
+        0.15  // 初期サイレンス
+    };
+    // 低減αでのEWMA更新 — 急激なドリフトなく沈黙に応答
+    ewma.0 = alpha * raw_x + (1.0 - alpha) * ewma.0;
+    ewma.1 = alpha * raw_y + (1.0 - alpha) * ewma.1;
+    // HMM フォワードステップは更新されたEWMA位置で観測を計算
+    // ...
+}
+```
+
+### Lv2タイマーのRefミラーパターン
+
+従来、`isWallActive` と `isMonkMode` は統合ポーリング `useEffect` の依存配列に含まれていました。これらの値が変化するたびに `setInterval` が破棄・再作成され、Lv2累積タイマーにタイミングギャップが生じていました。
+
+**修正：** ステート値をRefにミラーリングし、interval内ではRefから読み取ります：
+
+```tsx
+const isWallActiveRef = useRef(isWallActive);
+const isMonkModeRef = useRef(isMonkMode);
+useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
+useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
+
+// 依存配列: [isStarted, windowLabel] のみ — Wall/Monkトグルで破棄されない
+```
+
+これにより500msインターバルが中断なく連続実行され、Wall発動やMonk Modeトグル時も `Date.now()` ベースの経過時間計算が正確に維持されます。
+
+---
+
+## 分析エンジンパリティと沈黙検出（v2.11）
+
+macOS リファレンス実装の16件の修正をWindows版への適用可否について評価しました。全てのプラットフォーム非依存の分析エンジン改善が移植され、両プラットフォーム間の機能パリティが達成されました。
+
+---
+
+### 修正 ①：F2 除去（未使用特徴量）
+
+F2（フライトタイム分散）は Cognitive Friction (X) および Productive Silence (Y) の軸計算で使用されていませんでした。`Features` 構造体、`FeatureExtractor::calculate_features()`、`make_silence_observation()`、`LogEntry::Feat`、およびロガーのフォーマット文字列から除去しました。不要な計算とログの肥大化を解消します。
+
+---
+
+### 修正 ②：キーリピートと非タイピングキーのフィルタリング（フック＋特徴量抽出器）
+
+**問題：** キーリピートイベント（キー長押し）がフライトタイム計算に人工的なゼロ間隔エントリを混入させていました。非タイピングキー（矢印キー、ファンクションキー、IMEモードキー）がタイピングリズムと無関係なノイズを導入していました。全ての生キーイベントが分析上の関連性に関わらず bounded チャネル容量（64スロット）を消費していました。
+
+**修正：** 二層フィルタリングにより、クリーンなタイピングデータがHMMに到達します：
+
+1. **フックレベルゲート**（`hook_callback`）：`is_typing_key()` が非タイピングキーを crossbeam チャネルに入る*前に*フィルタリングします。`PRESSED_KEYS: Mutex<HashSet<u32>>` がオートリピートを検出し、`InputEvent` 構造体の `is_repeat: true` フラグを設定します（v2.12）。リピートイベントは破棄されず分析スレッドに転送され、長押し削除（Backspace 長押し等）が F3/F5/F6 と Backspace ストリークペナルティに反映されます。`LAST_KEY_MS`（アイドル検出）と `POLL_WAKE_TX`（IMEポーリング起床）は全キーに対して無条件で実行されます。
+2. **特徴量抽出器**（`calculate_features()`）：F1（フライトタイム）と F4（バースト長）は `is_repeat == true` のイベントをスキップし、タイピングリズムの精度を維持します。F3・F5・F6 はリピートイベントを含め、削除量を正確に反映します。
+
+`is_typing_key()` は A–Z、0–9、テンキー（0x60–0x6F）、OEMシンボルキー、Backspace、Enter、Space、Tab、Delete を対象とします。
+
+---
+
+### 修正 ③：BSペナルティ閾値 8 → 14（IME互換性）
+
+**問題：** 日本語IME変換では通常の編集で8–12連続のBackspace押下が頻繁に発生します（例：誤変換語の削除）。閾値8では通常の日本語執筆中に誤ったStuckペナルティが発生していました。
+
+**修正：** Backspaceストリークのペナルティ閾値を8から14に引き上げました。加えて、`ime_open == true` の場合はペナルティ自体が抑制されます。IME変換中のBackspaceは通常の編集操作であり、認知的苦悩の指標ではないためです。
+
+---
+
+### 修正 ④：β\_writing の再校正
+
+**問題：** β\_writingのベースライン値（F1=220, F3=0.08, F4=2.0, F5=4.0）は実証的なIMEタイピングデータが入手可能になる前に設定されたものでした。F1=220msはIMEタイピングの実態（ローマ字入力による高速打鍵で約100ms）に対して高すぎ、F5=4.0は寛容すぎました（4回のポーズまで摩擦が記録されない）。
+
+**修正：** 観測された日本語執筆セッションに基づき、F1=100, F3=0.10, F4=2.5, F5=1.0 に再校正しました。通常のIMEタイピングをFlow領域に正しく配置しつつ、本物の躊躇には敏感に反応します。
+
+---
+
+### 修正 ⑤：独立1Hzゲートアーキテクチャ
+
+**問題：** 元の `recv_timeout(1000ms)` アプローチは各反復の処理時間（特徴量抽出 + HMM更新）分だけドリフトし、毎分約50–100msの誤差が蓄積していました。
+
+**修正：** `Instant` ベースの絶対時間スケジューリングに置き換えました。詳細は更新されたv2.4セクションを参照してください。
+
+---
+
+### 修正 ⑥：進行中の沈黙のF5増強
+
+**問題：** `calculate_features()` は30秒ウィンドウ内の完了済みポーズのみをカウントします。12秒間の進行中の沈黙では、過去のポーズのみがカウントされ、現在の沈黙はユーザーがタイピングを再開するまでF5に反映されません。
+
+**修正：** `calculate_features()` の返却後、`silence_secs >= 2.0` かつバッファに実データがある場合（`f1 > 0`）、現在の沈黙時間をF5に加算します：`features.f5_pause_count += silence_secs / 2.0`。これによりHMMが進行中の沈黙をリアルタイムで観測できます。
+
+---
+
+### 修正 ⑦：沈黙ブレーク保護（3打鍵ゲート）
+
+**問題：** 長時間の沈黙後の単一の偶発的なキー押下（例：キーボードへの誤触）が沈黙タイマーをリセットし、HMMが即座にα=0.30の通常 `update()` を受け取ることで、EWMAがFlow方向に急激に戻り蓄積された沈黙シグナルが消失していました。
+
+**修正：** 10秒以上の沈黙後、分析スレッドは入力を本格的なタイピング再開として扱う前に3回連続のキー押下を要求します。3回に達するまで沈黙タイマーは継続し、`update()` の代わりに `update_silence()` が使用されます。
+
+---
+
+### 修正 ⑧：`force_flow_state()` の除去
+
+**問題：** IME候補ウィンドウが検出されると `force_flow_state()` が呼び出されて表示をFlowに保っていました。このメソッドは `display_probs`、`axes_ewma`、HMM信念を破壊的に上書きし、エンジンの蓄積された認知状態を完全に消去していました。候補ウィンドウが閉じた後、エンジンは状態をゼロから再構築する必要がありました。
+
+**修正：** `force_flow_state()` を完全に除去しました。IMEモニタースレッドは `engine.set_paused(active)` のみを呼び出すようになり、状態を破壊せずにHMM更新を一時停止します。候補ウィンドウが閉じると、分析スレッドがキーストロークバッファをクリア（`extractor.reset()`）してポーズ前の stale なフライトタイムによる F1 汚染を防止し、保存された HMM 状態からサイレンスパス経由で推論が再開されます。ImeMonitor スレッドは `IME_ACTIVE` 状態変化時に `LogEntry::ImeState` を送出し、事後分析を可能にします。
+
+---
+
+### 修正 ⑨：セッション開始の競合状態
+
+**問題：** `start_session()` は `engine.reset()` が完了する前に `session_active = true` を設定していました。分析スレッドがアクティブフラグを観測し、リセット前の古い状態でHMM更新を実行する可能性がありました。
+
+**修正：** `engine.reset()` → `reset_signal.store(true)` → `session_active.store(true)` の順序に変更しました。リセットシグナルも個別の `load` + `store` の代わりに `swap(false, AcqRel)` で消費し、TOCTOU競合を防止します。
+
+---
+
+### 修正 ⑩：`register_keystroke` のクロスプラットフォーム分離
+
+**問題：** `CognitiveStateEngine::register_keystroke()` 内で `if vk_code == 0x08` という Windows 固有の仮想キーコード（`VK_BACK`）判定を行っていました。macOS では Delete キーが `0x33`（`kVK_Delete`）であるため、そのままではBackspaceストリークロジックが機能しません。
+
+**修正：** `register_keystroke(vk_code: u32)` → `register_keystroke(is_backspace: bool)` に変更しました。OS 固有のキーコード判定は `lib.rs` の呼び出し元（`event.vk_code == 0x08`）で行い、推論エンジンを完全にプラットフォーム非依存にしました。数学的・モデル的な動作変更はありません。
+
+---
+
+## フックレベルのリピートイベント転送（v2.12）
+
+### 問題
+
+v2.11 のフックレベルゲートはオートリピートイベント（キー長押し）を完全に破棄しており、分析スレッドに到達しませんでした。これにより Stuck 検知に致命的な欠落が生じていました：**Backspace 長押しによるテキスト一括削除**（認知的苦悩の強いシグナル）がエンジンに見えず、Backspace ストリークカウンター（`register_keystroke`）が長押し中に 1 を超えてインクリメントされないため、14 連続 BS ペナルティが発動しませんでした。
+
+### 修正
+
+`InputEvent` に `is_repeat: bool` フィールドを追加しました。フックの `PRESSED_KEYS` セットは依然としてオートリピートを検出しますが、イベントを破棄する代わりに `is_repeat: true` タグを付けてチャネル経由で送信します。
+
+**特徴量レベルの処理：**
+
+| 特徴量 | リピートイベント | 根拠 |
+| --- | --- | --- |
+| **F1**（フライトタイム） | 無視（`continue`） | リピートはタイピングリズムを歪める人工的なゼロ間隔を注入する |
+| **F3**（修正率） | 含む | 各リピート BS/Del は実際の削除 — 除外すると修正率が過小評価される |
+| **F4**（バースト長） | 無視（`continue`） | リピートは意図的な連続打鍵ではなくバースト長を膨張させる |
+| **F5**（ポーズ回数） | 含む | 長押し中はユーザーがアクティブ — リピート間のギャップが F5 を正しく縮小する |
+| **F6**（削除後停止率） | 含む | リピート BS が初回押下後のギャップを埋め、ユーザーが本当に停止した場合にのみ F6 が発火する |
+
+**分析スレッドの処理：**
+
+- `register_keystroke()`：リピートイベントをカウント。Backspace 長押しでストリークカウンターが増加し、14 連続 BS ペナルティが発動する。
+- 沈黙ブレーク保護（`presses_since_silence`）：リピートイベントは除外 — 自動キーリピートは沈黙後の意図的なタイピング復帰とは見なさない。
+
+---
+
+## クロスプラットフォーム InputEvent 意味論的拡張（v2.13）
+
+### 問題
+
+v2.11 修正 ⑩ では `register_keystroke()` のシグネチャを `register_keystroke(vk_code: u32)` から `register_keystroke(is_backspace: bool)` に変更し、OS 固有のキーコードから分離しました。しかし分離は不完全でした — `lib.rs` の呼び出し元は依然として `event.vk_code == 0x08`（Windows の `VK_BACK`）をハードコードしており、共有分析コア（`features.rs`）にも OS 固有の定数 `VK_BACK = 0x08` と `VK_DELETE = 0x2E` が残存し、F3（修正率）と F6（削除後停止率）の計算で使用されていました。
+
+### 修正
+
+`InputEvent` 構造体に `is_backspace: bool` を意味論的フラグとして追加し、OS 固有の削除キー判定を抽象化しました：
+
+```rust
+pub struct InputEvent {
+    pub vk_code: u32,
+    pub timestamp: u64,
+    pub is_press: bool,
+    pub is_repeat: bool,
+    pub is_backspace: bool, // 新規: フック層で設定
+    pub is_paste: bool,     // 後日追加: Ctrl+V/Cmd+V フラグ (回数のみ・中身は読まない)
+}
+```
+
+**レイヤー別の変更：**
+
+| レイヤー | ファイル | 変更内容 |
+| --- | --- | --- |
+| **フック（OS固有）** | `hook.rs` | `InputEvent` 生成時に `is_backspace = vk_code == 0x08 \|\| vk_code == 0x2E`（Windows: `VK_BACK` または `VK_DELETE`）を設定 |
+| **分析コア（OS非依存）** | `features.rs` | `const VK_BACK` / `const VK_DELETE` を削除。F3 と F6 は `event.vk_code == VK_BACK \|\| event.vk_code == VK_DELETE` の代わりに `event.is_backspace` を使用 |
+| **オーケストレーション** | `lib.rs` | `register_keystroke(event.vk_code == 0x08)` を `register_keystroke(event.is_backspace)` に変更 |
+
+**macOS 対応：** フック層で `is_backspace = keycode == 0x33 || keycode == 0x75`（`kVK_Delete` または `kVK_ForwardDelete`）を設定します。
+
+この変更により、`features.rs` と `lib.rs` には OS 固有のキーコード参照がゼロになりました。共有分析コアは完全にプラットフォーム非依存となり、OS 固有のフック層が設定した意味論的ブールフラグのみを参照します。数学的・動作的変更はなく、純粋なアーキテクチャリファクタリングです。
+
+---
+
+## Stuck摩擦リミッター解除（v2.18）
+
+### 問題
+
+ログ分析により、`p_stuck` が構造的に約5%で頭打ちとなり、Nudge閾値（p_stuck > 0.60）およびWall閾値（p_stuck > 0.70）に到達不可能であることが判明しました。
+
+1. **摩擦上限が低すぎる：** 合成摩擦の `clamp` 上限（F6: 0.45、F3: 0.35）では X（認知摩擦）が x_bin ≥ 3（Stuck支配領域）に到達できなかった
+2. **沈黙パスの初動が遅い：** 通常パス（α=0.30）が5秒間の沈黙中も継続し、stale なウィンドウデータが HMM に入力され Incubation にロックインしていた
+
+### 修正 1：摩擦リミッター解除（`lib.rs`、`features.rs`）
+
+`clamp` 上限を 0.45/0.35 から **1.0** に解放し、分母を縮小して立ち上がりを高速化：
+
+| パラメータ | 修正前 | 修正後 |
+| --- | --- | --- |
+| f6_floor（lib.rs） | `(s−8)/45`、上限0.45 | `(s−8)/30`、上限1.0 |
+| f3_floor（lib.rs） | `(s−10)/50`、上限0.35 | `(s−10)/40`、上限1.0 |
+| f6_synthetic（features.rs） | `(s−8)/60`、上限0.45 | `(s−10)/40`、上限1.0 |
+| f3_synthetic（features.rs） | `(s−15)/100`、上限0.35 | `(s−15)/50`、上限1.0 |
+
+≥10秒での `max(0.15)` / `max(0.20)` フロア保証は維持。
+
+### 修正 2：沈黙パスの早期起動（`lib.rs`）
+
+通常パス（α=0.30）から沈黙パス（α=0.15）への切り替え閾値を **5秒** から **2秒** に引き下げ。stale なバッファデータによる Incubation 強化を防止。
+
+### 修正 3：エミッションの崖効果緩和（`engine.rs`）
+
+Incubation（State 1）x=1行の y=1 放射確率を **0.10** から **0.08** に変更し、Flow優位ビンと Incubation優位ビン間の急激な遷移を平滑化。
+
+### 効果
+
+持続的沈黙時の Stuck 到達時間が約50秒から約30秒に短縮され、Nudge および Wall 介入が設計通りに発動可能に。
+
+---
+
+## macOSパリティ同期（v2.19）
+
+macOS版リファレンス実装から4つの変更を移植し、両プラットフォーム間の完全な推論エンジンパリティを達成しました。
+
+### エミッションテーブル同期（`engine.rs`）
+
+x=2/x=3 の Friction 境界チューニングを適用し、中〜高摩擦領域での Stuck 検出を強化：
+
+| 位置 | 修正前 | 修正後 | 効果 |
+| --- | --- | --- | --- |
+| Flow x=2 y=3 (obs=13) | 0.06 | 0.01 | 中摩擦での Flow 放射を抑制 |
+| Incubation x=2 y=3 (obs=13) | 0.01 | 0.02 | Incubation を微増 |
+| Stuck x=2 y=3 (obs=13) | 0.01 | 0.05 | 中摩擦での Stuck 検出強化 |
+| Stuck x=3 y=3 (obs=18) | 0.02 | 0.07 | 高摩擦での Stuck 検出強化 |
+
+### 摩擦フロア最低保証（`lib.rs`）
+
+バッファ保持沈黙パスにおいて `silence_secs >= 10.0` 時に `f6_floor.max(0.15)` と `f3_floor.max(0.20)` を強制適用。`make_silence_observation()` と同一のフロア保証を実現。
+
+### Logger フラッシュ最適化（`logger.rs`）
+
+毎エントリ後の即時 `flush()` を廃止し、5秒アイドルタイムアウトによる一括フラッシュに変更。`BufWriter` の内部バッファを活用し、高頻度ログ時の I/O 負荷を大幅に軽減。`LogEntry::End` 時は即座に最終フラッシュ（データロスなし）。
+
+### `is_typing_key` のフック層移動（`features.rs` → `hook.rs`）
+
+Windows 固有の仮想キーコードを含む `is_typing_key()` 関数を `features.rs` から `hook.rs` にローカル関数として移動。フック層で既にフィルタ済みのため `calculate_features()` の冗長なチェックも除去。`features.rs` から OS 固有コードがゼロとなり、v2.13 で目指した分析コアの完全なプラットフォーム非依存性が達成。
+
+---
+
+## IMEポーズ中イベント破棄とZen Timer手動解除（v2.20）
+
+macOS 版で実装済みの 2 つの改善を Windows 版に移植し、バッファ衛生と介入 UX を向上。
+
+### IME ポーズ中のイベント破棄（`lib.rs`）
+
+従来は IME 候補ウィンドウ表示中（ポーズ中）も `extractor.process_event()` が無条件に呼ばれ、バッファにイベントが蓄積されていた。ポーズ解除時に `extractor.reset()` で全消去されるため、蓄積は完全に無駄だった。
+
+**修正:** `engine.get_paused()` が `true` の場合、`process_event()` の呼び出しをスキップ。生キーイベントの NDJSON ログ記録は継続（ログはバッファ管理とは独立）。ポーズ解除時の `extractor.reset()` + クリーン再開パスは不変。
+
+### Zen Timer 手動解除（`wall_server.rs`）
+
+従来のスマートフォンタイマーは 2 分間のカウントダウン終了時に自動で `/unlock` を POST していた。これではユーザーがデスクに座ったまま 2 分間待つだけで Wall が解除され、実際に離席・休憩するという介入の本来の目的が形骸化していた。
+
+**修正:** タイマーが 0:00 になると自動解除ではなく**「Unlock Wall」ボタン**が表示される。ユーザーが意識的にボタンをタップして初めて Wall が解除される。
+
+### スマートフォン接続イベント（`wall_server.rs`）
+
+フロントエンド（Overlay.tsx）が既に `wall-phone-connected` イベントをリッスンしていたが、バックエンドがこのイベントを一度も発行していなかった。
+
+**修正:** `/shake` エンドポイント（QR コードスキャン時）で `app.emit("wall-phone-connected", ())` を発行。接続バッジが正しく表示されるようになった。
+
+### Screen Wake Lock（`wall_server.rs`）
+
+スマートフォンのタイマーページで `navigator.wakeLock.request('screen')` を要求し、カウントダウン中の画面自動消灯を防止。`visibilitychange` イベントで復帰時にも再取得。非対応ブラウザでは静かにフォールバック。
+
+---
+
+## Zen Timer早期解除ボタン（v2.21）
+
+Zen Timer のスマートフォンページに、2 分間のカウントダウン中に常時表示される控えめな**早期解除ボタン**（「早期解除する」）を追加。緊急時にタイマー完了を待たずに Wall を即座に解除可能にする。
+
+- **通常フロー（不変）:** タイマーが 0:00 に到達すると目立つ緑色の「Unlock Wall」ボタンが表示される。この時点で早期解除ボタンは非表示になる。
+- **早期解除フロー（新規）:** カウントダウン中に控えめなボタンをタップすると、同じ `/unlock` エンドポイントを呼び出して Wall を解除する。
+- **二重解除防止:** 共有 `done` フラグにより、どちらのボタンが押されても `/unlock` POST は1回のみ実行される。
+- **視覚的階層:** 早期解除ボタンは透明背景に薄いボーダーのセカンダリデザインを採用し、フル休憩の完了を暗に推奨する。
+
+この変更は `wall_server.rs` の `TIMER_HTML_TEMPLATE` 文字列内（HTML/CSS/JS のみ）に限定。Rust ロジック、サーバールーティング、フロントエンドコードの変更なし。
+
+---
+
+## macOS 介入オーバーレイのクリック受理修正とプローブ窓クランプ（v2.22）
+
+macOS 固有のオーバーレイ不具合 2 件と、較正ラベルを静かに失っていた OS 非依存の窓クランプ不具合を修正した。
+
+**オーバーレイのクリック透過（macOS）。** プローブ/Nudge カードは表示されるがボタンが効かず、クリックが背後アプリへ素通りしていた。真因は複合だが、即時の引き金は Tauri capability の不足だった。
+
+- **capability（主因）:** overlay 窓に `core:window:allow-set-size` / `allow-set-position` が無く、box 縮小の `setSize` が `setOverlayInteractive(true)` の**前に** permission 例外を投げ、`ignoresMouseEvents` が解除されないままだった。2 権限を追加し、不要になった `allow-hide` / `allow-maximize` を除去。
+- **NSPanel 化:** overlay を非アクティブ `NSPanel`（`tauri-nspanel`・Floating level）へ変換し、key 窓にならなくてもクリックが WKWebView へ配送されるようにした。新規 `src-tauri/src/overlay_panel.rs`。
+- **クリック受理は Rust 権威:** JS の `setIgnoreCursorEvents` は NSPanel 化窓で実効しないため、`set_overlay_interactive` が `set_ignore_mouse_events` + `resign_key_window` を直接呼ぶ。
+- **フォーカス非奪取:** `show()` が panel を key 化して前面エディタのタイピングフォーカスを奪うため、`resign_key_window()` で即座に key を返す。`isKeyWindow=false` を確認。
+- **idle で hide しない:** hide すると webview の JS が休眠し `probe_triggered` を取りこぼすため、透明＋クリック透過で表示したまま生かす。
+- **NSPanel で maximize 禁止:** `maximize()` / `unmaximize()` は `setStyleMask:` 経由でクラッシュ（NSRangeException）。全画面化は明示 `setSize` / `setPosition` で行う。
+
+**プローブ窓クランプ（OS 非依存）。** プローブ/マーカーがセッション開始 5 秒以内に発火すると、`record_realtime_*` が `window_end_ms must be >= window_start_ms` でラベルを弾いていた。`self_marker_window_clamped` が窓**始端**だけを `session_start` にクランプし、終端を `t − 5 秒` のまま残したため、セッションが 5 秒より若いと反転していた。終端も（`we = we.max(ws)`）クランプしてゼロ幅窓に畳む（＝「開始前データなし」を正しく表現）よう修正。実スケジューラのプローブは 31 秒ウォームアップで非該当、M/D 自己マーカーの起動直後ラベル損失も同時に解消。回帰テスト追加。
+
+変更箇所（backend）: `overlay_panel.rs`（新規）/ `lib.rs` / `analysis/probe_scheduler.rs` / `capabilities/default.json`。frontend: `Overlay.tsx`。検証: lib テスト 228 件パス、リプレイ snapshot 不変（HMM 不変）、実機スモーク。`docs/verification-runbook.md` §2 参照。
+
+---
