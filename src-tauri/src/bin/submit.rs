@@ -14,7 +14,7 @@
 //! `cargo build --features package --bin gse-submit` でビルドする。
 
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use gse_next_lib::packaging::{
@@ -70,6 +70,40 @@ fn resolve_recipient_source(cli_recipient: Option<String>) -> Result<String, Str
 const USAGE: &str = "usage: gse-submit [--recipient <age1...|file>] [--out <dir>]\n\
      最新セッションを自動検出して匿名化+暗号化し提出物 (.age) を生成します。";
 
+/// 生成した `.age` をファイルマネージャで **選択状態** で開く (best-effort)。
+/// 被験者が「ファイルが見当たらない」事故 (OneDrive/iCloud の Documents リダイレクトで
+/// Explorer/Finder の「ドキュメント」が別実体を指す) を防ぐため、実体の場所を直接見せる。
+/// 失敗しても提出自体は成功しているので無視する (戻り値なし)。
+fn reveal_in_file_manager(path: &Path) {
+    #[cfg(target_os = "windows")]
+    {
+        // `explorer /select,"<file>"` でフォルダを開き当該ファイルを選択する。
+        // 注意: 通常の `.arg()` は arg 全体を二重引用符で括るため `"/select,C:\...\田中 太郎\x.age"`
+        // となり explorer が選択に失敗する (引用符が /select の前に来る形を解釈しない既知挙動)。
+        // raw_arg で `/select,"<path>"` (引用符はパス側) を手組みし、スペースを含む実体ホームでも
+        // 確実に選択させる。
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("explorer")
+            .raw_arg(format!("/select,\"{}\"", path.display()))
+            .spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // `open -R <file>` で Finder に reveal (ファイル選択状態)。
+        let _ = std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn();
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // Linux: ファイル選択 API は環境依存なので親フォルダを開く。
+        if let Some(dir) = path.parent() {
+            let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
+        }
+    }
+}
+
 /// `Ok(None)` = --help を表示した (正常終了)。`Ok(Some(_))` = 提出物を生成した。
 fn run() -> Result<Option<gse_next_lib::packaging::PackageReport>, String> {
     let (cli_recipient, cli_out, help) = parse_args()?;
@@ -123,12 +157,20 @@ fn main() -> ExitCode {
                     String::new()
                 },
             );
-            let _ = writeln!(o, "  提出ファイル: {}", r.out_path.display());
+            let _ = writeln!(o, "\n  提出ファイルの場所:\n    {}\n", r.out_path.display());
+            let _ = writeln!(
+                o,
+                "  ※ 上の場所が「ドキュメント」フォルダに見当たらない場合、OneDrive(Windows) / \n\
+                 iCloud(mac) でドキュメントの保存先が変更されている可能性があります。\n\
+                 上の絶対パスを直接たどってください。フォルダを自動で開きます。"
+            );
             let _ = writeln!(
                 o,
                 "→ このファイルを研究者の Dropbox File Request に提出してください。\n\
                  (中身は匿名化済みで、研究者の鍵でしか開けません)"
             );
+            // 生成物をファイルマネージャで選択状態にして「見当たらない」を防ぐ (best-effort)。
+            reveal_in_file_manager(&r.out_path);
             ExitCode::SUCCESS
         }
         Err(e) => {
