@@ -7,7 +7,7 @@
 //! スレッド起動・emit・ログ送信・実時刻取得は呼び出し側 (`lib.rs`) の責務
 //! (architecture-rules: 純粋スケジューリングは analysis/ に閉じ OS API を呼ばない)。
 //!
-//! # スケジューリング方式 (DB-1: 同次 Poisson + rolling thinning)
+//! # スケジューリング方式 (DB-1: 同次 Poisson + rolling thinning + soft max-gap)
 //!
 //! 指数間隔 (逆変換 `-ln(1-u)/λ`) で次候補時刻を抽選し、候補到来時に制約判定する:
 //! - **away**: `idle_ms ≥ away_idle_ms` (離席, v0.3 §4.3) は適格外 → 棄却 (thin)
@@ -17,6 +17,24 @@
 //! 棄却時は次候補を再抽選するだけで発火しない。全制約を満たした候補のみ発火する。
 //! 同次 Poisson は「件数条件付きで時刻が一様」= 一様ランダムの教科書的生成法であり、
 //! `probe_assignment.scheduled_ts` の実現分布から一様性を監査証明しやすい (D-14)。
+//!
+//! ## soft max-gap (DB-15): 枯渇 (early-cluster→drought) の是正
+//!
+//! 純・同次 Poisson は指数分布の長い裾により**初期にクラスタし以降数十分枯渇する**
+//! (実機 v2 で観測: 序盤に 2 回続けて出た後ほぼ出ない)。候補間隔を `max_gap_ms` で
+//! **上限クランプ** (censored exponential: 打ち切り点に確率質量が乗る。再正規化はしない)
+//! することで、候補は必ず `max_gap_ms` 以内に到来し、セッション全体へ均一にカバレッジが
+//! 広がる。これは ESM の **stratified random sampling** (各時間ブロックに 1 回ランダム) に
+//! 相当する標準手法で、間隔上限を設ける代わりにブロック内タイミングのランダム性
+//! (= 認知状態との独立性) を**概ね**保つ (完全独立ではない: 打ち切り点の確率質量が弱い
+//! 周期性を生み、作業状態が時間帯と相関する場合に僅かな歪みが残る。decisions.md D3)。
+//! 一様性 (条件付き一様) の厳密さは緩むが、これは
+//! 「均等カバレッジ」とのトレードオフであり、X1 較正にとっては枯渇による偏りの方が有害
+//! である (decisions.md D3 / research-positioning §4)。
+//!
+//! ※実効発火レートは名目 λ を上回る: max_gap クランプが間隔の floor を、cap_window 短縮
+//! (30→20min) が cap 天井 (4/h→6/h) を引き上げる。名目 λ は逆変換の基準レートであって
+//! 実現分布の平均ではない (decisions.md D2 のレート注記)。
 //!
 //! 自己マーカー (hotkey) はスケジュール対象外で、窓計算 ([`self_marker_window`]) のみ提供する。
 
@@ -117,14 +135,21 @@ impl ProbeId {
 /// スケジューラ制約 (v0.3 §4.3)。既定値は設計書の値。
 #[derive(Debug, Clone, Copy)]
 pub struct ProbeConfig {
-    /// 単位時間あたり発火率 (1/ms)。λ≈2回/30分 = 1/900_000。
+    /// 逆変換サンプリングの基準レート (1/ms)。λ≈2回/30分 = 1/900_000。名目値であり、
+    /// max_gap クランプと cap_window で実効発火レートは λ を上回る (モジュール doc 参照)。
     pub lambda_per_ms: f64,
-    /// 最小発火間隔 (ms)。既定 8 分。
+    /// 最小発火間隔 (ms)。既定 6 分 (密集と窓重複の抑止)。
     pub gap_min_ms: u64,
-    /// cap 判定ウィンドウ (ms)。既定 30 分。
+    /// cap 判定ウィンドウ (ms)。既定 20 分。短いほど cap による dead-zone が短く、
+    /// 「2 連発→以降長時間枯渇」の枯渇期間が縮む (旧 30 分→20 分)。
     pub cap_window_ms: u64,
-    /// cap ウィンドウ内の最大発火数。既定 2。
+    /// cap ウィンドウ内の最大発火数。既定 2 (バースト抑止)。
     pub cap_count: usize,
+    /// soft max-gap (ms)。候補間隔をこの値で打ち切り、指数分布の長い裾が生む数十分の
+    /// 枯渇を防ぐ (DB-15)。既定 22 分。`max_gap_ms >= gap_min_ms` を要する
+    /// (下回ると候補が gap で連続棄却され意味をなさない)。u64::MAX で打ち切り無効
+    /// (= 純・同次 Poisson、テスト用)。
+    pub max_gap_ms: u64,
     /// 離席とみなす idle しきい値 (ms)。既定 180_000 (intervention.rs AWAY_IDLE_MS と一致)。
     pub away_idle_ms: u64,
     /// ウォームアップ: セッション開始からこの時間が経つまでプローブを発火しない (ms)。
@@ -137,11 +162,12 @@ pub struct ProbeConfig {
 impl Default for ProbeConfig {
     fn default() -> Self {
         Self {
-            lambda_per_ms: 2.0 / (30.0 * 60.0 * 1000.0), // 2回/30分
-            gap_min_ms: 8 * 60 * 1000,                   // 8 分
-            cap_window_ms: 30 * 60 * 1000,               // 30 分
+            lambda_per_ms: 2.0 / (30.0 * 60.0 * 1000.0), // 2回/30分 (基準レート・名目)
+            gap_min_ms: 6 * 60 * 1000,                   // 6 分
+            cap_window_ms: 20 * 60 * 1000,               // 20 分
             cap_count: 2,
-            away_idle_ms: 180_000,          // 3 分
+            max_gap_ms: 22 * 60 * 1000, // 22 分 soft max-gap (枯渇防止 DB-15)
+            away_idle_ms: 180_000,      // 3 分
             min_session_elapsed_ms: 31_000, // ランダムプローブ窓 (t−31s) の全長
         }
     }
@@ -190,6 +216,14 @@ impl ProbeScheduler {
             config.lambda_per_ms
         );
         debug_assert!(config.cap_count >= 1, "cap_count must be >= 1");
+        // soft max-gap は gap_min を下回ってはならない (下回ると打ち切られた候補が
+        // 常に gap で棄却され発火が止まる)。DB-15。
+        debug_assert!(
+            config.max_gap_ms >= config.gap_min_ms,
+            "max_gap_ms ({}) must be >= gap_min_ms ({})",
+            config.max_gap_ms,
+            config.gap_min_ms
+        );
         let first = session_start_ms.saturating_add(Self::sample_interval_ms(&mut rng, &config));
         Self {
             rng,
@@ -210,12 +244,16 @@ impl ProbeScheduler {
     /// 指数分布の逆変換サンプリング: `interval = -ln(1-u)/λ`。
     /// `u→1` で `1-u→0` となり `ln(0)=-inf` に発散するため、`1-u` を `f64::EPSILON` で
     /// 下限クランプして無限大を防ぐ (発散は `u→1` 側のみで起きる)。
+    ///
+    /// soft max-gap (DB-15): 間隔を `max_gap_ms` で上限クランプ (censored exponential:
+    /// 打ち切り点に確率質量。再正規化なし)。候補は必ず `max_gap_ms` 以内に到来し、指数裾
+    /// による数十分の枯渇を防ぐ。「均等カバレッジ」と「条件付き一様性」のトレードオフ (D3)。
     fn sample_interval_ms(rng: &mut StdRng, config: &ProbeConfig) -> u64 {
         let u: f64 = rng.gen::<f64>();
         let one_minus_u = (1.0 - u).max(f64::EPSILON);
         let interval = -one_minus_u.ln() / config.lambda_per_ms;
-        // 最低 1ms (0 間隔の連続発火を避ける)。上限は設けない (Poisson 裾を歪めない)。
-        interval.max(1.0) as u64
+        // 上限 max_gap_ms で打ち切り、最低 1ms (0 間隔の連続発火を避ける)。
+        interval.min(config.max_gap_ms as f64).max(1.0) as u64
     }
 
     /// 1 ティック進める。発火確定時のみ `Some(FiredProbe)` を返す。
@@ -275,9 +313,19 @@ mod tests {
     const SESSION_START: u64 = 1_700_000_000_000;
     const MIN: u64 = 60_000;
 
-    /// seeded で長時間シミュレートし発火時刻列を集める (idle 固定)。
+    /// seeded で長時間シミュレートし発火時刻列を集める (default config, idle 固定)。
     fn simulate(seed: u64, horizon_ms: u64, idle_ms: u64) -> Vec<FiredProbe> {
-        let mut sched = ProbeScheduler::from_seed(seed, ProbeConfig::default(), SESSION_START);
+        simulate_cfg(seed, horizon_ms, idle_ms, ProbeConfig::default())
+    }
+
+    /// config 指定版シミュレータ。
+    fn simulate_cfg(
+        seed: u64,
+        horizon_ms: u64,
+        idle_ms: u64,
+        config: ProbeConfig,
+    ) -> Vec<FiredProbe> {
+        let mut sched = ProbeScheduler::from_seed(seed, config, SESSION_START);
         let mut fires = Vec::new();
         let mut now = SESSION_START;
         let end = SESSION_START + horizon_ms;
@@ -290,34 +338,140 @@ mod tests {
         fires
     }
 
+    /// 発火列とセッション端から「連続する空白 (start→first / fire→fire / last→end)」の
+    /// 最大値を求める。枯渇 (drought) の指標。
+    fn max_coverage_gap_ms(fires: &[FiredProbe], horizon_ms: u64) -> u64 {
+        let mut pts = vec![SESSION_START];
+        pts.extend(fires.iter().map(|f| f.scheduled_ts));
+        pts.push(SESSION_START + horizon_ms);
+        pts.windows(2).map(|w| w[1] - w[0]).max().unwrap_or(0)
+    }
+
     #[test]
-    fn gap_between_fires_is_at_least_8min() {
-        // 複数 seed で 8 時間シミュレート。連続発火間隔は常に ≥8 分。
+    fn gap_between_fires_is_at_least_gap_min() {
+        // 複数 seed で 8 時間シミュレート。連続発火間隔は常に ≥gap_min (既定 6 分)。
+        let gap_min = ProbeConfig::default().gap_min_ms;
         for seed in 0..8u64 {
             let fires = simulate(seed, 8 * 60 * MIN, 0);
             for w in fires.windows(2) {
                 let gap = w[1].scheduled_ts - w[0].scheduled_ts;
                 assert!(
-                    gap >= 8 * MIN,
-                    "seed {seed}: gap {gap}ms < 8min between fires"
+                    gap >= gap_min,
+                    "seed {seed}: gap {gap}ms < gap_min {gap_min}ms between fires"
                 );
             }
         }
     }
 
     #[test]
-    fn cap_at_most_2_per_any_30min_window() {
+    fn cap_at_most_cap_count_per_cap_window() {
+        // 任意の cap_window (既定 20 分) ローリング窓内の発火数は cap_count (既定 2) 以下。
+        let cfg = ProbeConfig::default();
         for seed in 0..8u64 {
             let fires = simulate(seed, 8 * 60 * MIN, 0);
             let ts: Vec<u64> = fires.iter().map(|f| f.scheduled_ts).collect();
-            // 各発火を起点に [t, t+30min) 内の発火数を数える。
             for (i, &t0) in ts.iter().enumerate() {
-                let count = ts[i..].iter().take_while(|&&t| t < t0 + 30 * MIN).count();
+                let count = ts[i..]
+                    .iter()
+                    .take_while(|&&t| t < t0 + cfg.cap_window_ms)
+                    .count();
                 assert!(
-                    count <= 2,
-                    "seed {seed}: {count} fires within a 30min window"
+                    count <= cfg.cap_count,
+                    "seed {seed}: {count} fires within a cap_window ({}min)",
+                    cfg.cap_window_ms / MIN
                 );
             }
+        }
+    }
+
+    #[test]
+    fn soft_max_gap_truncates_candidate_intervals() {
+        // DB-15: 候補間隔は常に max_gap_ms 以下 (truncated exponential)。
+        let cfg = ProbeConfig::default();
+        let mut rng = StdRng::seed_from_u64(1234);
+        for _ in 0..100_000 {
+            let iv = ProbeScheduler::sample_interval_ms(&mut rng, &cfg);
+            assert!(
+                iv <= cfg.max_gap_ms,
+                "candidate interval {iv}ms exceeds max_gap_ms {}ms",
+                cfg.max_gap_ms
+            );
+        }
+    }
+
+    #[test]
+    fn pure_poisson_droughts_but_default_config_does_not() {
+        // 回帰 (バグ再現 + 是正): 同じ seed で旧パラメータ (純・同次 Poisson:
+        // gap8/cap2-per-30min/打ち切り無効) は「初期クラスタ→以降数十分枯渇」を生み、
+        // 既定 config (soft max-gap 22min + cap 20min) はカバレッジ空白を有界化する。
+        let horizon = 120 * MIN;
+        let old = ProbeConfig {
+            lambda_per_ms: 2.0 / (30.0 * 60.0 * 1000.0),
+            gap_min_ms: 8 * MIN,
+            cap_window_ms: 30 * MIN,
+            cap_count: 2,
+            max_gap_ms: u64::MAX, // 打ち切り無効 = 純・同次 Poisson (旧挙動)
+            away_idle_ms: 180_000,
+            min_session_elapsed_ms: 31_000,
+        };
+        // 是正後は全 seed で空白が default cap_window+max_gap+小余裕 (≤45min) に収まる。
+        // bound は検証対象 = default config の cap_window(20min) を使う (old の 30min ではない)。
+        let bound = ProbeConfig::default().cap_window_ms + 22 * MIN + 3 * MIN; // 20+22+3 = 45min
+        let mut old_max_drought = 0u64;
+        for seed in 0..64u64 {
+            let new_fires = simulate(seed, horizon, 0);
+            let new_gap = max_coverage_gap_ms(&new_fires, horizon);
+            assert!(
+                new_gap <= bound,
+                "seed {seed}: default config coverage gap {new_gap}ms exceeds {bound}ms"
+            );
+            let old_fires = simulate_cfg(seed, horizon, 0, old);
+            old_max_drought = old_max_drought.max(max_coverage_gap_ms(&old_fires, horizon));
+        }
+        // バグ再現: 旧パラメータは (この seed 集合で) 是正後の上限を超える枯渇を生む。
+        assert!(
+            old_max_drought > bound,
+            "expected pure-Poisson to produce a drought > {bound}ms, max was {old_max_drought}ms"
+        );
+    }
+
+    #[test]
+    fn fires_spread_across_whole_session_not_just_early() {
+        // 一様性監査: 90 分セッションで発火がセッション後半にも十分散らばる
+        // (初期クラスタ→枯渇でない)。全 seed 合算で後半 (45-90min) の発火が
+        // 全体の 35% 以上を占める。
+        let horizon = 90 * MIN;
+        let mut first_half = 0usize;
+        let mut second_half = 0usize;
+        for seed in 0..200u64 {
+            for f in simulate(seed, horizon, 0) {
+                if f.session_elapsed_ms <= 45 * MIN {
+                    first_half += 1;
+                } else {
+                    second_half += 1;
+                }
+            }
+        }
+        let total = first_half + second_half;
+        assert!(total > 0, "no fires collected");
+        let second_frac = second_half as f64 / total as f64;
+        assert!(
+            second_frac >= 0.35,
+            "second-half fires only {:.1}% of total ({second_half}/{total}); probes clustered early",
+            second_frac * 100.0
+        );
+    }
+
+    #[test]
+    fn default_config_never_empty_over_typical_session() {
+        // 枯渇是正: アクティブな 60 分セッションで全 seed が ≥1 発火 (純 Poisson は
+        // 低レートゆえ稀に 0 発火だった)。
+        for seed in 0..256u64 {
+            let fires = simulate(seed, 60 * MIN, 0);
+            assert!(
+                !fires.is_empty(),
+                "seed {seed}: no probe fired over a 60min active session"
+            );
         }
     }
 
@@ -376,6 +530,7 @@ mod tests {
             gap_min_ms: 0,
             cap_window_ms: 1,
             cap_count: usize::MAX,
+            max_gap_ms: u64::MAX,
             away_idle_ms: 180_000,
             min_session_elapsed_ms: 0,
         };
@@ -411,6 +566,7 @@ mod tests {
             gap_min_ms: 0,
             cap_window_ms: 1,
             cap_count: usize::MAX,
+            max_gap_ms: u64::MAX,
             away_idle_ms: 180_000,
             min_session_elapsed_ms: 0,
         };
@@ -585,6 +741,7 @@ mod tests {
             gap_min_ms: 0,
             cap_window_ms: 1,
             cap_count: usize::MAX,
+            max_gap_ms: u64::MAX,
             away_idle_ms: u64::MAX,
             min_session_elapsed_ms: 31_000,
         };
