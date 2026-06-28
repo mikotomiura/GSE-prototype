@@ -52,7 +52,9 @@ pub fn convert_overlay_to_panel<R: Runtime>(window: &WebviewWindow<R>) -> tauri:
     panel.set_level(NS_FLOATING_WINDOW_LEVEL);
 
     // 全 Space + フルスクリーンアプリ上に重ねる。Wall (全画面ブロック) を Space 切替で
-    // 回避されないためにも望ましい。カードは画面外退避するので常駐コストは無視できる。
+    // 回避されないためにも望ましい。idle (Probe/Nudge/Wall 非表示) 時は Overlay.tsx が窓を
+    // 画面外 (-20000,-20000) + 1x1 へ退避するので、常駐窓が背後クリックを奪わない・常駐コストも
+    // 無視できる (CanJoinAllSpaces のまま退避するため Space 切替でも露出しない)。
     panel.set_collection_behaviour(
         NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
             | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary,
