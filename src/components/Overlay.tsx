@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { getCurrentWindow, currentMonitor } from "@tauri-apps/api/window";
+import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -12,11 +12,22 @@ const PROBE_BOX_W = 390;
 const PROBE_BOX_H = 430;
 const PROBE_BOX_MARGIN = 12;
 
+// idle 時にオーバーレイ窓を退避させる画面外座標 (physical px)。全モニタ構成の左上外側へ十分
+// 負方向に振る (revert された card 窓方式と同値・design.md)。幾何的に画面と重ならないため、
+// ignoresMouseEvents の tri-state バグや OS 退行 (Tahoe 26.x) に依らず背後クリックを奪わない。
+const OFFSCREEN_POS = -20000;
+
 // overlay のクリック受理切替。macOS では NSPanel 化窓で JS の setIgnoreCursorEvents が実効しない
 // ため、Rust 権威の set_overlay_interactive コマンド経由で ignoresMouseEvents を設定する (D9)。
 // interactive=true: カード/Wall がクリックを捕捉 / false: 背後アプリへ透過。
 const setOverlayInteractive = (interactive: boolean): Promise<unknown> =>
     invoke("set_overlay_interactive", { interactive });
+
+// show 時のモニタ解決。idle 退避 (画面外 -20000,-20000) で窓がどのモニタとも交差しないと
+// macOS の currentMonitor() は null を返す (NSWindow.screen()==nil) ため、primaryMonitor() へ
+// フォールバックする。これがないと退避後の初回 probe/Wall で setPosition がスキップされ、
+// カードが画面外に留まる / Wall が全画面化しない退行が起きる (窓位置に依存しない解決にする)。
+const resolveShowMonitor = async () => (await currentMonitor()) ?? (await primaryMonitor());
 
 // Nudge は応答 (dismiss ボタン) があるまで消えない。無応答が続いたらこの時間で
 // 自動フェード = silent 記録 (HCI: 自動消滅でユーザーが応答できない問題の回避 + CD7 silent 送出)。
@@ -146,7 +157,10 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         // 失敗して NSRangeException でクラッシュする (実機確認・D8)。明示サイズはタスクバーごと全被覆=
         // Wall の全ブロック意図にも合致する。
         const applyFullscreenBlock = async () => {
-            const mon = await currentMonitor();
+            // 退避後は窓が画面外のため currentMonitor() が null になりうる。primaryMonitor()
+            // フォールバックで mon を必ず得て setPosition/setSize を確実に走らせる
+            // (mon が null だと Wall が 1x1 offscreen のまま=全画面ブロック不成立になる退行を防ぐ)。
+            const mon = await resolveShowMonitor();
             if (cancelled) return;
             if (mon) {
                 await win.setPosition(new PhysicalPosition(mon.position.x, mon.position.y));
@@ -165,6 +179,25 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             // overlay の中身は idle 時すべて非表示 (ProbeCard=null / Nudge=opacity0 / Wall 非描画) なので
             // 透明窓として不可視・無害。被験者のクリックは背後アプリへ透過する。
             if (!visible) {
+                // 一次ガード (幾何退避): 窓を画面外 + 1x1 へ退避し、背後アプリと重なる領域を
+                // 物理的に消す。これにより ignoresMouseEvents の tri-state バグや OS 退行に
+                // 依らず背後クリックを奪わない (design.md 多層防御)。hide()/orderOut は使わない
+                // (D10: webview JS 休眠で probe_triggered 取りこぼし) — 窓は出したまま退避する。
+                // 二次ガードの setOverlayInteractive(false) とは try/catch を分け、panel 変換失敗で
+                // ignoresMouseEvents が設定できない場合でも退避だけは効かせて全画面ブロックを断つ
+                // (= 旧実装の「panel 失敗→idle throw→全画面透明窓が全クリック奪取」増幅条件の遮断)。
+                // cancelled ガード: idle→show 遷移で本 effect が stale 化した場合、退避が後続の
+                // show (box/全画面) を上書きしないよう各 await 後に中断する。
+                try {
+                    await win.setPosition(new PhysicalPosition(OFFSCREEN_POS, OFFSCREEN_POS));
+                    if (cancelled) return;
+                    await win.setSize(new PhysicalSize(1, 1));
+                    if (cancelled) return;
+                } catch (e) {
+                    console.warn("overlay idle offscreen retreat failed:", e);
+                    if (cancelled) return;
+                }
+                // 二次ガード (ignoresMouseEvents=YES)。退避の成否と独立に必ず試す。
                 try {
                     await setOverlayInteractive(false);
                 } catch (e) {
@@ -179,7 +212,10 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     // 右上小ボックス化 → カード外は他アプリへクリックが通る (非ブロック)。
                     // unmaximize() は使わない (maximize と同じく NSPanel + WKWebView でクラッシュ。D8)。
                     // 全画面状態からの復帰も下の明示 setSize で box サイズへ直接縮小すれば足りる。
-                    const mon = await currentMonitor();
+                    // 退避後は窓が画面外で currentMonitor() が null になりうるため primaryMonitor()
+                    // フォールバック (resolveShowMonitor)。これで下の setPosition (if (mon) 内) が
+                    // 確実に走り、カードがオンスクリーン右上へ復帰する (画面外残留=不可視を防ぐ)。
+                    const mon = await resolveShowMonitor();
                     if (cancelled) return;
                     const scale = mon?.scaleFactor ?? 1;
                     await win.setSize(
