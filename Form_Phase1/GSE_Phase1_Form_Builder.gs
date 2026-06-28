@@ -915,8 +915,10 @@ function buildManagementSheet() {
   buildLinksTab_(ss, props); // 毎回 URL を再集約（手動入力セルは保持）
   buildRosterTab_(ss); // 既存があれば作らない（入力データを破壊しない）
   buildSubmissionTab_(ss); // 同上
-  applyRosterValidation_(ss); // 毎回: condition/OS/撤回 のドロップダウン・条件付き書式
+  // ダッシュボードはロスターを「読む」だけ。ドロップダウン(=新 Sheets の「列の型」)を付ける前に
+  // 読むことで、型付き列に起因する読込エラーの土俵に乗らない（保険・読みは本来例外を投げないが順序を固定）。
   buildDashboardTab_(ss); // 毎回: 進捗ダッシュボード（集計式は再描画）
+  applyRosterValidation_(ss); // 最後: condition/OS/撤回 のドロップダウン・条件付き書式（型安全な順）
 
   ["シート1", "Sheet1"].forEach(function (n) {
     var s = ss.getSheetByName(n);
@@ -926,6 +928,24 @@ function buildManagementSheet() {
   Logger.log("✅ 管理シート作成/更新完了");
   Logger.log("🔗 " + ss.getUrl());
   return ss.getUrl();
+}
+
+// 壊れた運用管理シートを捨て、まっさらな新スプレッドシート(新URL)を作り直す（手動実行）。
+// 「列の型」で壊れて読み書きできなくなった既存シートから完全に離脱するための入口。
+// MGMT_SHEET_PROP を消すと buildManagementSheet が SpreadsheetApp.create で新規作成する。
+// フォーム URL は別管理（FORM_ID / 短縮URL / 公開用リンク集）なので一切影響しない。
+// 旧シートは削除せず Drive に残す（PII 保全。中身を移したい場合は手動コピー、不要なら手動削除）。
+function recreateManagementSheet() {
+  var props = PropertiesService.getScriptProperties();
+  var oldId = props.getProperty(MGMT_SHEET_PROP);
+  props.deleteProperty(MGMT_SHEET_PROP); // 次の build で新規作成させる
+  if (oldId) {
+    Logger.log("🗂 旧管理シート（残置・必要なら手動でデータ移行/削除）: " +
+      "https://docs.google.com/spreadsheets/d/" + oldId);
+  }
+  var url = buildManagementSheet(); // 新規スプレッドシートを作成し新URLを返す
+  Logger.log("🆕 新しい運用管理シート（このURLを今後使う）: " + url);
+  return url;
 }
 
 // --- タブ: リンク集（フォーム URL を自動集約 + Dropbox File Request URL は手動セル）---
@@ -1014,6 +1034,127 @@ function buildRosterTab_(ss) {
   sh.setColumnWidth(1, 70);
   sh.setColumnWidth(2, 150);
   sh.setColumnWidth(3, 210);
+}
+
+// 参加者ロスターの 14 列ヘッダ（buildRosterTab_ と単一情報源で共有）。
+// nextParticipantId_ / appendRosterRow_ / refreshRosterStatus が列順に依存するため変更不可。
+var ROSTER_HEADER = [
+  "P-ID", "氏名/ニックネーム", "メール", "OS", "条件(baseline/intervention)",
+  "F1同意日", "F2事前", "セッション数", "F4回答(計)", "F5事後",
+  "Dropbox提出", "NDA署名", "撤回/除外", "備考",
+];
+
+// ============================================================
+// 参加者ロスターを「おしゃれな」デザインで作り直す（手動実行）。
+// ============================================================
+// 新しい Google Sheets が列に「型(typed column)」を付けると、既存ロスターへの
+// setDataValidation / setConditionalFormatRules / 一部の読み書きが
+// 「型付きの列のセルに対してこの操作を行うことはできません」で失敗する。
+// 増分パッチでは剥がしきれないため、列の型が一切付いていない新規シートへ移行する。
+//
+// 安全性: 旧シートは**削除せず** "_backup_<日時>" にリネームして退避（実名↔P-ID の PII を保全）。
+// データは**ヘッダ名で対応付け**て復元するので、列順がずれていても壊れない。
+// 読み取りが型エラーで失敗しても、新シート作成は続行し旧シートは backup に残る（手動コピー可）。
+function rebuildRoster() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (!ssId) {
+    Logger.log("❌ 管理シート未作成です。先に buildManagementSheet() を実行してください。");
+    return;
+  }
+  var ss = SpreadsheetApp.openById(ssId);
+  rebuildRosterTab_(ss);
+  Logger.log("🔗 " + ss.getUrl());
+  return ss.getUrl();
+}
+
+function rebuildRosterTab_(ss) {
+  var name = "参加者ロスター";
+  var header = ROSTER_HEADER;
+
+  // 1) 既存データをヘッダ名で退避（型エラーなら諦めて backup を残す）。
+  var old = ss.getSheetByName(name);
+  var dataRows = [];
+  var backupName = "";
+  if (old) {
+    try {
+      var hr = rosterHeaderRow_(old);
+      var lastRow = old.getLastRow();
+      var lastCol = Math.max(old.getLastColumn(), header.length);
+      if (hr && lastRow > hr) {
+        var grid = old.getRange(hr, 1, lastRow - hr + 1, lastCol).getValues();
+        var oldHeader = grid[0].map(function (s) { return String(s).trim(); });
+        var pidCol = oldHeader.indexOf("P-ID");
+        var colIdx = header.map(function (h) { return oldHeader.indexOf(h); });
+        for (var i = 1; i < grid.length; i++) {
+          var row = grid[i];
+          if (pidCol < 0 || String(row[pidCol]).trim() === "") continue; // P-ID 空行は除外
+          dataRows.push(header.map(function (h, c) {
+            var oi = colIdx[c];
+            return oi >= 0 ? row[oi] : "";
+          }));
+        }
+      }
+    } catch (e) {
+      Logger.log("⚠ 旧ロスター読込で例外（型付き列の可能性）。データ移行をスキップし backup を残します: " + e);
+    }
+    backupName = name + "_backup_" +
+      Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Asia/Tokyo", "yyyyMMdd_HHmmss");
+    old.setName(backupName); // 削除せず退避
+  }
+
+  // 2) 新規シートをおしゃれに作る（列の型なしのまっさら状態）。
+  var sh = ss.insertSheet(name);
+  var nCol = header.length;
+  var NAVY = "#1a3a5c", ACCENT = "#2f6db5", RED = "#c62828";
+
+  // 行1: 機密バナー（merge）。
+  sh.getRange(1, 1, 1, nCol).merge();
+  sh.getRange(1, 1)
+    .setValue("⚠ 実名・メール ↔ P-ID 対応表（研究者のみ）。共有・コミット禁止。" +
+      "外部送信は P-ID を単一キーにした集計値(metrics.json)・数値尺度(survey.csv)のみ。")
+    .setFontWeight("bold").setFontColor("#ffffff").setBackground(RED)
+    .setWrap(true).setVerticalAlignment("middle").setFontSize(11);
+  sh.setRowHeight(1, 46);
+
+  // 行2: ヘッダ（ネイビー地・白文字・中央）。
+  var head = sh.getRange(2, 1, 1, nCol);
+  head.setValues([header])
+    .setFontWeight("bold").setFontColor("#ffffff").setBackground(NAVY)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setFontSize(11).setWrap(true)
+    .setBorder(true, true, true, true, true, false, "#ffffff", SpreadsheetApp.BorderStyle.SOLID);
+  sh.setRowHeight(2, 36);
+  sh.setFrozenRows(2);
+  sh.setFrozenColumns(1); // P-ID 列は固定して横スクロールしても見失わない
+
+  // データ域: 控えめなストライプ（おしゃれな交互背景）。
+  var bandRows = 500;
+  var dataRange = sh.getRange(3, 1, bandRows, nCol);
+  dataRange.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
+
+  // 列幅と配置。
+  var widths = [70, 160, 220, 90, 195, 100, 80, 90, 95, 80, 110, 90, 90, 220];
+  for (var w = 0; w < widths.length; w++) sh.setColumnWidth(w + 1, widths[w]);
+  // 中央寄せ列（コード/数値/ステータス系）: A,D,E,G,H,I,J,K,L,M。
+  [1, 4, 5, 7, 8, 9, 10, 11, 12, 13].forEach(function (c) {
+    sh.getRange(3, c, bandRows, 1).setHorizontalAlignment("center");
+  });
+
+  // 3) データ復元。
+  if (dataRows.length) {
+    sh.getRange(3, 1, dataRows.length, nCol).setValues(dataRows);
+  }
+
+  // 4) ドロップダウン/条件付き書式は型安全な順（クリア→書式→検証）で適用。
+  applyRosterValidation_(ss);
+
+  // 新シートを先頭付近（リンク集の次）へ。
+  ss.setActiveSheet(sh);
+  try { ss.moveActiveSheet(2); } catch (e) { /* 位置調整は失敗しても無害 */ }
+
+  Logger.log("✅ 参加者ロスターを再作成しました（移行 " + dataRows.length + " 行）。" +
+    (backupName ? "旧シートは「" + backupName + "」に退避済み。" : ""));
 }
 
 // ロスターの「P-ID」ヘッダがある行番号を返す（バナー有無に依存しないため動的探索）。
@@ -1673,6 +1814,37 @@ function applyRosterValidation_(ss) {
   var startRow = hr + 1;
   var nRows = 500; // 入力余地を見込んで広めに検証範囲を張る
 
+  // 新しい Google Sheets では requireValueInList のドロップダウンが「列の型(typed column)」として
+  // 扱われ、再実行時に型付き列を含む範囲への setConditionalFormatRules / setDataValidation が
+  // 「型付きの列のセルに対してこの操作を行うことはできません」で失敗する。
+  // → ① 既存のデータ検証をクリアして列の型を外す ② 列が素の状態で条件付き書式を張る
+  //   ③ 最後にドロップダウン（データ検証）を張り直す、の順にして再実行耐性を持たせる。
+  var fullRange = sheet.getRange(startRow, 1, nRows, 14);
+  try {
+    fullRange.clearDataValidations(); // 前回実行で付いたドロップダウン型を除去
+  } catch (e) {
+    Logger.log("clearDataValidations をスキップ: " + e);
+  }
+
+  // ① 条件付き書式を先に適用（この時点で列はまだ型なし）。撤回/除外に値がある行をグレーアウト。
+  //    手動で「列の型(Data>列の型)」が設定されていると依然失敗しうるので、ここは致命にせず
+  //    ログに復旧手順を残して続行する（書式は装飾であり検証本体より優先度が低い）。
+  try {
+    var rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied("=$M" + startRow + '<>""') // M列=13列目=撤回/除外
+      .setBackground("#e0e0e0")
+      .setFontColor("#9e9e9e")
+      .setRanges([fullRange])
+      .build();
+    sheet.setConditionalFormatRules([rule]);
+  } catch (e) {
+    Logger.log(
+      "条件付き書式の適用をスキップ（型付き列の可能性）: " + e +
+        " — 参加者ロスターの該当列を選択し [データ]>[列の型] を「なし」に戻すと解消します。"
+    );
+  }
+
+  // ② データ検証（ドロップダウン）を最後に適用する。列はクリア済みなので型衝突しない。
   var condRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["baseline", "intervention"], true)
     .setAllowInvalid(false)
@@ -1696,16 +1868,6 @@ function applyRosterValidation_(ss) {
     .setAllowInvalid(true) // 空欄（=有効参加者）を許容
     .build();
   sheet.getRange(startRow, 13, nRows, 1).setDataValidation(exclRule); // 撤回/除外(col13)
-
-  // 撤回/除外に値がある行をグレーアウト（条件付き書式）。既存ルールは置き換える。
-  var range = sheet.getRange(startRow, 1, nRows, 14);
-  var rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied("=$M" + startRow + '<>""') // M列=13列目=撤回/除外
-    .setBackground("#e0e0e0")
-    .setFontColor("#9e9e9e")
-    .setRanges([range])
-    .build();
-  sheet.setConditionalFormatRules([rule]);
 }
 
 // P-ID の形式・重複を検証してログに警告する（手動実行）。条件付き書式での着色も行う。
