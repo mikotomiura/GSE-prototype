@@ -54,7 +54,8 @@ var APP_DOWNLOAD_INFO =
   "アプリ一式は研究者が用意した Google Drive（閲覧専用）からまとめて入手できます: https://x.gd/6crxj\n" +
   "       ・Windows: gse-next.exe（インストール不要のポータブル版。x64-setup.exe ではなくこちらを使用）\n" +
   "       ・macOS(Apple Silicon): gse-next_0.1.21_aarch64.dmg\n" +
-  "       ・暗号化ツール gse-package(.exe) と公開鍵 pubkey.txt（全員共通）も同じフォルダに同梱\n" +
+  "       ・提出ツール「提出する」ランチャ（提出する_mac.command / 提出する_win.bat）＋ gse-submit(.exe)\n" +
+  "         ＋ 公開鍵 pubkey.txt（全員共通）も同じフォルダに同梱（手動版 gse-package も同梱）\n" +
   "       初回セッションは研究者が同席し、起動・権限付与・初回警告の確認まで一緒に行います";
 var PUBKEY_SOURCE_INFO =
   "配布フォルダ同梱の pubkey.txt（研究者の age 公開鍵・全員共通）。" +
@@ -609,12 +610,14 @@ function buildF4() {
   pid.setRequired(true);
 
   // セッション番号
-  // ログ突合キーはログファイル名 gse_<YYYYMMDD_HHMMSS>.ndjson の日時部分に統一する（独自表記や
+  // ログ突合キーはログファイル名 gse_<YYYYMMDD_HHMMSS> の日時部分に統一する（独自表記や
   // "s03" 等の略記はログと一致せず join が壊れるため、提出ファイル名の日時をそのまま入力してもらう）。
   // ※ アプリ画面にセッションID表示は無いため「エディタ画面に表示」という旧文言は実態と不一致だった。
+  // ※ M0 凍結（2026-06-28）で提出は gse-submit ラッパーが生成する .age ファイルに統一。提出名は
+  //    P###_gse_<YYYYMMDD_HHMMSS>.age で、日時部分は従来と同じ（突合キー不変）。
   var snum = form.addTextItem();
-  snum.setTitle("セッションID（提出するログファイル名 gse_◯◯◯.ndjson の ◯◯◯ 部分）");
-  snum.setHelpText("例: gse_20260302_075721.ndjson なら「20260302_075721」。ログとの突合に使用します。");
+  snum.setTitle("セッションID（提出するファイル名 P###_gse_◯◯◯.age の ◯◯◯ 部分）");
+  snum.setHelpText("例: P001_gse_20260302_075721.age なら「20260302_075721」。ログとの突合に使用します。");
   snum.setRequired(true);
 
   // S1: 集中度
@@ -1337,11 +1340,13 @@ function f1EmailBody_(pid, formUrls) {
     "  1) アプリ一式の入手",
     "     " + APP_DOWNLOAD_INFO,
     "  2) いつも通り作業すると、セッションログが端末に生成されます。",
-    "  3) ログを 1 コマンドで匿名化 + 暗号化:",
-    "       gse-package --input <生成された.ndjson> --participant " + pid + " --recipient pubkey.txt",
-    "     → " + pid + "_*.age ができます（元の生ログは送りません）。pubkey.txt は " + PUBKEY_SOURCE_INFO,
+    "  3) 配布フォルダの「提出する」をダブルクリックするだけ:",
+    "       Mac: 提出する_mac.command ／ Windows: 提出する_win.bat",
+    "     → 最新セッションを自動で匿名化＋暗号化し " + pid + "_*.age を作ります（P-ID も自動・パス入力不要）。",
+    "       元の生ログは送りません。鍵（pubkey.txt）は配布フォルダに同梱・自動使用されます。",
     "  4) Dropbox ファイルリクエストに " + pid + "_*.age を提出:",
     "       " + (DROPBOX_FILE_REQUEST_URL || "（研究者が URL を案内します）"),
+    "     ※ アップロード時に名前を聞かれたら、必ず " + pid + "（P-ID）を入力してください（実名は入れない）。",
     "     （提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。）",
     "",
     "■ アンケートのご回答（いずれも冒頭の「参加者ID(P-ID)」に " + pid + " を入力してください）",
@@ -1406,14 +1411,13 @@ function f1EmailHtml_(pid, formUrls) {
     '<div style="' + H3 + '">アプリの準備と提出（毎セッション）</div>',
     '<p style="' + P + '"><b>1) アプリ一式の入手</b><br>' + appInfoHtml + '</p>',
     '<p style="' + P + '"><b>2)</b> いつも通り作業すると、セッションログが端末に生成されます。</p>',
-    '<p style="' + P + '"><b>3)</b> ログを 1 コマンドで匿名化＋暗号化:</p>',
-    '<code style="' + CODE + '">gse-package --input &lt;生成された.ndjson&gt; --participant ' + esc(pid) + ' --recipient pubkey.txt</code>',
-    '<p style="' + SMALL + '">→ ' + esc(pid) + '_*.age ができます（元の生ログは送りません）。pubkey.txt は ' + esc(PUBKEY_SOURCE_INFO) + '</p>',
+    '<p style="' + P + '"><b>3)</b> 配布フォルダの「提出する」をダブルクリックするだけ（Mac: 提出する_mac.command ／ Windows: 提出する_win.bat）。</p>',
+    '<p style="' + SMALL + '">→ 最新セッションを自動で匿名化＋暗号化し ' + esc(pid) + '_*.age を作ります（P-ID も自動・パス入力不要）。元の生ログは送りません。鍵（pubkey.txt）は配布フォルダに同梱・自動使用されます。</p>',
     '<p style="' + P + '"><b>4)</b> Dropbox ファイルリクエストに ' + esc(pid) + '_*.age を提出:</p>',
     (DROPBOX_FILE_REQUEST_URL
       ? '<a href="' + esc(DROPBOX_FILE_REQUEST_URL) + '" style="' + BTN + 'background:#0061ff;">Dropbox 提出ページを開く</a>'
       : '<span style="' + SMALL + '">（研究者が URL を案内します）</span>'),
-    '<p style="' + SMALL + '">提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。</p>',
+    '<p style="' + SMALL + '">※ アップロード時に名前を聞かれたら、必ず <b>' + esc(pid) + '</b>（P-ID）を入力してください（実名は入れない）。提出者同士は互いのファイルを見られません。中身は研究者だけが復号できます。</p>',
     '<div style="' + H3 + '">アンケートのご回答</div>',
     '<p style="' + SMALL + '">いずれも冒頭の「参加者ID（P-ID）」に <b>' + esc(pid) + '</b> を入力してください。</p>',
     surveyRow("📋", "F2 事前アンケート", "検証を始める前に 1 回だけ", formUrls.f2),

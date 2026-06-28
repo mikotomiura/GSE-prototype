@@ -4,6 +4,22 @@
 > **出典**: `.idea/GSE_事後ラベリングシステム設計書_v0.3.md` §15。設計判断は `.steering/20260612-retro-labeling-and-corner-intervention/decisions.md` (D-1〜D-14)。
 > **改訂方針**: スモーク開始後の本書の変更は禁止 (forking paths 排除)。変更が必要なら新バージョンを切り、変更点と理由を明記して再凍結する。
 
+> **バージョンカット宣言 (2026-06-28・前向き / M0 凍結)**: リリース版 (HMM **0.3.0 release**) の pilot 提出
+> (P006 / P007) を復号・定量した結果、probe 枯渇バグと**較正レート過小**によりラベル収量が GATE2 を桁違いに
+> 下回った (P006=8.1分/有効0件・発火0、P007=37.2分/有効3件・7→28分で21分 drought)。よって**データ来歴で
+> 段を切る**:
+> - **`0.3.0 release` ビルド = shakedown**: M1 (配線・IME 健全性・UI) の確認にのみ用い、**GATE2/GATE3 の
+>   確証エビデンスには使わない**。P006 は researcher test、P007 は shakedown として記録 (`experiment-tracking.md`)。
+> - **M0 凍結ビルド (較正専用 ProbeConfig + 提出ラッパー + self-marker 導線 + ファイル名漏れ対策) = confirmatory**:
+>   このビルドで取得したデータのみ GATE2/GATE3 判定に供する。**P007 (実参加者) を M0 で confirmatory 再走**する。
+> - この宣言は **PreReg-1〜8 の合否基準を一切変更しない** (forking paths 排除)。変えるのは「どのビルドの
+>   データが確証に入るか」の来歴境界のみ。本タスクの根拠は `.steering/20260628-m0-freeze-calib-yield-and-submission/`
+>   (decisions D1–D5)、較正密度の文献裏取りは `docs/literature/20260628-calibration-sampling-density.md` [V24]–[V29]。
+> - **GATE2 ≥20件/人 の解釈注記 (閾値は不変)**: ≥20 は単一事例最小 ~15–18点 [V28] と within-person 信頼性
+>   理想 ~70–100機会 [V27] の**間の floor** であり、Stage-1 の C-index 方向検定の最低床として採る (高精度
+>   within-person 推定の十分条件ではない)。Stage-2 昇格時に機会数増を予告する。これは ≥20 の**根拠の明記**で
+>   あって基準変更ではない。
+
 ---
 
 ## 0. このスモークで主張すること / しないこと

@@ -76,3 +76,20 @@ experiments/<YYYYMMDD>-<exp-name>/
 既存の `scripts/run-calibration-cohort.sh`（`raw/P*/` → `gse-replay --calibration` →
 `metrics/Pxxx/<os>/*.calib.json` → `gse-cohort`）が事実上の repro 経路であり、
 `scripts/repro.sh` はこれを実験ディレクトリの config で薄くラップする想定（中身は実験追加時に実装）。
+
+## pilot 提出の来歴台帳（ビルドバージョンカット）
+
+ラベル収量・確証適格性は**取得ビルドの来歴**に依存するため、提出をビルド段ごとに格付けする
+（`preregistration-v0.3.md` のバージョンカット宣言 2026-06-28 と対応）。確証 (GATE2/GATE3) には
+**M0 凍結ビルド (confirmatory)** のデータのみ供する。
+
+| 提出 | ビルド | HMM | 格付け | 実測 | 用途 |
+|---|---|---|---|---|---|
+| P006 | 0.3.0 release | 0.3.0 | researcher test | 8.1分・発火0・有効0件 | 配線/IME/UI 確認のみ（確証に不可） |
+| P007 | 0.3.0 release | 0.3.0 | shakedown | 37.2分・発火3@7.0/28.4/37.2・有効3件・self-marker 0・21分 drought | M1 shakedown（確証に不可）。**M0 で confirmatory 再走** |
+
+- **不適格の原因**（M0 で是正済）: probe 枯渇バグ（PR#56）／較正レート過小（M0 較正 ProbeConfig）／
+  self-marker 未使用（M0 導線・教示）／提出が CLI 手打ち（M0 ラッパー）／`.age` 名 実名漏れ（M0 受領リネーム）。
+- **M0 凍結後の再走**: P007 を confirmatory として再取得し `calibration_blind` プールで GATE2→GATE3 判定。
+  release 版データは確証プールに混ぜない（`label_pool` と本台帳の格付けで分離）。
+- 生 NDJSON / `.age` 中身はコミットしない（data-privacy）。本台帳は集計・来歴メタのみ。

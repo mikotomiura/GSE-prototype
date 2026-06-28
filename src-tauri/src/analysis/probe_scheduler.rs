@@ -173,6 +173,82 @@ impl Default for ProbeConfig {
     }
 }
 
+impl ProbeConfig {
+    /// 較正専用プロファイル (M0 凍結・decisions D1)。構造化された較正セッション
+    /// (condition=blind_calibration) で**ラベル収量を優先**する。default (Phase2 配備・侵襲最小)
+    /// とは分離し、注入で共存させる (本番は lib.rs が condition に応じて選択)。
+    ///
+    /// 根拠 (T0 サーベイ docs/literature/20260628-calibration-sampling-density.md):
+    /// - ESM 標準は 6/日だが「総スケジュール回数は compliance とも dropout とも無相関・頻度↔期間は
+    ///   トレードオフ (>10/日 と >14日 の同時は無)」[V25 Wrzus&Neubauer 2023][V26 Jones 2019]
+    ///   ＝ 構造化セッション内の**高密度・短時間**は compliance を崩さず許容される。
+    /// - measurement independence は維持: stratified random (soft max-gap) のままで、小休止合わせ
+    ///   (opportune moment) は入れない (L0 較正の独立性 [V18]-[V23])。
+    ///
+    /// 収量逆算 (概算): 90 分セッションで提示 ~10-14 件 → compliance ~80% で有効 ~8-11/セッション →
+    /// **2-3 セッション/人で有効 ≈ 20 件 (GATE2)**。GSE ドメインの実 compliance は未測定のため
+    /// 概算であり、M0 凍結ビルドの P007 confirmatory 再走で実測して較正する。
+    pub fn calibration() -> Self {
+        Self {
+            // ~1回/6分 (default 1/15分の ~2.5×・収量優先)。
+            lambda_per_ms: 1.0 / (6.0 * 60.0 * 1000.0),
+            gap_min_ms: 3 * 60 * 1000, // 3 分 (31s 分析窓の非重複を保ちつつ密度確保)
+            cap_window_ms: 20 * 60 * 1000, // 20 分 (rolling 測定窓は維持)
+            // 較正は収量優先で cap を実質無効化 (λ=1/6分・20分の期待発火≈3.3 に対し 4 はほぼ非拘束。
+            // バースト上限としてのみ残し、通常は λ と gap_min が律速)。
+            cap_count: 4,
+            max_gap_ms: 10 * 60 * 1000, // 10 分 (短セッションの drought 防止・soft censoring 維持)
+            away_idle_ms: 180_000,      // 3 分 (離席除外は default と不変)
+            min_session_elapsed_ms: 31_000, // 31s warm-up (窓が session_start を割らない・DB-8)
+        }
+    }
+}
+
+/// 新セッション検出時のプローブスケジューラ初期化判定 (純ロジック・M0 D1)。
+///
+/// lib.rs のスケジューラスレッドが Atomic から読んだ値を渡す。session_meta の condition は
+/// **どの session_start のものか** (`meta_for_session_start_ms`) を session_start と照合してから
+/// 採用する。これにより「前セッションの古い meta が新セッションに適用される」事故 (世代未照合の
+/// 取り違え) を防ぐ (cross-review HIGH)。meta 未受領のまま grace を超えたらサイレント全滅を避けて
+/// default で起動する (fallback)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbeInitDecision {
+    /// まだ初期化しない (この session_start 向けの session_meta 受領待ち・grace 内)。
+    Wait,
+    /// 初期化する。`calibration`=較正プロファイルを使う / `meta_fallback`=meta 未受領で grace 切れの
+    /// default 化 (呼び出し側は warn する)。
+    Start {
+        calibration: bool,
+        meta_fallback: bool,
+    },
+}
+
+/// 初期化判定。`meta_for_session_start_ms == session_start_ms` のときだけ `meta_is_calibration` を
+/// 採用する (世代照合)。未照合かつ grace 超過なら default で起動、grace 内なら待つ。
+pub fn decide_probe_init(
+    session_start_ms: u64,
+    meta_for_session_start_ms: u64,
+    meta_is_calibration: bool,
+    waited_ms: u64,
+    grace_ms: u64,
+) -> ProbeInitDecision {
+    if meta_for_session_start_ms == session_start_ms {
+        // この世代の session_meta を受領済み。その condition で初期化する。
+        ProbeInitDecision::Start {
+            calibration: meta_is_calibration,
+            meta_fallback: false,
+        }
+    } else if waited_ms >= grace_ms {
+        // meta 未受領のまま grace 超過。プローブ全滅を避け default で起動 (calibration は選ばない)。
+        ProbeInitDecision::Start {
+            calibration: false,
+            meta_fallback: true,
+        }
+    } else {
+        ProbeInitDecision::Wait
+    }
+}
+
 /// 発火が確定したプローブ。呼び出し側が `probe_assignment` ログと
 /// `probe_triggered` emit に変換する (DB-4)。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -473,6 +549,164 @@ mod tests {
                 "seed {seed}: no probe fired over a 60min active session"
             );
         }
+    }
+
+    #[test]
+    fn calibration_profile_outyields_default_for_label_collection() {
+        // D1: 較正プロファイルは収量優先。同一 horizon/seed で default より多く発火する。
+        let horizon = 90 * MIN;
+        let mut cal_total = 0usize;
+        let mut def_total = 0usize;
+        for seed in 0..64u64 {
+            cal_total += simulate_cfg(seed, horizon, 0, ProbeConfig::calibration()).len();
+            def_total += simulate(seed, horizon, 0).len();
+        }
+        assert!(
+            cal_total > def_total,
+            "calibration ({cal_total}) should outyield default ({def_total}) over 90min×64seed"
+        );
+    }
+
+    #[test]
+    fn calibration_yield_supports_gate2_in_a_few_sessions() {
+        // D1 収量逆算: 較正セッション (90 分) の発火 (=提示) 数は、2-3 セッションで提示 ~25
+        // (compliance ~80% → 有効 ~20 = GATE2) に届くレートであること。全 seed で最低限の収量
+        // を保ち (空/極端低収量なし)、平均レートで 3 セッション ≥25 提示を満たす。
+        // 注: compliance 0.8 や「有効=提示×0.8」は GSE 未測定の概算 (decisions D1)。
+        let horizon = 90 * MIN;
+        let cfg = ProbeConfig::calibration();
+        let per_session: Vec<usize> = (0..64u64)
+            .map(|seed| simulate_cfg(seed, horizon, 0, cfg).len())
+            .collect();
+        let min_per = *per_session.iter().min().unwrap();
+        let mean = per_session.iter().sum::<usize>() as f64 / per_session.len() as f64;
+        // 実測 (seed 0..64, 90min): min=10 max=15 mean≈12.0。下限は collapse 検出用に
+        // 余裕を持たせて ≥8、平均は 2 セッションで提示 ~24 (有効 ~19) に届くレートを保証。
+        assert!(
+            min_per >= 8,
+            "every calibration session should yield ≥8 probes; min was {min_per}"
+        );
+        assert!(
+            mean * 2.0 >= 20.0,
+            "mean per-session yield {mean:.1} ×2 sessions should reach ≥20 presented; got {:.1}",
+            mean * 2.0
+        );
+    }
+
+    #[test]
+    fn calibration_gap_min_respected() {
+        // 較正でも隣接発火は gap_min (3 分) 以上 = 31s 分析窓の非重複を保証。
+        let gap_min = ProbeConfig::calibration().gap_min_ms;
+        for seed in 0..16u64 {
+            let fires = simulate_cfg(seed, 90 * MIN, 0, ProbeConfig::calibration());
+            for w in fires.windows(2) {
+                let gap = w[1].scheduled_ts - w[0].scheduled_ts;
+                assert!(
+                    gap >= gap_min,
+                    "seed {seed}: calibration gap {gap}ms < gap_min {gap_min}ms"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn calibration_no_drought_in_session() {
+        // 短い較正セッションで枯渇しない (P007 の 21 分 drought 再発防止)。
+        // カバレッジ空白は cap_window(20) + max_gap(10) + 小余裕(3) = 33 分以内。
+        let horizon = 90 * MIN;
+        let cfg = ProbeConfig::calibration();
+        let bound = cfg.cap_window_ms + cfg.max_gap_ms + 3 * MIN;
+        for seed in 0..64u64 {
+            let fires = simulate_cfg(seed, horizon, 0, cfg);
+            let gap = max_coverage_gap_ms(&fires, horizon);
+            assert!(
+                gap <= bound,
+                "seed {seed}: calibration coverage gap {gap}ms exceeds {bound}ms"
+            );
+        }
+    }
+
+    #[test]
+    fn calibration_deterministic_for_same_seed() {
+        // seed 決定性 (一様性監査 D-14) は較正プロファイルでも維持。
+        let a = simulate_cfg(42, 90 * MIN, 0, ProbeConfig::calibration());
+        let b = simulate_cfg(42, 90 * MIN, 0, ProbeConfig::calibration());
+        assert_eq!(
+            a, b,
+            "calibration profile must be deterministic for same seed"
+        );
+    }
+
+    const GRACE: u64 = 5_000;
+
+    #[test]
+    fn decide_probe_init_waits_until_meta_for_this_session() {
+        // この session_start 向けの meta が未受領 (meta_for=0) かつ grace 内 → Wait。
+        assert_eq!(
+            decide_probe_init(1000, 0, false, 1000, GRACE),
+            ProbeInitDecision::Wait
+        );
+    }
+
+    #[test]
+    fn decide_probe_init_uses_calibration_when_meta_matches() {
+        // meta_for == session_start かつ calibration=true → 較正で起動 (fallback でない)。
+        assert_eq!(
+            decide_probe_init(1000, 1000, true, 0, GRACE),
+            ProbeInitDecision::Start {
+                calibration: true,
+                meta_fallback: false
+            }
+        );
+        // baseline (calibration=false) → default で起動 (fallback でない)。
+        assert_eq!(
+            decide_probe_init(1000, 1000, false, 0, GRACE),
+            ProbeInitDecision::Start {
+                calibration: false,
+                meta_fallback: false
+            }
+        );
+    }
+
+    #[test]
+    fn decide_probe_init_falls_back_to_default_after_grace() {
+        // meta 未受領のまま grace 到達 → default で起動 (fallback フラグ立つ・calibration は選ばない)。
+        assert_eq!(
+            decide_probe_init(1000, 0, true, GRACE, GRACE),
+            ProbeInitDecision::Start {
+                calibration: false,
+                meta_fallback: true
+            }
+        );
+    }
+
+    #[test]
+    fn decide_probe_init_ignores_stale_meta_from_other_session() {
+        // 別セッション (古い meta_for=900) は照合不一致 → この session_start(1000) に適用しない。
+        // grace 内なら Wait、grace 超過なら fallback (古い calibration=true を引き継がない)。
+        assert_eq!(
+            decide_probe_init(1000, 900, true, 1000, GRACE),
+            ProbeInitDecision::Wait
+        );
+        assert_eq!(
+            decide_probe_init(1000, 900, true, GRACE, GRACE),
+            ProbeInitDecision::Start {
+                calibration: false,
+                meta_fallback: true
+            }
+        );
+    }
+
+    #[test]
+    fn decide_probe_init_prefers_meta_over_grace_at_boundary() {
+        // grace 到達と同時に meta も一致しているなら、fallback でなく meta の condition を優先。
+        assert_eq!(
+            decide_probe_init(1000, 1000, true, GRACE, GRACE),
+            ProbeInitDecision::Start {
+                calibration: true,
+                meta_fallback: false
+            }
+        );
     }
 
     #[test]

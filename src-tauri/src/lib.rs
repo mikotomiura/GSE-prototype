@@ -1,6 +1,10 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
+// 提出ツール (gse-package / gse-submit) 共有の匿名化+age 暗号化 (data-privacy SSOT)。
+// age 依存はこの module 経由のみ。blind アプリ本体 (default features) には載せない (D3)。
+#[cfg(feature = "package")]
+pub mod packaging;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -45,6 +49,24 @@ static LAST_SELF_MARKER_MS: AtomicU64 = AtomicU64::new(0);
 // start_session が Release で store し、専用プローブスレッドが Acquire で読む。
 // 0 = セッション未開始。値が変わったらスレッドはスケジューラを再初期化する。
 static SESSION_START_MS: AtomicU64 = AtomicU64::new(0);
+
+// M0 凍結 (decisions D1): 較正セッション (condition=blind_calibration) では収量優先の
+// ProbeConfig::calibration() を使う。record_session_meta が condition から設定する。
+static SESSION_IS_CALIBRATION: AtomicBool = AtomicBool::new(false);
+
+// M0 凍結 (decisions D1): プローブスレッドが「session_meta 受領後」にスケジューラを初期化する
+// ためのゲート。**どの session_start 向けの meta か** を記録し、scheduler は session_start と
+// 照合してから calibration 選択を採用する (cross-review HIGH: 世代未照合だと前セッションの古い
+// meta が新セッションに適用されうる)。frontend は start_session (SESSION_START_MS を set) →
+// record_session_meta (この値を set) の順で呼ぶ。0 = まだどの世代の meta も未受領。
+// プローブの schedule は session_start に anchor されるため、初期化が最大 1Hz 分遅れても決定性・
+// session_elapsed 計算は不変 (warm-up 31s 以内に必ず確定する)。
+static SESSION_META_FOR_START_MS: AtomicU64 = AtomicU64::new(0);
+
+// M0 (D1・code-review HIGH): session_meta 受領を待つ猶予。これを超えても未受領なら
+// プローブのサイレント全滅を避け default プロファイルで初期化し warn する。warm-up (31s) より
+// 十分短く、通常 (数 ms で受領) はこの fallback 経路に入らない。
+const PROBE_META_READY_GRACE_MS: u64 = 5_000;
 
 // Task C: セッションが宣言する介入の有効/無効 (session_meta.intervention_enabled)。
 // record_session_meta が設定し、get_intervention_decision が抑止判断に使う。
@@ -807,6 +829,17 @@ fn record_session_meta(
     let label_pool = parse_optional_label_pool(label_pool.as_deref())?;
     // 介入の有効/無効をプロセス全体へ反映 (両ウィンドウの get_intervention_decision が参照)。
     INTERVENTION_ENABLED.store(intervention_enabled, Ordering::Release);
+    // M0 (D1): 較正セッションなら収量優先プロファイルを選ぶフラグを立てる。condition が
+    // blind_calibration のときのみ true (X1 較正のラベル収量を稼ぐ)。世代タグ
+    // (SESSION_META_FOR_START_MS) を**この値を確定させた後**に Release で公開し、プローブスレッドが
+    // 正しいプロファイルで初期化できるようにする (Acquire 側で IS_CALIBRATION の可視性が保証される)。
+    SESSION_IS_CALIBRATION.store(
+        matches!(condition, Some(Condition::BlindCalibration)),
+        Ordering::Release,
+    );
+    // この meta が属する世代 = 現在の session_start。スケジューラはこれと session_start を照合する。
+    let current_session_start = SESSION_START_MS.load(Ordering::Acquire);
+    SESSION_META_FOR_START_MS.store(current_session_start, Ordering::Release);
     log.lock()
         .unwrap_or_else(|p| p.into_inner())
         .tx
@@ -1036,6 +1069,10 @@ fn start_session(
 
     // Task B: プローブスケジューラへセッション開始時刻を共有する。
     // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
+    // M0 (D1): session_start を公開した時点では SESSION_META_FOR_START_MS はまだこの世代を指さない
+    // (前セッションの値 or 0)。スケジューラは session_start と meta 世代を照合してから初期化するため、
+    // record_session_meta が来るまで較正プロファイル選択は確定しない (race 排除)。明示リセットは不要
+    // (世代照合が staleness を吸収する)。
     SESSION_START_MS.store(now, Ordering::Release);
 
     // setup() で事前生成されたオーバーレイウィンドウを show する (サイズ制御は Overlay.tsx)。
@@ -1601,7 +1638,8 @@ pub fn run() {
             // scheduler 純ロジックは analysis/probe_scheduler.rs (OS API 非依存)。
             {
                 use crate::analysis::probe_scheduler::{
-                    driver_idle_ms, ProbeConfig, ProbeScheduler,
+                    decide_probe_init, driver_idle_ms, ProbeConfig, ProbeInitDecision,
+                    ProbeScheduler,
                 };
                 let app_handle = app.handle().clone();
                 let probe_log_tx = log_tx_probe;
@@ -1615,6 +1653,9 @@ pub fn run() {
                     };
                     let mut scheduler: Option<ProbeScheduler> = None;
                     let mut active_session_start: u64 = 0;
+                    // M0 (D1): 現在初期化済みのプロファイルの away 閾値。idle 判定で参照する。
+                    // 較正/配備で同値 (3 分) だが、選択した config から引いて将来の差異に備える。
+                    let mut active_away_idle_ms: u64 = ProbeConfig::default().away_idle_ms;
                     loop {
                         thread::sleep(Duration::from_millis(1000));
                         let session_start = SESSION_START_MS.load(Ordering::Acquire);
@@ -1625,34 +1666,72 @@ pub fn run() {
                             continue;
                         }
                         if session_start != active_session_start {
+                            // M0 (D1): session_meta (condition) を session_start と**世代照合**してから
+                            // プロファイルを選ぶ。frontend は start_session → record_session_meta の順で
+                            // 呼ぶため、照合一致まで待たないと calibration 選択が race する。古い世代の
+                            // meta は不一致で弾かれる (cross-review HIGH)。純ロジック decide_probe_init に
+                            // 判定を委譲し、ここでは Atomic 読みと副作用 (warn/初期化) のみ行う。
+                            let meta_for = SESSION_META_FOR_START_MS.load(Ordering::Acquire);
+                            let meta_is_calibration =
+                                SESSION_IS_CALIBRATION.load(Ordering::Acquire);
+                            let waited = now_ms().saturating_sub(session_start);
+                            let (calibration, meta_fallback) = match decide_probe_init(
+                                session_start,
+                                meta_for,
+                                meta_is_calibration,
+                                waited,
+                                PROBE_META_READY_GRACE_MS,
+                            ) {
+                                // この session_start 向けの meta 未受領・grace 内: 再試行
+                                // (active_session_start は更新しない。schedule は session_start
+                                // anchor のため遅延は決定性に影響しない)。
+                                ProbeInitDecision::Wait => continue,
+                                ProbeInitDecision::Start {
+                                    calibration,
+                                    meta_fallback,
+                                } => (calibration, meta_fallback),
+                            };
+                            if meta_fallback {
+                                // meta 送信が失敗/未送信のまま grace 超過。サイレント全滅を避け
+                                // default で初期化し warn する (code-review HIGH)。
+                                tracing::warn!(
+                                    "probe scheduler: session_meta not received {}ms after \
+                                     session_start={}; falling back to default ProbeConfig \
+                                     (calibration NOT applied — check record_session_meta)",
+                                    waited,
+                                    session_start
+                                );
+                            }
                             // 新セッション検出 (DB-6)。entropy から u64 seed を引いて
                             // seed_from_u64 で初期化し、seed を tracing に記録する。本番は
                             // 非決定論的でありつつ「この seed でこの scheduled_ts 系列が出た」
                             // ことを後から再現でき、一様性監査 (D-14) が成立する。NDJSON schema は
                             // Task A で凍結のため seed は trace ログにのみ残す (schema 不変)。
                             active_session_start = session_start;
+                            // M0 (D1): 較正は収量優先、それ以外 (配備・baseline・fallback) は default。
+                            let config = if calibration {
+                                ProbeConfig::calibration()
+                            } else {
+                                ProbeConfig::default()
+                            };
+                            active_away_idle_ms = config.away_idle_ms;
                             let seed: u64 = rand::random();
                             tracing::info!(
-                                "probe scheduler seed={} for session_start={}",
+                                "probe scheduler seed={} calibration={} for session_start={}",
                                 seed,
+                                calibration,
                                 session_start
                             );
-                            scheduler = Some(ProbeScheduler::from_seed(
-                                seed,
-                                ProbeConfig::default(),
-                                session_start,
-                            ));
+                            scheduler =
+                                Some(ProbeScheduler::from_seed(seed, config, session_start));
                         }
                         let now = now_ms();
                         // idle 計算は driver_idle_ms (純ロジック) に委譲。F4: last_key==0 は
                         // 「idle 不明」として away_idle_ms に倒し、離席中の誤発火を防ぐ
                         // (Dashboard 表示用 get_keyboard_idle_ms とは意図的に挙動が異なる)。
                         let last_key = crate::input::hook::last_key_ms();
-                        // away_idle_ms は scheduler と同じ ProbeConfig::default() を参照。
-                        // 将来 away_idle_ms をユーザー設定で可変にするなら sched 側の config から
-                        // 引くよう差し替える (現フェーズは default 固定のため静的取得で一貫する)。
-                        let idle =
-                            driver_idle_ms(now, last_key, ProbeConfig::default().away_idle_ms);
+                        // away_idle_ms は初期化済みプロファイル (active_away_idle_ms) を参照。
+                        let idle = driver_idle_ms(now, last_key, active_away_idle_ms);
                         let Some(sched) = scheduler.as_mut() else {
                             continue;
                         };

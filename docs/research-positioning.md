@@ -179,7 +179,13 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 
 1. **M0 基盤フリーズ**: プローブ機構・blind dashboard・本文非保存 IME ログ [V5]・NDJSON スキーマ(label_pool)・
    gse-replay/cohort・PreReg 凍結・データ分離 [V15][V16][V17]。
-2. **M1 Phase 1a スモーク (n=3–5)**: 配線・IME 健全性・ラベル産出レート、**GATE2 通過**（GATE1 尺度理解は比較条件段で発効・現行スコープでは延期）、目標ライン確定。
+   **2026-06-28 M0 再凍結**（リリース版 pilot で判明したラベル収量・提出摩擦の是正を束ねる）:
+   **較正専用 ProbeConfig**（収量優先・λ≈1/6分・stratified random 維持 [V18][V19]、density 裏取り [V24][V25][V26]）／
+   **提出ラッパー**（最新セッション自動検出ダブルクリック・CLI 手打ち排除）／**self-marker 導線**（event-contingent の
+   取りこぼし対策 [V24]）／**`.age` ファイル名 実名漏れ対策**。リリース版(0.3.0 release)=shakedown、M0 凍結ビルド=
+   confirmatory のバージョンカットを `preregistration-v0.3.md` に前向き宣言。
+2. **M1 Phase 1a スモーク (n=3–5)**: 配線・IME 健全性・ラベル産出レート（M0 較正 ProbeConfig で 90 分提示 ~10–15・
+   2–3 セッションで有効 ≈20件/人＝GATE2 を逆算可能に）、**GATE2 通過**（GATE1 尺度理解は比較条件段で発効・現行スコープでは延期）、目標ライン確定。
 3. **M2 Phase 1b X1 較正 (n=5–10, blind)**: calibration_blind ラベルで個人内 C-index、GATE3 Go/Kill/not-kill（H-X1/H-X1b・L0 軸の確証）。
 4. **M3 Phase 2 Y 価値 (AB/BA)**: 介入の受容と効果、AI 依存↓・自力解決↑・品質維持（放棄率・計測外移行も併報）、Physical Anchor 層別評価（H-Y/H-PA）。
 5. **M4 Phase 3 X2 介入機会 (MRT)**: nudge/defer 割付の近接アウトカム差と Need 判断性能（HIR/Precision/recall）、Opportunity 妥当性の**探索**（H-X2・heterogeneity）。
@@ -205,6 +211,8 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   - Physical Anchor: 早期解除・拒否が多い → Outdoor をストレッチに戻し Indoor のみで再評価。
 - **「情報を持つ Kill」と「情報を持たない null」を区別する（指摘 K）**: 「X1 が Kill でも測定法の破綻検出という貢献が残る」が成り立つのは、
   **GATE2 を満たす十分なデータ**（回答率・latency・有効 ≥20 件/人）の下で C-index が偶然以下だった**真の Kill** に限る。
+  （**≥20件/人 は floor**: 単一事例最小 ~15–18点 [V28] と within-person 信頼性理想 ~70–100機会 [V27] の間に位置し、
+  Stage-1 の方向検定の最低床として採る。高精度 within-person 推定の十分条件ではなく、Stage-2 で機会数増を予告する。）
   これに対し**主指標被験者 0 名・提示プローブ 0 件・PreReg-5 最低要件未達**は Kill ではなく `DataInsufficient`（無理に Go/Kill とせずデータ拡充）であり、
   **課題放棄・計測外移行による空振り**は反証ではなく**測定の失敗**として切り分ける（前者だけが「測定法の破綻検出」という貢献になる）。
 - **無理に Go と言わない** [v0.4§1]: PreReg-5 充足が一部被験者のみなら、モデル Go でも Inconclusive に留める（データ拡充）。
