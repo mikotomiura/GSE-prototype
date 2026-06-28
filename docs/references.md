@@ -63,6 +63,12 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [V21] | doi:10.1145/1357054.1357070 | Iqbal, S. T. & Bailey, B. P. — Effects of intelligent notification management on users and their tasks | CHI '08, pp.93–102, 2008 | <https://doi.org/10.1145/1357054.1357070> | defer-to-breakpoint 通知＝L2' 介入最適化（無偏測定とは逆向き） | — | active |
 | [V22] | doi:10.1145/3130956 | Pielot, M. et al. — Beyond Interruptibility: Predicting Opportune Moments to Engage Mobile Phone Users | Proc. ACM IMWUT 1(3):91, 2017 | <https://doi.org/10.1145/3130956> | opportune moment／engagement 予測＝L2' 受容性最大化（較正に流用すると独立性汚染） | — | active |
 | [V23] | doi:10.1145/2858036.2858566 | Mehrotra, A. et al. — My Phone and Me: Understanding People's Receptivity to Mobile Notifications | CHI '16, pp.1021–1032, 2016 | <https://doi.org/10.1145/2858036.2858566> | 受容性・心理特性要因。重要な内容の通知すら disruption を生む＝介入侵襲のトレードオフ | — | active |
+| [V24] | doi:10.1145/3123988 | van Berkel, N., Ferreira, D. & Kostakos, V. — The Experience Sampling Method on Mobile Devices | ACM Comput. Surv. 50(6):93, pp.1–40, 2017 | <https://doi.org/10.1145/3123988> | モバイル ESM の決定版サーベイ。signal/interval/event-contingent の設計トレードオフ＝較正サンプリング設計の一次根拠 | — | active |
+| [V25] | doi:10.1177/10731911211067538 | Wrzus, C. & Neubauer, A. B. — Ecological Momentary Assessment: A Meta-Analysis on Designs, Samples, and Compliance Across Research Fields | Assessment 30(3):825–846, 2023 | <https://doi.org/10.1177/10731911211067538> | EMA メタ分析 k=477。標準=6/日×7日、compliance 平均79.2%、総回数は compliance/dropout と無相関＝較正密度設計の数値根拠 | — | active |
+| [V26] | doi:10.1111/add.14503 | Jones, A. et al. — Compliance with ecological momentary assessment protocols in substance users: a meta-analysis | Addiction 114(4):609–619, 2019 | <https://doi.org/10.1111/add.14503> | EMA compliance メタ分析 ≈75.1%（80%閾値未達が常態）。頻度/期間と compliance 無相関＝[V25] 補強 | — | active |
+| [V27] | doi:10.1007/s10869-022-09803-5 | Lafit, G. et al. — Optimizing Measurement Reliability in Within-Person Research: Guidelines for Research Design and R Shiny Web Application Tools | J. Bus. Psychol., 2022（online 2021） | <https://doi.org/10.1007/s10869-022-09803-5> | within-person 信頼性は測定機会数 T の関数。短尺は多数機会要＝GATE2 ≥20 の妥当性検証（信頼性理想は ~70–100） | — | active |
+| [V28] | doi:10.1177/0741932512452794 | Kratochwill, T. R. et al. — Single-Case Intervention Research Design Standards | Remedial & Special Education 34(1):26–38, 2013 | <https://doi.org/10.1177/0741932512452794> | 単一事例/N-of-1 設計標準。効果実証に ≥3 回・各 phase ≥5–6 データ点＝個人内サンプルサイズ下限 | — | active |
+| [V29] | doi:10.1145/2628363.2628364 | Pielot, M., Church, K. & de Oliveira, R. — An In-Situ Study of Mobile Phone Notifications | MobileHCI '14, pp.233–242, 2014 | <https://doi.org/10.1145/2628363.2628364> | 通知 63.5件/日・通知量↑→負の感情↑。通知/提出摩擦＝負担の実証（T2/T4 裏付け） | — | active |
 
 ---
 
@@ -79,7 +85,7 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | Mehta et al. 2025 | [P11] | [V6] |
 | Park 2024 | [P7] | [V13] |
 
-→ 一意な文献数 = 15 + 23 − 6 = **32**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで追加、P との重複なし）。
+→ 一意な文献数 = 15 + 29 − 6 = **38**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、P との重複なし）。
 
 ## 追加・撤回ルール
 

@@ -42,6 +42,15 @@ name = "gse-unpack"
 path = "src/bin/unpack.rs"
 required-features = ["package"]
 
+# M0 凍結 (T2 / decisions D3): 被験者が最新セッションを自動検出して匿名化+暗号化する
+# ダブルクリック提出ツール。gse-package のパス手打ちを排除する。匿名化+crypto は packaging
+# module で gse-package と単一情報源。同じ `package` feature gate で age 依存を隔離する
+# (cargo build --features package --bin gse-submit で生成)。
+[[bin]]
+name = "gse-submit"
+path = "src/bin/submit.rs"
+required-features = ["package"]
+
 [features]
 # gse-package bin 専用。age 暗号化を有効化する。default ビルド (Tauri アプリ) には載らない。
 package = ["dep:age"]

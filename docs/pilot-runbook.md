@@ -79,8 +79,11 @@ cd ..
 #   secret key written to: ~/.gse/age-identity.txt (KEEP SECRET, not in repo)
 ```
 
-- 公開鍵 (`age1...`) を `pubkey.txt` に保存し、`gse-package` exe と一緒に被験者へ配る (公開鍵は
-  配布安全)。
+- 公開鍵 (`age1...`) を `pubkey.txt` に保存し、`gse-submit`(＋`提出する` ランチャ) / `gse-package` exe と
+  一緒に被験者へ配る (公開鍵は配布安全)。`gse-submit` は同梱 `pubkey.txt` を自動で recipient に使う。
+- **公開鍵の取り違え防止**: 初回セッション同席時に、配布 `pubkey.txt` の `age1...` 文字列が研究者手元の
+  keygen 出力と一致することを目視確認する (gse-submit は鍵ピンニングしないため、配布フォルダの
+  `pubkey.txt` がすり替わると暗号化先が変わる。中身は匿名化済だが宛先誤りを防ぐ・security review LOW)。
 - **秘密鍵ファイルは絶対にコミット/共有しない**。`.gitignore` に `*age-identity*` / `*.agekey` を
   登録済 (多層防御)。Windows では共有フォルダ・Dropbox 同期下に置かない。
 
@@ -88,8 +91,9 @@ cd ..
 
 ## 3. 被験者手順 (3 ステップ — 非技術者向け)
 
-> 配布物: `gse` 本体アプリ + `gse-package(.exe)` + `pubkey.txt` (研究者公開鍵)。
-> Python / age CLI のインストールは不要。
+> 配布物: `gse` 本体アプリ + **`提出する` ランチャ** (`提出する_mac.command` / `提出する_win.bat`)
+> + `gse-submit(.exe)` (最新セッション自動検出の提出ツール) + `pubkey.txt` (研究者公開鍵)。
+> 上級者向け手動版として `gse-package(.exe)` も同梱。Python / age CLI のインストールは不要。
 
 ### Step 1 — セッション収集
 - いつも通りアプリを起動して作業する。**介入を有効** (`interventionEnabled=true`) で、
@@ -99,18 +103,25 @@ cd ..
 - セッション終了すると `raw/P000/gse_YYYYMMDD_HHMMSS.ndjson` が生成される (起動ログの
   `resolved_log_dir` で場所を確認)。
 
-### Step 2 — 匿名化 + 暗号化 (1 コマンド)
-```bash
-# <参加者番号> は研究者から割り当てられた P### を使う
-gse-package --input <raw.ndjson> --participant P003 --recipient pubkey.txt
-# → P003_gse_YYYYMMDD_HHMMSS.age が同じフォルダに出る
-```
-- このコマンドは (1) キー内容を category へ匿名化し、(2) 研究者の公開鍵で暗号化する。
-  **元の生 NDJSON は送らない。** `.age` は研究者の秘密鍵でしか開けない暗号塊。
+### Step 2 — 匿名化 + 暗号化 (ダブルクリック・推奨)
+- 配布フォルダの **`提出する`** をダブルクリックするだけ。`gse-submit` が
+  (1) `~/Documents/GSE-sessions/` の**最新 `gse_*.ndjson` を自動検出**し、
+  (2) キー内容を category へ匿名化し (本文非保存)、(3) 研究者の公開鍵で暗号化して
+  `~/Documents/GSE-submissions/P###_gse_YYYYMMDD_HHMMSS.age` を出す。
+  - **P### はアプリが記録した `~/.gse/participant_id` を自動使用**（手打ち不要・取り違え防止）。
+  - **元の生 NDJSON は送らない。** `.age` は研究者の秘密鍵でしか開けない暗号塊。
+- 手動が必要なときのみ（上級者）:
+  ```bash
+  gse-package --input <raw.ndjson> --participant P003 --recipient pubkey.txt
+  # → P003_gse_YYYYMMDD_HHMMSS.age が同じフォルダに出る
+  ```
 
 ### Step 3 — Dropbox File Request で提出
 - 研究者が用意した **Dropbox File Request URL** を開き、`P003_*.age` を **ドラッグ&ドロップ**するだけ。
   - (File Request は受領者(研究者)だけが中身を見られ、提出者同士は互いのファイルを見られない。)
+- ⚠ **提出者名の入力を求められたら P### を入れる (実名禁止)**。Dropbox File Request は投稿者名を
+  ファイル名に付与しうるため、実名を入れると `.age` ファイル名に実名が残る (中身は匿名化済だが
+  ファイル名で漏れる)。研究者側でも §4.1 で受領時に P### へリネームして二重に防ぐ (data-privacy)。
 - `.age` は暗号化済なので転送経路は信用不要 (D6)。生 NDJSON は手元に残し、提出しない。
 
 ---
@@ -120,10 +131,18 @@ gse-package --input <raw.ndjson> --participant P003 --recipient pubkey.txt
 受領した各 `P###_*.age` について以下を回す。`GSE_DATASET` は gse-dataset を指す前提。
 
 ### 4.1 復号 (`.age` → 匿名化 NDJSON)
+
+**受領直後に実名リネーム (T3・data-privacy)**: Dropbox File Request は投稿者名をファイル名へ付与
+しうるため、受領 `.age` 名に実名が残ることがある（例 `P006_gse_..._mikoto miura.age`）。`gse-unpack`
+の出力名は入力 `.age` のステムを踏襲するので、**復号前に `P###_gse_YYYYMMDD_HHMMSS.age` の正規形へ
+リネーム**して実名を除去する（中身は匿名化済だがファイル名の実名を断つ）。
+
 ```bash
+# 例: 受領名から実名を剥がして正規形へ。<P###> と日時は受領ファイルから読む。
+mv "P006_gse_20260624_101500_mikoto miura.age" P006_gse_20260624_101500.age
 # 復号。出力は匿名化 NDJSON (P###_*.ndjson)。--out 省略時は .age と同じフォルダ。
-gse-unpack --input P003_gse_20260624_101500.age --identity ~/.gse/age-identity.txt --out ./inbox
-# → ./inbox/P003_gse_20260624_101500.ndjson (匿名化済・category 形式)
+gse-unpack --input P006_gse_20260624_101500.age --identity ~/.gse/age-identity.txt --out ./inbox
+# → ./inbox/P006_gse_20260624_101500.ndjson (匿名化済・category 形式)
 ```
 > 復号後の平文 NDJSON は**ローカルのみ**。gse-dataset / 本 repo にコミットしない (data-privacy)。
 > raw `"vk"` が残っていれば gse-unpack が件数を WARN する (匿名化漏れの早期検知)。
