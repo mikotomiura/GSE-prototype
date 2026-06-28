@@ -11,7 +11,7 @@
 | 認知状態 | Cognitive State | ユーザーの知的作業における内的状態。GSE では直接読める対象として扱わず、UserLabel や説明概念として限定的に使う | 「認知状態を直接読むとは主張しない」 |
 | フロー | Flow | 滑らかにアウトプットが出ている行動パターンの説明語。現行 HMM の `p_flow` は flow-like continuation の参考スコア | 「p_flow は Flow 断定ではなく参考スコア」 |
 | インキュベーション | Incubation | 生産的な沈黙・熟考に近い行動パターンの説明語。現行 HMM の `p_incubation` は incubation-like pause の参考スコア | 「長い休止は Incubation と断定せず介入を defer する」 |
-| スタック | Stuck | 作業停滞・摩擦が強い可能性を表す説明語。現行 HMM の `p_stuck` は Need 層の `stuck_likelihood` として使う | 「p_stuck が高くても Opportunity が低ければ介入しない」 |
+| スタック | Stuck | 作業停滞・摩擦が強い可能性を表す説明語。`p_stuck` は **MhD（L1）が計算する** Stuck likelihood であり、**Need 層（L2）が `stuck_likelihood` として閾値消費する**（別層・別計算。[[MhD]] 参照） | 「p_stuck が高くても Opportunity が低ければ介入しない」 |
 | 生産的苦闘 | Productive Struggle | 困難に取り組むプロセス自体に学習・成長の価値がある状態。GSE が保護する対象 | 「生産的苦闘を阻害しない介入設計」 |
 | 不便益 | Fubeneki | あえて不便を導入することで得られる便益。GSE の理論的基盤 | 「Wall は不便益に基づく介入」 |
 | ナッジ | Nudge (Lv1) | `InterventionDecision.action == "nudge"` で発動する軽度介入。右端から小さく現れるサイドカードとして表示 | 「Nudge が表示されたがユーザーは作業を継続した」 |
@@ -46,6 +46,7 @@
 | 較正モード (blind dashboard) | calibration mode | 較正セッション中、被験者にモデル出力 (推定状態/Flow・Incubation・Stuck 確率/p_stuck/GT counter/状態色) を**一切見せない**メイン画面表示モード (`App.calibrationMode`、既定 ON)。主観回答のアンカリング汚染を防ぎ測定独立性を守る。frontend 表示分岐のみ (backend/schema 不変) | 「較正モードでは推定状態を出さない」 |
 | 尺度理解テスト | scale comprehension test | 本番前に 8 ビネット (2×2 象限×2) で Q1/Q2 が独立 2 軸として理解されているか検査する事前ゲート (PreReg-1) | 「尺度理解テストに合格してから本番データを取る」 |
 | 2段ゲート | two-stage gate | 「測定法の失敗」と「モデルの失敗」を別々の Go/No-Go で事前宣言する反証可能化の仕組み。測定法ゲート → モデルゲートの順 (v0.3 §7) | 「測定法ゲートを通過しない限りモデル評価に進まない」 |
+| ゲート対応 (GATE↔PreReg) | GATE–PreReg mapping | WBS の **GATE1–3** と preregistration の **PreReg-1..8** の対応。**GATE1 尺度理解 ↔ PreReg-1**（**現行スモークでは延期**・比較条件段で発効）/ **GATE2 測定法 ↔ PreReg-2・-3**（回答率 ≥80% / latency 中央値 ≤10s / 有効 ≥20 件/人）/ **GATE3 モデル（順序 C-index 中央値 ≥0.65 & 全員 >0.55）↔ PreReg-4**。0.65/0.55 は PreReg-4 で凍結した事前登録値。SSOT は `docs/preregistration-v0.3.md` | 「GATE3 は PreReg-4 のモデルゲート。現行スモークは GATE1 を延期し GATE2 起点」 |
 | 順序一致度 | C-index (concordance index) | 「X が大きい区間ほど主観 Q1 も大きい」という順位の一致割合。0.5 が偶然・1.0 が完全一致・0.5 未満は逆方向。順序尺度と相性が良く方向を保つ。`\|r\|≥0.30` の代替 (v0.3 §7) | 「被験者内 C-index 中央値 ≥0.65 で Go 候補」 |
 | 前向き固定 holdout | prospective fixed holdout | 各人の最初の 2 セッションで β を較正・凍結し、残りで完全固定評価する設計。「今日較正→明日使用」の実運用に一致。LOSO/LOUO の時間リークを避ける (v0.3 §8) | 「前向き固定 holdout で forking paths を排除」 |
 | 時間隔離窓 | temporal isolation window | プローブ時刻 t に対し分析対象を **t−31s..t−1s** (プローブ前) に限定し、申告後 (t..t+60s) を破棄することで「申告が打鍵を汚染する」P1 を時間順序で構造的に隔離する仕組み (`realtime_label.analysis_window_*`、v0.3 §4.2 / D-8) | 「時間隔離窓内の feat だけで X を集約する」 |
@@ -129,6 +130,7 @@
 | 略語 | 正式名称 | 意味 |
 |---|---|---|
 | GSE | Generative Struggle Engine | 本プロダクトの名称 |
+| MhD | Mind-house Detector（認知状態検出モデルの総称） | キーストローク行動から作業状態を推定する**検出モデルの総称**。内部で X(Cognitive Friction)/Y(Productive Engagement) 二軸と `p_stuck` を出す。**Stage 1 = 現行のルールベース HMM**（現在地・`engine.rs`）、**Stage 2 = ロジスティック回帰**（昇格は約 50 セッション＋3% 改善の Go/No-Go、未達なら Stage 1 を正＝オッカムの剃刀）。MhD の出力 `p_stuck`（L1 Stuck 計算）を Need 層（L2・`intervention.rs`）が閾値で消費する点に注意（別層・別計算） |
 | HMM | Hidden Markov Model | 隠れマルコフモデル |
 | EWMA | Exponentially Weighted Moving Average | 指数加重移動平均 |
 | IME | Input Method Editor | 日本語入力メソッドエディタ |
