@@ -5,3 +5,9 @@
 src-tauri/schema/current.json text eol=lf
 tests/snapshots/*.json text eol=lf
 tests/fixtures/*.ndjson text eol=lf
+
+# 提出ランチャ: Windows cmd は CRLF 前提。checkout 時に LF 化されると cmd の
+# パースが崩れるため CRLF 固定 (UTF-8 BOM は内容なので git が保持する)。
+# mac の .command は bash 用なので LF 固定。
+*.bat text eol=crlf
+*.command text eol=lf
