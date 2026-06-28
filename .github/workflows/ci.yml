@@ -109,6 +109,20 @@ jobs:
           path: src-tauri/target/release/gse-next.exe
           if-no-files-found: warn
           retention-days: 7
+      # 提出/復号ツール（package feature。アプリ本体 nsis ビルドは --features package 非使用のため別途ビルド）。
+      - name: Build submission/decrypt tools (package feature)
+        working-directory: src-tauri
+        run: cargo build --release --features package --bin gse-submit --bin gse-package --bin gse-unpack
+      - name: Upload Windows tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-tools
+          path: |
+            src-tauri/target/release/gse-submit.exe
+            src-tauri/target/release/gse-package.exe
+            src-tauri/target/release/gse-unpack.exe
+          if-no-files-found: error
+          retention-days: 7
 
   # ── タグ push: macOS ビルド ──────────────────────────────────
   build-macos:
@@ -169,6 +183,17 @@ jobs:
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 7
+      # 提出/復号ツール（macOS は --features package 付き tauri build で既にビルド済み）。
+      - name: Upload macOS tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-tools
+          path: |
+            src-tauri/target/release/gse-submit
+            src-tauri/target/release/gse-package
+            src-tauri/target/release/gse-unpack
+          if-no-files-found: error
+          retention-days: 7
 
   # ── GitHub Release 作成（片方成功でも実行）──────────────────
   release:
@@ -203,6 +228,22 @@ jobs:
         with:
           name: macos-dmg
           path: artifacts/
+
+      - name: Download Windows tools
+        if: ${{ needs.build-windows.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-tools
+          path: artifacts/
+        continue-on-error: true
+
+      - name: Download macOS tools
+        if: ${{ needs.build-macos.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-tools
+          path: artifacts/
+        continue-on-error: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
