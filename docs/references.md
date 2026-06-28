@@ -57,6 +57,12 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [V15] | url:google-workspace-security | Google Workspace Help — How Google protects your organization's security and privacy | Google | <https://support.google.com/a/answer/60762?hl=en> | Form↔ログのデータ分離・運用 | — | active |
 | [V16] | url:dropbox-file-request | Dropbox Help — How to create and manage Dropbox file requests | Dropbox | <https://help.dropbox.com/share/create-file-request> | ログ提出（File Request）運用 | — | active |
 | [V17] | url:dropbox-security | Dropbox Help — Dropbox account safety / how security works | Dropbox | <https://help.dropbox.com/security/how-security-works> | 暗号化・ゼロ知識保管の限界→ローカル暗号 | — | active |
+| [V18] | lit:larson-csik-1983-esm | Larson, R. & Csikszentmihalyi, M. — The Experience Sampling Method | New Directions for Methodology of Social & Behavioral Science 15:41–56, 1983 (reprint: Springer 2014, doi:10.1007/978-94-017-9088-8_2) | <https://doi.org/10.1007/978-94-017-9088-8_2> | ESM 原典・signal/interval/event-contingent。L0 較正プローブの measurement independence 一次根拠 | — | active |
+| [V19] | isbn:978-1-4129-2557-0 | Hektner, J. M., Schmidt, J. A. & Csikszentmihalyi, M. — Experience Sampling Method: Measuring the Quality of Everyday Life | Sage, 2007 | <https://methods.sagepub.com/book/mono/experience-sampling-method/toc> | ESM logistics・stratified/block 型信号がクラスタ回避の標準＝同次 Poisson 是正の裏付け | — | active |
+| [V20] | doi:10.1145/985692.985727 | Adamczyk, P. D. & Bailey, B. P. — If not now, when? The effects of interruption at different moments within task execution | CHI '04, pp.271–278, 2004 | <https://doi.org/10.1145/985692.985727> | 割り込みタイミング・breakpoint＝L2' Opportunity（介入機会）合わせ | — | active |
+| [V21] | doi:10.1145/1357054.1357070 | Iqbal, S. T. & Bailey, B. P. — Effects of intelligent notification management on users and their tasks | CHI '08, pp.93–102, 2008 | <https://doi.org/10.1145/1357054.1357070> | defer-to-breakpoint 通知＝L2' 介入最適化（無偏測定とは逆向き） | — | active |
+| [V22] | doi:10.1145/3130956 | Pielot, M. et al. — Beyond Interruptibility: Predicting Opportune Moments to Engage Mobile Phone Users | Proc. ACM IMWUT 1(3):91, 2017 | <https://doi.org/10.1145/3130956> | opportune moment／engagement 予測＝L2' 受容性最大化（較正に流用すると独立性汚染） | — | active |
+| [V23] | doi:10.1145/2858036.2858566 | Mehrotra, A. et al. — My Phone and Me: Understanding People's Receptivity to Mobile Notifications | CHI '16, pp.1021–1032, 2016 | <https://doi.org/10.1145/2858036.2858566> | 受容性・心理特性要因。重要な内容の通知すら disruption を生む＝介入侵襲のトレードオフ | — | active |
 
 ---
 
@@ -73,7 +79,7 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | Mehta et al. 2025 | [P11] | [V6] |
 | Park 2024 | [P7] | [V13] |
 
-→ 一意な文献数 = 15 + 17 − 6 = **26**。
+→ 一意な文献数 = 15 + 23 − 6 = **32**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで追加、P との重複なし）。
 
 ## 追加・撤回ルール
 
