@@ -27,3 +27,28 @@
   用途では実害なしと判断し、SetLastError ダンスは入れずコメントで明記。
 - X1 (debug_assertions で囲む): 既存 debug command 群 (force_wall 等) と同様 ensure_debug_enabled() のみで
   揃える。窓ジオメトリは非機密で security-checker も clear 済みのため不採用 (一貫性優先)。
+
+## D-audit-3: Windows 実機計測の結論 — 真因は「idle 残存」でなく「カード box の透明余白」
+- 計測 (GSE_log_issue.docx・gse_20260629_005937): **退避は Windows で完全に機能**。probe→idle/nudge→idle/
+  wall→idle すべてで `offscreen=true`(x=-20000, w=17×10) + `ex_transparent=true`。→ H1/H4 棄却、退避は健全。
+- 唯一の on-screen idle 行 (idle-after-1500ms=offscreen=false) は probe→idle の**遅延タイマーが正規表示の
+  Nudge を拾った計装ノイズ** (真の上書き H2/H3 ではない)。
+- ユーザー確認: クリックを奪われたのは「**カード(probe/Nudge)表示中**」。widget-show ログ
+  `w=406 h=439 ex_transparent=false` = box(406×439) がカード実寸(~358×~300)より大きく、**透明余白が
+  Windows でクリックを奪っていた** (#11461: 透明 WebView2 窓は透明ピクセルでもクリック捕捉)。
+  → 真因は「idle 残存」ではなく「カード box の透明余白」。framing を訂正。
+
+## D-audit-4: 修正方針 — overlay 窓をカード実寸ちょうどに縮める (窓=カード=透明余白ゼロ)
+- 退避(idle)は健全なので触らない。widget(カード表示)時の box を**カード実寸**へ縮め、透明余白を物理的に消す。
+  Windows は透明部分を透過できないため、これが唯一の堅牢策 (実寸縮小)。
+- 実装: ResizeObserver で `offsetWidth/offsetHeight` (CSS transform 非依存=pop-in scale で縮小値を拾わない)
+  を測り、窓を実寸へ setSize。カード CSS を viewport 単位 (100vw/100vh) から切り離し
+  (nudge width 340px固定 / probe maxHeight 600px固定)、窓縮小↔カード縮小の無限ループを遮断。
+- レビュー対応:
+  - code-reviewer HIGH: フォールバックが実カードより小さいと初回フレームでボタンクリップ=較正喪失 →
+    **フォールバックは必ず実カードより大きい側** (PROBE 380×470 / NUDGE 360×250。過大は自己回復・過小は到達不能)。
+  - code-reviewer MEDIUM: maxHeight 固定で画面収まり保証を失う → 窓を **monitor clamp** (winH=min(winH, monH-2*margin))。
+  - cross-review (Claude+Codex 一致) HIGH: `.nudge-card overflow:hidden` + clamp で dismiss クリップの逃げ場なし →
+    `.nudge-card` を `overflow-y:auto` 化 (ProbeCard と同じ保険)。
+- 検証: tsc green / vite build green / code-reviewer(再)・security-checker・cross-review 全解消。
+  Windows 実機での最終確認 (カード表示中にカード外クリックが背後へ通る) はユーザーの dev 機で。

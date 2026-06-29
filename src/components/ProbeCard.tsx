@@ -10,12 +10,15 @@ interface ActiveProbe extends ProbeTriggered {
 interface ProbeCardProps {
   // カードの表示/非表示を親 (Overlay) に伝え、cursor events と可視性を制御させる。
   onActiveChange: (active: boolean) => void;
+  // カードの実描画サイズ (logical px) を親へ通知する。親は overlay 窓をこの実寸に縮め、
+  // 透明余白 (Windows でクリックを奪う) を物理的に無くす。非表示時は null。
+  onResize: (size: { w: number; h: number } | null) => void;
 }
 
 /// v0.3 較正のプローブ回答カード (Task C / §4)。
 /// backend が emit する probe_triggered を listen し、Q1摩擦/Q2前進 (1-5) を回答 or skip する。
 /// 原則5: モデル出力 (X/Y/p_stuck/推定状態) は一切表示しない。
-const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
+const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange, onResize }) => {
   const [probe, setProbe] = useState<ActiveProbe | null>(null);
   const [q1, setQ1] = useState(3); // 摩擦 (1=詰まってない .. 5=とても詰まった)
   const [q2, setQ2] = useState(3); // 前進 (1=まったく進んでない .. 5=とても進んだ)
@@ -25,11 +28,37 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
   const [error, setError] = useState<string | null>(null);
   // listen コールバックは古い closure を捕捉するため、表示中判定は ref で行う。
   const probeRef = useRef<ActiveProbe | null>(null);
+  // カード本体 (実寸測定用)。overlay 窓をこの実寸へ縮めるために親へ通知する。
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     probeRef.current = probe;
     onActiveChange(probe !== null);
   }, [probe, onActiveChange]);
+
+  // カード実寸を ResizeObserver で測り親へ通知 (overlay 窓を実寸に縮め透明余白を消す)。
+  // 表示が消えたら null を通知。サイズ未変化なら通知しない (窓再配置の churn 抑制)。
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!probe || !el) {
+      onResize(null);
+      return;
+    }
+    const report = () => {
+      // offsetWidth/Height は layout 寸法で CSS transform (pop-in の scale) の影響を受けない。
+      // getBoundingClientRect だとアニメ中の縮小値を拾い窓が小さく確定→カード切れになる。
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w > 0 && h > 0) onResize({ w, h });
+    };
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      onResize(null);
+    };
+  }, [probe, onResize]);
 
   useEffect(() => {
     const unlisten = listen<ProbeTriggered>("probe_triggered", (event) => {
@@ -126,14 +155,18 @@ const ProbeCard: React.FC<ProbeCardProps> = ({ onActiveChange }) => {
 
   return (
     <div
+      ref={cardRef}
       className="probe-card probe-card-pop"
       style={{
-        position: "fixed",
-        right: "1.25rem",
-        top: "1.25rem",
+        // overlay 窓の右上に密着 (窓は本カード実寸へ縮むため余白=透明クリック奪取を作らない)。
+        position: "absolute",
+        right: 0,
+        top: 0,
         width: "320px",
-        // box モード窓 (PROBE_BOX_H) からはみ出して回答ボタンが透過領域に隠れるのを防ぐ。
-        maxHeight: "calc(100vh - 2.5rem)",
+        // maxHeight は viewport(100vh) 依存にしない: 窓を実寸へ縮めると 100vh も縮み、
+        // maxHeight→content クランプ→さらに縮小…の無限ループになるため固定上限にする。
+        // 通常画面では到達せず、極小画面でのみ効いて overflowY でスクロール可能に保つ。
+        maxHeight: "600px",
         overflowY: "auto",
         padding: "1rem 1.2rem",
         background: "rgba(28, 30, 38, 0.97)",
