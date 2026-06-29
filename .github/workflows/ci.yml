@@ -169,6 +169,15 @@ jobs:
             BINARY="$APP/Contents/MacOS/gse-next"
             ENTITLEMENTS="src-tauri/Entitlements.plist"
 
+            # 研究者専用 CLI (gse-package=手動提出 / gse-unpack=復号) を .app から除去する。
+            # macOS バンドラは --features package ビルドの全 [[bin]] を Contents/MacOS へ自動コピー
+            # するが、被験者配布物にこれらは不要 (アプリ内提出は gse-submit のみ使用)。鍵が無ければ
+            # gse-unpack は無力で機密漏れではないが、配布物を最小化する (再署名前に削除し署名整合を保つ)。
+            # Release のツール資産は target/release/ 由来 (別経路) なので研究者は引き続き取得できる。
+            echo "=== Stripping researcher-only CLIs from .app ==="
+            rm -f "$APP/Contents/MacOS/gse-package" "$APP/Contents/MacOS/gse-unpack"
+            ls "$APP/Contents/MacOS/"
+
             # レイヤード署名: --deep は Apple 非推奨。
             # ネスト署名の不整合が TCC の権限拒否を引き起こす可能性があるため、
             # 内部バイナリ → 外部バンドルの順に個別署名する。
@@ -196,6 +205,9 @@ jobs:
             test -f "$APP/Contents/MacOS/gse-submit" || { echo "::error::gse-submit が .app に同梱されていません (アプリ内提出が動作しない)"; exit 1; }
             ls "$APP/Contents/Resources/"*pubkey.txt "$APP/Contents/Resources/resources/pubkey.txt" 2>/dev/null | head -1 | grep -q pubkey.txt \
               || { echo "::error::pubkey.txt が .app の Resources に同梱されていません (recipient 未解決で提出不能)"; exit 1; }
+            if [ -e "$APP/Contents/MacOS/gse-package" ] || [ -e "$APP/Contents/MacOS/gse-unpack" ]; then
+              echo "::error::researcher 専用 CLI (gse-package/gse-unpack) が .app に残存 (strip 失敗)"; exit 1
+            fi
 
             echo "=== Verification ==="
             codesign --verify --strict "$APP" && echo "Signature OK" || echo "Signature verification failed"

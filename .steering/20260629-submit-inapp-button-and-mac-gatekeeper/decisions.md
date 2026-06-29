@@ -54,6 +54,16 @@ pubkey.txt と分離するため、in-app 提出を自己完結させるには�
 **判断**: `handleSubmit` で `/^[a-zA-Z0-9]{1,16}$/` を即時チェックし、不正 ID で IPC 往復しない。
 最終防線は backend `participant_id::is_valid_participant_id`（同一規則・SSOT）。
 
+## D8: 配布最小化 — researcher 専用 CLI を mac .app から除去（ユーザー選択 B・2026-06-29）
+**判断**: CI `build-macos` の再署名前に `gse-package`/`gse-unpack` を `.app/Contents/MacOS/` から `rm`。
+**根拠**: macOS バンドラは `--features package` ビルドの全 `[[bin]]` を自動コピーするが、被験者配布物に
+研究者専用 CLI（手動提出・**復号**）は不要。`gse-unpack` は秘密鍵が無ければ無力で機密漏れではないが
+（鍵は配布しない）、配布物を最小化する。Release のツール資産は `target/release/` 由来の別経路なので
+研究者は引き続き取得可。strip 後に署名し署名整合を保つ。残存検知アサートも追加。
+**配布の含意（確定）**: mac=`.dmg` 1つで自己完結。Windows=ポータブルゆえ単一化不可で
+`gse-next.exe`+`gse-submit.exe`+`pubkey.txt` の co-located フォルダが必須（`.bat`/`gse-package.exe` は任意、
+`gse-unpack.exe` は被験者に渡さない）。
+
 ## D5: fail-loud
 **判断**: 提出失敗は frontend で赤字インライン表示（既存 record 失敗パターン同様）、リトライ可能。
 backend は非 0 exit 時に stderr（無ければ stdout）を `Err` で返す。静かに失わない。
