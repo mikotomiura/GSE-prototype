@@ -178,6 +178,113 @@ body {
   color: var(--color-flow);
 }
 
+/* アプリ内提出 (案A sidecar): 参加者 ID 入力 + 提出ボタン + fail-loud 結果表示。 */
+.submit-section {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-sizing: border-box;
+}
+
+.submit-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.submit-help {
+  margin: 0 0 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+.submit-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.submit-id-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.submit-button {
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text);
+  background: rgba(96, 165, 250, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.submit-button:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.3);
+  border-color: rgba(96, 165, 250, 0.75);
+}
+
+.submit-button:disabled,
+.submit-id-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.submit-success {
+  margin-top: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.5);
+}
+
+.submit-success p {
+  margin: 0.2rem 0;
+}
+
+.submit-path code {
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+/* fail-loud: 失敗は赤字で常時表示し、静かに失わない (record 失敗インラインと同じ思想)。 */
+.submit-error {
+  margin-top: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  color: var(--color-stuck);
+}
+
+.submit-error p {
+  margin: 0.2rem 0;
+}
+
+.submit-error-detail {
+  font-size: 0.78rem;
+  opacity: 0.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* デバッグ: Wall 強制発動ボタン (較正モードのみ表示)。本番介入色と紛れないよう破線・控えめ。 */
 .debug-force-wall-button {
   width: 100%;

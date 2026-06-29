@@ -18,9 +18,9 @@ use std::str::FromStr;
 use crate::analysis::anonymize::{anonymize_ndjson, find_session_start};
 
 /// 参加者 ID の最小検証 (パストラバーサル防止)。英数字のみ・1..=16 文字。
-pub fn is_valid_participant_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= 16 && id.chars().all(|c| c.is_ascii_alphanumeric())
-}
+/// 規則の単一情報源は `crate::participant_id` (アプリ内提出 `submit_latest_session` と共有し
+/// feature gate を跨いだ drift を防ぐ)。後方互換のためここから re-export する。
+pub use crate::participant_id::is_valid_participant_id;
 
 /// `recipient` 引数が `age1...` ならそのまま、そうでなければファイルとして読み公開鍵行を抽出する。
 pub fn resolve_recipient(arg: &str) -> Result<String, String> {

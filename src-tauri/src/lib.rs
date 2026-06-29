@@ -1,6 +1,9 @@
 pub mod analysis;
 pub mod input;
 pub mod logger;
+// 提出ファイル名ラベル用 participant_id 検証の単一情報源 (feature 非依存)。
+// packaging (提出 CLI) と submit_latest_session (アプリ内提出) の双方が参照する。
+pub mod participant_id;
 // 提出ツール (gse-package / gse-submit) 共有の匿名化+age 暗号化 (data-privacy SSOT)。
 // age 依存はこの module 経由のみ。blind アプリ本体 (default features) には載せない (D3)。
 #[cfg(feature = "package")]
@@ -783,6 +786,158 @@ fn open_accessibility_settings() -> String {
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
     log.lock().unwrap_or_else(|p| p.into_inner()).path.clone()
+}
+
+// --- アプリ内提出 (案A sidecar / mac Gatekeeper 根絶) -------------------------------
+//
+// 被験者が既に Gatekeeper 承認済みの GSE アプリから「提出する」を押すと、同梱 `gse-submit`
+// を **子プロセス**として起動して最新セッションを匿名化 + age 暗号化する。親アプリが exec した
+// 子プロセスは Gatekeeper に再評価されない (バンドル内バイナリは app の信頼を継承) ため、
+// 別 exe/別スクリプトの `com.apple.quarantine` 発火を根絶する。`age` 依存は `gse-submit`
+// (feature = "package") 側に閉じ、本コマンドは subprocess 起動のみで `age` を link しない
+// (隔離方針 D3 を維持・default の Tauri ビルドに載る)。匿名化 + 暗号化ロジックは
+// `packaging.rs` を `gse-submit` 経由で再利用し、重複実装しない。
+
+/// アプリ内提出の結果 (frontend へ返す DTO)。`ok=false` は `Err` 経由で返すため通常 true。
+#[derive(serde::Serialize)]
+struct SubmitOutcome {
+    /// 生成された `.age` 提出物の絶対パス (stdout から抽出できた場合)。UI が保存先として表示する。
+    out_path: Option<String>,
+}
+
+/// gse-submit の stdout から生成 `.age` の絶対パスを抽出する (best-effort)。
+/// submit.rs (`gse-submit`) は「提出ファイルの場所:」の次行にインデント付きでパスを出す
+/// (`src/bin/submit.rs` の成功時 stdout)。書式変更に頑健にするため `.age` で終わる行を拾う。
+fn extract_age_path(stdout: &str) -> Option<String> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && l.ends_with(".age"))
+        .map(|l| l.to_string())
+}
+
+/// 同梱された研究者公開鍵 (`pubkey.txt` / `recipient.txt`) を bundle resource から解決する。
+/// 見つかれば `GSE_RECIPIENT` に渡す絶対パスを返す。見つからなければ `None` (この場合
+/// gse-submit は exe 隣の鍵探索にフォールバックし、無ければ案内付きで fail-loud)。
+fn resolve_bundled_recipient(app: &tauri::AppHandle) -> Option<String> {
+    let resource_dir = app.path().resource_dir().ok()?;
+    // resources の配置形式 (フラット / resources/ サブディレクトリ) の差異に頑健にするため
+    // 複数候補を探す。
+    for sub in ["", "resources"] {
+        let base = if sub.is_empty() {
+            resource_dir.clone()
+        } else {
+            resource_dir.join(sub)
+        };
+        for name in ["pubkey.txt", "recipient.txt"] {
+            let p = base.join(name);
+            if p.is_file() {
+                return Some(p.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
+}
+
+/// `gse-submit` を子プロセスとして実行する (ブロッキング)。`submit_latest_session` から
+/// `spawn_blocking` 経由で呼ばれ、メインスレッド/イベントループを塞がない。
+/// binary 解決 → env 設定 (`GSE_PARTICIPANT_ID` / `GSE_RECIPIENT`) → 実行 → 結果解釈までを行う。
+fn run_submit_blocking(app: tauri::AppHandle, id: String) -> Result<SubmitOutcome, String> {
+    // 同梱 gse-submit (current_exe の隣)。mac=.app/Contents/MacOS/gse-submit (リリースで同梱済)、
+    // win=gse-next.exe と同階層 gse-submit.exe (ポータブル配布フォルダに co-located)。
+    let exe =
+        std::env::current_exe().map_err(|e| format!("実行ファイルのパスを取得できません: {e}"))?;
+    let dir = exe
+        .parent()
+        .ok_or("実行ファイルの親ディレクトリを解決できません。")?;
+    let bin_name = if cfg!(windows) {
+        "gse-submit.exe"
+    } else {
+        "gse-submit"
+    };
+    let submit_bin = dir.join(bin_name);
+    if !submit_bin.is_file() {
+        return Err(format!(
+            "提出ツール ({}) が見つかりません。配布パッケージが壊れている可能性があります。研究者に連絡してください。",
+            submit_bin.display()
+        ));
+    }
+
+    // 同梱公開鍵を env 経由で渡す (gse-submit は GSE_RECIPIENT を最優先で採用)。
+    let recipient = resolve_bundled_recipient(&app);
+    if recipient.is_none() {
+        // mac は exe 隣 (Contents/MacOS) に鍵が無く resource 経由が唯一の経路。解決失敗を可視化し
+        // 「公開鍵未解決」の原因切り分けを容易にする (gse-submit 側で fail-loud になる)。
+        tracing::warn!(
+            "in-app submit: bundled recipient (pubkey.txt) not resolved; relying on gse-submit fallback"
+        );
+    }
+
+    // 参加者 ID は env で渡し対話プロンプトを省略する (子プロセスに TTY が無いため)。
+    let mut cmd = std::process::Command::new(&submit_bin);
+    cmd.env("GSE_PARTICIPANT_ID", &id);
+    if let Some(r) = &recipient {
+        cmd.env("GSE_RECIPIENT", r);
+    }
+    // Windows: 子プロセスのコンソール窓を出さない (CREATE_NO_WINDOW)。
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("提出ツールの起動に失敗しました: {e}"))?;
+
+    if output.status.success() {
+        tracing::info!("in-app submit succeeded for participant {}", id);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        Ok(SubmitOutcome {
+            out_path: extract_age_path(&stdout),
+        })
+    } else {
+        // fail-loud: 詳細 (stderr→stdout) は UI にのみ返しリトライ可能にする。ログには exit code
+        // のみ残す (stderr にはローカルのホームパス=OS ユーザー名が混入し得るため・data-privacy)。
+        tracing::warn!("in-app submit failed (exit {:?})", output.status.code());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let detail = if !stderr.trim().is_empty() {
+            stderr.trim()
+        } else {
+            stdout.trim()
+        };
+        Err(if detail.is_empty() {
+            "提出に失敗しました (詳細不明)。研究者に連絡してください。".to_string()
+        } else {
+            detail.to_string()
+        })
+    }
+}
+
+/// アプリ内「提出する」ボタンの Tauri コマンド。最新セッションを同梱 `gse-submit` で
+/// 匿名化 + 暗号化し、`.age` を生成する。失敗は fail-loud で `Err` を UI に返す (静かに失わない)。
+///
+/// `gse-submit` の匿名化 + age 暗号化は数百 ms 以上かかり得るため、`async` + `spawn_blocking`
+/// で subprocess をワーカースレッドに退避し、IPC/メインスレッド (overlay 制御等のイベントループ)
+/// を塞がない。
+#[tauri::command]
+async fn submit_latest_session(
+    app: tauri::AppHandle,
+    participant_id: String,
+) -> Result<SubmitOutcome, String> {
+    let id = participant_id.trim().to_string();
+    if !crate::participant_id::is_valid_participant_id(&id) {
+        return Err(
+            "参加者 ID が正しくありません (英数字のみ・1〜16 文字。例: P006)。".to_string(),
+        );
+    }
+
+    // ブロッキングな subprocess 実行をワーカースレッドへ退避 (UI を固めない)。
+    tauri::async_runtime::spawn_blocking(move || run_submit_blocking(app, id))
+        .await
+        .map_err(|e| format!("提出処理の実行に失敗しました: {e}"))?
 }
 
 /// Phase 1 Ground Truth ラベル記録の共通処理。
@@ -1965,6 +2120,7 @@ pub fn run() {
             set_overlay_interactive,
             quit_app,
             get_session_file,
+            submit_latest_session,
             record_user_label,
             record_session_meta,
             record_realtime_answer,
@@ -2084,5 +2240,29 @@ mod task_c_command_tests {
         );
         // 未知値は Err (黙って silent に倒さない)。
         assert!(parse_dismiss_reason(Some("whatever")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod submit_command_tests {
+    use super::extract_age_path;
+    // participant_id 検証の規則テストは crate::participant_id (単一情報源) 側に置く。
+
+    #[test]
+    fn extract_age_path_picks_dot_age_line() {
+        // submit.rs の実際の出力形 (「提出ファイルの場所:」の次行にインデント付きパス)。
+        let stdout = "✓ 最新セッションを匿名化 (12 行) → age 暗号化しました。\n\n  \
+             提出ファイルの場所:\n    /Users/p/Documents/GSE-submissions/P006_gse_x.age\n\n\
+             → このファイルを研究者の Dropbox に提出してください。";
+        assert_eq!(
+            extract_age_path(stdout).as_deref(),
+            Some("/Users/p/Documents/GSE-submissions/P006_gse_x.age")
+        );
+    }
+
+    #[test]
+    fn extract_age_path_none_when_absent() {
+        assert_eq!(extract_age_path("no path here\njust text"), None);
+        assert_eq!(extract_age_path(""), None);
     }
 }
