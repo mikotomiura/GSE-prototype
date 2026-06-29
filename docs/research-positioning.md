@@ -230,6 +230,15 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 - **軽減策**: criterion label の汚染は **時間隔離窓（プローブ前 t−31s..t−1s のみを分析）** で打鍵汚染を構造的に断ち、
   **遅延プローブ・事後リコールとの一致確認・プローブ頻度の感度分析**で反応性を点検する。
   GATE1（尺度理解）延期下では Q1/Q2 の二軸理解を**事後の理解確認・二軸性検定（H-X1b/PreReg-8）の感度分析**で補完する。直接 Stuck プローブ項目の追加（より独立な GT）は将来の収集設計課題。
+- **課題種別（task type）による停滞の質の差は理論的に予期されるが、現状は未統制・未検証**: 停滞（L1 Stuck）の
+  質はタスク種別で異なると予期される——論述（expository/argumentative）は **knowledge-transforming＝
+  内容/修辞の二問題空間を往復する高認知負荷**で「行き詰まり→再構成」が濃く起こり [P16][P17][P18]、物語・
+  近況・定型通信文は **knowledge-telling＝低負荷**で停滞は浅い。だが GSE Dashboard の課題種別 enum
+  （`argumentative`/`correspondence`/`creative`/`vibe_coding`）は**現状 ad-hoc・記録専用（`session_meta` 監査メタ）**で、
+  (i) telling↔transforming 軸での分類妥当性の検証、(ii) タスク別の停滞の質の層別分析、いずれも未着手
+  （`task_kind` は分析パイプラインで dead_code）。加えて `task_kind`→HMM β baseline（writing/coding）は
+  **未配線**で、タスク混在は単一 β での採点ミスマッチ（交絡）を生む。→ 軽減: **Phase1 は論述に対象を固定して
+  この交絡を統制**（§9）、タスク種別間の停滞差（per-task C-index/状態分布）は **N と検出力の都合で Phase2（N増）の層別検証**へ送る。
 
 ## 9. スコープ / 非スコープ
 
@@ -243,6 +252,10 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   - キーストローク**内容**・クリップボード本文・ウィンドウタイトルの記録（VK コード等のみ。data-privacy SSOT [V5][V7]）。
   - 強 Wall / Outdoor Physical Anchor の無制限適用（初期は opt-in、夜間 22:00–6:00 は Outdoor 無効）。
   - 大規模 N の確証研究（現フェーズは較正＝測定法と少数被験者の妥当性確認、半年 26 週 n=3–10）。
+  - **Phase1 の対象タスクは論述（argumentative＝knowledge-transforming 代表）に限定**する [P16][P17]。停滞信号が
+    最も濃く writing β ベースラインと整合し、ラベルを1タスクに集中して個人内 C-index の検出力を最大化するため。
+    **タスク種別間の停滞の質の比較（per-task 層別分析）は Phase2（N増）送り**（`task_kind` は記録のみ継続し、
+    Phase2 で telling↔transforming 軸の妥当性と併せて検証する。§8 限界参照）。
 
 ## References
 
