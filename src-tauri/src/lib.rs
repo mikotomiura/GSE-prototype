@@ -257,6 +257,111 @@ fn debug_force_probe(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// overlay 窓の実状態 (位置/サイズ/可視性/Windows のクリック透過 ex-style)。
+/// idle 残存バグ (背後アプリのクリックを奪う) を一次情報で監査するための読み取り専用 DTO。
+#[derive(serde::Serialize)]
+struct OverlayWindowState {
+    /// outer_position (physical px)。idle 退避済みなら大きな負値 (例 -20000)。
+    x: i32,
+    y: i32,
+    /// outer_size (physical px)。idle 退避済みなら 1x1 近辺 (OS の最小サイズに clamp されうる)。
+    width: u32,
+    height: u32,
+    /// Tauri から見た可視フラグ。idle でも hide() しない設計 (D10) なので true のはず。
+    /// None = is_visible() 取得失敗 (「非表示」と区別して監査を誤読させないため Option)。
+    visible: Option<bool>,
+    /// 番兵: 画面外退避済みか。Overlay.tsx の退避量 OFFSCREEN_POS(-20000) に対し余裕を持たせた
+    /// -10000 を閾値にする。idle で false なら退避が効いていない (H4)。
+    offscreen: bool,
+    /// Windows のみ: WS_EX_TRANSPARENT (OS クリック透過) が立っているか。macOS は None。
+    ex_transparent: Option<bool>,
+    /// Windows のみ: WS_EX_LAYERED が立っているか。macOS は None。
+    ex_layered: Option<bool>,
+}
+
+/// デバッグ用: overlay 窓の実位置/サイズ/可視性/(Windows) クリック透過 ex-style を読み返す。
+/// オーバーレイ残存バグ (idle で背後アプリのクリックを奪う) を推測でなく一次情報で監査するための
+/// **読み取り専用** 計装 (窓を一切変更しない)。フロント (Overlay.tsx) が各状態遷移直後に `tag` 付きで
+/// 呼び、結果を tracing に出して「どの遷移後 idle で窓が画面に残るか」の状態行列を埋める。
+/// `ensure_debug_enabled()` (GSE_DEBUG=1) ゲート下。被験者ビルドでは VITE_GSE_DEBUG off で呼ばれない。
+#[tauri::command]
+fn debug_overlay_window_state(
+    app: tauri::AppHandle,
+    tag: String,
+) -> Result<OverlayWindowState, String> {
+    ensure_debug_enabled()?;
+    let win = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window not found".to_string())?;
+    let pos = win.outer_position().map_err(|e| e.to_string())?;
+    let size = win.outer_size().map_err(|e| e.to_string())?;
+    // is_visible 取得失敗は None で報告する (false=非表示 と混同させない・監査の誤読防止)。
+    let visible = win.is_visible().ok();
+
+    // Windows のみ: GWL_EXSTYLE を読み返し、WS_EX_TRANSPARENT (set_ignore_cursor_events が
+    // 実効したか) を確認する。#11461 で透明 WebView2 窓には効かない疑いを一次情報で検証する。
+    #[cfg(windows)]
+    let (ex_transparent, ex_layered) = {
+        // NOTE: GetWindowLongPtrW は 64bit ターゲット限定 API (windows crate)。配布対象は x64
+        // (Surface Pro 8) のため実害なし。将来 32bit ビルドが必要になれば GetWindowLongW へ分岐する。
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
+        };
+        match win.hwnd() {
+            Ok(hwnd) => {
+                // バージョン橋渡し: `win.hwnd()` は Tauri が依存する windows 0.61 の HWND を返すが、
+                // 本クレートが直接 import する GetWindowLongPtrW は windows 0.58 の HWND を要求する
+                // (0.x の異 minor は semver 非互換で型が統一されない)。両版とも
+                // `HWND(pub *mut c_void)` と同一レイアウトなので、生ポインタ経由で 0.58 HWND を
+                // 構築して渡す (transmute 不要・cross-review H1 対応)。
+                let hwnd058 = HWND(hwnd.0);
+                // SAFETY: GetWindowLongPtrW は read-only な Win32 照会で副作用を持たない。
+                // hwnd058 は Tauri 所有の有効な overlay 窓ハンドル (生ポインタ同値) で、本コマンドは
+                // メインスレッドで同期実行されるため実行中に破棄されない。
+                // (NOTE/H2: 透明 always_on_top layered 窓の EXSTYLE は常に非0 のため、本 debug
+                //  用途では「0=失敗」と「0=フラグ無し」の曖昧さは実害なし。)
+                let ex = unsafe { GetWindowLongPtrW(hwnd058, GWL_EXSTYLE) } as u32;
+                (
+                    Some(ex & WS_EX_TRANSPARENT.0 != 0),
+                    Some(ex & WS_EX_LAYERED.0 != 0),
+                )
+            }
+            Err(e) => {
+                tracing::warn!("debug_overlay_window_state: hwnd() failed: {}", e);
+                (None, None)
+            }
+        }
+    };
+    #[cfg(not(windows))]
+    let (ex_transparent, ex_layered): (Option<bool>, Option<bool>) = (None, None);
+
+    let offscreen = pos.x <= -10_000 || pos.y <= -10_000;
+    tracing::info!(
+        target: "overlay_audit",
+        tag = %tag,
+        x = pos.x,
+        y = pos.y,
+        w = size.width,
+        h = size.height,
+        visible = ?visible,
+        offscreen = offscreen,
+        ex_transparent = ?ex_transparent,
+        ex_layered = ?ex_layered,
+        "overlay_window_state"
+    );
+    Ok(OverlayWindowState {
+        x: pos.x,
+        y: pos.y,
+        width: size.width,
+        height: size.height,
+        visible,
+        offscreen,
+        ex_transparent,
+        ex_layered,
+    })
+}
+
 /// ログ書込先の状態をフロントへ返す (#1 層2 fail-loud)。起動時にフロントが取得し、
 /// `ok=false` なら「ログがどこに / 書けていない」旨の警告バナーを常時表示する。
 #[tauri::command]
@@ -1846,6 +1951,7 @@ pub fn run() {
             force_wall,
             force_nudge,
             debug_force_probe,
+            debug_overlay_window_state,
             get_log_status,
             record_intervention_dismiss,
             get_keyboard_idle_ms,
