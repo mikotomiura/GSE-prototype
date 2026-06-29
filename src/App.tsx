@@ -9,11 +9,15 @@ import type { TaskKind } from "./probeTypes";
 import "./App.css";
 
 // Task C: session_meta の task_kind 宣言 (start 画面のセレクタ)。
+// Phase1 ロック: 較正は **論述 (argumentative) に固定**する。非論述を混ぜると C-index が
+// タスク種別で交絡するため (Phase1 実行可否レビューのブロッカー #2)。Phase1 完了後に
+// 他種別へ広げる時は下のコメントアウトを戻す (型 TaskKind は 4 種を保持・backend は不変)。
 const TASK_KINDS: { value: TaskKind; label: string }[] = [
   { value: "argumentative", label: "論述" },
-  { value: "correspondence", label: "通信文" },
-  { value: "creative", label: "創作" },
-  { value: "vibe_coding", label: "vibe coding" },
+  // --- Phase1 較正中はロックのため非表示 (復活させる時はコメントを外す) ---
+  // { value: "correspondence", label: "通信文" },
+  // { value: "creative", label: "創作" },
+  // { value: "vibe_coding", label: "vibe coding" },
 ];
 
 // Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / decisions FD2)。
@@ -301,7 +305,7 @@ function App() {
 
         {/* Task C: session_meta の task_kind 宣言 */}
         <div style={{ margin: "1rem 0" }}>
-          <div style={{ fontSize: "0.85rem", marginBottom: "0.4rem" }}>今回の作業種別:</div>
+          <div style={{ fontSize: "0.85rem", marginBottom: "0.4rem" }}>今回の作業種別（Phase1 は論述に固定）:</div>
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
             {TASK_KINDS.map((tk) => (
               <button

@@ -63,3 +63,8 @@ age-identity.txt
 # case-insensitive Windows git. *.age already covers every ciphertext regardless of id width.
 *.age
 P[0-9]*_*.ndjson
+# Session NDJSON は命名に関わらず never commit: logger 出力 `gse_YYYYMMDD_HHMMSS.ndjson` や
+# Dropbox リネーム後の `gse_..._P###.ndjson` は上の P[0-9]* に当たらないため別途ガードする
+# (experiments/ で復号・解析する時の誤コミット防止)。集計 JSON (metrics/calib/cohort.json) は対象外で
+# コミット可。committed fixtures は `gse_` 始まりでないため影響なし。
+gse_*.ndjson
