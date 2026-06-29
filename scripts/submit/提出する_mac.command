@@ -6,6 +6,12 @@
 # 初回のみ: ダウンロード直後は macOS のセキュリティ警告が出ることがあります。
 # その場合は gse-submit と本ファイルを右クリック →「開く」で一度許可してください。
 cd "$(dirname "$0")" || exit 1
+# macOS Gatekeeper 対策: ブラウザ/Drive 経由でダウンロードした未署名 (ad-hoc 署名) の CLI は
+# com.apple.quarantine が付き、そのまま実行すると Gatekeeper に SIGKILL される (exit 137)。
+# 本スクリプトはユーザーが右クリック→「開く」で一度承認して実行できているので、この時点で
+# 同じフォルダ内の隔離属性 (gse-submit / gse-package 等) を解除すれば、以降の ./gse-submit が
+# 起動できる。鍵やデータは書き換えない (xattr 属性の除去のみ)。
+xattr -dr com.apple.quarantine "$(dirname "$0")" 2>/dev/null
 chmod +x ./gse-submit 2>/dev/null
 ./gse-submit
 status=$?
