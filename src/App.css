@@ -479,13 +479,19 @@ body {
    (HCI: 緩やかな出現で周辺に留め、注意を奪わない)。応答ボタンを押すまで保持される。 */
 .nudge-card {
   position: absolute;
-  right: 16px;
-  top: 16px;
-  width: min(340px, calc(100vw - 32px));
+  /* overlay 窓の右上に密着 (窓は本カード実寸へ縮むため余白=透明クリック奪取を作らない)。
+     width は viewport(100vw) 依存にしない: 窓を実寸へ縮めると 100vw も縮み、width→縮小→…の
+     無限ループになるため固定値にする。 */
+  right: 0;
+  top: 0;
+  width: 340px;
   min-height: 86px;
   display: grid;
   grid-template-columns: 4px 1fr;
-  overflow: hidden;
+  /* 横は角丸クリップのため hidden。縦は auto: 窓が monitor clamp でカード高より小さくなっても
+     dismiss ボタンへスクロール到達できる逃げ道を残す (ProbeCard と同じ保険・cross-review H1)。 */
+  overflow-x: hidden;
+  overflow-y: auto;
   border-radius: 10px;
   background: rgba(248, 250, 252, 0.95);
   color: #172033;

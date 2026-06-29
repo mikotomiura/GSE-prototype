@@ -1,16 +1,23 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import ProbeCard from "./ProbeCard";
 
-// プローブ/Nudge 単独表示時にオーバーレイ窓を縮小する右上ボックス (logical px)。
-// カード (~360px) を収め、これ以外の画面領域は OS レベルでクリック透過になる
-// (被験者は作業を続けられる)。nudge も同じ box を再利用し非ブロック化する。
-const PROBE_BOX_W = 390;
-const PROBE_BOX_H = 430;
-const PROBE_BOX_MARGIN = 12;
+// プローブ/Nudge 単独表示時、overlay 窓は「カードの実寸ちょうど」に縮める (logical px)。
+// これにより窓=カードとなり透明余白が生じない → Windows でカード周囲のクリックを奪わない
+// (#11461: 透明 WebView2 窓は透明ピクセルでもクリックを捕捉するため、退避でなく実寸縮小で対処)。
+// 実寸は ResizeObserver で測る。下記は「測定が出るまでの一瞬」のフォールバック。
+// ★必ず実カードより大きい側に倒す: 過大なら 1 フレーム余分に透明余白が出て測定で即縮むだけ (自己回復) だが、
+//   過小だと submit/skip ボタンが窓外にクリップされ到達不能=較正ラベル喪失 (最悪)。非対称なので大きめ既定。
+const PROBE_FALLBACK_W = 380;
+const PROBE_FALLBACK_H = 470;
+const NUDGE_FALLBACK_W = 360;
+const NUDGE_FALLBACK_H = 250;
+// カードと画面端の余白 + カード切れ防止の僅かなパディング (透明余白を最小化するため 1px)。
+const CARD_SCREEN_MARGIN = 12;
+const CARD_FIT_PAD = 1;
 
 // idle 時にオーバーレイ窓を退避させる画面外座標 (physical px)。全モニタ構成の左上外側へ十分
 // 負方向に振る (revert された card 窓方式と同値・design.md)。幾何的に画面と重ならないため、
@@ -107,6 +114,12 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const [phoneConnected, setPhoneConnected] = useState(false);
     // Task C: プローブカード表示中フラグ。表示中は cursor events を受け付け、overlay を可視化する。
     const [probeActive, setProbeActive] = useState(false);
+    // プローブ/Nudge カードの実描画サイズ (logical px)。overlay 窓をこの実寸へ縮め透明余白を消す。
+    // null = 未測定 (フォールバックサイズを使う)。サイズ未変化なら state を更新しない (窓再配置の churn 抑制)。
+    const [probeCardSize, setProbeCardSize] = useState<{ w: number; h: number } | null>(null);
+    const [nudgeCardSize, setNudgeCardSize] = useState<{ w: number; h: number } | null>(null);
+    // Nudge カード本体 (実寸測定用)。
+    const nudgeRef = useRef<HTMLElement | null>(null);
     // Nudge を dismiss 済みか。同一 nudge の再表示を防ぐ。action が nudge 以外に変わると解除。
     const [nudgeDismissed, setNudgeDismissed] = useState(false);
     // dismiss 記録 (record_intervention_dismiss) が失敗したときのインラインエラー文言。
@@ -154,6 +167,35 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     const wallStartTimeRef = useRef<number>(0);
     const lastWarnedKeyAtRef = useRef<number>(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // ProbeCard から実寸通知を受ける安定コールバック (ProbeCard 側 effect deps の identity 維持)。
+    // サイズ未変化なら同一参照を返し、不要な窓再配置 effect を起こさない。
+    const handleProbeResize = useCallback((size: { w: number; h: number } | null) => {
+        setProbeCardSize((prev) => {
+            if (size === null) return null;
+            if (prev && prev.w === size.w && prev.h === size.h) return prev;
+            return size;
+        });
+    }, []);
+
+    // Nudge カードの実寸を測る (ProbeCard と異なり Nudge は常時マウントされ opacity で出し入れするため
+    // ここで観測)。窓はこの実寸へ縮める。
+    useEffect(() => {
+        const el = nudgeRef.current;
+        if (!el) return;
+        const report = () => {
+            // offsetWidth/Height は layout 寸法で transform (nudge の translateY/transition) 非依存。
+            const w = el.offsetWidth;
+            const h = el.offsetHeight;
+            if (w > 0 && h > 0) {
+                setNudgeCardSize((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+            }
+        };
+        report();
+        const ro = new ResizeObserver(report);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
 
     // スマートフォン接続イベントの購読
     useEffect(() => {
@@ -251,31 +293,41 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 await win.show();
                 if (cancelled) return;
                 if (widgetOnly) {
-                    // 右上小ボックス化 → カード外は他アプリへクリックが通る (非ブロック)。
-                    // unmaximize() は使わない (maximize と同じく NSPanel + WKWebView でクラッシュ。D8)。
-                    // 全画面状態からの復帰も下の明示 setSize で box サイズへ直接縮小すれば足りる。
-                    // 退避後は窓が画面外で currentMonitor() が null になりうるため primaryMonitor()
-                    // フォールバック (resolveShowMonitor)。これで下の setPosition (if (mon) 内) が
-                    // 確実に走り、カードがオンスクリーン右上へ復帰する (画面外残留=不可視を防ぐ)。
+                    // 窓を「表示中カードの実寸ちょうど」に縮め、右上へ置く → 窓=カードで透明余白ゼロ。
+                    // カード外 (窓外) は他アプリへクリックが通り、カード footprint だけが操作対象になる
+                    // (Windows: 透明余白でもクリックを奪う #11461 を、退避でなく実寸縮小で根治)。
+                    // unmaximize() は使わない (NSPanel + WKWebView でクラッシュ。D8)。退避後は窓が画面外で
+                    // currentMonitor() が null になりうるため resolveShowMonitor (primaryMonitor フォールバック)。
                     const mon = await resolveShowMonitor();
                     if (cancelled) return;
                     const scale = mon?.scaleFactor ?? 1;
-                    await win.setSize(
-                        new PhysicalSize(Math.round(PROBE_BOX_W * scale), Math.round(PROBE_BOX_H * scale))
-                    );
+                    // 実寸 (未測定なら一瞬のフォールバック)。測定が出たら本 effect が再実行され縮む。
+                    const cardSize = probeActive
+                        ? (probeCardSize ?? { w: PROBE_FALLBACK_W, h: PROBE_FALLBACK_H })
+                        : (nudgeCardSize ?? { w: NUDGE_FALLBACK_W, h: NUDGE_FALLBACK_H });
+                    // 窓がモニタを超えないよう clamp (高 DPI/小画面でカード下端=ボタンが画面外に
+                    // 出るのを防ぐ。maxHeight を viewport 非依存にした代償をここで回復する)。
+                    const marginPx = Math.round(CARD_SCREEN_MARGIN * scale);
+                    let winW = Math.round((cardSize.w + CARD_FIT_PAD) * scale);
+                    let winH = Math.round((cardSize.h + CARD_FIT_PAD) * scale);
+                    if (mon) {
+                        winW = Math.min(winW, mon.size.width - 2 * marginPx);
+                        winH = Math.min(winH, mon.size.height - 2 * marginPx);
+                    }
+                    await win.setSize(new PhysicalSize(winW, winH));
                     if (cancelled) return;
                     if (mon) {
-                        // 右上 (画面外に出ないよう clamp)。
+                        // 右上 (画面外に出ないよう clamp)。winW は physical 値なのでそのまま引く。
                         const x = Math.max(
                             mon.position.x,
-                            mon.position.x + mon.size.width - Math.round((PROBE_BOX_W + PROBE_BOX_MARGIN) * scale)
+                            mon.position.x + mon.size.width - winW - marginPx
                         );
-                        const y = mon.position.y + Math.round(PROBE_BOX_MARGIN * scale);
+                        const y = mon.position.y + marginPx;
                         await win.setPosition(new PhysicalPosition(x, y));
                         if (cancelled) return;
                     }
                     await setOverlayInteractive(true);
-                    // 計装: box(widget) show 後の実窓位置/サイズ (オンスクリーン右上 box か)。debug のみ。
+                    // 計装: カード実寸 show 後の実窓位置/サイズ (窓=カード実寸に縮んだか)。debug のみ。
                     auditWindowState(`widget-show probe=${probeActive} nudge=${nudgeVisible}`);
                 } else {
                     // Wall (単独 or 他と同時): 全画面 + クリックブロック。
@@ -304,7 +356,8 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         })();
 
         return () => { cancelled = true; };
-    }, [isWallActive, probeActive, nudgeVisible, currentWindow]);
+        // probeCardSize/nudgeCardSize: 実寸測定が出たら窓をカード実寸へ縮め直す (透明余白を消す)。
+    }, [isWallActive, probeActive, nudgeVisible, currentWindow, probeCardSize, nudgeCardSize]);
 
     // Wall 発動時はプローブカード・Nudge を畳む (Wall が支配)。
     // ProbeCard はアンマウントされ onActiveChange(false) を呼ばないので probeActive を明示リセット。
@@ -432,9 +485,10 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 Wall 発動中は表示しない (上の effect で probeActive もリセット)。
                 overlay 窓は tauri-nspanel で非アクティブ Panel 化しクリックを webview へ配送する
                 (透明窓でもクリックが届く・フォーカスは奪わない。decisions D7)。 */}
-            {!isWallActive && <ProbeCard onActiveChange={setProbeActive} />}
+            {!isWallActive && <ProbeCard onActiveChange={setProbeActive} onResize={handleProbeResize} />}
 
             <aside
+                ref={nudgeRef}
                 className={`nudge-card ${nudgeVisible ? "nudge-card-visible" : ""}`}
                 style={{
                     opacity: nudgeVisible ? 1 : 0,
