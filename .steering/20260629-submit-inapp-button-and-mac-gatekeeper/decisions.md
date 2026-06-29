@@ -27,17 +27,32 @@ pubkey.txt と分離するため、in-app 提出を自己完結させるには�
 **安全側**: 実鍵未確定間は age1 行を含まない placeholder にし、`resolve_recipient` が
 「no age1 found」で fail-loud（誤った宛先への暗号化＝復号不能データ生成を防ぐ）。**リリース前に実鍵必須**。
 
-## D4: CI 変更は不要と判明（当初プランから縮小）
-**判断**: 当初プランの「Windows nsis に gse-submit.exe 同梱」「mac 内部 bin 署名補強」は
-**いずれも不要**と実装中に判明。
-**根拠**:
+## D4: CI のバンドル変更は不要、ただし安全ゲート/署名を追加（cross-review 反映で改訂）
+**判断**: gse-submit を新たにバンドルする変更（externalBin 等）は **不要**。ただし cross-review
+（Codex+Claude 一致 HIGH）を受け、**リリース安全ゲートとネスト署名・存在アサート**を `ci.yml` に追加した。
+**根拠（バンドル不要）**:
 - mac: CI `build-macos` は既に `--features package` で `tauri build` し、`.app/Contents/MacOS/` に
   `gse-submit` を自動同梱。`bundle.resources`（pubkey.txt）は既存ビルドコマンドが自動で honor する。
-  内部 bin の個別署名は機能上不要（exec'd 子プロセスは Gatekeeper 非再評価）。
 - Windows: 被験者は**ポータブル版**を使い、配布フォルダに `gse-next.exe` / `gse-submit.exe` /
   `pubkey.txt` が **co-located**（参加者ガイド §2-B・§4）。`current_exe().parent()` 隣で解決できるため
   バンドル変更不要。NSIS インストーラ経路は対象外（fail-loud で「ツールが見つかりません」）。
-- 結果として externalBin の mac 二重コピー衝突リスクを完全回避。低リスク。
+  → externalBin の mac 二重コピー衝突リスクを完全回避。
+**追加した CI 変更（cross-review HIGH [1][2] 対応）**:
+- `build-macos` に **pubkey リリースゲート**: `resources/pubkey.txt` に `age1` 行が無ければ tag ビルドを
+  fail（プレースホルダのままリリースして全参加者が提出不能になるのを機械的に防ぐ）。dev/test は通らない。
+- `build-macos` の再署名ステップで **ネストヘルパ bin（gse-submit/gse-package/gse-unpack）を個別 ad-hoc 署名**
+  ＋ **`.app` 内に gse-submit と pubkey.txt が存在することをアサート**（欠落でリリース停止）。
+  ※ 現行リリースも未署名ネスト bin を同梱済で実害報告はないが、署名整合・AMFI 対策の belt-and-suspenders。
+- Windows の pubkey は**配布時に loose 配置**（make-participant-zip / 手動）で repo/CI 管理外のため CI ゲート対象外。
+
+## D6: 失敗詳細のホームパス伏字（cross-review [3] / data-privacy 対応）
+**判断**: `run_submit_blocking` が UI へ返す失敗詳細は `redact_home_path` で `$HOME`/`$USERPROFILE` を
+`~` に置換する。**根拠**: gse-submit の失敗メッセージに `/Users/<実名>/...` が混入し得る。被験者が
+エラー画面をスクショ共有しても OS ユーザー名（実名）が漏れないようにする。ログには exit code のみ。
+
+## D7: フロント即時バリデーション（cross-review [4] / UX）
+**判断**: `handleSubmit` で `/^[a-zA-Z0-9]{1,16}$/` を即時チェックし、不正 ID で IPC 往復しない。
+最終防線は backend `participant_id::is_valid_participant_id`（同一規則・SSOT）。
 
 ## D5: fail-loud
 **判断**: 提出失敗は frontend で赤字インライン表示（既存 record 失敗パターン同様）、リトライ可能。

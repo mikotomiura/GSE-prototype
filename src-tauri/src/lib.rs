@@ -899,21 +899,45 @@ fn run_submit_blocking(app: tauri::AppHandle, id: String) -> Result<SubmitOutcom
         })
     } else {
         // fail-loud: 詳細 (stderr→stdout) は UI にのみ返しリトライ可能にする。ログには exit code
-        // のみ残す (stderr にはローカルのホームパス=OS ユーザー名が混入し得るため・data-privacy)。
+        // のみ残す。さらに UI へ返す詳細はホームパス (= OS ユーザー名を含み得る) を伏せる
+        // (被験者がエラー画面を共有しても実名が漏れない・data-privacy)。
         tracing::warn!("in-app submit failed (exit {:?})", output.status.code());
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let detail = if !stderr.trim().is_empty() {
+        let raw = if !stderr.trim().is_empty() {
             stderr.trim()
         } else {
             stdout.trim()
         };
+        let detail = redact_home_path(raw);
         Err(if detail.is_empty() {
             "提出に失敗しました (詳細不明)。研究者に連絡してください。".to_string()
         } else {
-            detail.to_string()
+            detail
         })
     }
+}
+
+/// 文字列中のローカルのホームディレクトリパス (`$USERPROFILE` / `$HOME`、= OS ユーザー名を
+/// 含み得る) を `~` に伏せる。被験者がエラー詳細をスクショ共有しても実名が漏れないようにする
+/// (data-privacy)。`gse-submit` の失敗メッセージには `~/Documents/...` 等のパスが混入し得る。
+fn redact_home_path(detail: &str) -> String {
+    let homes: Vec<String> = ["USERPROFILE", "HOME"]
+        .iter()
+        .filter_map(|k| std::env::var_os(k))
+        .map(|v| v.to_string_lossy().into_owned())
+        .filter(|s| !s.is_empty())
+        .collect();
+    redact_prefixes(detail, &homes)
+}
+
+/// `homes` 中の各パス文字列を `~` に置換する純関数 (env 非依存・並列テスト安全)。
+fn redact_prefixes(detail: &str, homes: &[String]) -> String {
+    let mut out = detail.to_string();
+    for h in homes {
+        out = out.replace(h, "~");
+    }
+    out
 }
 
 /// アプリ内「提出する」ボタンの Tauri コマンド。最新セッションを同梱 `gse-submit` で
@@ -2245,8 +2269,26 @@ mod task_c_command_tests {
 
 #[cfg(test)]
 mod submit_command_tests {
-    use super::extract_age_path;
+    use super::{extract_age_path, redact_prefixes};
     // participant_id 検証の規則テストは crate::participant_id (単一情報源) 側に置く。
+
+    #[test]
+    fn redact_prefixes_masks_home_without_touching_env() {
+        // env を触らない純関数テスト (並列テスト安全)。
+        let homes = vec!["/Users/tanaka_taro".to_string()];
+        let masked = redact_prefixes(
+            "could not read input /Users/tanaka_taro/Documents/GSE-sessions/x.ndjson: nope",
+            &homes,
+        );
+        assert!(!masked.contains("tanaka_taro"), "home leaked: {masked}");
+        assert!(
+            masked.contains("~/Documents/GSE-sessions/x.ndjson"),
+            "got: {masked}"
+        );
+        // ホームを含まない文字列はそのまま。空 homes でも無変化。
+        assert_eq!(redact_prefixes("no path here", &homes), "no path here");
+        assert_eq!(redact_prefixes("plain", &[]), "plain");
+    }
 
     #[test]
     fn extract_age_path_picks_dot_age_line() {

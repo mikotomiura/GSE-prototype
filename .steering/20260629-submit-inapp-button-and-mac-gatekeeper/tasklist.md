@@ -14,8 +14,8 @@
 - [x] A-1 純関数（id 検証・パス解決・stdout 解析）の Rust ユニットテスト（submit_command_tests 3 件）
 - [x] A-3 bundle: `src-tauri/resources/pubkey.txt`（fail-loud placeholder）＋ `tauri.conf bundle.resources`
 - [x] A-2 frontend: Dashboard 提出セクション（ID 入力＋ボタン＋fail-loud 表示）＋ App.css
-- [x] A-4 CI: **変更不要**と判明（mac は gse-submit を .app に自動同梱済・resources は既存ビルドが honor、
-      Windows portable は配布フォルダに gse-submit.exe/pubkey.txt が co-located）→ decisions.md 参照
+- [x] A-4 CI: バンドル変更は不要（mac 自動同梱・Windows co-located）。cross-review を受け安全ゲート追加=
+      pubkey リリースゲート＋ネストbin署名＋.app 内容アサート（build-macos）→ decisions.md D4 参照
 
 ## テスト
 - [x] `cargo check`（default 本体＋context）/ `cargo check --features package --bin gse-submit`（隔離非回帰）
@@ -25,9 +25,10 @@
 - [ ] mac 実機 smoke（ダウンロード→アプリ承認→アプリ内提出→追加 Gatekeeper 無し）= ユーザー実施
 
 ## レビュー
-- [x] code-reviewer ＋ security-checker（data-privacy 重点）並列起動
-- [ ] `/cross-review`（Codex）
-- [ ] HIGH 指摘への対応
+- [x] code-reviewer ＋ security-checker（data-privacy 重点）並列起動 → HIGH/MEDIUM 対応済
+- [x] `/cross-review`（Codex gpt-5.5・縮退なし）→ 統合レポート取得
+- [x] HIGH 指摘対応: [1] CI で .app 内容アサート＋ネスト署名、[2] pubkey リリースゲート、
+      [3] 失敗詳細のホームパス伏字、[4] フロント即時バリデーション
 
 ## 完了処理
 - [ ] design.md の最終化・decisions.md（A/B 判断）

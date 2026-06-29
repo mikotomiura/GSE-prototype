@@ -141,6 +141,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # リリースゲート: アプリ内提出 (案A sidecar) は同梱 pubkey.txt を recipient に使う。
+      # プレースホルダ (age1 行なし) のままリリースすると参加者全員が提出不能になるため、
+      # 実鍵が挿入されていることを機械的に検証する (dev/test ビルドは本ステップを通らない)。
+      - name: Verify researcher public key present (release gate)
+        shell: bash
+        run: |
+          if ! grep -qE '^[[:space:]]*age1[0-9a-z]+' src-tauri/resources/pubkey.txt; then
+            echo "::error::src-tauri/resources/pubkey.txt に 'age1...' 公開鍵行がありません。リリース前に研究者の実鍵を挿入してください (プレースホルダのままでは参加者が提出不能)。"
+            exit 1
+          fi
+          echo "pubkey.txt OK (age1 line present)"
       - name: Build Tauri app
         # `--features package` is required on macOS: the .app bundler copies *every*
         # `[[bin]]` of the crate into Contents/MacOS/, including `gse-package` / `gse-unpack`
@@ -162,11 +173,29 @@ jobs:
             # ネスト署名の不整合が TCC の権限拒否を引き起こす可能性があるため、
             # 内部バイナリ → 外部バンドルの順に個別署名する。
             # --options runtime は ad-hoc 署名では使用しない（TCC 過剰検証の原因）。
+
+            # アプリ内提出 (案A) のサイドカー = 同梱 gse-submit を含むヘルパ CLI を個別署名する。
+            # ヘルパは app の TCC 権限を必要としないため entitlements なしの素の ad-hoc 署名にし、
+            # 署名済みバンドルにネスト未署名バイナリが残らないようにする (署名整合・AMFI 対策)。
+            echo "=== Signing bundled helper binaries (sidecar) ==="
+            for HELPER in gse-submit gse-package gse-unpack; do
+              if [ -f "$APP/Contents/MacOS/$HELPER" ]; then
+                codesign --force --sign - "$APP/Contents/MacOS/$HELPER"
+                echo "signed $HELPER"
+              fi
+            done
+
             echo "=== Signing inner binary ==="
             codesign --force --sign - --entitlements "$ENTITLEMENTS" "$BINARY"
 
             echo "=== Signing app bundle ==="
             codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP"
+
+            # アプリ内提出の前提物がバンドルに含まれることを保証する (欠落でリリースを止める)。
+            echo "=== Asserting in-app submit prerequisites in bundle ==="
+            test -f "$APP/Contents/MacOS/gse-submit" || { echo "::error::gse-submit が .app に同梱されていません (アプリ内提出が動作しない)"; exit 1; }
+            ls "$APP/Contents/Resources/"*pubkey.txt "$APP/Contents/Resources/resources/pubkey.txt" 2>/dev/null | head -1 | grep -q pubkey.txt \
+              || { echo "::error::pubkey.txt が .app の Resources に同梱されていません (recipient 未解決で提出不能)"; exit 1; }
 
             echo "=== Verification ==="
             codesign --verify --strict "$APP" && echo "Signature OK" || echo "Signature verification failed"

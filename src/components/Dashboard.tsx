@@ -100,6 +100,12 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
       setSubmitError("参加者 ID を入力してください (研究者が指定した P で始まる番号。例: P006)。");
       return;
     }
+    // backend (participant_id::is_valid_participant_id) と同一規則を即時チェックし、
+    // 不正 ID で IPC 往復せずその場でフィードバックする (最終防線は backend)。
+    if (!/^[a-zA-Z0-9]{1,16}$/.test(id)) {
+      setSubmitError("参加者 ID は英数字のみ・1〜16 文字です (例: P006)。");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     setSubmitResult(null);
