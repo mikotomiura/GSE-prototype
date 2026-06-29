@@ -33,6 +33,44 @@ const resolveShowMonitor = async () => (await currentMonitor()) ?? (await primar
 // 自動フェード = silent 記録 (HCI: 自動消滅でユーザーが応答できない問題の回避 + CD7 silent 送出)。
 const NUDGE_TIMEOUT_MS = 60_000;
 
+// idle 残存バグ (透明 overlay が画面に残り背後クリックを奪う) を一次情報で監査するための計装ゲート。
+// 研究者が `VITE_GSE_DEBUG=1` でビルドしたときだけ有効。被験者ビルドでは下記 auditWindowState は no-op。
+const OVERLAY_DEBUG = import.meta.env.VITE_GSE_DEBUG === "1";
+
+// `debug_overlay_window_state` の戻り値 (Rust `OverlayWindowState` DTO のフロント契約)。
+// 結果はフロントで捨て tracing(overlay_audit) のみが本質だが、型を固定して回帰検知に効かせる。
+interface OverlayWindowState {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    visible: boolean | null;
+    offscreen: boolean;
+    ex_transparent: boolean | null;
+    ex_layered: boolean | null;
+}
+
+// 窓状態の読み返しログ (debug 専用)。各状態遷移直後に Rust 権威の `debug_overlay_window_state` を
+// 呼び、overlay 窓の実位置/サイズ/(Windows) クリック透過を tracing(overlay_audit) へ出す。
+// 読み取り専用で窓を変更しないため D7-D13 非回帰。失敗は握りつぶす (計装が本流を壊さない・
+// GSE_DEBUG 未設定時は backend が Err を返すだけ)。`delayMs>0` は idle 後に窓が後から box へ
+// 戻る上書き (hypotheses H2/H3) を捕まえるための遅延読み返し。
+// 注: 遅延タイマーは effect cleanup と連動させない (意図的)。state/ref を一切触らず invoke→log のみで
+// 副作用がなく、後続遷移/アンマウント後に発火しても無害。むしろ「後から戻る上書き」を捕えたいので止めない。
+const auditWindowState = (tag: string, delayMs = 0): void => {
+    if (!OVERLAY_DEBUG) return;
+    const read = () => {
+        void invoke<OverlayWindowState>("debug_overlay_window_state", { tag }).catch((e) => {
+            console.warn("debug_overlay_window_state failed:", tag, e);
+        });
+    };
+    if (delayMs > 0) {
+        setTimeout(read, delayMs);
+    } else {
+        read();
+    }
+};
+
 interface OverlayProps {
     interventionDecision: InterventionDecision;
     isWallActive: boolean;
@@ -203,6 +241,10 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 } catch (e) {
                     console.warn("overlay idle (transparent click-through) failed:", e);
                 }
+                // 計装: idle 確定直後の実窓位置を読み返す (退避が効いたか)。さらに ~1.5s 後にも読み、
+                // 別 effect が後から box へ戻す上書き (H2/H3) を捕まえる。debug ビルドのみ。
+                auditWindowState("idle-immediate");
+                auditWindowState("idle-after-1500ms", 1500);
                 return;
             }
             try {
@@ -233,9 +275,13 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                         if (cancelled) return;
                     }
                     await setOverlayInteractive(true);
+                    // 計装: box(widget) show 後の実窓位置/サイズ (オンスクリーン右上 box か)。debug のみ。
+                    auditWindowState(`widget-show probe=${probeActive} nudge=${nudgeVisible}`);
                 } else {
                     // Wall (単独 or 他と同時): 全画面 + クリックブロック。
                     await applyFullscreenBlock();
+                    // 計装: Wall 全画面化後の実窓位置/サイズ (モニタ全域か)。debug のみ。
+                    auditWindowState("fullscreen-wall");
                 }
             } catch (e) {
                 // 既にこの effect がキャンセル済み (新 state へ遷移済み) なら何もしない。
