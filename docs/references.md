@@ -35,6 +35,9 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [P13] | isbn:978-0-14-311526-7 | Thaler, R. H. & Sunstein, C. R. — Nudge: Improving Decisions About Health, Wealth, and Happiness | Yale Univ. Press, 2008 | — | Lv1 Nudge 介入の理論根拠 | — | active |
 | [P14] | doi:10.1146/annurev-neuro-071013-014030 | Raichle, M. E. — The Brain's Default Mode Network | Annu. Rev. Neurosci. 38:433, 2015 | — | Incubation 状態（DMN/マインドワンダリング） | — | active |
 | [P15] | url:fu-berlin-gse-scale | Schwarzer, R. & Jerusalem, M. — Generalized Self-Efficacy Scale | in Measures in Health Psychology, NFER-NELSON, 1995 | <http://userpage.fu-berlin.de/~health/selfscal.htm> | 自己効力感の測定（一般性=副指標） | =V10 | active |
+| [P16] | doi:10.58680/ccc198115885 | Flower, L. & Hayes, J. R. — A Cognitive Process Theory of Writing | College Composition and Communication 32(4):365, 1981 | <https://doi.org/10.58680/ccc198115885> | 執筆の認知プロセス（planning/translating/reviewing）＝停滞の工程構造（課題種別の停滞接地） | — | active |
+| [P17] | isbn:978-0-521-33700-2 | Scardamalia, M. & Bereiter, C. — Knowledge Telling and Knowledge Transforming in Written Composition | in S. Rosenberg (Ed.), Advances in Applied Psycholinguistics Vol.2, pp.142–175, Cambridge Univ. Press, 1987 | — | 課題種別→停滞の質（論述=knowledge-transforming=高負荷 vs 物語/通信文=knowledge-telling=低負荷） | — | active |
+| [P18] | doi:10.1037/0278-7393.14.3.355 | Kellogg, R. T. — Attentional Overload and Writing Performance: Effects of Rough Draft and Outline Strategies | J. Exp. Psychol. Learn. Mem. Cogn. 14(3):355, 1988 | — | 停滞=作業記憶過負荷（課題要求でその大きさが変動）の実証的接地 | — | provisional |
 
 ## V 名前空間 — 検証方法論（ユーザー検証 v0.4 書誌）
 
