@@ -1,14 +1,5 @@
-# GSE 研究者 age 公開鍵 (X25519)。
-#
-# アプリ内「提出する」ボタンはこのファイルを recipient (暗号化宛先) として gse-submit に渡す。
-# 公開鍵は非機密なので commit して良い (秘密鍵は研究者端末のみ・絶対にここへ置かない)。
-#
-# ⚠ リリース前に必ず下行のプレースホルダを研究者の実際の公開鍵 (age1... で始まる 1 行) に置換すること。
-#   置換しないと gse-submit が「no 'age1...' public key found」で fail-loud し提出できない
-#   (誤った宛先への暗号化=復号不能データの生成を防ぐための安全側設計)。
-#
-# 形式: age1 で始まる bech32 1 行 (実在鍵の例はここに書かない。誤って有効化され既知秘密鍵宛に
-#       暗号化される事故を防ぐため、実鍵以外の age1... 文字列はこのファイルに残さないこと)。
-#
-# === 実鍵をこの下に 1 行で貼る (この行と下のプレースホルダは削除する) ===
-# PASTE_RESEARCHER_PUBLIC_KEY_HERE_age1_bech32_one_line
+# GSE 研究者 age 公開鍵 (X25519)。アプリ内「提出する」ボタンはこのファイルを recipient
+# (暗号化宛先) として gse-submit に渡す。公開鍵は非機密なので commit して良い
+# (秘密鍵 ~/.gse/age-identity.txt は研究者端末のみ・絶対にここへ置かない)。
+# resolve_recipient は最初の age1... 行を採用する。鍵をローテートする時はこの行を差し替える。
+age1h2p434c3w4n9ck79qyh29ewnmfqxkrdxstd8ukl47hzalkjx2emq7v6klp
