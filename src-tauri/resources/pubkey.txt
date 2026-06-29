@@ -1,0 +1,5 @@
+# GSE 研究者 age 公開鍵 (X25519)。アプリ内「提出する」ボタンはこのファイルを recipient
+# (暗号化宛先) として gse-submit に渡す。公開鍵は非機密なので commit して良い
+# (秘密鍵 ~/.gse/age-identity.txt は研究者端末のみ・絶対にここへ置かない)。
+# resolve_recipient は最初の age1... 行を採用する。鍵をローテートする時はこの行を差し替える。
+age1h2p434c3w4n9ck79qyh29ewnmfqxkrdxstd8ukl47hzalkjx2emq7v6klp

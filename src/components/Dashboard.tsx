@@ -29,6 +29,12 @@ interface LogStatusDto {
   actual_path: string | null;
 }
 
+/** アプリ内提出の結果 DTO (backend `submit_latest_session` / SubmitOutcome と同期)。 */
+interface SubmitOutcome {
+  /** 生成された .age 提出物の絶対パス (抽出できた場合)。 */
+  out_path: string | null;
+}
+
 interface DashboardProps {
   cognitiveState: {
     flow: number;
@@ -80,6 +86,34 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
   });
   // #1 層2 fail-loud: ログ書込先の状態。ok 以外なら警告バナーを常時表示し「静かな全損」を防ぐ。
   const [logStatus, setLogStatus] = useState<LogStatusDto | null>(null);
+
+  // アプリ内提出 (案A sidecar): 研究者割当の参加者 ID・送信中フラグ・成功/失敗結果。
+  // 失敗は fail-loud で赤字インライン表示し、静かに失わずリトライ可能にする。
+  const [submitParticipantId, setSubmitParticipantId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitResult, setSubmitResult] = useState<SubmitOutcome | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmit = () => {
+    const id = submitParticipantId.trim();
+    if (!id) {
+      setSubmitError("参加者 ID を入力してください (研究者が指定した P で始まる番号。例: P006)。");
+      return;
+    }
+    // backend (participant_id::is_valid_participant_id) と同一規則を即時チェックし、
+    // 不正 ID で IPC 往復せずその場でフィードバックする (最終防線は backend)。
+    if (!/^[a-zA-Z0-9]{1,16}$/.test(id)) {
+      setSubmitError("参加者 ID は英数字のみ・1〜16 文字です (例: P006)。");
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError(null);
+    setSubmitResult(null);
+    invoke<SubmitOutcome>("submit_latest_session", { participantId: id })
+      .then((res) => setSubmitResult(res))
+      .catch((e) => setSubmitError(typeof e === "string" ? e : String(e)))
+      .finally(() => setSubmitting(false));
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -564,6 +598,61 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
           💡 Nudge 強制表示 (デバッグ)
         </button>
       )}
+
+      {/* アプリ内提出 (案A sidecar / mac Gatekeeper 根絶): 既に承認済みのアプリから同梱 gse-submit
+          を起動し、最新セッションを匿名化+暗号化して .age を生成する。被験者ビルドで表示する
+          (debug 機能ではない)。失敗は fail-loud で赤字表示しリトライ可能。 */}
+      <div className="submit-section">
+        <h4 className="submit-title">セッションの提出</h4>
+        <p className="submit-help">
+          セッションが終わったら、研究者から指定された参加者 ID を入力して「提出する」を押してください。
+          最新のセッションが匿名化・暗号化され、提出ファイル (.age) が作成されます。
+        </p>
+        <div className="submit-row">
+          <input
+            type="text"
+            className="submit-id-input"
+            placeholder="参加者 ID (例: P006)"
+            value={submitParticipantId}
+            disabled={submitting}
+            maxLength={16}
+            aria-label="参加者 ID"
+            onChange={(e) => {
+              setSubmitParticipantId(e.target.value);
+              // ID を編集したら前回の結果/エラーをクリアし、入力と表示の不整合を防ぐ。
+              if (submitResult) setSubmitResult(null);
+              if (submitError) setSubmitError(null);
+            }}
+          />
+          <button
+            className="submit-button"
+            disabled={submitting}
+            onClick={handleSubmit}
+            title="最新セッションを匿名化・暗号化して提出ファイルを作成する"
+          >
+            {submitting ? "提出中…" : "提出する"}
+          </button>
+        </div>
+
+        {submitResult && (
+          <div className="submit-success" role="status">
+            <p>✓ 提出ファイルを作成しました。</p>
+            {submitResult.out_path && (
+              <p className="submit-path">
+                保存先: <code>{submitResult.out_path}</code>
+              </p>
+            )}
+            <p>このファイルを研究者の Dropbox に提出してください (中身は匿名化済みです)。</p>
+          </div>
+        )}
+
+        {submitError && (
+          <div className="submit-error" role="alert">
+            <p>× 提出に失敗しました。もう一度お試しください。</p>
+            <p className="submit-error-detail">{submitError}</p>
+          </div>
+        )}
+      </div>
 
       {/* ナビ: アプリ終了 (quit_app) とは別に、スタート画面へ戻る導線を用意する
           (作業種別の変更・尺度理解テスト・再開のため。アプリは終了しない)。 */}
