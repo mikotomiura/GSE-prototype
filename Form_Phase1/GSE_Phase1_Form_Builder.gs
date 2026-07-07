@@ -2664,9 +2664,20 @@ function buildControlTab_(ss) {
     .setRanges([statusCell]).build();
   sh.setConditionalFormatRules([endedRule, runRule]);
 
-  // 名前付き範囲(重複を避けて張り直す)。sendReminders / phase1Status_ がこれで読む。
-  try { ss.removeNamedRange(PHASE1_STATUS_RANGE); } catch (e) {}
-  ss.setNamedRange(PHASE1_STATUS_RANGE, statusCell);
+  // 名前付き範囲を張り直す(sendReminders / phase1Status_ が読む)。★フォールバック(タブ B2)が
+  // あるため best-effort。既存の同名レンジは getNamedRanges で消してから作る。removeNamedRange の
+  // 「存在しません」例外や setNamedRange の競合で buildManagementSheet 全体を止めないよう、
+  // 取得→削除→作成をまとめて try/catch で囲む(失敗してもタブ B2 で代替できる)。
+  try {
+    var existingNr = ss.getNamedRanges(); // 未存在でも例外を投げない
+    for (var k = 0; k < existingNr.length; k++) {
+      if (existingNr[k].getName() === PHASE1_STATUS_RANGE) existingNr[k].remove();
+    }
+    SpreadsheetApp.flush(); // 削除を確定してから作成(同一実行での競合を避ける)
+    ss.setNamedRange(PHASE1_STATUS_RANGE, statusCell);
+  } catch (e) {
+    Logger.log("⚠️ 名前付き範囲 " + PHASE1_STATUS_RANGE + " の設定に失敗(タブ B2 で代替継続): " + e);
+  }
 
   // 使い方メモ
   var notes = [
