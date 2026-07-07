@@ -97,7 +97,8 @@ var REMINDER_STALLED_DAYS = 2; // 提出も応答も無い日数がこの値以�
 var REMINDER_STALLED_THROTTLE_DAYS = 2;
 // Web アプリ公開後の exec URL を研究者が記入する(末尾 /exec)。空なら doGet ボタンは
 // テキスト案内(「ご返信ください」)に縮退し、リンクは張らない。
-var REMINDER_WEBAPP_URL = "";
+// ⚠ 更新デプロイで URL が変わったら差し替える(「デプロイを管理」でバージョン更新すれば URL 不変)。
+var REMINDER_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxvxGlvYp6HBRxolWHHbnlrP86IU_mTZD2rtrvePN0KHJw-L8s3kB_i8AI24bi4ixzs/exec";
 var REMINDER_DAILY_SUBJECT = "【GSE ユーザー検証】本日の課題についてのご確認";
 var REMINDER_STALLED_SUBJECT = "【GSE ユーザー検証】その後のご様子うかがい";
 // 「リマインド運用」タブに記録する種別ラベル(doGet 応答 / 送信ログの冪等判定に使う)。
