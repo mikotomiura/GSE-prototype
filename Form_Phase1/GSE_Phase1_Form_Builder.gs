@@ -2240,7 +2240,9 @@ function sendReminders() {
       }
       reminderSend_(p.email, REMINDER_STALLED_SUBJECT,
         reminderStalledBody_(p.pid, p.name), reminderStalledHtml_(p.pid, p.name));
-      reminderLogAppend_(ss, p.pid, REMINDER_KIND_STALLED);
+      // 送信ログは実送信時のみ記録する。下書き(dry-run)では冪等ログを汚さない
+      // (汚すと同日の本番実行が「送信済み」で全員スキップしてしまうため)。
+      if (REMINDER_AUTO_SEND) reminderLogAppend_(ss, p.pid, REMINDER_KIND_STALLED);
       nStalled++;
     } else {
       // 日次リマインド。当日いずれかの応答済み(休む/これから取り組む) or 当日送信済みなら
@@ -2249,7 +2251,7 @@ function sendReminders() {
       if (log.dailySentToday[p.pid]) { nSkipped++; continue; }
       reminderSend_(p.email, REMINDER_DAILY_SUBJECT,
         reminderDailyBody_(p.pid, p.name), reminderDailyHtml_(p.pid, p.name));
-      reminderLogAppend_(ss, p.pid, REMINDER_KIND_DAILY);
+      if (REMINDER_AUTO_SEND) reminderLogAppend_(ss, p.pid, REMINDER_KIND_DAILY); // 下書きは記録しない
       nDaily++;
     }
   }
