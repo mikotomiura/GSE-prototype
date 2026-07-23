@@ -120,6 +120,9 @@ cargo run --bin emit_schema   # 出力を src-tauri/schema/current.json と byte
 | `docs/development-guidelines.md` | コーディング規約・テスト方針・レビュー基準を確認したい時 |
 | `docs/glossary.md` | 用語の正確な定義を確認したい時 (禁止用語の確認も含む) |
 | `docs/external-skills.md` | 公式 (anthropics/skills) 由来の Skill 一覧、外部 LLM 送信可否 |
+| `docs/research-positioning.md` | 研究の問い・差分・主張範囲 (機会保存/学習効果の分離) を確認したい時 |
+| `docs/preregistration-v0.3.md` | Phase1 の凍結された合否契約 (PreReg-1..8・GATE1–3) を確認したい時 |
+| `docs/wbs-verification-halfyear.md` | 検証の 26 週マイルストーン・WBS・改訂予定を確認したい時 |
 
 ## 公式 Skill (Phase 2 で導入)
 

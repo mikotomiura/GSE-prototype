@@ -187,6 +187,10 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 
 ## 6. シナリオ（半年版 WBS / M0–M5 に対応）
 
+> WBS の SSOT は `docs/wbs-verification-halfyear.md`（26週マイルストーン・作業分解・改訂予定）。
+> 以下はその M0–M5 を研究ポジショニング側から要約したもの。Post-Phase1 の改訂（Phase 1.5 挿入・
+> Gate D/S/H 追加・Phase 2 分割）は同 md の §改訂予定（提案・未承認）にあり、Phase1 凍結は不変。
+
 1. **M0 基盤フリーズ**: プローブ機構・blind dashboard・本文非保存 IME ログ [V5]・NDJSON スキーマ(label_pool)・
    gse-replay/cohort・PreReg 凍結・データ分離 [V15][V16][V17]。
    **2026-06-28 M0 再凍結**（リリース版 pilot で判明したラベル収量・提出摩擦の是正を束ねる）:
