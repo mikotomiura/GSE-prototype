@@ -38,6 +38,8 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [P16] | doi:10.58680/ccc198115885 | Flower, L. & Hayes, J. R. — A Cognitive Process Theory of Writing | College Composition and Communication 32(4):365, 1981 | <https://doi.org/10.58680/ccc198115885> | 執筆の認知プロセス（planning/translating/reviewing）＝停滞の工程構造（課題種別の停滞接地） | — | active |
 | [P17] | isbn:978-0-521-33700-2 | Scardamalia, M. & Bereiter, C. — Knowledge Telling and Knowledge Transforming in Written Composition | in S. Rosenberg (Ed.), Advances in Applied Psycholinguistics Vol.2, pp.142–175, Cambridge Univ. Press, 1987 | — | 課題種別→停滞の質（論述=knowledge-transforming=高負荷 vs 物語/通信文=knowledge-telling=低負荷） | — | active |
 | [P18] | doi:10.1037/0278-7393.14.3.355 | Kellogg, R. T. — Attentional Overload and Writing Performance: Effects of Rough Draft and Outline Strategies | J. Exp. Psychol. Learn. Mem. Cogn. 14(3):355, 1988 | — | 停滞=作業記憶過負荷（課題要求でその大きさが変動）の実証的接地 | — | provisional |
+| [P19] | doi:10.1016/S0065-2601(06)38002-1 | Gollwitzer, P. M. & Sheeran, P. — Implementation Intentions and Goal Achievement: A Meta-Analysis of Effects and Processes | Adv. Exp. Soc. Psychol. 38:69–119, 2006 | <https://doi.org/10.1016/S0065-2601(06)38002-1> | if-then 実行意図 d=0.65。作業「活性化」UI（セッション開始時の意図設定）の理論根拠 | — | provisional |
+| [P20] | doi:10.1145/3698205.3729547 | Learning@Scale 2025 — メタ認知プロンプトの事前登録 RCT（N=1,005、null） | Proc. L@S '25, 2025 | <https://doi.org/10.1145/3698205.3729547> | プロンプト単体は不活性でありうる＝効果はユーザーの目標整合に依存（活性化が介入の前提条件） | — | provisional |
 
 ## V 名前空間 — 検証方法論（ユーザー検証 v0.4 書誌）
 
@@ -72,6 +74,10 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [V27] | doi:10.1007/s10869-022-09803-5 | Lafit, G. et al. — Optimizing Measurement Reliability in Within-Person Research: Guidelines for Research Design and R Shiny Web Application Tools | J. Bus. Psychol., 2022（online 2021） | <https://doi.org/10.1007/s10869-022-09803-5> | within-person 信頼性は測定機会数 T の関数。短尺は多数機会要＝GATE2 ≥20 の妥当性検証（信頼性理想は ~70–100） | — | active |
 | [V28] | doi:10.1177/0741932512452794 | Kratochwill, T. R. et al. — Single-Case Intervention Research Design Standards | Remedial & Special Education 34(1):26–38, 2013 | <https://doi.org/10.1177/0741932512452794> | 単一事例/N-of-1 設計標準。効果実証に ≥3 回・各 phase ≥5–6 データ点＝個人内サンプルサイズ下限 | — | active |
 | [V29] | doi:10.1145/2628363.2628364 | Pielot, M., Church, K. & de Oliveira, R. — An In-Situ Study of Mobile Phone Notifications | MobileHCI '14, pp.233–242, 2014 | <https://doi.org/10.1145/2628363.2628364> | 通知 63.5件/日・通知量↑→負の感情↑。通知/提出摩擦＝負担の実証（T2/T4 裏付け） | — | active |
+| [V30] | url:cmu-ml-18-104 | CMU-ML-18-104 — Keystroke dynamics によるストレスの個人内分類（PhD thesis） | Carnegie Mellon Univ. Machine Learning Dept., 2018 | <https://reports-archive.adm.cs.cmu.edu/anon/ml2018/CMU-ML-18-104.pdf> | 個人内分類 89.5% vs 被験者横断 <60%・universal marker 不在（116名）＝within-person 較正必須の一次根拠。per-user 較正コスト＝採用摩擦の裏付け | — | provisional |
+| [V31] | doi:10.1177/0741088313491692 | Leijten, M. & Van Waes, L. — Keystroke Logging in Writing Research: Using Inputlog to Analyze and Visualize Writing Processes | Written Communication 30(3):358–392, 2013 | <https://doi.org/10.1177/0741088313491692> | ポーズ長のテキスト単位階層（語内<語間<文間<段落間）＝ポーズ「位置」分類の方法論。本文非保存で移植可能 | — | provisional |
+| [V32] | doi:10.1017/S0272263119000263 | Révész, A. et al. — Investigating the Relationship of Task Complexity, Cognitive Processes, and L2 Writing | Studies in Second Language Acquisition, 2019 | <https://doi.org/10.1017/S0272263119000263> | 論述課題での keystroke+視線+刺激再生の三角測量。文間ポーズ=planning / 語内ポーズ=transcription＝停滞の質の弁別根拠 | — | provisional |
+| [V33] | doi:10.1073/pnas.2213114120 | Grüning, D. J. et al. — Directing smartphone use through the self-nudge app one sec | PNAS 120(8):e2213114120, 2023 | <https://doi.org/10.1073/pnas.2213114120> | 10秒 friction+意図表示で 36% 断念・試行自体 37% 減、habituation 耐性。self-nudge（自己導入）フレーミングの受容性根拠 | — | provisional |
 
 ---
 
@@ -88,7 +94,14 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | Mehta et al. 2025 | [P11] | [V6] |
 | Park 2024 | [P7] | [V13] |
 
-→ 一意な文献数 = 15 + 29 − 6 = **38**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、P との重複なし）。
+→ 一意な文献数 = 20 + 33 − 6 = **47**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、
+P19–P20 / V30–V33 を 2026-07-23 に介入コンテンツ×文脈シグナル×ML サーヴェイ
+`docs/literature/20260703-intervention-content-and-ml-grounding.md` から追加。P との重複なし）。
+
+> ⚠️ **P19–P20 / V30–V33 は `provisional`**: 出典は上記サーヴェイカード経由であり、**原論文の直接確認前**である
+> （サーヴェイ自体が adversarial verify 通過を Card1/Card2 の 5 主張のみと明示している）。
+> 効果量を設計判断の一次根拠に使う前に原論文を確認し、`active` へ昇格させること。
+> 同サーヴェイの残り 17 件は**登録候補のまま**（研究者確認待ち。カード末尾の候補表を参照）。
 
 ## 追加・撤回ルール
 
