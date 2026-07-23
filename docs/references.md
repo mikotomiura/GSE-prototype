@@ -38,6 +38,16 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [P16] | doi:10.58680/ccc198115885 | Flower, L. & Hayes, J. R. — A Cognitive Process Theory of Writing | College Composition and Communication 32(4):365, 1981 | <https://doi.org/10.58680/ccc198115885> | 執筆の認知プロセス（planning/translating/reviewing）＝停滞の工程構造（課題種別の停滞接地） | — | active |
 | [P17] | isbn:978-0-521-33700-2 | Scardamalia, M. & Bereiter, C. — Knowledge Telling and Knowledge Transforming in Written Composition | in S. Rosenberg (Ed.), Advances in Applied Psycholinguistics Vol.2, pp.142–175, Cambridge Univ. Press, 1987 | — | 課題種別→停滞の質（論述=knowledge-transforming=高負荷 vs 物語/通信文=knowledge-telling=低負荷） | — | active |
 | [P18] | doi:10.1037/0278-7393.14.3.355 | Kellogg, R. T. — Attentional Overload and Writing Performance: Effects of Rough Draft and Outline Strategies | J. Exp. Psychol. Learn. Mem. Cogn. 14(3):355, 1988 | — | 停滞=作業記憶過負荷（課題要求でその大きさが変動）の実証的接地 | — | provisional |
+| [P19] | doi:10.1016/S0065-2601(06)38002-1 | Gollwitzer, P. M. & Sheeran, P. — Implementation Intentions and Goal Achievement: A Meta-Analysis of Effects and Processes | Adv. Exp. Soc. Psychol. 38:69–119, 2006 | <https://doi.org/10.1016/S0065-2601(06)38002-1> | 実行意図の古典的メタ分析。⚠️ **効果量 d=0.65 は [P21]（642テスト・2024/2025）に上書きされた**（本 d=.65 主張は 2026-07-23 の検証で 0-3 否決）。**効果量の引用は [P21] を使うこと**。本項は歴史的位置づけとして保持 | →P21 | superseded |
+| [P20] | doi:10.1145/3698205.3729547 | Learning@Scale 2025 — メタ認知プロンプトの事前登録 RCT（N=1,005、null） | Proc. L@S '25, 2025 | <https://doi.org/10.1145/3698205.3729547> | プロンプト単体は不活性でありうる＝効果はユーザーの目標整合に依存（活性化が介入の前提条件） | — | provisional |
+| [P21] | doi:10.1080/10463283.2024.2334563 | Sheeran, P., Listrom, O. & Gollwitzer, P. M. — The Effects of Implementation Intentions on Goal Attainment: A Meta-Analysis of 642 Tests | European Review of Social Psychology 36(1):162–194, 2024/2025 | <https://doi.org/10.1080/10463283.2024.2334563> | **実行意図の効果量 SSOT**。素の d=.36 [.33,.40] → 出版バイアス補正後 RoBMA d=.15 [.08,.22]（tau=0.27）。contingent d=.43 > schedule d=.29、記録すると d=.31 vs .44、詳細化で .46→.24、リハーサル有効 .45 vs .33＝活性化 UI の設計制約 | ←P19 | active |
+| [P22] | doi:10.1037/a0015984 | Armitage, C. J. — Effectiveness of Experimenter-Provided and Self-Generated Implementation Intentions to Reduce Alcohol Consumption | Health Psychology 28(5):545–553, 2009 | <https://doi.org/10.1037/a0015984> | テンプレ選択式でも自由記述と有意差なし（p=.62）＝content-free 制約下の UI 選択の根拠。ただし等価性検定ではない（検証 2-1） | — | active |
+| [P23] | doi:10.1111/dar.13553 | Cooke, R. et al. — Effectiveness of implementation intention interventions to reduce alcohol consumption: meta-analysis | Drug and Alcohol Review, 2023 (PMID 36173203) | <https://doi.org/10.1111/dar.13553> | オンライン配信サブグループ d+=-0.04 [-0.14,0.06]・大学生 d+=-0.04＝GSE が置かれる配信様式での null（境界条件） | — | active |
+| [P24] | url:jmir-mhealth-2025-e65260 | Ahmadyar, S., Szypula, J., Bogosian, A. & Tapper, K. — 実行意図 vs 実務的 tips の要因実験（n=169、2週間日次アドヒアランス） | JMIR Mhealth Uhealth 13:e65260, 2025 (PMC12334108) | <https://mhealth.jmir.org/2025/1/e65260> | 能動統制に対し上乗せなし（71% vs 72%, P=.73）＝独立 null。⚠️ DOI 未確定のため URL キーで登録（provisional）。同論文のモデレーション主張（P=.04）は 0-3 否決につき引用禁止 | — | provisional |
+| [P25] | doi:10.1177/0146167204271308 | Sheeran, P., Webb, T. L. & Gollwitzer, P. M. — The Interplay Between Goal Intentions and Implementation Intentions | Pers. Soc. Psychol. Bull. 31(1):87–98, 2005 (PMID 15574664) | <https://doi.org/10.1177/0146167204271308> | 効果は強く活性化した目標意図に条件づけられる＝**実行意図は動機を作らない**（活性化 UI の適用限界） | — | active |
+| [P26] | doi:10.1037/0022-3514.83.1.231 | Koestner, R., Lekes, N., Powers, T. A. & Chicoine, E. — Attaining Personal Goals: Self-Concordance Plus Implementation Intentions | J. Pers. Soc. Psychol. 83(1):231–244, 2002 (PMID 12088128) | <https://doi.org/10.1037/0022-3514.83.1.231> | 個人プロジェクトでは実行意図の主効果ゼロ・self-concordance との交互作用のみ＝需要が薄い層では効かない | — | active |
+| [P27] | doi:10.3102/00346543211019105 | Sinha, T. & Kapur, M. — When Problem Solving Followed by Instruction Works: Evidence for Productive Failure | Review of Educational Research 91(5), 2021 | <https://doi.org/10.3102/00346543211019105> | PS-I の効果は成果指標で符号が変わる（概念/転移 g=0.36・手続き g=-0.03 null・ドメイン一般/低学年で反転）＝「摩擦が技能を育てる」は主張不可。⚠️出版バイアス補正で g→0.87 と不安定 | — | active |
+| [P28] | doi:10.1007/s10648-016-9379-x | Loibl, K., Roll, I. & Rummel, N. — Towards a Theory of When and How Problem Solving Followed by Instruction Supports Learning | Educational Psychology Review 29(4):693–715, 2017 | <https://doi.org/10.1007/s10648-016-9379-x> | PS-I の効果源は遅延でなく後段 consolidation（生成解への教示接続 g=0.56 vs 0.20 等）＝GSE は前半のみ実装し後半欠落。⚠️研究間モデレータで因果未確立 | — | active |
 
 ## V 名前空間 — 検証方法論（ユーザー検証 v0.4 書誌）
 
@@ -72,6 +82,21 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [V27] | doi:10.1007/s10869-022-09803-5 | Lafit, G. et al. — Optimizing Measurement Reliability in Within-Person Research: Guidelines for Research Design and R Shiny Web Application Tools | J. Bus. Psychol., 2022（online 2021） | <https://doi.org/10.1007/s10869-022-09803-5> | within-person 信頼性は測定機会数 T の関数。短尺は多数機会要＝GATE2 ≥20 の妥当性検証（信頼性理想は ~70–100） | — | active |
 | [V28] | doi:10.1177/0741932512452794 | Kratochwill, T. R. et al. — Single-Case Intervention Research Design Standards | Remedial & Special Education 34(1):26–38, 2013 | <https://doi.org/10.1177/0741932512452794> | 単一事例/N-of-1 設計標準。効果実証に ≥3 回・各 phase ≥5–6 データ点＝個人内サンプルサイズ下限 | — | active |
 | [V29] | doi:10.1145/2628363.2628364 | Pielot, M., Church, K. & de Oliveira, R. — An In-Situ Study of Mobile Phone Notifications | MobileHCI '14, pp.233–242, 2014 | <https://doi.org/10.1145/2628363.2628364> | 通知 63.5件/日・通知量↑→負の感情↑。通知/提出摩擦＝負担の実証（T2/T4 裏付け） | — | active |
+| [V30] | url:cmu-ml-18-104 | CMU-ML-18-104 — Keystroke dynamics によるストレスの個人内分類（PhD thesis） | Carnegie Mellon Univ. Machine Learning Dept., 2018 | <https://reports-archive.adm.cs.cmu.edu/anon/ml2018/CMU-ML-18-104.pdf> | 個人内分類 89.5% vs 被験者横断 <60%・universal marker 不在（116名）＝within-person 較正必須の一次根拠。per-user 較正コスト＝採用摩擦の裏付け | — | provisional |
+| [V31] | doi:10.1177/0741088313491692 | Leijten, M. & Van Waes, L. — Keystroke Logging in Writing Research: Using Inputlog to Analyze and Visualize Writing Processes | Written Communication 30(3):358–392, 2013 | <https://doi.org/10.1177/0741088313491692> | ポーズ長のテキスト単位階層（語内<語間<文間<段落間）＝ポーズ「位置」分類の方法論。本文非保存で移植可能 | — | provisional |
+| [V32] | doi:10.1017/S0272263119000263 | Révész, A. et al. — Investigating the Relationship of Task Complexity, Cognitive Processes, and L2 Writing | Studies in Second Language Acquisition, 2019 | <https://doi.org/10.1017/S0272263119000263> | 論述課題での keystroke+視線+刺激再生の三角測量。文間ポーズ=planning / 語内ポーズ=transcription＝停滞の質の弁別根拠 | — | provisional |
+| [V33] | doi:10.1073/pnas.2213114120 | Grüning, D. J. et al. — Directing smartphone use through the self-nudge app one sec | PNAS 120(8):e2213114120, 2023 | <https://doi.org/10.1073/pnas.2213114120> | **2026-07-24 訂正・検証済 2-1**: 効果源は10秒 friction でなく **dismiss option の第一級提示**（事前登録 N=500 で dismiss 単独 d≈0.72、friction 上乗せせず）＝GSE の「待たせる」より「defer/やめるを第一級提示」を支持。減衰は週1 43%→4-6週 32-34%（**"habituation 耐性" は不正確・3週で相対25%減後に定常**）。⚠️**共著者がベンダー(one sec originator)＝COI**・フィールドは自己選択で統制群なし | — | active |
+| [V34] | doi:10.1145/2858036.2858428 | Kim, Y.-H., Jeon, J. H., Choe, E. K., Lee, B., Kim, K. & Seo, J. — TimeAware: Leveraging Framing Effects to Enhance Personal Productivity | CHI '16, pp.272–283, 2016 | <https://doi.org/10.1145/2858036.2858428> | 自己追跡フィードバックはネガティブ枠のみ有効（0.634）・**撤去2週で効果消失**（IV→WD -0.473, p=.003）＝継続利用の主柱にできない根拠。N=24 で PF の null は検出力不足 | — | active |
+| [V35] | doi:10.1145/3613904.3642469 | Hu, Y. & Lee, S. W. — （タイムラプス自己内省による生産性フィードバックの比較実験） | CHI '24, 2024 | <https://doi.org/10.1145/3613904.3642469> | 豊かな文脈的フィードバックでも**客観生産性は動かず**（62.6 vs 64.8, F(1,297)=1.58 n.s.）主観のみ上昇＝自己追跡の効果は知覚に偏る。N=15 で検出力不足 | — | active |
+| [V36] | doi:10.1371/journal.pone.0245066 | Aeon, B., Faber, A. & Panaccio, A. — Does time management work? A meta-analysis | PLOS ONE 16(1):e0245066, 2021 | <https://doi.org/10.1371/journal.pone.0245066> | 158研究・490効果量。⚠️ **大半が横断研究**でフォローアップ・継続利用アウトカムを報告せず＝novelty effect 減衰と retention の判定材料にならない（スコープ否定）。r≈.25 上限主張とウェルビーイング優位主張は 0-3 否決につき引用禁止 | — | active |
+| [V37] | doi:10.1145/3449287 | Buçinca, Z., Malaya, M. B. & Gajos, K. Z. — To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making | PACM HCI (CSCW) 5(CSCW1) Art.188, 2021 | <https://doi.org/10.1145/3449287> | cognitive forcing が AI 過信を有意低減（ラボ N=199）。⚠️Need for Cognition 受益格差・最も便益を得た層が最低評価・2026年に部分的非再現・LLM 以前の模擬 AI＝存在証明のみ | — | active |
+| [V38] | doi:10.1145/3579605 | Vasconcelos, H. et al. — Explanations Can Reduce Overreliance on AI Systems During Decision-Making | PACM HCI (CSCW), 2023 | <https://doi.org/10.1145/3579605> | overreliance は「検証コスト vs 便益の戦略的選択」＝摩擦や情報付与でなく検証コスト低減が要。⚠️正解が安価検証可能な迷路課題で論述・コーディングに外挿不可 | — | active |
+| [V39] | doi:10.1145/3571810 | Roffarello, A. M. et al. — Achieving Digital Wellbeing Through Digital Self-Control Tools: A Systematic Review and Meta-Analysis | ACM TOCHI 30(4), 2023 | <https://doi.org/10.1145/3571810> | DSCT 設計空間の効果天井 g=0.47。⚠️**k=7・統制群なき前後比較中心・平均22日の短期のみ**・novelty 減衰不明・circumvention と abandonment を未解決課題と明記。Gate D 閾値に ≲0.5 SD 超を前提化しない根拠 | — | active |
+| [V40] | doi:10.1073/pnas.2200300119 | Maier, M. et al. — No evidence for nudging after adjusting for publication bias | PNAS 119(31):e2200300119, 2022 | <https://doi.org/10.1073/pnas.2200300119> | ナッジ d=0.43→補正後 d≈0。assistance 系(GSE Lv1 Nudge 近似) d=0.22→0.01 (BF01≈9)、information 系 d=0.00 (BF01=33.84)、**structure 系(GSE Wall 近似)のみ inconclusive=未否定**。⚠️原著 Mertens らは過補正と反論(係争中)・one-shot 健康行動 | — | active |
+| [V41] | doi:10.2196/14567 | Baumel, A. et al. — Objective User Engagement With Mental Health Apps: Systematic Search and Panel-Based Usage Analysis | JMIR 21(9):e14567, 2019 | <https://doi.org/10.2196/14567> | 93アプリの客観パネル。**30日継続率 中央値 3.3%・DAU=インストールの4.0%**＝Gate D の桁ベンチ。⚠️メンタルヘルス/スマホで領域跨ぎ・効果量を閾値に直接代入しない | — | active |
+| [V42] | doi:10.1038/s41746-020-0224-8 | Pratap, A. et al. — Indicators of retention in remote digital health studies: a cross-study evaluation of 100,000 participants | npj Digital Medicine 3:21, 2020 | <https://doi.org/10.1038/s41746-020-0224-8> | 8研究 N≈11万。**継続中央値 5.5日・54.6%初日離脱**・**登録経路が支配(臨床医紹介44日 vs 自己選択4日, P<1e-16)**＝Phase1 低参加に直結・研究者同席を支持 | — | active |
+| [V43] | doi:10.2196/85349 | (JMIR Formative Research) — Readiness-gated re-engagement in a digital self-control tool | JMIR Formative Research, 2026 | <https://doi.org/10.2196/85349> | 「出さない判断」の先行例: 再エンゲージ促しは46%しか受諾せず非受諾54%で無介入と有意差なし(P=.82)。**受動行動指標が受容性を予測・自己申告は予測せず(P>.10)**＝content-free receptivity ゲートの先行例。⚠️準実験・2026刊で独立再現なし | — | active |
+| [V44] | doi:10.1145/3772318.3791716 | Alin, P. et al. — (TikTok の摩擦介入と主体性) | CHI 2026, 2026 | <https://doi.org/10.1145/3772318.3791716> | 摩擦は強迫利用を減らすが agency 回復を伴わず UX 悪化＝「friction→主体性向上」前提への境界条件。摩擦はターゲット特異的。⚠️N=48・事前登録なし・被引用0・目標対立的な動画消費が対象 | — | active |
 
 ---
 
@@ -88,7 +113,25 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | Mehta et al. 2025 | [P11] | [V6] |
 | Park 2024 | [P7] | [V13] |
 
-→ 一意な文献数 = 15 + 29 − 6 = **38**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、P との重複なし）。
+→ 一意な文献数 = 28 + 44 − 6 = **66**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、
+P27–P28 / V37–V44 を 2026-07-24 の Post-Phase1 摩擦・継続率・AI 過信サーヴェイ
+（`docs/literature/20260724-friction-retention-and-overreliance-evidence.md`・deep-research 第2/第3ラウンド）で追加（一次全文で数値照合済み・すべて active）、
+P19–P20 / V30–V33 を 2026-07-23 に介入コンテンツ×文脈シグナル×ML サーヴェイ
+`docs/literature/20260703-intervention-content-and-ml-grounding.md` から追加。P との重複なし）。
+
+> ⚠️ **P21–P26 / V34–V36 は 2026-07-23 の deep-research サーヴェイ第1ラウンド
+> （`docs/literature/20260723-activation-layer-and-self-tracking-evidence.md`）で追加**。
+> いずれも 3 票の敵対的検証を通過した主張に基づき、一次ソース本文で数値を逐語照合済みのため `active`
+> （[P24] のみ DOI 未確定で `provisional`）。
+>
+> ⚠️ **[P19] は `superseded`**: d=0.65 という効果量主張が同ラウンドで 0-3 否決された。
+> **実行意図の効果量を引くときは必ず [P21]（d=.36 素・補正後 d=.15）を使うこと**。
+> 番号は citation-ssot 規約により再利用せず、行も残す。
+>
+> ⚠️ **P19–P20 / V30–V33 は `provisional`**: 出典は上記サーヴェイカード経由であり、**原論文の直接確認前**である
+> （サーヴェイ自体が adversarial verify 通過を Card1/Card2 の 5 主張のみと明示している）。
+> 効果量を設計判断の一次根拠に使う前に原論文を確認し、`active` へ昇格させること。
+> 同サーヴェイの残り 17 件は**登録候補のまま**（研究者確認待ち。カード末尾の候補表を参照）。
 
 ## 追加・撤回ルール
 
