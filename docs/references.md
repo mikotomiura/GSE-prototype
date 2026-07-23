@@ -38,8 +38,14 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [P16] | doi:10.58680/ccc198115885 | Flower, L. & Hayes, J. R. — A Cognitive Process Theory of Writing | College Composition and Communication 32(4):365, 1981 | <https://doi.org/10.58680/ccc198115885> | 執筆の認知プロセス（planning/translating/reviewing）＝停滞の工程構造（課題種別の停滞接地） | — | active |
 | [P17] | isbn:978-0-521-33700-2 | Scardamalia, M. & Bereiter, C. — Knowledge Telling and Knowledge Transforming in Written Composition | in S. Rosenberg (Ed.), Advances in Applied Psycholinguistics Vol.2, pp.142–175, Cambridge Univ. Press, 1987 | — | 課題種別→停滞の質（論述=knowledge-transforming=高負荷 vs 物語/通信文=knowledge-telling=低負荷） | — | active |
 | [P18] | doi:10.1037/0278-7393.14.3.355 | Kellogg, R. T. — Attentional Overload and Writing Performance: Effects of Rough Draft and Outline Strategies | J. Exp. Psychol. Learn. Mem. Cogn. 14(3):355, 1988 | — | 停滞=作業記憶過負荷（課題要求でその大きさが変動）の実証的接地 | — | provisional |
-| [P19] | doi:10.1016/S0065-2601(06)38002-1 | Gollwitzer, P. M. & Sheeran, P. — Implementation Intentions and Goal Achievement: A Meta-Analysis of Effects and Processes | Adv. Exp. Soc. Psychol. 38:69–119, 2006 | <https://doi.org/10.1016/S0065-2601(06)38002-1> | if-then 実行意図 d=0.65。作業「活性化」UI（セッション開始時の意図設定）の理論根拠 | — | provisional |
+| [P19] | doi:10.1016/S0065-2601(06)38002-1 | Gollwitzer, P. M. & Sheeran, P. — Implementation Intentions and Goal Achievement: A Meta-Analysis of Effects and Processes | Adv. Exp. Soc. Psychol. 38:69–119, 2006 | <https://doi.org/10.1016/S0065-2601(06)38002-1> | 実行意図の古典的メタ分析。⚠️ **効果量 d=0.65 は [P21]（642テスト・2024/2025）に上書きされた**（本 d=.65 主張は 2026-07-23 の検証で 0-3 否決）。**効果量の引用は [P21] を使うこと**。本項は歴史的位置づけとして保持 | →P21 | superseded |
 | [P20] | doi:10.1145/3698205.3729547 | Learning@Scale 2025 — メタ認知プロンプトの事前登録 RCT（N=1,005、null） | Proc. L@S '25, 2025 | <https://doi.org/10.1145/3698205.3729547> | プロンプト単体は不活性でありうる＝効果はユーザーの目標整合に依存（活性化が介入の前提条件） | — | provisional |
+| [P21] | doi:10.1080/10463283.2024.2334563 | Sheeran, P., Listrom, O. & Gollwitzer, P. M. — The Effects of Implementation Intentions on Goal Attainment: A Meta-Analysis of 642 Tests | European Review of Social Psychology 36(1):162–194, 2024/2025 | <https://doi.org/10.1080/10463283.2024.2334563> | **実行意図の効果量 SSOT**。素の d=.36 [.33,.40] → 出版バイアス補正後 RoBMA d=.15 [.08,.22]（tau=0.27）。contingent d=.43 > schedule d=.29、記録すると d=.31 vs .44、詳細化で .46→.24、リハーサル有効 .45 vs .33＝活性化 UI の設計制約 | ←P19 | active |
+| [P22] | doi:10.1037/a0015984 | Armitage, C. J. — Effectiveness of Experimenter-Provided and Self-Generated Implementation Intentions to Reduce Alcohol Consumption | Health Psychology 28(5):545–553, 2009 | <https://doi.org/10.1037/a0015984> | テンプレ選択式でも自由記述と有意差なし（p=.62）＝content-free 制約下の UI 選択の根拠。ただし等価性検定ではない（検証 2-1） | — | active |
+| [P23] | doi:10.1111/dar.13553 | Cooke, R. et al. — Effectiveness of implementation intention interventions to reduce alcohol consumption: meta-analysis | Drug and Alcohol Review, 2023 (PMID 36173203) | <https://doi.org/10.1111/dar.13553> | オンライン配信サブグループ d+=-0.04 [-0.14,0.06]・大学生 d+=-0.04＝GSE が置かれる配信様式での null（境界条件） | — | active |
+| [P24] | url:jmir-mhealth-2025-e65260 | Ahmadyar, S., Szypula, J., Bogosian, A. & Tapper, K. — 実行意図 vs 実務的 tips の要因実験（n=169、2週間日次アドヒアランス） | JMIR Mhealth Uhealth 13:e65260, 2025 (PMC12334108) | <https://mhealth.jmir.org/2025/1/e65260> | 能動統制に対し上乗せなし（71% vs 72%, P=.73）＝独立 null。⚠️ DOI 未確定のため URL キーで登録（provisional）。同論文のモデレーション主張（P=.04）は 0-3 否決につき引用禁止 | — | provisional |
+| [P25] | doi:10.1177/0146167204271308 | Sheeran, P., Webb, T. L. & Gollwitzer, P. M. — The Interplay Between Goal Intentions and Implementation Intentions | Pers. Soc. Psychol. Bull. 31(1):87–98, 2005 (PMID 15574664) | <https://doi.org/10.1177/0146167204271308> | 効果は強く活性化した目標意図に条件づけられる＝**実行意図は動機を作らない**（活性化 UI の適用限界） | — | active |
+| [P26] | doi:10.1037/0022-3514.83.1.231 | Koestner, R., Lekes, N., Powers, T. A. & Chicoine, E. — Attaining Personal Goals: Self-Concordance Plus Implementation Intentions | J. Pers. Soc. Psychol. 83(1):231–244, 2002 (PMID 12088128) | <https://doi.org/10.1037/0022-3514.83.1.231> | 個人プロジェクトでは実行意図の主効果ゼロ・self-concordance との交互作用のみ＝需要が薄い層では効かない | — | active |
 
 ## V 名前空間 — 検証方法論（ユーザー検証 v0.4 書誌）
 
@@ -77,7 +83,10 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [V30] | url:cmu-ml-18-104 | CMU-ML-18-104 — Keystroke dynamics によるストレスの個人内分類（PhD thesis） | Carnegie Mellon Univ. Machine Learning Dept., 2018 | <https://reports-archive.adm.cs.cmu.edu/anon/ml2018/CMU-ML-18-104.pdf> | 個人内分類 89.5% vs 被験者横断 <60%・universal marker 不在（116名）＝within-person 較正必須の一次根拠。per-user 較正コスト＝採用摩擦の裏付け | — | provisional |
 | [V31] | doi:10.1177/0741088313491692 | Leijten, M. & Van Waes, L. — Keystroke Logging in Writing Research: Using Inputlog to Analyze and Visualize Writing Processes | Written Communication 30(3):358–392, 2013 | <https://doi.org/10.1177/0741088313491692> | ポーズ長のテキスト単位階層（語内<語間<文間<段落間）＝ポーズ「位置」分類の方法論。本文非保存で移植可能 | — | provisional |
 | [V32] | doi:10.1017/S0272263119000263 | Révész, A. et al. — Investigating the Relationship of Task Complexity, Cognitive Processes, and L2 Writing | Studies in Second Language Acquisition, 2019 | <https://doi.org/10.1017/S0272263119000263> | 論述課題での keystroke+視線+刺激再生の三角測量。文間ポーズ=planning / 語内ポーズ=transcription＝停滞の質の弁別根拠 | — | provisional |
-| [V33] | doi:10.1073/pnas.2213114120 | Grüning, D. J. et al. — Directing smartphone use through the self-nudge app one sec | PNAS 120(8):e2213114120, 2023 | <https://doi.org/10.1073/pnas.2213114120> | 10秒 friction+意図表示で 36% 断念・試行自体 37% 減、habituation 耐性。self-nudge（自己導入）フレーミングの受容性根拠 | — | provisional |
+| [V33] | doi:10.1073/pnas.2213114120 | Grüning, D. J. et al. — Directing smartphone use through the self-nudge app one sec | PNAS 120(8):e2213114120, 2023 | <https://doi.org/10.1073/pnas.2213114120> | 10秒 friction+意図表示で 36% 断念・試行自体 37% 減、habituation 耐性。self-nudge（自己導入）フレーミングの受容性根拠。⚠️ **2 ラウンド連続で検証を通過しておらず独立再現も未確認**＝GSE の差別化仮説の中核でありながら根拠は未固定 | — | provisional |
+| [V34] | doi:10.1145/2858036.2858428 | Kim, Y.-H., Jeon, J. H., Choe, E. K., Lee, B., Kim, K. & Seo, J. — TimeAware: Leveraging Framing Effects to Enhance Personal Productivity | CHI '16, pp.272–283, 2016 | <https://doi.org/10.1145/2858036.2858428> | 自己追跡フィードバックはネガティブ枠のみ有効（0.634）・**撤去2週で効果消失**（IV→WD -0.473, p=.003）＝継続利用の主柱にできない根拠。N=24 で PF の null は検出力不足 | — | active |
+| [V35] | doi:10.1145/3613904.3642469 | Hu, Y. & Lee, S. W. — （タイムラプス自己内省による生産性フィードバックの比較実験） | CHI '24, 2024 | <https://doi.org/10.1145/3613904.3642469> | 豊かな文脈的フィードバックでも**客観生産性は動かず**（62.6 vs 64.8, F(1,297)=1.58 n.s.）主観のみ上昇＝自己追跡の効果は知覚に偏る。N=15 で検出力不足 | — | active |
+| [V36] | doi:10.1371/journal.pone.0245066 | Aeon, B., Faber, A. & Panaccio, A. — Does time management work? A meta-analysis | PLOS ONE 16(1):e0245066, 2021 | <https://doi.org/10.1371/journal.pone.0245066> | 158研究・490効果量。⚠️ **大半が横断研究**でフォローアップ・継続利用アウトカムを報告せず＝novelty effect 減衰と retention の判定材料にならない（スコープ否定）。r≈.25 上限主張とウェルビーイング優位主張は 0-3 否決につき引用禁止 | — | active |
 
 ---
 
@@ -94,10 +103,19 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | Mehta et al. 2025 | [P11] | [V6] |
 | Park 2024 | [P7] | [V13] |
 
-→ 一意な文献数 = 20 + 33 − 6 = **47**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、
+→ 一意な文献数 = 26 + 36 − 6 = **56**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、
 P19–P20 / V30–V33 を 2026-07-23 に介入コンテンツ×文脈シグナル×ML サーヴェイ
 `docs/literature/20260703-intervention-content-and-ml-grounding.md` から追加。P との重複なし）。
 
+> ⚠️ **P21–P26 / V34–V36 は 2026-07-23 の deep-research サーヴェイ第1ラウンド
+> （`docs/literature/20260723-activation-layer-and-self-tracking-evidence.md`）で追加**。
+> いずれも 3 票の敵対的検証を通過した主張に基づき、一次ソース本文で数値を逐語照合済みのため `active`
+> （[P24] のみ DOI 未確定で `provisional`）。
+>
+> ⚠️ **[P19] は `superseded`**: d=0.65 という効果量主張が同ラウンドで 0-3 否決された。
+> **実行意図の効果量を引くときは必ず [P21]（d=.36 素・補正後 d=.15）を使うこと**。
+> 番号は citation-ssot 規約により再利用せず、行も残す。
+>
 > ⚠️ **P19–P20 / V30–V33 は `provisional`**: 出典は上記サーヴェイカード経由であり、**原論文の直接確認前**である
 > （サーヴェイ自体が adversarial verify 通過を Card1/Card2 の 5 主張のみと明示している）。
 > 効果量を設計判断の一次根拠に使う前に原論文を確認し、`active` へ昇格させること。
