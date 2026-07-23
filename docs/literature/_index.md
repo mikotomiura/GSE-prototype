@@ -13,6 +13,8 @@
 
 | 2026-07-23 | activation-layer-and-self-tracking-evidence | [20260723-activation-layer-and-self-tracking-evidence.md](20260723-activation-layer-and-self-tracking-evidence.md) | 8 | RQ1 活性化層=**条件付き採用**: if-then は頑健に非ゼロだが小さい（d=.36→補正後 **d=.15**）、GSE のセル（online .31/field .27/行動変容 .27）はすべて下限側。UI 制約は `rehearse but do not persist`（記録すると .44→.31、詳細化で .46→.24、常時表示は不可）、テンプレ選択は可（p=.62、2-1）。**最重要: 実行意図は動機を作らない**（目標意図に条件づけ・Koestner 主効果ゼロ）＝Phase1 の需要の薄さには効かず、needs ベース選抜が筋。RQ2 自己追跡=**継続利用の主柱には非推奨**（ネガ枠のみ有効 0.634・**撤去2週で消失** -0.473・客観 null で主観のみ）。⚠️ **RQ3 (AI へ逃げる瞬間の friction)・RQ4・RQ5 (フォーカスアプリの天井) は検証済み証拠ゼロ＝探索未完遂**（予算枯渇）。[P19] d=0.65 は 0-3 否決され [P21] に上書き |
 
+| 2026-07-24 | friction-retention-and-overreliance-evidence | [20260724-friction-retention-and-overreliance-evidence.md](20260724-friction-retention-and-overreliance-evidence.md) | 10 | **パートA (生産的苦闘)**: 摩擦の学習効果は成果指標で符号が変わる (概念 g=0.36 / 手続き g=-0.03 null / 低学年で反転 [P27])、効果源は遅延でなく後段 consolidation [P28]＝GSE は前半のみ実装し後半欠落。→「摩擦が能力を育てる」は主張不可、「自力解決の機会を保存」に限定 (パートC)。**パートB (Gate D)**: DSCT 効果天井 g=0.47 (脆弱基盤 [V39])、ナッジは補正後 d≈0 で structure系(Wall)のみ未否定 [V40]、30日継続率 中央値 3.3% [V41]・登録経路が支配 (44 vs 4日 [V42])、「出さない判断」+行動指標 receptivity の先行例 [V43]、one sec 効果源は dismiss-first で friction でない [V33訂正]、摩擦は agency 回復を伴わない [V44]。⚠️**RQ-2 (agentic coding 過信) / RQ-3 (accountability) は3ラウンド通じ確定証拠ゼロ＝判定不能** |
+
 > 各カードは docs/literature/<YYYYMMDD>-<topic-slug>.md。
 > 出典は docs/references.md に append-only で登録される（citation-ssot skill 経由、P/V 名前空間）。
 > 精読の起点候補（references.md より）:
