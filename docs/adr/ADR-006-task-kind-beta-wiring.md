@@ -1,8 +1,8 @@
 # ADR-006: task_kind → β baseline 配線 or IME 状態を代理とするか
 
-- **ステータス**: **Accepted（枠組み = Alternative C「分離」・研究者採択 2026-07-24）**。実装は Phase1 完了後
-  （Epic 2）。下位2点（IME off 日本語論述の扱い／Creative・VibeCoding の baseline）は**未決・研究者判断待ち**。
-- **日付**: 2026-07-24（提起）／ 2026-07-24（枠組み C を採択）
+- **ステータス**: **Accepted（枠組み = Alternative C「分離」＋下位決定 #2/#3 も確定・研究者採択 2026-07-24）**。
+  実装は Phase1 完了後（Epic 2）。
+- **日付**: 2026-07-24（提起 → 枠組み C 採択 → 下位決定 #2/#3 確定、すべて同日）
 - **対応**: Epic 2（Writing Adapter 抽出）の分岐点。roadmap ADR-006。
 - **関連**: ADR-001（HMM 降格）/ ADR-002（domain-local inference）/ `docs/architecture/domain-adapter-boundary.md §Layer 3-4`
 
@@ -93,9 +93,24 @@ match session.task_kind {
   移す／Writing head 内の「IME off 英字・数式」サブ baseline として残す）。
 - Phase1 は Writing head のみ稼働 ＝ 現行挙動と一致するため、抽出フェーズ（2a）は **`HMM_VERSION` 不変**で通せる。
 
-### 未決（下位決定・研究者判断待ち）
-- **#2 IME off の日本語論述**（英字引用・数式・URL）を Writing head 内でどう扱うか — β_writing 固定 or サブ baseline に細分。
-- **#3 VibeCoding / Creative の baseline** — 現 β_coding を流用するか head 固有に作り直すか（Creative は打鍵希薄で β 自体が不適の可能性）。
+### 下位決定（確定・研究者採択 2026-07-24）
+
+**#2 IME off の日本語論述（英字引用・数式・URL）の β 扱い → 「再スコープ（collapse しない）」を採択。**
+- Writing head 内に **latin/英数サブ baseline** を持つ。値は**現 `β_coding`（F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08）を
+  そのまま `β_writing_latin` に改名**して流用し、`ime_open` で `β_writing`（IME on）と切り替える。
+- **backspace ペナルティ（obs=25・streak≥14）は現行どおり `!ime_open` 紐付けを維持**。
+- 根拠: β_writing（F1=100 / F4=2.5）は日本語 IME 変換のリズム。ラテン直接入力は速く・バーストが長く、現 β_coding プロファイルに
+  近い。β_writing 固定に collapse するとラテン窓を誤採点する。**再スコープは現行挙動そのものの概念的分離**であり、
+  **抽出フェーズ（2a）で byte-equal 維持＝`HMM_VERSION` bump 不要**（改名は数値変更を伴わない）。
+
+**#3 VibeCoding / Creative の baseline → 「head 所有 ＋ Creative は打鍵 β 無し」を採択。**
+- **VibeCoding**: Coding head が **現 `β_coding` を初期シードとして継承**し、以後は**自前で所有・再チューニング**する。
+  ただし Coding head の**主信号は打鍵 β でなく coding イベント**（accept/reject/test/revert/diff-review・
+  `domain-adapter-boundary.md §Adapter B`）。エージェントコーディングは AI 操作主体で連続打鍵が薄いため、打鍵 β は弱い補助。
+- **Creative**: **打鍵 β を持たせない**。打鍵希薄で無音＝idle と区別できず打鍵 β は原理的に不適。feasibility のみ（Epic 6）、
+  head を作るなら編集/タイムラインイベント基盤。**現 β_coding の流用はしない**。
+- 帰結: 現 β_coding は v2 で **2 つの所有者に分岐**する — (i) Writing head の `β_writing_latin`（#2・値そのまま）、
+  (ii) Coding head の初期 β（#3・以後独立に再チューニング）。両者は同じ数値から出発するが概念的・進化的に別物。
 
 ## Alternatives
 
@@ -147,10 +162,10 @@ match session.task_kind {
 5. `schema_dto.rs` は additive のみ（task_kind enum は 4 変種維持・`emit_schema` diff を確認）。
 6. Coding head 追加（Phase2）で初めて task_kind が baseline 選択に効く。cross-domain contamination guard は Epic 5。
 
-## 研究者への判断依頼（残る未決点）
-- ~~Alternative A / B / C のどれを正とするか~~ → **C（分離）を採択済み（2026-07-24）**。
-- **#2** IME off の日本語論述（英字引用・数式）を Writing head 内でどう扱うか（β_writing 固定 or 細分）。→ 未決。
-- **#3** `Creative`/`VibeCoding` の baseline を coding β 流用にするか head 固有にするか（Creative は打鍵希薄で要検討）。→ 未決。
+## 研究者判断（すべて確定・2026-07-24）
+- ~~Alternative A / B / C~~ → **C（分離）採択**。
+- ~~#2 IME off 日本語論述の β 扱い~~ → **再スコープ（β_writing_latin サブ baseline・collapse しない）採択**（上記「下位決定」）。
+- ~~#3 Creative/VibeCoding の baseline~~ → **head 所有（Coding は β_coding 継承→自前再チューニング）＋ Creative は打鍵 β 無し**採択。
 
-> #2/#3 は Phase1 完了後・実装着手（Epic 2 Phase 2b）の直前に決めれば足りる（Phase1 中は Writing head のみで
-> 現行挙動と一致するため影響しない）。
+> 確定した #2/#3 は **抽出（2a）では現行挙動と一致するため影響せず**、実際に効くのは配線（2b）＝Coding head 追加時（Phase2）。
+> 実装は Phase1 完了・凍結解除後（Migration 参照）。

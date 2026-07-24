@@ -152,7 +152,10 @@ trait DomainInferenceHead {
 - domain head が**未較正の場合、強介入を禁止**する。
 - Phase1 の Writing HMM 出力を直接共通スコアとして扱わない。
 - **task_kind ごとに baseline と閾値を分ける**／個人 baseline と task baseline を分離する。
-  → ★現行は β を `ime_open` で切替え **task_kind 非配線**。この配線を正とするかは **ADR-006**（最優先）。
+  → ★現行は β を `ime_open` で切替え **task_kind 非配線**。**ADR-006 で Alternative C（分離）＋下位決定 #2/#3 を採択済み**
+  （2026-07-24）: task_kind は head を選び β は head 所有、`ime_open` は Writing head 内の within-writing 信号として維持。
+  Writing head は `β_writing`（IME on）と `β_writing_latin`（IME off・現 β_coding 値を改名流用）を持つ。Coding head は
+  β_coding を初期シードに継承し以後自前所有（主信号は coding イベント）。Creative は打鍵 β を持たない。詳細は **ADR-006**。
 
 ---
 
