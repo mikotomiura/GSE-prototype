@@ -14,13 +14,14 @@ UX 改修)が出た時だけ、別途 /start-task で .steering 実装タスク�
 1. Skill: `reproducibility-discipline`(必須・実験規約SSOT) / `data-privacy`(復号・PII・外部送信禁止/必須) /
    `hmm-analysis`・`ml-workflow`(model_gate が Kill/Inconclusive で再チューニング判断する時)。
 2. docs: `docs/experiment-tracking.md`(再現性SSOT) / `docs/development-guidelines.md` §3(Replay-as-Truth)・§10(データ) /
-   `docs/calibration-smoke-runbook.md`(あれば) / `scripts/run-calibration-cohort.sh` のヘッダ。
+   `docs/calibration-smoke-runbook.md`(あれば) / `scripts/repro.sh`(来歴固定 1コマンドエントリ・PR #74) と
+   委譲先 `scripts/run-calibration-cohort.sh` のヘッダ。
 3. メモリ: 提出/配布(`build-ci-and-pilot-distribution`) と 較正収量(`pilot-calibration-label-yield-gap`)。
 
 ## ゴール
 収集済み `.age` を全件復号 → gse-dataset の `raw/P###/` レイアウトへ被験者別に配置 →
-`scripts/run-calibration-cohort.sh` で per-被験者 `*.calib.json`(C-index・回答率・latency・有効件数) と
-コホート判定(Go/Kill/INCONCLUSIVE/DataInsufficient) を生成 → 判定と次アクションを
+`scripts/repro.sh`(来歴固定 + `run-calibration-cohort.sh` 委譲) で per-被験者 `*.calib.json`(C-index・回答率・
+latency・有効件数) とコホート判定(Go/Kill/INCONCLUSIVE/DataInsufficient) を生成 → 判定と次アクションを
 `experiments/<YYYYMMDD>-phase1-calibration-analysis/` に再現可能な形で記録する。
 
 ## 凍結ゲート閾値（calibration_eval.rs。実装と一致させる・再実装しない）
@@ -37,15 +38,27 @@ UX 改修)が出た時だけ、別途 /start-task で .steering 実装タスク�
      較正評価から除外**する。task_kind ロック (`.steering/20260629-lock-task-kind-argumentative`) 以前に収集された
      データには非論述セッションが混入し得るため (混ぜると C-index がタスク種別で交絡)。除外件数を experiments に記録。
      例: `grep -L '"task_kind":"argumentative"' <decrypted>/*.ndjson` で非論述ファイルを特定し配置対象から外す。
-2. 全件で `GSE_DATASET=<root> scripts/run-calibration-cohort.sh`(--os 明示)を実行し cohort 判定 JSON を得る。
-3. 結果を experiments/ に記録: HMM_VERSION・Cargo.lock・入力NDJSONの件数/hash・gse-dataset commit・OS・seed を刻印し、
-   1コマンド再現(repro)を残す。per-被験者の C-index/回答率/有効件数の表と、コホート verdict、収量(20件到達状況)を要約。
+2. 全件で **`GSE_DATASET=<root> scripts/repro.sh --exp phase1-calibration-analysis --os <macos|windows>`** を実行する
+   (PR #74 で追加。`run-calibration-cohort.sh` の来歴固定ラッパで、パイプラインは再実装せず委譲する)。これが
+   `raw/P*/` → `gse-replay --calibration` → `gse-cohort` を走らせ cohort 判定 JSON を得る。
+   - **前提**: Step 1 の復号・task_kind フィルタ・`raw/P###/` 配置を先に済ませておく (repro.sh は raw/ を
+     そのまま集計し、task_kind フィルタは行わない)。`--dry-run` で実行予定コマンドを確認できる。
+3. 記録は **repro.sh が自動化**する: `experiments/<YYYYMMDD>-phase1-calibration-analysis/` に
+   `provenance.json`(HMM_VERSION を engine.rs const から抽出・repo/gse-dataset commit・rustc・Cargo.lock hash) /
+   `data.md`(入力 NDJSON の sha256 一覧・生ログはコピーせず hash のみ) / `env.md` を刻印し、cohort verdict と
+   per-被験者 `*.calib.json` を `results/` に回収する。**手作業で残すのは `notes.md`** (検証仮説=research-positioning §5 H? /
+   PreReg 番号 / 借用手法 [n]) と、per-被験者の C-index/回答率/有効件数の表・コホート verdict・収量(20件到達状況)の要約。
+   - seed は刻まない (集計パイプラインは seedless=決定論。乱数抽選はプローブ収集時点で NDJSON に記録済み)。
 
 ## 判定後の分岐（結論を experiments に明記）
 - DataInsufficient → 収集継続（self-marker 教示・セッション追加で有効≥20/人を満たす。コード変更不要）。
 - measurement_gate Kill → 回答率/latency 改善（教示/プローブUX）。コード変更なら /start-task で .steering 実装タスク。
 - model_gate Kill/INCONCLUSIVE → HMM が当たっていない/不足。`hmm-analysis`/`ml-workflow` で再チューニング検討
   （HMM_VERSION bump → ゴールデン再生成 → 差分記録）。これは /start-task で .steering 実装タスクに切る。
+  - **注 (PR #74 以降)**: golden は 3 本 (`minimal.json` / `phase1_ime_heavy.json` / `category_coverage.json`) に増え、
+    cargo test `replay_snapshot_goldens_byte_equal` が byte-equal で強制する。HMM_VERSION bump 時は **3 本すべて**
+    `gse-replay <fixture> > tests/snapshots/<name>.json` で再生成し `cargo test --bin gse-replay` を通すこと
+    (1 本でも怠ると当該テストが FAIL する)。差分が意図どおりか `.steering/` に記録する。
 - model_gate Go → confirmatory 成立。次フェーズ（介入効果検証等）の設計へ。
 
 ## 死守
