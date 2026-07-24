@@ -1,7 +1,8 @@
 # ADR-006: task_kind → β baseline 配線 or IME 状態を代理とするか
 
-- **ステータス**: **Deferred**（研究者判断待ち・★Post-Phase1 の最優先論点）
-- **日付**: 2026-07-24
+- **ステータス**: **Accepted（枠組み = Alternative C「分離」・研究者採択 2026-07-24）**。実装は Phase1 完了後
+  （Epic 2）。下位2点（IME off 日本語論述の扱い／Creative・VibeCoding の baseline）は**未決・研究者判断待ち**。
+- **日付**: 2026-07-24（提起）／ 2026-07-24（枠組み C を採択）
 - **対応**: Epic 2（Writing Adapter 抽出）の分岐点。roadmap ADR-006。
 - **関連**: ADR-001（HMM 降格）/ ADR-002（domain-local inference）/ `docs/architecture/domain-adapter-boundary.md §Layer 3-4`
 
@@ -53,20 +54,48 @@ let (beta_f1, beta_f3, beta_f4, beta_f5, beta_f6) = if ime_open {
 
 ## Decision
 
-**二者択一（配線 vs 代理）を単純採決せず、「決定を Deferred のまま、v2 で採る枠組みを Alternative C（分離）に
-寄せる」ことを推奨し、確定は研究者判断に委ねる。**
+**枠組みとして Alternative C「分離」を採択する（研究者判断・2026-07-24）。** 二者択一（配線 A / 代理 B）は採らない。
 
-推奨の骨子（Alternative C・下記）:
-1. **task_kind は「どの domain head/baseline set を使うか」を選ぶ上位信号**とする（ADR-002 の Adapter 境界と一体）。
-2. **IME 状態は Writing head 内部の within-writing 信号**として維持する（β_writing 内の日本語 composition・
-   BS ペナルティ gate は writing 固有の挙動であり、ドメイン選択の役割から切り離す）。
-3. 実装は Phase1 完了後・`HMM_VERSION` bump とセット・**動作非変更を破る変更**なので Epic 2 の acceptance
-   （replay/calibration parity）を満たす形で段階導入する。
+C の骨子:
+1. **task_kind は「どの domain head を走らせるか」を選ぶ上位ルーティング信号**とする（ADR-002 の Adapter 境界と一体）。
+   β は各 head の所有物に格上げし、「1 関数内の 2 択 if」から外す。
+2. **IME 状態（`ime_open`）は Writing head 内部の within-writing 信号**として維持する（β_writing 内の日本語
+   composition・BS ペナルティ gate は writing 固有の挙動であり、ドメイン選択の役割から切り離す）。
+3. 実装は Phase1 完了後。**抽出（挙動不変・no bump）と配線（挙動変更・bump）を 2 サブフェーズに分ける**
+   （Migration 参照）。
 
-**なぜ確定でなく Deferred か**: (i) 凍結対象（engine.rs/HMM_VERSION）に触れ Phase1 完了が前提、
-(ii) Phase1 は task_kind 定数のため**今この配線を検証するデータが無い**、(iii) 選択は「β を 2 本維持するか
-head-local baseline にするか」という ADR-002/Epic 2 の抽象化と不可分。→ Phase1 verdict 確定後に ADR-002 と
-同時確定するのが安全。
+**採択根拠**: A/B は単一 HMM 内の β 切替の入力を変えるだけで、Phase2 のタスク混在時に交絡（§8）が戻る。
+C は task_kind（宣言）と IME（観測）を**直交**させ、Phase1 挙動を包含したままドメイン追加に耐える。日本語 IME
+信号を Writing head 内に温存するため IME データ収集・dataset 公開とも矛盾しない（→ Context「誤解の防止」）。
+
+**なぜ「枠組み採択」に留め、実装は Deferred か**: (i) 凍結対象（engine.rs/HMM_VERSION）に触れ Phase1 完了が前提、
+(ii) Phase1 は task_kind 定数のため**今この配線を検証するデータが無い**、(iii) 下位2点（下記）が未決。
+→ Phase1 verdict 確定後、ADR-002 と同時に実装着手する。
+
+### Alternative C の実装形（具体化）
+
+```rust
+// 現在: 1 つの HMM・β は 2 セット・切替 = 実行時 IME 状態
+//   fn calculate_latent_axes(features, ime_open) { let β = if ime_open { β_writing } else { β_coding }; }
+
+// C: task_kind が head を選ぶ。β は各 head のプロパティ。
+match session.task_kind {
+    Argumentative | Correspondence =>
+        WritingHead.infer(features, ime_open),   // ime_open は head 内部で β_writing・日本語composition・BS gate を制御
+    VibeCoding =>
+        CodingHead.infer(features, /* focus / test / accept 等の coding 信号 */),  // 自前 baseline
+    Creative =>
+        CreativeHead::feasibility_only(),         // 打鍵希薄・Epic 6 feasibility のみ
+}
+```
+
+- **現行 β_coding（IME off で選ばれる分）の行き先**は下位決定 #3 に依存する未決の移行論点（Coding head baseline へ
+  移す／Writing head 内の「IME off 英字・数式」サブ baseline として残す）。
+- Phase1 は Writing head のみ稼働 ＝ 現行挙動と一致するため、抽出フェーズ（2a）は **`HMM_VERSION` 不変**で通せる。
+
+### 未決（下位決定・研究者判断待ち）
+- **#2 IME off の日本語論述**（英字引用・数式・URL）を Writing head 内でどう扱うか — β_writing 固定 or サブ baseline に細分。
+- **#3 VibeCoding / Creative の baseline** — 現 β_coding を流用するか head 固有に作り直すか（Creative は打鍵希薄で β 自体が不適の可能性）。
 
 ## Alternatives
 
@@ -82,7 +111,7 @@ head-local baseline にするか」という ADR-002/Epic 2 の抽象化と不�
 - ❌ Phase2 のタスク混在で交絡が残る（§8）。task_kind が永続的に dead_code。
 - ❌ v2 の「task_kind ごとに baseline と閾値を分ける」原則（設計書 §3.5）を満たさない。
 
-### C. 分離（推奨の枠組み）: task_kind → head/baseline-set 選択、IME → within-writing 信号
+### C. 分離（★採択・2026-07-24）: task_kind → head/baseline-set 選択、IME → within-writing 信号
 - task_kind が **domain head を選び**（Writing/Coding/Creative・ADR-002）、β は各 head のプロパティにする。
   Writing head の中では IME 状態が composition/BS gate の within-writing 信号として残る。
 - ✅ 宣言（task_kind）と観測（IME）の**役割を直交**させる。v2 の domain-local baseline 原則と整合。
@@ -118,7 +147,10 @@ head-local baseline にするか」という ADR-002/Epic 2 の抽象化と不�
 5. `schema_dto.rs` は additive のみ（task_kind enum は 4 変種維持・`emit_schema` diff を確認）。
 6. Coding head 追加（Phase2）で初めて task_kind が baseline 選択に効く。cross-domain contamination guard は Epic 5。
 
-## 研究者への判断依頼（この ADR で確定できない点）
-- **Alternative A / B / C のどれを正とするか**（推奨は C・分離）。
-- IME off の日本語論述（英字引用・数式）を Writing head 内でどう扱うか（β_writing 固定 or 細分）。
-- `Creative`/`VibeCoding` の baseline を coding β 流用にするか head 固有にするか（Creative は打鍵希薄で要検討）。
+## 研究者への判断依頼（残る未決点）
+- ~~Alternative A / B / C のどれを正とするか~~ → **C（分離）を採択済み（2026-07-24）**。
+- **#2** IME off の日本語論述（英字引用・数式）を Writing head 内でどう扱うか（β_writing 固定 or 細分）。→ 未決。
+- **#3** `Creative`/`VibeCoding` の baseline を coding β 流用にするか head 固有にするか（Creative は打鍵希薄で要検討）。→ 未決。
+
+> #2/#3 は Phase1 完了後・実装着手（Epic 2 Phase 2b）の直前に決めれば足りる（Phase1 中は Writing head のみで
+> 現行挙動と一致するため影響しない）。

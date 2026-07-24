@@ -15,12 +15,15 @@ Epic 1 はコード変更ゼロ・凍結対象非接触で物理干渉しない�
 特に Need/Opportunity 分離・none/defer・cooldown 群・Monk Mode=介入拒否は**既に実装済み**であることを明記
 （「新規実装でなく整理が主」）。
 
-## D4: ★ADR-006 は Deferred（研究者判断）+ 推奨 = Alternative C（分離）
+## D4: ★ADR-006 = Alternative C（分離）を研究者採択（2026-07-24）
 現行 β 選択は `ime_open` 切替で task_kind 非配線（engine.rs で実測確認・task_kind は analysis/ に 0 件）。
 IME 状態は β 選択だけでなく backspace ペナルティも gate（engine.rs:367）＝ within-writing の意味を持つ。
-→ 二者択一（配線 A / 現状維持 B）でなく **C: task_kind→head 選択・IME→within-writing 信号の分離**を推奨。
-確定は (i) 凍結（HMM_VERSION）・(ii) Phase1 は task_kind 定数で検証データ無し・(iii) ADR-002/Epic 2 と不可分、
-の 3 点から Phase1 完了後に ADR-002 と同時に研究者が決める。
+→ 二者択一（配線 A / 現状維持 B）でなく **C: task_kind→head 選択・β は head 所有・IME→within-writing 信号の分離**を
+**研究者が採択**（2026-07-24・"Cにしますか"）。A/B は単一 HMM 内の β 切替入力を変えるだけで Phase2 混在時に交絡が戻るのに対し、
+C は宣言(task_kind)と観測(IME)を直交させ Phase1 挙動を包含。日本語 IME 信号は Writing head 内に温存＝dataset 公開と両立。
+- **実装は Phase1 完了後**（凍結 HMM_VERSION・task_kind 定数で検証データ無し）。抽出(2a・no bump)/配線(2b・bump)の 2 段階。
+- **下位2点は未決**（Epic 2 Phase 2b 直前で決めれば足りる）: #2 IME off 日本語論述の β 扱い、#3 Creative/VibeCoding の baseline。
+- ADR-006 に具体化（match ルーティング・β_coding 移行論点・2a/2b 境界）を追記済み。ステータス Deferred→Accepted(枠組み C)。
 
 ## D5: エビデンス過大主張の防止を各 docs に構造化
 - 実証支持: none/defer 第一級 [V43]・Motivation Generator 非標準実装 [P21][V40]・Gate D は prior [V41][V42]。

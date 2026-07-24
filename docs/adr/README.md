@@ -23,5 +23,5 @@ Migration** を持つ。SSOT のアーキテクチャ概要は `docs/architectur
 | [ADR-003](ADR-003-accountability-outside-core.md) | Accountability を core 外の opt-in extension に分離 | Proposed（採否は Deferred・第4ラウンド待ち） | Epic 3.5+ |
 | [ADR-004](ADR-004-decision-engine-boundary.md) | Decision Engine 境界（pure function 化）+ Consent 軸 | Accepted（Consent 実装は Epic 3） | Epic 3 |
 | [ADR-005](ADR-005-event-envelope-versioning.md) | Event Envelope schema versioning | Proposed | Epic 2/5 |
-| [**ADR-006**](ADR-006-task-kind-beta-wiring.md) | **task_kind → β baseline 配線 or IME 代理を正とするか** | **Deferred（研究者判断待ち・★最優先論点）** | Epic 2 分岐点 |
+| [**ADR-006**](ADR-006-task-kind-beta-wiring.md) | **task_kind → β baseline 配線 or IME 代理を正とするか** | **Accepted（枠組み C「分離」採択 2026-07-24）・実装は Phase1 後・下位2点未決** | Epic 2 分岐点 |
 | [ADR-007](ADR-007-receptivity-decomposed-vs-unified.md) | receptivity 統合スコア化 or 分解維持 | Accepted（分解維持を推奨） | Epic 3 |
