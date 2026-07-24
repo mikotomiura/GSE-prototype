@@ -2043,6 +2043,14 @@ mod tests {
         p
     }
 
+    fn snapshot_path(name: &str) -> PathBuf {
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("tests");
+        p.push("snapshots");
+        p.push(name);
+        p
+    }
+
     /// v0.4 Outcome metrics の Replay-as-Truth 回帰: outcome_metrics.ndjson を
     /// collector → segment → compute_outcome_metrics に通し、固定値を検証する。
     /// fixture 設計: 2 エピソード (10000-11000 / 200000-201000)、ep1 は manual のみで
@@ -2690,6 +2698,44 @@ mod tests {
             snapshots_without_timestamp(&anon_snaps),
             "feature values must match across all key categories incl. Other-folded keys"
         );
+    }
+
+    /// **Epic 2 安全網: `--snapshot` ゴールデン回帰を CLI 手動でなく cargo test で強制する**。
+    /// これまで `gse-replay <fixture> --snapshot <golden>` は手動実行のみで、`engine.rs` /
+    /// `features.rs` / `loop_step.rs` の挙動変更を byte-equal (FeatSnapshot 構造体等価) で守る
+    /// 唯一の門が CI/test の外にあった。既存の `replay_anonymized_matches_raw_features` 系は
+    /// raw==anon の *相対* 比較のため、両辺が同時にずれる絶対ドリフト (β / EWMA α / 放出行列
+    /// 変更など) を検出できない。本テストは各 fixture の現行出力を **コミット済みゴールデンの
+    /// 絶対値**と突き合わせ、`run_replay` + `compare_snapshots` (main の `--snapshot` 経路と同一
+    /// 関数) を駆動する。ゴールデンは `gse-replay <fixture> > tests/snapshots/<name>.json` で再生成。
+    /// HMM_VERSION bump 時はゴールデン再生成が設計上必須 (差分意図を .steering に記録)。
+    ///
+    /// カバレッジ (② golden 監査より):
+    /// - `minimal`          : active-typing 特徴量 (F1/F3/F4/obs/EWMA・alpha=0.3)
+    /// - `phase1_ime_heavy` : IME pause + 沈黙経路 (alpha=0.15・f5 pause 蓄積・f1 沈黙フロア・β-writing)
+    /// - `category_coverage`: resolve_key_vk + Other 畳み込み + obs 量子化
+    #[test]
+    fn replay_snapshot_goldens_byte_equal() {
+        let cases = [
+            ("minimal.ndjson", "minimal.json"),
+            ("phase1_ime_heavy.ndjson", "phase1_ime_heavy.json"),
+            ("category_coverage.ndjson", "category_coverage.json"),
+        ];
+        for (fixture, golden) in cases {
+            let snaps = run_replay(&fixture_path(fixture))
+                .unwrap_or_else(|e| panic!("replay {fixture}: {e}"));
+            assert!(
+                !snaps.is_empty(),
+                "{fixture}: golden fixture must produce snapshots"
+            );
+            compare_snapshots(&snaps, &snapshot_path(golden)).unwrap_or_else(|e| {
+                panic!(
+                    "{golden} drift — replay output diverged from committed golden.\n{e}\n\
+                     意図した変更なら `gse-replay tests/fixtures/{fixture} > tests/snapshots/{golden}` \
+                     で再生成し .steering に差分意図を記録すること (HMM_VERSION bump 時は必須)。"
+                )
+            });
+        }
     }
 
     /// **`--metrics` 経路の既知の制約を明示・回帰ロックする (D-RC3)**。匿名化は `is_text_producing`
