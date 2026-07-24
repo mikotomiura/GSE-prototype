@@ -26,6 +26,11 @@ var F5_FORM_ID = "1I-X1B8F-tQk7aEAdqderOLhjobeHct48KU23NWwfhlY";
 var F2_FORM_ID = "1rIgGukudblKEMIef8EkC_KmjUBumrpoLkIew5w6kRWY"; // F2 事前アンケート（被験者配布 x.gd/m3q89 の正本・編集ID）
 var F4_FORM_ID = "1Q4Iy2r7Uswth9zVOpV81jIKOdKj5dJSW2L-ScKaurqU"; // F4 セッション後アンケート（被験者配布 x.gd/3qba4 の正本・編集ID）
 var CLEAR_EXISTING = true; // 既存設問を削除してから投入するか
+// ⚠ 固定ID(openById)の正本フォーム(F1/F2/F4/F5)は、回答が1件でもあると clearForm で
+//   全回答の中身が消える(2026-07-08 buildAllSupportForms 再実行で F2/F4/F5 の過去回答が消失)。
+//   下記ガード(assertClearableForm_)が既定 false で build系を中断して保護する。
+//   意図的に設問を作り直す時だけ true にする(その場合、既存回答が失われることを承知で)。
+var ALLOW_CLEAR_WITH_RESPONSES = false;
 
 // セッションログ (.age) の提出先 Dropbox **File Request** URL（/request/ 形式・提出専用で相互不可視）。
 // 共有フォルダ (/scl/fo/) は提出者同士がファイル名で互いに見えるため不可 (pilot-runbook D6)。
@@ -107,6 +112,8 @@ var REMINDER_KIND_STALLED = "送信:停滞";
 var REMINDER_KIND_WILLDO = "応答:これから取り組む";
 var REMINDER_KIND_REST = "応答:本日は休む";
 var REMINDER_LOG_TAB = "リマインド運用";
+// 「本日のリマインド予定」タブ: 送信予定/送信済み/抑制/対象外を一覧表示(監視用・P-ID のみ)。
+var REMINDER_PLAN_TAB = "本日のリマインド予定";
 
 // ============================================================
 // 進捗目標 / Phase1 運用ステータス / UI パレット
@@ -173,6 +180,7 @@ function buildForm() {
   // 直接 deleteItem で末尾から消すと、まだ go-to-page 参照されているページを
   // 先に削除して "Invalid data updating form" になる（buildForm 再実行時の典型エラー）。
   if (CLEAR_EXISTING) {
+    if (!assertClearableForm_(form, "F1")) return; // 回答のある正本フォームを保護
     clearForm(form);
   }
 
@@ -425,6 +433,7 @@ function buildF2() {
   var form = FormApp.openById(F2_FORM_ID);
   // openById は同一フォーム再利用のため再実行時の設問重複を防ぐべく既存設問を全削除する。
   if (CLEAR_EXISTING) {
+    if (!assertClearableForm_(form, "F2")) return; // 回答のある正本フォームを保護
     clearForm(form);
   }
   form.setTitle("GSE ユーザー検証 Phase1 – F2 事前アンケート（ベースライン）");
@@ -649,6 +658,7 @@ function buildF4() {
   var form = FormApp.openById(F4_FORM_ID);
   // openById は同一フォーム再利用のため再実行時の設問重複を防ぐべく既存設問を全削除する。
   if (CLEAR_EXISTING) {
+    if (!assertClearableForm_(form, "F4")) return; // 回答のある正本フォームを保護
     clearForm(form);
   }
   form.setTitle("GSE ユーザー検証 Phase1 – F4 セッション後アンケート");
@@ -749,6 +759,7 @@ function buildF5() {
   // (create 方式には不要だったが openById では必須)。clearForm でナビゲーションを先に解除して
   // "Invalid data updating form" を回避する（F5 自体は分岐を持たないが buildForm と同一経路に統一）。
   if (CLEAR_EXISTING) {
+    if (!assertClearableForm_(form, "F5")) return; // 回答のある正本フォームを保護
     clearForm(form);
   }
   form.setTitle("GSE ユーザー検証 Phase1 – F5 事後アンケート");
@@ -978,6 +989,8 @@ function buildManagementSheet() {
   applyRosterValidation_(ss); // condition/OS/撤回 のドロップダウン・条件付き書式（型安全な順）
   buildControlTab_(ss); // ★最後に: Phase1 ステータス トグルを先頭タブへ(既存値は保持)。
   //   他タブの insertSheet(name,0) で押し下げられないよう、全タブ構築後に先頭へ再アサートする。
+  buildReminderPlanTab_(ss); // 本日のリマインド予定(監視用タブ)を再描画
+  installMgmtMenuTrigger_(ss); // 管理シートに「GSE 運用」メニュー(onOpen トリガー)を冪等設置
 
   ["シート1", "Sheet1"].forEach(function (n) {
     var s = ss.getSheetByName(n);
@@ -1714,6 +1727,7 @@ function refreshRosterStatus() {
   sheet.getRange(hr + 1, 7, nRows, 5).setValues(out);
 
   buildDashboardTab_(ss, f4, f2); // 集計後にダッシュボードを再描画(算出済み f4/f2 を再利用)
+  buildReminderPlanTab_(ss, f4, f2); // 本日のリマインド予定も再描画(同じ f4/f2 を再利用)
   Logger.log("✅ ロスター状態を更新しました（F2/F4/F5 を P-ID で集計）");
 }
 
@@ -2120,6 +2134,36 @@ function installRosterRefreshTrigger() {
 // （まだ参照されているページを先に削除してナビゲーションが orphan 化するため）。
 // 対策: 削除の前に全ナビゲーション参照を解除（選択肢を plain 化・ページを CONTINUE 化）し、
 // クロス参照を断ってから削除する。
+// ============================================================
+// 安全ガード: 回答のある正本フォームの誤クリアを防ぐ
+// ============================================================
+// 固定ID(openById)の F1/F2/F4/F5 は被験者が提出中の「正本」。回答が1件でもある状態で
+// clearForm(=全設問 deleteItem)を走らせると、Google Forms は削除設問への既存回答の中身を
+// 消す(復元不能。2026-07-08 に buildAllSupportForms 再実行で F2/F4/F5 の過去回答が消失)。
+// build系は clearForm の直前に必ずこれを呼び、回答があれば中断する。
+// 通常の再集計は refreshRosterStatus()(フォームを触らない)。設問を本当に作り直す時だけ
+// ファイル冒頭の ALLOW_CLEAR_WITH_RESPONSES=true にする(既存回答は失われる)。
+function assertClearableForm_(form, key) {
+  var n;
+  try {
+    n = form.getResponses().length;
+  } catch (e) {
+    // 回答数を確認できない場合は安全側(中断)に倒す。
+    Logger.log("⛔ " + key + ": 回答数を確認できませんでした(" + e + ")。" +
+      "安全のため build" + key + " を中断しました。");
+    return false;
+  }
+  if (n > 0 && !ALLOW_CLEAR_WITH_RESPONSES) {
+    Logger.log("⛔ " + key + ": このフォームには既に " + n + " 件の回答があります。" +
+      "clearForm を実行すると全回答の中身が失われます。build" + key + " を中断しました。\n" +
+      "　・通常の再集計は refreshRosterStatus() を使ってください(フォームを変更しません)。\n" +
+      "　・本当に設問を作り直す場合のみ、冒頭 ALLOW_CLEAR_WITH_RESPONSES=true にして再実行" +
+      "してください(既存回答は失われます)。");
+    return false;
+  }
+  return true;
+}
+
 function clearForm(form) {
   var items = form.getItems();
 
@@ -2204,59 +2248,94 @@ function sendReminders() {
   var nDaily = 0, nStalled = 0, nSkipped = 0;
   for (var i = 0; i < people.length; i++) {
     var p = people[i];
-    if (p.excluded) { nSkipped++; continue; } // 撤回/除外(col13)
-    if (!p.email || p.email.indexOf("@") === -1) { nSkipped++; continue; } // 送信先なし
-
-    // ★参加フェーズのゲート: セッション実施フェーズに入った人だけを対象にする。
-    //   F4 が1件でもある(=既に作業開始) か、オンボーディング完了(NDA署名済 かつ F2事前完了) のいずれか。
-    //   同意直後で NDA未署名/F2未提出/アプリ未配布の被験者に「課題未提出」を送る誤送信を防ぐ。
-    var hasF4 = !!f4[p.pid];
-    var eligible = hasF4 || (p.ndaSigned && p.f2);
-    if (!eligible) { nSkipped++; continue; }
-
-    var latest = hasF4 ? f4[p.pid].latest : "";
-    if (latest === today) { nSkipped++; continue; } // 本日 F4 提出済み → 送らない
-
-    // 停滞日数 = 「提出も応答も無い」連続日数。
-    // 起点: 最新F4提出日 → 無ければ F2完了日(=準備完了) → それも無ければ F1同意日。
-    // F2完了日を優先することで「同意は昔・準備完了は最近」の人が即停滞判定される誤りを避ける。
-    var submitStart = latest
-      || (f2[p.pid] ? f2[p.pid].latest : "")
-      || reminderYmd_(p.consentDate, tz);
-    var daysSinceSubmit = submitStart ? reminderDiffDays_(today, submitStart) : null;
-    if (daysSinceSubmit === null) daysSinceSubmit = 0; // 日付が読めない時は安全側(=日次)へ
-    var lastResp = log.lastResponse[p.pid];
-    var daysSinceResp = lastResp ? reminderDiffDays_(today, lastResp) : null;
-    var idleDays = (daysSinceResp === null)
-      ? daysSinceSubmit
-      : Math.min(daysSinceSubmit, daysSinceResp);
-
-    if (idleDays >= REMINDER_STALLED_DAYS) {
-      // 停滞チェックイン(督促でなく気遣い)。THROTTLE_DAYS 未満での連投は避ける。
-      var lastStalled = log.stalledLastSent[p.pid];
-      if (lastStalled) {
-        var since = reminderDiffDays_(today, lastStalled);
-        if (since !== null && since < REMINDER_STALLED_THROTTLE_DAYS) { nSkipped++; continue; }
-      }
+    // ★送信判定は reminderClassify_ に一元化(「本日のリマインド予定」タブと同一真実源)。
+    //   ここでは判定結果に従って実送信 + ログ記録するだけ(判定条件は関数内に集約)。
+    var c = reminderClassify_(p, f4, f2, log, today, tz);
+    if (c.category === "send_stalled") {
+      // 停滞チェックイン(督促でなく気遣い)。
       reminderSend_(p.email, REMINDER_STALLED_SUBJECT,
         reminderStalledBody_(p.pid, p.name), reminderStalledHtml_(p.pid, p.name));
       // 送信ログは実送信時のみ記録する。下書き(dry-run)では冪等ログを汚さない
       // (汚すと同日の本番実行が「送信済み」で全員スキップしてしまうため)。
       if (REMINDER_AUTO_SEND) reminderLogAppend_(ss, p.pid, REMINDER_KIND_STALLED);
       nStalled++;
-    } else {
-      // 日次リマインド。当日いずれかの応答済み(休む/これから取り組む) or 当日送信済みなら
-      // 送らない(ボタンが効いた感を保ち、冪等性も担保)。
-      if (log.respondedToday[p.pid]) { nSkipped++; continue; }
-      if (log.dailySentToday[p.pid]) { nSkipped++; continue; }
+    } else if (c.category === "send_daily") {
+      // 日次リマインド。
       reminderSend_(p.email, REMINDER_DAILY_SUBJECT,
         reminderDailyBody_(p.pid, p.name), reminderDailyHtml_(p.pid, p.name));
       if (REMINDER_AUTO_SEND) reminderLogAppend_(ss, p.pid, REMINDER_KIND_DAILY); // 下書きは記録しない
       nDaily++;
+    } else {
+      nSkipped++; // 対象外/送信済み/応答済み/抑制中(内訳は「本日のリマインド予定」タブ参照)
     }
   }
   Logger.log("✅ リマインド完了 (" + (REMINDER_AUTO_SEND ? "自動送信" : "下書き") + "): 日次 "
     + nDaily + " / 停滞 " + nStalled + " / 対象外 " + nSkipped);
+  // 送信後に「本日のリマインド予定」タブを再描画して「予定」→「送信済み」へ反映する。
+  // 描画失敗が送信フローを壊さないよう握りつぶす(送信本体は既に完了している)。
+  try { buildReminderPlanTab_(ss, f4, f2); } catch (e) { Logger.log("⚠️ リマインド予定タブ再描画スキップ: " + e); }
+}
+
+// ★リマインド送信判定の単一真実源。sendReminders(実送信) と buildReminderPlanTab_(表示) が
+//   同じ関数を使うことで、予定一覧と実際の送信が構造的にズレないようにする。
+// 返り値 category:
+//   send_daily / send_stalled … 今回送る対象(=送信予定)
+//   sent_daily / sent_stalled … 本日既に送信済み(停滞は lastStalled===today)
+//   responded                 … 本日 doGet 応答済み(抑制)
+//   throttled_stalled         … 停滞スロットル中(直近送信済で連投回避・今回は送らない)
+//   submitted_today           … 本日 F4 提出済み(送信不要)
+//   not_eligible              … 未オンボード(NDA未署名/F2未提出 かつ F4無)
+//   no_email / excluded       … 送信先メール無し / 撤回・除外(col13)
+// 送信は category ∈ {send_daily, send_stalled} のときだけ行う(旧 sendReminders と等価)。
+function reminderClassify_(p, f4, f2, log, today, tz) {
+  if (p.excluded) return { category: "excluded" }; // 撤回/除外(col13)
+  if (!p.email || p.email.indexOf("@") === -1) return { category: "no_email" }; // 送信先なし
+
+  // ★参加フェーズのゲート: セッション実施フェーズに入った人だけを対象にする。
+  //   F4 が1件でもある(=既に作業開始) か、オンボーディング完了(NDA署名済 かつ F2事前完了) のいずれか。
+  //   同意直後で NDA未署名/F2未提出/アプリ未配布の被験者に「課題未提出」を送る誤送信を防ぐ。
+  var hasF4 = !!f4[p.pid];
+  var eligible = hasF4 || (p.ndaSigned && p.f2);
+  if (!eligible) return { category: "not_eligible" };
+
+  var latest = hasF4 ? f4[p.pid].latest : "";
+  if (latest === today) return { category: "submitted_today", latest: latest }; // 本日提出済み → 送らない
+
+  // 停滞日数 = 「提出も応答も無い」連続日数。
+  // 起点: 最新F4提出日 → 無ければ F2完了日(=準備完了) → それも無ければ F1同意日。
+  // F2完了日を優先することで「同意は昔・準備完了は最近」の人が即停滞判定される誤りを避ける。
+  var submitStart = latest
+    || (f2[p.pid] ? f2[p.pid].latest : "")
+    || reminderYmd_(p.consentDate, tz);
+  var daysSinceSubmit = submitStart ? reminderDiffDays_(today, submitStart) : null;
+  if (daysSinceSubmit === null) daysSinceSubmit = 0; // 日付が読めない時は安全側(=日次)へ
+  var lastResp = log.lastResponse[p.pid];
+  var daysSinceResp = lastResp ? reminderDiffDays_(today, lastResp) : null;
+  var idleDays = (daysSinceResp === null)
+    ? daysSinceSubmit
+    : Math.min(daysSinceSubmit, daysSinceResp);
+  var base = { latest: latest, idleDays: idleDays, daysSinceSubmit: daysSinceSubmit };
+
+  if (idleDays >= REMINDER_STALLED_DAYS) {
+    // 停滞チェックイン。THROTTLE_DAYS 未満での連投は避ける(直近送信済なら送らない)。
+    var lastStalled = log.stalledLastSent[p.pid];
+    if (lastStalled) {
+      var since = reminderDiffDays_(today, lastStalled);
+      if (since !== null && since < REMINDER_STALLED_THROTTLE_DAYS) {
+        // 本日送信なら「送信済み」、それ以前の送信でスロットル中なら「抑制中」として区別する。
+        base.category = (lastStalled === today) ? "sent_stalled" : "throttled_stalled";
+        base.lastStalled = lastStalled;
+        return base;
+      }
+    }
+    base.category = "send_stalled";
+    return base;
+  }
+  // 日次リマインド。当日応答済み or 当日送信済みなら送らない(冪等性・ボタンが効いた感)。
+  if (log.respondedToday[p.pid]) { base.category = "responded"; return base; }
+  if (log.dailySentToday[p.pid]) { base.category = "sent_daily"; return base; }
+  base.category = "send_daily";
+  return base;
 }
 
 // AUTO_SEND=true で即送信、false で下書き作成(dry-run 用)。
@@ -2454,6 +2533,253 @@ function reminderLogQuery_(ss, today, tz) {
     }
   }
   return res;
+}
+
+// ============================================================
+// 本日のリマインド予定タブ(監視用・P-ID のみ)
+// ============================================================
+// 「リマインド運用」タブから本日分の送信/応答イベントの時刻を P-ID 別に集める(表示用)。
+// 判定には使わない(判定は reminderClassify_ / reminderLogQuery_)。
+// 返り値: { P-ID: { sent:"HH:mm"(本日最新の送信), resp:"HH:mm"(本日最新の応答), respKind:ラベル } }
+function reminderTodayEvents_(ss, today, tz) {
+  var res = {};
+  var sh = ss.getSheetByName(REMINDER_LOG_TAB);
+  if (!sh) return res;
+  var last = sh.getLastRow();
+  if (last < 2) return res;
+  var vals = sh.getRange(2, 1, last - 1, 4).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var pid = String(vals[i][1]).trim().toUpperCase();
+    if (!/^P\d+$/.test(pid)) continue;
+    var kind = String(vals[i][2]).trim();
+    var day = reminderYmd_(vals[i][3], tz);
+    if (day !== today) continue;
+    var hhmm = reminderHhmm_(vals[i][0], tz); // timestamp 列 "yyyy-MM-dd HH:mm:ss" → "HH:mm"
+    if (!res[pid]) res[pid] = {};
+    if (kind === REMINDER_KIND_DAILY || kind === REMINDER_KIND_STALLED) {
+      res[pid].sent = hhmm; // 行は時系列追記のため上書きで本日最新の送信時刻になる
+    } else if (kind === REMINDER_KIND_WILLDO || kind === REMINDER_KIND_REST) {
+      res[pid].resp = hhmm;
+      res[pid].respKind = (kind === REMINDER_KIND_REST) ? "本日は休む" : "これから取り組む";
+    }
+  }
+  return res;
+}
+
+// timestamp から "HH:mm" を取り出す。取れなければ空文字。
+// log タブはテキスト書式(@)だが、研究者が列書式を変えると Sheets が Date 型で返しうるため
+// reminderYmd_ と同様に [object Date] を先に処理する(時刻表示の空欄化を防ぐ)。
+function reminderHhmm_(ts, tz) {
+  if (Object.prototype.toString.call(ts) === "[object Date]") {
+    return Utilities.formatDate(ts, tz, "HH:mm");
+  }
+  var m = /\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2})/.exec(String(ts));
+  return m ? (m[1] + ":" + m[2]) : "";
+}
+
+// category → 表示ラベル / 詳細文 / 背景色 に変換する(表示専用)。
+function reminderPlanDescribe_(c, ev) {
+  ev = ev || {};
+  switch (c.category) {
+    case "send_daily":
+      return { label: "🔔 送信予定(日次)", color: UI_ACCENT_BG,
+        detail: "本日 " + REMINDER_DAILY_HOUR + ":00 の日次リマインド候補" };
+    case "send_stalled":
+      return { label: "🕊 送信予定(停滞)", color: UI_WARN_BG,
+        detail: "停滞チェックイン候補(" + c.idleDays + "日 無音)" };
+    case "sent_daily":
+      return { label: "✅ 送信済み(日次)", color: UI_OK_BG,
+        detail: "本日送信済み" + (ev.sent ? " " + ev.sent : "") };
+    case "sent_stalled":
+      return { label: "✅ 送信済み(停滞)", color: UI_OK_BG,
+        detail: "本日送信済み" + (ev.sent ? " " + ev.sent : "") };
+    case "responded":
+      return { label: "💬 応答あり", color: UI_OK_BG,
+        detail: (ev.respKind || "応答") + (ev.resp ? " " + ev.resp : "") + " → 本日は送信しません" };
+    case "throttled_stalled":
+      return { label: "⏳ 抑制中(停滞)", color: UI_ACCENT_BG,
+        detail: "直近に停滞メール送信済み(最終 " + (c.lastStalled || "?") + ")。連投回避で本日は送信しません" };
+    case "submitted_today":
+      return { label: "🎉 本日提出済み", color: UI_OK_BG, detail: "本日 F4 提出済み。送信不要" };
+    case "not_eligible":
+      return { label: "⏸ 未オンボード", color: UI_WARN_BG,
+        detail: "NDA未署名 または F2未提出 かつ F4無。送信対象外" };
+    case "no_email":
+      return { label: "⚠ メール未登録", color: UI_DANGER_BG, detail: "ロスターに送信先メールがありません" };
+    case "excluded":
+      return { label: "— 撤回/除外", color: "#e0e0e0", detail: "撤回/除外(col13)" };
+    default:
+      return { label: String(c.category), color: "#ffffff", detail: "" };
+  }
+}
+
+// 「本日のリマインド予定」タブを全再描画する。判定は reminderClassify_(送信と同一真実源)。
+// f4/f2 (countByPid_ の結果) を渡せば再利用し、無ければ自前取得する(buildDashboardTab_ と同パターン)。
+// ⚠ 実名はこのタブに出さない(PII 露出面の最小化)。突合は P-ID のみ。
+function buildReminderPlanTab_(ss, f4, f2) {
+  var props = PropertiesService.getScriptProperties();
+  if (!f4) f4 = countByPid_("F4", props);
+  if (!f2) f2 = countByPid_("F2", props);
+
+  var roster = ss.getSheetByName("参加者ロスター");
+  var sh = ss.getSheetByName(REMINDER_PLAN_TAB) || ss.insertSheet(REMINDER_PLAN_TAB);
+  sh.clear();
+  // clear() は結合/条件付き書式を消さないので明示除去(再実行耐性)。失敗はログに残して続行。
+  try { sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).breakApart(); } catch (e) { Logger.log("plan breakApart スキップ: " + e); }
+  try { sh.setConditionalFormatRules([]); } catch (e) { Logger.log("plan CF リセットスキップ: " + e); }
+
+  var tz = Session.getScriptTimeZone();
+  var today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  var NCOL = 5;
+  var log = reminderLogQuery_(ss, today, tz);
+  var events = reminderTodayEvents_(ss, today, tz);
+  var people = readRoster_(roster);
+  var status = phase1Status_(ss);
+  var sendingActive = (status !== PHASE1_STATUS_ENDED) && REMINDER_ENABLED;
+
+  // category → 表示グループ。
+  var GROUP = {
+    send_daily: "plan", send_stalled: "plan",
+    sent_daily: "sent", sent_stalled: "sent",
+    responded: "suppressed", throttled_stalled: "suppressed",
+    submitted_today: "other", not_eligible: "other", no_email: "other", excluded: "other",
+  };
+  var buckets = { plan: [], sent: [], suppressed: [], other: [] };
+  people.forEach(function (p) {
+    var c = reminderClassify_(p, f4, f2, log, today, tz);
+    var d = reminderPlanDescribe_(c, events[p.pid]);
+    var idleNum = (typeof c.idleDays === "number") ? c.idleDays : -1;
+    var row = {
+      values: [p.pid, d.label, d.detail, c.latest ? c.latest : "—", idleNum >= 0 ? idleNum : "—"],
+      color: d.color,
+      idle: idleNum,
+    };
+    (buckets[GROUP[c.category] || "other"]).push(row);
+  });
+  buckets.plan.sort(function (a, b) { return b.idle - a.idle; }); // 無音の長い順に上へ
+
+  var r = 1;
+  // --- タイトル帯 ---
+  sh.getRange(r, 1, 1, NCOL).merge().setValue("🔔 本日のリマインド予定")
+    .setBackground(UI_HEAD_BG).setFontColor(UI_HEAD_FG).setFontWeight("bold").setFontSize(15)
+    .setVerticalAlignment("middle");
+  sh.setRowHeight(r, 42); r++;
+  sh.getRange(r, 1, 1, NCOL).merge()
+    .setValue("本日 " + today + "　／　Phase1 ステータス: " + status
+      + "　／　日次送信 " + REMINDER_DAILY_HOUR + ":00　／　最終更新 "
+      + Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm")
+      + "　（メニュー「GSE 運用 > 本日のリマインド予定を更新」で再計算）")
+    .setBackground(UI_ACCENT_BG).setFontColor("#333333").setFontSize(10).setWrap(true);
+  r++;
+  // --- 送信可否バナー ---
+  if (!sendingActive) {
+    sh.getRange(r, 1, 1, NCOL).merge()
+      .setValue("⚠ 現在リマインド送信は停止中です（"
+        + (!REMINDER_ENABLED ? "REMINDER_ENABLED=false" : "Phase1=終了")
+        + "）。下の『送信予定』は候補の表示のみで、実際の送信は行われません。")
+      .setBackground(UI_DANGER_BG).setFontColor("#7a1f1f").setFontWeight("bold").setWrap(true);
+    r++;
+  } else if (!REMINDER_AUTO_SEND) {
+    sh.getRange(r, 1, 1, NCOL).merge()
+      .setValue("ℹ 下書きモード（REMINDER_AUTO_SEND=false）。『送信予定』は Gmail 下書きとして作成され、自動送信はされません。")
+      .setBackground(UI_WARN_BG).setFontColor("#7a5b00").setWrap(true);
+    r++;
+  }
+  r++;
+
+  r = renderPlanSection_(sh, r, NCOL,
+    "① 送信予定（今夜 " + REMINDER_DAILY_HOUR + ":00 に送る候補）", buckets.plan,
+    "（本日の送信予定はありません）");
+  r = renderPlanSection_(sh, r, NCOL, "② 本日 送信済み", buckets.sent,
+    "（本日はまだ送信していません）");
+  r = renderPlanSection_(sh, r, NCOL, "③ 応答あり・抑制中（送信しない）", buckets.suppressed,
+    "（該当なし）");
+  r = renderPlanSection_(sh, r, NCOL, "④ 対象外・送信不要", buckets.other,
+    "（該当なし）");
+
+  // --- 列幅・装飾 ---
+  sh.setColumnWidth(1, 90);
+  sh.setColumnWidth(2, 160);
+  sh.setColumnWidth(3, 400);
+  sh.setColumnWidth(4, 120);
+  sh.setColumnWidth(5, 90);
+  sh.setFrozenRows(2);
+}
+
+// 「本日のリマインド予定」の 1 セクション(見出し + 表)を描画し、次の行番号を返す。
+function renderPlanSection_(sh, r, NCOL, title, rows, emptyMsg) {
+  r = dashSection_(sh, r, NCOL, title);
+  var head = ["P-ID", "区分", "詳細", "最終F4提出", "無音日数"];
+  sh.getRange(r, 1, 1, NCOL).setValues([head]);
+  styleTableHeader_(sh, r, NCOL); r++;
+  if (rows.length === 0) {
+    sh.getRange(r, 1, 1, NCOL).merge().setValue(emptyMsg)
+      .setBackground(UI_ACCENT_BG).setFontColor(UI_MUTED);
+    return r + 2;
+  }
+  var values = rows.map(function (x) { return x.values; });
+  sh.getRange(r, 1, values.length, NCOL).setValues(values);
+  for (var i = 0; i < rows.length; i++) {
+    sh.getRange(r + i, 2, 1, 1).setBackground(rows[i].color); // 区分セルのみ色付け(視認性)
+  }
+  return r + values.length + 1;
+}
+
+// 「本日のリマインド予定」タブを手動で最新化する(研究者がメニュー/エディタから実行)。
+function refreshReminderPlan() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP);
+  if (!ssId) {
+    Logger.log("❌ 管理シート未作成。先に buildManagementSheet() を実行してください");
+    return;
+  }
+  var ss = SpreadsheetApp.openById(ssId);
+  buildReminderPlanTab_(ss);
+  try { ss.setActiveSheet(ss.getSheetByName(REMINDER_PLAN_TAB)); } catch (e) { /* アクティブ化は best-effort */ }
+  Logger.log("✅ 本日のリマインド予定を更新しました");
+}
+
+// 管理シートを開いた時のカスタムメニュー(installable onOpen トリガーから呼ばれる)。
+// ★本スクリプトは管理シートの container-bound ではない(標準スクリプト)ため simple onOpen は
+//   発火しない。installMgmtMenuTrigger_ が forSpreadsheet で onOpen トリガーを設置する。
+function onOpenMgmt(e) {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("GSE 運用")
+      .addItem("🔔 本日のリマインド予定を更新", "refreshReminderPlan")
+      .addItem("📊 ロスター集計を更新", "refreshRosterStatus")
+      .addToUi();
+  } catch (err) {
+    Logger.log("onOpenMgmt メニュー生成スキップ: " + err);
+  }
+}
+
+// 管理シートに onOpenMgmt を呼ぶ installable onOpen トリガーを冪等設置する。
+// 既に同一シート宛の同名トリガーがあれば作らない(build 毎の重複増殖を防ぐ)。
+// あわせて、recreateManagementSheet で旧シートに孤児化した onOpenMgmt トリガーを掃除する
+// (リセット反復でトリガー上限 20 に近づくのを防ぐ)。
+function installMgmtMenuTrigger_(ss) {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    var exists = false;
+    for (var i = 0; i < triggers.length; i++) {
+      var t = triggers[i];
+      if (t.getHandlerFunction() !== "onOpenMgmt" || !t.getTriggerSourceId) continue;
+      var src = t.getTriggerSourceId();
+      if (src === ss.getId()) {
+        exists = true; // 現行シート宛は残す
+      } else {
+        // 旧シート宛の孤児トリガーを削除(削除失敗は致命にしない)。
+        try { ScriptApp.deleteTrigger(t); Logger.log("🧹 旧管理シート宛の onOpenMgmt トリガーを削除: " + src); }
+        catch (delErr) { Logger.log("⚠️ 孤児トリガー削除スキップ: " + delErr); }
+      }
+    }
+    if (exists) return; // 既に現行シート宛に設置済み
+    ScriptApp.newTrigger("onOpenMgmt").forSpreadsheet(ss).onOpen().create();
+    Logger.log("✅ 管理シートに『GSE 運用』メニュー(onOpen トリガー)を設置しました");
+  } catch (e) {
+    Logger.log("⚠️ メニュー用 onOpen トリガー設置スキップ(手動で installMgmtMenuTrigger_ 実行可): " + e);
+  }
 }
 
 // 値を yyyy-MM-dd 文字列に正規化する(Sheets が日付型で返した場合に備える)。

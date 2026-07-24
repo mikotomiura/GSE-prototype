@@ -27,6 +27,34 @@
 - [x] **Phase 0: Bootstrap** (このコマンド)
   - 完了日時: 2026-06-16
   - 備考: 環境チェック完了（git repo / codex / gh 確認済み）。フル上書きモードで再構築。進捗ファイルを新10Phase体系へリセット。既存 v1 成果物は各 Phase の上書きモードで作り直す。
+- [x] **Phase R1: /setup-research-framing** — 研究トラック土台（**2026-06-28 後付け有効化**）
+  - 完了日時: 2026-06-28
+  - 経緯: v2 構築時は SKIP 扱いだったが、GSE が研究プロジェクト（HCI / 被験者較正 / preregistration /
+    gse-dataset）である実態に対し研究トラックの空白が実害と判断し、後から有効化。既存 docs・
+    `docs/preregistration-v0.3.md`・`docs/functional-design.md` から研究ポジショニングを**遡って抽出**して明文化。
+  - 作成ファイル:
+    - docs/research-positioning.md — 用語前提（MhD 内部 X/Y vs 検証 X/Y の区別）+ 9 セクション。MhD=検出モデル/Stage1=ルールベース HMM を明記
+    - docs/references.md — 中央書誌 SSOT。**研究者本人の 2 書誌を名前空間統合**: 理論 P1–P15（提案補足資料）+ 方法論 V1–V17（ユーザー検証 v0.4）、重複 6・一意 26 本。renumber 回避のため P/V 名前空間保持
+    - docs/experiment-tracking.md — 再現性規約 + 検証方法論アンカー（X1/X2/Y 三層・GATE1–3・label_pool 分離・AB/BA・MRT・本文非保存・age 暗号化）
+    - docs/literature/_index.md — 文献カード索引（空テンプレ、精読起点を P/V から列挙）
+    - experiments/README.md — 科学的実験ログのルート（.steering/ と責務分離）
+    - .claude/skills/reproducibility-discipline/ (SKILL.md, checklist.md)
+    - .claude/skills/citation-ssot/ (SKILL.md, examples.md) — P/V 名前空間を明記
+    - .claude/skills/literature-card/ (SKILL.md, card-template.md)
+  - コアの問い: 本文非保存の行動プロキシだけで「生産的苦闘 [P12]」と「不毛な行き詰まり」を分離し、不便益介入 [P6] で前者を守れるか（AI 即答時代の対抗仮説 [P1][P4][P5]）
+  - 主要な差分（研究の所在）: 測定（キーストローク [P7][P11][V7]）・思想（不便益 [P6]）・学習科学（生産的苦闘 [P9][P12]）・
+    身体性（Physical Anchor [P2][P8][P10]）を、Need/Opportunity 分離 + 段階介入 + 事前登録 X1/X2/Y 検証を備えた**動く閉ループ HCI に統合**する点
+  - **2026-06-28 重大修正（研究者フィードバック反映）**:
+    1. references.md を web 検索の当て推量から**研究者本人の 2 書誌（P/V）統合**へ全面差し替え（Csikszentmihalyi/Epp/Lau 等の捏造寄り暫定を除去）
+    2. **Physical Anchor を非スコープ→実装予定（第一級）**に修正（受容/実行/効果/安全の層別検証・Go/No-Go あり）
+    3. MhD 内部 X/Y（Cognitive Friction / Productive Engagement）と検証 X/Y（推論妥当性 / システム価値）の取り違えを是正
+    4. 仮説を X1/X2/Y 三層 + GATE1–3 + 26 週 M0–M5（AB/BA・MRT）に接地
+  - **売りの headline 決定（2026-06-28・研究者選択）**: **B「行動的弁別」を主役**に、Vision（C: AI 時代の認知的自立）と
+    System（A: 不便益の閉ループ実装）を入れ子化。§1 に層構造、§4 に「核心の差分 = content-free に停滞の"質"を弁別し介入を分岐させる前向き検証」を明記。
+    守りと攻め両対応（X1 Kill でも測定法破綻検出が貢献として残り、Go なら H-Y/H-X2 が開く）。
+  - **要・研究者確認（残）**: §1/§4/§5/§7 の主張の細部言い回し。検証手続きは既存 preregistration / v0.4 設計 / WBS に接地済み。
+  - 参照した一次資料: docs/[提案プロジェクト補足資料]GSE_proposal_参考文献.md / Form_Phase1/ユーザー検証_codex-review_v0.4 / docs/wbs_検証用docs/*.docx
+  - Phase 4 への申し送り: 3 skill は導出済み。Phase H で Lite tier の実証評価を後追い（deferred-evaluations.md へ）。
 - [x] **Phase 1: /setup-docs** — 永続ドキュメント (Opus 必須)
   - 完了日時: 2026-06-16
   - 方式: **フル上書きではなく Review & Refresh (マージ)** を採用。成熟プロジェクト (v0.3 較正) のため、5 docs を読み取り専用サブエージェント並列監査 → ドリフトのみパッチ → 横断整合性レビュー。
@@ -145,15 +173,15 @@
   - 出力プレフィックス統一: [preflight] / [guard] / [fmt] / [stop]
   - 全 hook: "type": "command" に統一（"type": "prompt" 混在なし）
 - [x] **Phase 9: /verify-setup** — 整合性検証（Codex 疎通 / AGENTS↔CLAUDE 同期 / ライセンス整合 含む）
-  - 完了日時: 2026-06-16
-  - 検証結果: **✅ HEALTHY** (CRITICAL=0 / HIGH=0 / MEDIUM=1→修正済 / LOW=2)
+  - 完了日時: 2026-06-16 (初回) / 2026-06-28 (月次メンテ再実行)
+  - 検証結果: **✅ HEALTHY** (CRITICAL=0 / HIGH=0 / MEDIUM=1 / LOW=2)
   - Phase 5 状態: 完了 (Codex 連携あり)
   - Phase 2 状態: 完了 (anthropics/skills 14個導入, document-skills skip)
-  - Codex 疎通: ✅ PASS (exit 0、"Hello。こんにちは")
-  - AGENTS↔CLAUDE 同期: ✅ (Claude keywords≤1, AGENTS keywords≤2、閾値以内)
-  - ライセンス整合: ⚠️ secrets-pre-filter.sh が不要な拡張子フィルタを含む (M-1)
-  - 修正が必要な項目: 3件 (CRITICAL=0 / HIGH=0 / MEDIUM=1 / LOW=2)
-  - レポート: .steering/_verify-report-20260616.md
+  - Codex 疎通: ✅ PASS (exit 0、"Hello。こんにちは"、gpt-5.5 v0.125.0)
+  - AGENTS↔CLAUDE 同期: ✅ (Codex keywords=1≤5, Claude keywords=2≤3、閾値以内)
+  - ライセンス整合: ✅ (前回 M-1 解消済み。document-skills 未導入のため proprietary 拡張子フィルタ 0 件で正しい)
+  - 2026-06-28 残課題: MEDIUM=1 (procedural-docs-coverage マップ未生成) / LOW=2 (一部 hook の +x 欠如=機能影響なし, codex ver 記録ドリフト)
+  - レポート: .steering/_verify-report-20260616.md (初回) / .steering/_verify-report-20260628.md (再実行)
 
 ## 次に実行すべきコマンド
 
@@ -246,6 +274,18 @@
 - claude-api (Apache 2.0, 外部 LLM 送信許可)
 - example-skills: algorithmic-art, brand-guidelines, canvas-design, doc-coauthoring, frontend-design, internal-comms, mcp-builder, skill-creator, slack-gif-creator, theme-factory, web-artifacts-builder, webapp-testing (Apache 2.0, 外部 LLM 送信許可)
 - document-skills (pdf/docx/xlsx/pptx): **未導入** (Proprietary / GSE では不要)
+
+### Research トラック参照 (Phase R1, 2026-06-28 後付け)
+- docs/research-positioning.md → docs/functional-design.md / architecture.md (導出元・既存実装が先行のため遡って明文化)
+- docs/references.md (中央書誌 SSOT, append-only) ← 全設計書の inline [n]
+- docs/experiment-tracking.md → experiments/ (gse-replay / HMM_VERSION / gse-dataset / preregistration-v0.3 に接地)
+- /literature-review (Phase 7・未導入) → docs/literature/ → research-positioning.md §3/§4 を更新
+
+### 研究トラック skill (docs から導出)
+- .claude/skills/reproducibility-discipline ← docs/experiment-tracking.md (SSOT)
+- .claude/skills/citation-ssot ← docs/references.md (SSOT)
+- .claude/skills/literature-card ← docs/literature/_index.md + docs/references.md (SSOT)
+- 製品トラック Phase 4 (/setup-skills) はこの 3 skill を重複生成しない（自前 13 + Codex 3 + 研究 3 = 19 skill）
 
 ---
 
