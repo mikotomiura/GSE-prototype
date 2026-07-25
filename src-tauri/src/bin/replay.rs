@@ -2714,12 +2714,17 @@ mod tests {
     /// - `minimal`          : active-typing 特徴量 (F1/F3/F4/obs/EWMA・alpha=0.3)
     /// - `phase1_ime_heavy` : IME pause + 沈黙経路 (alpha=0.15・f5 pause 蓄積・f1 沈黙フロア・β-writing)
     /// - `category_coverage`: resolve_key_vk + Other 畳み込み + obs 量子化
+    /// - `deep_silence`     : 深い沈黙フロア (loop_step.rs 8/10/30s 分岐)。約43秒沈黙で TransitionPath の
+    ///                        ctx フロア (f6/f3 = ctx × time_scale ランプ) と、バッファ枯渇後の SilencePath
+    ///                        (make_silence_observation) の両方を踏む。従来 fixture は f6 が常に 0 で
+    ///                        完全未ガードだった領域 (② golden 監査 row 3)。
     #[test]
     fn replay_snapshot_goldens_byte_equal() {
         let cases = [
             ("minimal.ndjson", "minimal.json"),
             ("phase1_ime_heavy.ndjson", "phase1_ime_heavy.json"),
             ("category_coverage.ndjson", "category_coverage.json"),
+            ("deep_silence.ndjson", "deep_silence.json"),
         ];
         for (fixture, golden) in cases {
             let snaps = run_replay(&fixture_path(fixture))
