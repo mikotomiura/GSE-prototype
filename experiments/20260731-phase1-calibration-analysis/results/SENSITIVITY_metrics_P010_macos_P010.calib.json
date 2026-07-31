@@ -1,0 +1,64 @@
+{
+  "schema": "calibration/v0.3",
+  "included_in_primary": true,
+  "session_count": 17,
+  "main_session_count": 17,
+  "exploratory_session_count": 0,
+  "calibration_session_count": 2,
+  "evaluation_session_count": 15,
+  "agg": {
+    "source": "ewma",
+    "stat": "median"
+  },
+  "measurement": {
+    "random_probe_total": 116,
+    "random_probe_answered": 115,
+    "answer_rate": 0.9913793103448276,
+    "latency_median_ms": 6242,
+    "valid_count": 115,
+    "no_answer_rate": 0.008620689655172414,
+    "dont_remember_count": 1,
+    "random_probe_assigned": 120,
+    "assigned_without_label": 4,
+    "per_subject_pass": true
+  },
+  "cindex": {
+    "x_q1_pooled": 0.5165537998495109,
+    "x_q1_session_median": 0.4,
+    "y_q2_pooled": 0.6336302895322939,
+    "y_q2_session_median": 0.6666666666666666,
+    "eval_pair_source_count": 103
+  },
+  "mnar": {
+    "point": 0.5165537998495109,
+    "lower": 0.5057971014492754,
+    "upper": 0.5262586019558131,
+    "no_answer_rate": 0.009615384615384616,
+    "caution": false,
+    "invalid": false
+  },
+  "vignette": {
+    "total": 0,
+    "matched": 0,
+    "passed": false
+  },
+  "bidimensionality": {
+    "flow": 0,
+    "stuck": 1,
+    "incubation": 30,
+    "idle": 0,
+    "ambiguous": 84,
+    "incubation_fraction": 0.967741935483871,
+    "off_diagonal_fraction": 0.967741935483871,
+    "verifiable": true
+  },
+  "recall": {
+    "reported": false,
+    "positive_episode_count": 1,
+    "reason": "PreReg-6: point estimate withheld (Stuck-quadrant positives among uniform random probes < 30 needed for power; smoke withholds Recall)"
+  },
+  "notes": [
+    "main sessions are NOT in ascending session_start order — prospective holdout may leak future→past; pass sessions in chronological order (§8, Codex#3)",
+    "4 probe_assignment(s) had no matching realtime_label — answer_rate may overstate (silent missingness, PreReg-7); investigate session integrity"
+  ]
+}

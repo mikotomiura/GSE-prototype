@@ -1,0 +1,132 @@
+{
+  "schema": "cohort/v0.3",
+  "subject_count": 5,
+  "included_subject_count": 5,
+  "gate_eligible_count": 3,
+  "vignette": {
+    "passed_subjects": 0,
+    "total_subjects": 5,
+    "pass_fraction": 0.0,
+    "passed": false
+  },
+  "measurement": {
+    "overall_answer_rate": 0.9227799227799228,
+    "per_subject_answer_rates": [
+      0.9913793103448276,
+      1.0,
+      0.925,
+      0.3333333333333333,
+      1.0
+    ],
+    "verdict": "pass"
+  },
+  "model": {
+    "session_median_cindices": [
+      0.4,
+      0.16666666666666666,
+      0.0
+    ],
+    "cohort_median": 0.16666666666666666,
+    "excluded_for_missing_median": 1,
+    "excluded_for_insufficient_data": 0,
+    "excluded_for_measurement_quality": 1,
+    "verdict": "kill"
+  },
+  "overall": "inconclusive",
+  "decision_reason": "PreReg-1 尺度理解未達: 通過率 0.00 < 0.80 → 教示文再設計・本番データ不可",
+  "mnar_invalid_count": 1,
+  "mnar_caution_count": 1,
+  "bidimensionality_verifiable_count": 1,
+  "subjects": [
+    {
+      "subject_id": "P010",
+      "included_in_primary": true,
+      "x_q1_session_median": 0.4,
+      "x_q1_pooled": 0.5165537998495109,
+      "answer_rate": 0.9913793103448276,
+      "per_subject_pass": true,
+      "evaluation_session_count": 15,
+      "random_probe_total": 116,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": true,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": true
+    },
+    {
+      "subject_id": "P011",
+      "included_in_primary": true,
+      "x_q1_session_median": 0.16666666666666666,
+      "x_q1_pooled": 0.4594594594594595,
+      "answer_rate": 1.0,
+      "per_subject_pass": true,
+      "evaluation_session_count": 8,
+      "random_probe_total": 29,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": true,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": false
+    },
+    {
+      "subject_id": "P012",
+      "included_in_primary": true,
+      "x_q1_session_median": 0.0,
+      "x_q1_pooled": 0.3305084745762712,
+      "answer_rate": 0.925,
+      "per_subject_pass": true,
+      "evaluation_session_count": 8,
+      "random_probe_total": 40,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": true,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": false
+    },
+    {
+      "subject_id": "P013",
+      "included_in_primary": true,
+      "x_q1_session_median": null,
+      "x_q1_pooled": 0.0,
+      "answer_rate": 0.3333333333333333,
+      "per_subject_pass": false,
+      "evaluation_session_count": 13,
+      "random_probe_total": 24,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": false,
+      "vignette_passed": false,
+      "mnar_caution": true,
+      "mnar_invalid": true,
+      "bidimensionality_verifiable": false
+    },
+    {
+      "subject_id": "P014",
+      "included_in_primary": true,
+      "x_q1_session_median": 0.3333333333333333,
+      "x_q1_pooled": 0.38095238095238093,
+      "answer_rate": 1.0,
+      "per_subject_pass": false,
+      "evaluation_session_count": 9,
+      "random_probe_total": 50,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": false,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": false
+    }
+  ],
+  "notes": [
+    "subject P013: no session-median C-index (insufficient eval sessions) → excluded from model gate",
+    "subject P014: PreReg-2 per-subject requirement unmet (per_subject_pass=false: 回答率/latency/有効件数) → excluded from model gate",
+    "PreReg-7: 無回答率 >30% の被験者あり (該当被験者の主分析は不成立)"
+  ]
+}
