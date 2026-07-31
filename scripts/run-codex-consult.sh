@@ -14,6 +14,14 @@
 
 set -uo pipefail
 
+# 予算管理 / JSON パースは python で行う (jq / flock 非依存: macOS に flock が無いため。
+# run-codex-review.sh と同一方式に統一)。
+PYTHON=$(command -v python3 || command -v python || true)
+if [ -z "$PYTHON" ]; then
+  echo "[run-codex-consult] FAILED: python not found (予算管理/JSON パースに必須)" >&2
+  exit 1
+fi
+
 PREVIEW=false
 if [ "${1:-}" = "--preview" ]; then
   PREVIEW=true
@@ -40,12 +48,18 @@ if ! scripts/secrets-filter.sh < "$INPUT_FILE" > "$TMPDIR_WORK/filtered.md"; the
   exit 1
 fi
 
-# 予算チェック
-TODAY=$(date +%Y-%m-%d)
-DATA=$(cat .codex/budget.json)
-BUDGET=$(echo "$DATA" | jq -r '.daily_token_budget')
-PER_INV=$(echo "$DATA" | jq -r '.per_invocation_max')
-USED=$(echo "$DATA" | jq -r --arg d "$TODAY" 'if .today.date == $d then .today.tokens_used else 0 end')
+# 予算チェック (python; jq 不要)
+BUDGET_INFO=$("$PYTHON" - <<'PY'
+import json, datetime
+d = json.load(open('.codex/budget.json', encoding='utf-8'))
+today = datetime.date.today().isoformat()
+used = d['today']['tokens_used'] if d['today'].get('date') == today else 0
+print(d['daily_token_budget'], d['per_invocation_max'], used)
+PY
+)
+BUDGET=$(echo "$BUDGET_INFO" | cut -d' ' -f1)
+PER_INV=$(echo "$BUDGET_INFO" | cut -d' ' -f2)
+USED=$(echo "$BUDGET_INFO" | cut -d' ' -f3)
 if [ $((BUDGET - USED)) -lt "$PER_INV" ]; then
   echo "[run-codex-consult] BLOCKED: budget exceeded ($USED/$BUDGET used today)" >&2
   exit 1
@@ -75,23 +89,57 @@ codex exec --json --sandbox read-only --skip-git-repo-check \
   -m gpt-5.5 -c model_reasoning_effort=medium \
   - <<< "$PROMPT" > "$TMPDIR_WORK/result.jsonl"
 
-# 最終 agent_message のみ出力
-jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' \
-  "$TMPDIR_WORK/result.jsonl"
+# 結果を python で parse: 最終 agent_message を stdout、token を budget.json へ反映 (jq/flock 不要)。
+"$PYTHON" - "$TMPDIR_WORK/result.jsonl" <<'PY'
+import json, sys, datetime
+texts, tokens = [], 0
 
-# トークン使用量を予算に反映 (atomic + flock)
-TOKENS=$(jq -r 'select(.type=="usage") | .usage.total_tokens // 0' "$TMPDIR_WORK/result.jsonl" | tail -1)
-TOKENS=${TOKENS:-0}
 
-(
-  flock -x 9
-  jq --arg d "$TODAY" --argjson t "$TOKENS" \
-    'if .today.date == $d
-     then .today.tokens_used += $t | .today.invocations += 1
-     else .history += [.today] | .history = (.history | sort_by(.date) | .[-30:])
-          | .today = {date: $d, tokens_used: $t, invocations: 1}
-     end' \
-    .codex/budget.json > .codex/budget.json.tmp \
-    && mv .codex/budget.json.tmp .codex/budget.json \
-    || echo "[run-codex-consult] WARN: budget update failed" >&2
-) 9> .codex/budget.json.lock
+def find_tokens(o):
+    """usage の載る位置は codex のバージョンで揺れるため、total_tokens を再帰探索する。
+    旧実装は `.type=="usage"` 決め打ちで、形が変わると**黙って 0 を記録**し予算ガードを無効化していた。"""
+    if isinstance(o, dict):
+        v = o.get('total_tokens')
+        if isinstance(v, int):
+            return v
+        for x in o.values():
+            r = find_tokens(x)
+            if r:
+                return r
+    elif isinstance(o, list):
+        for x in o:
+            r = find_tokens(x)
+            if r:
+                return r
+    return 0
+
+
+for line in open(sys.argv[1], encoding='utf-8'):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        o = json.loads(line)
+    except Exception:
+        continue
+    if o.get('type') == 'item.completed' and o.get('item', {}).get('type') == 'agent_message':
+        texts.append(o['item'].get('text', ''))
+    tokens = find_tokens(o) or tokens
+# 最終 agent_message を出力 (stdout = 相談結果)
+print('\n'.join(texts))
+if not tokens:
+    print('[run-codex-consult] WARN: token usage not found in codex output; '
+          'budget records invocation only', file=sys.stderr)
+# トークン使用量を予算に反映 (read-modify-write)
+p = '.codex/budget.json'
+d = json.load(open(p, encoding='utf-8'))
+today = datetime.date.today().isoformat()
+if d['today'].get('date') == today:
+    d['today']['tokens_used'] += tokens
+    d['today']['invocations'] += 1
+else:
+    d.setdefault('history', []).append(d['today'])
+    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
+    d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+PY

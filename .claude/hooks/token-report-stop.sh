@@ -48,7 +48,9 @@ LINE="- $TODAY (session end): codex tokens=$USED, invocations=$INVS"
         } > "$LOG"
     fi
     if grep -q "^- $TODAY" "$LOG" 2>/dev/null; then
-        sed -i "s|^- $TODAY.*|$LINE|" "$LOG"
+        # `sed -i "式" file` は BSD sed (macOS) で式がバックアップ拡張子として食われ失敗する。
+        # `-i.bak` + 削除なら GNU/BSD 両対応 (git-bash / macOS 共通)。
+        sed -i.bak "s|^- $TODAY.*|$LINE|" "$LOG" && rm -f "$LOG.bak"
     else
         echo "$LINE" >> "$LOG"
     fi
