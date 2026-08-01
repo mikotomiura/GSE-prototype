@@ -49,3 +49,15 @@
 - [x] PII・セッション日時・raw NDJSON なし
 - [ ] `/cross-review`（**skip**・理由は `decisions.md` 判断 12）
 - [ ] 研究者判断待ち: G1 相乗り / `phase` 暫定案 / 正例の 2 種類目
+
+## 追加ラウンド: 文献接地（`/literature-review`・2026-08-02）
+- [x] RQ 分解（RQ1 較正 3 下位 / RQ2 検出 4 下位・反証 angle 2 本を含む）
+- [x] 多角探索 16 ソース取得
+- [x] claim 抽出 12 → 敵対的 3 票検証（confirmed 11 / 否決 4・うち 2-1 が 1）
+- [x] カード生成 `docs/literature/20260802-scope-detection-and-conformal-calibration.md`（10 カード）
+- [x] `docs/references.md` へ append-only 登録（[P36]–[P42] / [V66]–[V74]・renumber なし）
+- [x] `docs/literature/_index.md` に 1 行追記
+- [x] 設計本体 §0/§2.4/§3.1/§4.1/§4.2/§4.5/§5 と ADR-010 D1/D5 へ inline 還元
+- [x] `research-positioning §3`（ランドスケープ 3 項追加）/ `§4`（★ 新規性の縮小）へ還元・**§5 は未変更**
+- [x] 全 inline [n] が references.md に実在することを機械確認
+- [ ] 次ラウンド: 一次全文確認（[V66] の α 下限・[V68] の適用範囲）/ Chow 原論文 / [P39][P40] 本文 / SE の IDE テレメトリ系
