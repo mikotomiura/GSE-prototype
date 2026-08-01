@@ -19,17 +19,31 @@ jobs:
   # ── ブランチ push / PR: 両 OS で build + test + snapshot 回帰 ──
   # 旧 `cargo check` のみから拡充 (2026-04-15, Phase 1 ci-matrix-build)。
   # Windows / macOS 両方で毎 push 検証することで、#[cfg] 分岐漏れを早期検知。
+  # macOS ジョブのみ self-hosted に移行 (2026-08-01)。
+  #
+  # 理由: private repo の GitHub-hosted 分数は **macOS が 10倍**・Windows が 2倍・Linux が 1倍で
+  # 課金される。毎 push の macOS check + タグ時の macOS リリースビルド (40分=400分課金) が
+  # 無料枠 (2000分/月) を食い潰していた。その回避としてリポジトリを一時 public にしていたが、
+  # public 化は **履歴全体を公開**するため experiments/ の被験者水準データが露出する。
+  # 研究記録を消すのではなく public 化そのものをやめる、というのが本変更の意図。
+  #
+  # Windows / Linux は GitHub-hosted のまま:
+  # - Windows は 2倍課金で、macOS を外せば無料枠に十分収まる
+  # - self-hosted はランナー offline 時にジョブが**キューへ滞留**する (hosted への自動
+  #   フォールバックは無い)。実機依存を macOS 1 台に限定してリスク面を小さくする
+  # - Windows も移す場合は Surface Pro に `gse-win` ラベルでランナーを登録し、
+  #   下の `runner: windows-latest` を `[self-hosted, gse-win]` に変えるだけでよい
   check:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - runner: windows-latest
             target: x86_64-pc-windows-msvc
-          - os: macos-latest
+          - runner: gse-mac-selfhosted
             target: aarch64-apple-darwin
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner == 'gse-mac-selfhosted' && fromJSON('["self-hosted","gse-mac"]') || matrix.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +94,7 @@ jobs:
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    # Windows は 2倍課金。macOS を self-hosted に外せば無料枠に収まるため hosted のまま。
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -127,7 +142,9 @@ jobs:
   # ── タグ push: macOS ビルド ──────────────────────────────────
   build-macos:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: macos-latest
+    # Ad-hoc 署名 (APPLE_SIGNING_IDENTITY: "-") のため Developer 証明書に依存せず、
+    # self-hosted へ移しても署名フローは変わらない。
+    runs-on: [self-hosted, gse-mac]
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
