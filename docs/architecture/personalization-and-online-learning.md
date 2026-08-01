@@ -1116,6 +1116,11 @@ Frontend に推論ロジックを置かない。raw session log や学習デー�
 ## 11. 未解決事項（Deferred・意図的に閉じていない）
 
 1. **`phase` の定義**をユーザー選択 / head 推定 / 固定時間帯のどれにするか。
+   → ★ **暫定案あり（研究者判断待ち・`task-adaptation-and-scope-gating.md §3.6`）**:
+   Phase2 では**意味づけしない**（構造的定義のみ・自然セッションは `unspecified` に collapse し、
+   構造化較正セッションでのみ割当 block id を `phase` とする）。
+   理由は鍵の濃度（`user × task_kind × phase`）を増やすと**鍵あたりのデータが減る**一方、
+   意味的分割を検証する正解ラベルが無いこと。
 2. `model_uncertainty` を head 間で比較可能にするか、head-local のままにするか
    （本書は暫定的に **head-local**＝`recovery_risk_uncertainty` を head 内で閉じる）。
 3. 介入の非対称コスト `λ_user_task` を明示的に自己報告させるか、結果から学習するか
@@ -1225,6 +1230,16 @@ Frontend に推論ロジックを置かない。raw session log や学習デー�
       （本コホートは外的正解ラベルが 1 件しかなく、検出力も偽陽性率も推定できない）。
       ⚠️ マスキング／破綻点はロバスト統計の教科書的事象だが**本ラウンドでは出典を確認していない**。
       「文献に接地している」と読まないこと（`citation-ssot`）。
+    - ★★ **設計はここから `docs/architecture/task-adaptation-and-scope-gating.md` へ移した（2026-08-02）／
+      決定は `ADR-010`。** 本項は**起票と実測の記録**として残す。要点だけ引くと:
+      out-of-scope は **head にせず head 相対の `scope_fit`** とし `evidence_quality` を下げる（新機構を作らない・**D1/D2**）／
+      宣言と観測が食い違っても **re-route しない**（**D3**）／読み出しは **Decision Episode** 単位（**D4**）／
+      検出器は `(個人内逸脱 OR コホート逸脱) AND 絶対ゲート` ＋ 尺度 floor ＋ 縮約 ＋ **到達不能性の出力**で
+      **構造だけを凍結し定数は凍結しない**（**D5**）。
+      ★ **尺度 floor は scope 検出器専用にせず、`§4.4` Phase A の robust quantile 実装に置く**——
+      同じ尺度過敏は `reference_deviation` を含む**全ての within-person z** に効くためである。
+      ★ 検証の律速は**ラベル供給**であり、その設計（セッション内 block・正例の作り方・
+      各 head の baseline 獲得計画）は同文書 §2 にある。
 
 ---
 

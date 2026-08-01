@@ -5,6 +5,9 @@
 - **日付**: 2026-07-24（提起 → 枠組み C 採択 → 下位決定 #2/#3 確定、すべて同日）
 - **対応**: Epic 2（Writing Adapter 抽出）の分岐点。roadmap ADR-006。
 - **関連**: ADR-001（HMM 降格）/ ADR-002（domain-local inference）/ `docs/architecture/domain-adapter-boundary.md §Layer 3-4`
+- **拡張**: **ADR-010**（「どの head も当てはまらない」= head 相対 `scope_fit`）。
+  本 ADR が決めた **head の選択**に、**選ばれた head が当てはまっていない場合の経路**を足す
+  （`evidence_quality` を下げるだけで re-route しない）。**本 ADR の Decision は変更しない。**
 
 ## Context
 

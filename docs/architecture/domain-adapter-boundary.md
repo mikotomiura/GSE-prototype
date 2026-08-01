@@ -165,6 +165,16 @@ trait DomainInferenceHead {
 > `{criterion, 写像係数, 個人 profile}` へ広げる（ADR-006 の枠組み C を前提とした**拡張**であり、
 > ADR-006 は改訂しない）。→ `docs/architecture/personalization-and-online-learning.md`・**ADR-008 / ADR-009**。
 
+> **scope ゲーティング（Proposed・ADR-010）**: 「**走っている head が当てはまっていない**」場合の経路。
+> `NullHead` を作らず、head 相対の `scope_fit` を additive に足して
+> **`evidence_quality` を減衰・`uncertainty` を増やす**だけにする。これにより上記「原則」の
+> **未較正 head では強介入を禁止**が**そのまま発火する**（新しいゲート機構を作らない）。
+> 宣言 `task_kind` は routing のみ、観測署名は `scope_fit` のみに使い、食い違っても **re-route しない**。
+> 判定機構は共有し、**特徴集合と定数は head が所有する**（β と同じ所有規則）。
+> Phase2 で較正するのは **Writing head のみ**（Coding は Adapter B 未実装のため未較正のまま運用・
+> Creative は打鍵 β を持たないので baseline を獲得しない）。
+> → `docs/architecture/task-adaptation-and-scope-gating.md`・**ADR-010**。
+
 ## 関連文書
 - 上位: `docs/architecture/gse-v2-overview.md`
 - 介入側（Layer 5-7）: `docs/architecture/intervention-decision-engine.md`
