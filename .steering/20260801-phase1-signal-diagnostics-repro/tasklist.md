@@ -44,9 +44,18 @@
 
 ## ドキュメント
 - [x] `docs/experiment-tracking.md` の実験一覧へ追記 (必要なら) — 一覧節が無いため不要と判断
-- [ ] `.idea` の該当節に「再現済み・出典 experiments/20260801-signal-diagnostics」を追記
+- [x] `.idea` の該当節に「再現済み・出典 experiments/20260801-signal-diagnostics」を追記
+      (訂正 3 件も併記。gitignore のためコミットには乗らない)
+
+## 残作業 (別セッション)
+- [ ] **未解決 3 件の原因特定** — ハンドオフ:
+      `.steering/_handoff/next-session-prompt-signal-diagnostics-unresolved.md`
+      1. 「並べ替え検定 68 件」の定義 (候補集合の総当たり)
+      2. r=0.78 vs 0.763 の差 (ewma_x か / 被験者平均か / 丸め前か)
+      3. **ICC が 1.2-1.3 倍ずれる原因** (式 × 前処理の総当たり。窓集約 n=200 が有力)
+         — ADR の主張の強さに直結するので最優先
 
 ## 完了処理
-- [ ] design.md の最終化
+- [x] design.md の最終化 (再現性の閾値を実測に合わせて改訂済み)
 - [x] decisions.md の作成 (再現不能だった主張の扱い・不一致の解釈)
-- [ ] git commit
+- [x] git commit (f4b3aec / branch chore/phase1-signal-diagnostics・push 未実施)
