@@ -55,6 +55,12 @@
 | データ不足判定 | DataInsufficient | コホート判定の値の 1 つ。主指標被験者0名・提示プローブ0件・PreReg-5 最低要件 (eval≥6/probe≥16) 充足者なしのとき、無理に Go/Kill とせず「データ拡充が必要」と正直に報告する状態 (v0.3 §11 主張限界) | 「PreReg-5 未達なので DataInsufficient」 |
 | Need | Need | 介入が必要そうかを表す層。MVP では主に `p_stuck` を `stuck_likelihood` として利用する | 「Need は高いが Opportunity が低い」 |
 | Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode で判定する | 「Opportunity が低いため defer する」 |
+| 受容性 | Receptivity | 今このユーザーが介入を受け取れる状態かを表す層。**Layer 5（Opportunity 側）に属する**。現行実装は cooldown + daily_cap + recent_dismiss + idle gate の**分解形**で、統合スコアは持たない（**ADR-007**）。⚠️ **潜在状態（Layer 4）に置かない**——入力がシステム状態と履歴であり潜在状態からの放出ではないため（**ADR-009**） | 「Receptivity は Layer 5。Layer 4 の潜在状態に混ぜない」 |
+| 自力回復リスク | self_directed_recovery_risk | このユーザーが、この task 文脈で、**近い時間範囲（horizon H）内に自力による前進を回復できない確率**。Layer 4 の出力として `WorkStateEstimate` に additive 追加する提案（**ADR-009**・Proposed）。旧 X 軸（Cognitive Friction）の後継候補で、criterion が主観プローブでなく**行動**である点が決定的に異なる | 「recovery risk 単独では強介入を出さない」 |
+| 前進 proxy | progress_proxy | 個人×task_kind×phase 基準で正規化した**純産出の持続**（窓内の 挿入−削除 打鍵数を個人基準で正規化し、T 秒以内に取り消されないこと）。content-free（打鍵数と時刻のみ）。`self_directed_recovery` ラベルの構成要素 | 「progress_proxy が個人基準を超えたら回復とみなす」 |
+| 判断エピソード | Decision Episode | ML の収集単位。全打鍵でなく session start / phase change / pause onset・recovery / externalization / revision loop / intervention decision・outcome / session end を境界とする短い区間。種別・時間・回数・遷移のみを保存する | 「raw event でなく Decision Episode 単位で ContextSnapshot を作る」 |
+| 個人プロファイル保管 | PersonalizationStore | `user × task_kind × phase` の個人プロファイル（基準値・写像係数・介入効用）を**ローカル保持**する部品。外部送信しない。更新するのは `OnlineUpdater` で、**潜在状態の構造は更新しない**（**ADR-008**） | 「PersonalizationStore の永続化には同意と削除 UI が要る」 |
+| 打ち切り | censoring（recovery ラベル） | content-free 制約下では検索・別デバイス・口頭相談などの外部化が観測できないため、focus 喪失・アプリ切替（**回数のみ**）を打ち切り指標として記録し、「自力回復」と「観測外で解決して戻った」を区別できないことを明示する運用 | 「打ち切り率が閾値を超えたら recovery ラベルは使えない（反証ゲート G2）」 |
 | アウェイアイドル | away_idle | `idle_ms ≥ 180秒` で**介入を全停止**するサプレッション (席を離れたら黙る=不便益)。一次抑制は idle 閾値そのもの。加えて放置で p_stuck も低下するため二重に介入は出ない (idle≠Stuck) | 「10分放置で介入が出ないのは away_idle で正常」 |
 | 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
 | defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |

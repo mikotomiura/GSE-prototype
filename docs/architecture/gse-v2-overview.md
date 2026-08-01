@@ -210,7 +210,11 @@ Go → Writing Adapter の X1 証拠として保存。Inconclusive/DataInsuffici
 
 ## 関連文書
 - 詳細層設計: `docs/architecture/domain-adapter-boundary.md`（Layer 0-3）／`docs/architecture/intervention-decision-engine.md`（Layer 5-7）
-- 設計判断: `docs/adr/README.md`（ADR-001〜007）
+- **個人適応・オンライン学習（Layer 3-4 拡張・Proposed）**: `docs/architecture/personalization-and-online-learning.md`
+  — Phase1 較正の実測を受けた X 軸の再定義（`self_directed_recovery_risk`）、オンライン更新の層別境界、
+  潜在状態の扱い、反証ゲート。**本書の 7 層（§2）と Epic ロードマップ（§6）は変更しない**（Layer 4 出力への
+  additive 追加の提案に留まる）。決定は ADR-008 / ADR-009
+- 設計判断: `docs/adr/README.md`（ADR-001〜009）
 - 研究の主張・エビデンス: `docs/research-positioning.md`
 - 現行実態: `.steering/20260724-epic0-repo-reality-check/`
 - 昇格元（歴史資料）: `~/Downloads/GSE_Post_Phase1_Improvement_Design_v0.1.md`

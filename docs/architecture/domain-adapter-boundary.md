@@ -159,8 +159,16 @@ trait DomainInferenceHead {
 
 ---
 
+> **additive 拡張候補（Proposed・Phase1 完了後）**: `WorkStateEstimate` に
+> `self_directed_recovery_risk` / `recovery_risk_uncertainty` を additive に追加する提案がある。
+> 既存 5 proxy・`uncertainty`・`evidence_quality` は不変。あわせて head の所有物を β から
+> `{criterion, 写像係数, 個人 profile}` へ広げる（ADR-006 の枠組み C を前提とした**拡張**であり、
+> ADR-006 は改訂しない）。→ `docs/architecture/personalization-and-online-learning.md`・**ADR-008 / ADR-009**。
+
 ## 関連文書
 - 上位: `docs/architecture/gse-v2-overview.md`
 - 介入側（Layer 5-7）: `docs/architecture/intervention-decision-engine.md`
-- 判断: `docs/adr/ADR-002`（domain-local inference）／`ADR-005`（event envelope）／`ADR-006`（task_kind→β）
+- 個人適応・オンライン学習（Layer 3-4 拡張）: `docs/architecture/personalization-and-online-learning.md`
+- 判断: `docs/adr/ADR-002`（domain-local inference）／`ADR-005`（event envelope）／`ADR-006`（task_kind→β）／
+  `ADR-008`（オンライン学習の境界）／`ADR-009`（recovery risk 軸・潜在状態）
 - 現行実態: `.steering/20260724-epic0-repo-reality-check/design-vs-code-gap.md`

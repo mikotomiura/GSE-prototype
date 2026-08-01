@@ -1,7 +1,8 @@
 # 文献カード インデックス
 
-`/literature-review` (Phase 7) が生成する落合フォーマットのカード一覧。新トピックごとに追記される。
-`docs/references.md` に研究者本人の 2 書誌（理論 P1–P18 / 方法論 V1–V29）を統合登録済み（一意 41 本）。
+`/literature-review` が生成する落合フォーマットのカード一覧。新トピックごとに追記される。
+`docs/references.md` に 2 書誌（理論 `[Pn]` / 方法論 `[Vn]`）を名前空間付きで統合登録している
+（2026-08-01 時点: P1–P32 / V1–V58・重複 6 を除いた**一意 84 本**。件数の SSOT は references.md）。
 落合フォーマット精読カードは下表のトピック単位で作成済み。
 
 | 日付 | トピック | ファイル | カード数 | 「やり残し」要約 |
@@ -15,6 +16,7 @@
 
 | 2026-07-24 | friction-retention-and-overreliance-evidence | [20260724-friction-retention-and-overreliance-evidence.md](20260724-friction-retention-and-overreliance-evidence.md) | 10 | **パートA (生産的苦闘)**: 摩擦の学習効果は成果指標で符号が変わる (概念 g=0.36 / 手続き g=-0.03 null / 低学年で反転 [P27])、効果源は遅延でなく後段 consolidation [P28]＝GSE は前半のみ実装し後半欠落。→「摩擦が能力を育てる」は主張不可、「自力解決の機会を保存」に限定 (パートC)。**パートB (Gate D)**: DSCT 効果天井 g=0.47 (脆弱基盤 [V39])、ナッジは補正後 d≈0 で structure系(Wall)のみ未否定 [V40]、30日継続率 中央値 3.3% [V41]・登録経路が支配 (44 vs 4日 [V42])、「出さない判断」+行動指標 receptivity の先行例 [V43]、one sec 効果源は dismiss-first で friction でない [V33訂正]、摩擦は agency 回復を伴わない [V44]。⚠️**RQ-2 (agentic coding 過信) / RQ-3 (accountability) は3ラウンド通じ確定証拠ゼロ＝判定不能** |
 | 2026-07-24 | agentic-coding-overreliance-detection (RQ-2 専用) | [20260724-agentic-coding-overreliance-detection.md](20260724-agentic-coding-overreliance-detection.md) | 9 | **RQ-2 の穴を埋める第4ラウンド (20ソース・25検証・24 confirmed/1 refuted)。Epic 4 gate**: **(a) 過信は実在し害を生む=確定** (Perry CCS'23: AI 支援で4/5課題セキュリティ低下+主観的安心・非安全解ほど AI 信頼高 [V45]、害は静的解析で~35.8% CWE [V46])。**(b) content-free 代理→害/overreliance は PLAUSIBLE BUT UNPROVEN (直接証拠なしに接する)**: コーディング領域で代理×害を co-measure した研究ゼロ。テレメトリは accept 行為を~0.97 予測するが害リンクなし [V47][V48]、accept率の唯一の検証済相関は自己申告 ρ=0.24・revert近縁 persistence は劣後 [V49]、accept≠盲目(accept-then-verify) [V50]、行動→安全は弱連関で部分 content-coupled [V51]。行動検出の直接証拠は**非コーディング×能動注入×非純 content-free のみ** (92%/2probe [V52])。分野自身が測定法不在を公認 [V53]。→**Epic 4 は現状前提のまま建てる証拠不十分=先に de-risk (代理×客観的害の co-measure pilot) が妥当**。否決: 「issue 22.7%残存=過剰 accept 署名」0-3 |
+| 2026-08-01 | behavioral-economics-and-online-personalization | [20260801-behavioral-economics-and-online-personalization.md](20260801-behavioral-economics-and-online-personalization.md) | 9 | **`.idea` 引用の SSOT 化ラウンド（⚠️ 敵対的検証なし・abstract 水準）**。各本に「その概念を借りずに同じ設計が導けないか」を問い、装飾的引用を落とした結果 **9 本中 3 本は「採らない理由」の出典**として登録 ([P30] Ellsberg=ambiguity aversion を推定しない / [P32] Mills=delivery 個人化を採らない / [V55] CPT-RL=確率加重は識別不能)。★最大の成果は **[P32] の 2 成分分解で [V40] 衝突を解いたこと**——個人化は「よりうまく説得するため」でなく**「より確実に黙るため」**に使う (delivery 個人化=採らない / 抑制方向=採る)。**[V54] KTO は「KTO 的」と名乗るのをやめる**（借りているのは二値フィードバック＋非対称効用の枠組みだけで、GSE 側は素の非対称損失）。[V57][V58] MRT/JITAI の 6 要素分離はそのまま SSOT 品質で採用。[V56] は doc#2 §2.1-C の無引用主張の該当出典。⚠️ **やり残し: `self_directed_recovery_risk` に対応する先行研究（content-free ログからの自力回復推定）を未サーヴェイ＝新規性主張が文献で裏付けられていない**・オンライン学習×事前登録の両立の方法論文献ゼロ |
 
 > 各カードは docs/literature/<YYYYMMDD>-<topic-slug>.md。
 > 出典は docs/references.md に append-only で登録される（citation-ssot skill 経由、P/V 名前空間）。

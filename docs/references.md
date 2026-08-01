@@ -48,6 +48,10 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [P26] | doi:10.1037/0022-3514.83.1.231 | Koestner, R., Lekes, N., Powers, T. A. & Chicoine, E. — Attaining Personal Goals: Self-Concordance Plus Implementation Intentions | J. Pers. Soc. Psychol. 83(1):231–244, 2002 (PMID 12088128) | <https://doi.org/10.1037/0022-3514.83.1.231> | 個人プロジェクトでは実行意図の主効果ゼロ・self-concordance との交互作用のみ＝需要が薄い層では効かない | — | active |
 | [P27] | doi:10.3102/00346543211019105 | Sinha, T. & Kapur, M. — When Problem Solving Followed by Instruction Works: Evidence for Productive Failure | Review of Educational Research 91(5), 2021 | <https://doi.org/10.3102/00346543211019105> | PS-I の効果は成果指標で符号が変わる（概念/転移 g=0.36・手続き g=-0.03 null・ドメイン一般/低学年で反転）＝「摩擦が技能を育てる」は主張不可。⚠️出版バイアス補正で g→0.87 と不安定 | — | active |
 | [P28] | doi:10.1007/s10648-016-9379-x | Loibl, K., Roll, I. & Rummel, N. — Towards a Theory of When and How Problem Solving Followed by Instruction Supports Learning | Educational Psychology Review 29(4):693–715, 2017 | <https://doi.org/10.1007/s10648-016-9379-x> | PS-I の効果源は遅延でなく後段 consolidation（生成解への教示接続 g=0.56 vs 0.20 等）＝GSE は前半のみ実装し後半欠落。⚠️研究間モデレータで因果未確立 | — | active |
+| [P29] | doi:10.2307/2937956 | Tversky, A. & Kahneman, D. — Loss Aversion in Riskless Choice: A Reference-Dependent Model | Quarterly Journal of Economics 106(4):1039–1061, 1991 | <https://doi.org/10.2307/2937956> | 参照点依存・損失非対称の**概念的出所**。GSE は `false_positive_cost`（不要介入で集中を壊す）と `false_negative_cost`（見逃し）を個人×task で分けて持つ。⚠️ **GSE で実際に作動しているのは標準的な cost-sensitive decision theory（非対称損失）**であり、prospect theory 固有の要素（確率加重・価値関数の曲率）は使っていない。「ユーザーに損失回避性という性格がある」とは断定しない | — | active |
+| [P30] | doi:10.2307/1884324 | Ellsberg, D. — Risk, Ambiguity, and the Savage Axioms | Quarterly Journal of Economics 75(4):643–669, 1961 | <https://doi.org/10.2307/1884324> | 曖昧性回避（既知確率 vs 未知確率）の原典。**GSE では「ユーザーの ambiguity aversion を推定しない」という棄却の出典**として引く。採用する設計（`model_uncertainty` が高いとき強介入を出さない）は既存 SSOT（`domain-adapter-boundary.md §原則`）に既にあり行動経済学を必要としない | — | active |
+| [P31] | doi:10.1073/pnas.2216115120 | Buyalskaya, A., Ho, H., Milkman, K. L., Li, X., Duckworth, A. L. & Camerer, C. — What can machine learning teach us about habit formation? Evidence from exercise and hygiene | PNAS 120(17):e2216115120, 2023（訂正: doi:10.1073/pnas.2312763120）| <https://doi.org/10.1073/pnas.2216115120> | 習慣形成の速度は領域依存（ジム＝数ヶ月 / 手洗い＝数週）・**個人ごとに「文脈から行動が予測できる程度」が違う**（LASSO AUC 0.768/0.781）・**予測しやすい（習慣的な）人ほど介入に反応しにくい**。GSE では `context→action family→outcome` の**個人別 Markov count** の設計ヒントとしてのみ用いる。⚠️ ジム通い・手洗いのデータであり知的作業へ直接一般化しない | — | active |
+| [P32] | doi:10.1017/bpp.2020.7 | Mills, S. — Personalized nudging | Behavioural Public Policy 6:150–159, 2022（online first 2020） | <https://doi.org/10.1017/bpp.2020.7> | 個人化を「**何を促すか**（choice personalization）」と「**どう提示するか**（delivery personalization）」に分ける枠組み。⚠️ **GSE は後者（説得方向）を採らない**——[V40] のナッジ assistance 系は補正後 d≈0.01（BF01≈9）であり、`gse-v2-overview.md §5` の「Motivation Generator を標準実装しない」と衝突するため。GSE が個人化するのは**抑制方向**（いつ出さないか・強度上限）に限る（ADR-008 D7） | — | active |
 
 ## V 名前空間 — 検証方法論（ユーザー検証 v0.4 書誌）
 
@@ -106,6 +110,11 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [V51] | arXiv:2211.03622 | Perry et al. (2023) — 観察的二次分析(engagement×脆弱性) | ACM CCS 2023 | <https://arxiv.org/abs/2211.03622> | engagement 行動(再構成・不信)多いほど脆弱性少・低編集距離("Model Close")は安全解に達しにくい(安全解の87%が有意編集を要す)＝行動→安全の弱連関。⚠️**部分 content-coupled**(再構成=プロンプト参照・編集距離=コード比較)・非対称(低編集距離→非安全は非決定的)・記述的 | =V45 | active |
 | [V52] | doi:10.1145/3772318.3790332 | (会話 LLM 誤情報での overreliance 行動検出 N=77, CHI 2026) + Swaroop et al. 2025 (probe, N=147) + arXiv:2602.11567 | CHI 2026 / 2025 | <https://doi.org/10.1145/3772318.3790332> | overreliance は行動署名を残す最強の直接証拠(マウス/キーボードナビが低/高 overreliance 弁別・誤 probe への accept で quality を2 probe~92%予測)。⚠️**転移証拠のみ**: (1)領域不一致(誤情報/論理パズルでコーディングでない) (2)非純 content-free(内容参照要) (3)非受動(能動誤り注入・construct内自己相関) | — | active |
 | [V53] | arXiv:2509.08010 | Ibrahim, K. et al. — (overreliance 測定の系統レビュー) + arXiv:2605.23130 (SOUPS 2026, セキュリティ意識 N=15) | 2025–2026 | <https://arxiv.org/abs/2509.08010> | 分野レビューが「実証的証拠の欠如は**妥当な overreliance 測定法の不在**を反映」と明記し測定法を提案に留める＝RQ-2(b) 空白は分野公認の open gap(well-calibrated negative)。実 IDE で"Validation"意図はメッセージ3.99%のみ(低検証の示唆)。⚠️提案止まり・SOUPS は質的 N=15 でテレメトリ/欠陥相関なし | — | provisional |
+| [V54] | arXiv:2402.01306 | Ethayarajh, K., Xu, W., Muennighoff, N., Jurafsky, D. & Kiela, D. — KTO: Model Alignment as Prospect Theoretic Optimization | arXiv:2402.01306, 2024 (ICML 2024) | <https://arxiv.org/abs/2402.01306> | **「二値の desirable/undesirable フィードバックと非対称効用から学習する」という枠組みだけ**を借りる。⚠️ **GSE は「KTO 的」と名乗らない**——KTO 固有の実装（言語モデルの生成ポリシー・参照分布・生成尤度に対する目的関数）に対応するものが GSE に無く、GSE 側の `utility = gain − λ·cost` は**素の非対称損失**であるため（ADR-008 / `personalization-and-online-learning.md §7.5`） | — | active |
+| [V55] | url:pmlr-v48-la16 | Prashanth, L. A., Jie, C., Fu, M., Marcus, S. & Szepesvári, C. — Cumulative Prospect Theory Meets Reinforcement Learning: Prediction and Control | ICML 2016, PMLR 48:1406–1415 | <https://proceedings.mlr.press/v48/la16.html> | prospect theory の確率加重を RL の目的関数に載せる定式化が存在することの出典。⚠️ **GSE では採らない**——確率加重を同定するための明示的な賭け構造（明示的なリスク選択肢）が通常作業に無く識別不能なため（`personalization-and-online-learning.md §6.3`）。⚠️ DOI 未確定のため PMLR の正規化 URL を key とする | — | provisional |
+| [V56] | arXiv:2203.05782 | Sukumar, S., Ward, A. F., Elliott-Williams, C., Hakimi, S. & Mozer, M. C. — Overcoming Temptation: Incentive Design For Intertemporal Choice | arXiv:2203.05782, 2022 | <https://arxiv.org/abs/2203.05782> | 遅延報酬課題を MDP として定式化し、時間割引・努力コスト・意志力の個人差をフィットして**個人別にインセンティブを最適化**した研究例（オンラインゲームで行動データを収集）。`.idea` doc#2 §2.1-C の「研究例がある」という無引用主張に対応する出典。⚠️ **GSE で同じパラメータが識別できる保証はない**ため、明示的な努力割引率は推定せず低次元の行動 proxy に留める。⚠️ preprint・査読誌版未確認 | — | provisional |
+| [V57] | doi:10.2105/AJPH.2022.307150 | Liu, X., Deliu, N. & Chakraborty, B. — Microrandomized Trials: Developing Just-in-Time Adaptive Interventions for Better Public Health | American Journal of Public Health 113(1):60–69, 2023 | <https://doi.org/10.2105/AJPH.2022.307150> | JITAI の構成要素分離（decision point / tailoring variables / intervention options / decision rules / proximal outcomes / distal outcomes）の整理。GSE の閉ループ評価はこの分離をそのまま採る（ADR-008 D6）。⚠️ 公衆衛生 mHealth 文脈であり効果量は GSE に転用しない | — | active |
+| [V58] | doi:10.1037/hea0000305 | Klasnja, P., Hekler, E. B., Shiffman, S., Boruvka, A., Almirall, D., Tewari, A. & Murphy, S. A. — Micro-Randomized Trials: An Experimental Design for Developing Just-in-Time Adaptive Interventions | Health Psychology 34(Suppl):1220–1228, 2015 | <https://doi.org/10.1037/hea0000305> | MRT の実験デザイン原典（時点ごとの無作為化・近接効果・時変モデレーション）。GSE の decision point での小さな無作為化（既存 H-X2 の nudge/defer 70/30）を因果識別の足場にする根拠。[V4] Qian et al. 2021 と併せて読む | — | active |
 
 ---
 
@@ -122,7 +131,7 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | Mehta et al. 2025 | [P11] | [V6] |
 | Park 2024 | [P7] | [V13] |
 
-→ 一意な文献数 = 28 + 44 − 6 = **66**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、
+→ 一意な文献数 = 32 + 58 − 6 = **84**（V18–V23 を 2026-06-28 の probe-timing/interruptibility サーベイで、V24–V29 を同日の calibration sampling density/yield サーベイで追加、
 P27–P28 / V37–V44 を 2026-07-24 の Post-Phase1 摩擦・継続率・AI 過信サーヴェイ
 （`docs/literature/20260724-friction-retention-and-overreliance-evidence.md`・deep-research 第2/第3ラウンド）で追加（一次全文で数値照合済み・すべて active）、
 P19–P20 / V30–V33 を 2026-07-23 に介入コンテンツ×文脈シグナル×ML サーヴェイ
@@ -136,6 +145,16 @@ P19–P20 / V30–V33 を 2026-07-23 に介入コンテンツ×文脈シグナ�
 > ⚠️ **[P19] は `superseded`**: d=0.65 という効果量主張が同ラウンドで 0-3 否決された。
 > **実行意図の効果量を引くときは必ず [P21]（d=.36 素・補正後 d=.15）を使うこと**。
 > 番号は citation-ssot 規約により再利用せず、行も残す。
+>
+> ⚠️ **P29–P32 / V54–V58 は 2026-08-01 のアーキテクチャ統合
+> （`.steering/20260801-architecture-consolidation/`・`docs/architecture/personalization-and-online-learning.md`）で追加**。
+> `.idea` の設計メモが素の markdown リンクで引いていた 9 本を citation-ssot 規約へ載せ替えたもの。
+> 書誌（著者・年・巻号・DOI）は一次ページで確認済み。ただし**内容は abstract 水準の確認**であり、
+> 本文の数値を設計判断の一次根拠に使う前に全文確認が要る。文献カード:
+> `docs/literature/20260801-behavioral-economics-and-online-personalization.md`。
+> **[V55]（DOI 無し・PMLR URL キー）と [V56]（preprint）は `provisional`**。
+> ⚠️ **このうち [P30] / [P32] / [V55] は「採らない理由」の出典**として登録されている。
+> active 行だが GSE は当該手法を**採用していない**（各行の接地列を参照）。
 >
 > ⚠️ **P19–P20 / V30–V33 は `provisional`**: 出典は上記サーヴェイカード経由であり、**原論文の直接確認前**である
 > （サーヴェイ自体が adversarial verify 通過を Card1/Card2 の 5 主張のみと明示している）。
