@@ -1,0 +1,234 @@
+{
+  "note": "EXPLORATORY — 事前登録外。確証に使わない。run.sh では再生成されない。",
+  "purpose": "M4 (IKI>10s) が計画ポーズと離席を混ぜている交絡の分離",
+  "per_session": [
+    {
+      "pid": "P010",
+      "session": "P010-s01",
+      "plan_pause_10_120s": 0.013763,
+      "away_gt_120s": 0.000336
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s02",
+      "plan_pause_10_120s": 0.01454,
+      "away_gt_120s": 0.000364
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s03",
+      "plan_pause_10_120s": 0.012903,
+      "away_gt_120s": 0.001019
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s04",
+      "plan_pause_10_120s": 0.005438,
+      "away_gt_120s": 0.000279
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s05",
+      "plan_pause_10_120s": 0.00899,
+      "away_gt_120s": 0.001183
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s06",
+      "plan_pause_10_120s": 0.010874,
+      "away_gt_120s": 0.000821
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s07",
+      "plan_pause_10_120s": 0.00831,
+      "away_gt_120s": 0.000923
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s08",
+      "plan_pause_10_120s": 0.005974,
+      "away_gt_120s": 0.001195
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s09",
+      "plan_pause_10_120s": 0.011836,
+      "away_gt_120s": 0.001353
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s10",
+      "plan_pause_10_120s": 0.007445,
+      "away_gt_120s": 0.001133
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s11",
+      "plan_pause_10_120s": 0.011142,
+      "away_gt_120s": 0.001161
+    },
+    {
+      "pid": "P010",
+      "session": "P010-s12",
+      "plan_pause_10_120s": 0.01211,
+      "away_gt_120s": 0.000637
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s01",
+      "plan_pause_10_120s": 0.001316,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s02",
+      "plan_pause_10_120s": 0.003262,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s03",
+      "plan_pause_10_120s": 0.000629,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s04",
+      "plan_pause_10_120s": 0.0,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s05",
+      "plan_pause_10_120s": 0.001219,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s01",
+      "plan_pause_10_120s": 0.029621,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s02",
+      "plan_pause_10_120s": 0.007701,
+      "away_gt_120s": 0.0
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s03",
+      "plan_pause_10_120s": 0.010338,
+      "away_gt_120s": 0.000459
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s04",
+      "plan_pause_10_120s": 0.011581,
+      "away_gt_120s": 0.001007
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s05",
+      "plan_pause_10_120s": 0.008801,
+      "away_gt_120s": 0.001517
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s06",
+      "plan_pause_10_120s": 0.004083,
+      "away_gt_120s": 0.001114
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s07",
+      "plan_pause_10_120s": 0.017559,
+      "away_gt_120s": 0.003512
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s01",
+      "plan_pause_10_120s": 0.023372,
+      "away_gt_120s": 0.010017
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s03",
+      "plan_pause_10_120s": 0.002871,
+      "away_gt_120s": 0.000957
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s04",
+      "plan_pause_10_120s": 0.015432,
+      "away_gt_120s": 0.006173
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s05",
+      "plan_pause_10_120s": 0.026834,
+      "away_gt_120s": 0.003578
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s06",
+      "plan_pause_10_120s": 0.004008,
+      "away_gt_120s": 0.01002
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s07",
+      "plan_pause_10_120s": 0.005672,
+      "away_gt_120s": 0.001702
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s08",
+      "plan_pause_10_120s": 0.004181,
+      "away_gt_120s": 0.000697
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s09",
+      "plan_pause_10_120s": 0.010101,
+      "away_gt_120s": 0.001684
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s10",
+      "plan_pause_10_120s": 0.020561,
+      "away_gt_120s": 0.007477
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s01",
+      "plan_pause_10_120s": 0.016694,
+      "away_gt_120s": 0.001642
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s02",
+      "plan_pause_10_120s": 0.008306,
+      "away_gt_120s": 0.002492
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s03",
+      "plan_pause_10_120s": 0.007505,
+      "away_gt_120s": 0.0006
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s04",
+      "plan_pause_10_120s": 0.009768,
+      "away_gt_120s": 0.003663
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s06",
+      "plan_pause_10_120s": 0.012658,
+      "away_gt_120s": 0.007595
+    }
+  ]
+}
