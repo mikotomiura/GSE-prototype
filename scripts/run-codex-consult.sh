@@ -22,6 +22,15 @@ if [ -z "$PYTHON" ]; then
   exit 1
 fi
 
+# Windows git-bash の日本語ロケール (cp932) で Unicode エラーにならないよう UTF-8 を強制。
+# ここで落ちると codex 課金後・budget 更新前に死に、消費が記録されない。
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+
+# budget.json は repo root 基準で参照する (cwd 依存だと予算チェックが不成立になる)
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+BUDGET_FILE="$ROOT/.codex/budget.json"
+export BUDGET_FILE
+
 PREVIEW=false
 if [ "${1:-}" = "--preview" ]; then
   PREVIEW=true
@@ -38,8 +47,12 @@ TMPDIR_WORK=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 # 機密フィルタ (fail-closed)
-if ! scripts/secrets-filter.sh < "$INPUT_FILE" > "$TMPDIR_WORK/filtered.md"; then
-  rc=$?
+# `if ! cmd; then rc=$?` は **常に 0** になる (`!` が反転した後のステータスを拾うため)。
+# それだと secrets-filter の exit 2 (機密検出) と 1 (故障) を区別できず、
+# 呼び出し側が「機密でブロック」と「codex 故障」を取り違える。
+scripts/secrets-filter.sh < "$INPUT_FILE" > "$TMPDIR_WORK/filtered.md"
+rc=$?
+if [ "$rc" -ne 0 ]; then
   if [ "$rc" -eq 2 ]; then
     echo "[run-codex-consult] BLOCKED: secrets-filter detected sensitive content" >&2
     exit 2
@@ -49,17 +62,37 @@ if ! scripts/secrets-filter.sh < "$INPUT_FILE" > "$TMPDIR_WORK/filtered.md"; the
 fi
 
 # 予算チェック (python; jq 不要)
-BUDGET_INFO=$("$PYTHON" - <<'PY'
-import json, datetime
-d = json.load(open('.codex/budget.json', encoding='utf-8'))
+# budget.json が壊れていると BUDGET_INFO が空になり、`$((BUDGET - USED))` が
+# 「算術エラー -> if 偽 -> そのまま codex を呼ぶ」で **fail-open** する。明示的に止める。
+if ! BUDGET_INFO=$("$PYTHON" - "$BUDGET_FILE" 2>/dev/null <<'PY'
+import json, sys, datetime
+
+
+def need_int(v):
+    """非整数 / bool / 負値 / 桁あふれを弾く。ここを緩めると値が bash の算術に渡り、
+    `$((BUDGET - USED))` が構文エラー → set -e 無しで続行 → **素通り** になる。"""
+    if isinstance(v, bool) or not isinstance(v, int) or v < 0 or v > 10**12:
+        raise ValueError(f'invalid budget value: {v!r}')
+    return v
+
+
+d = json.load(open(sys.argv[1], encoding='utf-8'))
 today = datetime.date.today().isoformat()
 used = d['today']['tokens_used'] if d['today'].get('date') == today else 0
-print(d['daily_token_budget'], d['per_invocation_max'], used)
+print(need_int(d['daily_token_budget']), need_int(d['per_invocation_max']), need_int(used))
 PY
-)
+); then
+  echo "[run-codex-consult] FAILED: .codex/budget.json を読めない / 値が不正" >&2
+  exit 1
+fi
 BUDGET=$(echo "$BUDGET_INFO" | cut -d' ' -f1)
 PER_INV=$(echo "$BUDGET_INFO" | cut -d' ' -f2)
 USED=$(echo "$BUDGET_INFO" | cut -d' ' -f3)
+for v in "$BUDGET" "$PER_INV" "$USED"; do
+  case "$v" in
+    ''|*[!0-9]*) echo "[run-codex-consult] FAILED: 予算値が整数として読めない" >&2; exit 1 ;;
+  esac
+done
 if [ $((BUDGET - USED)) -lt "$PER_INV" ]; then
   echo "[run-codex-consult] BLOCKED: budget exceeded ($USED/$BUDGET used today)" >&2
   exit 1
@@ -85,23 +118,35 @@ if [ "$PREVIEW" = "true" ]; then
 fi
 
 # Codex 呼び出し (固定パラメータ)
-codex exec --json --sandbox read-only --skip-git-repo-check \
+if ! codex exec --json --sandbox read-only --skip-git-repo-check \
   -m gpt-5.5 -c model_reasoning_effort=medium \
-  - <<< "$PROMPT" > "$TMPDIR_WORK/result.jsonl"
+  - <<< "$PROMPT" > "$TMPDIR_WORK/result.jsonl"; then
+  echo "[run-codex-consult] FAILED: codex exec error" >&2
+  exit 1
+fi
 
 # 結果を python で parse: 最終 agent_message を stdout、token を budget.json へ反映 (jq/flock 不要)。
 "$PYTHON" - "$TMPDIR_WORK/result.jsonl" <<'PY'
-import json, sys, datetime
+import json, os, sys, datetime
 texts, tokens = [], 0
 
 
 def find_tokens(o):
-    """usage の載る位置は codex のバージョンで揺れるため、total_tokens を再帰探索する。
-    旧実装は `.type=="usage"` 決め打ちで、形が変わると**黙って 0 を記録**し予算ガードを無効化していた。"""
+    """usage の載る位置も**キー名**も codex のバージョンで揺れるため再帰探索する。
+    旧実装は `.type=="usage"` の `total_tokens` 決め打ちで、形が変わると
+    **黙って 0 を記録**し予算ガードを無効化していた。
+
+    実測 (codex-cli 0.142.5): `turn.completed.usage` に `total_tokens` は無く
+    `{input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens}` が入る。
+    cached_input_tokens は input_tokens の内数、reasoning_output_tokens は
+    output_tokens の内数なので、合計は input + output で採る。"""
     if isinstance(o, dict):
         v = o.get('total_tokens')
         if isinstance(v, int):
             return v
+        i, out = o.get('input_tokens'), o.get('output_tokens')
+        if isinstance(i, int) or isinstance(out, int):
+            return (i if isinstance(i, int) else 0) + (out if isinstance(out, int) else 0)
         for x in o.values():
             r = find_tokens(x)
             if r:
@@ -124,14 +169,17 @@ for line in open(sys.argv[1], encoding='utf-8'):
         continue
     if o.get('type') == 'item.completed' and o.get('item', {}).get('type') == 'agent_message':
         texts.append(o['item'].get('text', ''))
-    tokens = find_tokens(o) or tokens
+    # codex は usage を**累積**で出すため最大値を採る。行ごとの加算にすると
+    # 累積形式で二重計上になる。非累積形式なら過小計上だが、予算を緩める方向の
+    # 誤りは WARN で気づけるようにしてある。
+    tokens = max(tokens, find_tokens(o))
 # 最終 agent_message を出力 (stdout = 相談結果)
 print('\n'.join(texts))
 if not tokens:
     print('[run-codex-consult] WARN: token usage not found in codex output; '
           'budget records invocation only', file=sys.stderr)
 # トークン使用量を予算に反映 (read-modify-write)
-p = '.codex/budget.json'
+p = os.environ.get('BUDGET_FILE') or '.codex/budget.json'
 d = json.load(open(p, encoding='utf-8'))
 today = datetime.date.today().isoformat()
 if d['today'].get('date') == today:
@@ -141,5 +189,10 @@ else:
     d.setdefault('history', []).append(d['today'])
     d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
     d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
-json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+# 同ディレクトリの一時ファイル + os.replace で atomic に差し替える。
+# `open(p, 'w')` は開いた瞬間に truncate するため、中断で budget.json が壊れる。
+tmp = p + '.tmp'
+with open(tmp, 'w', encoding='utf-8') as f:
+    json.dump(d, f, ensure_ascii=False, indent=2)
+os.replace(tmp, p)
 PY

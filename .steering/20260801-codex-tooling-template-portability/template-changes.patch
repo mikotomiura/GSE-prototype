@@ -1,0 +1,1206 @@
+--- a/.claude/commands/commands_setup/setup-codex-bridge.md
++++ b/.claude/commands/commands_setup/setup-codex-bridge.md
+@@ -7,7 +7,7 @@
+   隔離 + 明示承認) の 2 Skill を作成する。Phase 7 (`/cross-review`)、Phase 8
+   (予算/秘匿ガード hook) の前提となる。/setup-skills の完了後、または Codex 連携を
+   使わないプロジェクトでは skip 可能。
+-allowed-tools: Read, Write, Glob, Bash(mkdir *), Bash(ls *), Bash(cat *), Bash(chmod *), Bash(codex *), Bash(jq *), Bash(date *)
++allowed-tools: Read, Write, Glob, Bash(mkdir *), Bash(ls *), Bash(cat *), Bash(chmod *), Bash(git update-index *), Bash(codex *), Bash(python3 *), Bash(date *)
+ ---
+ 
+ # /setup-codex-bridge — Codex CLI 連携基盤の構築
+@@ -267,6 +267,11 @@
+   if ($0 ~ /\.(env|pem|key)([[:space:]]|$)/) skip_hunk = 1
+   if ($0 ~ /credentials|secret/) skip_hunk = 1
+   if ($0 ~ prop_re) skip_hunk = 1
++  # ⚠️ プロジェクト固有の「外部 LLM に出してはいけない」データ形式があればここに足す。
++  # 例: キーストローク動態を扱うプロジェクトは
++  #   if ($0 ~ /\.ndjson([^A-Za-z0-9_]|$)/) skip_hunk = 1
++  # 追跡外の実データは diff に乗らないが、**追跡下の fixture** は乗るので必要。
++  # hook 側 (.claude/hooks/secrets-pre-filter.sh の DENY_PATTERN) にも同じものを足すこと。
+   if (skip_hunk) {
+     print "[secrets-filter] SKIPPED hunk: " $0
+     matched = 1
+@@ -303,6 +308,7 @@
+ 
+ ```bash
+ chmod +x scripts/secrets-filter.sh
++git update-index --chmod=+x scripts/secrets-filter.sh 2>/dev/null || true  # 追跡下では mode も 100755 に
+ ```
+ 
+ > **動作テスト**: `echo "OPENAI_API_KEY=sk-abcdef1234567890abcdef" | scripts/secrets-filter.sh` で `[REDACTED]` に置換されることを確認。
+@@ -322,7 +328,7 @@
+   局面で起動する。入力は設計ドキュメント / 候補案 / トレードオフメモ等の markdown 抜粋
+   (公開可能な最小範囲)。read-only で書き込みは行わない。proprietary plugin の出力 /
+   機密情報を含む場合は実行を中止する。日常的な設計判断で 1-2 回呼ぶ運用を想定。
+-allowed-tools: Bash(scripts/run-codex-consult.sh *), Bash(jq *), Read
++allowed-tools: Bash(scripts/run-codex-consult.sh *), Read
+ disable-model-invocation: false
+ ---
+ 
+@@ -473,7 +479,7 @@
+   除去してから渡す。読み取り専用 (sandbox=read-only) で書き込みは行わない。
+   対象が docs/external-skills.md で「外部 LLM 送信禁止」とされる Skill の出力を含む場合、
+   または .codex/budget.json の予算超過時は実行を中止する。
+-allowed-tools: Bash(codex *), Bash(git *), Bash(jq *), Bash(scripts/secrets-filter.sh), Read
++allowed-tools: Bash(scripts/run-codex-review.sh *), Bash(git diff *), Bash(scripts/secrets-filter.sh), Read
+ ---
+ 
+ # Codex Review Skill
+@@ -490,13 +496,58 @@
+ 
+ ### Step 1: 予算チェック
+ 
+-\`\`\`bash
+-TODAY=$(date +%Y-%m-%d)
+-DATA=$(cat .codex/budget.json)
+-BUDGET=$(echo "$DATA" | jq -r '.daily_token_budget')
+-PER_INV=$(echo "$DATA" | jq -r '.per_invocation_max')
+-USED=$(echo "$DATA" | jq -r --arg d "$TODAY" 'if .today.date == $d then .today.tokens_used else 0 end')
++> **`jq` / `flock` は使わない**。macOS には `flock` が無く、`jq` も未導入環境がある。
++> 生成スクリプトは `set -uo pipefail` (= `set -e` 無し) なので、コマンド不在は
++> **エラーで止まらず静かに 0 を記録して予算ガードを無効化する**。python に統一する。
+ 
++\`\`\`bash
++PYTHON=$(command -v python3 || command -v python || true)
++if [ -z "$PYTHON" ]; then
++  echo "[codex-review] FAILED: python not found (予算管理/JSON パースに必須)" >&2
++  exit 1
++fi
++
++# Windows git-bash の日本語ロケール (cp932) で Unicode エラーにならないよう UTF-8 を強制。
++# ここで落ちると codex 課金後・budget 更新前に死に、消費が記録されない。
++export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
++
++# budget.json は repo root 基準で参照する (cwd 依存だと予算チェックが不成立になる)
++ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
++BUDGET_FILE="$ROOT/.codex/budget.json"
++export BUDGET_FILE
++
++# budget.json が壊れていると BUDGET_INFO が空になり、`$((BUDGET - USED))` が
++# 「算術エラー -> if 偽 -> そのまま codex を呼ぶ」で **fail-open** する。明示的に止める。
++if ! BUDGET_INFO=$("$PYTHON" - "$BUDGET_FILE" 2>/dev/null <<'PY'
++import json, sys, datetime
++
++
++def need_int(v):
++    """非整数 / bool / 負値 / 桁あふれを弾く。ここを緩めると値が bash の算術に渡り、
++    `$((BUDGET - USED))` が構文エラー → set -e 無しで続行 → **素通り** になる。"""
++    if isinstance(v, bool) or not isinstance(v, int) or v < 0 or v > 10**12:
++        raise ValueError(f'invalid budget value: {v!r}')
++    return v
++
++
++d = json.load(open(sys.argv[1], encoding='utf-8'))
++today = datetime.date.today().isoformat()
++used = d['today']['tokens_used'] if d['today'].get('date') == today else 0
++print(need_int(d['daily_token_budget']), need_int(d['per_invocation_max']), need_int(used))
++PY
++); then
++  echo "[codex-review] FAILED: .codex/budget.json を読めない (破損?)" >&2
++  exit 1
++fi
++BUDGET=$(echo "$BUDGET_INFO" | cut -d' ' -f1)
++PER_INV=$(echo "$BUDGET_INFO" | cut -d' ' -f2)
++USED=$(echo "$BUDGET_INFO" | cut -d' ' -f3)
++for v in "$BUDGET" "$PER_INV" "$USED"; do
++  case "$v" in
++    ''|*[!0-9]*) echo "[codex-review] FAILED: 予算値が整数として読めない" >&2; exit 1 ;;
++  esac
++done
++
+ if [ $((BUDGET - USED)) -lt "$PER_INV" ]; then
+   echo "[codex-review] BLOCKED: daily budget would be exceeded ($USED/$BUDGET tokens used today)"
+   exit 1
+@@ -522,7 +573,7 @@
+ \`\`\`bash
+ git diff | scripts/secrets-filter.sh > /tmp/codex-review-input.diff
+ LINES=$(wc -l < /tmp/codex-review-input.diff)
+-THRESHOLD=$(echo "$DATA" | jq -r '.diff_size_threshold_lines')
++THRESHOLD=$("$PYTHON" -c "import json; print(json.load(open('.codex/budget.json', encoding='utf-8'))['diff_size_threshold_lines'])")
+ 
+ if [ "$LINES" -gt "$THRESHOLD" ]; then
+   echo "[codex-review] WARN: diff is $LINES lines (threshold: $THRESHOLD)"
+@@ -544,39 +595,87 @@
+ ---
+ $(cat /tmp/codex-review-input.diff)"
+ 
+-RESULT=$(codex exec --json --sandbox read-only --skip-git-repo-check \
++if ! codex exec --json --sandbox read-only --skip-git-repo-check \
+   -m gpt-5.5 -c model_reasoning_effort=medium \
+-  - <<< "$PROMPT")
++  - <<< "$PROMPT" > /tmp/codex-review-result.jsonl; then
++  echo "[codex-review] FAILED: codex exec error" >&2
++  rm -f /tmp/codex-review-input.diff /tmp/codex-review-result.jsonl
++  exit 1
++fi
+ 
+-# 最終応答抽出
+-echo "$RESULT" | jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text'
++# 最終 agent_message を stdout、token 使用量を budget.json へ反映 (jq / flock 不要)
++"$PYTHON" - /tmp/codex-review-result.jsonl <<'PY'
++import json, sys, datetime
+ 
+-# トークン使用量を予算ファイルに atomic update + flock で反映 (race 回避)
+-TOKENS=$(echo "$RESULT" | jq -r 'select(.type=="usage") | .usage.total_tokens // 0' | tail -1)
+-TOKENS=${TOKENS:-0}
++def find_tokens(o):
++    """usage の載る位置は codex のバージョンで揺れるため、total_tokens を再帰探索する。
++    旧実装は `.type=="usage"` 決め打ちで、形が変わると**黙って 0 を記録**し
++    予算ガードを無効化していた。"""
++    if isinstance(o, dict):
++        v = o.get('total_tokens')
++        if isinstance(v, int):
++            return v
++        for x in o.values():
++            r = find_tokens(x)
++            if r:
++                return r
++    elif isinstance(o, list):
++        for x in o:
++            r = find_tokens(x)
++            if r:
++                return r
++    return 0
+ 
+-# flock を使った排他更新。tmp に書いて mv で atomic rename
+-(
+-  flock -x 9
+-  jq --arg d "$TODAY" --argjson t "$TOKENS" \
+-    'if .today.date == $d
+-     then .today.tokens_used += $t | .today.invocations += 1
+-     else .history += [.today] | .history = (.history | sort_by(.date) | .[-30:])
+-          | .today = {date: $d, tokens_used: $t, invocations: 1}
+-     end' \
+-    .codex/budget.json > .codex/budget.json.tmp 2>/dev/null \
+-    && mv .codex/budget.json.tmp .codex/budget.json \
+-    || echo "[codex-review] WARN: budget update failed, may need manual repair"
+-) 9> .codex/budget.json.lock
++texts, tokens = [], 0
++for line in open(sys.argv[1], encoding='utf-8'):
++    line = line.strip()
++    if not line:
++        continue
++    try:
++        o = json.loads(line)
++    except Exception:
++        continue
++    if o.get('type') == 'item.completed' and o.get('item', {}).get('type') == 'agent_message':
++        texts.append(o['item'].get('text', ''))
++    # codex は usage を**累積**で出すため最大値を採る。行ごとの加算にすると
++    # 累積形式で二重計上になる。非累積形式なら過小計上だが、予算を緩める方向の
++    # 誤りは WARN で気づけるようにしてある。
++    tokens = max(tokens, find_tokens(o))
+ 
++print('\n'.join(texts))
++if not tokens:
++    print('[codex-review] WARN: token usage not found in codex output; '
++          'budget records invocation only', file=sys.stderr)
++
++# トークン使用量を予算に反映 (read-modify-write)
++p = os.environ.get('BUDGET_FILE') or '.codex/budget.json'
++d = json.load(open(p, encoding='utf-8'))
++today = datetime.date.today().isoformat()
++if d['today'].get('date') == today:
++    d['today']['tokens_used'] += tokens
++    d['today']['invocations'] += 1
++else:
++    d.setdefault('history', []).append(d['today'])
++    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
++    d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
++# 同ディレクトリの一時ファイル + os.replace で atomic に差し替える。
++# `open(p, 'w')` は開いた瞬間に truncate するため、中断で budget.json が壊れる。
++tmp = p + '.tmp'
++with open(tmp, 'w', encoding='utf-8') as f:
++    json.dump(d, f, ensure_ascii=False, indent=2)
++os.replace(tmp, p)
++PY
++
+ # 中間ファイル削除 (ログ保存禁止)
+-rm -f /tmp/codex-review-input.diff
++rm -f /tmp/codex-review-input.diff /tmp/codex-review-result.jsonl
+ \`\`\`
+ 
+-> **race 条件回避**: 並列 `codex-review` 呼び出しや日付切替時の lost update を避けるため、`flock -x` で排他ロックを取得してから atomic update する。`mv` は POSIX で atomic なので、書きかけ状態の `.budget.json` がレースで読まれることはない。
++> **なぜ `flock` を使わないか**: `flock` は Linux util-linux 由来で **macOS には無い**。生成スクリプトは `set -uo pipefail` (= `set -e` 無し) なので `flock: command not found` でも処理が継続し、続く `jq` が 0 を返して **`tokens_used=0` が記録される** = 予算ガードが静かに無効化される。exit code は 0 なので誰も気づかない。ロックを失う代わりに正しい値が記録される方が明確に良い (想定利用は単一ユーザー・単一マシンで、並列 `codex-review` は稀)。どうしても排他が要る場合は `os.mkdir()` ベースの可搬ロック (POSIX / Windows 両対応) で代替する。
+ >
++> **`total_tokens` を再帰探索する理由**: codex の JSON 出力で usage が載る位置はバージョンで揺れる。`.type=="usage"` 決め打ちだと形が変わった瞬間に黙って 0 を書き続けるため、見つからない場合は `WARN` を stderr に出して**気づける**ようにする。
++>
+ > **破損時復旧**: `.codex/budget.json` が壊れた場合の復旧手順:
+-> 1. `.codex/budget.json.tmp` が残っていれば `cp .codex/budget.json.tmp .codex/budget.json`
++> 1. `git` で追跡していれば `git checkout -- .codex/budget.json` (当日分は失われるが構造は戻る)
+ > 2. それも壊れていれば `/setup-codex-bridge --repair-budget` (将来実装) または手動で初期 JSON に戻す
+ > 3. `history` 配列は失われるが `today` は次回呼び出しで再構築される
+ 
+@@ -653,7 +752,7 @@
+   完了後の diff をメイン worktree の Claude が review してから merge する。
+   workspace-write 権限が必要。明示的なユーザー承認なしに起動しない。
+   proprietary plugin 出力 / 機密情報を含むタスクは対象外。
+-allowed-tools: Bash(codex *), Bash(git worktree *), Bash(git *), Bash(jq *), Bash(scripts/secrets-filter.sh), Read
++allowed-tools: Bash(codex *), Bash(git worktree *), Bash(git *), Bash(scripts/secrets-filter.sh), Read
+ ---
+ 
+ # Codex Rescue Skill
+@@ -888,21 +987,49 @@
+ # scripts/run-codex-review.sh
+ # cross-reviewer エージェントから呼ばれる codex-review wrapper。
+ # 任意の codex exec コマンド実行を防ぐため、ここでパラメータを固定化する。
++# 予算管理 / JSON パースは python で行う (jq / flock 非依存: macOS に flock が無いため)。
+ #
+ # 使い方: scripts/run-codex-review.sh > /tmp/cross-review-codex.md
+ # 内部で git diff | scripts/secrets-filter.sh を通し、固定 prompt で Codex を呼ぶ。
++#
++# exit code:
++#   0: レビュー完了 (stdout に結果)
++#   1: 予算超過 / Codex エラー / python 不在
++#   2: secrets-filter が機密を検出 (fail-closed)
+ 
+ set -uo pipefail
++
++PYTHON=$(command -v python3 || command -v python || true)
++if [ -z "$PYTHON" ]; then
++  echo "[run-codex-review] FAILED: python not found (予算管理/JSON パースに必須)" >&2
++  exit 1
++fi
++
++# Windows git-bash の日本語ロケール (cp932) で Unicode エラーにならないよう UTF-8 を強制。
++# ここで落ちると codex 課金後・budget 更新前に死に、消費が記録されない。
++export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+ 
++# budget.json は repo root 基準で参照する (cwd 依存だと予算チェックが不成立になる)
++ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
++BUDGET_FILE="$ROOT/.codex/budget.json"
++export BUDGET_FILE
++
+ # 中間ファイルは終了時に削除 (preview/log 保存禁止)
+ TMPDIR=$(mktemp -d)
+ trap 'rm -rf "$TMPDIR"' EXIT
+ 
+ INPUT="$TMPDIR/input.diff"
+ git diff > "$TMPDIR/raw.diff"
++if [ ! -s "$TMPDIR/raw.diff" ]; then
++  echo "[run-codex-review] no unstaged changes to review (skipped, no budget consumed)" >&2
++  exit 0
++fi
+ 
+-if ! scripts/secrets-filter.sh < "$TMPDIR/raw.diff" > "$INPUT"; then
+-  rc=$?
++# `if ! cmd; then rc=$?` は **常に 0** になる (`!` が反転した後のステータスを拾うため)。
++# それだと secrets-filter の exit 2 (機密検出) と 1 (故障) を区別できない。
++scripts/secrets-filter.sh < "$TMPDIR/raw.diff" > "$INPUT"
++rc=$?
++if [ "$rc" -ne 0 ]; then
+   if [ "$rc" -eq 2 ]; then
+     echo "[run-codex-review] BLOCKED: secrets-filter detected sensitive content" >&2
+     exit 2
+@@ -911,14 +1038,40 @@
+   exit 1
+ fi
+ 
+-# 予算チェック (hook + Skill の責務だが wrapper でも fail-fast)
+-TODAY=$(date +%Y-%m-%d)
+-DATA=$(cat .codex/budget.json)
+-BUDGET=$(echo "$DATA" | jq -r '.daily_token_budget')
+-PER_INV=$(echo "$DATA" | jq -r '.per_invocation_max')
+-USED=$(echo "$DATA" | jq -r --arg d "$TODAY" 'if .today.date == $d then .today.tokens_used else 0 end')
++# 予算チェック (hook + Skill の責務だが wrapper でも fail-fast)。python; jq 不要
++# budget.json が壊れていると BUDGET_INFO が空になり、`$((BUDGET - USED))` が
++# 「算術エラー -> if 偽 -> そのまま codex を呼ぶ」で **fail-open** する。明示的に止める。
++if ! BUDGET_INFO=$("$PYTHON" - "$BUDGET_FILE" 2>/dev/null <<'PY'
++import json, sys, datetime
++
++
++def need_int(v):
++    """非整数 / bool / 負値 / 桁あふれを弾く。ここを緩めると値が bash の算術に渡り、
++    `$((BUDGET - USED))` が構文エラー → set -e 無しで続行 → **素通り** になる。"""
++    if isinstance(v, bool) or not isinstance(v, int) or v < 0 or v > 10**12:
++        raise ValueError(f'invalid budget value: {v!r}')
++    return v
++
++
++d = json.load(open(sys.argv[1], encoding='utf-8'))
++today = datetime.date.today().isoformat()
++used = d['today']['tokens_used'] if d['today'].get('date') == today else 0
++print(need_int(d['daily_token_budget']), need_int(d['per_invocation_max']), need_int(used))
++PY
++); then
++  echo "[run-codex-review] FAILED: .codex/budget.json を読めない (破損?)" >&2
++  exit 1
++fi
++BUDGET=$(echo "$BUDGET_INFO" | cut -d' ' -f1)
++PER_INV=$(echo "$BUDGET_INFO" | cut -d' ' -f2)
++USED=$(echo "$BUDGET_INFO" | cut -d' ' -f3)
++for v in "$BUDGET" "$PER_INV" "$USED"; do
++  case "$v" in
++    ''|*[!0-9]*) echo "[run-codex-review] FAILED: 予算値が整数として読めない" >&2; exit 1 ;;
++  esac
++done
+ if [ $((BUDGET - USED)) -lt "$PER_INV" ]; then
+-  echo "[run-codex-review] BLOCKED: budget exceeded" >&2
++  echo "[run-codex-review] BLOCKED: budget exceeded ($USED/$BUDGET used today)" >&2
+   exit 1
+ fi
+ 
+@@ -935,32 +1088,89 @@
+ $(cat "$INPUT")"
+ 
+ # 固定パラメータで Codex を呼ぶ (任意コマンド実行を防ぐ)
+-codex exec --json --sandbox read-only --skip-git-repo-check \
++if ! codex exec --json --sandbox read-only --skip-git-repo-check \
+   -m gpt-5.5 -c model_reasoning_effort=medium \
+-  - <<< "$PROMPT" > "$TMPDIR/result.jsonl"
++  - <<< "$PROMPT" > "$TMPDIR/result.jsonl"; then
++  echo "[run-codex-review] FAILED: codex exec error" >&2
++  exit 1
++fi
+ 
+-# 最終 agent_message のみ出力
+-jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$TMPDIR/result.jsonl"
++# 結果を python で parse: 最終 agent_message を stdout、token を budget.json へ反映 (jq/flock 不要)
++"$PYTHON" - "$TMPDIR/result.jsonl" <<'PY'
++import json, os, sys, datetime
+ 
+-# トークン使用量を予算に反映 (atomic + flock)
+-TOKENS=$(jq -r 'select(.type=="usage") | .usage.total_tokens // 0' "$TMPDIR/result.jsonl" | tail -1)
+-TOKENS=${TOKENS:-0}
+ 
+-(
+-  flock -x 9
+-  jq --arg d "$TODAY" --argjson t "$TOKENS" \
+-    'if .today.date == $d
+-     then .today.tokens_used += $t | .today.invocations += 1
+-     else .history += [.today] | .history = (.history | sort_by(.date) | .[-30:])
+-          | .today = {date: $d, tokens_used: $t, invocations: 1}
+-     end' \
+-    .codex/budget.json > .codex/budget.json.tmp \
+-    && mv .codex/budget.json.tmp .codex/budget.json
+-) 9> .codex/budget.json.lock
++def find_tokens(o):
++    """usage の載る位置も**キー名**も codex のバージョンで揺れるため再帰探索する。
++    旧実装は `.type=="usage"` の `total_tokens` 決め打ちで、形が変わると
++    **黙って 0 を記録**し予算ガードを無効化していた。
++
++    実測 (codex-cli 0.142.5): `turn.completed.usage` に `total_tokens` は無く
++    `{input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens}` が入る。
++    cached_input_tokens は input_tokens の内数、reasoning_output_tokens は
++    output_tokens の内数なので、合計は input + output で採る。"""
++    if isinstance(o, dict):
++        v = o.get('total_tokens')
++        if isinstance(v, int):
++            return v
++        i, out = o.get('input_tokens'), o.get('output_tokens')
++        if isinstance(i, int) or isinstance(out, int):
++            return (i if isinstance(i, int) else 0) + (out if isinstance(out, int) else 0)
++        for x in o.values():
++            r = find_tokens(x)
++            if r:
++                return r
++    elif isinstance(o, list):
++        for x in o:
++            r = find_tokens(x)
++            if r:
++                return r
++    return 0
++
++
++texts, tokens = [], 0
++for line in open(sys.argv[1], encoding='utf-8'):
++    line = line.strip()
++    if not line:
++        continue
++    try:
++        o = json.loads(line)
++    except Exception:
++        continue
++    if o.get('type') == 'item.completed' and o.get('item', {}).get('type') == 'agent_message':
++        texts.append(o['item'].get('text', ''))
++    # codex は usage を**累積**で出すため最大値を採る。行ごとの加算にすると
++    # 累積形式で二重計上になる。非累積形式なら過小計上だが、予算を緩める方向の
++    # 誤りは WARN で気づけるようにしてある。
++    tokens = max(tokens, find_tokens(o))
++# 最終 agent_message を出力 (stdout = レビュー本文)
++print('\n'.join(texts))
++if not tokens:
++    print('[run-codex-review] WARN: token usage not found in codex output; '
++          'budget records invocation only', file=sys.stderr)
++# トークン使用量を予算に反映 (read-modify-write)
++p = os.environ.get('BUDGET_FILE') or '.codex/budget.json'
++d = json.load(open(p, encoding='utf-8'))
++today = datetime.date.today().isoformat()
++if d['today'].get('date') == today:
++    d['today']['tokens_used'] += tokens
++    d['today']['invocations'] += 1
++else:
++    d.setdefault('history', []).append(d['today'])
++    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
++    d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
++# 同ディレクトリの一時ファイル + os.replace で atomic に差し替える。
++# `open(p, 'w')` は開いた瞬間に truncate するため、中断で budget.json が壊れる。
++tmp = p + '.tmp'
++with open(tmp, 'w', encoding='utf-8') as f:
++    json.dump(d, f, ensure_ascii=False, indent=2)
++os.replace(tmp, p)
++PY
+ ```
+ 
+ ```bash
+ chmod +x scripts/run-codex-review.sh
++git update-index --chmod=+x scripts/run-codex-review.sh 2>/dev/null || true  # git 追跡時は mode も 100755 に
+ ```
+ 
+ #### 6.5b. scripts/run-codex-consult.sh (codex-consult Skill 用)
+@@ -976,9 +1186,31 @@
+ # 使い方:
+ #   scripts/run-codex-consult.sh /tmp/codex-consult-input.md
+ #   scripts/run-codex-consult.sh --preview /tmp/codex-consult-input.md  # 送信前確認
++#
++# exit code:
++#   0: 完了 (stdout に結果 or preview)
++#   1: 予算超過 / 入力エラー / Codex エラー / python 不在
++#   2: secrets-filter が機密を検出 (fail-closed)
+ 
+ set -uo pipefail
+ 
++# 予算管理 / JSON パースは python で行う (jq / flock 非依存: macOS に flock が無いため。
++# run-codex-review.sh と同一方式に統一)。
++PYTHON=$(command -v python3 || command -v python || true)
++if [ -z "$PYTHON" ]; then
++  echo "[run-codex-consult] FAILED: python not found (予算管理/JSON パースに必須)" >&2
++  exit 1
++fi
++
++# Windows git-bash の日本語ロケール (cp932) で Unicode エラーにならないよう UTF-8 を強制。
++# ここで落ちると codex 課金後・budget 更新前に死に、消費が記録されない。
++export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
++
++# budget.json は repo root 基準で参照する (cwd 依存だと予算チェックが不成立になる)
++ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
++BUDGET_FILE="$ROOT/.codex/budget.json"
++export BUDGET_FILE
++
+ PREVIEW=false
+ if [ "${1:-}" = "--preview" ]; then
+   PREVIEW=true
+@@ -998,8 +1230,11 @@
+ FILTERED="$TMPDIR/input.md"
+ 
+ # 機密 / proprietary フィルタ (fail-closed)
+-if ! scripts/secrets-filter.sh < "$INPUT_FILE" > "$FILTERED"; then
+-  rc=$?
++# `if ! cmd; then rc=$?` は **常に 0** になる (`!` が反転した後のステータスを拾うため)。
++# それだと secrets-filter の exit 2 (機密検出) と 1 (故障) を区別できない。
++scripts/secrets-filter.sh < "$INPUT_FILE" > "$FILTERED"
++rc=$?
++if [ "$rc" -ne 0 ]; then
+   if [ "$rc" -eq 2 ]; then
+     echo "[run-codex-consult] BLOCKED: secrets-filter detected sensitive content" >&2
+     exit 2
+@@ -1008,14 +1243,40 @@
+   exit 1
+ fi
+ 
+-# 予算チェック
+-TODAY=$(date +%Y-%m-%d)
+-DATA=$(cat .codex/budget.json)
+-BUDGET=$(echo "$DATA" | jq -r '.daily_token_budget')
+-PER_INV=$(echo "$DATA" | jq -r '.per_invocation_max')
+-USED=$(echo "$DATA" | jq -r --arg d "$TODAY" 'if .today.date == $d then .today.tokens_used else 0 end')
++# 予算チェック (python; jq 不要)
++# budget.json が壊れていると BUDGET_INFO が空になり、`$((BUDGET - USED))` が
++# 「算術エラー -> if 偽 -> そのまま codex を呼ぶ」で **fail-open** する。明示的に止める。
++if ! BUDGET_INFO=$("$PYTHON" - "$BUDGET_FILE" 2>/dev/null <<'PY'
++import json, sys, datetime
++
++
++def need_int(v):
++    """非整数 / bool / 負値 / 桁あふれを弾く。ここを緩めると値が bash の算術に渡り、
++    `$((BUDGET - USED))` が構文エラー → set -e 無しで続行 → **素通り** になる。"""
++    if isinstance(v, bool) or not isinstance(v, int) or v < 0 or v > 10**12:
++        raise ValueError(f'invalid budget value: {v!r}')
++    return v
++
++
++d = json.load(open(sys.argv[1], encoding='utf-8'))
++today = datetime.date.today().isoformat()
++used = d['today']['tokens_used'] if d['today'].get('date') == today else 0
++print(need_int(d['daily_token_budget']), need_int(d['per_invocation_max']), need_int(used))
++PY
++); then
++  echo "[run-codex-consult] FAILED: .codex/budget.json を読めない (破損?)" >&2
++  exit 1
++fi
++BUDGET=$(echo "$BUDGET_INFO" | cut -d' ' -f1)
++PER_INV=$(echo "$BUDGET_INFO" | cut -d' ' -f2)
++USED=$(echo "$BUDGET_INFO" | cut -d' ' -f3)
++for v in "$BUDGET" "$PER_INV" "$USED"; do
++  case "$v" in
++    ''|*[!0-9]*) echo "[run-codex-consult] FAILED: 予算値が整数として読めない" >&2; exit 1 ;;
++  esac
++done
+ if [ $((BUDGET - USED)) -lt "$PER_INV" ]; then
+-  echo "[run-codex-consult] BLOCKED: budget exceeded" >&2
++  echo "[run-codex-consult] BLOCKED: budget exceeded ($USED/$BUDGET used today)" >&2
+   exit 1
+ fi
+ 
+@@ -1039,34 +1300,97 @@
+ fi
+ 
+ # Codex 呼び出し (固定パラメータ)
+-codex exec --json --sandbox read-only --skip-git-repo-check \
++if ! codex exec --json --sandbox read-only --skip-git-repo-check \
+   -m gpt-5.5 -c model_reasoning_effort=medium \
+-  - <<< "$PROMPT" > "$TMPDIR/result.jsonl"
++  - <<< "$PROMPT" > "$TMPDIR/result.jsonl"; then
++  echo "[run-codex-consult] FAILED: codex exec error" >&2
++  exit 1
++fi
+ 
+-# 最終 agent_message のみ出力
+-jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$TMPDIR/result.jsonl"
++# 結果を python で parse: 最終 agent_message を stdout、token を budget.json へ反映 (jq/flock 不要)
++"$PYTHON" - "$TMPDIR/result.jsonl" <<'PY'
++import json, os, sys, datetime
+ 
+-# トークン使用量を予算に反映 (atomic + flock)
+-TOKENS=$(jq -r 'select(.type=="usage") | .usage.total_tokens // 0' "$TMPDIR/result.jsonl" | tail -1)
+-TOKENS=${TOKENS:-0}
+ 
+-(
+-  flock -x 9
+-  jq --arg d "$TODAY" --argjson t "$TOKENS" \
+-    'if .today.date == $d
+-     then .today.tokens_used += $t | .today.invocations += 1
+-     else .history += [.today] | .history = (.history | sort_by(.date) | .[-30:])
+-          | .today = {date: $d, tokens_used: $t, invocations: 1}
+-     end' \
+-    .codex/budget.json > .codex/budget.json.tmp \
+-    && mv .codex/budget.json.tmp .codex/budget.json
+-) 9> .codex/budget.json.lock
++def find_tokens(o):
++    """usage の載る位置も**キー名**も codex のバージョンで揺れるため再帰探索する。
++    旧実装は `.type=="usage"` の `total_tokens` 決め打ちで、形が変わると
++    **黙って 0 を記録**し予算ガードを無効化していた。
++
++    実測 (codex-cli 0.142.5): `turn.completed.usage` に `total_tokens` は無く
++    `{input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens}` が入る。
++    cached_input_tokens は input_tokens の内数、reasoning_output_tokens は
++    output_tokens の内数なので、合計は input + output で採る。"""
++    if isinstance(o, dict):
++        v = o.get('total_tokens')
++        if isinstance(v, int):
++            return v
++        i, out = o.get('input_tokens'), o.get('output_tokens')
++        if isinstance(i, int) or isinstance(out, int):
++            return (i if isinstance(i, int) else 0) + (out if isinstance(out, int) else 0)
++        for x in o.values():
++            r = find_tokens(x)
++            if r:
++                return r
++    elif isinstance(o, list):
++        for x in o:
++            r = find_tokens(x)
++            if r:
++                return r
++    return 0
++
++
++texts, tokens = [], 0
++for line in open(sys.argv[1], encoding='utf-8'):
++    line = line.strip()
++    if not line:
++        continue
++    try:
++        o = json.loads(line)
++    except Exception:
++        continue
++    if o.get('type') == 'item.completed' and o.get('item', {}).get('type') == 'agent_message':
++        texts.append(o['item'].get('text', ''))
++    # codex は usage を**累積**で出すため最大値を採る。行ごとの加算にすると
++    # 累積形式で二重計上になる。非累積形式なら過小計上だが、予算を緩める方向の
++    # 誤りは WARN で気づけるようにしてある。
++    tokens = max(tokens, find_tokens(o))
++# 最終 agent_message を出力 (stdout = 相談結果)
++print('\n'.join(texts))
++if not tokens:
++    print('[run-codex-consult] WARN: token usage not found in codex output; '
++          'budget records invocation only', file=sys.stderr)
++# トークン使用量を予算に反映 (read-modify-write)
++p = os.environ.get('BUDGET_FILE') or '.codex/budget.json'
++d = json.load(open(p, encoding='utf-8'))
++today = datetime.date.today().isoformat()
++if d['today'].get('date') == today:
++    d['today']['tokens_used'] += tokens
++    d['today']['invocations'] += 1
++else:
++    d.setdefault('history', []).append(d['today'])
++    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
++    d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
++# 同ディレクトリの一時ファイル + os.replace で atomic に差し替える。
++# `open(p, 'w')` は開いた瞬間に truncate するため、中断で budget.json が壊れる。
++tmp = p + '.tmp'
++with open(tmp, 'w', encoding='utf-8') as f:
++    json.dump(d, f, ensure_ascii=False, indent=2)
++os.replace(tmp, p)
++PY
+ ```
+ 
+ ```bash
+ chmod +x scripts/run-codex-consult.sh
++git update-index --chmod=+x scripts/run-codex-consult.sh 2>/dev/null || true
+ ```
+ 
++> **実行ビットを忘れない**: `run-codex-*.sh` は `scripts/secrets-filter.sh < ...` の形で
++> **直接実行**する (`bash` 経由ではない)。`secrets-filter.sh` を含め実行ビットが落ちていると
++> `Permission denied` で fail-closed し、**Codex 連携が丸ごと無言で死ぬ**。
++> `chmod +x` に加え、git 追跡下では mode を `100755` にする (`git update-index --chmod=+x`)。
++> `git ls-files -s scripts/` で `100644` になっていないか確認すること。
++
+ > **review wrapper との違い**: `run-codex-review.sh` は `git diff` を取りに行くが、`run-codex-consult.sh` は引数で受け取った markdown ファイルを処理する。プロンプトテンプレートも違う (review = 焦点 4 観点 / consult = 抜け + アイデア)。**両者を 1 つの wrapper にまとめると保守困難** になるので分離。
+ 
+ > **責務分離 (3 重防衛の明文化)**: 同じ予算 / 機密チェックが 3 箇所に出てくるが、それぞれの目的は異なる:
+--- a/.claude/commands/commands_setup/setup-hooks.md
++++ b/.claude/commands/commands_setup/setup-hooks.md
+@@ -516,47 +516,108 @@
+ #
+ # 入力: stdin に Bash tool の引数 JSON
+ # 出力: PASS の場合 [guard] PASS: codex budget OK / BLOCKED の場合 [guard] BLOCKED: ...
++#
++# JSON パースは python で行う (jq 非依存)。jq 不在時に空文字へ縮退すると
++# **ガードが素通り (fail-open) する** ため、判定不能なら BLOCK する (fail-closed)。
+ 
+ set -uo pipefail
+ 
+-# Bash tool の command を抽出
+ INPUT_JSON=$(cat)
+-COMMAND=$(echo "$INPUT_JSON" | jq -r '.tool_input.command // empty')
+-
+-# 高速早期 exit: codex を含まないコマンドは即座に通過 (Bash 全発火対策)
+-case "$COMMAND" in
++
++# 高速早期 exit: raw JSON に codex の文字列が無ければ parse すらしない (Bash 全発火対策)
++case "$INPUT_JSON" in
+   *codex*) ;;  # 進む
+   *) exit 0 ;;  # 関係ないコマンド: 即 exit 0 (PASS の echo も出さない)
+ esac
+ 
+-# 文字列レベルでさらに codex exec が含まれるか確認
+-if ! echo "$COMMAND" | grep -qE 'codex[[:space:]]+exec'; then
+-  exit 0
++PYTHON=$(command -v python3 || command -v python || true)
++if [ -z "$PYTHON" ]; then
++  echo "[guard] BLOCKED: python not found — codex 予算を検証できないため通さない (fail-closed)" >&2
++  exit 2
+ fi
+ 
+-# .codex/budget.json が無ければ (Phase 5 未完了) スキップ
+-if [ ! -f .codex/budget.json ]; then
++# Windows git-bash の日本語ロケール (cp932) 対策
++export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
++
++# Bash tool の command を抽出
++if ! COMMAND=$(printf '%s' "$INPUT_JSON" | "$PYTHON" -c \
++  'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null); then
++  echo "[guard] BLOCKED: hook 入力 JSON を parse できない — fail-closed" >&2
++  exit 2
++fi
++
++# codex の**サブコマンドを限定しない**。`codex exec` 決め打ちだと
++# `codex e` (alias) / `codex review` / `codex --cd . exec` / 行継続 がすべて素通りする。
++# ただし判定は**コマンド位置** (行頭 / パイプ / `;` / `&&` / `||` / `(` の直後) に限る。
++# 単に「codex という語を含むか」にすると、ヒアドキュメント内で codex に言及しただけの
++# 無関係な Bash 呼び出しまでブロックしてしまう (実際に踏んだ)。
++# 判定は python で行う。`grep` に頼ると **grep 不在・regex エラーでも exit 0 = 素通り**
++# になり、外部コマンド不在で静かに壊れるという本件と同じ穴が残る。
++CODEX_HIT=$(printf '%s' "$COMMAND" | "$PYTHON" -c \
++  "import re,sys; print('1' if re.search(r'(?m)(^|[|;&(]|&&|\|\|)[ \t]*(\S*/)?codex([ \t]|$)', sys.stdin.read()) else '0')" 2>/dev/null)
++if [ "$CODEX_HIT" != "1" ] && [ "$CODEX_HIT" != "0" ]; then
++  echo "[guard] BLOCKED: codex 判定に失敗 — fail-closed" >&2
++  exit 2
++fi
++[ "$CODEX_HIT" = "0" ] && exit 0
++
++# リポジトリルート基準で探す。cwd 依存だと「ファイルが無い → PASS」で
++# ガードが丸ごと無効化される。
++ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
++BUDGET_FILE="$ROOT/.codex/budget.json"
++if [ ! -f "$BUDGET_FILE" ]; then
+   echo "[guard] PASS: .codex/budget.json absent (Phase 5 not run, no guard applies)"
+   exit 0
+ fi
+ 
+-# 予算チェック
+-TODAY=$(date +%Y-%m-%d)
+-DATA=$(cat .codex/budget.json)
+-BUDGET=$(echo "$DATA" | jq -r '.daily_token_budget')
+-PER_INV=$(echo "$DATA" | jq -r '.per_invocation_max')
+-USED=$(echo "$DATA" | jq -r --arg d "$TODAY" 'if .today.date == $d then .today.tokens_used else 0 end')
++# 予算チェック (python; jq 不要)。読み取りに失敗したら BLOCK する
++if ! BUDGET_INFO=$("$PYTHON" - "$BUDGET_FILE" 2>/dev/null <<'PY'
++import json, sys, datetime
+ 
+-if [ $((BUDGET - USED)) -lt "$PER_INV" ]; then
+-  echo "[guard] BLOCKED: codex daily budget exceeded (used=$USED budget=$BUDGET per_inv=$PER_INV)"
+-  echo "Run /codex-bridge --reset-budget or wait until tomorrow." >&2
++
++def need_int(v):
++    """非整数 / bool / 負値 / 桁あふれを弾く。ここを緩めると値が bash の算術に渡り、
++    `$((BUDGET - USED))` が構文エラー → set -e 無しで続行 → **素通り** になる。"""
++    if isinstance(v, bool) or not isinstance(v, int) or v < 0 or v > 10**12:
++        raise ValueError(f'invalid budget value: {v!r}')
++    return v
++
++
++d = json.load(open(sys.argv[1], encoding='utf-8'))
++today = datetime.date.today().isoformat()
++used = d['today']['tokens_used'] if d.get('today', {}).get('date') == today else 0
++print(need_int(d['daily_token_budget']), need_int(d['per_invocation_max']), need_int(used))
++PY
++); then
++  echo "[guard] BLOCKED: .codex/budget.json を読めない / 値が不正 — fail-closed" >&2
+   exit 2
+ fi
++BUDGET=$(echo "$BUDGET_INFO" | cut -d' ' -f1)
++PER_INV=$(echo "$BUDGET_INFO" | cut -d' ' -f2)
++USED=$(echo "$BUDGET_INFO" | cut -d' ' -f3)
+ 
+-echo "[guard] PASS: codex budget OK ($((BUDGET - USED)) tokens remaining)"
++# python 側で検証済みだが、受け渡しの崩れも算術エラー = fail-open になるので二重に確認する
++for v in "$BUDGET" "$PER_INV" "$USED"; do
++  case "$v" in
++    ''|*[!0-9]*) echo "[guard] BLOCKED: 予算値が整数として読めない — fail-closed" >&2; exit 2 ;;
++  esac
++done
++
++REMAINING=$((BUDGET - USED))
++if [ "$REMAINING" -lt "$PER_INV" ]; then
++  echo "[guard] BLOCKED: codex daily budget exceeded (used=$USED budget=$BUDGET per_inv=$PER_INV)" >&2
++  echo "[guard]          Wait until tomorrow, or reset .codex/budget.json manually." >&2
++  exit 2
++fi
++
++echo "[guard] PASS: codex budget OK ($REMAINING tokens remaining)"
+ exit 0
+ \`\`\`
+ 
++> **fail-open にしないこと**: `jq`/`python` の出力を `|| echo "0"` で握ると、
++> パーサ不在時に `BUDGET=0 / USED=0 / PER_INV=0` → `0 -lt 0` が false → **PASS** となり、
++> ガードが黙って無効化される。ガードは「検証できない = 通さない」が正しい。
++
+ \`\`\`bash
+ chmod +x .claude/hooks/codex-budget-guard.sh
+ \`\`\`
+@@ -574,21 +635,48 @@
+ set -uo pipefail
+ 
+ INPUT_JSON=$(cat)
+-COMMAND=$(echo "$INPUT_JSON" | jq -r '.tool_input.command // empty')
+ 
+-# 高速早期 exit: codex を含まないコマンドは即座に通過 (Bash 全発火対策)
+-case "$COMMAND" in
++# 高速早期 exit: raw JSON に codex の文字列が無ければ parse すらしない (Bash 全発火対策)
++case "$INPUT_JSON" in
+   *codex*) ;;
+   *) exit 0 ;;
+ esac
+ 
+-# 文字列レベルでさらに codex exec が含まれるか確認
+-if ! echo "$COMMAND" | grep -qE 'codex[[:space:]]+exec'; then
+-  exit 0
++# JSON パースは python (jq 非依存)。判定不能なら通さない (fail-closed)
++PYTHON=$(command -v python3 || command -v python || true)
++if [ -z "$PYTHON" ]; then
++  echo "[guard] BLOCKED: python not found — codex コマンドを検査できないため通さない (fail-closed)" >&2
++  exit 2
++fi
++
++# Windows git-bash の日本語ロケール (cp932) 対策
++export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
++
++if ! COMMAND=$(printf '%s' "$INPUT_JSON" | "$PYTHON" -c \
++  'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null); then
++  echo "[guard] BLOCKED: hook 入力 JSON を parse できない — fail-closed" >&2
++  exit 2
++fi
++
++# codex の**サブコマンドを限定しない**。`codex exec` 決め打ちだと
++# `codex e` (alias) / `codex review` / `codex --cd . exec` / 行継続 がすべて素通りする。
++# ただし判定は**コマンド位置** (行頭 / パイプ / `;` / `&&` / `||` / `(` の直後) に限る。
++# 単に「codex という語を含むか」にすると、ヒアドキュメント内で codex に言及しただけの
++# 無関係な Bash 呼び出しまでブロックしてしまう (実際に踏んだ)。
++# 判定は python で行う。`grep` に頼ると **grep 不在・regex エラーでも exit 0 = 素通り**
++# になり、外部コマンド不在で静かに壊れるという本件と同じ穴が残る。
++CODEX_HIT=$(printf '%s' "$COMMAND" | "$PYTHON" -c \
++  "import re,sys; print('1' if re.search(r'(?m)(^|[|;&(]|&&|\|\|)[ \t]*(\S*/)?codex([ \t]|$)', sys.stdin.read()) else '0')" 2>/dev/null)
++if [ "$CODEX_HIT" != "1" ] && [ "$CODEX_HIT" != "0" ]; then
++  echo "[guard] BLOCKED: codex 判定に失敗 — fail-closed" >&2
++  exit 2
+ fi
++[ "$CODEX_HIT" = "0" ] && exit 0
+ 
+ # 機密 / proprietary パターン (denylist。fail-closed のため網羅性は scripts/secrets-filter.sh と一致させる)
+-DENY_PATTERN='\.env([[:space:]"]|$)|\.pem([[:space:]"]|$)|\.key([[:space:]"]|$)|credentials|/secrets/|\.pdf([[:space:]"]|$)|\.docx([[:space:]"]|$)|\.xlsx([[:space:]"]|$)|\.pptx([[:space:]"]|$)'
++# 終端は「英数字・アンダースコアでない文字 or 行末」にする。空白と `"` だけに限ると
++# `codex exec "$(cat .env)"` のような**最も自然な書き方**が素通りする。
++DENY_PATTERN='\.env([^A-Za-z0-9_]|$)|\.envrc([^A-Za-z0-9_]|$)|\.pem([^A-Za-z0-9_]|$)|\.key([^A-Za-z0-9_]|$)|credentials([^A-Za-z0-9_]|$)|/secrets/|\.pdf([^A-Za-z0-9_]|$)|\.docx([^A-Za-z0-9_]|$)|\.xlsx([^A-Za-z0-9_]|$)|\.pptx([^A-Za-z0-9_]|$)'
+ 
+ if echo "$COMMAND" | grep -qE "$DENY_PATTERN"; then
+   echo "[guard] BLOCKED: codex exec command references secrets or proprietary file" >&2
+@@ -608,6 +696,14 @@
+ chmod +x .claude/hooks/secrets-pre-filter.sh
+ \`\`\`
+ 
++> **プロジェクト固有パターンの追加 (ヒアリング Q8 と対応)**: `DENY_PATTERN` は汎用の
++> credential / proprietary 拡張子しか持たない。**そのプロジェクトで外部 LLM に出してはいけない
++> データ形式があれば必ず足す**。例: キーストローク動態を扱うプロジェクトでは
++> `\.ndjson([^A-Za-z0-9_]|$)` を追加する (セッションログ = 生の入力データのため)。
++> 判断基準は `docs/external-skills.md` と、プロジェクトの data-privacy 規約。
++> 併せて `scripts/secrets-filter.sh` の `skip_hunk` 側にも同じ拡張子を足すこと
++> (hook はコマンド文字列、filter は diff 本文を見るので**両方**必要)。
++>
+ > **限界の明示**: この hook は Bash tool の `command` フィールドのみを検査する。`heredoc` で stdin に渡す内容や、シェル変数経由で間接渡しされた内容までは検査できない。Skill 側の `scripts/secrets-filter.sh` と二重で構えることで穴を埋める。
+ 
+ #### 7.5c. token-report-stop.sh の作成
+@@ -622,15 +718,39 @@
+ 
+ set -uo pipefail
+ 
+-if [ ! -f .codex/budget.json ]; then
++# repo root 基準で参照する (cwd 依存だと当日の使用量を取り落とす)
++ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
++BUDGET_FILE="$ROOT/.codex/budget.json"
++if [ ! -f "$BUDGET_FILE" ]; then
+   exit 0  # Phase 5 未完了
+ fi
+ 
++# JSON パースは python (jq 非依存)。本 hook は**報告専用**でゲートではないため、
++# python 不在時は WARN を出して静かに終わる (guard 系の fail-closed とは扱いが違う)。
++PYTHON=$(command -v python3 || command -v python || true)
++if [ -z "$PYTHON" ]; then
++  echo "[stop] WARN: python not found; skipping codex token report" >&2
++  exit 0
++fi
++
++export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
++
+ TODAY=$(date +%Y-%m-%d)
+-DATA=$(cat .codex/budget.json)
+-DATE_REC=$(echo "$DATA" | jq -r '.today.date')
+-USED=$(echo "$DATA" | jq -r '.today.tokens_used')
+-INVS=$(echo "$DATA" | jq -r '.today.invocations')
++# 空白区切り + cut は date に空白が入ると崩れる。1 行 1 値にして read で受ける。
++if ! TODAY_INFO=$("$PYTHON" - "$BUDGET_FILE" 2>/dev/null <<'PY'
++import json, sys
++d = json.load(open(sys.argv[1], encoding='utf-8')).get('today', {})
++print(str(d.get('date', '')).replace('\n', ' '))
++print(int(d.get('tokens_used', 0)))
++print(int(d.get('invocations', 0)))
++PY
++); then
++  echo "[stop] WARN: .codex/budget.json を読めない / 値が不正; skipping codex token report" >&2
++  exit 0
++fi
++{ IFS= read -r DATE_REC; IFS= read -r USED; IFS= read -r INVS; } <<EOF_INFO
++$TODAY_INFO
++EOF_INFO
+ 
+ # 当日でなければ何もしない (history へ移動済みのはず)
+ if [ "$DATE_REC" != "$TODAY" ]; then
+@@ -650,32 +770,34 @@
+   exit 0  # 既に記録済み
+ fi
+ 
+-# .steering/_token_log.md に追記 (atomic update + flock)
++# .steering/_token_log.md に追記
++# flock は使わない: macOS に無く、`set -e` の無いスクリプトでは
++# `flock: command not found` でも処理が続くだけで排他にならない (= 壊れたロック)。
++# 上の冪等性キーで多重記録は防いでいるため、ロック無しで実害は無い。
+ mkdir -p .steering
+ LOG=.steering/_token_log.md
+ LINE="- $TODAY (session end): codex tokens=$USED, invocations=$INVS"
+ 
+-(
+-  flock -x 9
+-  if [ ! -f "$LOG" ]; then
+-    {
+-      echo "# Codex Token Usage Log"
+-      echo
+-      echo "Generated by .claude/hooks/token-report-stop.sh on session end."
+-      echo "Reflects per-day codex tokens (Claude tokens are tracked separately by /context)."
+-      echo
+-    } > "$LOG"
+-  fi
+-  # 同日の重複行があれば上書き、無ければ追記
+-  if grep -q "^- $TODAY" "$LOG" 2>/dev/null; then
+-    sed -i.bak "s/^- $TODAY.*/$LINE/" "$LOG"
+-    rm -f "${LOG}.bak"
+-  else
+-    echo "$LINE" >> "$LOG"
+-  fi
+-  # 冪等性キーを更新
+-  echo "$KEY" > "$LAST_KEY_FILE"
+-) 9> "${LOG}.lock"
++if [ ! -f "$LOG" ]; then
++  {
++    echo "# Codex Token Usage Log"
++    echo
++    echo "Generated by .claude/hooks/token-report-stop.sh on session end."
++    echo "Reflects per-day codex tokens (Claude tokens are tracked separately by /context)."
++    echo
++  } > "$LOG"
++fi
++# 同日の重複行があれば上書き、無ければ追記
++if grep -q "^- $TODAY" "$LOG" 2>/dev/null; then
++  # `sed -i "式" file` は BSD sed (macOS) で式がバックアップ拡張子として食われ失敗する。
++  # `-i.bak` + 削除なら GNU/BSD 両対応 (git-bash / macOS 共通)。
++  sed -i.bak "s|^- $TODAY.*|$LINE|" "$LOG"
++  rm -f "${LOG}.bak"
++else
++  echo "$LINE" >> "$LOG"
++fi
++# 冪等性キーを更新
++echo "$KEY" > "$LAST_KEY_FILE"
+ 
+ echo "[stop] codex usage today: $USED tokens / $INVS invocations (logged to $LOG)"
+ exit 0
+@@ -796,11 +918,27 @@
+ `CODEX_HOOKS_ENABLED=false` の場合 (Phase 5 skip 状態) は **本コマンドが settings.json テンプレートから Codex 関連ブロックを物理的に削除して書き出す**。「削除推奨」のような曖昧な指示にせず、生成時点でブロックを出さないか、自動削除する:
+ 
+ ```bash
++# jq ではなく python を使う (jq は macOS/git-bash で未導入なことがあり、
++# 不在時に「消したつもりで消えていない」状態を静かに作るため)
+ if [ "$CODEX_HOOKS_ENABLED" = "false" ]; then
+-  jq 'del(.hooks.PreToolUse[] | select(.matcher == "Bash" and (.hooks[].command | tostring | test("codex"))))
+-      | del(.hooks.Stop[].hooks[] | select(.command | tostring | test("token-report-stop")))' \
+-    .claude/settings.json > .claude/settings.json.tmp \
+-    && mv .claude/settings.json.tmp .claude/settings.json
++  python3 - <<'PY'
++import json
++p = '.claude/settings.json'
++d = json.load(open(p, encoding='utf-8'))
++hooks = d.get('hooks', {})
++
++
++def cmds(entry):
++    return ' '.join(str(h.get('command', '')) for h in entry.get('hooks', []))
++
++
++hooks['PreToolUse'] = [e for e in hooks.get('PreToolUse', []) if 'codex' not in cmds(e)]
++for e in hooks.get('Stop', []):
++    e['hooks'] = [h for h in e.get('hooks', [])
++                  if 'token-report-stop' not in str(h.get('command', ''))]
++hooks['Stop'] = [e for e in hooks.get('Stop', []) if e.get('hooks')]
++json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
++PY
+ fi
+ ```
+ 
+--- a/.claude/commands/commands_setup/verify-setup.md
++++ b/.claude/commands/commands_setup/verify-setup.md
+@@ -7,7 +7,7 @@
+   Codex ガード hook 群 / Codex 疎通テストを追加検証する。さらに AGENTS↔CLAUDE 同期検証と
+   ライセンス整合検証 (proprietary plugin 経路の漏れ確認) を行い、検証レポートを生成する。
+   /setup-hooks の完了後、または既存環境の健全性を確認したい時に実行する。
+-allowed-tools: Read, Glob, Grep, Bash(ls *), Bash(cat *), Bash(wc *), Bash(find *), Bash(grep *), Bash(jq *), Bash(codex *)
++allowed-tools: Read, Glob, Grep, Bash(ls *), Bash(cat *), Bash(wc *), Bash(find *), Bash(grep *), Bash(git ls-files *), Bash(python3 *), Bash(codex *)
+ ---
+ 
+ # /verify-setup — 環境構築の整合性検証
+@@ -282,8 +282,10 @@
+ 予算ファイルの正常性も検証:
+ 
+ ```bash
++# jq ではなく python で検証する (jq 未導入環境があるため。不在時に「検証したつもり」で
++# 通ってしまうのを避ける)
+ set +e
+-jq -e '.daily_token_budget and .per_invocation_max and .today.date' .codex/budget.json > /dev/null
++python3 -c "import json,sys; d=json.load(open('.codex/budget.json',encoding='utf-8')); sys.exit(0 if (d.get('daily_token_budget') and d.get('per_invocation_max') and d.get('today',{}).get('date')) else 1)"
+ BUDGET_OK=$?
+ set -e
+ if [ "$BUDGET_OK" -ne 0 ]; then
+@@ -339,11 +341,106 @@
+ - [ ] **Phase R1 完了時のみ**: `citation-ssot` の description / 本体に append-only・恒久 [n]・tombstone・再利用禁止が明記され、`docs/references.md` の採番ルールと一致しているか
+ - [ ] **Phase 5 完了時のみ**: `codex-consult` / `codex-review` / `codex-rescue` の 3 Skill が存在し、それぞれの責務分離 (設計相談 / diff レビュー / rescue 実装) が SKILL.md で明確か
+ - [ ] **Phase 5 完了時のみ**: `codex-consult` の入力が「公開可能な最小抜粋」に限定するルールが SKILL.md に記載されているか
+-- [ ] **Phase 5 完了時のみ**: `codex-review` 内部で予算チェック / proprietary・機密チェック / secrets-filter / atomic budget update (flock) が実装されているか
++- [ ] **Phase 5 完了時のみ**: `codex-review` 内部で予算チェック / proprietary・機密チェック / secrets-filter / 予算更新が実装されているか
++- [ ] **Phase 5 完了時のみ**: 予算更新が **`flock` / `jq` 非依存 (python の read-modify-write)** で実装されているか。
++      `flock` は macOS に無く、生成スクリプトは `set -e` 無しなので不在でも処理が続き、
++      **`tokens_used=0` を静かに記録して予算ガードを無効化する** (下記 Step 4.4 で機械的に検査)
+ - [ ] **Phase 5 完了時のみ**: 各 Skill が wrapper 経由 (`scripts/run-codex-*.sh`) を使い、`Bash(codex *)` 直接許可になっていないか
+ 
+ 問題のある Skill をリストアップ。
++
++### Step 4.4: Codex 連携ツールの移植性 / 実行ビット監査 (Phase 5 完了時のみ)
++
++**背景**: 過去に「壊れてもエラーが出ない」故障が 2 段構えで起きている。どちらも exit code は 0 で、
++**誰も気づかないまま 1 ヶ月以上放置**された。この 2 つは目視レビューでは見落とすので機械検査する。
++
++1. **実行ビット落ち** — `run-codex-*.sh` は `scripts/secrets-filter.sh < ...` の形で **直接実行**する
++   (`bash` 経由ではない)。実行ビットが無いと `Permission denied` → fail-closed で
++   Codex 連携が丸ごと無言で死ぬ。
++2. **`flock` / `jq` 依存** — `flock` は macOS に無い。生成スクリプトは `set -uo pipefail`
++   (= `set -e` 無し) なので `command not found` でも処理が継続し、続く `jq` が 0 を返して
++   `budget.json` に `tokens_used=0` が記録される = **予算ガードが実質無効**。
++
++```bash
++FAIL=0
++
++# (1) 直接実行される script に実行ビットがあるか (作業ツリー + git mode の両方)
++for f in scripts/secrets-filter.sh scripts/run-codex-review.sh scripts/run-codex-consult.sh; do
++  [ -f "$f" ] || continue
++  [ -x "$f" ] || { echo "FAIL: $f に実行ビットが無い (chmod +x)"; FAIL=1; }
++  MODE=$(git ls-files -s "$f" 2>/dev/null | cut -d' ' -f1)
++  if [ -n "$MODE" ] && [ "$MODE" != "100755" ]; then
++    echo "FAIL: $f の git mode が $MODE (git update-index --chmod=+x $f)"; FAIL=1
++  fi
++done
+ 
++# (2) codex 連携スクリプト / hook に flock・jq が「実コマンドとして」残っていないか
++#     (コメント・文字列中の言及は許容するため行頭/パイプ位置で判定)
++# SKILL.md も対象に含める。元のバグは codex-review SKILL.md 内の手順から広まった。
++for f in scripts/run-codex-*.sh .claude/hooks/codex-budget-guard.sh \
++         .claude/hooks/secrets-pre-filter.sh .claude/hooks/token-report-stop.sh \
++         .claude/skills/codex-review/SKILL.md .claude/skills/codex-consult/SKILL.md; do
++  [ -f "$f" ] || continue
++  if grep -nE '^[[:space:]]*(flock|jq)[[:space:]]|\|[[:space:]]*jq[[:space:]]' "$f"; then
++    echo "FAIL: $f が flock/jq を実コマンドとして使っている (python へ置換)"; FAIL=1
++  fi
++done
++
++# (3) 予算を書くスクリプトが python 検出 + 不在時 fail を持つか
++for f in scripts/run-codex-review.sh scripts/run-codex-consult.sh; do
++  [ -f "$f" ] || continue
++  grep -q 'command -v python3' "$f" \
++    || { echo "FAIL: $f に python 検出 (command -v python3) が無い"; FAIL=1; }
++done
++
++# (4) guard hook が fail-open していないか (パース失敗を || echo "0" で握っていないか)
++for f in .claude/hooks/codex-budget-guard.sh .claude/hooks/secrets-pre-filter.sh; do
++  [ -f "$f" ] || continue
++  # `|| echo "0"` だけでなく `|| echo ""` / `|| true` / `|| VAR=0` も同じ fail-open。
++  # 「無ければ既定値で続行してよい」ことが自明な 2 つだけ除外する:
++  #   PYTHON=$(command -v python3 || command -v python || true)
++  #   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
++  if grep -nE '\|\|[[:space:]]*(echo|true)' "$f" | grep -vE 'command -v|rev-parse'; then
++    echo "FAIL: $f がパース失敗を既定値へ縮退させている (fail-open。判定不能なら exit 2 にする)"; FAIL=1
++  fi
++  # 予算値を算術に渡す前に整数検証しているか (python が通っても bash 側で崩れると素通りする)
++  if grep -q 'BUDGET - USED' "$f" && ! grep -q '\*\[!0-9\]\*' "$f"; then
++    echo "FAIL: $f が \$((BUDGET - USED)) の前に整数検証をしていない (非整数で算術エラー → 素通り)"; FAIL=1
++  fi
++done
++
++# (5) トークン抽出が .type=="usage" 決め打ちでなく total_tokens 再帰探索 + WARN か
++for f in scripts/run-codex-review.sh scripts/run-codex-consult.sh; do
++  [ -f "$f" ] || continue
++  grep -q 'find_tokens' "$f" \
++    || { echo "FAIL: $f のトークン抽出が再帰探索 (find_tokens) になっていない"; FAIL=1; }
++  grep -q 'WARN: token usage not found' "$f" \
++    || { echo "FAIL: $f が token 未検出時に WARN を出さない (黙って 0 を記録する)"; FAIL=1; }
++done
++
++# (6) ゲートが `codex exec` 決め打ちになっていないか
++#     `codex e` (alias) / `codex review` / `codex --cd . exec` が素通りする
++for f in .claude/hooks/codex-budget-guard.sh .claude/hooks/secrets-pre-filter.sh; do
++  [ -f "$f" ] || continue
++  if grep -q "codex\[\[:space:\]\]+exec" "$f"; then
++    echo "FAIL: $f が 'codex exec' 決め打ち (codex e / codex review / オプション先行が素通り)"; FAIL=1
++  fi
++done
++
++# (7) 機密ゲートの終端クラスが空白と \" だけになっていないか
++#     `codex exec "$(cat .env)"` のような最も自然な書き方が素通りする
++if [ -f .claude/hooks/secrets-pre-filter.sh ]; then
++  if grep -q '\[\[:space:\]\]"\]' .claude/hooks/secrets-pre-filter.sh; then
++    echo "FAIL: secrets-pre-filter.sh の DENY 終端が狭い (コマンド置換内の参照が素通り)"; FAIL=1
++  fi
++fi
++
++[ "$FAIL" -eq 0 ] && echo "PASS: codex tooling portability OK"
++```
++
++FAIL が出たら `/setup-codex-bridge` / `/setup-hooks` のテンプレートを確認する
++(配備済みファイルがテンプレートから **ドリフト** している可能性もある — 両方見ること)。
++
+ ### Step 4.5: 手続き的 docs ↔ skill カバレッジ監査 (常時)
+ 
+ `docs/development-guidelines.md` と `docs/repository-structure.md` の **手続き的な節** が、すべて発火経路
+@@ -457,12 +554,17 @@
+ 
+ #### ファイル存在と権限
+ - [ ] `.claude/hooks/session-start.sh` が実行可能か (`-x` 権限)
+-- [ ] `.claude/hooks/preflight.sh` が存在し実行権限があるか
+-- [ ] `.claude/hooks/pre-edit-steering.sh` が存在し実行権限があるか
+-- [ ] `.claude/hooks/post-fmt.sh` が存在し実行権限があるか
+-- [ ] `.claude/hooks/stop-check.sh` が存在し実行権限があるか
+-- [ ] `.claude/hooks/pre-edit-banned.sh` が存在する場合、実行権限があるか
++- [ ] `.claude/hooks/preflight.sh` が存在するか
++- [ ] `.claude/hooks/pre-edit-steering.sh` が存在するか
++- [ ] `.claude/hooks/post-fmt.sh` が存在するか
++- [ ] `.claude/hooks/stop-check.sh` が存在するか
++- [ ] `.claude/hooks/pre-edit-banned.sh` が存在するか (任意)
+ 
++> **実行ビットについて**: `.claude/hooks/*.sh` は settings.json から `bash <path>` で
++> 起動されるため **実行ビットは不要** (mode 644 で正常)。実行ビットが要るのは
++> `scripts/secrets-filter.sh` のように**直接実行**されるものだけで、そちらは Step 4.4 (1) が
++> 作業ツリーと git mode の両方を検査する。ここでは存在確認のみ行う。
++
+ #### settings.json の構造
+ - [ ] JSON 構文が正しいか
+ - [ ] SessionStart, UserPromptSubmit, PreToolUse, Stop, PostToolUse の 5 種類の Hook があるか
+@@ -494,15 +596,16 @@
+ 
+ > **Skip 条件**: `.codex/budget.json` が存在しない場合 (Phase 5 skip) はこのサブセクション全体を skip。
+ 
+-- [ ] `.claude/hooks/codex-budget-guard.sh` が存在し実行権限があるか
+-- [ ] `.claude/hooks/secrets-pre-filter.sh` が存在し実行権限があるか
+-- [ ] `.claude/hooks/token-report-stop.sh` が存在し実行権限があるか
+-- [ ] `codex-budget-guard.sh` と `secrets-pre-filter.sh` が冒頭で `case "$COMMAND" in *codex*) ;; *) exit 0 ;;` の高速早期 exit を持つか (Bash 全発火対策)
++- [ ] `.claude/hooks/codex-budget-guard.sh` が存在するか (実行ビットは不要 — `bash` 経由起動)
++- [ ] `.claude/hooks/secrets-pre-filter.sh` が存在するか (実行ビットは不要 — `bash` 経由起動)
++- [ ] `.claude/hooks/token-report-stop.sh` が存在するか (実行ビットは不要 — `bash` 経由起動)
++- [ ] `codex-budget-guard.sh` と `secrets-pre-filter.sh` が冒頭で `case "$INPUT_JSON" in *codex*) ;; *) exit 0 ;;` の高速早期 exit を持つか (Bash 全発火対策。**JSON パース前**に判定することで、無関係な Bash 呼び出しで python を起動しない)
++- [ ] 同 2 hook が JSON パースに `jq` ではなく python を使い、パーサ不在時に **exit 2 (fail-closed)** となるか (Step 4.4 で機械検査)
+ - [ ] `secrets-pre-filter.sh` の DENY パターンが `docs/external-skills.md` の proprietary 拡張子と整合 (Step 2.6 で別途検証済)
+ - [ ] `token-report-stop.sh` が冪等性キー (`$TODAY:tokens=$USED:invs=$INVS`) で重複記録を防いでいるか
+ - [ ] settings.json に Bash matcher の PreToolUse ブロックが登録され、`codex-budget-guard.sh` と `secrets-pre-filter.sh` が呼ばれているか
+ - [ ] settings.json の Stop hook に `token-report-stop.sh` が追加されているか
+-- [ ] **Phase 5 skip 時**: settings.json から Codex 関連ブロックが削除されているか (`jq` で確認)
++- [ ] **Phase 5 skip 時**: settings.json から Codex 関連ブロックが削除されているか (python で確認)
+ 
+ ```bash
+ # Phase 5 skip 時の包括的な取り残し検出
+--- a/.claude/commands/commands_setup/setup-agents.md
++++ b/.claude/commands/commands_setup/setup-agents.md
+@@ -820,7 +820,7 @@
+ 
+ ### Step 5: トークン使用量の記録
+ 
+-`.codex/budget.json` の `tokens_used` 更新は `codex-review` Skill 内部で実施済 (atomic + flock)。本エージェントは追加更新しない。
++`.codex/budget.json` の `tokens_used` 更新は `codex-review` Skill 内部で実施済 (python の read-modify-write。`flock`/`jq` は macOS で不在になり静かに壊れるため使わない)。本エージェントは追加更新しない。
+ 
+ ## レポート形式
+ 
+--- a/.claude/commands/commands_setup/setup-skills.md
++++ b/.claude/commands/commands_setup/setup-skills.md
+@@ -391,7 +391,7 @@
+    - 両者が一致して指摘した問題 → 優先度高、即座に修正
+    - 一方しか指摘しない問題 → false positive 可能性を Claude が判定して採用/却下
+    - Codex のみが指摘した問題で実装に影響しないもの → 記録だけして却下
+-6. `.codex/budget.json` の `tokens_used` を更新 (codex-review Skill と同じ atomic update + flock)
++6. `.codex/budget.json` の `tokens_used` を更新 (codex-review Skill と同じ python の read-modify-write。`flock`/`jq` 非依存)
+ 7. `/tmp/skill-public-excerpt.md` を削除 (`trap` で確実に)
+ 
+ **Skip する場合**:
+--- a/.claude/commands/commands_setup/setup-commands.md
++++ b/.claude/commands/commands_setup/setup-commands.md
+@@ -956,7 +956,7 @@
+ 
+ ## トークン使用量の更新
+ 
+-`.codex/budget.json` の更新は `codex-review` Skill 内部で完結 (atomic + flock)。本コマンドは追加更新しない。
++`.codex/budget.json` の更新は `codex-review` Skill 内部で完結 (python の read-modify-write。`flock`/`jq` 非依存)。本コマンドは追加更新しない。
+ 
+ ## 関連
+ 

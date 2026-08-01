@@ -46,6 +46,11 @@ in_pem {
   skip_hunk = 0
   if ($0 ~ /\.(env|pem|key)([[:space:]]|$)/) skip_hunk = 1
   if ($0 ~ /credentials|secret/) skip_hunk = 1
+  # NDJSON セッションログ (キーストローク動態) は外部 LLM 送信禁止。
+  # 参加者の実データは gitignore で追跡外だが、追跡下の fixture
+  # (src-tauri/tests/fixtures/*.ndjson) は vk コード列を含み diff に乗る。
+  # 規約の単一真実源は docs/agent-shared.md / data-privacy Skill。
+  if ($0 ~ /\.ndjson([^A-Za-z0-9_]|$)/) skip_hunk = 1
   if ($0 ~ prop_re) skip_hunk = 1
   if (skip_hunk) {
     print "[secrets-filter] SKIPPED hunk: " $0
