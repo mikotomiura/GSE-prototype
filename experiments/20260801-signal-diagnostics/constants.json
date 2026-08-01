@@ -1,0 +1,31 @@
+{
+  "_note": "このファイルは extract_constants.py が Rust ソースから生成する。手で編集しない。",
+  "source": {
+    "engine": "src-tauri/src/analysis/engine.rs",
+    "features": "src-tauri/src/analysis/features.rs"
+  },
+  "kappa": 2.0,
+  "beta": {
+    "BETA_WRITING_F1": 100.0,
+    "BETA_WRITING_F3": 0.1,
+    "BETA_WRITING_F4": 2.5,
+    "BETA_WRITING_F5": 1.0,
+    "BETA_WRITING_F6": 0.12,
+    "BETA_CODING_F1": 150.0,
+    "BETA_CODING_F3": 0.06,
+    "BETA_CODING_F4": 5.0,
+    "BETA_CODING_F5": 2.0,
+    "BETA_CODING_F6": 0.08
+  },
+  "weights_x": {
+    "phi3": 0.3,
+    "phi6": 0.25,
+    "phi1": 0.25,
+    "phi5": 0.2
+  },
+  "weights_y": {
+    "phi4": 0.4,
+    "one_minus_phi1": 0.35,
+    "one_minus_phi5": 0.25
+  }
+}

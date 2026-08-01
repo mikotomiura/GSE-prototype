@@ -1,0 +1,39 @@
+{
+  "experiment": "20260801-signal-diagnostics",
+  "kind": "exploratory",
+  "purpose": ".idea/20260801-architecture-signal-and-online-learning.md §1 の実測値を再現可能にする",
+  "seed": 20260801,
+  "n_perm": 10000,
+  "permutation": {
+    "scheme": "within_subject_label_shuffle",
+    "rationale": "被験者間の絶対値差を帰無仮説に持ち込まないため。pooled シャッフルだと被験者間差が有意性を作る",
+    "p_value": "two_sided, |C-0.5| ベース, (hits+1)/(n_perm+1) 補正 (Phipson & Smyth 2010)",
+    "_note": "説明のみ。スキームは diagnostics.py の実装で固定 (被験者内シャッフル)"
+  },
+  "label_filter": {
+    "source": "random_probe",
+    "answered": true,
+    "note": "PreReg-6 の分母規約。self_marker 由来は主指標に入れない",
+    "_note": "diagnostics.py がこの値を実際に使う (説明だけではない)"
+  },
+  "hmm_version_expected": "0.3.0",
+  "constants_source": "extract_constants.py が engine.rs / features.rs から抽出 (constants.json)",
+  "diagnostics": {
+    "D1": "既存特徴量 → Q1/Q2 の C-index + 並べ替え検定",
+    "D2": "φ レール飽和率 (β_writing 固定 / ime_state 由来の実 β)",
+    "D3": "X の再計算と feat.raw_x との突合、項ごとの寄与",
+    "D4": "ICC(1) — f1/f3/f4/f5/f6 の個人差割合 (feat 全件)",
+    "D5": "収集済みだが未使用の信号 (paste / ime_dwell / keys / bs_rate) の C-index",
+    "D6": "ime_shadow.nav / .abandon の非ゼロ件数 (死んだフィールドの確認)",
+    "D7": "paste/1000打鍵 の被験者間比と paste=0 セッション比率"
+  },
+  "subjects": [
+    "P010",
+    "P011",
+    "P012",
+    "P013",
+    "P014"
+  ],
+  "_subjects_note": "diagnostics.py が実際に読み込んだ集合と照合し、不一致なら中止する (raw/ への混入検知)",
+  "hmm_version_expected_note": "diagnostics.py が入力の meta.hmm_version と照合し、不一致なら中止する"
+}
