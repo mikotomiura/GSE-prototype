@@ -159,3 +159,21 @@ main へのマージ前チェック:
 ## 関連する他の Skill
 
 - `architecture-rules` — ファイル追加時の mod.rs 更新ルール
+
+<!-- loop:begin -->
+## Loop worktree policy
+- **1 issue = 1 branch = 1 worktree = 1 PR**。混ぜない。
+- base branch は `_loop-config.json` / `LOOP_BASE_BRANCH` で pin。既定は origin/HEAD→main→master。
+- **dirty tree**: spawn 前に main checkout を commit/stash してクリーンに近づける (共有 index 事故防止)。
+- **remote 同期**: spawn 前に `git fetch origin <base>`。長命な worktree は定期的に base へ rebase。
+- **命名**: branch `loop/[id]-[short]` / worktree `../wt/[repo]-[id]-[short]`。
+- **stale cleanup**: merge 後は `scripts/loop-spawn.sh --cleanup [id]` で worktree remove + branch -d + prune。
+- **並行 resource 隔離** (`_loop-config.json.resource_isolation`):
+  - `per-worktree` → DB 名 / port を worktree ごとに分離 (例 `PORT=$((5432+id))`、schema/db 名に id 付与)。
+    GSE では Wall Server の待受ポート等が該当。
+  - `serialize` → resource-heavy な test は排他ロックで直列化 (同時実行数は budget.parallel 内でも 1)。
+    `gse-replay --snapshot` の対象ゴールデンが共有ファイルの場合はこちら。
+  - 共有 fixture の破壊を避けるため、隔離できない test は AC recheck 時のみ実行する。
+- この節は `.claude/commands/loop-issue.md` / `.claude/agents/loop-worker.md` / `scripts/loop-spawn.sh` /
+  `scripts/loop-run.sh` から参照される SSOT。二重化しない。
+<!-- loop:end -->

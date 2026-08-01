@@ -157,7 +157,19 @@
 
 ## 次に実行すべきコマンド
 
-`/verify-setup`（Phase 9・整合性検証・Codex 疎通含む・**Sonnet で可**）
+なし。Loop Engineering 統合 (L0–L7) は 2026-08-01 に全 phase 完了・L7 verify HEALTHY。
+日々の運用は `docs/loop-engineering.md` §3 (grill → to-issues → `/clear` → A/B/C 実行 → review → merge) に従う。
+月次メンテとして `/verify-loop-setup` を再実行し coverage drift を監視すること。
+
+> L0–L7 は 2026-08-01 完了。詳細は末尾の Loop 統合 phase チェックリストを参照。
+
+> Phase L0 は 2026-08-01 完了（full モード / 実行モード A+B+C / Codex enabled /
+> grilling は self-provided へ degrade）。
+
+> 基盤環境 (Phase 0–9) は 2026-06-16 に完了・verify HEALTHY。
+> 2026-08-01 に `/bootstrap` を再実行して環境チェックし直し、
+> 「基盤は再構築せず Loop 拡張へ進む」をユーザー確定。詳細は末尾の
+> 「Loop Engineering 拡張トラック」節を参照。
 
 ## 各コマンド実行前のチェックリスト
 
@@ -258,3 +270,215 @@
 - 旧体系の到達点: 旧 Phase 7 `/verify-setup` まで完了（HEALTHY 判定）
 - 旧体系で構築済み: docs 5点 / CLAUDE.md / Skill 11個 / agent 9個 / command 8個 / hook 6個
 - アドホックに存在していた Codex 化: `AGENTS.md`（旧スタイル）・`.codex/agents/*.toml`・`.codex/hooks/*.sh`（`.claude` のコピー）。新 Phase 5 で正式版に作り直す。
+
+---
+
+## 追補: 2026-08-01 環境ギャップ監査（`/bootstrap` 再実行）
+
+`/bootstrap` を再実行して環境チェックし直した。基盤 Phase 0–9 は 2026-06-16 完了・verify HEALTHY
+のため **再構築せず、不足箇所のみ追記モードで補修**することをユーザーが確定。
+
+### 監査で判明した状態（2026-06-16 以降のドリフト）
+
+| 領域 | 2026-06-16 時点 | 2026-08-01 実測 | 判定 |
+|---|---|---|---|
+| Skill | 自前 13 + Codex 3 | **19** (citation-ssot / literature-card / reproducibility-discipline / empirical-prompt-tuning が後日追加) | 進捗記録・CLAUDE.md 未反映だった |
+| Command | 8 + `/cross-review` | 10 (`/implement` 廃止版が残存) | `/literature-review` が**未実装**だった |
+| Agent | 10 | 10 | 一致 |
+| Hook | 8 | 9 (token-report-stop.sh) | 実体先行 |
+| docs | 5 + external-skills | **20** + `adr/` 8 + `architecture/` 3 + `literature/` 8 | リンクハブ未反映だった |
+| Research トラック | 進捗記録に **Phase R1 の行が無い** | research-positioning / references / experiment-tracking / literature/_index / experiments/ は**すべて実在** | 後付け構築（Post-Phase1 Epic1・PR #71–73）で成立済み。記録のみ欠落 |
+
+### Phase R1 の遡及記録
+
+- [x] **Phase R1: /setup-research-framing** — 研究トラック土台
+  - 状態: enabled（**コマンド経由ではなく Post-Phase1 Epic1 で実質構築**）
+  - 完了日時: 2026-07-25 前後（PR #71 / #72 / #73 で main 済み）
+  - 実在ファイル: `docs/research-positioning.md` / `docs/references.md`（P 名前空間 28 + V 名前空間）/
+    `docs/experiment-tracking.md` / `docs/literature/_index.md` + カード 7 本 / `experiments/`
+  - 追加で構築されていたもの: `docs/adr/` (ADR-001〜007) / `docs/architecture/` (v2 再設計)
+
+### 2026-08-01 に実施した補修（サーヴェイ関連＋発見性）
+
+1. **`/literature-review` を新規実装** (`.claude/commands/literature-review.md`)
+   — 3 箇所から参照されながら存在しなかった（research-positioning.md §3 / literature/_index.md /
+   literature-card SKILL.md）。過去 4 ラウンドの実運用手順（RQ の下位問い分解 → 多角探索 →
+   claim 抽出 → **敵対的 3 票検証・対称フィルタ・0-3 否決** → エビデンス温度
+   (`確定` / `PLAUSIBLE BUT UNPROVEN` / `判定不能`) → カード → references append-only →
+   _index 追記 → positioning 還元）を暗黙知からコマンドへ固定した。
+2. **CLAUDE.md** — Skill 表に「研究トラック Skill」節を追加（citation-ssot / literature-card /
+   reproducibility-discipline / empirical-prompt-tuning）+ implementation-workflow 行を追加。
+   コマンド一覧に `/cross-review` と `/literature-review`、agent 一覧に `cross-reviewer` を追加。
+3. **docs/agent-shared.md** — リンクハブに references.md / literature/_index.md /
+   experiment-tracking.md / adr/README.md / architecture/gse-v2-overview.md を追加。
+4. **dangling 参照の解消** — 「Phase 7 で追加される」表記を実在コマンドの記述へ更新
+   (literature-card SKILL.md / literature/_index.md / research-positioning.md)、
+   citation-ssot SKILL.md の関連節に `/literature-review` を追加。
+
+5. **`/implement` の削除**（ユーザー確定 2026-08-01）— 2026-04 に 3 分割され廃止済みの
+   14 行スタブ。`git rm .claude/commands/implement.md` で削除。併せて `finish-task.md` の
+   description 行 7（「/implement の完了後に必ず実行する」＝ Phase 1 で follow-up として
+   据え置かれていた最後の残存参照）を `/add-feature, /fix-bug, /refactor` へ修正。
+   → **コマンドは 10 本**（実装 9 + 研究 1）、`/implement` 参照はリポジトリ全体でゼロ。
+
+### 未処理（要ユーザー判断）
+- `docs/external-skills.md` の plugin 表は 2026-06-16 時点のもの。組み込み系
+  (dataviz / artifact-design 等) は未記載だが、送信可否ルール上の影響はない。
+
+<!-- loop:begin -->
+## Loop Engineering 統合
+
+- 状態: bootstrapped
+- 統合モード: **full**
+  - 根拠: `.claude/` 存在 ✓ / `.steering/_setup-progress.md` 存在 ✓ / `docs/agent-shared.md` 存在 ✓
+    （3 条件すべて充足。既存の thin-command / verify 慣習に乗せて統合する）
+- 開始日: 2026-08-01
+- 実行モード (L5 で確定): **A+B+C**（ユーザー確定 2026-08-01・既定どおり全採用）
+  - C を入れるため A も必須（C は `loop-issue` / `loop-spawn.sh` に依存）
+- CLAUDE.md loop 節: **appended** (2026-08-01 / L1)
+  - L0 時点の CLAUDE.md: **あり (128 行)** — 上限 150 に対し**残枠 22 行**。L1 の節 (≤20 行) は
+    収まるが余裕がないため、L1 は追記後に行数を再測定すること
+  - 追記後の実測: **148 行** (上限 150 以内・残枠 2 行)。以降 CLAUDE.md へ追記する phase は
+    **基盤側 (docs/agent-shared.md 等) への退避を先に検討**すること
+- Codex ゲート (L6): **enabled**（codex-cli 0.142.5 / 既存 `.codex/config.toml`・`budget.json`・
+  `scripts/secrets-filter.sh`・`run-codex-review.sh` を再利用。wrapper を複製しない）
+- grilling (L2): **self-provided**（Matt Pocock 外部 skill 未導入。installed_plugins =
+  rust-analyzer-lsp / example-skills / claude-api のみ → 自前 grilling / issue-slicing skill に degrade）
+- PR 連携: **gh-enabled**（gh 2.90.0）
+- 環境前提: claude 2.1.220（`/goal` 必須の 2.1.139 以上 ✓）/ git repo ✓
+
+> L0 時点で Loop 成果物は**皆無**（`docs/loop-engineering.md` / `.claude/commands/loop-issue.md` /
+> `loop-status.md` / `.claude/agents/loop-watchdog.md` / `scripts/loop-guard.sh` / `loop-spawn.sh` /
+> `loop-run.sh` すべて不在）。L0〜L7 のコマンドファイルは
+> `.claude/commands/commands_setup_research_inloop/` に配置済み。
+
+> ⚠ **モードC の 3 条件**（README §2.9）は L5 までに実測すること。GSE は `cargo test --workspace` と
+> `gse-replay --snapshot` という機械的 verify を既に持つため成立しやすいが、
+> ①events の writer を `loop-run.sh` 一元にする ②AC の検証コマンドが verify に載る
+> ③verify がベースラインで緑 ——のどれかが崩れると「客観に見えて無意味な緑/赤」を量産する。
+
+### Loop 統合 phase チェックリスト
+- [x] L0 /loop-bootstrap — 環境検出・モード判定（完了: 2026-08-01）
+- [x] L1 /setup-loop-docs — docs/loop-engineering.md ＋ steering テンプレ ＋ CLAUDE.md ポインタ節
+      (完了: 2026-08-01 / 追加成果物 `.steering/_template/loop-config.README.md` = JSON に書けない
+       README §2.3 の ⚠ 集 ＋ GSE 用 verify 置換の申し送り。coverage-map 登録は L7 に defer)
+- [x] L2 /setup-loop-grilling — grilling/issue-slicing(Opus) 自前版・start-task grill 化
+      (完了: 2026-08-01 / grilling engine 判定 = self-provided。証拠: `.claude/skills/`・
+       `~/.claude/skills/` に grilling/to-prd/to-issues 相当の SKILL.md が存在しないことを grep で確認。
+       成果物: `.claude/skills/grilling/SKILL.md`・`.claude/skills/issue-slicing/SKILL.md`
+       (共に model: Opus をプローズで明記)。`start-task.md` は Step 1「3 問ヒアリング」を
+       loop:begin/end マーカで REPLACE (追記のみ・既存 Step 1 本文は保持)。
+       issue-slicing は `docs/loop-engineering.md` の 7 基準を逐語埋め込み・自己検査 8 項目・
+       Allowed Files 交差表 / DAG 出力義務を保持。docs/external-skills.md への external 登録は
+       該当なし (self-provided のため)。)
+- [x] L3 /setup-loop-observability — events/board/loop-status (見える化コア)
+      (完了: 2026-08-01 / 成果物 `.claude/commands/loop-status.md`。events/board のデータモデルを
+       README §2.4/§2.5 準拠の CONTRACT として文書化 (逐語使用・増補なし)。writer 契約
+       (append-only・worker が絶対パスで main へ) と single-writer 契約 (`/loop-status` のみが
+       board を再描画) を明記。ダミー events (README §2.4 のサンプル 4 行) で smoke test を実施し、
+       `.steering/20260801-smoke-observability/` (検証用・確認後 rm -rf 済み) で
+       001 ✅ done / 002 🔄 running(test✗1) / 003 ⛔ blocked の board 描画を確認。
+       heartbeat の UTC 統一・N分前 算出も動作確認済み。既存ファイルの上書きなし)
+- [x] L4 /setup-loop-monitor — loop-watchdog(Haiku) ＋ loop-guard.sh ＋ hook-selfcheck.sh
+      (完了: 2026-08-01 / 成果物 `.claude/agents/loop-watchdog.md`(model: haiku・tools 限定・
+       parse常時＋recheck/done時のみ独立再実行・報告8行上限・board非書込)、
+       `.claude/hooks/loop-guard.sh`(fingerprint連続/attempt/token_ceiling・fail-safe・
+       main-root解決+worktreeブランチ束縛・selfcheck: safeマーカ付き)、
+       `.claude/hooks/hook-selfcheck.sh`(SessionStart・settings.json 登録済み全 hook を
+       静的検査+safe-smokeで毎セッション検証・常に exit 0)。settings.json への登録は
+       jq マージで idempotent/reversible (Stop に loop-guard.sh・SessionStart に
+       hook-selfcheck.sh を追加、既存 stop-check.sh/token-report-stop.sh/session-start.sh は保持)。
+       ⚠ 実装時に判明した既存慣習との差分: 本リポジトリの hook 登録は
+       `bash "$(git rev-parse --show-toplevel ...)/.claude/hooks/x.sh"` というラッパー形式のため、
+       README 原文の素朴な `grep -oE '[^[:space:]]+\.sh'` 抽出だと `.)/.claude/hooks/x.sh` という
+       壊れたパスになり全 hook が missing 扱いになるバグを実装中に検出。
+       `sed -E 's#.*(\.claude/hooks/|\.claude/commands/|scripts/)#\1#'` で正規化して修正済み
+       (`hook-selfcheck.sh` 内)。実行確認: `bash .claude/hooks/hook-selfcheck.sh` →
+       `[hookcheck] OK: 11 hooks healthy`。`loop-guard.sh` は非 loop worktree で
+       `[guard] PASS: not a loop worktree` を返すことを確認 (fail-safe)。)
+- [x] L5 /setup-loop-executor — [A] loop-issue ＋ loop-spawn.sh / [B] loop-orchestrate ＋ loop-worker / [C] loop-run.sh
+      (完了: 2026-08-01 / 実行モード A+B+C 全導入 (2026-08-01 確定どおり)。
+       [A] `.claude/commands/loop-issue.md` (薄い executor・full モードで実装骨格は
+       `implementation-workflow` skill に委譲・allowed-tools を GSE の cargo/npm スタックに合わせて
+       pytest/mypy/ruff から cargo test/clippy/check・npx tsc・npm run に置換)、
+       `scripts/loop-spawn.sh` (base 解決・dirty/stale・`--cleanup`・`--no-exec`、chmod +x)、
+       worktree ポリシーは `.claude/skills/git-workflow/SKILL.md` に `<!-- loop:begin/end -->` で
+       追記 (GIT_WF_OK=true につき SSOT を skill 側に集約、loop-issue/loop-worker/loop-run.sh は参照のみ)。
+       [B] `.claude/agents/loop-worker.md` (model: sonnet・subagent 制約明記・要約のみ返却)、
+       `.claude/commands/loop-orchestrate.md` (セッション境界ガード・DAG・既定並列 1・review ゲート Opus)。
+       [C] `scripts/loop-run.sh` (script が制御・events は exit code・chmod +x)。CLI フラグ/JSON
+       スキーマは `claude --version` = 2.1.220 で本コマンド文中の実測値と一致することを確認し
+       (`--help` で `--allowedTools`/`--max-budget-usd`/`--model`/`--output-format`/
+       `--permission-mode` の 6 択 `acceptEdits/auto/bypassPermissions/manual/dontAsk/plan`/
+       `-p`/`-w` の実在を再確認)、`--max-turns` 等 help 非掲載フラグの挙動 (subtype/usage.cache_*)
+       は既存の実測記録を再利用 (同一バージョンにつき live `claude -p` 再実験はコスト対効果が
+       無いと判断し省略)。fingerprint 抽出は cargo/npx tsc の診断書式 (`error[..]:`/`panicked at`/
+       `file:line:col:`) に対応する正規表現へ調整 (spec 既定は pytest/ruff 向けだったため)。
+       `.claude/settings.json` に `permissions.deny` を jq で idempotent 追加
+       (`git push`/`gh pr merge`/`git reset --hard`/`git rebase`/`sudo`/`rm -rf`/`chmod -R`)。
+       いずれも `bash -n` で構文検証済み。Grill Me 完了・アンチパターン一覧との突合せ済み。)
+- [x] L6 /setup-loop-codex — タスク境界 Codex ゲート (TASK-PRE / TASK-POST)
+      (完了: 2026-08-01 / bridge 検出済み (codex-cli 0.142.5・既存 codex-consult/codex-review skill・
+       run-codex-consult.sh/run-codex-review.sh・.codex/budget.json・secrets-filter.sh・/cross-review
+       すべて再利用・複製なし) につき skip せず配線。`docs/loop-engineering.md` に
+       `<!-- loop:codex:begin/end -->` で altitude 表 (issue ループ内=script/Haiku・
+       タスク境界前後=Codex gpt-5.5、~15x コスト根拠) ＋ TASK-PRE (codex-consult・設問 3 種固定・
+       保存先 `.steering/[task]/_codex-preplan.md`・助言扱い明記) を追記。
+       `.claude/commands/loop-issue.md` に同マーカで TASK-POST (全 issue 緑 + フル CI 後に 1 回・
+       既存 `/cross-review` 参照・secrets-filter 経由のフィルタ済み diff のみ・budget.json 尊重・
+       `/cross-review` 不在時は codex-review skill 直呼びに degrade) を追記。両ゲートとも
+       read-only・issue ループ内には配線せず。Grill Me 実施 (複製なし/read-only/marker 内/
+       advisory 明記/bridge 捏造なしを確認)。既存ファイルの上書きなし (追記のみ)。)
+- [x] L7 /verify-loop-setup — 整合性検証・coverage-map 登録
+  - 完了日時: 2026-08-01 17:29
+  - 検証結果: HEALTHY
+  - Codex ゲート(L6): enabled · grilling(L2): self-provided
+  - coverage-map drift: なし (procedural-docs-coverage: loop-engineering を本検証で新規登録)
+  - 修正が必要な項目: 1 件 (CRITICAL 0 / HIGH 0 / MEDIUM 0 / LOW 1)
+    LOW: loop-watchdog.md が呼び出し元 (loop-issue/loop-worker) を名指ししていない (discoverability のみ・機能的破綻なし)
+  - レポート: `.steering/_verify-loop-report-20260801.md`
+
+### 構築物の相互参照マップ (Loop 層・各 phase が追記)
+| 種別 | 名前 | 参照先 |
+|---|---|---|
+| skill | grilling | `.claude/skills/grilling/SKILL.md` |
+| skill | issue-slicing | `.claude/skills/issue-slicing/SKILL.md` |
+| command | start-task (grill 化) | `.claude/commands/start-task.md` (loop:begin/end 節) |
+| command | /loop-status | `.claude/commands/loop-status.md` → `_loop-board.md` 再描画 |
+| contract | `_loop-events.jsonl` | append-only・worker が絶対パスで main へ (README §2.4) |
+| contract | `_loop-board.md` | single-writer・`/loop-status` のみ再描画 (README §2.5) |
+| 経路 | grill → to-prd → to-issues | `.steering/[task]/issues/00X.md`
+  (テンプレ `.steering/_template/loop-issue.md`) + `.steering/[task]/_issue-plan.md` (DAG・交差表) |
+| Agent | loop-watchdog   | events(2.4)←parse/recheck ／ 上段: 意味判断(Haiku) |
+| Hook  | loop-guard.sh   | _loop-config.json(budget) → settings.json Stop 登録 ／ 下段: fingerprint/attempt/token |
+| Hook  | hook-selfcheck.sh | settings.json SessionStart 登録 ／ 毎セッション全 hook を検証 (静的＋safe smoke) |
+| command | `.claude/commands/loop-issue.md` | [A][C] docs/loop-engineering.md / _loop-config.json / loop-watchdog / test-runner |
+| script  | `scripts/loop-spawn.sh` | [A][C] git worktree ../wt/[repo]-[id]-[short] / --cleanup / --no-exec |
+| policy  | Loop worktree policy | `.claude/skills/git-workflow/SKILL.md` (loop:begin/end 節・SSOT) |
+| command | `.claude/commands/loop-orchestrate.md` | [B] issues/*.md の DAG / loop-worker / loop-status / code-reviewer |
+| agent   | `.claude/agents/loop-worker.md` (sonnet) | [B] docs/loop-engineering.md / test-runner / loop-watchdog / events_path |
+| script  | `scripts/loop-run.sh` | [C] _loop-config.json.headless / loop-spawn.sh --no-exec / claude -p /loop-issue / events_path |
+| settings | `.claude/settings.json` permissions.deny | [C] git push/reset --hard/rebase・sudo・rm -rf・chmod -R (allowlist の実質境界) |
+| Codex ゲート | TASK-PRE (codex-consult) | docs/loop-engineering.md ＜loop:codex＞ → .steering/[task]/_codex-preplan.md |
+| Codex ゲート | TASK-POST (/cross-review) | .claude/commands/loop-issue.md ＜loop:codex＞ → 既存 codex-review + code-reviewer |
+
+### procedural-docs-coverage: loop-engineering
+(L7 で登録・doc の実見出しと set-difference で drift 監査する。 L1 は defer 済み)
+
+| doc | 節 | 種別 | カバーする発火経路 (skill/agent/command/hook または docs-only) |
+|---|---|---|---|
+| loop-engineering | 目的 | docs-only | docs-only |
+| loop-engineering | 基本単位 | docs-only | docs-only |
+| loop-engineering | 原則 | 手続き | loop-issue + loop-worker + loop-watchdog (/goal 客観検証・トランスクリプト自己申告の打消し) |
+| loop-engineering | Done Condition (issue 完了の条件・すべて満たす) | 手続き | loop-watchdog (AC↔test 判定) + loop-run.sh (acceptance 段) |
+| loop-engineering | Stop Condition (即時停止し人にエスカレートする条件・いずれか) | 手続き | loop-guard.sh (fingerprint/attempt/token) |
+| loop-engineering | Budget 方針 | 手続き | loop-guard.sh + _loop-config.json.budget + loop-run.sh (token_ceiling 積算・cache 込み) |
+| loop-engineering | Events 語彙 (events.jsonl の event 値・全 10 種) | 手続き | loop-status (契約) + loop-worker/loop-run.sh (writer) |
+| loop-engineering | Board 状態機械 | 手続き | loop-status |
+| loop-engineering | モデル割当ポリシー | 手続き | .claude/agents/*.md の model: (L7 Step 2c が突き合わせ) |
+| loop-engineering | issue-slicing の基準 (7 条件) | 手続き | issue-slicing skill (Opus) |
+| loop-engineering | 実行モードとセッション境界 | 手続き | loop-orchestrate (境界ガード) + loop-spawn.sh / loop-run.sh + CLAUDE.md loop 節 |
+| loop-engineering | Codex ゲート (任意・タスク境界のみ) | 手続き | TASK-PRE: codex-consult skill → `.steering/[task]/_codex-preplan.md` / TASK-POST: `.claude/commands/loop-issue.md` ＜loop:codex＞ → `/cross-review` |
+| loop-engineering | TASK-PRE: issue 独立性の第二意見 (codex-consult, read-only) | 手続き | codex-consult skill (L6 enabled のため実配線・advisory) |
+| loop-engineering | 日常運用との対応 (README §3・再掲のみ・新規手順は作らない) | docs-only | docs-only <!-- coverage-ok: README §3 再掲のみ、新規手順を作らない節 --> |
+<!-- loop:end -->

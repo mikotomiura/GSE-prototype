@@ -90,7 +90,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 
 ## 3. 先行研究ランドスケープ (暫定)
 
-> ⚠️ 暫定地図。網羅精読は Phase 7 `/literature-review` の落合フォーマット深掘りに委ねる。詳細書誌は docs/references.md。
+> ⚠️ 暫定地図。網羅精読は `/literature-review` の落合フォーマット深掘りに委ねる。詳細書誌は docs/references.md。
 
 - **不便益 (Benefit of Inconvenience)** [P6]: 川上・内藤。利便性と便益を直交軸とみなす設計思想。GSE の介入哲学の源流。
 - **生産的苦闘 / 望ましい困難** [P12][P9]: Kapur の Productive Failure、Bjork の desirable difficulties。

@@ -4,7 +4,7 @@ description: >
   Step 3 で schema parity check (tier-3 workflow guard) が走り、
   src-tauri/src/schema_dto.rs または src-tauri/schema/current.json に変更がある場合は
   gse-dataset 側との JSON 意味同値を検証する。drift 検出時は Step 4 に進まず停止する。
-  /implement の完了後に必ず実行する。
+  /add-feature, /fix-bug, /refactor の完了後に必ず実行する。
 allowed-tools: Read, Write, Edit, Bash(git *), Bash(python scripts/check_schema_parity.py*), Bash(python3 scripts/check_schema_parity.py*), Task
 ---
 

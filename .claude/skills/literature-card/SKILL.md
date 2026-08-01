@@ -48,4 +48,6 @@ docs/literature/<YYYYMMDD>-<topic-slug>.md に保存し、_index.md の表に 1 
 
 ## 関連する他の Skill
 - citation-ssot — 出典登録で必ず併用
-- (Phase 7) /literature-review — 複数カードを一括生成する反復コマンド（本 skill のカード契約を踏襲）
+- `/literature-review` — サーヴェイ 1 ラウンド全体の実行コマンド（探索→敵対的 3 票検証→
+  複数カード一括生成→references 登録→_index 追記→positioning 還元）。本 skill のカード契約を踏襲する。
+  カード 1 枚を書くだけなら本 skill 単体でよい。

@@ -56,3 +56,4 @@ DOI/版/URL が未確認なら状態を `provisional` で登録し、確認後 `
 ## 関連する他の Skill
 - literature-card — 文献カード作成時に出典をここへ登録
 - reproducibility-discipline — 実験 notes の借用手法 [n] 登録
+- `/literature-review` — サーヴェイ 1 ラウンドを回すコマンド（Step 6 で本 skill を発火させる）

@@ -1,0 +1,178 @@
+# Loop Engineering — 単一 SSOT
+
+## 目的
+短い・検証可能・記録可能な issue 単位ループで、有界自律実行 (/goal) を
+worktree 隔離のもと安全に回す。人が目視できる監視ファイルを中核に置く。
+
+## 基本単位
+- task        : 1 つのまとまった開発目標 (例: add-user-auth)。1 retrospective に対応。
+- issue       : task を割った vertical slice。1 issue = 1 worktree = 1 PR 候補。
+- loop        : 1 issue に対する attempt の列 (execute → verify → done/stop)。
+- goal        : /goal による 1 セッションの有界自律実行 (executor)。
+- checkpoint  : events.jsonl の 1 状態遷移行 (attempt_start / test_fail / issue_done 等)。
+- retrospective: task 完了時の学習記録 (次ループへの入力)。
+
+## 原則
+1. **1 issue = 1 worktree = 1 PR 候補**。issue は vertical slice で切る (縦に薄く貫く)。
+2. **/goal は executor でありセッションにつき 1 回**。完了判定は fast model が
+   トランスクリプト基準で行い、テストを独立実行しない → 「done」は自己申告。
+   だから **客観検証 (exit code) を events.jsonl に別記録**し、重要 issue は
+   watchdog が独立再実行する。
+3. **grill を goal の前段に置く**。要件を adaptive に詰めてから issue 化・実行する。
+4. **worktree 隔離**。共有する監視ファイルは main checkout の絶対パス 1 か所に集約。
+   worktree 内 `.steering` に書くと他端末から見えない。
+
+## Done Condition (issue 完了の条件・すべて満たす)
+- [ ] Acceptance Criteria を全項目充足 (AC↔test マッピングで対応 test が緑)
+- [ ] test / typecheck / lint がすべて緑 (pin 済み verify コマンドの exit 0)
+- [ ] Execution Result に summary を記載 (PR 本文になる)
+- [ ] 未解決事項・既知の制約を明記
+- [ ] PR 説明 (背景・変更点・検証方法) を用意
+
+## Stop Condition (即時停止し人にエスカレートする条件・いずれか)
+- 要件が曖昧 (AC を確定できない)
+- scope 外の変更が必要になった (Allowed Files を超える)
+- 同一 failure が連続 (同一 fingerprint の反復)
+- 原因不明 (前進の見込みが立たない)
+- security に関わる判断が必要
+- 新規依存の追加が必要
+
+## Budget 方針
+- `max_attempts`           : 1 issue あたりの attempt 上限 (既定 6)。
+- `no_progress_threshold`  : 同一 fingerprint がこの回数連続したら停止 (既定 4)。
+- `token_ceiling`          : task 全体の token 上限 (既定 40,000,000)。
+- `parallel`               : 同時 worktree 数 (既定 3)。
+- **no-progress fingerprint**: `sha1(失敗test id + error種別 + file:line)`。
+  同一 fingerprint が連続すると loop-guard.sh が数え、budget 内でも停止する。
+
+## Events 語彙 (events.jsonl の event 値・全 10 種)
+`attempt_start` | `test_pass` | `test_fail` | `typecheck_fail` | `lint_fail` |
+`no_progress_stop` | `scope_violation` | `blocked` | `issue_done` | `abandoned`
+
+1 状態遷移 = 1 行 append (main checkout の絶対パスへ)。board は書かない。
+**writer はモードで変わる**: モードA/B = 各 worker セッション (LLM の申告) /
+モードC = `scripts/loop-run.sh` **だけ** (worker に書かせるとモードC の存在意義が消える)。
+
+## Board 状態機械
+`queued(⏳) → running(🔄) → verifying → review → done(✅)` / 逸脱 `blocked(⛔)` / 断念 `abandoned`。
+board は events を issue ごとに畳んだ (最終 event 優先) 表示。単一書き手 (dashboard 端末) のみ再描画。
+
+## モデル割当ポリシー
+**やり直しが効かない判断は Opus / やり直しが効く作業は Sonnet / 判断を含まない実行は Haiku。**
+誤りのコストで選ぶ。issue の切り方を誤ると全ループが正しい方向に無駄に回るので Opus。
+実装は verify で機械的に検出・再試行できるので Sonnet。verify 実行や parse は判断を含まないので Haiku。
+
+| 役割 | model | 根拠 |
+|---|---|---|
+| 設計判断・SSOT 設計・grill | Opus | 判断分岐を閉じる作業。やり直しが効かない |
+| issue-slicing (縦切り分解) | Opus | 切り方の誤りが最も高価 |
+| オーケストレーション (/loop-orchestrate) | Sonnet | 定型の制御。判断は gate に委譲 |
+| オーケストレーション (無人・loop-run.sh) | script (無料) | 簿記であり推論ではない。LLM に渡さない |
+| survey (探索・影響調査) | Sonnet | read-only・再実行可能 |
+| issue 実装 (worker / loop-worker) | Sonnet | verify が誤りを機械的に検出する |
+| verify 実行 (test-runner) | Haiku | exit code 回収のみ |
+| 監視 (loop-watchdog) | Haiku | parse ＋ 条件付き再実行 |
+| ガード (loop-guard.sh) | script | 無料・機械的 |
+| 統合レビュー (code-reviewer / security-checker) | Opus | 見逃しコストが高い |
+| 第二意見 (codex-consult / cross-review) | gpt-5.5 | 別 LLM の独立性が価値 |
+
+この表は `.claude/agents/*.md` の frontmatter `model:` と一致させる (L7 が drift を検出する)。
+
+## issue-slicing の基準 (7 条件)
+1. **縦切り**: 1 issue = 層を貫いて価値を 1 本通す。層別の横切り分割は禁止。
+2. **粒度**: `budget.max_attempts` (既定 6) 以内に緑にできる大きさ。目安 変更 ≤ 5 ファイル / ≤ 300 行 / AC 3〜7 項目。
+3. **独立性**: `## Allowed Files` 集合が交差しない issue だけが並列可能。交差するなら `## Dependencies` で直列化。
+4. **検証可能性**: AC は exit code か test 名で言える。AC↔test マッピングが空の issue は issue ではない。
+   さらに **その exit code を script が実際に回収できるか** (= `verify` / `acceptance` に載っているか) まで確認する。
+5. **verify_level**: AC 直結 / security / 公開 API / データ移行 / 課金 に触れるなら `recheck`。それ以外は `parse`。
+6. **DAG**: 依存は DAG。循環禁止。orchestrator は topological order で実行する。
+7. **単独 merge 可能性**: 単体 merge しても main が壊れない。1 issue = 1 PR 候補。
+
+分解の締めに slicer 自身が検査する: 単独 merge 可否 / 各 AC の test 名を今書けるか /
+Allowed Files 交差表を作ったか / DAG に循環がないか (最長 chain 何段か) /
+recheck を基準 5 で選別したか (全部 parse にしていないか) /
+**pin 済み verify の前提を変える issue を最初の単独ウェーブに置いたか** /
+**test/lint が無条件に緑になる issue に `acceptance.sh` を書いたか**。
+
+## 実行モードとセッション境界
+**分解セッションと実行セッションは必ず分ける。** `to-issues` 後に `/clear` し、新セッションで実行を始める。
+
+- 分解セッションには却下案・議論・暗黙の前提が残っており、そのまま実行すると
+  「issue に書いていない前提」を持ち込む。**issue ファイルだけを読んで実行が成立しないなら
+  issue-slicing が失敗している** — 新セッションはこの契約の検査装置。
+- モデルを Opus (分解) → Sonnet (実行制御) に切り替える自然な境界。
+- 分解セッションは既に context を消費しており、実行は長時間・多 subagent で context を食う。
+- `/goal` はセッションにつき 1 ゴール (モードA)。分解で消費していると起動できない。
+
+| | A: 手動 worktree 並列 | B: orchestrator ＋ subagent | C: script ＋ headless (無人) |
+|---|---|---|---|
+| 起動 | `loop-spawn.sh` → `/loop-issue` | `/loop-orchestrate` (新セッション) | `bash scripts/loop-run.sh <task>` |
+| 制御の主体 | 人 | LLM (Sonnet) | **script (決定論)** |
+| 隔離 | worktree で完全隔離 | 親と同一チェックアウト | worktree で完全隔離 |
+| 並列度 | `budget.parallel` (既定 3) | 既定 1 (直列) | `budget.parallel` (semaphore) |
+| スラッシュコマンド | ✅ | ❌ | ✅ (`claude -p "/loop-issue 001"`) |
+| loop-guard.sh | ✅ 発火 | ❌ 素通り | ✅ 発火 |
+| 有界化 | `/goal … or stop after N turns` | プロンプト内蔵ループ | `--max-turns` ＋ script の attempt ループ |
+| events の writer | 各セッション (LLM の申告) | worker subagent (LLM の申告) | **script (verify の exit code)** |
+| 停止手段 | guard ＋ watchdog ＋ 人 | LLM 二段 (弱い) | **script が数えて停止・kill 可** |
+| 向く場面 | 対話しながら進めたい | 手軽に試したい | **本命の自動化**・夜間・CI |
+
+**なぜ C が本命か**: オーケストレーションは「何回試したか / 同じ失敗か / 予算を超えたか」という
+**簿記**であって推論ではない。LLM に持たせると止める役がループの当事者になる (B の弱点)。
+C では制御がループの**外**にあり、events も自己申告ではなく exit code から作られるため、
+「done は自己申告」問題が構造的に消える。
+
+**ただし C の客観性は自動的には成立しない。次の 3 条件を満たした結果として出てくる**:
+①events を書くのは `loop-run.sh` だけ ②AC の検証コマンドが `verify` / `acceptance` に載っている
+③verify がベースラインで緑。どれかが崩れると「客観に見えて無意味な緑/赤」を量産する。
+
+**C の危険と既定**: 非対話で書き込みを許すので次を守る。
+worktree 隔離を必須 (main checkout で走らせない) / `headless.permission_mode` の既定は
+`acceptEdits` (全許可は worktree 隔離下で明示合意時のみ) / `budget.token_ceiling` を必ず設定し
+script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns` で有界化。
+
+**`claude -p` は完全なセッション**であり、機能が削られた実行ではない。だからカスタムスラッシュ
+コマンド・hook・settings.json・権限設定がすべて効き、worktree 内で `loop-guard.sh` が発火する。
+C は「script が外から数える」「hook が内から止める」の**二重の停止機構**を持つ唯一のモード。
+また 1 attempt = 1 新セッションなので、**セッション境界が構造的に保証される**。
+
+**新しい実行モードを初めて使う時は、最も安い issue 1 本を `parallel=1` で回して基盤を検証する。**
+`--dry-run` では権限・cwd 境界・hook 発火・契約の二重定義が観測できない (実測で 2 回空振り)。
+
+`_loop-config.json.mode` に `"A"` / `"B"` / `"C"` を pin する。
+**全モードで events / board / watchdog gate / Stop 条件の契約は同一**。変わるのは制御の主体だけ。
+
+<!-- loop:codex:begin -->
+## Codex ゲート (任意・タスク境界のみ)
+
+Codex はタスク境界の 2 点にだけ配置する。issue ループの内側 (毎 attempt・毎 issue) には
+入れない。マルチエージェント構成はトークンを ~15x 消費しうるため、coarse・低頻度・
+コスト有界に固定する。issue 内の意味判断は Haiku watchdog (安価) が担う。
+
+| 高度 | 担当 | model | 頻度 | 権限 |
+|---|---|---|---|---|
+| issue ループ内 (毎 attempt) | `loop-guard.sh` / `loop-watchdog` | script / Haiku | 高頻度・安価 | 監視・停止のみ |
+| **タスク境界 (前)** | `codex-consult` | gpt-5.5 | task 毎 1 回 | read-only |
+| **タスク境界 (後)** | `/cross-review` (codex-review ∥ code-reviewer) | gpt-5.5 ∥ Opus | task 毎 1 回 | read-only |
+
+### TASK-PRE: issue 独立性の第二意見 (codex-consult, read-only)
+grill → /start-task → /to-prd → /to-issues で issue が確定した**直後**、
+実行 (loop-issue) を始める**前**に、1 回だけ実行する:
+
+1. issue 一覧の公開可能な最小抜粋 (各 issue の Goal / Scope In-Out / Allowed Files /
+   Dependencies / AC↔test) を整形する。internal 名称は仮名化。
+2. 既存 `codex-consult` skill を起動 (内部で `scripts/run-codex-consult.sh` が
+   secrets-filter + budget チェックを実施。read-only)。設問を固定する:
+   - これらの issue は**本当に独立/並列化可能**か。隠れた共有状態・暗黙の順序依存は無いか。
+   - 抜けている**エッジケース**は何か。
+   - **順序ハザード** (先行 merge が後続の前提を壊す、schema/API の破壊的変更順) は無いか。
+   - vertical slice の切り方に、後で衝突する分割はないか。
+3. Codex の応答を `.steering/[YYYYMMDD]-[task]/_codex-preplan.md` に保存する。
+4. **これは助言**。採否は人が決める。盲点は issue/Dependencies に反映し、
+   誤検知 (Codex は文脈の半分しか持たない) は却下理由を preplan に併記する。
+
+### 日常運用との対応 (README §3・再掲のみ・新規手順は作らない)
+- 端末0 の計画時: `/to-issues` 直後に「必要なら TASK-PRE (codex-consult) で issue 独立性を第二意見」。
+- 全 issue 緑: 「TASK-POST (/cross-review) → 統合フル CI 確認 → merge → retrospective」
+  (TASK-POST の手順は `.claude/commands/loop-issue.md` ＜loop:codex＞ 節を参照)。
+<!-- loop:codex:end -->
