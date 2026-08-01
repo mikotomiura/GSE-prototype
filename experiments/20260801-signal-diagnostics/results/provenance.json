@@ -1,6 +1,6 @@
 {
   "_note": "run.sh が実行のたびに生成する。手で編集しない。",
-  "repo_commit": "c48bdcc3110c705bc374635ec67645cac38a3614",
+  "repo_commit": "7605c6cecb61a375cb640d214c281f42c46d4c5d",
   "dataset_commit": "c2f960c0b9a04778e616dbd212517c65a76f132c",
   "cargo_lock_sha256": "f45b5eb438beacf39092b1299a10fdfaca09dbd2586f1caaf9ddee68a43b8c46",
   "python_version": "3.14.4",

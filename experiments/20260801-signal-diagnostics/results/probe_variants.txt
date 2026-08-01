@@ -1,0 +1,277 @@
+########## probe_variants — notes.md §1 未解決 3 件の候補定義 総当たり
+(調査用スクリプト。本体 diagnostics.py の結果は変えない)
+
+========== P1: `.idea` §1.1「並べ替え検定 68 件」のセル数定義
+17 特徴量 × 5 被験者 × 2 ターゲット = 170 セル / 算出可能 148
+算出不能セル: 22 件
+    bs_rate/P013/Q1(n=3,lv=1)
+    ewma_x/P013/Q1(n=7,lv=1)
+    ewma_y/P013/Q1(n=7,lv=1)
+    f1/P013/Q1(n=7,lv=1)
+    f3/P013/Q1(n=7,lv=1)
+    f4/P013/Q1(n=7,lv=1)
+    f5/P013/Q1(n=7,lv=1)
+    f6/P013/Q1(n=7,lv=1)
+    ime_dwell_med/P012/Q1(n=0,lv=0)
+    ime_dwell_med/P012/Q2(n=0,lv=0)
+    ime_dwell_med/P013/Q1(n=1,lv=1)
+    ime_dwell_med/P013/Q2(n=1,lv=1)
+    ime_dwell_med/P014/Q1(n=0,lv=0)
+    ime_dwell_med/P014/Q2(n=0,lv=0)
+    keys/P013/Q1(n=7,lv=1)
+    p_flow/P013/Q1(n=7,lv=1)
+    p_inc/P013/Q1(n=7,lv=1)
+    p_stuck/P013/Q1(n=7,lv=1)
+    paste_chars/P013/Q1(n=7,lv=1)
+    paste_count/P013/Q1(n=7,lv=1)
+    raw_x/P013/Q1(n=7,lv=1)
+    raw_y/P013/Q1(n=7,lv=1)
+
+-- 名前付き集合の総当たり 648 通り中、68 になったもの: 10 件 --
+特徴量セット                            被験者             ターゲット     数え方           pooled  
+all17 (orig12 + extra5)           drop_P010 (4名)  Q1のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P010 (4名)  Q2のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P011 (4名)  Q1のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P011 (4名)  Q2のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P012 (4名)  Q1のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P012 (4名)  Q2のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P013 (4名)  Q1のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P013 (4名)  Q2のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P014 (4名)  Q1のみ      全セル           なし      
+all17 (orig12 + extra5)           drop_P014 (4名)  Q2のみ      全セル           なし      
+
+-- 構造的な解 (「全セル」で数える場合、count = |F|·|S|·|T| (+pooled なら |F|·|T|)) --
+   ※ 中身に依らず個数だけで決まるので、この式の整数解が候補の全体になる
+    |F|= 17  |S|=1  |T|=2  pooled=あり
+    |F|= 17  |S|=2  |T|=2  pooled=なし
+    |F|= 17  |S|=3  |T|=1  pooled=あり
+    |F|= 17  |S|=4  |T|=1  pooled=なし
+    |F|= 34  |S|=1  |T|=1  pooled=あり
+    |F|= 34  |S|=1  |T|=2  pooled=なし
+    |F|= 34  |S|=2  |T|=1  pooled=なし
+
+========== P2: `.idea` §1.3「実 X と 0.25·φ(F1) の相関 r=0.78」
+スケール不変性の確認: r(x_logged, 0.25·φ1)=0.763036 / r(x_logged, φ1)=0.763036 → 同一=True
+-- 総当たり 640 通り中、|r − 0.78| < 0.005 になったもの --
+   φ(F1) 項に限る: 1 件 / 全項: 7 件
+   φ(F1) の次点 (判定域外): x_recalc_writing × r_f1 pearson pooled r=0.7747 (|Δ|=0.0053) — 判定域を広げても一意性がすぐ崩れないかの目安
+
+scope               X                   項         相関        集約                         r       n
+feat全件              x_logged            r_f3      pearson   被験者ごとの平均              0.7788       5
+feat全件              x_recalc_writing    w_f1      pearson   pooled                0.7798  124517 ★
+feat全件              x_recalc_writing    w_f6      pearson   pooled                0.7807  124517
+feat全件              x_real              r_f3      pearson   被験者ごとの平均              0.7791       5
+feat全件              ewma_x              r_f3      pearson   pooled                0.7829  124517
+feat全件              ewma_x              r_f3      pearson   被験者ごとの平均              0.7763       5
+ラベル窓集約(n=200)       x_recalc_writing    w_f3      pearson   被験者ごとの平均               0.775       5
+
+-- 参考: φ(F1) 項の全変種 --
+scope               X                   項         相関        集約                         r       n
+feat全件              x_logged            w_f1      pearson   pooled                 0.763  124517
+feat全件              x_logged            w_f1      pearson   被験者ごとの平均              0.6988       5
+feat全件              x_logged            w_f1      pearson   被験者ごとの平均 (Fisher z)    0.713       5
+feat全件              x_logged            w_f1      pearson   セッションごとの平均            0.6608      40
+feat全件              x_logged            w_f1      pearson   セッションごとの平均 (Fisher z)  0.7227      40
+feat全件              x_logged            w_f1      spearman  pooled                0.6729  124517
+feat全件              x_logged            w_f1      spearman  被験者ごとの平均              0.6361       5
+feat全件              x_logged            w_f1      spearman  被験者ごとの平均 (Fisher z)   0.6524       5
+feat全件              x_logged            w_f1      spearman  セッションごとの平均            0.5647      40
+feat全件              x_logged            w_f1      spearman  セッションごとの平均 (Fisher z)  0.6407      40
+feat全件              x_logged            r_f1      pearson   pooled                 0.761  124517
+feat全件              x_logged            r_f1      pearson   被験者ごとの平均              0.6901       5
+feat全件              x_logged            r_f1      pearson   被験者ごとの平均 (Fisher z)   0.7064       5
+feat全件              x_logged            r_f1      pearson   セッションごとの平均            0.6576      40
+feat全件              x_logged            r_f1      pearson   セッションごとの平均 (Fisher z)  0.7248      40
+feat全件              x_logged            r_f1      spearman  pooled                 0.676  124517
+feat全件              x_logged            r_f1      spearman  被験者ごとの平均              0.6304       5
+feat全件              x_logged            r_f1      spearman  被験者ごとの平均 (Fisher z)    0.649       5
+feat全件              x_logged            r_f1      spearman  セッションごとの平均             0.575      40
+feat全件              x_logged            r_f1      spearman  セッションごとの平均 (Fisher z)  0.6533      40
+feat全件              x_recalc_writing    w_f1      pearson   pooled                0.7798  124517
+feat全件              x_recalc_writing    w_f1      pearson   被験者ごとの平均               0.721       5
+feat全件              x_recalc_writing    w_f1      pearson   被験者ごとの平均 (Fisher z)   0.7346       5
+feat全件              x_recalc_writing    w_f1      pearson   セッションごとの平均            0.6869      40
+feat全件              x_recalc_writing    w_f1      pearson   セッションごとの平均 (Fisher z)  0.7432      40
+feat全件              x_recalc_writing    w_f1      spearman  pooled                0.7097  124517
+feat全件              x_recalc_writing    w_f1      spearman  被験者ごとの平均              0.6789       5
+feat全件              x_recalc_writing    w_f1      spearman  被験者ごとの平均 (Fisher z)   0.6958       5
+feat全件              x_recalc_writing    w_f1      spearman  セッションごとの平均             0.611      40
+feat全件              x_recalc_writing    w_f1      spearman  セッションごとの平均 (Fisher z)  0.6806      40
+feat全件              x_recalc_writing    r_f1      pearson   pooled                0.7747  124517
+feat全件              x_recalc_writing    r_f1      pearson   被験者ごとの平均              0.7085       5
+feat全件              x_recalc_writing    r_f1      pearson   被験者ごとの平均 (Fisher z)   0.7236       5
+feat全件              x_recalc_writing    r_f1      pearson   セッションごとの平均            0.6747      40
+feat全件              x_recalc_writing    r_f1      pearson   セッションごとの平均 (Fisher z)  0.7375      40
+feat全件              x_recalc_writing    r_f1      spearman  pooled                0.6895  124517
+feat全件              x_recalc_writing    r_f1      spearman  被験者ごとの平均               0.647       5
+feat全件              x_recalc_writing    r_f1      spearman  被験者ごとの平均 (Fisher z)    0.666       5
+feat全件              x_recalc_writing    r_f1      spearman  セッションごとの平均            0.5854      40
+feat全件              x_recalc_writing    r_f1      spearman  セッションごとの平均 (Fisher z)   0.655      40
+feat全件              x_real              w_f1      pearson   pooled                0.7629  124517
+feat全件              x_real              w_f1      pearson   被験者ごとの平均              0.6985       5
+feat全件              x_real              w_f1      pearson   被験者ごとの平均 (Fisher z)   0.7128       5
+feat全件              x_real              w_f1      pearson   セッションごとの平均            0.6604      40
+feat全件              x_real              w_f1      pearson   セッションごとの平均 (Fisher z)  0.7225      40
+feat全件              x_real              w_f1      spearman  pooled                0.6722  124517
+feat全件              x_real              w_f1      spearman  被験者ごとの平均              0.6357       5
+feat全件              x_real              w_f1      spearman  被験者ごとの平均 (Fisher z)   0.6521       5
+feat全件              x_real              w_f1      spearman  セッションごとの平均            0.5642      40
+feat全件              x_real              w_f1      spearman  セッションごとの平均 (Fisher z)  0.6401      40
+feat全件              x_real              r_f1      pearson   pooled                0.7609  124517
+feat全件              x_real              r_f1      pearson   被験者ごとの平均              0.6898       5
+feat全件              x_real              r_f1      pearson   被験者ごとの平均 (Fisher z)   0.7062       5
+feat全件              x_real              r_f1      pearson   セッションごとの平均            0.6573      40
+feat全件              x_real              r_f1      pearson   セッションごとの平均 (Fisher z)  0.7246      40
+feat全件              x_real              r_f1      spearman  pooled                0.6754  124517
+feat全件              x_real              r_f1      spearman  被験者ごとの平均              0.6301       5
+feat全件              x_real              r_f1      spearman  被験者ごとの平均 (Fisher z)   0.6487       5
+feat全件              x_real              r_f1      spearman  セッションごとの平均            0.5746      40
+feat全件              x_real              r_f1      spearman  セッションごとの平均 (Fisher z)  0.6529      40
+feat全件              ewma_x              w_f1      pearson   pooled                0.7578  124517
+feat全件              ewma_x              w_f1      pearson   被験者ごとの平均              0.6837       5
+feat全件              ewma_x              w_f1      pearson   被験者ごとの平均 (Fisher z)   0.7004       5
+feat全件              ewma_x              w_f1      pearson   セッションごとの平均            0.6328      40
+feat全件              ewma_x              w_f1      pearson   セッションごとの平均 (Fisher z)  0.6978      40
+feat全件              ewma_x              w_f1      spearman  pooled                0.6592  124517
+feat全件              ewma_x              w_f1      spearman  被験者ごとの平均              0.6211       5
+feat全件              ewma_x              w_f1      spearman  被験者ごとの平均 (Fisher z)   0.6362       5
+feat全件              ewma_x              w_f1      spearman  セッションごとの平均            0.5449      40
+feat全件              ewma_x              w_f1      spearman  セッションごとの平均 (Fisher z)  0.6084      40
+feat全件              ewma_x              r_f1      pearson   pooled                0.7554  124517
+feat全件              ewma_x              r_f1      pearson   被験者ごとの平均               0.675       5
+feat全件              ewma_x              r_f1      pearson   被験者ごとの平均 (Fisher z)   0.6937       5
+feat全件              ewma_x              r_f1      pearson   セッションごとの平均            0.6293      40
+feat全件              ewma_x              r_f1      pearson   セッションごとの平均 (Fisher z)  0.6993      40
+feat全件              ewma_x              r_f1      spearman  pooled                0.6583  124517
+feat全件              ewma_x              r_f1      spearman  被験者ごとの平均              0.6117       5
+feat全件              ewma_x              r_f1      spearman  被験者ごとの平均 (Fisher z)   0.6287       5
+feat全件              ewma_x              r_f1      spearman  セッションごとの平均            0.5484      40
+feat全件              ewma_x              r_f1      spearman  セッションごとの平均 (Fisher z)  0.6129      40
+ラベル窓集約(n=200)       x_logged            w_f1      pearson   pooled                0.7478     200
+ラベル窓集約(n=200)       x_logged            w_f1      pearson   被験者ごとの平均              0.7478       5
+ラベル窓集約(n=200)       x_logged            w_f1      pearson   被験者ごとの平均 (Fisher z)   0.8072       5
+ラベル窓集約(n=200)       x_logged            w_f1      pearson   セッションごとの平均            0.7108      29
+ラベル窓集約(n=200)       x_logged            w_f1      pearson   セッションごとの平均 (Fisher z)  0.9869      29
+ラベル窓集約(n=200)       x_logged            w_f1      spearman  pooled                0.6247     200
+ラベル窓集約(n=200)       x_logged            w_f1      spearman  被験者ごとの平均              0.6418       5
+ラベル窓集約(n=200)       x_logged            w_f1      spearman  被験者ごとの平均 (Fisher z)   0.7372       5
+ラベル窓集約(n=200)       x_logged            w_f1      spearman  セッションごとの平均            0.6482      29
+ラベル窓集約(n=200)       x_logged            w_f1      spearman  セッションごとの平均 (Fisher z)  0.9907      29
+ラベル窓集約(n=200)       x_logged            r_f1      pearson   pooled                0.7542     200
+ラベル窓集約(n=200)       x_logged            r_f1      pearson   被験者ごとの平均              0.7497       5
+ラベル窓集約(n=200)       x_logged            r_f1      pearson   被験者ごとの平均 (Fisher z)   0.8084       5
+ラベル窓集約(n=200)       x_logged            r_f1      pearson   セッションごとの平均            0.6299      29
+ラベル窓集約(n=200)       x_logged            r_f1      pearson   セッションごとの平均 (Fisher z)  0.9923      29
+ラベル窓集約(n=200)       x_logged            r_f1      spearman  pooled                0.6179     200
+ラベル窓集約(n=200)       x_logged            r_f1      spearman  被験者ごとの平均              0.6213       5
+ラベル窓集約(n=200)       x_logged            r_f1      spearman  被験者ごとの平均 (Fisher z)   0.7214       5
+ラベル窓集約(n=200)       x_logged            r_f1      spearman  セッションごとの平均            0.5922      29
+ラベル窓集約(n=200)       x_logged            r_f1      spearman  セッションごとの平均 (Fisher z)  0.9948      29
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      pearson   pooled                0.7688     200
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      pearson   被験者ごとの平均              0.7706       5
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      pearson   被験者ごとの平均 (Fisher z)   0.8232       5
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      pearson   セッションごとの平均            0.7579      29
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      pearson   セッションごとの平均 (Fisher z)  0.9889      29
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      spearman  pooled                0.6462     200
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      spearman  被験者ごとの平均              0.6843       5
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      spearman  被験者ごとの平均 (Fisher z)     0.77       5
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      spearman  セッションごとの平均            0.6846      29
+ラベル窓集約(n=200)       x_recalc_writing    w_f1      spearman  セッションごとの平均 (Fisher z)  0.9962      29
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      pearson   pooled                0.7711     200
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      pearson   被験者ごとの平均              0.7694       5
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      pearson   被験者ごとの平均 (Fisher z)   0.8223       5
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      pearson   セッションごとの平均            0.6765      29
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      pearson   セッションごとの平均 (Fisher z)  0.9853      29
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      spearman  pooled                 0.617     200
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      spearman  被験者ごとの平均              0.6456       5
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      spearman  被験者ごとの平均 (Fisher z)   0.7368       5
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      spearman  セッションごとの平均            0.6043      29
+ラベル窓集約(n=200)       x_recalc_writing    r_f1      spearman  セッションごとの平均 (Fisher z)  0.9882      29
+ラベル窓集約(n=200)       x_real              w_f1      pearson   pooled                0.7477     200
+ラベル窓集約(n=200)       x_real              w_f1      pearson   被験者ごとの平均              0.7479       5
+ラベル窓集約(n=200)       x_real              w_f1      pearson   被験者ごとの平均 (Fisher z)   0.8073       5
+ラベル窓集約(n=200)       x_real              w_f1      pearson   セッションごとの平均            0.7106      29
+ラベル窓集約(n=200)       x_real              w_f1      pearson   セッションごとの平均 (Fisher z)  0.9869      29
+ラベル窓集約(n=200)       x_real              w_f1      spearman  pooled                0.6246     200
+ラベル窓集約(n=200)       x_real              w_f1      spearman  被験者ごとの平均              0.6404       5
+ラベル窓集約(n=200)       x_real              w_f1      spearman  被験者ごとの平均 (Fisher z)   0.7365       5
+ラベル窓集約(n=200)       x_real              w_f1      spearman  セッションごとの平均            0.6467      29
+ラベル窓集約(n=200)       x_real              w_f1      spearman  セッションごとの平均 (Fisher z)  0.9906      29
+ラベル窓集約(n=200)       x_real              r_f1      pearson   pooled                0.7542     200
+ラベル窓集約(n=200)       x_real              r_f1      pearson   被験者ごとの平均              0.7498       5
+ラベル窓集約(n=200)       x_real              r_f1      pearson   被験者ごとの平均 (Fisher z)   0.8085       5
+ラベル窓集約(n=200)       x_real              r_f1      pearson   セッションごとの平均            0.6295      29
+ラベル窓集約(n=200)       x_real              r_f1      pearson   セッションごとの平均 (Fisher z)  0.9922      29
+ラベル窓集約(n=200)       x_real              r_f1      spearman  pooled                 0.618     200
+ラベル窓集約(n=200)       x_real              r_f1      spearman  被験者ごとの平均              0.6198       5
+ラベル窓集約(n=200)       x_real              r_f1      spearman  被験者ごとの平均 (Fisher z)   0.7206       5
+ラベル窓集約(n=200)       x_real              r_f1      spearman  セッションごとの平均            0.5906      29
+ラベル窓集約(n=200)       x_real              r_f1      spearman  セッションごとの平均 (Fisher z)  0.9948      29
+ラベル窓集約(n=200)       ewma_x              w_f1      pearson   pooled                 0.754     200
+ラベル窓集約(n=200)       ewma_x              w_f1      pearson   被験者ごとの平均              0.7433       5
+ラベル窓集約(n=200)       ewma_x              w_f1      pearson   被験者ごとの平均 (Fisher z)    0.805       5
+ラベル窓集約(n=200)       ewma_x              w_f1      pearson   セッションごとの平均            0.7182      29
+ラベル窓集約(n=200)       ewma_x              w_f1      pearson   セッションごとの平均 (Fisher z)  0.9843      29
+ラベル窓集約(n=200)       ewma_x              w_f1      spearman  pooled                0.5949     200
+ラベル窓集約(n=200)       ewma_x              w_f1      spearman  被験者ごとの平均               0.599       5
+ラベル窓集約(n=200)       ewma_x              w_f1      spearman  被験者ごとの平均 (Fisher z)    0.666       5
+ラベル窓集約(n=200)       ewma_x              w_f1      spearman  セッションごとの平均            0.6204      29
+ラベル窓集約(n=200)       ewma_x              w_f1      spearman  セッションごとの平均 (Fisher z)  0.9981      29
+ラベル窓集約(n=200)       ewma_x              r_f1      pearson   pooled                0.7566     200
+ラベル窓集約(n=200)       ewma_x              r_f1      pearson   被験者ごとの平均              0.7426       5
+ラベル窓集約(n=200)       ewma_x              r_f1      pearson   被験者ごとの平均 (Fisher z)   0.8044       5
+ラベル窓集約(n=200)       ewma_x              r_f1      pearson   セッションごとの平均            0.6276      29
+ラベル窓集約(n=200)       ewma_x              r_f1      pearson   セッションごとの平均 (Fisher z)  0.9779      29
+ラベル窓集約(n=200)       ewma_x              r_f1      spearman  pooled                0.5925     200
+ラベル窓集約(n=200)       ewma_x              r_f1      spearman  被験者ごとの平均              0.5772       5
+ラベル窓集約(n=200)       ewma_x              r_f1      spearman  被験者ごとの平均 (Fisher z)   0.6489       5
+ラベル窓集約(n=200)       ewma_x              r_f1      spearman  セッションごとの平均              0.55      29
+ラベル窓集約(n=200)       ewma_x              r_f1      spearman  セッションごとの平均 (Fisher z)  0.9945      29
+
+========== P3: `.idea` §1.4 の ICC (f1=0.060 f3=0.055 f4=0.159 f5=0.156)
+総当たり 336 通り (式 × 前処理 × 被験者集合)
+3 桁完全一致: 2 件
+    ★ η² = SSB/SST / feat全件 [現行] / all5 → {'f1': 0.0602, 'f3': 0.0551, 'f4': 0.1591, 'f5': 0.1557, 'f6': 0.0688}
+    ★ ω² (バイアス補正η²) / feat全件 [現行] / all5 → {'f1': 0.0602, 'f3': 0.0551, 'f4': 0.159, 'f5': 0.1557, 'f6': 0.0688}
+
+-- `.idea` に近い順 上位 15 --
+式                           前処理                     被験者              最大差  ICC
+η² = SSB/SST                feat全件 [現行]             all5          0.0003  f1=0.0602 f3=0.0551 f4=0.1591 f5=0.1557 f6=0.0688
+ω² (バイアス補正η²)               feat全件 [現行]             all5          0.0003  f1=0.0602 f3=0.0551 f4=0.159 f5=0.1557 f6=0.0688
+η² = SSB/SST                feat全件 [現行]             drop_P012     0.0095  f1=0.0622 f3=0.0551 f4=0.1621 f5=0.1655 f6=0.0721
+ω² (バイアス補正η²)               feat全件 [現行]             drop_P012     0.0095  f1=0.0621 f3=0.0551 f4=0.162 f5=0.1655 f6=0.0721
+SSB/SSW                     feat全件 1–99%クリップ        drop_P014     0.0097  f1=0.0577 f3=0.0525 f4=0.1676 f5=0.1463 f6=0.0339
+SSB/SSW                     feat全件 1–99%クリップ        all5          0.0123  f1=0.0632 f3=0.0583 f4=0.1644 f5=0.1683 f6=0.0739
+η² = SSB/SST                feat全件 1–99%クリップ        drop_P012     0.0142  f1=0.0613 f3=0.0551 f4=0.1448 f5=0.1627 f6=0.0721
+ω² (バイアス補正η²)               feat全件 1–99%クリップ        drop_P012     0.0142  f1=0.0613 f3=0.0551 f4=0.1448 f5=0.1627 f6=0.0721
+ω² (バイアス補正η²)               feat全件 [現行]             drop_P013     0.0143  f1=0.0572 f3=0.0566 f4=0.1505 f5=0.1703 f6=0.0863
+η² = SSB/SST                feat全件 [現行]             drop_P013     0.0144  f1=0.0573 f3=0.0567 f4=0.1505 f5=0.1704 f6=0.0863
+ICC(1) 単純平均群サイズ             feat全件 1–99%クリップ        all5          0.0178  f1=0.0731 f3=0.0679 f4=0.1705 f5=0.1738 f6=0.0845
+η² = SSB/SST                feat全件 1–99%クリップ        all5          0.0178  f1=0.0594 f3=0.0551 f4=0.1412 f5=0.1441 f6=0.0688
+ω² (バイアス補正η²)               feat全件 1–99%クリップ        all5          0.0178  f1=0.0594 f3=0.0551 f4=0.1412 f5=0.144 f6=0.0688
+ICC(1) 単純平均群サイズ             feat全件 1–99%クリップ        drop_P014     0.0237  f1=0.0714 f3=0.0653 f4=0.1827 f5=0.1632 f6=0.0432
+η² = SSB/SST                feat全件 1–99%クリップ        drop_P013     0.0249  f1=0.0567 f3=0.0567 f4=0.1341 f5=0.1631 f6=0.0863
+
+-- 比 (.idea ÷ 本実験) の上位候補 --
+式                           前処理                     被験者           比
+η² = SSB/SST                feat全件 [現行]             all5          {'f1': 0.997, 'f3': 0.998, 'f4': 0.999, 'f5': 1.002}
+ω² (バイアス補正η²)               feat全件 [現行]             all5          {'f1': 0.997, 'f3': 0.998, 'f4': 1.0, 'f5': 1.002}
+η² = SSB/SST                feat全件 [現行]             drop_P012     {'f1': 0.965, 'f3': 0.998, 'f4': 0.981, 'f5': 0.943}
+ω² (バイアス補正η²)               feat全件 [現行]             drop_P012     {'f1': 0.966, 'f3': 0.998, 'f4': 0.981, 'f5': 0.943}
+SSB/SSW                     feat全件 1–99%クリップ        drop_P014     {'f1': 1.04, 'f3': 1.048, 'f4': 0.949, 'f5': 1.066}
+SSB/SSW                     feat全件 1–99%クリップ        all5          {'f1': 0.949, 'f3': 0.943, 'f4': 0.967, 'f5': 0.927}
+η² = SSB/SST                feat全件 1–99%クリップ        drop_P012     {'f1': 0.979, 'f3': 0.998, 'f4': 1.098, 'f5': 0.959}
+ω² (バイアス補正η²)               feat全件 1–99%クリップ        drop_P012     {'f1': 0.979, 'f3': 0.998, 'f4': 1.098, 'f5': 0.959}
+ω² (バイアス補正η²)               feat全件 [現行]             drop_P013     {'f1': 1.049, 'f3': 0.972, 'f4': 1.056, 'f5': 0.916}
+η² = SSB/SST                feat全件 [現行]             drop_P013     {'f1': 1.047, 'f3': 0.97, 'f4': 1.056, 'f5': 0.915}
+
+-- ICC(1) と η² の関係 (feat 全件・5 被験者) --
+   ICC(1) = (F−1)/(F+k0−1)         : 分散成分比 σ²b/(σ²b+σ²w) の推定量
+   η²     = (k−1)F/((k−1)F+(N−k))  : この標本で群が説明する平方和の割合
+   η² は群平方和に自由度 k−1 しか与えないので、群数 k が小さいと ICC を過小評価する
+feat     k         N          k0    F=MSB/MSW    ICC(1)        η²    η²/ICC    .idea
+f1       5    124517    22923.87      1994.54      0.08    0.0602    0.7527     0.06
+f3       5    124517    22923.87      1815.59    0.0734    0.0551    0.7513    0.055
+f4       5    124517    22923.87      5888.14    0.2043    0.1591    0.7785    0.159
+f5       5    124517    22923.87       5741.8    0.2003    0.1557    0.7776    0.156
+f6       5    124517    22923.87      2299.53    0.0911    0.0688    0.7549     None

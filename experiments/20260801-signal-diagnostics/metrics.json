@@ -22,27 +22,32 @@
     "f1": {
       "point": 0.08,
       "loo_min": 0.0562,
-      "loo_max": 0.1049
+      "loo_max": 0.1049,
+      "eta_squared": 0.0602
     },
     "f3": {
       "point": 0.0734,
       "loo_min": 0.0621,
-      "loo_max": 0.0838
+      "loo_max": 0.0838,
+      "eta_squared": 0.0551
     },
     "f4": {
       "point": 0.2043,
       "loo_min": 0.1117,
-      "loo_max": 0.3019
+      "loo_max": 0.3019,
+      "eta_squared": 0.1591
     },
     "f5": {
       "point": 0.2003,
       "loo_min": 0.1345,
-      "loo_max": 0.2383
+      "loo_max": 0.2383,
+      "eta_squared": 0.1557
     },
     "f6": {
       "point": 0.0911,
       "loo_min": 0.0495,
-      "loo_max": 0.1258
+      "loo_max": 0.1258,
+      "eta_squared": 0.0688
     }
   },
   "paste_rate_max_min_ratio": 96.6,

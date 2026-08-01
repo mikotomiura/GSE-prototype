@@ -57,6 +57,11 @@ sha256 は `cat P0XX/*.ndjson | shasum -a 256` の先頭 16 文字。)
   打鍵数・paste 件数は範囲値に丸める。
   (粒度は既に追跡済みの `20260731-.../results/metrics_P0*.calib.json` と同水準で、
   本実験で新たに細かくはしていない。)
+  **外部公開時に丸め・再割当ての対象に含めるもの** (独立レビューで追加):
+  `results/probe_variants.json` の `P1_permutation_cell_count.matrix_summary.
+  uncomputable_detail` — 被験者別のラベル窓数と回答水準数が読め、
+  P013 の straight-lining (q1 が全て "1") が特定できる。
+  `results/diagnostics.json` の `D1_D5_cindex_permutation.cells` も同水準。
 - 出力は書き出し直前に `assert_no_pii()` で機械検査する (ファイル名・絶対パス・URL・
   1e12 以上の整数=絶対時刻を検出したら非ゼロ終了)。
 

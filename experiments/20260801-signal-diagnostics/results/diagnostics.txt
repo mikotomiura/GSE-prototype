@@ -42,16 +42,21 @@ ime_state 由来の文脈内訳: {'CODING': 39123, 'WRITING': 85394}
   beta_writing_fixed   max_abs_err=0.295742 r=0.988969
   ime_state_derived    max_abs_err=0.265417 r=0.999957
     残差 |Δ|: 中央=0 p95=0.000116667 max=0.265417 / >0.01 の件数=106 (0.085%)
-  -- 相関 (β_writing 固定 = .idea の条件) --
+  -- 相関 (β_writing 項 × 記録 X) --
     r(x_logged, phi3_term) = 0.809
     r(x_logged, phi6_term) = 0.7703
     r(x_logged, phi1_term) = 0.763
     r(x_logged, phi5_term) = 0.5056
-  -- 相関 (実 β = 記録された raw_x と同条件) --
+  -- 相関 (実 β 項 × 記録 X = 基準が揃った条件) --
     r(x_logged, phi3_term) = 0.7882
     r(x_logged, phi6_term) = 0.772
     r(x_logged, phi1_term) = 0.761
     r(x_logged, phi5_term) = 0.5178
+  -- 相関 (β_writing 項 × 再計算 X(β_writing) = .idea §1.3 の条件) --
+    r(x_recalc_beta_writing, phi3_term) = 0.8093
+    r(x_recalc_beta_writing, phi6_term) = 0.7807
+    r(x_recalc_beta_writing, phi1_term) = 0.7798
+    r(x_recalc_beta_writing, phi5_term) = 0.5108
   -- 標準化寄与 sd(項)/sd(X) — 「どの項が X を動かすか」はこちら --
     phi3: 0.4242
     phi6: 0.3107
@@ -59,12 +64,14 @@ ime_state 由来の文脈内訳: {'CODING': 39123, 'WRITING': 85394}
     phi5: 0.2741
 
 ########## D4 ICC (群=被験者・feat 全件)
-feat        ICC             LOO範囲         n  groups
-f1       0.0800       0.056–0.105    124517       5
-f3       0.0734       0.062–0.084    124517       5
-f4       0.2043       0.112–0.302    124517       5
-f5       0.2003       0.135–0.238    124517       5
-f6       0.0911       0.050–0.126    124517       5
+feat     ICC(1)             LOO範囲       η²         n  groups
+f1       0.0800       0.056–0.105   0.0602    124517       5
+f3       0.0734       0.062–0.084   0.0551    124517       5
+f4       0.2043       0.112–0.302   0.1591    124517       5
+f5       0.2003       0.135–0.238   0.1557    124517       5
+f6       0.0911       0.050–0.126   0.0688    124517       5
+  ※ η² = SSB/SST は `.idea` §1.4 が「ICC」と書いていた値 (3 桁一致)。
+     群数 k=5 では ICC を 0.75-0.78 倍に過小評価する。主張には ICC(1) を使う。
 
 ########## D6 ime_shadow の死んだフィールド
 pid        shadow件数   nav≠0  abandon≠0

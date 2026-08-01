@@ -1776,6 +1776,12 @@
       "r(x_logged, phi1_term)": 0.761,
       "r(x_logged, phi5_term)": 0.5178
     },
+    "term_correlations_with_recalc_x_beta_writing": {
+      "r(x_recalc_beta_writing, phi3_term)": 0.8093,
+      "r(x_recalc_beta_writing, phi6_term)": 0.7807,
+      "r(x_recalc_beta_writing, phi1_term)": 0.7798,
+      "r(x_recalc_beta_writing, phi5_term)": 0.5108
+    },
     "standardized_contributions": {
       "phi3": 0.4242,
       "phi6": 0.3107,
@@ -1791,6 +1797,7 @@
       "k0": 22923.87,
       "msb": 1007256039.1357063,
       "msw": 505007.13139588677,
+      "eta_squared": 0.0602,
       "loo_min": 0.0562,
       "loo_max": 0.1049
     },
@@ -1801,6 +1808,7 @@
       "k0": 22923.87,
       "msb": 146.83436761203203,
       "msw": 0.08087414052881528,
+      "eta_squared": 0.0551,
       "loo_min": 0.0621,
       "loo_max": 0.0838
     },
@@ -1811,6 +1819,7 @@
       "k0": 22923.87,
       "msb": 23573.437292650156,
       "msw": 4.003542646993323,
+      "eta_squared": 0.1591,
       "loo_min": 0.1117,
       "loo_max": 0.3019
     },
@@ -1821,6 +1830,7 @@
       "k0": 22923.87,
       "msb": 297356862.8587687,
       "msw": 51788.064590923364,
+      "eta_squared": 0.1557,
       "loo_min": 0.1345,
       "loo_max": 0.2383
     },
@@ -1831,6 +1841,7 @@
       "k0": 22923.87,
       "msb": 199.71969735618214,
       "msw": 0.08685241581688864,
+      "eta_squared": 0.0688,
       "loo_min": 0.0495,
       "loo_max": 0.1258
     }
