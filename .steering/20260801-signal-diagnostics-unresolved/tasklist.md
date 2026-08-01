@@ -34,7 +34,8 @@
 
 ## 完了処理
 - [x] design.md / decisions.md の最終化
-- [ ] git commit (**パス指定のみ**。`git add -A` / `commit -a` は使わない)
+- [x] git commit (パス指定のみ。ブランチ `chore/signal-diagnostics-unresolved` / commit `bac5cc5`)
+- [ ] push / PR (**未実施** — ユーザー判断待ち)
 
 ## やらないこと (スコープ外・確認済み)
 - ADR-008/009 の起票 → 本タスクの結論を入力に別タスク
