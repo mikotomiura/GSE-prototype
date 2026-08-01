@@ -45,7 +45,9 @@
 ## 検証
 - [x] コード変更ゼロ（`git status` で `src/` `src-tauri/` に差分なし）
 - [x] 凍結対象に触れていない
-- [x] `research-positioning.md §5` 未変更 / `docs/references.md` 未変更
+- [x] `research-positioning.md §5` 未変更
+- [x] ~~`docs/references.md` 未変更~~ → ★ **追加ラウンド（下記）で [P36]–[P42] / [V66]–[V74] を append-only 登録した**
+      （設計フェーズ単体では未変更だった。renumber・削除はしていない）
 - [x] PII・セッション日時・raw NDJSON なし
 - [ ] `/cross-review`（**skip**・理由は `decisions.md` 判断 12）
 - [ ] 研究者判断待ち: G1 相乗り / `phase` 暫定案 / 正例の 2 種類目
