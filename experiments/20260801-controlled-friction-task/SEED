@@ -1,0 +1,4 @@
+# 乱数 seed（reproducibility-discipline ルール 2）
+# 用途: ブロック順序（ABBA 釣り合わせ後の系列）の被験者ごとの無作為化
+# ⚠️ 実験は未実施。この値は設計時に固定したものであり、実施時に変更しない。
+BLOCK_ORDER_SEED=20260801

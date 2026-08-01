@@ -50,7 +50,8 @@
   `self_directed_recovery_risk: Option<f32>` と `recovery_risk_uncertainty: Option<f32>` を
   **additive に追加**する（ADR-005 の additive 原則。既存 5 proxy は不変）。
 - **採用の主要根拠は「行動から自己ラベル付けできる」こと**。criterion が主観プローブでなく
-  行動（stall 後 H 分以内の自力回復の有無）であるため、**プローブを 1 件も撃たずに教師信号が生成される**。
+  行動（stall onset 後の自力回復までの離散時間・D2 改訂後）であるため、
+  **プローブを 1 件も撃たずに教師信号が生成される**。
   Phase1 で死んだ label supply の構造問題への直接の答えである。
 
 ### D1b. 旧 X 軸（Cognitive Friction）の**格を落とす** ★D1 と対で読むこと
@@ -74,15 +75,40 @@
 > ⚠️ **降格は「X の測定に失敗したから」ではなく「X には現行の観測空間で信号が無いことが実測で示されたから」**である。
 > 統制タスク実験（D7 / G1）で分離できれば、旧 X が復権する余地は残る。降格は不可逆な棄却ではない。
 
-### D2. 目的変数の operational definition を先に閉じる
+### D2. 目的変数の operational definition を先に閉じる ★ **2026-08-01 改訂**
+
+> **改訂の経緯**: 初版 D2 は `self_directed_recovery` を「stall onset から **H 分以内**に回復したかの**二値**」と
+> 定義していた。**打ち切りのある time-to-event を固定 horizon で二値化するこの定式化は方法論的に誤りである**
+> ことが一次文献で確認されたため改訂する（本 ADR は Proposed であり改訂可能）。
+> 判定基準は結果を見る前に固定した: `.steering/20260801-recovery-axis-grounding/requirement.md`。
+> 判定と根拠: 同 `decisions.md` 判断 1 / `docs/literature/20260801-recovery-labeling-and-online-prereg.md` RQ-1。
 
 - `progress_proxy` = 個人×task_kind×phase 基準で正規化した**純産出の持続**
-  （窓内の 挿入−削除 打鍵数を個人基準で正規化し、T 秒以内に取り消されないこと）。content-free。
-- `self_directed_recovery` = stall onset から H 分以内に、**観測された外部化（paste）を挟まずに**
-  `progress_proxy` が個人基準を超えて回復すること。H は事前宣言して凍結する。
-- **打ち切り（censoring）**: content-free 制約下では検索・別デバイス・口頭相談は観測できない。
-  focus 喪失・アプリ切替（**回数のみ**・識別子もタイトルも保存しない）を打ち切り指標として別に記録し、
-  「自力回復」と「観測外で解決して戻った」を区別できないことを明示する。
+  （窓内の 挿入−削除 打鍵数を個人基準で正規化し、T 秒以内に取り消されないこと）。content-free。**不変**。
+- ★ `self_directed_recovery` = **離散時間の time-to-event 観測**である。stall onset で時計をリセットし、
+  幅 Δ の期 k = 1,2,… ごとに次の 4 択を記録する: `recovery` / `externalized`（paste）/
+  `left_observation`（focus 喪失・アプリ切替）/ `still_stalled`。
+  ラベルは二値ではなく **（イベント期 k, 種別 j）または（最終観測期 k, 打ち切り）**の組。
+- ★ **H はラベル定義から外す**。H は推定器の外側にあり、**意思決定層が読み出すときのパラメータ**になる。
+  ハザードから任意の H に対する `CIF_rec(H)` を計算できるため、介入層ごとに異なる H を問い合わせてよい。
+- ★ **打ち切りではなく競合リスクとして扱う**。ある事象の発生が目的事象の発生を排除するとき、
+  それは打ち切りではなく競合イベントであり、単純に打ち切り扱いすると発生率が上方バイアスする [V61]。
+  また生存解析の独立打ち切り仮定は「事象を起こしやすいかどうかで選択的に離脱していないこと」を要求するが [V59]、
+  GSE の focus 喪失は「詰まったから離脱した」形で起こりうるため**この仮定が破れている疑いが強い**。
+
+| 事象 | 扱い |
+|---|---|
+| `externalized`（paste） | **競合イベント**（外部化して解決したなら自力回復ではない＝軸の定義と一致） |
+| `left_observation` | ★ **競合と真の打ち切りの混合。潰さずに両方の極端で上下界を取る**（新 G2） |
+| セッション終了 | 管理的打ち切り（independent） |
+
+- ★ **反証ゲート G2 を再定義**した。旧 G2「打ち切り区間が事前宣言した割合を超えたら失格」は
+  **打ち切りを捨てる前提のゲート**であり本改訂で意味を失った。新 G2 は
+  **「上下界の幅が介入判断を反転させないか」**（`personalization-and-online-learning.md §3.4/§8.2`）。
+
+> ⚠️ **一次確認は [V59]（Allison 1982）1 本**である（該当章を逐語照合）。[V60] [V61] は abstract 水準。
+> ⚠️ **H の任意性は消えたが、期の幅 Δ の任意性は残る**（`personalization-and-online-learning.md §11-7`）。
+> 「任意性が完全に消えた」とは主張しない。
 
 ### D3. 潜在状態の層を ontology から head の実装詳細へ降格し、**状態数を今決めない**
 
@@ -91,8 +117,9 @@ Layer 4 の出力（固定）
     WorkStateEstimate + self_directed_recovery_risk (+ uncertainty)
 
 推定器（未確定・競合させる）
-    ★正   baseline : p_recovery = sigmoid(bias_user_task_phase + (w_head + δ_user_task)·context)
-                     潜在状態を持たない
+    ★正   baseline : 離散時間の競合リスク・ハザード（person-period 多項ロジスティック・D2 改訂後）
+                     h_j(k) = softmax_j( α_j(k) + bias + (w_head + δ_user_task)·context_k )
+                     潜在状態を持たない（α_j(k) は状態ではなく stall onset からの経過時間の関数）
       候補 A       : 相互排他な作業モードの状態フィルタ（例 Progressing / Stalled / Externalizing）
       候補 B       : online EM による潜在構造学習（→ D6）
 ```
@@ -118,8 +145,11 @@ Layer 4 の出力（固定）
 GATE3 の判定（DataInsufficient）も旧軸に対するものである。
 **新軸には新しい仮説番号が要る**。本 ADR は **H-X1d（案）** を提案する:
 
-> `self_directed_recovery_risk` は、行動由来 criterion（stall 後 H 分以内の自力回復の有無）を
-> 個人内で偶然を超えて予測する。
+> `self_directed_recovery_risk` は、行動由来 criterion（stall onset 後の自力回復までの離散時間・
+> 競合イベントと打ち切りを含む）を個人内で偶然を超えて予測する。
+> ★ 2026-08-01 の D2 改訂に追随して文言を更新した（旧: 「stall 後 H 分以内の自力回復の**有無**」）。
+> 検証は二値 C-index ではなく**離散時間・競合事象向けの時間依存指標**で行う
+> （`personalization-and-online-learning.md §8.1`）。
 
 > ⚠️ `research-positioning.md §5` は「研究者による確認が必要な節」である。
 > **本 ADR は提案に留め、§5 は変更しない**。採択は研究者判断。
@@ -168,8 +198,13 @@ D4 のゲートを通れば Phase 4 で復活しうる。
 - ADR-001（HMM を Writing head の baseline へ降格）と整合する。HMM は候補 A の一実装であり、
   D4 のゲートに服する。**現行 HMM の内部挙動・`HMM_VERSION` は本 ADR では変えない**。
 - ADR-007 は**維持**（Receptivity は Layer 5・分解形）。本 ADR はこれを再確認するだけで変更しない。
-- 打ち切り（D2）が支配的な場合、新軸のラベルは成立しない。
+- ★ **`left_observation`（focus 喪失・アプリ切替）の内訳が同定できないため、軸は点推定でなく
+  上下界として計算される場面がある**（D2 改訂）。幅が介入判断を反転させるなら新軸のラベルは成立しない。
   → 反証ゲート G2（`personalization-and-online-learning.md §8.2`）として事前宣言する。
+- ★ **推定器が多項（3+1 カテゴリ）になる**（D2 改訂）。sigmoid → softmax の 1 段だけで、
+  逐次更新は O(d·m), m=3 のまま。**軽量性（§4.5）・ONNX 不要の結論は変わらない**。
+  ただし replay の pinning（ADR-008 D5）には **期の幅 Δ・baseline hazard の形・
+  person-period 展開の順序**が追加で pin 対象になる。
 - **コード変更ゼロ**。凍結対象に一切触れない。
 
 ## Migration
@@ -178,7 +213,11 @@ D4 のゲートを通れば Phase 4 で復活しうる。
 2. 凍結解除後の**最初のタスク = G1 統制タスク実験**（D7）。ここで分離できなければ、
    パイプラインを作る前に軸そのものを疑う。
 3. **P1**: `progress_proxy` / `self_directed_recovery` ラベルが実際に取れるかを確認（G2）。
-   現行 X を置換せず並走。
+   現行 X を置換せず並走。★ D2 改訂に伴い、P1 では **`left_observation` の上下界を実際に計算し、
+   幅が介入判断を反転させないか**を見る（新 G2）。**期の幅 Δ を P1 の開始前に事前宣言する**。
 4. **P2**: stateless baseline を実装し H-X1d（案）を個人内で評価。
+   ★ baseline は**離散時間の競合リスク・ハザードモデル（person-period 多項ロジスティック）**である
+   （`personalization-and-online-learning.md §4.4` Phase C）。「stateless」は**潜在状態を持たない**という意味であり、
+   時間依存 baseline hazard `α_j(k)` を持つことと矛盾しない（`α_j(k)` は状態ではなく経過時間の関数）。
 5. **P4**: 候補 A / B を D4 のゲートにかける。通らなければ採用しない。
 6. `research-positioning.md §5` への H-X1d 追記は**研究者採択後**に別タスクで行う。

@@ -1,0 +1,107 @@
+{
+  "schema_version": "1",
+  "experiment_id": "20260801-controlled-friction-task",
+  "status": "DESIGN_ONLY_NOT_EXECUTED",
+  "gate": "G1",
+  "executable_after": "phase1_complete_and_researcher_approval",
+
+  "design": {
+    "domain": "writing_argumentative",
+    "blocks_per_session": 8,
+    "block_minutes": 5,
+    "inter_block_minutes": 1,
+    "conditions": ["HI", "LO"],
+    "blocks_per_condition": 4,
+    "assignment": "within_person_alternating_ABBA_balanced_then_seed_randomized",
+    "output_requirement_chars": [300, 400],
+    "source_material_total_chars_matched_across_conditions": true,
+    "rationale_block_count": "C(8,4)=70 permutations -> min exact p = 1/70 = 0.0143 < 0.05. With 4 blocks C(4,2)=6 -> min p = 0.167, unreachable."
+  },
+
+  "feature_sets": {
+    "FS_A": {
+      "description": "current 5 features (legacy X-axis observation space)",
+      "features": ["F1", "F3", "F4", "F5", "F6"]
+    },
+    "FS_B": {
+      "description": "FS_A + Tier0 + Tier1",
+      "features": [
+        "F1", "F3", "F4", "F5", "F6",
+        "keys", "bs_rate", "external_paste_chars", "ime_dwell_med",
+        "silence_p50", "silence_p90", "silence_max",
+        "burst_p50", "burst_p90"
+      ]
+    }
+  },
+
+  "analysis": {
+    "unit": "block",
+    "model": "l2_penalized_logistic_regression",
+    "penalty": "l2",
+    "lambda": 1.0,
+    "lambda_selection": "PRESPECIFIED_FIXED_no_tuning",
+    "feature_standardization": "z_score_within_subject_using_training_folds_only",
+    "hyperparameter_tuning": false,
+    "cross_validation": "within_subject_leave_one_block_pair_out",
+    "pooling_across_subjects": false,
+    "metric": "out_of_fold_within_subject_AUC",
+    "rationale_for_penalization": "With 8 blocks per subject, each training fold has ~6 blocks while FS_B has 14 features. Unpenalized logistic regression would hit complete separation, producing diverging coefficients and artificially high AUC that cannot be distinguished from real signal. A fixed-strength L2 penalty guarantees finite coefficients. Strength is PRESPECIFIED, not tuned: tuning would require nested CV that 6 training blocks cannot support. See [V63] (penalized methods help when events are few).",
+    "known_limitation": "lambda=1.0 on z-scored features is a convention, not an optimum. It is frozen before data collection so that it cannot be chosen to favour a result."
+  },
+
+  "prespecified_thresholds": {
+    "primary_inferential_criterion": "permutation_test",
+    "permutation_test": {
+      "unit": "block_labels_within_subject",
+      "alpha": 0.05,
+      "combine_across_subjects": "fisher",
+      "pipeline_rerun_per_permutation": true,
+      "why_primary": "The ENTIRE pipeline (standardization, penalized fit, CV, AUC) is re-run on each permuted label assignment. Any optimism from small-sample fitting inflates AUC under permuted labels too, so it is absorbed by the null distribution. This is what makes the result trustworthy despite the small block count."
+    },
+    "descriptive_thresholds": {
+      "note": "Secondary. Computed out-of-fold. Used to judge practical magnitude, NOT significance.",
+      "median_within_subject_auc_min": 0.70,
+      "per_subject_auc_min": 0.60,
+      "per_subject_auc_min_fraction": 0.80
+    },
+    "pass_requires": "permutation_test significant AND descriptive_thresholds met",
+    "justification_for_0_70": "Phase1 observed chance-level for current features (0.442-0.507) and 0.60-0.68 for the strongest simple signal (keys->Q2). A deliberately induced high-friction condition must exceed the best naturally observed weak signal.",
+    "separation_diagnostic": {
+      "report_always": true,
+      "items": ["max_absolute_coefficient", "count_of_folds_with_perfect_training_separation"],
+      "note": "If perfect training separation still occurs under the fixed L2 penalty, report it. Do not silently pass."
+    }
+  },
+
+  "manipulation_check": {
+    "instrument": "forced_comparison_paper_or_external_form",
+    "reason_not_in_app": "probe_scheduler.rs is frozen; also 1-5 Likert caused straight-lining in Phase1 (P013)",
+    "pass_threshold_hi_chosen_as_harder": 0.70,
+    "on_failure": "do_not_interpret_separation_result; redesign task"
+  },
+
+  "prespecified_exclusions": {
+    "subject_level": "none_post_hoc; only pre-declared consent withdrawal",
+    "block_level": "only technical log loss (keystroke log missing or truncated); rule frozen before data collection"
+  },
+
+  "forbidden_post_hoc": [
+    "changing thresholds",
+    "adding a third feature set",
+    "excluding subjects after seeing results",
+    "excluding blocks for non-technical reasons"
+  ],
+
+  "reproducibility": {
+    "seed_file": "SEED",
+    "env_file": "env.md",
+    "data_file": "data.md",
+    "hmm_version": "TO_BE_STAMPED_AT_EXECUTION",
+    "repro_entrypoint": "scripts/repro.sh"
+  },
+
+  "prereg": {
+    "covered_by_preregistration_v0_3": false,
+    "note": "G1 is a new gate introduced after the v0.3 preregistration was frozen. Section 3 of README.md must be separately preregistered before execution (researcher decision)."
+  }
+}
