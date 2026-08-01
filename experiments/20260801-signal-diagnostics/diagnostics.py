@@ -219,8 +219,14 @@ def ime_open_series(ime_states, feats):
 
 
 # ---------------------------------------------------------------- D1 / D5
-def window_rows(subjects, label_source="random_probe", label_answered=True):
-    """ラベル窓ごとに、既存特徴量と『収集済みだが未使用』の信号を集約する。"""
+def window_rows(subjects, label_source="random_probe", label_answered=True, feats=None):
+    """ラベル窓ごとに、既存特徴量と『収集済みだが未使用』の信号を集約する。
+
+    `feats` は集約する feat フィールド (既定 `FEATS`)。probe_variants.py が
+    別の特徴量集合で数え直すために使う。module 変数 `FEATS` を外から書き換えて
+    呼ぶ形にすると、差し替えが呼ばれる側から見えず静かに壊れる。
+    """
+    feats_wanted = FEATS if feats is None else feats
     per = collections.defaultdict(lambda: collections.defaultdict(list))
     counts = collections.Counter()
     for pid, sessions in subjects.items():
@@ -242,7 +248,7 @@ def window_rows(subjects, label_source="random_probe", label_answered=True):
                     continue
                 counts["usable"] += 1
                 row = {}
-                for k in FEATS:
+                for k in feats_wanted:
                     vs = [o[k] for o in win if k in o]
                     row[k] = statistics.median(vs) if vs else None
                 # ---- 収集済みだが未使用の信号 (.idea §1.5)
@@ -442,15 +448,20 @@ def d2_d3(subjects, const):
         db = math.sqrt(sum((y - mb) ** 2 for y in bb))
         return num / (da * db) if da and db else None
 
-    def corr_map(series):
+    def corr_map(series, base, base_name):
         out = {}
         for k, v in series.items():
-            r = pearson(x_logged, v)
-            out[f"r(x_logged, {k}_term)"] = round(r, 4) if r is not None else None
+            r = pearson(base, v)
+            out[f"r({base_name}, {k}_term)"] = round(r, 4) if r is not None else None
         return out
 
-    corr = corr_map(term_series)          # β_writing 固定 (.idea の条件)
-    corr_real = corr_map(term_real)       # 実 β (記録された raw_x と同条件)
+    corr = corr_map(term_series, x_logged, "x_logged")       # β_writing 項 × 記録 X
+    corr_real = corr_map(term_real, x_logged, "x_logged")    # 実 β 項 × 記録 X
+    # `.idea` §1.3 の条件: §1.3 は「124,517 サンプルで φ を再計算 (β_writing 基準)」なので
+    # **両辺とも β_writing 基準の再計算 X** で相関を取っている。記録された raw_x は
+    # IME 状態で切り替わる実 β で作られており基準が違う。この差が
+    # 「.idea r=0.78 / 再現 0.763」の原因 (probe_variants.py P2 で総当たり確認)。
+    corr_recalc = corr_map(term_series, x_recalc, "x_recalc_beta_writing")
 
     # 相関はスケール不変なので重みが効かない。「どの項が X を動かしているか」は
     # 標準化寄与 w_i·sd(phi_i)/sd(X) の方が答えになる。
@@ -482,6 +493,7 @@ def d2_d3(subjects, const):
         },
         "term_correlations_with_logged_x": corr,
         "term_correlations_real_beta": corr_real,
+        "term_correlations_with_recalc_x_beta_writing": corr_recalc,
         "standardized_contributions": std_contrib,
     }
 
@@ -557,8 +569,16 @@ def d4_icc(subjects):
             v, _ = _icc1([g for j, g in enumerate(groups) if j != i])
             if v is not None:
                 loo.append(v)
+        # η² = SSB/SST も併記する。`.idea` §1.4 が「ICC」と書いていた値の正体がこれで
+        # (f1=0.060 f3=0.055 f4=0.159 f5=0.156 と 3 桁一致・probe_variants.py で確認)、
+        # 併記しておかないと将来また「1.2-1.3 倍ずれている」と追跡し直すことになる。
+        # η² は群平方和に自由度 k-1 しか与えないので、群数 k が小さいと ICC を
+        # 系統的に過小評価する (k=5 の本データで 0.75-0.78 倍)。
+        # 「個人差の割合 = 分散成分比」を主張したいなら ICC(1) の方が正しい推定量。
+        eta2 = ssb / (ssb + ssw) if (ssb + ssw) else None
         out[f] = {"icc": round(icc, 4), "n_total": n_total, "n_groups": k_groups,
                   "k0": round(k0, 2), "msb": msb, "msw": msw,
+                  "eta_squared": round(eta2, 4) if eta2 is not None else None,
                   "loo_min": round(min(loo), 4) if loo else None,
                   "loo_max": round(max(loo), 4) if loo else None}
     return out
@@ -619,9 +639,17 @@ def d6_d7(subjects):
 _PII_PATTERNS = [
     (r"gse_\d{8}", "logger 由来のセッションファイル名 (= 開始絶対時刻)"),
     (r"\.ndjson", "NDJSON ファイル名"),
-    (r"(?:^|[\s\"'])/(?:Users|home)/", "絶対パス"),
-    (r"\\\\Users\\\\", "Windows 絶対パス"),
+    # 絶対パスの境界は「区切り文字の直後」ではなく「識別子文字の直後でない」で取る。
+    # 旧実装は空白/引用符始まりしか見ておらず `path=/Users/...` `~/gse-dataset` を
+    # 素通りさせていた (独立レビュー指摘)。GSE_DATASET は環境ごとに任意パスを取る。
+    (r"(?<![\w.])(?:~|/(?:Users|home|Volumes))/", "絶対パス / ホーム相対パス"),
+    (r"(?<![\w.])[A-Za-z]:[\\/]", "Windows 絶対パス"),
+    (r"\\\\Users\\\\", "Windows 絶対パス (エスケープ済み)"),
     (r"https?://", "URL"),
+    # probe_variants.py が内部で使う `P010#3` 形式のセッション識別子。
+    # data.md は「セッション単位の生値は出さない」と約束しているが、
+    # 現状それを守っているのは集計の構造だけで、機械検査が無かった (独立レビュー指摘)。
+    (r"P\d{3}#\d+", "セッション識別子 (pid#session_index)"),
 ]
 
 
@@ -786,7 +814,7 @@ def main():
         "bonferroni_passed_count": dd["bonferroni_passed_count"],
         "phi_rail_pct_beta_writing": {k: v["rail_pct"] for k, v in rails.items()},
         "icc": {k: {"point": v.get("icc"), "loo_min": v.get("loo_min"),
-                    "loo_max": v.get("loo_max")}
+                    "loo_max": v.get("loo_max"), "eta_squared": v.get("eta_squared")}
                 for k, v in res["D4_icc"].items()},
         "paste_rate_max_min_ratio": pd_["paste_rate_max_min_ratio"],
         "phi_equivalence_check": res.get("phi_equivalence_check", {}).get("passed"),
@@ -853,11 +881,14 @@ def render(res, path):
         if rs:
             a(f"    残差 |Δ|: 中央={rs['median']:.6g} p95={rs['p95']:.6g} "
               f"max={rs['max']:.6g} / >0.01 の件数={rs['gt_0_01']} ({rs['gt_0_01_pct']}%)")
-    a("  -- 相関 (β_writing 固定 = .idea の条件) --")
+    a("  -- 相関 (β_writing 項 × 記録 X) --")
     for k, v in r["term_correlations_with_logged_x"].items():
         a(f"    {k} = {v}")
-    a("  -- 相関 (実 β = 記録された raw_x と同条件) --")
+    a("  -- 相関 (実 β 項 × 記録 X = 基準が揃った条件) --")
     for k, v in r["term_correlations_real_beta"].items():
+        a(f"    {k} = {v}")
+    a("  -- 相関 (β_writing 項 × 再計算 X(β_writing) = .idea §1.3 の条件) --")
+    for k, v in r["term_correlations_with_recalc_x_beta_writing"].items():
         a(f"    {k} = {v}")
     a("  -- 標準化寄与 sd(項)/sd(X) — 「どの項が X を動かすか」はこちら --")
     for k, v in r["standardized_contributions"].items():
@@ -865,12 +896,16 @@ def render(res, path):
     a("")
 
     a("########## D4 ICC (群=被験者・feat 全件)")
-    a(f"{'feat':<6}{'ICC':>9}{'LOO範囲':>18}{'n':>10}{'groups':>8}")
+    a(f"{'feat':<6}{'ICC(1)':>9}{'LOO範囲':>18}{'η²':>9}{'n':>10}{'groups':>8}")
     for f, v in res["D4_icc"].items():
         icc = f"{v['icc']:.4f}" if v.get("icc") is not None else "—"
         loo = ("{:.3f}–{:.3f}".format(v["loo_min"], v["loo_max"])
                if v.get("loo_min") is not None else "—")
-        a(f"{f:<6}{icc:>9}{loo:>18}{v.get('n_total','—'):>10}{v.get('n_groups','—'):>8}")
+        eta = f"{v['eta_squared']:.4f}" if v.get("eta_squared") is not None else "—"
+        a(f"{f:<6}{icc:>9}{loo:>18}{eta:>9}"
+          f"{v.get('n_total','—'):>10}{v.get('n_groups','—'):>8}")
+    a("  ※ η² = SSB/SST は `.idea` §1.4 が「ICC」と書いていた値 (3 桁一致)。")
+    a("     群数 k=5 では ICC を 0.75-0.78 倍に過小評価する。主張には ICC(1) を使う。")
     a("")
 
     dd = res["D6_D7_dead_fields_and_paste"]
