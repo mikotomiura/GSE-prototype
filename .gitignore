@@ -68,3 +68,11 @@ P[0-9]*_*.ndjson
 # (experiments/ で復号・解析する時の誤コミット防止)。集計 JSON (metrics/calib/cohort.json) は対象外で
 # コミット可。committed fixtures は `gse_` 始まりでないため影響なし。
 gse_*.ndjson
+
+# experiments/ 配下の中間ダンプ。上の 3 ルールは「logger 由来のファイル名のまま置いた場合」
+# しかカバーせず、解析中にリネームした NDJSON や行単位ダンプ (rows.csv / windows.jsonl) は
+# 素通りする。experiments/ に置いてよいのは集計値だけなので拡張子で塞ぐ。
+# (committed fixtures は src-tauri/tests/fixtures/ 配下なので影響しない)
+experiments/**/raw/
+experiments/**/*.ndjson
+experiments/**/*.jsonl

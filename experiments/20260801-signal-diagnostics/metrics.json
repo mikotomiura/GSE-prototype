@@ -1,0 +1,50 @@
+{
+  "experiment": "20260801-signal-diagnostics",
+  "kind": "exploratory",
+  "hmm_version": {
+    "0.3.0": 40
+  },
+  "n_feat": 124517,
+  "n_labels": 200,
+  "x_axis_cells_computable": 24,
+  "x_axis_nominal_sig_count": 0,
+  "nominal_sig_count": 6,
+  "bonferroni_attainable_count": 70,
+  "bonferroni_passed_count": 0,
+  "phi_rail_pct_beta_writing": {
+    "f1": 63.6,
+    "f3": 74.2,
+    "f4": 44.1,
+    "f5": 90.4,
+    "f6": 92.2
+  },
+  "icc": {
+    "f1": {
+      "point": 0.08,
+      "loo_min": 0.0562,
+      "loo_max": 0.1049
+    },
+    "f3": {
+      "point": 0.0734,
+      "loo_min": 0.0621,
+      "loo_max": 0.0838
+    },
+    "f4": {
+      "point": 0.2043,
+      "loo_min": 0.1117,
+      "loo_max": 0.3019
+    },
+    "f5": {
+      "point": 0.2003,
+      "loo_min": 0.1345,
+      "loo_max": 0.2383
+    },
+    "f6": {
+      "point": 0.0911,
+      "loo_min": 0.0495,
+      "loo_max": 0.1258
+    }
+  },
+  "paste_rate_max_min_ratio": 96.6,
+  "phi_equivalence_check": true
+}

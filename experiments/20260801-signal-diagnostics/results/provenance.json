@@ -1,0 +1,33 @@
+{
+  "_note": "run.sh が実行のたびに生成する。手で編集しない。",
+  "repo_commit": "c48bdcc3110c705bc374635ec67645cac38a3614",
+  "dataset_commit": "c2f960c0b9a04778e616dbd212517c65a76f132c",
+  "cargo_lock_sha256": "f45b5eb438beacf39092b1299a10fdfaca09dbd2586f1caaf9ddee68a43b8c46",
+  "python_version": "3.14.4",
+  "input_per_subject": {
+    "P000": {
+      "files": 0,
+      "concat_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "P010": {
+      "files": 12,
+      "concat_sha256": "a253214d22aaddc9bbaf46f80b9f8b257570e26fa1b52fa6a71838b5dac83e6b"
+    },
+    "P011": {
+      "files": 5,
+      "concat_sha256": "d0c458d0412e2e4d6320e624b98621f00a20075cc426f6cc1680873812b1c8ca"
+    },
+    "P012": {
+      "files": 7,
+      "concat_sha256": "8c9a0d57704d7794fb5f35944dc0568bbe9e4ed81dfb222401b77de828301498"
+    },
+    "P013": {
+      "files": 10,
+      "concat_sha256": "a4f1fff1f82c3a468f9f9940ee99ba8fc57ec6aa6e05623b1934b31502726d0e"
+    },
+    "P014": {
+      "files": 6,
+      "concat_sha256": "00600a051503f78a1b5e1fae569c75d061d9783205a3ac1f7c979c7384cf5b92"
+    }
+  }
+}
