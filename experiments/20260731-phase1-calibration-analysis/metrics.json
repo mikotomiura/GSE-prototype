@@ -1,0 +1,132 @@
+{
+  "schema": "cohort/v0.3",
+  "subject_count": 5,
+  "included_subject_count": 5,
+  "gate_eligible_count": 1,
+  "vignette": {
+    "passed_subjects": 0,
+    "total_subjects": 5,
+    "pass_fraction": 0.0,
+    "passed": false
+  },
+  "measurement": {
+    "overall_answer_rate": 0.9259259259259259,
+    "per_subject_answer_rates": [
+      0.9903846153846154,
+      1.0,
+      0.9722222222222222,
+      0.3333333333333333,
+      1.0
+    ],
+    "verdict": "pass"
+  },
+  "model": {
+    "session_median_cindices": [
+      0.45
+    ],
+    "cohort_median": 0.45,
+    "excluded_for_missing_median": 3,
+    "excluded_for_insufficient_data": 1,
+    "excluded_for_measurement_quality": 0,
+    "verdict": "kill"
+  },
+  "overall": "inconclusive",
+  "decision_reason": "PreReg-1 尺度理解未達: 通過率 0.00 < 0.80 → 教示文再設計・本番データ不可",
+  "mnar_invalid_count": 1,
+  "mnar_caution_count": 1,
+  "bidimensionality_verifiable_count": 1,
+  "subjects": [
+    {
+      "subject_id": "P010",
+      "included_in_primary": true,
+      "x_q1_session_median": 0.45,
+      "x_q1_pooled": 0.512022630834512,
+      "answer_rate": 0.9903846153846154,
+      "per_subject_pass": true,
+      "evaluation_session_count": 10,
+      "random_probe_total": 104,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": true,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": true
+    },
+    {
+      "subject_id": "P011",
+      "included_in_primary": true,
+      "x_q1_session_median": 0.4,
+      "x_q1_pooled": 0.36538461538461536,
+      "answer_rate": 1.0,
+      "per_subject_pass": true,
+      "evaluation_session_count": 3,
+      "random_probe_total": 21,
+      "prereg5_eval_ok": false,
+      "prereg5_probe_ok": true,
+      "gate_eligible": false,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": false
+    },
+    {
+      "subject_id": "P012",
+      "included_in_primary": true,
+      "x_q1_session_median": null,
+      "x_q1_pooled": null,
+      "answer_rate": 0.9722222222222222,
+      "per_subject_pass": true,
+      "evaluation_session_count": 5,
+      "random_probe_total": 36,
+      "prereg5_eval_ok": false,
+      "prereg5_probe_ok": true,
+      "gate_eligible": false,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": false
+    },
+    {
+      "subject_id": "P013",
+      "included_in_primary": true,
+      "x_q1_session_median": null,
+      "x_q1_pooled": null,
+      "answer_rate": 0.3333333333333333,
+      "per_subject_pass": false,
+      "evaluation_session_count": 8,
+      "random_probe_total": 21,
+      "prereg5_eval_ok": true,
+      "prereg5_probe_ok": true,
+      "gate_eligible": false,
+      "vignette_passed": false,
+      "mnar_caution": true,
+      "mnar_invalid": true,
+      "bidimensionality_verifiable": false
+    },
+    {
+      "subject_id": "P014",
+      "included_in_primary": true,
+      "x_q1_session_median": null,
+      "x_q1_pooled": 0.4642857142857143,
+      "answer_rate": 1.0,
+      "per_subject_pass": false,
+      "evaluation_session_count": 4,
+      "random_probe_total": 34,
+      "prereg5_eval_ok": false,
+      "prereg5_probe_ok": true,
+      "gate_eligible": false,
+      "vignette_passed": false,
+      "mnar_caution": false,
+      "mnar_invalid": false,
+      "bidimensionality_verifiable": false
+    }
+  ],
+  "notes": [
+    "subject P011: PreReg-5 unmet (eval_sessions=3 need≥6, random_probes=21 need≥16) → excluded from model gate (データ拡充)",
+    "subject P012: no session-median C-index (insufficient eval sessions) → excluded from model gate",
+    "subject P013: no session-median C-index (insufficient eval sessions) → excluded from model gate",
+    "subject P014: no session-median C-index (insufficient eval sessions) → excluded from model gate",
+    "PreReg-7: 無回答率 >30% の被験者あり (該当被験者の主分析は不成立)"
+  ]
+}

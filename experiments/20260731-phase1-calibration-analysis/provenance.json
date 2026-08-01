@@ -1,0 +1,11 @@
+{
+  "experiment": "20260731-phase1-calibration-analysis",
+  "generated_utc": "2026-07-31T13:51:59Z",
+  "hmm_version": "0.3.0",
+  "repo_commit": "232d412c6925d0d45c94facee33066dae2716604",
+  "dataset_root": "/Users/johnd/gse-dataset",
+  "dataset_commit": "968c2a2b03b6cfe541909d0c8a0599a4bff45099",
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11)",
+  "cargo_lock_sha256": "f45b5eb438beacf39092b1299a10fdfaca09dbd2586f1caaf9ddee68a43b8c46",
+  "pipeline": "run-calibration-cohort.sh (gse-replay --calibration -> gse-cohort)"
+}

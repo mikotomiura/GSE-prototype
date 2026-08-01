@@ -1,0 +1,64 @@
+{
+  "schema": "calibration/v0.3",
+  "included_in_primary": true,
+  "session_count": 6,
+  "main_session_count": 6,
+  "exploratory_session_count": 0,
+  "calibration_session_count": 2,
+  "evaluation_session_count": 4,
+  "agg": {
+    "source": "ewma",
+    "stat": "median"
+  },
+  "measurement": {
+    "random_probe_total": 34,
+    "random_probe_answered": 34,
+    "answer_rate": 1.0,
+    "latency_median_ms": 14200,
+    "valid_count": 34,
+    "no_answer_rate": 0.0,
+    "dont_remember_count": 0,
+    "random_probe_assigned": 35,
+    "assigned_without_label": 1,
+    "per_subject_pass": false
+  },
+  "cindex": {
+    "x_q1_pooled": 0.4642857142857143,
+    "x_q1_session_median": null,
+    "y_q2_pooled": 0.42338709677419356,
+    "y_q2_session_median": 0.25,
+    "eval_pair_source_count": 20
+  },
+  "mnar": {
+    "point": 0.4642857142857143,
+    "lower": 0.4642857142857143,
+    "upper": 0.4642857142857143,
+    "no_answer_rate": 0.0,
+    "caution": false,
+    "invalid": false
+  },
+  "vignette": {
+    "total": 0,
+    "matched": 0,
+    "passed": false
+  },
+  "bidimensionality": {
+    "flow": 11,
+    "stuck": 0,
+    "incubation": 0,
+    "idle": 0,
+    "ambiguous": 23,
+    "incubation_fraction": 0.0,
+    "off_diagonal_fraction": 0.0,
+    "verifiable": false
+  },
+  "recall": {
+    "reported": false,
+    "positive_episode_count": 0,
+    "reason": "PreReg-6: point estimate withheld (Stuck-quadrant positives among uniform random probes < 30 needed for power; smoke withholds Recall)"
+  },
+  "notes": [
+    "main sessions are NOT in ascending session_start order — prospective holdout may leak future→past; pass sessions in chronological order (§8, Codex#3)",
+    "1 probe_assignment(s) had no matching realtime_label — answer_rate may overstate (silent missingness, PreReg-7); investigate session integrity"
+  ]
+}
