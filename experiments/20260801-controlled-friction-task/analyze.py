@@ -324,20 +324,35 @@ def exact_permutation_test(rows: list[list[float]], labels: list[int]) -> dict:
     k = sum(labels)
     observed = cv_auc(rows, labels)
     obs_auc = observed["auc"]
-    ge = 0
-    total = 0
+    perm_aucs = []
     for combo in itertools.combinations(range(n), k):
         perm = [1 if i in combo else 0 for i in range(n)]
-        total += 1
-        if cv_auc(rows, perm)["auc"] >= obs_auc - 1e-12:
-            ge += 1
+        perm_aucs.append(cv_auc(rows, perm)["auc"])
+    total = len(perm_aucs)
+    ge = sum(1 for a in perm_aucs if a >= obs_auc - 1e-12)
+
+    # ★ 到達可能な最小 p（**ラベルに依存しない診断値**）
+    #   帰無分布の最大値に何通りの割付が並ぶかで決まる。並びが多いほど、
+    #   **完全に分離していても p を小さくできない**。1/total（理論上の最小）と混同しないこと。
+    #   ⚠️ Phase1 実データの疑似ブロックで測ると、この床が 0.05 を超える被験者が実在した
+    #      （.steering/20260802-g1-implementation/decisions.md D-5）。
+    max_auc = max(perm_aucs)
+    n_at_max = sum(1 for a in perm_aucs if a >= max_auc - 1e-12)
+    floor_p = n_at_max / total
     return {
         "observed_auc": round(obs_auc, 4),
         "n_permutations": total,
         "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
         "n_ge_observed": ge,
         "p_value": round(ge / total, 6),
-        "min_attainable_p": round(1.0 / total, 6),
+        "theoretical_min_p": round(1.0 / total, 6),
+        "attainable_min_p_for_this_subject": round(floor_p, 6),
+        "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is "
+                                 f"{round(max_auc, 4)}, and {n_at_max}/{total} assignments tie there. "
+                                 "No labelling, however perfect, can produce a p below this floor.",
+        "test_can_reject_at_all": floor_p < ALPHA,
+        "null_auc_median": round(sorted(perm_aucs)[total // 2], 4),
+        "null_auc_p95": round(sorted(perm_aucs)[min(total - 1, int(0.95 * (total - 1)))], 4),
         "alpha": ALPHA,
         "significant": (ge / total) < ALPHA,
         "one_sided": "larger AUC = more separation",
@@ -738,8 +753,12 @@ def selftest() -> int:
     #    「有意に到達できること」と「最小 p が 1/70 として計算されていること」である。
     if not r["significant"] or r["p_value"] >= ALPHA:
         fails.append(f"分離する合成データで有意にならない: p={r['p_value']}")
-    if abs(r["min_attainable_p"] - 1 / 70) > 1e-6:
-        fails.append(f"最小到達可能 p が違う: {r['min_attainable_p']} != {1/70:.6f}")
+    if abs(r["theoretical_min_p"] - 1 / 70) > 1e-6:
+        fails.append(f"理論上の最小 p が違う: {r['theoretical_min_p']} != {1/70:.6f}")
+    if not (r["theoretical_min_p"] <= r["attainable_min_p_for_this_subject"] <= 1.0):
+        fails.append("到達可能な最小 p が理論最小を下回っている（診断値の定義違反）")
+    if "test_can_reject_at_all" not in r:
+        fails.append("test_can_reject_at_all が出力されていない (D-5 の診断)")
 
     # 2) ラベルが無情報 -> 有意にならない
     rows2, labels2 = _synthetic(sep=0.0)

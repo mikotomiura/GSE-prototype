@@ -217,7 +217,19 @@
       "enumeration": "EXHAUSTIVE, never sampled. G1: all C(8,4)=70 label assignments. Positive control: all C(10,2)=45. Therefore the permutation test is SEED-INDEPENDENT.",
       "fisher_applies_when": "n>=2 only. With n=1 the single within-subject p is reported as-is (combining one p-value with Fisher would not return the same number and would only cause confusion).",
       "cross_validation_fold_definition": "leave-one-block-pair-out: every (held-out positive block, held-out negative block) pair is one fold. G1: 4x4=16 folds. Positive control: 2x8=16 folds. The out-of-fold AUC is the fraction of folds in which the held-out positive block scores higher than the held-out negative block (ties count 0.5). This IS the AUC over held-out pairs.",
-      "fold_definition_status": "GAP-FILL: the frozen version-1 text specified 'within-subject leave-one-block-pair-out' and 'out-of-fold AUC' but not how folds are aggregated. Declared here before any data exists. See .steering/20260802-g1-implementation/decisions.md D-3."
+      "fold_definition_status": "GAP-FILL: the frozen version-1 text specified 'within-subject leave-one-block-pair-out' and 'out-of-fold AUC' but not how folds are aggregated. Declared here before any data exists. See .steering/20260802-g1-implementation/decisions.md D-3.",
+      "attainability_reporting": {
+        "why": "The permutation p is discrete. If several label assignments tie at the maximum of the null distribution, no labelling - however perfectly separating - can push p below that floor.",
+        "mandatory_outputs": [
+          "theoretical_min_p (1/70 for G1, 1/45 for the positive control)",
+          "attainable_min_p_for_this_subject (ties at the null maximum / total) - LABEL-FREE",
+          "test_can_reject_at_all (is the attainable floor below alpha)",
+          "null_auc_median and null_auc_p95"
+        ],
+        "label_free": "These depend only on the shape of the null distribution, so they can be computed before looking at the result and add no researcher degree of freedom.",
+        "measured_on_phase1_data": "Cutting Phase1 argumentative sessions into 5-minute pseudo-blocks and enumerating all assignments: the positive control floor exceeded 0.05 in 1 of 4 sessions (0.067), and the 8-block primary floor exceeded 0.05 in 1 of 5 sessions (0.057). The null AUC 95th percentile is about 0.94, so reaching p<0.05 effectively requires AUC near 1.0 - the descriptive 0.70 threshold is nowhere near binding.",
+        "not_a_criterion_change": "Sections 2.5 and 3.3 are UNCHANGED. This is a reporting obligation only. Whether the 2.5 void rule should be amended is a researcher decision recorded in .steering/20260802-g1-implementation/decisions.md D-5, and must be settled BEFORE any confirmatory datum is collected."
+      }
     },
     "descriptive_thresholds": {
       "note": "Secondary. Computed out-of-fold. Used to judge practical magnitude, NOT significance.",
