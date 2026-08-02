@@ -5,6 +5,29 @@
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
   "revision": {
+    "version": 3,
+    "date": "2026-08-02",
+    "frozen_before_any_data": true,
+    "asymmetry": "Version 3 contains ZERO changes that make passing easier. Sections 3.1/3.2/3.4/3.5/3.6 (criteria, thresholds, feature sets, tests) remain UNCHANGED from version 1. Both branches of a failed positive control still refuse to read the 3.3 verdict, so no new path to 'separated' is created.",
+    "v3_changes": {
+      "trigger": "decisions.md D-5: with the version-2 rule, a positive control that fails ONLY because the permutation test has no attainable rejection region (test_can_reject_at_all=false) is diagnosed as an INSTRUMENT FAULT and voids all of G1. Measured on Phase1 data this occurred in 1 of 4 pseudo-sessions.",
+      "researcher_decision": "option (b) of decisions.md D-5",
+      "change_1_positive_control_void_rule": "2.5: the 'positive control x' row is split. x AND test_can_reject_at_all=true -> G1 IS VOID (unchanged from version 2). x AND test_can_reject_at_all=false -> VERDICT WITHHELD (underpowered test, not a broken instrument).",
+      "change_2_section_3_7_precondition": "3.7: a subject with x AND test_can_reject_at_all=false is NOT counted as negative evidence about keystrokes as an instrument. Reported as 'did not reach a verdict (underpowered)'. Applies to the x side ONLY; the v side is unchanged.",
+      "why_not_a_loosening": [
+        "Both branches still refuse to read the 3.3 verdict: the number of routes to a 'separated' claim is unchanged (zero new routes).",
+        "The branching variable test_can_reject_at_all is LABEL-FREE (determined by the shape of the null distribution alone, 5.2), so the branch cannot be chosen after seeing the result.",
+        "Section 3.4 (viewing order) is UNCHANGED: a failed positive control still stops the analysis before 3.3 is read. Only the diagnosis name and the follow-up action are subdivided.",
+        "Change 2 NARROWS what a negative result may claim; it does not widen what a positive result may claim.",
+        "With n=1 there is still no rescue: x AND test_can_reject_at_all=true voids all of G1, exactly as in version 2."
+      ],
+      "also_recorded": {
+        "materials": "the production set of 8 topics x 2 versions was written in this revision; validate_materials.py --strict is green",
+        "n_subjects": "NOT frozen in v3. Per 2.4-1 the confirmatory n is frozen AFTER pilot P-1 and BEFORE any confirmatory datum. Researcher decision recorded in notes.md.",
+        "execution_order": "G1 runs AFTER the Phase1 freeze is lifted, as ADR-009 D7 states. No ADR amendment is needed."
+      }
+    },
+    "v2": {
     "version": 2,
     "date": "2026-08-02",
     "frozen_before_any_data": true,
@@ -26,6 +49,7 @@
     "clarification_only": [
       "3.3-3 denominator expressed as a FRACTION (>=80% of n) instead of '4 of 5'. Neither 80% nor AUC 0.60 changed."
     ]
+    }
   },
   "design": {
     "domain": "writing_argumentative",
@@ -59,7 +83,24 @@
       "record": "write the frozen n into this file and record the date and commit hash in notes.md",
       "pilot_not_reused": "the pilot subject (the researcher) is NOT reused in the confirmatory sample",
       "no_replacement": "subjects removed by the eligibility gate (2.9) are NOT replaced; the reduced n is reported as-is",
-      "multiplicity": "Under the null, P(at least 1 of 5 independent subjects has p<0.05) = 1-0.95^5 = 23%. Across-subject multiplicity is handled ONLY by Fisher combination (3.3-1). 'One subject was significant' is never reported as evidence of separation."
+      "multiplicity": "Under the null, P(at least 1 of 5 independent subjects has p<0.05) = 1-0.95^5 = 23%. Across-subject multiplicity is handled ONLY by Fisher combination (3.3-1). 'One subject was significant' is never reported as evidence of separation.",
+      "v3_status": "STILL NOT FROZEN. Researcher decision (2026-08-02, version 3): keep the 2.4-1 schedule and freeze after pilot P-1. Freezing earlier is not required and the pilot may still change block length / source volume, which affects how many subjects are affordable. The optional-stopping risk is unaffected because the freeze still precedes the first confirmatory datum. The freeze procedure is written out in notes.md."
+    },
+    "execution_order": {
+      "decision": "RUN G1 AFTER the Phase1 freeze is lifted",
+      "decided": "2026-08-02 (version 3, researcher decision)",
+      "rationale": "ADR-009 D7 and docs/architecture/personalization-and-online-learning.md 8.2 both state that G1 is the first task after unfreezing. G1 has no TECHNICAL dependency on the freeze (analysis touches zero lines of src-tauri/), but the declared order is kept.",
+      "adr_amendment_needed": false,
+      "consequence": "G1 cannot start while Phase1 is GATE3=DataInsufficient. Pilot P-1 is not confirmatory data and is not blocked by this decision."
+    },
+    "materials_status": {
+      "production_set_complete": true,
+      "topics": 8,
+      "versions_per_topic": ["lo", "hi"],
+      "plus": "copy.md (positive control, shared by all subjects)",
+      "validated_by": "python3 validate_materials.py --strict (green)",
+      "written_in": "version 3",
+      "may_still_change": "Pilot P-1 may change source volume / block length (2.8 permits exactly this). Section 3 criteria may NOT change."
     },
     "optional_stopping": "FORBIDDEN: no confirmatory analysis is viewed until the frozen n is collected; n is not changed on interim results; adding subjects until significance is explicitly forbidden",
     "topic_condition_counterbalance": {
@@ -228,7 +269,8 @@
         ],
         "label_free": "These depend only on the shape of the null distribution, so they can be computed before looking at the result and add no researcher degree of freedom.",
         "measured_on_phase1_data": "Cutting Phase1 argumentative sessions into 5-minute pseudo-blocks and enumerating all assignments: the positive control floor exceeded 0.05 in 1 of 4 sessions (0.067), and the 8-block primary floor exceeded 0.05 in 1 of 5 sessions (0.057). The null AUC 95th percentile is about 0.94, so reaching p<0.05 effectively requires AUC near 1.0 - the descriptive 0.70 threshold is nowhere near binding.",
-        "not_a_criterion_change": "Sections 2.5 and 3.3 are UNCHANGED. This is a reporting obligation only. Whether the 2.5 void rule should be amended is a researcher decision recorded in .steering/20260802-g1-implementation/decisions.md D-5, and must be settled BEFORE any confirmatory datum is collected."
+        "not_a_criterion_change": "Introduced in version 2 as a REPORTING OBLIGATION only; section 3.3 is UNCHANGED to this day.",
+        "settled_in_v3": "The D-5 question (should the 2.5 void rule be amended?) was settled in version 3 with researcher decision (b), BEFORE any confirmatory datum was collected. Section 3.3 was NOT changed; the 2.5 'x' row was split by test_can_reject_at_all and 3.7 gained an evidential precondition. See revision.v3_changes."
       }
     },
     "descriptive_thresholds": {
@@ -270,6 +312,14 @@
       "move instrumentation resources to Adapter B (coding events: accept / reject / test / revert), i.e. content-free events that are NOT keystrokes"
     ],
     "negative_result_caveat": "Never state 'keystrokes cannot measure this in principle'. [P44] leaves 'the manipulation was too subtle' open.",
+    "negative_result_precondition_v3": {
+      "rule": "A subject whose primary test has test_can_reject_at_all=false does NOT count as negative evidence about keystrokes as an instrument. Report that subject as 'did not reach a verdict (underpowered)', not as x, and always print test_can_reject_at_all and attainable_min_p_for_this_subject alongside.",
+      "why": "For such a subject the attainable minimum p exceeds alpha, so even perfect separation yields x. That is a property of the TEST, not of the world, and it cannot support the 'lost on the densest ground, so it loses everywhere' argument.",
+      "n_equals_1_consequence": "If this happens at n=1 the whole of G1 is VERDICT WITHHELD. Do not proceed to doubting the axis; re-run with higher attainability.",
+      "applies_to_negative_side_only": "The v side is unchanged: reaching p<0.05 already implies the test was attainable. This narrows what x may claim and widens nothing.",
+      "not_a_threshold_change": "Section 3.3 thresholds and the 2.5 pass/fail rule are untouched. Only the interpretation of an x result is constrained.",
+      "power_context": "Measured on Phase1 data the null AUC 95th percentile is about 0.94, so p<0.05 effectively requires AUC near 1.0. A real but moderate effect (AUC 0.75-0.85) will be reported as x. The design is knowingly conservative; this fact MUST accompany any x interpretation."
+    },
     "positive_result_scope": "A positive result licenses ONLY 'separable in argumentative writing'. It does NOT transfer to other domains (ADR-001 states this explicitly) and does NOT imply 'work state is separable during real work' (see ecological_validity).",
     "overclaiming_forbidden": "Do not generalize a pass into 'the GSE observation space was sufficient'."
   },
@@ -330,8 +380,13 @@
     "permutations": "C(10,2)=45 -> min exact p = 0.0222 < 0.05",
     "decision_rule": {
       "pass_and_hi_lo_separates": "report separation per section 3.3",
-      "pass_and_hi_lo_fails": "ONLY case in which 'keystrokes cannot separate friction' may be claimed; must also state that the manipulation may have been too subtle [P44]",
-      "fail": "G1 IS VOID. Instrument/pipeline fault suspected. Do not read x/x as a property of the world. Diagnose and re-run."
+      "pass_and_hi_lo_fails": "ONLY case in which 'keystrokes cannot separate friction' may be claimed; must also state that the manipulation may have been too subtle [P44]; the 3.7 evidential precondition must also hold",
+      "fail_and_test_can_reject_at_all_true": "G1 IS VOID. Instrument/pipeline fault suspected. Do not read x/x as a property of the world. Diagnose and re-run.",
+      "fail_and_test_can_reject_at_all_false": "VERDICT WITHHELD (added in version 3). The instrument is NOT suspected: the permutation test had no attainable rejection region for this subject, so even perfect separation would have failed. The 3.3 verdict is still NOT read. Re-run with a design that raises attainability (e.g. more blocks); do NOT diagnose the instrument and do NOT doubt the axis.",
+      "why_split_is_not_a_loosening": "Both fail branches refuse to read the 3.3 verdict, so no new route to a 'separated' claim exists. test_can_reject_at_all is label-free, so the branch cannot be chosen after seeing the result. Section 3.4 (viewing order and stopping behaviour) is unchanged.",
+      "multiple_failing_subjects": "If ANY failing subject has test_can_reject_at_all=true the cohort status is G1_VOID (an instrument-fault suspicion is never diluted by another subject's underpower).",
+      "implemented_in": "analyze.py interpretability(); the cohort result carries decision_status in {INTERPRETABLE, MANIPULATION_CHECK_NOT_SUPPLIED, MANIPULATION_CHECK_FAILED, POSITIVE_CONTROL_NOT_RUN, G1_VOID, VERDICT_WITHHELD}. Regression-tested in analyze.py selftest.",
+      "n_equals_1_note": "With n=1 there is no Fisher rescue: a single subject failing with test_can_reject_at_all=true voids all of G1."
     },
     "known_limitation": "Copy blocks are at FIXED positions, so this separation is confounded with position. Use as a FLOOR CHECK on instrument health only; do NOT claim an effect size and do NOT cite this test as evidence of effect. Also, copy vs writing is a much larger contrast than HI/LO: passing does not guarantee power for HI/LO."
   },

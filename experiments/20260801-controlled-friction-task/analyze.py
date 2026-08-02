@@ -531,6 +531,56 @@ def manipulation_check(blocks: list[dict], answers: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# §3.4 の見る順序 ＋ §2.5（第 3 版）の分岐
+# ---------------------------------------------------------------------------
+def interpretability(mchecks: dict, pcs: list[dict]) -> tuple[str, bool, str]:
+    """`§3.4` の見る順序（操作チェック → positive control）を 1 か所に閉じる。
+
+    ★ **第 3 版の変更点**: positive control が `✗` のときの扱いを、**ラベル非依存**の
+    診断値 `test_can_reject_at_all` で分ける（`preregistration.md §2.5`）:
+
+      - `✗` かつ **true**  -> `G1_VOID`（計器故障の疑い・**第 2 版から不変**）
+      - `✗` かつ **false** -> `VERDICT_WITHHELD`（**検出力不足であって計器故障ではない**）
+
+    ⚠️ **どちらの枝でも `§3.3` の判定を読まない**（`interpretable=False`）。
+       したがってこれは**判定を緩める分岐ではない**——「分離できた」と言える経路は
+       1 本も増えていない。分岐変数は帰無分布の形だけで決まるので、
+       **結果を見てから枝を選ぶことができない**。
+
+    ★ 落ちた被験者が複数いる場合、**1 名でも `true` で落ちていれば `G1_VOID`** とする
+      （計器故障の疑いを検出力不足で薄めない・保守側）。
+
+    戻り値: (status, interpretable, reason)
+    """
+    if not mchecks:
+        return ("MANIPULATION_CHECK_NOT_SUPPLIED", False,
+                "manipulation check not supplied. Per 3.4 the separation result must not be "
+                "interpreted until the manipulation check has been read and passed.")
+    if not all(m["passed"] for m in mchecks.values()):
+        return ("MANIPULATION_CHECK_FAILED", False,
+                "manipulation check FAILED (2.6): the friction was not manipulated; redesign the task.")
+    if not pcs:
+        return ("POSITIVE_CONTROL_NOT_RUN", False,
+                "positive control could not be run (no eligible 10-block subject).")
+
+    failed = [p for p in pcs if not p.get("passed")]
+    if any(p.get("test_can_reject_at_all") for p in failed):
+        return ("G1_VOID", False,
+                "positive control FAILED with test_can_reject_at_all=true: G1 IS VOID (2.5). "
+                "Instrument/pipeline fault suspected. Do NOT read a negative result as a property "
+                "of the world. Diagnose and re-run.")
+    if failed:
+        return ("VERDICT_WITHHELD", False,
+                "positive control FAILED, but test_can_reject_at_all=false for every failing subject: "
+                "VERDICT WITHHELD (2.5, revision 3). This is UNDERPOWER, not an instrument fault - "
+                "even perfect separation could not have reached p<alpha for these subjects. "
+                "Do NOT diagnose the instrument and do NOT doubt the axis; re-run with a design "
+                "that raises attainability (e.g. more blocks).")
+    return ("INTERPRETABLE", True,
+            "manipulation check passed and positive control passed (3.4 order satisfied).")
+
+
+# ---------------------------------------------------------------------------
 # コホート水準の判定（§3.3）
 # ---------------------------------------------------------------------------
 def cohort_verdict(per_subject: list[dict], interpretable: bool, reason: str) -> dict:
@@ -679,26 +729,25 @@ def main() -> int:
         return 1
 
     # §3.4 の見る順序: 1. 操作チェック → 2. positive control → 3. FS-A / FS-B
-    mc_ok = bool(mchecks) and all(m["passed"] for m in mchecks.values())
+    # ★ 分岐は interpretability() に閉じている（§2.5 第 3 版の 2 枝を含む）
     pcs = [s["positive_control"] for s in per_subject if not s["positive_control"].get("skipped")]
-    pc_ok = bool(pcs) and all(p.get("passed") for p in pcs)
-    if not mchecks:
-        interp, why = False, ("manipulation check not supplied. Per 3.4 the separation result must not be "
-                              "interpreted until the manipulation check has been read and passed.")
-    elif not mc_ok:
-        interp, why = False, "manipulation check FAILED (2.6): the friction was not manipulated; redesign the task."
-    elif not pcs:
-        interp, why = False, "positive control could not be run (no eligible 10-block subject)."
-    elif not pc_ok:
-        interp, why = False, ("positive control FAILED: G1 IS VOID (2.5). Instrument/pipeline fault suspected. "
-                              "Do NOT read a negative result as a property of the world.")
-    else:
-        interp, why = True, "manipulation check passed and positive control passed (3.4 order satisfied)."
+    status, interp, why = interpretability(mchecks, pcs)
 
     result = {
         "experiment": "20260801-controlled-friction-task",
         "gate": "G1",
         "preregistration": "preregistration.md (frozen; authoritative over this output)",
+        "preregistration_revision": 3,
+        "decision_status": status,
+        "decision_status_values": {
+            "INTERPRETABLE": "3.4 order satisfied; read the 3.3 verdict",
+            "MANIPULATION_CHECK_NOT_SUPPLIED": "3.4-1 not read yet",
+            "MANIPULATION_CHECK_FAILED": "2.6 failed; do not interpret separation",
+            "POSITIVE_CONTROL_NOT_RUN": "no eligible 10-block subject",
+            "G1_VOID": "2.5: positive control failed AND the test could have rejected -> instrument fault suspected",
+            "VERDICT_WITHHELD": "2.5 (revision 3): positive control failed but the test could NOT have "
+                                "rejected for any failing subject -> underpower, NOT an instrument fault",
+        },
         "reading_order_3_4": ["1_manipulation_check", "2_positive_control", "3_feature_sets"],
         "1_manipulation_check": mchecks or {"supplied": False},
         "2_positive_control": {s["subject"]: s["positive_control"] for s in per_subject},
@@ -714,7 +763,9 @@ def main() -> int:
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"[ok] {out}  interpretable={interp}")
+    print(f"[ok] {out}  status={status} interpretable={interp}")
+    if not interp:
+        print(f"       {why}")
     for name in FEATURE_SETS:
         v = result["3_verdict"][name]
         print(f"  {name}: separated={v['separated']} median_auc={v['criterion_2_median_auc']} "
@@ -790,6 +841,42 @@ def selftest() -> int:
     if not (0.0 < f["p_value"] < 0.01):
         fails.append(f"Fisher の値が異常: {f}")
 
+    # 5b) ★ §2.5（第 3 版）: positive control ✗ の扱いが到達可能性で分岐する
+    mc_pass = {"P001": {"passed": True}}
+    pc_pass = {"passed": True, "test_can_reject_at_all": True}
+    pc_fail_attainable = {"passed": False, "test_can_reject_at_all": True}
+    pc_fail_unattainable = {"passed": False, "test_can_reject_at_all": False}
+
+    st, it, _ = interpretability(mc_pass, [pc_pass])
+    if st != "INTERPRETABLE" or not it:
+        fails.append(f"positive control 合格なのに status={st} interpretable={it}")
+
+    st, it, why = interpretability(mc_pass, [pc_fail_attainable])
+    if st != "G1_VOID" or it:
+        fails.append(f"✗ かつ到達可能なのに G1_VOID にならない: status={st} (§2.5)")
+
+    st, it, why = interpretability(mc_pass, [pc_fail_unattainable])
+    if st != "VERDICT_WITHHELD" or it:
+        fails.append(f"✗ かつ到達不能なのに判定保留にならない: status={st} (§2.5 第 3 版)")
+    if "IS VOID" in why:
+        fails.append("判定保留の説明文に 'IS VOID' が混ざっている（計器故障と誤診させる）")
+
+    # ★ 1 名でも到達可能で落ちていれば G1_VOID（検出力不足で薄めない・保守側）
+    st, _, _ = interpretability(mc_pass, [pc_fail_unattainable, pc_fail_attainable])
+    if st != "G1_VOID":
+        fails.append(f"到達可能な失敗が混ざっているのに G1_VOID にならない: status={st}")
+
+    # ★ どちらの枝でも §3.3 を読まない = 判定は緩んでいない
+    for pc in (pc_fail_attainable, pc_fail_unattainable):
+        if interpretability(mc_pass, [pc])[1]:
+            fails.append("positive control ✗ なのに interpretable=True になっている（判定が緩んでいる）")
+
+    # ★ 見る順序（§3.4）: 操作チェックが先。positive control が合格でも止まる
+    if interpretability({}, [pc_pass])[0] != "MANIPULATION_CHECK_NOT_SUPPLIED":
+        fails.append("操作チェック未提出なのに先に進んでいる (§3.4-1)")
+    if interpretability({"P001": {"passed": False}}, [pc_pass])[0] != "MANIPULATION_CHECK_FAILED":
+        fails.append("操作チェック不合格なのに先に進んでいる (§3.4-1)")
+
     # 6) 適格性ゲートは打鍵数だけで判定し、ブロックを落とさない（§2.9）
     blks = [{"block": i, "condition": ("HI" if i % 2 else "LO"), "n_keydowns": 500} for i in range(2, 10)]
     blks += [{"block": 1, "condition": "copy", "n_keydowns": 500},
@@ -850,7 +937,8 @@ def selftest() -> int:
             print(f"  - {f_}")
         return 1
     print("[OK] analyze.py selftest 緑 "
-          "(全数列挙 70/45・分離/非分離・分散ゼロ・Fisher・適格性ゲート・特徴量定義)")
+          "(全数列挙 70/45・分離/非分離・分散ゼロ・Fisher・★§2.5 第 3 版の分岐・"
+          "見る順序 §3.4・適格性ゲート・特徴量定義)")
     return 0
 
 
