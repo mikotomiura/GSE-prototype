@@ -51,7 +51,7 @@ fi
 # --- 2. 実施資材 -------------------------------------------------------------
 echo
 echo "[2] 実施資材"
-for f in protocol.md consent.md; do
+for f in protocol.md consent.md participant-guide.md; do
   if [ -s "$f" ]; then ok "$f"; else bad "$f が無い/空（実施できない）"; fi
 done
 if [ -d materials ]; then ok "materials/"; else bad "materials/ が無い"; fi
