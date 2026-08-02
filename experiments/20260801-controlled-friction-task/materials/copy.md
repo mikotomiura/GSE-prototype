@@ -1,7 +1,7 @@
 ---
 id: copy
 version: copy
-title: 書き写し課題（positive control）
+title: 書き写し
 sources: 0
 output_requirement_chars: none
 ---

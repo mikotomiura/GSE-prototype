@@ -235,5 +235,18 @@ if __name__ == "__main__":
             text = text[:text.index(marker)]
         elif arg.startswith("--title="):
             text = f"# {arg.split('=', 1)[1]}\n\n" + text
+        elif arg == "--frontmatter-title":
+            # ★ 課題文用: front matter を **落として** title と id だけを見出しにする。
+            #   ⚠️ `version: lo|hi` と `sources:` を印刷すると条件が被験者に見えてしまう。
+            m = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
+            if not m:
+                sys.exit(f"[NG] front matter が無い: {src}")
+            meta = dict(
+                (k.strip(), v.strip())
+                for k, v in (ln.split(":", 1) for ln in m.group(1).splitlines() if ":" in ln))
+            head = meta.get("title", "課題")
+            if meta.get("id") and meta["id"] != "copy":
+                head += f"（{meta['id']}）"
+            text = f"# {head}\n\n" + m.group(2)
     write_docx(text, dst)
     print(f"[ok] {dst}  ({dst.stat().st_size:,} bytes)")
