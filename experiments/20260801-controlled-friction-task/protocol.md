@@ -255,6 +255,14 @@ python3 assign.py --subject P015 --json   # 機械可読（解析入力になる
 - [ ] タイマーを用意した（被験者から見えない位置）
 - [ ] 実施端末を決めた。★ **Windows 11 が望ましい**
       （macOS では `ime_dwell_med` が構造的に欠測する・`preregistration.md §5.1`）
+- [ ] ★★ **起動モードを「第 1 週（blind 較正）」にした**
+      - **介入が全部 gate される**（`INTERVENTION_ENABLED=false` → `safe_default()`）
+      - **推定状態が非表示になる**（第 2 週だと被験者に見えて交絡になる）
+      - ⚠️ **第 2 週 ＋ Monk Mode では駄目。Monk Mode は Wall しか抑制せず Nudge は出る**
+      - ⚠️ 第 1 週はプローブが最も密（λ 1回/6分）なので、**B-1 の無効化が前提**
+- [ ] ★ 配布物を印刷した（`bash make-handouts.sh` で `handouts/` に .docx を生成）
+      - `G1_説明・同意文書.docx`（署名を取る）／ `G1_参加のご案内.docx`（署名後に渡す）
+      - ⚠️ `G1_実験の解説.docx` は**第三者・共同研究者向け。被験者には渡さない**
 
 ### 当日・開始前
 

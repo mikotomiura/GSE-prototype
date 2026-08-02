@@ -76,3 +76,6 @@ gse_*.ndjson
 experiments/**/raw/
 experiments/**/*.ndjson
 experiments/**/*.jsonl
+
+# G1 配布用 .docx（markdown から再生成できる派生物）
+experiments/*/handouts/

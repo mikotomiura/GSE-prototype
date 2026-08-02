@@ -214,6 +214,38 @@
 - **影響範囲**: `preregistration.md` 第 4 版 §6（記録のみ）／ `config.json`
   `revision.v4_changes.also_recorded.block_partitioning`。**設計変更なし。**
 
+## 判断 E-9: 起動モードは **第 1 週（blind 較正）**。Monk Mode には頼らない
+
+- **判断日**: 2026-08-03
+- **問い**: 「第 2 週を選んだうえで Monk Mode で介入を抑える」でよいか。
+- **一次確認した事実**（`intervention.rs` を読んだ）:
+  - `monk_mode` が現れるのは **`update_wall_accumulation()`（`:439`）と
+    `apply_wall_suppressions()`（`:474`）だけ**。
+  - ★ **Nudge の経路には `monk_mode` のチェックが一切ない。**
+  → ★ **Monk Mode は Wall しか抑制しない。第 2 週 + Monk Mode では Nudge が発火する。**
+- **採用**: ★ **第 1 週（blind 較正）**
+- **理由**:
+  1. ★ **介入が全部 gate される。** `INTERVENTION_ENABLED=false` → `safe_default()`（`lib.rs:473`）。
+     Nudge も Wall も出ない。**Monk Mode に頼る必要がない。**
+  2. ★ **推定状態が非表示になる**（`calibrationMode=true`）。
+     第 2 週は Dashboard に推定状態が出るので、**被験者が「今 Stuck と出た」を見て行動を変える**
+     ——これは content-free 観測を目的とする G1 では明確な交絡である。
+  3. プローブの密度差（第 1 週 λ=1回/6分 vs 第 2 週 λ=2回/30分）は
+     **B-1（案 C）で無効化するので無関係になる**。
+- ⚠️ **B-1 を実装しない限り、どちらのモードを選んでも駄目**（プローブは止まらない）。
+- **影響範囲**: `protocol.md`（起動モードを明記）。**コードも事前登録も変更しない。**
+
+## ★ 新しい懸念 B-4: 第 1 週モードは Phase1 の較正プールと同じラベルになる
+
+- **発見**: E-9 の帰結として、G1 を第 1 週モードで回すと `session_meta` に
+  **`condition=blind_calibration` / `label_pool=calibration_blind`** が刻まれる（`App.tsx`）。
+  これは **Phase1 の較正セッションとまったく同じラベル**である。
+- ⚠️ **リスク**: gse-dataset 側の集計が `label_pool` で拾うと、**G1 のデータが Phase1 の集計に混入しうる**。
+  ★ `calibration_eval` が `label_pool` で絞っていない件は既知の問題として記録されている。
+- **対処（未実施・次セッション）**: 被験者 ID を Phase1（P010–P014）と分ける（`protocol.md` は P015 以降を例示）
+  だけでは不十分で、**`data.md` の送付フローで G1 を明示的に分離する**必要がある。
+- ★ **事前登録の変更は不要**（実施・データ管理の問題であって判定基準の問題ではない）。
+
 ---
 
 ## ★ 本ラウンドで**やらなかった**こと（意図的）
