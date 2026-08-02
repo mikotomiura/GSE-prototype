@@ -147,9 +147,16 @@
 | **Coding** | ★ **Phase2 では較正しない**。主信号（accept/reject/test/revert）は **Adapter B が未実装**で観測できない（`domain-adapter-boundary.md §Adapter B`・Epic 4 は feasibility 止まり）。打鍵 β だけで較正したことにしない | ★ **未較正のまま運用**＝強介入禁止が自動で効く |
 | **Creative** | ★ **baseline を獲得しない**（ADR-006 #3 で打鍵 β を持たないと確定済み）。Phase2 の成果物は feasibility 調査であって baseline ではない | 較正対象外 |
 
-> ★ **これは先送りではなく決定である**: Coding / Creative に被験者セッション枠を割り当てない。
-> 観測手段が無い head の baseline を打鍵だけで作ると、**未較正であることを隠す**ことになり、
+> ★ **これは先送りではなく決定である**: Coding / Creative に **較正（baseline 獲得）用の**被験者セッション枠を
+> 割り当てない。観測手段が無い head の baseline を打鍵だけで作ると、**未較正であることを隠す**ことになり、
 > 「未較正 head では強介入を出さない」という安全側の既存原則を**無効化してしまう**。
+>
+> ⚠️ **ドメイン拡張そのものを止める決定ではない。** 本節が制限するのは**較正枠のみ**であり、
+> **Epic 4（Agentic Coding・observe-only / de-risk pilot）と Epic 6（Creative feasibility・Go/Defer/Kill 判定）は
+> 別トラックとして生きている**（`gse-v2-overview.md` の Epic 表）。
+> それらが要求する観測は「baseline を作るための較正セッション」ではなく
+> **「どのイベントが取得可能か・privacy threat model はどうか・代理と客観的害を co-measure できるか」**であり、
+> 本設計はそれを一切妨げない。ADR-006 の枠組み C（task_kind → head ルーティング）も無改変である。
 
 ### 2.8 G1（統制タスク実験）との統合
 
@@ -208,6 +215,26 @@ block 構成・counterbalance 規則・正例の種類・除外基準・§4.5 �
 > **「誤った head で黙って処理される」（§11-11 の穴の本体）が、ルーティングを直さずに塞がる。**
 > 逆に言えば、head ごとに **判別特徴も定数も別物**である（Writing の「推敲の不在」は Coding では意味が違う）。
 > → **scope 判定機構は共有し、特徴集合と定数は head が所有する**（ADR-006 の「β は head 所有」と同じ所有規則）。
+
+### ★★ 参照分布の鍵は head 単位ではなく `head × task_kind` 単位である（2026-08-02 追加）
+
+ADR-006 の分岐は `Argumentative | Correspondence => WritingHead` であり、**論述と通信文は同じ head** に入る。
+ところが両者は **knowledge-transforming と knowledge-telling** で停滞の質が構造的に違い（[P17]・
+`docs/literature/20260629-task-type-writing-struggle.md`）、打鍵特徴は **課題の小さな違いにも感度がある**（[P36]）。
+
+> ★ **したがって「論述で較正した Writing head に通信文を流すと `scope_fit` が下がる」という
+> 偽陽性モードが構造的に存在する。** ジャンルの違いを対象外と取り違える——[P36] が名指しした失敗そのものである。
+
+**対処（新機構を作らない範囲で閉じる）**: `scope_fit` の**参照分布を `head × task_kind`（宣言値）で鍵づける**。
+個人 baseline が既に `user × task_kind × phase` で鍵づけられている（`§5.3 ContextSnapshot`）のと**同じ規則**であり、
+鍵を 1 つ揃えるだけで済む。`phase` は §3.6 により Phase2 では `unspecified` に collapse する。
+
+⚠️ **前提の弱さを明記する**: この鍵づけは `task_kind` enum が意味のある分割であることに依存するが、
+**現行の 4 変種は ad-hoc であり理論的裏づけが無い**（`research-positioning §8`・
+`20260629` カードが telling↔transforming 軸での**再定義と経験的検証**を「やり残し」として名指し済み）。
+→ **enum の再定義は本設計の前提条件**であり、§6 の未解決に挙げる。
+⚠️ 鍵を増やすと**鍵あたりのデータが減る**（§3.6 と同じトレードオフ）。task_kind は 4 変種を超えて増やさない
+（`ADR-006 Migration 5`: schema は additive のみ・enum は 4 変種維持）。
 
 ### 3.3 決定 3: 宣言と観測が食い違ったら — **re-route しない**
 
@@ -361,6 +388,11 @@ scope_fit    = g( { flag_m, margin_m } )        # 単調・(0,1] 有界・§4.4
 - `g` は **単調非増加**・値域 `(0, 1]`・**下限を持つ**（0 にしない＝ hard mute の禁止・§3.5）。
 - `evidence_quality ← evidence_quality × g(scope_fit)`、`uncertainty` は対応して単調に増やす。
 - **他の消費者を作らない**（§3.5 の allow-list）。
+- ★ **旧 X 軸との関係（2026-08-02 追加）**: `evidence_quality` は新軸専用の欄ではない。
+  ADR-009 D1b で旧 X 軸は**降格**したが、`p_stuck` → Need は **Phase 2b までは現行のまま**介入を駆動する
+  （`personalization…md §2.5`）。したがって **`scope_fit` は当面、降格した旧軸の側にこそ効く**。
+  これは意図どおりである——`progress_proxy` の穴は `§11-11` が明記するとおり
+  **旧軸と新軸に共通する穴**であり、scope ゲーティングは両方を同時に守る。
 - **ヒステリシス**を持たせる（窓ごとに評価が振動して介入可否がちらつくのを防ぐ）。
   形式は既存の EMA ヒステリシス（`hmm-analysis`）と同型にし、新しい平滑化機構を発明しない。
 
@@ -436,6 +468,12 @@ scope_fit    = g( { flag_m, margin_m } )        # 単調・(0,1] 有界・§4.4
 3. `g` の関数形とヒステリシス定数（§4.4）は §4.5 の手続きに未記載——**S 層のデータが取れてから**決める。
 4. B-2（コホート項）の是非は Phase2 で**比較して**決める。本書は既定を「入れる」に置いただけである。
 5. 自動 re-route（§3.3 昇格ゲート）は Phase2 では実装しない。
+6. ★★ **`task_kind` enum（4 変種）が ad-hoc である**（`research-positioning §8`）。§3.2 の
+   `head × task_kind` 鍵づけは enum が意味のある分割であることに依存するため、
+   **telling↔transforming 軸での再定義と経験的検証**（`20260629` カードのやり残し）が
+   **本設計の前提条件**になった。⚠️ 再定義しても **enum は 4 変種を超えて増やさない**（ADR-006 Migration 5）。
+   → Phase2 の構造化較正（§2）は、この再定義を**検証できる block 構成**にすること
+   （論述 block と通信文 block を同一人物内で取れば、telling/transforming の分離が同じデータで検定できる）。
 
 ## 7. 関連文書
 

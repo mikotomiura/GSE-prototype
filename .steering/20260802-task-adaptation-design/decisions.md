@@ -146,3 +146,37 @@
   「断定せず割り引く」を文献側から支持する結果になった**。
 
 ⚠️ **一次全文確認はゼロ**（abstract/要旨水準）。凍結対象・確証トラックは動かしていない。
+
+## 判断 14: ユーザー指摘で 2 つの穴を塞いだ（2026-08-02・設計レビュー）
+
+### (a) 「較正枠を割り当てない」の書きすぎ → ドメイン拡張と較正を分離
+
+判断 8 の「Coding / Creative に被験者セッション枠を割り当てない」が、
+**Epic 4（Agentic・observe-only / de-risk pilot）と Epic 6（Creative feasibility）まで止める**ように読めた。
+制限しているのは **較正（baseline 獲得）枠のみ**であり、feasibility / de-risk が要求する観測
+（取得可能イベント・privacy threat model・代理×客観的害の co-measure）は本設計の対象外だと明記した。
+ADR-006 の枠組み C も無改変である。
+
+### (b) ★★ `scope_fit` の参照分布を head 単位で書いていた（真の設計欠陥）
+
+ADR-006 の分岐は `Argumentative | Correspondence => WritingHead` で、**論述と通信文が同じ head** に入る。
+一方 [P17] は両者が **knowledge-transforming / knowledge-telling** で停滞の質が違うと述べ、
+[P36] は **打鍵特徴が課題の小さな違いにも感度がある**と結論している。
+→ **論述で較正した head に通信文を流すと `scope_fit` が下がる**という偽陽性モードが構造的に存在した。
+**ジャンルの違いを対象外と取り違える**——[P36] が名指しした失敗そのもの。
+
+**対処**: 参照分布を **`head × task_kind`（宣言値）で鍵づける**。個人 baseline が既に
+`user × task_kind × phase` で鍵づけられているのと同じ規則で、鍵を 1 つ揃えるだけ。新機構は増えない。
+
+**副次的な帰結**: この鍵づけは `task_kind` enum が意味のある分割であることに依存する。
+現行 4 変種は **ad-hoc**（`20260629` カードが telling↔transforming 軸での再定義を「やり残し」と名指し済み）。
+→ **enum の再定義が本設計の前提条件**になったので §6 の未解決に追加し、
+Phase2 の block 構成で**同一人物内に論述 block と通信文 block を置けば同じデータで検定できる**ことを書いた。
+⚠️ 再定義しても **enum は 4 変種を超えて増やさない**（ADR-006 Migration 5・schema は additive のみ）。
+
+### (c) 旧 X 軸との接続点を明示
+
+`scope_fit` → `evidence_quality` は新軸専用ではない。ADR-009 D1b で旧 X 軸は降格したが
+`p_stuck` → Need は **Phase 2b までは現行のまま**介入を駆動するため、
+**`scope_fit` は当面、降格した旧軸の側にこそ効く**。これは `§11-11` が
+「`progress_proxy` の穴は**旧軸と新軸に共通**」と書いたことと整合する（意図どおり）。
