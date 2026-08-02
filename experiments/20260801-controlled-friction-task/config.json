@@ -1,39 +1,74 @@
 {
   "schema_version": "1",
   "experiment_id": "20260801-controlled-friction-task",
-  "status": "DESIGN_ONLY_NOT_EXECUTED",
+  "status": "PREREGISTERED_FROZEN_NOT_EXECUTED",
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
-
   "design": {
     "domain": "writing_argumentative",
-    "blocks_per_session": 8,
+    "blocks_per_session": 10,
     "block_minutes": 5,
     "inter_block_minutes": 1,
-    "conditions": ["HI", "LO"],
+    "conditions": [
+      "HI",
+      "LO"
+    ],
     "blocks_per_condition": 4,
     "assignment": "within_person_alternating_ABBA_balanced_then_seed_randomized",
-    "output_requirement_chars": [300, 400],
+    "output_requirement_chars": [
+      300,
+      400
+    ],
     "source_material_total_chars_matched_across_conditions": true,
-    "rationale_block_count": "C(8,4)=70 permutations -> min exact p = 1/70 = 0.0143 < 0.05. With 4 blocks C(4,2)=6 -> min p = 0.167, unreachable."
+    "rationale_block_count": "C(8,4)=70 permutations -> min exact p = 1/70 = 0.0143 < 0.05. With 4 blocks C(4,2)=6 -> min p = 0.167, unreachable.",
+    "g1_blocks": 8,
+    "positive_control_blocks": 2,
+    "session_minutes_approx": 62,
+    "block_layout": "[1]=copy, [2..9]=G1 (HI4/LO4, order seed-randomized), [10]=copy",
+    "positive_control_position": "FIXED_first_and_last_not_randomized",
+    "rationale_copy_block_position": "Keeps the forced-comparison chain closed inside the 8 G1 blocks (a copy block between two G1 blocks would break 'compared with the previous block'). Also makes the leading copy block serve as the individual transcription baseline [P38].",
+    "n_subjects": 5,
+    "optional_stopping": "FORBIDDEN: no analysis is viewed until all 5 subjects are collected; n is not changed on interim results"
   },
-
   "feature_sets": {
     "FS_A": {
       "description": "current 5 features (legacy X-axis observation space)",
-      "features": ["F1", "F3", "F4", "F5", "F6"]
+      "features": [
+        "F1",
+        "F3",
+        "F4",
+        "F5",
+        "F6"
+      ]
     },
     "FS_B": {
       "description": "FS_A + Tier0 + Tier1",
       "features": [
-        "F1", "F3", "F4", "F5", "F6",
-        "keys", "bs_rate", "external_paste_chars", "ime_dwell_med",
-        "silence_p50", "silence_p90", "silence_max",
-        "burst_p50", "burst_p90"
-      ]
+        "F1",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "keys",
+        "bs_rate",
+        "external_paste_chars",
+        "ime_dwell_med",
+        "silence_p50",
+        "silence_p90",
+        "silence_max",
+        "burst_p50",
+        "burst_p90"
+      ],
+      "tier1_definitions": {
+        "iki_ms": "interval between consecutive keydowns; block measurement starts at first keydown and ends at last keydown (pre-block waiting time excluded)",
+        "silence": "IKI >= 2000 ms (matches the current F5 threshold)",
+        "silence_p50_p90_max": "quantiles/max of silence DURATIONS (ms) within the block; if the block contains zero silences all three are 0 (declared, not missing)",
+        "burst": "run of consecutive keystrokes delimited by silences; burst length = number of keystrokes in the run",
+        "burst_p50_p90": "quantiles of burst LENGTH within the block",
+        "band_rates_excluded": "the banded silence rates of personalization-and-online-learning.md 5.2 are NOT used here: >120s band cannot occur in a 5-minute block, and adding features would worsen the 14-features / ~6-training-blocks ratio. Deferred to Phase2."
+      }
     }
   },
-
   "analysis": {
     "unit": "block",
     "model": "l2_penalized_logistic_regression",
@@ -48,7 +83,6 @@
     "rationale_for_penalization": "With 8 blocks per subject, each training fold has ~6 blocks while FS_B has 14 features. Unpenalized logistic regression would hit complete separation, producing diverging coefficients and artificially high AUC that cannot be distinguished from real signal. A fixed-strength L2 penalty guarantees finite coefficients. Strength is PRESPECIFIED, not tuned: tuning would require nested CV that 6 training blocks cannot support. See [V63] (penalized methods help when events are few).",
     "known_limitation": "lambda=1.0 on z-scored features is a convention, not an optimum. It is frozen before data collection so that it cannot be chosen to favour a result."
   },
-
   "prespecified_thresholds": {
     "primary_inferential_criterion": "permutation_test",
     "permutation_test": {
@@ -56,42 +90,48 @@
       "alpha": 0.05,
       "combine_across_subjects": "fisher",
       "pipeline_rerun_per_permutation": true,
-      "why_primary": "The ENTIRE pipeline (standardization, penalized fit, CV, AUC) is re-run on each permuted label assignment. Any optimism from small-sample fitting inflates AUC under permuted labels too, so it is absorbed by the null distribution. This is what makes the result trustworthy despite the small block count."
+      "why_primary": "The ENTIRE pipeline (standardization, penalized fit, CV, AUC) is re-run on each permuted label assignment. Any optimism from small-sample fitting inflates AUC under permuted labels too, so it is absorbed by the null distribution. This is what makes the result trustworthy despite the small block count.",
+      "combine_across_subjects_frozen": true,
+      "fisher_known_limitation": "Within-subject p-values are discrete (minimum 1/70 = 0.0143, finitely many attainable values), so they deviate from the uniform null Fisher assumes. This discreteness makes the combined p CONSERVATIVE (harder to reach significance), not anti-conservative. Frozen knowingly."
     },
     "descriptive_thresholds": {
       "note": "Secondary. Computed out-of-fold. Used to judge practical magnitude, NOT significance.",
-      "median_within_subject_auc_min": 0.70,
-      "per_subject_auc_min": 0.60,
-      "per_subject_auc_min_fraction": 0.80
+      "median_within_subject_auc_min": 0.7,
+      "per_subject_auc_min": 0.6,
+      "per_subject_auc_min_fraction": 0.8,
+      "per_subject_auc_min_fraction_denominator": "n=5 -> at least 4 subjects"
     },
     "pass_requires": "permutation_test significant AND descriptive_thresholds met",
     "justification_for_0_70": "Phase1 observed chance-level for current features (0.442-0.507) and 0.60-0.68 for the strongest simple signal (keys->Q2). A deliberately induced high-friction condition must exceed the best naturally observed weak signal.",
     "separation_diagnostic": {
       "report_always": true,
-      "items": ["max_absolute_coefficient", "count_of_folds_with_perfect_training_separation"],
+      "items": [
+        "max_absolute_coefficient",
+        "count_of_folds_with_perfect_training_separation"
+      ],
       "note": "If perfect training separation still occurs under the fixed L2 penalty, report it. Do not silently pass."
     }
   },
-
   "manipulation_check": {
     "instrument": "forced_comparison_paper_or_external_form",
     "reason_not_in_app": "probe_scheduler.rs is frozen; also 1-5 Likert caused straight-lining in Phase1 (P013)",
-    "pass_threshold_hi_chosen_as_harder": 0.70,
-    "on_failure": "do_not_interpret_separation_result; redesign task"
+    "pass_threshold_hi_chosen_as_harder": 0.7,
+    "on_failure": "do_not_interpret_separation_result; redesign task",
+    "asked_for_blocks": "G1 blocks 3..9 only (7 comparisons); NOT asked for copy blocks nor for the first G1 block (no valid predecessor)",
+    "denominator": "ONLY cross-condition pairs (HI vs LO). Same-condition pairs (HI-HI, LO-LO) carry no information and are excluded from the denominator."
   },
-
   "prespecified_exclusions": {
     "subject_level": "none_post_hoc; only pre-declared consent withdrawal",
     "block_level": "only technical log loss (keystroke log missing or truncated); rule frozen before data collection"
   },
-
   "forbidden_post_hoc": [
     "changing thresholds",
     "adding a third feature set",
     "excluding subjects after seeing results",
-    "excluding blocks for non-technical reasons"
+    "excluding blocks for non-technical reasons",
+    "changing n after seeing interim results",
+    "reusing task material sets across sessions"
   ],
-
   "reproducibility": {
     "seed_file": "SEED",
     "env_file": "env.md",
@@ -99,9 +139,51 @@
     "hmm_version": "TO_BE_STAMPED_AT_EXECUTION",
     "repro_entrypoint": "scripts/repro.sh"
   },
-
   "prereg": {
     "covered_by_preregistration_v0_3": false,
-    "note": "G1 is a new gate introduced after the v0.3 preregistration was frozen. Section 3 of README.md must be separately preregistered before execution (researcher decision)."
+    "note": "G1 is a new gate introduced after the v0.3 preregistration was frozen. It is now separately preregistered in preregistration.md (frozen before any data).",
+    "separately_preregistered": true
+  },
+  "preregistration": {
+    "document": "preregistration.md",
+    "frozen_before_any_data": true,
+    "authority": "preregistration.md is authoritative if it disagrees with this file",
+    "note": "G1 is NOT covered by docs/preregistration-v0.3.md (frozen Phase1 contract, unchanged). Preregistered separately."
+  },
+  "positive_control": {
+    "purpose": "Make the FS-A x / FS-B x cell interpretable by separating 'keystrokes cannot measure work state' from 'manipulation too weak' and 'instrument broken'.",
+    "task": "copy task (standard instrument [P38])",
+    "known_detectability": "copy-typing vs authentic writing is separable from keystroke logs alone (RF 99% [P37]); revisions move across tasks [P36]",
+    "labels": "copy(2) vs writing(8)",
+    "test": "same pipeline as the primary analysis (standardization, L2 fit, CV, AUC, permutation)",
+    "permutations": "C(10,2)=45 -> min exact p = 0.0222 < 0.05",
+    "decision_rule": {
+      "pass_and_hi_lo_separates": "report separation per section 3.3",
+      "pass_and_hi_lo_fails": "ONLY case in which 'keystrokes cannot separate friction' may be claimed; must also state that the manipulation may have been too subtle [P44]",
+      "fail": "G1 IS VOID. Instrument/pipeline fault suspected. Do not read x/x as a property of the world. Diagnose and re-run."
+    },
+    "known_limitation": "Copy blocks are at FIXED positions, so this separation is confounded with position. Use as a FLOOR CHECK on instrument health only; do NOT claim an effect size and do NOT cite this test as evidence of effect. Also, copy vs writing is a much larger contrast than HI/LO: passing does not guarantee power for HI/LO."
+  },
+  "production_confound": {
+    "why": "[P43] reports lower text production rate for integrated tasks. FS_B contains `keys`. Separation could therefore be attributable to output-volume differences rather than friction - the same objection used to reject vocabulary constraints in README 2.2.",
+    "mandatory_reporting": [
+      "per-condition realised output (block `keys` and final character count)",
+      "standardized coefficients of each FS_B feature",
+      "out-of-fold AUC of `keys` ALONE (single feature, descriptive)"
+    ],
+    "interpretation_rule": "If FS_B AUC does not substantially exceed the `keys`-alone AUC, the separation may be attributable to output volume and must be reported as such.",
+    "not_a_third_feature_set": "The keys-alone AUC is a descriptive single-feature statistic, NOT a third feature set. It does not violate the forbidden_post_hoc rule."
+  },
+  "prior_work": {
+    "finding": "Prior controlled protocols EXIST and their results are INCONSISTENT.",
+    "same_family_manipulation": "integrated (reading-into-writing / source-based) vs independent writing task, e.g. TOEFL iBT",
+    "P43_chan_2017": "N=2, exploratory: integrated more demanding - longer pauses, more revisions, lower production rate",
+    "P44_michel_et_al_2020": "N=60, TOEFL iBT 2 independent x 2 integrated, counterbalanced, with eye-tracking: apart from source use, writing behaviours and cognitive processes were largely SIMILAR across task types",
+    "consequences": [
+      "do not claim the manipulation is our own invention",
+      "a null result is realistic and is declared valuable in advance (preregistration.md 3.7)",
+      "the x/x cell is not interpretable without the positive control -> positive_control added"
+    ],
+    "directional_prior_from_P36": "mean IKI stable across tasks; revisions / word count / total time move -> predicts FS_A fail, FS_B pass. NOT a decision criterion; recorded so that a mismatch cannot later be called 'expected'."
   }
 }

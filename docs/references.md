@@ -63,6 +63,8 @@ GSE には**2 つの先行する局所書誌**が存在し、それぞれ独自�
 | [P40] | doi:10.1111/jedm.12431 | Deane, P. et al. — Using Keystroke Dynamics to Detect Nonoriginal Text | Journal of Educational Measurement, 2026 | <https://onlinelibrary.wiley.com/doi/abs/10.1111/jedm.12431> | 打鍵動態による**非オリジナル文（転写）検出**。[P37][P39] と合わせ、判別可能性が単一研究の産物でないことを示す。⚠️ **本文未取得**・著者リストと巻号未確認 | — | provisional |
 | [P41] | proc:ijcai-2007-task-switch | Shen, J., Li, L., Dietterich, T. G. et al. — Real-Time Detection of Task Switches of Desktop Users | IJCAI 2007, pp.2868–2873（関連: Detecting and Correcting User Activity Switches, IUI 2009） | <https://www.ijcai.org/Proceedings/07/Papers/460.pdf> | ★ デスクトップの**タスク切替のリアルタイム検出**という問題自体は既知（TaskTracer/TaskPredictor）。⚠️ ただし特徴は**アクセスされたリソース**（ファイル・Web ページ・メール・ウィンドウ）であり、**GSE が `§5.4` で自ら禁じている識別子**に依存する。→ GSE の差分は「識別子なし」という制約側にあり、それは**新規性であると同時に精度上の不利**（`research-positioning §3/§4`）。⚠️ 本文未精読・頁未確認 | — | provisional |
 | [P42] | proc:chi-1999-mixed-initiative | Horvitz, E. — Principles of Mixed-Initiative User Interfaces | CHI 1999, pp.159–166 | <http://erichorvitz.com/chi99horvitz.pdf> | **不確実性の下では自動化を弱める / 主導権を渡さない**という設計原理の確立した出典。ADR-010 D1・D3（確信が無いなら head を切り替えず介入を弱める）は**この原理の素直な実装**であり、新規の発明として書かない | — | active |
+| [P43] | doi:10.1186/s40468-017-0040-5 | Chan, S. — Using keystroke logging to understand writers' processes on a reading-into-writing test | Language Testing in Asia 7:10, 2017 | <https://doi.org/10.1186/s40468-017-0040-5> | ★ G1 の HI/LO（3 本の矛盾資料を統合 / 1 本を要約）と**同型の操作**（integrated reading-into-writing vs independent）の先行研究。integrated の方が demanding で**ポーズ長・修正数が増え産出速度が落ちる**。→ (i)「自前の課題設計」と主張しない、(ii) ★ **産出量交絡**（`keys` による分離が摩擦でなく産出量差に帰属しうる）への報告義務と解釈制限を G1 事前登録 §3.5 に追加。⚠️ **N=2 の探索的研究**であり効果量を引かない。本文未取得（書誌＋要旨水準）| — | provisional |
+| [P44] | doi:10.1177/0267658320915501 | Michel, M., Révész, A., Lu, X., Kourtali, N.-E., Lee, M. & Borges, L. — Investigating L2 writing processes across independent and integrated tasks: A mixed-methods study | Second Language Research 36(3), 2020 | <https://doi.org/10.1177/0267658320915501> | ★★ **GSE に不利な側の出典**。N=**60**・TOEFL iBT の independent 2 本 × integrated 2 本・counterbalanced・eye-tracking 併用で、**source use を除けば writing behaviours と cognitive processes は概ね similar**。→ G1 の 12 倍の標本で同系統の操作が広い行動差を作らないと報告されている＝**帰無が現実的**。G1 事前登録では (i) §3.7 で**負の結果の価値を事前宣言**し、(ii) ★★ `FS-A ✗ / FS-B ✗` を「打鍵では測れない/操作が弱い/計器故障」に分解するための **positive control（copy task ブロック）を新設**する根拠にした。⚠️ 本文未取得（書誌＋要旨水準）| — | provisional |
 
 ## V 名前空間 — 検証方法論（ユーザー検証 v0.4 書誌）
 
@@ -206,6 +208,14 @@ P19–P20 / V30–V33 を 2026-07-23 に介入コンテンツ×文脈シグナ�
 > （content-free での写経判別・タスク切替検出は既存）。GSE がこれらの手法を採用したわけではない。
 > ⚠️ **[P39] [P40] は試験監督（不正検知）文脈**であり、GSE の自律性支援とは目的が異なる。
 > **手法は借りるがフレーミングは借りない。**
+
+
+> ⚠️ **P43–P44 は 2026-08-02 の G1 事前登録ラウンド
+> （`.steering/20260802-g1-preregistration/`・`docs/literature/20260802-controlled-task-manipulation-prior-protocols.md`）で追加**。
+> **どちらも書誌＋要旨水準**（本文未取得）。★ **[P44] は GSE に不利な側の出典**であり、
+> 「先行研究が無いから新規」「操作すれば差が出るはず」という 2 つの論法を同時に潰すために登録している。
+> ⚠️ **両者は結論が一貫していない**（[P43] は差あり・[P44] は概ね差なし）。
+> **片方だけを引いて都合よく主張しないこと。**
 
 ## 追加・撤回ルール
 
