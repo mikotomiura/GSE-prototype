@@ -1,9 +1,32 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "experiment_id": "20260801-controlled-friction-task",
   "status": "PREREGISTERED_FROZEN_NOT_EXECUTED",
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
+  "revision": {
+    "version": 2,
+    "date": "2026-08-02",
+    "frozen_before_any_data": true,
+    "asymmetry": "This revision contains ONLY changes that make the verdict STRICTER or are verdict-neutral clarifications. It contains ZERO changes that make passing easier. Sections 3.1/3.2/3.4/3.5/3.6 (criteria, thresholds, feature sets, tests) are UNCHANGED from version 1.",
+    "corrections": [
+      "n=5 freeze is WITHDRAWN: the confirmatory n is frozen AFTER the pilot (preregistration.md 2.4). It was a convention, not a power calculation.",
+      "'Tier 0/1 cannot be started before the freeze is lifted' was WRONG: they are computable entirely offline from the existing NDJSON (preregistration.md 5-3)."
+    ],
+    "additions": [
+      "2.1 rewritten: argumentative writing is the BEST CASE for keystrokes, not a representative task",
+      "2.7 topic-by-condition counterbalancing across subjects",
+      "2.8 pilot clause (researcher, excluded from the confirmatory sample)",
+      "2.9 block-level minimum-keystroke ELIGIBILITY GATE",
+      "3.7 asymmetry of conclusions and the concrete next action when the result is negative",
+      "3.8 ecological validity limits (G1 is a floor check on measurability)",
+      "3.9 n=1 handling: exhaustive enumeration, Fisher only for n>=2",
+      "5.1 handling of zero-variance features (feature set unchanged)"
+    ],
+    "clarification_only": [
+      "3.3-3 denominator expressed as a FRACTION (>=80% of n) instead of '4 of 5'. Neither 80% nor AUC 0.60 changed."
+    ]
+  },
   "design": {
     "domain": "writing_argumentative",
     "blocks_per_session": 10,
@@ -27,8 +50,81 @@
     "block_layout": "[1]=copy, [2..9]=G1 (HI4/LO4, order seed-randomized), [10]=copy",
     "positive_control_position": "FIXED_first_and_last_not_randomized",
     "rationale_copy_block_position": "Keeps the forced-comparison chain closed inside the 8 G1 blocks (a copy block between two G1 blocks would break 'compared with the previous block'). Also makes the leading copy block serve as the individual transcription baseline [P38].",
-    "n_subjects": 5,
-    "optional_stopping": "FORBIDDEN: no analysis is viewed until all 5 subjects are collected; n is not changed on interim results"
+    "domain_rationale": "Argumentative writing is chosen because it is the BEST CASE for keystroke observation, NOT because it is representative. VibeCoding has thin continuous typing (ADR-006 sub-decision 3) and Creative is typing-sparse with silence indistinguishable from idle. G1 settles the question on the most favourable ground: a floor check. Representativeness is NOT claimed; participant P011 stated in F4 that they rarely write continuously.",
+    "n_subjects": "TO_BE_FROZEN_AFTER_PILOT",
+    "n_subjects_v1_withdrawn": 5,
+    "n_subjects_rule": {
+      "why_withdrawn": "n=5 was a convention ('same size as Phase1'), not a power calculation (decisions.md judgement 8). The primary test is WITHIN-subject: C(8,4)=70 means n=1 already reaches min p=0.0143<0.05. The required n depends on the DIRECTION of the result, which cannot be known in advance: separation -> 'possible for at least one person' suffices; no separation -> cannot rule out an idiosyncratic subject, so more are needed.",
+      "freeze_point": "after the pilot (2.8), BEFORE any confirmatory datum is collected",
+      "record": "write the frozen n into this file and record the date and commit hash in notes.md",
+      "pilot_not_reused": "the pilot subject (the researcher) is NOT reused in the confirmatory sample",
+      "no_replacement": "subjects removed by the eligibility gate (2.9) are NOT replaced; the reduced n is reported as-is",
+      "multiplicity": "Under the null, P(at least 1 of 5 independent subjects has p<0.05) = 1-0.95^5 = 23%. Across-subject multiplicity is handled ONLY by Fisher combination (3.3-1). 'One subject was significant' is never reported as evidence of separation."
+    },
+    "optional_stopping": "FORBIDDEN: no confirmatory analysis is viewed until the frozen n is collected; n is not changed on interim results; adding subjects until significance is explicitly forbidden",
+    "topic_condition_counterbalance": {
+      "problem": "If topics 1-4 are always LO and 5-8 always HI, condition is perfectly confounded with topic WITHIN each subject. Separation could then be 'topics 5-8 happened to be harder to write', which is the same class of error that led 2.2 to reject vocabulary constraints.",
+      "rule": "All 8 topics exist in BOTH an LO and an HI version. Each subject sees each topic exactly once, in exactly one version (8 blocks = 8 topics).",
+      "within_person": "IRREDUCIBLE: showing the same topic in both conditions would introduce a familiarity confound instead.",
+      "across_person": "Two arrangements only. A: topics 1-4 = HI, 5-8 = LO. B: topics 5-8 = HI, 1-4 = LO. Subjects alternate A/B in subject-number order, generated deterministically by assign.py from SEED.",
+      "why_sufficient": "Topic-driven artefacts point in OPPOSITE directions under A and B, so they do not accumulate under Fisher combination.",
+      "limitation": "With odd n the arrangements are unbalanced; the per-arrangement counts MUST be reported. With n=1 no counterbalancing exists and topic confounding is NOT excluded - this must be stated explicitly in the report."
+    },
+    "pilot": {
+      "subjects": "the researcher, 1 person",
+      "stages": {
+        "P-1": {
+          "blocks": 4,
+          "layout": "copy / LO / HI / copy (HI-LO order seed-randomized)",
+          "materials_needed": "1 topic x 2 versions + copy (already written)",
+          "checks": [
+            "keystroke yield in BOTH conditions (feeds the 2.9 eligibility gate)",
+            "do the materials and the procedure work"
+          ],
+          "known_deviations_from_the_confirmatory_design": [
+            "the SAME topic appears in both conditions for the same person (2.7 forbids this in the confirmatory design; the second block is contaminated by familiarity)",
+            "C(2,1)=2 permutations cannot reach p<0.05, so NO test is run",
+            "with a single HI/LO pair the forced-comparison chain (2.6) does not exist, so NO manipulation check is taken"
+          ],
+          "claims_allowed": "keystroke volume and procedure only; nothing about separation"
+        },
+        "P-2": {
+          "optional": true,
+          "blocks": 10,
+          "layout": "identical to the confirmatory design",
+          "materials_needed": "8 topics x 2 versions + copy (written after P-1)",
+          "checks": ["full run-through", "early read on separation (NOT a verdict)"]
+        }
+      },
+      "excluded_from_confirmatory_sample": true,
+      "why_excluded": "the researcher authored the task materials and knows both the hypothesis and the decision criteria",
+      "purposes": [
+        "check that a 5-minute block yields enough keystrokes in BOTH conditions (feeds 2.9)",
+        "check that the materials and the procedure work",
+        "an early read on whether separation is plausible (NOT a verdict)"
+      ],
+      "what_may_change_after_the_pilot": [
+        "task materials",
+        "procedure",
+        "block length",
+        "amount of source material"
+      ],
+      "what_may_not_change_after_the_pilot": "section 3 decision criteria. If they are changed, say so explicitly and forfeit the confirmatory status of that run (report as exploratory).",
+      "blinding": "IMPOSSIBLE for the pilot (the researcher authored the materials). protocol.md documents a procedure for using the materials without pre-reading them, and the impossibility of full blinding MUST be stated in the report.",
+      "results_path": "results/pilot/ (kept separate from the confirmatory analysis)"
+    },
+    "block_eligibility_gate": {
+      "why": "P014-type recurrence: a session with only 9 presses exists in the Phase1 cohort. A 5-minute HI block spent mostly reading degenerates the block features, and this happens SYSTEMATICALLY MORE OFTEN under HI. Dropping such a block would break the HI4/LO4 balance and therefore the C(8,4)=70 permutation structure; keeping it means the classifier separates 'typed vs did not type'.",
+      "threshold_keydowns_per_block": 100,
+      "unit": "SUBJECT, not block. Blocks are never dropped.",
+      "primary_analysis": "a subject with ANY of the 8 G1 blocks below the threshold is not analysed for the primary verdict (3.3)",
+      "positive_control": "a subject with ANY of the 10 blocks below the threshold is not analysed for the positive control (2.5)",
+      "data_retained": "ineligible subjects are NOT discarded; they are reported as ineligible together with their per-block keydown counts",
+      "no_replacement": true,
+      "justification_for_100": "Phase1 natural argumentative logs (P010-P014, 360 consecutive 5-minute windows) have a median of 261 keydowns per 5-minute window and a first quartile of 61. 100 is roughly one sixth of the median: low enough not to disqualify slow writers, high enough to catch the P014 case (9 presses). Below 100 keydowns the Tier 1 quantiles (silence_p90, burst_p90) rest on a handful of values and carry no distributional meaning. A supervised 5-minute writing block should be denser than a natural log window, so this threshold is set at a 'should be met trivially' level.",
+      "frozen_before_pilot": "the value is declared BEFORE the pilot and is NOT moved by the pilot result",
+      "why_not_a_researcher_degree_of_freedom": "The gate is evaluated on keystroke counts alone, BEFORE any model is fitted. analyze.py enforces this ordering and prints eligibility before fitting, so 'drop subjects after seeing the result' is structurally impossible."
+    }
   },
   "feature_sets": {
     "FS_A": {
@@ -39,7 +135,11 @@
         "F4",
         "F5",
         "F6"
-      ]
+      ],
+      "block_aggregation": "MEDIAN over the block's 1 Hz `feat` NDJSON rows",
+      "source": "the `feat` rows emitted by the running system, NOT recomputed from key events",
+      "source_rationale": "FS_A asks whether the LEGACY OBSERVATION SPACE separates the conditions, and that observation space is literally what the runtime computes. Recomputation offline would differ: InputEvent.is_repeat is not present in the NDJSON, and features.rs excludes auto-repeat from F1 and F4, so an offline recomputation would silently include auto-repeat and be a different quantity.",
+      "status": "GAP-FILL declared before any data exists. See .steering/20260802-g1-implementation/decisions.md D-2."
     },
     "FS_B": {
       "description": "FS_A + Tier0 + Tier1",
@@ -66,7 +166,28 @@
         "burst": "run of consecutive keystrokes delimited by silences; burst length = number of keystrokes in the run",
         "burst_p50_p90": "quantiles of burst LENGTH within the block",
         "band_rates_excluded": "the banded silence rates of personalization-and-online-learning.md 5.2 are NOT used here: >120s band cannot occur in a 5-minute block, and adding features would worsen the 14-features / ~6-training-blocks ratio. Deferred to Phase2."
+      },
+      "offline_computability": {
+        "claim": "ALL of Tier0 and Tier1 are computable offline from the existing anonymized NDJSON. The version-1 claim that schema_dto.rs must be unfrozen first was WRONG.",
+        "evidence": {
+          "keys_and_bs_rate_and_silence_and_burst": "`key` rows carry one record per keystroke: {t, category, press} after anonymization (analysis/anonymize.rs converts vk -> category and absolute epoch t -> session-relative ms)",
+          "external_paste_chars": "`paste` rows carry {t, external_paste_chars}",
+          "ime_dwell_med": "`ime_shadow` rows carry {t, dwell_ms, nav, abandon}"
+        },
+        "what_is_actually_frozen": "wiring Tier0/1 into the RUNTIME inference path (the `feat` row and the HMM). That is irrelevant to offline analysis.",
+        "consequence": "G1 has no technical dependency on lifting the Phase1 freeze; analysis touches zero lines of src-tauri/. Whether to RUN it before the freeze is lifted remains a researcher decision (ADR-009 D7 states G1 is the first task after unfreezing)."
+      },
+      "platform_availability": {
+        "ime_dwell_med": "ime_shadow is emitted only under #[cfg(target_os = \"windows\")] (lib.rs). On macOS this feature is STRUCTURALLY MISSING and is 0 in every block.",
+        "external_paste_chars": "with paper-handout materials (protocol.md) no paste occurs, so this feature is 0 in every block",
+        "recommendation": "running on Windows 11 lets FS_B be evaluated with all 14 features as designed. This is a RECOMMENDATION, not a decision criterion."
       }
+    },
+    "degenerate_feature_handling": {
+      "rule": "A feature whose standard deviation is 0 within a training fold is standardized to 0 in that fold (it contributes nothing).",
+      "not_removed": "The feature set is NOT changed. FS_B remains 14 features (section 3.2 is untouched).",
+      "mandatory_reporting": "Which features degenerated, and in how many folds, MUST appear in the output (`degenerate_features`). Never pass silently.",
+      "os_reporting": "The execution OS is recorded in env.md and in the results. If ime_dwell_med was missing on macOS, report that FS_B was effectively evaluated with 13 features."
     }
   },
   "analysis": {
@@ -92,14 +213,19 @@
       "pipeline_rerun_per_permutation": true,
       "why_primary": "The ENTIRE pipeline (standardization, penalized fit, CV, AUC) is re-run on each permuted label assignment. Any optimism from small-sample fitting inflates AUC under permuted labels too, so it is absorbed by the null distribution. This is what makes the result trustworthy despite the small block count.",
       "combine_across_subjects_frozen": true,
-      "fisher_known_limitation": "Within-subject p-values are discrete (minimum 1/70 = 0.0143, finitely many attainable values), so they deviate from the uniform null Fisher assumes. This discreteness makes the combined p CONSERVATIVE (harder to reach significance), not anti-conservative. Frozen knowingly."
+      "fisher_known_limitation": "Within-subject p-values are discrete (minimum 1/70 = 0.0143, finitely many attainable values), so they deviate from the uniform null Fisher assumes. This discreteness makes the combined p CONSERVATIVE (harder to reach significance), not anti-conservative. Frozen knowingly.",
+      "enumeration": "EXHAUSTIVE, never sampled. G1: all C(8,4)=70 label assignments. Positive control: all C(10,2)=45. Therefore the permutation test is SEED-INDEPENDENT.",
+      "fisher_applies_when": "n>=2 only. With n=1 the single within-subject p is reported as-is (combining one p-value with Fisher would not return the same number and would only cause confusion).",
+      "cross_validation_fold_definition": "leave-one-block-pair-out: every (held-out positive block, held-out negative block) pair is one fold. G1: 4x4=16 folds. Positive control: 2x8=16 folds. The out-of-fold AUC is the fraction of folds in which the held-out positive block scores higher than the held-out negative block (ties count 0.5). This IS the AUC over held-out pairs.",
+      "fold_definition_status": "GAP-FILL: the frozen version-1 text specified 'within-subject leave-one-block-pair-out' and 'out-of-fold AUC' but not how folds are aggregated. Declared here before any data exists. See .steering/20260802-g1-implementation/decisions.md D-3."
     },
     "descriptive_thresholds": {
       "note": "Secondary. Computed out-of-fold. Used to judge practical magnitude, NOT significance.",
       "median_within_subject_auc_min": 0.7,
       "per_subject_auc_min": 0.6,
       "per_subject_auc_min_fraction": 0.8,
-      "per_subject_auc_min_fraction_denominator": "n=5 -> at least 4 subjects"
+      "per_subject_auc_min_fraction_denominator": "ceil(0.8 * n), where n is the value frozen after the pilot. Version 1 said 'n=5 -> at least 4 subjects'; expressing it as a fraction is a CLARIFICATION ONLY - neither 0.8 nor 0.6 changed.",
+      "n_equals_1_note": "The descriptive criteria still apply with n=1 (median = that subject's AUC, fraction = 1/1), but the report MUST state that passing them carries little practical meaning at n=1."
     },
     "pass_requires": "permutation_test significant AND descriptive_thresholds met",
     "justification_for_0_70": "Phase1 observed chance-level for current features (0.442-0.507) and 0.60-0.68 for the strongest simple signal (keys->Q2). A deliberately induced high-friction condition must exceed the best naturally observed weak signal.",
@@ -121,8 +247,30 @@
     "denominator": "ONLY cross-condition pairs (HI vs LO). Same-condition pairs (HI-HI, LO-LO) carry no information and are excluded from the denominator."
   },
   "prespecified_exclusions": {
-    "subject_level": "none_post_hoc; only pre-declared consent withdrawal",
-    "block_level": "only technical log loss (keystroke log missing or truncated); rule frozen before data collection"
+    "subject_level": "none_post_hoc; only pre-declared consent withdrawal, plus the pre-declared eligibility gate in design.block_eligibility_gate (evaluated on keystroke counts BEFORE any model is fitted, never replaced)",
+    "block_level": "only technical log loss (keystroke log missing or truncated); rule frozen before data collection. Blocks are NEVER dropped for low keystroke count - that is handled at subject level to preserve the HI4/LO4 permutation structure."
+  },
+  "asymmetry_of_conclusions": {
+    "why": "Argumentative writing is the BEST CASE for keystroke observation (see design.domain_rationale), so a negative result travels further than a positive one.",
+    "negative_result_scope": "A negative result (with the positive control passing) is negative evidence about KEYSTROKES AS AN INSTRUMENT and applies to ALL domains: losing on the densest typing ground means the thinner VibeCoding and Creative grounds cannot win.",
+    "negative_result_next_actions": [
+      "doubt the axis itself; do not build the pipeline (personalization-and-online-learning.md 8.2 G1)",
+      "move instrumentation resources to Adapter B (coding events: accept / reject / test / revert), i.e. content-free events that are NOT keystrokes"
+    ],
+    "negative_result_caveat": "Never state 'keystrokes cannot measure this in principle'. [P44] leaves 'the manipulation was too subtle' open.",
+    "positive_result_scope": "A positive result licenses ONLY 'separable in argumentative writing'. It does NOT transfer to other domains (ADR-001 states this explicitly) and does NOT imply 'work state is separable during real work' (see ecological_validity).",
+    "overclaiming_forbidden": "Do not generalize a pass into 'the GSE observation space was sufficient'."
+  },
+  "ecological_validity": {
+    "statement": "G1 does NOT measure whether real work states are separable. It is the prior question: a FLOOR CHECK on measurability of a contrast the experimenter deliberately created.",
+    "limits": [
+      "condition labels are assigned by the experimenter, not felt friction; the manipulation check only guarantees subjective ORDER",
+      "tasks are cut into 5-minute blocks, while real stalling can span tens of minutes to days",
+      "supervised, with given materials and a specified output length; not self-directed work",
+      "fixed to argumentative writing, which participant P011 stated they rarely do continuously",
+      "the copy positive control is position-fixed and therefore confounded with position; no effect size is claimed"
+    ],
+    "consequence": "A pass does NOT imply separability in natural work logs. Phase1 failed that separately (GATE3 DataInsufficient) and a G1 pass does not retroactively resolve it."
   },
   "forbidden_post_hoc": [
     "changing thresholds",
@@ -137,7 +285,18 @@
     "env_file": "env.md",
     "data_file": "data.md",
     "hmm_version": "TO_BE_STAMPED_AT_EXECUTION",
-    "repro_entrypoint": "scripts/repro.sh"
+    "repro_entrypoint": "scripts/repro.sh",
+    "protocol_file": "protocol.md",
+    "consent_file": "consent.md",
+    "materials_dir": "materials/",
+    "scripts": {
+      "assign.py": "deterministic per-subject assignment (arrangement A/B, topic->condition, ABBA-balanced then seed-randomized block order)",
+      "validate_materials.py": "mechanical checks on the task materials (source count, matched total length, stated output requirement)",
+      "analyze.py": "block features (FS_A from feat rows, Tier0/1 from key/paste/ime_shadow rows) + the frozen decision pipeline",
+      "run.sh": "pre-execution readiness check: green when materials, protocol and consent are all present and valid; red otherwise"
+    },
+    "permutation_seed_independence": "the permutation test enumerates all assignments exhaustively, so it does not depend on SEED",
+    "dependencies": "Python standard library only; no requirements.txt (same policy as experiments/20260802-within-person-scope-detector)"
   },
   "prereg": {
     "covered_by_preregistration_v0_3": false,
