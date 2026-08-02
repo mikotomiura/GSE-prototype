@@ -5,10 +5,31 @@
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
   "revision": {
-    "version": 3,
-    "date": "2026-08-02",
+    "version": 4,
+    "date": "2026-08-03",
     "frozen_before_any_data": true,
-    "asymmetry": "Version 3 contains ZERO changes that make passing easier. Sections 3.1/3.2/3.4/3.5/3.6 (criteria, thresholds, feature sets, tests) remain UNCHANGED from version 1. Both branches of a failed positive control still refuse to read the 3.3 verdict, so no new path to 'separated' is created.",
+    "asymmetry": "Version 4 contains ZERO changes that make passing easier. Section 2.6 (manipulation-check threshold) and section 3.4 (viewing order) are BOTH untouched; sections 3.1/3.2/3.4/3.5/3.6 remain byte-identical to version 1. The only change is that the tool now WITHHOLDS the 3.3 verdict when the 3.4 viewing order was not satisfied - a reduction of information, so no new path to 'separated' is created.",
+    "v4_changes": {
+      "trigger": "Section 3.4 freezes a viewing order ('if the manipulation check fails, do NOT interpret the 3.3 result'), but the implementation did not enforce it: analyze.py printed separated / median_auc / fisher_p even when interpretable=false. The document forbade what the tool put in front of you.",
+      "researcher_decision": "keep 2.6 as-is AND add strict sealing (blockers.md B-2)",
+      "change_1_verdict_sealing": "New section 5.3. When interpretable=false the label-dependent results of 3.3 are NOT written to the output or printed. Reading them anyway requires an explicit --unseal, which stamps confirmatory_status_forfeited=true and makes that run EXPLORATORY.",
+      "change_2_manipulation_check_reporting": "New section 5.3. The manipulation-check denominator (cross-condition pairs), the number passed, and - when it fails - the false-negative rate must be reported, together with the statement that an effective manipulation has NOT been ruled out.",
+      "not_sealed": [
+        "everything read EARLIER in the 3.4 order: manipulation check (2.6), positive control (2.5), eligibility (2.9, keystroke counts only)",
+        "the LABEL-FREE attainability diagnostics of 5.2 (theoretical_min_p, attainable_min_p_for_this_subject, test_can_reject_at_all, null_auc_median, null_auc_p95)",
+        "the reason the analysis stopped (interpretable, interpretability_reason, decision_status)"
+      ],
+      "why_not_a_loosening": [
+        "Sealing REMOVES information; the number of routes to a 'separated' claim is unchanged (zero new routes).",
+        "Neither the 2.6 threshold nor the 3.4 order was modified. Only what the tool shows AFTER stopping changed.",
+        "It STRENGTHENS the discipline: 'do not interpret' was previously an aspiration because the tool displayed the numbers anyway; now the implementation enforces it.",
+        "--unseal is a recorder, not an escape hatch: using it stamps confirmatory_status_forfeited=true, mechanising the same treatment 2.8 already prescribes for looking at pilot results.",
+        "The 5.2 reporting obligations are NOT reduced: label-free diagnostics are never sealed."
+      ],
+      "also_recorded": {
+        "block_partitioning": "Researcher decision 2026-08-03: UNCHANGED. One visit, 10 blocks straight through (2.3). The idea of keeping an HI-LO pair together per topic cannot be used in the confirmatory design because 2.7-2 gives each subject exactly one version of each topic; showing both versions of one topic happens only in pilot P-1 as a declared deviation (2.8)."
+      }
+    },
     "v3_changes": {
       "trigger": "decisions.md D-5: with the version-2 rule, a positive control that fails ONLY because the permutation test has no attainable rejection region (test_can_reject_at_all=false) is diagnosed as an INSTRUMENT FAULT and voids all of G1. Measured on Phase1 data this occurred in 1 of 4 pseudo-sessions.",
       "researcher_decision": "option (b) of decisions.md D-5",
@@ -298,7 +319,33 @@
     "pass_threshold_hi_chosen_as_harder": 0.7,
     "on_failure": "do_not_interpret_separation_result; redesign task",
     "asked_for_blocks": "G1 blocks 3..9 only (7 comparisons); NOT asked for copy blocks nor for the first G1 block (no valid predecessor)",
-    "denominator": "ONLY cross-condition pairs (HI vs LO). Same-condition pairs (HI-HI, LO-LO) carry no information and are excluded from the denominator."
+    "denominator": "ONLY cross-condition pairs (HI vs LO). Same-condition pairs (HI-HI, LO-LO) carry no information and are excluded from the denominator.",
+    "denominator_distribution": {
+      "guaranteed_range": [4, 6],
+      "why": "assign.py condition_sequence() splits the 8 G1 blocks into 4 adjacent pairs and makes every pair either (HI,LO) or (LO,HI) (ABBA balancing), so the 4 within-pair adjacencies are ALWAYS cross-condition. The 3 between-pair adjacencies vary. Denominators of 1-3 cannot occur.",
+      "measured": "20,000 seeds: denominator 4 in 33.6%, 5 in 32.9%, 6 in 33.5%",
+      "required_passes": {"4": "3/4 (75%)", "5": "4/5 (80%)", "6": "5/6 (83%)"},
+      "false_positive_rate_under_null_50pct": {"4": 0.313, "5": 0.188, "6": 0.109},
+      "false_negative_rate_if_manipulation_truly_80pct": {"4": 0.181, "5": 0.263, "6": 0.345},
+      "consequence": "At EVERY denominator only ONE answer may be missed. Even a genuinely effective manipulation fails this gate 18-35% of the time. The threshold is NOT changed (that would loosen the verdict); instead section 5.3 requires reporting these numbers and seals the 3.3 verdict so that a re-run stays confirmatory."
+    }
+  },
+  "verdict_sealing": {
+    "section": "5.3 (added in version 4)",
+    "rule": "When interpretable=false the label-dependent results of 3.3 are withheld from both stdout and the results JSON.",
+    "sealed": [
+      "3_verdict entries per feature set (separated, criterion_*, fisher, per_subject_auc, per_subject_p)",
+      "per_subject[].primary label-dependent values (observed_auc, p_value, significant, coefficients, max_abs_coefficient, folds_with_perfect_training_separation, keys_alone_DESCRIPTIVE)"
+    ],
+    "never_sealed": [
+      "1_manipulation_check and 2_positive_control (read EARLIER in the 3.4 order)",
+      "eligibility (2.9; keystroke counts only, evaluated before any model is fitted)",
+      "LABEL-FREE attainability diagnostics (5.2): theoretical_min_p, attainable_min_p_for_this_subject, test_can_reject_at_all, null_auc_median, null_auc_p95",
+      "interpretable, interpretability_reason, decision_status (the reason the analysis stopped)"
+    ],
+    "override": "--unseal. Stamps confirmatory_status_forfeited=true in the results; that run is reported as EXPLORATORY.",
+    "what_it_protects": "ONLY the confirmatory status of a corrected re-run. A failure is still recorded as a failure; sealing does not make a false negative disappear.",
+    "implemented_in": "analyze.py seal_verdict(); regression-tested in analyze.py selftest."
   },
   "prespecified_exclusions": {
     "subject_level": "none_post_hoc; only pre-declared consent withdrawal, plus the pre-declared eligibility gate in design.block_eligibility_gate (evaluated on keystroke counts BEFORE any model is fitted, never replaced)",

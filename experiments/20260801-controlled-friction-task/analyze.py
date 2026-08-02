@@ -581,6 +581,69 @@ def interpretability(mchecks: dict, pcs: list[dict]) -> tuple[str, bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# ★ 見る順序の強制 — 判定の封印（§5.3・第 4 版）
+# ---------------------------------------------------------------------------
+#: ★ **ラベルに依存しない**診断値（`§5.2`）。封印しない。
+#  帰無分布の形だけで決まるので、見ても事後の自由度にならない。むしろ
+#  「検出力不足で落ちたのか計器が壊れて落ちたのか」の判断に必要である。
+LABEL_FREE_KEYS = frozenset({
+    "n_permutations", "enumeration", "theoretical_min_p",
+    "attainable_min_p_for_this_subject", "attainable_min_p_note",
+    "test_can_reject_at_all", "null_auc_median", "null_auc_p95",
+    "alpha", "one_sided", "n_features",
+})
+
+SEAL_NOTE = (
+    "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). "
+    "Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. "
+    "Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+)
+
+
+def seal_verdict(result: dict) -> dict:
+    """`§3.4` の見る順序を**実装で強制する**（`§5.3`・第 4 版）。
+
+    ★ **なぜ要るか**: `§3.4-1` は「操作チェックが不合格なら `§3.3` の結果を**解釈しない**」と
+    凍結しているが、第 3 版までの実装は `interpretable=False` でも `separated` / `median_auc` /
+    `fisher_p` をそのまま出していた。**文書が禁じたものをツールが目の前に出していた。**
+
+    ★ **なぜ封印が判定を緩めないか**: 封印は**情報を減らす**方向の変更である。
+    「分離できた」と言える経路は 1 本も増えていない。むしろ
+    **偽の不合格（`§2.6` の操作チェックは、操作が真に 80% 効いていても 18〜35% で落ちる）を
+    引いたときに、数値を見ずに済むので再実施が確証的なまま**でいられる
+    （`§2.8` が「見てから変えたら確証性を放棄」と定めているのと同じ構造）。
+
+    封印するもの / しないもの:
+
+    - 封印する: `3_verdict` のラベル依存量、`per_subject[].primary` のラベル依存量
+    - ★ 封印しない: `1_manipulation_check` / `2_positive_control`（`§3.4` の順序で**先に見る**もの）、
+      適格性（`§2.9`・打鍵数のみ）、ブロックの記述統計、
+      および **ラベル非依存の到達可能性診断**（`§5.2`・`LABEL_FREE_KEYS`）
+    """
+    def seal_test(d: dict) -> dict:
+        kept = {k: v for k, v in d.items() if k in LABEL_FREE_KEYS}
+        kept["sealed"] = True
+        kept["sealed_note"] = SEAL_NOTE
+        return kept
+
+    verdict = result.get("3_verdict", {})
+    result["3_verdict"] = {
+        "interpretable": verdict.get("interpretable"),
+        "interpretability_reason": verdict.get("interpretability_reason"),
+        "sealed": True,
+        "sealed_note": SEAL_NOTE,
+    }
+    for s in result.get("per_subject", []):
+        primary = s.get("primary")
+        if isinstance(primary, dict) and "skipped" not in primary:
+            s["primary"] = {
+                name: (seal_test(v) if isinstance(v, dict) else v)
+                for name, v in primary.items()
+            }
+    return result
+
+
+# ---------------------------------------------------------------------------
 # コホート水準の判定（§3.3）
 # ---------------------------------------------------------------------------
 def cohort_verdict(per_subject: list[dict], interpretable: bool, reason: str) -> dict:
@@ -691,6 +754,10 @@ def main() -> int:
                     help="★ ラベルを読まずにブロック長と打鍵数だけを出す（実施当日の検算）")
     ap.add_argument("--out", default=str(here / "results" / "metrics.json"))
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--unseal", action="store_true",
+                    help="★ §3.4 の見る順序を満たしていないのに判定を見る。"
+                         "使うと confirmatory_status_forfeited=true が結果に刻まれ、"
+                         "その回は探索的として報告することになる (§5.3)")
     a = ap.parse_args()
 
     if a.selftest:
@@ -760,12 +827,31 @@ def main() -> int:
         "hmm_version": "TO_BE_STAMPED_AT_EXECUTION (env.md)",
         "privacy": "no session timestamps, no file names, no written text appear in this output",
     }
+    # ★ §5.3（第 4 版）: §3.4 の見る順序を実装で強制する。
+    #   interpretable=False なら、明示的に --unseal しない限り判定を出さない。
+    sealed = (not interp) and not a.unseal
+    if sealed:
+        result = seal_verdict(result)
+    result["verdict_sealed"] = sealed
+    if a.unseal and not interp:
+        result["confirmatory_status_forfeited"] = True
+        result["confirmatory_status_forfeited_note"] = (
+            "The 3.4 viewing order was NOT satisfied and --unseal was used. "
+            "This run must be reported as EXPLORATORY (preregistration.md 5.3).")
+
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"[ok] {out}  status={status} interpretable={interp}")
     if not interp:
         print(f"       {why}")
+    if sealed:
+        print("  [SEALED] §3.4 の見る順序を満たしていないため、§3.3 の判定を出力していない。")
+        print("           ラベル非依存の到達可能性診断 (§5.2) は per_subject に残してある。")
+        print("           どうしても見るなら --unseal（その回は探索的になる・§5.3）。")
+        return 0
+    if a.unseal and not interp:
+        print("  [UNSEALED] ★ 確証性を放棄した。この回は探索的として報告すること (§5.3)。")
     for name in FEATURE_SETS:
         v = result["3_verdict"][name]
         print(f"  {name}: separated={v['separated']} median_auc={v['criterion_2_median_auc']} "
@@ -877,6 +963,52 @@ def selftest() -> int:
     if interpretability({"P001": {"passed": False}}, [pc_pass])[0] != "MANIPULATION_CHECK_FAILED":
         fails.append("操作チェック不合格なのに先に進んでいる (§3.4-1)")
 
+    # 5c) ★ §5.3（第 4 版）: 見る順序を満たさないとき判定が封印される
+    fake = {
+        "1_manipulation_check": {"P001": {"passed": False}},
+        "2_positive_control": {"P001": {"passed": True, "p_value": 0.02}},
+        "3_verdict": {
+            "interpretable": False, "interpretability_reason": "manipulation check FAILED",
+            "FS_A": {"separated": True, "criterion_2_median_auc": 0.99,
+                     "fisher": {"p_value": 0.001}},
+        },
+        "per_subject": [{
+            "subject": "P001",
+            "eligibility": {"eligible_for_primary": True},
+            "positive_control": {"passed": True, "p_value": 0.02},
+            "primary": {"FS_A": {"p_value": 0.001, "observed_auc": 0.99,
+                                 "max_abs_coefficient": 3.1,
+                                 "test_can_reject_at_all": True,
+                                 "attainable_min_p_for_this_subject": 0.0143,
+                                 "null_auc_p95": 0.9375}},
+        }],
+    }
+    sealed = seal_verdict(json.loads(json.dumps(fake)))
+
+    if "FS_A" in sealed["3_verdict"]:
+        fails.append("封印後も 3_verdict に特徴量セットの判定が残っている (§5.3)")
+    if sealed["3_verdict"].get("interpretable") is not False:
+        fails.append("封印で interpretable まで消えている（止まった理由が読めなくなる）")
+    if not sealed["3_verdict"].get("interpretability_reason"):
+        fails.append("封印で止まった理由まで消えている")
+
+    sp = sealed["per_subject"][0]["primary"]["FS_A"]
+    for k in ("p_value", "observed_auc", "max_abs_coefficient"):
+        if k in sp:
+            fails.append(f"封印後も per_subject.primary に {k} が残っている (§5.3)")
+    # ★ ラベル非依存の診断値（§5.2 の報告義務）は封印しない
+    for k in ("test_can_reject_at_all", "attainable_min_p_for_this_subject", "null_auc_p95"):
+        if k not in sp:
+            fails.append(f"ラベル非依存の診断値 {k} まで封印している (§5.2 の報告義務違反)")
+
+    # ★ §3.4 で「先に見る」ものは封印しない
+    if sealed["per_subject"][0]["positive_control"].get("p_value") != 0.02:
+        fails.append("positive control を封印している (§3.4 の順序で先に見るもの)")
+    if sealed["1_manipulation_check"]["P001"]["passed"] is not False:
+        fails.append("操作チェックを封印している (§3.4 の順序で先に見るもの)")
+    if sealed["2_positive_control"]["P001"].get("p_value") != 0.02:
+        fails.append("2_positive_control を封印している (§3.4 の順序で先に見るもの)")
+
     # 6) 適格性ゲートは打鍵数だけで判定し、ブロックを落とさない（§2.9）
     blks = [{"block": i, "condition": ("HI" if i % 2 else "LO"), "n_keydowns": 500} for i in range(2, 10)]
     blks += [{"block": 1, "condition": "copy", "n_keydowns": 500},
@@ -937,7 +1069,7 @@ def selftest() -> int:
             print(f"  - {f_}")
         return 1
     print("[OK] analyze.py selftest 緑 "
-          "(全数列挙 70/45・分離/非分離・分散ゼロ・Fisher・★§2.5 第 3 版の分岐・"
+          "(全数列挙 70/45・分離/非分離・分散ゼロ・Fisher・★§2.5 第 3 版の分岐・★§5.3 判定の封印・"
           "見る順序 §3.4・適格性ゲート・特徴量定義)")
     return 0
 
