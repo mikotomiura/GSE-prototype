@@ -109,6 +109,16 @@ $env:GSE_DISABLE_PROBES=1; Start-Process "GSE.exe"
 
 ## 2. ★★ ラベル対応表と、取り違え防止
 
+### 2.0 ★ 被験者 ID は Phase1 と共有する（研究者判断 2026-08-03）
+
+**同じ人には同じ P-ID を使う。** 採番元は **Phase1 の運用管理シート「参加者ロスター」ただ 1 つ**で、
+G1 側では採番しない。初参加の被験者は **Phase1 側で採番してから** G1 を回す。
+
+⚠️ ★ **帰結**: G1 は第 1 週モードで回すので `label_pool=calibration_blind` が刻まれ、
+**その人の Phase1 較正セッションと ID もラベルも同じ**になる。
+→ 分離は **`blocks/P0xx.json` の `file` 列**と**送付時の明示**だけが担う（`data.md` の B-4）。
+**当日終了後の送付を省略・後回しにしない。**
+
 ### 2.1 割付の生成（実施の**前日まで**に行う）
 
 ```bash
@@ -332,8 +342,9 @@ python3 assign.py --subject P015 --json   # 機械可読（解析入力になる
 - [ ] ★★ **`GSE_DISABLE_PROBES=1` を起動手段（ショートカット / launcher / プロファイル）に
       固定した**（§1.1・`preregistration.md §5.4`）。⚠️ 毎回手で打たない（10 回のうち 1 回抜ける）
 - [ ] ★ **記入パッドを開く手順を確認した**（§1.2）。拡張機能なしのプロファイル・全画面
-- [ ] ★ `Form_G1` の 3 フォームを配備し、回答 URL をブックマークした（`Form_G1/README.md`）
+- [ ] ★ `Form_G1` の 3 フォーム ＋ 管理シートを配備し、回答 URL をブックマークした（`Form_G1/README.md`）
       - ⚠️ **紙のバックアップ**（`§3.1` の様式・`handouts/G1_説明・同意文書.docx`）も持参する
+- [ ] ★ **被験者の P-ID を Phase1 のロスターで確認した**（初参加なら Phase1 側で採番した・§2.0）
 - [ ] ★ 配布物を印刷した（`bash make-handouts.sh` で `handouts/` に .docx を生成）
       - `G1_説明・同意文書.docx`（署名を取る）／ `G1_参加のご案内.docx`（署名後に渡す）
       - ★ `handouts/materials/*.docx`（**課題文 17 枚**。ブロック開始直前に 1 枚ずつ渡す）
@@ -369,7 +380,10 @@ python3 assign.py --subject P015 --json   # 機械可読（解析入力になる
         一度も走っていない）。出力が壊れていたら、その場で解析せず記録だけして持ち帰る
 - [ ] ★ **被験者が書いた本文を保存していない**ことを確認した（content-free 原則）
 - [ ] 課題文の紙は回収済み・記録用紙と一緒に保管した
-- [ ] NDJSON を匿名化して gse-dataset へ送った（`data.md` の手順）
+- [ ] ★★ NDJSON を匿名化して gse-dataset へ送った。**G1 のセッションであることを明記した**
+      （`data.md` の B-4。⚠️ **P-ID が Phase1 と同じなので、これを飛ばすと
+      その人の Phase1 較正セッションと見分けられなくなる**）
+- [ ] ★ 管理シートの「G1 実施トラッキング」に 1 行記入した（`Form_G1/README.md`）
 - [ ] ★ `python3 forms_to_blocks.py --csv <G1-M回答.csv> --subject P0xx --write`
 - [ ] ★★ **`python3 validate_blocks.py --dataset ~/gse-dataset` が緑**
       - **転記ミス**（構成・割付との不一致・NDJSON 名の重複／不在・強制比較の対応）を検出する

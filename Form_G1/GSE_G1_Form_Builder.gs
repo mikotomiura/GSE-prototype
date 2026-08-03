@@ -49,6 +49,32 @@ var CLEAR_EXISTING = true;
 // 問い合わせ先（PII ではないのでここに置いてよい）。
 var CONTACT_EMAIL = "mmiura.network@gmail.com";
 
+// G1 運用管理シートの ID を覚えておく Script Property キー。
+// ⚠️ Phase1 の GSE_MGMT_SHEET_ID とは**別のキー**（別シート）。ただし P-ID は共有する（下記）。
+var MGMT_SHEET_PROP_G1 = "GSE_G1_MGMT_SHEET_ID";
+
+// ============================================================
+// ★★ P-ID は Phase1 と共有する（研究者判断 2026-08-03）
+// ============================================================
+// 同じ人には同じ P-ID を使う。1 人の人間に 2 つの識別子を作らない。
+//
+// ★ したがって **本ファイルは P-ID を採番しない**。採番元は
+//   `Form_Phase1/GSE_Phase1_Form_Builder.gs` の `addParticipant()` /
+//   Phase1 運用管理シートの「参加者ロスター」**ただ 1 つ**である。
+//   ⚠️ 2 か所で採番すると必ず衝突する（別シートを走査しても相手の最大値が見えないため）。
+//   新規の被験者が来たら **Phase1 側で採番してから** G1 を回すこと。
+//
+// ★ 同じ理由で、本シートは **実名・メールを持たない**。実名↔P-ID の対応表を 2 か所に作らない
+//   (data-privacy)。G1 の同意フォーム(G1-C)の回答シートと Phase1 のロスターに既にある。
+//
+// ⚠️⚠️ **ID 共有の帰結（必ず読む）**: G1 は第 1 週(blind 較正)モードで回すため
+//   session_meta に condition=blind_calibration / label_pool=calibration_blind が刻まれ、
+//   **Phase1 の較正セッションと同じラベル**になる（data.md の B-4）。
+//   ID まで同じにすると、**ID 範囲による分離が使えなくなる**。
+//   → 分離は次の 2 つだけが担う。どちらも省略しないこと:
+//     1. `blocks/P0xx.json` の `file` 列（どの NDJSON が G1 のブロックかを列挙している）
+//     2. gse-dataset への送付時に **G1 のセッションであることを明示**する（data.md の送付フロー）
+
 // ============================================================
 // ★ 設問タイトルの契約（forms_to_blocks.py がこの語で列を探す）
 // ============================================================
@@ -69,7 +95,8 @@ function setupG1Forms() {
   buildConsentForm();
   buildManipulationCheckForm();
   buildPostSurveyForm();
-  Logger.log("🎉 G1 フォーム 3 本を構築した。URL は Script Properties (FORMURL_G1_*) にある。");
+  var url = buildManagementSheet();
+  Logger.log("🎉 G1 フォーム 3 本 ＋ 管理シート 作成完了: " + url);
   Logger.log(listG1FormUrls());
 }
 
@@ -162,6 +189,14 @@ function buildConsentForm() {
     form,
     "ご記名",
     "撤回のお申し出を受け付けるために必要です。ログとは別に保管し、P0xx とのみ結び付けます。"
+  );
+  // ★ P-ID は Phase1 と共有する（同じ人＝同じ ID）。以前ご参加の方は既にお持ちなので書いてもらう。
+  //   ⚠️ 必須にしない — 初参加の方は持っていない（その場合は実験者が Phase1 側で採番する）。
+  var pid = form.addTextItem();
+  pid.setTitle("参加者ID（お持ちの方のみ）");
+  pid.setHelpText(
+    "以前 GSE の検証にご参加いただいた方は、そのときお伝えした P から始まる記号をご記入ください。" +
+      "初めての方は空欄で構いません。"
   );
   form.addTextItem().setTitle("お名前").setRequired(true);
   var mail = form.addTextItem();
@@ -317,6 +352,168 @@ function buildPostSurveyForm() {
 
   recordFormUrl_("G1_SURVEY", form, "G1-S 終了後アンケート（判定には使わない）");
   Logger.log("G1-S 終了後アンケートを構築した: " + form.getPublishedUrl());
+}
+
+// ============================================================
+// 運用管理シート（Phase1 の buildManagementSheet と同じ型・★ 2 タブだけ）
+// ============================================================
+// Phase1 は「リンク集 / 参加者ロスター / セッション提出トラッキング / 進捗ダッシュボード」の
+// 4 タブを持つ。★ G1 は **リンク集 / G1 実施トラッキング の 2 タブだけ**にする:
+//   - **参加者ロスターを作らない** — P-ID と実名の対応表は Phase1 側が真実源だから（上記）。
+//     2 か所に持つと必ずずれるうえ、PII の複製が増える。
+//   - **進捗ダッシュボードを作らない** — G1 は 1 人 1 回の来所で完結するので、
+//     Phase1 のような長期追跡の集計値（平均セッション数・継続率）に意味が無い。
+function buildManagementSheet() {
+  var props = PropertiesService.getScriptProperties();
+  var ss = null;
+  var ssId = props.getProperty(MGMT_SHEET_PROP_G1);
+  if (ssId) {
+    try {
+      ss = SpreadsheetApp.openById(ssId);
+    } catch (e) {
+      ss = null; // 削除済み等 → 作り直す
+    }
+  }
+  if (!ss) {
+    ss = SpreadsheetApp.create("GSE G1 運用管理シート");
+    props.setProperty(MGMT_SHEET_PROP_G1, ss.getId());
+  }
+
+  buildLinksTab_(ss, props); // 毎回 URL を再集約（手動入力セルは保持する）
+  buildRunTab_(ss); // 既存があれば作らない（入力データを破壊しない）
+  applyRunValidation_(ss); // 最後: ドロップダウン（型付き列に起因する読込順の事故を避ける）
+
+  ["シート1", "Sheet1"].forEach(function (n) {
+    var s = ss.getSheetByName(n);
+    if (s && ss.getSheets().length > 1) ss.deleteSheet(s);
+  });
+
+  Logger.log("✅ G1 管理シート作成/更新完了");
+  Logger.log("🔗 " + ss.getUrl());
+  return ss.getUrl();
+}
+
+// リンク集: 3 フォームの URL を集約する。手動入力セル（B4/B5）は毎回退避して保持する。
+function buildLinksTab_(ss, props) {
+  var sh = ss.getSheetByName("リンク集") || ss.insertSheet("リンク集", 0);
+  var prevPad = "";
+  var prevDataset = "";
+  try {
+    prevPad = sh.getRange(4, 2).getValue();
+    prevDataset = sh.getRange(5, 2).getValue();
+  } catch (e) {
+    /* 初回は空 */
+  }
+  sh.clear();
+  var rows = [
+    ["GSE G1 リンク集", "", "", ""],
+    ["", "", "", ""],
+    ["項目", "値 / URL", "種別", "備考"],
+    [
+      "記入パッド (writing-pad.html) の置き場",
+      prevPad || "",
+      "手動",
+      "★ 被験者の入力先。全被験者・全ブロックで同一 (preregistration.md §2.11)。" +
+        "実施端末にコピーし、拡張機能なしのプロファイルで開く (protocol.md §1.2)",
+    ],
+    [
+      "gse-dataset への送付先",
+      prevDataset || "",
+      "手動",
+      "⚠️ G1 のセッションであることを明示して送る (data.md の B-4)。" +
+        "第1週モードで回すため label_pool が Phase1 の較正と同じになる",
+    ],
+    ["", "", "", ""],
+    ["フォーム", "タイトル", "編集URL", "回答URL"],
+  ];
+  ["G1_CONSENT", "G1_MCHECK", "G1_SURVEY"].forEach(function (k) {
+    var raw = props.getProperty("FORMURL_" + k);
+    if (raw) {
+      var o = JSON.parse(raw);
+      rows.push([k + "｜" + o.label, o.title, o.editUrl, o.publishedUrl]);
+    } else {
+      rows.push([k, "（未生成 — setupG1Forms を実行）", "", ""]);
+    }
+  });
+  rows.push(["", "", "", ""]);
+  rows.push([
+    "★ P-ID の採番元",
+    "Phase1 運用管理シートの「参加者ロスター」",
+    "参照",
+    "⚠️ G1 では採番しない。同じ人には同じ P-ID を使う。新規は Phase1 側で採番してから回す",
+  ]);
+  sh.getRange(1, 1, rows.length, 4).setValues(rows);
+  sh.getRange(1, 1).setFontWeight("bold").setFontSize(14);
+  sh.getRange(3, 1, 1, 4).setFontWeight("bold");
+  sh.getRange(7, 1, 1, 4).setFontWeight("bold");
+  sh.setColumnWidth(1, 260);
+  sh.setColumnWidth(2, 340);
+  sh.setColumnWidth(3, 320);
+  sh.setColumnWidth(4, 320);
+}
+
+// G1 実施トラッキングの列（1 被験者 1 行）。★ 実名・メールを持たない。
+// ⚠️ ブロックごとの条件・題材・NDJSON 名は **ここに書かない**。
+//    ラベルの真実源は記録用紙 → blocks/P0xx.json であり、二重に持つと必ずずれる
+//    (protocol.md §2.3-1「転記は 1 方向だけ」)。
+var RUN_HEADER = [
+  "P-ID",
+  "G1-C 同意",
+  "実施日",
+  "実施OS",
+  "アプリのビルド",
+  "GSE_DISABLE_PROBES=1",
+  "HMM_VERSION",
+  "配置(A/B)",
+  "完了ブロック数(/10)",
+  "G1-M 回答数(/7)",
+  "G1-S 回答",
+  "verify-blocks 実施",
+  "validate_blocks 緑",
+  "gse-dataset 送付",
+  "撤回/除外",
+  "備考",
+];
+
+function buildRunTab_(ss) {
+  if (ss.getSheetByName("G1 実施トラッキング")) return;
+  var sh = ss.insertSheet("G1 実施トラッキング");
+  // 行1: 注意バナー。★ ここに何を書いてはいけないかを、シートの上で明示する。
+  sh.getRange(1, 1).setValue(
+    "⚠ P-ID は Phase1 と共有（同じ人＝同じ ID）。採番は Phase1 の参加者ロスターで行う。" +
+      "★ 実名・メールをこのシートに書かない（Phase1 ロスターと G1-C 回答が真実源）。" +
+      "★ ブロックごとの条件・題材・NDJSON 名も書かない（記録用紙 → blocks/P0xx.json が真実源）。"
+  );
+  sh.getRange(1, 1, 1, RUN_HEADER.length).merge();
+  sh.getRange(1, 1)
+    .setFontWeight("bold")
+    .setFontColor("#ffffff")
+    .setBackground("#b71c1c")
+    .setWrap(true);
+  sh.getRange(2, 1, 1, RUN_HEADER.length).setValues([RUN_HEADER]).setFontWeight("bold");
+  sh.setFrozenRows(2);
+  sh.setColumnWidth(1, 70);
+  sh.setColumnWidth(16, 260);
+}
+
+// 取り違えを減らすためのドロップダウン。★ 判定に関わる列は 1 つも無い（運用の記録だけ）。
+function applyRunValidation_(ss) {
+  var sh = ss.getSheetByName("G1 実施トラッキング");
+  if (!sh) return;
+  var rows = 200;
+  function listRule(values) {
+    return SpreadsheetApp.newDataValidation().requireValueInList(values, true).build();
+  }
+  var yn = ["はい", "いいえ"];
+  sh.getRange(3, 2, rows, 1).setDataValidation(listRule(yn)); // G1-C 同意
+  sh.getRange(3, 4, rows, 1).setDataValidation(listRule(["Windows 11", "macOS"]));
+  sh.getRange(3, 6, rows, 1).setDataValidation(listRule(yn)); // GSE_DISABLE_PROBES
+  sh.getRange(3, 8, rows, 1).setDataValidation(listRule(["A", "B"]));
+  sh.getRange(3, 11, rows, 1).setDataValidation(listRule(yn)); // G1-S
+  sh.getRange(3, 12, rows, 1).setDataValidation(listRule(yn)); // verify-blocks
+  sh.getRange(3, 13, rows, 1).setDataValidation(listRule(yn)); // validate_blocks
+  sh.getRange(3, 14, rows, 1).setDataValidation(listRule(yn)); // 送付
+  sh.getRange(3, 15, rows, 1).setDataValidation(listRule(["", "撤回", "除外"]));
 }
 
 // ============================================================
