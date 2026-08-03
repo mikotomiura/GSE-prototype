@@ -8,7 +8,7 @@
     "version": 4,
     "date": "2026-08-03",
     "frozen_before_any_data": true,
-    "asymmetry": "Version 4 contains ZERO changes that make passing easier. Section 2.6 (manipulation-check threshold) and section 3.4 (viewing order) are BOTH untouched; sections 3.1/3.2/3.4/3.5/3.6 remain byte-identical to version 1. The only change is that the tool now WITHHOLDS the 3.3 verdict when the 3.4 viewing order was not satisfied - a reduction of information, so no new path to 'separated' is created.",
+    "asymmetry": "Version 4 contains ZERO changes that make passing easier. Section 2.6 (manipulation-check threshold) and section 3.4 (viewing order) are BOTH untouched; versions 3 and 4 did not touch sections 3.1-3.6 at all. (Correction recorded in v4: sections 3.1/3.2/3.4/3.5 are byte-identical to version 1; section 3.3 had ONLY its denominator wording changed in v2 (thresholds 80% and AUC 0.60 unchanged) and section 3.6 had ONLY a note appended in v2 (the six prohibitions are unchanged). The v2/v3 claim that 3.6 was byte-identical was inaccurate.) The only change is that the tool now WITHHOLDS the 3.3 verdict when the 3.4 viewing order was not satisfied - a reduction of information, so no new path to 'separated' is created.",
     "v4_changes": {
       "trigger": "Section 3.4 freezes a viewing order ('if the manipulation check fails, do NOT interpret the 3.3 result'), but the implementation did not enforce it: analyze.py printed separated / median_auc / fisher_p even when interpretable=false. The document forbade what the tool put in front of you.",
       "researcher_decision": "keep 2.6 as-is AND add strict sealing (blockers.md B-2)",
