@@ -55,6 +55,12 @@ for f in protocol.md consent.md participant-guide.md; do
   if [ -s "$f" ]; then ok "$f"; else bad "$f が無い/空（実施できない）"; fi
 done
 if [ -d materials ]; then ok "materials/"; else bad "materials/ が無い"; fi
+# ★ 第 5 版 §2.11: 被験者の入力先は固定する（無いと「どこに打つか」が未定になる）
+if [ -s writing-pad.html ]; then
+  ok "writing-pad.html（被験者の入力先・§2.11）"
+else
+  bad "writing-pad.html が無い。被験者の入力先が固定されていない（§2.11）"
+fi
 
 # --- 3. 課題文の機械検証（§2.2 / §2.7） --------------------------------------
 echo
@@ -79,7 +85,7 @@ fi
 # --- 4. スクリプトの自己検証 -------------------------------------------------
 echo
 echo "[4] スクリプトの自己検証"
-for s in assign analyze; do
+for s in assign analyze validate_blocks forms_to_blocks; do
   TMP_S=$(mktemp)
   if python3 "$s.py" --selftest > "$TMP_S" 2>&1; then
     ok "$s.py --selftest 緑"
@@ -90,18 +96,40 @@ for s in assign analyze; do
   rm -f "$TMP_S"
 done
 
-# --- 5. 凍結対象に触れていないこと ------------------------------------------
+# --- 5. アプリ側の前提 -------------------------------------------------------
+# ★ 第 5 版 §5.4 で検査の意図を置き換えた。
+#   旧: 「G1 はコード変更ゼロで実施できる」→ src-tauri/ src/ に変更が無いこと
+#   新: 「G1 が要求する変更 (プローブ kill switch) が入っており、それ以外の未コミット変更が無い」
+#
+#   ⚠️ 旧検査は `git status` を見るだけなので、**変更をコミットした瞬間に黙って緑に戻った**。
+#      すなわち「コード変更ゼロ」を検査しているつもりで、実際には何も検査していなかった
+#      (silent pass)。kill switch の存在を直接見ることで、失われたら赤になるようにする。
 echo
-echo "[5] 凍結対象への非接触（G1 はコード変更ゼロで実施できる）"
+echo "[5] アプリ側の前提（プローブ kill switch・§5.4）"
+KILL_SWITCH_FN="src-tauri/src/analysis/probe_scheduler.rs"
+KILL_SWITCH_USE="src-tauri/src/lib.rs"
+if [ -f "../../$KILL_SWITCH_FN" ] && [ -f "../../$KILL_SWITCH_USE" ]; then
+  if grep -q 'pub fn probes_disabled_by_env' "../../$KILL_SWITCH_FN" \
+     && grep -q 'GSE_DISABLE_PROBES' "../../$KILL_SWITCH_USE"; then
+    ok "プローブ kill switch がある（GSE_DISABLE_PROBES / probes_disabled_by_env）"
+  else
+    bad "プローブ kill switch が見つからない（GSE_DISABLE_PROBES / probes_disabled_by_env）"
+    note "  §2.6 は「アプリ内プローブを使わない」と凍結し、§3.6 が事後のブロック除外を"
+    note "  禁じているので、**実施前に止めるしかない**（§5.4）"
+  fi
+else
+  note "src-tauri/ が見つからない（この repo の外で走らせている）"
+fi
 if git rev-parse --git-dir >/dev/null 2>&1; then
   DIRTY=$(git status --porcelain -- ../../src-tauri ../../src 2>/dev/null | wc -l | tr -d ' ')
   if [ "$DIRTY" = "0" ]; then
-    ok "src-tauri/ と src/ に未コミットの変更が無い"
+    ok "src-tauri/ と src/ に未コミットの変更が無い（実施は検証済みビルドで行う）"
   else
-    bad "src-tauri/ または src/ に変更がある（$DIRTY 件）。G1 はコード変更を要さない"
+    bad "src-tauri/ または src/ に未コミットの変更がある（$DIRTY 件）"
+    note "  ★ 未検証のビルドで実験を回さないこと（kill switch 以外の変更は G1 に不要）"
   fi
 else
-  note "git repo の外なので凍結対象チェックを飛ばした"
+  note "git repo の外なのでコミット状態のチェックを飛ばした"
 fi
 
 # --- 6. データの状態 ---------------------------------------------------------
@@ -115,8 +143,20 @@ if [ "$SPECS" = "0" ]; then
   note "blocks/ に割付ファイルが無い = **まだ 1 件もデータを取っていない**（事前登録どおり）"
   note "  実施後の手順: python3 assign.py --subject P0xx --json > blocks/P0xx.json"
   note "                → 各 block に \"file\" と \"produced_chars\" を書き足す"
+  note "                → python3 forms_to_blocks.py --csv <G1-M回答.csv> --subject P0xx --write"
+  note "                → python3 validate_blocks.py --dataset ~/gse-dataset"
 else
   ok "blocks/ に割付ファイルが $SPECS 件ある"
+  # ★ 転記ミスの検出（除外も判定もしない・§3.6 に触れない）
+  TMP_VB=$(mktemp)
+  if python3 validate_blocks.py > "$TMP_VB" 2>&1; then
+    sed 's/^/    /' "$TMP_VB"
+    ok "割付ファイルの転記に問題なし"
+  else
+    sed 's/^/    /' "$TMP_VB"
+    bad "割付ファイルに転記ミスの疑いがある（validate_blocks.py）"
+  fi
+  rm -f "$TMP_VB"
 fi
 
 # --- 判定 -------------------------------------------------------------------

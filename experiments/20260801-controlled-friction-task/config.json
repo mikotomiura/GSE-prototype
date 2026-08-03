@@ -5,10 +5,28 @@
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
   "revision": {
-    "version": 4,
+    "version": 5,
     "date": "2026-08-03",
     "frozen_before_any_data": true,
-    "asymmetry": "Version 4 contains ZERO changes that make passing easier. Section 2.6 (manipulation-check threshold) and section 3.4 (viewing order) are BOTH untouched; versions 3 and 4 did not touch sections 3.1-3.6 at all. (Correction recorded in v4: sections 3.1/3.2/3.4/3.5 are byte-identical to version 1; section 3.3 had ONLY its denominator wording changed in v2 (thresholds 80% and AUC 0.60 unchanged) and section 3.6 had ONLY a note appended in v2 (the six prohibitions are unchanged). The v2/v3 claim that 3.6 was byte-identical was inaccurate.) The only change is that the tool now WITHHOLDS the 3.3 verdict when the 3.4 viewing order was not satisfied - a reduction of information, so no new path to 'separated' is created.",
+    "asymmetry": "Version 5 contains ZERO changes that make passing easier. Sections 3.1-3.6 are untouched (as in v3 and v4). The three additions either (a) make an ALREADY FROZEN rule enforceable (2.6 forbids in-app probes; the app fired them anyway), (b) CLOSE a post-hoc degree of freedom (the exit survey is declared non-verdict BEFORE it is collected), or (c) fill a blank that was never specified (where the subject types). One correction: the v2 claim 'G1 needs ZERO code change' no longer holds - the app needs a probe kill switch to honour 2.6. The separate v2 claim that Tier 0/1 can be computed OFFLINE (so G1 does not technically depend on the Phase1 unfreeze) is UNCHANGED and still correct.",
+    "v5_changes": {
+      "trigger": "Making pilot P-1 actually runnable exposed two blockers: (B-1) the app fires random probes during G1 blocks even though 2.6 freezes 'no in-app probes', and 3.6 forbids dropping contaminated blocks afterwards, so it can only be stopped BEFORE execution; (B-5) protocol.md never said WHERE the subject types the 300-400 characters, and autocorrect/autocomplete would contaminate bs_rate, one of the 14 FS-B features.",
+      "researcher_decision": "B-1 = option C (disable the probes). B-5 = a local HTML writing pad (2026-08-03). Exit survey = collect it, but declare it non-verdict first.",
+      "change_1_exit_survey": "New section 2.10. The exit survey is collected AFTER the last copy block. Its answers are NOT used for the 3.3 verdict, the 2.5 positive control or the 2.6 manipulation check. Declaring this BEFORE collection removes the post-hoc freedom of deciding later what the survey is for.",
+      "change_2_input_target": "New section 2.11. The subject types ONLY into writing-pad.html, identical for every subject and every block. The pad does not save or transmit the text (content-free promise in consent.md 3), has no spellcheck/autocomplete/autocorrect, and counts characters with the same rule as validate_materials.py count_chars.",
+      "change_3_probe_kill_switch": "New section 5.4. G1 runs with GSE_DISABLE_PROBES=1, which prevents the probe scheduler thread from starting. Only probe_assignment / probe_triggered / realtime_label disappear; the feat rows (FS-A) and key/paste/ime_shadow rows (FS-B) are unchanged, as are the HMM and replay parity. Verification is objective, not self-reported: validate_blocks.py --dataset requires ZERO such lines in every block.",
+      "correction_zero_code_change": "Section 5-3 said G1 touches no line of src-tauri/. That is withdrawn: honouring 2.6 requires the kill switch. run.sh check [5] is re-aimed accordingly - from 'no changes under src-tauri/ and src/' to 'the kill switch IS present AND there are no unrelated uncommitted changes'. The old check only looked at git status, so it went silently green the moment the change was committed (a silent pass).",
+      "why_not_a_loosening": {
+        "sections_3_1_to_3_6": "untouched, exactly as in versions 3 and 4",
+        "no_new_pass_path": "nothing about a disabled probe, a fixed input target or a non-verdict survey makes 'separated' easier to declare",
+        "enforces_an_existing_freeze": "2.6 already forbade in-app probes since version 1; the app simply did not obey it (same structural failure as E-6 and E-7: the document forbade what the tool did anyway)",
+        "protects_3_6": "3.6 forbids dropping blocks post hoc, so a probe-contaminated block could not have been removed later"
+      },
+      "also_recorded": {
+        "transcription_validator": "validate_blocks.py added. It ONLY detects transcription mistakes (structure, agreement with the deterministic assign.py output, duplicate/missing NDJSON names, manipulation-check correspondence, probe lines). It never excludes a block or a subject and holds no threshold, so it does not touch 2.9 or 3.6.",
+        "forms": "Form_G1/GSE_G1_Form_Builder.gs builds the consent / forced-comparison / exit-survey forms; forms_to_blocks.py converts the forced-comparison CSV into manipulation_check_answers without hand transcription."
+      }
+    },
     "v4_changes": {
       "trigger": "Section 3.4 freezes a viewing order ('if the manipulation check fails, do NOT interpret the 3.3 result'), but the implementation did not enforce it: analyze.py printed separated / median_auc / fisher_p even when interpretable=false. The document forbade what the tool put in front of you.",
       "researcher_decision": "keep 2.6 as-is AND add strict sealing (blockers.md B-2)",
@@ -49,27 +67,27 @@
       }
     },
     "v2": {
-    "version": 2,
-    "date": "2026-08-02",
-    "frozen_before_any_data": true,
-    "asymmetry": "This revision contains ONLY changes that make the verdict STRICTER or are verdict-neutral clarifications. It contains ZERO changes that make passing easier. Sections 3.1/3.2/3.4/3.5/3.6 (criteria, thresholds, feature sets, tests) are UNCHANGED from version 1.",
-    "corrections": [
-      "n=5 freeze is WITHDRAWN: the confirmatory n is frozen AFTER the pilot (preregistration.md 2.4). It was a convention, not a power calculation.",
-      "'Tier 0/1 cannot be started before the freeze is lifted' was WRONG: they are computable entirely offline from the existing NDJSON (preregistration.md 5-3)."
-    ],
-    "additions": [
-      "2.1 rewritten: argumentative writing is the BEST CASE for keystrokes, not a representative task",
-      "2.7 topic-by-condition counterbalancing across subjects",
-      "2.8 pilot clause (researcher, excluded from the confirmatory sample)",
-      "2.9 block-level minimum-keystroke ELIGIBILITY GATE",
-      "3.7 asymmetry of conclusions and the concrete next action when the result is negative",
-      "3.8 ecological validity limits (G1 is a floor check on measurability)",
-      "3.9 n=1 handling: exhaustive enumeration, Fisher only for n>=2",
-      "5.1 handling of zero-variance features (feature set unchanged)"
-    ],
-    "clarification_only": [
-      "3.3-3 denominator expressed as a FRACTION (>=80% of n) instead of '4 of 5'. Neither 80% nor AUC 0.60 changed."
-    ]
+      "version": 2,
+      "date": "2026-08-02",
+      "frozen_before_any_data": true,
+      "asymmetry": "This revision contains ONLY changes that make the verdict STRICTER or are verdict-neutral clarifications. It contains ZERO changes that make passing easier. Sections 3.1/3.2/3.4/3.5/3.6 (criteria, thresholds, feature sets, tests) are UNCHANGED from version 1.",
+      "corrections": [
+        "n=5 freeze is WITHDRAWN: the confirmatory n is frozen AFTER the pilot (preregistration.md 2.4). It was a convention, not a power calculation.",
+        "'Tier 0/1 cannot be started before the freeze is lifted' was WRONG: they are computable entirely offline from the existing NDJSON (preregistration.md 5-3)."
+      ],
+      "additions": [
+        "2.1 rewritten: argumentative writing is the BEST CASE for keystrokes, not a representative task",
+        "2.7 topic-by-condition counterbalancing across subjects",
+        "2.8 pilot clause (researcher, excluded from the confirmatory sample)",
+        "2.9 block-level minimum-keystroke ELIGIBILITY GATE",
+        "3.7 asymmetry of conclusions and the concrete next action when the result is negative",
+        "3.8 ecological validity limits (G1 is a floor check on measurability)",
+        "3.9 n=1 handling: exhaustive enumeration, Fisher only for n>=2",
+        "5.1 handling of zero-variance features (feature set unchanged)"
+      ],
+      "clarification_only": [
+        "3.3-3 denominator expressed as a FRACTION (>=80% of n) instead of '4 of 5'. Neither 80% nor AUC 0.60 changed."
+      ]
     }
   },
   "design": {
@@ -117,7 +135,10 @@
     "materials_status": {
       "production_set_complete": true,
       "topics": 8,
-      "versions_per_topic": ["lo", "hi"],
+      "versions_per_topic": [
+        "lo",
+        "hi"
+      ],
       "plus": "copy.md (positive control, shared by all subjects)",
       "validated_by": "python3 validate_materials.py --strict (green)",
       "written_in": "version 3",
@@ -155,7 +176,10 @@
           "blocks": 10,
           "layout": "identical to the confirmatory design",
           "materials_needed": "8 topics x 2 versions + copy (written after P-1)",
-          "checks": ["full run-through", "early read on separation (NOT a verdict)"]
+          "checks": [
+            "full run-through",
+            "early read on separation (NOT a verdict)"
+          ]
         }
       },
       "excluded_from_confirmatory_sample": true,
@@ -314,21 +338,37 @@
     }
   },
   "manipulation_check": {
-    "instrument": "forced_comparison_paper_or_external_form",
+    "instrument": "forced_comparison_form_with_paper_backup (Form_G1 G1-M; paper form in protocol.md 3.1)",
     "reason_not_in_app": "probe_scheduler.rs is frozen; also 1-5 Likert caused straight-lining in Phase1 (P013)",
     "pass_threshold_hi_chosen_as_harder": 0.7,
     "on_failure": "do_not_interpret_separation_result; redesign task",
     "asked_for_blocks": "G1 blocks 3..9 only (7 comparisons); NOT asked for copy blocks nor for the first G1 block (no valid predecessor)",
     "denominator": "ONLY cross-condition pairs (HI vs LO). Same-condition pairs (HI-HI, LO-LO) carry no information and are excluded from the denominator.",
     "denominator_distribution": {
-      "guaranteed_range": [4, 6],
+      "guaranteed_range": [
+        4,
+        6
+      ],
       "why": "assign.py condition_sequence() splits the 8 G1 blocks into 4 adjacent pairs and makes every pair either (HI,LO) or (LO,HI) (ABBA balancing), so the 4 within-pair adjacencies are ALWAYS cross-condition. The 3 between-pair adjacencies vary. Denominators of 1-3 cannot occur.",
       "measured": "20,000 seeds: denominator 4 in 33.6%, 5 in 32.9%, 6 in 33.5%",
-      "required_passes": {"4": "3/4 (75%)", "5": "4/5 (80%)", "6": "5/6 (83%)"},
-      "false_positive_rate_under_null_50pct": {"4": 0.313, "5": 0.188, "6": 0.109},
-      "false_negative_rate_if_manipulation_truly_80pct": {"4": 0.181, "5": 0.263, "6": 0.345},
+      "required_passes": {
+        "4": "3/4 (75%)",
+        "5": "4/5 (80%)",
+        "6": "5/6 (83%)"
+      },
+      "false_positive_rate_under_null_50pct": {
+        "4": 0.313,
+        "5": 0.188,
+        "6": 0.109
+      },
+      "false_negative_rate_if_manipulation_truly_80pct": {
+        "4": 0.181,
+        "5": 0.263,
+        "6": 0.345
+      },
       "consequence": "At EVERY denominator only ONE answer may be missed. Even a genuinely effective manipulation fails this gate 18-35% of the time. The threshold is NOT changed (that would loosen the verdict); instead section 5.3 requires reporting these numbers and seals the 3.3 verdict so that a re-run stays confirmatory."
-    }
+    },
+    "transcription": "forms_to_blocks.py converts the form CSV into manipulation_check_answers; validate_blocks.py then checks the correspondence. No hand transcription."
   },
   "verdict_sealing": {
     "section": "5.3 (added in version 4)",
@@ -402,10 +442,14 @@
       "assign.py": "deterministic per-subject assignment (arrangement A/B, topic->condition, ABBA-balanced then seed-randomized block order)",
       "validate_materials.py": "mechanical checks on the task materials (source count, matched total length, stated output requirement)",
       "analyze.py": "block features (FS_A from feat rows, Tier0/1 from key/paste/ime_shadow rows) + the frozen decision pipeline",
-      "run.sh": "pre-execution readiness check: green when materials, protocol and consent are all present and valid; red otherwise"
+      "run.sh": "pre-execution readiness check: green when materials, protocol and consent are all present and valid; red otherwise",
+      "validate_blocks.py": "transcription-integrity check on blocks/P0xx.json (structure, agreement with assign.py, NDJSON names, manipulation-check correspondence, and with --dataset the absence of probe lines). Detection only: it never excludes anything and holds no threshold.",
+      "forms_to_blocks.py": "converts the G1-M forced-comparison CSV into manipulation_check_answers (relative choices -> block numbers). Refuses to guess: missing, duplicate or out-of-range answers stop the script.",
+      "writing-pad.html": "the fixed input target for the subject (2.11). No save, no transmit, no autocomplete; character count uses the same rule as validate_materials.py."
     },
     "permutation_seed_independence": "the permutation test enumerates all assignments exhaustively, so it does not depend on SEED",
-    "dependencies": "Python standard library only; no requirements.txt (same policy as experiments/20260802-within-person-scope-detector)"
+    "dependencies": "Python standard library only; no requirements.txt (same policy as experiments/20260802-within-person-scope-detector)",
+    "hmm_version_stamping": "TO_BE_STAMPED_AT_EXECUTION. Procedure in protocol.md 6: on the day of execution the experimenter reads HMM_VERSION out of the running build and writes it into this file and env.md, before the analysis is run."
   },
   "prereg": {
     "covered_by_preregistration_v0_3": false,
@@ -458,5 +502,32 @@
       "the x/x cell is not interpretable without the positive control -> positive_control added"
     ],
     "directional_prior_from_P36": "mean IKI stable across tasks; revisions / word count / total time move -> predicts FS_A fail, FS_B pass. NOT a decision criterion; recorded so that a mismatch cannot later be called 'expected'."
+  },
+  "execution_environment": {
+    "preregistration_section": "5.4 / 2.11 (version 5)",
+    "app_launch_mode": "week1_blind_calibration (interventions are gated off and the estimated state is hidden; decisions.md E-9)",
+    "required_env": {
+      "GSE_DISABLE_PROBES": "1"
+    },
+    "why_env_not_build": "the two launch modes in App.tsx cannot stop the probes; splitting the build would create two participant binaries",
+    "objective_verification": "validate_blocks.py --dataset requires ZERO probe_assignment / probe_triggered / realtime_label lines in every block NDJSON",
+    "self_marker_hotkey": "NOT gated by the kill switch (user-initiated). protocol.md forbids pressing it; a press would show up as a realtime_label line and fail the check above.",
+    "input_target": "writing-pad.html (identical for every subject and every block; no save, no transmit, no autocomplete)",
+    "char_count_rule": "same as validate_materials.py count_chars: whitespace and Unicode category C excluded, counted per code point",
+    "os": "Windows 11 or macOS. On macOS ime_dwell_med is structurally missing (5.1), so FS-B is effectively 13 features; report it."
+  },
+  "exit_survey": {
+    "preregistration_section": "2.10 (version 5)",
+    "when": "once, AFTER the last copy block (block 10)",
+    "used_for_verdict": false,
+    "declaration": "The answers are NOT used for the 3.3 verdict, the 2.5 positive control or the 2.6 manipulation check. If they ever are, say so and report that run as EXPLORATORY (same treatment as 2.8).",
+    "purposes": [
+      "debriefing / demand characteristics (never asking WHICH block was the hard condition)",
+      "subjective cross-check of 5.4 (did any in-app prompt appear); the OBJECTIVE check is the NDJSON one",
+      "procedural improvement permitted by 2.8 (materials, block length, source volume)",
+      "ecological-validity record (3.8-4)"
+    ],
+    "pii": "subject ID only; no name, no email",
+    "instrument": "Form_G1 G1-S"
   }
 }

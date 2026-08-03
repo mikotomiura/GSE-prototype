@@ -27,9 +27,36 @@
 
 ```bash
 python3 assign.py --subject P015 --json > blocks/P015.json
-# → 各 block に "file"（NDJSON 名）と "produced_chars"（産出文字数）を書き足す
-# → 末尾に "manipulation_check_answers" を書き足す
+# → 各 block に "file"（NDJSON 名）と "produced_chars"（記入パッドの文字数）を書き足す
+# → 強制比較は **手で書かない**。フォームの CSV から機械変換する:
+python3 forms_to_blocks.py --csv ~/Downloads/G1-M回答.csv --subject P015 --write
+# → ★ 転記の整合を必ず検査する（構成・割付との一致・NDJSON 名・強制比較の対応・probe 行 0）
+python3 validate_blocks.py --dataset ~/gse-dataset
 ```
+
+★ **`validate_blocks.py` は転記ミスの検出だけを行う。** 除外も判定もしない（`§3.6` に触れない）。
+
+## ★ B-4 — G1 のデータを Phase1 の較正プールから分離する
+
+⚠️ G1 は**第 1 週（blind 較正）モード**で回すので、`session_meta` に
+**`condition=blind_calibration` / `label_pool=calibration_blind`** が刻まれる。
+これは **Phase1 の較正セッションとまったく同じラベル**である。
+
+| リスク | 手当て |
+|---|---|
+| gse-dataset 側の集計が `label_pool` で拾うと、**G1 のデータが Phase1 の集計に混入しうる** | ★ **被験者 ID を Phase1（P010–P014）と分ける**（G1 は **P015 以降**）だけでは不十分 |
+| ★ `calibration_eval` が `label_pool` で絞っていない件は既知の問題 | ★ **送付時に G1 を明示的に分離する**（下記） |
+
+**送付フロー（★ P-1 で通しで確認する）**:
+
+1. 匿名化して `.age` に固める（⚠️ **ファイル名に実名を使わない**。`P0xx` のみ）。
+2. ★ **G1 のセッションであることを送付時のメモに明記する**（被験者 ID の範囲だけに頼らない）。
+3. gse-dataset 側で **Phase1 の較正コホートの集計に入らない**ことを確認する。
+4. ★ **`--verify-blocks` / `validate_blocks.py --dataset` を P-1 で初めて走らせる**——
+   どちらも**データが 1 件も無かったため一度も実行されていない**。
+   P-1 は「解析の前段が実際に動くか」を確かめる初回でもある。
+
+★ **事前登録の変更は不要**（実施・データ管理の問題であって判定基準の問題ではない）。
 
 ⚠️ ★ **`blocks/*.json` はコミットしない**（`blocks/.gitignore`）。
 NDJSON のファイル名には**セッション日時**が入り、再識別の手がかりになるため。
@@ -43,6 +70,7 @@ NDJSON のファイル名には**セッション日時**が入り、再識別の
 | 被験者 ID（P0xx） | TBD |
 | セッション数 / ブロック数 | TBD（確証デザインは 1 人 10 ブロック = 10 セッション） |
 | 実施 OS | TBD（★ `ime_dwell_med` の可用性に効く・`env.md`） |
+| ★ `GSE_DISABLE_PROBES` | TBD（**必須 = 1**・`preregistration.md §5.4`。⚠️ `validate_blocks.py --dataset` が客観検証する） |
 | NDJSON の hash | TBD |
 | 課題文セット ID | TBD（`materials/topicNN_{lo,hi}.md`・パイロットは `topic01` のみ） |
 | 配置（A / B） | TBD（`assign.py` が被験者番号から決定的に出す） |
@@ -51,8 +79,9 @@ NDJSON のファイル名には**セッション日時**が入り、再識別の
 ## 課題文について
 
 - パイロット用: **`topic01` の LO / HI ＋ `copy`** を作成済み（`materials/`）。
-- 本番用: **8 題材 × 2 版**が要る（`preregistration.md §2.7` の counterbalance）。**未作成**。
-  パイロットの結果（資料の量・ブロック長）を見てから作る。
+- 本番用: **8 題材 × 2 版**（`preregistration.md §2.7` の counterbalance）。
+  ★ **第 3 版で作成済み**（`validate_materials.py --strict` が緑）。
+  ⚠️ パイロットの結果（資料の量・ブロック長）を受けた修正は `§2.8` が許容している。
 - ★ **課題文は被験者の産出物ではない**ためリポジトリ内に置いてよい。
 - ★ **課題文セットをセッション間で使い回さない**（`preregistration.md §3.6`）。
   1 人が同じ題材を 2 回見ることは無い（`assign.py` が保証する）。

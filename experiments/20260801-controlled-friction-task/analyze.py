@@ -39,6 +39,14 @@ import sys
 # ---------------------------------------------------------------------------
 # 事前登録から来る定数（preregistration.md / config.json のミラー。ここで変えない）
 # ---------------------------------------------------------------------------
+# ★ この実装が従っている事前登録の版。**結果ファイルに刻まれる**。
+#   ⚠️ `selftest()` が `config.json` の `revision.version` と一致することを検査する。
+#   このプロジェクトでは「文書だけ改訂して実装が追随しない」事故が 2 回起きており
+#   （E-6: §2.5 の分岐 / E-7: §3.4 の見る順序）、★ **この定数自体も第 4 版で 3 のまま
+#   取り残されていた**（第 5 版で発見）。番号がずれたら selftest が赤になるようにして、
+#   人が気づくかどうかに依存させない。
+PREREG_REVISION = 5
+
 LAMBDA = 1.0                     # §3.1 L2 罰則（z 標準化後）・事前固定・チューニングしない
 SILENCE_MS = 2000                # §3.2 silence = IKI >= 2000ms（現行 F5 の閾値に揃える）
 MIN_KEYDOWNS_PER_BLOCK = 100     # §2.9 適格性ゲート
@@ -804,7 +812,7 @@ def main() -> int:
         "experiment": "20260801-controlled-friction-task",
         "gate": "G1",
         "preregistration": "preregistration.md (frozen; authoritative over this output)",
-        "preregistration_revision": 3,
+        "preregistration_revision": PREREG_REVISION,
         "decision_status": status,
         "decision_status_values": {
             "INTERPRETABLE": "3.4 order satisfied; read the 3.3 verdict",
@@ -812,7 +820,7 @@ def main() -> int:
             "MANIPULATION_CHECK_FAILED": "2.6 failed; do not interpret separation",
             "POSITIVE_CONTROL_NOT_RUN": "no eligible 10-block subject",
             "G1_VOID": "2.5: positive control failed AND the test could have rejected -> instrument fault suspected",
-            "VERDICT_WITHHELD": "2.5 (revision 3): positive control failed but the test could NOT have "
+            "VERDICT_WITHHELD": "2.5 (since revision 3): positive control failed but the test could NOT have "
                                 "rejected for any failing subject -> underpower, NOT an instrument fault",
         },
         "reading_order_3_4": ["1_manipulation_check", "2_positive_control", "3_feature_sets"],
@@ -877,6 +885,21 @@ def _synthetic(sep: float, n: int = 8, d: int = 14, seed: int = 0) -> tuple[list
 
 def selftest() -> int:
     fails: list[str] = []
+
+    # 0) ★ 版の一致（E-6 / E-7 の教訓を機械化する）
+    #    事前登録を改訂したら、その規則を実行するスクリプトが同じ版になっているか。
+    #    ⚠️ この検査が無かったため、PREREG_REVISION は第 4 版のあいだ 3 のまま残っていた。
+    cfg_path = pathlib.Path(__file__).resolve().parent / "config.json"
+    try:
+        cfg_rev = json.loads(cfg_path.read_text(encoding="utf-8"))["revision"]["version"]
+    except Exception as e:                                  # noqa: BLE001 - 検査そのものを落とさない
+        fails.append(f"config.json の revision.version を読めない: {e}")
+    else:
+        if cfg_rev != PREREG_REVISION:
+            fails.append(
+                f"★ 事前登録の版と実装の版が食い違っている: config.json={cfg_rev} / "
+                f"analyze.py PREREG_REVISION={PREREG_REVISION}。"
+                f"文書を改訂したら、その規則を実行するスクリプトを同じ版にすること")
 
     # 1) 明確に分離する合成データ -> AUC 1.0 / p = 1/70
     rows, labels = _synthetic(sep=50.0)

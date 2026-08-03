@@ -10,8 +10,11 @@
 | ★ 並べ替え検定の seed | ★ **非該当**。**全数列挙**（G1: C(8,4)=70 / positive control: C(10,2)=45）なので seed に依存しない（`preregistration.md §3.9`） | — |
 | GSE-prototype commit | 実施時の commit hash | TBD |
 | Rust toolchain / `Cargo.lock` | 被験者端末で動かすアプリのビルド元 | TBD |
-| `HMM_VERSION` | `engine.rs` の定数（`feat` 行の出所なので結果にも刻む） | TBD |
+| `HMM_VERSION` | `engine.rs` の定数（`feat` 行の出所なので結果にも刻む）。★ **刻印手順は `protocol.md §6.1`**（実施当日・開始前に `env.md` へ、解析前に `config.json` へ） | TBD |
 | ★ 実施 OS | **被験者端末**（Windows 11 / macOS）を記録する。下記の理由で結果解釈に効く | TBD |
+| ★ アプリのビルド | 実施に使った**本番バイナリ**のタグ／コミット（★ 10 セッションは同一バイナリで回す） | TBD |
+| ★ `GSE_DISABLE_PROBES` | **必須 = `1`**（`preregistration.md §5.4`）。⚠️ 立て忘れは `validate_blocks.py --dataset` が捕まえる | TBD |
+| ★ 被験者の入力先 | **`writing-pad.html`**（`preregistration.md §2.11`）。ブラウザとプロファイル（拡張なし）を記録する | TBD |
 | `gse-replay` | ★ **非該当**。`analyze.py` は NDJSON を直接集計し、`gse-replay` も HMM も通さない | — |
 
 ## 依存の少なさについて
@@ -40,6 +43,16 @@ numpy / scipy を使っていないのは、**再現に lockfile を要さない
 凍結されているのは **Tier 0/1 を実行時の推論経路（`feat` 行・HMM）へ配線すること**であって、
 **オフライン解析には無関係**である。`analyze.py` は `src-tauri/` を 1 行も変更していない。
 
+> ### ★ 追記（2026-08-03・第 5 版）— 「コード変更ゼロ」は撤回した
+>
+> ⚠️ **解析は依然として `src-tauri/` に依存しない**（上の訂正は有効である）。
+> ★ しかし **実施のためにアプリ側の 1 行が要る**ことになった: `§2.6` は「アプリ内プローブを
+> 使わない」と凍結しているのに、アプリは放っておくと出す。`§3.6` が事後のブロック除外を
+> 禁じているので、**止められるのは実施前だけ**である（`preregistration.md §5.4`）。
+> → **プローブ kill switch**（`GSE_DISABLE_PROBES=1`）を実装した。
+> 消えるのは `probe_assignment` / `probe_triggered` / `realtime_label` の 3 行だけで、
+> **FS-A（`feat` 行）も FS-B（`key` / `paste` / `ime_shadow` 行）も HMM も不変**である。
+
 → ★ **技術的には、G1 は Phase1 の凍結解除を待たずに実施できる。**
 ⚠️ ただし `ADR-009 D7` / `personalization-and-online-learning.md §8.2` は
 「G1 は凍結解除後の最初のタスク」と書いている。**実施順序の決定は研究者判断**であり、
@@ -52,6 +65,8 @@ numpy / scipy を使っていないのは、**再現に lockfile を要さない
   → **macOS で実施すると `ime_dwell_med` が構造的に欠測**し、全ブロックで 0 になる。
 - **`external_paste_chars`** は、課題文を**紙で配る**運用（`protocol.md`）ではペーストが
   発生しないため、どの OS でも全ブロック 0 になる見込みである。
+  ★ 記入パッド（`§2.11`）はペーストを**禁止しない**（禁止は打鍵挙動への介入になる）ので、
+  実際に 0 だったかは `validate_blocks.py --dataset` が `paste` 行数として報告する。
 - 特徴量セット（FS-B = 14 特徴）は**変えない**。分散ゼロ特徴は標準化後 0 に潰し、
   **`degenerate_features` として必ず出力する**（`preregistration.md §5.1`）。
 - ★ **可能なら Windows 11 で実施することが望ましい**（FS-B を設計どおり 14 特徴で評価できる）。
