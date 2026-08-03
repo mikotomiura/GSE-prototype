@@ -47,7 +47,8 @@ var Utilities = { formatDate: function () { return "2026-01-01"; } };
 var UrlFetchApp = { fetch: function () { throw new Error("not used"); } };
 __GAS_SOURCE__
 // ★ 実際に呼ぶ。未定義参照があればここで ReferenceError になる。
-var out = { subject: g1PreVisitSubject_(), body: g1PreVisitBody_("P999", "1/1(月) 10:00") };
+var out = { subject: g1PreVisitSubject_(), body: g1PreVisitBody_("P999", "1/1(月) 10:00"),
+            ackSubject: g1RegisterAckSubject_(), ack: g1RegisterAckBody_("P999", "8/10 午後") };
 var thanks = (function () {
   // sendThankYouEmail は本文を組み立ててから送るので、下書き経路を通して例外が出ないか見る。
   try { G1_CONTACT = G1_CONTACT || "（テスト）"; sendThankYouEmail("P999", "t@example.com"); return "ok"; }
@@ -121,32 +122,39 @@ def main() -> int:
     fails: list[str] = list(check_run_columns())
 
     res = run_gas()
+    # ★ 事前案内メールと受付メールの**両方**を同じ基準で見る。
+    #   片方だけ検査すると、もう片方に題材が書き戻されても緑になる。
+    bodies = {"事前案内メール": res["body"], "受付メール": res["ack"]}
     body = res["body"]
 
     if res.get("thanks") != "ok":
         fails.append(f"sendThankYouEmail が失敗する: {res.get('thanks')}")
 
     # ★ 本命: 題材名が本文に載っていないこと（第 7 版 §2.12）
-    for t in topic_titles():
-        if t in body:
-            fails.append(f'題材名 "{t}" が事前案内メールに載っている（§2.12 は開示しないと凍結）')
+    for label, b in bodies.items():
+        for t in topic_titles():
+            if t in b:
+                fails.append(f'題材名 "{t}" が{label}に載っている（§2.12 は開示しないと凍結）')
 
     # ★ 課題の型も開示しない
-    for token in ("資料が 1 本", "資料が 3 本", "資料 1 本の要約", "資料 3 本の統合", "統合"):
-        if token in body:
-            fails.append(f'課題の型を示す表現 "{token}" が事前案内メールにある（§2.12）')
+    for label, b in bodies.items():
+        for token in ("資料が 1 本", "資料が 3 本", "資料 1 本の要約", "資料 3 本の統合", "統合"):
+            if token in b:
+                fails.append(f'課題の型を示す表現 "{token}" が{label}にある（§2.12）')
 
     # ★ 条件名・構成概念
-    for token in ("HI", "LO", "摩擦", "仮説", "判定基準"):
-        if token in body:
-            fails.append(f'"{token}" が事前案内メールにある（§2.12 / protocol.md §4.3）')
+    for label, b in bodies.items():
+        for token in ("HI", "LO", "摩擦", "仮説", "判定基準"):
+            if token in b:
+                fails.append(f'"{token}" が{label}にある（§2.12 / protocol.md §4.3）')
 
     # ★ 検査が空回りしていないこと: 本文がちゃんと生成されている
-    if len(body) < 200:
-        fails.append(f"本文が短すぎる（{len(body)} 文字）。生成に失敗している疑い")
-    for must in ("参加者ID", "5 分", "300〜400 字", "書き写し"):
-        if must not in body:
-            fails.append(f'必要な案内 "{must}" が本文に無い')
+    for label, b in bodies.items():
+        if len(b) < 200:
+            fails.append(f"{label}の本文が短すぎる（{len(b)} 文字）。生成に失敗している疑い")
+        for must in ("参加者ID", "5 分", "300〜400 字", "書き写し"):
+            if must not in b:
+                fails.append(f'{label}に必要な案内 "{must}" が無い')
 
     if fails:
         print("[NG] 事前案内メールが §2.12 の開示範囲から外れている")
@@ -155,7 +163,7 @@ def main() -> int:
         return 1
     print("[OK] 事前案内メールは §2.12（第 7 版）の開示範囲を守っている")
     print("     G1 実施トラッキングの列参照も RUN_HEADER と一致している")
-    print(f"     題材名 {len(topic_titles())} 件・課題の型・条件名のいずれも本文に無い")
+    print(f"     事前案内メール／受付メールとも、題材名 {len(topic_titles())} 件・課題の型・条件名が本文に無い")
     return 0
 
 
