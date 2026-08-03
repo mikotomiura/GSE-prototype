@@ -53,15 +53,30 @@ P###_x.age ──Dropbox File Request──────▶   匿名化 NDJSON
 被験者配布用と研究者用の 2 つの CLI は `package` feature でビルドする (age 依存は default の
 Tauri 本体に載らない)。
 
+★ **1 コマンドで workspace の `bin/` に install する**（2026-08-03 で経路を統一）:
+
+```bash
+bash scripts/install-researcher-tools.sh          # gse-unpack を bin/ へ
+bash scripts/install-researcher-tools.sh --check  # 入っているかだけ確認
+```
+
+- ★ **配置後に `--help` を実行して動くことまで確認する**（署名・実行権限・アーキ違いをここで捕まえる）。
+- ⚠️ `bin/` は `.gitignore` 済み。**バイナリをコミットしない**（本リポジトリは一時 public にする運用がある）。
+- `gse-package`（被験者向け手動版）も要るなら `--with-package` を付ける。
+  ⚠️ ★ **通常は不要**——`gse-package` は Phase1 で誰も使わず、配布もしなくなった。
+
+<details>
+<summary>手で叩く場合（スクリプトを使わないとき）</summary>
+
 ```bash
 cd src-tauri
-# 被験者に配る暗号化 CLI
-cargo build --release --features package --bin gse-package
-# 研究者用の復号 / 鍵生成 CLI
 cargo build --release --features package --bin gse-unpack
 cd ..
-# 生成物: src-tauri/target/release/gse-package(.exe) / gse-unpack(.exe)
+# 生成物: src-tauri/target/release/gse-unpack(.exe)
 ```
+⚠️ `src-tauri/target/` は `cargo clean` や toolchain 更新で消える。手順書に書くパスとしては
+`bin/` のほうが安定する。
+</details>
 
 ---
 
@@ -72,15 +87,17 @@ cd ..
 
 ```bash
 # 秘密鍵は repo 外 (既定: ~/.gse/age-identity.txt)。公開鍵が stdout に出る。
-./src-tauri/target/release/gse-unpack --keygen --out ~/.gse/age-identity.txt
+./bin/gse-unpack --keygen --out ~/.gse/age-identity.txt
 # 出力例:
 #   age public key (give to participants as --recipient):
 #   age1qz...          ← この公開鍵を被験者配布パッケージ (pubkey.txt) に入れる
 #   secret key written to: ~/.gse/age-identity.txt (KEEP SECRET, not in repo)
 ```
 
-- 公開鍵 (`age1...`) を `pubkey.txt` に保存し、`gse-submit`(＋`提出する` ランチャ) / `gse-package` exe と
-  一緒に被験者へ配る (公開鍵は配布安全)。`gse-submit` は同梱 `pubkey.txt` を自動で recipient に使う。
+- 公開鍵 (`age1...`) を `pubkey.txt` に保存する（公開鍵は配布して安全）。
+  - ★ **macOS**: `.app` の Resources に内蔵される（CI が同梱を assert する）。個別配布は不要。
+  - ★ **Windows**: `gse-next.exe` / `gse-submit.exe` / `提出する_win.bat` と**同じフォルダ**に置いて配る。
+  - `gse-submit` は同梱 `pubkey.txt` を自動で recipient に使う。
 - **公開鍵の取り違え防止**: 初回セッション同席時に、配布 `pubkey.txt` の `age1...` 文字列が研究者手元の
   keygen 出力と一致することを目視確認する (gse-submit は鍵ピンニングしないため、配布フォルダの
   `pubkey.txt` がすり替わると暗号化先が変わる。中身は匿名化済だが宛先誤りを防ぐ・security review LOW)。
@@ -98,7 +115,7 @@ cd ..
 >   を**同じフォルダ**に置く。アプリ内提出 (方法1) が正規で、bat はフォールバック。
 >
 > ⚠️ ★ **`gse-package(.exe)` は配布しない** (Phase1 で誰も使わずに完了したため)。
-> 研究者が手元で必要なときは `cargo build --release --features package --bin gse-package` で作れる。
+> 研究者が手元で必要なときは `bash scripts/install-researcher-tools.sh --with-package` で作れる。
 > Python / age CLI のインストールは不要。
 
 ### Step 1 — セッション収集
@@ -147,7 +164,7 @@ cd ..
 # 例: 受領名から実名を剥がして正規形へ。<P###> と日時は受領ファイルから読む。
 mv "P006_gse_20260624_101500_mikoto miura.age" P006_gse_20260624_101500.age
 # 復号。出力は匿名化 NDJSON (P###_*.ndjson)。--out 省略時は .age と同じフォルダ。
-gse-unpack --input P006_gse_20260624_101500.age --identity ~/.gse/age-identity.txt --out ./inbox
+./bin/gse-unpack --input P006_gse_20260624_101500.age --identity ~/.gse/age-identity.txt --out ./inbox
 # → ./inbox/P006_gse_20260624_101500.ndjson (匿名化済・category 形式)
 ```
 > 復号後の平文 NDJSON は**ローカルのみ**。gse-dataset / 本 repo にコミットしない (data-privacy)。

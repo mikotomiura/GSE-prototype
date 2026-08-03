@@ -79,3 +79,7 @@ experiments/**/*.jsonl
 
 # G1 配布用 .docx（markdown から再生成できる派生物）
 experiments/*/handouts/
+
+# 研究者専用 CLI の install 先 (scripts/install-researcher-tools.sh)。
+# ★ バイナリをコミットしない (本リポジトリは一時 public にする運用がある)。
+/bin/
