@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G1 記入パッド</title>
+<!--
+  G1 統制タスク実験 — 被験者の入力先（B-5 の解・研究者判断 2026-08-03）
+
+  ★ このファイルは「被験者が 300〜400 字をどこに打つか」を **全被験者・全ブロックで固定する**
+    ためのものである。実務の都合ではなく **統制** である:
+      - bs_rate（訂正率）は FS-B の 14 特徴量の 1 つであり、オートコレクト・赤波線・自動補完が
+        働くと修正行動が変わる。入力先が人ごと・ブロックごとに違えば、preregistration.md §2.2 が
+        却下したはずの「機械的に打鍵を変える操作」を統制外で招き入れることになる。
+      - したがって **入力先を 1 つに固定すること自体が要件**であり、
+        どのエディタが優秀かという話ではない。
+
+  ★ 設計上の約束（consent.md §3 / participant-guide.md §6 / protocol.md §7 の content-free 原則）
+      1. 本文を **保存しない**。localStorage / sessionStorage / IndexedDB / Cookie を使わない。
+      2. 本文を **どこにも送らない**。fetch / XHR / WebSocket / <form> / 外部リソースを一切持たない。
+      3. 記録するのは **文字数だけ**（画面に出すだけで、ファイルにも書かない）。
+      4. 依存ゼロ・単一ファイル。オフラインで開ける。
+
+  ★ 文字数の数え方は validate_materials.py の count_chars と **同じ規則**に揃えてある:
+      空白・改行・制御文字（Unicode カテゴリ C）を数えない。コードポイント単位。
+      → 資料の文字数（§2.2 の ±5% 制約）と産出文字数（§3.5 の報告義務）が同じ物差しになる。
+
+  ⚠️ 開き方は protocol.md §2.4 に従うこと（拡張機能なしのプロファイルで開く）。
+     Grammarly 等の拡張は data-gramm 属性で抑止を試みるが、**抑止できない拡張もある**。
+-->
+<style>
+  /* ★ OS 差・テーマ差を持ち込まないため、配色とフォント指定を固定する（見た目も統制対象）。 */
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: #f5f5f4; color: #1c1917;
+    font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 16px; line-height: 1.6;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .block-no { font-size: 14px; }
+  .block-no input {
+    width: 4em; font-size: 14px; padding: 2px 6px;
+    border: 1px solid #a8a29e; border-radius: 4px; background: #fff;
+  }
+  textarea {
+    width: 100%; height: 58vh; min-height: 280px; padding: 16px;
+    font-family: inherit; font-size: 17px; line-height: 1.9;
+    color: inherit; background: #fff;
+    border: 1px solid #a8a29e; border-radius: 6px; resize: none;
+  }
+  textarea:focus { outline: 2px solid #0f766e; outline-offset: 1px; }
+  footer {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    margin-top: 12px; font-size: 15px;
+  }
+  #count { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hint { color: #57534e; font-size: 13px; }
+  button {
+    font: inherit; font-size: 14px; padding: 6px 14px;
+    border: 1px solid #a8a29e; border-radius: 6px; background: #fff; cursor: pointer;
+  }
+  button:hover { background: #e7e5e4; }
+  .notice {
+    margin-top: 14px; padding: 10px 14px; font-size: 13px; line-height: 1.7;
+    background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px; color: #7c2d12;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>G1 記入パッド</h1>
+    <label class="block-no">ブロック <input id="block" type="text" inputmode="numeric"
+      autocomplete="off" spellcheck="false" aria-label="ブロック番号"></label>
+  </header>
+
+  <!--
+    ★ 補完・自動修正を全部切る。ここが B-5 の本体である。
+       autocorrect / autocapitalize は非標準だが Safari / iOS が見る。
+       data-gramm* は Grammarly の慣習的なオプトアウト属性。
+  -->
+  <textarea id="pad"
+    spellcheck="false"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    data-gramm="false"
+    data-gramm_editor="false"
+    data-enable-grammarly="false"
+    aria-label="本文"></textarea>
+
+  <footer>
+    <span>文字数 <span id="count">0</span></span>
+    <span class="hint">（空白・改行を数えません／目安 300〜400 字）</span>
+    <button id="clear" type="button">消去して次のブロックへ</button>
+  </footer>
+
+  <p class="notice">
+    ★ <strong>書いた文章は保存されません。</strong>
+    このページを閉じる・再読み込みすると本文は消えます。記録するのは文字数だけです。
+  </p>
+</div>
+
+<script>
+"use strict";
+(function () {
+  var pad = document.getElementById("pad");
+  var out = document.getElementById("count");
+  var clearBtn = document.getElementById("clear");
+
+  // ★ validate_materials.py の count_chars と同じ規則:
+  //   空白（\s）と Unicode カテゴリ C（制御・書式・私用領域外の非文字）を数えない。
+  //   Python の str は コードポイント単位で反復するため、Array.from で揃える
+  //   （Intl.Segmenter の書記素単位にすると Python 側と数が食い違う）。
+  var SPACE = /\s/u;
+  var OTHER = /\p{C}/u;
+  function countChars(text) {
+    var n = 0;
+    var chars = Array.from(text);
+    for (var i = 0; i < chars.length; i++) {
+      var ch = chars[i];
+      if (!SPACE.test(ch) && !OTHER.test(ch)) n++;
+    }
+    return n;
+  }
+
+  function refresh() {
+    out.textContent = String(countChars(pad.value));
+  }
+
+  // input は IME 変換の確定時にも発火する。変換途中の未確定文字列も value に載るため、
+  // 数値は変換中に揺れるが、確定後は必ず正しい値に落ち着く（打鍵挙動には介入しない）。
+  pad.addEventListener("input", refresh);
+
+  clearBtn.addEventListener("click", function () {
+    // ★ 実験者がブロック終了時に文字数を記録してから押す。
+    //   本文をメモリからも落とし、次ブロックが前ブロックの続きから始まらないようにする。
+    pad.value = "";
+    refresh();
+    pad.focus();
+  });
+
+  // ★ 誤って閉じる・再読み込みするとブロックの本文が失われ、そのブロックの
+  //   産出文字数（§3.5 の報告義務）が取れなくなる。保存はしないが、警告は出す。
+  window.addEventListener("beforeunload", function (e) {
+    if (pad.value.length === 0) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
+  refresh();
+  pad.focus();
+})();
+</script>
+</body>
+</html>
