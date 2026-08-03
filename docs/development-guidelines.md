@@ -155,8 +155,8 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
 
 - **`check` ジョブ**: matrix ビルド (windows / macOS target)。`cargo build` → `cargo test --workspace` → スナップショット回帰 (`gse-replay --snapshot`) → schema drift check (`emit_schema` vs `schema/current.json`)
 - **`frontend-check` ジョブ**: `npm ci` → TypeScript 型チェック → Vite production ビルド
-- **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Tauri アプリをビルドし NSIS / portable exe / DMG をアーティファクト化 (macOS は entitlements 付き再署名)
-- **`release` ジョブ**: 両ビルド成功後に GitHub Release を作成
+- **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Windows は **portable exe** (`--no-bundle`)、macOS は **DMG** をアーティファクト化 (macOS は entitlements 付き再署名 ＋ 研究者専用 CLI の strip)
+- **`release` ジョブ**: 両ビルド成功後に GitHub Release を作成。★ **公開するのは 5 アセットだけ** — 被験者向け `gse-next.exe` / `gse-submit.exe` / `*.dmg` と、研究者専用 `gse-unpack(.exe)`。⚠️ NSIS インストーラと `gse-package` は **Phase1 で使われなかったので配らない** (2026-08-03)
 
 > **運用上の注意**: GitHub Actions の無料枠 (3000 時間) を超過したため、現状はクラウド CI が利用できず、**ローカル検証で代替**している (`cargo test --workspace` / `gse-replay --snapshot` / `emit_schema` diff を手元で実行)。TCC 権限テストは元々自動化不可で実機手動検証。
 

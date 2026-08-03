@@ -120,13 +120,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build Tauri app
-        run: npx tauri build --bundles nsis
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-nsis
-          path: src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: error
-          retention-days: 7
+        # ★ インストーラ (NSIS) は作らない (2026-08-03)。Phase1 の実運用で被験者が使ったのは
+        #   **ポータブル版 gse-next.exe** だけだった (Smart App Control の都合で
+        #   docs/participant-setup-guide.md も portable を案内している)。
+        #   インストーラを配ると「どちらを使うのか」が増えるだけで、実績が無い。
+        #   ⚠️ ポータブル exe は cargo の成果物 (target/release/gse-next.exe) なので
+        #      バンドラは不要。`--no-bundle` でフロントのビルドと cargo build までを行う。
+        run: npx tauri build --no-bundle
       - name: Upload portable exe (SAC bypass)
         uses: actions/upload-artifact@v4
         with:
@@ -134,17 +134,20 @@ jobs:
           path: src-tauri/target/release/gse-next.exe
           if-no-files-found: warn
           retention-days: 7
-      # 提出/復号ツール（package feature。アプリ本体 nsis ビルドは --features package 非使用のため別途ビルド）。
+      # 提出/復号ツール（package feature。アプリ本体のビルドは --features package 非使用のため別途ビルド）。
       - name: Build submission/decrypt tools (package feature)
         working-directory: src-tauri
-        run: cargo build --release --features package --bin gse-submit --bin gse-package --bin gse-unpack
+        run: cargo build --release --features package --bin gse-submit --bin gse-unpack
       - name: Upload Windows tools
         uses: actions/upload-artifact@v4
         with:
           name: windows-tools
+          # ★ 被験者が使うのは gse-submit.exe だけ (アプリ内提出も 提出する_win.bat も
+          #   これを exe と同階層に要求する)。gse-unpack.exe は**研究者専用の復号器**で、
+          #   .app / インストーラから意図的に除外されているため Release が唯一の入手経路。
+          #   ⚠️ gse-package.exe (手動フォールバック) は Phase1 で使われなかったので配らない。
           path: |
             src-tauri/target/release/gse-submit.exe
-            src-tauri/target/release/gse-package.exe
             src-tauri/target/release/gse-unpack.exe
           if-no-files-found: error
           retention-days: 7
@@ -266,9 +269,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-tools
+          # ★ macOS は **dmg だけで完結する** (.app に gse-submit と pubkey.txt が同梱され、
+          #   アプリ内提出が正規ルート)。Phase1 の実運用でも mac は dmg のみで完了した。
+          #   → 単体 gse-submit / gse-package は配らない (mac の 提出する_mac.command 経路は廃止)。
+          #   gse-unpack は**研究者専用の復号器**で .app から意図的に strip されているため残す。
           path: |
-            src-tauri/target/release/gse-submit
-            src-tauri/target/release/gse-package
             src-tauri/target/release/gse-unpack
           if-no-files-found: error
           retention-days: 7
@@ -285,13 +290,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Windows NSIS artifacts
-        if: ${{ needs.build-windows.result == 'success' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-nsis
-          path: artifacts/
-
       - name: Download Windows portable artifacts
         if: ${{ needs.build-windows.result == 'success' }}
         uses: actions/download-artifact@v4

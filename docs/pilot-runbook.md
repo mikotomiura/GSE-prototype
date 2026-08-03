@@ -91,9 +91,15 @@ cd ..
 
 ## 3. 被験者手順 (3 ステップ — 非技術者向け)
 
-> 配布物: `gse` 本体アプリ + **`提出する` ランチャ** (`提出する_mac.command` / `提出する_win.bat`)
-> + `gse-submit(.exe)` (最新セッション自動検出の提出ツール) + `pubkey.txt` (研究者公開鍵)。
-> 上級者向け手動版として `gse-package(.exe)` も同梱。Python / age CLI のインストールは不要。
+> 配布物 (★ 2026-08-03 に整理。Phase1 の実績に合わせて最小化した):
+> - **macOS**: `.dmg` **のみ**。提出ツール (`gse-submit`) と `pubkey.txt` は `.app` に内蔵されており、
+>   アプリ内提出 (方法1) だけで完結する。⚠️ **`提出する_mac.command` 経路は廃止した**。
+> - **Windows**: `gse-next.exe` (portable) + `gse-submit.exe` + **`提出する_win.bat`** + `pubkey.txt`
+>   を**同じフォルダ**に置く。アプリ内提出 (方法1) が正規で、bat はフォールバック。
+>
+> ⚠️ ★ **`gse-package(.exe)` は配布しない** (Phase1 で誰も使わずに完了したため)。
+> 研究者が手元で必要なときは `cargo build --release --features package --bin gse-package` で作れる。
+> Python / age CLI のインストールは不要。
 
 ### Step 1 — セッション収集
 - いつも通りアプリを起動して作業する。**介入を有効** (`interventionEnabled=true`) で、
