@@ -5,10 +5,10 @@
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
   "revision": {
-    "version": 5,
+    "version": 6,
     "date": "2026-08-03",
     "frozen_before_any_data": true,
-    "asymmetry": "Version 5 contains ZERO changes that make passing easier. Sections 3.1-3.6 are untouched (as in v3 and v4). The three additions either (a) make an ALREADY FROZEN rule enforceable (2.6 forbids in-app probes; the app fired them anyway), (b) CLOSE a post-hoc degree of freedom (the exit survey is declared non-verdict BEFORE it is collected), or (c) fill a blank that was never specified (where the subject types). One correction: the v2 claim 'G1 needs ZERO code change' no longer holds - the app needs a probe kill switch to honour 2.6. The separate v2 claim that Tier 0/1 can be computed OFFLINE (so G1 does not technically depend on the Phase1 unfreeze) is UNCHANGED and still correct.",
+    "asymmetry": "*** Version 6 is the FIRST revision that CANNOT claim 'zero changes that make passing easier'. *** The researcher decided (2026-08-03) to send a pre-visit email to confirmatory subjects that discloses the TOPIC DOMAINS and the TASK TYPES (1-source summary vs 3-source integration). Knowing the task type in advance lets a subject answer the forced comparison (2.6) from the remembered TYPE rather than from the experienced difficulty, which makes the manipulation check EASIER to pass. Because 3.4 puts the manipulation check BEFORE the verdict, an easier gate means the 3.3 verdict becomes reachable more often. This is stated plainly instead of being argued away. The counterweight is NOT a change to 3.1-3.6 (untouched, as in v2-v5) but a RESTRICTION on how the manipulation check may be interpreted: a PASS is declared in advance to be weak evidence that friction was manipulated, and may be used only on the negative-result side (3.7); the primary guarantee remains the positive control (2.5, unchanged). Disclosure also works AGAINST detection (subjects who read up on a domain reduce the HI load and add noise), but the direction is not uniform across subjects, so this is NOT claimed to cancel out.",
     "v5_changes": {
       "trigger": "Making pilot P-1 actually runnable exposed two blockers: (B-1) the app fires random probes during G1 blocks even though 2.6 freezes 'no in-app probes', and 3.6 forbids dropping contaminated blocks afterwards, so it can only be stopped BEFORE execution; (B-5) protocol.md never said WHERE the subject types the 300-400 characters, and autocorrect/autocomplete would contaminate bs_rate, one of the 14 FS-B features.",
       "researcher_decision": "B-1 = option C (disable the probes). B-5 = a local HTML writing pad (2026-08-03). Exit survey = collect it, but declare it non-verdict first.",
@@ -88,6 +88,38 @@
       "clarification_only": [
         "3.3-3 denominator expressed as a FRACTION (>=80% of n) instead of '4 of 5'. Neither 80% nor AUC 0.60 changed."
       ]
+    },
+    "v6_changes": {
+      "trigger": "Researcher decision 2026-08-03: run G1 recruitment/scheduling the same way Phase1 does (auto participant-ID assignment + automatic email), and make the pre-visit email concretely describe the task domains and the procedure, so subjects are not asked to show up without knowing what they will do.",
+      "researcher_decision": "Include the task DOMAIN in the pre-visit email. Assistant raised the objection that this weakens 2.6 and introduces uncontrolled prior knowledge; the researcher reaffirmed the decision, so it is implemented and its consequences are declared here rather than silently absorbed.",
+      "change_1_disclosure_declared": "New section 2.12. What IS disclosed before the visit (schedule, block structure, 300-400 chars, that copy blocks exist, the topic DOMAINS, the task TYPES, that the materials are fictional) and what is NOT (the material text itself, which block is which type, any difficulty hint, the hypothesis, HI/LO names). Materials are still handed out one sheet at a time on the day (protocol.md 2.3-2).",
+      "change_2_manipulation_check_interpretation": "New section 2.12-3. 2.6 itself is UNCHANGED (same question, same >=70% threshold, same denominator, same position in the 3.4 viewing order). What changes is what a PASS is allowed to mean: it is declared in advance to be WEAK evidence that friction was manipulated, and may be cited only when interpreting a NEGATIVE result (3.7). Reports must state that subjects knew the domains and types in advance whenever the manipulation-check result is reported.",
+      "change_3_prior_study_recorded": "New section 2.12-4. The exit survey (2.10) additionally asks how much of the pre-visit email the subject read and whether they looked the domain up. Recorded in results/ and reported. NOT used for any verdict (2.10 declaration applies) and NOT used to exclude anyone (3.6 unchanged).",
+      "scope": "Confirmatory execution ONLY. Pilot P-1 is unaffected: the subject is the researcher, who authored the materials and receives no pre-visit email.",
+      "sections_3_1_to_3_6": "untouched, exactly as in versions 2, 3, 4 and 5"
+    },
+    "v5": {
+      "version": 5,
+      "date": "2026-08-03",
+      "asymmetry": "Version 5 contains ZERO changes that make passing easier. Sections 3.1-3.6 are untouched (as in v3 and v4). The three additions either (a) make an ALREADY FROZEN rule enforceable (2.6 forbids in-app probes; the app fired them anyway), (b) CLOSE a post-hoc degree of freedom (the exit survey is declared non-verdict BEFORE it is collected), or (c) fill a blank that was never specified (where the subject types). One correction: the v2 claim 'G1 needs ZERO code change' no longer holds - the app needs a probe kill switch to honour 2.6. The separate v2 claim that Tier 0/1 can be computed OFFLINE (so G1 does not technically depend on the Phase1 unfreeze) is UNCHANGED and still correct.",
+      "v5_changes": {
+        "trigger": "Making pilot P-1 actually runnable exposed two blockers: (B-1) the app fires random probes during G1 blocks even though 2.6 freezes 'no in-app probes', and 3.6 forbids dropping contaminated blocks afterwards, so it can only be stopped BEFORE execution; (B-5) protocol.md never said WHERE the subject types the 300-400 characters, and autocorrect/autocomplete would contaminate bs_rate, one of the 14 FS-B features.",
+        "researcher_decision": "B-1 = option C (disable the probes). B-5 = a local HTML writing pad (2026-08-03). Exit survey = collect it, but declare it non-verdict first.",
+        "change_1_exit_survey": "New section 2.10. The exit survey is collected AFTER the last copy block. Its answers are NOT used for the 3.3 verdict, the 2.5 positive control or the 2.6 manipulation check. Declaring this BEFORE collection removes the post-hoc freedom of deciding later what the survey is for.",
+        "change_2_input_target": "New section 2.11. The subject types ONLY into writing-pad.html, identical for every subject and every block. The pad does not save or transmit the text (content-free promise in consent.md 3), has no spellcheck/autocomplete/autocorrect, and counts characters with the same rule as validate_materials.py count_chars.",
+        "change_3_probe_kill_switch": "New section 5.4. G1 runs with GSE_DISABLE_PROBES=1, which prevents the probe scheduler thread from starting. Only probe_assignment / probe_triggered / realtime_label disappear; the feat rows (FS-A) and key/paste/ime_shadow rows (FS-B) are unchanged, as are the HMM and replay parity. Verification is objective, not self-reported: validate_blocks.py --dataset requires ZERO such lines in every block.",
+        "correction_zero_code_change": "Section 5-3 said G1 touches no line of src-tauri/. That is withdrawn: honouring 2.6 requires the kill switch. run.sh check [5] is re-aimed accordingly - from 'no changes under src-tauri/ and src/' to 'the kill switch IS present AND there are no unrelated uncommitted changes'. The old check only looked at git status, so it went silently green the moment the change was committed (a silent pass).",
+        "why_not_a_loosening": {
+          "sections_3_1_to_3_6": "untouched, exactly as in versions 3 and 4",
+          "no_new_pass_path": "nothing about a disabled probe, a fixed input target or a non-verdict survey makes 'separated' easier to declare",
+          "enforces_an_existing_freeze": "2.6 already forbade in-app probes since version 1; the app simply did not obey it (same structural failure as E-6 and E-7: the document forbade what the tool did anyway)",
+          "protects_3_6": "3.6 forbids dropping blocks post hoc, so a probe-contaminated block could not have been removed later"
+        },
+        "also_recorded": {
+          "transcription_validator": "validate_blocks.py added. It ONLY detects transcription mistakes (structure, agreement with the deterministic assign.py output, duplicate/missing NDJSON names, manipulation-check correspondence, probe lines). It never excludes a block or a subject and holds no threshold, so it does not touch 2.9 or 3.6.",
+          "forms": "Form_G1/GSE_G1_Form_Builder.gs builds the consent / forced-comparison / exit-survey forms; forms_to_blocks.py converts the forced-comparison CSV into manipulation_check_answers without hand transcription."
+        }
+      }
     }
   },
   "design": {

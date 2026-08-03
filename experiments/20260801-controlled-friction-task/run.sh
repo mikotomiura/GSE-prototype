@@ -96,6 +96,19 @@ for s in assign analyze validate_blocks forms_to_blocks; do
   rm -f "$TMP_S"
 done
 
+# ★ 第 6 版 §2.12: 課題の分野を事前案内メールで開示すると凍結した。
+#   その文面を作る Form_G1 の G1_TOPIC_TITLES と、真実源である materials/ の title が
+#   ズレると、**送った分野と当日配る課題文が食い違う**（凍結を守れていない状態になる）。
+#   ⚠️ 同じ事実を 2 か所に持っているので、検査でしか守れない。
+TMP_T=$(mktemp)
+if python3 ../../scripts/check_g1_topic_titles.py > "$TMP_T" 2>&1; then
+  ok "課題の分野が materials/ と Form_G1 で一致している（§2.12-1）"
+else
+  sed 's/^/    /' "$TMP_T"
+  bad "課題の分野が materials/ と Form_G1 でズレている（§2.12-1）"
+fi
+rm -f "$TMP_T"
+
 # --- 5. アプリ側の前提 -------------------------------------------------------
 # ★ 第 5 版 §5.4 で検査の意図を置き換えた。
 #   旧: 「G1 はコード変更ゼロで実施できる」→ src-tauri/ src/ に変更が無いこと
