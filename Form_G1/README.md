@@ -50,12 +50,22 @@ G1 は**第 1 週（blind 較正）モード**で回すので、`session_meta` �
 
 ## 配備手順（★ 固定 ID 方式。これを外すと過去の不具合が再発する）
 
-1. **Google Forms で空のフォームを 3 つ作る**（`FormApp.create` は使わない）。
+1. ✅ **Google Forms で空のフォームを 3 つ作る**（`FormApp.create` は使わない）— **完了**（2026-08-03）。
    > ⚠️ Phase1 では `FormApp.create` が実行のたびに別フォームを量産し、被験者に配った短縮 URL が
    > 指すフォームと集計が読むフォームがズレて「**回答が記録されない**」不具合を起こした。
-2. 各フォームの編集 URL `https://docs.google.com/forms/d/<ここ>/edit` の `<ここ>` を
-   `GSE_G1_Form_Builder.gs` の `FORM_ID_CONSENT` / `FORM_ID_MCHECK` / `FORM_ID_SURVEY` に貼る。
-   空のままだと builder は**エラーで停止する**（量産防止のガード）。
+2. ✅ 各フォームの編集 URL `https://docs.google.com/forms/d/<ここ>/edit` の `<ここ>` を
+   `GSE_G1_Form_Builder.gs` の `FORM_ID_CONSENT` / `FORM_ID_MCHECK` / `FORM_ID_SURVEY` に貼る
+   — **記入済み**。空のままだと builder は**エラーで停止する**（量産防止のガード）。
+
+   | 定数 | 役割 | 作成時の呼び名 |
+   |---|---|---|
+   | `FORM_ID_CONSENT` | G1-C 説明・同意 | form1 |
+   | `FORM_ID_MCHECK` | G1-M 強制比較 | form2 |
+   | `FORM_ID_SURVEY` | G1-S 終了後アンケート | form3 |
+
+   > ⚠️ ★ 3 本とも**空フォーム**だったので、**どれがどの役割になるかはこの割り当てが決める**。
+   > `setupG1Forms()` がタイトル・説明・設問を書き込む。
+   > **一度でも被験者に URL を配ったら、割り当てを入れ替えてはならない。**
 3. Apps Script エディタに `.gs` を貼り、`setupG1Forms()` を実行する
    （3 フォーム ＋ 管理シートが一度に作られる）。
 4. `listG1FormUrls()` で回答 URL / 編集 URL を取り出す。回答 URL を実施端末のブックマークに入れる。

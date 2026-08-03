@@ -39,9 +39,14 @@
 // ============================================================
 // 設定（★ 実行前に埋める）
 // ============================================================
-var FORM_ID_CONSENT = ""; // G1-C 同意フォームの編集用フォーム ID
-var FORM_ID_MCHECK = ""; // G1-M 強制比較フォームの編集用フォーム ID
-var FORM_ID_SURVEY = ""; // G1-S 終了後アンケートの編集用フォーム ID
+// ★ 研究者が 2026-08-03 に作成した空フォーム 3 本を割り当てた（Phase1 と同じく .gs に置く規約）。
+// ⚠️ 3 本とも**空フォーム**なので、どれがどの役割になるかは**この割り当てが決める**。
+//    setupG1Forms() を実行すると、各フォームにタイトル・説明・設問が書き込まれる。
+//    ★ 一度でも被験者に URL を配ったら、**この割り当てを入れ替えてはならない**
+//      （配った URL が別のフォームを指すことになる — Phase1 の量産バグと同じ壊れ方）。
+var FORM_ID_CONSENT = "1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE"; // G1-C 説明・同意（form1）
+var FORM_ID_MCHECK = "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA"; // G1-M 強制比較（form2）
+var FORM_ID_SURVEY = "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU"; // G1-S 終了後アンケート（form3）
 
 // 既存設問を毎回作り直すか（通常 true）。
 var CLEAR_EXISTING = true;
