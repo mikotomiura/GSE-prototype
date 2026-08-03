@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""★ G1 の受付メールが `preregistration.md §2.12`（第 7 版）の開示範囲を守っているか検査する。
+"""★ G1 のメールが `preregistration.md §2.12`（第 8 版）の開示範囲を守っているか検査する。
 
-第 7 版は「**課題の題材（分野）と型を事前の連絡に書かない**」と凍結した
-（当日その場で画面提示するので教える必要が無い。§2.13）。
-⚠️ ★ 一度は「分野を書く」と決めて第 6 版で実装し、第 7 版で撤回した経緯がある。
-   **書き戻されたら赤にする**のがこの検査の役目である。
-⚠️ ★ 事前案内メールは 2026-08-03 に廃止した（日時・場所は研究者が手書きで連絡する）。
-   検査対象は**受付メール 1 通**である。
+⚠️ ★ **第 8 版で開示方針が変わった。** 課題文の本文は**来所前に開示する**（閲覧リンク）。
+   それでも **メール本文** には次を書かない:
+   - 題材名 … ★ 並べた順序が **提示順**（§2.12 が伏せると宣言した項目）を示唆しうる
+   - 課題の型 / 条件名（HI / LO）/ 難易度の示唆 / 仮説 / 判定基準 / 「摩擦」
+   → 開示は**リンク先の閲覧専用ドキュメント**で行い、メールは URL だけを運ぶ。
+⚠️ ★ 検査対象は **受付メールと事前資料メールの 2 通**である。
+   片方だけ見ると、もう片方に書き戻されても緑になる（第 7 版で実際にそう設計した理由）。
 
 ### ★ node で実際に関数を呼ぶ
 
@@ -50,6 +51,10 @@ var UrlFetchApp = { fetch: function () { throw new Error("not used"); } };
 __GAS_SOURCE__
 // ★ 実際に呼ぶ。未定義参照があればここで ReferenceError になる。
 var out = { ackSubject: g1RegisterAckSubject_(), ack: g1RegisterAckBody_("P999") };
+// ★★ 第 8 版: 事前資料メール。⚠️ 受付メールと**同じ基準**で見る。
+//    片方だけ検査すると、もう片方に題材名が書き戻されても緑になる（第 7 版の教訓）。
+out.materialsSubject = g1MaterialsSubject_();
+out.materials = g1MaterialsBody_("P999", "https://example.com/x");
 var thanks = (function () {
   // sendThankYouEmail は本文を組み立ててから送るので、下書き経路を通して例外が出ないか見る。
   try { G1_CONTACT = G1_CONTACT || "（テスト）"; sendThankYouEmail("P999", "t@example.com"); return "ok"; }
@@ -155,26 +160,29 @@ def main() -> int:
         subprocess.run(["node", "--version"], capture_output=True, check=True)
     except Exception:
         # ⚠️ 外部コマンド不在で黙って緑にしない（silent-failure-in-guard-scripts）。
-        print("[NG] node が無いので事前案内メールの検査ができない（飛ばさずに赤にする）")
+        print("[NG] node が無いのでメール本文の検査ができない（飛ばさずに赤にする）")
         return 1
 
     fails: list[str] = list(check_run_columns()) + list(check_consent_question_names())
 
     res = run_gas()
-    # ★ 事前案内メールと受付メールの**両方**を同じ基準で見る。
-    #   片方だけ検査すると、もう片方に題材が書き戻されても緑になる。
-    bodies = {"受付メール": res["ack"]}
+    # ★ 受付メールと事前資料メールの**両方**を同じ基準で見る（§2.12 第 8 版）。
+    #   ⚠️ 片方だけ検査すると、もう片方に題材が書き戻されても緑になる。
+    bodies = {"受付メール": res["ack"], "事前資料メール": res["materials"]}
 
     if res.get("thanks") != "ok":
         fails.append(f"sendThankYouEmail が失敗する: {res.get('thanks')}")
 
-    # ★ 本命: 題材名が本文に載っていないこと（第 7 版 §2.12）
+    # ★ 本命: 題材名が**メール本文**に載っていないこと。
+    #   ⚠️ ★ 第 8 版で課題文そのものは事前開示に変わったが、**開示はリンク先**で行う。
+    #      メール本文に題材名を並べると、並べた順序が **提示順**を示唆しうる。
+    #      §2.12（第 8 版）は提示順を「開示しない」側に残しているので、この検査は**維持する**。
     for label, b in bodies.items():
         for t in topic_titles():
             if t in b:
                 fails.append(f'題材名 "{t}" が{label}に載っている（§2.12 は開示しないと凍結）')
 
-    # ★ 課題の型も開示しない
+    # ★ 課題の型もメール本文には書かない（同上・リンク先で読ませる）
     for label, b in bodies.items():
         for token in ("資料が 1 本", "資料が 3 本", "資料 1 本の要約", "資料 3 本の統合", "統合"):
             if token in b:
@@ -199,19 +207,25 @@ def main() -> int:
             )
 
     # ★ 検査が空回りしていないこと: 本文がちゃんと生成されている
+    must_by_label = {
+        "受付メール": ("参加者ID", "5 分", "300〜400 字", "書き写し"),
+        # ★ 第 8 版 §2.12: 事前資料メールが「リンクを渡す」「読まなくてよい」「架空である」
+        #   の 3 点を落としていないか。⚠️ 読む量で評価しないと明記する（§2.12-4）。
+        "事前資料メール": ("参加者ID", "https://", "架空", "評価することはありません"),
+    }
     for label, b in bodies.items():
         if len(b) < 200:
             fails.append(f"{label}の本文が短すぎる（{len(b)} 文字）。生成に失敗している疑い")
-        for must in ("参加者ID", "5 分", "300〜400 字", "書き写し"):
+        for must in must_by_label.get(label, ()):
             if must not in b:
                 fails.append(f'{label}に必要な案内 "{must}" が無い')
 
     if fails:
-        print("[NG] 受付メールが §2.12 の開示範囲から外れている")
+        print("[NG] メールが §2.12（第 8 版）の開示範囲から外れている")
         for f in fails:
             print(f"  - {f}")
         return 1
-    print("[OK] 受付メールは §2.12（第 7 版）の開示範囲を守っている")
+    print("[OK] 受付メール・事前資料メールは §2.12（第 8 版）の開示範囲を守っている")
     print("     G1 実施トラッキングの列参照・G1-C の設問名も一致している")
     print(f"     題材名 {len(topic_titles())} 件・課題の型・条件名のいずれも本文に無い")
     return 0
