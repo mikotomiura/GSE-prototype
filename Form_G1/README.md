@@ -49,35 +49,124 @@ G1 は**第 1 週（blind 較正）モード**で回すので、`session_meta` �
 
 ---
 
-## 配備手順（★ 固定 ID 方式。これを外すと過去の不具合が再発する）
+## ★★ 配備手順（コピペから実施まで・通し）
 
-1. ✅ **Google Forms で空のフォームを 3 つ作る**（`FormApp.create` は使わない）— **完了**（2026-08-03）。
-   > ⚠️ Phase1 では `FormApp.create` が実行のたびに別フォームを量産し、被験者に配った短縮 URL が
-   > 指すフォームと集計が読むフォームがズレて「**回答が記録されない**」不具合を起こした。
-2. ✅ 各フォームの編集 URL `https://docs.google.com/forms/d/<ここ>/edit` の `<ここ>` を
-   `GSE_G1_Form_Builder.gs` の `FORM_ID_CONSENT` / `FORM_ID_MCHECK` / `FORM_ID_SURVEY` に貼る
-   — **記入済み**。空のままだと builder は**エラーで停止する**（量産防止のガード）。
+> ★ **固定 ID 方式**である。`FormApp.create` を使わない。
+> ⚠️ Phase1 では `FormApp.create` が実行のたびに別フォームを量産し、配った URL と集計が読む
+> フォームがズレて「**回答が記録されない**」不具合を起こした。
 
-   | 定数 | 役割 | 作成時の呼び名 | 状態 |
-   |---|---|---|---|
-   | `FORM_ID_CONSENT` | G1-C 説明・同意 | form1 | ✅ 記入済み |
-   | `FORM_ID_MCHECK` | G1-M 強制比較 | form2 | ✅ 記入済み |
-   | `FORM_ID_SURVEY` | G1-S 終了後アンケート | form3 | ✅ 記入済み |
-   | ★ `FORM_ID_REGISTER` | **G1-R 参加登録** | form4 | ⚠️ **空。研究者が空フォームを作って貼る** |
+### STEP 1 — 空フォームを 4 つ作る（Google Forms）
 
-   > ⚠️ ★ 3 本とも**空フォーム**だったので、**どれがどの役割になるかはこの割り当てが決める**。
-   > `setupG1Forms()` がタイトル・説明・設問を書き込む。
-   > **一度でも被験者に URL を配ったら、割り当てを入れ替えてはならない。**
-3. Apps Script エディタに `.gs` を貼り、`setupG1Forms()` を実行する
-   （3 フォーム ＋ 管理シートが一度に作られる）。
-4. `listG1FormUrls()` で回答 URL / 編集 URL を取り出す。回答 URL を実施端末のブックマークに入れる。
-5. 各フォームの「回答」タブで**スプレッドシートへのリンク**を作る（CSV 出力に使う）。
-6. 管理シートの「リンク集」で、**記入パッドの置き場**と**送付先**の手動セルを埋める。
-   ⚠️ 再実行しても手動セルは保持される（Phase1 の `buildLinksTab_` と同じ挙動）。
+`forms.google.com` で**空のフォームを 4 つ**作り、それぞれの編集 URL
+`https://docs.google.com/forms/d/<ここ>/edit` の **`<ここ>`** を控える。
 
-> ⚠️ 実行時間・クォータに当たったら、`buildConsentForm()` / `buildManipulationCheckForm()` /
-> `buildPostSurveyForm()` を単独実行 → 最後に `buildManagementSheet()` を回す
-> （URL は Script Properties に残るので集約は成功する）。
+| 定数 | 役割 | 状態 |
+|---|---|---|
+| `FORM_ID_CONSENT` | G1-C 説明・同意 | ✅ 記入済み |
+| `FORM_ID_MCHECK` | G1-M 強制比較 | ✅ 記入済み |
+| `FORM_ID_SURVEY` | G1-S 終了後アンケート | ✅ 記入済み |
+| ★ `FORM_ID_REGISTER` | **G1-R 参加登録** | ⚠️ **空。ここだけ新しく作る** |
+
+⚠️ ★ **空フォームなので、どれがどの役割になるかはこの割り当てが決める。**
+**一度でも被験者に URL を配ったら、割り当てを入れ替えてはならない。**
+
+### STEP 2 — Apps Script にコピペする
+
+1. `script.google.com` → **新しいプロジェクト**
+2. `Form_G1/GSE_G1_Form_Builder.gs` の中身を**全部貼る**（既定の `myFunction` は消す）
+3. プロジェクト名を付ける（例: `GSE G1 Forms`）
+
+### STEP 3 — 定数を埋める（★ 空のままだと fail-closed で止まる）
+
+ファイル冒頭の 3 つを埋める:
+
+```javascript
+var FORM_ID_REGISTER = "★STEP 1 で作った G1-R の ID★";
+var PHASE1_MGMT_SHEET_ID = "★Phase1 の運用管理シートの ID★";  // 参加者ロスターがあるファイル
+var G1_CONTACT = "研究責任者 ○○（xxx@example.com）";
+```
+
+| 定数 | どこから取るか | 空だとどうなるか |
+|---|---|---|
+| `FORM_ID_REGISTER` | STEP 1 | `setupG1Forms()` が **G1-R だけ飛ばす**（他は作られる） |
+| `PHASE1_MGMT_SHEET_ID` | Phase1 の管理シート URL の `/spreadsheets/d/<ここ>/edit` | ★ **P-ID を採番できない**（採番元は Phase1 のロスターただ 1 つ） |
+| `G1_CONTACT` | 研究責任者の連絡先 | ★ **受付メールが送れない** |
+
+⚠️ ★ **日時・場所は定数に持たない。** メールに書かないためである（下記「自動メールは 1 通だけ」）。
+
+### STEP 4 — フォームと管理シートを作る
+
+エディタ上部の関数セレクタで **`setupG1Forms`** を選び ▶ 実行。
+
+- ★ **初回は権限承認**が出る（Forms / Spreadsheet / Gmail）。「詳細」→「安全でないページに移動」で許可する。
+- 実行ログ（`Ctrl/Cmd + Enter`）に **管理シートの URL** と各フォームの URL が出る。
+- ★ 未設定の定数があれば**ログが警告する**（`G1_CONTACT` / `PHASE1_MGMT_SHEET_ID`）。
+
+> ⚠️ 実行時間・クォータに当たったら、`buildG1RegisterForm()` / `buildConsentForm()` /
+> `buildManipulationCheckForm()` / `buildPostSurveyForm()` を**単独実行** → 最後に
+> `buildManagementSheet()` を回す（URL は Script Properties に残るので集約は成功する）。
+
+### STEP 5 — 受付メールの文面を確認する（★ 送る前に）
+
+**`previewRegisterAckEmail`** を実行 → ログに本文がそのまま出る。**送信はしない。**
+
+★ `preregistration.md §2.12` の開示範囲と突き合わせる（題材・課題の型・難易度を書かない）。
+⚠️ 手元でも機械検査できる:
+
+```bash
+python3 scripts/check_g1_emails.py    # run.sh からも走る
+```
+
+### STEP 6 — 自動送信を有効にする（★ 判断が要る）
+
+```javascript
+var G1_AUTO_SEND = true;   // 既定は false（下書き）
+```
+
+⚠️ ★ **`false` のままだと Gmail に下書きが溜まるだけで、被験者には届かない。**
+登録直後に受付メールを届けるなら `true` にする。`installG1RegisterTrigger()` が実行時に警告する。
+
+### STEP 7 — 登録トリガを設置する（★ 一度だけ）
+
+**`installG1RegisterTrigger`** を実行。以後、G1-R が提出されるたびに
+`onG1RegisterSubmit` が自動で走る（採番 → トラッキング行追加 → 受付メール）。
+
+⚠️ 二重作成を防ぐため、既存の同名トリガは先に全削除される。外すときは `removeG1RegisterTriggers()`。
+
+### STEP 8 — 回答をスプレッドシートに繋ぐ
+
+各フォームの「**回答**」タブ → スプレッドシートアイコン → リンクを作る。
+★ **G1-M は必須**（`forms_to_blocks.py` が CSV を読む）。
+
+### STEP 9 — URL を取り出して配る
+
+**`listG1FormUrls`** を実行 → ログに回答 URL / 編集 URL が出る。
+
+- **G1-R** … 募集で配る
+- **G1-C / G1-S** … 実施端末にブックマーク
+- **G1-M** … 実施端末とは**別のタブ／端末**で開く（記入画面を切り替えないため）
+
+### STEP 10 — 管理シートの手動セルを埋める
+
+「リンク集」タブの**送付先**などの手動セルを埋める。⚠️ 再実行しても手動セルは保持される。
+
+---
+
+### 被験者ごとの運用（STEP 1〜10 の後）
+
+```javascript
+// 登録が来たら自動で走る（何もしなくてよい）
+//   → P-ID 採番 → G1 実施トラッキングに行追加 → 受付メール
+
+// 日程は研究者が普通に返信して決める（★ 自動化しない）
+// 実施予定日が決まったら「G1 実施トラッキング」の該当列に書き込む
+
+// 登録フォームを使わず手で追加する場合
+assignG1ParticipantId()                        // → "P015" を返す
+
+// 実施後（任意）
+sendThankYouEmail("P015", "xxx@example.com")   // お礼 ＋ ★ 口外しないお願い
+```
 
 ### （任意）x.gd で回答 URL を短縮する
 
@@ -135,22 +224,7 @@ G1 は**第 1 週（blind 較正）モード**で回すので、`session_meta` �
 > 研究者が普通に返信するほうが早く、自動化する価値が無い。
 > → かつてあった `sendPreVisitEmail` / `sendPendingPreVisitEmails` は**廃止した**。
 
-### 配備手順
-
-```javascript
-// 1. Google Forms で空フォームを作り、ID を FORM_ID_REGISTER に貼る
-// 2. 定数を埋める: PHASE1_MGMT_SHEET_ID / G1_CONTACT
-setupG1Forms()               // G1-R も含めて構築（FORM_ID_REGISTER が空なら G1-R だけ飛ばす）
-previewRegisterAckEmail()    // ★ 送る前に受付メールの本文を確認（送信しない）
-installG1RegisterTrigger()   // ★ 一度だけ。以後、登録のたびに自動で走る
-listG1FormUrls()             // 回答 URL を取得 → 募集で配る
-// 実施後（任意）
-sendThankYouEmail("P015", "xxx@example.com")   // お礼 ＋ ★ 口外しないお願い
-```
-
-⚠️ ★ **`G1_AUTO_SEND` の既定は `false`（下書き）**である。
-登録直後に受付メールを届けるなら **`true` にする**。false のままだと Gmail に下書きが溜まるだけで、
-**被験者には届かない**（`installG1RegisterTrigger()` が実行時に警告する）。
+★ 具体的な手順は上の「**配備手順（コピペから実施まで・通し）**」を参照。
 
 ### ★ Phase1 から踏襲した 4 点（同じ失敗を繰り返さないため）
 

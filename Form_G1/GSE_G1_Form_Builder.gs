@@ -117,8 +117,15 @@ function setupG1Forms() {
   //   管理シートより先に呼ぶ — リンク集タブが短縮 URL を読むため。
   shortenFormUrls();
   var url = buildManagementSheet();
-  Logger.log("🎉 G1 フォーム 3 本 ＋ 管理シート 作成完了: " + url);
+  var n = FORM_ID_REGISTER ? 4 : 3;
+  Logger.log("🎉 G1 フォーム " + n + " 本 ＋ 管理シート 作成完了: " + url);
   Logger.log(listG1FormUrls());
+  if (!G1_CONTACT) {
+    Logger.log("⚠️ ★ G1_CONTACT が空です。受付メールは送れません（fail-closed）。");
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("⚠️ ★ PHASE1_MGMT_SHEET_ID が空です。P-ID の採番ができません（採番元は Phase1 のロスター）。");
+  }
 }
 
 function listG1FormUrls() {
