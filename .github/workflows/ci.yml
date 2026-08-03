@@ -104,6 +104,16 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
+          # ★ タグ (リリース) ビルドではキャッシュを**保存しない**。
+          # v0.1.22 で実害が出た: 成果物 (dmg / tools) は全部できていて ##[error] も 0 件なのに、
+          # post ステップの `Failed to save: Unable to reserve cache with key ...` だけで
+          # job が failure になり、release ジョブの macOS ダウンロード段
+          # (`needs.build-macos.result == 'success'`) が弾かれて **dmg がリリースから落ちた**。
+          # ⚠️ ここで release 側のゲートを緩めると「本当にビルドが壊れたとき」に
+          #    部分的なリリースを黙って公開してしまうので、緩めるのは**保存側**にする。
+          # 復元は従来どおり行うのでビルド時間は変わらない。キャッシュの更新は
+          # 頻繁に走る check ジョブ (main / PR) が担う。
+          save-if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -153,6 +163,16 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
+          # ★ タグ (リリース) ビルドではキャッシュを**保存しない**。
+          # v0.1.22 で実害が出た: 成果物 (dmg / tools) は全部できていて ##[error] も 0 件なのに、
+          # post ステップの `Failed to save: Unable to reserve cache with key ...` だけで
+          # job が failure になり、release ジョブの macOS ダウンロード段
+          # (`needs.build-macos.result == 'success'`) が弾かれて **dmg がリリースから落ちた**。
+          # ⚠️ ここで release 側のゲートを緩めると「本当にビルドが壊れたとき」に
+          #    部分的なリリースを黙って公開してしまうので、緩めるのは**保存側**にする。
+          # 復元は従来どおり行うのでビルド時間は変わらない。キャッシュの更新は
+          # 頻繁に走る check ジョブ (main / PR) が担う。
+          save-if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
