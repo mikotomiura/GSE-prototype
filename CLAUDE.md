@@ -63,6 +63,7 @@
 | `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
 | `implementation-workflow` | 実装タスクの共通骨格 (調査→設計→実装→テスト→レビュー) |
 | ★ `verify-before-claiming` | **事実を断定する前**（「不要」「壊れる」「既知」「〜になる」）／削除・簡略化の提案／memory を根拠に使う時 |
+| ★ `browser-verification` | **`mcp__claude-in-chrome__*` を使う時**（最初の 1 回で必ず）／GAS・フォーム・シートの配備検証／生成 HTML の表示確認 |
 
 ### 研究トラック Skill (docs/ の研究文書・`experiments/` を触る時)
 
