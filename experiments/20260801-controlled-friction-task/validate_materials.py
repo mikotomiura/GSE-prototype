@@ -211,7 +211,10 @@ def main() -> int:
         print(f"[NG] materials ディレクトリが無い: {root}")
         return 1
 
-    paths = sorted(p for p in root.glob("*.md") if p.name != "README.md")
+    # ★ materials/ の *.md は原則すべて課題文とみなす（取り違え・入れ忘れを検出するため）。
+    #   例外は**明示列挙**する。ここを glob パターンで緩めると、課題文の入れ忘れが素通りする。
+    NON_MATERIAL = {"README.md", "sources.md"}   # sources.md = 実験者用の出典メモ
+    paths = sorted(p for p in root.glob("*.md") if p.name not in NON_MATERIAL)
     if not paths:
         print(f"[NG] {root} に課題文が 1 つも無い")
         return 1
