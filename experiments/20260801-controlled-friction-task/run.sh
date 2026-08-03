@@ -85,7 +85,7 @@ fi
 # --- 4. スクリプトの自己検証 -------------------------------------------------
 echo
 echo "[4] スクリプトの自己検証"
-for s in assign analyze validate_blocks forms_to_blocks; do
+for s in assign analyze validate_blocks forms_to_blocks build_task_pages; do
   TMP_S=$(mktemp)
   if python3 "$s.py" --selftest > "$TMP_S" 2>&1; then
     ok "$s.py --selftest 緑"
@@ -96,16 +96,17 @@ for s in assign analyze validate_blocks forms_to_blocks; do
   rm -f "$TMP_S"
 done
 
-# ★ 第 6 版 §2.12: 課題の分野を事前案内メールで開示すると凍結した。
-#   その文面を作る Form_G1 の G1_TOPIC_TITLES と、真実源である materials/ の title が
-#   ズレると、**送った分野と当日配る課題文が食い違う**（凍結を守れていない状態になる）。
-#   ⚠️ 同じ事実を 2 か所に持っているので、検査でしか守れない。
+# ★ 第 7 版 §2.12: 事前案内メールに**題材（分野）と課題の型を書かない**と凍結した
+#   （当日その場で画面提示するので教える必要が無い・§2.13）。
+#   ⚠️ 一度「分野を書く」と決めて第 6 版で実装し、第 7 版で撤回した経緯がある。
+#      **書き戻されたら赤にする**。node で本文生成関数を実際に呼ぶので、
+#      未定義参照（実例: G1_TOPIC_TITLES の残存）も同時に捕まる。
 TMP_T=$(mktemp)
-if python3 ../../scripts/check_g1_topic_titles.py > "$TMP_T" 2>&1; then
-  ok "課題の分野が materials/ と Form_G1 で一致している（§2.12-1）"
+if python3 ../../scripts/check_g1_previsit_email.py > "$TMP_T" 2>&1; then
+  ok "事前案内メールが §2.12 の開示範囲を守っている"
 else
   sed 's/^/    /' "$TMP_T"
-  bad "課題の分野が materials/ と Form_G1 でズレている（§2.12-1）"
+  bad "事前案内メールが §2.12 の開示範囲から外れている"
 fi
 rm -f "$TMP_T"
 

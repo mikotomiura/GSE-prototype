@@ -744,19 +744,11 @@ var G1_AUTO_SEND = false;
 var G1_VISIT_PLACE = "";     // 例: "○○大学 △△棟 3F 会議室"
 var G1_CONTACT = "";         // 例: "研究責任者 ○○（mmiura.network@example.com）"
 
-// ★★ 課題の分野（preregistration.md §2.12-1 で「事前に開示する」と凍結した）。
-//    ⚠️ materials/topicNN_*.md の front matter `title:` と**同じ文字列**でなければならない。
-//    → scripts/check_g1_topic_titles.py が両者の一致を機械検査する（run.sh から走る）。
-var G1_TOPIC_TITLES = [
-  "町立図書館の開館時間",
-  "商店街の駐輪場",
-  "小学校の屋外プール",
-  "燃やすごみの収集",
-  "公民館の部屋の予約",
-  "コミュニティバス",
-  "公園でのボール遊び",
-  "学校から家庭への連絡",
-];
+// ⚠️ ★ 第 6 版にあった G1_TOPIC_TITLES（課題の分野を事前案内メールに載せる）は
+//    **第 7 版で撤回した**。課題文は当日その場で画面提示する（§2.13）ので、
+//    事前に題材を教える必要が無い。→ §2.6 の操作チェックが元の強さに戻る。
+//    ⚠️ ★ **題材名をこのファイルに書き戻さないこと。**
+//       scripts/check_g1_topic_titles.py がメール本文に題材名が混ざっていないかを検査する。
 
 // ------------------------------------------------------------
 // P-ID の採番（★ Phase1 のロスターに対して行う）
@@ -808,9 +800,6 @@ function g1PreVisitSubject_() {
 }
 
 function g1PreVisitBody_(pid, visitDate) {
-  var topics = G1_TOPIC_TITLES.map(function (t, i) {
-    return "    ・" + t;
-  }).join("\n");
   return [
     "この度は研究へのご参加をご承諾いただき、ありがとうございます。",
     "当日の内容を事前にお知らせします。**当日までにお読みください。**",
@@ -833,17 +822,11 @@ function g1PreVisitBody_(pid, visitDate) {
     "    ・文章は本実験専用の記入画面に打っていただきます。**書いた文章は保存されません。**",
     "    ・最後に短いアンケート（5 分ほど）にお答えいただきます。",
     "",
-    "■ 課題の種類（2 種類あります）",
-    "    ・資料が 1 本のもの … それを指定の読み手に向けて要約します。",
-    "    ・資料が 3 本のもの … 3 本は互いに食い違っています。踏まえて 1 つの主張にまとめます。",
-    "    ※ どちらも書く量は 300〜400 字で、読む量（資料の総文字数）もほぼ同じに揃えてあります。",
-    "    ※ ★ どの回がどちらになるかは、当日その場でお渡しする紙に書いてあります。",
-    "",
-    "■ 課題の分野（下記のような、身近な地域の話題です）",
-    topics,
-    "    ※ ★ **資料はすべて本実験のために作成した架空のものです。**",
-    "       自治体名・数値・調査結果は実在しません。事前の下調べは必要ありません。",
-    "    ※ 専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
+    "■ 課題の内容について",
+    "    ★ どんな資料が出るかは、当日その場でお伝えします（事前の準備は要りません）。",
+    "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
+    "    ・資料はすべて本実験のために作成した架空のものです。事前の下調べは必要ありません。",
+    "    ・課題文は画面に表示されます。同じ画面で文章を書いていただきます。",
     "",
     "■ 当日までにお願いしたいこと",
     "    ・日本語入力（IME）は、ふだん使っている設定のままでお越しください。",
@@ -923,4 +906,108 @@ function sendThankYouEmail(pid, email) {
     Logger.log("📝 下書きを作成しました: " + pid);
   }
   return subject;
+}
+
+// ------------------------------------------------------------
+// ★★ 実務的な入口（Apps Script エディタの「実行」から呼べる = 引数なし）
+// ------------------------------------------------------------
+// ⚠️ ★ GAS エディタは**引数付き関数を直接実行できない**（引数が undefined になる）。
+//    sendPreVisitEmail(pid, email, date) はそのままでは実行手段が無いので、
+//    シートを走査する引数なしの入口を用意する。
+//
+// 動き:
+//   「G1 実施トラッキング」を上から見て、**実施予定日が入っていて、
+//    事前案内メール送信日が空**の行だけを対象にする。
+//   メールアドレスは **Phase1 の参加者ロスター**から P-ID で引く（G1 側に実名・メールを持たない）。
+//   送信（または下書き作成）に成功したら**送信日を書き込む**。
+//
+// ★ 冪等である。2 回実行しても送信済みの行は飛ばす。
+//   ⚠️ Phase1 の FormApp.create 量産バグと同じ壊れ方（毎回作り直して配ったものとズレる）を避ける。
+function sendPendingPreVisitEmails() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP_G1);
+  if (!ssId) {
+    throw new Error("★ 管理シートが未作成です。先に buildManagementSheet() を実行してください。");
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    throw new Error("★ PHASE1_MGMT_SHEET_ID が空です（メールアドレスの引き元）。");
+  }
+  var sh = SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング");
+  if (!sh) throw new Error("★ 「G1 実施トラッキング」タブがありません。");
+
+  var colPid = runCol_("P-ID");
+  var colSent = runCol_("事前案内メール送信日");
+  var colPlan = runCol_("実施予定日");
+  var last = sh.getLastRow();
+  if (last < 3) {
+    Logger.log("対象行がありません（3 行目以降にデータを入れてください）。");
+    return 0;
+  }
+  var n = last - 2;
+  var pids = sh.getRange(3, colPid, n, 1).getValues();
+  var sents = sh.getRange(3, colSent, n, 1).getValues();
+  var plans = sh.getRange(3, colPlan, n, 1).getValues();
+
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var done = 0;
+  var skipped = 0;
+  for (var i = 0; i < n; i++) {
+    var pid = String(pids[i][0]).trim();
+    if (!pid) continue;
+    if (String(sents[i][0]).trim()) { skipped++; continue; }        // ★ 送信済みは飛ばす（冪等）
+    var plan = plans[i][0];
+    if (!plan) {                                                     // 日程未定は送らない
+      Logger.log("⏭ " + pid + ": 実施予定日が空なので送りません。");
+      continue;
+    }
+    var email = g1FindEmailInPhase1Roster_(pid);
+    if (!email) {
+      Logger.log("⚠️ " + pid + ": Phase1 ロスターにメールがありません。ロスターに記入してください。");
+      continue;
+    }
+    var planStr = (plan instanceof Date)
+      ? Utilities.formatDate(plan, Session.getScriptTimeZone(), "M/d(E) HH:mm")
+      : String(plan);
+    sendPreVisitEmail(pid, email, planStr);
+    sh.getRange(3 + i, colSent).setValue(today);                     // ★ 送ったことを必ず残す
+    done++;
+  }
+  Logger.log(
+    "✅ 事前案内 " + done + " 件（" + (G1_AUTO_SEND ? "送信" : "下書き作成") + "）／" +
+      "送信済みで飛ばした行 " + skipped + " 件"
+  );
+  if (!G1_AUTO_SEND) {
+    Logger.log("📝 Gmail の下書きを確認して送信してください（自動送信にするなら G1_AUTO_SEND=true）。");
+  }
+  return done;
+}
+
+// Phase1 の参加者ロスターから P-ID でメールアドレスを引く。
+// ★ G1 側に実名・メールを持たないための経路である（data-privacy / Form_G1/README.md）。
+function g1FindEmailInPhase1Roster_(pid) {
+  var ss = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID);
+  var sheet = ss.getSheetByName("参加者ロスター");
+  if (!sheet) throw new Error("★ Phase1 の管理シートに「参加者ロスター」タブがありません。");
+  var last = sheet.getLastRow();
+  if (last < 1) return null;
+  // 列: A=P-ID / B=氏名 / C=メール（Form_Phase1 の ROSTER_HEADER と同じ並び）
+  // ⚠️ ★ Phase1 側で列順を変えたらここも直す（同じ事実を 2 か所で仮定している）。
+  var values = sheet.getRange(1, 1, last, 3).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(pid).trim()) {
+      var email = String(values[i][2]).trim();
+      return email || null;
+    }
+  }
+  return null;
+}
+
+// ★ 送信前に文面を目で確認するための関数（引数なし・送信しない）。
+//   実行するとログに本文がそのまま出る。⚠️ preregistration.md §2.12 の開示範囲と突き合わせること。
+function previewPreVisitEmail() {
+  Logger.log("件名: " + g1PreVisitSubject_());
+  Logger.log("--------");
+  Logger.log(g1PreVisitBody_("P0XX", "（実施予定日がここに入ります）"));
+  Logger.log("--------");
+  Logger.log("★ §2.12 の開示範囲と一致しているか確認してください（分野は出す／課題文の本文は出さない）。");
 }
