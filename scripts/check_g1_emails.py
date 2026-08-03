@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""★ G1 の事前案内メールが `preregistration.md §2.12`（第 7 版）の開示範囲を守っているか検査する。
+"""★ G1 の受付メールが `preregistration.md §2.12`（第 7 版）の開示範囲を守っているか検査する。
 
-第 7 版は「**課題の題材（分野）と型を事前案内に書かない**」と凍結した
+第 7 版は「**課題の題材（分野）と型を事前の連絡に書かない**」と凍結した
 （当日その場で画面提示するので教える必要が無い。§2.13）。
 ⚠️ ★ 一度は「分野を書く」と決めて第 6 版で実装し、第 7 版で撤回した経緯がある。
    **書き戻されたら赤にする**のがこの検査の役目である。
+⚠️ ★ 事前案内メールは 2026-08-03 に廃止した（日時・場所は研究者が手書きで連絡する）。
+   検査対象は**受付メール 1 通**である。
 
 ### ★ node で実際に関数を呼ぶ
 
@@ -15,7 +17,7 @@
 誤検出も出ない。⚠️ `node --check` は構文しか見ないので、これの代わりにはならない。
 
 使い方:
-    python3 scripts/check_g1_previsit_email.py
+    python3 scripts/check_g1_emails.py
 """
 
 from __future__ import annotations
@@ -47,8 +49,7 @@ var Utilities = { formatDate: function () { return "2026-01-01"; } };
 var UrlFetchApp = { fetch: function () { throw new Error("not used"); } };
 __GAS_SOURCE__
 // ★ 実際に呼ぶ。未定義参照があればここで ReferenceError になる。
-var out = { subject: g1PreVisitSubject_(), body: g1PreVisitBody_("P999", "1/1(月) 10:00"),
-            ackSubject: g1RegisterAckSubject_(), ack: g1RegisterAckBody_("P999", "8/10 午後") };
+var out = { ackSubject: g1RegisterAckSubject_(), ack: g1RegisterAckBody_("P999", "8/10 午後") };
 var thanks = (function () {
   // sendThankYouEmail は本文を組み立ててから送るので、下書き経路を通して例外が出ないか見る。
   try { G1_CONTACT = G1_CONTACT || "（テスト）"; sendThankYouEmail("P999", "t@example.com"); return "ok"; }
@@ -124,8 +125,7 @@ def main() -> int:
     res = run_gas()
     # ★ 事前案内メールと受付メールの**両方**を同じ基準で見る。
     #   片方だけ検査すると、もう片方に題材が書き戻されても緑になる。
-    bodies = {"事前案内メール": res["body"], "受付メール": res["ack"]}
-    body = res["body"]
+    bodies = {"受付メール": res["ack"]}
 
     if res.get("thanks") != "ok":
         fails.append(f"sendThankYouEmail が失敗する: {res.get('thanks')}")
@@ -157,13 +157,13 @@ def main() -> int:
                 fails.append(f'{label}に必要な案内 "{must}" が無い')
 
     if fails:
-        print("[NG] 事前案内メールが §2.12 の開示範囲から外れている")
+        print("[NG] 受付メールが §2.12 の開示範囲から外れている")
         for f in fails:
             print(f"  - {f}")
         return 1
-    print("[OK] 事前案内メールは §2.12（第 7 版）の開示範囲を守っている")
+    print("[OK] 受付メールは §2.12（第 7 版）の開示範囲を守っている")
     print("     G1 実施トラッキングの列参照も RUN_HEADER と一致している")
-    print(f"     事前案内メール／受付メールとも、題材名 {len(topic_titles())} 件・課題の型・条件名が本文に無い")
+    print(f"     題材名 {len(topic_titles())} 件・課題の型・条件名のいずれも本文に無い")
     return 0
 
 

@@ -123,19 +123,29 @@ G1 は**第 1 週（blind 較正）モード**で回すので、`session_meta` �
      └─ 新規 → P-ID を採番してロスターに追記
   ② G1 実施トラッキングに行を作る（希望日時は「備考」へ）
   ③ ★ 受付メールを自動送信（P-ID ＋ 当日の流れ ＋ 記録の範囲）
-        ↓ 研究者が日程を調整し「実施予定日」を埋める
-  sendPendingPreVisitEmails() で確定した日時の案内を送る（冪等・未送信の行だけ）
+        ↓
+  研究者が返信して日時・場所を確定する（★ 手書き。自動化しない）
 ```
+
+> ### ★ 自動メールは **受付の 1 通だけ**（研究者判断 2026-08-03）
+>
+> ⚠️ **リマインドは実装していない**（時間トリガは 1 つも無い）。
+> G1 は**対面 1 回で完結**するので「未提出者を追う」という Phase1 の課題が存在しない。
+> ★ **日時・場所もメールに書かない。** 対面 1 回きりなら、日程の確定連絡は
+> 研究者が普通に返信するほうが早く、自動化する価値が無い。
+> → かつてあった `sendPreVisitEmail` / `sendPendingPreVisitEmails` は**廃止した**。
 
 ### 配備手順
 
 ```javascript
 // 1. Google Forms で空フォームを作り、ID を FORM_ID_REGISTER に貼る
-// 2. 定数を埋める: PHASE1_MGMT_SHEET_ID / G1_VISIT_PLACE / G1_CONTACT
+// 2. 定数を埋める: PHASE1_MGMT_SHEET_ID / G1_CONTACT
 setupG1Forms()               // G1-R も含めて構築（FORM_ID_REGISTER が空なら G1-R だけ飛ばす）
 previewRegisterAckEmail()    // ★ 送る前に受付メールの本文を確認（送信しない）
 installG1RegisterTrigger()   // ★ 一度だけ。以後、登録のたびに自動で走る
 listG1FormUrls()             // 回答 URL を取得 → 募集で配る
+// 実施後（任意）
+sendThankYouEmail("P015", "xxx@example.com")   // お礼 ＋ ★ 口外しないお願い
 ```
 
 ⚠️ ★ **`G1_AUTO_SEND` の既定は `false`（下書き）**である。
@@ -157,7 +167,7 @@ listG1FormUrls()             // 回答 URL を取得 → 募集で配る
 
 ### ★★ メールに書いてよいもの / 書いてはいけないもの
 
-`preregistration.md §2.12`（第 7 版）が凍結している。**受付メール・事前案内メールとも同じ基準**である。
+`preregistration.md §2.12`（第 7 版）が凍結している。
 
 | ★ 書いてよい | ⚠️ 書いてはいけない |
 |---|---|
@@ -172,7 +182,7 @@ listG1FormUrls()             // 回答 URL を取得 → 募集で配る
 > **書き戻されたら検査が赤になる**:
 >
 > ```bash
-> python3 scripts/check_g1_previsit_email.py   # run.sh からも走る
+> python3 scripts/check_g1_emails.py   # run.sh からも走る
 > ```
 >
 > この検査は ★ **node で GAS のグローバルをスタブし、本文生成関数を実際に呼ぶ**。

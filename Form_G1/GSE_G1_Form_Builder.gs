@@ -585,9 +585,9 @@ function buildLinksTab_(ss, props) {
 //    (protocol.md §2.3-1「転記は 1 方向だけ」)。
 var RUN_HEADER = [
   "P-ID",
-  // ★ 募集・日程調整（第 6 版・§2.12）。⚠️ 実名・メールはここに書かない。
+  // ★ 募集・日程調整。⚠️ 実名・メールはここに書かない。
   //   実名↔P-ID の対応表は Phase1 のロスターと G1-C 回答シートが真実源である。
-  "事前案内メール送信日",
+  //   ⚠️ 「事前案内メール送信日」列は廃止した（事前案内メールを廃止したため・2026-08-03）。
   "実施予定日",
   "G1-C 同意",
   "実施日",
@@ -753,9 +753,10 @@ var PHASE1_MGMT_SHEET_ID = "";
 //      メール送信は取り消せない。文面を一度目で確認してから true にすること。
 var G1_AUTO_SEND = false;
 
-// 実施場所・連絡先（★ 実施前に埋める）。空欄のままだと sendPreVisitEmail が止まる。
-var G1_VISIT_PLACE = "";     // 例: "○○大学 △△棟 3F 会議室"
-var G1_CONTACT = "";         // 例: "研究責任者 ○○（mmiura.network@example.com）"
+// 連絡先（★ 実施前に埋める）。空欄のままだと受付メールが止まる（fail-closed）。
+// ⚠️ ★ 日時・場所はメールに書かない（研究者判断 2026-08-03）。対面 1 回きりなので、
+//    日程の確定連絡は研究者が普通に返信するほうが早く、自動化する価値が無い。
+var G1_CONTACT = "";         // 例: "研究責任者 ○○（xxx@example.com）"
 
 // ⚠️ ★ 第 6 版にあった G1_TOPIC_TITLES（課題の分野を事前案内メールに載せる）は
 //    **第 7 版で撤回した**。課題文は当日その場で画面提示する（§2.13）ので、
@@ -805,83 +806,6 @@ function assignG1ParticipantId() {
   return pid;
 }
 
-// ------------------------------------------------------------
-// 事前案内メール（★ §2.12 の開示範囲を厳守する）
-// ------------------------------------------------------------
-function g1PreVisitSubject_() {
-  return "【ご案内】キーボードの打ち方に関する研究へのご参加について";
-}
-
-function g1PreVisitBody_(pid, visitDate) {
-  return [
-    "この度は研究へのご参加をご承諾いただき、ありがとうございます。",
-    "当日の内容を事前にお知らせします。**当日までにお読みください。**",
-    "",
-    "■ あなたの参加者ID（P-ID）",
-    "    " + pid,
-    "    ※ 記録はこの記号で管理します。お名前とは別に保管します。",
-    "",
-    "■ 日時・場所",
-    "    日時: " + (visitDate || "（調整中）"),
-    "    場所: " + G1_VISIT_PLACE,
-    "    所要: 約 70 分（説明・休憩を含みます）",
-    "",
-    "■ 当日やっていただくこと",
-    "    5 分の作業を 10 回、間に 1 分の休憩をはさんで行います。",
-    "    ・最初と最後の 1 回ずつは「書き写し」です。考える必要はありません。",
-    "      これは計測器が正しく動いているか確かめるための課題で、隠していることはありません。",
-    "    ・間の 8 回が本番です。資料を読んで 300〜400 字の文章を書いていただきます。",
-    "    ・8 回のうち 7 回、「直前の回と 1 つ前の回のどちらが詰まったか」を 1 つだけ選んでいただきます。",
-    "    ・文章は本実験専用の記入画面に打っていただきます。**書いた文章は保存されません。**",
-    "    ・最後に短いアンケート（5 分ほど）にお答えいただきます。",
-    "",
-    "■ 課題の内容について",
-    "    ★ どんな資料が出るかは、当日その場でお伝えします（事前の準備は要りません）。",
-    "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
-    "    ・資料はすべて本実験のために作成した架空のものです。事前の下調べは必要ありません。",
-    "    ・課題文は画面に表示されます。同じ画面で文章を書いていただきます。",
-    "",
-    "■ 当日までにお願いしたいこと",
-    "    ・日本語入力（IME）は、ふだん使っている設定のままでお越しください。",
-    "    ・当日は携帯電話の電源を切っていただきます。",
-    "",
-    "■ 記録するもの / しないもの",
-    "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
-    "    記録しない: ★ **どの文字を打ったか（本文）**、画面の内容、音声・映像",
-    "    ※ 詳しくは添付の説明・同意文書をご覧ください。当日、署名をお願いします。",
-    "",
-    "■ 参加は任意です",
-    "    途中でやめられます。理由の説明は要りません。終わった後でも記録の削除を求められます。",
-    "",
-    "ご不明な点があれば、このメールにご返信ください。",
-    G1_CONTACT,
-  ].join("\n");
-}
-
-// 事前案内メールを 1 通作る（既定は下書き。G1_AUTO_SEND=true で自動送信）。
-// ★ §2.12-5「開示は全被験者に同一の文面で行う」ため、宛先ごとに文面を書き分けないこと。
-function sendPreVisitEmail(pid, email, visitDate) {
-  if (!pid || !email) {
-    throw new Error("★ pid と email は必須です。例: sendPreVisitEmail('P015','xxx@example.com','8/10(月) 14:00')");
-  }
-  if (!G1_VISIT_PLACE || !G1_CONTACT) {
-    throw new Error(
-      "★ G1_VISIT_PLACE / G1_CONTACT が空です。場所と連絡先が空欄のまま送らないため停止しました。"
-    );
-  }
-  var subject = g1PreVisitSubject_();
-  var body = g1PreVisitBody_(pid, visitDate);
-  if (G1_AUTO_SEND) {
-    MailApp.sendEmail(email, subject, body);
-    Logger.log("📧 送信しました: " + pid + " → " + g1MaskEmail_(email));
-  } else {
-    GmailApp.createDraft(email, subject, body);
-    Logger.log("📝 下書きを作成しました: " + pid + " → " + g1MaskEmail_(email));
-    Logger.log("   （内容を確認して送信してください。自動送信にするなら G1_AUTO_SEND=true）");
-  }
-  return subject;
-}
-
 // ログに実アドレスを残さない（data-privacy）。Phase1 の maskEmail_ と同じ考え方。
 function g1MaskEmail_(email) {
   var s = String(email);
@@ -920,142 +844,6 @@ function sendThankYouEmail(pid, email) {
   }
   return subject;
 }
-
-// ------------------------------------------------------------
-// ★★ 実務的な入口（Apps Script エディタの「実行」から呼べる = 引数なし）
-// ------------------------------------------------------------
-// ⚠️ ★ GAS エディタは**引数付き関数を直接実行できない**（引数が undefined になる）。
-//    sendPreVisitEmail(pid, email, date) はそのままでは実行手段が無いので、
-//    シートを走査する引数なしの入口を用意する。
-//
-// 動き:
-//   「G1 実施トラッキング」を上から見て、**実施予定日が入っていて、
-//    事前案内メール送信日が空**の行だけを対象にする。
-//   メールアドレスは **Phase1 の参加者ロスター**から P-ID で引く（G1 側に実名・メールを持たない）。
-//   送信（または下書き作成）に成功したら**送信日を書き込む**。
-//
-// ★ 冪等である。2 回実行しても送信済みの行は飛ばす。
-//   ⚠️ Phase1 の FormApp.create 量産バグと同じ壊れ方（毎回作り直して配ったものとズレる）を避ける。
-function sendPendingPreVisitEmails() {
-  var props = PropertiesService.getScriptProperties();
-  var ssId = props.getProperty(MGMT_SHEET_PROP_G1);
-  if (!ssId) {
-    throw new Error("★ 管理シートが未作成です。先に buildManagementSheet() を実行してください。");
-  }
-  if (!PHASE1_MGMT_SHEET_ID) {
-    throw new Error("★ PHASE1_MGMT_SHEET_ID が空です（メールアドレスの引き元）。");
-  }
-  var sh = SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング");
-  if (!sh) throw new Error("★ 「G1 実施トラッキング」タブがありません。");
-
-  var colPid = runCol_("P-ID");
-  var colSent = runCol_("事前案内メール送信日");
-  var colPlan = runCol_("実施予定日");
-  var last = sh.getLastRow();
-  if (last < 3) {
-    Logger.log("対象行がありません（3 行目以降にデータを入れてください）。");
-    return 0;
-  }
-  var n = last - 2;
-  var pids = sh.getRange(3, colPid, n, 1).getValues();
-  var sents = sh.getRange(3, colSent, n, 1).getValues();
-  var plans = sh.getRange(3, colPlan, n, 1).getValues();
-
-  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
-  var done = 0;
-  var skipped = 0;
-  for (var i = 0; i < n; i++) {
-    var pid = String(pids[i][0]).trim();
-    if (!pid) continue;
-    if (String(sents[i][0]).trim()) { skipped++; continue; }        // ★ 送信済みは飛ばす（冪等）
-    var plan = plans[i][0];
-    if (!plan) {                                                     // 日程未定は送らない
-      Logger.log("⏭ " + pid + ": 実施予定日が空なので送りません。");
-      continue;
-    }
-    var email = g1FindEmailInPhase1Roster_(pid);
-    if (!email) {
-      Logger.log("⚠️ " + pid + ": Phase1 ロスターにメールがありません。ロスターに記入してください。");
-      continue;
-    }
-    var planStr = (plan instanceof Date)
-      ? Utilities.formatDate(plan, Session.getScriptTimeZone(), "M/d(E) HH:mm")
-      : String(plan);
-    sendPreVisitEmail(pid, email, planStr);
-    sh.getRange(3 + i, colSent).setValue(today);                     // ★ 送ったことを必ず残す
-    done++;
-  }
-  Logger.log(
-    "✅ 事前案内 " + done + " 件（" + (G1_AUTO_SEND ? "送信" : "下書き作成") + "）／" +
-      "送信済みで飛ばした行 " + skipped + " 件"
-  );
-  if (!G1_AUTO_SEND) {
-    Logger.log("📝 Gmail の下書きを確認して送信してください（自動送信にするなら G1_AUTO_SEND=true）。");
-  }
-  return done;
-}
-
-// Phase1 の参加者ロスターから P-ID でメールアドレスを引く。
-// ★ G1 側に実名・メールを持たないための経路である（data-privacy / Form_G1/README.md）。
-function g1FindEmailInPhase1Roster_(pid) {
-  var ss = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID);
-  var sheet = ss.getSheetByName("参加者ロスター");
-  if (!sheet) throw new Error("★ Phase1 の管理シートに「参加者ロスター」タブがありません。");
-  var last = sheet.getLastRow();
-  if (last < 1) return null;
-  // 列: A=P-ID / B=氏名 / C=メール（Form_Phase1 の ROSTER_HEADER と同じ並び）
-  // ⚠️ ★ Phase1 側で列順を変えたらここも直す（同じ事実を 2 か所で仮定している）。
-  var values = sheet.getRange(1, 1, last, 3).getValues();
-  for (var i = 0; i < values.length; i++) {
-    if (String(values[i][0]).trim() === String(pid).trim()) {
-      var email = String(values[i][2]).trim();
-      return email || null;
-    }
-  }
-  return null;
-}
-
-// ★ 送信前に文面を目で確認するための関数（引数なし・送信しない）。
-//   実行するとログに本文がそのまま出る。⚠️ preregistration.md §2.12 の開示範囲と突き合わせること。
-function previewPreVisitEmail() {
-  Logger.log("件名: " + g1PreVisitSubject_());
-  Logger.log("--------");
-  Logger.log(g1PreVisitBody_("P0XX", "（実施予定日がここに入ります）"));
-  Logger.log("--------");
-  Logger.log("★ §2.12 の開示範囲と一致しているか確認してください（分野は出す／課題文の本文は出さない）。");
-}
-
-// ============================================================
-// ★★ G1-R 参加登録フォーム → 自動採番 → 受付メール（Phase1 の onF1Submit を踏襲）
-// ============================================================
-// 運用:
-//   1. Google Forms で空フォームを 1 つ作り、その ID を FORM_ID_REGISTER に貼る。
-//   2. buildG1RegisterForm() を実行（setupG1Forms からも呼ばれる）。
-//   3. installG1RegisterTrigger() を **一度だけ** 実行 → onFormSubmit トリガが付く。
-//   4. 以後、被験者が登録するたび onG1RegisterSubmit(e) が自動で走る:
-//      P-ID 採番（Phase1 ロスター）→ G1 実施トラッキングに行追加 → 受付メール。
-//
-// ★ Phase1 から踏襲した 4 点（同じ失敗を繰り返さないため）:
-//   - LockService: 同時提出で **同じ P-ID が 2 人に出る**のを防ぐ。
-//   - メールによる重複チェック: 再提出しても**再発番しない**（冪等）。
-//   - メール送信の失敗を**備考列に可視化**する（発番だけ済んで通知が消えるのを防ぐ）。
-//   - ログに実アドレスを出さない（maskEmail）。
-//
-// ⚠️ ★ 適格性の自動判定は**入れない**。preregistration.md に募集段階の適格基準が無く、
-//    §2.9 の適格性ゲート（≥100 打鍵）は**実施後**に見るものだからである。
-//    ここで独自基準を作ると、事前登録に無い除外を持ち込むことになる。
-
-var Q_REG_CONSENT = "説明の確認";
-var Q_REG_NAME = "お名前";
-var Q_REG_EMAIL = "メールアドレス";
-var Q_REG_RETURNING = "以前に本研究の検証にご参加いただいたことがありますか";
-var Q_REG_PID = "参加者ID（お持ちの方のみ）";
-var Q_REG_PREFERRED = "ご都合のよい日時";
-var Q_REG_NOTE = "ご連絡事項（任意）";
-
-var REG_CONSENT_TEXT = "説明を読み、参加が任意であること・いつでも中断できることを理解しました";
-var REG_RETURNING_YES = "はい";
-var REG_RETURNING_NO = "いいえ（今回が初めて）";
 
 function buildG1RegisterForm() {
   var form = openFixed_(FORM_ID_REGISTER, "FORM_ID_REGISTER");
@@ -1312,9 +1100,9 @@ function g1RegisterAckBody_(pid, preferred) {
     "    ※ 記録はこの記号で管理します。お名前とは別に保管します。",
     "    ※ 当日までこのメールを保管してください。",
     "",
-    "■ 日程について",
+    "■ 日程",
     (preferred ? "    ご希望として次を承りました: " + preferred : "    ご希望日時を追ってお伺いします。"),
-    "    ★ 調整のうえ、確定した日時と場所を改めてご案内します。",
+    "    ★ このメールに返信する形で、日時と場所をご相談させてください。",
     "",
     "■ 当日の流れ（約 70 分）",
     "    ・5 分の作業を 10 回、間に 1 分の休憩をはさみます。",
