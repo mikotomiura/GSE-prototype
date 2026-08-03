@@ -538,11 +538,13 @@ function buildLinksTab_(ss, props) {
     ["", "", "", ""],
     ["項目", "値 / URL", "種別", "備考"],
     [
-      "記入パッド (writing-pad.html) の置き場",
+      "ブロックページ (pages/<P-ID>/blockNN.html) の置き場",
       prevPad || "",
       "手動",
-      "★ 被験者の入力先。全被験者・全ブロックで同一 (preregistration.md §2.11)。" +
-        "実施端末にコピーし、拡張機能なしのプロファイルで開く (protocol.md §1.2)",
+      "★ 課題文と記入欄を 1 画面にしたページ。**紙配布は 2026-08-03 に廃止した** (第 7 版 §2.13)。" +
+        "実施前に `python3 build_task_pages.py --subject <P-ID>` で生成し、実施端末にコピーする。" +
+        "⚠️ ブロック開始時に **そのブロックのファイルだけ**を、拡張機能なしのプロファイルで開く " +
+        "(protocol.md §1.2)。次のファイルを先に開くと先読みで打鍵量の測定が壊れる",
     ],
     [
       "gse-dataset への送付先",
@@ -610,8 +612,58 @@ var RUN_HEADER = [
   "備考",
 ];
 
+// ★★ 実シートのヘッダ行（row 2）と RUN_HEADER が一致しているか。
+//   ⚠️ **runCol_ は「コード側の RUN_HEADER」しか見ない。** 実シートのヘッダが古いままだと、
+//      列名で引いているのに**実シートでは別の列を指す**。
+//   ★ 2026-08-03 に実際に起きた: 旧版で作られた 16 列のシート（実施予定日なし）に対し、
+//      17 列の RUN_HEADER で applyRunValidation_ を回したため、
+//      **日付列「実施日」に「はい/いいえ」のドロップダウンが付いた**（実測・スクリーンショット確認）。
+//   → 黙ってずらさず、**ここで止める**。
+function runHeaderDiff_(sh) {
+  var live = sh.getRange(2, 1, 1, Math.max(sh.getLastColumn(), RUN_HEADER.length)).getValues()[0];
+  var diff = [];
+  for (var i = 0; i < RUN_HEADER.length; i++) {
+    var a = String(RUN_HEADER[i]);
+    var b = String(live[i] === undefined ? "" : live[i]).trim();
+    if (a !== b) diff.push("col" + (i + 1) + ": コード='" + a + "' / シート='" + b + "'");
+  }
+  return diff;
+}
+
+function assertRunHeader_(sh) {
+  var diff = runHeaderDiff_(sh);
+  if (diff.length) {
+    throw new Error(
+      "★ 「G1 実施トラッキング」のヘッダがコードの RUN_HEADER と一致しません。\n" +
+        "⚠️ このまま進めると runCol_ が**別の列**を指し、入力規則や備考が静かにずれます。\n" +
+        diff.join("\n") +
+        "\n→ データが無ければ setupG1Forms() が自動で作り直します。" +
+        "データがある場合は、列を手で合わせてから再実行してください。"
+    );
+  }
+}
+
 function buildRunTab_(ss) {
-  if (ss.getSheetByName("G1 実施トラッキング")) return;
+  var exist = ss.getSheetByName("G1 実施トラッキング");
+  if (exist) {
+    var diff = runHeaderDiff_(exist);
+    if (!diff.length) return; // 一致している = 何もしない（入力データを破壊しない）
+    // ★ ヘッダが古い。データが無いときだけ作り直す（データがあれば人が判断する）。
+    var used = exist.getLastRow() > 2
+      ? exist.getRange(3, 1, exist.getLastRow() - 2, 1).getValues().filter(function (r) {
+          return String(r[0]).trim() !== "";
+        })
+      : [];
+    if (used.length) {
+      throw new Error(
+        "★ 「G1 実施トラッキング」のヘッダが古いのに、データが " + used.length + " 行あります。\n" +
+          diff.join("\n") +
+          "\n⚠️ 勝手に列をずらすと記録が壊れるので中止しました。手で列を合わせてから再実行してください。"
+      );
+    }
+    Logger.log("⚠️ ヘッダが古いのでタブを作り直します（データ行 0）: " + diff.join(" / "));
+    ss.deleteSheet(exist); // ★ 古い入力規則ごと消す（残すと新旧の規則が二重に付く）
+  }
   var sh = ss.insertSheet("G1 実施トラッキング");
   // 行1: 注意バナー。★ ここに何を書いてはいけないかを、シートの上で明示する。
   sh.getRange(1, 1).setValue(
@@ -647,7 +699,11 @@ function runCol_(header) {
 function applyRunValidation_(ss) {
   var sh = ss.getSheetByName("G1 実施トラッキング");
   if (!sh) return;
+  assertRunHeader_(sh); // ★ ずれたまま規則を貼らない（上のコメント参照）
   var rows = 200;
+  // ★ 先に全部消す。⚠️ 消さないと、列構成を変えたときに**旧位置の規則が残って二重に付く**
+  //   （2026-08-03 実測: B〜G 列すべてにドロップダウンが付いた状態になっていた）。
+  sh.getRange(3, 1, rows, RUN_HEADER.length).clearDataValidations();
   function listRule(values) {
     return SpreadsheetApp.newDataValidation().requireValueInList(values, true).build();
   }
@@ -750,17 +806,29 @@ function recordFormUrl_(key, form, label) {
 //    採番元は **Phase1 のロスターただ 1 つ**である（protocol.md §2.0 / Form_G1/README.md）。
 //    ⚠️ G1 側で採番すると 2 か所採番になり、相手の最大値が見えないので**必ず衝突する**。
 //    URL の /spreadsheets/d/<ここ>/edit の <ここ> を貼る。空なら採番系は動かない（fail-closed）。
-var PHASE1_MGMT_SHEET_ID = "";
+//
+// ⚠️★★ **Drive に「【非公開】GSE_Phase1_運用管理シート」が 2 つある**（2026-08-03 実測）。
+//    取り違えると **P-ID が既存参加者と衝突する**ので、下の ID を勝手に差し替えないこと。
+//      ✅ 1ND5HSXZ...  参加者ロスター = P006..P014（現行・最終更新 2026-08-03）→ 次は P015
+//      ❌ 12T8WU4D...  参加者ロスター = P001..P008（古い・最終更新 2026-06-28）
+//         → こちらを指すと g1NextParticipantId_ が **P009 を返し、実在する P009..P014 と衝突する**。
+//    ★ 見分け方: 「参加者ロスター」タブに **P010 以降が入っているほうが正**。
+var PHASE1_MGMT_SHEET_ID = "1ND5HSXZcD_9vHjKAcM8K8Ow9VFVVwuP4L3pulP6ud7Y";
 
 // ★ true にすると MailApp で自動送信する。既定は false（GmailApp で下書きを作る）。
 //   ⚠️ Phase1 は AUTO_SEND=true で運用しているが、G1 は**対面・少人数**なので既定を下書きにした。
 //      メール送信は取り消せない。文面を一度目で確認してから true にすること。
-var G1_AUTO_SEND = false;
+// ⚠️ ★ 2026-08-03 の研究者判断で **true**（実送信）に切り替えた。
+//    登録直後に受付メールが届かないと、被験者は P-ID を知らないまま待つことになる。
+//    ⚠️ 送信は取り消せない。文面を変えたら previewRegisterAckEmail() で必ず先に確認する。
+var G1_AUTO_SEND = true;
 
 // 連絡先（★ 実施前に埋める）。空欄のままだと受付メールが止まる（fail-closed）。
 // ⚠️ ★ 日時・場所はメールに書かない（研究者判断 2026-08-03）。対面 1 回きりなので、
 //    日程の確定連絡は研究者が普通に返信するほうが早く、自動化する価値が無い。
-var G1_CONTACT = "";         // 例: "研究責任者 ○○（xxx@example.com）"
+var G1_CONTACT = "三浦尊統（mmiura.network@gmail.com）"; // 研究者判断 2026-08-03
+// ⚠️ ★ consent.md §8「所属・連絡先（実施前に記入）」を埋めるときは、**ここと同じ文字列**にする。
+//    片方だけ直すと、同意文書とメールで連絡先が食い違う。
 
 // ⚠️ ★ 第 6 版にあった G1_TOPIC_TITLES（課題の分野を事前案内メールに載せる）は
 //    **第 7 版で撤回した**。課題文は当日その場で画面提示する（§2.13）ので、
@@ -875,6 +943,16 @@ function g1EnsureRunRow_(pid) {
   }
   var sh = SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング");
   if (!sh) return null;
+  // ★ ヘッダがずれていると「備考」が別の列（見出しの無い列）に書かれ、
+  //   送信失敗のフラグを研究者が**見つけられなくなる**。ずれていたら行を作らず記録に残す。
+  //   ⚠️ ここで throw すると onG1ConsentSubmit の採番まで巻き戻るので、null を返して続行させる
+  //      （P-ID の発番と受付メールのほうが優先度が高い）。
+  try {
+    assertRunHeader_(sh);
+  } catch (headerErr) {
+    Logger.log("❌ トラッキング行を作れません（ヘッダ不一致・setupG1Forms を再実行）: " + headerErr);
+    return null;
+  }
 
   var colPid = runCol_("P-ID");
   var colNote = runCol_("備考");
@@ -922,7 +1000,10 @@ function g1RegisterAckBody_(pid) {
     "■ 記録するもの / しないもの",
     "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
     "    記録しない: ★ どの文字を打ったか（本文）、画面の内容、音声・映像",
-    "    ※ 書いた文章そのものは保存しません。当日、説明・同意文書に署名をお願いします。",
+    // ⚠️ ★ 紙署名は 2026-08-03 に廃止した（D-1(a)）。このフォーム（G1-C）の回答が同意の正本である。
+    //    ⚠️ ここを「署名をお願いします」に戻すと、protocol.md §4.1-1 / consent.md /
+    //       Form_G1/README.md と食い違う。**4 か所を同時に直すこと。**
+    "    ※ 書いた文章そのものは保存しません。ご同意はこのフォームの回答で完了しています。",
     "",
     "■ 当日までにお願いしたいこと",
     "    ・日本語入力（IME）は、ふだん使っている設定のままでお越しください。",
@@ -960,7 +1041,9 @@ function previewRegisterAckEmail() {
 //      P-ID 採番（Phase1 ロスター）→ G1 実施トラッキングに行追加 → 受付メール。
 //
 // ⚠️ ★ 当日その場で G1-C に回答した場合も同じ経路を通る（受付メールが届くだけで害は無い）。
-//    ★ 対面の署名は別途 `handouts/G1_説明・同意文書.docx` で取る（protocol.md §4.1）。
+//    ★★ **この G1-C の回答が同意の正本である**（研究者判断 2026-08-03 = D-1(a)）。
+//    ⚠️ 紙署名は廃止した。`handouts/G1_説明・同意文書.docx` は
+//       **フォームが開けない機器トラブル時の予備**である（protocol.md §4.1-1）。
 
 function installG1ConsentTrigger() {
   removeG1ConsentTriggers();

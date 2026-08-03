@@ -186,6 +186,18 @@ def main() -> int:
             if token in b:
                 fails.append(f'"{token}" が{label}にある（§2.12 / protocol.md §4.3）')
 
+    # ★★ 紙署名は 2026-08-03 に廃止した（D-1(a)）。G1-C の回答が同意の正本である。
+    #   ⚠️ この検査を足した理由: **実動作で初めて見つかったバグだから**である。
+    #   受付メールに「当日、説明・同意文書に署名をお願いします」が残っており、
+    #   §2.12 の開示範囲だけを見ていた既存の検査は**緑のまま通していた**。
+    #   ⚠️ 文言を戻すと protocol.md §4.1-1 / consent.md / Form_G1/README.md と食い違う。
+    for label, b in bodies.items():
+        if "署名" in b:
+            fails.append(
+                f'"署名" が{label}にある。★ 紙署名は廃止した（D-1(a)）。'
+                "同意の正本は G1-C の回答である（protocol.md §4.1-1）"
+            )
+
     # ★ 検査が空回りしていないこと: 本文がちゃんと生成されている
     for label, b in bodies.items():
         if len(b) < 200:
