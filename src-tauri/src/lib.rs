@@ -1920,132 +1920,155 @@ pub fn run() {
             // emit と logger 送信の両方が要るプローブ駆動は専用スレッドに分離する。
             // IME Monitor 風の sleep ポーリングで 1Hz 駆動 (wake 信号は不要)。
             // scheduler 純ロジックは analysis/probe_scheduler.rs (OS API 非依存)。
+            //
+            // ★ G1 統制タスク実験の kill switch (B-1): env `GSE_DISABLE_PROBES=1` のとき
+            // **このスレッドを起こさない**。poll 側で握り潰すのではなくスレッドごと止めるのは、
+            // 「発火はしたが黙殺した」状態を残さないためである (probe_assignment も
+            // probe_triggered も構造的に発生しえなくなる)。
+            // 既定 (未設定) では従来どおり起動するので通常運用の挙動は変わらない。
+            // 根拠と非影響の論証: experiments/20260801-controlled-friction-task/preregistration.md
+            // §2.6 / §5.4 ・ analysis::probe_scheduler::probes_disabled_by_env。
             {
                 use crate::analysis::probe_scheduler::{
-                    decide_probe_init, driver_idle_ms, ProbeConfig, ProbeInitDecision,
-                    ProbeScheduler,
+                    decide_probe_init, driver_idle_ms, probes_disabled_by_env, ProbeConfig,
+                    ProbeInitDecision, ProbeScheduler,
                 };
+                let probes_disabled =
+                    probes_disabled_by_env(std::env::var("GSE_DISABLE_PROBES").ok().as_deref());
+                if probes_disabled {
+                    // ★ 実施ログに必ず 1 行残す。実機で「止まっているつもり」を防ぐ番兵であり、
+                    // 実施後の客観検証は NDJSON 側 (probe_assignment 行 0) で行う。
+                    tracing::warn!(
+                        "probe scheduler DISABLED by GSE_DISABLE_PROBES=1 \
+                         (G1 controlled-friction experiment; preregistration.md 2.6). \
+                         No scheduled probe_assignment / probe_triggered will be produced. \
+                         NOTE: the self-marker hotkey is user-initiated and is NOT gated here; \
+                         G1 forbids pressing it (protocol.md)."
+                    );
+                }
                 let app_handle = app.handle().clone();
                 let probe_log_tx = log_tx_probe;
-                thread::spawn(move || {
-                    tracing::info!("Probe scheduler thread started");
-                    let now_ms = || -> u64 {
-                        SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_millis() as u64
-                    };
-                    let mut scheduler: Option<ProbeScheduler> = None;
-                    let mut active_session_start: u64 = 0;
-                    // M0 (D1): 現在初期化済みのプロファイルの away 閾値。idle 判定で参照する。
-                    // 較正/配備で同値 (3 分) だが、選択した config から引いて将来の差異に備える。
-                    let mut active_away_idle_ms: u64 = ProbeConfig::default().away_idle_ms;
-                    loop {
-                        thread::sleep(Duration::from_millis(1000));
-                        let session_start = SESSION_START_MS.load(Ordering::Acquire);
-                        if session_start == 0 {
-                            // セッション未開始: スケジューラを破棄して待機。
-                            scheduler = None;
-                            active_session_start = 0;
-                            continue;
-                        }
-                        if session_start != active_session_start {
-                            // M0 (D1): session_meta (condition) を session_start と**世代照合**してから
-                            // プロファイルを選ぶ。frontend は start_session → record_session_meta の順で
-                            // 呼ぶため、照合一致まで待たないと calibration 選択が race する。古い世代の
-                            // meta は不一致で弾かれる (cross-review HIGH)。純ロジック decide_probe_init に
-                            // 判定を委譲し、ここでは Atomic 読みと副作用 (warn/初期化) のみ行う。
-                            let meta_for = SESSION_META_FOR_START_MS.load(Ordering::Acquire);
-                            let meta_is_calibration =
-                                SESSION_IS_CALIBRATION.load(Ordering::Acquire);
-                            let waited = now_ms().saturating_sub(session_start);
-                            let (calibration, meta_fallback) = match decide_probe_init(
-                                session_start,
-                                meta_for,
-                                meta_is_calibration,
-                                waited,
-                                PROBE_META_READY_GRACE_MS,
-                            ) {
-                                // この session_start 向けの meta 未受領・grace 内: 再試行
-                                // (active_session_start は更新しない。schedule は session_start
-                                // anchor のため遅延は決定性に影響しない)。
-                                ProbeInitDecision::Wait => continue,
-                                ProbeInitDecision::Start {
-                                    calibration,
-                                    meta_fallback,
-                                } => (calibration, meta_fallback),
-                            };
-                            if meta_fallback {
-                                // meta 送信が失敗/未送信のまま grace 超過。サイレント全滅を避け
-                                // default で初期化し warn する (code-review HIGH)。
-                                tracing::warn!(
-                                    "probe scheduler: session_meta not received {}ms after \
+                if !probes_disabled {
+                    thread::spawn(move || {
+                        tracing::info!("Probe scheduler thread started");
+                        let now_ms = || -> u64 {
+                            SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis() as u64
+                        };
+                        let mut scheduler: Option<ProbeScheduler> = None;
+                        let mut active_session_start: u64 = 0;
+                        // M0 (D1): 現在初期化済みのプロファイルの away 閾値。idle 判定で参照する。
+                        // 較正/配備で同値 (3 分) だが、選択した config から引いて将来の差異に備える。
+                        let mut active_away_idle_ms: u64 = ProbeConfig::default().away_idle_ms;
+                        loop {
+                            thread::sleep(Duration::from_millis(1000));
+                            let session_start = SESSION_START_MS.load(Ordering::Acquire);
+                            if session_start == 0 {
+                                // セッション未開始: スケジューラを破棄して待機。
+                                scheduler = None;
+                                active_session_start = 0;
+                                continue;
+                            }
+                            if session_start != active_session_start {
+                                // M0 (D1): session_meta (condition) を session_start と**世代照合**してから
+                                // プロファイルを選ぶ。frontend は start_session → record_session_meta の順で
+                                // 呼ぶため、照合一致まで待たないと calibration 選択が race する。古い世代の
+                                // meta は不一致で弾かれる (cross-review HIGH)。純ロジック decide_probe_init に
+                                // 判定を委譲し、ここでは Atomic 読みと副作用 (warn/初期化) のみ行う。
+                                let meta_for = SESSION_META_FOR_START_MS.load(Ordering::Acquire);
+                                let meta_is_calibration =
+                                    SESSION_IS_CALIBRATION.load(Ordering::Acquire);
+                                let waited = now_ms().saturating_sub(session_start);
+                                let (calibration, meta_fallback) = match decide_probe_init(
+                                    session_start,
+                                    meta_for,
+                                    meta_is_calibration,
+                                    waited,
+                                    PROBE_META_READY_GRACE_MS,
+                                ) {
+                                    // この session_start 向けの meta 未受領・grace 内: 再試行
+                                    // (active_session_start は更新しない。schedule は session_start
+                                    // anchor のため遅延は決定性に影響しない)。
+                                    ProbeInitDecision::Wait => continue,
+                                    ProbeInitDecision::Start {
+                                        calibration,
+                                        meta_fallback,
+                                    } => (calibration, meta_fallback),
+                                };
+                                if meta_fallback {
+                                    // meta 送信が失敗/未送信のまま grace 超過。サイレント全滅を避け
+                                    // default で初期化し warn する (code-review HIGH)。
+                                    tracing::warn!(
+                                        "probe scheduler: session_meta not received {}ms after \
                                      session_start={}; falling back to default ProbeConfig \
                                      (calibration NOT applied — check record_session_meta)",
-                                    waited,
+                                        waited,
+                                        session_start
+                                    );
+                                }
+                                // 新セッション検出 (DB-6)。entropy から u64 seed を引いて
+                                // seed_from_u64 で初期化し、seed を tracing に記録する。本番は
+                                // 非決定論的でありつつ「この seed でこの scheduled_ts 系列が出た」
+                                // ことを後から再現でき、一様性監査 (D-14) が成立する。NDJSON schema は
+                                // Task A で凍結のため seed は trace ログにのみ残す (schema 不変)。
+                                active_session_start = session_start;
+                                // M0 (D1): 較正は収量優先、それ以外 (配備・baseline・fallback) は default。
+                                let config = if calibration {
+                                    ProbeConfig::calibration()
+                                } else {
+                                    ProbeConfig::default()
+                                };
+                                active_away_idle_ms = config.away_idle_ms;
+                                let seed: u64 = rand::random();
+                                tracing::info!(
+                                    "probe scheduler seed={} calibration={} for session_start={}",
+                                    seed,
+                                    calibration,
                                     session_start
                                 );
+                                scheduler =
+                                    Some(ProbeScheduler::from_seed(seed, config, session_start));
                             }
-                            // 新セッション検出 (DB-6)。entropy から u64 seed を引いて
-                            // seed_from_u64 で初期化し、seed を tracing に記録する。本番は
-                            // 非決定論的でありつつ「この seed でこの scheduled_ts 系列が出た」
-                            // ことを後から再現でき、一様性監査 (D-14) が成立する。NDJSON schema は
-                            // Task A で凍結のため seed は trace ログにのみ残す (schema 不変)。
-                            active_session_start = session_start;
-                            // M0 (D1): 較正は収量優先、それ以外 (配備・baseline・fallback) は default。
-                            let config = if calibration {
-                                ProbeConfig::calibration()
-                            } else {
-                                ProbeConfig::default()
+                            let now = now_ms();
+                            // idle 計算は driver_idle_ms (純ロジック) に委譲。F4: last_key==0 は
+                            // 「idle 不明」として away_idle_ms に倒し、離席中の誤発火を防ぐ
+                            // (Dashboard 表示用 get_keyboard_idle_ms とは意図的に挙動が異なる)。
+                            let last_key = crate::input::hook::last_key_ms();
+                            // away_idle_ms は初期化済みプロファイル (active_away_idle_ms) を参照。
+                            let idle = driver_idle_ms(now, last_key, active_away_idle_ms);
+                            let Some(sched) = scheduler.as_mut() else {
+                                continue;
                             };
-                            active_away_idle_ms = config.away_idle_ms;
-                            let seed: u64 = rand::random();
-                            tracing::info!(
-                                "probe scheduler seed={} calibration={} for session_start={}",
-                                seed,
-                                calibration,
-                                session_start
-                            );
-                            scheduler =
-                                Some(ProbeScheduler::from_seed(seed, config, session_start));
-                        }
-                        let now = now_ms();
-                        // idle 計算は driver_idle_ms (純ロジック) に委譲。F4: last_key==0 は
-                        // 「idle 不明」として away_idle_ms に倒し、離席中の誤発火を防ぐ
-                        // (Dashboard 表示用 get_keyboard_idle_ms とは意図的に挙動が異なる)。
-                        let last_key = crate::input::hook::last_key_ms();
-                        // away_idle_ms は初期化済みプロファイル (active_away_idle_ms) を参照。
-                        let idle = driver_idle_ms(now, last_key, active_away_idle_ms);
-                        let Some(sched) = scheduler.as_mut() else {
-                            continue;
-                        };
-                        if let Some(fired) = sched.poll(now, idle) {
-                            // (2) probe_assignment ログ (一様性の監査用・scheduled_ts)。
-                            let _ = probe_log_tx.try_send(LogEntry::ProbeAssignment {
-                                probe_id: fired.probe_id.as_str().to_string(),
-                                scheduled_ts: fired.scheduled_ts,
-                                session_elapsed_ms: fired.session_elapsed_ms,
-                            });
-                            // (3) frontend へ emit (回答カード表示は Task C)。
-                            if let Err(e) = app_handle.emit(
-                                "probe_triggered",
-                                serde_json::json!({
-                                    "probe_id": fired.probe_id.as_str(),
-                                    "source": "random_probe",
-                                    "analysis_window_start_ms": fired.window_start_ms,
-                                    "analysis_window_end_ms": fired.window_end_ms,
-                                }),
-                            ) {
-                                tracing::warn!("probe_triggered emit failed: {}", e);
+                            if let Some(fired) = sched.poll(now, idle) {
+                                // (2) probe_assignment ログ (一様性の監査用・scheduled_ts)。
+                                let _ = probe_log_tx.try_send(LogEntry::ProbeAssignment {
+                                    probe_id: fired.probe_id.as_str().to_string(),
+                                    scheduled_ts: fired.scheduled_ts,
+                                    session_elapsed_ms: fired.session_elapsed_ms,
+                                });
+                                // (3) frontend へ emit (回答カード表示は Task C)。
+                                if let Err(e) = app_handle.emit(
+                                    "probe_triggered",
+                                    serde_json::json!({
+                                        "probe_id": fired.probe_id.as_str(),
+                                        "source": "random_probe",
+                                        "analysis_window_start_ms": fired.window_start_ms,
+                                        "analysis_window_end_ms": fired.window_end_ms,
+                                    }),
+                                ) {
+                                    tracing::warn!("probe_triggered emit failed: {}", e);
+                                }
+                                tracing::info!(
+                                    "probe fired: {} at {}",
+                                    fired.probe_id.as_str(),
+                                    fired.scheduled_ts
+                                );
                             }
-                            tracing::info!(
-                                "probe fired: {} at {}",
-                                fired.probe_id.as_str(),
-                                fired.scheduled_ts
-                            );
                         }
-                    }
-                });
+                    });
+                } // if !probes_disabled
             }
 
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
