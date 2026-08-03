@@ -9,7 +9,7 @@ description: >
   - 生成した HTML (pages/*.html など) をブラウザで確認するとき
   - スクリーンショットを何枚も撮って状態を追いかけそうになっているとき
   - 「機械検査が全部緑だから動くはず」と言いそうになっているとき
-allowed-tools: Bash, Read, Grep
+allowed-tools: Bash, Read, Grep, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__javascript_tool, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__read_console_messages
 ---
 
 # ブラウザで実物を確かめる
@@ -34,6 +34,20 @@ allowed-tools: Bash, Read, Grep
 > 実バイナリ）のズレを**原理的に検出できない**。外界は読みに行くしかない。
 
 ---
+
+## 0. ★ まず「何を満たせば合格か」を先に確定する
+
+⚠️ **開いてから考えない。** 検査項目を実行者が発明すると、通ったかどうかを後から言えない。
+★ **要件は必ずリポジトリ側に一次資料がある。** ブラウザを開く前にそれを Read する:
+
+| 検証対象 | 要件の一次資料 |
+|---|---|
+| `pages/<ID>/blockNN.html`（課題文ページ） | `experiments/20260801-controlled-friction-task/preregistration.md` **§2.13**（提示方法）＋ **§2.11**（記入欄の要件） |
+| `writing-pad.html`（記入パッド単体） | 同 **§2.11** ＋ ファイル冒頭のコメント（設計上の約束 4 点） |
+| Apps Script / フォーム / 管理シート | `Form_G1/README.md`（配備手順）＋ `.gs` の `RUN_HEADER` など実装側の定義 |
+| 被験者に見えるもの全般 | `preregistration.md` **§2.12**（開示してよい / いけない） |
+
+★ **見つけた要件を箇条書きにしてから開く。** 報告はその箇条書きに 1 対 1 で対応させる。
 
 ## 1. ★★ コンテキストを食い潰さない
 
@@ -73,6 +87,43 @@ JSON.stringify({
 
 ## 2. ⚠️ 実測で潰した落とし穴（GSE 固有・繰り返し踏むもの）
 
+### 2.0 ★★ 「できないはず」を確かめるときは、**必ず対照を取る**
+
+⚠️ ★ **これが最も危険な失敗である。** 否定的テスト（選択できないはず・出ないはず・
+送信されないはず）は、**「本当にブロックされた」と「そもそも操作が届いていない」を
+区別できない**。届いていないだけなのに **合格と誤読する**（実測で 2 回起きている）。
+
+★ **必ず、効くはずの場所で同じ操作をして、効くことを見る。**
+
+```js
+// ✅ 対照つき: .notice は選択できる / .task は選択できない、を同時に見る
+const s = window.getSelection(); const mk = el => { const r = document.createRange();
+  r.selectNodeContents(el); s.removeAllRanges(); s.addRange(r); const n = s.toString().length;
+  s.removeAllRanges(); return n; };
+JSON.stringify({
+  control: mk(document.querySelector('.notice')),  // ★ >0 でなければ検査自体が空回り
+  target:  mk(document.querySelector('.task')),    // ★ 0 なら本当に効いている
+})
+```
+
+⚠️ **`control` が 0 なら、`target` が 0 でも何も言えない。** 先に control を直す。
+★ これはリポジトリ側の「検査が空回りしていないか実測する」（`--selftest` の作法）と同じ思想である。
+
+### 2.0b ★ クリックが効かないときは、**着弾したかを先に見る**
+
+⚠️ `computer` に渡す座標と `getBoundingClientRect()` の CSS px が**一致しない環境がある**
+（実測でスクリーンショット空間と 1.5 倍前後ずれた例あり。ウィンドウ倍率で変わる）。
+★ 座標がずれていると **全クリックが黙って外れる**。「反応しない」を要素の仕様と誤読しない。
+
+```js
+// ★ 着弾プローブ: このあと computer left_click して、記録が入るかを見る
+window.__hits = [];
+document.addEventListener('mousedown', e => window.__hits.push(
+  {x: e.clientX, y: e.clientY, tag: e.target.tagName, cls: e.target.className}), true);
+```
+
+→ クリック後に `window.__hits` を読む。★ **空なら座標系の問題**であって要素の問題ではない。
+
 ### 2.1 ★ `file://` は拡張機能から触れない
 
 `mcp__claude-in-chrome__navigate` に `file:///…` を渡すと
@@ -81,12 +132,21 @@ JSON.stringify({
 → **ローカル HTTP で配信して検証する**:
 
 ```bash
+# ★ ポートは固定しない。⚠️ 並行セッション / 前回の残骸が専有していることがある
+PORT=$((8700 + RANDOM % 200))
 cd <生成物のディレクトリ>
-nohup python3 -m http.server 8731 --bind 127.0.0.1 > /dev/null 2>&1 &
-sleep 1; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8731/block02.html
-# 検証が終わったら必ず止める
-pkill -f "http.server 8731"
+nohup python3 -m http.server $PORT --bind 127.0.0.1 > /dev/null 2>&1 &
+sleep 1
+CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$PORT/block02.html)
+# ★★ 200 でなければ**先に進まない**。⚠️ `nohup … &` はポート専有時に**無言で死ぬ**
+[ "$CODE" = 200 ] || { echo "サーバが上がっていない (code=$CODE)。ポートを変えて再試行"; }
+echo "PORT=$PORT"
+# 検証が終わったら必ず止める（★ 自分が立てたポートだけ）
+pkill -f "http.server $PORT"
 ```
+
+⚠️ ★ **`nohup … &` は silent failure 型である。** 起動したつもりで 404 / 000 のまま
+「ページが壊れている」と誤読した実例がある。**必ず 200 を確かめてから開く。**
 
 ⚠️ ★ **`file://` そのものを検証したことにはならない。** 被験者は `file://` で開く。
 外部リソース・`fetch`・storage を一切持たないページなら差は出ないはずだが、
@@ -172,11 +232,21 @@ function assertRunHeader_(sh) {
 | ★ **本番シート / ロスターへの書き込み** | 採番が本番に混ざる |
 | 認証情報の入力 | ★ **絶対にやらない**（ユーザー自身に依頼する） |
 
+### ⚠️★ ユーザーの状態を壊さない（**戻せないもの**がある）
+
+| 壊しやすいもの | どうする |
+|---|---|
+| ★ **クリップボード** | ⚠️ **`cmd+c` を試す前に `pbpaste > /tmp/clip.bak` で退避**し、終わったら `pbcopy < /tmp/clip.bak` で戻す。★ 退避せずに上書きすると**永久に戻せない**（実例あり） |
+| 他セッションのタブ / サーバ | ★ **触らない。** 自分が作ったものだけ片付ける（`pkill` は自分のポートに限定する） |
+| 未保存のタブ | ⚠️ `beforeunload` が出ると自動化が**固まる**。`navigate` / `tabs_close_mcp` がタイムアウトしたらこれを疑う。★ **自分で開いたタブ以外を閉じにいかない** |
+
 ### ★ テストしたら必ず後片付けし、**片付けられなかったものを書く**
 
 - 作ったテスト行は消す（消したことを報告に書く）
 - ⚠️ ★ **フォームの回答（＝データ）は勝手に削除しない。** 残っていることを報告する
 - 氏名欄には `TEST-…-delete-me` のように**後から探せる文字列**を入れる
+- ★ **自分が作っていないもの**（他セッションのタブ・サーバ・未コミット差分）は
+  **触らず、報告に「自分のものではない」と書く**
 
 ---
 
@@ -188,7 +258,12 @@ function assertRunHeader_(sh) {
 - ★ **試していないもの**（例:「`file://` そのものでは未確認」「Windows 実機は未実施」
   「新規採番の経路は通っていない」）
 - ★ **代替手段で検証したもの**と、その差がどこに残るか
-- 後片付けの結果（消したもの / 残したもの）
+- 後片付けの結果（消したもの / 残したもの / ★ **戻せなかったもの**）
+- ★ **合否の言い方**: 「要件 N 件中 M 件を実測で確認、未検証 K 件」と数で言う。
+  ⚠️ ★ **未検証が残っているうちは「問題なし」と書かない。**
+- ⚠️ ★ **ブラウザでは原理的に検証できない要件**（他 OS での見え方・実 IME の変換・
+  拡張機能ありの環境）は、**「試していない」に落として明示する**。
+  ★ 「たぶん同じはず」で埋めない。
 
 ---
 
