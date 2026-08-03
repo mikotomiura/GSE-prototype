@@ -77,6 +77,36 @@ G1 は**第 1 週（blind 較正）モード**で回すので、`session_meta` �
 > `buildPostSurveyForm()` を単独実行 → 最後に `buildManagementSheet()` を回す
 > （URL は Script Properties に残るので集約は成功する）。
 
+### （任意）x.gd で回答 URL を短縮する
+
+★ **G1 は対面実施なので必須ではない**（実験者がブックマークから開く）。
+同意フォームだけ**事前にメールで送る**ような場合に効く。
+
+1. x.gd の API キーを取得し、Apps Script エディタで **1 回だけ**次を実行する:
+
+   ```javascript
+   function setXgdKey() {
+     PropertiesService.getScriptProperties().setProperty("XGD_API_KEY", "★ここにキー★");
+   }
+   ```
+
+   ⚠️ ★ **実行したらこの関数を消すこと**（エディタのソースにキーが残るため）。
+   ⚠️ ★ **キーを `.gs` にもこのリポジトリにも書かない。** 本リポジトリは**一時 public にする運用**がある。
+   キーは Script Properties にだけ置く（`.gs` のソースには出ない）。
+
+2. `shortenFormUrls()` を実行する（`setupG1Forms()` からも呼ばれる）。
+   結果は Script Properties の `SHORTURL_*` に入り、`buildManagementSheet()` が
+   **リンク集タブの「回答URL」列**に反映する（短縮が無ければ通常の回答 URL にフォールバック）。
+
+**設計上の約束**:
+
+- ★ **キー未設定なら何もしない**（ログに案内を出して戻る）。壊れない。
+- ★ **冪等**: 既に短縮済みのものは作り直さない。
+  ⚠️ 毎回叩くと**別の短縮 URL が量産され**、配った URL と集計が読む URL がズレる
+  （Phase1 の `FormApp.create` と同じ壊れ方）。作り直すときは `clearShortUrls()` を明示的に実行する。
+- ★ **失敗を黙って飛ばさない**: `status !== 200` ならログに残して**保存しない**
+  （エラー文字列を短縮 URL として配る事故を防ぐ）。
+
 ## 実施当日
 
 - **G1-C**: 開始前に被験者に回答してもらう。

@@ -100,6 +100,9 @@ function setupG1Forms() {
   buildConsentForm();
   buildManipulationCheckForm();
   buildPostSurveyForm();
+  // ★ 短縮 URL は任意。XGD_API_KEY が未設定なら何もしない（実施に支障は無い）。
+  //   管理シートより先に呼ぶ — リンク集タブが短縮 URL を読むため。
+  shortenFormUrls();
   var url = buildManagementSheet();
   Logger.log("🎉 G1 フォーム 3 本 ＋ 管理シート 作成完了: " + url);
   Logger.log(listG1FormUrls());
@@ -115,7 +118,13 @@ function listG1FormUrls() {
       return;
     }
     var o = JSON.parse(raw);
-    out.push(key + ": " + o.label + "\n  回答: " + o.publishedUrl + "\n  編集: " + o.editUrl);
+    var shortUrl = getShortUrl_(props, key);
+    out.push(
+      key + ": " + o.label +
+        "\n  回答: " + o.publishedUrl +
+        (shortUrl ? "\n  短縮: " + shortUrl : "") +
+        "\n  編集: " + o.editUrl
+    );
   });
   return out.join("\n");
 }
@@ -360,6 +369,103 @@ function buildPostSurveyForm() {
 }
 
 // ============================================================
+// x.gd 短縮 URL（任意・Phase1 は手作業で作っていたものを自動化する）
+// ============================================================
+// ★ **API キーを .gs にもリポジトリにも置かない。** 本リポジトリは一時 public にする運用があるため。
+//   キーは Apps Script の **Script Properties** に置く。設定は 1 回だけ、エディタで次を実行する:
+//
+//     function setXgdKey() {
+//       PropertiesService.getScriptProperties().setProperty("XGD_API_KEY", "★ここにキー★");
+//     }
+//     ⚠️ 実行したらこの関数は消すこと（エディタのソースにキーが残る）。
+//
+// ★ キー未設定なら**何もしないで戻る**（壊れない）。短縮は運用の利便であって、
+//   実施に必須ではない（G1 は対面実施で、実験者がブックマークから開く）。
+var XGD_KEY_PROP = "XGD_API_KEY";
+var XGD_ENDPOINT = "https://xgd.io/V1/shorten";
+
+// 短縮 URL を Script Properties に覚えておくキー（リンク集タブが読む）。
+function shortUrlProp_(key) {
+  return "SHORTURL_" + key;
+}
+
+function getShortUrl_(props, key) {
+  return props.getProperty(shortUrlProp_(key)) || "";
+}
+
+/**
+ * ★ 3 フォームの「回答用 URL」を x.gd で短縮し、Script Properties に保存する。
+ *
+ * 冪等: **既に短縮済みのものは作り直さない**（毎回叩くと別の短縮 URL が量産され、
+ * 被験者に配った URL と集計が読む URL がズレる — Phase1 の FormApp.create と同じ壊れ方）。
+ * 作り直したいときは Script Properties の SHORTURL_* を消してから再実行する。
+ */
+function shortenFormUrls() {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty(XGD_KEY_PROP);
+  if (!key) {
+    Logger.log(
+      "ℹ️ " + XGD_KEY_PROP + " が未設定なので短縮しない（実施には支障なし）。\n" +
+        "   設定する場合: PropertiesService.getScriptProperties()" +
+        '.setProperty("' + XGD_KEY_PROP + '", "…") を 1 回だけ実行し、その関数を消すこと。'
+    );
+    return;
+  }
+
+  ["G1_CONSENT", "G1_MCHECK", "G1_SURVEY"].forEach(function (k) {
+    if (getShortUrl_(props, k)) {
+      Logger.log("· " + k + ": 既に短縮済みなので触らない（" + getShortUrl_(props, k) + "）");
+      return;
+    }
+    var raw = props.getProperty("FORMURL_" + k);
+    if (!raw) {
+      Logger.log("· " + k + ": フォーム未生成のため飛ばす");
+      return;
+    }
+    var published = JSON.parse(raw).publishedUrl;
+    if (!published) {
+      Logger.log("· " + k + ": publishedUrl が空のため飛ばす");
+      return;
+    }
+    var url =
+      XGD_ENDPOINT +
+      "?key=" + encodeURIComponent(key) +
+      "&url=" + encodeURIComponent(published) +
+      "&analytics=false";
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    var body = res.getContentText();
+    var json = null;
+    try {
+      json = JSON.parse(body);
+    } catch (e) {
+      /* JSON でない = API 側の異常 */
+    }
+    // ⚠️ ★ 失敗を黙って飛ばさない。status を見ずに body を保存すると
+    //    「短縮したつもりでエラー文字列を配る」事故になる。
+    if (!json || json.status !== 200 || !json.shorturl) {
+      Logger.log(
+        "❌ " + k + ": 短縮に失敗した (HTTP " + res.getResponseCode() + ") — " +
+          (json && json.message ? json.message : body.slice(0, 200))
+      );
+      return;
+    }
+    props.setProperty(shortUrlProp_(k), json.shorturl);
+    Logger.log("✅ " + k + ": " + json.shorturl + "  →  " + published);
+  });
+
+  Logger.log("★ リンク集タブへ反映するには buildManagementSheet() を実行する。");
+}
+
+/** 短縮 URL を捨てて作り直せるようにする（配布前にだけ使うこと）。 */
+function clearShortUrls() {
+  var props = PropertiesService.getScriptProperties();
+  ["G1_CONSENT", "G1_MCHECK", "G1_SURVEY"].forEach(function (k) {
+    props.deleteProperty(shortUrlProp_(k));
+  });
+  Logger.log("🧹 短縮 URL を消した。⚠️ 既に配布済みなら、配った URL は生きたまま残る。");
+}
+
+// ============================================================
 // 運用管理シート（Phase1 の buildManagementSheet と同じ型・★ 2 タブだけ）
 // ============================================================
 // Phase1 は「リンク集 / 参加者ロスター / セッション提出トラッキング / 進捗ダッシュボード」の
@@ -429,15 +535,18 @@ function buildLinksTab_(ss, props) {
         "第1週モードで回すため label_pool が Phase1 の較正と同じになる",
     ],
     ["", "", "", ""],
-    ["フォーム", "タイトル", "編集URL", "回答URL"],
+    ["フォーム", "タイトル", "編集URL", "回答URL（短縮があれば短縮版）"],
   ];
   ["G1_CONSENT", "G1_MCHECK", "G1_SURVEY"].forEach(function (k) {
     var raw = props.getProperty("FORMURL_" + k);
+    // 回答 URL 列は短縮版(x.gd)を優先し、未作成なら publishedUrl にフォールバックする
+    // （Phase1 の buildLinksTab_ と同じ考え方）。
+    var shortUrl = getShortUrl_(props, k);
     if (raw) {
       var o = JSON.parse(raw);
-      rows.push([k + "｜" + o.label, o.title, o.editUrl, o.publishedUrl]);
+      rows.push([k + "｜" + o.label, o.title, o.editUrl, shortUrl || o.publishedUrl]);
     } else {
-      rows.push([k, "（未生成 — setupG1Forms を実行）", "", ""]);
+      rows.push([k, "（未生成 — setupG1Forms を実行）", "", shortUrl]);
     }
   });
   rows.push(["", "", "", ""]);
