@@ -405,7 +405,10 @@ python3 validate_blocks.py     # ★ 実施前は「まだ実施していない�
 
 - [ ] `bash run.sh` が緑（資材・プロトコル・同意・kill switch が揃っている）
 - [ ] `python3 assign.py --subject P0xx --json > blocks/P0xx.json` で割付を保存した
-- [ ] `python3 validate_blocks.py` が緑（実施前は「未記入」の note だけが出る）
+- [ ] `python3 validate_blocks.py` が緑（実施前は「まだ実施していない」note だけが出る）
+      - ⚠️ ★ **前日は `--dataset` を付けない。** 付けると、確証標本では被験者 ID を Phase1 と
+        共有しているため（`§2.0`）、`raw/<P-ID>/` に**既にある Phase1 の較正 NDJSON** を
+        「G1 の転記漏れ」と誤検出しうる。`--dataset` は**実施後**に使う（下記「当日・終了後」）
 - [ ] `python3 assign.py --subject P0xx` で割付表を生成し、記録用紙に転記した
 - [ ] 課題文を印刷し、**ブロック番号と題材 ID だけ**を書いた封筒に入れた（条件は書かない）
 - [ ] 強制比較の用紙（§3.1）を印刷した
@@ -479,6 +482,7 @@ python3 validate_blocks.py     # ★ 実施前は「まだ実施していない�
       その人の Phase1 較正セッションと見分けられなくなる**）
 - [ ] ★ 管理シートの「G1 実施トラッキング」に 1 行記入した（`Form_G1/README.md`）
 - [ ] ★ `python3 forms_to_blocks.py --csv <G1-M回答.csv> --subject P0xx --write`
+      - ⚠️ ★ **P-1 では実行しない**（G1-M を取らないので回答 CSV が存在しない・`§2.8`）
 - [ ] ★★ **`python3 validate_blocks.py --dataset ~/gse-dataset` が緑**
       - **転記ミス**（構成・割付との不一致・NDJSON 名の重複／不在・強制比較の対応）を検出する
       - ★ **`probe_assignment` が 1 行でもあれば赤**になる（`GSE_DISABLE_PROBES` の立て忘れ検出）

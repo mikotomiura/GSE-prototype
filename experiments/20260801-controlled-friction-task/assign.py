@@ -383,6 +383,13 @@ def main() -> int:
     seed = read_seed(pathlib.Path(a.seed_file))
     if a.selftest:
         return selftest(seed)
+    # ★ --pilot と --subject の同時指定を黙って優先解決しない（/cross-review 2026-08-03）。
+    #   下の分岐は --pilot を先に見るので、--subject の値が**捨てられたことに気づけない**。
+    #   このプロジェクトの一貫方針は「黙って無視すると事故になる」である。
+    if a.pilot and a.subject:
+        ap.error("--pilot と --subject は同時に指定できない。"
+                 "P-1（縮小セッション）と確証デザインは別物である（preregistration.md §2.8）")
+        return 2
     if a.pilot:
         try:
             result = pilot_assign(seed, a.pilot_topic, a.pilot_label)
