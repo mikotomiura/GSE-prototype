@@ -40,11 +40,22 @@ PR #84 は main にマージ済み（`7e01edc`）、リリースタグ **`v0.1.2
 
 ### T-1 ビルド成果物を実施端末に入れる
 
-- **`v0.1.22`** の Release から取る。**9 アセットすべて公開済み**:
-  - Windows: `gse-next_0.1.22_x64-setup.exe` / `gse-next.exe` / `gse-package.exe` / `gse-submit.exe` / `gse-unpack.exe`
-  - macOS: `gse-next_0.1.22_aarch64.dmg` / `gse-package` / `gse-submit` / `gse-unpack`
+- **`v0.1.22`** の Release から取る。★ **公開アセットは 5 つ**（`gh release view v0.1.22` で実測・2026-08-03）:
+
+  | 用途 | Windows | macOS |
+  |---|---|---|
+  | **アプリ本体** | ★ **`gse-next.exe`（portable）** | `gse-next_0.1.22_aarch64.dmg` |
+  | 提出ツール | `gse-submit.exe` | ★ 単体では配っていない（`.app` 内蔵を使う） |
+  | 復号（研究者用） | `gse-unpack.exe` | `gse-unpack` |
+
+  > ### ⚠️ ★ 訂正（2026-08-03）— 本文書の旧版は「9 アセット」と書いていたが**誤り**
+  >
+  > `f3785ae` で配布を **Phase1 の実績どおり 5 つに絞り**、公開済みの `v0.1.22` からも
+  > **4 アセットを削除した**（NSIS インストーラ `*-setup.exe` / `gse-package(.exe)` / mac 単体 `gse-submit`）。
+  > → ★ **Windows にインストーラは無い。`gse-next.exe` をそのまま置いて使う。**
+
 - ★ **CI が作った本番バイナリを使う**（開発ビルドで回さない）。
-- ⚠️ **10 セッションは同一バイナリで回す**（`protocol.md §6.1`）。
+- ⚠️ **同一バイナリで回す**（`protocol.md §6.1`）。P-1 は 1 回あたり 4 ブロック。
 
 > ### ⚠️ `v0.1.22` のビルドで起きたこと（次にタグを打つ人向け・**対処済み**）
 >
@@ -62,15 +73,29 @@ PR #84 は main にマージ済み（`7e01edc`）、リリースタグ **`v0.1.2
 
 ### T-2 ★★ `GSE_DISABLE_PROBES=1` を起動手段に固定する
 
+★ **launcher を用意した**（2026-08-03）。手で打たない:
+
+| OS | 使うもの |
+|---|---|
+| macOS | `experiments/20260801-controlled-friction-task/launch-g1-macos.command`（ダブルクリック） |
+| Windows | 同 `launch-g1-windows.bat`（★ `gse-next.exe` と同じフォルダに置く） |
+
+> ### ⚠️ ★ 訂正（2026-08-03）— 本文書の旧版のコマンドは**アプリ名が違って起動しない**
+>
+> `productName` は **`gse-next`** である（`tauri.conf.json` で確認）。`GSE` / `GSE.exe` ではない。
+> さらに ★ **`open -a` は既に起動していると新プロセスを作らず前面に出すだけ**なので、
+> **その回の環境変数が適用されない**。前のインスタンスを必ず終了させる（launcher がやる）。
+> ✅ `VAR=1 open -a <App>` 自体は環境変数を渡す（macOS 26.5.2 で実測確認）。
+> ⚠️ ただし `ps eww` では確認できない（macOS は他プロセスの環境を出さない）。
+
 ```bash
-# macOS
-GSE_DISABLE_PROBES=1 open -a GSE
+# 手で打つ場合（macOS・★ 先に前のインスタンスを終了させること）
+GSE_DISABLE_PROBES=1 open -a gse-next
 # Windows (PowerShell)
-$env:GSE_DISABLE_PROBES=1; Start-Process "GSE.exe"
+$env:GSE_DISABLE_PROBES=1; Start-Process ".\gse-next.exe"
 ```
 
-- ★ **1 ブロック = 1 セッションなのでアプリを 10 回起動する。毎回必要。**
-  **ショートカット / launcher / シェルプロファイルに固定する。手打ちにすると 10 回のうち 1 回抜ける。**
+- ★ **1 ブロック = 1 セッションなのでブロックごとに起動する。毎回必要。**
 - 起動時のログに `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` が出ることを 1 回確認する。
 - ⚠️ **本当の確認は実施後**（`validate_blocks.py --dataset` が `probe_assignment` 行 0 を検査する）。
 
@@ -90,12 +115,21 @@ $env:GSE_DISABLE_PROBES=1; Start-Process "GSE.exe"
 
 ### T-5 割付を作る
 
+★ **P-1 は 2 端末 × 2 題材で回す**（研究者判断 2026-08-03 = G-1 / G-4・`protocol.md §5.1`）。
+
 ```bash
 cd experiments/20260801-controlled-friction-task
-python3 assign.py --pilot                    # P-1 は 4 ブロック（copy / LO / HI / copy）
-python3 assign.py --pilot --json > blocks/PILOT.json
-python3 validate_blocks.py                   # 実施前は「未記入」の note だけが出れば OK
+# 1 回目: Windows・topic01
+python3 assign.py --pilot --pilot-label win --json > blocks/PILOT-win.json
+# 2 回目: macOS・topic02（★ 題材を変える。同じだと 2 回目は内容既知で打鍵が速くなる）
+python3 assign.py --pilot --pilot-label mac --pilot-topic 2 --json > blocks/PILOT-mac.json
+python3 validate_blocks.py                   # ★ 実施前は「まだ実施していない」note だけで緑
 ```
+
+- ★ **Windows を先に**（`ime_dwell_med` が取れる 14 特徴で主たる答えを取る）。
+- ★ **同日なら 60 分以上空ける**か翌日（連続実施の疲労が打鍵量の測定を歪める）。
+- ★ NDJSON は `~/gse-dataset/raw/PILOT-win/` `raw/PILOT-mac/` に置く
+  （★ P-1 は Phase1 の P-ID を使わない。理由は `protocol.md §5.1`）。
 
 ⚠️ ★ **P-1 は確証デザインではない**（`§2.8`）。**判定を一切行わない。**
 既知の逸脱（同一題材を両条件で出す・C(2,1)=2 で検定不能・強制比較の鎖が成立しない）は宣言済み。
@@ -117,6 +151,17 @@ python3 validate_blocks.py                   # 実施前は「未記入」の no
 ★ **どちらもデータが 1 件も無かったため未実行である。** 出力が壊れていたら、
 **その場で解析せず記録だけして持ち帰る**（当日デバッグしない）。
 
+### ⚠️ ★ P-1 で**やらない**こと（`§2.8` の凍結・2026-08-03 追記）
+
+| やらない | 理由 |
+|---|---|
+| ❌ **強制比較（操作チェック・フォーム G1-M）** | HI / LO の対が 1 組しかなく**比較の鎖が成立しない**。`assign.py --pilot` の出力も全ブロック `manipulation_check: False` |
+| ❌ **判定（§3）・並べ替え検定** | C(2,1)=2 通りで **p<0.05 に到達できない** |
+
+★ **P-1 で使うフォームは G1-C（同意）と G1-S（終了後）だけ**である。
+⚠️ `protocol.md §6` の当日チェックリストは 10 ブロック用なので、
+**そのまま追うと G1-M を取ってしまう**（`§6` 冒頭に P-1 用の但し書きを入れた）。
+
 ### 実施当日に必ずやること
 
 - [ ] `HMM_VERSION` を刻む（`protocol.md §6.1`：開始前に `env.md`、解析前に `config.json`）
@@ -124,6 +169,8 @@ python3 validate_blocks.py                   # 実施前は「未記入」の no
       **文字数と NDJSON 名を記録用紙に転記** → パッドを消去
 - [ ] ★ **自己マーカー hotkey（Ctrl/Cmd+Shift+Alt+M）を押さない**（kill switch の対象外）
 - [ ] 終了後アンケート（G1-S）に答える
+- [ ] ★ **デブリーフ資料を渡す**（`debrief.md` → `handouts/G1_実験の説明_終了後.docx`・G-6）
+      ⚠️ **G1-S の後に渡す**（条件を明かす文書なので先に見せない）
 - [ ] ★★ **NDJSON を gse-dataset へ送るとき「G1 のセッション」と明記する**
       ⚠️ **P-ID を Phase1 と共有しているので、ID では Phase1 の較正セッションと区別できない**
       （`data.md` の B-4）。**当日中にやる。後回しにしない。**

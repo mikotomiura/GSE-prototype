@@ -17,6 +17,45 @@
 | ★ 被験者の入力先 | **`writing-pad.html`**（`preregistration.md §2.11`）。ブラウザとプロファイル（拡張なし）を記録する | TBD |
 | `gse-replay` | ★ **非該当**。`analyze.py` は NDJSON を直接集計し、`gse-replay` も HMM も通さない | — |
 
+## ★★ P-1 の実施記録（実施当日・**最初のブロックより前**に埋める）
+
+`protocol.md §6.1` の刻印手順に従う。⚠️ **時刻は書かない**（本 repo は一時 public 化の運用がある）。
+★ **2 回**回す（`protocol.md §5.1` = 研究者判断 G-1 / G-4）。
+
+### P-1 1 回目
+
+| 項目 | 記入 |
+|---|---|
+| 実施 OS | **Windows 11** ／ ビルド番号: `______` |
+| 題材 | **topic01**（`assign.py --pilot`） |
+| 割付ファイル | `blocks/PILOT-win.json` |
+| アプリのビルド | タグ `v0.1.22` ／ コミット `______`（★ 4 ブロックとも同一バイナリ） |
+| `HMM_VERSION` | `______`（★ 実施に使う**そのビルド**の値。参考: `main` の `engine.rs` は `0.3.0`） |
+| `GSE_DISABLE_PROBES` | `1`（★ launcher `launch-g1-windows.bat` 経由） |
+| 起動ログの確認 | ☐ `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` を確認した |
+| 週の選択 | ☐ **第 1 週（blind 較正）**（★ 既定値。触っていなければ OK） |
+| 入力先 | `writing-pad.html` ／ ブラウザ: `______` ／ プロファイル: 拡張なし ☐ |
+| 実施日 | `______`（★ 時刻は書かない） |
+
+### P-1 2 回目
+
+| 項目 | 記入 |
+|---|---|
+| 実施 OS | **macOS** ／ バージョン: `______` |
+| 題材 | **topic02**（`assign.py --pilot --pilot-topic 2`） |
+| 割付ファイル | `blocks/PILOT-mac.json` |
+| アプリのビルド | タグ `v0.1.22` ／ コミット `______` |
+| `HMM_VERSION` | `______` |
+| `GSE_DISABLE_PROBES` | `1`（★ launcher `launch-g1-macos.command` 経由） |
+| 起動ログの確認 | ☐ 確認した |
+| 週の選択 | ☐ **第 1 週（blind 較正）** |
+| 入力先 | `writing-pad.html` ／ ブラウザ: `______` ／ プロファイル: 拡張なし ☐ |
+| 実施日 | `______` ／ 1 回目からの間隔: `______`（★ **60 分以上空ける**か翌日） |
+| ⚠️ 既知の欠測 | `ime_dwell_med` が構造的に欠測 → **実質 13 特徴**（`§5.1`） |
+
+⚠️ ★ **解析の前**に `config.json` の `reproducibility.hmm_version` を同じ値に書き換えてコミットする
+（`protocol.md §6.1`）。現在は `TO_BE_STAMPED_AT_EXECUTION` のままである。
+
 ## 依存の少なさについて
 
 `analyze.py` は標準ライブラリのみで動く（`json` / `statistics` / `math` / `itertools` / `pathlib`）。
