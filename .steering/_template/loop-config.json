@@ -1,0 +1,21 @@
+{
+  "task": "add-user-auth",
+  "mode": "A",
+  "verify": { "test": "pytest -q", "typecheck": "mypy .", "lint": "ruff check ." },
+  "ci_command": "make ci",
+  "scope_test_template": "pytest -q {paths}",
+  "resource_isolation": "per-worktree",
+  "base_branch": null,
+  "budget": { "max_attempts": 6, "no_progress_threshold": 4, "token_ceiling": 40000000, "parallel": 3 },
+  "events_path": "<ABSOLUTE>/.steering/20260701-add-user-auth/_loop-events.jsonl",
+  "acceptance_template": "bash {issue_dir}/acceptance.sh",
+  "headless": {
+    "max_turns": 30,
+    "max_budget_usd": 5.0,
+    "permission_mode": "acceptEdits",
+    "model": "sonnet",
+    "watchdog_model": "haiku",
+    "allowed_tools": "Read,Write,Edit,MultiEdit,Glob,Grep,Task,TodoWrite,Bash(uv run pytest:*),Bash(uv run ruff:*),Bash(uv run mypy:*),Bash(pytest:*),Bash(ruff:*),Bash(mypy:*),Bash(npm test:*),Bash(npm run:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),Bash(git add:*),Bash(git commit:*),Bash(echo:*),Bash(printf:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(jq:*),Bash(test:*),Bash(mkdir:*),Bash(touch:*),Bash(diff:*),Bash(basename:*),Bash(dirname:*),Bash(pwd:*),Bash(date:*),Bash(true:*),Bash(cd:*)",
+    "fingerprint_cmd": null
+  }
+}

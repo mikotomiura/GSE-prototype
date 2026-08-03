@@ -204,6 +204,28 @@ impl ProbeConfig {
     }
 }
 
+/// ★ プローブの kill switch (純ロジック・G1 統制タスク実験の B-1)。
+///
+/// `experiments/20260801-controlled-friction-task/preregistration.md §2.6` は
+/// 「**アプリ内プローブを使わない**」と凍結している (主観は紙/外部フォームの強制比較で取る)。
+/// ところが G1 は「1 ブロック = 1 セッション」でアプリを 10 回起動し直すため、スケジューラは
+/// **ブロックごとに抽選し直す**。5 分ブロックあたりの発火確率は設定からの計算で 28% (配備
+/// プロファイル) / 57% (較正プロファイル) であり、★ **介入を止められる唯一の起動モード
+/// (第 1 週 blind 較正) がプローブを最も密にする**。起動モードの選択では止まらないことは
+/// 調査済み (`.steering/20260802-g1-execution-prep/blockers.md` B-1)。
+///
+/// そこで **env による明示的な無効化**を 1 本だけ入れる。既定 (未設定) では**何も変わらない**ので
+/// Phase1 / Phase2 の通常運用・リプレイ parity・HMM 挙動には一切影響しない。消えるのは
+/// `probe_assignment` / `probe_triggered` / `realtime_label` の 3 行だけであり、G1 の特徴量
+/// (FS-A = `feat` 行 / FS-B = `key`・`paste`・`ime_shadow` 行) は不変である。
+///
+/// 受け付ける真値は `GSE_DEBUG` と同じく **`"1"` のみ**とする (曖昧な真値解釈を持ち込まない)。
+/// 事故は「止めたつもりで止まっていない」側で起きるが、それは実施後に NDJSON から機械的に
+/// 検出できる (`validate_blocks.py --dataset` が `probe_assignment` 行 0 を検査する)。
+pub fn probes_disabled_by_env(value: Option<&str>) -> bool {
+    matches!(value, Some("1"))
+}
+
 /// 新セッション検出時のプローブスケジューラ初期化判定 (純ロジック・M0 D1)。
 ///
 /// lib.rs のスケジューラスレッドが Atomic から読んだ値を渡す。session_meta の condition は
@@ -695,6 +717,29 @@ mod tests {
                 meta_fallback: true
             }
         );
+    }
+
+    /// ★ G1 (B-1) の kill switch: **既定 (未設定) では絶対に無効化しない**。
+    /// ここが緩むと Phase1 / Phase2 の通常運用でプローブが黙って全滅するため、
+    /// 「未設定」「空文字」「`"0"`」「`"true"`」を**すべて false** に固定して回帰テストにする。
+    #[test]
+    fn probes_kill_switch_is_off_unless_exactly_one() {
+        assert!(
+            !probes_disabled_by_env(None),
+            "未設定で無効化してはならない"
+        );
+        assert!(!probes_disabled_by_env(Some("")));
+        assert!(!probes_disabled_by_env(Some("0")));
+        assert!(!probes_disabled_by_env(Some("true")));
+        assert!(!probes_disabled_by_env(Some("yes")));
+        assert!(!probes_disabled_by_env(Some(" 1")));
+        assert!(!probes_disabled_by_env(Some("1 ")));
+    }
+
+    /// ★ `"1"` のときだけ無効化する (G1 の実施時にだけ立てる)。
+    #[test]
+    fn probes_kill_switch_engages_on_exactly_one() {
+        assert!(probes_disabled_by_env(Some("1")));
     }
 
     #[test]

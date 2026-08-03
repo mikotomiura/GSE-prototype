@@ -24,7 +24,9 @@ ActiveTyping / PostBurstPause / CorrectionAfterPause / ActiveCorrectionLoop`（`
 support consent / Monk Mode / current active operation / prior annoyance / task kind / evidence quality。
 
 現行実装は **cooldown + daily_cap + recent_dismiss + idle gate の合成**（統合 receptivity スコアは未実装）。
-統合スコア化 vs 分解維持は **ADR-007**。⚠️ `support_consent` は行動指標でなく**自己申告**（[V43] 逆風）のため、
+統合スコア化 vs 分解維持は **ADR-007**。
+⚠️ **Receptivity は Layer 5 の概念であり、Layer 4 の潜在状態に置かない**（入力がシステム状態と履歴であって
+潜在状態からの放出ではないため、放出モデルが書けない）。**ADR-009 でこの層の所属を再確認済み**。⚠️ `support_consent` は行動指標でなく**自己申告**（[V43] 逆風）のため、
 receptivity の**主軸に据えない**（`gse-v2-overview.md §5`）。
 
 ### Dismiss reason（設計書 §3.6・現行 `DismissReason`）

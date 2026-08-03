@@ -61,6 +61,16 @@
 | `git-workflow` | コミット / ブランチ / バージョン / `.steering/` 記録 |
 | `physical-anchor` | Lv3/Lv4 Physical Anchor / Flutter 連携 |
 | `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
+| `implementation-workflow` | 実装タスクの共通骨格 (調査→設計→実装→テスト→レビュー) |
+
+### 研究トラック Skill (docs/ の研究文書・`experiments/` を触る時)
+
+| Skill | いつ参照するか |
+|---|---|
+| `citation-ssot` | 理論・手法・先行研究に依拠する記述を書く (`[Pn]`/`[Vn]` 採番・append-only) |
+| `literature-card` | 論文/文献を精読してカード化する (`docs/literature/`・落合フォーマット) |
+| `reproducibility-discipline` | `experiments/` 配下・較正スモーク・seed/lockfile/HMM_VERSION 固定 |
+| `empirical-prompt-tuning` | Skill / コマンド / プロンプトを新規作成・大幅改訂した直後の検証 |
 
 ## 作業記録の運用ルール (重要)
 
@@ -110,8 +120,29 @@ Hook は 3 層で動作し、全層の出力がユーザーに明示される (W
 
 ## 利用可能なコマンド / サブエージェント
 
-- **コマンド**: `/start-task` `/add-feature` `/fix-bug` `/refactor` `/reimagine`
-  `/review-changes` `/smart-compact` `/finish-task` (詳細は `.claude/commands/`)
+- **コマンド**: 実装=`/start-task` `/add-feature` `/fix-bug` `/refactor` `/reimagine`
+  `/review-changes` `/cross-review` `/smart-compact` `/finish-task` /
+  研究=`/literature-review` (サーヴェイ 1 ラウンド) (詳細は `.claude/commands/`)
 - **サブエージェント**: 収集=`file-finder` `dependency-checker` `impact-analyzer` /
-  レビュー=`code-reviewer` `test-analyzer` `security-checker` /
+  レビュー=`code-reviewer` `test-analyzer` `security-checker` `cross-reviewer` /
   実行=`test-runner` `build-executor` `log-analyzer` (詳細は `.claude/agents/`)
+
+<!-- loop:begin -->
+## Loop Engineering (issue 単位ループ)
+
+複数 issue に割って自律ループで回す作業は、**必ず** `docs/loop-engineering.md` を Read してから
+始めてください (用語 / Done・Stop / budget / events 契約 / モデル割当の単一 SSOT)。
+
+- **入口**: `/start-task` の grill でゴールを確定 → `to-prd` → `to-issues` で縦切り issue に分解する。
+  曖昧なゴールのままループを回さない (間違った方向に効率よく走るだけ)。
+- **分解は Opus**: issue-slicing は切り方を誤ると全ループが無駄になるため Opus で行う。
+  7 基準 (縦切り / 粒度 / Allowed Files 非交差 / AC↔test / verify_level / DAG / 単独 merge 可) は
+  `docs/loop-engineering.md` を参照。
+- **セッション境界**: issue 分解と loop 実行は **別セッション**。分解が終わったら `/clear` し、
+  新セッションで実行を始める。設計文脈を実行に持ち込まない。
+  *issue ファイルだけを読んで実行が成立しないなら、分解が失敗している。*
+- **実行**: C(無人)=`bash scripts/loop-run.sh <task>` / B=新セッションで `/model sonnet` → `/loop-orchestrate` /
+  A=端末ごとに `scripts/loop-spawn.sh <id>` → `/loop-issue <id>` (GSE は A+B+C を採用・L5 で実体化)。
+- **監視**: `/loop-status` が board の単一書き手。worker は events に append のみ。
+- **done を自己申告で信じない**: `issue_done` は必ず `loop-watchdog` の客観再検証を通す。
+<!-- loop:end -->

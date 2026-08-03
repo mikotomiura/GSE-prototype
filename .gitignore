@@ -36,7 +36,7 @@ src-tauri/target/
 
 #個人用ファイル
 issue.md
-.claude/commands/commands_setup
+.claude/commands/commands_setup_research_inloop
 docs/[提案プロジェクト詳細資料]GSE_proposal.docx.pdf
 docs/[提案プロジェクト補足資料]GSE技術設計書.docx.pdf
 .idea/
@@ -76,3 +76,6 @@ gse_*.ndjson
 experiments/**/raw/
 experiments/**/*.ndjson
 experiments/**/*.jsonl
+
+# G1 配布用 .docx（markdown から再生成できる派生物）
+experiments/*/handouts/

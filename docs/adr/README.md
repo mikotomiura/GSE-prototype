@@ -25,3 +25,11 @@ Migration** を持つ。SSOT のアーキテクチャ概要は `docs/architectur
 | [ADR-005](ADR-005-event-envelope-versioning.md) | Event Envelope schema versioning | Proposed | Epic 2/5 |
 | [**ADR-006**](ADR-006-task-kind-beta-wiring.md) | **task_kind → β baseline 配線 or IME 代理を正とするか** | **Accepted（枠組み C「分離」＋下位決定 #2/#3 確定 2026-07-24）・実装は Phase1 後** | Epic 2 分岐点 |
 | [ADR-007](ADR-007-receptivity-decomposed-vs-unified.md) | receptivity 統合スコア化 or 分解維持 | Accepted（分解維持を推奨） | Epic 3 |
+| [ADR-008](ADR-008-online-learning-boundary.md) | オンライン学習の境界（PersonalizationStore / OnlineUpdater / ContextBuilder・PreReg-5 との両立基準） | Proposed | Epic 2+ / Phase1 後 |
+| [ADR-009](ADR-009-recovery-risk-axis-and-latent-state.md) | X 軸を `self_directed_recovery_risk` へ再定義し、潜在状態の数を決めない | Proposed | Epic 2+ / Phase1 後 |
+| [ADR-010](ADR-010-task-scope-gating.md) | 「どの head も当てはまらない」— head 相対 `scope_fit` / 宣言と観測の役割分離（**ADR-006 の拡張であって改訂ではない**） | Proposed | Epic 2+ / Phase1 後 |
+
+> ADR-008 / ADR-009 は一体で読む。背景・段階計画・評価指標・反証ゲートは
+> `docs/architecture/personalization-and-online-learning.md`（統合設計文書）を参照。
+> ADR-010 は ADR-006 と一体で読む。較正プロトコル・検出器の構造・定数の推定手続きは
+> `docs/architecture/task-adaptation-and-scope-gating.md`（設計本体）を参照。

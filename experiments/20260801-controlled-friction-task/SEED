@@ -1,0 +1,6 @@
+# 乱数 seed（reproducibility-discipline ルール 2）
+# 用途: ブロック順序（ABBA 釣り合わせ後の系列）の被験者ごとの無作為化
+# ★ 対象は G1 の 8 ブロック（HI4/LO4）のみ。positive control の copy 2 ブロックは
+#    位置固定（先頭・末尾）であり無作為化しない (preregistration.md §2.3)。
+# ⚠️ 実験は未実施。この値は設計時に固定したものであり、実施時に変更しない。
+BLOCK_ORDER_SEED=20260801

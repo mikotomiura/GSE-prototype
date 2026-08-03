@@ -1,0 +1,700 @@
+{
+  "experiment": "20260802-task-scope-detector",
+  "preregistered": "preregistration.md",
+  "seed": 20260802,
+  "n_sessions_included": 38,
+  "n_sessions_excluded": 2,
+  "excluded_sessions": [
+    {
+      "pid": "P013",
+      "session": "P013-s02",
+      "n_press": 108
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s05",
+      "n_press": 9
+    }
+  ],
+  "metrics": [
+    "keys_per_min",
+    "iki_p50",
+    "iki_p90",
+    "long_pause_rate_10s",
+    "bs_rate",
+    "enter_rate"
+  ],
+  "robust_center_scale": {
+    "keys_per_min": {
+      "median": 62.8385,
+      "scale": 34.8233
+    },
+    "iki_p50": {
+      "median": 169.0,
+      "scale": 20.7564
+    },
+    "iki_p90": {
+      "median": 714.5,
+      "scale": 215.7183
+    },
+    "long_pause_rate_10s": {
+      "median": 0.0112,
+      "scale": 0.0056
+    },
+    "bs_rate": {
+      "median": 0.0769,
+      "scale": 0.0223
+    },
+    "enter_rate": {
+      "median": 0.0941,
+      "scale": 0.0198
+    }
+  },
+  "per_participant_median": {
+    "P010": {
+      "keys_per_min": 65.1165,
+      "iki_p50": 176.0,
+      "iki_p90": 656.0,
+      "long_pause_rate_10s": 0.012,
+      "bs_rate": 0.0875,
+      "enter_rate": 0.0772,
+      "n_sessions": 12
+    },
+    "P011": {
+      "keys_per_min": 252.034,
+      "iki_p50": 145.0,
+      "iki_p90": 354.0,
+      "long_pause_rate_10s": 0.0012,
+      "bs_rate": 0.0905,
+      "enter_rate": 0.1036,
+      "n_sessions": 5
+    },
+    "P012": {
+      "keys_per_min": 64.076,
+      "iki_p50": 142.0,
+      "iki_p90": 743.0,
+      "long_pause_rate_10s": 0.0108,
+      "bs_rate": 0.0677,
+      "enter_rate": 0.104,
+      "n_sessions": 7
+    },
+    "P013": {
+      "keys_per_min": 21.176,
+      "iki_p50": 160.0,
+      "iki_p90": 856.0,
+      "long_pause_rate_10s": 0.014,
+      "bs_rate": 0.042,
+      "enter_rate": 0.0495,
+      "n_sessions": 9
+    },
+    "P014": {
+      "keys_per_min": 32.436,
+      "iki_p50": 185.0,
+      "iki_p90": 711.0,
+      "long_pause_rate_10s": 0.0134,
+      "bs_rate": 0.078,
+      "enter_rate": 0.1109,
+      "n_sessions": 5
+    }
+  },
+  "outliers_z_gt_3": [
+    {
+      "pid": "P011",
+      "session": "P011-s01",
+      "z": {
+        "keys_per_min": 6.19
+      }
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s03",
+      "z": {
+        "keys_per_min": 5.43
+      }
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s04",
+      "z": {
+        "keys_per_min": 6.11
+      }
+    },
+    {
+      "pid": "P011",
+      "session": "P011-s05",
+      "z": {
+        "keys_per_min": 4.36
+      }
+    },
+    {
+      "pid": "P012",
+      "session": "P012-s01",
+      "z": {
+        "long_pause_rate_10s": 3.29
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s01",
+      "z": {
+        "long_pause_rate_10s": 3.97
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s03",
+      "z": {
+        "iki_p50": 15.37,
+        "enter_rate": -3.98
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s05",
+      "z": {
+        "long_pause_rate_10s": 3.43
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s07",
+      "z": {
+        "enter_rate": -3.87
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s08",
+      "z": {
+        "bs_rate": -3.41,
+        "enter_rate": -4.62
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s09",
+      "z": {
+        "enter_rate": -3.23
+      }
+    },
+    {
+      "pid": "P013",
+      "session": "P013-s10",
+      "z": {
+        "long_pause_rate_10s": 3.01
+      }
+    },
+    {
+      "pid": "P014",
+      "session": "P014-s01",
+      "z": {
+        "enter_rate": 3.1
+      }
+    }
+  ],
+  "expected_outlier_cells_by_chance": 0.62,
+  "permutation_test": {
+    "statistic": "mean_within_pid_distance / mean_between_pid_distance",
+    "observed": 0.617,
+    "n_permutations": 10000,
+    "p_value": 0.0001,
+    "alpha": 0.05,
+    "significant": true
+  },
+  "sessions": [
+    {
+      "n_press": 2980,
+      "task_kind": "argumentative",
+      "span_min": 45.49,
+      "keys_per_min": 65.515,
+      "iki_p50": 182.0,
+      "iki_p90": 1080.0,
+      "long_pause_rate_10s": 0.014099,
+      "bs_rate": 0.125839,
+      "enter_rate": 0.079195,
+      "pid": "P010",
+      "session": "P010-s01"
+    },
+    {
+      "n_press": 2752,
+      "task_kind": "argumentative",
+      "span_min": 41.84,
+      "keys_per_min": 65.774,
+      "iki_p50": 176.0,
+      "iki_p90": 952.0,
+      "long_pause_rate_10s": 0.014904,
+      "bs_rate": 0.116642,
+      "enter_rate": 0.075581,
+      "pid": "P010",
+      "session": "P010-s02"
+    },
+    {
+      "n_press": 2946,
+      "task_kind": "argumentative",
+      "span_min": 52.12,
+      "keys_per_min": 56.518,
+      "iki_p50": 169.0,
+      "iki_p90": 578.0,
+      "long_pause_rate_10s": 0.013922,
+      "bs_rate": 0.073999,
+      "enter_rate": 0.069246,
+      "pid": "P010",
+      "session": "P010-s03"
+    },
+    {
+      "n_press": 7173,
+      "task_kind": "argumentative",
+      "span_min": 60.13,
+      "keys_per_min": 119.289,
+      "iki_p50": 176.0,
+      "iki_p90": 511.0,
+      "long_pause_rate_10s": 0.005717,
+      "bs_rate": 0.075561,
+      "enter_rate": 0.066221,
+      "pid": "P010",
+      "session": "P010-s04"
+    },
+    {
+      "n_press": 4228,
+      "task_kind": "argumentative",
+      "span_min": 65.13,
+      "keys_per_min": 64.912,
+      "iki_p50": 176.0,
+      "iki_p90": 801.0,
+      "long_pause_rate_10s": 0.010173,
+      "bs_rate": 0.090823,
+      "enter_rate": 0.082545,
+      "pid": "P010",
+      "session": "P010-s05"
+    },
+    {
+      "n_press": 4875,
+      "task_kind": "argumentative",
+      "span_min": 74.63,
+      "keys_per_min": 65.321,
+      "iki_p50": 169.0,
+      "iki_p90": 848.0,
+      "long_pause_rate_10s": 0.011695,
+      "bs_rate": 0.076718,
+      "enter_rate": 0.074667,
+      "pid": "P010",
+      "session": "P010-s06"
+    },
+    {
+      "n_press": 5416,
+      "task_kind": "argumentative",
+      "span_min": 85.3,
+      "keys_per_min": 63.492,
+      "iki_p50": 176.0,
+      "iki_p90": 632.0,
+      "long_pause_rate_10s": 0.009234,
+      "bs_rate": 0.105613,
+      "enter_rate": 0.073855,
+      "pid": "P010",
+      "session": "P010-s07"
+    },
+    {
+      "n_press": 3349,
+      "task_kind": "argumentative",
+      "span_min": 47.51,
+      "keys_per_min": 70.491,
+      "iki_p50": 176.0,
+      "iki_p90": 545.0,
+      "long_pause_rate_10s": 0.007168,
+      "bs_rate": 0.084503,
+      "enter_rate": 0.067184,
+      "pid": "P010",
+      "session": "P010-s08"
+    },
+    {
+      "n_press": 2958,
+      "task_kind": "argumentative",
+      "span_min": 56.55,
+      "keys_per_min": 52.311,
+      "iki_p50": 168.0,
+      "iki_p90": 648.0,
+      "long_pause_rate_10s": 0.013189,
+      "bs_rate": 0.107843,
+      "enter_rate": 0.081812,
+      "pid": "P010",
+      "session": "P010-s09"
+    },
+    {
+      "n_press": 6180,
+      "task_kind": "argumentative",
+      "span_min": 93.88,
+      "keys_per_min": 65.831,
+      "iki_p50": 176.0,
+      "iki_p90": 664.0,
+      "long_pause_rate_10s": 0.008577,
+      "bs_rate": 0.070874,
+      "enter_rate": 0.088188,
+      "pid": "P010",
+      "session": "P010-s10"
+    },
+    {
+      "n_press": 8617,
+      "task_kind": "argumentative",
+      "span_min": 138.57,
+      "keys_per_min": 62.185,
+      "iki_p50": 168.0,
+      "iki_p90": 505.0,
+      "long_pause_rate_10s": 0.012303,
+      "bs_rate": 0.090403,
+      "enter_rate": 0.078798,
+      "pid": "P010",
+      "session": "P010-s11"
+    },
+    {
+      "n_press": 3139,
+      "task_kind": "argumentative",
+      "span_min": 50.8,
+      "keys_per_min": 61.795,
+      "iki_p50": 184.0,
+      "iki_p90": 745.0,
+      "long_pause_rate_10s": 0.012747,
+      "bs_rate": 0.071042,
+      "enter_rate": 0.103855,
+      "pid": "P010",
+      "session": "P010-s12"
+    },
+    {
+      "n_press": 8357,
+      "task_kind": "argumentative",
+      "span_min": 30.02,
+      "keys_per_min": 278.409,
+      "iki_p50": 145.0,
+      "iki_p90": 295.0,
+      "long_pause_rate_10s": 0.001316,
+      "bs_rate": 0.080412,
+      "enter_rate": 0.103626,
+      "pid": "P011",
+      "session": "P011-s01"
+    },
+    {
+      "n_press": 5213,
+      "task_kind": "argumentative",
+      "span_min": 31.33,
+      "keys_per_min": 166.369,
+      "iki_p50": 150.0,
+      "iki_p90": 522.0,
+      "long_pause_rate_10s": 0.003262,
+      "bs_rate": 0.090543,
+      "enter_rate": 0.110685,
+      "pid": "P011",
+      "session": "P011-s02"
+    },
+    {
+      "n_press": 6359,
+      "task_kind": "argumentative",
+      "span_min": 25.23,
+      "keys_per_min": 252.034,
+      "iki_p50": 144.0,
+      "iki_p90": 354.0,
+      "long_pause_rate_10s": 0.000629,
+      "bs_rate": 0.094669,
+      "enter_rate": 0.094983,
+      "pid": "P011",
+      "session": "P011-s03"
+    },
+    {
+      "n_press": 5756,
+      "task_kind": "argumentative",
+      "span_min": 20.87,
+      "keys_per_min": 275.782,
+      "iki_p50": 147.0,
+      "iki_p90": 338.0,
+      "long_pause_rate_10s": 0.0,
+      "bs_rate": 0.097985,
+      "enter_rate": 0.093294,
+      "pid": "P011",
+      "session": "P011-s04"
+    },
+    {
+      "n_press": 6562,
+      "task_kind": "argumentative",
+      "span_min": 30.55,
+      "keys_per_min": 214.778,
+      "iki_p50": 144.0,
+      "iki_p90": 388.0,
+      "long_pause_rate_10s": 0.001219,
+      "bs_rate": 0.086102,
+      "enter_rate": 0.108504,
+      "pid": "P011",
+      "session": "P011-s05"
+    },
+    {
+      "n_press": 845,
+      "task_kind": "argumentative",
+      "span_min": 20.1,
+      "keys_per_min": 42.041,
+      "iki_p50": 174.0,
+      "iki_p90": 1000.0,
+      "long_pause_rate_10s": 0.029621,
+      "bs_rate": 0.105325,
+      "enter_rate": 0.104142,
+      "pid": "P012",
+      "session": "P012-s01"
+    },
+    {
+      "n_press": 1819,
+      "task_kind": "argumentative",
+      "span_min": 18.3,
+      "keys_per_min": 99.409,
+      "iki_p50": 142.0,
+      "iki_p90": 718.0,
+      "long_pause_rate_10s": 0.007701,
+      "bs_rate": 0.057174,
+      "enter_rate": 0.105553,
+      "pid": "P012",
+      "session": "P012-s02"
+    },
+    {
+      "n_press": 4354,
+      "task_kind": "argumentative",
+      "span_min": 58.52,
+      "keys_per_min": 74.405,
+      "iki_p50": 141.0,
+      "iki_p90": 743.0,
+      "long_pause_rate_10s": 0.010797,
+      "bs_rate": 0.070051,
+      "enter_rate": 0.104042,
+      "pid": "P012",
+      "session": "P012-s03"
+    },
+    {
+      "n_press": 1987,
+      "task_kind": "argumentative",
+      "span_min": 31.01,
+      "keys_per_min": 64.076,
+      "iki_p50": 160.0,
+      "iki_p90": 887.0,
+      "long_pause_rate_10s": 0.012588,
+      "bs_rate": 0.053347,
+      "enter_rate": 0.111726,
+      "pid": "P012",
+      "session": "P012-s04"
+    },
+    {
+      "n_press": 3296,
+      "task_kind": "argumentative",
+      "span_min": 88.67,
+      "keys_per_min": 37.17,
+      "iki_p50": 140.0,
+      "iki_p90": 683.0,
+      "long_pause_rate_10s": 0.010319,
+      "bs_rate": 0.067658,
+      "enter_rate": 0.097391,
+      "pid": "P012",
+      "session": "P012-s05"
+    },
+    {
+      "n_press": 2695,
+      "task_kind": "argumentative",
+      "span_min": 30.4,
+      "keys_per_min": 88.662,
+      "iki_p50": 128.0,
+      "iki_p90": 524.0,
+      "long_pause_rate_10s": 0.005197,
+      "bs_rate": 0.068275,
+      "enter_rate": 0.096475,
+      "pid": "P012",
+      "session": "P012-s06"
+    },
+    {
+      "n_press": 1140,
+      "task_kind": "argumentative",
+      "span_min": 41.35,
+      "keys_per_min": 27.566,
+      "iki_p50": 152.0,
+      "iki_p90": 976.0,
+      "long_pause_rate_10s": 0.021071,
+      "bs_rate": 0.066667,
+      "enter_rate": 0.092982,
+      "pid": "P012",
+      "session": "P012-s07"
+    },
+    {
+      "n_press": 600,
+      "task_kind": "argumentative",
+      "span_min": 41.65,
+      "keys_per_min": 14.407,
+      "iki_p50": 182.0,
+      "iki_p90": 1080.0,
+      "long_pause_rate_10s": 0.033389,
+      "bs_rate": 0.05,
+      "enter_rate": 0.098333,
+      "pid": "P013",
+      "session": "P013-s01"
+    },
+    {
+      "n_press": 1046,
+      "task_kind": "argumentative",
+      "span_min": 15.43,
+      "keys_per_min": 67.788,
+      "iki_p50": 488.0,
+      "iki_p90": 1359.0,
+      "long_pause_rate_10s": 0.003828,
+      "bs_rate": 0.013384,
+      "enter_rate": 0.015296,
+      "pid": "P013",
+      "session": "P013-s03"
+    },
+    {
+      "n_press": 973,
+      "task_kind": "argumentative",
+      "span_min": 56.07,
+      "keys_per_min": 17.353,
+      "iki_p50": 175.0,
+      "iki_p90": 761.0,
+      "long_pause_rate_10s": 0.021605,
+      "bs_rate": 0.077081,
+      "enter_rate": 0.097636,
+      "pid": "P013",
+      "session": "P013-s04"
+    },
+    {
+      "n_press": 560,
+      "task_kind": "argumentative",
+      "span_min": 26.74,
+      "keys_per_min": 20.943,
+      "iki_p50": 199.0,
+      "iki_p90": 1120.0,
+      "long_pause_rate_10s": 0.030411,
+      "bs_rate": 0.085714,
+      "enter_rate": 0.101786,
+      "pid": "P013",
+      "session": "P013-s05"
+    },
+    {
+      "n_press": 500,
+      "task_kind": "argumentative",
+      "span_min": 23.61,
+      "keys_per_min": 21.176,
+      "iki_p50": 145.0,
+      "iki_p90": 657.0,
+      "long_pause_rate_10s": 0.014028,
+      "bs_rate": 0.042,
+      "enter_rate": 0.088,
+      "pid": "P013",
+      "session": "P013-s06"
+    },
+    {
+      "n_press": 1764,
+      "task_kind": "argumentative",
+      "span_min": 37.86,
+      "keys_per_min": 46.597,
+      "iki_p50": 159.0,
+      "iki_p90": 791.0,
+      "long_pause_rate_10s": 0.007374,
+      "bs_rate": 0.010771,
+      "enter_rate": 0.017574,
+      "pid": "P013",
+      "session": "P013-s07"
+    },
+    {
+      "n_press": 1436,
+      "task_kind": "argumentative",
+      "span_min": 40.31,
+      "keys_per_min": 35.624,
+      "iki_p50": 160.0,
+      "iki_p90": 856.0,
+      "long_pause_rate_10s": 0.004878,
+      "bs_rate": 0.000696,
+      "enter_rate": 0.002786,
+      "pid": "P013",
+      "session": "P013-s08"
+    },
+    {
+      "n_press": 595,
+      "task_kind": "argumentative",
+      "span_min": 10.32,
+      "keys_per_min": 57.648,
+      "iki_p50": 136.0,
+      "iki_p90": 488.0,
+      "long_pause_rate_10s": 0.011785,
+      "bs_rate": 0.020168,
+      "enter_rate": 0.030252,
+      "pid": "P013",
+      "session": "P013-s09"
+    },
+    {
+      "n_press": 1071,
+      "task_kind": "argumentative",
+      "span_min": 52.09,
+      "keys_per_min": 20.562,
+      "iki_p50": 153.0,
+      "iki_p90": 864.0,
+      "long_pause_rate_10s": 0.028037,
+      "bs_rate": 0.109244,
+      "enter_rate": 0.049486,
+      "pid": "P013",
+      "session": "P013-s10"
+    },
+    {
+      "n_press": 3655,
+      "task_kind": "argumentative",
+      "span_min": 136.08,
+      "keys_per_min": 26.86,
+      "iki_p50": 185.0,
+      "iki_p90": 711.0,
+      "long_pause_rate_10s": 0.018336,
+      "bs_rate": 0.049248,
+      "enter_rate": 0.155404,
+      "pid": "P014",
+      "session": "P014-s01"
+    },
+    {
+      "n_press": 1205,
+      "task_kind": "argumentative",
+      "span_min": 23.33,
+      "keys_per_min": 51.645,
+      "iki_p50": 185.0,
+      "iki_p90": 655.0,
+      "long_pause_rate_10s": 0.010797,
+      "bs_rate": 0.093776,
+      "enter_rate": 0.13527,
+      "pid": "P014",
+      "session": "P014-s02"
+    },
+    {
+      "n_press": 6663,
+      "task_kind": "argumentative",
+      "span_min": 79.18,
+      "keys_per_min": 84.146,
+      "iki_p50": 177.0,
+      "iki_p90": 664.0,
+      "long_pause_rate_10s": 0.008106,
+      "bs_rate": 0.084947,
+      "enter_rate": 0.110911,
+      "pid": "P014",
+      "session": "P014-s03"
+    },
+    {
+      "n_press": 820,
+      "task_kind": "argumentative",
+      "span_min": 25.28,
+      "keys_per_min": 32.436,
+      "iki_p50": 185.0,
+      "iki_p90": 763.0,
+      "long_pause_rate_10s": 0.013431,
+      "bs_rate": 0.078049,
+      "enter_rate": 0.1,
+      "pid": "P014",
+      "session": "P014-s04"
+    },
+    {
+      "n_press": 791,
+      "task_kind": "argumentative",
+      "span_min": 33.65,
+      "keys_per_min": 23.509,
+      "iki_p50": 182.0,
+      "iki_p90": 844.0,
+      "long_pause_rate_10s": 0.020253,
+      "bs_rate": 0.060683,
+      "enter_rate": 0.098609,
+      "pid": "P014",
+      "session": "P014-s06"
+    }
+  ]
+}
