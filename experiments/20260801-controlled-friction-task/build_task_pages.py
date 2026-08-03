@@ -108,6 +108,28 @@ def render_task_panel(block: int, doc: dict) -> str:
     return "\n".join(parts)
 
 
+def strip_comments(page: str) -> str:
+    """★★ 生成ページからコメントを落とす（2026-08-04 に外部レビューで発見）。
+
+    ⚠️ `writing-pad.html` の設計コメントには `bs_rate` / `FS-B` / `統制` /
+       `preregistration.md §2.2 / §3.5` など **構成概念と判定の手がかり**が入っている。
+       `§2.13` の論拠自体が「**ソースを表示すれば全部読める**」を脅威に挙げており、
+       `§2.12` は仮説・判定基準・構成概念を**非開示**と凍結している。
+    ⚠️ ★ **描画されないから安全、ではない。** 被験者は Ctrl+U でソースを見られる。
+
+    ★ 落とすのは 3 種:
+      1. HTML コメント `<!-- -->`
+      2. CSS / JS のブロックコメント `/* */`
+      3. JS の**行頭**行コメント `//`（⚠️ 行頭に限る。URL の `//` を壊さないため。
+         実測: このテンプレートに `://` は 0 件、行頭以外の `//` も 0 件）
+    """
+    page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
+    page = re.sub(r"/\*.*?\*/", "", page, flags=re.S)
+    page = re.sub(r"^[ \t]*//.*$", "", page, flags=re.M)
+    # 連続する空行を 1 行に畳む（コメント除去で穴だらけになるため）
+    return re.sub(r"\n{3,}", "\n\n", page)
+
+
 def build_page(template: str, block: int, doc: dict) -> str:
     panel = render_task_panel(block, doc)
     # ★ window.G1_BLOCK を先に置く。writing-pad.html 側がこれを見てブロック番号を固定する。
@@ -120,6 +142,13 @@ def build_page(template: str, block: int, doc: dict) -> str:
     page = template.replace(SLOT, injected)
     # ★ タブに条件・題材が出ないよう、タイトルはブロック番号までにする。
     page = page.replace("<title>G1 記入パッド</title>", f"<title>G1 ブロック {block}</title>")
+    # ★★ HTML コメントを落とす（2026-08-04 に外部レビューで発見）。
+    #   ⚠️ writing-pad.html の設計コメントには `bs_rate` / `FS-B` / `統制` /
+    #      `preregistration.md §2.2 / §3.5` など **構成概念と判定の手がかり**が入っている。
+    #      §2.13 の論拠自体が「**ソースを表示すれば全部読める**」を脅威に挙げており、
+    #      §2.12 は仮説・判定基準・構成概念を**非開示**と凍結している。
+    #   ⚠️ 描画されないから安全、ではない。被験者は Ctrl+U でソースを見られる。
+    page = strip_comments(page)
     return page
 
 
@@ -129,6 +158,12 @@ def leak_check(page: str, doc: dict, block: int) -> list[str]:
     `make-handouts.sh` の配布事故チェックと同じ思想（front matter / 条件名を出さない）。
     """
     bad: list[str] = []
+    # ★★ 構成概念・判定の手がかりがソースに残っていないか（2026-08-04 追加）。
+    #   ⚠️ 「描画されないから良い」ではない。**ソース表示で読める**（§2.13 の論拠そのもの）。
+    for token in ("bs_rate", "FS-B", "preregistration", "統制", "判定基準", "仮説", "摩擦",
+                  "positive control", "external_paste_chars"):
+        if token in page:
+            bad.append(f"非開示語がソースに残っている: {token!r}（§2.12 / §2.13）")
     meta = doc["meta"]
     for key in ("id", "version", "sources", "output_requirement_chars", "title"):
         if key in meta and f"{key}:" in page:
@@ -210,6 +245,23 @@ def selftest() -> int:
         fails.append("課題文中の HTML がエスケープされていない")
     if "<strong>強調</strong>" not in page:
         fails.append("**強調** が変換されていない")
+
+    # ★★ HTML コメントが生成物に残っていないこと（2026-08-04 追加）
+    doc_c = parse_material(HERE / "materials" / "topic01_lo.md")
+    page_c = build_page(template, 2, doc_c)
+    if "<!--" in page_c:
+        fails.append("★ 生成ページに HTML コメントが残っている（ソース表示で読める）")
+    for token in ("bs_rate", "FS-B", "preregistration", "統制"):
+        if token in page_c:
+            fails.append(f"★ 非開示語 {token!r} が生成ページに残っている")
+    # ★ 落としすぎて壊れていないこと（機能が生きているか）
+    for must in ('window.G1_BLOCK = "2"', "countChars", "user-select: none", 'id="pad"',
+                 'id="count"', "beforeunload"):
+        if must not in page_c:
+            fails.append(f"★ コメント除去で機能が壊れた: {must!r} が消えている")
+    # ★ その検査が空回りしていないか: 非開示語を残したページは赤になるはず
+    if not leak_check(template.replace(SLOT, "x"), doc_c, 2):
+        fails.append("★ leak_check が非開示語を検出しない（空回り）")
 
     # ★ leak_check 自体が空回りしていないか（わざと壊して赤くなるか）
     broken = {"meta": {"version": "hi", "title": "町立図書館の開館時間"},
