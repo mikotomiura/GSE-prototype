@@ -25,7 +25,7 @@
       空白・改行・制御文字（Unicode カテゴリ C）を数えない。コードポイント単位。
       → 資料の文字数（§2.2 の ±5% 制約）と産出文字数（§3.5 の報告義務）が同じ物差しになる。
 
-  ⚠️ 開き方は protocol.md §2.4 に従うこと（拡張機能なしのプロファイルで開く）。
+  ⚠️ 開き方は protocol.md §1.2 に従うこと（拡張機能なしのプロファイルで開く）。
      Grammarly 等の拡張は data-gramm 属性で抑止を試みるが、**抑止できない拡張もある**。
 -->
 <style>
@@ -116,8 +116,20 @@
   //   空白（\s）と Unicode カテゴリ C（制御・書式・私用領域外の非文字）を数えない。
   //   Python の str は コードポイント単位で反復するため、Array.from で揃える
   //   （Intl.Segmenter の書記素単位にすると Python 側と数が食い違う）。
-  var SPACE = /\s/u;
-  var OTHER = /\p{C}/u;
+  // ⚠️ `\p{C}` は ES2018+ の Unicode property escape。**正規表現リテラルは
+  //    パース時に評価される**ため、古い実行環境だとスクリプト全体が SyntaxError で死に、
+  //    カウンタが 0 のまま固まる（気づきにくい壊れ方）。new RegExp + try/catch にして、
+  //    使えないときは制御文字の範囲判定に落とす（`/cross-review` 2026-08-03 の指摘）。
+  var SPACE = /\s/;
+  var OTHER;
+  try {
+    OTHER = new RegExp("\\p{C}", "u");
+  } catch (e) {
+    // 制御・書式文字の主要レンジ（Cc / Cf の代表）。Python 側の category(ch)[0]=="C" の
+    // 近似であって厳密な同値ではない。★ 実用上ここに落ちるのは古い環境だけである。
+    OTHER = /[\u0000-\u001F\u007F-\u009F\u00AD\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/;
+  }
+
   function countChars(text) {
     var n = 0;
     var chars = Array.from(text);

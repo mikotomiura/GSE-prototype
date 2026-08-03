@@ -15,7 +15,21 @@
   - 適格性ゲート（≥100 打鍵）も分離の判定も `analyze.py` の責務であり、こちらは触らない
   - ★ **条件ラベル（HI / LO）を画面に出さない**。P-1 は研究者本人が被験者であり、
     検証のたびに条件が見えると盲検が更に崩れる。不一致は「ブロック 5 が割付と違う」とだけ言う
+    （`selftest()` が**出力に条件名が現れないこと**を回帰テストとして固定している）
   - ★ **NDJSON のファイル名を出力しない**（名前にセッション日時が入る・`blocks/README.md`）
+
+⚠️ ★ **検出できない転記ミスの型（既知の限界・開示しておく）**:
+
+  1. **ファイルの取り違え**— `file` が実在し、重複もしていないが、**別のブロックの録音**である場合。
+     NDJSON 名にブロック番号は入らない（アプリが付ける名前は日時ベース）ので、
+     ファイル名からは対応を検証できない。
+     → ★ **`analyze.py --verify-blocks` のブロック長（4:00〜5:00）と打鍵数**が間接的な手掛かりになるが、
+       同じ 5 分ブロック同士の入れ替わりは**原理的に区別できない**。
+       だからこそ `protocol.md §2.3-2` が「課題文は 1 枚だけ渡し、回収して用紙に重ねる」
+       という**物理的な順序の保存**を要求している。
+  2. **`produced_chars` の隣接ブロック間の入れ替わり**— どちらも妥当な範囲（例 320 と 360）なら
+     **無警告で通る**。桁違い（35 / 3500）しか捕まえられない。
+  → ⚠️ **この 2 つは「検査した」と言ってはならない。** 報告時に限界として明記する。
 
 使い方:
     python3 validate_blocks.py                          # blocks/ を全件検査
@@ -108,10 +122,12 @@ def check_structure(spec: dict, r: Report) -> None:
             r.fail(f"{subject}: ブロック {n} は copy でなければならない (§2.3・位置固定)")
     g1 = [by_no[n].get("condition") for n in range(2, 10)]
     if g1.count("HI") != N_HI or g1.count("LO") != N_LO:
-        # ★ 個々の条件は出さない。数だけ言う（HI/LO の並びが見えると盲検が崩れる）。
-        r.fail(f"{subject}: G1 の 8 ブロックは HI {N_HI} / LO {N_LO} でなければならない "
-               f"(実際: HI {g1.count('HI')} / LO {g1.count('LO')})。"
-               f"C(8,4)=70 という並べ替えの前提が壊れる (§2.3)")
+        # ★ 条件名も内訳も出さない。「4 本ずつになっていない」とだけ言う。
+        #   ⚠️ 内訳（HI 3 / LO 5）を出すと、それ自体が条件の情報になる。
+        #   直し方は「割付表から転記し直す」の一手しかないので、内訳は要らない。
+        r.fail(f"{subject}: G1 の 8 ブロックは 2 条件が {N_HI} 本ずつでなければならない "
+               f"(実際はそうなっていない)。C(8,4)=70 という並べ替えの前提が壊れる (§2.3)。"
+               f"`python3 assign.py --subject {subject}` を再生成して転記し直すこと")
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +431,42 @@ def selftest() -> int:
          lambda s: s["manipulation_check_answers"][0].update(harder=1), expect_fail=True)
     case("produced_chars が非整数", lambda s: s["blocks"][1].update(produced_chars="350"),
          expect_fail=True)
+
+    # ★★ 非開示の回帰テスト（`/cross-review` 2026-08-03 の HIGH 指摘）
+    #    docstring は「条件ラベルを画面に出さない」と約束している。★ **約束と実装が食い違う**のが
+    #    このプロジェクトの繰り返しの失敗（E-6 / E-7 / B-1）なので、約束のほうを検査する。
+    #    ⚠️ 壊れた割付ファイルを何通りも通し、**全メッセージに条件名も課題文パスも現れない**ことを見る。
+    SECRETS = ("HI", "LO", "_hi", "_lo")
+
+    def leaks(spec_: dict) -> tuple[list[str], int]:
+        rr = validate_spec(spec_, seed, {}, None)
+        msgs = rr.fails + rr.warns + rr.notes
+        # ★ 第 2 要素はメッセージ総数。0 なら「漏れていない」ではなく**検査が空回りしている**。
+        return ([m for m in msgs if any(tok in m for tok in SECRETS)], len(rr.fails))
+
+    broken: list[tuple[str, dict]] = []
+    s = _good_spec(seed)
+    # ★ LO の 1 本を HI に倒す → 必ず 5/3 になる（seed に依存せず崩れることを保証する）。
+    for b in s["blocks"]:
+        if b["condition"] == "LO":
+            b["condition"] = "HI"
+            break
+    broken.append(("条件の本数崩れ", s))
+    s = _good_spec(seed)
+    s["blocks"][1]["condition"] = "copy"                            # 条件の取り違え
+    broken.append(("条件の取り違え", s))
+    s = _good_spec(seed)
+    s["blocks"][4]["material"] = "materials/topic99_hi.md"          # 課題文パスの取り違え
+    broken.append(("課題文パスの取り違え", s))
+    s = _good_spec(seed)
+    s["blocks"][0]["condition"] = "HI"                              # copy 位置ずれ
+    broken.append(("copy 位置ずれ", s))
+    for name, spec_ in broken:
+        found, n_fails = leaks(spec_)
+        if n_fails == 0:
+            fails.append(f"★ 非開示テストが空回りしている（{name} が FAIL にならない）")
+        if found:
+            fails.append(f"★ 出力に条件ラベル/課題文パスが漏れている（{name}）: {found[0]}")
 
     # ★ WARN は FAIL にしない（除外の判断をしないことの回帰テスト・§3.6）
     spec = _good_spec(seed)

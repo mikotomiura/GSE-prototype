@@ -112,6 +112,25 @@ if [ -f "../../$KILL_SWITCH_FN" ] && [ -f "../../$KILL_SWITCH_USE" ]; then
   if grep -q 'pub fn probes_disabled_by_env' "../../$KILL_SWITCH_FN" \
      && grep -q 'GSE_DISABLE_PROBES' "../../$KILL_SWITCH_USE"; then
     ok "プローブ kill switch がある（GSE_DISABLE_PROBES / probes_disabled_by_env）"
+    # ★ grep は「文字列があること」しか見ない。挙動（★ 未設定で無効化しないこと）は
+    #   Rust のユニットテストが持っているので、cargo があるなら実際に走らせる。
+    #   ⚠️ cargo が無い環境（被験者端末は CI ビルド済みバイナリを使う）では**飛ばしたことを明示**する。
+    #      黙って飛ばすと silent-failure-in-guard-scripts の「外部コマンド不在で素通り」になる。
+    CARGO_BIN=$(command -v cargo || echo "$HOME/.cargo/bin/cargo")
+    if [ -x "$CARGO_BIN" ]; then
+      TMP_KS=$(mktemp)
+      if (cd ../.. && "$CARGO_BIN" test --quiet --manifest-path src-tauri/Cargo.toml --lib \
+            probe_scheduler::tests::probes_kill_switch) > "$TMP_KS" 2>&1; then
+        ok "kill switch の挙動テストが緑（未設定では無効化しない・\"1\" のときだけ無効化する）"
+      else
+        sed 's/^/    /' "$TMP_KS"
+        bad "kill switch の挙動テストが赤。★ 既定挙動が変わっている可能性がある"
+      fi
+      rm -f "$TMP_KS"
+    else
+      note "cargo が無いので kill switch の挙動テストは飛ばした（★ 飛ばしたことを明示している）"
+      note "  → 実施後の客観検証は validate_blocks.py --dataset（probe 行 0）で行う"
+    fi
   else
     bad "プローブ kill switch が見つからない（GSE_DISABLE_PROBES / probes_disabled_by_env）"
     note "  §2.6 は「アプリ内プローブを使わない」と凍結し、§3.6 が事後のブロック除外を"

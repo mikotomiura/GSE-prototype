@@ -35,6 +35,7 @@ import csv
 import io
 import json
 import pathlib
+import re
 import sys
 
 # ★ フォーム側の設問タイトルに含まれる語（`GSE_G1_Form_Builder.gs` の Q_* と対応）。
@@ -51,10 +52,13 @@ def find_columns(header: list[str]) -> dict[str, int]:
     for name, key in HEADER_KEYS.items():
         hits = [i for i, h in enumerate(header) if key in h]
         if not hits:
+            # ⚠️ ★ ヘッダ全体をダンプしない。誤って G1-C（同意）の CSV を渡すと
+            #    「お名前」「メールアドレス」という列名が出力に混ざる（`/cross-review` の指摘）。
             raise SystemExit(
-                f"[NG] CSV に「{key}」を含む列が無い。フォームの設問文を変えたなら、"
-                f"本スクリプトの HEADER_KEYS も同じ版に直すこと "
-                f"(decisions.md E-6 / E-7 の教訓)。実際のヘッダ: {header}")
+                f"[NG] CSV に「{key}」を含む列が無い（列数 {len(header)}）。"
+                f"★ G1-M（強制比較）の CSV か確認すること。"
+                f"フォームの設問文を変えたなら、本スクリプトの HEADER_KEYS も"
+                f"同じ版に直すこと (decisions.md E-6 / E-7 の教訓)")
         if len(hits) > 1:
             raise SystemExit(f"[NG] 「{key}」を含む列が {len(hits)} 個ある。設問文を一意にすること")
         idx[name] = hits[0]
@@ -87,9 +91,17 @@ def parse_rows(rows: list[list[str]], subject: str) -> list[dict]:
                 f"§2.6 は 3〜9 の直後のみと凍結している（copy と G1 の最初には比較対象が無い）")
 
         choice = row[idx["harder"]].strip()
-        if CHOICE_PREV in choice:
+        # ★ 部分一致で判定するので、**両方に合致する値**は先勝ちで黙って通ってしまう。
+        #   単一選択フォームでは起きにくいが、「二択の外は推測で埋めない」という本スクリプトの
+        #   方針からすると先勝ちは推測である（`/cross-review` の指摘）。明示的に止める。
+        hit_prev, hit_cur = CHOICE_PREV in choice, CHOICE_CURRENT in choice
+        if hit_prev and hit_cur:
+            raise SystemExit(
+                f"[NG] {lineno} 行目: 回答が二択の**両方**に合致する ({choice!r})。"
+                f"★ どちらを選んだのかスクリプトには決められない。実験者が確認すること")
+        if hit_prev:
             harder = block - 1
-        elif CHOICE_CURRENT in choice:
+        elif hit_cur:
             harder = block
         else:
             raise SystemExit(
@@ -122,8 +134,51 @@ def write_into_spec(spec_path: pathlib.Path, answers: list[dict]) -> None:
     spec_path.write_text(json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+#: ★ GAS builder の定数名 → 本スクリプト側で「その文字列に含まれていなければならない」語。
+#  `Q_SUBJECT_ID = "被験者ID"` のように、`.gs` 側は本スクリプトのキーを**含む**文字列を持つ。
+GS_CONTRACT = {
+    "Q_SUBJECT_ID": HEADER_KEYS["subject"],
+    "Q_BLOCK_NO": HEADER_KEYS["block"],
+    "Q_HARDER": HEADER_KEYS["harder"],
+    "CHOICE_PREV": CHOICE_PREV,
+    "CHOICE_CURRENT": CHOICE_CURRENT,
+}
+GS_BUILDER = pathlib.Path(__file__).resolve().parents[2] / "Form_G1" / "GSE_G1_Form_Builder.gs"
+
+
+def check_gs_contract() -> list[str]:
+    """★ フォーム側（GAS）と本スクリプトの契約が同じ版かを機械的に突き合わせる。
+
+    ⚠️ **これが無いと、`.gs` の設問文だけ変えても `--selftest` は緑のまま残る。**
+    このプロジェクトでは「文書だけ改訂して実装が追随しない」事故が 3 回起きており
+    （E-6 / E-7 / B-1）、その教訓が GAS↔Python の境界に及んでいなかった
+    （`/cross-review` 2026-08-03 の指摘）。
+
+    ★ **`.gs` が見つからない場合は FAIL にする。** 「見つからないので飛ばす」は
+    `silent-failure-in-guard-scripts` そのものであり、ゲートを素通りさせる。
+    """
+    if not GS_BUILDER.is_file():
+        return [f"GAS builder が見つからない: {GS_BUILDER}（契約を検証できない）"]
+    src = GS_BUILDER.read_text(encoding="utf-8")
+    out: list[str] = []
+    for var, needle in GS_CONTRACT.items():
+        m = re.search(rf'^var\s+{re.escape(var)}\s*=\s*"([^"]*)"\s*;', src, re.MULTILINE)
+        if m is None:
+            out.append(f"{GS_BUILDER.name} に `var {var} = \"...\";` が無い")
+        elif needle not in m.group(1):
+            out.append(
+                f"★ 契約が食い違っている: {GS_BUILDER.name} の {var}={m.group(1)!r} が "
+                f"本スクリプトの {needle!r} を含まない。"
+                f"どちらかを直して**同じ版**にすること")
+    return out
+
+
 def selftest() -> int:
     fails: list[str] = []
+
+    # 0) ★ GAS 側との契約（設問文・選択肢）
+    fails += check_gs_contract()
+
     header = ["タイムスタンプ", "被験者ID", "ブロック番号", "より詰まったのはどちらですか"]
 
     def rows_for(pairs, subject="P015"):
@@ -149,6 +204,9 @@ def selftest() -> int:
     expect_exit("ブロック 2 の回答", rows_for([(2, "直前のブロックのほう")] + full))
     expect_exit("二重送信", rows_for(full + [(3, "直前のブロックのほう")]))
     expect_exit("二択の外", rows_for(full[:-1] + [(9, "どちらでもない")]))
+    # ★ 両方に合致する値を先勝ちで通さない（`/cross-review` の指摘）
+    expect_exit("二択の両方に合致",
+                rows_for(full[:-1] + [(9, "1つ前のブロックのほう / 直前のブロックのほう")]))
     expect_exit("列が無い", [["タイムスタンプ", "氏名"], ["x", "y"]])
     # ★ 他被験者の行は無視され、当該被験者の 7 件が揃っていれば通る
     mixed = rows_for(full) + [["t", "P016", "3", "直前のブロックのほう"]]
