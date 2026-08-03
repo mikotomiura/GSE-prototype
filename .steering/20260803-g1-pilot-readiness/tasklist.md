@@ -11,7 +11,7 @@
 
 ## T-1b B-5 = 入力先（ローカル HTML 入力パッド）
 
-- [x] `materials/writing-pad.html` を作る（補完 off・live 文字数・保存なし）
+- [x] `writing-pad.html` を作る（補完 off・live 文字数・保存なし）
 - [x] 文字数の数え方を 1 つに固定し、`preregistration.md §3.5` の産出量報告と整合させる
 - [x] `protocol.md` に「どこに入力するか」と当日の手順（拡張なしで開く等）を書く
 - [x] `participant-guide.md` / `consent.md` の「本文は保存しない」との整合を確認する

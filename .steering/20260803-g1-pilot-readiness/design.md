@@ -64,7 +64,7 @@ lib.rs                        std::env::var("GSE_DISABLE_PROBES") を読み、
 
 ## T-1b 入力先（B-5 = ローカル HTML 入力パッド・研究者判断 2026-08-03）
 
-`materials/writing-pad.html` を 1 枚置き、**ブラウザで開いて打つ**。
+`writing-pad.html` を 1 枚置き、**ブラウザで開いて打つ**。
 
 | B-5 の要件 | どう満たすか |
 |---|---|
