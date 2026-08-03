@@ -49,7 +49,7 @@ var Utilities = { formatDate: function () { return "2026-01-01"; } };
 var UrlFetchApp = { fetch: function () { throw new Error("not used"); } };
 __GAS_SOURCE__
 // ★ 実際に呼ぶ。未定義参照があればここで ReferenceError になる。
-var out = { ackSubject: g1RegisterAckSubject_(), ack: g1RegisterAckBody_("P999", "8/10 午後") };
+var out = { ackSubject: g1RegisterAckSubject_(), ack: g1RegisterAckBody_("P999") };
 var thanks = (function () {
   // sendThankYouEmail は本文を組み立ててから送るので、下書き経路を通して例外が出ないか見る。
   try { G1_CONTACT = G1_CONTACT || "（テスト）"; sendThankYouEmail("P999", "t@example.com"); return "ok"; }
@@ -86,6 +86,44 @@ def check_run_columns() -> list[str]:
 
 
 
+def check_consent_question_names() -> list[str]:
+    """★ G1-C の設問タイトルが「フォーム構築」と「回答取得」で共有されているか。
+
+    ⚠️ G1-C はそのまま参加登録として使う（提出で P-ID 採番 + 受付メール）。
+    設問タイトルを片方だけ変えると、提出されても氏名やメールが取れず
+    **黙って発番が止まる**（例外も出ないので気づけない）。
+    → 定数 Q_C_* が定義され、buildConsentForm と g1ConsentAnswers_ の両方で
+      参照されていることを見る。
+    """
+    text = GAS.read_text(encoding="utf-8")
+    defined = set(re.findall(r"var (Q_C_\w+) = ", text))
+    if not defined:
+        return ["Q_C_* 定数が無い（設問タイトルがハードコードに戻っている疑い）"]
+
+    def body_of(fn: str) -> str:
+        m = re.search(r"^function " + fn + r"\b.*?(?=^function )", text, re.S | re.M)
+        return m.group(0) if m else ""
+
+    build = body_of("buildConsentForm")
+    parse = body_of("g1ConsentAnswers_")
+    if not build or not parse:
+        return ["buildConsentForm / g1ConsentAnswers_ が見つからない"]
+
+    out = []
+    for c in sorted(defined):
+        in_build = c in build
+        in_parse = c in parse
+        if in_build and not in_parse:
+            out.append(f"{c} はフォームには出るが回答取得で使われていない（取りこぼす）")
+        if in_parse and not in_build:
+            out.append(f"{c} は回答取得で使うがフォームに設問が無い（常に空になる）")
+    # ★ 検査が空回りしていないこと: 少なくとも氏名とメールは両方で使われているはず
+    for must in ("Q_C_NAME", "Q_C_EMAIL"):
+        if must not in defined:
+            out.append(f"{must} が定義されていない（採番に必要）")
+    return out
+
+
 def topic_titles() -> list[str]:
     out = []
     for p in sorted(MATERIALS.glob("topic*_lo.md")):
@@ -120,7 +158,7 @@ def main() -> int:
         print("[NG] node が無いので事前案内メールの検査ができない（飛ばさずに赤にする）")
         return 1
 
-    fails: list[str] = list(check_run_columns())
+    fails: list[str] = list(check_run_columns()) + list(check_consent_question_names())
 
     res = run_gas()
     # ★ 事前案内メールと受付メールの**両方**を同じ基準で見る。
@@ -162,7 +200,7 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print("[OK] 受付メールは §2.12（第 7 版）の開示範囲を守っている")
-    print("     G1 実施トラッキングの列参照も RUN_HEADER と一致している")
+    print("     G1 実施トラッキングの列参照・G1-C の設問名も一致している")
     print(f"     題材名 {len(topic_titles())} 件・課題の型・条件名のいずれも本文に無い")
     return 0
 

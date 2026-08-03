@@ -47,10 +47,6 @@
 var FORM_ID_CONSENT = "1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE"; // G1-C 説明・同意（form1）
 var FORM_ID_MCHECK = "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA"; // G1-M 強制比較（form2）
 var FORM_ID_SURVEY = "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU"; // G1-S 終了後アンケート（form3）
-// ★★ G1-R 参加登録フォーム（第 8 版で追加・2026-08-03）。
-//    ⚠️ **空フォームを 1 つ作って ID をここに貼る**（固定 ID 方式。空のままだと builder が止まる）。
-//    このフォームが提出されると onG1RegisterSubmit が P-ID を採番し、受付メールを自動送信する。
-var FORM_ID_REGISTER = ""; // G1-R 参加登録（form4）★ 研究者が空フォームを作って貼る
 
 // 既存設問を毎回作り直すか（通常 true）。
 var CLEAR_EXISTING = true;
@@ -101,15 +97,6 @@ var CHOICE_CURRENT = "直前のブロックのほう";
 // 入口
 // ============================================================
 function setupG1Forms() {
-  // ★ G1-R は「空フォーム ID を貼ってから」でないと作れない（固定 ID 方式の fail-closed）。
-  //   未設定なら止めずに案内だけ出す（同意/強制比較/終了後の 3 本は作れるため）。
-  if (FORM_ID_REGISTER) {
-    buildG1RegisterForm();
-  } else {
-    Logger.log("⏭ G1-R 参加登録フォームは飛ばしました（FORM_ID_REGISTER が空）。");
-    Logger.log("   ★ 登録→自動採番→受付メールを使うなら、空フォームを作って ID を貼り、");
-    Logger.log("     setupG1Forms() を再実行 → installG1RegisterTrigger() を一度だけ実行してください。");
-  }
   buildConsentForm();
   buildManipulationCheckForm();
   buildPostSurveyForm();
@@ -117,8 +104,7 @@ function setupG1Forms() {
   //   管理シートより先に呼ぶ — リンク集タブが短縮 URL を読むため。
   shortenFormUrls();
   var url = buildManagementSheet();
-  var n = FORM_ID_REGISTER ? 4 : 3;
-  Logger.log("🎉 G1 フォーム " + n + " 本 ＋ 管理シート 作成完了: " + url);
+  Logger.log("🎉 G1 フォーム 3 本 ＋ 管理シート 作成完了: " + url);
   Logger.log(listG1FormUrls());
   if (!G1_CONTACT) {
     Logger.log("⚠️ ★ G1_CONTACT が空です。受付メールは送れません（fail-closed）。");
@@ -131,7 +117,7 @@ function setupG1Forms() {
 function listG1FormUrls() {
   var props = PropertiesService.getScriptProperties();
   var out = [];
-  ["G1_REGISTER", "G1_CONSENT", "G1_MCHECK", "G1_SURVEY"].forEach(function (key) {
+  ["G1_CONSENT", "G1_MCHECK", "G1_SURVEY"].forEach(function (key) {
     var raw = props.getProperty("FORMURL_" + key);
     if (!raw) {
       out.push(key + ": (未生成)");
@@ -148,6 +134,12 @@ function listG1FormUrls() {
   });
   return out.join("\n");
 }
+
+// ★ G1-C の設問タイトル。**回答取得（onG1ConsentSubmit）と共有する**。
+//   ⚠️ 片方だけ変えると、提出されても氏名やメールが取れずに黙って発番が止まる。
+var Q_C_PID = "参加者ID（お持ちの方のみ）";
+var Q_C_NAME = "お名前";
+var Q_C_EMAIL = "メールアドレス";
 
 // ============================================================
 // G1-C 同意フォーム（consent.md が文面の真実源）
@@ -194,7 +186,11 @@ function buildConsentForm() {
   );
   form.setCollectEmail(false); // 下の設問で明示的に取る（何を取るかを本人に見せる）
   form.setShowLinkToRespondAgain(false);
-  form.setConfirmationMessage("ご回答ありがとうございます。実験者にお知らせください。");
+  // ★ 募集でも当日でも使える文言にする（当日は実験者が同席している）。
+  form.setConfirmationMessage(
+    "ご回答ありがとうございます。参加者ID と当日のご案内をメールでお送りします。\n" +
+      "（その場でご回答いただいた場合は、実験者にお知らせください。）"
+  );
 
   addSectionHeader(
     form,
@@ -227,16 +223,17 @@ function buildConsentForm() {
   // ★ P-ID は Phase1 と共有する（同じ人＝同じ ID）。以前ご参加の方は既にお持ちなので書いてもらう。
   //   ⚠️ 必須にしない — 初参加の方は持っていない（その場合は実験者が Phase1 側で採番する）。
   var pid = form.addTextItem();
-  pid.setTitle("参加者ID（お持ちの方のみ）");
+  pid.setTitle(Q_C_PID);
   pid.setHelpText(
     "以前 GSE の検証にご参加いただいた方は、そのときお伝えした P から始まる記号をご記入ください。" +
       "初めての方は空欄で構いません。"
   );
-  form.addTextItem().setTitle("お名前").setRequired(true);
+  form.addTextItem().setTitle(Q_C_NAME).setRequired(true);
   var mail = form.addTextItem();
-  mail.setTitle("メールアドレス");
+  mail.setTitle(Q_C_EMAIL);
   mail.setRequired(true);
   mail.setValidation(FormApp.createTextValidation().requireTextMatchesPattern(".+@.+").build());
+
 
   recordFormUrl_("G1_CONSENT", form, "G1-C 説明・同意");
   Logger.log("G1-C 同意フォームを構築した: " + form.getPublishedUrl());
@@ -852,117 +849,6 @@ function sendThankYouEmail(pid, email) {
   return subject;
 }
 
-function buildG1RegisterForm() {
-  var form = openFixed_(FORM_ID_REGISTER, "FORM_ID_REGISTER");
-  if (CLEAR_EXISTING) clearForm(form);
-
-  form.setTitle("GSE 研究 — 参加登録");
-  form.setDescription(
-    [
-      "キーボードの打ち方に関する研究への参加登録フォームです。",
-      "",
-      "■ ご参加いただくこと",
-      "　・所要 約 70 分（説明・休憩を含みます）。対面で 1 回のみです。",
-      "　・5 分の作業を 10 回、間に 1 分の休憩をはさんで行います。",
-      "　・最初と最後の 1 回ずつは「書き写し」で、考える必要はありません。",
-      "　・間の 8 回は、資料を読んで 300〜400 字の文章を書いていただきます。",
-      "　・記録するのは「キーを押した時刻とキーの種類」だけです。",
-      "　　★ どの文字を打ったか（本文）は記録しません。書いた文章も保存しません。",
-      "",
-      "■ 参加は任意です",
-      "　断っても不利益はありません。途中でやめられ、後からデータの削除も求められます。",
-      "",
-      "ご登録いただくと、参加者ID と当日のご案内をメールでお送りします。",
-      "日時は追ってご相談のうえ確定します。",
-    ].join("\n")
-  );
-  form.setCollectEmail(false); // ★ 連絡先は下の設問で受ける（Phase1 の F1 と同じ方式）
-  form.setLimitOneResponsePerUser(false);
-  form.setShowLinkToRespondAgain(false);
-
-  // ★ 同意の確認（必須）。⚠️ これは当日の署名（G1-C）の代わりではない。
-  var consent = form.addCheckboxItem();
-  consent.setTitle(Q_REG_CONSENT).setRequired(true);
-  consent.setChoiceValues([REG_CONSENT_TEXT]);
-
-  form.addTextItem().setTitle(Q_REG_NAME).setRequired(true);
-  form.addTextItem()
-    .setTitle(Q_REG_EMAIL)
-    .setHelpText("★ 参加者ID と当日のご案内をこのアドレスにお送りします。")
-    .setRequired(true);
-
-  var returning = form.addMultipleChoiceItem();
-  returning.setTitle(Q_REG_RETURNING).setRequired(true);
-  returning.setChoiceValues([REG_RETURNING_YES, REG_RETURNING_NO]);
-
-  form.addTextItem()
-    .setTitle(Q_REG_PID)
-    .setHelpText("以前ご参加の方で、P から始まる参加者ID をご存じであればご記入ください（任意）。")
-    .setRequired(false);
-
-  form.addParagraphTextItem()
-    .setTitle(Q_REG_PREFERRED)
-    .setHelpText("候補をいくつか挙げてください（例: 8/10 午後、8/12 終日）。追ってご相談します。")
-    .setRequired(true);
-
-  form.addParagraphTextItem().setTitle(Q_REG_NOTE).setRequired(false);
-
-  recordFormUrl_("G1_REGISTER", form, "G1-R 参加登録");
-  Logger.log("✅ G1-R 参加登録フォームを構築しました");
-  return form;
-}
-
-// トリガを設定する（二重作成防止に既存を全削除してから作る。Phase1 の installF1Trigger と同型）。
-function installG1RegisterTrigger() {
-  removeG1RegisterTriggers();
-  if (!FORM_ID_REGISTER) {
-    throw new Error("★ FORM_ID_REGISTER が空です。先に空フォームを作って ID を貼ってください。");
-  }
-  ScriptApp.newTrigger("onG1RegisterSubmit")
-    .forForm(FormApp.openById(FORM_ID_REGISTER))
-    .onFormSubmit()
-    .create();
-  Logger.log("✅ onG1RegisterSubmit トリガを G1-R に設定しました");
-  Logger.log("ℹ️ G1_AUTO_SEND=" + G1_AUTO_SEND + "（false=下書き作成 / true=自動送信）");
-  if (!G1_AUTO_SEND) {
-    Logger.log(
-      "⚠️ ★ G1_AUTO_SEND=false のままだと、登録されても**下書きが作られるだけ**で被験者に届きません。" +
-        " 登録直後に受付メールを届けるなら true にしてください（内容は previewRegisterAckEmail() で確認できます）。"
-    );
-  }
-}
-
-function removeG1RegisterTriggers() {
-  var triggers = ScriptApp.getProjectTriggers();
-  var n = 0;
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === "onG1RegisterSubmit") {
-      ScriptApp.deleteTrigger(triggers[i]);
-      n++;
-    }
-  }
-  if (n) Logger.log("🧹 既存の onG1RegisterSubmit トリガを " + n + " 件削除しました");
-}
-
-// フォーム回答を素直な object にする（設問タイトルで引く。★ 設問名を変えたら定数も直す）。
-function g1RegisterAnswers_(response) {
-  var out = { consent: false, name: "", email: "", returning: "", pid: "", preferred: "", note: "" };
-  var items = response.getItemResponses();
-  for (var i = 0; i < items.length; i++) {
-    var title = items[i].getItem().getTitle();
-    var v = items[i].getResponse();
-    var s = Array.isArray(v) ? v.join(" / ") : String(v == null ? "" : v);
-    if (title === Q_REG_CONSENT) out.consent = s.indexOf(REG_CONSENT_TEXT) >= 0;
-    else if (title === Q_REG_NAME) out.name = s.trim();
-    else if (title === Q_REG_EMAIL) out.email = s.trim();
-    else if (title === Q_REG_RETURNING) out.returning = s.trim();
-    else if (title === Q_REG_PID) out.pid = s.trim().toUpperCase();
-    else if (title === Q_REG_PREFERRED) out.preferred = s.trim();
-    else if (title === Q_REG_NOTE) out.note = s.trim();
-  }
-  return out;
-}
-
 // Phase1 ロスターを P-ID またはメールで引く。見つかれば {pid, row} を返す。
 function g1FindInPhase1Roster_(sheet, opts) {
   var last = sheet.getLastRow();
@@ -979,92 +865,8 @@ function g1FindInPhase1Roster_(sheet, opts) {
   return null;
 }
 
-// ★★ 参加登録の提出で走る。P-ID 採番 → トラッキング行追加 → 受付メール。
-function onG1RegisterSubmit(e) {
-  if (!e || !e.response) {
-    Logger.log("❌ onG1RegisterSubmit: response が取得できません（トリガ経由で呼んでください）");
-    return;
-  }
-  var a = g1RegisterAnswers_(e.response);
-  if (!a.consent) {
-    // ⚠️ 同意チェックは必須設問なので通常ここには来ない。来たら発番しない。
-    Logger.log("⛔ 参加登録: 同意の確認が無いため発番しません");
-    return;
-  }
-  if (!a.email) {
-    Logger.log("⛔ 参加登録: メールアドレスが空のため発番しません");
-    return;
-  }
-  if (!PHASE1_MGMT_SHEET_ID) {
-    Logger.log("❌ PHASE1_MGMT_SHEET_ID が未設定。採番元が無いので中止します（登録は失われません）");
-    return;
-  }
-
-  // ★ 同時提出で同じ P-ID が 2 人に出るのを防ぐ（Phase1 と同じ）。
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(30000);
-  } catch (lockErr) {
-    Logger.log("❌ ロックを取得できませんでした。時間をおいて手動で addParticipant してください: " + lockErr);
-    return;
-  }
-
-  try {
-    var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
-    if (!roster) {
-      Logger.log("❌ Phase1 の管理シートに「参加者ロスター」タブがありません（発番中止）");
-      return;
-    }
-
-    // 1) 既存の人か（★ 再提出でも再発番しない = 冪等。Phase1 参加者は既存 ID をそのまま使う）
-    var found = g1FindInPhase1Roster_(roster, { pid: a.pid, email: a.email });
-    var pid;
-    var isNew = false;
-    if (found && found.pid) {
-      pid = found.pid;
-      Logger.log("♻️ 既存の参加者として扱います: " + pid + "（" + g1MaskEmail_(a.email) + "）");
-      // 既存行にメールが無ければ補う（ID 申告だけで登録された場合）
-      if (!String(roster.getRange(found.row, 3).getValue()).trim()) {
-        roster.getRange(found.row, 3).setValue(a.email);
-      }
-    } else {
-      pid = g1NextParticipantId_(roster);
-      roster.appendRow([pid, a.name, a.email]);
-      isNew = true;
-      SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
-      Logger.log("✅ P-ID 発番: " + pid + "（" + g1MaskEmail_(a.email) + "）");
-    }
-
-    // 2) G1 実施トラッキングに行を用意する（★ 実名・メールは書かない）
-    var noteCell = g1EnsureRunRow_(pid, a.preferred);
-
-    // 3) 受付メール。⚠️ ★ ここで例外が出ると「発番済みだが通知が無い」状態になり、
-    //    再提出しても 1) で冪等スキップされるので**永久に届かない**。備考列に可視化する。
-    try {
-      var subject = g1RegisterAckSubject_();
-      var body = g1RegisterAckBody_(pid, a.preferred);
-      if (G1_AUTO_SEND) {
-        MailApp.sendEmail(a.email, subject, body);
-        Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
-      } else {
-        GmailApp.createDraft(a.email, subject, body);
-        Logger.log("📝 受付メールの下書きを作成しました → " + g1MaskEmail_(a.email));
-        Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
-      }
-    } catch (mailErr) {
-      if (noteCell) {
-        noteCell.setValue("⚠受付メール未作成-要手動送信: " + mailErr);
-      }
-      Logger.log("❌ 受付メールに失敗（P-ID は確定済 " + pid + "）。備考にフラグを立てました: " + mailErr);
-    }
-    Logger.log(isNew ? "🎉 新規登録: " + pid : "🔁 再登録（発番なし）: " + pid);
-  } finally {
-    lock.releaseLock();
-  }
-}
-
 // G1 実施トラッキングに P-ID の行が無ければ作る。備考セル（失敗の可視化先）を返す。
-function g1EnsureRunRow_(pid, preferred) {
+function g1EnsureRunRow_(pid) {
   var props = PropertiesService.getScriptProperties();
   var ssId = props.getProperty(MGMT_SHEET_PROP_G1);
   if (!ssId) {
@@ -1084,10 +886,6 @@ function g1EnsureRunRow_(pid, preferred) {
   }
   var row = Math.max(last + 1, 3);
   sh.getRange(row, colPid).setValue(pid);
-  if (preferred) {
-    // ★ 希望日時は「実施予定日」ではない（未確定）。備考に置き、確定したら実施予定日へ研究者が入れる。
-    sh.getRange(row, colNote).setValue("希望: " + preferred);
-  }
   return sh.getRange(row, colNote);
 }
 
@@ -1098,7 +896,7 @@ function g1RegisterAckSubject_() {
 // ★ 受付メール。⚠️ preregistration.md §2.12 の開示範囲を守る:
 //   題材（分野）・課題の型・難易度の示唆・条件名を **書かない**。
 //   （課題文は当日その場で画面提示する = §2.13。事前に教える必要が無い。）
-function g1RegisterAckBody_(pid, preferred) {
+function g1RegisterAckBody_(pid) {
   return [
     "ご登録ありがとうございます。参加登録を承りました。",
     "",
@@ -1106,10 +904,6 @@ function g1RegisterAckBody_(pid, preferred) {
     "    " + pid,
     "    ※ 記録はこの記号で管理します。お名前とは別に保管します。",
     "    ※ 当日までこのメールを保管してください。",
-    "",
-    "■ 日程",
-    (preferred ? "    ご希望として次を承りました: " + preferred : "    ご希望日時を追ってお伺いします。"),
-    "    ★ このメールに返信する形で、日時と場所をご相談させてください。",
     "",
     "■ 当日の流れ（約 70 分）",
     "    ・5 分の作業を 10 回、間に 1 分の休憩をはさみます。",
@@ -1146,7 +940,149 @@ function g1RegisterAckBody_(pid, preferred) {
 function previewRegisterAckEmail() {
   Logger.log("件名: " + g1RegisterAckSubject_());
   Logger.log("--------");
-  Logger.log(g1RegisterAckBody_("P0XX", "8/10 午後、8/12 終日"));
+  Logger.log(g1RegisterAckBody_("P0XX"));
   Logger.log("--------");
   Logger.log("★ §2.12 の開示範囲と一致しているか確認（題材・課題の型・難易度を書かない）。");
+}
+
+// ============================================================
+// ★★ G1-C の提出 → P-ID 採番 → 受付メール（Phase1 の onF1Submit と同型）
+// ============================================================
+// ★ **G1-C がそのまま参加登録である**（研究者判断 2026-08-03）。
+//   G1-C は説明文に consent.md の内容を全部載せ、同意 7 項目・氏名・メールを取っている。
+//   ⚠️ 別に「参加登録フォーム」を作るのは**重複**だった（一度作って廃止した）。
+//   Phase1 も F1（スクリーニング＋同意）を募集時に使い、それをトリガーにしている。
+//
+// 運用:
+//   1. setupG1Forms() を実行済みにする（管理シートが要る）。
+//   2. installG1ConsentTrigger() を **一度だけ** 実行。
+//   3. 以後、G1-C が提出されるたびに onG1ConsentSubmit(e) が自動で走る:
+//      P-ID 採番（Phase1 ロスター）→ G1 実施トラッキングに行追加 → 受付メール。
+//
+// ⚠️ ★ 当日その場で G1-C に回答した場合も同じ経路を通る（受付メールが届くだけで害は無い）。
+//    ★ 対面の署名は別途 `handouts/G1_説明・同意文書.docx` で取る（protocol.md §4.1）。
+
+function installG1ConsentTrigger() {
+  removeG1ConsentTriggers();
+  if (!FORM_ID_CONSENT) {
+    throw new Error("★ FORM_ID_CONSENT が空です。");
+  }
+  ScriptApp.newTrigger("onG1ConsentSubmit")
+    .forForm(FormApp.openById(FORM_ID_CONSENT))
+    .onFormSubmit()
+    .create();
+  Logger.log("✅ onG1ConsentSubmit トリガを G1-C に設定しました");
+  Logger.log("ℹ️ G1_AUTO_SEND=" + G1_AUTO_SEND + "（false=下書き作成 / true=自動送信）");
+  if (!G1_AUTO_SEND) {
+    Logger.log(
+      "⚠️ ★ G1_AUTO_SEND=false のままだと、登録されても**下書きが作られるだけ**で被験者に届きません。"
+    );
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("⚠️ ★ PHASE1_MGMT_SHEET_ID が空です。採番できないので提出時に中止されます。");
+  }
+}
+
+function removeG1ConsentTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "onG1ConsentSubmit") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("🧹 既存の onG1ConsentSubmit トリガを " + n + " 件削除しました");
+}
+
+// G1-C の回答を取り出す。★ 設問タイトルは Q_C_* 定数と共有する（片方だけ変えない）。
+// ⚠️ 同意 7 項目はフォーム側で必須なので、ここでは検査しない（未同意の提出は原理的に来ない）。
+function g1ConsentAnswers_(response) {
+  var out = { name: "", email: "", pid: "" };
+  var items = response.getItemResponses();
+  for (var i = 0; i < items.length; i++) {
+    var title = items[i].getItem().getTitle();
+    var v = items[i].getResponse();
+    var s = Array.isArray(v) ? v.join(" / ") : String(v == null ? "" : v);
+    if (title === Q_C_NAME) out.name = s.trim();
+    else if (title === Q_C_EMAIL) out.email = s.trim();
+    else if (title === Q_C_PID) out.pid = s.trim().toUpperCase();
+  }
+  return out;
+}
+
+// ★★ G1-C の提出で走る。P-ID 採番 → トラッキング行追加 → 受付メール。
+function onG1ConsentSubmit(e) {
+  if (!e || !e.response) {
+    Logger.log("❌ onG1ConsentSubmit: response が取得できません（トリガ経由で呼んでください）");
+    return;
+  }
+  var a = g1ConsentAnswers_(e.response);
+  if (!a.email) {
+    Logger.log("⛔ G1-C 提出: メールアドレスが空のため発番しません");
+    return;
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("❌ PHASE1_MGMT_SHEET_ID が未設定。採番元が無いので中止します（回答は失われません）");
+    return;
+  }
+
+  // ★ 同時提出で同じ P-ID が 2 人に出るのを防ぐ（Phase1 と同じ）。
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    Logger.log("❌ ロックを取得できませんでした。手動で assignG1ParticipantId してください: " + lockErr);
+    return;
+  }
+
+  try {
+    var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+    if (!roster) {
+      Logger.log("❌ Phase1 の管理シートに「参加者ロスター」タブがありません（発番中止）");
+      return;
+    }
+
+    // 1) 既存の人か（★ 再提出でも再発番しない = 冪等。Phase1 参加者は既存 ID をそのまま使う）
+    var found = g1FindInPhase1Roster_(roster, { pid: a.pid, email: a.email });
+    var pid;
+    var isNew = false;
+    if (found && found.pid) {
+      pid = found.pid;
+      Logger.log("♻️ 既存の参加者として扱います: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+      if (!String(roster.getRange(found.row, 3).getValue()).trim()) {
+        roster.getRange(found.row, 3).setValue(a.email);
+      }
+    } else {
+      pid = g1NextParticipantId_(roster);
+      roster.appendRow([pid, a.name, a.email]);
+      isNew = true;
+      SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
+      Logger.log("✅ P-ID 発番: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+    }
+
+    // 2) G1 実施トラッキングに行を用意する（★ 実名・メールは書かない）
+    var noteCell = g1EnsureRunRow_(pid);
+
+    // 3) 受付メール。⚠️ ★ ここで例外が出ると「発番済みだが通知が無い」状態になり、
+    //    再提出しても 1) で冪等スキップされるので**永久に届かない**。備考列に可視化する。
+    try {
+      var subject = g1RegisterAckSubject_();
+      var body = g1RegisterAckBody_(pid);
+      if (G1_AUTO_SEND) {
+        MailApp.sendEmail(a.email, subject, body);
+        Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
+      } else {
+        GmailApp.createDraft(a.email, subject, body);
+        Logger.log("📝 受付メールの下書きを作成しました → " + g1MaskEmail_(a.email));
+        Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
+      }
+    } catch (mailErr) {
+      if (noteCell) noteCell.setValue("⚠受付メール未作成-要手動送信: " + mailErr);
+      Logger.log("❌ 受付メールに失敗（P-ID は確定済 " + pid + "）。備考にフラグを立てました: " + mailErr);
+    }
+    Logger.log(isNew ? "🎉 新規登録: " + pid : "🔁 再提出（発番なし）: " + pid);
+  } finally {
+    lock.releaseLock();
+  }
 }
