@@ -23,10 +23,46 @@ for f in materials/topic*.md materials/copy.md; do
   python3 "$M" "$f" "handouts/materials/${base}.docx" --frontmatter-title
 done
 
-# --- 3. 第三者・共同研究者向けの解説（★ 被験者には渡さない） ----------------
+# --- 3. ★ 課題文の合本（実験者用・準備と封入のため）------------------------
+# ⚠️ **被験者には渡さない。** 被験者に渡すのは上の 1 枚ずつ（handouts/materials/）である。
+#   理由: §2.7-2「1 人は 1 題材につき 1 版しか見ない」／
+#         protocol.md §2.3-2「開始直前に 1 枚だけ渡す（先読みと取り違えの防止）」
+COMBINED=$(mktemp -t g1combined).md
+{
+  echo "# 課題文 全題材（実験者用）"
+  echo
+  echo "> ## ⚠️ この冊子は実験者用である。**被験者には渡さない。**"
+  echo "> 被験者に渡すのは \`handouts/materials/\` の **1 枚ずつ**である"
+  echo "> （§2.7-2: 1 人は 1 題材につき 1 版しか見ない ／"
+  echo ">  protocol.md §2.3-2: 開始直前に 1 枚だけ渡す）。"
+  echo "> 用途は**印刷・封入の準備と内容の確認**に限る。"
+  echo
+  echo "---"
+  echo
+  for n in 01 02 03 04 05 06 07 08; do
+    for v in lo hi; do
+      f="materials/topic${n}_${v}.md"
+      [ -f "$f" ] || continue
+      title=$(sed -n 's/^title: //p' "$f" | head -1)
+      echo "## topic${n} — ${title} ／ 版: $(echo "$v" | tr '[:lower:]' '[:upper:]')"
+      echo
+      sed '1,/^---$/d' "$f" | sed 's/^## /### /'
+      echo
+      echo "---"
+      echo
+    done
+  done
+  echo "## copy — 書き写し（全被験者共通・位置固定）"
+  echo
+  sed '1,/^---$/d' materials/copy.md | sed 's/^## /### /'
+} > "$COMBINED"
+python3 "$M" "$COMBINED" "handouts/G1_課題文_全題材_実験者用.docx"
+rm -f "$COMBINED"
+
+# --- 4. 第三者・共同研究者向けの解説（★ 被験者には渡さない） ----------------
 python3 "$M" README.md "handouts/G1_実験の解説.docx"
 
-# --- 4. 配布事故の機械チェック ----------------------------------------------
+# --- 5. 配布事故の機械チェック ----------------------------------------------
 echo
 echo "[check] 被験者に渡すものに、渡してはいけない語が入っていないか"
 python3 - <<'PY'
