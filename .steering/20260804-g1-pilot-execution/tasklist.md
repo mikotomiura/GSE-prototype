@@ -219,3 +219,24 @@
 ⚠️ 行番号のスクリーンショットでは**貼れていないのに気づけない**ことがあった（2 回発生）。
 ★ **`monaco.editor.getModels()[0].getLineCount()` / `.getValue()` を直接読むのが確実**である。
 実測: 貼れていないとき **1298 行**（ローカル 1303）と出て、undo も disabled のままだった。
+
+---
+
+## ★★ T-3 Windows 実機検証（記入枠）
+
+- 実施環境: Windows 機 / アカウント `johndo.mik.080`（Drive は mmiura.network でサインインして取得）
+- 配布元: Drive `Gate/G1/G1_実施用_Windows`（4 点・サイズは Release と一致確認済み）
+
+| # | 確かめること | 結果 | 備考 |
+|---|---|---|---|
+| 1 | 4 ファイルを**同じフォルダ**に置いた | ☐ | |
+| 2 | `certutil -hashfile gse-next.exe SHA256` = `44a8c6e1…b094ed89` | ☐ | |
+| 3 | `certutil -hashfile gse-submit.exe SHA256` = `f44b03cb…3238a561` | ☐ | |
+| 4 | ★ `.bat` をダブルクリック → **文字化けしない** | ☐ | |
+| 5 | `gse-next.exe` が起動する | ☐ | |
+| 6 | ★★ **起動中に再度 `.bat`** → 前のを終了してから起動し直す（`taskkill`） | ☐ | ⚠️ ここが効かないと打鍵が 2 本の NDJSON に混ざる |
+| 7 | ⚠️ ログに `probe scheduler DISABLED …`（★ **出ない見込み**） | ☐ | `windows_subsystem="windows"` でコンソールが無い。`gse-next.exe > gse-log.txt 2>&1` で拾えるかは**未実測** |
+| 8 | （任意）アプリ内「提出する」で `.age` ができる | ☐ | `gse-submit.exe` / `pubkey.txt` が隣にあることの検証 |
+
+⚠️ ★ **失敗したらログ・スクリーンショットをそのまま持ち帰る。推測で直さない。**
+★ 「動かなかった」と「試していない」を書き分ける。
