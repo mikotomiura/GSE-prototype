@@ -180,9 +180,60 @@ def check_against_assignment(spec: dict, seed: int, r: Report) -> None:
 # ---------------------------------------------------------------------------
 # 3. NDJSON ファイル名（重複・欠落）
 # ---------------------------------------------------------------------------
+EXECUTION_MODES = ("onsite", "athome")
+
+
+def check_execution_mode(spec: dict, r: Report) -> None:
+    """★ 第 9 版 `§2.14`: 実施形態 (来所 / 無人在宅) が記録されているかを見る。
+
+    ⚠️ ★ **判定にも除外にも使わない** (`§3.6` 無変更)。ここが見るのは「記録されているか」だけである。
+
+    ⚠️ ★ **なぜ検査が要るか**: `§2.14-3` は「報告時に内訳 (来所 n / 在宅 n) を必ず併記する」と
+    凍結した。⚠️ **文書で義務を作っただけで保存先が空のまま緑になる**なら、その義務は効かない
+    (2026-08-04 の `/cross-review` で Codex が指摘した)。
+    ★ このプロジェクトが 5 回繰り返している「決定を変えたら検査のほうも増やす」と同じ型である。
+
+    ★ **緩めすぎない設計** (`I-1` と同じ): 実施前 (file が 1 つも無い) は **note**、
+    実施済み (file がある) のに未記録なら **fail**。
+    ⚠️ パイロットは `§2.14-7` により形態の区別が無いので対象外。
+    """
+    subject = spec.get("subject", "?")
+    # ⚠️ ★ 確証仕様は "confirmatory" キーを**持たない**（assign.assign の戻り値）。
+    #    パイロットだけが "confirmatory": False を明示する（assign.pilot_assign）。
+    #    → `not spec.get("confirmatory")` と書くと**確証側まで素通り**する（実測で踏んだ）。
+    if spec.get("confirmatory") is False:
+        return  # §2.14-7: P-1 / P-2 は研究者本人が実施するので形態の区別が無い
+    mode = spec.get("execution_mode")
+    executed = any(b.get("file") for b in spec.get("blocks", []))
+    if mode is None:
+        if executed:
+            r.fail(f"{subject}: 実施済みなのに execution_mode が未記録。"
+                   f"§2.14-3 は報告時に実施形態の内訳を併記することを要求している"
+                   f'（blocks/{subject}.json に "execution_mode": "onsite" か "athome" を書く）')
+        else:
+            r.note(f"{subject}: execution_mode が未記録 = **まだ実施していない**"
+                   f"（実施したら onsite / athome を書き足すこと・§2.14）")
+        return
+    if mode not in EXECUTION_MODES:
+        r.fail(f"{subject}: execution_mode が {mode!r}。"
+               f"{' / '.join(EXECUTION_MODES)} のいずれかにする（§2.14）")
+
+
 def check_files(spec: dict, seen: dict[str, str], r: Report) -> None:
     subject = spec.get("subject", "?")
     local: dict[str, int] = {}
+
+    # ★ 実施前（前日に割付を置いた状態）と、記入漏れを区別する。
+    #   `protocol.md §6` は「前日まで: assign.py --json > blocks/P0xx.json を作り、
+    #   validate_blocks.py が緑」を要求している。実施前は NDJSON がまだ存在しないので
+    #   file は 1 つも埋まらない。**全ブロック未記入なら未実施**であり、転記ミスではない。
+    #   ⚠️ ★ **一部だけ未記入は記入漏れ**として fail のままにする（そこが本当の事故である）。
+    n_with_file = sum(1 for b in spec["blocks"] if b.get("file"))
+    if n_with_file == 0:
+        r.note(f"{subject}: NDJSON 名が 1 つも未記入 = **まだ実施していない**"
+               f"（実施したらブロックごとに file を書き足すこと・protocol.md §2.2）")
+        return
+
     for b in spec["blocks"]:
         n = b.get("block")
         f = b.get("file")
@@ -295,6 +346,23 @@ def scan_ndjson(path: pathlib.Path) -> dict[str, int]:
 
 def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
     subject = spec.get("subject", "?")
+
+    # ★ 「まだ実施していない」と「実施したのに転記し忘れた」を区別する。
+    #   `check_files` は全ブロック未記入を note（未実施）として通すが、
+    #   ⚠️ **dataset に NDJSON が実在するならそれは未実施ではなく転記漏れ**である。
+    #   ここで捕まえないと、実施後に file 列を丸ごと書き忘れても緑になってしまう
+    #   （下の loop は `if not f: continue` で黙って飛ばすため）。
+    if not any(b.get("file") for b in spec["blocks"]):
+        d = dataset / "raw" / subject
+        existing = sorted(d.glob("*.ndjson")) if d.is_dir() else []
+        if existing:
+            r.fail(f"{subject}: dataset に NDJSON が {len(existing)} 本あるのに、"
+                   f"割付ファイルに file が 1 つも書かれていない。"
+                   f"記録用紙から転記すること (protocol.md §2.2)")
+        else:
+            r.note(f"{subject}: dataset にも NDJSON が無い = **まだ実施していない**")
+        return
+
     for b in spec["blocks"]:
         n, f = b.get("block"), b.get("file")
         if not f:
@@ -335,6 +403,7 @@ def validate_spec(spec: dict, seed: int, seen: dict[str, str],
         return r  # 構成が壊れているなら以降の照合は意味を持たない
     check_against_assignment(spec, seed, r)
     check_files(spec, seen, r)
+    check_execution_mode(spec, r)
     check_manipulation_answers(spec, r)
     check_produced_chars(spec, r)
     if dataset is not None:
@@ -394,6 +463,8 @@ def _good_spec(seed: int, subject: str = "P015") -> dict:
     by_no = {b["block"]: b for b in spec["blocks"]}
     # 「直前のほうが詰まった」を一貫して選んだ回答（内容は検査対象でない・形だけ使う）
     spec["manipulation_check_answers"] = [{"block": n, "harder": n} for n in MCHECK_BLOCKS]
+    # ★ 第 9 版 §2.14: 実施済みの正常系なので実施形態も記録済みにする。
+    spec["execution_mode"] = "onsite"
     assert by_no[1]["condition"] == "copy"
     return spec
 
@@ -412,6 +483,23 @@ def selftest() -> int:
                          f"{'PASS' if r.ok else 'FAIL: ' + r.fails[0]}")
 
     case("正常系", lambda s: None, expect_fail=False)
+    # ★★ 第 9 版 §2.14-3 の報告義務に、保存先と検査があることを固定する
+    #    （2026-08-04 の /cross-review で Codex が「文書だけ増えて検査が無い」と指摘）。
+    case("★ 実施済みなのに実施形態が未記録",
+         lambda s: s.update(execution_mode=None), expect_fail=True)
+    case("★ 実施形態の値が語彙外",
+         lambda s: s.update(execution_mode="ときどき在宅"), expect_fail=True)
+    case("実施形態 athome は正常",
+         lambda s: s.update(execution_mode="athome"), expect_fail=False)
+
+    def _before_execution(s: dict) -> None:
+        """★ 実施前（前日に割付を置いた状態）は実施形態も未記録でよい = 緑（I-1 と同じ）。"""
+        for b in s["blocks"]:
+            b.pop("file", None)
+        s.pop("manipulation_check_answers", None)
+        s["execution_mode"] = None
+
+    case("★ 実施前は実施形態が未記録でも緑", _before_execution, expect_fail=False)
     case("ブロック欠落", lambda s: s["blocks"].pop(), expect_fail=True)
     case("copy 位置ずれ", lambda s: s["blocks"][0].update(condition="HI"), expect_fail=True)
     case("条件の取り違え",
@@ -426,11 +514,42 @@ def selftest() -> int:
     case("NDJSON 名の重複",
          lambda s: s["blocks"][2].update(file=s["blocks"][1]["file"]), expect_fail=True)
     case("NDJSON 名の欠落", lambda s: s["blocks"][4].pop("file"), expect_fail=True)
+    # ★ 実施前（前日に割付だけ置いた状態）と、記入漏れを区別する
+    #   protocol.md §6「前日まで validate_blocks.py が緑」を実装が満たしているかの検査。
+    case("実施前（全ブロック未記入）は緑",
+         lambda s: [b.pop("file", None) for b in s["blocks"]], expect_fail=False)
+    case("★ 一部だけ記入は記入漏れとして赤",
+         lambda s: [b.pop("file", None) for b in s["blocks"][1:]], expect_fail=True)
     case("強制比較が 6 件", lambda s: s["manipulation_check_answers"].pop(), expect_fail=True)
     case("強制比較が二択の外",
          lambda s: s["manipulation_check_answers"][0].update(harder=1), expect_fail=True)
     case("produced_chars が非整数", lambda s: s["blocks"][1].update(produced_chars="350"),
          expect_fail=True)
+
+    # ★★ 「未実施」と「実施したのに転記し忘れた」の区別（--dataset 指定時）
+    #    ⚠️ 上の「実施前は緑」を入れたことで、**実施後に file 列を丸ごと書き忘れても
+    #    緑になる**穴が生まれうる（check_dataset は `if not f: continue` で飛ばすため）。
+    #    ★ dataset 側に NDJSON が実在するかどうかで区別できていることを固定する。
+    with tempfile.TemporaryDirectory() as td:
+        ds = pathlib.Path(td)
+        spec_no_files = _good_spec(seed)
+        subj = spec_no_files["subject"]
+        for b in spec_no_files["blocks"]:
+            b.pop("file", None)
+
+        # (a) dataset に NDJSON が無い → 未実施なので緑
+        r_a = validate_spec(spec_no_files, seed, {}, ds)
+        if not r_a.ok:
+            fails.append(f"未実施（dataset に NDJSON 無し）が緑にならない: {r_a.fails[0]}")
+
+        # (b) dataset に NDJSON がある → 転記漏れなので赤
+        raw = ds / "raw" / subj
+        raw.mkdir(parents=True)
+        (raw / "gse_00000000_000000.ndjson").write_text("", encoding="utf-8")
+        r_b = validate_spec(spec_no_files, seed, {}, ds)
+        if r_b.ok:
+            fails.append("★ dataset に NDJSON があるのに file 未記入が緑になった"
+                         "（実施後の転記漏れを見逃す）")
 
     # ★★ 非開示の回帰テスト（`/cross-review` 2026-08-03 の HIGH 指摘）
     #    docstring は「条件ラベルを画面に出さない」と約束している。★ **約束と実装が食い違う**のが

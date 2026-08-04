@@ -103,7 +103,15 @@ PROMPT="独立した第二意見として以下の git diff をレビューし�
 $(cat "$TMPDIR_WORK/input.diff")"
 
 # 固定パラメータで Codex を呼ぶ
+# ★ -C で作業ルートを一時ディレクトリに閉じる (2026-08-04)。
+#   ⚠️ これが無いと codex は **repo ルートで動き、diff とは無関係にリポジトリを読み返す**。
+#   2026-08-03 に 1 回で 458,940 トークン (日次予算 200,000 の 2 倍超) を消費した原因がこれである。
+#   レビュー対象の diff は PROMPT に入っているので、repo への読み取りは不要。
+#   ★ `-C` / `--cd` は `codex exec --help` で実在を確認済み (codex-cli 0.142.5)。
+#   ⚠️ 予算ガードは「呼ぶ前」しか見られず、1 回の呼び出しが予算を食い尽くすのを止められない。
+#   入力側を絞るこの措置が、現状ゆいいつの実効的な歯止めである。
 if ! codex exec --json --sandbox read-only --skip-git-repo-check \
+  -C "$TMPDIR_WORK" \
   -m gpt-5.5 -c model_reasoning_effort=medium \
   - <<< "$PROMPT" > "$TMPDIR_WORK/result.jsonl"; then
   echo "[run-codex-review] FAILED: codex exec error" >&2

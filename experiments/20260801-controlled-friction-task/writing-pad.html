@@ -68,6 +68,24 @@
     margin-top: 14px; padding: 10px 14px; font-size: 13px; line-height: 1.7;
     background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px; color: #7c2d12;
   }
+
+  /* ★ 課題文パネル（build_task_pages.py が差し込む。単体で開いたときは存在しない） */
+  .task {
+    margin-bottom: 16px; padding: 16px 20px;
+    background: #fff; border: 1px solid #a8a29e; border-radius: 6px;
+    max-height: 42vh; overflow-y: auto;
+    /* ★★ コピーさせない。紙で配っていたときは物理的にペーストできず、
+       preregistration.md §5.1 は「external_paste_chars は全ブロック 0」と宣言していた。
+       画面提示に変えてもその前提を保つ。⚠️ これは**入力への介入ではない**
+       （§2.11 は「パッドはペーストを禁止しない」= 被験者の打鍵挙動に手を出さない、という意味）。 */
+    user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none;
+  }
+  .task h2 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
+  .task h3 { font-size: 14px; margin: 14px 0 4px; font-weight: 600; color: #44403c; }
+  .task p { margin: 6px 0; }
+  .task .fiction { font-size: 13px; color: #7c2d12; }
+  /* ★ 生成版では textarea を少し低くして、課題文と記入欄が同時に見えるようにする */
+  body.has-task textarea { height: 34vh; min-height: 200px; }
 </style>
 </head>
 <body>
@@ -77,6 +95,8 @@
     <label class="block-no">ブロック <input id="block" type="text" inputmode="numeric"
       autocomplete="off" spellcheck="false" aria-label="ブロック番号"></label>
   </header>
+
+  <!--G1_TASK_PANEL_SLOT-->
 
   <!--
     ★ 補完・自動修正を全部切る。ここが B-5 の本体である。
@@ -111,6 +131,17 @@
   var pad = document.getElementById("pad");
   var out = document.getElementById("count");
   var clearBtn = document.getElementById("clear");
+
+  // ★ build_task_pages.py が生成したブロックページでは window.G1_BLOCK が入っている。
+  //   その場合、ブロック番号は**割付から決まっている**ので手入力させない
+  //   （手入力はそこで取り違えが起きる。protocol.md §2.3「転記は 1 方向だけ」）。
+  //   単体で開いたとき（従来どおりの記入パッド）は undefined で、入力欄のまま動く。
+  var blockInput = document.getElementById("block");
+  if (typeof window.G1_BLOCK !== "undefined" && blockInput) {
+    blockInput.value = window.G1_BLOCK;
+    blockInput.readOnly = true;
+    document.body.classList.add("has-task");
+  }
 
   // ★ validate_materials.py の count_chars と同じ規則:
   //   空白（\s）と Unicode カテゴリ C（制御・書式・私用領域外の非文字）を数えない。

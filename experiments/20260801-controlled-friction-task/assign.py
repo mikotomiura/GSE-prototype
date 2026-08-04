@@ -123,11 +123,44 @@ def assign(subject: str, seed: int) -> dict:
         "arrangement_note": "A: topic01-04=HI / topic05-08=LO,  B: topic05-08=HI / topic01-04=LO (preregistration.md 2.7)",
         "condition_sequence_g1": conds,
         "blocks": blocks,
+        # ★★ 第 9 版 §2.14: 実施形態 (来所 / 無人在宅) を被験者ごとに記録する共変量。
+        #    実施後に "onsite" | "athome" を手で書き足す。⚠️ **判定にも除外にも使わない**
+        #    (§3.6 無変更)。§2.14-3 の報告義務は「内訳の併記」なので保存先が要る。
+        #    ⚠️ validate_blocks.py が「実施済みなのに未記録」を fail にする。
+        "execution_mode": None,
         "frozen_sources": ["preregistration.md 2.3", "preregistration.md 2.7", "SEED"],
     }
 
 
-def pilot_assign(seed: int, topic: int = 1) -> dict:
+def validate_pilot_topic(topic: int) -> None:
+    """★ P-1 の題材番号は 1..N_TOPICS でなければならない。
+
+    範囲外を黙って受けると `materials/topic09_hi.md` のような**存在しないパス**を
+    割付表に出してしまい、当日「封筒に入れる紙が無い」形でしか露見しない。
+    """
+    if not 1 <= topic <= N_TOPICS:
+        raise ValueError(
+            f"--pilot-topic は 1..{N_TOPICS} であること (指定: {topic})。"
+            f" 本番用の課題文は topic01..topic{N_TOPICS:02d} しか無い (§2.7)"
+        )
+
+
+def pilot_subject(label: str | None) -> str:
+    """★ P-1 の被験者 ID。`validate_blocks.py` は **ファイル名 == subject** を要求する
+    （`blocks/<subject>.json`）ので、P-1 を複数回回すときはここを分けないと
+    **割付ファイルが上書きされる**か、ファイル名不一致で赤くなる。
+    """
+    if label is None:
+        return "PILOT"
+    if not re.fullmatch(r"[A-Za-z0-9]{1,8}", label):
+        raise ValueError(
+            f"--pilot-label は英数字 1..8 文字であること (指定: {label!r})。"
+            " ファイル名 blocks/PILOT-<label>.json になるため"
+        )
+    return f"PILOT-{label}"
+
+
+def pilot_assign(seed: int, topic: int = 1, label: str | None = None) -> dict:
     """★ パイロット段階 P-1 の縮小セッション（copy / LO / HI / copy の 4 ブロック）。
 
     ⚠️ **これは確証デザインではない。** 確証デザインは 10 ブロック（copy + G1 8 + copy）であり、
@@ -136,7 +169,19 @@ def pilot_assign(seed: int, topic: int = 1) -> dict:
       (ii) 課題文と手順が機能するか
     の 2 点だけであり、**判定を一切行わない**（§2.8）。
     したがって並べ替え検定も操作チェックも走らせない（C(2,1)=2 では p<0.05 に到達できない）。
+
+    ★ `topic` は P-1 を**複数回**回すときに変える（研究者判断 2026-08-03 = G-4）。
+    2 回目で同じ題材を使うと、被験者は 1 回目で HI / LO の両方を書き終えており
+    **内容を完全に知った状態**になる。P-1 の目的は打鍵量の測定なので、
+    それでは「5 分で十分な打鍵が出るか」の答えが**速く書けるほうへ歪む**。
+    ⚠️ ★ `rng_for` のキーは `"PILOT"` のまま変えない。
+    → 題材を変えても **LO / HI の提示順は変わらない**（`--pilot` 単独の出力は後方互換）。
+      P-1 は判定しないので順序効果を統制する必要が無く、
+      むしろ**順序を両回で揃えるほうが 2 回の比較を素直にする**。
     """
+    validate_pilot_topic(topic)
+    subject = pilot_subject(label)
+    # ★ rng のキーは label に依らず "PILOT" 固定（提示順を両回で揃える・後方互換）
     rng = rng_for(seed, "PILOT")
     order = ["LO", "HI"]
     rng.shuffle(order)
@@ -153,9 +198,10 @@ def pilot_assign(seed: int, topic: int = 1) -> dict:
     blocks.append({"block": 4, "condition": "copy", "topic_id": "copy",
                    "material": "materials/copy.md", "manipulation_check": False})
     return {
-        "subject": "PILOT",
+        "subject": subject,
         "seed": seed,
         "stage": "P-1",
+        "pilot_topic": topic,
         "confirmatory": False,
         "arrangement": None,
         "warning": "NOT the confirmatory design. 4 blocks, 1 topic, no verdict. See preregistration.md 2.8.",
@@ -254,6 +300,46 @@ def selftest(seed: int) -> int:
     if any(b["manipulation_check"] for b in p["blocks"]):
         fails.append("pilot: 強制比較は縮小版では取らない（比較の鎖が成立しない）")
 
+    # ★ --pilot-topic（G-4）: 題材を変えても順序は変わらず、材料パスだけが変わること
+    p2 = pilot_assign(seed, 2)
+    if {b["topic_id"] for b in p2["blocks"] if b["condition"] != "copy"} != {"topic02"}:
+        fails.append("pilot: --pilot-topic 2 が topic02 を指していない")
+    if any(b["material"] != f"materials/{b['topic_id']}_{b['condition'].lower()}.md"
+           for b in p2["blocks"] if b["condition"] != "copy"):
+        fails.append("pilot: --pilot-topic 2 の課題文パスが題材/条件と一致しない")
+    if [b["condition"] for b in p2["blocks"]] != [b["condition"] for b in p["blocks"]]:
+        fails.append("pilot: 題材を変えたら条件の順序まで変わった"
+                     "（rng_for のキーは 'PILOT' 固定であること = --pilot 単独の後方互換）")
+    if p["pilot_topic"] != 1 or p2["pilot_topic"] != 2:
+        fails.append("pilot: pilot_topic が割付ファイルに記録されていない"
+                     "（どの回がどの題材だったか後から分からなくなる）")
+    # ★ 範囲外は黙って通さない（存在しない materials/topicNN を割付表に出さない）
+    for bad in (0, N_TOPICS + 1, -1):
+        try:
+            pilot_assign(seed, bad)
+        except ValueError:
+            pass
+        else:
+            fails.append(f"pilot: --pilot-topic {bad} が拒否されない（存在しない課題文を指す）")
+
+    # ★ --pilot-label（G-1）: validate_blocks.py は「ファイル名 == subject」を要求するので、
+    #   P-1 を複数回回すなら subject が分かれていなければ割付ファイルを置けない
+    if p["subject"] != "PILOT":
+        fails.append("pilot: label 未指定なら subject は 'PILOT'（後方互換）")
+    labeled = pilot_assign(seed, 2, "mac")
+    if labeled["subject"] != "PILOT-mac":
+        fails.append(f"pilot: --pilot-label mac の subject が PILOT-mac でない -> {labeled['subject']}")
+    if [b["condition"] for b in labeled["blocks"]] != [b["condition"] for b in p["blocks"]]:
+        fails.append("pilot: label を付けたら条件の順序まで変わった（rng キーは 'PILOT' 固定であること）")
+    for bad_label in ("", "with space", "toolonglabel", "P/015"):
+        try:
+            pilot_assign(seed, 1, bad_label)
+        except ValueError:
+            pass
+        else:
+            fails.append(f"pilot: --pilot-label {bad_label!r} が拒否されない"
+                         "（ファイル名になるので英数字に限る）")
+
     # 決定性: 同じ入力なら同じ出力
     if assign("P015", seed) != per_subject["P015"]:
         fails.append("決定的でない（同じ seed / 被験者で結果が変わる）")
@@ -286,6 +372,14 @@ def main() -> int:
     ap.add_argument("--subject", help="被験者 ID (例: P015)")
     ap.add_argument("--pilot", action="store_true",
                     help="パイロット段階 P-1 の縮小セッション（4 ブロック・確証デザインではない）")
+    ap.add_argument("--pilot-label", metavar="LABEL",
+                    help="P-1 を複数回回すときの識別子（例: win / mac）。"
+                         "被験者 ID が PILOT-<LABEL> になり、割付は blocks/PILOT-<LABEL>.json に置く"
+                         "（★ validate_blocks.py はファイル名 == subject を要求する）")
+    ap.add_argument("--pilot-topic", type=int, default=1, metavar="N",
+                    help=f"P-1 で使う題材番号 1..{N_TOPICS}（既定 1）。"
+                         "★ P-1 を 2 回以上回すときは回ごとに変える"
+                         "（同じ題材だと 2 回目は内容既知になり打鍵量の測定が歪む）")
     ap.add_argument("--seed-file", default=str(here / "SEED"))
     ap.add_argument("--json", action="store_true", help="機械可読な JSON を出す")
     ap.add_argument("--selftest", action="store_true")
@@ -294,9 +388,30 @@ def main() -> int:
     seed = read_seed(pathlib.Path(a.seed_file))
     if a.selftest:
         return selftest(seed)
+    # ★ --pilot と --subject の同時指定を黙って優先解決しない（/cross-review 2026-08-03）。
+    #   下の分岐は --pilot を先に見るので、--subject の値が**捨てられたことに気づけない**。
+    #   このプロジェクトの一貫方針は「黙って無視すると事故になる」である。
+    if a.pilot and a.subject:
+        ap.error("--pilot と --subject は同時に指定できない。"
+                 "P-1（縮小セッション）と確証デザインは別物である（preregistration.md §2.8）")
+        return 2
     if a.pilot:
-        result = pilot_assign(seed)
+        try:
+            result = pilot_assign(seed, a.pilot_topic, a.pilot_label)
+        except ValueError as e:
+            ap.error(str(e))
+            return 2
     elif a.subject:
+        # ★ --pilot-topic / --pilot-label は P-1 専用。確証デザインの題材は §2.7 の配置 A/B が
+        #   決めるので実験者が選べない。黙って無視すると「指定したのに効かない」事故になる。
+        if a.pilot_topic != 1:
+            ap.error("--pilot-topic は --pilot と併用する。確証デザインの題材は "
+                     "§2.7 の配置 (A/B) が決めるので実験者は選べない")
+            return 2
+        if a.pilot_label is not None:
+            ap.error("--pilot-label は --pilot と併用する（確証標本の被験者 ID は "
+                     "Phase1 のロスターが唯一の採番元・protocol.md §2.0）")
+            return 2
         result = assign(a.subject, seed)
     else:
         ap.error("--subject / --pilot / --selftest のいずれかが要る")

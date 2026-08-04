@@ -87,6 +87,11 @@ var MGMT_SHEET_PROP_G1 = "GSE_G1_MGMT_SHEET_ID";
 //    HEADER_KEYS も同じ版に直すこと。**文書だけ直して実装が追随しない**事故が
 //    このプロジェクトで 2 回起きている（decisions.md E-6 / E-7）。
 var Q_SUBJECT_ID = "被験者ID";
+
+// ★★ 第 8 版 §2.12-4: 事前にどれだけ読んだかを G1-S で記録する。
+//    ⚠️ **判定に使わない・除外にも使わない**（§3.6 無変更）。§3.8 の限界の記述に使う。
+var Q_S_PREREAD = "事前にお送りした資料を、当日までにどのくらいご覧になりましたか。";
+var Q_S_PREREAD_NOTE = "書く内容を考えておいた場合、どのくらい考えたか教えてください（任意）。";
 var Q_BLOCK_NO = "ブロック番号";
 var Q_HARDER = "より詰まったのはどちらですか";
 // 二択の選択肢文字列（相対表現。★ ブロック番号を被験者に計算させない）。
@@ -106,6 +111,12 @@ function setupG1Forms() {
   var url = buildManagementSheet();
   Logger.log("🎉 G1 フォーム 3 本 ＋ 管理シート 作成完了: " + url);
   Logger.log(listG1FormUrls());
+  if (!G1_CONTACT) {
+    Logger.log("⚠️ ★ G1_CONTACT が空です。受付メールは送れません（fail-closed）。");
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("⚠️ ★ PHASE1_MGMT_SHEET_ID が空です。P-ID の採番ができません（採番元は Phase1 のロスター）。");
+  }
 }
 
 function listG1FormUrls() {
@@ -128,6 +139,12 @@ function listG1FormUrls() {
   });
   return out.join("\n");
 }
+
+// ★ G1-C の設問タイトル。**回答取得（onG1ConsentSubmit）と共有する**。
+//   ⚠️ 片方だけ変えると、提出されても氏名やメールが取れずに黙って発番が止まる。
+var Q_C_PID = "参加者ID（お持ちの方のみ）";
+var Q_C_NAME = "お名前";
+var Q_C_EMAIL = "メールアドレス";
 
 // ============================================================
 // G1-C 同意フォーム（consent.md が文面の真実源）
@@ -174,7 +191,11 @@ function buildConsentForm() {
   );
   form.setCollectEmail(false); // 下の設問で明示的に取る（何を取るかを本人に見せる）
   form.setShowLinkToRespondAgain(false);
-  form.setConfirmationMessage("ご回答ありがとうございます。実験者にお知らせください。");
+  // ★ 募集でも当日でも使える文言にする（当日は実験者が同席している）。
+  form.setConfirmationMessage(
+    "ご回答ありがとうございます。参加者ID と当日のご案内をメールでお送りします。\n" +
+      "（その場でご回答いただいた場合は、実験者にお知らせください。）"
+  );
 
   addSectionHeader(
     form,
@@ -207,16 +228,17 @@ function buildConsentForm() {
   // ★ P-ID は Phase1 と共有する（同じ人＝同じ ID）。以前ご参加の方は既にお持ちなので書いてもらう。
   //   ⚠️ 必須にしない — 初参加の方は持っていない（その場合は実験者が Phase1 側で採番する）。
   var pid = form.addTextItem();
-  pid.setTitle("参加者ID（お持ちの方のみ）");
+  pid.setTitle(Q_C_PID);
   pid.setHelpText(
     "以前 GSE の検証にご参加いただいた方は、そのときお伝えした P から始まる記号をご記入ください。" +
       "初めての方は空欄で構いません。"
   );
-  form.addTextItem().setTitle("お名前").setRequired(true);
+  form.addTextItem().setTitle(Q_C_NAME).setRequired(true);
   var mail = form.addTextItem();
-  mail.setTitle("メールアドレス");
+  mail.setTitle(Q_C_EMAIL);
   mail.setRequired(true);
   mail.setValidation(FormApp.createTextValidation().requireTextMatchesPattern(".+@.+").build());
+
 
   recordFormUrl_("G1_CONSENT", form, "G1-C 説明・同意");
   Logger.log("G1-C 同意フォームを構築した: " + form.getPublishedUrl());
@@ -304,6 +326,28 @@ function buildPostSurveyForm() {
   form
     .addParagraphTextItem()
     .setTitle("そう感じた場合、どのあたりが違うと思いましたか（任意）。");
+
+  // --- 1b. ★★ 事前にどれだけ読んだか（第 8 版 §2.12-4）---------------------
+  // ⚠️★ **判定に使わない。除外にも使わない**（§3.6 無変更）。§3.8 の限界の記述に使う。
+  //    §2.12（第 8 版）で課題文を来所前に開示したので、事前学習の量が
+  //    被験者ごとにばらつく。⚠️ 強制できないので、せめて記録する。
+  //    ⚠️ ★ **自己申告であり検証できない**ことも §3.8 に書いてある。
+  addSectionHeader(
+    form,
+    "1b. 事前にお送りした資料について",
+    "★ 正解はありません。**読んでいなくても全く問題ありません。**\n" +
+      "⚠️ この回答で参加者を除外したり、評価を変えたりすることはありません。"
+  );
+  var preread = form.addMultipleChoiceItem();
+  preread.setTitle(Q_S_PREREAD);
+  preread.setChoices([
+    preread.createChoice("開いていない"),
+    preread.createChoice("ざっと目を通した"),
+    preread.createChoice("一通り読んだ"),
+    preread.createChoice("読んだうえで、書く内容も考えておいた"),
+  ]);
+  preread.setRequired(true);
+  form.addParagraphTextItem().setTitle(Q_S_PREREAD_NOTE);
 
   // --- 2. ★ B-1 の実測（プローブが本当に出なかったか）----------------------
   // preregistration.md §2.6 は「アプリ内プローブを使わない」と凍結し、§5.4 の kill switch で
@@ -472,7 +516,7 @@ function clearShortUrls() {
 // 4 タブを持つ。★ G1 は **リンク集 / G1 実施トラッキング の 2 タブだけ**にする:
 //   - **参加者ロスターを作らない** — P-ID と実名の対応表は Phase1 側が真実源だから（上記）。
 //     2 か所に持つと必ずずれるうえ、PII の複製が増える。
-//   - **進捗ダッシュボードを作らない** — G1 は 1 人 1 回の来所で完結するので、
+//   - **進捗ダッシュボードを作らない** — G1 は 1 人 1 回の実施機会で完結するので、
 //     Phase1 のような長期追跡の集計値（平均セッション数・継続率）に意味が無い。
 function buildManagementSheet() {
   var props = PropertiesService.getScriptProperties();
@@ -521,11 +565,13 @@ function buildLinksTab_(ss, props) {
     ["", "", "", ""],
     ["項目", "値 / URL", "種別", "備考"],
     [
-      "記入パッド (writing-pad.html) の置き場",
+      "ブロックページ (pages/<P-ID>/blockNN.html) の置き場",
       prevPad || "",
       "手動",
-      "★ 被験者の入力先。全被験者・全ブロックで同一 (preregistration.md §2.11)。" +
-        "実施端末にコピーし、拡張機能なしのプロファイルで開く (protocol.md §1.2)",
+      "★ 課題文と記入欄を 1 画面にしたページ。**紙配布は 2026-08-03 に廃止した** (第 7 版 §2.13)。" +
+        "実施前に `python3 build_task_pages.py --subject <P-ID>` で生成し、実施端末にコピーする。" +
+        "⚠️ ブロック開始時に **そのブロックのファイルだけ**を、拡張機能なしのプロファイルで開く " +
+        "(protocol.md §1.2)。次のファイルを先に開くと先読みで打鍵量の測定が壊れる",
     ],
     [
       "gse-dataset への送付先",
@@ -572,8 +618,20 @@ function buildLinksTab_(ss, props) {
 //    (protocol.md §2.3-1「転記は 1 方向だけ」)。
 var RUN_HEADER = [
   "P-ID",
+  // ★ 募集・日程調整。⚠️ 実名・メールはここに書かない。
+  //   実名↔P-ID の対応表は Phase1 のロスターと G1-C 回答シートが真実源である。
+  //   ⚠️ 「事前案内メール送信日」列は廃止した（事前案内メールを廃止したため・2026-08-03）。
+  "実施予定日",
   "G1-C 同意",
+  // ★★ 第 8 版（2026-08-04）: 課題文の閲覧リンクを事前に送る（preregistration.md §2.12）。
+  //    いつ送ったかを残す。⚠️ URL 自体はここに書かない（割付が推測されうる）。
+  "課題文リンク送信日",
   "実施日",
+  // ★★ 第 9 版（2026-08-04）: 実施形態を共変量として記録する（preregistration.md §2.14）。
+  //    ⚠️ **判定にも除外にも使わない**（§3.6 無変更）。報告時に内訳を併記するための列である。
+  //    ⚠️ ここが無いと §2.14-3 の報告義務に対して**保存先が存在しない**ことになる
+  //       （2026-08-04 の cross-review で Codex が指摘）。
+  "実施形態",
   "実施OS",
   "アプリのビルド",
   "GSE_DISABLE_PROBES=1",
@@ -589,8 +647,58 @@ var RUN_HEADER = [
   "備考",
 ];
 
+// ★★ 実シートのヘッダ行（row 2）と RUN_HEADER が一致しているか。
+//   ⚠️ **runCol_ は「コード側の RUN_HEADER」しか見ない。** 実シートのヘッダが古いままだと、
+//      列名で引いているのに**実シートでは別の列を指す**。
+//   ★ 2026-08-03 に実際に起きた: 旧版で作られた 16 列のシート（実施予定日なし）に対し、
+//      17 列の RUN_HEADER で applyRunValidation_ を回したため、
+//      **日付列「実施日」に「はい/いいえ」のドロップダウンが付いた**（実測・スクリーンショット確認）。
+//   → 黙ってずらさず、**ここで止める**。
+function runHeaderDiff_(sh) {
+  var live = sh.getRange(2, 1, 1, Math.max(sh.getLastColumn(), RUN_HEADER.length)).getValues()[0];
+  var diff = [];
+  for (var i = 0; i < RUN_HEADER.length; i++) {
+    var a = String(RUN_HEADER[i]);
+    var b = String(live[i] === undefined ? "" : live[i]).trim();
+    if (a !== b) diff.push("col" + (i + 1) + ": コード='" + a + "' / シート='" + b + "'");
+  }
+  return diff;
+}
+
+function assertRunHeader_(sh) {
+  var diff = runHeaderDiff_(sh);
+  if (diff.length) {
+    throw new Error(
+      "★ 「G1 実施トラッキング」のヘッダがコードの RUN_HEADER と一致しません。\n" +
+        "⚠️ このまま進めると runCol_ が**別の列**を指し、入力規則や備考が静かにずれます。\n" +
+        diff.join("\n") +
+        "\n→ データが無ければ setupG1Forms() が自動で作り直します。" +
+        "データがある場合は、列を手で合わせてから再実行してください。"
+    );
+  }
+}
+
 function buildRunTab_(ss) {
-  if (ss.getSheetByName("G1 実施トラッキング")) return;
+  var exist = ss.getSheetByName("G1 実施トラッキング");
+  if (exist) {
+    var diff = runHeaderDiff_(exist);
+    if (!diff.length) return; // 一致している = 何もしない（入力データを破壊しない）
+    // ★ ヘッダが古い。データが無いときだけ作り直す（データがあれば人が判断する）。
+    var used = exist.getLastRow() > 2
+      ? exist.getRange(3, 1, exist.getLastRow() - 2, 1).getValues().filter(function (r) {
+          return String(r[0]).trim() !== "";
+        })
+      : [];
+    if (used.length) {
+      throw new Error(
+        "★ 「G1 実施トラッキング」のヘッダが古いのに、データが " + used.length + " 行あります。\n" +
+          diff.join("\n") +
+          "\n⚠️ 勝手に列をずらすと記録が壊れるので中止しました。手で列を合わせてから再実行してください。"
+      );
+    }
+    Logger.log("⚠️ ヘッダが古いのでタブを作り直します（データ行 0）: " + diff.join(" / "));
+    ss.deleteSheet(exist); // ★ 古い入力規則ごと消す（残すと新旧の規則が二重に付く）
+  }
   var sh = ss.insertSheet("G1 実施トラッキング");
   // 行1: 注意バナー。★ ここに何を書いてはいけないかを、シートの上で明示する。
   sh.getRange(1, 1).setValue(
@@ -607,27 +715,47 @@ function buildRunTab_(ss) {
   sh.getRange(2, 1, 1, RUN_HEADER.length).setValues([RUN_HEADER]).setFontWeight("bold");
   sh.setFrozenRows(2);
   sh.setColumnWidth(1, 70);
-  sh.setColumnWidth(16, 260);
+  sh.setColumnWidth(runCol_("備考"), 260);
+}
+
+// ★ ヘッダ名 → 列番号（1 始まり）。
+//   ⚠️ 列番号をハードコードしない。第 6 版で列を 2 つ足したときに、
+//      ハードコードしていた applyRunValidation_ の入力規則が**全部 1 つずつズレた**。
+//      ズレても画面上はドロップダウンが「別の列」に付くだけで、静かに間違う。
+function runCol_(header) {
+  var i = RUN_HEADER.indexOf(header);
+  if (i < 0) {
+    throw new Error("★ RUN_HEADER に列 '" + header + "' がありません（列名を変えたら参照側も直す）");
+  }
+  return i + 1;
 }
 
 // 取り違えを減らすためのドロップダウン。★ 判定に関わる列は 1 つも無い（運用の記録だけ）。
 function applyRunValidation_(ss) {
   var sh = ss.getSheetByName("G1 実施トラッキング");
   if (!sh) return;
+  assertRunHeader_(sh); // ★ ずれたまま規則を貼らない（上のコメント参照）
   var rows = 200;
+  // ★ 先に全部消す。⚠️ 消さないと、列構成を変えたときに**旧位置の規則が残って二重に付く**
+  //   （2026-08-03 実測: B〜G 列すべてにドロップダウンが付いた状態になっていた）。
+  sh.getRange(3, 1, rows, RUN_HEADER.length).clearDataValidations();
   function listRule(values) {
     return SpreadsheetApp.newDataValidation().requireValueInList(values, true).build();
   }
+  function apply(header, values) {
+    sh.getRange(3, runCol_(header), rows, 1).setDataValidation(listRule(values));
+  }
   var yn = ["はい", "いいえ"];
-  sh.getRange(3, 2, rows, 1).setDataValidation(listRule(yn)); // G1-C 同意
-  sh.getRange(3, 4, rows, 1).setDataValidation(listRule(["Windows 11", "macOS"]));
-  sh.getRange(3, 6, rows, 1).setDataValidation(listRule(yn)); // GSE_DISABLE_PROBES
-  sh.getRange(3, 8, rows, 1).setDataValidation(listRule(["A", "B"]));
-  sh.getRange(3, 11, rows, 1).setDataValidation(listRule(yn)); // G1-S
-  sh.getRange(3, 12, rows, 1).setDataValidation(listRule(yn)); // verify-blocks
-  sh.getRange(3, 13, rows, 1).setDataValidation(listRule(yn)); // validate_blocks
-  sh.getRange(3, 14, rows, 1).setDataValidation(listRule(yn)); // 送付
-  sh.getRange(3, 15, rows, 1).setDataValidation(listRule(["", "撤回", "除外"]));
+  apply("G1-C 同意", yn);
+  apply("実施形態", ["来所", "無人在宅"]);
+  apply("実施OS", ["Windows 11", "macOS"]);
+  apply("GSE_DISABLE_PROBES=1", yn);
+  apply("配置(A/B)", ["A", "B"]);
+  apply("G1-S 回答", yn);
+  apply("verify-blocks 実施", yn);
+  apply("validate_blocks 緑", yn);
+  apply("gse-dataset 送付", yn);
+  apply("撤回/除外", ["", "撤回", "除外"]);
 }
 
 // ============================================================
@@ -698,4 +826,478 @@ function recordFormUrl_(key, form, label) {
       publishedUrl: form.getPublishedUrl(),
     })
   );
+}
+
+// ============================================================
+// 募集・日程調整の自動化（第 6 版・研究者判断 2026-08-03）
+// ============================================================
+// ★ preregistration.md §2.12 が「事前案内で何を開示し、何を伏せるか」を凍結している。
+//   本節はその実装であり、**文面を変えるときは §2.12 の表と突き合わせること。**
+//   ⚠️ このプロジェクトは「文書だけ改訂して実装が追随しない」事故を繰り返している
+//      (.steering/20260802-g1-execution-prep/decisions.md E-6 / E-7)。
+//
+// ⚠️⚠️ P-1（パイロット）では使わない。研究者本人が被験者であり課題文の作成者である（§2.12-5）。
+
+// ★★ Phase1 の運用管理シート ID（参加者ロスターがあるスプレッドシート）。
+//    採番元は **Phase1 のロスターただ 1 つ**である（protocol.md §2.0 / Form_G1/README.md）。
+//    ⚠️ G1 側で採番すると 2 か所採番になり、相手の最大値が見えないので**必ず衝突する**。
+//    URL の /spreadsheets/d/<ここ>/edit の <ここ> を貼る。空なら採番系は動かない（fail-closed）。
+//
+// ⚠️★★ **Drive に「【非公開】GSE_Phase1_運用管理シート」が 2 つある**（2026-08-03 実測）。
+//    取り違えると **P-ID が既存参加者と衝突する**ので、下の ID を勝手に差し替えないこと。
+//      ✅ 1ND5HSXZ...  参加者ロスター = P006..P014（現行・最終更新 2026-08-03）→ 次は P015
+//      ❌ 12T8WU4D...  参加者ロスター = P001..P008（古い・最終更新 2026-06-28）
+//         → こちらを指すと g1NextParticipantId_ が **P009 を返し、実在する P009..P014 と衝突する**。
+//    ★ 見分け方: 「参加者ロスター」タブに **P010 以降が入っているほうが正**。
+var PHASE1_MGMT_SHEET_ID = "1ND5HSXZcD_9vHjKAcM8K8Ow9VFVVwuP4L3pulP6ud7Y";
+
+// ★ true にすると MailApp で自動送信する。既定は false（GmailApp で下書きを作る）。
+//   ⚠️ Phase1 は AUTO_SEND=true で運用しているが、G1 は**対面・少人数**なので既定を下書きにした。
+//      メール送信は取り消せない。文面を一度目で確認してから true にすること。
+// ⚠️ ★ 2026-08-03 の研究者判断で **true**（実送信）に切り替えた。
+//    登録直後に受付メールが届かないと、被験者は P-ID を知らないまま待つことになる。
+//    ⚠️ 送信は取り消せない。文面を変えたら previewRegisterAckEmail() で必ず先に確認する。
+var G1_AUTO_SEND = true;
+
+// 連絡先（★ 実施前に埋める）。空欄のままだと受付メールが止まる（fail-closed）。
+// ⚠️ ★ 日時・場所はメールに書かない（研究者判断 2026-08-03）。対面 1 回きりなので、
+//    日程の確定連絡は研究者が普通に返信するほうが早く、自動化する価値が無い。
+var G1_CONTACT = "三浦尊統（mmiura.network@gmail.com）"; // 研究者判断 2026-08-03
+// ⚠️ ★ consent.md §8「所属・連絡先（実施前に記入）」を埋めるときは、**ここと同じ文字列**にする。
+//    片方だけ直すと、同意文書とメールで連絡先が食い違う。
+
+// ⚠️ ★ 第 6 版にあった G1_TOPIC_TITLES（課題の分野を事前案内メールに載せる）は
+//    **第 7 版で撤回した**。課題文は当日その場で画面提示する（§2.13）ので、
+//    事前に題材を教える必要が無い。→ §2.6 の操作チェックが元の強さに戻る。
+//    ⚠️ ★ **題材名をこのファイルに書き戻さないこと。**
+//       scripts/check_g1_topic_titles.py がメール本文に題材名が混ざっていないかを検査する。
+
+// ------------------------------------------------------------
+// P-ID の採番（★ Phase1 のロスターに対して行う）
+// ------------------------------------------------------------
+// Phase1 の nextParticipantId_ と同じ規則（P + 3 桁ゼロ埋め・既存の最大値 + 1）。
+// ⚠️ ★ 実装を 2 つ持つことになるので、**規則を変えるときは両方**（Form_Phase1 側が正）。
+function g1NextParticipantId_(sheet) {
+  var max = 0;
+  var last = sheet.getLastRow();
+  var values = last > 1 ? sheet.getRange(1, 1, last, 1).getValues() : [];
+  for (var i = 0; i < values.length; i++) {
+    var m = String(values[i][0]).match(/^P(\d+)$/);
+    if (m) {
+      var n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+  }
+  var next = max + 1;
+  return "P" + (next < 1000 ? ("000" + next).slice(-3) : String(next));
+}
+
+// G1 の新規参加者に P-ID を採番し、**Phase1 のロスターに 1 行追加**して返す。
+// ★ 既に Phase1 に参加した人はここを通さない。その人の既存 P-ID をそのまま使う（§2.0）。
+function assignG1ParticipantId() {
+  if (!PHASE1_MGMT_SHEET_ID) {
+    throw new Error(
+      "★ PHASE1_MGMT_SHEET_ID が空です。採番元は Phase1 の参加者ロスターただ 1 つなので、\n" +
+        "Phase1 の運用管理シートの ID を .gs に貼ってから実行してください。\n" +
+        "⚠️ G1 側にロスターを作って採番すると、2 か所採番になり必ず衝突します。"
+    );
+  }
+  var ss = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID);
+  var sheet = ss.getSheetByName("参加者ロスター");
+  if (!sheet) {
+    throw new Error("★ Phase1 の管理シートに「参加者ロスター」タブがありません。ID を確認してください。");
+  }
+  var pid = g1NextParticipantId_(sheet);
+  sheet.appendRow([pid]);
+  Logger.log("✅ P-ID を採番しました: " + pid + "（氏名・メールは Phase1 ロスターに手入力）");
+  Logger.log("🔗 " + ss.getUrl());
+  return pid;
+}
+
+// ログに実アドレスを残さない（data-privacy）。Phase1 の maskEmail_ と同じ考え方。
+function g1MaskEmail_(email) {
+  var s = String(email);
+  var at = s.indexOf("@");
+  if (at <= 1) return "***";
+  return s.charAt(0) + "***" + s.substring(at);
+}
+
+// 終了後のお礼（★ 任意。デブリーフ資料は当日紙で渡す。結果概要の送付希望者向け）。
+function sendThankYouEmail(pid, email) {
+  if (!pid || !email) throw new Error("★ pid と email は必須です。");
+  if (!G1_CONTACT) throw new Error("★ G1_CONTACT が空です。");
+  var subject = "【御礼】研究へのご参加ありがとうございました";
+  var body = [
+    "本日はご参加いただきありがとうございました（参加者ID: " + pid + "）。",
+    "",
+    "当日お渡しした説明のとおり、記録したのはキーを押した時刻とキーの種類、",
+    "日本語変換にかかった時間、書いた文字数だけです。",
+    "★ お書きいただいた文章そのものは保存していません。",
+    "",
+    "★ お願い: 同じ課題をこれから参加される方にも使います。",
+    "  課題の中身（どんな資料が出たか・どちらが難しかったか）は、",
+    "  参加予定のある方にはお話しにならないようお願いします。",
+    "",
+    "結果がまとまりましたら、ご希望の方には概要をお送りします。",
+    "記録の削除をご希望の場合は、いつでもこのメールにご返信ください。",
+    "",
+    G1_CONTACT,
+  ].join("\n");
+  if (G1_AUTO_SEND) {
+    MailApp.sendEmail(email, subject, body);
+    Logger.log("📧 送信しました: " + pid);
+  } else {
+    GmailApp.createDraft(email, subject, body);
+    Logger.log("📝 下書きを作成しました: " + pid);
+  }
+  return subject;
+}
+
+// Phase1 ロスターを P-ID またはメールで引く。見つかれば {pid, row} を返す。
+function g1FindInPhase1Roster_(sheet, opts) {
+  var last = sheet.getLastRow();
+  if (last < 1) return null;
+  var rows = sheet.getRange(1, 1, last, 3).getValues(); // P-ID / 氏名 / メール
+  var email = opts.email ? String(opts.email).trim().toLowerCase() : "";
+  var pid = opts.pid ? String(opts.pid).trim().toUpperCase() : "";
+  for (var i = 0; i < rows.length; i++) {
+    var rowPid = String(rows[i][0]).trim().toUpperCase();
+    var rowEmail = String(rows[i][2]).trim().toLowerCase();
+    if (pid && rowPid === pid) return { pid: rowPid, row: i + 1 };
+    if (email && rowEmail && rowEmail === email) return { pid: rowPid, row: i + 1 };
+  }
+  return null;
+}
+
+// G1 実施トラッキングに P-ID の行が無ければ作る。備考セル（失敗の可視化先）を返す。
+function g1EnsureRunRow_(pid) {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty(MGMT_SHEET_PROP_G1);
+  if (!ssId) {
+    Logger.log("⚠️ G1 管理シートが未作成なのでトラッキング行は作れません（buildManagementSheet() を実行）");
+    return null;
+  }
+  var sh = SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング");
+  if (!sh) return null;
+  // ★ ヘッダがずれていると「備考」が別の列（見出しの無い列）に書かれ、
+  //   送信失敗のフラグを研究者が**見つけられなくなる**。ずれていたら行を作らず記録に残す。
+  //   ⚠️ ここで throw すると onG1ConsentSubmit の採番まで巻き戻るので、null を返して続行させる
+  //      （P-ID の発番と受付メールのほうが優先度が高い）。
+  try {
+    assertRunHeader_(sh);
+  } catch (headerErr) {
+    Logger.log("❌ トラッキング行を作れません（ヘッダ不一致・setupG1Forms を再実行）: " + headerErr);
+    return null;
+  }
+
+  var colPid = runCol_("P-ID");
+  var colNote = runCol_("備考");
+  var last = sh.getLastRow();
+  for (var r = 3; r <= last; r++) {
+    if (String(sh.getRange(r, colPid).getValue()).trim().toUpperCase() === pid) {
+      return sh.getRange(r, colNote); // 既にある（再登録）
+    }
+  }
+  var row = Math.max(last + 1, 3);
+  sh.getRange(row, colPid).setValue(pid);
+  return sh.getRange(row, colNote);
+}
+
+function g1RegisterAckSubject_() {
+  return "【受付】キーボードの打ち方に関する研究 — 参加登録を承りました";
+}
+
+// ★ 受付メール。⚠️ preregistration.md §2.12 の開示範囲を守る:
+//   題材（分野）・課題の型・難易度の示唆・条件名を **書かない**。
+//   （課題文は当日その場で画面提示する = §2.13。事前に教える必要が無い。）
+function g1RegisterAckBody_(pid) {
+  return [
+    "ご登録ありがとうございます。参加登録を承りました。",
+    "",
+    "■ あなたの参加者ID（P-ID）",
+    "    " + pid,
+    "    ※ 記録はこの記号で管理します。お名前とは別に保管します。",
+    "    ※ 当日までこのメールを保管してください。",
+    "",
+    "■ 当日の流れ（約 70 分）",
+    "    ・5 分の作業を 10 回、間に 1 分の休憩をはさみます。",
+    "    ・最初と最後の 1 回ずつは「書き写し」です。考える必要はありません。",
+    "      これは計測器が正しく動いているか確かめるための課題で、隠していることはありません。",
+    "    ・間の 8 回は、資料を読んで 300〜400 字の文章を書いていただきます。",
+    "    ・途中で 7 回、「直前の回と 1 つ前の回のどちらが詰まったか」を 1 つだけ選んでいただきます。",
+    "    ・最後に短いアンケート（5 分ほど）にお答えいただきます。",
+    "",
+    // ★★ 第 8 版（2026-08-04）: 課題文の本文を来所前に開示する（preregistration.md §2.12）。
+    //    ⚠️ 本文そのものはメールに書かず、**別便の閲覧リンク**で渡す
+    //       （sendTaskMaterialsEmail）。理由は 2 つ:
+    //       (a) 登録時点ではまだ割付を作っていない（どの題材が出るか決まっていない）
+    //       (b) ★ メール本文に題材名を書くと、書いた順序が **提示順** を示唆しうる。
+    //          §2.12 は提示順を「開示しない」側に置いている。
+    //    ⚠️ ★ **題材名をこのメール本文に書き戻さないこと。**
+    //       scripts/check_g1_emails.py が両方のメールを同じ基準で検査する。
+    "■ 課題の内容について",
+    "    ★ 当日お読みいただく資料は、**事前にメールでお送りします**（別便）。",
+    // ★ 第 9 版（§2.14）: 在宅実施があるので「お越し」と書かない。
+    "      目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
+    "      ⚠️ どちらでも問題ありません。**準備の量で評価することはありません。**",
+    "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
+    "    ・資料はすべて本実験のために作成した架空のものです。",
+    "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
+    "    ・課題文は当日も画面に表示されます。同じ画面で文章を書いていただきます。",
+    "",
+    "■ 記録するもの / しないもの",
+    "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
+    "    記録しない: ★ どの文字を打ったか（本文）、画面の内容、音声・映像",
+    // ⚠️ ★ 紙署名は 2026-08-03 に廃止した（D-1(a)）。このフォーム（G1-C）の回答が同意の正本である。
+    //    ⚠️ ここを「署名をお願いします」に戻すと、protocol.md §4.1-1 / consent.md /
+    //       Form_G1/README.md と食い違う。**4 か所を同時に直すこと。**
+    "    ※ 書いた文章そのものは保存しません。ご同意はこのフォームの回答で完了しています。",
+    "",
+    "■ 当日までにお願いしたいこと",
+    "    ・日本語入力（IME）は、ふだん使っている設定のままにしてください。",
+    "    ・当日は携帯電話の電源を切ってください。",
+    "",
+    "■ 参加は任意です",
+    "    途中でやめられます。理由の説明は要りません。終わった後でも記録の削除を求められます。",
+    "",
+    "ご不明な点があれば、このメールにご返信ください。",
+    G1_CONTACT,
+  ].join("\n");
+}
+
+// ★ 送信前に内容を確認する（引数なし・送信しない）。
+function previewRegisterAckEmail() {
+  Logger.log("件名: " + g1RegisterAckSubject_());
+  Logger.log("--------");
+  Logger.log(g1RegisterAckBody_("P0XX"));
+  Logger.log("--------");
+  Logger.log("★ §2.12 の開示範囲と一致しているか確認（題材・課題の型・難易度を書かない）。");
+  Logger.log("");
+  Logger.log("件名: " + g1MaterialsSubject_());
+  Logger.log("--------");
+  Logger.log(g1MaterialsBody_("P0XX", "https://example.com/★閲覧専用リンク★"));
+  Logger.log("--------");
+  Logger.log("★ こちらも同じ基準（題材名・課題の型・条件名・提示順を書かない）。");
+}
+
+// ============================================================
+// ★★ 課題文の事前開示（第 8 版・2026-08-04・preregistration.md §2.12）
+// ============================================================
+// ⚠️ ★ **これは判定を緩める可能性のある変更である。** 第 8 版の改訂履歴に向きごとに記録した。
+//    ここは実装であって根拠ではない。文面を変えるときは §2.12 の表と突き合わせること。
+//
+// ⚠️⚠️ **自動化しない。** 送るのは研究者が明示的に実行したときだけである。理由:
+//   (a) 登録時点では割付が無く、その被験者にどの題材が出るか決まっていない
+//   (b) ★ 閲覧専用ドキュメントを作る手作業（権限設定）が必ず挟まる
+//   (c) 送信は取り消せない。⚠️ ★ **URL を取り違えると別の被験者の割付を渡すことになる**
+//
+// ⚠️ ★ **本文に題材名・課題の型・条件名・提示順を書かない。** 中身はリンク先にある。
+//    scripts/check_g1_emails.py が受付メールと同じ基準で本文を検査する。
+
+function g1MaterialsSubject_() {
+  return "【事前資料】キーボードの打ち方に関する研究 — 当日お読みいただく資料";
+}
+
+function g1MaterialsBody_(pid, url) {
+  return [
+    "当日お読みいただく資料をお送りします。",
+    "",
+    "■ 参加者ID（P-ID）",
+    "    " + pid,
+    "",
+    "■ 資料（閲覧のみ）",
+    "    " + url,
+    "",
+    "■ お願い",
+    "    ★ 目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
+    "      ⚠️ **準備の量で評価することはありません。** どちらでも問題ありません。",
+    "    ・当日は同じ内容が画面にも表示されます。手元に印刷する必要はありません。",
+    "    ・終わったあとのアンケートで「事前にどのくらい読んだか」を伺います。",
+    "      ★ 正解はありません。**実験の判定には使いません。**",
+    "",
+    "■ 資料について",
+    "    ・すべて本実験のために作成した架空のものです。",
+    "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
+    "    ・★ **他の方に見せないでください。** 同じ資料を他の参加者にもお願いしています。",
+    "",
+    "ご不明な点があれば、このメールにご返信ください。",
+    G1_CONTACT,
+  ].join("\n");
+}
+
+// 課題文の閲覧リンクを 1 人に送る。★ 研究者が閲覧専用ドキュメントを用意してから実行する。
+//   使い方: sendTaskMaterialsEmail("P015", "xxx@example.com", "https://…")
+function sendTaskMaterialsEmail(pid, email, url) {
+  if (!G1_CONTACT) throw new Error("★ G1_CONTACT が空です。");
+  if (!pid || !email || !url) {
+    throw new Error("★ sendTaskMaterialsEmail(pid, email, url) の 3 つとも必要です。");
+  }
+  // ⚠️ ★ URL の取り違えは「別の被験者の割付を渡す」事故になる。最低限の形式検査をする。
+  if (!/^https:\/\//.test(url)) {
+    throw new Error("★ URL が https:// で始まっていません: " + url);
+  }
+  var subject = g1MaterialsSubject_();
+  var body = g1MaterialsBody_(pid, url);
+  if (G1_AUTO_SEND) {
+    MailApp.sendEmail(email, subject, body);
+    Logger.log("📧 事前資料メールを送信しました → " + g1MaskEmail_(email) + "（" + pid + "）");
+  } else {
+    GmailApp.createDraft(email, subject, body);
+    Logger.log("📝 事前資料メールの下書きを作成しました → " + g1MaskEmail_(email));
+    Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
+  }
+  // 送った日を実施トラッキングに残す（★ URL 自体は書かない。割付が推測されうる）。
+  try {
+    var noteCell = g1EnsureRunRow_(pid);
+    if (noteCell) {
+      var sh = noteCell.getSheet();
+      sh.getRange(noteCell.getRow(), runCol_("課題文リンク送信日")).setValue(new Date());
+    }
+  } catch (e) {
+    Logger.log("⚠️ 送信日を記録できませんでした（メールは送信済み）: " + e);
+  }
+}
+
+// ============================================================
+// ★★ G1-C の提出 → P-ID 採番 → 受付メール（Phase1 の onF1Submit と同型）
+// ============================================================
+// ★ **G1-C がそのまま参加登録である**（研究者判断 2026-08-03）。
+//   G1-C は説明文に consent.md の内容を全部載せ、同意 7 項目・氏名・メールを取っている。
+//   ⚠️ 別に「参加登録フォーム」を作るのは**重複**だった（一度作って廃止した）。
+//   Phase1 も F1（スクリーニング＋同意）を募集時に使い、それをトリガーにしている。
+//
+// 運用:
+//   1. setupG1Forms() を実行済みにする（管理シートが要る）。
+//   2. installG1ConsentTrigger() を **一度だけ** 実行。
+//   3. 以後、G1-C が提出されるたびに onG1ConsentSubmit(e) が自動で走る:
+//      P-ID 採番（Phase1 ロスター）→ G1 実施トラッキングに行追加 → 受付メール。
+//
+// ⚠️ ★ 当日その場で G1-C に回答した場合も同じ経路を通る（受付メールが届くだけで害は無い）。
+//    ★★ **この G1-C の回答が同意の正本である**（研究者判断 2026-08-03 = D-1(a)）。
+//    ⚠️ 紙署名は廃止した。`handouts/G1_説明・同意文書.docx` は
+//       **フォームが開けない機器トラブル時の予備**である（protocol.md §4.1-1）。
+
+function installG1ConsentTrigger() {
+  removeG1ConsentTriggers();
+  if (!FORM_ID_CONSENT) {
+    throw new Error("★ FORM_ID_CONSENT が空です。");
+  }
+  ScriptApp.newTrigger("onG1ConsentSubmit")
+    .forForm(FormApp.openById(FORM_ID_CONSENT))
+    .onFormSubmit()
+    .create();
+  Logger.log("✅ onG1ConsentSubmit トリガを G1-C に設定しました");
+  Logger.log("ℹ️ G1_AUTO_SEND=" + G1_AUTO_SEND + "（false=下書き作成 / true=自動送信）");
+  if (!G1_AUTO_SEND) {
+    Logger.log(
+      "⚠️ ★ G1_AUTO_SEND=false のままだと、登録されても**下書きが作られるだけ**で被験者に届きません。"
+    );
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("⚠️ ★ PHASE1_MGMT_SHEET_ID が空です。採番できないので提出時に中止されます。");
+  }
+}
+
+function removeG1ConsentTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "onG1ConsentSubmit") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("🧹 既存の onG1ConsentSubmit トリガを " + n + " 件削除しました");
+}
+
+// G1-C の回答を取り出す。★ 設問タイトルは Q_C_* 定数と共有する（片方だけ変えない）。
+// ⚠️ 同意 7 項目はフォーム側で必須なので、ここでは検査しない（未同意の提出は原理的に来ない）。
+function g1ConsentAnswers_(response) {
+  var out = { name: "", email: "", pid: "" };
+  var items = response.getItemResponses();
+  for (var i = 0; i < items.length; i++) {
+    var title = items[i].getItem().getTitle();
+    var v = items[i].getResponse();
+    var s = Array.isArray(v) ? v.join(" / ") : String(v == null ? "" : v);
+    if (title === Q_C_NAME) out.name = s.trim();
+    else if (title === Q_C_EMAIL) out.email = s.trim();
+    else if (title === Q_C_PID) out.pid = s.trim().toUpperCase();
+  }
+  return out;
+}
+
+// ★★ G1-C の提出で走る。P-ID 採番 → トラッキング行追加 → 受付メール。
+function onG1ConsentSubmit(e) {
+  if (!e || !e.response) {
+    Logger.log("❌ onG1ConsentSubmit: response が取得できません（トリガ経由で呼んでください）");
+    return;
+  }
+  var a = g1ConsentAnswers_(e.response);
+  if (!a.email) {
+    Logger.log("⛔ G1-C 提出: メールアドレスが空のため発番しません");
+    return;
+  }
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("❌ PHASE1_MGMT_SHEET_ID が未設定。採番元が無いので中止します（回答は失われません）");
+    return;
+  }
+
+  // ★ 同時提出で同じ P-ID が 2 人に出るのを防ぐ（Phase1 と同じ）。
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    Logger.log("❌ ロックを取得できませんでした。手動で assignG1ParticipantId してください: " + lockErr);
+    return;
+  }
+
+  try {
+    var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+    if (!roster) {
+      Logger.log("❌ Phase1 の管理シートに「参加者ロスター」タブがありません（発番中止）");
+      return;
+    }
+
+    // 1) 既存の人か（★ 再提出でも再発番しない = 冪等。Phase1 参加者は既存 ID をそのまま使う）
+    var found = g1FindInPhase1Roster_(roster, { pid: a.pid, email: a.email });
+    var pid;
+    var isNew = false;
+    if (found && found.pid) {
+      pid = found.pid;
+      Logger.log("♻️ 既存の参加者として扱います: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+      if (!String(roster.getRange(found.row, 3).getValue()).trim()) {
+        roster.getRange(found.row, 3).setValue(a.email);
+      }
+    } else {
+      pid = g1NextParticipantId_(roster);
+      roster.appendRow([pid, a.name, a.email]);
+      isNew = true;
+      SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
+      Logger.log("✅ P-ID 発番: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+    }
+
+    // 2) G1 実施トラッキングに行を用意する（★ 実名・メールは書かない）
+    var noteCell = g1EnsureRunRow_(pid);
+
+    // 3) 受付メール。⚠️ ★ ここで例外が出ると「発番済みだが通知が無い」状態になり、
+    //    再提出しても 1) で冪等スキップされるので**永久に届かない**。備考列に可視化する。
+    try {
+      var subject = g1RegisterAckSubject_();
+      var body = g1RegisterAckBody_(pid);
+      if (G1_AUTO_SEND) {
+        MailApp.sendEmail(a.email, subject, body);
+        Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
+      } else {
+        GmailApp.createDraft(a.email, subject, body);
+        Logger.log("📝 受付メールの下書きを作成しました → " + g1MaskEmail_(a.email));
+        Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
+      }
+    } catch (mailErr) {
+      if (noteCell) noteCell.setValue("⚠受付メール未作成-要手動送信: " + mailErr);
+      Logger.log("❌ 受付メールに失敗（P-ID は確定済 " + pid + "）。備考にフラグを立てました: " + mailErr);
+    }
+    Logger.log(isNew ? "🎉 新規登録: " + pid : "🔁 再提出（発番なし）: " + pid);
+  } finally {
+    lock.releaseLock();
+  }
 }

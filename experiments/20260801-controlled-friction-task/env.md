@@ -12,10 +12,51 @@
 | Rust toolchain / `Cargo.lock` | 被験者端末で動かすアプリのビルド元 | TBD |
 | `HMM_VERSION` | `engine.rs` の定数（`feat` 行の出所なので結果にも刻む）。★ **刻印手順は `protocol.md §6.1`**（実施当日・開始前に `env.md` へ、解析前に `config.json` へ） | TBD |
 | ★ 実施 OS | **被験者端末**（Windows 11 / macOS）を記録する。下記の理由で結果解釈に効く | TBD |
+| ★★ 実施形態 | **来所 / 無人在宅**（`preregistration.md §2.14`・第 9 版）。⚠️ **被験者ごとに記録し、報告時に内訳を併記する。判定にも除外にも使わない**（`§3.6` 無変更） | TBD |
 | ★ アプリのビルド | 実施に使った**本番バイナリ**のタグ／コミット（★ 10 セッションは同一バイナリで回す） | TBD |
 | ★ `GSE_DISABLE_PROBES` | **必須 = `1`**（`preregistration.md §5.4`）。⚠️ 立て忘れは `validate_blocks.py --dataset` が捕まえる | TBD |
 | ★ 被験者の入力先 | **`writing-pad.html`**（`preregistration.md §2.11`）。ブラウザとプロファイル（拡張なし）を記録する | TBD |
 | `gse-replay` | ★ **非該当**。`analyze.py` は NDJSON を直接集計し、`gse-replay` も HMM も通さない | — |
+
+## ★★ P-1 の実施記録（実施当日・**最初のブロックより前**に埋める）
+
+`protocol.md §6.1` の刻印手順に従う。⚠️ **時刻は書かない**（本 repo は一時 public 化の運用がある）。
+★ **2 回**回す（`protocol.md §5.1` = 研究者判断 G-1 / G-4）。
+
+### P-1 1 回目
+
+| 項目 | 記入 |
+|---|---|
+| 実施 OS | **Windows 11** ／ ビルド番号: `______` |
+| 題材 | **topic01**（`assign.py --pilot`） |
+| 割付ファイル | `blocks/PILOT-win.json` |
+| アプリのビルド | タグ `v0.1.22` ／ コミット `______`（★ 4 ブロックとも同一バイナリ） |
+| `HMM_VERSION` | `______`（★ 実施に使う**そのビルド**の値。参考: `main` の `engine.rs` は `0.3.0`） |
+| `GSE_DISABLE_PROBES` | `1`（★ launcher `launch-g1-windows.bat` 経由） |
+| 起動ログの確認 | ☐ `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` を確認した ／ ☐ **確認できなかった**（⚠️ ★ Windows の release ビルドは `windows_subsystem = "windows"` でコンソールを持たないため、ダブルクリック起動では**出ない見込み**。客観検証は `validate_blocks.py --dataset` の `probe_assignment` 行 0 で行う） |
+| 実施形態 | **来所**（★ P-1 は研究者本人。`§2.14-7` により形態の区別は非該当） |
+| 週の選択 | ☐ **第 1 週（blind 較正）**（★ 既定値。触っていなければ OK） |
+| 入力先 | `writing-pad.html` ／ ブラウザ: `______` ／ プロファイル: 拡張なし ☐ |
+| 実施日 | `______`（★ 時刻は書かない） |
+
+### P-1 2 回目
+
+| 項目 | 記入 |
+|---|---|
+| 実施 OS | **macOS** ／ バージョン: `______` |
+| 題材 | **topic02**（`assign.py --pilot --pilot-topic 2`） |
+| 割付ファイル | `blocks/PILOT-mac.json` |
+| アプリのビルド | タグ `v0.1.22` ／ コミット `______` |
+| `HMM_VERSION` | `______` |
+| `GSE_DISABLE_PROBES` | `1`（★ launcher `launch-g1-macos.command` 経由） |
+| 起動ログの確認 | ☐ 確認した |
+| 週の選択 | ☐ **第 1 週（blind 較正）** |
+| 入力先 | `writing-pad.html` ／ ブラウザ: `______` ／ プロファイル: 拡張なし ☐ |
+| 実施日 | `______` ／ 1 回目からの間隔: `______`（★ **60 分以上空ける**か翌日） |
+| ⚠️ 既知の欠測 | `ime_dwell_med` が構造的に欠測 → **実質 13 特徴**（`§5.1`） |
+
+⚠️ ★ **解析の前**に `config.json` の `reproducibility.hmm_version` を同じ値に書き換えてコミットする
+（`protocol.md §6.1`）。現在は `TO_BE_STAMPED_AT_EXECUTION` のままである。
 
 ## 依存の少なさについて
 

@@ -31,7 +31,11 @@
 - **macOS**: macOS 13 Ventura 以降, Xcode Command Line Tools
   - TCC 権限はバイナリ変更時にリセットが必要 (`tccutil reset ListenEvent [bundle-id]`)
   - ad-hoc 署名では CDHash が不安定で Input Monitoring が機能しない場合あり
-  - quarantine 属性 (`com.apple.quarantine`) が未署名ビルドをブロックする場合は `xattr -cr` で除去
+  - quarantine 属性 (`com.apple.quarantine`) が未署名ビルドをブロックする場合は
+    ★ **`xattr -dr com.apple.quarantine <path>`** で除去する
+    （⚠️ ★ **`xattr -cr` は使わない** — 全属性を消して**署名を無効化する恐れ**がある。
+    `README.md:147` / `README.ja.md:147` / `docs/participant-setup-guide.md:41` が明示的に禁止しており、
+    ここだけが `-cr` のまま食い違っていた。2026-08-04 に是正）
 - **共通**: Rust stable, Node.js (Frontend), `cargo tauri dev` で開発
 
 ### プラットフォーム固有コーディングガイド
