@@ -608,3 +608,42 @@ Drive の `1GjPUECPOAXBPxq5uXl5EDe6Km5w2MSiM` は**古いまま**である。
 > ★ **同じ内容を持つファイルが 2 つあるときは、必ず両方を grep で数え直す**
 > （`§8` の「決定を変えたら関係する文書を全部同時に直す」と同じ型が、
 > ドキュメントではなく**スクリプト**で起きた）。
+
+---
+
+## Drive 配布物 — 完成（2026-08-04）
+
+### `Gate/G1/G1_実施用_macOS`（7 ファイル）
+
+| ファイル | ローカル | Drive | 照合 |
+|---|---|---|---|
+| `gse-next_0.1.22_aarch64.dmg` | 5,995,136 | **5,995,136** | サイズのみ（研究者が drag & drop） |
+| `launch-g1-macos.command` | 7,991 | **7,991** | base64・バイト一致 |
+| `block01.html` | 7,268 | **7,268** | base64・バイト一致 |
+| `block02.html` | 6,858 | **6,858** | base64・バイト一致 |
+| `block03.html` | 6,642 | **6,642** | base64・バイト一致 |
+| `block04.html` | 7,268 | **7,268** | base64・バイト一致 |
+| `README_先に読む.txt` | （Drive 用に作成） | 3,109 | — |
+
+### `Gate/G1/G1_実施用_Windows`（8 ファイル）
+
+| ファイル | Drive | 一次資料 | 照合 |
+|---|---|---|---|
+| `gse-next.exe` | 10,316,800 | Release と同じ | サイズのみ |
+| `gse-submit.exe` | 960,512 | Release と同じ | サイズのみ |
+| `launch-g1-windows.bat` | **4,574** | 4,574 | base64・バイト一致 |
+| `pubkey.txt` | 507 | 同じ | サイズのみ |
+| `block01〜04.html` | 7268 / 6869 / 6613 / 7268 | 同じ | サイズのみ |
+
+### 照合の限界（★ 正直に残す）
+
+- ★ **`base64Content` で送ったものだけがバイト一致を主張できる**
+  （`.command` / `.bat` / mac の `block01〜04`）
+- ⚠️ ★ **`.dmg` / `.exe` / `pubkey.txt` / Windows の `block0N.html` はサイズしか照合していない。**
+  6 MB / 10 MB のダウンロードが要り、こちらでは中身を見ていない
+  → ★ **バイト同一性は実機で確かめる**:
+  - Windows: T-3 の項目 2・3（`certutil -hashfile … SHA256`。期待値は記録済み）
+  - macOS: `shasum -a 256` = `41069c47a1ab64f19bd9183bc26184207266ccdd29f76e0f4fd96290e2b9da85`
+
+⚠️ ★ **`.dmg` を Drive から落とすと `com.apple.quarantine` が付く**
+（`gh release download` で取ると付かないことを実測）。README に解除手順を記載済み。
