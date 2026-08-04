@@ -82,7 +82,7 @@ P-1 を回している間は着手しない）:
    - ⚠️ 項目 7（`probe scheduler DISABLED …` のログ）は **Windows では出ない見込み**である
      （`main.rs:2` の `windows_subsystem = "windows"`）。★ **出なくても失敗ではない。**
      客観検証は実施後の `validate_blocks.py --dataset`（`probe_assignment` 行 0）で行う
-2. **受付メールは届いたか**（`johndo.mik.080@gmail.com`）。
+2. **受付メールは届いたか**（`j***@gmail.com`）。
    ★ 届いていれば、ずっと未検証だった「**着信**」が閉じる
 3. **G1 実施トラッキングの `P009` 行**を消すか残すか（前セッションのテスト提出で増えた。研究者判断待ち）
 
