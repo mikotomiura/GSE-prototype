@@ -123,6 +123,11 @@ def assign(subject: str, seed: int) -> dict:
         "arrangement_note": "A: topic01-04=HI / topic05-08=LO,  B: topic05-08=HI / topic01-04=LO (preregistration.md 2.7)",
         "condition_sequence_g1": conds,
         "blocks": blocks,
+        # ★★ 第 9 版 §2.14: 実施形態 (来所 / 無人在宅) を被験者ごとに記録する共変量。
+        #    実施後に "onsite" | "athome" を手で書き足す。⚠️ **判定にも除外にも使わない**
+        #    (§3.6 無変更)。§2.14-3 の報告義務は「内訳の併記」なので保存先が要る。
+        #    ⚠️ validate_blocks.py が「実施済みなのに未記録」を fail にする。
+        "execution_mode": None,
         "frozen_sources": ["preregistration.md 2.3", "preregistration.md 2.7", "SEED"],
     }
 

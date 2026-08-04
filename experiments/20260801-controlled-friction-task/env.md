@@ -12,6 +12,7 @@
 | Rust toolchain / `Cargo.lock` | 被験者端末で動かすアプリのビルド元 | TBD |
 | `HMM_VERSION` | `engine.rs` の定数（`feat` 行の出所なので結果にも刻む）。★ **刻印手順は `protocol.md §6.1`**（実施当日・開始前に `env.md` へ、解析前に `config.json` へ） | TBD |
 | ★ 実施 OS | **被験者端末**（Windows 11 / macOS）を記録する。下記の理由で結果解釈に効く | TBD |
+| ★★ 実施形態 | **来所 / 無人在宅**（`preregistration.md §2.14`・第 9 版）。⚠️ **被験者ごとに記録し、報告時に内訳を併記する。判定にも除外にも使わない**（`§3.6` 無変更） | TBD |
 | ★ アプリのビルド | 実施に使った**本番バイナリ**のタグ／コミット（★ 10 セッションは同一バイナリで回す） | TBD |
 | ★ `GSE_DISABLE_PROBES` | **必須 = `1`**（`preregistration.md §5.4`）。⚠️ 立て忘れは `validate_blocks.py --dataset` が捕まえる | TBD |
 | ★ 被験者の入力先 | **`writing-pad.html`**（`preregistration.md §2.11`）。ブラウザとプロファイル（拡張なし）を記録する | TBD |
@@ -32,7 +33,8 @@
 | アプリのビルド | タグ `v0.1.22` ／ コミット `______`（★ 4 ブロックとも同一バイナリ） |
 | `HMM_VERSION` | `______`（★ 実施に使う**そのビルド**の値。参考: `main` の `engine.rs` は `0.3.0`） |
 | `GSE_DISABLE_PROBES` | `1`（★ launcher `launch-g1-windows.bat` 経由） |
-| 起動ログの確認 | ☐ `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` を確認した |
+| 起動ログの確認 | ☐ `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` を確認した ／ ☐ **確認できなかった**（⚠️ ★ Windows の release ビルドは `windows_subsystem = "windows"` でコンソールを持たないため、ダブルクリック起動では**出ない見込み**。客観検証は `validate_blocks.py --dataset` の `probe_assignment` 行 0 で行う） |
+| 実施形態 | **来所**（★ P-1 は研究者本人。`§2.14-7` により形態の区別は非該当） |
 | 週の選択 | ☐ **第 1 週（blind 較正）**（★ 既定値。触っていなければ OK） |
 | 入力先 | `writing-pad.html` ／ ブラウザ: `______` ／ プロファイル: 拡張なし ☐ |
 | 実施日 | `______`（★ 時刻は書かない） |
