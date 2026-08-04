@@ -154,6 +154,37 @@ var G1_AUTO_SEND = true;   // 既定は false（下書き）
 - **G1-S** … 実施端末にブックマーク
 - **G1-M** … 実施端末とは**別のタブ／端末**で開く（記入画面を切り替えないため）
 
+#### ★★ 公開 URL の指紋（2026-08-04 記録・`setupG1Forms` の前後で**数値比較**するため）
+
+⚠️ ★ **実 URL をここに書かない。** 本リポジトリは**一時 public にする運用がある**。
+G1-C に提出されると `onG1ConsentSubmit` が走り、**Phase1 本番ロスターに行が増え、受付メールが実送信される**。
+→ 実 URL は `.idea/短縮版リンク集.md`（**`.gitignore` 済み**）に置く。
+
+| フォーム | 回答 URL の SHA-256（先頭 16）＝ ★ **照合用の指紋**（秘密値ではない） |
+|---|---|
+| `G1-C` | `517f5d7e44432104` |
+| `G1-M` | `2fbb6bcd5d212b17` |
+| `G1-S` | `0589bc798ece102d` |
+
+⚠️ ★ **これは基準値であって、「以前と同じ」の証明ではない。**
+以前の値が記録されていなかったので、**過去との比較は原理的にできない**。
+★ **次に `setupG1Forms` を走らせたあと、初めて比較が成立する。**
+
+★ **再確認は Apps Script を動かさずにできる**（`.gs:47-49` の固定 ID からリダイレクトを解決する）:
+
+```bash
+# ★ 出力が上の表と一致すれば「基準値のときから変わっていない」と言える
+for id in 1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE \
+          1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA \
+          1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU; do
+  curl -s -o /dev/null -w '%{url_effective}\n' -L "https://docs.google.com/forms/d/$id/viewform" \
+    | tr -d '\n' | shasum -a 256 | cut -c1-16
+done
+```
+
+⚠️ ★ **これは「固定 ID 方式が効いているか」の検査であって、フォームの中身の検査ではない。**
+設問が変わっても URL は変わらない。中身は `previewRegisterAckEmail` などで別途見る。
+
 ### STEP 10 — 管理シートの手動セルを埋める
 
 「リンク集」タブの**送付先**などの手動セルを埋める。⚠️ 再実行しても手動セルは保持される。

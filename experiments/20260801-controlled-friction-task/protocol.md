@@ -604,9 +604,68 @@ python3 validate_blocks.py     # ★ 実施前は「まだ実施していない�
 
 | いつ | 誰が | 何を |
 |---|---|---|
-| **実施当日・開始前**（最初のブロックより前） | 実験者 | 実施に使う**そのビルド**の `HMM_VERSION` を確認する |
+| **実施当日・開始前**（最初のブロックより前） | 実験者 | 実施に使う**そのビルド**の `HMM_VERSION` を確認する（★ 取り方は下記） |
 | 同上 | 実験者 | `env.md` に **HMM_VERSION / 実施 OS / アプリのビルド（タグまたはコミット） / `GSE_DISABLE_PROBES` の値**を記入する |
 | **解析の前** | 実験者 | `config.json` の `reproducibility.hmm_version` を同じ値に書き換え、コミットする |
+
+#### ★★ `HMM_VERSION` の取り方 — **NDJSON の 1 行目に載っている**
+
+`logger.rs:917` がセッション開始時に `{"type":"meta","session_start":…,"hmm_version":"<semver>"}`
+を書く。値は `engine::HMM_VERSION` 定数なので、★ **実際に走ったバイナリの値そのもの**である。
+
+⚠️ ★ **ワイルドカードのまま読まない。** `head -1 gse_*.ndjson | head -1` は複数ファイルがあると
+`==> gse_….ndjson <==` という**ファイル名ヘッダを返す**（★ **JSON ですらない**。実測で確認した）。
+→ ★ **対象を 1 本に確定してから読む**:
+
+```bash
+# macOS — ★ 最新の 1 本を選び、対象を表示してから読む
+f=$(ls -t ~/Documents/GSE-sessions/gse_*.ndjson | head -1); echo "対象: $f"; head -1 "$f"
+# → {"type":"meta","session_start":…,"hmm_version":"0.3.0"}
+```
+
+```powershell
+# Windows (PowerShell) — ⚠️ ★ 未実測（Windows 実機が無い）。macOS 版だけ実測済み
+$f = Get-ChildItem $env:USERPROFILE\Documents\GSE-sessions\gse_*.ndjson |
+     Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$f.FullName; Get-Content $f.FullName -TotalCount 1
+```
+
+★ **repo の `engine.rs` を読んで代用しない。** 配布バイナリは `v0.1.22` のタグ時点のもので、
+`main` の現在値と一致する保証がない（`env.md` は「参考: `main` の `engine.rs` は `0.3.0`」と
+**参考値**であることを明示している）。
+
+⚠️ ★ **「開始前に」という要求とは順序が食い違う**（1 行目が出るのはブロック 1 を起動した後）。
+→ ★ **ブロック 1 を起動した直後**（打ち始める前）に読めばよい。**そのビルドの実測値**であり、
+起動前に別経路で見るより確かである。
+
+#### ★★ ブロック直後の 30 秒チェック（⚠️ **2026-08-04 の事故を受けて追加**）
+
+⚠️ ★ **launcher を通さずに起動するとプローブが発火する**（`lib.rs:1938`。実機初回で実際に起きた）。
+`validate_blocks.py --dataset` は**全ブロックを終えて dataset へ送った後**にしか回らないので、
+★ **気づくのが遅すぎる**。→ **各ブロック終了直後にその場で見る**:
+
+⚠️ ★ **`grep -c` は 0 件でも `0` を出力する**（実測）。★ **「何も出なければ OK」ではない。
+出た数字を読む。**
+
+```bash
+# macOS — ★ 出力される数字が判定。0 = OK
+f=$(ls -t ~/Documents/GSE-sessions/gse_*.ndjson | head -1)
+grep -c -E '"type":"(probe_assignment|probe_triggered|realtime_label)"' "$f"
+```
+
+```bat
+:: Windows (cmd) — findstr は一致行だけを出す（⚠️ ★ 未実測。macOS 版だけ実測済み）
+findstr /C:"probe_assignment" /C:"probe_triggered" /C:"realtime_label" ^
+  "%USERPROFILE%\Documents\GSE-sessions\<そのブロックの>.ndjson"
+```
+
+- ★ **`grep -c` が `0` なら続行。** 1 以上なら **そのブロックは使えない**（`§2.6` の凍結違反）
+- ★ **実測で確かめた**: クリーン → `0` ／ `probe_assignment` あり → `1` ／
+  ⚠️ **対照**として `realtime_label` だけの行も `1` を返す（= **検査は空回りしていない**）
+- ⚠️ ★ **やり直すのはブロック 1 本だけで済む。** 4 本すべて捨てずに済む
+- ⚠️ `realtime_label` は**自己マーカー hotkey を押した**痕跡である（kill switch の対象外）
+- ★ この 3 つは `validate_blocks.py` の `FORBIDDEN_LINE_TYPES` と**同一**である
+  （`validate_blocks.py:67`。★ 事後検査と同じものを前倒しで見ているだけ）
 
 ⚠️ **時刻は記録しない**（本 repo は一時 public 化の運用がある）。日付までにとどめる。
 ⚠️ ★ **ブロックごとにビルドを変えない。** 10 セッションは同一バイナリで回す。

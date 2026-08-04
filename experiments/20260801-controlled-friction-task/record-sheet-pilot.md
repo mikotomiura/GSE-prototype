@@ -13,6 +13,33 @@ NDJSON は `~/gse-dataset/raw/<この ID>/` に置く（Phase1 の較正セッ�
 
 アプリのビルド: v__________　　HMM_VERSION: __________　　`GSE_DISABLE_PROBES`: ☐ 1（launcher 使用）
 
+> ### ★ `HMM_VERSION` と NDJSON ファイル名の取り方（`protocol.md §6.1`）
+>
+> NDJSON は **`~/Documents/GSE-sessions/gse_<日時>.ndjson`**（Win は `%USERPROFILE%\Documents\…`）。
+> ★ **`HMM_VERSION` はその 1 行目に載っている**（`{"type":"meta",…,"hmm_version":"…"}`）。
+> ⚠️ ★ **repo の `engine.rs` を読んで代用しない**（配布バイナリは `v0.1.22` 時点のもの）。
+> ⚠️ ★ **ワイルドカードのまま読まない**（`==> ファイル名 <==` が返る。実測）。1 本に確定してから読む:
+>
+> ```bash
+> f=$(ls -t ~/Documents/GSE-sessions/gse_*.ndjson | head -1); echo "対象: $f"; head -1 "$f"
+> ```
+>
+> ### ★★ ブロック直後の 30 秒チェック（⚠️ **必ずやる**）
+>
+> ⚠️ ★ **launcher を通さずに起動するとプローブが発火する**（実機初回で実際に起きた）。
+> ★ **各ブロックが終わったら、その場で**そのブロックの NDJSON を見る:
+>
+> ```bash
+> # macOS — ⚠️ ★ grep -c は 0 件でも 0 を出す。「何も出ない」ではなく **数字を読む**
+> grep -c -E '"type":"(probe_assignment|probe_triggered|realtime_label)"' "$f"
+> # Windows (cmd) — findstr は一致行だけを出す（⚠️ ★ 未実測）
+> findstr /C:"probe_assignment" /C:"probe_triggered" /C:"realtime_label" <そのブロック>.ndjson
+> ```
+>
+> ★ **`0` なら続行。1 以上ならそのブロックは使えない**（`§2.6`）。
+> ⚠️ ★ **やり直すのは 1 ブロックだけで済む。** 終了後の `validate_blocks.py --dataset` まで
+> 待つと **4 本まとめて捨てる**ことになる。
+
 ★ 「条件」「題材ID」「課題文」の 3 列は **`assign.py` の出力を一方向に転記する**。手で決めない。
 
 ```

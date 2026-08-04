@@ -19,11 +19,62 @@
 #    ★ **本当の確認は実施後**の `python3 validate_blocks.py --dataset ~/gse-dataset`
 #      （`probe_assignment` 行が 1 行でもあれば赤）。自己申告で済ませない。
 
+#
+# ★★ macOS のセキュリティ 3 関門（2026-08-04 実測で切り分け）
+#   1. 実行ビット: Drive/zip 経由でダウンロードすると +x が落ちる
+#      → ダブルクリックが "permission denied" になる（実測）
+#   2. quarantine: ダウンロード物に com.apple.quarantine が付く → Gatekeeper が止める
+#   3. ★ アプリ本体: CI は ad-hoc 署名 (APPLE_SIGNING_IDENTITY: "-") で **未公証**
+#      → .app も同じ関門に当たる。★ これが本命である
+#
+#   ★★ 1 と 2 は `bash <このファイル>` で両方回避できる（3 状態すべてで動くことを実測）。
+#      → 推奨: ~/.zshrc に  alias g1='bash <このファイルのフルパス>'
+#              以降はターミナルで `g1`。10 回の再実行は ↑ + Enter で済む。
+#   ⚠️ 3 はアプリ側なので回避できない。下の PRE-FLIGHT が検出して直し方を出す。
+#
+# ⚠️★★ Phase1 の先行事例を踏まえること
+#   `.steering/20260629-submit-inapp-button-and-mac-gatekeeper/requirement.md` が
+#   **同じ問題**（`提出する_mac.command`）で以下を確定している:
+#     「2層構造: ①`.command` 自身が quarantine → ダブルクリックでブロック（被験者がここで停止）
+#       ②中で呼ぶバイナリも quarantine → SIGKILL。
+#       スクリプト内の `xattr -dr` は**②しか解決しない**（起動して初めて走るため①に無力）」
+#   → Phase1 は **`.command` 経路そのものを廃止**し、Gatekeeper 承認済みのアプリ内ボタンにした
+#     (`docs/pilot-runbook.md`)。
+#   ⚠️ ★ **下の PRE-FLIGHT も②の対策であり、①には無力である。**
+#      ①を消す手は 2 つしかない: (a) `bash` 経由で起動する  (b) launcher 自体を無くす。
+#   ⚠️ `xattr -cr` は使わない（全属性を消して署名を壊す・README.md:147）。`-dr` を使う。
+
 set -u
 
 APP="gse-next"
 
 echo "=== G1 launcher (macOS) ==="
+
+# ---- PRE-FLIGHT: アプリの所在と quarantine を先に見る（★ 起動してから気づかない） ----
+APP_PATH=""
+for cand in "/Applications/$APP.app" "$HOME/Applications/$APP.app"; do
+  [ -d "$cand" ] && APP_PATH="$cand" && break
+done
+
+if [ -z "$APP_PATH" ]; then
+  echo "  ⚠️ $APP.app が /Applications にも ~/Applications にも見つかりません。"
+  echo "     .dmg を開いて $APP.app を /Applications にコピーしてください。"
+  read -r -p "Enter で閉じます..." _
+  exit 1
+fi
+echo "[0/3] アプリ: $APP_PATH"
+
+if xattr -p com.apple.quarantine "$APP_PATH" > /dev/null 2>&1; then
+  echo "  ⚠️ ★ $APP.app に quarantine が付いています（ダウンロード物）。"
+  echo "     CI は ad-hoc 署名 (\"-\") で **未公証** なので、Gatekeeper がこのまま止めます。"
+  echo "     ★ 次の 1 行をターミナルに貼って解除してください（研究者本人の端末での正当な操作）:"
+  echo
+  echo "       xattr -dr com.apple.quarantine \"$APP_PATH\""
+  echo
+  echo "     解除したら、このファイルをもう一度開いてください。"
+  read -r -p "Enter で閉じます..." _
+  exit 1
+fi
 
 # 1. 既存インスタンスを確実に終了させる
 if pgrep -x "$APP" > /dev/null 2>&1; then
@@ -45,8 +96,15 @@ fi
 
 # 2. kill switch 付きで起動する
 echo "[2/3] GSE_DISABLE_PROBES=1 で $APP を起動します..."
+# ⚠️ ★ アプリ名の形を使う。`VAR=1 open -a <アプリ名>` が env を渡すことは 2026-08-03 に
+#    テスト用 .app で実測済みだが、`open -a <フルパス>` の形は**確かめていない**。
+#    PRE-FLIGHT で所在は確認済みなので、ここは検証済みの形のままにする。
 if ! GSE_DISABLE_PROBES=1 open -a "$APP"; then
-  echo "  ⚠️ 起動に失敗しました。$APP.app が /Applications にあるか確認してください。"
+  echo "  ⚠️ 起動に失敗しました。"
+  echo "     ★ Gatekeeper で止まっている場合は次を試してください:"
+  echo "       xattr -dr com.apple.quarantine \"$APP_PATH\""
+  echo "     ⚠️ 「開発元を検証できません」のダイアログが出た場合は"
+  echo "        システム設定 > プライバシーとセキュリティ の下部で「このまま開く」。"
   read -r -p "Enter で閉じます..." _
   exit 1
 fi
