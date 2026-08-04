@@ -113,9 +113,20 @@ fi
 cat <<'EOS'
 [3/3] 起動しました。ブロックを始める前に確認してください:
   - 週の選択が「第1週 (blind 較正)」であること（既定のまま。触っていなければ OK）
-  - アプリのログに `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` が出ていること（当日 1 回でよい）
-  - 記入パッド (writing-pad.html) を拡張機能なしのプロファイルで全画面表示していること
+  - ★ そのブロックの blockNN.html を「1 つだけ」開いていること
+    （記入欄はページに内蔵されている。protocol.md §1.2 / preregistration.md §2.13）
+    拡張機能なしのプロファイルで開く。⚠️ 次のブロックのファイルを先に開かない
   - ★ 自己マーカー hotkey (Cmd+Shift+Alt+M) を押さないこと
+
+⚠️ 「アプリのログに probe scheduler DISABLED … が出ること」は確認手段にならない。
+   open -a 起動では stdout がどこにも出ない（Windows の windows_subsystem="windows" と同じ）。
+   ★ 代わりに、各ブロックが終わったら「30 秒チェック」を行う:
+
+     f=$(ls -t ~/Documents/GSE-sessions/gse_*.ndjson | head -1)
+     grep -c -E '"type":"(probe_assignment|probe_triggered|realtime_label)"' "$f"
+
+   → 0 なら続行。1 以上ならそのブロックは使えない。
+   ⚠️ grep -c は 0 件でも 0 を出す。「何も出ない」ではなく数字を読むこと。
 EOS
 
 read -r -p "Enter でこのウィンドウを閉じます..." _

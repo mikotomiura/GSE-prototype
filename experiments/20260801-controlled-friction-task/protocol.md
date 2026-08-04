@@ -93,8 +93,15 @@ $env:GSE_DISABLE_PROBES=1; Start-Process ".\gse-next.exe"
 
 **立っていることの確認**（当日 1 回でよい）:
 
-- アプリのログに `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` が出る。
-- ★ **本当の確認は実施後**に行う（`§6` 当日終了後）:
+- ⚠️ ★ **~~アプリのログに `probe scheduler DISABLED …` が出る~~ → これは確認手段にならない。**
+  **両 OS とも見えない**（実測・2026-08-04）:
+  - Windows: `main.rs:2` の `windows_subsystem = "windows"` で release ビルドにコンソールが付かない
+  - macOS: `open -a` 起動なので stdout がどこにも出ない
+  - ★ ログは `lib.rs:1523` の `tracing_subscriber::fmt::init()` = **stdout** に出るため、
+    ★ **端末から明示的にリダイレクトした場合しか読めない**（未実測）
+- ★ **代わりに「ブロック直後の 30 秒チェック」を使う**（`§6.1`）。★ 各ブロック終了時に
+  そのブロックの NDJSON を見る。⚠️ **1 ブロックで気づけるのが要点**である。
+- ★ **最終的な確認は実施後**に行う（`§6` 当日終了後）:
   `python3 validate_blocks.py --dataset ~/gse-dataset` が
   **`probe_assignment` 行が 1 行でもあれば赤になる**。自己申告で済ませない。
 
@@ -557,8 +564,11 @@ python3 validate_blocks.py     # ★ 実施前は「まだ実施していない�
 - [ ] copy ブロックの存在を説明した（§4.1-2）
 - [ ] IME 設定を確認し、以降変えないことを伝えた
 - [ ] アプリが起動し、キーボードフックの権限が通ることを確認した
-- [ ] ★ アプリのログに `probe scheduler DISABLED by GSE_DISABLE_PROBES=1` が出た（§1.1）
-- [ ] ★ **`HMM_VERSION` を刻んだ**（下記「§6.1 HMM_VERSION の刻印」）
+- [ ] ⚠️ ★ ~~アプリのログに `probe scheduler DISABLED …` が出た~~ → **この項目は削除した。**
+      ★ **両 OS とも観測できない**（`§1.1`）ので、チェックできない項目をチェックリストに置かない。
+      → ★ 代わりに **各ブロック直後の「30 秒チェック」**（`§6.1`）を「各ブロック」の節で行う
+- [ ] ★ **`HMM_VERSION` を刻んだ**（下記「§6.1 HMM_VERSION の刻印」）。
+      ★ 取り方は `§6.1`（**ブロック 1 を起動した直後**に NDJSON の 1 行目を読む）
 
 ### 各ブロック
 
@@ -568,6 +578,12 @@ python3 validate_blocks.py     # ★ 実施前は「まだ実施していない�
 - [ ] 「では始めてください。5 分です」→ 5:00 → アプリ停止 → ★ **タブを閉じた**
 - [ ] ★ **記入パッドの文字数を記録用紙に転記し、「消去して次のブロックへ」を押した**
 - [ ] NDJSON ファイル名を記録用紙に転記した
+- [ ] ★★ **30 秒チェックが `0` だった**（`§6.1`。⚠️ ★ **ここで捕まえれば 1 ブロックのやり直しで済む**）
+      ```bash
+      f=$(ls -t ~/Documents/GSE-sessions/gse_*.ndjson | head -1)
+      grep -c -E '"type":"(probe_assignment|probe_triggered|realtime_label)"' "$f"
+      ```
+      ⚠️ `grep -c` は 0 件でも `0` を出す。**「何も出ない」ではなく数字を読む**
 - [ ] （ブロック 3〜9）強制比較を 1 問取った
 
 ### 当日・終了後

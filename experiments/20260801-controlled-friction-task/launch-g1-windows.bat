@@ -44,7 +44,12 @@ start "" "%~dp0gse-next.exe"
 
 echo [3/3] 起動しました。ブロックを始める前に確認してください:
 echo   - 週の選択が「第1週 (blind 較正)」であること（既定のまま。触っていなければ OK）
-echo   - ログに probe scheduler DISABLED by GSE_DISABLE_PROBES=1 が出ていること（当日 1 回でよい）
+echo   - ブロックが終わったら「30 秒チェック」を行うこと（protocol.md 6.1）
+echo       findstr /C:"probe_assignment" /C:"probe_triggered" /C:"realtime_label" ^
+echo         "%%USERPROFILE%%\Documents\GSE-sessions\<そのブロック>.ndjson"
+echo     何も表示されなければ OK。1 行でも出たらそのブロックは使えない
+echo   ※ 「ログに probe scheduler DISABLED が出ること」は確認手段にならない
+echo     （release ビルドは windows_subsystem="windows" でコンソールを持たない）
 echo   - 記入パッド (writing-pad.html) を拡張機能なしのプロファイルで全画面表示していること
 echo   - ★ 自己マーカー hotkey (Ctrl+Shift+Alt+M) を押さないこと
 echo.
