@@ -45,12 +45,14 @@ start "" "%~dp0gse-next.exe"
 echo [3/3] 起動しました。ブロックを始める前に確認してください:
 echo   - 週の選択が「第1週 (blind 較正)」であること（既定のまま。触っていなければ OK）
 echo   - ブロックが終わったら「30 秒チェック」を行うこと（protocol.md 6.1）
-echo       findstr /C:"probe_assignment" /C:"probe_triggered" /C:"realtime_label" ^
-echo         "%%USERPROFILE%%\Documents\GSE-sessions\<そのブロック>.ndjson"
+echo       findstr /C:"probe_assignment" /C:"probe_triggered" /C:"realtime_label" そのブロックの.ndjson
+echo       （場所は %%USERPROFILE%%\Documents\GSE-sessions\ ）
 echo     何も表示されなければ OK。1 行でも出たらそのブロックは使えない
 echo   ※ 「ログに probe scheduler DISABLED が出ること」は確認手段にならない
 echo     （release ビルドは windows_subsystem="windows" でコンソールを持たない）
-echo   - 記入パッド (writing-pad.html) を拡張機能なしのプロファイルで全画面表示していること
+echo   - ★ そのブロックの blockNN.html を「1 つだけ」開いていること
+echo     （記入欄はページに内蔵されている。protocol.md 1.2 / preregistration.md 2.13）
+echo     拡張機能なしのプロファイルで開く。次のブロックのファイルを先に開かない
 echo   - ★ 自己マーカー hotkey (Ctrl+Shift+Alt+M) を押さないこと
 echo.
 pause
