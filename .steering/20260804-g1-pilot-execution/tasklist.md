@@ -411,3 +411,67 @@ zip は**冗長**であり、**どちらが正か分からなくなるぶん有�
 ### ★ このセッションで確認したこと
 
 - `bash run.sh` = **GREEN**（exit 0・実施前チェック全項目通過）を実測した
+
+---
+
+## ★★ P-1 mac 側の準備（2026-08-04・研究者の許可を得て実施）
+
+### ★ 実施したこと
+
+| 何 | 結果 |
+|---|---|
+| `gh release download v0.1.22 --pattern '*.dmg'` → `~/G1-mac/` | ★ **`com.apple.quarantine` が付かない**（`com.apple.provenance` のみ・実測） |
+| dmg の署名検証 | `codesign --verify --strict` = **Signature OK**（`adhoc,runtime` / `com.johnd.gse-next`） |
+| `/Applications/gse-next.app` へ導入 | ★ **quarantine なし**（Gatekeeper のダイアログは出ない見込み） |
+| `~/G1-mac/` に launcher ＋ `pages/block01〜04.html`（`PILOT-mac`・topic02） | 実行ビット付き・quarantine なし |
+| `~/.zshrc` に `alias g1='bash ~/G1-mac/launch-g1-macos.command'` | ★ 層 0（実行ビット）と層①（quarantine）を回避する経路 |
+
+> ### ★★ 「剥がす」より「付けない」
+> `gh release download`（CLI）で取ると **quarantine がそもそも付かない**。
+> ⚠️ ブラウザ / Drive で落とすと付く。★ **`xattr -dr` は後始末であって、CLI 取得なら不要**である。
+
+⚠️ ★ **アプリは起動していない。** 起動すると打鍵記録が始まり、Input Monitoring の TCC
+ダイアログが出る（対話が要る）。★ **最初の起動は研究者が行う。**
+
+### ⚠️★★ 発見 — **CI のリリースゲート 3 本が発火せずに通っていた**
+
+配布された `v0.1.22` の `.app` を実検査したところ、`Contents/MacOS/` に
+★ **`gse-package` / `gse-unpack` が残存**していた。
+
+⚠️ `ci.yml:248` は「残存していたら `::error::` ＋ `exit 1`」と**リリースを止める設計**である。
+`git merge-base --is-ancestor` で確認すると、strip を入れたコミット `f8286aa`(2026-06-29) は
+★ **`v0.1.22`(2026-08-03) に含まれている**。→ **ゲートが動いていない。**
+
+**機構（★ `silent-failure-in-guard-scripts` の型そのもの）**:
+
+```bash
+APP=$(find src-tauri/target/release/bundle -name "*.app" -type d | head -1)
+if [ -n "$APP" ]; then     # ⚠️ ★ else が無い
+  ... strip / 再署名 / ::error:: ゲート 3 本 ...
+fi                         # → $APP が空なら **全部飛んで step は exit 0**
+```
+
+**傍証**（★ 実物の署名から）: 署名フラグが `0x10002(adhoc,**runtime**)` である。
+⚠️ CI は「`--options runtime` は ad-hoc 署名では使用しない（TCC 過剰検証の原因）」と明記して
+**runtime を付けない**再署名をする。→ ★ **載っているのは tauri 自身の署名であり、CI の再署名は走っていない。**
+
+⚠️ ★ **`find` が空を返した理由まではここでは特定できない**（Actions のログが要る）。
+
+**影響**:
+
+| 何 | 評価 |
+|---|---|
+| P-1 | ★ **実害なし**（研究者本人の端末） |
+| 確証実施の配布 | ⚠️ `gse-unpack` が被験者に渡る。★ **鍵が無ければ無力**で機密漏れではない（CI コメント自身の評価）が、配布物最小化の意図が破れている |
+| ⚠️★★ **ゲートそのもの** | **3 本まとめて無効**。`gse-submit` 欠落・`pubkey.txt` 欠落も**検出できない**状態だった。★ 今回は実物に両方あることを確認したので提出は動く見込み |
+
+**直し方（★ 別タスク）**: `if [ -n "$APP" ]` に `else` を足して
+「`.app` が見つからない = 失敗」として `exit 1` させる。⚠️ ★ **ゲートは「見つからなければ素通り」で
+書いてはいけない**（`silent-failure-in-guard-scripts`）。
+
+### ★ 優先順の訂正（研究者の指摘）
+
+⚠️ 私は「ad-hoc 署名は CDHash が不安定で Input Monitoring が効かないことがある」
+（`development-guidelines.md:33`）を根拠に「mac 回はまず打鍵が取れるか確かめる」を最優先に置いた。
+→ ★ **研究者から「既存の GSE では打鍵データは取れている」と実績の指摘。**
+★ **実績 > 設計想定**（`verify-before-claiming`）。最優先から外した。
