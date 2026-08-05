@@ -6,6 +6,15 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [main]
+  # ★ 検証用の Windows ビルドを **タグを切らずに** 作るための手動発火 (2026-08-06)。
+  #
+  # ⚠️ なぜ要るか: Windows の portable exe を作るのは `build-windows` だけで、従来は
+  #   **タグ push (`v*`) でしか動かなかった**。G1 の Windows 検証
+  #   (`experiments/20260801-controlled-friction-task/windows-verification.md`) のために
+  #   タグを切ると、(a) self-hosted の macOS ランナーが要る、(b) GitHub Release が作られる、
+  #   (c) バージョン番号を 1 つ消費する — と副作用が大きい。
+  # ★ 手動発火では `build-windows` だけを走らせる (`check` / `frontend-check` / `release` は動かさない)。
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,7 +43,9 @@ jobs:
   # - Windows も移す場合は Surface Pro に `gse-win` ラベルでランナーを登録し、
   #   下の `runner: windows-latest` を `[self-hosted, gse-win]` に変えるだけでよい
   check:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    # ★ 手動発火では走らせない (self-hosted の macOS ランナーが offline だとキューへ滞留するため。
+    #   手動発火の目的は Windows の exe を 1 個作ることだけである)。
+    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +87,7 @@ jobs:
 
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────
   frontend-check:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -93,7 +104,10 @@ jobs:
 
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    # ★ タグ push (リリース) と、手動発火 (検証用ビルド) の両方で走る。
+    #   ⚠️ `release` ジョブの `if` はタグ限定のままなので、★ 手動発火では
+    #   **Release は作られない**。成果物は Actions の artifact (7 日) だけである。
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
     # Windows は 2倍課金。macOS を self-hosted に外せば無料枠に収まるため hosted のまま。
     runs-on: windows-latest
     timeout-minutes: 40
