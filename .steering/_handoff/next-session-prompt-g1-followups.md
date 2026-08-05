@@ -1,5 +1,24 @@
 # 次セッション開始プロンプト — G1 モードの残タスク（Windows 検証 / 配布の署名 / follow-up）
 
+> ## ✅ 2026-08-06 に実施した（`.steering/20260806-g1-followups-and-windows-verification/`）
+>
+> | # | 何 | 状態 |
+> |---|---|---|
+> | 3 | follow-up 3 件（§3） | ✅ **完了**（F-1 / F-2 / F-3 とも。★ F-1 は先に測ってから入れた） |
+> | 2 | 配布の署名・公証（§2） | ✅ **研究者判断で案 A（現状維持）に確定**。`protocol.md §1.1` に初回手順を追加 |
+> | 1 | Windows 検証（§1） | ⚠️ ★ **未実施のまま**。手順書 `windows-verification.md` と、タグを切らずに Windows exe を作る CI の手動発火（`workflow_dispatch`）を用意しただけ |
+>
+> ★ **残っているのは §1 だけ**である。次にやること:
+> 1. GitHub → Actions → "CI / Release" → **Run workflow**（branch = 作業ブランチ）
+>    → artifact `windows-portable` を落とす（⚠️ ★ **この発火はまだ 1 回も試していない**）
+> 2. Windows 実機で `windows-verification.md` の **W-1〜W-8** を順に実施する
+> 3. ★ 特に **W-4（`tasklist` の生出力）** を持ち帰る。`g1::other_pids_from_tasklist` は
+>    **CSV の形だけ見て書いたまま**で、実出力での検証がまだ済んでいない
+>
+> ⚠️ §3 と §2 は**消化済み**なのでやり直さない。§4（繰り返した失敗）は引き続き読む価値がある。
+> ★ 2026-08-06 に **6 通り目の「発火しない検査」**を見つけた:
+> **`cargo test --lib <filter>` は 0 件マッチでも rc=0** → ゲートが黙って緑になる。
+
 このファイルの「===」以下をコピペして開始する。
 
 **前提**: 2026-08-05 に G1 モード（第 1 段＋第 2 段・`preregistration.md` **第 10 版**）を実装し、
