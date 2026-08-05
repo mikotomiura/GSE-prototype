@@ -100,9 +100,20 @@ static FORCE_NUDGE: AtomicBool = AtomicBool::new(false);
 /// 「発火はしたが黙殺した」状態を構造的に消している設計が崩れる (D-7)。
 static G1_MODE: std::sync::OnceLock<Option<&'static str>> = std::sync::OnceLock::new();
 
-/// このプロセスで `start_session` が呼ばれた回数 (= 開始したブロック数)。
-/// 2 回目以降の `start_session` がログをローテートする判断に使う。
+/// このプロセスで開始したブロック数。2 回目以降の `start_session` がローテートする判断に使う。
+/// ⚠️ ★ **`session_active` が false→true になったときだけ**増やす (連打・再試行で増やさない)。
 static G1_BLOCKS_STARTED: AtomicU64 = AtomicU64::new(0);
+
+/// 分析スレッドがドレイン (非アクティブ) 分岐に入っているか。
+///
+/// ⚠️★ **G1 のブロック終了で `session_end` の後ろに `feat` / `key` 行が続くのを防ぐための同期点。**
+/// `session_active=false` を立てても、分析スレッドは既に `rx.recv_timeout(...)` に入っており
+/// **次の 1Hz マークまで最大 ~1000ms ブロックしうる**。その 1 イテレーションが
+/// `try_send(Key/Feat)` を投げるので、★ **固定 sleep では追い越しを防げない**
+/// (code-review HIGH。当初 200ms にしていたのは「非アクティブ時 sleep は 50ms」という
+/// 誤った根拠に基づいていた——待つべきは `recv_timeout` の上限である)。
+/// → **分析スレッドがドレインに入ったことを観測してから** `BlockEnd` を送る。
+static ANALYSIS_IDLE: AtomicBool = AtomicBool::new(true);
 
 /// G1 モードか (引き金つき)。`None` なら通常運用。
 fn g1_mode() -> Option<&'static str> {
@@ -131,10 +142,15 @@ impl LogState {
 
     /// いま書いている NDJSON のパス (ローテート追随)。
     fn current_path(&self) -> String {
+        // ⚠️ poison 時に空文字を返すと `quit_app` がそれを behavioral_gt.py に渡し、
+        // `Path::new("").parent()` から**意図しないフォルダを開く** (code-review MEDIUM)。
+        // 他のロック箇所と同じく into_inner でデータを取り出す。
         self.target
             .lock()
-            .map(|t| t.path.to_string_lossy().to_string())
-            .unwrap_or_default()
+            .unwrap_or_else(|p| p.into_inner())
+            .path
+            .to_string_lossy()
+            .to_string()
     }
 }
 
@@ -1397,7 +1413,9 @@ fn start_session(
     // 前セッションの沈黙時間が初回更新に混入するレースコンディションが発生する。
     engine.reset();
     reset_signal.0.store(true, Ordering::Release);
-    session_active.0.store(true, Ordering::Release);
+    // ★ 旧値を取る。⚠️ 既に true (= 連打・record_session_meta 失敗後の再押下) なら
+    //   **新しいブロックではない**ので、下のローテートを回してはならない (code-review HIGH)。
+    let was_active = session_active.0.swap(true, Ordering::Release);
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -1410,19 +1428,26 @@ fn start_session(
     //   ⚠️ ★ **G1 モードでないときは何もしない。** 通常運用 (Phase1) では「戻る → 開始する」で
     //   ファイルが分かれてしまうと、`gse-submit` が最新 1 本しか出さないため
     //   **前半が提出されなくなる**。既定の挙動を 1 バイトも変えないこと。
-    let blocks_started = G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel);
-    if g1_mode().is_some() && blocks_started > 0 {
-        // ⚠️ ファイル名は秒粒度なので next_session_path が既存衝突を避ける (静かな全損防止)。
-        let new_path = logger::next_session_path();
-        tracing::info!(
-            "G1: rotating session log for block #{} -> {:?}",
-            blocks_started + 1,
-            new_path
-        );
-        if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
-            // ⚠️ ★ ここで黙ると「1 ファイルに 2 ブロック」= protocol.md §1 が (b) を却下した
-            // 「沈黙して間違った結果を出す」失敗そのものになる。必ず声を上げる。
-            tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+    // ⚠️★ **`was_active` が false のときだけ**ローテートする。
+    //   「開始する」は送信中に disabled にならず、record_session_meta 失敗時の文言は
+    //   **明示的に再押下を促す**ので、無条件に数えると孤児ファイルが 1 本増える
+    //   (= protocol.md §1「1 ブロック = 1 ファイル」の破れ・code-review HIGH)。
+    if g1_mode().is_some() && !was_active {
+        let blocks_started = G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel);
+        if blocks_started > 0 {
+            // ⚠️ ファイル名は秒粒度。衝突回避は **logger スレッド側**でも行う
+            // (ここは別スレッドなので exists 判定と create の間に窓がある・code-review MEDIUM)。
+            let new_path = logger::next_session_path();
+            tracing::info!(
+                "G1: rotating session log for block #{} -> {:?}",
+                blocks_started + 1,
+                new_path
+            );
+            if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
+                // ⚠️ ★ ここで黙ると「1 ファイルに 2 ブロック」= protocol.md §1 が (b) を却下した
+                // 「沈黙して間違った結果を出す」失敗そのものになる。必ず声を上げる。
+                tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+            }
         }
     }
 
@@ -1563,6 +1588,14 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 #[cfg(target_os = "windows")]
 fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     use std::sync::atomic::Ordering::Relaxed;
+    // ⚠️★ G1: この経路は IME Monitor スレッドから呼ばれ、**`session_active` を見ていない**
+    // (code-review HIGH)。ブロックを閉じた後に IME の後始末が飛んでくると
+    // `session_end` の後ろに `ime_shadow` 行が続く。
+    // ★ G1 モードのときだけ止める (通常運用の挙動は変えない)。
+    // `SESSION_START_MS` はブロック終了時に 0 に戻されるので、これが「ブロック中か」を表す。
+    if g1_mode().is_some() && SESSION_START_MS.load(Ordering::Acquire) == 0 {
+        return;
+    }
     if input::hook::IME_SHADOW_READY.swap(false, Ordering::AcqRel) {
         // 正常経路: IME_HIDE で dwell 計算済み
         let dwell_ms = input::hook::IME_SHADOW_DWELL_MS.swap(0, Relaxed);
@@ -1622,7 +1655,7 @@ pub fn run() {
     tracing::info!("Session log: {}", log_path_str);
 
     let (session_logger, log_tx, log_shutdown_rx, log_status) =
-        SessionLogger::start(log_path, g1_source.map(|s| s.as_str()));
+        SessionLogger::start(log_path, g1_source);
     if log_status != LogStatus::Ok {
         tracing::error!(
             "Session log status is not Ok: {:?} (intended {})",
@@ -1707,9 +1740,14 @@ pub fn run() {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
             if !session_active_for_thread.load(Ordering::Acquire) {
                 while rx.try_recv().is_ok() {}
+                // ★ G1: 「もうこのスレッドは LogEntry を投げない」ことの表明。
+                //   ブロック終了スレッドがこれを観測してから session_end を書く。
+                ANALYSIS_IDLE.store(true, Ordering::Release);
                 thread::sleep(Duration::from_millis(50));
                 continue;
             }
+            // ★ ここから先は Key/Feat を送りうる。**recv_timeout に入る前に**表明を降ろす。
+            ANALYSIS_IDLE.store(false, Ordering::Release);
 
             // start_session コマンドによるリセット要求をチェック
             if should_reset_for_thread.swap(false, Ordering::AcqRel) {
@@ -2106,9 +2144,23 @@ pub fn run() {
                         block_session_active.store(false, Ordering::Release);
                         SESSION_START_MS.store(0, Ordering::Release);
 
-                        // 2) 分析スレッドが inactive を観測してドレインに入るのを待つ
-                        //    (分析ループの非アクティブ時 sleep は 50ms)。
-                        thread::sleep(Duration::from_millis(200));
+                        // 2) ⚠️★ **分析スレッドがドレインに入ったことを観測してから**進む。
+                        //    固定 sleep では足りない: 分析スレッドは既に recv_timeout に入って
+                        //    いて **次の 1Hz マークまで最大 ~1000ms** ブロックしうるので、
+                        //    その在庫 1 イテレーションが session_end を追い越して
+                        //    Key/Feat を投げる (code-review HIGH)。
+                        let deadline = Instant::now() + Duration::from_millis(1500);
+                        while !ANALYSIS_IDLE.load(Ordering::Acquire) {
+                            if Instant::now() >= deadline {
+                                // ★ 黙って進まない。追い越しが起きたかもしれないことを残す。
+                                tracing::warn!(
+                                    "G1: analysis thread did not go idle within 1500ms; \
+                                     a feat/key line may follow session_end in this block"
+                                );
+                                break;
+                            }
+                            thread::sleep(Duration::from_millis(20));
+                        }
 
                         // 3) ブロックを閉じる。⚠️ ★ ここでは**新しいファイルを開かない**
                         //    (10 ブロック目の後に空の 11 本目が残り、`gse-submit` が

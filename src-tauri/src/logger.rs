@@ -918,12 +918,19 @@ fn temp_fallback_path(primary: &Path) -> PathBuf {
 ///
 /// - `hmm_version` は `engine.rs` の定数。`gse-replay` がゴールデンスナップショットと
 ///   突き合わせる際に同一バージョンであることを検証する。
-/// - `g1_mode` は G1 実施時のみ `Some("marker" | "env")`。
+/// - `g1_mode` は G1 実施時のみ `Some(..)`。⚠️ ★ **`&str` ではなく `G1Source` を受ける。**
+///   手書き JSON なのでエスケープが無く、将来ここへ参加者 ID のような外部由来の文字列が
+///   渡ると **NDJSON の 1 行が黙って壊れ**、解析側 (`validate_blocks.py` / `anonymize`) が
+///   誤読する。★ 値域を型で閉じてその経路を作らせない (security review MEDIUM)。
 ///   ⚠️ ★ **`None` のときの出力は従来と 1 バイトも変わらない**
 ///   (`skip_serializing_if` 相当を手書きで担保している)。ゴールデンと既存フィクスチャの
 ///   非回帰がこれに依存しているので、キーの順序を含めて変えないこと。
-fn write_meta_start(writer: &mut impl Write, session_start: u64, g1_mode: Option<&str>) {
-    match g1_mode {
+fn write_meta_start(
+    writer: &mut impl Write,
+    session_start: u64,
+    g1_mode: Option<crate::g1::G1Source>,
+) {
+    match g1_mode.map(|s| s.as_str()) {
         None => {
             let _ = writeln!(
                 writer,
@@ -974,7 +981,7 @@ impl SessionLogger {
     /// (⚠️ ★ マーカーが外れると黙って通常モードになるため・D-7)。
     pub fn start(
         log_path: PathBuf,
-        g1_mode: Option<&'static str>,
+        g1_mode: Option<crate::g1::G1Source>,
     ) -> (Self, Sender<LogEntry>, Receiver<()>, LogStatus) {
         let (tx, rx) = bounded::<LogEntry>(512);
         let (shutdown_tx, shutdown_rx) = bounded::<()>(1);
@@ -1272,10 +1279,29 @@ impl SessionLogger {
                             dirty = false;
                         }
                         LogEntry::Rotate { new_path } => {
+                            // ⚠️★ **自分自身を truncate しない。** 呼び出し側 (UI スレッド) が
+                            // 出したパスが今の書込先と同じなら、開き直すと現ブロックが消える。
+                            let current_same = target_for_thread
+                                .lock()
+                                .map(|t| t.path == new_path)
+                                .unwrap_or(false);
+                            if current_same {
+                                tracing::warn!(
+                                    "SessionLogger: rotate target equals current path; skipping                                      (would truncate the block being written)"
+                                );
+                                continue;
+                            }
                             if !block_closed {
                                 write_meta_end(&mut writer, now_ms());
                             }
                             let _ = writer.flush();
+
+                            // ⚠️★ **一意化をここ (logger スレッド) でもう一度行う。**
+                            // 呼び出し側の exists 判定は別スレッドで、判定〜実作成の間に窓がある。
+                            // ファイル名は秒粒度なので、同じ秒に 2 回 Rotate が積まれると
+                            // `create_file_at` の truncate が前ブロックを消す (code-review MEDIUM)。
+                            // ★ logger スレッドは単一なので、ここで確定させれば窓が閉じる。
+                            let new_path = unique_path_from(new_path);
 
                             // ★ 旧ファイルはここで drop される (writer の差し替えで閉じる)。
                             let (boxed, actual, new_status) = open_log_target(&new_path);
@@ -1879,6 +1905,47 @@ mod tests {
         let _ = fs::remove_file(&p2);
     }
 
+    /// ⚠️★ **同じパスへの `Rotate` は自分自身を truncate してはならない**（code-review MEDIUM）。
+    ///
+    /// 呼び出し側 (UI スレッド) の一意化と実作成 (logger スレッド) の間には窓があり、
+    /// 同じ秒に 2 回積まれると同じパスが来うる。★ 来たら**書きかけのブロックを守る**。
+    #[test]
+    fn rotate_to_current_path_does_not_truncate_the_open_block() {
+        let p = rot_test_path("same", 0);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::Key {
+            vk_code: 65,
+            timestamp: 1,
+            is_press: true,
+        })
+        .unwrap();
+        // ★ いま書いている先と同じパスへローテートを要求する。
+        let current = logger.target.lock().unwrap().path.clone();
+        tx.send(LogEntry::Rotate { new_path: current }).unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 66,
+            timestamp: 2,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        // ★ 前半の打鍵が生きている = truncate されていない。
+        assert!(c.contains(r#""vk":65"#), "rotate truncated the block:\n{c}");
+        assert!(c.contains(r#""vk":66"#), "{c}");
+        // ★ 同一パスなので meta(session_start) は 1 つのまま (開き直していない)。
+        assert_eq!(
+            c.matches(r#""type":"meta","session_start""#).count(),
+            1,
+            "{c}"
+        );
+        let _ = fs::remove_file(&p);
+    }
+
     /// ⚠️ `BlockEnd` の直後に `End` (アプリ終了) が来ても `session_end` は **1 行だけ**。
     /// 二重に書くと解析側がブロック終端を取り違える。
     #[test]
@@ -1919,7 +1986,7 @@ mod tests {
     #[test]
     fn meta_line_records_g1_source_when_g1() {
         let mut buf: Vec<u8> = Vec::new();
-        write_meta_start(&mut buf, 1234, Some("marker"));
+        write_meta_start(&mut buf, 1234, Some(crate::g1::G1Source::Marker));
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains(r#""g1_mode":"marker""#), "{s}");
         // JSON として妥当であること (手書き書式なので毎回確かめる)。

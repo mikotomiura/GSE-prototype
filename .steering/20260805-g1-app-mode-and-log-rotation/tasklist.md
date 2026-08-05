@@ -77,3 +77,47 @@
 - [ ] git commit
 - [ ] ⚠️ 後片付け: `~/G1-app-test/` と、実測で増えた `~/Documents/GSE-sessions/` の NDJSON
       （★ **key 行 0 = 打鍵内容なし**を確認済み）。**研究者の確認後に削除する**
+
+---
+
+## 9. レビュー結果と対応（2026-08-05・code-reviewer + security-checker 並列）
+
+### security-checker: CRITICAL 0 / HIGH 0 / MEDIUM 2 / LOW 4
+
+| # | 指摘 | 判定 | 対応 |
+|---|---|---|---|
+| 1 | `pgrep` / `tasklist` が**相対名**。Windows の探索順は `current_exe()` のディレクトリが System32 より**先**なので、配布フォルダに `tasklist.exe` を置かれると乗っ取られる | ★ **実在** | ★ **絶対パス化**（`%SystemRoot%\System32\tasklist.exe` / `/usr/bin/pgrep`）。`SystemRoot` 不在なら検査を諦める。⚠️ ★ **本タスクで記録した「zsh の `log` ビルトイン」と同型の罠**だった |
+| 2 | `write_meta_start` が `&str` を受け、手書き JSON の値域を型で縛れていない | ★ **将来の予防** | `Option<G1Source>` を受けるようにした（外部由来の文字列が渡る経路を型で塞いだ） |
+| LOW×4 | `O_NOFOLLOW` 不使用 / ログに絶対パス / single-instance 通知の偽装可 / `lines()` 無制限 | 実害なし | 認識のみ（記録に残す） |
+
+★ 依頼した 8 点は**すべて「問題なし」**（0600 維持・`g1_mode` は固定 2 値・マーカーは存在検査のみ・
+emit ペイロードは空・文書に PII 混入なし・依存の推移的追加ゼロ）。
+
+### code-reviewer: HIGH 2 / MEDIUM 6 / LOW 6
+
+| # | 指摘 | 判定 | 対応 |
+|---|---|---|---|
+| **H1** | ⚠️★★ **5 分自動終了の 200ms sleep では追い越しを防げない。** 分析スレッドは `session_active` を読んだ後 `recv_timeout` で**最大 ~1000ms** ブロックし、その在庫 1 イテレーションが `session_end` の後ろに `feat`/`key` を投げうる。コメントの根拠（「非アクティブ時 sleep は 50ms」）自体が誤り | ★★ **実在（一次資料で確認）** | ★ `ANALYSIS_IDLE` を追加し、**分析スレッドがドレインに入ったことを観測してから** `BlockEnd` を送る（上限 1.5s・超過は `warn`）。`emit_ime_shadow` は `session_active` を見ないので、**G1 モードのときだけ** `SESSION_START_MS==0` で止める |
+| **H2** | ⚠️★★ **`start_session` 連打／再試行で余分な NDJSON が 1 本増える**（= `§1`「1 ブロック = 1 ファイル」の破れ）。`record_session_meta` 失敗時の文言が**明示的に再押下を促す**ので必ず起きる | ★★ **実在** | ★ `session_active.swap(true)` の**旧値**を見て、`!was_active` のときだけローテートする |
+| M1 | `unique_path_from` の TOCTOU が**スレッドをまたぐ**（判定は UI・作成は logger） | ★ 実在 | ★ **logger スレッド側でもう一度一意化**。logger は単一スレッドなので窓が閉じる |
+| M2 | `Rotate` が現在の書込先との同一性を検査せず、自分自身を truncate しうる | ★ 実在 | ★ ガードを追加 ＋ **回帰テスト**（壊して赤を実測） |
+| M3 | `current_path()` だけ poison 時に**空文字**を返し、`quit_app` が空パスを `behavioral_gt.py` に渡す | ★ 実在 | `into_inner()` に統一 |
+| M4 | Windows の `tasklist` に `CREATE_NO_WINDOW` が無く、コンソール窓が光る | ★ 実在 | `creation_flags(0x0800_0000)` を追加 |
+| M5 | single-instance を **G1 以外でも**登録しており、通常運用の挙動が変わる | ★ 実在 | ⚠️ ★ **例外として明記する**（下記） |
+| M6 | 二重起動の検査が**起動 1.5 秒後の 1 回だけ** | ★ 実在 | ⚠️ **未対応**（下記） |
+| LOW×6 | doc の食い違い / `docs/architecture.md` 未更新 / `BlockEnd` 重複が無音 / スレッドに終了条件が無い 他 | — | ⚠️ **未対応**（下記） |
+
+### ⚠️ ★ 対応しなかったもの（**やっていないと書く**）
+
+| # | なぜ今やらないか |
+|---|---|
+| **M5**（single-instance が通常運用にも効く） | ★ **意図的に残す。** 2 個同時起動は Phase1 でも打鍵を割る不具合であり、止めるのは改善である。⚠️ ただし「G1 でないとき 1 バイトも変わらない」という自分の要件とは**字面上矛盾する**ので、★ **例外として記録する**。止められた 2 個目が空 NDJSON を残す件は提出側（`has_any_data_row`）で緩和済み。**本筋は `SessionLogger::start` を single-instance 判定の後ろへ動かすこと**で、これは別タスク |
+| **M6**（二重起動の検査が 1 回だけ） | ⚠️ **次セッション送り。** `start_session` の先頭でも呼べば済むが、子プロセス起動が `start_session` の応答時間に載る。★ **測ってから入れる** |
+| LOW 群 | `docs/architecture.md` / `docs/repository-structure.md` の更新（architecture-rules ルール 4 手順 5）は**やるべき**。⚠️ 本セッションでは未実施 |
+
+### ★ code-reviewer が「問題なし」と明示した点
+
+`session_end` の 1 ファイル 1 行（`block_closed` の遷移）／ローテート時の close 安全性／
+デッドロック無し（ロック順が単一・fail-closed）／`has_any_data_row` が全読みしない／
+`emit_schema` byte 一致・golden replay 4 本一致／規約（`println!` 無し・新規 `unsafe` 無し・
+`analysis/` への OS 依存の染み出し無し・新規ファイルの clippy 警告 0）。

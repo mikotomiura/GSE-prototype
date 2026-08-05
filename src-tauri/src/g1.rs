@@ -178,19 +178,43 @@ pub fn other_pids_from_tasklist(output: &str, self_pid: u32) -> Vec<u32> {
 pub fn other_instance_running() -> bool {
     let self_pid = std::process::id();
     let out = if cfg!(windows) {
-        std::process::Command::new("tasklist")
-            .args([
-                "/FI",
-                &format!("IMAGENAME eq {}", PROCESS_NAME),
-                "/FO",
-                "CSV",
-                "/NH",
-            ])
-            .output()
+        // ⚠️★ **絶対パスで叩く。** `Command::new("tasklist")` は PATH 探索になり、Windows の
+        // 探索順は「子プロセス指定 PATH → **`current_exe()` のディレクトリ** → System32 → …」
+        // である。★ **配布フォルダ (`G1-app`) は被験者が解凍する書き込み可能な場所**で、
+        // アプリと同階層に `tasklist.exe` を置かれると **System32 の本物より先に**起動する。
+        // ★ これは本タスクで記録した「zsh の `log` ビルトインで偽の緑を踏んだ」と**同型の罠**であり、
+        // 同じ直し方 (絶対パス) で塞ぐ。`SystemRoot` が取れなければ**検査を諦める**。
+        let system_root = match std::env::var("SystemRoot") {
+            Ok(v) if !v.is_empty() => v,
+            _ => {
+                tracing::warn!("G1: SystemRoot not set; skipping duplicate-instance check");
+                return false;
+            }
+        };
+        let tasklist = std::path::Path::new(&system_root)
+            .join("System32")
+            .join("tasklist.exe");
+        let mut cmd = std::process::Command::new(tasklist);
+        cmd.args([
+            "/FI",
+            &format!("IMAGENAME eq {}", PROCESS_NAME),
+            "/FO",
+            "CSV",
+            "/NH",
+        ]);
+        // ★ GUI アプリから起動するとコンソール窓が一瞬光り、被験者に見える。
+        //   同 repo に先例あり (lib.rs の診断コマンド)。CREATE_NO_WINDOW = 0x0800_0000。
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000);
+        }
+        cmd.output()
             .ok()
             .map(|o| (String::from_utf8_lossy(&o.stdout).to_string(), true))
     } else {
-        std::process::Command::new("pgrep")
+        // 同上。`pgrep` は PATH 依存にせず絶対パスで呼ぶ (macOS / Linux とも /usr/bin)。
+        std::process::Command::new("/usr/bin/pgrep")
             .args(["-x", PROCESS_NAME])
             .output()
             .ok()
