@@ -1453,11 +1453,9 @@ fn start_session(
                 tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
                 G1_BLOCKS_STARTED.fetch_sub(1, Ordering::AcqRel);
                 session_active.0.store(false, Ordering::Release);
-                return Err(
-                    "ログの切り替えに失敗しました。ブロックを開始できません。\
+                return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
                      このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
-                        .to_string(),
-                );
+                    .to_string());
             }
         }
     }

@@ -1323,9 +1323,8 @@ impl SessionLogger {
                             // データを取り出して更新する (ここだけ握り潰すと、ローテート先が
                             // temp に落ちたことが UI に届かない・cross-review: Codex 指摘)。
                             {
-                                let mut t = target_for_thread
-                                    .lock()
-                                    .unwrap_or_else(|e| e.into_inner());
+                                let mut t =
+                                    target_for_thread.lock().unwrap_or_else(|e| e.into_inner());
                                 t.path = actual;
                                 t.status = new_status;
                             }
@@ -1941,10 +1940,17 @@ mod tests {
 
         let c1 = fs::read_to_string(&p).unwrap();
         // ★ 前半の打鍵が生きている = **truncate されていない**。
-        assert!(c1.contains(r#""vk":65"#), "rotate truncated the block:\n{c1}");
+        assert!(
+            c1.contains(r#""vk":65"#),
+            "rotate truncated the block:\n{c1}"
+        );
         // ★ 後半の打鍵が混ざっていない = **マージされていない**。
         assert!(!c1.contains(r#""vk":66"#), "blocks were merged:\n{c1}");
-        assert_eq!(c1.matches(r#""type":"meta","session_end""#).count(), 1, "{c1}");
+        assert_eq!(
+            c1.matches(r#""type":"meta","session_end""#).count(),
+            1,
+            "{c1}"
+        );
 
         // ★ 後半は別名のファイルへ行っている。
         let rotated = logger.target.lock().unwrap().path.clone();

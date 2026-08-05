@@ -34,6 +34,10 @@ GSE-prototype/
 │   │   ├── logger.rs             #     NDJSON セッションロガー
 │   │   │                         #       + UserLabelKind enum / LogEntry::UserLabel (Phase 1)
 │   │   ├── schema_dto.rs         #     [NEW Phase 1] LogEntry ミラー DTO (schemars 派生専用)
+│   │   ├── g1.rs                 #     [NEW 2026-08] G1 統制タスク実験モードの判定 (OS API 非依存)
+│   │   ├── participant_id.rs     #     participant_id 検証の単一情報源 (feature 非依存)
+│   │   ├── packaging.rs          #     匿名化 + age 暗号化 SSOT (#[cfg(feature = "package")] gated)
+│   │   ├── overlay_panel.rs      #     macOS: overlay 窓の NSPanel 化 FFI グルー (#[cfg(macos)] gated)
 │   │   ├── wall_server.rs        #     Lv2 Wall HTTP サーバー + QR + Zen Timer
 │   │   ├── sensors.rs            #     センサーモジュール dispatch (#[cfg(macos)] gated)
 │   │   ├── sensors_macos.rs      #     macOS: SensorManager stub (CoreMotion 予約)
@@ -130,6 +134,19 @@ GSE-prototype/
 - **目的**: キーストローク分析と認知状態推定
 - **置くべきもの**: 特徴量抽出、HMM エンジン、`loop_step`、`intervention` (Opportunity MVP)、`intervention_eval` (オフライン評価)、`probe_scheduler` (v0.3 純スケジューリング)、`metrics` (Phase 1 GT 集計)、`calibration_eval` (v0.3 較正解析: C-index/2段ゲート/MNAR)、将来の ML 推論
 - **置くべきでないもの**: OS API 呼び出し、入力イベント捕捉、タイムスタンプ生成 (`SystemTime` は `lib.rs` で付与)
+
+#### `src-tauri/src/g1.rs` (2026-08)
+
+- **置くべきもの**: 「いま G1 統制タスク実験の実施中か」の**判定だけ**。
+  `g1.mode` マーカーの探索パス計算 (純関数)、`GSE_G1_MODE` の解釈 (純関数)、
+  `BLOCK_DURATION_MS` / `G1Source`、プロセス列挙の出力パース (純関数)
+- **置くべきでないもの**: ★ **効果の適用**。ローテートも 5 分タイマーもプローブ停止も
+  `lib.rs` が行う (このモジュールは「判定」だけを持つ)
+- ⚠️ **プラットフォーム分岐は引数に出す**: `exe_to_folder_levels()` が階層数を返し、
+  `folder_up(exe, levels_up)` は純関数。★ **両 OS の形を片方の OS 上で検証できる**
+- ⚠️ **OS 依存はプロセス列挙だけ**（`pgrep` / `tasklist` を**絶対パス**で起動する。
+  相対名だと Windows が `current_exe()` のディレクトリを System32 より先に探すため）
+- 詳細: `docs/architecture.md §4.12` / `.steering/20260805-g1-app-mode-and-log-rotation/`
 
 #### `src-tauri/src/schema_dto.rs` (Phase 1)
 
