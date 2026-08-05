@@ -110,6 +110,17 @@ function App() {
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
   const [hookActive, setHookActive] = useState<boolean | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  // G1 統制タスク実験モード。null = 通常運用、"marker" / "env" = 引き金つきで G1 モード。
+  // ⚠️ ★ マーカーが外れる / launcher の `open -a` で通常アプリが起動する、のいずれでも
+  // 黙って通常モードになるため、開始する前に画面で分かるようにする (decisions D-7 / R-7)。
+  const [g1Mode, setG1Mode] = useState<string | null>(null);
+  // G1: このプロセスで終了したブロック数 (5 分での自動終了ごとに増える)。
+  const [g1BlocksDone, setG1BlocksDone] = useState(0);
+  // G1: 直前のブロックが 5 分で自動終了したか (スタート画面に「終わった」だけを出す)。
+  // ⚠️ ★ 残り時間は出さない (§4.4「残り時間のアナウンスをしない」/ §2.2 が却下した時間圧)。
+  const [blockEnded, setBlockEnded] = useState(false);
+  // 二重起動を検出した (別インスタンスの起動をブロックした)。
+  const [duplicateBlocked, setDuplicateBlocked] = useState(false);
   // Task C: session_meta 宣言 + ビネット導線。
   const [taskKind, setTaskKind] = useState<TaskKind>("argumentative");
   const [showVignette, setShowVignette] = useState(false);
@@ -220,6 +231,43 @@ function App() {
     };
   }, [windowLabel, currentWindow]);
 
+  // 4b. G1 モードの取得 (起動時 1 回)。null なら通常運用で、画面には何も足さない。
+  //     ⚠️ ★ G1 実施者は「G1 モード」の表示が出ていることを開始前に確認する
+  //     (participant-guide.md)。出ていなければ通常アプリが起動している
+  //     = プローブが復活していて、実施後まで気づけない (decisions R-7)。
+  useEffect(() => {
+    invoke<string | null>("get_g1_mode")
+      .then((mode) => setG1Mode(mode))
+      .catch((e) => console.error("get_g1_mode failed:", e));
+  }, []);
+
+  // 4c. G1: 5 分でのブロック自動終了。バックエンドがログを閉じたのでスタート画面へ戻す。
+  //     ⚠️ ★ 出すのは「終わった」だけ。残り時間・カウントダウンは出さない
+  //     (protocol.md §4.4「残り時間のアナウンスをしない」/ §2.2 が却下した時間圧)。
+  useEffect(() => {
+    const unlisten = listen("g1-block-ended", () => {
+      setIsWallActive(false);
+      setIsStarted(false);
+      setBlockEnded(true);
+      setG1BlocksDone((n) => n + 1);
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
+  // 4d. 二重起動の検出。★ 2 個目のプロセスはプラグインが終了させ、この通知は
+  //     **1 個目** に届く。黙って前面に出すだけだと、被験者は「開いたのに何も起きない」
+  //     としか分からないため、理由を画面に出す (decisions R-7)。
+  useEffect(() => {
+    const unlisten = listen("second-instance-blocked", () => {
+      setDuplicateBlocked(true);
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
   // 5. Monk Mode: Dashboard のトグルから monk-mode-changed を受け取り isMonkMode を更新。
   //    両ウィンドウ(main/overlay)がこのイベントをリッスンし状態を同期する。
   //    Monk Mode ON 時は LV2 Wall タイマーが無効化される。
@@ -252,6 +300,8 @@ function App() {
 
   const handleStart = async () => {
     setStartError(null);
+    // 新しいブロックを始めるので、前ブロックの終了通知を消す。
+    setBlockEnded(false);
     try {
       await invoke("start_session");
     } catch (e) {
@@ -302,6 +352,75 @@ function App() {
             キーストロークを解析し、介入判断に必要な作業状態をリアルタイムで推定します。
           </p>
         </div>
+
+        {/* ★ 二重起動の検出 (decisions R-7)。2 個目は起動を止めてあるが、
+            被験者から見ると「開いたのに何も起きない」ので理由を出す。 */}
+        {duplicateBlocked && (
+          <div
+            role="alert"
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.6rem 0.9rem",
+              borderRadius: "6px",
+              border: "1px solid #ff6b6b",
+              background: "rgba(255,107,107,0.12)",
+              fontSize: "0.85rem",
+              maxWidth: "34rem",
+            }}
+          >
+            ⚠️ <b>GSE が 2 つ動いている可能性があります。</b>
+            <br />
+            2 つ同時に動くと、打鍵の記録が 2 つのファイルに分かれて<b>そのブロックが使えなくなります</b>。
+            <br />
+            <span style={{ fontSize: "0.8rem" }}>
+              ほかに開いている GSE（Dock / タスクバーを確認）を<b>終了してから</b>、
+              このウィンドウで開始してください。心当たりが無ければ研究者にご連絡ください。
+            </span>
+          </div>
+        )}
+
+        {/* ★ G1 モードの表示 (fail-loud・decisions D-7 / R-7)。
+            ⚠️ 通常運用 (g1Mode === null) では何も足さない = 既定の画面を変えない。 */}
+        {g1Mode !== null && (
+          <div
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.6rem 0.9rem",
+              borderRadius: "6px",
+              border: "2px solid #4caf50",
+              background: "rgba(76,175,80,0.15)",
+              fontSize: "0.9rem",
+            }}
+          >
+            <b>G1 モードで動作しています</b>
+            <span style={{ opacity: 0.7, fontSize: "0.8rem" }}>（{g1Mode}）</span>
+            <br />
+            <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+              1 ブロックは 5 分で自動的に終了し、ここに戻ります。
+              {g1BlocksDone > 0 && <> これまでに {g1BlocksDone} ブロック終了しました。</>}
+            </span>
+          </div>
+        )}
+
+        {/* ★ ブロック終了の通知。⚠️ 出すのは「終わった」だけ。残り時間は出さない (§4.4)。 */}
+        {blockEnded && (
+          <div
+            role="status"
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.6rem 0.9rem",
+              borderRadius: "6px",
+              border: "1px solid #888",
+              fontSize: "0.9rem",
+            }}
+          >
+            5 分が経過したので、このブロックの記録を終了しました。
+            <br />
+            <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+              記入ページの文字数を控えてから本文を消去し、1 分休んで次のブロックを開始してください。
+            </span>
+          </div>
+        )}
 
         {/* Task C: session_meta の task_kind 宣言 */}
         <div style={{ margin: "1rem 0" }}>

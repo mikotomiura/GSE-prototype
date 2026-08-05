@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -687,6 +688,22 @@ pub enum LogEntry {
         q1_friction: u8,
         q2_progress: u8,
     },
+    /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
+    /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
+    ///
+    /// ★ なぜ 2 段階に分けるか: ブロック終了時に新ファイルを開くと、10 ブロック目の後に
+    /// **中身が `meta` 1 行だけの 11 本目**が残る。`gse-submit` は
+    /// `find_latest_session_ndjson` で**最新 1 本**を選ぶので、
+    /// ⚠️ ★ **被験者が「提出する」を押すと空ファイルが出てしまう**。
+    /// → 開くのは「次のブロックを始めるとき」だけにする。
+    BlockEnd,
+    /// **G1: 書込先を次のブロック用に切り替える。**
+    ///
+    /// 現ファイルを (まだなら `session_end` を書いてから) 閉じ、`new_path` を開いて
+    /// ⚠️ ★ **新ファイルの実時刻で `meta`(session_start) を書く**。
+    /// `analysis::anonymize::find_session_start` が `t` の基点にするのがこの行なので、
+    /// 前ファイルの値を引き継ぐと**匿名化後の時刻が全部ずれる**。
+    Rotate { new_path: PathBuf },
     /// セッション終了マーカー
     End,
 }
@@ -794,6 +811,22 @@ pub enum LogStatus {
     Disabled { error: String },
 }
 
+/// **いま書いている先**。G1 のローテート (`LogEntry::Rotate`) で変わりうるため、
+/// 起動時の値をコピーして持ち回るのではなく共有ハンドル越しに読む。
+///
+/// ⚠️ ★ `status` も一緒に持つのが要点である。ローテート先が書けずに temp へ落ちたとき、
+/// 起動時の `LogStatus::Ok` を UI が持ち続けると **fail-loud バナーが出ないまま
+/// 想定外の場所に書き続ける**。#1 (静かな全損) の再発になるため、
+/// **path と status を 1 つの構造体で同時に更新する**。
+#[derive(Debug, Clone)]
+pub struct LogTarget {
+    pub path: PathBuf,
+    pub status: LogStatus,
+}
+
+/// `LogTarget` の共有ハンドル。logger スレッドが書き、UI コマンドと `quit_app` が読む。
+pub type SharedLogTarget = Arc<Mutex<LogTarget>>;
+
 /// 書込先を確定する。`primary` → temp フォールバック → `io::sink()` 縮退の順に試す。
 /// 戻り値の `Box<dyn Write + Send>` を BufWriter で包めば consumer ループの `writeln!` 群は無改変
 /// (sink は書き込みを捨てる)。**いずれの場合も consumer スレッドは生かし続ける**ことで channel が
@@ -880,11 +913,51 @@ fn temp_fallback_path(primary: &Path) -> PathBuf {
     std::env::temp_dir().join("GSE-sessions").join(unique)
 }
 
+/// `meta`(session_start) 行を書く。★ **新しいファイルを開くたびに必ず呼ぶ**
+/// (起動時 / `LogEntry::Rotate` 時)。
+///
+/// - `hmm_version` は `engine.rs` の定数。`gse-replay` がゴールデンスナップショットと
+///   突き合わせる際に同一バージョンであることを検証する。
+/// - `g1_mode` は G1 実施時のみ `Some("marker" | "env")`。
+///   ⚠️ ★ **`None` のときの出力は従来と 1 バイトも変わらない**
+///   (`skip_serializing_if` 相当を手書きで担保している)。ゴールデンと既存フィクスチャの
+///   非回帰がこれに依存しているので、キーの順序を含めて変えないこと。
+fn write_meta_start(writer: &mut impl Write, session_start: u64, g1_mode: Option<&str>) {
+    match g1_mode {
+        None => {
+            let _ = writeln!(
+                writer,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}"}}"#,
+                session_start,
+                crate::analysis::engine::HMM_VERSION,
+            );
+        }
+        Some(source) => {
+            let _ = writeln!(
+                writer,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}"}}"#,
+                session_start,
+                crate::analysis::engine::HMM_VERSION,
+                source,
+            );
+        }
+    }
+}
+
+/// `meta`(session_end) 行を書く。ブロック終了 / ローテート / 終了の 3 経路で使う。
+fn write_meta_end(writer: &mut impl Write, session_end: u64) {
+    let _ = writeln!(writer, r#"{{"type":"meta","session_end":{}}}"#, session_end);
+}
+
 /// NDJSON形式でセッションデータを書き込むロガー。
 /// バックグラウンドスレッドでファイルIOを行うため、
 /// 送信側 (分析スレッド) は非ブロッキングで送信できる。
 pub struct SessionLogger {
+    /// 起動時に確定した書込先 (診断用の不変値)。
+    /// ⚠️ ★ **ローテート後の「いま書いている先」ではない**。それは `target` を見ること。
     pub log_path: PathBuf,
+    /// いま書いている先 + その状態 (ローテートで更新される共有ハンドル)。
+    pub target: SharedLogTarget,
     _handle: thread::JoinHandle<()>,
 }
 
@@ -896,28 +969,35 @@ impl SessionLogger {
     /// 書込先は **spawn 前に同期的に確定** する (`open_log_target`)。これにより:
     /// - 起動時点で書込可否を検証できる (GSE_DATASET 妥当性・macOS Documents 権限) → `LogStatus` を UI へ。
     /// - File::create 失敗でも consumer スレッドが死なず channel が Disconnected にならない (#1 解消)。
-    pub fn start(log_path: PathBuf) -> (Self, Sender<LogEntry>, Receiver<()>, LogStatus) {
+    ///
+    /// `g1_mode` は G1 実施時のみ `Some(..)`。`meta` 行に刻んで事後検証できるようにする
+    /// (⚠️ ★ マーカーが外れると黙って通常モードになるため・D-7)。
+    pub fn start(
+        log_path: PathBuf,
+        g1_mode: Option<&'static str>,
+    ) -> (Self, Sender<LogEntry>, Receiver<()>, LogStatus) {
         let (tx, rx) = bounded::<LogEntry>(512);
         let (shutdown_tx, shutdown_rx) = bounded::<()>(1);
 
         // 書込先を spawn 前に同期確定 (primary → temp → sink)。actual_path を log_path に採用する。
         let (boxed, actual_path, status) = open_log_target(&log_path);
         let resolved_path = actual_path.clone();
+        let target: SharedLogTarget = Arc::new(Mutex::new(LogTarget {
+            path: actual_path.clone(),
+            status: status.clone(),
+        }));
+        let target_for_thread = target.clone();
 
         let handle = thread::spawn(move || {
             let mut writer = BufWriter::new(boxed);
 
             // セッション開始メタデータ
-            // hmm_version は engine.rs の HMM_VERSION 定数。
-            // gse-replay がゴールデンスナップショットと突き合わせる際に
-            // 同一バージョンであることを検証する。
             let session_start = now_ms();
-            let _ = writeln!(
-                writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}"}}"#,
-                session_start,
-                crate::analysis::engine::HMM_VERSION,
-            );
+            write_meta_start(&mut writer, session_start, g1_mode);
+
+            // ★ ブロックを `session_end` で閉じ済みか。`BlockEnd` → `Rotate` → `End` の
+            // どの順で来ても **`session_end` を 1 ファイルにつき 1 行だけ**にするための状態。
+            let mut block_closed = false;
 
             tracing::info!("SessionLogger: writing to {:?}", actual_path);
 
@@ -1181,9 +1261,57 @@ impl SessionLogger {
                             );
                             dirty = true;
                         }
+                        LogEntry::BlockEnd => {
+                            // ★ 閉じるだけ。次のファイルは開かない (11 本目の空ファイル対策)。
+                            if !block_closed {
+                                write_meta_end(&mut writer, now_ms());
+                                block_closed = true;
+                            }
+                            let _ = writer.flush();
+                            last_flush = Instant::now();
+                            dirty = false;
+                        }
+                        LogEntry::Rotate { new_path } => {
+                            if !block_closed {
+                                write_meta_end(&mut writer, now_ms());
+                            }
+                            let _ = writer.flush();
+
+                            // ★ 旧ファイルはここで drop される (writer の差し替えで閉じる)。
+                            let (boxed, actual, new_status) = open_log_target(&new_path);
+                            writer = BufWriter::new(boxed);
+
+                            // ⚠️ ★ **新ファイルの実時刻**で meta を書く。
+                            // anonymize.rs の find_session_start がこの行を `t` の基点にするため、
+                            // 前ファイルの値を引き継ぐと匿名化後の時刻が全部ずれる。
+                            write_meta_start(&mut writer, now_ms(), g1_mode);
+                            let _ = writer.flush();
+
+                            if new_status != LogStatus::Ok {
+                                // ⚠️ ★ ローテート先が書けなかった。UI のバナーへ伝える必要がある
+                                // (起動時 Ok のまま黙って temp に書き続けるのが #1 の再発)。
+                                tracing::error!(
+                                    "SessionLogger: rotate to {:?} degraded: {:?}",
+                                    new_path,
+                                    new_status
+                                );
+                            } else {
+                                tracing::info!("SessionLogger: rotated to {:?}", actual);
+                            }
+                            if let Ok(mut t) = target_for_thread.lock() {
+                                t.path = actual;
+                                t.status = new_status;
+                            }
+
+                            block_closed = false;
+                            last_flush = Instant::now();
+                            dirty = false;
+                        }
                         LogEntry::End => {
-                            let _ =
-                                writeln!(writer, r#"{{"type":"meta","session_end":{}}}"#, now_ms());
+                            // ★ 直前に BlockEnd が来ていたら二重に書かない。
+                            if !block_closed {
+                                write_meta_end(&mut writer, now_ms());
+                            }
                             break;
                         }
                     },
@@ -1210,6 +1338,7 @@ impl SessionLogger {
         let logger = Self {
             // 実際に書いている場所を log_path に採用する (fallback 時は temp パス)。
             log_path: resolved_path,
+            target,
             _handle: handle,
         };
 
@@ -1486,6 +1615,40 @@ pub fn default_log_path() -> PathBuf {
     dir.join(format!("gse_{}.ndjson", ts))
 }
 
+/// 既存ファイルを踏まない次のセッションパスを返す (G1 のローテート用)。
+///
+/// ⚠️ ★ **`chrono_like_filename()` は秒粒度**である。同じ秒に 2 回ローテートすると
+/// `create_file_at` の `truncate(true)` が **前のブロックを丸ごと消す**。
+/// ブロック間隔は 5 分なので通常は起きないが、「開始する」を連打すれば起こせる。
+/// ★ 静かな全損 (気づけない失敗) になるので、運用の注意ではなく**構造で防ぐ**。
+///
+/// 衝突時は `gse_YYYYMMDD_HHMMSS_2.ndjson`, `_3` … と後置する。
+pub fn next_session_path() -> PathBuf {
+    unique_path_from(default_log_path())
+}
+
+/// `next_session_path` の本体。★ **base を引数に取る**ので env に依存せず単体テストできる
+/// (`default_log_path()` は `GSE_DATASET` / `HOME` を読むため、そのままだと
+/// 並列テストで env を触ることになり検証が不安定になる)。
+fn unique_path_from(base: PathBuf) -> PathBuf {
+    if !base.exists() {
+        return base;
+    }
+    let dir = base.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+    let stem = base
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "gse_session".to_string());
+    for n in 2..1000u32 {
+        let candidate = dir.join(format!("{}_{}.ndjson", stem, n));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    // ★ 1000 本ぶつかるのは異常事態。pid を混ぜて必ず別名にする (黙って上書きしない)。
+    dir.join(format!("{}_{}.ndjson", stem, std::process::id()))
+}
+
 /// フォールバック: ~/Documents/GSE-sessions/
 fn fallback_log_dir() -> PathBuf {
     let base = std::env::var("USERPROFILE")
@@ -1590,7 +1753,7 @@ mod tests {
             .join("sub")
             .join(format!("gse_start_fb_{}.ndjson", std::process::id()));
 
-        let (logger, tx, shutdown_rx, status) = SessionLogger::start(primary.clone());
+        let (logger, tx, shutdown_rx, status) = SessionLogger::start(primary.clone(), None);
         assert!(
             matches!(status, LogStatus::Fallback { .. }),
             "expected Fallback, got {:?}",
@@ -1615,6 +1778,183 @@ mod tests {
 
         let _ = fs::remove_file(&actual);
         let _ = fs::remove_file(&blocker);
+    }
+
+    // -----------------------------------------------------------------------
+    // G1: ブロックごとのローテート (protocol.md §1 「1 ブロック = NDJSON 1 ファイル」)
+    // -----------------------------------------------------------------------
+
+    /// テスト用の一意なログパス (同時実行しても衝突しない)。
+    fn rot_test_path(tag: &str, n: u32) -> PathBuf {
+        std::env::temp_dir().join("GSE-rot-test").join(format!(
+            "gse_{}_{}_{}.ndjson",
+            tag,
+            std::process::id(),
+            n
+        ))
+    }
+
+    /// ★★ 本タスクの核心の回帰: `Rotate` で **2 本のファイルに分かれ**、
+    /// **それぞれが自分の `meta`(session_start) と `session_end` を 1 行ずつ持つ**。
+    ///
+    /// ⚠️ ★ 2 本目の `session_start` が 1 本目と別の実時刻であることも見る。
+    /// `analysis::anonymize::find_session_start` がこの行を `t` の基点にするため、
+    /// 引き継いでしまうと**匿名化後の時刻が全部ずれる** (静かに間違う)。
+    #[test]
+    fn rotate_splits_log_into_two_files_each_with_own_meta() {
+        let p1 = rot_test_path("rot", 1);
+        let p2 = rot_test_path("rot", 2);
+        let (logger, tx, shutdown_rx, status) = SessionLogger::start(p1.clone(), None);
+        assert_eq!(status, LogStatus::Ok);
+
+        tx.send(LogEntry::SessionStart { timestamp: 1000 }).unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 65,
+            timestamp: 1100,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::BlockEnd).unwrap();
+        // ★ 2 本目の session_start が別時刻になるよう now_ms の粒度 (ms) 以上待つ。
+        thread::sleep(Duration::from_millis(5));
+        tx.send(LogEntry::Rotate {
+            new_path: p2.clone(),
+        })
+        .unwrap();
+        tx.send(LogEntry::SessionStart { timestamp: 2000 }).unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 66,
+            timestamp: 2100,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c1 = fs::read_to_string(&p1).expect("block 1 file");
+        let c2 = fs::read_to_string(&p2).expect("block 2 file");
+
+        // 1 本目: 自分の meta / 自分の key / session_end を 1 行ずつ。
+        // ⚠️ ★ `"session_start"` だけで数えると `{"type":"session_start","t":..}` エントリにも
+        // 当たる。**meta 行**を数えたいので `"type":"meta","session_start"` で絞る。
+        assert_eq!(
+            c1.matches(r#""type":"meta","session_start""#).count(),
+            1,
+            "b1:\n{c1}"
+        );
+        assert_eq!(c1.matches(r#""type":"meta","session_end""#).count(), 1);
+        assert!(c1.contains(r#""vk":65"#), "b1 missing its key:\n{c1}");
+        // ★ 2 本目の打鍵が 1 本目に混ざっていないこと (= ブロックが本当に分かれた)。
+        assert!(!c1.contains(r#""vk":66"#), "b1 leaked b2 key:\n{c1}");
+
+        // 2 本目: 自分の meta / 自分の key / session_end。
+        assert_eq!(
+            c2.matches(r#""type":"meta","session_start""#).count(),
+            1,
+            "b2:\n{c2}"
+        );
+        assert_eq!(c2.matches(r#""type":"meta","session_end""#).count(), 1);
+        assert!(c2.contains(r#""vk":66"#), "b2 missing its key:\n{c2}");
+        assert!(!c2.contains(r#""vk":65"#), "b2 leaked b1 key:\n{c2}");
+
+        // ★ 2 本目の meta が **新ファイルの実時刻** で書かれている (引き継ぎでない)。
+        let meta_ts = |c: &str| -> u64 {
+            let line = c.lines().next().unwrap();
+            let v: serde_json::Value = serde_json::from_str(line).unwrap();
+            v["session_start"].as_u64().unwrap()
+        };
+        assert!(
+            meta_ts(&c2) > meta_ts(&c1),
+            "block 2 meta must use its own wall clock: {} vs {}",
+            meta_ts(&c2),
+            meta_ts(&c1)
+        );
+
+        // 共有ハンドルがローテート後のパスを指している (UI / quit_app が読む値)。
+        assert_eq!(logger.target.lock().unwrap().path, p2);
+
+        let _ = fs::remove_file(&p1);
+        let _ = fs::remove_file(&p2);
+    }
+
+    /// ⚠️ `BlockEnd` の直後に `End` (アプリ終了) が来ても `session_end` は **1 行だけ**。
+    /// 二重に書くと解析側がブロック終端を取り違える。
+    #[test]
+    fn block_end_then_quit_writes_session_end_once() {
+        let p = rot_test_path("once", 0);
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::BlockEnd).unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        assert_eq!(
+            c.matches(r#""type":"meta","session_end""#).count(),
+            1,
+            "session_end must appear exactly once:\n{c}"
+        );
+        let _ = fs::remove_file(&p);
+    }
+
+    /// ★★ 非回帰の要: `g1_mode` が `None` のとき `meta` 行は **従来と 1 バイトも変わらない**。
+    /// ⚠️ ゴールデンスナップショットと既存フィクスチャがこの形に依存している。
+    #[test]
+    fn meta_line_is_byte_identical_when_not_g1() {
+        let mut buf: Vec<u8> = Vec::new();
+        write_meta_start(&mut buf, 1234, None);
+        assert_eq!(
+            String::from_utf8(buf).unwrap(),
+            format!(
+                "{{\"type\":\"meta\",\"session_start\":1234,\"hmm_version\":\"{}\"}}\n",
+                crate::analysis::engine::HMM_VERSION
+            )
+        );
+    }
+
+    /// ★ G1 のときだけ引き金を刻む (マーカーが外れたことを事後に検出できるようにする)。
+    #[test]
+    fn meta_line_records_g1_source_when_g1() {
+        let mut buf: Vec<u8> = Vec::new();
+        write_meta_start(&mut buf, 1234, Some("marker"));
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains(r#""g1_mode":"marker""#), "{s}");
+        // JSON として妥当であること (手書き書式なので毎回確かめる)。
+        let v: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+        assert_eq!(v["g1_mode"], "marker");
+        assert_eq!(v["session_start"], 1234);
+    }
+
+    /// ⚠️★ ファイル名は**秒粒度**。同じ秒に 2 回ローテートしても
+    /// **前のブロックを truncate で消さない**こと。
+    #[test]
+    fn next_session_path_does_not_reuse_existing_file() {
+        let dir = std::env::temp_dir().join(format!("gse_nsp_{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let base = dir.join("gse_20260805_223000.ndjson");
+
+        // 未使用なら base をそのまま返す (通常経路を変えない)。
+        assert_eq!(unique_path_from(base.clone()), base);
+
+        // ★ 既に在るなら別名を返す (= truncate で前のブロックを消さない)。
+        File::create(&base).unwrap();
+        let second = unique_path_from(base.clone());
+        assert_ne!(second, base, "rotation must not reuse an existing path");
+        assert_eq!(second, dir.join("gse_20260805_223000_2.ndjson"));
+
+        // ★ 3 本目もぶつからない。
+        File::create(&second).unwrap();
+        assert_eq!(
+            unique_path_from(base.clone()),
+            dir.join("gse_20260805_223000_3.ndjson")
+        );
+
+        let _ = fs::remove_file(&base);
+        let _ = fs::remove_file(&second);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -2163,7 +2503,7 @@ mod tests {
             "gse_probe_schema_test_{}.ndjson",
             std::process::id()
         ));
-        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(path.clone());
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(path.clone(), None);
 
         tx.send(LogEntry::SessionMeta {
             timestamp: 1000,
@@ -2261,7 +2601,7 @@ mod tests {
             "gse_paste_schema_test_{}.ndjson",
             std::process::id()
         ));
-        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(path.clone());
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(path.clone(), None);
 
         tx.send(LogEntry::Paste {
             timestamp: 1234,

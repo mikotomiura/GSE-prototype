@@ -164,6 +164,33 @@ pub fn read_persisted_participant_id() -> Option<String> {
 
 /// `dir` 内で `gse_*.ndjson` のうち **最終更新が最も新しい** ものを返す。
 /// `*.anon.ndjson` 等の派生は対象外 (先頭 `gse_` + 拡張子 `ndjson` のみ)。
+/// NDJSON に `meta` 以外の行が 1 つでもあるか（= 提出する価値があるセッションか）。
+///
+/// ★ 読むのは **`"type"` の値だけ**である（打鍵の内容も時刻も見ない・data-privacy）。
+/// 読めないファイルは **`true`**（= 候補に残す）に倒す。⚠️ 読めないことを理由に
+/// 本物のセッションを黙って捨てるほうが害が大きいため。
+fn has_any_data_row(path: &Path) -> bool {
+    use std::io::BufRead;
+    let f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return true,
+    };
+    for line in std::io::BufReader::new(f).lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => return true,
+        };
+        let t = line.trim();
+        if t.is_empty() {
+            continue;
+        }
+        if !t.contains(r#""type":"meta""#) {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn find_latest_session_ndjson(dir: &Path) -> Option<PathBuf> {
     let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
     for entry in std::fs::read_dir(dir).ok()?.flatten() {
@@ -178,6 +205,20 @@ pub fn find_latest_session_ndjson(dir: &Path) -> Option<PathBuf> {
             continue;
         }
         if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        // ⚠️★ **中身の無いセッションを「最新」に選ばない。**
+        //
+        // 2026-08-05 の実測で見つかった: 二重起動を止められた 2 個目のプロセスは、
+        // 止められる前に **NDJSON を作ってから死ぬ**（`SessionLogger::start` が
+        // Tauri builder より先に走るため）。★ その空ファイルが最新になり、
+        // 被験者が「提出する」を押すと **空の .age が出る**。
+        //
+        // ★ 起動直後のクラッシュ・ディスク不足など、原因を問わず同じ形で守れるので
+        // 二重起動対策の副産物ではなく**恒久的な堅牢化**として入れる。
+        // ⚠️ 判定は「打鍵が 1 つも無い」ではなく **「meta 行しか無い」** で行う
+        // (打鍵ゼロでも probe 回答などが入った正当なセッションを落とさないため)。
+        if !has_any_data_row(&path) {
             continue;
         }
         let mtime = match entry.metadata().and_then(|m| m.modified()) {
@@ -350,6 +391,39 @@ mod tests {
             s.ends_with("Documents/GSE-sessions") || s.ends_with("raw/P007"),
             "unexpected session dir (logger fallback drift?): {s}"
         );
+    }
+
+    /// ⚠️★ **中身の無いセッションを最新に選ばない**（2026-08-05 の実測で見つかった穴）。
+    ///
+    /// 二重起動を止められた 2 個目のプロセスは、止められる前に NDJSON を作ってから死ぬ。
+    /// ★ その空ファイルが最新になると、被験者の「提出する」が**空の .age** を出す。
+    #[test]
+    fn find_latest_skips_sessions_with_only_meta_rows() {
+        let dir = std::env::temp_dir().join(format!("gse_submit_meta_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 本物のセッション (古い)
+        std::fs::write(
+            dir.join("gse_20260101_010101.ndjson"),
+            "{\"type\":\"meta\",\"session_start\":1}\n{\"type\":\"key\",\"t\":2,\"vk\":65,\"press\":true}\n",
+        )
+        .unwrap();
+        // ★ 中断された起動 (新しいが meta だけ) — これを選んではならない
+        std::fs::write(
+            dir.join("gse_20260102_020202.ndjson"),
+            "{\"type\":\"meta\",\"session_start\":9}\n",
+        )
+        .unwrap();
+        // 完全な空ファイルも同様
+        std::fs::write(dir.join("gse_20260103_030303.ndjson"), "").unwrap();
+
+        let found = find_latest_session_ndjson(&dir).unwrap();
+        assert_eq!(
+            found.file_name().and_then(|s| s.to_str()),
+            Some("gse_20260101_010101.ndjson"),
+            "meta しか無いセッションを提出候補にしてはならない"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

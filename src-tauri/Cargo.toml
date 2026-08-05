@@ -71,6 +71,11 @@ tauri-plugin-opener = "2"
 # Phase 1: Ground Truth ラベリング用のグローバルホットキー
 # (Cmd/Ctrl+Shift+Alt+F/I/S → record_user_label)
 tauri-plugin-global-shortcut = "2"
+# G1: 二重起動の検出。★ 2026-08-05 の実測で「同じ bundle ID でもパスが違えば 2 プロセスが
+# 共存し、NDJSON が 2 本に割れる」ことを確認したため必要になった
+# (.steering/20260805-g1-app-mode-and-log-rotation/decisions.md R-7)。
+# ⚠️ 公式文書の指示どおり **最初に登録する**こと。
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 # `float_roundtrip`: gse-replay のゴールデンスナップショットで f64 の
 # JSON → parse → JSON のラウンドトリップを bit-equal に保証するため有効化。

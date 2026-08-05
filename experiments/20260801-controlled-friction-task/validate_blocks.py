@@ -65,6 +65,9 @@ PLAUSIBLE_CHARS = (150, 800)
 
 # ★ B-1（`preregistration.md §2.6`）の客観検証。G1 のログにこれらの行があってはならない。
 FORBIDDEN_LINE_TYPES = ("probe_assignment", "probe_triggered", "realtime_label")
+# ★ 第 10 版 §5.4-5: G1 モードを立てた引き金。logger の meta 行に刻まれる
+#   （Rust 側の単一情報源は src-tauri/src/g1.rs の G1Source::as_str）。
+G1_MODE_VALUES = ("marker", "env")
 
 
 class Report:
@@ -344,6 +347,32 @@ def scan_ndjson(path: pathlib.Path) -> dict[str, int]:
     return counts
 
 
+def read_g1_modes(path: pathlib.Path) -> set[str]:
+    """`meta` 行に刻まれた `g1_mode` の値を集める（★ 第 10 版 `§5.4-6`）。
+
+    ⚠️ ★ **`§5.4-2` の probe 行 0 検査を置き換えるものではない。** 独立した 2 本目である:
+    - probe 行 0  … 「プローブが出なかった」ことの検査（結果を見る）
+    - `g1_mode`   … 「G1 モードで起動していた」ことの検査（原因を見る）
+
+    ★ なぜ原因側も要るか: マーカーが外れる / アプリをフォルダの外に出す /
+    launcher の `open -a` で通常アプリが起動する（**2026-08-05 に実測**）のいずれでも
+    黙って通常モードになる。⚠️ そのとき probe 行は**たまたま 0 のこともある**
+    （5 分ブロックでの発火確率は 57%）ので、★ **probe 行 0 だけでは見逃す。**
+    """
+    modes: set[str] = set()
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("type") == "meta" and isinstance(obj.get("g1_mode"), str):
+                modes.add(obj["g1_mode"])
+    return modes
+
+
 def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
     subject = spec.get("subject", "?")
 
@@ -380,6 +409,19 @@ def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
                 r.fail(f"{subject}: ブロック {n} に {t} 行が {counts[t]} 件ある。"
                        f"§2.6 は「アプリ内プローブを使わない」と凍結している。"
                        f"GSE_DISABLE_PROBES=1 を立てずに実施した疑いがある")
+        # ★ 第 10 版 §5.4-6 の客観検証（**§5.4-2 の probe 行 0 とは別の 2 本目**）。
+        #   ⚠️ パイロットは G1 モードが実装される前に取っているので対象外
+        #   （check_execution_mode と同じ判定。"confirmatory": False を持つのは pilot_assign だけ）。
+        if spec.get("confirmatory") is not False:
+            modes = read_g1_modes(p)
+            if not modes:
+                r.fail(f"{subject}: ブロック {n} の meta 行に g1_mode が無い。"
+                       f"G1 モードで起動していない（マーカーの無い通常アプリが動いた）疑いがある。"
+                       f"第 10 版 §5.4-6。★ probe 行 0 だけでは見逃す"
+                       f"（5 分ブロックでの発火確率は 57% なのでたまたま 0 になりうる）")
+            elif not modes <= set(G1_MODE_VALUES):
+                r.fail(f"{subject}: ブロック {n} の g1_mode が {sorted(modes)}。"
+                       f"{' / '.join(G1_MODE_VALUES)} のいずれかであるはず（第 10 版 §5.4-5）")
         if counts.get("_malformed"):
             r.warn(f"{subject}: ブロック {n} に壊れた行が {counts['_malformed']} 件ある")
         # ★ INFO: FS-B の可用性（§5.1）。ime_shadow が 0 なら ime_dwell_med が定数になる。
@@ -629,6 +671,10 @@ def selftest() -> int:
         if rc == 0:
             fails.append("被験者間で NDJSON 名が重複したら NG を返すこと")
 
+    # ★ G1 モードで取れたログの見本（第 10 版 §5.4-6: meta 行に g1_mode が載る）
+    G1_LOG = ('{"type":"meta","session_start":1,"hmm_version":"0.3.0","g1_mode":"marker"}\n'
+              '{"type":"key","t":1,"press":true}\n')
+
     # ★ 禁止行（プローブ）の検出 — B-1 の客観検証
     with tempfile.TemporaryDirectory() as td:
         d = pathlib.Path(td)
@@ -636,16 +682,60 @@ def selftest() -> int:
         raw = d / "raw" / spec["subject"]
         raw.mkdir(parents=True)
         for blk in spec["blocks"]:
-            (raw / blk["file"]).write_text('{"type":"key","t":1,"press":true}\n', encoding="utf-8")
+            (raw / blk["file"]).write_text(G1_LOG, encoding="utf-8")
         r = validate_spec(spec, seed, {}, d)
         if not r.ok:
             fails.append(f"probe 行が無いログを FAIL にしてはならない: {r.fails[0]}")
         (raw / spec["blocks"][3]["file"]).write_text(
-            '{"type":"key","t":1,"press":true}\n{"type":"probe_assignment","probe_id":"x"}\n',
+            G1_LOG + '{"type":"probe_assignment","probe_id":"x"}\n',
             encoding="utf-8")
         r = validate_spec(spec, seed, {}, d)
         if r.ok or not any("probe_assignment" in m for m in r.fails):
             fails.append("probe_assignment 行があれば FAIL にすること (§2.6 / B-1)")
+
+    # ★★ 第 10 版 §5.4-6: g1_mode の検査（**probe 行 0 とは独立の 2 本目**）
+    with tempfile.TemporaryDirectory() as td:
+        d = pathlib.Path(td)
+        spec = _good_spec(seed)
+        raw = d / "raw" / spec["subject"]
+        raw.mkdir(parents=True)
+        for blk in spec["blocks"]:
+            (raw / blk["file"]).write_text(G1_LOG, encoding="utf-8")
+
+        # ⚠️ ★ ここが要点: **probe 行は 0 のまま**で g1_mode だけを落とす。
+        #    §5.4-2 の検査は緑のままなので、2 本目が無ければ**見逃す**ケースである。
+        (raw / spec["blocks"][2]["file"]).write_text(
+            '{"type":"meta","session_start":1,"hmm_version":"0.3.0"}\n'
+            '{"type":"key","t":1,"press":true}\n', encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if r.ok or not any("g1_mode" in m for m in r.fails):
+            fails.append("確証で meta に g1_mode が無ければ FAIL にすること (第 10 版 §5.4-6)")
+        if any("probe_assignment" in m for m in r.fails):
+            fails.append("g1_mode 欠落を probe 行の検査で誤検出している（2 本が独立していない）")
+
+        # ★ 値が想定外なら FAIL
+        (raw / spec["blocks"][2]["file"]).write_text(
+            '{"type":"meta","session_start":1,"hmm_version":"0.3.0","g1_mode":"yes"}\n',
+            encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if r.ok or not any("g1_mode" in m for m in r.fails):
+            fails.append("g1_mode が marker/env 以外なら FAIL にすること (第 10 版 §5.4-5)")
+
+    # ⚠️ ★ パイロットは G1 モード実装前に取っているので **対象外**（P-1 を赤にしない）
+    with tempfile.TemporaryDirectory() as td:
+        d = pathlib.Path(td)
+        pilot = assign.pilot_assign(seed, topic=2, label="mac")
+        for i, blk in enumerate(pilot["blocks"], start=1):
+            blk["file"] = f"pilot_session_{i:02d}.ndjson"
+        raw = d / "raw" / pilot["subject"]
+        raw.mkdir(parents=True)
+        for blk in pilot["blocks"]:
+            (raw / blk["file"]).write_text(
+                '{"type":"meta","session_start":1,"hmm_version":"0.3.0"}\n'
+                '{"type":"key","t":1,"press":true}\n', encoding="utf-8")
+        r = validate_spec(pilot, seed, {}, d)
+        if any("g1_mode" in m for m in r.fails):
+            fails.append("パイロットに g1_mode を要求してはならない（実装前に取得済み）")
 
     if fails:
         print("[NG] validate_blocks.py --selftest 失敗:")
