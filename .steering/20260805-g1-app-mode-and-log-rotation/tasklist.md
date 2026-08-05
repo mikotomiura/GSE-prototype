@@ -121,3 +121,29 @@ emit ペイロードは空・文書に PII 混入なし・依存の推移的追�
 デッドロック無し（ロック順が単一・fail-closed）／`has_any_data_row` が全読みしない／
 `emit_schema` byte 一致・golden replay 4 本一致／規約（`println!` 無し・新規 `unsafe` 無し・
 `analysis/` への OS 依存の染み出し無し・新規ファイルの clippy 警告 0）。
+
+---
+
+## 10. `/cross-review`（Claude + Codex）と実機確認（2026-08-05）
+
+- [x] ゲート通過（機密なし / 1,266 insertions ＜ manual_approval 2,000 / 予算内 / codex・jq 実在）
+- [x] Codex 消費 **41,631 トークン**（137,035 → 178,666 / 200,000・invocations 2 → 3）
+- [x] ★★ **両者一致 HIGH を修正**: `Rotate` の送信失敗時に `SessionStart` を無条件送信していた
+      → 状態を巻き戻して `Err` を返す（`start_session` を `Result` 化）
+- [x] Codex 独自指摘（同一パス skip でブロックがマージされる）→ **一意化を先に**移して解消
+- [x] ⚠️★ **同一パスガードが到達不能だった**（壊しても赤にならない）→ **消した**（本タスク 3 回目）
+- [x] Codex 独自指摘（poison 時に rotate 結果を握り潰す）→ `into_inner` に統一
+- [x] H2（他 producer の session ゲート）は **直さない判断**と根拠を `decisions.md` R-9 に記録
+      （★ 止めると `§5.4-3` が凍結した「自己マーカーは検査が捕まえる」が効かなくなるため）
+- [x] ★★ **実機で 2 ブロック通し確認（研究者が操作）**:
+      ブロック 1 = `meta start(g1_mode:marker)` → `session_start` → `feat×7` → **`session_end` が最終行**、
+      ブロック 2 = 自分の `meta start` を持つ別ファイル。
+      ★ **`session_end` の後ろに 1 行も続いていない**（HIGH ① の修正が実機で効いた）。
+      ★ 増えたファイルは 1 本だけ（HIGH ② の孤児ファイルも出ていない）
+- [x] 回帰: `cargo test --workspace` 277 / `--features package` 269 / `tsc` 緑
+
+### ⚠️ それでも実機で確かめていないこと
+
+- **5 分の自動終了**（待っていない。単体テストと 2 ブロック通しでは経路が別）
+- **Windows 全般**（マーカーの階層 / 二重起動 / `tasklist` の解析）
+- **新品端末での TCC 初回**

@@ -1405,7 +1405,7 @@ fn start_session(
     latest_feat: State<LatestFeatState>,
     intervention: State<InterventionState>,
     log: State<Arc<Mutex<LogState>>>,
-) {
+) -> Result<(), String> {
     // リセットシグナルを先にセットしてからセッションを有効化する。
     // 分析スレッドが active=true を Acquire で読んだ時点で、
     // それより前に Release された reset=true も可視であることが保証される。
@@ -1444,9 +1444,20 @@ fn start_session(
                 new_path
             );
             if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
-                // ⚠️ ★ ここで黙ると「1 ファイルに 2 ブロック」= protocol.md §1 が (b) を却下した
-                // 「沈黙して間違った結果を出す」失敗そのものになる。必ず声を上げる。
+                // ⚠️★★ **ここで進んではならない** (cross-review HIGH・Claude と Codex が一致)。
+                // channel (bounded 512) が満杯だと Rotate だけが落ち、直後の SessionStart 以降が
+                // **既に `session_end` を書き終えた旧ファイル**に積まれる。
+                // = protocol.md §1 が (b) を却下した「沈黙して間違った結果を出す」失敗そのもの。
+                // ★ 触った状態を**全部巻き戻して** Err を返し、画面に出す (start_session の
+                // 失敗はフロントが「開始に失敗しました」と表示する)。
                 tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+                G1_BLOCKS_STARTED.fetch_sub(1, Ordering::AcqRel);
+                session_active.0.store(false, Ordering::Release);
+                return Err(
+                    "ログの切り替えに失敗しました。ブロックを開始できません。\
+                     このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
+                        .to_string(),
+                );
             }
         }
     }
@@ -1475,6 +1486,7 @@ fn start_session(
     } else {
         tracing::error!("Overlay window not found — setup() may have failed");
     }
+    Ok(())
 }
 
 /// アプリ終了。終了前に以下を順に実行する:

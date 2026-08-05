@@ -1279,29 +1279,24 @@ impl SessionLogger {
                             dirty = false;
                         }
                         LogEntry::Rotate { new_path } => {
-                            // ⚠️★ **自分自身を truncate しない。** 呼び出し側 (UI スレッド) が
-                            // 出したパスが今の書込先と同じなら、開き直すと現ブロックが消える。
-                            let current_same = target_for_thread
-                                .lock()
-                                .map(|t| t.path == new_path)
-                                .unwrap_or(false);
-                            if current_same {
-                                tracing::warn!(
-                                    "SessionLogger: rotate target equals current path; skipping                                      (would truncate the block being written)"
-                                );
-                                continue;
-                            }
+                            // ⚠️★ **一意化を先に行う。** 呼び出し側 (UI スレッド) の exists 判定と
+                            // 実作成の間には窓があり、ファイル名は秒粒度なので同じパスが来うる。
+                            // ★ ここで先に別名へ振ることで、下の「同一パス」判定に落ちる
+                            // = **2 つの論理ブロックが 1 ファイルに黙って混ざる**経路を消す
+                            // (cross-review: Codex 指摘)。logger スレッドは単一なので窓が閉じる。
+                            let new_path = unique_path_from(new_path);
+
+                            // ⚠️★ **ここに「同一パスなら skip」のガードは置かない。**
+                            // 上の一意化が先に走るので、書きかけのファイルは必ず存在する
+                            // → `unique_path_from` が別名を返す → 同一パスには**なりえない**。
+                            // ★ 実際、ガードを書いて**わざと壊しても赤にならなかった**（到達不能）。
+                            // 発火しない検査を残すと「守られているつもり」を作るので置かない。
+                            // 唯一同一パスになりうるのは現ファイルがディスク上に無いとき
+                            // （外部削除 / LogStatus::Disabled の sink）で、その場合は開き直すほうが正しい。
                             if !block_closed {
                                 write_meta_end(&mut writer, now_ms());
                             }
                             let _ = writer.flush();
-
-                            // ⚠️★ **一意化をここ (logger スレッド) でもう一度行う。**
-                            // 呼び出し側の exists 判定は別スレッドで、判定〜実作成の間に窓がある。
-                            // ファイル名は秒粒度なので、同じ秒に 2 回 Rotate が積まれると
-                            // `create_file_at` の truncate が前ブロックを消す (code-review MEDIUM)。
-                            // ★ logger スレッドは単一なので、ここで確定させれば窓が閉じる。
-                            let new_path = unique_path_from(new_path);
 
                             // ★ 旧ファイルはここで drop される (writer の差し替えで閉じる)。
                             let (boxed, actual, new_status) = open_log_target(&new_path);
@@ -1324,7 +1319,13 @@ impl SessionLogger {
                             } else {
                                 tracing::info!("SessionLogger: rotated to {:?}", actual);
                             }
-                            if let Ok(mut t) = target_for_thread.lock() {
+                            // ⚠️ poison でも黙って諦めない。他の箇所と同じく into_inner で
+                            // データを取り出して更新する (ここだけ握り潰すと、ローテート先が
+                            // temp に落ちたことが UI に届かない・cross-review: Codex 指摘)。
+                            {
+                                let mut t = target_for_thread
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner());
                                 t.path = actual;
                                 t.status = new_status;
                             }
@@ -1905,12 +1906,17 @@ mod tests {
         let _ = fs::remove_file(&p2);
     }
 
-    /// ⚠️★ **同じパスへの `Rotate` は自分自身を truncate してはならない**（code-review MEDIUM）。
+    /// ⚠️★★ **同じパスへの `Rotate` が来ても、前のブロックを壊さず・混ぜない。**
     ///
     /// 呼び出し側 (UI スレッド) の一意化と実作成 (logger スレッド) の間には窓があり、
-    /// 同じ秒に 2 回積まれると同じパスが来うる。★ 来たら**書きかけのブロックを守る**。
+    /// ファイル名は秒粒度なので**同じパスが来うる**。守るべき性質は 2 つある:
+    /// - 書きかけのブロックを **truncate しない**（code-review MEDIUM）
+    /// - ⚠️ 2 つの論理ブロックを **1 ファイルに黙って混ぜない**（cross-review: Codex 指摘）
+    ///
+    /// ★ logger スレッド側で**先に一意化**するので、同一パス要求は
+    /// 「無視」ではなく **別名への正しいローテート**になる（両方の性質を同時に満たす）。
     #[test]
-    fn rotate_to_current_path_does_not_truncate_the_open_block() {
+    fn rotate_to_current_path_neither_truncates_nor_merges_blocks() {
         let p = rot_test_path("same", 0);
         let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
         tx.send(LogEntry::Key {
@@ -1933,17 +1939,22 @@ mod tests {
             .recv_timeout(Duration::from_secs(5))
             .expect("logger did not shut down in time");
 
-        let c = fs::read_to_string(&p).unwrap();
-        // ★ 前半の打鍵が生きている = truncate されていない。
-        assert!(c.contains(r#""vk":65"#), "rotate truncated the block:\n{c}");
-        assert!(c.contains(r#""vk":66"#), "{c}");
-        // ★ 同一パスなので meta(session_start) は 1 つのまま (開き直していない)。
-        assert_eq!(
-            c.matches(r#""type":"meta","session_start""#).count(),
-            1,
-            "{c}"
-        );
+        let c1 = fs::read_to_string(&p).unwrap();
+        // ★ 前半の打鍵が生きている = **truncate されていない**。
+        assert!(c1.contains(r#""vk":65"#), "rotate truncated the block:\n{c1}");
+        // ★ 後半の打鍵が混ざっていない = **マージされていない**。
+        assert!(!c1.contains(r#""vk":66"#), "blocks were merged:\n{c1}");
+        assert_eq!(c1.matches(r#""type":"meta","session_end""#).count(), 1, "{c1}");
+
+        // ★ 後半は別名のファイルへ行っている。
+        let rotated = logger.target.lock().unwrap().path.clone();
+        assert_ne!(rotated, p, "rotation must land on a different path");
+        let c2 = fs::read_to_string(&rotated).unwrap();
+        assert!(c2.contains(r#""vk":66"#), "{c2}");
+        assert!(!c2.contains(r#""vk":65"#), "{c2}");
+
         let _ = fs::remove_file(&p);
+        let _ = fs::remove_file(&rotated);
     }
 
     /// ⚠️ `BlockEnd` の直後に `End` (アプリ終了) が来ても `session_end` は **1 行だけ**。

@@ -305,3 +305,64 @@ G1-app/{g1.mode, gse-next.app}  と  plain/{gse-next.app}  の 2 つを作り、
   → 研究者の確認後に削除する。**勝手に消さない**（本物のセッションと同じ場所にあるため）。
 - ★ `/Applications/gse-next.app` は `codesign --verify --strict` が rc=0 のまま（無傷）。
 
+
+---
+
+## R-9: `/cross-review`（Claude + Codex）の結果と、**直さなかったものの根拠**
+
+Codex 消費 **41,631 トークン**（`.codex/budget.json`: 137,035 → 178,666 / 200,000・invocations 2 → 3）。
+対象はコード差分のみ（1,266 insertions・`manual_approval_threshold` 2,000 内）。
+
+### 両者一致 HIGH（★ **修正した**）
+
+⚠️★★ **`Rotate` の送信に失敗しても `SessionStart` を無条件に送っていた。**
+`try_send` は bounded(512) が満杯だと落ちるので、ローテートされないまま
+**既に `session_end` を書き終えた旧ファイル**に次ブロックが積まれる。
+★ `protocol.md §1` が (b) を却下した「沈黙して間違った結果を出す」失敗そのものである。
+
+→ **触った状態を全部巻き戻して `Err` を返す**（`start_session` を `Result` 化）。
+フロントは既に失敗を「開始に失敗しました」と表示する経路を持っている。
+
+★ Codex は別の引き金で同じ設計ギャップに到達した（同一パス skip による**ブロックの
+サイレントなマージ**）。→ **一意化を `Rotate` 処理の先頭へ移し**、同一パスになりえなくした。
+
+### ⚠️★★ ここでも「発火しない検査」を書いていた
+
+同一パスガード（`current_same` → `continue`）を足したが、
+★ **わざと壊しても赤にならなかった**。一意化を先に行うと、書きかけのファイルは必ず存在するので
+`unique_path_from` が別名を返し、★ **同一パスには到達しない**。
+→ ★ **ガードを消した。** 発火しない検査を残すと「守られているつもり」を作る。
+（本タスクで**3 回目**。1 回目は Python の検査 2 本、2 回目は 200ms sleep の根拠、今回がこれ。）
+
+### ⚠️ H2: 他の producer が session ゲートを見ていない — **直さない。根拠を書く**
+
+`record_user_label`（ホットキー）／`record_self_marker`／`record_intervention_dismiss`／
+`vignette_response`／`wall_server` の `InterventionResponse` は `session_active` を見ずに `try_send` する。
+→ ブロックを閉じた後に押されると `session_end` の**後ろ**に行が付きうる。
+
+★ **それでも止めない。理由は 2 つある**:
+
+1. ⚠️★ **止めると `§5.4-2 / -3` の検出が効かなくなる。**
+   `§5.4-3` は「自己マーカーが押されたら `realtime_label` 行として検査が捕まえる」と
+   **凍結している**。★ アプリ側で握り潰すと、**禁止事項の違反が見えなくなる**。
+   ★ 記録が汚れることより、**違反が検出できることのほうが重い**（`§3.6` は事後除外を禁じており、
+   検出できなければ報告もできない）。
+2. G1 は**第 1 週モード**で回すので `INTERVENTION_ENABLED=false`。
+   Wall / Nudge は発火せず、`intervention_response` 系は**そもそも出ない**。
+   プローブも止めているので `realtime_label` は自己マーカーだけである。
+
+⚠️ ★ **例外は `emit_ime_shadow` だけ**で、これは**ユーザー操作ではなく IME の後始末**が
+勝手に飛んでくる経路なので、G1 モードのときだけ止めた（違反の検出とは無関係）。
+
+### ⚠️ 直していないもの（★ **やっていないと書く**）
+
+- **`start_session` が `log.lock()` を関数末尾（`win.show()`）まで保持している**（Claude のみ・LOW）。
+  デッドロックはしないが保持範囲が広い。→ **次セッター**。
+- **二重起動の検査が起動 1 回だけ**（code-review M6）。→ **測ってから入れる**。
+- **`docs/architecture.md` / `docs/repository-structure.md` の更新**（新規トップレベルモジュール）。
+  ★ `architecture-rules` ルール 4 手順 5 に該当する。→ **やるべきだが未実施**。
+
+### ★ 両者が独立に「問題なし」と判定した点
+
+`SharedLogTarget` のロック順（logger は `target` のみ・UI は `LogState` → `target` の一方向）に
+**デッドロック経路は無い**。`BlockEnd` / `Rotate` / `End` の状態遷移も正しい。
