@@ -181,6 +181,96 @@ def leak_check(page: str, doc: dict, block: int) -> list[str]:
     return bad
 
 
+#: ★ ボタンのラベルが「別のページへ行く」と読める語（2026-08-05・P-1 で実際に踏んだ）。
+#   旧ラベル「消去して次のブロックへ」は押しても遷移せず、被験者がそこで止まった。
+NAV_PROMISE_WORDS = ("次のブロック", "次へ", "進む", "移動", "開始する")
+
+#: ★ `<button>` を実際に遷移させる書き方。**これが無いのに上の語を名乗ってはいけない。**
+#   ⚠️ ★ `<a href>` を入れていた版は**誤りだった**（2026-08-05 の cross-review で判明）:
+#      `<button>` は `<a href>` では遷移しない。ページのどこかに無関係なリンクが 1 本
+#      増えただけで、約束を破っているボタンが**永久に検出できなくなる**（黙って緑になる）。
+#      → ★ **判定はボタン単位で行う**。下の `_nav_scope_for()` を参照。
+NAV_IMPL_TOKENS = ("location.href", "location.assign", "location.replace",
+                   "location =", "window.open", ".submit(", ".requestSubmit(")
+
+
+def _strip_html_comments(page: str) -> str:
+    """⚠️ ★ コメントの散文を実装と読み違えない（この検査は文言を読む検査なので特に危ない）。
+
+    生成ページでは `strip_comments()` が先に走るので通常は空振りするが、
+    ★ **生テンプレートに対して直接呼ばれても正しく動く**ようにここでも落とす。
+    """
+    return re.sub(r"<!--.*?-->", "", page, flags=re.S)
+
+
+def _nav_scope_for(page: str, button_html: str, button_id: str | None) -> str:
+    """★ そのボタンの遷移実装が書かれうる場所**だけ**を集める。
+
+    ⚠️ ページ全体を見てはいけない（無関係な遷移コードで緑になってしまう）。
+    見るのは 2 か所だけ:
+      1. ボタンタグ自身（`onclick="..."`）
+      2. **その id に言及している `<script>`**（このテンプレートの書き方）
+    """
+    scopes = [button_html]
+    if button_id:
+        for m in re.finditer(r"<script\b[^>]*>(.*?)</script>", page, re.S):
+            if button_id in m.group(1):
+                scopes.append(m.group(1))
+    return "\n".join(scopes)
+
+
+def promise_check(page: str) -> list[str]:
+    """★ ボタンのラベルが、そのボタンが**実際にすること**を超えていないか。
+
+    ⚠️ これは漏れ検査 (`leak_check`) ではなく **約束の検査**である。
+    分けてあるのは、両者が壊れる理由が違うため
+    （漏れ = 課題文の中身、約束 = テンプレート側の文言と実装のズレ）。
+
+    ★ 「遷移を足して緑にする」のは**誤った直し方**である:
+      - `protocol.md §1` D-1 = 1 ブロック 1 セッション。ブロック間には 1 分休憩と
+        launcher 経由のアプリ再起動が入る（ページが勝手に進むと前ブロックの記録に混ざる）。
+      - `preregistration.md §2.13` =「次のブロックのファイルを先に開かない」。
+      → 正しい直し方は **ラベルを実装に合わせる**ことである。
+
+    ⚠️ ★ **この検査の限界**（広げすぎると誤爆するので、あえて狭くしてある）:
+      - 対象は `<button>` と `<input type=button|submit>` の 2 つだけ。
+        `<a>` をボタンに見せる書き方は見ていない（このテンプレートでは使っていない）。
+      - 遷移の判定は上の `NAV_IMPL_TOKENS` の**文字列一致**であり、構文解析ではない。
+      → ★ **このテンプレート専用の回帰検査**である。記入欄をアプリ側へ移すなど
+        ページの作りが変わったら、ここも作り直す（`--selftest` が先に落ちるはず）。
+    """
+    bad: list[str] = []
+    page = _strip_html_comments(page)
+
+    controls: list[tuple[str, str, str | None]] = []
+    for m in re.finditer(r"<button\b[^>]*>(.*?)</button>", page, re.S):
+        tag = m.group(0)
+        label = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+        id_m = re.search(r'\bid\s*=\s*["\']([^"\']+)["\']', tag)
+        controls.append((label, tag, id_m.group(1) if id_m else None))
+    for m in re.finditer(r'<input\b[^>]*\btype\s*=\s*["\']?(?:button|submit)["\']?[^>]*>',
+                         page, re.S | re.I):
+        tag = m.group(0)
+        v_m = re.search(r'\bvalue\s*=\s*["\']([^"\']*)["\']', tag)
+        id_m = re.search(r'\bid\s*=\s*["\']([^"\']+)["\']', tag)
+        controls.append((v_m.group(1).strip() if v_m else "",
+                         tag, id_m.group(1) if id_m else None))
+
+    for label, tag, ctrl_id in controls:
+        promised = [w for w in NAV_PROMISE_WORDS if w in label]
+        if not promised:
+            continue
+        scope = _nav_scope_for(page, tag, ctrl_id)
+        if any(tok in scope for tok in NAV_IMPL_TOKENS):
+            continue
+        bad.append(
+            f"ボタンのラベル {label!r} が {promised[0]!r} と約束しているのに、"
+            f"このボタンには遷移の実装が無い"
+            f"（★ 遷移を足すのではなく**ラベルを直す**。§1 D-1 / §2.13）"
+        )
+    return bad
+
+
 def build_for_subject(subject: str, blocks_dir: pathlib.Path, out_root: pathlib.Path) -> int:
     spec_path = blocks_dir / f"{subject}.json"
     if not spec_path.is_file():
@@ -202,6 +292,12 @@ def build_for_subject(subject: str, blocks_dir: pathlib.Path, out_root: pathlib.
         if leaks:
             print(f"[NG] ブロック {block}: 出してはいけないものが混ざっている")
             for x in leaks:
+                print(f"  - {x}")
+            return 1
+        promises = promise_check(page)
+        if promises:
+            print(f"[NG] ブロック {block}: ラベルが実装より多くを約束している")
+            for x in promises:
                 print(f"  - {x}")
             return 1
         (out_dir / f"block{block:02d}.html").write_text(page, encoding="utf-8")
@@ -268,6 +364,43 @@ def selftest() -> int:
               "sections": [("教示", "materials/topic01_hi.md を読む")]}
     if not leak_check(build_page(template, 1, broken), broken, 1):
         fails.append("★ leak_check が空回りしている（条件が露出しても検出しない）")
+
+    # ★★ 約束の検査（2026-08-05 追加・P-1 で「押しても次へ行かない」を実際に踏んだ）
+    doc_lo = parse_material(HERE / "materials" / "topic01_lo.md")
+    page_lo = build_page(template, 2, doc_lo)
+    if promise_check(page_lo):
+        fails.append(f"★ 現行テンプレートが約束超過: {promise_check(page_lo)}")
+    # ⚠️ 検査が空回りしていないか: 旧ラベルに戻したページは赤になるはず
+    regressed = page_lo.replace(">本文を消去する<", ">消去して次のブロックへ<")
+    if regressed == page_lo:
+        fails.append("★ 空回り検査を組めない（テンプレートのボタン文言が想定と違う）")
+    elif not promise_check(regressed):
+        fails.append("★ promise_check が空回りしている（旧ラベルを検出しない）")
+    # ⚠️★ **無関係な遷移コードで緑にならないこと**（2026-08-05 cross-review の HIGH 指摘）。
+    #   判定はボタン単位なので、ページのどこかにリンクが増えても赤のままでなければならない。
+    elif not promise_check(regressed.replace(
+            "</footer>", '</footer><script>function other(){location.href="x.html";}</script>')):
+        fails.append("★ promise_check がページ全体を見ている"
+                     "（そのボタンと無関係な遷移コードで約束違反を見逃す）")
+    # ⚠️★ コメントの散文を実装と読み違えないこと。
+    #   ★ 注入先は**ボタンの内側**にする。外に置くとスコープ限定のほうが先に効いてしまい、
+    #     この検査は**何を壊しても赤にならない**（＝あって無いのと同じ）。2026-08-05 に実測して直した。
+    elif not promise_check(regressed.replace(
+            "</button>", "<!-- location.href で進めてもよいが進めない --></button>")):
+        fails.append("★ promise_check がコメントを実装と読み違えている")
+    # ⚠️★ `<input type=button>` の枝も実際に効いていること
+    #   （★ 2026-08-05 に「この枝を落としても selftest が緑のまま」だったので足した。
+    #     ★ **検査を書いただけでは、その枝を検査したことにならない**）
+    if not promise_check(page_lo.replace(
+            "</footer>", '<input type="button" value="次のブロックへ"></footer>')):
+        fails.append("★ promise_check が <input type=button> を見ていない")
+
+    # ★ 逆向き: そのボタン自身に遷移実装があるページは**緑**でなければならない（過検出でない）
+    honest = page_lo.replace('<button id="clear" type="button">本文を消去する</button>',
+                             '<button type="button" onclick="location.href=\'x.html\'">'
+                             '次へ進む</button>')
+    if promise_check(honest):
+        fails.append("★ promise_check が過検出している（実装のあるボタンまで赤にする）")
 
     if fails:
         print("[NG] build_task_pages.py selftest 失敗:")

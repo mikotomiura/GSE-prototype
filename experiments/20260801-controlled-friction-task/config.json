@@ -536,7 +536,7 @@
     "seed_file": "SEED",
     "env_file": "env.md",
     "data_file": "data.md",
-    "hmm_version": "TO_BE_STAMPED_AT_EXECUTION",
+    "hmm_version": "0.3.0",
     "repro_entrypoint": "scripts/repro.sh",
     "protocol_file": "protocol.md",
     "consent_file": "consent.md",
@@ -552,7 +552,7 @@
     },
     "permutation_seed_independence": "the permutation test enumerates all assignments exhaustively, so it does not depend on SEED",
     "dependencies": "Python standard library only; no requirements.txt (same policy as experiments/20260802-within-person-scope-detector)",
-    "hmm_version_stamping": "TO_BE_STAMPED_AT_EXECUTION. Procedure in protocol.md 6: on the day of execution the experimenter reads HMM_VERSION out of the running build and writes it into this file and env.md, before the analysis is run."
+    "hmm_version_stamping": "STAMPED 2026-08-05 from the P-1 macOS run (PILOT-mac, 2026-08-04). The value 0.3.0 was READ OUT OF THE meta LINE OF THE NDJSON that the distributed v0.1.22 binary (commit 7a939b8) actually wrote -- it was NOT read from engine.rs. It happens to equal the constant on main, but that coincidence is not the evidence. STILL OPEN: the Windows run (PILOT-win) has not happened; if its meta line reports a different value, the two P-1 runs were not on the same HMM and that must be recorded here rather than overwritten. Procedure in protocol.md 6."
   },
   "prereg": {
     "covered_by_preregistration_v0_3": false,

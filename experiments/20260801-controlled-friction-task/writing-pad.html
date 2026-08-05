@@ -69,6 +69,33 @@
     background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px; color: #7c2d12;
   }
 
+  /* ★★ 5 分の終了通知（2026-08-05 追加）。
+       ⚠️ **残り時間は出さない。** protocol.md §4.4 は「残り時間のアナウンスをしない」と定め、
+          その理由は「時間の切迫を作る操作は採らない」と決めてあるためである。
+          → ★ 出すのは**終わったという 1 つの事実**だけにする。
+       ★ 既定は非表示。5 分たったときだけ現れる。 */
+  #timesup { display: none; }
+  /* ⚠️ ★ **レイアウトを 1px も動かさない**（2026-08-05・実測で踏んだ）。
+       通常フローに置くと、その高さぶんだけ下が押し下げられ、
+       **文字数の表示が画面外へ出た**（734x750 で footer の下端が 757px になった）。
+       ★ 知らせが出るのは「文字数を控えてください」と言う場面そのものなので、
+         それを隠すのは最悪の壊れ方である。→ position: fixed で層を分ける。 */
+  body.g1-over #timesup {
+    display: block;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    padding: 12px 16px;
+    font-size: 17px; font-weight: 700; text-align: center;
+    background: #7f1d1d; color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+  }
+  /* ★ 終了後は記入欄が読み取り専用になる。見た目でもそれが分かるようにする
+       （⚠️ 本文は消さない。文字数を控えるまで画面に残す必要がある）。 */
+  body.g1-over textarea { background: #f5f5f4; color: #57534e; }
+  /* ★ 消去ボタンの 2 段階目（P-1 で「押しても次へ行かない」ラベルを直したのと同じ趣旨で、
+       押した結果が取り返しのつかないものは、押す前に分かるようにする）。 */
+  button.arm { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
+  button.arm:hover { background: #991b1b; }
+
   /* ★ 課題文パネル（build_task_pages.py が差し込む。単体で開いたときは存在しない） */
   .task {
     margin-bottom: 16px; padding: 16px 20px;
@@ -113,15 +140,32 @@
     data-enable-grammarly="false"
     aria-label="本文"></textarea>
 
+  <div id="timesup" role="status" aria-live="polite">
+    ★ 5 分たちました。ここで手を止めてください。
+  </div>
+
   <footer>
     <span>文字数 <span id="count">0</span></span>
     <span class="hint">（空白・改行を数えません／目安 300〜400 字）</span>
-    <button id="clear" type="button">消去して次のブロックへ</button>
+    <!-- ⚠️ ★ ラベルは**このボタンが実際にすること**だけを書く（2026-08-05・P-1 で発覚）。
+         旧ラベル「消去して次のブロックへ」は、押しても次のブロックへ行かないのに
+         行くと約束していた。ページ遷移を足すのは**誤り**である:
+           - protocol.md §1 D-1 = 1 ブロック 1 セッション。ブロック間には
+             1 分休憩と launcher 経由のアプリ再起動が入る。
+             ページが勝手に進むと、前ブロックの記録中に次を書き始められる。
+           - preregistration.md §2.13 =「次のブロックのファイルを先に開かない」。
+         → ★ 遷移させないのが正しい。**ラベルの側を実装に合わせる。** -->
+    <button id="clear" type="button">本文を消去する</button>
   </footer>
 
   <p class="notice">
     ★ <strong>書いた文章は保存されません。</strong>
-    このページを閉じる・再読み込みすると本文は消えます。記録するのは文字数だけです。
+    このページを閉じる・再読み込みすると本文は消えます。記録するのは文字数だけです。<br>
+    ★ <strong>このページを開いた時点で 5 分が始まります。</strong>
+    先に開いて置いておかないでください。5 分たつと知らせが出て、記入欄は書けなくなります
+    （⚠️ 本文は消えません。<strong>文字数を控えてから</strong>「本文を消去する」を押してください）。<br>
+    ★ 次のブロックは<strong>このページからは始まりません</strong>。
+    <strong>アプリを起動し直してから</strong>次の番号のページを開いて始めます。
   </p>
 </div>
 
@@ -179,13 +223,73 @@
   // 数値は変換中に揺れるが、確定後は必ず正しい値に落ち着く（打鍵挙動には介入しない）。
   pad.addEventListener("input", refresh);
 
+  // ★★ 消去は 2 段階にする（2026-08-05 追加）。
+  //   ⚠️ このボタンは記入欄のすぐ下にあり、押すと**取り返しがつかない**（保存していないため）。
+  //   ★ 文字数を控える前に消してしまうと、そのブロックの産出量が永久に取れない
+  //     （P-1 では 4 ブロックとも産出量を取り損ねた）。
+  //   ★ 本文が空のときは 1 回で消える（確認する意味が無いので邪魔をしない）。
+  var CLEAR_LABEL = "本文を消去する";
+  var ARMED_LABEL = "もう一度押すと消えます";
+  var armed = false;
+  var armTimer = null;
+
+  function disarm() {
+    armed = false;
+    if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+    clearBtn.textContent = CLEAR_LABEL;
+    clearBtn.classList.remove("arm");
+  }
+
   clearBtn.addEventListener("click", function () {
-    // ★ 実験者がブロック終了時に文字数を記録してから押す。
+    // ★ ブロック終了時に文字数を控えてから押す。
     //   本文をメモリからも落とし、次ブロックが前ブロックの続きから始まらないようにする。
+    if (pad.value.length > 0 && !armed) {
+      armed = true;
+      clearBtn.textContent = ARMED_LABEL;
+      clearBtn.classList.add("arm");
+      // ★ 押しっぱなしにしない。10 秒で元に戻す（押す気が無かった人を待たせない）。
+      armTimer = setTimeout(disarm, 10000);
+      return;
+    }
     pad.value = "";
+    disarm();
     refresh();
-    pad.focus();
+    // ⚠️ 5 分経過後は読み取り専用なので、フォーカスを戻して打鍵を誘わない。
+    if (!document.body.classList.contains("g1-over")) pad.focus();
   });
+
+  // ★ 消すつもりが無くなったら（また書き始めたら）解除する。
+  pad.addEventListener("input", function () { if (armed) disarm(); });
+
+  // ★★ 5 分の終了通知（2026-08-05 追加・在宅実施を前提にした）。
+  //
+  //   ⚠️ ★ なぜ要るか: protocol.md §4.4 は「無人在宅では被験者自身が計る」と書いているが、
+  //      **P-1 でそれは起きなかった**（4 ブロック中 3 本が 5 分を大きく超過した。
+  //      被験者は手順を全部知っている研究者本人だった）。
+  //      ブロック長は事後に検出はできるが、決まりにより**後から落とせない**。
+  //      → ★ **止められるのは実施中だけ**なので、道具をこのページに置く。
+  //
+  //   ⚠️ ★ 出すのは「終わった」だけである。**残り時間は出さない**（§4.4）。
+  //   ⚠️ ★ 起点は**このページを開いた時刻**である。手順では、アプリを起動してから
+  //      そのブロックのページを開くことになっているので、開いた時点が開始である。
+  //      → 注意書きにもそう書いてある（先に開いて放置しない）。
+  var BLOCK_MS = 5 * 60 * 1000;
+
+  function timeIsUp() {
+    if (document.body.classList.contains("g1-over")) return;
+    document.body.classList.add("g1-over");
+    // ★ readOnly にする（disabled ではない）。⚠️ disabled だと本文が選択できなくなり、
+    //   文字数を確かめる邪魔になる。★ **本文は消さない**（控えるまで画面に残す）。
+    pad.readOnly = true;
+    disarm();
+    pad.blur();
+    // ★ 文字数を確実に画面へ入れる（⚠️ 実測で画面外に出ていた）。
+    //   ★ ここで見せたいのは本文ではなく**文字数**である。
+    var f = document.querySelector("footer");
+    if (f && f.scrollIntoView) f.scrollIntoView({ block: "end" });
+  }
+
+  setTimeout(timeIsUp, BLOCK_MS);
 
   // ★ 誤って閉じる・再読み込みするとブロックの本文が失われ、そのブロックの
   //   産出文字数（§3.5 の報告義務）が取れなくなる。保存はしないが、警告は出す。
