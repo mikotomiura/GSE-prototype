@@ -993,6 +993,11 @@ pub const LOGGER_NOT_STARTED: &str = "session logger has not started yet";
 /// ⚠️ ★ 提出側の緩和 (`packaging::has_any_data_row`) は残す。**置き換えではなく二重化**である
 /// (起動直後のクラッシュ・ディスク不足など、二重起動以外の原因でも空ファイルは出るため)。
 ///
+/// ⚠️ ★ **`start()` が返す `SessionLogger` は呼び出し側で即 drop してよい**（`lib.rs` はそうしている）。
+/// `JoinHandle` は drop しても join も停止もしないので、consumer スレッドは走り続ける。
+/// ★ **将来 `SessionLogger` に `Drop` を実装する場合はこの前提が壊れる**ので、
+/// そのときは `lib.rs` の `.setup()` 側で保持するように直すこと（cross-review 2026-08-06）。
+///
 /// `tx` / `shutdown_rx` / `target` は `start()` の前から配れる。スレッドは
 /// `start()` まで走らないので、それまでに送られた行は bounded(512) に溜まり、
 /// `start()` 後に順に書かれる (★ 取りこぼさない)。

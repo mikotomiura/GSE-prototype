@@ -15,6 +15,37 @@ ok()   { printf '  [ OK ] %s\n' "$1"; }
 bad()  { printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); }
 note() { printf '  [note] %s\n' "$1"; }
 
+# ⚠️★ cargo のテストフィルタを走らせる (2026-08-06・/cross-review MEDIUM で判明)。
+#
+# ★ **`cargo test --lib <filter>` は 1 件もマッチしなくても exit 0 を返す**
+#   （実測: `test result: ok. 0 passed; 0 failed; ... 271 filtered out` / rc=0）。
+#   → ⚠️ テスト名を変えたりテストを消したりすると、**検査は黙って緑のまま**になる。
+#   これは `silent-failure-in-guard-scripts` の「外部コマンドの rc だけを見る」型そのものである。
+# ★ そこで **rc に加えて「何本通ったか」を数える**。期待本数に満たなければ赤にする。
+#
+# 使い方: run_cargo_filter <期待本数> <フィルタ> <ラベル>
+run_cargo_filter() {
+  local expect="$1" filter="$2" label="$3"
+  local tmp rc passed
+  tmp=$(mktemp)
+  rc=0
+  (cd ../.. && "$CARGO_BIN" test --quiet --manifest-path src-tauri/Cargo.toml --lib "$filter") \
+    > "$tmp" 2>&1 || rc=$?
+  # ★ "N passed" の N を取る。行が無ければ空 → 0 に倒す（★ 取れなかったを緑にしない）。
+  passed=$(grep -oE '[0-9]+ passed' "$tmp" | head -1 | grep -oE '[0-9]+' || true)
+  [ -n "$passed" ] || passed=0
+  if [ "$rc" -ne 0 ]; then
+    sed 's/^/    /' "$tmp"
+    bad "$label の挙動テストが赤（rc=$rc）"
+  elif [ "$passed" -lt "$expect" ]; then
+    sed 's/^/    /' "$tmp"
+    bad "$label の挙動テストが $passed 本しか通っていない（$expect 本を期待）。★ テストが消えた/改名された可能性"
+  else
+    ok "$label の挙動テストが緑（$passed / $expect 本）"
+  fi
+  rm -f "$tmp"
+}
+
 echo "=============================================================="
 echo " G1 実施前チェック (experiments/20260801-controlled-friction-task)"
 echo "=============================================================="
@@ -132,15 +163,9 @@ if [ -f "../../$KILL_SWITCH_FN" ] && [ -f "../../$KILL_SWITCH_USE" ]; then
     #      黙って飛ばすと silent-failure-in-guard-scripts の「外部コマンド不在で素通り」になる。
     CARGO_BIN=$(command -v cargo || echo "$HOME/.cargo/bin/cargo")
     if [ -x "$CARGO_BIN" ]; then
-      TMP_KS=$(mktemp)
-      if (cd ../.. && "$CARGO_BIN" test --quiet --manifest-path src-tauri/Cargo.toml --lib \
-            probe_scheduler::tests::probes_kill_switch) > "$TMP_KS" 2>&1; then
-        ok "kill switch の挙動テストが緑（未設定では無効化しない・\"1\" のときだけ無効化する）"
-      else
-        sed 's/^/    /' "$TMP_KS"
-        bad "kill switch の挙動テストが赤。★ 既定挙動が変わっている可能性がある"
-      fi
-      rm -f "$TMP_KS"
+      # ★ 2 本ある（未設定で無効化しない ／ "1" のときだけ無効化する）。
+      #   ⚠️ 本数まで見るのは、0 件マッチでも rc=0 になるためである（run_cargo_filter のコメント）。
+      run_cargo_filter 2 probe_scheduler::tests::probes_kill_switch "kill switch"
     else
       note "cargo が無いので kill switch の挙動テストは飛ばした（★ 飛ばしたことを明示している）"
       note "  → 実施後の客観検証は validate_blocks.py --dataset（probe 行 0）で行う"
@@ -169,15 +194,8 @@ if [ -f "../../$LOGGER_WIRING" ]; then
     ok "セッションログを開くのは setup() の中（2 個目のプロセスが空 NDJSON を残さない）"
     CARGO_BIN=$(command -v cargo || echo "$HOME/.cargo/bin/cargo")
     if [ -x "$CARGO_BIN" ]; then
-      TMP_LG=$(mktemp)
-      if (cd ../.. && "$CARGO_BIN" test --quiet --manifest-path src-tauri/Cargo.toml --lib \
-            logger::tests::log_channel) > "$TMP_LG" 2>&1; then
-        ok "LogChannel の挙動テストが緑（start() までファイルを作らない・先に送った行を落とさない）"
-      else
-        sed 's/^/    /' "$TMP_LG"
-        bad "LogChannel の挙動テストが赤。★ 空 NDJSON の退行が戻っている可能性がある"
-      fi
-      rm -f "$TMP_LG"
+      # ★ 2 本ある（start() までファイルを作らない ／ 先に送った行を落とさず meta が 1 行目）。
+      run_cargo_filter 2 logger::tests::log_channel "LogChannel"
     else
       note "cargo が無いので LogChannel の挙動テストは飛ばした（★ 飛ばしたことを明示している）"
     fi
