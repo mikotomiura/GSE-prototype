@@ -43,7 +43,16 @@
 - [x] `windows-verification.md` を作成（W-1〜W-8・「操作 → 何を見る → 記録欄」）
 - [x] CI に `workflow_dispatch` を追加（★ タグを切らずに `build-windows` だけ走らせる）
 - [x] `actionlint` = 新規指摘ゼロ（既存 2 件は HEAD にも出る）
-- [ ] ⚠️ ★ **手動発火をまだ 1 回もしていない**（研究者が実行する）
+- [x] ✅ ★ **手動発火を実測した**（2026-08-06・run `31029380118`）
+  - [x] ⚠️ ★ **デフォルトブランチに `workflow_dispatch` が無いと発火できない**ことが確定
+        → `ci.yml` だけの PR **#86** を `main` へ merge（`fa21812`・アプリのコードは 0 行）
+  - [x] ★ 発火後は **`build-windows` だけ**が走り、他 3 ジョブは skipped（`if` 条件どおり）
+  - [x] ★ pull_request では `build-windows` が skipped（通常の PR を重くしない）
+  - [x] ✅ **ビルド成功**（run `31029380118`）。artifact を落として `file` で確認:
+        `gse-next.exe` = `PE32+ (GUI) x86-64` 10,474,496 B ／ `gse-submit.exe` 968,192 B ／
+        `gse-unpack.exe` 736,768 B（★ 研究者専用・被験者に配らない）。⚠️ 保持 7 日（`2026-08-12` 失効）
+- [ ] ⚠️★ **私が push 由来の `check` を巻き添えで cancel した**（`concurrency` が同一グループ）。
+      ★ **Windows 上の `cargo test` は 1 度も走っていない** → `gh run rerun 31029374567` が要る
 - [ ] ⚠️ ★ **W-1〜W-8 は 1 項目も実施していない**（Windows 実機が要る）
 - [ ] ⚠️ ★ **`tasklist` の実出力を受け取ってパーサを実測検証する**（W-4）
 

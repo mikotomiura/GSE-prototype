@@ -24,16 +24,59 @@
 
 ```
 GitHub → Actions → "CI / Release" → Run workflow
-   └ Branch: feature/g1-app-mode-and-log-rotation  を選んで実行
+   └ Branch: <検証したいブランチ>  を選んで実行
+```
+
+CLI なら:
+
+```bash
+gh workflow run ci.yml --ref <検証したいブランチ>
 ```
 
 - ★ **タグは切らない。** 手動発火 (`workflow_dispatch`) では `build-windows` だけが走り、
   **GitHub Release は作られない**（`ci.yml` の `release` ジョブはタグ限定のまま）。
-  macOS(self-hosted) ジョブも走らない。
 - 成果物: Actions の artifact **`windows-portable`**（`gse-next.exe`）と
   **`windows-tools`**（`gse-submit.exe` / `gse-unpack.exe`）。★ 保持は **7 日**。
-- ⚠️ ★ **これは未実測の段取りである**（`workflow_dispatch` を足したのが 2026-08-06 で、
-  まだ 1 回も発火させていない）。動かなかったらここに書く。
+
+> ### ✅ ★ ここは **2026-08-06 に実測した**（run `31029380118`）
+>
+> | 確かめたこと | 結果 |
+> |---|---|
+> | ★ **デフォルトブランチに `workflow_dispatch` が無いと発火できない** | ⚠️ ★ **そのとおりだった。** `main` へ先に `ci.yml` だけを PR (#86) して merge するまで、feature ブランチを ref にしても発火できない。★ **これは GitHub の仕様であって回避策ではない** |
+> | 発火後に走るジョブ | ★ **`build-windows` だけ**。`check` / `frontend-check` / `build-macos` はすべて **skipped**（`if` 条件どおり） |
+> | pull_request のとき | ★ `build-windows` は **skipped**（PR #86 の checks で確認）。★ 通常の PR を重くしない |
+>
+> ⚠️ ★ **`main` に `workflow_dispatch` が入っていない状態は二度と来ない**（merge 済み）ので、
+> 次回以降は `gh workflow run ci.yml --ref <ブランチ>` だけでよい。
+>
+> ### ⚠️★★ **push した直後に発火すると、push 由来の `check` が巻き添えで cancel される**
+>
+> `ci.yml` の `concurrency` は `group: <workflow>-<ref>` ／ `cancel-in-progress: true` である。
+> ★ **手動発火は push 由来の run と同じグループに入る**ので、
+> 2026-08-06 は push した `check`（Windows / mac の `cargo test`・`frontend-check`）が
+> **3 ジョブとも cancelled** になった。
+>
+> ⚠️ ★ **「Windows でテストが通った」ことにはならない。** 通ったのは
+> `build-windows`（`npx tauri build --no-bundle` = **コンパイル**）だけである。
+> → ★ 発火は **push の run が終わってから**行うか、終わったあとで
+> `gh run rerun <push の run id>` で `check` を回し直すこと。
+
+### 0.1b 落とした exe が本物か確かめる（★ 数字で見る）
+
+```bash
+gh run download <run id> -D <保存先>
+file <保存先>/windows-portable/gse-next.exe
+```
+
+★ 2026-08-06 の実測（run `31029380118`）:
+
+| ファイル | サイズ | `file` の判定 |
+|---|---|---|
+| `windows-portable/gse-next.exe` | 10,474,496 | `PE32+ executable (GUI) x86-64` ← ★ GUI = `windows_subsystem="windows"` と整合 |
+| `windows-tools/gse-submit.exe` | 968,192 | `PE32+ executable (console) x86-64` |
+| `windows-tools/gse-unpack.exe` | 736,768 | `PE32+ executable (console) x86-64`（★ **研究者専用**。被験者に配らない） |
+
+⚠️ artifact の保持は **7 日**（この回は `2026-08-12` 失効）。
 
 ### 0.2 フォルダを 2 つ作る
 

@@ -157,9 +157,37 @@
 - **理由**: 検証のためにバージョン番号を 1 つ消費し、Release を作り、self-hosted ランナーを
   要求するのは重すぎる。★ 一方で「開発ビルドを配らない / 検証しない」（`protocol.md §4b.1`）は守る。
 - **トレードオフ**: 成果物は Actions の artifact（**7 日で消える**）。
-- ⚠️ ★ **確かめていないこと**: **`workflow_dispatch` はまだ 1 回も発火させていない。**
-  ★ `actionlint` は通っている（既存の 2 件は HEAD にもある既知の指摘）が、
-  **lint が通ることと発火することは別**である。
+### ✅ ★ 実測（2026-08-06・run `31029380118`）— **仕様どおりだったが、1 手増えた**
+
+⚠️ ★ **`workflow_dispatch` はデフォルトブランチに無いと発火できない。**
+`ci.yml` を feature ブランチに置いただけでは `gh workflow run --ref <feature>` が通らない。
+→ ★ **`ci.yml` だけを `main` へ先に入れる PR (#86) が要った**（研究者判断で採用・merge 済み `fa21812`）。
+⚠️ ★ 私は当初これを「仕様に基づく想定」としか言えなかった（push が拒否されて実地で試せなかった）。
+★ **merge 後に実際に発火して初めて確定した。**
+
+| 確かめたこと | 結果 |
+|---|---|
+| 発火の可否（`--ref feature/...`） | ★ **通った**（`main` に `workflow_dispatch` が入った後） |
+| 走るジョブ | ★ **`build-windows` だけ**。`check` / `frontend-check` / `build-macos` は **skipped** |
+| pull_request のとき | ★ `build-windows` は **skipped**（PR #86 の checks で確認）。通常の PR を重くしない |
+| Release | ★ 作られない（`release` の `if` はタグ限定のまま） |
+
+### ⚠️★★ **私が起こした副作用 — push 由来の `check` を巻き添えで cancel した**
+
+`ci.yml` の `concurrency` は `group: <workflow>-<ref>` ／ `cancel-in-progress: true`。
+★ **手動発火は push 由来の run と同じグループに入る**ので、
+作業ブランチを push した直後に発火した結果、run `31029374567`（push 由来）の
+**`check (windows-latest)` / `check (gse-mac-selfhosted)` / `frontend-check` が 3 つとも cancelled** になった。
+
+⚠️ ★ **帰結を正確に書く**: 通ったのは `build-windows`（`npx tauri build --no-bundle` = **コンパイル**）だけで、
+★ **Windows 上の `cargo test --workspace` は 1 度も走っていない**。
+（macOS 上のテストはローカルで緑だが、それは別の OS である。）
+→ ★ **`gh run rerun 31029374567` で回し直すのが正しい**。手順書にも書いた。
+
+⚠️ **PR #86 の副作用**: `main` に CI 変更が先に入った（**アプリのコードは 1 行も入っていない**）。
+`ci.yml` の同じ変更は作業ブランチ側にも cherry-pick 元（`7a0704e`）として存在するので、
+★ **作業ブランチを後で `main` へ入れるときに同一内容の変更が両側にある**。
+⚠️ 内容が同一なので衝突しない見込みだが、**まだ確かめていない**。
 - **影響範囲**: `.github/workflows/ci.yml` / `windows-verification.md` / `protocol.md §1.1`・`§8`。
 
 ---
