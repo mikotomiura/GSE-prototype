@@ -26,7 +26,7 @@ use crate::analysis::intervention::{
 use crate::analysis::loop_step::FeatSnapshot;
 use crate::logger::{
     Condition, DismissReason, ExpectedQuadrant, LabelPool, LogEntry, LogStatus, ProbeRef,
-    ProbeSource, SessionLogger, SharedLogTarget, SkipReason, TaskKind, Track, UserLabelKind,
+    ProbeSource, SharedLogTarget, SkipReason, TaskKind, Track, UserLabelKind,
 };
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
@@ -1391,6 +1391,33 @@ fn set_overlay_interactive(app: tauri::AppHandle, interactive: bool) -> Result<(
     Ok(())
 }
 
+/// G1: 他の GSE プロセスが動いていないかを OS に聞き、見つかったら画面へ出す (別スレッド)。
+///
+/// ⚠️ ★ **同期に呼んではならない。** 2026-08-06 に実測した (macOS 26.5.2・5 回):
+/// `/usr/bin/pgrep` の子プロセス起動に **28.2 / 19.0 / 18.8 / 18.5 / 18.1 ms**。
+/// ★ Windows の `tasklist.exe` は **未計測**である (この環境からは測れない)。
+/// → ★ `start_session` の応答に載せると「開始する」の反応が鈍る。応答は先に返し、
+///   検査は別スレッドで走らせて **結果だけを emit** する (待たせない・止めない)。
+///
+/// ★ 止めずに画面へ出すのは `setup()` 側と同じ方針である (列挙の失敗や名前の一致ミスで
+/// 実施を潰さないため。判断は人に返す)。フロントの `second-instance-blocked` は
+/// `setDuplicateBlocked(true)` で冪等なので、複数回来ても害はない。
+fn spawn_duplicate_instance_check(app: tauri::AppHandle, delay: Duration, when: &'static str) {
+    thread::spawn(move || {
+        if !delay.is_zero() {
+            thread::sleep(delay);
+        }
+        if crate::g1::other_instance_running() {
+            tracing::error!(
+                "G1: ANOTHER GSE PROCESS IS RUNNING ({}). Keystrokes will be split across \
+                 two NDJSON files (protocol.md 2-3). Quit the other one.",
+                when
+            );
+            let _ = app.emit("second-instance-blocked", ());
+        }
+    });
+}
+
 /// 「開始する」ボタン押下時に呼ばれる。
 /// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
 /// 2. CognitiveStateEngine を初期状態にリセット
@@ -1422,45 +1449,59 @@ fn start_session(
         .as_millis() as u64;
     *latest_feat.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
     *intervention.0.lock().unwrap_or_else(|p| p.into_inner()) = InterventionPolicyState::new(now);
-    let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+    // ★ ロックは**ログへ送る間だけ**保持する (follow-up F-2 / code-review LOW)。
+    //   以前は `win.show()` を含む関数末尾まで持っていた。デッドロックはしないが、
+    //   ⚠️ ロック中にウィンドウ操作 (別スレッドへ波及しうる) を行う形は残さない。
+    {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
 
-    // ★ G1: 2 ブロック目以降はログをローテートする (1 ブロック = NDJSON 1 ファイル・protocol.md §1)。
-    //   ⚠️ ★ **G1 モードでないときは何もしない。** 通常運用 (Phase1) では「戻る → 開始する」で
-    //   ファイルが分かれてしまうと、`gse-submit` が最新 1 本しか出さないため
-    //   **前半が提出されなくなる**。既定の挙動を 1 バイトも変えないこと。
-    // ⚠️★ **`was_active` が false のときだけ**ローテートする。
-    //   「開始する」は送信中に disabled にならず、record_session_meta 失敗時の文言は
-    //   **明示的に再押下を促す**ので、無条件に数えると孤児ファイルが 1 本増える
-    //   (= protocol.md §1「1 ブロック = 1 ファイル」の破れ・code-review HIGH)。
-    if g1_mode().is_some() && !was_active {
-        let blocks_started = G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel);
-        if blocks_started > 0 {
-            // ⚠️ ファイル名は秒粒度。衝突回避は **logger スレッド側**でも行う
-            // (ここは別スレッドなので exists 判定と create の間に窓がある・code-review MEDIUM)。
-            let new_path = logger::next_session_path();
-            tracing::info!(
-                "G1: rotating session log for block #{} -> {:?}",
-                blocks_started + 1,
-                new_path
-            );
-            if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
-                // ⚠️★★ **ここで進んではならない** (cross-review HIGH・Claude と Codex が一致)。
-                // channel (bounded 512) が満杯だと Rotate だけが落ち、直後の SessionStart 以降が
-                // **既に `session_end` を書き終えた旧ファイル**に積まれる。
-                // = protocol.md §1 が (b) を却下した「沈黙して間違った結果を出す」失敗そのもの。
-                // ★ 触った状態を**全部巻き戻して** Err を返し、画面に出す (start_session の
-                // 失敗はフロントが「開始に失敗しました」と表示する)。
-                tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
-                G1_BLOCKS_STARTED.fetch_sub(1, Ordering::AcqRel);
-                session_active.0.store(false, Ordering::Release);
-                return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
-                     このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
-                    .to_string());
+        // ★ G1: 2 ブロック目以降はログをローテートする (1 ブロック = NDJSON 1 ファイル・protocol.md §1)。
+        //   ⚠️ ★ **G1 モードでないときは何もしない。** 通常運用 (Phase1) では「戻る → 開始する」で
+        //   ファイルが分かれてしまうと、`gse-submit` が最新 1 本しか出さないため
+        //   **前半が提出されなくなる**。既定の挙動を 1 バイトも変えないこと。
+        // ⚠️★ **`was_active` が false のときだけ**ローテートする。
+        //   「開始する」は送信中に disabled にならず、record_session_meta 失敗時の文言は
+        //   **明示的に再押下を促す**ので、無条件に数えると孤児ファイルが 1 本増える
+        //   (= protocol.md §1「1 ブロック = 1 ファイル」の破れ・code-review HIGH)。
+        if g1_mode().is_some() && !was_active {
+            let blocks_started = G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel);
+            if blocks_started > 0 {
+                // ⚠️ ファイル名は秒粒度。衝突回避は **logger スレッド側**でも行う
+                // (ここは別スレッドなので exists 判定と create の間に窓がある・code-review MEDIUM)。
+                let new_path = logger::next_session_path();
+                tracing::info!(
+                    "G1: rotating session log for block #{} -> {:?}",
+                    blocks_started + 1,
+                    new_path
+                );
+                if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
+                    // ⚠️★★ **ここで進んではならない** (cross-review HIGH・Claude と Codex が一致)。
+                    // channel (bounded 512) が満杯だと Rotate だけが落ち、直後の SessionStart 以降が
+                    // **既に `session_end` を書き終えた旧ファイル**に積まれる。
+                    // = protocol.md §1 が (b) を却下した「沈黙して間違った結果を出す」失敗そのもの。
+                    // ★ 触った状態を**全部巻き戻して** Err を返し、画面に出す (start_session の
+                    // 失敗はフロントが「開始に失敗しました」と表示する)。
+                    tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+                    G1_BLOCKS_STARTED.fetch_sub(1, Ordering::AcqRel);
+                    session_active.0.store(false, Ordering::Release);
+                    return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
+                         このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
+                        .to_string());
+                }
             }
         }
+
+        let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
     }
 
-    let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
+    // ★ G1: **ブロックを始めるたびに**二重起動を見に行く (follow-up F-1 / code-review M6)。
+    //   ⚠️ 従来は起動 1.5 秒後の 1 回だけだったので、★ **G1 アプリを開いた後に**
+    //   被験者が旧アプリ (Phase1 用 `/Applications`) を開くと、警告が出ないまま
+    //   打鍵が 2 本の NDJSON に割れた (protocol.md §2-3)。
+    //   ★ 応答時間には載せない (上の `spawn_duplicate_instance_check` の実測コメント参照)。
+    if g1_mode().is_some() && !was_active {
+        spawn_duplicate_instance_check(app.clone(), Duration::ZERO, "at block start");
+    }
 
     // Task B: プローブスケジューラへセッション開始時刻を共有する。
     // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
@@ -1659,22 +1700,26 @@ pub fn run() {
         );
     }
 
-    // セッションロガー起動
+    // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
+    //
+    // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
+    //   NDJSON を作ってから死ぬ (実測で 0 行のファイル・decisions R-8 結果 4)。
+    //   `gse-submit` は最新 1 本を選ぶので、★ 被験者が「提出する」を押すと空の `.age` が出る。
+    // ★ 一次資料 (`tauri` 2.10.2 `src/app.rs`) で確認した順序:
+    //   プラグインの `exit(0)` は `Builder::build()` 末尾の `initialize_plugins` で走り、
+    //   **`.setup()` クロージャはその後の `App::run()` の中**で呼ばれる。
+    //   → ★ 実際にファイルを開くのは `.setup()` の中 (`log_channel.start(..)`)。
+    //   ここでは channel と共有ハンドルだけを作り、スレッド群に配る。
     let log_path = logger::default_log_path();
     let log_path_str = log_path.to_string_lossy().to_string();
-    tracing::info!("Session log: {}", log_path_str);
+    tracing::info!("Session log (will open in setup): {}", log_path_str);
 
-    let (session_logger, log_tx, log_shutdown_rx, log_status) =
-        SessionLogger::start(log_path, g1_source);
-    if log_status != LogStatus::Ok {
-        tracing::error!(
-            "Session log status is not Ok: {:?} (intended {})",
-            log_status,
-            log_path_str
-        );
-    }
+    let log_channel = logger::LogChannel::new();
+    let log_tx = log_channel.tx.clone();
+    let log_shutdown_rx = log_channel.shutdown_rx.clone();
     // ★ 書込先はローテートで変わる。値をコピーせず共有ハンドルを配る。
-    let log_target = session_logger.target.clone();
+    //   `start()` が**この同じ Arc を上書き**するので、`.manage()` の順序は変えなくてよい。
+    let log_target = log_channel.target.clone();
 
     // LogState を Arc<Mutex> でラップして Tauri state に渡す
     let log_state = Arc::new(Mutex::new(LogState {
@@ -2073,6 +2118,26 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            // ★★ セッションログのファイルを**ここで初めて開く** (follow-up F-3)。
+            //
+            // ⚠️ ★ ここに来ている = **single-instance プラグインに止められなかった** ということ
+            //   である (プラグインの `exit(0)` は `Builder::build()` の中で走り、この
+            //   クロージャは `App::run()` の中で呼ばれる。一次資料: `tauri` 2.10.2 `src/app.rs`)。
+            //   → ★ 2 個目のプロセスは **NDJSON を作らずに死ぬ**。
+            // ⚠️ これは提出側の `has_any_data_row` を**置き換えるものではない**。
+            //   起動直後のクラッシュ等でも空ファイルは出るので、両方残す。
+            let (session_logger, log_status) = log_channel.start(log_path, g1_source);
+            if log_status != LogStatus::Ok {
+                tracing::error!(
+                    "Session log status is not Ok: {:?} (intended {})",
+                    log_status,
+                    log_path_str
+                );
+            }
+            // `SessionLogger` を drop すると JoinHandle が detach されるだけで、
+            // consumer スレッドは走り続ける (従来 `run()` 末尾での drop と同じ挙動)。
+            drop(session_logger);
+
             // --- キーボードフック・IME ポーリングの初期化 ---
             // Tauri の setup() はメインスレッドで、Tauri ランタイム初期化完了後に実行される。
             // ウィンドウシステムが完全に初期化された後にフックをインストールすることで、
@@ -2096,19 +2161,15 @@ pub fn run() {
             //
             // ★ ここでは**止めない**（列挙の失敗や名前の一致ミスで実施を潰さないため）。
             //   代わりに**画面に出す**。判断は人に返す。
+            // ★ setup() を塞がないよう別スレッドで。窓が出てから知らせる (1.5s)。
+            //   ⚠️ これは**起動時の 1 回**。ブロック開始ごとの検査は `start_session` にある
+            //   (follow-up F-1)。★ 片方だけでは「起動後に旧アプリを開かれる」を捕まえられない。
             if g1_mode().is_some() {
-                let app_handle = app.handle().clone();
-                thread::spawn(move || {
-                    // setup() を塞がないよう別スレッドで。窓が出てから知らせる。
-                    thread::sleep(Duration::from_millis(1500));
-                    if crate::g1::other_instance_running() {
-                        tracing::error!(
-                            "G1: ANOTHER GSE PROCESS IS RUNNING. Keystrokes will be split across \
-                             two NDJSON files (protocol.md 2-3). Quit the other one."
-                        );
-                        let _ = app_handle.emit("second-instance-blocked", ());
-                    }
-                });
+                spawn_duplicate_instance_check(
+                    app.handle().clone(),
+                    Duration::from_millis(1500),
+                    "at startup",
+                );
             }
 
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。

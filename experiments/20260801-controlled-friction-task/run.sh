@@ -153,6 +153,42 @@ if [ -f "../../$KILL_SWITCH_FN" ] && [ -f "../../$KILL_SWITCH_USE" ]; then
 else
   note "src-tauri/ が見つからない（この repo の外で走らせている）"
 fi
+
+# --- 5.1 セッションログを開く場所（空 NDJSON = 空の .age を防ぐ） --------------
+# ⚠️ ★ 2026-08-05 の実測: `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、
+#    **止められる前に NDJSON を作ってから死ぬ**（0 行のファイルができた）。
+#    `gse-submit` は最新 1 本を選ぶので、★ 被験者が「提出する」を押すと**空の .age** が出る。
+# ★ 直し方は順序である（一次資料 `tauri` 2.10.2 `src/app.rs`）:
+#    プラグインの exit(0) は Builder::build() の中、`.setup()` は App::run() の中。
+#    → ログを開くのは `.setup()` の中（`log_channel.start(log_path, ..)`）でなければならない。
+# ⚠️ grep は「文字列があること」しか見ないので、挙動は下の cargo test が持つ。
+LOGGER_WIRING="src-tauri/src/lib.rs"
+if [ -f "../../$LOGGER_WIRING" ]; then
+  if grep -q 'log_channel\.start(log_path' "../../$LOGGER_WIRING" \
+     && ! grep -q 'SessionLogger::start(' "../../$LOGGER_WIRING"; then
+    ok "セッションログを開くのは setup() の中（2 個目のプロセスが空 NDJSON を残さない）"
+    CARGO_BIN=$(command -v cargo || echo "$HOME/.cargo/bin/cargo")
+    if [ -x "$CARGO_BIN" ]; then
+      TMP_LG=$(mktemp)
+      if (cd ../.. && "$CARGO_BIN" test --quiet --manifest-path src-tauri/Cargo.toml --lib \
+            logger::tests::log_channel) > "$TMP_LG" 2>&1; then
+        ok "LogChannel の挙動テストが緑（start() までファイルを作らない・先に送った行を落とさない）"
+      else
+        sed 's/^/    /' "$TMP_LG"
+        bad "LogChannel の挙動テストが赤。★ 空 NDJSON の退行が戻っている可能性がある"
+      fi
+      rm -f "$TMP_LG"
+    else
+      note "cargo が無いので LogChannel の挙動テストは飛ばした（★ 飛ばしたことを明示している）"
+    fi
+  else
+    bad "セッションログを起動時点で開いている（lib.rs が SessionLogger::start を呼んでいる）"
+    note "  ★ 2 個目のプロセスが空の NDJSON を残し、gse-submit が**空の .age** を作る"
+  fi
+else
+  note "src-tauri/src/lib.rs が見つからない（この repo の外で走らせている）"
+fi
+
 if git rev-parse --git-dir >/dev/null 2>&1; then
   DIRTY=$(git status --porcelain -- ../../src-tauri ../../src 2>/dev/null | wc -l | tr -d ' ')
   if [ "$DIRTY" = "0" ]; then

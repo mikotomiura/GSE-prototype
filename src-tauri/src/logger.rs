@@ -968,31 +968,135 @@ pub struct SessionLogger {
     _handle: thread::JoinHandle<()>,
 }
 
-impl SessionLogger {
-    /// ロガーを開始し、ログエントリ送信用の `Sender`・シャットダウン通知用の `Receiver`・
-    /// 書込先の `LogStatus` を返す。`Sender` を Clone して複数スレッドから送信可能。
-    /// `shutdown_rx` は `LogEntry::End` 処理完了後に値を受信する。
+/// `LogChannel` がまだ `start()` されていないことを表す `LogStatus::Disabled` の理由文字列。
+///
+/// ⚠️ ★ 「まだ開いていない」を **`Ok` ではなく `Disabled`** で表すのは意図的である。
+/// 万一 `start()` が呼ばれないまま UI が状態を読んだら、★ **偽の緑ではなく警告バナー**が出る。
+/// (`Dashboard.tsx` は起動時に 1 回だけ読み、以後ポーリングしない = 誤った値は貼り付いたままになる。)
+pub const LOGGER_NOT_STARTED: &str = "session logger has not started yet";
+
+/// ★ **NDJSON をまだ作らない**段階のロガーハンドル (channel + 共有ハンドルだけ)。
+///
+/// ## なぜ 2 段階に分かれているか (2026-08-06・follow-up F-3)
+///
+/// ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、
+/// **止められる前に NDJSON を作ってから死ぬ**。実測で **0 行のファイル**ができた
+/// (`.steering/20260805-g1-app-mode-and-log-rotation/decisions.md` R-8 結果 4)。
+/// `gse-submit` は最新 1 本を選ぶため、★ 被験者が「提出する」を押すと空の `.age` が出る。
+///
+/// ★ 原因は **順序**である (一次資料: `tauri` 2.10.2 `src/app.rs`):
+/// プラグインの `exit(0)` は `Builder::build()` 末尾の `initialize_plugins` で走り、
+/// **ユーザーの `.setup()` クロージャはその後の `App::run()` の中**で呼ばれる。
+/// → ★ `new()` を `run()` の先頭で、`start()` を `.setup()` の中で呼べば、
+/// **2 個目のプロセスはファイルを作る前に死ぬ**。
+///
+/// ⚠️ ★ 提出側の緩和 (`packaging::has_any_data_row`) は残す。**置き換えではなく二重化**である
+/// (起動直後のクラッシュ・ディスク不足など、二重起動以外の原因でも空ファイルは出るため)。
+///
+/// `tx` / `shutdown_rx` / `target` は `start()` の前から配れる。スレッドは
+/// `start()` まで走らないので、それまでに送られた行は bounded(512) に溜まり、
+/// `start()` 後に順に書かれる (★ 取りこぼさない)。
+pub struct LogChannel {
+    /// ログ行の送信端。`start()` の前から Clone して配ってよい。
+    pub tx: Sender<LogEntry>,
+    rx: Receiver<LogEntry>,
+    shutdown_tx: Sender<()>,
+    /// `LogEntry::End` 処理完了の通知端 (`quit_app` が待つ)。
+    pub shutdown_rx: Receiver<()>,
+    /// いま書いている先 + 状態。`start()` が **同じ Arc を上書き**する
+    /// (★ `.manage()` に渡した後から差し替えられるようにするため)。
+    pub target: SharedLogTarget,
+}
+
+impl Default for LogChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LogChannel {
+    /// channel と共有ハンドルだけを用意する。★ **ファイルは作らない**。
+    pub fn new() -> Self {
+        let (tx, rx) = bounded::<LogEntry>(512);
+        let (shutdown_tx, shutdown_rx) = bounded::<()>(1);
+        let target: SharedLogTarget = Arc::new(Mutex::new(LogTarget {
+            path: PathBuf::new(),
+            status: LogStatus::Disabled {
+                error: LOGGER_NOT_STARTED.to_string(),
+            },
+        }));
+        Self {
+            tx,
+            rx,
+            shutdown_tx,
+            shutdown_rx,
+            target,
+        }
+    }
+
+    /// 書込先を開き、consumer スレッドを起こす。★ **ここで初めて NDJSON ができる**。
     ///
     /// 書込先は **spawn 前に同期的に確定** する (`open_log_target`)。これにより:
-    /// - 起動時点で書込可否を検証できる (GSE_DATASET 妥当性・macOS Documents 権限) → `LogStatus` を UI へ。
+    /// - この時点で書込可否を検証できる (GSE_DATASET 妥当性・macOS Documents 権限) → `LogStatus` を UI へ。
     /// - File::create 失敗でも consumer スレッドが死なず channel が Disconnected にならない (#1 解消)。
     ///
     /// `g1_mode` は G1 実施時のみ `Some(..)`。`meta` 行に刻んで事後検証できるようにする
     /// (⚠️ ★ マーカーが外れると黙って通常モードになるため・D-7)。
     pub fn start(
+        self,
+        log_path: PathBuf,
+        g1_mode: Option<crate::g1::G1Source>,
+    ) -> (SessionLogger, LogStatus) {
+        let LogChannel {
+            tx: _tx,
+            rx,
+            shutdown_tx,
+            shutdown_rx: _shutdown_rx,
+            target,
+        } = self;
+        SessionLogger::spawn(log_path, g1_mode, rx, shutdown_tx, target)
+    }
+}
+
+impl SessionLogger {
+    /// ロガーを開始し、ログエントリ送信用の `Sender`・シャットダウン通知用の `Receiver`・
+    /// 書込先の `LogStatus` を返す。`Sender` を Clone して複数スレッドから送信可能。
+    /// `shutdown_rx` は `LogEntry::End` 処理完了後に値を受信する。
+    ///
+    /// ★ `LogChannel::new()` → `start()` を 1 呼び出しにまとめた薄いラッパである
+    /// (テストと、2 段階に分ける必要のない呼び出し側のため)。
+    /// ⚠️ **`run()` はこれを使わない** — 2 個目のプロセスがファイルを作ってしまうため
+    /// (`LogChannel` のコメント参照)。
+    pub fn start(
         log_path: PathBuf,
         g1_mode: Option<crate::g1::G1Source>,
     ) -> (Self, Sender<LogEntry>, Receiver<()>, LogStatus) {
-        let (tx, rx) = bounded::<LogEntry>(512);
-        let (shutdown_tx, shutdown_rx) = bounded::<()>(1);
+        let channel = LogChannel::new();
+        let tx = channel.tx.clone();
+        let shutdown_rx = channel.shutdown_rx.clone();
+        let (logger, status) = channel.start(log_path, g1_mode);
+        (logger, tx, shutdown_rx, status)
+    }
 
+    fn spawn(
+        log_path: PathBuf,
+        g1_mode: Option<crate::g1::G1Source>,
+        rx: Receiver<LogEntry>,
+        shutdown_tx: Sender<()>,
+        target: SharedLogTarget,
+    ) -> (Self, LogStatus) {
         // 書込先を spawn 前に同期確定 (primary → temp → sink)。actual_path を log_path に採用する。
         let (boxed, actual_path, status) = open_log_target(&log_path);
         let resolved_path = actual_path.clone();
-        let target: SharedLogTarget = Arc::new(Mutex::new(LogTarget {
-            path: actual_path.clone(),
-            status: status.clone(),
-        }));
+        // ★ 共有ハンドルを**上書き**する (新しい Arc を作らない)。`.manage()` 済みの
+        //   `LogStatusState` が同じ Arc を握っているため。poison しても保守的に上書きする。
+        {
+            let mut t = target.lock().unwrap_or_else(|p| p.into_inner());
+            *t = LogTarget {
+                path: actual_path.clone(),
+                status: status.clone(),
+            };
+        }
         let target_for_thread = target.clone();
 
         let handle = thread::spawn(move || {
@@ -1368,7 +1472,7 @@ impl SessionLogger {
             _handle: handle,
         };
 
-        (logger, tx, shutdown_rx, status)
+        (logger, status)
     }
 }
 
@@ -1730,6 +1834,97 @@ mod tests {
         assert_eq!(actual, primary);
         assert!(primary.exists());
         let _ = fs::remove_file(&actual);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // --- follow-up F-3: LogChannel は start() までファイルを作らない ---
+
+    /// ⚠️★★ **`LogChannel::new()` は NDJSON を作ってはならない。**
+    ///
+    /// これが F-3 の本体である。single-instance プラグインに止められる 2 個目のプロセスは
+    /// `.setup()` に到達せずに `exit(0)` するので、`new()` が作らないかぎり
+    /// **空ファイルは残らない** (decisions R-8 結果 4 の退行の恒久修正)。
+    #[test]
+    fn log_channel_new_does_not_create_file_until_start() {
+        let dir = std::env::temp_dir().join(format!("gse_f3_{}", std::process::id()));
+        let path = dir.join("gse_f3test.ndjson");
+        let _ = fs::remove_file(&path);
+
+        let channel = LogChannel::new();
+        assert!(
+            !path.exists(),
+            "LogChannel::new() must NOT create the NDJSON: {:?}",
+            path
+        );
+
+        // ★ start() 前の状態は Ok であってはならない (偽の緑を出さない)。
+        {
+            let t = channel.target.lock().unwrap();
+            assert!(
+                matches!(&t.status, LogStatus::Disabled { error } if error == LOGGER_NOT_STARTED),
+                "before start(), status must be Disabled(not started), got {:?}",
+                t.status
+            );
+        }
+
+        // ★ 共有ハンドルは start() で**同じ Arc のまま**上書きされること
+        //   (`.manage()` に渡した後から差し替えるため。ここが崩れると UI が
+        //    「まだ開いていない」状態を握り続ける)。
+        let shared = channel.target.clone();
+        let (logger, status) = channel.start(path.clone(), None);
+        assert_eq!(status, LogStatus::Ok);
+        assert!(path.exists(), "start() must create the NDJSON: {:?}", path);
+        {
+            let t = shared.lock().unwrap();
+            assert_eq!(t.path, path, "start() must overwrite the SHARED target");
+            assert_eq!(t.status, LogStatus::Ok);
+        }
+
+        drop(logger);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// ★ `start()` の前に送った行を取りこぼさない (channel は先に配られている)。
+    #[test]
+    fn log_channel_buffers_entries_sent_before_start() {
+        let dir = std::env::temp_dir().join(format!("gse_f3buf_{}", std::process::id()));
+        let path = dir.join("gse_f3buf.ndjson");
+        let _ = fs::remove_file(&path);
+
+        let channel = LogChannel::new();
+        let tx = channel.tx.clone();
+        // ★ スレッドはまだ走っていない。bounded(512) に溜まる。
+        tx.try_send(LogEntry::SessionStart {
+            timestamp: 1_700_000_000_000,
+        })
+        .expect("send before start must succeed (channel exists)");
+
+        let shutdown_rx = channel.shutdown_rx.clone();
+        let (logger, _status) = channel.start(path.clone(), None);
+        tx.try_send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger should finish");
+
+        let body = fs::read_to_string(&path).unwrap();
+        assert!(
+            body.contains(r#""type":"session_start""#),
+            "entry sent before start() must still be written: {}",
+            body
+        );
+        // ⚠️★ **`meta` は必ず 1 行目**でなければならない。start() 前に溜まった行が
+        //   先に書かれると `validate_blocks.py` の `g1_mode` 検査 (`§5.4-6`) と
+        //   `analyze.py` の meta 読み取りが壊れる。
+        let first = body.lines().next().unwrap_or_default();
+        assert!(
+            first.contains(r#""type":"meta""#),
+            "meta must be the FIRST line even when entries were buffered: {}",
+            first
+        );
+
+        drop(logger);
+        let _ = fs::remove_file(&path);
         let _ = fs::remove_dir_all(&dir);
     }
 
