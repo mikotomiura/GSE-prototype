@@ -94,7 +94,32 @@
         ただし **送信対象がその同意の範囲を超えていた**」→ ★ **範囲を絞って解消**
       - ★ ⚠️ **security-checker の MEDIUM-4（macOS 隔離の破れ）は実測で否定した**
         （`notes.md §8-3d`・陽性対照つき）
-- [ ] ⚠️★ `/cross-review` — **未実施**（★ skip 理由を下に明記する）
+- [x] ⚠️★ `/cross-review` — **実施した（2026-08-07）**。★ Codex のレビュー本文が返ったことを
+      目で確認している（`rc=0` だけを根拠にしていない）。
+      - ★ **対象**: `reconcile.rs` + `submission.rs` + `GSE_G1_Submit.gs`（**1,890 insertions**・
+        `manual_approval_threshold_lines` = 2,000 の内側）。
+        ⚠️ `Cargo.lock` / `docs/` / `.steering/` / `experiments/` は送っていない。
+      - ⚠️★★ **踏んだ罠 1**: `run-codex-review.sh` は `git diff`（未ステージ）しか見ないため、
+        **コミット済みの本タスクは対象ゼロで rc=0** になる。
+        → ★ wrapper に **範囲指定の引数**を足した（`git diff "$@"`）。
+        ⚠️ 引数を渡したのに差分が空なら **exit 1** にした（rc=0 での誤読を塞ぐ）。
+      - ⚠️★★ **踏んだ罠 2**: `secrets-filter.sh` が **rc=2（fail-closed）**でブロックした。
+        ★ 一次資料まで降りて確認したところ **実体のある機密はゼロ**（`let secret = v` という
+        変数束縛と、「`.gs` に `SHARED_SECRET` を書くな」という注意書きの 2 行だけ。
+        フィルタ出力は入力と **byte-equal** = 1 バイトも伏せていない）。
+        → ★ **研究者の明示承認**を得て、wrapper の `--ack-filtered`（既定は fail-closed のまま）で
+        1 回だけ通した。⚠️ 自動では絶対に付けない旨を wrapper の先頭に書いた。
+      - ★ **結果**: ⚠️ **Codex だけが見つけた穴が 1 件あった**（D-17）。
+        Claude 側レビュー 2 本（code-reviewer / security-checker）は見落としていた。
+        | # | Codex の指摘 | 判定 | 対応 |
+        |---|---|---|---|
+        | 1 | 受け口の名前検査が **同秒ローテートの連番 (`_2`)** を弾く | ⚠️★ **採用（実在）** | D-17。regex 修正＋両側に検査（破壊して赤を実測） |
+        | 2 | 壊れた base64 が `server error` に丸まる | ★ 採用 | D-18。専用の理由を返す＋発火するテスト |
+        | 3 | `age_for_stem` が participant を見ない | ★ **却下** | D-19。安全側に倒れる／絞ると二重送信が出る |
+        | 4 | `is_closed_g1_session` の文字列一致が脆い | ★ **却下** | D-20。emit_schema ＋ golden が形を固定している |
+        | 5 | `.ok` を付けた後に `.age` が消えた場合の再収束テストが無い | ★ 却下 | 消えた `.age` は**新しいブロック番号**で包み直されるので `.ok` は一致しない（`next_block_number` は max+1）。孤児 `.ok` は無害 |
+      - ★ 重複報告はゼロだった（Claude 側で潰した 7 件と 1 件も重ならない）。
+- [x] ~~⚠️★ `/cross-review` — 未実施~~（★ 以下は前セッションの skip 理由。経緯として残す）
       - ★ **予算はその場で計算した**（⚠️ メモの数字は使っていない）:
         - 全体差分 = **25 files / 4,395 insertions / 181 deletions = 4,576 行**
         - `.codex/budget.json` の `manual_approval_threshold_lines` = **2,000** → ★ **超過**
