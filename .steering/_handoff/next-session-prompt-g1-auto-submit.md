@@ -1,10 +1,10 @@
-# 次セッション開始プロンプト — G1 自動提出の**実装**（第 2 版）
+# 次セッション開始プロンプト — G1 自動提出の**残務**（第 3 版）
 
 このファイルの「===」以下をコピペして開始する。
 
-**前提**: 2026-08-07 に **同意の確定・GAS の実測・設計 (`/reimagine`) まで完了**した。
-★ **残っているのは実装だけ**（`tasklist.md §3` 以降）。
-⚠️ ★ 第 1 版（Q-1〜Q-4 待ちの版）は**もう有効ではない**。git 履歴に残っている。
+**前提**: 2026-08-08 に **実装・テスト・Claude 側レビュー・文書改訂まで完了**した。
+★ 残っているのは **`/cross-review`** と **研究者の手作業 3 件**、および**未実測 3 件**である。
+⚠️ ★ 第 2 版（実装待ちの版）は**もう有効ではない**。git 履歴に残っている。
 
 ---
 
@@ -12,107 +12,133 @@
 
 ## §0 このセッションでやること
 
-`.steering/20260806-g1-auto-submit-on-block-end/` の **`tasklist.md §3` 実装**を進める。
+`.steering/20260806-g1-auto-submit-on-block-end/` の **残務**を片付ける。
+⚠️ ★ **実装は終わっている。作り直さない。**
 
 ★ **最初に読むもの（この順）**:
 
-1. `design.md` — ★ **採用済みの v2（収束型）**。⚠️ **ここが実装の契約である**
-2. `decisions.md` — D-1〜D-6（確定）＋「まだ決めていないこと」#1/#2/#3/#5
-3. `gas-measurements.md` — ★ **実測値。⚠️ 推測で上書きしない**
-4. `incident-20260807-g1c-rebuild.md` — ⚠️ ★ **同じ穴を掘らないために必ず読む**
-5. `requirement.md` の受け入れ条件
+1. `.steering/20260806-g1-auto-submit-on-block-end/tasklist.md` — ★ **§5 と §7 だけが残っている**
+2. `decisions.md` — D-1〜**D-16**（★ **D-14 が最新の方針転換**: 送信前の確認）
+3. `experiments/20260801-controlled-friction-task/notes.md` **§8**（★ 実測したことと、していないこと）
 
-⚠️ ★ **`/reimagine` は適用済み（1 回目・v2 採用）。もう一度回さない。**
-`design-v1.md`（却下案）と `design-comparison.md` に経緯がある。★ **v1 に戻さない。**
+## §1 いまの状態（★ 実測済み）
 
----
+- ブランチ **`feature/g1-auto-submit-on-block-end`**（`docs/win-g1-measured-tests` から 7 コミット）
+- ⚠️ ★ **未 push**。PR は出ていない（前セッションで `git push` が権限で拒否された）
+- 検証はすべて緑（★ 2026-08-08 実測）:
+  - `bash experiments/20260801-controlled-friction-task/run.sh` → **GREEN**
+    （★ cargo ゲートが "2 / 2 本" で**実走**・受け口ガード **20 / 20**）
+  - `cargo test --workspace` **287** / `--features package` **309** + bin 23/7/2
+  - golden 4 本 byte-equal / `emit_schema` byte-equal / `npx tsc --noEmit` 緑
 
-## §1 ★ 設計の核（`design.md` の要約。⚠️ これを崩さない）
+## §2 ★ タスク A — `/cross-review`（★ ユーザー承認済み）
 
-★ **イベント駆動にしない。収束型にする。**
+⚠️★★ **踏む罠が 1 つある。先に読むこと。**
+
+`scripts/run-codex-review.sh` は **`git diff`（＝ 未ステージの変更）だけ**をレビュー対象にする。
+★ 今回の作業は **全部コミット済み**なので、そのまま実行すると:
 
 ```
-毎回、ディスクの状態を突き合わせて「足りない仕事」だけをする:
-
-  ① 閉じ終わった NDJSON   … session_end を持つ、いま書いていないファイル
-  ② それに対応する .age    … 無ければ作る（匿名化 → 暗号化）
-  ③ それに対応する .sent   … 無ければ送る（成功したら .sent を置く）
-
-  未送信 N 件 = ② が在って ③ が無いものの数   ← ★ 別カウンタを持たない
+[run-codex-review] no unstaged changes to review (skipped, no budget consumed)
 ```
 
-- ★ **ブロック終了 / アプリ起動は「ヒント」にすぎない。** 取りこぼしても次の機会に収束する。
-- ★ **再送という特別処理を作らない**（`.sent` が無ければ送る、それだけ）。
-- ★ **永続カウンタを作らない**（ズレるため。実際 `G1_BLOCKS_STARTED` は再起動でリセットされる）。
-- ⚠️ ★ **ブロック中に走らせない。**
-- ★ 置き場所は **`gse-submit`（`package` feature）**。⚠️ **盲検アプリ本体に `age` も HTTP も載せない。**
-- ★ **CSP を 1 文字も触らない**（Rust の別プロセスから送るため）。
+を出して ★ **exit 0** で返る。⚠️ **rc=0 なので「走った」と誤読しやすい**
+（`silent-failure-in-guard-scripts` の型そのもの）。
+→ ★ **出力に Codex のレビュー本文が入っていることを目で確かめる**まで「実施した」と書かない。
 
-## §2 ★ 実測済み（**再調査しない**）
+### ★ 予算（⚠️ **その場で計算し直すこと**。以下は 2026-08-08 時点の値）
 
-| 何 | 実測値 |
+| 何 | 値 |
 |---|---|
-| GAS への POST | 匿名 `curl`（Cookie 無し）で **300 KB / 1.45 s / 200**。50 MB でも 200 = **上限未到達** |
-| ⚠️ 302 | POST は **302 を返す** → ★ **リダイレクト追従が必須**。メソッドを強制すると **405** |
-| ⚠️★ ヘッダ | GAS の `e` は `contextPath/parameter/parameters/queryString/contentLength/postData` の **6 キーだけ**。★ **ヘッダも IP も取れない** → 認証は**本文**に入れる（⚠️ クエリに置かない） |
-| 研究者が見える記録 | 実行数ページの **6 列だけ**（導入/関数/種類/開始時間/期間/ステータス）。★ `console.log` 本文は出ない（陽性対照つきで確認）。Cloud ログは開けない |
-| → 帰結 | ★ **送信の成否は送信先から追えない。** `.sent` が唯一の真実源 → **未送信件数の表示は必須の安全装置** |
-| `find_latest_session_ndjson` | 本番の呼び出しは `submit.rs:222` の **1 箇所だけ** |
-| 匿名化 | `packaging.rs` に集約。★ **`vk` が漏れないテストが既にある**（新経路でも使える） |
-| `g1-block-ended` | emit は `lib.rs:2246` の **1 箇所**。その場に `block_log_tx` と `app_handle` がある |
-| ★ 閉じたファイルのパス | ブロック終了時点では**まだローテートしていない** → **`current_path()` がそれ**（`lib.rs:860`） |
-| `age` の隔離 | `gse-package`/`gse-unpack`/`gse-submit` が `required-features = ["package"]` |
-| ⚠️ Rotate 失敗時の作法 | **触った状態を全部巻き戻して `Err`**（`lib.rs:1477-1490`）。★ **自動提出もこの厳しさに合わせる** |
+| 全体差分 | 25 files / **4,395 insertions / 181 deletions = 4,576 行** |
+| `.codex/budget.json` `manual_approval_threshold_lines` | **2,000** → ★ **超過**（⚠️ ユーザーが 2026-08-08 に**明示承認済み**） |
+| `per_invocation_max` | **30,000 tokens** → ★ 全体を送ると超える見込み |
+| `daily_token_budget` | 200,000（`today.date` が古ければ日次はリセット扱い） |
 
-## §3 ⚠️★ 実装前に閉じる 3 件
+→ ★ **新規コードの中核 3 ファイルだけに絞る**（**1,890 insertions** = 閾値内）:
 
-1. ★ **「× で閉じてもプロセスが残る」** — `lib.rs` が `overlay` という 2 つ目の窓を作り、
-   Tauri は全窓が閉じたときに終了するので **overlay が残る限りプロセスが死なない**
-   （`CloseRequested`/`ExitRequested` の処理が無い）。
-   ⚠️ ★ **「アプリ起動時」がヒントの 1 つなので、起動の定義がこれに依存する。**
-2. ⚠️ ★ **GAS の実行時間は `DriveApp` 保存込みで未実測**（`gas-measurements.md §3`）。
-   ★ 本番 `doPost` を書いたら測る。**推測で埋めない。**
-3. ⚠️ ★ **`data-privacy` ルール 3-1**（オプトイン UI・デフォルト OFF）との整合。
-   同意は紙＋G1-C（8 項目目）で取り、アプリ側は「G1 マーカーが無ければ送信経路が無い」＝既定 OFF。
-   ★ **この読み替えでよいかを `security-checker` に明示的に問う**（`decisions.md` 未確定 #5）。
-   満たさないと判断されたら **G1 スタート画面に確認チェックを 1 つ足す**（縮退案）。
+```bash
+git diff docs/win-g1-measured-tests..HEAD -- \
+  src-tauri/src/reconcile.rs src-tauri/src/submission.rs Form_G1/GSE_G1_Submit.gs
+```
 
-## §4 制約（厳守）
+⚠️ ★ `Cargo.lock` / `docs/` / `.steering/` / `experiments/` は **送らない**。
+⚠️ ★ `scripts/secrets-filter.sh` を必ず通す。
 
-- ★★ `preregistration.md §3.1/§3.2/§3.4/§3.5/§3.6` を変更しない
-- ★ `§5.4-2` の客観検証（probe 行 0）は**何があっても残す**
-- ★ **通常運用（マーカー無し起動）を 1 ピクセルも変えない。** ID 欄も送信も **G1 モード限定**
-- ★ **送るのは `.age` だけ。** 生 NDJSON を送る経路を作らない。★ **送信後も `.age` を消さない**
-- ⚠️ ★ `ime_state` の session ゲートには触らない（`20260805` **R-9**・**蒸し返さない**）
-- ⚠️ ★ **`schema_dto.rs` を変えない**（ブロック番号を `session_meta` に足す案は
-  schema drift と gse-dataset 整合まで波及するので**却下済み**。manifest 側で持つ）
-- **PII**: 実名・メール・セッション日時 / NDJSON ファイル名を成果物に出さない
-- ★ Rust は `rust-standards` / `architecture-rules`、外部送信なので **`data-privacy` を先に読む**
+### ★ レビューで見てほしいこと
 
-## §5 ⚠️ 環境の罠（★ 先に読む）
+1. **収束の穴** — 何度走らせても収束するか。並行実行・途中終了で**ブロック番号の重複**や
+   取りこぼしが起きないか（`ReconcileLock` の stale 判定・Drop 漏れを含む）。
+2. **黙って壊れる経路** — 「送ったつもり」になる経路。とくに **`.sent` を書く条件**と
+   `append_manifest` 失敗時の扱い。
+3. **GAS 受け口** — 匿名アクセス可の Web App である点、`saveWithoutOverwriting_` が
+   上書き・握り潰しをしないか、`decodedLength_` の境界。
+4. **「自分の分だけ」判定** — `parse_block_number` / `owned_age_files` / `age_for_stem` の抜け。
+
+⚠️ ★ **以下は Claude 側で既に潰してある。重複報告は要らない**
+（★ **両者が見落とした穴**を探してほしい）:
+G1 スコープの絞り漏れ / 送信先未設定が画面に出ない / ブロック終了の合図の残留 /
+ロック作成失敗と busy の混同 / 子プロセス stderr の PII / GAS シークレットの置き場所 /
+GAS の「同名同サイズなら保存しない」が提出を握り潰す。
+
+### ⚠️ 前セッションで起きたこと（★ 環境の問題であって設計の問題ではない）
+
+★ セッション後半、`Bash` / `Agent` / `Skill` の多くが **権限チェックで拒否**された。
+`codex` / `jq` は `/opt/homebrew/bin` に**存在する**ので不在ではない。
+→ ★ 新セッションなら通る見込み。⚠️ また拒否されたら**無理に回避せず**ユーザーに伝える。
+
+## §3 ★ タスク B — 研究者の手作業 3 件（⚠️ **自動化しない**）
+
+⚠️★★ **Apps Script の関数セレクタは自動操作を受け付けない**（4 回試して 4 回とも失敗・実測）。
+★ これで **同意フォームの全設問を消す事故**を起こしている
+（`incident-20260807-g1c-rebuild.md`）。⚠️ **自動で実行しようとしない。人に依頼する。**
+
+| # | 何 | 手順 |
+|---|---|---|
+| **B-1** | ⚠️★★ **配布済み G1-C の同意 8 項目目を更新** | D-14 で文言を「自動送信」→「毎回の送信確認」に変えた。★ **`migrateConsentForm()`**（回答を消さない・idempotent）を実行 → **`checkConsentFormParity()`** で一致を確認。⚠️ ★ **`setupG1Forms()` を実行しない**（`clearForm()` が同意記録を壊す） |
+| **B-2** | 受け口 (GAS `doPost`) の**配備** | `Form_G1/README.md` の手順。★ **新規プロジェクト**に `GSE_G1_Submit.gs` を貼る（⚠️ フォームビルダーと**混ぜない**）→ スクリプト プロパティに `FOLDER_ID` / `SHARED_SECRET` → `checkSubmitConfig()` で ✅ → ウェブアプリとしてデプロイ（実行=自分 / アクセス=全員）→ `/exec` を控える |
+| **B-3** | ⚠️ **未実測の GAS 所要時間を埋める** | `measureSaveTiming()` をエディタで 1 回実行し、出力を `gas-measurements.md §3` に貼って「未実測」を消す |
+
+★ B-2 のあと、配布フォルダ（`g1.mode` と同じ場所）に `g1-submit.json` を置く:
+
+```json
+{ "endpoint": "https://script.google.com/macros/s/…/exec", "secret": "<B-2 と同じ>" }
+```
+
+⚠️ ★ **これが無ければアプリは送信しない**（`.age` はローカルに貯まり、画面に
+「この端末は自動送信の設定がされていません」が出る）。★ `.gitignore` 済み。**コミットしない。**
+
+## §4 ⚠️ タスク C — まだ実測していないこと（★ 実施前に埋める）
+
+1. ⚠️★ **端末 → 実エンドポイントの通し確認**（`.age` が 1 本実際に届くこと）。★ **未実施**
+2. ⚠️★ **Windows 実機での動作確認**。★ 未実施（前セッションは macOS のみ）
+3. ⚠️★ **`cargo audit` / `cargo deny`**。★ 未実行（環境に未インストール）。
+   `.age` 送信のため `rustls` / `aws-lc-rs` / `ring` 等 **40 パッケージが lockfile に増えている**
+   （⚠️ ただし **配布アプリ本体には載らない**ことは実測済み・`notes.md §8-3d`）
+
+★ 1 が済むまで `consent.md` の**実施前の停止条件**ブロックを消さない。
+
+## §5 ★ 終わり方
+
+- `bash run.sh` **GREEN**（★ cargo ゲートが "N / N 本" で**実際に走った**ことを確認）
+- `/finish-task`
+- ⚠️ ★ **push と PR**（前セッションで拒否されたまま）
+
+## §6 ⚠️ 環境の罠（★ 先に読む）
 
 | 罠 | 中身 |
 |---|---|
 | ⚠️★★ `~/.cargo/bin/cargo` が壊れている | rustup shim が dangling。実体は **`~/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo`**（1.97.1）。★ **PATH に足さないと `run.sh` の cargo ゲートが「飛ばした」と言って素通りする** |
-| repo 直下の `cargo test --workspace` は空振り | `Cargo.toml` は `src-tauri/`。`cd src-tauri` か `--manifest-path` |
-| `run.sh` は未コミット変更で RED | `src-tauri/` `src/` に未コミット変更があると FAIL。**ゲートが仕様どおり働いているだけ** |
-| ⚠️★★ **Apps Script の関数セレクタは自動操作を受け付けない** | option クリックもキーボードも効かず `setupG1Forms` のまま。★ **これで事故を起こした**（`incident-…md`）。⚠️ **自動で実行しようとしない。人に依頼する** |
-| ⚠️★ Apps Script の保存 | 「変更が保存されていません」表示のまま**保存が通っていない**ことがある。★ **リロードして実体のハッシュで確かめる** |
+| repo 直下の `cargo test` は空振り | `Cargo.toml` は `src-tauri/`。`cd src-tauri` か `--manifest-path` |
+| ⚠️ **Bash の cwd が持ち越される** | 前セッションで `cd src-tauri` のまま `.codex/` を探して「無い」と誤読した。★ **`pwd` を確かめる** |
+| `run.sh` は未コミット変更で RED | 仕様どおり。コミットしてから走らせる |
+| ⚠️★★ Apps Script の関数セレクタ | **自動操作を受け付けない**（§3 参照）。⚠️ 保存も「変更が保存されていません」表示のまま通っていないことがある → ★ **リロードして実体で確かめる** |
 
-## §6 終わり方
+## §7 ⚠️★ やらないこと
 
-- `bash run.sh` が **GREEN (rc=0)**（★ cargo ゲートが "N / N 本" で**実際に走った**ことを確認）
-- `cargo test --workspace` / `--features package` / golden / `emit_schema` byte-equal / `npx tsc --noEmit`
-- ★ **検査を足したら、その場でわざと壊して赤を実測する**（後回しにしない）
-- `code-reviewer` ＋ **`security-checker`** を並列（★ 外部送信なので security 必須。§3-3 を明示的に問う）
-- 最後に `/cross-review`（★ 予算は**その場で計算する**。⚠️ **メモの数字を根拠にしない**）
-
-## §7 ★ 研究者にお願いしている宿題（未完）
-
-1. ⚠️ **Apps Script で `checkConsentFormParity()` を 1 回実行**（読み取り専用）。
-   ★ `✅ G1-C はコードと一致している（同意項目 8 件・既存回答 3 件）` が出れば確定。
-   ⚠️ ★ **`migrateConsentForm()` は実行不要**（事故で走った `setupG1Forms` が結果的に
-   同じ状態にしたため、いま走らせても挿入 0 件）。
-2. `docs/win-g1-measured-tests`（3 コミット）が **未 push**。
-   ⚠️ ★ 本セッションで `git push` が **2 回とも権限で拒否**された。★ **PR は出せていない。**
-3. ⚠️ 消えた G1-C 回答 1 件分を Phase1 ロスター / 受付メール控えから再構成できるかは **未確認**。
+- ★ **実装を作り直さない**（`/reimagine` は適用済み・v2 採用）
+- ★ **D-14 を蒸し返さない**（送信前の確認は研究者判断。⚠️ D-4 が却下した失敗様式が戻ることは
+  `decisions.md` D-14 と `notes.md §8-3e` に**明記済み**）
+- ⚠️ ★ `preregistration.md §3.1/§3.2/§3.4/§3.5/§3.6` を変更しない
+- ⚠️ ★ `ime_state` の session ゲート（`20260805` R-9）を蒸し返さない
+- ⚠️ ★ `schema_dto.rs` を変えない
