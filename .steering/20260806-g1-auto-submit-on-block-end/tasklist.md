@@ -31,13 +31,21 @@
 
 ## 2. 設計
 
-- [ ] design.md を書く（送信の実行主体・キューの形・ブロック番号の採り方）
-- [ ] ★ **`/reimagine`**: requirement.md だけを見て v2 案を作り、2 案を比較して採用を決める
-- [ ] decisions.md の「まだ決めていないこと」4 件を閉じる
+- [x] design.md を書く（送信の実行主体・キューの形・ブロック番号の採り方）
+- [x] ★ **`/reimagine`**: requirement.md だけを見て v2 案を作り、2 案を比較して採用を決める
+      → ★ **v2（収束型）を採用**（研究者判断 2026-08-07）。`design-v1.md` / `design-comparison.md`
+- [x] decisions.md の「まだ決めていないこと」のうち **#1 送信の実行主体 / #2 ブロック番号 /
+      #3 シークレットの置き場所** を design.md で閉じた（★ #3 は security-checker の確認待ち）
+- [ ] ⚠️ ★ **#5 `data-privacy` ルール 3-1 との整合**を security-checker に明示的に問う
 - [x] ★ `consent.md` の**文案**を出す → `consent-draft.md`（★ 実装より先）
 - [x] ⚠️ ★ 研究者が `consent-draft.md` §5 の **Q-1〜Q-4** を判断する
       → ★ **Q-1 / Q-2 / Q-4 = 研究者判断（D-4 / D-5 / D-6）**、**Q-3 = 実測で確定**
-- [ ] ★ `consent.md` / `Form_G1/README.md` / `protocol.md §4.1-1` を **同時に**直す ← ★ **次はここ**
+- [x] ★ `consent.md` / `Form_G1/README.md` / `protocol.md §4.1-1` ＋ `GSE_G1_Form_Builder.gs` を
+      **同時に**直した（★ **4 箇所**。同意項目は 8 つに）
+- [ ] ⚠️★ **研究者が Apps Script で `checkConsentFormParity()` を 1 回実行**（読み取り専用）。
+      ★ `✅ G1-C はコードと一致している` を確認する。
+      ⚠️ **`migrateConsentForm()` は実行不要**（事故で走った `setupG1Forms` が結果的に
+      同じ状態にしたため、いま走らせても挿入 0 件）
 
 ## 3. 実装
 
