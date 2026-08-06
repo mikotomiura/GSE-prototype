@@ -26,6 +26,10 @@ interface SubmissionStatus {
   unsent: number;
   /** 直近の自動提出で起きた問題 (無ければ null)。 */
   last_error: string | null;
+  /** ★ 送信先が未設定 (研究者の設定忘れ / 意図的な停止)。⚠️ **送られないまま貯まる**。 */
+  upload_disabled: boolean;
+  /** ★ 被験者の確認待ちの本数 (`.age` は在るが「送信する」がまだ押されていない)。 */
+  awaiting_approval: number;
 }
 
 /**
@@ -130,7 +134,11 @@ function App() {
   // G1 統制タスク実験モード。null = 通常運用、"marker" / "env" = 引き金つきで G1 モード。
   // ⚠️ ★ マーカーが外れる / launcher の `open -a` で通常アプリが起動する、のいずれでも
   // 黙って通常モードになるため、開始する前に画面で分かるようにする (decisions D-7 / R-7)。
-  const [g1Mode, setG1Mode] = useState<string | null>(null);
+  // ⚠️ ★ `undefined` = **まだ判定していない**。`null` = 通常運用。
+  //   判定前を `null` と同じ扱いにすると、G1 でも 1 フレームだけ ID 欄なしで
+  //   「開始する」が押せてしまう (バックエンドの gate が受け止めるが、
+  //   出る文言が ID の赤字ではなく汎用エラーになる)。
+  const [g1Mode, setG1Mode] = useState<string | null | undefined>(undefined);
   // G1: このプロセスで終了したブロック数 (5 分での自動終了ごとに増える)。
   const [g1BlocksDone, setG1BlocksDone] = useState(0);
   // G1: 直前のブロックが 5 分で自動終了したか (スタート画面に「終わった」だけを出す)。
@@ -145,7 +153,12 @@ function App() {
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
     unsent: 0,
     last_error: null,
+    upload_disabled: false,
+    awaiting_approval: 0,
   });
+  // 「送信する」を押したときのエラー (押したのに何も起きない状態を作らない)。
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [approving, setApproving] = useState(false);
   // 二重起動を検出した (別インスタンスの起動をブロックした)。
   const [duplicateBlocked, setDuplicateBlocked] = useState(false);
   // Task C: session_meta 宣言 + ビネット導線。
@@ -265,13 +278,17 @@ function App() {
   useEffect(() => {
     invoke<string | null>("get_g1_mode")
       .then((mode) => setG1Mode(mode))
-      .catch((e) => console.error("get_g1_mode failed:", e));
+      .catch((e) => {
+        // ⚠️ 判定に失敗したら通常運用として扱う (判定前のまま固まらせない)。
+        console.error("get_g1_mode failed:", e);
+        setG1Mode(null);
+      });
   }, []);
 
   // 4b-2. G1: 登録済みの参加者 ID を復元する (次回起動で入力し直させない)。
   //       ⚠️ ★ 通常運用では **呼ばない** (g1Mode === null なら何も起きない)。
   useEffect(() => {
-    if (g1Mode === null) return;
+    if (!g1Mode) return;
     invoke<string | null>("get_g1_participant_id")
       .then((id) => {
         if (id) setG1ParticipantId(id);
@@ -284,7 +301,7 @@ function App() {
   //       ⚠️ **端末側のこの表示が唯一の安全装置**である。
   //       ⚠️ ★ ブロック実施中はポーリングしない (測定中の端末に余計な仕事をさせない)。
   useEffect(() => {
-    if (g1Mode === null || isStarted) return;
+    if (!g1Mode || isStarted) return;
     let cancelled = false;
     const read = () => {
       invoke<SubmissionStatus>("get_submission_status")
@@ -367,7 +384,7 @@ function App() {
     // ★ G1: 参加者 ID を先に確定させる。⚠️ **ここで保存しないと `.age` に ID が付かない**
     //   (P-1 で実際に起きた: 提出時の手打ちだったので提出しない限り ID がどこにも付かなかった)。
     //   ⚠️ ★ 通常運用 (g1Mode === null) では 1 行も走らない。
-    if (g1Mode !== null) {
+    if (g1Mode) {
       const id = g1ParticipantId.trim();
       if (!isValidParticipantId(id)) {
         setG1IdError("参加者 ID を入力してください (英数字のみ・1〜16 文字。例: P012)。");
@@ -460,7 +477,7 @@ function App() {
 
         {/* ★ G1 モードの表示 (fail-loud・decisions D-7 / R-7)。
             ⚠️ 通常運用 (g1Mode === null) では何も足さない = 既定の画面を変えない。 */}
-        {g1Mode !== null && (
+        {!!g1Mode && (
           <div
             style={{
               margin: "0.5rem 0",
@@ -519,9 +536,93 @@ function App() {
           </div>
         )}
 
+        {/* ★★ 送信前の確認 (G1 モード限定・D-14)。⚠️ **押されるまで消えない。**
+            ★ 記録 (.age) は確認の有無に関わらず既に作られており、失われていない。
+            ⚠️ ★ ここで「あとで」を押し続けると **研究者に届かない**ので、そのことを明記する
+            (D-4 が却下した「止めたまま最後まで行く」を、文言で埋め合わせる)。 */}
+        {!!g1Mode && submissionStatus.awaiting_approval > 0 && (
+          <div
+            role="alertdialog"
+            aria-label="記録の送信確認"
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.8rem 1rem",
+              borderRadius: "6px",
+              border: "2px solid #4caf50",
+              background: "rgba(76,175,80,0.12)",
+              fontSize: "0.9rem",
+              maxWidth: "34rem",
+            }}
+          >
+            <b>
+              このブロックの記録を研究者に送信しますか？
+              {submissionStatus.awaiting_approval > 1 && (
+                <>（未確認 {submissionStatus.awaiting_approval} 件）</>
+              )}
+            </b>
+            <br />
+            <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>
+              送るのは<b>暗号化された記録だけ</b>です（打った文章は含まれません）。
+              <br />
+              ⚠️ <b>送信しないと研究者に届きません。</b>
+              「あとで」を選んでも記録は消えないので、次のブロックの後にまとめて送れます。
+            </span>
+            <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.7rem" }}>
+              <button
+                onClick={async () => {
+                  setApproveError(null);
+                  setApproving(true);
+                  try {
+                    await invoke<number>("approve_pending_submissions");
+                    // 送信は別プロセスで走る。件数はポーリングが拾う。
+                    const s = await invoke<SubmissionStatus>("get_submission_status");
+                    setSubmissionStatus(s);
+                  } catch (e) {
+                    console.error("approve_pending_submissions failed:", e);
+                    setApproveError(
+                      "送信の確認を保存できませんでした。記録は残っています。研究者にご連絡ください。"
+                    );
+                  } finally {
+                    setApproving(false);
+                  }
+                }}
+                disabled={approving}
+                style={{
+                  padding: "0.45rem 1.1rem",
+                  borderRadius: "6px",
+                  border: "2px solid #4caf50",
+                  background: "rgba(76,175,80,0.25)",
+                  cursor: approving ? "wait" : "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                {approving ? "送信中…" : "送信する"}
+              </button>
+              <button
+                onClick={() => setApproveError(null)}
+                style={{
+                  padding: "0.45rem 1.1rem",
+                  borderRadius: "6px",
+                  border: "1px solid #888",
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                あとで
+              </button>
+            </div>
+            {approveError && (
+              <p role="alert" style={{ color: "#ff6b6b", margin: "0.4rem 0 0", fontSize: "0.8rem" }}>
+                {approveError}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ★ 未送信の可視化 (G1 モード限定)。⚠️ **0 件なら何も出さない** (被験者のノイズにしない)。
-            ★ 送信の成否は送信先から追えないので、ここが唯一の安全装置である。 */}
-        {g1Mode !== null && submissionStatus.unsent > 0 && (
+            ★ 送信の成否は送信先から追えないので、ここが唯一の安全装置である。
+            ⚠️ 確認待ちのぶんは上のカードが担当するので、ここでは **確認済みで未達のもの**だけ扱う。 */}
+        {!!g1Mode && submissionStatus.unsent - submissionStatus.awaiting_approval > 0 && (
           <div
             role="status"
             style={{
@@ -534,19 +635,33 @@ function App() {
               maxWidth: "34rem",
             }}
           >
-            未送信の記録が <b>{submissionStatus.unsent} 件</b> あります。
+            まだ送れていない記録が{" "}
+            <b>{submissionStatus.unsent - submissionStatus.awaiting_approval} 件</b> あります。
             <br />
             <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-              記録はお使いのパソコンに残っており、失われていません。次のブロックの後に自動で送信を再試行します。
+              記録はお使いのパソコンに残っており、失われていません。
               <b>そのまま実施を続けてください。</b>
-              最後まで残る場合は研究者にご連絡ください。
+              <br />
+              {submissionStatus.upload_disabled ? (
+                /* ⚠️ ★ ここを「再試行します」と書いてはならない。送信先が設定されていないときは
+                   **自動では永久に送られない**。研究者の設定忘れが「誰も気づかない全損」に
+                   なるのを、この 1 文だけが防いでいる。 */
+                <>
+                  ⚠️ <b>この端末は自動送信の設定がされていません。</b>
+                  自動では送られませんので、<b>研究者にご連絡ください。</b>
+                </>
+              ) : (
+                <>
+                  次のブロックの後に自動で送信を再試行します。最後まで残る場合は研究者にご連絡ください。
+                </>
+              )}
             </span>
           </div>
         )}
 
         {/* ⚠️ ★ 自動提出そのものが起動できなかった / 失敗した場合。★ ログではなく画面に出す
             (「起こしたつもりで動いていない」を黙って通さない)。 */}
-        {g1Mode !== null && submissionStatus.last_error && (
+        {!!g1Mode && submissionStatus.last_error && (
           <div
             role="alert"
             style={{
@@ -643,9 +758,11 @@ function App() {
         <button
           className="start-button"
           onClick={handleStart}
-          disabled={g1Mode !== null && !isValidParticipantId(g1ParticipantId.trim())}
+          disabled={
+            g1Mode === undefined || (!!g1Mode && !isValidParticipantId(g1ParticipantId.trim()))
+          }
           title={
-            g1Mode !== null && !isValidParticipantId(g1ParticipantId.trim())
+            !!g1Mode && !isValidParticipantId(g1ParticipantId.trim())
               ? "参加者 ID を入力してください"
               : undefined
           }

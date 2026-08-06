@@ -33,6 +33,26 @@ use std::path::{Path, PathBuf};
 /// ★ **端末側のこの印が唯一の真実源**である。
 pub const SENT_SUFFIX: &str = "sent";
 
+/// ★ **被験者が送信を確認した**印の拡張子。`<name>.age` に対して `<name>.age.ok`。
+///
+/// ## ⚠️★ なぜ「送る前の確認」を入れたか (研究者判断 2026-08-08・D-14)
+///
+/// 目的は **同意の担保**である。⚠️ 配布フォルダはコピーできるので、
+/// ★ **同意手続きを経ていない人が G1 ビルドを起動する**経路が塞がっていなかった
+/// (security-checker 指摘)。→ ★ **確認が無ければ送信経路が開かない**ようにする。
+///
+/// ## ★ 失っても大丈夫な形にしてある
+///
+/// ⚠️ ★ D-4 は「被験者側の停止スイッチ」を **却下していた** — 無人在宅で
+/// 「止めたまま最後まで行く」と回収がゼロになるためである。★ 確認を毎回にすると
+/// **その失敗様式が戻る**。そこで被害を最小化する:
+///
+/// - ★ **`.age` は確認の有無に関わらず必ず作る**。確認が要るのは ③ 送信だけである
+///   → 最後の回収経路 (被験者のフォルダから研究者が受け取る) は**常に生きている**
+/// - ★ 確認カードは **押されるまで消えない**。次の起動でも出る
+/// - ★ 「あとで」を選んでも `.age` は残るので、後からまとめて確認できる
+pub const APPROVED_SUFFIX: &str = "ok";
+
 /// 提出物の来歴 (どの NDJSON が何ブロック目だったか) を残す append-only の台帳。
 pub const MANIFEST_FILE_NAME: &str = "manifest.jsonl";
 
@@ -192,17 +212,91 @@ pub fn sent_marker_path(age: &Path) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// まだ送っていない `.age` (= `.sent` が無いもの)。
-pub fn unsent_age_files(dir: &Path) -> Vec<PathBuf> {
+/// ★ **この収束器が、この参加者のために作った** `.age` だけを返す。
+///
+/// ⚠️★★ **「フォルダにある `.age` 全部」ではない** (code-review / security-checker とも HIGH)。
+/// `~/Documents/GSE-submissions` には **Phase1 の手動提出物** (`P007_gse_….age`) や
+/// **P-1 の残骸** が同じ端末に残る (`notes.md §7-5`: P-1 実機に 4 本ある)。
+/// 全部を対象にすると:
+/// - ⚠️ ★ **同意の範囲外の記録が G1 のエンドポイントへ送られる**
+///   (Phase1 は手動 Dropbox 提出に同意しており、この経路には同意していない)
+/// - ⚠️ ★ スタート画面にいきなり「未送信 4 件」が出て、被験者が混乱する
+///
+/// ★ 判定は **ファイル名がこの参加者のブロック形式か** で行う
+/// (`<participant>_block<NN>_….age`)。⚠️ 旧形式 (`<participant>_<stem>.age`) は
+/// **対象外**である — ★ 「二重に包まない」(`age_for_stem`) と「送る」は別の話であり、
+/// 手動提出した分をこの経路で送り直さない。
+pub fn owned_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
     list_age_files(dir)
+        .into_iter()
+        .filter(|p| {
+            p.file_name()
+                .and_then(|s| s.to_str())
+                .and_then(|n| parse_block_number(n, participant))
+                .is_some()
+        })
+        .collect()
+}
+
+/// `.age` に対する **送信確認済み**の印のパス (`<name>.age.ok`)。
+pub fn approval_marker_path(age: &Path) -> PathBuf {
+    let mut s = age.as_os_str().to_os_string();
+    s.push(".");
+    s.push(APPROVED_SUFFIX);
+    PathBuf::from(s)
+}
+
+/// まだ送っていない `.age` (= 自分の分で `.sent` が無いもの)。
+/// ★ **確認の有無は問わない** (画面の「まだ届いていない」件数はこれで数える)。
+pub fn unsent_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
+    owned_age_files(dir, participant)
         .into_iter()
         .filter(|p| !sent_marker_path(p).exists())
         .collect()
 }
 
 /// 未送信の件数。★ **カウンタではなく突き合わせ**なのでズレようがない。
-pub fn unsent_count(dir: &Path) -> usize {
-    unsent_age_files(dir).len()
+/// ★ 画面に出す件数と、実際に送る対象を **同じ規則**で数える (drift させない)。
+pub fn unsent_count(dir: &Path, participant: &str) -> usize {
+    unsent_age_files(dir, participant).len()
+}
+
+/// ★ **送ってよい** `.age` (= 未送信で、被験者の確認が済んでいるもの)。
+///
+/// ⚠️ ★ 送信層はこれ**だけ**を送る。確認が無いものは `.age` として残るが送られない。
+pub fn approved_unsent_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
+    unsent_age_files(dir, participant)
+        .into_iter()
+        .filter(|p| approval_marker_path(p).exists())
+        .collect()
+}
+
+/// ★ **被験者の確認待ち** の `.age` (= 未送信で、確認の印が無いもの)。
+/// 画面はこの件数だけ「送信しますか？」を出す。
+pub fn awaiting_approval_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
+    unsent_age_files(dir, participant)
+        .into_iter()
+        .filter(|p| !approval_marker_path(p).exists())
+        .collect()
+}
+
+/// 確認待ちの件数。
+pub fn awaiting_approval_count(dir: &Path, participant: &str) -> usize {
+    awaiting_approval_age_files(dir, participant).len()
+}
+
+/// ★ 確認待ちの `.age` **すべて**に確認の印を付ける (被験者が「送信する」を押したとき)。
+///
+/// 付けた本数を返す。⚠️ 1 本でも書けなければ `Err`。★ 「押したのに付いていない」を作らない。
+pub fn approve_pending(dir: &Path, participant: &str) -> Result<usize, String> {
+    let pending = awaiting_approval_age_files(dir, participant);
+    let mut n = 0;
+    for age in &pending {
+        std::fs::write(approval_marker_path(age), b"approved\n")
+            .map_err(|e| format!("送信の確認を保存できませんでした: {e}"))?;
+        n += 1;
+    }
+    Ok(n)
 }
 
 /// 入力 NDJSON のステム (`gse_20260807_101112`) に対応する `.age` が既に在るか。
@@ -362,14 +456,37 @@ mod tests {
         std::fs::write(d.join("P012_block02_gse_b.age.sent"), b"ok").unwrap();
         // `.age` でないものは数えない。
         std::fs::write(d.join("notes.txt"), b"x").unwrap();
-        assert_eq!(unsent_count(&d), 1);
+        assert_eq!(unsent_count(&d, "P012"), 1);
         assert_eq!(
-            unsent_age_files(&d)[0].file_name().unwrap(),
+            unsent_age_files(&d, "P012")[0].file_name().unwrap(),
             "P012_block01_gse_a.age"
         );
         // ★ 印を足せば 0 になる (= 何度走らせても同じ状態に収束する)。
         std::fs::write(d.join("P012_block01_gse_a.age.sent"), b"ok").unwrap();
-        assert_eq!(unsent_count(&d), 0);
+        assert_eq!(unsent_count(&d, "P012"), 0);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★★ **他人の分・Phase1 の手動提出物・旧形式を「未送信」に数えない。**
+    ///
+    /// `~/Documents/GSE-submissions` は使い回されるフォルダで、P-1 の実機には
+    /// 旧形式の `.age` が 4 本残っている (`notes.md §7-5`)。★ これを数えると
+    /// 被験者のスタート画面にいきなり「未送信 4 件」が出て、⚠️ **同意していない経路で
+    /// 送られる**ことにもなる。
+    #[test]
+    fn foreign_and_legacy_submissions_are_not_ours() {
+        let d = tmp("owned");
+        std::fs::write(d.join("P012_block01_gse_a.age"), b"x").unwrap(); // ★ 自分の分
+        std::fs::write(d.join("P007_block01_gse_b.age"), b"x").unwrap(); // 他人の分
+        std::fs::write(d.join("P012_gse_c.age"), b"x").unwrap(); // 旧形式 (手動提出)
+        std::fs::write(d.join("P007_gse_d.age"), b"x").unwrap(); // 他人の旧形式
+        assert_eq!(unsent_count(&d, "P012"), 1);
+        assert_eq!(
+            owned_age_files(&d, "P012")[0].file_name().unwrap(),
+            "P012_block01_gse_a.age"
+        );
+        // ★ ただし旧形式でも「もう包んである」判定には使う (二重に包まないため)。
+        assert!(age_for_stem(&d, "gse_c").is_some());
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -377,7 +494,7 @@ mod tests {
     fn unsent_count_is_zero_for_missing_dir() {
         let d = std::env::temp_dir().join(format!("gse_subm_missing_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
-        assert_eq!(unsent_count(&d), 0);
+        assert_eq!(unsent_count(&d, "P012"), 0);
     }
 
     /// ★ 既に `.age` がある NDJSON は二度と包まない (べき等)。旧形式も一致させる。

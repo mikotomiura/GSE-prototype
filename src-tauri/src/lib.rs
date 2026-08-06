@@ -1041,6 +1041,14 @@ fn redact_prefixes(detail: &str, homes: &[String]) -> String {
 /// 収束器の直近の失敗。★ 画面に出すために保持する (`None` = 直近は成功)。
 static SUBMIT_LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
 
+/// ★ 送信先が設定されていない (`g1-submit.json` が無い / 空) ことを直近の実行が報告したか。
+///
+/// ⚠️★★ **これを画面に出さないと、研究者の設定忘れが「誰も気づかない全損」になる**
+/// (code-review HIGH)。`.age` はできるので `errors` は空・exit 0 で、
+/// ★ **未送信件数だけが静かに増える**。UI は「次のブロックの後に再試行します」と
+/// 書いているが、⚠️ 実際には**永久に送られない**。
+static SUBMIT_UPLOAD_DISABLED: AtomicBool = AtomicBool::new(false);
+
 /// スタート画面へ返す提出状態 (G1 モードのときだけフロントが読む)。
 #[derive(serde::Serialize, Clone)]
 struct SubmissionStatusDto {
@@ -1048,19 +1056,55 @@ struct SubmissionStatusDto {
     unsent: usize,
     /// 直近の自動提出で起きた問題 (無ければ `null`)。
     last_error: Option<String>,
+    /// ★ 送信先が未設定 (研究者の設定忘れ / 意図的な停止・D-4)。
+    upload_disabled: bool,
+    /// ★ **被験者の確認待ち**の本数 (`.age` は在るが「送信する」がまだ押されていない・D-14)。
+    awaiting_approval: usize,
 }
 
 /// 未送信件数と直近のエラーを返す。★ 0 件・エラー無しなら UI は何も出さない。
+///
+/// ⚠️ ★ 件数は **`unsent_age_files` と同じ規則**で数える (この参加者のブロック分だけ)。
+/// 別々の規則にすると、画面の件数と実際に送られる対象が drift する。
 #[tauri::command]
 fn get_submission_status() -> SubmissionStatusDto {
-    let unsent = crate::submission::default_submission_dir()
-        .map(|d| crate::submission::unsent_count(&d))
-        .unwrap_or(0);
+    let (unsent, awaiting_approval) = match (
+        crate::submission::default_submission_dir(),
+        crate::submission::read_g1_participant_id(),
+    ) {
+        (Some(dir), Some(id)) => (
+            crate::submission::unsent_count(&dir, &id),
+            crate::submission::awaiting_approval_count(&dir, &id),
+        ),
+        _ => (0, 0),
+    };
     let last_error = SUBMIT_LAST_ERROR
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .clone();
-    SubmissionStatusDto { unsent, last_error }
+    SubmissionStatusDto {
+        unsent,
+        last_error,
+        upload_disabled: SUBMIT_UPLOAD_DISABLED.load(Ordering::Relaxed),
+        awaiting_approval,
+    }
+}
+
+/// ★ 被験者が「送信する」を押したときに呼ぶ (D-14: 送信前の確認)。
+///
+/// 確認待ちの `.age` **すべて**に確認の印を付け、そのまま収束器を起こす。
+/// ⚠️ ★ **印を付けるところまでは同期**にする。押したのに何も起きていない状態を作らない。
+#[tauri::command]
+fn approve_pending_submissions(app: tauri::AppHandle) -> Result<usize, String> {
+    let dir = crate::submission::default_submission_dir()
+        .ok_or("提出物フォルダを解決できませんでした。")?;
+    let id =
+        crate::submission::read_g1_participant_id().ok_or("参加者 ID が登録されていません。")?;
+    let n = crate::submission::approve_pending(&dir, &id)?;
+    tracing::info!("G1: participant approved {} submission(s)", n);
+    // ★ 確認直後に送る。⚠️ 失敗しても `.age` と確認の印は残るので、次の機会に送られる。
+    spawn_reconcile(app, "after approval");
+    Ok(n)
 }
 
 /// 登録済みの G1 参加者 ID を返す (未登録なら `null`)。
@@ -1085,6 +1129,17 @@ fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
         return;
     }
     thread::spawn(move || {
+        // ⚠️ ★ **ブロック中には走らせない** (`design.md` §1: 測定中の端末に負荷をかけない)。
+        //   起動時のヒントはスレッドで遅れて走るので、被験者が数秒後に「開始する」を押すと
+        //   ★ **ブロック中に age 暗号化と送信が走りうる** (code-review LOW)。
+        //   ★ 見送っても損失にならない (次のブロック終了で必ず拾われる)。
+        if SESSION_START_MS.load(Ordering::Acquire) != 0 {
+            tracing::info!(
+                "G1 auto-submit ({}): skipped (a block is running; will run at block end)",
+                reason
+            );
+            return;
+        }
         let outcome = run_reconcile_blocking(&app);
         let mut slot = SUBMIT_LAST_ERROR.lock().unwrap_or_else(|p| p.into_inner());
         match outcome {
@@ -1144,24 +1199,36 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
         .output()
         .map_err(|e| format!("自動提出ツールを起動できませんでした: {e}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let summary = extract_reconcile_summary(&stdout);
+    // ★ 「送信先が未設定」は errors にも exit code にも出ない。要約行から拾って画面へ届ける。
+    SUBMIT_UPLOAD_DISABLED.store(
+        summary
+            .as_ref()
+            .map(|s| summary_flag(s, "upload_disabled"))
+            .unwrap_or(false),
+        Ordering::Relaxed,
+    );
     if output.status.success() {
-        return Ok(Some(
-            extract_reconcile_summary(&stdout).unwrap_or_else(|| "done".to_string()),
-        ));
+        return Ok(Some(summary.unwrap_or_else(|| "done".to_string())));
     }
-    // fail-loud: 詳細はホームパス (= OS ユーザー名を含み得る) を伏せてから返す (data-privacy)。
+    // fail-loud。⚠️★ **詳細をそのまま画面に出さない** (code-review MEDIUM):
+    //   子プロセスの stderr は `gse-submit: P012_block03_gse_20260807_101112.age を送信できません: …`
+    //   の形で **参加者 ID とセッション日時**を含む。`redact_home_path` はホームパスしか伏せない。
+    //   ★ 画面には定型文だけを出し、⚠️ 詳細は**ローカルのログにだけ**残す。
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = if !stderr.trim().is_empty() {
         stderr.trim()
     } else {
         stdout.trim()
     };
-    let detail = redact_home_path(raw);
-    Err(if detail.is_empty() {
-        "自動提出に失敗しました (詳細不明)。研究者に連絡してください。".to_string()
-    } else {
-        detail
-    })
+    tracing::error!("G1 auto-submit detail: {}", redact_home_path(raw));
+    Err(format!(
+        "記録の自動送信に失敗しました (未送信 {} 件)。実施はそのまま続けてください。",
+        summary
+            .as_ref()
+            .and_then(|s| summary_count(s, "unsent"))
+            .unwrap_or(0)
+    ))
 }
 
 /// `gse-submit --reconcile` が出す要約行 (`GSE_RECONCILE {...}`) を取り出す。
@@ -1173,6 +1240,22 @@ fn extract_reconcile_summary(stdout: &str) -> Option<String> {
         .map(str::trim)
         .find_map(|l| l.strip_prefix("GSE_RECONCILE "))
         .map(|s| s.to_string())
+}
+
+/// 要約行 (JSON) から bool を読む。読めなければ `false` (安全側)。
+fn summary_flag(summary: &str, key: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(summary)
+        .ok()
+        .and_then(|v| v.get(key).and_then(|x| x.as_bool()))
+        .unwrap_or(false)
+}
+
+/// 要約行 (JSON) から件数を読む。
+fn summary_count(summary: &str, key: &str) -> Option<usize> {
+    serde_json::from_str::<serde_json::Value>(summary)
+        .ok()
+        .and_then(|v| v.get(key).and_then(|x| x.as_u64()))
+        .map(|n| n as usize)
 }
 
 /// アプリ内「提出する」ボタンの Tauri コマンド。最新セッションを同梱 `gse-submit` で
@@ -2422,6 +2505,15 @@ pub fn run() {
                         // 3) ブロックを閉じる。⚠️ ★ ここでは**新しいファイルを開かない**
                         //    (10 ブロック目の後に空の 11 本目が残り、`gse-submit` が
                         //    最新 1 本としてそれを出してしまうため)。開くのは次の start_session。
+                        // ⚠️★★ **前の回の合図を捨ててから送る** (code-review HIGH)。
+                        //   合図の channel は容量 1 で、下の `recv_timeout` が待ち切れなかった
+                        //   回の合図は**残る**。残ったままだと次のブロックで `recv_timeout` が
+                        //   ★ **古い合図で即座に返り**、`session_end` が書かれる前に収束器を
+                        //   起こす → 以後ずっと 1 ブロック遅れる。
+                        //   ⚠️ プロセスは × で終了しない (D-10) ので、
+                        //   **最後のブロックがこのプロセスの間ずっと送られない**。
+                        while block_end_ack.try_recv().is_ok() {}
+
                         let closed = match block_log_tx.try_send(LogEntry::BlockEnd) {
                             Err(e) => {
                                 tracing::error!("G1: FAILED to close block: {}", log_send_error(e));
@@ -2718,6 +2810,7 @@ pub fn run() {
             get_g1_participant_id,
             set_g1_participant_id,
             get_submission_status,
+            approve_pending_submissions,
             record_intervention_dismiss,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,

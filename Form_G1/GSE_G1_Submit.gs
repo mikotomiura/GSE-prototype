@@ -44,11 +44,15 @@
  *
  *   1. script.google.com で **新しいプロジェクト**を作り、このファイルを貼る。
  *      ⚠️ ★ フォームビルダーのプロジェクトに貼らない（上記の理由）。
- *   2. Google ドライブに受け取り用フォルダを 1 つ作り、その ID を `FOLDER_ID` に書く。
+ *   2. Google ドライブに受け取り用フォルダを 1 つ作り、その ID を
+ *      ⚙️「プロジェクトの設定」→「スクリプト プロパティ」の `FOLDER_ID` に入れる。
  *      （フォルダの URL `https://drive.google.com/drive/folders/<ここ>` の `<ここ>`）
- *   3. `SHARED_SECRET` に **長いランダム文字列**を書く（32 文字以上を推奨）。
- *      ⚠️ ★ これが守っているのは **可用性だけ**である。中身は研究者の age 公開鍵で
- *      暗号化済みなので、経路が漏れても読めない。★ 過大評価しない。
+ *      ⚠️ ★ **`.gs` に書かない**（このリポジトリは一時 public にする運用がある）。
+ *   3. 同じ場所の `SHARED_SECRET` に **長いランダム文字列**を入れる（32 文字以上を推奨）。
+ *      ⚠️ ★ これが守るのは **可用性と、記録の完全性**である。★ **機密性は age が守る**
+ *      （中身は研究者の公開鍵で暗号化済みなので、経路が漏れても読めない）。
+ *      ⚠️ ただしシークレットを持つ者は **偽の提出を投入できる**（完全性）ので、
+ *      ★ 「可用性だけ」と過小評価もしない。★ 全被験者に同じ値が配られる点に留意する。
  *   4. `checkSubmitConfig()` を実行し、`✅` が出ることを確認する（読み取り専用）。
  *   5. 「デプロイ」→「新しいデプロイ」→ 種類=**ウェブアプリ**
  *        - 実行ユーザー: **自分**
@@ -65,14 +69,28 @@
  */
 
 // ============================================================
-// 設定（★ 配備時に埋める）
+// 設定
 // ============================================================
+//
+// ⚠️★★ **シークレットとフォルダ ID をこのファイルに書かない。**
+//   ★ このリポジトリは Actions の分数都合で **一時的に public にする運用がある**
+//     (`.steering` / memory に記録あり)。⚠️ `.gs` に `SHARED_SECRET = 'xxxx'` と書いて
+//     commit すると、public にした瞬間に **誰でも研究者の Drive 受け取りフォルダへ
+//     書き込めるようになる**。★ git 履歴に入るので、後からローテートしても痕跡は消せない。
+//   → ★ **Apps Script の「スクリプト プロパティ」に置く**（repo に入れられない場所）。
+//
+//   置き方: エディタ左下の ⚙️「プロジェクトの設定」→「スクリプト プロパティ」→
+//           `FOLDER_ID` と `SHARED_SECRET` を追加する。
+//   ⚠️ ★ 設定したら `checkSubmitConfig()` を 1 回実行して確かめる。
 
-/** 受け取った `.age` を置く Google ドライブのフォルダ ID。 */
-var FOLDER_ID = '';
-
-/** 共有シークレット（本文で照合する）。⚠️ 守るのは可用性だけ。 */
-var SHARED_SECRET = '';
+/** スクリプト プロパティから設定を読む。★ ソースには秘密を置かない。 */
+function config_() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    folderId: String(props.getProperty('FOLDER_ID') || '').trim(),
+    secret: String(props.getProperty('SHARED_SECRET') || '').trim()
+  };
+}
 
 /**
  * 受け取る 1 本の上限バイト数。
@@ -95,7 +113,8 @@ var MAX_BYTES = 8 * 1024 * 1024;
 function doPost(e) {
   var t0 = new Date().getTime();
   try {
-    if (!FOLDER_ID || !SHARED_SECRET) {
+    var cfg = config_();
+    if (!cfg.folderId || !cfg.secret) {
       return json_({ ok: false, error: 'endpoint not configured' });
     }
     if (!e || !e.postData || !e.postData.contents) {
@@ -107,7 +126,7 @@ function doPost(e) {
     } catch (parseErr) {
       return json_({ ok: false, error: 'bad json' });
     }
-    if (!secretMatches_(String(body.secret || ''), SHARED_SECRET)) {
+    if (!secretMatches_(String(body.secret || ''), cfg.secret)) {
       // ⚠️ ★ 何が違うか（長さ・前方一致）を返さない。
       return json_({ ok: false, error: 'unauthorized' });
     }
@@ -120,15 +139,20 @@ function doPost(e) {
     if (!b64) {
       return json_({ ok: false, error: 'empty payload' });
     }
+    // ★ 上限の検査は **デコードの前に 1 回だけ**行う。
+    //   ⚠️★ 当初はデコード後にも同じ検査を置いていたが、**片方を壊しても赤にならなかった**
+    //   （もう片方が同じ入力を捕まえる）。★ 発火しない検査を残さないので 1 本にした。
+    //   ★ base64 の長さから元のバイト数は決まるので、前段でも**正確に**判定できる。
+    if (decodedLength_(b64) > MAX_BYTES) {
+      return json_({ ok: false, error: 'too large' });
+    }
     var bytes = Utilities.base64Decode(b64);
+    // ⚠️ 空でない base64 が 0 バイトに解ける形（`"===="` 等）を通さない。
     if (bytes.length === 0) {
       return json_({ ok: false, error: 'empty payload' });
     }
-    if (bytes.length > MAX_BYTES) {
-      return json_({ ok: false, error: 'too large', bytes: bytes.length });
-    }
 
-    var folder = DriveApp.getFolderById(FOLDER_ID);
+    var folder = DriveApp.getFolderById(cfg.folderId);
     var saved = saveWithoutOverwriting_(folder, name, bytes);
     return json_({
       ok: true,
@@ -157,36 +181,34 @@ function doGet(e) {
 // ============================================================
 
 /**
- * ファイル名を検証する。★ 通すのは **`.age` だけ**（design.md §4）。
+ * ファイル名を検証する。★ 通すのは **提出物の形をした `.age` だけ**（design.md §4）。
  *
  * ⚠️ ★ 名前は被験者の端末から来る = **信用しない**。
  *
  * ★ 脅威を取り違えないこと: Drive のファイル名は **パスではない**ので、
  *   ここでの危険は「ディレクトリ traversal」ではなく
  *   **「提出物でないものを受け取ってしまう」「研究者が中身を取り違える」** である。
- *   → 検査は **許可リスト** 1 本を軸にする。
  *
- * ⚠️★★ **冗長なガードを置かない。** 当初は `/` `\` `..` を個別に弾く行も書いたが、
- *   ★ **わざと 1 行ずつ壊しても検査が赤にならなかった**（許可リストが同じ入力を先に捕まえるため）。
- *   発火しない検査を残すと「守られているつもり」を作るので置かない
- *   （`logger.rs` の Rotate ガードで同じ判断をしている）。
- *   → ★ いま残っている 4 つは、**どれを壊しても `submit_guard_test.cjs` が赤になる**
- *     ことを実測してある（各チェックに専用の入力がある）。
+ * ## ⚠️★★ 検査を **1 本にまとめた経緯**（★ どちらも実測で決めた）
+ *
+ * 1. 最初は `/` `\` `..` を個別に弾く行を書いた
+ *    → ★ **1 行ずつ壊しても赤にならなかった**（許可リストが同じ入力を先に捕まえる）。
+ * 2. そこで許可リスト・先頭ドット・拡張子・長さの 4 本に整理した
+ *    → security-checker の指摘で **提出物の形**まで絞る 1 本を足したところ、
+ *      ★ **その 1 本が残り 4 本をすべて包含し、また 1 つも赤にならなくなった**（実測）。
+ *
+ * → ★ **発火しない検査を残さない**（`logger.rs` の Rotate ガードと同じ判断）。
+ *   残したこの 1 本は、⚠️ **壊すと `submit_guard_test.cjs` の名前ケースが全部赤になる**。
  *
  * 通ったら名前をそのまま返し、通らなければ空文字を返す（★ 直して通さない。
  * 黙って別名で保存すると、どの提出物か分からなくなる）。
  */
 function sanitizeName_(name) {
-  // (1) 長さ。★ 極端に長い名前は Drive の一覧を壊し、研究者が読めなくなる。
-  if (!name || name.length > 120) return '';
-  // (2) ★ 許可リスト。英数字と `. _ -` 以外は**すべて**拒否する
-  //     （空白・制御文字・パス区切り `/` `\`・全角・引用符などはここで落ちる）。
-  if (!/^[A-Za-z0-9._-]+$/.test(name)) return '';
-  // (3) 先頭ドット（隠しファイル・`.age` そのもの）を拒否。
-  if (name.charAt(0) === '.') return '';
-  // (4) ★ 拡張子は `.age` に限る（生 NDJSON を受け取る経路を作らない）。
-  if (!/\.age$/.test(name)) return '';
-  return name;
+  if (!name) return '';
+  // ★ **提出物そのものの形**しか通さない（`P012_block03_gse_20260807_101112.age`）。
+  //   参加者 ID(英数字 1〜16) ＋ `_block` ＋ 2〜3 桁 ＋ `_gse_` ＋ 日付 8 桁 ＋ `_` ＋ 時刻 6 桁 ＋ `.age`
+  //   ★ 名前の規約は `submission::age_file_name` と対である（片方を変えたら両方直す）。
+  return /^[A-Za-z0-9]{1,16}_block\d{2,3}_gse_\d{8}_\d{6}\.age$/.test(name) ? name : '';
 }
 
 /**
@@ -195,6 +217,20 @@ function sanitizeName_(name) {
  * ⚠️ GAS は本当の定数時間比較を保証しないが、★ **先頭一致で早く返る実装にはしない**。
  *   守っているのは可用性だけなので、ここに強い保証は求めない（design.md §4）。
  */
+/**
+ * base64 文字列がデコード後に何バイトになるかを、★ **デコードせずに**求める。
+ *
+ * ⚠️ 巨大な payload を一度メモリに展開してから捨てるのを避けるため（可用性）。
+ * ★ 4 文字が 3 バイトに対応し、末尾の `=` の数だけ減る。
+ */
+function decodedLength_(b64) {
+  if (!b64) return 0;
+  var padding = 0;
+  if (b64.charAt(b64.length - 1) === '=') padding++;
+  if (b64.charAt(b64.length - 2) === '=') padding++;
+  return Math.floor(b64.length / 4) * 3 - padding;
+}
+
 function secretMatches_(given, expected) {
   if (!expected) return false;
   var diff = given.length ^ expected.length;
@@ -206,29 +242,30 @@ function secretMatches_(given, expected) {
 }
 
 /**
- * 上書きせずに保存する。
+ * ★★ **必ず保存する。上書きも省略もしない。**
  *
- * ⚠️★ **既にあるものを消さない・置き換えない。** 1 本も失えない。
- * - 同名 **かつ同サイズ** が既にある → ★ **再送とみなして何もしない**（`duplicate: true`）。
- *   端末側で「送れたのに `.sent` を置けなかった」ときに二重に届くのが主な経路であり、
- *   同じものが 2 本並ぶより、1 本だけ在るほうが研究者の手間が少ない。
- * - 同名だがサイズが違う → ★ **別名で保存**して両方残す（人が見て判断する）。
+ * ⚠️★★ 当初は「同名かつ同サイズなら再送とみなして保存しない」にしていた。
+ *   security-checker の指摘で **これが提出を握り潰す経路になる**と分かった:
+ *   シークレットを持つ者（= 全被験者の端末に平文で配られる非ローテーション資格情報なので、
+ *   被験者本人やその端末に触れる者で成立する）が **同名・同サイズのダミーを先回りして置く**と、
+ *   本物の提出に対して `ok` を返してしまう。★ 端末側は `.sent` を書き、
+ *   ⚠️ **その記録は永久に回収されない**（送信先から成否を追えないので誰も気づけない）。
+ *
+ * ★ この研究の絶対条件は「1 本も失わない」である。
+ *   → **重複が Drive に並ぶ**（研究者が中身を見て捨てられる）ほうが、
+ *     **1 本消える**（取り返せない）より桁違いにましである。
+ *   ⚠️ 重複が生まれる正常な経路もある（送れたのに `.sent` を書けずに再送した場合）。
+ *     ★ それでも保存する。判断は人に返す。
  */
 function saveWithoutOverwriting_(folder, name, bytes) {
-  var existing = folder.getFilesByName(name);
-  while (existing.hasNext()) {
-    var f = existing.next();
-    if (f.getSize() === bytes.length) {
-      return { name: name, duplicate: true };
-    }
-  }
+  var duplicateName = folder.getFilesByName(name).hasNext();
   var finalName = name;
-  if (folder.getFilesByName(name).hasNext()) {
-    // ★ サイズ違いの同名。⚠️ 消さずに別名で残す。
-    finalName = name.replace(/\.age$/, '') + '_conflict-' + new Date().getTime() + '.age';
+  if (duplicateName) {
+    // ★ 消さない・置き換えない。**別名で足す**。
+    finalName = name.replace(/\.age$/, '') + '_dup-' + new Date().getTime() + '.age';
   }
   folder.createFile(Utilities.newBlob(bytes, 'application/octet-stream', finalName));
-  return { name: finalName, duplicate: false };
+  return { name: finalName, duplicate: duplicateName };
 }
 
 function json_(obj) {
@@ -246,15 +283,16 @@ function json_(obj) {
  * ★ **読み取りのみ**（ファイルを作らない）。
  */
 function checkSubmitConfig() {
+  var cfg = config_();
   var problems = [];
-  if (!FOLDER_ID) problems.push('FOLDER_ID が空');
-  if (!SHARED_SECRET) problems.push('SHARED_SECRET が空');
-  if (SHARED_SECRET && SHARED_SECRET.length < 24) {
+  if (!cfg.folderId) problems.push('スクリプト プロパティ FOLDER_ID が未設定');
+  if (!cfg.secret) problems.push('スクリプト プロパティ SHARED_SECRET が未設定');
+  if (cfg.secret && cfg.secret.length < 24) {
     problems.push('SHARED_SECRET が短い（24 文字以上を推奨）');
   }
-  if (FOLDER_ID) {
+  if (cfg.folderId) {
     try {
-      var folder = DriveApp.getFolderById(FOLDER_ID);
+      var folder = DriveApp.getFolderById(cfg.folderId);
       console.log('受け取りフォルダ: ' + folder.getName());
     } catch (err) {
       problems.push('FOLDER_ID のフォルダを開けない: ' + err);
@@ -278,7 +316,7 @@ function checkSubmitConfig() {
  */
 function measureSaveTiming() {
   checkSubmitConfig();
-  var folder = DriveApp.getFolderById(FOLDER_ID);
+  var folder = DriveApp.getFolderById(config_().folderId);
   var sizes = [1024, 300 * 1024, 1024 * 1024];
   var results = [];
   for (var i = 0; i < sizes.length; i++) {

@@ -251,8 +251,21 @@ fn run_reconcile(args: Args) -> Result<gse_next_lib::reconcile::ReconcileReport,
         )?;
 
     // 2) 場所。
-    let session_dir = submission::default_session_dir(&participant)
+    //    ⚠️★ **セッション置き場の解決には logger と同じ ID を使う** (code-review MEDIUM)。
+    //    `GSE_DATASET` があるとき logger は `raw/<自動生成 ID>` に書くのに対し、
+    //    ここで研究者割当の ID (`P012`) を使うと `raw/P012` を見に行き、
+    //    ★ **0 件・エラー無し・exit 0 の完全な空振り**になる (研究者端末で必ず踏む)。
+    //    ★ 研究者割当の ID は **ファイル名ラベル専用**である (手動経路 `run_package_one` と同じ扱い)。
+    let path_id = read_persisted_participant_id();
+    let session_dir = submission::default_session_dir(path_id.as_deref().unwrap_or("P000"))
         .ok_or("セッション保存先 (~/Documents/GSE-sessions) を解決できませんでした。")?;
+    if !session_dir.is_dir() {
+        // ⚠️ ★ 黙って 0 件にしない。**探した場所が存在しない**ことを言う。
+        return Err(format!(
+            "セッション保存先が見つかりません: {}",
+            session_dir.display()
+        ));
+    }
     let submission_dir = args
         .out
         .clone()
@@ -266,7 +279,10 @@ fn run_reconcile(args: Args) -> Result<gse_next_lib::reconcile::ReconcileReport,
     //    ★ 無ければ `.age` を作るところまでで止まる = D-4 の停止スイッチ。
     //    ⚠️ 壊れている場合は Err を返して **黙って「送らない」に倒さない**。
     let cfg = submission::load_submit_config(submission::distribution_folder().as_deref())?;
-    let uploader = cfg.as_ref().map(HttpUploader::new);
+    let uploader = match cfg.as_ref() {
+        Some(c) => Some(HttpUploader::new(c)?),
+        None => None,
+    };
 
     let opts = ReconcileOptions {
         session_dir,
@@ -380,6 +396,7 @@ fn main() -> ExitCode {
                     "unsent": r.unsent,
                     "upload_disabled": r.upload_disabled,
                     "skipped_busy": r.skipped_busy,
+                    "awaiting_approval": r.awaiting_approval,
                     "errors": r.errors.len(),
                 })
             );

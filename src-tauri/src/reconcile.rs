@@ -59,6 +59,9 @@ pub struct ReconcileReport {
     /// ★ 別の収束器が走っていたので **何もしなかった**。⚠️ これは失敗ではない
     /// (ヒントは 2 本あり、次の機会に収束する)。
     pub skipped_busy: bool,
+    /// ★ **被験者の確認待ち**の本数 (`.age` は在るが「送信する」がまだ押されていない)。
+    /// ⚠️ これは失敗ではないが、★ **放置すると届かない**ので画面に出す。
+    pub awaiting_approval: usize,
     /// ⚠️ 起きた問題。★ **握り潰さない**。呼び出し側が画面へ出す。
     pub errors: Vec<String>,
 }
@@ -82,12 +85,25 @@ pub struct ReconcileLock {
     path: PathBuf,
 }
 
+/// ロックを取ろうとした結果。
+///
+/// ⚠️★ **「他が走っている」と「そもそも作れない」を混ぜない** (code-review MEDIUM)。
+/// 混ぜると、書けないフォルダで **永久に沈黙する**（毎回「busy なので何もしません」に見える）。
+pub enum LockOutcome {
+    /// 取れた。
+    Acquired(ReconcileLock),
+    /// 他の収束器が走っている。★ 失敗ではない (次の機会に収束する)。
+    Busy,
+    /// ⚠️ ロックファイルを作れない (権限・ディスク等)。★ **失敗として画面に出す。**
+    Unavailable(String),
+}
+
 impl ReconcileLock {
-    /// ロックを取る。★ 取れなければ `None` (= 誰かが走っている)。
+    /// ロックを取る。
     ///
     /// `stale_after` より古いロックは **奪う**。⚠️ プロセスが強制終了されるとロックが
     /// 残るので、★ 残骸で永久に自動提出が止まるほうが害が大きい。
-    pub fn acquire(dir: &Path, stale_after: std::time::Duration) -> Option<Self> {
+    pub fn acquire(dir: &Path, stale_after: std::time::Duration) -> LockOutcome {
         let path = dir.join("reconcile.lock");
         for attempt in 0..2 {
             match std::fs::OpenOptions::new()
@@ -95,10 +111,10 @@ impl ReconcileLock {
                 .create_new(true)
                 .open(&path)
             {
-                Ok(_) => return Some(Self { path }),
+                Ok(_) => return LockOutcome::Acquired(Self { path }),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                     if attempt > 0 {
-                        return None;
+                        return LockOutcome::Busy;
                     }
                     // ★ 古すぎるロックは残骸とみなして奪う。
                     let stale = std::fs::metadata(&path)
@@ -106,15 +122,22 @@ impl ReconcileLock {
                         .map(|t| t.elapsed().map(|d| d > stale_after).unwrap_or(false))
                         .unwrap_or(false);
                     if !stale {
-                        return None;
+                        return LockOutcome::Busy;
                     }
                     tracing::warn!("reconcile: taking over a stale lock at {:?}", path);
                     let _ = std::fs::remove_file(&path);
                 }
-                Err(_) => return None, // 作れない (権限等) なら走らない (安全側)
+                // ⚠️ ★ ここを Busy に倒さない。書けないなら**毎回**失敗し続けるので、
+                //   「次の機会に収束する」が成り立たない = 黙って止まる。
+                Err(e) => {
+                    return LockOutcome::Unavailable(format!(
+                        "提出フォルダに書き込めません ({}): {e}",
+                        path.display()
+                    ))
+                }
             }
         }
-        None
+        LockOutcome::Busy
     }
 }
 
@@ -130,16 +153,27 @@ impl Drop for ReconcileLock {
 /// ⚠️ 短すぎると、正常に走っている収束器のロックを奪って上の衝突を再現してしまう。
 pub const LOCK_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
-/// ★ 閉じ終わったセッション NDJSON を、**名前昇順** (= 時刻順) で列挙する。
+/// ★ **G1 で書かれ、かつ閉じ終わった**セッション NDJSON を、名前昇順 (= 時刻順) で列挙する。
 ///
-/// 条件は 3 つ:
+/// 条件は 4 つ:
 /// 1. `gse_*.ndjson` の通常ファイル (`.anon.ndjson` 等の派生は除く)
 /// 2. ★ `meta.session_end` を持つ = **もう書かれない**
 /// 3. `meta` 以外の行がある = 中身がある (`has_any_data_row`。2026-08-05 の空ファイル対策)
+/// 4. ★★ `meta` 行に **`g1_mode` がある** = G1 の実施で書かれたものである
 ///
 /// ⚠️ ★ 条件 2 が「いま書いているファイルを触らない」を **構造的に** 保証している。
 /// 呼び出し側から「現在のパス」を渡してもらう設計にしなかったのは、
 /// ★ 渡し忘れると黙って書きかけのファイルを包む形になるためである。
+///
+/// ## ⚠️★★ 条件 4 が要る理由 (code-review HIGH)
+///
+/// ★ `~/Documents/GSE-sessions` は **participant 非依存の共有ディレクトリ**である
+/// (`logger.rs` の fallback)。Phase1 の較正セッションや P-1 の記録が **同じ端末に残る**。
+/// 条件 4 が無いと、収束器はそれらも「閉じ終わった NDJSON」として拾い、
+/// ⚠️ ★ **古いセッションにブロック番号 1〜4 を与えてから**、本物の G1 ブロックに 5 を振る。
+/// → 受け入れ条件「ブロックの自動終了 1 回につき `.age` が 1 本・名前にブロック番号」が
+/// **黙って意味を失う**。しかも古い記録が研究者へ送られる。
+/// ★ 判定材料は `logger::write_meta_start` が既に書いている (`"g1_mode":"marker"|"env"`)。
 pub fn closed_sessions(dir: &Path) -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = match std::fs::read_dir(dir) {
         Ok(rd) => rd
@@ -155,7 +189,7 @@ pub fn closed_sessions(dir: &Path) -> Vec<PathBuf> {
                     && name.ends_with(".ndjson")
                     && !name.ends_with(".anon.ndjson")
             })
-            .filter(|p| has_session_end(p) && has_any_data_row(p))
+            .filter(|p| is_closed_g1_session(p) && has_any_data_row(p))
             .collect(),
         Err(_) => Vec::new(),
     };
@@ -163,27 +197,35 @@ pub fn closed_sessions(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// NDJSON が `meta.session_end` 行を持つか。
+/// NDJSON が **G1 で書かれ、かつ `session_end` を持つ**か (1 パスで両方見る)。
 ///
-/// ★ 読むのは **行の形だけ**である (打鍵の内容も時刻も解釈しない・data-privacy)。
+/// ★ 読むのは **`meta` 行の形だけ**である (打鍵の内容も時刻も解釈しない・data-privacy)。
 /// 読めないファイルは `false` (= 触らない) に倒す。⚠️ 書きかけを包むより、
 /// 次の機会に持ち越すほうが安全だからである (収束型なので持ち越しは損失にならない)。
-pub fn has_session_end(path: &Path) -> bool {
+pub fn is_closed_g1_session(path: &Path) -> bool {
     use std::io::BufRead;
     let f = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(_) => return false,
     };
+    let mut closed = false;
+    let mut is_g1 = false;
     for line in std::io::BufReader::new(f).lines() {
         let line = match line {
             Ok(l) => l,
             Err(_) => return false,
         };
+        if !line.contains(r#""type":"meta""#) {
+            continue;
+        }
         if line.contains(r#""session_end""#) {
-            return true;
+            closed = true;
+        }
+        if line.contains(r#""g1_mode""#) {
+            is_g1 = true;
         }
     }
-    false
+    closed && is_g1
 }
 
 /// 台帳 (`manifest.jsonl`) と既存 `.age` から、次に使うブロック番号を決める。
@@ -265,10 +307,16 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
     // ★ 同時に 2 つ走らせない (ブロック番号の衝突を防ぐ・`ReconcileLock` のコメント参照)。
     //   ⚠️ 取れなかったのは **失敗ではない**。何もせずに帰る。
     let _lock = match ReconcileLock::acquire(&opts.submission_dir, LOCK_STALE_AFTER) {
-        Some(l) => l,
-        None => {
+        LockOutcome::Acquired(l) => l,
+        LockOutcome::Busy => {
             report.skipped_busy = true;
-            report.unsent = unsent_count(&opts.submission_dir);
+            report.unsent = unsent_count(&opts.submission_dir, &opts.participant);
+            return report;
+        }
+        LockOutcome::Unavailable(e) => {
+            // ⚠️ ★ 黙らない。書けないフォルダは毎回失敗するので、次の機会にも収束しない。
+            report.errors.push(e);
+            report.unsent = unsent_count(&opts.submission_dir, &opts.participant);
             return report;
         }
     };
@@ -316,9 +364,14 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         }
     }
 
-    // --- ③ .sent が無い .age を送る --------------------------------------------
+    // --- ③ 確認済みで .sent が無い .age を送る -----------------------------------
+    // ⚠️★ **被験者が「送信する」を押した分だけ**送る (D-14: 同意の担保)。
+    //   ★ 確認が無いものも ② で `.age` にはなっている = **データは失われない**。
+    //   送られないだけであり、後から確認すればそのまま送られる (収束型のまま)。
     if let Some(up) = uploader {
-        for age in crate::submission::unsent_age_files(&opts.submission_dir) {
+        for age in
+            crate::submission::approved_unsent_age_files(&opts.submission_dir, &opts.participant)
+        {
             let name = match age.file_name().and_then(|s| s.to_str()) {
                 Some(n) => n.to_string(),
                 None => continue,
@@ -349,7 +402,9 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         }
     }
 
-    report.unsent = unsent_count(&opts.submission_dir);
+    report.unsent = unsent_count(&opts.submission_dir, &opts.participant);
+    report.awaiting_approval =
+        crate::submission::awaiting_approval_count(&opts.submission_dir, &opts.participant);
     report
 }
 
@@ -368,19 +423,25 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
 pub struct HttpUploader {
     endpoint: String,
     secret: String,
-    timeout: std::time::Duration,
+    /// ★ クライアントは **1 回だけ** 作る。⚠️ 送信のたびに build すると、
+    /// 10 本再送で TLS/プロキシの初期化を 10 回やることになる (code-review LOW)。
+    client: reqwest::blocking::Client,
 }
 
 #[cfg(feature = "package")]
 impl HttpUploader {
-    pub fn new(cfg: &crate::submission::SubmitConfig) -> Self {
-        Self {
-            endpoint: cfg.endpoint.clone(),
-            secret: cfg.secret.clone(),
+    pub fn new(cfg: &crate::submission::SubmitConfig) -> Result<Self, String> {
+        let client = reqwest::blocking::Client::builder()
             // 実測は 300 KB で 1.45 s。⚠️ ★ Drive 保存を含む本番 doPost の所要時間は **未実測**
             // なので、余裕を大きく取る (`gas-measurements.md` §3)。
-            timeout: std::time::Duration::from_secs(180),
-        }
+            .timeout(std::time::Duration::from_secs(180))
+            .build()
+            .map_err(|e| format!("HTTP クライアントを初期化できません: {e}"))?;
+        Ok(Self {
+            endpoint: cfg.endpoint.clone(),
+            secret: cfg.secret.clone(),
+            client,
+        })
     }
 }
 
@@ -395,11 +456,8 @@ impl Uploader for HttpUploader {
         })
         .to_string();
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(self.timeout)
-            .build()
-            .map_err(|e| format!("HTTP クライアントを初期化できません: {e}"))?;
-        let resp = client
+        let resp = self
+            .client
             .post(&self.endpoint)
             .header("Content-Type", "application/json")
             .body(body)
@@ -426,10 +484,15 @@ impl Uploader for HttpUploader {
 
 /// 送信先の応答が「受領した」と言っているか (純関数)。
 ///
-/// ★ 空白の入り方に依らない最小の判定にする (GAS 側の整形に引きずられないため)。
+/// ⚠️ ★ **本文の部分一致で判定しない** (code-review LOW)。
+/// 部分一致だと `{"echo":"\"ok\":true"}` のような**別の意味の本文**まで成功と読む。
+/// ★ GAS 側は必ず JSON を返す (`json_()`) ので、**構造として読む**。
+/// ⚠️ 読めない本文 (HTML のエラーページ等) は当然 `false`。
 pub fn response_is_ok(body: &str) -> bool {
-    let compact: String = body.chars().filter(|c| !c.is_whitespace()).collect();
-    compact.contains("\"ok\":true")
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("ok").and_then(|x| x.as_bool()))
+        .unwrap_or(false)
 }
 
 /// エラー表示用に応答本文を切り詰める (画面・ログを汚さない)。
@@ -459,8 +522,20 @@ mod tests {
         age::x25519::Identity::generate().to_public().to_string()
     }
 
-    /// 閉じたセッション (session_end + 打鍵) を 1 本書く。
+    /// ★ **G1 で** 閉じたセッション (g1_mode + session_end + 打鍵) を 1 本書く。
+    /// ⚠️ `g1_mode` は `logger::write_meta_start` が G1 実施時にだけ刻む値である。
     fn write_closed(dir: &Path, name: &str) {
+        std::fs::write(
+            dir.join(name),
+            "{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.3.0\",\"g1_mode\":\"marker\"}\n\
+             {\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n\
+             {\"type\":\"meta\",\"session_end\":9000}\n",
+        )
+        .unwrap();
+    }
+
+    /// ⚠️ **Phase1 相当** (G1 ではない) の閉じたセッション。★ 触ってはならない。
+    fn write_closed_non_g1(dir: &Path, name: &str) {
         std::fs::write(
             dir.join(name),
             "{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.3.0\"}\n\
@@ -495,6 +570,11 @@ mod tests {
         fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), String> {
             Err("connection refused (test)".to_string())
         }
+    }
+
+    /// 被験者が「送信する」を押した状態にする (確認の印を付ける)。
+    fn approve(subm: &Path) -> usize {
+        crate::submission::approve_pending(subm, "P012").unwrap()
     }
 
     fn opts(sess: &Path, subm: &Path, recipient: &str) -> ReconcileOptions {
@@ -536,11 +616,20 @@ mod tests {
         write_closed(&s, "gse_20260807_020202.ndjson");
 
         let up = OkUploader(Mutex::new(Vec::new()));
+        // 1 回目: `.age` はできるが、★ **確認前なので送らない**。
         let first = reconcile(&opts(&s, &o, &r), Some(&up));
         assert_eq!(first.packaged, 2);
-        assert_eq!(first.sent, 2);
-        assert_eq!(first.unsent, 0);
+        assert_eq!(first.sent, 0, "★ 確認前に送ってはならない");
+        assert_eq!(first.awaiting_approval, 2);
         assert!(first.errors.is_empty(), "{:?}", first.errors);
+
+        // 被験者が「送信する」を押す。
+        assert_eq!(approve(&o), 2);
+        let sent = reconcile(&opts(&s, &o, &r), Some(&up));
+        assert_eq!(sent.packaged, 0);
+        assert_eq!(sent.sent, 2);
+        assert_eq!(sent.unsent, 0);
+        assert_eq!(sent.awaiting_approval, 0);
 
         // ★ もう一度走らせても **何も増えない**。
         let second = reconcile(&opts(&s, &o, &r), Some(&up));
@@ -566,12 +655,17 @@ mod tests {
         write_closed(&s, "gse_20260807_010101.ndjson");
         let up = OkUploader(Mutex::new(Vec::new()));
         reconcile(&opts(&s, &o, &r), Some(&up));
+        approve(&o);
+        reconcile(&opts(&s, &o, &r), Some(&up));
 
         // ★ ここで「ブロック終了イベントを取りこぼした」状況を作る = 送信処理を呼ばずに
         //   NDJSON だけが増える。
         write_closed(&s, "gse_20260807_020202.ndjson");
         let rep = reconcile(&opts(&s, &o, &r), Some(&up));
         assert_eq!(rep.packaged, 1, "取りこぼしたブロックが拾われていない");
+        assert_eq!(rep.awaiting_approval, 1);
+        approve(&o);
+        let rep = reconcile(&opts(&s, &o, &r), Some(&up));
         assert_eq!(rep.sent, 1);
         assert_eq!(rep.unsent, 0);
         // ブロック番号は 1 → 2 と続く。
@@ -589,9 +683,13 @@ mod tests {
         let r = test_recipient();
         write_closed(&s, "gse_20260807_010101.ndjson");
 
+        // 0) `.age` を作り、被験者が「送信する」を押した状態にする。
+        reconcile(&opts(&s, &o, &r), Some(&FailUploader));
+        assert_eq!(approve(&o), 1);
+
         // 1) 送信先が落ちている。
         let down = reconcile(&opts(&s, &o, &r), Some(&FailUploader));
-        assert_eq!(down.packaged, 1);
+        assert_eq!(down.packaged, 0);
         assert_eq!(down.sent, 0);
         assert_eq!(down.unsent, 1, "★ 未送信が見えていなければ回収できない");
         assert!(
@@ -688,6 +786,113 @@ mod tests {
         let _ = std::fs::remove_dir_all(&o2);
     }
 
+    /// ⚠️★★ **G1 以外の記録に手を出さない** (code-review / security-checker とも HIGH)。
+    ///
+    /// `~/Documents/GSE-sessions` と `~/Documents/GSE-submissions` は **使い回される**。
+    /// Phase1 の較正セッションや P-1 の残骸が同じ端末に在り、実際に P-1 実機には
+    /// 旧形式の `.age` が 4 本残っている (`notes.md §7-5`)。
+    ///
+    /// ★ 絞りが無いと:
+    /// - ⚠️ **Phase1 の記録が、同意していない経路 (G1 のエンドポイント) へ送られる**
+    /// - ⚠️ 古いセッションがブロック番号 1〜4 を食い潰し、**本物の G1 ブロック 1 が block05 になる**
+    /// - ⚠️ 初回起動でいきなり「未送信 4 件」が出て被験者が混乱する
+    #[test]
+    fn nothing_outside_g1_is_packaged_counted_or_sent() {
+        let s = tmpdir("scope_s");
+        let o = tmpdir("scope_o");
+        let r = test_recipient();
+
+        // Phase1 相当 (g1_mode 無し) の閉じたセッション。★ 触ってはならない。
+        write_closed_non_g1(&s, "gse_20260701_010101.ndjson");
+        // 手動提出で作られた旧形式の `.age` (P-1 の残骸)。★ 送ってはならない。
+        std::fs::write(o.join("P012_gse_20260701_010101.age"), b"old").unwrap();
+        // 別参加者の提出物。★ 送ってはならない。
+        std::fs::write(o.join("P007_block01_gse_x.age"), b"other").unwrap();
+
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let rep = reconcile(&opts(&s, &o, &r), Some(&up));
+        assert_eq!(rep.packaged, 0, "★ G1 でないセッションを包んではならない");
+        assert_eq!(rep.sent, 0, "★ 自分の分でない .age を送ってはならない");
+        assert_eq!(rep.unsent, 0, "★ 他人・旧形式を未送信に数えてはならない");
+        assert!(up.0.lock().unwrap().is_empty(), "1 本も送ってはならない");
+
+        // ★ 陽性対照: G1 のセッションを 1 本足せば、ちゃんと block01 から始まる。
+        write_closed(&s, "gse_20260808_010101.ndjson");
+        let rep2 = reconcile(&opts(&s, &o, &r), Some(&up));
+        assert_eq!(rep2.packaged, 1);
+        approve(&o);
+        let rep2 = reconcile(&opts(&s, &o, &r), Some(&up));
+        assert_eq!(rep2.sent, 1);
+        assert!(
+            o.join("P012_block01_gse_20260808_010101.age").is_file(),
+            "★ 古い記録に番号を食われて block01 でなくなってはならない"
+        );
+        let _ = std::fs::remove_dir_all(&s);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ★★ **確認していないブロックは送らない。ただし `.age` は必ず作る。**
+    ///
+    /// ⚠️ ★ ここが D-14 の核心である。同意の担保のために送信を止めるが、
+    /// **記録そのものは止めない** — さもないと D-4 が却下した
+    /// 「止めたまま最後まで行って回収ゼロ」が本当に起きる。
+    /// ★ `.age` がローカルに在る限り、研究者が端末から受け取る最後の経路は生きている。
+    #[test]
+    fn unapproved_blocks_are_packaged_but_never_sent() {
+        let s = tmpdir("appr_s");
+        let o = tmpdir("appr_o");
+        let r = test_recipient();
+        write_closed(&s, "gse_20260808_010101.ndjson");
+
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let rep = reconcile(&opts(&s, &o, &r), Some(&up));
+        assert_eq!(
+            rep.packaged, 1,
+            "★ 確認前でも .age は作る (データを失わない)"
+        );
+        assert_eq!(rep.sent, 0, "★ 確認前に送ってはならない");
+        assert_eq!(rep.awaiting_approval, 1);
+        assert!(up.0.lock().unwrap().is_empty());
+        let age = o.join("P012_block01_gse_20260808_010101.age");
+        assert!(age.is_file(), "★ .age はローカルに残る");
+
+        // ★ 何度走らせても、確認しない限り送られない (「あとで」を押し続けた状態)。
+        for _ in 0..3 {
+            let again = reconcile(&opts(&s, &o, &r), Some(&up));
+            assert_eq!(again.sent, 0);
+            assert_eq!(again.awaiting_approval, 1);
+        }
+        assert!(up.0.lock().unwrap().is_empty());
+
+        // 被験者が「送信する」を押したら送られる。
+        assert_eq!(approve(&o), 1);
+        let after = reconcile(&opts(&s, &o, &r), Some(&up));
+        assert_eq!(after.sent, 1);
+        assert_eq!(after.awaiting_approval, 0);
+        assert_eq!(after.unsent, 0);
+        let _ = std::fs::remove_dir_all(&s);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️ ロックが作れない (書けないフォルダ) を「busy」と混ぜない。
+    /// ★ 混ぜると、書けない環境で**毎回何もせず・エラーも出さず**に沈黙する。
+    #[test]
+    fn an_unwritable_folder_is_an_error_not_busy() {
+        // ⚠️ ★ 「ロックのパスにディレクトリを置く」では **赤にならなかった** (実測):
+        //   `O_CREAT|O_EXCL` は既存ディレクトリにも `AlreadyExists` を返すので busy 扱いになる。
+        //   → ★ **存在しないフォルダ**で試す (どのプラットフォームでも `NotFound` になる)。
+        let o = std::env::temp_dir().join(format!("gse_rec_nodir_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&o);
+        assert!(
+            matches!(
+                ReconcileLock::acquire(&o, LOCK_STALE_AFTER),
+                LockOutcome::Unavailable(_)
+            ),
+            "★ 書けない状態を busy に倒してはならない"
+        );
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
     /// ★★ **収束器が 2 つ同時に走らない。** 走っている間は後から来たほうが何もせずに帰る。
     ///
     /// ⚠️ ★ これが無いと、2 つの収束器が同じ `next_block_number` を読み、
@@ -701,7 +906,10 @@ mod tests {
         write_closed(&s, "gse_20260807_010101.ndjson");
 
         // 1 つ目が走っている状態を作る。
-        let held = ReconcileLock::acquire(&o, LOCK_STALE_AFTER).expect("first lock");
+        let held = match ReconcileLock::acquire(&o, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("first lock must be acquired"),
+        };
         let rep = reconcile(&opts(&s, &o, &r), None);
         assert!(rep.skipped_busy, "★ 走っている間は何もしないこと");
         assert_eq!(rep.packaged, 0, "★ 番号を採ってはならない");
@@ -725,19 +933,31 @@ mod tests {
         std::fs::write(o.join("reconcile.lock"), b"").unwrap();
         // 猶予 0 なら「古い」とみなして奪う。
         let taken = ReconcileLock::acquire(&o, std::time::Duration::from_secs(0));
-        assert!(taken.is_some(), "★ 残骸で永久に止まってはならない");
+        assert!(
+            matches!(taken, LockOutcome::Acquired(_)),
+            "★ 残骸で永久に止まってはならない"
+        );
         drop(taken);
 
         // ⚠️ ★ 逆に、**いま取ったばかりのロックは奪えない**。
         //   (猶予 0 で試すと自分で置いたロックまで古い扱いになる — 実測して分かった。
         //    ★ だから `LOCK_STALE_AFTER` を短くしてはならない。)
-        let held = ReconcileLock::acquire(&o, LOCK_STALE_AFTER).expect("fresh lock");
+        let held = match ReconcileLock::acquire(&o, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("fresh lock must be acquired"),
+        };
         assert!(
-            ReconcileLock::acquire(&o, LOCK_STALE_AFTER).is_none(),
+            matches!(
+                ReconcileLock::acquire(&o, LOCK_STALE_AFTER),
+                LockOutcome::Busy
+            ),
             "★ 走っている収束器のロックを奪ってはならない"
         );
         drop(held);
-        assert!(ReconcileLock::acquire(&o, LOCK_STALE_AFTER).is_some());
+        assert!(matches!(
+            ReconcileLock::acquire(&o, LOCK_STALE_AFTER),
+            LockOutcome::Acquired(_)
+        ));
         let _ = std::fs::remove_dir_all(&o);
     }
 
@@ -755,8 +975,8 @@ mod tests {
     #[test]
     fn the_lock_file_is_not_counted_as_a_submission() {
         let o = tmpdir("lockcount");
-        let _l = ReconcileLock::acquire(&o, LOCK_STALE_AFTER).unwrap();
-        assert_eq!(crate::submission::unsent_count(&o), 0);
+        let _l = ReconcileLock::acquire(&o, LOCK_STALE_AFTER);
+        assert_eq!(crate::submission::unsent_count(&o, "P012"), 0);
         let _ = std::fs::remove_dir_all(&o);
     }
 
@@ -768,5 +988,12 @@ mod tests {
         assert!(!response_is_ok(r#"{"ok":false,"error":"bad secret"}"#));
         assert!(!response_is_ok("<html>Google Apps Script error</html>"));
         assert!(!response_is_ok(""));
+        // ⚠️ ★ **本文に文字列として現れるだけの `"ok":true` を成功と読まない。**
+        //   部分一致で判定していたときはこれを通していた。
+        assert!(!response_is_ok(r#"{"echo":"\"ok\":true"}"#));
+        assert!(
+            !response_is_ok(r#"{"ok":"true"}"#),
+            "文字列の \"true\" は真ではない"
+        );
     }
 }
