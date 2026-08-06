@@ -56,9 +56,79 @@ pub struct ReconcileReport {
     pub unsent: usize,
     /// ★ 送信先が設定されていない (D-4 の研究者側スイッチが OFF)。`.age` はローカルに貯まる。
     pub upload_disabled: bool,
+    /// ★ 別の収束器が走っていたので **何もしなかった**。⚠️ これは失敗ではない
+    /// (ヒントは 2 本あり、次の機会に収束する)。
+    pub skipped_busy: bool,
     /// ⚠️ 起きた問題。★ **握り潰さない**。呼び出し側が画面へ出す。
     pub errors: Vec<String>,
 }
+
+/// 収束器が同時に 2 つ走らないようにする排他ロック (提出物フォルダに 1 つ)。
+///
+/// ## ⚠️★ なぜ要るか — 「べき等だから二重起動を気にしなくてよい」は **言い過ぎだった**
+///
+/// 収束器の起点は 2 本ある (アプリ起動時 / ブロック終了時)。★ 送信が詰まると
+/// 起動時の 1 回が **ブロック 1 本ぶん (5 分) より長く走りうる**
+/// (⚠️ 送信のタイムアウトは 180 秒 × 未送信本数)。そこへブロック終了の 1 回が重なると:
+///
+/// - 2 つの収束器が **同じ `next_block_number` を読む** (読み取りと `.age` 作成の間に窓がある)
+/// - → ★ **別々の NDJSON に同じブロック番号が付く** (`P012_block01_A.age` と
+///   `P012_block01_B.age` が並ぶ)。⚠️ **どちらが 1 本目か研究者に分からなくなる**
+///
+/// ★ ファイルを失うわけではないが、**受け入れ条件「ファイル名にブロック番号が入る」が
+/// 意味を失う**ので塞ぐ。塞ぎ方は「後から来たほうが何もせずに帰る」だけでよい
+/// (★ 収束型なので、やらなかった仕事は次の機会に必ず拾われる)。
+pub struct ReconcileLock {
+    path: PathBuf,
+}
+
+impl ReconcileLock {
+    /// ロックを取る。★ 取れなければ `None` (= 誰かが走っている)。
+    ///
+    /// `stale_after` より古いロックは **奪う**。⚠️ プロセスが強制終了されるとロックが
+    /// 残るので、★ 残骸で永久に自動提出が止まるほうが害が大きい。
+    pub fn acquire(dir: &Path, stale_after: std::time::Duration) -> Option<Self> {
+        let path = dir.join("reconcile.lock");
+        for attempt in 0..2 {
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(_) => return Some(Self { path }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if attempt > 0 {
+                        return None;
+                    }
+                    // ★ 古すぎるロックは残骸とみなして奪う。
+                    let stale = std::fs::metadata(&path)
+                        .and_then(|m| m.modified())
+                        .map(|t| t.elapsed().map(|d| d > stale_after).unwrap_or(false))
+                        .unwrap_or(false);
+                    if !stale {
+                        return None;
+                    }
+                    tracing::warn!("reconcile: taking over a stale lock at {:?}", path);
+                    let _ = std::fs::remove_file(&path);
+                }
+                Err(_) => return None, // 作れない (権限等) なら走らない (安全側)
+            }
+        }
+        None
+    }
+}
+
+impl Drop for ReconcileLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+/// ロックが残骸とみなされるまでの時間。
+///
+/// ★ 送信のタイムアウト (180 秒) × 想定される未送信の最大本数 (10 ブロック) を超える値にする。
+/// ⚠️ 短すぎると、正常に走っている収束器のロックを奪って上の衝突を再現してしまう。
+pub const LOCK_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
 /// ★ 閉じ終わったセッション NDJSON を、**名前昇順** (= 時刻順) で列挙する。
 ///
@@ -191,6 +261,17 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         ));
         return report;
     }
+
+    // ★ 同時に 2 つ走らせない (ブロック番号の衝突を防ぐ・`ReconcileLock` のコメント参照)。
+    //   ⚠️ 取れなかったのは **失敗ではない**。何もせずに帰る。
+    let _lock = match ReconcileLock::acquire(&opts.submission_dir, LOCK_STALE_AFTER) {
+        Some(l) => l,
+        None => {
+            report.skipped_busy = true;
+            report.unsent = unsent_count(&opts.submission_dir);
+            return report;
+        }
+    };
 
     // --- ② 閉じ終わった NDJSON に .age が無ければ作る --------------------------
     for input in closed_sessions(&opts.session_dir) {
@@ -605,6 +686,78 @@ mod tests {
         assert_eq!(next_block_number(&o2, "P099"), 1, "他人の番号を継がない");
         let _ = std::fs::remove_dir_all(&o);
         let _ = std::fs::remove_dir_all(&o2);
+    }
+
+    /// ★★ **収束器が 2 つ同時に走らない。** 走っている間は後から来たほうが何もせずに帰る。
+    ///
+    /// ⚠️ ★ これが無いと、2 つの収束器が同じ `next_block_number` を読み、
+    /// **別々の NDJSON に同じブロック番号が付く**（どちらが 1 本目か分からなくなる）。
+    /// ★ 何もせずに帰るのは損失にならない（収束型なので次の機会に必ず拾われる）。
+    #[test]
+    fn a_second_reconciler_does_nothing_while_one_is_running() {
+        let s = tmpdir("busy_s");
+        let o = tmpdir("busy_o");
+        let r = test_recipient();
+        write_closed(&s, "gse_20260807_010101.ndjson");
+
+        // 1 つ目が走っている状態を作る。
+        let held = ReconcileLock::acquire(&o, LOCK_STALE_AFTER).expect("first lock");
+        let rep = reconcile(&opts(&s, &o, &r), None);
+        assert!(rep.skipped_busy, "★ 走っている間は何もしないこと");
+        assert_eq!(rep.packaged, 0, "★ 番号を採ってはならない");
+        assert!(rep.errors.is_empty(), "★ 失敗ではない: {:?}", rep.errors);
+
+        // 1 つ目が終われば、次の機会にちゃんと拾われる。
+        drop(held);
+        let rep2 = reconcile(&opts(&s, &o, &r), None);
+        assert!(!rep2.skipped_busy);
+        assert_eq!(rep2.packaged, 1);
+        assert!(o.join("P012_block01_gse_20260807_010101.age").is_file());
+        let _ = std::fs::remove_dir_all(&s);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️ ★ プロセスが強制終了してロックが残っても、**永久に止まらない**。
+    #[test]
+    fn a_stale_lock_is_taken_over() {
+        let o = tmpdir("stale");
+        // 残骸のロック（誰も持っていない）。
+        std::fs::write(o.join("reconcile.lock"), b"").unwrap();
+        // 猶予 0 なら「古い」とみなして奪う。
+        let taken = ReconcileLock::acquire(&o, std::time::Duration::from_secs(0));
+        assert!(taken.is_some(), "★ 残骸で永久に止まってはならない");
+        drop(taken);
+
+        // ⚠️ ★ 逆に、**いま取ったばかりのロックは奪えない**。
+        //   (猶予 0 で試すと自分で置いたロックまで古い扱いになる — 実測して分かった。
+        //    ★ だから `LOCK_STALE_AFTER` を短くしてはならない。)
+        let held = ReconcileLock::acquire(&o, LOCK_STALE_AFTER).expect("fresh lock");
+        assert!(
+            ReconcileLock::acquire(&o, LOCK_STALE_AFTER).is_none(),
+            "★ 走っている収束器のロックを奪ってはならない"
+        );
+        drop(held);
+        assert!(ReconcileLock::acquire(&o, LOCK_STALE_AFTER).is_some());
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️ ★ 猶予を短くすると、走っている収束器のロックを奪って番号衝突を再現してしまう。
+    /// ★ 送信のタイムアウト (180 秒) × 10 ブロックより十分に長いことを固定する。
+    #[test]
+    fn the_stale_threshold_is_longer_than_a_worst_case_run() {
+        assert!(
+            LOCK_STALE_AFTER >= std::time::Duration::from_secs(180 * 10),
+            "LOCK_STALE_AFTER が短すぎる (送信タイムアウト 180s × 10 ブロックを超えること)"
+        );
+    }
+
+    /// ★ ロックファイルを未送信として数えない（`.age` ではないので）。
+    #[test]
+    fn the_lock_file_is_not_counted_as_a_submission() {
+        let o = tmpdir("lockcount");
+        let _l = ReconcileLock::acquire(&o, LOCK_STALE_AFTER).unwrap();
+        assert_eq!(crate::submission::unsent_count(&o), 0);
+        let _ = std::fs::remove_dir_all(&o);
     }
 
     /// ⚠️★ **HTTP 200 だけを成功と読まない。** GAS は例外でも 200 を返す。

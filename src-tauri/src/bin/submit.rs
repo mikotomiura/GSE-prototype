@@ -379,6 +379,7 @@ fn main() -> ExitCode {
                     "sent": r.sent,
                     "unsent": r.unsent,
                     "upload_disabled": r.upload_disabled,
+                    "skipped_busy": r.skipped_busy,
                     "errors": r.errors.len(),
                 })
             );

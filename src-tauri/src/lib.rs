@@ -1088,9 +1088,17 @@ fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
         let outcome = run_reconcile_blocking(&app);
         let mut slot = SUBMIT_LAST_ERROR.lock().unwrap_or_else(|p| p.into_inner());
         match outcome {
-            Ok(summary) => {
+            Ok(Some(summary)) => {
                 tracing::info!("G1 auto-submit ({}): {}", reason, summary);
                 *slot = None;
+            }
+            Ok(None) => {
+                // ★ 何もしなかった (ID 未登録)。⚠️ **失敗ではないので画面に出さない。**
+                //   ⚠️ ★ 直前の失敗を **消しもしない** (成功していないため)。
+                tracing::info!(
+                    "G1 auto-submit ({}): skipped (participant id not registered yet)",
+                    reason
+                );
             }
             Err(e) => {
                 // ⚠️ ログだけにしない。★ 画面へ出すために保持する。
@@ -1101,13 +1109,21 @@ fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
     });
 }
 
-/// 収束器を子プロセスとして実行する (ブロッキング)。成功時は要約行を返す。
+/// 収束器を子プロセスとして実行する (ブロッキング)。
 ///
-/// ⚠️ ★ **参加者 ID が無ければ起こさない。** ID 無しで走らせても収束器側で失敗するだけなので、
-/// ここで止めて理由を返す (「起動したのに何もしていない」を作らない)。
-fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<String, String> {
-    let id = crate::submission::read_g1_participant_id()
-        .ok_or("参加者 ID が未登録のため、自動提出を実行できません。")?;
+/// `Ok(Some(要約))` = 走った / `Ok(None)` = **参加者 ID 未登録なので何もしなかった**。
+///
+/// ⚠️★ ID 未登録を **エラーにしない**のは、★ **初回起動では必ずこの状態になる**からである
+/// (被験者はまだ ID を入力していない)。エラーにすると、⚠️ **ID を入力する前のスタート画面に
+/// 赤いエラーが出る** — 手引きは「未送信が残っていないことだけ確認してください」と
+/// 書いているので、これは被験者を無用に不安にさせる。
+/// ★ この時点で失うものは無い: ID が要るのは `.age` の名前だけで、
+/// ID が入るまでブロックは 1 つも始められない (`g1_start_gate`)。
+fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, String> {
+    let id = match crate::submission::read_g1_participant_id() {
+        Some(id) => id,
+        None => return Ok(None),
+    };
     let submit_bin = resolve_submit_bin()?;
 
     let mut cmd = std::process::Command::new(&submit_bin);
@@ -1129,7 +1145,9 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("自動提出ツールを起動できませんでした: {e}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     if output.status.success() {
-        return Ok(extract_reconcile_summary(&stdout).unwrap_or_else(|| "done".to_string()));
+        return Ok(Some(
+            extract_reconcile_summary(&stdout).unwrap_or_else(|| "done".to_string()),
+        ));
     }
     // fail-loud: 詳細はホームパス (= OS ユーザー名を含み得る) を伏せてから返す (data-privacy)。
     let stderr = String::from_utf8_lossy(&output.stderr);
