@@ -8,6 +8,14 @@
 > | 2 | 配布の署名・公証（§2） | ✅ **研究者判断で案 A（現状維持）に確定**。`protocol.md §1.1` に初回手順を追加 |
 > | 1 | Windows 検証（§1） | ⚠️ ★ **未実施のまま**。手順書 `windows-verification.md` と、タグを切らずに Windows exe を作る CI の手動発火（`workflow_dispatch`）を用意しただけ |
 >
+> ## ⚠️ ★ このファイルは **役目を終えた**（2026-08-06）
+>
+> ★ **次セッションは `next-session-prompt-g1-windows-results.md` を読むこと。**
+> Windows のビルドと配布（Drive 配置）まで済み、研究者が **P-1 の Windows 実施を進めた**。
+> ⚠️ ★ **結果はまだ受け取っていない**ので、次セッションの入口は「結果を受け取って処理する」である。
+>
+> 以下は当時の記述として残す。
+>
 > ★ **残っているのは §1 だけ**である。次にやること:
 > 1. GitHub → Actions → "CI / Release" → **Run workflow**（branch = 作業ブランチ）
 >    → artifact `windows-portable` を落とす（⚠️ ★ **この発火はまだ 1 回も試していない**）
