@@ -509,6 +509,108 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// ⚠️★★ `age_for_stem` は **participant を見ない** (cross-review: Codex 指摘・2026-08-07)。
+    ///
+    /// ★ 見ないのは意図である: 手動提出の旧形式 (`<pid>_<stem>.age`) と二重に包まないため。
+    /// ⚠️ 代償として、**別の参加者**の `.age` が同じ stem を持つと、こちらの NDJSON は
+    /// 包まれない。★ 起こるのは「同じ端末・同じ秒に始まった別参加者のセッション」だけで、
+    /// セッション名は秒粒度なので実運用では起きない。
+    ///
+    /// ★ 起きても **NDJSON は端末に残る** (収束器は毎回見に行くので、衝突する `.age` を
+    /// 研究者が退かせればその場で包まれる) = 失敗しても安全側に倒れる。
+    /// ⚠️ 逆に participant で絞ると、ID を打ち間違えて入れ直した被験者の**同じセッションが
+    /// 2 つの ID で 2 度包まれて 2 度送られる**。★ 「1 本届かない (気づける)」より
+    /// 「同じ記録が二重に届く (気づけない)」ほうが悪いので、現状の判定を採る。
+    #[test]
+    fn age_for_stem_is_participant_agnostic_on_purpose() {
+        let d = tmp("stem_foreign");
+        // 別の参加者が同じ stem で先に包んでいる状況。
+        std::fs::write(d.join("P007_block01_gse_20260807_101112.age"), b"x").unwrap();
+        assert!(
+            age_for_stem(&d, "gse_20260807_101112").is_some(),
+            "participant を見ない判定である (この assert が落ちたら上のコメントごと見直す)"
+        );
+        // ★ ただし **送る対象**は participant で絞られたままである (同意の範囲・HIGH)。
+        assert_eq!(owned_age_files(&d, "P012").len(), 0);
+        assert_eq!(unsent_count(&d, "P012"), 0);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★★ 端末が作る名前が、受け口 (GAS `sanitizeName_`) の通す形に収まっているか。
+    ///
+    /// ★ 名前の規約は **2 か所**にある (`age_file_name` ＋ `logger::unique_path_from` と、
+    /// `Form_G1/GSE_G1_Submit.gs`)。片方だけ動くと `bad name` が毎回返り、
+    /// ⚠️ **そのブロックは永久に届かない**。cross-review (Codex) が見つけた穴で、
+    /// ★ 同秒ローテートの `_2` を受け口が弾いていた。
+    ///
+    /// ⚠️ ここでは受け口の正規表現を**書き写して**照合する (Rust から `.gs` は動かせない)。
+    /// ★ 受け口側の陽性対照は `Form_G1/submit_guard_test.cjs` §4b にある。
+    /// **片方を変えたら両方直す。**
+    #[test]
+    fn generated_names_fit_the_endpoint_name_rule() {
+        // GSE_G1_Submit.gs: /^[A-Za-z0-9]{1,16}_block\d{2,3}_gse_\d{8}_\d{6}(_\d{1,10})?\.age$/
+        fn accepted_by_endpoint(name: &str) -> bool {
+            let body = match name.strip_suffix(".age") {
+                Some(b) => b,
+                None => return false,
+            };
+            let (pid, rest) = match body.split_once("_block") {
+                Some(x) => x,
+                None => return false,
+            };
+            if pid.is_empty() || pid.len() > 16 || !pid.chars().all(|c| c.is_ascii_alphanumeric()) {
+                return false;
+            }
+            let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if digits.len() < 2 || digits.len() > 3 {
+                return false;
+            }
+            let stem = match rest[digits.len()..].strip_prefix("_") {
+                Some(s) => s,
+                None => return false,
+            };
+            let parts: Vec<&str> = stem.split('_').collect();
+            let shape_ok = matches!(parts.len(), 3 | 4)
+                && parts[0] == "gse"
+                && parts[1].len() == 8
+                && parts[2].len() == 6
+                && parts[1..3]
+                    .iter()
+                    .all(|p| p.chars().all(|c| c.is_ascii_digit()));
+            if !shape_ok {
+                return false;
+            }
+            // 任意の連番 (同秒ローテート `_2`… / 1000 本衝突時の `_<pid>`)
+            parts.len() == 3
+                || (!parts[3].is_empty()
+                    && parts[3].len() <= 10
+                    && parts[3].chars().all(|c| c.is_ascii_digit()))
+        }
+
+        // ★ 陰性対照: 照合器が「何でも通す」実装になっていないこと。
+        assert!(!accepted_by_endpoint("evil.age"));
+        assert!(!accepted_by_endpoint(
+            "P012_block02_gse_20260808_101112_x.age"
+        ));
+        assert!(!accepted_by_endpoint("P012_block1_gse_20260808_101112.age"));
+
+        // ★ 端末が実際に作る名前 (`logger::unique_path_from` の 3 形 × ブロック番号)。
+        for stem in [
+            "gse_20260808_101112",   // 通常
+            "gse_20260808_101112_2", // 同じ秒に 2 度ローテート
+            "gse_20260808_101112_999",
+            "gse_20260808_101112_48213", // 1000 本衝突 → pid 後置
+        ] {
+            for block in [1u32, 10, 100] {
+                let name = age_file_name("P012", block, stem);
+                assert!(
+                    accepted_by_endpoint(&name),
+                    "受け口が弾く名前を端末が作っている: {name}"
+                );
+            }
+        }
+    }
+
     /// ⚠️ ★ 「送信を止めている」と「設定が壊れている」を混ぜない。
     #[test]
     fn submit_config_distinguishes_off_from_broken() {

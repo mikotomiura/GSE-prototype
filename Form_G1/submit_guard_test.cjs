@@ -182,6 +182,59 @@ function check(name, fn, expectOk) {
   );
 }
 
+// --- 4b. ★★ 端末が **実際に作る**名前は全部通る（陽性対照）---------------------
+//   ⚠️★ ここが本当に守っているもの: 名前の規約は 2 か所にあり
+//     (Rust `submission::age_file_name` ＋ セッション名 `logger::unique_path_from` と、
+//      GAS `sanitizeName_`)、★ **片方だけ動くと「毎回 bad name で永久に届かない」**になる。
+//   ★ 下の一覧は logger の命名規則から導いた実在の形である（cross-review: Codex 指摘で追加）:
+//     - 通常          `gse_YYYYMMDD_HHMMSS`
+//     - 同秒ローテート `gse_YYYYMMDD_HHMMSS_2` … `_999`（★ 静かな全損を防ぐための正規の名前）
+//     - 1000 本衝突    `gse_YYYYMMDD_HHMMSS_<pid>`
+//     - ブロック 3 桁  `_block100_`
+{
+  const accepted = [
+    "P012_block01_gse_20260808_101112.age",
+    "P012_block10_gse_20260808_101112.age",
+    "P012_block100_gse_20260808_101112.age",
+    "P012_block02_gse_20260808_101112_2.age",
+    "P012_block02_gse_20260808_101112_999.age",
+    "P012_block02_gse_20260808_101112_48213.age",
+    "a_block01_gse_20260808_101112.age",
+    "P0123456789abcde_block01_gse_20260808_101112.age",
+  ];
+  accepted.forEach((name) => {
+    const folder = makeFolder();
+    const ctx = makeCtx(folder, SECRET);
+    const res = post(ctx, { secret: SECRET, name, b64: b64(100) });
+    cases.push({
+      name: `端末が作る名前は通る: ${name}`,
+      ok: res.ok === true && folder.files.length === 1,
+      expectOk: true,
+      got: { error: res.error, files: folder.files.length },
+    });
+  });
+}
+{
+  // ⚠️ ★ 連番を許したことで **何でも通る**ようになっていないことを測る（境界の陰性対照）。
+  const rejected = [
+    "P012_block02_gse_20260808_101112_x.age", // 連番が数字でない
+    "P012_block02_gse_20260808_101112_.age", // 連番が空
+    "P012_block02_gse_20260808_101112_2_3.age", // 連番が 2 段
+    "P012_block02_gse_20260808_1011_2.age", // 時刻が 6 桁でない
+  ];
+  rejected.forEach((name) => {
+    const folder = makeFolder();
+    const ctx = makeCtx(folder, SECRET);
+    const res = post(ctx, { secret: SECRET, name, b64: b64(100) });
+    cases.push({
+      name: `連番を許しても形が崩れた名前は落とす: ${name}`,
+      ok: res.ok === false && res.error === "bad name" && folder.files.length === 0,
+      expectOk: true,
+      got: { error: res.error, files: folder.files.length },
+    });
+  });
+}
+
 // --- 5. 上限超え → 止まるべき -------------------------------------------------
 {
   const ctx = makeCtx(makeFolder(), SECRET);
@@ -228,6 +281,28 @@ function check(name, fn, expectOk) {
   cases.push({
     name: "JSON として壊れている本文は 'bad json' と返す",
     ok: res.ok === false && res.error === "bad json",
+    expectOk: true,
+    got: res,
+  });
+}
+
+{
+  // ⚠️ ★ base64 として壊れた本文。**Node の Buffer は壊れた base64 でも例外を投げない**ので、
+  //   ここだけ本物 (GAS の `Utilities.base64Decode`) と同じく**投げる**スタブに差し替える。
+  //   ★ そうしないと「検査を書いたが一度も発火しない」テストになる。
+  //   測っているのは「止まる」ではなく **「理由が研究者に伝わる」** (server error に丸めない)。
+  const ctx = makeCtx(makeFolder(), SECRET);
+  ctx.Utilities.base64Decode = () => {
+    throw new Error("Invalid argument");
+  };
+  const res = post(ctx, {
+    secret: SECRET,
+    name: "P012_block01_gse_20260808_101112.age",
+    b64: "!!!not-base64!!!",
+  });
+  cases.push({
+    name: "壊れた base64 は 'server error' でなく 'bad base64' と返す",
+    ok: res.ok === false && res.error === "bad base64",
     expectOk: true,
     got: res,
   });

@@ -146,7 +146,15 @@ function doPost(e) {
     if (decodedLength_(b64) > MAX_BYTES) {
       return json_({ ok: false, error: 'too large' });
     }
-    var bytes = Utilities.base64Decode(b64);
+    // ⚠️ base64 として壊れている本文は **ここで例外になる**。catch まで飛ばすと
+    //   `server error` にまとめられ、★ 研究者に「壊れた本文が来た」と伝わらない
+    //   (cross-review: Codex 指摘)。理由の分かる応答にする。
+    var bytes;
+    try {
+      bytes = Utilities.base64Decode(b64);
+    } catch (decodeErr) {
+      return json_({ ok: false, error: 'bad base64' });
+    }
     // ⚠️ 空でない base64 が 0 バイトに解ける形（`"===="` 等）を通さない。
     if (bytes.length === 0) {
       return json_({ ok: false, error: 'empty payload' });
@@ -206,9 +214,20 @@ function doGet(e) {
 function sanitizeName_(name) {
   if (!name) return '';
   // ★ **提出物そのものの形**しか通さない（`P012_block03_gse_20260807_101112.age`）。
-  //   参加者 ID(英数字 1〜16) ＋ `_block` ＋ 2〜3 桁 ＋ `_gse_` ＋ 日付 8 桁 ＋ `_` ＋ 時刻 6 桁 ＋ `.age`
+  //   参加者 ID(英数字 1〜16) ＋ `_block` ＋ 2〜3 桁 ＋ `_gse_` ＋ 日付 8 桁 ＋ `_` ＋ 時刻 6 桁
+  //   ＋ ★ 任意の連番 ＋ `.age`
   //   ★ 名前の規約は `submission::age_file_name` と対である（片方を変えたら両方直す）。
-  return /^[A-Za-z0-9]{1,16}_block\d{2,3}_gse_\d{8}_\d{6}\.age$/.test(name) ? name : '';
+  //
+  // ⚠️★★ 末尾の `(_\d{1,10})?` を削ってはならない（cross-review: Codex 指摘・2026-08-07）。
+  //   ★ セッション名は **秒粒度**なので、同じ秒に 2 度ローテートすると
+  //   `logger::unique_path_from` が `gse_20260808_101112_2.ndjson`（さらに衝突すると
+  //   `_3`…、1000 本ぶつかると `_<pid>`）を作る。これは **静かな全損を防ぐための正規の命名**であり、
+  //   端末はその名前で `.age` を作って送ってくる。
+  //   ⚠️ ここで弾くと `bad name` が毎回返り、★ **そのブロックは永久に届かない**
+  //   （収束器は「未送信」のまま何度でも失敗を繰り返す = 黙って壊れる経路）。
+  return /^[A-Za-z0-9]{1,16}_block\d{2,3}_gse_\d{8}_\d{6}(_\d{1,10})?\.age$/.test(name)
+    ? name
+    : '';
 }
 
 /**
