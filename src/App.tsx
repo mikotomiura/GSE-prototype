@@ -20,6 +20,23 @@ const TASK_KINDS: { value: TaskKind; label: string }[] = [
   // { value: "vibe_coding", label: "vibe coding" },
 ];
 
+/** 自動提出の状態 DTO (backend `get_submission_status` / SubmissionStatusDto と同期)。 */
+interface SubmissionStatus {
+  /** 未送信の `.age` 本数。★ 突き合わせで数える (カウンタではない)。 */
+  unsent: number;
+  /** 直近の自動提出で起きた問題 (無ければ null)。 */
+  last_error: string | null;
+}
+
+/**
+ * 提出ラベル用参加者 ID の妥当性。★ backend `participant_id::is_valid_participant_id`
+ * (英数字のみ・1〜16 文字) と **同じ規則**である。⚠️ 片方だけ緩めると、画面は通すのに
+ * バックエンドが弾く (またはその逆) 状態になる。
+ */
+function isValidParticipantId(id: string): boolean {
+  return /^[A-Za-z0-9]{1,16}$/.test(id);
+}
+
 // Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / decisions FD2)。
 // 介入有効化・較正モード・condition・label_pool を 1 つの選択にまとめ、不整合な組合せ
 // (例: 介入 ON なのに calibration_blind プール) を構造的に表現不能にする。各 condition /
@@ -119,6 +136,16 @@ function App() {
   // G1: 直前のブロックが 5 分で自動終了したか (スタート画面に「終わった」だけを出す)。
   // ⚠️ ★ 残り時間は出さない (§4.4「残り時間のアナウンスをしない」/ §2.2 が却下した時間圧)。
   const [blockEnded, setBlockEnded] = useState(false);
+  // G1: 研究者が割り当てた参加者 ID。★ 起動時に 1 回だけ入力し、以後のブロックで使い回す。
+  // ⚠️ ★ 通常運用では **この欄自体を出さない** (g1Mode === null なら描画しない)。
+  const [g1ParticipantId, setG1ParticipantId] = useState("");
+  const [g1IdError, setG1IdError] = useState<string | null>(null);
+  // G1: 自動提出の状態。★ 送信先から成否を追えないので (gas-measurements M-5)、
+  // ⚠️ **未送信件数の表示は「あれば親切」ではなく必須の安全装置**である。
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
+    unsent: 0,
+    last_error: null,
+  });
   // 二重起動を検出した (別インスタンスの起動をブロックした)。
   const [duplicateBlocked, setDuplicateBlocked] = useState(false);
   // Task C: session_meta 宣言 + ビネット導線。
@@ -241,6 +268,40 @@ function App() {
       .catch((e) => console.error("get_g1_mode failed:", e));
   }, []);
 
+  // 4b-2. G1: 登録済みの参加者 ID を復元する (次回起動で入力し直させない)。
+  //       ⚠️ ★ 通常運用では **呼ばない** (g1Mode === null なら何も起きない)。
+  useEffect(() => {
+    if (g1Mode === null) return;
+    invoke<string | null>("get_g1_participant_id")
+      .then((id) => {
+        if (id) setG1ParticipantId(id);
+      })
+      .catch((e) => console.error("get_g1_participant_id failed:", e));
+  }, [g1Mode]);
+
+  // 4b-3. G1: 自動提出の状態 (未送信件数 / 直近の失敗) を、スタート画面にいる間だけ見る。
+  //       ★ 送信の成否は送信先から追えない (gas-measurements.md M-5) ので、
+  //       ⚠️ **端末側のこの表示が唯一の安全装置**である。
+  //       ⚠️ ★ ブロック実施中はポーリングしない (測定中の端末に余計な仕事をさせない)。
+  useEffect(() => {
+    if (g1Mode === null || isStarted) return;
+    let cancelled = false;
+    const read = () => {
+      invoke<SubmissionStatus>("get_submission_status")
+        .then((s) => {
+          if (!cancelled) setSubmissionStatus(s);
+        })
+        .catch((e) => console.error("get_submission_status failed:", e));
+    };
+    read();
+    // 自動提出は別プロセスなので完了イベントが無い。★ スタート画面にいる間だけ 3 秒で追う。
+    const t = setInterval(read, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [g1Mode, isStarted, g1BlocksDone]);
+
   // 4c. G1: 5 分でのブロック自動終了。バックエンドがログを閉じたのでスタート画面へ戻す。
   //     ⚠️ ★ 出すのは「終わった」だけ。残り時間・カウントダウンは出さない
   //     (protocol.md §4.4「残り時間のアナウンスをしない」/ §2.2 が却下した時間圧)。
@@ -300,8 +361,26 @@ function App() {
 
   const handleStart = async () => {
     setStartError(null);
+    setG1IdError(null);
     // 新しいブロックを始めるので、前ブロックの終了通知を消す。
     setBlockEnded(false);
+    // ★ G1: 参加者 ID を先に確定させる。⚠️ **ここで保存しないと `.age` に ID が付かない**
+    //   (P-1 で実際に起きた: 提出時の手打ちだったので提出しない限り ID がどこにも付かなかった)。
+    //   ⚠️ ★ 通常運用 (g1Mode === null) では 1 行も走らない。
+    if (g1Mode !== null) {
+      const id = g1ParticipantId.trim();
+      if (!isValidParticipantId(id)) {
+        setG1IdError("参加者 ID を入力してください (英数字のみ・1〜16 文字。例: P012)。");
+        return;
+      }
+      try {
+        await invoke("set_g1_participant_id", { id });
+      } catch (e) {
+        console.error("set_g1_participant_id failed:", e);
+        setG1IdError("参加者 ID を保存できませんでした。研究者に連絡してください。");
+        return;
+      }
+    }
     try {
       await invoke("start_session");
     } catch (e) {
@@ -396,8 +475,97 @@ function App() {
             <span style={{ opacity: 0.7, fontSize: "0.8rem" }}>（{g1Mode}）</span>
             <br />
             <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-              1 ブロックは 5 分で自動的に終了し、ここに戻ります。
+              1 ブロックは 5 分で自動的に終了し、ここに戻ります。記録は自動で研究者へ送られます。
               {g1BlocksDone > 0 && <> これまでに {g1BlocksDone} ブロック終了しました。</>}
+            </span>
+
+            {/* ★ 参加者 ID (G1 モード限定)。⚠️ 妥当な ID が入るまで「開始する」を押せない。 */}
+            <div style={{ marginTop: "0.7rem", fontSize: "0.85rem" }}>
+              <label htmlFor="g1-participant-id">
+                参加者 ID（研究者から渡された番号。例: P012）
+              </label>
+              <div style={{ marginTop: "0.3rem" }}>
+                <input
+                  id="g1-participant-id"
+                  type="text"
+                  value={g1ParticipantId}
+                  onChange={(e) => {
+                    setG1ParticipantId(e.target.value.toUpperCase());
+                    setG1IdError(null);
+                  }}
+                  placeholder="P012"
+                  maxLength={16}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-invalid={!isValidParticipantId(g1ParticipantId.trim())}
+                  style={{
+                    padding: "0.35rem 0.6rem",
+                    borderRadius: "6px",
+                    border: isValidParticipantId(g1ParticipantId.trim())
+                      ? "1px solid #4caf50"
+                      : "1px solid #ff6b6b",
+                    fontSize: "1rem",
+                    width: "9rem",
+                    textAlign: "center",
+                  }}
+                />
+              </div>
+              {g1IdError && (
+                <p role="alert" style={{ color: "#ff6b6b", margin: "0.3rem 0 0", fontSize: "0.8rem" }}>
+                  {g1IdError}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ★ 未送信の可視化 (G1 モード限定)。⚠️ **0 件なら何も出さない** (被験者のノイズにしない)。
+            ★ 送信の成否は送信先から追えないので、ここが唯一の安全装置である。 */}
+        {g1Mode !== null && submissionStatus.unsent > 0 && (
+          <div
+            role="status"
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.6rem 0.9rem",
+              borderRadius: "6px",
+              border: "1px solid #ffa726",
+              background: "rgba(255,167,38,0.12)",
+              fontSize: "0.85rem",
+              maxWidth: "34rem",
+            }}
+          >
+            未送信の記録が <b>{submissionStatus.unsent} 件</b> あります。
+            <br />
+            <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+              記録はお使いのパソコンに残っており、失われていません。次のブロックの後に自動で送信を再試行します。
+              <b>そのまま実施を続けてください。</b>
+              最後まで残る場合は研究者にご連絡ください。
+            </span>
+          </div>
+        )}
+
+        {/* ⚠️ ★ 自動提出そのものが起動できなかった / 失敗した場合。★ ログではなく画面に出す
+            (「起こしたつもりで動いていない」を黙って通さない)。 */}
+        {g1Mode !== null && submissionStatus.last_error && (
+          <div
+            role="alert"
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.6rem 0.9rem",
+              borderRadius: "6px",
+              border: "1px solid #ff6b6b",
+              background: "rgba(255,107,107,0.12)",
+              fontSize: "0.85rem",
+              maxWidth: "34rem",
+            }}
+          >
+            ⚠️ 記録の自動送信でエラーが起きています。
+            <br />
+            <span style={{ fontSize: "0.78rem", opacity: 0.85 }}>
+              記録自体はお使いのパソコンに残っています。<b>実施はそのまま続けてください。</b>
+              このまま消えない場合は、次の内容を研究者にお伝えください:
+              <br />
+              <code style={{ fontSize: "0.72rem" }}>{submissionStatus.last_error}</code>
             </span>
           </div>
         )}
@@ -470,7 +638,18 @@ function App() {
           </div>
         </div>
 
-        <button className="start-button" onClick={handleStart}>
+        {/* ⚠️ ★ G1 では **妥当な参加者 ID が入るまで押せない** (受け入れ条件 1)。
+            ★ 通常運用 (g1Mode === null) では条件が常に false = 従来どおり常に押せる。 */}
+        <button
+          className="start-button"
+          onClick={handleStart}
+          disabled={g1Mode !== null && !isValidParticipantId(g1ParticipantId.trim())}
+          title={
+            g1Mode !== null && !isValidParticipantId(g1ParticipantId.trim())
+              ? "参加者 ID を入力してください"
+              : undefined
+          }
+        >
           開始する
         </button>
         <button
