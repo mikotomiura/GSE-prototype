@@ -406,7 +406,7 @@ function migrateConsentForm() {
     "G1-C を差分適用した: 挿入 " + inserted.length + " 件" +
       (inserted.length ? "\n  + " + inserted.join("\n  + ") : "（説明文の更新のみ）")
   );
-  Logger.log(checkConsentFormParity());
+  checkConsentFormParity(); // ★ 自分でログに出すので Logger.log で包まない (二重に出る)
   return inserted;
 }
 
@@ -458,10 +458,15 @@ function checkConsentFormParity() {
   if (!descOk) lines.push("❌ 説明文がコードと一致しない");
 
   var n = form.getResponses().length;
-  if (!lines.length) {
-    return "✅ G1-C はコードと一致している（同意項目 " + wanted.length + " 件・既存回答 " + n + " 件）";
-  }
-  return "G1-C parity（既存回答 " + n + " 件）\n" + lines.join("\n");
+  var msg = !lines.length
+    ? "✅ G1-C はコードと一致している（同意項目 " + wanted.length + " 件・既存回答 " + n + " 件）"
+    : "G1-C parity（既存回答 " + n + " 件）\n" + lines.join("\n");
+  // ⚠️★★ **自分でログに出す。** 戻り値だけだと、エディタから ▶ で単独実行したときに
+  //   実行ログが「実行開始 / 実行完了」だけになり、★ **判定が 1 文字も見えない**。
+  //   （2026-08-07 に実際に起きた: 研究者が単独実行し、空ログを見て「通った」と読みかけた）
+  //   ★ 手順書は「ログに ✅ が出ることを確認」と書いているので、コードをそれに合わせる。
+  Logger.log(msg);
+  return msg;
 }
 
 // ============================================================
