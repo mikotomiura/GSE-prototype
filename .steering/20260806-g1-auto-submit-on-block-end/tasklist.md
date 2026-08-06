@@ -86,8 +86,14 @@
 
 ## 5. レビュー
 
-- [ ] `code-reviewer` と **`security-checker`** を並列起動（★ 外部送信なので security 必須）
-- [ ] HIGH 指摘への対応
+- [x] `code-reviewer` と **`security-checker`** を並列起動（★ 外部送信なので security 必須）
+- [x] HIGH 指摘への対応（HIGH 4 / MEDIUM 5 / LOW 5 を反映。`notes.md §8-3c`・`decisions.md` D-12〜D-16）
+      - ★ **data-privacy ルール 3-1 の判定**: security-checker は
+        「読み替え自体は成立する（マーカー＋設定ファイルの **2 つの独立したスイッチ**が
+        両方揃わないと送信経路が存在しない = チェックボックスの既定 OFF より構造的に強い）。
+        ただし **送信対象がその同意の範囲を超えていた**」→ ★ **範囲を絞って解消**
+      - ★ ⚠️ **security-checker の MEDIUM-4（macOS 隔離の破れ）は実測で否定した**
+        （`notes.md §8-3d`・陽性対照つき）
 - [ ] ★ `/cross-review`（★ 予算はその場で計算する。⚠️ **メモの数字を根拠にしない**）
 
 ## 6. ドキュメント
