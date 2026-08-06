@@ -329,6 +329,50 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
   G1 モードではプロセス名の検査で二重化してある
 - 詳細: `.steering/20260805-g1-app-mode-and-log-rotation/`
 
+### 4.13 submission + reconcile — G1 提出物の収束型自動提出 (2026-08-08)
+
+- **責務**: G1 実施中に、**被験者が提出の操作を 1 回もしなくても** ID 付きの `.age` が
+  研究者へ届くようにする。`requirement.md` のゴールは「操作せずに届く」だが、
+  ★ 守っている本体は **「データを失わない」** である
+- **層の分かれ方** (⚠️ ★ **盲検アプリ本体に `age` も HTTP も載せない**・decisions D3):
+
+  | モジュール | feature | 何を持つか |
+  |---|---|---|
+  | `submission.rs` | ★ **gate の外** | 提出物の**状態の規約**だけ (`.age` / `.sent` / 台帳 / 参加者 ID / 送信先設定のパスと名前)。アプリ本体も未送信件数を数えるため |
+  | `reconcile.rs` | `package` | 収束器の本体 (走査・採番・匿名化+暗号化の呼び出し・送信・`.sent`) と `Uploader` trait |
+  | `bin/submit.rs` | `package` | `--reconcile` / `--input` の入口 |
+  | `lib.rs` | default | ★ **収束器を子プロセスで起こすだけ**。Tauri CSP を 1 文字も触らない |
+
+- **★ 収束型 (reconciler) である** — 「いま何をすべきか」をイベントから決めず、
+  毎回ディスクの状態を突き合わせて足りない仕事だけをする:
+
+  ```
+  ① 閉じ終わった NDJSON  … session_end を持つ、いま書いていないファイル
+  ② それに対応する .age   … 無ければ作る (匿名化 → age 暗号化)
+  ③ それに対応する .sent  … 無ければ送る (成功したら .sent を置く)
+
+  未送信 N 件 = ② が在って ③ が無いものの数   ← ★ 別カウンタを持たない
+  ```
+
+- ⚠️★★ **イベント駆動にしなかった理由**: `preregistration.md §3.6` がブロックの事後除外を
+  禁じているので、★ **1 ブロックの取りこぼしが回復不能な損失**になる。
+  P-1 は 2 回とも「その瞬間に取るべき動作を取り損ねた」型で失敗した。
+  → ★ 収束型では **取りこぼしという概念が無く、「再送」という特別処理も要らない**
+- **起動のきっかけは 2 つとも「ヒント」**: ブロックの自動終了時 / アプリ起動時。
+  ★ どちらを取りこぼしても次の機会に収束する。何度走らせても安全 (べき等)
+- ⚠️ ★ **ブロック中には走らせない** (測定中の端末に余計な仕事をさせない)。
+  ブロック終了時は、logger の `LogChannel::block_end_rx` で
+  **`session_end` が書かれたことを観測してから**起こす (固定 sleep を使わない)
+- **送信先**: GAS Web App → 研究者の Drive (`Form_G1/GSE_G1_Submit.gs`)。
+  ★ 実測に基づく制約 — POST は **302 を返す**のでリダイレクト追従が必須 (メソッド強制は 405)、
+  GAS の `e` に**ヘッダが無い**ので認証は**本文**、⚠️ **HTTP 200 は成功の証拠にならない**
+  (GAS は例外でも 200)。→ ★ **`{"ok":true}` の明示応答を要求する**
+- ⚠️★ **送信の成否は送信先から追えない** (実行数ページはログ本文を出さず Cloud ログも開けない・実測)。
+  → ★ 端末側の `.sent` が唯一の真実源であり、**未送信件数の画面表示は必須の安全装置**である
+- **止め方**: 配布フォルダの `g1-submit.json` を外すと ② までで止まる
+  (`.age` はローカルに貯まる)。★ **再ビルド不要**・研究者側にだけあるスイッチ (decisions D-4)
+- 詳細: `.steering/20260806-g1-auto-submit-on-block-end/`
+
 ## 5. データフロー
 
 ### フロー 1: キーストローク → 状態推定（1Hz サイクル）
@@ -432,6 +476,7 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
 | mac: Global Shortcut | `tauri-plugin-global-shortcut` (Carbon RegisterEventHotKey) | Capabilities 2 件 | 同上 |
 | **gse-dataset repo** (Phase 1) | git push/pull (`metrics/P*/<os>/*.metrics.json`) | GitHub 認証 | push 失敗 → ローカル保持、次回同期。生 NDJSON は絶対に repo に置かない |
 | **JSON Schema sync** (Phase 1) | 手動コピー (`cp src-tauri/schema/current.json gse-dataset/schema/`) | — | CI drift check が両 repo の非整合を機械的にブロック |
+| **G1 自動提出** (2026-08-08) | HTTPS POST (`gse-submit --reconcile` → GAS Web App → 研究者 Drive) | 本文の共有シークレット (⚠️ GAS の `e` にヘッダが無いためヘッダ認証は不可能・実測) | ★ `.age` はローカルに残り `.sent` が付かない → **次の機会に自動で送り直す**。未送信件数をスタート画面に表示 (fail-loud)。⚠️ 送るのは `.age` のみで生 NDJSON の経路は存在しない |
 | 学習データ収集 (Phase 2+) | 未定 (gse-dataset 経由 or 別) | オプトイン同意 + 匿名化 | Phase 2 ML 訓練時に設計再検討 |
 
 ## 7. プラットフォーム抽象化
