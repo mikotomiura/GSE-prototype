@@ -11,6 +11,14 @@ pub mod participant_id;
 // age 依存はこの module 経由のみ。blind アプリ本体 (default features) には載せない (D3)。
 #[cfg(feature = "package")]
 pub mod packaging;
+// 提出物 (.age / .sent / 台帳 / 参加者 ID / 送信先設定) の**状態の規約**。
+// ⚠️ ★ feature gate の外に置く: 盲検アプリ本体も「未送信 N 件」を数えるため
+// (数えるのに age は要らない)。両側が同じ規約を読むことで drift を防ぐ。
+pub mod submission;
+// G1 自動提出の収束器 (ディスクの状態を突き合わせ、足りない仕事だけをする)。
+// age と HTTP を使うので package feature 側 (`gse-submit --reconcile` が実行主体)。
+#[cfg(feature = "package")]
+pub mod reconcile;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -914,9 +922,12 @@ fn resolve_bundled_recipient(app: &tauri::AppHandle) -> Option<String> {
 /// `gse-submit` を子プロセスとして実行する (ブロッキング)。`submit_latest_session` から
 /// `spawn_blocking` 経由で呼ばれ、メインスレッド/イベントループを塞がない。
 /// binary 解決 → env 設定 (`GSE_PARTICIPANT_ID` / `GSE_RECIPIENT`) → 実行 → 結果解釈までを行う。
-fn run_submit_blocking(app: tauri::AppHandle, id: String) -> Result<SubmitOutcome, String> {
-    // 同梱 gse-submit (current_exe の隣)。mac=.app/Contents/MacOS/gse-submit (リリースで同梱済)、
-    // win=gse-next.exe と同階層 gse-submit.exe (ポータブル配布フォルダに co-located)。
+/// 同梱 `gse-submit` の絶対パス (current_exe の隣)。
+/// mac=`.app/Contents/MacOS/gse-submit` (リリースで同梱済)、
+/// win=`gse-next.exe` と同階層 `gse-submit.exe` (ポータブル配布フォルダに co-located)。
+///
+/// ★ 手動提出と自動提出 (収束器) の**両方**がこれを使う (解決規則を 2 つ持たない)。
+fn resolve_submit_bin() -> Result<PathBuf, String> {
     let exe =
         std::env::current_exe().map_err(|e| format!("実行ファイルのパスを取得できません: {e}"))?;
     let dir = exe
@@ -934,6 +945,11 @@ fn run_submit_blocking(app: tauri::AppHandle, id: String) -> Result<SubmitOutcom
             submit_bin.display()
         ));
     }
+    Ok(submit_bin)
+}
+
+fn run_submit_blocking(app: tauri::AppHandle, id: String) -> Result<SubmitOutcome, String> {
+    let submit_bin = resolve_submit_bin()?;
 
     // 同梱公開鍵を env 経由で渡す (gse-submit は GSE_RECIPIENT を最優先で採用)。
     let recipient = resolve_bundled_recipient(&app);
@@ -1010,6 +1026,135 @@ fn redact_prefixes(detail: &str, homes: &[String]) -> String {
         out = out.replace(h, "~");
     }
     out
+}
+
+// --- G1 自動提出 (収束器の起動と、その結果の可視化) --------------------------------
+//
+// ★ アプリ本体は **収束器を起こすだけ**である (`design.md` §2)。匿名化・age 暗号化・HTTP は
+//   すべて `gse-submit` (feature = "package") の中にあり、⚠️ **盲検アプリ本体に age も HTTP も
+//   載せない** (decisions D3)。→ ★ Tauri CSP を 1 文字も触らずに外部送信が成立する。
+//
+// ⚠️★ **「起こしたつもりで動いていない」を検知する経路が要る** (`design.md` §2)。
+//   `silent-failure-in-guard-scripts` の型そのものなので、★ 失敗はログではなく
+//   **画面 (未送信件数の隣)** に出す。
+
+/// 収束器の直近の失敗。★ 画面に出すために保持する (`None` = 直近は成功)。
+static SUBMIT_LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
+
+/// スタート画面へ返す提出状態 (G1 モードのときだけフロントが読む)。
+#[derive(serde::Serialize, Clone)]
+struct SubmissionStatusDto {
+    /// 未送信の `.age` 本数。★ **突き合わせで数える** (カウンタを持たない)。
+    unsent: usize,
+    /// 直近の自動提出で起きた問題 (無ければ `null`)。
+    last_error: Option<String>,
+}
+
+/// 未送信件数と直近のエラーを返す。★ 0 件・エラー無しなら UI は何も出さない。
+#[tauri::command]
+fn get_submission_status() -> SubmissionStatusDto {
+    let unsent = crate::submission::default_submission_dir()
+        .map(|d| crate::submission::unsent_count(&d))
+        .unwrap_or(0);
+    let last_error = SUBMIT_LAST_ERROR
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone();
+    SubmissionStatusDto { unsent, last_error }
+}
+
+/// 登録済みの G1 参加者 ID を返す (未登録なら `null`)。
+#[tauri::command]
+fn get_g1_participant_id() -> Option<String> {
+    crate::submission::read_g1_participant_id()
+}
+
+/// G1 参加者 ID を登録する。⚠️ ★ 妥当でない ID は **書かずに** `Err` を返す (fail-closed)。
+#[tauri::command]
+fn set_g1_participant_id(id: String) -> Result<(), String> {
+    crate::submission::write_g1_participant_id(&id)
+}
+
+/// 収束器 (`gse-submit --reconcile`) を **別スレッドで** 1 回起こす。
+///
+/// ★ `reason` はログ用のきっかけ名 (`"at startup"` / `"after block"`)。
+/// ⚠️ ★ **G1 モードでなければ何もしない** (通常運用の挙動を 1 バイトも変えない)。
+/// ★ 何度呼んでも安全 (収束器はべき等) なので、二重起動を気にしなくてよい。
+fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
+    if g1_mode().is_none() {
+        return;
+    }
+    thread::spawn(move || {
+        let outcome = run_reconcile_blocking(&app);
+        let mut slot = SUBMIT_LAST_ERROR.lock().unwrap_or_else(|p| p.into_inner());
+        match outcome {
+            Ok(summary) => {
+                tracing::info!("G1 auto-submit ({}): {}", reason, summary);
+                *slot = None;
+            }
+            Err(e) => {
+                // ⚠️ ログだけにしない。★ 画面へ出すために保持する。
+                tracing::error!("G1 auto-submit ({}) FAILED: {}", reason, e);
+                *slot = Some(e);
+            }
+        }
+    });
+}
+
+/// 収束器を子プロセスとして実行する (ブロッキング)。成功時は要約行を返す。
+///
+/// ⚠️ ★ **参加者 ID が無ければ起こさない。** ID 無しで走らせても収束器側で失敗するだけなので、
+/// ここで止めて理由を返す (「起動したのに何もしていない」を作らない)。
+fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<String, String> {
+    let id = crate::submission::read_g1_participant_id()
+        .ok_or("参加者 ID が未登録のため、自動提出を実行できません。")?;
+    let submit_bin = resolve_submit_bin()?;
+
+    let mut cmd = std::process::Command::new(&submit_bin);
+    cmd.arg("--reconcile");
+    cmd.env("GSE_PARTICIPANT_ID", &id);
+    if let Some(r) = resolve_bundled_recipient(app) {
+        cmd.env("GSE_RECIPIENT", r);
+    }
+    // Windows: 子プロセスのコンソール窓を出さない (CREATE_NO_WINDOW)。
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("自動提出ツールを起動できませんでした: {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    if output.status.success() {
+        return Ok(extract_reconcile_summary(&stdout).unwrap_or_else(|| "done".to_string()));
+    }
+    // fail-loud: 詳細はホームパス (= OS ユーザー名を含み得る) を伏せてから返す (data-privacy)。
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let raw = if !stderr.trim().is_empty() {
+        stderr.trim()
+    } else {
+        stdout.trim()
+    };
+    let detail = redact_home_path(raw);
+    Err(if detail.is_empty() {
+        "自動提出に失敗しました (詳細不明)。研究者に連絡してください。".to_string()
+    } else {
+        detail
+    })
+}
+
+/// `gse-submit --reconcile` が出す要約行 (`GSE_RECONCILE {...}`) を取り出す。
+///
+/// ★ ここで拾えるのは **件数だけ**である (ファイル名も参加者 ID も出していない・data-privacy)。
+fn extract_reconcile_summary(stdout: &str) -> Option<String> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .find_map(|l| l.strip_prefix("GSE_RECONCILE "))
+        .map(|s| s.to_string())
 }
 
 /// アプリ内「提出する」ボタンの Tauri コマンド。最新セッションを同梱 `gse-submit` で
@@ -1433,6 +1578,19 @@ fn start_session(
     intervention: State<InterventionState>,
     log: State<Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ★★ G1: 参加者 ID が無いまま**ブロックを始めさせない** (`requirement.md` 受け入れ条件 1)。
+    //
+    // ⚠️ ★ **何も触る前に**返す。ここから先はログのローテートまで進むので、途中で止めると
+    //   `G1_BLOCKS_STARTED` と実ファイルがずれる。
+    // ⚠️ ★ 通常運用 (マーカー無し) は `g1_start_gate` が必ず `Ok` を返す = 非回帰。
+    // ★ フロントもボタンを無効化するが、**バックエンド側にも置く** (二重 gate)。
+    //   フロントだけだと DevTools から直接 invoke できてしまい、
+    //   ID 無しの `.age` が誰のものか分からないまま研究者に届く。
+    crate::submission::g1_start_gate(
+        g1_mode().is_some(),
+        crate::submission::read_g1_participant_id().as_deref(),
+    )?;
+
     // リセットシグナルを先にセットしてからセッションを有効化する。
     // 分析スレッドが active=true を Acquire で読んだ時点で、
     // それより前に Release された reset=true も可視であることが保証される。
@@ -1717,6 +1875,8 @@ pub fn run() {
     let log_channel = logger::LogChannel::new();
     let log_tx = log_channel.tx.clone();
     let log_shutdown_rx = log_channel.shutdown_rx.clone();
+    // ★ G1: ブロックが `session_end` まで書けたことの合図 (自動提出の起点を正しくするため)。
+    let block_end_ack_rx = log_channel.block_end_rx.clone();
     // ★ 書込先はローテートで変わる。値をコピーせず共有ハンドルを配る。
     //   `start()` が**この同じ Arc を上書き**するので、`.manage()` の順序は変えなくてよい。
     let log_target = log_channel.target.clone();
@@ -2170,6 +2330,13 @@ pub fn run() {
                     Duration::from_millis(1500),
                     "at startup",
                 );
+
+                // ★ G1: 起動時にも収束器を回す (`design.md` §1「起動のきっかけはヒント」)。
+                //   ⚠️ ★ **前回の実施で送れなかった分**をここで拾う。取りこぼしても
+                //   次のブロック終了で拾われるので、ここが失敗しても正しさは壊れない。
+                //   ★ この時点ではまだブロックが始まっていない (被験者はスタート画面) ので
+                //   「ブロック中に走らせない」を満たす。
+                spawn_reconcile(app.handle().clone(), "at startup");
             }
 
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。
@@ -2191,6 +2358,7 @@ pub fn run() {
                 let app_handle = app.handle().clone();
                 let block_log_tx = log_tx_g1;
                 let block_session_active = session_active_for_g1;
+                let block_end_ack = block_end_ack_rx;
                 thread::spawn(move || {
                     tracing::info!(
                         "G1: block auto-end thread started (limit={} ms)",
@@ -2236,14 +2404,42 @@ pub fn run() {
                         // 3) ブロックを閉じる。⚠️ ★ ここでは**新しいファイルを開かない**
                         //    (10 ブロック目の後に空の 11 本目が残り、`gse-submit` が
                         //    最新 1 本としてそれを出してしまうため)。開くのは次の start_session。
-                        if let Err(e) = block_log_tx.try_send(LogEntry::BlockEnd) {
-                            tracing::error!("G1: FAILED to close block: {}", log_send_error(e));
-                        } else {
-                            tracing::info!("G1: block auto-ended at {} ms", now);
-                        }
+                        let closed = match block_log_tx.try_send(LogEntry::BlockEnd) {
+                            Err(e) => {
+                                tracing::error!("G1: FAILED to close block: {}", log_send_error(e));
+                                false
+                            }
+                            Ok(()) => {
+                                tracing::info!("G1: block auto-ended at {} ms", now);
+                                true
+                            }
+                        };
 
                         // 4) 画面へ通知 (スタート画面へ戻す)。★ 「終わった」だけを伝える。
                         let _ = app_handle.emit("g1-block-ended", ());
+
+                        // 5) ★ 自動提出を起こす。⚠️ ★ **`session_end` が書かれてから**にする。
+                        //    収束器は「`session_end` を持つファイル」しか触らないので、
+                        //    先に起こすとこのブロックは 1 周遅れる。⚠️ とくに **最後のブロック**は
+                        //    `overlay` 窓があるためプロセスが × で終了せず、
+                        //    「次の起動」が来ないまま送られない。
+                        //    ★ 固定 sleep ではなく **合図を待つ** (ANALYSIS_IDLE と同じ考え方)。
+                        if closed {
+                            match block_end_ack.recv_timeout(Duration::from_secs(5)) {
+                                Ok(()) => {}
+                                Err(_) => {
+                                    // ★ 黙って進まない。収束型なので次の機会に拾えるが、
+                                    //   ⚠️ 待てなかったこと自体を残す。
+                                    tracing::warn!(
+                                        "G1: block-end ack did not arrive within 5s; \
+                                         this block will be picked up on a later reconcile"
+                                    );
+                                }
+                            }
+                        }
+                        // ⚠️ ★ ここは **ブロックとブロックの間** である (被験者はスタート画面)。
+                        //    `design.md` の「ブロック中に走らせない」を満たす。
+                        spawn_reconcile(app_handle.clone(), "after block");
                     }
                 });
             }
@@ -2500,6 +2696,10 @@ pub fn run() {
             debug_overlay_window_state,
             get_log_status,
             get_g1_mode,
+            // G1 自動提出 (★ すべて G1 モード限定の画面からしか呼ばれない)。
+            get_g1_participant_id,
+            set_g1_participant_id,
+            get_submission_status,
             record_intervention_dismiss,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,
