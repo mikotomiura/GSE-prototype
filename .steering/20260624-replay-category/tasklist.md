@@ -27,4 +27,4 @@
 
 ## 完了処理
 - [x] design.md 最終化 / decisions.md 作成 (D-RC1..D-RC4)
-- [ ] git commit (feature/replay-category) → PR
+- [x] git commit (feature/replay-category be85b62) → PR #29

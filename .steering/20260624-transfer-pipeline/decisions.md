@@ -26,3 +26,15 @@
 ## D6: 出力名 = P###_<入力ステム>.age
 - 入力 raw (gse_YYYYMMDD_HHMMSS.ndjson) のステムを踏襲しセッション識別を保持 (chrono 依存回避)。
 - 暗号塊なので転送経路 (Dropbox File Request) は信用不要 (D6)。
+
+## D7: 計画文書を実装 (age) に追従更新 — 2026-06-24, ユーザー承認
+- 監査で WBS v2 / codex-review v0.4 が旧記述「ローカル ZIP 暗号化」のままと判明 (実装は D1 で age に変更済)。
+  「古い情報で実装した」逆向きの乖離 (実装が先行・文書が未追従) のため、文書を実装に合わせ更新。
+- 変更 2 箇所 (python-docx でセル/段落の run 内テキスト置換、書式保持):
+  - `GSE_マイルストーン_WBS_半年版_v2.docx` 表 0.15 行: 「ローカル ZIP 暗号化」→「ローカル age(X25519)
+    暗号化（gse-package CLI）」。
+  - `ユーザー検証_codex-review_v0.4.docx` §6: 「ローカルで ZIP 暗号化し」→「ローカルで age（X25519 公開鍵
+    暗号）により暗号化し（gse-package CLI）、研究者だけが秘密鍵を保持することでゼロ知識保管を実現する」。
+    ([17] 引用・本文非保存原則は保持)。
+- 残務 (本タスク範囲外, WBS 0.15「運用」側): Dropbox File Request 運用手順書・participant_id 再発番ルールは
+  未整備。実装完了≠0.15 完了。replay の category 対応も D4 で follow-up 化済。
