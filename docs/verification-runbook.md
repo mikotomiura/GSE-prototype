@@ -14,6 +14,12 @@
 
 `src-tauri/` で実行する。**全部 green でなければ先に進まない。**
 
+> ⚠️ ★ **`~/.cargo/bin/cargo` が動かない環境がある**（2026-08-06 に macOS で実測）。
+> `~/.cargo/bin/*` は rustup の shim（symlink）で、`rustup` 本体が消えると**全部 dangling** になり
+> `no such file or directory` で落ちる。⚠️ ★ `ls` ではリンクが見えるので**壊れていると気づきにくい**。
+> → 実体は `~/.rustup/toolchains/<toolchain>/bin/cargo`。`cargo --version` が通らなければそちらを使う。
+> ★ これを踏むと `run.sh` の cargo ゲート 4 本が「飛ばした」と言って**素通り**する。
+
 ```bash
 cd src-tauri
 

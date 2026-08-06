@@ -70,13 +70,26 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 ゴールデンセッション NDJSON を `gse-replay` CLI で再実行し、`FeatSnapshot` 列の
 **byte-equal 一致** で回帰保護するのが背骨。リプレイ 1 本が単体/統合/回帰/GT 評価/チューニングを兼ねる。
 
+⚠️ ★ **`Cargo.toml` は repo 直下に無い (`src-tauri/` にある)。**
+repo 直下で `cargo test --workspace` を叩くと
+`error: could not find 'Cargo.toml' in <repo> or any parent directory` で**即座に空振りする**
+(2026-08-06 に Windows / macOS の**両方で実測**)。→ 下記のどちらかで実行する。
+
 ```bash
+cd src-tauri     # ★ 以下は src-tauri/ から実行する
 # 回帰検証 (最優先)
 cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json
 # 単体テスト
 cargo test --workspace
 # Schema drift check (gse-dataset 整合)
 cargo run --bin emit_schema   # 出力を src-tauri/schema/current.json と byte-equal 比較
+```
+
+repo 直下から動かずに叩くなら `--manifest-path` を付ける
+(★ `run.sh` はこの形を使っている):
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml --workspace
 ```
 
 - モード系フラグ (`--snapshot` / `--metrics` / `--segments` / `--intervention`) は相互排他
