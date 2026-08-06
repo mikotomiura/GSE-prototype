@@ -8,8 +8,22 @@
 >
 > | ファイル | 何 | ★ Apps Script プロジェクト |
 > |---|---|---|
-> | `GSE_G1_Form_Builder.gs` | 3 フォーム ＋ 運用管理シートの構築 | **A** |
-> | `GSE_G1_Submit.gs` | ★ 提出物 (`.age`) の受け口（Web App / `doPost`） | ★ **B（別プロジェクト）** |
+> | `GSE_G1_Form_Builder.gs` | 3 フォーム ＋ 運用管理シートの構築 | **A** = ★ **`GSE_Gate1`**（作成済み） |
+> | `GSE_G1_Submit.gs` | ★ 提出物 (`.age`) の受け口（Web App / `doPost`） | ★ **B（別プロジェクト・未作成）** |
+>
+> ★ **A の場所**: https://script.google.com/home/my → **`GSE_Gate1`**
+> （⚠️ ★ **プロジェクト名がどこにも書かれておらず、探すのに手間取った**ので明記する。
+> 実績は `.steering/20260804-g1-pilot-execution/tasklist.md`）。
+> 開いたら次の 3 つで**正しいプロジェクトか確かめる**:
+> 1. ⏰ トリガー画面に **`onG1ConsentSubmit`**（イベント=フォーム送信時）が 1 本ある ← 最も確実
+> 2. ソース冒頭に `var FORM_ID_CONSENT = "1Hs3NtuO…"` がある
+> 3. 関数一覧に `setupG1Forms` / `migrateConsentForm` / `checkConsentFormParity` がある
+>
+> ⚠️★★ **G1-C の編集画面 → ⋮ →「スクリプト エディタ」から開かないこと。**
+> ★ こちらは**フォーム束縛スクリプト**（中身は空）であり、A ではない。
+> 貼っても実フォームは変わらず、3 つ目のプロジェクトが増えるだけである。
+> 根拠: `GSE_G1_Form_Builder.gs` は `FormApp.openById()` でフォームを開いており、
+> 束縛スクリプト特有の `getActiveForm()` を **1 度も使っていない** = 独立プロジェクトである。
 >
 > ⚠️ ★ **同じプロジェクトに置いてはならない。** 2026-08-07 に、関数セレクタの選択が
 > 反映されないまま既定の `setupG1Forms` を実行し、**同意フォームの全設問を消す事故**を起こした
