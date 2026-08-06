@@ -1,4 +1,7 @@
 pub mod analysis;
+// G1 統制タスク実験の「G1 モード」判定 (OS API 非依存の純ロジック + current_exe のみ)。
+// 効果 (ローテート / 5 分でのブロック終了 / プローブ停止 / 二重起動 fail-loud) は lib.rs が適用する。
+pub mod g1;
 pub mod input;
 pub mod logger;
 // 提出ファイル名ラベル用 participant_id 検証の単一情報源 (feature 非依存)。
@@ -23,7 +26,7 @@ use crate::analysis::intervention::{
 use crate::analysis::loop_step::FeatSnapshot;
 use crate::logger::{
     Condition, DismissReason, ExpectedQuadrant, LabelPool, LogEntry, LogStatus, ProbeRef,
-    ProbeSource, SessionLogger, SkipReason, TaskKind, Track, UserLabelKind,
+    ProbeSource, SharedLogTarget, SkipReason, TaskKind, Track, UserLabelKind,
 };
 use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
@@ -87,12 +90,45 @@ static FORCE_WALL: AtomicBool = AtomicBool::new(false);
 static FORCE_NUDGE: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
+// G1 統制タスク実験モード (experiments/20260801-controlled-friction-task)
+// ---------------------------------------------------------------------------
+
+/// G1 モードの引き金 (`"marker"` / `"env"`)。`run()` が起動時に 1 回だけ書き、以後は読み取り専用。
+///
+/// ⚠️ ★ `OnceLock` にしているのは「実行時に切り替えられない」ことを型で示すためである。
+/// 実行時トグルにすると、プローブを**スレッドごと起こさない**ことで
+/// 「発火はしたが黙殺した」状態を構造的に消している設計が崩れる (D-7)。
+static G1_MODE: std::sync::OnceLock<Option<&'static str>> = std::sync::OnceLock::new();
+
+/// このプロセスで開始したブロック数。2 回目以降の `start_session` がローテートする判断に使う。
+/// ⚠️ ★ **`session_active` が false→true になったときだけ**増やす (連打・再試行で増やさない)。
+static G1_BLOCKS_STARTED: AtomicU64 = AtomicU64::new(0);
+
+/// 分析スレッドがドレイン (非アクティブ) 分岐に入っているか。
+///
+/// ⚠️★ **G1 のブロック終了で `session_end` の後ろに `feat` / `key` 行が続くのを防ぐための同期点。**
+/// `session_active=false` を立てても、分析スレッドは既に `rx.recv_timeout(...)` に入っており
+/// **次の 1Hz マークまで最大 ~1000ms ブロックしうる**。その 1 イテレーションが
+/// `try_send(Key/Feat)` を投げるので、★ **固定 sleep では追い越しを防げない**
+/// (code-review HIGH。当初 200ms にしていたのは「非アクティブ時 sleep は 50ms」という
+/// 誤った根拠に基づいていた——待つべきは `recv_timeout` の上限である)。
+/// → **分析スレッドがドレインに入ったことを観測してから** `BlockEnd` を送る。
+static ANALYSIS_IDLE: AtomicBool = AtomicBool::new(true);
+
+/// G1 モードか (引き金つき)。`None` なら通常運用。
+fn g1_mode() -> Option<&'static str> {
+    *G1_MODE.get().unwrap_or(&None)
+}
+
+// ---------------------------------------------------------------------------
 // ログ状態 (quit_app からも参照できるよう Tauri state で管理)
 // ---------------------------------------------------------------------------
 
 pub(crate) struct LogState {
     tx: Sender<LogEntry>,
-    path: String,
+    /// ⚠️ ★ **いま書いている先**の共有ハンドル。G1 のローテートで変わるので、
+    /// 起動時のパスを `String` で持ち回ってはならない (前ブロックのファイルを指し続ける)。
+    target: SharedLogTarget,
     /// ロガースレッドが End を処理し終えたときに通知される受信端
     shutdown_rx: Receiver<()>,
 }
@@ -102,6 +138,19 @@ impl LogState {
     /// 生の `tx` を公開せず「スレッドへ move する用途の clone」だけを意図として露出する。
     pub(crate) fn clone_log_tx(&self) -> Sender<LogEntry> {
         self.tx.clone()
+    }
+
+    /// いま書いている NDJSON のパス (ローテート追随)。
+    fn current_path(&self) -> String {
+        // ⚠️ poison 時に空文字を返すと `quit_app` がそれを behavioral_gt.py に渡し、
+        // `Path::new("").parent()` から**意図しないフォルダを開く** (code-review MEDIUM)。
+        // 他のロック箇所と同じく into_inner でデータを取り出す。
+        self.target
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .path
+            .to_string_lossy()
+            .to_string()
     }
 }
 
@@ -123,9 +172,12 @@ struct LatestFeatState(Arc<Mutex<Option<FeatSnapshot>>>);
 /// cooldown / daily cap / recent dismiss / Wall 累積時間を保持する。
 struct InterventionState(Arc<Mutex<InterventionPolicyState>>);
 
-/// ログ書込先の状態 (fail-loud バナー用)。`run()` が SessionLogger::start の `LogStatus` から
-/// 構築して managed state に保持し、`get_log_status` コマンドがフロントへ返す。
-struct LogStatusState(LogStatus);
+/// ログ書込先の状態 (fail-loud バナー用)。`run()` が SessionLogger の共有ハンドルを
+/// managed state に保持し、`get_log_status` コマンドがフロントへ返す。
+///
+/// ⚠️ ★ 値のコピーではなく共有ハンドルを持つ。G1 のローテート先が書けずに temp へ落ちたとき、
+/// 起動時の `Ok` を返し続けると **バナーが出ないまま想定外の場所に書き続ける** ため。
+struct LogStatusState(SharedLogTarget);
 
 /// フロントへ返すログ状態 DTO (#1 層2 fail-loud)。`ok=false` ならバナーを常時表示する。
 /// data-privacy: キーストローク内容は含めない。パスは診断のため含める (本文ではない)。
@@ -365,11 +417,31 @@ fn debug_overlay_window_state(
     })
 }
 
+/// G1 モードをフロントへ返す (fail-loud 表示用)。`None` なら通常運用。
+///
+/// ⚠️ ★ なぜ画面に出すのか: マーカーが外れる / アプリをフォルダの外に出す / launcher で
+/// `open -a` してしまう、のいずれでも **黙って通常モードで起動する**。
+/// ★ 2026-08-05 の実測では `open -a gse-next` が `/Applications` の通常アプリを起こした。
+/// 実施後に `validate_blocks.py --dataset` が赤くなって初めて気づくのでは遅い
+/// (`preregistration.md §3.6` がブロックの事後除外を禁じている) ため、
+/// **開始する前に画面で分かる**ようにする。
+#[tauri::command]
+fn get_g1_mode() -> Option<String> {
+    g1_mode().map(|s| s.to_string())
+}
+
 /// ログ書込先の状態をフロントへ返す (#1 層2 fail-loud)。起動時にフロントが取得し、
 /// `ok=false` なら「ログがどこに / 書けていない」旨の警告バナーを常時表示する。
 #[tauri::command]
 fn get_log_status(status: State<'_, LogStatusState>) -> LogStatusDto {
-    match &status.0 {
+    // ローテート後の状態を読む (共有ハンドル)。poison 時は保守的に「書けていない」を返す。
+    let current = match status.0.lock() {
+        Ok(t) => t.status.clone(),
+        Err(_) => LogStatus::Disabled {
+            error: "log target state poisoned".to_string(),
+        },
+    };
+    match &current {
         LogStatus::Ok => LogStatusDto {
             ok: true,
             mode: "ok".to_string(),
@@ -785,7 +857,7 @@ fn open_accessibility_settings() -> String {
 /// 現在のセッションログファイルのパスを返す (UI表示用)
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
-    log.lock().unwrap_or_else(|p| p.into_inner()).path.clone()
+    log.lock().unwrap_or_else(|p| p.into_inner()).current_path()
 }
 
 // --- アプリ内提出 (案A sidecar / mac Gatekeeper 根絶) -------------------------------
@@ -1319,6 +1391,33 @@ fn set_overlay_interactive(app: tauri::AppHandle, interactive: bool) -> Result<(
     Ok(())
 }
 
+/// G1: 他の GSE プロセスが動いていないかを OS に聞き、見つかったら画面へ出す (別スレッド)。
+///
+/// ⚠️ ★ **同期に呼んではならない。** 2026-08-06 に実測した (macOS 26.5.2・5 回):
+/// `/usr/bin/pgrep` の子プロセス起動に **28.2 / 19.0 / 18.8 / 18.5 / 18.1 ms**。
+/// ★ Windows の `tasklist.exe` は **未計測**である (この環境からは測れない)。
+/// → ★ `start_session` の応答に載せると「開始する」の反応が鈍る。応答は先に返し、
+///   検査は別スレッドで走らせて **結果だけを emit** する (待たせない・止めない)。
+///
+/// ★ 止めずに画面へ出すのは `setup()` 側と同じ方針である (列挙の失敗や名前の一致ミスで
+/// 実施を潰さないため。判断は人に返す)。フロントの `second-instance-blocked` は
+/// `setDuplicateBlocked(true)` で冪等なので、複数回来ても害はない。
+fn spawn_duplicate_instance_check(app: tauri::AppHandle, delay: Duration, when: &'static str) {
+    thread::spawn(move || {
+        if !delay.is_zero() {
+            thread::sleep(delay);
+        }
+        if crate::g1::other_instance_running() {
+            tracing::error!(
+                "G1: ANOTHER GSE PROCESS IS RUNNING ({}). Keystrokes will be split across \
+                 two NDJSON files (protocol.md 2-3). Quit the other one.",
+                when
+            );
+            let _ = app.emit("second-instance-blocked", ());
+        }
+    });
+}
+
 /// 「開始する」ボタン押下時に呼ばれる。
 /// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
 /// 2. CognitiveStateEngine を初期状態にリセット
@@ -1333,7 +1432,7 @@ fn start_session(
     latest_feat: State<LatestFeatState>,
     intervention: State<InterventionState>,
     log: State<Arc<Mutex<LogState>>>,
-) {
+) -> Result<(), String> {
     // リセットシグナルを先にセットしてからセッションを有効化する。
     // 分析スレッドが active=true を Acquire で読んだ時点で、
     // それより前に Release された reset=true も可視であることが保証される。
@@ -1341,15 +1440,68 @@ fn start_session(
     // 前セッションの沈黙時間が初回更新に混入するレースコンディションが発生する。
     engine.reset();
     reset_signal.0.store(true, Ordering::Release);
-    session_active.0.store(true, Ordering::Release);
+    // ★ 旧値を取る。⚠️ 既に true (= 連打・record_session_meta 失敗後の再押下) なら
+    //   **新しいブロックではない**ので、下のローテートを回してはならない (code-review HIGH)。
+    let was_active = session_active.0.swap(true, Ordering::Release);
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
     *latest_feat.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
     *intervention.0.lock().unwrap_or_else(|p| p.into_inner()) = InterventionPolicyState::new(now);
-    let guard = log.lock().unwrap_or_else(|p| p.into_inner());
-    let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
+    // ★ ロックは**ログへ送る間だけ**保持する (follow-up F-2 / code-review LOW)。
+    //   以前は `win.show()` を含む関数末尾まで持っていた。デッドロックはしないが、
+    //   ⚠️ ロック中にウィンドウ操作 (別スレッドへ波及しうる) を行う形は残さない。
+    {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+
+        // ★ G1: 2 ブロック目以降はログをローテートする (1 ブロック = NDJSON 1 ファイル・protocol.md §1)。
+        //   ⚠️ ★ **G1 モードでないときは何もしない。** 通常運用 (Phase1) では「戻る → 開始する」で
+        //   ファイルが分かれてしまうと、`gse-submit` が最新 1 本しか出さないため
+        //   **前半が提出されなくなる**。既定の挙動を 1 バイトも変えないこと。
+        // ⚠️★ **`was_active` が false のときだけ**ローテートする。
+        //   「開始する」は送信中に disabled にならず、record_session_meta 失敗時の文言は
+        //   **明示的に再押下を促す**ので、無条件に数えると孤児ファイルが 1 本増える
+        //   (= protocol.md §1「1 ブロック = 1 ファイル」の破れ・code-review HIGH)。
+        if g1_mode().is_some() && !was_active {
+            let blocks_started = G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel);
+            if blocks_started > 0 {
+                // ⚠️ ファイル名は秒粒度。衝突回避は **logger スレッド側**でも行う
+                // (ここは別スレッドなので exists 判定と create の間に窓がある・code-review MEDIUM)。
+                let new_path = logger::next_session_path();
+                tracing::info!(
+                    "G1: rotating session log for block #{} -> {:?}",
+                    blocks_started + 1,
+                    new_path
+                );
+                if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
+                    // ⚠️★★ **ここで進んではならない** (cross-review HIGH・Claude と Codex が一致)。
+                    // channel (bounded 512) が満杯だと Rotate だけが落ち、直後の SessionStart 以降が
+                    // **既に `session_end` を書き終えた旧ファイル**に積まれる。
+                    // = protocol.md §1 が (b) を却下した「沈黙して間違った結果を出す」失敗そのもの。
+                    // ★ 触った状態を**全部巻き戻して** Err を返し、画面に出す (start_session の
+                    // 失敗はフロントが「開始に失敗しました」と表示する)。
+                    tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+                    G1_BLOCKS_STARTED.fetch_sub(1, Ordering::AcqRel);
+                    session_active.0.store(false, Ordering::Release);
+                    return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
+                         このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
+                        .to_string());
+                }
+            }
+        }
+
+        let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
+    }
+
+    // ★ G1: **ブロックを始めるたびに**二重起動を見に行く (follow-up F-1 / code-review M6)。
+    //   ⚠️ 従来は起動 1.5 秒後の 1 回だけだったので、★ **G1 アプリを開いた後に**
+    //   被験者が旧アプリ (Phase1 用 `/Applications`) を開くと、警告が出ないまま
+    //   打鍵が 2 本の NDJSON に割れた (protocol.md §2-3)。
+    //   ★ 応答時間には載せない (上の `spawn_duplicate_instance_check` の実測コメント参照)。
+    if g1_mode().is_some() && !was_active {
+        spawn_duplicate_instance_check(app.clone(), Duration::ZERO, "at block start");
+    }
 
     // Task B: プローブスケジューラへセッション開始時刻を共有する。
     // 専用スレッドが値の変化を検出してスケジューラを再初期化する。
@@ -1373,6 +1525,7 @@ fn start_session(
     } else {
         tracing::error!("Overlay window not found — setup() may have failed");
     }
+    Ok(())
 }
 
 /// アプリ終了。終了前に以下を順に実行する:
@@ -1390,7 +1543,7 @@ fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State
     let (session_path, shutdown_rx) = {
         let guard = log.lock().unwrap_or_else(|p| p.into_inner());
         let _ = guard.tx.try_send(LogEntry::End);
-        (guard.path.clone(), guard.shutdown_rx.clone())
+        (guard.current_path(), guard.shutdown_rx.clone())
     };
 
     let app_handle = app.clone();
@@ -1486,6 +1639,14 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 #[cfg(target_os = "windows")]
 fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     use std::sync::atomic::Ordering::Relaxed;
+    // ⚠️★ G1: この経路は IME Monitor スレッドから呼ばれ、**`session_active` を見ていない**
+    // (code-review HIGH)。ブロックを閉じた後に IME の後始末が飛んでくると
+    // `session_end` の後ろに `ime_shadow` 行が続く。
+    // ★ G1 モードのときだけ止める (通常運用の挙動は変えない)。
+    // `SESSION_START_MS` はブロック終了時に 0 に戻されるので、これが「ブロック中か」を表す。
+    if g1_mode().is_some() && SESSION_START_MS.load(Ordering::Acquire) == 0 {
+        return;
+    }
     if input::hook::IME_SHADOW_READY.swap(false, Ordering::AcqRel) {
         // 正常経路: IME_HIDE で dwell 計算済み
         let dwell_ms = input::hook::IME_SHADOW_DWELL_MS.swap(0, Relaxed);
@@ -1522,26 +1683,48 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
 pub fn run() {
     tracing_subscriber::fmt::init();
 
-    // セッションロガー起動
-    let log_path = logger::default_log_path();
-    let log_path_str = log_path.to_string_lossy().to_string();
-    tracing::info!("Session log: {}", log_path_str);
-
-    let (session_logger, log_tx, log_shutdown_rx, log_status) = SessionLogger::start(log_path);
-    // 実際の書込先 (fallback 時は temp パス) を採用する。
-    let resolved_log_path_str = session_logger.log_path.to_string_lossy().to_string();
-    if log_status != LogStatus::Ok {
-        tracing::error!(
-            "Session log status is not Ok: {:?} (intended {})",
-            log_status,
-            log_path_str
+    // ★ G1 モードの判定 — **起動時に 1 回だけ**読む (g1.rs のモジュールコメント参照)。
+    //   実行時トグルにすると、プローブスケジューラを「スレッドごと起こさない」ことで
+    //   「発火はしたが黙殺した」を構造的に消している設計 (下の kill switch) が崩れる。
+    let g1_source = crate::g1::detect_from_env();
+    G1_MODE
+        .set(g1_source.map(|s| s.as_str()))
+        .expect("G1_MODE is set exactly once in run()");
+    if let Some(src) = g1_source {
+        tracing::warn!(
+            "G1 MODE ENABLED (source={}): session log rotates per block, blocks auto-end at {} ms, \
+             probe scheduler will NOT start. \
+             See experiments/20260801-controlled-friction-task/preregistration.md 5.4.",
+            src.as_str(),
+            crate::g1::BLOCK_DURATION_MS
         );
     }
+
+    // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
+    //
+    // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
+    //   NDJSON を作ってから死ぬ (実測で 0 行のファイル・decisions R-8 結果 4)。
+    //   `gse-submit` は最新 1 本を選ぶので、★ 被験者が「提出する」を押すと空の `.age` が出る。
+    // ★ 一次資料 (`tauri` 2.10.2 `src/app.rs`) で確認した順序:
+    //   プラグインの `exit(0)` は `Builder::build()` 末尾の `initialize_plugins` で走り、
+    //   **`.setup()` クロージャはその後の `App::run()` の中**で呼ばれる。
+    //   → ★ 実際にファイルを開くのは `.setup()` の中 (`log_channel.start(..)`)。
+    //   ここでは channel と共有ハンドルだけを作り、スレッド群に配る。
+    let log_path = logger::default_log_path();
+    let log_path_str = log_path.to_string_lossy().to_string();
+    tracing::info!("Session log (will open in setup): {}", log_path_str);
+
+    let log_channel = logger::LogChannel::new();
+    let log_tx = log_channel.tx.clone();
+    let log_shutdown_rx = log_channel.shutdown_rx.clone();
+    // ★ 書込先はローテートで変わる。値をコピーせず共有ハンドルを配る。
+    //   `start()` が**この同じ Arc を上書き**するので、`.manage()` の順序は変えなくてよい。
+    let log_target = log_channel.target.clone();
 
     // LogState を Arc<Mutex> でラップして Tauri state に渡す
     let log_state = Arc::new(Mutex::new(LogState {
         tx: log_tx.clone(),
-        path: resolved_log_path_str,
+        target: log_target.clone(),
         shutdown_rx: log_shutdown_rx,
     }));
 
@@ -1555,6 +1738,8 @@ pub fn run() {
     // セッションアクティブフラグ (start_session まで false → 分析スレッドがドレイン)
     let session_active = Arc::new(AtomicBool::new(false));
     let session_active_for_thread = session_active.clone();
+    // ★ G1: ブロック自動終了スレッド用 (5 分でブロックを閉じる)。
+    let session_active_for_g1 = session_active.clone();
 
     let initial_now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1571,6 +1756,7 @@ pub fn run() {
     let log_tx_ime_poll = log_tx.clone();
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
+    let log_tx_g1 = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -1609,9 +1795,14 @@ pub fn run() {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
             if !session_active_for_thread.load(Ordering::Acquire) {
                 while rx.try_recv().is_ok() {}
+                // ★ G1: 「もうこのスレッドは LogEntry を投げない」ことの表明。
+                //   ブロック終了スレッドがこれを観測してから session_end を書く。
+                ANALYSIS_IDLE.store(true, Ordering::Release);
                 thread::sleep(Duration::from_millis(50));
                 continue;
             }
+            // ★ ここから先は Key/Feat を送りうる。**recv_timeout に入る前に**表明を降ろす。
+            ANALYSIS_IDLE.store(false, Ordering::Release);
 
             // start_session コマンドによるリセット要求をチェック
             if should_reset_for_thread.swap(false, Ordering::AcqRel) {
@@ -1793,6 +1984,31 @@ pub fn run() {
     let log_state_for_shortcut = log_state.clone();
 
     let builder = tauri::Builder::default();
+
+    // ★★ 二重起動の検出。**公式文書の指示どおり最初に登録する**
+    //    (「The Single Instance plugin must be the first one to be registered to work well」)。
+    //
+    // ⚠️ ★ なぜ要るか (2026-08-05 の実測・decisions R-7):
+    //    `/Applications/gse-next.app` と G1 フォルダのコピーは **同じ bundle ID でも
+    //    別プロセスとして平然と共存し、NDJSON が 2 本に割れた**。
+    //    ★ 「macOS は 2 個目のインスタンスを起動しない」は **この形では成立しない**。
+    //    2 つが同時に走ると両方がキーボードを掴み、打鍵が 2 本に分かれる (protocol.md §2-3)。
+    //
+    // 2 個目のプロセスはプラグインが終了させ、このコールバックは **1 個目**で走る。
+    // ★ 黙って前面に出すだけにしない: 画面へ通知して fail-loud にする
+    //   (被験者から見ると「開いたのに何も起きない」ため、理由が分からないと詰む)。
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        tracing::warn!(
+            "second instance launch detected and blocked (G1: two instances would split keystrokes \
+             across two NDJSON files; see protocol.md 2-3)"
+        );
+        if let Some(win) = app.get_webview_window("main") {
+            let _ = win.show();
+            let _ = win.set_focus();
+        }
+        let _ = app.emit("second-instance-blocked", ());
+    }));
+
     // macOS: overlay 窓を非アクティブ NSPanel 化するためのプラグイン (decisions D7)。
     // crate 自体が macОS 限定依存のため登録も cfg ゲートする。
     #[cfg(target_os = "macos")]
@@ -1902,6 +2118,26 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            // ★★ セッションログのファイルを**ここで初めて開く** (follow-up F-3)。
+            //
+            // ⚠️ ★ ここに来ている = **single-instance プラグインに止められなかった** ということ
+            //   である (プラグインの `exit(0)` は `Builder::build()` の中で走り、この
+            //   クロージャは `App::run()` の中で呼ばれる。一次資料: `tauri` 2.10.2 `src/app.rs`)。
+            //   → ★ 2 個目のプロセスは **NDJSON を作らずに死ぬ**。
+            // ⚠️ これは提出側の `has_any_data_row` を**置き換えるものではない**。
+            //   起動直後のクラッシュ等でも空ファイルは出るので、両方残す。
+            let (session_logger, log_status) = log_channel.start(log_path, g1_source);
+            if log_status != LogStatus::Ok {
+                tracing::error!(
+                    "Session log status is not Ok: {:?} (intended {})",
+                    log_status,
+                    log_path_str
+                );
+            }
+            // `SessionLogger` を drop すると JoinHandle が detach されるだけで、
+            // consumer スレッドは走り続ける (従来 `run()` 末尾での drop と同じ挙動)。
+            drop(session_logger);
+
             // --- キーボードフック・IME ポーリングの初期化 ---
             // Tauri の setup() はメインスレッドで、Tauri ランタイム初期化完了後に実行される。
             // ウィンドウシステムが完全に初期化された後にフックをインストールすることで、
@@ -1914,6 +2150,103 @@ pub fn run() {
 
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);
+
+            // ★★ G1: 他の GSE が動いていないかを OS に聞く（プラグインの**穴を埋める**）。
+            //
+            // ⚠️ ★ 2026-08-05 の実測: `tauri-plugin-single-instance` は
+            //   **両方のビルドがプラグインを持っている**ときにしか効かない。
+            //   **プラグインの無い旧ビルド**（被験者の /Applications にある Phase1 用）と
+            //   新ビルドは **2 プロセス同時に走った**。★ これが protocol.md §2-3 の
+            //   「打鍵が 2 本の NDJSON に割れる」当のシナリオである。
+            //
+            // ★ ここでは**止めない**（列挙の失敗や名前の一致ミスで実施を潰さないため）。
+            //   代わりに**画面に出す**。判断は人に返す。
+            // ★ setup() を塞がないよう別スレッドで。窓が出てから知らせる (1.5s)。
+            //   ⚠️ これは**起動時の 1 回**。ブロック開始ごとの検査は `start_session` にある
+            //   (follow-up F-1)。★ 片方だけでは「起動後に旧アプリを開かれる」を捕まえられない。
+            if g1_mode().is_some() {
+                spawn_duplicate_instance_check(
+                    app.handle().clone(),
+                    Duration::from_millis(1500),
+                    "at startup",
+                );
+            }
+
+            // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。
+            //
+            // ⚠️ ★ なぜアプリ側に置くか (D-6 の「見直しタイミング」の決着):
+            //   記入ページ (writing-pad.html) は **被験者の打鍵を止める** 役 (readOnly + 告知)。
+            //   本スレッドは **NDJSON のブロック境界を切る** 役である。役割が違うので二重ではない。
+            //   ★ 手順は「ページを開く → 開始する」の順に統一したので、ページの 5:00 が
+            //   先に来る = ★ **打鍵の取りこぼしが構造的にゼロ**になる (protocol.md §4.2 / §4b.2)。
+            //
+            // ⚠️ ★ ブラウザ側の setTimeout ではなく Rust スレッドにした理由:
+            //   G1 実施中、GSE の窓は**背面**にある (被験者はブラウザを見ている)。
+            //   WebView の背面タイマーはスロットリングされうるため、ログ境界を託せない。
+            //
+            // ⚠️ ★ 残り時間は emit しない。`§4.4` が「残り時間のアナウンスをしない」と定めており、
+            //   カウントダウンは `§2.2` が却下した「時間圧」を全ブロックに入れることになる。
+            //   出すのは「終わった」1 回だけである。
+            if g1_mode().is_some() {
+                let app_handle = app.handle().clone();
+                let block_log_tx = log_tx_g1;
+                let block_session_active = session_active_for_g1;
+                thread::spawn(move || {
+                    tracing::info!(
+                        "G1: block auto-end thread started (limit={} ms)",
+                        crate::g1::BLOCK_DURATION_MS
+                    );
+                    loop {
+                        thread::sleep(Duration::from_millis(500));
+                        let start = SESSION_START_MS.load(Ordering::Acquire);
+                        if start == 0 {
+                            continue; // ブロック未開始
+                        }
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        if now.saturating_sub(start) < crate::g1::BLOCK_DURATION_MS {
+                            continue;
+                        }
+
+                        // 1) 先に分析スレッドを止める。⚠️ ★ これを後にすると
+                        //    `session_end` の**後ろ**に feat / key 行が続きうる。
+                        block_session_active.store(false, Ordering::Release);
+                        SESSION_START_MS.store(0, Ordering::Release);
+
+                        // 2) ⚠️★ **分析スレッドがドレインに入ったことを観測してから**進む。
+                        //    固定 sleep では足りない: 分析スレッドは既に recv_timeout に入って
+                        //    いて **次の 1Hz マークまで最大 ~1000ms** ブロックしうるので、
+                        //    その在庫 1 イテレーションが session_end を追い越して
+                        //    Key/Feat を投げる (code-review HIGH)。
+                        let deadline = Instant::now() + Duration::from_millis(1500);
+                        while !ANALYSIS_IDLE.load(Ordering::Acquire) {
+                            if Instant::now() >= deadline {
+                                // ★ 黙って進まない。追い越しが起きたかもしれないことを残す。
+                                tracing::warn!(
+                                    "G1: analysis thread did not go idle within 1500ms; \
+                                     a feat/key line may follow session_end in this block"
+                                );
+                                break;
+                            }
+                            thread::sleep(Duration::from_millis(20));
+                        }
+
+                        // 3) ブロックを閉じる。⚠️ ★ ここでは**新しいファイルを開かない**
+                        //    (10 ブロック目の後に空の 11 本目が残り、`gse-submit` が
+                        //    最新 1 本としてそれを出してしまうため)。開くのは次の start_session。
+                        if let Err(e) = block_log_tx.try_send(LogEntry::BlockEnd) {
+                            tracing::error!("G1: FAILED to close block: {}", log_send_error(e));
+                        } else {
+                            tracing::info!("G1: block auto-ended at {} ms", now);
+                        }
+
+                        // 4) 画面へ通知 (スタート画面へ戻す)。★ 「終わった」だけを伝える。
+                        let _ = app_handle.emit("g1-block-ended", ());
+                    }
+                });
+            }
 
             // Task B: ランダム時点プローブの専用スケジューラスレッド (DB-2)。
             // 1Hz Analysis Thread はレイテンシ要件があり AppHandle も持たないため、
@@ -1933,17 +2266,28 @@ pub fn run() {
                     decide_probe_init, driver_idle_ms, probes_disabled_by_env, ProbeConfig,
                     ProbeInitDecision, ProbeScheduler,
                 };
-                let probes_disabled =
+                // ★ 引き金は 2 本ある (preregistration.md §5.4 第 10 版 / D-7)。
+                //   ⚠️ ★ **env の経路を消していない。** G1 モード (フォルダのマーカー) を
+                //   **第 2 の引き金として足した**だけである。したがって:
+                //     - 「G1 の実施時はプローブスケジューラを起動しない」 → 強化される
+                //     - 「既定 (未設定) では従来どおり起動する」          → 無変更
+                //     - 合格経路                                          → 1 本も増えない
+                //   ★ §5.4-2 の客観検証 (validate_blocks.py で probe 行 0) はそのまま残す。
+                let disabled_by_env =
                     probes_disabled_by_env(std::env::var("GSE_DISABLE_PROBES").ok().as_deref());
+                let disabled_by_g1 = g1_mode();
+                let probes_disabled = disabled_by_env || disabled_by_g1.is_some();
                 if probes_disabled {
                     // ★ 実施ログに必ず 1 行残す。実機で「止まっているつもり」を防ぐ番兵であり、
                     // 実施後の客観検証は NDJSON 側 (probe_assignment 行 0) で行う。
                     tracing::warn!(
-                        "probe scheduler DISABLED by GSE_DISABLE_PROBES=1 \
-                         (G1 controlled-friction experiment; preregistration.md 2.6). \
+                        "probe scheduler DISABLED (env={}, g1_mode={:?}) \
+                         (G1 controlled-friction experiment; preregistration.md 2.6 / 5.4). \
                          No scheduled probe_assignment / probe_triggered will be produced. \
                          NOTE: the self-marker hotkey is user-initiated and is NOT gated here; \
-                         G1 forbids pressing it (protocol.md)."
+                         G1 forbids pressing it (protocol.md).",
+                        disabled_by_env,
+                        disabled_by_g1
                     );
                 }
                 let app_handle = app.handle().clone();
@@ -2145,7 +2489,7 @@ pub fn run() {
         .manage(SessionActive(session_active))
         .manage(LatestFeatState(latest_feat))
         .manage(InterventionState(intervention_state))
-        .manage(LogStatusState(log_status))
+        .manage(LogStatusState(log_target))
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cognitive_state,
@@ -2155,6 +2499,7 @@ pub fn run() {
             debug_force_probe,
             debug_overlay_window_state,
             get_log_status,
+            get_g1_mode,
             record_intervention_dismiss,
             get_keyboard_idle_ms,
             get_last_keypress_timestamp,

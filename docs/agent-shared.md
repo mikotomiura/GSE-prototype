@@ -31,7 +31,8 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 - `src/` — React/TypeScript フロントエンド (UI / Tauri IPC のみ。ビジネスロジック禁止)
 - `src-tauri/src/input/` — OS レベル入力キャプチャ (`hook_*` / `ime_*`、プラットフォーム固有)
 - `src-tauri/src/analysis/` — 認知状態推定 (features / engine / loop_step / intervention / probe_scheduler / metrics、OS 非依存)
-- `src-tauri/src/` — `lib.rs` (統合・IPC・スレッド起動)、`logger.rs`、`wall_server.rs`、`schema_dto.rs`
+- `src-tauri/src/` — `lib.rs` (統合・IPC・スレッド起動)、`logger.rs`、`wall_server.rs`、`schema_dto.rs`、
+  `g1.rs` (G1 統制タスク実験モードの判定・OS API 非依存)
 - `src-tauri/bin/` — `gse-replay` (回帰/評価 CLI)、`emit_schema` (JSON Schema 生成)
 - `docs/` — 永続ドキュメント (5 ファイル + `external-skills.md` + 設計書 PDF)
 - `.steering/` — タスク単位の作業記録 (`[YYYYMMDD]-[task-name]/`)

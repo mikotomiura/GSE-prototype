@@ -85,7 +85,7 @@
 
 ## 3. スレッドモデル
 
-GSE は 7 つのスレッド/タスクで構成される。
+GSE は 7 つのスレッド/タスクで構成される (★ G1 モード時のみ 2 つ増える)。
 
 | スレッド | 責務 | 通信方式 | 優先度 |
 |---|---|---|---|
@@ -96,6 +96,8 @@ GSE は 7 つのスレッド/タスクで構成される。
 | **IME Polling** | Win: ImmGet\* / mac: TIS ポーリング (GCD メインキュー経由) | Atomic IME_OPEN | 低 |
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
 | **Probe Scheduler** | v0.3 較正: ランダム時点プローブの一様時刻生成 (Poisson+thinning) → `probe_assignment` ログ + `probe_triggered` emit。純ロジックは `analysis/probe_scheduler.rs` (OS API 非依存) | Atomic SESSION_START_MS 読取, LogEntry Sender, AppHandle emit | 低 |
+| **G1 Block End** | ★ **G1 モード時のみ起動**。`g1::BLOCK_DURATION_MS` (5 分) でブロックの記録を終了し、`BlockEnd` 送信 + `g1-block-ended` emit | Atomic SESSION_START_MS / ANALYSIS_IDLE, LogEntry Sender, AppHandle emit | 低 |
+| **G1 Duplicate Check** | ★ **G1 モード時のみ・起動 1 回**。他の GSE プロセスを OS に問い合わせ (`pgrep` / `tasklist`)、居れば `second-instance-blocked` emit | AppHandle emit | 低 |
 
 純スケジューリング (指数間隔・thinning・窓計算・不透明 ProbeId 生成) は `analysis/probe_scheduler.rs` に隔離し OS API を呼ばない。スレッド起動・実時刻取得・emit・hotkey 配線は `lib.rs` 側に閉じる (architecture-rules)。
 
@@ -204,6 +206,16 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   `LogStatus { Ok | Fallback | Disabled }` として返され、`get_log_status` IPC 経由で Dashboard が
   **fail-loud バナー**を常時表示する（静かな全損を撲滅）。NDJSON はキーストローク動態を含むため unix では
   `file=0600` に制限する。詳細は `data-privacy` Skill / `.steering/20260626-phase1-card-repro-backend-fix/`。
+- ★ **G1 ローテート (2026-08-05)**: `LogEntry::BlockEnd` (現ファイルに `session_end` を書いて閉じる)
+  と `LogEntry::Rotate { new_path }` (旧ファイルを閉じ、新ファイルを **新ファイルの実時刻の `meta`** で開く)
+  を追加。★ **閉じるのと開くのを分けてある**——ブロック終了時に新ファイルを開くと
+  10 ブロック目の後に `meta` 1 行だけの 11 本目が残り、`gse-submit` (最新 1 本を選ぶ) が
+  空ファイルを提出してしまうため。開くのは次の `start_session` だけ。
+  `block_closed` フラグにより `session_end` は **1 ファイルにつき 1 行**になる。
+  書込先は `SharedLogTarget = Arc<Mutex<LogTarget{path,status}>>` で共有し、
+  ⚠️ ローテート先が temp に落ちたときも `get_log_status` の fail-loud バナーが追随する。
+  ⚠️ ファイル名は秒粒度なので `unique_path_from` が **logger スレッド内で**衝突を避ける
+  (前ブロックの `truncate` による静かな全損の防止)。
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
 - **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
@@ -290,6 +302,32 @@ TransitionPath はバッファに実データがあるため onset を遅め (8s
 #### 拡張時の注意
 
 Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 0.3.0)。`pre_silence_features` を TypingPath でキャプチャし、TransitionPath / SilencePath で F3/F6 文脈フロアとして使用する。両パスの式・onset は**独立に維持する**こと（統合禁止）。設計詳細は `.steering/20260416-phase2a-synthetic-friction/design.md` を参照。
+
+### 4.12 g1 — G1 統制タスク実験モード (2026-08-05)
+
+- **責務**: 「いま G1 統制タスク実験の実施中か」**だけ**を判定する。効果の適用は `lib.rs` が行う
+- **依存先**: なし (std のみ。`current_exe()` とプロセス列挙以外は純関数)
+- **引き金 2 本** (`experiments/20260801-controlled-friction-task/preregistration.md §5.4-5`):
+  - `marker` — 実行ファイルを**包むフォルダ**に `g1.mode` がある (配布形。mac は exe の 4 階層上 / Windows は 1 階層上)
+  - `env` — `GSE_G1_MODE=1` (開発・検証用)
+- ⚠️ ★ **起動時に 1 回だけ読み `OnceLock` に固定する。実行時トグルにしない。**
+  プローブスケジューラは「スレッドごと起こさない」ことで「発火はしたが黙殺した」状態を
+  構造的に消しており、実行時に切り替えられるとその性質が崩れる
+- **G1 モードで起きること** (いずれも既定では起きない):
+  1. プローブスケジューラを起こさない (★ 既存の `GSE_DISABLE_PROBES=1` は**無変更**。OR で足しただけ)
+  2. `start_session` 2 回目以降でログをローテート (1 ブロック = NDJSON 1 ファイル)
+  3. 5 分でブロックの記録を自動終了 (⚠️ **残り時間は出さない**。時間圧を入れないため)
+  4. 二重起動を検出して画面に出す
+  5. `meta` 行に `"g1_mode":"marker"|"env"` を刻む ＋ スタート画面に「G1 モードで動作しています」
+- ⚠️ ★ **マーカーは `.app` の中に置けない**——実測で `codesign --verify --strict` が
+  `a sealed resource is missing or invalid` になる。置き場所はバンドルの外だけである
+- **非回帰**: G1 モードでないとき `meta` 行は従来と **byte-identical**
+  (ゴールデンスナップショットと既存フィクスチャがこれに依存)
+- ★ **例外**: `tauri-plugin-single-instance` だけは**通常運用にも効く**
+  (2 個同時起動は Phase1 でも打鍵を 2 本の NDJSON に割る不具合なので、止めるほうが正しい)。
+  ⚠️ ただしプラグインを持たない**旧ビルドとは共存する**ことを実測済みで、
+  G1 モードではプロセス名の検査で二重化してある
+- 詳細: `.steering/20260805-g1-app-mode-and-log-rotation/`
 
 ## 5. データフロー
 

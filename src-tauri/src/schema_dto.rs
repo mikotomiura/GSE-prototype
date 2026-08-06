@@ -47,6 +47,17 @@ pub enum LogEntryDto {
         hmm_version: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         session_end: Option<u64>,
+        /// G1 統制タスク実験モードの引き金 (`"marker"` | `"env"`)。**start 形状のみ**。
+        ///
+        /// ⚠️ ★ **G1 実施時にしか出ない**ので、通常運用の NDJSON は従来と byte 単位で同一である
+        /// (ゴールデンスナップショットと既存フィクスチャの非回帰がこれに依存する)。
+        ///
+        /// ★ なぜ記録するか: マーカーが外れる / アプリをフォルダの外に出す /
+        /// launcher の `open -a` で通常アプリが起動する、のいずれでも**黙って通常モードになる**。
+        /// この行が無いブロックは「G1 モードで取れていない」と**事後に判定できる**
+        /// (`preregistration.md §5.4` 第 10 版 / `.steering/20260805-g1-app-mode-and-log-rotation`)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        g1_mode: Option<String>,
     },
     /// ユーザーが「開始する」ボタンを押した時刻。
     SessionStart { t: u64 },
