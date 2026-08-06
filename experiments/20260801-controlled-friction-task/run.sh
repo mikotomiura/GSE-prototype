@@ -151,9 +151,19 @@ rm -f "$TMP_T"
 if ! command -v node > /dev/null 2>&1; then
   bad "node が無いので Form_G1 のガード検査を実行できない（★ 飛ばさず赤にする）"
 else
+  # ⚠️★ 件数は **出力から読む**。ここに数字を書き込むと、ケースを足したときに
+  #   表示だけが古い数字のまま残り、「20 / 20 通った」が実体と無関係になる
+  #   (2026-08-07 に実際に起きた: 33 ケースあるのに 20 と表示していた)。
+  #   ⚠️ 読めなかったら数字を捏造せず「件数不明」と出す (0 と書くと通過に見える)。
+  guard_count() {
+    local n
+    n=$(sed -n 's/^全 \([0-9]*\) ケース期待どおり$/\1/p' "$1" | tail -1)
+    echo "${n:-件数不明}"
+  }
+
   TMP_G=$(mktemp)
   if node ../../Form_G1/guard_test.cjs > "$TMP_G" 2>&1; then
-    ok "G1 フォームの作り直しガードが効いている（4 / 4 ケース）"
+    ok "G1 フォームの作り直しガードが効いている（$(guard_count "$TMP_G") ケース全通過）"
   else
     sed 's/^/    /' "$TMP_G"
     bad "G1 フォームの作り直しガードが期待どおり動いていない"
@@ -169,7 +179,7 @@ else
   #      9 種すべてで赤になる**ことを実測済み（9 / 9）。
   TMP_S=$(mktemp)
   if node ../../Form_G1/submit_guard_test.cjs > "$TMP_S" 2>&1; then
-    ok "G1 提出受け口 (doPost) のガードが効いている（20 / 20 ケース）"
+    ok "G1 提出受け口 (doPost) のガードが効いている（$(guard_count "$TMP_S") ケース全通過）"
   else
     sed 's/^/    /' "$TMP_S"
     bad "G1 提出受け口 (doPost) のガードが期待どおり動いていない"
