@@ -36,6 +36,25 @@ if [ "${1:-}" = "--ack-filtered" ]; then
   shift
 fi
 
+# ⚠️★★ 残りの引数は `<range> [-- <paths>]` **だけ**に絞る (security-checker 指摘)。
+#   ★ `--` 以外のオプションを通すと `git diff --no-index <repo 外のパス>` が書け、
+#   ⚠️ **追跡外・repo 外のファイルを Codex に送れてしまう**。
+#   実測: `g1-submit.json` (endpoint + SHARED_SECRET) は .gitignore で通常の git diff には
+#   出ないが、`--no-index` は index も ignore も無視するので到達する。
+#   ★ このラッパの存在理由は「パラメータを固定すること」なので、入力範囲も固定側に含める。
+seen_ddash=0
+for a in "$@"; do
+  if [ "$a" = "--" ]; then
+    seen_ddash=1
+    continue
+  fi
+  if [ "$seen_ddash" -eq 0 ] && [ "${a#-}" != "$a" ]; then
+    echo "[run-codex-review] FAILED: オプションは受け付けません: $a" >&2
+    echo "[run-codex-review] 受け付ける形: <base>..<head> [-- <path> ...]" >&2
+    exit 1
+  fi
+done
+
 PYTHON=$(command -v python3 || command -v python || true)
 if [ -z "$PYTHON" ]; then
   echo "[run-codex-review] FAILED: python not found (予算管理/JSON パースに必須)" >&2
@@ -72,15 +91,20 @@ fi
 # 呼び出し側が「機密でブロック」と「codex 故障」を取り違える。
 # cwd に依存すると `cd src-tauri` した状態から呼んだだけでフィルタが見つからず
 # rc=127 (= "secrets-filter error") になる。repo root 基準で引く。
-"$ROOT/scripts/secrets-filter.sh" < "$TMPDIR_WORK/raw.diff" > "$TMPDIR_WORK/input.diff"
+SECRETS_FILTER_REPORT="$TMPDIR_WORK/filter-report.txt" \
+  "$ROOT/scripts/secrets-filter.sh" < "$TMPDIR_WORK/raw.diff" > "$TMPDIR_WORK/input.diff"
 rc=$?
 if [ "$rc" -ne 0 ]; then
   if [ "$rc" -eq 2 ]; then
     if [ "$ACK_FILTERED" -eq 1 ]; then
       echo "[run-codex-review] WARN: secrets-filter がヒットしたが --ack-filtered で続行する" >&2
       echo "[run-codex-review] WARN: 送信するのは**フィルタ後**の差分である" >&2
-      grep -c '^\[secrets-filter\] SKIPPED' "$TMPDIR_WORK/input.diff" \
-        | sed 's/^/[run-codex-review] WARN: 除去された hunk 行数: /' >&2
+      # ⚠️★ **どの行がなぜマッチしたかを出す** (security-checker 指摘)。
+      #   ★ 以前は「除去された hunk 行数」だけを出していたが、それは **安全な側**
+      #   (中身が消えた部分) の件数であり、人が確かめるべき行内マッチが 1 件も見えなかった。
+      #   ⚠️ 値そのものは出さない (端末とスクロールバックに秘密を残さない)。
+      echo "[run-codex-review] WARN: 人が確認すべき箇所 (行番号と理由。値は出さない):" >&2
+      sed 's/^/[run-codex-review]   raw.diff:/' "$TMPDIR_WORK/filter-report.txt" >&2
     else
       echo "[run-codex-review] BLOCKED: secrets-filter detected sensitive content" >&2
       echo "[run-codex-review] 誤検知だと人が確認できた場合のみ --ack-filtered を付けて再実行する" >&2
