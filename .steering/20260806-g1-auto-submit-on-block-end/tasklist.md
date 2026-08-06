@@ -119,6 +119,15 @@
         | 4 | `is_closed_g1_session` の文字列一致が脆い | ★ **却下** | D-20。emit_schema ＋ golden が形を固定している |
         | 5 | `.ok` を付けた後に `.age` が消えた場合の再収束テストが無い | ★ 却下 | 消えた `.age` は**新しいブロック番号**で包み直されるので `.ok` は一致しない（`next_block_number` は max+1）。孤児 `.ok` は無害 |
       - ★ 重複報告はゼロだった（Claude 側で潰した 7 件と 1 件も重ならない）。
+- [x] ⚠️★★ **2 周目**: 上の修正そのものを `security-checker` ＋ Codex に掛けた
+      → ★ **レビュー基盤に足した仕掛けが新しい穴になっていた**（`decisions.md` **D-21**）。
+      - ⚠️ `secrets-filter` は「大文字小文字無視」と**書いてあるだけ**で、
+        `"secret": "…"`（★ `g1-submit.json` そのものの形）が **rc=0 で素通り**していた
+      - ⚠️★ wrapper の引数が素通しで `git diff --no-index` が書け、
+        **`.gitignore` した `g1-submit.json` に到達できた**（実測）
+      - → 両方塞ぎ、`scripts/secrets-filter-test.sh`（17）と
+        `scripts/run-codex-review-test.sh`（7）で**壊して赤を実測**した
+      - ★ Codex の `ROOT` 未定義指摘は**誤検知**（差分の外で定義済み）
 - [x] ~~⚠️★ `/cross-review` — 未実施~~（★ 以下は前セッションの skip 理由。経緯として残す）
       - ★ **予算はその場で計算した**（⚠️ メモの数字は使っていない）:
         - 全体差分 = **25 files / 4,395 insertions / 181 deletions = 4,576 行**
@@ -150,4 +159,9 @@
 ## 7. 完了処理
 
 - [x] decisions.md に D-7〜D-11 を追記し、未確定 #1/#2/#3 を閉じた（残るは #5）
-- [ ] `/finish-task`
+- [x] `/finish-task`（2026-08-07）
+      - schema parity check: **skip**（★ `schema_dto.rs` / `schema/current.json` は触っていない）
+      - `cargo test --workspace` **289** / `--features package` **311** + bin 23/7/2
+      - golden 4 本 byte-equal / `emit_schema` byte-equal / `npx tsc --noEmit` 緑
+      - `bash run.sh` **GREEN**（★ cargo ゲートが "2 / 2 本" で実走・受け口ガード **33 ケース**）
+- [ ] ⚠️★ **push と PR** — ★ 研究者の判断待ち（前セッションは権限で拒否された）
