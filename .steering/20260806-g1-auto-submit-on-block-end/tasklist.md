@@ -4,7 +4,9 @@
 
 ## 0. 準備
 
-- [ ] ★ `data-privacy` Skill を読む（**外部送信を足すので必須**）
+- [x] ★ `data-privacy` Skill を読む（**外部送信を足すので必須**）
+      → ⚠️ ★ **ルール 3 との緊張が 1 件出た**（`decisions.md` の「まだ決めていないこと」#5）
+- [x] ★ `browser-verification` Skill を読む（GAS を実機で触るため）
 - [ ] `architecture-rules` / `rust-standards` / `typescript-standards` を読む
 - [ ] `.steering/20260805-g1-app-mode-and-log-rotation/decisions.md` R-7 / R-8 / **R-9** を読む
       （★ R-9 は「蒸し返さない」ことの確認）
@@ -19,10 +21,11 @@
 - [ ] ローテート後に「閉じたばかりのファイルのパス」を取れるか確認する
       （`logger.rs` / `lib.rs` の `g1-block-ended` 発火経路）
 - [ ] Tauri 2.0 で HTTP を出す経路（`tauri-plugin-http` / `reqwest` 直）と CSP の要件を確認する
-- [ ] ⚠️ GAS Web App の **POST サイズ上限・実行時間上限**を実測する（★ 推測で書かない）
-      → `.age` の実サイズは P-1 の 4 本で見積もる
-- [ ] ⚠️★ **Q-3**: GAS の実行ログに**接続元・日時が何まで残るか**を実測する
-      （★ 同意文書に書く内容なので、**推測で埋めてはいけない**）
+- [x] ⚠️ GAS Web App の **POST サイズ上限**を実測する → `gas-measurements.md` §2
+      （★ 300 KB は 1.45 s で通過。**50 MB まで通ったところで打ち切り＝上限は未到達**）
+- [ ] ⚠️ GAS の**実行時間上限** → ★ **未実測。** ⚠️ `DriveApp` 保存を含む本番形で測り直す
+- [x] ⚠️★ **Q-3**: GAS の実行ログに**接続元・日時が何まで残るか**を実測する
+      → `gas-measurements.md` §1（★ **陽性対照つき**。⚠️ Google 社内の記録は確認不能と明記）
 - [ ] ★ 「× で閉じてもプロセスが残る」（`overlay` 窓が生き残る）を本タスクで決着させる
       → 再送キューがいつ回るかがこれに依存する
 
@@ -32,8 +35,9 @@
 - [ ] ★ **`/reimagine`**: requirement.md だけを見て v2 案を作り、2 案を比較して採用を決める
 - [ ] decisions.md の「まだ決めていないこと」4 件を閉じる
 - [x] ★ `consent.md` の**文案**を出す → `consent-draft.md`（★ 実装より先）
-- [ ] ⚠️ ★ 研究者が `consent-draft.md` §5 の **Q-1〜Q-4** を判断する（**ここで止まっている**）
-- [ ] ★ 承認後、`consent.md` / `Form_G1/README.md` / `protocol.md §4.1-1` を **同時に**直す
+- [x] ⚠️ ★ 研究者が `consent-draft.md` §5 の **Q-1〜Q-4** を判断する
+      → ★ **Q-1 / Q-2 / Q-4 = 研究者判断（D-4 / D-5 / D-6）**、**Q-3 = 実測で確定**
+- [ ] ★ `consent.md` / `Form_G1/README.md` / `protocol.md §4.1-1` を **同時に**直す ← ★ **次はここ**
 
 ## 3. 実装
 
