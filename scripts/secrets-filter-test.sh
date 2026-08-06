@@ -72,6 +72,26 @@ expect_clean "ふつうのコメント"   '// 送信先は配布フォルダの�
 expect_clean "ふつうの diff 見出し" 'diff --git a/src-tauri/src/reconcile.rs b/src-tauri/src/reconcile.rs'
 expect_clean "型注釈のコロン"     'let block: u32 = 3;'
 
+echo "--- 4. ★ レポート (SECRETS_FILTER_REPORT) に値そのものを書かない ---"
+# ⚠️ レポートは `--ack-filtered` のときに **端末へ出す**。値を書くと
+#   スクロールバックとログに秘密が残る (cross-review 指摘)。
+{
+  rep=$(mktemp)
+  printf 'ok\nconst secret = "TOPSECRETVALUE9"\n' \
+    | SECRETS_FILTER_REPORT="$rep" "$FILTER" > /dev/null
+  total=$((total + 1))
+  if [ ! -s "$rep" ]; then
+    echo "NG   レポートが空 (どの行がマッチしたか分からない)"
+    ng=$((ng + 1))
+  elif grep -qF 'TOPSECRETVALUE9' "$rep"; then
+    echo "NG   レポートに値が書かれている: $(cat "$rep")"
+    ng=$((ng + 1))
+  else
+    echo "OK   レポートは行番号と理由だけ → $(tr '\n' ' ' < "$rep")"
+  fi
+  rm -f "$rep"
+}
+
 echo
 if [ "$ng" -eq 0 ]; then
   echo "全 $total ケース期待どおり"

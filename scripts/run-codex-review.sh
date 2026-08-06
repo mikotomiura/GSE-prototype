@@ -42,14 +42,24 @@ fi
 #   実測: `g1-submit.json` (endpoint + SHARED_SECRET) は .gitignore で通常の git diff には
 #   出ないが、`--no-index` は index も ignore も無視するので到達する。
 #   ★ このラッパの存在理由は「パラメータを固定すること」なので、入力範囲も固定側に含める。
+#   ⚠️ ★ コメントと実装を一致させる: `--` の前は **range を高々 1 個**しか許さない
+#   (「`-` で始まらなければ何個でも通る」だと、書いてある形より広い・cross-review 指摘)。
 seen_ddash=0
+ranges=0
 for a in "$@"; do
   if [ "$a" = "--" ]; then
     seen_ddash=1
     continue
   fi
-  if [ "$seen_ddash" -eq 0 ] && [ "${a#-}" != "$a" ]; then
+  [ "$seen_ddash" -eq 1 ] && continue
+  if [ "${a#-}" != "$a" ]; then
     echo "[run-codex-review] FAILED: オプションは受け付けません: $a" >&2
+    echo "[run-codex-review] 受け付ける形: <base>..<head> [-- <path> ...]" >&2
+    exit 1
+  fi
+  ranges=$((ranges + 1))
+  if [ "$ranges" -gt 1 ]; then
+    echo "[run-codex-review] FAILED: range は 1 個までです ('--' の前に $a)" >&2
     echo "[run-codex-review] 受け付ける形: <base>..<head> [-- <path> ...]" >&2
     exit 1
   fi
