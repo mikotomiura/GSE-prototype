@@ -1254,6 +1254,89 @@ function g1EnsureRunRow_(pid) {
   return sh.getRange(row, colNote);
 }
 
+/**
+ * ★★ その被験者の課題ページフォルダを **名前で** 探す（2026-08-07）。
+ *
+ * ⚠️★★ **なぜ登録時にリンクを載せられるようになったのか。**
+ *   従来「登録時点では割付が無いので送れない」としていた。これは**手順の前提**であって
+ *   原理的な制約ではない。★ P-ID は `既存の最大値 + 1` で決まる（`g1NextParticipantId_`）ので
+ *   **次に出る番号は予測できる**。研究者が募集前に
+ *       `assign.py --subject P0XX` → `make-distribution.sh` → Drive へ配置 → 共有
+ *   まで済ませておけば、登録時にはフォルダが**既に存在する**。
+ *   ⚠️ ★ 割付は従来どおり研究者の明示的な行為のままである（`§3-1` に触れない）。
+ *   ★ GAS がやるのは「名前で探して、妥当なら URL を返す」だけで、**何も作らない**。
+ *
+ * ⚠️ 見つからなければ "" を返す。★ その場合は 2 便の従来経路に落ちる（壊れない）。
+ *
+ * @return {{url: string, problem: string}} url が空なら problem に理由が入る
+ */
+function g1MaterialsUrlForPid_(pid) {
+  if (!G1_MATERIALS_PARENT_ID) return { url: "", problem: "G1_MATERIALS_PARENT_ID が未設定" };
+  var parent;
+  try {
+    parent = DriveApp.getFolderById(G1_MATERIALS_PARENT_ID);
+  } catch (e) {
+    return { url: "", problem: "課題ページの親フォルダを開けません: " + e };
+  }
+  var it;
+  try {
+    it = parent.getFoldersByName(String(pid).trim());
+  } catch (e2) {
+    return { url: "", problem: "フォルダを探せません: " + e2 };
+  }
+  if (!it.hasNext()) {
+    return { url: "", problem: "この P-ID のフォルダがまだありません（★ 先に用意しておけば 1 通で送れます）" };
+  }
+  var folder = it.next();
+  if (it.hasNext()) {
+    // ⚠️ ★ 同名が 2 つある = どちらが正しいか機械には決められない。**送らない**。
+    return { url: "", problem: "同じ名前のフォルダが 2 つ以上あります（★ 人が片付けてください）" };
+  }
+  var url = "https://drive.google.com/drive/folders/" + folder.getId();
+  // ★ 既存のガード 7 をそのまま通す（共有し忘れ・置き場所違いをここでも捕まえる）
+  var problem = g1MaterialsFolderProblem_(url, pid);
+  if (problem) return { url: "", problem: problem };
+  return { url: url, problem: "" };
+}
+
+/**
+ * ★ 募集を始める前に、次に出る P-ID のフォルダが用意できているかを見る（引数なし・読むだけ）。
+ * ⚠️ ここが空のまま募集すると、被験者は課題ページを 2 便目まで待つことになる。
+ */
+function checkMaterialsProvisioning() {
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("❌ PHASE1_MGMT_SHEET_ID が未設定です。");
+    return;
+  }
+  var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+  if (!roster) {
+    Logger.log("❌ 「参加者ロスター」タブがありません。");
+    return;
+  }
+  var next = g1NextParticipantId_(roster);
+  var n = parseInt(String(next).replace(/^P/, ""), 10);
+  Logger.log("★ 次に発番される P-ID: " + next);
+  Logger.log("--------");
+  var ready = 0;
+  for (var i = 0; i < 5; i++) {
+    var pid = "P" + ("000" + (n + i)).slice(-3);
+    var found = g1MaterialsUrlForPid_(pid);
+    if (found.url) {
+      ready++;
+      Logger.log("✅ " + pid + ": 用意できています");
+    } else {
+      Logger.log("⚠️ " + pid + ": " + found.problem);
+    }
+  }
+  Logger.log("--------");
+  Logger.log(
+    ready > 0
+      ? "★ 先頭 " + ready + " 人ぶんは **受付メール 1 通**で課題ページまで渡せます。"
+      : "⚠️ ★ いま登録が来ると、課題ページは**別便**になります（2 便運用）。"
+  );
+  Logger.log("★ 用意の手順: assign.py --subject <P-ID> → make-distribution.sh → Drive へ配置 → 共有");
+}
+
 function g1RegisterAckSubject_() {
   return "【受付】キーボードの打ち方に関する研究 — 参加登録を承りました";
 }
@@ -1261,7 +1344,32 @@ function g1RegisterAckSubject_() {
 // ★ 受付メール。⚠️ preregistration.md §2.12 の開示範囲を守る:
 //   題材（分野）・課題の型・難易度の示唆・条件名を **書かない**。
 //   （課題文は当日その場で画面提示する = §2.13。事前に教える必要が無い。）
-function g1RegisterAckBody_(pid) {
+function g1RegisterAckBody_(pid, materialsUrl) {
+  // ★★ 課題ページのフォルダが**もう用意できていれば**、この 1 通で全部渡す（2026-08-07）。
+  //    ⚠️ 用意できていなければ「別便で送る」と書く（従来の 2 便運用に落ちる）。
+  //    ★ どちらの場合も §2.12 は守る: 本文に**題材名・課題の型・条件名・提示順を書かない**。
+  //      書くのはリンクだけで、中身はリンク先にある。
+  var hasMaterials = !!materialsUrl;
+  var materialsBlock = hasMaterials
+    ? [
+        "■ あなた専用の課題ページ（★ アプリと同じフォルダに入れてください）",
+        "    " + materialsUrl,
+        "    1. このリンクを開き、block01.html … を **すべて** 保存します",
+        "    2. ★ 上でダウンロードしたアプリのフォルダの中へ、**まとめて移してください**",
+        "    ⚠️ ★ **あなた専用です。** 他の方とは中身が違うので、共有しないでください。",
+        "    ★ 目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
+        "      ⚠️ **準備の量で評価することはありません。**",
+        "    ⚠️ ★ **当日までにご自分で開いて始めてしまわないでください。**",
+        "      開いた時点から時間を計ります（読むだけなら差し支えありません）。",
+        "",
+      ]
+    : [
+        "■ 課題の内容について",
+        "    ★ 当日お読みいただく資料は、**別便のメールでお送りします**。",
+        "      目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
+        "      ⚠️ どちらでも問題ありません。**準備の量で評価することはありません。**",
+        "",
+      ];
   return [
     "ご登録ありがとうございます。参加登録を承りました。",
     "",
@@ -1295,36 +1403,37 @@ function g1RegisterAckBody_(pid) {
     "    ⚠️ ★ **早めにお願いします。** 初回だけ、お使いの機器がキーボードの入力を",
     "      読み取ってよいか確認を出すことがあり、許可の後に開き直しが必要です。",
     "      当日その場だと、始めるまでに時間がかかってしまいます。",
-    "    ⚠️ このフォルダに課題のページは入っていません（下記のとおり別便でお送りします）。",
+    "    ⚠️ このファイルに課題のページは入っていません（課題のページは下記のとおり別にお渡しします）。",
     "",
-    "■ 課題の内容について",
-    "    ★ 当日お読みいただく資料は、**事前にメールでお送りします**（別便）。",
-    // ★ 第 9 版（§2.14）: 在宅実施があるので「お越し」と書かない。
-    "      目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
-    "      ⚠️ どちらでも問題ありません。**準備の量で評価することはありません。**",
-    "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
-    "    ・資料はすべて本実験のために作成した架空のものです。",
-    "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
-    "    ・課題文は当日も画面に表示されます。同じ画面で文章を書いていただきます。",
-    "",
-    "■ 記録するもの / しないもの",
-    "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
-    "    記録しない: ★ どの文字を打ったか（本文）、画面の内容、音声・映像",
+  ]
+    .concat(materialsBlock)
+    .concat([
+      "■ 課題について",
+      // ★ 第 9 版（§2.14）: 在宅実施があるので「お越し」と書かない。
+      "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
+      "    ・資料はすべて本実験のために作成した架空のものです。",
+      "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
+      "    ・課題文は当日も画面に表示されます。同じ画面で文章を書いていただきます。",
+      "",
+      "■ 記録するもの / しないもの",
+      "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
+      "    記録しない: ★ どの文字を打ったか（本文）、画面の内容、音声・映像",
     // ⚠️ ★ 紙署名は 2026-08-03 に廃止した（D-1(a)）。このフォーム（G1-C）の回答が同意の正本である。
     //    ⚠️ ここを「署名をお願いします」に戻すと、protocol.md §4.1-1 / consent.md /
     //       Form_G1/README.md と食い違う。**4 か所を同時に直すこと。**
-    "    ※ 書いた文章そのものは保存しません。ご同意はこのフォームの回答で完了しています。",
-    "",
-    "■ 当日までにお願いしたいこと",
-    "    ・日本語入力（IME）は、ふだん使っている設定のままにしてください。",
-    "    ・当日は携帯電話の電源を切ってください。",
-    "",
-    "■ 参加は任意です",
-    "    途中でやめられます。理由の説明は要りません。終わった後でも記録の削除を求められます。",
-    "",
-    "ご不明な点があれば、このメールにご返信ください。",
-    G1_CONTACT,
-  ].join("\n");
+      "    ※ 書いた文章そのものは保存しません。ご同意はこのフォームの回答で完了しています。",
+      "",
+      "■ 当日までにお願いしたいこと",
+      "    ・日本語入力（IME）は、ふだん使っている設定のままにしてください。",
+      "    ・当日は携帯電話の電源を切ってください。",
+      "",
+      "■ 参加は任意です",
+      "    途中でやめられます。理由の説明は要りません。終わった後でも記録の削除を求められます。",
+      "",
+      "ご不明な点があれば、このメールにご返信ください。",
+      G1_CONTACT,
+    ])
+    .join("\n");
 }
 
 // ★ 送信前に内容を確認する（引数なし・送信しない）。
@@ -2170,8 +2279,21 @@ function onG1ConsentSubmit(e) {
     // 3) 受付メール。⚠️ ★ ここで例外が出ると「発番済みだが通知が無い」状態になり、
     //    再提出しても 1) で冪等スキップされるので**永久に届かない**。備考列に可視化する。
     try {
+      // ★★ 2026-08-07: 課題ページのフォルダが**もう用意できていれば、この 1 通で全部渡す**。
+      //    ⚠️ 用意できていなければ従来どおり 2 便に落ちる（壊れない）。
+      var found = { url: "", problem: "" };
+      try {
+        found = g1MaterialsUrlForPid_(pid);
+      } catch (lookupErr) {
+        found = { url: "", problem: "探索に失敗: " + lookupErr };
+      }
+      if (found.url) {
+        Logger.log("✅ 課題ページのフォルダが見つかったので、受付メール 1 通で渡します: " + pid);
+      } else {
+        Logger.log("ℹ️ 課題ページは別便になります（" + found.problem + "）");
+      }
       var subject = g1RegisterAckSubject_();
-      var body = g1RegisterAckBody_(pid);
+      var body = g1RegisterAckBody_(pid, found.url);
       if (G1_AUTO_SEND) {
         MailApp.sendEmail(a.email, subject, body);
         Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
@@ -2181,8 +2303,35 @@ function onG1ConsentSubmit(e) {
         Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
       }
     } catch (mailErr) {
+      found = { url: "", problem: "受付メールに失敗したので記録しない" }; // ★ 下の記録を止める
       if (noteCell) noteCell.setValue("⚠受付メール未作成-要手動送信: " + mailErr);
       Logger.log("❌ 受付メールに失敗（P-ID は確定済 " + pid + "）。備考にフラグを立てました: " + mailErr);
+    }
+    // ⚠️★★ **受付メールで課題ページまで渡したなら、それをシートに記録する。**
+    //    記録しないと `g1AutoSendPendingMaterials` が「まだ送っていない」と見なし、
+    //    ★ **同じ人に事前資料メールをもう 1 通送る**（送信は取り消せない）。
+    //    → 「配布フォルダURL」と「課題文リンク送信日」の両方を埋めて、冪等キーを閉じる。
+    if (found.url && noteCell) {
+      try {
+        var sh2 = noteCell.getSheet();
+        var r2 = noteCell.getRow();
+        if (String(sh2.getRange(r2, runCol_("配布フォルダURL")).getValue()).trim() === "") {
+          sh2.getRange(r2, runCol_("配布フォルダURL")).setValue(found.url);
+        }
+        if (String(sh2.getRange(r2, runCol_("課題文リンク送信日")).getValue()).trim() === "") {
+          sh2.getRange(r2, runCol_("課題文リンク送信日")).setValue(new Date());
+        }
+        SpreadsheetApp.flush();
+        Logger.log("✅ 課題ページを受付メールで渡した旨を記録しました（2 通目は送られません）");
+      } catch (recErr) {
+        // ⚠️ ★ ここが失敗すると 2 通目が飛ぶ。**黙らせない。**
+        Logger.log("❌ ★ 受付メールで渡したのに記録できませんでした。⚠️ 2 通目が送られる恐れ: " + recErr);
+        try {
+          noteCell.setValue("⚠★受付メールで課題ページを渡したが記録できず-手で送信日を入れること: " + recErr);
+        } catch (e5) {
+          Logger.log("⚠️ 備考にも書けませんでした: " + e5);
+        }
+      }
     }
     Logger.log(isNew ? "🎉 新規登録: " + pid : "🔁 再提出（発番なし）: " + pid);
   } finally {

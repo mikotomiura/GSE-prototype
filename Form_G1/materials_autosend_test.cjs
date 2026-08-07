@@ -37,6 +37,9 @@ function makeSheet(grid, failWriteCol) {
     insertColumnBefore(idx) {
       cells.forEach((row) => row.splice(idx - 1, 0, ""));
     },
+    appendRow(vals) {
+      cells.push(vals.slice());
+    },
     getRange(r, c, nr, nc) {
       const rows = nr === undefined ? 1 : nr;
       const colsN = nc === undefined ? 1 : nc;
@@ -185,6 +188,20 @@ function makeCtx(opts) {
         return {
           getName: () => f.name,
           getSharingAccess: () => f.access,
+          getId: () => id,
+          getFoldersByName: (name) => {
+            const hits = Object.keys(opts.folders || {}).filter(
+              (k) => (opts.folders[k].parent === id) && opts.folders[k].name === name
+            );
+            let i = 0;
+            return {
+              hasNext: () => i < hits.length,
+              next: () => {
+                const fid = hits[i++];
+                return { getId: () => fid, getName: () => opts.folders[fid].name };
+              },
+            };
+          },
           getFiles: () => {
             const names = f.files || [];
             let i = 0;
@@ -687,6 +704,98 @@ console.log("15. 受付メールにアプリのダウンロードリンクが入
     mat.indexOf("閲覧のみ") < 0,
     "在宅実施では被験者が blockNN.html を手元に持つ"
   );
+}
+
+console.log("16. ★ 受付メール 1 通で課題ページまで渡す（pre-provision）");
+{
+  const ctx = makeCtx({});
+  const found = ctx.g1MaterialsUrlForPid_("P015");
+  ok("用意済みなら URL が返る", found.url === urlFor("P015"), found.url + " / " + found.problem);
+  const body = ctx.g1RegisterAckBody_("P015", found.url);
+  ok("受付メールにアプリのリンク", body.indexOf(ctx.G1_APP_DOWNLOAD_URL) >= 0);
+  ok("受付メールに課題ページのリンク", body.indexOf(found.url) >= 0);
+  ok("「別便」と書かない", body.indexOf("別便のメール") < 0, "1 通で渡すのに別便と書くと混乱する");
+  ok("★ 専用だと明示する", body.indexOf("あなた専用") >= 0);
+}
+{
+  // 用意されていない P-ID → 「別便」に落ちる（★ 壊れない）
+  const ctx = makeCtx({});
+  const found = ctx.g1MaterialsUrlForPid_("P099");
+  ok("未用意なら URL は空", found.url === "", found.url);
+  ok("理由を返す", found.problem.length > 0, found.problem);
+  const body = ctx.g1RegisterAckBody_("P099", found.url);
+  ok("別便と案内する", body.indexOf("別便のメール") >= 0);
+  ok("それでもアプリのリンクはある", body.indexOf(ctx.G1_APP_DOWNLOAD_URL) >= 0);
+}
+{
+  // ⚠️ 共有し忘れのフォルダは載せない（ガード 7 を通している）
+  const folders = Object.assign({}, FOLDERS, {
+    "FOLDER-P015": { name: "P015", parent: PARENT_ID, access: "PRIVATE" },
+  });
+  const ctx = makeCtx({ folders: folders });
+  ok("共有前なら載せない", ctx.g1MaterialsUrlForPid_("P015").url === "");
+}
+{
+  // ⚠️ 同名フォルダが 2 つ → どちらか決められないので載せない
+  const folders = Object.assign({}, FOLDERS, {
+    "FOLDER-P015b": { name: "P015", parent: PARENT_ID, access: "ANYONE_WITH_LINK" },
+  });
+  const ctx = makeCtx({ folders: folders });
+  const found = ctx.g1MaterialsUrlForPid_("P015");
+  ok("同名 2 つなら載せない", found.url === "", found.url);
+  ok("理由に「2 つ以上」と書く", found.problem.indexOf("2 つ以上") >= 0, found.problem);
+}
+
+console.log("17. ★ 1 通で渡したら 2 通目が飛ばない（冪等キーを閉じる）");
+{
+  const ctx = makeCtx({ runRows: [], roster: [] });
+  // G1-C の提出を模す
+  const resp = {
+    getItemResponses: () => [
+      { getItem: () => ({ getTitle: () => ctx.Q_C_NAME }), getResponse: () => "試験 太郎" },
+      { getItem: () => ({ getTitle: () => ctx.Q_C_EMAIL }), getResponse: () => "t@example.com" },
+    ],
+  };
+  ctx.onG1ConsentSubmit({ response: resp });
+  ok("受付メールが 1 通", ctx.__sent.length === 1, "sent=" + ctx.__sent.length);
+
+  const H = ctx.RUN_HEADER;
+  const rows = ctx.__runSheet._cells.length;
+  const pidCell = String(ctx.__runSheet.getRange(rows, H.indexOf("P-ID") + 1).getValue());
+  ok("トラッキング行ができる", /^P\d{3}$/.test(pidCell), pidCell);
+
+  // ★ 発番された P-ID のフォルダが用意されていれば URL と送信日が入るはず
+  const url = String(ctx.__runSheet.getRange(rows, H.indexOf("配布フォルダURL") + 1).getValue());
+  const sent = ctx.__runSheet.getRange(rows, H.indexOf("課題文リンク送信日") + 1).getValue();
+  if (pidCell === "P001") {
+    // 既定の FOLDERS には P001 が無いので「別便」経路。★ 記録もされない = 2 通目が正しく飛ぶ
+    ok("未用意なら送信日を埋めない（2 通目に任せる）", String(sent).trim() === "", String(sent));
+  }
+  // 用意済みの P-ID で改めて確かめる
+  // ⚠️★ ロスターは **1 行目がヘッダ**である（`g1NextParticipantId_` は `last > 1` のときだけ読む）。
+  //    1 行だけのロスターを渡すと採番が P001 に落ちる（2026-08-07 に実測で踏んだ）。
+  const ctx2 = makeCtx({ runRows: [], roster: [["P-ID", "氏名", "メール"], ["P014", "", ""]] });
+  const resp2 = {
+    getItemResponses: () => [
+      { getItem: () => ({ getTitle: () => ctx2.Q_C_EMAIL }), getResponse: () => "t15@example.com" },
+    ],
+  };
+  ctx2.onG1ConsentSubmit({ response: resp2 }); // → P015 が発番される
+  const H2 = ctx2.RUN_HEADER;
+  const r2 = ctx2.__runSheet._cells.length;
+  ok("P015 が発番された", String(ctx2.__runSheet.getRange(r2, H2.indexOf("P-ID") + 1).getValue()) === "P015");
+  ok(
+    "★ 配布フォルダURL が記録される",
+    String(ctx2.__runSheet.getRange(r2, H2.indexOf("配布フォルダURL") + 1).getValue()) === urlFor("P015")
+  );
+  ok(
+    "★ 課題文リンク送信日 が記録される",
+    String(ctx2.__runSheet.getRange(r2, H2.indexOf("課題文リンク送信日") + 1).getValue()).trim() !== ""
+  );
+  // ⚠️ ここが本題: 2 通目が飛ばないこと
+  const before = ctx2.__sent.length;
+  ctx2.g1AutoSendPendingMaterials();
+  ok("⚠️ 2 通目が飛ばない", ctx2.__sent.length === before, "sent=" + ctx2.__sent.length);
 }
 
 console.log("");
