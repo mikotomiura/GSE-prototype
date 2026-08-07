@@ -149,12 +149,19 @@ echo
 # ⚠️★ `pages/` を直接ドラッグさせない。★ `pages/` には PILOT-win / PILOT-mac が居るので、
 #   全選択でドラッグすると **パイロットの割付が被験者に配られる**。
 #   → 今回の対象だけを並べた専用の置き場を作る。
+#
+# ⚠️★★ フォルダ名は **`G1課題文_<P-ID>`** である（2026-08-07 に実 Drive の名前へ合わせた）。
+#   ★ GAS 側 (`Form_G1/GSE_G1_Form_Builder.gs` の `g1MaterialsFolderNames_`) が
+#     「`P006`」と「`G1課題文_P006`」の **完全一致 2 通りだけ**を認める。
+#   ⚠️ ここを勝手に変えると、GAS がフォルダを見つけられず **受付メールが黙って 2 便運用に落ちる**
+#     （壊れないので気づきにくい）。★ 変えるなら両方を同時に直すこと。
+DRIVE_PREFIX="G1課題文_"
 DRIVE="$HERE/dist/_drive"
 rm -rf "$DRIVE"
 mkdir -p "$DRIVE"
 for ID in "${SUBJECTS[@]}"; do
-  mkdir -p "$DRIVE/$ID"
-  cp "$HERE/pages/$ID"/block*.html "$DRIVE/$ID/"
+  mkdir -p "$DRIVE/${DRIVE_PREFIX}$ID"
+  cp "$HERE/pages/$ID"/block*.html "$DRIVE/${DRIVE_PREFIX}$ID/"
 done
 
 # ⚠️★ シークレットや余計なものが紛れていないことを、**置いたあとの実体で**確かめる。
@@ -162,9 +169,14 @@ done
 BAD=$(find "$DRIVE" -mindepth 1 ! -name 'block*.html' ! -type d | head -5)
 [ -z "$BAD" ] || die "課題ページ以外が紛れています:
 $BAD"
-BADDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d ! -name 'P[0-9][0-9][0-9]' | head -5)
-[ -z "$BADDIR" ] || die "被験者 ID でないフォルダがあります:
+# ⚠️★ GAS が認める名前 (`g1MaterialsFolderNames_`) から 1 文字でも外れたら止める。
+#   ★ ここが緩いと「上げたのに GAS が見つけられない」を配布まで持ち越す。
+BADDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d ! -name "${DRIVE_PREFIX}P[0-9][0-9][0-9]" | head -5)
+[ -z "$BADDIR" ] || die "GAS が認めない名前のフォルダがあります（${DRIVE_PREFIX}P0NN のはず）:
 $BADDIR"
+NDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+[ "$NDIR" -eq "${#SUBJECTS[@]}" ] \
+  || die "フォルダが $NDIR 個です（${#SUBJECTS[@]} 人ぶんのはず）"
 DEPTH=$(find "$DRIVE" -mindepth 2 -maxdepth 2 -type d | head -5)
 [ -z "$DEPTH" ] || die "入れ子のフォルダがあります（★ 平らでなければならない）:
 $DEPTH"

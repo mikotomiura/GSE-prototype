@@ -592,6 +592,15 @@ cd experiments/20260801-controlled-friction-task
 ★ `prepare-subjects.sh` は **既存の `blocks/<ID>.json` を上書きしない**（実施後に書き足された
 `produced_chars` / `file` / 操作チェックが消えるため）。整合の判定は `validate_blocks.py` に任せる。
 
+⚠️★★ **フォルダ名は `G1課題文_<P-ID>`**（例: `G1課題文_P006`）。
+GAS は `g1MaterialsFolderNames_()` で **`P006`** と **`G1課題文_P006`** の
+**完全一致 2 通りだけ**を認める（★ 前方一致・部分一致にはしていない。
+「P01」が「P010」を、「G1課題文_P006_旧」が P006 を掴むのを防ぐため）。
+⚠️ ★ 両方の名前が同時にあると「2 つ以上」で**送らない**。
+★ 名前の規約を変えるときは `prepare-subjects.sh` の `DRIVE_PREFIX` と
+`g1MaterialsFolderNames_` を**同時に**直すこと。片方だけだと
+**受付メールが黙って 2 便運用に落ちる**（壊れないので気づきにくい）。
+
 ★ 用意できているかは **`checkMaterialsProvisioning()`**（引数なし・読むだけ）で確認できる。
 ⚠️ **ロスターに実在する全 P-ID**（＝再利用されうる ID）と、次に出る 3 人ぶんを**分けて**数える
 （`checkMaterialsProvisioning(0)` で新規ぶんを見ない）。

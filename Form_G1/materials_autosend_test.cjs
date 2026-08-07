@@ -917,6 +917,78 @@ console.log("18. ★ checkMaterialsProvisioning — ロスター全体を見る�
   }
 }
 
+console.log("19. ★ フォルダ名は「P-ID」と「G1課題文_P-ID」の 2 通りだけ認める");
+{
+  // ★ 陽性対照 1: 裸の P-ID（従来の名前）
+  const ctx = makeCtx({});
+  ok("裸の P-ID で引ける", ctx.g1MaterialsUrlForPid_("P015").url === urlFor("P015"));
+}
+{
+  // ★ 陽性対照 2: 接頭辞つき（★ 実運用の名前。2026-08-07 に実 Drive で確認した形）
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  folders["FOLDER-P015"] = { name: "G1課題文_P015", parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  const ctx = makeCtx({ folders: folders });
+  const found = ctx.g1MaterialsUrlForPid_("P015");
+  ok("接頭辞つきでも引ける", found.url === urlFor("P015"), found.url + " / " + found.problem);
+  // ⚠️ ガード 7 も同じ名前を認めていること（片方だけ直すと「探せたのに弾かれる」）
+  ok("ガード 7 も通る", ctx.g1MaterialsFolderProblem_(urlFor("P015"), "P015") === "",
+     ctx.g1MaterialsFolderProblem_(urlFor("P015"), "P015"));
+}
+{
+  // ⚠️★ 本丸: 前方一致に**なっていない**こと。P01 系の名前で P010 を掴まない
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  folders["FOLDER-P010"] = { name: "G1課題文_P010", parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  const ctx = makeCtx({ folders: folders });
+  ok("★ P01 で P010 を掴まない", ctx.g1MaterialsUrlForPid_("P01").url === "");
+  ok("★ P0 で P010 を掴まない", ctx.g1MaterialsUrlForPid_("P0").url === "");
+}
+{
+  // ⚠️★ 余計な語がついた名前は認めない（「G1課題文_P015_旧」を掴まない）
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  folders["FOLDER-old"] = { name: "G1課題文_P015_旧", parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  const ctx = makeCtx({ folders: folders });
+  const found = ctx.g1MaterialsUrlForPid_("P015");
+  ok("★ 後ろに語がつく名前は掴まない", found.url === "", found.url);
+  // ⚠️ ガード 7 側も同じ（URL を直に貼られた場合の受け皿）
+  const prob = ctx.g1MaterialsFolderProblem_(urlFor("old").replace("FOLDER-old", "FOLDER-old"), "P015");
+  ok("ガード 7 も弾く", prob.indexOf("P-ID と違います") >= 0, prob);
+}
+{
+  // ⚠️★ 2 通り認めた副作用: 両方の名前が同時に存在したら**送らない**
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  folders["FOLDER-A"] = { name: "P015", parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  folders["FOLDER-B"] = { name: "G1課題文_P015", parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  const ctx = makeCtx({ folders: folders });
+  const found = ctx.g1MaterialsUrlForPid_("P015");
+  ok("★ 両方あるなら送らない", found.url === "", found.url);
+  ok("理由に「2 つ以上」と書く", found.problem.indexOf("2 つ以上") >= 0, found.problem);
+}
+{
+  // ⚠️ 接頭辞つきでも共有し忘れは止まる（ガード 7 を通していることの確認）
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  folders["FOLDER-P015"] = { name: "G1課題文_P015", parent: PARENT_ID, access: "PRIVATE" };
+  const ctx = makeCtx({ folders: folders });
+  const found = ctx.g1MaterialsUrlForPid_("P015");
+  ok("★ 共有前なら接頭辞つきでも載せない", found.url === "", found.url);
+  ok("理由が「まだ共有されていません」", found.problem.indexOf("まだ共有されていません") >= 0, found.problem);
+}
+{
+  // ★ 実運用そのまま: P006-P020 が接頭辞つきで全部そろっている状態を checkMaterialsProvisioning が緑と読む
+  const roster = [["P-ID", "氏名", "メール"]];
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  for (let i = 6; i <= 20; i++) {
+    const p = "P" + ("000" + i).slice(-3);
+    if (i <= 14) roster.push([p, "", ""]);
+    folders["FOLDER-" + p] = { name: "G1課題文_" + p, parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  }
+  const ctx = makeCtx({ roster: roster, folders: folders });
+  ctx.checkMaterialsProvisioning();
+  const log = ctx.__logs.join("\n");
+  ok("★ 実運用の形で既存が全員そろう", log.indexOf("既存 9 人ぶんは全員") >= 0, log.slice(0, 500));
+  ok("★ 新規 3 人ぶんも用意できている", log.indexOf("新規は先頭 3 人ぶん") >= 0, log.slice(-400));
+  ok("未用意の警告は出ない", log.indexOf("人ぶんが未用意") < 0);
+}
+
 console.log("");
 if (failures) {
   console.log("❌ " + failures + " 件失敗");

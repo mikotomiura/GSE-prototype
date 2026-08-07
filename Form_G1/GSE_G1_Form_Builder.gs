@@ -1272,6 +1272,22 @@ function g1EnsureRunRow_(pid) {
  *
  * @return {{url: string, problem: string}} url が空なら problem に理由が入る
  */
+// ★★ 被験者別フォルダとして**認める名前**（★ ここが単一の真実源）。
+//   ⚠️ 探す側 (`g1MaterialsUrlForPid_`) と検査する側 (`g1MaterialsFolderProblem_`) の**両方**が
+//   ここを読む。片方だけ直すと「探せたのにガードで弾かれる」という原因の分かりにくい失敗になる。
+//
+// ⚠️★ 2026-08-07: 実運用のフォルダ名が `G1課題文_P006` 形式だったので接頭辞つきを認めた。
+//   ★ 接頭辞は Drive の画面で何のフォルダか分かるようにするためのもので、
+//     `preregistration.md §2.12` が伏せる項目（題材・課題の型・条件名）を 1 つも含まない。
+//   ⚠️ **前方一致にしない。** 完全一致を 2 通り認めるだけである
+//     （前方一致だと「P01」が「P010」を、「G1課題文_P006_旧」が P006 を掴む）。
+var G1_MATERIALS_FOLDER_PREFIX = "G1課題文_";
+
+function g1MaterialsFolderNames_(pid) {
+  var p = String(pid).trim();
+  return [p, G1_MATERIALS_FOLDER_PREFIX + p];
+}
+
 function g1MaterialsUrlForPid_(pid) {
   if (!G1_MATERIALS_PARENT_ID) return { url: "", problem: "G1_MATERIALS_PARENT_ID が未設定" };
   var parent;
@@ -1280,20 +1296,36 @@ function g1MaterialsUrlForPid_(pid) {
   } catch (e) {
     return { url: "", problem: "課題ページの親フォルダを開けません: " + e };
   }
-  var it;
+  // ⚠️★ 認めるフォルダ名は **この 2 つだけ**（2026-08-07・実運用の名前に合わせた）。
+  //   ★ 部分一致・前方一致にしてはならない。「P01」で「P010」を掴む、
+  //     「G1課題文_P006_旧」を掴む、といった取り違えが起きる。★ 完全一致を 2 通り認めるだけである。
+  //   ⚠️ 名前の検査はここだけでなく `g1MaterialsFolderProblem_`（ガード 7）にもある。
+  //     ★ **両方を同じ関数 `g1MaterialsFolderNames_` から作る**。片方だけ直すと、
+  //     「探せたのにガードで弾かれる」という原因の分かりにくい失敗になる。
+  var names = g1MaterialsFolderNames_(pid);
+  var hits = [];
   try {
-    it = parent.getFoldersByName(String(pid).trim());
+    for (var n = 0; n < names.length; n++) {
+      var it = parent.getFoldersByName(names[n]);
+      while (it.hasNext()) hits.push(it.next());
+    }
   } catch (e2) {
     return { url: "", problem: "フォルダを探せません: " + e2 };
   }
-  if (!it.hasNext()) {
-    return { url: "", problem: "この P-ID のフォルダがまだありません（★ 先に用意しておけば 1 通で送れます）" };
+  if (hits.length === 0) {
+    return {
+      url: "",
+      problem:
+        "この P-ID のフォルダがまだありません（★ 先に用意しておけば 1 通で送れます。" +
+        "探した名前: " + names.join(" / ") + "）",
+    };
   }
-  var folder = it.next();
-  if (it.hasNext()) {
-    // ⚠️ ★ 同名が 2 つある = どちらが正しいか機械には決められない。**送らない**。
-    return { url: "", problem: "同じ名前のフォルダが 2 つ以上あります（★ 人が片付けてください）" };
+  if (hits.length > 1) {
+    // ⚠️ ★ 候補が 2 つ以上 = どちらが正しいか機械には決められない。**送らない**。
+    //   ★ 名前を 2 通り認めたことで「P006 と G1課題文_P006 が両方ある」もここで止まる。
+    return { url: "", problem: "同じ被験者のフォルダが 2 つ以上あります（★ 人が片付けてください）" };
   }
+  var folder = hits[0];
   var url = "https://drive.google.com/drive/folders/" + folder.getId();
   // ★ 既存のガード 7 をそのまま通す（共有し忘れ・置き場所違いをここでも捕まえる）
   var problem = g1MaterialsFolderProblem_(url, pid);
@@ -1699,9 +1731,17 @@ function g1MaterialsFolderProblem_(url, pid) {
   } catch (e) {
     return "フォルダを開けません（ID 違い・削除済み・権限なし）: " + e;
   }
+  // ★ 認める名前は `g1MaterialsFolderNames_` ただ 1 か所で決める（探す側と同じ集合）。
+  //   ⚠️ 大文字小文字だけを吸収する。★ 前後の別語や部分一致は認めない。
   var name = String(folder.getName()).trim().toUpperCase();
-  if (name !== String(pid).trim().toUpperCase()) {
-    return "フォルダ名が「" + folder.getName() + "」で P-ID と違います（★ 別の被験者の URL かも）";
+  var allowed = g1MaterialsFolderNames_(pid).map(function (s) {
+    return s.toUpperCase();
+  });
+  if (allowed.indexOf(name) < 0) {
+    return (
+      "フォルダ名が「" + folder.getName() + "」で P-ID と違います（★ 別の被験者の URL かも。" +
+      "認める名前: " + g1MaterialsFolderNames_(pid).join(" / ") + "）"
+    );
   }
   if (G1_MATERIALS_PARENT_ID) {
     var inParent = false;
