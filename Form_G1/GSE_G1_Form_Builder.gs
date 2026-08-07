@@ -854,8 +854,19 @@ var RUN_HEADER = [
   //   ⚠️ 「事前案内メール送信日」列は廃止した（事前案内メールを廃止したため・2026-08-03）。
   "実施予定日",
   "G1-C 同意",
+  // ★★ 2026-08-07: 配布フォルダ（課題ページ）の URL。★ 研究者が貼る**唯一の手入力**であり、
+  //    g1AutoSendPendingMaterials() の引き金でもある（貼られるまで送らない）。
+  // ⚠️ ★ 第 8 版のコメントは「URL 自体はここに書かない（割付が推測されうる）」としていたが、
+  //    2026-08-07 に**方針を変えた**。理由を隠さず書く:
+  //      (a) Apps Script の関数セレクタは**引数を渡せない**。3 引数の sendTaskMaterialsEmail は
+  //          研究者がラッパーを手書きしないと実行できず、そこが手作業として残っていた。
+  //      (b) このシートは研究者しか開かない（実名・メールを持たないのは別の理由 = 匿名化）。
+  //      (c) ★ URL は Drive の不透明な ID であって、**それ自体は割付を露呈しない**。
+  //          露呈するのはリンク先の中身であり、それは被験者本人には元から開示している（§2.12）。
+  //    ⚠️ ★ したがって「このシートを被験者や第三者に見せない」ことが前提条件である。
+  "配布フォルダURL",
   // ★★ 第 8 版（2026-08-04）: 課題文の閲覧リンクを事前に送る（preregistration.md §2.12）。
-  //    いつ送ったかを残す。⚠️ URL 自体はここに書かない（割付が推測されうる）。
+  //    いつ送ったかを残す。★ 空 = 未送信。g1AutoSendPendingMaterials() の冪等キーである。
   "課題文リンク送信日",
   "実施日",
   // ★★ 第 9 版（2026-08-04）: 実施形態を共変量として記録する（preregistration.md §2.14）。
@@ -1387,6 +1398,327 @@ function sendTaskMaterialsEmail(pid, email, url) {
   } catch (e) {
     Logger.log("⚠️ 送信日を記録できませんでした（メールは送信済み）: " + e);
   }
+}
+
+// ============================================================
+// ★★ 事前資料メールの自動送信（2026-08-07・decisions.md D-3）
+// ============================================================
+// ⚠️ ★ **なぜ「登録時に自動」ではなく「URL が貼られたら自動」なのか。**
+//   登録時点では割付がまだ無く、その被験者にどの課題文が出るか決まっていない（§3-1）。
+//   割付は seed を使う科学的な行為なので、梱包やメールのついでに走らせてはならない。
+//   → ★ **研究者が配布フォルダの URL を貼った** ことを「割付が確定した」合図として使う。
+//
+// ⚠️⚠️ ★ **メール送信は取り消せない。** ガードを 4 本、fail-closed で置く:
+//   1. キルスイッチ  … Script Properties G1_MATERIALS_AUTOSEND_OFF
+//   2. URL 形式      … https://drive.google.com/ で始まること
+//   3. 冪等          … 「課題文リンク送信日」が空の行だけ
+//   4. 1 回の上限    … G1_MATERIALS_MAX_PER_RUN 人まで（列の貼り間違いを頑健に抑える）
+//
+// ★ 本文 (g1MaterialsBody_) は**変えていない**。scripts/check_g1_emails.py の基準を跨がない。
+
+/** ★ これを Script Properties に真値で置くと自動送信が止まる（値は何でもよい）。 */
+var G1_AUTOSEND_OFF_PROP = "G1_MATERIALS_AUTOSEND_OFF";
+
+/** ★ 1 回の発火で送る上限。⚠️ 0 にしないこと（0 は「無効」ではなく「1 人も送らない」）。 */
+var G1_MATERIALS_MAX_PER_RUN = 3;
+
+/** 配布フォルダ URL として受け付ける形。⚠️ ★ ここを緩めると別サイトの URL を配れてしまう。 */
+var G1_MATERIALS_URL_RE = /^https:\/\/drive\.google\.com\/[^\s]+$/;
+
+/** 「G1 実施トラッキング」シートを返す。無ければ null（★ throw しない）。 */
+function g1RunSheet_() {
+  var ssId = PropertiesService.getScriptProperties().getProperty(MGMT_SHEET_PROP_G1);
+  if (!ssId) return null;
+  return SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング") || null;
+}
+
+/**
+ * ★★ 実シートに「配布フォルダURL」列を挿す（1 回だけ・冪等）。
+ *
+ * ⚠️ ★ **setupG1Forms() を実行してはならない**（フォームを作り直してしまう）。
+ *    列を足すのはこの関数の仕事である。
+ *
+ * ⚠️ ★ なぜ「コードの RUN_HEADER を直すだけ」で済まないか:
+ *    runCol_ は **コード側の RUN_HEADER しか見ない**。実シートが古いままだと、
+ *    列名で引いているのに実シートでは**別の列**を指す。
+ *    2026-08-03 に実際に起きている（16 列のシートへ 17 列の定義で入力規則を貼り、
+ *    日付列「実施日」に「はい/いいえ」のドロップダウンが付いた）。
+ *
+ * ★ 列の「挿入」であって作り直しではないので、既存データも入力規則も右へずれて保たれる。
+ */
+function migrateRunSheetAddUrlColumn() {
+  var sh = g1RunSheet_();
+  if (!sh) {
+    throw new Error("★ G1 管理シートが見つかりません（buildManagementSheet() を先に実行）。");
+  }
+
+  var NEW_COL = "配布フォルダURL";
+  if (runHeaderDiff_(sh).length === 0) {
+    Logger.log("✅ 既に「" + NEW_COL + "」列があります（何もしません）。");
+    return;
+  }
+
+  // ★ 「新列を抜いたヘッダ」= 移行前に期待される姿。これと一致するときだけ触る。
+  var idx = runCol_(NEW_COL); // 1 始まり
+  var expectedOld = RUN_HEADER.slice(0, idx - 1).concat(RUN_HEADER.slice(idx));
+  var live = sh.getRange(2, 1, 1, Math.max(sh.getLastColumn(), expectedOld.length)).getValues()[0];
+  var mismatch = [];
+  for (var i = 0; i < expectedOld.length; i++) {
+    var a = String(expectedOld[i]);
+    var b = String(live[i] === undefined ? "" : live[i]).trim();
+    if (a !== b) mismatch.push("col" + (i + 1) + ": 期待='" + a + "' / シート='" + b + "'");
+  }
+  if (mismatch.length) {
+    // ⚠️ ★ 見覚えのない形。黙って列を挿すと記録が 1 列ずれる。**止める。**
+    throw new Error(
+      "★ 「G1 実施トラッキング」が、移行前として期待する形と違います。\n" +
+        "⚠️ このまま列を挿すと既存の記録が 1 列ずれます。中止しました。\n" +
+        mismatch.join("\n") +
+        "\n→ 列を手で合わせてから、もう一度この関数を実行してください。"
+    );
+  }
+
+  sh.insertColumnBefore(idx);
+  sh.getRange(2, idx).setValue(NEW_COL).setFontWeight("bold");
+  sh.setColumnWidth(idx, 260);
+  SpreadsheetApp.flush();
+
+  assertRunHeader_(sh); // ★ 挿したあとに、コードと実シートが本当に一致したか確かめる
+  Logger.log("✅ 「" + NEW_COL + "」列を " + idx + " 列目に挿しました。");
+  Logger.log("★ 次: 被験者ごとに配布フォルダの URL をこの列に貼ると、自動で事前資料メールが出ます。");
+  Logger.log("ℹ️ 自動送信を止めるには Script Properties に " + G1_AUTOSEND_OFF_PROP + " を置きます。");
+}
+
+/** P-ID から Phase1 ロスターのメールを引く。見つからなければ ""。 */
+function g1EmailForPid_(pid) {
+  if (!PHASE1_MGMT_SHEET_ID) return "";
+  var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+  if (!roster) return "";
+  var found = g1FindInPhase1Roster_(roster, { pid: pid });
+  if (!found) return "";
+  return String(roster.getRange(found.row, 3).getValue()).trim();
+}
+
+/**
+ * 送信対象を集める（★ 送らない）。g1AutoSendPendingMaterials と previewPendingTaskMaterials で共有する。
+ * ⚠️ ★ 「なぜ送らないか」を必ず理由付きで返す。黙って飛ばすと、研究者は
+ *    「URL は貼ったのに永久に届かない」状態に気づけない。
+ */
+function g1CollectPendingMaterials_() {
+  var sh = g1RunSheet_();
+  if (!sh) return { rows: [], skipped: [], error: "G1 管理シートが見つかりません" };
+  try {
+    assertRunHeader_(sh);
+  } catch (e) {
+    return { rows: [], skipped: [], error: String(e.message).split("\n")[0] };
+  }
+
+  var colPid = runCol_("P-ID");
+  var colUrl = runCol_("配布フォルダURL");
+  var colSent = runCol_("課題文リンク送信日");
+  var last = sh.getLastRow();
+  var rows = [];
+  var skipped = [];
+
+  // --- 1 周目: ★ URL の重複を数える（送信済みの行も含める） ---------------------
+  // ⚠️★★ 形式検査 (ガード 2) は「Drive の URL か」しか見ない。**宛先が正しいか**は見ない。
+  //   実際に起こる事故は「別の被験者の URL を貼る」「1 人ぶんを複数行にコピペする」であり、
+  //   どちらも形式検査を素通りする。★ 同じ URL が 2 人以上に紐づいていたら **貼り間違い**なので、
+  //   自動では送らず人に返す（送信は取り消せないので、疑わしいときは送らない側に倒す）。
+  //   ★ 送信済みの行も数に入れる: 既に P015 へ送った URL を P016 に貼る事故を捕まえるため。
+  var pidsByUrl = {};
+  for (var r0 = 3; r0 <= last; r0++) {
+    var p0 = String(sh.getRange(r0, colPid).getValue()).trim().toUpperCase();
+    var u0 = String(sh.getRange(r0, colUrl).getValue()).trim();
+    if (!p0 || !u0) continue;
+    if (!pidsByUrl[u0]) pidsByUrl[u0] = [];
+    if (pidsByUrl[u0].indexOf(p0) < 0) pidsByUrl[u0].push(p0);
+  }
+
+  // --- 2 周目: 送る相手を決める -------------------------------------------------
+  for (var r = 3; r <= last; r++) {
+    var pid = String(sh.getRange(r, colPid).getValue()).trim().toUpperCase();
+    if (!pid) continue;
+    var url = String(sh.getRange(r, colUrl).getValue()).trim();
+    var sent = sh.getRange(r, colSent).getValue();
+
+    if (sent !== "" && sent !== null && sent !== undefined) continue; // ガード 3: 冪等（静かでよい）
+    if (!url) continue; // まだ配布フォルダを作っていない = 正常な待ち状態
+    if (!G1_MATERIALS_URL_RE.test(url)) {
+      skipped.push(pid + ": URL が https://drive.google.com/ で始まっていません"); // ガード 2
+      continue;
+    }
+    if (pidsByUrl[url] && pidsByUrl[url].length > 1) {
+      // ガード 5: ★ 同じ URL が複数の P-ID に紐づいている = 貼り間違い
+      skipped.push(
+        pid + ": 同じ URL が " + pidsByUrl[url].join(" / ") + " に貼られています" +
+          "（★ 貼り間違いの可能性。人が直してから送ってください）"
+      );
+      continue;
+    }
+    var email = g1EmailForPid_(pid);
+    if (!email) {
+      skipped.push(pid + ": Phase1 ロスターにメールがありません");
+      continue;
+    }
+    rows.push({ row: r, pid: pid, url: url, email: email });
+  }
+  return { rows: rows, skipped: skipped, error: "" };
+}
+
+/**
+ * ★ 送らずに対象だけ出す（引数なし・安全）。⚠️ 実送信の前に必ず一度これを見る。
+ */
+function previewPendingTaskMaterials() {
+  var found = g1CollectPendingMaterials_();
+  if (found.error) {
+    Logger.log("❌ " + found.error);
+    return;
+  }
+  Logger.log("ℹ️ 自動送信: " + (g1AutoSendDisabled_() ? "⛔ 停止中（キルスイッチ）" : "有効"));
+  Logger.log("ℹ️ G1_AUTO_SEND=" + G1_AUTO_SEND + "（false=下書き作成 / true=実送信）");
+  Logger.log("ℹ️ 1 回の上限: " + G1_MATERIALS_MAX_PER_RUN + " 人");
+  Logger.log("--------");
+  if (!found.rows.length) {
+    Logger.log("送る相手はいません（URL 未記入 or 送信済み）。");
+  }
+  for (var i = 0; i < found.rows.length; i++) {
+    var it = found.rows[i];
+    var mark = i < G1_MATERIALS_MAX_PER_RUN ? "→ 今回送る" : "… 次回に回る（上限）";
+    Logger.log(mark + ": " + it.pid + " → " + g1MaskEmail_(it.email));
+  }
+  for (var j = 0; j < found.skipped.length; j++) {
+    Logger.log("⚠️ 飛ばす " + found.skipped[j]);
+  }
+  Logger.log("--------");
+  Logger.log("★ 実際に送るのは g1AutoSendPendingMaterials()（トリガーが自動で呼びます）。");
+}
+
+/** キルスイッチが入っているか。 */
+function g1AutoSendDisabled_() {
+  var v = PropertiesService.getScriptProperties().getProperty(G1_AUTOSEND_OFF_PROP);
+  return !!(v && String(v).trim() !== "" && String(v).trim().toLowerCase() !== "false");
+}
+
+/**
+ * ★★ 時間トリガーが呼ぶ本体（引数なし）。
+ * ⚠️ 送信は取り消せない。上のガード 4 本を通ったものだけ送る。
+ */
+function g1AutoSendPendingMaterials() {
+  if (g1AutoSendDisabled_()) {
+    Logger.log("⛔ " + G1_AUTOSEND_OFF_PROP + " が立っているので送信しません。"); // ガード 1
+    return;
+  }
+
+  // ⚠️★★ **排他制御が要る理由**（onG1ConsentSubmit と同じ流儀・2026-08-07 の cross-review で Codex が指摘）:
+  //   「送信日が空か調べる → 送る → 送信日を書く」は **原子的ではない**。
+  //   時間トリガーの実行が延びて次の発火と重なる、あるいは研究者が手で実行すると、
+  //   ★ **両方が「まだ空」を見て同じ相手に 2 通送る**。⚠️ 送信は取り消せない。
+  //   → 収集から記録までを丸ごとロックで囲む。取れなければ **何もしない**（次の発火で拾う）。
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    Logger.log("⏳ 他の実行が動いているので今回は送りません（次の発火で拾います）: " + lockErr);
+    return;
+  }
+
+  try {
+    var found = g1CollectPendingMaterials_();
+    if (found.error) {
+      Logger.log("❌ " + found.error + "（送信しません）");
+      return;
+    }
+    for (var j = 0; j < found.skipped.length; j++) {
+      Logger.log("⚠️ 飛ばす " + found.skipped[j]);
+    }
+    if (!found.rows.length) return;
+
+    var sh = g1RunSheet_();
+    var colNote = runCol_("備考");
+    var colSent = runCol_("課題文リンク送信日");
+    var n = Math.min(found.rows.length, G1_MATERIALS_MAX_PER_RUN); // ガード 4
+    if (found.rows.length > n) {
+      Logger.log("ℹ️ " + found.rows.length + " 人が対象ですが、1 回の上限 " + n + " 人まで送ります（残りは次回）。");
+    }
+    for (var i = 0; i < n; i++) {
+      var it = found.rows[i];
+      try {
+        // ★ 既存関数をそのまま使う。本文の生成はあちらが持っている（二重に持たない）。
+        sendTaskMaterialsEmail(it.pid, it.email, it.url);
+      } catch (e) {
+        // ⚠️ ★ 黙って落とさない。onG1ConsentSubmit と同じく備考に出す。
+        Logger.log("❌ " + it.pid + " への事前資料メールに失敗: " + e);
+        try {
+          sh.getRange(it.row, colNote).setValue("⚠事前資料メール失敗-要手動送信: " + e);
+        } catch (e2) {
+          Logger.log("⚠️ 備考にも書けませんでした: " + e2);
+        }
+        continue;
+      }
+
+      // ⚠️★★ **「送れたのに記録できていない」を捕まえる**（cross-review 2026-08-07・MEDIUM）:
+      //   sendTaskMaterialsEmail は送信日の書き込み失敗を try/catch で握りつぶし、
+      //   Logger に出すだけで再スローしない。人が 1 件ずつ呼んでいた頃はログで気づけたが、
+      //   ★ トリガー化でその人間のチェックが消えた。放置すると **次の発火で同じ人に再送**される。
+      //   → 書けたことを**読み直して確かめ**、空なら自分で書く。それも駄目なら備考で可視化する。
+      try {
+        var mark = sh.getRange(it.row, colSent).getValue();
+        if (mark === "" || mark === null || mark === undefined) {
+          sh.getRange(it.row, colSent).setValue(new Date());
+          SpreadsheetApp.flush();
+          var again = sh.getRange(it.row, colSent).getValue();
+          if (again === "" || again === null || again === undefined) {
+            throw new Error("送信日を書けませんでした");
+          }
+          Logger.log("⚠️ " + it.pid + ": 送信日が空だったので補って書きました（★ 二重送信の芽を潰した）");
+        }
+      } catch (e3) {
+        // ⚠️★ ここに来たら **送信済みなのに記録が無い**。次の発火で再送されるので、必ず目に付ける。
+        Logger.log("❌ " + it.pid + ": ★ 送信は済んだが送信日を記録できません。⚠️ 二重送信の恐れ: " + e3);
+        try {
+          sh.getRange(it.row, colNote).setValue(
+            "⚠★送信済だが送信日を記録できず-手で日付を入れること（放置すると再送される）: " + e3
+          );
+        } catch (e4) {
+          Logger.log("⚠️ 備考にも書けませんでした: " + e4);
+          Logger.log("★ " + G1_AUTOSEND_OFF_PROP + " を立てて自動送信を止めることを検討してください。");
+        }
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** ★ 時間トリガーを 1 回だけ設置する（1 時間ごと）。 */
+function installMaterialsAutoSendTrigger() {
+  removeMaterialsAutoSendTriggers();
+  ScriptApp.newTrigger("g1AutoSendPendingMaterials").timeBased().everyHours(1).create();
+  Logger.log("✅ g1AutoSendPendingMaterials を 1 時間ごとに実行するトリガーを設置しました。");
+  Logger.log("ℹ️ 止めるには Script Properties に " + G1_AUTOSEND_OFF_PROP + " を置く"
+    + "（★ トリガーを消さずに止められる）か、removeMaterialsAutoSendTriggers() を実行します。");
+  if (!G1_AUTO_SEND) {
+    Logger.log("⚠️ ★ G1_AUTO_SEND=false なので**下書きが溜まるだけ**で被験者に届きません。");
+  }
+  try {
+    assertRunHeader_(g1RunSheet_());
+  } catch (e) {
+    Logger.log("⚠️ ★ 実シートに「配布フォルダURL」列がまだありません: " + String(e.message).split("\n")[0]);
+    Logger.log("   → migrateRunSheetAddUrlColumn() を先に 1 回実行してください。");
+  }
+}
+
+function removeMaterialsAutoSendTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "g1AutoSendPendingMaterials") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("🧹 既存の g1AutoSendPendingMaterials トリガを " + n + " 件削除しました");
 }
 
 // ============================================================

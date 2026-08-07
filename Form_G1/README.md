@@ -461,7 +461,8 @@ G1 は **ブロックが 5 分で自動終了するたびに、暗号化済み�
 ### ローカルで測れること
 
 ```bash
-node Form_G1/submit_guard_test.cjs     # 受け口のガード（★ 実 Drive に触らない）
+node Form_G1/submit_guard_test.cjs      # 受け口のガード（★ 実 Drive に触らない）
+node Form_G1/materials_autosend_test.cjs # 事前資料メールの自動送信ガード（★ 実シート・実メールに触らない）
 ```
 
 ★ 名前ガード／シークレット照合／サイズ上限／保存の非握り潰し／設定不足／GET 拒否／
@@ -472,6 +473,80 @@ node Form_G1/submit_guard_test.cjs     # 受け口のガード（★ 実 Drive �
 ⚠️★ **端末が作る名前は全部通ること**も測っている（§4b の陽性対照）。
 ★ 同じ秒にログがローテートすると `..._101112_2.age` という名前になるので、
 受け口はそれも受け取る（`decisions.md` D-17）。
+
+## ★★ 配布と事前資料メール（2026-08-07 に自動化）
+
+`.steering/20260807-g1-distribution-automation/` が根拠。決定は同 `decisions.md` D-1〜D-5。
+
+### 配布の形（★ アプリは共通・課題ページだけ被験者別）
+
+```
+Drive: GSE_ユーザー検証_G1_アプリダウンロードリンク/   ← ★ 被験者に配るのはこのリンク（全員同じ）
+         G1_実施用_Windows/    exe×2 / bat / pubkey.txt / g1.mode / g1-submit.json
+         G1_実施用_macOS/      dmg / g1.mode / g1-submit.json / README_先に読む.txt
+Drive: G1/G1_課題ページ_被験者別/                      ← ★ 親リンクは誰にも渡さない
+         <P-ID>/  block01..NN.html                     ← ★ この直リンクだけを本人に送る
+```
+
+⚠️★★ **課題ページを「アプリダウンロードリンク」の下に置いてはならない。**
+被験者に渡しているのは**親フォルダ**のリンクなので、その下に置くと
+**どの被験者も他の被験者のフォルダを一覧できる**。
+`preregistration.md §2.12` は「他の被験者の割付」を**開示しない**側に置いている。
+
+★ アプリを共通にしてよい理由: **P-ID は配布物に焼き込まれていない**。
+被験者がアプリの画面に 1 回入力し、`~/.gse/g1_participant_id` に保存される
+（`src/App.tsx:499-521` / `src-tauri/src/submission.rs:70`）。
+`.age` のファイル名はその値から組み立てられ（`submission.rs:165`）、
+G1 モードでは妥当な ID が無ければ 1 ブロックも始められない（`submission.rs:143` `g1_start_gate`）。
+
+### 手順（被験者 1 人ぶん）
+
+```bash
+cd experiments/20260801-controlled-friction-task
+python3 assign.py --subject P0XX && python3 validate_blocks.py   # ★ 割付。自動化しない (§3-1)
+./make-distribution.sh P0XX both                                 # 梱包
+./make-upload-manifest.sh P0XX                                   # 上げる物 + 照合表
+```
+
+→ Drive の `G1_課題ページ_被験者別/` に `P0XX` フォルダを作り、`_upload/*.b64` を
+`base64Content` ＋ `disableConversionToGoogleType: true` で上げる（Drive 画面へ
+ドラッグしても等価）。上げ終えたら **必ず** 照合する:
+
+```bash
+./verify-drive-upload.py dist/P0XX/_upload/manifest.tsv <search_files の出力.json>
+```
+
+⚠️ ★ **rc=1 のあいだはフォルダの URL を配らない。**
+⚠️ ★ Drive MCP には**更新・削除が無い**。壊すと重複が残るので、直すときは Drive の画面で消す。
+
+### 事前資料メール（★ 引数の手打ちは不要になった）
+
+⚠️ Apps Script の関数セレクタは**引数を渡せない**ので、`sendTaskMaterialsEmail(pid, email, url)`
+は研究者がラッパーを手書きしないと実行できなかった。これを次の形に置き換えた:
+
+1. **1 回だけ**: `migrateRunSheetAddUrlColumn()` を実行して「配布フォルダURL」列を挿す
+   （⚠️ ★ `setupG1Forms()` は実行しない。フォームを作り直してしまう）
+2. **1 回だけ**: `installMaterialsAutoSendTrigger()`（1 時間ごと）
+3. 以後は「G1 実施トラッキング」の **「配布フォルダURL」列に URL を貼るだけ**
+
+★ 送る前に `previewPendingTaskMaterials()`（送らずに対象を出す）で確かめられる。
+
+⚠️⚠️ **送信は取り消せない。** ガードを 4 本 fail-closed で置いてある
+（`materials_autosend_test.cjs` が全部を実測する。⚠️ 陽性対照込み）:
+
+| # | ガード | 効き方 |
+|---|---|---|
+| 1 | キルスイッチ | Script Properties に `G1_MATERIALS_AUTOSEND_OFF` を置くと即停止（トリガーは消さなくてよい） |
+| 2 | URL 形式 | `https://drive.google.com/` で始まらないものは送らない |
+| 3 | 冪等 | 「課題文リンク送信日」が空の行だけ。★ 何度発火しても 1 通 |
+| 4 | 1 回の上限 | 既定 3 人。列の貼り間違いが一斉送信になる事故を頑健に抑える |
+| 5 | URL の重複 | ★ 同じ URL が 2 人以上に貼られていたら送らない（=「別の被験者の URL を貼った」を捕まえる。送信済みの行も数に入れる） |
+| 6 | 排他制御 | `LockService` で収集〜記録を囲む。⚠️ トリガーの重なりと手動実行の衝突で**同じ人に 2 通**行くのを防ぐ |
+
+★ さらに、送信後に「課題文リンク送信日」を**読み直して**確かめる。空なら補って書き、
+それも失敗したら備考に出す。⚠️ ここを見ないと「送れたのに記録が無い → 次の発火で再送」になる。
+
+⚠️ ★ **このシートを被験者や第三者に見せない。** URL 列を持つようになったため。
 
 ## 関連
 
