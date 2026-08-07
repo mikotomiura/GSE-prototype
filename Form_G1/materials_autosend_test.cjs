@@ -1086,6 +1086,49 @@ console.log("20. ★ レビュー指摘の反映（2026-08-07）");
   );
 }
 
+console.log("21. ★ 配布形式 (zip) と文面が食い違わないこと（2026-08-08 に実在した不具合）");
+{
+  // ⚠️★★ Drive に置いてあるのは **zip 2 個**。⚠️ 文面が「フォルダを丸ごと保存」と言っていた。
+  //   ★ それは zip 配布へ切り替えた理由そのものに反する（Drive はパーミッションを保存しないので
+  //     フォルダ経由だと .app の実行ビットが落ちる）。→ 文面側を固定する。
+  const ctx = makeCtx({});
+  const body = ctx.g1RegisterAckBody_("P015", urlFor("P015"));
+  ok("★ zip だと言う", body.indexOf("G1_実施用_Windows.zip") >= 0 && body.indexOf("G1_実施用_macOS.zip") >= 0);
+  ok("★ 展開（解凍）を指示する", body.indexOf("展開（解凍）してください") >= 0);
+  ok("★ macOS / Windows の展開手順を書く", body.indexOf("すべて展開") >= 0);
+  ok("⚠️ 展開せずに開くなと言う", body.indexOf("展開せずに中身を開かないでください") >= 0);
+  // ⚠️★ 本丸: 「フォルダを丸ごと保存」に戻っていないこと
+  ok("⚠️★ 「フォルダを丸ごと保存」に戻っていない", body.indexOf("丸ごと**保存") < 0 && body.indexOf("フォルダがあります") < 0, body.slice(0, 0));
+  // ★ 課題ページの移動先が「展開してできたフォルダ」であること（展開前は存在しない）
+  ok("★ 移動先は展開後のフォルダ", body.indexOf("展開してできた") >= 0);
+  ok("★ アプリのリンクが入る", body.indexOf(ctx.G1_APP_DOWNLOAD_URL) >= 0);
+  ok("★ 課題ページのリンクが入る", body.indexOf(urlFor("P015")) >= 0);
+  ok("「別便」と書かない", body.indexOf("別便のメール") < 0);
+}
+{
+  // ⚠️★★ プレビューが **1 通運用の本文を一度も出せていなかった** 不具合の再発防止。
+  //   原因: g1RegisterAckBody_(pid, materialsUrl) を **引数 1 つ**で呼んでいた。
+  const ctx = makeCtx({ roster: [["P-ID", "氏名", "メール"], ["P015", "", ""]] });
+  ctx.previewRegisterAckEmail();
+  const log = ctx.__logs.join("\n");
+  ok("★ 用意済みなら課題ページの URL が本文に出る", log.indexOf(urlFor("P015")) >= 0, log.slice(0, 600));
+  ok("★ 本番と同じだと言い切る", log.indexOf("本番とまったく同じ本文") >= 0);
+  ok("⚠️ 別便の分岐は出さない", log.indexOf("別便のメールでお送りします") < 0, log.slice(0, 600));
+  ok("★ アプリのリンクも確認用に出す", log.indexOf(ctx.G1_APP_DOWNLOAD_URL) >= 0);
+  // ⚠️ 2 通目のプレースホルダは「バグでは？」と読まれない書き方であること
+  ok("⚠️ example.com を出さない", log.indexOf("example.com") < 0, log.slice(-600));
+  ok("★ プレースホルダだと明示する", log.indexOf("プレースホルダ") >= 0);
+  ok("★ 1 通も送らない", ctx.__sent.length === 0 && ctx.__drafts.length === 0);
+}
+{
+  // ★ 陰性対照: 用意できていない P-ID なら、別便の分岐を出しつつ「用意しろ」と言う
+  const ctx = makeCtx({ roster: [["P-ID", "氏名", "メール"], ["P099", "", ""]] });
+  ctx.previewRegisterAckEmail();
+  const log = ctx.__logs.join("\n");
+  ok("★ 未用意だと言う", log.indexOf("まだ用意できていません") >= 0, log.slice(0, 400));
+  ok("★ 別便に落ちた本文だと断る", log.indexOf("別便に落ちたとき") >= 0);
+}
+
 console.log("");
 if (failures) {
   console.log("❌ " + failures + " 件失敗");
