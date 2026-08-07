@@ -1456,7 +1456,18 @@ function checkMaterialsProvisioning(lookahead) {
         : "⚠️ いま**新規**の登録が来ると、課題ページは別便になります（2 便運用）。"
     );
   }
-  Logger.log("★ 用意の手順: ./prepare-subjects.sh --range P001 P015 → Drive へドラッグ → 1 つずつ共有");
+  // ⚠️★ 範囲をハードコードしない。★ 案内に書いた範囲と実運用の範囲がずれると、
+  //   「言われたとおり打ったのに足りない」が起きる（2026-08-07 に実機ログで P001-P015 の
+  //   古い案内が残っているのを見つけた。実際の範囲は P006-P020 だった）。
+  //   → **いま見た P-ID から範囲を作って出す**（＝ ロスターが動けば案内も動く）。
+  var span = existing.concat(future);
+  Logger.log(
+    span.length > 0
+      ? "★ 用意の手順: ./prepare-subjects.sh --range " + span[0] + " " + span[span.length - 1] +
+          " → Drive へドラッグ → 1 つずつ共有"
+      : "★ 用意の手順: ./prepare-subjects.sh --range <開始 P-ID> <終了 P-ID> → Drive へドラッグ → 1 つずつ共有"
+  );
+  Logger.log("   ★ フォルダ名は " + g1MaterialsFolderNames_("P0NN").join(" / ") + " のどちらか。");
   Logger.log("   ⚠️ 共有は**フォルダ 1 つずつ**。親を共有にして継承させないこと（全被験者分が見えます）。");
 }
 

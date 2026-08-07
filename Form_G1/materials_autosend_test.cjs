@@ -987,6 +987,18 @@ console.log("19. ★ フォルダ名は「P-ID」と「G1課題文_P-ID」の 2 
   ok("★ 実運用の形で既存が全員そろう", log.indexOf("既存 9 人ぶんは全員") >= 0, log.slice(0, 500));
   ok("★ 新規 3 人ぶんも用意できている", log.indexOf("新規は先頭 3 人ぶん") >= 0, log.slice(-400));
   ok("未用意の警告は出ない", log.indexOf("人ぶんが未用意") < 0);
+  // ⚠️★ 案内の範囲は**いま見た P-ID から作る**（ハードコードすると実運用とずれる。
+  //    2026-08-07 の実機ログに P001-P015 という古い案内が残っていた）
+  ok("★ 案内の範囲が実運用と一致する", log.indexOf("--range P006 P017") >= 0, log.slice(-400));
+  ok("★ 認めるフォルダ名も案内する", log.indexOf("G1課題文_P0NN") >= 0, log.slice(-400));
+}
+{
+  // ⚠️ 陰性対照: 見る対象が 1 つも無くても壊れない（★ undefined を範囲に出さない）
+  const ctx = makeCtx({ roster: [["P-ID", "氏名", "メール"]] });
+  ctx.checkMaterialsProvisioning(0);
+  const log = ctx.__logs.join("\n");
+  ok("★ 対象ゼロで undefined を出さない", log.indexOf("undefined") < 0, log);
+  ok("汎用の案内に落ちる", log.indexOf("<開始 P-ID>") >= 0, log);
 }
 
 console.log("");
