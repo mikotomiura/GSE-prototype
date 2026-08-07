@@ -1425,6 +1425,84 @@ var G1_MATERIALS_MAX_PER_RUN = 3;
 /** 配布フォルダ URL として受け付ける形。⚠️ ★ ここを緩めると別サイトの URL を配れてしまう。 */
 var G1_MATERIALS_URL_RE = /^https:\/\/drive\.google\.com\/[^\s]+$/;
 
+/**
+ * ★★ 被験者別フォルダを束ねる**親**フォルダの ID（`G1_課題ページ_被験者別`）。
+ *
+ * ⚠️★★ **この親は「制限付き（非公開）」にしてある。** 2026-08-07 の判断:
+ *   親を「リンクを知っている全員」にすると、★ 被験者へ送る URL を**親のほうにしてしまった
+ *   1 回**で全被験者のフォルダ一覧が渡る（`preregistration.md §2.12`「他の被験者の割付」）。
+ *   → 親を非公開にすると、同じ取り違えは「アクセス権が必要です」で**止まる**（fail-closed）。
+ *   ★ 代わりに **被験者フォルダを 1 つずつ共有する**手作業が要る。その付け忘れは下の検査が拾う。
+ */
+var G1_MATERIALS_PARENT_ID = "1qhl28IDeh-19upuZf_YxPwwdq_d9xVcI";
+
+/** Drive のフォルダ URL から ID を取り出す。取れなければ ""。 */
+function g1FolderIdFromUrl_(url) {
+  var m = String(url).match(/\/folders\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : "";
+}
+
+/**
+ * ★★ 配布フォルダの **実体** を確かめる（ガード 7）。問題が無ければ ""、あれば理由を返す。
+ *
+ * ⚠️ ★ 形式検査（ガード 2）は文字列しか見ない。ここは Drive に問い合わせて
+ *    「**そのフォルダが本当にこの被験者のもので、本人が開けるか**」を見る。
+ *    次の 4 つは、どれも形式検査を素通りする事故である:
+ *      (a) 親フォルダの URL を貼った        → ★ 全被験者が見える
+ *      (b) 別の被験者のフォルダの URL を貼った → ★ 割付を取り違えて渡す
+ *      (c) 配布用の親の下に無いフォルダ       → 置き場所を間違えている
+ *      (d) ★ **共有し忘れ**                 → 被験者はリンクを開けない（届いても使えない）
+ *
+ * ⚠️★ この関数のために **DriveApp のスコープが増える**。次回実行時に Apps Script が
+ *    再承認を求めるので、⚠️ 研究者が「承認」を押すまで自動送信は走らない（安全側に倒れる）。
+ */
+function g1MaterialsFolderProblem_(url, pid) {
+  var id = g1FolderIdFromUrl_(url);
+  if (!id) return "URL からフォルダ ID を取り出せません（/folders/<ID> の形ではない）";
+  if (G1_MATERIALS_PARENT_ID && id === G1_MATERIALS_PARENT_ID) {
+    return "★★ これは被験者別フォルダの**親**の URL です（⚠️ 全被験者分が見えます）";
+  }
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(id);
+  } catch (e) {
+    return "フォルダを開けません（ID 違い・削除済み・権限なし）: " + e;
+  }
+  var name = String(folder.getName()).trim().toUpperCase();
+  if (name !== String(pid).trim().toUpperCase()) {
+    return "フォルダ名が「" + folder.getName() + "」で P-ID と違います（★ 別の被験者の URL かも）";
+  }
+  if (G1_MATERIALS_PARENT_ID) {
+    var inParent = false;
+    try {
+      var ps = folder.getParents();
+      while (ps.hasNext()) {
+        if (ps.next().getId() === G1_MATERIALS_PARENT_ID) {
+          inParent = true;
+          break;
+        }
+      }
+    } catch (e2) {
+      return "親フォルダを確かめられません: " + e2;
+    }
+    if (!inParent) return "配布用の親フォルダ（G1_課題ページ_被験者別）の下にありません";
+  }
+  // ⚠️ ★ 共有し忘れの検出。親を非公開にした分、ここが**唯一の**受け皿である。
+  var access;
+  try {
+    access = String(folder.getSharingAccess());
+  } catch (e3) {
+    return "共有設定を読めません: " + e3;
+  }
+  if (access !== "ANYONE_WITH_LINK" && access !== "ANYONE") {
+    return (
+      "★ まだ共有されていません（共有=" + access + "）。⚠️ このまま送っても被験者は開けません。" +
+      "Drive で「リンクを知っている全員（閲覧者）」にしてください"
+    );
+  }
+  return "";
+}
+
 /** 「G1 実施トラッキング」シートを返す。無ければ null（★ throw しない）。 */
 function g1RunSheet_() {
   var ssId = PropertiesService.getScriptProperties().getProperty(MGMT_SHEET_PROP_G1);
@@ -1559,6 +1637,12 @@ function g1CollectPendingMaterials_() {
     var email = g1EmailForPid_(pid);
     if (!email) {
       skipped.push(pid + ": Phase1 ロスターにメールがありません");
+      continue;
+    }
+    // ガード 7: ★ Drive に問い合わせて実体を確かめる（親の URL / 別人 / 共有し忘れ）
+    var problem = g1MaterialsFolderProblem_(url, pid);
+    if (problem) {
+      skipped.push(pid + ": " + problem);
       continue;
     }
     rows.push({ row: r, pid: pid, url: url, email: email });

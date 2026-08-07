@@ -113,7 +113,7 @@ function makeSheet(grid, failWriteCol) {
  *   omitUrlCol… true なら「配布フォルダURL」列を持たない**移行前**のシートを作る
  */
 function makeCtx(opts) {
-  opts = opts || {};
+  opts = Object.assign({ folders: FOLDERS }, opts || {});
   const logs = [];
   const sent = [];
   const drafts = [];
@@ -164,7 +164,26 @@ function makeCtx(opts) {
     MailApp: { sendEmail: (to, subject) => sent.push({ to, subject }) },
     GmailApp: { createDraft: (to, subject) => drafts.push({ to, subject }) },
     FormApp: { openById: () => ({}) },
-    DriveApp: {},
+    // ★ Drive のフォルダを最小限だけ真似る。opts.folders は {id: {name, parent, access}}。
+    //   id が opts.folders に無ければ「開けない」= 実 Drive の getFolderById が投げるのと同じ。
+    DriveApp: {
+      getFolderById: (id) => {
+        const f = (opts.folders || {})[id];
+        if (!f) throw new Error("TEST: そんなフォルダは無い (" + id + ")");
+        return {
+          getName: () => f.name,
+          getSharingAccess: () => f.access,
+          getParents: () => {
+            const list = f.parent ? [f.parent] : [];
+            let i = 0;
+            return {
+              hasNext: () => i < list.length,
+              next: () => ({ getId: () => list[i++] }),
+            };
+          },
+        };
+      },
+    },
     Session: {},
     LockService: {
       getScriptLock: () => ({
@@ -200,7 +219,15 @@ function ok(name, cond, detail) {
   }
 }
 
-const GOOD_URL = "https://drive.google.com/drive/folders/1xzoU4wpEiBfiic-wKdtC2HTEweqoFzWq";
+// ★ 実コードの G1_MATERIALS_PARENT_ID と同じ値。ずれたらガード 7 の検査が空振りする。
+const PARENT_ID = "1qhl28IDeh-19upuZf_YxPwwdq_d9xVcI";
+const urlFor = (pid) => "https://drive.google.com/drive/folders/FOLDER-" + pid;
+/** 既定の Drive: P015..P019 のフォルダが親の下にあり、リンク共有済み。 */
+const FOLDERS = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+["P015", "P016", "P017", "P018", "P019"].forEach((p) => {
+  FOLDERS["FOLDER-" + p] = { name: p, parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+});
+const GOOD_URL = urlFor("P015");
 const ROSTER = [
   ["P015", "テスト太郎", "t15@example.com"],
   ["P016", "テスト次郎", "t16@example.com"],
@@ -281,10 +308,10 @@ console.log("5. ガード 4 — 1 回の上限");
   const ctx = makeCtx({
     // ★ 被験者ごとに別のフォルダなので URL も別（同じにするとガード 5 が止める = 正しい）
     runRows: [
-      { "P-ID": "P015", 配布フォルダURL: GOOD_URL + "15" },
-      { "P-ID": "P016", 配布フォルダURL: GOOD_URL + "16" },
-      { "P-ID": "P017", 配布フォルダURL: GOOD_URL + "17" },
-      { "P-ID": "P018", 配布フォルダURL: GOOD_URL + "18" },
+      { "P-ID": "P015", 配布フォルダURL: urlFor("P015") },
+      { "P-ID": "P016", 配布フォルダURL: urlFor("P016") },
+      { "P-ID": "P017", 配布フォルダURL: urlFor("P017") },
+      { "P-ID": "P018", 配布フォルダURL: urlFor("P018") },
     ],
     roster: ROSTER,
   });
@@ -395,8 +422,8 @@ console.log("10. ガード 5 — URL の重複（★ 別の被験者の URL を�
   // ★ 陽性対照: 違う URL なら 2 人とも送る（重複検出が全部止めていないこと）
   const ctx = makeCtx({
     runRows: [
-      { "P-ID": "P015", 配布フォルダURL: GOOD_URL },
-      { "P-ID": "P016", 配布フォルダURL: GOOD_URL + "2" },
+      { "P-ID": "P015", 配布フォルダURL: urlFor("P015") },
+      { "P-ID": "P016", 配布フォルダURL: urlFor("P016") },
     ],
     roster: ROSTER,
   });
@@ -433,6 +460,80 @@ console.log("12. ★ 送信は済んだが送信日を書けない（放置す�
   const noteCol = header.indexOf("備考") + 1;
   const note = String(ctx.__runSheet.getRange(3, noteCol).getValue());
   ok("備考にフラグが立つ", note.indexOf("送信済") >= 0, "note=" + note);
+}
+
+console.log("13. ガード 7 — フォルダの実体（★ 親を非公開に戻した分、ここが受け皿）");
+{
+  // (a) ★★ 親フォルダの URL を貼った = 全被験者分が見える
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: "https://drive.google.com/drive/folders/" + PARENT_ID }],
+    roster: ROSTER,
+  });
+  ctx.g1AutoSendPendingMaterials();
+  ok("親の URL は送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
+  ok(
+    "「親」だと理由に書く",
+    ctx.__logs.some((l) => l.indexOf("親") >= 0),
+    ctx.__logs.join(" / ")
+  );
+}
+{
+  // (b) 別の被験者のフォルダ（名前が P-ID と違う）
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: urlFor("P016") }],
+    roster: ROSTER,
+  });
+  ctx.g1AutoSendPendingMaterials();
+  ok("別の被験者のフォルダは送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
+}
+{
+  // (c) 配布用の親の下に無い
+  const folders = Object.assign({}, FOLDERS, {
+    "FOLDER-P015": { name: "P015", parent: "よそのフォルダ", access: "ANYONE_WITH_LINK" },
+  });
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: GOOD_URL }],
+    roster: ROSTER,
+    folders: folders,
+  });
+  ctx.g1AutoSendPendingMaterials();
+  ok("親の下に無ければ送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
+}
+{
+  // (d) ★ 共有し忘れ — 送っても被験者は開けない
+  const folders = Object.assign({}, FOLDERS, {
+    "FOLDER-P015": { name: "P015", parent: PARENT_ID, access: "PRIVATE" },
+  });
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: GOOD_URL }],
+    roster: ROSTER,
+    folders: folders,
+  });
+  ctx.g1AutoSendPendingMaterials();
+  ok("共有し忘れなら送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
+  ok(
+    "共有せよと理由に書く",
+    ctx.__logs.some((l) => l.indexOf("リンクを知っている全員") >= 0),
+    ctx.__logs.join(" / ")
+  );
+}
+{
+  // (e) 存在しない / 消された ID
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: urlFor("存在しない") }],
+    roster: ROSTER,
+  });
+  ctx.g1AutoSendPendingMaterials();
+  ok("開けないフォルダは送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
+}
+{
+  // (f) /folders/<ID> の形でない Drive URL
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: "https://drive.google.com/file/d/abc/view" }],
+    roster: ROSTER,
+  });
+  ctx.g1AutoSendPendingMaterials();
+  ok("フォルダ URL でなければ送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
 }
 
 console.log("");
