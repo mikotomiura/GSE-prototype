@@ -75,3 +75,18 @@
 - [ ] ★ 人: `.gs` を貼り直す → `installRunSheetRefreshTrigger()` を 1 回
 - [ ] ★ 人: スクリプト プロパティ `G1_SUBMIT_FOLDER_ID` に受け口の `FOLDER_ID` と同じ値を入れる
       （⚠️ 無いと「完了ブロック数」「実施日」だけ埋まらない）
+
+## 6. ★ 次セッションへ送るもの（引き継ぎ: `.steering/_handoff/next-session-prompt-g1-provisioning-and-vps.md`）
+- [ ] ★【A】P001–P015 の課題ページを用意 → Drive 配置 → 1 つずつ共有
+      ⚠️ G1 の被験者は**過去の参加者が主**（研究者判断 2026-08-07）＝ 既存 P-ID で登録されるので
+      P015 だけでなく **P001 から全部**要る
+      ⚠️★ `assign.py --subject <ID>` だけでは `blocks/<ID>.json` は作られない。
+      `--json > blocks/<ID>.json` が要る（2026-08-07 に踏んだ）
+      ★ 15 人ぶんのループスクリプトは**まだ無い**
+- [ ] ★【B】Phase1.5 / Phase2 の完全随時自動化（VPS）を設計する
+      ★ G1 で on-demand にできなかった 3 つの理由（Python / Drive 資格情報 / 権限設定 API）が
+      そのまま設計の出発点になる。⚠️ 最大の利得は**共有の自動化**（`permissions.create`）
+- [ ] ⚠️ `checkMaterialsProvisioning()` は「次に発番される P-ID から 5 人」しか見ない。
+      過去参加者が主という運用に合わせて **P001–P015 を全部見る形に直す**
+- [ ] ⚠️ `.gs` の最新版（受付メール 1 通化・`checkMaterialsProvisioning`）を `GSE_Gate1` へ貼る
+- [ ] ⚠️ `git push`（deny なのでユーザーが打つ）
