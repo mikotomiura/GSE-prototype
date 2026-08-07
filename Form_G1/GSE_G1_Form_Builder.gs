@@ -1261,8 +1261,10 @@ function g1EnsureRunRow_(pid) {
  *   従来「登録時点では割付が無いので送れない」としていた。これは**手順の前提**であって
  *   原理的な制約ではない。★ P-ID は `既存の最大値 + 1` で決まる（`g1NextParticipantId_`）ので
  *   **次に出る番号は予測できる**。研究者が募集前に
- *       `assign.py --subject P0XX` → `make-distribution.sh` → Drive へ配置 → 共有
+ *       `./prepare-subjects.sh --range P001 P015` → Drive へドラッグ → 1 つずつ共有
  *   まで済ませておけば、登録時にはフォルダが**既に存在する**。
+ *   ⚠️★ さらに G1 は**過去の参加者が主**なので、予測ではなく **ロスターに載っている ID**
+ *     を用意しておくのが本筋である（`checkMaterialsProvisioning` はそちらを見る）。
  *   ⚠️ ★ 割付は従来どおり研究者の明示的な行為のままである（`§3-1` に触れない）。
  *   ★ GAS がやるのは「名前で探して、妥当なら URL を返す」だけで、**何も作らない**。
  *
@@ -1300,10 +1302,47 @@ function g1MaterialsUrlForPid_(pid) {
 }
 
 /**
- * ★ 募集を始める前に、次に出る P-ID のフォルダが用意できているかを見る（引数なし・読むだけ）。
- * ⚠️ ここが空のまま募集すると、被験者は課題ページを 2 便目まで待つことになる。
+ * ★ ロスターに**実在する** P-ID を昇順で返す（重複は畳む）。
+ *
+ * ⚠️★ `g1NextParticipantId_` は最大値しか見ないので、**過去参加者が誰なのか**は分からない。
+ *   G1 の被験者は「過去の参加者」が主である（研究者判断 2026-08-07）＝ `onG1ConsentSubmit` は
+ *   採番せず既存 ID を再利用する（`g1FindInPhase1Roster_` がメールで引く）ので、
+ *   ★ **用意しておくべき P-ID はロスターに載っている全員**である。
+ *
+ * ⚠️ 1 行目はヘッダである。`g1NextParticipantId_` と同じく `^P\d+$` に一致する行だけを拾うので、
+ *   ヘッダ（「参加者ID」など）は自然に外れる。
  */
-function checkMaterialsProvisioning() {
+function g1RosterParticipantIds_(sheet) {
+  var last = sheet.getLastRow();
+  if (last < 1) return [];
+  var values = sheet.getRange(1, 1, last, 1).getValues();
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < values.length; i++) {
+    var s = String(values[i][0]).trim();
+    if (!/^P\d+$/.test(s)) continue;
+    if (seen[s]) continue;
+    seen[s] = true;
+    out.push(s);
+  }
+  out.sort(function (a, b) {
+    return parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10);
+  });
+  return out;
+}
+
+/**
+ * ★ 募集を始める前に、課題ページのフォルダが用意できているかを見る（読むだけ・何も作らない）。
+ *
+ * ⚠️★★ **2026-08-07 に見る範囲を変えた。**
+ *   旧版は「次に発番される P-ID から 5 人」しか見なかった。⚠️ これは
+ *   **新規参加者しか来ない**という前提であり、G1 の実際の運用（過去参加者が主・既存 ID を再利用）
+ *   と食い違う。★ その前提のままだと、**再参加者のフォルダが 1 つも無くても緑に見える**。
+ *   → ロスターに実在する全 P-ID（＝再利用されうる ID）＋ 次に発番される数人、を見る。
+ *
+ * @param {number=} lookahead 次に発番される分を何人ぶん見るか（既定 3）
+ */
+function checkMaterialsProvisioning(lookahead) {
   if (!PHASE1_MGMT_SHEET_ID) {
     Logger.log("❌ PHASE1_MGMT_SHEET_ID が未設定です。");
     return;
@@ -1313,28 +1352,80 @@ function checkMaterialsProvisioning() {
     Logger.log("❌ 「参加者ロスター」タブがありません。");
     return;
   }
+  var ahead = lookahead === undefined || lookahead === null ? 3 : parseInt(lookahead, 10);
+  if (!(ahead >= 0)) ahead = 3;
+
+  var existing = g1RosterParticipantIds_(roster);
+  // ⚠️★ 1 人あたり Drive を 4 回叩く（名前で探す / 開く / 親を辿る / 共有設定を読む）。
+  //   Apps Script の実行は 6 分で切られるので、人数が増えたときに**黙って途中で死ぬ**。
+  //   → 上限で切り、★ **切ったことを必ず言う**（無言の打ち切りは「全部見た」と読まれる）。
+  var LIMIT = 40;
+  var truncated = 0;
+  if (existing.length > LIMIT) {
+    truncated = existing.length - LIMIT;
+    existing = existing.slice(0, LIMIT);
+  }
   var next = g1NextParticipantId_(roster);
   var n = parseInt(String(next).replace(/^P/, ""), 10);
-  Logger.log("★ 次に発番される P-ID: " + next);
+  var future = [];
+  for (var i = 0; i < ahead; i++) {
+    future.push("P" + ("000" + (n + i)).slice(-3));
+  }
+
+  Logger.log("★ ロスターに実在する P-ID: " + (existing.length ? existing.join(" ") : "（なし）"));
+  if (truncated > 0) {
+    Logger.log(
+      "⚠️★ 実行時間の上限があるため先頭 " + LIMIT + " 人までしか見ていません（残り " + truncated +
+        " 人は未検査）。★ この結果を「全員そろっている」と読まないこと。"
+    );
+  }
+  Logger.log("★ 次に発番される P-ID: " + next + "（先読み " + ahead + " 人）");
   Logger.log("--------");
-  var ready = 0;
-  for (var i = 0; i < 5; i++) {
-    var pid = "P" + ("000" + (n + i)).slice(-3);
+
+  // ⚠️ ★ 2 群を分けて数える。「再参加者ぶんが揃っているか」と「新規ぶんの余裕があるか」は
+  //   運用上まったく別の話であり、合算すると**どちらが欠けているのか分からなくなる**。
+  var missingExisting = [];
+  var missingFuture = [];
+  function check(pid, into, label) {
     var found = g1MaterialsUrlForPid_(pid);
     if (found.url) {
-      ready++;
-      Logger.log("✅ " + pid + ": 用意できています");
+      Logger.log("✅ " + pid + " (" + label + "): 用意できています");
     } else {
-      Logger.log("⚠️ " + pid + ": " + found.problem);
+      into.push(pid);
+      Logger.log("⚠️ " + pid + " (" + label + "): " + found.problem);
     }
   }
+  for (var a = 0; a < existing.length; a++) check(existing[a], missingExisting, "既存");
+  for (var b = 0; b < future.length; b++) check(future[b], missingFuture, "新規");
+
   Logger.log("--------");
-  Logger.log(
-    ready > 0
-      ? "★ 先頭 " + ready + " 人ぶんは **受付メール 1 通**で課題ページまで渡せます。"
-      : "⚠️ ★ いま登録が来ると、課題ページは**別便**になります（2 便運用）。"
-  );
-  Logger.log("★ 用意の手順: assign.py --subject <P-ID> → make-distribution.sh → Drive へ配置 → 共有");
+  if (existing.length === 0) {
+    Logger.log("⚠️ ロスターに P-ID が 1 つもありません（★ 管理シートを取り違えていないか確認）。");
+  } else if (missingExisting.length === 0) {
+    // ⚠️ 打ち切っているときに「全員」と言わない（★ 見ていない人がいる）
+    Logger.log(
+      truncated > 0
+        ? "✅ 見た " + existing.length + " 人ぶんは **受付メール 1 通**で渡せます（⚠️ 残り " +
+            truncated + " 人は未検査）。"
+        : "✅ 既存 " + existing.length + " 人ぶんは全員 **受付メール 1 通**で渡せます。"
+    );
+  } else {
+    Logger.log(
+      "⚠️★ 既存参加者 " + missingExisting.length + " / " + existing.length +
+        " 人ぶんが未用意: " + missingExisting.join(" ")
+    );
+    Logger.log("   ⚠️ 過去の参加者が再登録すると、この人たちは課題ページを**別便**まで待つことになります。");
+  }
+  if (ahead > 0) {
+    var readyFuture = future.length - missingFuture.length;
+    Logger.log(
+      readyFuture > 0
+        ? "★ 新規は先頭 " + readyFuture + " 人ぶん用意できています。"
+        : "⚠️ いま**新規**の登録が来ると、課題ページは別便になります（2 便運用）。"
+    );
+  }
+  Logger.log("★ 用意の手順: ./prepare-subjects.sh --range P001 P015 → Drive へドラッグ → 1 つずつ共有");
+  Logger.log("   ⚠️ 共有は**フォルダ 1 つずつ**。親を共有にして継承させないこと（全被験者分が見えます）。");
 }
 
 function g1RegisterAckSubject_() {

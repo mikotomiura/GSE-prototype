@@ -798,6 +798,125 @@ console.log("17. ★ 1 通で渡したら 2 通目が飛ばない（冪等キー
   ok("⚠️ 2 通目が飛ばない", ctx2.__sent.length === before, "sent=" + ctx2.__sent.length);
 }
 
+console.log("18. ★ checkMaterialsProvisioning — ロスター全体を見る（過去参加者が主の運用）");
+{
+  // ⚠️ ロスターは 1 行目がヘッダ。★ ここでは P006..P010 が「過去の参加者」である。
+  const roster = [
+    ["P-ID", "氏名", "メール"],
+    ["P006", "", ""],
+    ["P007", "", ""],
+    ["P008", "", ""],
+    ["P009", "", ""],
+    ["P010", "", ""],
+  ];
+  {
+    const ctx = makeCtx({ roster: roster });
+    const ids = ctx.g1RosterParticipantIds_(
+      ctx.SpreadsheetApp.openById("roster-sheet").getSheetByName("参加者ロスター")
+    );
+    ok("実在する P-ID を全部拾う", ids.join(",") === "P006,P007,P008,P009,P010", ids.join(","));
+    ok("ヘッダ行を拾わない", ids.indexOf("P-ID") < 0);
+  }
+  {
+    // ⚠️ 重複と並び順の乱れを畳む（★ 手入力のロスターは順番が保証されない）
+    const ctx = makeCtx({
+      roster: [["P-ID"], ["P010"], ["P006"], ["P010"], ["（欠番）"], ["P008"]],
+    });
+    const ids = ctx.g1RosterParticipantIds_(
+      ctx.SpreadsheetApp.openById("roster-sheet").getSheetByName("参加者ロスター")
+    );
+    ok("重複を畳んで昇順にする", ids.join(",") === "P006,P008,P010", ids.join(","));
+  }
+  {
+    // ★★ 本題: 既定の Drive には P015..P019 しか無い。旧版（次の 5 人だけ見る）は
+    //    P011..P015 を見て「先頭 1 人ぶんは渡せます」と**緑寄りに**報告していた。
+    //    ⚠️ 実際には過去参加者 P006..P010 が 1 人も用意できていない。
+    const ctx = makeCtx({ roster: roster });
+    ctx.checkMaterialsProvisioning();
+    const log = ctx.__logs.join("\n");
+    ok("既存 5 人ぶんの未用意を名指しする", log.indexOf("P006 P007 P008 P009 P010") >= 0, log);
+    ok("★ 既存が欠けていることを警告する", log.indexOf("既存参加者 5 / 5 人ぶんが未用意") >= 0);
+    ok("再登録すると別便になると書く", log.indexOf("別便") >= 0);
+    // ★ 既存と新規を**別に**数えていること（合算すると、どちらが欠けているか分からなくなる）
+    ok("新規ぶんも別枠で見る", log.indexOf("P011 (新規)") >= 0 && log.indexOf("P013 (新規)") >= 0, log);
+    ok("新規が未用意なら 2 便と言う", log.indexOf("**新規**の登録が来ると") >= 0, log);
+    // ⚠️ 陰性対照: 読むだけであって、何も送らない・作らない
+    ok("1 通も送らない", ctx.__sent.length === 0 && ctx.__drafts.length === 0);
+  }
+  {
+    // ★ 陽性対照: 過去参加者ぶんが全部そろっていれば緑になる（★ 全部止めるガードではない）
+    const folders = Object.assign({}, FOLDERS);
+    ["P006", "P007", "P008", "P009", "P010"].forEach((p) => {
+      folders["FOLDER-" + p] = { name: p, parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+    });
+    const ctx = makeCtx({ roster: roster, folders: folders });
+    ctx.checkMaterialsProvisioning();
+    const log = ctx.__logs.join("\n");
+    ok("★ 全員そろえば緑", log.indexOf("既存 5 人ぶんは全員") >= 0, log);
+    ok("未用意の警告は出ない", log.indexOf("人ぶんが未用意") < 0, log);
+  }
+  {
+    // ⚠️ 共有し忘れが 1 人いれば、その 1 人だけ名指しされる（ガード 7 を通している）
+    const folders = Object.assign({}, FOLDERS);
+    ["P006", "P007", "P008", "P009", "P010"].forEach((p) => {
+      folders["FOLDER-" + p] = {
+        name: p,
+        parent: PARENT_ID,
+        access: p === "P008" ? "PRIVATE" : "ANYONE_WITH_LINK",
+      };
+    });
+    const ctx = makeCtx({ roster: roster, folders: folders });
+    ctx.checkMaterialsProvisioning();
+    const log = ctx.__logs.join("\n");
+    ok("共有し忘れ 1 人を名指し", log.indexOf("既存参加者 1 / 5 人ぶんが未用意: P008") >= 0, log);
+    ok("理由が「まだ共有されていません」", log.indexOf("まだ共有されていません") >= 0);
+  }
+  {
+    // ⚠️ ロスターが空（★ 管理シートを取り違えた形）→ 黙って緑にしない
+    const ctx = makeCtx({ roster: [["P-ID", "氏名", "メール"]] });
+    ctx.checkMaterialsProvisioning();
+    const log = ctx.__logs.join("\n");
+    ok("空ロスターを警告する", log.indexOf("P-ID が 1 つもありません") >= 0, log);
+    ok("★「全員そろった」とは言わない", log.indexOf("人ぶんは全員") < 0, log);
+  }
+  {
+    // ⚠️★ 人数が上限を超えたら「切ったこと」を必ず言う（★ 無言の打ち切りは「全部見た」と読まれる）
+    const many = [["P-ID", "氏名", "メール"]];
+    const folders = Object.assign({}, FOLDERS);
+    for (let i = 1; i <= 45; i++) {
+      const p = "P" + ("000" + i).slice(-3);
+      many.push([p, "", ""]);
+      folders["FOLDER-" + p] = { name: p, parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+    }
+    const ctx = makeCtx({ roster: many, folders: folders });
+    ctx.checkMaterialsProvisioning(0);
+    const log = ctx.__logs.join("\n");
+    ok("★ 打ち切ったことを言う", log.indexOf("残り 5 人は未検査") >= 0, log.slice(0, 400));
+    // ⚠️ 本丸: 見ていない人がいるのに「全員そろった」と読ませない
+    ok("★「全員」と言わない", log.indexOf("人ぶんは全員") < 0, log.slice(0, 400));
+    ok("見た分は緑と言う", log.indexOf("見た 40 人ぶんは") >= 0, log.slice(0, 400));
+  }
+  {
+    // ★ 陰性対照: 上限以下なら打ち切りの警告は出ないし、「全員」と言ってよい
+    const few = [["P-ID", "氏名", "メール"]];
+    const folders = Object.assign({}, FOLDERS);
+    ["P015", "P016", "P017"].forEach((p) => few.push([p, "", ""]));
+    const ctx = makeCtx({ roster: few, folders: folders });
+    ctx.checkMaterialsProvisioning(0);
+    const log = ctx.__logs.join("\n");
+    ok("上限以下なら打ち切りを言わない", log.indexOf("未検査") < 0, log);
+    ok("★ 全員そろえば「全員」と言う", log.indexOf("既存 3 人ぶんは全員") >= 0, log);
+  }
+  {
+    // ★ 先読み 0 なら新規の話をしない（既存の話だけ見たいとき）
+    const ctx = makeCtx({ roster: roster });
+    ctx.checkMaterialsProvisioning(0);
+    const log = ctx.__logs.join("\n");
+    ok("先読み 0 で新規の行が出ない", log.indexOf("新規は先頭") < 0 && log.indexOf("(新規)") < 0, log);
+    ok("既存の判定は出る", log.indexOf("既存参加者 5 / 5 人ぶんが未用意") >= 0);
+  }
+}
+
 console.log("");
 if (failures) {
   console.log("❌ " + failures + " 件失敗");

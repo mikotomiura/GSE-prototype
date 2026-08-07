@@ -575,16 +575,28 @@ Apps Script が再承認を求める。★ 承認するまで自動送信は走�
 原理的な制約ではなかった。★ P-ID は `既存の最大値 + 1` で決まる（`g1NextParticipantId_`）ので
 **次に出る番号は予測できる**。→ **募集前に先回りして用意しておけば 1 通で渡せる**。
 
+⚠️★★ さらに **G1 の被験者は「過去の参加者」が主**である（研究者判断 2026-08-07）。
+既存 P-ID で登録されるので `onG1ConsentSubmit` は**採番せず既存 ID を再利用**する。
+→ ★ 用意しておくべきなのは「次に出る番号」ではなく **ロスターに載っている全員 + 次の数人**である。
+
 ```bash
-# ★ 募集を始める前に、次に出る P-ID の分をまとめて用意しておく
+# ★ 募集を始める前に、まとめて用意しておく（★ 15 人ぶんを 1 コマンドで）
 cd experiments/20260801-controlled-friction-task
-python3 assign.py --subject P015 && python3 validate_blocks.py
-./make-distribution.sh P015 both && ./make-upload-manifest.sh P015
-#   → Drive の G1_課題ページ_被験者別/ に P015 フォルダを作って配置し、そのフォルダを共有
+./prepare-subjects.sh --range P001 P015
+#   → dist/_drive/P001..P015/ ができる。★ このフォルダ群を Drive の
+#     G1_課題ページ_被験者別/ へ**まとめてドラッグ**し、⚠️ **1 つずつ**共有する。
+#   ⚠️ 上げたあと byte 照合が緑になるまでリンクを配らない:
+#       ./verify-drive-upload.py dist/<ID>/_upload/manifest.tsv <search_files の出力.json>
 ```
 
+★ `prepare-subjects.sh` は **既存の `blocks/<ID>.json` を上書きしない**（実施後に書き足された
+`produced_chars` / `file` / 操作チェックが消えるため）。整合の判定は `validate_blocks.py` に任せる。
+
 ★ 用意できているかは **`checkMaterialsProvisioning()`**（引数なし・読むだけ）で確認できる。
-次に出る P-ID から 5 人ぶんを見て、1 通で渡せるかを教える。
+⚠️ **ロスターに実在する全 P-ID**（＝再利用されうる ID）と、次に出る 3 人ぶんを**分けて**数える
+（`checkMaterialsProvisioning(0)` で新規ぶんを見ない）。
+⚠️★ 旧版は「次に出る P-ID から 5 人」しか見ておらず、**過去参加者のフォルダが 1 つも無くても
+緑寄りに見えた**。2026-08-07 に是正した。
 
 | | 受付メール（登録直後・自動） | 事前資料メール（保険・自動） |
 |---|---|---|
