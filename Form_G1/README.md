@@ -582,8 +582,10 @@ Apps Script が再承認を求める。★ 承認するまで自動送信は走�
 ```bash
 # ★ 募集を始める前に、まとめて用意しておく（★ 15 人ぶんを 1 コマンドで）
 cd experiments/20260801-controlled-friction-task
-./prepare-subjects.sh --range P001 P015
-#   → dist/_drive/P001..P015/ ができる。★ このフォルダ群を Drive の
+./prepare-subjects.sh --range P006 P020     # ★ 2026-08-07 時点の実運用範囲
+#   ⚠️ 範囲をここから写さないこと。★ `checkMaterialsProvisioning()` が
+#      **いまのロスターから作った範囲**を出すので、それを打つのが正しい。
+#   → dist/_drive/G1課題文_P006 … G1課題文_P020/ ができる。★ このフォルダ群を Drive の
 #     G1_課題ページ_被験者別/ へ**まとめてドラッグ**し、⚠️ **1 つずつ**共有する。
 #   ⚠️ 上げたあと byte 照合が緑になるまでリンクを配らない:
 #       ./verify-drive-upload.py dist/<ID>/_upload/manifest.tsv <search_files の出力.json>

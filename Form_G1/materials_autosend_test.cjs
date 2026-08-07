@@ -950,7 +950,7 @@ console.log("19. ★ フォルダ名は「P-ID」と「G1課題文_P-ID」の 2 
   const found = ctx.g1MaterialsUrlForPid_("P015");
   ok("★ 後ろに語がつく名前は掴まない", found.url === "", found.url);
   // ⚠️ ガード 7 側も同じ（URL を直に貼られた場合の受け皿）
-  const prob = ctx.g1MaterialsFolderProblem_(urlFor("old").replace("FOLDER-old", "FOLDER-old"), "P015");
+  const prob = ctx.g1MaterialsFolderProblem_(urlFor("old"), "P015");
   ok("ガード 7 も弾く", prob.indexOf("P-ID と違います") >= 0, prob);
 }
 {
@@ -999,6 +999,91 @@ console.log("19. ★ フォルダ名は「P-ID」と「G1課題文_P-ID」の 2 
   const log = ctx.__logs.join("\n");
   ok("★ 対象ゼロで undefined を出さない", log.indexOf("undefined") < 0, log);
   ok("汎用の案内に落ちる", log.indexOf("<開始 P-ID>") >= 0, log);
+}
+
+console.log("20. ★ レビュー指摘の反映（2026-08-07）");
+{
+  // ⚠️★★ 名前の規約が **bash と GAS の 2 か所**にある。コメントは「同時に直せ」と言うが、
+  //   ★ それを**機械が確かめていない**と、片方だけ直った状態が黙って通る。
+  const shell = fs.readFileSync(
+    path.join(__dirname, "..", "experiments", "20260801-controlled-friction-task", "prepare-subjects.sh"),
+    "utf8"
+  );
+  const m = shell.match(/^DRIVE_PREFIX="([^"]*)"/m);
+  const ctx = makeCtx({});
+  ok("prepare-subjects.sh に DRIVE_PREFIX がある", !!m, shell.slice(0, 0));
+  ok(
+    "★ bash の DRIVE_PREFIX と GAS の G1_MATERIALS_FOLDER_PREFIX が一致",
+    m && m[1] === ctx.G1_MATERIALS_FOLDER_PREFIX,
+    (m ? m[1] : "(無し)") + " vs " + ctx.G1_MATERIALS_FOLDER_PREFIX
+  );
+}
+{
+  // ⚠️★ 打ち切りは **番号の小さい方**を落とす（直近の参加者ほど再登録しやすいため）
+  const roster = [["P-ID", "氏名", "メール"]];
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  for (let i = 1; i <= 45; i++) {
+    const p = "P" + ("000" + i).slice(-3);
+    roster.push([p, "", ""]);
+    // ★ P045 (直近) だけ用意されていない状態を作る
+    if (i !== 45) folders["FOLDER-" + p] = { name: "G1課題文_" + p, parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  }
+  const ctx = makeCtx({ roster: roster, folders: folders });
+  ctx.checkMaterialsProvisioning(0);
+  const log = ctx.__logs.join("\n");
+  ok("★ 直近を残すと言う", log.indexOf("直近 40 人") >= 0, log.slice(0, 300));
+  ok("★ 古い方を落とす (P001 は見ない)", log.indexOf("P001 (既存)") < 0, log.slice(0, 300));
+  ok("★ 直近の未用意を捕まえる (P045)", log.indexOf("未用意: P045") >= 0, log.slice(-400));
+  // ⚠️ 本丸: 打ち切り + 未用意ありのとき、分母が実ロスターでないことを**同じ行で**言う
+  ok("★ 分母が「見た人数」だと同じ行で言う", log.indexOf("未検査 5 人は含みません") >= 0, log.slice(-400));
+}
+{
+  // ⚠️★ 非正準な P-ID (ゼロ埋めなし) を名指しで警告する。★ 黙って P001 に直さない
+  const ctx = makeCtx({ roster: [["P-ID"], ["P6"], ["P015"]] });
+  ctx.checkMaterialsProvisioning(0);
+  const log = ctx.__logs.join("\n");
+  ok("★ 非正準を名指しする", log.indexOf("3 桁ゼロ埋めでない P-ID があります: P6") >= 0, log.slice(0, 400));
+  ok("★ 直すのはロスター側だと言う", log.indexOf("直すのはロスター側") >= 0);
+  ok("⚠️ 勝手に P006 へ正規化しない", log.indexOf("P006") < 0, log.slice(0, 400));
+}
+{
+  // ⚠️★ 案内の範囲: 飛び番があるときは --range でなく ID 列挙にする
+  //   (--range は連続前提。飛び番だと prepare-subjects.sh の 50 人上限に弾かれる)
+  const ctx = makeCtx({ roster: [["P-ID"], ["P006"], ["P900"]] });
+  ctx.checkMaterialsProvisioning(0);
+  const log = ctx.__logs.join("\n");
+  ok("★ 飛び番なら --range を出さない", log.indexOf("--range P006 P900") < 0, log.slice(-400));
+  ok("★ ID 列挙で出す", log.indexOf("prepare-subjects.sh P006 P900") >= 0, log.slice(-400));
+  ok("理由を書く", log.indexOf("飛び番があるので") >= 0);
+}
+{
+  // ★ 陰性対照: 連続なら従来どおり --range
+  const ctx = makeCtx({ roster: [["P-ID"], ["P006"], ["P007"], ["P008"]] });
+  ctx.checkMaterialsProvisioning(0);
+  const log = ctx.__logs.join("\n");
+  ok("★ 連続なら --range のまま", log.indexOf("--range P006 P008") >= 0, log.slice(-400));
+  ok("飛び番の注意は出ない", log.indexOf("飛び番があるので") < 0);
+}
+{
+  // ⚠️ 空の P-ID で Drive を探しに行かない
+  const ctx = makeCtx({});
+  ok("空 P-ID の名前は空配列", ctx.g1MaterialsFolderNames_("").length === 0);
+  ok("空 P-ID は null でも空配列", ctx.g1MaterialsFolderNames_(null).length === 0);
+  const found = ctx.g1MaterialsUrlForPid_("");
+  ok("★ 空 P-ID なら探さずに理由を返す", found.url === "" && found.problem.indexOf("P-ID が空") >= 0, found.problem);
+}
+{
+  // ⚠️★ 大小の非対称は**意図的**。★ ガードは通るが finder は見つけない、を固定する
+  //   (意図せず片方だけ変わったら、このテストが落ちて気づける)
+  const folders = { [PARENT_ID]: { name: "G1_課題ページ_被験者別", access: "PRIVATE" } };
+  folders["FOLDER-P015"] = { name: "g1課題文_p015", parent: PARENT_ID, access: "ANYONE_WITH_LINK" };
+  const ctx = makeCtx({ folders: folders });
+  ok("★ finder は大小違いを見つけない", ctx.g1MaterialsUrlForPid_("P015").url === "");
+  ok(
+    "★ ガード 7 は大小違いを通す（意図的な非対称）",
+    ctx.g1MaterialsFolderProblem_(urlFor("P015"), "P015") === "",
+    ctx.g1MaterialsFolderProblem_(urlFor("P015"), "P015")
+  );
 }
 
 console.log("");

@@ -23,12 +23,41 @@
 provision.py --range P006 P020
   1. blocks/<ID>.json が無ければ assign.py --json で作る（★ 有れば触らない）
   2. validate_blocks.py（⚠️ 赤なら 1 枚も上げない）
-  3. build_task_pages.py
-  4. Drive: 親の下に <ID> フォルダを作る（無ければ）
-  5. Drive: blockNN.html を上げる（⚠️ 既にあれば byte を見て、違えば消してから上げ直す）
-  6. ★ 照合（Drive の fileSize vs 手元）— ⚠️ 赤ならここで止まる
-  7. ★ 緑のときだけ そのフォルダに permissions.create (type=anyone, role=reader)
+  3. build_task_pages.py（⚠️ 出力を捨てない。§2.12 の leak_check の理由がここに出る）
+  4. ★ **上げてよい物だけに絞る（allowlist）**
+       ⚠️ `^block\d{2}\.html$` に一致する物**だけ**。1 つでも外れたら中止する。
+       ★ shell 版の `prepare-subjects.sh` が「置いたあとの実体」で同じ検査をしている
+         (`decisions.md` D-1)。⚠️ 実装で落とすと `g1-submit.json` / `pubkey.txt` が
+         上がる経路が開く。
+  5. Drive: 親の下に <ID> フォルダを作る（無ければ）
+  6. Drive: blockNN.html を上げる
+       ⚠️★ **既にあるものを差し替えるときは、先に共有を外す。** 下の「更新の順序」を参照。
+  7. ★ 照合（Drive の fileSize vs 手元）— ⚠️ 赤ならここで止まる（共有しない）
+  8. ★ 緑のときだけ permissions.create
+       (type=anyone, role=reader, ★ allowFileDiscovery=false を**明示**)
+  9. ★ 設定したら permissions.list で**読み返して**確かめる
+       ⚠️ `allowFileDiscovery !== false` なら「共有済み」と記録しない
 ```
+
+### ⚠️★★ 更新の順序（D-4 は初回だけでは足りない）
+
+`decisions.md` D-4 は「照合が緑になるまで共有しない」だが、★ これは**初回の用意**しか守らない。
+⚠️ **既に共有済みのフォルダ**を差し替えるとき、「消す → 上げる」の順だと
+**削除成功 → アップロード失敗**の窓で、被験者は**欠けたブロック集合**を見られる。
+
+→ ★ 更新は必ず次の順で行う（初回・更新を問わず「共有は最後」を守る）:
+
+```
+共有を外す → 差し替える → 照合する → 共有し直す
+```
+
+★ あるいは**別フォルダに作ってから差し替える**（こちらのほうが窓が短い）。
+
+### ⚠️★ `allowFileDiscovery` を暗黙の既定に任せない
+
+Drive v3 の `type=anyone` は既定で `allowFileDiscovery=false`（＝リンクを知っている全員）だが、
+★ **fail-open 側の性質を API の暗黙既定に依存させない**。true になれば検索可能＝一般公開になり、
+⚠️ 全被験者の割付が検索から辿れる。→ 明示指定し、**設定後に読み返す**。
 
 ★ 1〜3 は **`prepare-subjects.sh` と同じ規律**（既存の割付を上書きしない・validate が赤なら作らない）を
 Python に移すだけである。⚠️ 4〜7 が新しい部分。
@@ -39,11 +68,20 @@ Python に移すだけである。⚠️ 4〜7 が新しい部分。
 
 ```
 5 分ごと:
-  ロスターを読む（Sheets API）
-  → 実在する全 P-ID ＋ 次の K 人 について、
-     フォルダが「ある・中身が合っている・共有されている」状態へ寄せる
-  → 既にその状態なら何もしない
+  ★ **P-ID の配列と、各 P-ID の「配る / 止める」だけ**を読む（decisions.md D-8）
+     ⚠️ ロスターそのもの (Sheets API) を読まない。氏名・メール列が VPS の
+        資格情報の到達範囲に入る = 実名↔P-ID 対応表の漏洩になるため。
+     → GAS が `g1RosterParticipantIds_()` の出力と撤回フラグだけを書いた JSON を経由する。
+  → 各 P-ID を宣言された状態へ寄せる:
+       「配る」  … フォルダがある・中身が合っている・共有されている
+       「止める」 … ★ **共有が外れている**（decisions.md D-7）
+  → 既にその状態なら何もしない（API 呼び出し 0 回）
 ```
+
+⚠️★★ **「止める」を表現できるまで、共有を収束器で管理してはならない。**
+初版は「共有を誤って外しても次の周回で戻る」を利点として書いていたが、
+★ それは**同意撤回・緊急停止・実施終了**で研究者が意図して外した共有まで戻してしまう
+（`decisions.md` D-7 で撤回した）。
 
 ⚠️ ★ **登録リクエストに同期して叩く設計（push）を採らない。** 理由:
 
@@ -64,11 +102,27 @@ Python に移すだけである。⚠️ 4〜7 が新しい部分。
 ## 変更対象
 
 ### 新規作成するファイル（Stage 1）
-- `experiments/20260801-controlled-friction-task/provision.py` — 上記 1〜7。★ `prepare-subjects.sh` の
+- `experiments/20260801-controlled-friction-task/provision.py` — 上記 1〜9。★ `prepare-subjects.sh` の
   1〜3 を呼び直すのではなく **subprocess で同じスクリプトを叩く**（⚠️ 手続きを 2 つにしない）
 - `experiments/20260801-controlled-friction-task/drive_client.py` — Drive API の薄いラッパ
-  （folder 作成 / file 作成 / list / permissions.create）。★ 単体でテストできる形にする
+  （folder 作成 / file 作成 / list / permissions.create / permissions.list / permissions.delete）。
+  ★ 単体でテストできる形にする
 - `scripts/provision-credentials.md` — ★ 資格情報の取り方と置き場（⚠️ **秘密そのものは置かない**）
+
+### ⚠️★★ 資格情報の置き場（実装より先に決める）
+
+★ **repo の外に固定する**: `~/.config/gse-provision/`（0700）に
+`client_secret.json` と `token.json` を置き、`provision.py` はそこだけを見る。
+
+⚠️ google-auth の `InstalledAppFlow` は **既定で cwd に `token.json` を書く**。
+`provision.py` は追跡下のディレクトリ (`experiments/.../`) に置くので、
+★ 既定のまま動かすと**リフレッシュトークン（平文）が追跡下に落ちる**。
+⚠️★ 本リポジトリは Actions 分数の都合で**一時 public にする運用がある**ので、
+`g1-submit.json` と同型の事故になる。
+
+★ 2026-08-07 に `.gitignore` へ `token.json` / `*token*.json` / `client_secret*.json` /
+`credentials.json` / `.env*` / `*.pem` を追加済み（実測で 8 パターンの ignore を確認）。
+⚠️ ただし **.gitignore は最後の網**であって置き場の決定ではない。両方やる。
 
 ### 新規作成するファイル（Stage 2）
 - `scripts/provision-reconcile.py` — ロスターを読んで `provision.py` の状態へ寄せる周回
@@ -131,7 +185,13 @@ Python に移すだけである。⚠️ 4〜7 が新しい部分。
   - 既に正しい状態: **API 呼び出しが 0 回**（冪等）
   - 部分アップロード（8/10 枚）: 赤で止まり、共有しない
   - ⚠️ 別被験者のページが紛れている: 「余分」で赤
+  - ⚠️★ **課題ページ以外（`g1-submit.json` / `pubkey.txt`）を置いたら赤**（allowlist の陰性対照）
   - 権限設定だけ失敗: 次の周回で回復する
+  - ⚠️★★ **撤回フラグが立った P-ID: 共有が外れた状態へ寄る**（`decisions.md` D-7）
+    ★ 共有する側のテストと**対にして**書く。片側だけだと fail-open に気づけない
+  - ⚠️★ `allowFileDiscovery=true` が返ってきたら「共有済み」と記録しない
+  - ⚠️★ 更新時に「共有を外す → 差し替え → 照合 → 共有し直す」の順になっている
+    （★ 削除成功 → アップロード失敗の窓で共有が残らないこと）
 - **統合（spike）**: 実 Drive の**捨てフォルダ**に対して 1 人ぶんを通す。
   ⚠️ 本番の親フォルダで試さない。
 - **回帰**: `node Form_G1/materials_autosend_test.cjs`（★ GAS を変えないので落ちないはず＝

@@ -1261,7 +1261,8 @@ function g1EnsureRunRow_(pid) {
  *   従来「登録時点では割付が無いので送れない」としていた。これは**手順の前提**であって
  *   原理的な制約ではない。★ P-ID は `既存の最大値 + 1` で決まる（`g1NextParticipantId_`）ので
  *   **次に出る番号は予測できる**。研究者が募集前に
- *       `./prepare-subjects.sh --range P001 P015` → Drive へドラッグ → 1 つずつ共有
+ *       `./prepare-subjects.sh --range <開始 P-ID> <終了 P-ID>` → Drive へドラッグ → 1 つずつ共有
+ *       （★ 範囲は `checkMaterialsProvisioning()` がロスターから作って出す。ここに書かない）
  *   まで済ませておけば、登録時にはフォルダが**既に存在する**。
  *   ⚠️★ さらに G1 は**過去の参加者が主**なので、予測ではなく **ロスターに載っている ID**
  *     を用意しておくのが本筋である（`checkMaterialsProvisioning` はそちらを見る）。
@@ -1284,7 +1285,11 @@ function g1EnsureRunRow_(pid) {
 var G1_MATERIALS_FOLDER_PREFIX = "G1課題文_";
 
 function g1MaterialsFolderNames_(pid) {
-  var p = String(pid).trim();
+  var p = String(pid == null ? "" : pid).trim();
+  // ⚠️★ 空や不正な ID で Drive を探しに行かない（`getFoldersByName("")` は
+  //   何を返すか保証が無いうえ、無意味な問い合わせを 2 回投げる）。★ 空配列を返し、
+  //   呼び出し側 (`g1MaterialsUrlForPid_`) が「形が違う」と言い切れるようにする。
+  if (!p) return [];
   return [p, G1_MATERIALS_FOLDER_PREFIX + p];
 }
 
@@ -1303,6 +1308,16 @@ function g1MaterialsUrlForPid_(pid) {
   //     ★ **両方を同じ関数 `g1MaterialsFolderNames_` から作る**。片方だけ直すと、
   //     「探せたのにガードで弾かれる」という原因の分かりにくい失敗になる。
   var names = g1MaterialsFolderNames_(pid);
+  if (names.length === 0) {
+    return { url: "", problem: "P-ID が空です（★ 呼び出し側の不具合）" };
+  }
+  // ⚠️★★ **探す側は大文字小文字に厳格、ガード 7 は大小を吸収する**（意図的な非対称）。
+  //   ★ 探す側 (`getFoldersByName`) を緩められないのは、Drive API が完全一致でしか引けず、
+  //     大小違いを許すには**親の全フォルダを列挙する**しかないためである（人数ぶん重くなる）。
+  //   ★ ガード 7 が緩いのは、そちらは **人が貼った URL** を検査する経路だからである
+  //     （URL は既にフォルダを名指ししているので、大小の揺れで弾く必要が無い）。
+  //   ⚠️ 帰結: `g1課題文_p015` のような名前は **ガードは通るが自動では見つからない**。
+  //     → 自動で 1 通にしたければフォルダ名は `g1MaterialsFolderNames_` の形そのままにすること。
   var hits = [];
   try {
     for (var n = 0; n < names.length; n++) {
@@ -1388,14 +1403,29 @@ function checkMaterialsProvisioning(lookahead) {
   if (!(ahead >= 0)) ahead = 3;
 
   var existing = g1RosterParticipantIds_(roster);
-  // ⚠️★ 1 人あたり Drive を 4 回叩く（名前で探す / 開く / 親を辿る / 共有設定を読む）。
-  //   Apps Script の実行は 6 分で切られるので、人数が増えたときに**黙って途中で死ぬ**。
-  //   → 上限で切り、★ **切ったことを必ず言う**（無言の打ち切りは「全部見た」と読まれる）。
+
+  // ⚠️★ ロスターに**非正準な P-ID**（`P1` のようなゼロ埋めなし）があると、
+  //   ★ ここは `P1` を探しに行くが、Drive のフォルダは `P001` なので**永久に見つからない**。
+  //   （`g1RosterParticipantIds_` / `g1NextParticipantId_` は `^P\d+$` で拾う仕様なので、
+  //     ここで弾かず**名指しで警告する**。⚠️ 黙って `P1→P001` に直すと入力ミスを隠す。）
+  var nonCanonical = existing.filter(function (p) {
+    return !/^P\d{3}$/.test(p);
+  });
+
+  // ⚠️★ 1 人あたり Drive を **約 6 回**叩く（親を開く / 名前で 2 通り探す /
+  //   ガード 7 で開く・親を辿る・共有設定を読む）。Apps Script の実行は 6 分で切られる。
+  //   ★ 実測 (2026-08-07・GSE_Gate1 の実行ログ): 12 人で 16 秒 = **約 1.3 秒/人**。
+  //     → 40 人で約 55 秒。6 分に対して余裕がある。
+  //   ⚠️ それでも上限を置くのは、人数が想定外に増えたときに**黙って途中で死ぬ**のを防ぐため。
+  //   → ★ **切ったことを必ず言う**（無言の打ち切りは「全部見た」と読まれる）。
   var LIMIT = 40;
   var truncated = 0;
   if (existing.length > LIMIT) {
     truncated = existing.length - LIMIT;
-    existing = existing.slice(0, LIMIT);
+    // ⚠️★★ 落とすのは**番号の小さい方**である（review 指摘）。
+    //   ★ G1 は「過去参加者が主」＝ **直近の参加者ほど再登録しやすい**。
+    //   昇順の先頭を残すと、いちばん確かめたい層が未検査になり、目的に対して向きが逆になる。
+    existing = existing.slice(existing.length - LIMIT);
   }
   var next = g1NextParticipantId_(roster);
   var n = parseInt(String(next).replace(/^P/, ""), 10);
@@ -1407,8 +1437,15 @@ function checkMaterialsProvisioning(lookahead) {
   Logger.log("★ ロスターに実在する P-ID: " + (existing.length ? existing.join(" ") : "（なし）"));
   if (truncated > 0) {
     Logger.log(
-      "⚠️★ 実行時間の上限があるため先頭 " + LIMIT + " 人までしか見ていません（残り " + truncated +
+      "⚠️★ 実行時間の上限があるため **直近 " + LIMIT + " 人**だけを見ています（古い " + truncated +
         " 人は未検査）。★ この結果を「全員そろっている」と読まないこと。"
+    );
+  }
+  if (nonCanonical.length > 0) {
+    Logger.log(
+      "⚠️★ ロスターに 3 桁ゼロ埋めでない P-ID があります: " + nonCanonical.join(" ") +
+        "\n   ★ Drive のフォルダは P001 形式なので、この行は**永久に「まだありません」**になります。" +
+        "\n   ⚠️ 直すのはロスター側です（機械で正規化すると入力ミスを隠すため、ここでは直しません）。"
     );
   }
   Logger.log("★ 次に発番される P-ID: " + next + "（先読み " + ahead + " 人）");
@@ -1442,9 +1479,13 @@ function checkMaterialsProvisioning(lookahead) {
         : "✅ 既存 " + existing.length + " 人ぶんは全員 **受付メール 1 通**で渡せます。"
     );
   } else {
+    // ⚠️★ 分母は「見た人数」であって「ロスターの人数」ではない。★ 打ち切っているときに
+    //   分母だけ出すと **ロスター全体の話に読める**（警告は遠く離れた行にある・review 指摘）。
+    //   → 同じ行で「未検査 X 人を含まない」と言い切る。
     Logger.log(
       "⚠️★ 既存参加者 " + missingExisting.length + " / " + existing.length +
-        " 人ぶんが未用意: " + missingExisting.join(" ")
+        " 人ぶんが未用意: " + missingExisting.join(" ") +
+        (truncated > 0 ? "（★ 分母は**見た " + existing.length + " 人**。未検査 " + truncated + " 人は含みません）" : "")
     );
     Logger.log("   ⚠️ 過去の参加者が再登録すると、この人たちは課題ページを**別便**まで待つことになります。");
   }
@@ -1460,13 +1501,30 @@ function checkMaterialsProvisioning(lookahead) {
   //   「言われたとおり打ったのに足りない」が起きる（2026-08-07 に実機ログで P001-P015 の
   //   古い案内が残っているのを見つけた。実際の範囲は P006-P020 だった）。
   //   → **いま見た P-ID から範囲を作って出す**（＝ ロスターが動けば案内も動く）。
-  var span = existing.concat(future);
-  Logger.log(
-    span.length > 0
-      ? "★ 用意の手順: ./prepare-subjects.sh --range " + span[0] + " " + span[span.length - 1] +
-          " → Drive へドラッグ → 1 つずつ共有"
-      : "★ 用意の手順: ./prepare-subjects.sh --range <開始 P-ID> <終了 P-ID> → Drive へドラッグ → 1 つずつ共有"
-  );
+  //
+  // ⚠️★★ ただし `--range` は **連続かつ 3 桁ゼロ埋め**を前提にしている
+  //   (`prepare-subjects.sh` は `^P[0-9]{3}$` を要求し、範囲は 50 人までで切る)。
+  //   ★ 飛び番（P006 と P900）や非正準（P6）だと「言われたとおり打ったのに動かない」になり、
+  //     ⚠️ **今回直したのと同じ種類の不具合**を案内側で作ることになる。
+  //   → 範囲で書けないときは **ID を並べる形**で出す。
+  var span = existing.concat(future).filter(function (p) {
+    return /^P\d{3}$/.test(p);
+  });
+  if (span.length === 0) {
+    Logger.log("★ 用意の手順: ./prepare-subjects.sh --range <開始 P-ID> <終了 P-ID> → Drive へドラッグ → 1 つずつ共有");
+  } else {
+    var lo = parseInt(span[0].slice(1), 10);
+    var hi = parseInt(span[span.length - 1].slice(1), 10);
+    var contiguous = hi - lo + 1 === span.length && span.length <= 50;
+    Logger.log(
+      contiguous
+        ? "★ 用意の手順: ./prepare-subjects.sh --range " + span[0] + " " + span[span.length - 1] +
+            " → Drive へドラッグ → 1 つずつ共有"
+        : "★ 用意の手順: ./prepare-subjects.sh " + span.join(" ") +
+            " → Drive へドラッグ → 1 つずつ共有\n" +
+            "   ⚠️ 飛び番があるので --range ではなく ID を並べる形にしています。"
+    );
+  }
   Logger.log("   ★ フォルダ名は " + g1MaterialsFolderNames_("P0NN").join(" / ") + " のどちらか。");
   Logger.log("   ⚠️ 共有は**フォルダ 1 つずつ**。親を共有にして継承させないこと（全被験者分が見えます）。");
 }

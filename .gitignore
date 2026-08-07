@@ -93,3 +93,25 @@ experiments/*/handouts/
 
 # ★ G1: 課題文+記入を統合したブロックページ（割付が入るのでコミットしない・blocks/ と同じ扱い）
 experiments/*/pages/
+
+# ============================================================================
+# ⚠️★★ 資格情報（OAuth / API キー）— 実装前に先回りして塞ぐ (2026-08-07)
+# ============================================================================
+# ★ 2026-08-07 のセキュリティレビューで、**この 5 パターンがどれも無視されていない**ことを
+#   実測した (`git check-ignore` が全部 rc=1)。
+# ⚠️ Drive の随時自動化 (`.steering/20260807-vps-provisioning-automation/`) は OAuth の
+#   ユーザー資格情報を使う。google-auth の `InstalledAppFlow` は **既定で cwd に
+#   `token.json`（リフレッシュトークン平文）を書く**ので、追跡下のディレクトリで動かすと
+#   `git add -A` で混入しうる。
+# ★★ **本リポジトリは Actions 分数の都合で一時 public にする運用がある**（上の /bin/ 参照）。
+#   混入した瞬間に、研究者本人として Drive を読み書きできるトークンが公開される。
+#   → `g1-submit.json` と同型の事故なので、**実装より先に**塞ぐ。
+# ⚠️ ただし .gitignore は最後の網である。★ 資格情報の置き場は repo の外
+#   (`~/.config/gse-provision/`・0700) に固定すること（design.md D-2）。
+token.json
+*token*.json
+credentials.json
+client_secret*.json
+.env
+.env.*
+*.pem

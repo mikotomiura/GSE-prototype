@@ -42,6 +42,15 @@ cd "$(dirname "$0")"
 
 HERE="$(pwd)"
 
+# ⚠️★ 作業ファイルは `mktemp` で作り、EXIT で片付ける。
+#   ★ `/tmp/g1-validate.$$` のような **予測できる名前**にしない。理由は 2 つ:
+#     1. `validate_blocks.py` の出力には**条件・題材 ID・課題文パス（＝割付）**が載る。
+#        共有マシンでは他ユーザから読める。
+#     2. `>` は既存のシンボリックリンクの**リンク先を上書きする**。
+#   ⚠️ die の途中でも消えるよう trap に寄せる（各 die での rm -f の書き忘れを構造的に潰す）。
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
 die() { echo "[prepare-subjects] ✗ $*" >&2; exit 1; }
 note() { echo "[prepare-subjects] $*"; }
 
@@ -80,20 +89,34 @@ MADE=0; KEPT=0
 for ID in "${SUBJECTS[@]}"; do
   B="$HERE/blocks/$ID.json"
   if [ -f "$B" ]; then
+    # ⚠️★ **有るだけでは「既存」と認めない。** 0 バイトや壊れた JSON をそのまま温存すると、
+    #   以降は毎回 `validate_blocks.py` の「JSON として読めない」で止まるのに、
+    #   ★ **直し方（消して再実行）がどこにも出ない**という詰まり方をする（review 指摘）。
+    #   ⚠️ ここで作り直してはならない（上書き禁止の規律）。★ 人に消させる。
+    if ! python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1],encoding='utf-8'))
+assert d.get('subject')==sys.argv[2], 'subject=%r' % d.get('subject')
+assert d.get('blocks'), 'blocks が空'
+" "$B" "$ID" 2>"$WORK/blockerr"; then
+      sed 's/^/    /' "$WORK/blockerr" >&2 || true
+      die "blocks/$ID.json が壊れています（0 バイト / JSON でない / 別人のもの）。
+  ★ 中身を確かめてから **手で消して**、もう一度このスクリプトを実行してください:
+      rm blocks/$ID.json && ./prepare-subjects.sh $ID
+  ⚠️ 実施後のファイルなら produced_chars / file / 操作チェックが入っています。消す前に必ず中を見ること。"
+    fi
     KEPT=$((KEPT + 1))
     note "割付 $ID: 既にあります（★ 上書きしません）"
     continue
   fi
-  TMP="$(mktemp)"
+  TMP="$WORK/$ID.json.new"
   # ⚠️★ `--json` が要る。無いと表が出て、下の JSON 検査で落ちる。
-  if ! python3 assign.py --subject "$ID" --json > "$TMP" 2>/tmp/g1-assign-err.$$; then
-    sed 's/^/    /' /tmp/g1-assign-err.$$ >&2 || true
-    rm -f "$TMP" /tmp/g1-assign-err.$$
+  if ! python3 assign.py --subject "$ID" --json > "$TMP" 2>"$WORK/assignerr"; then
+    sed 's/^/    /' "$WORK/assignerr" >&2 || true
     die "assign.py が失敗しました: $ID"
   fi
-  rm -f /tmp/g1-assign-err.$$
   # ★ 置く前に「読める JSON で、その被験者のもので、ブロックが入っている」ことを確かめる。
-  python3 - "$TMP" "$ID" <<'PY' || { rm -f "$TMP"; exit 1; }
+  python3 - "$TMP" "$ID" <<'PY' || exit 1
 import json, sys
 path, sid = sys.argv[1], sys.argv[2]
 try:
@@ -106,8 +129,10 @@ n = len(d.get("blocks") or [])
 if n == 0:
     sys.exit("[prepare-subjects] ✗ blocks が空です")
 PY
+  # ⚠️★ `chmod 644` を書かない。★ 割付は被験者ごとの条件・題材が載るファイルであり、
+  #   umask が厳しい環境（077 等）で **わざわざ world-readable に緩める**のは逆である。
+  #   既定の umask に従わせる。
   mv "$TMP" "$B"
-  chmod 644 "$B"
   MADE=$((MADE + 1))
   note "割付 $ID: 作りました"
 done
@@ -117,12 +142,10 @@ note "割付: 新規 $MADE 人 / 既存 $KEPT 人"
 # --- 2. 転記の整合（★ 赤なら 1 枚も作らない） ---------------------------------
 # ⚠️ `validate_blocks.py` は blocks/ 全体を見る。★ ここが「割付が assign.py の決定的出力と
 #   一致するか」を判定する単一の真実源であり、上書き禁止の裏返しでもある。
-if ! python3 validate_blocks.py > /tmp/g1-validate.$$ 2>&1; then
-  sed 's/^/    /' /tmp/g1-validate.$$ >&2
-  rm -f /tmp/g1-validate.$$
+if ! python3 validate_blocks.py > "$WORK/validate.log" 2>&1; then
+  sed 's/^/    /' "$WORK/validate.log" >&2
   die "validate_blocks.py が通らないので課題ページを作りません"
 fi
-rm -f /tmp/g1-validate.$$
 note "割付の整合 ✅"
 echo
 
@@ -131,16 +154,27 @@ echo
 #   block09/10 が居残ると、**配布物に古い割付が混ざる**。→ 一時ディレクトリに作って差し替える。
 for ID in "${SUBJECTS[@]}"; do
   WANT=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1],encoding='utf-8'))['blocks']))" "$HERE/blocks/$ID.json")
-  TMPD="$(mktemp -d)"
-  python3 build_task_pages.py --subject "$ID" --out "$TMPD" > /dev/null \
-    || { rm -rf "$TMPD"; die "build_task_pages.py が失敗しました: $ID"; }
-  GOT=$(find "$TMPD/$ID" -maxdepth 1 -name 'block*.html' 2>/dev/null | wc -l | tr -d ' ')
+  TMPD="$WORK/pages-$ID"
+  # ⚠️★★ 出力を `> /dev/null` で捨ててはならない（review 指摘・実測で確認）。
+  #   `build_task_pages.py` の `leak_check` は **`preregistration.md §2.12` の非開示語**
+  #   （`_hi` / `_lo` / `topic0` / 条件名 等）が課題ページに漏れていないかを見ており、
+  #   ★ **何が漏れたかを stdout に書く**。捨てると研究者に届くのは
+  #   「build_task_pages.py が失敗しました」だけになり、原因が分からない。
+  if ! python3 build_task_pages.py --subject "$ID" --out "$TMPD" > "$WORK/build.log" 2>&1; then
+    sed 's/^/    /' "$WORK/build.log" >&2 || true
+    die "build_task_pages.py が失敗しました: $ID（★ 上の行に理由が出ています）"
+  fi
+  # ⚠️★ `find` を先に走らせない。★ ディレクトリが無いと `find` が rc=1 → `pipefail` で
+  #   代入が失敗 → `set -e` が **メッセージを 1 行も出さずに**殺す（実測: rc=1・出力なし）。
+  #   → 下の die に永久に到達しない。★ 存在を先に確かめる。
+  [ -d "$TMPD/$ID" ] \
+    || die "$ID: 課題ページのディレクトリができていません（build_task_pages.py の --out 指定を確認）"
+  GOT=$(find "$TMPD/$ID" -maxdepth 1 -name 'block*.html' | wc -l | tr -d ' ')
   [ "$GOT" -eq "$WANT" ] \
-    || { rm -rf "$TMPD"; die "$ID: 課題ページが $GOT 枚しかありません（割付は $WANT ブロック）"; }
+    || die "$ID: 課題ページが $GOT 枚しかありません（割付は $WANT ブロック）"
   rm -rf "$HERE/pages/$ID"
   mkdir -p "$HERE/pages"
   mv "$TMPD/$ID" "$HERE/pages/$ID"
-  rm -rf "$TMPD"
   note "課題ページ $ID: $GOT 枚 ✅"
 done
 echo
@@ -166,20 +200,36 @@ done
 
 # ⚠️★ シークレットや余計なものが紛れていないことを、**置いたあとの実体で**確かめる。
 #   (`decisions.md` D-1: 被験者別フォルダに置いてよいのは課題ページだけ)
-BAD=$(find "$DRIVE" -mindepth 1 ! -name 'block*.html' ! -type d | head -5)
+#
+# ⚠️★★ **`find ... | head -5` と書いてはならない**（review 指摘・2026-08-07 に実測）。
+#   `head` が 5 行で終了 → `find` が SIGPIPE で死ぬ → `set -o pipefail` が 141 を拾う →
+#   ★ **代入が失敗して `set -e` が die に到達する前に殺す**。しかも**何も表示されない**。
+#   ⚠️ 一番読ませたい「課題ページ以外が紛れています」がまさにこの経路にあった。
+#   ★ 実測した閾値: 6 / 20 / 100 件（出力 14 KB）では die に到達する。
+#     **1000 件（149 KB）で rc=141・出力なし**になる ＝ パイプバッファ (64 KB) の溢れが条件で、
+#     「5 件を超えたら」ではない。→ 現行 15 人では出ないが、機構は本物なので塞ぐ。
+#   → **全件を変数に取り（`|| true`）、表示するときだけ `head` に通す。**
+show5() { printf '%s\n' "$1" | head -5; }
+
+BAD=$(find "$DRIVE" -mindepth 1 ! -name 'block*.html' ! -type d || true)
 [ -z "$BAD" ] || die "課題ページ以外が紛れています:
-$BAD"
+$(show5 "$BAD")"
+# ⚠️★ 被験者フォルダの**外**（`_drive` 直下）に置かれた block*.html は上の検査を素通りする
+#   （名前が block*.html なので除外条件に掛かる）。★ 直下にファイルがあってはならない。
+STRAY=$(find "$DRIVE" -mindepth 1 -maxdepth 1 ! -type d || true)
+[ -z "$STRAY" ] || die "被験者フォルダの外にファイルがあります（★ 直下はフォルダだけ）:
+$(show5 "$STRAY")"
 # ⚠️★ GAS が認める名前 (`g1MaterialsFolderNames_`) から 1 文字でも外れたら止める。
 #   ★ ここが緩いと「上げたのに GAS が見つけられない」を配布まで持ち越す。
-BADDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d ! -name "${DRIVE_PREFIX}P[0-9][0-9][0-9]" | head -5)
+BADDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d ! -name "${DRIVE_PREFIX}P[0-9][0-9][0-9]" || true)
 [ -z "$BADDIR" ] || die "GAS が認めない名前のフォルダがあります（${DRIVE_PREFIX}P0NN のはず）:
-$BADDIR"
+$(show5 "$BADDIR")"
 NDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 [ "$NDIR" -eq "${#SUBJECTS[@]}" ] \
   || die "フォルダが $NDIR 個です（${#SUBJECTS[@]} 人ぶんのはず）"
-DEPTH=$(find "$DRIVE" -mindepth 2 -maxdepth 2 -type d | head -5)
+DEPTH=$(find "$DRIVE" -mindepth 2 -maxdepth 2 -type d || true)
 [ -z "$DEPTH" ] || die "入れ子のフォルダがあります（★ 平らでなければならない）:
-$DEPTH"
+$(show5 "$DEPTH")"
 # ⚠️★ `${DRIVE}` と括る。★ bash は全角文字を**変数名の一部**として読むので、
 #   `$DRIVE（` は `DRIVE（` という別の（存在しない）変数になり、`set -u` で落ちる（実測）。
 note "ドラッグ用: ${DRIVE}（${#SUBJECTS[@]} フォルダ・課題ページのみ ✅）"
@@ -207,7 +257,13 @@ subjects = sys.argv[2:]
 #   **実際の検出力より強い保証を名乗る**ことになる（照合表は違うのに Drive では区別できない、が起きうる）。
 sig = {}
 for s in subjects:
-    lines = (here / "dist" / s / "_upload" / "manifest.tsv").read_text(encoding="utf-8").strip().split("\n")
+    p = here / "dist" / s / "_upload" / "manifest.tsv"
+    # ⚠️★ 生のトレースバックを出さない。★ 他の失敗と体裁を揃えないと、
+    #   「これはこのスクリプトの検査なのか、python が落ちたのか」が読み手に分からない。
+    try:
+        lines = p.read_text(encoding="utf-8").strip().split("\n")
+    except OSError as e:
+        sys.exit(f"[prepare-subjects] ✗ 照合表を読めません: {p} ({e.strerror})")
     key = tuple(tuple(l.split("\t")[:2]) for l in lines)
     sig.setdefault(key, []).append(s)
 clashes = [v for v in sig.values() if len(v) > 1]
@@ -226,6 +282,9 @@ cat <<EOS
 
   1. Finder で開く:
        open "$DRIVE"
+     ⚠️ Finder で開くと macOS が各フォルダに **.DS_Store** を作ることがある。
+        ★ 一緒にドラッグしても中身は課題ページだけだが、照合で「余分」として赤になる。
+        気になるなら上げる前に: find "$DRIVE" -name .DS_Store -delete
   2. Drive の「G1_課題ページ_被験者別」フォルダを開き、**${#SUBJECTS[@]} 個のフォルダを丸ごと**ドラッグする。
      ⚠️ 親フォルダは**制限付き（非公開）**のままにすること (decisions.md D-7)。
   3. ★ **フォルダを 1 つずつ**「リンクを知っている全員（閲覧者）」にする。

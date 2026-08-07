@@ -45,6 +45,17 @@ die() { echo "[make-upload-manifest] ✗ $*" >&2; exit 1; }
 note() { echo "[make-upload-manifest] $*"; }
 
 [ -n "$SUBJECT" ] || die "被験者 ID を渡してください。例: ./make-upload-manifest.sh P015"
+# ⚠️★★ 形を検査する。★ 下で `rm -rf "$HERE/dist/$SUBJECT/_upload"` を実行するので、
+#   `../..` のような入力が **dist の外を消す**（review 指摘）。
+#   ★ 認めるのは被験者 ID とパイロットのラベルだけ（`assign.py --pilot-label` が作る形）。
+case "$SUBJECT" in
+  P[0-9][0-9][0-9]) ;;
+  PILOT-*)
+    # ⚠️ `PILOT-` の後ろに `/` や `.` が来ないこと（`PILOT-../..` を弾く）
+    [[ "$SUBJECT" =~ ^PILOT-[A-Za-z0-9_]+$ ]] \
+      || die "パイロットのラベルに使えない文字があります: $SUBJECT" ;;
+  *) die "被験者 ID の形が違います: $SUBJECT （P015 か PILOT-win のような形）" ;;
+esac
 
 WIN="$HERE/dist/$SUBJECT/G1_実施用_Windows"
 MAC="$HERE/dist/$SUBJECT/G1_実施用_macOS"
@@ -90,7 +101,8 @@ compare_against() {
 if [ "$FROM_PAGES" -eq 1 ]; then
   compare_against "$WIN" "dist/$SUBJECT/G1_実施用_Windows（既存の梱包）"
   compare_against "$MAC" "dist/$SUBJECT/G1_実施用_macOS（既存の梱包）"
-elif [ -d "$WIN" ] && [ -d "$MAC" ] && [ "$SRC" = "$WIN" ]; then
+elif [ -d "$WIN" ]; then
+  # ★ SRC は 61 行目で WIN に確定している（WIN が無ければ SRC=MAC で比較相手が無い）。
   compare_against "$MAC" "macOS 側"
 fi
 
