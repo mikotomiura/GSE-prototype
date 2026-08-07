@@ -183,15 +183,32 @@ def leak_check(page: str, doc: dict, block: int) -> list[str]:
 
 #: ★ ボタンのラベルが「別のページへ行く」と読める語（2026-08-05・P-1 で実際に踏んだ）。
 #   旧ラベル「消去して次のブロックへ」は押しても遷移せず、被験者がそこで止まった。
-NAV_PROMISE_WORDS = ("次のブロック", "次へ", "進む", "移動", "開始する")
+#   ⚠️ ★ **2026-08-08 に「開始する」をここから外し、下の START_* へ移した。**
+#      「開始する」は *別のページへ行く* 約束ではなく *その場で始まる* 約束である。
+#      ゲート（押すと課題と記入欄が出て 5 分が走り出す）を入れた時点で、
+#      ここに残しておくと **正しく動くボタンを赤にし、遷移コードを足させてしまう**
+#      （= §1 D-1「ページが勝手に進んではいけない」を破る直し方を促す）。
+#      ★ 検査は弱めていない: 下の START 枝が「始めると名乗って始めない」を捕まえる。
+NAV_PROMISE_WORDS = ("次のブロック", "次へ", "進む", "移動")
 
 #: ★ `<button>` を実際に遷移させる書き方。**これが無いのに上の語を名乗ってはいけない。**
 #   ⚠️ ★ `<a href>` を入れていた版は**誤りだった**（2026-08-05 の cross-review で判明）:
 #      `<button>` は `<a href>` では遷移しない。ページのどこかに無関係なリンクが 1 本
 #      増えただけで、約束を破っているボタンが**永久に検出できなくなる**（黙って緑になる）。
-#      → ★ **判定はボタン単位で行う**。下の `_nav_scope_for()` を参照。
+#      → ★ **判定はボタン単位で行う**。下の `_button_scope_for()` を参照。
 NAV_IMPL_TOKENS = ("location.href", "location.assign", "location.replace",
                    "location =", "window.open", ".submit(", ".requestSubmit(")
+
+#: ★ ボタンのラベルが「押すとその場で始まる」と読める語（2026-08-08 追加）。
+#   ゲートのボタン（「課題を表示して始める」）がこれに当たる。
+#   ⚠️ ★ **「始まる」の実体はタイマーが走り出すことである。** 課題を表示するだけで
+#      5 分が動かないボタン（またはその逆）は、被験者の 5 分を静かに壊す。
+#   ⚠️ ★ 旧版の失敗様式そのもの: `setTimeout` が**トップレベル**にあったため
+#      「開いた瞬間に始まる」= ボタンの有無と無関係に走っていた（2026-08-08 に修正）。
+START_PROMISE_WORDS = ("始める", "開始する", "スタート")
+
+#: ★ その場で始める実装。★ タイマー起動と、隠していたものを出す印の両方を見る。
+START_IMPL_TOKENS = ("setTimeout", "BLOCK_MS", "g1-started")
 
 
 def _strip_html_comments(page: str) -> str:
@@ -203,10 +220,10 @@ def _strip_html_comments(page: str) -> str:
     return re.sub(r"<!--.*?-->", "", page, flags=re.S)
 
 
-def _nav_scope_for(page: str, button_html: str, button_id: str | None) -> str:
-    """★ そのボタンの遷移実装が書かれうる場所**だけ**を集める。
+def _button_scope_for(page: str, button_html: str, button_id: str | None) -> str:
+    """★ そのボタンの実装が書かれうる場所**だけ**を集める。
 
-    ⚠️ ページ全体を見てはいけない（無関係な遷移コードで緑になってしまう）。
+    ⚠️ ページ全体を見てはいけない（無関係なコードで緑になってしまう）。
     見るのは 2 か所だけ:
       1. ボタンタグ自身（`onclick="..."`）
       2. **その id に言及している `<script>`**（このテンプレートの書き方）
@@ -217,6 +234,34 @@ def _nav_scope_for(page: str, button_html: str, button_id: str | None) -> str:
             if button_id in m.group(1):
                 scopes.append(m.group(1))
     return "\n".join(scopes)
+
+
+def _function_body(page: str, header: str) -> str | None:
+    """★ `header`（例: `function startBlock`）で始まる関数の**本体**を波括弧で切り出す。
+
+    ⚠️ ★ **「行の前後関係」で中身を判定してはいけない**（2026-08-08 に実測で踏んだ）。
+    `setTimeout` を関数の**後ろ**へ移した壊れ版が、
+    「`function startBlock` より後ろにあるから中にある」という判定を**素通り**した。
+    ★ 位置は包含の証拠にならない。→ 波括弧を数えて本体そのものを取る。
+
+    ⚠️ 文字列リテラル中の波括弧は数えてしまうが、このテンプレートには無い（実測）。
+    ★ 汎用パーサではなく、このテンプレート専用の回帰検査である。
+    """
+    i = page.find(header)
+    if i < 0:
+        return None
+    j = page.find("{", i)
+    if j < 0:
+        return None
+    depth = 0
+    for k in range(j, len(page)):
+        if page[k] == "{":
+            depth += 1
+        elif page[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return page[j:k + 1]
+    return None
 
 
 def promise_check(page: str) -> list[str]:
@@ -232,10 +277,21 @@ def promise_check(page: str) -> list[str]:
       - `preregistration.md §2.13` =「次のブロックのファイルを先に開かない」。
       → 正しい直し方は **ラベルを実装に合わせる**ことである。
 
+    ★ 見る約束は 2 種類ある（2026-08-08 に 2 種目を足した）:
+      1. **遷移**の約束（「次へ」等） → `NAV_*`。正しい直し方はラベルを直すこと。
+      2. **その場で始まる**約束（「始める」等） → `START_*`。
+         ⚠️ ★ こちらは逆で、**実装の側が正しい**ことのほうが多い。
+         2026-08-08 まで `setTimeout` がトップレベルにあり、ボタンが無いのに
+         「開いた瞬間に 5 分が始まる」状態だった。★ この枝は
+         「始めると名乗るボタンが本当にタイマーを起こすか」を見る。
+
     ⚠️ ★ **この検査の限界**（広げすぎると誤爆するので、あえて狭くしてある）:
       - 対象は `<button>` と `<input type=button|submit>` の 2 つだけ。
         `<a>` をボタンに見せる書き方は見ていない（このテンプレートでは使っていない）。
-      - 遷移の判定は上の `NAV_IMPL_TOKENS` の**文字列一致**であり、構文解析ではない。
+      - 判定は `NAV_IMPL_TOKENS` / `START_IMPL_TOKENS` の**文字列一致**であり、構文解析ではない。
+      - ⚠️ ★ スコープは「その id に言及する `<script>` 全体」なので、
+        **同じ script 内に別目的のタイマーがあれば通ってしまう**（粗い）。
+        ★ それでも「ラベルだけあって実装がまったく無い」型は確実に捕まえる。
       → ★ **このテンプレート専用の回帰検査**である。記入欄をアプリ側へ移すなど
         ページの作りが変わったら、ここも作り直す（`--selftest` が先に落ちるはず）。
     """
@@ -256,18 +312,27 @@ def promise_check(page: str) -> list[str]:
         controls.append((v_m.group(1).strip() if v_m else "",
                          tag, id_m.group(1) if id_m else None))
 
+    # (語の一覧, 実装の一覧, 何が無いか, 直し方)
+    kinds = (
+        (NAV_PROMISE_WORDS, NAV_IMPL_TOKENS, "遷移の実装が無い",
+         "★ 遷移を足すのではなく**ラベルを直す**。§1 D-1 / §2.13"),
+        (START_PROMISE_WORDS, START_IMPL_TOKENS, "5 分を始める実装が無い",
+         "★ ラベルを直すか、押した時に課題を出してタイマーを起こすかのどちらかにする"),
+    )
     for label, tag, ctrl_id in controls:
-        promised = [w for w in NAV_PROMISE_WORDS if w in label]
-        if not promised:
-            continue
-        scope = _nav_scope_for(page, tag, ctrl_id)
-        if any(tok in scope for tok in NAV_IMPL_TOKENS):
-            continue
-        bad.append(
-            f"ボタンのラベル {label!r} が {promised[0]!r} と約束しているのに、"
-            f"このボタンには遷移の実装が無い"
-            f"（★ 遷移を足すのではなく**ラベルを直す**。§1 D-1 / §2.13）"
-        )
+        scope = None
+        for words, impls, missing, hint in kinds:
+            promised = [w for w in words if w in label]
+            if not promised:
+                continue
+            if scope is None:
+                scope = _button_scope_for(page, tag, ctrl_id)
+            if any(tok in scope for tok in impls):
+                continue
+            bad.append(
+                f"ボタンのラベル {label!r} が {promised[0]!r} と約束しているのに、"
+                f"このボタンには{missing}（{hint}）"
+            )
     return bad
 
 
@@ -352,7 +417,7 @@ def selftest() -> int:
             fails.append(f"★ 非開示語 {token!r} が生成ページに残っている")
     # ★ 落としすぎて壊れていないこと（機能が生きているか）
     for must in ('window.G1_BLOCK = "2"', "countChars", "user-select: none", 'id="pad"',
-                 'id="count"', "beforeunload"):
+                 'id="count"', "beforeunload", 'id="start"', "g1-started"):
         if must not in page_c:
             fails.append(f"★ コメント除去で機能が壊れた: {must!r} が消えている")
     # ★ その検査が空回りしていないか: 非開示語を残したページは赤になるはず
@@ -394,6 +459,41 @@ def selftest() -> int:
     if not promise_check(page_lo.replace(
             "</footer>", '<input type="button" value="次のブロックへ"></footer>')):
         fails.append("★ promise_check が <input type=button> を見ていない")
+
+    # ★★ 開始ゲート（2026-08-08 追加）— **開いただけでは何も始まらない**こと。
+    #   ⚠️ ★ 旧版は `setTimeout` が**トップレベル**にあり、ファイルを開いた瞬間に 5 分が
+    #      走り出していた。受付メールの「目を通しておいて構いません」と正面から食い違い、
+    #      ★ **誰も気づかないまま配布物が出来上がっていた**（2026-08-08 に発見）。
+    if 'id="start"' not in page_lo:
+        fails.append("★ 開始ゲートのボタンが生成ページに無い")
+    if "g1-started" not in page_lo:
+        fails.append("★ 開始前後を切り替える印（g1-started）が生成ページに無い")
+    # ★ 開始前に「課題文」と「記入欄」の**両方**が隠れていること。
+    #   ⚠️ 片方だけでは意味が無い（記入欄が先に出ていればそこから打ち始められるし、
+    #      課題文が先に出ていれば読む時間だけ 5 分の外に出る）。
+    for rule in ("body:not(.g1-started) .task", "body:not(.g1-started) textarea"):
+        if rule not in page_lo:
+            fails.append(f"★ 開始前に隠す指定が無い: {rule!r}")
+    # ⚠️★ タイマーの起動が**ボタンの中**にあること（トップレベルへ戻っていないこと）。
+    #   ⚠️ ★ **前後関係で判定してはいけない**。2026-08-08 に、`setTimeout` を
+    #      `function startBlock` の**後ろ**へ移した壊れ版を作って試したところ、
+    #      「後ろにあるから中にある」という判定は**緑のまま通した**。
+    #      → 波括弧で本体を切り出して、その中にあることを見る。
+    body = _function_body(page_lo, "function startBlock")
+    if body is None:
+        fails.append("★ startBlock() が無い（タイマーがボタンの中に入っていない）")
+    elif page_lo.count("setTimeout(timeIsUp") != 1:
+        fails.append(
+            f"★ 5 分タイマーの起動が {page_lo.count('setTimeout(timeIsUp')} か所ある"
+            "（1 か所＝ startBlock() の中だけであること）"
+        )
+    elif "setTimeout(timeIsUp" not in body:
+        fails.append("★ setTimeout(timeIsUp) が startBlock() の外にある（開いた瞬間に始まる）")
+    # ⚠️★ START 枝が空回りしていないか: 「始める」と名乗るだけのボタンは赤になるはず。
+    #   ★ id を付けない = スコープはタグ自身だけ → 実装が見つからない、という組み方にする。
+    if not promise_check(page_lo.replace(
+            "</footer>", '<button type="button">開始する</button></footer>')):
+        fails.append("★ promise_check が「始めると名乗って始めない」ボタンを見ていない")
 
     # ★ 逆向き: そのボタン自身に遷移実装があるページは**緑**でなければならない（過検出でない）
     honest = page_lo.replace('<button id="clear" type="button">本文を消去する</button>',
