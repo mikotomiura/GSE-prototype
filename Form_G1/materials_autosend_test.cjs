@@ -163,7 +163,19 @@ function makeCtx(opts) {
     },
     MailApp: { sendEmail: (to, subject) => sent.push({ to, subject }) },
     GmailApp: { createDraft: (to, subject) => drafts.push({ to, subject }) },
-    FormApp: { openById: () => ({}) },
+    // ★ フォーム回答を最小限だけ真似る。opts.formResponses は {formId: [{設問: 値}]}。
+    FormApp: {
+      openById: (id) => ({
+        getResponses: () =>
+          ((opts.formResponses || {})[id] || []).map((ans) => ({
+            getItemResponses: () =>
+              Object.keys(ans).map((title) => ({
+                getItem: () => ({ getTitle: () => title }),
+                getResponse: () => ans[title],
+              })),
+          })),
+      }),
+    },
     // ★ Drive のフォルダを最小限だけ真似る。opts.folders は {id: {name, parent, access}}。
     //   id が opts.folders に無ければ「開けない」= 実 Drive の getFolderById が投げるのと同じ。
     DriveApp: {
@@ -173,6 +185,14 @@ function makeCtx(opts) {
         return {
           getName: () => f.name,
           getSharingAccess: () => f.access,
+          getFiles: () => {
+            const names = f.files || [];
+            let i = 0;
+            return {
+              hasNext: () => i < names.length,
+              next: () => ({ getName: () => names[i++] }),
+            };
+          },
           getParents: () => {
             const list = f.parent ? [f.parent] : [];
             let i = 0;
@@ -534,6 +554,139 @@ console.log("13. ガード 7 — フォルダの実体（★ 親を非公開に�
   });
   ctx.g1AutoSendPendingMaterials();
   ok("フォルダ URL でなければ送らない", ctx.__sent.length === 0, "sent=" + ctx.__sent.length);
+}
+
+console.log("14. refreshG1RunSheet — 導出列の自動集計");
+{
+  const SUBMIT_FOLDER = "SUBMIT-FOLDER";
+  const folders = Object.assign({}, FOLDERS, {
+    [SUBMIT_FOLDER]: {
+      name: "提出物",
+      access: "PRIVATE",
+      files: [
+        // P015: block01..03 の 3 種類（★ 同じ block の重複は 1 と数える）
+        "P015_block01_gse_20260810_100000.age",
+        "P015_block02_gse_20260810_101000.age",
+        "P015_block02_gse_20260810_101500_2.age",
+        "P015_block03_gse_20260810_102000.age",
+        // P016: 1 種類だけ。⚠️ 日付が P015 より前 = 行ごとに独立して見ていること
+        "P016_block01_gse_20260808_090000.age",
+        // ★ 形が違うものは無視する（陰性対照）
+        "readme.txt",
+        "P015_block01.age",
+      ],
+    },
+  });
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015" }, { "P-ID": "P016" }],
+    roster: ROSTER,
+    folders: folders,
+    props: { G1_SUBMIT_FOLDER_ID: SUBMIT_FOLDER },
+    formResponses: {
+      // G1-M: P015 はブロック 3,4,5（★ 5 は 2 回答えている → 異なり数 3）
+      "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA": [
+        { 被験者ID: "P015", ブロック番号: "3" },
+        { 被験者ID: "P015", ブロック番号: "4" },
+        { 被験者ID: "P015", ブロック番号: "5" },
+        { 被験者ID: "P015", ブロック番号: "5" },
+        { 被験者ID: "P016", ブロック番号: "3" },
+      ],
+      // G1-S: P015 のみ回答あり
+      "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU": [{ 被験者ID: "P015" }],
+    },
+  });
+  ctx.refreshG1RunSheet();
+  const H = ctx.RUN_HEADER;
+  const cell = (row, name) => ctx.__runSheet.getRange(row, H.indexOf(name) + 1).getValue();
+
+  ok("G1-C 同意 が埋まる", cell(3, "G1-C 同意") === "はい", String(cell(3, "G1-C 同意")));
+  ok("完了ブロック数 = 3（重複を数えない）", cell(3, "完了ブロック数(/10)") === 3, String(cell(3, "完了ブロック数(/10)")));
+  ok("G1-M 回答数 = 3（同じブロックの重複を数えない）", cell(3, "G1-M 回答数(/7)") === 3, String(cell(3, "G1-M 回答数(/7)")));
+  ok("G1-S 回答 = はい", cell(3, "G1-S 回答") === "はい", String(cell(3, "G1-S 回答")));
+  ok(
+    "実施日 = 最も早い .age の日付",
+    // ⚠️ ★ `instanceof Date` は使えない。vm の中で作った Date は**別レルム**なので常に false になる
+    //    （実測で踏んだ。値は正しいのにテストだけ赤くなる = 偽陰性）。
+    Object.prototype.toString.call(cell(3, "実施日")) === "[object Date]" &&
+      cell(3, "実施日").getFullYear() === 2026 &&
+      cell(3, "実施日").getMonth() === 7 &&
+      cell(3, "実施日").getDate() === 10,
+    String(cell(3, "実施日"))
+  );
+  ok("P016 は独立に数える（完了 1）", cell(4, "完了ブロック数(/10)") === 1, String(cell(4, "完了ブロック数(/10)")));
+  ok("P016 は G1-S 未回答なので空", String(cell(4, "G1-S 回答")).trim() === "", String(cell(4, "G1-S 回答")));
+  ok(
+    "⚠️ 判定に関わる列は触らない",
+    ["実施形態", "配置(A/B)", "撤回/除外", "verify-blocks 実施", "validate_blocks 緑", "gse-dataset 送付"]
+      .every((h) => String(cell(3, h)).trim() === ""),
+    "どれかが埋まっている"
+  );
+}
+{
+  // ⚠️ ★ 手入力の「実施日」を上書きしない
+  const SUBMIT_FOLDER = "SUBMIT-FOLDER";
+  const folders = Object.assign({}, FOLDERS, {
+    [SUBMIT_FOLDER]: { name: "提出物", access: "PRIVATE", files: ["P015_block01_gse_20260810_100000.age"] },
+  });
+  const ctx = makeCtx({
+    runRows: [{ "P-ID": "P015", 実施日: "研究者が書いた値" }],
+    roster: ROSTER,
+    folders: folders,
+    props: { G1_SUBMIT_FOLDER_ID: SUBMIT_FOLDER },
+  });
+  ctx.refreshG1RunSheet();
+  const H = ctx.RUN_HEADER;
+  ok(
+    "実施日の手入力を上書きしない",
+    ctx.__runSheet.getRange(3, H.indexOf("実施日") + 1).getValue() === "研究者が書いた値"
+  );
+}
+{
+  // フォルダ ID 未設定 → 他の列は動き、飛ばしたことを言う
+  const ctx = makeCtx({ runRows: [{ "P-ID": "P015" }], roster: ROSTER });
+  ctx.refreshG1RunSheet();
+  const H = ctx.RUN_HEADER;
+  ok(
+    "未設定でも G1-C 同意 は埋まる",
+    ctx.__runSheet.getRange(3, H.indexOf("G1-C 同意") + 1).getValue() === "はい"
+  );
+  ok(
+    "飛ばしたことをログに出す",
+    ctx.__logs.some((l) => l.indexOf("G1_SUBMIT_FOLDER_ID") >= 0),
+    ctx.__logs.join(" / ")
+  );
+}
+{
+  // ⚠️ ヘッダがずれていたら 1 行も書かない
+  const ctx = makeCtx({ omitUrlCol: true, runRows: [{ "P-ID": "P015" }], roster: ROSTER });
+  ctx.refreshG1RunSheet();
+  const before = ctx.__runSheet.getRange(3, 3).getValue();
+  ok("ヘッダ不一致なら集計しない", String(before).trim() === "", String(before));
+  ok(
+    "理由をログに出す",
+    ctx.__logs.some((l) => l.indexOf("ヘッダ") >= 0),
+    ctx.__logs.join(" / ")
+  );
+}
+
+console.log("15. 受付メールにアプリのダウンロードリンクが入る");
+{
+  const ctx = makeCtx({});
+  const body = ctx.g1RegisterAckBody_("P015");
+  ok("アプリのリンクが本文にある", body.indexOf(ctx.G1_APP_DOWNLOAD_URL) >= 0);
+  ok("P-ID も入っている", body.indexOf("P015") >= 0);
+  ok(
+    "⚠️ 課題ページは別便だと書いてある",
+    body.indexOf("別便") >= 0,
+    "「別便」が無いと被験者はアプリだけで始めようとする"
+  );
+  const mat = ctx.g1MaterialsBody_("P015", GOOD_URL);
+  ok("事前資料メールに課題ページのリンクがある", mat.indexOf(GOOD_URL) >= 0);
+  ok(
+    "★「閲覧のみ」という実態と違う表現が消えている",
+    mat.indexOf("閲覧のみ") < 0,
+    "在宅実施では被験者が blockNN.html を手元に持つ"
+  );
 }
 
 console.log("");

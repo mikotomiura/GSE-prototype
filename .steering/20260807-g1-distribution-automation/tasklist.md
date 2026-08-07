@@ -64,3 +64,14 @@
   **そのファイルが存在しない**（実在するのは `check_g1_emails.py`。検査内容は同等）
 - 同一端末を 2 人が使うと `~/.gse/g1_participant_id` が前の人の値のまま残る（`lib.rs:1113`）
 - `g1-submit.json`（共有シークレット）が `anyone: reader` のフォルダにある（D-2 で現状維持と決定）
+
+## 5. 実運用で見つかった穴（D-8・2026-08-07 ユーザーが G1-C を実走して発見）
+- [x] 受付メールに **アプリのダウンロードリンク** を追加（★ 入れない理由が無かった）
+- [x] 事前資料メールの「閲覧のみ」を撤回し、ダウンロード → アプリのフォルダへ、に書き換え
+- [x] `refreshG1RunSheet()` — 導出 5 列を自動集計（★ 判定に関わる列は触らない）
+- [x] `installRunSheetRefreshTrigger()` / `removeRunSheetRefreshTriggers()`
+- [x] 単体テスト 17 項目追加（計 53 項目緑・★ 陰性対照/上書き禁止/ヘッダ不一致を含む）
+- [x] 列の要否を preregistration と突き合わせ（★ `実施形態` は `§2.14-3` により消せない）
+- [ ] ★ 人: `.gs` を貼り直す → `installRunSheetRefreshTrigger()` を 1 回
+- [ ] ★ 人: スクリプト プロパティ `G1_SUBMIT_FOLDER_ID` に受け口の `FOLDER_ID` と同じ値を入れる
+      （⚠️ 無いと「完了ブロック数」「実施日」だけ埋まらない）

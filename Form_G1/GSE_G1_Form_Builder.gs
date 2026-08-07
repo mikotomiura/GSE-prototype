@@ -1108,6 +1108,15 @@ var G1_CONTACT = "三浦尊統（mmiura.network@gmail.com）"; // 研究者判�
 // ⚠️ ★ consent.md §8「所属・連絡先（実施前に記入）」を埋めるときは、**ここと同じ文字列**にする。
 //    片方だけ直すと、同意文書とメールで連絡先が食い違う。
 
+// ★★ アプリ配布フォルダ（Windows / macOS）。⚠️ **全員同じ**である。
+//   ★ 受付メールに入れてよい理由: この中身は**割付にも題材にも依存しない**ので、
+//     `preregistration.md §2.12` が伏せると宣言した項目を 1 つも開示しない。
+//   ⚠️ ★ **課題ページ (blockNN.html) はここに入れない。** 入れると全員が同じ課題を持つことになり、
+//     被験者別の割付が壊れる。課題ページは別便 (sendTaskMaterialsEmail) で個別に渡す。
+//   ★ 早めに渡す価値がある: macOS は初回に「キーボードの入力の監視」を許可 → 再起動が要るので、
+//     当日その場で詰まると 1 回きりの実施機会を潰しかねない (`§2.3` は分割を許さない)。
+var G1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/1FDkU52n9EXO92TzCieivexg7WKsXHkFP";
+
 // ⚠️ ★ 第 6 版にあった G1_TOPIC_TITLES（課題の分野を事前案内メールに載せる）は
 //    **第 7 版で撤回した**。課題文は当日その場で画面提示する（§2.13）ので、
 //    事前に題材を教える必要が無い。→ §2.6 の操作チェックが元の強さに戻る。
@@ -1277,6 +1286,17 @@ function g1RegisterAckBody_(pid) {
     //          §2.12 は提示順を「開示しない」側に置いている。
     //    ⚠️ ★ **題材名をこのメール本文に書き戻さないこと。**
     //       scripts/check_g1_emails.py が両方のメールを同じ基準で検査する。
+    // ★★ 2026-08-07 追加。⚠️ 受付メールにアプリのリンクが無く、被験者が自分で用意する術が
+    //    無かった（在宅実施では致命的）。★ アプリは全員共通なので §2.12 に触れない。
+    "■ アプリのご用意（★ 当日までにお願いします）",
+    "    " + G1_APP_DOWNLOAD_URL,
+    "    ・Windows 用と macOS 用のフォルダがあります。★ **お使いのほうを丸ごと**保存してください。",
+    "    ・macOS は中の「README_先に読む.txt」、Windows は同じフォルダの起動用ファイルに従ってください。",
+    "    ⚠️ ★ **早めにお願いします。** 初回だけ、お使いの機器がキーボードの入力を",
+    "      読み取ってよいか確認を出すことがあり、許可の後に開き直しが必要です。",
+    "      当日その場だと、始めるまでに時間がかかってしまいます。",
+    "    ⚠️ このフォルダに課題のページは入っていません（下記のとおり別便でお送りします）。",
+    "",
     "■ 課題の内容について",
     "    ★ 当日お読みいただく資料は、**事前にメールでお送りします**（別便）。",
     // ★ 第 9 版（§2.14）: 在宅実施があるので「お越し」と書かない。
@@ -1347,13 +1367,24 @@ function g1MaterialsBody_(pid, url) {
     "■ 参加者ID（P-ID）",
     "    " + pid,
     "",
-    "■ 資料（閲覧のみ）",
+    // ⚠️★ 2026-08-07 訂正: ここは「閲覧のみ」と書いていたが、**実態と食い違っていた**。
+    //    `§2.14`（第 9 版）で無人在宅を正規の実施形態にした時点で、被験者は blockNN.html を
+    //    手元に持って自分で開く（`§2.13`）。★ 事実と違う案内をすると当日に詰まる。
+    //    ⚠️ `§2.12` の「閲覧のみで開示する」という宣言との緊張は preregistration 側の論点であり、
+    //       メールで取り繕う問題ではない（`§2.12` 自身も「防ぎ切ることを前提にしない」と書いている）。
+    "■ あなた専用の課題ページ",
     "    " + url,
+    "    1. このリンクを開き、block01.html … を **すべて** 保存してください。",
+    "    2. ★ 受付メールでご案内したアプリのフォルダの中へ、**まとめて移してください**。",
+    "       （同じ場所に置いておくと、当日どれを開くか迷いません）",
+    "    ⚠️ ★ **あなた専用です。** 他の方とは中身が違うので、共有しないでください。",
     "",
     "■ お願い",
     "    ★ 目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
     "      ⚠️ **準備の量で評価することはありません。** どちらでも問題ありません。",
-    "    ・当日は同じ内容が画面にも表示されます。手元に印刷する必要はありません。",
+    "    ⚠️ ★ **当日までにご自分で開いて始めてしまわないでください。** 開いた時点から時間を計ります。",
+    "      （読むだけなら差し支えありません）",
+    "    ・当日は同じ内容が画面に表示されます。手元に印刷する必要はありません。",
     "    ・終わったあとのアンケートで「事前にどのくらい読んだか」を伺います。",
     "      ★ 正解はありません。**実験の判定には使いません。**",
     "",
@@ -1791,6 +1822,216 @@ function installMaterialsAutoSendTrigger() {
     Logger.log("⚠️ ★ 実シートに「配布フォルダURL」列がまだありません: " + String(e.message).split("\n")[0]);
     Logger.log("   → migrateRunSheetAddUrlColumn() を先に 1 回実行してください。");
   }
+}
+
+// ============================================================
+// ★★ 「G1 実施トラッキング」の自動集計（2026-08-07）
+// ============================================================
+// ⚠️ ★ **20 列のうち、これまで自動で埋まるのは 3 列だけだった**（P-ID / 課題文リンク送信日 / 備考）。
+//    残りは全部手入力で、⚠️ 埋め忘れると「回答は来ているのに集計に出ない」状態が静かに続く。
+//
+// ★ **手で入れる意味が無い列**（=どこかに真実源があり、写すだけの列）を自動で埋める:
+//
+//   | 列 | 真実源 | 決め方 |
+//   |---|---|---|
+//   | G1-C 同意           | G1-C の提出そのもの     | 提出されていれば「はい」 |
+//   | G1-M 回答数(/7)     | G1-M の回答            | 被験者IDごとの**ブロック番号の異なり数** |
+//   | G1-S 回答           | G1-S の回答            | 1 件でもあれば「はい」 |
+//   | 完了ブロック数(/10) | 受け口に届いた `.age`   | `P0XX_blockNN_…` の**異なる NN の数** |
+//   | 実施日              | 同上                   | 最も早い `.age` の `gse_YYYYMMDD` |
+//
+// ⚠️★ **手入力を上書きしない**: 「実施日」は空のときだけ書く（研究者の記入を尊重する）。
+//    導出値（回答数・完了ブロック数）は毎回書き直す。★ そうしないと古い数字が居座る。
+//
+// ⚠️★★ **判定に関わる列は 1 つも触らない。** `実施形態` `配置(A/B)` `撤回/除外`
+//    `verify-blocks 実施` `validate_blocks 緑` `gse-dataset 送付` は**人の判断**であり、
+//    機械が埋めてよいものではない（`preregistration.md §3.6` は事後除外を禁じている）。
+
+/** 受け口 (`GSE_G1_Submit.gs` / プロジェクト B) が `.age` を貯める Drive フォルダの ID。 */
+var G1_SUBMIT_FOLDER_PROP = "G1_SUBMIT_FOLDER_ID";
+
+/** `.age` のファイル名 → {pid, block, ymd}。形が違えば null。★ 受け口の NAME_RE と同じ形。 */
+function g1ParseAgeName_(name) {
+  var m = String(name).match(/^([A-Za-z0-9]{1,16})_block(\d{2,3})_gse_(\d{8})_\d{6}(?:_\d{1,10})?\.age$/);
+  if (!m) return null;
+  return { pid: m[1].toUpperCase(), block: parseInt(m[2], 10), ymd: m[3] };
+}
+
+/**
+ * 受け口フォルダを 1 周して、P-ID ごとの {blocks:Set相当, firstYmd} を作る。
+ * ⚠️ フォルダ ID が未設定なら null を返す（★ 例外にしない。集計の他の列は動かしたい）。
+ */
+function g1CollectSubmittedBlocks_() {
+  var folderId = PropertiesService.getScriptProperties().getProperty(G1_SUBMIT_FOLDER_PROP);
+  if (!folderId) return null;
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(String(folderId).trim());
+  } catch (e) {
+    Logger.log("⚠️ " + G1_SUBMIT_FOLDER_PROP + " のフォルダを開けません: " + e);
+    return null;
+  }
+  var out = {};
+  var it = folder.getFiles();
+  while (it.hasNext()) {
+    var parsed = g1ParseAgeName_(it.next().getName());
+    if (!parsed) continue; // ★ `.age` 以外・重複回避で付いた別名は無視する
+    if (!out[parsed.pid]) out[parsed.pid] = { blocks: [], firstYmd: "" };
+    var rec = out[parsed.pid];
+    if (rec.blocks.indexOf(parsed.block) < 0) rec.blocks.push(parsed.block);
+    if (!rec.firstYmd || parsed.ymd < rec.firstYmd) rec.firstYmd = parsed.ymd;
+  }
+  return out;
+}
+
+/** フォームの回答を被験者ID で束ねる。`countBy` を渡すとその設問の異なり数を数える。 */
+function g1CountResponsesByPid_(formId, countBy) {
+  var out = {};
+  if (!formId) return out;
+  var responses;
+  try {
+    responses = FormApp.openById(formId).getResponses();
+  } catch (e) {
+    Logger.log("⚠️ フォームの回答を読めません (" + formId + "): " + e);
+    return out;
+  }
+  for (var i = 0; i < responses.length; i++) {
+    var items = responses[i].getItemResponses();
+    var pid = "";
+    var key = "";
+    for (var j = 0; j < items.length; j++) {
+      var title = items[j].getItem().getTitle();
+      var v = items[j].getResponse();
+      var s = Array.isArray(v) ? v.join("/") : String(v == null ? "" : v);
+      if (title === Q_SUBJECT_ID) pid = s.trim().toUpperCase();
+      else if (countBy && title === countBy) key = s.trim();
+    }
+    if (!pid) continue;
+    if (!out[pid]) out[pid] = [];
+    // ★ countBy が無いフォーム (G1-S) は回答そのものを 1 件として数える
+    var token = countBy ? key : String(i);
+    if (out[pid].indexOf(token) < 0) out[pid].push(token);
+  }
+  return out;
+}
+
+/** `YYYYMMDD` → Date。壊れていれば null。 */
+function g1YmdToDate_(ymd) {
+  var m = String(ymd).match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/**
+ * ★★ トラッキング表の導出列を埋め直す（引数なし・トリガーからも人からも呼べる）。
+ * ⚠️ ★ **判定に関わる列は触らない**（上のコメント参照）。
+ */
+function refreshG1RunSheet() {
+  var sh = g1RunSheet_();
+  if (!sh) {
+    Logger.log("❌ G1 管理シートが見つかりません（buildManagementSheet() を実行）");
+    return;
+  }
+  try {
+    assertRunHeader_(sh);
+  } catch (e) {
+    // ⚠️ ★ ずれたまま書くと**別の列を壊す**。黙って進まない。
+    Logger.log("❌ ヘッダが一致しないので集計しません: " + String(e.message).split("\n")[0]);
+    return;
+  }
+
+  var submitted = g1CollectSubmittedBlocks_();
+  if (submitted === null) {
+    Logger.log(
+      "ℹ️ " + G1_SUBMIT_FOLDER_PROP + " が未設定なので「完了ブロック数」「実施日」は飛ばします。" +
+        "（受け口プロジェクトの FOLDER_ID と同じ値をここのスクリプト プロパティにも入れると埋まります）"
+    );
+  }
+  var mcheck = g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO);
+  var survey = g1CountResponsesByPid_(FORM_ID_SURVEY, "");
+
+  var colPid = runCol_("P-ID");
+  var colConsent = runCol_("G1-C 同意");
+  var colDate = runCol_("実施日");
+  var colBlocks = runCol_("完了ブロック数(/10)");
+  var colM = runCol_("G1-M 回答数(/7)");
+  var colS = runCol_("G1-S 回答");
+
+  var last = sh.getLastRow();
+  var touched = 0;
+  for (var r = 3; r <= last; r++) {
+    var pid = String(sh.getRange(r, colPid).getValue()).trim().toUpperCase();
+    if (!pid) continue;
+    var changes = [];
+
+    // ★ G1-C 同意: この行が存在する = G1-C が提出された、である（行は提出でしか作られない）。
+    if (String(sh.getRange(r, colConsent).getValue()).trim() === "") {
+      sh.getRange(r, colConsent).setValue("はい");
+      changes.push("G1-C 同意");
+    }
+
+    // ★ 導出値は毎回書き直す（古い数字を居座らせない）
+    var m = (mcheck[pid] || []).length;
+    if (String(sh.getRange(r, colM).getValue()) !== String(m)) {
+      sh.getRange(r, colM).setValue(m);
+      changes.push("G1-M=" + m);
+    }
+    var s = (survey[pid] || []).length > 0 ? "はい" : "";
+    if (s && String(sh.getRange(r, colS).getValue()).trim() !== s) {
+      sh.getRange(r, colS).setValue(s);
+      changes.push("G1-S");
+    }
+
+    if (submitted) {
+      var rec = submitted[pid];
+      var nb = rec ? rec.blocks.length : 0;
+      if (String(sh.getRange(r, colBlocks).getValue()) !== String(nb)) {
+        sh.getRange(r, colBlocks).setValue(nb);
+        changes.push("完了ブロック=" + nb);
+      }
+      // ⚠️ ★ 実施日は**空のときだけ**書く（研究者が入れた日付を上書きしない）
+      if (rec && rec.firstYmd && String(sh.getRange(r, colDate).getValue()).trim() === "") {
+        var d = g1YmdToDate_(rec.firstYmd);
+        if (d) {
+          sh.getRange(r, colDate).setValue(d);
+          changes.push("実施日");
+        }
+      }
+    }
+
+    if (changes.length) {
+      touched++;
+      Logger.log("· " + pid + ": " + changes.join(" / "));
+    }
+  }
+  SpreadsheetApp.flush();
+  Logger.log(touched ? "✅ " + touched + " 行を更新しました。" : "✅ 更新はありません（すべて最新）。");
+  Logger.log("ℹ️ ★ 実施形態 / 配置(A/B) / 撤回・除外 / 検証系の列は**人の判断**なので触りません。");
+}
+
+/** ★ 集計を 1 時間ごとに回す（1 回だけ実行する）。 */
+function installRunSheetRefreshTrigger() {
+  removeRunSheetRefreshTriggers();
+  ScriptApp.newTrigger("refreshG1RunSheet").timeBased().everyHours(1).create();
+  Logger.log("✅ refreshG1RunSheet を 1 時間ごとに実行するトリガーを設置しました。");
+  if (!PropertiesService.getScriptProperties().getProperty(G1_SUBMIT_FOLDER_PROP)) {
+    Logger.log(
+      "⚠️ ★ " + G1_SUBMIT_FOLDER_PROP + " が未設定です。受け口プロジェクトの FOLDER_ID と" +
+        "同じ値を入れると「完了ブロック数」「実施日」も埋まります。"
+    );
+  }
+}
+
+function removeRunSheetRefreshTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "refreshG1RunSheet") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("🧹 既存の refreshG1RunSheet トリガを " + n + " 件削除しました");
 }
 
 function removeMaterialsAutoSendTriggers() {
