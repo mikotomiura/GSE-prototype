@@ -76,6 +76,38 @@ pub fn package_session(
     recipient_arg: &str,
     out_dir: &Path,
 ) -> Result<PackageReport, String> {
+    let out_name = default_out_name(participant, input);
+    package_session_as(input, participant, recipient_arg, out_dir, &out_name)
+}
+
+/// 既定の提出物ファイル名 `<participant>_<入力ステム>.age` (手動提出経路の名前)。
+pub fn default_out_name(participant: &str, input: &Path) -> String {
+    format!("{participant}_{}.age", session_stem(input))
+}
+
+/// 入力 NDJSON のステム (セッション識別子)。取れなければ `"session"`。
+pub fn session_stem(input: &Path) -> String {
+    input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("session")
+        .to_string()
+}
+
+/// `package_session` の本体。★ **出力ファイル名を呼び出し側が決められる**版。
+///
+/// 自動提出 (reconciler) は `<participant>_block<NN>_<stem>.age` を要求する
+/// (受け入れ条件「ファイル名に ID とブロック番号が入ること」) が、
+/// ⚠️ ★ **匿名化 + 暗号化の経路は手動提出と 1 本のまま**にしたい (data-privacy SSOT)。
+/// → 分岐させるのは名前だけにする。
+pub fn package_session_as(
+    input: &Path,
+    participant: &str,
+    recipient_arg: &str,
+    out_dir: &Path,
+    out_name: &str,
+) -> Result<PackageReport, String> {
     if !is_valid_participant_id(participant) {
         return Err(format!(
             "invalid participant id (expect P### etc.): {participant}"
@@ -97,13 +129,7 @@ pub fn package_session(
     let recipient = resolve_recipient(recipient_arg)?;
     let encrypted = encrypt_to_recipient(anonymized.as_bytes(), &recipient)?;
 
-    // 3) 出力 <participant>_<入力ステム>.age (セッション識別=入力ファイル名を踏襲)。
-    let stem = input
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .filter(|s| !s.is_empty())
-        .unwrap_or("session");
-    let out_name = format!("{participant}_{stem}.age");
+    // 3) 出力 (名前は呼び出し側が決める。既定は <participant>_<入力ステム>.age)。
     let out_path = out_dir.join(out_name);
     std::fs::create_dir_all(out_dir)
         .map_err(|e| format!("could not create out dir {}: {e}", out_dir.display()))?;
@@ -118,33 +144,12 @@ pub fn package_session(
 
 // --- gse-submit (最新セッション自動検出) 専用ヘルパ ---------------------------------
 
-/// home ディレクトリ。`USERPROFILE` → `HOME` の順で引く (logger.rs `fallback_log_dir` と一致。
-/// Windows git-bash で両方設定された場合に解決先が割れないよう順序を揃える)。
-fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(PathBuf::from)
-}
-
-/// セッション NDJSON が書かれるディレクトリを解決する。
+/// パス規約の単一情報源は `crate::submission` (★ feature gate の外) に移した。
 ///
-/// **SSOT 注記**: logger.rs `default_log_path` / `fallback_log_dir` の規則を提出側から鏡写しに
-/// している (logger の `resolve_participant_id` は ID を新規生成・永続化する副作用があり、
-/// 読み取り専用が要る提出ツールからは呼べないため意図的に複製)。logger 側のパス規約を変えたら
-/// 本関数も追従すること (`session_dir_mirrors_logger_fallback` テストで一致を監視)。
-/// `GSE_DATASET` 設定時は `<GSE_DATASET>/raw/<participant>`、無ければ
-/// `~/Documents/GSE-sessions` (logger の fallback)。
-pub fn default_session_dir(participant: &str) -> Option<PathBuf> {
-    if let Some(dataset) = std::env::var_os("GSE_DATASET") {
-        return Some(PathBuf::from(dataset).join("raw").join(participant));
-    }
-    home_dir().map(|h| h.join("Documents").join("GSE-sessions"))
-}
-
-/// 提出物 (`.age`) を置くディレクトリ。`~/Documents/GSE-submissions` (無ければ session dir)。
-pub fn default_submission_dir() -> Option<PathBuf> {
-    home_dir().map(|h| h.join("Documents").join("GSE-submissions"))
-}
+/// ⚠️ ★ アプリ本体 (default features・`age` を載せない) も未送信件数を数えるためにこの規約を
+/// 読む必要があるので、`feature = "package"` の中に置いておけない。後方互換のため
+/// ここから re-export する (呼び出し側の `packaging::default_session_dir` は無変更で動く)。
+pub use crate::submission::{default_session_dir, default_submission_dir, home_dir};
 
 /// `~/.gse/participant_id` を **読み取り専用** で取得する (生成・永続化はしない)。
 /// 提出ツールはアプリ実行後に走る前提なので ID は既存。env `GSE_PARTICIPANT_ID` / `GSE_PID`
@@ -169,7 +174,7 @@ pub fn read_persisted_participant_id() -> Option<String> {
 /// ★ 読むのは **`"type"` の値だけ**である（打鍵の内容も時刻も見ない・data-privacy）。
 /// 読めないファイルは **`true`**（= 候補に残す）に倒す。⚠️ 読めないことを理由に
 /// 本物のセッションを黙って捨てるほうが害が大きいため。
-fn has_any_data_row(path: &Path) -> bool {
+pub fn has_any_data_row(path: &Path) -> bool {
     use std::io::BufRead;
     let f = match std::fs::File::open(path) {
         Ok(f) => f,
@@ -381,17 +386,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    #[test]
-    fn session_dir_mirrors_logger_fallback() {
-        // logger.rs fallback_log_dir と同じ末尾規約を保つ (SSOT 鏡写しの drift 監視)。
-        // GSE_DATASET の有無に依存しない構造検証。
-        let dir = default_session_dir("P007").expect("home resolvable in test");
-        let s = dir.to_string_lossy().replace('\\', "/");
-        assert!(
-            s.ends_with("Documents/GSE-sessions") || s.ends_with("raw/P007"),
-            "unexpected session dir (logger fallback drift?): {s}"
-        );
-    }
+    // NOTE: `session_dir_mirrors_logger_fallback` (logger のパス規約との drift 監視) は
+    // 規約の定義ごと `crate::submission` へ移した。テストもそちらにある。
 
     /// ⚠️★ **中身の無いセッションを最新に選ばない**（2026-08-05 の実測で見つかった穴）。
     ///

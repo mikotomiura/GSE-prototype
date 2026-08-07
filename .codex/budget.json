@@ -5,9 +5,9 @@
   "diff_size_threshold_lines": 500,
   "manual_approval_threshold_lines": 2000,
   "today": {
-    "date": "2026-08-06",
-    "tokens_used": 26803,
-    "invocations": 1
+    "date": "2026-08-07",
+    "tokens_used": 66876,
+    "invocations": 2
   },
   "history": [
     {
@@ -39,6 +39,11 @@
       "date": "2026-08-05",
       "tokens_used": 178666,
       "invocations": 3
+    },
+    {
+      "date": "2026-08-06",
+      "tokens_used": 26803,
+      "invocations": 1
     }
   ]
 }

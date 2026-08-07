@@ -24,21 +24,43 @@ use gse_next_lib::packaging::{
     is_valid_participant_id, package_session, read_persisted_participant_id,
 };
 
-/// 任意の `--recipient <age1...|file>` / `--out <dir>` のみ受ける (基本はゼロ引数)。
-fn parse_args() -> Result<(Option<String>, Option<PathBuf>, bool), String> {
-    let mut recipient: Option<String> = None;
-    let mut out: Option<PathBuf> = None;
-    let mut help = false;
-    let mut args = std::env::args().skip(1);
-    while let Some(a) = args.next() {
-        match a.as_str() {
-            "--recipient" => recipient = Some(args.next().ok_or("--recipient requires a value")?),
-            "--out" => out = Some(PathBuf::from(args.next().ok_or("--out requires a value")?)),
-            "-h" | "--help" => help = true,
+/// コマンドラインの解釈結果。★ **ゼロ引数の既定挙動は不変**である
+/// (被験者の手動提出経路の非回帰。`requirement.md` B)。
+#[derive(Default)]
+struct Args {
+    recipient: Option<String>,
+    out: Option<PathBuf>,
+    /// 包む対象を明示する (既定は「最新 1 本」)。
+    input: Option<PathBuf>,
+    /// ★ 収束モード: ディスクの状態を突き合わせ、足りない `.age` を作り、未送信を送る。
+    reconcile: bool,
+    help: bool,
+}
+
+fn parse_args() -> Result<Args, String> {
+    parse_args_from(std::env::args().skip(1))
+}
+
+/// ★ 引数の解釈を **env から切り離す** (テストできるようにするため)。
+fn parse_args_from<I: IntoIterator<Item = String>>(args: I) -> Result<Args, String> {
+    let mut a = Args::default();
+    let mut it = args.into_iter();
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "--recipient" => a.recipient = Some(it.next().ok_or("--recipient requires a value")?),
+            "--out" => a.out = Some(PathBuf::from(it.next().ok_or("--out requires a value")?)),
+            "--input" => {
+                a.input = Some(PathBuf::from(it.next().ok_or("--input requires a value")?))
+            }
+            "--reconcile" => a.reconcile = true,
+            "-h" | "--help" => a.help = true,
             other => return Err(format!("unknown arg: {other}")),
         }
     }
-    Ok((recipient, out, help))
+    if a.reconcile && a.input.is_some() {
+        return Err("--reconcile と --input は同時に使えません".to_string());
+    }
+    Ok(a)
 }
 
 /// 公開鍵の解決順: `--recipient` > `$GSE_RECIPIENT` > exe と同階層の `recipient.txt`。
@@ -69,8 +91,13 @@ fn resolve_recipient_source(cli_recipient: Option<String>) -> Result<String, Str
         .to_string())
 }
 
-const USAGE: &str = "usage: gse-submit [--recipient <age1...|file>] [--out <dir>]\n\
-     最新セッションを自動検出して匿名化+暗号化し提出物 (.age) を生成します。";
+const USAGE: &str =
+    "usage: gse-submit [--recipient <age1...|file>] [--out <dir>] [--input <ndjson>]\n\
+       gse-submit --reconcile [--recipient <age1...|file>] [--out <dir>]\n\
+     既定 (ゼロ引数): 最新セッションを自動検出して匿名化+暗号化し提出物 (.age) を生成します。\n\
+     --input:     包む NDJSON を明示します (既定の「最新 1 本」を使いません)。\n\
+     --reconcile: 閉じ終わった全セッションについて、足りない .age を作り、未送信を送ります\n\
+                  (★ 何度実行しても同じ状態に収束します)。";
 
 /// 生成した `.age` をファイルマネージャで **選択状態** で開く (best-effort)。
 /// 被験者が「ファイルが見当たらない」事故 (OneDrive/iCloud の Documents リダイレクトで
@@ -194,12 +221,125 @@ fn prompt_participant_id(default: Option<&str>) -> Result<String, String> {
     Err("参加者 ID を確定できませんでした (3 回とも無効な入力でした)。".to_string())
 }
 
-/// `Ok(None)` = --help を表示した (正常終了)。`Ok(Some(_))` = 提出物を生成した。
-fn run() -> Result<Option<gse_next_lib::packaging::PackageReport>, String> {
-    let (cli_recipient, cli_out, help) = parse_args()?;
-    if help {
-        return Ok(None);
+/// 実行の結末。★ `--reconcile` は「1 本を包む」形に収まらないので別の腕にする。
+enum Outcome {
+    /// `--help` を表示した (正常終了)。
+    Help,
+    /// 提出物を 1 本生成した (既定 / `--input`)。
+    Packaged(gse_next_lib::packaging::PackageReport),
+    /// 収束を 1 回まわした。
+    Reconciled(gse_next_lib::reconcile::ReconcileReport),
+}
+
+/// `--reconcile`: ディスクの状態を突き合わせ、足りない仕事だけをする。
+///
+/// ⚠️ ★ **ブロック中に呼ばれない**ことは呼び出し側 (`lib.rs`) が保証する。
+/// 本関数は「閉じ終わった NDJSON」しか触らないので、万一ブロック中に走っても
+/// 書きかけのファイルには手を出さない (二重の防御)。
+fn run_reconcile(args: Args) -> Result<gse_next_lib::reconcile::ReconcileReport, String> {
+    use gse_next_lib::reconcile::{reconcile, HttpUploader, ReconcileOptions, Uploader};
+    use gse_next_lib::submission;
+
+    // 1) 参加者 ID。★ env (アプリが渡す) → G1 の保存済み ID の順。
+    //    ⚠️ ★ **対話入力にフォールバックしない。** 自動提出は誰も見ていない場所で走るので、
+    //    プロンプトで止まると「起動したのに何もしていない」状態になる (fail-closed)。
+    let participant = env_participant_id()
+        .or_else(submission::read_g1_participant_id)
+        .ok_or(
+            "参加者 ID が登録されていないため自動提出できません。\
+             アプリのスタート画面で ID を入力してください。",
+        )?;
+
+    // 2) 場所。
+    //    ⚠️★ **セッション置き場の解決には logger と同じ ID を使う** (code-review MEDIUM)。
+    //    `GSE_DATASET` があるとき logger は `raw/<自動生成 ID>` に書くのに対し、
+    //    ここで研究者割当の ID (`P012`) を使うと `raw/P012` を見に行き、
+    //    ★ **0 件・エラー無し・exit 0 の完全な空振り**になる (研究者端末で必ず踏む)。
+    //    ★ 研究者割当の ID は **ファイル名ラベル専用**である (手動経路 `run_package_one` と同じ扱い)。
+    let path_id = read_persisted_participant_id();
+    let session_dir = submission::default_session_dir(path_id.as_deref().unwrap_or("P000"))
+        .ok_or("セッション保存先 (~/Documents/GSE-sessions) を解決できませんでした。")?;
+    if !session_dir.is_dir() {
+        // ⚠️ ★ 黙って 0 件にしない。**探した場所が存在しない**ことを言う。
+        return Err(format!(
+            "セッション保存先が見つかりません: {}",
+            session_dir.display()
+        ));
     }
+    let submission_dir = args
+        .out
+        .clone()
+        .or_else(submission::default_submission_dir)
+        .unwrap_or_else(|| session_dir.clone());
+
+    // 3) 公開鍵。
+    let recipient = resolve_recipient_source(args.recipient.clone())?;
+
+    // 4) 送信先 (研究者が配布フォルダに置く g1-submit.json)。
+    //    ★ 無ければ `.age` を作るところまでで止まる = D-4 の停止スイッチ。
+    //    ⚠️ 壊れている場合は Err を返して **黙って「送らない」に倒さない**。
+    let cfg = submission::load_submit_config(submission::distribution_folder().as_deref())?;
+    let uploader = match cfg.as_ref() {
+        Some(c) => Some(HttpUploader::new(c)?),
+        None => None,
+    };
+
+    let opts = ReconcileOptions {
+        session_dir,
+        submission_dir,
+        participant,
+        recipient,
+    };
+    Ok(reconcile(
+        &opts,
+        uploader.as_ref().map(|u| u as &dyn Uploader),
+    ))
+}
+
+fn run() -> Result<Outcome, String> {
+    let args = parse_args()?;
+    if args.help {
+        return Ok(Outcome::Help);
+    }
+    if args.reconcile {
+        return run_reconcile(args).map(Outcome::Reconciled);
+    }
+    run_package_one(args).map(Outcome::Packaged)
+}
+
+/// 包む対象の NDJSON を決める。
+///
+/// ★ `--input` があればそれ。⚠️ **無ければ従来どおり「最新 1 本」**である
+/// (ゼロ引数の既定挙動の非回帰)。指定されたパスが無ければ **黙って最新へ落ちない**
+/// — 落とすと「別のセッションを提出したのに気づかない」形になる (fail-closed)。
+fn resolve_input(cli_input: Option<PathBuf>, session_dir: &Path) -> Result<PathBuf, String> {
+    match cli_input {
+        Some(p) => {
+            if !p.is_file() {
+                return Err(format!(
+                    "指定された NDJSON が見つかりません: {}",
+                    p.display()
+                ));
+            }
+            Ok(p)
+        }
+        None => find_latest_session_ndjson(session_dir).ok_or_else(|| {
+            format!(
+                "提出できるセッション (gse_*.ndjson) が {} に見つかりません。",
+                session_dir.display()
+            )
+        }),
+    }
+}
+
+/// 既定 (ゼロ引数) と `--input` の経路。★ **ゼロ引数の挙動は従来と 1 バイトも変えない。**
+fn run_package_one(args: Args) -> Result<gse_next_lib::packaging::PackageReport, String> {
+    let Args {
+        recipient: cli_recipient,
+        out: cli_out,
+        input: cli_input,
+        ..
+    } = args;
 
     // 1) セッション探索用 ID (アプリが記録した既存値)。入力 NDJSON の場所特定にのみ使う。
     //    研究者の GSE_DATASET 経路は `raw/<id>` を辿るため ID 必須。被験者の非 dataset 経路は
@@ -219,12 +359,7 @@ fn run() -> Result<Option<gse_next_lib::packaging::PackageReport>, String> {
         default_session_dir(stored_id.as_deref().unwrap_or("P000"))
     }
     .ok_or("セッション保存先 (~/Documents/GSE-sessions) を解決できませんでした。")?;
-    let input = find_latest_session_ndjson(&session_dir).ok_or_else(|| {
-        format!(
-            "提出できるセッション (gse_*.ndjson) が {} に見つかりません。",
-            session_dir.display()
-        )
-    })?;
+    let input = resolve_input(cli_input, &session_dir)?;
 
     // 3) ファイル名ラベル用の参加者 ID を確定 (研究者割当の P006 等を対話で入力)。
     let label_id = resolve_label_participant_id(stored_id.as_deref())?;
@@ -238,17 +373,45 @@ fn run() -> Result<Option<gse_next_lib::packaging::PackageReport>, String> {
         .unwrap_or_else(|| session_dir.clone());
 
     // 6) 匿名化 + 暗号化 (gse-package と同一ロジック)。ファイル名は label_id を使う。
-    package_session(&input, &label_id, &recipient, &out_dir).map(Some)
+    package_session(&input, &label_id, &recipient, &out_dir)
 }
 
 fn main() -> ExitCode {
     match run() {
-        Ok(None) => {
+        Ok(Outcome::Help) => {
             // --help: 使い方を stdout に出して正常終了 (exit 0)。
             let _ = writeln!(io::stdout(), "{USAGE}");
             ExitCode::SUCCESS
         }
-        Ok(Some(r)) => {
+        Ok(Outcome::Reconciled(r)) => {
+            let mut o = io::stdout().lock();
+            // ★ 呼び出し元 (アプリ) が読む 1 行。⚠️ ファイル名も参加者 ID も出さない
+            //   (画面・ログに載るため・data-privacy)。**件数だけ**を出す。
+            let _ = writeln!(
+                o,
+                "GSE_RECONCILE {}",
+                serde_json::json!({
+                    "packaged": r.packaged,
+                    "sent": r.sent,
+                    "unsent": r.unsent,
+                    "upload_disabled": r.upload_disabled,
+                    "skipped_busy": r.skipped_busy,
+                    "awaiting_approval": r.awaiting_approval,
+                    "errors": r.errors.len(),
+                })
+            );
+            for e in &r.errors {
+                let _ = writeln!(io::stderr(), "gse-submit: {e}");
+            }
+            // ⚠️ ★ 問題があったら **非ゼロで返す**。呼び出し元が「起動したが動いていない」と
+            //   「動いたが失敗した」を区別できないと fail-loud にならない。
+            if r.errors.is_empty() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            }
+        }
+        Ok(Outcome::Packaged(r)) => {
             let mut o = io::stdout().lock();
             let _ = writeln!(
                 o,
@@ -285,7 +448,94 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::looks_autogenerated;
+    use super::{looks_autogenerated, parse_args_from, resolve_input};
+    use std::path::{Path, PathBuf};
+
+    fn args(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// ★★ **ゼロ引数の既定は不変**。何も指定しなければ従来と同じ経路に入る。
+    #[test]
+    fn zero_args_keeps_the_legacy_behaviour() {
+        let a = parse_args_from(args(&[])).unwrap();
+        assert!(a.input.is_none(), "★ 既定は「最新 1 本」のまま");
+        assert!(!a.reconcile);
+        assert!(!a.help);
+        assert!(a.recipient.is_none());
+        assert!(a.out.is_none());
+    }
+
+    #[test]
+    fn input_and_reconcile_are_parsed() {
+        let a = parse_args_from(args(&["--input", "/tmp/x.ndjson"])).unwrap();
+        assert_eq!(a.input, Some(PathBuf::from("/tmp/x.ndjson")));
+        let a = parse_args_from(args(&["--reconcile"])).unwrap();
+        assert!(a.reconcile);
+        // 既存フラグと併用できる。
+        let a = parse_args_from(args(&["--reconcile", "--out", "/tmp/o"])).unwrap();
+        assert!(a.reconcile);
+        assert_eq!(a.out, Some(PathBuf::from("/tmp/o")));
+    }
+
+    /// ⚠️ 値の無いフラグ / 相互排他 / 未知の引数は **黙って通さない**。
+    #[test]
+    fn malformed_args_are_rejected() {
+        assert!(parse_args_from(args(&["--input"])).is_err());
+        assert!(parse_args_from(args(&["--reconcile", "--input", "/tmp/x"])).is_err());
+        assert!(parse_args_from(args(&["--nope"])).is_err());
+    }
+
+    /// ★ `--input` は **別ディレクトリのファイル**でも受ける (セッションフォルダに縛らない)。
+    /// ⚠️ 存在しないパスは **最新 1 本へ黙って落ちない**。
+    #[test]
+    fn resolve_input_prefers_explicit_path_and_fails_loudly() {
+        let dir = std::env::temp_dir().join(format!("gse_submit_input_{}", std::process::id()));
+        let elsewhere = dir.join("elsewhere");
+        let session = dir.join("sessions");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::fs::create_dir_all(&session).unwrap();
+        // セッションフォルダには「最新 1 本」候補がある。
+        std::fs::write(
+            session.join("gse_20260101_010101.ndjson"),
+            "{\"type\":\"meta\",\"session_start\":1}\n{\"type\":\"key\",\"t\":2,\"vk\":65,\"press\":true}\n",
+        )
+        .unwrap();
+        // 別ディレクトリの明示指定が優先される。
+        let explicit = elsewhere.join("gse_20260202_020202.ndjson");
+        std::fs::write(&explicit, "{\"type\":\"meta\",\"session_start\":1}\n").unwrap();
+        assert_eq!(
+            resolve_input(Some(explicit.clone()), &session).unwrap(),
+            explicit
+        );
+        // 指定なしなら従来どおり最新 1 本。
+        assert_eq!(
+            resolve_input(None, &session)
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "gse_20260101_010101.ndjson"
+        );
+        // ⚠️ 存在しない指定 → エラー (最新へフォールバックしない)。
+        let missing = elsewhere.join("does_not_exist.ndjson");
+        assert!(resolve_input(Some(missing), &session).is_err());
+        // ディレクトリを渡しても通さない。
+        assert!(resolve_input(Some(elsewhere.clone()), &session).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 候補が 1 本も無ければ (指定なし) エラー。★ Path 引数の形も固定する。
+    #[test]
+    fn resolve_input_errors_when_nothing_to_submit() {
+        let dir = std::env::temp_dir().join(format!("gse_submit_empty_in_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(resolve_input(None, Path::new(&dir)).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn autogenerated_ids_are_not_offered_as_default() {

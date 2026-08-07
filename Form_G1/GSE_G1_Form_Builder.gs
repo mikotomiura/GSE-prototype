@@ -51,6 +51,58 @@ var FORM_ID_SURVEY = "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU"; // G1-S 終
 // 既存設問を毎回作り直すか（通常 true）。
 var CLEAR_EXISTING = true;
 
+// ★★ 回答があるフォームを作り直してよいか（既定 false = fail-closed）。
+//
+// ⚠️★ **2026-08-07 の事故を受けて追加した。** 実際に起きたこと:
+//    「回答を保全する」と決めていたのに、Apps Script の関数セレクタの選択が反映されないまま
+//    `setupG1Forms` を実行してしまい、`buildConsentForm()` が `clearForm()` で全設問を削除した。
+//    → G1-C の**回答レコード 3 件は残ったが、答えがどの設問のものか失われた**
+//      （要約・個別のどちらも「回答なし」表示になった。★ 実測で確認）。
+//    ⚠️ ★ **Forms に回答の版履歴は無い。取り返しがつかない。**
+//
+// ★ 教訓: 「気をつける」では防げない。**コード側で止める。**
+//    人間の 1 クリックのミスが同意記録を壊せる設計そのものが欠陥だった。
+//
+// ★ 意図して作り直すときだけ true にし、⚠️ **作業が終わったら false に戻す**。
+//    → 回答を保ったまま文面を更新したいときは `migrateConsentForm()` を使う（削除しない）。
+var ALLOW_REBUILD_WITH_RESPONSES = false;
+
+// ★ clearForm() の直前に必ず通す関門。⚠️ **黙って進めない**（`data-privacy` / 研究記録の保全）。
+function assertSafeToRebuild_(form, label) {
+  var n;
+  try {
+    n = form.getResponses().length;
+  } catch (e) {
+    // ★ 回答数を確認できないなら **安全側に倒して止める**。
+    //   ⚠️ 「確認できなかった」を「0 件」と読み替えない（silent-failure 型の典型）。
+    throw new Error(
+      "★ " + label + " の回答数を確認できませんでした: " + e + "\n" +
+        "⚠️ 確認できない以上、作り直しません（fail-closed）。"
+    );
+  }
+  if (n === 0) return;
+
+  if (ALLOW_REBUILD_WITH_RESPONSES) {
+    Logger.log(
+      "⚠️⚠️ " + label + ": 回答が " + n + " 件あるが ALLOW_REBUILD_WITH_RESPONSES=true のため作り直します。\n" +
+        "   ★ この操作で **回答と設問の紐付けが失われます**。作業後は必ず false に戻してください。"
+    );
+    return;
+  }
+
+  throw new Error(
+    "⛔ " + label + " には既に回答が " + n + " 件あります。作り直しを中止しました（fail-closed）。\n" +
+      "\n" +
+      "★ 回答を保ったまま文面を更新したい場合（ほぼ常にこちら）:\n" +
+      "    migrateConsentForm()  … 既存設問を消さず、足りない項目だけを挿入する\n" +
+      "    checkConsentFormParity()  … 実フォームとコードのズレを読み取り専用で報告する\n" +
+      "\n" +
+      "⚠️ どうしても作り直す場合は ALLOW_REBUILD_WITH_RESPONSES = true にしてから再実行し、\n" +
+      "   ★ **回答と設問の紐付けが失われることを承知したうえで**行ってください。\n" +
+      "   （2026-08-07 に実際にこれを事故で起こしています。Forms に版履歴はありません。）"
+  );
+}
+
 // 問い合わせ先（PII ではないのでここに置いてよい）。
 var CONTACT_EMAIL = "mmiura.network@gmail.com";
 
@@ -149,12 +201,17 @@ var Q_C_EMAIL = "メールアドレス";
 // ============================================================
 // G1-C 同意フォーム（consent.md が文面の真実源）
 // ============================================================
-function buildConsentForm() {
-  var form = openFixed_(FORM_ID_CONSENT, "FORM_ID_CONSENT");
-  if (CLEAR_EXISTING) clearForm(form);
+// ★★ 説明文と同意項目は **この 2 つの関数だけが真実源**である。
+//   ⚠️ buildConsentForm()（新規構築）と migrateConsentForm()（既存フォームへの差分適用）の
+//      両方がここを見る。★ **文面を 2 か所に書かない。**
+//      このプロジェクトは「片方だけ直して食い違わせる」事故を繰り返している。
+//   ⚠️ 文面の真実源はさらに上流の consent.md である（先に consent.md を直し、ここへ写す）。
+function consentFormTitle_() {
+  return "GSE G1 統制タスク実験 — 説明・同意";
+}
 
-  form.setTitle("GSE G1 統制タスク実験 — 説明・同意");
-  form.setDescription(
+function consentFormDescription_() {
+  return (
     "ご協力ありがとうございます。以下をお読みのうえ、ご回答ください。\n\n" +
       "▼ 何を調べる研究か\n" +
       "キーボードの打ち方から「作業がどれくらい詰まっているか」を推定できるかを調べています。" +
@@ -171,24 +228,84 @@ function buildConsentForm() {
       "▼ 記録するもの\n" +
       "・キーを押した時刻（ミリ秒）とキーの種類（文字キー / バックスペース / 空白 / 改行 など）\n" +
       "・日本語入力の変換にかかった時間\n" +
-      "・貼り付けの回数と文字数（中身は取得しません）\n\n" +
+      "・貼り付けの回数と文字数（中身は取得しません）\n" +
+      "・★ 記録を送った日時と、送信が成功したかどうか\n\n" +
       "▼ 記録しないもの（一切保存されません）\n" +
       "・★ あなたが書いた文章そのもの（実験者が文字数だけを数えます）\n" +
       "・どの文字を打ったか（本文の復元はできません）\n" +
-      "・画面の内容・ウィンドウのタイトル・アプリ名・音声・映像\n\n" +
+      "・画面の内容・ウィンドウのタイトル・アプリ名・音声・映像\n" +
+      "・★ 位置情報・端末の中の他のファイル・お使いの端末の種類\n\n" +
+      "▼ ★ 記録の送られ方（毎回、あなたに確認します）\n" +
+      "・★ 1 つのブロック（5 分）が終わるたびに、画面に「このブロックの記録を送信しますか？」と\n" +
+      "  出ます。「送信する」を押したときだけ、その記録が研究者に送られます。\n" +
+      "  ★ 押さない限り送られません。「あとで」を選ぶこともできます。\n" +
+      "・★ 「あとで」を選んでも記録は消えません。端末に残るので、次のブロックの後にまとめて\n" +
+      "  送れます。★ ただし最後まで送信しなければ研究者には届きません（端末に残るだけです）。\n" +
+      "  その場合は研究者が後で直接受け取ります。\n" +
+      "・★ 送られるのは暗号化されたファイルだけです。中身は研究者の鍵でしか開けません。\n" +
+      "  途中で通る場所（インターネット上のサービス）では誰も中身を読めません。\n" +
+      "・★ 送られるファイルに、あなたが書いた文章は入っていません。どの文字を押したかは、\n" +
+      "  送られる前に「文字キー / バックスペース / 空白」のような種類に置き換えられます。\n" +
+      "・送り先は研究者が管理する Google ドライブです（途中で Google のサービスを経由します）。\n" +
+      "・送信のときに研究者の手元に残るのは「いつ送られたか」と「送れたかどうか」だけで、\n" +
+      "  あなたの端末やアカウントを特定する情報は残りません。ただし、途中で通る Google の\n" +
+      "  サービスが内部で何を記録しているかは研究者には確認できません（一般的なインターネット\n" +
+      "  利用と同じです）。\n" +
+      "・★ インターネットに接続していないと送れません。そのときは記録が端末に残り、あとで\n" +
+      "  自動的に送り直します（送信を一度確認したものは、あらためて押す必要はありません）。\n" +
+      "  画面に「まだ送れていない件数」が出ます。0 にならないまま\n" +
+      "  終わった場合は研究者にお知らせください（記録は端末に残っています）。\n" +
+      "・★ 送ったあとも、同じ記録があなたの端末に残ります。勝手に消すことはしません。\n" +
+      "・★ なぜこの形にするのか: 予備の実施で、記録の一部が失われたことがありました。\n" +
+      "  あなたの手間を省くためではなく、記録を確実に残すために、記録そのものは自動で\n" +
+      "  作られます（ここは操作不要です）。★ ただし研究者へ送るかどうかは毎回あなたが決めます。\n\n" +
       "▼ リスクと負担\n" +
       "・身体的なリスクはありません。約 70 分の拘束と、書く作業による軽い疲労が負担です。\n" +
       "・★ 難しく感じるブロックがあります。それは設計上わざとそうしてあります。\n" +
       "  うまく書けなくても能力の評価ではありません。採点も比較もしません。\n\n" +
       "▼ 参加は任意です\n" +
       "断っても不利益はありません。途中でやめられ、理由の説明も要りません。" +
-      "後からデータの削除を求められます（公表済みの集計から個別に取り除くことはできません）。\n\n" +
+      "後からデータの削除を求められます（★ すでに送信されたものも対象です。" +
+      "ただし公表済みの集計から個別に取り除くことはできません）。\n" +
+      "・★ 送信をやめたいときは、確認の画面で「あとで」を選んでください。それだけで送られません" +
+      "（記録は端末に残ります）。以後もずっと送りたくない場合は研究者にお知らせください。" +
+      "送信を止める設定にしたうえで、記録を端末に残したまま進めることができます" +
+      "（記録は研究者が後で直接受け取ります）。" +
+      "★ 設定の変更は研究者が行いますので、お申し出からお手続きまでに時間がかかることがあります。\n\n" +
       "▼ 結果の使われ方\n" +
       "個人が特定できる形では公表しません。分析スクリプトや集計結果は公開される可能性がありますが、" +
       "そこに含まれるのは P0xx という記号と数値だけで、氏名・実施日時・本文は含みません。\n\n" +
       "▼ お問い合わせ先\n" +
       CONTACT_EMAIL
   );
+}
+
+// ★ consent.md の同意欄 8 項目をそのまま設問化する。★ **順序が意味を持つ**（挿入位置の基準）。
+//   ⚠️ 2 と 3 は G1 固有（欺瞞を用いない・preregistration.md §2.8）。落とさないこと。
+//   ⚠️ ★ 自動送信の 1 項目は 2026-08-07 に追加した（研究者判断 D-1 / D-4）。
+//      consent.md 同意欄 / protocol.md §4.1-1 / 本ファイルの 3 箇所を同時に直すこと。
+function consentItemTitles_() {
+  return [
+    "上の説明を読み、質問する機会がありました。",
+    "★ 最初と最後のブロックが「書き写し」であることの説明を受けました。",
+    "★ 一部のブロックが意図的に難しく作られていることの説明を受けました。",
+    "書いた文章は保存されないことを理解しました。",
+    "★ 最後に短いアンケートがあり、それは実験の判定には使われないことの説明を受けました。",
+    "いつでも中断でき、後からデータの削除を求められることを理解しました。",
+    "★ ブロックごとに送信の確認画面が出て、「送信する」を押したときだけ暗号化された記録がインターネット経由で送られることの説明を受けました。",
+    "打鍵の記録（本文を除く）と、その研究利用に同意します。",
+  ];
+}
+
+function buildConsentForm() {
+  var form = openFixed_(FORM_ID_CONSENT, "FORM_ID_CONSENT");
+  if (CLEAR_EXISTING) {
+    assertSafeToRebuild_(form, "G1-C 説明・同意");
+    clearForm(form);
+  }
+
+  form.setTitle(consentFormTitle_());
+  form.setDescription(consentFormDescription_());
   form.setCollectEmail(false); // 下の設問で明示的に取る（何を取るかを本人に見せる）
   form.setShowLinkToRespondAgain(false);
   // ★ 募集でも当日でも使える文言にする（当日は実験者が同席している）。
@@ -203,17 +320,7 @@ function buildConsentForm() {
     "以下のすべてに同意いただける場合のみ、参加をお願いします。"
   );
 
-  // ★ consent.md の同意欄 6 項目をそのまま設問化する。
-  //   ⚠️ 2 と 3 は G1 固有（欺瞞を用いない・preregistration.md §2.8）。落とさないこと。
-  [
-    "上の説明を読み、質問する機会がありました。",
-    "★ 最初と最後のブロックが「書き写し」であることの説明を受けました。",
-    "★ 一部のブロックが意図的に難しく作られていることの説明を受けました。",
-    "書いた文章は保存されないことを理解しました。",
-    "★ 最後に短いアンケートがあり、それは実験の判定には使われないことの説明を受けました。",
-    "いつでも中断でき、後からデータの削除を求められることを理解しました。",
-    "打鍵の記録（本文を除く）と、その研究利用に同意します。",
-  ].forEach(function (title) {
+  consentItemTitles_().forEach(function (title) {
     var q = form.addCheckboxItem();
     q.setTitle(title);
     q.setChoices([q.createChoice("同意する / 理解した")]);
@@ -245,11 +352,132 @@ function buildConsentForm() {
 }
 
 // ============================================================
+// ★★ G1-C を「作り直さずに」最新の文面へ揃える（差分適用・2026-08-07）
+// ============================================================
+// ⚠️ ★ **buildConsentForm() は CLEAR_EXISTING=true で全設問を削除して作り直す。**
+//    公開済みフォームに既存回答があるとき、それをやると
+//    **どの回答がどの設問へのものだったかが失われる**（同意記録なので取り返しがつかない）。
+//    → ★ 本関数は **既存項目を消さず、足りないものだけを正しい位置に挿入する**。
+//
+// ★ 何度実行しても同じ状態になる（idempotent）:
+//    - 既に在る同意項目は**触らない**（title 一致で判定）
+//    - 無い項目だけを consentItemTitles_() の順序どおりの位置に挿入する
+//    - 説明文・題名は毎回 consentFormDescription_() / consentFormTitle_() で上書きする
+//
+// ⚠️ ★ **設問の削除は一切行わない。** consentItemTitles_() から項目を消したとしても、
+//    本関数は実フォームから消さない。★ 消すのは人間の判断であり、
+//    「回答が消える操作」を自動化しない（`data-privacy` / 研究記録の保全）。
+//    → 余分な項目が残っていないかは checkConsentFormParity() が**報告**する。
+function migrateConsentForm() {
+  var form = openFixed_(FORM_ID_CONSENT, "FORM_ID_CONSENT");
+
+  form.setTitle(consentFormTitle_());
+  form.setDescription(consentFormDescription_());
+
+  var wanted = consentItemTitles_();
+  var inserted = [];
+
+  wanted.forEach(function (title, wantedIdx) {
+    if (findItemByTitle_(form, title)) return; // 既に在る → 触らない
+
+    // ★ 挿入位置: 「自分より前に在るべき項目」のうち実在する最後のものの直後。
+    //   ⚠️ 実フォームの index で数える（コード側の配列 index で数えない）。
+    //   ★ これが `runCol_` 型の「コード側だけ見て実物を見ない」バグの回避である。
+    var anchorIndex = -1;
+    for (var k = 0; k < wantedIdx; k++) {
+      var prev = findItemByTitle_(form, wanted[k]);
+      if (prev) anchorIndex = prev.getIndex();
+    }
+    if (anchorIndex < 0) {
+      // 前に置くべき項目が 1 つも無い → 「同意の確認」セクションの直後に置く
+      var header = findItemByTitle_(form, "同意の確認");
+      anchorIndex = header ? header.getIndex() : 0;
+    }
+
+    var q = form.addCheckboxItem();
+    q.setTitle(title);
+    q.setChoices([q.createChoice("同意する / 理解した")]);
+    q.setRequired(true);
+    form.moveItem(q.getIndex(), anchorIndex + 1);
+    inserted.push(title);
+  });
+
+  Logger.log(
+    "G1-C を差分適用した: 挿入 " + inserted.length + " 件" +
+      (inserted.length ? "\n  + " + inserted.join("\n  + ") : "（説明文の更新のみ）")
+  );
+  checkConsentFormParity(); // ★ 自分でログに出すので Logger.log で包まない (二重に出る)
+  return inserted;
+}
+
+function findItemByTitle_(form, title) {
+  var items = form.getItems();
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].getTitle() === title) return items[i];
+  }
+  return null;
+}
+
+// ★★ 実フォームとコードのズレを **実物を読んで** 報告する（`browser-verification` §3）。
+//    ⚠️ コード側の配列を数えるだけの検査は、コードと外界のズレを原理的に検出できない。
+//    ★ 「順序」まで見る。⚠️ 同意項目は順序が意味を持つ（consent.md の並びと対応させる）。
+function checkConsentFormParity() {
+  var form = openFixed_(FORM_ID_CONSENT, "FORM_ID_CONSENT");
+  var wanted = consentItemTitles_();
+  var lines = [];
+
+  var missing = wanted.filter(function (t) {
+    return !findItemByTitle_(form, t);
+  });
+  if (missing.length) lines.push("❌ 不足 " + missing.length + " 件:\n  - " + missing.join("\n  - "));
+
+  // 実フォーム上でのチェックボックス設問の並び（= 被験者が見る順序）
+  var actual = form
+    .getItems(FormApp.ItemType.CHECKBOX)
+    .map(function (it) {
+      return it.getTitle();
+    });
+  var extra = actual.filter(function (t) {
+    return wanted.indexOf(t) < 0;
+  });
+  if (extra.length) {
+    lines.push(
+      "⚠️ コードに無い設問が実フォームに " + extra.length + " 件ある（★ 自動では消さない）:\n  - " +
+        extra.join("\n  - ")
+    );
+  }
+
+  var actualWanted = actual.filter(function (t) {
+    return wanted.indexOf(t) >= 0;
+  });
+  if (actualWanted.join("") !== wanted.join("")) {
+    lines.push("❌ 順序がコードと一致しない:\n  実物: " + actualWanted.join(" / ") + "\n  期待: " + wanted.join(" / "));
+  }
+
+  var descOk = form.getDescription() === consentFormDescription_();
+  if (!descOk) lines.push("❌ 説明文がコードと一致しない");
+
+  var n = form.getResponses().length;
+  var msg = !lines.length
+    ? "✅ G1-C はコードと一致している（同意項目 " + wanted.length + " 件・既存回答 " + n + " 件）"
+    : "G1-C parity（既存回答 " + n + " 件）\n" + lines.join("\n");
+  // ⚠️★★ **自分でログに出す。** 戻り値だけだと、エディタから ▶ で単独実行したときに
+  //   実行ログが「実行開始 / 実行完了」だけになり、★ **判定が 1 文字も見えない**。
+  //   （2026-08-07 に実際に起きた: 研究者が単独実行し、空ログを見て「通った」と読みかけた）
+  //   ★ 手順書は「ログに ✅ が出ることを確認」と書いているので、コードをそれに合わせる。
+  Logger.log(msg);
+  return msg;
+}
+
+// ============================================================
 // G1-M 強制比較フォーム（preregistration.md §2.6・★ 7 回答える）
 // ============================================================
 function buildManipulationCheckForm() {
   var form = openFixed_(FORM_ID_MCHECK, "FORM_ID_MCHECK");
-  if (CLEAR_EXISTING) clearForm(form);
+  if (CLEAR_EXISTING) {
+    assertSafeToRebuild_(form, "G1-M 強制比較");
+    clearForm(form);
+  }
 
   form.setTitle("GSE G1 — ブロック直後の 1 問");
   form.setDescription(
@@ -299,7 +527,10 @@ function buildManipulationCheckForm() {
 // ============================================================
 function buildPostSurveyForm() {
   var form = openFixed_(FORM_ID_SURVEY, "FORM_ID_SURVEY");
-  if (CLEAR_EXISTING) clearForm(form);
+  if (CLEAR_EXISTING) {
+    assertSafeToRebuild_(form, "G1-S 終了後アンケート");
+    clearForm(form);
+  }
 
   form.setTitle("GSE G1 — 終了後アンケート");
   form.setDescription(
@@ -1162,7 +1393,7 @@ function sendTaskMaterialsEmail(pid, email, url) {
 // ★★ G1-C の提出 → P-ID 採番 → 受付メール（Phase1 の onF1Submit と同型）
 // ============================================================
 // ★ **G1-C がそのまま参加登録である**（研究者判断 2026-08-03）。
-//   G1-C は説明文に consent.md の内容を全部載せ、同意 7 項目・氏名・メールを取っている。
+//   G1-C は説明文に consent.md の内容を全部載せ、同意 8 項目・氏名・メールを取っている。
 //   ⚠️ 別に「参加登録フォーム」を作るのは**重複**だった（一度作って廃止した）。
 //   Phase1 も F1（スクリーニング＋同意）を募集時に使い、それをトリガーにしている。
 //
@@ -1211,7 +1442,7 @@ function removeG1ConsentTriggers() {
 }
 
 // G1-C の回答を取り出す。★ 設問タイトルは Q_C_* 定数と共有する（片方だけ変えない）。
-// ⚠️ 同意 7 項目はフォーム側で必須なので、ここでは検査しない（未同意の提出は原理的に来ない）。
+// ⚠️ 同意 8 項目はフォーム側で必須なので、ここでは検査しない（未同意の提出は原理的に来ない）。
 function g1ConsentAnswers_(response) {
   var out = { name: "", email: "", pid: "" };
   var items = response.getItemResponses();

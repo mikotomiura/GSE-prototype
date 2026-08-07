@@ -211,8 +211,26 @@ jobs:
         # `[[bin]]` of the crate into Contents/MacOS/, including `gse-package` / `gse-unpack`
         # which are gated behind `required-features = ["package"]`. Without the flag those
         # binaries are never built and bundling fails ("Failed to copy binary ... does not
-        # exist"). The `age` isolation design (Cargo.toml) is preserved — only the release
-        # build opts in; the default `gse-next` binary still does not link `age`.
+        # exist").
+        #
+        # ★★ ISOLATION CLAIM — MEASURED 2026-08-08 (do not re-litigate from theory).
+        # A reviewer flagged this as broken reasoning: cargo unifies features per crate, so
+        # the *library* IS compiled with `package` here, therefore (they argued) the blind
+        # app links `age` + `reqwest` + rustls. The mechanism is right; the conclusion is not.
+        # Unused rlib objects are dropped at link time. Measured on the actual release binary
+        # (`cargo build --release --features package --bin gse-next`, same profile as here):
+        #   strings gse-next  | grep -c rustls              -> 0
+        #   strings gse-next  | grep -c aws_lc_rs           -> 0
+        #   strings gse-next  | grep -c reqwest             -> 0
+        #   strings gse-next  | grep -c age-encryption.org  -> 0
+        # Positive control (same technique on a binary that DOES link them):
+        #   strings gse-submit | grep -c rustls             -> 78
+        #   strings gse-submit | grep -c age-encryption.org -> 4
+        # And `strings gse-next | grep -c gse_next_lib -> 6`, so the tool does read this
+        # binary (the zeros are not an empty measurement).
+        # => The `age`/HTTP isolation (Cargo.toml, decisions D3 / D-7) HOLDS for the shipped
+        #    macOS app. If this build command or the profile changes, RE-MEASURE — do not
+        #    assume either way.
         run: npx tauri build --bundles dmg --features package
         env:
           APPLE_SIGNING_IDENTITY: "-"  # Ad-hoc signing (no Apple Developer certificate)

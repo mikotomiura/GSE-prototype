@@ -154,8 +154,46 @@ pub fn other_pids_from_pgrep(output: &str, self_pid: u32) -> Vec<u32> {
 
 /// Windows `tasklist /FO CSV /NH` の出力から自分以外の PID を拾う (純関数)。
 ///
-/// 形式: `"gse-next.exe","1234","Console","1","12,345 K"`
-/// ⚠️ ★ **Windows では未実測**である（macOS でしか動かしていない）。
+/// 形式: `"gse-next.exe","17456","Console","3","47,644 K"`
+///
+/// ## ★ 2026-08-06 に Windows 実機で実出力を採取した
+///
+/// 採取記録は `.steering/20260806-g1-followups-and-windows-verification/windows-measurements.md`
+/// (M-1 / M-2)。環境は `Windows 10.0.26200.8973` / ロケール `ja-JP` / コンソール CP `65001`。
+/// 下の `tasklist_*` テストは **その生出力をそのまま**入力にしてある。
+///
+/// ★ 実測で分かったこと:
+/// - 該当プロセスが無いとき `tasklist` は **`rc=0`** で
+///   `INFO: No tasks are running which match the specified criteria.` を **stdout** に出す。
+///   ★ 本関数は `o.stdout` を読むので、⚠️ **この行は確実にここへ渡る**。
+/// - ⚠️★★ **同じ 1 台で文言が英語にも日本語にもなった** (M-1 / M-9)。
+///   `cmd.exe` 直叩き = 英語 ／ PowerShell 経由 (`& cmd.exe /c …`) = 日本語
+///   (`情報: 指定された条件に一致するタスクは実行されていません。`)。★ 条件の違いは**未特定**。
+///   → ★ だからこそ本関数は **「数値に見える 2 列目」しか拾わない**設計を維持する
+///   (何語でも安全側 = 検出なしに倒れる)。⚠️ **文言を列挙する実装にしてはならない。**
+/// - `/FO CSV` を付けても **この INFO 行は CSV 化されない**（1 行そのまま出る）。
+/// - メモリ列 `"47,644 K"` のカンマは、区切りが `","`(引用符込み) なので**影響しない**。
+///
+/// ## ✅ ★ 経路全体が Windows 実機で走ったことも実測した (M-8 / 陽性対照 E-1)
+///
+/// ⚠️ ★ **同名 exe の二重起動では 2 行を捕まえられない**（実測）。
+/// `tauri-plugin-single-instance` が 2 個目を **14 ms** で終了させるので、`tasklist` 1 回
+/// (≒57 ms) より短く、57 ms 間隔 209 サンプルでも **2 行は 1 度も観測されなかった**。
+/// → ★ そのとき出る警告は `second-instance-blocked` 由来であって**本関数の経路ではない**。
+///
+/// ★ そこで **プラグインを持たない `gse-next.exe` という名前の別プロセス**を先に起こして
+/// 「本当に 2 プロセス」を作り、**偽 `tasklist.exe` を配布フォルダに置いたまま**検査を走らせた。
+/// ⚠️ これは `decisions.md` R-8 の「プラグインの無い旧ビルドと共存した」実測と**同じ形**である。
+/// 結果、⚠️ **警告が出た**。→ ★ この 1 回で 3 つ同時に言える:
+///
+/// 1. `other_instance_running()` が Windows で **実際に走った**（空振り合格ではない）
+/// 2. 使われたのは **System32 の本物**（絶対パス指定が効いている。偽 exe の痕跡ファイルは無し）
+/// 3. **本関数が実機の CSV を実際にパースして PID を拾えた**
+///
+/// ## ⚠️ ★ それでも実測していないこと
+///
+/// ★ 2 行を作ったのは **代用プロセス**であって、**本物の GSE が 2 個並んだ状態ではない**。
+/// 被験者の実環境（Phase1 の旧 `gse-next.exe` が残っている）そのものは再現していない。
 pub fn other_pids_from_tasklist(output: &str, self_pid: u32) -> Vec<u32> {
     output
         .lines()
@@ -323,19 +361,86 @@ mod tests {
         );
     }
 
-    /// ★ Windows の CSV 形式から PID 列を取る。⚠️ **実機未検証**（形式のみ）。
+    /// ★★ **Windows 実機の生出力**（2026-08-06 採取・`windows-measurements.md` M-2）。
+    /// `tasklist /FI "IMAGENAME eq gse-next.exe" /FO CSV /NH` の 1 行をそのまま入力にしてある。
+    /// ★ この行を書き換えるときは**実機で採り直す**こと（想像で直さない）。
     #[test]
     fn tasklist_csv_extracts_pid_column() {
-        let out = "\"gse-next.exe\",\"1234\",\"Console\",\"1\",\"12,345 K\"\n";
-        assert_eq!(other_pids_from_tasklist(out, 999), vec![1234]);
-        assert_eq!(other_pids_from_tasklist(out, 1234), Vec::<u32>::new());
+        let out = "\"gse-next.exe\",\"17456\",\"Console\",\"3\",\"47,644 K\"\r\n";
+        assert_eq!(other_pids_from_tasklist(out, 999), vec![17456]);
+        // ★ 自分自身は「他のインスタンス」に数えない（さもないと常に警告が出る）。
+        assert_eq!(other_pids_from_tasklist(out, 17456), Vec::<u32>::new());
     }
 
-    /// ⚠️ 該当プロセスが無いときの tasklist は情報メッセージを返す。PID と誤読しない。
+    /// ★ 区切りが **`","`(引用符込み) であること**を固定する。
+    ///
+    /// ⚠️ ★ **わざと壊して分かったこと**: 区切りを素の `,` に変えても、実機で採れた行
+    /// （`"explorer.exe","2084","Console","3","386,368 K"`）では **2 列目が変わらない**ので
+    /// テストが赤にならない。★ メモリ列のカンマは**最終列**にしか出ず、PID 列より後ろだからである。
+    /// → ★ **「実測行を置いただけでは区切りの選択を守れない」**。そこで、素のカンマ分割だと
+    /// 2 列目がずれる行（**イメージ名にカンマを含む**形）を構成して赤を出せるようにする。
+    /// ★ この行は **実測ではない**（Windows のファイル名にカンマは使えるが、実機では見ていない）。
+    #[test]
+    fn tasklist_splits_on_quoted_comma_not_bare_comma() {
+        // ★ 素の `,` で割ると cols[1] = `app.exe"` になり数値化に失敗 → PID を取りこぼす。
+        let out = "\"my,app.exe\",\"2084\",\"Console\",\"3\",\"386,368 K\"\r\n";
+        assert_eq!(
+            other_pids_from_tasklist(out, 999),
+            vec![2084],
+            "区切りは `\",\"` である必要がある（素の `,` だと 2 列目がずれる）"
+        );
+        // 実測行（M-2）でも同じ結果になること。
+        let real = "\"explorer.exe\",\"2084\",\"Console\",\"3\",\"386,368 K\"\r\n";
+        assert_eq!(other_pids_from_tasklist(real, 999), vec![2084]);
+    }
+
+    /// ★★ **Windows 実機の生出力**（2026-08-06 採取・`windows-measurements.md` M-1）。
+    ///
+    /// ⚠️ ★ 実測で分かった重要な点: **`ja-JP` 環境でも文言は英語**で、**`rc=0`** かつ
+    /// **stdout** に出た。`/FO CSV` を付けても CSV 化されない。
+    /// ★ ただし **1 台の実測**にすぎないので、「日本語 Windows なら常に英語」とは書かない。
+    /// → 下の `tasklist_non_csv_lines_are_dropped_whatever_the_language` が本命の防御である。
     #[test]
     fn tasklist_ignores_no_task_message() {
-        let out = "INFO: No tasks are running which match the specified criteria.\n";
+        let out = "INFO: No tasks are running which match the specified criteria.\r\n";
         assert_eq!(other_pids_from_tasklist(out, 999), Vec::<u32>::new());
+    }
+
+    /// ★★ **文言が何語でも安全側（= 検出なし）に倒れる**ことを固定する。
+    ///
+    /// ⚠️★★ **日本語文言は「起こりうる」ではなく実際に起きた**（`windows-measurements.md` **M-9**）。
+    /// **同じ 1 台**で、`cmd.exe` 直叩きだと**英語**、PowerShell 経由 (`& cmd.exe /c …`) だと
+    /// **日本語**が返った。★ 条件の違いは特定できていない。
+    /// → ⚠️ ★ **文言をテストで列挙する方針だったら破綻していた。**
+    /// 本関数は「`","` で 2 列以上に割れ、2 列目が数値」の行しか拾わないので、
+    /// ★ **文言ではなくその性質をテストで固定する。**
+    #[test]
+    fn tasklist_non_csv_lines_are_dropped_whatever_the_language() {
+        // ★ 実測された日本語文言 (M-9)。
+        let ja = "情報: 指定された条件に一致するタスクは実行されていません。\r\n";
+        assert_eq!(other_pids_from_tasklist(ja, 999), Vec::<u32>::new());
+        // 数字を含む非 CSV 行も PID と誤読しない。
+        let noisy = "エラー: 無効な引数またはオプションです - '/FO CSV 1234'\r\n";
+        assert_eq!(other_pids_from_tasklist(noisy, 999), Vec::<u32>::new());
+        assert_eq!(other_pids_from_tasklist("", 999), Vec::<u32>::new());
+    }
+
+    /// ★★ **2 プロセス同時のときの Windows 実機の生出力**
+    /// （2026-08-06 採取・`windows-measurements.md` **M-8**）。
+    ///
+    /// ⚠️ ★ この 2 行は **代用プロセス**（`gse-next.exe` という名前で眠るだけの別プロセス）を
+    /// 使って作った。★ **同名 exe の二重起動では原理的に 2 行にならない**ためである
+    /// (`tauri-plugin-single-instance` が 2 個目を 14 ms で終了させ、`tasklist` 1 回 ≒57 ms より短い)。
+    /// ★ 代用は「ごまかし」ではなく、⚠️ `decisions.md` R-8 の
+    /// **「プラグインを持たない旧ビルドと共存する」**という**本命の脅威モデルの再現**である。
+    #[test]
+    fn tasklist_two_rows_yield_the_other_pid_only() {
+        let out = "\"gse-next.exe\",\"13864\",\"Console\",\"4\",\"4,212 K\"\r\n\
+                   \"gse-next.exe\",\"13696\",\"Console\",\"4\",\"37,164 K\"\r\n";
+        // ★ 実機ではこの状態で「2 つ動いている」警告に到達した (M-8)。
+        assert_eq!(other_pids_from_tasklist(out, 13696), vec![13864]);
+        assert_eq!(other_pids_from_tasklist(out, 13864), vec![13696]);
+        assert_eq!(other_pids_from_tasklist(out, 999), vec![13864, 13696]);
     }
 
     /// ★ ブロック長は `preregistration.md §2.3` の 5 分と `writing-pad.html` の

@@ -1,6 +1,6 @@
 [package]
 name = "gse-next"
-version = "0.1.22"
+version = "0.1.23"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -52,8 +52,11 @@ path = "src/bin/submit.rs"
 required-features = ["package"]
 
 [features]
-# gse-package bin 専用。age 暗号化を有効化する。default ビルド (Tauri アプリ) には載らない。
-package = ["dep:age"]
+# gse-package / gse-submit bin 専用。age 暗号化と **HTTP 送信** を有効化する。
+# ⚠️ ★ default ビルド (盲検 Tauri アプリ) には載らない。G1 の自動提出は
+# `gse-submit --reconcile` (別プロセス) が行うので、★ **アプリ本体に age も HTTP も載せない**
+# (decisions D3 の隔離方針を維持し、Tauri CSP を 1 文字も触らずに済む)。
+package = ["dep:age", "dep:reqwest"]
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -108,6 +111,19 @@ tracing-subscriber = "0.3.22"
 # transfer-pipeline (feature "package" / bin gse-package 専用・optional): 匿名化 NDJSON を
 # 研究者 X25519 公開鍵宛に age 暗号化する。default の Tauri ビルドには載らない (RAM/サイズ抑制)。
 age = { version = "0.10", optional = true }
+# G1 自動提出 (feature "package" / bin gse-submit 専用・optional): 生成した `.age` を
+# GAS Web App へ POST する。★ `tauri` が既に依存しているクレートなので**新規の供給元を増やさない**。
+# ⚠️ ★ 実測 (gas-measurements.md M-1): GAS の POST は **302 を返す**ので
+# **リダイレクト追従が必須**。reqwest の既定方針は 302 で POST → GET に変える (curl 既定と同じ) ため、
+# 実測で 200 が返った形と一致する。★ メソッドを強制すると **405** になる。
+# `rustls` feature は `rustls-platform-verifier` 経由で OS の信頼ストアを使う (Win/mac 両対応)。
+reqwest = { version = "0.13", optional = true, default-features = false, features = [
+    "blocking",
+    "rustls",
+    "charset",
+    "http2",
+    "system-proxy",
+] }
 
 # --- Platform-specific dependencies ---
 

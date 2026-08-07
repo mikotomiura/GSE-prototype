@@ -49,6 +49,15 @@ analysis.db
 cross_section.csv
 cross_section.parquet
 
+# ★★ G1 自動提出の共有シークレット。⚠️ **絶対にコミットしない。**
+# このリポジトリは Actions の分数都合で **一時的に public にする運用がある**ので、
+# ⚠️ 一度入れると public にした瞬間に「誰でも研究者の Drive 受け取りフォルダへ書き込める」状態になる。
+# ★ git 履歴に残るため、後からローテートしても痕跡は消せない (security-checker 指摘)。
+# ⚠️ ★ GAS 側の `SHARED_SECRET` / `FOLDER_ID` は **Apps Script のスクリプト プロパティ**に
+#    置く規約にしたので、`.gs` には秘密が入らない (`Form_G1/GSE_G1_Submit.gs` 冒頭)。
+g1-submit.json
+**/g1-submit*.json
+
 # age secret keys (gse-unpack --keygen, pilot-runbook §2) — never commit private keys.
 # Public keys (age1...) are safe to distribute; only the secret identity is sensitive.
 *age-identity*

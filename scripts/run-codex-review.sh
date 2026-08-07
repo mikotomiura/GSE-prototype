@@ -4,15 +4,66 @@
 # 任意の codex exec コマンド実行を防ぐため、パラメータを固定化する。
 # jq 非依存 (python 使用) — jq 未導入環境向けに python 化 (2026-06-16)。
 #
-# 使い方: scripts/run-codex-review.sh > /tmp/cross-review-codex.md
+# 使い方:
+#   scripts/run-codex-review.sh > /tmp/cross-review-codex.md            # 未ステージ変更
+#   scripts/run-codex-review.sh <base>..<head> -- path1 path2 > out.md  # 対象を明示
+#   scripts/run-codex-review.sh --ack-filtered <base>..<head> -- path1  # ★ 下記参照
+#
+# 引数を渡すとそのまま `git diff "$@"` に流す。★ 引数なしの既定挙動 (未ステージ変更) は不変。
+# ⚠️ 引数が無いと **コミット済みの変更はレビューされない** (git diff は未ステージのみ)。
+# タスク完了後の /cross-review は差分がコミット済みなので、範囲を明示して呼ぶこと。
 # 内部で git diff | scripts/secrets-filter.sh を通し、固定 prompt で Codex を呼ぶ。
 #
+# ★ --ack-filtered (2026-08-07 追加)
+#   secrets-filter が exit 2 を返しても中止せず、警告を出して続行する **明示的な** 逃がし口。
+#   既定は fail-closed のまま。⚠️ 自動では絶対に付けない。人が差分の該当行を目で見て
+#   「実体のある機密は無い」と確認し、その根拠を .steering に残した時だけ付ける。
+#   背景: secrets-filter は行内に `secret =` 等の**語**が出ただけで 2 を返すため、
+#   `let secret = v` のような識別子や「SHARED_SECRET を .gs に書くな」という注意書きでも
+#   ブロックされる。この誤検知で cross-review が連続で skip される事故が実際に起きている。
+#   ⚠️ フィルタは通る (置換・hunk 除去は適用済み)。飛ばすのは「中止の判断」だけである。
+#
 # exit code:
-#   0: Codex レビュー完了 (stdout に結果)
-#   1: 予算超過 / Codex エラー / python 不在
-#   2: secrets-filter が機密を検出 (fail-closed)
+#   0: Codex レビュー完了 (stdout に結果) / 引数なしで未ステージ変更が無い (skip)
+#   1: 予算超過 / Codex エラー / python 不在 / ★ 明示した範囲の差分が空
+#   2: secrets-filter が機密を検出 (fail-closed。--ack-filtered 指定時は 2 を返さない)
 
 set -uo pipefail
+
+ACK_FILTERED=0
+if [ "${1:-}" = "--ack-filtered" ]; then
+  ACK_FILTERED=1
+  shift
+fi
+
+# ⚠️★★ 残りの引数は `<range> [-- <paths>]` **だけ**に絞る (security-checker 指摘)。
+#   ★ `--` 以外のオプションを通すと `git diff --no-index <repo 外のパス>` が書け、
+#   ⚠️ **追跡外・repo 外のファイルを Codex に送れてしまう**。
+#   実測: `g1-submit.json` (endpoint + SHARED_SECRET) は .gitignore で通常の git diff には
+#   出ないが、`--no-index` は index も ignore も無視するので到達する。
+#   ★ このラッパの存在理由は「パラメータを固定すること」なので、入力範囲も固定側に含める。
+#   ⚠️ ★ コメントと実装を一致させる: `--` の前は **range を高々 1 個**しか許さない
+#   (「`-` で始まらなければ何個でも通る」だと、書いてある形より広い・cross-review 指摘)。
+seen_ddash=0
+ranges=0
+for a in "$@"; do
+  if [ "$a" = "--" ]; then
+    seen_ddash=1
+    continue
+  fi
+  [ "$seen_ddash" -eq 1 ] && continue
+  if [ "${a#-}" != "$a" ]; then
+    echo "[run-codex-review] FAILED: オプションは受け付けません: $a" >&2
+    echo "[run-codex-review] 受け付ける形: <base>..<head> [-- <path> ...]" >&2
+    exit 1
+  fi
+  ranges=$((ranges + 1))
+  if [ "$ranges" -gt 1 ]; then
+    echo "[run-codex-review] FAILED: range は 1 個までです ('--' の前に $a)" >&2
+    echo "[run-codex-review] 受け付ける形: <base>..<head> [-- <path> ...]" >&2
+    exit 1
+  fi
+done
 
 PYTHON=$(command -v python3 || command -v python || true)
 if [ -z "$PYTHON" ]; then
@@ -32,8 +83,14 @@ export BUDGET_FILE
 TMPDIR_WORK=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
-git diff > "$TMPDIR_WORK/raw.diff"
+git diff "$@" > "$TMPDIR_WORK/raw.diff"
 if [ ! -s "$TMPDIR_WORK/raw.diff" ]; then
+  if [ "$#" -gt 0 ]; then
+    # 範囲を明示して呼んだのに空 = 指定ミス。ここで exit 0 を返すと
+    # 「rc=0 だから走った」と誤読される (silent failure)。明示的に落とす。
+    echo "[run-codex-review] FAILED: 指定した差分が空です: git diff $*" >&2
+    exit 1
+  fi
   echo "[run-codex-review] no unstaged changes to review (skipped, no budget consumed)" >&2
   exit 0
 fi
@@ -42,15 +99,31 @@ fi
 # `if ! cmd; then rc=$?` は **常に 0** になる (`!` が反転した後のステータスを拾うため)。
 # それだと secrets-filter の exit 2 (機密検出) と 1 (故障) を区別できず、
 # 呼び出し側が「機密でブロック」と「codex 故障」を取り違える。
-scripts/secrets-filter.sh < "$TMPDIR_WORK/raw.diff" > "$TMPDIR_WORK/input.diff"
+# cwd に依存すると `cd src-tauri` した状態から呼んだだけでフィルタが見つからず
+# rc=127 (= "secrets-filter error") になる。repo root 基準で引く。
+SECRETS_FILTER_REPORT="$TMPDIR_WORK/filter-report.txt" \
+  "$ROOT/scripts/secrets-filter.sh" < "$TMPDIR_WORK/raw.diff" > "$TMPDIR_WORK/input.diff"
 rc=$?
 if [ "$rc" -ne 0 ]; then
   if [ "$rc" -eq 2 ]; then
-    echo "[run-codex-review] BLOCKED: secrets-filter detected sensitive content" >&2
-    exit 2
+    if [ "$ACK_FILTERED" -eq 1 ]; then
+      echo "[run-codex-review] WARN: secrets-filter がヒットしたが --ack-filtered で続行する" >&2
+      echo "[run-codex-review] WARN: 送信するのは**フィルタ後**の差分である" >&2
+      # ⚠️★ **どの行がなぜマッチしたかを出す** (security-checker 指摘)。
+      #   ★ 以前は「除去された hunk 行数」だけを出していたが、それは **安全な側**
+      #   (中身が消えた部分) の件数であり、人が確かめるべき行内マッチが 1 件も見えなかった。
+      #   ⚠️ 値そのものは出さない (端末とスクロールバックに秘密を残さない)。
+      echo "[run-codex-review] WARN: 人が確認すべき箇所 (行番号と理由。値は出さない):" >&2
+      sed 's/^/[run-codex-review]   raw.diff:/' "$TMPDIR_WORK/filter-report.txt" >&2
+    else
+      echo "[run-codex-review] BLOCKED: secrets-filter detected sensitive content" >&2
+      echo "[run-codex-review] 誤検知だと人が確認できた場合のみ --ack-filtered を付けて再実行する" >&2
+      exit 2
+    fi
+  else
+    echo "[run-codex-review] FAILED: secrets-filter error rc=$rc" >&2
+    exit 1
   fi
-  echo "[run-codex-review] FAILED: secrets-filter error rc=$rc" >&2
-  exit 1
 fi
 
 # 予算チェック (python; jq 不要)

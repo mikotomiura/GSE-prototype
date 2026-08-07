@@ -1008,6 +1008,19 @@ pub struct LogChannel {
     shutdown_tx: Sender<()>,
     /// `LogEntry::End` 処理完了の通知端 (`quit_app` が待つ)。
     pub shutdown_rx: Receiver<()>,
+    block_end_tx: Sender<()>,
+    /// ★ `LogEntry::BlockEnd` を **書いて flush し終えた** ことの通知端。
+    ///
+    /// ⚠️★ **なぜ要るか (G1 自動提出)**: ブロック終了の直後に収束器 (`gse-submit --reconcile`)
+    /// を起こすが、収束器は「`session_end` を持つファイル」しか触らない。`BlockEnd` は
+    /// channel 越しの非同期処理なので、★ **送った直後にはまだ `session_end` が書かれていない**。
+    /// そのまま起こすと、そのブロックは毎回 1 周遅れて拾われることになる
+    /// (収束型なので損失にはならないが、⚠️ **最後のブロックはプロセスが生き続ける限り
+    /// 送られない** — `lib.rs` は `overlay` 窓があるため × で閉じても終了しない)。
+    ///
+    /// ★ 固定 sleep で待たないのは、`ANALYSIS_IDLE` を入れたときと同じ理由である:
+    /// **待つべき時間ではなく、待つべき状態を観測する**。
+    pub block_end_rx: Receiver<()>,
     /// いま書いている先 + 状態。`start()` が **同じ Arc を上書き**する
     /// (★ `.manage()` に渡した後から差し替えられるようにするため)。
     pub target: SharedLogTarget,
@@ -1024,6 +1037,9 @@ impl LogChannel {
     pub fn new() -> Self {
         let (tx, rx) = bounded::<LogEntry>(512);
         let (shutdown_tx, shutdown_rx) = bounded::<()>(1);
+        // ★ 容量 1 + `try_send` にする。⚠️ 誰も待っていないブロック終了で
+        //   logger スレッドを**絶対に止めない**ため (ログの遅延は打鍵の取りこぼしになる)。
+        let (block_end_tx, block_end_rx) = bounded::<()>(1);
         let target: SharedLogTarget = Arc::new(Mutex::new(LogTarget {
             path: PathBuf::new(),
             status: LogStatus::Disabled {
@@ -1035,6 +1051,8 @@ impl LogChannel {
             rx,
             shutdown_tx,
             shutdown_rx,
+            block_end_tx,
+            block_end_rx,
             target,
         }
     }
@@ -1057,9 +1075,11 @@ impl LogChannel {
             rx,
             shutdown_tx,
             shutdown_rx: _shutdown_rx,
+            block_end_tx,
+            block_end_rx: _block_end_rx,
             target,
         } = self;
-        SessionLogger::spawn(log_path, g1_mode, rx, shutdown_tx, target)
+        SessionLogger::spawn(log_path, g1_mode, rx, shutdown_tx, block_end_tx, target)
     }
 }
 
@@ -1088,6 +1108,7 @@ impl SessionLogger {
         g1_mode: Option<crate::g1::G1Source>,
         rx: Receiver<LogEntry>,
         shutdown_tx: Sender<()>,
+        block_end_tx: Sender<()>,
         target: SharedLogTarget,
     ) -> (Self, LogStatus) {
         // 書込先を spawn 前に同期確定 (primary → temp → sink)。actual_path を log_path に採用する。
@@ -1386,6 +1407,11 @@ impl SessionLogger {
                             let _ = writer.flush();
                             last_flush = Instant::now();
                             dirty = false;
+                            // ★ **flush の後**に知らせる。⚠️ 先に知らせると、収束器が
+                            //   `session_end` の無いファイルを見て「まだ閉じていない」と
+                            //   判断してしまう (待った意味が消える)。
+                            //   `try_send` なので誰も待っていなくてもここで止まらない。
+                            let _ = block_end_tx.try_send(());
                         }
                         LogEntry::Rotate { new_path } => {
                             // ⚠️★ **一意化を先に行う。** 呼び出し側 (UI スレッド) の exists 判定と
@@ -2161,6 +2187,85 @@ mod tests {
 
         let _ = fs::remove_file(&p);
         let _ = fs::remove_file(&rotated);
+    }
+
+    /// ★★ **ブロック終了の合図が届き、その時点で `session_end` が読める。**
+    ///
+    /// ⚠️ G1 の自動提出 (収束器) は「`session_end` を持つファイル」しか触らないので、
+    /// 中身が揃う前に合図が来ると **そのブロックを毎回 1 周遅れて拾う**ことになる。
+    /// ★ とくに最後のブロックは、`lib.rs` が `overlay` 窓を持つためプロセスが
+    /// × では終了せず、⚠️ **次の起動が来ないまま送られない**。
+    ///
+    /// ## ⚠️★ この検査が **押さえていないこと** (わざと壊して実測した)
+    ///
+    /// | 壊し方 | 結果 |
+    /// |---|---|
+    /// | `BlockEnd` の `flush()` を外す | ★ **赤** (3 回とも) |
+    /// | `try_send` を送らない | ★ **赤** (5 秒でタイムアウト) |
+    /// | ⚠️ `try_send` を `flush()` の **前**に動かす | **緑のまま** (3 回とも) |
+    ///
+    /// ★ 3 つ目が緑なのは、2 つの操作が同じスレッドで**隣り合っている**ため、
+    /// 読み手が「flush 前」の窓を掴めないからである。
+    /// → ⚠️ **順序そのものはこの検査では守られていない。** 守っているのは実装側のコメントである。
+    /// ★ ここに「順序を検査している」と書かないのは、**発火しない検査を持っているつもり**に
+    /// ならないためである。実際に守れているのは
+    /// **「合図が来る」「その時点で `session_end` が読める」** の 2 点である。
+    #[test]
+    fn block_end_ack_arrives_and_session_end_is_readable() {
+        let p = rot_test_path("ack", 0);
+        let channel = LogChannel::new();
+        let tx = channel.tx.clone();
+        let block_end_rx = channel.block_end_rx.clone();
+        let (logger, _status) = channel.start(p.clone(), None);
+
+        tx.send(LogEntry::Key {
+            vk_code: 65,
+            timestamp: 1,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::BlockEnd).unwrap();
+        block_end_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("BlockEnd ack did not arrive");
+
+        // ★ 合図を受け取った直後に読む。sleep を挟まない (挟んだら何も検査していない)。
+        let c = fs::read_to_string(&p).unwrap();
+        assert!(
+            c.contains(r#""type":"meta","session_end""#),
+            "合図の時点で session_end が読めなければならない:\n{c}"
+        );
+        assert!(
+            c.contains(r#""vk":65"#),
+            "直前の行も flush されていること:\n{c}"
+        );
+        drop(logger);
+        let _ = fs::remove_file(&p);
+    }
+
+    /// ⚠️ 誰も合図を待っていなくても logger は止まらない (容量 1 の channel を埋めても進む)。
+    /// ★ ここが詰まると打鍵の記録が遅れる = ブロックが壊れる。
+    #[test]
+    fn block_end_ack_never_blocks_the_logger() {
+        let p = rot_test_path("ack_nb", 0);
+        // ★ 受信端を **捨てる**。以後 try_send は必ず失敗する経路になる。
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        for _ in 0..5 {
+            tx.send(LogEntry::BlockEnd).unwrap();
+        }
+        tx.send(LogEntry::Key {
+            vk_code: 66,
+            timestamp: 2,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger stalled on the block-end ack");
+        let c = fs::read_to_string(&p).unwrap();
+        assert!(c.contains(r#""vk":66"#), "{c}");
+        let _ = fs::remove_file(&p);
     }
 
     /// ⚠️ `BlockEnd` の直後に `End` (アプリ終了) が来ても `session_end` は **1 行だけ**。
