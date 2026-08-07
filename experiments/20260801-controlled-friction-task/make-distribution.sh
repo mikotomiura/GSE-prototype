@@ -171,13 +171,63 @@ build_mac() {
   local M="$OUT/G1_実施用_macOS"
   local DMG
   DMG=$(basename "$(ls "$CACHE"/*.dmg | head -1)")
+  # ⚠️★ **先に消す。** 2026-08-07 に踏んだ: dmg の同梱をやめたのに、前回の実行で置いた
+  #   dmg がフォルダに残り続け、★ **配布物に「取り出してください」の残骸**が混ざった。
+  #   dist/ は毎回作り直してよい生成物なので、積み上げない。
+  rm -rf "$M"
   mkdir -p "$M"
-  cp "$CACHE/$DMG" "$M/"
   cp "$CONFIG" "$M/g1-submit.json"
   : > "$M/g1.mode"
   cp "$PAGES_DIR"/block*.html "$M/"
+
+  # --- ★★ `.app` を **最初からフォルダに入れて**配る（2026-08-07） ---------------
+  # ⚠️★★ **なぜ dmg を配るのをやめたか（実測で踏んだ事故）**
+  #   旧版は dmg を同梱し、README で「`.app` をこのフォルダへドラッグしてください」と頼んでいた。
+  #   ★ 2026-08-07、**README を書いた本人**が dmg から直接起動し、G1 モードにならず
+  #     **プローブが発火した**（`~/.gse/g1_participant_id` が作られず、通常モードの
+  #     自動生成 ID が使われていたことで確定）。⚠️ 在宅の被験者なら確実に起きる。
+  #   ★ マーカーは実行ファイルから **4 階層上**の 1 か所しか見ない (`g1.rs: exe_to_folder_levels`)。
+  #     dmg から起動すると `/Volumes/…` を見るので、フォルダの `g1.mode` は**あっても効かない**。
+  #   ⚠️ アプリは何の警告も出さずに普通に動く。これが最も悪い性質である。
+  #   ⚠️ ★ **macOS の launcher で解決してはならない** — `open -a` は名前解決して
+  #     `/Applications` の通常アプリを起こすため 2026-08-05 に**廃止済み**
+  #     (`preregistration.md §5.4-5`・`launch-g1-macos.command` に理由が残っている)。
+  #   → ★ **ドラッグという工程そのものを無くす。** `§5.4-5` の凍結された配布形
+  #     （`g1.mode` と `gse-next.app` と `blockNN.html` が同居する `G1-app/`）と一致する。
+  #
+  # ⚠️★ **署名に触らない**（`§5.4-5`: 中身は 1 バイトも変えない）。`ditto` で取り出して
+  #   `ditto -c -k` で固めるだけである。2026-08-07 に往復を実測した:
+  #     dmg 内 → コピー後 → zip → 展開後 の 4 点すべてで `codesign --verify --strict` が OK、
+  #     実行ビットも `-rwxr-xr-x` のまま。
+  local MNT
+  MNT=$(mktemp -d)
+  # ⚠️★ 途中で失敗してもマウントを残さない（残すと次回の attach が別名になって気づけない）
+  trap 'hdiutil detach "$MNT" -quiet 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' RETURN
+  hdiutil attach "$CACHE/$DMG" -mountpoint "$MNT" -nobrowse -quiet \
+    || die "dmg をマウントできませんでした: $DMG"
+  [ -d "$MNT/gse-next.app" ] || die "dmg の中に gse-next.app がありません"
+  # ★ 配る実体の署名を、取り出す前に確かめる（壊れた成果物を配らない）
+  codesign --verify --strict "$MNT/gse-next.app" \
+    || die "dmg 内の gse-next.app の署名が壊れています"
+  ditto "$MNT/gse-next.app" "$M/gse-next.app" || die "gse-next.app を取り出せませんでした"
+  hdiutil detach "$MNT" -quiet || true
+  trap - RETURN
+  rmdir "$MNT" 2>/dev/null || true
+
+  # ★ フォルダに置いた状態でもう一度確かめる（`g1.mode` を同居させても署名は無傷であること）
+  codesign --verify --strict "$M/gse-next.app" \
+    || die "フォルダへ置いた gse-next.app の署名が壊れました"
+
   sed "s/@DMG@/$DMG/g" "$HERE/dist-readme-macos.txt" > "$M/README_先に読む.txt"
-  note "macOS: $(find "$M" -type f | wc -l | tr -d ' ') ファイル (dmg=$DMG)"
+
+  # --- ★ 配るのは **zip 1 個**。⚠️ フォルダのままだと Drive が固め直して .app が壊れうる -----
+  #   ★ zip なら Drive は**ただのファイル**として配るので、バイトが変わらない。
+  local Z="$OUT/G1_実施用_macOS.zip"
+  rm -f "$Z"
+  ( cd "$OUT" && ditto -c -k --sequesterRsrc --keepParent "G1_実施用_macOS" "$(basename "$Z")" ) \
+    || die "zip を作れませんでした"
+  note "macOS: $(find "$M" -type f | wc -l | tr -d ' ') ファイル + gse-next.app（★ 同梱済み）"
+  note "macOS zip: $(basename "$Z") ($(wc -c < "$Z" | tr -d ' ') B) ← ★ Drive にはこれを置く"
 }
 
 case "$TARGET" in
@@ -199,7 +249,17 @@ MAN="$OUT/MANIFEST.txt"
     [ -d "$d" ] || continue
     echo "## $(basename "$d")"
     ( cd "$d" && for f in *; do
-        printf '%-34s %10d B  %s\n' "$f" "$(wc -c < "$f" | tr -d ' ')" "$(shasum -a 256 "$f" | cut -c1-16)"
+        if [ -d "$f" ]; then
+          # ⚠️★ `.app` は**ディレクトリ**である。`wc -c < dir` は 0 を返すので、
+          #   そのまま出すと **「0 B」= 空に見える**（2026-08-07 に実測で踏んだ）。
+          #   → 中のファイルの合計 byte 数と、★ **署名の検証結果**を出す。
+          printf '%-34s %10d B  %s (%s ファイル)\n' "$f/" \
+            "$(find "$f" -type f -exec wc -c {} + | tail -1 | awk '{print $1}')" \
+            "$(codesign --verify --strict "$f" > /dev/null 2>&1 && echo 'codesign OK' || echo '⚠️ codesign NG')" \
+            "$(find "$f" -type f | wc -l | tr -d ' ')"
+        else
+          printf '%-34s %10d B  %s\n' "$f" "$(wc -c < "$f" | tr -d ' ')" "$(shasum -a 256 "$f" | cut -c1-16)"
+        fi
       done )
     echo
   done
