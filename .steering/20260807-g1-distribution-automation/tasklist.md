@@ -136,9 +136,8 @@
 - [x] `installRunSheetRefreshTrigger()` / `removeRunSheetRefreshTriggers()`
 - [x] 単体テスト 17 項目追加（計 53 項目緑・★ 陰性対照/上書き禁止/ヘッダ不一致を含む）
 - [x] 列の要否を preregistration と突き合わせ（★ `実施形態` は `§2.14-3` により消せない）
-- [ ] ★ 人: `.gs` を貼り直す → `installRunSheetRefreshTrigger()` を 1 回
-- [ ] ★ 人: スクリプト プロパティ `G1_SUBMIT_FOLDER_ID` に受け口の `FOLDER_ID` と同じ値を入れる
-      （⚠️ 無いと「完了ブロック数」「実施日」だけ埋まらない）
+- [x] ★ 人: `.gs` を貼り直す → `installRunSheetRefreshTrigger()` を 1 回（2026-08-08）
+- [x] ★ 人: スクリプト プロパティ `G1_SUBMIT_FOLDER_ID`（設定済みを確認・2026-08-08）
 
 ## 6. ★ 次セッションへ送るもの（引き継ぎ: `.steering/_handoff/next-session-prompt-g1-provisioning-and-vps.md`）
 - [x] ★【A-1】被験者ぶんの一括生成 — `prepare-subjects.sh` を作った（2026-08-07）
@@ -200,5 +199,27 @@
       分けて数える。`checkMaterialsProvisioning(0)` で新規ぶんを見ない
       ★ node テスト 19 項目追加（計 **93 項目緑**・⚠️ 陽性対照 / 陰性対照 / 空ロスター / 共有し忘れ 1 人）
       ★ 非回帰: `guard_test.cjs` 4/4 ・`submit_guard_test.cjs` 33/33 ・`check_g1_emails.py` 緑
-- [ ] ⚠️ `.gs` の最新版（受付メール 1 通化・`checkMaterialsProvisioning` 改）を `GSE_Gate1` へ貼る
+- [x] ⚠️ `.gs` の最新版を `GSE_Gate1` へ貼った（2026-08-08・実機ログで確認）
+      ★ **新しい版が動いていることの根拠**: 案内が `--range P006 P017` と**動的に**出た
+        （古い版なら `P001 P015` がハードコードで出る）
+      ★ 12 フォルダすべて `✅` = ガード 7 通過 = 「親の下にある / 名前が一致 / **共有されている**」
+        → ⚠️ **私が MCP で測った結果と GAS 側から独立に一致した**（別経路の二重確認）
+      ★ 警告ゼロ（「直近 40 人」「3 桁ゼロ埋めでない」「未用意」いずれも出ず）
+      ★ 所要 15 秒 / 12 人 = 1.25 秒/人（40 人上限でも約 50 秒・6 分制限に余裕）
+- [x] ⚠️ トリガー 3 本を確認（`onG1ConsentSubmit` / `g1AutoSendPendingMaterials` /
+      `refreshG1RunSheet`・2026-08-08）
+
+## ★★ G1 は開始可能な状態になった（2026-08-08）
+
+配布・通知・集計はすべて配備済み。⚠️ **残るのは「過去参加者に G1-C の URL を送る」だけ**である。
+
+```
+被験者が G1-C に回答
+  → 既存 P-ID を再利用（メールで引く・★ 採番しない）
+  → 受付メール 1 通（アプリ zip + G1課題文_P0NN のリンク）
+  → トラッキング行が立ち、配布フォルダURL と課題文リンク送信日が記録される
+```
+
+⚠️ 声をかける相手はロスター上 `撤回/除外` でない **P010–P014 の 5 名**が中心
+（P006–P009 は除外済み・うち 2 名は test アカウント）。★ 含めるかは研究者判断。
 - [ ] ⚠️ `git push`（deny なのでユーザーが打つ）
