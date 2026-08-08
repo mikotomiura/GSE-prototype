@@ -164,6 +164,9 @@ function App() {
   // Task C: session_meta 宣言 + ビネット導線。
   const [taskKind, setTaskKind] = useState<TaskKind>("argumentative");
   const [showVignette, setShowVignette] = useState(false);
+  // ⚠️ `import.meta.env.DEV` ではなく明示的な `VITE_GSE_DEBUG=1` で判定する
+  //   (Dashboard.tsx:224 と同じ規約。起動方法で盲検が崩れないようにするため)。
+  const debugView = import.meta.env.VITE_GSE_DEBUG === "1";
   // Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / FD2)。既定は第1週 (blind 較正)。
   // 介入有効化・較正モード・condition・label_pool はこの 1 選択から派生し、開始後はスタート
   // 画面を離れるためセッション中は変更できない (実質ロック)。
@@ -592,6 +595,10 @@ function App() {
                   borderRadius: "6px",
                   border: "2px solid #4caf50",
                   background: "rgba(76,175,80,0.25)",
+                  // ⚠️★ 文字色を明示する。ボタンは `color` を継承しないので、
+                  //   指定しないと UA 既定（ほぼ黒）が暗い背景に載って**読めなくなる**
+                  //   （2026-08-08 にスタート画面で同じ形の「空の箱」を実機で踏んだ）。
+                  color: "#e2e8f0",
                   cursor: approving ? "wait" : "pointer",
                   fontWeight: "bold",
                 }}
@@ -605,6 +612,8 @@ function App() {
                   borderRadius: "6px",
                   border: "1px solid #888",
                   background: "transparent",
+                  // ⚠️★ 同上。透明背景ならなおさら文字色を明示する。
+                  color: "#cbd5e1",
                   cursor: "pointer",
                 }}
               >
@@ -769,25 +778,24 @@ function App() {
         >
           開始する
         </button>
-        <button
-          className="start-button"
-          onClick={() => setShowVignette(true)}
-          style={{ background: "transparent", border: "1px solid #888", marginTop: "0.5rem" }}
-        >
-          尺度理解テスト (初回)
-        </button>
-        {/* ⚠️★ スタート画面にも終了を置く。**「← 戻る」でここへ来ると終了手段が無かった**
-            (2026-08-08 の指摘)。× で閉じてもプロセスは残っていたので、
-            ★ 被験者は「閉じたつもりで動き続けている」状態を作れてしまった
-            (3 時間動き続けていた実例あり)。窓側 (×)・トレイ・ここ の 3 経路とも
-            同じ Rust の終了処理 (`shutdown_and_exit`) を通る。 */}
-        <button
-          className="start-button"
-          onClick={handleQuit}
-          style={{ background: "transparent", border: "1px solid #888", marginTop: "0.5rem" }}
-        >
-          GSE を終了
-        </button>
+        {/* ⚠️★★ スタート画面には「開始する」以外のボタンを置かない (2026-08-08 の研究者指摘)。
+            ★ 実際の画面では、下に並んでいた 2 つのボタンが **中身の見えない空の箱**になっていた:
+              `.start-button` は緑地用に `color: #0f172a`（ほぼ黒）を持っているのに、
+              インラインで `background: transparent` **だけ**を上書きしていたため、
+              暗い背景に黒文字で ★ **文字が完全に見えなかった**。
+            ⚠️ 「尺度理解テスト」は `docs/functional-design.md:143` のとおり
+              **現行スコープでは延期**（比較条件を実装した段で発効）なので、被験者には出さない。
+              ★ 研究者のデバッグビルド (`VITE_GSE_DEBUG=1`) でだけ残す。
+            ⚠️ 終了ボタンはここから外した。★ **× とトレイの「GSE を終了」で終了できる**
+              ことを実機で確認済み（どちらも 2 秒でプロセスが消える）。 */}
+        {debugView && (
+          <button
+            className="start-button start-button-secondary"
+            onClick={() => setShowVignette(true)}
+          >
+            尺度理解テスト (初回・研究者用)
+          </button>
+        )}
         {startError && (
           <p className="start-error" style={{ color: '#ff6b6b', marginTop: '0.5rem', fontSize: '0.9rem' }}>
             {startError}
