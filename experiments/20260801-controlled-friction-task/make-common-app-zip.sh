@@ -150,8 +150,29 @@ ditto -x -k "$OUT/G1_実施用_macOS.zip" "$V" || die "macOS zip を展開でき
 codesign --verify --strict "$V/G1_実施用_macOS/gse-next.app" || die "展開後に署名が壊れています"
 [ -x "$V/G1_実施用_macOS/gse-next.app/Contents/MacOS/gse-next" ] || die "展開後に実行ビットが落ちています"
 [ -f "$V/G1_実施用_macOS/g1.mode" ] || die "展開後に g1.mode がありません"
+
+# ★★ 初回セットアップスクリプトが**展開後も動く**こと（2026-08-08）。
+#   ⚠️ 同梱しただけでは足りない。⚠️ zip 越しに壊れていないかは**展開して走らせないと分からない**。
+[ -f "$V/G1_実施用_macOS/初回セットアップ_mac.sh" ] || die "展開後に 初回セットアップ_mac.sh がありません"
+bash "$V/G1_実施用_macOS/初回セットアップ_mac.sh" --selftest > /dev/null \
+  || die "展開後の 初回セットアップ_mac.sh が自己検査に落ちました"
+
+# ★★ README が**被験者を守る 3 文**を落としていないこと（2026-08-08）。
+#   ⚠️ ★ 「壊れていません」「ゴミ箱に入れないで」が無いと、被験者は
+#      「壊れているため開けません」を見て **本当にゴミ箱に入れてしまう**（取り返しがつかない）。
+#   ⚠️ ★ 表記ゆれで検査が空回りしないよう、**README 側の文言をこの検査に合わせる**こと
+#      （2026-08-08 に「壊れてはいません」と書いて grep が 0 件になった）。
+R="$V/G1_実施用_macOS/README_先に読む.txt"
+for phrase in "研究者と一緒に" "壊れていません" "ゴミ箱に入れないで" "ターミナルの窓へドラッグ"; do
+  grep -q "$phrase" "$R" || die "README に「${phrase}」がありません（★ 被験者を守る文言・§2.14 第 13 版）"
+done
+# ⚠️ 旧版（A 型ダイアログ向け）の案内が戻っていないこと。★ B 型では効かない。
+for phrase in "右クリック" "開発元を確認できません"; do
+  ! grep -q "$phrase" "$R" || die "README に旧版の案内「${phrase}」が残っています（★ B 型では効かない）"
+done
+
 rm -rf "$V"
-note "macOS: 展開して検査 ✅（署名 / 実行ビット / g1.mode の位置）"
+note "macOS: 展開して検査 ✅（署名 / 実行ビット / g1.mode / セットアップ自己検査 / README 文言）"
 
 # ★ Windows zip は「Windows で化けないこと」を機械で確かめる。
 #   ⚠️ 目で見て判断しない（macOS の unzip は化けて見えても Windows では正しいことがある）。

@@ -73,7 +73,7 @@ run_setup() {
 # ★ 自己検査 — ⚠️ 検査が空回りしていないことを確かめる（対照を取る）
 # --------------------------------------------------------------------------
 selftest() {
-  local tmp fixture app rc out fails=0
+  local tmp fixture app appsdir out fails=0
   tmp=$(mktemp -d) || { echo "[NG] 作業ディレクトリを作れない"; exit 1; }
   # shellcheck disable=SC2064
   trap "rm -rf '$tmp'" EXIT
@@ -96,13 +96,25 @@ PLIST
   codesign --force --sign - "$app" 2>/dev/null || { echo "[NG] fixture に ad-hoc 署名できない"; exit 1; }
   : > "$fixture/$MARKER"
 
-  check() { # $1=期待(ok|ng) $2=説明 $3=出力
+  # ⚠️★★ NG は**理由まで**照合する。2026-08-08 に実測で踏んだ:
+  #   `/Applications` ガードを丸ごと外しても、`/Applications/gse-next.app` が
+  #   存在しないので **別の理由で NG になり、テストは緑のままだった**。
+  #   ★ 「NG になったこと」ではなく「**狙った理由で** NG になったこと」を見る。
+  #   $1=期待(ok|ng) $2=説明 $3=出力 $4=NG のとき出力に含まれるべき語（必須）
+  check() {
     if [ "$1" = ok ]; then
       case "$3" in OK:*) return 0 ;; esac
-    else
-      case "$3" in NG:*) return 0 ;; esac
+      echo "  ✗ $2 — 期待=OK 実際=「$3」"; fails=$((fails + 1)); return 1
     fi
-    echo "  ✗ $2 — 期待=$1 実際=「$3」"; fails=$((fails + 1))
+    case "$3" in
+      NG:*)
+        case "$3" in
+          *"$4"*) return 0 ;;
+          *) echo "  ✗ $2 — NG だが理由が違う（「$4」を含むはず）: 「$3」"
+             fails=$((fails + 1)); return 1 ;;
+        esac ;;
+    esac
+    echo "  ✗ $2 — 期待=NG 実際=「$3」"; fails=$((fails + 1))
   }
 
   # 1) quarantine 付き → OK になり、消えていること
@@ -117,24 +129,31 @@ PLIST
 
   # 3) ⚠️ 対照: g1.mode が無ければ NG（★ ここが効かないと §5.4-5 を素通りさせる）
   mv "$fixture/$MARKER" "$tmp/marker.bak"
-  out=$( (run_setup "$fixture") 2>&1 ); check ng "g1.mode が無ければ NG" "$out"
+  out=$( (run_setup "$fixture") 2>&1 ); check ng "g1.mode が無ければ NG" "$out" "$MARKER がこのフォルダにありません"
   mv "$tmp/marker.bak" "$fixture/$MARKER"
 
   # 4) ⚠️ 対照: アプリが無ければ NG
-  out=$( (run_setup "$tmp") 2>&1 ); check ng "アプリが無ければ NG" "$out"
+  out=$( (run_setup "$tmp") 2>&1 ); check ng "アプリが無ければ NG" "$out" "$APP_NAME がこのフォルダにありません"
 
-  # 5) ⚠️ 対照: /Applications は拒否する
-  out=$( (run_setup "/Applications") 2>&1 ); check ng "/Applications を拒否する" "$out"
+  # 5) ⚠️★★ 対照: /Applications は**ガードで**拒否する。
+  #   ⚠️ ここは「NG になること」だけを見てはならない。ガードを外しても
+  #     `/Applications/gse-next.app` が無ければ別の理由で NG になり、**空回りする**
+  #     （2026-08-08 に実測で踏んだ）。★ 理由の文言まで照合する。
+  out=$( (run_setup "/Applications") 2>&1 ); check ng "/Applications をガードで拒否する" "$out" "「アプリケーション」フォルダのアプリは対象外です"
+  # ★ さらに: /Applications に**アプリが実在しても**ガードが先に効くこと（fixture で模擬）
+  appsdir="$tmp/Applications-like"; mkdir -p "$appsdir"
+  cp -R "$app" "$appsdir/" 2>/dev/null; : > "$appsdir/$MARKER"
+  out=$( (run_setup "/Applications") 2>&1 ); check ng "アプリが実在しても /Applications は拒否" "$out" "「アプリケーション」フォルダのアプリは対象外です"
 
   # 6) ⚠️ 対照: 署名を壊したら NG（★ 検査が本当に署名を見ているか）
   echo broken >> "$app/Contents/MacOS/gse-next"
-  out=$( (run_setup "$fixture") 2>&1 ); check ng "署名が壊れていたら NG" "$out"
+  out=$( (run_setup "$fixture") 2>&1 ); check ng "署名が壊れていたら NG" "$out" "署名の検証に失敗しました"
 
   # 7) ⚠️ 対照: 存在しないフォルダは NG
-  out=$( (run_setup "$tmp/no-such-dir") 2>&1 ); check ng "存在しないフォルダは NG" "$out"
+  out=$( (run_setup "$tmp/no-such-dir") 2>&1 ); check ng "存在しないフォルダは NG" "$out" "フォルダが見つかりません"
 
   if [ "$fails" -ne 0 ]; then echo "[NG] 初回セットアップ_mac.sh --selftest: $fails 件失敗"; exit 1; fi
-  echo "[OK] 初回セットアップ_mac.sh --selftest 緑（7 項目・対照つき）"
+  echo "[OK] 初回セットアップ_mac.sh --selftest 緑（8 項目・NG は理由まで照合）"
   exit 0
 }
 
