@@ -1809,6 +1809,35 @@ fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State
     shutdown(&app, &log, &wall);
 }
 
+/// 終了処理が始まっているか。★ トレイの更新スレッドが抜けるために見る。
+pub(crate) fn is_shutting_down() -> bool {
+    SHUTTING_DOWN.load(Ordering::SeqCst)
+}
+
+/// 終了処理の権利を取る。★ 最初の 1 回だけ `true` を返す。
+///
+/// ⚠️ 終了の入口は 4 つある（画面の「セッション終了」/ スタート画面の「GSE を終了」/
+/// トレイの「終了」/ main 窓の ×）。二重に入ると、ログを閉じる待ち合わせが二重になり
+/// `exit(0)` が競合する。
+///
+/// ★ フラグを**引数で受ける**ので単体で検算できる（グローバルだとテスト順に依存する）。
+fn claim_shutdown(flag: &AtomicBool) -> bool {
+    !flag.swap(true, Ordering::SeqCst)
+}
+
+/// 終了時に「分析を起動してセッションフォルダを開く」かどうか。
+///
+/// ⚠️★ **G1（被験者の端末）ではやらない。** 被験者の画面に NDJSON の並んだフォルダが
+/// 開くのは混乱のもとであり、`behavioral_gt.py` も被験者の端末には無い。
+///
+/// ⚠️★ **セッションパスが空のときもやらない。** ロガーが開けていない場合に空文字が来ると、
+/// `Path::new("").parent()` は `Some("")` を返すので、★ **意図しないフォルダを開く**
+/// (2026-08-08 の cross-review。★ スタート画面に終了ボタンを足して
+/// 「セッション未開始のまま終了する」経路が現実的になったので、ここを塞ぐ)。
+fn wants_researcher_exit_flow(not_g1: bool, session_path: &str) -> bool {
+    not_g1 && !session_path.trim().is_empty()
+}
+
 /// ★ 終了経路の**唯一の実装**。
 ///
 /// ⚠️ 以前は `quit_app`（画面の「セッション終了」）だけがここを通っていた。
@@ -1823,9 +1852,7 @@ pub(crate) fn shutdown_and_exit(app: &tauri::AppHandle) {
 }
 
 fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>, wall: &WallServerState) {
-    // ⚠️ ★ 二重に走らせない。× を押してから急いでトレイの「終了」を押す等で
-    //   2 回入ると、ログを閉じる待ち合わせが二重になり `exit(0)` が競合する。
-    if SHUTTING_DOWN.swap(true, Ordering::SeqCst) {
+    if !claim_shutdown(&SHUTTING_DOWN) {
         tracing::info!("shutdown already in progress; ignoring the second request");
         return;
     }
@@ -1841,11 +1868,7 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>, wall: &WallServe
         (guard.current_path(), guard.shutdown_rx.clone())
     };
 
-    // ⚠️★ G1（被験者の端末）では**分析の起動とフォルダを開くのをやらない**。
-    //   ★ 被験者の画面に NDJSON の並んだフォルダが開くのは混乱のもとであり、
-    //     `behavioral_gt.py` も被験者の端末には無い（あっても走らせる意味が無い）。
-    //   ★ 通常運用（研究者の開発使い）は従来どおり analysis → フォルダ表示まで行う。
-    let researcher_flow = g1_mode().is_none();
+    let researcher_flow = wants_researcher_exit_flow(g1_mode().is_none(), &session_path);
 
     let app_handle = app.clone();
 
@@ -2915,6 +2938,49 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+
+    /// ⚠️★ 終了の入口は 4 つある（画面 / スタート画面 / トレイ / ×）。
+    /// **2 回目以降は通さない** — 通すとログを閉じる待ち合わせが二重になり `exit(0)` が競合する。
+    #[test]
+    fn only_the_first_shutdown_request_is_claimed() {
+        let flag = AtomicBool::new(false);
+        assert!(claim_shutdown(&flag), "★ 1 回目は通るはず");
+        assert!(!claim_shutdown(&flag), "★ 2 回目は弾くはず");
+        assert!(!claim_shutdown(&flag), "★ 3 回目も弾くはず");
+    }
+
+    /// ⚠️★ G1（被験者の端末）では分析起動もフォルダ表示もしない。
+    #[test]
+    fn g1_exit_never_opens_the_folder() {
+        assert!(
+            !wants_researcher_exit_flow(false, "/tmp/gse_20260808_010101.ndjson"),
+            "★ G1 なのに被験者の画面へフォルダを開こうとしている"
+        );
+    }
+
+    /// ⚠️★ セッションパスが空なら、研究者運用でも何も開かない。
+    ///
+    /// ★ `Path::new("").parent()` は `Some("")` を返すので、**意図しないフォルダが開く**。
+    /// スタート画面に終了ボタンを足したことで「未開始のまま終了」が現実的になった。
+    #[test]
+    fn empty_session_path_never_opens_the_folder() {
+        assert!(!wants_researcher_exit_flow(true, ""));
+        assert!(!wants_researcher_exit_flow(true, "   "));
+    }
+
+    /// 研究者運用 + 実パスのときだけ従来どおり動く（★ 非回帰）。
+    #[test]
+    fn researcher_flow_still_runs_for_a_real_session() {
+        assert!(wants_researcher_exit_flow(
+            true,
+            "/tmp/gse_20260808_010101.ndjson"
+        ));
+    }
 }
 
 #[cfg(test)]

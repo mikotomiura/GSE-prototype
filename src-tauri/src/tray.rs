@@ -70,6 +70,14 @@ pub fn measure_title(state: MeasureState) -> &'static str {
     }
 }
 
+/// いまの状態を 2 つの Atomic から読む。
+fn current_state(session_active: &AtomicBool) -> MeasureState {
+    measure_state(
+        session_active.load(Ordering::Acquire),
+        crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed),
+    )
+}
+
 /// メニュー項目の ID。
 const MENU_QUIT: &str = "gse-tray-quit";
 const MENU_STATUS: &str = "gse-tray-status";
@@ -85,7 +93,9 @@ const MENU_STATUS: &str = "gse-tray-status";
 /// (`crate::shutdown_and_exit`) も `AppHandle<Wry>` を取る。★ generic にすると
 /// 呼び出し側で必ず型が合わなくなる（実際に合わずに落ちた）。
 pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<()> {
-    let initial = measure_state(false, false);
+    // ★ 初期値を決め打ちにしない。⚠️ `false, false` と書くと、setup の順序が変わったときに
+    //   **最大 1 秒間だけ嘘を表示する**（2026-08-08 の cross-review）。実際の値から始める。
+    let initial = current_state(&session_active);
 
     // ★ 状態表示は**押せない項目**にする（押しても何も起きないのに押させない）。
     let status = MenuItem::with_id(
@@ -121,10 +131,13 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             let mut last = initial;
             loop {
                 std::thread::sleep(Duration::from_millis(1000));
-                let next = measure_state(
-                    session_active.load(Ordering::Acquire),
-                    crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed),
-                );
+                // ★ 終了処理が始まったら抜ける。⚠️ 落ちるまでの数百 ms のあいだ
+                //   トレイを触り続けると、破棄済みのハンドルに書きに行くことになる。
+                if crate::is_shutting_down() {
+                    tracing::info!("tray updater stopping (shutdown in progress)");
+                    return;
+                }
+                let next = current_state(&session_active);
                 if next == last {
                     continue; // ★ 変わっていないなら触らない（無用な UI 更新を出さない）
                 }
