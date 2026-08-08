@@ -1019,9 +1019,17 @@ function refreshSubmissionTab_(ss) {
   var mcheck = g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO);
 
   var sh = ss.getSheetByName(SUBMIT_TAB_NAME) || ss.insertSheet(SUBMIT_TAB_NAME);
-  sh.clear();
   var rows = submissionRows_(pids, submitted, mcheck);
   var width = rows[0].length;
+
+  // ⚠️★★ **結合を先に解く。** `clear()` は中身と書式を消すが、★ **結合は残る**。
+  //   前回 `styleSubmissionTab_` が作った B1:P1 / B2:P2 の結合が残ったまま
+  //   `setValues` すると、2 回目以降の再描画で壊れる
+  //   （2026-08-08 の cross-review で Codex が指摘。★ 順序が逆だった）。
+  //   ⚠️ このタブは毎時トリガーから何度も描き直されるので、
+  //     **2 回目が動かない = 実質いつも壊れている**ことになる。
+  unmergeAll_(sh);
+  sh.clear();
   sh.getRange(1, 1, rows.length, width).setValues(rows); // ★ 往復 1 回
   styleSubmissionTab_(sh, rows.length, width);
   Logger.log("✅ " + SUBMIT_TAB_NAME + " を描き直しました（" + pids.length + " 名）");
@@ -1035,6 +1043,21 @@ function refreshSubmissionTab() {
     return;
   }
   refreshSubmissionTab_(SpreadsheetApp.openById(ssId));
+}
+
+/**
+ * シート全体の結合を解く。★ `setValues` の**前**に呼ぶこと。
+ *
+ * ⚠️ `Sheet.clear()` は結合を残す。結合が残ったまま値を書くと、
+ * 2 回目以降の再描画が壊れる（このタブは毎時描き直される）。
+ */
+function unmergeAll_(sh) {
+  try {
+    sh.getRange(1, 1, Math.max(sh.getMaxRows(), 1), Math.max(sh.getMaxColumns(), 1)).breakApart();
+  } catch (e) {
+    // ★ 結合が 1 つも無いときは例外にしない（新規タブの初回はここを通る）
+    Logger.log("ℹ️ 結合の解除をスキップしました: " + e);
+  }
 }
 
 /** 実施トラッキングの P-ID 列を上から読む（★ ここが行の真実源）。 */
@@ -1079,7 +1102,9 @@ function submissionRows_(pids, submitted, mcheck) {
   rows.push(pad([
     "",
     submitted === null
-      ? "❌ " + G1_SUBMIT_FOLDER_PROP + " が未設定なので、提出の有無を見ていません（表は空になります）。"
+      ? "❌ " + G1_SUBMIT_FOLDER_PROP + " が未設定なので、提出の有無を**見ていません**。" +
+        "★ セルの `?` は「未提出」ではなく「分からない」です（受け口プロジェクトの FOLDER_ID を" +
+        "スクリプト プロパティに入れると埋まります）。"
       : "✅=.age 到着 ／ ▲=.age は届いたが G1-M 未回答（3〜9 のみ） ／ 空=未着",
   ]));
 
@@ -1108,9 +1133,10 @@ function submissionRows_(pids, submitted, mcheck) {
   return rows;
 }
 
-/** 1 人ぶんの行。 */
+/** 1 人ぶんの行。★ `submitted === null`（フォルダ未設定）は「未着手」と区別する。 */
 function submissionRowFor_(pid, submitted, mcheck) {
-  var rec = submitted && submitted[pid] ? submitted[pid] : null;
+  var unknown = submitted === null; // ⚠️ 「提出が無い」ではなく「見ていない」
+  var rec = !unknown && submitted[pid] ? submitted[pid] : null;
   var got = rec ? rec.blocks : [];
   var answered = (mcheck[pid] || []).map(function (s) {
     return parseInt(String(s).trim(), 10);
@@ -1120,6 +1146,13 @@ function submissionRowFor_(pid, submitted, mcheck) {
   var missing = [];
   var mMissing = [];
   for (var b = 1; b <= G1_BLOCK_COUNT; b++) {
+    // ⚠️ ★ 見ていないときは空欄ではなく `?`。**空欄は「未着」を意味してしまう**
+    //   （2026-08-08 cross-review: 凡例が「表は空になります」と言う一方で
+    //     実際は全員が「未着手」に見え、★ 研究者が「全員未提出」と誤読しうる）。
+    if (unknown) {
+      row.push("?");
+      continue;
+    }
     var has = got.indexOf(b) >= 0;
     var needsM = G1_MCHECK_BLOCKS.indexOf(b) >= 0;
     if (!has) {
@@ -1134,11 +1167,31 @@ function submissionRowFor_(pid, submitted, mcheck) {
       row.push("✅");
     }
   }
-  row.push(got.length);
+
+  if (unknown) {
+    row.push("", "", "", "", "⚠ 提出フォルダ未設定（見ていない）");
+    return row;
+  }
+
+  // ⚠️ ★ 1〜10 の外のブロック番号を数に混ぜない。`g1ParseAgeName_` の正規表現は
+  //   `block(\d{2,3})` を通すので、**壊れた名前なら 11 以上も入りうる**。
+  //   混ぜると「提出(/10)」が 10 を超えて意味を失う。★ 別枠で警告にする。
+  var inRange = got.filter(function (b) {
+    return b >= 1 && b <= G1_BLOCK_COUNT;
+  });
+  var outOfRange = got.filter(function (b) {
+    return b < 1 || b > G1_BLOCK_COUNT;
+  });
+
+  row.push(inRange.length);
   row.push(missing.length ? missing.join(",") : "");
   row.push(mMissing.length ? mMissing.join(",") : "");
   row.push(rec && rec.firstYmd ? submissionYmdLabel_(rec.firstYmd) : "");
-  row.push(submissionStatus_(got.length, mMissing.length));
+  var status = submissionStatus_(inRange.length, mMissing.length);
+  if (outOfRange.length) {
+    status += "（⚠ 範囲外のブロック: " + outOfRange.join(",") + "）";
+  }
+  row.push(status);
   return row;
 }
 
@@ -1174,11 +1227,7 @@ function styleSubmissionTab_(sh, rowCount, width) {
   // ⚠️★★ **A1 を結合に含めない。** 含めると `setFrozenColumns(1)` が
   //   「結合されたセルの一部だけを含む列を固定することはできません」で落ちる
   //   （2026-08-08 に実施トラッキングで実測した罠。★ 同じ穴を踏み直さない）。
-  try {
-    sh.getRange(1, 1, 1, Math.max(width, sh.getMaxColumns())).breakApart();
-  } catch (e) {
-    /* 結合が無ければ何もしない */
-  }
+  //   ★ 解除は `refreshSubmissionTab_` が `setValues` の**前**に済ませてある。
   if (width > 1) {
     try {
       sh.getRange(1, 2, 1, width - 1).merge();

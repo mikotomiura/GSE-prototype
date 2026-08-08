@@ -30,10 +30,12 @@ FUNCS = [
     "submissionStatus_",
     "submissionOrphans_",
 ]
+# 偽シートを使う検査で追加で切り出すもの（Spreadsheet API を呼ぶが、偽物で受けられる）
+SHEET_FUNCS = ["unmergeAll_", "styleSubmissionTab_"]
 CONSTS = ["G1_BLOCK_COUNT", "G1_MCHECK_BLOCKS", "G1_SUBMIT_FOLDER_PROP"]
 
 
-def extract(src: str) -> str:
+def extract(src: str, extra: list[str] | None = None) -> str:
     """`.gs` から定数と純関数だけを切り出す。★ 見つからなければ例外で止める（黙って空にしない）。"""
     out = []
     for name in CONSTS:
@@ -41,7 +43,7 @@ def extract(src: str) -> str:
         if not m:
             raise AssertionError(f"★ 定数 {name} が .gs に無い（切り出しが空回りする）")
         out.append(m.group(0))
-    for name in FUNCS:
+    for name in FUNCS + (extra or []):
         m = re.search(rf"^function {re.escape(name)}\(.*?^\}}", src, re.M | re.S)
         if not m:
             raise AssertionError(f"★ 関数 {name} が .gs に無い（切り出しが空回りする）")
@@ -49,9 +51,9 @@ def extract(src: str) -> str:
     return "\n".join(out)
 
 
-def run_js(src: str, script: str) -> object:
+def run_js(src: str, script: str, extra: list[str] | None = None) -> object:
     """切り出したコード + 検査スクリプトを node で走らせ、JSON を返す。"""
-    prog = extract(src) + "\n" + script
+    prog = extract(src, extra) + "\n" + script
     p = subprocess.run(
         ["node", "-e", prog], capture_output=True, text=True, timeout=60
     )
@@ -148,6 +150,178 @@ class TestSubmissionTab(unittest.TestCase):
         self.assertEqual(self.rows[0][0], "⚠", "★ A1 は目印 1 文字だけにする")
         self.assertIn("手動編集禁止", self.rows[0][1])
         self.assertEqual(self.rows[1][0], "", "★ A2 も空にする（結合の境界を跨がせない）")
+
+    def test_folder_unset_is_not_shown_as_not_started(self):
+        """⚠️★ 「見ていない」を「未提出」に見せない。
+
+        2026-08-08 の cross-review で Codex が指摘した誤読。凡例では
+        「見ていません」と言いながら、表では全員が「未着手」に見えていた。
+        """
+        rows = run_js(
+            self.src,
+            'console.log(JSON.stringify(submissionRows_(["P001"], null, {})));',
+        )
+        row = rows[3]
+        self.assertEqual(row[1:11], ["?"] * 10, "★ 未設定なのに空欄（= 未着）に見えている")
+        self.assertIn("未設定", row[15])
+        self.assertNotIn("未着手", row[15])
+
+    def test_out_of_range_blocks_do_not_inflate_the_count(self):
+        """⚠️ `block099` のような壊れた名前で「提出(/10)」が 10 を超えないこと。"""
+        rows = run_js(
+            self.src,
+            'console.log(JSON.stringify(submissionRows_(["P001"],'
+            ' {P001:{blocks:[1,2,3,99],firstYmd:"20260810"}}, {})));',
+        )
+        row = rows[3]
+        self.assertEqual(row[11], 3, "★ 範囲外のブロックが件数に混ざっている")
+        self.assertIn("範囲外", row[15])
+
+    # --- ★ 実物の制約を入れた偽シート -----------------------------------------
+
+    def test_redraw_breaks_merges_before_writing_values(self):
+        """⚠️★★ 2 回目の再描画で落ちないこと（`clear()` は結合を解かない）。
+
+        ★ 前回の教訓（`.steering/_handoff` §6-1）を実行する:
+          **実物で落ちたら、まず偽物に制約を足してから直す。**
+        ここでの偽シートは「結合が残っている範囲へ `setValues` したら落ちる」という
+        Apps Script 側の制約を持っている。★ 制約の無い偽物は緑になってしまう。
+        """
+        harness = """
+        var log = [];
+        function FakeSheet() { this.merges = []; }
+        FakeSheet.prototype.getMaxRows = function () { return 100; };
+        FakeSheet.prototype.getMaxColumns = function () { return 26; };
+        FakeSheet.prototype.setRowHeight = function () { return this; };
+        FakeSheet.prototype.setColumnWidth = function () { return this; };
+        FakeSheet.prototype.setFrozenRows = function () { return this; };
+        FakeSheet.prototype.setFrozenColumns = function (n) {
+          // ★ 実物の制約: 結合の一部だけを含む列は固定できない
+          for (var i = 0; i < this.merges.length; i++) {
+            var m = this.merges[i];
+            if (m.c <= n && m.c + m.w - 1 > n) {
+              throw new Error("結合されたセルの一部だけを含む列を固定することはできません");
+            }
+          }
+          return this;
+        };
+        FakeSheet.prototype.clear = function () { log.push("clear"); return this; };
+        var sheet = new FakeSheet();
+        function FakeRange(r, c, h, w) { this.r=r; this.c=c; this.h=h; this.w=w; }
+        FakeRange.prototype.merge = function () {
+          sheet.merges.push({ r:this.r, c:this.c, h:this.h, w:this.w });
+          log.push("merge");
+          return this;
+        };
+        FakeRange.prototype.breakApart = function () {
+          sheet.merges = [];
+          log.push("breakApart");
+          return this;
+        };
+        FakeRange.prototype.setValues = function () {
+          // ★ 実物の制約: 結合が残っている範囲へは書けない
+          if (sheet.merges.length) throw new Error("結合セルへ setValues した");
+          log.push("setValues");
+          return this;
+        };
+        ["setFontWeight","setFontColor","setBackground","setWrap","setVerticalAlignment",
+         "setHorizontalAlignment","setFontSize","setValue"].forEach(function (m) {
+          FakeRange.prototype[m] = function () { return this; };
+        });
+        FakeSheet.prototype.getRange = function (r, c, h, w) { return new FakeRange(r, c, h, w); };
+        var Logger = { log: function () {} };
+
+        // 1 回目と 2 回目を、同じシートに対して回す
+        function redraw() {
+          var rows = submissionRows_(["P001"], {P001:{blocks:[1],firstYmd:"20260810"}}, {});
+          var width = rows[0].length;
+          unmergeAll_(sheet);
+          sheet.clear();
+          sheet.getRange(1, 1, rows.length, width).setValues(rows);
+          styleSubmissionTab_(sheet, rows.length, width);
+        }
+        redraw();
+        redraw();
+        console.log(JSON.stringify(log));
+        """
+        log = run_js(self.src, harness, extra=SHEET_FUNCS)
+        self.assertEqual(log.count("setValues"), 2, "★ 2 回目の setValues に到達していない")
+        # ★ setValues の直前に必ず breakApart が来ていること
+        for i, ev in enumerate(log):
+            if ev == "setValues":
+                self.assertIn(
+                    "breakApart",
+                    log[:i],
+                    "★ setValues より前に breakApart が無い",
+                )
+
+    def test_real_code_unmerges_before_clear(self):
+        """★ 実コードの順序を静的に固定する: `unmergeAll_` → `clear` → `setValues`。
+
+        ⚠️ `clear()` は結合を解かないので、この順序が崩れると 2 回目の再描画で落ちる。
+        """
+        body = re.search(
+            r"^function refreshSubmissionTab_\(.*?^\}", self.src, re.M | re.S
+        )
+        self.assertIsNotNone(body, "★ refreshSubmissionTab_ が .gs に無い")
+        text = body.group(0)
+        i_unmerge = text.index("unmergeAll_(sh)")
+        i_clear = text.index("sh.clear()")
+        i_set = text.index(".setValues(rows)")
+        self.assertLess(i_unmerge, i_clear, "★ unmergeAll_ が clear より後にある")
+        self.assertLess(i_clear, i_set, "★ clear が setValues より後にある")
+
+    def test_fake_sheet_constraint_is_not_vacuous(self):
+        """⚠️ ★ 上の偽シートが**本当に制約を効かせている**こと。
+
+        ★ 制約の無い偽物は何でも緑にする（`.steering/_handoff` §6-1 の教訓）。
+        ここでは **わざと `unmergeAll_` を抜いた手順**を偽シートに流し、
+        2 回目で落ちることを確かめる。落ちなければ、上の検査は空回りしている。
+        ⚠️ `.gs` は変異させない（この harness は実コードの順序を使っていないため、
+        変異させても意味が無い。★ 効いているように見せない）。
+        """
+        harness_no_unmerge = """
+        var log = [];
+        function FakeSheet() { this.merges = []; }
+        FakeSheet.prototype.getMaxRows = function () { return 100; };
+        FakeSheet.prototype.getMaxColumns = function () { return 26; };
+        ["setRowHeight","setColumnWidth","setFrozenRows","setFrozenColumns"].forEach(function (m) {
+          FakeSheet.prototype[m] = function () { return this; };
+        });
+        FakeSheet.prototype.clear = function () { return this; };
+        var sheet = new FakeSheet();
+        function FakeRange(r, c, h, w) { this.r=r; this.c=c; this.h=h; this.w=w; }
+        FakeRange.prototype.merge = function () {
+          sheet.merges.push({ r:this.r, c:this.c, h:this.h, w:this.w }); return this;
+        };
+        FakeRange.prototype.breakApart = function () { sheet.merges = []; return this; };
+        FakeRange.prototype.setValues = function () {
+          if (sheet.merges.length) throw new Error("結合セルへ setValues した");
+          return this;
+        };
+        ["setFontWeight","setFontColor","setBackground","setWrap","setVerticalAlignment",
+         "setHorizontalAlignment","setFontSize","setValue"].forEach(function (m) {
+          FakeRange.prototype[m] = function () { return this; };
+        });
+        FakeSheet.prototype.getRange = function (r, c, h, w) { return new FakeRange(r, c, h, w); };
+        var Logger = { log: function () {} };
+        function redraw() {
+          var rows = submissionRows_(["P001"], {P001:{blocks:[1],firstYmd:"20260810"}}, {});
+          var width = rows[0].length;
+          sheet.clear();                                   // ★ unmergeAll_ を呼ばない
+          sheet.getRange(1, 1, rows.length, width).setValues(rows);
+          styleSubmissionTab_(sheet, rows.length, width);
+        }
+        var err = "";
+        try { redraw(); redraw(); } catch (e) { err = String(e.message); }
+        console.log(JSON.stringify({ err: err }));
+        """
+        out = run_js(self.src, harness_no_unmerge, extra=["styleSubmissionTab_"])
+        self.assertIn(
+            "結合セルへ setValues した",
+            out["err"],
+            "★ 偽シートが制約を効かせていない（この検査は空回りしている）",
+        )
 
     # --- ★ ここから「壊すと赤になるか」 -------------------------------------
 
