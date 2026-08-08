@@ -37,7 +37,7 @@ cd "$(dirname "$0")"
 
 HERE="$(pwd)"
 REPO="$(cd ../.. && pwd)"
-TAG="v0.1.23"
+TAG="v0.1.24"
 CONFIG="$REPO/g1-submit.json"
 
 die() { echo "[make-common-app-zip] ✗ $*" >&2; exit 1; }
