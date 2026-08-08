@@ -953,7 +953,8 @@ function buildManagementSheet() {
 
   buildLinksTab_(ss, props); // 毎回 URL を再集約（手動入力セルは保持する）
   buildRunTab_(ss); // 既存があれば作らない（入力データを破壊しない）
-  applyRunValidation_(ss); // 最後: ドロップダウン（型付き列に起因する読込順の事故を避ける）
+  applyRunValidation_(ss); // ドロップダウン（型付き列に起因する読込順の事故を避ける）
+  refreshSubmissionTab_(ss); // ★ 最後: 全部が導出値なので、実施トラッキングが整ってから描く
 
   ["シート1", "Sheet1"].forEach(function (n) {
     var s = ss.getSheetByName(n);
@@ -963,6 +964,251 @@ function buildManagementSheet() {
   Logger.log("✅ G1 管理シート作成/更新完了");
   Logger.log("🔗 " + ss.getUrl());
   return ss.getUrl();
+}
+
+// ============================================================
+// セッション提出トラッキング（★ 全部が導出値・手動編集禁止）
+// ============================================================
+// ⚠️★ **Phase1 の buildSubmissionTab_ をそのまま写していない。** Phase1 のそれは
+//   ヘッダ + ダミー 1 行だけの**手書き用の空タブ**で、埋めるコードがどこにも無い。
+//   ★ 無人・在宅（第 13 版）で「誰も埋めないタブ」を増やすのは、無いより悪い
+//   （見て「空だから提出ゼロ」と読み違える）。
+//
+// ★ G1 には自動化の材料が既にある:
+//     g1CollectSubmittedBlocks_()  … 受け口フォルダの `.age` を **ブロック単位**で拾う
+//     g1CountResponsesByPid_()     … G1-M に**どのブロックで**答えたかを拾う
+//   → 全部を導出する。手入力の列は **1 つも作らない**。
+//
+// ★ ここが答えるのは、19 列の「G1 実施トラッキング」が答えられないこと:
+//   「完了ブロック数(/10) = 7」の **どの 3 つが欠けているか**。
+//   ⚠️ 在宅では研究者が見ていないので、これが分からないと問い合わせ文が書けない。
+//
+// ⚠️ 行は **「G1 実施トラッキング」の P-ID から作る**（受け口フォルダからは作らない）。
+//   フォルダ側を真実源にすると、打ち間違えた P-ID がそのまま被験者として並ぶ。
+//   ★ 代わりに「シートに居ない P-ID の .age」は**別枠で警告として出す**（黙って捨てない）。
+
+var SUBMIT_TAB_NAME = "セッション提出トラッキング";
+/** G1 は **1 ブロック = 1 セッション**（ロガーがブロックごとにローテートする）。 */
+var G1_BLOCK_COUNT = 10;
+/** G1-M（ブロック直後の 1 問）を答える対象ブロック。★ 1・2・10 には比較対象が無い（§2.6）。 */
+var G1_MCHECK_BLOCKS = [3, 4, 5, 6, 7, 8, 9];
+
+/**
+ * セッション提出トラッキングを描き直す。★ 冪等（毎回まるごと再描画する）。
+ *
+ * ⚠️ ★ 往復回数を増やさない。2026-08-08 に 200 行 × 19 列を列ごとに書いて
+ *    **6 分の実行上限で落ちた**。→ 値は 1 回の setValues でまとめて書く。
+ */
+function refreshSubmissionTab_(ss) {
+  var run = ss.getSheetByName("G1 実施トラッキング");
+  if (!run) {
+    Logger.log("⚠️ 「G1 実施トラッキング」が無いので " + SUBMIT_TAB_NAME + " は描けません");
+    return;
+  }
+  try {
+    assertRunHeader_(run);
+  } catch (e) {
+    // ⚠️ ★ ヘッダがずれている状態で P-ID 列を読むと**別の列**を読む。黙って進まない。
+    Logger.log("❌ ヘッダが一致しないので " + SUBMIT_TAB_NAME + " を描きません: " +
+      String(e.message).split("\n")[0]);
+    return;
+  }
+
+  var pids = submissionPids_(run);
+  var submitted = g1CollectSubmittedBlocks_(); // null = 受け口フォルダ未設定
+  var mcheck = g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO);
+
+  var sh = ss.getSheetByName(SUBMIT_TAB_NAME) || ss.insertSheet(SUBMIT_TAB_NAME);
+  sh.clear();
+  var rows = submissionRows_(pids, submitted, mcheck);
+  var width = rows[0].length;
+  sh.getRange(1, 1, rows.length, width).setValues(rows); // ★ 往復 1 回
+  styleSubmissionTab_(sh, rows.length, width);
+  Logger.log("✅ " + SUBMIT_TAB_NAME + " を描き直しました（" + pids.length + " 名）");
+}
+
+/** 研究者が手で回すための入口（トリガーからは refreshG1RunSheet 経由で呼ばれる）。 */
+function refreshSubmissionTab() {
+  var ssId = PropertiesService.getScriptProperties().getProperty(MGMT_SHEET_PROP_G1);
+  if (!ssId) {
+    Logger.log("❌ G1 管理シートが未作成です（buildManagementSheet() を実行）");
+    return;
+  }
+  refreshSubmissionTab_(SpreadsheetApp.openById(ssId));
+}
+
+/** 実施トラッキングの P-ID 列を上から読む（★ ここが行の真実源）。 */
+function submissionPids_(run) {
+  var last = run.getLastRow();
+  if (last < 3) return [];
+  var col = runCol_("P-ID");
+  var vals = run.getRange(3, col, last - 2, 1).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var pid = String(vals[i][0]).trim().toUpperCase();
+    if (pid && out.indexOf(pid) < 0) out.push(pid);
+  }
+  return out;
+}
+
+/**
+ * 表の中身を 2 次元配列で組む。★ Spreadsheet を触らないので**単体で検算できる**
+ * （`testSubmissionRows()` が壊れた入力を通して赤を見る）。
+ *
+ * @param {string[]} pids 実施トラッキングに載っている P-ID
+ * @param {Object|null} submitted g1CollectSubmittedBlocks_() の戻り（null = フォルダ未設定）
+ * @param {Object} mcheck g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO) の戻り
+ */
+function submissionRows_(pids, submitted, mcheck) {
+  var rows = [];
+  var width = 1 + G1_BLOCK_COUNT + 5;
+
+  function pad(arr) {
+    while (arr.length < width) arr.push("");
+    return arr;
+  }
+
+  // ⚠️★ バナーの本文は **B1**（A1 ではない）。A1 に置いて折返しを付けると、
+  //   P-ID 列の幅（80px）の中で折り返されて**読めなくなる**。
+  //   ★ 実施トラッキングで実証済みの形（A1 は結合に含めず、B1 以降を結合）に揃える。
+  rows.push(pad([
+    "⚠",
+    "自動生成タブ・手動編集禁止（refreshG1RunSheet / buildManagementSheet で全再描画されます）。" +
+      "★ G1 は 1 ブロック = 1 セッション（ロガーがブロックごとにローテートする）。",
+  ]));
+  rows.push(pad([
+    "",
+    submitted === null
+      ? "❌ " + G1_SUBMIT_FOLDER_PROP + " が未設定なので、提出の有無を見ていません（表は空になります）。"
+      : "✅=.age 到着 ／ ▲=.age は届いたが G1-M 未回答（3〜9 のみ） ／ 空=未着",
+  ]));
+
+  var header = ["P-ID"];
+  for (var b = 1; b <= G1_BLOCK_COUNT; b++) header.push(("0" + b).slice(-2));
+  header.push("提出(/10)", "欠けているブロック", "G1-M 未(3〜9)", "初回提出日", "状態");
+  rows.push(header);
+
+  for (var i = 0; i < pids.length; i++) {
+    rows.push(submissionRowFor_(pids[i], submitted, mcheck));
+  }
+  if (!pids.length) rows.push(pad(["（実施トラッキングに P-ID がありません）"]));
+
+  // ⚠️★ シートに居ない P-ID の .age を**黙って捨てない**。
+  //   ★ 現実に起きる: 被験者がアプリに P-ID を打ち間違えると、その回の記録は
+  //     「誰のものか分からないまま」受け口に溜まる。ここで気づけないと永久に気づけない。
+  var orphans = submissionOrphans_(pids, submitted);
+  if (orphans.length) {
+    rows.push(pad([""]));
+    rows.push(pad(["⚠ シートに無い P-ID の .age（★ 打ち間違いを疑う）"]));
+    for (var j = 0; j < orphans.length; j++) {
+      rows.push(pad([orphans[j].pid, "", "", "", "", "", "", "", "", "", "",
+        orphans[j].blocks.length + " 本"]));
+    }
+  }
+  return rows;
+}
+
+/** 1 人ぶんの行。 */
+function submissionRowFor_(pid, submitted, mcheck) {
+  var rec = submitted && submitted[pid] ? submitted[pid] : null;
+  var got = rec ? rec.blocks : [];
+  var answered = (mcheck[pid] || []).map(function (s) {
+    return parseInt(String(s).trim(), 10);
+  });
+
+  var row = [pid];
+  var missing = [];
+  var mMissing = [];
+  for (var b = 1; b <= G1_BLOCK_COUNT; b++) {
+    var has = got.indexOf(b) >= 0;
+    var needsM = G1_MCHECK_BLOCKS.indexOf(b) >= 0;
+    if (!has) {
+      row.push("");
+      missing.push(b);
+      continue;
+    }
+    if (needsM && answered.indexOf(b) < 0) {
+      row.push("▲");
+      mMissing.push(b);
+    } else {
+      row.push("✅");
+    }
+  }
+  row.push(got.length);
+  row.push(missing.length ? missing.join(",") : "");
+  row.push(mMissing.length ? mMissing.join(",") : "");
+  row.push(rec && rec.firstYmd ? submissionYmdLabel_(rec.firstYmd) : "");
+  row.push(submissionStatus_(got.length, mMissing.length));
+  return row;
+}
+
+/** `YYYYMMDD` → `YYYY-MM-DD`（★ 壊れていれば元の文字列をそのまま出す）。 */
+function submissionYmdLabel_(ymd) {
+  var m = String(ymd).match(/^(\d{4})(\d{2})(\d{2})$/);
+  return m ? m[1] + "-" + m[2] + "-" + m[3] : String(ymd);
+}
+
+/** 状態の一言。★ 研究者が「次に何をするか」で分かれるようにする。 */
+function submissionStatus_(gotCount, mMissingCount) {
+  if (gotCount === 0) return "未着手";
+  if (gotCount < G1_BLOCK_COUNT) return "実施中 (" + gotCount + "/10)";
+  if (mMissingCount > 0) return "⚠ 10 本そろったが G1-M 不足";
+  return "完了";
+}
+
+/** シートに載っていない P-ID の提出を拾う。 */
+function submissionOrphans_(pids, submitted) {
+  var out = [];
+  if (!submitted) return out;
+  for (var pid in submitted) {
+    if (!Object.prototype.hasOwnProperty.call(submitted, pid)) continue;
+    if (pids.indexOf(pid) >= 0) continue;
+    out.push({ pid: pid, blocks: submitted[pid].blocks });
+  }
+  return out;
+}
+
+/** 見た目。★ 「G1 実施トラッキング」と同じ配色に揃える（別物に見せない）。 */
+function styleSubmissionTab_(sh, rowCount, width) {
+  var NAVY = "#1a3a5c", RED = "#b71c1c";
+  // ⚠️★★ **A1 を結合に含めない。** 含めると `setFrozenColumns(1)` が
+  //   「結合されたセルの一部だけを含む列を固定することはできません」で落ちる
+  //   （2026-08-08 に実施トラッキングで実測した罠。★ 同じ穴を踏み直さない）。
+  try {
+    sh.getRange(1, 1, 1, Math.max(width, sh.getMaxColumns())).breakApart();
+  } catch (e) {
+    /* 結合が無ければ何もしない */
+  }
+  if (width > 1) {
+    try {
+      sh.getRange(1, 2, 1, width - 1).merge();
+      sh.getRange(2, 2, 1, width - 1).merge();
+    } catch (e) {
+      Logger.log("ℹ️ バナーの結合をスキップしました: " + e);
+    }
+  }
+  sh.getRange(1, 1, 1, width).setFontWeight("bold").setFontColor("#ffffff")
+    .setBackground(RED).setWrap(true).setVerticalAlignment("middle")
+    .setHorizontalAlignment("left").setFontSize(11);
+  sh.setRowHeight(1, 34);
+  sh.getRange(2, 1, 1, width).setFontSize(10).setFontColor("#57534e")
+    .setWrap(true).setHorizontalAlignment("left");
+  sh.getRange(3, 1, 1, width).setFontWeight("bold").setFontColor("#ffffff")
+    .setBackground(NAVY).setHorizontalAlignment("center").setWrap(true);
+  sh.setFrozenRows(3);
+  // ⚠️★ バナーを A1 から結合しない（`setFrozenColumns(1)` が
+  //   「結合されたセルの一部だけを含む列を固定することはできません」で落ちる・2026-08-08 実測）。
+  sh.setFrozenColumns(1);
+  sh.setColumnWidth(1, 80);
+  for (var c = 2; c <= 1 + G1_BLOCK_COUNT; c++) sh.setColumnWidth(c, 38);
+  sh.setColumnWidth(2 + G1_BLOCK_COUNT, 80);
+  sh.setColumnWidth(3 + G1_BLOCK_COUNT, 150);
+  sh.setColumnWidth(4 + G1_BLOCK_COUNT, 120);
+  sh.setColumnWidth(5 + G1_BLOCK_COUNT, 100);
+  sh.setColumnWidth(6 + G1_BLOCK_COUNT, 190);
+  if (rowCount > 3) {
+    sh.getRange(4, 2, rowCount - 3, G1_BLOCK_COUNT).setHorizontalAlignment("center");
+  }
 }
 
 // リンク集: 3 フォームの URL を集約する。手動入力セル（B4/B5）は毎回退避して保持する。
@@ -2954,6 +3200,16 @@ function refreshG1RunSheet() {
   SpreadsheetApp.flush();
   Logger.log(touched ? "✅ " + touched + " 行を更新しました。" : "✅ 更新はありません（すべて最新）。");
   Logger.log("ℹ️ ★ 実施形態 / 撤回・除外 / 検証系の列は**人の判断**なので触りません。");
+
+  // ★ 同じ材料 (submitted / mcheck) から描けるので、ここで一緒に描き直す。
+  //   ⚠️ 別トリガーにしない — 毎時トリガーが 2 本になると互いに待って遅くなる
+  //   （2026-08-08 に g1AutoSendPendingMaterials と競合して実測）。
+  try {
+    refreshSubmissionTab_(sh.getParent());
+  } catch (e) {
+    // ⚠️ ★ 派生タブの失敗で**本体の集計を巻き添えにしない**（本体はもう書き終えている）。
+    Logger.log("⚠️ " + SUBMIT_TAB_NAME + " の再描画に失敗しました: " + e);
+  }
 }
 
 /** ★ 集計を 1 時間ごとに回す（1 回だけ実行する）。 */
