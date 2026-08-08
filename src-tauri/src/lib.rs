@@ -28,6 +28,9 @@ mod overlay_panel;
 pub mod schema_dto;
 #[cfg(target_os = "macos")]
 pub mod sensors;
+// メニューバー / タスクトレイの常駐アイコン (計測中かの表示 + いつでも終了)。
+// ⚠️ 窓を閉じると UI ごと消えるのに計測は生きている、という穴を塞ぐ。
+pub mod tray;
 pub mod wall_server;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
@@ -94,6 +97,11 @@ static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 // `force_wall` コマンドが true にし、main ウィンドウの判定が swap で消費する (ワンショット)。
 // 通常は false のまま = 既存挙動と完全同一 (pilot 非汚染)。
 static FORCE_WALL: AtomicBool = AtomicBool::new(false);
+
+// 終了処理が既に走っているか。⚠️ ★ 終了の入口は 3 つある
+// (画面の「セッション終了」/ トレイの「終了」/ main 窓の ×)。二重に走らせると
+// ログを閉じる待ち合わせが二重になり `exit(0)` が競合する。★ 最初の 1 回だけ通す。
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 // デバッグ用: 次回の get_intervention_decision (overlay) で Nudge を一度だけ強制表示するフラグ。
 // `force_nudge` コマンドが true にし、overlay ウィンドウの判定が swap で消費する (ワンショット)。
@@ -1798,6 +1806,31 @@ fn start_session(
 ///   5. セッションフォルダを Explorer で開く
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State<WallServerState>) {
+    shutdown(&app, &log, &wall);
+}
+
+/// ★ 終了経路の**唯一の実装**。
+///
+/// ⚠️ 以前は `quit_app`（画面の「セッション終了」）だけがここを通っていた。
+/// トレイの「終了」と main 窓の × も**同じ道**を通す — 経路ごとに書くと、
+/// ★ どれか 1 つだけ「ログを閉じずに落ちる」ようになる（静かに壊れる）。
+///
+/// `AppHandle` から State を引くので、コマンド以外からも呼べる。
+pub(crate) fn shutdown_and_exit(app: &tauri::AppHandle) {
+    let log = app.state::<Arc<Mutex<LogState>>>();
+    let wall = app.state::<WallServerState>();
+    shutdown(app, &log, &wall);
+}
+
+fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>, wall: &WallServerState) {
+    // ⚠️ ★ 二重に走らせない。× を押してから急いでトレイの「終了」を押す等で
+    //   2 回入ると、ログを閉じる待ち合わせが二重になり `exit(0)` が競合する。
+    if SHUTTING_DOWN.swap(true, Ordering::SeqCst) {
+        tracing::info!("shutdown already in progress; ignoring the second request");
+        return;
+    }
+    tracing::info!("shutdown requested");
+
     // WallServer を先に停止してファイアウォールルールを削除
     wall.stop();
 
@@ -1808,6 +1841,12 @@ fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State
         (guard.current_path(), guard.shutdown_rx.clone())
     };
 
+    // ⚠️★ G1（被験者の端末）では**分析の起動とフォルダを開くのをやらない**。
+    //   ★ 被験者の画面に NDJSON の並んだフォルダが開くのは混乱のもとであり、
+    //     `behavioral_gt.py` も被験者の端末には無い（あっても走らせる意味が無い）。
+    //   ★ 通常運用（研究者の開発使い）は従来どおり analysis → フォルダ表示まで行う。
+    let researcher_flow = g1_mode().is_none();
+
     let app_handle = app.clone();
 
     // バックグラウンドスレッドで分析→フォルダ表示→アプリ終了
@@ -1815,40 +1854,46 @@ fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State
         // ロガースレッドのファイルクローズを channel で安全に待機 (最大2秒)
         let _ = shutdown_rx.recv_timeout(Duration::from_millis(2000));
 
-        // behavioral_gt.py を探して実行
-        match find_behavioral_gt() {
-            Some(script) => {
-                tracing::info!("Auto-analysis: python {:?} {}", script, session_path);
-                match std::process::Command::new("python")
-                    .args([script.to_str().unwrap_or(""), &session_path])
-                    .spawn()
-                {
-                    Ok(_) => tracing::info!("behavioral_gt.py launched"),
-                    Err(e) => tracing::warn!("Failed to launch behavioral_gt.py: {}", e),
+        if researcher_flow {
+            // behavioral_gt.py を探して実行
+            match find_behavioral_gt() {
+                Some(script) => {
+                    tracing::info!("Auto-analysis: python {:?} {}", script, session_path);
+                    match std::process::Command::new("python")
+                        .args([script.to_str().unwrap_or(""), &session_path])
+                        .spawn()
+                    {
+                        Ok(_) => tracing::info!("behavioral_gt.py launched"),
+                        Err(e) => tracing::warn!("Failed to launch behavioral_gt.py: {}", e),
+                    }
+                    // Python 分析に少し時間を与えてから Explorer を開く
+                    thread::sleep(std::time::Duration::from_millis(1500));
                 }
-                // Python 分析に少し時間を与えてから Explorer を開く
-                thread::sleep(std::time::Duration::from_millis(1500));
+                None => {
+                    tracing::warn!(
+                        "behavioral_gt.py not found. Skipping auto-analysis. \
+                         Run manually: python analysis/behavioral_gt.py {}",
+                        session_path
+                    );
+                }
             }
-            None => {
-                tracing::warn!(
-                    "behavioral_gt.py not found. Skipping auto-analysis. \
-                     Run manually: python analysis/behavioral_gt.py {}",
-                    session_path
-                );
-            }
-        }
 
-        // セッションフォルダをファイルマネージャで開く
-        if let Some(folder) = Path::new(&session_path).parent() {
-            tracing::info!("Opening session folder: {:?}", folder);
-            #[cfg(target_os = "windows")]
-            {
-                let _ = std::process::Command::new("explorer").arg(folder).spawn();
+            // セッションフォルダをファイルマネージャで開く
+            if let Some(folder) = Path::new(&session_path).parent() {
+                tracing::info!("Opening session folder: {:?}", folder);
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = std::process::Command::new("explorer").arg(folder).spawn();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = std::process::Command::new("open").arg(folder).spawn();
+                }
             }
-            #[cfg(target_os = "macos")]
-            {
-                let _ = std::process::Command::new("open").arg(folder).spawn();
-            }
+        } else {
+            tracing::info!(
+                "G1 mode: skipping auto-analysis and the folder popup (participant-facing exit)"
+            );
         }
 
         thread::sleep(std::time::Duration::from_millis(200));
@@ -2007,6 +2052,8 @@ pub fn run() {
     let session_active_for_thread = session_active.clone();
     // ★ G1: ブロック自動終了スレッド用 (5 分でブロックを閉じる)。
     let session_active_for_g1 = session_active.clone();
+    // ★ トレイの状態表示用 (1Hz で読むだけ・書かない)。
+    let session_active_for_tray = session_active.clone();
 
     let initial_now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2797,7 +2844,29 @@ pub fn run() {
                     tracing::error!("Failed to convert overlay to NSPanel: {}", e);
                 }
             }
+
+            // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
+            //   (`tray.rs` のモジュールコメント参照)。★ 失敗しても起動は止めない
+            //   — トレイが出ないことより、アプリが起動しないことのほうが重い。
+            if let Err(e) = crate::tray::setup(app.handle(), session_active_for_tray) {
+                tracing::error!("Failed to build the tray icon: {}", e);
+            }
             Ok(())
+        })
+        // ⚠️★★ × で閉じたときに**プロセスを残さない**。
+        //   `lib.rs` は実行時に `overlay` 窓を作るので、main を閉じても
+        //   「全部の窓が閉じた」に到達せず、★ Tauri は終了しない。
+        //   2026-08-08 に **3 時間動き続けていた実例**（CPU 157 分・記録継続中）を見つけた。
+        //   ★ overlay の × は無視する（そもそも枠が無いが、将来 close されても道連れにしない）。
+        .on_window_event(|window, event| {
+            if !matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                return;
+            }
+            if window.label() == "overlay" {
+                return;
+            }
+            tracing::info!("main window close requested -> shutting down");
+            crate::shutdown_and_exit(window.app_handle());
         })
         .manage(engine)
         .manage(log_state)

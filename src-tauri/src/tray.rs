@@ -1,0 +1,243 @@
+//! メニューバー / タスクトレイの常駐アイコン。
+//!
+//! # なぜ要るか（★ 2 つの問題が同じ穴だった）
+//!
+//! 1. ⚠️ **窓を閉じても終了できない。** `lib.rs` は実行時に `overlay` 窓を作るので、
+//!    Tauri の「全部の窓が閉じたら終了する」に到達しない。`CloseRequested` を捌く箇所も
+//!    無かった（grep 済み）。★ 2026-08-08 に **3 時間動き続けていた `gse-next`
+//!    （CPU 157 分・`g1_mode:"marker"` のまま打鍵を記録中）** を実際に見つけた。
+//! 2. ⚠️ **計測中かどうかが分からない。** `SessionActive` も `HOOK_ACTIVE` も Rust 側にあるが、
+//!    Dashboard を開いていないと見えない。★ いちばん知りたい「窓を閉じた状態」で見えない。
+//!
+//! → ★ **窓と独立に生き続けるトレイ**に置けば両方解ける。
+//!
+//! # ⚠️ 盲検（`preregistration.md §2.12`）
+//!
+//! ★ **認知状態 (Flow / Incubation / Stuck) はここに出さない。** 出すのは
+//! 「打鍵を記録しているか」だけである。⚠️ 状態を出すと被験者に仮説が漏れる。
+//! `measure_label` が返す 3 つの文字列以外をトレイに載せないこと
+//! (`tray_labels_never_leak_cognitive_state` テストで固定してある)。
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::AppHandle;
+
+/// トレイに出す「計測の状態」。★ 認知状態ではない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MeasureState {
+    /// セッションが動いていない = 打鍵を記録していない。
+    Stopped,
+    /// セッション中で、フックも生きている = 正常に記録できている。
+    Measuring,
+    /// ⚠️ ★ セッション中なのに**フックが死んでいる**。
+    ///
+    /// macOS の CGEventTap は失効しうる (memory: `macos-tap-idle-away-probe-bug`)。
+    /// ★ 今まではこの状態を **画面を見ないと気づけなかった**（しかも気づけた例が無い）。
+    /// ⚠️ 気づかないまま続けると、そのブロックは**打鍵ゼロのまま記録される**。
+    HookDown,
+}
+
+/// 2 つの Atomic から状態を決める純関数。★ Tauri に触らないので単体で検算できる。
+pub fn measure_state(session_active: bool, hook_active: bool) -> MeasureState {
+    match (session_active, hook_active) {
+        (false, _) => MeasureState::Stopped,
+        (true, true) => MeasureState::Measuring,
+        (true, false) => MeasureState::HookDown,
+    }
+}
+
+/// トレイに出す文字列。⚠️ ★ **ここに認知状態を書かない**（盲検）。
+pub fn measure_label(state: MeasureState) -> &'static str {
+    match state {
+        MeasureState::Stopped => "GSE — 停止中（記録していません）",
+        MeasureState::Measuring => "GSE — 計測中",
+        MeasureState::HookDown => "⚠ GSE — 計測できていません（研究者に連絡してください）",
+    }
+}
+
+/// macOS のメニューバーに出す短い見出し。★ 常時見えるので最小限にする。
+///
+/// ⚠️ Windows のトレイに題名は出ない（tooltip 側で見せる）。
+pub fn measure_title(state: MeasureState) -> &'static str {
+    match state {
+        MeasureState::Stopped => "○",
+        MeasureState::Measuring => "● 計測中",
+        MeasureState::HookDown => "⚠ 計測できていません",
+    }
+}
+
+/// メニュー項目の ID。
+const MENU_QUIT: &str = "gse-tray-quit";
+const MENU_STATUS: &str = "gse-tray-status";
+
+/// トレイを作り、1Hz で状態を追う更新スレッドを起こす。
+///
+/// ★ 更新を polling にしているのは、セッションの on/off が
+/// `start_session` / ブロック自動終了 / 停止 と**複数の箇所**で切り替わるためである。
+/// ⚠️ 呼び出し側に通知を足して回ると、足し忘れた経路だけ古い表示が残る
+/// （★ 静かに間違う）。1Hz の読み取りは `FeatSnapshot` のゲートと同じ粒度で、費用も無い。
+/// ⚠️ ★ ランタイムは `Wry` に固定する（generic にしない）。
+/// `TrayIconBuilder::build` が `Manager<Wry>` を要求するうえ、終了経路
+/// (`crate::shutdown_and_exit`) も `AppHandle<Wry>` を取る。★ generic にすると
+/// 呼び出し側で必ず型が合わなくなる（実際に合わずに落ちた）。
+pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<()> {
+    let initial = measure_state(false, false);
+
+    // ★ 状態表示は**押せない項目**にする（押しても何も起きないのに押させない）。
+    let status = MenuItem::with_id(
+        app,
+        MENU_STATUS,
+        measure_label(initial),
+        false,
+        None::<&str>,
+    )?;
+    let quit = MenuItem::with_id(app, MENU_QUIT, "GSE を終了", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&status, &PredefinedMenuItem::separator(app)?, &quit])?;
+
+    let mut builder = TrayIconBuilder::with_id("gse-tray")
+        .menu(&menu)
+        .tooltip(measure_label(initial))
+        .title(measure_title(initial))
+        // ★ アイコンだけを左クリックしてもメニューを出す（macOS の既定に合わせる）。
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == MENU_QUIT {
+                tracing::info!("tray: quit requested");
+                crate::shutdown_and_exit(app);
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    let tray = builder.build(app)?;
+
+    std::thread::Builder::new()
+        .name("gse-tray".to_string())
+        .spawn(move || {
+            let mut last = initial;
+            loop {
+                std::thread::sleep(Duration::from_millis(1000));
+                let next = measure_state(
+                    session_active.load(Ordering::Acquire),
+                    crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed),
+                );
+                if next == last {
+                    continue; // ★ 変わっていないなら触らない（無用な UI 更新を出さない）
+                }
+                last = next;
+                // ⚠️ ★ 「計測できていません」は**ログにも残す**。トレイは後から読み返せない
+                //   （`gse-app.log` があれば研究者が後から追える）。
+                if next == MeasureState::HookDown {
+                    tracing::error!(
+                        "keyboard hook is down while a session is active; \
+                         keystrokes are NOT being recorded"
+                    );
+                } else {
+                    tracing::info!("tray state -> {:?}", next);
+                }
+                let _ = status.set_text(measure_label(next));
+                let _ = tray.set_tooltip(Some(measure_label(next)));
+                let _ = tray.set_title(Some(measure_title(next)));
+            }
+        })?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stopped_when_no_session_regardless_of_hook() {
+        assert_eq!(measure_state(false, false), MeasureState::Stopped);
+        assert_eq!(measure_state(false, true), MeasureState::Stopped);
+    }
+
+    #[test]
+    fn measuring_only_when_session_and_hook_are_both_up() {
+        assert_eq!(measure_state(true, true), MeasureState::Measuring);
+    }
+
+    /// ⚠️★★ ここがこの機能のいちばんの値打ち。
+    ///
+    /// セッション中にフックが死ぬ (macOS の CGEventTap 失効) と、
+    /// ★ **打鍵ゼロのブロックが静かに記録される**。今までは気づく手段が無かった。
+    #[test]
+    fn hook_down_is_distinguished_from_stopped() {
+        let s = measure_state(true, false);
+        assert_eq!(s, MeasureState::HookDown);
+        assert_ne!(
+            s,
+            MeasureState::Stopped,
+            "★ 「止めた」と「壊れている」を同じ表示にしてはならない"
+        );
+        assert!(
+            measure_label(s).contains("計測できていません"),
+            "★ 異常だと分かる言葉になっていない: {}",
+            measure_label(s)
+        );
+    }
+
+    /// ⚠️ ★ 盲検: トレイに認知状態を出さない (`preregistration.md §2.12`)。
+    ///
+    /// ★ ここを緩めると、被験者はトレイを見るだけで「いま Stuck 判定だ」と分かってしまう。
+    #[test]
+    fn tray_labels_never_leak_cognitive_state() {
+        let banned = [
+            "Flow",
+            "flow",
+            "Incubation",
+            "incubation",
+            "Stuck",
+            "stuck",
+            "フロー",
+            "インキュベーション",
+            "スタック",
+            "停滞",
+            "沈思",
+            "確率",
+            "p_",
+        ];
+        for state in [
+            MeasureState::Stopped,
+            MeasureState::Measuring,
+            MeasureState::HookDown,
+        ] {
+            for text in [measure_label(state), measure_title(state)] {
+                for word in banned {
+                    assert!(
+                        !text.contains(word),
+                        "★ トレイの文言に非開示語 {word:?} が入っている: {text:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// 3 状態が**互いに違う文言**であること（同じだと区別できない）。
+    #[test]
+    fn all_three_states_are_visually_distinct() {
+        let labels = [
+            measure_label(MeasureState::Stopped),
+            measure_label(MeasureState::Measuring),
+            measure_label(MeasureState::HookDown),
+        ];
+        let titles = [
+            measure_title(MeasureState::Stopped),
+            measure_title(MeasureState::Measuring),
+            measure_title(MeasureState::HookDown),
+        ];
+        for set in [labels, titles] {
+            assert_eq!(
+                std::collections::HashSet::from(set).len(),
+                3,
+                "★ 3 状態のうち 2 つが同じ文言になっている: {set:?}"
+            );
+        }
+    }
+}

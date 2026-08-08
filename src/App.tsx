@@ -776,6 +776,18 @@ function App() {
         >
           尺度理解テスト (初回)
         </button>
+        {/* ⚠️★ スタート画面にも終了を置く。**「← 戻る」でここへ来ると終了手段が無かった**
+            (2026-08-08 の指摘)。× で閉じてもプロセスは残っていたので、
+            ★ 被験者は「閉じたつもりで動き続けている」状態を作れてしまった
+            (3 時間動き続けていた実例あり)。窓側 (×)・トレイ・ここ の 3 経路とも
+            同じ Rust の終了処理 (`shutdown_and_exit`) を通る。 */}
+        <button
+          className="start-button"
+          onClick={handleQuit}
+          style={{ background: "transparent", border: "1px solid #888", marginTop: "0.5rem" }}
+        >
+          GSE を終了
+        </button>
         {startError && (
           <p className="start-error" style={{ color: '#ff6b6b', marginTop: '0.5rem', fontSize: '0.9rem' }}>
             {startError}
