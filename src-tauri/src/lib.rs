@@ -1,4 +1,7 @@
 pub mod analysis;
+// アプリ本体の診断ログ (tracing) をファイルに残す writer。
+// ⚠️ stdout だけだと Finder 起動の .app では**どこにも残らない** (2026-08-08 実測)。
+pub mod applog;
 // G1 統制タスク実験の「G1 モード」判定 (OS API 非依存の純ロジック + current_exe のみ)。
 // 効果 (ローテート / 5 分でのブロック終了 / プローブ停止 / 二重起動 fail-loud) は lib.rs が適用する。
 pub mod g1;
@@ -1940,7 +1943,10 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt::init();
+    // ★ `tracing` を stdout **と** ファイルの両方へ流す (`applog` のモジュールコメント参照)。
+    //   ⚠️ 旧 `tracing_subscriber::fmt::init()` は stdout だけで、Finder 起動の `.app` では
+    //   どこにも残っていなかった (2026-08-08 に実測)。
+    crate::applog::init_tracing(&crate::logger::app_log_path());
 
     // ★ G1 モードの判定 — **起動時に 1 回だけ**読む (g1.rs のモジュールコメント参照)。
     //   実行時トグルにすると、プローブスケジューラを「スレッドごと起こさない」ことで

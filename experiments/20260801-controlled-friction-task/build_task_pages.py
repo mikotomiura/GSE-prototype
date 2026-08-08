@@ -417,7 +417,11 @@ def selftest() -> int:
             fails.append(f"★ 非開示語 {token!r} が生成ページに残っている")
     # ★ 落としすぎて壊れていないこと（機能が生きているか）
     for must in ('window.G1_BLOCK = "2"', "countChars", "user-select: none", 'id="pad"',
-                 'id="count"', "beforeunload", 'id="start"', "g1-started"):
+                 'id="count"', "beforeunload", 'id="start"', "g1-started",
+                 # ⚠️★ 「開始後は未入力でも閉じる前に警告する」ガード（2026-08-08 追加）。
+                 #   ★ `"beforeunload"` があるだけでは足りない。**条件のほうが本体**である
+                 #     （以前は未入力なら黙って閉じられ、残り時間ごと消えていた）。
+                 "if (!started && pad.value.length === 0) return;"):
         if must not in page_c:
             fails.append(f"★ コメント除去で機能が壊れた: {must!r} が消えている")
     # ★ その検査が空回りしていないか: 非開示語を残したページは赤になるはず

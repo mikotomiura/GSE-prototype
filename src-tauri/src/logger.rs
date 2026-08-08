@@ -1759,12 +1759,7 @@ fn resolve_participant_id() -> String {
 /// 決定したディレクトリと参加者 ID は `tracing::info!` で常時出力する。どのセッションが
 /// どの参加者 ID でどこに書かれたかが運用ログから即確認できる。
 pub fn default_log_path() -> PathBuf {
-    let participant_id = resolve_participant_id();
-    let dir = if let Ok(dataset) = std::env::var("GSE_DATASET") {
-        PathBuf::from(dataset).join("raw").join(&participant_id)
-    } else {
-        fallback_log_dir()
-    };
+    let (dir, participant_id) = session_log_dir();
     tracing::info!(
         resolved_log_dir = %dir.display(),
         participant_id = %participant_id,
@@ -1774,6 +1769,63 @@ pub fn default_log_path() -> PathBuf {
 
     let ts = chrono_like_filename();
     dir.join(format!("gse_{}.ndjson", ts))
+}
+
+/// セッションログを置くディレクトリと、決定に使った参加者 ID を返す。
+///
+/// ⚠️ ★ **ここでは `tracing` に何も出さない**。この関数は `applog` から
+/// **subscriber を設置する前**にも呼ばれるため、ここで `info!` しても
+/// どこにも出ずに消える (それが「出ている」と誤解される)。
+/// 可観測性のためのログは呼び出し側 (`default_log_path`) が持つ。
+pub fn session_log_dir() -> (PathBuf, String) {
+    let participant_id = resolve_participant_id();
+    let dir = log_dir_for(std::env::var("GSE_DATASET").ok(), &participant_id);
+    (dir, participant_id)
+}
+
+/// 保存先ディレクトリを決める**唯一の式**。★ env を読まないので並列テストで安全。
+///
+/// ⚠️ ★ `session_log_dir()` (NDJSON) と `app_log_path()` (診断ログ) の**両方がここを通る**。
+/// 2 つの場所に同じ分岐を書くと、片方だけ直して静かにフォルダが割れる。
+fn log_dir_for(dataset: Option<String>, participant_id: &str) -> PathBuf {
+    match dataset {
+        Some(d) => PathBuf::from(d).join("raw").join(participant_id),
+        None => fallback_log_dir(),
+    }
+}
+
+/// 診断ログのファイル名。
+const APP_LOG_FILE_NAME: &str = "gse-app.log";
+
+/// アプリ本体の診断ログ (`tracing`) を書き出すファイル。
+///
+/// ★ **セッション NDJSON と同じフォルダ**に置く。理由:
+/// 1. 研究者が NDJSON を見に行く場所と同じなので、探す場所が増えない。
+///    ⚠️ ★ **被験者向けの `README_先に読む.txt` はこのフォルダに触れていない**
+///    (2026-08-08 に `dist-readme-macos.txt` を grep して確認)。
+///    → 研究者がログを取り寄せるときは**場所を伝える必要がある**。
+/// 2. `quit_app` (アプリ内の終了ボタン) がこのフォルダをファイルマネージャで開く
+///    (`lib.rs`)。⚠️ ★ ただし **× で閉じた場合はこの経路を通らない**
+///    (`windows-verification.md §4-1`)。
+/// 3. ⚠️ 収束器 (`reconcile.rs:189`) は `*.ndjson` しか拾わないので、
+///    `.log` を同居させても**提出物には混ざらない** (実装で確認済み)。
+///
+/// # ⚠️ ★ なぜ `session_log_dir()` をそのまま呼ばないのか
+///
+/// この関数は **`tracing` の購読者を設置する前**に呼ばれる。`resolve_participant_id()` には
+/// 「新しい ID を生成して `~/.gse/participant_id` に永続化し、それを `info!` で記録する」
+/// という副作用があり、⚠️ ★ **ここで先に呼ぶとその 1 行がどこにも出ないまま消える**。
+/// `GSE_DATASET` が無いとき (= 被験者の実機) は保存先が参加者 ID に依存しないので、
+/// ★ **ID を解決しない**。副作用は後続の `default_log_path()` に任せる (そこは購読者の設置後)。
+pub fn app_log_path() -> PathBuf {
+    let dataset = std::env::var("GSE_DATASET").ok();
+    let dir = match dataset {
+        // ★ ID を解決しない (上記)。保存先が ID に依存しない経路なので、
+        //   副作用 (生成 + 永続化 + その `info!`) を購読者の設置前に先取りしない。
+        None => fallback_log_dir(),
+        Some(d) => log_dir_for(Some(d), &resolve_participant_id()),
+    };
+    dir.join(APP_LOG_FILE_NAME)
 }
 
 /// 既存ファイルを踏まない次のセッションパスを返す (G1 のローテート用)。
@@ -1853,6 +1905,33 @@ fn chrono_like_filename() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- 診断ログ (gse-app.log) の置き場 ---
+
+    /// ★ 診断ログは **セッション NDJSON と同じフォルダ**に置く、が唯一の要件である。
+    ///
+    /// ⚠️ ★ `log_dir_for` を 2 か所から呼んでいるので、片方だけ直すと静かにフォルダが割れる。
+    /// ここで両分岐を突き合わせておく (env を触らないので並列テストで安全)。
+    #[test]
+    fn app_log_and_session_log_share_a_directory() {
+        // GSE_DATASET 無し (= 被験者の実機): 参加者 ID に依存しない
+        assert_eq!(log_dir_for(None, "P007"), fallback_log_dir());
+        assert_eq!(log_dir_for(None, "P999"), log_dir_for(None, "P007"));
+
+        // GSE_DATASET 有り (= 開発機): <dataset>/raw/<PID>
+        assert_eq!(
+            log_dir_for(Some("/tmp/ds".to_string()), "P007"),
+            PathBuf::from("/tmp/ds").join("raw").join("P007")
+        );
+    }
+
+    /// ⚠️ ★ 提出物に混ざらないこと。収束器 (`reconcile.rs`) は `*.ndjson` だけを拾うので、
+    /// 診断ログの名前が `.ndjson` で終わってはならない。
+    #[test]
+    fn app_log_is_not_picked_up_as_a_session_file() {
+        assert!(!APP_LOG_FILE_NAME.ends_with(".ndjson"));
+        assert!(APP_LOG_FILE_NAME.ends_with(".log"));
+    }
 
     // --- #1 層2: consumer 耐障害化 (open_log_target フォールバック) ---
 
