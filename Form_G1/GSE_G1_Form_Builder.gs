@@ -676,6 +676,154 @@ function getShortUrl_(props, key) {
   return props.getProperty(shortUrlProp_(key)) || "";
 }
 
+// ============================================================
+// ★★ 配布 URL の短縮（2026-08-08・研究者要望）
+// ============================================================
+// ⚠️ ★ **短縮は「見やすさ」のためであって、機能上の必要ではない。**
+//   実測: 受付メール中の Drive URL は text/plain でも**折り返されていない**（リンクは切れていない）。
+//
+// ⚠️★★ したがって **失敗しても絶対に止めない。生の URL に落ちる。**
+//   ★ 短縮できなかったせいでリンクが配られない、という事故を作らないためである。
+//   （`shortenFormUrls()` が「短縮したつもりでエラー文字列を配る」を警戒しているのと同じ考え）
+//
+// ★ **送信時には短縮しない。** 事前に `shortenG1DistributionUrls()` で作って
+//   Script Properties に貯めておき、送信時は**引くだけ**にする。理由:
+//   ⚠️ `onG1ConsentSubmit` は登録の瞬間に走るトリガーであり、
+//      そこで外部 API を叩くと**遅延と失敗が登録経路に乗る**。
+
+/** ★ 短縮があればそれを、無ければ生の URL を返す（⚠️ 絶対に空を返さない）。 */
+function g1ShortOr_(key, rawUrl) {
+  if (!rawUrl) return rawUrl;
+  try {
+    var s = getShortUrl_(PropertiesService.getScriptProperties(), key);
+    return s || rawUrl;
+  } catch (e) {
+    // ⚠️ ★ プロパティが読めなくても生の URL は返す。ここで例外を投げない。
+    return rawUrl;
+  }
+}
+
+/** ★ 課題ページ（被験者ごと）の短縮キー。 */
+function g1MaterialsShortKey_(pid) {
+  return "G1_MATERIALS_" + String(pid == null ? "" : pid).trim();
+}
+
+/**
+ * ★ 1 本短縮して Script Properties に保存する。
+ * @return {string} "" = 成功 / それ以外 = 失敗理由（⚠️ 呼び出し側が**握りつぶさない**）
+ */
+function g1ShortenOne_(props, apiKey, key, rawUrl) {
+  // ⚠️★ 既にあるものを上書きしない。★ 配布済みの短縮 URL を生かしたままにするため。
+  if (getShortUrl_(props, key)) return "";
+  var url =
+    XGD_ENDPOINT +
+    "?key=" + encodeURIComponent(apiKey) +
+    "&url=" + encodeURIComponent(rawUrl) +
+    "&analytics=false";
+  var res, body, json = null;
+  try {
+    res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    body = res.getContentText();
+  } catch (e) {
+    return "通信に失敗: " + e;
+  }
+  try {
+    json = JSON.parse(body);
+  } catch (e) {
+    /* JSON でない = API 側の異常 */
+  }
+  if (!json || json.status !== 200 || !json.shorturl) {
+    return "HTTP " + res.getResponseCode() + " — " +
+      (json && json.message ? json.message : String(body).slice(0, 200));
+  }
+  props.setProperty(shortUrlProp_(key), json.shorturl);
+  return "";
+}
+
+/**
+ * ★★ 配布 URL（アプリ ＋ 被験者ごとの課題ページ）を**事前に**短縮してキャッシュする。
+ *
+ * ★ 何度実行してもよい（既にあるものは触らない）。
+ * ⚠️ ★ **これを実行しなくてもメールは出る**（生の URL になるだけ）。
+ * ⚠️ 課題ページのフォルダがまだ無い P-ID は飛ばす。★ 用意してから実行し直すこと。
+ */
+function shortenG1DistributionUrls() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty(XGD_KEY_PROP);
+  if (!apiKey) {
+    Logger.log("ℹ️ " + XGD_KEY_PROP + " が未設定なので短縮しません（★ 実施には支障なし。生の URL が配られます）。");
+    return;
+  }
+
+  var done = 0, skipped = 0, failed = 0, notReady = 0;
+
+  // --- 1. アプリ配布 URL（★ 全員共通） ---
+  if (getShortUrl_(props, "G1_APP")) {
+    Logger.log("· アプリ: 既に短縮済み（" + getShortUrl_(props, "G1_APP") + "）");
+    skipped++;
+  } else {
+    var e1 = g1ShortenOne_(props, apiKey, "G1_APP", G1_APP_DOWNLOAD_URL);
+    if (e1) { Logger.log("❌ アプリ: " + e1); failed++; }
+    else { Logger.log("✅ アプリ: " + getShortUrl_(props, "G1_APP")); done++; }
+  }
+
+  // --- 2. 課題ページ（★ 被験者ごと） ---
+  var pids = [];
+  try {
+    var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+    pids = roster ? g1RosterParticipantIds_(roster) : [];
+  } catch (e) {
+    Logger.log("❌ ロスターを読めません: " + e);
+    return;
+  }
+  if (!pids.length) {
+    Logger.log("⚠️ ロスターに P-ID が 1 つもありません（★ 管理シートを取り違えていないか確認）。");
+  }
+
+  for (var i = 0; i < pids.length; i++) {
+    var pid = pids[i];
+    var k = g1MaterialsShortKey_(pid);
+    if (getShortUrl_(props, k)) { skipped++; continue; }
+    var found = g1MaterialsUrlForPid_(pid);
+    if (!found.url) {
+      Logger.log("· " + pid + ": まだ用意できていないので飛ばす（" + found.problem + "）");
+      notReady++;
+      continue;
+    }
+    var err = g1ShortenOne_(props, apiKey, k, found.url);
+    if (err) { Logger.log("❌ " + pid + ": " + err); failed++; }
+    else { Logger.log("✅ " + pid + ": " + getShortUrl_(props, k)); done++; }
+  }
+
+  Logger.log("--------");
+  Logger.log("★ 新規 " + done + " 件 / 既存 " + skipped + " 件 / 未用意 " + notReady + " 件 / 失敗 " + failed + " 件");
+  if (failed) {
+    Logger.log("⚠️ ★ 失敗した分は**生の URL で配られます**（リンクは切れません）。直したら実行し直してください。");
+  }
+  if (notReady) {
+    Logger.log("⚠️ ★ 未用意の分は課題フォルダを作ってから実行し直してください。");
+  }
+  Logger.log("★ 実際の本文は previewRegisterAckEmail() で確かめること。");
+}
+
+/**
+ * ⚠️ 短縮 URL を捨てて作り直せるようにする（★ **配布前にだけ**使うこと）。
+ * ⚠️★ 既に配ったメールの短縮 URL は x.gd 側に残るので**生きたまま**である。
+ *   ここで消えるのは「次に送るメールが引く先」だけである。
+ */
+function clearG1DistributionShortUrls() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties();
+  var n = 0;
+  for (var name in all) {
+    if (name === shortUrlProp_("G1_APP") || name.indexOf(shortUrlProp_("G1_MATERIALS_")) === 0) {
+      props.deleteProperty(name);
+      n++;
+    }
+  }
+  Logger.log("🧹 配布 URL の短縮を " + n + " 件消しました。⚠️ 既に配った URL は生きたまま残ります。");
+}
+
 /**
  * ★ 3 フォームの「回答用 URL」を x.gd で短縮し、Script Properties に保存する。
  *
@@ -1550,10 +1698,14 @@ function g1RegisterAckBody_(pid, materialsUrl) {
   //    ★ どちらの場合も §2.12 は守る: 本文に**題材名・課題の型・条件名・提示順を書かない**。
   //      書くのはリンクだけで、中身はリンク先にある。
   var hasMaterials = !!materialsUrl;
+  // ★★ 2026-08-08: 短縮があれば短縮を出す（無ければ生の URL）。
+  //   ⚠️ ★ 短縮は `shortenG1DistributionUrls()` で**事前に**作る。ここでは引くだけである
+  //      （送信時に外部 API を叩くと、遅延と失敗が登録経路に乗るため）。
+  var materialsLink = g1ShortOr_(g1MaterialsShortKey_(pid), materialsUrl);
   var materialsBlock = hasMaterials
     ? [
         "■ あなた専用の課題ページ（★ アプリと同じフォルダに入れてください）",
-        "    " + materialsUrl,
+        "    " + materialsLink,
         "    1. このリンクを開き、block01.html … を **すべて** 保存します",
         // ⚠️★ 2026-08-08 訂正: 「アプリのフォルダ」は **展開して初めてできる**。
         //   展開前は zip ファイルしかないので、指す先が無い案内になっていた。
@@ -1611,7 +1763,8 @@ function g1RegisterAckBody_(pid, materialsUrl) {
     //   ⚠️ ★ **展開の指示はメールにしか置けない。** README_先に読む.txt は zip の**中**にあり、
     //     展開する前の被験者には読めないからである。
     "■ アプリのご用意（★ 当日までにお願いします）",
-    "    " + G1_APP_DOWNLOAD_URL,
+    // ★ 短縮があれば短縮（無ければ生）。⚠️ 事前に shortenG1DistributionUrls() で作る。
+    "    " + g1ShortOr_("G1_APP", G1_APP_DOWNLOAD_URL),
     "    ・「G1_実施用_Windows.zip」と「G1_実施用_macOS.zip」の 2 つがあります。",
     "      ★ **お使いのほうだけ**をダウンロードしてください（両方は要りません）。",
     "    ・★ ダウンロードしたら、**展開（解凍）してください**。",

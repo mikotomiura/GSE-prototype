@@ -43,7 +43,16 @@ MATERIALS = REPO / "experiments" / "20260801-controlled-friction-task" / "materi
 
 # GAS のグローバルを最小限スタブして、本文生成関数だけを評価する。
 HARNESS = r"""
-var PropertiesService = { getScriptProperties: function () { return { getProperty: function () { return null; },
+// ★★ 2026-08-08: 短縮 URL の**両方の分岐**を試せるようにする。
+//   ⚠️ 既定は null（＝短縮なし＝生の URL に落ちる側）。__SHORT_MODE__ が "1" のときだけ
+//      SHORTURL_* に短縮を返す。★ 片方だけ試すと、もう片方が壊れても緑になる。
+var __SHORT_MODE__ = "__SHORTMODE__";
+var PropertiesService = { getScriptProperties: function () { return {
+  getProperty: function (k) {
+    if (__SHORT_MODE__ !== "1") return null;
+    if (String(k).indexOf("SHORTURL_") === 0) return "https://x.gd/SHORT" + String(k).length;
+    return null;
+  },
   setProperty: function () {} }; } };
 var SpreadsheetApp = { openById: function () { throw new Error("not used"); } };
 var FormApp = { openById: function () { throw new Error("not used"); },
@@ -149,11 +158,14 @@ def topic_titles() -> list[str]:
     return out
 
 
-def run_gas() -> dict:
+def run_gas(short_mode: str = "0") -> dict:
     src = GAS.read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as td:
         js = pathlib.Path(td) / "harness.js"
-        js.write_text(HARNESS.replace("__GAS_SOURCE__", src), encoding="utf-8")
+        js.write_text(
+            HARNESS.replace("__GAS_SOURCE__", src).replace("__SHORTMODE__", short_mode),
+            encoding="utf-8",
+        )
         r = subprocess.run(["node", str(js)], capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(
@@ -301,6 +313,34 @@ def main() -> int:
                     "★ 第 13 版（§2.14）: 初回起動は同席であること、"
                     "「壊れている」表示は故障ではないこと、ゴミ箱に入れないことを必ず書く"
                 )
+
+    # ★★ 2026-08-08: 短縮 URL の**両分岐**を検査する（研究者要望で導入）。
+    #   ⚠️ 上の bodies は短縮なし（フォールバック側）である。★ そちらは生の URL が出ること、
+    #      短縮ありのときは**短縮が出ること**を、それぞれ確かめる。
+    #   ⚠️ 片方だけ見ると、もう片方が壊れても緑になる。
+    for label in ("受付メール(用意済み)", "課題ページメール"):
+        if "https://example.com" not in bodies[label]:
+            fails.append(
+                f"{label}: 短縮が無いときに生の URL へフォールバックしていない。"
+                "★ 短縮できなくてもリンクは配られなければならない"
+            )
+    short = run_gas("1")
+    short_bodies = {
+        "受付メール(未用意)": short["ack"],
+        "受付メール(用意済み)": short["ackWithMaterials"],
+    }
+    for label, b in short_bodies.items():
+        if "https://x.gd/SHORT" not in b:
+            fails.append(
+                f"{label}: 短縮 URL があるのに本文へ反映されていない"
+                "（★ g1ShortOr_ を通していない箇所がある）"
+            )
+    # ★ 用意済みの分岐では、短縮が出るなら**生の Drive URL は出ない**こと（二重掲載の防止）
+    if "https://example.com/folder" in short["ackWithMaterials"]:
+        fails.append(
+            "受付メール(用意済み): 短縮があるのに生の URL も残っている"
+            "（★ どちらを開けばよいか分からなくなる）"
+        )
 
     if fails:
         print("[NG] メールが §2.12（第 11 版）の開示範囲・撤回後の文言から外れている")
