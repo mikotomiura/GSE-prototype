@@ -163,16 +163,36 @@ pub fn spawn(path: &Path) -> io::Result<AppLogMaker> {
         .spawn(move || {
             let mut reported: u64 = 0;
             while let Ok(chunk) = rx.recv() {
-                // ⚠️ ★ 捨てた件数を**黙って捨てない**。次に書けたときに 1 行残す
+                // ⚠️ ★ 失敗を**黙って捨てない**。書けたときに 1 行残す
                 //   (`silent-failure-in-guard-scripts` の教訓: 黙って落ちる経路を作らない)。
-                let now = dropped_for_thread.load(Ordering::Relaxed);
-                if now > reported {
-                    let note = format!(
-                        "[applog] {} log line(s) were dropped (writer queue full)\n",
-                        now - reported
-                    );
+                //
+                // ⚠️★★ ここで `tracing::warn!` を使ってはならない。この関数は購読者の
+                //   書き込み先そのものなので、warn がまた chunk になって戻ってくる
+                //   (失敗が続くと自分で自分に餌をやり続ける)。★ ファイルに直接書く。
+                let dropped_now = dropped_for_thread.load(Ordering::Relaxed);
+                let (failed_now, recreated_now) = sink.take_notes();
+                if dropped_now > reported || failed_now > 0 || recreated_now > 0 {
+                    let mut note = String::new();
+                    if dropped_now > reported {
+                        note.push_str(&format!(
+                            "[applog] {} log line(s) were dropped (writer queue full)\n",
+                            dropped_now - reported
+                        ));
+                        reported = dropped_now;
+                    }
+                    if failed_now > 0 {
+                        note.push_str(&format!(
+                            "[applog] {failed_now} write/rotate failure(s) since the last note \
+                             (the log may be incomplete or over its size cap)\n"
+                        ));
+                    }
+                    if recreated_now > 0 {
+                        note.push_str(&format!(
+                            "[applog] the log file was missing and got recreated {recreated_now} \
+                             time(s); earlier lines are in a deleted or moved file\n"
+                        ));
+                    }
                     let _ = sink.write_all(note.as_bytes());
-                    reported = now;
                 }
                 let _ = sink.write_all(&chunk);
             }
@@ -187,26 +207,71 @@ struct Sink {
     path: PathBuf,
     file: File,
     written: u64,
+    /// 前回の報告以降に起きた書き込み/世代交代の失敗数。★ 0 にはせず、書けたときに吐き出す。
+    failures: u64,
+    /// 前回の報告以降に「ファイルが消えていたので作り直した」回数。
+    recreated: u64,
 }
 
 impl Sink {
     fn open(path: PathBuf) -> io::Result<Self> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let file = append_file(&path)?;
+        let file = open_at(&path)?;
         let written = file.metadata().map(|m| m.len()).unwrap_or(0);
         Ok(Self {
             path,
             file,
             written,
+            failures: 0,
+            recreated: 0,
         })
     }
 
+    /// たまっている件数を取り出して 0 に戻す。返り値は (失敗, 作り直し)。
+    fn take_notes(&mut self) -> (u64, u64) {
+        (
+            std::mem::take(&mut self.failures),
+            std::mem::take(&mut self.recreated),
+        )
+    }
+
     fn write_all(&mut self, data: &[u8]) -> io::Result<()> {
-        if self.written + data.len() as u64 > MAX_BYTES {
-            self.rotate()?;
+        // ⚠️★★ **書く前にパスを見る。** Unix では unlink されたファイルに書いても
+        //   **成功してしまう** ので、⚠️ 書き込みエラーでは「消された」に気づけない
+        //   (2026-08-08 に T6 を書いて実測。エラー時の再試行だけでは赤のままだった)。
+        //   → 以後ずっと 0 行になるのを防ぐため、★ パスの有無で判定して開き直す。
+        //   ★ この stat は**書き込みスレッドの中**なので、フックのコールバックには乗らない。
+        if !self.path.exists() {
+            match open_at(&self.path) {
+                Ok(f) => {
+                    self.file = f;
+                    self.written = 0;
+                    self.recreated += 1;
+                }
+                Err(_) => self.failures += 1,
+            }
         }
+        if self.written + data.len() as u64 > MAX_BYTES {
+            self.rotate();
+        }
+        match self.write_raw(data) {
+            Ok(()) => Ok(()),
+            Err(first) => {
+                // ⚠️ ★ **1 度だけ開き直して試し直す** (ハンドルが壊れただけなら直る)。
+                //   ディスクフルや権限変更なら 2 度目も失敗して Err が返る。
+                self.failures += 1;
+                match open_at(&self.path) {
+                    Ok(f) => {
+                        self.file = f;
+                        self.written = 0;
+                        self.write_raw(data)
+                    }
+                    Err(_) => Err(first),
+                }
+            }
+        }
+    }
+
+    fn write_raw(&mut self, data: &[u8]) -> io::Result<()> {
         self.file.write_all(data)?;
         // ★ 毎回 flush する。⚠️ 診断ログは「落ちる直前の 1 行」がいちばん要る。
         //   バッファに抱えたまま異常終了すると、**いちばん読みたい行だけが消える**。
@@ -216,17 +281,43 @@ impl Sink {
     }
 
     /// `gse-app.log` → `gse-app.log.1` へ 1 世代だけ回す (旧 `.1` は捨てる)。
-    fn rotate(&mut self) -> io::Result<()> {
+    ///
+    /// ⚠️ ★ 失敗しても**書き続ける**ほうが安全である (ログが伸びるだけで実施は止まらない)。
+    /// ただし ★ **黙って上限を破らない** — 失敗を数えて次に書けたときに 1 行残す。
+    ///
+    /// ★ 「開いたままの rename は Windows で失敗する」という懸念 (2026-08-08 の Codex レビュー)
+    /// は**この形では成立しない**: Rust std は Windows で `FILE_SHARE_DELETE` を含む
+    /// share mode で開く (`library/std/src/sys/fs/windows.rs:206` を確認済み) ので、
+    /// 自分が開いているファイルの rename は通る。★ それでも失敗しうる経路
+    /// (別プロセスのハンドル・権限) は残るので、数えて報告する形にしてある。
+    fn rotate(&mut self) {
         let mut backup = self.path.clone().into_os_string();
         backup.push(".1");
         let backup = PathBuf::from(backup);
-        // rename が失敗しても**書き続ける**ほうが安全 (ログが伸びるだけで実施は止まらない)。
-        if std::fs::rename(&self.path, &backup).is_ok() {
-            self.file = append_file(&self.path)?;
-            self.written = 0;
+        if std::fs::rename(&self.path, &backup).is_err() {
+            self.failures += 1;
+            return;
         }
-        Ok(())
+        match open_at(&self.path) {
+            Ok(f) => {
+                self.file = f;
+                self.written = 0;
+            }
+            // ★ 開き直せなかった: 旧ハンドル (= 今は `.1`) にそのまま書き続ける。
+            //   ⚠️ 消えるよりは残るほうがよい。失敗は数える。
+            Err(_) => self.failures += 1,
+        }
     }
+}
+
+/// 親ディレクトリごと用意して追記モードで開く。
+///
+/// ★ フォルダごと消された場合も直せるように、**開き直しの経路もここを通す**。
+fn open_at(path: &Path) -> io::Result<File> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    append_file(path)
 }
 
 /// 追記モードで開く。⚠️ ★ `truncate` しない (前回の起動のログを消さない)。
@@ -391,6 +482,55 @@ mod tests {
         assert!(
             dropped.load(Ordering::Relaxed) > 0,
             "捨てたのに件数が数えられていない"
+        );
+    }
+
+    /// T6: ★ **外からファイルを消されても、次の行から書き直せる。**
+    ///
+    /// ⚠️ これは机上の心配ではない: ログの置き場はセッション NDJSON と同じフォルダで、
+    /// 被験者が「古いものを片付ける」つもりで消しうる。★ 黙って以後 0 行になってはならない。
+    #[test]
+    fn recovers_when_the_file_is_deleted_underneath() {
+        let dir = tmpdir("t6");
+        let path = dir.join("gse-app.log");
+        let maker = spawn(&path).unwrap();
+        send(&maker, "before delete\n");
+        assert!(wait_until(|| std::fs::read_to_string(&path)
+            .map(|s| s.contains("before delete"))
+            .unwrap_or(false)));
+
+        std::fs::remove_file(&path).unwrap();
+        send(&maker, "after delete\n");
+
+        assert!(
+            wait_until(|| std::fs::read_to_string(&path)
+                .map(|s| s.contains("after delete"))
+                .unwrap_or(false)),
+            "★ 消された後に書き直せていない (以後ずっと 0 行になる)"
+        );
+    }
+
+    /// T7: 世代交代に失敗しても**黙って上限を破らない** (失敗が 1 行残る)。
+    ///
+    /// ⚠️ `.1` を **ディレクトリ**にしておくと rename が必ず失敗する
+    /// (★ 権限をいじるより移植性が高い作り方)。
+    #[test]
+    fn reports_when_rotation_fails() {
+        let dir = tmpdir("t7");
+        let path = dir.join("gse-app.log");
+        std::fs::create_dir(dir.join("gse-app.log.1")).unwrap(); // rename を必ず失敗させる
+        std::fs::write(&path, vec![b'x'; MAX_BYTES as usize - 8]).unwrap();
+
+        let maker = spawn(&path).unwrap();
+        send(&maker, "over the limit\n");
+        send(&maker, "next line carries the note\n");
+
+        assert!(
+            wait_until(|| std::fs::read_to_string(&path)
+                .map(|s| s.contains("write/rotate failure(s)"))
+                .unwrap_or(false)),
+            "★ 世代交代に失敗したのに黙っている: {:?}",
+            std::fs::read_to_string(&path).map(|s| s.len()).unwrap_or(0)
         );
     }
 
