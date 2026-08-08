@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -38,19 +39,35 @@ import sys
 import tempfile
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-GAS = REPO / "Form_G1" / "GSE_G1_Form_Builder.gs"
+# ★ 検査対象は通常 repo の .gs である。⚠️ `G1_GAS_PATH` で差し替えられるのは
+#   **この検査自体が空回りしていないか**を試すため（scripts/tests/test_check_g1_emails.py が、
+#   コピーを壊して「赤くなること」を確かめる）。★ 本番の実行では設定しない。
+GAS = pathlib.Path(os.environ.get("G1_GAS_PATH") or REPO / "Form_G1" / "GSE_G1_Form_Builder.gs")
 MATERIALS = REPO / "experiments" / "20260801-controlled-friction-task" / "materials"
 
 # GAS のグローバルを最小限スタブして、本文生成関数だけを評価する。
 HARNESS = r"""
 // ★★ 2026-08-08: 短縮 URL の**両方の分岐**を試せるようにする。
-//   ⚠️ 既定は null（＝短縮なし＝生の URL に落ちる側）。__SHORT_MODE__ が "1" のときだけ
+//   ⚠️ 既定は null（＝短縮なし＝生の URL に落ちる側）。__MODE__ が "1" のときだけ
 //      SHORTURL_* に短縮を返す。★ 片方だけ試すと、もう片方が壊れても緑になる。
-var __SHORT_MODE__ = "__SHORTMODE__";
+//   ★★ 2026-08-08 追加: フォームの回答 URL は **3 段**に落ちる（g1FormLink_）。
+//      短縮 → publishedUrl → フォーム ID から組み立て。⚠️ ★ 3 段あるなら 3 段とも試す。
+//      "2" = publishedUrl だけがある状態（＝短縮をまだ作っていない実運用の初期状態）。
+var __MODE__ = "__SHORTMODE__";
 var PropertiesService = { getScriptProperties: function () { return {
   getProperty: function (k) {
-    if (__SHORT_MODE__ !== "1") return null;
-    if (String(k).indexOf("SHORTURL_") === 0) return "https://x.gd/SHORT" + String(k).length;
+    k = String(k);
+    // ★ キーごとに違う値を返す（同じ値だと M と S の取り違えを検査できない）。
+    if (__MODE__ === "1" && k.indexOf("SHORTURL_") === 0) {
+      return "https://x.gd/SHORT-" + k.slice("SHORTURL_".length);
+    }
+    if (__MODE__ === "2" && k.indexOf("FORMURL_") === 0) {
+      return JSON.stringify({
+        publishedUrl: "https://docs.google.com/forms/d/e/PUBLISHED-" +
+          k.slice("FORMURL_".length) + "/viewform",
+        editUrl: "", title: "", label: "",
+      });
+    }
     return null;
   },
   setProperty: function () {} }; } };
@@ -103,11 +120,55 @@ def check_run_columns() -> list[str]:
     referenced = re.findall(r'(?:runCol_|apply)\(\s*"([^"]+)"', text)
     if not referenced:
         return ["列名の参照が 1 つも見つからない（検査が空回りしている疑い）"]
-    return [
+    out = [
         f'列 "{r}" の参照が RUN_HEADER に無い（列名を変えたら参照側も直す）'
         for r in sorted(set(referenced))
         if r not in headers
     ]
+
+    # ★★ 2026-08-08: 移行表と列幅も**ヘッダ名で引く**ので、同じ落とし穴がある。
+    #   ⚠️ 綴りがずれても例外は出ない。★ 「静かに何もしない」だけである
+    #      （列幅なら見た目が崩れるだけだが、移行表なら**列が直らないまま緑**になる）。
+    for name, pattern in (
+        ("列幅 (styleRunTab_ の WIDTHS)", r"var\s+WIDTHS\s*=\s*\{(.*?)\}\s*;"),
+        ("移行の改名 (RUN_MIGRATION_RENAMES)", r"var\s+RUN_MIGRATION_RENAMES\s*=\s*\[(.*?)\]\s*;"),
+        ("移行の追加 (RUN_MIGRATION_ADDS)", r"var\s+RUN_MIGRATION_ADDS\s*=\s*\[(.*?)\]\s*;"),
+        ("移行の値 (RUN_MIGRATION_VALUES)", r"var\s+RUN_MIGRATION_VALUES\s*=\s*\[(.*?)\]\s*;"),
+    ):
+        m2 = re.search(pattern, text, re.S)
+        if not m2:
+            out.append(f"{name} が見つからない（検査が空回りしている疑い）")
+            continue
+        block = m2.group(1)
+        if name.startswith("列幅"):
+            # WIDTHS はすべて実在の列であること（★ 逆に、全列に幅があることも見る）
+            keys = re.findall(r'"([^"]+)"\s*:', block)
+            out += [f'列幅 "{k}" が RUN_HEADER に無い（改名の取り残し）' for k in keys if k not in headers]
+            out += [f'列 "{h}" の幅が WIDTHS に無い（新しい列を足したら幅も足す）'
+                    for h in headers if h not in keys]
+        elif "改名" in name:
+            # ★ 改名の **右側**（新しい名前）は RUN_HEADER に在るはず。左側（旧名）は在ってはならない。
+            for old, new in re.findall(r'\[\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\]', block):
+                if new not in headers:
+                    out.append(f'移行の改名先 "{new}" が RUN_HEADER に無い')
+                if old in headers:
+                    out.append(f'移行の改名元 "{old}" が RUN_HEADER に残っている（改名し忘れ）')
+        else:
+            for k in re.findall(r'(?:name|col|after)\s*:\s*"([^"]+)"', block):
+                if k not in headers:
+                    out.append(f'{name} が参照する列 "{k}" が RUN_HEADER に無い')
+
+    # ★ 削除した列が、コードのどこかで参照されたまま残っていないか。
+    m3 = re.search(r"var\s+RUN_MIGRATION_DROPS\s*=\s*\[(.*?)\]\s*;", text, re.S)
+    if not m3:
+        out.append("移行の削除 (RUN_MIGRATION_DROPS) が見つからない（検査が空回りしている疑い）")
+    else:
+        for dropped in re.findall(r'"([^"]+)"', m3.group(1)):
+            if dropped in headers:
+                out.append(f'削除したはずの列 "{dropped}" が RUN_HEADER に残っている')
+            if f'runCol_("{dropped}")' in text:
+                out.append(f'削除した列 "{dropped}" を runCol_ が参照している（実行時に例外になる）')
+    return out
 
 
 
@@ -155,6 +216,17 @@ def topic_titles() -> list[str]:
         m = re.search(r"^title:\s*(.+?)\s*$", p.read_text(encoding="utf-8"), re.M)
         if m:
             out.append(m.group(1))
+    return out
+
+
+def gas_constants(*names: str) -> dict[str, str]:
+    """★ .gs の `var NAME = "…";` を読む（検査側にハードコードを増やさないため）。"""
+    text = GAS.read_text(encoding="utf-8")
+    out = {}
+    for n in names:
+        m = re.search(r"var\s+" + re.escape(n) + r'\s*=\s*"([^"]+)"', text)
+        if m:
+            out[n] = m.group(1)
     return out
 
 
@@ -216,9 +288,14 @@ def main() -> int:
                 fails.append(f'課題の型を示す表現 "{token}" が{label}にある（§2.12）')
 
     # ★ 条件名・構成概念
+    # ⚠️★ 2026-08-08: "HI" / "LO" は **2 文字の英大文字**なので、本文に載る **URL の不透明な ID**
+    #    と衝突する（実測: フォーム ID `…7ZSVMHIA` の末尾が "HI" に当たって赤くなった）。
+    #    ★ 条件名は**散文**に書かれていないかを見たいので、URL を除いてから検査する。
+    #    ⚠️ 除くのは URL だけである（散文中の "HI 条件" は今までどおり捕まる）。
     for label, b in bodies.items():
+        prose = re.sub(r"https?://\S+", " ", b)
         for token in ("HI", "LO", "摩擦", "仮説", "判定基準"):
-            if token in b:
+            if token in prose:
                 fails.append(f'"{token}" が{label}にある（§2.12 / protocol.md §4.3）')
 
     # ★★ 紙署名は 2026-08-03 に廃止した（D-1(a)）。G1-C の回答が同意の正本である。
@@ -314,6 +391,42 @@ def main() -> int:
                     "「壊れている」表示は故障ではないこと、ゴミ箱に入れないことを必ず書く"
                 )
 
+    # ★★★ 2026-08-08 新設: **G1-M / G1-S へたどり着けること**。
+    #   ⚠️ ★ これが無かったせいで、受付メール・README・blockNN.html のどこにも
+    #      リンクが無い状態が **P009 の実施まで気づかれなかった**（G1-M 回答数 = 0）。
+    #      ★ 機械検査・文書検査がすべて緑でも、被験者が完走できるとは限らない。
+    #   ⚠️ ★ **リンクの有無だけを見ない。** 位置づけ（いつ・何回・どう開くか）が
+    #      書かれていることまで見る。リンクだけ貼っても被験者は使い分けられない。
+    fid = gas_constants("FORM_ID_MCHECK", "FORM_ID_SURVEY")
+    for k in ("FORM_ID_MCHECK", "FORM_ID_SURVEY"):
+        if k not in fid:
+            fails.append(f"{k} を .gs から読めない（検査が空回りしている疑い）")
+    ROUTING_MUST = (
+        "参加登録・ご同意",          # (1) が済んでいること
+        "3 回目〜9 回目",            # (2) いつ
+        "計 7 回",                   # (2) 何回
+        "ブロック番号",              # ★ フォーム側の呼び方との橋渡し（§2.6 の設問は凍結）
+        "別のタブ",                  # ★ protocol.md §3.1b（記入画面を切り替えない）
+        "1 回だけ",                  # (2) 二重送信しない / (3) 1 回
+        "10 回すべてが終わったあと",  # (3) いつ
+    )
+    for label in ("受付メール(未用意)", "受付メール(用意済み)"):
+        b = bodies[label]
+        for must in ROUTING_MUST:
+            if must not in b:
+                fails.append(
+                    f'{label}に "{must}" が無い。'
+                    "★ 3 つのフォームの位置づけ（いつ・何回・どう開くか）を書く"
+                )
+        # ★ リンクそのもの。⚠️ 短縮もプロパティも無いとき（= この検査の既定モード）は
+        #   フォーム ID から組み立てた URL になる。★ **空にならないこと**が要件である。
+        for name, key in (("G1-M", "FORM_ID_MCHECK"), ("G1-S", "FORM_ID_SURVEY")):
+            if fid.get(key) and fid[key] not in b:
+                fails.append(
+                    f"{label}に {name} のリンクが無い。"
+                    "★ 在宅の被験者はここからしかフォームに到達できない"
+                )
+
     # ★★ 2026-08-08: 短縮 URL の**両分岐**を検査する（研究者要望で導入）。
     #   ⚠️ 上の bodies は短縮なし（フォールバック側）である。★ そちらは生の URL が出ること、
     #      短縮ありのときは**短縮が出ること**を、それぞれ確かめる。
@@ -341,6 +454,22 @@ def main() -> int:
             "受付メール(用意済み): 短縮があるのに生の URL も残っている"
             "（★ どちらを開けばよいか分からなくなる）"
         )
+    # ★★ フォームの回答 URL は 3 段（短縮 → publishedUrl → ID から組み立て）。
+    #   ⚠️ ★ **3 段あるなら 3 段とも試す。** 1 段でも空を返すと導線が消える。
+    #   ★ M と S で**別の値**を返すスタブにしてあるので、取り違え（両方 M など）も捕まる。
+    for label in ("受付メール(未用意)", "受付メール(用意済み)"):
+        for name, key in (("G1-M", "G1_MCHECK"), ("G1-S", "G1_SURVEY")):
+            if "https://x.gd/SHORT-" + key not in short_bodies[label]:
+                fails.append(f"{label}: {name} の**短縮**が本文に出ていない（g1ShortOr_ / g1FormLink_）")
+    published = run_gas("2")
+    for label, b in (("受付メール(未用意)", published["ack"]),
+                     ("受付メール(用意済み)", published["ackWithMaterials"])):
+        for name, key in (("G1-M", "G1_MCHECK"), ("G1-S", "G1_SURVEY")):
+            if "PUBLISHED-" + key not in b:
+                fails.append(
+                    f"{label}: 短縮が無いとき {name} が **publishedUrl** に落ちていない"
+                    "（★ 3 段のうち 2 段目が壊れている）"
+                )
 
     if fails:
         print("[NG] メールが §2.12（第 11 版）の開示範囲・撤回後の文言から外れている")

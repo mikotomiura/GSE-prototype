@@ -323,7 +323,7 @@ console.log("3. ガード 2 — URL 形式");
 console.log("4. ガード 3 — 冪等（送信済みには送らない）");
 {
   const ctx = makeCtx({
-    runRows: [{ "P-ID": "P015", 配布フォルダURL: GOOD_URL, 課題文リンク送信日: new Date() }],
+    runRows: [{ "P-ID": "P015", 配布フォルダURL: GOOD_URL, 課題ページ送付日: new Date() }],
     roster: ROSTER,
   });
   ctx.g1AutoSendPendingMaterials();
@@ -447,7 +447,7 @@ console.log("10. ガード 5 — URL の重複（★ 別の被験者の URL を�
   // ★ 既に P015 へ送った URL を P016 に貼った → 送信済みの行も数に入れるので捕まる
   const ctx = makeCtx({
     runRows: [
-      { "P-ID": "P015", 配布フォルダURL: GOOD_URL, 課題文リンク送信日: new Date() },
+      { "P-ID": "P015", 配布フォルダURL: GOOD_URL, 課題ページ送付日: new Date() },
       { "P-ID": "P016", 配布フォルダURL: GOOD_URL },
     ],
     roster: ROSTER,
@@ -484,7 +484,7 @@ console.log("12. ★ 送信は済んだが送信日を書けない（放置す�
   const ctx = makeCtx({
     runRows: [{ "P-ID": "P015", 配布フォルダURL: GOOD_URL }],
     roster: ROSTER,
-    failWriteHeader: "課題文リンク送信日",
+    failWriteHeader: "課題ページ送付日",
   });
   ctx.g1AutoSendPendingMaterials();
   ok("メールは送られている", ctx.__sent.length === 1, "sent=" + ctx.__sent.length);
@@ -634,7 +634,7 @@ console.log("14. refreshG1RunSheet — 導出列の自動集計");
   ok("P016 は G1-S 未回答なので空", String(cell(4, "G1-S 回答")).trim() === "", String(cell(4, "G1-S 回答")));
   ok(
     "⚠️ 判定に関わる列は触らない",
-    ["実施形態", "配置(A/B)", "撤回/除外", "verify-blocks 実施", "validate_blocks 緑", "gse-dataset 送付"]
+    ["実施形態", "撤回/除外", "verify-blocks 実施", "validate_blocks 緑", "gse-dataset 送付"]
       .every((h) => String(cell(3, h)).trim() === ""),
     "どれかが埋まっている"
   );
@@ -766,7 +766,7 @@ console.log("17. ★ 1 通で渡したら 2 通目が飛ばない（冪等キー
 
   // ★ 発番された P-ID のフォルダが用意されていれば URL と送信日が入るはず
   const url = String(ctx.__runSheet.getRange(rows, H.indexOf("配布フォルダURL") + 1).getValue());
-  const sent = ctx.__runSheet.getRange(rows, H.indexOf("課題文リンク送信日") + 1).getValue();
+  const sent = ctx.__runSheet.getRange(rows, H.indexOf("課題ページ送付日") + 1).getValue();
   if (pidCell === "P001") {
     // 既定の FOLDERS には P001 が無いので「別便」経路。★ 記録もされない = 2 通目が正しく飛ぶ
     ok("未用意なら送信日を埋めない（2 通目に任せる）", String(sent).trim() === "", String(sent));
@@ -789,8 +789,8 @@ console.log("17. ★ 1 通で渡したら 2 通目が飛ばない（冪等キー
     String(ctx2.__runSheet.getRange(r2, H2.indexOf("配布フォルダURL") + 1).getValue()) === urlFor("P015")
   );
   ok(
-    "★ 課題文リンク送信日 が記録される",
-    String(ctx2.__runSheet.getRange(r2, H2.indexOf("課題文リンク送信日") + 1).getValue()).trim() !== ""
+    "★ 課題ページ送付日 が記録される",
+    String(ctx2.__runSheet.getRange(r2, H2.indexOf("課題ページ送付日") + 1).getValue()).trim() !== ""
   );
   // ⚠️ ここが本題: 2 通目が飛ばないこと
   const before = ctx2.__sent.length;
