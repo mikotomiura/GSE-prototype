@@ -92,6 +92,13 @@ cp "$CONFIG" "$M/g1-submit.json"
 : > "$M/g1.mode"
 sed "s/@DMG@/$DMG/g" "$HERE/dist-readme-macos.txt" > "$M/README_先に読む.txt"
 
+# ★★ 初回セットアップスクリプト（preregistration.md 第 13 版 §2.14）。
+#   ⚠️ 手打ちの `xattr` の置き換え。★ ドラッグして実行するのでパスを打たない。
+#   ⚠️ quarantine が付いていても `bash <パス>` なら動く（2026-08-08 実測）。
+cp "$HERE/初回セットアップ_mac.sh" "$M/" || die "初回セットアップ_mac.sh を入れられません"
+bash "$M/初回セットアップ_mac.sh" --selftest > /dev/null \
+  || die "★ 初回セットアップ_mac.sh の自己検査が赤い。壊れたものを配らない"
+
 MNT=$(mktemp -d)
 trap 'hdiutil detach "$MNT" -quiet 2>/dev/null || true; rmdir "$MNT" 2>/dev/null || true' EXIT
 hdiutil attach "$CACHE/$DMG" -mountpoint "$MNT" -nobrowse -quiet || die "dmg をマウントできません"

@@ -220,6 +220,14 @@ build_mac() {
 
   sed "s/@DMG@/$DMG/g" "$HERE/dist-readme-macos.txt" > "$M/README_先に読む.txt"
 
+  # ★★ 初回セットアップスクリプト（preregistration.md 第 13 版 §2.14）。
+  #   ⚠️ 手打ちの `xattr` を置き換える。研究者が同席して 1 回だけ実行する。
+  #   ★ ドラッグして実行するので**パスを 1 文字も打たない**。
+  #   ⚠️ quarantine が付いていても `bash <パス>` なら動く（2026-08-08 実測）。
+  cp "$HERE/初回セットアップ_mac.sh" "$M/" || die "初回セットアップ_mac.sh を入れられません"
+  bash "$M/初回セットアップ_mac.sh" --selftest > /dev/null \
+    || die "★ 初回セットアップ_mac.sh の自己検査が赤い。壊れたものを配らない"
+
   # --- ★ 配るのは **zip 1 個**。⚠️ フォルダのままだと Drive が固め直して .app が壊れうる -----
   #   ★ zip なら Drive は**ただのファイル**として配るので、バイトが変わらない。
   local Z="$OUT/G1_実施用_macOS.zip"
