@@ -1073,6 +1073,48 @@ static SUBMIT_LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
 /// 書いているが、⚠️ 実際には**永久に送られない**。
 static SUBMIT_UPLOAD_DISABLED: AtomicBool = AtomicBool::new(false);
 
+// --- ★ 送信の「成功」を画面に出すための実測値 (2026-08-10) ------------------------
+//
+// ⚠️★★ 送信成功はこれまで **何も表示していなかった** (箱が消えるだけ)。しかも承認から
+//   完了まで実機で 6.2 秒 / 5.7 秒かかっており、その間も無表示だった。
+//   → ★ 「警告が消えた ＝ 成功」と読ませていた (memory `silent-success-is-not-visible`)。
+//
+// ⚠️★★ **根拠を「ボタンを押したこと」にしない。** 収束器が `.sent` を置いたときだけ
+//   `GSE_RECONCILE` の `sent` が増える (`reconcile.rs` の設計核 ③: アップロードが
+//   `Ok(())` を返したときにだけ `.sent` を置く)。★ ここが端末から得られる最強の証拠であり、
+//   押下や `awaiting_approval` の減少を根拠にすると **偽のレシート**になる。
+
+/// 最後に **1 件以上送れた** 時刻 (epoch ms)。`0` = このプロセスではまだ 1 件も送れていない。
+static SUBMIT_LAST_SENT_MS: AtomicU64 = AtomicU64::new(0);
+
+/// そのとき送れた本数 (レシートの「N 件」)。
+static SUBMIT_LAST_SENT_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// いま走っている収束器の本数。★ `> 0` = 送信中 (画面に「送信しています…」を出す)。
+///
+/// ⚠️ 起点が 2 本ある (起動時 / 承認・ブロック終了時) ので bool ではなく数える。
+static SUBMIT_IN_FLIGHT: AtomicU64 = AtomicU64::new(0);
+
+/// `SUBMIT_IN_FLIGHT` を必ず戻すための番兵。
+///
+/// ⚠️★ 手で `fetch_sub` を書くと、途中の panic や `?` の early return で**戻し忘れる**。
+/// そうなると画面は「送信しています…」のまま**永久に固まり**、
+/// ★ 未送信件数の警告も (`!sending` gate により) 出なくなる = **沈黙が悪化する**。
+struct InFlightGuard;
+
+impl InFlightGuard {
+    fn new() -> Self {
+        SUBMIT_IN_FLIGHT.fetch_add(1, Ordering::Relaxed);
+        Self
+    }
+}
+
+impl Drop for InFlightGuard {
+    fn drop(&mut self) {
+        SUBMIT_IN_FLIGHT.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 /// スタート画面へ返す提出状態 (G1 モードのときだけフロントが読む)。
 #[derive(serde::Serialize, Clone)]
 struct SubmissionStatusDto {
@@ -1084,6 +1126,12 @@ struct SubmissionStatusDto {
     upload_disabled: bool,
     /// ★ **被験者の確認待ち**の本数 (`.age` は在るが「送信する」がまだ押されていない・D-14)。
     awaiting_approval: usize,
+    /// ★ いま収束器が走っている (= 送信を試みている最中)。
+    sending: bool,
+    /// ★ 最後に 1 件以上送れた時刻 (epoch ms)。`null` = このプロセスではまだ無い。
+    last_sent_ms: Option<u64>,
+    /// ★ そのとき送れた本数。`last_sent_ms` が `null` なら `0`。
+    last_sent_count: usize,
 }
 
 /// 未送信件数と直近のエラーを返す。★ 0 件・エラー無しなら UI は何も出さない。
@@ -1106,11 +1154,18 @@ fn get_submission_status() -> SubmissionStatusDto {
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .clone();
+    let last_sent_ms = match SUBMIT_LAST_SENT_MS.load(Ordering::Acquire) {
+        0 => None,
+        ms => Some(ms),
+    };
     SubmissionStatusDto {
         unsent,
         last_error,
         upload_disabled: SUBMIT_UPLOAD_DISABLED.load(Ordering::Relaxed),
         awaiting_approval,
+        sending: SUBMIT_IN_FLIGHT.load(Ordering::Relaxed) > 0,
+        last_sent_ms,
+        last_sent_count: SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed) as usize,
     }
 }
 
@@ -1152,7 +1207,15 @@ fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
     if g1_mode().is_none() {
         return;
     }
+    // ⚠️★★ **スレッドの外で**数え始める。中で数えると、被験者が「送信する」を押して
+    //   確認カードが消えてから、スレッドが起きて `sending` が立つまでの間に
+    //   ★ **無表示の窓**ができる (今回潰そうとしている沈黙そのもの)。
+    //   `approve_pending_submissions` はこの関数を呼んでから返るので、
+    //   ★ フロントが押下直後に読む状態には既に `sending: true` が乗っている。
+    let in_flight = InFlightGuard::new();
     thread::spawn(move || {
+        // ★ スレッドが終わるとき (下の early return も含め) に必ず戻す。
+        let _in_flight = in_flight;
         // ⚠️ ★ **ブロック中には走らせない** (`design.md` §1: 測定中の端末に負荷をかけない)。
         //   起動時のヒントはスレッドで遅れて走るので、被験者が数秒後に「開始する」を押すと
         //   ★ **ブロック中に age 暗号化と送信が走りうる** (code-review LOW)。
@@ -1232,6 +1295,18 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
             .unwrap_or(false),
         Ordering::Relaxed,
     );
+    // ★★ 送信できた事実を記録する (レシートの根拠)。
+    // ⚠️ ★ **exit code を見る前に**やる。errors が在っても「送れた分は送れた」ので、
+    //   部分成功を捨てない (`.sent` は成功した本にだけ置かれている)。
+    record_sent_if_any(
+        summary.as_deref().and_then(|s| summary_count(s, "sent")),
+        || {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0)
+        },
+    );
     if output.status.success() {
         return Ok(Some(summary.unwrap_or_else(|| "done".to_string())));
     }
@@ -1280,6 +1355,26 @@ fn summary_count(summary: &str, key: &str) -> Option<usize> {
         .ok()
         .and_then(|v| v.get(key).and_then(|x| x.as_u64()))
         .map(|n| n as usize)
+}
+
+/// 収束器が報告した `sent` を、レシートの根拠として記録する。
+///
+/// ⚠️★★ **`sent == 0` では何も書き換えない。** 収束器はアプリ起動時にも走り、
+/// ★ **平常時はほぼ毎回 `sent: 0`** である。0 で上書きすると
+/// ⚠️ **本当に送れた直後のレシートが数秒で消える** (被験者から見ると「出て、消えた」)。
+/// ★ この関数が保つのは「**最後に本当に送れたのはいつ・何件か**」であって、
+/// 「直近の実行の結果」ではない。
+///
+/// 時刻は引数で受ける (テストが実時計に依存しないため)。
+fn record_sent_if_any(sent: Option<usize>, now_ms: impl FnOnce() -> u64) {
+    let n = match sent {
+        Some(n) if n > 0 => n,
+        _ => return,
+    };
+    SUBMIT_LAST_SENT_COUNT.store(n as u64, Ordering::Relaxed);
+    // ★ 件数を先に置き、時刻を Release で置く。読む側は時刻を Acquire で読むので、
+    //   「新しい時刻・古い件数」の組み合わせが観測されない。
+    SUBMIT_LAST_SENT_MS.store(now_ms(), Ordering::Release);
 }
 
 /// アプリ内「提出する」ボタンの Tauri コマンド。最新セッションを同梱 `gse-submit` で
@@ -3313,5 +3408,95 @@ mod submit_command_tests {
     fn extract_age_path_none_when_absent() {
         assert_eq!(extract_age_path("no path here\njust text"), None);
         assert_eq!(extract_age_path(""), None);
+    }
+}
+
+/// ★ 提出レシート (「送信しました」) の根拠に関するテスト。
+///
+/// ⚠️★★ ここで守っているのは **「押した ≠ 送れた」** である。レシートは
+/// 収束器が `.sent` を置いた本数 (`GSE_RECONCILE` の `sent`) からしか作られない。
+#[cfg(test)]
+mod submission_receipt_tests {
+    use super::{
+        record_sent_if_any, summary_count, InFlightGuard, SUBMIT_IN_FLIGHT, SUBMIT_LAST_SENT_COUNT,
+        SUBMIT_LAST_SENT_MS,
+    };
+    use std::sync::atomic::Ordering;
+
+    /// ⚠️ 静的変数を共有するので、この 1 関数の中で順に検査する (並列テスト安全)。
+    #[test]
+    fn only_a_real_send_writes_the_receipt() {
+        SUBMIT_LAST_SENT_MS.store(0, Ordering::Relaxed);
+        SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Relaxed);
+
+        // ① 要約行が読めない (収束器が古い / 出力が壊れた) → 何も書かない。
+        record_sent_if_any(None, || 1_000);
+        assert_eq!(
+            SUBMIT_LAST_SENT_MS.load(Ordering::Relaxed),
+            0,
+            "★ 根拠が無いのにレシートを出してはならない"
+        );
+
+        // ② `sent: 0` (= 送るものが無かった / 送れなかった) → 何も書かない。
+        record_sent_if_any(Some(0), || 2_000);
+        assert_eq!(
+            SUBMIT_LAST_SENT_MS.load(Ordering::Relaxed),
+            0,
+            "★ 0 件をレシートにしてはならない"
+        );
+
+        // ③ 実際に送れた → 時刻と件数が入る。
+        record_sent_if_any(Some(2), || 3_000);
+        assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 3_000);
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed), 2);
+
+        // ④ ⚠️★★ その後の「送るものが無い」実行でレシートが**消えてはならない**。
+        //    収束器はアプリ起動のたびに走り、平常時はほぼ毎回 `sent: 0` である。
+        //    ここで 0 を書くと、被験者から見て「出て、すぐ消えた」になる。
+        record_sent_if_any(Some(0), || 4_000);
+        assert_eq!(
+            SUBMIT_LAST_SENT_MS.load(Ordering::Acquire),
+            3_000,
+            "★ 送れた事実は次の空振りで消えてはならない"
+        );
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed), 2);
+
+        // ⑤ 次に送れたら更新される。
+        record_sent_if_any(Some(1), || 5_000);
+        assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 5_000);
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed), 1);
+
+        SUBMIT_LAST_SENT_MS.store(0, Ordering::Relaxed);
+        SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Relaxed);
+    }
+
+    /// ★ `gse-submit` が実際に出す形の要約行から `sent` が読めること
+    /// (⚠️ ここが読めないと、レシートは永久に出ない = 沈黙に戻る)。
+    #[test]
+    fn sent_is_read_from_the_real_summary_line() {
+        // submit.rs `main()` の `serde_json::json!` と同じキー並び。
+        let line = r#"{"packaged":1,"sent":1,"unsent":0,"upload_disabled":false,"skipped_busy":false,"awaiting_approval":0,"errors":0}"#;
+        assert_eq!(summary_count(line, "sent"), Some(1));
+        assert_eq!(summary_count(line, "unsent"), Some(0));
+        // 知らないキーは None (勝手に 0 と読まない)。
+        assert_eq!(summary_count(line, "nope"), None);
+    }
+
+    /// ⚠️★ 番兵が panic でも in-flight を戻すこと。
+    /// 戻し忘れると画面が「送信しています…」のまま**永久に固まる**。
+    #[test]
+    fn in_flight_returns_to_zero_even_on_panic() {
+        SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
+        let r = std::panic::catch_unwind(|| {
+            let _g = InFlightGuard::new();
+            assert_eq!(SUBMIT_IN_FLIGHT.load(Ordering::Relaxed), 1);
+            panic!("収束器が落ちた");
+        });
+        assert!(r.is_err(), "★ panic を捕まえられていない");
+        assert_eq!(
+            SUBMIT_IN_FLIGHT.load(Ordering::Relaxed),
+            0,
+            "★ 送信中のまま固まる"
+        );
     }
 }
