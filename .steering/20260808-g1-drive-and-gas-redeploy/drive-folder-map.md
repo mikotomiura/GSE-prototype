@@ -3,6 +3,12 @@
 親フォルダ（★ 制限付き＝ owner のみ。実測確認済み・D-7 のまま）:
 https://drive.google.com/drive/folders/1qhl28IDeh-19upuZf_YxPwwdq_d9xVcI
 
+★ 親フォルダ直下に置いた**研究者用**ファイル（⚠️ 被験者には配らない）:
+
+| いつ | 何 | リンク | 実測 |
+|---|---|---|---|
+| 2026-08-09 | Windows 実機 Claude Code への調査依頼プロンプト（block01 の打鍵 / 起動①の終了） | [file/d/1mzriMKMhm5p5cFubu7v4UmsGWGAVpmMb](https://drive.google.com/file/d/1mzriMKMhm5p5cFubu7v4UmsGWGAVpmMb/view) | ★ `fileSize=10775` が手元と **byte 一致** ／ 共有は **owner のみ**（`get_file_permissions` で実測） |
+
 ⚠️ ★ **フォルダ ID は 2026-08-08 の差し替えで全部変わった。**
 研究者が旧 15 フォルダを削除し、`dist/_drive` の 15 フォルダを丸ごと上げ直したため
 （＝引き継ぎ `§3` の手順どおり）。★ 旧 ID を書いた資料は無効である。
