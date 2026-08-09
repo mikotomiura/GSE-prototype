@@ -465,12 +465,42 @@ def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
         #   **5 分間 0 打のブロックが正常として提出された**。当時は提出物だけを見ても
         #   「打っていない」のか「記録できていない」のか区別できなかった。
         #   ★ アプリが `hook_health` 行を出すようになったので、ここで**機械判定**する。
+        #
+        # ⚠️★★ **2026-08-09 の実機実測による是正（案 A）**:
+        #   当初は `alive=false` があれば無条件に FAIL にしていた。⚠️ これは**厳しすぎた**。
+        #   ★ 生存監視は「OS は入力を見ている（マウス）のにキーのフックが呼ばれない」を
+        #   starvation として数えるため、**読む・マウスを動かす時間が長い作業では誤発火する**。
+        #   実測（通常作業 63 分・`measurements.md` §3）:
+        #     - starvation ≥30 秒のエピソード **8 回**（セッションの **13.3%**）
+        #     - うち **1 回が 120 秒に達し `alive=false`**、★ **もう 1 回は peak 119 秒**
+        #       ＝ 閾値まで **1 秒**。★ 120 秒が通常作業の分布のど真ん中を切っている
+        #   ⚠️ `preregistration.md §3.6` はブロックの事後除外を禁じているので、
+        #   ★ **誤 FAIL は 1 ブロックの回復不能な損失**になる。
+        #
+        #   → ★ **FAIL は「フックが死んだ」かつ「実際に打鍵が 1 件も無い」の AND** にする。
+        #     この AND が捕まえるのは 8/09 の本物の事故（5 分 0 打が正常として提出された）
+        #     そのものであり、⚠️ **誤検知だけではブロックを落とさない**。
+        #
+        # ⚠️★ **残る穴（承知の上で受け入れている）**: ブロックの**途中で**フックが死ぬと
+        #   `key` は 0 でないので WARN 止まりになり、★ **末尾が欠けたブロックが通る**。
+        #   → だから WARN は「打鍵が少ないのは打たなかったからだ」と読ませない文言にし、
+        #   ★ **人が見て判断する**ことを求める（機械では区別できない）。
         dead, dropped = read_hook_health(p)
         if dead is not None:
-            r.fail(f"{subject}: ブロック {n} は打鍵を記録できていない可能性が高い"
-                   f"（hook_health で alive=false・starved={dead} ms）。"
-                   f"★ 打鍵数が少なくても「打たなかった」と読まないこと。"
-                   f"windows-verification.md §5-7")
+            keys = counts.get("key", 0)
+            if keys == 0:
+                r.fail(f"{subject}: ブロック {n} は打鍵を記録できていない"
+                       f"（hook_health で alive=false・starved={dead} ms、かつ key 行 0）。"
+                       f"★ これは「打たなかった」ではなく**記録できていない**。"
+                       f"windows-verification.md §5-7")
+            else:
+                r.warn(f"{subject}: ブロック {n} でフックが一時的に死んだと判定されている"
+                       f"（alive=false・starved={dead} ms）が、key 行は {keys} 件ある。"
+                       f"★ **誤検知の可能性が高い**（マウスのみの時間が 2 分続くと出る。"
+                       f"通常作業 63 分で 1 回出た実測あり）。"
+                       f"⚠️ ただし**ブロックの途中でフックが死んだ**なら末尾の打鍵が"
+                       f"欠けている。★ 機械では区別できないので、"
+                       f"打鍵数と作業内容が釣り合うかを人が確認すること")
         if dropped:
             r.warn(f"{subject}: ブロック {n} で打鍵イベントが {dropped} 件捨てられている"
                    f"（channel 溢れ）。その打鍵はログに入っていない")
@@ -726,6 +756,10 @@ def selftest() -> int:
     # ★ G1 モードで取れたログの見本（第 10 版 §5.4-6: meta 行に g1_mode が載る）
     G1_LOG = ('{"type":"meta","session_start":1,"hmm_version":"0.3.0","g1_mode":"marker"}\n'
               '{"type":"key","t":1,"press":true}\n')
+    # ★ 打鍵が 1 件も無いログ。⚠️ 2026-08-09 の実機事故（5 分 0 打が正常として提出された）
+    #   を再現するために要る。`G1_LOG` は key を持つので流用できない。
+    G1_META_ONLY = ('{"type":"meta","session_start":1,"hmm_version":"0.3.0",'
+                    '"g1_mode":"marker"}\n')
 
     # ★ 禁止行（プローブ）の検出 — B-1 の客観検証
     with tempfile.TemporaryDirectory() as td:
@@ -768,14 +802,31 @@ def selftest() -> int:
         if not r.ok:
             fails.append(f"alive=true の hook_health を FAIL にしてはならない: {r.fails[0]}")
 
-        # ★★ 本命: alive=false があれば FAIL にする（= 0 打を「打たなかった」と読ませない）。
+        # ★★ 本命: alive=false **かつ key 行 0** なら FAIL にする（案 A・2026-08-09 実測是正）。
+        #    ⚠️ ここが 8/09 に実際に起きた事故そのもの（5 分 0 打が正常として提出された）。
+        #    ★ `G1_LOG` は key 行を 1 件持つので、**meta 行だけのログ**を使う。
+        (raw / spec["blocks"][1]["file"]).write_text(
+            G1_META_ONLY + '{"type":"hook_health","t":1,"alive":false,'
+                           '"starved_ms":120000,"rehook":true,"dropped":0}\n',
+            encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if r.ok or not any("記録できていない" in m for m in r.fails):
+            fails.append("alive=false かつ key 0 の hook_health は FAIL にすること (§5-7)")
+
+        # ⚠️★★ 対照 3（**案 A の核心**）: alive=false でも **key 行があれば FAIL にしない**。
+        #    ★ これが無いと、通常作業で 63 分に 1 回出る誤検知が
+        #    **正常なブロックを落とす**（`measurements.md` §3 の実測）。
+        #    ⚠️ FAIL ではないが **WARN は必ず出す**（黙って通さない）。
         (raw / spec["blocks"][1]["file"]).write_text(
             G1_LOG + '{"type":"hook_health","t":1,"alive":false,'
                      '"starved_ms":120000,"rehook":true,"dropped":0}\n',
             encoding="utf-8")
         r = validate_spec(spec, seed, {}, d)
-        if r.ok or not any("記録できていない" in m for m in r.fails):
-            fails.append("alive=false の hook_health があれば FAIL にすること (§5-7)")
+        if not r.ok:
+            fails.append(
+                f"alive=false でも key 行があれば FAIL にしてはならない（誤検知）: {r.fails[0]}")
+        if not any("誤検知の可能性" in m for m in r.warns):
+            fails.append("alive=false + key>0 は WARN を出すこと（黙って通さない）")
 
         # ★ dropped は WARN（FAIL ではない）。★ 警告が出ることまで確かめる。
         (raw / spec["blocks"][2]["file"]).write_text(
