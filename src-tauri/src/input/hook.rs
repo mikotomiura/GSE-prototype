@@ -128,6 +128,17 @@ pub static HOOK_STARVED: AtomicBool = AtomicBool::new(false);
 /// 「沈黙の長さ」の基準にできない (memory `macos-tap-idle-away-probe-bug` と同型の罠)。
 pub static CALLBACK_COUNT: AtomicU64 = AtomicU64::new(0);
 
+/// ⚠️★★ 分析スレッドへ渡せずに**捨てた**打鍵イベントの累計。
+///
+/// ★ `CALLBACK_COUNT` は「OS がフックを呼んだ回数」であって
+/// **「記録できた回数」ではない**。channel が詰まれば呼ばれても記録は失われる
+/// (security-checker MEDIUM: それを数えないと、本機能が目的とする
+/// 「打っているのに記録されていない」の一部を素通りさせる)。
+///
+/// ⚠️ ★ コールバック内でログを書けないので (`hook-constraints` 共通-1: ログ禁止)、
+/// **カウンタだけ上げて、監視スレッドが統計的に 1 回だけ報告する** (共通-3 のパターン)。
+pub static EVENTS_DROPPED: AtomicU64 = AtomicU64::new(0);
+
 /// macOS: CGEventTap 作成の連続失敗回数（診断用）。
 /// TCC 権限が付与されていない、またはコード署名の問題を示す。
 #[cfg(target_os = "macos")]

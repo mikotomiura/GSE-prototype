@@ -254,6 +254,7 @@
       "type": "object",
       "required": [
         "alive",
+        "dropped",
         "rehook",
         "starved_ms",
         "t",
@@ -262,6 +263,12 @@
       "properties": {
         "alive": {
           "type": "boolean"
+        },
+        "dropped": {
+          "description": "分析スレッドへ渡せずに捨てた打鍵イベントの累計。 ★ 「フックが呼ばれた」と「記録できた」は別なので両方残す。",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         },
         "rehook": {
           "type": "boolean"

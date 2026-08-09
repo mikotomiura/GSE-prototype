@@ -2574,6 +2574,12 @@ pub fn run() {
                     let mut prev_tick = liveness::last_system_input_tick();
                     let mut prev_callbacks =
                         crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);
+                    // ⚠️★ 「呼ばれた」と「記録できた」は別。channel が詰まって捨てた分を見張る。
+                    let mut prev_dropped =
+                        crate::input::hook::EVENTS_DROPPED.load(Ordering::Relaxed);
+                    // ★ `tick_ms` は公称値ではなく**実測**を渡す (スリープ復帰やスケジューラ遅延で
+                    //   `starved_ms` が実時間からずれるのを防ぐ)。★ 測った量を残すのが本行の趣旨。
+                    let mut last_tick_at = Instant::now();
                     let mut prev_health = HookHealth::Ok;
                     // ⚠️★★ 再設置は **1 エピソードにつき 1 回**だけ (cross-review 両者一致 HIGH)。
                     //   ★ 時間バックオフ (60 秒ごと再試行) にしていたが、それだと
@@ -2611,12 +2617,30 @@ pub fn run() {
                         let hook_event_seen = callbacks != prev_callbacks;
                         prev_callbacks = callbacks;
 
+                        // ⚠️★ 「呼ばれた」だけでは足りない。channel が詰まって**捨てた**分は
+                        //   記録されていないので、増えたら必ず残す
+                        //   (★ コールバック内ではログを書けないのでここで報告する)。
+                        let dropped = crate::input::hook::EVENTS_DROPPED.load(Ordering::Relaxed);
+                        if dropped > prev_dropped {
+                            tracing::error!(
+                                dropped_total = dropped,
+                                dropped_now = dropped - prev_dropped,
+                                "keystroke events were dropped before reaching the analysis thread \
+                                 (channel full); those keystrokes are NOT in the session log"
+                            );
+                            prev_dropped = dropped;
+                        }
+
+                        // ★ 経過は公称値ではなく**実測**を渡す。
+                        let elapsed_ms = last_tick_at.elapsed().as_millis() as u64;
+                        last_tick_at = Instant::now();
+
                         starv = liveness::step(
                             starv,
                             session_active,
                             system_input_seen,
                             hook_event_seen,
-                            TICK_MS,
+                            elapsed_ms,
                         );
                         let health = liveness::health(starv, th);
                         peak_starved_ms = peak_starved_ms.max(starv.starved_ms);
@@ -2678,6 +2702,7 @@ pub fn run() {
                                 alive: health != HookHealth::Down,
                                 starved_ms: reported_starved_ms,
                                 rehook,
+                                dropped,
                             })
                             .is_err()
                         {

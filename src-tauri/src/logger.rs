@@ -615,6 +615,11 @@ pub enum LogEntry {
         starved_ms: u64,
         /// このイベントで**再設置を要求した**か。
         rehook: bool,
+        /// ⚠️★ 分析スレッドへ渡せずに**捨てた**打鍵イベントの累計 (プロセス開始から)。
+        ///
+        /// ★ フックが呼ばれていても channel が詰まれば記録は失われる。
+        /// 「呼ばれた」と「記録できた」は別なので、両方を残す。
+        dropped: u64,
     },
     /// ユーザーが「開始する」を押した時刻 (セッション境界マーカー)
     SessionStart { timestamp: u64 },
@@ -1242,11 +1247,12 @@ impl SessionLogger {
                             alive,
                             starved_ms,
                             rehook,
+                            dropped,
                         } => {
                             let _ = writeln!(
                                 writer,
-                                r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{}}}"#,
-                                timestamp, alive, starved_ms, rehook,
+                                r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{},"dropped":{}}}"#,
+                                timestamp, alive, starved_ms, rehook, dropped,
                             );
                             dirty = true;
                         }

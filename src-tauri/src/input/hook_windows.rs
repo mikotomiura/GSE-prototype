@@ -474,8 +474,11 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                     is_paste,
                 };
                 if let Some(sender) = EVENT_SENDER.get() {
-                    if let Err(e) = sender.try_send(event) {
-                        tracing::warn!("InputEvent dropped (channel full): {}", e);
+                    if sender.try_send(event).is_err() {
+                        // ⚠️★ ここでログを書かない (`hook-constraints` 共通-1: コールバック内は
+                        //   Atomic と try_send のみ。ログはアロケーションとバッファ操作を伴う)。
+                        //   ★ カウンタだけ上げ、監視スレッドが統計的に 1 回だけ報告する (共通-3)。
+                        EVENTS_DROPPED.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             }

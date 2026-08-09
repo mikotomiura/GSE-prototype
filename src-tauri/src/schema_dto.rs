@@ -111,6 +111,9 @@ pub enum LogEntryDto {
         alive: bool,
         starved_ms: u64,
         rehook: bool,
+        /// 分析スレッドへ渡せずに捨てた打鍵イベントの累計。
+        /// ★ 「フックが呼ばれた」と「記録できた」は別なので両方残す。
+        dropped: u64,
     },
     /// Phase 1 Ground Truth ユーザーラベル。
     /// `recovered_at` はログ記録時は常に null、`gse-replay --metrics` で後付け算出。
