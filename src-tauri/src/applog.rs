@@ -442,10 +442,17 @@ mod tests {
         assert!(wait_until(|| std::fs::metadata(&path)
             .map(|m| m.len() < MAX_BYTES)
             .unwrap_or(false)));
-        let fresh = std::fs::read_to_string(&path).unwrap();
+        // ⚠️★ **行が入るまで待つ**（「新しいファイルが存在する」では足りない）。
+        //   `rotate()` は rename → open → (書き込みは呼び出し側) の順なので、
+        //   ★ **0 バイトで存在する瞬間**がある。そこで読むと空文字が返る。
+        //   ⚠️ 2026-08-08 の Windows CI が実際にここで落ちた
+        //   (`307 passed; 1 failed`・macOS では再現しない)。
         assert!(
-            fresh.contains("tips it over"),
-            "世代交代した後の新しいファイルに行が入っていない: {fresh:?}"
+            wait_until(|| std::fs::read_to_string(&path)
+                .map(|s| s.contains("tips it over"))
+                .unwrap_or(false)),
+            "世代交代した後の新しいファイルに行が入っていない: {:?}",
+            std::fs::read_to_string(&path)
         );
         assert_eq!(
             std::fs::metadata(&backup).unwrap().len(),
