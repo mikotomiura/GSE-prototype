@@ -79,3 +79,12 @@
 - [ ] macOS への配線（`CGEventSourceSecondsSinceLastEventType`）— D-4
 - [ ] ⚠️ `analyze.py` 側の消費者（`validate_blocks.py` には入れたが `analyze.py` は未対応）
 - [ ] ⚠️★★ **Windows 実機での発火確認**（★ ここが埋まるまで「動く」とは書かない）
+      → 検証設計 (T-A〜T-D) は `.steering/_handoff/next-session-prompt-submission-receipt-and-windows-hook-test.md` §5
+
+## ✅ Windows CI（2026-08-09・run 31316460555）
+
+- [x] ★★ **`check (windows-latest): success`** — 今回の Windows 固有コードが
+      **Windows で初めてコンパイル・テストを通った**
+- [x] ★ `applog` テスト修正が効いた（⚠️ macOS では検証不能で、これが唯一の検査だった）
+- [x] ⚠️★ 途中で `hook_windows.rs` の `EVENTS_DROPPED` **import 忘れ**を CI が捕まえた
+      （手元は fmt/clippy/test すべて緑）→ memory `windows-only-code-needs-ci`
