@@ -47,15 +47,35 @@
 - [ ] `windows-verification.md` §5-6 の提案表を「実装済み」に更新
 - [ ] git コミット（`git-workflow`・`Refs:` 付き）
 
+## ✅ 積み残しの片づけ（2026-08-09・コミット `eb7eaf8`）
+
+- [x] ⚠️ `CALLBACK_COUNT` は「呼ばれた回数」で「**記録できた回数**」ではない
+      → `EVENTS_DROPPED` を追加し、`hook_health` に `dropped` を載せ、監視スレッドが `ERROR` を出す。
+      ★ 併せて **コールバック内の `tracing::warn!`（`hook-constraints` 共通-1 の既存違反）も解消**
+- [x] ⚠️ macOS の `CALLBACK_COUNT` 0 リセット → **廃止**（単調増加に）。
+      ★ 残すと配線した瞬間に**偽の生存シグナル**（死んでいるのに Ok）になる
+- [x] ⚠️ `packaging.rs::has_any_data_row` が診断行を data row と数える → 除外。
+      ★ 3 状態（meta のみ / meta+診断行 / meta+打鍵）のテストを追加し、**除外を外して赤も実測**
+- [x] ⚠️ `step()` の `tick_ms` が公称値 → `Instant` の**実測値**に
+- [x] ★★ `hook_health` を**読む消費者**を実装（`validate_blocks.py::read_hook_health`）。
+      `alive=false` → **FAIL**（「打鍵が少ない＝打たなかった」と読ませない）／ `dropped>0` → WARN。
+      ★ selftest に**対照 2 本**（行が無い / `alive=true`）を含む 4 ケース。**3 通りの壊し方で赤を実測**
+- [x] ⚠️ `gse-dataset` の schema 同期 → `~/gse-dataset` で `7cc8430` としてコミット（★ **push はしていない**）。
+      `check_schema_parity` **OK (in sync)**。★ さらに使い捨て venv で `validate_schema.py` を走らせ、
+      **`hook_health` 行が通ること**と、⚠️ **`dropped` を落とすと落ちること**（＝検査が空回りしていない）を実測
+
+## ⚠️ この作業で**新たに見つかった**もの（★ 私の変更とは無関係）
+
+- [ ] ⚠️★★ **`gse-dataset` の既存 NDJSON は schema 検証を通らない。**
+      `raw/` の実ファイルは匿名化済みで `key` 行が `{"category":…}` だが、
+      schema の `Key` variant は `{"vk": u32}` しか受け付けない
+      → ★ **実測: 1 ファイルで 13,115 errors**。schema と匿名化パイプラインのどちらを正とするか判断が要る
+- [ ] ⚠️★ **`cargo test --workspace` は `packaging` の 23 件を走らせない**
+      （`#[cfg(feature = "package")]` の裏）。★ `--features package` を付けると 315 → **338**。
+      `docs/agent-shared.md` のテスト手順がこれを取りこぼしている
+
 ## ⚠️ 次タスクへ送るもの
 
 - [ ] macOS への配線（`CGEventSourceSecondsSinceLastEventType`）— D-4
-- [ ] ⚠️ `CALLBACK_COUNT` は macOS のタップ再作成時に **0 リセット**される（`hook_macos.rs:713`）。
-      ★ 今は macOS が常に `system_input_seen=false` なので無害だが、**配線した瞬間に偽の生存シグナルになる**
-- [ ] ⚠️ `CALLBACK_COUNT` は「呼ばれた回数」であって「記録できた回数」ではない
-      → `try_send` が詰まって捨てられても `alive=true` になる（security-checker MEDIUM・未対応）
-- [ ] ⚠️ `hook_health` を**読む消費者がまだ居ない**（`analyze.py` / `validate_blocks.py` 側）
-- [ ] ⚠️ `gse-dataset` 側 `schema/current.json` に `hook_health` を反映しないと提出検証が落ちる
-      （★ `check_schema_parity.py` で `Missing variants in B: hook_health` を実測済み）
-- [ ] ⚠️ `packaging.rs::has_any_data_row` が `hook_health` を data row と数える（空セッション検出が緩む）
-- [ ] ⚠️ `step()` に渡す `tick_ms` が公称値で実測ではない（`starved_ms` が実時間とずれうる）
+- [ ] ⚠️ `analyze.py` 側の消費者（`validate_blocks.py` には入れたが `analyze.py` は未対応）
+- [ ] ⚠️★★ **Windows 実機での発火確認**（★ ここが埋まるまで「動く」とは書かない）
