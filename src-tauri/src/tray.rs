@@ -70,11 +70,21 @@ pub fn measure_title(state: MeasureState) -> &'static str {
     }
 }
 
-/// いまの状態を 2 つの Atomic から読む。
+/// いまの状態を Atomic から読む。
+///
+/// ⚠️★★ 「フックが生きている」は **2 つの AND** である:
+/// - `HOOK_ACTIVE` … 設置に成功した (`SetWindowsHookExW` / `CGEventTap`)
+/// - `!HOOK_STARVED` … ★ **イベントが実際に届いている** (`input::liveness` が判定)
+///
+/// 2026-08-09 の Windows 実機では前者だけが `true` のまま、5 分間 0 打のブロックが
+/// 「● 計測中」の表示で自動提出された (`windows-verification.md` §5-7)。
+/// ★ 純関数 `measure_state()` の意味 (第 2 引数 = 「フックが生きているか」) は変えていない。
 fn current_state(session_active: &AtomicBool) -> MeasureState {
+    let installed = crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed);
+    let starved = crate::input::hook::HOOK_STARVED.load(Ordering::Relaxed);
     measure_state(
         session_active.load(Ordering::Acquire),
-        crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed),
+        installed && !starved,
     )
 }
 

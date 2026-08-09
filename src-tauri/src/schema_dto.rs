@@ -100,6 +100,18 @@ pub enum LogEntryDto {
     },
     /// IME 入力モード/候補ウィンドウ状態の切替。
     ImeState { t: u64, on: bool, active: bool },
+    /// ⚠️★ キーボードフックの生存状態の変化 (`input::liveness`)。
+    ///
+    /// `alive=false` は「フックは設置済みだが、システムに入力があるのに
+    /// コールバックが呼ばれていない」状態を指す。★ **判断ではなく測った量** (`starved_ms`) を
+    /// 併記するので、解析側が閾値を変えて再解釈できる。
+    /// 背景: `windows-verification.md` §5-7 (5 分間 0 打のブロックが正常提出された)。
+    HookHealth {
+        t: u64,
+        alive: bool,
+        starved_ms: u64,
+        rehook: bool,
+    },
     /// Phase 1 Ground Truth ユーザーラベル。
     /// `recovered_at` はログ記録時は常に null、`gse-replay --metrics` で後付け算出。
     UserLabel {

@@ -105,11 +105,27 @@ pub static JIS_KEYBOARD_SEEN: AtomicBool = AtomicBool::new(false);
 /// Read by `get_hook_status` Tauri command to report hook state.
 /// Windows: SetWindowsHookExW 成功時に true、フック無効化時に false。
 /// macOS: CGEventTap インストール成功時に true。
+///
+/// ⚠️★★ **これは「設置できた」しか意味しない。**「イベントが届いている」ではない。
+/// 2026-08-09 の Windows 実機で、OS が低レベルフックを黙って外したあとも本フラグは
+/// `true` のままで、5 分間 0 打のブロックが「正常」として提出された
+/// (`windows-verification.md` §5-7)。★ 届いているかどうかは `HOOK_STARVED` を見ること。
 pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// macOS: CGEventTap コールバックが呼ばれた回数（診断用）。
-/// 0 のままなら「タップは作成されたがイベントが届いていない」ことを示す。
-#[cfg(target_os = "macos")]
+/// ⚠️★★ true = 「設置済みなのにイベントが届いていない」と監視スレッドが判断した状態。
+///
+/// `input::liveness` の純関数が `HookHealth::Down` を返したときに立つ。
+/// ★ `HOOK_ACTIVE` とは**別概念**なので同じフラグに混ぜない
+/// (混ぜるとフックスレッドと監視スレッドが同じ Atomic を奪い合う)。
+/// トレイはこの 2 つの AND を「計測中」として表示する。
+pub static HOOK_STARVED: AtomicBool = AtomicBool::new(false);
+
+/// キーボードフックのコールバックが呼ばれた回数（診断 + 生存監視）。
+///
+/// 0 のままなら「フックは作成されたがイベントが届いていない」ことを示す。
+/// ★ 2026-08-09 以降は Windows でも加算する (`input::liveness` の生存判定が読む)。
+/// ⚠️ ★ `LAST_KEY_MS` を生存判定に使わない理由: あちらは**再設置時に 0 へリセットされる**ので
+/// 「沈黙の長さ」の基準にできない (memory `macos-tap-idle-away-probe-bug` と同型の罠)。
 pub static CALLBACK_COUNT: AtomicU64 = AtomicU64::new(0);
 
 /// macOS: CGEventTap 作成の連続失敗回数（診断用）。
@@ -161,4 +177,22 @@ pub fn init_hook(sender: Sender<InputEvent>) {
 
     #[cfg(target_os = "macos")]
     hook_macos::start();
+}
+
+/// フックの再設置を要求する (silent death からの復帰・`decisions.md` D-3)。
+///
+/// ⚠️★★ **新しい復帰経路は書かない。** 既存の「メッセージループを抜けて
+/// ループ先頭で再設置する」経路 (`hook_windows.rs` の `Keyboard hook message loop exited`)
+/// を**起こすだけ**である。★ 経路を増やすと、どれか 1 つが静かに壊れる。
+///
+/// 戻り値: 要求を送れたら `true`。macOS はタップ失効の再作成を自前で持つので `false`。
+pub fn request_reinstall() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        hook_windows::request_reinstall()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
 }

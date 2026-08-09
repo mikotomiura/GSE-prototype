@@ -690,6 +690,24 @@ fn get_diagnostics() -> HashMap<String, String> {
         "last_key_ms".into(),
         crate::input::hook::last_key_ms().to_string(),
     );
+    // ⚠️★★ 「設置できた」(`hook_active`) と「届いている」(`!hook_starved`) は別概念である
+    //   (`input::liveness`)。★ 研究者向けの診断には**両方**出す。
+    //   ⚠️ ★ 一方 `get_hook_status`（= 被験者の画面のバナー）は **意図的に変えていない**:
+    //   マウスのみの作業で誤検知しうるため、被験者の画面に警告を増やすと
+    //   盲検と介入規制 (`protocol.md` / decisions D-5) に触れる。トレイ表示までに留める。
+    diag.insert(
+        "hook_starved".into(),
+        crate::input::hook::HOOK_STARVED
+            .load(Ordering::Relaxed)
+            .to_string(),
+    );
+    // ★ 2026-08-09 以降は Windows でも加算されるので、macOS 限定の節から出した。
+    diag.insert(
+        "callback_count".into(),
+        crate::input::hook::CALLBACK_COUNT
+            .load(Ordering::Relaxed)
+            .to_string(),
+    );
     diag.insert("os".into(), std::env::consts::OS.to_string());
     diag.insert("arch".into(), std::env::consts::ARCH.to_string());
     diag.insert("version".into(), env!("CARGO_PKG_VERSION").to_string());
@@ -710,12 +728,7 @@ fn get_diagnostics() -> HashMap<String, String> {
 
         diag.insert("input_monitoring_granted".into(), preflight.to_string());
         diag.insert("ax_is_trusted".into(), ax_trusted.to_string());
-        diag.insert(
-            "callback_count".into(),
-            crate::input::hook::CALLBACK_COUNT
-                .load(Ordering::Relaxed)
-                .to_string(),
-        );
+        // ★ `callback_count` は両 OS 共通の節へ移した (上記)。
         diag.insert(
             "consecutive_tap_failures".into(),
             crate::input::hook::CONSECUTIVE_TAP_FAILURES
@@ -2077,6 +2090,8 @@ pub fn run() {
     let session_active_for_g1 = session_active.clone();
     // ★ トレイの状態表示用 (1Hz で読むだけ・書かない)。
     let session_active_for_tray = session_active.clone();
+    // ★★ フック生存監視スレッド用 (`input::liveness`)。
+    let session_active_for_liveness = session_active.clone();
 
     let initial_now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2094,6 +2109,7 @@ pub fn run() {
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
     let log_tx_g1 = log_tx.clone();
+    let log_tx_liveness = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -2536,6 +2552,147 @@ pub fn run() {
             // ⚠️ ★ 残り時間は emit しない。`§4.4` が「残り時間のアナウンスをしない」と定めており、
             //   カウントダウンは `§2.2` が却下した「時間圧」を全ブロックに入れることになる。
             //   出すのは「終わった」1 回だけである。
+            // ⚠️★★ キーボードフックの生存監視 (2026-08-09 の silent death 対策)。
+            //
+            //   背景: Windows 実機で **5 分間 0 打のブロックが「正常」として自動提出された**。
+            //   `HOOK_ACTIVE` は「設置できた」しか意味せず、OS が低レベルフックを黙って外しても
+            //   true のままだったからである (`windows-verification.md` §5-7)。
+            //
+            //   ★ 独立スレッドにする理由: トレイのスレッドに載せると、**トレイの生成に失敗した
+            //   環境では検知ごと消える** (`Failed to build the tray icon` は実在する経路)。
+            //   ⚠️ 判断は `input::liveness` の純関数に閉じてあり、ここは配線だけを持つ。
+            {
+                let liveness_session_active = session_active_for_liveness;
+                let liveness_log_tx = log_tx_liveness;
+                thread::spawn(move || {
+                    use crate::input::liveness::{self, HookHealth, Starvation, Thresholds};
+
+                    const TICK_MS: u64 = 1000;
+
+                    let th = Thresholds::default();
+                    let mut starv = Starvation::default();
+                    let mut prev_tick = liveness::last_system_input_tick();
+                    let mut prev_callbacks =
+                        crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);
+                    let mut prev_health = HookHealth::Ok;
+                    // ⚠️★★ 再設置は **1 エピソードにつき 1 回**だけ (cross-review 両者一致 HIGH)。
+                    //   ★ 時間バックオフ (60 秒ごと再試行) にしていたが、それだと
+                    //   **マウスのみ / 読書中心の作業**という既知の誤検知
+                    //   (`liveness.rs` のテストで仕様として固定済み) のあいだ、
+                    //   ⚠️ **生きているフックを 60 秒おきに壊し続ける**。
+                    //   しかもそれが起きるのは無打鍵で読んでいる時間 = 研究上重要な区間である。
+                    //   ★ 本当に死んでいるなら 1 回で直るか直らないかであり、
+                    //     繰り返しても得るものが無い。
+                    let mut rehook_done_this_episode = false;
+                    // ⚠️★ この starvation エピソードで到達した最大値。
+                    //   `step()` は復帰した瞬間に 0 へ戻すので、そのまま書くと
+                    //   **復帰行が `starved_ms: 0` になり「何秒落ちていたか」が消える**
+                    //   (code-reviewer MEDIUM)。★ 測った量を残すのが本行の存在理由なので保持する。
+                    let mut peak_starved_ms: u64 = 0;
+
+                    loop {
+                        thread::sleep(Duration::from_millis(TICK_MS));
+                        if is_shutting_down() {
+                            return;
+                        }
+
+                        let session_active = liveness_session_active.load(Ordering::Acquire);
+
+                        // ★ 生 tick の「変化」だけを見る (絶対時刻へ変換しない = ラップアラウンド安全)。
+                        let tick = liveness::last_system_input_tick();
+                        let system_input_seen = match (prev_tick, tick) {
+                            (Some(a), Some(b)) => a != b,
+                            // 判断材料が無い OS (macOS 等) は安全側に倒す = starvation を進めない。
+                            _ => false,
+                        };
+                        prev_tick = tick;
+
+                        let callbacks = crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);
+                        let hook_event_seen = callbacks != prev_callbacks;
+                        prev_callbacks = callbacks;
+
+                        starv = liveness::step(
+                            starv,
+                            session_active,
+                            system_input_seen,
+                            hook_event_seen,
+                            TICK_MS,
+                        );
+                        let health = liveness::health(starv, th);
+                        peak_starved_ms = peak_starved_ms.max(starv.starved_ms);
+
+                        // ★ トレイはこのフラグを見る (`tray::current_state`)。
+                        crate::input::hook::HOOK_STARVED
+                            .store(health == HookHealth::Down, Ordering::Relaxed);
+
+                        // ★ Down になった最初の 1 回だけ、既存の再設置経路を起こす (D-3)。
+                        let mut rehook = false;
+                        if health == HookHealth::Down && !rehook_done_this_episode {
+                            rehook = crate::input::hook::request_reinstall();
+                            rehook_done_this_episode = true;
+                        }
+                        // ★ 本物の復帰 (フックが呼ばれた or 計測終了) でエピソードを閉じる。
+                        if starv.starved_ms == 0 {
+                            rehook_done_this_episode = false;
+                        }
+
+                        // ★ 1Hz で連発しない。状態が変わったとき、または再設置したときだけ記録する。
+                        if health == prev_health && !rehook {
+                            continue;
+                        }
+
+                        match health {
+                            HookHealth::Suspect if prev_health == HookHealth::Ok => {
+                                tracing::error!(
+                                    starved_ms = starv.starved_ms,
+                                    "keyboard hook may be dead: the system saw input but the hook \
+                                     was not called (keystrokes may NOT be recorded)"
+                                );
+                            }
+                            HookHealth::Down if prev_health != HookHealth::Down => {
+                                tracing::error!(
+                                    starved_ms = starv.starved_ms,
+                                    rehook_requested = rehook,
+                                    "keyboard hook is NOT delivering events; keystrokes are NOT \
+                                     being recorded for this block"
+                                );
+                            }
+                            HookHealth::Ok if prev_health != HookHealth::Ok => {
+                                tracing::info!("keyboard hook is delivering events again");
+                            }
+                            _ => {}
+                        }
+
+                        // ★ 復帰行には**エピソードのピーク**を載せる (現在値は 0 に戻っているため)。
+                        let reported_starved_ms = if health == HookHealth::Ok {
+                            peak_starved_ms
+                        } else {
+                            starv.starved_ms
+                        };
+                        if liveness_log_tx
+                            .try_send(LogEntry::HookHealth {
+                                timestamp: SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_millis() as u64,
+                                alive: health != HookHealth::Down,
+                                starved_ms: reported_starved_ms,
+                                rehook,
+                            })
+                            .is_err()
+                        {
+                            // ⚠️★ この行は「そのブロックが有効か」を判断する唯一の証跡なので、
+                            //   落ちたことだけは残す (監視スレッドなのでログ制約は無い)。
+                            tracing::error!("failed to record a hook_health line (log queue full)");
+                        }
+                        if health == HookHealth::Ok {
+                            peak_starved_ms = 0;
+                        }
+                        prev_health = health;
+                    }
+                });
+            }
+
             if g1_mode().is_some() {
                 let app_handle = app.handle().clone();
                 let block_log_tx = log_tx_g1;

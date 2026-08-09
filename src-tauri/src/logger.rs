@@ -598,6 +598,24 @@ pub enum LogEntry {
         on: bool,
         active: bool,
     },
+    /// ⚠️★★ キーボードフックの生存状態が変わった (`input::liveness`)。
+    ///
+    /// 2026-08-09 の Windows 実機で、**5 分間 0 打のブロックが「正常」として自動提出された**
+    /// (`windows-verification.md` §5-7)。⚠️ 提出物 (`.age`) だけを見ても
+    /// 「打っていない」のか「記録できていない」のか**区別できなかった**のが最大の問題である。
+    ///
+    /// ★ そこで本行は **判断ではなく測った量** (`starved_ms`) を載せる。
+    /// 後から閾値を変えて再解釈でき、解析側 (`analyze.py` / `validate_blocks.py`) が
+    /// 「このブロックは無効」と機械判定できる。
+    HookHealth {
+        timestamp: u64,
+        /// false = 「設置済みなのにイベントが届いていない」と判断した状態。
+        alive: bool,
+        /// 「システムには入力があるのに自前のフックが呼ばれなかった」時間の累積 (ms)。
+        starved_ms: u64,
+        /// このイベントで**再設置を要求した**か。
+        rehook: bool,
+    },
     /// ユーザーが「開始する」を押した時刻 (セッション境界マーカー)
     SessionStart { timestamp: u64 },
     /// Ground Truth ユーザーラベル (Phase 1)
@@ -1216,6 +1234,19 @@ impl SessionLogger {
                                 writer,
                                 r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
                                 timestamp, on, active,
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::HookHealth {
+                            timestamp,
+                            alive,
+                            starved_ms,
+                            rehook,
+                        } => {
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{}}}"#,
+                                timestamp, alive, starved_ms, rehook,
                             );
                             dirty = true;
                         }

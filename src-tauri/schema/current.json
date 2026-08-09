@@ -250,6 +250,41 @@
       }
     },
     {
+      "description": "⚠️★ キーボードフックの生存状態の変化 (`input::liveness`)。\n\n`alive=false` は「フックは設置済みだが、システムに入力があるのに コールバックが呼ばれていない」状態を指す。★ **判断ではなく測った量** (`starved_ms`) を 併記するので、解析側が閾値を変えて再解釈できる。 背景: `windows-verification.md` §5-7 (5 分間 0 打のブロックが正常提出された)。",
+      "type": "object",
+      "required": [
+        "alive",
+        "rehook",
+        "starved_ms",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "alive": {
+          "type": "boolean"
+        },
+        "rehook": {
+          "type": "boolean"
+        },
+        "starved_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "hook_health"
+          ]
+        }
+      }
+    },
+    {
       "description": "Phase 1 Ground Truth ユーザーラベル。 `recovered_at` はログ記録時は常に null、`gse-replay --metrics` で後付け算出。",
       "type": "object",
       "required": [
