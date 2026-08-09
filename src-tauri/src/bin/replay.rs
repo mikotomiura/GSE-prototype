@@ -154,6 +154,16 @@ enum ReplayEvent {
     /// 本 variant が無いと NDJSON に intervention_response 行があるとき deserialize でエラーになる。
     #[serde(rename = "intervention_response")]
     InterventionResponse(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️★★ キーボードフックの生存診断 (`input::liveness`)。features/HMM 未使用のため読み飛ばす。
+    ///
+    /// ★ **この variant が無いと `--snapshot` 経路が丸ごと落ちる。**
+    /// `run_replay` は未知タグを `Err` にして中断するので (`--metrics` 側だけが lenient)、
+    /// 行型を足したのに ここへ足し忘れると **実セッションが 1 本も replay できなくなる**
+    /// (= Replay-as-Truth が切れる)。⚠️ 2026-08-09 に実測で踏んだ:
+    /// `parse error at line 2: unknown variant 'hook_health'`。
+    /// 回帰は `hook_health_line_is_skipped_by_run_replay` が張っている。
+    #[serde(rename = "hook_health")]
+    HookHealth(#[allow(dead_code)] serde_json::Value),
     /// v0.3 較正スモーク: セッション宣言。`--calibration` 経路で track を抽出する。
     /// snapshot/run_replay 経路では `timestamp()==None` で読み飛ばす。
     #[serde(rename = "session_meta")]
@@ -234,6 +244,8 @@ impl ReplayEvent {
             ReplayEvent::ImeShadow(_) => None,
             ReplayEvent::InterventionDecision(_) => None,
             ReplayEvent::InterventionResponse(_) => None,
+            // 診断行。ゲート進行を動かさないので時刻順ソートから除外する。
+            ReplayEvent::HookHealth(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
             // run_replay (snapshot 経路) の時刻順ソートからは除外する (UserLabel と同方針)。
             ReplayEvent::SessionMeta { .. } => None,
@@ -1645,6 +1657,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::ImeShadow(_)
             | ReplayEvent::InterventionDecision(_)
             | ReplayEvent::InterventionResponse(_)
+            | ReplayEvent::HookHealth(_)
             | ReplayEvent::SessionMeta { .. }
             | ReplayEvent::ProbeAssignment { .. }
             | ReplayEvent::RealtimeLabel { .. }
@@ -2174,6 +2187,50 @@ mod tests {
             ),
             "expected ReplayEvent::Paste with Some(7), got {ev:?}"
         );
+    }
+
+    /// ⚠️★★ `hook_health` 行 (フック生存診断) を含む NDJSON が **`run_replay` を通る**こと。
+    ///
+    /// ★ この回帰が要る理由 (2026-08-09 に実測で踏んだ): `run_replay` は未知タグを
+    /// `Err` にして**中断する**ため、`logger.rs` に行型を足して `ReplayEvent` に足し忘れると
+    /// **その版のアプリで採った実セッションが 1 本も replay できなくなる**
+    /// (`parse error: unknown variant 'hook_health'`)。
+    /// ⚠️ ゴールデン fixture は全て旧形式なので、**ゴールデンが緑でもこの事故は検出できない**。
+    #[test]
+    fn hook_health_line_is_skipped_by_run_replay() {
+        let line =
+            r#"{"type":"hook_health","t":120000,"alive":false,"starved_ms":120000,"rehook":true}"#;
+        let ev: ReplayEvent = serde_json::from_str(line).expect("parse hook_health");
+        assert!(
+            matches!(ev, ReplayEvent::HookHealth(_)),
+            "expected ReplayEvent::HookHealth, got {ev:?}"
+        );
+        assert_eq!(
+            ev.timestamp(),
+            None,
+            "hook_health は時刻順ソートから除外する"
+        );
+
+        // ★ 単体の deserialize だけでは足りない: **run_replay 全体が通ること**を確かめる。
+        let mut ndjson =
+            std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read minimal fixture");
+        ndjson.push_str(line);
+        ndjson.push('\n');
+        // ★ 同一ファイル内の他テストと同じく PID を付ける (並行実行での衝突回避)。
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_hook_health_replay_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let with_line = run_replay(&tmp).expect("run_replay must accept hook_health lines");
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+        assert_eq!(
+            with_line.len(),
+            baseline.len(),
+            "hook_health 行は FeatSnapshot 列を 1 件も変えてはならない"
+        );
+        let _ = std::fs::remove_file(&tmp);
     }
 
     /// `intervention_response` 行 (Phase A2 の Wall 応答 + 旧 Nudge dismiss) が deserialize でき、

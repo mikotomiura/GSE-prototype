@@ -30,6 +30,17 @@ interface SubmissionStatus {
   upload_disabled: boolean;
   /** ★ 被験者の確認待ちの本数 (`.age` は在るが「送信する」がまだ押されていない)。 */
   awaiting_approval: number;
+  /** ★ いま収束器が走っている (= 送信を試みている最中)。承認から完了まで実機で 6 秒かかる。 */
+  sending: boolean;
+  /**
+   * ★ 最後に **1 件以上送れた** 時刻 (epoch ms)。`null` = この起動ではまだ 1 件も送れていない。
+   *
+   * ⚠️★★ これは **「送信する」を押した時刻ではない**。収束器が `.sent` を置いた
+   * (= アップロードが成功した) 事実だけがここに載る。押下を根拠にすると偽のレシートになる。
+   */
+  last_sent_ms: number | null;
+  /** ★ そのとき送れた本数 (レシートの「N 件」)。 */
+  last_sent_count: number;
 }
 
 /**
@@ -39,6 +50,17 @@ interface SubmissionStatus {
  */
 function isValidParticipantId(id: string): boolean {
   return /^[A-Za-z0-9]{1,16}$/.test(id);
+}
+
+/**
+ * レシートに出す時刻 (HH:MM)。★ 端末のローカル時刻で出す (被験者が自分の時計と照合できる形)。
+ * ⚠️ 秒は出さない (精度を装わない)。
+ */
+function formatReceiptTime(epochMs: number): string {
+  return new Date(epochMs).toLocaleTimeString("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / decisions FD2)。
@@ -155,6 +177,9 @@ function App() {
     last_error: null,
     upload_disabled: false,
     awaiting_approval: 0,
+    sending: false,
+    last_sent_ms: null,
+    last_sent_count: 0,
   });
   // 「送信する」を押したときのエラー (押したのに何も起きない状態を作らない)。
   const [approveError, setApproveError] = useState<string | null>(null);
@@ -164,6 +189,9 @@ function App() {
   // Task C: session_meta 宣言 + ビネット導線。
   const [taskKind, setTaskKind] = useState<TaskKind>("argumentative");
   const [showVignette, setShowVignette] = useState(false);
+  // ⚠️ `import.meta.env.DEV` ではなく明示的な `VITE_GSE_DEBUG=1` で判定する
+  //   (Dashboard.tsx:224 と同じ規約。起動方法で盲検が崩れないようにするため)。
+  const debugView = import.meta.env.VITE_GSE_DEBUG === "1";
   // Phase 1 の 2 相プロトコル週セレクタ (tasklist #A / FD2)。既定は第1週 (blind 較正)。
   // 介入有効化・較正モード・condition・label_pool はこの 1 選択から派生し、開始後はスタート
   // 画面を離れるためセッション中は変更できない (実質ロック)。
@@ -312,12 +340,14 @@ function App() {
     };
     read();
     // 自動提出は別プロセスなので完了イベントが無い。★ スタート画面にいる間だけ 3 秒で追う。
-    const t = setInterval(read, 3000);
+    // ⚠️ ★ 送信中だけ 1 秒に上げる。実機で承認 → 完了に 6 秒かかっており、3 秒のままだと
+    //   ★ **送り終わってから最大 3 秒間、レシートが出ない**（沈黙が残る）。
+    const t = setInterval(read, submissionStatus.sending ? 1000 : 3000);
     return () => {
       cancelled = true;
       clearInterval(t);
     };
-  }, [g1Mode, isStarted, g1BlocksDone]);
+  }, [g1Mode, isStarted, g1BlocksDone, submissionStatus.sending]);
 
   // 4c. G1: 5 分でのブロック自動終了。バックエンドがログを閉じたのでスタート画面へ戻す。
   //     ⚠️ ★ 出すのは「終わった」だけ。残り時間・カウントダウンは出さない
@@ -592,6 +622,10 @@ function App() {
                   borderRadius: "6px",
                   border: "2px solid #4caf50",
                   background: "rgba(76,175,80,0.25)",
+                  // ⚠️★ 文字色を明示する。ボタンは `color` を継承しないので、
+                  //   指定しないと UA 既定（ほぼ黒）が暗い背景に載って**読めなくなる**
+                  //   （2026-08-08 にスタート画面で同じ形の「空の箱」を実機で踏んだ）。
+                  color: "#e2e8f0",
                   cursor: approving ? "wait" : "pointer",
                   fontWeight: "bold",
                 }}
@@ -605,6 +639,8 @@ function App() {
                   borderRadius: "6px",
                   border: "1px solid #888",
                   background: "transparent",
+                  // ⚠️★ 同上。透明背景ならなおさら文字色を明示する。
+                  color: "#cbd5e1",
                   cursor: "pointer",
                 }}
               >
@@ -619,10 +655,40 @@ function App() {
           </div>
         )}
 
+        {/* ★★ 送信中 (2026-08-10)。⚠️ 実機で承認 → 完了に **6.2 秒 / 5.7 秒**かかっており、
+            その間このスタート画面は **完全に無表示**だった。★ 空白を「たぶん成功」と
+            読ませないために、送っている最中であることをそのまま出す。
+            ⚠️ 進捗率や残り秒数は出さない (収束器から取れない値を装わない)。 */}
+        {!!g1Mode && submissionStatus.sending && submissionStatus.unsent > 0 && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              margin: "0.5rem 0",
+              padding: "0.6rem 0.9rem",
+              borderRadius: "6px",
+              border: "1px solid #64b5f6",
+              background: "rgba(100,181,246,0.12)",
+              fontSize: "0.85rem",
+              maxWidth: "34rem",
+            }}
+          >
+            <b>記録を送信しています…</b>
+            <br />
+            <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+              数秒かかります。このままお待ちください。
+            </span>
+          </div>
+        )}
+
         {/* ★ 未送信の可視化 (G1 モード限定)。⚠️ **0 件なら何も出さない** (被験者のノイズにしない)。
             ★ 送信の成否は送信先から追えないので、ここが唯一の安全装置である。
-            ⚠️ 確認待ちのぶんは上のカードが担当するので、ここでは **確認済みで未達のもの**だけ扱う。 */}
-        {!!g1Mode && submissionStatus.unsent - submissionStatus.awaiting_approval > 0 && (
+            ⚠️ 確認待ちのぶんは上のカードが担当するので、ここでは **確認済みで未達のもの**だけ扱う。
+            ⚠️ ★ 送信中は出さない。文面が「次のブロックの後に再試行します」なので、
+            **いま送っている最中**に出すと嘘になる (上の送信中カードが代わりに出ている)。 */}
+        {!!g1Mode &&
+          !submissionStatus.sending &&
+          submissionStatus.unsent - submissionStatus.awaiting_approval > 0 && (
           <div
             role="status"
             style={{
@@ -658,6 +724,70 @@ function App() {
             </span>
           </div>
         )}
+
+        {/* ★★ 提出レシート (2026-08-10)。送信の**成功**を肯定形で出す唯一の場所。
+
+            ⚠️★★ 根拠は「送信するを押したこと」**ではない**。バックエンドの
+            `last_sent_ms` は、収束器が `.sent` を置いた (= アップロードが成功した) ときにしか
+            立たない。押下を根拠にすると **偽のレシート**になる。
+
+            ⚠️ ★ 確認待ちが 1 件でもある間は出さない。次のブロックの確認カードと並ぶと、
+            **まだ送っていない回のレシート**に読めるため。隠しておけば、見えているレシートの
+            「この回」は必ず直近のブロックを指す。
+
+            ⚠️ 未送信が残っていても出す (部分成功)。「1 件送れた / 1 件残っている」は
+            両方とも事実であり、片方を伏せない。 */}
+        {!!g1Mode &&
+          submissionStatus.awaiting_approval === 0 &&
+          !submissionStatus.sending &&
+          submissionStatus.last_sent_ms !== null && (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                margin: "0.5rem 0",
+                padding: "0.6rem 0.9rem",
+                borderRadius: "6px",
+                border: "1px solid #4caf50",
+                background: "rgba(76,175,80,0.12)",
+                fontSize: "0.85rem",
+                maxWidth: "34rem",
+              }}
+            >
+              <b>
+                ✅ この回の記録を送信しました（
+                {formatReceiptTime(submissionStatus.last_sent_ms)}・
+                {submissionStatus.last_sent_count} 件）
+              </b>
+              <br />
+              <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+                この端末からの送信は完了しています。<b>次のブロックに進んでください。</b>
+              </span>
+            </div>
+          )}
+
+        {/* ★ 未送信 0 件を **肯定形**で言う。⚠️ 「警告が出ていない」を成功と読ませない
+            (memory `silent-success-is-not-visible`)。★ まだ 1 件も送っていない起動直後は
+            「すべて送信済み」と書けないので、⚠️ **言える事実だけ**を書く。 */}
+        {!!g1Mode &&
+          submissionStatus.awaiting_approval === 0 &&
+          !submissionStatus.sending &&
+          submissionStatus.last_sent_ms === null &&
+          submissionStatus.unsent === 0 && (
+            <div
+              role="status"
+              style={{
+                margin: "0.5rem 0",
+                padding: "0.6rem 0.9rem",
+                borderRadius: "6px",
+                border: "1px solid #888",
+                fontSize: "0.85rem",
+                maxWidth: "34rem",
+              }}
+            >
+              ✅ 送信を待っている記録はありません。
+            </div>
+          )}
 
         {/* ⚠️ ★ 自動提出そのものが起動できなかった / 失敗した場合。★ ログではなく画面に出す
             (「起こしたつもりで動いていない」を黙って通さない)。 */}
@@ -769,13 +899,24 @@ function App() {
         >
           開始する
         </button>
-        <button
-          className="start-button"
-          onClick={() => setShowVignette(true)}
-          style={{ background: "transparent", border: "1px solid #888", marginTop: "0.5rem" }}
-        >
-          尺度理解テスト (初回)
-        </button>
+        {/* ⚠️★★ スタート画面には「開始する」以外のボタンを置かない (2026-08-08 の研究者指摘)。
+            ★ 実際の画面では、下に並んでいた 2 つのボタンが **中身の見えない空の箱**になっていた:
+              `.start-button` は緑地用に `color: #0f172a`（ほぼ黒）を持っているのに、
+              インラインで `background: transparent` **だけ**を上書きしていたため、
+              暗い背景に黒文字で ★ **文字が完全に見えなかった**。
+            ⚠️ 「尺度理解テスト」は `docs/functional-design.md:143` のとおり
+              **現行スコープでは延期**（比較条件を実装した段で発効）なので、被験者には出さない。
+              ★ 研究者のデバッグビルド (`VITE_GSE_DEBUG=1`) でだけ残す。
+            ⚠️ 終了ボタンはここから外した。★ **× とトレイの「GSE を終了」で終了できる**
+              ことを実機で確認済み（どちらも 2 秒でプロセスが消える）。 */}
+        {debugView && (
+          <button
+            className="start-button start-button-secondary"
+            onClick={() => setShowVignette(true)}
+          >
+            尺度理解テスト (初回・研究者用)
+          </button>
+        )}
         {startError && (
           <p className="start-error" style={{ color: '#ff6b6b', marginTop: '0.5rem', fontSize: '0.9rem' }}>
             {startError}

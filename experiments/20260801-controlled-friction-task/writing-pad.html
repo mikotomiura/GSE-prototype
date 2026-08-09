@@ -107,6 +107,36 @@
        （§2.11 は「パッドはペーストを禁止しない」= 被験者の打鍵挙動に手を出さない、という意味）。 */
     user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none;
   }
+  /* ★★ 開始ゲート（2026-08-08 追加）。
+       ⚠️ ★ **開いただけでは何も始まらない**ようにする。旧版は setTimeout がトップレベルに
+          あったため、ファイルを開いた瞬間に 5 分が走り出していた。
+          → 受付メールが「目を通しておいて構いません」と言い、ページが「開くな」と言う
+            という自己矛盾を生んでいた（2026-08-08 に発見）。
+       ★ 押すと課題と記入欄が**同時に**出る。⚠️ **資料を読む時間は 5 分の中のまま**である
+          （読む作業そのものが条件の差なので、それを 5 分の外に出すと差が消える）。
+       ★ 何も保存しないので、誤って押しても閉じて開き直せば元に戻る。 */
+  #gate { margin-bottom: 16px; padding: 20px; background: #fff;
+          border: 1px solid #a8a29e; border-radius: 6px; }
+  #gate p { margin: 0 0 14px; }
+  #gate .gate-note { margin: 14px 0 0; font-size: 13px; line-height: 1.7; color: #57534e; }
+  #start { font-size: 17px; font-weight: 700; padding: 12px 24px;
+           background: #0f766e; color: #fff; border-color: #0f766e; }
+  #start:hover { background: #115e59; }
+  /* ★ 開始前は課題も記入欄も文字数も出さない。⚠️ **課題文だけ隠しても意味が無い**
+       （記入欄が先に出ていると、そこから打ち始められる）。 */
+  body:not(.g1-started) .task,
+  body:not(.g1-started) textarea,
+  body:not(.g1-started) footer { display: none; }
+  body.g1-started #gate { display: none; }
+  /* ★ 開始後に出す一言。アプリ側の「開始する」を押し忘れたまま書き始めると、
+       その打鍵がアプリのファイルに入らない。旧版にはこの注意が無かった。 */
+  #after-start { display: none; }
+  body.g1-started #after-start {
+    display: block; margin: 0 0 12px; padding: 8px 12px;
+    font-size: 13px; line-height: 1.7;
+    background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px; color: #7c2d12;
+  }
+
   .task h2 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
   .task h3 { font-size: 14px; margin: 14px 0 4px; font-weight: 600; color: #44403c; }
   .task p { margin: 6px 0; }
@@ -122,6 +152,28 @@
     <label class="block-no">ブロック <input id="block" type="text" inputmode="numeric"
       autocomplete="off" spellcheck="false" aria-label="ブロック番号"></label>
   </header>
+
+  <!--
+    ★★ 開始ゲート（2026-08-08 追加）。⚠️ ★ **押すまで課題も記入欄も出さない。**
+       押した瞬間に両方が出て、そこから 5 分を数える。
+  -->
+  <section id="gate" aria-label="開始">
+    <p>
+      ★ <strong>このページを開いただけでは、まだ何も始まっていません。</strong><br>
+      下のボタンを押すと、<strong>課題と記入欄が出て、その時から 5 分</strong>を数えます。
+    </p>
+    <button id="start" type="button">課題を表示して始める</button>
+    <p class="gate-note">
+      ⚠️ ★ <strong>押す前に、アプリを開いておいてください。</strong>
+      押したあとは、アプリの「開始する」を押してから書き始めます。<br>
+      ★ 間違って押しても大丈夫です。<strong>このページを閉じて開き直せば、元の状態に戻ります</strong>
+      （このページは何も保存していません）。
+    </p>
+  </section>
+
+  <div id="after-start" role="note">
+    ⚠️ ★ <strong>アプリの「開始する」を押してから書き始めてください。</strong>
+  </div>
 
   <!--G1_TASK_PANEL_SLOT-->
 
@@ -161,11 +213,12 @@
   <p class="notice">
     ★ <strong>書いた文章は保存されません。</strong>
     このページを閉じる・再読み込みすると本文は消えます。記録するのは文字数だけです。<br>
-    ★ <strong>このページを開いた時点で 5 分が始まります。</strong>
-    先に開いて置いておかないでください。5 分たつと知らせが出て、記入欄は書けなくなります
+    ★ <strong>5 分は「課題を表示して始める」を押した時から数えます。</strong>
+    5 分たつと知らせが出て、記入欄は書けなくなります
     （⚠️ 本文は消えません。<strong>文字数を控えてから</strong>「本文を消去する」を押してください）。<br>
     ★ 次のブロックは<strong>このページからは始まりません</strong>。
-    <strong>アプリを起動し直してから</strong>次の番号のページを開いて始めます。
+    次の番号のページを開き、そこで<strong>「課題を表示して始める」</strong>を押して始めます
+    （★ <strong>アプリは開いたままで結構です。</strong>起動し直す必要はありません）。
   </p>
 </div>
 
@@ -175,6 +228,7 @@
   var pad = document.getElementById("pad");
   var out = document.getElementById("count");
   var clearBtn = document.getElementById("clear");
+  var startBtn = document.getElementById("start");
 
   // ★ build_task_pages.py が生成したブロックページでは window.G1_BLOCK が入っている。
   //   その場合、ブロック番号は**割付から決まっている**ので手入力させない
@@ -270,9 +324,10 @@
   //      → ★ **止められるのは実施中だけ**なので、道具をこのページに置く。
   //
   //   ⚠️ ★ 出すのは「終わった」だけである。**残り時間は出さない**（§4.4）。
-  //   ⚠️ ★ 起点は**このページを開いた時刻**である。手順では、アプリを起動してから
-  //      そのブロックのページを開くことになっているので、開いた時点が開始である。
-  //      → 注意書きにもそう書いてある（先に開いて放置しない）。
+  //   ⚠️ ★ 起点は**「課題を表示して始める」を押した時刻**である（2026-08-08 に変更）。
+  //      旧版は**ページを開いた時刻**が起点だったので、ファイルを開くだけでブロックが
+  //      走り出し、案内文（「目を通しておいて構いません」）と食い違っていた。
+  //      ★ 押すまでは課題も記入欄も出ないので、開くだけでは読むこともできない。
   var BLOCK_MS = 5 * 60 * 1000;
 
   function timeIsUp() {
@@ -289,18 +344,39 @@
     if (f && f.scrollIntoView) f.scrollIntoView({ block: "end" });
   }
 
-  setTimeout(timeIsUp, BLOCK_MS);
+  // ★★ ブロックを始める。⚠️ ★ **課題の表示と 5 分の起動は同じ 1 回の操作**である。
+  //   片方だけ（例: 先に課題を出して、あとで開始を押す）にすると、
+  //   ⚠️ 資料を読む時間が 5 分の外に出て、条件の差そのものが薄まる。
+  // ★ 押し直しても数え直さない（`started` で 1 回きり）。ボタンは押した時点で画面から消える。
+  var started = false;
+
+  function startBlock() {
+    if (started) return;
+    started = true;
+    document.body.classList.add("g1-started");
+    setTimeout(timeIsUp, BLOCK_MS);
+    pad.focus();
+  }
+
+  if (startBtn) startBtn.addEventListener("click", startBlock);
 
   // ★ 誤って閉じる・再読み込みするとブロックの本文が失われ、そのブロックの
   //   産出文字数（§3.5 の報告義務）が取れなくなる。保存はしないが、警告は出す。
+  //
+  // ⚠️★ **`started` も見る**（2026-08-08 に追加。それまでは未入力なら黙って閉じられた）。
+  //   開始を押した時点で 5 分のタイマーは走っており、⚠️ **再読み込みしても巻き戻らない**
+  //   （`setTimeout` はページごと消える）。まだ 1 文字も書いていない段階こそ
+  //   「間違えて閉じた」が起きやすいのに、そこだけ無警告だった。
+  //   ★ 失われるのは本文だけではなく、**そのブロックの残り時間**である。
   window.addEventListener("beforeunload", function (e) {
-    if (pad.value.length === 0) return;
+    if (!started && pad.value.length === 0) return;
     e.preventDefault();
     e.returnValue = "";
   });
 
   refresh();
-  pad.focus();
+  // ★ 開始前は記入欄が出ていないので、フォーカスはゲートのボタンに置く。
+  if (startBtn) startBtn.focus();
 })();
 </script>
 </body>

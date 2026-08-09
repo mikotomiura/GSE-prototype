@@ -140,10 +140,15 @@ var MGMT_SHEET_PROP_G1 = "GSE_G1_MGMT_SHEET_ID";
 //    このプロジェクトで 2 回起きている（decisions.md E-6 / E-7）。
 var Q_SUBJECT_ID = "被験者ID";
 
-// ★★ 第 8 版 §2.12-4: 事前にどれだけ読んだかを G1-S で記録する。
+// ★★ §2.12-4: 当日より前に中を見たかを G1-S で記録する。
 //    ⚠️ **判定に使わない・除外にも使わない**（§3.6 無変更）。§3.8 の限界の記述に使う。
-var Q_S_PREREAD = "事前にお送りした資料を、当日までにどのくらいご覧になりましたか。";
-var Q_S_PREREAD_NOTE = "書く内容を考えておいた場合、どのくらい考えたか教えてください（任意）。";
+// ★★ 2026-08-08（第 11 版）: 事前開示を撤回したので、聞き方を
+//    「どのくらい読んだか」→「**当日より前に開いたか**」に変えた。
+//    ⚠️ ★ **設問自体は残す。** 撤回は抑止であって保証ではなく（押せば読める）、
+//       「事前に見た人はいない」を前提に置けないため。★ 測るという解き方を維持する。
+var Q_S_PREREAD =
+  "当日より前に、課題ページの「課題を表示して始める」を押して中をご覧になりましたか。";
+var Q_S_PREREAD_NOTE = "ご覧になった場合、書く内容も考えておかれましたか（任意）。";
 var Q_BLOCK_NO = "ブロック番号";
 var Q_HARDER = "より詰まったのはどちらですか";
 // 二択の選択肢文字列（相対表現。★ ブロック番号を被験者に計算させない）。
@@ -558,24 +563,27 @@ function buildPostSurveyForm() {
     .addParagraphTextItem()
     .setTitle("そう感じた場合、どのあたりが違うと思いましたか（任意）。");
 
-  // --- 1b. ★★ 事前にどれだけ読んだか（第 8 版 §2.12-4）---------------------
+  // --- 1b. ★★ 当日より前に中を見たか（§2.12-4）-----------------------------
   // ⚠️★ **判定に使わない。除外にも使わない**（§3.6 無変更）。§3.8 の限界の記述に使う。
-  //    §2.12（第 8 版）で課題文を来所前に開示したので、事前学習の量が
-  //    被験者ごとにばらつく。⚠️ 強制できないので、せめて記録する。
+  //    ★★ 2026-08-08（第 11 版）: 事前開示を**撤回した**。
+  //    ⚠️ ★ それでもこの設問は残す。撤回は**抑止であって保証ではない**からである:
+  //       無人在宅では blockNN.html を当日より前に手元へ渡すしかなく、
+  //       ページの「課題を表示して始める」を押せば中は読める。
+  //       → 「事前に見た人はいない」を前提に置けない。★ **測って報告する**。
   //    ⚠️ ★ **自己申告であり検証できない**ことも §3.8 に書いてある。
   addSectionHeader(
     form,
-    "1b. 事前にお送りした資料について",
-    "★ 正解はありません。**読んでいなくても全く問題ありません。**\n" +
+    "1b. 当日より前に開いたかどうか",
+    "★ 正解はありません。**開いていても、開いていなくても全く問題ありません。**\n" +
       "⚠️ この回答で参加者を除外したり、評価を変えたりすることはありません。"
   );
   var preread = form.addMultipleChoiceItem();
   preread.setTitle(Q_S_PREREAD);
   preread.setChoices([
-    preread.createChoice("開いていない"),
-    preread.createChoice("ざっと目を通した"),
-    preread.createChoice("一通り読んだ"),
-    preread.createChoice("読んだうえで、書く内容も考えておいた"),
+    preread.createChoice("押していない（当日が初めて）"),
+    preread.createChoice("押したが、ほとんど読まなかった"),
+    preread.createChoice("押して、一通り読んだ"),
+    preread.createChoice("押して読んだうえで、書く内容も考えておいた"),
   ]);
   preread.setRequired(true);
   form.addParagraphTextItem().setTitle(Q_S_PREREAD_NOTE);
@@ -666,6 +674,184 @@ function shortUrlProp_(key) {
 
 function getShortUrl_(props, key) {
   return props.getProperty(shortUrlProp_(key)) || "";
+}
+
+// ============================================================
+// ★★ 配布 URL の短縮（2026-08-08・研究者要望）
+// ============================================================
+// ⚠️ ★ **短縮は「見やすさ」のためであって、機能上の必要ではない。**
+//   実測: 受付メール中の Drive URL は text/plain でも**折り返されていない**（リンクは切れていない）。
+//
+// ⚠️★★ したがって **失敗しても絶対に止めない。生の URL に落ちる。**
+//   ★ 短縮できなかったせいでリンクが配られない、という事故を作らないためである。
+//   （`shortenFormUrls()` が「短縮したつもりでエラー文字列を配る」を警戒しているのと同じ考え）
+//
+// ★ **送信時には短縮しない。** 事前に `shortenG1DistributionUrls()` で作って
+//   Script Properties に貯めておき、送信時は**引くだけ**にする。理由:
+//   ⚠️ `onG1ConsentSubmit` は登録の瞬間に走るトリガーであり、
+//      そこで外部 API を叩くと**遅延と失敗が登録経路に乗る**。
+
+/** ★ 短縮があればそれを、無ければ生の URL を返す（⚠️ 絶対に空を返さない）。 */
+function g1ShortOr_(key, rawUrl) {
+  if (!rawUrl) return rawUrl;
+  try {
+    var s = getShortUrl_(PropertiesService.getScriptProperties(), key);
+    return s || rawUrl;
+  } catch (e) {
+    // ⚠️ ★ プロパティが読めなくても生の URL は返す。ここで例外を投げない。
+    return rawUrl;
+  }
+}
+
+/**
+ * ★★ 被験者に配る**フォームの回答 URL**（2026-08-08 新設）。
+ *
+ * ⚠️ ★ **絶対に空を返さない。** 空を返すと本文に「リンクの無い案内」が載り、
+ *    ★ 導線が無いのと同じになる（それが今回直している不具合そのものである）。
+ * ⚠️ `shortenG1DistributionUrls()` は**アプリと課題ページしか短縮しない**。
+ *    フォームの短縮は `shortenFormUrls()` 側（`SHORTURL_G1_MCHECK` / `SHORTURL_G1_SURVEY`）である。
+ *
+ * 3 段に落ちる:
+ *   1. 短縮 `SHORTURL_<key>`（`shortenFormUrls()` が作る）
+ *   2. `FORMURL_<key>` の `publishedUrl`（`recordFormUrl_` がフォーム構築時に保存する）
+ *   3. ★ 編集 ID から回答 URL を組み立てる（プロパティが 1 つも無くてもリンクは配る）
+ *      ⚠️ 3 は最後の砦である。⚠️ 匿名で開けることを curl（Cookie 無し）で実測して採用した
+ *      （`/forms/d/<id>/viewform` → 公開 URL `/forms/d/e/…/viewform` へ 302）。
+ */
+function g1FormLink_(key, formId) {
+  var published = "";
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var s = getShortUrl_(props, key);
+    if (s) return s;
+    var raw = props.getProperty("FORMURL_" + key);
+    if (raw) published = JSON.parse(raw).publishedUrl || "";
+  } catch (e) {
+    // ⚠️ ★ プロパティが読めなくてもリンクは配る。ここで例外を投げない。
+  }
+  if (published) return published;
+  return "https://docs.google.com/forms/d/" + formId + "/viewform";
+}
+
+/** ★ 課題ページ（被験者ごと）の短縮キー。 */
+function g1MaterialsShortKey_(pid) {
+  return "G1_MATERIALS_" + String(pid == null ? "" : pid).trim();
+}
+
+/**
+ * ★ 1 本短縮して Script Properties に保存する。
+ * @return {string} "" = 成功 / それ以外 = 失敗理由（⚠️ 呼び出し側が**握りつぶさない**）
+ */
+function g1ShortenOne_(props, apiKey, key, rawUrl) {
+  // ⚠️★ 既にあるものを上書きしない。★ 配布済みの短縮 URL を生かしたままにするため。
+  if (getShortUrl_(props, key)) return "";
+  var url =
+    XGD_ENDPOINT +
+    "?key=" + encodeURIComponent(apiKey) +
+    "&url=" + encodeURIComponent(rawUrl) +
+    "&analytics=false";
+  var res, body, json = null;
+  try {
+    res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    body = res.getContentText();
+  } catch (e) {
+    return "通信に失敗: " + e;
+  }
+  try {
+    json = JSON.parse(body);
+  } catch (e) {
+    /* JSON でない = API 側の異常 */
+  }
+  if (!json || json.status !== 200 || !json.shorturl) {
+    return "HTTP " + res.getResponseCode() + " — " +
+      (json && json.message ? json.message : String(body).slice(0, 200));
+  }
+  props.setProperty(shortUrlProp_(key), json.shorturl);
+  return "";
+}
+
+/**
+ * ★★ 配布 URL（アプリ ＋ 被験者ごとの課題ページ）を**事前に**短縮してキャッシュする。
+ *
+ * ★ 何度実行してもよい（既にあるものは触らない）。
+ * ⚠️ ★ **これを実行しなくてもメールは出る**（生の URL になるだけ）。
+ * ⚠️ 課題ページのフォルダがまだ無い P-ID は飛ばす。★ 用意してから実行し直すこと。
+ */
+function shortenG1DistributionUrls() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty(XGD_KEY_PROP);
+  if (!apiKey) {
+    Logger.log("ℹ️ " + XGD_KEY_PROP + " が未設定なので短縮しません（★ 実施には支障なし。生の URL が配られます）。");
+    return;
+  }
+
+  var done = 0, skipped = 0, failed = 0, notReady = 0;
+
+  // --- 1. アプリ配布 URL（★ 全員共通） ---
+  if (getShortUrl_(props, "G1_APP")) {
+    Logger.log("· アプリ: 既に短縮済み（" + getShortUrl_(props, "G1_APP") + "）");
+    skipped++;
+  } else {
+    var e1 = g1ShortenOne_(props, apiKey, "G1_APP", G1_APP_DOWNLOAD_URL);
+    if (e1) { Logger.log("❌ アプリ: " + e1); failed++; }
+    else { Logger.log("✅ アプリ: " + getShortUrl_(props, "G1_APP")); done++; }
+  }
+
+  // --- 2. 課題ページ（★ 被験者ごと） ---
+  var pids = [];
+  try {
+    var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+    pids = roster ? g1RosterParticipantIds_(roster) : [];
+  } catch (e) {
+    Logger.log("❌ ロスターを読めません: " + e);
+    return;
+  }
+  if (!pids.length) {
+    Logger.log("⚠️ ロスターに P-ID が 1 つもありません（★ 管理シートを取り違えていないか確認）。");
+  }
+
+  for (var i = 0; i < pids.length; i++) {
+    var pid = pids[i];
+    var k = g1MaterialsShortKey_(pid);
+    if (getShortUrl_(props, k)) { skipped++; continue; }
+    var found = g1MaterialsUrlForPid_(pid);
+    if (!found.url) {
+      Logger.log("· " + pid + ": まだ用意できていないので飛ばす（" + found.problem + "）");
+      notReady++;
+      continue;
+    }
+    var err = g1ShortenOne_(props, apiKey, k, found.url);
+    if (err) { Logger.log("❌ " + pid + ": " + err); failed++; }
+    else { Logger.log("✅ " + pid + ": " + getShortUrl_(props, k)); done++; }
+  }
+
+  Logger.log("--------");
+  Logger.log("★ 新規 " + done + " 件 / 既存 " + skipped + " 件 / 未用意 " + notReady + " 件 / 失敗 " + failed + " 件");
+  if (failed) {
+    Logger.log("⚠️ ★ 失敗した分は**生の URL で配られます**（リンクは切れません）。直したら実行し直してください。");
+  }
+  if (notReady) {
+    Logger.log("⚠️ ★ 未用意の分は課題フォルダを作ってから実行し直してください。");
+  }
+  Logger.log("★ 実際の本文は previewRegisterAckEmail() で確かめること。");
+}
+
+/**
+ * ⚠️ 短縮 URL を捨てて作り直せるようにする（★ **配布前にだけ**使うこと）。
+ * ⚠️★ 既に配ったメールの短縮 URL は x.gd 側に残るので**生きたまま**である。
+ *   ここで消えるのは「次に送るメールが引く先」だけである。
+ */
+function clearG1DistributionShortUrls() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties();
+  var n = 0;
+  for (var name in all) {
+    if (name === shortUrlProp_("G1_APP") || name.indexOf(shortUrlProp_("G1_MATERIALS_")) === 0) {
+      props.deleteProperty(name);
+      n++;
+    }
+  }
+  Logger.log("🧹 配布 URL の短縮を " + n + " 件消しました。⚠️ 既に配った URL は生きたまま残ります。");
 }
 
 /**
@@ -767,7 +953,8 @@ function buildManagementSheet() {
 
   buildLinksTab_(ss, props); // 毎回 URL を再集約（手動入力セルは保持する）
   buildRunTab_(ss); // 既存があれば作らない（入力データを破壊しない）
-  applyRunValidation_(ss); // 最後: ドロップダウン（型付き列に起因する読込順の事故を避ける）
+  applyRunValidation_(ss); // ドロップダウン（型付き列に起因する読込順の事故を避ける）
+  refreshSubmissionTab_(ss); // ★ 最後: 全部が導出値なので、実施トラッキングが整ってから描く
 
   ["シート1", "Sheet1"].forEach(function (n) {
     var s = ss.getSheetByName(n);
@@ -777,6 +964,300 @@ function buildManagementSheet() {
   Logger.log("✅ G1 管理シート作成/更新完了");
   Logger.log("🔗 " + ss.getUrl());
   return ss.getUrl();
+}
+
+// ============================================================
+// セッション提出トラッキング（★ 全部が導出値・手動編集禁止）
+// ============================================================
+// ⚠️★ **Phase1 の buildSubmissionTab_ をそのまま写していない。** Phase1 のそれは
+//   ヘッダ + ダミー 1 行だけの**手書き用の空タブ**で、埋めるコードがどこにも無い。
+//   ★ 無人・在宅（第 13 版）で「誰も埋めないタブ」を増やすのは、無いより悪い
+//   （見て「空だから提出ゼロ」と読み違える）。
+//
+// ★ G1 には自動化の材料が既にある:
+//     g1CollectSubmittedBlocks_()  … 受け口フォルダの `.age` を **ブロック単位**で拾う
+//     g1CountResponsesByPid_()     … G1-M に**どのブロックで**答えたかを拾う
+//   → 全部を導出する。手入力の列は **1 つも作らない**。
+//
+// ★ ここが答えるのは、19 列の「G1 実施トラッキング」が答えられないこと:
+//   「完了ブロック数(/10) = 7」の **どの 3 つが欠けているか**。
+//   ⚠️ 在宅では研究者が見ていないので、これが分からないと問い合わせ文が書けない。
+//
+// ⚠️ 行は **「G1 実施トラッキング」の P-ID から作る**（受け口フォルダからは作らない）。
+//   フォルダ側を真実源にすると、打ち間違えた P-ID がそのまま被験者として並ぶ。
+//   ★ 代わりに「シートに居ない P-ID の .age」は**別枠で警告として出す**（黙って捨てない）。
+
+var SUBMIT_TAB_NAME = "セッション提出トラッキング";
+/** G1 は **1 ブロック = 1 セッション**（ロガーがブロックごとにローテートする）。 */
+var G1_BLOCK_COUNT = 10;
+/** G1-M（ブロック直後の 1 問）を答える対象ブロック。★ 1・2・10 には比較対象が無い（§2.6）。 */
+var G1_MCHECK_BLOCKS = [3, 4, 5, 6, 7, 8, 9];
+
+/**
+ * セッション提出トラッキングを描き直す。★ 冪等（毎回まるごと再描画する）。
+ *
+ * ⚠️ ★ 往復回数を増やさない。2026-08-08 に 200 行 × 19 列を列ごとに書いて
+ *    **6 分の実行上限で落ちた**。→ 値は 1 回の setValues でまとめて書く。
+ */
+function refreshSubmissionTab_(ss) {
+  var run = ss.getSheetByName("G1 実施トラッキング");
+  if (!run) {
+    Logger.log("⚠️ 「G1 実施トラッキング」が無いので " + SUBMIT_TAB_NAME + " は描けません");
+    return;
+  }
+  try {
+    assertRunHeader_(run);
+  } catch (e) {
+    // ⚠️ ★ ヘッダがずれている状態で P-ID 列を読むと**別の列**を読む。黙って進まない。
+    Logger.log("❌ ヘッダが一致しないので " + SUBMIT_TAB_NAME + " を描きません: " +
+      String(e.message).split("\n")[0]);
+    return;
+  }
+
+  var pids = submissionPids_(run);
+  var submitted = g1CollectSubmittedBlocks_(); // null = 受け口フォルダ未設定
+  var mcheck = g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO);
+
+  var sh = ss.getSheetByName(SUBMIT_TAB_NAME) || ss.insertSheet(SUBMIT_TAB_NAME);
+  var rows = submissionRows_(pids, submitted, mcheck);
+  var width = rows[0].length;
+
+  // ⚠️★★ **結合を先に解く。** `clear()` は中身と書式を消すが、★ **結合は残る**。
+  //   前回 `styleSubmissionTab_` が作った B1:P1 / B2:P2 の結合が残ったまま
+  //   `setValues` すると、2 回目以降の再描画で壊れる
+  //   （2026-08-08 の cross-review で Codex が指摘。★ 順序が逆だった）。
+  //   ⚠️ このタブは毎時トリガーから何度も描き直されるので、
+  //     **2 回目が動かない = 実質いつも壊れている**ことになる。
+  unmergeAll_(sh);
+  sh.clear();
+  sh.getRange(1, 1, rows.length, width).setValues(rows); // ★ 往復 1 回
+  styleSubmissionTab_(sh, rows.length, width);
+  Logger.log("✅ " + SUBMIT_TAB_NAME + " を描き直しました（" + pids.length + " 名）");
+}
+
+/** 研究者が手で回すための入口（トリガーからは refreshG1RunSheet 経由で呼ばれる）。 */
+function refreshSubmissionTab() {
+  var ssId = PropertiesService.getScriptProperties().getProperty(MGMT_SHEET_PROP_G1);
+  if (!ssId) {
+    Logger.log("❌ G1 管理シートが未作成です（buildManagementSheet() を実行）");
+    return;
+  }
+  refreshSubmissionTab_(SpreadsheetApp.openById(ssId));
+}
+
+/**
+ * シート全体の結合を解く。★ `setValues` の**前**に呼ぶこと。
+ *
+ * ⚠️ `Sheet.clear()` は結合を残す。結合が残ったまま値を書くと、
+ * 2 回目以降の再描画が壊れる（このタブは毎時描き直される）。
+ */
+function unmergeAll_(sh) {
+  try {
+    sh.getRange(1, 1, Math.max(sh.getMaxRows(), 1), Math.max(sh.getMaxColumns(), 1)).breakApart();
+  } catch (e) {
+    // ★ 結合が 1 つも無いときは例外にしない（新規タブの初回はここを通る）
+    Logger.log("ℹ️ 結合の解除をスキップしました: " + e);
+  }
+}
+
+/** 実施トラッキングの P-ID 列を上から読む（★ ここが行の真実源）。 */
+function submissionPids_(run) {
+  var last = run.getLastRow();
+  if (last < 3) return [];
+  var col = runCol_("P-ID");
+  var vals = run.getRange(3, col, last - 2, 1).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var pid = String(vals[i][0]).trim().toUpperCase();
+    if (pid && out.indexOf(pid) < 0) out.push(pid);
+  }
+  return out;
+}
+
+/**
+ * 表の中身を 2 次元配列で組む。★ Spreadsheet を触らないので**単体で検算できる**
+ * （`testSubmissionRows()` が壊れた入力を通して赤を見る）。
+ *
+ * @param {string[]} pids 実施トラッキングに載っている P-ID
+ * @param {Object|null} submitted g1CollectSubmittedBlocks_() の戻り（null = フォルダ未設定）
+ * @param {Object} mcheck g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO) の戻り
+ */
+function submissionRows_(pids, submitted, mcheck) {
+  var rows = [];
+  var width = 1 + G1_BLOCK_COUNT + 5;
+
+  function pad(arr) {
+    while (arr.length < width) arr.push("");
+    return arr;
+  }
+
+  // ⚠️★ バナーの本文は **B1**（A1 ではない）。A1 に置いて折返しを付けると、
+  //   P-ID 列の幅（80px）の中で折り返されて**読めなくなる**。
+  //   ★ 実施トラッキングで実証済みの形（A1 は結合に含めず、B1 以降を結合）に揃える。
+  rows.push(pad([
+    "⚠",
+    "自動生成タブ・手動編集禁止（refreshG1RunSheet / buildManagementSheet で全再描画されます）。" +
+      "★ G1 は 1 ブロック = 1 セッション（ロガーがブロックごとにローテートする）。",
+  ]));
+  rows.push(pad([
+    "",
+    submitted === null
+      ? "❌ " + G1_SUBMIT_FOLDER_PROP + " が未設定なので、提出の有無を**見ていません**。" +
+        "★ セルの `?` は「未提出」ではなく「分からない」です（受け口プロジェクトの FOLDER_ID を" +
+        "スクリプト プロパティに入れると埋まります）。"
+      : "✅=.age 到着 ／ ▲=.age は届いたが G1-M 未回答（3〜9 のみ） ／ 空=未着",
+  ]));
+
+  var header = ["P-ID"];
+  for (var b = 1; b <= G1_BLOCK_COUNT; b++) header.push(("0" + b).slice(-2));
+  header.push("提出(/10)", "欠けているブロック", "G1-M 未(3〜9)", "初回提出日", "状態");
+  rows.push(header);
+
+  for (var i = 0; i < pids.length; i++) {
+    rows.push(submissionRowFor_(pids[i], submitted, mcheck));
+  }
+  if (!pids.length) rows.push(pad(["（実施トラッキングに P-ID がありません）"]));
+
+  // ⚠️★ シートに居ない P-ID の .age を**黙って捨てない**。
+  //   ★ 現実に起きる: 被験者がアプリに P-ID を打ち間違えると、その回の記録は
+  //     「誰のものか分からないまま」受け口に溜まる。ここで気づけないと永久に気づけない。
+  var orphans = submissionOrphans_(pids, submitted);
+  if (orphans.length) {
+    rows.push(pad([""]));
+    rows.push(pad(["⚠ シートに無い P-ID の .age（★ 打ち間違いを疑う）"]));
+    for (var j = 0; j < orphans.length; j++) {
+      rows.push(pad([orphans[j].pid, "", "", "", "", "", "", "", "", "", "",
+        orphans[j].blocks.length + " 本"]));
+    }
+  }
+  return rows;
+}
+
+/** 1 人ぶんの行。★ `submitted === null`（フォルダ未設定）は「未着手」と区別する。 */
+function submissionRowFor_(pid, submitted, mcheck) {
+  var unknown = submitted === null; // ⚠️ 「提出が無い」ではなく「見ていない」
+  var rec = !unknown && submitted[pid] ? submitted[pid] : null;
+  var got = rec ? rec.blocks : [];
+  var answered = (mcheck[pid] || []).map(function (s) {
+    return parseInt(String(s).trim(), 10);
+  });
+
+  var row = [pid];
+  var missing = [];
+  var mMissing = [];
+  for (var b = 1; b <= G1_BLOCK_COUNT; b++) {
+    // ⚠️ ★ 見ていないときは空欄ではなく `?`。**空欄は「未着」を意味してしまう**
+    //   （2026-08-08 cross-review: 凡例が「表は空になります」と言う一方で
+    //     実際は全員が「未着手」に見え、★ 研究者が「全員未提出」と誤読しうる）。
+    if (unknown) {
+      row.push("?");
+      continue;
+    }
+    var has = got.indexOf(b) >= 0;
+    var needsM = G1_MCHECK_BLOCKS.indexOf(b) >= 0;
+    if (!has) {
+      row.push("");
+      missing.push(b);
+      continue;
+    }
+    if (needsM && answered.indexOf(b) < 0) {
+      row.push("▲");
+      mMissing.push(b);
+    } else {
+      row.push("✅");
+    }
+  }
+
+  if (unknown) {
+    row.push("", "", "", "", "⚠ 提出フォルダ未設定（見ていない）");
+    return row;
+  }
+
+  // ⚠️ ★ 1〜10 の外のブロック番号を数に混ぜない。`g1ParseAgeName_` の正規表現は
+  //   `block(\d{2,3})` を通すので、**壊れた名前なら 11 以上も入りうる**。
+  //   混ぜると「提出(/10)」が 10 を超えて意味を失う。★ 別枠で警告にする。
+  var inRange = got.filter(function (b) {
+    return b >= 1 && b <= G1_BLOCK_COUNT;
+  });
+  var outOfRange = got.filter(function (b) {
+    return b < 1 || b > G1_BLOCK_COUNT;
+  });
+
+  row.push(inRange.length);
+  row.push(missing.length ? missing.join(",") : "");
+  row.push(mMissing.length ? mMissing.join(",") : "");
+  row.push(rec && rec.firstYmd ? submissionYmdLabel_(rec.firstYmd) : "");
+  var status = submissionStatus_(inRange.length, mMissing.length);
+  if (outOfRange.length) {
+    status += "（⚠ 範囲外のブロック: " + outOfRange.join(",") + "）";
+  }
+  row.push(status);
+  return row;
+}
+
+/** `YYYYMMDD` → `YYYY-MM-DD`（★ 壊れていれば元の文字列をそのまま出す）。 */
+function submissionYmdLabel_(ymd) {
+  var m = String(ymd).match(/^(\d{4})(\d{2})(\d{2})$/);
+  return m ? m[1] + "-" + m[2] + "-" + m[3] : String(ymd);
+}
+
+/** 状態の一言。★ 研究者が「次に何をするか」で分かれるようにする。 */
+function submissionStatus_(gotCount, mMissingCount) {
+  if (gotCount === 0) return "未着手";
+  if (gotCount < G1_BLOCK_COUNT) return "実施中 (" + gotCount + "/10)";
+  if (mMissingCount > 0) return "⚠ 10 本そろったが G1-M 不足";
+  return "完了";
+}
+
+/** シートに載っていない P-ID の提出を拾う。 */
+function submissionOrphans_(pids, submitted) {
+  var out = [];
+  if (!submitted) return out;
+  for (var pid in submitted) {
+    if (!Object.prototype.hasOwnProperty.call(submitted, pid)) continue;
+    if (pids.indexOf(pid) >= 0) continue;
+    out.push({ pid: pid, blocks: submitted[pid].blocks });
+  }
+  return out;
+}
+
+/** 見た目。★ 「G1 実施トラッキング」と同じ配色に揃える（別物に見せない）。 */
+function styleSubmissionTab_(sh, rowCount, width) {
+  var NAVY = "#1a3a5c", RED = "#b71c1c";
+  // ⚠️★★ **A1 を結合に含めない。** 含めると `setFrozenColumns(1)` が
+  //   「結合されたセルの一部だけを含む列を固定することはできません」で落ちる
+  //   （2026-08-08 に実施トラッキングで実測した罠。★ 同じ穴を踏み直さない）。
+  //   ★ 解除は `refreshSubmissionTab_` が `setValues` の**前**に済ませてある。
+  if (width > 1) {
+    try {
+      sh.getRange(1, 2, 1, width - 1).merge();
+      sh.getRange(2, 2, 1, width - 1).merge();
+    } catch (e) {
+      Logger.log("ℹ️ バナーの結合をスキップしました: " + e);
+    }
+  }
+  sh.getRange(1, 1, 1, width).setFontWeight("bold").setFontColor("#ffffff")
+    .setBackground(RED).setWrap(true).setVerticalAlignment("middle")
+    .setHorizontalAlignment("left").setFontSize(11);
+  sh.setRowHeight(1, 34);
+  sh.getRange(2, 1, 1, width).setFontSize(10).setFontColor("#57534e")
+    .setWrap(true).setHorizontalAlignment("left");
+  sh.getRange(3, 1, 1, width).setFontWeight("bold").setFontColor("#ffffff")
+    .setBackground(NAVY).setHorizontalAlignment("center").setWrap(true);
+  sh.setFrozenRows(3);
+  // ⚠️★ バナーを A1 から結合しない（`setFrozenColumns(1)` が
+  //   「結合されたセルの一部だけを含む列を固定することはできません」で落ちる・2026-08-08 実測）。
+  sh.setFrozenColumns(1);
+  sh.setColumnWidth(1, 80);
+  for (var c = 2; c <= 1 + G1_BLOCK_COUNT; c++) sh.setColumnWidth(c, 38);
+  sh.setColumnWidth(2 + G1_BLOCK_COUNT, 80);
+  sh.setColumnWidth(3 + G1_BLOCK_COUNT, 150);
+  sh.setColumnWidth(4 + G1_BLOCK_COUNT, 120);
+  sh.setColumnWidth(5 + G1_BLOCK_COUNT, 100);
+  sh.setColumnWidth(6 + G1_BLOCK_COUNT, 190);
+  if (rowCount > 3) {
+    sh.getRange(4, 2, rowCount - 3, G1_BLOCK_COUNT).setHorizontalAlignment("center");
+  }
 }
 
 // リンク集: 3 フォームの URL を集約する。手動入力セル（B4/B5）は毎回退避して保持する。
@@ -847,16 +1328,47 @@ function buildLinksTab_(ss, props) {
 // ⚠️ ブロックごとの条件・題材・NDJSON 名は **ここに書かない**。
 //    ラベルの真実源は記録用紙 → blocks/P0xx.json であり、二重に持つと必ずずれる
 //    (protocol.md §2.3-1「転記は 1 方向だけ」)。
+// ★★ 2026-08-08（第 13 版に合わせた整理・研究者判断）:
+//   ⚠️ 「実施予定日」を**削除**した。★ 在宅実施では研究者が日程を握らないので、
+//      常に空のまま残り、「予定を入れ忘れている」ように見えるだけだった（実測: 全行空）。
+//      ★ 初回起動の同席日を残したいときは「備考」に書く。
+//   ⚠️ 「配置(A/B)」を**削除**した。★ 配置は `assign.py` が P-ID から**決定的に**出す
+//      （`protocol.md §2.1`「実験者が選ばない」）。シートに持つと二重真実源になり、
+//      ★ このシート冒頭のバナー（条件・題材を書かない）とも噛み合わなかった。
+//      → 見たいときは `python3 assign.py --subject P0NN` を実行する。
+//   ⚠️ 「課題文リンク送信日」→「課題ページ送付日」に**改名**した（削除しない）。
+//      ★ ★ この列は `g1AutoSendPendingMaterials()` の**冪等キー**である。消すと
+//      **同じ人に 2 通目が再送される**（送信は取り消せない）。名前だけを実態に合わせた
+//      （第 13 版では受付メール 1 通で渡すので「リンク送信」という別便は既定ではない）。
+//   ⚠️ 「GSE_DISABLE_PROBES=1」→「G1モード確認」に**改名**した。★ launcher 時代の言い方で、
+//      今は `g1.mode` マーカーの有無で決まる（`preregistration.md` 第 10 版 §5.4-5）。
+//   ★ 「配布URL(短縮)」を**追加**した（導出列・`refreshG1RunSheet` が埋める）。
+//      ⚠️ ★ 「配布フォルダURL」の側は**生のままでなければならない**。
+//      `G1_MATERIALS_URL_RE` と `g1FolderIdFromUrl_` が読む**機械入力**だからである。
 var RUN_HEADER = [
   "P-ID",
-  // ★ 募集・日程調整。⚠️ 実名・メールはここに書かない。
+  // ⚠️ 実名・メールはここに書かない。
   //   実名↔P-ID の対応表は Phase1 のロスターと G1-C 回答シートが真実源である。
   //   ⚠️ 「事前案内メール送信日」列は廃止した（事前案内メールを廃止したため・2026-08-03）。
-  "実施予定日",
   "G1-C 同意",
-  // ★★ 第 8 版（2026-08-04）: 課題文の閲覧リンクを事前に送る（preregistration.md §2.12）。
-  //    いつ送ったかを残す。⚠️ URL 自体はここに書かない（割付が推測されうる）。
-  "課題文リンク送信日",
+  // ★★ 2026-08-07: 配布フォルダ（課題ページ）の URL。★ 研究者が貼る**唯一の手入力**であり、
+  //    g1AutoSendPendingMaterials() の引き金でもある（貼られるまで送らない）。
+  // ⚠️ ★ 第 8 版のコメントは「URL 自体はここに書かない（割付が推測されうる）」としていたが、
+  //    2026-08-07 に**方針を変えた**。理由を隠さず書く:
+  //      (a) Apps Script の関数セレクタは**引数を渡せない**。3 引数の sendTaskMaterialsEmail は
+  //          研究者がラッパーを手書きしないと実行できず、そこが手作業として残っていた。
+  //      (b) このシートは研究者しか開かない（実名・メールを持たないのは別の理由 = 匿名化）。
+  //      (c) ★ URL は Drive の不透明な ID であって、**それ自体は割付を露呈しない**。
+  //          露呈するのはリンク先の中身であり、それは被験者本人には元から開示している（§2.12）。
+  //    ⚠️ ★ したがって「このシートを被験者や第三者に見せない」ことが前提条件である。
+  "配布フォルダURL",
+  // ★ 導出列（研究者は触らない）。★ 被験者に**実際に配られた**短縮 URL を見せる。
+  //   ⚠️ 短縮が無ければ空のままにする（生 URL を二重に置かない）。
+  "配布URL(短縮)",
+  // ★★ 第 8 版（2026-08-04）: 課題ページのリンクを渡した日。★ 空 = 未送付。
+  //    ⚠️ ★ g1AutoSendPendingMaterials() の**冪等キー**である（消さない）。
+  //    受付メール 1 通で渡したときは onG1ConsentSubmit がここに日付を入れる。
+  "課題ページ送付日",
   "実施日",
   // ★★ 第 9 版（2026-08-04）: 実施形態を共変量として記録する（preregistration.md §2.14）。
   //    ⚠️ **判定にも除外にも使わない**（§3.6 無変更）。報告時に内訳を併記するための列である。
@@ -865,9 +1377,10 @@ var RUN_HEADER = [
   "実施形態",
   "実施OS",
   "アプリのビルド",
-  "GSE_DISABLE_PROBES=1",
+  // ★ 「G1 モードで動作しています」が画面に出ていたか（`g1.mode` マーカー）。
+  //   ⚠️ 旧名は「GSE_DISABLE_PROBES=1」だった（launcher で環境変数を立てていた頃の名残）。
+  "G1モード確認",
   "HMM_VERSION",
-  "配置(A/B)",
   "完了ブロック数(/10)",
   "G1-M 回答数(/7)",
   "G1-S 回答",
@@ -909,6 +1422,153 @@ function assertRunHeader_(sh) {
   }
 }
 
+// ★ 列番号 → 列記号（条件付き書式の数式で使う）。
+function colLetter_(n) {
+  var s = "";
+  while (n > 0) {
+    var m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = (n - m - 1) / 26;
+  }
+  return s;
+}
+
+// ★★ 見た目（2026-08-08・研究者の指摘「Phase1 よりかなり怠っている」）。
+//   ★ Phase1 の `rebuildRosterTab_` と**同じ型**にする: 赤バナー / ネイビーのヘッダ /
+//     ヘッダ 2 行と P-ID 列の固定 / 交互背景 / 列ごとの幅 / 中央寄せ / 条件付き書式。
+//   ⚠️ 装飾は**データを触らない**。何度呼んでもよい（buildRunTab_ と移行の両方から呼ぶ）。
+function styleRunTab_(sh) {
+  var n = RUN_HEADER.length;
+  var NAVY = "#1a3a5c", RED = "#b71c1c";
+
+  // 行1: 注意バナー。★ 何を書いてはいけないかを、シートの上で明示する。
+  //
+  // ⚠️★★ **バナーを A1 から結合すると `setFrozenColumns(1)` が例外で落ちる**
+  //   （実測 2026-08-08・実シート）:
+  //     「結合されたセルの一部だけを含む列を固定することはできません。」
+  //   ★ 固定の境界（A と B の間）が結合を**分断する**からである。
+  //   → ★ **A1 は結合に含めず**、バナーは **B1 以降**だけを結合する。
+  //     これで「P-ID 列の固定」と「1 行の帯」を両立できる。
+  //   ⚠️ 旧版の結合（A1 から全列）が残っていると同じ例外になるので、**先に解除する**。
+  try {
+    sh.getRange(1, 1, 1, Math.max(n, sh.getMaxColumns())).breakApart();
+  } catch (e) {
+    /* 結合が無ければ何もしない（例外にしない） */
+  }
+  if (n > 1) {
+    try {
+      sh.getRange(1, 2, 1, n - 1).merge();
+    } catch (e) {
+      Logger.log("ℹ️ バナーの結合をスキップしました: " + e);
+    }
+  }
+  sh.getRange(1, 1).setValue("⚠");
+  sh.getRange(1, 2)
+    .setValue(
+      "P-ID は Phase1 と共有（同じ人＝同じ ID）。採番は Phase1 の参加者ロスターで行う。" +
+        "★ 実名・メールをこのシートに書かない（Phase1 ロスターと G1-C 回答が真実源）。" +
+        "★ ブロックごとの条件・題材・NDJSON 名も書かない（記録用紙 → blocks/P0xx.json が真実源）。" +
+        "★ 配置(A/B) は assign.py が P-ID から決める（このシートには持たない）。"
+    );
+  sh.getRange(1, 1, 1, n)
+    .setFontWeight("bold")
+    .setFontColor("#ffffff")
+    .setBackground(RED)
+    .setWrap(true)
+    .setVerticalAlignment("middle")
+    .setHorizontalAlignment("left")
+    .setFontSize(11);
+  sh.setRowHeight(1, 46);
+
+  // 行2: ヘッダ。
+  sh.getRange(2, 1, 1, n)
+    .setValues([RUN_HEADER])
+    .setFontWeight("bold")
+    .setFontColor("#ffffff")
+    .setBackground(NAVY)
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setFontSize(11)
+    .setWrap(true)
+    .setBorder(true, true, true, true, true, false, "#ffffff", SpreadsheetApp.BorderStyle.SOLID);
+  sh.setRowHeight(2, 36);
+  sh.setFrozenRows(2);
+  try {
+    sh.setFrozenColumns(1); // ★ 横スクロールしても P-ID を見失わない
+  } catch (e) {
+    // ⚠️ ★ 黙って飛ばさない。バナーの結合が A 列に掛かっていると必ずここで落ちる。
+    Logger.log("⚠️ ★ P-ID 列を固定できませんでした（バナーの結合が A 列に掛かっている疑い）: " + e);
+  }
+
+  // ⚠️★ 2026-08-08 実測: ここを 200 行 × 列ごとに触ると **実行が 5 分を超える**
+  //   （Sheets の 1 呼び出しが遅く、列ごとのループがそのまま往復回数になる）。
+  //   ★ 行数を絞り、範囲をまとめて **呼び出し回数を減らす**。
+  var BAND_ROWS = 100;
+  try {
+    // ★ 既に縞があるなら張り直さない（毎回張ると重いうえ二重になる）。
+    if (!sh.getBandings || sh.getBandings().length === 0) {
+      sh.getRange(3, 1, BAND_ROWS, n).applyRowBanding(
+        SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false
+      );
+    }
+  } catch (e) {
+    /* 既に縞が張ってあると失敗する（無害） */
+  }
+
+  // 列幅（ヘッダ名で引く。★ 列を足しても壊れない）。
+  var WIDTHS = {
+    "P-ID": 70, "G1-C 同意": 80, "配布フォルダURL": 240, "配布URL(短縮)": 130,
+    "課題ページ送付日": 110, "実施日": 100, "実施形態": 170, "実施OS": 100,
+    "アプリのビルド": 110, "G1モード確認": 110, "HMM_VERSION": 110,
+    "完了ブロック数(/10)": 120, "G1-M 回答数(/7)": 110, "G1-S 回答": 90,
+    "verify-blocks 実施": 120, "validate_blocks 緑": 120, "gse-dataset 送付": 120,
+    "撤回/除外": 90, "備考": 260,
+  };
+  // ★ 連続した同じ幅はまとめて 1 回で設定する（setColumnWidths は範囲指定で 1 往復）。
+  var i0 = 0;
+  while (i0 < n) {
+    var w = WIDTHS[RUN_HEADER[i0]];
+    var i1 = i0;
+    while (i1 + 1 < n && WIDTHS[RUN_HEADER[i1 + 1]] === w) i1++;
+    if (w) {
+      if (i1 > i0 && sh.setColumnWidths) sh.setColumnWidths(i0 + 1, i1 - i0 + 1, w);
+      else sh.setColumnWidth(i0 + 1, w);
+    }
+    i0 = i1 + 1;
+  }
+  // ★ URL と備考以外は中央寄せ（数字とステータスが読みやすい）。
+  //   ⚠️ 列ごとに呼ばず、**まず全体を中央寄せ**してから左寄せの列だけ戻す（3 往復で済む）。
+  sh.getRange(3, 1, BAND_ROWS, n).setHorizontalAlignment("center");
+  ["配布フォルダURL", "配布URL(短縮)", "備考"].forEach(function (h) {
+    if (RUN_HEADER.indexOf(h) < 0) return;
+    sh.getRange(3, runCol_(h), BAND_ROWS, 1).setHorizontalAlignment("left");
+  });
+
+  // 条件付き書式。⚠️ ★ 型付き列（ドロップダウン）が張られていると失敗しうるので、
+  //   ここは**致命にしない**（Phase1 の applyRosterValidation_ と同じ扱い）。
+  try {
+    var full = sh.getRange(3, 1, BAND_ROWS, n);
+    var excl = "$" + colLetter_(runCol_("撤回/除外")) + "3";
+    var done = "$" + colLetter_(runCol_("完了ブロック数(/10)")) + "3";
+    sh.setConditionalFormatRules([
+      // ★ 撤回・除外された行は灰色に沈める（先に置く = 勝たせる）
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied("=" + excl + '<>""')
+        .setBackground("#e0e0e0").setFontColor("#9e9e9e").setRanges([full]).build(),
+      // ★ 10 ブロック完走 = 緑
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied("=" + done + "=10")
+        .setBackground("#e6f4ea").setRanges([full]).build(),
+      // ⚠️ 途中で止まっている（1〜9）= 黄。★ 「まだ終わっていない」を見落とさないため
+        SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied("=AND(" + done + '<>"",' + done + ">0," + done + "<10)")
+        .setBackground("#fff8e1").setRanges([full]).build(),
+    ]);
+  } catch (e) {
+    Logger.log("ℹ️ 条件付き書式をスキップしました（型付き列の可能性）: " + e);
+  }
+}
+
 function buildRunTab_(ss) {
   var exist = ss.getSheetByName("G1 実施トラッキング");
   if (exist) {
@@ -931,22 +1591,7 @@ function buildRunTab_(ss) {
     ss.deleteSheet(exist); // ★ 古い入力規則ごと消す（残すと新旧の規則が二重に付く）
   }
   var sh = ss.insertSheet("G1 実施トラッキング");
-  // 行1: 注意バナー。★ ここに何を書いてはいけないかを、シートの上で明示する。
-  sh.getRange(1, 1).setValue(
-    "⚠ P-ID は Phase1 と共有（同じ人＝同じ ID）。採番は Phase1 の参加者ロスターで行う。" +
-      "★ 実名・メールをこのシートに書かない（Phase1 ロスターと G1-C 回答が真実源）。" +
-      "★ ブロックごとの条件・題材・NDJSON 名も書かない（記録用紙 → blocks/P0xx.json が真実源）。"
-  );
-  sh.getRange(1, 1, 1, RUN_HEADER.length).merge();
-  sh.getRange(1, 1)
-    .setFontWeight("bold")
-    .setFontColor("#ffffff")
-    .setBackground("#b71c1c")
-    .setWrap(true);
-  sh.getRange(2, 1, 1, RUN_HEADER.length).setValues([RUN_HEADER]).setFontWeight("bold");
-  sh.setFrozenRows(2);
-  sh.setColumnWidth(1, 70);
-  sh.setColumnWidth(runCol_("備考"), 260);
+  styleRunTab_(sh); // ★ 見た目は移行経路と共有する（2 か所で書くとずれる）
 }
 
 // ★ ヘッダ名 → 列番号（1 始まり）。
@@ -966,7 +1611,8 @@ function applyRunValidation_(ss) {
   var sh = ss.getSheetByName("G1 実施トラッキング");
   if (!sh) return;
   assertRunHeader_(sh); // ★ ずれたまま規則を貼らない（上のコメント参照）
-  var rows = 200;
+  // ⚠️★ 100 行で足りる（G1 の被験者は 2 桁）。★ 広げるほど 1 実行が遅くなる（実測）。
+  var rows = 100;
   // ★ 先に全部消す。⚠️ 消さないと、列構成を変えたときに**旧位置の規則が残って二重に付く**
   //   （2026-08-03 実測: B〜G 列すべてにドロップダウンが付いた状態になっていた）。
   sh.getRange(3, 1, rows, RUN_HEADER.length).clearDataValidations();
@@ -978,10 +1624,11 @@ function applyRunValidation_(ss) {
   }
   var yn = ["はい", "いいえ"];
   apply("G1-C 同意", yn);
-  apply("実施形態", ["来所", "無人在宅"]);
+  // ⚠️★ 第 13 版（§2.14）: 「無人在宅」は**実態と違う**（初回起動だけ研究者が同席する）。
+  //    ★ 旧値のまま残っている行は migrateRunSheetToV14_() が書き換える。
+  apply("実施形態", ["来所", "在宅（初回起動のみ同席）"]);
   apply("実施OS", ["Windows 11", "macOS"]);
-  apply("GSE_DISABLE_PROBES=1", yn);
-  apply("配置(A/B)", ["A", "B"]);
+  apply("G1モード確認", yn);
   apply("G1-S 回答", yn);
   apply("verify-blocks 実施", yn);
   apply("validate_blocks 緑", yn);
@@ -1096,6 +1743,15 @@ var G1_AUTO_SEND = true;
 var G1_CONTACT = "三浦尊統（mmiura.network@gmail.com）"; // 研究者判断 2026-08-03
 // ⚠️ ★ consent.md §8「所属・連絡先（実施前に記入）」を埋めるときは、**ここと同じ文字列**にする。
 //    片方だけ直すと、同意文書とメールで連絡先が食い違う。
+
+// ★★ アプリ配布フォルダ（Windows / macOS）。⚠️ **全員同じ**である。
+//   ★ 受付メールに入れてよい理由: この中身は**割付にも題材にも依存しない**ので、
+//     `preregistration.md §2.12` が伏せると宣言した項目を 1 つも開示しない。
+//   ⚠️ ★ **課題ページ (blockNN.html) はここに入れない。** 入れると全員が同じ課題を持つことになり、
+//     被験者別の割付が壊れる。課題ページは別便 (sendTaskMaterialsEmail) で個別に渡す。
+//   ★ 早めに渡す価値がある: macOS は初回に「キーボードの入力の監視」を許可 → 再起動が要るので、
+//     当日その場で詰まると 1 回きりの実施機会を潰しかねない (`§2.3` は分割を許さない)。
+var G1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/1FDkU52n9EXO92TzCieivexg7WKsXHkFP";
 
 // ⚠️ ★ 第 6 版にあった G1_TOPIC_TITLES（課題の分野を事前案内メールに載せる）は
 //    **第 7 版で撤回した**。課題文は当日その場で画面提示する（§2.13）ので、
@@ -1234,14 +1890,383 @@ function g1EnsureRunRow_(pid) {
   return sh.getRange(row, colNote);
 }
 
+/**
+ * ★★ その被験者の課題ページフォルダを **名前で** 探す（2026-08-07）。
+ *
+ * ⚠️★★ **なぜ登録時にリンクを載せられるようになったのか。**
+ *   従来「登録時点では割付が無いので送れない」としていた。これは**手順の前提**であって
+ *   原理的な制約ではない。★ P-ID は `既存の最大値 + 1` で決まる（`g1NextParticipantId_`）ので
+ *   **次に出る番号は予測できる**。研究者が募集前に
+ *       `./prepare-subjects.sh --range <開始 P-ID> <終了 P-ID>` → Drive へドラッグ → 1 つずつ共有
+ *       （★ 範囲は `checkMaterialsProvisioning()` がロスターから作って出す。ここに書かない）
+ *   まで済ませておけば、登録時にはフォルダが**既に存在する**。
+ *   ⚠️★ さらに G1 は**過去の参加者が主**なので、予測ではなく **ロスターに載っている ID**
+ *     を用意しておくのが本筋である（`checkMaterialsProvisioning` はそちらを見る）。
+ *   ⚠️ ★ 割付は従来どおり研究者の明示的な行為のままである（`§3-1` に触れない）。
+ *   ★ GAS がやるのは「名前で探して、妥当なら URL を返す」だけで、**何も作らない**。
+ *
+ * ⚠️ 見つからなければ "" を返す。★ その場合は 2 便の従来経路に落ちる（壊れない）。
+ *
+ * @return {{url: string, problem: string}} url が空なら problem に理由が入る
+ */
+// ★★ 被験者別フォルダとして**認める名前**（★ ここが単一の真実源）。
+//   ⚠️ 探す側 (`g1MaterialsUrlForPid_`) と検査する側 (`g1MaterialsFolderProblem_`) の**両方**が
+//   ここを読む。片方だけ直すと「探せたのにガードで弾かれる」という原因の分かりにくい失敗になる。
+//
+// ⚠️★ 2026-08-07: 実運用のフォルダ名が `G1課題文_P006` 形式だったので接頭辞つきを認めた。
+//   ★ 接頭辞は Drive の画面で何のフォルダか分かるようにするためのもので、
+//     `preregistration.md §2.12` が伏せる項目（題材・課題の型・条件名）を 1 つも含まない。
+//   ⚠️ **前方一致にしない。** 完全一致を 2 通り認めるだけである
+//     （前方一致だと「P01」が「P010」を、「G1課題文_P006_旧」が P006 を掴む）。
+var G1_MATERIALS_FOLDER_PREFIX = "G1課題文_";
+
+function g1MaterialsFolderNames_(pid) {
+  var p = String(pid == null ? "" : pid).trim();
+  // ⚠️★ 空や不正な ID で Drive を探しに行かない（`getFoldersByName("")` は
+  //   何を返すか保証が無いうえ、無意味な問い合わせを 2 回投げる）。★ 空配列を返し、
+  //   呼び出し側 (`g1MaterialsUrlForPid_`) が「形が違う」と言い切れるようにする。
+  if (!p) return [];
+  return [p, G1_MATERIALS_FOLDER_PREFIX + p];
+}
+
+function g1MaterialsUrlForPid_(pid) {
+  if (!G1_MATERIALS_PARENT_ID) return { url: "", problem: "G1_MATERIALS_PARENT_ID が未設定" };
+  var parent;
+  try {
+    parent = DriveApp.getFolderById(G1_MATERIALS_PARENT_ID);
+  } catch (e) {
+    return { url: "", problem: "課題ページの親フォルダを開けません: " + e };
+  }
+  // ⚠️★ 認めるフォルダ名は **この 2 つだけ**（2026-08-07・実運用の名前に合わせた）。
+  //   ★ 部分一致・前方一致にしてはならない。「P01」で「P010」を掴む、
+  //     「G1課題文_P006_旧」を掴む、といった取り違えが起きる。★ 完全一致を 2 通り認めるだけである。
+  //   ⚠️ 名前の検査はここだけでなく `g1MaterialsFolderProblem_`（ガード 7）にもある。
+  //     ★ **両方を同じ関数 `g1MaterialsFolderNames_` から作る**。片方だけ直すと、
+  //     「探せたのにガードで弾かれる」という原因の分かりにくい失敗になる。
+  var names = g1MaterialsFolderNames_(pid);
+  if (names.length === 0) {
+    return { url: "", problem: "P-ID が空です（★ 呼び出し側の不具合）" };
+  }
+  // ⚠️★★ **探す側は大文字小文字に厳格、ガード 7 は大小を吸収する**（意図的な非対称）。
+  //   ★ 探す側 (`getFoldersByName`) を緩められないのは、Drive API が完全一致でしか引けず、
+  //     大小違いを許すには**親の全フォルダを列挙する**しかないためである（人数ぶん重くなる）。
+  //   ★ ガード 7 が緩いのは、そちらは **人が貼った URL** を検査する経路だからである
+  //     （URL は既にフォルダを名指ししているので、大小の揺れで弾く必要が無い）。
+  //   ⚠️ 帰結: `g1課題文_p015` のような名前は **ガードは通るが自動では見つからない**。
+  //     → 自動で 1 通にしたければフォルダ名は `g1MaterialsFolderNames_` の形そのままにすること。
+  var hits = [];
+  try {
+    for (var n = 0; n < names.length; n++) {
+      var it = parent.getFoldersByName(names[n]);
+      while (it.hasNext()) hits.push(it.next());
+    }
+  } catch (e2) {
+    return { url: "", problem: "フォルダを探せません: " + e2 };
+  }
+  if (hits.length === 0) {
+    return {
+      url: "",
+      problem:
+        "この P-ID のフォルダがまだありません（★ 先に用意しておけば 1 通で送れます。" +
+        "探した名前: " + names.join(" / ") + "）",
+    };
+  }
+  if (hits.length > 1) {
+    // ⚠️ ★ 候補が 2 つ以上 = どちらが正しいか機械には決められない。**送らない**。
+    //   ★ 名前を 2 通り認めたことで「P006 と G1課題文_P006 が両方ある」もここで止まる。
+    return { url: "", problem: "同じ被験者のフォルダが 2 つ以上あります（★ 人が片付けてください）" };
+  }
+  var folder = hits[0];
+  var url = "https://drive.google.com/drive/folders/" + folder.getId();
+  // ★ 既存のガード 7 をそのまま通す（共有し忘れ・置き場所違いをここでも捕まえる）
+  var problem = g1MaterialsFolderProblem_(url, pid);
+  if (problem) return { url: "", problem: problem };
+  return { url: url, problem: "" };
+}
+
+/**
+ * ★ ロスターに**実在する** P-ID を昇順で返す（重複は畳む）。
+ *
+ * ⚠️★ `g1NextParticipantId_` は最大値しか見ないので、**過去参加者が誰なのか**は分からない。
+ *   G1 の被験者は「過去の参加者」が主である（研究者判断 2026-08-07）＝ `onG1ConsentSubmit` は
+ *   採番せず既存 ID を再利用する（`g1FindInPhase1Roster_` がメールで引く）ので、
+ *   ★ **用意しておくべき P-ID はロスターに載っている全員**である。
+ *
+ * ⚠️ 1 行目はヘッダである。`g1NextParticipantId_` と同じく `^P\d+$` に一致する行だけを拾うので、
+ *   ヘッダ（「参加者ID」など）は自然に外れる。
+ */
+function g1RosterParticipantIds_(sheet) {
+  var last = sheet.getLastRow();
+  if (last < 1) return [];
+  var values = sheet.getRange(1, 1, last, 1).getValues();
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < values.length; i++) {
+    var s = String(values[i][0]).trim();
+    if (!/^P\d+$/.test(s)) continue;
+    if (seen[s]) continue;
+    seen[s] = true;
+    out.push(s);
+  }
+  out.sort(function (a, b) {
+    return parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10);
+  });
+  return out;
+}
+
+/**
+ * ★ 募集を始める前に、課題ページのフォルダが用意できているかを見る（読むだけ・何も作らない）。
+ *
+ * ⚠️★★ **2026-08-07 に見る範囲を変えた。**
+ *   旧版は「次に発番される P-ID から 5 人」しか見なかった。⚠️ これは
+ *   **新規参加者しか来ない**という前提であり、G1 の実際の運用（過去参加者が主・既存 ID を再利用）
+ *   と食い違う。★ その前提のままだと、**再参加者のフォルダが 1 つも無くても緑に見える**。
+ *   → ロスターに実在する全 P-ID（＝再利用されうる ID）＋ 次に発番される数人、を見る。
+ *
+ * @param {number=} lookahead 次に発番される分を何人ぶん見るか（既定 3）
+ */
+function checkMaterialsProvisioning(lookahead) {
+  if (!PHASE1_MGMT_SHEET_ID) {
+    Logger.log("❌ PHASE1_MGMT_SHEET_ID が未設定です。");
+    return;
+  }
+  var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+  if (!roster) {
+    Logger.log("❌ 「参加者ロスター」タブがありません。");
+    return;
+  }
+  var ahead = lookahead === undefined || lookahead === null ? 3 : parseInt(lookahead, 10);
+  if (!(ahead >= 0)) ahead = 3;
+
+  var existing = g1RosterParticipantIds_(roster);
+
+  // ⚠️★ ロスターに**非正準な P-ID**（`P1` のようなゼロ埋めなし）があると、
+  //   ★ ここは `P1` を探しに行くが、Drive のフォルダは `P001` なので**永久に見つからない**。
+  //   （`g1RosterParticipantIds_` / `g1NextParticipantId_` は `^P\d+$` で拾う仕様なので、
+  //     ここで弾かず**名指しで警告する**。⚠️ 黙って `P1→P001` に直すと入力ミスを隠す。）
+  var nonCanonical = existing.filter(function (p) {
+    return !/^P\d{3}$/.test(p);
+  });
+
+  // ⚠️★ 1 人あたり Drive を **約 6 回**叩く（親を開く / 名前で 2 通り探す /
+  //   ガード 7 で開く・親を辿る・共有設定を読む）。Apps Script の実行は 6 分で切られる。
+  //   ★ 実測 (2026-08-07・GSE_Gate1 の実行ログ): 12 人で 16 秒 = **約 1.3 秒/人**。
+  //     → 40 人で約 55 秒。6 分に対して余裕がある。
+  //   ⚠️ それでも上限を置くのは、人数が想定外に増えたときに**黙って途中で死ぬ**のを防ぐため。
+  //   → ★ **切ったことを必ず言う**（無言の打ち切りは「全部見た」と読まれる）。
+  var LIMIT = 40;
+  var truncated = 0;
+  if (existing.length > LIMIT) {
+    truncated = existing.length - LIMIT;
+    // ⚠️★★ 落とすのは**番号の小さい方**である（review 指摘）。
+    //   ★ G1 は「過去参加者が主」＝ **直近の参加者ほど再登録しやすい**。
+    //   昇順の先頭を残すと、いちばん確かめたい層が未検査になり、目的に対して向きが逆になる。
+    existing = existing.slice(existing.length - LIMIT);
+  }
+  var next = g1NextParticipantId_(roster);
+  var n = parseInt(String(next).replace(/^P/, ""), 10);
+  var future = [];
+  for (var i = 0; i < ahead; i++) {
+    future.push("P" + ("000" + (n + i)).slice(-3));
+  }
+
+  Logger.log("★ ロスターに実在する P-ID: " + (existing.length ? existing.join(" ") : "（なし）"));
+  if (truncated > 0) {
+    Logger.log(
+      "⚠️★ 実行時間の上限があるため **直近 " + LIMIT + " 人**だけを見ています（古い " + truncated +
+        " 人は未検査）。★ この結果を「全員そろっている」と読まないこと。"
+    );
+  }
+  if (nonCanonical.length > 0) {
+    Logger.log(
+      "⚠️★ ロスターに 3 桁ゼロ埋めでない P-ID があります: " + nonCanonical.join(" ") +
+        "\n   ★ Drive のフォルダは P001 形式なので、この行は**永久に「まだありません」**になります。" +
+        "\n   ⚠️ 直すのはロスター側です（機械で正規化すると入力ミスを隠すため、ここでは直しません）。"
+    );
+  }
+  Logger.log("★ 次に発番される P-ID: " + next + "（先読み " + ahead + " 人）");
+  Logger.log("--------");
+
+  // ⚠️ ★ 2 群を分けて数える。「再参加者ぶんが揃っているか」と「新規ぶんの余裕があるか」は
+  //   運用上まったく別の話であり、合算すると**どちらが欠けているのか分からなくなる**。
+  var missingExisting = [];
+  var missingFuture = [];
+  function check(pid, into, label) {
+    var found = g1MaterialsUrlForPid_(pid);
+    if (found.url) {
+      Logger.log("✅ " + pid + " (" + label + "): 用意できています");
+    } else {
+      into.push(pid);
+      Logger.log("⚠️ " + pid + " (" + label + "): " + found.problem);
+    }
+  }
+  for (var a = 0; a < existing.length; a++) check(existing[a], missingExisting, "既存");
+  for (var b = 0; b < future.length; b++) check(future[b], missingFuture, "新規");
+
+  Logger.log("--------");
+  if (existing.length === 0) {
+    Logger.log("⚠️ ロスターに P-ID が 1 つもありません（★ 管理シートを取り違えていないか確認）。");
+  } else if (missingExisting.length === 0) {
+    // ⚠️ 打ち切っているときに「全員」と言わない（★ 見ていない人がいる）
+    Logger.log(
+      truncated > 0
+        ? "✅ 見た " + existing.length + " 人ぶんは **受付メール 1 通**で渡せます（⚠️ 残り " +
+            truncated + " 人は未検査）。"
+        : "✅ 既存 " + existing.length + " 人ぶんは全員 **受付メール 1 通**で渡せます。"
+    );
+  } else {
+    // ⚠️★ 分母は「見た人数」であって「ロスターの人数」ではない。★ 打ち切っているときに
+    //   分母だけ出すと **ロスター全体の話に読める**（警告は遠く離れた行にある・review 指摘）。
+    //   → 同じ行で「未検査 X 人を含まない」と言い切る。
+    Logger.log(
+      "⚠️★ 既存参加者 " + missingExisting.length + " / " + existing.length +
+        " 人ぶんが未用意: " + missingExisting.join(" ") +
+        (truncated > 0 ? "（★ 分母は**見た " + existing.length + " 人**。未検査 " + truncated + " 人は含みません）" : "")
+    );
+    Logger.log("   ⚠️ 過去の参加者が再登録すると、この人たちは課題ページを**別便**まで待つことになります。");
+  }
+  if (ahead > 0) {
+    var readyFuture = future.length - missingFuture.length;
+    Logger.log(
+      readyFuture > 0
+        ? "★ 新規は先頭 " + readyFuture + " 人ぶん用意できています。"
+        : "⚠️ いま**新規**の登録が来ると、課題ページは別便になります（2 便運用）。"
+    );
+  }
+  // ⚠️★ 範囲をハードコードしない。★ 案内に書いた範囲と実運用の範囲がずれると、
+  //   「言われたとおり打ったのに足りない」が起きる（2026-08-07 に実機ログで P001-P015 の
+  //   古い案内が残っているのを見つけた。実際の範囲は P006-P020 だった）。
+  //   → **いま見た P-ID から範囲を作って出す**（＝ ロスターが動けば案内も動く）。
+  //
+  // ⚠️★★ ただし `--range` は **連続かつ 3 桁ゼロ埋め**を前提にしている
+  //   (`prepare-subjects.sh` は `^P[0-9]{3}$` を要求し、範囲は 50 人までで切る)。
+  //   ★ 飛び番（P006 と P900）や非正準（P6）だと「言われたとおり打ったのに動かない」になり、
+  //     ⚠️ **今回直したのと同じ種類の不具合**を案内側で作ることになる。
+  //   → 範囲で書けないときは **ID を並べる形**で出す。
+  var span = existing.concat(future).filter(function (p) {
+    return /^P\d{3}$/.test(p);
+  });
+  if (span.length === 0) {
+    Logger.log("★ 用意の手順: ./prepare-subjects.sh --range <開始 P-ID> <終了 P-ID> → Drive へドラッグ → 1 つずつ共有");
+  } else {
+    var lo = parseInt(span[0].slice(1), 10);
+    var hi = parseInt(span[span.length - 1].slice(1), 10);
+    var contiguous = hi - lo + 1 === span.length && span.length <= 50;
+    Logger.log(
+      contiguous
+        ? "★ 用意の手順: ./prepare-subjects.sh --range " + span[0] + " " + span[span.length - 1] +
+            " → Drive へドラッグ → 1 つずつ共有"
+        : "★ 用意の手順: ./prepare-subjects.sh " + span.join(" ") +
+            " → Drive へドラッグ → 1 つずつ共有\n" +
+            "   ⚠️ 飛び番があるので --range ではなく ID を並べる形にしています。"
+    );
+  }
+  Logger.log("   ★ フォルダ名は " + g1MaterialsFolderNames_("P0NN").join(" / ") + " のどちらか。");
+  Logger.log("   ⚠️ 共有は**フォルダ 1 つずつ**。親を共有にして継承させないこと（全被験者分が見えます）。");
+}
+
 function g1RegisterAckSubject_() {
   return "【受付】キーボードの打ち方に関する研究 — 参加登録を承りました";
+}
+
+// ============================================================
+// ★★ フォームの導線（2026-08-08 新設・この不具合が今回の最優先事項だった）
+// ============================================================
+// ⚠️★★ **2026-08-08 の実測**: 受付メール・`README_先に読む.txt`・`blockNN.html` の
+//   どれにも G1-M / G1-S のリンクが **1 つも無かった**。
+//   `protocol.md:711` の「G1-M / G1-S の回答 URL」は**研究者の持ち物リスト**（来所前提）で、
+//   `protocol.md §3.1` は「操作チェックは §3 の**用紙**へ」＝ **紙が既定**である。
+//   → ★ 第 13 版の在宅実施では紙が使えず、**被験者は 10 ブロック完走しても
+//     G1-M に 7 回とも答えられない**（実証: P009 の「G1-M 回答数(/7)」= 0）。
+//     `§2.6` の操作チェックが**データ 0 件**になる。
+//
+// ★ 研究者判断（2026-08-08）: **受付メール 1 通に全部入れる。**
+// ⚠️ ★ **リンクを貼るだけでは足りない。** 3 つのフォームの**関係**（どれが何で、
+//   いつ・何回・なぜ答えるのか）を書く。書かないと、被験者は (2) を「登録の再送」と
+//   思って 1 回も出さないか、逆に毎ブロック (3) を出す。
+//
+// ⚠️ ★ **`§2.6` の設問文とタイミングは凍結である。ここは案内を足すだけ**であり、
+//   設問・回数・対象ブロック（3〜9）を変えていない。
+// ⚠️ ★ 開示範囲（`§2.12`）も守る: 題材名・課題の型・条件名・提示順・「摩擦」を書かない。
+function g1FormRoutingBlock_(pid) {
+  // ⚠️ ★ 短縮が無ければ生の URL に落ちる（`g1FormLink_` が絶対に空を返さない）。
+  var mcheck = g1FormLink_("G1_MCHECK", FORM_ID_MCHECK);
+  var survey = g1FormLink_("G1_SURVEY", FORM_ID_SURVEY);
+  return [
+    "■ ご回答いただくフォームは 3 つです（★ 役割が違うので使い分けてください）",
+    "",
+    "  (1) 参加登録・ご同意 … ★ **もう終わっています**",
+    "      このメールが届いた時点で受け付け済みです。もう一度出す必要はありません。",
+    "",
+    "  (2) 作業の直後に答える 1 問 … ★ **3 回目〜9 回目の作業のあと、毎回（計 7 回）**",
+    "      " + mcheck,
+    "      ・参加者ID（" + pid + "）と、いま終わった作業の番号を選び、1 問だけ答えます。",
+    "        ★ フォームでは番号を「ブロック番号」と呼んでいます（3 回目＝ブロック 3 です）。",
+    "      ・⚠️ ★ **文章を書く画面（記入ページ）とは切り離してください。**",
+    // ⚠️★ ここで「スマートフォンで開いてもよい」と書かない。**同じメールの
+    //   「当日は携帯電話の電源を切ってください」と矛盾する**（participant-guide.md §5 /
+    //   protocol.md §4.1-4 も電源を切る側で揃っている）。★ 別のタブに寄せる。
+    "        ★ **ブラウザの別のタブ**で開いてください（protocol.md §3.1b）。",
+    "        ★ 始める前に開いておくと、1 分の休憩の中で答えられます。",
+    "      ・1 回の作業につき **1 回だけ**送信してください（同じ番号を 2 回送らない）。",
+    "      ・★ 1 回目・2 回目・10 回目のあとは答えません（比べる相手がいないためです）。",
+    "      ・★ 答えるのは 30 秒ほどです。間の休憩（1 分）の中で終わります。",
+    // ⚠️ ★ 「答えないと記録が無効になる」とは書かない。**事実ではない**（§2.6 の合否は
+    //    コホート全体の割合で見る）うえ、被験者への圧力になる。★ 大切さだけを伝える。
+    "      ★ 打鍵の記録だけでは分からないことを伺っているので、7 回そろうと助かります。",
+    "        ★ 忘れたときは、思い出した時点で答えていただければ大丈夫です。",
+    "",
+    "  (3) 終了後アンケート … ★ **10 回すべてが終わったあとに 1 回だけ**",
+    "      " + survey,
+    "      ・5 分ほどです。★ 正解はありません。答えたくない設問は飛ばして構いません。",
+    "      ・★ これで終わりです。ご協力ありがとうございます。",
+    "",
+    "    ※ (2) と (3) は同じリンクを何度でも開けます。当日すぐ出せるよう、",
+    "      ★ **このメールを開いたままにするか、ブックマークしておいてください。**",
+    "",
+  ];
 }
 
 // ★ 受付メール。⚠️ preregistration.md §2.12 の開示範囲を守る:
 //   題材（分野）・課題の型・難易度の示唆・条件名を **書かない**。
 //   （課題文は当日その場で画面提示する = §2.13。事前に教える必要が無い。）
-function g1RegisterAckBody_(pid) {
+function g1RegisterAckBody_(pid, materialsUrl) {
+  // ★★ 課題ページのフォルダが**もう用意できていれば**、この 1 通で全部渡す（2026-08-07）。
+  //    ⚠️ 用意できていなければ「別便で送る」と書く（従来の 2 便運用に落ちる）。
+  //    ★ どちらの場合も §2.12 は守る: 本文に**題材名・課題の型・条件名・提示順を書かない**。
+  //      書くのはリンクだけで、中身はリンク先にある。
+  var hasMaterials = !!materialsUrl;
+  // ★★ 2026-08-08: 短縮があれば短縮を出す（無ければ生の URL）。
+  //   ⚠️ ★ 短縮は `shortenG1DistributionUrls()` で**事前に**作る。ここでは引くだけである
+  //      （送信時に外部 API を叩くと、遅延と失敗が登録経路に乗るため）。
+  var materialsLink = g1ShortOr_(g1MaterialsShortKey_(pid), materialsUrl);
+  var materialsBlock = hasMaterials
+    ? [
+        "■ あなた専用の課題ページ（★ アプリと同じフォルダに入れてください）",
+        "    " + materialsLink,
+        "    1. このリンクを開き、block01.html … を **すべて** 保存します",
+        // ⚠️★ 2026-08-08 訂正: 「アプリのフォルダ」は **展開して初めてできる**。
+        //   展開前は zip ファイルしかないので、指す先が無い案内になっていた。
+        "    2. ★ 上で**展開してできた**「G1_実施用_…」フォルダの中へ、**まとめて移してください**",
+        "    ⚠️ ★ **あなた専用です。** 他の方とは中身が違うので、共有しないでください。",
+        // ★★ 2026-08-08 改訂（preregistration.md §2.12 第 11 版）:
+        //    「事前に読む」という案内をやめた。★ 課題は**当日その場で取り掛かる**ものである。
+        //    ⚠️ 旧文は同じ段落で「目を通して構いません」と「開いて始めないでください」を
+        //       並べており、被験者から見て**どうすればよいか決まらなかった**。
+        //    ★ ページ側にゲートを入れたので、**開くだけでは何も始まらない**と言い切れる。
+        "    ★ ページは**当日その場で開いて取り掛かって**いただきます。事前の準備は要りません。",
+        "      ⚠️ **準備の量で評価することはありません。**",
+        "    ★ 開いただけでは何も始まりません。ページの「課題を表示して始める」を押すと、",
+        "      課題が表示され、そこから時間を計ります。★ **当日まで押さないでください。**",
+        "",
+      ]
+    : [
+        "■ 課題の内容について",
+        "    ★ 当日お使いいただくページは、**別便のメールでお送りします**。",
+        "      ★ 当日その場で開いて取り掛かっていただくものです。事前の準備は要りません。",
+        "      ⚠️ **準備の量で評価することはありません。**",
+        "",
+      ];
   return [
     "ご登録ありがとうございます。参加登録を承りました。",
     "",
@@ -1256,7 +2281,8 @@ function g1RegisterAckBody_(pid) {
     "      これは計測器が正しく動いているか確かめるための課題で、隠していることはありません。",
     "    ・間の 8 回は、資料を読んで 300〜400 字の文章を書いていただきます。",
     "    ・途中で 7 回、「直前の回と 1 つ前の回のどちらが詰まったか」を 1 つだけ選んでいただきます。",
-    "    ・最後に短いアンケート（5 分ほど）にお答えいただきます。",
+    "      （下の「ご回答いただくフォーム」の (2) です）",
+    "    ・最後に短いアンケート（5 分ほど）にお答えいただきます。（同じく (3) です）",
     "",
     // ★★ 第 8 版（2026-08-04）: 課題文の本文を来所前に開示する（preregistration.md §2.12）。
     //    ⚠️ 本文そのものはメールに書かず、**別便の閲覧リンク**で渡す
@@ -1266,90 +2292,191 @@ function g1RegisterAckBody_(pid) {
     //          §2.12 は提示順を「開示しない」側に置いている。
     //    ⚠️ ★ **題材名をこのメール本文に書き戻さないこと。**
     //       scripts/check_g1_emails.py が両方のメールを同じ基準で検査する。
-    "■ 課題の内容について",
-    "    ★ 当日お読みいただく資料は、**事前にメールでお送りします**（別便）。",
-    // ★ 第 9 版（§2.14）: 在宅実施があるので「お越し」と書かない。
-    "      目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
-    "      ⚠️ どちらでも問題ありません。**準備の量で評価することはありません。**",
-    "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
-    "    ・資料はすべて本実験のために作成した架空のものです。",
-    "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
-    "    ・課題文は当日も画面に表示されます。同じ画面で文章を書いていただきます。",
+    // ★★ 2026-08-07 追加。⚠️ 受付メールにアプリのリンクが無く、被験者が自分で用意する術が
+    //    無かった（在宅実施では致命的）。★ アプリは全員共通なので §2.12 に触れない。
+    // ⚠️★★ 2026-08-08 訂正: ここは「**フォルダ**があります。丸ごと保存してください」と
+    //   書いていたが、⚠️ **実際に置いてあるのは zip ファイル 2 つ**である。
+    //   ★ しかも「フォルダを丸ごと保存」は **zip 配布に切り替えた理由そのもの**に反する:
+    //     Drive はパーミッションを保存しないので、フォルダ経由で落とすと
+    //     `.app` の実行ビットが落ちる (`make-common-app-zip.sh` の冒頭・実測済み)。
+    //   ⚠️ ★ **展開の指示はメールにしか置けない。** README_先に読む.txt は zip の**中**にあり、
+    //     展開する前の被験者には読めないからである。
+    "■ アプリのご用意（★ 当日までにお願いします）",
+    // ★ 短縮があれば短縮（無ければ生）。⚠️ 事前に shortenG1DistributionUrls() で作る。
+    "    " + g1ShortOr_("G1_APP", G1_APP_DOWNLOAD_URL),
+    "    ・「G1_実施用_Windows.zip」と「G1_実施用_macOS.zip」の 2 つがあります。",
+    "      ★ **お使いのほうだけ**をダウンロードしてください（両方は要りません）。",
+    "    ・★ ダウンロードしたら、**展開（解凍）してください**。",
+    "        - macOS: ファイルをダブルクリックすると展開されます",
+    "        - Windows: 右クリック →「すべて展開」",
+    "      ⚠️ ★ **展開せずに中身を開かないでください。** そのままだと正しく動きません。",
+    "    ・展開してできた「G1_実施用_…」フォルダは、★ **デスクトップなど分かりやすい場所に置き、",
+    "      そのまま動かさないでください。**",
+    "    ・そのあとは、macOS はフォルダ内の「README_先に読む.txt」、",
+    "      Windows は同じフォルダの起動用ファイルに従ってください。",
+    // ★★ 2026-08-08（preregistration.md 第 13 版 §2.14）: 実測で、macOS は
+    //    「壊れているため開けません」を出し **被験者は自力で開けない**と判明した。
+    //    ⚠️ 旧文は「早めにご自分で開いておいてください」と促しており、
+    //       ★ **できないことを依頼していた**（開けずに不安にさせるだけだった）。
+    //    → ★ 初回起動は研究者が同席して行う、に変える。
+    "    ★★ **初回の起動は、研究者と一緒に行います**（対面または画面共有で 5 分ほど）。",
+    "      ⚠️ ★ **ご自分で開こうとしても開けません。** 開けなくても故障ではありません。",
+    "      macOS では「壊れているため開けません」と出ますが、★ **壊れていません。**",
+    "      ⚠️ ★ **ゴミ箱に入れないでください。** 解除の操作は研究者が行います。",
+    "      ★ ダウンロードと展開まで済ませたら、日程のご都合をお知らせください。",
+    "      （2 回目からはダブルクリックだけで開きます）",
+    "    ⚠️ この zip に課題のページは入っていません（課題のページは下記のとおり別にお渡しします）。",
     "",
-    "■ 記録するもの / しないもの",
-    "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
-    "    記録しない: ★ どの文字を打ったか（本文）、画面の内容、音声・映像",
+  ]
+    .concat(materialsBlock)
+    .concat(g1FormRoutingBlock_(pid))
+    .concat([
+      "■ 課題について",
+      // ★ 第 9 版（§2.14）: 在宅実施があるので「お越し」と書かない。
+      "    ・専門知識は要りません。ふだんの生活の感覚で判断できる話題だけを使っています。",
+      "    ・資料はすべて本実験のために作成した架空のものです。",
+      "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
+      "    ・課題文は当日も画面に表示されます。同じ画面で文章を書いていただきます。",
+      "",
+      "■ 記録するもの / しないもの",
+      "    記録する: キーを押した時刻とキーの種類、日本語変換にかかった時間、書いた文字数",
+      "    記録しない: ★ どの文字を打ったか（本文）、画面の内容、音声・映像",
     // ⚠️ ★ 紙署名は 2026-08-03 に廃止した（D-1(a)）。このフォーム（G1-C）の回答が同意の正本である。
     //    ⚠️ ここを「署名をお願いします」に戻すと、protocol.md §4.1-1 / consent.md /
     //       Form_G1/README.md と食い違う。**4 か所を同時に直すこと。**
-    "    ※ 書いた文章そのものは保存しません。ご同意はこのフォームの回答で完了しています。",
-    "",
-    "■ 当日までにお願いしたいこと",
-    "    ・日本語入力（IME）は、ふだん使っている設定のままにしてください。",
-    "    ・当日は携帯電話の電源を切ってください。",
-    "",
-    "■ 参加は任意です",
-    "    途中でやめられます。理由の説明は要りません。終わった後でも記録の削除を求められます。",
-    "",
-    "ご不明な点があれば、このメールにご返信ください。",
-    G1_CONTACT,
-  ].join("\n");
+      "    ※ 書いた文章そのものは保存しません。ご同意はこのフォームの回答で完了しています。",
+      "",
+      "■ 当日までにお願いしたいこと",
+      "    ・日本語入力（IME）は、ふだん使っている設定のままにしてください。",
+      "    ・当日は携帯電話の電源を切ってください。",
+      "",
+      "■ 参加は任意です",
+      "    途中でやめられます。理由の説明は要りません。終わった後でも記録の削除を求められます。",
+      "",
+      "ご不明な点があれば、このメールにご返信ください。",
+      G1_CONTACT,
+    ])
+    .join("\n");
 }
 
 // ★ 送信前に内容を確認する（引数なし・送信しない）。
+//
+// ⚠️★★ 2026-08-08 に直した不具合: ここは `g1RegisterAckBody_("P0XX")` と **引数 1 つ**で
+//   呼んでいたが、あの関数は `(pid, materialsUrl)` の **2 引数**である。
+//   → `materialsUrl` が undefined → `hasMaterials=false` → ★ **常に「別便でお送りします」の
+//     分岐しか表示されなかった**。⚠️ つまり **1 通運用の文面を一度もプレビューできていなかった**
+//     （2026-08-08 に研究者が「課題文リンクが example.com になっている」と気づいて発覚）。
+//   ★ プレビューは「本番と同じ物を見せる」ためにあるので、**実在するフォルダの URL を引いて**出す。
 function previewRegisterAckEmail() {
+  // ★ 実在する P-ID の URL を引く（用意済みなら本番とまったく同じ本文になる）。
+  //   ⚠️ 引けなければ「まだ用意できていない」ということなので、★ それも見せる。
+  var samplePid = "P015";
+  if (PHASE1_MGMT_SHEET_ID) {
+    try {
+      var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+      var ids = roster ? g1RosterParticipantIds_(roster) : [];
+      if (ids.length) samplePid = ids[ids.length - 1]; // ★ 直近の参加者で見る
+    } catch (e) {
+      Logger.log("⚠️ ロスターを読めないので P015 で代用します: " + e);
+    }
+  }
+  var found = g1MaterialsUrlForPid_(samplePid);
+
+  Logger.log("★★ 【1 通目】受付メール（登録直後に自動送信）— サンプル P-ID: " + samplePid);
+  if (found.url) {
+    Logger.log("★ この P-ID は用意できているので、**本番とまったく同じ本文**です。");
+  } else {
+    Logger.log("⚠️ この P-ID はまだ用意できていません（" + found.problem + "）");
+    Logger.log("   → 下は**別便に落ちたとき**の本文です。★ 1 通運用の本文を見るには先に用意すること。");
+  }
   Logger.log("件名: " + g1RegisterAckSubject_());
   Logger.log("--------");
-  Logger.log(g1RegisterAckBody_("P0XX"));
+  Logger.log(g1RegisterAckBody_(samplePid, found.url));
   Logger.log("--------");
   Logger.log("★ §2.12 の開示範囲と一致しているか確認（題材・課題の型・難易度を書かない）。");
+  Logger.log("★ アプリのリンクが zip 2 個の置き場を指しているか: " + G1_APP_DOWNLOAD_URL);
   Logger.log("");
+
+  // ⚠️★ 2 通目は **URL が実行時引数**なので、ここだけは本物を出せない。
+  //   → プレースホルダだと**一目で分かる**書き方にする（example.com は「バグでは？」と読まれた）。
+  Logger.log("★★ 【2 通目】事前資料メール（★ 1 通目で渡せなかったときだけの保険）");
+  Logger.log("⚠️ 下の URL は **プレースホルダ**です（本番は sendTaskMaterialsEmail の引数で渡す実物）。");
   Logger.log("件名: " + g1MaterialsSubject_());
   Logger.log("--------");
-  Logger.log(g1MaterialsBody_("P0XX", "https://example.com/★閲覧専用リンク★"));
+  Logger.log(g1MaterialsBody_(samplePid, "《ここに実際のフォルダ URL が入ります／プレビューでは仮の文字列》"));
   Logger.log("--------");
   Logger.log("★ こちらも同じ基準（題材名・課題の型・条件名・提示順を書かない）。");
 }
 
 // ============================================================
-// ★★ 課題文の事前開示（第 8 版・2026-08-04・preregistration.md §2.12）
+// ★★ 課題ページの受け渡し（第 8 版で新設 → **第 11 版で事前開示を撤回**・2026-08-08）
 // ============================================================
-// ⚠️ ★ **これは判定を緩める可能性のある変更である。** 第 8 版の改訂履歴に向きごとに記録した。
-//    ここは実装であって根拠ではない。文面を変えるときは §2.12 の表と突き合わせること。
+// ⚠️★ **第 11 版の訂正（2026-08-08）。** 第 8 版はここを「事前開示」と呼び、
+//    「判定を緩める可能性のある変更」と記録していた。★ 第 11 版でそれを**撤回した**:
+//    課題は事前に読むものではなく、**当日その場で取り掛かるもの**である。
+//    ⚠️ ★ **撤回の向きは 1 つではない**（preregistration.md §2.12 第 11 版の表を見ること）:
+//      (a) 操作チェックが「事前に読んだ記憶」でなく体験で答えられる = 妥当性が上がる
+//      (b) HI–LO の差が縮まなくなる = **分離が出やすくなる = 判定を緩める側**
+//    ⚠️ ★ ここは実装であって根拠ではない。文面を変えるときは §2.12 の表と突き合わせること。
+//
+// ⚠️ ★ **撤回しても「読めなくなった」わけではない。** 無人在宅では blockNN.html を
+//    当日より前に手元へ渡すしかなく、ページの「課題を表示して始める」を押せば読める。
+//    → **抑止であって保証ではない**。だから §2.12-3 / -4 / -6 は残してある。
 //
 // ⚠️⚠️ **自動化しない。** 送るのは研究者が明示的に実行したときだけである。理由:
 //   (a) 登録時点では割付が無く、その被験者にどの題材が出るか決まっていない
-//   (b) ★ 閲覧専用ドキュメントを作る手作業（権限設定）が必ず挟まる
+//   (b) ★ 配布フォルダを作って共有する手作業（権限設定）が必ず挟まる
 //   (c) 送信は取り消せない。⚠️ ★ **URL を取り違えると別の被験者の割付を渡すことになる**
 //
 // ⚠️ ★ **本文に題材名・課題の型・条件名・提示順を書かない。** 中身はリンク先にある。
 //    scripts/check_g1_emails.py が受付メールと同じ基準で本文を検査する。
 
 function g1MaterialsSubject_() {
-  return "【事前資料】キーボードの打ち方に関する研究 — 当日お読みいただく資料";
+  // ★★ 2026-08-08 改訂（§2.12 第 11 版）: 「事前資料」「お読みいただく」をやめた。
+  //    ⚠️ 件名が「事前に読むもの」と名乗っていると、本文で撤回しても効かない。
+  return "【課題ページ】キーボードの打ち方に関する研究 — 当日お使いいただくページ";
 }
 
 function g1MaterialsBody_(pid, url) {
   return [
-    "当日お読みいただく資料をお送りします。",
+    "当日お使いいただく課題ページをお送りします。",
     "",
     "■ 参加者ID（P-ID）",
     "    " + pid,
     "",
-    "■ 資料（閲覧のみ）",
+    // ⚠️★ 2026-08-07 訂正: ここは「閲覧のみ」と書いていたが、**実態と食い違っていた**。
+    //    `§2.14`（第 9 版）で無人在宅を正規の実施形態にした時点で、被験者は blockNN.html を
+    //    手元に持って自分で開く（`§2.13`）。★ 事実と違う案内をすると当日に詰まる。
+    //    ⚠️ `§2.12` の「閲覧のみで開示する」という宣言との緊張は preregistration 側の論点であり、
+    //       メールで取り繕う問題ではない（`§2.12` 自身も「防ぎ切ることを前提にしない」と書いている）。
+    "■ あなた専用の課題ページ",
     "    " + url,
+    "    1. このリンクを開き、block01.html … を **すべて** 保存してください。",
+    // ⚠️★ 2026-08-08 訂正: 受付メールで案内するのは zip である。フォルダは展開後にできる。
+    "    2. ★ 受付メールの zip を**展開してできた**「G1_実施用_…」フォルダの中へ、**まとめて移してください**。",
+    "       （同じ場所に置いておくと、当日どれを開くか迷いません）",
+    "    ⚠️ ★ **あなた専用です。** 他の方とは中身が違うので、共有しないでください。",
     "",
+    // ★★ 2026-08-08 改訂（preregistration.md §2.12 第 11 版）: 事前開示を撤回した。
+    //    ⚠️ 旧文は「目を通して構いません」と「開いて始めないでください」を並べていて、
+    //       被験者から見て**どうすればよいか決まらなかった**（2026-08-08 に発見）。
+    //    ★ ページ側にゲートを入れたので、**開くだけでは何も始まらない**と言い切れる。
+    //    ⚠️ ★ ただし**押せば読める**（防ぎ切れない）。だからこそ §2.12-4 の設問は残す。
     "■ お願い",
-    "    ★ 目を通しておいていただいて構いませんし、読まずに当日を迎えても構いません。",
-    "      ⚠️ **準備の量で評価することはありません。** どちらでも問題ありません。",
-    "    ・当日は同じ内容が画面にも表示されます。手元に印刷する必要はありません。",
-    "    ・終わったあとのアンケートで「事前にどのくらい読んだか」を伺います。",
+    "    ★ 当日その場で開いて取り掛かっていただくものです。事前の準備は要りません。",
+    "      ⚠️ **準備の量で評価することはありません。**",
+    "    ★ 開いただけでは何も始まりません。ページの「課題を表示して始める」を押すと、",
+    "      課題が表示され、そこから時間を計ります。★ **当日まで押さないでください。**",
+    "    ・★ 間違って押してしまっても大丈夫です。ページを閉じて開き直せば元に戻ります。",
+    "      ⚠️ その場合は、そのまま**当日にもう一度開き直して**ください。",
+    "    ・当日は手元に印刷する必要はありません。画面だけで進みます。",
+    "    ・終わったあとのアンケートで「当日より前に開いたか」を伺います。",
     "      ★ 正解はありません。**実験の判定には使いません。**",
     "",
-    "■ 資料について",
+    "■ 内容について",
     "    ・すべて本実験のために作成した架空のものです。",
     "      ★ 数値・地名・調査結果は実在しません。外部で事実として引用しないでください。",
-    "    ・★ **他の方に見せないでください。** 同じ資料を他の参加者にもお願いしています。",
+    "    ・★ **他の方に見せないでください。** 同じ内容を他の参加者にもお願いしています。",
     "",
     "ご不明な点があれば、このメールにご返信ください。",
     G1_CONTACT,
@@ -1382,11 +2509,793 @@ function sendTaskMaterialsEmail(pid, email, url) {
     var noteCell = g1EnsureRunRow_(pid);
     if (noteCell) {
       var sh = noteCell.getSheet();
-      sh.getRange(noteCell.getRow(), runCol_("課題文リンク送信日")).setValue(new Date());
+      sh.getRange(noteCell.getRow(), runCol_("課題ページ送付日")).setValue(new Date());
     }
   } catch (e) {
     Logger.log("⚠️ 送信日を記録できませんでした（メールは送信済み）: " + e);
   }
+}
+
+// ============================================================
+// ★★ 事前資料メールの自動送信（2026-08-07・decisions.md D-3）
+// ============================================================
+// ⚠️ ★ **なぜ「登録時に自動」ではなく「URL が貼られたら自動」なのか。**
+//   登録時点では割付がまだ無く、その被験者にどの課題文が出るか決まっていない（§3-1）。
+//   割付は seed を使う科学的な行為なので、梱包やメールのついでに走らせてはならない。
+//   → ★ **研究者が配布フォルダの URL を貼った** ことを「割付が確定した」合図として使う。
+//
+// ⚠️⚠️ ★ **メール送信は取り消せない。** ガードを 4 本、fail-closed で置く:
+//   1. キルスイッチ  … Script Properties G1_MATERIALS_AUTOSEND_OFF
+//   2. URL 形式      … https://drive.google.com/ で始まること
+//   3. 冪等          … 「課題ページ送付日」が空の行だけ
+//   4. 1 回の上限    … G1_MATERIALS_MAX_PER_RUN 人まで（列の貼り間違いを頑健に抑える）
+//
+// ★ 本文 (g1MaterialsBody_) は**変えていない**。scripts/check_g1_emails.py の基準を跨がない。
+
+/** ★ これを Script Properties に真値で置くと自動送信が止まる（値は何でもよい）。 */
+var G1_AUTOSEND_OFF_PROP = "G1_MATERIALS_AUTOSEND_OFF";
+
+/** ★ 1 回の発火で送る上限。⚠️ 0 にしないこと（0 は「無効」ではなく「1 人も送らない」）。 */
+var G1_MATERIALS_MAX_PER_RUN = 3;
+
+/** 配布フォルダ URL として受け付ける形。⚠️ ★ ここを緩めると別サイトの URL を配れてしまう。 */
+var G1_MATERIALS_URL_RE = /^https:\/\/drive\.google\.com\/[^\s]+$/;
+
+/**
+ * ★★ 被験者別フォルダを束ねる**親**フォルダの ID（`G1_課題ページ_被験者別`）。
+ *
+ * ⚠️★★ **この親は「制限付き（非公開）」にしてある。** 2026-08-07 の判断:
+ *   親を「リンクを知っている全員」にすると、★ 被験者へ送る URL を**親のほうにしてしまった
+ *   1 回**で全被験者のフォルダ一覧が渡る（`preregistration.md §2.12`「他の被験者の割付」）。
+ *   → 親を非公開にすると、同じ取り違えは「アクセス権が必要です」で**止まる**（fail-closed）。
+ *   ★ 代わりに **被験者フォルダを 1 つずつ共有する**手作業が要る。その付け忘れは下の検査が拾う。
+ */
+var G1_MATERIALS_PARENT_ID = "1qhl28IDeh-19upuZf_YxPwwdq_d9xVcI";
+
+/** Drive のフォルダ URL から ID を取り出す。取れなければ ""。 */
+function g1FolderIdFromUrl_(url) {
+  var m = String(url).match(/\/folders\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : "";
+}
+
+/**
+ * ★★ 配布フォルダの **実体** を確かめる（ガード 7）。問題が無ければ ""、あれば理由を返す。
+ *
+ * ⚠️ ★ 形式検査（ガード 2）は文字列しか見ない。ここは Drive に問い合わせて
+ *    「**そのフォルダが本当にこの被験者のもので、本人が開けるか**」を見る。
+ *    次の 4 つは、どれも形式検査を素通りする事故である:
+ *      (a) 親フォルダの URL を貼った        → ★ 全被験者が見える
+ *      (b) 別の被験者のフォルダの URL を貼った → ★ 割付を取り違えて渡す
+ *      (c) 配布用の親の下に無いフォルダ       → 置き場所を間違えている
+ *      (d) ★ **共有し忘れ**                 → 被験者はリンクを開けない（届いても使えない）
+ *
+ * ⚠️★ この関数のために **DriveApp のスコープが増える**。次回実行時に Apps Script が
+ *    再承認を求めるので、⚠️ 研究者が「承認」を押すまで自動送信は走らない（安全側に倒れる）。
+ */
+function g1MaterialsFolderProblem_(url, pid) {
+  var id = g1FolderIdFromUrl_(url);
+  if (!id) return "URL からフォルダ ID を取り出せません（/folders/<ID> の形ではない）";
+  if (G1_MATERIALS_PARENT_ID && id === G1_MATERIALS_PARENT_ID) {
+    return "★★ これは被験者別フォルダの**親**の URL です（⚠️ 全被験者分が見えます）";
+  }
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(id);
+  } catch (e) {
+    return "フォルダを開けません（ID 違い・削除済み・権限なし）: " + e;
+  }
+  // ★ 認める名前は `g1MaterialsFolderNames_` ただ 1 か所で決める（探す側と同じ集合）。
+  //   ⚠️ 大文字小文字だけを吸収する。★ 前後の別語や部分一致は認めない。
+  var name = String(folder.getName()).trim().toUpperCase();
+  var allowed = g1MaterialsFolderNames_(pid).map(function (s) {
+    return s.toUpperCase();
+  });
+  if (allowed.indexOf(name) < 0) {
+    return (
+      "フォルダ名が「" + folder.getName() + "」で P-ID と違います（★ 別の被験者の URL かも。" +
+      "認める名前: " + g1MaterialsFolderNames_(pid).join(" / ") + "）"
+    );
+  }
+  if (G1_MATERIALS_PARENT_ID) {
+    var inParent = false;
+    try {
+      var ps = folder.getParents();
+      while (ps.hasNext()) {
+        if (ps.next().getId() === G1_MATERIALS_PARENT_ID) {
+          inParent = true;
+          break;
+        }
+      }
+    } catch (e2) {
+      return "親フォルダを確かめられません: " + e2;
+    }
+    if (!inParent) return "配布用の親フォルダ（G1_課題ページ_被験者別）の下にありません";
+  }
+  // ⚠️ ★ 共有し忘れの検出。親を非公開にした分、ここが**唯一の**受け皿である。
+  var access;
+  try {
+    access = String(folder.getSharingAccess());
+  } catch (e3) {
+    return "共有設定を読めません: " + e3;
+  }
+  if (access !== "ANYONE_WITH_LINK" && access !== "ANYONE") {
+    return (
+      "★ まだ共有されていません（共有=" + access + "）。⚠️ このまま送っても被験者は開けません。" +
+      "Drive で「リンクを知っている全員（閲覧者）」にしてください"
+    );
+  }
+  return "";
+}
+
+/** 「G1 実施トラッキング」シートを返す。無ければ null（★ throw しない）。 */
+function g1RunSheet_() {
+  var ssId = PropertiesService.getScriptProperties().getProperty(MGMT_SHEET_PROP_G1);
+  if (!ssId) return null;
+  return SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング") || null;
+}
+
+/**
+ * ★★ 実シートに「配布フォルダURL」列を挿す（1 回だけ・冪等）。
+ *
+ * ⚠️ ★ **setupG1Forms() を実行してはならない**（フォームを作り直してしまう）。
+ *    列を足すのはこの関数の仕事である。
+ *
+ * ⚠️ ★ なぜ「コードの RUN_HEADER を直すだけ」で済まないか:
+ *    runCol_ は **コード側の RUN_HEADER しか見ない**。実シートが古いままだと、
+ *    列名で引いているのに実シートでは**別の列**を指す。
+ *    2026-08-03 に実際に起きている（16 列のシートへ 17 列の定義で入力規則を貼り、
+ *    日付列「実施日」に「はい/いいえ」のドロップダウンが付いた）。
+ *
+ * ★ 列の「挿入」であって作り直しではないので、既存データも入力規則も右へずれて保たれる。
+ */
+function migrateRunSheetAddUrlColumn() {
+  var sh = g1RunSheet_();
+  if (!sh) {
+    throw new Error("★ G1 管理シートが見つかりません（buildManagementSheet() を先に実行）。");
+  }
+
+  var NEW_COL = "配布フォルダURL";
+  if (runHeaderDiff_(sh).length === 0) {
+    Logger.log("✅ 既に「" + NEW_COL + "」列があります（何もしません）。");
+    return;
+  }
+
+  // ★ 「新列を抜いたヘッダ」= 移行前に期待される姿。これと一致するときだけ触る。
+  var idx = runCol_(NEW_COL); // 1 始まり
+  var expectedOld = RUN_HEADER.slice(0, idx - 1).concat(RUN_HEADER.slice(idx));
+  var live = sh.getRange(2, 1, 1, Math.max(sh.getLastColumn(), expectedOld.length)).getValues()[0];
+  var mismatch = [];
+  for (var i = 0; i < expectedOld.length; i++) {
+    var a = String(expectedOld[i]);
+    var b = String(live[i] === undefined ? "" : live[i]).trim();
+    if (a !== b) mismatch.push("col" + (i + 1) + ": 期待='" + a + "' / シート='" + b + "'");
+  }
+  if (mismatch.length) {
+    // ⚠️ ★ 見覚えのない形。黙って列を挿すと記録が 1 列ずれる。**止める。**
+    throw new Error(
+      "★ 「G1 実施トラッキング」が、移行前として期待する形と違います。\n" +
+        "⚠️ このまま列を挿すと既存の記録が 1 列ずれます。中止しました。\n" +
+        mismatch.join("\n") +
+        "\n→ 列を手で合わせてから、もう一度この関数を実行してください。"
+    );
+  }
+
+  sh.insertColumnBefore(idx);
+  sh.getRange(2, idx).setValue(NEW_COL).setFontWeight("bold");
+  sh.setColumnWidth(idx, 260);
+  SpreadsheetApp.flush();
+
+  assertRunHeader_(sh); // ★ 挿したあとに、コードと実シートが本当に一致したか確かめる
+  Logger.log("✅ 「" + NEW_COL + "」列を " + idx + " 列目に挿しました。");
+  Logger.log("★ 次: 被験者ごとに配布フォルダの URL をこの列に貼ると、自動で事前資料メールが出ます。");
+  Logger.log("ℹ️ 自動送信を止めるには Script Properties に " + G1_AUTOSEND_OFF_PROP + " を置きます。");
+}
+
+/**
+ * ★★ 実シートの列を第 13 版に合わせる（2026-08-08・**冪等**）。
+ *
+ * ⚠️ ★ **コードの RUN_HEADER を直すだけでは足りない。** `runCol_` は
+ *    **コード側の配列しか見ない**ので、実シートが古いままだと**静かに別の列へ書く**
+ *    （memory: `name-lookup-only-works-within-one-source` / 2026-08-03 に実際に起きた）。
+ *
+ * ⚠️ ★ **列は名前で引いて直す。** 位置で決め打ちすると、途中まで手で直されたシートを壊す。
+ * ⚠️ ★ **削除する列の中身は、消す前に全部ログへ出す**（黙って捨てない）。
+ *
+ * 実行後に `assertRunHeader_` で**実シートとコードが本当に一致したか**を確かめ、
+ * 入力規則と見た目を張り直す。
+ */
+var RUN_MIGRATION_RENAMES = [
+  ["課題文リンク送信日", "課題ページ送付日"],
+  ["GSE_DISABLE_PROBES=1", "G1モード確認"],
+];
+var RUN_MIGRATION_DROPS = ["実施予定日", "配置(A/B)"];
+var RUN_MIGRATION_ADDS = [{ name: "配布URL(短縮)", after: "配布フォルダURL" }];
+var RUN_MIGRATION_VALUES = [
+  // ★ 第 13 版で実施形態の言い方を変えた。★ 既存行の値も揃える（選択肢だけ変えると宙に浮く）。
+  { col: "実施形態", from: "無人在宅", to: "在宅（初回起動のみ同席）" },
+];
+
+function migrateRunSheetToV14() {
+  var sh = g1RunSheet_();
+  if (!sh) {
+    throw new Error("★ G1 管理シートが見つかりません（buildManagementSheet() を先に実行）。");
+  }
+  function header() {
+    var w = Math.max(sh.getLastColumn(), RUN_HEADER.length);
+    return sh.getRange(2, 1, 1, w).getValues()[0].map(function (v) {
+      return String(v === undefined || v === null ? "" : v).trim();
+    });
+  }
+  if (runHeaderDiff_(sh).length === 0 && sh.getLastColumn() === RUN_HEADER.length) {
+    Logger.log("✅ 実シートは既に最新の列構成です（何もしません）。見た目だけ張り直します。");
+    styleRunTab_(sh);
+    applyRunValidation_(sh.getParent());
+    return;
+  }
+  var lastRow = sh.getLastRow();
+  var nData = Math.max(lastRow - 2, 0);
+  var changed = [];
+
+  // 1) 改名（★ 中身は動かさない）
+  RUN_MIGRATION_RENAMES.forEach(function (pair) {
+    var h = header();
+    var i = h.indexOf(pair[0]);
+    if (i >= 0) {
+      sh.getRange(2, i + 1).setValue(pair[1]);
+      changed.push("改名: " + pair[0] + " → " + pair[1] + "（col" + (i + 1) + "）");
+    } else if (h.indexOf(pair[1]) < 0) {
+      Logger.log("⚠️ 旧名も新名も見つかりません: " + pair[0] + " / " + pair[1]);
+    }
+  });
+
+  // 2) 削除（⚠️ ★ 消す前に中身をログに出す）
+  RUN_MIGRATION_DROPS.forEach(function (name) {
+    var i = header().indexOf(name);
+    if (i < 0) return;
+    if (nData > 0) {
+      var vals = sh.getRange(3, i + 1, nData, 1).getValues().map(function (r) {
+        return String(r[0] === undefined || r[0] === null ? "" : r[0]).trim();
+      });
+      var nonEmpty = vals.filter(function (v) { return v !== ""; });
+      Logger.log(
+        "🗑 「" + name + "」を削除します。★ 消える値 " + nonEmpty.length + " 件: " +
+          (nonEmpty.length ? nonEmpty.join(" / ") : "（すべて空）")
+      );
+    }
+    sh.deleteColumn(i + 1);
+    changed.push("削除: " + name);
+  });
+
+  // 3) 追加（★ 左隣の列名の右へ挿す）
+  RUN_MIGRATION_ADDS.forEach(function (add) {
+    var h = header();
+    if (h.indexOf(add.name) >= 0) return;
+    var i = h.indexOf(add.after);
+    if (i < 0) {
+      Logger.log("⚠️ 「" + add.after + "」が無いので「" + add.name + "」を足せません。");
+      return;
+    }
+    sh.insertColumnAfter(i + 1);
+    sh.getRange(2, i + 2).setValue(add.name);
+    changed.push("追加: " + add.name + "（col" + (i + 2) + "）");
+  });
+
+  // 4) 値の言い換え
+  RUN_MIGRATION_VALUES.forEach(function (v) {
+    var i = header().indexOf(v.col);
+    if (i < 0 || nData <= 0) return;
+    var range = sh.getRange(3, i + 1, nData, 1);
+    var vals = range.getValues();
+    var hit = 0;
+    for (var r = 0; r < vals.length; r++) {
+      if (String(vals[r][0]).trim() === v.from) {
+        vals[r][0] = v.to;
+        hit++;
+      }
+    }
+    if (hit) {
+      range.setValues(vals);
+      changed.push("値: " + v.col + " の「" + v.from + "」" + hit + " 件 → 「" + v.to + "」");
+    }
+  });
+
+  SpreadsheetApp.flush();
+
+  // ⚠️ ★ 余った列を見落とさない（runHeaderDiff_ は RUN_HEADER の長さまでしか見ない）。
+  if (sh.getLastColumn() > RUN_HEADER.length) {
+    var extra = sh
+      .getRange(2, RUN_HEADER.length + 1, 1, sh.getLastColumn() - RUN_HEADER.length)
+      .getValues()[0]
+      .filter(function (v) { return String(v).trim() !== ""; });
+    if (extra.length) {
+      Logger.log("⚠️ ★ 右側に見覚えのない列が残っています: " + extra.join(" / ") +
+        "（★ 研究者が足した列なら残して構いませんが、位置に依存する処理はありません）");
+    }
+  }
+
+  // ★ ここで初めて「コードと実シートが一致したか」を確かめる。ずれていれば例外で止まる。
+  assertRunHeader_(sh);
+  // ⚠️★ 見た目で落ちても**入力規則までは必ず張る**（列の移行が中途半端に見えるのを防ぐ）。
+  //   2026-08-08 に実際に踏んだ: styleRunTab_ の setFrozenColumns が例外を投げ、
+  //   ★ 列は直っているのに規則が張られないまま終わった。
+  try {
+    styleRunTab_(sh);
+  } catch (e) {
+    Logger.log("⚠️ ★ 見た目の設定で失敗しました（列の移行は完了しています）: " + e);
+  }
+  applyRunValidation_(sh.getParent());
+
+  Logger.log(changed.length ? "✅ 移行しました:\n· " + changed.join("\n· ") : "✅ 変更はありません。");
+  Logger.log("★ 次: refreshG1RunSheet() を 1 回実行すると「配布URL(短縮)」が埋まります。");
+}
+
+/** P-ID から Phase1 ロスターのメールを引く。見つからなければ ""。 */
+function g1EmailForPid_(pid) {
+  if (!PHASE1_MGMT_SHEET_ID) return "";
+  var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+  if (!roster) return "";
+  var found = g1FindInPhase1Roster_(roster, { pid: pid });
+  if (!found) return "";
+  return String(roster.getRange(found.row, 3).getValue()).trim();
+}
+
+/**
+ * 送信対象を集める（★ 送らない）。g1AutoSendPendingMaterials と previewPendingTaskMaterials で共有する。
+ * ⚠️ ★ 「なぜ送らないか」を必ず理由付きで返す。黙って飛ばすと、研究者は
+ *    「URL は貼ったのに永久に届かない」状態に気づけない。
+ */
+function g1CollectPendingMaterials_() {
+  var sh = g1RunSheet_();
+  if (!sh) return { rows: [], skipped: [], error: "G1 管理シートが見つかりません" };
+  try {
+    assertRunHeader_(sh);
+  } catch (e) {
+    return { rows: [], skipped: [], error: String(e.message).split("\n")[0] };
+  }
+
+  var colPid = runCol_("P-ID");
+  var colUrl = runCol_("配布フォルダURL");
+  var colSent = runCol_("課題ページ送付日");
+  var last = sh.getLastRow();
+  var rows = [];
+  var skipped = [];
+
+  // --- 1 周目: ★ URL の重複を数える（送信済みの行も含める） ---------------------
+  // ⚠️★★ 形式検査 (ガード 2) は「Drive の URL か」しか見ない。**宛先が正しいか**は見ない。
+  //   実際に起こる事故は「別の被験者の URL を貼る」「1 人ぶんを複数行にコピペする」であり、
+  //   どちらも形式検査を素通りする。★ 同じ URL が 2 人以上に紐づいていたら **貼り間違い**なので、
+  //   自動では送らず人に返す（送信は取り消せないので、疑わしいときは送らない側に倒す）。
+  //   ★ 送信済みの行も数に入れる: 既に P015 へ送った URL を P016 に貼る事故を捕まえるため。
+  var pidsByUrl = {};
+  for (var r0 = 3; r0 <= last; r0++) {
+    var p0 = String(sh.getRange(r0, colPid).getValue()).trim().toUpperCase();
+    var u0 = String(sh.getRange(r0, colUrl).getValue()).trim();
+    if (!p0 || !u0) continue;
+    if (!pidsByUrl[u0]) pidsByUrl[u0] = [];
+    if (pidsByUrl[u0].indexOf(p0) < 0) pidsByUrl[u0].push(p0);
+  }
+
+  // --- 2 周目: 送る相手を決める -------------------------------------------------
+  for (var r = 3; r <= last; r++) {
+    var pid = String(sh.getRange(r, colPid).getValue()).trim().toUpperCase();
+    if (!pid) continue;
+    var url = String(sh.getRange(r, colUrl).getValue()).trim();
+    var sent = sh.getRange(r, colSent).getValue();
+
+    if (sent !== "" && sent !== null && sent !== undefined) continue; // ガード 3: 冪等（静かでよい）
+    if (!url) continue; // まだ配布フォルダを作っていない = 正常な待ち状態
+    if (!G1_MATERIALS_URL_RE.test(url)) {
+      skipped.push(pid + ": URL が https://drive.google.com/ で始まっていません"); // ガード 2
+      continue;
+    }
+    if (pidsByUrl[url] && pidsByUrl[url].length > 1) {
+      // ガード 5: ★ 同じ URL が複数の P-ID に紐づいている = 貼り間違い
+      skipped.push(
+        pid + ": 同じ URL が " + pidsByUrl[url].join(" / ") + " に貼られています" +
+          "（★ 貼り間違いの可能性。人が直してから送ってください）"
+      );
+      continue;
+    }
+    var email = g1EmailForPid_(pid);
+    if (!email) {
+      skipped.push(pid + ": Phase1 ロスターにメールがありません");
+      continue;
+    }
+    // ガード 7: ★ Drive に問い合わせて実体を確かめる（親の URL / 別人 / 共有し忘れ）
+    var problem = g1MaterialsFolderProblem_(url, pid);
+    if (problem) {
+      skipped.push(pid + ": " + problem);
+      continue;
+    }
+    rows.push({ row: r, pid: pid, url: url, email: email });
+  }
+  return { rows: rows, skipped: skipped, error: "" };
+}
+
+/**
+ * ★ 送らずに対象だけ出す（引数なし・安全）。⚠️ 実送信の前に必ず一度これを見る。
+ */
+function previewPendingTaskMaterials() {
+  var found = g1CollectPendingMaterials_();
+  if (found.error) {
+    Logger.log("❌ " + found.error);
+    return;
+  }
+  Logger.log("ℹ️ 自動送信: " + (g1AutoSendDisabled_() ? "⛔ 停止中（キルスイッチ）" : "有効"));
+  Logger.log("ℹ️ G1_AUTO_SEND=" + G1_AUTO_SEND + "（false=下書き作成 / true=実送信）");
+  Logger.log("ℹ️ 1 回の上限: " + G1_MATERIALS_MAX_PER_RUN + " 人");
+  Logger.log("--------");
+  if (!found.rows.length) {
+    Logger.log("送る相手はいません（URL 未記入 or 送信済み）。");
+  }
+  for (var i = 0; i < found.rows.length; i++) {
+    var it = found.rows[i];
+    var mark = i < G1_MATERIALS_MAX_PER_RUN ? "→ 今回送る" : "… 次回に回る（上限）";
+    Logger.log(mark + ": " + it.pid + " → " + g1MaskEmail_(it.email));
+  }
+  for (var j = 0; j < found.skipped.length; j++) {
+    Logger.log("⚠️ 飛ばす " + found.skipped[j]);
+  }
+  Logger.log("--------");
+  Logger.log("★ 実際に送るのは g1AutoSendPendingMaterials()（トリガーが自動で呼びます）。");
+}
+
+/** キルスイッチが入っているか。 */
+function g1AutoSendDisabled_() {
+  var v = PropertiesService.getScriptProperties().getProperty(G1_AUTOSEND_OFF_PROP);
+  return !!(v && String(v).trim() !== "" && String(v).trim().toLowerCase() !== "false");
+}
+
+/**
+ * ★★ 時間トリガーが呼ぶ本体（引数なし）。
+ * ⚠️ 送信は取り消せない。上のガード 4 本を通ったものだけ送る。
+ */
+function g1AutoSendPendingMaterials() {
+  if (g1AutoSendDisabled_()) {
+    Logger.log("⛔ " + G1_AUTOSEND_OFF_PROP + " が立っているので送信しません。"); // ガード 1
+    return;
+  }
+
+  // ⚠️★★ **排他制御が要る理由**（onG1ConsentSubmit と同じ流儀・2026-08-07 の cross-review で Codex が指摘）:
+  //   「送信日が空か調べる → 送る → 送信日を書く」は **原子的ではない**。
+  //   時間トリガーの実行が延びて次の発火と重なる、あるいは研究者が手で実行すると、
+  //   ★ **両方が「まだ空」を見て同じ相手に 2 通送る**。⚠️ 送信は取り消せない。
+  //   → 収集から記録までを丸ごとロックで囲む。取れなければ **何もしない**（次の発火で拾う）。
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    Logger.log("⏳ 他の実行が動いているので今回は送りません（次の発火で拾います）: " + lockErr);
+    return;
+  }
+
+  try {
+    var found = g1CollectPendingMaterials_();
+    if (found.error) {
+      Logger.log("❌ " + found.error + "（送信しません）");
+      return;
+    }
+    for (var j = 0; j < found.skipped.length; j++) {
+      Logger.log("⚠️ 飛ばす " + found.skipped[j]);
+    }
+    if (!found.rows.length) return;
+
+    var sh = g1RunSheet_();
+    var colNote = runCol_("備考");
+    var colSent = runCol_("課題ページ送付日");
+    var n = Math.min(found.rows.length, G1_MATERIALS_MAX_PER_RUN); // ガード 4
+    if (found.rows.length > n) {
+      Logger.log("ℹ️ " + found.rows.length + " 人が対象ですが、1 回の上限 " + n + " 人まで送ります（残りは次回）。");
+    }
+    for (var i = 0; i < n; i++) {
+      var it = found.rows[i];
+      try {
+        // ★ 既存関数をそのまま使う。本文の生成はあちらが持っている（二重に持たない）。
+        sendTaskMaterialsEmail(it.pid, it.email, it.url);
+      } catch (e) {
+        // ⚠️ ★ 黙って落とさない。onG1ConsentSubmit と同じく備考に出す。
+        Logger.log("❌ " + it.pid + " への事前資料メールに失敗: " + e);
+        try {
+          sh.getRange(it.row, colNote).setValue("⚠事前資料メール失敗-要手動送信: " + e);
+        } catch (e2) {
+          Logger.log("⚠️ 備考にも書けませんでした: " + e2);
+        }
+        continue;
+      }
+
+      // ⚠️★★ **「送れたのに記録できていない」を捕まえる**（cross-review 2026-08-07・MEDIUM）:
+      //   sendTaskMaterialsEmail は送信日の書き込み失敗を try/catch で握りつぶし、
+      //   Logger に出すだけで再スローしない。人が 1 件ずつ呼んでいた頃はログで気づけたが、
+      //   ★ トリガー化でその人間のチェックが消えた。放置すると **次の発火で同じ人に再送**される。
+      //   → 書けたことを**読み直して確かめ**、空なら自分で書く。それも駄目なら備考で可視化する。
+      try {
+        var mark = sh.getRange(it.row, colSent).getValue();
+        if (mark === "" || mark === null || mark === undefined) {
+          sh.getRange(it.row, colSent).setValue(new Date());
+          SpreadsheetApp.flush();
+          var again = sh.getRange(it.row, colSent).getValue();
+          if (again === "" || again === null || again === undefined) {
+            throw new Error("送信日を書けませんでした");
+          }
+          Logger.log("⚠️ " + it.pid + ": 送信日が空だったので補って書きました（★ 二重送信の芽を潰した）");
+        }
+      } catch (e3) {
+        // ⚠️★ ここに来たら **送信済みなのに記録が無い**。次の発火で再送されるので、必ず目に付ける。
+        Logger.log("❌ " + it.pid + ": ★ 送信は済んだが送信日を記録できません。⚠️ 二重送信の恐れ: " + e3);
+        try {
+          sh.getRange(it.row, colNote).setValue(
+            "⚠★送信済だが送信日を記録できず-手で日付を入れること（放置すると再送される）: " + e3
+          );
+        } catch (e4) {
+          Logger.log("⚠️ 備考にも書けませんでした: " + e4);
+          Logger.log("★ " + G1_AUTOSEND_OFF_PROP + " を立てて自動送信を止めることを検討してください。");
+        }
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** ★ 時間トリガーを 1 回だけ設置する（1 時間ごと）。 */
+function installMaterialsAutoSendTrigger() {
+  removeMaterialsAutoSendTriggers();
+  ScriptApp.newTrigger("g1AutoSendPendingMaterials").timeBased().everyHours(1).create();
+  Logger.log("✅ g1AutoSendPendingMaterials を 1 時間ごとに実行するトリガーを設置しました。");
+  Logger.log("ℹ️ 止めるには Script Properties に " + G1_AUTOSEND_OFF_PROP + " を置く"
+    + "（★ トリガーを消さずに止められる）か、removeMaterialsAutoSendTriggers() を実行します。");
+  if (!G1_AUTO_SEND) {
+    Logger.log("⚠️ ★ G1_AUTO_SEND=false なので**下書きが溜まるだけ**で被験者に届きません。");
+  }
+  try {
+    assertRunHeader_(g1RunSheet_());
+  } catch (e) {
+    Logger.log("⚠️ ★ 実シートに「配布フォルダURL」列がまだありません: " + String(e.message).split("\n")[0]);
+    Logger.log("   → migrateRunSheetAddUrlColumn() を先に 1 回実行してください。");
+  }
+}
+
+// ============================================================
+// ★★ 「G1 実施トラッキング」の自動集計（2026-08-07）
+// ============================================================
+// ⚠️ ★ **列のうち、これまで自動で埋まるのは 3 列だけだった**（P-ID / 課題ページ送付日 / 備考）。
+//    残りは全部手入力で、⚠️ 埋め忘れると「回答は来ているのに集計に出ない」状態が静かに続く。
+//
+// ★ **手で入れる意味が無い列**（=どこかに真実源があり、写すだけの列）を自動で埋める:
+//
+//   | 列 | 真実源 | 決め方 |
+//   |---|---|---|
+//   | G1-C 同意           | G1-C の提出そのもの     | 提出されていれば「はい」 |
+//   | G1-M 回答数(/7)     | G1-M の回答            | 被験者IDごとの**ブロック番号の異なり数** |
+//   | G1-S 回答           | G1-S の回答            | 1 件でもあれば「はい」 |
+//   | 完了ブロック数(/10) | 受け口に届いた `.age`   | `P0XX_blockNN_…` の**異なる NN の数** |
+//   | 実施日              | 同上                   | 最も早い `.age` の `gse_YYYYMMDD` |
+//
+// ⚠️★ **手入力を上書きしない**: 「実施日」は空のときだけ書く（研究者の記入を尊重する）。
+//    導出値（回答数・完了ブロック数）は毎回書き直す。★ そうしないと古い数字が居座る。
+//
+// ⚠️★★ **判定に関わる列は 1 つも触らない。** `実施形態` `撤回/除外`
+//    `verify-blocks 実施` `validate_blocks 緑` `gse-dataset 送付` は**人の判断**であり、
+//    機械が埋めてよいものではない（`preregistration.md §3.6` は事後除外を禁じている）。
+
+/** 受け口 (`GSE_G1_Submit.gs` / プロジェクト B) が `.age` を貯める Drive フォルダの ID。 */
+var G1_SUBMIT_FOLDER_PROP = "G1_SUBMIT_FOLDER_ID";
+
+/** `.age` のファイル名 → {pid, block, ymd}。形が違えば null。★ 受け口の NAME_RE と同じ形。 */
+function g1ParseAgeName_(name) {
+  var m = String(name).match(/^([A-Za-z0-9]{1,16})_block(\d{2,3})_gse_(\d{8})_\d{6}(?:_\d{1,10})?\.age$/);
+  if (!m) return null;
+  return { pid: m[1].toUpperCase(), block: parseInt(m[2], 10), ymd: m[3] };
+}
+
+/**
+ * 受け口フォルダを 1 周して、P-ID ごとの {blocks:Set相当, firstYmd} を作る。
+ * ⚠️ フォルダ ID が未設定なら null を返す（★ 例外にしない。集計の他の列は動かしたい）。
+ */
+function g1CollectSubmittedBlocks_() {
+  var folderId = PropertiesService.getScriptProperties().getProperty(G1_SUBMIT_FOLDER_PROP);
+  if (!folderId) return null;
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(String(folderId).trim());
+  } catch (e) {
+    Logger.log("⚠️ " + G1_SUBMIT_FOLDER_PROP + " のフォルダを開けません: " + e);
+    return null;
+  }
+  var out = {};
+  var it = folder.getFiles();
+  while (it.hasNext()) {
+    var parsed = g1ParseAgeName_(it.next().getName());
+    if (!parsed) continue; // ★ `.age` 以外・重複回避で付いた別名は無視する
+    if (!out[parsed.pid]) out[parsed.pid] = { blocks: [], firstYmd: "" };
+    var rec = out[parsed.pid];
+    if (rec.blocks.indexOf(parsed.block) < 0) rec.blocks.push(parsed.block);
+    if (!rec.firstYmd || parsed.ymd < rec.firstYmd) rec.firstYmd = parsed.ymd;
+  }
+  return out;
+}
+
+/** フォームの回答を被験者ID で束ねる。`countBy` を渡すとその設問の異なり数を数える。 */
+function g1CountResponsesByPid_(formId, countBy) {
+  var out = {};
+  if (!formId) return out;
+  var responses;
+  try {
+    responses = FormApp.openById(formId).getResponses();
+  } catch (e) {
+    Logger.log("⚠️ フォームの回答を読めません (" + formId + "): " + e);
+    return out;
+  }
+  for (var i = 0; i < responses.length; i++) {
+    var items = responses[i].getItemResponses();
+    var pid = "";
+    var key = "";
+    for (var j = 0; j < items.length; j++) {
+      var title = items[j].getItem().getTitle();
+      var v = items[j].getResponse();
+      var s = Array.isArray(v) ? v.join("/") : String(v == null ? "" : v);
+      if (title === Q_SUBJECT_ID) pid = s.trim().toUpperCase();
+      else if (countBy && title === countBy) key = s.trim();
+    }
+    if (!pid) continue;
+    if (!out[pid]) out[pid] = [];
+    // ★ countBy が無いフォーム (G1-S) は回答そのものを 1 件として数える
+    var token = countBy ? key : String(i);
+    if (out[pid].indexOf(token) < 0) out[pid].push(token);
+  }
+  return out;
+}
+
+/** `YYYYMMDD` → Date。壊れていれば null。 */
+function g1YmdToDate_(ymd) {
+  var m = String(ymd).match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/**
+ * ★★ トラッキング表の導出列を埋め直す（引数なし・トリガーからも人からも呼べる）。
+ * ⚠️ ★ **判定に関わる列は触らない**（上のコメント参照）。
+ */
+function refreshG1RunSheet() {
+  var sh = g1RunSheet_();
+  if (!sh) {
+    Logger.log("❌ G1 管理シートが見つかりません（buildManagementSheet() を実行）");
+    return;
+  }
+  try {
+    assertRunHeader_(sh);
+  } catch (e) {
+    // ⚠️ ★ ずれたまま書くと**別の列を壊す**。黙って進まない。
+    Logger.log("❌ ヘッダが一致しないので集計しません: " + String(e.message).split("\n")[0]);
+    return;
+  }
+
+  var submitted = g1CollectSubmittedBlocks_();
+  if (submitted === null) {
+    Logger.log(
+      "ℹ️ " + G1_SUBMIT_FOLDER_PROP + " が未設定なので「完了ブロック数」「実施日」は飛ばします。" +
+        "（受け口プロジェクトの FOLDER_ID と同じ値をここのスクリプト プロパティにも入れると埋まります）"
+    );
+  }
+  var mcheck = g1CountResponsesByPid_(FORM_ID_MCHECK, Q_BLOCK_NO);
+  var survey = g1CountResponsesByPid_(FORM_ID_SURVEY, "");
+
+  var colPid = runCol_("P-ID");
+  var colConsent = runCol_("G1-C 同意");
+  var colDate = runCol_("実施日");
+  var colBlocks = runCol_("完了ブロック数(/10)");
+  var colM = runCol_("G1-M 回答数(/7)");
+  var colS = runCol_("G1-S 回答");
+  var colShort = runCol_("配布URL(短縮)");
+
+  var last = sh.getLastRow();
+  var touched = 0;
+  for (var r = 3; r <= last; r++) {
+    var pid = String(sh.getRange(r, colPid).getValue()).trim().toUpperCase();
+    if (!pid) continue;
+    var changes = [];
+
+    // ★ 被験者に**実際に配られた**短縮 URL を見せる（2026-08-08）。
+    //   ⚠️ ★ 「配布フォルダURL」の側は**生のまま**にする（G1_MATERIALS_URL_RE と
+    //      g1FolderIdFromUrl_ が読む機械入力である）。短縮はこの導出列だけに置く。
+    //   ⚠️ 短縮が無ければ**空のままにする**（生 URL を 2 列に重ねない）。
+    var shortUrl = getShortUrl_(PropertiesService.getScriptProperties(), g1MaterialsShortKey_(pid));
+    if (shortUrl && String(sh.getRange(r, colShort).getValue()).trim() !== shortUrl) {
+      sh.getRange(r, colShort).setValue(shortUrl);
+      changes.push("配布URL(短縮)");
+    }
+
+    // ★ G1-C 同意: この行が存在する = G1-C が提出された、である（行は提出でしか作られない）。
+    if (String(sh.getRange(r, colConsent).getValue()).trim() === "") {
+      sh.getRange(r, colConsent).setValue("はい");
+      changes.push("G1-C 同意");
+    }
+
+    // ★ 導出値は毎回書き直す（古い数字を居座らせない）
+    var m = (mcheck[pid] || []).length;
+    if (String(sh.getRange(r, colM).getValue()) !== String(m)) {
+      sh.getRange(r, colM).setValue(m);
+      changes.push("G1-M=" + m);
+    }
+    var s = (survey[pid] || []).length > 0 ? "はい" : "";
+    if (s && String(sh.getRange(r, colS).getValue()).trim() !== s) {
+      sh.getRange(r, colS).setValue(s);
+      changes.push("G1-S");
+    }
+
+    if (submitted) {
+      var rec = submitted[pid];
+      var nb = rec ? rec.blocks.length : 0;
+      if (String(sh.getRange(r, colBlocks).getValue()) !== String(nb)) {
+        sh.getRange(r, colBlocks).setValue(nb);
+        changes.push("完了ブロック=" + nb);
+      }
+      // ⚠️ ★ 実施日は**空のときだけ**書く（研究者が入れた日付を上書きしない）
+      if (rec && rec.firstYmd && String(sh.getRange(r, colDate).getValue()).trim() === "") {
+        var d = g1YmdToDate_(rec.firstYmd);
+        if (d) {
+          sh.getRange(r, colDate).setValue(d);
+          changes.push("実施日");
+        }
+      }
+    }
+
+    if (changes.length) {
+      touched++;
+      Logger.log("· " + pid + ": " + changes.join(" / "));
+    }
+  }
+  SpreadsheetApp.flush();
+  Logger.log(touched ? "✅ " + touched + " 行を更新しました。" : "✅ 更新はありません（すべて最新）。");
+  Logger.log("ℹ️ ★ 実施形態 / 撤回・除外 / 検証系の列は**人の判断**なので触りません。");
+
+  // ★ 同じ材料 (submitted / mcheck) から描けるので、ここで一緒に描き直す。
+  //   ⚠️ 別トリガーにしない — 毎時トリガーが 2 本になると互いに待って遅くなる
+  //   （2026-08-08 に g1AutoSendPendingMaterials と競合して実測）。
+  try {
+    refreshSubmissionTab_(sh.getParent());
+  } catch (e) {
+    // ⚠️ ★ 派生タブの失敗で**本体の集計を巻き添えにしない**（本体はもう書き終えている）。
+    Logger.log("⚠️ " + SUBMIT_TAB_NAME + " の再描画に失敗しました: " + e);
+  }
+}
+
+/** ★ 集計を 1 時間ごとに回す（1 回だけ実行する）。 */
+function installRunSheetRefreshTrigger() {
+  removeRunSheetRefreshTriggers();
+  ScriptApp.newTrigger("refreshG1RunSheet").timeBased().everyHours(1).create();
+  Logger.log("✅ refreshG1RunSheet を 1 時間ごとに実行するトリガーを設置しました。");
+  if (!PropertiesService.getScriptProperties().getProperty(G1_SUBMIT_FOLDER_PROP)) {
+    Logger.log(
+      "⚠️ ★ " + G1_SUBMIT_FOLDER_PROP + " が未設定です。受け口プロジェクトの FOLDER_ID と" +
+        "同じ値を入れると「完了ブロック数」「実施日」も埋まります。"
+    );
+  }
+}
+
+function removeRunSheetRefreshTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "refreshG1RunSheet") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("🧹 既存の refreshG1RunSheet トリガを " + n + " 件削除しました");
+}
+
+function removeMaterialsAutoSendTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var n = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "g1AutoSendPendingMaterials") {
+      ScriptApp.deleteTrigger(triggers[i]);
+      n++;
+    }
+  }
+  if (n) Logger.log("🧹 既存の g1AutoSendPendingMaterials トリガを " + n + " 件削除しました");
 }
 
 // ============================================================
@@ -1513,8 +3422,21 @@ function onG1ConsentSubmit(e) {
     // 3) 受付メール。⚠️ ★ ここで例外が出ると「発番済みだが通知が無い」状態になり、
     //    再提出しても 1) で冪等スキップされるので**永久に届かない**。備考列に可視化する。
     try {
+      // ★★ 2026-08-07: 課題ページのフォルダが**もう用意できていれば、この 1 通で全部渡す**。
+      //    ⚠️ 用意できていなければ従来どおり 2 便に落ちる（壊れない）。
+      var found = { url: "", problem: "" };
+      try {
+        found = g1MaterialsUrlForPid_(pid);
+      } catch (lookupErr) {
+        found = { url: "", problem: "探索に失敗: " + lookupErr };
+      }
+      if (found.url) {
+        Logger.log("✅ 課題ページのフォルダが見つかったので、受付メール 1 通で渡します: " + pid);
+      } else {
+        Logger.log("ℹ️ 課題ページは別便になります（" + found.problem + "）");
+      }
       var subject = g1RegisterAckSubject_();
-      var body = g1RegisterAckBody_(pid);
+      var body = g1RegisterAckBody_(pid, found.url);
       if (G1_AUTO_SEND) {
         MailApp.sendEmail(a.email, subject, body);
         Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
@@ -1524,8 +3446,35 @@ function onG1ConsentSubmit(e) {
         Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
       }
     } catch (mailErr) {
+      found = { url: "", problem: "受付メールに失敗したので記録しない" }; // ★ 下の記録を止める
       if (noteCell) noteCell.setValue("⚠受付メール未作成-要手動送信: " + mailErr);
       Logger.log("❌ 受付メールに失敗（P-ID は確定済 " + pid + "）。備考にフラグを立てました: " + mailErr);
+    }
+    // ⚠️★★ **受付メールで課題ページまで渡したなら、それをシートに記録する。**
+    //    記録しないと `g1AutoSendPendingMaterials` が「まだ送っていない」と見なし、
+    //    ★ **同じ人に事前資料メールをもう 1 通送る**（送信は取り消せない）。
+    //    → 「配布フォルダURL」と「課題ページ送付日」の両方を埋めて、冪等キーを閉じる。
+    if (found.url && noteCell) {
+      try {
+        var sh2 = noteCell.getSheet();
+        var r2 = noteCell.getRow();
+        if (String(sh2.getRange(r2, runCol_("配布フォルダURL")).getValue()).trim() === "") {
+          sh2.getRange(r2, runCol_("配布フォルダURL")).setValue(found.url);
+        }
+        if (String(sh2.getRange(r2, runCol_("課題ページ送付日")).getValue()).trim() === "") {
+          sh2.getRange(r2, runCol_("課題ページ送付日")).setValue(new Date());
+        }
+        SpreadsheetApp.flush();
+        Logger.log("✅ 課題ページを受付メールで渡した旨を記録しました（2 通目は送られません）");
+      } catch (recErr) {
+        // ⚠️ ★ ここが失敗すると 2 通目が飛ぶ。**黙らせない。**
+        Logger.log("❌ ★ 受付メールで渡したのに記録できませんでした。⚠️ 2 通目が送られる恐れ: " + recErr);
+        try {
+          noteCell.setValue("⚠★受付メールで課題ページを渡したが記録できず-手で送信日を入れること: " + recErr);
+        } catch (e5) {
+          Logger.log("⚠️ 備考にも書けませんでした: " + e5);
+        }
+      }
     }
     Logger.log(isNew ? "🎉 新規登録: " + pid : "🔁 再提出（発番なし）: " + pid);
   } finally {

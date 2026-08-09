@@ -8,21 +8,69 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use lazy_static::lazy_static;
 use windows::Win32::Foundation::{HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, HHOOK, KBDLLHOOKSTRUCT, MSG,
-    PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
-    WM_SYSKEYUP,
+    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK,
+    KBDLLHOOKSTRUCT, MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT,
+    WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
 use super::{
-    EVENT_SENDER, HOOK_ACTIVE, IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSITION_START_MS,
-    IME_OPEN, IME_SHADOW_ABANDON, IME_SHADOW_DWELL_MS, IME_SHADOW_READY, IME_STATE_DIRTY,
-    LAST_KEY_MS, POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA,
-    VK_DBE_KATAKANA, VK_DBE_SBCSCHAR, VK_KANJI,
+    CALLBACK_COUNT, EVENTS_DROPPED, EVENT_SENDER, HOOK_ACTIVE, IME_ACTIVE, IME_CANDIDATE_NAV_COUNT,
+    IME_COMPOSITION_START_MS, IME_OPEN, IME_SHADOW_ABANDON, IME_SHADOW_DWELL_MS, IME_SHADOW_READY,
+    IME_STATE_DIRTY, LAST_KEY_MS, POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR,
+    VK_DBE_HIRAGANA, VK_DBE_KATAKANA, VK_DBE_SBCSCHAR, VK_KANJI,
 };
 use crate::analysis::features::InputEvent;
+
+/// 生存監視 (`input::liveness`) からの「フックを張り直せ」という要求。
+///
+/// ⚠️★★ **スレッド ID + `PostThreadMessageW(WM_QUIT)` は使わない。**
+/// Windows のスレッド ID は**終了後に再利用される**ため、stale な ID へ投げると
+/// **他プロセスのスレッド**のメッセージループを畳みうる (security-checker MEDIUM)。
+/// フックスレッドは 1 ms 周期で `PeekMessageW` を回しているので、
+/// フラグを見るだけで同じ再設置経路を起こせる。★ 宛先の曖昧さが原理的に消える。
+static REINSTALL_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// フックスレッドへ「メッセージループを抜けて張り直せ」と伝える。
+///
+/// ⚠️★ 既存の再設置経路を**起こすだけ**で、復帰処理そのものはここに書かない
+/// (`hook.rs::request_reinstall` の doc を参照)。
+pub(super) fn request_reinstall() -> bool {
+    if !HOOK_ACTIVE.load(Ordering::Relaxed) {
+        // ⚠️ 未設置 (設置失敗のバックオフ中など) に要求しても意味が無い。
+        //   ★ 要求を溜めると、次に成功したフックを入った瞬間に畳んでしまう
+        //   (code-reviewer MEDIUM)。
+        return false;
+    }
+    REINSTALL_REQUESTED.store(true, Ordering::Release);
+    true
+}
+
+/// 張ってあるフックを外す。⚠️★ **張り直す前に必ず呼ぶ。**
+///
+/// 既に OS 側で外れていれば `Err` が返るだけなので、真の silent death 経路でも無害である。
+fn unhook_all() {
+    if let Some(h) = HOOK_HANDLE.lock().unwrap_or_else(|p| p.into_inner()).take() {
+        // SAFETY: `h.0` は本スレッドが `SetWindowsHookExW` で得たハンドルで、
+        // 外すのも同じスレッドである (Win32 の要件)。二重解放は `take()` が防ぐ。
+        if let Err(e) = unsafe { UnhookWindowsHookEx(h.0) } {
+            tracing::warn!("UnhookWindowsHookEx failed (already removed by the OS?): {e:?}");
+        }
+    }
+    if let Some(h) = WINEVENT_HOOK_HANDLE
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .take()
+    {
+        // SAFETY: 同上 (`SetWinEventHook` の戻り値を同じスレッドで解放する)。
+        if !unsafe { UnhookWinEvent(h.0) }.as_bool() {
+            tracing::warn!("UnhookWinEvent failed (already removed by the OS?)");
+        }
+    }
+}
 
 /// タイピングリズムに関連するキーかどうかを判定する（Windows固有のVKコード）。
 fn is_typing_key(vk_code: u32) -> bool {
@@ -148,6 +196,9 @@ pub(super) fn start() {
             let _ = PeekMessageW(&mut msg, None, 0, 0, PM_NOREMOVE);
         }
         tracing::info!("Hook thread message queue initialized");
+        // ★ 「今回の脱出が生存監視の要求によるものか」をログの文言に反映するための印。
+        //   ⚠️ 要求フラグ自体のクリアは**インストール成功の直後**に行う (下記)。
+        let mut requested_reinstall = false;
 
         // --- Step 0b: モジュールハンドル取得 ---
         // HINSTANCE::default() (NULL) の代わりに実モジュールハンドルを使用する。
@@ -205,6 +256,12 @@ pub(super) fn start() {
 
                         // フック成功 → HOOK_ACTIVE を true に
                         HOOK_ACTIVE.store(true, Ordering::Relaxed);
+                        // ⚠️★ **張り直した直後に要求を捨てる** (cross-review)。
+                        //   自然失効 (WM_QUIT) で先にループを抜けた場合、監視スレッドが立てた
+                        //   要求が消費されずに残り、★ 次のインストール直後に即座に消費されて
+                        //   **もう 1 往復の unhook → 2 秒 sleep → 再設置**が走る。
+                        //   ★ 今張ったばかりのフックに対する要求ではないので、捨ててよい。
+                        REINSTALL_REQUESTED.store(false, Ordering::Release);
                         tracing::info!("Keyboard hook installed");
 
                         // --- Step 3: Message loop (PeekMessageW ポーリング) ---
@@ -214,6 +271,15 @@ pub(super) fn start() {
                         // フックメッセージを正しく処理しないケースが確認されている。
                         // PeekMessageW ポーリングはスタンドアロン診断テストで実証済み。
                         loop {
+                            // ★ 生存監視 (`input::liveness`) からの再設置要求。
+                            //   ⚠️ ★ `PostThreadMessageW(WM_QUIT)` を使わない理由:
+                            //   スレッド ID は**終了後に再利用される**ので、stale な ID へ投げると
+                            //   **他プロセスのスレッド**のメッセージループを畳みうる
+                            //   (security-checker MEDIUM)。フラグならその危険が原理的に無い。
+                            if REINSTALL_REQUESTED.swap(false, Ordering::AcqRel) {
+                                requested_reinstall = true;
+                                break;
+                            }
                             let mut msg = MSG::default();
                             if PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
                                 if msg.message == WM_QUIT {
@@ -228,11 +294,36 @@ pub(super) fn start() {
                         // メッセージループ終了 = フック無効化
                         // スレッドを終了せず、ループ先頭に戻ってフックを再インストール
                         HOOK_ACTIVE.store(false, Ordering::Relaxed);
-                        LAST_KEY_MS.store(0, Ordering::Relaxed);
-                        tracing::warn!(
-                            "Keyboard hook message loop exited (hook invalidated). \
-                             Re-installing in 2s..."
-                        );
+
+                        // ⚠️★★ **必ず先に外してから張り直す** (code-reviewer / security-checker とも HIGH)。
+                        //   従来この経路は「OS が既にフックを外した後」しか走らなかったので
+                        //   Unhook 無しでも露見しなかった。★ 2026-08-09 に足した生存監視は
+                        //   **フックが生きている状態でも**再設置を起こす (マウスのみの作業は
+                        //   誤検知しうる = `liveness.rs` のテストで仕様として固定済み) ため、
+                        //   外さないと WH_KEYBOARD_LL が二重に積まれる。
+                        //   → 1 打鍵で `hook_callback` が 2 回呼ばれ、**同一時刻の key 行が重複**して
+                        //   IKI≈0 が量産され特徴量が壊れる (研究計器としての致命傷)。
+                        //   ★ 既に OS が外していれば Err が返るだけで無害なので、
+                        //     真の silent death 側の挙動は変わらない。
+                        unhook_all();
+
+                        // ⚠️★ `LAST_KEY_MS` は **0 に戻さない**。
+                        //   0 は `probe_scheduler` の `driver_idle_ms` から「離席」に見え、
+                        //   次の打鍵までプローブが抑止される (Phase1 で GATE2 を落とした形と同型)。
+                        //   ★ macOS 側は既にリセットしない方針に統一済み。
+                        //   ★ 誤検知由来の再設置が 60 秒おきに走ると、この差でラベル収量が静かに削れる。
+                        if requested_reinstall {
+                            tracing::warn!(
+                                "Keyboard hook reinstall requested by the liveness monitor \
+                                 (events stopped arriving). Re-installing in 2s..."
+                            );
+                            requested_reinstall = false;
+                        } else {
+                            tracing::warn!(
+                                "Keyboard hook message loop exited (hook invalidated). \
+                                 Re-installing in 2s..."
+                            );
+                        }
                         thread::sleep(std::time::Duration::from_secs(2));
                         // loop continues → re-install hook
                     }
@@ -282,6 +373,11 @@ pub(super) fn start() {
 }
 
 unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    // ★ 生存監視 (`input::liveness`) 用のカウンタ。⚠️ **OS がこのコールバックを呼んだこと**
+    //   そのものを数えるので、`code < 0` やタイピング以外のキーでも加算する。
+    //   ★ Atomic 1 回だけ = `hook-constraints` Win-1 (Atomic / try_send のみ) に適合。
+    CALLBACK_COUNT.fetch_add(1, Ordering::Relaxed);
+
     if code >= 0 {
         let event_type = wparam.0 as u32;
         let is_press = event_type == WM_KEYDOWN || event_type == WM_SYSKEYDOWN;
@@ -378,8 +474,11 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
                     is_paste,
                 };
                 if let Some(sender) = EVENT_SENDER.get() {
-                    if let Err(e) = sender.try_send(event) {
-                        tracing::warn!("InputEvent dropped (channel full): {}", e);
+                    if sender.try_send(event).is_err() {
+                        // ⚠️★ ここでログを書かない (`hook-constraints` 共通-1: コールバック内は
+                        //   Atomic と try_send のみ。ログはアロケーションとバッファ操作を伴う)。
+                        //   ★ カウンタだけ上げ、監視スレッドが統計的に 1 回だけ報告する (共通-3)。
+                        EVENTS_DROPPED.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             }

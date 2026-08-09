@@ -1,4 +1,7 @@
 pub mod analysis;
+// アプリ本体の診断ログ (tracing) をファイルに残す writer。
+// ⚠️ stdout だけだと Finder 起動の .app では**どこにも残らない** (2026-08-08 実測)。
+pub mod applog;
 // G1 統制タスク実験の「G1 モード」判定 (OS API 非依存の純ロジック + current_exe のみ)。
 // 効果 (ローテート / 5 分でのブロック終了 / プローブ停止 / 二重起動 fail-loud) は lib.rs が適用する。
 pub mod g1;
@@ -25,6 +28,9 @@ mod overlay_panel;
 pub mod schema_dto;
 #[cfg(target_os = "macos")]
 pub mod sensors;
+// メニューバー / タスクトレイの常駐アイコン (計測中かの表示 + いつでも終了)。
+// ⚠️ 窓を閉じると UI ごと消えるのに計測は生きている、という穴を塞ぐ。
+pub mod tray;
 pub mod wall_server;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
@@ -91,6 +97,11 @@ static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 // `force_wall` コマンドが true にし、main ウィンドウの判定が swap で消費する (ワンショット)。
 // 通常は false のまま = 既存挙動と完全同一 (pilot 非汚染)。
 static FORCE_WALL: AtomicBool = AtomicBool::new(false);
+
+// 終了処理が既に走っているか。⚠️ ★ 終了の入口は 3 つある
+// (画面の「セッション終了」/ トレイの「終了」/ main 窓の ×)。二重に走らせると
+// ログを閉じる待ち合わせが二重になり `exit(0)` が競合する。★ 最初の 1 回だけ通す。
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 // デバッグ用: 次回の get_intervention_decision (overlay) で Nudge を一度だけ強制表示するフラグ。
 // `force_nudge` コマンドが true にし、overlay ウィンドウの判定が swap で消費する (ワンショット)。
@@ -679,6 +690,24 @@ fn get_diagnostics() -> HashMap<String, String> {
         "last_key_ms".into(),
         crate::input::hook::last_key_ms().to_string(),
     );
+    // ⚠️★★ 「設置できた」(`hook_active`) と「届いている」(`!hook_starved`) は別概念である
+    //   (`input::liveness`)。★ 研究者向けの診断には**両方**出す。
+    //   ⚠️ ★ 一方 `get_hook_status`（= 被験者の画面のバナー）は **意図的に変えていない**:
+    //   マウスのみの作業で誤検知しうるため、被験者の画面に警告を増やすと
+    //   盲検と介入規制 (`protocol.md` / decisions D-5) に触れる。トレイ表示までに留める。
+    diag.insert(
+        "hook_starved".into(),
+        crate::input::hook::HOOK_STARVED
+            .load(Ordering::Relaxed)
+            .to_string(),
+    );
+    // ★ 2026-08-09 以降は Windows でも加算されるので、macOS 限定の節から出した。
+    diag.insert(
+        "callback_count".into(),
+        crate::input::hook::CALLBACK_COUNT
+            .load(Ordering::Relaxed)
+            .to_string(),
+    );
     diag.insert("os".into(), std::env::consts::OS.to_string());
     diag.insert("arch".into(), std::env::consts::ARCH.to_string());
     diag.insert("version".into(), env!("CARGO_PKG_VERSION").to_string());
@@ -699,12 +728,7 @@ fn get_diagnostics() -> HashMap<String, String> {
 
         diag.insert("input_monitoring_granted".into(), preflight.to_string());
         diag.insert("ax_is_trusted".into(), ax_trusted.to_string());
-        diag.insert(
-            "callback_count".into(),
-            crate::input::hook::CALLBACK_COUNT
-                .load(Ordering::Relaxed)
-                .to_string(),
-        );
+        // ★ `callback_count` は両 OS 共通の節へ移した (上記)。
         diag.insert(
             "consecutive_tap_failures".into(),
             crate::input::hook::CONSECUTIVE_TAP_FAILURES
@@ -1049,6 +1073,48 @@ static SUBMIT_LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
 /// 書いているが、⚠️ 実際には**永久に送られない**。
 static SUBMIT_UPLOAD_DISABLED: AtomicBool = AtomicBool::new(false);
 
+// --- ★ 送信の「成功」を画面に出すための実測値 (2026-08-10) ------------------------
+//
+// ⚠️★★ 送信成功はこれまで **何も表示していなかった** (箱が消えるだけ)。しかも承認から
+//   完了まで実機で 6.2 秒 / 5.7 秒かかっており、その間も無表示だった。
+//   → ★ 「警告が消えた ＝ 成功」と読ませていた (memory `silent-success-is-not-visible`)。
+//
+// ⚠️★★ **根拠を「ボタンを押したこと」にしない。** 収束器が `.sent` を置いたときだけ
+//   `GSE_RECONCILE` の `sent` が増える (`reconcile.rs` の設計核 ③: アップロードが
+//   `Ok(())` を返したときにだけ `.sent` を置く)。★ ここが端末から得られる最強の証拠であり、
+//   押下や `awaiting_approval` の減少を根拠にすると **偽のレシート**になる。
+
+/// 最後に **1 件以上送れた** 時刻 (epoch ms)。`0` = このプロセスではまだ 1 件も送れていない。
+static SUBMIT_LAST_SENT_MS: AtomicU64 = AtomicU64::new(0);
+
+/// そのとき送れた本数 (レシートの「N 件」)。
+static SUBMIT_LAST_SENT_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// いま走っている収束器の本数。★ `> 0` = 送信中 (画面に「送信しています…」を出す)。
+///
+/// ⚠️ 起点が 2 本ある (起動時 / 承認・ブロック終了時) ので bool ではなく数える。
+static SUBMIT_IN_FLIGHT: AtomicU64 = AtomicU64::new(0);
+
+/// `SUBMIT_IN_FLIGHT` を必ず戻すための番兵。
+///
+/// ⚠️★ 手で `fetch_sub` を書くと、途中の panic や `?` の early return で**戻し忘れる**。
+/// そうなると画面は「送信しています…」のまま**永久に固まり**、
+/// ★ 未送信件数の警告も (`!sending` gate により) 出なくなる = **沈黙が悪化する**。
+struct InFlightGuard;
+
+impl InFlightGuard {
+    fn new() -> Self {
+        SUBMIT_IN_FLIGHT.fetch_add(1, Ordering::Relaxed);
+        Self
+    }
+}
+
+impl Drop for InFlightGuard {
+    fn drop(&mut self) {
+        SUBMIT_IN_FLIGHT.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 /// スタート画面へ返す提出状態 (G1 モードのときだけフロントが読む)。
 #[derive(serde::Serialize, Clone)]
 struct SubmissionStatusDto {
@@ -1060,6 +1126,12 @@ struct SubmissionStatusDto {
     upload_disabled: bool,
     /// ★ **被験者の確認待ち**の本数 (`.age` は在るが「送信する」がまだ押されていない・D-14)。
     awaiting_approval: usize,
+    /// ★ いま収束器が走っている (= 送信を試みている最中)。
+    sending: bool,
+    /// ★ 最後に 1 件以上送れた時刻 (epoch ms)。`null` = このプロセスではまだ無い。
+    last_sent_ms: Option<u64>,
+    /// ★ そのとき送れた本数。`last_sent_ms` が `null` なら `0`。
+    last_sent_count: usize,
 }
 
 /// 未送信件数と直近のエラーを返す。★ 0 件・エラー無しなら UI は何も出さない。
@@ -1082,11 +1154,18 @@ fn get_submission_status() -> SubmissionStatusDto {
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .clone();
+    let last_sent_ms = match SUBMIT_LAST_SENT_MS.load(Ordering::Acquire) {
+        0 => None,
+        ms => Some(ms),
+    };
     SubmissionStatusDto {
         unsent,
         last_error,
         upload_disabled: SUBMIT_UPLOAD_DISABLED.load(Ordering::Relaxed),
         awaiting_approval,
+        sending: SUBMIT_IN_FLIGHT.load(Ordering::Relaxed) > 0,
+        last_sent_ms,
+        last_sent_count: SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed) as usize,
     }
 }
 
@@ -1128,7 +1207,15 @@ fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
     if g1_mode().is_none() {
         return;
     }
+    // ⚠️★★ **スレッドの外で**数え始める。中で数えると、被験者が「送信する」を押して
+    //   確認カードが消えてから、スレッドが起きて `sending` が立つまでの間に
+    //   ★ **無表示の窓**ができる (今回潰そうとしている沈黙そのもの)。
+    //   `approve_pending_submissions` はこの関数を呼んでから返るので、
+    //   ★ フロントが押下直後に読む状態には既に `sending: true` が乗っている。
+    let in_flight = InFlightGuard::new();
     thread::spawn(move || {
+        // ★ スレッドが終わるとき (下の early return も含め) に必ず戻す。
+        let _in_flight = in_flight;
         // ⚠️ ★ **ブロック中には走らせない** (`design.md` §1: 測定中の端末に負荷をかけない)。
         //   起動時のヒントはスレッドで遅れて走るので、被験者が数秒後に「開始する」を押すと
         //   ★ **ブロック中に age 暗号化と送信が走りうる** (code-review LOW)。
@@ -1208,6 +1295,18 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
             .unwrap_or(false),
         Ordering::Relaxed,
     );
+    // ★★ 送信できた事実を記録する (レシートの根拠)。
+    // ⚠️ ★ **exit code を見る前に**やる。errors が在っても「送れた分は送れた」ので、
+    //   部分成功を捨てない (`.sent` は成功した本にだけ置かれている)。
+    record_sent_if_any(
+        summary.as_deref().and_then(|s| summary_count(s, "sent")),
+        || {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0)
+        },
+    );
     if output.status.success() {
         return Ok(Some(summary.unwrap_or_else(|| "done".to_string())));
     }
@@ -1256,6 +1355,26 @@ fn summary_count(summary: &str, key: &str) -> Option<usize> {
         .ok()
         .and_then(|v| v.get(key).and_then(|x| x.as_u64()))
         .map(|n| n as usize)
+}
+
+/// 収束器が報告した `sent` を、レシートの根拠として記録する。
+///
+/// ⚠️★★ **`sent == 0` では何も書き換えない。** 収束器はアプリ起動時にも走り、
+/// ★ **平常時はほぼ毎回 `sent: 0`** である。0 で上書きすると
+/// ⚠️ **本当に送れた直後のレシートが数秒で消える** (被験者から見ると「出て、消えた」)。
+/// ★ この関数が保つのは「**最後に本当に送れたのはいつ・何件か**」であって、
+/// 「直近の実行の結果」ではない。
+///
+/// 時刻は引数で受ける (テストが実時計に依存しないため)。
+fn record_sent_if_any(sent: Option<usize>, now_ms: impl FnOnce() -> u64) {
+    let n = match sent {
+        Some(n) if n > 0 => n,
+        _ => return,
+    };
+    SUBMIT_LAST_SENT_COUNT.store(n as u64, Ordering::Relaxed);
+    // ★ 件数を先に置き、時刻を Release で置く。読む側は時刻を Acquire で読むので、
+    //   「新しい時刻・古い件数」の組み合わせが観測されない。
+    SUBMIT_LAST_SENT_MS.store(now_ms(), Ordering::Release);
 }
 
 /// アプリ内「提出する」ボタンの Tauri コマンド。最新セッションを同梱 `gse-submit` で
@@ -1795,6 +1914,58 @@ fn start_session(
 ///   5. セッションフォルダを Explorer で開く
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State<WallServerState>) {
+    shutdown(&app, &log, &wall);
+}
+
+/// 終了処理が始まっているか。★ トレイの更新スレッドが抜けるために見る。
+pub(crate) fn is_shutting_down() -> bool {
+    SHUTTING_DOWN.load(Ordering::SeqCst)
+}
+
+/// 終了処理の権利を取る。★ 最初の 1 回だけ `true` を返す。
+///
+/// ⚠️ 終了の入口は 4 つある（画面の「セッション終了」/ スタート画面の「GSE を終了」/
+/// トレイの「終了」/ main 窓の ×）。二重に入ると、ログを閉じる待ち合わせが二重になり
+/// `exit(0)` が競合する。
+///
+/// ★ フラグを**引数で受ける**ので単体で検算できる（グローバルだとテスト順に依存する）。
+fn claim_shutdown(flag: &AtomicBool) -> bool {
+    !flag.swap(true, Ordering::SeqCst)
+}
+
+/// 終了時に「分析を起動してセッションフォルダを開く」かどうか。
+///
+/// ⚠️★ **G1（被験者の端末）ではやらない。** 被験者の画面に NDJSON の並んだフォルダが
+/// 開くのは混乱のもとであり、`behavioral_gt.py` も被験者の端末には無い。
+///
+/// ⚠️★ **セッションパスが空のときもやらない。** ロガーが開けていない場合に空文字が来ると、
+/// `Path::new("").parent()` は `Some("")` を返すので、★ **意図しないフォルダを開く**
+/// (2026-08-08 の cross-review。★ スタート画面に終了ボタンを足して
+/// 「セッション未開始のまま終了する」経路が現実的になったので、ここを塞ぐ)。
+fn wants_researcher_exit_flow(not_g1: bool, session_path: &str) -> bool {
+    not_g1 && !session_path.trim().is_empty()
+}
+
+/// ★ 終了経路の**唯一の実装**。
+///
+/// ⚠️ 以前は `quit_app`（画面の「セッション終了」）だけがここを通っていた。
+/// トレイの「終了」と main 窓の × も**同じ道**を通す — 経路ごとに書くと、
+/// ★ どれか 1 つだけ「ログを閉じずに落ちる」ようになる（静かに壊れる）。
+///
+/// `AppHandle` から State を引くので、コマンド以外からも呼べる。
+pub(crate) fn shutdown_and_exit(app: &tauri::AppHandle) {
+    let log = app.state::<Arc<Mutex<LogState>>>();
+    let wall = app.state::<WallServerState>();
+    shutdown(app, &log, &wall);
+}
+
+fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>, wall: &WallServerState) {
+    if !claim_shutdown(&SHUTTING_DOWN) {
+        tracing::info!("shutdown already in progress; ignoring the second request");
+        return;
+    }
+    tracing::info!("shutdown requested");
+
     // WallServer を先に停止してファイアウォールルールを削除
     wall.stop();
 
@@ -1805,6 +1976,8 @@ fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State
         (guard.current_path(), guard.shutdown_rx.clone())
     };
 
+    let researcher_flow = wants_researcher_exit_flow(g1_mode().is_none(), &session_path);
+
     let app_handle = app.clone();
 
     // バックグラウンドスレッドで分析→フォルダ表示→アプリ終了
@@ -1812,40 +1985,46 @@ fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State
         // ロガースレッドのファイルクローズを channel で安全に待機 (最大2秒)
         let _ = shutdown_rx.recv_timeout(Duration::from_millis(2000));
 
-        // behavioral_gt.py を探して実行
-        match find_behavioral_gt() {
-            Some(script) => {
-                tracing::info!("Auto-analysis: python {:?} {}", script, session_path);
-                match std::process::Command::new("python")
-                    .args([script.to_str().unwrap_or(""), &session_path])
-                    .spawn()
-                {
-                    Ok(_) => tracing::info!("behavioral_gt.py launched"),
-                    Err(e) => tracing::warn!("Failed to launch behavioral_gt.py: {}", e),
+        if researcher_flow {
+            // behavioral_gt.py を探して実行
+            match find_behavioral_gt() {
+                Some(script) => {
+                    tracing::info!("Auto-analysis: python {:?} {}", script, session_path);
+                    match std::process::Command::new("python")
+                        .args([script.to_str().unwrap_or(""), &session_path])
+                        .spawn()
+                    {
+                        Ok(_) => tracing::info!("behavioral_gt.py launched"),
+                        Err(e) => tracing::warn!("Failed to launch behavioral_gt.py: {}", e),
+                    }
+                    // Python 分析に少し時間を与えてから Explorer を開く
+                    thread::sleep(std::time::Duration::from_millis(1500));
                 }
-                // Python 分析に少し時間を与えてから Explorer を開く
-                thread::sleep(std::time::Duration::from_millis(1500));
+                None => {
+                    tracing::warn!(
+                        "behavioral_gt.py not found. Skipping auto-analysis. \
+                         Run manually: python analysis/behavioral_gt.py {}",
+                        session_path
+                    );
+                }
             }
-            None => {
-                tracing::warn!(
-                    "behavioral_gt.py not found. Skipping auto-analysis. \
-                     Run manually: python analysis/behavioral_gt.py {}",
-                    session_path
-                );
-            }
-        }
 
-        // セッションフォルダをファイルマネージャで開く
-        if let Some(folder) = Path::new(&session_path).parent() {
-            tracing::info!("Opening session folder: {:?}", folder);
-            #[cfg(target_os = "windows")]
-            {
-                let _ = std::process::Command::new("explorer").arg(folder).spawn();
+            // セッションフォルダをファイルマネージャで開く
+            if let Some(folder) = Path::new(&session_path).parent() {
+                tracing::info!("Opening session folder: {:?}", folder);
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = std::process::Command::new("explorer").arg(folder).spawn();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = std::process::Command::new("open").arg(folder).spawn();
+                }
             }
-            #[cfg(target_os = "macos")]
-            {
-                let _ = std::process::Command::new("open").arg(folder).spawn();
-            }
+        } else {
+            tracing::info!(
+                "G1 mode: skipping auto-analysis and the folder popup (participant-facing exit)"
+            );
         }
 
         thread::sleep(std::time::Duration::from_millis(200));
@@ -1940,7 +2119,10 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt::init();
+    // ★ `tracing` を stdout **と** ファイルの両方へ流す (`applog` のモジュールコメント参照)。
+    //   ⚠️ 旧 `tracing_subscriber::fmt::init()` は stdout だけで、Finder 起動の `.app` では
+    //   どこにも残っていなかった (2026-08-08 に実測)。
+    crate::applog::init_tracing(&crate::logger::app_log_path());
 
     // ★ G1 モードの判定 — **起動時に 1 回だけ**読む (g1.rs のモジュールコメント参照)。
     //   実行時トグルにすると、プローブスケジューラを「スレッドごと起こさない」ことで
@@ -2001,6 +2183,10 @@ pub fn run() {
     let session_active_for_thread = session_active.clone();
     // ★ G1: ブロック自動終了スレッド用 (5 分でブロックを閉じる)。
     let session_active_for_g1 = session_active.clone();
+    // ★ トレイの状態表示用 (1Hz で読むだけ・書かない)。
+    let session_active_for_tray = session_active.clone();
+    // ★★ フック生存監視スレッド用 (`input::liveness`)。
+    let session_active_for_liveness = session_active.clone();
 
     let initial_now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2018,6 +2204,7 @@ pub fn run() {
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
     let log_tx_g1 = log_tx.clone();
+    let log_tx_liveness = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -2446,7 +2633,12 @@ pub fn run() {
             //   記入ページ (writing-pad.html) は **被験者の打鍵を止める** 役 (readOnly + 告知)。
             //   本スレッドは **NDJSON のブロック境界を切る** 役である。役割が違うので二重ではない。
             //   ★ 手順は「ページを開く → 開始する」の順に統一したので、ページの 5:00 が
-            //   先に来る = ★ **打鍵の取りこぼしが構造的にゼロ**になる (protocol.md §4.2 / §4b.2)。
+            //   先に来る = ★ **末尾の打鍵は落ちない** (protocol.md §4.2 / §4b.2)。
+            //   ⚠️⚠️ ★ 第 12 版の訂正: ここにはかつて「取りこぼしが構造的にゼロ」と書いてあった。
+            //     ★ この順序が守るのは **末尾側だけ** である。⚠️ ページのゲートを押してから
+            //     アプリの「開始する」を押すまでの間に打ち始めれば、**頭が落ちる**
+            //     (ゲート押下で記入欄に focus が入り、すぐ打てる)。
+            //     → 手順書で抑止するが保証はしない。preregistration.md §2.12-1 / §3.8。
             //
             // ⚠️ ★ ブラウザ側の setTimeout ではなく Rust スレッドにした理由:
             //   G1 実施中、GSE の窓は**背面**にある (被験者はブラウザを見ている)。
@@ -2455,6 +2647,172 @@ pub fn run() {
             // ⚠️ ★ 残り時間は emit しない。`§4.4` が「残り時間のアナウンスをしない」と定めており、
             //   カウントダウンは `§2.2` が却下した「時間圧」を全ブロックに入れることになる。
             //   出すのは「終わった」1 回だけである。
+            // ⚠️★★ キーボードフックの生存監視 (2026-08-09 の silent death 対策)。
+            //
+            //   背景: Windows 実機で **5 分間 0 打のブロックが「正常」として自動提出された**。
+            //   `HOOK_ACTIVE` は「設置できた」しか意味せず、OS が低レベルフックを黙って外しても
+            //   true のままだったからである (`windows-verification.md` §5-7)。
+            //
+            //   ★ 独立スレッドにする理由: トレイのスレッドに載せると、**トレイの生成に失敗した
+            //   環境では検知ごと消える** (`Failed to build the tray icon` は実在する経路)。
+            //   ⚠️ 判断は `input::liveness` の純関数に閉じてあり、ここは配線だけを持つ。
+            {
+                let liveness_session_active = session_active_for_liveness;
+                let liveness_log_tx = log_tx_liveness;
+                thread::spawn(move || {
+                    use crate::input::liveness::{self, HookHealth, Starvation, Thresholds};
+
+                    const TICK_MS: u64 = 1000;
+
+                    let th = Thresholds::default();
+                    let mut starv = Starvation::default();
+                    let mut prev_tick = liveness::last_system_input_tick();
+                    let mut prev_callbacks =
+                        crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);
+                    // ⚠️★ 「呼ばれた」と「記録できた」は別。channel が詰まって捨てた分を見張る。
+                    let mut prev_dropped =
+                        crate::input::hook::EVENTS_DROPPED.load(Ordering::Relaxed);
+                    // ★ `tick_ms` は公称値ではなく**実測**を渡す (スリープ復帰やスケジューラ遅延で
+                    //   `starved_ms` が実時間からずれるのを防ぐ)。★ 測った量を残すのが本行の趣旨。
+                    let mut last_tick_at = Instant::now();
+                    let mut prev_health = HookHealth::Ok;
+                    // ⚠️★★ 再設置は **1 エピソードにつき 1 回**だけ (cross-review 両者一致 HIGH)。
+                    //   ★ 時間バックオフ (60 秒ごと再試行) にしていたが、それだと
+                    //   **マウスのみ / 読書中心の作業**という既知の誤検知
+                    //   (`liveness.rs` のテストで仕様として固定済み) のあいだ、
+                    //   ⚠️ **生きているフックを 60 秒おきに壊し続ける**。
+                    //   しかもそれが起きるのは無打鍵で読んでいる時間 = 研究上重要な区間である。
+                    //   ★ 本当に死んでいるなら 1 回で直るか直らないかであり、
+                    //     繰り返しても得るものが無い。
+                    let mut rehook_done_this_episode = false;
+                    // ⚠️★ この starvation エピソードで到達した最大値。
+                    //   `step()` は復帰した瞬間に 0 へ戻すので、そのまま書くと
+                    //   **復帰行が `starved_ms: 0` になり「何秒落ちていたか」が消える**
+                    //   (code-reviewer MEDIUM)。★ 測った量を残すのが本行の存在理由なので保持する。
+                    let mut peak_starved_ms: u64 = 0;
+
+                    loop {
+                        thread::sleep(Duration::from_millis(TICK_MS));
+                        if is_shutting_down() {
+                            return;
+                        }
+
+                        let session_active = liveness_session_active.load(Ordering::Acquire);
+
+                        // ★ 生 tick の「変化」だけを見る (絶対時刻へ変換しない = ラップアラウンド安全)。
+                        let tick = liveness::last_system_input_tick();
+                        let system_input_seen = match (prev_tick, tick) {
+                            (Some(a), Some(b)) => a != b,
+                            // 判断材料が無い OS (macOS 等) は安全側に倒す = starvation を進めない。
+                            _ => false,
+                        };
+                        prev_tick = tick;
+
+                        let callbacks = crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);
+                        let hook_event_seen = callbacks != prev_callbacks;
+                        prev_callbacks = callbacks;
+
+                        // ⚠️★ 「呼ばれた」だけでは足りない。channel が詰まって**捨てた**分は
+                        //   記録されていないので、増えたら必ず残す
+                        //   (★ コールバック内ではログを書けないのでここで報告する)。
+                        let dropped = crate::input::hook::EVENTS_DROPPED.load(Ordering::Relaxed);
+                        if dropped > prev_dropped {
+                            tracing::error!(
+                                dropped_total = dropped,
+                                dropped_now = dropped - prev_dropped,
+                                "keystroke events were dropped before reaching the analysis thread \
+                                 (channel full); those keystrokes are NOT in the session log"
+                            );
+                            prev_dropped = dropped;
+                        }
+
+                        // ★ 経過は公称値ではなく**実測**を渡す。
+                        let elapsed_ms = last_tick_at.elapsed().as_millis() as u64;
+                        last_tick_at = Instant::now();
+
+                        starv = liveness::step(
+                            starv,
+                            session_active,
+                            system_input_seen,
+                            hook_event_seen,
+                            elapsed_ms,
+                        );
+                        let health = liveness::health(starv, th);
+                        peak_starved_ms = peak_starved_ms.max(starv.starved_ms);
+
+                        // ★ トレイはこのフラグを見る (`tray::current_state`)。
+                        crate::input::hook::HOOK_STARVED
+                            .store(health == HookHealth::Down, Ordering::Relaxed);
+
+                        // ★ Down になった最初の 1 回だけ、既存の再設置経路を起こす (D-3)。
+                        let mut rehook = false;
+                        if health == HookHealth::Down && !rehook_done_this_episode {
+                            rehook = crate::input::hook::request_reinstall();
+                            rehook_done_this_episode = true;
+                        }
+                        // ★ 本物の復帰 (フックが呼ばれた or 計測終了) でエピソードを閉じる。
+                        if starv.starved_ms == 0 {
+                            rehook_done_this_episode = false;
+                        }
+
+                        // ★ 1Hz で連発しない。状態が変わったとき、または再設置したときだけ記録する。
+                        if health == prev_health && !rehook {
+                            continue;
+                        }
+
+                        match health {
+                            HookHealth::Suspect if prev_health == HookHealth::Ok => {
+                                tracing::error!(
+                                    starved_ms = starv.starved_ms,
+                                    "keyboard hook may be dead: the system saw input but the hook \
+                                     was not called (keystrokes may NOT be recorded)"
+                                );
+                            }
+                            HookHealth::Down if prev_health != HookHealth::Down => {
+                                tracing::error!(
+                                    starved_ms = starv.starved_ms,
+                                    rehook_requested = rehook,
+                                    "keyboard hook is NOT delivering events; keystrokes are NOT \
+                                     being recorded for this block"
+                                );
+                            }
+                            HookHealth::Ok if prev_health != HookHealth::Ok => {
+                                tracing::info!("keyboard hook is delivering events again");
+                            }
+                            _ => {}
+                        }
+
+                        // ★ 復帰行には**エピソードのピーク**を載せる (現在値は 0 に戻っているため)。
+                        let reported_starved_ms = if health == HookHealth::Ok {
+                            peak_starved_ms
+                        } else {
+                            starv.starved_ms
+                        };
+                        if liveness_log_tx
+                            .try_send(LogEntry::HookHealth {
+                                timestamp: SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_millis() as u64,
+                                alive: health != HookHealth::Down,
+                                starved_ms: reported_starved_ms,
+                                rehook,
+                                dropped,
+                            })
+                            .is_err()
+                        {
+                            // ⚠️★ この行は「そのブロックが有効か」を判断する唯一の証跡なので、
+                            //   落ちたことだけは残す (監視スレッドなのでログ制約は無い)。
+                            tracing::error!("failed to record a hook_health line (log queue full)");
+                        }
+                        if health == HookHealth::Ok {
+                            peak_starved_ms = 0;
+                        }
+                        prev_health = health;
+                    }
+                });
+            }
+
             if g1_mode().is_some() {
                 let app_handle = app.handle().clone();
                 let block_log_tx = log_tx_g1;
@@ -2786,7 +3144,29 @@ pub fn run() {
                     tracing::error!("Failed to convert overlay to NSPanel: {}", e);
                 }
             }
+
+            // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
+            //   (`tray.rs` のモジュールコメント参照)。★ 失敗しても起動は止めない
+            //   — トレイが出ないことより、アプリが起動しないことのほうが重い。
+            if let Err(e) = crate::tray::setup(app.handle(), session_active_for_tray) {
+                tracing::error!("Failed to build the tray icon: {}", e);
+            }
             Ok(())
+        })
+        // ⚠️★★ × で閉じたときに**プロセスを残さない**。
+        //   `lib.rs` は実行時に `overlay` 窓を作るので、main を閉じても
+        //   「全部の窓が閉じた」に到達せず、★ Tauri は終了しない。
+        //   2026-08-08 に **3 時間動き続けていた実例**（CPU 157 分・記録継続中）を見つけた。
+        //   ★ overlay の × は無視する（そもそも枠が無いが、将来 close されても道連れにしない）。
+        .on_window_event(|window, event| {
+            if !matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                return;
+            }
+            if window.label() == "overlay" {
+                return;
+            }
+            tracing::info!("main window close requested -> shutting down");
+            crate::shutdown_and_exit(window.app_handle());
         })
         .manage(engine)
         .manage(log_state)
@@ -2835,6 +3215,49 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+
+    /// ⚠️★ 終了の入口は 4 つある（画面 / スタート画面 / トレイ / ×）。
+    /// **2 回目以降は通さない** — 通すとログを閉じる待ち合わせが二重になり `exit(0)` が競合する。
+    #[test]
+    fn only_the_first_shutdown_request_is_claimed() {
+        let flag = AtomicBool::new(false);
+        assert!(claim_shutdown(&flag), "★ 1 回目は通るはず");
+        assert!(!claim_shutdown(&flag), "★ 2 回目は弾くはず");
+        assert!(!claim_shutdown(&flag), "★ 3 回目も弾くはず");
+    }
+
+    /// ⚠️★ G1（被験者の端末）では分析起動もフォルダ表示もしない。
+    #[test]
+    fn g1_exit_never_opens_the_folder() {
+        assert!(
+            !wants_researcher_exit_flow(false, "/tmp/gse_20260808_010101.ndjson"),
+            "★ G1 なのに被験者の画面へフォルダを開こうとしている"
+        );
+    }
+
+    /// ⚠️★ セッションパスが空なら、研究者運用でも何も開かない。
+    ///
+    /// ★ `Path::new("").parent()` は `Some("")` を返すので、**意図しないフォルダが開く**。
+    /// スタート画面に終了ボタンを足したことで「未開始のまま終了」が現実的になった。
+    #[test]
+    fn empty_session_path_never_opens_the_folder() {
+        assert!(!wants_researcher_exit_flow(true, ""));
+        assert!(!wants_researcher_exit_flow(true, "   "));
+    }
+
+    /// 研究者運用 + 実パスのときだけ従来どおり動く（★ 非回帰）。
+    #[test]
+    fn researcher_flow_still_runs_for_a_real_session() {
+        assert!(wants_researcher_exit_flow(
+            true,
+            "/tmp/gse_20260808_010101.ndjson"
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -2985,5 +3408,95 @@ mod submit_command_tests {
     fn extract_age_path_none_when_absent() {
         assert_eq!(extract_age_path("no path here\njust text"), None);
         assert_eq!(extract_age_path(""), None);
+    }
+}
+
+/// ★ 提出レシート (「送信しました」) の根拠に関するテスト。
+///
+/// ⚠️★★ ここで守っているのは **「押した ≠ 送れた」** である。レシートは
+/// 収束器が `.sent` を置いた本数 (`GSE_RECONCILE` の `sent`) からしか作られない。
+#[cfg(test)]
+mod submission_receipt_tests {
+    use super::{
+        record_sent_if_any, summary_count, InFlightGuard, SUBMIT_IN_FLIGHT, SUBMIT_LAST_SENT_COUNT,
+        SUBMIT_LAST_SENT_MS,
+    };
+    use std::sync::atomic::Ordering;
+
+    /// ⚠️ 静的変数を共有するので、この 1 関数の中で順に検査する (並列テスト安全)。
+    #[test]
+    fn only_a_real_send_writes_the_receipt() {
+        SUBMIT_LAST_SENT_MS.store(0, Ordering::Relaxed);
+        SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Relaxed);
+
+        // ① 要約行が読めない (収束器が古い / 出力が壊れた) → 何も書かない。
+        record_sent_if_any(None, || 1_000);
+        assert_eq!(
+            SUBMIT_LAST_SENT_MS.load(Ordering::Relaxed),
+            0,
+            "★ 根拠が無いのにレシートを出してはならない"
+        );
+
+        // ② `sent: 0` (= 送るものが無かった / 送れなかった) → 何も書かない。
+        record_sent_if_any(Some(0), || 2_000);
+        assert_eq!(
+            SUBMIT_LAST_SENT_MS.load(Ordering::Relaxed),
+            0,
+            "★ 0 件をレシートにしてはならない"
+        );
+
+        // ③ 実際に送れた → 時刻と件数が入る。
+        record_sent_if_any(Some(2), || 3_000);
+        assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 3_000);
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed), 2);
+
+        // ④ ⚠️★★ その後の「送るものが無い」実行でレシートが**消えてはならない**。
+        //    収束器はアプリ起動のたびに走り、平常時はほぼ毎回 `sent: 0` である。
+        //    ここで 0 を書くと、被験者から見て「出て、すぐ消えた」になる。
+        record_sent_if_any(Some(0), || 4_000);
+        assert_eq!(
+            SUBMIT_LAST_SENT_MS.load(Ordering::Acquire),
+            3_000,
+            "★ 送れた事実は次の空振りで消えてはならない"
+        );
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed), 2);
+
+        // ⑤ 次に送れたら更新される。
+        record_sent_if_any(Some(1), || 5_000);
+        assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 5_000);
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed), 1);
+
+        SUBMIT_LAST_SENT_MS.store(0, Ordering::Relaxed);
+        SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Relaxed);
+    }
+
+    /// ★ `gse-submit` が実際に出す形の要約行から `sent` が読めること
+    /// (⚠️ ここが読めないと、レシートは永久に出ない = 沈黙に戻る)。
+    #[test]
+    fn sent_is_read_from_the_real_summary_line() {
+        // submit.rs `main()` の `serde_json::json!` と同じキー並び。
+        let line = r#"{"packaged":1,"sent":1,"unsent":0,"upload_disabled":false,"skipped_busy":false,"awaiting_approval":0,"errors":0}"#;
+        assert_eq!(summary_count(line, "sent"), Some(1));
+        assert_eq!(summary_count(line, "unsent"), Some(0));
+        // 知らないキーは None (勝手に 0 と読まない)。
+        assert_eq!(summary_count(line, "nope"), None);
+    }
+
+    /// ⚠️★ 番兵が panic でも in-flight を戻すこと。
+    /// 戻し忘れると画面が「送信しています…」のまま**永久に固まる**。
+    #[test]
+    fn in_flight_returns_to_zero_even_on_panic() {
+        SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
+        let r = std::panic::catch_unwind(|| {
+            let _g = InFlightGuard::new();
+            assert_eq!(SUBMIT_IN_FLIGHT.load(Ordering::Relaxed), 1);
+            panic!("収束器が落ちた");
+        });
+        assert!(r.is_err(), "★ panic を捕まえられていない");
+        assert_eq!(
+            SUBMIT_IN_FLIGHT.load(Ordering::Relaxed),
+            0,
+            "★ 送信中のまま固まる"
+        );
     }
 }

@@ -133,7 +133,10 @@ fn ax_prompt_for_trust() -> bool {
     ctx.result
 }
 
-use super::{CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, HOOK_ACTIVE, USING_ACCESSIBILITY_FALLBACK};
+use super::{
+    CALLBACK_COUNT, CONSECUTIVE_TAP_FAILURES, EVENTS_DROPPED, HOOK_ACTIVE,
+    USING_ACCESSIBILITY_FALLBACK,
+};
 
 // ---------------------------------------------------------------------------
 // macOS typing key filter (raw CGKeyCode)
@@ -417,15 +420,20 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
             let is_paste = is_press
                 && vk_code == 0x56
                 && event.get_flags().contains(CGEventFlags::CGEventFlagCommand);
-            if let Err(e) = sender.try_send(InputEvent {
-                vk_code,
-                timestamp,
-                is_press,
-                is_repeat,
-                is_backspace,
-                is_paste,
-            }) {
-                tracing::warn!("InputEvent dropped (channel full): {}", e);
+            if sender
+                .try_send(InputEvent {
+                    vk_code,
+                    timestamp,
+                    is_press,
+                    is_repeat,
+                    is_backspace,
+                    is_paste,
+                })
+                .is_err()
+            {
+                // ⚠️★ コールバック内でログを書かない (`hook-constraints` mac-1 / 共通-1)。
+                //   ★ カウンタだけ上げ、監視スレッドが統計的に 1 回だけ報告する (共通-3)。
+                EVENTS_DROPPED.fetch_add(1, Ordering::Relaxed);
             }
         }
     }
@@ -710,7 +718,15 @@ pub fn start() {
                         tap.mach_port.as_concrete_TypeRef() as *mut std::ffi::c_void,
                         Ordering::Release,
                     );
-                    CALLBACK_COUNT.store(0, Ordering::Relaxed);
+                    // ⚠️★★ **`CALLBACK_COUNT` を 0 に戻さない。**
+                    //   2026-08-09 以降、このカウンタは `input::liveness` が
+                    //   「フックが呼ばれ続けているか」を見る**単調増加の生存信号**になった。
+                    //   ★ ここで 0 に戻すと、監視スレッドから見て値が「変化した」ように見え、
+                    //   ⚠️ **タップ再作成が偽の生存シグナルになる**
+                    //   (= 死んでいるのに Ok と判定する)。
+                    //   ★ `LAST_KEY_MS` を 0 に戻さないのと同じ理由である (F4)。
+                    //   「このタップで何回呼ばれたか」を診断したい場合は、
+                    //   ★ 差分で見ること (get_diagnostics は累計を出す)。
                     CONSECUTIVE_REENABLES.store(0, Ordering::Relaxed);
                     tracing::info!(
                         "CGEventTap installed via {} (macOS keyboard hook active)",

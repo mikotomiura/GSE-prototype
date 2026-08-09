@@ -347,6 +347,44 @@ def scan_ndjson(path: pathlib.Path) -> dict[str, int]:
     return counts
 
 
+def read_hook_health(path: pathlib.Path) -> tuple[int | None, int]:
+    """`hook_health` 行から「フックが死んでいたか」と「捨てた件数」を読む。
+
+    戻り値 `(worst_starved_ms, dropped_total)`:
+    - `worst_starved_ms` … `alive=false` の行のうち `starved_ms` の最大。★ 1 件も無ければ `None`
+    - `dropped_total`    … `dropped` の最大（累計値なので最大＝最終値）
+
+    ⚠️★★ **なぜ要るか**: 2026-08-09 の Windows 実機で、フックが「設置済みなのに
+    イベントが届かない」状態になり、**5 分間 0 打のブロックが正常として提出された**
+    (`windows-verification.md` §5-7)。★ 当時この行が無く、提出物だけでは
+    「打っていない」と「記録できていない」を**区別できなかった**。
+
+    ★ 行が 1 件も無いのは正常（アプリは状態が変化したときにしか書かない）。
+    ⚠️ ★ **古い版のアプリで採ったログにもこの行は無い**ので、
+    「行が無い＝健全」ではなく「行が無い＝判断材料が無い」である。
+    """
+    worst: int | None = None
+    dropped = 0
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if '"hook_health"' not in line:
+                continue
+            try:
+                o = json.loads(line)
+            except Exception:
+                continue
+            if o.get("type") != "hook_health":
+                continue
+            d = o.get("dropped")
+            if isinstance(d, int):
+                dropped = max(dropped, d)
+            if o.get("alive") is False:
+                s = o.get("starved_ms")
+                s = s if isinstance(s, int) else 0
+                worst = s if worst is None else max(worst, s)
+    return worst, dropped
+
+
 def read_g1_modes(path: pathlib.Path) -> set[str]:
     """`meta` 行に刻まれた `g1_mode` の値を集める（★ 第 10 版 `§5.4-6`）。
 
@@ -422,6 +460,20 @@ def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
             elif not modes <= set(G1_MODE_VALUES):
                 r.fail(f"{subject}: ブロック {n} の g1_mode が {sorted(modes)}。"
                        f"{' / '.join(G1_MODE_VALUES)} のいずれかであるはず（第 10 版 §5.4-5）")
+        # ⚠️★★ フックの生存（2026-08-09 追加・`windows-verification.md` §5-7）。
+        #   実機で「フックは設置済みなのにイベントが届かない」状態が起き、
+        #   **5 分間 0 打のブロックが正常として提出された**。当時は提出物だけを見ても
+        #   「打っていない」のか「記録できていない」のか区別できなかった。
+        #   ★ アプリが `hook_health` 行を出すようになったので、ここで**機械判定**する。
+        dead, dropped = read_hook_health(p)
+        if dead is not None:
+            r.fail(f"{subject}: ブロック {n} は打鍵を記録できていない可能性が高い"
+                   f"（hook_health で alive=false・starved={dead} ms）。"
+                   f"★ 打鍵数が少なくても「打たなかった」と読まないこと。"
+                   f"windows-verification.md §5-7")
+        if dropped:
+            r.warn(f"{subject}: ブロック {n} で打鍵イベントが {dropped} 件捨てられている"
+                   f"（channel 溢れ）。その打鍵はログに入っていない")
         if counts.get("_malformed"):
             r.warn(f"{subject}: ブロック {n} に壊れた行が {counts['_malformed']} 件ある")
         # ★ INFO: FS-B の可用性（§5.1）。ime_shadow が 0 なら ime_dwell_med が定数になる。
@@ -692,6 +744,47 @@ def selftest() -> int:
         r = validate_spec(spec, seed, {}, d)
         if r.ok or not any("probe_assignment" in m for m in r.fails):
             fails.append("probe_assignment 行があれば FAIL にすること (§2.6 / B-1)")
+
+    # ⚠️★★ hook_health の検査（2026-08-09・`windows-verification.md` §5-7）
+    with tempfile.TemporaryDirectory() as td:
+        d = pathlib.Path(td)
+        spec = _good_spec(seed)
+        raw = d / "raw" / spec["subject"]
+        raw.mkdir(parents=True)
+        for blk in spec["blocks"]:
+            (raw / blk["file"]).write_text(G1_LOG, encoding="utf-8")
+
+        # ★ 対照 1: 行が 1 件も無いログ（＝ 旧版のアプリ・正常時）は FAIL にしない。
+        r = validate_spec(spec, seed, {}, d)
+        if not r.ok:
+            fails.append(f"hook_health 行が無いログを FAIL にしてはならない: {r.fails[0]}")
+
+        # ★ 対照 2: alive=true の行だけなら FAIL にしない。
+        (raw / spec["blocks"][0]["file"]).write_text(
+            G1_LOG + '{"type":"hook_health","t":1,"alive":true,'
+                     '"starved_ms":0,"rehook":false,"dropped":0}\n',
+            encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if not r.ok:
+            fails.append(f"alive=true の hook_health を FAIL にしてはならない: {r.fails[0]}")
+
+        # ★★ 本命: alive=false があれば FAIL にする（= 0 打を「打たなかった」と読ませない）。
+        (raw / spec["blocks"][1]["file"]).write_text(
+            G1_LOG + '{"type":"hook_health","t":1,"alive":false,'
+                     '"starved_ms":120000,"rehook":true,"dropped":0}\n',
+            encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if r.ok or not any("記録できていない" in m for m in r.fails):
+            fails.append("alive=false の hook_health があれば FAIL にすること (§5-7)")
+
+        # ★ dropped は WARN（FAIL ではない）。★ 警告が出ることまで確かめる。
+        (raw / spec["blocks"][2]["file"]).write_text(
+            G1_LOG + '{"type":"hook_health","t":1,"alive":true,'
+                     '"starved_ms":0,"rehook":false,"dropped":7}\n',
+            encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if not any("捨てられている" in m for m in r.warns):
+            fails.append("dropped>0 の hook_health は WARN を出すこと")
 
     # ★★ 第 10 版 §5.4-6: g1_mode の検査（**probe 行 0 とは独立の 2 本目**）
     with tempfile.TemporaryDirectory() as td:

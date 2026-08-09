@@ -189,6 +189,12 @@ pub fn has_any_data_row(path: &Path) -> bool {
         if t.is_empty() {
             continue;
         }
+        // ⚠️★ **診断行はデータ行に数えない。** 数えると「打鍵ゼロのセッション」でも
+        //   提出候補として残り、★ 空ファイル検出の網が緩む (code-reviewer MEDIUM)。
+        //   ここに追加する行型は「それ自体が被験者の作業を表さない」ものに限ること。
+        if t.contains(r#""type":"hook_health""#) {
+            continue;
+        }
         if !t.contains(r#""type":"meta""#) {
             return true;
         }
@@ -246,6 +252,40 @@ pub fn find_latest_session_ndjson(dir: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use std::io::Read;
+
+    /// ⚠️★ 診断行 (`hook_health`) が「データ行」に数えられないこと。
+    ///
+    /// ★ 3 状態で試す (`verify-before-claiming`):
+    /// meta だけ / meta ＋ 診断行 / meta ＋ 本物の打鍵。
+    /// ⚠️ 真ん中が `true` になると、**打鍵ゼロのセッションが提出候補に残る**。
+    #[test]
+    fn hook_health_is_not_a_data_row() {
+        // ⚠️★ 既存テスト (`find_latest_skips_sessions_with_only_meta_rows`) が
+        //   `gse_pkg_test_<pid>` を使っている。★ 同じ名前にすると**並列実行で互いのファイルを消し合う**
+        //   (実測: 単独では緑、全体実行で赤)。テストごとに別名にすること。
+        let dir = std::env::temp_dir().join(format!("gse_pkg_hookhealth_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let meta = r#"{"type":"meta","session_start":0,"hmm_version":"0.3.0"}"#;
+        let diag = r#"{"type":"hook_health","t":1,"alive":false,"starved_ms":120000,"rehook":true,"dropped":0}"#;
+        let key = r#"{"type":"key","t":2,"category":"alphabetic","press":true}"#;
+
+        let cases: [(&str, String, bool); 3] = [
+            ("meta のみ", format!("{meta}\n"), false),
+            ("meta + 診断行", format!("{meta}\n{diag}\n"), false),
+            ("meta + 打鍵", format!("{meta}\n{key}\n"), true),
+        ];
+        for (label, body, expected) in cases {
+            let p = dir.join(format!("gse_{}.ndjson", label.len()));
+            std::fs::write(&p, &body).unwrap();
+            assert_eq!(
+                has_any_data_row(&p),
+                expected,
+                "{label}: has_any_data_row が期待と違う"
+            );
+            let _ = std::fs::remove_file(&p);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn participant_id_validation() {

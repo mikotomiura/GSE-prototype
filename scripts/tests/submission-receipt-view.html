@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>GSE 提出レシート — 実マウント検証ハーネス</title>
+  </head>
+  <!-- ★ index.html と **同じ** body 背景。⚠️ ここを変えると輝度差の測定が偽物になる。 -->
+  <body style="margin:0; background-color:#0f172a;">
+    <div id="root"></div>
+    <script type="module">
+      // ★ 提出レシート UI の実マウント検証 (memory `ui-changes-need-eyes`)。
+      //
+      // ⚠️ tsc も cargo test も **色を見ない**。2026-08-08 に「背景と同色の文字」を
+      //   実機で出しているので、★ 実スタイルシートに対して実マウントさせて測る。
+      //   ⚠️ 偽の CSS / 偽のコンポーネントを作って確かめない (実物の制約を知らないため)。
+      //
+      // ⚠️ ★ Tauri API が無いとアプリは描画されない (`getCurrentWindow()` が投げる)。
+      //   → 最小の `__TAURI_INTERNALS__` shim を入れてから `/src/main.tsx` を import する。
+      //
+      // 使い方: `npm run dev` して
+      //   http://localhost:5173/scripts/tests/submission-receipt-view.html?state=receipt
+      // `state` = empty | awaiting | sending | receipt | unsent | partial
+
+      const STATES = {
+        // 起動直後・まだ 1 件も送っていない
+        empty: { unsent: 0, awaiting_approval: 0, sending: false, last_sent_ms: null, last_sent_count: 0 },
+        // ブロックが終わって確認待ち
+        awaiting: { unsent: 1, awaiting_approval: 1, sending: false, last_sent_ms: null, last_sent_count: 0 },
+        // ⚠️★ 確認待ち + 前回のレシートが在る状態 (= 偽レシートが出ないことの検査)
+        awaiting_after_send: {
+          unsent: 1, awaiting_approval: 1, sending: false,
+          last_sent_ms: Date.parse("2026-08-10T09:12:00+09:00"), last_sent_count: 1,
+        },
+        // 「送信する」を押した直後の数秒
+        sending: { unsent: 1, awaiting_approval: 0, sending: true, last_sent_ms: null, last_sent_count: 0 },
+        // 送れた
+        receipt: {
+          unsent: 0, awaiting_approval: 0, sending: false,
+          last_sent_ms: Date.parse("2026-08-10T09:12:00+09:00"), last_sent_count: 1,
+        },
+        // 送れないまま貯まっている
+        unsent: { unsent: 2, awaiting_approval: 0, sending: false, last_sent_ms: null, last_sent_count: 0 },
+        // 部分成功 (1 件送れて 1 件残った)
+        partial: {
+          unsent: 1, awaiting_approval: 0, sending: false,
+          last_sent_ms: Date.parse("2026-08-10T09:12:00+09:00"), last_sent_count: 1,
+        },
+      };
+
+      const key0 = new URLSearchParams(location.search).get("state") || "receipt";
+
+      // ★ 検査側から読み書きできるように晒す。⚠️ **再読み込みで状態を切り替えない**:
+      //   アプリは 3 秒ポーリングで状態を取り直すので、ここを差し替えるだけで
+      //   ★ **実際の更新経路をそのまま通って**画面が変わる (偽の再マウントで測らない)。
+      window.__GSE_STATUS = { last_error: null, upload_disabled: false, ...STATES[key0] };
+      window.__gseSet = (k) => {
+        if (!STATES[k]) throw new Error(`unknown state: ${k}`);
+        window.__GSE_STATUS = { last_error: null, upload_disabled: false, ...STATES[k] };
+        return k;
+      };
+      window.__GSE_STATES = Object.keys(STATES);
+
+      window.__TAURI_INTERNALS__ = {
+        metadata: {
+          currentWindow: { label: "main" },
+          currentWebview: { windowLabel: "main", label: "main" },
+        },
+        transformCallback: (cb) => {
+          const id = Math.floor(Math.random() * 1e9);
+          window[`_${id}`] = cb;
+          return id;
+        },
+        invoke: async (cmd) => {
+          switch (cmd) {
+            case "plugin:event|listen":
+            case "plugin:event|unlisten":
+              return 0;
+            case "get_g1_mode":
+              return "marker"; // ★ G1 モードでないと提出 UI は 1 つも描かれない
+            case "get_g1_participant_id":
+              return "P999";
+            case "get_submission_status":
+              return window.__GSE_STATUS;
+            case "get_hook_status":
+              return true;
+            case "get_keyboard_idle_ms":
+              return 0;
+            case "get_cognitive_state":
+              return { flow: 0.8, incubation: 0.15, stuck: 0.05 };
+            case "get_intervention_decision":
+              return {
+                action: "none", need_score: 0, opportunity_score: 0, p_stuck: 0,
+                idle_ms: 0, wall_accum_ms: 0, reason: "safe_default", suppressed_by: [],
+              };
+            default:
+              return null;
+          }
+        },
+      };
+
+      await import("/src/main.tsx?shim=1");
+    </script>
+  </body>
+</html>

@@ -547,6 +547,29 @@ body {
   box-shadow: 0 2px 12px rgba(74, 222, 128, 0.3);
 }
 
+/* 副次ボタン（研究者用）。
+   ⚠️★ **`background` だけをインラインで transparent にしてはならない。**
+   `.start-button` は緑地用に `color: #0f172a`（ほぼ黒）を持っているので、
+   背景だけ透明にすると ★ **暗い背景に黒文字＝文字が見えない空の箱**になる
+   （2026-08-08 に実機のスクリーンショットで発覚。★ 見た目の確認をしていなかった）。
+   → 色とセットで 1 つのクラスにまとめ、書き忘れられないようにする。 */
+.start-button-secondary {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid #888;
+  box-shadow: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.start-button-secondary:hover {
+  background: rgba(203, 213, 225, 0.08);
+  box-shadow: none;
+  transform: none;
+}
+
 .start-hint {
   font-size: 0.75rem;
   opacity: 0.35;
