@@ -40,8 +40,9 @@
 
 ## 完了処理
 
-- [ ] `/finish-task`
-- [ ] コミット（`test` or `fix` scope=analysis）
+- [x] `/finish-task`（Step1-4 完了。schema parity は非 touch で skip）
+- [x] コミット `c89735b` fix(analysis) / branch `fix/detect-multi-session-block`
+- [ ] push → PR → merge（★ push はエージェントから実行不可・ユーザーが `! git push`）
 
 ## ★ 積み残し（本タスクでは触らない）
 
