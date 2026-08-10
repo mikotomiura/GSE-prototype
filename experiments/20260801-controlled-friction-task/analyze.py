@@ -33,6 +33,7 @@ import itertools
 import json
 import math
 import pathlib
+import re
 import statistics
 import sys
 
@@ -45,7 +46,7 @@ import sys
 #   （E-6: §2.5 の分岐 / E-7: §3.4 の見る順序）、★ **この定数自体も第 4 版で 3 のまま
 #   取り残されていた**（第 5 版で発見）。番号がずれたら selftest が赤になるようにして、
 #   人が気づくかどうかに依存させない。
-PREREG_REVISION = 10
+PREREG_REVISION = 14
 
 LAMBDA = 1.0                     # §3.1 L2 罰則（z 標準化後）・事前固定・チューニングしない
 SILENCE_MS = 2000                # §3.2 silence = IKI >= 2000ms（現行 F5 の閾値に揃える）
@@ -79,8 +80,80 @@ def _pct(sorted_vals: list[float], p: float) -> float:
     return float(sorted_vals[k])
 
 
-def read_block(path: pathlib.Path) -> dict:
+def prereg_revision_from_doc(path: pathlib.Path) -> int | None:
+    """`preregistration.md` の見出しから**最新の改訂番号**を読む（★ SSOT を直接見る）。
+
+    ⚠️★★ **なぜ要るか**: 版一致検査は長らく `analyze.py ↔ config.json` だけを見ていた。
+    ★ **両方が同じだけ遅れていれば緑になる**——実際に文書が第 13 版まで進んだのに
+    どちらも 10 のまま緑だった（2026-08-10 に実測）。
+    → 検査は**文書そのもの**を読まなければ、遅れを検出できない。
+
+    見出しの形: `## ★ 改訂履歴 — 第 13 版（2026-08-08・...）`
+    ★ 見出し行 (`#` 始まり) に限って探す（本文中の「第 3 版」に引っ張られないため）。
+    ★ 最大値を採る（履歴の並び順に依存しない）。
+    """
+    best: int | None = None
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("#"):
+            continue
+        m = re.search(r"改訂履歴.*?第\s*(\d+)\s*版", line)
+        if m:
+            v = int(m.group(1))
+            best = v if best is None else max(best, v)
+    return best
+
+
+def session_starts(path: pathlib.Path) -> tuple[int, list[int]]:
+    """`session_start` 行を読み、**(構造上の本数, cutoff に使える時刻の列)** を返す。
+
+    ⚠️★★ **2 つを分ける理由**（2026-08-10 の `/cross-review` で Codex が指摘・実測で再現）:
+    以前はこの関数が「`t` が有効な `int` である行」だけを数えていた。⚠️ ところが
+    `validate_blocks.py::scan_ndjson` は **`type` だけで数える**。
+    ★ 2 本目の `session_start` の `t` が壊れていると、
+    **validate_blocks は 2 本と数えて FAIL するのに、こちらは 1 本と数えて黙って混ぜた**。
+    ★ 本タスクが塞ごうとした「沈黙して間違った結果を出す」経路が、狭い条件で開いたままだった。
+
+    → ★ **「壊れているか」を見る数え方**（`type` のみ・validate_blocks と同じ基準）と、
+      **「どこから読むか」を決める時刻**（有効な `int` のみ）は**別の問い**である。混ぜない。
+
+    ⚠️ ★ `meta` 行も `"session_start"` を**キーとして**持つ（`{"type":"meta","session_start":0,...}`）
+    ので、文字列一致だけでは meta を数えてしまう。★ `type` で必ず絞る。
+
+    ★ 行が 0 本なのは異常ではない: アプリが `session_start` 行を書く前の版のログがある。
+    「0 本 = 判断材料が無い」であって「壊れている」ではない。
+    """
+    n = 0
+    ts: list[int] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if '"session_start"' not in line:
+            continue
+        try:
+            o = json.loads(line)
+        except Exception:
+            continue
+        if o.get("type") != "session_start":
+            continue
+        n += 1                                    # ★ 構造の本数は type だけで数える
+        t = o.get("t")
+        if isinstance(t, int) and not isinstance(t, bool):
+            ts.append(t)
+    return n, ts
+
+
+def read_block(path: pathlib.Path, from_last_session: bool = False) -> dict:
     """匿名化 NDJSON 1 ファイル（= 1 ブロック）からブロック特徴量を計算する。
+
+    ⚠️★★ `from_last_session=True` のとき、**最後の `session_start` 以降の行だけ**を読む
+    （2026-08-10 の P010 block07・`notes.md §10-3`）。
+
+    ★ なぜ「最後」なのか: 「開始する」の押し直しは `engine.reset()` と `SESSION_START_MS` の
+    引き直しを伴う（`lib.rs:1948` / `:2019`）ので、**アプリにとって最後のセッションが
+    「そのブロック」**である。自動終了もそこから 5 分で閉じる
+    （P010 block07 で 568.5s 予測 vs 569.05s 実測）。
+
+    ⚠️ ★ **この関数は止まらない。** セッションが 2 本あることは `n_session_starts` として
+    返すだけで、赤にするかどうかは呼び出し側が決める（`--verify-blocks` は情報提示専用で
+    常に 0 を返す契約があり、ここで止めると道連れで死ぬ）。
 
     入力は `analysis/anonymize.rs` を通した形式を前提とする:
       key        {t(相対ms), category, press}   ← vk は匿名化で category に置き換わっている
@@ -88,6 +161,17 @@ def read_block(path: pathlib.Path) -> dict:
       ime_shadow {t, dwell_ms, nav, abandon}
       feat       {t, f1, f3, f4, f5, f6, ...}   ← FS-A の出所（§3.2 / design D-2）
     生の `vk` を持つ未匿名 NDJSON も受け付ける（`vk` から category を導けるため）。
+
+    ★ **cutoff が依存している前提**（`/cross-review` 2026-08-10 の指摘 2・★ 実装で確認した）:
+    `t` は**再開始をまたいで単調**である。`analysis/anonymize.rs::find_session_start` は
+    **キー `session_start` を持つ最初の行（＝ `meta` 行 1 本だけ）**を返し、
+    `anonymize_ndjson` がその 1 つの値を**ファイル全体**の相対化基点に使うので、
+    2 本目の `session_start` が来ても `t` は 0 に戻らない。
+    ⚠️ ★ **この不変条件が崩れたら**（相対化をセッションごとに行うようになったら）**cutoff は壊れる。**
+
+    ⚠️ ★ **`malformed_lines` は cutoff より前の行も数える**（同・指摘 1）。
+    ★ パースできなかった行には `t` が無いので、**どちらのセッションに属するか原理的に決められない**。
+    → 落とさずに数え、この事実を書いておく（★ 黙って正確なふりをしない）。
     """
     keydowns: list[int] = []
     corrections = 0
@@ -95,6 +179,14 @@ def read_block(path: pathlib.Path) -> dict:
     dwells: list[int] = []
     feats: list[dict] = []
     malformed = 0
+
+    n_starts, start_ts = session_starts(path)
+    # ★ セッションが 1 本（または 0 本＝旧版のログ）なら cutoff は立てない。
+    #   ⚠️ フラグを付けても**正常なファイルの結果は 1 ビットも変わらない**
+    #   （selftest が対照でこれを固定している）。
+    # ⚠️★ セッションが 2 本以上なのに有効な `t` が 2 本揃わないなら **cutoff を決められない**。
+    #   ★ ここでは止めず (`--verify-blocks` の契約)、`restart_cutoff_applied` で呼び出し側に伝える。
+    cutoff = start_ts[-1] if (from_last_session and n_starts > 1 and len(start_ts) > 1) else None
 
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.strip():
@@ -104,6 +196,13 @@ def read_block(path: pathlib.Path) -> dict:
         except Exception:
             malformed += 1
             continue
+        if cutoff is not None:
+            ot = o.get("t")
+            # ⚠️ `t` を持たない行 (meta / session_meta) は落とさない。
+            #   ★ 落とすのは「前の試行に属する観測行」だけである。
+            # ⚠️ `bool` は `int` の派生なので明示的に除く（`t: true` を 1 と読まない）。
+            if isinstance(ot, (int, float)) and not isinstance(ot, bool) and ot < cutoff:
+                continue
         t = o.get("type")
         if t == "key":
             if o.get("press") is not True:
@@ -158,6 +257,12 @@ def read_block(path: pathlib.Path) -> dict:
         "span_ms": span_ms,
         "n_feat_rows": len(rows),
         "malformed_lines": malformed,
+        # ★ 数えて返すだけ。判断は呼び出し側（`load_subject_blocks` / `cmd_verify_blocks`）。
+        "n_session_starts": n_starts,
+        # ⚠️★ 「最終セッションだけを読めたか」。`from_last_session=True` を指定したのに
+        #   これが False なら、★ **起点が決められなかった**＝全行読んでいる。
+        #   呼び出し側はここを見て止める（黙って混ぜたものを「最終セッション」と刻ませない）。
+        "restart_cutoff_applied": cutoff is not None,
         "features": dict(fs_a, **{
             "keys": float(n),
             "bs_rate": (corrections / n) if n else 0.0,
@@ -694,8 +799,18 @@ def cohort_verdict(per_subject: list[dict], interpretable: bool, reason: str) ->
 # ---------------------------------------------------------------------------
 # 入出力
 # ---------------------------------------------------------------------------
-def load_subject_blocks(spec: dict, dataset: pathlib.Path) -> list[dict]:
-    """割付ファイル（assign.py の JSON に `file` を書き足したもの）を読み、特徴量を付ける。"""
+def load_subject_blocks(spec: dict, dataset: pathlib.Path,
+                        from_last_session: bool = False) -> list[dict]:
+    """割付ファイル（assign.py の JSON に `file` を書き足したもの）を読み、特徴量を付ける。
+
+    ⚠️★★ **1 ファイルに `session_start` が 2 本以上あれば止まる**
+    （2026-08-10 の P010 block07・`notes.md §10-3`）。
+
+    ★ 黙って最終セッションを採ってはならない。どのデータが解析に入ったかが結果から見えなくなり、
+    `protocol.md §1` が (b) を却下した「**沈黙して間違った結果を出す**」と同型になる。
+    → `from_last_session=True`（CLI では `--last-session-on-restart`）を**明示したときだけ**通し、
+    使った事実は結果に刻む（`--unseal` の `confirmatory_status_forfeited` と同じ作法）。
+    """
     subject = spec["subject"]
     out = []
     for b in spec["blocks"]:
@@ -705,7 +820,31 @@ def load_subject_blocks(spec: dict, dataset: pathlib.Path) -> list[dict]:
         p = dataset / "raw" / subject / b["file"]
         if not p.is_file():
             raise SystemExit(f"[NG] {subject} block {b['block']}: NDJSON が見つからない")
-        blk = read_block(p)
+        # ★ `read_block` は止まらないので、**先に読んでから**判断する。
+        #   ⚠️ ここで `session_starts` を別に呼ぶとファイルを 3 回読むことになる。
+        blk = read_block(p, from_last_session=from_last_session)
+        n_starts = blk["n_session_starts"]
+        if n_starts > 1 and not from_last_session:
+            raise SystemExit(
+                f"[NG] {subject} block {b['block']}: この NDJSON に session_start が "
+                f"{n_starts} 本ある。1 ブロック = 1 セッション (protocol.md §1) が破れており、"
+                f"★ **このまま読むと前の試行の打鍵と空白が混入する**。\n"
+                f"     ブロックの途中で「開始する」が押し直されたときに起きる"
+                f"（アプリはこのときログを切り替えない）。\n"
+                f"     ★ 最終セッションだけを採るなら --last-session-on-restart を付ける"
+                f"（採った事実は結果に restart_handling として刻まれる・preregistration.md §3.10）。")
+        # ⚠️★★ フラグを付けても、**最終セッションの起点が決められないなら止める**。
+        #   ★ ここで黙って全行読むと、`restart_handling` に「最終セッションを採った」と
+        #   刻まれるのに実際は混ざっている ＝ **結果そのものが嘘をつく**。
+        #   （2 本目の `session_start` に有効な `t` が無いときに起きる）
+        if n_starts > 1 and from_last_session and not blk["restart_cutoff_applied"]:
+            raise SystemExit(
+                f"[NG] {subject} block {b['block']}: session_start が {n_starts} 本あるが、"
+                f"★ **最終セッションの起点が決められない**"
+                f"（session_start 行に有効な t が 2 本揃っていない）。\n"
+                f"     ⚠️ このまま読むと全行が混ざるのに restart_handling には"
+                f"「最終セッションを採った」と刻まれる ＝ 結果が嘘をつく。\n"
+                f"     ★ NDJSON を人が確認すること（preregistration.md §3.10）。")
         blk.update({"block": b["block"], "condition": b["condition"],
                     "topic_id": b.get("topic_id"), "arrangement": spec.get("arrangement"),
                     "produced_chars": b.get("produced_chars")})
@@ -731,15 +870,29 @@ def cmd_verify_blocks(dataset: pathlib.Path, subject: str) -> int:
     print("  #  | 打鍵数 | 長さ(mm:ss) | feat行 | 適格(>=100)")
     print("-----+--------+-------------+--------+------------")
     ok = True
+    restarted: list[tuple[int, int]] = []
     for i, f in enumerate(files, start=1):
         b = read_block(f)                       # ファイル名は出力しない（日時が入るため）
         secs = b["span_ms"] / 1000.0
         good = b["n_keydowns"] >= MIN_KEYDOWNS_PER_BLOCK
         ok = ok and good
+        if b["n_session_starts"] > 1:
+            restarted.append((i, b["n_session_starts"]))
         mmss = f"{int(secs)//60:d}:{int(secs)%60:02d}"
         print(f" {i:3d} | {b['n_keydowns']:6d} | {mmss:>11s} "
-              f"| {b['n_feat_rows']:6d} | {'○' if good else '× ★要記録'}")
+              f"| {b['n_feat_rows']:6d} | {'○' if good else '× ★要記録'}"
+              f"{'  ⚠️ 再開始あり' if b['n_session_starts'] > 1 else ''}")
     print()
+    # ⚠️★★ 再開始は**表示するが赤にしない**（`protocol.md §7` / decisions D-3）。
+    #   ★ ここを 0 以外で返すと、当日の実験者が「その場でやり直させる」誘因を持つ。
+    #   それは §3.6（事後除外の禁止）を実質的に迂回する経路になる。
+    if restarted:
+        for i, k in restarted:
+            print(f"  ⚠️★ {i} 本目に session_start が {k} 本ある = ブロックの途中で"
+                  f"「開始する」が押し直された（アプリはログを切り替えない）。")
+        print("  ★ ここでは何もしない（当日その場で対処しない・protocol.md §7）。")
+        print("     解析時に analyze.py が止まる。--last-session-on-restart の判断はそのとき行う。")
+        print()
     print("  ★ 5 分ブロックなら長さは 4:00〜5:00 に収まるはず。大きく外れたら起動/停止の取り違えを疑う。")
     print("  ★ 打鍵数を記録用紙に転記する。閾値割れでも **その場でやり直さない**（protocol.md §7）。")
     if len(files) not in (4, 10):
@@ -766,6 +919,11 @@ def main() -> int:
                     help="★ §3.4 の見る順序を満たしていないのに判定を見る。"
                          "使うと confirmatory_status_forfeited=true が結果に刻まれ、"
                          "その回は探索的として報告することになる (§5.3)")
+    ap.add_argument("--last-session-on-restart", action="store_true",
+                    help="★ 1 ファイルに session_start が 2 本以上あるブロックで、"
+                         "**最後のセッションだけ**を読む (§3.10)。使うと restart_handling が"
+                         "結果に刻まれる。⚠️ 確証ステータスは失わない"
+                         "（規則は結果を見る前に凍結されている・§3.10）")
     a = ap.parse_args()
 
     if a.selftest:
@@ -787,9 +945,18 @@ def main() -> int:
 
     per_subject = []
     mchecks = {}
+    # ★ 再開始のあったブロックを結果に刻む（§3.10・報告義務）。
+    #   ⚠️ フラグ無しならここに到達する前に load_subject_blocks が止まるので、
+    #   **中身が入るのは --last-session-on-restart を使ったときだけ**である。
+    restarted_blocks: list[dict] = []
     for s in specs:
         spec = json.loads(s.read_text(encoding="utf-8"))
-        blocks = load_subject_blocks(spec, dataset)
+        blocks = load_subject_blocks(spec, dataset,
+                                     from_last_session=a.last_session_on_restart)
+        for b in blocks:
+            if b.get("n_session_starts", 0) > 1:
+                restarted_blocks.append({"subject": spec["subject"], "block": b["block"],
+                                         "n_session_starts": b["n_session_starts"]})
         if spec.get("manipulation_check_answers"):
             mchecks[spec["subject"]] = manipulation_check(blocks, spec["manipulation_check_answers"])
         per_subject.append(analyse_subject(spec["subject"], blocks))
@@ -822,6 +989,14 @@ def main() -> int:
             "G1_VOID": "2.5: positive control failed AND the test could have rejected -> instrument fault suspected",
             "VERDICT_WITHHELD": "2.5 (since revision 3): positive control failed but the test could NOT have "
                                 "rejected for any failing subject -> underpower, NOT an instrument fault",
+        },
+        # ⚠️★★ §3.10: 1 ファイルに複数セッションがあったブロックの扱いを**必ず刻む**
+        #   （2026-08-10 の P010 block07）。★ 規則は結果を見る**前**に凍結したので
+        #   確証ステータスは失わない。刻むのは「どのデータが解析に入ったか」を残すためである。
+        "restart_handling": {
+            "rule": "last session only (preregistration.md 3.10; frozen before any analysis run)",
+            "flag_used": bool(a.last_session_on_restart),
+            "blocks": restarted_blocks,
         },
         "reading_order_3_4": ["1_manipulation_check", "2_positive_control", "3_feature_sets"],
         "1_manipulation_check": mchecks or {"supplied": False},
@@ -889,7 +1064,8 @@ def selftest() -> int:
     # 0) ★ 版の一致（E-6 / E-7 の教訓を機械化する）
     #    事前登録を改訂したら、その規則を実行するスクリプトが同じ版になっているか。
     #    ⚠️ この検査が無かったため、PREREG_REVISION は第 4 版のあいだ 3 のまま残っていた。
-    cfg_path = pathlib.Path(__file__).resolve().parent / "config.json"
+    here_ = pathlib.Path(__file__).resolve().parent
+    cfg_path = here_ / "config.json"
     try:
         cfg_rev = json.loads(cfg_path.read_text(encoding="utf-8"))["revision"]["version"]
     except Exception as e:                                  # noqa: BLE001 - 検査そのものを落とさない
@@ -900,6 +1076,26 @@ def selftest() -> int:
                 f"★ 事前登録の版と実装の版が食い違っている: config.json={cfg_rev} / "
                 f"analyze.py PREREG_REVISION={PREREG_REVISION}。"
                 f"文書を改訂したら、その規則を実行するスクリプトを同じ版にすること")
+
+    # ⚠️★★ **単一真実源そのもの**（`preregistration.md`）と突き合わせる（2026-08-10 追加）。
+    #   ★ 上の検査は `analyze.py ↔ config.json` しか見ていなかった。
+    #   ⚠️ **両方が同じだけ遅れていれば緑になる**——実際に、文書が第 13 版まで進んだのに
+    #   config.json と PREREG_REVISION が **10 のまま 3 版遅れて緑だった**（実測）。
+    #   ★ これは「名前で引く対策は 1 つの真実源の中でしか効かない」と同じ型である:
+    #   ★★ **検査は「どちら側を見ているか」を問わなければならない。**
+    try:
+        doc_rev = prereg_revision_from_doc(here_ / "preregistration.md")
+    except OSError as e:                                    # noqa: BLE001 - 検査そのものを落とさない
+        fails.append(f"preregistration.md を読めない（版の検査ができない）: {e}")
+        doc_rev = PREREG_REVISION          # ★ 下の比較を二重に赤くしない
+    if doc_rev is None:
+        fails.append("★ preregistration.md から改訂番号を読めない"
+                     "（見出しの書式が変わった? 検査が空回りする）")
+    elif doc_rev != PREREG_REVISION:
+        fails.append(
+            f"★★ 事前登録**文書**の版と実装の版が食い違っている: "
+            f"preregistration.md=第 {doc_rev} 版 / analyze.py PREREG_REVISION={PREREG_REVISION}。"
+            f"⚠️ config.json だけを合わせても意味が無い（両方が同じだけ遅れうる）")
 
     # 1) 明確に分離する合成データ -> AUC 1.0 / p = 1/70
     rows, labels = _synthetic(sep=50.0)
@@ -1085,6 +1281,120 @@ def selftest() -> int:
             fails.append(f"silence_max が違う: {f2['silence_max']} != 6900")
         if f2["burst_p90"] != 3.0:
             fails.append(f"burst_p90 が違う: {f2['burst_p90']} != 3 (バースト長 [3,2,1])")
+
+    # ⚠️★★ 8) 1 ファイルに 2 セッション（2026-08-10 の P010 block07・`notes.md §10-3`）
+    #    ★ `read_block` はファイル全体を 1 ブロックとして読むので、**黙って前の試行を混ぜる**。
+    #      `protocol.md §1` が (b) を却下した「沈黙して間違った結果を出す」そのものである。
+    #    → 解析経路は既定で止まり、`--last-session-on-restart` を明示したときだけ通す。
+    with tempfile.TemporaryDirectory() as td:
+        d = pathlib.Path(td)
+
+        def _sess(start_t: int, keys: list[int]) -> str:
+            out = [json.dumps({"type": "session_start", "t": start_t})]
+            for t in keys:
+                out.append(json.dumps({"type": "key", "t": t, "category": "alphabetic",
+                                       "press": True}))
+            return "\n".join(out) + "\n"
+
+        head = json.dumps({"type": "meta", "session_start": 0, "hmm_version": "x",
+                           "g1_mode": "marker"}) + "\n"
+        # 第 1 セッション = 失敗した試行（打鍵 3 件）／第 2 セッション = 本番（打鍵 5 件）
+        two = head + _sess(0, [10, 20, 30]) + _sess(1000, [1010, 1020, 1030, 1040, 1050])
+        one = head + _sess(0, [10, 20, 30, 40, 50])
+
+        p_two = d / "two.ndjson"
+        p_two.write_text(two, encoding="utf-8")
+        p_one = d / "one.ndjson"
+        p_one.write_text(one, encoding="utf-8")
+
+        # ★ read_block は**数えて返すだけ**（ここで止めない → decisions D-3）。
+        #   ⚠️ 止めると --verify-blocks が道連れで死ぬ。
+        b2 = read_block(p_two)
+        if b2.get("n_session_starts") != 2:
+            fails.append(f"read_block が session_start を数えていない: {b2.get('n_session_starts')}")
+        if b2["n_keydowns"] != 8:
+            fails.append(f"既定の read_block は全行を読むこと: {b2['n_keydowns']} != 8")
+        # ★ 対照: 1 セッションなら 1 と数える（0 や None にしない）
+        b1 = read_block(p_one)
+        if b1.get("n_session_starts") != 1:
+            fails.append(f"1 セッションを 1 と数えていない: {b1.get('n_session_starts')}")
+
+        # ★★ from_last_session=True で**最終セッションだけ**を読む
+        b2l = read_block(p_two, from_last_session=True)
+        if b2l["n_keydowns"] != 5:
+            fails.append(f"最終セッションだけを読めていない: {b2l['n_keydowns']} != 5")
+        if b2l["span_ms"] != 40:
+            fails.append(f"最終セッションの span が違う: {b2l['span_ms']} != 40")
+        # ⚠️ ★ 対照: **1 セッションのファイルはフラグの有無で結果が変わらない**。
+        #   これが無いと、フラグが正常なブロックまで削っていても気づけない。
+        if read_block(p_one, from_last_session=True)["n_keydowns"] != b1["n_keydowns"]:
+            fails.append("★ 1 セッションのファイルでフラグの有無が結果を変えている")
+
+        # ★★ 解析経路は既定で**止まる**（黙って混ぜない）
+        spec = {"subject": "PX", "arrangement": "A",
+                "blocks": [{"block": 1, "condition": "copy", "topic_id": "copy",
+                            "file": "two.ndjson"}]}
+        raw = d / "raw" / "PX"
+        raw.mkdir(parents=True)
+        (raw / "two.ndjson").write_text(two, encoding="utf-8")
+        (raw / "one.ndjson").write_text(one, encoding="utf-8")
+        try:
+            load_subject_blocks(spec, d)
+            fails.append("★ 2 セッションのファイルを既定で解析に通してはならない (protocol.md §1)")
+        except SystemExit as e:
+            if "session_start" not in str(e):
+                fails.append(f"止まる理由が session_start だと分からない: {e}")
+        # ★ フラグを明示したら通り、最終セッションだけを採る
+        try:
+            got = load_subject_blocks(spec, d, from_last_session=True)
+            if got[0]["n_keydowns"] != 5:
+                fails.append(f"フラグ付きで最終セッションを採れていない: {got[0]['n_keydowns']}")
+        except SystemExit as e:
+            fails.append(f"--last-session-on-restart を付けても止まった: {e}")
+        # ⚠️ ★ 対照: 1 セッションだけの被験者は**フラグ無しでも通る**
+        spec1 = dict(spec, blocks=[dict(spec["blocks"][0], file="one.ndjson")])
+        try:
+            load_subject_blocks(spec1, d)
+        except SystemExit as e:
+            fails.append(f"1 セッションのファイルで止まってはならない: {e}")
+
+        # ⚠️★★ **2 つの「数え方」がずれていた**（2026-08-10 の /cross-review で Codex が指摘・再現済み）。
+        #   `validate_blocks.py::scan_ndjson` は `type` だけで数えるのに、
+        #   旧 `session_start_ts`（現 `session_starts`）は「`t` が有効な int」まで要求していた。
+        #   ★ 2 本目の `session_start` の `t` が壊れていると、
+        #   **validate_blocks は 2 と数えて FAIL するのに analyze は 1 と数えて黙って混ぜた**（実測）。
+        #   ⚠️ 本タスクが塞ごうとした「沈黙して間違った結果を出す」経路が、狭い条件で開いたままだった。
+        #   → ★ **構造の数え方（type のみ）と、cutoff に使う時刻（有効な int）を分ける。**
+        broken_t = (head
+                    + json.dumps({"type": "session_start", "t": 0}) + "\n"
+                    + json.dumps({"type": "key", "t": 10, "category": "alphabetic",
+                                  "press": True}) + "\n"
+                    + json.dumps({"type": "session_start", "t": "1000"}) + "\n"   # ⚠️ 壊れた t
+                    + json.dumps({"type": "key", "t": 1010, "category": "alphabetic",
+                                  "press": True}) + "\n")
+        p_bt = d / "broken_t.ndjson"
+        p_bt.write_text(broken_t, encoding="utf-8")
+        (raw / "broken_t.ndjson").write_text(broken_t, encoding="utf-8")
+        if read_block(p_bt)["n_session_starts"] != 2:
+            fails.append("★ session_start の数え方が validate_blocks と揃っていない"
+                         "（t が壊れていても 2 本は 2 本と数えること）")
+        spec_bt = dict(spec, blocks=[dict(spec["blocks"][0], file="broken_t.ndjson")])
+        try:
+            load_subject_blocks(spec_bt, d)
+            fails.append("★★ 2 本目の t が壊れていても、2 セッションなら止めること"
+                         "（黙って混ぜる経路が残っている）")
+        except SystemExit:
+            pass
+        # ★★ フラグを付けても、**起点が決められないなら止める**。
+        #   ⚠️ ここで黙って全行読むと、restart_handling に「最終セッションを採った」と
+        #   刻まれるのに実際は混ざっている ＝ **結果が嘘をつく**。
+        try:
+            load_subject_blocks(spec_bt, d, from_last_session=True)
+            fails.append("★★ 最終セッションの起点が決められないのに通してはならない"
+                         "（restart_handling が嘘になる）")
+        except SystemExit as e:
+            if "起点" not in str(e):
+                fails.append(f"止まる理由が「起点が決められない」だと分からない: {e}")
 
     if fails:
         print("[NG] analyze.py selftest 失敗:")
