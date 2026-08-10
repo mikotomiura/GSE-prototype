@@ -460,6 +460,33 @@ def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
             elif not modes <= set(G1_MODE_VALUES):
                 r.fail(f"{subject}: ブロック {n} の g1_mode が {sorted(modes)}。"
                        f"{' / '.join(G1_MODE_VALUES)} のいずれかであるはず（第 10 版 §5.4-5）")
+        # ⚠️★★ 1 ブロック = 1 セッション（`protocol.md §1`）の**直接の検査**
+        #   （2026-08-10 の P010 block07・`notes.md §10-3`）。
+        #
+        # ★ 何が起きたか: フックが 3 分 17 秒ぶん打鍵を記録できず、参加者が「開始する」を
+        #   押し直した。⚠️ アプリは `!was_active` のときしかローテートしない (`lib.rs:1973`) ので、
+        #   **2 本目の `session_start` が同じファイルに積まれた**。
+        #
+        # ⚠️★★ **なぜ独立の検査が要るか**: 下の hook_health 検査は
+        #   「`alive=false` **かつ** key 行 0」の AND である。
+        #   ★ 2 本目のセッションの打鍵 (2846 行) が key>0 側に効くので、**AND は素通りする**。
+        #   ⚠️ AND を締め直して直すのではない——あの AND は 2026-08-09 の実測
+        #   （通常作業 63 分で 1 回誤検知）に対する正しい是正であり、`§3.6` は事後除外を
+        #   禁じているので**誤 FAIL は 1 ブロックの回復不能な損失**になる。
+        #   → ★ **条件を厳しくするのではなく、別の観点の検査を足す**
+        #     （`§5.4` の probe 行 0 と `g1_mode` が 2 本立てなのと同じ考え方）。
+        #
+        # ⚠️ ★ **0 本は赤にしない。** アプリが `session_start` 行を書く前の版のログがあり、
+        #   「行が無い = 判断材料が無い」であって「壊れている」ではない（hook_health と同じ）。
+        n_starts = counts.get("session_start", 0)
+        if n_starts >= 2:
+            r.fail(f"{subject}: ブロック {n} の NDJSON に session_start が {n_starts} 本ある。"
+                   f"1 ブロック = 1 セッション (protocol.md §1) が破れている。"
+                   f"★ ブロックの途中で「開始する」が押し直された疑いがある"
+                   f"（アプリはこのときログを切り替えない）。"
+                   f"⚠️ このまま解析すると**前の試行の打鍵と空白が混入する**。"
+                   f"`analyze.py --last-session-on-restart` の判断が要る")
+
         # ⚠️★★ フックの生存（2026-08-09 追加・`windows-verification.md` §5-7）。
         #   実機で「フックは設置済みなのにイベントが届かない」状態が起き、
         #   **5 分間 0 打のブロックが正常として提出された**。当時は提出物だけを見ても
@@ -494,13 +521,22 @@ def check_dataset(spec: dict, dataset: pathlib.Path, r: Report) -> None:
                        f"★ これは「打たなかった」ではなく**記録できていない**。"
                        f"windows-verification.md §5-7")
             else:
-                r.warn(f"{subject}: ブロック {n} でフックが一時的に死んだと判定されている"
-                       f"（alive=false・starved={dead} ms）が、key 行は {keys} 件ある。"
-                       f"★ **誤検知の可能性が高い**（マウスのみの時間が 2 分続くと出る。"
-                       f"通常作業 63 分で 1 回出た実測あり）。"
-                       f"⚠️ ただし**ブロックの途中でフックが死んだ**なら末尾の打鍵が"
-                       f"欠けている。★ 機械では区別できないので、"
-                       f"打鍵数と作業内容が釣り合うかを人が確認すること")
+                # ⚠️★★ 文面は**測った量を出すだけ**にする（`liveness.rs` の設計思想と同じ）。
+                #   ⚠️ 2026-08-10 まで、ここは「★ **誤検知の可能性が高い**」と断定していた。
+                #   ★ P010 block07 は**誤検知ではなかった**（3 分 17 秒ぶん打鍵が 1 件も
+                #   記録されず、参加者が「開始する」を押し直した・`notes.md §10-3`）のに、
+                #   この文面は**それを誤検知として片付けるよう読者を誘導した**。
+                #   → ★ 検査が出すのは量であって結論ではない。両方の読みを**同じ重みで**並べる。
+                r.warn(f"{subject}: ブロック {n} でフックの生存判定が alive=false になった"
+                       f"（starved={dead} ms・key 行は {keys} 件）。"
+                       f"★ ここは**測った量であって結論ではない**。読みは 2 通りあり、"
+                       f"機械では区別できない: "
+                       f"(a) 誤検知——読む/マウスだけの時間が 2 分続くと出る"
+                       f"（通常作業 63 分で 1 回出た実測あり・measurements.md §3）。"
+                       f"(b) 本当に届いていなかった——その間の打鍵は**ログに入っていない**"
+                       f"（2026-08-09 の Windows 実機・2026-08-10 の P010 block07 が実例）。"
+                       f"⚠️ 打鍵の空白と starved の長さを突き合わせ、"
+                       f"必要なら gse-app.log と本人の記憶で決めること")
         if dropped:
             r.warn(f"{subject}: ブロック {n} で打鍵イベントが {dropped} 件捨てられている"
                    f"（channel 溢れ）。その打鍵はログに入っていない")
@@ -825,8 +861,18 @@ def selftest() -> int:
         if not r.ok:
             fails.append(
                 f"alive=false でも key 行があれば FAIL にしてはならない（誤検知）: {r.fails[0]}")
-        if not any("誤検知の可能性" in m for m in r.warns):
+        if not any("alive=false" in m and "starved=" in m for m in r.warns):
             fails.append("alive=false + key>0 は WARN を出すこと（黙って通さない）")
+        # ⚠️★★ 文面が「誤検知だ」と断定する形に戻ったら赤にする（2026-08-10 の教訓）。
+        #   ★ P010 block07 は誤検知ではなかったのに、旧文面は
+        #   「★ **誤検知の可能性が高い**」と読者を誘導していた。
+        #   → 検査が出すのは量であって結論ではない。両方の読みが並ぶことを固定する。
+        w = next((m for m in r.warns if "alive=false" in m), "")
+        if "誤検知の可能性が高い" in w:
+            fails.append("★ hook 生存の WARN が「誤検知」と断定している"
+                         "（測った量を出し、両方の読みを並べること）")
+        if not ("(a)" in w and "(b)" in w):
+            fails.append("★ hook 生存の WARN に 2 通りの読みが並んでいない")
 
         # ★ dropped は WARN（FAIL ではない）。★ 警告が出ることまで確かめる。
         (raw / spec["blocks"][2]["file"]).write_text(
@@ -864,6 +910,45 @@ def selftest() -> int:
         r = validate_spec(spec, seed, {}, d)
         if r.ok or not any("g1_mode" in m for m in r.fails):
             fails.append("g1_mode が marker/env 以外なら FAIL にすること (第 10 版 §5.4-5)")
+
+    # ⚠️★★ 1 ファイルに 2 セッション（2026-08-10 の P010 block07・`notes.md §10-3`）
+    #   ★ 実データで起きた形をそのまま固定する: フックが死んで打鍵が記録されず、
+    #     参加者が「開始する」を押し直した。⚠️ アプリはローテートを飛ばすので
+    #     (`lib.rs:1973` の `!was_active`)、**同じファイルに 2 本目の session_start が積まれた**。
+    #   ⚠️ 既存の hook_health 検査 (`alive=false` AND key 行 0) は
+    #     **2 本目のセッションの打鍵が key>0 側に効いて素通りさせる**ので、これは独立の 2 本目である。
+    with tempfile.TemporaryDirectory() as td:
+        d = pathlib.Path(td)
+        spec = _good_spec(seed)
+        raw = d / "raw" / spec["subject"]
+        raw.mkdir(parents=True)
+        one = ('{"type":"meta","session_start":1,"hmm_version":"0.3.0","g1_mode":"marker"}\n'
+               '{"type":"session_start","t":0}\n'
+               '{"type":"key","t":1,"press":true}\n')
+        for blk in spec["blocks"]:
+            (raw / blk["file"]).write_text(one, encoding="utf-8")
+
+        # ★ 対照が先: session_start が 1 本のログは**緑のまま**であること。
+        #   ⚠️ これが無いと「赤くなった」だけを見て、正常系を落とす検査を通してしまう。
+        r = validate_spec(spec, seed, {}, d)
+        if not r.ok:
+            fails.append(f"session_start が 1 本のログを FAIL にしてはならない: {r.fails[0]}")
+
+        # ★★ 本命: 2 本目の session_start があれば FAIL（protocol.md §1 の直接検査）
+        (raw / spec["blocks"][6]["file"]).write_text(
+            one + '{"type":"session_start","t":268503}\n'
+                  '{"type":"key","t":268504,"press":true}\n',
+            encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if r.ok or not any("session_start" in m for m in r.fails):
+            fails.append("1 ファイルに session_start が 2 本あれば FAIL にすること (protocol.md §1)")
+
+        # ⚠️ ★ 古い版のログには session_start 行が無い。**0 本を赤にしない**
+        #   （`G1_LOG` がまさにその形で、上の検査群がすべてそれを使っている）。
+        (raw / spec["blocks"][6]["file"]).write_text(G1_LOG, encoding="utf-8")
+        r = validate_spec(spec, seed, {}, d)
+        if not r.ok:
+            fails.append(f"session_start 行が 0 本のログを FAIL にしてはならない: {r.fails[0]}")
 
     # ⚠️ ★ パイロットは G1 モード実装前に取っているので **対象外**（P-1 を赤にしない）
     with tempfile.TemporaryDirectory() as td:
