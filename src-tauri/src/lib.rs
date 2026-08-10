@@ -2701,11 +2701,9 @@ pub fn run() {
 
                         // ★ 生 tick の「変化」だけを見る (絶対時刻へ変換しない = ラップアラウンド安全)。
                         let tick = liveness::last_system_input_tick();
-                        let system_input_seen = match (prev_tick, tick) {
-                            (Some(a), Some(b)) => a != b,
-                            // 判断材料が無い OS (macOS 等) は安全側に倒す = starvation を進めない。
-                            _ => false,
-                        };
+                        // ⚠️★ 比較規則は **OS ごとに違う**ので `liveness` 側に置いてある
+                        //   (Windows は等値・macOS は揺れの許容幅つき)。ここで `!=` と書かない。
+                        let system_input_seen = liveness::system_input_seen(prev_tick, tick);
                         prev_tick = tick;
 
                         let callbacks = crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);

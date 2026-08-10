@@ -530,6 +530,42 @@ fn update_compose_state(vk: u32) {
 }
 
 // ---------------------------------------------------------------------------
+// Permission decisions (pure — テストできる形に切り出す)
+// ---------------------------------------------------------------------------
+//
+// ⚠️★★ ここを純関数にしたのは、**2026-08-10 に壊れていたのがまさにこの判断**だからである。
+//   旧実装は「要求するか」と「どちらの tap を先に試すか」を 1 つの `if` に同居させており、
+//   Accessibility が付いている端末で **Input Monitoring の要求ごと落ちていた**。
+//   TCC は実機でしか動かないが、★ **判断そのものはここでテストできる。**
+
+/// Input Monitoring を **要求する** (= システム設定を開く) か。
+///
+/// ★ Accessibility の有無と **独立** である。ここが独立でなかったのが 2026-08-10 の欠陥。
+pub(crate) fn should_request_input_monitoring(im_granted: bool) -> bool {
+    !im_granted
+}
+
+/// どちらの tap を **先に試す** か (true = Default tap / Accessibility から試す)。
+///
+/// ★ これは順序の最適化にすぎない。要求の有無を左右してはならない。
+pub(crate) fn prefer_accessibility_first(im_granted: bool, ax_trusted: bool) -> bool {
+    !im_granted && ax_trusted
+}
+
+/// tap 作成に成功したとき「**Accessibility で動いている**」と言えるか。
+///
+/// ⚠️ 試した tap の種類 (`tap_was_accessibility`) だけでは判断できない。
+/// Accessibility に切り替えた後で Input Monitoring が付与されて成功する経路があり、
+/// ★ そのとき「Accessibility で動いている」と記録すると **研究者の診断が嘘になる**
+/// (`lib.rs` の `using_accessibility_fallback`)。
+pub(crate) fn effective_accessibility_fallback(
+    tap_was_accessibility: bool,
+    im_granted_now: bool,
+) -> bool {
+    tap_was_accessibility && !im_granted_now
+}
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -561,24 +597,44 @@ pub fn start() {
         // ListenOnly の無駄な失敗を待たず、即座に Default tap を使用する。
         // ad-hoc 署名では Input Monitoring の TCC CDHash 認証が不安定なため、
         // Accessibility が使えるなら最初からそちらを選ぶ。
-        let mut use_accessibility = if !im_granted && ax_trusted {
+        // --- Step 2: Request Input Monitoring permission ---
+        //
+        // ⚠️★★ **Accessibility が付いていても、Input Monitoring が無いなら必ず要求する。**
+        //
+        // 2026-08-10 の macOS 実機ログで、要求を飛ばすと **二度と要求されなくなる**ことを
+        // 実測した (`.steering/20260810-macos-hook-and-empty-block-fixes/requirement.md`):
+        //
+        //   04:09:45  Accessibility フォールバックがネイティブダイアログを出す → ★ ここで AX が付く
+        //   04:10:51  "Input Monitoring denied but Accessibility granted … skipping ListenOnly"
+        //   04:12:34  同上 ← ⚠️ **システム設定が開かない・被験者に何も伝わらない**
+        //
+        // ★ Accessibility は bundle id + 署名で効くので **アプリを置き直しても引き継がれる**。
+        //   一方 Input Monitoring はより厳しく、置き直すと denied に戻る。
+        //   → 一度 AX が付いた端末では、旧実装のこの分岐が **恒久的に**要求を止めていた。
+        // ⚠️ 被験者から見ると「何も出ないまま打鍵が記録されないアプリ」になる。
+        //   実際、上のログの端末は研究者が手でシステム設定を開くまで回復しなかった。
+        //
+        // ★ 「要求するか」と「どちらの tap を先に試すか」は**別の判断**である。同居させない。
+        if should_request_input_monitoring(im_granted) {
+            tracing::warn!(
+                "Input Monitoring permission not granted. \
+                 Opening System Settings > Privacy & Security > Input Monitoring..."
+            );
+            // SAFETY: CGRequestListenEventAccess はシステムダイアログ表示のみ。
+            unsafe { CGRequestListenEventAccess() };
+            tracing::info!("Polling for Input Monitoring permission...");
+        }
+
+        // --- Step 2b: どちらの tap を先に試すか (要求は上で済ませてある) ---
+        let mut use_accessibility = if prefer_accessibility_first(im_granted, ax_trusted) {
             tracing::info!(
                 "Input Monitoring denied but Accessibility granted. \
-                 Using Default tap (Accessibility) directly — skipping ListenOnly."
+                 Trying Default tap (Accessibility) first \
+                 (Input Monitoring has still been requested above)."
             );
             USING_ACCESSIBILITY_FALLBACK.store(true, Ordering::Release);
             true
         } else {
-            if !im_granted {
-                // --- Step 2: Request Input Monitoring permission ---
-                tracing::warn!(
-                    "Input Monitoring permission not granted. \
-                     Opening System Settings > Privacy & Security > Input Monitoring..."
-                );
-                // SAFETY: CGRequestListenEventAccess はシステムダイアログ表示のみ。
-                unsafe { CGRequestListenEventAccess() };
-                tracing::info!("Polling for Input Monitoring permission...");
-            }
             false
         };
 
@@ -728,9 +784,30 @@ pub fn start() {
                     //   「このタップで何回呼ばれたか」を診断したい場合は、
                     //   ★ 差分で見ること (get_diagnostics は累計を出す)。
                     CONSECUTIVE_REENABLES.store(0, Ordering::Relaxed);
+
+                    // ⚠️★ **`mode_label` は「試した tap の種類」であって、効いている権限ではない。**
+                    //   `use_accessibility` は一度 true になると、Input Monitoring が後から
+                    //   付与されて成功しても true のままである
+                    //   (ListenOnly への復帰チェックは 10 回失敗ごとにしか走らない)。
+                    //   → ★ 2026-08-10 に "installed via Accessibility" と出したが、
+                    //     実際には直前に付与された Input Monitoring で成功していた (実測)。
+                    //   ⚠️ この値は `lib.rs` の `using_accessibility_fallback` として
+                    //     **研究者の診断に出る**ので、嘘を残すと調査を誤らせる。
+                    // SAFETY: どちらも pure read-only の TCC チェック。副作用なし。
+                    let im_now = unsafe { CGPreflightListenEventAccess() };
+                    let ax_now = unsafe { AXIsProcessTrusted() };
+                    // ★ 「Accessibility で動いている」と言えるのは、Input Monitoring が
+                    //   無いまま Default tap で成功しているときだけである。
+                    USING_ACCESSIBILITY_FALLBACK.store(
+                        effective_accessibility_fallback(ax_mode, im_now),
+                        Ordering::Release,
+                    );
                     tracing::info!(
-                        "CGEventTap installed via {} (macOS keyboard hook active)",
-                        mode_label
+                        "CGEventTap installed (macOS keyboard hook active) \
+                         tap_mode={} input_monitoring={} accessibility={}",
+                        mode_label,
+                        im_now,
+                        ax_now
                     );
 
                     CFRunLoop::run_current();
@@ -824,4 +901,78 @@ pub fn start() {
             }
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+//
+// ⚠️ TCC / CGEventTap は実機でしか動かない。ここでテストするのは **判断だけ**である。
+// ★ 2026-08-10 に実機で壊れていたのは判断のほうであり、その形をここに固定する。
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ★★ **回帰テストの本体。**
+    ///
+    /// 旧実装は `!im_granted && ax_trusted` のとき Accessibility を先に試すのと**同時に**
+    /// `CGRequestListenEventAccess()` を飛ばしていた。→ Accessibility が付いた端末では
+    /// ⚠️ **二度と Input Monitoring を要求しない**アプリになり、被験者から見ると
+    /// 「何も出ないまま打鍵が記録されない」状態になる (2026-08-10 実機ログで確認)。
+    #[test]
+    fn requests_input_monitoring_even_when_accessibility_is_granted() {
+        assert!(
+            should_request_input_monitoring(false),
+            "★ Input Monitoring が無いなら、Accessibility の有無に関わらず必ず要求する"
+        );
+    }
+
+    /// 要求の判断は Accessibility を**引数に取らない** = 構造的に影響され得ない。
+    /// ★ 付与済みなら要求しない (ダイアログの無駄撃ちをしない) ことも固定する。
+    #[test]
+    fn does_not_request_input_monitoring_when_already_granted() {
+        assert!(!should_request_input_monitoring(true));
+    }
+
+    /// 「先に試す tap」は要求とは別の判断であり、こちらは Accessibility を見てよい。
+    #[test]
+    fn prefers_accessibility_only_when_it_is_the_only_grant() {
+        assert!(
+            prefer_accessibility_first(false, true),
+            "IM 無し / AX 有り → AX を先に試す"
+        );
+        assert!(
+            !prefer_accessibility_first(true, true),
+            "IM 有り → ListenOnly を先に試す"
+        );
+        assert!(!prefer_accessibility_first(true, false));
+        assert!(
+            !prefer_accessibility_first(false, false),
+            "どちらも無い → AX を先に試す理由が無い (要求して待つ)"
+        );
+    }
+
+    /// ⚠️★ 成功時に「Accessibility で動いている」と言えるのは、
+    /// **Input Monitoring が無いまま** Default tap で成功したときだけである。
+    ///
+    /// 2026-08-10 の実機では、Accessibility に切り替えた後で Input Monitoring が付与され、
+    /// その権限で成功したのに `CGEventTap installed via Accessibility` と記録していた。
+    /// ★ この値は研究者の診断 (`using_accessibility_fallback`) に出るので、嘘を残さない。
+    #[test]
+    fn effective_fallback_is_false_once_input_monitoring_arrives() {
+        assert!(
+            effective_accessibility_fallback(true, false),
+            "AX tap で成功・IM 無し → 本当に Accessibility で動いている"
+        );
+        assert!(
+            !effective_accessibility_fallback(true, true),
+            "★ AX tap で成功でも IM が付いているなら Accessibility 頼みではない (実機で誤記録した形)"
+        );
+        assert!(!effective_accessibility_fallback(false, true));
+        assert!(
+            !effective_accessibility_fallback(false, false),
+            "ListenOnly で成功しているなら Accessibility フォールバックではない"
+        );
+    }
 }

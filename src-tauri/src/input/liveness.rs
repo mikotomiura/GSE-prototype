@@ -136,9 +136,101 @@ pub fn last_system_input_tick() -> Option<u32> {
     }
 }
 
-/// macOS 等: 判断材料が無い。★ D-4 により配線は次タスク
-/// (`CGEventSourceSecondsSinceLastEventType` は別の実測が要る)。
-#[cfg(not(target_os = "windows"))]
+/// tick が「揺れ」ではなく **本当に入力があった** ことを示しているか。
+///
+/// ⚠️★ Windows と macOS で規則が違うのは、**tick の出どころが違う**からである。
+/// - Windows (`GetLastInputInfo`): OS が持つ値をそのまま読む。揺れない → 等値比較でよい。
+/// - macOS (`CGEventSourceSecondsSinceLastEventType`): 「最後の入力からの秒数」なので
+///   ★ `now - since` に直す必要があり、その引き算に**サンプリングの揺れが乗る**。
+pub fn system_input_seen(prev: Option<u32>, now: Option<u32>) -> bool {
+    match (prev, now) {
+        (Some(a), Some(b)) => tick_indicates_input(a, b),
+        // 判断材料が無い OS は安全側に倒す = starvation を進めない。
+        _ => false,
+    }
+}
+
+/// macOS 以外: 値が変われば入力があった。⚠️ 32bit のラップアラウンドは等値比較なので無害。
+#[cfg(not(target_os = "macos"))]
+fn tick_indicates_input(a: u32, b: u32) -> bool {
+    a != b
+}
+
+/// macOS で「揺れ」と「入力」を分ける閾値 (ms)。
+///
+/// ## ★ 実測 (2026-08-10・離席 12 秒 / 200ms 間隔 60 サンプル)
+///
+/// `now - since` の広がりは **55.5 ms** だった (隣接差の中央値 0.001 ms、最大 55.46 ms が 1 回)。
+/// 一方、**連続打鍵中**は 1 秒 tick ごとに約 **1000 ms** 動く。
+/// → 55 ms と 1000 ms の間に線を引けばよい。★ 実測の 4 倍以上の余裕を取って 250 ms とする。
+#[cfg(target_os = "macos")]
+const MACOS_JITTER_TOLERANCE_MS: u32 = 250;
+
+/// macOS: **250 ms 以上**動いたときだけ入力とみなす。
+///
+/// ⚠️★★ ここを「秒に量子化して等値比較」にしてはならない。**一度そう書いて赤を見た**:
+/// 秒に丸めると、真の最終入力時刻が秒境界の近くにあるとき 55 ms の揺れが
+/// バケツをまたいで「入力があった」に化ける (= 離席中の誤警告)。
+/// ⚠️ かといって「±1 秒の差を無視する」にすると、**連続打鍵 (毎 tick +1 秒) まで
+/// 無視して**しまい、★ 検出器が一番必要な場面で盲目になる。
+/// → ms のまま持ち、**許容幅で比べる**のが正しい形である。
+#[cfg(target_os = "macos")]
+fn tick_indicates_input(a: u32, b: u32) -> bool {
+    // ★ `i32` の wrapping 差で比べる。u32 の `wrapping_sub` だと **負の揺れ** (-55ms) が
+    //   約 42.9 億に化けて閾値を越え、⚠️ 揺れを入力と誤読する。
+    (b as i32).wrapping_sub(a as i32).unsigned_abs() >= MACOS_JITTER_TOLERANCE_MS
+}
+
+/// macOS の「最後の入力からの秒数」を、**ミリ秒**の絶対時刻 tick に写す純関数。
+///
+/// ⚠️★★ **`since_secs` をそのまま返してはならない。** `since_secs` は離席中に
+/// 増え続けるので、「変化した = 入力があった」と読む呼び出し側から見ると
+/// **常に入力があることになり**、⚠️ 離席中ずっと starvation が進んで
+/// 「フックが死んだ」と誤警告する (`step` は `system_input_seen && !hook_event_seen` で進む)。
+/// → ★ **絶対時刻 (`now - since`)** に直す。これは入力があったときにだけ動く。
+///
+/// 揺れの吸収は `tick_indicates_input` (許容幅) が担当する。★ ここでは丸めない。
+pub(crate) fn last_input_tick_ms(now_ms: u64, since_secs: f64) -> Option<u32> {
+    // ⚠️ 異常値は「判断材料が無い」に倒す (`None` = starvation を進めない = 安全側)。
+    if !since_secs.is_finite() || since_secs < 0.0 {
+        return None;
+    }
+    let since_ms = (since_secs * 1000.0) as u64;
+    let last_ms = now_ms.saturating_sub(since_ms);
+    // ★ u32 への切り捨ては意図的。約 49.7 日で巻き戻るが、`tick_indicates_input` が
+    //   `i32` の wrapping 差で比べるので巻き戻りは 1 tick しか誤らない。
+    Some(last_ms as u32)
+}
+
+/// macOS: `CGEventSourceSecondsSinceLastEventType` で OS 側の最終入力時刻を取る。
+#[cfg(target_os = "macos")]
+pub fn last_system_input_tick() -> Option<u32> {
+    /// `kCGEventSourceStateCombinedSessionState`。
+    const COMBINED_SESSION_STATE: i32 = 0;
+    /// `kCGAnyInputEventType` (= `~0`)。キーだけでなくマウスも「システム入力」に数える。
+    /// ⚠️ ★ ここをキーだけに絞ってはならない。`step` の意図は
+    /// 「**人は居るのにフックだけ黙っている**」の検出であり、マウス操作も在席の証拠である。
+    const ANY_INPUT_EVENT_TYPE: u32 = u32::MAX;
+
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn CGEventSourceSecondsSinceLastEventType(state_id: i32, event_type: u32) -> f64;
+    }
+
+    // SAFETY: 引数は 2 つとも値渡しの整数で、API は **読み取りのみ** を行い
+    // ポインタを保持しない (pure read-only の問い合わせ)。権限も要らない。
+    let since_secs = unsafe {
+        CGEventSourceSecondsSinceLastEventType(COMBINED_SESSION_STATE, ANY_INPUT_EVENT_TYPE)
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_millis() as u64;
+    last_input_tick_ms(now_ms, since_secs)
+}
+
+/// Windows / macOS 以外: 判断材料が無い。
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub fn last_system_input_tick() -> Option<u32> {
     None
 }
@@ -272,5 +364,75 @@ mod tests {
         }
         assert_eq!(s.starved_ms, 0);
         assert_eq!(health(s, th()), HookHealth::Ok);
+    }
+}
+
+#[cfg(test)]
+mod macos_tick_tests {
+    use super::*;
+
+    /// ★★ 本命: **離席中の揺れを入力と読まない**こと。
+    ///
+    /// ⚠️ ここが `true` になると `system_input_seen` が立ち続け、`hook_event_seen = false` と
+    /// 組んで starvation が進み、**席を外しただけで「フックが死んだ」と警告する**。
+    /// 2026-08-10 の実測 (揺れ 55.5 ms・境界に乗る最悪配置) をそのまま入力にする。
+    #[test]
+    fn idle_jitter_is_not_read_as_input() {
+        // ★ 真の最終入力時刻を **わざと秒境界ちょうど**に置く (秒量子化だと必ず割れる配置)。
+        let base_last_ms: u64 = 1_786_338_674_000;
+        let jitter = [0.0_f64, 0.001, -0.02, 55.46, 0.0, -0.003];
+        let mut prev: Option<u32> = None;
+        for i in 0..60u64 {
+            let now_ms = base_last_ms + 100_000 + i * 200;
+            let since_ms = (now_ms - base_last_ms) as f64 + jitter[(i % 6) as usize];
+            let tick = last_input_tick_ms(now_ms, since_ms / 1000.0);
+            if let Some(p) = prev {
+                assert!(
+                    !system_input_seen(Some(p), tick),
+                    "★ 離席中の揺れ ({:?} -> {:?}) を入力と読んだ = 誤警告になる",
+                    p,
+                    tick
+                );
+            }
+            prev = tick;
+        }
+    }
+
+    /// ★★ 逆向き: **連続打鍵は必ず入力と読む**こと。
+    ///
+    /// ⚠️ ここが `false` になると、フックが死んでいて被験者が打ち続けている
+    /// **一番検出したい場面**で検出器が黙る。
+    #[test]
+    fn continuous_typing_is_always_read_as_input() {
+        let mut prev: Option<u32> = None;
+        for i in 0..60u64 {
+            // 打鍵し続けている = 最後の入力は常に「たった今」。tick は 1 秒ごとに約 +1000ms。
+            let now_ms = 1_786_338_674_000 + i * 1000;
+            let tick = last_input_tick_ms(now_ms, 0.01);
+            if let Some(p) = prev {
+                assert!(
+                    system_input_seen(Some(p), tick),
+                    "★ 連続打鍵を入力と読めなかった = 検出器が盲目になる"
+                );
+            }
+            prev = tick;
+        }
+    }
+
+    /// 判断材料が無い側は必ず `false` (= starvation を進めない)。
+    #[test]
+    fn missing_tick_never_counts_as_input() {
+        assert!(!system_input_seen(None, Some(5)));
+        assert!(!system_input_seen(Some(5), None));
+        assert!(!system_input_seen(None, None));
+    }
+
+    /// ⚠️ 異常値は `None` に倒す。★ 進めるより凍結するほうが安全である。
+    #[test]
+    fn bogus_values_fall_back_to_none() {
+        let now_ms: u64 = 1_786_338_800_000;
+        assert_eq!(last_input_tick_ms(now_ms, f64::NAN), None);
+        assert_eq!(last_input_tick_ms(now_ms, f64::INFINITY), None);
+        assert_eq!(last_input_tick_ms(now_ms, -1.0), None);
     }
 }
