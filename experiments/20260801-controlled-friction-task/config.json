@@ -1,11 +1,11 @@
 {
   "schema_version": "2",
   "experiment_id": "20260801-controlled-friction-task",
-  "status": "PREREGISTERED_FROZEN_NOT_EXECUTED",
+  "status": "SHAKEDOWN_DONE_CONFIRMATORY_NOT_STARTED",
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
   "revision": {
-    "version": 14,
+    "version": 15,
     "date": "2026-08-10",
     "frozen_before_any_data": false,
     "asymmetry": "Version 10 adds a SECOND TRIGGER for the probe kill switch and two fail-loud surfaces, and makes the app itself keep '1 block = 1 NDJSON file' and stop the block at 5:00. *** It is NOT a replacement of anything. *** probes_disabled_by_env (GSE_DISABLE_PROBES=1) is UNCHANGED in implementation and remains a valid trigger; the new 'G1 mode' (a g1.mode marker file in the folder that contains the app, or GSE_G1_MODE=1) is OR-ed in. Therefore: 'the probe scheduler does not start during G1' is STRENGTHENED (one more path that cannot be forgotten); 'by default (unset) it starts as before' is UNCHANGED; the objective check in 5.4-2 (zero probe_assignment rows) is UNCHANGED and MUST be kept; and ZERO new passing paths are introduced - only more ways to stop. *** For changes 2 and 3 (log rotation per block, 5:00 auto-end of the recording, duplicate-launch blocking): section 2.3 is not changed by a single character; what changed is whether the frozen composition is actually honoured, which is the same argument used in 5.4 and in D-6. No passing path is added: there is no verdict that becomes reachable because a block stopped at 5 minutes. The 3.2 feature sets are untouched - FS-A comes from feat rows and FS-B from key/paste/ime_shadow rows, and rotation changes WHICH FILE a row lands in, never the row itself. *** If anything it moves in the STRICTER direction: P-1 produced block lengths of 4:04 to 11:37, and every FS-B feature (keys, silence_*, burst_*) scales with length, which widens exactly the 'separation attributable to production volume' path that 3.5 guards against; equalising all blocks at 5:00 narrows it. *** Directions that work the other way, stated rather than argued away: (a) anything typed after 5:00 is not recorded, mitigated by reordering the procedure to 'open the page, THEN press start' so the page's own 5:00 (D-6) fires first - but whether the order was followed CANNOT be verified; (b) the app is no longer restarted per block, so feature reset depends on start_session rather than on process restart - start_session already calls engine.reset() and resets the 30 s window, but OS hook and process state are no longer washed by a restart, and THAT WAS NOT MEASURED; (c) if the marker is removed the app runs silently in normal mode, mitigated by the two fail-loud surfaces below but NOT replacing 5.4-2. *** New fail-loud, both additive: the start screen shows 'G1 mode' with its trigger, and the meta line carries g1_mode ('marker'|'env') so a block recorded WITHOUT G1 mode is detectable after the fact. The key is absent in normal operation, so ordinary NDJSON is byte-identical to before. *** MEASURED on 2026-08-05 and it changed one design decision: 'open -a gse-next' launched the /Applications copy, NOT the copy inside the G1 folder, and the two ran as two processes at once splitting keystrokes across two NDJSON files. The macOS launcher is therefore RETIRED; keeping it would silently start a non-G1 app whose probes are live, discoverable only when 5.4-2 goes red after the session. *** Sections 3.1/3.2/3.4/3.5/3.6 are UNCHANGED, as in every revision since v2.",
@@ -209,6 +209,14 @@
       "what_the_rule_cannot_fix": "The participant's TOTAL time on that topic is not recoverable. P010 block07 consumed about 9.5 minutes in total, and the recorded 4:44 does NOT start at the moment the participant began the topic. The rule only decides which rows to read; it does NOT restore comparability between blocks. This must be reported alongside 3.5.",
       "not_an_exclusion": "3.6 is unchanged. No block and no subject is dropped. 3.1/3.2/3.4/3.5/3.6 remain byte-identical to version 1.",
       "change_2_version_check_looked_at_the_wrong_pair": "The selftest's revision-consistency check compared analyze.py's PREREG_REVISION to config.json only. Both can lag by the same amount and stay green - and they did: preregistration.md had advanced to revision 13 while config.json and PREREG_REVISION sat at 10, green, for three revisions (measured 2026-08-10). The check now reads the revision number directly out of preregistration.md, the single source of truth. This changes no decision criterion; it corrects which side the check looks at."
+    },
+    "v15_changes": {
+      "trigger": "Verifying P010 revealed that it had run past three preconditions the frozen document states as unmet: (1) the execution condition (Phase1 complete + researcher approval lifting the freeze) still reads 'not lifted'; (2) 2.4-2 requires n to be frozen into design.n_subjects BEFORE any confirmatory datum is collected, and it was still TO_BE_FROZEN_AFTER_PILOT; (3) status still read PREREGISTERED_FROZEN_NOT_EXECUTED. Separately, analyze.py never consulted the confirmatory flag at all and its glob P*.json also matched PILOT-mac/PILOT-win - pilots were excluded from confirmatory analysis only because their NDJSON was absent from the dataset, not because any code enforced it.",
+      "change_1_shakedown_clause": "New clause in 2.8: a shakedown run by a real participant, explicitly OUTSIDE the confirmatory sample. P010 is placed there. Rationale: keeping P010 as confirmatory subject #1 would make the n freeze retroactive and leave an optional-stopping doubt that cannot be fully discharged. Moving it out lets 2.4-2 be SATISFIED going forward. Cost, stated not argued away: P010's data cannot contribute to the primary verdict.",
+      "change_2_n_frozen": "design.n_subjects frozen at 3 (numeric). P010 is not counted, so three NEW participants are required. Rationale: n>=2 is the minimum at which Fisher combination applies (3.9), balanced against per-subject cost (onsite, >1h). n=5 was rejected because 2.4 itself already withdrew that number as a convention rather than a power calculation; n=1 was rejected because counterbalancing does not hold. 2.4-4/5/6 are re-declared: no analysis until all three are collected, no topping up, no 'add subjects until significant'.",
+      "change_3_sample_roster": "New top-level sample_roster is the SINGLE SOURCE OF TRUTH for who is in the confirmatory sample, and analyze.py now enforces it at runtime. It is kept HERE, under git, because blocks/*.json is excluded by blocks/.gitignore (session timestamps in filenames) and therefore exists on one machine only, with no review trail. Writing the classification in both places and cross-checking was rejected: two mirrors that lag by the same amount stay green (the exact failure measured in this repo on the same day, notes.md 10-7).",
+      "change_4_freeze_lift_recorded": "The execution condition is NOT reworded. What is recorded instead is the fact that the researcher approved starting G1 while Phase1 GATE3 remains DataInsufficient - approval is a path the clause already contemplates. Risk stated: if the G1 result turns out to depend on a Phase1 premise, the interpretation may have to be redone once GATE3 is settled.",
+      "mechanisation_not_loosening": "2.4-4 ('do not look at any confirmatory result until the frozen n is collected') was an aspiration until now; analyze.py stops when the roster holds fewer than n_subjects. This is the same move by which 5.3's seal mechanised 3.4. No new passing path is introduced - only more ways to stop. 3.1/3.2/3.4/3.5/3.6 remain byte-identical to version 1."
     }
   },
   "design": {
@@ -235,7 +243,7 @@
     "positive_control_position": "FIXED_first_and_last_not_randomized",
     "rationale_copy_block_position": "Keeps the forced-comparison chain closed inside the 8 G1 blocks (a copy block between two G1 blocks would break 'compared with the previous block'). Also makes the leading copy block serve as the individual transcription baseline [P38].",
     "domain_rationale": "Argumentative writing is chosen because it is the BEST CASE for keystroke observation, NOT because it is representative. VibeCoding has thin continuous typing (ADR-006 sub-decision 3) and Creative is typing-sparse with silence indistinguishable from idle. G1 settles the question on the most favourable ground: a floor check. Representativeness is NOT claimed; participant P011 stated in F4 that they rarely write continuously.",
-    "n_subjects": "TO_BE_FROZEN_AFTER_PILOT",
+    "n_subjects": 3,
     "n_subjects_v1_withdrawn": 5,
     "n_subjects_rule": {
       "why_withdrawn": "n=5 was a convention ('same size as Phase1'), not a power calculation (decisions.md judgement 8). The primary test is WITHIN-subject: C(8,4)=70 means n=1 already reaches min p=0.0143<0.05. The required n depends on the DIRECTION of the result, which cannot be known in advance: separation -> 'possible for at least one person' suffices; no separation -> cannot rule out an idiosyncratic subject, so more are needed.",
@@ -654,5 +662,16 @@
     ],
     "pii": "subject ID only; no name, no email",
     "instrument": "Form_G1 G1-S"
+  },
+  "sample_roster": {
+    "_note": "誰が確証標本かの単一の正。analyze.py はここだけを見る (blocks/*.json は gitignore 対象でこの端末にしか無いため参照しない)。preregistration.md 2.4 / 2.8",
+    "confirmatory": [],
+    "pilot": [
+      "PILOT-mac",
+      "PILOT-win"
+    ],
+    "shakedown": [
+      "P010"
+    ]
   }
 }
