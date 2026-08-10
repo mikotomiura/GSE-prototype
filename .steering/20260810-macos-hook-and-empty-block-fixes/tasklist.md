@@ -39,3 +39,21 @@
 - [x] `gse-replay --snapshot` 4 本すべて一致
 - [x] ⚠️ ★ `OK:` は **stderr** に出る。`2>/dev/null` で一度自分の測定結果を捨てた
 - [x] `HMM_VERSION` bump は**不要** (HMM 不変・ゴールデン 4 本一致・schema drift なし)
+
+## 【3-b】レビュー指摘の修正 (v0.1.26)
+
+- [x] HIGH-1 レシートの断定文を `unsent === 0 && last_error === null` のときだけ出す
+- [x] HIGH-2 番兵を `emit("g1-block-ended")` の **前**で立て、ブロック終了時にレシートを捨てる
+- [x] MED (sec) `resolve_submit_bin` の画面文言から絶対パス (= OS ユーザー名) を落とす
+- [x] MED (sec) 参加者 ID が変わったらレシートの根拠を捨てる
+- [x] MED 梱包フェーズの無表示を埋める (`unsent > 0` ゲートを外し、起動時スキャンだけ除外)
+- [x] MED 「数秒かかります」を 30 秒で切り替え、未送信カードの抑制も解除する
+- [x] MED 数え損ね (`counted: false`) のときは緑の ✅ を出さない
+- [x] LOW `SUBMIT_IN_FLIGHT` の ordering を Release/Acquire に、`unwrap_or(0)` を `1` に
+- [x] LOW 「この回…3 件」の文言を件数で分岐
+- [x] `cargo test --workspace --features package` = **353 passed** (3 回連続で緑)
+- [x] ⚠️ ★ 新テストが既存テストと同じ Atomic を踏み、**単独で緑・全体で赤**になった → 直列化
+- [x] `tsc --noEmit` / clippy / ゴールデン 4 本 / schema drift
+- [x] バージョンを **v0.1.26** に上げる
+- [ ] ⚠️ CI で本番バイナリを作り、**実機で 5 項目を再確認**する
+- [ ] ⚠️ 配布 zip を作り直して Drive を差し替える

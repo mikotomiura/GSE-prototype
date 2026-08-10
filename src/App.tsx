@@ -41,7 +41,32 @@ interface SubmissionStatus {
   last_sent_ms: number | null;
   /** ★ そのとき送れた本数 (レシートの「N 件」)。 */
   last_sent_count: number;
+  /**
+   * ★★ 件数を **本当に数えられたか**。
+   *
+   * ⚠️ ホーム or 参加者 ID が解決できないと `unsent` は「実際に 0 件」ではなく
+   * **「数えられなかった」**の意味で 0 になる。★ ここを見ずに緑の ✅ を出すと、
+   * `.age` が実在するのに「送信を待っている記録はありません」と言う (fail-open)。
+   */
+  counted: boolean;
+  /** いま走っている収束器のきっかけ (0=無し / 1=起動時 / 2=ブロック終了後 / 3=承認後)。 */
+  sending_reason: number;
+  /** 収束器が走り始めた時刻 (epoch ms)。null = 走っていない。 */
+  sending_since_ms: number | null;
 }
+
+/** 収束器のきっかけ。★ backend `ReconcileReason` と同期。 */
+const RECONCILE_REASON_STARTUP = 1;
+
+/**
+ * ⚠️★ 「数秒かかります」が嘘になる境目 (ms)。
+ *
+ * 送信の timeout は **180 秒/件**で、3 件なら最悪 9 分かかる。★ その間ずっと
+ * 「数秒かかります」と言い続け、しかも `!sending` ゲートで
+ * **未送信カード (唯一の安全装置) が隠れる**。→ この時間を超えたら文面を変え、
+ * 未送信カードの抑制も解除する。
+ */
+const SENDING_LONG_MS = 30_000;
 
 /**
  * 提出ラベル用参加者 ID の妥当性。★ backend `participant_id::is_valid_participant_id`
@@ -180,7 +205,19 @@ function App() {
     sending: false,
     last_sent_ms: null,
     last_sent_count: 0,
+    // ⚠️★ 初期値は **false** にする。まだ 1 度も数えていないので「0 件だった」とは言えない
+    //   (ここを true にすると、起動直後の 1 フレームだけ緑の ✅ が出る)。
+    counted: false,
+    sending_reason: 0,
+    sending_since_ms: null,
   });
+  // ⚠️★ 送信が長引いているか。★ `sending_since_ms` を 1 秒ごとに評価し直すための時計。
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  // ★ 送信が `SENDING_LONG_MS` を超えたか。文面の切り替えと、未送信カードの抑制解除に使う。
+  const sendingIsLong =
+    submissionStatus.sending &&
+    submissionStatus.sending_since_ms !== null &&
+    nowMs - submissionStatus.sending_since_ms > SENDING_LONG_MS;
   // 「送信する」を押したときのエラー (押したのに何も起きない状態を作らない)。
   const [approveError, setApproveError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
@@ -348,6 +385,15 @@ function App() {
       clearInterval(t);
     };
   }, [g1Mode, isStarted, g1BlocksDone, submissionStatus.sending]);
+
+  // 4b-4. ⚠️★ 送信中だけ時計を進める。★ `sending_since_ms` は backend から来る固定値なので、
+  //       これが無いと「30 秒を超えた」の判定が **次のポーリングまで更新されない**。
+  //       ⚠️ 送信していないときは 1 秒ごとの再描画をしない (通常運用に負荷をかけない)。
+  useEffect(() => {
+    if (!submissionStatus.sending) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [submissionStatus.sending]);
 
   // 4c. G1: 5 分でのブロック自動終了。バックエンドがログを閉じたのでスタート画面へ戻す。
   //     ⚠️ ★ 出すのは「終わった」だけ。残り時間・カウントダウンは出さない
@@ -659,7 +705,14 @@ function App() {
             その間このスタート画面は **完全に無表示**だった。★ 空白を「たぶん成功」と
             読ませないために、送っている最中であることをそのまま出す。
             ⚠️ 進捗率や残り秒数は出さない (収束器から取れない値を装わない)。 */}
-        {!!g1Mode && submissionStatus.sending && submissionStatus.unsent > 0 && (
+        {/* ⚠️★★ 条件から `unsent > 0` を外した (code-reviewer MEDIUM)。
+            ★ ブロック終了直後は **`.age` をまだ作っていない**ので `unsent === 0` であり、
+            旧条件では **梱包フェーズが完全に無表示**だった (今回潰したかった沈黙が残っていた)。
+            ⚠️ 代わりに「起動時のスキャンでは出さない」で絞る。起動時は毎回走って
+            平常時は何もしないので、出すと起動のたびに箱が点滅する。 */}
+        {!!g1Mode &&
+          submissionStatus.sending &&
+          submissionStatus.sending_reason !== RECONCILE_REASON_STARTUP && (
           <div
             role="status"
             aria-live="polite"
@@ -676,7 +729,16 @@ function App() {
             <b>記録を送信しています…</b>
             <br />
             <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-              数秒かかります。このままお待ちください。
+              {/* ⚠️★ 「数秒」と言い切らない。送信の timeout は 180 秒/件で、
+                  3 件なら最悪 9 分かかる (code-reviewer MEDIUM)。 */}
+              {sendingIsLong ? (
+                <>
+                  時間がかかっています。<b>記録は失われていません。</b>
+                  このままお待ちいただくか、次のブロックに進んでください。
+                </>
+              ) : (
+                <>しばらくかかることがあります。このままお待ちください。</>
+              )}
             </span>
           </div>
         )}
@@ -686,8 +748,11 @@ function App() {
             ⚠️ 確認待ちのぶんは上のカードが担当するので、ここでは **確認済みで未達のもの**だけ扱う。
             ⚠️ ★ 送信中は出さない。文面が「次のブロックの後に再試行します」なので、
             **いま送っている最中**に出すと嘘になる (上の送信中カードが代わりに出ている)。 */}
+        {/* ⚠️★ 送信が長引いているときは **抑制を解除する** (code-reviewer MEDIUM)。
+            旧条件 `!sending` のままだと、最悪 9 分のあいだ
+            ★ **唯一の安全装置である未送信件数が隠れ続ける**。 */}
         {!!g1Mode &&
-          !submissionStatus.sending &&
+          (!submissionStatus.sending || sendingIsLong) &&
           submissionStatus.unsent - submissionStatus.awaiting_approval > 0 && (
           <div
             role="status"
@@ -755,13 +820,35 @@ function App() {
               }}
             >
               <b>
-                ✅ この回の記録を送信しました（
-                {formatReceiptTime(submissionStatus.last_sent_ms)}・
-                {submissionStatus.last_sent_count} 件）
+                {/* ⚠️★ 「この回」と言えるのは 1 件のときだけである。確認カードが
+                    明示的に「あとで」を勧めている以上、複数件はふつうに起きる。 */}
+                {submissionStatus.last_sent_count > 1 ? (
+                  <>
+                    ✅ 記録を送信しました（
+                    {formatReceiptTime(submissionStatus.last_sent_ms)}・この回を含む
+                    {submissionStatus.last_sent_count} 件）
+                  </>
+                ) : (
+                  <>
+                    ✅ この回の記録を送信しました（
+                    {formatReceiptTime(submissionStatus.last_sent_ms)}・
+                    {submissionStatus.last_sent_count} 件）
+                  </>
+                )}
               </b>
               <br />
               <span style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-                この端末からの送信は完了しています。<b>次のブロックに進んでください。</b>
+                {/* ⚠️★★ **断定してよいのは、残りが無く失敗も無いときだけ** (code-reviewer HIGH)。
+                    ★ 部分成功や後続の失敗が同時に起きている場面で「完了しています」と言うと、
+                    赤いエラーカード・未送信カードと **矛盾した緑**が並ぶ。
+                    残りがあるときは見出し (送れた事実) だけにし、続きは他のカードに語らせる。 */}
+                {submissionStatus.unsent === 0 && submissionStatus.last_error === null ? (
+                  <>
+                    この端末からの送信は完了しています。<b>次のブロックに進んでください。</b>
+                  </>
+                ) : (
+                  <>送信できたぶんの記録です。残りはこの下の案内をご覧ください。</>
+                )}
               </span>
             </div>
           )}
@@ -769,7 +856,13 @@ function App() {
         {/* ★ 未送信 0 件を **肯定形**で言う。⚠️ 「警告が出ていない」を成功と読ませない
             (memory `silent-success-is-not-visible`)。★ まだ 1 件も送っていない起動直後は
             「すべて送信済み」と書けないので、⚠️ **言える事実だけ**を書く。 */}
+        {/* ⚠️★★ `counted` を条件に足した (code-reviewer MEDIUM)。
+            ホーム or 参加者 ID が解決できないと `unsent` は「実際に 0 件」ではなく
+            **「数えられなかった」**の意味で 0 になる。★ そのまま緑の ✅ を出すと、
+            `.age` が実在するのに「送信を待っている記録はありません」と言う = fail-open。
+            ⚠️ 従来は同じ状態で **何も出なかった**ので、これは退行を戻す修正である。 */}
         {!!g1Mode &&
+          submissionStatus.counted &&
           submissionStatus.awaiting_approval === 0 &&
           !submissionStatus.sending &&
           submissionStatus.last_sent_ms === null &&
