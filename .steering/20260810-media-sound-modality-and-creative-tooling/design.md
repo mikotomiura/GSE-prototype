@@ -33,8 +33,13 @@ timestamp / f1 / f3 / f4 / f5 / f6 / p_flow / p_inc / p_stuck
 
 ```bash
 cd src-tauri   # ★ Cargo.toml は repo 直下に無い
-cargo run --bin gse-replay -- ../tests/fixtures/minimal.ndjson --snapshot out.json
+cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot out.json
 ```
+
+> ⚠️ **2026-08-11 訂正**: 旧記述は `../tests/fixtures/minimal.ndjson` だったが**誤り**。
+> 実体は **`src-tauri/tests/fixtures/minimal.ndjson`** なので、`src-tauri/` から見た相対パスは
+> **`tests/fixtures/`（`../` を付けない）**である（`ls` で実測確認）。
+> `docs/agent-shared.md` の記述が正しい。
 
 `--snapshot / --metrics / --json / --segment / --segments / --intervention /
 --calibration / --sweep / --nudge-diag / --corr-floor` を確認済み（モード系は相互排他）。
