@@ -36,13 +36,12 @@
 - [x] `preregistration.md`: 実施条件に研究者承認での開始とリスクを追記（D-4）
 - [x] `preregistration.md`: `§2.4` に n=3 凍結と `§2.4-4/5/6` の再宣言
 - [x] ⚠️ 改訂履歴に「本改訂は **P010 取得後**・いかなる解析より前」を明記
-- [~] `notes.md`: n 凍結の日付は記入済み。⚠️★ **コミットハッシュはコミット後に差し替える**
-      （`PENDING-FILL-AFTER-COMMIT` が preregistration.md と notes.md に各 1 箇所）
+- [x] `notes.md`: n 凍結の日付と**コミットハッシュ `d3caebd`**（§2.4-1 手続き 3・2 箇所）
 - [x] `data.md` 冒頭の訂正（★ `results/` が空なのは今も真）
 
 ## 完了処理
 
-- [ ] `/finish-task`
+- [x] `/finish-task`（schema parity は非 touch で skip）
 - [ ] コミット → push → PR → merge
 
 ## ★ 本タスクの後にやること（別タスク）
