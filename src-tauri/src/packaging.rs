@@ -195,6 +195,22 @@ pub fn has_any_data_row(path: &Path) -> bool {
         if t.contains(r#""type":"hook_health""#) {
             continue;
         }
+        // ⚠️★★ **`ime_state` も数えない。** 2026-08-10 の macOS 実機で実際に踏んだ:
+        //   ★ IME モニタは **アプリ起動直後**に `ime_state` を 2 行書く。ブロックを一度も
+        //   始めずにアプリを閉じただけの 80 秒 (meta 2 行 + `ime_state` 2 行・261 B) が
+        //   ここを `true` で通り、`.age` に包まれ、**block01 を消費して送信された**。
+        //   → 本物の 1 本目が block02 になった (`.steering/20260810-macos-visual-check-and-distribution/`)。
+        //
+        // ★ 実データで測った根拠 (推測ではない): ブロックを回したセッションで
+        //   `session_start` 行より **前**に出ていた非 meta 行は **`ime_state` だけ**であり、
+        //   開始後には `session_start` / `session_meta` / `feat` / `key` が出る。
+        //   → `ime_state` を落としても、本物のブロックは `feat`/`key` で必ず残る。
+        //
+        // ⚠️★ macOS で重い理由: 初回起動は「起動 → 権限付与 → 再起動」が正規手順なので
+        //   (`README_先に読む.txt`)、★ macOS 参加者はほぼ全員この経路を踏む。
+        if t.contains(r#""type":"ime_state""#) {
+            continue;
+        }
         if !t.contains(r#""type":"meta""#) {
             return true;
         }
@@ -276,6 +292,57 @@ mod tests {
         ];
         for (label, body, expected) in cases {
             let p = dir.join(format!("gse_{}.ndjson", label.len()));
+            std::fs::write(&p, &body).unwrap();
+            assert_eq!(
+                has_any_data_row(&p),
+                expected,
+                "{label}: has_any_data_row が期待と違う"
+            );
+            let _ = std::fs::remove_file(&p);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// ⚠️★★ **2026-08-10 の macOS 実機で実際に提出されてしまった形**を、そのまま固定する。
+    ///
+    /// `~/Documents/GSE-sessions/gse_20260810_041051.ndjson` (261 B) の実物と同じ 4 行:
+    /// アプリを起動して閉じただけで、ブロックは一度も始まっていない。
+    /// ★ これが `.age` に包まれ block01 を消費して送信され、本物の 1 本目が block02 になった。
+    ///
+    /// ★ 3 状態で試す (`verify-before-claiming`): 未開始 / 開始後 (feat) / 開始後 (key)。
+    /// ⚠️ 真ん中と右が `false` になったら、**本物のブロックを捨てている** = はるかに重い失敗である。
+    #[test]
+    fn ime_state_alone_is_not_a_data_row() {
+        let dir = std::env::temp_dir().join(format!("gse_pkg_imestate_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // ★ 実物のバイト列 (t とタイムスタンプだけ短くしてある)
+        let meta = r#"{"type":"meta","session_start":1786335051878,"hmm_version":"0.3.0","g1_mode":"marker"}"#;
+        let end = r#"{"type":"meta","session_end":1786335132424}"#;
+        let ime = r#"{"type":"ime_state","t":1786335051194,"on":false,"active":false}"#;
+        let feat = r#"{"type":"feat","t":3,"f1":250.00,"f3":0.1,"f4":0.0,"f5":1.0,"f6":1.0}"#;
+        let key = r#"{"type":"key","t":4,"category":"alphabetic","press":true}"#;
+
+        let cases: [(&str, String, bool); 4] = [
+            (
+                "★ ブロック未開始 (実物と同じ 4 行)",
+                format!("{meta}\n{ime}\n{ime}\n{end}\n"),
+                false,
+            ),
+            ("ime_state だけ", format!("{meta}\n{ime}\n"), false),
+            (
+                "開始後: feat がある",
+                format!("{meta}\n{ime}\n{feat}\n"),
+                true,
+            ),
+            (
+                "開始後: 打鍵がある",
+                format!("{meta}\n{ime}\n{key}\n"),
+                true,
+            ),
+        ];
+        for (i, (label, body, expected)) in cases.into_iter().enumerate() {
+            let p = dir.join(format!("gse_case{i}.ndjson"));
             std::fs::write(&p, &body).unwrap();
             assert_eq!(
                 has_any_data_row(&p),

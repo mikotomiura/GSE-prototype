@@ -964,9 +964,20 @@ fn resolve_submit_bin() -> Result<PathBuf, String> {
     };
     let submit_bin = dir.join(bin_name);
     if !submit_bin.is_file() {
+        // ⚠️★★ **絶対パスを画面に出さない** (security-checker MEDIUM-1)。
+        //
+        //   このメッセージは `last_error` 経由でスタート画面の `<code>` に出るが、
+        //   ★ 画面の文言は「**次の内容を研究者にお伝えください**」であり、
+        //   **被験者にスクリーンショット共有を促している**。Windows のポータブル配布では
+        //   `C:\Users\<実名>\Downloads\...` になりうるので、
+        //   ⚠️ ★ **P012 と実名が同じ画像に並ぶ = 仮名化が解ける**。
+        //   ★ 診断に要る絶対パスは **ローカルのログにだけ**残す。
+        tracing::error!(
+            "gse-submit not found: {}",
+            redact_home_path(&submit_bin.to_string_lossy())
+        );
         return Err(format!(
-            "提出ツール ({}) が見つかりません。配布パッケージが壊れている可能性があります。研究者に連絡してください。",
-            submit_bin.display()
+            "提出ツール ({bin_name}) が見つかりません。配布パッケージが壊れている可能性があります。研究者に連絡してください。"
         ));
     }
     Ok(submit_bin)
@@ -1102,17 +1113,87 @@ static SUBMIT_IN_FLIGHT: AtomicU64 = AtomicU64::new(0);
 /// ★ 未送信件数の警告も (`!sending` gate により) 出なくなる = **沈黙が悪化する**。
 struct InFlightGuard;
 
+/// いま走っている収束器の**きっかけ**。0=無し / 1=起動時 / 2=ブロック終了後 / 3=承認後。
+///
+/// ⚠️★ 画面が「送信しています…」を出してよいかの判断に使う。★ **起動時のスキャンだけは
+/// 出さない**: 毎回走って平常時は何もしないので、出すと起動のたびに箱が点滅する。
+/// ⚠️ 逆に、それ以外 (ブロック終了後・承認後) は **`.age` を作る前から**出さないと、
+/// ★ 梱包中 (`unsent` がまだ 0) が無表示になる (code-reviewer MEDIUM)。
+static SUBMIT_IN_FLIGHT_REASON: AtomicU64 = AtomicU64::new(0);
+
+/// 収束器が走り始めた時刻 (epoch ms)。0 = 走っていない。
+///
+/// ⚠️★ 「数秒かかります」は嘘になりうる: 送信の timeout は **180 秒/件**で、
+/// 3 件なら最悪 9 分かかる。★ その間 `!sending` ゲートで
+/// **未送信カード (唯一の安全装置) が隠れる**ので、経過時間を画面へ渡して判断させる。
+static SUBMIT_IN_FLIGHT_SINCE_MS: AtomicU64 = AtomicU64::new(0);
+
+/// 収束器のきっかけ。★ 数値は DTO 経由でフロントへ渡る。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReconcileReason {
+    Startup = 1,
+    BlockEnd = 2,
+    Approval = 3,
+}
+
+impl ReconcileReason {
+    /// ログ用の名前 (従来の `reason` 文字列と同じ文言を保つ)。
+    fn label(self) -> &'static str {
+        match self {
+            ReconcileReason::Startup => "at startup",
+            ReconcileReason::BlockEnd => "after block",
+            ReconcileReason::Approval => "after approval",
+        }
+    }
+}
+
 impl InFlightGuard {
-    fn new() -> Self {
-        SUBMIT_IN_FLIGHT.fetch_add(1, Ordering::Relaxed);
+    fn new(reason: ReconcileReason) -> Self {
+        // ⚠️★ `Release` にする。⚠️ `Relaxed` だと `last_sent_ms` の `Release` ストアと
+        //   同期せず、★ aarch64 (macOS ビルド) で「`sending=false` なのに `last_sent_ms=0`」を
+        //   観測する並びがありうる = 送信成功直後の 1 ポーリング分だけレシートが出ない
+        //   (code-reviewer LOW)。
+        let prev = SUBMIT_IN_FLIGHT.fetch_add(1, Ordering::Release);
+        SUBMIT_IN_FLIGHT_REASON.store(reason as u64, Ordering::Release);
+        if prev == 0 {
+            SUBMIT_IN_FLIGHT_SINCE_MS.store(now_epoch_ms(), Ordering::Release);
+        }
         Self
     }
 }
 
 impl Drop for InFlightGuard {
     fn drop(&mut self) {
-        SUBMIT_IN_FLIGHT.fetch_sub(1, Ordering::Relaxed);
+        // `fetch_sub` は減算 **前**の値を返す。1 なら自分が最後の 1 本である。
+        if SUBMIT_IN_FLIGHT.fetch_sub(1, Ordering::Release) == 1 {
+            SUBMIT_IN_FLIGHT_REASON.store(0, Ordering::Release);
+            SUBMIT_IN_FLIGHT_SINCE_MS.store(0, Ordering::Release);
+        }
     }
+}
+
+/// いまの epoch ms。
+///
+/// ⚠️★ 失敗時に **`0` を返さない**。`0` は `last_sent_ms` で
+/// 「まだ 1 件も送っていない」を表すセンチネルなので、★ 衝突すると
+/// **実際に送れてもレシートが永久に出ない** (システム時計が 1970 以前の端末・
+/// code-reviewer LOW)。
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(1)
+}
+
+/// ★ レシートの根拠を捨てる (「前の回のレシート」が次の回に残らないようにする)。
+///
+/// ⚠️★★ これを呼ばないと、`last_sent_ms` は**プロセス全体で 1 個**しかないため:
+/// - ブロック終了直後の梱包前に **前の回のレシート**が数秒出る (code-reviewer HIGH-2)
+/// - 参加者 ID を打ち直すと、別 ID の `.age` が orphan 化して `unsent=0` になり、
+///   ★ **偽レシート**が出続ける (security-checker MEDIUM-2)
+fn reset_sent_receipt() {
+    SUBMIT_LAST_SENT_MS.store(0, Ordering::Release);
+    SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Release);
 }
 
 /// スタート画面へ返す提出状態 (G1 モードのときだけフロントが読む)。
@@ -1132,6 +1213,17 @@ struct SubmissionStatusDto {
     last_sent_ms: Option<u64>,
     /// ★ そのとき送れた本数。`last_sent_ms` が `null` なら `0`。
     last_sent_count: usize,
+    /// ★★ **件数を本当に数えられたか。**
+    ///
+    /// ⚠️ ホーム or 参加者 ID が解決できないと `unsent` / `awaiting_approval` は
+    /// 「実際に 0 件」ではなく **「数えられなかった」** の意味で 0 になる。
+    /// ★ ここを見ずに「✅ 送信を待っている記録はありません」を出すと、
+    /// `.age` が実在するのに **fail-open で緑を出す** (code-reviewer MEDIUM)。
+    counted: bool,
+    /// いま走っている収束器のきっかけ (0=無し / 1=起動時 / 2=ブロック終了後 / 3=承認後)。
+    sending_reason: u64,
+    /// 収束器が走り始めた時刻 (epoch ms)。`null` = 走っていない。
+    sending_since_ms: Option<u64>,
 }
 
 /// 未送信件数と直近のエラーを返す。★ 0 件・エラー無しなら UI は何も出さない。
@@ -1140,15 +1232,17 @@ struct SubmissionStatusDto {
 /// 別々の規則にすると、画面の件数と実際に送られる対象が drift する。
 #[tauri::command]
 fn get_submission_status() -> SubmissionStatusDto {
-    let (unsent, awaiting_approval) = match (
+    // ⚠️★ 「0 件だった」と「数えられなかった」を **区別して**返す (`counted`)。
+    let (unsent, awaiting_approval, counted) = match (
         crate::submission::default_submission_dir(),
         crate::submission::read_g1_participant_id(),
     ) {
         (Some(dir), Some(id)) => (
             crate::submission::unsent_count(&dir, &id),
             crate::submission::awaiting_approval_count(&dir, &id),
+            true,
         ),
-        _ => (0, 0),
+        _ => (0, 0, false),
     };
     let last_error = SUBMIT_LAST_ERROR
         .lock()
@@ -1163,9 +1257,16 @@ fn get_submission_status() -> SubmissionStatusDto {
         last_error,
         upload_disabled: SUBMIT_UPLOAD_DISABLED.load(Ordering::Relaxed),
         awaiting_approval,
-        sending: SUBMIT_IN_FLIGHT.load(Ordering::Relaxed) > 0,
+        // ⚠️★ `Acquire` にする (`InFlightGuard` の `Release` と対にする)。
+        sending: SUBMIT_IN_FLIGHT.load(Ordering::Acquire) > 0,
         last_sent_ms,
-        last_sent_count: SUBMIT_LAST_SENT_COUNT.load(Ordering::Relaxed) as usize,
+        last_sent_count: SUBMIT_LAST_SENT_COUNT.load(Ordering::Acquire) as usize,
+        counted,
+        sending_reason: SUBMIT_IN_FLIGHT_REASON.load(Ordering::Acquire),
+        sending_since_ms: match SUBMIT_IN_FLIGHT_SINCE_MS.load(Ordering::Acquire) {
+            0 => None,
+            ms => Some(ms),
+        },
     }
 }
 
@@ -1182,7 +1283,7 @@ fn approve_pending_submissions(app: tauri::AppHandle) -> Result<usize, String> {
     let n = crate::submission::approve_pending(&dir, &id)?;
     tracing::info!("G1: participant approved {} submission(s)", n);
     // ★ 確認直後に送る。⚠️ 失敗しても `.age` と確認の印は残るので、次の機会に送られる。
-    spawn_reconcile(app, "after approval");
+    spawn_reconcile(app, ReconcileReason::Approval);
     Ok(n)
 }
 
@@ -1195,7 +1296,19 @@ fn get_g1_participant_id() -> Option<String> {
 /// G1 参加者 ID を登録する。⚠️ ★ 妥当でない ID は **書かずに** `Err` を返す (fail-closed)。
 #[tauri::command]
 fn set_g1_participant_id(id: String) -> Result<(), String> {
-    crate::submission::write_g1_participant_id(&id)
+    // ⚠️★★ **ID が変わったらレシートの根拠を捨てる** (security-checker MEDIUM-2)。
+    //
+    //   `last_sent_ms` はプロセス全体で 1 個しか無いのに、`unsent` /
+    //   `awaiting_approval` は **現在の ID 限定**で数える。被験者が `P012` → `P013`
+    //   (あるいは `p012`) と打ち直すと既存の `.age` が全部 orphan 化して 0 件になり、
+    //   ★ **前の ID で送った実績のレシートが「この回の記録を送信しました」として出続ける**。
+    //   → 未送信が恒久的に届かないまま、被験者にも研究者にも警告が出ない。
+    let changed = crate::submission::read_g1_participant_id().as_deref() != Some(id.trim());
+    crate::submission::write_g1_participant_id(&id)?;
+    if changed {
+        reset_sent_receipt();
+    }
+    Ok(())
 }
 
 /// 収束器 (`gse-submit --reconcile`) を **別スレッドで** 1 回起こす。
@@ -1203,16 +1316,36 @@ fn set_g1_participant_id(id: String) -> Result<(), String> {
 /// ★ `reason` はログ用のきっかけ名 (`"at startup"` / `"after block"`)。
 /// ⚠️ ★ **G1 モードでなければ何もしない** (通常運用の挙動を 1 バイトも変えない)。
 /// ★ 何度呼んでも安全 (収束器はべき等) なので、二重起動を気にしなくてよい。
-fn spawn_reconcile(app: tauri::AppHandle, reason: &'static str) {
+fn spawn_reconcile(app: tauri::AppHandle, reason: ReconcileReason) {
     if g1_mode().is_none() {
         return;
     }
+    spawn_reconcile_with_guard(app, reason, InFlightGuard::new(reason));
+}
+
+/// ★★ 番兵を **呼び出し側で作ってから**渡す版。
+///
+/// ⚠️★★ ブロック終了経路がこれを使う理由 (code-reviewer HIGH-2):
+///   `emit("g1-block-ended")` でフロントはスタート画面へ戻り、**即座に**状態を読みに来る。
+///   ところが `sending: true` が立つのは `block_end_ack` を待った**後**なので、その窓では
+///   `awaiting_approval=0 / unsent=0 / sending=false / last_sent_ms=前の回` になり、
+///   ★ **前の回のレシート**が最大 3 秒 (ack タイムアウト時 8 秒) 残る。2 ブロック目以降**毎回**。
+///   → ★ 番兵を **emit より前**で作れば、スタート画面が出た瞬間から `sending: true` になり、
+///     レシートも全クリアカードも**構造的に**出せなくなる。
+fn spawn_reconcile_with_guard(
+    app: tauri::AppHandle,
+    reason: ReconcileReason,
+    in_flight: InFlightGuard,
+) {
+    if g1_mode().is_none() {
+        return;
+    }
+    let reason = reason.label();
     // ⚠️★★ **スレッドの外で**数え始める。中で数えると、被験者が「送信する」を押して
     //   確認カードが消えてから、スレッドが起きて `sending` が立つまでの間に
     //   ★ **無表示の窓**ができる (今回潰そうとしている沈黙そのもの)。
     //   `approve_pending_submissions` はこの関数を呼んでから返るので、
     //   ★ フロントが押下直後に読む状態には既に `sending: true` が乗っている。
-    let in_flight = InFlightGuard::new();
     thread::spawn(move || {
         // ★ スレッドが終わるとき (下の early return も含め) に必ず戻す。
         let _in_flight = in_flight;
@@ -1300,12 +1433,8 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
     //   部分成功を捨てない (`.sent` は成功した本にだけ置かれている)。
     record_sent_if_any(
         summary.as_deref().and_then(|s| summary_count(s, "sent")),
-        || {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0)
-        },
+        // ⚠️★ `0` は「まだ 1 件も送っていない」のセンチネルなので返さない (`now_epoch_ms`)。
+        now_epoch_ms,
     );
     if output.status.success() {
         return Ok(Some(summary.unwrap_or_else(|| "done".to_string())));
@@ -2624,7 +2753,7 @@ pub fn run() {
                 //   次のブロック終了で拾われるので、ここが失敗しても正しさは壊れない。
                 //   ★ この時点ではまだブロックが始まっていない (被験者はスタート画面) ので
                 //   「ブロック中に走らせない」を満たす。
-                spawn_reconcile(app.handle().clone(), "at startup");
+                spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
             }
 
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。
@@ -2701,11 +2830,9 @@ pub fn run() {
 
                         // ★ 生 tick の「変化」だけを見る (絶対時刻へ変換しない = ラップアラウンド安全)。
                         let tick = liveness::last_system_input_tick();
-                        let system_input_seen = match (prev_tick, tick) {
-                            (Some(a), Some(b)) => a != b,
-                            // 判断材料が無い OS (macOS 等) は安全側に倒す = starvation を進めない。
-                            _ => false,
-                        };
+                        // ⚠️★ 比較規則は **OS ごとに違う**ので `liveness` 側に置いてある
+                        //   (Windows は等値・macOS は揺れの許容幅つき)。ここで `!=` と書かない。
+                        let system_input_seen = liveness::system_input_seen(prev_tick, tick);
                         prev_tick = tick;
 
                         let callbacks = crate::input::hook::CALLBACK_COUNT.load(Ordering::Relaxed);
@@ -2883,6 +3010,15 @@ pub fn run() {
                             }
                         };
 
+                        // ⚠️★★ 4) の **前**に番兵を立てる (code-reviewer HIGH-2)。
+                        //   スタート画面が出た瞬間から `sending: true` にしないと、
+                        //   ★ 梱包が始まるまでの数秒、**前の回のレシート**
+                        //   (1 ブロック目は「✅ 送信を待っている記録はありません」) が出る。
+                        let in_flight = InFlightGuard::new(ReconcileReason::BlockEnd);
+                        // ★★ 併せて **前の回のレシートを捨てる**。`last_sent_ms` はプロセスに
+                        //   1 個しか無いので、捨てないと「この回」が前の回を指しうる。
+                        reset_sent_receipt();
+
                         // 4) 画面へ通知 (スタート画面へ戻す)。★ 「終わった」だけを伝える。
                         let _ = app_handle.emit("g1-block-ended", ());
 
@@ -2907,7 +3043,13 @@ pub fn run() {
                         }
                         // ⚠️ ★ ここは **ブロックとブロックの間** である (被験者はスタート画面)。
                         //    `design.md` の「ブロック中に走らせない」を満たす。
-                        spawn_reconcile(app_handle.clone(), "after block");
+                        // ★ 番兵は 4) の前で作ってある。ここでは**渡すだけ**にして、
+                        //   「スタート画面が出てから送信中が立つまで」の窓を無くす。
+                        spawn_reconcile_with_guard(
+                            app_handle.clone(),
+                            ReconcileReason::BlockEnd,
+                            in_flight,
+                        );
                     }
                 });
             }
@@ -3418,8 +3560,9 @@ mod submit_command_tests {
 #[cfg(test)]
 mod submission_receipt_tests {
     use super::{
-        record_sent_if_any, summary_count, InFlightGuard, SUBMIT_IN_FLIGHT, SUBMIT_LAST_SENT_COUNT,
-        SUBMIT_LAST_SENT_MS,
+        now_epoch_ms, record_sent_if_any, reset_sent_receipt, summary_count, InFlightGuard,
+        ReconcileReason, SUBMIT_IN_FLIGHT, SUBMIT_IN_FLIGHT_REASON, SUBMIT_IN_FLIGHT_SINCE_MS,
+        SUBMIT_LAST_SENT_COUNT, SUBMIT_LAST_SENT_MS,
     };
     use std::sync::atomic::Ordering;
 
@@ -3482,13 +3625,22 @@ mod submission_receipt_tests {
         assert_eq!(summary_count(line, "nope"), None);
     }
 
+    /// ⚠️★★ **`SUBMIT_IN_FLIGHT` はプロセス共有のグローバルである。**
+    /// `cargo test` は既定で並列に走るので、これを触るテストが 2 本以上あると
+    /// ★ 互いのカウンタを踏み合って **単独では緑・全体では赤**になる
+    /// (`packaging.rs` の一時ディレクトリ衝突と同じ形)。→ ここで直列化する。
+    static IN_FLIGHT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// ⚠️★ 番兵が panic でも in-flight を戻すこと。
     /// 戻し忘れると画面が「送信しています…」のまま**永久に固まる**。
     #[test]
     fn in_flight_returns_to_zero_even_on_panic() {
+        let _lock = IN_FLIGHT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
         let r = std::panic::catch_unwind(|| {
-            let _g = InFlightGuard::new();
+            let _g = InFlightGuard::new(ReconcileReason::Approval);
             assert_eq!(SUBMIT_IN_FLIGHT.load(Ordering::Relaxed), 1);
             panic!("収束器が落ちた");
         });
@@ -3498,5 +3650,63 @@ mod submission_receipt_tests {
             0,
             "★ 送信中のまま固まる"
         );
+        // ⚠️★ きっかけと開始時刻も戻ること。戻し忘れると画面が
+        //   「起動時のスキャンではない」と読み続け、★ 送信中カードが出たままになる。
+        assert_eq!(
+            SUBMIT_IN_FLIGHT_REASON.load(Ordering::Acquire),
+            0,
+            "★ きっかけが残っている"
+        );
+        assert_eq!(
+            SUBMIT_IN_FLIGHT_SINCE_MS.load(Ordering::Acquire),
+            0,
+            "★ 開始時刻が残っている"
+        );
+    }
+
+    /// ⚠️★★ **入れ子でも、最後の 1 本が抜けるまできっかけを消さないこと。**
+    ///
+    /// ブロック終了経路は `emit` の前で番兵を立て、収束器スレッドへ渡す。
+    /// ★ その最中に承認経路がもう 1 本立つと番兵が 2 本になる。
+    /// ⚠️ 内側が落ちた時点で 0 に戻すと、**まだ送っているのに送信中カードが消える**。
+    #[test]
+    fn nested_guards_keep_the_reason_until_the_last_one_drops() {
+        let _lock = IN_FLIGHT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
+        SUBMIT_IN_FLIGHT_REASON.store(0, Ordering::Relaxed);
+        let outer = InFlightGuard::new(ReconcileReason::BlockEnd);
+        {
+            let _inner = InFlightGuard::new(ReconcileReason::Approval);
+            assert_eq!(SUBMIT_IN_FLIGHT.load(Ordering::Acquire), 2);
+        }
+        assert_eq!(SUBMIT_IN_FLIGHT.load(Ordering::Acquire), 1);
+        assert_ne!(
+            SUBMIT_IN_FLIGHT_REASON.load(Ordering::Acquire),
+            0,
+            "★ 内側が抜けただけできっかけを消した = 送信中カードが早く消える"
+        );
+        drop(outer);
+        assert_eq!(SUBMIT_IN_FLIGHT_REASON.load(Ordering::Acquire), 0);
+        assert_eq!(SUBMIT_IN_FLIGHT_SINCE_MS.load(Ordering::Acquire), 0);
+    }
+
+    /// ⚠️★ `now_epoch_ms()` は **`0` を返さない**。`0` は `last_sent_ms` の
+    /// 「まだ 1 件も送っていない」センチネルなので、衝突すると
+    /// ★ 実際に送れてもレシートが永久に出ない。
+    #[test]
+    fn now_epoch_ms_never_returns_the_sentinel() {
+        assert_ne!(now_epoch_ms(), 0);
+    }
+
+    /// ★ レシートの根拠を捨てる操作が、両方の値を落とすこと。
+    #[test]
+    fn reset_sent_receipt_clears_both_values() {
+        SUBMIT_LAST_SENT_MS.store(1234, Ordering::Relaxed);
+        SUBMIT_LAST_SENT_COUNT.store(7, Ordering::Relaxed);
+        reset_sent_receipt();
+        assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 0);
+        assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Acquire), 0);
     }
 }
