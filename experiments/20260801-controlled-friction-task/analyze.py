@@ -46,7 +46,7 @@ import sys
 #   （E-6: §2.5 の分岐 / E-7: §3.4 の見る順序）、★ **この定数自体も第 4 版で 3 のまま
 #   取り残されていた**（第 5 版で発見）。番号がずれたら selftest が赤になるようにして、
 #   人が気づくかどうかに依存させない。
-PREREG_REVISION = 14
+PREREG_REVISION = 15
 
 LAMBDA = 1.0                     # §3.1 L2 罰則（z 標準化後）・事前固定・チューニングしない
 SILENCE_MS = 2000                # §3.2 silence = IKI >= 2000ms（現行 F5 の閾値に揃える）
@@ -101,6 +101,118 @@ def prereg_revision_from_doc(path: pathlib.Path) -> int | None:
             v = int(m.group(1))
             best = v if best is None else max(best, v)
     return best
+
+
+ROSTER_KINDS = ("confirmatory", "pilot", "shakedown")
+
+
+def check_subject_matches_filename(stem: str, spec: dict) -> str | None:
+    """割付ファイル名と中身の `subject` が一致するかを見る。→ エラー文言 or `None`。
+
+    ⚠️★★ **なぜ要るか**（`/cross-review` 2026-08-10・Claude と Codex が一致して指摘）:
+    `sample_roster` は **ファイル名**（`p.stem`）で被験者を許可するのに、
+    結果に刻まれるのは **`spec["subject"]`** である。
+    ★ 両者がずれると **roster が許可していない被験者の結果が確証解析に載る**。
+    ⚠️ `validate_blocks.py:590` は同じ検査を持っていたが、`analyze.py` には無かった——
+    ★ 「誰が確証標本かを実装で強制する」という本改訂の目的そのものに穴が開いていた。
+    """
+    subj = spec.get("subject")
+    if subj == stem:
+        return None
+    return (f"[NG] blocks/{stem}.json: ファイル名と subject が一致しない (subject={subj!r})。"
+            f"★ sample_roster はファイル名で許可するので、中身とずれると"
+            f"**許可していない被験者の結果が確証解析に載る**")
+
+
+def resolve_sample(roster: dict | None, n_subjects, subjects_present: list[str]
+                   ) -> tuple[list[str], list[dict], list[str]]:
+    """★ **誰を確証標本として解析するか**を決める（`§2.4` / `§2.8`）。
+
+    戻り値 `(解析する被験者, 外した被験者と理由, エラー文言)`。
+    エラーが 1 件でもあれば呼び出し側は**止める**。
+
+    ⚠️★★ **なぜ要るか（2026-08-10 に実測）**: それまで `analyze.py` は割付ファイルの
+    `confirmatory` フラグを**一度も見ていなかった**うえ、glob `P*.json` は
+    `PILOT-mac.json` / `PILOT-win.json` まで拾っていた。
+    ★ パイロットが確証解析から外れていたのは **「dataset に NDJSON を置いていないから」**
+    であって、**コードが保証していたわけではない**。
+    → 「誰が確証標本か」は主張そのものを決めるので、**実行時に強制する**。
+
+    ★ **単一の正は `config.json` の `sample_roster`**（git 管理下）。
+    ⚠️ `blocks/*.json` は `blocks/.gitignore` が `*.json` を除外しており、
+    **研究者の 1 台にしか無く、レビューも履歴も残らない**。だからそちらには置かない。
+    ⚠️ ★ 両方に書いて突き合わせる案も却下した——本日の教訓
+    「**鏡どうしを比べても、両方が同じだけずれていれば緑になる**」（`notes.md §10-7`）。
+
+    ★ **純関数**（ファイルも I/O も触らない）。境界をテストで直接固定できる。
+    """
+    errors: list[str] = []
+    excluded: list[dict] = []
+
+    # ⚠️★ 境界 1: キーが無い。「古い config なら全員」と読むと**保護が黙って消える**。
+    if not isinstance(roster, dict):
+        return [], [], [
+            "[NG] config.json に sample_roster が無い。★ 誰が確証標本かを決められないので解析しない"
+            "（preregistration.md §2.4 / §2.8）。"
+            'sample_roster: {"confirmatory": [...], "pilot": [...], "shakedown": [...]} を書く']
+
+    lists: dict[str, list[str]] = {}
+    for kind in ROSTER_KINDS:
+        v = roster.get(kind, [])
+        if not isinstance(v, list) or any(not isinstance(x, str) for x in v):
+            errors.append(f"[NG] sample_roster.{kind} が文字列のリストでない")
+            v = []
+        lists[kind] = v
+
+    # ⚠️★ 境界 6: 同じ被験者が 2 つのリストに居る。分類が曖昧なまま進まない。
+    seen: dict[str, str] = {}
+    for kind in ROSTER_KINDS:
+        for s in lists[kind]:
+            if s in seen:
+                where = (f"{seen[s]} の中に 2 回" if seen[s] == kind
+                         else f"{seen[s]} と {kind} の両方に")
+                errors.append(f"[NG] sample_roster: {s} が {where}ある。"
+                              f"★ どちらの標本かが決まらない"
+                              f"（★ 同一リスト内の重複は len(confirmatory) を水増しし、"
+                              f"n の判定を誤らせる）")
+            else:
+                seen[s] = kind
+
+    conf = lists["confirmatory"]
+    # ⚠️★ 境界 2: 空を「全員」と読まない（roster 導入前の挙動に黙って戻さない）。
+    if not conf:
+        errors.append("[NG] sample_roster.confirmatory が空。★ 確証標本が 0 名では解析できない")
+
+    present = set(subjects_present)
+    # ⚠️★ 境界 3: roster に居るのに割付ファイルが無い ＝ **欠員**。黙って n-1 で解析しない。
+    missing = [s for s in conf if s not in present]
+    if missing:
+        errors.append(f"[NG] 確証標本に欠員がある（割付ファイルが無い）: {missing}。"
+                      f"★ 収集が完了するまで解析結果を見ない（§2.4-4）")
+
+    # ⚠️★★ 境界 5: 収集済みが n に達していない。**§2.4-4（optional stopping の禁止）の機械化**。
+    #   ★ これまで「凍結した n 分が揃うまで見ない」は努力目標だった
+    #     （`§5.3` の封印が `§3.4` を機械化したのと同じ形をここにも入れる）。
+    if isinstance(n_subjects, int) and not isinstance(n_subjects, bool):
+        if len(conf) < n_subjects:
+            errors.append(
+                f"[NG] 確証標本が {len(conf)} 名で、凍結した n={n_subjects} に達していない。"
+                f"★ 揃うまで解析結果を見ない（§2.4-4 optional stopping の禁止）")
+    else:
+        errors.append(f"[NG] config.json の design.n_subjects が数値で凍結されていない "
+                      f"(実際: {n_subjects!r})。★ 確証データより前に凍結する（§2.4-2）")
+
+    # ⚠️★ 境界 4: roster のどこにも無い割付ファイル。**報告して外す**（黙って落とさない・D-5）。
+    #   ★ 止めはしない: 将来の被験者の割付を先に置く運用（protocol.md §6）を壊さないため。
+    for s in sorted(present):
+        kind = seen.get(s)
+        if kind is None:
+            excluded.append({"subject": s, "reason": "not_in_roster"})
+        elif kind != "confirmatory":
+            excluded.append({"subject": s, "reason": kind})
+
+    analysed = [s for s in conf if s in present]
+    return analysed, excluded, errors
 
 
 def session_starts(path: pathlib.Path) -> tuple[int, list[int]]:
@@ -943,14 +1055,43 @@ def main() -> int:
         print("           → 各 block に \"file\"（NDJSON 名）と \"produced_chars\" を書き足す")
         return 1
 
+    # ⚠️★★ 誰が確証標本かを **config.json の sample_roster で強制する**（§2.4 / §2.8）。
+    #   ★ ここが無かったので、パイロットが確証解析から外れていたのは
+    #     「dataset に NDJSON が無いから」であって**コードの保証ではなかった**（2026-08-10 実測）。
+    cfg_all = json.loads((here / "config.json").read_text(encoding="utf-8"))
+    # ⚠️★★ roster は**ファイル名**で許可するので、中身の `subject` とずれていたら先に止める
+    #   （`/cross-review` 2026-08-10・両者一致 HIGH）。★ ずれたまま進むと
+    #   **roster が許可していない被験者の結果が確証解析に載る**。
+    specs_loaded = []
+    for p in specs:
+        spec_ = json.loads(p.read_text(encoding="utf-8"))
+        msg = check_subject_matches_filename(p.stem, spec_)
+        if msg is not None:
+            print(msg)
+            return 1
+        specs_loaded.append((p, spec_))
+    analysed, excluded, roster_errors = resolve_sample(
+        cfg_all.get("sample_roster"),
+        cfg_all.get("design", {}).get("n_subjects"),
+        [p.stem for p in specs])
+    if roster_errors:
+        for m in roster_errors:
+            print(m)
+        print("     ★ 単一の正は config.json の sample_roster（blocks/*.json ではない）。")
+        return 1
+    # ⚠️ 外した被験者は**黙って消さない**（decisions D-5）。理由つきで出し、結果にも刻む。
+    for e in excluded:
+        print(f"[warn] {e['subject']} を確証解析から外した（sample_roster: {e['reason']}）")
+    keep = set(analysed)
+    specs_loaded = [(p, s) for p, s in specs_loaded if p.stem in keep]
+
     per_subject = []
     mchecks = {}
     # ★ 再開始のあったブロックを結果に刻む（§3.10・報告義務）。
     #   ⚠️ フラグ無しならここに到達する前に load_subject_blocks が止まるので、
     #   **中身が入るのは --last-session-on-restart を使ったときだけ**である。
     restarted_blocks: list[dict] = []
-    for s in specs:
-        spec = json.loads(s.read_text(encoding="utf-8"))
+    for _path, spec in specs_loaded:
         blocks = load_subject_blocks(spec, dataset,
                                      from_last_session=a.last_session_on_restart)
         for b in blocks:
@@ -997,6 +1138,14 @@ def main() -> int:
             "rule": "last session only (preregistration.md 3.10; frozen before any analysis run)",
             "flag_used": bool(a.last_session_on_restart),
             "blocks": restarted_blocks,
+        },
+        # ⚠️★★ 誰を確証標本として解析し、誰をなぜ外したかを**必ず刻む**（§2.4 / §2.8）。
+        #   ★ 「絞る」実装は必ず「黙って落とす」危険を連れてくるので、結果から追えるようにする。
+        "sample_roster_applied": {
+            "source": "config.json sample_roster (single source of truth; blocks/*.json is NOT consulted)",
+            "n_subjects_frozen": cfg_all.get("design", {}).get("n_subjects"),
+            "analysed": analysed,
+            "excluded": excluded,
         },
         "reading_order_3_4": ["1_manipulation_check", "2_positive_control", "3_feature_sets"],
         "1_manipulation_check": mchecks or {"supplied": False},
@@ -1395,6 +1544,74 @@ def selftest() -> int:
         except SystemExit as e:
             if "起点" not in str(e):
                 fails.append(f"止まる理由が「起点が決められない」だと分からない: {e}")
+
+    # ⚠️★★ 9) 確証標本の roster（`§2.4` / `§2.8`・2026-08-10 追加）
+    #    ★ **誰が確証標本か**をコードで強制する。それまで `analyze.py` は
+    #      `confirmatory` フラグを**一度も見ておらず**、glob `P*.json` は `PILOT-*` まで拾っていた。
+    #      ⚠️ パイロットが確証解析から外れていたのは「dataset に NDJSON が無いから」であって
+    #      **コードの保証ではなかった**（実測で確認）。
+    #    ★ 純関数なので、境界をファイル無しで直接固定できる。
+    ROSTER = {"confirmatory": ["P011", "P012", "P013"],
+              "pilot": ["PILOT-mac", "PILOT-win"],
+              "shakedown": ["P010"]}
+    PRESENT = ["P010", "P011", "P012", "P013", "PILOT-mac", "PILOT-win"]
+
+    # ★ 正常系: confirmatory の 3 名だけが解析に入る
+    got, exc, errs = resolve_sample(ROSTER, 3, PRESENT)
+    if errs:
+        fails.append(f"★ 正常な roster でエラーになった: {errs[0]}")
+    if got != ["P011", "P012", "P013"]:
+        fails.append(f"★ confirmatory だけを解析対象にしていない: {got}")
+    # ⚠️ 外した人は**黙って消さず**、理由つきで返す（decisions D-5）
+    by_subj = {e["subject"]: e["reason"] for e in exc}
+    if by_subj.get("P010") != "shakedown" or by_subj.get("PILOT-mac") != "pilot":
+        fails.append(f"★ 外した被験者と理由を返していない: {exc}")
+
+    # ⚠️★ 境界 1: `sample_roster` キー自体が無い → 止まる
+    #    （「古い config なら全員」と読むと保護が黙って消える）
+    if not resolve_sample(None, 3, PRESENT)[2]:
+        fails.append("★ sample_roster が無いのに通してはならない")
+    # ⚠️★ 境界 2: confirmatory が空 → 止まる（空を「全員」と読まない）
+    if not resolve_sample(dict(ROSTER, confirmatory=[]), 3, PRESENT)[2]:
+        fails.append("★ confirmatory が空なのに通してはならない")
+    # ⚠️★ 境界 3: roster に居るが割付ファイルが無い（欠員）→ 止まる
+    #    ★ 黙って n-1 で解析しない
+    if not resolve_sample(ROSTER, 3, ["P011", "P012", "PILOT-mac"])[2]:
+        fails.append("★ 確証標本に欠員があるのに通してはならない")
+    # ⚠️★ 境界 4: roster のどこにも無い割付ファイル → **報告して除外**（止めはしない）
+    got4, exc4, errs4 = resolve_sample(ROSTER, 3, PRESENT + ["P099"])
+    if errs4:
+        fails.append(f"★ 未登録の割付ファイルで止めてはならない（報告して外す）: {errs4[0]}")
+    if {e["subject"]: e["reason"] for e in exc4}.get("P099") != "not_in_roster":
+        fails.append("★ 未登録の割付ファイルを黙って落としている（報告すること・D-5）")
+    # ⚠️★ 境界 5: 収集済みが n に達していない → 止まる（§2.4-4 optional stopping の禁止）
+    if not resolve_sample(dict(ROSTER, confirmatory=["P011", "P012"]), 3, PRESENT)[2]:
+        fails.append("★★ n 未達で解析を通してはならない（§2.4-4 の機械化）")
+    # ⚠️★ 境界 6: 同じ被験者が 2 つのリストに居る → 止まる（分類が曖昧なまま進まない）
+    if not resolve_sample(dict(ROSTER, shakedown=["P010", "P011"]), 3, PRESENT)[2]:
+        fails.append("★ 被験者が 2 つのリストに重複しているのに通してはならない")
+    # ⚠️★ 境界 6b: **同じリスト内**の重複でも止まる（`len(conf)` を水増しさせない）。
+    #    ★ /cross-review 2026-08-10 で Codex が「現状エラーにならない」と述べたが、
+    #      実測では**エラーになった**（seen が同一 kind でも累積するため）。
+    #      ⚠️ ただし専用の検査が無かったので、ここで固定する。
+    e6b = resolve_sample(dict(ROSTER, confirmatory=["P011", "P011", "P012"]), 3, PRESENT)[2]
+    if not e6b:
+        fails.append("★ 同一リスト内の重複でも止めること（len(confirmatory) の水増しを防ぐ）")
+    elif "confirmatory と confirmatory" in e6b[0]:
+        fails.append("★ 同一リスト内の重複のメッセージが「confirmatory と confirmatory」になっている"
+                     "（読み手に何が起きたか伝わらない）")
+
+    # ⚠️★★ 割付ファイル名と中身の `subject` の一致（`/cross-review` 2026-08-10・両者一致 HIGH）
+    #    ★ roster は**ファイル名**で許可するのに、結果に刻まれるのは `spec["subject"]` である。
+    #      ⚠️ 両者がずれると、**許可していない被験者の結果が確証解析に載る**。
+    #      `validate_blocks.py:590` は同じ検査を持っているが、`analyze.py` には無かった。
+    if check_subject_matches_filename("P011", {"subject": "P011"}) is not None:
+        fails.append("★ 一致しているのにエラーにしてはならない")
+    if check_subject_matches_filename("P011", {"subject": "P099"}) is None:
+        fails.append("★★ ファイル名と subject がずれているのに通してはならない"
+                     "（roster が許可した ID と結果の ID が食い違う）")
+    if check_subject_matches_filename("P011", {}) is None:
+        fails.append("★ subject が無い割付ファイルを通してはならない")
 
     if fails:
         print("[NG] analyze.py selftest 失敗:")
