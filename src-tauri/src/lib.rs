@@ -3635,7 +3635,9 @@ mod submission_receipt_tests {
     /// 戻し忘れると画面が「送信しています…」のまま**永久に固まる**。
     #[test]
     fn in_flight_returns_to_zero_even_on_panic() {
-        let _lock = IN_FLIGHT_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let _lock = IN_FLIGHT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
         let r = std::panic::catch_unwind(|| {
             let _g = InFlightGuard::new(ReconcileReason::Approval);
@@ -3669,7 +3671,9 @@ mod submission_receipt_tests {
     /// ⚠️ 内側が落ちた時点で 0 に戻すと、**まだ送っているのに送信中カードが消える**。
     #[test]
     fn nested_guards_keep_the_reason_until_the_last_one_drops() {
-        let _lock = IN_FLIGHT_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let _lock = IN_FLIGHT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
         SUBMIT_IN_FLIGHT_REASON.store(0, Ordering::Relaxed);
         let outer = InFlightGuard::new(ReconcileReason::BlockEnd);

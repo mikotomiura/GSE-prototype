@@ -190,6 +190,7 @@ fn tick_indicates_input(a: u32, b: u32) -> bool {
 /// → ★ **絶対時刻 (`now - since`)** に直す。これは入力があったときにだけ動く。
 ///
 /// 揺れの吸収は `tick_indicates_input` (許容幅) が担当する。★ ここでは丸めない。
+#[cfg(target_os = "macos")]
 pub(crate) fn last_input_tick_ms(now_ms: u64, since_secs: f64) -> Option<u32> {
     // ⚠️ 異常値は「判断材料が無い」に倒す (`None` = starvation を進めない = 安全側)。
     if !since_secs.is_finite() || since_secs < 0.0 {
@@ -246,6 +247,21 @@ mod tests {
             log_after_ms: 30_000,
             down_after_ms: 120_000,
         }
+    }
+
+    /// ★ OS 非依存: 判断材料が片方でも無ければ、必ず `false` (= starvation を進めない)。
+    /// ⚠️ ここが `true` に倒れると、**判断材料が無い OS で誤警告**が出る。
+    #[test]
+    fn missing_tick_never_counts_as_input() {
+        assert!(!system_input_seen(None, Some(5)));
+        assert!(!system_input_seen(Some(5), None));
+        assert!(!system_input_seen(None, None));
+    }
+
+    /// ★ OS 非依存: **同じ値なら入力ではない**。どちらの規則でも成立する不変条件。
+    #[test]
+    fn an_unchanged_tick_is_never_input() {
+        assert!(!system_input_seen(Some(1_234_567), Some(1_234_567)));
     }
 
     /// 正常: フックが呼ばれ続けている → 何度回しても `Ok` で 0 のまま。
@@ -367,7 +383,48 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+// ---------------------------------------------------------------------------
+// ⚠️★★ **OS ごとに「対になるテスト」を置くこと。**
+//
+// `tick_indicates_input` は OS ごとに規則が違う。片方だけテストを書くと、
+// ★ もう片方は **CI で走るテストが減るだけ**になり、その OS の規則が未検証のまま残る。
+// 2026-08-10 に実際にその状態を作った (macOS 前提のテストを Windows でも走らせて赤 →
+// `cfg` で閉じたが、Windows 側の対を書き忘れた)。
+// ---------------------------------------------------------------------------
+
+/// Windows の規則: `GetLastInputInfo` の値は OS が持つものをそのまま読むので**揺れない**。
+/// → ★ 許容幅を入れてはならない (入れると、1 秒 tick で進む連続打鍵を取りこぼす)。
+#[cfg(all(test, target_os = "windows"))]
+mod windows_tick_tests {
+    use super::*;
+
+    /// ★ 1 でも動けば入力である (macOS のような許容幅を持たない)。
+    #[test]
+    fn any_change_is_input() {
+        assert!(system_input_seen(Some(1000), Some(1001)));
+        assert!(system_input_seen(Some(1000), Some(999)));
+    }
+
+    /// ⚠️ 32bit のラップアラウンドをまたいでも「変わった」と読めること
+    /// (等値比較なので巻き戻っても壊れない)。
+    #[test]
+    fn wraparound_is_still_a_change() {
+        assert!(system_input_seen(Some(u32::MAX), Some(0)));
+    }
+
+    /// ★ 同じ値なら入力ではない。
+    #[test]
+    fn an_unchanged_tick_is_not_input() {
+        assert!(!system_input_seen(Some(42), Some(42)));
+    }
+}
+
+// ⚠️★★ **`target_os = "macos"` で閉じる。** ここのテストは macOS の比較規則
+//   (許容幅つき) を前提にしており、Windows の規則 (等値比較) では成立しない。
+//   ★ 2026-08-10 に閉じ忘れ、**手元 (macOS) では緑・Windows CI で赤**になった
+//   (memory `windows-only-code-needs-ci` の裏返し: 手元で走るテストが
+//   他方の OS でも走ることを忘れる形)。
+#[cfg(all(test, target_os = "macos"))]
 mod macos_tick_tests {
     use super::*;
 
@@ -417,14 +474,6 @@ mod macos_tick_tests {
             }
             prev = tick;
         }
-    }
-
-    /// 判断材料が無い側は必ず `false` (= starvation を進めない)。
-    #[test]
-    fn missing_tick_never_counts_as_input() {
-        assert!(!system_input_seen(None, Some(5)));
-        assert!(!system_input_seen(Some(5), None));
-        assert!(!system_input_seen(None, None));
     }
 
     /// ⚠️ 異常値は `None` に倒す。★ 進めるより凍結するほうが安全である。

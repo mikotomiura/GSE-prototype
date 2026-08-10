@@ -119,9 +119,14 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 
 ## CI / 運用上の注意
 
-- CI は GitHub Actions (`.github/workflows/ci.yml`) で構成済みだが、無料枠 (3000h) 超過のため
-  現状クラウド CI は利用不可。**ローカル検証で代替** (`cargo test --workspace` /
-  `gse-replay --snapshot` / `emit_schema` diff を手元実行)。
+- CI は GitHub Actions (`.github/workflows/ci.yml`) で稼働中。⚠️ ★ 2026-08-10 に
+  「無料枠 (3000h) 超過でクラウド CI 利用不可」という**古い記述を訂正**した
+  (PR #94 で `check` (windows / macOS) / `frontend-check` の実行を確認済み)。
+- ⚠️★★ **手元の検証は CI の代替にならない。** macOS では `hook_windows.rs` が 1 行も
+  コンパイルされず、逆に `#[cfg]` を付けないテストは**相手側の OS でも走る**
+  (2026-08-10 に macOS 前提のテストが Windows CI で赤になった)。
+  → OS ごとに規則が違うロジックは **両 OS に対のテスト**を置く
+  (`docs/development-guidelines.md` §3)。
 - Hook はすべて bash 前提。Windows では **git-bash 必須** (PowerShell では動かない)。
 
 ## 詳細ドキュメント (リンクハブ)

@@ -153,6 +153,31 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
 - **TCC 権限テスト**: OS システムダイアログのため自動化不可。手動テスト手順を `.steering/` に記録
 - **macOS フックの実機テスト**: `cargo tauri dev` でアプリを起動し、Dashboard の診断パネル（hook_active, callback_count, consecutive_tap_failures, using_accessibility_fallback）で動作確認
 
+### ⚠️★★ OS ごとに規則が違うロジックは、**両 OS に対のテストを置く**
+
+`cargo test --workspace` は **CI の matrix で Windows と macOS の両方**で走る。したがって
+`#[cfg]` を付けないテストは **両 OS で実行される**。ここで 2 通りの失敗がある:
+
+1. **片方の OS の規則を、両 OS で走らせてしまう**
+   → 手元 (macOS) では緑、⚠️ **Windows CI で赤**。
+   ★ 2026-08-10 に実際に出した (`liveness::macos_tick_tests` が macOS の許容幅を前提に
+   していたのに `cfg` で閉じておらず、Windows の等値比較で落ちた)。
+2. ★★ **`cfg` で閉じて満足してしまう**
+   → その OS では走らなくなるだけで、⚠️ **もう片方の規則は未検証のまま残る**。
+   「CI が緑」は「両方の規則を確かめた」を意味しない。
+
+→ **規約**: OS ごとに実装が分岐する関数を単体テストするときは、
+`#[cfg(all(test, target_os = "windows"))]` と `#[cfg(all(test, target_os = "macos"))]` の
+**両方**にモジュールを置き、★ **それぞれの OS の規則を肯定形で固定する**。
+片方にしか書けない場合は、⚠️ **書けない理由をコメントに残す**
+(例: TCC ダイアログのように自動化できない)。
+
+現状の実例は `input/liveness.rs` の `tick_indicates_input`
+(Windows = 等値比較 / macOS = 250 ms の許容幅) を参照。
+
+⚠️ ★ OS API を直接呼ぶ関数 (`wall_server::add_firewall_rule` 等) はこの規約の対象外である
+(純関数ではないので単体テストの形にならない)。実機手動確認を `.steering/` に残すこと。
+
 ### CI/CD パイプライン
 
 GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `feature/*`)・`pull_request` (main)・`v*` タグで起動する:
@@ -162,7 +187,10 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
 - **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Windows は **portable exe** (`--no-bundle`)、macOS は **DMG** をアーティファクト化 (macOS は entitlements 付き再署名 ＋ 研究者専用 CLI の strip)
 - **`release` ジョブ**: 両ビルド成功後に GitHub Release を作成。★ **公開するのは 5 アセットだけ** — 被験者向け `gse-next.exe` / `gse-submit.exe` / `*.dmg` と、研究者専用 `gse-unpack(.exe)`。⚠️ NSIS インストーラと `gse-package` は **Phase1 で使われなかったので配らない** (2026-08-03)
 
-> **運用上の注意**: GitHub Actions の無料枠 (3000 時間) を超過したため、現状はクラウド CI が利用できず、**ローカル検証で代替**している (`cargo test --workspace` / `gse-replay --snapshot` / `emit_schema` diff を手元で実行)。TCC 権限テストは元々自動化不可で実機手動検証。
+> **運用上の注意**: ⚠️ ★ **クラウド CI は動いている** (2026-08-10 に PR #94 で `check` (windows / macOS) と `frontend-check` の実行を確認。リリースビルドも v0.1.25 で success)。
+> 過去に無料枠超過で run が数秒で落ちた時期があり、その頃の記述が「CI 利用不可」のまま各所に残っていたので訂正する。
+> ★ **手元の検証は CI の代替にならない**: macOS では `hook_windows.rs` が 1 行もコンパイルされず、逆に OS 別テストは相手側の OS でも走る (上節)。**両方を回すこと。**
+> TCC 権限テストは元々自動化不可で実機手動検証。
 
 ## 4. レビュー基準
 
