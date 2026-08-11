@@ -32,6 +32,16 @@
   変更する必要が生じたとき (ドリフトが実際に起きた/起きかけたとき)、MEDIUM-2 の共通化を
   別タスクとして実施することを検討する。
 
+**補足 (2026-08-12, /cross-review 結果)**: Codex による独立レビューでも新規の論理的欠陥は
+指摘されなかった。Codex が挙げた4点 (pubkey gate の形式検証の弱さ / fetch_xor でも
+hook↔polling スレッド間競合は残る / 統合的な状態遷移テストの不在 / Windows CI での
+テスト実行可否) はいずれも、本 decisions.md の判断3・判断4・design.md のテスト戦略で
+既にスコープ外と明記済みか、diff-only レビューによる誤検知 (`check` job の既存
+`cargo test --workspace` ステップを見落とした) だった。特に「hook↔polling スレッド間の
+IME_OPEN 書き込み競合は fetch_xor でも解消しない」という指摘は判断4の
+トレードオフ節で認めている限界と同一であり、Codex が独立に同じ結論に達したことは
+判断4の妥当性を補強する。
+
 **補足 (LOW, ドキュメント漏れの是正)**: `ime_macos.rs` の `select_ime_source` 抽出でも同様に
 `JIS_KEYBOARD_SEEN.load(Acquire)` が `dirty == true` のときも無条件に評価されるようになった
 (旧: `else if` による短絡)。100ms 周期のポーリングスレッド (フックコールバックではない) での
