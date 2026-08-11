@@ -98,14 +98,28 @@ fn is_typing_key(vk_code: u32) -> bool {
 // (`hook_macos.rs` の「Permission decisions (pure)」節と同じ方針)。
 
 /// IME モードキーの **押下** 時、`IME_OPEN` をどう遷移させるべきか。
-/// `Some(new_value)` = 遷移する、`None` = このキーは IME モードに関係しない。
-fn ime_open_after_press(vk_code: u32, current_ime_open: bool) -> Option<bool> {
+#[derive(Debug, PartialEq, Eq)]
+enum ImeOpenTransition {
+    /// 明示的な値に設定する。
+    Set(bool),
+    /// 現在値をトグルする (VK_KANJI)。
+    ///
+    /// ⚠️★ `load` してから呼び出し側で `store(!current)` する形にしない。
+    /// `IME_OPEN` は IME ポーリングスレッド (`ime_windows.rs`) からも書かれるため、
+    /// load → store の間に他スレッドの書き込みが挟まると失われる (非アトミック RMW)。
+    /// 呼び出し側は `IME_OPEN.fetch_xor(true, Ordering::AcqRel)` を使うこと
+    /// (`hook_macos.rs` の VK_KANJI 処理と同じアトミック手段)。
+    Toggle,
+    /// このキーは IME モードに関係しない。
+    None,
+}
+
+fn ime_open_after_press(vk_code: u32) -> ImeOpenTransition {
     match vk_code {
-        VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => Some(false),
-        VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => Some(true),
-        // VK_KANJI はモード切り替えキーなので現在値をトグルする。
-        VK_KANJI => Some(!current_ime_open),
-        _ => None,
+        VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => ImeOpenTransition::Set(false),
+        VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => ImeOpenTransition::Set(true),
+        VK_KANJI => ImeOpenTransition::Toggle,
+        _ => ImeOpenTransition::None,
     }
 }
 
@@ -460,11 +474,18 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
 
             // IME mode tracking via VK_DBE_* keys.
             if is_press {
-                if let Some(new_ime_open) =
-                    ime_open_after_press(vk_code, IME_OPEN.load(Ordering::Relaxed))
-                {
-                    IME_OPEN.store(new_ime_open, Ordering::Release);
-                    IME_STATE_DIRTY.store(true, Ordering::Release);
+                match ime_open_after_press(vk_code) {
+                    ImeOpenTransition::Set(v) => {
+                        IME_OPEN.store(v, Ordering::Release);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    ImeOpenTransition::Toggle => {
+                        // ⚠️★ load→store ではなく fetch_xor でアトミックにトグルする
+                        // (ImeOpenTransition::Toggle の doc 参照)。
+                        IME_OPEN.fetch_xor(true, Ordering::AcqRel);
+                        IME_STATE_DIRTY.store(true, Ordering::Release);
+                    }
+                    ImeOpenTransition::None => {}
                 }
             }
 
@@ -562,6 +583,14 @@ mod tests {
         assert!(is_typing_key(0x08), "Backspace");
         assert!(is_typing_key(0x0D), "Enter");
         assert!(is_typing_key(0x20), "Space");
+        assert!(is_typing_key(0x09), "Tab");
+        assert!(is_typing_key(0x2E), "Delete");
+        assert!(is_typing_key(0x60), "Numpad 0 (範囲下端)");
+        assert!(is_typing_key(0x6F), "Numpad Divide (範囲上端)");
+        assert!(is_typing_key(0xBA), "OEM 記号 (範囲下端)");
+        assert!(is_typing_key(0xC0), "OEM 記号 (範囲上端)");
+        assert!(is_typing_key(0xDB), "OEM 記号 2群目 (範囲下端)");
+        assert!(is_typing_key(0xDF), "OEM 記号 2群目 (範囲上端)");
     }
 
     #[test]
@@ -574,31 +603,65 @@ mod tests {
         );
     }
 
+    /// ★ 範囲判定の off-by-one を捕まえる (境界の 1 つ外側)。
+    #[test]
+    fn typing_key_range_boundaries_are_exclusive_outside() {
+        assert!(!is_typing_key(0x40), "A-Z 範囲の直前");
+        assert!(!is_typing_key(0x5B), "A-Z 範囲の直後");
+        assert!(!is_typing_key(0x2F), "0-9 範囲の直前");
+        assert!(!is_typing_key(0x3A), "0-9 範囲の直後");
+        assert!(!is_typing_key(0x5F), "Numpad 範囲の直前");
+        assert!(!is_typing_key(0x70), "Numpad 範囲の直後 (F1 = VK_F1)");
+        assert!(!is_typing_key(0xB9), "OEM 記号 1群目の直前");
+        assert!(!is_typing_key(0xC1), "OEM 記号 1群目の直後");
+        assert!(!is_typing_key(0xDA), "OEM 記号 2群目の直前");
+        assert!(!is_typing_key(0xE0), "OEM 記号 2群目の直後");
+    }
+
     #[test]
     fn press_of_alphanumeric_key_closes_ime() {
-        assert_eq!(ime_open_after_press(VK_DBE_ALPHANUMERIC, true), Some(false));
-        assert_eq!(ime_open_after_press(VK_DBE_SBCSCHAR, true), Some(false));
+        // ★ Set(false) は current の値に関係なく常に false にする (Toggle との縮退を避けるため
+        //   意図的に「変化なし」になるケースも確認する)。
+        assert_eq!(
+            ime_open_after_press(VK_DBE_ALPHANUMERIC),
+            ImeOpenTransition::Set(false)
+        );
+        assert_eq!(
+            ime_open_after_press(VK_DBE_SBCSCHAR),
+            ImeOpenTransition::Set(false)
+        );
     }
 
     #[test]
     fn press_of_kana_key_opens_ime() {
-        assert_eq!(ime_open_after_press(VK_DBE_HIRAGANA, false), Some(true));
-        assert_eq!(ime_open_after_press(VK_DBE_KATAKANA, false), Some(true));
-        assert_eq!(ime_open_after_press(VK_DBE_DBCSCHAR, false), Some(true));
+        assert_eq!(
+            ime_open_after_press(VK_DBE_HIRAGANA),
+            ImeOpenTransition::Set(true)
+        );
+        assert_eq!(
+            ime_open_after_press(VK_DBE_KATAKANA),
+            ImeOpenTransition::Set(true)
+        );
+        assert_eq!(
+            ime_open_after_press(VK_DBE_DBCSCHAR),
+            ImeOpenTransition::Set(true)
+        );
     }
 
-    /// ★ VK_KANJI はモード切り替えキーなので、現在値に応じて結果が変わる (トグル)。
+    /// ★ VK_KANJI はモード切り替えキーなので Set ではなく Toggle を返す。
+    /// `Set`/`Toggle` を型で分けたことで、「current を無視して固定値にする」テストと
+    /// 「current に応じて変わる」テストが構造的に混同できなくなっている
+    /// (旧 `Option<bool>` 表現では両者が同じ戻り値になる縮退ケースがあった)。
     #[test]
-    fn press_of_kanji_key_toggles_current_state() {
-        assert_eq!(ime_open_after_press(VK_KANJI, false), Some(true));
-        assert_eq!(ime_open_after_press(VK_KANJI, true), Some(false));
+    fn press_of_kanji_key_returns_toggle() {
+        assert_eq!(ime_open_after_press(VK_KANJI), ImeOpenTransition::Toggle);
     }
 
     #[test]
     fn press_of_unrelated_key_does_not_change_ime_state() {
         assert_eq!(
-            ime_open_after_press(0x41, false),
-            None,
+            ime_open_after_press(0x41),
+            ImeOpenTransition::None,
             "A キーは IME モードに無関係"
         );
     }

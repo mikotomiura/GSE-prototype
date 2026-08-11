@@ -1,5 +1,44 @@
 # 重要な設計判断
 
+## 判断 4: code-reviewer 指摘への対応範囲 (2026-08-11 レビュー後)
+
+- **判断日時**: 2026-08-11
+- **背景**: `code-reviewer` から MEDIUM 3件・LOW 6件の指摘を受けた。
+  すべてを本タスクで対応すると `/refactor` の「振る舞いを変える変更は含めない」
+  「バグ修正・新機能追加を混ぜない」制約を超える恐れがあり、対応する/しないの線引きが必要だった。
+- **選択肢**: 指摘ごとに個別判断 (一括採用/一括却下ではなく)。
+- **採用**:
+  - **対応した**: `ime_open_after_press` の `Option<bool>` → `ImeOpenTransition{Set/Toggle/None}` 化
+    (MEDIUM-1)。`hook_macos.rs:354` が VK_KANJI トグルに既に `fetch_xor(true, AcqRel)` を使っており、
+    Windows 側だけ load→store の非アトミック RMW だったのは是正すべき非対称と判断。
+    副作用として MEDIUM-3 (Set/Toggle の縮退テスト) も型で構造的に解消。
+    `is_typing_key` の境界値テスト追加 (LOW)。`ime_macos.rs::ImeSource` への Debug/PartialEq derive
+    (LOW)。`ime_windows.rs` の矛盾した doc 一覧の削除 (LOW)。
+  - **見送った**: press/release 遷移表を `hook.rs` へ移し Windows/macOS で共有する提案 (MEDIUM-2)。
+    `is_stale_winevent_active` を struct 引数にする提案・`classify_ime_nav_key` のマジックナンバーへの
+    named const 追加・`"CandidateUI"` 冗長条件の削除 (いずれも LOW)。
+- **理由**: MEDIUM-1 は「今回touched した hook_windows.rs 単体で完結し、既存の macOS パターンに
+  倣うだけ」で追加スコープが無い。一方 MEDIUM-2 はレビューで指摘された通り正しい観察だが、
+  実行すると **`hook_macos.rs` (既存4テスト・未touch) への変更が必要**になり、
+  decisions.md 判断1 で確定した「抽出範囲は hook_windows.rs のみ」を超える。ユーザー承認済みの
+  design.md のスコープを検証中に無断で拡大しない (CLAUDE.md 禁止事項: 「ドキュメント化されていない
+  設計判断を勝手に変更しない」)。
+- **トレードオフ**: MEDIUM-2 を見送った結果、Windows/macOS の VK_DBE_* 遷移表は
+  依然として 2 箇所に重複したまま (今回の変更で「無テストの重複」から「両方テスト済みの重複」に
+  改善しただけ)。ドリフト (片方だけ表を書き換えて他方を忘れる) のリスクは残る。
+- **影響範囲**: `hook_windows.rs` のみ (`ime_open_after_press` のシグネチャ変更、テスト更新)。
+  `hook_macos.rs` は無変更。
+- **見直しタイミング**: `hook_windows.rs` / `hook_macos.rs` の VK_DBE_* 遷移表のどちらかを
+  変更する必要が生じたとき (ドリフトが実際に起きた/起きかけたとき)、MEDIUM-2 の共通化を
+  別タスクとして実施することを検討する。
+
+**補足 (LOW, ドキュメント漏れの是正)**: `ime_macos.rs` の `select_ime_source` 抽出でも同様に
+`JIS_KEYBOARD_SEEN.load(Acquire)` が `dirty == true` のときも無条件に評価されるようになった
+(旧: `else if` による短絡)。100ms 周期のポーリングスレッド (フックコールバックではない) での
+Acquire load 1 回であり、`is_japanese_ime_open()` (dispatch_sync_f) の呼び出し条件は
+`match` により従来どおり遅延されるため実害はない。hook_windows.rs 側 (判断1/判断4) と
+同じ「無条件 load は Atomic 読み取りのみで副作用なし」という等価性根拠が適用される。
+
 ## 判断 1: hook_windows.rs の抽出範囲
 
 - **判断日時**: 2026-08-11

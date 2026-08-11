@@ -113,22 +113,8 @@ impl ImeMonitor {
 
 /// Scan all top-level windows for visible IME candidate windows using EnumWindows.
 ///
-/// Known IME candidate window class names on Windows 10/11:
-///   - "CandidateUI_UIElement" : Modern IME candidate list (Microsoft IME, Google IME)
-///   - "IME"               : Classic IMM32 IME window
-///   - "*Candidate*"       : Catch-all for other IME implementations
-///
-/// INTENTIONALLY EXCLUDED:
-///   - "MSCTFIME UI" : This is the TSF language bar (A/あ indicator on the taskbar).
-///     It is ALWAYS visible on systems with Japanese IME loaded, even during normal
-///     Latin text entry. Including it caused the engine to be permanently paused.
-///
-///   - `class == "IME"` (exact match) : This is a background system window created by the
-///     OS for every IMM32-aware application. It is ALWAYS visible (WS_VISIBLE set) on
-///     systems with Japanese IME, even when NOT composing. Including it causes a permanent
-///     false-positive that pauses all keystroke analysis indefinitely.
-///     Only substring matches ("CandidateUI", "Candidate") are used to catch the real
-///     candidate popup windows while excluding this always-on system window.
+/// マッチ判定そのもの (どのクラス名を候補ウィンドウとみなすか、"MSCTFIME UI" や
+/// 完全一致 "IME" をなぜ除外するか) は `is_ime_candidate_class_name` の doc を参照。
 fn is_ime_candidate_window_visible() -> bool {
     // The callback sets *lparam to true and stops enumeration when an IME window is found.
     unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
