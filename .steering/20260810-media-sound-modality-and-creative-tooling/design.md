@@ -68,9 +68,47 @@ cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson > out.json
 | **Blender** | 5.1 | `blender.exe`（`-b -P script.py`） | 実体を確認 |
 | **Cinema 4D 2026** | — | **`c4dpy.exe`**（Python API）・`Commandline.exe` | 実体を確認 |
 | **Adobe Audition 2026** | — | ⚠️ **CLI は無い**（GUI `Adobe Audition.exe` のみ） | `*.exe` を列挙して確認 |
-| **Media Encoder 2026** | — | ⚠️ **CLI は確認できず**（GUI のみ） | 同上 |
+| **Media Encoder 2026** | — | ⚠️ **CLI は確認できず**（GUI のみ）→ ★ **2026-08-11 に訂正・下記** | 同上 |
 
 ⚠️ **未確認**: Media Encoder の watch folder 機構は**実機で試していない**ので当てにしない。
+
+### 1.2b ★ 2026-08-11 追記・訂正（実際に叩いて確認した）
+
+> ★ `.steering/20260811-expression-prototype-step0/` のセッションで、
+> 「前セッションの記録」ではなく **実機で実行して**確かめ直した結果。
+
+| ツール | 実行したこと | 結果 |
+|---|---|---|
+| **Substance 3D Designer** | `sbsrender.exe --help` | ★ **exit 0**・`info` / `render` サブコマンドを確認。**バッチで N 案生成できる** |
+| **After Effects 2026** | `aerender.exe -help` | ★ **使用法を出力し、GUI は起動しなかった**（プロセス一覧で確認）。バッチレンダ可 |
+| **Media Encoder 2026** | `ame_webservice_console.exe --help` | ⚠️★★ **下記のとおり「CLI 無し」は不正確だった** |
+
+★★ **Media Encoder の訂正**——「CLI は確認できず」で止めていたが、**プログラムから叩く入口は存在する**。
+ただし **CLI ではなく HTTP のウェブサービス**である:
+
+```
+$ ame_webservice_console.exe --help
+Launching web services.  Use --help for options.
+Starting HTTP service on ip 192.168.3.85, port 8080
+Creating AMEServer - Succeeded
+                                    ← 終了しない（timeout で殺した / exit 124）
+```
+
+⚠️★★★ **2 つの罠がある**:
+
+1. **`--help` を渡してもヘルプを出さず、サービスを起動する。**
+   ★ `toeexpand` の終了コード反転（S0-D2）と同型の「**入口の規約を確かめずに叩くと想定外のことが起きる**」例。
+2. ★★★ **`127.0.0.1` ではなく LAN の IP（`192.168.3.85`）の :8080 に bind する。**
+   → **同一ネットワークから到達できるエンコードサービスが立つ。**
+   ⚠️ **`data-privacy` の観点では、これは外部送信境界を 1 本増やすのと同じ**である。
+   **必要性が確認されるまで使わない**（D5 と同じ判断）。
+
+★ **実行後にプロセス・ポートとも残っていないことを確認済み**（`Get-Process` / `Get-NetTCPConnection` が空）。
+
+> ★ **優先度の判断**: 表現層の媒体は **D17 / D21 で「画面内・常時リアルタイム」**に決まっている。
+> 一方 Adobe 系で使える入口は **どれもバッチレンダ**でリアルタイムではない。
+> → **Adobe を一通り検証するのではなく、必要になったものだけ検証する。**
+> **いま要るのは TouchDesigner（リアルタイム）と Audition（人が聴く工程・自動化しない）だけである。**
 
 ### 1.3 ★ 最重要の発見: `toeexpand` が TouchDesigner を Claude Code の射程に入れる
 

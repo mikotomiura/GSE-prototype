@@ -72,7 +72,11 @@
       → ★★★ **修正を守る検査そのものが空回りしていた**（S0-D14）ほか HIGH 2 / MEDIUM 5 を実測で再現→修正
 - [x] 回帰検証（**343 tests passed / 0 failed**・`gse-replay --snapshot` 15 一致・`emit_schema` byte-equal）
 - [x] schema parity check → **skip**（schema 非 touch）
-- [ ] `/finish-task` Step 4（コミット）
+- [x] `/finish-task` Step 4（コミット `fcc06c8`）
+- [x] ★ Adobe 系 CLI 入口の実測と `20260810-.../design.md` §1.2b への訂正追記
+      （Media Encoder は「CLI 無し」ではなく **HTTP ウェブサービス**。⚠️ **LAN IP に bind する**）
+- [x] 次セッション用の引き継ぎを作成
+      （`.steering/_handoff/next-session-prompt-step3-layer0-realtime.md`）
 
 ---
 
