@@ -33,8 +33,16 @@ timestamp / f1 / f3 / f4 / f5 / f6 / p_flow / p_inc / p_stuck
 
 ```bash
 cd src-tauri   # ★ Cargo.toml は repo 直下に無い
-cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot out.json
+cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson > out.json
 ```
+
+> ⚠️★★ **2026-08-11 再訂正（実行して判明）**: 旧記述の **`--snapshot out.json` は誤り**である。
+> **`--snapshot <file>` は「既存ゴールデンとの比較」モードであり、出力はしない**
+> （`src-tauri/src/bin/replay.rs:9-10` の逐語 —— `gse-replay <session.ndjson>` が
+> 「stdout に JSON 配列を出力」／`--snapshot <file>` が「既存スナップショットと完全一致比較」）。
+> ファイルが存在しないと `MISMATCH: cannot read ...` で **exit 1** になる（実測）。
+> → ★ **取り出したいときは `--snapshot` を付けず、stdout をリダイレクトする。**
+> 詳細: `.steering/20260811-expression-prototype-step0/decisions.md` S0-D6。
 
 > ⚠️ **2026-08-11 訂正**: 旧記述は `../tests/fixtures/minimal.ndjson` だったが**誤り**。
 > 実体は **`src-tauri/tests/fixtures/minimal.ndjson`** なので、`src-tauri/` から見た相対パスは

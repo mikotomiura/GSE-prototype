@@ -215,8 +215,11 @@ Step 0  ★ toeexpand / toecollapse を空の .toe で往復させる          �
           (a) ツリーがテキストとして読めるか (b) 往復で壊れないか
           → 通らなければ TouchDesigner は Claude Code から扱えない。以降は全部やめる
 
-Step 1  gse-replay --snapshot の出力を CSV 化（標準ライブラリのみ）
-          cd src-tauri && cargo run --bin gse-replay -- <ndjson> --snapshot out.json
+Step 1  gse-replay の出力を CSV 化（標準ライブラリのみ）
+          cd src-tauri && cargo run --bin gse-replay -- <ndjson> > out.json
+          ⚠★★ 2026-08-11 訂正: 旧記述の `--snapshot out.json` は誤り。
+               --snapshot は「既存ゴールデンとの比較」モードで出力しない
+               (replay.rs:9-10 / 実測で MISMATCH exit 1)。S0-D6 参照。
 
 Step 2  ★ 表現層の平滑化を先に実装する（時定数 ≥60 秒）
           1Hz のステップを消す。★ ここを飛ばすと「毎秒のオンセット」が入る

@@ -98,10 +98,13 @@ TEMPLATE="/c/Program Files/Derivative/TouchDesigner/Samples/Setup/Base/NewProjec
 ## §4 Step 0 が通ったら（順に）
 
 ```text
-Step 1  gse-replay --snapshot の出力を CSV 化（依存は標準ライブラリのみ）
+Step 1  gse-replay の出力を CSV 化（依存は標準ライブラリのみ）   ← ★ 2026-08-11 実施済み
           cd src-tauri
-          cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot out.json
+          cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson > out.json
           ⚠️ ★ パスは `tests/fixtures/`（`../` を付けない）。Cargo.toml は repo 直下に無い
+          ⚠️★★ 訂正: 旧記述の `--snapshot out.json` は**誤り**。`--snapshot` は
+                **既存ゴールデンとの比較**モードで出力しない（`replay.rs:9-10`・実測 exit 1）。
+                → S0-D6 / `.steering/20260811-expression-prototype-step0/`
 
 Step 2  ★★ 表現層の平滑化を先に実装する（時定数 ≥60 秒）
           → 1Hz の離散サンプルをそのまま音量/密度に当てると
@@ -151,11 +154,17 @@ Step 7  気に入った設定を JSON に書き出し、EXPR_VERSION を刻ん�
 
 ## §6 ⚠️ 未処理のまま残っているもの（本件と無関係だが放置されている）
 
-- **未コミットが 7 件ある**（`.steering/` の 2 タスク分 ＋ `.codex/budget.json`）。
-  ★ **セッション開始時にコミットするか研究者に確認する**。
-- **タグ `v0.1.21` がローカル `a26eafa` / リモート `90d86d2` で食い違う**（fetch が reject される）。
-  → **破壊的操作なので研究者の指示待ち。**
-- ローカル stash 1 件（`win-local: gitignore tmp_codex rule + budget.json`）と未追跡の空ファイル `MEMO`。
+> ★★ **2026-08-11 更新（実測）**: 下記のうち **3 件中 2 件は既に解決済み**だった。
+> **本節の記述を根拠にせず、`git` で現況を確認すること。**
+
+- ~~**未コミットが 7 件ある**~~ → ★ **解決済み**。2026-08-11 セッション開始時点で **0 件**（コミット済み）。
+- ~~**タグ `v0.1.21` がローカル `a26eafa` / リモート `90d86d2` で食い違う**（fetch が reject される）~~
+  → ★★ **解決済み**（研究者が前セッションで対応・2026-08-11 に実測確認）。
+  **ローカル・リモートとも `90d86d2` で一致**し、`git fetch --tags origin` は **exit 0** で通る。
+- ~~未追跡の空ファイル `MEMO`~~ → ★ **解決済み**（存在しない）。
+- ⚠️ **ローカル stash 1 件は残っている**
+  （`stash@{0}: On main: win-local: gitignore tmp_codex rule + budget.json 2026-06-23`）。
+  → ★ 本件と無関係。**内容が既にコミット済みか確認してから捨てるかを研究者が判断する。**
 
 ## §7 ★ やり残し（試作と並行して効いてくる順）
 
