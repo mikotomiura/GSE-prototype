@@ -58,6 +58,18 @@ class GrainProcessor extends AudioWorkletProcessor {
     this.normExp = o.densityNormExp === undefined ? 0.5 : o.densityNormExp;
     this.rnd = mulberry32(o.seed || 1);
 
+    // ★★ 2026-08-12 追加（S4-D12: 層 2 の音を作り直す）——
+    //   音色候補の切替は「目標値」を置いて**一次遅れで寄せる**。
+    //   ⚠️★★★ 段差で切り替えると **それ自体がオンセット**であり、
+    //     spec §2 の禁止事項を UI 操作で作りに行くことになる（引き継ぎ §5-5 が Step 3 で踏んだ形）。
+    //   ★ 既定 6.0 s の一次遅れ = 実効 0.027 Hz。禁止帯（0.5–20 Hz / 15–70 Hz）から 1 桁以上離れている。
+    //   ⚠️ とくに normExp は、段差で変えると重なり 4 枚で **2 倍のレベル跳ね**になる。
+    this.morphS = o.morphS === undefined ? 6.0 : o.morphS;
+    this.tgt = {
+      grainSec: this.grainSec, centerHz: this.centerHz,
+      spreadCents: this.spreadCents, normExp: this.normExp,
+    };
+
     // 固定長のボイスプール。★ 実行中に確保し直さない（メモリを増やさない）
     this.vPhase = new Float64Array(MAX_VOICES); // 粒内の位置 0..1
     this.vStep = new Float64Array(MAX_VOICES);  // 1 サンプルあたりの粒内進み
@@ -78,7 +90,41 @@ class GrainProcessor extends AudioWorkletProcessor {
           dropped: this.dropped,
           seconds: this.frames / sampleRate,
           activeVoices: this.countActive(),
+          // ★ 「いま効いている値」を返す。目標値ではない（見本が no-op でないことを外から実測できる）
+          cur: {
+            grainMs: +(this.grainSec * 1000).toFixed(3),
+            centerHz: +this.centerHz.toFixed(3),
+            spreadCents: +this.spreadCents.toFixed(3),
+            densityNormExp: +this.normExp.toFixed(4),
+          },
+          tgt: {
+            grainMs: +(this.tgt.grainSec * 1000).toFixed(3),
+            centerHz: +this.tgt.centerHz.toFixed(3),
+            spreadCents: +this.tgt.spreadCents.toFixed(3),
+            densityNormExp: +this.tgt.normExp.toFixed(4),
+          },
         });
+      } else if (e.data && e.data.cmd === "set") {
+        // ★ 音色候補 / 密度手がかりの切替（S4-D12）。★ 受け付ける鍵を明示し、
+        //   ⚠️ **想定外の鍵を黙って無視しない**（黙って無視すると「効かない候補」が緑のまま通る）
+        const p = e.data.params || {};
+        const allow = ["grainMs", "centerHz", "spreadCents", "densityNormExp"];
+        const unknown = Object.keys(p).filter((k) => !allow.includes(k));
+        const bad = [];
+        if (p.grainMs !== undefined) {
+          if (!(p.grainMs > 0)) bad.push("grainMs"); else this.tgt.grainSec = p.grainMs / 1000;
+        }
+        if (p.centerHz !== undefined) {
+          if (!(p.centerHz > 0)) bad.push("centerHz"); else this.tgt.centerHz = p.centerHz;
+        }
+        if (p.spreadCents !== undefined) {
+          if (!(p.spreadCents >= 0)) bad.push("spreadCents"); else this.tgt.spreadCents = p.spreadCents;
+        }
+        if (p.densityNormExp !== undefined) {
+          if (!(p.densityNormExp >= 0 && p.densityNormExp <= 1)) bad.push("densityNormExp");
+          else this.tgt.normExp = p.densityNormExp;
+        }
+        this.port.postMessage({ ack: "set", unknown, rejected: bad, tgt: { ...this.tgt } });
       }
     };
   }
@@ -115,6 +161,16 @@ class GrainProcessor extends AudioWorkletProcessor {
     const n = out.length;
     const rateArr = params.rate;
     const rateConst = rateArr.length === 1;
+
+    // ★★ 音色パラメータを目標値へ一次遅れで寄せる（ブロックごとに 1 回・S4-D12）。
+    //   ★ ブロック内では一定なので、粒の発火・加算は従来どおり段差を持たない。
+    {
+      const a = 1 - Math.exp(-(n / sampleRate) / Math.max(1e-3, this.morphS));
+      this.grainSec += (this.tgt.grainSec - this.grainSec) * a;
+      this.centerHz += (this.tgt.centerHz - this.centerHz) * a;
+      this.spreadCents += (this.tgt.spreadCents - this.spreadCents) * a;
+      this.normExp += (this.tgt.normExp - this.normExp) * a;
+    }
 
     for (let i = 0; i < n; i++) {
       const rate = rateConst ? rateArr[0] : rateArr[i];

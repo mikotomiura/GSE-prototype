@@ -869,6 +869,137 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
         if "paste" not in json.dumps(b, ensure_ascii=False):
             raise Fail("系統 B に paste を落とした旨の注記が無い（★ 満たしていないことを明示する）")
 
+    # ---- 層 2 の作り直し（S4-D12・2026-08-12） ------------------------------
+    RW = cfg.get("layer2_rework")
+
+    @add("★ 層 2 作り直しの 3 軸がそろっている（音色 / 密度の写し方 / 密度の幅）")
+    def _():
+        if not RW:
+            raise Fail("layer2_rework が無い")
+        for k in ("timbre", "density_cue", "density_span"):
+            opts = RW.get(k, {}).get("options")
+            if not opts:
+                raise Fail(f"{k} の options が無い")
+            if len(opts) < 2:
+                raise Fail(f"{k} の候補が {len(opts)} 個しかない（比べられない）")
+
+    @add("★ 既定が現行のまま（対照を残す）")
+    def _():
+        d = RW["defaults"]
+        if d != {"timbre": "t_current", "density_cue": "c_texture", "density_span": "s_current"}:
+            raise Fail(f"既定が現行でない: {d}。★ 前回の音と比べられなくなる")
+        t0 = next(o for o in RW["timbre"]["options"] if o["id"] == "t_current")
+        for a, b in (("grain_ms", "grain_ms"), ("center_hz", "center_hz"),
+                     ("spread_cents", "spread_cents")):
+            if abs(t0[a] - L2[b]) > 1e-9:
+                raise Fail(f"対照 t_current が layer2 の実値とずれている: {a} {t0[a]} != {L2[b]}")
+
+    @add("★★ 密度の幅候補が下限 100 grains/s を守っている（[P64]・動かさない）")
+    def _():
+        floor = cfg["spec_anchors"]["grain_rate_floor_per_s"]
+        for o in RW["density_span"]["options"]:
+            if o["rate_min_per_s"] < floor:
+                raise Fail(f"{o['id']} の下限 {o['rate_min_per_s']} < {floor}")
+            if o["rate_max_per_s"] <= o["rate_min_per_s"]:
+                raise Fail(f"{o['id']} の上限が下限以下")
+
+    @add("★★ 候補切替の一次遅れが禁止帯より 1 桁以上下（切替自体を変調にしない）")
+    def _():
+        tau = RW["morph_s"]
+        f = 1.0 / (2.0 * math.pi * tau)          # 一次遅れの実効カットオフ
+        if f >= 0.05:
+            raise Fail(f"morph_s={tau}s → {f:.4f} Hz。禁止帯下端 0.5 Hz の 1/10 (0.05 Hz) 以上")
+
+    @add("★★ 粒の重なりが 1 枚を下回らない（全候補 × 全 span の下限で）")
+    def _():
+        for t in RW["timbre"]["options"]:
+            for s in RW["density_span"]["options"]:
+                ov = s["rate_min_per_s"] * t["grain_ms"] / 1000.0
+                if ov < 1.0:
+                    raise Fail(f"{t['id']}×{s['id']} で重なり {ov:.2f} 枚 < 1（粒間に無音＝分節）")
+
+    @add("★ 全候補の粒の帯域が Nyquist を下回る（実時間 48 kHz / 検算 8 kHz）")
+    def _():
+        for t in RW["timbre"]["options"]:
+            hi = t["center_hz"] * (2.0 ** (t["spread_cents"] / 1200.0))
+            for sr in (48000.0, cfg["selftest"].get("offline_sample_rate_hz", 8000.0)):
+                if hi >= sr / 2.0:
+                    raise Fail(f"{t['id']} の上端 {hi:.0f} Hz が {sr/2:.0f} Hz 以上")
+
+    @add("★★ 音色候補の fact に書いた主ローブ幅・帯域が算術と一致する（doc の drift 防止）")
+    def _():
+        for t in RW["timbre"]["options"]:
+            lobe = 4000.0 / t["grain_ms"]                       # Hann 主ローブ幅 = 4/T
+            lo = t["center_hz"] * 2.0 ** (-t["spread_cents"] / 1200.0)
+            hi = t["center_hz"] * 2.0 ** (t["spread_cents"] / 1200.0)
+            f = t["fact"]
+            for want in (f"{round(lobe)} Hz", f"{round(lo)}–{round(hi)} Hz"):
+                if want not in f:
+                    raise Fail(f"{t['id']} の fact に『{want}』が無い: {f}")
+
+    @add("★★ 密度手がかりの fact に書いた振幅比が overlap^(0.5-exp) と一致する")
+    def _():
+        span = next(o for o in RW["density_span"]["options"] if o["id"] == "s_current")
+        ratio_overlap = span["rate_max_per_s"] / span["rate_min_per_s"]
+        for c in RW["density_cue"]["options"]:
+            r = ratio_overlap ** (0.5 - c["density_norm_exp"])
+            if c["density_norm_exp"] == 0.5:
+                if "ほぼ不変" not in c["fact"]:
+                    raise Fail("c_texture の fact が『ほぼ不変』と言っていない")
+            elif f"{r:.2f}" not in c["fact"] and f"{r:.1f}" not in c["fact"]:
+                raise Fail(f"{c['id']}: 期待比 {r:.2f} が fact に無い: {c['fact']}")
+
+    @add("★★★ processor が目標値と現在値を分け、段差でなくランプで移る")
+    def _():
+        if "this.tgt" not in worklet:
+            raise Fail("processor に目標値 this.tgt が無い（段差で切り替わる）")
+        if "morphS" not in worklet:
+            raise Fail("processor に morphS が無い")
+        # ★ 一次遅れの本体（ブロックごとに寄せる）が実在すること
+        if "this.tgt.grainSec - this.grainSec" not in worklet:
+            raise Fail("grainSec を目標値へ寄せる処理が無い")
+        if "this.tgt.normExp - this.normExp" not in worklet:
+            raise Fail("normExp を目標値へ寄せる処理が無い（レベル跳ねの原因）")
+
+    @add("★★★ processor の set が未知/不正な鍵を黙って無視しない")
+    def _():
+        if '"set"' not in worklet:
+            raise Fail("processor に set コマンドが無い")
+        # ⚠️★ 部分一致だけで見ると `_unknown` へ改名しても素通りする（2026-08-12 の meta で実測）。
+        #   ★ **鍵を集める式**と**応答に載せる式**の両方を固定する。
+        if "const unknown = Object.keys(p).filter" not in worklet:
+            raise Fail("未知の鍵を集める式が無い（黙って無視する形に戻っている）")
+        if 'ack: "set", unknown' not in worklet:
+            raise Fail("set の応答に unknown を載せていない（黙って落ちる候補が緑になる）")
+        if "rejected: bad" not in worklet:
+            raise Fail("set の応答に rejected を載せていない")
+        if "logLine(\"⚠️ 層 2 の set が一部通っていない" not in html:
+            raise Fail("player が set の不通過を握り潰している")
+
+    @add("★★ player が『いま効いている値』を processor から受け取って出す（目標値ではない）")
+    def _():
+        # ⚠️★ `e.data.cur` の部分一致だけだと、条件を `if (false)` に潰しても
+        #   本文中の `e.data.cur.grainMs` が残って素通りする（2026-08-12 の meta で実測）。
+        if "if (e.data.cur) {" not in html:
+            raise Fail("player が processor の cur を読んでいない（受け取りが潰されている）")
+        for el in ("l2-cur-grain", "l2-cur-center", "l2-cur-spread", "l2-cur-norm"):
+            if el not in html:
+                raise Fail(f"表示要素 {el} が無い")
+
+    @add("★★ player が起動時から選択中の候補で層 2 を作る（既定で作って寄せない）")
+    def _():
+        if 'grainMs: reworkOpt("timbre").grain_ms' not in html:
+            raise Fail("attachLayer2 が config 既定で作っている（候補の音を最初から聴けない）")
+        if 'densityNormExp: reworkOpt("dcue").density_norm_exp' not in html:
+            raise Fail("attachLayer2 が密度手がかりの選択を無視している")
+
+    @add("★★ 粒子率の幅が『密度の幅』候補から来る（config 直読みが残っていない）")
+    def _():
+        if "rateMin() + v * (rateMax() - rateMin())" not in html:
+            raise Fail("currentRate が候補の幅を使っていない")
+        if "L2.rate_min_per_s + v * (L2.rate_max_per_s" in html:
+            raise Fail("currentRate に config 直読みの古い式が残っている")
+
     return checks
 
 
@@ -1082,6 +1213,51 @@ def meta_checks() -> int:
          mut_html("async function reparseCsv(", "async function reparseGone("), "読み直していない"),
         ("SEED から seed を消す",
          (cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, "seed なし"), "SEED"),
+
+        # ---- 層 2 の作り直し（S4-D12） ------------------------------------
+        ("★ 既定を新候補にして対照を失う",
+         mut_cfg(lambda c: c["layer2_rework"]["defaults"].update(timbre="t_low_long")),
+         "既定が現行でない"),
+        ("★ 対照 t_current を layer2 の実値からずらす",
+         mut_cfg(lambda c: next(o for o in c["layer2_rework"]["timbre"]["options"]
+                                if o["id"] == "t_current").update(center_hz=441.0)),
+         "対照 t_current が layer2 の実値とずれている"),
+        ("★★ 密度の幅の下限を 100 grains/s より下げる",
+         mut_cfg(lambda c: next(o for o in c["layer2_rework"]["density_span"]["options"]
+                                if o["id"] == "s_wide").update(rate_min_per_s=60.0)),
+         "下限"),
+        ("★★ 候補切替を速くして禁止帯に近づける（morph_s 1 s）",
+         mut_cfg(lambda c: c["layer2_rework"].update(morph_s=1.0)), "禁止帯下端"),
+        ("★ 粒長を短くして重なりを 1 枚未満にする",
+         mut_cfg(lambda c: next(o for o in c["layer2_rework"]["timbre"]["options"]
+                                if o["id"] == "t_high_air").update(grain_ms=5.0)),
+         "重なり"),
+        ("★★ 音色 fact の数値だけをずらす（doc の drift）",
+         mut_cfg(lambda c: next(o for o in c["layer2_rework"]["timbre"]["options"]
+                                if o["id"] == "t_low_long").update(fact="主ローブ幅 99 Hz / 帯域 1–2 Hz")),
+         "fact に"),
+        ("★★ 密度手がかり fact の比だけをずらす",
+         mut_cfg(lambda c: next(o for o in c["layer2_rework"]["density_cue"]["options"]
+                                if o["id"] == "c_level").update(fact="振幅比 約 9.9 倍")),
+         "期待比"),
+        ("★★★ processor の目標値を消して段差で切り替える形に戻す",
+         mut_wk("this.tgt.normExp - this.normExp", "0 - 0"), "normExp を目標値へ寄せる"),
+        ("★★★ processor の set が未知の鍵を黙って無視する形に戻す",
+         mut_wk("const unknown = Object.keys(p)", "const _unknown = Object.keys(p)"),
+         "未知の鍵を集める式"),
+        ("★★★ set の応答から unknown を落とす（集めるが返さない）",
+         mut_wk('ack: "set", unknown', 'ack: "set", _dropped'), "unknown を載せていない"),
+        ("★★ player が set の不通過を握り潰す形に戻す",
+         mut_html('logLine("⚠️ 層 2 の set が一部通っていない', 'void("'), "握り潰している"),
+        ("★★ 層 2 を config 既定で作ってから寄せる形に戻す",
+         mut_html('grainMs: reworkOpt("timbre").grain_ms', "grainMs: L2.grain_ms"),
+         "config 既定で作っている"),
+        ("★★ currentRate に config 直読みの古い式を戻す",
+         mut_html("return rateMin() + v * (rateMax() - rateMin());",
+                  "return L2.rate_min_per_s + v * (L2.rate_max_per_s - L2.rate_min_per_s);"),
+         "候補の幅を使っていない"),
+        ("★ 『いま効いている値』の受け取りを消す",
+         mut_html("if (e.data.cur) {", "if (false) {"), "cur を読んでいない"),
     ]
 
     print("== meta 検査（★ 検査を壊して赤くなることの確認） ==")

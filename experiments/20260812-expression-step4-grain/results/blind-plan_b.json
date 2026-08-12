@@ -1,0 +1,192 @@
+{
+  "expr_version": "0.3.0-step4",
+  "hmm_version": "0.3.0",
+  "plan": "plan_b",
+  "plan_label": "B 案: 次元で分ける（★ 音色＝倍音傾斜のみ・0.005 / 0.0031 Hz）",
+  "base_hz": 55,
+  "decay": "inv_n2",
+  "layer2": {
+    "grain_ms": 40,
+    "center_hz": 440,
+    "seed": 20260812,
+    "rate_min": 100,
+    "rate_max": 400
+  },
+  "blind_test": {
+    "_note": [
+      "★★★ 本 Step の関門（S4-D4）。§4c『いま変わったのは基層か、自分か』を強制選択で当てさせる。",
+      "★ 連続再生したまま 60 s の窓を並べる（トライアル間で音を止めない＝オンセットを作らない）。",
+      "⚠️ 途中で正誤を出さない（フィードバックが後続の回答を形作る）。"
+    ],
+    "trial_seconds": 60,
+    "_trial_seconds_why": "★ τ = 60 s の 1 時定数（63% 到達）。これより短いと『案が悪い』と『まだ届いていない』が区別できない",
+    "trials_per_plan": 10,
+    "composition": {
+      "layer0": 4,
+      "layer2": 4,
+      "catch": 2
+    },
+    "scored_trials": 8,
+    "pass_threshold_correct": 7,
+    "_threshold_why": [
+      "★ 二項検定 片側 p = 0.035（chance = 0.5）。8 問中 7 問以上で案を残す。",
+      "⚠️★★★ 過大に読まないこと（S4-D4 に明記）:",
+      "  1. n = 1 である。統計的検出力を持った検定ではなくスクリーニングである。",
+      "  2. 3 案を測るので多重比較が効く。Bonferroni（α=0.0167）なら 7/8 は通らない。★ 補正は適用していない。",
+      "  3. ★ 閾値は『落とす』ために使う。『残った案が安全である』証明には使わない。"
+    ],
+    "order_seed": 20260812,
+    "_order_seed_why": "★ 出題順は seed 固定。事後に results/ から順序を再現できる（reproducibility-discipline ルール 2）",
+    "layer0_step_scale": 1,
+    "layer2_step_scale": 0.7,
+    "_step_scale_note": [
+      "★ 層 0 は深さ 1 <-> (1 - layer0_step_scale) を往復する（既定 1.0 なので 1 <-> 0）。",
+      "★ 層 2 は 0.5 ± layer2_step_scale/2 を往復する（既定 0.7 なので 0.15 <-> 0.85）。",
+      "⚠️★ **往復のどちら向きでも振幅を同じにする**。以前は 0.5 -> 0.85 と 0.85 <-> 0.15 で",
+      "  **1 回目の層 2 トライアルだけ変化量が半分**になっており、出題順が案ごとに違うため",
+      "  ★ 案の比較にバイアスが入っていた（レビューで発見）。",
+      "⚠️★ 変化量は知覚的に等化していない。それぞれの案の設計上の深さをそのまま使う。",
+      "★ 等化していないことを notes.md に必ず書く（『公平な比較だった』と書かない）。",
+      "→ だから『見本モード』（非盲検・ラベル付き）を先に置く。S4-D4 の限界 3 点と併せて読むこと。"
+    ],
+    "choices": [
+      {
+        "id": "layer0",
+        "label": "基層が変わった"
+      },
+      {
+        "id": "layer2",
+        "label": "自分（状態）が変わった"
+      },
+      {
+        "id": "unsure",
+        "label": "わからない"
+      }
+    ]
+  },
+  "order": [
+    "catch",
+    "catch",
+    "layer0",
+    "layer2",
+    "layer2",
+    "layer0",
+    "layer2",
+    "layer0",
+    "layer0",
+    "layer2"
+  ],
+  "results": [
+    {
+      "index": 0,
+      "truth": "catch",
+      "answer": "layer0",
+      "correct": null,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 1,
+      "truth": "catch",
+      "answer": "layer0",
+      "correct": null,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 2,
+      "truth": "layer0",
+      "answer": "layer2",
+      "correct": false,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 3,
+      "truth": "layer2",
+      "answer": "layer0",
+      "correct": false,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 4,
+      "truth": "layer2",
+      "answer": "layer2",
+      "correct": true,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 5,
+      "truth": "layer0",
+      "answer": "layer2",
+      "correct": false,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 6,
+      "truth": "layer2",
+      "answer": "layer0",
+      "correct": false,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 7,
+      "truth": "layer0",
+      "answer": "layer0",
+      "correct": true,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 8,
+      "truth": "layer0",
+      "answer": "layer2",
+      "correct": false,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    },
+    {
+      "index": 9,
+      "truth": "layer2",
+      "answer": "unsure",
+      "correct": false,
+      "trial_seconds": 60,
+      "residual_at_start": {
+        "l0": 0,
+        "l2": 0
+      }
+    }
+  ],
+  "note": "n=1 のスクリーニング。多重比較の補正なし。閾値は案を落とすために使う（S4-D4）"
+}

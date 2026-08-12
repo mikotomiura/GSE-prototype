@@ -14,13 +14,13 @@
 - [x] `step4.config.json`（層 0 候補 / 層 2 / A・B・C 案 / 盲検 / 検算）
 - [x] `player/grain-processor.js`（AudioWorklet・seed 固定・Hann 窓・ジッタ・粒数カウンタ）
 - [x] `player/step4.html`（層 0 逐語複製 ＋ 層 2 ＋ 傾斜 ＋ 混同テスト ＋ 検算）
-- [x] `scripts/step4_selftest.py`（静的 58 件 ＋ meta 52 件）
+- [x] `scripts/step4_selftest.py`（静的 ＋ meta。★ 層 2 作り直しで 79 / 80 件へ）
 - [x] `run.sh` / `env.md` / `data.md` / `notes.md`
 - [x] ★ `EXPR_VERSION` を `0.3.0-step4` へ（S4-D3。Step 3 の config も追随）
 
 ## テスト
-- [x] `step4_selftest.py` **66 ok / 0 fail**（2026-08-12 再実測。中断前の記載 58 は検査追加前の値）
-- [x] ★ meta 検査 **66 ok / 0 fail**（検査を壊して赤くなることを実測。同上・記載 52 は古い）
+- [x] `step4_selftest.py` **79 ok / 0 fail**（層 2 作り直しの 13 件を追加。中断前の記載 58 は古い）
+- [x] ★ meta 検査 **80 ok / 0 fail**（★ 追加分で silent pass を 2 件見つけ、検査側を直した）
 - [x] `expr_smooth.py --selftest` **51 PASS / 0 FAIL**
 - [x] ★ Step 3 の検査が bump 後も **30 ok / 0 fail**
 - [x] `git check-ignore` で実データ混入 0 件
@@ -30,8 +30,10 @@
 - [x] ★ A6 粒子率の実測（Worklet カウンタ・4 プリセット・誤差 <2%）
 - [x] ★ 倍音傾斜の機構確認（B/C 案の前提）
 - [x] ★ 盲検の出題順が seed で再現すること
-- [ ] ⚠️★★★ **B4: 停止・音量が実クリックで効くこと**（**交渉不可・ウィンドウが hidden で未実測**）
-- [ ] ⚠️ **A7: 10 分連続でノード数・メモリが増えないこと**（実クリックが要る）
+- [x] ★★★ **B4: 停止・音量が実クリックで効くこと**（**交渉不可**）
+      → **2026-08-12 実測で 4 条件すべて PASS**（`notes.md` §3.9。3 セッションぶりに解除）
+      ⚠️ macOS / `file://` は未確認
+- [ ] ⚠️ **A7: 10 分連続でノード数・メモリが増えないこと**（★ 2026-08-12 に測定中）
 - [ ] ⚠️ **実データ（P010 等）を通す**（`run.sh data` 未実行）
 
 ## 耳（★ 研究者が判定する。エージェントは判定しない）
