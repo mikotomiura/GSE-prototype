@@ -133,6 +133,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # リリースゲート: Windows の提出ツール (gse-submit.exe) も exe 隣の pubkey.txt を
+      # recipient として使う (lib.rs:resolve_bundled_recipient のフォールバック元と同じ鍵ファイル)。
+      # build-macos の同名ステップと同条件。★ workflow_dispatch (タグを切らない手動検証ビルド)
+      # では走らせない — 手動発火の目的は exe を 1 個作ることだけで、リリース鍵の有無を問わない。
+      - name: Verify researcher public key present (release gate)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          if ! grep -qE '^[[:space:]]*age1[0-9a-z]+' src-tauri/resources/pubkey.txt; then
+            echo "::error::src-tauri/resources/pubkey.txt に 'age1...' 公開鍵行がありません。リリース前に研究者の実鍵を挿入してください (プレースホルダのままでは参加者が提出不能)。"
+            exit 1
+          fi
+          echo "pubkey.txt OK (age1 line present)"
       - name: Build Tauri app
         # ★ インストーラ (NSIS) は作らない (2026-08-03)。Phase1 の実運用で被験者が使ったのは
         #   **ポータブル版 gse-next.exe** だけだった (Smart App Control の都合で

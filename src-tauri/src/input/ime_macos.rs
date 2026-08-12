@@ -62,13 +62,11 @@ pub fn spawn_ime_open_polling_thread(
             }
 
             let dirty = crate::input::hook::IME_STATE_DIRTY.swap(false, Ordering::AcqRel);
+            let jis_keyboard_seen = crate::input::hook::JIS_KEYBOARD_SEEN.load(Ordering::Acquire);
 
-            let current_state = if dirty {
-                crate::input::hook::IME_OPEN.load(Ordering::Acquire)
-            } else if crate::input::hook::JIS_KEYBOARD_SEEN.load(Ordering::Acquire) {
-                crate::input::hook::IME_OPEN.load(Ordering::Acquire)
-            } else {
-                is_japanese_ime_open()
+            let current_state = match select_ime_source(dirty, jis_keyboard_seen) {
+                ImeSource::HookFlag => crate::input::hook::IME_OPEN.load(Ordering::Acquire),
+                ImeSource::TisQuery => is_japanese_ime_open(),
             };
 
             if last_state.map_or(true, |prev| prev != current_state) {
@@ -79,6 +77,33 @@ pub fn spawn_ime_open_polling_thread(
             }
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// IME state source selection (pure — テストできる形に切り出す)
+// ---------------------------------------------------------------------------
+//
+// Path A (JIS 物理キー): hook_callback が VK_DBE_* / VK_KANJI を検知して IME_OPEN を
+// 直接更新した (dirty) か、そもそも JIS キーボードが確認されている場合は、その値を信頼する。
+// Path B (ANSI/US キーボード): どちらでもない場合のみ、100ms 毎の TIS ポーリングにフォールバックする。
+
+/// どちらの情報源から IME 開閉状態を読むべきか。
+#[derive(Debug, PartialEq, Eq)]
+enum ImeSource {
+    /// hook_callback が更新した `IME_OPEN` を信頼する (Path A)。
+    HookFlag,
+    /// `is_japanese_ime_open()` (TIS) にフォールバックする (Path B)。
+    TisQuery,
+}
+
+/// `dirty` (直近の VK_DBE_* / VK_KANJI 検知) または `jis_keyboard_seen` のいずれかが
+/// true なら `IME_OPEN` を信頼できる。どちらも false のときだけ TIS 問い合わせが要る。
+fn select_ime_source(dirty: bool, jis_keyboard_seen: bool) -> ImeSource {
+    if dirty || jis_keyboard_seen {
+        ImeSource::HookFlag
+    } else {
+        ImeSource::TisQuery
+    }
 }
 
 fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool, active: bool) {
@@ -164,4 +189,38 @@ fn is_japanese_ime_open() -> bool {
         );
     }
     ctx.result
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// dirty (VK_DBE_* / VK_KANJI を直近検知) なら、JIS キーボードでなくても IME_OPEN を信頼する。
+    #[test]
+    fn hook_flag_wins_when_dirty() {
+        assert_eq!(select_ime_source(true, false), ImeSource::HookFlag);
+    }
+
+    /// JIS キーボード確認済みなら、dirty でなくても IME_OPEN を信頼する (Path A)。
+    #[test]
+    fn hook_flag_wins_when_jis_keyboard_seen() {
+        assert_eq!(select_ime_source(false, true), ImeSource::HookFlag);
+    }
+
+    /// dirty でも JIS キーボードでもないときだけ、TIS 問い合わせ (Path B) にフォールバックする。
+    /// ★ ここが ANSI/US キーボードでの唯一の検出経路なので、条件を緩めてはならない。
+    #[test]
+    fn tis_query_only_when_neither_signal_present() {
+        assert_eq!(select_ime_source(false, false), ImeSource::TisQuery);
+    }
+
+    /// 両方 true でも HookFlag 優先 (TIS 問い合わせをしない = dispatch_sync_f を避けられる)。
+    #[test]
+    fn hook_flag_wins_when_both_signals_present() {
+        assert_eq!(select_ime_source(true, true), ImeSource::HookFlag);
+    }
 }

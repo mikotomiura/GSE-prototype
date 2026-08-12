@@ -89,6 +89,86 @@ fn is_typing_key(vk_code: u32) -> bool {
     )
 }
 
+// ---------------------------------------------------------------------------
+// IME mode decisions (pure — テストできる形に切り出す)
+// ---------------------------------------------------------------------------
+//
+// ⚠️ VK_DBE_* / VK_KANJI の分岐そのものは `hook_callback` 内の Atomic 読み書きと
+// 一体化していたため無テストだった。判定だけを純関数として切り出す
+// (`hook_macos.rs` の「Permission decisions (pure)」節と同じ方針)。
+
+/// IME モードキーの **押下** 時、`IME_OPEN` をどう遷移させるべきか。
+#[derive(Debug, PartialEq, Eq)]
+enum ImeOpenTransition {
+    /// 明示的な値に設定する。
+    Set(bool),
+    /// 現在値をトグルする (VK_KANJI)。
+    ///
+    /// ⚠️★ `load` してから呼び出し側で `store(!current)` する形にしない。
+    /// `IME_OPEN` は IME ポーリングスレッド (`ime_windows.rs`) からも書かれるため、
+    /// load → store の間に他スレッドの書き込みが挟まると失われる (非アトミック RMW)。
+    /// 呼び出し側は `IME_OPEN.fetch_xor(true, Ordering::AcqRel)` を使うこと
+    /// (`hook_macos.rs` の VK_KANJI 処理と同じアトミック手段)。
+    Toggle,
+    /// このキーは IME モードに関係しない。
+    None,
+}
+
+fn ime_open_after_press(vk_code: u32) -> ImeOpenTransition {
+    match vk_code {
+        VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => ImeOpenTransition::Set(false),
+        VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => ImeOpenTransition::Set(true),
+        VK_KANJI => ImeOpenTransition::Toggle,
+        _ => ImeOpenTransition::None,
+    }
+}
+
+/// IME モードキーの **離す** 時、`IME_OPEN` をどう遷移させるべきか。
+///
+/// ⚠️ Surface Type Cover は `VK_DBE_HIRAGANA` を key-UP でしか発火しないため、
+/// press 側と異なり VK_KANJI を含まない別の遷移表になっている。
+fn ime_open_after_release(vk_code: u32) -> Option<bool> {
+    match vk_code {
+        VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => Some(true),
+        VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => Some(false),
+        _ => None,
+    }
+}
+
+/// IME 変換候補のナビゲーション/放棄キー分類 (Phase 2b shadow metrics 用)。
+#[derive(Debug, PartialEq, Eq)]
+enum ImeNavAction {
+    /// VK_LEFT/UP/RIGHT/DOWN — 候補ナビゲーション。
+    Navigate,
+    /// VK_ESCAPE — 変換放棄。
+    Abandon,
+    /// 上記以外。
+    Other,
+}
+
+fn classify_ime_nav_key(vk_code: u32) -> ImeNavAction {
+    match vk_code {
+        0x25 | 0x26 | 0x27 | 0x28 => ImeNavAction::Navigate,
+        0x1B => ImeNavAction::Abandon,
+        _ => ImeNavAction::Other,
+    }
+}
+
+/// このキーが IME モードキー (VK_DBE_* / VK_KANJI) かどうか。
+/// key-up でも IME ポーリングスレッドを起こす必要があるかの判定に使う
+/// (Surface Type Cover の VK_DBE_HIRAGANA は key-up でしか発火しないため)。
+fn is_ime_mode_key(vk_code: u32) -> bool {
+    matches!(
+        vk_code,
+        VK_DBE_ALPHANUMERIC
+            | VK_DBE_KATAKANA
+            | VK_DBE_HIRAGANA
+            | VK_DBE_SBCSCHAR
+            | VK_DBE_DBCSCHAR
+            | VK_KANJI
+    )
+}
+
 // IME WinEvent constants (winuser.h, Windows 8+)
 const EVENT_OBJECT_IME_CHANGE: u32 = 0x8016;
 const EVENT_OBJECT_IME_SHOW: u32 = 0x8017;
@@ -394,21 +474,18 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
 
             // IME mode tracking via VK_DBE_* keys.
             if is_press {
-                match vk_code {
-                    VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => {
-                        IME_OPEN.store(false, Ordering::Release);
+                match ime_open_after_press(vk_code) {
+                    ImeOpenTransition::Set(v) => {
+                        IME_OPEN.store(v, Ordering::Release);
                         IME_STATE_DIRTY.store(true, Ordering::Release);
                     }
-                    VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => {
-                        IME_OPEN.store(true, Ordering::Release);
+                    ImeOpenTransition::Toggle => {
+                        // ⚠️★ load→store ではなく fetch_xor でアトミックにトグルする
+                        // (ImeOpenTransition::Toggle の doc 参照)。
+                        IME_OPEN.fetch_xor(true, Ordering::AcqRel);
                         IME_STATE_DIRTY.store(true, Ordering::Release);
                     }
-                    VK_KANJI => {
-                        let current = IME_OPEN.load(Ordering::Relaxed);
-                        IME_OPEN.store(!current, Ordering::Release);
-                        IME_STATE_DIRTY.store(true, Ordering::Release);
-                    }
-                    _ => {}
+                    ImeOpenTransition::None => {}
                 }
             }
 
@@ -418,31 +495,22 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             // WinEvent IME_SHOW と hook_callback のタイミングずれにより、変換セッション
             // 最初の 1-2 キーが拾えない場合がある。Phase 2b は shadow-only なので許容。
             if is_press && IME_ACTIVE.load(Ordering::Relaxed) {
-                match vk_code {
-                    0x25 | 0x26 | 0x27 | 0x28 => {
-                        // VK_LEFT/UP/RIGHT/DOWN — 候補ナビゲーション
+                match classify_ime_nav_key(vk_code) {
+                    ImeNavAction::Navigate => {
                         IME_CANDIDATE_NAV_COUNT.fetch_add(1, Ordering::Relaxed);
                     }
-                    0x1B => {
-                        // VK_ESCAPE — 変換放棄
+                    ImeNavAction::Abandon => {
                         IME_SHADOW_ABANDON.store(true, Ordering::Relaxed);
                     }
-                    _ => {}
+                    ImeNavAction::Other => {}
                 }
             }
 
             // Surface Type Cover: VK_DBE_HIRAGANA fires ONLY as key-UP.
             if is_release {
-                match vk_code {
-                    VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => {
-                        IME_OPEN.store(true, Ordering::Release);
-                        IME_STATE_DIRTY.store(true, Ordering::Release);
-                    }
-                    VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => {
-                        IME_OPEN.store(false, Ordering::Release);
-                        IME_STATE_DIRTY.store(true, Ordering::Release);
-                    }
-                    _ => {}
+                if let Some(new_ime_open) = ime_open_after_release(vk_code) {
+                    IME_OPEN.store(new_ime_open, Ordering::Release);
+                    IME_STATE_DIRTY.store(true, Ordering::Release);
                 }
             }
 
@@ -484,16 +552,7 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             }
 
             // Wake IME polling thread.
-            let is_ime_mode_key = matches!(
-                vk_code,
-                VK_DBE_ALPHANUMERIC
-                    | VK_DBE_KATAKANA
-                    | VK_DBE_HIRAGANA
-                    | VK_DBE_SBCSCHAR
-                    | VK_DBE_DBCSCHAR
-                    | VK_KANJI
-            );
-            if is_press || (is_release && is_ime_mode_key) {
+            if is_press || (is_release && is_ime_mode_key(vk_code)) {
                 if let Some(tx) = POLL_WAKE_TX.get() {
                     let _ = tx.try_send(());
                 }
@@ -502,4 +561,168 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
     }
 
     CallNextHookEx(None, code, wparam, lparam)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+//
+// ⚠️ WH_KEYBOARD_LL / WinEvent は実機でしか動かない。ここでテストするのは **判断だけ**である。
+// ★ hook_macos.rs (4 テスト) と対称な水準で、コールバックから切り出した純関数を固定する。
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typing_key_covers_letters_digits_and_control_keys() {
+        assert!(is_typing_key(0x41), "A");
+        assert!(is_typing_key(0x5A), "Z");
+        assert!(is_typing_key(0x30), "0");
+        assert!(is_typing_key(0x39), "9");
+        assert!(is_typing_key(0x08), "Backspace");
+        assert!(is_typing_key(0x0D), "Enter");
+        assert!(is_typing_key(0x20), "Space");
+        assert!(is_typing_key(0x09), "Tab");
+        assert!(is_typing_key(0x2E), "Delete");
+        assert!(is_typing_key(0x60), "Numpad 0 (範囲下端)");
+        assert!(is_typing_key(0x6F), "Numpad Divide (範囲上端)");
+        assert!(is_typing_key(0xBA), "OEM 記号 (範囲下端)");
+        assert!(is_typing_key(0xC0), "OEM 記号 (範囲上端)");
+        assert!(is_typing_key(0xDB), "OEM 記号 2群目 (範囲下端)");
+        assert!(is_typing_key(0xDF), "OEM 記号 2群目 (範囲上端)");
+    }
+
+    #[test]
+    fn typing_key_excludes_non_typing_keys() {
+        assert!(!is_typing_key(0x25), "VK_LEFT はタイピングキーではない");
+        assert!(!is_typing_key(0x1B), "VK_ESCAPE はタイピングキーではない");
+        assert!(
+            !is_typing_key(VK_KANJI),
+            "IME モードキー自体はタイピングキーではない"
+        );
+    }
+
+    /// ★ 範囲判定の off-by-one を捕まえる (境界の 1 つ外側)。
+    #[test]
+    fn typing_key_range_boundaries_are_exclusive_outside() {
+        assert!(!is_typing_key(0x40), "A-Z 範囲の直前");
+        assert!(!is_typing_key(0x5B), "A-Z 範囲の直後");
+        assert!(!is_typing_key(0x2F), "0-9 範囲の直前");
+        assert!(!is_typing_key(0x3A), "0-9 範囲の直後");
+        assert!(!is_typing_key(0x5F), "Numpad 範囲の直前");
+        assert!(!is_typing_key(0x70), "Numpad 範囲の直後 (F1 = VK_F1)");
+        assert!(!is_typing_key(0xB9), "OEM 記号 1群目の直前");
+        assert!(!is_typing_key(0xC1), "OEM 記号 1群目の直後");
+        assert!(!is_typing_key(0xDA), "OEM 記号 2群目の直前");
+        assert!(!is_typing_key(0xE0), "OEM 記号 2群目の直後");
+    }
+
+    #[test]
+    fn press_of_alphanumeric_key_closes_ime() {
+        // ★ Set(false) は current の値に関係なく常に false にする (Toggle との縮退を避けるため
+        //   意図的に「変化なし」になるケースも確認する)。
+        assert_eq!(
+            ime_open_after_press(VK_DBE_ALPHANUMERIC),
+            ImeOpenTransition::Set(false)
+        );
+        assert_eq!(
+            ime_open_after_press(VK_DBE_SBCSCHAR),
+            ImeOpenTransition::Set(false)
+        );
+    }
+
+    #[test]
+    fn press_of_kana_key_opens_ime() {
+        assert_eq!(
+            ime_open_after_press(VK_DBE_HIRAGANA),
+            ImeOpenTransition::Set(true)
+        );
+        assert_eq!(
+            ime_open_after_press(VK_DBE_KATAKANA),
+            ImeOpenTransition::Set(true)
+        );
+        assert_eq!(
+            ime_open_after_press(VK_DBE_DBCSCHAR),
+            ImeOpenTransition::Set(true)
+        );
+    }
+
+    /// ★ VK_KANJI はモード切り替えキーなので Set ではなく Toggle を返す。
+    /// `Set`/`Toggle` を型で分けたことで、「current を無視して固定値にする」テストと
+    /// 「current に応じて変わる」テストが構造的に混同できなくなっている
+    /// (旧 `Option<bool>` 表現では両者が同じ戻り値になる縮退ケースがあった)。
+    #[test]
+    fn press_of_kanji_key_returns_toggle() {
+        assert_eq!(ime_open_after_press(VK_KANJI), ImeOpenTransition::Toggle);
+    }
+
+    #[test]
+    fn press_of_unrelated_key_does_not_change_ime_state() {
+        assert_eq!(
+            ime_open_after_press(0x41),
+            ImeOpenTransition::None,
+            "A キーは IME モードに無関係"
+        );
+    }
+
+    /// ⚠️★ Surface Type Cover は VK_DBE_HIRAGANA を key-up でしか発火しない。
+    /// press 側の遷移表と非対称 (VK_KANJI が無い) であることをここで固定する。
+    #[test]
+    fn release_of_kana_key_opens_ime() {
+        assert_eq!(ime_open_after_release(VK_DBE_HIRAGANA), Some(true));
+        assert_eq!(ime_open_after_release(VK_DBE_KATAKANA), Some(true));
+        assert_eq!(ime_open_after_release(VK_DBE_DBCSCHAR), Some(true));
+    }
+
+    #[test]
+    fn release_of_alphanumeric_key_closes_ime() {
+        assert_eq!(ime_open_after_release(VK_DBE_ALPHANUMERIC), Some(false));
+        assert_eq!(ime_open_after_release(VK_DBE_SBCSCHAR), Some(false));
+    }
+
+    #[test]
+    fn release_of_kanji_key_does_not_change_ime_state() {
+        assert_eq!(
+            ime_open_after_release(VK_KANJI),
+            None,
+            "★ press 側と違い release 側の遷移表に VK_KANJI は無い"
+        );
+    }
+
+    #[test]
+    fn nav_keys_classified_as_navigate() {
+        for vk in [0x25, 0x26, 0x27, 0x28] {
+            assert_eq!(classify_ime_nav_key(vk), ImeNavAction::Navigate);
+        }
+    }
+
+    #[test]
+    fn escape_classified_as_abandon() {
+        assert_eq!(classify_ime_nav_key(0x1B), ImeNavAction::Abandon);
+    }
+
+    #[test]
+    fn typing_key_classified_as_other() {
+        assert_eq!(classify_ime_nav_key(0x41), ImeNavAction::Other);
+    }
+
+    #[test]
+    fn ime_mode_key_matches_all_dbe_and_kanji_keys() {
+        for vk in [
+            VK_DBE_ALPHANUMERIC,
+            VK_DBE_KATAKANA,
+            VK_DBE_HIRAGANA,
+            VK_DBE_SBCSCHAR,
+            VK_DBE_DBCSCHAR,
+            VK_KANJI,
+        ] {
+            assert!(is_ime_mode_key(vk));
+        }
+    }
+
+    #[test]
+    fn ime_mode_key_excludes_typing_keys() {
+        assert!(!is_ime_mode_key(0x41), "A キーは IME モードキーではない");
+    }
 }

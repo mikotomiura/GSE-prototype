@@ -102,7 +102,7 @@ impl ImeMonitor {
         // confirms a visible candidate window, the IME_ACTIVE flag is stale.
         // This happens when EVENT_OBJECT_IME_HIDE was missed (e.g. focus change, crash).
         // Reset it here to prevent permanently pausing all keystroke analysis.
-        if winevent_active && !enumwindows_active && !uia_active {
+        if is_stale_winevent_active(winevent_active, enumwindows_active, uia_active) {
             crate::input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
             return false;
         }
@@ -113,22 +113,8 @@ impl ImeMonitor {
 
 /// Scan all top-level windows for visible IME candidate windows using EnumWindows.
 ///
-/// Known IME candidate window class names on Windows 10/11:
-///   - "CandidateUI_UIElement" : Modern IME candidate list (Microsoft IME, Google IME)
-///   - "IME"               : Classic IMM32 IME window
-///   - "*Candidate*"       : Catch-all for other IME implementations
-///
-/// INTENTIONALLY EXCLUDED:
-///   - "MSCTFIME UI" : This is the TSF language bar (A/あ indicator on the taskbar).
-///     It is ALWAYS visible on systems with Japanese IME loaded, even during normal
-///     Latin text entry. Including it caused the engine to be permanently paused.
-///
-///   - `class == "IME"` (exact match) : This is a background system window created by the
-///     OS for every IMM32-aware application. It is ALWAYS visible (WS_VISIBLE set) on
-///     systems with Japanese IME, even when NOT composing. Including it causes a permanent
-///     false-positive that pauses all keystroke analysis indefinitely.
-///     Only substring matches ("CandidateUI", "Candidate") are used to catch the real
-///     candidate popup windows while excluding this always-on system window.
+/// マッチ判定そのもの (どのクラス名を候補ウィンドウとみなすか、"MSCTFIME UI" や
+/// 完全一致 "IME" をなぜ除外するか) は `is_ime_candidate_class_name` の doc を参照。
 fn is_ime_candidate_window_visible() -> bool {
     // The callback sets *lparam to true and stops enumeration when an IME window is found.
     unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -142,14 +128,7 @@ fn is_ime_candidate_window_visible() -> bool {
         if len > 0 {
             let class = String::from_utf16_lossy(&buf[..len as usize]);
 
-            // Match visible IME candidate windows only.
-            // Do NOT include "MSCTFIME" - that is the always-visible language bar.
-            // Do NOT include `class == "IME"` - that is a background system window
-            // created by the OS for every IMM32-aware application; it is ALWAYS
-            // visible (WS_VISIBLE set) on systems with Japanese IME, even when NOT
-            // composing. Including it causes a permanent false-positive that would
-            // pause all keystroke analysis indefinitely.
-            if class.contains("CandidateUI") || class.contains("Candidate") {
+            if is_ime_candidate_class_name(&class) {
                 // Signal found via lparam (pointer to bool on caller's stack)
                 *(lparam.0 as *mut bool) = true;
                 return BOOL(0); // Stop enumeration
@@ -171,6 +150,34 @@ fn is_ime_candidate_window_visible() -> bool {
 // Kept for API compatibility (unused)
 pub fn is_ime_active_check() -> bool {
     false
+}
+
+// ---------------------------------------------------------------------------
+// IME candidate window decisions (pure — テストできる形に切り出す)
+// ---------------------------------------------------------------------------
+
+/// WinEvent (`IME_ACTIVE`) が立っているのに EnumWindows / UIAutomation のどちらも
+/// 候補ウィンドウを確認できないとき、`IME_ACTIVE` は stale (EVENT_OBJECT_IME_HIDE 取りこぼし)。
+///
+/// ⚠️★ stale のまま放置すると、二度と `EVENT_OBJECT_IME_HIDE` が来ない限り
+/// 分析が永久に一時停止する (fail-open ではなく fail-stuck になる)。
+fn is_stale_winevent_active(
+    winevent_active: bool,
+    enumwindows_active: bool,
+    uia_active: bool,
+) -> bool {
+    winevent_active && !enumwindows_active && !uia_active
+}
+
+/// IME 候補ウィンドウのクラス名判定。
+///
+/// ⚠️★★ **"MSCTFIME UI" (言語バーの A/あ 表示) と、完全一致の "IME" (IMM32 の常駐
+/// システムウィンドウ) を含めてはならない。** どちらも日本語 IME 読み込み時は常時
+/// 可視なため、含めると変換していないときも false positive になり、
+/// 分析が永久に一時停止する事故になる (実際に起きた不具合)。
+/// ★ 部分一致 "CandidateUI" / "Candidate" のみで判定することでこれらを自然に除外する。
+fn is_ime_candidate_class_name(class: &str) -> bool {
+    class.contains("CandidateUI") || class.contains("Candidate")
 }
 
 /// Spawn a dedicated background thread for IME open/close state tracking.
@@ -281,4 +288,62 @@ fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool) {
         "IME open: {} (polling)",
         if on { "ON (あ)" } else { "OFF (A)" }
     );
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stale_when_only_winevent_signals_active() {
+        assert!(
+            is_stale_winevent_active(true, false, false),
+            "★ WinEvent だけが active なら stale とみなし、放置せずリセットする"
+        );
+    }
+
+    #[test]
+    fn not_stale_when_enumwindows_confirms() {
+        assert!(!is_stale_winevent_active(true, true, false));
+    }
+
+    #[test]
+    fn not_stale_when_uia_confirms() {
+        assert!(!is_stale_winevent_active(true, false, true));
+    }
+
+    #[test]
+    fn not_stale_when_winevent_itself_is_false() {
+        // WinEvent が false のときは「stale」という概念自体が当てはまらない。
+        assert!(!is_stale_winevent_active(false, false, false));
+    }
+
+    #[test]
+    fn matches_known_candidate_class_names() {
+        assert!(is_ime_candidate_class_name("CandidateUI_UIElement"));
+        assert!(is_ime_candidate_class_name("SomeCandidateWindow"));
+    }
+
+    /// ★★ 回帰テストの本体。この 2 クラス名を含めると分析が永久停止する不具合が実際に起きた。
+    #[test]
+    fn excludes_language_bar_and_imm32_system_window() {
+        assert!(
+            !is_ime_candidate_class_name("MSCTFIME UI"),
+            "言語バー (A/あ 表示) は変換中でなくても常時可視 → 含めると誤検知が固定化する"
+        );
+        assert!(
+            !is_ime_candidate_class_name("IME"),
+            "IMM32 の常駐システムウィンドウは常時可視 → 完全一致 'IME' は含めない"
+        );
+    }
+
+    #[test]
+    fn does_not_match_unrelated_class_names() {
+        assert!(!is_ime_candidate_class_name("Chrome_WidgetWin_1"));
+        assert!(!is_ime_candidate_class_name(""));
+    }
 }
