@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>GSE 表現層 Step 4 — 層 2（粒子）＋ 層 0 の自律変異</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, "Segoe UI", sans-serif; margin: 0 auto; max-width: 68rem;
+         padding: 1.2rem 1.4rem 4rem; line-height: 1.7; }
+  h1 { font-size: 1.25rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1.02rem; margin: 1.6rem 0 .5rem; border-bottom: 2px solid #8884; padding-bottom: .25rem; }
+  .sub { color: #888; font-size: .84rem; margin: 0 0 1rem; }
+  fieldset { border: 1px solid #8886; border-radius: 8px; margin: 0 0 1rem; padding: .7rem 1rem 1rem; }
+  legend { font-weight: 600; font-size: .93rem; padding: 0 .4rem; }
+  .row { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+  .opt { border: 1px solid #8886; border-radius: 6px; padding: .28rem .6rem; cursor: pointer; font-size: .88rem; }
+  button { font: inherit; padding: .42rem 1rem; border-radius: 6px; border: 1px solid #8886;
+           cursor: pointer; background: #8881; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  button.big { font-size: 1.05rem; padding: .7rem 1.6rem; }
+  input[type=range] { width: 15rem; vertical-align: middle; }
+  .stat { font-variant-numeric: tabular-nums; color: #888; font-size: .85rem; }
+  .note { font-size: .84rem; color: #888; margin: .35rem 0 0; }
+  .danger { color: #dc2626; font-weight: 600; }
+  .warn { color: #d08700; }
+  pre { background: #8881; padding: .7rem .9rem; border-radius: 6px; overflow: auto;
+        max-height: 32rem; font-size: .8rem; line-height: 1.45; }
+  .pass { color: #16a34a; } .fail { color: #dc2626; font-weight: 600; }
+  .nodata { color: #d08700; }
+  table { border-collapse: collapse; font-size: .85rem; margin: .5rem 0 0; }
+  th, td { border: 1px solid #8886; padding: .22rem .6rem; text-align: left; }
+  .trial-box { border: 2px solid #2563eb; border-radius: 10px; padding: 1rem; margin: .6rem 0 0; }
+  .huge { font-size: 2.1rem; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<h1>GSE 表現層 Step 4 — 層 2（粒子）＋ 層 0 の自律変異</h1>
+<p class="sub">
+  Step 4 / <span id="ver">EXPR_VERSION 読込中…</span> ―
+  <b>層 2（グラニュラー粒子）</b>と<b>層 0 の自律変異</b>を同時に鳴らし、
+  <b>混同が起きるか</b>を測ります。
+  ★ <b>機械検査が緑でも「良い音」ではありません。</b>判定するのは耳です。
+</p>
+
+<div id="loaderr" class="danger" hidden>
+  <p>設定ファイル <code>../step4.config.json</code> を読めませんでした。</p>
+  <p class="note">
+    <code>file://</code> で開くと同一オリジン制約で <code>fetch</code> が落ちます。
+    <code>bash run.sh serve</code> で開くか、下から設定ファイルを選んでください。
+  </p>
+  <p><input type="file" id="cfgpick" accept=".json,application/json"></p>
+</div>
+
+<div id="app" hidden>
+
+<!-- ================= 交渉不可の要件（[P71] spec §5 要件 1） ================= -->
+<fieldset>
+  <legend>再生 / ★★★ 止められること・音量を変えられること（交渉不可・[P71]）</legend>
+  <p class="row">
+    <button id="btn-play" class="primary big">▶ 鳴らす</button>
+    <button id="btn-stop" class="big" disabled>■ 止める</button>
+    <span class="stat" id="elapsed">停止中</span>
+  </p>
+  <p class="danger" id="transport-error" hidden></p>
+  <p class="row">
+    <label for="vol">音量</label>
+    <input type="range" id="vol" min="0" max="100" value="30">
+    <span class="stat" id="volout">30%（−10.5 dBFS 相当）</span>
+  </p>
+  <p class="note">
+    ★ 停止は即時 <code>stop()</code> ではなく <span id="fadeout-s">—</span> s のランプで 0 へ落としてから
+    <code>close()</code> します（spec §2「✗ オンセット」を停止時にも作らないため）。
+    立ち上げも <span id="fadein-s">—</span> s のフェードインです。
+  </p>
+  <p class="note warn">
+    ⚠️ <b>B4: この 2 つが実際に効くことは Step 3 で未実測のまま残っています。</b>
+    ★ <b>真っ先に「止める」を押し、音量を動かしてください。</b>これは交渉不可の要件です。
+  </p>
+</fieldset>
+
+<!-- ================= 層 0 ================= -->
+<h2>層 0（基層）— 状態に応答しない</h2>
+
+<fieldset>
+  <legend>基音（spec §2: 55–110 Hz 帯）</legend>
+  <div class="row" id="ax-base"></div>
+  <p class="note">切替は <span id="glide-s">—</span> s の連続グライドです（spec §2「動かすなら連続グライド」）。</p>
+</fieldset>
+
+<fieldset>
+  <legend>★ B5: 倍音の減衰則 — どれで「ブラウンノイズに聴こえた」のか（S3-D14）</legend>
+  <div class="row" id="ax-decay"></div>
+  <p class="note">
+    ⚠️ Step 3 ではどれで聴いたかの記録がありません（既定は 1/n²）。
+    ★ <b>明示的に聴き比べて決めてください。</b>
+    ⚠️ 実際に鳴っているのはノイズではなく<b>整数次倍音の正弦和</b>です
+    （「ブラウンノイズに聴こえた」こと自体が発見である・S3-D14）。
+  </p>
+</fieldset>
+
+<fieldset>
+  <legend>★★★ 層 0 の自律変異 — 分離案（S3-D13 の A / B / C）</legend>
+  <div class="row" id="ax-plan"></div>
+  <p class="note" id="plan-desc">—</p>
+  <p class="note warn">
+    ⚠️ <b>これが本 Step の主題です。</b>層 0 の自律変異が状態の波（0.001–0.02 Hz）と同じ帯域に入ると、
+    <b>「基層が勝手に揺れた」と「自分の状態が変わった」が区別できなくなります＝表現層の偽陽性。</b>
+  </p>
+</fieldset>
+
+<!-- ================= 層 2 ================= -->
+<h2>層 2（粒子）— 前進を密度に写す</h2>
+
+<fieldset>
+  <legend>★ B6: 粒子率と下限 100 grains/s（spec §2）</legend>
+  <p class="row">
+    <label class="opt"><input type="checkbox" id="l2-on" checked> 層 2 を鳴らす</label>
+    <label for="l2-fixed" style="margin-left:.6rem">固定粒子率</label>
+    <span class="row" id="ax-rate"></span>
+  </p>
+  <p class="row">
+    <label class="opt"><input type="checkbox" id="l2-map"> ★ データで密度を動かす（固定粒子率を上書き）</label>
+    <span class="stat" id="rate-now">—</span>
+  </p>
+  <p class="note">
+    ⚠️★★ <b>粒子率 100 grains/s は文献の数値ではなく [P64] の分節原理からの演繹です</b>（spec §9-6）。
+    ★ <b>だから下限を割った状態（50 / 20 / 8）も用意してあります。</b>
+    <b>本当に「粒が個別に聞こえてリズムとして分節する」かを、実際に下げて確かめてください。</b>
+  </p>
+  <p class="note">
+    ★ 粒は <b>Hann 窓を掛けた正弦バースト</b>（合成音のみ。実物音の引用禁止＝S3-D14 を維持）。
+    発火間隔には<b>ジッタ</b>を入れてあります（等間隔は「拍」そのもので spec §2 の禁止事項）。
+  </p>
+</fieldset>
+
+<fieldset>
+  <legend>系統 A（推定経由）/ 系統 B（観測直結）— spec §3</legend>
+  <div class="row" id="ax-path"></div>
+  <p class="note" id="path-desc">—</p>
+  <p class="row">
+    <label for="csvpick">smoothed CSV</label>
+    <input type="file" id="csvpick" accept=".csv,text/csv">
+    <span class="stat nodata" id="csvinfo">未選択</span>
+  </p>
+  <p class="note">
+    ★ 実データは <b>読むだけ</b>です。ファイル名も含めてどこへも送信しません（S3-D9 / <code>data-privacy</code>）。
+    ⚠️ 系統 B の <code>paste</code> は <code>FeatSnapshot</code> に無いため落としてあります（S4-D6）。
+  </p>
+  <p class="row">
+    <span>★ B3: 離席復帰の扱い</span>
+    <span class="row" id="ax-gap"></span>
+  </p>
+  <p class="stat" id="mapstat">—</p>
+  <p class="note warn">
+    ⚠️ <b>B3 は S0-D11 が未決として残してから 2 Step 持ち越しています。</b>
+    ★ <b>P010（離席が経過の 71%・最大 994 秒）でしか判断材料が出ません。</b>
+  </p>
+</fieldset>
+
+<!-- ================= 混同テスト ================= -->
+<h2>★★★ 混同テスト（本 Step の関門）</h2>
+
+<fieldset>
+  <legend>1. 見本を聴く（非盲検・ラベル付き）</legend>
+  <p class="note">
+    ★ <b>先にこれをやってください。</b>これが無いと「案が悪い」と「そもそも聞こえない」が混ざります。
+    ⚠️ <b>2 種類の変化量は知覚的に等化していません</b>（S4-D4 の限界 3 点を参照）。
+  </p>
+  <p class="row">
+    <button id="btn-demo-l0">基層を変える（層 0）</button>
+    <button id="btn-demo-l2">状態を変える（層 2）</button>
+    <button id="btn-demo-reset">元に戻す</button>
+    <span class="stat" id="demostat">—</span>
+  </p>
+</fieldset>
+
+<fieldset>
+  <legend>2. 盲検・強制選択トライアル（S4-D4）</legend>
+  <p class="note">
+    現在の分離案について <b><span id="bt-n">—</span> トライアル × <span id="bt-sec">—</span> 秒</b>。
+    内訳は <b>層 0 が動く <span id="bt-c0">—</span> / 層 2 が動く <span id="bt-c2">—</span> /
+    ★ 何も動かない catch <span id="bt-cc">—</span></b>。
+    ★ <b>案を残す閾値 = 採点 <span id="bt-scored">—</span> 問中 <span id="bt-thr">—</span> 問以上正答。</b>
+    ⚠️ <b>途中で正誤は出しません。</b>
+  </p>
+  <p class="row">
+    <button id="btn-bt-start" class="primary">盲検を始める</button>
+    <button id="btn-bt-abort" disabled>中止する</button>
+    <span class="stat" id="btstat">未開始</span>
+  </p>
+  <div id="trialbox" class="trial-box" hidden>
+    <p class="stat">分離案 <b id="bt-plan">—</b> / トライアル <b id="bt-i">—</b> / <span id="bt-total">—</span></p>
+    <p class="huge" id="bt-count">—</p>
+    <p class="row" id="bt-choices" hidden></p>
+    <p class="note" id="bt-hint">聴いてください。カウントが 0 になったら回答欄が出ます。</p>
+  </div>
+  <div id="btresult" hidden>
+    <p class="row">
+      <button id="btn-bt-export">結果を保存（JSON）</button>
+      <span class="stat">★ results/ に置いてください</span>
+    </p>
+    <div id="btresult-body"></div>
+  </div>
+</fieldset>
+
+<!-- ================= 検算 ================= -->
+<h2>機械検算（★ 「危険でないと言えない」ことしか示しません）</h2>
+
+<fieldset>
+  <legend>変調スペクトル（S3-D4 / S0-D8）</legend>
+  <p class="note">
+    本番と同じ合成グラフを <code>OfflineAudioContext</code> で
+    <span id="st-sec">—</span> s レンダリングし、<b>Hann 窓</b>付き直接 DFT で線の位置を測ります。
+    ⚠️ <b>窓なし DFT と帯域 RMS は使いません</b>（S0-D8: 実測で符号が逆になった）。
+    ⚠️ <b>変調は側帯波 f0±f に出ます</b>（Step 3 で 4 Hz の線だけ見ていた検査が空回りしていた）。
+  </p>
+  <p class="row">
+    <button id="btn-selftest">検算を走らせる</button>
+    <button id="btn-sabotage" title="検査が空回りしていないことを確かめる">★ 逆検査（4 Hz を注入して赤くする）</button>
+    <button id="btn-grainrate">★ 粒子率を実測する（設定値ではなく実体）</button>
+    <button id="btn-tilt">★ 倍音傾斜の機構を測る（B/C 案の前提）</button>
+    <button id="btn-clearlog">ログ消去</button>
+  </p>
+  <pre id="log">（未実行）</pre>
+</fieldset>
+
+</div><!-- /app -->
+
+<script>
+"use strict";
+
+/* =========================================================================
+ * GSE 表現層 Step 4 — 層 2（粒子）＋ 層 0 の自律変異
+ *
+ * ★ 設計の拘束（すべて一次資料に接地。勝手に変えない）
+ *   - media-expression-spec.md §2 層 0: 55–110 Hz + 整数次倍音のみ / 非調和ゼロ / sharpness 低
+ *   - spec §2 層 2: グラニュラー密度。★★ 粒子率の下限 = 100 grains/s
+ *   - spec §2 全層共通の禁止: オンセット / 拍・リズム / 音高のステップ / 実物音の引用
+ *   - spec §1.3: ★ 表現層の平滑化 τ ≥ 60 秒（交渉不可・数値で固定）
+ *   - spec §5 要件 1 [P71]: ★ 止められること・音量を変えられること（交渉不可）
+ *   - S0-D8: 変調スペクトルは必ず Hann 窓。窓なし DFT / 帯域 RMS を判定に使わない
+ *   - S3-D4: 検算は「本番と同じ合成グラフ」を測る（二重実装しない）
+ *   - S3-D13: 層 0 の自律変異と状態の波の混同 → A/B/C 案を耳で決める
+ *
+ * ★★★ S4-D8: 層 0 のコアは layer0.html からの**逐語複製**である。
+ *   乖離していないことを scripts/step4_selftest.py が毎回実測する。
+ *   ⚠️ 下の LAYER0-CORE 区画を編集したら、Step 3 側にも同じ変更を入れること。
+ *   **赤を消すために比較対象を減らさない。**
+ * ========================================================================= */
+
+const $ = (id) => document.getElementById(id);
+let CFG = null;
+
+/* ---------- 設定の読み込み（file:// では fetch が落ちるのでフォールバックを持つ） ---------- */
+async function loadConfig() {
+  try {
+    const res = await fetch("../step4.config.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+function boot(cfg) {
+  CFG = cfg;
+  $("loaderr").hidden = true;
+  $("app").hidden = false;
+  $("ver").textContent =
+    "EXPR_VERSION " + cfg.expr_version + " / HMM_VERSION " + cfg.hmm_version;
+  $("fadeout-s").textContent = cfg.envelope.fade_out_s;
+  $("fadein-s").textContent = cfg.envelope.fade_in_s;
+  $("glide-s").textContent = cfg.envelope.glide_s;
+  $("st-sec").textContent = cfg.selftest.render_seconds;
+  const bt = cfg.blind_test;
+  $("bt-n").textContent = bt.trials_per_plan;
+  $("bt-sec").textContent = bt.trial_seconds;
+  $("bt-c0").textContent = bt.composition.layer0;
+  $("bt-c2").textContent = bt.composition.layer2;
+  $("bt-cc").textContent = bt.composition.catch;
+  $("bt-scored").textContent = bt.scored_trials;
+  $("bt-thr").textContent = bt.pass_threshold_correct;
+  buildAxisUI();
+  wireTransport();
+  wireLayer2();
+  wireBlind();
+  wireSelftest();
+}
+
+(async () => {
+  const cfg = await loadConfig();
+  if (cfg) { boot(cfg); return; }
+  $("loaderr").hidden = false;
+  $("cfgpick").addEventListener("change", async (ev) => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    try { boot(JSON.parse(await f.text())); }
+    // ⚠️ alert() を使わない（モーダルはページを止め、自動検証も固める）
+    // ⚠️★ innerHTML / insertAdjacentHTML を使わない —— `JSON.parse` の例外メッセージは
+    //    **読ませたファイルの中身を無エスケープで含む**（V8 はエラー位置の前後を切り出す）。
+    //    ★ 選ばせるファイルは任意なので、HTML として解釈させる経路を作らない。
+    catch (e) {
+      const p = document.createElement("p");
+      p.className = "danger";
+      p.textContent = "設定ファイルを解釈できません: " + e.message;
+      $("loaderr").appendChild(p);
+    }
+  });
+})();
+
+/* ---------- 選択状態 ---------- */
+const sel = { base: null, decay: null, plan: null, rate: null, path: null, gap: null };
+
+function radioGroup(hostId, options, defaultId, key, onChange) {
+  const host = $(hostId);
+  host.innerHTML = "";
+  options.forEach((o) => {
+    const lab = document.createElement("label");
+    lab.className = "opt";
+    const inp = document.createElement("input");
+    inp.type = "radio";
+    inp.name = key;
+    inp.value = o.id;
+    inp.checked = o.id === defaultId;
+    inp.addEventListener("change", () => { sel[key] = o.id; onChange(o); });
+    lab.appendChild(inp);
+    lab.appendChild(document.createTextNode(o.label));
+    if (o.spec_compliant === false) lab.style.borderColor = "#d08700";
+    host.appendChild(lab);
+  });
+  sel[key] = defaultId;
+}
+
+function buildAxisUI() {
+  const c = CFG.candidates;
+  radioGroup("ax-base", c.base_hz.options, c.base_hz.default, "base", () => applyBase());
+  radioGroup("ax-decay", c.decay_law.options, c.decay_law.default, "decay", () => applyDecay());
+  radioGroup("ax-plan", CFG.separation_plans.options, CFG.separation_plans.default, "plan",
+             () => { applyPlan(); describePlan(); });
+  const rateOpts = CFG.layer2.below_floor_presets_per_s.map((r) => ({
+    id: "r" + r, rate: r,
+    label: r + " grains/s" + (r < CFG.spec_anchors.grain_rate_floor_per_s ? "（★ 下限割れ）" : "（下限）"),
+    spec_compliant: r >= CFG.spec_anchors.grain_rate_floor_per_s,
+  }));
+  radioGroup("ax-rate", rateOpts, rateOpts[0].id, "rate", () => applyRate(true));
+  radioGroup("ax-path", CFG.mapping.pathways, CFG.mapping.default, "path",
+             () => { describePath(); reparseCsv(); });
+  radioGroup("ax-gap", CFG.mapping.gap_behavior.options, CFG.mapping.gap_behavior.default, "gap", () => {});
+  describePlan(); describePath();
+}
+
+const optById = (list, id) => list.find((o) => o.id === id);
+const baseOpt  = () => optById(CFG.candidates.base_hz.options, sel.base);
+const decayOpt = () => optById(CFG.candidates.decay_law.options, sel.decay);
+const planOpt  = () => optById(CFG.separation_plans.options, sel.plan);
+const rateOpt  = () => CFG.layer2.below_floor_presets_per_s.find((r) => "r" + r === sel.rate);
+const pathOpt  = () => optById(CFG.mapping.pathways, sel.path);
+
+function describePlan() {
+  const p = planOpt();
+  const rates = (p.rates_hz || []);
+  const period = rates.length ? (1 / Math.max(...rates) / 60).toFixed(1) + " 分" : "—";
+  $("plan-desc").textContent =
+    "次元: " + (p.dimension === "amp" ? "振幅" : p.dimension === "tilt" ? "音色（倍音傾斜）" : "なし") +
+    " / レート: " + (rates.length ? rates.join(" + ") + " Hz（最速の周期 " + period + "）" : "なし") +
+    (p._cost ? "  " + p._cost : "");
+}
+function describePath() {
+  const p = pathOpt();
+  $("path-desc").textContent = "列 " + p.column + " — " + p.note;
+}
+
+/* =========================================================================
+ * LAYER0-CORE:BEGIN
+ * ★★★ ここから下の関数群は experiments/20260812-expression-layer0-drone/player/layer0.html
+ *      からの**逐語複製**である（S4-D8）。scripts/step4_selftest.py が一致を実測する。
+ *      ⚠️ 編集したら Step 3 側にも同じ変更を入れること。赤を消すために検査を緩めない。
+ * ========================================================================= */
+
+function maxPartials() {
+  return Math.max(...CFG.candidates.decay_law.options.map((o) => o.partials));
+}
+
+/** 倍音の振幅係数。★ 整数次のみ・非調和成分ゼロ（spec §2）。合計 1 に正規化する。
+ *  返す配列は常に長さ `slots`。`partials` を超える次数は **0**（＝鳴らない）。 */
+function partialAmps(law, partials, slots) {
+  const n_slots = slots || partials;
+  const a = [];
+  for (let n = 1; n <= n_slots; n++) {
+    a.push(n <= partials ? (law === "1/n" ? 1 / n : 1 / (n * n)) : 0);
+  }
+  const s = a.reduce((p, q) => p + q, 0);
+  return a.map((v) => (s > 0 ? v / s : 0)); // 全倍音が同位相で揃っても振幅 1 を超えない
+}
+
+/** dB のピーク偏差 → 線形の偏差（+depth dB 側で厳密に一致する）。 */
+const dbToLinDev = (db) => Math.pow(10, db / 20) - 1;
+
+/**
+ * 合成グラフを組む。
+ * @param ctx AudioContext または OfflineAudioContext
+ * @param o   { baseHz, law, partials, driftDepthDb, driftRates, dcCarrier, headroom }
+ *            dcCarrier=true なら発振器の代わりに定数 1 を流す
+ *            → 出力そのものが「マスターゲインの包絡」になる（検算用・S3-D4）
+ */
+function buildGraph(ctx, o) {
+  const t0 = ctx.currentTime;
+  const sum    = ctx.createGain(); sum.gain.value = 1;
+  const drift  = ctx.createGain(); drift.gain.value = 1;
+  const expr   = ctx.createGain(); expr.gain.value = 1;
+  const master = ctx.createGain(); master.gain.value = 0; // ★ 常に 0 から始める（オンセット回避）
+  sum.connect(drift); drift.connect(expr); expr.connect(master);
+  master.connect(ctx.destination);
+
+  const oscs = [], gains = [], srcs = [];
+  if (o.dcCarrier) {
+    const dc = ctx.createConstantSource();
+    dc.offset.value = 1;
+    dc.connect(sum);
+    srcs.push(dc);
+  } else {
+    // ★ 常に slots 本作る。使わない次数はゲイン 0（作り直しを不要にするため）
+    const amps = partialAmps(o.law, o.partials, o.slots);
+    amps.forEach((a, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";                       // ★ 正弦のみ。非調和成分を持ち込まない
+      osc.frequency.value = o.baseHz * (i + 1); // ★ 整数次
+      const g = ctx.createGain();
+      g.gain.value = a * o.headroom;
+      osc.connect(g); g.connect(sum);
+      oscs.push(osc); gains.push(g); srcs.push(osc);
+    });
+  }
+
+  // 超低速ゆらぎ: 通約できない 2 波の和を drift.gain へ加算（S3-D10）
+  // ★ LFO も常に全レート分を作り、深さ 0 のときはゲイン 0 にする（作り直しを不要にするため）
+  const lfos = [], lfoGains = [];
+  const rates = o.allRates || [];
+  const active = (o.driftRates || []).length;
+  const per = active ? dbToLinDev(o.driftDepthDb || 0) / active : 0;
+  rates.forEach((r) => {
+    const lfo = ctx.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = r;
+    const lg = ctx.createGain();
+    lg.gain.value = (o.driftRates || []).includes(r) ? per : 0;
+    lfo.connect(lg); lg.connect(drift.gain);
+    lfos.push(lfo); lfoGains.push(lg); srcs.push(lfo);
+  });
+
+  return { ctx, sum, drift, expr, master, oscs, gains, lfos, lfoGains, rates, srcs, t0,
+           headroom: o.headroom, partials: o.partials, law: o.law, baseHz: o.baseHz };
+}
+
+function startAll(g, when) { g.srcs.forEach((s) => s.start(when)); }
+
+/**
+ * 片側振幅（Hann 窓 + コヒーレントゲイン補正・平均除去）。
+ * ★ expr_smooth.py:163 dft_magnitude と同一の規約に揃えてある。
+ * ⚠️ window=false は用意しない（S0-D8: 窓なしは符号を逆にする）。
+ */
+function hannAmplitude(x, fsHz, freqHz) {
+  const n = x.length;
+  if (n < 3) return 0;
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += x[i];
+  mean /= n;
+  let cg = 0;
+  for (let i = 0; i < n; i++) cg += 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
+  cg /= n;
+  const w = (-2 * Math.PI * freqHz) / fsHz;
+  let re = 0, im = 0;
+  for (let i = 0; i < n; i++) {
+    const win = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
+    const v = (x[i] - mean) * win, ph = w * i;
+    re += v * Math.cos(ph); im += v * Math.sin(ph);
+  }
+  return (Math.hypot(re, im) / n) * 2.0 / cg;
+}
+
+/** ブロック平均による間引き。★ sinc の減衰を厳密に補正して返す（安全側に誤らないため）。 */
+function decimate(x, factor) {
+  const m = Math.floor(x.length / factor), out = new Float64Array(m);
+  for (let i = 0; i < m; i++) {
+    let s = 0;
+    for (let k = 0; k < factor; k++) s += x[i * factor + k];
+    out[i] = s / factor;
+  }
+  return out;
+}
+function sincGain(freqHz, fsInHz, factor) {
+  const a = (Math.PI * freqHz * factor) / fsInHz;
+  return a === 0 ? 1 : Math.sin(a) / a;
+}
+
+/** フェードイン部を捨てた定常部だけを返す（立ち上がりは測定対象ではない）。 */
+function steadyPart(r) {
+  const skip = Math.round((CFG.envelope.fade_in_s + 2) * r.sr);
+  return r.data.subarray(skip);
+}
+
+/* =========================================================================
+ * LAYER0-CORE:END
+ * ========================================================================= */
+
+/** 全分離案が使う LFO レートの和集合（★ 常に作っておき、深さ 0 で無効化する）。
+ *  ⚠️ layer0.html の allDriftRates() は candidates.drift を読むが、本 Step は
+ *     separation_plans を読むので**別関数**である（S4-D8 の比較対象に含めない）。 */
+function allPlanRates(includeProbe) {
+  const s = new Set();
+  CFG.separation_plans.options.forEach((o) => (o.rates_hz || []).forEach((r) => s.add(r)));
+  // ⚠️★ 検証専用レートは **検算のときだけ** 足す。
+  //    実時間グラフに入れると config の「研究者には鳴らさない」という記述と実体がずれる。
+  if (includeProbe && CFG.selftest.tilt_probe_rate_hz) s.add(CFG.selftest.tilt_probe_rate_hz);
+  return [...s].sort((a, b) => a - b);
+}
+
+/* =========================================================================
+ * 層 0 の「倍音傾斜」変調（B / C 案の実体）
+ *
+ * ★★ LFO を各倍音のゲイン AudioParam へ、重み w_n を掛けて入れる。
+ *    w_n は **Σ a_n·w_n = 0** に正規化してあるので、
+ *    ★ **倍音の配分（音色）は動くが、振幅の総和はほぼ動かない。**
+ *    → これが「次元で分ける」の実体である。⚠️ そう主張するだけでなく btn-tilt で実測する。
+ * ========================================================================= */
+function tiltWeights(amps) {
+  // u_n = log2(n+1): 低次と高次を対称に扱うための尺度（線形の n だと高次に寄りすぎる）
+  const u = amps.map((_, i) => Math.log2(i + 2));
+  const sa = amps.reduce((p, q) => p + q, 0);
+  if (sa <= 0) return amps.map(() => 0);
+  const mean = amps.reduce((p, a, i) => p + a * u[i], 0) / sa;
+  const w = u.map((v) => v - mean);
+  const wmax = Math.max(...w.map(Math.abs), 1e-9);
+  return w.map((v) => v / wmax); // -1..1
+}
+
+/** LFO → tiltGain[lfo][partial] → gains[partial].gain を張る（常に最大構成・使わない側は 0）。 */
+function attachTilt(g) {
+  g.tiltGains = g.lfos.map((lfo) =>
+    g.gains.map((pg) => {
+      const tg = g.ctx.createGain();
+      tg.gain.value = 0;
+      lfo.connect(tg); tg.connect(pg.gain);
+      return tg;
+    })
+  );
+}
+
+/* =========================================================================
+ * 層 2（粒子）— AudioWorklet
+ * ========================================================================= */
+async function attachLayer2(g, ctx) {
+  const L2 = CFG.layer2;
+  const node = new AudioWorkletNode(ctx, "grain-processor", {
+    numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1],
+    processorOptions: {
+      grainMs: L2.grain_ms, centerHz: L2.center_hz, spreadCents: L2.spread_cents,
+      seed: L2.seed, jitter: L2.jitter === undefined ? 0.5 : L2.jitter,
+      densityNormExp: L2.density_norm_exp === undefined ? 0.5 : L2.density_norm_exp,
+    },
+  });
+  const bpf = ctx.createBiquadFilter();
+  bpf.type = "lowpass";              // ★ sharpness を上げない（spec §2 層 0 と同じ思想）
+  bpf.frequency.value = L2.bpf_hz;
+  bpf.Q.value = L2.bpf_q;
+  const gain = ctx.createGain();
+  gain.gain.value = 0;               // ★ 0 から始める（オンセット回避）
+  node.connect(bpf); bpf.connect(gain); gain.connect(g.master);
+  g.grain = node; g.grainGain = gain; g.grainBpf = bpf;
+  return node;
+}
+
+function ensureWorklet(ctx) {
+  // ★ addModule は ctx ごとに要る（Offline も含む）。★ 失敗を握り潰さない
+  return ctx.audioWorklet.addModule("grain-processor.js");
+}
+
+/* =========================================================================
+ * 合成注入の遷移（★ raised-cosine・所要 transition_s 秒）
+ *
+ * ⚠️★★★ S4-D5 は「τ≥60 s の一次遅れを通す」と決めたが、**実装後のレビューで欠点が出た**:
+ *   一次遅れは 1 時定数で 63% しか到達せず、★ **37% が次トライアルへ持ち越される。**
+ *   → **catch トライアル（何も動かさない）でも前トライアルの残留が動き続け、
+ *      「いつも何か変わったと答える」応答バイアスの検出が成立しなくなる。**
+ *
+ * ★ raised-cosine に替える理由（★ 緩めたのではなく、2 点とも安全側に強くなる）:
+ *   1. **始端・終端の傾きが 0**。⚠️ 一次遅れは **t=0 で傾きが最大**（＝導関数に角がある）。
+ *      spec §2 の「✗ オンセット」に対して raised-cosine のほうが厳しい。
+ *   2. **transition_s で完全に到達する**ので **残留がゼロ**。catch が本当に「何も動かない」になる。
+ *   3. 帯域は約 1/transition_s = 0.017 Hz で、spec §1.3 の上限 ≤0.017 Hz に収まる。
+ *      ★ 禁止帯（0.5–20 Hz / 15–70 Hz）からは 2 桁下のまま。
+ *
+ * ⚠️ **実データ経路には掛けない** —— CSV は既に `expr_smooth.py --tau 60` を通っている。
+ * ========================================================================= */
+class Transition {
+  constructor(dur, init) { this.dur = dur; this.from = init; this.to = init; this.t = dur; }
+  /** 新しい目標へ動き出す（★ 現在値から始めるので、途中で呼んでも段差にならない）。 */
+  set(target) { this.from = this.value(); this.to = target; this.t = 0; }
+  advance(dt) { if (dt > 0) this.t = Math.min(this.dur, this.t + dt); return this.value(); }
+  value() {
+    const u = this.dur > 0 ? Math.min(1, this.t / this.dur) : 1;
+    const w = 0.5 - 0.5 * Math.cos(Math.PI * u); // ★ 端点の傾きが 0
+    return this.from + (this.to - this.from) * w;
+  }
+  /** ★ まだ動き終わっていない量（catch の汚染を results に残すために測る）。 */
+  residual() { return Math.abs(this.to - this.value()); }
+}
+
+/* =========================================================================
+ * 実時間再生
+ * ========================================================================= */
+const HEADROOM = 0.5; // −6 dB。倍音が同位相で揃ったときのクリップ余裕
+
+let ctx = null, graph = null, playing = false, starting = false;
+let startedAt = 0, tickTimer = null, ctlTimer = null;
+let analyser = null, analyserBuf = null;
+let lastCtl = 0, volTarget = null;
+// ★ 状態の遷移器（0..1）。見本 / 盲検が書き込む唯一の入口。
+//   ⚠️ 層 0 のベースラインは **1（＝分離案の設計どおりの深さ）**である。
+//      0 から始めると、盲検を開始した瞬間に「深さ 1 → 0」という**誰も指示していない変化**が起きる。
+let trL2 = null, trL0 = null;
+
+/* ★ 検証用の読み取り専用フック（browser-verification）。
+ * ⚠️ 「グラフを組んだ」と「実際に音が出ている」は別である。 */
+window.__step4 = {
+  state() {
+    return {
+      playing,
+      ctxState: ctx ? ctx.state : null,
+      ctxTime: ctx ? +ctx.currentTime.toFixed(3) : null,
+      masterGain: graph ? +graph.master.gain.value.toFixed(6) : null,
+      grainGain: graph && graph.grainGain ? +graph.grainGain.gain.value.toFixed(6) : null,
+      grainRate: graph && graph.grain ? +graph.grain.parameters.get("rate").value.toFixed(2) : null,
+      oscCount: graph ? graph.oscs.length : 0,
+      lfoCount: graph ? graph.lfos.length : 0,
+      tiltNodes: graph && graph.tiltGains ? graph.tiltGains.length * graph.tiltGains[0].length : 0,
+      partialGains: graph ? graph.gains.map((g) => +g.gain.value.toFixed(6)) : [],
+      sel: { ...sel },
+      volSlider: +$("vol").value,
+      csvLoaded: !!mp.rows,
+      // ★ 「目標値」ではなく **いま効いている値**を出す（見本が no-op でないことを外から実測できる）
+      effL2: trL2 ? +trL2.value().toFixed(4) : null,
+      effL0: trL0 ? +trL0.value().toFixed(4) : null,
+      effectiveRate: graph && graph.grain ? +graph.grain.parameters.get("rate").value.toFixed(2) : null,
+      demoActive, grainsPerS: lastGrainStats ? lastGrainStats.rate : null,
+      dropped: lastGrainStats ? lastGrainStats.dropped : null,
+      blind: bt.running ? { plan: bt.plan, i: bt.i, total: bt.order.length } : null,
+    };
+  },
+  /** 実出力の RMS（★ 0 なら「グラフはあるが鳴っていない」）。 */
+  rms() {
+    if (!analyser) return null;
+    analyser.getFloatTimeDomainData(analyserBuf);
+    let s = 0;
+    for (let i = 0; i < analyserBuf.length; i++) s += analyserBuf[i] * analyserBuf[i];
+    return +Math.sqrt(s / analyserBuf.length).toExponential(4);
+  },
+  logText() { return $("log").textContent; },
+  results() { return bt.results; },
+};
+
+function showTransportError(msg) {
+  const el = $("transport-error");
+  el.textContent = msg;
+  el.hidden = false;
+  console.warn("[step4] " + msg);
+}
+
+function volLinear() { return $("vol").value / 100; }
+
+function updateVolLabel() {
+  const v = volLinear();
+  const db = v > 0 ? (20 * Math.log10(v)).toFixed(1) + " dBFS 相当" : "無音";
+  $("volout").textContent = $("vol").value + "%（" + db + "）";
+}
+
+async function play() {
+  // ⚠️★★★ 再入ガード。★ `playing = true` は末尾でしか立たないうえ、下に最大 1.2 s の await がある。
+  //   2 回押すと **AudioContext が 2 つ生き、片方は参照を失って止められなくなる**（[P71] 違反）。
+  //   ★ B4 の実測手順（鳴らす → すぐ止める）がまさにこの経路を踏む。
+  if (playing || starting) return;
+  starting = true;
+  $("btn-play").disabled = true;
+  try {
+    await startAudio();
+  } finally {
+    starting = false;
+    if (!playing) $("btn-play").disabled = false;
+  }
+}
+
+async function startAudio() {
+  $("transport-error").hidden = true;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // ⚠️★★ `await ctx.resume()` を素で待たない（S3 の実測: Promise が解決せず無言で固まる）
+  await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 1200))]);
+  if (ctx.state !== "running") {
+    try { await ctx.close(); } catch (e) {}
+    ctx = null;
+    showTransportError(
+      "ブラウザが音の再生を許可しませんでした（AudioContext が suspended のまま）。" +
+      "「鳴らす」を実際にクリックして開始してください。" +
+      "それでも出ない場合はアドレスバー左の鍵アイコン → サイトの設定 → 「音声」が" +
+      "「ブロック」になっていないか確認してください。"
+    );
+    return;
+  }
+  try {
+    await ensureWorklet(ctx);
+  } catch (e) {
+    try { await ctx.close(); } catch (e2) {}
+    ctx = null;
+    showTransportError(
+      "AudioWorklet (grain-processor.js) を読み込めませんでした: " + e.message +
+      "。★ file:// では読み込めません。`bash run.sh serve` で開いてください。"
+    );
+    return;
+  }
+  const dc = decayOpt();
+  graph = buildGraph(ctx, {
+    baseHz: baseOpt().hz, law: dc.law, partials: dc.partials,
+    driftDepthDb: 0, driftRates: [],          // ★ 分離案は applyPlan() が張る（0 から始める）
+    slots: maxPartials(), allRates: allPlanRates(),
+    dcCarrier: false, headroom: HEADROOM,
+  });
+  attachTilt(graph);
+  await attachLayer2(graph, ctx);
+
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyserBuf = new Float32Array(analyser.fftSize);
+  graph.master.connect(analyser);
+
+  // ★ Worklet の粒数統計を実時間でも受け取る（A6 を「設定値」でなく実体で見るため）
+  graph.grain.port.onmessage = (e) => {
+    if (e.data && e.data.seconds > 0) {
+      lastGrainStats = { rate: e.data.grainsEmitted / e.data.seconds, dropped: e.data.dropped,
+                         voices: e.data.activeVoices };
+    }
+  };
+  const now = ctx.currentTime;
+  startAll(graph, now);
+  // ★ フェードイン: アタックを作らない（spec §2 ✗オンセット）
+  // ⚠️★ 音量の「目標値」を変数で持つ —— スライダを直接 master.gain へ書くと、
+  //    フェードイン中は **ランプ終端（play 時点の音量）に必ず上書きされて元へ戻る**。
+  //    ★ notes §4 は「真っ先に音量を動かす」と指示しており、まさにこの窓に当たる。
+  volTarget = Math.max(volLinear(), 0.0002);
+  graph.master.gain.setValueAtTime(0.0001, now);
+  graph.master.gain.exponentialRampToValueAtTime(volTarget, now + CFG.envelope.fade_in_s);
+  if ($("l2-on").checked) {
+    graph.grainGain.gain.setValueAtTime(0.0001, now);
+    graph.grainGain.gain.linearRampToValueAtTime(CFG.layer2.gain, now + CFG.envelope.fade_in_s);
+  }
+  // ★ 層 0 のベースラインは 1（分離案の設計どおりの深さ）。0 から始めない
+  trL0 = new Transition(CFG.mapping.transition_s, 1.0);
+  // ⚠️★ 層 2 の静止点を **中央 0.5 ではなく往復の一端**に置く。
+  //    中央から始めると **1 回目のトライアルだけ変化量が半分**になり（実測: 0.35 vs 0.7）、
+  //    ★ 出題順が案ごとに違うため **案の比較にバイアスが入る**。
+  trL2 = new Transition(CFG.mapping.transition_s, 0.5 - CFG.blind_test.layer2_step_scale / 2);
+  lastCtl = performance.now();
+  _lastScale = null;
+  applyPlan(); applyRate();
+  playing = true; startedAt = performance.now();
+  $("btn-play").disabled = true; $("btn-stop").disabled = false;
+  if (mp.rows) scheduleStart();
+  tickTimer = setInterval(tick, 250);
+  ctlTimer = setInterval(control, 50);   // ★ 20 Hz。値はランプで渡すので段差にならない
+}
+
+async function stop() {
+  if (!playing) return;
+  const now = ctx.currentTime, f = CFG.envelope.fade_out_s;
+  // ★ 即時 stop() にしない。ランプで 0 へ落としてから close する
+  graph.master.gain.cancelScheduledValues(now);
+  graph.master.gain.setValueAtTime(Math.max(graph.master.gain.value, 0.0001), now);
+  graph.master.gain.exponentialRampToValueAtTime(0.0001, now + f);
+  playing = false;
+  $("btn-play").disabled = false; $("btn-stop").disabled = true;
+  clearInterval(tickTimer); tickTimer = null;
+  clearInterval(ctlTimer); ctlTimer = null;
+  mp.scheduledUpto = 0;
+  if (bt.running) abortBlind("再生が止められたため中止しました");
+  // ⚠️★★★ 後片付けの対象を**いま閉じている ctx に固定**する。
+  //   モジュール変数を後から読むと、550 ms の間に再生した**新しい ctx を閉じてしまい**、
+  //   `playing = true` のまま `graph = null` になって **二度と止められなくなる**（[P71] 違反）。
+  const dyingCtx = ctx, dyingGraph = graph;
+  setTimeout(async () => {
+    try { dyingGraph.srcs.forEach((s) => s.stop()); await dyingCtx.close(); } catch (e) {}
+    if (ctx === dyingCtx) {   // ★ その間に再生していたら触らない
+      ctx = null; graph = null; analyser = null; analyserBuf = null; volTarget = null;
+      $("elapsed").textContent = "停止中";
+    }
+  }, (f + 0.15) * 1000);
+}
+
+function applyBase() {
+  if (!playing) return;
+  const f0 = baseOpt().hz, now = ctx.currentTime, gl = CFG.envelope.glide_s;
+  // ★ 音高のステップを作らない（spec §2）。連続グライドで動かす
+  graph.oscs.forEach((osc, i) => {
+    osc.frequency.cancelScheduledValues(now);
+    osc.frequency.setValueAtTime(osc.frequency.value, now);
+    osc.frequency.exponentialRampToValueAtTime(f0 * (i + 1), now + gl);
+  });
+  graph.baseHz = f0;
+}
+
+/** ★ 倍音の本数が変わっても鳴らし直さない（使わない次数をゲイン 0 へランプするだけ）。 */
+function applyDecay() {
+  if (!playing) return;
+  const d = decayOpt();
+  const amps = partialAmps(d.law, d.partials, graph.gains.length);
+  const now = ctx.currentTime, gl = CFG.envelope.glide_s;
+  graph.gains.forEach((g, i) => {
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(g.gain.value, now);
+    g.gain.linearRampToValueAtTime(amps[i] * HEADROOM, now + gl);
+  });
+  graph.law = d.law; graph.partials = d.partials;
+  applyPlan(); // 傾斜の重みは振幅配分に依存するので張り直す
+}
+
+/**
+ * ★★★ 分離案の適用（A / B / C）。
+ * ⚠️ 案を切り替えても鳴らし直さない —— LFO も tilt ノードも常に全部あり、**ゲインだけをランプ**する。
+ *    （引き継ぎ §5-5: フェードアウト→フェードインは spec §2 が禁じたオンセットそのもの）
+ */
+function applyPlan() {
+  if (!playing) return;
+  // ★ 案を切り替えたときは glide_s でゆっくり移る。深さは **いま効いている scale** を使う
+  //   （固定の 1 を使うと、見本 / 盲検の最中に案を触った瞬間に深さが跳ぶ）
+  _lastScale = null;
+  applyPlanScaled(trL0 ? trL0.value() : 1.0, CFG.envelope.glide_s);
+}
+
+function applyRate(fromRadio) {
+  // ★ 固定粒子率のラジオを触ったら、見本モードの掌握を明示的に手放す
+  //   （でないと「固定に戻したのに密度が戻らない」になる）
+  if (fromRadio) { demoActive = false; $("demostat").textContent = "固定粒子率に戻しました"; }
+  if (!playing || !graph.grain) return;
+  const rp = graph.grain.parameters.get("rate");
+  const now = ctx.currentTime;
+  rp.cancelScheduledValues(now);
+  rp.setValueAtTime(rp.value, now);
+  rp.linearRampToValueAtTime(currentRate(), now + 1.0); // ★ 段差にしない
+}
+
+/** ★ データ駆動中か（★ このとき粒子率の書き手は scheduleAhead() だけである）。 */
+function isDataDriven() { return !!(mp.rows && $("l2-map").checked && !bt.running && !demoActive); }
+
+/** いま鳴らすべき粒子率。★ 見本 / 盲検 / データのどれが握っているかで決まる。 */
+function currentRate(u) {
+  if (!$("l2-on").checked) return 0;
+  if (bt.running || demoActive || $("l2-map").checked) {
+    const L2 = CFG.layer2;
+    const v = Math.min(1, Math.max(0, u === undefined ? (trL2 ? trL2.value() : 0.5) : u));
+    return L2.rate_min_per_s + v * (L2.rate_max_per_s - L2.rate_min_per_s);
+  }
+  return rateOpt();
+}
+
+/**
+ * ★ 20 Hz の制御ループ。遷移器の値を連続ランプでパラメータへ渡す。
+ *
+ * ⚠️★★★ **粒子率の書き手は常に 1 つだけにする。**
+ *   以前はデータ駆動中もここが `cancelScheduledValues()` を打っており、
+ *   `scheduleAhead()` が 1 秒先まで積んだ自動化を **50 ms ごとに全消し**していた。
+ *   `mp.scheduledUpto` は前進済みなので消えた区間は二度と積まれず、
+ *   ★ **粒子率が定数に張り付いて B8（系統 A/B）と B3（carry/restart）が原理的に測れなかった。**
+ */
+function control() {
+  if (!playing || !graph) return;
+  const nowMs = performance.now();
+  const dt = (nowMs - lastCtl) / 1000;
+  lastCtl = nowMs;
+  const vL2 = trL2.advance(dt), vL0 = trL0.advance(dt);
+
+  const now = ctx.currentTime, ramp = 0.06;
+  if (graph.grain && !isDataDriven()) {
+    const rp = graph.grain.parameters.get("rate");
+    rp.cancelScheduledValues(now);
+    rp.setValueAtTime(rp.value, now);
+    rp.linearRampToValueAtTime(currentRate(vL2), now + ramp);
+  }
+  // ★ 常に呼ぶ。★ 見本 / 盲検の出入りでベースラインが飛ばないようにするため
+  //   （以前はモードに入った瞬間だけ深さ 0 が適用され、80 ms で段差ができていた）
+  applyPlanScaled(vL0);
+}
+
+let _lastScale = null;
+/** 分離案の深さを `scale`（0..1）倍で適用する。★ 深さの書き手はこの関数だけである。 */
+function applyPlanScaled(scale, rampS) {
+  if (!playing || !graph.tiltGains) return;
+  // ★ 毎 50 ms 張り直すと automation が積み上がるので、意味のある変化のときだけ
+  if (_lastScale !== null && Math.abs(scale - _lastScale) < 0.002) return;
+  _lastScale = scale;
+  // ⚠️ 盲検中は選択中の案ではなく **開始時に固定した案** を使う（途中で刺激が入れ替わらないように）
+  const p = bt.running ? optById(CFG.separation_plans.options, bt.plan) : planOpt();
+  const rates = p.rates_hz || [];
+  const now = ctx.currentTime, ramp = rampS === undefined ? 0.08 : rampS;
+  const perAmp = rates.length && p.dimension === "amp"
+    ? (dbToLinDev(p.depth_db || 0) * scale) / rates.length : 0;
+  graph.lfoGains.forEach((lg, i) => {
+    const t = (p.dimension === "amp" && rates.includes(graph.rates[i])) ? perAmp : 0;
+    lg.gain.cancelScheduledValues(now);
+    lg.gain.setValueAtTime(lg.gain.value, now);
+    lg.gain.linearRampToValueAtTime(t, now + ramp);
+  });
+  const d = decayOpt();
+  const amps = partialAmps(d.law, d.partials, graph.gains.length);
+  const w = tiltWeights(amps);
+  const perTilt = rates.length && p.dimension === "tilt"
+    ? ((p.tilt_depth || 0) * scale) / rates.length : 0;
+  graph.tiltGains.forEach((row, li) => {
+    const on = p.dimension === "tilt" && rates.includes(graph.rates[li]);
+    row.forEach((tg, n) => {
+      const t = on ? perTilt * amps[n] * HEADROOM * w[n] : 0;
+      tg.gain.cancelScheduledValues(now);
+      tg.gain.setValueAtTime(tg.gain.value, now);
+      tg.gain.linearRampToValueAtTime(t, now + ramp);
+    });
+  });
+}
+
+let _grainStatT = 0, lastGrainStats = null;
+function tick() {
+  if (!playing) return;
+  const s = (performance.now() - startedAt) / 1000;
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(Math.floor(s % 60)).padStart(2, "0");
+  const tiltN = graph.tiltGains ? graph.tiltGains.length * graph.tiltGains[0].length : 0;
+  // ⚠️★ ノード数は設計上絶対に増えない値なので、それだけでは A7 の計器にならない。
+  //    ★ 増えうるもの（落粒・JS ヒープ）を併記する。
+  const heap = performance.memory
+    ? " / JS ヒープ " + (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + " MB" : "";
+  $("elapsed").textContent =
+    "再生中 " + mm + ":" + ss + " / 発振器 " + graph.oscs.length + " + LFO " + graph.lfos.length +
+    " + 傾斜 " + tiltN + "（★ 増えないこと）" +
+    (lastGrainStats ? " / 落粒 " + lastGrainStats.dropped : "") + heap;
+  // ★ 実際に鳴っている粒子率は AudioParam から読む（データ駆動中は scheduleAhead が書いている）
+  const r = graph.grain ? graph.grain.parameters.get("rate").value : 0;
+  $("rate-now").textContent =
+    "粒子率 " + r.toFixed(1) + " grains/s" +
+    (lastGrainStats ? "（★ Worklet 実測 " + lastGrainStats.rate.toFixed(1) + "）" : "") +
+    (r > 0 && r < CFG.spec_anchors.grain_rate_floor_per_s ? "  ★ 下限割れ" : "");
+  // ★ Worklet が実際に発した粒を定期的に取り出す（設定値ではなく実体）
+  if (graph.grain && s - _grainStatT > 2) {
+    _grainStatT = s;
+    graph.grain.port.postMessage({ cmd: "stats" });
+  }
+  if (isDataDriven()) scheduleAhead();
+}
+
+function wireTransport() {
+  $("btn-play").addEventListener("click", play);
+  $("btn-stop").addEventListener("click", stop);
+  $("vol").addEventListener("input", () => {
+    updateVolLabel();
+    if (!playing) return;
+    const now = ctx.currentTime, g = graph.master.gain;
+    volTarget = Math.max(volLinear(), 0.0002);
+    // ⚠️★★★ 先に**予約済みのランプを打ち切る**。
+    //   フェードイン中（最初の 4 秒）は `exponentialRampToValueAtTime(play 時点の音量, now+4)` が
+    //   予約されており、これを消さないと **スライダを動かしても数秒後に必ず元へ戻る**。
+    //   ★ [P71] 要件 1（音量を変えられること）は交渉不可であり、notes §4 は
+    //     「真っ先に音量を動かす」と指示している —— まさにこの窓に当たる。
+    if (g.cancelAndHoldAtTime) {
+      g.cancelAndHoldAtTime(now);
+    } else {
+      const cur = Math.max(g.value, 0.0002);
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(cur, now);
+    }
+    // ★ 段差を作らない（setTargetAtTime = 一次遅れ）
+    g.setTargetAtTime(volTarget, now, CFG.envelope.volume_time_constant_s);
+  });
+  updateVolLabel();
+}
+
+function wireLayer2() {
+  $("l2-on").addEventListener("change", () => {
+    if (!playing) return;
+    const now = ctx.currentTime;
+    graph.grainGain.gain.cancelScheduledValues(now);
+    graph.grainGain.gain.setValueAtTime(graph.grainGain.gain.value, now);
+    graph.grainGain.gain.linearRampToValueAtTime(
+      $("l2-on").checked ? CFG.layer2.gain : 0.0, now + 2.0); // ★ ランプで消す（オンセット回避）
+    applyRate();
+  });
+  $("l2-map").addEventListener("change", () => {
+    if (!mp.rows && $("l2-map").checked) {
+      $("l2-map").checked = false;
+      $("mapstat").textContent = "先に smoothed CSV を選んでください（固定粒子率はデータ不要です）";
+      return;
+    }
+    applyRate();
+    if (playing && mp.rows) scheduleStart();
+  });
+  $("csvpick").addEventListener("change", onCsv);
+  $("btn-demo-l0").addEventListener("click", () => demo("l0"));
+  $("btn-demo-l2").addEventListener("click", () => demo("l2"));
+  $("btn-demo-reset").addEventListener("click", () => demo("reset"));
+}
+
+/* =========================================================================
+ * 見本モード（★ 非盲検・ラベル付き）
+ * ⚠️ これが無いと「案が悪い」と「そもそも聞こえない」が混ざる（S4-D4）。
+ * ========================================================================= */
+let demoActive = false;
+function demo(kind) {
+  if (!playing) { $("demostat").textContent = "先に「鳴らす」を押してください"; return; }
+  if (bt.running) { $("demostat").textContent = "盲検中は使えません"; return; }
+  const T = CFG.mapping.transition_s;
+  // ⚠️★ demoActive は「層 2 の密度を遷移器で握っているか」を決める。
+  //    ★ ここを立て忘れると `currentRate()` が固定プリセットを返し続け、
+  //      **見本の『状態を変える』が完全な no-op になる**（レビューで実測された欠陥）。
+  if (kind === "l0") {
+    demoActive = true;
+    trL0.set(trL0.to > 0.5 ? 0 : CFG.blind_test.layer0_step_scale);
+    $("demostat").textContent = "★ 基層（層 0）を動かしました。" + T + " s かけて移ります";
+  } else if (kind === "l2") {
+    demoActive = true;
+    trL2.set(trL2.to > 0.5 ? 0.15 : 0.85);
+    $("demostat").textContent = "★ 状態（層 2 の密度）を動かしました。" + T + " s かけて移ります";
+  } else {
+    trL0.set(1.0); trL2.set(0.5 - CFG.blind_test.layer2_step_scale / 2);
+    $("demostat").textContent = "元に戻しています（" + T + " s）";
+  }
+}
+
+/* =========================================================================
+ * データマッピング（系統 A / 系統 B）
+ * ⚠️ どちらの系統でも spec §1.3 の追加平滑化を通してから音に当てる。
+ *    CSV は既に expr_smooth.py（τ=60）を通っているので、ここでは値をそのまま目標値にする。
+ * ========================================================================= */
+const mp = { rows: null, col: null, scheduledUpto: 0, audioT0: 0, segStarts: null };
+
+/** ★ 選んだファイルを保持する（系統 A/B を切り替えたら**同じファイルを読み直す**ため）。
+ *  ⚠️ 保持するのは File ハンドルだけで、内容は音にする以外どこへも出さない（data-privacy）。 */
+let csvFile = null;
+
+/** 系統（列）を切り替えたときに読み直す。★ 切り替えても鳴っているのが前の列のまま、を防ぐ。 */
+async function reparseCsv() {
+  if (!csvFile) return;
+  await loadCsvFile(csvFile);
+  if (playing && isDataDriven()) scheduleStart();
+}
+
+async function onCsv(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  csvFile = f;
+  await loadCsvFile(f);
+  if (playing && isDataDriven()) scheduleStart();
+}
+
+async function loadCsvFile(f) {
+  try {
+    const rows = parseSmoothCsv(await f.text());
+    _gapCache = null;   // ★ 別ファイル/別列に替わったので必ず捨てる（行数が同じでも中身は違う）
+    mp.rows = rows.rows; mp.col = rows.col; mp.segStarts = rows.segStarts;
+    // ★ 実データは読むだけ。ファイル名も含めて外部へ出さない（data-privacy / S3-D9）
+    $("csvinfo").className = "stat";
+    $("csvinfo").textContent =
+      rows.rows.length.toLocaleString() + " frames / " +
+      (rows.rows[rows.rows.length - 1].t - rows.rows[0].t).toFixed(1) + " s / segment " +
+      rows.segStarts.length + " / EXPR_VERSION " + rows.version + " / 列 " + rows.col;
+    if (rows.version !== CFG.expr_version) {
+      $("csvinfo").textContent += "  ⚠️ 版が config（" + CFG.expr_version + "）と違う";
+    }
+  } catch (e) {
+    mp.rows = null;
+    $("csvinfo").className = "stat nodata";
+    $("csvinfo").textContent = "読めません: " + e.message;
+  }
+}
+
+function parseSmoothCsv(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.length);
+  if (lines.length < 3) throw new Error("行が少なすぎます");
+  const head = lines[0].split(",");
+  const col = pathOpt().column;
+  const iT = head.indexOf("t_rel_s"), iSeg = head.indexOf("segment"),
+        iVer = head.indexOf("expr_version"), iCol = head.indexOf(col);
+  if (iT < 0 || iSeg < 0 || iCol < 0) {
+    throw new Error("必要な列がありません（t_rel_s / segment / " + col + "）");
+  }
+  const rows = [], segStarts = [];
+  let prevSeg = null, vmin = Infinity, vmax = -Infinity, version = "";
+  for (let i = 1; i < lines.length; i++) {
+    const p = lines[i].split(",");
+    const t = parseFloat(p[iT]), v = parseFloat(p[iCol]), seg = parseInt(p[iSeg], 10);
+    if (!isFinite(t) || !isFinite(v)) throw new Error(i + " 行目が数値でない");
+    if (iVer >= 0) version = p[iVer];
+    if (seg !== prevSeg) { segStarts.push(rows.length); prevSeg = seg; }
+    rows.push({ t, v, seg });
+    if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+  }
+  // 0..1 へ正規化（★ 範囲が潰れている場合は変調しない = 中央のまま）
+  const span = vmax - vmin;
+  rows.forEach((r) => { r.u = span > 1e-9 ? (r.v - vmin) / span : 0.5; });
+  return { rows, col, segStarts, version };
+}
+
+function scheduleStart() {
+  if (!playing || !mp.rows || !$("l2-map").checked) return;
+  mp.scheduledUpto = 0;
+  mp.audioT0 = ctx.currentTime + 0.2;
+  scheduleAhead();
+}
+
+/**
+ * 先読み 1.0 s ぶんの自動化を積む。
+ * ★ CSV の 1 フレームごとに linearRampToValueAtTime を積む = Step 2 が作った
+ *   「レンダレートで連続追従」をそのまま粒子率に写す。
+ * ★ 離席 segment 境界の扱いは B3（carry / restart）で切り替える。
+ */
+function scheduleAhead() {
+  const rows = mp.rows, N = rows.length;
+  if (mp.scheduledUpto >= N || !graph.grain) return;
+  const LOOKAHEAD = 1.0;
+  const L2 = CFG.layer2;
+  const gapMode = sel.gap;
+  const restartFade = CFG.mapping.gap_behavior.restart_fade_s;
+  const horizon = ctx.currentTime + LOOKAHEAD;
+  const rp = graph.grain.parameters.get("rate");
+  let i = mp.scheduledUpto;
+  const t0Row = rows[0].t;
+  while (i < N) {
+    const r = rows[i];
+    // segment を跨ぐ経過時間（離席）は詰めて再生する。音の時間 = 実際に鳴っていた時間
+    const when = mp.audioT0 + (r.t - t0Row) - gapOffsetAt(i);
+    if (when > horizon) break;
+    if (when >= ctx.currentTime) {
+      rp.linearRampToValueAtTime(
+        L2.rate_min_per_s + r.u * (L2.rate_max_per_s - L2.rate_min_per_s), when);
+      if (gapMode === "restart" && mp.segStarts.includes(i) && i > 0) {
+        // ★ 対案: 復帰時に無音から立ち上げる（= 自分でオンセットを作る側）
+        graph.master.gain.cancelScheduledValues(when);
+        graph.master.gain.setValueAtTime(0.0001, when);
+        graph.master.gain.exponentialRampToValueAtTime(
+          Math.max(volLinear(), 0.0002), when + restartFade);
+      }
+    }
+    i++;
+  }
+  mp.scheduledUpto = i;
+  const done = ((i / N) * 100).toFixed(1);
+  $("mapstat").textContent =
+    "自動化を " + i.toLocaleString() + " / " + N.toLocaleString() + " frames（" + done +
+    "%）まで積みました。離席の扱い: " +
+    (gapMode === "carry" ? "前の状態から続ける" : "無音から立ち上げる");
+}
+
+/** segment 境界より前にあった離席ギャップの合計（詰める量）。 */
+let _gapCache = null;
+function gapOffsetAt(i) {
+  if (!_gapCache || _gapCache.n !== mp.rows.length) {
+    const rows = mp.rows, acc = new Float64Array(rows.length);
+    let off = 0;
+    for (let k = 1; k < rows.length; k++) {
+      if (rows[k].seg !== rows[k - 1].seg) off += rows[k].t - rows[k - 1].t;
+      acc[k] = off;
+    }
+    _gapCache = { n: rows.length, acc };
+  }
+  return _gapCache.acc[i];
+}
+
+/* =========================================================================
+ * ★★★ 混同テスト — 盲検・強制選択（S4-D4 / S4-D5）
+ *
+ * ★ 連続再生したまま 60 s の窓を並べる（トライアル間で音を止めない = オンセットを作らない）。
+ * ★ 出題順は seed 固定（reproducibility-discipline ルール 2）。
+ * ⚠️ 途中で正誤を出さない。
+ * ========================================================================= */
+const bt = { running: false, plan: null, order: [], i: 0, results: [], t0: 0, timer: null, answered: false };
+
+/** ★ seed 固定 PRNG（grain-processor.js と同じ mulberry32）。Math.random() を使わない。 */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildOrder(seed, comp) {
+  const list = [];
+  for (let k = 0; k < comp.layer0; k++) list.push("layer0");
+  for (let k = 0; k < comp.layer2; k++) list.push("layer2");
+  for (let k = 0; k < comp.catch; k++) list.push("catch");
+  const rnd = mulberry32(seed);
+  for (let i = list.length - 1; i > 0; i--) { // Fisher-Yates（★ seed 固定なので再現できる）
+    const j = Math.floor(rnd() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+function wireBlind() {
+  $("btn-bt-start").addEventListener("click", startBlind);
+  $("btn-bt-abort").addEventListener("click", () => abortBlind("研究者が中止しました"));
+  $("btn-bt-export").addEventListener("click", exportBlind);
+  const host = $("bt-choices");
+  host.innerHTML = "";
+  CFG.blind_test.choices.forEach((c) => {
+    const b = document.createElement("button");
+    b.textContent = c.label;
+    b.className = "big";
+    b.addEventListener("click", () => answer(c.id));
+    host.appendChild(b);
+  });
+}
+
+function startBlind() {
+  if (!playing) { $("btstat").textContent = "先に「鳴らす」を押してください"; return; }
+  if (planOpt().dimension === "none") {
+    $("btstat").textContent = "★ 分離案（A / B / C）を選んでください。「自律変異なし」は対照であって被験対象ではありません";
+    return;
+  }
+  const c = CFG.blind_test;
+  // ★ 案ごとに seed をずらす（同じ順序が 3 回続くと順序を覚えてしまう）
+  const planIdx = CFG.separation_plans.options.findIndex((o) => o.id === sel.plan);
+  bt.running = true; bt.plan = sel.plan; bt.i = 0; bt.results = [];
+  bt.order = buildOrder(c.order_seed + planIdx * 977, c.composition);
+  // ★ 開始時点の値をそのままベースラインにする（★ 開始が「誰も指示していない変化」にならないように）
+  demoActive = false;
+  lockUI(true);
+  $("btn-bt-start").disabled = true; $("btn-bt-abort").disabled = false;
+  $("trialbox").hidden = false; $("btresult").hidden = true;
+  $("bt-plan").textContent = planOpt().label;
+  $("bt-total").textContent = bt.order.length + " 回";
+  nextTrial();
+}
+
+/** 盲検中は刺激を決める UI を固定する（★ 途中で刺激が入れ替わらないように）。 */
+function lockUI(lock) {
+  ["ax-base", "ax-decay", "ax-plan", "ax-rate", "ax-path", "ax-gap"].forEach((id) =>
+    $(id).querySelectorAll("input").forEach((i) => { i.disabled = lock; }));
+  ["l2-on", "l2-map", "csvpick", "btn-demo-l0", "btn-demo-l2", "btn-demo-reset"].forEach((id) => {
+    $(id).disabled = lock;
+  });
+}
+
+function nextTrial() {
+  if (!bt.running) return;
+  if (bt.i >= bt.order.length) { finishBlind(); return; }
+  const kind = bt.order[bt.i];
+  const BT = CFG.blind_test;
+  // ★ 遷移を始める**前**に残留を記録する（★ catch が本当に「何も動かない」かを事後に確かめられる）
+  bt.residualAtStart = { l0: +trL0.residual().toFixed(4), l2: +trL2.residual().toFixed(4) };
+  // ★ 1 トライアルにつき 1 つだけ動かす。★ raised-cosine で transition_s 以内に**完全に到達**する
+  //   ⚠️ 振幅は往復とも同じにする（以前は 0.5→0.85 と 0.85↔0.15 で **1 回目だけ変化量が半分**だった）
+  const d0 = BT.layer0_step_scale, d2 = BT.layer2_step_scale;
+  if (kind === "layer0") trL0.set(trL0.to > 0.5 ? 1 - d0 : 1.0);
+  else if (kind === "layer2") trL2.set(trL2.to > 0.5 ? 0.5 - d2 / 2 : 0.5 + d2 / 2);
+  // catch は何も動かさない
+  bt.t0 = performance.now();
+  bt.answered = false;
+  $("bt-i").textContent = (bt.i + 1) + " 回目";
+  $("bt-choices").hidden = true;
+  $("bt-hint").textContent = "聴いてください。カウントが 0 になったら回答欄が出ます。";
+  clearInterval(bt.timer);
+  bt.timer = setInterval(trialTick, 200);
+  trialTick();
+}
+
+function trialTick() {
+  if (!bt.running) return;
+  const left = CFG.blind_test.trial_seconds - (performance.now() - bt.t0) / 1000;
+  if (left > 0) { $("bt-count").textContent = left.toFixed(0) + " s"; return; }
+  clearInterval(bt.timer); bt.timer = null;
+  $("bt-count").textContent = "回答";
+  $("bt-choices").hidden = false;
+  $("bt-hint").textContent = "いま変わったのはどちらでしたか?（★ 正誤は最後まで出しません）";
+}
+
+function answer(choice) {
+  if (!bt.running || bt.answered) return;
+  bt.answered = true;
+  const kind = bt.order[bt.i];
+  bt.results.push({
+    index: bt.i, truth: kind, answer: choice,
+    correct: kind === "catch" ? null : kind === choice,
+    trial_seconds: CFG.blind_test.trial_seconds,
+    // ★ トライアル開始時点で前の遷移がどれだけ動き残っていたか。
+    //   raised-cosine が transition_s <= trial_seconds で完了するので 0 になるはずだが、
+    //   ★ 「なるはず」で済ませず**測って残す**（catch の解釈がここに依存する）
+    residual_at_start: bt.residualAtStart,
+  });
+  bt.i++;
+  $("btstat").textContent = bt.i + " / " + bt.order.length + " 回 終了（★ 正誤は最後に出します）";
+  nextTrial();
+}
+
+function abortBlind(why) {
+  if (!bt.running) return;
+  bt.running = false;
+  clearInterval(bt.timer); bt.timer = null;
+  $("trialbox").hidden = true;
+  lockUI(false);
+  $("btn-bt-start").disabled = false; $("btn-bt-abort").disabled = true;
+  $("btstat").textContent = "中止: " + why + "（" + bt.i + " / " + bt.order.length + " 回まで）";
+}
+
+function finishBlind() {
+  bt.running = false;
+  clearInterval(bt.timer); bt.timer = null;
+  $("trialbox").hidden = true;
+  lockUI(false);
+  $("btn-bt-start").disabled = false; $("btn-bt-abort").disabled = true;
+  const scored = bt.results.filter((r) => r.correct !== null);
+  const nCorrect = scored.filter((r) => r.correct).length;
+  const catches = bt.results.filter((r) => r.correct === null);
+  const falseAlarm = catches.filter((r) => r.answer !== "unsure").length;
+  const thr = CFG.blind_test.pass_threshold_correct;
+  const keep = nCorrect >= thr;
+  $("btstat").textContent = "終了";
+  $("btresult").hidden = false;
+  // ⚠️★ innerHTML を使わない —— `planOpt().label` は **config 由来の文字列**であり、
+  //    設定ファイルは fetch 失敗時に研究者が任意のものを選べる（フォールバック）。
+  //    ★ HTML として解釈させると、実データを読んだページ上で任意 JS が走りうる。
+  const body = $("btresult-body");
+  body.textContent = "";
+  const tbl = document.createElement("table");
+  const row = (h, v, cls) => {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th"); th.textContent = h;
+    const td = document.createElement("td"); td.textContent = v;
+    if (cls) td.className = cls;
+    tr.appendChild(th); tr.appendChild(td); tbl.appendChild(tr);
+  };
+  row("分離案", optById(CFG.separation_plans.options, bt.plan).label);
+  row("正答（採点対象）", nCorrect + " / " + scored.length);
+  row("閾値", thr + " / " + CFG.blind_test.scored_trials + " 以上");
+  row("判定", keep ? "★ この案は残す" : "★ この案は落とす", keep ? "pass" : "fail");
+  row("catch での誤警報",
+      falseAlarm + " / " + catches.length + "（★ 大きいと『いつも何か変わったと答える』傾向）");
+  body.appendChild(tbl);
+  const warn = document.createElement("p");
+  warn.className = "note warn";
+  warn.textContent =
+    "⚠️ n=1 のスクリーニングです。多重比較の補正はしていません。" +
+    "★ 閾値は「落とす」ために使い、「残った案が安全である」証明には使いません（S4-D4）。";
+  body.appendChild(warn);
+  logLine("── 盲検 " + optById(CFG.separation_plans.options, bt.plan).label + ": 正答 " + nCorrect + "/" + scored.length +
+          " / 誤警報 " + falseAlarm + "/" + catches.length + " → " +
+          (keep ? "残す" : "落とす"), keep ? "pass" : "fail");
+}
+
+function exportBlind() {
+  const payload = {
+    expr_version: CFG.expr_version,
+    hmm_version: CFG.hmm_version,
+    plan: bt.plan,
+    plan_label: optById(CFG.separation_plans.options, bt.plan).label,
+    base_hz: baseOpt().hz,
+    decay: decayOpt().id,
+    layer2: { grain_ms: CFG.layer2.grain_ms, center_hz: CFG.layer2.center_hz,
+              seed: CFG.layer2.seed, rate_min: CFG.layer2.rate_min_per_s,
+              rate_max: CFG.layer2.rate_max_per_s },
+    blind_test: CFG.blind_test,
+    order: bt.order,
+    results: bt.results,
+    // ⚠️ 実データ由来の値は 1 つも入れない（data-privacy）
+    note: "n=1 のスクリーニング。多重比較の補正なし。閾値は案を落とすために使う（S4-D4）",
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "blind-" + bt.plan + ".json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* =========================================================================
+ * 機械検算（S3-D4 / S0-D8）
+ * ========================================================================= */
+function logLine(s, cls) {
+  const el = $("log");
+  if (el.textContent === "（未実行）") el.textContent = "";
+  if (cls) {
+    const sp = document.createElement("span");
+    sp.className = cls; sp.textContent = s + "\n";
+    el.appendChild(sp);
+  } else {
+    el.appendChild(document.createTextNode(s + "\n"));
+  }
+  el.scrollTop = el.scrollHeight;
+  console.log("[step4] " + s);
+}
+
+const dB = (a, ref) => (a <= 0 || ref <= 0 ? -Infinity : 20 * Math.log10(a / ref));
+const fmtdB = (v) => (v === -Infinity ? "  -inf dB" : v.toFixed(1).padStart(7) + " dB");
+
+/**
+ * オフラインレンダ。★ 実時間再生と同じ buildGraph / attachLayer2 を呼ぶ（S3-D4: 二重実装しない）。
+ * @param opt.dcCarrier   包絡だけを取り出す（発振器の代わりに定数 1）
+ * @param opt.sabotage    ★ 逆検査: 4 Hz を注入する
+ * @param opt.grainRate   層 2 の粒子率（0 なら層 2 を鳴らさない）
+ * @param opt.gainModHz   ★ 陽性対照: 層 2 のゲインを既知の周波数で変調する
+ * @param opt.tiltRateHz  ★ 傾斜の機構確認（実レートではない。0.005 Hz は 400 s では分解できない）
+ */
+async function renderOffline(opt) {
+  const sr = CFG.selftest.sample_rate_hz, secs = CFG.selftest.render_seconds;
+  const octx = new OfflineAudioContext(1, Math.round(sr * secs), sr);
+  const dc = decayOpt(), p = planOpt();
+  const useTilt = opt.tiltRateHz ? true : p.dimension === "tilt";
+  const rates = opt.tiltRateHz ? [opt.tiltRateHz] : (p.rates_hz || []);
+  const g = buildGraph(octx, {
+    baseHz: baseOpt().hz, law: dc.law, partials: dc.partials,
+    driftDepthDb: useTilt ? 0 : (p.depth_db || 0),
+    driftRates: useTilt ? [] : rates,
+    slots: maxPartials(), allRates: allPlanRates(true),
+    dcCarrier: opt.dcCarrier, headroom: HEADROOM,
+  });
+  if (!opt.dcCarrier) {
+    attachTilt(g);
+    if (useTilt) {
+      const amps = partialAmps(dc.law, dc.partials, g.gains.length);
+      const w = tiltWeights(amps);
+      const depth = opt.tiltRateHz ? (p.tilt_depth || CFG.selftest.tilt_probe_depth || 0.45)
+                                   : (p.tilt_depth || 0);
+      const per = rates.length ? depth / rates.length : 0;
+      g.tiltGains.forEach((row, li) => {
+        const on = rates.includes(g.rates[li]);
+        row.forEach((tg, n) => { tg.gain.value = on ? per * amps[n] * HEADROOM * w[n] : 0; });
+      });
+    }
+  }
+  if (opt.grainRate > 0) {
+    await ensureWorklet(octx);
+    await attachLayer2(g, octx);
+    g.grain.parameters.get("rate").value = opt.grainRate;
+    const gp = g.grainGain.gain;
+    if (opt.gainModHz) {
+      // ★ 陽性対照: 既知の周波数でゲインを揺らす。これが検出できなければ計器が死んでいる
+      const per = 1 / opt.gainModHz, steps = 64;
+      for (let t = 0; t < secs; t += per / steps) {
+        gp.setValueAtTime(
+          CFG.layer2.gain * (1 + 0.5 * Math.sin(2 * Math.PI * opt.gainModHz * t)), t);
+      }
+    } else {
+      gp.value = CFG.layer2.gain;
+    }
+  }
+  const vol = Math.max(volLinear(), 0.05);
+  g.master.gain.setValueAtTime(0.0001, 0);
+  g.master.gain.exponentialRampToValueAtTime(vol, CFG.envelope.fade_in_s);
+  if (opt.sabotage) {
+    // ★ 逆検査: 4 Hz の矩形変調を expr へ注入する。検査が生きていれば必ず FAIL になる
+    const per = 1 / 4.0;
+    for (let t = CFG.envelope.fade_in_s; t < secs; t += per) {
+      g.expr.gain.setValueAtTime(1.0, t);
+      g.expr.gain.setValueAtTime(0.7, t + per / 2);
+    }
+  }
+  startAll(g, 0);
+  const buf = await octx.startRendering();
+  return { data: buf.getChannelData(0), sr, secs, graph: g };
+}
+
+async function runSelftest(sabotage) {
+  setBusy(true);
+  try {
+    const probes = CFG.selftest.probe_lines_hz, refs = CFG.selftest.reference_lines_hz;
+    const thr = CFG.selftest.pass_threshold_db;
+    const DEC = CFG.selftest.env_decim, SMIN = CFG.selftest.sinc_min;
+    const grainRate = $("l2-on").checked ? currentRateForTest() : 0;
+    const posCtlHz = CFG.selftest.positive_control_hz; // ★ 状態の波の帯域（0.001–0.02 Hz）の中に置く
+    logLine("──────────────────────────────────────────────");
+    logLine((sabotage ? "★ 逆検査（4 Hz 注入）" : "検算") + " / 基音 " + baseOpt().hz +
+            " Hz / " + decayOpt().law + " ×" + decayOpt().partials +
+            " / 分離案 " + planOpt().label + " / 粒子率 " + grainRate + " grains/s");
+    logLine("レンダ " + CFG.selftest.render_seconds + " s @ " + CFG.selftest.sample_rate_hz +
+            " Hz / 包絡 " + (CFG.selftest.sample_rate_hz / DEC) + " Hz / 窓 Hann / 判定 " + thr + " dB");
+
+    let allPass = true;
+
+    // ---- (0) ★★★ 層 2 が実際に鳴っているか（対照つき） --------------------
+    // ⚠️★★★ 2026-08-12 の実測で踏んだ欠陥への対策 ——
+    //   Worklet 内部の gain AudioParam（既定 0）と外部 GainNode の**二重制御**になっており、
+    //   ★ **層 2 が RMS = 0.000e+0 の完全な無音のまま、静的検査 56 件が全部緑になった。**
+    //   捕まえたのは陽性対照だけだった。→ ★ **「鳴っていること」を最初に測る。**
+    //   ★ 対照（層 0 単体）と一緒に測る。片方だけでは「測定が死んでいる」と区別できない。
+    if (grainRate > 0) {
+      const l0 = await renderRms({ layer0: true, grainRate: 0 });
+      const l2 = await renderRms({ layer0: false, grainRate });
+      const ratio = l0 > 0 ? l2 / l0 : 0;
+      const ok = l0 > 1e-4 && l2 > 1e-4 && ratio > 0.05 && ratio < 20;
+      logLine("[0] ★ 層が両方とも鳴っているか  層 0 単体 RMS " + l0.toExponential(3) +
+              " / 層 2 単体 RMS " + l2.toExponential(3) + " / 比 " + ratio.toFixed(3) +
+              (ok ? "   PASS" : "   ★ FAIL（無音か、桁が違う）"), ok ? "pass" : "fail");
+      if (!ok) allPass = false;
+    }
+
+    // ---- (1) 包絡（DC キャリア）: マスター鎖の変調そのものを測る -----------
+    const env = await renderOffline({ dcCarrier: true, sabotage, grainRate: 0 });
+    const ed = decimate(steadyPart(env), DEC);
+    const efs = env.sr / DEC;
+    let emean = 0; for (let i = 0; i < ed.length; i++) emean += ed[i]; emean /= ed.length;
+    logLine("[1] 包絡（本番と同じゲイン鎖に定数 1 を流したもの）  平均 " + emean.toFixed(6));
+    const planRates = planOpt().dimension === "amp" ? (planOpt().rates_hz || []) : [];
+    for (const f of probes.concat(refs, planRates)) {
+      const corr = sincGain(f, env.sr, DEC);
+      const isProbe = probes.includes(f);
+      const kind = isProbe ? "" : (planRates.includes(f) ? "   （陽性対照: A 案の自律変異）" : "   （参考）");
+      if (Math.abs(corr) < SMIN || f >= efs / 2) {
+        logLine("    " + String(f).padStart(8) + " Hz : 測定不能（間引きの零点/Nyquist 超）" + kind);
+        if (isProbe) allPass = false;
+        continue;
+      }
+      const rel = dB(hannAmplitude(ed, efs, f) / corr, emean);
+      const pass = !isProbe || rel <= thr;
+      if (isProbe && !pass) allPass = false;
+      logLine("    " + String(f).padStart(8) + " Hz : " + fmtdB(rel) +
+              (isProbe ? (pass ? "   PASS" : "   FAIL") : kind),
+              isProbe ? (pass ? "pass" : "fail") : null);
+    }
+
+    // ---- (2) 実音声（層 0 ＋ 層 2）: 側帯波で測る -------------------------
+    // ⚠️★★★ Step 3 の教訓: 55 Hz の搬送波を 4 Hz で AM しても、エネルギーは 4 Hz ではなく
+    //   側帯波 51/59 Hz に出る。4 Hz の線を見ていた検査は -90 dB で PASS したままだった。
+    const aud = await renderOffline({ dcCarrier: false, sabotage, grainRate });
+    const as = steadyPart(aud);
+    const f0 = baseOpt().hz;
+    const a0 = hannAmplitude(as, aud.sr, f0);
+    logLine("[2] 実音声（層 0 " + (grainRate > 0 ? "＋ 層 2 粒子" : "のみ") + "）  基音 " + f0 +
+            " Hz の振幅 " + a0.toExponential(3) + "  ★ 側帯波 f0±f で測る");
+    for (const f of probes) {
+      const lo = hannAmplitude(as, aud.sr, f0 - f);
+      const hi = hannAmplitude(as, aud.sr, f0 + f);
+      const rel = dB(Math.max(lo, hi), a0);
+      const pass = rel <= thr;
+      if (!pass) allPass = false;
+      logLine("    f0±" + String(f).padStart(7) + " Hz : " + fmtdB(rel) +
+              (pass ? "   PASS" : "   FAIL"), pass ? "pass" : "fail");
+    }
+
+    // ---- (3) ★ 陽性対照: 層 2 の経路が既知の周波数を実際に載せられるか ----
+    if (grainRate > 0) {
+      const aSlow = CFG.selftest.env_alpha_slow, aFast = CFG.selftest.env_alpha_fast;
+      const pc = await renderOffline({ dcCarrier: false, grainRate, gainModHz: posCtlHz });
+      const ps = decimate(envelopeOf(steadyPart(pc), aSlow), DEC);
+      let pm = 0; for (let i = 0; i < ps.length; i++) pm += ps[i]; pm /= ps.length;
+      const corr = sincGain(posCtlHz, pc.sr, DEC);
+      const rel = dB(hannAmplitude(ps, pc.sr / DEC, posCtlHz) / corr, pm);
+      const ok = rel > -40;
+      logLine("[3] ★ 陽性対照（層 2 ゲインを " + posCtlHz + " Hz で変調） : " + fmtdB(rel) +
+              (ok ? "   検出 OK（計器は生きている）" : "   ★ 検出できない = 計器を疑う"),
+              ok ? "pass" : "fail");
+      if (!ok) allPass = false;
+      // ★ 粒子率そのものの線（判定しない。禁止帯に出るかを「測って出す」）
+      const gr = decimate(envelopeOf(as, aFast), DEC);
+      let gm = 0; for (let i = 0; i < gr.length; i++) gm += gr[i]; gm /= gr.length;
+      const c2 = sincGain(grainRate, aud.sr, DEC);
+      if (Math.abs(c2) >= SMIN && grainRate < aud.sr / DEC / 2) {
+        const det = onePoleResponseDb(grainRate, aFast, aud.sr);
+        logLine("    粒子率の線 " + grainRate + " Hz : " +
+                fmtdB(dB(hannAmplitude(gr, aud.sr / DEC, grainRate) / c2, gm)) +
+                "   （★ 判定しない。禁止帯 15–70 Hz / 0.5–20 Hz に入るかを見るための実測値。" +
+                "⚠️ 包絡検波器の落ち " + det.toFixed(1) + " dB は補正していない）");
+      } else {
+        logLine("    粒子率の線 " + grainRate + " Hz : 測定不能（間引きの零点/Nyquist 超）");
+      }
+    }
+
+    // ---- 判定 -----------------------------------------------------------
+    if (sabotage) {
+      logLine(allPass
+        ? "★★★ 逆検査が PASS してしまった = 検査が空回りしている。信用してはならない。"
+        : "★ 逆検査は FAIL。検査は生きている（4 Hz を入れれば赤くなる）。", allPass ? "fail" : "pass");
+    } else {
+      logLine(allPass
+        ? "★ すべて PASS。⚠️ ただしこれは「4 Hz 付近に乗っていない」ことしか言っていない。良い音かは耳が決める。"
+        : "★ FAIL がある。原因を特定するまで先へ進まない。", allPass ? "pass" : "fail");
+    }
+  } catch (e) {
+    logLine("検算が例外で落ちた: " + e.message, "fail");
+    console.error(e);
+  } finally {
+    setBusy(false);
+  }
+}
+
+/**
+ * 全波整流 + 一次ローパスで包絡を取り出す（★ 粒子の変調は搬送波を持つので包絡で見る）。
+ * @param a フィルタ係数。カットオフ ≈ a·fs/2π。★ config の env_alpha_slow / env_alpha_fast を渡す
+ *          （★ 見たい周波数より上にカットオフを置かないと、測っているつもりで落としている）
+ */
+function envelopeOf(x, a) {
+  const out = new Float64Array(x.length);
+  let v = 0;
+  for (let i = 0; i < x.length; i++) { v += a * (Math.abs(x[i]) - v); out[i] = v; }
+  return out;
+}
+/** 一次ローパスの振幅応答（★ 粒子率の線に併記して、落ちを黙って隠さない）。 */
+function onePoleResponseDb(freqHz, a, fsHz) {
+  const fc = (a * fsHz) / (2 * Math.PI);
+  return 20 * Math.log10(1 / Math.sqrt(1 + Math.pow(freqHz / fc, 2)));
+}
+
+function currentRateForTest() {
+  const r = currentRate();
+  return r > 0 ? r : CFG.layer2.rate_min_per_s;
+}
+
+/**
+ * ★ 指定した層だけを鳴らして RMS を返す（検査 [0] 用。★ 対照を取るための道具）。
+ * ⚠️ 短いレンダで足りる（鳴っているか / 桁が合っているかだけを見る）。
+ */
+async function renderRms({ layer0, grainRate }) {
+  const sr = CFG.selftest.sample_rate_hz, secs = 8;
+  const octx = new OfflineAudioContext(1, sr * secs, sr);
+  const dc = decayOpt();
+  const g = buildGraph(octx, {
+    baseHz: baseOpt().hz, law: dc.law, partials: layer0 ? dc.partials : 0,
+    driftDepthDb: 0, driftRates: [], slots: maxPartials(), allRates: [],
+    dcCarrier: false, headroom: HEADROOM,
+  });
+  if (grainRate > 0) {
+    await ensureWorklet(octx);
+    await attachLayer2(g, octx);
+    g.grain.parameters.get("rate").value = grainRate;
+    g.grainGain.gain.value = CFG.layer2.gain;
+  }
+  g.master.gain.value = 1.0;   // ★ ここでは音量ランプを掛けない（比だけを見る）
+  startAll(g, 0);
+  const buf = await octx.startRendering();
+  const d = buf.getChannelData(0).subarray(sr * 2); // 立ち上がりを捨てる
+  let s = 0;
+  for (let i = 0; i < d.length; i++) s += d[i] * d[i];
+  return Math.sqrt(s / d.length);
+}
+
+/** ★ 粒子率の実測（設定値ではなく Worklet が実際に発した数）。 */
+async function measureGrainRate() {
+  setBusy(true);
+  try {
+    logLine("──────────────────────────────────────────────");
+    logLine("★ 粒子率の実測（★ 設定値ではなく Worklet のカウンタ。下限 " +
+            CFG.spec_anchors.grain_rate_floor_per_s + " grains/s）");
+    for (const r of CFG.layer2.below_floor_presets_per_s) {
+      const sr = CFG.selftest.sample_rate_hz, secs = 20;
+      const octx = new OfflineAudioContext(1, sr * secs, sr);
+      await ensureWorklet(octx);
+      const g = buildGraph(octx, {
+        baseHz: baseOpt().hz, law: decayOpt().law, partials: decayOpt().partials,
+        driftDepthDb: 0, driftRates: [], slots: maxPartials(), allRates: allPlanRates(true),
+        dcCarrier: false, headroom: HEADROOM,
+      });
+      await attachLayer2(g, octx);
+      g.grain.parameters.get("rate").value = r;
+      g.grainGain.gain.value = CFG.layer2.gain;
+      g.master.gain.value = 0.3;
+      const stats = new Promise((res) => { g.grain.port.onmessage = (e) => res(e.data); });
+      startAll(g, 0);
+      await octx.startRendering();
+      g.grain.port.postMessage({ cmd: "stats" });
+      const s = await Promise.race([stats, new Promise((res) => setTimeout(() => res(null), 3000))]);
+      if (!s) { logLine("    " + String(r).padStart(4) + " grains/s : 統計を取得できず", "fail"); continue; }
+      const measured = s.grainsEmitted / s.seconds;
+      const err = Math.abs(measured - r) / r;
+      const floor = CFG.spec_anchors.grain_rate_floor_per_s;
+      logLine("    設定 " + String(r).padStart(4) + " → 実測 " + measured.toFixed(1).padStart(7) +
+              " grains/s（誤差 " + (err * 100).toFixed(1) + "% / 落粒 " + s.dropped +
+              " / 同時発音 " + s.activeVoices + "）" +
+              (r >= floor ? "  ★ 下限以上" : "  ★ 下限割れ（分節するはず — 耳で確かめる）"),
+              err < 0.05 ? "pass" : "fail");
+    }
+    logLine("⚠️ これは「設定どおり粒が出た」ことしか言っていない。★ 分節して聞こえるかは耳が決める。");
+  } catch (e) {
+    logLine("粒子率の実測が例外で落ちた: " + e.message, "fail");
+    console.error(e);
+  } finally {
+    setBusy(false);
+  }
+}
+
+/**
+ * ★ 倍音傾斜の機構を測る（B / C 案が立っている前提の検証）。
+ * ⚠️★★★ 実レート（0.005 / 0.0005 Hz）は 400 s のレンダでは分解できない
+ *   （分解能 1/400 = 0.0025 Hz。搬送波の主ローブに埋まる）。
+ *   → ★ **機構だけを速いレートで確かめる。実レートで測ったとは書かない。**
+ */
+async function measureTilt() {
+  setBusy(true);
+  try {
+    const probe = CFG.selftest.tilt_probe_rate_hz;
+    const DEC = CFG.selftest.env_decim;
+    logLine("──────────────────────────────────────────────");
+    logLine("★ 倍音傾斜（B / C 案）の機構確認 — 検証専用レート " + probe + " Hz");
+    logLine("⚠️ 実レート（" + (planOpt().rates_hz || []).join(" / ") +
+            " Hz）は 400 s では分解できない（分解能 " +
+            (1 / CFG.selftest.render_seconds).toFixed(4) + " Hz）。★ 機構だけの確認である。");
+    const r = await renderOffline({ dcCarrier: false, grainRate: 0, tiltRateHz: probe });
+    const as = steadyPart(r);
+    const f0 = baseOpt().hz, nP = decayOpt().partials;
+    // (i) 高次倍音に側帯波が出る = 音色が動いている
+    const fh = f0 * nP;
+    const ah = hannAmplitude(as, r.sr, fh);
+    const sb = Math.max(hannAmplitude(as, r.sr, fh - probe), hannAmplitude(as, r.sr, fh + probe));
+    const relSb = dB(sb, ah);
+    const moved = relSb > -40;
+    logLine("  (i) 第 " + nP + " 倍音 " + fh.toFixed(1) + " Hz の側帯波 ±" + probe + " Hz : " +
+            fmtdB(relSb) + (moved ? "   ★ 音色は動いている" : "   ★ 動いていない = 傾斜が効いていない"),
+            moved ? "pass" : "fail");
+    // (ii) 総和（＝音量）はほぼ動かない —— ★ これが「次元で分ける」の主張の実体
+    const ev = decimate(envelopeOf(as, CFG.selftest.env_alpha_slow), DEC);
+    let em = 0; for (let i = 0; i < ev.length; i++) em += ev[i]; em /= ev.length;
+    const corr = sincGain(probe, r.sr, DEC);
+    const relAmp = dB(hannAmplitude(ev, r.sr / DEC, probe) / corr, em);
+    const quiet = relAmp < -20;
+    logLine("  (ii) 全体の包絡 " + probe + " Hz : " + fmtdB(relAmp) +
+            (quiet ? "   ★ 音量はほぼ動いていない" : "   ⚠️ 音量も動いている = 次元が分かれていない"),
+            quiet ? "pass" : "fail");
+    logLine("  → " + (moved && quiet
+      ? "★ B / C 案の前提（音色だけが動く）は機構として成立している。⚠️ 耳が分離できるかは別問題。"
+      : "★ B / C 案の前提が機構の水準で崩れている。耳にかける前に直す。"),
+      moved && quiet ? "pass" : "fail");
+  } catch (e) {
+    logLine("傾斜の測定が例外で落ちた: " + e.message, "fail");
+    console.error(e);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function setBusy(b) {
+  ["btn-selftest", "btn-sabotage", "btn-grainrate", "btn-tilt"].forEach((id) => {
+    $(id).disabled = b;
+  });
+}
+
+function wireSelftest() {
+  $("btn-selftest").addEventListener("click", () => runSelftest(false));
+  $("btn-sabotage").addEventListener("click", () => runSelftest(true));
+  $("btn-grainrate").addEventListener("click", measureGrainRate);
+  $("btn-tilt").addEventListener("click", measureTilt);
+  $("btn-clearlog").addEventListener("click", () => { $("log").textContent = "（未実行）"; });
+}
+</script>
+</body>
+</html>

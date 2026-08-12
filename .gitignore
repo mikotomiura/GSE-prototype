@@ -145,4 +145,12 @@ snapshot*.json
 *.snapshot.json
 *.feat.csv
 *.smooth.csv
+# ⚠️★★★ 2026-08-12 追加 (Step 4 の security-checker が false green を実測で見つけた)。
+#   `run.sh data` が実際に書くのは `$OUT/<tag>.snap.json` と `$OUT/<tag>.csv` であり、
+#   上の `snapshot*.json` / `out.csv` は **どちらにも当たらない**。
+#   ★ 検査の probe が「スクリプトが作らない名前」を試していたため、穴が開いたまま緑だった。
+#   → ★ 実際に書かれる名前を塞ぐ。probe 側も同じ名前を試すよう直した (両 Step の run.sh)。
+*.snap.json
+experiments/**/*.csv
+experiments/**/*.ndjson
 # (__pycache__/ と *.pyc は上の「# Python」節で既に無視されている)
