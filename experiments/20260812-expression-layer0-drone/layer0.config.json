@@ -1,0 +1,122 @@
+{
+  "_readme": [
+    "層 0（基層）の合成パラメータ。★ これが「耳で決めた版」の凍結物である（S3-D5）。",
+    "player/layer0.html はこのファイルを読むだけで、パラメータを内蔵しない。",
+    "expr_version は .steering/20260811-expression-prototype-step0/scripts/expr_smooth.py:59 の",
+    "EXPR_VERSION と一致していなければならない。★ scripts/layer0_selftest.py が一致を検査する。"
+  ],
+
+  "expr_version": "0.3.0-step4",
+  "hmm_version": "0.3.0",
+
+  "spec_anchors": {
+    "band_hz": [55, 110],
+    "note": "media-expression-spec.md §2 層 0『55–110 Hz 帯の持続音 ＋ 整数次倍音のみ』",
+    "forbidden_mod_bands_hz": [[0.5, 20.0], [15.0, 70.0]],
+    "forbidden_note": "§1.1 禁止帯。4 Hz 付近が最悪（fluctuation strength ピーク・ISE を 70/63 予測）[P69][P65]。15–70 Hz は roughness",
+    "state_wave_band_hz": [0.001, 0.02],
+    "state_wave_note": "§1.1 状態の波はここに置く。★ 書き方は『緩慢だから安全』ではなく『禁止帯から離れているから安全』"
+  },
+
+  "candidates": {
+    "base_hz": {
+      "_axis": "S3-D2 軸 1: 基音。spec §2 の 55–110 Hz 帯を端から端まで",
+      "options": [
+        { "id": "a1", "hz": 55.0, "label": "A1 55.0 Hz（帯の下端）" },
+        { "id": "d2", "hz": 73.416, "label": "D2 73.416 Hz" },
+        { "id": "e2", "hz": 82.407, "label": "E2 82.407 Hz" },
+        { "id": "a2", "hz": 110.0, "label": "A2 110.0 Hz（帯の上端）" }
+      ],
+      "default": "a1"
+    },
+
+    "decay_law": {
+      "_axis": "S3-D2 軸 2: 倍音の減衰則。spec §2 が要求する『sharpness 低』を決める",
+      "_note": "倍音は整数次のみ（n = 1,2,3,…）。非調和成分をゼロにするのは spec §2 の禁止事項",
+      "options": [
+        { "id": "inv_n2", "law": "1/n^2", "partials": 8, "label": "1/n²（安全側・最も暗い）" },
+        { "id": "inv_n", "law": "1/n", "partials": 8, "label": "1/n（上限側の確認・最も明るい）" },
+        { "id": "low_only", "law": "1/n^2", "partials": 3, "label": "低次のみ（n≤3・ほぼ正弦波）" }
+      ],
+      "default": "inv_n2"
+    },
+
+    "drift": {
+      "_axis": "S3-D2 軸 3: 超低速ゆらぎの有無",
+      "_WARNING": [
+        "⚠️★★★ depth_db > 0 の候補は spec §2 の『層 0 は動かさない』から意図的に逸脱している。",
+        "S3-D10 を読むこと。これは『仕様に従った候補』ではなく『仕様の制約が耳に耐えるかを試す探り』である。",
+        "『完全な定常音が死んだ音に聞こえるか』を確かめるためだけに存在する。"
+      ],
+      "options": [
+        {
+          "id": "none",
+          "depth_db": 0.0,
+          "label": "無（★ spec §2 準拠 = 完全な定常音）",
+          "spec_compliant": true
+        },
+        {
+          "id": "slow",
+          "depth_db": 1.5,
+          "rates_hz": [0.005, 0.0031],
+          "label": "有（±1.5 dB・2 波の和）",
+          "spec_compliant": false,
+          "_why_two_rates": [
+            "★ 単一正弦だと『周期的な強弱』そのものになり spec §2 の禁止事項に文字どおり当たる。",
+            "2 波の和にすると反復周期が 1/gcd(0.005, 0.0031) = 10000 s（166.7 分）へ延び、",
+            "試聴 10 分（S3-D3）の 16 倍以上になるので、試聴中に『繰り返し』として聴こえない。",
+            "⚠️ ただし有理比なので数学的には必ず反復する。★ 『非周期』と書いてはならない。",
+            "★ この 10000 s は手計算ではなく scripts/layer0_selftest.py が Fraction で計算して検査する。"
+          ]
+        }
+      ],
+      "default": "none"
+    }
+  },
+
+  "envelope": {
+    "_note": "★ 全て spec §2 の禁止事項『オンセット』を避けるための時定数。急激な変化を作らない",
+    "fade_in_s": 4.0,
+    "fade_out_s": 0.4,
+    "volume_time_constant_s": 0.05,
+    "glide_s": 6.0,
+    "_glide_note": [
+      "候補を切り替えるときの基音の連続グライド時間。spec §2『動かすなら連続グライド』に従う。",
+      "⚠️ これは研究者が候補を切り替えたときにだけ起きる過渡であって、",
+      "★ 常時鳴っている表現の一部ではない。凍結後の運用では発生しない。"
+    ]
+  },
+
+  "step3b": {
+    "_note": [
+      "引き継ぎ §3b が許した範囲: 『基層が鳴り続けている上で、平滑化された値が\"聴こえない程度に\"何かに乗る』。",
+      "★ 既定は OFF。ON にしても音色・音高には乗せず、マスターゲインにのみ ±0.5 dB 以内で乗せる。",
+      "⚠️ これは Step 4 で行う本格的なマッピングではない。確かめるのは",
+      "『1Hz の目標値 → レンダレートで連続追従』という形が音として破綻しないかだけである。"
+    ],
+    "enabled_by_default": false,
+    "depth_db": 0.5,
+    "column": "ewma_x",
+    "param_time_constant_s": 2.0,
+    "gap_behavior": {
+      "_note": "S0-D11 が未決として残し、引き継ぎ §6 が『Step 3 で耳で決める』とした分岐（S3-D6）",
+      "options": [
+        { "id": "carry", "label": "前の状態から続ける（★ 現在の実装・既定）" },
+        { "id": "restart", "label": "無音から立ち上げる（対案）" }
+      ],
+      "default": "carry",
+      "restart_fade_s": 4.0
+    }
+  },
+
+  "selftest": {
+    "_note": "S3-D4: 本番と同じ合成グラフを OfflineAudioContext で測る。★ 窓なし DFT を使わない（S0-D8）",
+    "render_seconds": 400,
+    "sample_rate_hz": 8000,
+    "probe_lines_hz": [3.995, 4.0, 4.005],
+    "reference_lines_hz": [0.5, 20.0, 70.0],
+    "pass_threshold_db": -60.0,
+    "_threshold_source": "S0-D7 が数値で固定した基準（4 Hz の減衰 <= -60 dB）。★ 本 Step で発明した値ではない",
+    "_render_seconds_why": "400 s なら分解能 1/400 = 0.0025 Hz。probe_lines の 0.005 Hz 間隔を分離できる"
+  }
+}
