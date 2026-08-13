@@ -1,0 +1,86 @@
+{
+  "expr_version": "0.3.0-step4",
+  "condition": "abx_density",
+  "transition": "tr_0",
+  "transition_seconds": 0,
+  "measured_ratio": 1.4011245352616284,
+  "measured_db": 2.929534762435778,
+  "timbre": "t_low_wide",
+  "density_cue": "c_level",
+  "density_span": "s_current",
+  "layer0_gain": "l0_half",
+  "layer0_gain_value": 0.5,
+  "ratio_condition": {
+    "l0gain": "l0_half",
+    "l0gain_value": 0.5,
+    "timbre": "t_low_wide",
+    "dcue": "c_level",
+    "dspan": "s_current",
+    "map": false,
+    "l2on": true,
+    "plan": "plan_a"
+  },
+  "rate_min": 100,
+  "rate_max": 400,
+  "trials": [
+    {
+      "index": 0,
+      "truth": "diff",
+      "answer": "diff",
+      "correct": true
+    },
+    {
+      "index": 1,
+      "truth": "same",
+      "answer": "diff",
+      "correct": false
+    },
+    {
+      "index": 2,
+      "truth": "same",
+      "answer": "same",
+      "correct": true
+    },
+    {
+      "index": 3,
+      "truth": "same",
+      "answer": "same",
+      "correct": true
+    },
+    {
+      "index": 4,
+      "truth": "same",
+      "answer": "same",
+      "correct": true
+    },
+    {
+      "index": 5,
+      "truth": "diff",
+      "answer": "diff",
+      "correct": true
+    },
+    {
+      "index": 6,
+      "truth": "diff",
+      "answer": "same",
+      "correct": false
+    },
+    {
+      "index": 7,
+      "truth": "diff",
+      "answer": "same",
+      "correct": false
+    }
+  ],
+  "correct": 5,
+  "threshold": 7,
+  "pass": false,
+  "stats": {
+    "hit": 2,
+    "nDiff": 4,
+    "fa": 1,
+    "nSame": 4,
+    "balanced": true
+  },
+  "note": "★ 瞬時 A/B は spec §2 の禁止事項を意図的に破る診断条件。製品の提示方法ではない。"
+}

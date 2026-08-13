@@ -845,11 +845,38 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
         if "showTransportError" not in seg:
             raise Fail("Worklet 読み込みの失敗が画面に出ない（無言で固まる）")
 
-    @add("player に絶対パス / ユーザー名が混入していない")
+    @add("player / config に絶対パス・ユーザー名が混入していない")
     def _():
-        for pat in (r"[A-Za-z]:\\\\", r"[A-Za-z]:/Users/", r"/home/[a-z]", r"johnd"):
-            if re.search(pat, html) or re.search(pat, worklet):
-                raise Fail(f"絶対パス/ユーザー名らしき文字列 {pat} がある")
+        # ⚠️★★★ 2026-08-13（security-checker の指摘 ＋ 実測）に **検出漏れを直した**。
+        #   ★ 旧パターン `[A-Za-z]:\\\\` は **バックスラッシュ 2 個**を要求していたので、
+        #     散文中の普通の Windows パス（`C:\GSE-prototype\...`）に当たらなかった。
+        #   ★ 旧パターンは `/Users/<name>`（macOS の home 形式）も 1 つも見ていなかった。
+        #   ★ 実測: 6 形式のうち **旧は 4 つを取り逃し、新は 6/6 検出・対照 6 件で誤検出 0**。
+        #
+        # ⚠️★ **ユーザー名をハードコードしない**（旧実装は実ユーザー名を直接持っていた）——
+        #   (a) それ自体がリポジトリにユーザー名を残すことになり、
+        #   (b) **別マシン / 別ユーザー名では検査が空回りする**（★ 指摘された事故シナリオそのもの）。
+        #   → ★ **home パスの「形」で見る** ＋ 実行中のユーザー名を実行時に引く。
+        pats = [
+            r"(?<![A-Za-z])[A-Za-z]:[\\/]",              # ★ C:\… / C:/… （★ 直前が英字なら http**s**:// 等なので除外）
+            r"(?<![A-Za-z])/(Users|home)/[A-Za-z]",      # ★ /Users/<name> / /home/<name>
+            r"(?<![A-Za-z])AppData[\\/]",                # ★ Windows のユーザー領域
+        ]
+        # ★ 実行中のユーザー名（★ ハードコードしないので macOS / CI でもそのまま効く）
+        try:
+            me = Path.home().name
+            if me and len(me) >= 3 and me.lower() not in ("root", "user", "home", "users"):
+                pats.append(re.escape(me))
+        except Exception:
+            pass   # ★ home が引けない環境では形の検査だけで走らせる（★ 黙って緑にはしない）
+        # ⚠️ 既知の誤検出の形: JS の `{a:/re/}` のように **空白なしで `:` の直後に `/`** が来る書き方。
+        #   ★ 誤検出は「うるさいだけ」で人が 10 秒で直せる。★ 見逃しは実害が出る。★ 誤検出側に倒す。
+        for label, text in (("player", html), ("worklet", worklet), ("config", cfg_text)):
+            for pat in pats:
+                m = re.search(pat, text)
+                if m:
+                    ctx = text[max(0, m.start() - 40):m.start() + 40].replace("\n", " ")
+                    raise Fail(f"{label} に絶対パス/ユーザー名らしき文字列がある（{pat}）: …{ctx}…")
 
     @add("★ config が『非周期』と書いていない（有理比なので数学的には必ず反復する）")
     def _():
@@ -1143,8 +1170,13 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
                 "★ 盲検中に条件を変えられると null になり、TypeError で結果が丸ごと消える"
             )
         inv = strip_js_comments(extract_function(html, "invalidateAbxRatio"))
-        if "abx.blind" not in inv:
+        # ★ 2026-08-13: 中止は `abxBlindStop()` の **単一経路**に集約した（AB-D2・レビュー実測）。
+        #   ★ ここは「中止しているか」を見る。★ 実際に手放しているかは stop 側の検査が見る。
+        if "abxBlindStop(" not in inv and "abx.blind" not in inv:
             raise Fail("invalidateAbxRatio が走行中の盲検を中止していない")
+        stp = strip_js_comments(extract_function(html, "abxBlindStop"))
+        if not re.search(r"abx\.blind\s*=\s*null", stp):
+            raise Fail("abxBlindStop が abx.blind を手放していない（中止が効かない）")
 
     @add("★★ 盲検中に触れる軸が lockUI に全部入っている")
     def _():
@@ -1164,6 +1196,408 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
         ex = strip_js_comments(extract_function(html, "exportAbx"))
         if "abx.lastResult" not in ex:
             raise Fail("exportAbx が abx.lastResult を保存していない")
+
+    # ---- ★★★ 盲検の提示手順（2026-08-13・AB-D1〜AB-D6）------------------
+    #
+    # ⚠️★★★ 既存の検査 103 件は、**3 件の交絡を全部緑のまま素通りさせた。**
+    #   ★ 理由（AB-D0）: 既存の検査はすべて **「1 トライアルの中」または「刺激の作り方」**を見ており、
+    #     ⚠️ **「トライアルとトライアルの間」と「同じ聴き手が繰り返すこと」を見る検査が 1 件も無かった。**
+    #   → ★ 以下は **試行の系列（順序・持ち越し・反復）** を検査対象にする。
+
+    ABX_BLIND = cfg["layer2_rework"]["abx"]["blind"]
+
+    @add("★★★ AB-D1: 盲検の出題 seed が config に固定されていない（毎回同じ順を出さない）")
+    def _():
+        # ⚠️★★★ 実際に踏んだ形: order_seed が固定定数だったので buildAbxOrder が
+        #   **毎回まったく同じ順**を返し（実測で 3 回とも同一）、研究者が 5 倍率ぶん
+        #   同じ順を聴くことになっていた。★ 後の倍率ほど正答が上がる ＝ 閾値が高い倍率側に見える。
+        if "order_seed" in ABX_BLIND:
+            raise Fail(
+                "layer2_rework.abx.blind.order_seed が復活している。"
+                "★ 固定 seed だと同じ聴き手が繰り返すあいだ毎回同じ出題順になる（AB-D1）"
+            )
+        if "_order_seed_removed_why" not in ABX_BLIND:
+            raise Fail("order_seed を消した理由が config に残っていない（★ 戻される）")
+
+    @add("★★★ AB-D1: 出題順の seed を毎回引き、引いた値を結果に残している")
+    def _():
+        body = strip_js_comments(html)
+        if "function drawOrderSeed(" not in body:
+            raise Fail("drawOrderSeed() が無い（seed を引き直す経路が存在しない）")
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if not re.search(r"const\s+orderSeed\s*=\s*drawOrderSeed\(\)", st):
+            raise Fail("abxBlindStart が seed を引き直していない")
+        if re.search(r"buildAbxOrder\(\s*B\.order_seed", st):
+            raise Fail("abxBlindStart がまだ config の固定 seed を使っている")
+        if not re.search(r"buildAbxOrder\(\s*orderSeed", st):
+            raise Fail("buildAbxOrder に引き直した seed を渡していない")
+        # ⚠️★★★ 引いた値を **abx.blind に載せる**ところが抜けると `order_seed: undefined` になる
+        #   （★ レビュー実測: `orderSeed,` を落としても緑だった）。
+        # ⚠️★★★ 最初の直しも **まだ空回りしていた**（meta が捕まえた）——
+        #   `buildAbxOrder(orderSeed,` が同じ関数に在るので `orderSeed\s*,` が当たってしまう。
+        #   → ★ **`abx.blind = { … }` のリテラルの中だけ**を見る。
+        #   ★ 波括弧を対応させて取り出す（★ `{ ...abx.ratioCond }` が入れ子になっているので
+        #     非貪欲な正規表現では最初の `}` で切れる）。
+        i = st.find("abx.blind = {")
+        if i < 0:
+            raise Fail("abx.blind の生成リテラルが読めない")
+        j, depth = st.index("{", i), 0
+        for k in range(j, len(st)):
+            if st[k] == "{":
+                depth += 1
+            elif st[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+        obj = st[j:k + 1]
+        if not re.search(r"(?<![A-Za-z])orderSeed\s*[,:]", obj):
+            raise Fail("引いた seed を abx.blind に載せていない（結果が order_seed: undefined になる）")
+        # ★★ 引いても**記録しなければ再現できない**。★ ここが AB-D1 の肝である
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        if not re.search(r"order_seed:\s*bl\.orderSeed", fin):
+            raise Fail(
+                "結果の order_seed が bl.orderSeed を指していない。"
+                "★ 毎回引き直すなら、実際に使った値を記録しないと出題順を再構成できない（AB-D1）"
+            )
+
+    @add("★★★ AB-D2: トライアル冒頭のリセットが『1 区間目』より **前** にある（持ち越しを採点区間へ入れない）")
+    def _():
+        # ⚠️★★★ 実際に踏んだ形: diff のトライアルは B のまま終わるので、
+        #   次のトライアル冒頭の abxSet("A") が **当ててほしい跳びと同じ大きさの跳び**を
+        #   1 区間目のまっただ中で鳴らしていた（実測 400 → 106（150 ms）→ 100）。
+        # ★ 「呼んでいるか」では足りない —— **位置**で見る（BF-5 と同じ教訓）。
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        m_reset = re.search(r'abxSetInstant\(\s*"A"\s*\)', nx)
+        m_prep = re.search(r'abxPhase\(\s*bl\s*,\s*"prep2"', nx)
+        m_i1 = re.search(r'abxPhase\(\s*bl\s*,\s*"i1"', nx)
+        if not (m_reset and m_prep and m_i1):
+            raise Fail(
+                "abxBlindNext に prep2 / i1 の相が無い（"
+                f'abxSetInstant("A")={bool(m_reset)} prep2={bool(m_prep)} i1={bool(m_i1)}）'
+            )
+        if not (m_reset.start() < m_prep.start() < m_i1.start()):
+            raise Fail(
+                'abxSetInstant("A") → prep2 → i1 の順になっていない。'
+                "★ リセットが 1 区間目より後だと、持ち越しの跳びが採点区間の中で鳴る（AB-D2）"
+            )
+        # ⚠️★★★ レビュー実測の silent pass: `abxSet("A")` を `if (bl.i === 0)` で包むと
+        #   **2 回目以降が元の欠陥に戻る**のに、位置は変わらないので緑だった。
+        #   → ★ **リセットが条件分岐の中に入っていない**ことを見る。
+        head = nx[:m_reset.start()]
+        if re.search(r"\bif\s*\([^)]*\)\s*\{?[^;{}]*$", head):
+            raise Fail(
+                'リセットが条件分岐の中にある。★ 毎トライアル無条件に走らないと、'
+                "2 回目以降が元の欠陥（持ち越しが採点区間で鳴る）に戻る（AB-D2）"
+            )
+
+    @add("★★★ AB-D7: 準備区間の跳びが **真値に依らない**（試行ごとの正解フィードバックを配らない）")
+    def _():
+        # ⚠️★★★ レビュー実測で見つかった **穴 5**: 採点区間の外へ動かしただけでは足りない。
+        #   ★ トライアルは same なら A、diff なら B で終わるので、準備区間の跳びは
+        #     **「直前が diff だったときだけ」**鳴る。⚠️ 出題は 4/4 の**非復元**なので
+        #     過去の真値が未来の真値を制約する（＝正解フィードバック）。
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        if "carry" not in nx or "prep1" not in nx:
+            raise Fail(
+                "準備区間が 2 段（prep1 / prep2）になっていない。"
+                "★ 1 段だと入場状態がそのまま跳びに出るので、真値が漏れる（AB-D7）"
+            )
+        # ★ carry が **真値（kind）から作られていない**こと（★ 作られたら漏れが残る）
+        m = re.search(r"const\s+carry\s*=\s*([^;]+);", nx)
+        if not m:
+            raise Fail("carry の決め方が読めない")
+        expr = m.group(1)
+        if "kind" in expr or "truth" in expr or "order" in expr:
+            raise Fail(f"carry が真値から作られている（{expr.strip()}）。★ 漏れが残る（AB-D7）")
+        if "mulberry32" not in expr and "random" not in expr.lower():
+            raise Fail(f"carry が乱数になっていない（{expr.strip()}）")
+        # ⚠️★★★ **1 段では直らない**（BF-5 と同じ「呼んだが効いていない」形）——
+        #   carry を鳴らす相が、A へ戻す前に実在すること
+        m_carry = re.search(r"abxSetInstant\(\s*carry\s*\)", nx)
+        m_p1 = re.search(r'abxPhase\(\s*bl\s*,\s*"prep1"', nx)
+        m_a = re.search(r'abxSetInstant\(\s*"A"\s*\)', nx)
+        if not (m_carry and m_p1 and m_a and m_carry.start() < m_p1.start() < m_a.start()):
+            raise Fail(
+                'abxSetInstant(carry) → prep1 → abxSetInstant("A") の順になっていない。'
+                "★ 待ちを挟まないと carry は 1 サンプルも鳴らない（★ BF-5 と同じ no-op）"
+            )
+
+    @add("★★★ AB-D7: トライアル間の切替だけが即座で、採点区間は遷移時間を守る")
+    def _():
+        body = strip_js_comments(html)
+        if "function abxSetInstant(" not in body:
+            raise Fail("abxSetInstant() が無い")
+        fn = strip_js_comments(extract_function(html, "abxSetInstant"))
+        if not re.search(r"dur:\s*0", fn):
+            raise Fail("abxSetInstant が即座になっていない（dur: 0 が無い）")
+        # ⚠️★★★ 採点区間で使ったら、遷移時間という本題の独立変数が黙って無効になる
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        after_i1 = nx[re.search(r'abxPhase\(\s*bl\s*,\s*"i1"', nx).start():]
+        if "abxSetInstant" in after_i1:
+            raise Fail(
+                "採点区間（1 区間目以降）で abxSetInstant を使っている。"
+                "★ 遷移時間（量と速度の切り分け）が黙って無効になる（AB-D7）"
+            )
+        if not re.search(r'abxSet\(kind === "diff"', nx):
+            raise Fail("2 区間目の切替が abxSet（遷移時間を守る側）になっていない")
+
+    @add("★★★ AB-D2 / AB-D7: 準備区間の長さが実装の式から出ていて、跳びの減衰より十分長い")
+    def _():
+        if "prep_seconds" not in ABX_BLIND:
+            raise Fail("blind.prep_seconds が config に無い（AB-D2）")
+        if not (ABX_BLIND["prep_seconds"] > 0):
+            raise Fail(f"prep_seconds が 0 以下（{ABX_BLIND['prep_seconds']}）")
+        body = strip_js_comments(html)
+        if "function abxPrepSeconds(" not in body:
+            raise Fail("abxPrepSeconds() が無い")
+        fn = strip_js_comments(extract_function(html, "abxPrepSeconds"))
+        # ⚠️★★★ 旧版の検査は **恒真だった**（レビュー実測）——
+        #   `want = max(prep, sec+2); if want < sec+2` は max の定義上ぜったいに真にならない。
+        #   ★ **仕様の式を再実装して自分と比べていた**ので、実装が何であっても緑だった。
+        #   → ★ **実装のソースから式を取り出して**判定する。
+        m = re.search(r"return\s+Math\.max\(\s*B\.prep_seconds\s*,\s*([0-9.]+)\s*\)\s*;", fn)
+        if not m:
+            raise Fail(
+                "abxPrepSeconds が `Math.max(B.prep_seconds, <床>)` の形になっていない: "
+                + fn.strip().splitlines()[-2:][0].strip()
+            )
+        floor = float(m.group(1))
+        # ★ 跳びの減衰は実測 700 ms。★ 床はその 2 倍以上を要求する
+        if floor < 1.4:
+            raise Fail(f"準備区間の床が短すぎる（{floor} s）。★ 跳びの減衰は実測 0.7 s")
+        # ★ 実効値（config と床の大きいほう）が、2 段に割っても減衰より長いこと
+        eff = max(ABX_BLIND["prep_seconds"], floor)
+        if eff / 2 < 0.7:
+            raise Fail(f"準備区間を 2 段に割ると 1 段が {eff / 2} s で、跳びの減衰 0.7 s を下回る")
+
+    @add("★★★ AB-D2: 3 つの相が画面に出る（『何と比べるか』が聴き手に決まる）")
+    def _():
+        # ⚠️★★★ 研究者の申告: 「最初の第一回目は何と比較すればよいのかわからない」。
+        #   ★ same のトライアルは 8 秒間まったくの無変化で、境目の印が音にも画面にも無かった。
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        for label in ("準備中", "1 区間目", "2 区間目"):
+            if label not in nx:
+                raise Fail(f"相の表示『{label}』が abxBlindNext に無い（AB-D2 / AB-D3）")
+        ph = strip_js_comments(extract_function(html, "abxPhase"))
+        if "abx-blind-state" not in ph:
+            raise Fail("abxPhase が画面に相を書いていない")
+        # ⚠️★★★ レビュー実測の silent pass: textContent から `${label}` を落としても緑だった
+        #   （★ 相の名前が画面に出ない ＝ 研究者の元の申告が再発する）。
+        if not re.search(r'"abx-blind-state"\s*\)\s*\.textContent\s*=\s*[^;]*\blabel\b', ph):
+            raise Fail("abxPhase が相の名前（label）を画面に書いていない")
+        # ★ 残り秒を出す（★ 境目がいつ来るかが分からないと 1 区間目/2 区間目の区別が付かない）
+        # ⚠️★★★ 「`phaseEndsAt` が本文にあるか」で見たら **silent pass だった**（meta が捕まえた）——
+        #   ★ 代入 `bl.phaseEndsAt = ...` が同じ関数に居るので、**表示を消しても緑**になる。
+        #   → ★ **「残りを計算していること」と「それを画面に書いていること」を別々に見る。**
+        if not re.search(r"\bleft\s*=\s*Math\.max\(\s*0\s*,\s*bl\.phaseEndsAt", ph):
+            raise Fail("abxPhase が残り時間を計算していない（境目の時刻が聴き手に分からない）")
+        if not re.search(r'"abx-blind-state"\s*\)\s*\.textContent\s*=\s*[^;]*\bleft\b', ph):
+            raise Fail("abxPhase が残り時間を画面に書いていない（計算しても出さなければ同じ）")
+
+    @add("★★★ AB-D3: 盲検の提示に **音の印を足していない**（測っている差に別の差を混ぜない）")
+    def _():
+        # ★ 無音やビープを足すと「密度差を聞き分けた」のか「印の前後を聞き分けた」のかが混ざる。
+        for name in ("abxBlindNext", "abxPhase"):
+            fn = strip_js_comments(extract_function(html, name))
+            for bad in ("createOscillator", "createBufferSource", "createNoise", "AudioBufferSource"):
+                if bad in fn:
+                    raise Fail(f"{name} が音を作っている（{bad}）。★ 境目は画面表示だけで示す（AB-D3）")
+            # ★ master を落として無音区間を作る形も禁じる
+            if re.search(r"master\.gain[^;]*0\s*[,)]", fn):
+                raise Fail(f"{name} が master を落として無音区間を作っている（AB-D3）")
+
+    @add("★★★ AB-D2: 相が state() に出る（跳びが準備区間に落ちたことを外から実測できる）")
+    def _():
+        # ⚠️★ 出さないと AC-1 / AC-4 を測れない。★ 「検査できる形で作る」を後付けにしない（S5-D11）
+        body = strip_js_comments(html)
+        m = re.search(r"blind:\s*abx\.blind\s*\?\s*\{(.*?)\}\s*:\s*null", body, re.S)
+        if not m:
+            raise Fail("state() が abx.blind を出していない")
+        blk = m.group(1)
+        # ⚠️★★★ 「`phase` が入っているか」で見たら **silent pass だった**（meta が捕まえた）——
+        #   ★ `phaseLeftMs` が `phase` を**部分文字列として含む**ので、`phase:` を消しても緑になる。
+        #   → ★ **鍵は「鍵として」照合する**（`名前:` の形で見る）。
+        for key, src in (("phase", "abx.blind.phase"),
+                         ("phaseLeftMs", None),
+                         ("orderSeed", "abx.blind.orderSeed")):
+            if not re.search(r"(?<![A-Za-z])" + key + r"\s*:", blk):
+                raise Fail(f"state().abx.blind に {key} が無い（外から相を実測できない）")
+            if src and src not in blk:
+                raise Fail(f"state().abx.blind の {key} が {src} を指していない")
+
+    @add("★★ AB-D2: 回答相以外の回答を受け付けない（ボタンを隠すだけを門番にしない）")
+    def _():
+        ans = strip_js_comments(extract_function(html, "abxAnswer"))
+        m_gate = re.search(r'bl\.phase\s*!==\s*"answer"', ans)
+        if not m_gate:
+            raise Fail(
+                "abxAnswer が相を確かめていない。"
+                "★ ボタンの hidden だけが門番だと、相の外から回答が入りうる（S5-D6 と同じ型）"
+            )
+        # ⚠️★★★ レビュー実測の silent pass: 門番を `results.push` の **後ろ**へ動かしても
+        #   文字列は在るので緑だった。★ 位置で見る（BF-5 の教訓）。
+        m_push = re.search(r"bl\.results\.push\(", ans)
+        if m_push and m_gate.start() > m_push.start():
+            raise Fail("相の確認が結果の記録より後ろにある（★ 門番が空回りする）")
+
+    @add("★★★ AB-D9: 『この dB を刺激の大きさと読んでよいか』が判定され、結果に残る")
+    def _():
+        # ⚠️★★★ 2026-08-13 に実際に踏んだ **穴 6**: BF-2 のゲートは **対照条件だけ**に効いていた。
+        #   ★ abx_density × c_texture で盲検が走り、`measured_db: 0.247` が
+        #     「コントラスト」として記録された。⚠️ c_texture は density_norm_exp = 0.5 ＝
+        #     **エネルギー保存**で、**密度は変わるがレベルは変わらない。**
+        #   → ★ BF-2 が「差が無いのに測った」なら、これは「差はあるが計器が見ていないのに
+        #     計器の値を刺激の大きさとして記録した」。★ 向きが逆の同じ過ち。
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if "density_norm_exp" not in st:
+            raise Fail(
+                "盲検の開始時に『レベルに出る写し方か』を見ていない。"
+                "★ 判定は id ではなく density_norm_exp（設計上の正規化指数）から出す（AB-D9）"
+            )
+        if not re.search(r'abxOpt\(\)\.id === "abx_density"[^;]*levelBearing', st):
+            raise Fail("abx_density で『レベルに出るのに比が小さい』条件を断っていない（AB-D9）")
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        # ⚠️★★ Codex 指摘: 対照条件（abx_level）は密度の写し方に関係なく measured_db が刺激量である。
+        #   ★ 入れ忘れると `abx_level` × `c_texture` で false と誤記録される。
+        if not re.search(r'contrastMeasurable\s*=\s*abxOpt\(\)\.id === "abx_level"', st):
+            raise Fail(
+                "contrastMeasurable が対照条件（abx_level）を見ていない。"
+                "★ abx_level は比をマスタゲインに直接掛けるので、写し方に関係なく刺激量である（AB-D9）"
+            )
+        if not re.search(r"contrast_measurable:\s*bl\.contrastMeasurable", fin):
+            raise Fail(
+                "結果に contrast_measurable が残らない。"
+                "★ 無いと『0.25 dB だったから読めなかった』と逆向きに誤読される（AB-D9）"
+            )
+        if "contrast_note" not in fin:
+            raise Fail("contrast_measurable の意味を書いた注記が結果に無い")
+        # ★ config 側: 判定の根拠になる density_norm_exp が全候補にあること
+        for o in cfg["layer2_rework"]["density_cue"]["options"]:
+            if "density_norm_exp" not in o:
+                raise Fail(f"density_cue {o['id']} に density_norm_exp が無い（判定の根拠が消える）")
+
+    @add("★★★ AB-D2: 盲検を中止する経路が **UI から到達できる**（安全機構を到達不能にしない）")
+    def _():
+        # ⚠️★★★ レビュー実測: `abx.blind = null` を書くのは invalidateAbxRatio だけで、
+        #   その呼び出し元 4 つは **lockUI(true) で disabled になる**ラジオの onChange だった。
+        #   ★ つまり盲検中は中止が原理的に発火せず、★ abxPhase の戻り値ガードは一度も走らない。
+        #   ⚠️ tr_60 の 8 回は約 25 分あり、**止める手段が F5 しか無かった。**
+        body = strip_js_comments(html)
+        if "function abxBlindStop(" not in body:
+            raise Fail("中止の単一経路 abxBlindStop() が無い")
+        if 'id="btn-abx-stop"' not in html:
+            raise Fail("中止ボタンが UI に無い（★ 中止経路が UI から到達できない）")
+        if not re.search(r'"btn-abx-stop"\s*\)\s*\.addEventListener', body):
+            raise Fail("中止ボタンが配線されていない")
+        lk = strip_js_comments(extract_function(html, "lockUI"))
+        # ★ 中止ボタンだけはロックの対象外（★ ロックすると止められない）
+        if not re.search(r'"btn-abx-stop"\s*\)\s*\.disabled\s*=\s*!lock', lk):
+            raise Fail("中止ボタンが lockUI で無効化されている（★ 止める手段が消える）")
+        # ★ 「止める」でも盲検が中止されること（★ B7 だけ中止していた）
+        stp = strip_js_comments(extract_function(html, "stop"))
+        if "abxBlindStop(" not in stp:
+            raise Fail(
+                "stop() が瞬時 A/B の盲検を中止していない。"
+                "★ 相は進み続け、**無音のまま回答が集まって正常に見える結果 JSON が書かれる**（BF-2 と同じ形）"
+            )
+        # ★ 相の待ちが「再生中か」も見ること
+        ph = strip_js_comments(extract_function(html, "abxPhase"))
+        if "playing" not in ph:
+            raise Fail("abxPhase が再生中かを見ていない（停止しても相が進む）")
+
+    @add("★★★ AB-D2: 盲検中は A/B の手動ボタンと①がロックされる（試行を書き換えられない）")
+    def _():
+        # ⚠️★★★ レビュー実測: btn-abx-a / -b / -off / -blind が lockUI に入っておらず、
+        #   ★ `B` を 1 区間目で押せば **same の試行が事実上 diff になる**。記録も棄却もされない。
+        #   ★ ax-l0gain が Step 4 から漏れていたのと同じ形。
+        lk = strip_js_comments(extract_function(html, "lockUI"))
+        for bid in ("btn-abx-a", "btn-abx-b", "btn-abx-off", "btn-abx-blind", "btn-abx-cal"):
+            if f'"{bid}"' not in lk:
+                raise Fail(f"{bid} が lockUI に入っていない（盲検中に刺激を書き換えられる）")
+        # ★ ②の再入も断る（★ 進行中の列が無警告で捨てられる）
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if not re.search(r"if\s*\(\s*abx\.blind\s*\)", st):
+            raise Fail("abxBlindStart に再入ガードが無い（★ 進行中の列がデータごと消える）")
+
+    @add("★★★ AB-D2: 盲検が終わったら abx.blind を手放す（①が二度と押せなくならない）")
+    def _():
+        # ⚠️★★★ レビュー実測: `cal.disabled = … || !!abx.blind` が 250 ms ごとに走るので、
+        #   終了時に abx.blind を残すと **①が二度と押せなくなる**。
+        #   ★ AB-D5 の「同じ条件で①を 3 回連続測る」がそもそも実行できない状態だった。
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        if not re.search(r"abx\.blind\s*=\s*null", fin):
+            raise Fail(
+                "abxBlindFinish が abx.blind を手放していない。"
+                "★ describeLayer0Gain の cal.disabled が !!abx.blind を見るので①が押せなくなる"
+            )
+
+    @add("★★ AB-D5: 結果に版と時刻が残る（修正前後・測定時刻を取り違えない）")
+    def _():
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        for key in ("protocol:", "started_at:", "finished_at:", "timing:"):
+            if key not in fin:
+                raise Fail(f"結果に {key} が無い（★ AB-D5 の時刻仮説を事後に検証できない）")
+        # ⚠️★ 提示の時間構造そのもの（★ 修正前後の結果を取り違えないための鍵）
+        for key, src in (("prep_seconds", "bl.prepSec"), ("seconds_per_side", "bl.sideSec")):
+            if not re.search(key + r":\s*" + re.escape(src), fin):
+                raise Fail(f"結果の {key} が {src} を指していない（★ 提示の時間構造が残らない）")
+        ex = strip_js_comments(extract_function(html, "exportAbx"))
+        if "stamp" not in ex:
+            raise Fail("保存名に時刻が入っていない（★ 測り直しが同名になり上書きしうる）")
+
+    @add("★★ AB-D2: 提示の相の長さが **凍結値**から出る（記録と提示が食い違わない）")
+    def _():
+        # ⚠️★ live 参照（abxSideSeconds()）だと、ロックが 1 つ外れた瞬間に
+        #   JSON の prep_seconds / seconds_per_side と実際の提示が食い違う。
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        if "abxSideSeconds()" in nx or "abxPrepSeconds()" in nx:
+            raise Fail("abxBlindNext が相の長さを live 参照している（★ 記録は凍結値なので食い違う）")
+        if "bl.sideSec" not in nx or "bl.prepSec" not in nx:
+            raise Fail("abxBlindNext が凍結値（bl.sideSec / bl.prepSec）を使っていない")
+
+    @add("★★ AB-D2: 所要時間の表示が準備区間を含んでいる（見積もりだけ古いまま残さない）")
+    def _():
+        d = strip_js_comments(extract_function(html, "describeRework"))
+        # ⚠️★★★ 「本文に abxPrepSeconds() があるか」で見たら **silent pass だった**（meta が捕まえた）——
+        #   ★ 同じ関数の**別の行**（fact の文言）が呼んでいるので、**見積もりから外しても緑**になる。
+        #   → ★ **見積もりの式そのもの**を見る。
+        m = re.search(r"\bmins\s*=\s*([^;]+);", d)
+        if not m:
+            raise Fail("所要時間の見積もり（mins）が describeRework に無い")
+        if "abxPrepSeconds()" not in m.group(1):
+            raise Fail(
+                f"所要時間の見積もりに準備区間が入っていない（mins = {m.group(1).strip()}）。"
+                "★ 1 トライアルは 3 相になった（AB-D2）"
+            )
+
+    @add("★★ AB-D2: 中止が相の途中でも効く（中止したのに次のトライアルが始まらない）")
+    def _():
+        ph = strip_js_comments(extract_function(html, "abxPhase"))
+        # ⚠️★★★ 「本文に abx.blind !== bl があるか」で見たら **silent pass だった**（meta が捕まえた）——
+        #   ★ 表示用 tick の中の同じ式が残るので、**戻り値を `return true;` にしても緑**になる。
+        #   → ★ **呼び出し側が見るもの（戻り値）を名指しで見る。**
+        # ★ 生存判定は `live()` の 1 か所から作る（★ 戻り値と表示 tick を同じ定義から出す・S5-D11）
+        m_live = re.search(r"const\s+live\s*=\s*\(\)\s*=>\s*([^;]+);", ph)
+        if not m_live:
+            raise Fail("abxPhase に生存判定 live() が無い")
+        expr = m_live.group(1)
+        if "abx.blind === bl" not in expr:
+            raise Fail(f"live() が中止（abx.blind = null）を見ていない: {expr.strip()}")
+        if "playing" not in expr:
+            raise Fail(f"live() が再生中かを見ていない: {expr.strip()}（★ 停止しても相が進む）")
+        if not re.search(r"return\s+live\(\)\s*;", ph):
+            raise Fail(
+                "abxPhase の戻り値が live() になっていない。"
+                "★ 呼び出し側は戻り値でしか中止を知れない"
+            )
+        if not re.search(r"if\s*\(\s*!live\(\)\s*\)\s*return", ph):
+            raise Fail("abxPhase の表示 tick が中止後も画面を書き換えうる")
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        if nx.count("if (!await abxPhase(") < 3:
+            raise Fail(
+                "abxBlindNext が abxPhase の戻り値を見ていない相がある。"
+                "★ 中止しても残りの相が走り、次のトライアルが始まる"
+            )
 
     @add("★★★ BF-6: 層 2 が粒を出していないまま測らせない（無音で盲検を回さない）")
     def _():
@@ -1727,6 +2161,180 @@ def meta_checks() -> int:
          mut_both("  const expr   = ctx.createGain(); expr.gain.value = 1;",
                   "  const expr   = ctx.createGain(); expr.gain.value = layer0GainOpt().gain;"),
          "LAYER0-CORE"),
+        # ---- ★★★ 盲検の提示手順（AB-D1〜AB-D6）------------------------------
+        #
+        # ⚠️★★★ AB-D0: この 3 件は **既存の検査 103 件を全部緑のまま素通り**した。
+        #   ★ 以下は「壊し方」を **系列の側**（順序・持ち越し・反復）から与える。
+        ("★★★ AB-D1: 固定 order_seed を config に戻す（毎回同じ出題順に戻る）",
+         mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].update(order_seed=20260813)),
+         "order_seed が復活している"),
+        ("★★★ AB-D1: order_seed を消した理由を config から消す（次の人が戻す）",
+         mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].pop("_order_seed_removed_why")),
+         "消した理由が config に残っていない"),
+        ("★★★ AB-D1: seed を引き直さず固定値に戻す",
+         mut_html("  const orderSeed = drawOrderSeed();", "  const orderSeed = 20260813;"),
+         "seed を引き直していない"),
+        ("★★★ AB-D1: 引いた seed を結果に残さない（出題順が再構成できなくなる）",
+         mut_html("    order_seed: bl.orderSeed,", ""), "bl.orderSeed を指していない"),
+        # ⚠️★★★ **本命の変異**: 交絡そのものを戻す。
+        ("★★★ AB-D2: リセットを 1 区間目の後ろへ動かす（持ち越しが採点区間で鳴る＝元の欠陥）",
+         mut_html('  abxSetInstant("A");\n'
+                  '  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;\n'
+                  '  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;',
+                  '  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;\n'
+                  '  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;\n'
+                  '  abxSetInstant("A");'),
+         "順になっていない"),
+        ("★★★ AB-D2: 準備区間を丸ごと消す（元の 2 相に戻る）",
+         mut_html('  abxSetInstant(carry);\n'
+                  '  if (!await abxPhase(bl, "prep1", half, "準備中（まだ判定しません）")) return;\n'
+                  '  abxSetInstant("A");\n'
+                  '  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;\n',
+                  '  abxSetInstant("A");\n'), "prep2 / i1 の相が無い"),
+        ("★★ AB-D2: prep_seconds を config から消す",
+         mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].pop("prep_seconds")),
+         "prep_seconds が config に無い"),
+        ("★★★ AB-D2: 相の表示から『2 区間目』を落とす（境目が分からなくなる）",
+         mut_html('"2 区間目")) return;', '"")) return;'), "2 区間目"),
+        ("★★★ AB-D2: 残り秒を出さない（境目がいつ来るか分からない）",
+         mut_html("    const left = Math.max(0, bl.phaseEndsAt - performance.now());\n"
+                  "    $(\"abx-blind-state\").textContent = `${head} — ${label}（あと ${(left / 1000).toFixed(1)} 秒）`;",
+                  "    $(\"abx-blind-state\").textContent = `${head} — ${label}`;"),
+         "残り時間を計算していない"),
+        ("★★★ AB-D3: 境目にビープを足す（測っている差に別の差を混ぜる）",
+         mut_html("  tick();\n  const iv = setInterval(tick, 100);",
+                  "  ctx.createOscillator().start();\n  tick();\n  const iv = setInterval(tick, 100);"),
+         "音を作っている"),
+        ("★★★ AB-D2: state() から相を落とす（跳びの落ち先を外から実測できなくなる）",
+         mut_html("                                  phase: abx.blind.phase,", ""), "phase が無い"),
+        ("★★ AB-D2: 回答相の確認を外す（相の外から回答が入る）",
+         mut_html('  if (bl.phase !== "answer") return;', ""), "相を確かめていない"),
+        ("★★ AB-D2: 所要時間の見積もりから準備区間を落とす",
+         mut_html("  const mins = (B.trials * (abxPrepSeconds() + abxSideSeconds() * 2)) / 60;",
+                  "  const mins = (B.trials * abxSideSeconds() * 2) / 60;"),
+         "準備区間が入っていない"),
+        ("★★ AB-D2: 中止の確認を外す（中止しても次のトライアルが始まる）",
+         mut_html("  return live();", "  return true;"), "戻り値が live() になっていない"),
+        ("★★ AB-D2: 中止後も表示 tick が画面を書き換える",
+         mut_html("    if (!live()) return;\n", ""), "中止後も画面を書き換えうる"),
+        # ---- ★★★ 絶対パス検査の検出漏れ（security-checker 指摘・2026-08-13）------
+        # ⚠️★★★ **旧パターンはこの 4 形式を取り逃していた**（実測）。
+        #   ★ 「検査を直した」と言うなら、**取り逃していた形そのもの**で赤くなることを実測する。
+        # ⚠️★ アンカーは **LAYER0-CORE の外**に取る（★ 中に入れると S4-D8 の一致検査が先に発火し、
+        #   目的の検査を試したことにならない —— S5-8 で実測した形）。
+        #   ⚠️★★ 最初 `<!-- LAYER0-CORE:BEGIN` を使ったら **実在しない文字列**だったので置換が no-op になり、
+        #   ★ **silent pass を自分で作った**（meta が捕まえた）。★ アンカーの実在も確かめること。
+        ("★★★ 散文中の Windows パスを player に混ぜる（旧パターンは取り逃した）",
+         mut_html('<p class="note" id="abx-result">',
+                  "<!-- out C:" + "\\" + "GSE-out" + "\\" + 'x.json -->\n  <p class="note" id="abx-result">'),
+         "絶対パス/ユーザー名らしき文字列がある"),
+        ("★★★ 別ユーザー名の Windows パスを混ぜる（ハードコード名では捕まらない）",
+         mut_html('<p class="note" id="abx-result">',
+                  "<!-- C:" + "\\" + "Users" + "\\" + "alice" + "\\" + 'x -->\n  <p class="note" id="abx-result">'),
+         "絶対パス/ユーザー名らしき文字列がある"),
+        ("★★★ macOS の home パスを混ぜる（旧パターンに /Users/ の形が無かった）",
+         mut_html('<p class="note" id="abx-result">',
+                  '<!-- /Users/someone/Documents/x -->\n  <p class="note" id="abx-result">'),
+         "絶対パス/ユーザー名らしき文字列がある"),
+        ("★★★ config 側に絶対パスを混ぜる（旧実装は config を 1 バイトも見ていなかった）",
+         mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].__setitem__(
+             "_out_dir", "C:/GSE-out/results")),
+         "config に絶対パス"),
+        # ---- ★★★ code-reviewer が実測で見つけた silent pass 7 件（2026-08-13）--------
+        # ⚠️★★★ **7 件とも「壊しても緑」だった。** ★ 直した検査が本当に赤くなることをここで実測する。
+        ("★★★ M1: 引いた seed を abx.blind に載せない（order_seed が undefined になる）",
+         mut_html("                orderSeed,\n", ""), "abx.blind に載せていない"),
+        ("★★★ M2: 準備区間の床を 0 にする（AB-D6 の後継が丸ごと無効化される）",
+         mut_html("  return Math.max(B.prep_seconds, 2.0);", "  return Math.max(B.prep_seconds, 0);"),
+         "準備区間の床が短すぎる"),
+        ("★★★ M3: 相の名前を画面から落とす（研究者の元の申告が再発する）",
+         mut_html("`${head} — ${label}（あと ${(left / 1000).toFixed(1)} 秒）`",
+                  "`${head}（あと ${(left / 1000).toFixed(1)} 秒）`"),
+         "相の名前（label）を画面に書いていない"),
+        ("★★★ M4: 提示の時間構造を結果から落とす",
+         mut_html("    prep_seconds: bl.prepSec, seconds_per_side: bl.sideSec,", ""),
+         "prep_seconds が bl.prepSec を指していない"),
+        ("★★★ M5: リセットを 1 回目だけにする（2 回目以降が元の欠陥に戻る・位置は変わらない）",
+         mut_html('  abxSetInstant("A");\n  if (!await abxPhase(bl, "prep2"',
+                  '  if (bl.i === 0) abxSetInstant("A");\n  if (!await abxPhase(bl, "prep2"'),
+         "条件分岐の中にある"),
+        ("★★★ M6: 記録する seed を固定値にする（記録が嘘になる）",
+         mut_html("    order_seed: bl.orderSeed,", "    order_seed: 20260813,"),
+         "bl.orderSeed を指していない"),
+        ("★★★ M7: 相の門番を結果の記録より後ろへ動かす（門番が空回りする）",
+         mut_html('  if (bl.phase !== "answer") return;\n  const truth = bl.order[bl.i];\n'
+                  "  bl.results.push({ index: bl.i, truth, answer: ans, correct: truth === ans });",
+                  "  const truth = bl.order[bl.i];\n"
+                  "  bl.results.push({ index: bl.i, truth, answer: ans, correct: truth === ans });\n"
+                  '  if (bl.phase !== "answer") return;'),
+         "結果の記録より後ろ"),
+        # ---- ★★★ AB-D7（真値の漏れ）と中止経路 -----------------------------------
+        ("★★★ AB-D7: carry を真値から作る（準備区間の跳びが正解を漏らす）",
+         mut_html('const carry = mulberry32(bl.carrySeed + bl.i)() < 0.5 ? "A" : "B";',
+                  'const carry = kind === "diff" ? "B" : "A";'),
+         "carry が真値から作られている"),
+        ("★★★ AB-D7: 準備区間を 1 段に戻す（carry が 1 サンプルも鳴らない no-op になる）",
+         mut_html('  abxSetInstant(carry);\n  if (!await abxPhase(bl, "prep1", half, "準備中（まだ判定しません）")) return;\n', ""),
+         "2 段（prep1 / prep2）になっていない"),
+        ("★★★ AB-D7: 2 区間目の切替を即座にする（遷移時間という独立変数が黙って無効になる）",
+         mut_html('  abxSet(kind === "diff" ? "B" : "A");                 // ★ same は入れ替えない',
+                  '  abxSetInstant(kind === "diff" ? "B" : "A");'),
+         "採点区間（1 区間目以降）で abxSetInstant"),
+        ("★★★ 中止ボタンを lockUI で無効化する（25 分の盲検を止める手段が消える）",
+         mut_html('  $("btn-abx-stop").disabled = !lock;', '  $("btn-abx-stop").disabled = lock;'),
+         "中止ボタンが lockUI で無効化"),
+        ("★★★ stop() が盲検を中止しない（無音のまま回答が集まる・BF-2 と同じ形）",
+         mut_html('  abxBlindStop("再生が止められたため中止しました");', ""),
+         "stop() が瞬時 A/B の盲検を中止していない"),
+        ("★★★ A/B の手動ボタンを lockUI から外す（same の試行を diff に書き換えられる）",
+         mut_html('   "btn-abx-cal", "btn-abx-a", "btn-abx-b", "btn-abx-off", "btn-abx-blind"]',
+                  '   "btn-abx-cal"]'),
+         "lockUI に入っていない"),
+        ("★★★ ②の再入ガードを外す（進行中の列がデータごと消える）",
+         mut_html("  if (abx.blind) { logLine(\"⚠️ 盲検は実行中です（★ 中止するなら「盲検を中止」）\"); return; }", ""),
+         "再入ガードが無い"),
+        ("★★★ 終了時に abx.blind を残す（①が二度と押せなくなる）",
+         mut_html("  abx.blind = null;\n}\n\n/**\n * ★★★ 瞬時 A/B の結果を保存する（Step 5）。",
+                  "}\n\n/**\n * ★★★ 瞬時 A/B の結果を保存する（Step 5）。"),
+         "abx.blind を手放していない"),
+        ("★★ 結果から時刻を落とす（AB-D5 の時刻仮説を検証できなくなる）",
+         mut_html("    protocol: \"3phase-prep-v1\", started_at: bl.startedAt,\n", ""),
+         "protocol:"),
+        ("★★ 相の長さを live 参照に戻す（記録と提示が食い違う）",
+         mut_html("  const ms = bl.sideSec * 1000;", "  const ms = abxSideSeconds() * 1000;"),
+         "live 参照している"),
+        # ---- ★★★ AB-D9（穴 6・2026-08-13 に研究者の run で露出）------------------
+        ("★★★ AB-D9: レベルに出る写し方でも比が小さいまま走らせる（刺激そのものが小さい条件）",
+         mut_html('  if (abxOpt().id === "abx_density" && levelBearing && Math.abs(db) < 0.5) {',
+                  "  if (false) {"), "条件を断っていない"),
+        ("★★★ AB-D9: 判定を density_norm_exp ではなく id で書く（config と実装がずれる）",
+         mut_html("  const dnx = reworkOpt(\"dcue\").density_norm_exp;",
+                  '  const dnx = reworkOpt("dcue").id === "c_texture" ? 0.5 : 0;'),
+         "density_norm_exp（設計上の正規化指数）から出す"),
+        ("★★★ AB-D9: contrast_measurable を結果から落とす（逆向きの誤読が起きる）",
+         mut_html("    contrast_measurable: bl.contrastMeasurable,", ""),
+         "contrast_measurable が残らない"),
+        ("★★★ AB-D9: 対照条件（abx_level）を判定から落とす（Codex 指摘）",
+         mut_html('  const contrastMeasurable = abxOpt().id === "abx_level" ? true : levelBearing;',
+                  "  const contrastMeasurable = levelBearing;"),
+         "対照条件（abx_level）を見ていない"),
+        # ---- ★ AC-6 の完全化（★ 専用の変異が無かった 2 件・cross-review 指摘）--------
+        ("★★ 中止の単一経路が abx.blind を手放さない",
+         mut_html("  abx.blind = null;               // ★ 進行中の abxPhase はこれを見て false を返す",
+                  "  // (removed)"), "abxBlindStop が abx.blind を手放していない"),
+        ("★★ 残り秒を計算はするが画面に書かない（★ 単独では一度も発火実績が無かった）",
+         mut_html('    $("abx-blind-state").textContent = `${head} — ${label}（あと ${(left / 1000).toFixed(1)} 秒）`;',
+                  '    $("abx-blind-state").textContent = `${head} — ${label}`;'),
+         "残り時間を画面に書いていない"),
+        # ⚠️★ 「config から density_norm_exp を落とす」変異は **入れていない** ——
+        #   ★ 既存の振幅比の検査（`ratio_overlap ** (0.5 - density_norm_exp)`）が
+        #     **KeyError でクラッシュ**し、Fail ではなく例外になるため meta の型に乗らない。
+        #   ★ 保護そのものは効いている（★ クラッシュも exit≠0 なので赤になる）。
+        #   ⚠️ **「変異が無い＝検査されていない」ではないことを、ここに書いて残す。**
+        ("★★ abxPhase が再生中かを見なくなる（停止しても相が進む）",
+         mut_html("  const live = () => abx.blind === bl && playing;",
+                  "  const live = () => abx.blind === bl;"),
+         "再生中かを見ていない"),
     ]
 
     print("== meta 検査（★ 検査を壊して赤くなることの確認） ==")

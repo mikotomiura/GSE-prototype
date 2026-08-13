@@ -176,6 +176,9 @@
   </p>
   <p class="row">
     <button id="btn-abx-blind" disabled>② 盲検 10 回（同じ / 違う）</button>
+    <!-- ⚠️★★★ 2026-08-13: 中止ボタンが無く、盲検を止める手段が F5 しか無かった（レビュー実測）。
+         ★ これは lockUI の対象外にする（★ ロックすると止められない）。 -->
+    <button id="btn-abx-stop" disabled>盲検を中止</button>
     <span class="stat" id="abx-blind-state">—</span>
   </p>
   <p class="row" id="abx-choices" hidden>
@@ -684,16 +687,7 @@ function applyLayer0Gain(immediate) {
 function invalidateAbxRatio(why) {
   // ⚠️★★★ 盲検が走っている最中に刺激を変えられたら、**黙って続けない**。
   //   ★ 続けると「提示が止まったまま回答だけ集まる」列ができ、点数が何も測っていないものになる。
-  if (abx.blind) {
-    const bl = abx.blind;
-    abx.blind = null;
-    lockUI(false);
-    $("abx-choices").hidden = true;
-    $("abx-blind-state").textContent = "中止";
-    const msg = `⚠️★ 盲検を中止しました（${bl.i} / ${bl.order.length} 回目で ${why}）。` +
-      `★ 途中で条件が変わった列は採点しません。①から測り直してください。`;
-    $("abx-result").textContent = msg; logLine(msg);
-  }
+  abxBlindStop(why);
   // ★ 直前の結果も道連れにする（★ 「いま保存できる = いまの条件の結果」と誤読させない）
   if (abx.lastResult) { abx.lastResult = null; $("btn-abx-export").disabled = true; }
   if (abx.ratio === null) return;
@@ -951,7 +945,13 @@ function abxOff() {
  * 8 回中 **same が 6 回・diff が 2 回**になった。
  *   → ★ **「毎回 same と答える」だけで 6/8 取れてしまい、点数が感度を測っていなかった。**
  *   → ⚠️ **同じファイルの B7 盲検は `composition` で均衡させてある。** 既にある正しい型を使わなかった。
- * ★ Fisher-Yates を seed 固定 PRNG で回す（順序は再現できる）。
+ * ★ Fisher-Yates を seed PRNG で回す（★ seed を記録すれば順序は完全に再現できる）。
+ *
+ * ⚠️★★★ 2026-08-13（AB-D1）: **seed を config の固定定数から取るのをやめた。**
+ *   ★ 純関数なので固定 seed だと **毎回まったく同じ出題順**が出る（実測で 3 回とも同一）。
+ *   ⚠️ 同じ聴き手が 5 倍率ぶん繰り返す使い方では、**後の倍率ほど正答が上がる**ので
+ *     **閾値が実際より高い倍率側に見える**（＝逆向きの誤り）。
+ *   → ★ `drawOrderSeed()` で **② を押すごとに引き直し、引いた値を結果 JSON に残す。**
  */
 function buildAbxOrder(seed, n) {
   const half = Math.floor(n / 2);
@@ -964,7 +964,76 @@ function buildAbxOrder(seed, n) {
   return arr;
 }
 
-/** ★ ②盲検: 同じ / 違う。★ 出題は seed 固定で再現でき、★ same/diff は同数。 */
+/**
+ * ★★★ 出題順の seed を **1 回の盲検につき 1 回だけ引く**（AB-D1）。
+ *
+ * ⚠️★ **`Math.random()` を使わない** —— ★ 引いた値を記録して再現するのが目的なので、
+ *   **32 bit 整数として素直に残せる形**で引く（`mulberry32` の入力もその形）。
+ */
+function drawOrderSeed() {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
+/**
+ * ★★★ 盲検を中止する **唯一の経路**（2026-08-13・レビュー実測で新設）。
+ *
+ * ⚠️★★★ 実際に踏んでいた形: `abx.blind = null` を書くのは `invalidateAbxRatio` の 1 箇所だけで、
+ *   その呼び出し元は **4 つのラジオの onChange だけ**だった。★ その 4 つは `lockUI(true)` で
+ *   `disabled` になるので、**盲検中は中止が原理的に発火しない。**
+ *   → ★ `abxPhase` に入れた戻り値ガードは **一度も走らない**（＝安全機構が到達不能）。
+ *   ⚠️ しかも `tr_60` の 8 回は約 25 分あり、**止める手段が F5 しか無かった。**
+ * ★ 「記録と照合は同じ定義から作る」（S5-D11）と同じ思想で、**中止も 1 つの定義から作る。**
+ */
+function abxBlindStop(why) {
+  const bl = abx.blind;
+  if (!bl) return false;
+  abx.blind = null;               // ★ 進行中の abxPhase はこれを見て false を返す
+  lockUI(false);
+  $("abx-choices").hidden = true;
+  $("abx-blind-state").textContent = "中止";
+  const msg = `⚠️★ 盲検を中止しました（${bl.i} / ${bl.order.length} 回目で ${why}）。` +
+    `★ 途中で止めた列は採点しません。①から測り直してください。`;
+  $("abx-result").textContent = msg; logLine(msg);
+  return true;
+}
+
+/**
+ * ★★★ 準備区間の長さ（AB-D2 / AB-D6）。
+ *
+ * ⚠️★★★ `abxSet()` は **選択中の遷移時間を尊重する**（`dur: abxTrOpt().seconds`）ので、
+ *   `tr_60` では準備区間のリセットが 60 秒かかる。★ 3.0 s では終わらず持ち越しが 1 区間目へ漏れる。
+ * → ★ **`abxSideSeconds()` とまったく同じ規則**（「遷移が終わる前に聴かせない」）を当てる。
+ *   ★ `tr_0` では `max(3.0, 2.0) = 3.0`。
+ */
+function abxPrepSeconds() {
+  const B = CFG.layer2_rework.abx.blind;
+  // ⚠️★★★ AB-D7 が AB-D6 を **上書きした**（★ 経緯を消さずに書く）——
+  //   ★ AB-D6 は「`abxSet()` が遷移時間を尊重するので tr_60 では準備 60 秒が要る」として
+  //     `max(prep, tr + 2)` にしていた。⚠️ しかし AB-D7 でトライアル間の状態遷移を
+  //     **`abxSetInstant()`（遷移 0）** に変えたので、★ **準備区間が遷移時間に縛られる理由が消えた。**
+  //   ★ 準備区間は「刺激」ではなく「持ち越しを捨てる場所」なので、そこだけ即座で飛ばす。
+  //   ⚠️ 代償を隠さない: **遅い条件（tr_20 / tr_60）でも準備区間には鋭い跳びが 2 回入る。**
+  //     ★ 採点区間の外であり画面に「まだ判定しません」と出るが、★ **順応への影響は測っていない。**
+  //   → ★ 残るのは「即座の切替が落ち着く時間」だけ。実測 700 ms に対して 3.0 s（★ 2 段で 1.5 s ずつ）。
+  return Math.max(B.prep_seconds, 2.0);
+}
+
+/**
+ * ★★★ AB-D7: **遷移時間を無視して即座に**切り替える（★ トライアル間の持ち越し処理専用）。
+ *
+ * ⚠️★ `abxSet()` は選択中の遷移時間を尊重するので、`tr_60` では準備区間のリセットが 60 秒かかる。
+ *   ★ 準備区間は採点対象ではないので、**そこだけ即座**にする。
+ * ⚠️★★★ **採点区間（1 区間目 / 2 区間目）では絶対に使わない** ——
+ *   使うと、遷移時間という本題の独立変数（量と速度の切り分け）が黙って無効になる。
+ */
+function abxSetInstant(state) {
+  const to = state === "B" ? 1 : 0;
+  abx.tr = { from: to, to, t0: performance.now(), dur: 0 };
+  abx.active = true; abx.state = state;
+  abxApply();
+}
+
+/** ★ ②盲検: 同じ / 違う。★ 出題順は毎回引き直し（記録する）、★ same/diff は同数。 */
 function abxBlindStart() {
   if (!playing) { logLine("⚠️ 先に「鳴らす」を押してください"); return; }
   if (abx.ratio === null) {
@@ -997,8 +1066,54 @@ function abxBlindStart() {
     logLine(msg);
     return;
   }
+  // ⚠️★★★ AB-D9（2026-08-13 に実際に踏んだ **穴 6**）——
+  //   ★ BF-2 のゲートは **対照条件（abx_level）にしか効いていなかった。**
+  //   ★ `abx_density` × `c_texture` で盲検が走り、**`measured_db: 0.247` が
+  //     「コントラスト」として記録された。**
+  //   ⚠️ しかし `c_texture` は `density_norm_exp = 0.5` ＝ **エネルギー保存**であり、
+  //     **密度は 100→400 で変わっているのにレベルは変わらない。**
+  //     → ★ **①の dB は刺激の大きさを表していない。**「0.25 dB だったから読めなかった」と
+  //       読めてしまうが、実際には「**この計器では刺激の大きさが測れない条件**」である。
+  //   ★ BF-2 が「差が無いのに測った」なら、これは「**差はあるが計器が見ていないのに、
+  //     計器の値を刺激の大きさとして記録した**」。★ 向きが逆の同じ過ち。
+  const dnx = reworkOpt("dcue").density_norm_exp;
+  const levelBearing = typeof dnx === "number" ? dnx < 0.5 : true;
+  if (abxOpt().id === "abx_density" && levelBearing && Math.abs(db) < 0.5) {
+    // ★ レベルに出る写し方なのに比が小さい ＝ **刺激そのものが小さい**。★ ここは断る。
+    const msg = `⚠️★ 比が ${db.toFixed(2)} dB しかありません（|dB| < 0.5）。` +
+      `密度の写し方「${reworkOpt("dcue").label}」は**レベルに出る**設計なので、` +
+      `★ これは「刺激そのものが小さい」ことを意味します。★ 層 0 の音量を下げてから測り直してください。`;
+    $("abx-result").textContent = msg; logLine(msg); return;
+  }
+  // ★ レベルに出ない写し方（c_texture）は **断らない** —— ★ 質感だけで density を読めるかは
+  //   それ自体が正当な問いである。⚠️ **ただし「①の dB は刺激の大きさではない」と記録に明記する。**
+  // ⚠️★★ `/cross-review`（Codex）指摘: **対照条件（`abx_level`）を条件に入れ忘れていた。**
+  //   ★ `abx_level` は①で実測した比を**マスタゲインに直接掛ける**ので、
+  //     密度の写し方が何であれ `measured_db` は**定義上つねに刺激の大きさ**である。
+  //   ⚠️ 入れ忘れると `abx_level` × `c_texture` で `contrast_measurable: false` と**誤記録**され、
+  //     ★ AB-D9 が防ごうとした「向きが逆の誤読」がそのまま再発する。
+  const contrastMeasurable = abxOpt().id === "abx_level" ? true : levelBearing;
+  if (!contrastMeasurable) {
+    logLine(`⚠️★★★ 密度の写し方「${reworkOpt("dcue").label}」は**レベルが動かない設計**です。` +
+      `★ ①の ${db.toFixed(2)} dB は**刺激の大きさではありません**（★ 密度は 100→400 で変わっています）。` +
+      `★ 結果には contrast_measurable: false として残します。`);
+  }
   const B = CFG.layer2_rework.abx.blind;
-  const order = buildAbxOrder(B.order_seed, B.trials);
+  // ⚠️★★ 再入ガード（レビュー実測）: ②の再押下で**進行中の列が無警告で捨てられていた**
+  //   （★ 旧チェーンは次の await で静かに死ぬので、**データだけが消える**）。
+  if (abx.blind) { logLine("⚠️ 盲検は実行中です（★ 中止するなら「盲検を中止」）"); return; }
+  // ⚠️★★ 準備区間が 0 / NaN のまま走らせない（レビュー実測）——
+  //   ★ config を差し替えて `prep_seconds` が欠けると `Math.max(undefined, 2)` = NaN になり、
+  //     `setTimeout(NaN)` が即時発火して **準備区間が消え、交絡が静かに戻る**（画面は「あと NaN 秒」）。
+  if (!(abxPrepSeconds() > 0) || !(abxSideSeconds() > 0)) {
+    const msg = `⚠️★★★ 提示の時間構造が不正です（準備 ${abxPrepSeconds()} s / 区間 ${abxSideSeconds()} s）。` +
+      `★ config の prep_seconds / seconds_per_side を確かめてください。`;
+    $("abx-result").textContent = msg; logLine(msg); return;
+  }
+  // ⚠️★★★ AB-D1: **seed は 1 回の盲検につき 1 回引き、記録する。**
+  //   ★ config の固定定数から取ると、同じ聴き手が倍率ぶん繰り返すあいだ **毎回同じ順**になる。
+  const orderSeed = drawOrderSeed();
+  const order = buildAbxOrder(orderSeed, B.trials);
   // ★ 遷移時間も記録する（★ これが本題の独立変数である）
   // ⚠️★★★ **提示条件は開始時に凍結する。** 途中で軸を触られても
   //   (a) 記録が提示条件を指し続け、(b) 終了時に `abx.ratio` が null でも例外にならない。
@@ -1007,24 +1122,104 @@ function abxBlindStart() {
   abx.blind = { i: 0, order, results: [], cond: abxOpt().id,
                 tr: abxTrOpt().id, trSec: abxTrOpt().seconds,
                 l0gain: sel.l0gain, l0gainValue: layer0GainOpt().gain,
-                ratio: abx.ratio, ratioCond: { ...abx.ratioCond } };
+                ratio: abx.ratio, ratioCond: { ...abx.ratioCond },
+                // ★★★ AB-D1: 引いた seed を保持する（★ 結果 JSON へ出す）
+                orderSeed,
+                // ★★★ AB-D2: 相と所要（★ 実測できるように state() へ出す）
+                prepSec: abxPrepSeconds(), sideSec: abxSideSeconds(),
+                phase: "idle", phaseEndsAt: 0, timing: {},
+                // ★★★ AB-D9: ①の dB が刺激の大きさを表しているか（★ 表さない条件がある）
+                contrastMeasurable,
+                startedAt: new Date().toISOString(),
+                // ★★★ AB-D7: トライアル間の状態を **真値に依らない乱数**で決める（下記 abxBlindNext 参照）
+                carrySeed: drawOrderSeed() };
   lockUI(true);   // ★ 盲検中は刺激を変えられないようにする
   abxBlindNext();
 }
 
+/**
+ * ★★★ 1 つの相を待つ（AB-D2 / AB-D3）。★ 残り秒を画面に出す。
+ *
+ * ⚠️★★★ **音に印を足さない**（AB-D3）—— 測っているのは層 2 の密度差であり、
+ *   無音やビープを足すと「密度差を聞き分けた」のか「印の前後を聞き分けた」のかが混ざる。
+ *   ★ 境目は **画面表示だけ**で示す。
+ * ★ 戻り値 `false` は「この待ちの最中に中止された / 再生が止まった」の意味
+ *   （★ 呼び出し側は先へ進まない）。
+ * ⚠️★★ 世代カウンタは**置かない** —— `abx.blind` は中止・再開のたびに**新しいオブジェクト**になるので、
+ *   同一性比較 `abx.blind === bl` と情報量が同じである。★ 一度も再代入されない `gen` を置くと
+ *   **「効いていない機構を効いていることにする」**（レビュー実測で指摘された形）。
+ */
+async function abxPhase(bl, phase, ms, label) {
+  bl.phase = phase;
+  bl.phaseEndsAt = performance.now() + ms;
+  const t0 = performance.now();
+  const head = `${bl.i + 1} / ${bl.order.length} 回目`;
+  const live = () => abx.blind === bl && playing;
+  const tick = () => {
+    if (!live()) return;
+    const left = Math.max(0, bl.phaseEndsAt - performance.now());
+    $("abx-blind-state").textContent = `${head} — ${label}（あと ${(left / 1000).toFixed(1)} 秒）`;
+  };
+  tick();
+  const iv = setInterval(tick, 100);
+  await new Promise((r) => setTimeout(r, ms));
+  clearInterval(iv);
+  // ★★ 実測経過を残す（★ 設定値ではなく**実際に何秒鳴らしたか**）——
+  //   ⚠️ スリープやタブの throttling で相が伸縮しても、記録が設定値だけだと事後に検出できない。
+  (bl.timing[bl.i] ||= {})[phase + "_ms"] = Math.round(performance.now() - t0);
+  return live();
+}
+
+/**
+ * ★★★ 1 トライアルを **3 相**で提示する（AB-D2）。
+ *
+ * ⚠️★★★ 2026-08-13 に実際に踏んだ欠陥: **トライアル間で状態がリセットされていなかった。**
+ *   `diff` のトライアルは **B のまま終わる**ので、次のトライアル冒頭の `abxSet("A")` が
+ *   **当ててほしい跳びと同じ大きさで向きだけ逆の跳び**を、1 区間目のまっただ中で鳴らしていた
+ *   （★ 実測: 400 → 106（150 ms）→ 100）。
+ *   → ★ **研究者の 8 回のうち誤り 3 件が、すべて「直前が diff」のトライアルだった。**
+ *
+ * ★ 直し方: **`abxSet("A")` を「準備中」区間の先頭で呼ぶ。**
+ *   ⚠️★ 位置が命である ——「呼んでいるか」ではなく「**1 区間目より前で**呼んでいるか」（BF-5 の教訓）。
+ *
+ * ⚠️★★★ AB-D7（レビュー実測で見つかった **穴 5**）: 採点区間の外へ動かしただけでは足りない。
+ *   ★ トライアルは `same` なら A、`diff` なら B で終わるので、
+ *     **準備区間の跳びは「直前が diff だったとき **だけ** 」鳴る。**
+ *   ⚠️ 出題は **4 diff / 4 same の非復元**なので、★ **過去の真値が未来の真値を制約する**
+ *     （例: diff を 4 つ数え終えたら、残りは全部 same と分かる）。
+ *   → ★ **試行ごとの正解フィードバックを配っているのと同じ**であり、
+ *     ⚠️ 8 回独立 Bernoulli(0.5) を前提にした閾値 7/8（p=0.035）も成立しなくなる。
+ * ★ 直し方: **トライアル間の状態を、真値に依らない乱数で決める。**
+ *   ★ こうすると準備区間で跳びが鳴る確率は **真値に関係なく 1/2** になり、情報が乗らない。
+ *   ⚠️ 「毎回 B で終わらせる」案は却下 —— ★ **回答の瞬間に跳ぶかどうかが `same` のときだけ変わる**ので、
+ *     漏れが回答直前へ移動するだけで、しかもそちらのほうが悪い。
+ */
 async function abxBlindNext() {
-  const B = CFG.layer2_rework.abx.blind, bl = abx.blind;
+  const bl = abx.blind;
   if (!bl) return;
   if (bl.i >= bl.order.length) { abxBlindFinish(); return; }
   $("abx-choices").hidden = true;
   const kind = bl.order[bl.i];
-  const ms = abxSideSeconds() * 1000;                  // ★ 遷移が終わる前に聴かせない
-  $("abx-blind-state").textContent =
-    `${bl.i + 1} / ${bl.order.length} 回目 — 聴いてください（遷移 ${abxTrOpt().seconds} 秒）`;
-  abxSet("A");
-  await new Promise((r) => setTimeout(r, ms));
+  // ⚠️★★ 相の長さは **開始時に凍結した値**を使う（★ live 参照だと、ロックが 1 つ外れた瞬間に
+  //   記録（bl.prepSec / bl.sideSec）と実際の提示が食い違う。`currentAbxCond()` と同じ思想）。
+  const ms = bl.sideSec * 1000;                        // ★ 遷移が終わる前に聴かせない
+  // ★★★ AB-D7: 準備区間を **2 段**にする。
+  //   ⚠️★★★ **1 段では直らない** —— `abxSet(carry)` の直後に `abxSet("A")` を呼ぶと
+  //     carry は **1 サンプルも鳴らない**（★ BF-5 とまったく同じ「呼んだが効いていない」形）。
+  //   ★ 前半で **真値に依らない乱数の状態**を実際に鳴らし、後半で A へ戻す。
+  //     → 前半の跳び: 入場状態（真値依存）→ carry（一様乱数）… 可聴確率 **1/2・真値に無関係**
+  //     → 後半の跳び: carry → A                              … 可聴確率 **1/2・真値に無関係**
+  const carry = mulberry32(bl.carrySeed + bl.i)() < 0.5 ? "A" : "B";
+  (bl.timing[bl.i] ||= {}).carry = carry;              // ★ 実際に何へ飛ばしたかを残す
+  const half = bl.prepSec * 500;                       // ★ 準備区間の半分（ms）
+  abxSetInstant(carry);
+  if (!await abxPhase(bl, "prep1", half, "準備中（まだ判定しません）")) return;
+  abxSetInstant("A");
+  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;
+  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;
   abxSet(kind === "diff" ? "B" : "A");                 // ★ same は入れ替えない
-  await new Promise((r) => setTimeout(r, ms));
+  if (!await abxPhase(bl, "i2", ms, "2 区間目")) return;
+  bl.phase = "answer"; bl.phaseEndsAt = 0;
   $("abx-blind-state").textContent = `${bl.i + 1} / ${bl.order.length} 回目 — 回答`;
   $("abx-choices").hidden = false;
 }
@@ -1032,6 +1227,9 @@ async function abxBlindNext() {
 function abxAnswer(ans) {
   const bl = abx.blind;
   if (!bl || bl.i >= bl.order.length) return;
+  // ⚠️★★ 回答相でないときの回答を受け付けない（★ 「呼ばれても断る」・S5-D6 と同じ型）。
+  //   ★ ボタンを隠すだけを門番にしない —— キーボード操作や連打で相の外から入りうる。
+  if (bl.phase !== "answer") return;
   const truth = bl.order[bl.i];
   bl.results.push({ index: bl.i, truth, answer: ans, correct: truth === ans });
   bl.i++;
@@ -1068,18 +1266,45 @@ function abxBlindFinish() {
     expr_version: CFG.expr_version, condition: bl.cond,
     transition: bl.tr, transition_seconds: bl.trSec,
     measured_ratio: blRatio, measured_db: blDb,
+    // ⚠️★★★ AB-D9: **この dB を「刺激の大きさ」と読んでよいか。**
+    //   ★ false のときは「密度は変わっているが、レベルが動かない設計なので計器が見ていない」。
+    //   ⚠️ 無いと「0.25 dB だったから読めなかった」と**逆向きに誤読される**。
+    contrast_measurable: bl.contrastMeasurable,
+    contrast_note: bl.contrastMeasurable
+      ? "★ measured_db は刺激の大きさ（A と B のレベル比）である"
+      : "⚠️★★★ measured_db は刺激の大きさ **ではない** —— この密度の写し方はエネルギー保存で"
+        + "レベルが動かない。★ 密度は rate_min → rate_max で実際に変わっている。",
     timbre: bl.ratioCond.timbre, density_cue: bl.ratioCond.dcue, density_span: bl.ratioCond.dspan,
     // ★★★ Step 5: **層 0 の倍率を必ず残す**（★ これが本 Step の独立変数である）。
     //   ⚠️ 残さないと「どのコントラストで測った点数か」が事後に特定できない
     layer0_gain: bl.l0gain, layer0_gain_value: bl.l0gainValue,
     // ★ 比を測ったときの条件（★ 提示条件と一致していることが開始時に検査済み・凍結値）
     ratio_condition: bl.ratioCond,
+    // ★★★ AB-D1: **引いた seed を残す。** ⚠️ これが無いと、毎回引き直した瞬間に
+    //   「どの順で出題したか」を後から再構成できなくなる（★ trials[].truth と二重に残る）。
+    order_seed: bl.orderSeed,
+    // ★★★ AB-D2 / AB-D7: 提示の時間構造も残す（★ 交絡を直す前後の結果を取り違えないため）
+    prep_seconds: bl.prepSec, seconds_per_side: bl.sideSec,
+    // ★★★ 版と時刻（レビュー実測の指摘）——
+    //   ⚠️ 無いと「修正前後どちらの手順で測ったか」が `prep_seconds` の有無でしか分からず、
+    //     ★ AB-D5（`plan_a` は周期 33 分なので**測る時刻**で層 0 の水準が違う）も検証できない。
+    protocol: "3phase-prep-v1", started_at: bl.startedAt,
+    finished_at: new Date().toISOString(),
+    // ★ 相の**実測経過**と、トライアル間に飛ばした状態（AB-D7）
+    timing: bl.timing,
     rate_min: rateMin(), rate_max: rateMax(),
     trials: bl.results, correct: ok, threshold: B.pass_threshold_correct, pass,
     stats: bl.stats,   // ★ ヒット / 誤警報 / 均衡しているか（総正答だけを信じない）
     note: "★ 瞬時 A/B は spec §2 の禁止事項を意図的に破る診断条件。製品の提示方法ではない。",
   };
   $("btn-abx-export").disabled = false;   // ★ 保存できるようになったことを示す
+  // ⚠️★★★ 2026-08-13（レビュー実測）: **終わったのに `abx.blind` を残していた。**
+  //   ★ `describeLayer0Gain` の `cal.disabled = … || !!abx.blind` が 250 ms ごとに走るので、
+  //     **盲検を 1 回終えると①が二度と押せなくなる。**
+  //   ⚠️ AB-D5 が要求する「同じ条件で①を 3 回連続測る」が**そもそも実行できない状態**だった。
+  //   ★ 凍結値は `lastResult` に写し終えているので、ここで手放してよい。
+  //   ⚠️ `lockUI(false)` と「終了」表示は上（abxOff の直後）で既に済んでいる。★ 二重に書かない。
+  abx.blind = null;
 }
 
 /**
@@ -1096,7 +1321,10 @@ function exportAbx() {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   // ★ 条件が名前で分かるようにする（★ 倍率ごとに測るので上書きさせない）
-  a.download = `abx-${r.layer0_gain}-${r.density_span}-tr${r.transition_seconds}.json`;
+  // ⚠️★ 時刻を入れる（レビュー実測の指摘）—— ★ 入れないと**測り直しが同名になり**、
+  //   修正前の記録を上書きしうる（★ 今回の pre-fix ファイルは手作業のリネームで避けた）。
+  const stamp = (r.finished_at || "").replace(/[-:]/g, "").replace(/\..*$/, "").replace("T", "-");
+  a.download = `abx-${r.layer0_gain}-${r.density_span}-tr${r.transition_seconds}-${stamp}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   logLine("★ A/B の結果を保存: " + a.download);
@@ -1114,9 +1342,12 @@ function describeRework() {
   $("fact-dspan").textContent = reworkOpt("dspan").fact;
   $("fact-abx").textContent = abxOpt().fact;
   const B = CFG.layer2_rework.abx.blind;
-  const mins = (B.trials * abxSideSeconds() * 2) / 60;
+  // ★★ AB-D2: 1 トライアルは **準備中 ＋ 1 区間目 ＋ 2 区間目** の 3 相になった。
+  //   ⚠️ 準備区間を足し忘れると、画面の見積もりだけが古いままになる。
+  const mins = (B.trials * (abxPrepSeconds() + abxSideSeconds() * 2)) / 60;
   $("fact-abxtr").textContent =
-    abxTrOpt().fact + `　／　★ 盲検 ${B.trials} 回の所要は約 ${mins.toFixed(1)} 分`;
+    abxTrOpt().fact + `　／　★ 盲検 ${B.trials} 回の所要は約 ${mins.toFixed(1)} 分` +
+    `（★ 1 回 = 準備 ${abxPrepSeconds().toFixed(1)} s ＋ 区間 ${abxSideSeconds().toFixed(1)} s × 2）`;
   $("btn-abx-blind").textContent = `② 盲検 ${B.trials} 回（同じ / 違う・約 ${mins.toFixed(1)} 分）`;
 }
 
@@ -1455,8 +1686,14 @@ window.__step4 = {
       // ★ 瞬時 A/B（診断専用・2026-08-13）
       abx: { active: abx.active, state: abx.state, cond: sel.abx, ratio: abx.ratio,
              ratioCond: abx.ratioCond || null,
+             // ★★★ AB-D2: **相を出す。** ⚠️ 出さないと「跳びが準備区間の中に落ちたか」を
+             //   外から実測できない（★ 検査できる形で作ることを後付けにしない・S5-D11）。
              blind: abx.blind ? { i: abx.blind.i, n: abx.blind.order.length,
-                                  l0gain: abx.blind.l0gain } : null,
+                                  l0gain: abx.blind.l0gain,
+                                  phase: abx.blind.phase,
+                                  phaseLeftMs: Math.max(0, Math.round(abx.blind.phaseEndsAt - performance.now())),
+                                  prepSec: abx.blind.prepSec, sideSec: abx.blind.sideSec,
+                                  orderSeed: abx.blind.orderSeed } : null,
              lastResult: abx.lastResult || null },
       blind: bt.running ? { plan: bt.plan, i: bt.i, total: bt.order.length } : null,
     };
@@ -1636,6 +1873,11 @@ async function stop() {
   l0RampUntil = 0; l2MorphUntil = 0; masterSettleUntil = 0;  // ★ 止まっている間の「待ち時間」を残さない
   describeLayer0Gain();                // ★ 停止中は①を押せなくする（表示も「停止中」へ戻す）
   if (bt.running) abortBlind("再生が止められたため中止しました");
+  // ⚠️★★★ 2026-08-13（レビュー実測）: **B7 の盲検は中止していたのに、瞬時 A/B の盲検は放置していた。**
+  //   ★ 「止める」を押しても相の setTimeout は進み続け、`abxApply()` は `!playing` で早期 return するだけ。
+  //   → ★ **無音のまま回答が集まり、`abxBlindFinish` が「完全に正常に見える」結果 JSON を書く。**
+  //     ⚠️ BF-2（差ゼロの条件で盲検を回す）と同じ形が、停止経由でまた開いていた。
+  abxBlindStop("再生が止められたため中止しました");
   // ⚠️★★★ 後片付けの対象を**いま閉じている ctx に固定**する。
   //   モジュール変数を後から読むと、550 ms の間に再生した**新しい ctx を閉じてしまい**、
   //   `playing = true` のまま `graph = null` になって **二度と止められなくなる**（[P71] 違反）。
@@ -1906,6 +2148,9 @@ function wireLayer2() {
   $("btn-abx-blind").addEventListener("click", () => abxBlindStart());
   $("btn-abx-same").addEventListener("click", () => abxAnswer("same"));
   $("btn-abx-diff").addEventListener("click", () => abxAnswer("diff"));
+  $("btn-abx-stop").addEventListener("click", () => {
+    if (!abxBlindStop("研究者が中止しました")) logLine("⚠️ 盲検は実行されていません");
+  });
   $("btn-abx-export").addEventListener("click", () => exportAbx());
   $("btn-demo-reset").addEventListener("click", () => demo("reset"));
 }
@@ -2153,9 +2398,17 @@ function lockUI(lock) {
   ["ax-base", "ax-decay", "ax-plan", "ax-rate", "ax-path", "ax-gap",
    "ax-l0gain", "ax-timbre", "ax-dcue", "ax-dspan", "ax-abx", "ax-abxtr"].forEach((id) =>
     $(id).querySelectorAll("input").forEach((i) => { i.disabled = lock; }));
-  ["l2-on", "l2-map", "csvpick", "btn-demo-l0", "btn-demo-l2", "btn-demo-reset"].forEach((id) => {
+  // ⚠️★★★ 2026-08-13（レビュー実測）: **A/B の手動ボタンが漏れていた。**
+  //   ★ `btn-abx-b` を 1 区間目の途中で押せば **`same` の試行が事実上 `diff` になる**し、
+  //     「やめる」は `abx.active = false` にして通常マッピングへ戻すので
+  //     **その試行のコントラストが丸ごと消える。** ⚠️ どちらも記録も棄却もされない。
+  //   ★ `ax-l0gain` が Step 4 から漏れていたのと **まったく同じ形**である。
+  ["l2-on", "l2-map", "csvpick", "btn-demo-l0", "btn-demo-l2", "btn-demo-reset",
+   "btn-abx-cal", "btn-abx-a", "btn-abx-b", "btn-abx-off", "btn-abx-blind"].forEach((id) => {
     $(id).disabled = lock;
   });
+  // ★ 中止だけは**ロックの対象外**（★ ロックすると 25 分の盲検を止める手段が F5 だけになる）
+  $("btn-abx-stop").disabled = !lock;
 }
 
 function nextTrial() {
