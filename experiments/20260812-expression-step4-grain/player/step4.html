@@ -110,6 +110,57 @@
   </p>
 </fieldset>
 
+<!-- ================= 瞬時 A/B（診断専用） ================= -->
+<h2>★★★ 瞬時 A/B（診断専用）— 「差が分からない」のか「変化が分からない」のか</h2>
+
+<fieldset>
+  <legend>2026-08-13 追加（研究者判断）</legend>
+  <p class="note warn">
+    ⚠️★★★ <b>この節は spec §2 の「✗ オンセット」を意図的に破ります。</b>
+    ★ <b>診断のための条件であって、製品の提示方法ではありません。</b>
+    （下限を割った粒子率を意図的に鳴らして下限を確かめるのと同じ思想）
+  </p>
+  <p class="note">
+    ★ <b>何を切り分けるか</b>: 60 秒かけた +2.8 dB は<b>実測してあるのに知覚されなかった</b>。
+    <b>「差が小さすぎる（量の問題）」</b>のか<b>「変化が遅すぎる（速度の問題）」</b>のかを分ける。
+    → ★ <b>遷移させずに即座に入れ替えて、差そのものが聞こえるかを見る。</b>
+  </p>
+  <p class="row"><b style="min-width:9rem">条件</b> <span class="row" id="ax-abx"></span></p>
+  <p class="note" id="fact-abx">—</p>
+  <p class="row"><b style="min-width:9rem">遷移時間</b> <span class="row" id="ax-abxtr"></span></p>
+  <p class="note" id="fact-abxtr">—</p>
+  <p class="note warn">
+    ★★★ <b>ここが本題です。</b>「+2.8 dB / 60 秒で分からなかった」と「+1.03 dB / 即座で分かった」は
+    <b>音色も条件も違うので、そのままでは比べられません</b>。
+    ★ <b>同じ設定のまま遷移時間だけを変えて</b>、量の問題か速度の問題かを切り分けます。<br>
+    ★ 速い側で当たり遅い側で外すなら <b>速度の問題</b>／どの速さでも外すなら <b>量の問題</b>。
+  </p>
+  <p class="row">
+    <button id="btn-abx-cal">① 比を実測する（A/B 各 3 秒）</button>
+    <span class="stat" id="abx-ratio">—</span>
+  </p>
+  <p class="row">
+    <button id="btn-abx-a" disabled>A（薄い / 小）</button>
+    <button id="btn-abx-b" disabled>B（濃い / 大）</button>
+    <button id="btn-abx-off" disabled>やめる（通常へ戻す）</button>
+    <span class="stat" id="abx-now">停止中</span>
+  </p>
+  <p class="note warn">
+    ⚠️★ <b>対照は本番より「易しい」条件です</b>（層 2 だけでなく全体が動くため）。
+    ★ したがって <b>対照が聞こえなければ「量が足りない」で確定</b>しますが、
+    <b>対照が聞こえても本番が聞こえるとは言えません</b>。一方向にしか効きません。
+  </p>
+  <p class="row">
+    <button id="btn-abx-blind" disabled>② 盲検 10 回（同じ / 違う）</button>
+    <span class="stat" id="abx-blind-state">—</span>
+  </p>
+  <p class="row" id="abx-choices" hidden>
+    <button id="btn-abx-same">同じだった</button>
+    <button id="btn-abx-diff">違った</button>
+  </p>
+  <p class="note" id="abx-result">—</p>
+</fieldset>
+
 <!-- ================= 層 2 ================= -->
 <h2>層 2（粒子）— 前進を密度に写す</h2>
 
@@ -381,7 +432,11 @@ function buildAxisUI() {
   radioGroup("ax-dcue", RW.density_cue.options, D.density_cue, "dcue",
              () => { applyDensityCue(); describeRework(); });
   radioGroup("ax-dspan", RW.density_span.options, D.density_span, "dspan",
-             () => { applyRate(true); describeRework(); });
+             () => { applyRate(true); applyHeadroom(); describeRework(); });
+  radioGroup("ax-abx", RW.abx.options, RW.abx.default, "abx",
+             () => { abxApply(); describeRework(); });
+  radioGroup("ax-abxtr", RW.abx.transition.options, RW.abx.transition.default, "abxtr",
+             () => { describeRework(); });
 
   describePlan(); describePath(); describeRework();
 }
@@ -413,10 +468,254 @@ function applyDensityCue() {
     densityNormExp: reworkOpt("dcue").density_norm_exp } });
 }
 
+/* ---------------------------------------------------------------------------
+ * ★★★ 瞬時 A/B（診断専用・2026-08-13）
+ *   ⚠️ spec §2 の「✗ オンセット」を意図的に破る。★ 製品の提示方法ではない。
+ * ------------------------------------------------------------------------- */
+const abx = { active: false, state: "A", ratio: null, blind: null,
+              // ★ 遷移中の内挿（0..1）。★ 0 秒なら即座、それ以外は raised-cosine
+              tr: { from: 0, to: 0, t0: 0, dur: 0 } };
+
+function abxOpt() {
+  const A = CFG.layer2_rework.abx;
+  const o = A.options.find((x) => x.id === (sel.abx || A.default));
+  if (!o) throw new Error("A/B 条件が見つからない: " + sel.abx);
+  return o;
+}
+
+function abxTrOpt() {
+  const T = CFG.layer2_rework.abx.transition;
+  const o = T.options.find((x) => x.id === (sel.abxtr || T.default));
+  if (!o) throw new Error("遷移時間が見つからない: " + sel.abxtr);
+  return o;
+}
+
+/** ★ 遷移の現在値 0..1（A=0 / B=1）。★ raised-cosine（H6 と同じ。端点の傾きが 0）。 */
+function abxValue() {
+  const t = abx.tr;
+  if (t.dur <= 0) return t.to;
+  const u = Math.min(1, Math.max(0, (performance.now() - t.t0) / (t.dur * 1000)));
+  const w = 0.5 - 0.5 * Math.cos(Math.PI * u);
+  return t.from + (t.to - t.from) * w;
+}
+
+/** ★ 1 トライアルの片側の長さ。★ 遷移が終わる前に聴かせない。 */
+function abxSideSeconds() {
+  const B = CFG.layer2_rework.abx.blind;
+  return Math.max(B.seconds_per_side, abxTrOpt().seconds + 2);
+}
+
+/** ★ A/B のどちらを鳴らすかを実際のパラメータへ反映する。★ 即時（ランプ 60 ms）で入れ替える。 */
+function abxApply() {
+  if (!playing || !graph || !ctx) return;
+  const now = ctx.currentTime;
+  const g = graph.master.gain;
+  g.cancelScheduledValues(now);
+  if (abx.active && abxOpt().id === "abx_level" && abx.ratio) {
+    // ★ 対照: ①で**実測した**比をマスタゲインに掛ける（想定値ではない）。
+    //   ★ 遷移中は abxValue() で内挿するので、密度側とまったく同じ時間形になる。
+    const u = abxValue();
+    g.setValueAtTime(Math.max(0.0002, volTarget * (1 + (abx.ratio - 1) * u)), now);
+  } else {
+    g.setValueAtTime(Math.max(0.0002, volTarget), now);
+  }
+  const trs = abxTrOpt().seconds;
+  $("abx-now").textContent = abx.active
+    ? `${abx.state} へ（${abxOpt().label} / 遷移 ${trs} 秒・いま ${abxValue().toFixed(2)}）`
+    : "停止中";
+  // 密度側は currentRate() 経由で control() が書く
+}
+
+/** ★ ①比の実測。★ 想定式で埋めず、実際の rms を測って比を出す。 */
+async function abxCalibrate() {
+  if (!playing) { logLine("⚠️ 先に「鳴らす」を押してください"); return; }
+  const wasActive = abx.active, wasState = abx.state;
+  const measure = async (st) => {
+    abx.active = true; abx.state = st;
+    // ⚠️★★★ 2026-08-13 に踏んだ欠陥（BF-3）: 校正は**必ず端点で測る**。
+    //   ★ `abxSet()` は選択中の遷移時間を尊重するので、遷移 60 秒のまま校正すると
+    //     **3 秒間に 0.6% しか動いていない状態**を「B」として測ってしまい、比が ≈1 になる。
+    //   ★ 遷移時間は「盲検で何を提示するか」の変数であって、「端点がどれだけ違うか」とは無関係である。
+    const v = st === "B" ? 1 : 0;
+    abx.tr = { from: v, to: v, t0: performance.now(), dur: 0 };
+    abxApply();
+    await new Promise((r) => setTimeout(r, 1200));      // 端点に落ち着くのを待つ
+    let acc = 0, n = 0;
+    for (let i = 0; i < 36; i++) {                      // 約 1.8 s ぶん
+      const v = window.__step4.rms();
+      if (v !== null) { acc += v; n++; }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return n ? acc / n : null;
+  };
+  $("abx-ratio").textContent = "測定中…";
+  const savedSel = sel.abx;
+  sel.abx = "abx_density";                              // ★ 比は必ず密度条件で測る
+  const a = await measure("A"), b = await measure("B");
+  sel.abx = savedSel;
+  abx.active = wasActive; abx.state = wasState; abxApply();
+  if (!a || !b) { $("abx-ratio").textContent = "測れなかった"; return; }
+  abx.ratio = b / a;
+  const db = 20 * Math.log10(abx.ratio);
+  // ⚠️★ 原因を決めつけない。★ 実際に効いている値を見て、当てはまる理由だけを出す
+  let warn = "";
+  if (Math.abs(db) < 0.5) {
+    const cue = reworkOpt("dcue");
+    const norm = lastGrainCur ? lastGrainCur.densityNormExp : null;
+    const causes = [];
+    if (cue.density_norm_exp >= 0.45) {
+      causes.push(`密度の写し方「${cue.label}」は**レベルが動かない設計**です`);
+    } else if (norm !== null && Math.abs(norm - cue.density_norm_exp) > 0.05) {
+      causes.push(`写し方の切替がまだ移行中です（いま ${norm} / 目標 ${cue.density_norm_exp}）。数秒おいて測り直してください`);
+    } else {
+      causes.push(`層 0 が層 2 を覆っている可能性があります（層 2 だけが動くので、混ざると比が縮みます）`);
+    }
+    warn = "　⚠️★ 差が実質ありません: " + causes.join(" / ");
+  }
+  $("abx-ratio").textContent =
+    `A rms ${a.toFixed(4)} / B rms ${b.toFixed(4)} → 比 ${abx.ratio.toFixed(3)}` +
+    `（${db >= 0 ? "+" : ""}${db.toFixed(2)} dB・密度の写し方 = ${reworkOpt("dcue").label}）` + warn;
+  ["btn-abx-a", "btn-abx-b", "btn-abx-off", "btn-abx-blind"].forEach((id) => { $(id).disabled = false; });
+  logLine(`★ A/B の比を実測: ${abx.ratio.toFixed(3)}（${db.toFixed(2)} dB）`);
+}
+
+/** ★ A/B を切り替える。★ 遷移 0 秒なら即座、それ以外は raised-cosine で移る。 */
+function abxSet(state) {
+  const to = state === "B" ? 1 : 0;
+  abx.tr = { from: abxValue(), to, t0: performance.now(), dur: abxTrOpt().seconds };
+  abx.active = true; abx.state = state;
+  abxApply();
+}
+function abxOff() {
+  abx.active = false; abx.state = "A";
+  abx.tr = { from: 0, to: 0, t0: performance.now(), dur: 0 };
+  abxApply();
+}
+
+/**
+ * ★★★ 出題順を作る。⚠️★★★ **必ず均衡させる**（same と diff を同数）。
+ *
+ * 2026-08-13 に実際に踏んだ欠陥（BF-4）: 各試行を独立に `rnd() < 0.5` で振ったところ、
+ * 8 回中 **same が 6 回・diff が 2 回**になった。
+ *   → ★ **「毎回 same と答える」だけで 6/8 取れてしまい、点数が感度を測っていなかった。**
+ *   → ⚠️ **同じファイルの B7 盲検は `composition` で均衡させてある。** 既にある正しい型を使わなかった。
+ * ★ Fisher-Yates を seed 固定 PRNG で回す（順序は再現できる）。
+ */
+function buildAbxOrder(seed, n) {
+  const half = Math.floor(n / 2);
+  const arr = Array.from({ length: n }, (_, i) => (i < half ? "diff" : "same"));
+  const rnd = mulberry32(seed);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+
+/** ★ ②盲検: 同じ / 違う。★ 出題は seed 固定で再現でき、★ same/diff は同数。 */
+function abxBlindStart() {
+  if (!playing) { logLine("⚠️ 先に「鳴らす」を押してください"); return; }
+  if (abx.ratio === null) { logLine("⚠️ 先に①で比を実測してください"); return; }
+  // ⚠️★★★ 2026-08-13 に実際に踏んだ欠陥（BF-2）——
+  //   校正は「いま選ばれている密度の写し方」で比を測る。★ `c_texture` は
+  //   **エネルギー保存＝レベルが動かない設計**なので比は必ず ≈1 になる。
+  //   そのまま対照（マスタゲイン）を回すと **A と B が完全に同一**の条件を検査として提示してしまい、
+  //   ★ **「差が無いものを当てられない」という当然の結果が「聞き取れていない」と記録される。**
+  //   → ★ 差が無い条件で盲検を始めさせない。**黙って null 条件を走らせない。**
+  const db = 20 * Math.log10(abx.ratio);
+  if (abxOpt().id === "abx_level" && Math.abs(db) < 0.5) {
+    const msg = `⚠️ 対照の比が ${db.toFixed(2)} dB しかありません（|dB| < 0.5）。` +
+      `★ A と B が実質同一なので、この盲検は何も測れません。` +
+      `密度の写し方が「${reworkOpt("dcue").label}」だと比は設計上ほぼ 1 になります —— ` +
+      `★ 先に「中間」か「レベルにも出す」にして①を測り直してください。`;
+    $("abx-result").textContent = msg;
+    logLine(msg);
+    return;
+  }
+  const B = CFG.layer2_rework.abx.blind;
+  const order = buildAbxOrder(B.order_seed, B.trials);
+  // ★ 遷移時間も記録する（★ これが本題の独立変数である）
+  abx.blind = { i: 0, order, results: [], cond: abxOpt().id,
+                tr: abxTrOpt().id, trSec: abxTrOpt().seconds };
+  abxBlindNext();
+}
+
+async function abxBlindNext() {
+  const B = CFG.layer2_rework.abx.blind, bl = abx.blind;
+  if (!bl) return;
+  if (bl.i >= bl.order.length) { abxBlindFinish(); return; }
+  $("abx-choices").hidden = true;
+  const kind = bl.order[bl.i];
+  const ms = abxSideSeconds() * 1000;                  // ★ 遷移が終わる前に聴かせない
+  $("abx-blind-state").textContent =
+    `${bl.i + 1} / ${bl.order.length} 回目 — 聴いてください（遷移 ${abxTrOpt().seconds} 秒）`;
+  abxSet("A");
+  await new Promise((r) => setTimeout(r, ms));
+  abxSet(kind === "diff" ? "B" : "A");                 // ★ same は入れ替えない
+  await new Promise((r) => setTimeout(r, ms));
+  $("abx-blind-state").textContent = `${bl.i + 1} / ${bl.order.length} 回目 — 回答`;
+  $("abx-choices").hidden = false;
+}
+
+function abxAnswer(ans) {
+  const bl = abx.blind;
+  if (!bl || bl.i >= bl.order.length) return;
+  const truth = bl.order[bl.i];
+  bl.results.push({ index: bl.i, truth, answer: ans, correct: truth === ans });
+  bl.i++;
+  $("abx-choices").hidden = true;
+  abxBlindNext();
+}
+
+function abxBlindFinish() {
+  const B = CFG.layer2_rework.abx.blind, bl = abx.blind;
+  const ok = bl.results.filter((r) => r.correct).length;
+  const pass = ok >= B.pass_threshold_correct;
+  // ★★ 総正答だけを見ない。★ ヒット率（diff を当てた率）と誤警報率（same を diff と答えた率）を分ける。
+  //   ⚠️ 総正答だけだと「毎回 same と答える」戦略と区別できない（2026-08-13 に実際に起きた）
+  const dif = bl.results.filter((r) => r.truth === "diff");
+  const sam = bl.results.filter((r) => r.truth === "same");
+  const hit = dif.filter((r) => r.correct).length;
+  const fa = sam.filter((r) => !r.correct).length;
+  bl.stats = { hit, nDiff: dif.length, fa, nSame: sam.length,
+               balanced: dif.length === sam.length };
+  abxOff();
+  $("abx-blind-state").textContent = "終了";
+  $("abx-result").textContent =
+    `${bl.cond} / 遷移 ${bl.trSec} 秒: ${ok} / ${bl.order.length} 正答` +
+    `（閾値 ${B.pass_threshold_correct}）　ヒット ${hit}/${dif.length}　誤警報 ${fa}/${sam.length}` +
+    (bl.stats.balanced ? "" : "　⚠️★ 出題が均衡していない（この点数は感度を測っていない）") +
+    " → " + (pass ? "この条件では聞き取れている" : "★ この条件では閾値に届いていない");
+  logLine(`★ A/B 盲検 ${bl.cond} / 遷移 ${bl.trSec}s: ${ok}/${bl.order.length}` +
+          `（ヒット ${hit}/${dif.length} / 誤警報 ${fa}/${sam.length}）`);
+  abx.lastResult = {
+    expr_version: CFG.expr_version, condition: bl.cond,
+    transition: bl.tr, transition_seconds: bl.trSec,
+    measured_ratio: abx.ratio, measured_db: 20 * Math.log10(abx.ratio),
+    timbre: sel.timbre, density_cue: sel.dcue, density_span: sel.dspan,
+    rate_min: rateMin(), rate_max: rateMax(),
+    trials: bl.results, correct: ok, threshold: B.pass_threshold_correct, pass,
+    stats: bl.stats,   // ★ ヒット / 誤警報 / 均衡しているか（総正答だけを信じない）
+    note: "★ 瞬時 A/B は spec §2 の禁止事項を意図的に破る診断条件。製品の提示方法ではない。",
+  };
+}
+
+/** ★ 密度の幅を変えたらヘッドルームの基準も変える（渡さないと最大密度で割れる・2026-08-13） */
+function applyHeadroom() {
+  if (!playing || !graph || !graph.grain) return;
+  graph.grain.port.postMessage({ cmd: "set", params: { rateMax: rateMax() } });
+}
+
 function describeRework() {
   $("fact-timbre").textContent = reworkOpt("timbre").fact;
   $("fact-dcue").textContent = reworkOpt("dcue").fact;
   $("fact-dspan").textContent = reworkOpt("dspan").fact;
+  $("fact-abx").textContent = abxOpt().fact;
+  const B = CFG.layer2_rework.abx.blind;
+  const mins = (B.trials * abxSideSeconds() * 2) / 60;
+  $("fact-abxtr").textContent =
+    abxTrOpt().fact + `　／　★ 盲検 ${B.trials} 回の所要は約 ${mins.toFixed(1)} 分`;
+  $("btn-abx-blind").textContent = `② 盲検 ${B.trials} 回（同じ / 違う・約 ${mins.toFixed(1)} 分）`;
 }
 
 const optById = (list, id) => list.find((o) => o.id === id);
@@ -633,6 +932,8 @@ async function attachLayer2(g, ctx) {
       seed: L2.seed, jitter: L2.jitter === undefined ? 0.5 : L2.jitter,
       densityNormExp: reworkOpt("dcue").density_norm_exp,
       morphS: CFG.layer2_rework.morph_s,
+      // ★ ヘッドルームの基準（2026-08-13 の音割れ対策）。★ 渡さないと最大密度で割れる
+      rateMax: rateMax(),
     },
   });
   const bpf = ctx.createBiquadFilter();
@@ -698,6 +999,18 @@ let trL2 = null, trL0 = null;
 
 /* ★ 検証用の読み取り専用フック（browser-verification）。
  * ⚠️ 「グラフを組んだ」と「実際に音が出ている」は別である。 */
+/** ★ analyser の直近ウィンドウのピーク |x|。★ null は「測れない」であって「無音」ではない。 */
+function rawPeak() {
+  if (!analyser || !analyserBuf) return null;
+  analyser.getFloatTimeDomainData(analyserBuf);
+  let m = 0;
+  for (let i = 0; i < analyserBuf.length; i++) {
+    const a = Math.abs(analyserBuf[i]);
+    if (a > m) m = a;
+  }
+  return m;
+}
+
 window.__step4 = {
   state() {
     return {
@@ -724,9 +1037,21 @@ window.__step4 = {
       rework: { timbre: sel.timbre, dcue: sel.dcue, dspan: sel.dspan,
                 rateMin: rateMin(), rateMax: rateMax() },
       grainCur: lastGrainCur,
+      // ★ 瞬時 A/B（診断専用・2026-08-13）
+      abx: { active: abx.active, state: abx.state, cond: sel.abx, ratio: abx.ratio,
+             blind: abx.blind ? { i: abx.blind.i, n: abx.blind.order.length } : null,
+             lastResult: abx.lastResult || null },
       blind: bt.running ? { plan: bt.plan, i: bt.i, total: bt.order.length } : null,
     };
   },
+  /** ★ ピークとクリップの実測（2026-08-13）。★ rms だけでは音割れを検出できない。 */
+  peak() {
+    return { last: +lastPeak.toFixed(4), max: +peakMax.toFixed(4),
+             windows: peakWindows, clipWindows,
+             clipRate: peakWindows ? +(clipWindows / peakWindows).toFixed(4) : null,
+             threshold: CLIP_AT };
+  },
+  resetPeak() { resetPeak(); return "reset"; },
   /** 実出力の RMS（★ 0 なら「グラフはあるが鳴っていない」）。 */
   rms() {
     if (!analyser) return null;
@@ -945,6 +1270,10 @@ function isDataDriven() { return !!(mp.rows && $("l2-map").checked && !bt.runnin
 /** いま鳴らすべき粒子率。★ 見本 / 盲検 / データのどれが握っているかで決まる。 */
 function currentRate(u) {
   if (!$("l2-on").checked) return 0;
+  // ★★ 瞬時 A/B（診断専用・2026-08-13）が最優先。★ 遷移時間ぶん内挿する（0 秒なら即座）
+  if (abx.active && abxOpt().id === "abx_density") {
+    return rateMin() + abxValue() * (rateMax() - rateMin());
+  }
   if (bt.running || demoActive || $("l2-map").checked) {
     // ★ 2026-08-12（S4-D12）: 幅は「密度の幅」候補が決める。★ 下限 100 grains/s は候補側で守る
     const v = Math.min(1, Math.max(0, u === undefined ? (trL2 ? trL2.value() : 0.5) : u));
@@ -979,7 +1308,28 @@ function control() {
   // ★ 常に呼ぶ。★ 見本 / 盲検の出入りでベースラインが飛ばないようにするため
   //   （以前はモードに入った瞬間だけ深さ 0 が適用され、80 ms で段差ができていた）
   applyPlanScaled(vL0);
+
+  // ★ A/B の遷移中はマスタゲイン側も追随させる（★ 対照と本番で時間形をそろえる）
+  if (abx.active && abxOpt().id === "abx_level") abxApply();
+
+  samplePeak();
 }
+
+// ⚠️★★★ 2026-08-13: 研究者が「低く・広くしていたら途中途中音割れがする」と実聴で報告した。
+//   ★ **rms しか測っていなかったので、ピークが 1.0 を超えていることを検出できていなかった。**
+//   → ★ 20 Hz の制御ループでピークを見る（analyser は 2048 サンプル = 42.7 ms なので
+//     20 Hz なら時間のほぼ全体を覆う。⚠️ ただし **標本であって全サンプル走査ではない**）。
+let peakMax = 0, peakWindows = 0, clipWindows = 0, lastPeak = 0;
+const CLIP_AT = 0.999;
+function samplePeak() {
+  const p = rawPeak();
+  if (p === null) return;
+  lastPeak = p;
+  peakWindows++;
+  if (p > peakMax) peakMax = p;
+  if (p >= CLIP_AT) clipWindows++;
+}
+function resetPeak() { peakMax = 0; peakWindows = 0; clipWindows = 0; lastPeak = 0; }
 
 let _lastScale = null;
 /** 分離案の深さを `scale`（0..1）倍で適用する。★ 深さの書き手はこの関数だけである。 */
@@ -1095,6 +1445,15 @@ function wireLayer2() {
   $("csvpick").addEventListener("change", onCsv);
   $("btn-demo-l0").addEventListener("click", () => demo("l0"));
   $("btn-demo-l2").addEventListener("click", () => demo("l2"));
+
+  // ★★ 瞬時 A/B（診断専用・2026-08-13）
+  $("btn-abx-cal").addEventListener("click", () => { abxCalibrate(); });
+  $("btn-abx-a").addEventListener("click", () => abxSet("A"));
+  $("btn-abx-b").addEventListener("click", () => abxSet("B"));
+  $("btn-abx-off").addEventListener("click", () => abxOff());
+  $("btn-abx-blind").addEventListener("click", () => abxBlindStart());
+  $("btn-abx-same").addEventListener("click", () => abxAnswer("same"));
+  $("btn-abx-diff").addEventListener("click", () => abxAnswer("diff"));
   $("btn-demo-reset").addEventListener("click", () => demo("reset"));
 }
 

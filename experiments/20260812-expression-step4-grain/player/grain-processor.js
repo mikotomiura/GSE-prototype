@@ -70,6 +70,15 @@ class GrainProcessor extends AudioWorkletProcessor {
       spreadCents: this.spreadCents, normExp: this.normExp,
     };
 
+    // ⚠️★★★ 2026-08-13 追加（研究者が「音割れがする」と実聴で報告）——
+    //   `normExp < 0.5` は密度が上がるほど**素直にレベルが上がる**設計であり、
+    //   ★ **ヘッドルームの管理が無かった**ため最大密度でフルスケールを超えていた。
+    //   ★ 対策: **最大密度のときに normExp=0.5 のときと同じレベルになるよう**静的に割る。
+    //     → 密度手がかりは「濃いと大きくなる」ではなく **「薄いと小さくなる」** として出る。
+    //   ⚠️ コンプレッサ/リミッタは使わない —— **レベル依存のゲイン変化は隠れた状態信号**であり、
+    //     spec §2（層 2 以外に状態を漏らさない）に反する。★ 静的なヘッドルームで解く。
+    this.rateMax = o.rateMax > 0 ? o.rateMax : 400;
+
     // 固定長のボイスプール。★ 実行中に確保し直さない（メモリを増やさない）
     this.vPhase = new Float64Array(MAX_VOICES); // 粒内の位置 0..1
     this.vStep = new Float64Array(MAX_VOICES);  // 1 サンプルあたりの粒内進み
@@ -108,7 +117,7 @@ class GrainProcessor extends AudioWorkletProcessor {
         // ★ 音色候補 / 密度手がかりの切替（S4-D12）。★ 受け付ける鍵を明示し、
         //   ⚠️ **想定外の鍵を黙って無視しない**（黙って無視すると「効かない候補」が緑のまま通る）
         const p = e.data.params || {};
-        const allow = ["grainMs", "centerHz", "spreadCents", "densityNormExp"];
+        const allow = ["grainMs", "centerHz", "spreadCents", "densityNormExp", "rateMax"];
         const unknown = Object.keys(p).filter((k) => !allow.includes(k));
         const bad = [];
         if (p.grainMs !== undefined) {
@@ -123,6 +132,10 @@ class GrainProcessor extends AudioWorkletProcessor {
         if (p.densityNormExp !== undefined) {
           if (!(p.densityNormExp >= 0 && p.densityNormExp <= 1)) bad.push("densityNormExp");
           else this.tgt.normExp = p.densityNormExp;
+        }
+        // ★ ヘッドルームの基準になるので、密度の幅を変えたら必ず渡す（渡さないと割れる）
+        if (p.rateMax !== undefined) {
+          if (!(p.rateMax > 0)) bad.push("rateMax"); else this.rateMax = p.rateMax;
         }
         this.port.postMessage({ ack: "set", unknown, rejected: bad, tgt: { ...this.tgt } });
       }
@@ -205,7 +218,10 @@ class GrainProcessor extends AudioWorkletProcessor {
       //      「粒が融けるか個別に聞こえるか」という質感であり、これは spec §2 が層 2 に求めた軸そのもの。
       // ★ ゲインは掛けない。音量は**外部の GainNode 一箇所**で決める（上の parameterDescriptors 参照）
       const overlap = Math.max(1, rate * this.grainSec);
-      out[i] = s / Math.pow(overlap, this.normExp);
+      // ★ ヘッドルーム: 最大密度での重なり枚数で正規化し直す（2026-08-13・音割れ対策）。
+      //   normExp=0.5 のとき指数は 0 なので **従来の音は 1 サンプルも変わらない**。
+      const ovMax = Math.max(1, this.rateMax * this.grainSec);
+      out[i] = (s / Math.pow(overlap, this.normExp)) * Math.pow(ovMax, this.normExp - 0.5);
     }
     this.frames += n;
     return true;
