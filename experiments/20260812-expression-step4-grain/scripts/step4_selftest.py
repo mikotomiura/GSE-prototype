@@ -1000,6 +1000,363 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
         if "L2.rate_min_per_s + v * (L2.rate_max_per_s" in html:
             raise Fail("currentRate に config 直読みの古い式が残っている")
 
+    # -----------------------------------------------------------------------
+    # ★★★ Step 5（2026-08-13・S5-D1〜S5-D6）— 層 0 の音量つまみ
+    #
+    # ⚠️★★★ S4-D15: Step 4 では実装欠陥が 4 件出て、**4 件とも機械検査 79 件が全部緑のまま
+    #   素通りした**。共通原因は「検査が実装の内部を見ていて、**測定の妥当性**を見ていない」こと。
+    #   → ★ 以下は「set が実装されているか」ではなく **「その測定が何かを測れる条件になっているか」**
+    #      を検査対象にする。
+    # -----------------------------------------------------------------------
+    L0G = cfg.get("layer0_gain")
+
+    @add("★★★ 層 0 の音量軸が config に実在し、既定が『現行のまま』である")
+    def _():
+        if not L0G:
+            raise Fail("layer0_gain 軸が config に無い（S5-D1）")
+        opts = L0G["options"]
+        d = next((o for o in opts if o["id"] == L0G["default"]), None)
+        if d is None:
+            raise Fail(f"既定 {L0G['default']} が候補に無い")
+        if d["gain"] != 1.0:
+            raise Fail(
+                f"既定 {d['id']} の gain={d['gain']}。★ 既定は 1.0 でなければならない —— "
+                "既定で音が変わると Step 4 の実測が再現できなくなる（S5-D7 / S5-D8）"
+            )
+
+    @add("★★★ 対照が実在する: 倍率 1.0（現行）と 0（層 0 なし）の両方がある")
+    def _():
+        gains = {o["gain"] for o in L0G["options"]}
+        missing = {1.0, 0.0} - gains
+        if missing:
+            raise Fail(
+                f"層 0 の音量候補に {sorted(missing)} が無い。"
+                "★ 『層 0 が原因である』を示すには **層 0 を取り去った条件**が要る"
+                "（browser-verification §2.0 の対照）"
+            )
+
+    @add("★ 層 0 の音量候補が 0..1 の範囲にあり、id が重複していない")
+    def _():
+        seen = set()
+        for o in L0G["options"]:
+            g = o["gain"]
+            if not isinstance(g, (int, float)) or not (0.0 <= g <= 1.0):
+                raise Fail(f"{o['id']} の gain={g} が 0..1 の外（★ 1 を超えるとヘッドルームを壊す）")
+            if o["id"] in seen:
+                raise Fail(f"id {o['id']} が重複している")
+            seen.add(o["id"])
+
+    @add("★★★ 予測コントラストが『予測である』と config に明記されている（実測と混ぜない）")
+    def _():
+        # ⚠️★ 最初は layer0_gain 全体を 1 本の文字列にして探したが、**素通りした**（実測）——
+        #   同じ語が個々の候補の fact にもあるため、断り書きを消しても緑のままだった。
+        #   → ★ **断り書きが住む場所を名指しで検査する。**
+        note = " ".join(L0G.get("_predicted_contrast_note", []))
+        if "予測であって実測ではない" not in note:
+            raise Fail(
+                "predicted_db を置きながら _predicted_contrast_note に"
+                "『予測であって実測ではない』と書いていない。★ 予測を実測欄に書かせない歯止めが無い"
+            )
+        if not any("predicted_db" in o for o in L0G["options"]):
+            raise Fail("predicted_db を持つ候補が 1 つも無い（断り書きの対象が存在しない）")
+        # ★ player が予測値を **判定や計算に使っていない**こと（表示だけ）
+        if "predicted_db" in html and "pd[span]" not in html:
+            raise Fail("player が predicted_db を表示以外で使っている疑い")
+
+    @add("★★★ S5-D5: 実時間で expr.gain を書くのが applyLayer0Gain() だけである")
+    def _():
+        body = strip_js_comments(html)
+        # ⚠️★ 「`graph.expr.gain.method(` を数える」形では **素通りした**（実測）——
+        #   ★ 実装は `const p = graph.expr.gain;` と束ねてから書くので 0 件に見えた。
+        #   → ★ **`.value` 読み以外の出現をすべて「書き込みうる参照」として数える。**
+        refs = [m for m in re.finditer(r"graph\.expr\.gain(\.\w+)?(\s*=[^=])?", body)]
+        # ★ `.value` の **読み** だけを除外する。⚠️ `.value = ` は代入なので書き手である
+        #   （レビュー実測: `graph.expr.gain.value = 1;` を control() に足しても緑だった）
+        writable = [m.group(0) for m in refs if not (m.group(1) == ".value" and not m.group(2))]
+        if len(writable) != 1:
+            raise Fail(
+                f"graph.expr.gain への書き込みうる参照が {len(writable)} 箇所ある（{writable}）。"
+                "★ 書き手は applyLayer0Gain() の 1 つだけにする（S5-D5・H2 と同じ形）"
+            )
+        fn = strip_js_comments(extract_function(html, "applyLayer0Gain"))
+        if "graph.expr.gain" not in fn:
+            raise Fail("applyLayer0Gain() が graph.expr.gain を触っていない")
+
+    @add("★★★ BF-5: 起動時の適用が `playing = true` より **後** にある（前だと完全な no-op）")
+    def _():
+        # ⚠️★★★ 2026-08-13 に実際に踏んだ欠陥（BF-5）——
+        #   `applyLayer0Gain` は `if (!playing || !graph) return;` で始まるので、
+        #   `playing = true` より前に呼ぶと **1 命令も実行されない**。
+        #   ★ 層 0 の倍率には control() のような周期的な書き手が居ないので、
+        #     **停止 → 再生のたびに倍率 1.0 のまま鳴り続ける**（記録と実音が食い違う）。
+        #   ⚠️ 「呼んでいるか」を見る検査では捕まらない。★ **位置**を見る。
+        fn = strip_js_comments(extract_function(html, "startAudio"))
+        iCall, iFlag = fn.find("applyLayer0Gain(true)"), fn.find("playing = true")
+        if iCall < 0:
+            raise Fail("startAudio が applyLayer0Gain(true) を呼んでいない（選択が再生をまたがない）")
+        if iFlag < 0:
+            raise Fail("startAudio に playing = true が見つからない（検査の前提が崩れている）")
+        if iCall < iFlag:
+            raise Fail(
+                "applyLayer0Gain(true) が playing = true より前にある。"
+                "★ 早期 return で **完全な no-op** になる（BF-5）"
+            )
+        if "if (!playing" not in strip_js_comments(extract_function(html, "applyLayer0Gain")):
+            raise Fail("applyLayer0Gain の早期 return が消えた（この検査の前提が変わった）")
+
+    @add("★★★ 目標倍率と実効倍率の一致を **実行時に**確かめてから測る（静的検査では届かない層）")
+    def _():
+        body = strip_js_comments(html)
+        mism = strip_js_comments(extract_function(html, "layer0GainMismatch"))
+        if "graph.expr.gain.value" not in mism or "layer0GainOpt().gain" not in mism:
+            raise Fail("layer0GainMismatch が目標と実効を突き合わせていない")
+        cal = strip_js_comments(extract_function(html, "abxCalibrate"))
+        if "layer0GainMismatch()" not in cal:
+            raise Fail(
+                "abxCalibrate が実効倍率を確かめずに測っている。"
+                "★ 『呼んだはず』の倍率で測ると、記録と実音が食い違う（BF-5）"
+            )
+
+    @add("★★★ master の落ち着き（フェードイン / 音量操作）も『到達待ち』に入っている")
+    def _():
+        rem = strip_js_comments(extract_function(html, "calRemainMs"))
+        if "masterSettleUntil" not in rem:
+            raise Fail(
+                "calRemainMs が masterSettleUntil を見ていない。"
+                "★ フェードイン中に①を押すと **A だけ小さいレベルで測られ比が化ける**"
+            )
+        st = strip_js_comments(extract_function(html, "startAudio"))
+        if "masterSettleUntil" not in st:
+            raise Fail("startAudio がフェードインぶんの待ちを設定していない")
+
+    @add("★★ 盲検は開始時に凍結した条件だけを読む（途中で軸を触られても結果が消えない）")
+    def _():
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if "ratio: abx.ratio" not in st or "ratioCond: { ...abx.ratioCond }" not in st:
+            raise Fail("abxBlindStart が比と条件を凍結していない")
+        if "lockUI(true)" not in st:
+            raise Fail("盲検中に軸をロックしていない（刺激を途中で変えられる）")
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        if "abx.ratio" in fin:
+            raise Fail(
+                "abxBlindFinish が live の abx.ratio を読んでいる。"
+                "★ 盲検中に条件を変えられると null になり、TypeError で結果が丸ごと消える"
+            )
+        inv = strip_js_comments(extract_function(html, "invalidateAbxRatio"))
+        if "abx.blind" not in inv:
+            raise Fail("invalidateAbxRatio が走行中の盲検を中止していない")
+
+    @add("★★ 盲検中に触れる軸が lockUI に全部入っている")
+    def _():
+        lk = strip_js_comments(extract_function(html, "lockUI"))
+        for ax in ("ax-l0gain", "ax-timbre", "ax-dcue", "ax-dspan"):
+            if ax not in lk:
+                raise Fail(f"{ax} が lockUI に入っていない（盲検中に刺激を変えられる）")
+
+    @add("★★ 瞬時 A/B の結果に保存経路がある（層 0 の倍率が記録として残る）")
+    def _():
+        body = strip_js_comments(html)
+        if "function exportAbx(" not in body or 'id="btn-abx-export"' not in html:
+            raise Fail(
+                "abx.lastResult の保存経路が無い。"
+                "★ exportBlind() は分離案（B7）用で層 0 の倍率を含まない —— 閾値の記録が残らない"
+            )
+        ex = strip_js_comments(extract_function(html, "exportAbx"))
+        if "abx.lastResult" not in ex:
+            raise Fail("exportAbx が abx.lastResult を保存していない")
+
+    @add("★★★ BF-6: 層 2 が粒を出していないまま測らせない（無音で盲検を回さない）")
+    def _():
+        body = strip_js_comments(html)
+        w = strip_js_comments(extract_function(html, "layer2Status"))
+        if "lastGrainStats" not in w and "_l2Watch" not in w:
+            raise Fail("layer2Status が Worklet の実測カウンタを見ていない")
+        upd = strip_js_comments(extract_function(html, "updateL2Watch"))
+        # ★ 累積平均をそのまま使うと「昔たくさん出した」で緑になる。★ 微分していること
+        if "_l2Watch.n" not in upd or "_l2Watch.t" not in upd:
+            raise Fail(
+                "updateL2Watch が累積カウンタを微分していない。"
+                "★ grainsEmitted/seconds は **累積平均**なので、止まっていても当分は大きいまま"
+            )
+        cal = strip_js_comments(extract_function(html, "abxCalibrate"))
+        if "layer2Status()" not in cal:
+            raise Fail(
+                "abxCalibrate が層 2 の実体を確かめずに測っている。"
+                "★ 無音のまま測ると『差が無い』という結果だけが出る（BF-2 と同じ形）"
+            )
+        # ⚠️★★★ cross-review の HIGH: **「まだ分からない」を安全側に数えていないか。**
+        #   ★ 実際に踏んだ形 —— `em !== null && em < 20` と書いたため、
+        #     観測が確立していない 2〜4 秒の窓でガードが素通りしていた。
+        if 'ls.state !== "ok"' not in cal:
+            raise Fail(
+                "層 2 の判定が『ok 以外は断る』になっていない。"
+                "★ 未観測（unknown）を通す書き方だと、BF-6 を防ぐ機構自体に BF-6 と同じ穴が開く"
+            )
+        stt = strip_js_comments(extract_function(html, "layer2Status"))
+        for st_name in ('"unknown"', '"silent"', '"off"', '"ok"'):
+            if st_name not in stt:
+                raise Fail(f"layer2Status が {st_name} を区別していない")
+
+    @add("★★ 層 2 の観測が tick から更新されている")
+    def _():
+        if "updateL2Watch()" not in strip_js_comments(extract_function(html, "tick")):
+            raise Fail("tick が層 2 の実体を更新していない（観測が更新されない）")
+
+    @add("★★ 条件を変えたら『保存できる直前の結果』も道連れにする（古い結果を今のものと誤読させない）")
+    def _():
+        inv = strip_js_comments(extract_function(html, "invalidateAbxRatio"))
+        if "abx.lastResult = null" not in inv or "btn-abx-export" not in inv:
+            raise Fail(
+                "invalidateAbxRatio が直前の結果と保存ボタンを片付けていない。"
+                "★ 条件を変えた後も『いま保存できる = いまの条件の結果』と誤読されうる"
+            )
+
+    @add("★★ 実データ駆動中は①を測らない（比が実データ由来の値になる）")
+    def _():
+        cal = strip_js_comments(extract_function(html, "abxCalibrate"))
+        if "isDataDriven()" not in cal:
+            raise Fail(
+                "abxCalibrate がデータ駆動中かを見ていない。"
+                "★ 粒子率の書き手が CSV 側になり、measured_ratio が実データ由来になる（data-privacy）"
+            )
+
+    @add("★★★ S5-D4: buildGraph（LAYER0-CORE）に層 0 の音量つまみを埋め込んでいない")
+    def _():
+        fn = extract_function(html, "buildGraph")
+        for bad in ("layer0GainOpt", "l0gain", "sel.l0"):
+            if bad in fn:
+                raise Fail(
+                    f"buildGraph に {bad} が入っている。★ LAYER0-CORE は layer0.html との"
+                    "逐語一致を保つ必要がある（S4-D8）"
+                )
+
+    @add("★★ つまみが段差でなく raised-cosine で移る（spec §2 ✗オンセット）")
+    def _():
+        fn = strip_js_comments(extract_function(html, "applyLayer0Gain"))
+        if "setValueCurveAtTime" not in fn:
+            raise Fail("つまみが setValueCurveAtTime を使っていない（段差になっている疑い）")
+        if "0.5 - 0.5 * Math.cos" not in fn:
+            raise Fail("raised-cosine の式が無い（端点の傾きが 0 でない曲線を使っている）")
+        if "exponentialRampToValueAtTime" in fn:
+            raise Fail(
+                "exponentialRamp を使っている。★ **0 に到達できない**ので l0_off（倍率 0）が作れない"
+            )
+        if "CFG.envelope.glide_s" not in fn:
+            raise Fail("切替の所要が envelope.glide_s から来ていない（他の候補切替と揃っていない）")
+
+    @add("★★★ BF-3 と同じ形を塞ぐ: 校正が『切替の到達』を待つ")
+    def _():
+        cal = strip_js_comments(extract_function(html, "abxCalibrate"))
+        # ⚠️★ 「`calRemainMs()` が本文のどこかにあるか」では **素通りした**（実測）——
+        #   完了時の再チェックにも同じ呼び出しがあるので、**入口の門を消しても緑**だった。
+        #   → ★ **入口の門そのもの**を名指しで見る。
+        if "const rem = calRemainMs();" not in cal:
+            raise Fail(
+                "abxCalibrate の入口に calRemainMs() の門が無い。"
+                "★ ランプ / morph の途中を端点として測る（2026-08-13 に実際に踏んだ BF-3）"
+            )
+        rem = strip_js_comments(extract_function(html, "calRemainMs"))
+        for need in ("l0RampRemainMs", "l2MorphUntil"):
+            if need not in rem:
+                raise Fail(f"calRemainMs が {need} を見ていない（片方の待ちが抜ける）")
+
+    @add("★★★ 層 2 側の morph も『到達待ち』の対象になっている（BF-3 の層 2 版）")
+    def _():
+        body = strip_js_comments(html)
+        for fname in ("applyTimbre", "applyDensityCue"):
+            fn = strip_js_comments(extract_function(html, fname))
+            if "markL2Morph()" not in fn:
+                raise Fail(f"{fname}() が markL2Morph() を呼んでいない（morph 途中を校正しうる）")
+        mk = strip_js_comments(extract_function(html, "markL2Morph"))
+        if "morph_s" not in mk:
+            raise Fail("markL2Morph が morph_s を使っていない（待ち時間が実体と無関係）")
+
+    @add("★★★ 条件を変えたら比が無効になる（前の倍率の比で盲検を始めさせない）")
+    def _():
+        body = strip_js_comments(html)
+        inv = strip_js_comments(extract_function(html, "invalidateAbxRatio"))
+        if "abx.ratio = null" not in inv:
+            raise Fail("invalidateAbxRatio が比を消していない")
+        if 'btn-abx-blind' not in inv:
+            raise Fail("invalidateAbxRatio が盲検ボタンを無効化していない")
+        # ★ 比が変わる 4 軸すべてから呼ばれていること
+        # ⚠️★ 正規表現で `[^;]*?;` と書いたら **コールバック内の最初の `;` で切れて素通りした**（実測）。
+        #   → ★ `radioGroup(` で分割し、**その呼び出しの本文そのもの**を見る。
+        chunks = body.split("radioGroup(")[1:]
+        for key in ("l0gain", "timbre", "dcue", "dspan"):
+            hit = [c for c in chunks if f', "{key}",' in c.split("radioGroup(")[0]]
+            if len(hit) != 1:
+                raise Fail(f"軸 {key} の radioGroup 呼び出しが一意に見つからない（{len(hit)} 件）")
+            if "invalidateAbxRatio" not in hit[0]:
+                raise Fail(
+                    f"軸 {key} を変えても比が無効化されない。"
+                    "★ 別条件で測った比のまま盲検を始められてしまう（BF-2 と同じ形）"
+                )
+
+    @add("★★★ 比を測った条件と提示条件の一致を、盲検の開始時に実測している（門番を 2 枚にする）")
+    def _():
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if "abx.ratioCond" not in st:
+            raise Fail("abxBlindStart が『比を測ったときの条件』を照合していない")
+        # ⚠️★★★ cross-review の HIGH: **記録側と照合側が同じ定義から作られているか**。
+        #   ★ 実際に踏んだ形 —— 記録は 7 鍵なのに照合は 4 鍵しか見ておらず、
+        #     `l2-on` を外して盲検を始めると **全トライアルが無音**になるのに検出できなかった。
+        cal = strip_js_comments(extract_function(html, "abxCalibrate"))
+        if "currentAbxCond()" not in st or "currentAbxCond()" not in cal:
+            raise Fail(
+                "比の条件を記録する側と照合する側が同じ定義（currentAbxCond）を使っていない。"
+                "★ 片方に鍵を足し忘れると、無音の条件で盲検が始まる（BF-2 の再発）"
+            )
+        cond = strip_js_comments(extract_function(html, "currentAbxCond"))
+        for key in ("l2on", "map", "plan", "l0gain", "timbre", "dcue", "dspan"):
+            if key not in cond:
+                raise Fail(f"currentAbxCond が {key} を含んでいない（比を変えうる軸の取りこぼし）")
+        # ⚠️★ `drift.length` の存在だけを見ていたら **`const drift = [];` に置き換えても緑**だった（実測）。
+        #   ★ **比較そのもの**が実在することを見る（分岐の外殻ではなく中身）。
+        if "rc[k] !== nowCond[k]" not in st:
+            raise Fail("条件のずれを実際に比較していない（分岐はあるが中身が空回りしている）")
+        if "drift.length" not in st:
+            raise Fail("条件のずれを検出して止める分岐が無い")
+        cal = strip_js_comments(extract_function(html, "abxCalibrate"))
+        if "abx.ratioCond =" not in cal:
+            raise Fail("abxCalibrate が測定時の条件を記録していない（照合の相手が存在しない）")
+
+    @add("★★★ 盲検の結果に層 0 の倍率が残る（★ 本 Step の独立変数）")
+    def _():
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        for need in ("layer0_gain", "layer0_gain_value"):
+            if need not in fin:
+                raise Fail(
+                    f"結果 JSON に {need} が入らない。"
+                    "★ どのコントラストで測った点数かが事後に特定できなくなる"
+                )
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if "l0gain: sel.l0gain" not in st:
+            raise Fail("盲検の開始時に層 0 の倍率を固定していない（途中で触られると記録がずれる）")
+
+    @add("★★ 既に効いている 3 点が層 0 の追加で空回りしていない（均衡 / 対照の差 / ピーク）")
+    def _():
+        body = strip_js_comments(html)
+        # BF-4: 出題の均衡
+        ordfn = strip_js_comments(extract_function(html, "buildAbxOrder"))
+        if 'i < half ? "diff" : "same"' not in ordfn:
+            raise Fail("出題の均衡が壊れている（BF-4）")
+        # BF-2: 対照に差が無ければ始めない
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if "Math.abs(db) < 0.5" not in st:
+            raise Fail("対照の差ゼロを弾く分岐が消えている（BF-2）")
+        # BF-1: ピークを見ている
+        if "function samplePeak(" not in body or "clipWindows" not in body:
+            raise Fail("ピーク / クリップの計器が消えている（BF-1）")
+
+    @add("★★ __step4 が層 0 の『目標値』と『いま効いている値』を分けて出す")
+    def _():
+        body = strip_js_comments(html)
+        if "layer0Gain: {" not in body:
+            raise Fail("__step4.state() に layer0Gain が無い（外から実測できない）")
+        if "graph.expr.gain.value" not in body:
+            raise Fail("いま効いている値を AudioParam から読んでいない（目標値だけを出している）")
+
     return checks
 
 
@@ -1049,6 +1406,16 @@ def meta_checks() -> int:
 
     def mut_wk(old, new):
         return (cfg0, cfg_text0, html0, wk0.replace(old, new), py0, s3html0, s3ver0, seed0)
+
+    def mut_both(old, new):
+        """★ step4.html と layer0.html に **同じ**変更を入れる。
+
+        ⚠️★ LAYER0-CORE を片側だけ壊すと **S4-D8 の一致検査が先に発火する**ので、
+        ★ その先にある検査（例: S5-D4「つまみをコアに埋め込まない」）を試したことにならない。
+        → ★ 両側を揃えて壊し、**一致していても駄目なもの**を検査できていることを確かめる。
+        """
+        return (cfg0, cfg_text0, html0.replace(old, new), wk0, py0,
+                s3html0.replace(old, new), s3ver0, seed0)
 
     def plan(c, pid):
         return next(p for p in c["separation_plans"]["options"] if p["id"] == pid)
@@ -1258,6 +1625,108 @@ def meta_checks() -> int:
          "候補の幅を使っていない"),
         ("★ 『いま効いている値』の受け取りを消す",
          mut_html("if (e.data.cur) {", "if (false) {"), "cur を読んでいない"),
+
+        # ---- ★★★ Step 5（層 0 の音量つまみ）------------------------------
+        ("★★★ 層 0 の既定を 0.5 にする（既定で音が変わる）",
+         mut_cfg(lambda c: c["layer0_gain"].update(default="l0_half")), "既定は 1.0"),
+        ("★★★ 層 0 の候補から 0（対照）を消す",
+         mut_cfg(lambda c: c["layer0_gain"].__setitem__(
+             "options", [o for o in c["layer0_gain"]["options"] if o["gain"] != 0.0])),
+         "層 0 を取り去った条件"),
+        ("★ 層 0 の候補に 1 を超える倍率を足す",
+         mut_cfg(lambda c: c["layer0_gain"]["options"].append(
+             {"id": "l0_boost", "gain": 1.5, "label": "x", "fact": "x"})), "0..1 の外"),
+        ("★★★ 『予測であって実測ではない』の断り書きを消す",
+         mut_cfg(lambda c: c["layer0_gain"].__setitem__(
+             "_predicted_contrast_note", ["★ 予測です"])), "予測を実測欄に書かせない"),
+        ("★★★ expr.gain の書き手を 2 つにする",
+         mut_html("  applyLayer0Gain(true);",
+                  "  applyLayer0Gain(true); graph.expr.gain.setValueAtTime(1, now);"),
+         "書き手は applyLayer0Gain"),
+        ("★★ つまみを段差（setValueAtTime 一発）に変える",
+         mut_html("    p.setValueCurveAtTime(curve, now, dur);",
+                  "    p.setValueAtTime(to, now);"), "setValueCurveAtTime を使っていない"),
+        ("★★ つまみの raised-cosine を線形に変える",
+         mut_html("      const w = 0.5 - 0.5 * Math.cos(Math.PI * (i / (N - 1)));   // ★ raised-cosine",
+                  "      const w = i / (N - 1);"), "raised-cosine の式が無い"),
+        ("★★★ 校正が切替の到達を待たなくなる（BF-3 を戻す）",
+         mut_html("  const rem = calRemainMs();\n  if (rem > 0) {",
+                  "  const rem = 0;\n  if (rem > 0) {"), "入口に calRemainMs() の門が無い"),
+        ("★★★ calRemainMs が層 2 の morph を見なくなる",
+         mut_html("                  Math.max(0, l2MorphUntil - now),", "                  0,"),
+         "l2MorphUntil を見ていない"),
+        ("★★★ applyDensityCue が morph の到達を記録しない",
+         mut_html("    densityNormExp: reworkOpt(\"dcue\").density_norm_exp } });\n  markL2Morph();",
+                  "    densityNormExp: reworkOpt(\"dcue\").density_norm_exp } });"),
+         "markL2Morph() を呼んでいない"),
+        ("★★★ 層 0 を変えても比が無効化されない（別条件の比で盲検を始められる）",
+         mut_html('(o) => { invalidateAbxRatio("層 0 の音量を " + o.label + " に変えた");\n'
+                  "                      applyLayer0Gain(); describeLayer0Gain(); }",
+                  "(o) => { applyLayer0Gain(); describeLayer0Gain(); }"), "比が無効化されない"),
+        # ---- ★★★ BF-5（起動時の no-op）とその周辺 ----------------------
+        ("★★★ BF-5: 起動時の適用を playing = true より前へ戻す（完全な no-op になる）",
+         mut_html("  applyPlan(); applyRate();\n  playing = true; startedAt = performance.now();",
+                  "  applyPlan(); applyRate();\n  applyLayer0Gain(true);\n"
+                  "  playing = true; startedAt = performance.now();"),
+         "完全な no-op"),
+        ("★★★ 実行時の『目標 vs 実効』照合を外す",
+         mut_html("  const mm = layer0GainMismatch();\n  if (mm) {",
+                  "  const mm = null;\n  if (mm) {"), "実効倍率を確かめずに測っている"),
+        ("★★★ control() に 2 人目の書き手を足す（.value 代入）",
+         mut_html("  samplePeak();", "  graph.expr.gain.value = 1;\n  samplePeak();"),
+         "書き手は applyLayer0Gain"),
+        ("★★★ master の落ち着きを待たなくする（フェードイン中に測れてしまう）",
+         mut_html("                  Math.max(0, masterSettleUntil - now));",
+                  "                  0);"), "masterSettleUntil を見ていない"),
+        ("★★ 盲検が live の比を読むように戻す（途中で条件を変えると結果が消える）",
+         mut_html("  const blRatio = bl.ratio, blDb = 20 * Math.log10(blRatio);",
+                  "  const blRatio = abx.ratio, blDb = 20 * Math.log10(abx.ratio);"),
+         "live の abx.ratio を読んでいる"),
+        ("★★ lockUI から層 0 の軸を外す（盲検中にレベルを変えられる）",
+         mut_html('"ax-l0gain", "ax-timbre", "ax-dcue", "ax-dspan"', '"ax-timbre", "ax-dcue", "ax-dspan"'),
+         "ax-l0gain が lockUI に入っていない"),
+        ("★★ A/B の保存経路を消す（閾値の記録が残らない）",
+         mut_html("function exportAbx(", "function exportAbxGone("), "保存経路が無い"),
+        ("★★ データ駆動中でも①を測れるようにする",
+         mut_html("  if (isDataDriven()) {", "  if (false) {"), "データ駆動中かを見ていない"),
+        ("★★★ BF-6: 無音の層 2 でも①を測れるようにする",
+         mut_html("  const ls = layer2Status();", "  const ls = { state: 'ok' };"),
+         "層 2 の実体を確かめずに測っている"),
+        # ---- ★★★ cross-review（Claude ＋ Codex 一致）の HIGH 2 件 -----------
+        ("★★★ 照合を 4 鍵だけに戻す（l2-on を外して盲検を始められる＝全トライアル無音）",
+         mut_html("  const nowCond = currentAbxCond();   // ★ 記録側と同じ定義（7 鍵すべてを照合する）",
+                  "  const nowCond = { l0gain: sel.l0gain, timbre: sel.timbre,"
+                  " dcue: sel.dcue, dspan: sel.dspan };"),
+         "同じ定義（currentAbxCond）を使っていない"),
+        ("★★★ currentAbxCond から l2on を落とす（無音条件が検出されなくなる）",
+         mut_html("           map: $(\"l2-map\").checked, l2on: $(\"l2-on\").checked, plan: sel.plan };",
+                  "           map: $(\"l2-map\").checked, plan: sel.plan };"),
+         "currentAbxCond が l2on を含んでいない"),
+        ("★★★ 未観測（unknown）を素通りさせる（BF-6 ガードに同じ穴を開ける）",
+         mut_html('  if (ls.state !== "ok") {', '  if (ls.state === "silent") {'),
+         "『ok 以外は断る』になっていない"),
+        ("★★ 条件変更で直前の結果を片付けない",
+         mut_html("  if (abx.lastResult) { abx.lastResult = null;"
+                  ' $("btn-abx-export").disabled = true; }', ""),
+         "直前の結果と保存ボタンを片付けていない"),
+        ("★★★ BF-6: 層 2 の観測を累積平均のまま使う（止まっても当分は大きいまま）",
+         mut_html("  if (dt > 1.5) _l2Watch = { t, n, rate: (n - _l2Watch.n) / dt };",
+                  "  if (dt > 1.5) _l2Watch = { t, n, rate: lastGrainStats.rate };"),
+         "累積カウンタを微分していない"),
+        ("★★★ 盲検の開始時に条件の一致を照合しない（門番を 1 枚に減らす）",
+         mut_html("  const drift = Object.keys(nowCond).filter((k) => rc[k] !== nowCond[k]);",
+                  "  const drift = [];"), "実際に比較していない"),
+        ("★★★ 結果 JSON から層 0 の倍率を落とす",
+         mut_html("    layer0_gain: bl.l0gain, layer0_gain_value: bl.l0gainValue,", ""),
+         "事後に特定できなくなる"),
+        ("★★ __step4 から層 0 の実効値を落とす",
+         mut_html("      layer0Gain: {", "      layer0GainRemoved: {"), "layer0Gain が無い"),
+        # ⚠️★ 片側だけ壊すと S4-D8 の一致検査が先に発火して S5-D4 を試せない（実測）。
+        #   → ★ **両側に同じ変更**を入れ、「一致していてもコアに埋め込んではならない」ことを検査する
+        ("★★★ buildGraph につまみを埋め込む（★ Step 3 側にも同じ変更を入れて一致は保つ）",
+         mut_both("  const expr   = ctx.createGain(); expr.gain.value = 1;",
+                  "  const expr   = ctx.createGain(); expr.gain.value = layer0GainOpt().gain;"),
+         "LAYER0-CORE"),
     ]
 
     print("== meta 検査（★ 検査を壊して赤くなることの確認） ==")
