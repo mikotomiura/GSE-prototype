@@ -36,25 +36,94 @@ jobs:
   # public 化は **履歴全体を公開**するため experiments/ の被験者水準データが露出する。
   # 研究記録を消すのではなく public 化そのものをやめる、というのが本変更の意図。
   #
-  # Windows / Linux は GitHub-hosted のまま:
-  # - Windows は 2倍課金で、macOS を外せば無料枠に十分収まる
-  # - self-hosted はランナー offline 時にジョブが**キューへ滞留**する (hosted への自動
-  #   フォールバックは無い)。実機依存を macOS 1 台に限定してリスク面を小さくする
-  # - Windows も移す場合は Surface Pro に `gse-win` ラベルでランナーを登録し、
-  #   下の `runner: windows-latest` を `[self-hosted, gse-win]` に変えるだけでよい
+  # ★ Windows も self-hosted へ移行 (2026-08-15)。目的は **課金・無料枠を浮かせること**。
+  #   Windows は 2倍課金で、毎 push の check が恒常的な支出になっていた
+  #   (タグ時のみ走る `build-windows` は **hosted のまま**残す。下記参照)。
+  #
+  # ⚠️★★★ ただし Windows 機 (Surface Pro) は macOS 機と違い **たまにシャットダウンしている**。
+  #   self-hosted はランナー offline 時にジョブが **キューへ滞留**する (hosted への自動
+  #   フォールバックは無い)。しかも:
+  #   - `timeout-minutes` は **ジョブの実行時間にしか効かない**。キュー待ちには適用されない
+  #   - 滞留したジョブは **24〜48 時間**経ってからキャンセルされる
+  #   → ★ 「短い timeout を付けたプローブジョブ」では救えない (2026-08-15 に実測確認)。
+  #
+  # ★ そこで `decide-win-runner` を前段に置く: ランナーの online/offline を API で
+  #   **最大 30 秒ポーリング**し、生きていなければ `windows-latest` (従来) へ落とす。
+  #   **失敗側は必ず hosted** (token 無し / API エラー / タイムアウト) = キューに滞留させない。
+  #
+  # ⚠️ 救えない範囲を明記する: 割り当ては**ジョブ開始時に確定**するため、
+  #   **ビルド途中で Surface が落ちた場合は救えない** (そのジョブは失敗する)。
+  #   `if: failure()` の再実行ジョブを足せば救えるが、本物のテスト失敗でも再実行され
+  #   Windows は 2倍課金なので、**目的 (課金削減) と衝突するため採らなかった**。
+  #
+  # ⚠️ `GITHUB_TOKEN` では self-hosted ランナーの一覧を取得できない (2026-08-15 実測)。
+  #   fine-grained PAT (当 repo のみ・`Administration: Read`・期限付き) を
+  #   secret `RUNNER_STATUS_TOKEN` に置く。**未設定なら常に hosted へ落ちる** (fail-safe)。
+  decide-win-runner:
+    # ★ `check` と同じ条件にする (ここが skip されると `check` も skip されるため)。
+    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      runs_on: ${{ steps.probe.outputs.runs_on }}
+    steps:
+      - name: Probe self-hosted Windows runner (max 30s, fail-safe to hosted)
+        id: probe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+        run: |
+          set -uo pipefail
+          HOSTED='["windows-latest"]'
+          SELF='["self-hosted","gse-win"]'
+
+          decide() {
+            echo "runs_on=$1" >> "$GITHUB_OUTPUT"
+            echo "resolved runs-on = $1"
+            exit 0
+          }
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::notice::RUNNER_STATUS_TOKEN is unset -> hosted (fail-safe)"
+            decide "$HOSTED"
+          fi
+
+          # 5s x 6 = 最大 30s。★ 起き上がりかけを拾うためポーリングにしている。
+          for i in 1 2 3 4 5 6; do
+            body="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners" 2>/dev/null || true)"
+            if [ -n "$body" ]; then
+              online="$(printf '%s' "$body" \
+                | jq -r '[.runners[] | select(.status=="online" and (any(.labels[]; .name=="gse-win")))] | length' \
+                2>/dev/null || echo 0)"
+              if [ "${online:-0}" -gt 0 ]; then
+                echo "::notice::gse-win runner is online (attempt ${i}) -> self-hosted"
+                decide "$SELF"
+              fi
+            else
+              echo "::warning::runner status API call failed (attempt ${i})"
+            fi
+            if [ "$i" -lt 6 ]; then sleep 5; fi
+          done
+
+          echo "::notice::gse-win did not come online within 30s -> hosted (fallback)"
+          decide "$HOSTED"
+
   check:
     # ★ 手動発火では走らせない (self-hosted の macOS ランナーが offline だとキューへ滞留するため。
     #   手動発火の目的は Windows の exe を 1 個作ることだけである)。
     if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+    # ⚠️ mac 側も decide の完了を待つ (最大 30 秒)。両 OS を 1 matrix に保つための代償。
+    needs: decide-win-runner
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: windows-latest
+          - runner: gse-win-selfhosted
             target: x86_64-pc-windows-msvc
           - runner: gse-mac-selfhosted
             target: aarch64-apple-darwin
-    runs-on: ${{ matrix.runner == 'gse-mac-selfhosted' && fromJSON('["self-hosted","gse-mac"]') || matrix.runner }}
+    # ⚠️ matrix が 2 本である前提の三項式。★ 3 本目を足すときはここを必ず書き換えること。
+    runs-on: ${{ matrix.runner == 'gse-mac-selfhosted' && fromJSON('["self-hosted","gse-mac"]') || fromJSON(needs.decide-win-runner.outputs.runs_on) }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -108,7 +177,11 @@ jobs:
     #   ⚠️ `release` ジョブの `if` はタグ限定のままなので、★ 手動発火では
     #   **Release は作られない**。成果物は Actions の artifact (7 日) だけである。
     if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
-    # Windows は 2倍課金。macOS を self-hosted に外せば無料枠に収まるため hosted のまま。
+    # ★ 2026-08-15: `check` は self-hosted へ移したが、**本ジョブは hosted のまま**にする。
+    #   理由: (a) タグ push / 手動発火でしか走らないので**恒常的な支出ではない**、
+    #        (b) リリース成果物を作るジョブであり、⚠️ **Surface が途中で落ちると
+    #            リリースが壊れる**。割り当ては開始時に確定するのでフォールバックが効かない。
+    #   → ★ 課金削減の効き目は毎 push の `check` 側にあり、そこだけを移すのが割に合う。
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
