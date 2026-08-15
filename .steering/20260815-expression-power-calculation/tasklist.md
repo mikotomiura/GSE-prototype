@@ -51,13 +51,22 @@
       ⚠️ **到達可能性と識別可能性は別問題**である旨も併記した（[P110]）
 
 ## 4. レビュー
-- [~] ⚠️ `code-reviewer` + `security-checker` の並列起動 —— ★ **本セッションの動作条件で Agent ツールが
-      禁止されているため未実行**（EP-D6）。★ 代わりに機械的自己検査を実施:
+- [x] ⚠️ `code-reviewer` + `security-checker` の並列起動 —— ★ **2026-08-16 に実施した**
+      （★ EP-D6 の「動作条件で Agent 禁止」は解消した）。
+      ⚠️★★★ **結果として、同日中に spec §8 へ還元した結論のうち 2 件が誤りだと判明した**
+      （EP-D12「AUC 要求の k 非依存」は実装の都合／EP-D13「B=10 で k=12」は片側限定かつ要求 AUC=1.000）。
+      → ★ **spec §8 は訂正済み**。⚠️ **`notes.md` / `results/summary.md` は未修正（EP-Q7）**。
+      ⚠️ security-checker の H1/H2/M1/M3 は commit `636e082` で修正済み。
+      ⚠️ HIGH 3 件（EP-D14/D15 と M-f）と MEDIUM 8 件は**研究者判断待ち**（decisions.md 末尾）。
+      ★ 旧記録（Agent 禁止時の機械的自己検査）:
   - [x] 実セッション名の混入 **0 件** / `vk` 読み出し **0 件**
   - [x] `scripts/secrets-filter.sh` を全成果物に適用 → **rc=0**
   - [x] `__pycache__` は `.gitignore:50` で除外（`git check-ignore` 実測）
-- [ ] ⚠️ `/cross-review`（★ 研究者判断・EP-Q6。⚠️ **入力はスクリプト diff のみ**）
-- [ ] `/finish-task`（★ 研究者判断・EP-Q5）
+- [x] ⚠️ `/cross-review`（EP-Q6）—— ★ **2026-08-16 に `scripts/run-codex-review.sh 1adf092~1..1adf092 -- <scripts/run.sh/config>` で実施**。
+      ★ 指摘 6 件のうち `run.sh` の summarize ガード非対称は修正済み（`2f22716`）。
+      ⚠️ 「SEED が無い」は**誤検知**（★ 私がレビュー範囲のパスから SEED を外していた）
+- [x] `/finish-task`（EP-Q5）—— ★ **2026-08-16 に研究者の指示で実施**（steering 最終化 / テスト / レビュー 3 系統 / commit）。
+      ⚠️★★★ **ただし本タスクは「完了」ではなく「区切り」である** —— EP-Q7/Q8/Q9 が未決のまま残る
 
 ## 5. 追加で実施した検証（★ 研究者の指摘で発生）
 - [x] ★ **G1 の目的を一次で確認**（README §1.1 逐語）＋ ⚠️ **「確証データ未取得」を訂正**（EP-D7 / EP-D8）
