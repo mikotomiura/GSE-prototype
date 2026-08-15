@@ -307,6 +307,25 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
     ⚠️ 較正手続きの側も自前ではない——in-scope だけからの閾値較正は **conformal outlier testing** [V66] の特殊形であり、
     **被験者ごとの偽陽性率保証は分布非依存には不可能** [V68]。
     詳細: `docs/literature/20260802-scope-detection-and-conformal-calibration.md`。
+  - ★★★ **2026-08-16 の補強と、同時に加わった制約（AI へ逃げる瞬間のラウンド）**:
+    ★ **「予測に基づいて摩擦を *選択的に* 当てる」という GSE の形は、分野側が future work として名指ししている。**
+    cognitive forcing の正典 [P127] の逐語:
+    `developing adaptive strategies where the most effective cognitive forcing functions are deployed only in a
+    small fraction of cases where using them is predicted to substantially improve the final decision` ＋
+    `will require creating efficient models for predicting the performance of human+AI teams on particular task instances`。
+    ⚠️★★★ **ただし「必要とされている」と「作れる」は別に書く** —— その予測モデルが content-free で作れるかは
+    **判定不能**であり、唯一の定量 ablation は不利側に出ている（[V86]: 予測力の 94.81% が領域構造由来で、
+    構造を外すと **AUC .83 → .62**）。★ GSE は構造的に恒久 state-free 側にいる。
+  - ⚠️★★★ **介入対象の絞り込み（同ラウンド・3 本が独立に同じ境界を指した）**:
+    **抑えるべきは「外部に助けを求めること」ではなく「答えをそのまま受け取ること」。**
+    [P124]（事前登録つき現場 RCT）で **答えを出す GPT Base は AI 取り上げ後の成績を下げ（−0.054\*）、
+    ヒントに変えた GPT Tutor は害ゼロ（−0.004）**／ [P125] で **害は `direct solutions` 層に集中**／
+    ⚠️ [P126] は逆向きに **`students who need help will be best served by immediately seeking help`**。
+    → ★ 現行の Lv1 Nudge / Lv2 Wall はこの区別を持たない（`intervention-design` の見直し候補）。
+  - ★ **自己申告だけで成功と言わない制約が 2 本目の出典を得た**: [P124] 逐語
+    `students do not perceive any reduction in their learning ... they are not aware of how generative AI can
+    impede their learning` ＝ **害は自己申告に現れない**（[P77] moral placebo と同型）。
+    詳細: `docs/literature/20260816-ai-escape-moment-and-friction.md`。
 - **先人がやり残していること**:
   - キーストローク系 [P7][P11][V7] は状態・依存を**測る**が、その推定を**いつ・どう介入に変換するか**を扱わない。
   - 不便益 [P6] は介入の**思想**を、望ましい困難 [P9][P12] は「守るべき困難」の存在を与えるが、
