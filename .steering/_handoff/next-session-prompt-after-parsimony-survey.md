@@ -126,3 +126,126 @@
     [P92] Maglio & Campbell 2000 全文 / Klatte 1995（独語）・Schlittmeier 2008a /
     [P96] Browne & Cruse 1988・[P97] Olton & Johnson 1976 の原著 /
     ⚠️ **「自分の状態を表す意味づけられた音」と「タスク無関連音」の心理的地位の差**（★ 未探索）。
+
+---
+
+## §9 ★★★ 本セッションの経緯（★ 会話でしか残らない文脈・具体的に残す）
+
+> ★ **結論だけ読むと分からない「なぜそうなったか」をここに残す。**
+
+### 9-1 ★ ラウンドの範囲は 2 回交渉して決まった
+
+```text
+① エージェントが A/B/C を 6 つの下位問いに分解して提示
+      ↓
+⚠️ 研究者「分解を修正したい」（★ 修正内容は指定されなかった）
+      ↓
+★ エージェントが自分の分解の弱点 4 件を先に出した
+   (1) C を「評価基準」に寄せすぎ ——★ 原文は「表現方法」＝どう作るか
+   (2) B をイヤホンに絞りすぎ ——★ 原文は「音自体の問題」
+   (3) A に「音の他者性」が入っていない（★ A と B の交差点が無主）
+   (4) RQ-3（third place の規範）は出力が弱い可能性
+      ↓
+★★★ 研究者はそこで over-fitting という上位の問いを出した
+   （★ (1)〜(4) への直接の回答ではなく、より上の層の指摘だった）
+```
+
+> ★★ **教訓: 自分の弱点を先に出すと、研究者はより上の層の問題を指摘してくれた。**
+> ★ 「どこを直すか」を聞くだけでは、この問いは出てこなかった可能性が高い。
+
+### 9-2 ⚠️★★★ エージェントの予想は外れた（★ 記録として残す）
+
+★ 第 1 波を回す前、エージェントは **「文献はシンプル側を支持するだろう」**と予想していた。
+⚠️ **外れた。** ★ **「文献はシンプルにせよと言っている」を自分で 0-3 否決した**（T-1）。
+★ そして **反証側（[P109]・N=186,729）が本ラウンド最大規模の証拠**だった。
+
+> ★ **次のエージェントへ: 「研究者の直感を裏づける」方向に探索を寄せない。**
+> ★ **本ラウンドは反証 angle が最も多くを returned した。**
+
+### 9-3 ⚠️ 3 つの判断はすべて保留された（★ 理由は述べられていない）
+
+★ エージェントは **PS-Q1=(a) 絞る / PS-Q3=(iii) 外す / PS-Q5=本人 WHAT・他者 THAT** を推した。
+⚠️★★★ **研究者は 3 件すべてに「まだ決めない」を選んだ。★ 理由は述べられていない。**
+→ ⚠️ **理由を推測して代わりに決めない。** ★ **PS-D9（何が実際にそれを動かすか）だけ整理して渡した。**
+
+### 9-4 ★ 重複採番を 1 件、寸前で回避した
+
+⚠️ **[P93] を「新規の Warnock 2011」として登録しかけた。**
+★ **登録前に `grep '^| \[P9[0-3]\]' docs/references.md` を実行して同一と判明**し、
+★ **新規採番せず既存行を訂正する形に切り替えた**（★ [P65] の前例と同じ扱い）。
+
+> ★★ **教訓: 登録前に必ず DOI / 著者名で grep する。**
+
+---
+
+## §10 ★★★ 一次全文の取得可否（★ 次が同じ 403 を踏まないため・実測）
+
+### ★ 取れた（★ この URL で成功した）
+
+| 文献 | 手段 | URL |
+|---|---|---|
+| **[P109]** Zhang 2024 | ★ PDF → **pymupdf** | `https://socialactionlab.org/wp-content/uploads/2024/12/Dolores.-Health-Promotion-2024.pdf` |
+| **[P108]** Squires 2014 | ★ WebFetch（**PMC**） | `https://pmc.ncbi.nlm.nih.gov/articles/PMC4194373/` |
+| **[P93]** Warnock 2011 | ★ PDF → **pymupdf** | `https://www.dcs.gla.ac.uk/~stephen/papers/interact2011.pdf`（★ 著者の大学ページ） |
+| **[P112]** Skog 2003 | ★ PDF → **pymupdf** | `https://courses.ischool.berkeley.edu/i247/f05/readings/Skog_Ambient_InfoVis03.pdf`（★ 講義資料） |
+| **[P114]** Nair 2026 | ★ WebFetch（**PMC**） | `https://pmc.ncbi.nlm.nih.gov/articles/PMC12891046/` |
+| **[P110]** Cuijpers 2019 | ★ abstract（**機関リポジトリ**） | `https://research.vu.nl/en/publications/component-studies-of-psychological-treatments-of-adult-depression/` |
+| **[P106]** Hu & Zhang | ★ abstract（**arXiv**） | `https://arxiv.org/abs/2509.11059` |
+
+### ⚠️ 取れなかった（★ 再挑戦するなら別経路が要る）
+
+| 文献 | 障害 |
+|---|---|
+| **[P111]** Bell 2013 | ⚠️ **APA が abstract を閉じている**（Semantic Scholar も `abstract: null`）。★ PubMed は cookie 要求 |
+| **[P116]** Koelle 2020 | ⚠️ **ACM DL が 403** |
+| **[P115]** Müller 2009 | ⚠️ **Springer が認証要求**（`link.springer.com` → `idp.springer.com` へ 303） |
+| **[P110]** 本文 | ⚠️ **tandfonline が 403**（★ abstract は機関リポジトリで取れた） |
+
+### ★ 有効だった手順（★ そのまま再利用できる）
+
+```text
+1. WebFetch が「PDF が壊れている」と返しても、
+   ★ ローカルに保存されている（tool-results/webfetch-*.pdf）
+2. pymupdf で一次テキストを抽出する:
+   PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -c "import fitz; ..."
+3. ★ 抽出先を scratchpad に書き、grep で逐語を探す
+   （⚠️ WebFetch の要約は二次記述なので、必ずこの経路で逐語を取る）
+4. ncbi.nlm.nih.gov は pmc.ncbi.nlm.nih.gov へ 301 する → ★ リダイレクト先で再実行
+```
+
+⚠️★★★ **本セッションの抽出済みテキスト（`albarracin.txt` / `warnock2011.txt` / `skog2003.txt`）は
+セッション固有の scratchpad にあり、次セッションでは消えている。**
+★ **必要なら上の URL から再取得する**（★ 逐語はカードと `references.md` に転記済みなので、通常は不要）。
+
+---
+
+## §11 ★ リポジトリの状態（2026-08-15 セッション終了時点・実測）
+
+| 項目 | 値 |
+|---|---|
+| ブランチ | **`docs/media-sound-modality-survey`**（⚠️ main ではない） |
+| ★ **本セッションのコミット** | **`ab38b03`** `docs(expr): 表現層の文献サーヴェイ 3 ラウンド分を記録し、[P93] を一次で訂正する`（13 files, +2312） |
+| 未コミット | ★ **25 件**（★ **すべて他セッションの作業。本セッションでは触っていない**） |
+
+⚠️★★★ **なぜ 3 ラウンドを 1 コミットにしたか（★ 次が混乱しないように）**:
+★ `docs/references.md` / `_index.md` / `research-positioning.md` に
+**2026-08-14・2026-08-15 R1・2026-08-15 R2 の 3 ラウンド分の変更が同居**しており、
+⚠️ **`git add -p` / `-i` がこの環境で使えない**ためファイル単位でしか分けられなかった。
+★ **研究者の承認を取ったうえで 1 コミットにまとめた**（★ 経緯はコミットメッセージ本文にも書いてある）。
+
+### ⚠️ 残り 25 件の内訳（★ 誰の作業か）
+
+| 群 | ファイル | ★ 誰の作業か |
+|---|---|---|
+| Step 5c | `.steering/20260814-expression-step5c-speed-axis/` (4) ／ `_handoff/next-session-prompt-expression-theory-survey.md` | ★ **Step 5c セッション** |
+| spec 改訂 | `.steering/20260811-.../media-expression-spec.md` (M) | ★ **別セッション**（★ 本ラウンドは spec を変更していない） |
+| 場所とモダリティ | `.steering/20260814-expression-place-and-modality/` ／ `_handoff/next-session-prompt-expression-place-and-modality.md` ／ `next-session-prompt-post-survey.md` | ★ **前セッション** |
+| Physical Anchor | `.steering/20260815-physical-anchor-d11-alignment/` (3) | ★ **切り出し済み・未着手タスク** |
+| 実験 | `experiments/20260812-expression-step4-grain/` (5 M ＋ **結果 JSON 7 件**) | ★ **盲検 ABX の実測**（★ Step 4/5 セッション） |
+| その他 | `.codex/budget.json` ／ `scripts/secrets-filter*.sh` | ★ **別セッション** |
+
+> ★ **これらは変更意図を持つセッションが別コミットにするのが本来。**
+> ⚠️ **本セッションのエージェントは意図を持っていないので手を付けなかった。**
+
+⚠️★★★ **`git push` は `.claude/settings.json` で deny されている。**
+★ **押すなら研究者に `! git push` を依頼する**（★ 本セッションでは push していない）。
