@@ -424,7 +424,33 @@ def main() -> int:
     out["reachability"] = reachability_table(blocks, participants, k_values, alpha)
 
     # (B) AUC の厳密帰無
+    # ⚠️★★★ 2026-08-16 訂正（code-reviewer HIGH-1）:
+    #   ここは α を **固定** で渡している。★ したがって出力表に k が現れないのは
+    #   「要素数と無関係だから」ではなく **構成上の必然** である。
+    #   ⚠️ notes.md の反証 1「AUC 要求は k の関数ではない」はこの表を根拠にしていたので誤りだった。
+    #   → ★ 下の (B') で **α/k の格子**を別に出し、k 依存が実際に出ることを示す。
     out["auc_null"] = [auc_null_summary(b, alpha) for b in blocks]
+
+    # (B') ★ 要求 AUC を α/k の格子で出す（★ 到達可能性だけを見ると誤読する）
+    #   ★ 片側 / 両側の別も併記する。design.md は α（両側）を宣言しているため、
+    #   ⚠️ 片側だけで「到達可能」と書くと過大になる。
+    auc_by_k = []
+    for b in blocks:
+        base = auc_null_summary(b, alpha)
+        p1 = base["min_p_one_sided"]
+        row = {"blocks": b, "min_p_one_sided": p1, "min_p_two_sided": 2 * p1, "by_k": []}
+        for k in k_values:
+            a_eff = alpha / k
+            s = auc_null_summary(b, a_eff)
+            row["by_k"].append({
+                "k": k,
+                "alpha_effective": a_eff,
+                "reachable_one_sided": p1 <= a_eff,
+                "reachable_two_sided": (2 * p1) <= a_eff,
+                "smallest_auc_reaching_alpha": s["smallest_auc_reaching_alpha"],
+            })
+        auc_by_k.append(row)
+    out["auc_null_by_k"] = auc_by_k
 
     # (C)(D) 検出力の格子（解析式）
     power_rows = []

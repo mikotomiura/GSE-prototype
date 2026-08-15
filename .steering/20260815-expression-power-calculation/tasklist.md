@@ -55,7 +55,8 @@
       （★ EP-D6 の「動作条件で Agent 禁止」は解消した）。
       ⚠️★★★ **結果として、同日中に spec §8 へ還元した結論のうち 2 件が誤りだと判明した**
       （EP-D12「AUC 要求の k 非依存」は実装の都合／EP-D13「B=10 で k=12」は片側限定かつ要求 AUC=1.000）。
-      → ★ **spec §8 は訂正済み**。⚠️ **`notes.md` / `results/summary.md` は未修正（EP-Q7）**。
+      → ★ **spec §8 / `notes.md` / `results/summary.md` の 3 者とも訂正済み（EP-Q7 解消・2026-08-16）**。
+      ★ `summary.md` は機械生成なので **`power_calc.py` に α/k 格子を追加し `summarize.py` を直した**。
       ⚠️ security-checker の H1/H2/M1/M3 は commit `636e082` で修正済み。
       ⚠️ HIGH 3 件（EP-D14/D15 と M-f）と MEDIUM 8 件は**研究者判断待ち**（decisions.md 末尾）。
       ★ 旧記録（Agent 禁止時の機械的自己検査）:

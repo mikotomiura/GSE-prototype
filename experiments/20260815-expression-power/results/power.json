@@ -113,6 +113,302 @@
       "smallest_auc_reaching_alpha": 0.67578125
     }
   ],
+  "auc_null_by_k": [
+    {
+      "blocks": 4,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        }
+      ],
+      "min_p_one_sided": 0.16666666666666666,
+      "min_p_two_sided": 0.3333333333333333
+    },
+    {
+      "blocks": 6,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": true,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": 1.0
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        }
+      ],
+      "min_p_one_sided": 0.05,
+      "min_p_two_sided": 0.1
+    },
+    {
+      "blocks": 8,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.9375
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": true,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": 1.0
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": false,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": null
+        }
+      ],
+      "min_p_one_sided": 0.014285714285714285,
+      "min_p_two_sided": 0.02857142857142857
+    },
+    {
+      "blocks": 10,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.84
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.92
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.96
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": true,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": 1.0
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": true,
+          "reachable_two_sided": false,
+          "smallest_auc_reaching_alpha": 1.0
+        }
+      ],
+      "min_p_one_sided": 0.003968253968253968,
+      "min_p_two_sided": 0.007936507936507936
+    },
+    {
+      "blocks": 12,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.8055555555555556
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.8611111111111112
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.9166666666666666
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.9444444444444444
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.9722222222222222
+        }
+      ],
+      "min_p_one_sided": 0.0010822510822510823,
+      "min_p_two_sided": 0.0021645021645021645
+    },
+    {
+      "blocks": 16,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.765625
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.796875
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.84375
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.875
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.890625
+        }
+      ],
+      "min_p_one_sided": 7.77000777000777e-05,
+      "min_p_two_sided": 0.0001554001554001554
+    },
+    {
+      "blocks": 32,
+      "by_k": [
+        {
+          "alpha_effective": 0.05,
+          "k": 1,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.67578125
+        },
+        {
+          "alpha_effective": 0.025,
+          "k": 2,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.70703125
+        },
+        {
+          "alpha_effective": 0.0125,
+          "k": 4,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.734375
+        },
+        {
+          "alpha_effective": 0.00625,
+          "k": 8,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.7578125
+        },
+        {
+          "alpha_effective": 0.004166666666666667,
+          "k": 12,
+          "reachable_one_sided": true,
+          "reachable_two_sided": true,
+          "smallest_auc_reaching_alpha": 0.7734375
+        }
+      ],
+      "min_p_one_sided": 1.6636709775209934e-09,
+      "min_p_two_sided": 3.3273419550419868e-09
+    }
+  ],
   "config_echo": {
     "alpha": 0.05,
     "expr_version": "0.3.0-step4",
