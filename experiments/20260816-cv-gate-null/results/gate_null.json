@@ -1,0 +1,189 @@
+{
+  "schema": "cv-gate-null/v1",
+  "note": "集計統計量のみ。★ ファイル名・セッション名・時刻・vk を含まない。",
+  "window_minutes": 5,
+  "gate": 100,
+  "seed": 20260816,
+  "bootstrap": 200,
+  "input_manifest": {
+    "files": 63,
+    "total_bytes": 61949775,
+    "manifest_sha256": "120e1a5e16447449c52c1313a2fa058b99949cc055d42354a3760b26ae50fa3b"
+  },
+  "participants_used": 5,
+  "participants_excluded": [],
+  "median_observed_cv": {
+    "all": 1.0526,
+    "ge1": 0.7576,
+    "ge100": 0.5019,
+    "ge200": 0.3952
+  },
+  "median_random_removal_null_cv": 1.0378,
+  "median_predicted_cv_under_H0": {
+    "all": 0.8916,
+    "ge1": 0.5967,
+    "ge200": 0.5004
+  },
+  "decomposition": {
+    "total_drop_all_to_ge100": 0.5507,
+    "share_zero_atom": 0.5357,
+    "share_body_truncation": 0.4643
+  },
+  "per_participant": [
+    {
+      "participant": "P010",
+      "windows": 219,
+      "windows_zero": 18,
+      "windows_ge100": 171,
+      "fit": {
+        "mu": 5.7473,
+        "sigma": 0.5519,
+        "moment_check": {
+          "theoretical_mean": 370.42,
+          "empirical_mean": 366.31,
+          "rel_error": 0.0112
+        }
+      },
+      "observed_cv": {
+        "ge200": 0.3952,
+        "ge1": 0.6446,
+        "all": 0.7365,
+        "ge100": 0.5019
+      },
+      "random_removal_null_cv": 0.7363,
+      "predicted_cv_under_H0": {
+        "ge200": 0.5004,
+        "ge1": 0.5967,
+        "all": 0.691
+      },
+      "predicted_ge1_boot_ci": [
+        0.5169,
+        0.6759
+      ]
+    },
+    {
+      "participant": "P011",
+      "windows": 58,
+      "windows_zero": 1,
+      "windows_ge100": 57,
+      "fit": {
+        "mu": 6.7256,
+        "sigma": 0.5084,
+        "moment_check": {
+          "theoretical_mean": 948.47,
+          "empirical_mean": 927.16,
+          "rel_error": 0.023
+        }
+      },
+      "observed_cv": {
+        "ge200": 0.3887,
+        "ge1": 0.4091,
+        "all": 0.4337,
+        "ge100": 0.4091
+      },
+      "random_removal_null_cv": 0.4356,
+      "predicted_cv_under_H0": {
+        "ge200": 0.5411,
+        "ge1": 0.5431,
+        "all": 0.5636
+      },
+      "predicted_ge1_boot_ci": [
+        0.3952,
+        0.7273
+      ]
+    },
+    {
+      "participant": "P012",
+      "windows": 83,
+      "windows_zero": 21,
+      "windows_ge100": 48,
+      "fit": {
+        "mu": 5.7316,
+        "sigma": 0.5415,
+        "moment_check": {
+          "theoretical_mean": 362.41,
+          "empirical_mean": 361.54,
+          "rel_error": 0.0024
+        }
+      },
+      "observed_cv": {
+        "ge200": 0.4356,
+        "ge1": 0.7576,
+        "all": 1.0526,
+        "ge100": 0.5353
+      },
+      "random_removal_null_cv": 1.0378,
+      "predicted_cv_under_H0": {
+        "ge200": 0.4875,
+        "ge1": 0.5838,
+        "all": 0.8916
+      },
+      "predicted_ge1_boot_ci": [
+        0.4625,
+        0.6931
+      ]
+    },
+    {
+      "participant": "P013",
+      "windows": 81,
+      "windows_zero": 19,
+      "windows_ge100": 32,
+      "fit": {
+        "mu": 5.4816,
+        "sigma": 0.9086,
+        "moment_check": {
+          "theoretical_mean": 422.62,
+          "empirical_mean": 408.19,
+          "rel_error": 0.0354
+        }
+      },
+      "observed_cv": {
+        "ge200": 0.5977,
+        "ge1": 1.2811,
+        "all": 1.564,
+        "ge100": 0.7446
+      },
+      "random_removal_null_cv": 1.5303,
+      "predicted_cv_under_H0": {
+        "ge200": 0.8513,
+        "ge1": 1.1327,
+        "all": 1.4081
+      },
+      "predicted_ge1_boot_ci": [
+        0.7057,
+        1.9513
+      ]
+    },
+    {
+      "participant": "P014",
+      "windows": 176,
+      "windows_zero": 64,
+      "windows_ge100": 74,
+      "fit": {
+        "mu": 5.6941,
+        "sigma": 0.5566,
+        "moment_check": {
+          "theoretical_mean": 353.71,
+          "empirical_mean": 346.96,
+          "rel_error": 0.0195
+        }
+      },
+      "observed_cv": {
+        "ge200": 0.2986,
+        "ge1": 0.8013,
+        "all": 1.2571,
+        "ge100": 0.4537
+      },
+      "random_removal_null_cv": 1.2503,
+      "predicted_cv_under_H0": {
+        "ge200": 0.4946,
+        "ge1": 0.6026,
+        "all": 1.0686
+      },
+      "predicted_ge1_boot_ci": [
+        0.4819,
+        0.7346
+      ]
+    }
+  ]
+}
