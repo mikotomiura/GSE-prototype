@@ -15,50 +15,78 @@
 - [x] ★ 研究者判断を 2 件取得（D1 順序 / D2 dataset 同時更新）
 - [x] ★ 未決を 2 件閉じた（D3 案 B / D4 `FeatSnapshot` に含める）
 
-## ⚠️★★★ 実装の前に（★ ここから次セッション）
+## ⚠️★★★ 実装の前に（★ 2026-08-16 実施済み）
 
-- [ ] ⚠️★★★ **B-1: 既存 drift の解消** —— `hook_health` variant と `meta.g1_mode` を
-      `C:\gse-dataset/schema/current.json` へ反映し、`check_schema_parity.py` を **exit 0** に戻す
-      （★ **本タスクの差分を足す前に**。⚠️ 順序を守らないと切り分け不能になる）
-- [ ] ★ B-1 の解消を **単独でコミット**する（★ 本タスクの変更と混ぜない）
+- [x] ⚠️★★★ **B-1: 既存 drift の解消** —— `hook_health` variant と `meta.g1_mode` を
+      `C:\gse-dataset/schema/current.json` へ反映し、`check_schema_parity.py` を **exit 0** に戻した
+      （★ 49 insertions / 0 deletions ＝ additive-only）
+- [x] ★ B-1 の解消を **単独でコミット**した（★ `gse-dataset` の `c9e97ef`。⚠️ **push は未実施**）
 
-## 実装
+## 実装（★ 2026-08-16 実施済み）
 
-- [ ] `features.rs` — `total_keys` / `correction_keys` を `FeatSnapshot` まで持ち回す（★ 新規計算ゼロ）
-- [ ] `analysis/loop_step.rs` — `FeatSnapshot` に `keys: u64` / `bs_keys: u64` を追加
-- [ ] `schema_dto.rs` — `Feat` DTO に `Option<u64>` ＋ `#[serde(default)]` で追加（★ 読むときは省略可）
-- [ ] `logger.rs:1214` — フォーマット文字列に 2 フィールド追加（★ **書くときは常に値を書く**）
-- [ ] `cargo run --bin emit_schema` → `schema/current.json` を再生成（★ **同じコミットに含める**）
-- [ ] ★ gse-dataset 側へ本タスクの additive 変更を反映
+- [x] `features.rs` — `Features` に `keys` / `bs_keys` を追加し `calculate_features()` で埋める（★ 新規計算ゼロ）
+- [x] `analysis/loop_step.rs` — `FeatSnapshot` に `keys: u64` / `bs_keys: u64` を追加
+      （★ ⚠️ **推論経路に依らず実測値を書く**。判断 5 を参照）
+- [x] `schema_dto.rs` — `Feat` DTO に `Option<u64>` ＋ `#[serde(default)]` で追加（★ 読むときは省略可）
+- [x] `logger.rs` — `LogEntry::Feat` に 2 フィールド追加 ＋ **`format_feat_line()` を純粋関数として抽出**
+      （★ `format_paste_line` と同型にしてテスト可能にした。★ 書き出しは常に値を書く）
+- [x] ★ **`bin/replay.rs`（⚠️ 設計時に洗い出せていなかったファイル）** — `LoggedFeatDto` を同期。判断 7 を参照
+- [x] `lib.rs` — `FeatSnapshot` → `LogEntry::Feat` の変換に 2 フィールド追加
+- [x] `cargo run --bin emit_schema` → `schema/current.json` を再生成（★ 20 insertions / 0 deletions）
+- [x] ★ gse-dataset 側へ本タスクの additive 変更を反映（⚠️ **コミットは未実施**＝本 repo と同時に行う）
 
-## テスト
+## テスト（★ 2026-08-16 実施済み）
 
-- [ ] `logger.rs` のフォーマット文字列テストに期待文字列を追加（★ **新フィールドの位置と精度を固定**）
-- [ ] `features.rs` の単体テスト（★ `keys` / `bs_keys` が `total_keys` / `correction_keys` と一致）
-- [ ] ★ **旧フィクスチャ（新フィールドなし）を `gse-replay` が読めること**
-- [ ] ★★★ **golden 4 本を再生成し、差分が「新フィールドの追加のみ」であることを確認**
-      —— ⚠️ **`p_*` / `raw_*` / `ewma_*` / `obs` が動いていたら、その場で止める**（★ 契約違反の証拠）
-- [ ] `HMM_VERSION` が変わっていないこと
-- [ ] `cargo test --workspace` が緑（★ `cd src-tauri` してから。⚠️ repo 直下では空振りする）
-- [ ] `python scripts/check_schema_parity.py --dataset C:/gse-dataset` が **exit 0**
+- [x] `logger.rs` のフォーマット文字列テストに期待文字列を追加
+      （`feat_line_fixes_field_order_and_precision` / `feat_line_records_key_counts_as_integers_only`）
+- [x] `features.rs` の単体テスト 4 件（★ 分母/分子の一致・release 除外/repeat 算入・30 秒窓・合成観測は 0）
+- [x] ★ **旧 NDJSON（新フィールドなし）を読めること**
+      （`logged_feat_dto_accepts_legacy_line_without_tier0_fields`）
+- [x] ★★★ **golden 4 本を再生成し、差分が「新フィールドの追加のみ」であることを機械判定**
+      —— ★ **`p_*` / `raw_*` / `ewma_*` / `obs` / `f1`〜`f6` は 1 ビットも動いていない**。
+      詳細は `golden-regeneration.md`
+- [x] `HMM_VERSION` が `0.3.0` のまま（★ `engine.rs` は 1 行も変更していない）
+- [x] `cargo test --workspace` が緑（**354 + 25 + 1 passed / 0 failed**）
+- [x] `python scripts/check_schema_parity.py --dataset C:/gse-dataset` が **exit 0**
+- [x] ★ `cargo fmt --all -- --check` 緑 ／ `cargo clippy` の**新規警告ゼロ**
+      （⚠️ 既存の `schema_dto.rs:39-42` / `logger.rs:352` は本変更の前から出ているもの）
+- [x] ★ **新フィールドを読む本番コードが存在しないこと**（★ grep 実測: 読み取りはテストと
+      `loop_step.rs` の記録用退避のみ）
 
-## レビュー
+## レビュー（★ 2026-08-16 実施済み・詳細は `review-findings.md`）
 
-- [ ] ★★★ **`code-reviewer` + `security-checker` を並列起動**（★ CLAUDE.md 必須。
-      ⚠️ 前セッションでは動作条件で Agent が禁止されていたため実行できなかった）
-- [ ] `/cross-review`（★ Codex 独立レビュー。⚠️ **入力は diff のみ。生ログ・NDJSON を渡さない**）
-- [ ] HIGH 指摘への対応
+- [x] ★★★ **`code-reviewer` + `security-checker` を並列起動**
+- [x] `/cross-review`（★ Codex 独立レビュー）
+      ⚠️ **コマンドはそのまま使えなかった**（★ 他タスク由来の未コミット 27 件で
+      2000 行超 ＋ `secrets-filter*.sh` のファイル名が Step 2 の fail-closed に当たる）
+      → ★ `scripts/run-codex-review.sh -- <paths>` を本タスクのパスに限定して直接呼んだ。
+      ★ `secrets-filter.sh` は **exit 0**（`--ack-filtered` は使っていない）
+- [x] HIGH 指摘への対応（★ **2 件とも対応済み**）
+      - H-1: ⚠️★★★ **`keys` の意味を誤って記述していた**（「今から 30 秒」ではなく
+        「最後の打鍵から遡る 30 秒」＝ **沈黙中は同じ値がくり返される**）→ doc 正本化 ＋
+        テスト名訂正 ＋ 凍結挙動のテスト追加 ＋ `development-guidelines.md §10.3.2` 新設
+      - H-2: ★ 中核判断（実測値の退避）が**どのテストでも観測できなかった** →
+        `loop_step.rs` に `mod tests` を新設（4 件）。★ **変異テストで実効性を確認**
+- [x] MEDIUM 5 件への対応（★ backlog に送らず本タスクで消化）
+      - M-1 `anonymize.rs` の passthrough を **フィールド集合の固定テスト**でゲート
+      - M-2 `format_feat_line` を **`struct FeatLine`** に（13 連続 f64 の取り違え防止）
+      - M-3 旧ログ欠測を **`tracing::warn!`** で可視化 ＋ 解析者向け docs
+      - M-4 **`engine_output_is_invariant_to_tier0_key_counts`**（★ 契約を実行可能にする）
+      - M-5 **`bs_keys > keys` を入力側で reject**（★ 将来の u64 underflow を止める）
 
-## ドキュメント
+## ドキュメント（★ 2026-08-16 実施済み）
 
-- [ ] ⚠️★★★ `personalization-and-online-learning.md §10` の順序記述を改訂（★ D1・「G1 は P1 より前」）
-- [ ] ★ `§5.2` の Tier 0 表を更新（⚠️ **`bs_rate` を「未配線」としているのは誤り**＝ `f3` として既出。原本 §0 が指摘済み）
-- [ ] ★ golden 再生成の差分を `.steering/` に記録（★ Replay-as-Truth の規約）
+- [x] ⚠️★★★ `personalization-and-online-learning.md §10` の順序記述を改訂（★ D1・例外注記を追加）
+- [x] ★ `§5.2` の Tier 0 表を更新（★ `keys` / `bs_rate` を「2026-08-16 配線済み」に。
+      ⚠️ `bs_rate`「未配線」の誤りは 2026-08-01 に訂正済みだったので、そこへ `bs_keys` 追加の理由を追記）
+- [x] ★ golden 再生成の差分を `.steering/` に記録（`golden-regeneration.md`）
 - [ ] ★ `notes.md §5③` の「golden 3 本」を訂正するか判断（⚠️ 別タスクの記録なので研究者判断）
 
 ## 完了処理
 
-- [ ] design.md の最終化
-- [ ] decisions.md の追記（★ 実装中に出た判断）
+- [x] design.md の最終化
+- [x] decisions.md の追記（★ 判断 5/6/7 ＋ 実測 3）
 - [ ] `/finish-task`（★ Step 3 で schema parity check が走る）
 - [ ] git commit（★ **1 コミットに閉じる** = revert 1 回で戻せるようにする）
+- [ ] ⚠️★★★ **研究者の手が要る**: `gse-dataset` の push（★ `git push` は deny）。
+      ⚠️ **本 repo 側と近接したタイミングでマージすること**（片側だけだと parity が落ちる）

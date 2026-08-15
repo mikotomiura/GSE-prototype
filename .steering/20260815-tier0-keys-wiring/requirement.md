@@ -60,20 +60,28 @@ cd .. && python scripts/check_schema_parity.py --dataset C:/gse-dataset   # exit
 
 ## 受け入れ条件（★ `tier0-wiring-design.md §7` を継承し 2 件追加）
 
-- [ ] `emit_schema` の diff が **additive-only**（追加のみ・型変更なし・required 追加なし）
-- [ ] 旧フィクスチャ（新フィールドなし）を `gse-replay` が読める
-- [ ] ★★★ golden 再生成の差分が **新フィールドの追加のみ**（`p_*` / `raw_*` / `ewma_*` / `obs` が動いていない）
-      —— ⚠️ **これが最重要。動いていたら §2 の「記録と推論の分離」が破れている証拠なので、その場で止める**
-- [ ] `HMM_VERSION` が変わっていない
-- [ ] `check_schema_parity.py` が **exit 0**（★ 下記 ⚠️ 既存 drift を先に解消する必要がある）
-- [ ] `cargo test --workspace` が緑
-- [ ] 新フィールドを読む本番コードが **まだ存在しない**こと
-- [ ] ★ **追加 1**: `.age` / NDJSON / 実セッション名が repo に入っていないこと（`data-privacy`）
-- [ ] ★ **追加 2**: `code-reviewer` + `security-checker` の並列レビュー（★ CLAUDE.md 必須・前セッションでは動作条件で禁止されていた）
+> ★ **2026-08-16: 全項目を実測で確認済み。** 実測値は `design.md` 末尾の表 ／
+> ゴールデンの検証は `golden-regeneration.md` を参照。
 
-## ⚠️★★★ 着手前に解消が要るブロッカー（★ 本セッションの実測）
+- [x] `emit_schema` の diff が **additive-only**（追加のみ・型変更なし・required 追加なし）
+- [x] 旧フィクスチャ（新フィールドなし）を `gse-replay` が読める
+- [x] ★★★ golden 再生成の差分が **新フィールドの追加のみ**（`p_*` / `raw_*` / `ewma_*` / `obs` が動いていない）
+      —— ★ **4 本 155 行すべてで機械判定した**（目視ではない）
+- [x] `HMM_VERSION` が変わっていない（★ `0.3.0`・`engine.rs` は 1 行も変更なし）
+- [x] `check_schema_parity.py` が **exit 0**（★ B-1 の既存 drift を先に単独コミットで解消した）
+- [x] `cargo test --workspace` が緑（★ 354 + 25 + 1 passed / 0 failed）
+- [x] 新フィールドを読む本番コードが **まだ存在しない**こと
+- [x] ★ **追加 1**: `.age` / NDJSON / 実セッション名が repo に入っていないこと（`data-privacy`）
+- [x] ★ **追加 2**: `code-reviewer` + `security-checker` の並列レビュー
+
+## ⚠️★★★ 着手前に解消が要るブロッカー（★ 2026-08-16 に両方とも解消済み）
 
 ### B-1: **既存の schema parity drift がある**（★ 本タスクの変更以前の問題）
+
+> ★★★ **2026-08-16: 解消済み。** `C:\gse-dataset` 側に `hook_health` variant と `meta.g1_mode` を
+> 反映し（★ 49 insertions / 0 deletions ＝ additive-only）、`check_schema_parity.py` を exit 0 に戻して
+> **`gse-dataset` の `c9e97ef` として単独でコミットした**（★ 本タスクの変更を入れる**前**に）。
+> ⚠️ **push は未実施**（`git push` は deny）。研究者の手が要る。
 
 ```
 $ python scripts/check_schema_parity.py --dataset C:/gse-dataset

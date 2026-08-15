@@ -292,6 +292,22 @@ struct LoggedFeatDto {
     ewma_y: f64,
     obs: usize,
     alpha: f64,
+    /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の総キー押下数。
+    ///
+    /// ⚠️★★★ **Tier 0 配線より前に収集された NDJSON には存在しない。**
+    /// その場合 `None` → `FeatSnapshot` では `0` になる。すなわち
+    /// **「旧ログで欠測」と「実測 0 打」を `--metrics` 経路では区別できない**。
+    /// ★ `collect_logged_feats` が欠測行数を集計して `tracing::warn!` を 1 回出すので、
+    /// CLI の出力でも気づけるようにしてある。
+    ///
+    /// ⚠️★★★ **窓の右端は「最後の打鍵時刻」であって `t` ではない。累積でもない。**
+    /// **沈黙中は同じ値がくり返し出る**ので、**行をまたいで足し上げてはいけない**
+    /// (★ 正本: `analysis/loop_step.rs` の `FeatSnapshot::keys` の doc)。
+    #[serde(default)]
+    keys: Option<u64>,
+    /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の BS/Del 押下数。注意点は `keys` と同じ。
+    #[serde(default)]
+    bs_keys: Option<u64>,
 }
 
 /// `LoggedFeatDto` → `FeatSnapshot` の安全な変換。
@@ -360,6 +376,20 @@ impl TryFrom<LoggedFeatDto> for FeatSnapshot {
             }
         }
 
+        // ★ Tier 0: `bs_keys ≤ keys` は producer 側で構造的に成り立つ不変条件
+        // (`bs_keys` は `keys` の部分集合を数えたもの)。壊れた NDJSON がこれを破ると、
+        // ⚠️ 将来の消費者が `progress_proxy = keys − bs_keys` を `u64` で計算した瞬間に
+        // **underflow で panic ないし巨大値**になる。入力側で止める
+        // (他の検証と同じ方針: `argmax_class` の NaN 問題を入力側で止めたのと同型)。
+        // ⚠️ 旧ログ (両方 None → 0/0) は `0 ≤ 0` で通るので後方互換は壊れない。
+        let (keys, bs_keys) = (d.keys.unwrap_or(0), d.bs_keys.unwrap_or(0));
+        if bs_keys > keys {
+            return Err(format!(
+                "bs_keys exceeds keys (impossible for a producer-written line): keys={} bs_keys={}",
+                keys, bs_keys
+            ));
+        }
+
         Ok(FeatSnapshot {
             timestamp: d.timestamp,
             f1: d.f1,
@@ -376,6 +406,9 @@ impl TryFrom<LoggedFeatDto> for FeatSnapshot {
             ewma_y: d.ewma_y,
             obs: d.obs,
             alpha: d.alpha,
+            // ★ Tier 0: 旧ログ (フィールド無し) は 0 に倒す。上の doc コメントの注意を参照。
+            keys,
+            bs_keys,
         })
     }
 }
@@ -1168,6 +1201,8 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
     let mut parse_failed_lines: u64 = 0;
     let mut feat_decode_failed: u64 = 0;
     let mut feat_validation_failed: u64 = 0;
+    // ★ Tier 0 配線以前の feat 行 (keys/bs_keys を持たない) の件数。
+    let mut feat_missing_tier0: u64 = 0;
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
@@ -1188,6 +1223,12 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
                     continue;
                 }
             };
+            // ★ Tier 0: 配線以前のログには keys/bs_keys が無く、`0` に倒れる。
+            // ⚠️ 消費者 (Python / DuckDB 側) は Rust の doc コメントを読めないので、
+            // 「実測 0 打ではなく欠測である」ことを CLI 出力で気づけるようにする。
+            if dto.keys.is_none() || dto.bs_keys.is_none() {
+                feat_missing_tier0 += 1;
+            }
             // M3: TryFrom で NaN/Inf/範囲外を reject、汚染を metrics 前段で止める
             match FeatSnapshot::try_from(dto) {
                 Ok(f) => out.push(f),
@@ -1216,6 +1257,14 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
             skipped = feat_decode_failed,
             "collect_logged_feats: feat entries failed to decode as LoggedFeatDto \
              (possible schema drift vs schema_dto::LogEntryDto::Feat)"
+        );
+    }
+    if feat_missing_tier0 > 0 {
+        tracing::warn!(
+            missing = feat_missing_tier0,
+            "collect_logged_feats: feat entries have no keys/bs_keys (pre-Tier0-wiring log). \
+             They are reported as 0, which is INDISTINGUISHABLE from 'measured zero keystrokes'. \
+             Do NOT compute progress_proxy (= keys - bs_keys) from this session."
         );
     }
     if out.is_empty() {
@@ -2351,6 +2400,8 @@ mod tests {
             ewma_y: 0.7,
             obs: 11,
             alpha: 0.2,
+            keys: Some(48),
+            bs_keys: Some(6),
         };
         let json = serde_json::to_string(&src).expect("serialize LogEntryDto::Feat");
         let ev: ReplayEvent =
@@ -2369,6 +2420,65 @@ mod tests {
         assert!((feat.p_flow - 0.6).abs() < 1e-9);
         assert_eq!(feat.obs, 11);
         assert!((feat.alpha - 0.2).abs() < 1e-9);
+        // ★ Tier 0: schema_dto ↔ LoggedFeatDto ↔ FeatSnapshot の 3 者で drift しないこと。
+        assert_eq!(feat.keys, 48);
+        assert_eq!(feat.bs_keys, 6);
+    }
+
+    /// ★ Tier 0 後方互換: **新フィールドを持たない旧 NDJSON** の feat 行が読めること。
+    /// 読めなくなると `--metrics` 経路が既存 gse-dataset の全ログで落ちる。
+    #[test]
+    fn logged_feat_dto_accepts_legacy_line_without_tier0_fields() {
+        let legacy = r#"{"type":"feat","t":1700000001000,"f1":140.0,"f3":0.0,"f4":4.0,"f5":0.0,"f6":0.0,"p_flow":0.85,"p_inc":0.10,"p_stuck":0.05,"raw_x":0.0,"raw_y":0.6,"ewma_x":0.07,"ewma_y":0.74,"obs":3,"alpha":0.3}"#;
+        let val: serde_json::Value = serde_json::from_str(legacy).expect("parse legacy feat line");
+        let dto: LoggedFeatDto = serde_json::from_value(val).expect("legacy line must still parse");
+        assert!(dto.keys.is_none());
+        assert!(dto.bs_keys.is_none());
+        let feat: FeatSnapshot = dto.try_into().expect("legacy line converts");
+        // ⚠️ 欠測は 0 に倒れる。「実測 0 打」と区別できない点は LoggedFeatDto の doc を参照。
+        assert_eq!(feat.keys, 0);
+        assert_eq!(feat.bs_keys, 0);
+    }
+
+    /// ★ Tier 0: 片方だけ欠けた行も落とさずに読む (forward/backward 互換)。
+    #[test]
+    fn logged_feat_dto_accepts_partially_missing_tier0_fields() {
+        let mut dto = valid_dto();
+        dto.bs_keys = None;
+        let feat: FeatSnapshot = dto.try_into().expect("keys only must convert");
+        assert_eq!(feat.keys, 21);
+        assert_eq!(feat.bs_keys, 0);
+
+        let mut dto = valid_dto();
+        dto.keys = None; // keys 欠測 → 0。bs_keys=2 > 0 なので不変条件で reject される
+        let err = FeatSnapshot::try_from(dto).expect_err("bs_keys > keys must be rejected");
+        assert!(
+            err.contains("bs_keys exceeds keys"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// ★ Tier 0: `bs_keys > keys` は producer では起こり得ない。壊れた行は入力側で止める。
+    /// ⚠️ 通すと将来の `progress_proxy = keys − bs_keys` が u64 underflow する。
+    #[test]
+    fn bs_keys_greater_than_keys_rejected() {
+        let mut dto = valid_dto();
+        dto.keys = Some(3);
+        dto.bs_keys = Some(4);
+        let err = FeatSnapshot::try_from(dto).expect_err("must reject bs_keys > keys");
+        assert!(
+            err.contains("bs_keys exceeds keys"),
+            "unexpected error: {}",
+            err
+        );
+
+        // 境界: 等しい場合は正常 (全打鍵が BS のウィンドウは実在しうる)
+        let mut dto = valid_dto();
+        dto.keys = Some(4);
+        dto.bs_keys = Some(4);
+        let feat: FeatSnapshot = dto.try_into().expect("bs_keys == keys is valid");
+        assert_eq!(feat.keys - feat.bs_keys, 0);
     }
 
     // =========================================================================
@@ -2393,6 +2503,8 @@ mod tests {
             ewma_y: 0.74,
             obs: 3,
             alpha: 0.3,
+            keys: Some(21),
+            bs_keys: Some(2),
         }
     }
 
@@ -2772,9 +2884,15 @@ mod tests {
     /// - `phase1_ime_heavy` : IME pause + 沈黙経路 (alpha=0.15・f5 pause 蓄積・f1 沈黙フロア・β-writing)
     /// - `category_coverage`: resolve_key_vk + Other 畳み込み + obs 量子化
     /// - `deep_silence`     : 深い沈黙フロア (loop_step.rs 8/10/30s 分岐)。約43秒沈黙で TransitionPath の
-    ///                        ctx フロア (f6/f3 = ctx × time_scale ランプ) と、バッファ枯渇後の SilencePath
-    ///                        (make_silence_observation) の両方を踏む。従来 fixture は f6 が常に 0 で
-    ///                        完全未ガードだった領域 (② golden 監査 row 3)。
+    ///                        ctx フロア (f6/f3 = ctx × time_scale ランプ) を踏む。従来 fixture は
+    ///                        f6 が常に 0 で完全未ガードだった領域 (② golden 監査 row 3)。
+    ///                        ⚠️★ **2026-08-16 訂正**: 本 fixture は **SilencePath を踏まない**。
+    ///                        `FeatureExtractor` は IME pause 遷移でしか `reset()` されず、
+    ///                        窓の右端も「最後の打鍵時刻」なので、沈黙が何秒続いても
+    ///                        `f1` は 150.0 のまま (= 全 51 行が TransitionPath)。
+    ///                        ★ SilencePath (`f1` = 2000.0) を踏むのは `phase1_ime_heavy` だけである。
+    ///                        ★ SilencePath の分岐そのものは `analysis/loop_step.rs` の
+    ///                        unit test が直接カバーしている。
     #[test]
     fn replay_snapshot_goldens_byte_equal() {
         let cases = [

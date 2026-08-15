@@ -2457,6 +2457,9 @@ pub fn run() {
                     ewma_y: f.ewma_y,
                     obs: f.obs,
                     alpha: f.alpha,
+                    // ★ Tier 0 (記録のみ): 打鍵数をそのまま NDJSON へ。推論には使わない。
+                    keys: f.keys,
+                    bs_keys: f.bs_keys,
                 });
             }
         }

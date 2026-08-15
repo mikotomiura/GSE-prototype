@@ -97,6 +97,26 @@ pub enum LogEntryDto {
         ewma_y: f64,
         obs: u64,
         alpha: f64,
+        /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の総キー押下数 (= `f3` の分母)。
+        /// **打鍵の数のみ**で、どのキーか・何を書いたかは含まない (data-privacy CD1)。
+        ///
+        /// ⚠️★★★ **累積カウンタではなく、窓の右端は「最後の打鍵時刻」であって `t` ではない。**
+        /// **沈黙中は同じ値が毎秒くり返される**ので、**feat 行をまたいで足し上げてはいけない**
+        /// (実測つきの説明は `analysis/loop_step.rs` の `FeatSnapshot::keys` の doc が正本)。
+        ///
+        /// ⚠️ **producer は常に値を書く**が、schema 上は省略可 (`Option`) にしている。
+        /// Tier 0 配線より前に収集された NDJSON には本フィールドが無く、それらも
+        /// この schema で検証できる必要があるため (`Paste.external_paste_chars` と同じ扱い・
+        /// ADR-005 additive)。「読むときは省略可・書くときは必須」の非対称は意図的。
+        ///
+        /// ⚠️★ HMM にも X/Y 合成式にも流していない (記録のみ)。`HMM_VERSION` は不変。
+        #[serde(default)]
+        keys: Option<u64>,
+        /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の BS/Del 押下数 (= `f3` の分子)。
+        /// `f3` は `{:.4}` 丸めのため、`keys − bs_keys` を整数で得るには分子も整数で必要になる。
+        /// 窓の意味・省略可の理由は `keys` と同じ。
+        #[serde(default)]
+        bs_keys: Option<u64>,
     },
     /// IME 入力モード/候補ウィンドウ状態の切替。
     ImeState { t: u64, on: bool, active: bool },

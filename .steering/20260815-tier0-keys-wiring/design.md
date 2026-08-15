@@ -1,7 +1,11 @@
 # 設計 — Tier 0 配線（`keys` / `bs_keys`）
 
-> ⚠️ **本セッションではコードを 1 行も書いていない。** 以下は実装計画である。
 > ★ 原本は `.steering/20260801-recovery-axis-grounding/tier0-wiring-design.md`（181 行）。本書はその**差分と補正**を書く。
+>
+> ★★★ **2026-08-16 に実装完了。** 以下は計画として書かれたものだが、
+> **§「実装で計画から外れたこと」（末尾）に実測との差分を追記してある**。
+> ★ 実装中に出た判断は `decisions.md` の判断 5/6/7 ＋ 実測 3、
+> ★ ゴールデン再生成の検証は `golden-regeneration.md` を参照。
 
 ## 実装アプローチ
 
@@ -134,3 +138,29 @@ REAL EXIT=1
    ⚠️ **ただし G1 の FS-B には必要**（原本 §8-3）なので、★ **G1 の残り 2 名を回す前に決める必要がある**。
 4. ⚠️ 期の幅 Δ（§11-7）が決まると Tier 1 の窓が決まる → ★ **順序としては Δ が先**。
 5. ★ **`logger.rs` の行番号がずれている**（memo `:974` → 実測 `:1214`）。★ 他の参照も同様にずれている前提で読むこと。
+
+---
+
+## ★★★ 実装で計画から外れたこと（2026-08-16・実測）
+
+| # | 計画 | ★ 実際 | 記録 |
+|---|---|---|---|
+| 1 | 変更対象は 8 ファイル | ⚠️ **11 ファイル**。★ 計画に無かった 3 つ: **`src/bin/replay.rs`**（`LoggedFeatDto` の同期。★ 当該ファイル自身の doc コメントが「`LogEntry::Feat` に新フィールドが追加されたら schema_dto.rs と本 DTO の両方を更新する」と要求していた）／**`src/lib.rs`**（`FeatSnapshot` → `LogEntry::Feat` の変換）／**テストヘルパ 3 か所**（`calibration_eval.rs` / `intervention_eval.rs` / `metrics.rs` の `FeatSnapshot` リテラル） | — |
+| 2 | `logger.rs` は「フォーマット文字列に 2 フィールド追加」 | ★ **`format_feat_line()` を純粋関数として抽出**した。★ 理由: テスト戦略が要求する「フォーマット文字列テスト（`format_paste_line` と同型）」は、**インラインの `writeln!` のままでは書けない**。★ 抽出は振る舞いを変えない（★ ゴールデン 4 本と `cargo test` で担保） | — |
+| 3 | 「`features.rs` から `FeatSnapshot` まで持ち回す」 | ⚠️ ★ **SilencePath では持ち回せない**（★ 合成観測が打鍵を数えていないため）。→ ★ **実測値を退避して経路に依らず書く**方式に変えた | `decisions.md` 判断 5 |
+| 4 | `FeatSnapshot` にも `#[serde(default)]` を付ける想定（原本 §3 の読み方） | ★ **付けない**ことにした（★ golden を全部再生成するので互換不要／欠けた golden を 0 で黙って受けるほうが危険） | `decisions.md` 判断 6 |
+| 5 | 旧 NDJSON 互換は「DTO を `Option`」で足りる | ⚠️ ★ **`--metrics` 経路の `LoggedFeatDto` という第 3 の DTO があった**。★ 欠測を `0` に倒したが、**「旧ログの欠測」と「実測 0 打」が区別できない**という妥協が残る | `decisions.md` 判断 7（★ **T0-Q5 として次に渡す**） |
+
+### ★ 実測した検証結果（★ 受け入れ条件との対応）
+
+| 受け入れ条件 | ★ 実測 |
+|---|---|
+| `emit_schema` の diff が additive-only | ★ **feat variant に 2 プロパティ追加のみ**。`required` 変更なし・既存プロパティの型変更なし・variant の増減なし（★ JSON 意味比較で機械判定） |
+| 旧フィクスチャを `gse-replay` が読める | ★ golden 4 本の fixture がそのまま通る ＋ 旧 `feat` 行の後方互換テストを追加 |
+| ★★★ golden の差分が新フィールドの追加のみ | ★ **4 本 155 行すべてで「追加キー = {keys, bs_keys} ちょうど・削除ゼロ・既存値は `repr()` 一致」** |
+| `HMM_VERSION` が変わっていない | ★ `0.3.0` のまま（★ `engine.rs` は 1 行も変更なし） |
+| `check_schema_parity.py` が exit 0 | ★ exit 0（20750 bytes canonical） |
+| `cargo test --workspace` が緑 | ★ **354 + 25 + 1 passed / 0 failed** |
+| 新フィールドを読む本番コードが無い | ★ grep 実測: 読み取りは**テストと `loop_step.rs` の記録用退避のみ** |
+| `.age` / NDJSON / 実セッション名が repo に入っていない | ★ `security-checker` で確認 |
+| `code-reviewer` + `security-checker` 並列レビュー | ★ 実施 |
