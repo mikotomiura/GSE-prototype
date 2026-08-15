@@ -80,7 +80,9 @@
 - [x] ★ `§5.2` の Tier 0 表を更新（★ `keys` / `bs_rate` を「2026-08-16 配線済み」に。
       ⚠️ `bs_rate`「未配線」の誤りは 2026-08-01 に訂正済みだったので、そこへ `bs_keys` 追加の理由を追記）
 - [x] ★ golden 再生成の差分を `.steering/` に記録（`golden-regeneration.md`）
-- [ ] ★ `notes.md §5③` の「golden 3 本」を訂正するか判断（⚠️ 別タスクの記録なので研究者判断）
+- [x] ★ `notes.md §5③` の「golden 3 本」を訂正（★ **T0-Q3・研究者が 2026-08-16 に訂正を承認**）
+      → ★ **4 本**に訂正し `deep_silence.json` を明記。★ 3 本だけ再生成すると
+      `deep_silence` が取り残されて `cargo test` が落ちる旨と、`cd src-tauri` の注意も併記
 
 ## 完了処理
 
