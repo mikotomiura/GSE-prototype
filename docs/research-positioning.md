@@ -250,6 +250,35 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   —— ★ **観測空間を広げたときの利得は、現時点で文献から予測できない。**
   ⚠️ **空白であることは有望であることを意味しない**（★ 開放的な知的作業の停滞をデスクトップ操作ログから
   検出した学術研究は本探索でゼロ。ヒットは特許と、正解が存在する e-learning・ITS [P33][P34] のみ）。
+- ★★★ **沈黙（打鍵が止まっている区間）の中身を割れるか —— 弁別は「長さ」でなく「直前イベント」にある**
+  （2026-08-15 追加・`docs/literature/20260815-silence-discrimination-pause-semantics.md`）:
+  ⚠️★★★ **「沈黙を長さの帯域で切れば計画と離脱が分かれる」は、実測で否定されている。**
+  ★ **米国/Python 231 名 ＋ 欧州/Java 244 名 = 475 名の 2 独立文脈**で、**micro（2–15 秒＝局所思考）/ short
+  （15–180 秒＝計画・修正）/ mid（3–10 分＝離脱または外部資源）/ long（>10 分＝離脱）**という
+  **4 帯域を事前宣言してから**検定した結果は、逐語
+  **`frequency of pauses of all lengths is negatively correlated with performance`** [P121] ——
+  ★ **著者自身の事前予測（micro は正相関するはず）が外れている**。
+  ⚠️★★★ **しかも mid 帯域は結論でも `may be distracted easily, but it could also indicate students who are
+  spending time using external resources for help` と割れたまま**であり、
+  ★ **これは GSE の新軸 `self_directed_recovery_risk` が最も分けたい 2 つ（離脱 vs 外部化して解決）そのものである。**
+  ★★★ **代わりに弁別しているのは「沈黙の直前に何を押したか」である** —— 同論文で
+  **英数キーは全イベントの 57% を占めるのに micro の 27% / long の 15% しか開始せず**、
+  ★ **特殊文字は micro ポーズと負相関**（著者の解釈は **`student hesitancy and lack of fluency with ... syntax`**
+  ＝つまずきの信号）、★ **Return は全帯域でほぼ一定＝弁別に使えない**、★ **run（検証行動）は short/mid/long に集中**。
+  → ★★★ **`personalization-and-online-learning.md §5.2` の `boundary keys`（「ポーズの長さでなく位置を分類する」
+  [V31][V32]）は、従来は散文の言語構造への接地しか無かったが、coding 文脈の実測で裏づけられた。**
+  ★ **閾値の個人相対化については 3 分野が独立に収束する** —— 実配備の個人分位 [P119]、固定帯域が分離しなかった
+  こと [P121]、執筆研究の**個人の中央値 ×2**（⚠️ 学士論文・N=46・中学生＝証拠の重みは低い）[P123]。
+  ★ 併せて **「2 秒閾値」は検証されたものではない** —— 逐語 **`primarily based on tradition`** /
+  **`an arbitrary two-second lower threshold`** [P123]。
+  ⚠️★★★ **それでも「沈黙中に何が起きていたか」を content-free に同定した研究はゼロのままである。**
+  ★ **理由も分かった** —— 分野は**打鍵ログだけでは分からないと結論して視線計測へ行った**（逐語
+  **`a moment of inactivity in the logs gives no clue as to what the writer was doing during that time`**、
+  実測として**沈黙の実質的な中身は読み返しだった**）[V85]。
+  ★ ITS 側は**ログのみで off-task を検出**し、しかも**「教科について教師や他の生徒と話している場合」と区別できた**と
+  報告されるが [P122]、⚠️ **ITS には正誤ラベル・問題境界・mastery 定義があり GSE には 3 つとも無い**
+  （[P33][P34] への評価と同構造）。→ ★ **GSE がここを解くなら、文献に無い経路を自前で作ることになる。**
+  ⚠️ **空白であることは有望であることを意味しない。**
 - ★ **不確実性下で自動化を弱める設計原理** [P42]: mixed-initiative の中核。GSE の「未較正 head では強介入を出さない」
   「証拠が合わなければ割り引く」（ADR-010）はこの原理の実装であって新規の発明ではない。
 
