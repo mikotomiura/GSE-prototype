@@ -45,11 +45,13 @@ def load_references(ref_path: Path):
         ident = f'[{m.group(1)}{m.group(2)}]'
         key = cells[1] if len(cells) > 1 else ''
         state = cells[-1] if cells else ''
+        # 末尾から 2 番目が「重複」列 (相互リンク)。列が欠けている行では空扱いにする。
+        dup_cell = cells[-2] if len(cells) >= 3 else ''
         if ident in rows:
             violations.append(
                 f'{ident} が references.md に 2 回登録 (line {lineno} / {rows[ident]["line"]})')
         rows[ident] = {'ns': m.group(1), 'n': int(m.group(2)), 'key': key,
-                       'state': state, 'line': lineno}
+                       'state': state, 'dup': dup_cell, 'line': lineno}
         if key and key != '—':
             key_to_ids[(m.group(1), key)].append(ident)
     return rows, key_to_ids, violations
@@ -89,11 +91,21 @@ def main() -> int:
         # tombstone 済みの行は「重複を撤回した結果」なので違反に数えない
         # (tombstone は規約が定める重複の *是正手段* そのもの)。
         live = [i for i in ids if 'tombstone' not in rows[i]['state']]
-        if len(live) > 1:
+        if len(live) <= 1:
+            if len(ids) > 1:
+                print(f'  [参考] key={key} の重複は tombstone で是正済み -> {ids}')
+            continue
+        # ルール 4 の例外 (2026-08-16): 同一文献の *別主張* は別 ID を許すが、
+        # 「重複」列での相互リンクが必須。リンクの無い同一 key は「気付かずに
+        # 二重登録した事故」であり違反 ([P130] がその型)。
+        linked = [i for i in live
+                  if any(sib[1:-1] in rows[i]['dup'] for sib in live if sib != i)]
+        if len(linked) >= len(live) - 1:
+            print(f'  [参考] key={key} の重複は相互リンク済み (ルール 4 の例外) -> {live}')
+        else:
             violations.append(
-                f'{ns} 名前空間内で key={key} が重複 -> {live} (citation-ssot ルール 4)')
-        elif len(ids) > 1:
-            print(f'  [参考] key={key} の重複は tombstone で是正済み -> {ids}')
+                f'{ns} 名前空間内で key={key} が重複し、「重複」列の相互リンクが無い '
+                f'-> {live} (citation-ssot ルール 4)')
 
     unregistered = {i: v for i, v in cited.items() if i not in rows}
     for ident, locs in sorted(unregistered.items()):
