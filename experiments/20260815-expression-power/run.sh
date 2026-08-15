@@ -53,6 +53,16 @@ anchor() {
 
 summarize() {
   echo "== 要約表の生成 =="
+  # ⚠️★ 2026-08-16 追加（Codex 独立レビュー指摘）: --power-mc / --anchor-cohort は
+  #   [ -f ] で守られているのに --anchor だけ無条件で渡していた。summarize.py は
+  #   --anchor を required にしているため、results/ を消して gse-dataset 不在で
+  #   `run.sh all` を回すと生の FileNotFoundError で落ちる（「1 コマンド再現」の主張と矛盾）。
+  #   ★ 挙動は変えず、失敗を読める形にする。
+  if [ ! -f results/block_variance.json ]; then
+    echo "!! results/block_variance.json が無い。summarize は --anchor を必須にしているので中止する。" >&2
+    echo "   ★ 本ファイルは repo にコミット済み。消した場合は 'bash run.sh anchor'（要 gse-dataset）で再生成する。" >&2
+    return 1
+  fi
   extra=""
   [ -f results/power_mc.json ] && extra="$extra --power-mc results/power_mc.json"
   [ -f results/block_variance_cohort.json ] && \
