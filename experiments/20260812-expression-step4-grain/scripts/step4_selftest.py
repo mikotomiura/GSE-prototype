@@ -36,6 +36,7 @@ import math
 import re
 import sys
 from fractions import Fraction
+from itertools import combinations
 from pathlib import Path
 
 # ⚠️★ Windows のコンソールは cp932 で、`—`(U+2014) や `⚠`(U+26A0) を符号化できない。
@@ -75,6 +76,32 @@ TAU_MIN_S = 60.0             # spec §1.3（交渉不可）
 LISTEN_S = 600.0             # S3-D3: 試聴 10 分
 REPEAT_MARGIN = 5.0
 PREV_VERSION = "0.2.0-step3"  # Step 3 の版。ここから上がっていなければならない
+
+# ★★★ 2026-08-14 `/cross-review`（HIGH）——**混入検査を連結で素通りしていた実セッション名**。
+#   ⚠️★★★ 混入検査が見るのは**組み立て済みの文字列**だけなので、
+#     `"Pnnn" + "_gse_" + "<年月日>_<時分秒>"` の形で書くと **1 バイトも引っかからない。**
+#   ⚠️★★★ その形で **実在の識別子が 4 箇所**（run.sh / notes.md / data.md / 検査自身の変異見本）に
+#     入っており、⚠️ **本 diff を `/cross-review` に掛けた時点で外部 LLM へ送信された。**
+#   ★ 連結そのものは要る（★ 書かないと自己走査が自分の変異データに反応して赤くなる）。
+#   → ★ **要るのは連結を消すことではなく「連結しても架空名しか置けない」ことの強制**である。
+#     ★ 見本は**この 1 か所だけ**で作り、`_fixtures_hide_no_real_session` が実測で縛る。
+# ⚠️ 架空名の条件: (a) `sess` パターン（年 20xx）に**当たること**——当たらないと変異が赤くならない、
+#   (b) 実在しえないこと（★ 参加者 999 / 2000-01-01 00:00:00。★ 実データは 2026 年）。
+FAKE_SESSION = "P999" + "_gse_" + "20000101_000000"
+
+
+def _concat_src(sess: str, joiner: str = " + ") -> str:
+    """★ セッション名を「連結で書かれた Python ソース」の表記へ組み立て直す。
+
+    ⚠️★★ meta 変異の見本を**リテラルで書けない**ため必要になる ——
+    リテラルで書くと `_fixtures_hide_no_real_session` が**自分自身に反応して常に赤くなる**
+    （★ この系列で何度も踏んだ「検査が自分の変異データを見ている」型）。
+
+    ★ `joiner` を `" "` にすると **暗黙連結**（`"a" "b"`・`+` 無し）の形になる
+      —— ⚠️ 2026-08-14 の `/cross-review` が **これが 2 層とも素通りする**ことを実測した形である。
+    """
+    q = '"'
+    return q + sess[:4] + q + joiner + q + sess[4:9] + q + joiner + q + sess[9:] + q
 
 # ★★★ S4-D8: 層 0 のコアとして「逐語複製であること」を要求する関数群。
 #     ⚠️ allDriftRates は step4 側に存在しない（config の形が違うため allPlanRates を使う）。
@@ -155,6 +182,70 @@ def repeat_period_s(rates: list[float]) -> float:
     return float(1 / g) if g > 0 else math.inf
 
 
+def js_eval_simple(expr: str, env: dict):
+    """JS の **三項式 / `===` / `!==` / 文字列リテラル / 識別子 / 括弧** だけを評価する。
+
+    ★★★ 目的（2026-08-14・`code-reviewer` 指摘）: 「上下の均衡」の検査が
+    **実装を 1 行も見ずに config だけを見ていた**。★ `to` を常に "B" にする変異でも全部緑だった。
+    → ★ **実装のソースから式を取り出して、実際に評価する。**
+
+    ⚠️ わざと非常に狭い文法しか受け付けない。★ 想定外の形は **黙って通さず例外にする**
+    （★ 「読めなかったので緑」は、この repo が何度も踏んでいる silent pass そのもの）。
+    """
+    s = expr.strip()
+
+    def parse(t: str):
+        t = t.strip()
+        # ★ 三項（★ 最も外側の `?` を、括弧の深さ 0 で探す）
+        depth = 0
+        for i, ch in enumerate(t):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            elif ch == "?" and depth == 0:
+                d2 = 0
+                for j in range(i + 1, len(t)):
+                    c2 = t[j]
+                    if c2 == "(":
+                        d2 += 1
+                    elif c2 == ")":
+                        d2 -= 1
+                    elif c2 == "?" and d2 == 0:
+                        raise ValueError("入れ子の三項が同じ深さにある: " + t)
+                    elif c2 == ":" and d2 == 0:
+                        return ("?:", parse(t[:i]), parse(t[i + 1:j]), parse(t[j + 1:]))
+                raise ValueError("三項の `:` が見つからない: " + t)
+        if t.startswith("(") and t.endswith(")"):
+            return parse(t[1:-1])
+        m = re.match(r"^(.+?)(===|!==)(.+)$", t)
+        if m:
+            return ("cmp", m.group(2), parse(m.group(1)), parse(m.group(3)))
+        m = re.match(r'^"([^"]*)"$|^\'([^\']*)\'$', t)
+        if m:
+            return ("lit", m.group(1) if m.group(1) is not None else m.group(2))
+        if re.match(r"^[A-Za-z_$][\w$]*$", t):
+            return ("var", t)
+        raise ValueError("読めない部分式: " + t)
+
+    def ev(node):
+        k = node[0]
+        if k == "lit":
+            return node[1]
+        if k == "var":
+            if node[1] not in env:
+                raise ValueError("未知の変数: " + node[1])
+            return env[node[1]]
+        if k == "cmp":
+            a, b = ev(node[2]), ev(node[3])
+            return (a == b) if node[1] == "===" else (a != b)
+        if k == "?:":
+            return ev(node[2]) if ev(node[1]) else ev(node[3])
+        raise ValueError("読めない節: " + str(node))
+
+    return ev(parse(s))
+
+
 def binom_tail(k: int, n: int, p: float) -> float:
     """P(X >= k) for X~Bin(n, p)。★ 閾値の主張を計算で裏づける（コメントを信じない）。"""
     return sum(math.comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(k, n + 1))
@@ -169,13 +260,22 @@ def load_sources():
     step3_html = STEP3_PLAYER_PATH.read_text(encoding="utf-8")
     step3_ver = json.loads(STEP3_CONFIG_PATH.read_text(encoding="utf-8"))["expr_version"]
     seed_text = SEED_PATH.read_text(encoding="utf-8") if SEED_PATH.exists() else ""
-    return cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, seed_text
+    # ★★★ 2026-08-14: 混入検査の走査対象（★ **ここで 1 回だけ読む**）。
+    #   ⚠️★★★ 検査の中で直接 read_text すると **meta 変異で壊せない**ので、
+    #     「検査を書いたら壊して赤くなることを実測する」が原理的にできなくなる。
+    #   ★ 実際 `run.sh` の実セッション名は 1 日以上、どの検査にも見られていなかった。
+    extra = {}
+    for name in ("run.sh", "notes.md", "data.md"):
+        p = EXP_DIR / name
+        extra[name] = p.read_text(encoding="utf-8") if p.exists() else None
+    extra["step4_selftest.py"] = Path(__file__).read_text(encoding="utf-8")
+    return cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, seed_text, extra
 
 
 # ---------------------------------------------------------------------------
 # 検査本体
 # ---------------------------------------------------------------------------
-def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, seed_text):
+def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, seed_text, extra):
     checks: list[tuple[str, callable]] = []
 
     def add(name):
@@ -857,26 +957,98 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
         #   (a) それ自体がリポジトリにユーザー名を残すことになり、
         #   (b) **別マシン / 別ユーザー名では検査が空回りする**（★ 指摘された事故シナリオそのもの）。
         #   → ★ **home パスの「形」で見る** ＋ 実行中のユーザー名を実行時に引く。
+        # ⚠️★★★ 2026-08-14（security-checker の指摘 ＋ 実測）に **走査範囲**を広げた。
+        #   ★ 旧実装が見ていたのは **player / worklet / config の 3 つだけ**だった。
+        #   ⚠️★★★ その外に **実セッション名が 2 件**あった（`run.sh` のコメント・`830758c` で混入）——
+        #     ★ しかも **同じ run.sh の中で「セッション名は repo に書かない」と宣言していた。**
+        #   → ★ **事故が起きた当のファイルを見ていない検査は、何も守っていない。**
+        #     （★ `browser-verification` の「この検査はどちら側を見ているか」と同じ問い）
+        # ---- PII-PATTERNS:BEGIN ----（⚠️ 自己走査ではこの区間を外す。★ 目印の実在も検査する）
         pats = [
             r"(?<![A-Za-z])[A-Za-z]:[\\/]",              # ★ C:\… / C:/… （★ 直前が英字なら http**s**:// 等なので除外）
             r"(?<![A-Za-z])/(Users|home)/[A-Za-z]",      # ★ /Users/<name> / /home/<name>
             r"(?<![A-Za-z])AppData[\\/]",                # ★ Windows のユーザー領域
         ]
+        # ★★★ 実セッション名（擬似 ID ＋ **打鍵開始日時**）。★ data.md が repo に書かないと宣言している。
+        #   ★ 架空名は `_00000000_` 形式にする約束なので、**年が 20xx で始まるものだけ**を拾う。
+        sess = r"P\d{3}_gse_20\d{6}_\d{6}"
         # ★ 実行中のユーザー名（★ ハードコードしないので macOS / CI でもそのまま効く）
+        me = None
         try:
-            me = Path.home().name
-            if me and len(me) >= 3 and me.lower() not in ("root", "user", "home", "users"):
-                pats.append(re.escape(me))
+            cand = Path.home().name
+            if cand and len(cand) >= 3 and cand.lower() not in ("root", "user", "home", "users"):
+                me = re.escape(cand)
         except Exception:
             pass   # ★ home が引けない環境では形の検査だけで走らせる（★ 黙って緑にはしない）
+        # ---- PII-PATTERNS:END ----
+        pats.append(sess)
+        if me:
+            pats.append(me)
+        # ★★ 高信号だけの組（★ 説明文に**正当に**出てくる形は除く）——
+        #   ⚠️ notes / data / 検査自身には「取り逃していた形」の**見本**が散文として載っている
+        #     （★ 例: 2026-08-13 の検出漏れの表）。★ そこに絶対パスの形を当てると誤検出になる。
+        #   ★ しかし **実セッション名と実ユーザー名は、どの文書にも正当な出番が無い。**
+        strict_only = [sess] + ([me] if me else [])
         # ⚠️ 既知の誤検出の形: JS の `{a:/re/}` のように **空白なしで `:` の直後に `/`** が来る書き方。
         #   ★ 誤検出は「うるさいだけ」で人が 10 秒で直せる。★ 見逃しは実害が出る。★ 誤検出側に倒す。
-        for label, text in (("player", html), ("worklet", worklet), ("config", cfg_text)):
-            for pat in pats:
+        targets = [("player", html, pats), ("worklet", worklet, pats), ("config", cfg_text, pats)]
+        for name in ("run.sh", "notes.md", "data.md"):
+            text = extra.get(name)
+            if text is None:
+                raise Fail(f"{name} が無い（★ 走査対象が黙って消えると検査が空回りする）")
+            # ★ run.sh は**実行されるコード**なので全パターン。notes / data は散文なので高信号だけ。
+            targets.append((name, text, pats if name == "run.sh" else strict_only))
+        # ★★★ **検査自身も走査する** —— ⚠️ 2026-08-13 の事故は
+        #   「旧実装（＝この検査自身）が実ユーザー名を直接持っていた」形だった。
+        #   ⚠️★ ただし上の正規表現リテラルと meta 変異の**架空**パスに自己反応するので、
+        #     ★ 高信号だけを当て、さらにパターン定義区間を外す。
+        self_text = extra["step4_selftest.py"]
+        b, e = self_text.find("# ---- PII-PATTERNS:BEGIN ----"), self_text.find("# ---- PII-PATTERNS:END ----")
+        if b < 0 or e < 0:
+            raise Fail("自己走査の除外区間の目印が実在しない（★ 除外が no-op になり、自分の正規表現に反応する）")
+        targets.append(("step4_selftest.py", self_text[:b] + self_text[e:], strict_only))
+        for label, text, use in targets:
+            for pat in use:
                 m = re.search(pat, text)
                 if m:
                     ctx = text[max(0, m.start() - 40):m.start() + 40].replace("\n", " ")
-                    raise Fail(f"{label} に絶対パス/ユーザー名らしき文字列がある（{pat}）: …{ctx}…")
+                    raise Fail(f"{label} に絶対パス/ユーザー名/実セッション名らしき文字列がある（{pat}）: …{ctx}…")
+
+    @add("★★★ 検査自身が『連結』で実セッション名を隠し持っていない（2026-08-14 `/cross-review` HIGH）")
+    def _():
+        # ⚠️★★★ **上の混入検査は組み立て済みの文字列しか見ない。**
+        #   ★ `"Pnnn" + "_gse_" + "<年月日>_<時分秒>"` の形で書くと **1 バイトも引っかからない。**
+        #   ⚠️★★★ 実際にこの形で **実在の識別子が 4 箇所**に入っており、
+        #     ⚠️ **`/cross-review` の diff に乗って外部 LLM へ送信された**（2026-08-14・実害が出た）。
+        #   ⚠️ **これは「うっかり」ではなく検査の構造的な穴である** ——
+        #     ★ 連結は「自己走査に反応させない」ために**意図的に**使っている書き方なので、
+        #     ★ 同じ書き方をすれば**誰でも・いつでも**素通りできた。
+        # → ★ **連結を畳んでからもう一度当てる。** ★ 残ってよいのは `FAKE_SESSION` だけ。
+        # ⚠️ 誤検出側に倒す（★ 上の検査と同じ方針）—— 畳むことで無関係な隣接文字列が
+        #   繋がって当たることはありうるが、★ **見逃しの実害の方が大きい。**
+        self_text = extra["step4_selftest.py"]
+        b, e = self_text.find("# ---- PII-PATTERNS:BEGIN ----"), self_text.find("# ---- PII-PATTERNS:END ----")
+        if b < 0 or e < 0:
+            raise Fail("自己走査の除外区間の目印が実在しない（★ 上の検査と同じ前提が壊れている）")
+        scan = self_text[:b] + self_text[e:]
+        # ★ `"a" + "b"` → `"ab"`（★ 空白・改行を跨ぐ連結も畳む）
+        # ⚠️★★★ 2026-08-14 `/cross-review`（HIGH）—— **`+` を必須にしていたのが穴だった。**
+        #   ★ Python は `"a" "b"`（**暗黙連結**）も合法で、しかも**改行を跨げる**。
+        #   ⚠️ 実測: 暗黙連結は (a) この畳み込みを素通りし、(b) `secrets-filter.sh` も
+        #     **awk が行単位**なので改行で分けると素通りする ＝ **2 層とも突破された。**
+        #   → ★ `+` を**省略可能**にする。★ 陰性対照 5 件（`print("a", "b")` / `{"k": "v"}` /
+        #     `f("x") + g("y")` / `["p", "q"]` / `"a" + str(n) + "b"`）で**誤結合しない**ことを実測した
+        #     （★ 区切りに `,` `:` や識別子が入る形は畳まれない）。
+        # ⚠️ **これでも塞げない形は残る**: `"".join([...])` / `%` 書式 / f-string / `chr()` 連結。
+        #   ★ 既知の限界として S5C-D12 に明記した（★ 「塞いだ」と書かない）。
+        folded = re.sub(r'"\s*\+?\s*"', "", scan)
+        for m in re.finditer(r"P\d{3}_gse_20\d{6}_\d{6}", folded):
+            got = m.group(0)
+            if got != FAKE_SESSION:
+                # ⚠️★ **実名を出力に書かない**（★ ここで出すと今度はログと端末へ漏れる）。
+                raise Fail(
+                    "検査自身が連結で実セッション名らしき文字列を隠し持っている"
+                    f"（先頭 {got[:4]}…・{len(got)} 文字）。★ 見本は FAKE_SESSION だけを使うこと")
 
     @add("★ config が『非周期』と書いていない（有理比なので数学的には必ず反復する）")
     def _():
@@ -1260,69 +1432,196 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
                 "★ 毎回引き直すなら、実際に使った値を記録しないと出題順を再構成できない（AB-D1）"
             )
 
-    @add("★★★ AB-D2: トライアル冒頭のリセットが『1 区間目』より **前** にある（持ち越しを採点区間へ入れない）")
+    @add("★★★ S5C-D1: 準備区間と 1 区間目で状態を **1 つも動かさない**（AB-D10 の漏れの経路を消す）")
     def _():
-        # ⚠️★★★ 実際に踏んだ形: diff のトライアルは B のまま終わるので、
-        #   次のトライアル冒頭の abxSet("A") が **当ててほしい跳びと同じ大きさの跳び**を
-        #   1 区間目のまっただ中で鳴らしていた（実測 400 → 106（150 ms）→ 100）。
-        # ★ 「呼んでいるか」では足りない —— **位置**で見る（BF-5 と同じ教訓）。
+        # ⚠️★★★ ここまでに 3 回間違えている（★ 経緯を消さない）:
+        #   初版  リセット無し        → 持ち越しの跳びが 1 区間目の中で鳴る
+        #   AB-D2 リセットを準備区間へ → 跳びが「直前が diff のときだけ」鳴り、真値が漏れる
+        #   AB-D7 乱数 carry を挟む    → **跳びの回数の偶奇**が入場状態を一意に決める
+        # ★★★ S5C-D1（A′）: 準備区間から **状態変化そのもの**を無くす。
+        #   ★ 経路が存在しないので、偶奇も向きも大きさも問えない。
         nx = strip_js_comments(extract_function(html, "abxBlindNext"))
-        m_reset = re.search(r'abxSetInstant\(\s*"A"\s*\)', nx)
-        m_prep = re.search(r'abxPhase\(\s*bl\s*,\s*"prep2"', nx)
-        m_i1 = re.search(r'abxPhase\(\s*bl\s*,\s*"i1"', nx)
-        if not (m_reset and m_prep and m_i1):
+        m_prep = re.search(r'abxPhase\(\s*bl\s*,\s*"prep"\s*,', nx)
+        m_i1 = re.search(r'abxPhase\(\s*bl\s*,\s*"i1"\s*,', nx)
+        m_i2 = re.search(r'abxPhase\(\s*bl\s*,\s*"i2"\s*,', nx)
+        if not (m_prep and m_i1 and m_i2):
             raise Fail(
-                "abxBlindNext に prep2 / i1 の相が無い（"
-                f'abxSetInstant("A")={bool(m_reset)} prep2={bool(m_prep)} i1={bool(m_i1)}）'
+                "abxBlindNext に prep / i1 / i2 の 3 相がそろっていない（"
+                f"prep={bool(m_prep)} i1={bool(m_i1)} i2={bool(m_i2)}）"
             )
-        if not (m_reset.start() < m_prep.start() < m_i1.start()):
-            raise Fail(
-                'abxSetInstant("A") → prep2 → i1 の順になっていない。'
-                "★ リセットが 1 区間目より後だと、持ち越しの跳びが採点区間の中で鳴る（AB-D2）"
-            )
-        # ⚠️★★★ レビュー実測の silent pass: `abxSet("A")` を `if (bl.i === 0)` で包むと
-        #   **2 回目以降が元の欠陥に戻る**のに、位置は変わらないので緑だった。
-        #   → ★ **リセットが条件分岐の中に入っていない**ことを見る。
-        head = nx[:m_reset.start()]
-        if re.search(r"\bif\s*\([^)]*\)\s*\{?[^;{}]*$", head):
-            raise Fail(
-                'リセットが条件分岐の中にある。★ 毎トライアル無条件に走らないと、'
-                "2 回目以降が元の欠陥（持ち越しが採点区間で鳴る）に戻る（AB-D2）"
-            )
+        if not (m_prep.start() < m_i1.start() < m_i2.start()):
+            raise Fail("prep → i1 → i2 の順になっていない")
+        # ★★★ **本体**: 先頭〜1 区間目の待ちが終わるまでに、状態を変える呼び出しが 1 つも無いこと。
+        #   ⚠️ 「abxSet が無い」ではなく **位置**で見る（BF-5 の教訓）——
+        #     採点区間より後ろにあるのは正しいので、前半だけを切り出して見る。
+        # ★ 関数の**宣言行**を外す（★ 外さないと自分の名前 `abxBlindNext(` を呼び出しと誤読する）
+        head = nx[nx.index("{"):m_i1.end()]
+        # ⚠️★★★ 「`abxSet*` が無い」だけでは足りない（`code-reviewer` 実測）——
+        #   ★ `hiddenReset()` のような **ヘルパ経由**なら素通りする。
+        #   → ★ **呼んでよいものを列挙し、それ以外の呼び出しを落とす**（★ 足すときに必ず人が見る形）。
+        #   ★ 足してよいのは **状態を書かない純粋な getter** だけ。⚠️ 足すときは実装を読んで確かめる。
+        allowed = {"abxPhase", "abxBlindFinish", "$", "Object", "Math", "if", "for", "while",
+                   "switch", "catch", "return", "await", "typeof",
+                   "abxSideSeconds", "abxPrepSeconds", "abxTrOpt", "abxOpt"}
+        for m_call in re.finditer(r"\b([A-Za-z_$][\w$]*)\s*\(", head):
+            if m_call.group(1) not in allowed:
+                raise Fail(
+                    f"準備区間 / 1 区間目で `{m_call.group(1)}()` を呼んでいる。"
+                    "★ ここで状態を動かすと、その向きと回数が入場状態＝直前トライアルの真値を運ぶ（AB-D10）。"
+                    "★ 状態を変えないと言えるなら、この検査の allowed に足すこと"
+                )
+        # ★ 直接代入で状態を動かす形も落とす（★ 呼び出しだけを見ると素通りする）
+        if re.search(r"\babx\.(state|tr|active)\s*=", head):
+            raise Fail("準備区間 / 1 区間目で abx の状態を直接書き換えている")
 
-    @add("★★★ AB-D7: 準備区間の跳びが **真値に依らない**（試行ごとの正解フィードバックを配らない）")
+    @add("★★★ S5C-D1: 1 区間目と 2 区間目の長さが **真値に依らない**（時間の手がかりを作らない）")
     def _():
-        # ⚠️★★★ レビュー実測で見つかった **穴 5**: 採点区間の外へ動かしただけでは足りない。
-        #   ★ トライアルは same なら A、diff なら B で終わるので、準備区間の跳びは
-        #     **「直前が diff だったときだけ」**鳴る。⚠️ 出題は 4/4 の**非復元**なので
-        #     過去の真値が未来の真値を制約する（＝正解フィードバック）。
+        # ⚠️★★★ `code-reviewer` 実測: `abxPhase(bl, "i2", ms + (kind === "diff" ? 500 : 0), …)` で
+        #   **123 件が全部緑**だった。★ 長さが真値で変わると、耳を使わずに答えが出る。
         nx = strip_js_comments(extract_function(html, "abxBlindNext"))
-        if "carry" not in nx or "prep1" not in nx:
-            raise Fail(
-                "準備区間が 2 段（prep1 / prep2）になっていない。"
-                "★ 1 段だと入場状態がそのまま跳びに出るので、真値が漏れる（AB-D7）"
-            )
-        # ★ carry が **真値（kind）から作られていない**こと（★ 作られたら漏れが残る）
-        m = re.search(r"const\s+carry\s*=\s*([^;]+);", nx)
+        args = {}
+        for ph in ("i1", "i2"):
+            m = re.search(r'abxPhase\(\s*bl\s*,\s*"' + ph + r'"\s*,\s*([^,]+),', nx)
+            if not m:
+                raise Fail(f"{ph} の長さの引数が読めない")
+            args[ph] = m.group(1).strip()
+        if args["i1"] != args["i2"]:
+            raise Fail(f"1 区間目と 2 区間目の長さが違う式で書かれている（{args['i1']} / {args['i2']}）")
+        m = re.search(r"const\s+" + re.escape(args["i1"]) + r"\s*=\s*([^;]+);", nx)
         if not m:
-            raise Fail("carry の決め方が読めない")
-        expr = m.group(1)
-        if "kind" in expr or "truth" in expr or "order" in expr:
-            raise Fail(f"carry が真値から作られている（{expr.strip()}）。★ 漏れが残る（AB-D7）")
-        if "mulberry32" not in expr and "random" not in expr.lower():
-            raise Fail(f"carry が乱数になっていない（{expr.strip()}）")
-        # ⚠️★★★ **1 段では直らない**（BF-5 と同じ「呼んだが効いていない」形）——
-        #   carry を鳴らす相が、A へ戻す前に実在すること
-        m_carry = re.search(r"abxSetInstant\(\s*carry\s*\)", nx)
-        m_p1 = re.search(r'abxPhase\(\s*bl\s*,\s*"prep1"', nx)
-        m_a = re.search(r'abxSetInstant\(\s*"A"\s*\)', nx)
-        if not (m_carry and m_p1 and m_a and m_carry.start() < m_p1.start() < m_a.start()):
+            raise Fail(f"長さ `{args['i1']}` の定義が abxBlindNext に無い（★ 真値に依らないことを確かめられない）")
+        for bad in ("kind", "truth", "order"):
+            if re.search(r"\b" + bad + r"\b", m.group(1)):
+                raise Fail(f"区間の長さが真値から作られている（{m.group(1).strip()}）")
+        # ★ 準備区間も同じ（★ 相の長さで真値が分かってはならない）
+        m_prep = re.search(r'abxPhase\(\s*bl\s*,\s*"prep"\s*,\s*([^,]+),', nx)
+        for bad in ("kind", "truth", "order"):
+            if m_prep and re.search(r"\b" + bad + r"\b", m_prep.group(1)):
+                raise Fail(f"準備区間の長さが真値から作られている（{m_prep.group(1).strip()}）")
+
+    @add("★★★ S5C-D3: 盲検中に **提示条件を画面へ書かない**（★ 真値が読めてしまう経路）")
+    def _():
+        # ⚠️★★★ 2026-08-14（`code-reviewer` が実測で発見）——
+        #   `abx-now` は盲検パネルの中の可視要素で、`abxApply()` が `${abx.state} へ…` を書いていた。
+        #   ★ `abxSet(to)` は 2 区間目の頭で呼ばれるので、**diff なら表示が変わり same なら変わらない。**
+        #   ⚠️★★★ AB-D3 は「境目は**画面表示だけ**で示す」＝ **聴き手が画面を見る前提**である。
+        #   ★ 跳びの知覚が要らず**読むだけで分かる**ので、AB-D10 より重い。
+        ap = strip_js_comments(extract_function(html, "abxApply"))
+        m = re.search(r'\$\(\s*"abx-now"\s*\)\.textContent\s*=\s*([^;]+);', ap)
+        if not m:
+            raise Fail("abxApply が abx-now に何を書くか読めない（★ 形が変わったら検査し直す）")
+        assign = m.group(1)
+        if not re.search(r"\babx\.blind\b", assign):
             raise Fail(
-                'abxSetInstant(carry) → prep1 → abxSetInstant("A") の順になっていない。'
-                "★ 待ちを挟まないと carry は 1 サンプルも鳴らない（★ BF-5 と同じ no-op）"
+                "盲検中かどうかを見ずに abx-now を書いている。"
+                "★ 2 区間目の頭で表示が変われば diff、変わらなければ same と読めてしまう（S5C-D3）"
+            )
+        # ★ 盲検中の枝に状態が混ざっていないこと（★ 分岐を足しただけでは足りない）
+        blind_branch = assign.split("?")[1].split(":")[0] if "?" in assign else assign
+        for bad in ("abx.state", "abxValue", "abxOpt"):
+            if bad in blind_branch:
+                raise Fail(f"盲検中の表示に {bad} が混ざっている（★ 伏せたことにならない）")
+
+    @add("★★★ S5C-D6: レベルが動かない写し方では **明示的な承知が要る**（★ 同じ取り違えが 2 回起きた）")
+    def _():
+        # ⚠️★★★ 2026-08-13（S5-26）と 2026-08-14（本 Step）の **2 回とも**、
+        #   「ページを再読込したら `dcue` が既定（質感のみ）へ戻っていた」形で測ってしまい、
+        #   ★ **測り終えて結果 JSON を読むまで気づかなかった**（★ 合計 10 分ぶんの試聴が無駄になった）。
+        #   ⚠️★★★ S5-D2 の「手順で塞げるものを実装で塞ぎに行かない」は、
+        #     ★ **手順で 2 回とも防げなかった**という実績に負ける（`verify-before-claiming` ルール 3）。
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if 'id="abx-texture-ack"' not in html:
+            raise Fail("承知の印（abx-texture-ack）が画面に無い")
+        m = re.search(r"if\s*\(\s*!\s*contrastMeasurable\s*\)\s*\{", st)
+        if not m:
+            raise Fail("contrastMeasurable が false のときの枝が読めない")
+        # ★ 中括弧の対応で枝を切り出す（★ 行頭の空白に依存する正規表現は形が変わると黙って外れる）
+        depth, end = 0, None
+        for k in range(m.end() - 1, len(st)):
+            if st[k] == "{":
+                depth += 1
+            elif st[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = k
+                    break
+        if end is None:
+            raise Fail("contrastMeasurable の枝の終わりが見つからない")
+        branch = st[m.end():end]
+        if "abx-texture-ack" not in branch:
+            raise Fail("レベルが動かない写し方でも、承知の印を見ずに盲検が始まる（S5C-D6）")
+        if not re.search(r"\breturn\s*;", branch):
+            raise Fail("承知の印が無いときに **止めていない**（★ 警告だけでは 2 回とも防げなかった）")
+        # ★★ 測っている条件を、盲検のあいだずっと画面に出す（★ 走行中に見えなければ意味がない）
+        if not re.search(r"condTag:", st):
+            raise Fail("条件の札を開始時に凍結していない")
+        ph = strip_js_comments(extract_function(html, "abxPhase"))
+        if "condTag" not in ph:
+            raise Fail("盲検の画面に条件の札を出していない（★ 終わってからでは遅い）")
+
+    @add("★★★ S5C-D4: 開始状態が **1 つの変数から**作られ、乱数で引かれる")
+    def _():
+        # ⚠️★★★ `code-reviewer` 実測: `state: "A"` / `initialState: "A"` / `abxSetInstant("A")` の
+        #   3 つが独立したリテラルだったので、**記録だけを "B" に変えても全部緑**だった（記録が嘘になる）。
+        # ⚠️ 固定 "A" は聴き手に**既知の錨**を 2 つ与える（1 回目の diff は必ず上向き / 終状態も必ず "A"）。
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        m = re.search(r"const\s+initialState\s*=\s*([^;]+);", st)
+        if not m:
+            raise Fail("開始状態を 1 つの変数に置いていない（3 箇所に書くと記録だけ嘘になりうる）")
+        if "drawOrderSeed" not in m.group(1) and "random" not in m.group(1).lower():
+            raise Fail(f"開始状態が乱数で引かれていない（{m.group(1).strip()}）")
+        # ⚠️★ `initialState\b` だけでは足りない —— `initialState: "A"` と書かれても `\b` は成立し、
+        #   ★ **記録だけが嘘になる形が緑で通る**（★ meta で実測した）。→ ★ 短縮記法であることを要求する。
+        if not re.search(r"state:\s*initialState\s*,\s*initialState(?!\s*:)", st):
+            raise Fail("bl.state と bl.initialState が同じ変数から作られていない")
+        if not re.search(r"abxSetInstant\(\s*initialState\s*\)", st):
+            raise Fail("実際に鳴らす開始状態が initialState から作られていない（記録と提示がずれる）")
+
+    @add("★★★ S5C-D1: 2 区間目の状態が **1 区間目の状態から** 決まる（終点をリテラルで固定しない）")
+    def _():
+        # ⚠️★★★ AB-D10 の恒等式は「**終点が固定**」から出ていた ——
+        #   ★ 始点と終点が固定なら、跳びの回数の偶奇は経路によらない不変量になる。
+        #   → ★ 終点をリテラル（"A" / "B"）で書いた瞬間に漏れが復活する。
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        # ⚠️★★ 引数**そのもの**がリテラルの場合だけを見ると足りない ——
+        #   ★ `abxSet(kind === "diff" ? "B" : "A")` は「終点が真値だけで決まる」旧設計そのものなのに、
+        #     第 1 引数はリテラルではないので素通りする（★ meta で実測した）。
+        #   → ★ **引数リストのどこかに状態リテラルがあれば落とす。**
+        lit = re.search(r"\babxSet\w*\s*\([^)]*[\"'][AB][\"']", nx)
+        if lit:
+            raise Fail(
+                "2 区間目の状態をリテラルで指定している"
+                f"（{nx[lit.start():lit.end() + 8]!r}）。"
+                "★ 終点が固定されると跳びの偶奇＝入場状態という AB-D10 の恒等式が復活する"
+            )
+        if not re.search(r"const\s+from\s*=\s*bl\.state\s*;", nx):
+            raise Fail("1 区間目の状態が bl.state（持ち越した到達点）から来ていない")
+        m = re.search(r"const\s+to\s*=\s*([^;]+);", nx)
+        if not m:
+            raise Fail("2 区間目の状態の決め方が読めない")
+        expr = m.group(1)
+        if "from" not in expr:
+            raise Fail(f"2 区間目の状態が 1 区間目の状態を見ていない（{expr.strip()}）")
+        if "kind" not in expr:
+            raise Fail(f"2 区間目の状態が真値を見ていない（{expr.strip()}）")
+        if not re.search(r"\babxSet\s*\(\s*to\s*\)", nx):
+            raise Fail("2 区間目の切替が abxSet(to)（遷移時間を守る側）になっていない")
+        # ★★★ 持ち越し —— ★ 更新しないと 1 区間目の基準が固定に戻り、A′ が丸ごと無効になる
+        m_keep = re.search(r"\bbl\.state\s*=\s*to\s*;", nx)
+        if not m_keep:
+            raise Fail(
+                "到達点を次のトライアルへ持ち越していない（bl.state = to が無い）。"
+                "★ 持ち越さないと 1 区間目が毎回同じ状態になり、終点が固定＝AB-D10 に戻る"
+            )
+        # ⚠️★★★ **条件分岐の中に入れると 2 回目以降が持ち越さない**のに、行は残るので緑になる
+        #   （★ AB-D2 のときに実測した silent pass とまったく同じ形。★ meta で再実測した）。
+        if re.search(r"\bif\s*\([^)]*\)\s*\{?[^;{}]*$", nx[:m_keep.start()]):
+            raise Fail(
+                "到達点の持ち越しが条件分岐の中にある。★ 毎トライアル無条件に走らないと、"
+                "2 回目以降が固定の基準に戻り持ち越していないのと同じになる"
             )
 
-    @add("★★★ AB-D7: トライアル間の切替だけが即座で、採点区間は遷移時間を守る")
+    @add("★★★ S5C-D1: 遷移を持たない切替（abxSetInstant）の呼び出し元が **開始状態の定義 1 箇所だけ**")
     def _():
         body = strip_js_comments(html)
         if "function abxSetInstant(" not in body:
@@ -1330,16 +1629,119 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
         fn = strip_js_comments(extract_function(html, "abxSetInstant"))
         if not re.search(r"dur:\s*0", fn):
             raise Fail("abxSetInstant が即座になっていない（dur: 0 が無い）")
-        # ⚠️★★★ 採点区間で使ったら、遷移時間という本題の独立変数が黙って無効になる
+        # ⚠️★★★ トライアルの中で呼ぶと、(a) 準備区間に跳びが戻る（AB-D10 が復活）か、
+        #   (b) 採点区間で遷移時間という本題の独立変数が黙って無効になる。
         nx = strip_js_comments(extract_function(html, "abxBlindNext"))
-        after_i1 = nx[re.search(r'abxPhase\(\s*bl\s*,\s*"i1"', nx).start():]
-        if "abxSetInstant" in after_i1:
+        if "abxSetInstant" in nx:
             raise Fail(
-                "採点区間（1 区間目以降）で abxSetInstant を使っている。"
-                "★ 遷移時間（量と速度の切り分け）が黙って無効になる（AB-D7）"
+                "abxBlindNext が abxSetInstant を呼んでいる。"
+                "★ トライアルの中に遷移 0 の切替があると、跳びが戻るか遷移時間が無効になる（S5C-D1）"
             )
-        if not re.search(r'abxSet\(kind === "diff"', nx):
-            raise Fail("2 区間目の切替が abxSet（遷移時間を守る側）になっていない")
+        # ★ 呼び出し元の**数**で見る（★ 「どこかに 1 つある」では、増えたことに気づけない）
+        uses = re.findall(r"\babxSetInstant\s*\(", body)
+        if len(uses) != 2:      # ★ 定義 1 ＋ 呼び出し 1
+            raise Fail(
+                f"abxSetInstant の出現が {len(uses)} 箇所ある（★ 定義 1 ＋ 呼び出し 1 = 2 が正）。"
+                "★ 呼び出し元が増えると、どこで跳びが起きるかを追えなくなる"
+            )
+        st = strip_js_comments(extract_function(html, "abxBlindStart"))
+        if not re.search(r"abxSetInstant\(\s*initialState\s*\)", st):
+            raise Fail(
+                "盲検の開始状態を定義していない。"
+                "★ ①は測り終えたあと状態を元へ戻すので、②の入口の状態は不定である"
+            )
+
+    @add("★★★ S5C-D1: 上向き diff と下向き diff が **均衡する**（★ 実装の式を取り出して全通り評価する）")
+    def _():
+        # ⚠️★★★ 2026-08-14（`code-reviewer` 実測）: **旧版は config の trials しか見ていなかった。**
+        #   ★ `to` を常に "B" にする変異（＝交互性が完全に壊れる）でも **123 件が全部緑**だった。
+        #   → ★ **実装のソースから `to` の式を取り出し、(from, kind) の 4 通りで実際に評価する。**
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        m = re.search(r"const\s+to\s*=\s*([^;]+);", nx)
+        if not m:
+            raise Fail("2 区間目の状態の式が読めない")
+        expr = m.group(1)
+        for frm in ("A", "B"):
+            other = "B" if frm == "A" else "A"
+            try:
+                same_to = js_eval_simple(expr, {"from": frm, "kind": "same"})
+                diff_to = js_eval_simple(expr, {"from": frm, "kind": "diff"})
+            except ValueError as e:
+                raise Fail(f"2 区間目の式を評価できない（{expr.strip()}）: {e}")
+            if same_to != frm:
+                raise Fail(f"same なのに状態が変わる（from={frm} → {same_to}）")
+            if diff_to != other:
+                raise Fail(
+                    f"diff なのに反転していない（from={frm} → {diff_to}・{other} が正）。"
+                    "★ 交互に反転しないと上下の均衡が成立しない"
+                )
+        # ★ ここまでで「diff のたびに必ず反転する」ことが実装から確かめられた。
+        #   ★ その上で **いま config に書かれている trials で不変量が成立するか**を全通り列挙する。
+        n = ABX_BLIND["trials"]
+        if not isinstance(n, int) or not (2 <= n <= 16):
+            # ⚠️ 全列挙は組合せ爆発する（trials=24 で 270 万通り）。★ 上限を置いて**黙って重くしない**
+            raise Fail(f"trials={n} は全通り列挙の範囲外（2..16）。★ 上限を上げるなら列挙をやめる")
+        half = n // 2                      # ★ buildAbxOrder の Math.floor(n / 2) と同じ
+        if not re.search(r"const\s+half\s*=\s*Math\.floor\(\s*n\s*/\s*2\s*\)\s*;",
+                         strip_js_comments(extract_function(html, "buildAbxOrder"))):
+            raise Fail("buildAbxOrder の diff 個数の式が `Math.floor(n / 2)` でない（検査側の half とずれる）")
+        if half == 0:
+            raise Fail(f"diff が 1 回も出ない（trials={n}）")
+        for start in ("A", "B"):           # ★ 開始状態は乱数なので両方で確かめる（S5C-D4）
+            for pos in combinations(range(n), half):
+                hot, s, up, down = set(pos), start, 0, 0
+                for i in range(n):
+                    kind = "diff" if i in hot else "same"
+                    nxt = js_eval_simple(expr, {"from": s, "kind": kind})
+                    if kind == "diff":
+                        if s == "A":
+                            up += 1
+                        else:
+                            down += 1
+                    s = nxt
+                if up != down or s != start:
+                    raise Fail(
+                        f"上向き / 下向きの diff が均衡しない（trials={n} / 開始 {start} / "
+                        f"diff の位置 {pos} で 上 {up} 回・下 {down} 回・終状態 {s}）。"
+                        "★ diff の回数が偶数でないと成立しない"
+                    )
+
+    @add("★★★ S5C-D5: 方向の均衡を **実際に提示した列から数え直して**結果に残す")
+    def _():
+        # ⚠️★★★ 上の検査は「実装の式」を見ている。★ こちらは「その run で実際に何を提示したか」。
+        #   ★ 静的検査と実測記録の 2 枚にする（★ S5-D11「記録と照合は同じ定義から作る」）。
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        if not re.search(r"bl\.timing", fin):
+            raise Fail("方向の均衡を bl.timing（実際に提示した列）から数えていない")
+        for need, why in ((r"from\s*===\s*\"A\"\s*&&\s*t\.to\s*===\s*\"B\"", "上向きを数えていない"),
+                          (r"from\s*===\s*\"B\"\s*&&\s*t\.to\s*===\s*\"A\"", "下向きを数えていない")):
+            if not re.search(need, fin):
+                raise Fail(why)
+        if not re.search(r"direction_balance:\s*bl\.directionBalance", fin):
+            raise Fail("方向の均衡を結果 JSON に残していない（事後に検算できない）")
+        if not re.search(r"ok:\s*up\s*===\s*down", fin):
+            raise Fail("上向き = 下向き を判定していない")
+        if not re.search(r"directionBalance\.ok\s*\?", fin):
+            raise Fail("方向が均衡していないことを画面に出していない（★ 壊れた提示が黙って通る）")
+
+    @add("★★ S5C-D1: protocol が新手順の値で、**旧手順の値が実行経路に残っていない**")
+    def _():
+        # ⚠️★★★ 値を据え置くと、**測り直した結果と旧手順の結果が JSON 上で区別できなくなる。**
+        #   ★ 本 Step は「同じ刺激量を別の手順で測り直す」ことが主題なので、これは致命的である。
+        fin = strip_js_comments(extract_function(html, "abxBlindFinish"))
+        m = re.search(r'protocol:\s*"([^"]+)"', fin)
+        if not m:
+            raise Fail("結果に protocol が入っていない（どの手順で測ったか分からなくなる）")
+        if m.group(1) != "3phase-noreset-v2":
+            raise Fail(f"protocol が新手順の値になっていない（{m.group(1)}）")
+        if "3phase-prep-v1" in strip_js_comments(html):
+            raise Fail("旧手順の protocol 値が実行経路に残っている（記録が取り違えられる）")
+        # ★ 事後に方向の均衡を検算できる形で残っていること（★ AC-4 を記録側から支える）
+        nx = strip_js_comments(extract_function(html, "abxBlindNext"))
+        if not (re.search(r"\bt\.from\s*=\s*from\s*;", nx) and re.search(r"\bt\.to\s*=\s*to\s*;", nx)):
+            raise Fail("各トライアルの 1 区間目 / 2 区間目の状態を記録していない（from / to）")
+        if not re.search(r"initial_state:\s*bl\.initialState", fin):
+            raise Fail("開始状態を結果に残していない（状態列を復元できない）")
 
     @add("★★★ AB-D2 / AB-D7: 準備区間の長さが実装の式から出ていて、跳びの減衰より十分長い")
     def _():
@@ -1362,13 +1764,19 @@ def build_checks(cfg, cfg_text, html, worklet, py_ver, step3_html, step3_ver, se
                 + fn.strip().splitlines()[-2:][0].strip()
             )
         floor = float(m.group(1))
-        # ★ 跳びの減衰は実測 700 ms。★ 床はその 2 倍以上を要求する
+        # ⚠️★★★ 2026-08-14（S5C-D1）で **準備区間の役割が変わった**（★ 経緯を消さない）:
+        #   旧: 跳びの跡を捨てる場所 → ★ 床の根拠は「実測 700 ms の 2 倍」だった。
+        #   新: 状態を動かさないので **跡が無い** → ★ 床の根拠は「境目として知覚できる長さ」。
+        #   ⚠️★ ただし **1 回目だけは例外** —— ②の開始時の `abxSetInstant(initialState)` が
+        #     フル振幅の瞬時の跳びを作り、その跡が 1 回目の準備区間に入る（`code-reviewer` 指摘）。
+        #     → ★ **1 回目の跡を収めるためにも、床は跳びの減衰 0.7 s の 2 倍以上を保つ。**
+        #   ⚠️ 旧版にあった「2 段に割ると…」の条件は **2 段構成が消えたので削除した**
+        #     （★ 効いていない条件を「効いている」と記録に残さない）。
         if floor < 1.4:
-            raise Fail(f"準備区間の床が短すぎる（{floor} s）。★ 跳びの減衰は実測 0.7 s")
-        # ★ 実効値（config と床の大きいほう）が、2 段に割っても減衰より長いこと
+            raise Fail(f"準備区間の床が短すぎる（{floor} s）。★ 開始時の跳びの減衰は実測 0.7 s")
         eff = max(ABX_BLIND["prep_seconds"], floor)
-        if eff / 2 < 0.7:
-            raise Fail(f"準備区間を 2 段に割ると 1 段が {eff / 2} s で、跳びの減衰 0.7 s を下回る")
+        if eff < 1.4:
+            raise Fail(f"準備区間の実効値が {eff} s しかない（★ 1 回目の跳びの跡が 1 区間目へ漏れる）")
 
     @add("★★★ AB-D2: 3 つの相が画面に出る（『何と比べるか』が聴き手に決まる）")
     def _():
@@ -1828,18 +2236,31 @@ def first_failure(args_tuple) -> str | None:
 def meta_checks() -> int:
     """★ 壊し方 → 赤くなるべき検査（部分一致）。検査自体が空回りしていないことを実測する。"""
     base = load_sources()
-    cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, seed0 = base
+    cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, seed0, extra0 = base
 
     def mut_cfg(fn):
         c = copy.deepcopy(cfg0)
         fn(c)
-        return (c, json.dumps(c, ensure_ascii=False), html0, wk0, py0, s3html0, s3ver0, seed0)
+        return (c, json.dumps(c, ensure_ascii=False), html0, wk0, py0, s3html0, s3ver0, seed0, extra0)
 
     def mut_html(old, new):
-        return (cfg0, cfg_text0, html0.replace(old, new), wk0, py0, s3html0, s3ver0, seed0)
+        return (cfg0, cfg_text0, html0.replace(old, new), wk0, py0, s3html0, s3ver0, seed0, extra0)
 
     def mut_wk(old, new):
-        return (cfg0, cfg_text0, html0, wk0.replace(old, new), py0, s3html0, s3ver0, seed0)
+        return (cfg0, cfg_text0, html0, wk0.replace(old, new), py0, s3html0, s3ver0, seed0, extra0)
+
+    def mut_file(name, old, new):
+        """★ 混入検査の走査対象（run.sh / notes.md / data.md / 検査自身）を壊す。
+
+        ⚠️★★★ この helper が無いと、**走査対象を増やしても「壊して赤くなるか」を実測できない。**
+        ★ 2026-08-14 に `run.sh` の実セッション名が 1 日以上見つからなかったのは、
+          まさに「その範囲を見る検査が無い」状態だったからである。
+        """
+        e = dict(extra0)
+        if e.get(name) is None:
+            raise SystemExit(f"meta: 走査対象 {name} が読めていない")
+        e[name] = e[name].replace(old, new) if old else e[name] + new
+        return (cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, seed0, e)
 
     def mut_both(old, new):
         """★ step4.html と layer0.html に **同じ**変更を入れる。
@@ -1849,7 +2270,7 @@ def meta_checks() -> int:
         → ★ 両側を揃えて壊し、**一致していても駄目なもの**を検査できていることを確かめる。
         """
         return (cfg0, cfg_text0, html0.replace(old, new), wk0, py0,
-                s3html0.replace(old, new), s3ver0, seed0)
+                s3html0.replace(old, new), s3ver0, seed0, extra0)
 
     def plan(c, pid):
         return next(p for p in c["separation_plans"]["options"] if p["id"] == pid)
@@ -1858,12 +2279,12 @@ def meta_checks() -> int:
         ("版を config 側だけずらす",
          mut_cfg(lambda c: c.update(expr_version="9.9.9-bogus")), "expr_smooth.py"),
         ("Step 3 の config を追随させ忘れる",
-         (cfg0, cfg_text0, html0, wk0, py0, s3html0, "0.2.0-step3", seed0), "追随"),
+         (cfg0, cfg_text0, html0, wk0, py0, s3html0, "0.2.0-step3", seed0, extra0), "追随"),
         # ⚠️ 3 箇所すべてを据え置く。★ 1 箇所だけ戻すと**先に一致検査が落ちる**ので
         #    「上がっているか」の検査を試したことにならない（実測で踏んだ）。
         ("版を 3 箇所とも Step 3 のまま据え置く",
          ({**copy.deepcopy(cfg0), "expr_version": PREV_VERSION},
-          cfg_text0, html0, wk0, PREV_VERSION, s3html0, PREV_VERSION, seed0),
+          cfg_text0, html0, wk0, PREV_VERSION, s3html0, PREV_VERSION, seed0, extra0),
          "Step 3 の版から上がっている"),
         ("基音を帯の外（130 Hz）にする",
          mut_cfg(lambda c: c["candidates"]["base_hz"]["options"][0].update(hz=130.0)),
@@ -1926,7 +2347,7 @@ def meta_checks() -> int:
         ("傾斜プローブの注記から『実レート』を消す",
          mut_cfg(lambda c: c["selftest"].update(_tilt_probe_why=["ただの注記"])), "実レート"),
         ("config に『非周期』と書く",
-         (cfg0, cfg_text0 + "\n非周期\n", html0, wk0, py0, s3html0, s3ver0, seed0), "非周期"),
+         (cfg0, cfg_text0 + "\n非周期\n", html0, wk0, py0, s3html0, s3ver0, seed0, extra0), "非周期"),
         ("系統 B の paste 注記を消す",
          mut_cfg(lambda c: c["mapping"]["pathways"][1].pop("_paste_missing")), "paste"),
         ("★ player から停止ボタンを消す",
@@ -2008,12 +2429,12 @@ def meta_checks() -> int:
          #    ★ 検算側の allPlanRates(true) は残す（そちらは正しい呼び方である）
          (cfg0, cfg_text0,
           html0.replace("allRates: allPlanRates(),", "allRates: allPlanRates(true),", 1),
-          wk0, py0, s3html0, s3ver0, seed0),
+          wk0, py0, s3html0, s3ver0, seed0, extra0),
          "実時間再生に検証専用レート"),
         ("★ 系統切替で CSV を読み直さない形に戻す",
          mut_html("async function reparseCsv(", "async function reparseGone("), "読み直していない"),
         ("SEED から seed を消す",
-         (cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, "seed なし"), "SEED"),
+         (cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, "seed なし", extra0), "SEED"),
 
         # ---- 層 2 の作り直し（S4-D12） ------------------------------------
         ("★ 既定を新候補にして対照を失う",
@@ -2177,20 +2598,36 @@ def meta_checks() -> int:
         ("★★★ AB-D1: 引いた seed を結果に残さない（出題順が再構成できなくなる）",
          mut_html("    order_seed: bl.orderSeed,", ""), "bl.orderSeed を指していない"),
         # ⚠️★★★ **本命の変異**: 交絡そのものを戻す。
-        ("★★★ AB-D2: リセットを 1 区間目の後ろへ動かす（持ち越しが採点区間で鳴る＝元の欠陥）",
-         mut_html('  abxSetInstant("A");\n'
-                  '  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;\n'
-                  '  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;',
-                  '  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;\n'
-                  '  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;\n'
-                  '  abxSetInstant("A");'),
-         "順になっていない"),
-        ("★★★ AB-D2: 準備区間を丸ごと消す（元の 2 相に戻る）",
-         mut_html('  abxSetInstant(carry);\n'
-                  '  if (!await abxPhase(bl, "prep1", half, "準備中（まだ判定しません）")) return;\n'
+        # ---- ★★★ S5C-D1（A′）: 準備区間から状態変化を消したことの変異 ------------
+        #
+        # ⚠️★★★ 上の 3 版（初版 / AB-D2 / AB-D7）はすべて「跳びをどこへ置くか」の変異だった。
+        #   ★ A′ は **跳びを置かない**ので、変異の形も「跳びを 1 つ足す」に変わる。
+        ("★★★ S5C-D1: 準備区間に跳びを 1 つ戻す（向きと偶奇が入場状態を運ぶ＝AB-D10 の再発）",
+         mut_html('  if (!await abxPhase(bl, "prep", bl.prepSec * 1000, "準備中（まだ判定しません）")) return;',
                   '  abxSetInstant("A");\n'
-                  '  if (!await abxPhase(bl, "prep2", half, "準備中（まだ判定しません）")) return;\n',
-                  '  abxSetInstant("A");\n'), "prep2 / i1 の相が無い"),
+                  '  if (!await abxPhase(bl, "prep", bl.prepSec * 1000, "準備中（まだ判定しません）")) return;'),
+         "準備区間 / 1 区間目で `abxSetInstant()` を呼んでいる"),
+        ("★★★ S5C-D1: 切替を 1 区間目より前へ動かす（採点区間が両方 2 区間目の状態になる）",
+         mut_html('  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;\n'
+                  "  abxSet(to);",
+                  "  abxSet(to);\n"
+                  '  if (!await abxPhase(bl, "i1", ms, "1 区間目")) return;'),
+         "準備区間 / 1 区間目で `abxSet()` を呼んでいる"),
+        ("★★★ S5C-D1: 到達点を持ち越さない（1 区間目が毎回同じ状態に戻り、終点が固定される）",
+         mut_html("  bl.state = to;", ""), "持ち越していない"),
+        ("★★★ S5C-D1: 1 区間目の状態を固定に戻す（AB-D10 の恒等式が復活する）",
+         mut_html("  const from = bl.state;", '  const from = "A";'),
+         "bl.state（持ち越した到達点）から来ていない"),
+        ("★★★ S5C-D1: 2 区間目の状態をリテラルで書く（終点固定＝跳びの偶奇が入場状態になる）",
+         mut_html("  abxSet(to);", '  abxSet(kind === "diff" ? "B" : "A");'),
+         "リテラルで指定している"),
+        ("★★★ S5C-D1: 開始状態の定義を消す（②の入口の状態が不定になり、状態列が復元できない）",
+         mut_html("  abxSetInstant(initialState);\n  lockUI(true);", "  lockUI(true);"),
+         "実際に鳴らす開始状態が initialState から作られていない"),
+        ("★★★ S5C-D1: 各トライアルの from / to を記録しない（方向の均衡を事後に検算できない）",
+         mut_html("  t.from = from; t.to = to;", ""), "状態を記録していない"),
+        ("★★★ S5C-D1: 開始状態を結果に残さない（状態列が復元できない）",
+         mut_html("    initial_state: bl.initialState,\n", ""), "開始状態を結果に残していない"),
         ("★★ AB-D2: prep_seconds を config から消す",
          mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].pop("prep_seconds")),
          "prep_seconds が config に無い"),
@@ -2227,19 +2664,72 @@ def meta_checks() -> int:
         ("★★★ 散文中の Windows パスを player に混ぜる（旧パターンは取り逃した）",
          mut_html('<p class="note" id="abx-result">',
                   "<!-- out C:" + "\\" + "GSE-out" + "\\" + 'x.json -->\n  <p class="note" id="abx-result">'),
-         "絶対パス/ユーザー名らしき文字列がある"),
+         "player に絶対パス/ユーザー名/実セッション名"),
         ("★★★ 別ユーザー名の Windows パスを混ぜる（ハードコード名では捕まらない）",
          mut_html('<p class="note" id="abx-result">',
                   "<!-- C:" + "\\" + "Users" + "\\" + "alice" + "\\" + 'x -->\n  <p class="note" id="abx-result">'),
-         "絶対パス/ユーザー名らしき文字列がある"),
+         "player に絶対パス/ユーザー名/実セッション名"),
         ("★★★ macOS の home パスを混ぜる（旧パターンに /Users/ の形が無かった）",
          mut_html('<p class="note" id="abx-result">',
                   '<!-- /Users/someone/Documents/x -->\n  <p class="note" id="abx-result">'),
-         "絶対パス/ユーザー名らしき文字列がある"),
+         "player に絶対パス/ユーザー名/実セッション名"),
         ("★★★ config 側に絶対パスを混ぜる（旧実装は config を 1 バイトも見ていなかった）",
          mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].__setitem__(
              "_out_dir", "C:/GSE-out/results")),
          "config に絶対パス"),
+        # ---- ★★★ 走査範囲を広げたことの実測（security-checker 指摘・2026-08-14）--------
+        # ⚠️★★★ **run.sh に実セッション名が 2 件あり、1 日以上どの検査にも見られていなかった。**
+        #   ★ 旧実装が見ていたのは player / worklet / config の 3 つだけ。
+        #   → ★ 「事故が起きた当のファイルを見ていない検査は、何も守っていない。」
+        # ⚠️★★★ **見本は必ず連結で作る。** ★ そのまま書くと
+        #   「検査自身の走査」が自分の変異データに反応して赤くなる（★ 実測で 1 回踏んだ）。
+        #   ★ 既存の絶対パスの変異が `"C:" + "\\" + …` と書いてあるのと同じ理由・同じ形。
+        # ⚠️★★★ 2026-08-14 `/cross-review`（HIGH）—— ★ ここには **実在の識別子**が入っていた。
+        #   ★ 連結なので混入検査は 1 バイトも見ておらず、**外部 LLM へそのまま出た。**
+        #   → ★ 見本は `FAKE_SESSION`（架空・1 か所定義）だけを使う。
+        #     ★ 「連結しても架空名しか置けない」は `_fixtures_hide_no_real_session` が実測で縛る。
+        ("★★★ run.sh に実セッション名を戻す（★ 実際に混入していた形そのもの）",
+         mut_file("run.sh", "# ---------------------------------------------------------------------------\ncmd_data()",
+                  "# 例: " + FAKE_SESSION + "\ncmd_data()"),
+         "run.sh に絶対パス/ユーザー名/実セッション名"),
+        ("★★★ run.sh に絶対パスを混ぜる（★ run.sh は実行されるコードなので全パターンを当てる）",
+         mut_file("run.sh", 'PY="${PYTHON:-python}"', 'PY="C:/Python/python.exe"'),
+         "run.sh に絶対パス"),
+        ("★★★ notes.md に実セッション名を混ぜる（★ 散文でも実名は正当な出番が無い）",
+         mut_file("notes.md", "", "\n★ 素材: " + FAKE_SESSION + "\n"),
+         "notes.md に絶対パス/ユーザー名/実セッション名"),
+        ("★★★ data.md に実セッション名を混ぜる（★ 「パスを書かない」と宣言している当のファイル）",
+         mut_file("data.md", "", "\n★ 対象: " + FAKE_SESSION + "\n"),
+         "data.md に絶対パス/ユーザー名/実セッション名"),
+        ("★★★ 検査自身に実セッション名を混ぜる（★ 2026-08-13 の事故と同じ形）",
+         mut_file("step4_selftest.py", "", "\n# 例: " + FAKE_SESSION + "\n"),
+         "step4_selftest.py に絶対パス/ユーザー名/実セッション名"),
+        # ⚠️★★★ 2026-08-14 `/cross-review`（HIGH）の再発検査 ——
+        #   ★ **上の 4 件は「組み立て済み」の形しか試していなかった。**
+        #   ★ 実際に事故った形は **連結（`"P010" + "_gse_" + "…"`）** であり、
+        #     ⚠️ **その形は 4 件の変異のどれでも赤くならなかった。**
+        # ⚠️★★ 見本を**リテラルで書かない**（★ 書くと新しい検査が自分自身に反応して常に赤くなる）。
+        #   → ★ `FAKE_SESSION` から**実行時に**作り、連結の**ソース表記**へ組み立て直す。
+        ("★★★ 検査自身に『連結で隠した』実セッション名を混ぜる（★ 実際に外部送信された形）",
+         mut_file("step4_selftest.py", "",
+                  "\n# 例: " + _concat_src(FAKE_SESSION.replace("P999", "P123").replace("20000101", "20260101")) + "\n"),
+         "検査自身が連結で実セッション名らしき文字列を隠し持っている"),
+        # ⚠️★★★ 2026-08-14 `/cross-review`（HIGH）—— ★ **暗黙連結（`+` 無し）で書いた形**。
+        #   ★ 旧実装（`+` 必須）はこれを素通りし、`secrets-filter.sh` も改行で分ければ素通りした。
+        ("★★★ 検査自身に『暗黙連結（+ 無し）で隠した』実セッション名を混ぜる",
+         mut_file("step4_selftest.py", "",
+                  "\n# 例: " + _concat_src(
+                      FAKE_SESSION.replace("P999", "P456").replace("20000101", "20260202"),
+                      joiner=" ") + "\n"),
+         "検査自身が連結で実セッション名らしき文字列を隠し持っている"),
+        ("★★★ 自己走査の除外区間の目印を消す（★ 除外が no-op になり自分の正規表現に反応する）",
+         mut_file("step4_selftest.py", "# ---- PII-PATTERNS:END ----", "# ---- (removed) ----"),
+         "除外区間の目印が実在しない"),
+        ("★★★ 走査対象を 1 つ黙って消す（★ 対象が消えたのに緑のまま、を作らない）",
+         mut_file("run.sh", "", "") if False else
+         (cfg0, cfg_text0, html0, wk0, py0, s3html0, s3ver0, seed0,
+          {**extra0, "data.md": None}),
+         "data.md が無い"),
         # ---- ★★★ code-reviewer が実測で見つけた silent pass 7 件（2026-08-13）--------
         # ⚠️★★★ **7 件とも「壊しても緑」だった。** ★ 直した検査が本当に赤くなることをここで実測する。
         ("★★★ M1: 引いた seed を abx.blind に載せない（order_seed が undefined になる）",
@@ -2254,9 +2744,8 @@ def meta_checks() -> int:
         ("★★★ M4: 提示の時間構造を結果から落とす",
          mut_html("    prep_seconds: bl.prepSec, seconds_per_side: bl.sideSec,", ""),
          "prep_seconds が bl.prepSec を指していない"),
-        ("★★★ M5: リセットを 1 回目だけにする（2 回目以降が元の欠陥に戻る・位置は変わらない）",
-         mut_html('  abxSetInstant("A");\n  if (!await abxPhase(bl, "prep2"',
-                  '  if (bl.i === 0) abxSetInstant("A");\n  if (!await abxPhase(bl, "prep2"'),
+        ("★★★ M5: 持ち越しを 1 回目だけにする（2 回目以降が固定の基準に戻る・行は残る）",
+         mut_html("  bl.state = to;", "  if (bl.i === 0) bl.state = to;"),
          "条件分岐の中にある"),
         ("★★★ M6: 記録する seed を固定値にする（記録が嘘になる）",
          mut_html("    order_seed: bl.orderSeed,", "    order_seed: 20260813,"),
@@ -2269,17 +2758,57 @@ def meta_checks() -> int:
                   '  if (bl.phase !== "answer") return;'),
          "結果の記録より後ろ"),
         # ---- ★★★ AB-D7（真値の漏れ）と中止経路 -----------------------------------
-        ("★★★ AB-D7: carry を真値から作る（準備区間の跳びが正解を漏らす）",
-         mut_html('const carry = mulberry32(bl.carrySeed + bl.i)() < 0.5 ? "A" : "B";',
-                  'const carry = kind === "diff" ? "B" : "A";'),
-         "carry が真値から作られている"),
-        ("★★★ AB-D7: 準備区間を 1 段に戻す（carry が 1 サンプルも鳴らない no-op になる）",
-         mut_html('  abxSetInstant(carry);\n  if (!await abxPhase(bl, "prep1", half, "準備中（まだ判定しません）")) return;\n', ""),
-         "2 段（prep1 / prep2）になっていない"),
-        ("★★★ AB-D7: 2 区間目の切替を即座にする（遷移時間という独立変数が黙って無効になる）",
-         mut_html('  abxSet(kind === "diff" ? "B" : "A");                 // ★ same は入れ替えない',
-                  '  abxSetInstant(kind === "diff" ? "B" : "A");'),
-         "採点区間（1 区間目以降）で abxSetInstant"),
+        ("★★★ S5C-D1: 2 区間目の切替を即座にする（遷移時間という独立変数が黙って無効になる）",
+         mut_html("  abxSet(to);", "  abxSetInstant(to);"),
+         "abxSet(to)（遷移時間を守る側）になっていない"),
+        ("★★★ S5C-D1: trials を 10 にする（diff が 5 回＝奇数になり、上下の均衡が崩れる）",
+         mut_cfg(lambda c: c["layer2_rework"]["abx"]["blind"].update(trials=10)),
+         "均衡しない"),
+        # ---- ★★★ code-reviewer が実測で見つけた穴（2026-08-14）------------------------
+        # ⚠️★★★ **下の 6 件はすべて「123 件が全部緑のまま」通っていた形である。**
+        ("★★★ HIGH: 2 区間目の状態を交互にしない（★ 式の形は保ったまま不変量だけ壊す）",
+         mut_html('  const to = kind === "diff" ? (from === "A" ? "B" : "A") : from;',
+                  '  const to = kind === "diff" ? (from === "B" ? "B" : "B") : from;'),
+         "diff なのに反転していない"),
+        ("★★★ HIGH: 盲検中も abx-now に状態を書く（★ 真値が読むだけで分かる）",
+         mut_html('  $("abx-now").textContent = abx.blind\n    ? "盲検中（★ 提示条件は伏せています）"\n    : (abx.active',
+                  '  $("abx-now").textContent = (abx.active'),
+         "盲検中かどうかを見ずに"),
+        ("★★★ HIGH: 盲検中の表示に状態を混ぜる（★ 分岐を足しただけでは足りない）",
+         mut_html('    ? "盲検中（★ 提示条件は伏せています）"', "    ? `盲検中 ${abx.state}`"),
+         "伏せたことにならない"),
+        ("★★★ MEDIUM: 区間の長さを真値で変える（★ 耳を使わずに答えが出る）",
+         mut_html('  const ms = bl.sideSec * 1000;',
+                  '  const ms = bl.sideSec * 1000 + (kind === "diff" ? 500 : 0);'),
+         "区間の長さが真値から作られている"),
+        ("★★★ MEDIUM: 開始状態を固定に戻す（★ 1 回目の diff が必ず上向きになる錨）",
+         mut_html('  const initialState = drawOrderSeed() % 2 === 0 ? "A" : "B";',
+                  '  const initialState = "A";'),
+         "開始状態が乱数で引かれていない"),
+        ("★★★ MEDIUM: 記録する開始状態だけを別リテラルにする（★ 記録が嘘になる）",
+         mut_html("                state: initialState, initialState,",
+                  '                state: initialState, initialState: "A",'),
+         "同じ変数から作られていない"),
+        ("★★★ MEDIUM: 準備区間の状態変更をヘルパ経由にする（★ abxSet* を探すだけでは素通り）",
+         mut_html("  const from = bl.state;", "  hiddenReset();\n  const from = bl.state;"),
+         "を呼んでいる"),
+        ("★★★ S5C-D6: 承知の印を見ずに始める（★ 2026-08-13 と 08-14 に実際に起きた取り違え）",
+         mut_html('    if (!$("abx-texture-ack").checked) {', "    if (false) {"),
+         "承知の印を見ずに盲検が始まる"),
+        ("★★★ S5C-D6: 承知が無くても止めずに続ける（★ 警告だけでは 2 回とも防げなかった）",
+         mut_html('      $("abx-result").textContent = msg; logLine(msg); return;\n    }\n    logLine(`⚠️★★★ 密度の写し方',
+                  '      $("abx-result").textContent = msg; logLine(msg);\n    }\n    logLine(`⚠️★★★ 密度の写し方'),
+         "止めていない"),
+        ("★★★ S5C-D6: 条件の札を盲検の画面から落とす（★ 走行中に条件が見えなくなる）",
+         mut_html("  const head = `${bl.i + 1} / ${bl.order.length} 回目［${bl.condTag}］`;",
+                  "  const head = `${bl.i + 1} / ${bl.order.length} 回目`;"),
+         "条件の札を出していない"),
+        ("★★★ S5C-D5: 方向の均衡を結果に残さない（★ 提示が壊れても事後に分からない）",
+         mut_html("    direction_balance: bl.directionBalance,\n", ""),
+         "結果 JSON に残していない"),
+        ("★★★ S5C-D5: 方向が均衡していないことを画面に出さない（★ 壊れた提示が黙って通る）",
+         mut_html("    (bl.directionBalance.ok ? \"\"", '    (true ? ""'),
+         "画面に出していない"),
         ("★★★ 中止ボタンを lockUI で無効化する（25 分の盲検を止める手段が消える）",
          mut_html('  $("btn-abx-stop").disabled = !lock;', '  $("btn-abx-stop").disabled = lock;'),
          "中止ボタンが lockUI で無効化"),
@@ -2298,8 +2827,12 @@ def meta_checks() -> int:
                   "}\n\n/**\n * ★★★ 瞬時 A/B の結果を保存する（Step 5）。"),
          "abx.blind を手放していない"),
         ("★★ 結果から時刻を落とす（AB-D5 の時刻仮説を検証できなくなる）",
-         mut_html("    protocol: \"3phase-prep-v1\", started_at: bl.startedAt,\n", ""),
-         "protocol:"),
+         mut_html("    protocol: \"3phase-noreset-v2\", started_at: bl.startedAt,\n", ""),
+         "protocol が入っていない"),
+        ("★★★ S5C-D1: protocol を旧手順の値のままにする（測り直しと旧記録が JSON 上で区別できない）",
+         mut_html('    protocol: "3phase-noreset-v2", started_at: bl.startedAt,',
+                  '    protocol: "3phase-prep-v1", started_at: bl.startedAt,'),
+         "protocol が新手順の値になっていない"),
         ("★★ 相の長さを live 参照に戻す（記録と提示が食い違う）",
          mut_html("  const ms = bl.sideSec * 1000;", "  const ms = abxSideSeconds() * 1000;"),
          "live 参照している"),
@@ -2339,7 +2872,15 @@ def meta_checks() -> int:
 
     print("== meta 検査（★ 検査を壊して赤くなることの確認） ==")
     npass = nfail = 0
+    want_len = len(base)
     for label, mutated, expect in cases:
+        # ⚠️★★ 変異は生タプルでも書けるので、**要素数がずれたまま気づかない**ことがある
+        #   （★ 2026-08-14 に走査対象を 1 つ足したとき、5 箇所で実際にずれた）。
+        #   ★ TypeError で落ちると **どの変異が原因か分からない**ので、ここで名指しする。
+        if len(mutated) != want_len:
+            raise SystemExit(
+                f"meta: 変異「{label}」の要素数が {len(mutated)}（★ {want_len} が正）。"
+                "★ load_sources() に足したものを、この変異にも渡すこと")
         got = first_failure(mutated)
         if got is None:
             nfail += 1

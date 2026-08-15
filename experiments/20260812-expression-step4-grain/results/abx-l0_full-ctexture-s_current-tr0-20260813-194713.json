@@ -1,0 +1,153 @@
+{
+  "expr_version": "0.3.0-step4",
+  "condition": "abx_density",
+  "transition": "tr_0",
+  "transition_seconds": 0,
+  "measured_ratio": 1.0349942323601493,
+  "measured_db": 0.2987585927449136,
+  "contrast_measurable": false,
+  "contrast_note": "⚠️★★★ measured_db は刺激の大きさ **ではない** —— この密度の写し方はエネルギー保存でレベルが動かない。★ 密度は rate_min → rate_max で実際に変わっている。",
+  "timbre": "t_low_wide",
+  "density_cue": "c_texture",
+  "density_span": "s_current",
+  "layer0_gain": "l0_full",
+  "layer0_gain_value": 1,
+  "ratio_condition": {
+    "l0gain": "l0_full",
+    "l0gain_value": 1,
+    "timbre": "t_low_wide",
+    "dcue": "c_texture",
+    "dspan": "s_current",
+    "map": false,
+    "l2on": true,
+    "plan": "plan_a"
+  },
+  "order_seed": 3341880217,
+  "prep_seconds": 3,
+  "seconds_per_side": 4,
+  "protocol": "3phase-noreset-v2",
+  "started_at": "2026-08-13T19:45:40.638Z",
+  "finished_at": "2026-08-13T19:47:13.022Z",
+  "initial_state": "A",
+  "timing": {
+    "0": {
+      "from": "A",
+      "to": "A",
+      "prep_ms": 3006,
+      "i1_ms": 4007,
+      "i2_ms": 4000
+    },
+    "1": {
+      "from": "A",
+      "to": "A",
+      "prep_ms": 3008,
+      "i1_ms": 4002,
+      "i2_ms": 4002
+    },
+    "2": {
+      "from": "A",
+      "to": "B",
+      "prep_ms": 3009,
+      "i1_ms": 4007,
+      "i2_ms": 4013
+    },
+    "3": {
+      "from": "B",
+      "to": "A",
+      "prep_ms": 3006,
+      "i1_ms": 4002,
+      "i2_ms": 4015
+    },
+    "4": {
+      "from": "A",
+      "to": "B",
+      "prep_ms": 3014,
+      "i1_ms": 4018,
+      "i2_ms": 4010
+    },
+    "5": {
+      "from": "B",
+      "to": "B",
+      "prep_ms": 3008,
+      "i1_ms": 4000,
+      "i2_ms": 4000
+    },
+    "6": {
+      "from": "B",
+      "to": "B",
+      "prep_ms": 3016,
+      "i1_ms": 4001,
+      "i2_ms": 4007
+    },
+    "7": {
+      "from": "B",
+      "to": "A",
+      "prep_ms": 3014,
+      "i1_ms": 4001,
+      "i2_ms": 4016
+    }
+  },
+  "rate_min": 100,
+  "rate_max": 400,
+  "trials": [
+    {
+      "index": 0,
+      "truth": "same",
+      "answer": "same",
+      "correct": true
+    },
+    {
+      "index": 1,
+      "truth": "same",
+      "answer": "same",
+      "correct": true
+    },
+    {
+      "index": 2,
+      "truth": "diff",
+      "answer": "same",
+      "correct": false
+    },
+    {
+      "index": 3,
+      "truth": "diff",
+      "answer": "same",
+      "correct": false
+    },
+    {
+      "index": 4,
+      "truth": "diff",
+      "answer": "diff",
+      "correct": true
+    },
+    {
+      "index": 5,
+      "truth": "same",
+      "answer": "diff",
+      "correct": false
+    },
+    {
+      "index": 6,
+      "truth": "same",
+      "answer": "same",
+      "correct": true
+    },
+    {
+      "index": 7,
+      "truth": "diff",
+      "answer": "same",
+      "correct": false
+    }
+  ],
+  "correct": 4,
+  "threshold": 7,
+  "pass": false,
+  "stats": {
+    "hit": 1,
+    "nDiff": 4,
+    "fa": 1,
+    "nSame": 4,
+    "balanced": true
+  },
+  "note": "★ 瞬時 A/B は spec §2 の禁止事項を意図的に破る診断条件。製品の提示方法ではない。"
+}
