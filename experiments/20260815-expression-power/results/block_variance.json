@@ -1,0 +1,44 @@
+{
+  "block_level_keystroke_rate_per_min": {
+    "cv": 0.6575,
+    "mean": 116.58,
+    "mean_all_sessions_unfiltered": 111.41,
+    "median": 124.51,
+    "n_blocks": 10,
+    "sd": 76.65,
+    "sd_all_sessions_unfiltered": 69.55
+  },
+  "block_level_p_stuck_fraction": {
+    "mean": 0.0158,
+    "n_blocks": 10,
+    "sd": 0.0144
+  },
+  "input_manifest": {
+    "files": 13,
+    "manifest_sha256": "61985b323469f199ac72d74a9a3f7dc512c1d51e83b12203a388b4c6127e246b",
+    "total_bytes": 1766713
+  },
+  "min_session_minutes": 3.0,
+  "note": "集計統計量のみ。セッション名・時刻・vk は 1 つも含まない。",
+  "primary_unit": "session (= 1 block; spec §8 逐語『1 ブロック = 1 セッション = NDJSON 1 ファイル』)",
+  "schema": "expression-power-anchor/v2",
+  "secondary_within_session_windows": {
+    "caveat": "打鍵は自己相関を持つので、この窓長の SD を 1/sqrt(T) で 5 分へ外挿してはならない",
+    "sessions_usable": 10,
+    "window_minutes": 1,
+    "windows_total": 65,
+    "within_session_cv_median": 0.6275,
+    "within_session_mean_median": 121.644,
+    "within_session_sd_median": 51.775
+  },
+  "session_minutes": {
+    "max": 9.29,
+    "median": 5.71,
+    "min": 1.68,
+    "total": 72.3
+  },
+  "sessions_found": 13,
+  "sessions_kept": 10,
+  "sessions_summarized": 13,
+  "stuck_threshold": 0.7
+}

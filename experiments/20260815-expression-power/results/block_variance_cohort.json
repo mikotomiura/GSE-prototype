@@ -1,0 +1,290 @@
+{
+  "activity_gates": [
+    {
+      "min_keydown_per_window": 0,
+      "participants": 5,
+      "per_participant": [
+        {
+          "participant": "P010",
+          "rate_cv": 0.7365,
+          "rate_mean": 58.43,
+          "rate_sd": 43.03,
+          "windows_dropped": 0,
+          "windows_kept": 219
+        },
+        {
+          "participant": "P011",
+          "rate_cv": 0.4337,
+          "rate_mean": 182.23,
+          "rate_sd": 79.04,
+          "windows_dropped": 0,
+          "windows_kept": 58
+        },
+        {
+          "participant": "P012",
+          "rate_cv": 1.0526,
+          "rate_mean": 43.09,
+          "rate_sd": 45.36,
+          "windows_dropped": 0,
+          "windows_kept": 83
+        },
+        {
+          "participant": "P013",
+          "rate_cv": 1.564,
+          "rate_mean": 34.53,
+          "rate_sd": 54.01,
+          "windows_dropped": 0,
+          "windows_kept": 81
+        },
+        {
+          "participant": "P014",
+          "rate_cv": 1.2571,
+          "rate_mean": 30.92,
+          "rate_sd": 38.87,
+          "windows_dropped": 0,
+          "windows_kept": 176
+        }
+      ],
+      "source": "参考",
+      "windows_dropped": 0,
+      "windows_kept": 617,
+      "within_participant_cv_max": 1.564,
+      "within_participant_cv_median": 1.0526,
+      "within_participant_cv_min": 0.4337
+    },
+    {
+      "min_keydown_per_window": 1,
+      "participants": 5,
+      "per_participant": [
+        {
+          "participant": "P010",
+          "rate_cv": 0.6446,
+          "rate_mean": 63.66,
+          "rate_sd": 41.03,
+          "windows_dropped": 18,
+          "windows_kept": 201
+        },
+        {
+          "participant": "P011",
+          "rate_cv": 0.4091,
+          "rate_mean": 185.43,
+          "rate_sd": 75.87,
+          "windows_dropped": 1,
+          "windows_kept": 57
+        },
+        {
+          "participant": "P012",
+          "rate_cv": 0.7576,
+          "rate_mean": 57.69,
+          "rate_sd": 43.7,
+          "windows_dropped": 21,
+          "windows_kept": 62
+        },
+        {
+          "participant": "P013",
+          "rate_cv": 1.2811,
+          "rate_mean": 45.11,
+          "rate_sd": 57.79,
+          "windows_dropped": 19,
+          "windows_kept": 62
+        },
+        {
+          "participant": "P014",
+          "rate_cv": 0.8013,
+          "rate_mean": 48.59,
+          "rate_sd": 38.94,
+          "windows_dropped": 64,
+          "windows_kept": 112
+        }
+      ],
+      "source": "参考",
+      "windows_dropped": 123,
+      "windows_kept": 494,
+      "within_participant_cv_max": 1.2811,
+      "within_participant_cv_median": 0.7576,
+      "within_participant_cv_min": 0.4091
+    },
+    {
+      "min_keydown_per_window": 100,
+      "participants": 5,
+      "per_participant": [
+        {
+          "participant": "P010",
+          "rate_cv": 0.5019,
+          "rate_mean": 73.26,
+          "rate_sd": 36.77,
+          "windows_dropped": 48,
+          "windows_kept": 171
+        },
+        {
+          "participant": "P011",
+          "rate_cv": 0.4091,
+          "rate_mean": 185.43,
+          "rate_sd": 75.87,
+          "windows_dropped": 1,
+          "windows_kept": 57
+        },
+        {
+          "participant": "P012",
+          "rate_cv": 0.5353,
+          "rate_mean": 72.31,
+          "rate_sd": 38.71,
+          "windows_dropped": 35,
+          "windows_kept": 48
+        },
+        {
+          "participant": "P013",
+          "rate_cv": 0.7446,
+          "rate_mean": 81.64,
+          "rate_sd": 60.79,
+          "windows_dropped": 49,
+          "windows_kept": 32
+        },
+        {
+          "participant": "P014",
+          "rate_cv": 0.4537,
+          "rate_mean": 69.39,
+          "rate_sd": 31.48,
+          "windows_dropped": 102,
+          "windows_kept": 74
+        }
+      ],
+      "source": "G1 事前登録 §2.9 の適格性ゲート（凍結）",
+      "windows_dropped": 235,
+      "windows_kept": 382,
+      "within_participant_cv_max": 0.7446,
+      "within_participant_cv_median": 0.5019,
+      "within_participant_cv_min": 0.4091
+    },
+    {
+      "min_keydown_per_window": 200,
+      "participants": 5,
+      "per_participant": [
+        {
+          "participant": "P010",
+          "rate_cv": 0.3952,
+          "rate_mean": 83.97,
+          "rate_sd": 33.18,
+          "windows_dropped": 82,
+          "windows_kept": 137
+        },
+        {
+          "participant": "P011",
+          "rate_cv": 0.3887,
+          "rate_mean": 188.37,
+          "rate_sd": 73.21,
+          "windows_dropped": 2,
+          "windows_kept": 56
+        },
+        {
+          "participant": "P012",
+          "rate_cv": 0.4356,
+          "rate_mean": 84.01,
+          "rate_sd": 36.59,
+          "windows_dropped": 46,
+          "windows_kept": 37
+        },
+        {
+          "participant": "P013",
+          "rate_cv": 0.5977,
+          "rate_mean": 99.98,
+          "rate_sd": 59.76,
+          "windows_dropped": 57,
+          "windows_kept": 24
+        },
+        {
+          "participant": "P014",
+          "rate_cv": 0.2986,
+          "rate_mean": 81.85,
+          "rate_sd": 24.44,
+          "windows_dropped": 119,
+          "windows_kept": 57
+        }
+      ],
+      "source": "参考",
+      "windows_dropped": 306,
+      "windows_kept": 311,
+      "within_participant_cv_max": 0.5977,
+      "within_participant_cv_median": 0.3952,
+      "within_participant_cv_min": 0.2986
+    }
+  ],
+  "activity_gates_note": "⚠️ Phase1 は自然ログで、打鍵以外（読解・離席・別作業）が窓に入る。G1 は統制下で純粋な打鍵を集める。→ G1 の適格性ゲート(keydown>=100)を当てて『非打鍵ノイズが CV のどれだけを占めるか』を測る。★ ゲート値は事前登録で凍結済み",
+  "between_participant": {
+    "mean_of_participant_means": 69.84,
+    "sd_of_participant_means": 63.72
+  },
+  "input_manifest": {
+    "files": 63,
+    "manifest_sha256": "120e1a5e16447449c52c1313a2fa058b99949cc055d42354a3760b26ae50fa3b",
+    "total_bytes": 61949775
+  },
+  "note": "集計統計量のみ。★ ファイル名・セッション名・時刻・vk は 1 つも含まない。",
+  "participants": 5,
+  "per_participant": [
+    {
+      "keydown_per_window_median": 259,
+      "participant": "P010",
+      "rate_cv": 0.7365,
+      "rate_mean": 58.43,
+      "rate_sd": 43.03,
+      "sessions": 17,
+      "windows": 219
+    },
+    {
+      "keydown_per_window_median": 904.5,
+      "participant": "P011",
+      "rate_cv": 0.4337,
+      "rate_mean": 182.23,
+      "rate_sd": 79.04,
+      "sessions": 10,
+      "windows": 58
+    },
+    {
+      "keydown_per_window_median": 174,
+      "participant": "P012",
+      "rate_cv": 1.0526,
+      "rate_mean": 43.09,
+      "rate_sd": 45.36,
+      "sessions": 10,
+      "windows": 83
+    },
+    {
+      "keydown_per_window_median": 39,
+      "participant": "P013",
+      "rate_cv": 1.564,
+      "rate_mean": 34.53,
+      "rate_sd": 54.01,
+      "sessions": 15,
+      "windows": 81
+    },
+    {
+      "keydown_per_window_median": 47.0,
+      "participant": "P014",
+      "rate_cv": 1.2571,
+      "rate_mean": 30.92,
+      "rate_sd": 38.87,
+      "sessions": 11,
+      "windows": 176
+    }
+  ],
+  "prereg_cross_check": {
+    "_source": "experiments/20260801-controlled-friction-task/preregistration.md §2.9",
+    "recomputed_frac_below_100": 0.3809,
+    "recomputed_median": 205,
+    "recomputed_q1": 13.0,
+    "recomputed_windows": 617,
+    "recorded_frac_below_100": 0.29,
+    "recorded_median": 261,
+    "recorded_q1": 61,
+    "recorded_windows": 360
+  },
+  "schema": "expression-power-anchor-cohort/v1",
+  "window_minutes": 5,
+  "windows_total": 617,
+  "within_participant_cv": {
+    "max": 1.564,
+    "median": 1.0526,
+    "min": 0.4337
+  }
+}
