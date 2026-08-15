@@ -219,7 +219,7 @@
     "manifest_sha256": "120e1a5e16447449c52c1313a2fa058b99949cc055d42354a3760b26ae50fa3b",
     "total_bytes": 61949775
   },
-  "note": "集計統計量のみ。★ ファイル名・セッション名・時刻・vk は 1 つも含まない。",
+  "note": "集計統計量のみ。★ セッション名・時刻・vk は 1 つも含まない。⚠️★ 2026-08-16 訂正（security-checker M3）: **参加者の擬似 ID（P010 等）は含む**（★ block_variance.py がファイル名の先頭要素から導出している）。★ 元の note は「ファイル名…を 1 つも含まない」と書いており過大だった。",
   "participants": 5,
   "per_participant": [
     {

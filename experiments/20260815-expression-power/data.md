@@ -16,7 +16,7 @@
 | 項目 | 値 |
 |---|---|
 | 出所 | Phase1 ユーザー検証の生 NDJSON（**P010–P014 の 5 名**） |
-| 置き場所 | ⚠️★★★ **repo の外**（`C:\Users\johnd\Downloads\gse_user-verification_phase1_ndjson-...`）。★ 実行時は環境変数 `GSE_PHASE1_NDJSON` で渡す |
+| 置き場所 | ⚠️★★★ **repo の外**。★ 実行時は環境変数 `GSE_PHASE1_NDJSON` で渡す（⚠️★ **2026-08-16: 元は OS ユーザー名を含む絶対パスを書いていたが削除した**。★ `leakcheck.py` が `johnd` と Windows 絶対パスの両方を漏洩パターンに定義しており、姉妹実験の `run.sh` も「パスはリポジトリに書きません」と宣言していた＝宣言と実装が矛盾していた・security-checker M1） |
 | ファイル数 | **63** |
 | 総バイト | **61,949,775** |
 | ★ **manifest sha256** | **`120e1a5e16447449c52c1313a2fa058b99949cc055d42354a3760b26ae50fa3b`** |
