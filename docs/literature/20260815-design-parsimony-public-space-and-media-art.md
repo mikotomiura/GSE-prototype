@@ -469,8 +469,20 @@ ambient information visualization."**
 
 1. ⚠️★★★ **RQ-3（カフェ / third place の規範）は探索できなかった** —— ★ 予算を RQ-2 と RQ-5 に寄せた。
    ★ **次ラウンドの入口はここ。**
+   → ★★★ **2026-08-16 に実施し閉じた**（`20260816-third-place-norms-and-bystanders.md`）。
+   ⚠️★★★ **結果は本ラウンドの設計解に不利**: **A-7（他人に読めない符号にする）は「保護」でなく「賭け」**。
+   ★ [P112]（読めない→装飾扱い＝無視される）と **[P132]（読めない→注目＋監視疑い）が正反対の極**で、
+   ★ **両者を分けているのは意味の可読性ではなく装置の目立ちにくさ**という説明が両方に整合する。
+   ★ なお **カフェの規範的コンフリクトは「長居と低消費」であって表示物ではない** [P131]。
 2. ★★ **[P116] Koelle ら CHI 2020「Social Acceptability in HCI」の一次全文**（★ 403）——
    ★ **観察者視点を扱った研究が何 % かという数字**が、問い A の空白の大きさを決める。
+   → ★★★ **2026-08-16 に別 URL 経路で取得し閉じた**（★ **[P116] を provisional → active へ昇格**。
+   ⚠️ その際に一度 `[P130]` として二重登録してしまい、**[P130] は tombstone にして [P116] へ統合した**）。
+   ★ 得られた数字は「観察者視点の %」ではなく
+   **測定の内訳**だった —— **主観-量的 n=31 / 主観-質的 n=26 に対し客観指標は 69 本中わずか 5 本**。
+   ★ 語彙としては **user's / spectator's social acceptance の二重性**（Goffman）が確定。
+   ⚠️ 著者逐語 **`there is no existing guidance or practice on how to integrate the users' (or bystanders')
+   views on social acceptability more directly in the design process (yet)`**。
 3. ★★ **[P115] Müller ら 2009 の一次全文**（★ Springer 認証）。
 4. ★★ **イヤホン常時装着の対人知覚コストの一次**（★ 二次記述は一貫しているが出典に届いていない）。
 5. ★ **[P113] Redström, Skog & Hallnäs (2000) の一次**（★ informative art の定義の大元）。
