@@ -145,8 +145,11 @@
 | 項目 | 値 |
 |---|---|
 | ブランチ | **`docs/media-sound-modality-survey`**（⚠️ main ではない） |
-| 本セッションのコミット | **11 件**（`d6bbb9c` 以降のすべて。★ 末尾 SHA は本行を含むコミットで動くので書かない）|
+| 本セッションのコミット | **11 件**（`d6bbb9c` 以降のすべて）＋ main 取り込みのマージ 1 件 |
 | 作業ツリー | ★ **クリーン** |
-| ⚠️ push | ★★★ **本 repo は `ahead 11` で未 push。★ 研究者に `! git push` を依頼する** |
+| push / PR | ★★★ **push 済み。★ PR #101 を作成した**（`docs/media-sound-modality-survey` → `main`・**57 コミット / 192 ファイル / +57,782 −119**）<br>https://github.com/mikotomiura/GSE-prototype/pull/101 |
+| ⚠️ PR の性質 | ⚠️★★★ **ブランチ名は `docs/...` だが内容はサーヴェイに留まらない**（Rust の Tier 0 配線・CI・表現層試作を含む 5 系統） |
+| CI | ★★★ **全ジョブ緑**（`check` win-selfhosted / mac-selfhosted ＋ `frontend-check` ＋ `decide-win-runner` = SUCCESS。`build-*` / `release` はタグ時のみなので SKIPPED）。★ PR 状態は **MERGEABLE / CLEAN** |
+| ⚠️ マージ時の注意 | ★ 作成直後は **CONFLICTING** だった —— **CI の self-hosted 移行が別 SHA で PR #99 として先に main へ入っていた**ため。★ `origin/main` を取り込んで解消済み（衝突は `.codex/budget.json` と `.gitignore` の 2 件のみ）。⚠️ **衝突している PR では GitHub がマージ ref を作れず `pull_request` の CI が発火しない** |
 | `gse-dataset` | ★ `main` は `origin/main` と**同期**（⚠️ `metrics/P000/macos/` に未追跡ファイルが 1 件ある） |
 | 文献 | **20 カード / `[P1]`–`[P132]`（`[P130]` は tombstone）/ `[V1]`–`[V86]` = 218 行**（★ `check_citations.py` で実測） |
