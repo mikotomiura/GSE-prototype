@@ -161,6 +161,16 @@
 | gse-dataset | — | セッションメトリクスの集約データ repo (`mikotomiura/gse-dataset`, private)。生 NDJSON は絶対に置かず、`metrics/` と機械生成 schema のみ tracked | metrics.json, schema sync |
 | 被験者 ID | Participant ID | データ repo での匿名化識別子。`P000` (開発者自身) / `P001-P005` (Phase 2+ 外部被験者) | IRB, consent |
 | Phase 2a Go/No-Go | — | `aggregate_metrics.py` が出力する判定。Stuck precision 平均 ≥ 0.6 かつ n ≥ 5 で GO、未満は INCONCLUSIVE | metrics.json, baseline_metrics.md |
+| 収束器 | reconciler | 「あるべき状態 (desired state)」を宣言し、現状をそこへ寄せる周回処理。冪等が構造で保証される。`src-tauri/src/reconcile.rs` (`.age` の再送・取りこぼし回収) と配布自動化 Stage 2 が同じ形。**⚠️ 表現できない状態は管理してはならない**（「止めたい」を宣言できないなら共有を収束器の管轄に入れない） | desired state, D-7 |
+| desired state | — | 収束器の入力となる宣言。配布自動化では P-ID ごとの「配る / 止める」の 2 値。⚠️「配る」しか表現できない収束器は同意撤回を潰す | 収束器 |
+| spike | — | **実装前に、未検証の前提を実測で潰す使い捨ての検証**。結果は「可 / 否 + 実測値 + 実測日」で書き、⚠️「たぶん」「はず」を残さない。外れたときの行き先を先に決めてから実行する | verify-before-claiming |
+| 捨てフォルダ | throwaway folder | spike 専用に作り、終わったら消す Drive フォルダ。⚠️ **本番の親フォルダで spike しない**ための隔離先。中身は実被験者の割付を含めない | spike, PILOT-spike |
+| PILOT-spike | — | `assign.py --pilot --pilot-label spike` が生む spike 専用 subject。★ 本物の生成器を通した実形式の課題ページを、実被験者の割付を晒さずに得るための手段 | 捨てフォルダ, PILOT-mac/win |
+| 陽性対照 | positive control | 「検査が壊れていれば赤になるはず」の入力を**わざと**通し、実際に赤になることを確かめる検査。⚠️ これが無いと「常に緑を返すガード」を緑と読み違える | 陰性対照, silent-failure |
+| 陰性対照 | negative control | 「通ってはいけないもの」を通し、止まることを確かめる検査。例: 課題ページ以外 (`g1-submit.json` / `pubkey.txt`) を置いたら赤 | 陽性対照, 許可リスト |
+| 許可リスト | — | 「これだけを通す」形の判定。⚠️ 拒否リスト（これを止める）と対で、**漏れが fail-open にならない側**を選ぶ。配布では `^block\d{2}\.html$` に一致する物だけを上げる | 陰性対照, fail-closed |
+| drive.file スコープ | — | Google Drive API の**非機微**スコープ。「このアプリが作った・開いたファイルだけ」に限られる。⚠️ 資格情報が漏れても研究者の Drive 全体は読まれない。`drive` フルスコープ（機微）と混同しない | OAuth, spike-1 |
+| allowFileDiscovery | — | Drive の共有設定。`false` = リンクを知っている全員、`true` = **検索可能＝一般公開**。⚠️ API の暗黙既定に任せず**明示指定して読み返す**（fail-open 側の性質を既定に依存させない） | permissions.create, D-7 |
 
 ## 略語
 
@@ -186,7 +196,7 @@
 | 禁止 | 代替 | 理由 |
 |---|---|---|
 | winapi | windows crate | winapi crate はメンテナンス停止。公式の windows crate (v0.58+) を使用 |
-| allowlist | capabilities | Tauri 2.0 では v1 の allowlist を廃止し capabilities に移行 |
+| allowlist（★ Tauri の権限の文脈でのみ禁止） | capabilities | Tauri 2.0 では v1 の allowlist を廃止し capabilities に移行。⚠️ **Tauri 以外の文脈**（配布で上げてよいファイルを絞る等）で「これだけを通す」判定を指すときは日本語の「許可リスト」を使う（技術用語表を参照）。★ 2026-08-16 に適用範囲を明記 |
 | 集中度 / 集中状態 | Flow | 「集中」は曖昧。Csikszentmihalyi の Flow 概念を正確に使用する |
 | 行き詰まり度 | p_stuck / Stuck 確率 | 「度」は曖昧。確率値で語る |
 | タイマー | Zen Timer | 「タイマー」単体では Wall の Zen Timer か他のタイマーか不明 |
