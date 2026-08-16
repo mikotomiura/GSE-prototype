@@ -603,6 +603,8 @@ B-1・入力先・文字数・転記をまとめて解く案があった。**採
 | `notes.md` | 記録（判断・未解決・訂正） | 自由 |
 | `blocks/` | 割付ファイル（★ **コミットしない**） | — |
 | `results/` | 解析結果 | — |
+| ★ `prepare-subjects.sh` / `make-upload-manifest.sh` / `verify-drive-upload.py` | **配布の半自動版**（割付〜Drive へ上げる物を並べる〜上げたあとの byte 照合）。⚠️ 上げるのは人（ドラッグ）。★ 照合が緑になるまで URL を配らない | ⚠️ **消さない**（自動版が壊れたときの退路・`decisions.md` D-5） |
+| ⚠️★ `drive_client.py` / `provision_core.py` / `test_drive_client.py` | **配布の自動版（未完成）**。Drive API v3 の薄いラッパと「何を上げてよいか・どの順で共有するか」の判断。★ **解析には一切関わらない**（`run.sh` の経路に外部依存を入れていない） | ⚠️ 動かすには venv が要る（`env.md` の訂正節）。★ **`provision.py`（CLI）はまだ無い** — `drive.file` の「作れるが見えない」問題の決着待ち（`.steering/20260816-provision-spikes/spike-results.md`） |
 
 **よく使うコマンド**:
 

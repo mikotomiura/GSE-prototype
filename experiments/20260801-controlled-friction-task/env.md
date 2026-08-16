@@ -93,6 +93,34 @@ numpy / scipy を使っていないのは、**再現に lockfile を要さない
 （`experiments/20260802-within-person-scope-detector/env.md` と同じ方針）。
 将来 numpy を導入する場合は `requirements.txt` を本ディレクトリに追加すること。
 
+### ⚠️★ 訂正（2026-08-16）— 「標準ライブラリのみ」は **解析** に限る
+
+本ディレクトリに、外部依存を持つファイルが 3 つ増えた:
+
+| ファイル | 依存 | 役割 |
+|---|---|---|
+| `drive_client.py` | `google-api-python-client` | ★ Drive API の薄いラッパ（**配布**であって解析ではない） |
+| `provision_core.py` | （上を import するだけ） | ★ 配布の判断・順序 |
+| `test_drive_client.py` | `pytest` | ★ 偽 API での単体テスト |
+
+★ **解析の再現性は損なわれていない。** `analyze.py` / `assign.py` /
+`validate_materials.py` / `build_task_pages.py` は**引き続き標準ライブラリのみ**で動き、
+上の 3 ファイルを import しない（＝ `run.sh` の経路に外部依存は入らない）。
+
+⚠️ 配布側を動かすときだけ venv が要る（`reproducibility-discipline` ルール 2 に従い、
+lockfile をここから参照する）:
+
+```bash
+python3 -m venv ~/.venvs/gse-provision
+~/.venvs/gse-provision/bin/python -m pip install -r ../../scripts/requirements-dev.txt
+~/.venvs/gse-provision/bin/python -m pytest test_drive_client.py -q
+```
+
+- 依存の固定: `scripts/requirements-dev.txt`
+  （`google-api-python-client==2.198.0` / `google-auth-oauthlib==1.4.0` / `pytest==9.1.1`）
+- 手順と資格情報の置き場: `scripts/provision-credentials.md`
+- ★ venv を repo の外に置く理由: `.steering/20260816-provision-spikes/decisions.md` S-5
+
 ## ★ 訂正（2026-08-02・第 2 版）— Tier 0/1 は凍結解除を待たない
 
 > ~~⚠️ 実施は **Phase1 完了 ＋ 研究者承認による凍結解除後**。凍結中に `engine.rs` / `schema_dto.rs` を

@@ -5,6 +5,26 @@
 #
 #   pip install -r scripts/requirements-dev.txt
 #
+# ⚠️★ 2026-08-16: この Mac の python3 は Homebrew 3.14 (PEP 668 externally-managed) で、
+# 素の `pip install` は弾かれる (実測)。venv を作って入れること:
+#
+#   python3 -m venv ~/.venvs/gse-provision
+#   ~/.venvs/gse-provision/bin/python -m pip install -r scripts/requirements-dev.txt
+#
+# ★ venv を repo の外に置くのは、資格情報の置き場 `~/.config/gse-provision/` と対にし、
+#   `.gitignore` の網に依存しないため (本 repo は Actions 分数の都合で一時 public にする運用がある)。
+#   詳細: .steering/20260816-provision-spikes/decisions.md S-5
+
 # DuckDB join ハーネス (#6 / decisions.md D5)。NDJSON/JSON/CSV/Parquet を直接クエリでき、
 # ファイル真実源を崩さず分析だけ DB 化する用途。`analysis.db` は使い捨て・再生成可能。
 duckdb==1.5.4
+
+# ★ 課題ページ配布の自動化 (Drive API 直叩き)。
+#   .steering/20260807-vps-provisioning-automation/ の設計 / 20260816-provision-spikes/ の spike。
+#   ⚠️ スコープは `drive.file` のみ (非機微)。⚠️ 秘密 (client_secret.json / token.json) は
+#   repo に置かず `~/.config/gse-provision/` (0700) に置く。
+google-api-python-client==2.198.0
+google-auth-oauthlib==1.4.0
+
+# テストランナー (drive_client.py の偽 API 単体テスト用)。
+pytest==9.1.1
