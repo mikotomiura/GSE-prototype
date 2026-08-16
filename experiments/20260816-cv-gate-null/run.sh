@@ -22,6 +22,9 @@ if [ -z "${GSE_PHASE1_NDJSON:-}" ] || [ ! -d "${GSE_PHASE1_NDJSON}" ]; then
   exit 1
 fi
 
+echo "== 自己検査（★ 本解析より先に回す。落ちたら結果を書かない）=="
+"$PY" scripts/selftest.py
+
 echo "== EP-Q8 帰無比較（ゲートの算術効果と非打鍵ノイズを分ける）=="
 "$PY" scripts/gate_null.py \
   --flat-dir "${GSE_PHASE1_NDJSON}" \
@@ -29,6 +32,3 @@ echo "== EP-Q8 帰無比較（ゲートの算術効果と非打鍵ノイズを�
   --seed "$SEED" \
   --bootstrap 200 \
   --out results/gate_null.json
-
-echo "== 自己検査 =="
-"$PY" scripts/selftest.py

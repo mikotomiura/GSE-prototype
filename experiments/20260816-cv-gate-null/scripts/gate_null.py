@@ -23,20 +23,33 @@
   | keydown >= 1 の CV | 0.7576 | ★ **低打鍵側に余分な質量があるか** |
   | 全窓の CV | 1.0526 | ★ ゼロ点質量を観測比率で足して再現できるか |
 
+⚠️★★★ **主判定は CV ではなく「低打鍵窓 `[1, 100)` の *数*」で行う**（`implied_low_window_count`）——
+  ★ CV の比較はブートストラップ CI が広く、5 名中 2 名しか CI の外に出なかった。
+  ★ 窓数は直接カウントなので判別力が高い（★ 実測は 4.7〜19.9 倍・code-reviewer HIGH-2 の提案）。
+
 ★ 判定:
   - 予測 ≈ 観測 → **H0 は棄却されない** ＝ 別集団は要らず、低下は打ち切りの算術効果
     → ⚠️ **「非打鍵ノイズが半分」は支持されない（撤回すべき）**
-  - 観測 ≫ 予測 → **低打鍵側に余分な質量がある** ＝ notes の解釈が支持される
+  - 観測 ≫ 予測 → **低打鍵側に余分な質量がある** ＝ notes の解釈が（その部分だけ）支持される
 
 ★ 併せて **分解**する: 1.0526 → 0.5019 のうち
-  (i) ゼロ点質量の除去 と (ii) 本体の打ち切り が、それぞれ何割を説明するか。
+  (i) ゼロ打鍵窓（`=0`）の除去 と (ii) 低打鍵窓（`1–99`）の除去 が、それぞれ何割を説明するか。
+  ⚠️ (ii) は **打ち切りの算術効果と余分な低活動集団の除去が混ざっている**（解釈を名前に埋めない）。
 
 ⚠️★★★ プライバシー（`data-privacy` Skill / S5C-D8）:
   入力は repo 外の生 NDJSON。**出力は集計統計量のみ**。
-  ★ セッション名・ファイル名・時刻・vk を 1 つも書き出さない。
+  ★ セッション名・時刻・vk を 1 つも書き出さない。
+  ⚠️★★★ `participant` だけはファイル名の先頭断片に由来する。★ **擬似 ID の形
+  (`P` + 英数 3–13 桁) に一致した場合のみ残し、一致しない名前は `UNK-n` へ落とす**
+  (★ 初版は断片をそのまま書き出しており、実名や端末名を含むファイルが 1 つ混じれば
+  逐語でコミットされる状態だった・security-checker MEDIUM)。
 
-⚠️ 独立実装での突き合わせ: MLE（scipy.optimize）と **打ち切りモーメント法**（自前）の 2 経路で
-  同じ (mu, sigma) に到達するかを検算する（★ 2026-08-15 に解析式が系統的に外れた前例があるため）。
+⚠️ 独立実装での突き合わせ: MLE（scipy.optimize）と **打ち切りモーメント法**（`fit_truncated_moments`）の
+  2 経路で (mu, sigma) を**別々に解く**（★ 2026-08-15 に解析式が系統的に外れた前例があるため）。
+  ⚠️★★★ **実測では一致しない** —— 5 名全員でモーメント法の sigma が小さい。
+  ★ 原因は既知（2 次モーメントは裾に敏感で、小標本 n=32–171 では sigma を過小推定する）で、
+  ★ **向きは結論に対して保守側**（sigma が小さいほど H0 の期待窓数は減り、上の比は大きくなる）。
+  → ★ **「2 経路が一致した」とは書かない**（`notes.md §5-5`）。
 """
 
 from __future__ import annotations
@@ -46,6 +59,7 @@ import glob
 import json
 import math
 import os
+import re
 import sys
 
 import numpy as np
@@ -97,19 +111,68 @@ def fit_truncated_lognormal(x, lo):
     return float(best.x[0]), float(math.exp(best.x[1]))
 
 
-def moment_check(x, lo, mu, sigma):
-    """独立検算 — 当てた (mu, sigma) の打ち切り分布の理論平均と、標本平均を突き合わせる。
-
-    ★ MLE の実装ミスは「それらしい値」を返しうるので、別経路のモーメントで殴る。
-    """
+def truncated_moments(mu, sigma, lo):
+    """左側打ち切り対数正規の 1 次・2 次モーメント（理論値）。"""
     a = (math.log(lo) - mu) / sigma
-    # E[X | X > lo] = exp(mu + sigma^2/2) * Phi(sigma - a) / Phi(-a)
-    num = stats.norm.sf(a - sigma)
     den = stats.norm.sf(a)
-    theo = math.exp(mu + sigma ** 2 / 2) * num / den if den > 0 else float("nan")
+    m1 = math.exp(mu + sigma ** 2 / 2) * stats.norm.sf(a - sigma) / den
+    m2 = math.exp(2 * mu + 2 * sigma ** 2) * stats.norm.sf(a - 2 * sigma) / den
+    return m1, m2
+
+
+def fit_truncated_moments(x, lo, x0):
+    """★ 独立経路 — モーメント法で (mu, sigma) を **MLE とは別に解く**。
+
+    ⚠️★★★ 初版はここで「MLE が返した (mu,sigma) の理論平均と標本平均を比べる」だけの
+    適合度チェックをしており、**独立な当てはめではなかったのに `env.md` は
+    「2 経路で同じ (mu,sigma) に到達するか検算する」と書いていた**（★ code-reviewer HIGH）。
+    → ★ 1 次・2 次モーメントの 2 式を実際に解いて突き合わせる形に直した。
+    """
+    a = np.asarray(x, dtype=float)
+    t1, t2 = float(a.mean()), float((a ** 2).mean())
+
+    def eqs(p):
+        mu, log_sigma = p
+        m1, m2 = truncated_moments(mu, math.exp(log_sigma), lo)
+        return [m1 / t1 - 1.0, m2 / t2 - 1.0]
+
+    r = optimize.root(eqs, x0=[x0[0], math.log(x0[1])], method="hybr")
+    if not r.success:
+        return None
+    return float(r.x[0]), float(math.exp(r.x[1]))
+
+
+def moment_check(x, lo, mu, sigma):
+    """MLE の解を独立なモーメント法の解と突き合わせる（★ 実装ミスの検出）。"""
+    m1, _ = truncated_moments(mu, sigma, lo)
     emp = float(np.mean(x))
-    return {"theoretical_mean": round(theo, 2), "empirical_mean": round(emp, 2),
-            "rel_error": round(abs(theo - emp) / emp, 4) if emp else None}
+    out = {"theoretical_mean": round(m1, 2), "empirical_mean": round(emp, 2),
+           "mean_rel_error": round(abs(m1 - emp) / emp, 4) if emp else None}
+    mm = fit_truncated_moments(x, lo, (mu, sigma))
+    if mm is None:
+        out["moment_fit"] = None
+        out["agrees_with_mle"] = None
+    else:
+        out["moment_fit"] = {"mu": round(mm[0], 4), "sigma": round(mm[1], 4)}
+        # ★ 閾値判定を付ける（★ 出しっぱなしで誰も見ない数字にしない・code-reviewer LOW）
+        out["agrees_with_mle"] = bool(abs(mm[0] - mu) < 0.10 and abs(mm[1] - sigma) < 0.10)
+    return out
+
+
+def implied_low_window_count(mu, sigma, n_gated, lo):
+    """★★★ H0 の下で `[1, lo)` に何窓あるはずかを外挿する（★ CV 比較より鋭い統計量）。
+
+    ★ 当てた分布の下で `P(X >= lo)` が分かるので、観測された `n_gated` から
+      非ゼロ窓の総数を逆算し、`[1, lo)` の期待窓数を出す。
+    ⚠️ CV の比較は標本ゆらぎが大きく（ブートストラップ CI が広い）5 名中 2 名しか
+      CI の外に出なかった。★ 窓数は直接カウントなので判別力が高い（code-reviewer HIGH-2 の提案）。
+    """
+    p_ge = float(stats.norm.sf((math.log(lo) - mu) / sigma))
+    if p_ge <= 0:
+        return None
+    n_nonzero_implied = n_gated / p_ge
+    p_low = float(stats.norm.sf((math.log(1.0) - mu) / sigma)) - p_ge
+    return n_nonzero_implied * p_low
 
 
 def lognormal_cv_above(mu, sigma, lo):
@@ -132,15 +195,56 @@ def mixture_cv(mu, sigma, p_zero):
     return math.sqrt(var) / m1 if m1 > 0 and var > 0 else float("nan")
 
 
+def decompose(cv_all, cv_ge1, cv_gate):
+    """CV 低下（全窓 → ゲート後）を、除去した窓の種類で内訳にする。
+
+    ⚠️★★★ 初版はここを `share_zero_atom` / `share_body_truncation` と呼び、後者を
+    「打鍵している *本体* を切った **算術効果**」と断定していた。★ しかし同じ実験が
+    「`1–99` の窓にも余分な質量がある」と結論しており、`≥1 → ≥100` の段は
+    **算術効果と余分な低活動集団の除去が混ざっている**（★ code-reviewer HIGH）。
+    → ★ ラベルを **操作的**（何を除いたか）に改め、解釈を名前に埋め込まない。
+
+    ⚠️ share は **CV の差の比**であって分散分解ではない。記述的な内訳として読む。
+    """
+    if cv_all is None or cv_ge1 is None or cv_gate is None:
+        return None
+    total = cv_all - cv_gate
+    if not total:
+        return None
+    return {
+        "total_drop_all_to_gate": round(total, 4),
+        "share_from_removing_zero_windows": round((cv_all - cv_ge1) / total, 4),
+        "share_from_removing_low_windows_1_to_gate": round((cv_ge1 - cv_gate) / total, 4),
+        "note": ("share は CV の差の比であり分散分解ではない。"
+                 "後者は『打ち切りの算術効果』と『余分な低活動集団の除去』が混ざっている。"),
+    }
+
+
 def analyse(flat_dir: str, window_minutes: int, seed: int, boot: int):
     files = sorted(glob.glob(os.path.join(flat_dir, "**", "*.ndjson"), recursive=True))
     if not files:
-        sys.stderr.write(f"no sessions under {flat_dir}\n")
+        # ⚠️ パスを出さない —— 「リポジトリに絶対パスを書かない」と決めているのに、
+        #   失敗時のログは notes / 引き継ぎに貼られやすい（security-checker LOW）。
+        sys.stderr.write("GSE_PHASE1_NDJSON 配下に .ndjson が見つからない\n")
         return None
     by_pid: dict[str, list[str]] = {}
+    unknown_seq = 0
+    label_of: dict[str, str] = {}
     for p in files:
         base = os.path.basename(p)
-        by_pid.setdefault(base.split("_", 1)[0] if "_" in base else "UNKNOWN", []).append(p)
+        frag = base.split("_", 1)[0] if "_" in base else base
+        # ⚠️★★★ ファイル名の先頭断片をそのまま出力に書かない（security-checker MEDIUM）。
+        #   ★ 擬似 ID の形（P + 英数 3–13 桁）に一致しない名前は位置ラベルへ落とす。
+        #   ★ そうしないと、実名や端末名を含むファイルが 1 つ混じった瞬間に
+        #     検査を通らずコミット対象 JSON へ逐語で入る。
+        if re.fullmatch(r"P[0-9A-Za-z]{3,13}", frag):
+            pid = frag
+        else:
+            if frag not in label_of:
+                unknown_seq += 1
+                label_of[frag] = f"UNK-{unknown_seq}"
+            pid = label_of[frag]
+        by_pid.setdefault(pid, []).append(p)
 
     rng = np.random.default_rng(seed)
     rows = []
@@ -190,11 +294,19 @@ def analyse(flat_dir: str, window_minutes: int, seed: int, boot: int):
                 bs.append(lognormal_cv_above(m2_, s2_, 1.0))
             except Exception:
                 pass
+        obs_low = int(((w >= 1) & (w < GATE)).sum())
+        exp_low = implied_low_window_count(mu, sigma, gated.size, GATE)
         rows.append({
             "participant": pid,
             "windows": int(w.size),
             "windows_zero": int((w == 0).sum()),
             "windows_ge100": int(gated.size),
+            "low_windows_1_to_gate": {
+                "observed": obs_low,
+                "expected_under_H0": (round(exp_low, 1) if exp_low is not None else None),
+                "ratio": (round(obs_low / exp_low, 1)
+                          if exp_low and exp_low > 0 else None),
+            },
             "fit": {"mu": round(mu, 4), "sigma": round(sigma, 4),
                     "moment_check": moment_check(gated, GATE, mu, sigma)},
             "observed_cv": {k: (round(v, 4) if v == v else None) for k, v in obs.items()},
@@ -211,14 +323,18 @@ def analyse(flat_dir: str, window_minutes: int, seed: int, boot: int):
         vals = [r[kind][key] for r in used if r[kind].get(key) is not None]
         return round(float(np.median(vals)), 4) if vals else None
 
-    # 分解: 1.0526 -> 0.5019 のうち、ゼロ点質量の除去と本体の打ち切りの寄与
     obs_all = med("all", "observed_cv")
     obs_ge1 = med("ge1", "observed_cv")
     obs_g = med("ge100", "observed_cv")
-    drop_total = (obs_all - obs_g) if (obs_all and obs_g) else None
+    # ★ 対応のある差（★ 中央値どうしの差は別々の参加者の値を引き算しうる・code-reviewer MEDIUM）
+    paired = [r["observed_cv"]["ge1"] - r["predicted_cv_under_H0"]["ge1"] for r in used
+              if r["observed_cv"].get("ge1") is not None
+              and r["predicted_cv_under_H0"].get("ge1") is not None]
     return {
         "schema": "cv-gate-null/v1",
-        "note": "集計統計量のみ。★ ファイル名・セッション名・時刻・vk を含まない。",
+        "note": ("集計統計量のみ。セッション名・時刻・vk を含まない。"
+                 "participant は擬似 ID の形 (P+英数3-13桁) に一致した場合のみ残し、"
+                 "一致しないファイル名は UNK-n の位置ラベルへ落とす。"),
         "window_minutes": window_minutes,
         "gate": GATE,
         "seed": seed,
@@ -234,12 +350,11 @@ def analyse(flat_dir: str, window_minutes: int, seed: int, boot: int):
             if used else None),
         "median_predicted_cv_under_H0": {k: med(k, "predicted_cv_under_H0")
                                          for k in ("all", "ge1", "ge200")},
-        "decomposition": {
-            "total_drop_all_to_ge100": round(drop_total, 4) if drop_total else None,
-            "share_zero_atom": (round((obs_all - obs_ge1) / drop_total, 4)
-                                if drop_total else None),
-            "share_body_truncation": (round((obs_ge1 - obs_g) / drop_total, 4)
-                                      if drop_total else None),
+        "decomposition": decompose(obs_all, obs_ge1, obs_g),
+        "paired_obs_minus_pred_ge1": {
+            "median": round(float(np.median(paired)), 4) if paired else None,
+            "values": [round(v, 4) for v in paired],
+            "n_positive": int(sum(v > 0 for v in paired)),
         },
         "per_participant": rows,
     }

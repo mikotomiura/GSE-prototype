@@ -1,0 +1,9 @@
+{
+  "schema": "cv-gate-null-config/v1",
+  "window_minutes": 5,
+  "gate_keydown": 100,
+  "validate_gate_keydown": 200,
+  "bootstrap": 200,
+  "seed_file": "SEED",
+  "note": "gate_keydown=100 は G1 事前登録 §2.9 で凍結済みの適格性ゲート。本実験が事後に選んだ値ではない。"
+}

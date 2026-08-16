@@ -3,9 +3,9 @@
 
 `docs/references.md` を SSOT として、以下を検査する:
 
-1. **未登録参照** — docs/ 本文の `[Pn]`/`[Vn]` が references.md に無い
+1. **未登録参照** — docs/ と experiments/ 本文の `[Pn]`/`[Vn]` が references.md に無い
 2. **同一名前空間内の key 重複** — DOI / arXiv / 正規化 URL の二重登録 (ルール 4 違反)
-   ※ 名前空間跨ぎ (`[P2]`=`[V9]` 型) は規約上허容なので検出しない
+   ※ 名前空間跨ぎ (`[P2]`=`[V9]` 型) は規約上許容なので検出しない
 3. **tombstone の引用** — 撤回済み ID が本文で使われていないか (説明目的の言及は要目視)
 4. **欠番** — append-only なのに番号が飛んでいないか
 5. **件数** — `_index.md` などに手書きされた件数の照合材料 (実測値を出す)
@@ -57,24 +57,35 @@ def load_references(ref_path: Path):
     return rows, key_to_ids, violations
 
 
-def collect_citations(docs_dir: Path, root: Path):
-    """docs/ 配下 (references.md 以外) の inline 引用を集める。"""
+def collect_citations(roots, root: Path):
+    """指定ルート配下 (references.md 以外) の inline 引用を集める。
+
+    ⚠️ 初版は docs/ しか見ていなかったが、experiments/ の notes.md にも
+    reproducibility-discipline ルール 5 が借用手法の [n] を義務づけており、
+    そこの未登録参照が検出できていなかった。
+    """
     cited: dict[str, list[str]] = defaultdict(list)
-    for path in sorted(docs_dir.rglob('*.md')):
-        if path.name == 'references.md':
+    for base in roots:
+        if not base.exists():
             continue
-        text = path.read_text(encoding='utf-8', errors='replace')
-        for lineno, line in enumerate(text.splitlines(), 1):
-            for m in CITE.finditer(line):
-                cited[f'[{m.group(1)}{m.group(2)}]'].append(
-                    f'{path.relative_to(root).as_posix()}:{lineno}')
+        for path in sorted(base.rglob('*.md')):
+            if path.name == 'references.md':
+                continue
+            text = path.read_text(encoding='utf-8', errors='replace')
+            for lineno, line in enumerate(text.splitlines(), 1):
+                for m in CITE.finditer(line):
+                    cited[f'[{m.group(1)}{m.group(2)}]'].append(
+                        f'{path.relative_to(root).as_posix()}:{lineno}')
     return cited
 
 
 def main() -> int:
     root = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
     rows, key_to_ids, violations = load_references(root / 'docs' / 'references.md')
-    cited = collect_citations(root / 'docs', root)
+    # 走査ルート: docs/ (本文 SSOT) と experiments/ (notes.md の借用手法 [n])。
+    # .steering/ はタスク単位の作業記録で本文ではないため既定では見ない。
+    scan_roots = [root / 'docs', root / 'experiments']
+    cited = collect_citations(scan_roots, root)
 
     print(f'=== references.md: {len(rows)} 行 ===')
     for ns in ('P', 'V'):
@@ -98,20 +109,29 @@ def main() -> int:
         # ルール 4 の例外 (2026-08-16): 同一文献の *別主張* は別 ID を許すが、
         # 「重複」列での相互リンクが必須。リンクの無い同一 key は「気付かずに
         # 二重登録した事故」であり違反 ([P130] がその型)。
-        linked = [i for i in live
-                  if any(sib[1:-1] in rows[i]['dup'] for sib in live if sib != i)]
-        if len(linked) >= len(live) - 1:
+        #
+        # ⚠️ 初版は len(linked) >= len(live) - 1 で **片方向リンクを通していた**
+        #    (規約が掲げる模範例 [V45]/[V51] 自体が片方向だった)。「相互」を要求する
+        #    以上、全行がリンクを持つことを求める。
+        # ⚠️ 部分文字列一致もやめる —— 裸表記 `=V45` に対し `V4` が誤ヒットする。
+        unlinked = []
+        for ident in live:
+            dup_cell = rows[ident]['dup']
+            if not any(re.search(rf'{sib[1]}{sib[2:-1]}(?!\d)', dup_cell)
+                       for sib in live if sib != ident):
+                unlinked.append(ident)
+        if not unlinked:
             print(f'  [参考] key={key} の重複は相互リンク済み (ルール 4 の例外) -> {live}')
         else:
             violations.append(
-                f'{ns} 名前空間内で key={key} が重複し、「重複」列の相互リンクが無い '
-                f'-> {live} (citation-ssot ルール 4)')
+                f'{ns} 名前空間内で key={key} が重複し、「重複」列の相互リンクが片側だけ '
+                f'-> リンクが無い行: {unlinked} / 重複群: {live} (citation-ssot ルール 4)')
 
     unregistered = {i: v for i, v in cited.items() if i not in rows}
     for ident, locs in sorted(unregistered.items()):
         violations.append(f'{ident} が未登録 ({len(locs)} 箇所) 例: {locs[:3]}')
 
-    print(f'\n=== docs/ 内の引用: {len(cited)} 種 ===')
+    print(f'\n=== docs/ + experiments/ の引用: {len(cited)} 種 ===')
     tomb_cited = {i: v for i, v in cited.items()
                   if i in rows and 'tombstone' in rows[i]['state']}
     if tomb_cited:
@@ -122,7 +142,7 @@ def main() -> int:
 
     never = sorted(i for i in rows if i not in cited)
     if never:
-        print(f'  [参考] 登録済みだが docs/ 本文で未引用: {len(never)} 件 {never}')
+        print(f'  [参考] 登録済みだが本文で未引用: {len(never)} 件 {never}')
 
     print()
     if violations:

@@ -1,6 +1,6 @@
 {
   "schema": "cv-gate-null/v1",
-  "note": "集計統計量のみ。★ ファイル名・セッション名・時刻・vk を含まない。",
+  "note": "集計統計量のみ。セッション名・時刻・vk を含まない。participant は擬似 ID の形 (P+英数3-13桁) に一致した場合のみ残し、一致しないファイル名は UNK-n の位置ラベルへ落とす。",
   "window_minutes": 5,
   "gate": 100,
   "seed": 20260816,
@@ -25,9 +25,21 @@
     "ge200": 0.5004
   },
   "decomposition": {
-    "total_drop_all_to_ge100": 0.5507,
-    "share_zero_atom": 0.5357,
-    "share_body_truncation": 0.4643
+    "total_drop_all_to_gate": 0.5507,
+    "share_from_removing_zero_windows": 0.5357,
+    "share_from_removing_low_windows_1_to_gate": 0.4643,
+    "note": "share は CV の差の比であり分散分解ではない。後者は『打ち切りの算術効果』と『余分な低活動集団の除去』が混ざっている。"
+  },
+  "paired_obs_minus_pred_ge1": {
+    "median": 0.1484,
+    "values": [
+      0.0479,
+      -0.134,
+      0.1738,
+      0.1484,
+      0.1987
+    ],
+    "n_positive": 4
   },
   "per_participant": [
     {
@@ -35,13 +47,23 @@
       "windows": 219,
       "windows_zero": 18,
       "windows_ge100": 171,
+      "low_windows_1_to_gate": {
+        "observed": 30,
+        "expected_under_H0": 3.4,
+        "ratio": 8.9
+      },
       "fit": {
         "mu": 5.7473,
         "sigma": 0.5519,
         "moment_check": {
           "theoretical_mean": 370.42,
           "empirical_mean": 366.31,
-          "rel_error": 0.0112
+          "mean_rel_error": 0.0112,
+          "moment_fit": {
+            "mu": 5.7847,
+            "sigma": 0.4768
+          },
+          "agrees_with_mle": true
         }
       },
       "observed_cv": {
@@ -66,13 +88,23 @@
       "windows": 58,
       "windows_zero": 1,
       "windows_ge100": 57,
+      "low_windows_1_to_gate": {
+        "observed": 0,
+        "expected_under_H0": 0.0,
+        "ratio": 0.0
+      },
       "fit": {
         "mu": 6.7256,
         "sigma": 0.5084,
         "moment_check": {
           "theoretical_mean": 948.47,
           "empirical_mean": 927.16,
-          "rel_error": 0.023
+          "mean_rel_error": 0.023,
+          "moment_fit": {
+            "mu": 6.756,
+            "sigma": 0.3902
+          },
+          "agrees_with_mle": false
         }
       },
       "observed_cv": {
@@ -97,13 +129,23 @@
       "windows": 83,
       "windows_zero": 21,
       "windows_ge100": 48,
+      "low_windows_1_to_gate": {
+        "observed": 14,
+        "expected_under_H0": 0.9,
+        "ratio": 15.3
+      },
       "fit": {
         "mu": 5.7316,
         "sigma": 0.5415,
         "moment_check": {
           "theoretical_mean": 362.41,
           "empirical_mean": 361.54,
-          "rel_error": 0.0024
+          "mean_rel_error": 0.0024,
+          "moment_fit": {
+            "mu": 5.7549,
+            "sigma": 0.5038
+          },
+          "agrees_with_mle": true
         }
       },
       "observed_cv": {
@@ -128,13 +170,23 @@
       "windows": 81,
       "windows_zero": 19,
       "windows_ge100": 32,
+      "low_windows_1_to_gate": {
+        "observed": 30,
+        "expected_under_H0": 6.4,
+        "ratio": 4.7
+      },
       "fit": {
         "mu": 5.4816,
         "sigma": 0.9086,
         "moment_check": {
           "theoretical_mean": 422.62,
           "empirical_mean": 408.19,
-          "rel_error": 0.0354
+          "mean_rel_error": 0.0354,
+          "moment_fit": {
+            "mu": 5.7428,
+            "sigma": 0.6786
+          },
+          "agrees_with_mle": false
         }
       },
       "observed_cv": {
@@ -159,13 +211,23 @@
       "windows": 176,
       "windows_zero": 64,
       "windows_ge100": 74,
+      "low_windows_1_to_gate": {
+        "observed": 38,
+        "expected_under_H0": 1.9,
+        "ratio": 19.9
+      },
       "fit": {
         "mu": 5.6941,
         "sigma": 0.5566,
         "moment_check": {
           "theoretical_mean": 353.71,
           "empirical_mean": 346.96,
-          "rel_error": 0.0195
+          "mean_rel_error": 0.0195,
+          "moment_fit": {
+            "mu": 5.7527,
+            "sigma": 0.4325
+          },
+          "agrees_with_mle": false
         }
       },
       "observed_cv": {
