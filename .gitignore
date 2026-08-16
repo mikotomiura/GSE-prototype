@@ -103,6 +103,10 @@ experiments/*/pages/
 #   ユーザー資格情報を使う。google-auth の `InstalledAppFlow` は **既定で cwd に
 #   `token.json`（リフレッシュトークン平文）を書く**ので、追跡下のディレクトリで動かすと
 #   `git add -A` で混入しうる。
+#   ⚠️★ **2026-08-16 の訂正**: 「既定で cwd に書く」は**誤り**だった。それは公式サンプル
+#     コードの挙動であってライブラリの挙動ではない（追跡下を cwd にして実測し、
+#     `token.json` が生まれないことを確認）。★ ただし**この網は外さない** —
+#     書き先を決めるのは書き手であり、`creds.to_json()` を素朴に保存すれば普通に落ちる。
 # ★★ **本リポジトリは Actions 分数の都合で一時 public にする運用がある**（上の /bin/ 参照）。
 #   混入した瞬間に、研究者本人として Drive を読み書きできるトークンが公開される。
 #   → `g1-submit.json` と同型の事故なので、**実装より先に**塞ぐ。
@@ -115,3 +119,14 @@ client_secret*.json
 .env
 .env.*
 *.pem
+# ⚠️★ 2026-08-16 のセキュリティレビューで、**実際に使われうる名前に穴があった**ことを
+#   `git check-ignore` で実測した（陽性対照として README.md が追跡対象のままであることも確認）。
+#   ★ `creds.to_json()` の保存先は書き手が決めるので、下の名前で書けば追跡下に入る。
+authorized_user.json
+creds.json
+service_account.json
+*.pickle
+# ★ venv も追跡下に入れない（本 repo には venv パターンが 1 つも無かった）。
+#   ⚠️ 置き場の規約は `~/.venvs/gse-provision`（repo の外）だが、網も張る。
+.venv/
+venv/
