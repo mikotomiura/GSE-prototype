@@ -1,5 +1,34 @@
 # タスクリスト — Windows self-hosted ＋ 30 秒フォールバック
 
+## ⚠️★★★ 2026-08-16 追記 — 実施状況（★ G-GEAR 本体のセッションで実測）
+
+> ★ 起点は `issue-windows-selfhosted-ci-never-activated.md`（macOS 側セッションが起票）:
+> **「条件分岐は正しく動いているが、`gse-win` ランナーも PAT も無いので判定は毎回 `hosted` に落ちており、
+> self-hosted 経路は一度も実行されていない」**。★ 実測で再現した（secrets が exit 0 で `total_count: 0`）。
+
+| 手順 | 状態 |
+|---|---|
+| ランナーの展開（`C:\actions-runner`） | ★ **完了**（v2.336.0・103,253,740 bytes ＝ リリース資産と一致。★ 2026-08-16 時点でも最新版） |
+| 手順 1: `gse-win` の登録 | ★ **完了** —— `g-gear-win-x64` **online** / labels `self-hosted,Windows,X64,gse-win` |
+| サービス化 | ★ **完了** —— `actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64` が **Running / StartType: Automatic**（★ 再起動後も自動復帰） |
+| 手順 2: `RUNNER_STATUS_TOKEN` | ⚠️ **未設定**（★ これが無い限り判定は毎回 `hosted` に落ちる） |
+| 検査 A / B | ⚠️ **未実施**（★ 手順 2 待ち） |
+
+### ★ G-GEAR の前提（★ 「self-hosted には開発環境が無い」への回答・実測）
+
+| 前提 | 実測 |
+|---|---|
+| Rust | **1.94.1** / host target `x86_64-pc-windows-msvc`（installed） |
+| MSVC | **Visual Studio Build Tools 2026** 17.14（`VC.Tools.x86.x64`） |
+| bash / git | Git Bash あり（★ `check` の schema drift ステップが `shell: bash`） |
+| ディスク | 空き 624G |
+
+⚠️ **サービスの既定アカウントは `NT AUTHORITY` の `NETWORK SERVICE`** で、ユーザー `johnd` とは別プロファイルになる。
+★ Rust は `dtolnay/rust-toolchain` がジョブ内で入れるので通るはずだが、
+**リンカで落ちたら `--windowslogonaccount` で `johnd` に変える**。
+
+---
+
 ## 調査（★ 完了）
 
 - [x] ★ 現行 `ci.yml` の self-hosted 構成を一次で読む（mac は `gse-mac` で移行済み）
@@ -57,7 +86,10 @@ Expand-Archive -Path runner.zip -DestinationPath . -Force
              --unattended --runasservice
 
 # 1-4. 確認
-.\svc.cmd status
+#  ⚠️★★★ 2026-08-16 訂正: **v2.336.0 の Windows パッケージに `svc.cmd` は存在しない**
+#     （bin/ にあるのは svc.sh 系の Unix 用テンプレートのみ）。★ サービス名は .service に入る。
+Get-Content .service     # -> actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64
+Get-Service actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64
 gh api repos/mikotomiura/GSE-prototype/actions/runners -q '.runners[] | "\(.name) \(.status) \([.labels[].name]|join(","))"'
 ```
 
@@ -96,9 +128,11 @@ gh pr create --base main --title "chore(ci): Windows check を self-hosted へ�
 
 - [ ] ★ **検査 A（陽性）**: ランナー online の状態で PR → `decide-win-runner` のログに
       `gse-win runner is online` が出て、`check (gse-win-selfhosted)` が **self-hosted で走る**
-- [ ] ⚠️★★★ **検査 B（本命）**: `.\svc.cmd stop` でランナーを止めてから PR を更新 →
+- [ ] ⚠️★★★ **検査 B（本命）**: **`Stop-Service actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64`**
+      （⚠️ **要 admin**・★ `svc.cmd` は存在しない）でランナーを止めてから PR を更新 →
       `decide-win-runner` が **30 秒後に** `-> hosted (fallback)` を出し、`windows-latest` で走る
-- [ ] ★ 検査 B のあと `.\svc.cmd start` で戻す
+      ★ ⚠️ **`RUNNER_STATUS_TOKEN is unset` が出ていたら検査 B は無効**（別の理由で落ちている）
+- [ ] ★ 検査 B のあと **`Start-Service actions.runner.mikotomiura-GSE-prototype.g-gear-win-x64`**（要 admin）で戻す
 
 ## レビュー
 
