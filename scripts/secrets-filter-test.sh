@@ -66,7 +66,23 @@ expect_blocked ".env"                           'diff --git a/x.env b/x.env'    
 expect_blocked "★ 大文字の proprietary 拡張子"  'diff --git a/R.PDF b/R.PDF'         ''
 expect_blocked "credentials を含む名前"         'diff --git a/my_credentials b/my_credentials' ''
 
+echo "--- 2b. ★★★ 実セッション名 (2026-08-14: 実際に外部 LLM へ出た形) ---"
+# ⚠️★★★ 下の 2 つは 2026-08-14 まで **rc=0 で素通り**していた。
+#   ★ (b) の連結形が**実際に事故った形**であり、(a) だけ足しても再発を止められない。
+# ⚠️★★★ **見本は必ず架空値にする。** 陽性対照は「パターンに当たる」ことだけが要件であり、
+#   実在の識別子である必要は 1 ミリも無い。★ 2026-08-14 に**ここへ実名を書いて自分で踏んだ**
+#   (★ そして**このフィルタ自身が送信前に捕まえた**)。★ 架空値の条件は「年が 202x であること」だけ。
+expect_blocked "★ 組み立て済みのセッション名の形" \
+  '  "$D/P123_gse_20260101_000000.ndjson"' 'P123_gse_20260101_000000'
+expect_blocked "★★ 連結で分割された形 (実際の事故の形)" \
+  '         mut_file("run.sh", "", "# 例: P123" + "_gse_" + "20260101_000000")' '20260101_000000'
+
 echo "--- 3. ★ 陰性対照 (ふつうのコードは 1 バイトも変えない) ---"
+# ⚠️★★ 架空名は**素通りさせる** —— ここで止めると検査の見本を含む diff が毎回 exit 2 になり、
+#   ★ 人がフィルタを迂回する動機を作る。★ 架空名の約束は「年が 202x でない」こと。
+expect_clean "★ 架空名 (_00000000_ 形式)"  '  "$D/P000_gse_00000000_000000.ndjson"'
+expect_clean "★ 架空名 (年 2000 の見本)"   'FAKE_SESSION = "P999" + "_gse_" + "20000101_000000"'
+expect_clean "★ ふつうの gse 語 (誤検出しない)" 'cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson'
 expect_clean "ふつうの Rust"      'pub fn next_block_number(dir: &Path) -> u32 {'
 expect_clean "ふつうのコメント"   '// 送信先は配布フォルダの設定ファイルから読む'
 expect_clean "ふつうの diff 見出し" 'diff --git a/src-tauri/src/reconcile.rs b/src-tauri/src/reconcile.rs'

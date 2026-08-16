@@ -412,6 +412,65 @@ fn format_paste_line(timestamp: u64, external_paste_chars: Option<u64>) -> Strin
     )
 }
 
+/// `format_feat_line` の引数束。
+///
+/// ⚠️★ **位置引数にしない理由**: `feat` 行は 13 個の `f64` が連続するため、
+/// 位置引数だと呼び出し側で `p_inc`/`p_stuck` や `raw_x`/`raw_y` を**入れ替えても
+/// コンパイルが通る**（型が誤りを弾かない・code-reviewer 指摘）。
+/// フィールド名で束ねれば、書き出し側は field init shorthand で名前一致が強制される。
+struct FeatLine {
+    timestamp: u64,
+    f1: f64,
+    f3: f64,
+    f4: f64,
+    f5: f64,
+    f6: f64,
+    p_flow: f64,
+    p_inc: f64,
+    p_stuck: f64,
+    raw_x: f64,
+    raw_y: f64,
+    ewma_x: f64,
+    ewma_y: f64,
+    obs: usize,
+    alpha: f64,
+    keys: u64,
+    bs_keys: u64,
+}
+
+/// `LogEntry::Feat` の NDJSON 1 行を生成する純粋関数。
+///
+/// ⚠️★★★ **小数桁数はゴールデンスナップショットの byte-equal 契約そのもの**である
+/// (`f1`/`f4`=`{:.2}` / `f5`=`{:.1}` / それ以外の f64=`{:.4}` / `alpha`=`{:.2}`)。
+/// 桁数を変えると既存 NDJSON との比較・`gse-replay --metrics` の再解釈が壊れるため、
+/// 変更するときは `docs/development-guidelines.md` §3 の手順を踏むこと。
+///
+/// `keys` / `bs_keys` は **Tier 0 配線 (記録のみ)** で追加した整数フィールドで、
+/// 行末に append する (既存フィールドの位置・精度は 1 文字も変えない)。
+/// 打鍵の**数**のみで文字内容・VK 生値は含まない (data-privacy)。
+fn format_feat_line(v: &FeatLine) -> String {
+    format!(
+        r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4},"raw_x":{:.4},"raw_y":{:.4},"ewma_x":{:.4},"ewma_y":{:.4},"obs":{},"alpha":{:.2},"keys":{},"bs_keys":{}}}"#,
+        v.timestamp,
+        v.f1,
+        v.f3,
+        v.f4,
+        v.f5,
+        v.f6,
+        v.p_flow,
+        v.p_inc,
+        v.p_stuck,
+        v.raw_x,
+        v.raw_y,
+        v.ewma_x,
+        v.ewma_y,
+        v.obs,
+        v.alpha,
+        v.keys,
+        v.bs_keys,
+    )
+}
+
 /// `LogEntry::InterventionResponse` の NDJSON 1 行を生成する純粋関数。
 /// 介入提示に対するユーザー応答 (理由) を固定カテゴリで記録する。
 /// `intervention_decision` (判定側) とは別の「ユーザー応答側」ログ。本文は含まない。
@@ -589,6 +648,20 @@ pub enum LogEntry {
         ewma_y: f64,
         obs: usize,
         alpha: f64,
+        /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の総キー押下数 (= `f3` の分母)。
+        ///
+        /// **打鍵の「数」だけ**であり、どのキーを押したか・何を書いたかは含まない
+        /// (data-privacy CD1: `vk_code` は既存の `key` 行の話で、本行には入らない)。
+        /// ⚠️★ HMM にも X/Y 合成式にも流さない。消費者は将来の recovery 推定器のみ。
+        /// ⚠️★★★ **累積でも毎秒の打鍵数でもない。窓の右端は最後の打鍵時刻**であり、
+        /// **沈黙中は同じ値がくり返し書かれる**（★ 正本: `analysis/loop_step.rs` の
+        /// `FeatSnapshot::keys` の doc）。★ **行をまたいで足し上げないこと。**
+        keys: u64,
+        /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の BS/Del 押下数 (= `f3` の分子)。
+        ///
+        /// `f3` は `{:.4}` 丸めなので `f3 × keys` は整数に戻らない。`keys − bs_keys` を
+        /// 丸め誤差なしで得るために整数で別に持つ。窓の意味は `keys` と同じ。
+        bs_keys: u64,
     },
     /// IME入力モードの切替イベント
     /// on=true  → 日本語入力モード (あ/カ) に移行 → β_writing を使用
@@ -1208,25 +1281,33 @@ impl SessionLogger {
                             ewma_y,
                             obs,
                             alpha,
+                            keys,
+                            bs_keys,
                         } => {
+                            // ★ field init shorthand なので、名前が一致しない限りコンパイルが通らない
+                            // (13 個の連続する f64 の取り違えを型システムに弾かせる)。
                             let _ = writeln!(
                                 writer,
-                                r#"{{"type":"feat","t":{},"f1":{:.2},"f3":{:.4},"f4":{:.2},"f5":{:.1},"f6":{:.4},"p_flow":{:.4},"p_inc":{:.4},"p_stuck":{:.4},"raw_x":{:.4},"raw_y":{:.4},"ewma_x":{:.4},"ewma_y":{:.4},"obs":{},"alpha":{:.2}}}"#,
-                                timestamp,
-                                f1,
-                                f3,
-                                f4,
-                                f5,
-                                f6,
-                                p_flow,
-                                p_inc,
-                                p_stuck,
-                                raw_x,
-                                raw_y,
-                                ewma_x,
-                                ewma_y,
-                                obs,
-                                alpha,
+                                "{}",
+                                format_feat_line(&FeatLine {
+                                    timestamp,
+                                    f1,
+                                    f3,
+                                    f4,
+                                    f5,
+                                    f6,
+                                    p_flow,
+                                    p_inc,
+                                    p_stuck,
+                                    raw_x,
+                                    raw_y,
+                                    ewma_x,
+                                    ewma_y,
+                                    obs,
+                                    alpha,
+                                    keys,
+                                    bs_keys,
+                                }),
                             );
                             dirty = true;
                         }
@@ -2680,6 +2761,64 @@ mod tests {
             line,
             r#"{"type":"session_meta","track":"main","task_kind":"creative","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","ts":7}"#
         );
+    }
+
+    // ---- feat ----
+
+    #[test]
+    fn feat_line_fixes_field_order_and_precision() {
+        // ⚠️★★★ 既存フィールドの位置と小数桁数はゴールデンの byte-equal 契約。
+        // Tier 0 の keys / bs_keys は **行末に append** され、既存部分を 1 文字も動かさない。
+        // ★ 全フィールドに異なる値を入れて、取り違え (p_inc↔p_stuck 等) も検出できるようにする。
+        let line = format_feat_line(&FeatLine {
+            timestamp: 1_700_000_001_000,
+            f1: 104.567,   // {:.2} → 104.57
+            f3: 0.333_333, // {:.4} → 0.3333
+            f4: 4.25,      // {:.2} → 4.25
+            f5: 2.0,       // {:.1} → 2.0
+            f6: 0.5,       // {:.4} → 0.5000
+            p_flow: 0.6,
+            p_inc: 0.3,
+            p_stuck: 0.1,
+            raw_x: 0.123_456, // {:.4} → 0.1235 (四捨五入)
+            raw_y: 0.7,
+            ewma_x: 0.25,
+            ewma_y: 0.8,
+            obs: 13,
+            alpha: 0.3, // {:.2} → 0.30
+            keys: 9,
+            bs_keys: 3,
+        });
+        assert_eq!(
+            line,
+            r#"{"type":"feat","t":1700000001000,"f1":104.57,"f3":0.3333,"f4":4.25,"f5":2.0,"f6":0.5000,"p_flow":0.6000,"p_inc":0.3000,"p_stuck":0.1000,"raw_x":0.1235,"raw_y":0.7000,"ewma_x":0.2500,"ewma_y":0.8000,"obs":13,"alpha":0.30,"keys":9,"bs_keys":3}"#
+        );
+    }
+
+    #[test]
+    fn feat_line_records_key_counts_as_integers_only() {
+        // ★ Tier 0 は「打鍵の数」のみ。文字内容・VK 生値は 1 バイトも入らない (data-privacy)。
+        // 0 打のウィンドウでも null ではなく 0 を書く (書くときは常に値を書く)。
+        let line = format_feat_line(&FeatLine {
+            timestamp: 1,
+            f1: 0.0,
+            f3: 0.0,
+            f4: 0.0,
+            f5: 0.0,
+            f6: 0.0,
+            p_flow: 0.34,
+            p_inc: 0.33,
+            p_stuck: 0.33,
+            raw_x: 0.0,
+            raw_y: 0.0,
+            ewma_x: 0.0,
+            ewma_y: 0.0,
+            obs: 0,
+            alpha: 0.0,
+            keys: 0,
+            bs_keys: 0,
+        });
+        assert!(line.ends_with(r#""keys":0,"bs_keys":0}"#));
     }
 
     // ---- paste / intervention_response ----

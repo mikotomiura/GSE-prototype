@@ -1,0 +1,20 @@
+# 乱数 seed — experiments/20260812-expression-layer0-drone
+#
+# ★ 本実験（層 0 = 基層）は乱数を 1 つも使っていない。
+#   層 0 の仕様は「正弦波の足し算」（media-expression-spec.md §2）であり、
+#   合成は基音・倍音次数・減衰則・ゆらぎ周波数のすべてが layer0.config.json で決定論的に決まる。
+#   したがって固定すべき seed が存在しない。
+#
+# ⚠️ 「乱数を使っていないので SEED ファイルは要らない」とはしない。
+#    ★ *使っていないこと自体を記録する* のがここの役目である
+#    （後から見た人が「seed の記録漏れ」と「そもそも乱数が無い」を区別できるように）。
+#
+# ★ Step 4（層 2 = グラニュラー合成）では乱数が入る（D18 / 引き継ぎ §4）。
+#   そのときこのファイルに実際の seed を書く。
+#
+# 決定論の検査: scripts/layer0_selftest.py が config の全パラメータを静的に検査しており、
+#              同じ config からは同じ音が出る（Web Audio の OscillatorNode は位相 0 開始）。
+
+SEED = (none — this experiment uses no RNG)
+RNG_USED = false
+NEXT_STEP_NEEDS_SEED = true   # Step 4 granular synthesis

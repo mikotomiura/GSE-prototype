@@ -147,6 +147,50 @@ pub struct FeatSnapshot {
     pub ewma_y: f64,
     pub obs: usize,
     pub alpha: f64,
+    /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の総キー押下数。★ **本フィールド群の意味の正本。**
+    ///
+    /// # ⚠️★★★ これは「累積カウンタ」でも「毎秒の打鍵数」でもない
+    ///
+    /// 窓は `FeatureExtractor::calculate_features()` のもの、すなわち
+    /// **`[最後の打鍵時刻 − 30 秒, 最後の打鍵時刻]`** である
+    /// (`features.rs` の `cutoff = last_ts.saturating_sub(30_000)`。★ `last_ts` は
+    /// **バッファ最後のイベント時刻**であって `now_ms` ではない)。
+    ///
+    /// ⚠️★★★ **したがって沈黙中は同じ値が毎秒くり返し出力される。**
+    /// 実測 (`tests/snapshots/deep_silence.json`): `t=…008000` から `t=…051000` までの
+    /// **44 行連続で `keys=12, bs_keys=2` が不変**。打鍵ゼロの 43 秒間、同じ 12 打が毎秒書かれている。
+    /// ★ これは F1〜F6 が元から持つ性質を継承したもので、本配線が作った挙動ではない。
+    /// ⚠️ ただし `keys` は**率でなく個数**なので、この性質は消費者にとって危険度が高い。
+    ///
+    /// > ★★★ **feat 行をまたいで足し上げてはいけない。**
+    /// > 沈黙のたびに同じ打鍵を数十回**二重計上**する。
+    /// > ★ 窓の右端 (= 最後の打鍵時刻) が要るなら、同じ NDJSON の `key` 行から復元すること。
+    ///
+    /// # その他の注意
+    ///
+    /// - ⚠️★ **推論には一切使われない。** HMM にも X/Y 合成式にも流さないため、本フィールドを
+    ///   足しても `p_*` / `raw_*` / `ewma_*` / `obs` は 1 ビットも動かない
+    ///   (`.steering/20260801-recovery-axis-grounding/tier0-wiring-design.md` §2。
+    ///   ★ `engine_output_is_invariant_to_tier0_key_counts` テストで実行可能な契約にしてある)。
+    /// - ⚠️ **推論経路 (TypingPath / TransitionPath / SilencePath) に依存しない実測値**である。
+    ///   SilencePath の合成観測は打鍵を数えないため、`step()` は `calculate_features()` 側の
+    ///   値を経路に依らず載せる。
+    /// - ⚠️ **リングバッファ 600 イベントに律速される** (production の容量。press+release で
+    ///   1 打 2 イベントなので実質 ~300 打が上限)。BS のオートリピート等でこれを超えると
+    ///   **過小計上になり、同時に窓長も 30 秒未満に切り詰められる**。
+    /// - ⚠️ **IME ポーズ中の打鍵は数えない** (`step()` がバッファに入れる前に return するため)。
+    ///   日本語入力主体のセッションでは系統的に過小になる。
+    /// - ⚠️ `--metrics` 経路で**新フィールドを持たない旧 NDJSON** を読んだ場合は 0 が入る
+    ///   (`bin/replay.rs` の `LoggedFeatDto`)。「実測 0 打」と区別できない。
+    /// - ⚠️ ここに `#[serde(default)]` は **付けない**。ゴールデン (`tests/snapshots/*.json`) は
+    ///   Tier 0 配線のコミットで 4 本とも再生成済みで互換の必要が無く、欠けた golden を 0 で
+    ///   黙って受けるより `missing field` で落ちるほうが安全である。
+    pub keys: u64,
+    /// ★ Tier 0 (記録のみ): 特徴量ウィンドウ内の BS/Del 押下数。
+    ///
+    /// `f3` は `{:.4}` に丸めて書かれるため `f3 × keys` は整数に戻らない。丸め誤差を
+    /// 持ち込まないよう整数で別に持つ (案 B)。**窓の意味と注意点は `keys` の doc がすべて。**
+    pub bs_keys: u64,
 }
 
 /// `step()` の出力。
@@ -289,6 +333,12 @@ pub fn step(
     let silence_secs = (now_ms.saturating_sub(state.last_event_time_ms)) as f64 / 1000.0;
     let mut features = state.extractor.calculate_features();
 
+    // ★ Tier 0 (記録のみ): 打鍵数は**推論経路に依らず実測値**を記録する。
+    // SilencePath は合成観測 (`make_silence_observation`) を作って `log_features` に載せるが、
+    // 合成観測は打鍵を数えていない。ここで実測値を退避し、下の Feat 記録でそのまま使う。
+    // TransitionPath が `features` の f3/f5/f6 を書き換えても本値は影響を受けない。
+    let (window_keys, window_bs_keys) = (features.keys, features.bs_keys);
+
     // ── 沈黙 3 状態機構 ──────────────────────────────────────────────
     // 詳細は docs/architecture.md §4.7。
     let (log_features, diag_opt) = if features.f1_flight_time_median > 0.0 && silence_secs < 2.0 {
@@ -380,7 +430,181 @@ pub fn step(
         ewma_y,
         obs,
         alpha,
+        // ★ Tier 0: `log_features` ではなく実測値を使う (SilencePath の合成値を書かないため)。
+        keys: window_keys,
+        bs_keys: window_bs_keys,
     });
 
     out
+}
+
+// ============================================================================
+// Unit tests
+// ============================================================================
+//
+// ⚠️★ 本モジュールは長らく無テストで、ゴールデン (`gse-replay --snapshot`) だけが
+// 回帰保護だった。★ Tier 0 配線 (2026-08-16) で「推論経路に依らず実測打鍵数を書く」という
+// 判断を入れた際、**現行ゴールデン 4 本ではその判断が観測できない**ことが code-reviewer の
+// 指摘で判明したため、判断を直接固定するテストをここに置く。
+//   - TypingPath / TransitionPath: `log_features == features` なので両者は一致し区別できない
+//   - 既存ゴールデンの SilencePath 行はバッファが空で `keys=0` なのでやはり区別できない
+// → ★ **バッファが空でない SilencePath** を作ると初めて差が出る。
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn press(vk: u32, t: u64, is_backspace: bool) -> InputEvent {
+        InputEvent {
+            vk_code: vk,
+            timestamp: t,
+            is_press: true,
+            is_repeat: false,
+            is_backspace,
+            is_paste: false,
+        }
+    }
+
+    fn release(vk: u32, t: u64) -> InputEvent {
+        InputEvent {
+            vk_code: vk,
+            timestamp: t,
+            is_press: false,
+            is_repeat: false,
+            is_backspace: false,
+            is_paste: false,
+        }
+    }
+
+    /// ★★★ 本配線の中核判断の回帰保護。
+    ///
+    /// **SilencePath はバッファ空を意味しない。** 分岐条件は `f1 == 0.0` であり、
+    /// 打鍵があってもフライトタイムが 1 つも採れなければ (ここでは全 FT ≥ 2000ms で
+    /// `features.rs` の上限キャップに弾かれる) `f1 == 0.0` になる。
+    /// このとき合成観測 (`make_silence_observation`) は `keys = 0` を返すので、
+    /// ⚠️ `log_features.keys` をそのまま書くと **実際に打鍵があるのに 0 と記録される**。
+    #[test]
+    fn silence_path_with_nonempty_buffer_records_measured_key_counts() {
+        let engine = CognitiveStateEngine::new();
+        let mut state = AnalysisState::new(0, 600);
+
+        // FT がすべて 2000ms 以上になるよう press/release を離す → window_fts が空 → f1 = 0。
+        // BS を 1 打混ぜて bs_keys も 0 でないことを確認する。
+        for (i, (vk, is_bs)) in [(0x41, false), (0x08, true), (0x42, false)]
+            .into_iter()
+            .enumerate()
+        {
+            let t = i as u64 * 2_500;
+            state.extractor.process_event(press(vk, t, is_bs));
+            state.extractor.process_event(release(vk, t + 10));
+        }
+
+        // 前提の確認: この状態が本当に f1 == 0 かつ打鍵ありであること。
+        let measured = state.extractor.calculate_features();
+        assert_eq!(
+            measured.f1_flight_time_median, 0.0,
+            "前提が崩れている: f1 != 0 だと SilencePath に入らない"
+        );
+        assert_eq!((measured.keys, measured.bs_keys), (3, 1));
+
+        // 2 秒以上の沈黙にして 1Hz ゲートを踏ませる (last_event_time_ms は 0 のまま)。
+        let out = step(&mut state, &engine, None, 10_000, false);
+        let feat = out.feat.expect("1Hz ゲートが発火して feat が出るはず");
+
+        // SilencePath を通ったこと (合成観測の F1 = 2000.0) を確認したうえで…
+        assert_eq!(feat.f1, 2000.0, "SilencePath を通っていない");
+        // ★★★ …打鍵数は合成観測の 0 ではなく実測値であること。
+        assert_eq!(
+            (feat.keys, feat.bs_keys),
+            (3, 1),
+            "SilencePath で合成観測の keys=0 が書かれている (実測値の退避が効いていない)"
+        );
+    }
+
+    /// バッファが空の SilencePath では `keys = 0` が正しい (実測 0 打)。
+    #[test]
+    fn silence_path_with_empty_buffer_records_zero_key_counts() {
+        let engine = CognitiveStateEngine::new();
+        let mut state = AnalysisState::new(0, 600);
+
+        let out = step(&mut state, &engine, None, 10_000, false);
+        let feat = out.feat.expect("feat が出るはず");
+        assert_eq!(feat.f1, 2000.0, "SilencePath を通っていない");
+        assert_eq!((feat.keys, feat.bs_keys), (0, 0));
+    }
+
+    /// TypingPath でも実測値がそのまま載ること (経路によらず同じ意味の値であること)。
+    #[test]
+    fn typing_path_records_measured_key_counts() {
+        let engine = CognitiveStateEngine::new();
+        let mut state = AnalysisState::new(0, 600);
+
+        // FT < 2000ms のペアを作って f1 > 0 にする。
+        for (i, (vk, is_bs)) in [(0x41, false), (0x08, true), (0x42, false), (0x43, false)]
+            .into_iter()
+            .enumerate()
+        {
+            let t = i as u64 * 200;
+            state.extractor.process_event(press(vk, t, is_bs));
+            state.extractor.process_event(release(vk, t + 50));
+        }
+        state.last_event_time_ms = 700; // 沈黙 < 2s にして TypingPath へ
+
+        let out = step(&mut state, &engine, None, 1_000, false);
+        let feat = out.feat.expect("feat が出るはず");
+        assert!(
+            feat.f1 > 0.0 && feat.f1 < 2000.0,
+            "TypingPath を通っていない"
+        );
+        assert_eq!((feat.keys, feat.bs_keys), (4, 1));
+    }
+
+    /// ★★★ **契約を実行可能にするテスト**:
+    /// `keys` / `bs_keys` **以外が同一**の 2 つの `Features` を HMM に通し、
+    /// 出力 (`raw_x` / `raw_y` / `ewma_x` / `ewma_y` / `obs` / `p_*`) が
+    /// **bit-identical** であることを確認する。
+    ///
+    /// ⚠️ これが落ちたら `engine.rs` が Tier 0 の値を読み始めたということであり、
+    /// 「記録するだけで推論に流さない」という契約が破れている
+    /// (`.steering/20260801-recovery-axis-grounding/tier0-wiring-design.md` §2)。
+    #[test]
+    fn engine_output_is_invariant_to_tier0_key_counts() {
+        let base = Features {
+            f1_flight_time_median: 180.0,
+            f3_correction_rate: 0.25,
+            f4_burst_length: 3.0,
+            f5_pause_count: 2.0,
+            f6_pause_after_del_rate: 0.4,
+            keys: 0,
+            bs_keys: 0,
+        };
+        let loud = Features {
+            keys: 9_999,
+            bs_keys: 4_321,
+            ..base
+        };
+
+        let run = |f: &Features| {
+            let engine = CognitiveStateEngine::new();
+            let d = engine.update(f, false).expect("diagnostics");
+            let probs = engine.get_current_state();
+            (
+                d.raw_x.to_bits(),
+                d.raw_y.to_bits(),
+                d.ewma_x.to_bits(),
+                d.ewma_y.to_bits(),
+                d.obs,
+                d.alpha.to_bits(),
+                probs[&CognitiveState::Flow].to_bits(),
+                probs[&CognitiveState::Incubation].to_bits(),
+                probs[&CognitiveState::Stuck].to_bits(),
+            )
+        };
+
+        assert_eq!(
+            run(&base),
+            run(&loud),
+            "Tier 0 の打鍵数が HMM 出力を動かしている = 記録と推論の分離が破れている"
+        );
+    }
 }

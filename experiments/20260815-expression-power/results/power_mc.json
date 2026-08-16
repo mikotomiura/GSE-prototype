@@ -1,0 +1,406 @@
+{
+  "alpha": 0.05,
+  "dismantling": [
+    {
+      "alpha_effective": 0.0125,
+      "blocks": 10,
+      "blocks_per_condition": 2,
+      "delta80_mc": 1.71,
+      "family": "dismantling",
+      "k": 4,
+      "n": 5,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "blocks": 10,
+      "blocks_per_condition": 2,
+      "delta80_mc": 1.125,
+      "family": "dismantling",
+      "k": 4,
+      "n": 10,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "blocks": 20,
+      "blocks_per_condition": 4,
+      "delta80_mc": 1.096,
+      "family": "dismantling",
+      "k": 4,
+      "n": 5,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "blocks": 20,
+      "blocks_per_condition": 4,
+      "delta80_mc": 0.764,
+      "family": "dismantling",
+      "k": 4,
+      "n": 10,
+      "n_tests": 4
+    }
+  ],
+  "halves": [
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.062,
+      "analytic_optimism_pct": 5.4,
+      "blocks": 8,
+      "delta80_analytic": 1.144,
+      "delta80_mc": 1.206,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.023,
+      "analytic_optimism_pct": 2.6,
+      "blocks": 8,
+      "delta80_analytic": 0.886,
+      "delta80_mc": 0.909,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.011,
+      "analytic_optimism_pct": 1.7,
+      "blocks": 8,
+      "delta80_analytic": 0.626,
+      "delta80_mc": 0.637,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.053,
+      "analytic_optimism_pct": 5.2,
+      "blocks": 10,
+      "delta80_analytic": 1.023,
+      "delta80_mc": 1.076,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.021,
+      "analytic_optimism_pct": 2.6,
+      "blocks": 10,
+      "delta80_analytic": 0.792,
+      "delta80_mc": 0.813,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.02,
+      "analytic_optimism_pct": 3.5,
+      "blocks": 10,
+      "delta80_analytic": 0.56,
+      "delta80_mc": 0.58,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.004,
+      "analytic_optimism_pct": 0.5,
+      "blocks": 16,
+      "delta80_analytic": 0.809,
+      "delta80_mc": 0.813,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.01,
+      "analytic_optimism_pct": 1.6,
+      "blocks": 16,
+      "delta80_analytic": 0.626,
+      "delta80_mc": 0.636,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.003,
+      "analytic_optimism_pct": 0.6,
+      "blocks": 16,
+      "delta80_analytic": 0.443,
+      "delta80_mc": 0.446,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.05,
+      "analytic_optimism": 0.0,
+      "analytic_optimism_pct": 0.1,
+      "blocks": 32,
+      "delta80_analytic": 0.313,
+      "delta80_mc": 0.314,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 1
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.131,
+      "analytic_optimism_pct": 9.6,
+      "blocks": 8,
+      "delta80_analytic": 1.363,
+      "delta80_mc": 1.494,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.057,
+      "analytic_optimism_pct": 5.4,
+      "blocks": 8,
+      "delta80_analytic": 1.056,
+      "delta80_mc": 1.113,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.025,
+      "analytic_optimism_pct": 3.4,
+      "blocks": 8,
+      "delta80_analytic": 0.747,
+      "delta80_mc": 0.772,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.086,
+      "analytic_optimism_pct": 7.0,
+      "blocks": 10,
+      "delta80_analytic": 1.219,
+      "delta80_mc": 1.305,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.056,
+      "analytic_optimism_pct": 5.9,
+      "blocks": 10,
+      "delta80_analytic": 0.945,
+      "delta80_mc": 1.001,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.014,
+      "analytic_optimism_pct": 2.1,
+      "blocks": 10,
+      "delta80_analytic": 0.668,
+      "delta80_mc": 0.682,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.049,
+      "analytic_optimism_pct": 5.1,
+      "blocks": 16,
+      "delta80_analytic": 0.964,
+      "delta80_mc": 1.013,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.034,
+      "analytic_optimism_pct": 4.5,
+      "blocks": 16,
+      "delta80_analytic": 0.747,
+      "delta80_mc": 0.78,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": 0.016,
+      "analytic_optimism_pct": 3.1,
+      "blocks": 16,
+      "delta80_analytic": 0.528,
+      "delta80_mc": 0.544,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.0125,
+      "analytic_optimism": -0.0,
+      "analytic_optimism_pct": -0.1,
+      "blocks": 32,
+      "delta80_analytic": 0.373,
+      "delta80_mc": 0.373,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 4
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.215,
+      "analytic_optimism_pct": 14.2,
+      "blocks": 8,
+      "delta80_analytic": 1.513,
+      "delta80_mc": 1.728,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.1,
+      "analytic_optimism_pct": 8.6,
+      "blocks": 8,
+      "delta80_analytic": 1.172,
+      "delta80_mc": 1.272,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.038,
+      "analytic_optimism_pct": 4.6,
+      "blocks": 8,
+      "delta80_analytic": 0.829,
+      "delta80_mc": 0.867,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.119,
+      "analytic_optimism_pct": 8.8,
+      "blocks": 10,
+      "delta80_analytic": 1.354,
+      "delta80_mc": 1.473,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.064,
+      "analytic_optimism_pct": 6.2,
+      "blocks": 10,
+      "delta80_analytic": 1.048,
+      "delta80_mc": 1.113,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.016,
+      "analytic_optimism_pct": 2.2,
+      "blocks": 10,
+      "delta80_analytic": 0.741,
+      "delta80_mc": 0.758,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.07,
+      "analytic_optimism_pct": 6.5,
+      "blocks": 16,
+      "delta80_analytic": 1.07,
+      "delta80_mc": 1.14,
+      "family": "halves",
+      "n": 3,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.041,
+      "analytic_optimism_pct": 4.9,
+      "blocks": 16,
+      "delta80_analytic": 0.829,
+      "delta80_mc": 0.87,
+      "family": "halves",
+      "n": 5,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.01,
+      "analytic_optimism_pct": 1.7,
+      "blocks": 16,
+      "delta80_analytic": 0.586,
+      "delta80_mc": 0.596,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 12
+    },
+    {
+      "alpha_effective": 0.004166666666666667,
+      "analytic_optimism": 0.005,
+      "analytic_optimism_pct": 1.3,
+      "blocks": 32,
+      "delta80_analytic": 0.414,
+      "delta80_mc": 0.42,
+      "family": "halves",
+      "n": 10,
+      "n_tests": 12
+    }
+  ],
+  "note": "並べ替え検定をそのまま模擬した δ80。解析式は楽観側の下界として併記。",
+  "null_calibration": [
+    {
+      "alpha": 0.05,
+      "blocks": 8,
+      "n": 3,
+      "ok": true,
+      "rejection_rate": 0.0483
+    },
+    {
+      "alpha": 0.05,
+      "blocks": 8,
+      "n": 5,
+      "ok": true,
+      "rejection_rate": 0.0503
+    },
+    {
+      "alpha": 0.05,
+      "blocks": 16,
+      "n": 10,
+      "ok": true,
+      "rejection_rate": 0.0452
+    }
+  ],
+  "perms": 1200,
+  "schema": "expression-power-mc/v1",
+  "seed": 20260815,
+  "sims": 2500,
+  "target_power": 0.8
+}

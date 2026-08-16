@@ -1,5 +1,13 @@
 # Logs
-logs
+# ⚠️ 2026-08-11: `logs` / `dist` / `dist-ssr` を **リポジトリ直下へ錨止め**した (S0-D9)。
+#   素の `logs` は「どの階層の logs/ にも当たる」ため、TouchDesigner の展開ツリー
+#   (`*.toe.dir/` の階層名は **オペレータ名そのもの**) で COMP を `logs` / `dist` と命名すると
+#   そのサブツリーだけが黙って追跡外になる。★ しかも `toecollapse` は欠損しても
+#   exit 0 + `moved to` を返すので (Warning 1 行だけ)、**壊れた .toe が「成功」として作られる**。
+#   → 実測: `git check-ignore -v patch.toe.dir/logs/foo.n` が `.gitignore:2:logs` にヒットしていた。
+#   ⚠️ ネガーション (`!...`) では救えない —— 親ディレクトリが除外されると git は中へ降りない。
+#   ★ repo 内の実体は `./dist` のみ (直下) なので、錨止めしても既存の無視対象は変わらない (実測)。
+/logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -8,8 +16,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+/dist
+/dist-ssr
 *.local
 
 # Editor directories and files
@@ -119,6 +127,37 @@ client_secret*.json
 .env
 .env.*
 *.pem
+
+# TouchDesigner のプロジェクト/コンポーネントはバイナリなのでコミットしない (D6 / S0-D3)。
+# 追跡するのは toeexpand が生成した展開ツリー (<name>.toe.dir/) と目次 (<name>.toe.toc)。
+# ⚠️ .toc を除外してはならない — toecollapse は .dir と .toc の両方を要求する (実測 2026-08-11)。
+*.toe
+*.tox
+*.toe.bkp*
+*.tox.bkp*
+# ⚠️ 上の `*.tox` は **展開ツリーの内側にも効く** (実測: `patch.toe.dir/inner.tox` が IGNORED)。
+#   externalize した COMP をツリー内に置く運用を始めるなら、そこだけ例外指定が要る。
+#   現状の 2 サンプル (8,281 / 1,542 ファイル) には入れ子の .toe/.tox が 0 件なので実害なし。
+
+# 表現層試作の派生成果物 (S0-D9)。
+# ⚠️ FeatSnapshot の 1 秒刻み系列は、gse-dataset へ出してよい唯一の共有物と定めた
+#   `metrics.json` (集計値・約 1KB) より **遥かに粒度が高い**。`git add -A` で紛れ込ませない。
+#   ★ スクリプトが書くファイルは全てここで塞ぐ (docs/development-guidelines.md §10)。
+out.json
+out.csv
+snapshot*.json
+*.snapshot.json
+*.feat.csv
+*.smooth.csv
+# ⚠️★★★ 2026-08-12 追加 (Step 4 の security-checker が false green を実測で見つけた)。
+#   `run.sh data` が実際に書くのは `$OUT/<tag>.snap.json` と `$OUT/<tag>.csv` であり、
+#   上の `snapshot*.json` / `out.csv` は **どちらにも当たらない**。
+#   ★ 検査の probe が「スクリプトが作らない名前」を試していたため、穴が開いたまま緑だった。
+#   → ★ 実際に書かれる名前を塞ぐ。probe 側も同じ名前を試すよう直した (両 Step の run.sh)。
+*.snap.json
+experiments/**/*.csv
+experiments/**/*.ndjson
+# (__pycache__/ と *.pyc は上の「# Python」節で既に無視されている)
 # ⚠️★ 2026-08-16 のセキュリティレビューで、**実際に使われうる名前に穴があった**ことを
 #   `git check-ignore` で実測した（陽性対照として README.md が追跡対象のままであることも確認）。
 #   ★ `creds.to_json()` の保存先は書き手が決めるので、下の名前で書けば追跡下に入る。

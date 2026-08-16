@@ -185,6 +185,74 @@ mod tests {
         assert!(o2.contains("\"track\":\"main\""));
     }
 
+    /// ⚠️★★★ **プライバシーのゲート（security-checker MEDIUM・2026-08-16 追加）**
+    ///
+    /// `anonymize_line()` は **allow-list ではなく passthrough** である
+    /// (`vk` の category 化と絶対時刻の相対化以外は素通し)。したがって
+    /// **`feat` 行に新フィールドを足すと、匿名化のレビューを一切経ずに
+    /// 被験者端末の `.age` バンドルへ載る**。CD1 の防御が producer 側の注意力だけに
+    /// 依存している状態を、ここで機械的なゲートに変える。
+    ///
+    /// ★ 入力は `schema_dto::LogEntryDto::Feat`（= NDJSON の宣言上のミラー）から作る。
+    /// ★ `LogEntry::Feat` にフィールドを足して `schema_dto` に同期すると**本テストが落ちる**。
+    ///   落ちたら「その値を被験者端末の外へ出してよいか」を判断し、意図的なら期待集合を更新すること。
+    /// ⚠️ `schema_dto` への同期漏れ自体は schema drift check が別途捕まえる。
+    #[test]
+    fn anonymized_feat_line_field_set_is_pinned() {
+        use crate::schema_dto::LogEntryDto;
+
+        let src = LogEntryDto::Feat {
+            t: 1_030_000,
+            f1: 104.0,
+            f3: 0.125,
+            f4: 4.0,
+            f5: 1.0,
+            f6: 0.5,
+            p_flow: 0.6,
+            p_inc: 0.25,
+            p_stuck: 0.15,
+            raw_x: 0.1,
+            raw_y: 0.8,
+            ewma_x: 0.05,
+            ewma_y: 0.7,
+            obs: 3,
+            alpha: 0.3,
+            keys: Some(48),
+            bs_keys: Some(6),
+        };
+        let line = serde_json::to_string(&src).expect("serialize LogEntryDto::Feat");
+        let out = anonymize_line(&line, 1_000_000).expect("anonymize feat line");
+        let v: Value = serde_json::from_str(&out).expect("anonymized line is JSON");
+        let obj = v.as_object().expect("object");
+
+        let mut got: Vec<&str> = obj.keys().map(String::as_str).collect();
+        got.sort_unstable();
+        let expected = [
+            "alpha", "bs_keys", "ewma_x", "ewma_y", "f1", "f3", "f4", "f5", "f6", "keys", "obs",
+            "p_flow", "p_inc", "p_stuck", "raw_x", "raw_y", "t", "type",
+        ];
+        assert_eq!(
+            got, expected,
+            "feat 行のフィールド集合が変わった。匿名化バンドルに出してよい値か判断してから更新すること"
+        );
+
+        // ★ `type` 以外はすべて数値であること = 本文性のある文字列が 1 つも無いこと。
+        for (k, val) in obj {
+            if k == "type" {
+                continue;
+            }
+            assert!(
+                val.is_number(),
+                "feat の {k} が数値でない ({val}). 文字列は本文を運びうるので匿名化の再検討が要る"
+            );
+        }
+        // 絶対時刻は相対化されている。
+        assert_eq!(obj["t"], Value::from(30_000u64));
+        // ★ Tier 0 の打鍵数は「数」としてそのまま残る (F3/F6 と同じ扱い・再計算に必要)。
+        assert_eq!(obj["keys"], Value::from(48u64));
+        assert_eq!(obj["bs_keys"], Value::from(6u64));
+    }
+
     #[test]
     fn meta_session_start_becomes_zero() {
         let meta = r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.3.0"}"#;

@@ -28,6 +28,19 @@ pub struct Features {
     pub f5_pause_count: f64,
     /// F6: 削除後停止率 = BS/Del直後2秒以上停止する割合
     pub f6_pause_after_del_rate: f64,
+    /// ★ Tier 0 (記録のみ): **窓内の総キー押下数** = `f3_correction_rate` の**分母**。
+    ///
+    /// ⚠️★★★ **特徴量ではない。** HMM にも X/Y 合成式にも 1 バイトも流さない。
+    /// ⚠️★★★ **窓の右端は「最後の打鍵時刻」であって「今」ではない。**
+    /// **累積カウンタでもない。** 意味の正本は
+    /// `.steering/20260801-recovery-axis-grounding/tier0-wiring-design.md` §2 と、
+    /// `analysis/loop_step.rs` の `FeatSnapshot::keys` の doc を参照 (★ そこに実測つきで書いてある)。
+    pub keys: u64,
+    /// ★ Tier 0 (記録のみ): **窓内の BS/Del 押下数** = `f3_correction_rate` の**分子**。
+    ///
+    /// `f3` は `{:.4}` に丸めて NDJSON へ書かれるため `f3 × keys` は整数に戻らない。
+    /// 丸め誤差を持ち込まないよう整数で別途持つ (案 B)。注意点は `keys` と同じ。
+    pub bs_keys: u64,
 }
 
 impl Default for Features {
@@ -38,6 +51,8 @@ impl Default for Features {
             f4_burst_length: 0.0,
             f5_pause_count: 0.0,
             f6_pause_after_del_rate: 0.0,
+            keys: 0,
+            bs_keys: 0,
         }
     }
 }
@@ -232,6 +247,10 @@ impl FeatureExtractor {
             f4_burst_length: f4,
             f5_pause_count: f5,
             f6_pause_after_del_rate: f6,
+            // ★ Tier 0 (記録のみ): 上で F3 のために既に数え終えている値をそのまま載せる。
+            // 新規の走査・計算はゼロ。
+            keys: total_keys as u64,
+            bs_keys: correction_keys as u64,
         }
     }
 
@@ -305,6 +324,12 @@ impl FeatureExtractor {
             f4_burst_length: 0.0,
             f5_pause_count: silence_secs / 2.0,
             f6_pause_after_del_rate: f6_synthetic,
+            // ★ Tier 0: 本関数は**合成観測**であり、打鍵を数えていない。
+            // 0 を「実測 0 打」の意味で使わないよう、呼び出し側 (`loop_step::step`) が
+            // `calculate_features()` の実測値で必ず上書きする。ここでの 0 は
+            // FeatSnapshot に載らない (loop_step.rs の Feat 記録部を参照)。
+            keys: 0,
+            bs_keys: 0,
         })
     }
 }
@@ -443,6 +468,8 @@ mod tests {
             f4_burst_length: 5.0,
             f5_pause_count: 0.0,
             f6_pause_after_del_rate: 0.00,
+            keys: 100,
+            bs_keys: 2,
         }
     }
 
@@ -453,6 +480,8 @@ mod tests {
             f4_burst_length: 2.0,
             f5_pause_count: 3.0,
             f6_pause_after_del_rate: 0.30,
+            keys: 50,
+            bs_keys: 20,
         }
     }
 
@@ -560,6 +589,9 @@ mod tests {
         assert!(approx_eq(f.f4_burst_length, 0.0));
         assert!(approx_eq(f.f5_pause_count, 0.0));
         assert!(approx_eq(f.f6_pause_after_del_rate, 0.0));
+        // ★ Tier 0: バッファ空は「実測 0 打」なので 0 が正しい意味を持つ。
+        assert_eq!(f.keys, 0);
+        assert_eq!(f.bs_keys, 0);
     }
 
     #[test]
@@ -592,6 +624,90 @@ mod tests {
         e.process_event(key_press(0x42, 200));
         let f = e.calculate_features();
         assert!(approx_eq(f.f3_correction_rate, 1.0 / 3.0));
+    }
+
+    // ---------- Tier 0: keys / bs_keys (記録のみ) ----------
+
+    #[test]
+    fn tier0_key_counts_are_the_f3_numerator_and_denominator() {
+        // ★ keys = F3 の分母、bs_keys = F3 の分子。定義の一致を固定する。
+        // Press 5 keys: A, BS, B, BS, C → bs_keys=2 / keys=5 → f3 = 0.4
+        let mut e = extractor();
+        e.process_event(key_press(0x41, 0));
+        e.process_event(backspace_press(100));
+        e.process_event(key_press(0x42, 200));
+        e.process_event(backspace_press(300));
+        e.process_event(key_press(0x43, 400));
+        let f = e.calculate_features();
+        assert_eq!(f.keys, 5);
+        assert_eq!(f.bs_keys, 2);
+        // 丸めのない整数から f3 を再構成できること (案 B の根拠)
+        assert!(approx_eq(
+            f.f3_correction_rate,
+            f.bs_keys as f64 / f.keys as f64
+        ));
+        // 純産出 (progress_proxy) が整数で得られること
+        assert_eq!(f.keys - f.bs_keys, 3);
+    }
+
+    #[test]
+    fn tier0_key_counts_exclude_releases_but_include_repeats() {
+        // ★ 意味の固定: press のみを数え、release は数えない。
+        // ⚠️ リピート (BS 長押し) は **数える** — F3 の分母と同じ母集団に揃えるため。
+        //    (engine.register_keystroke も同じ理由でリピートを含める)
+        let mut e = extractor();
+        e.process_event(key_press(0x41, 0));
+        e.process_event(key_release(0x41, 50)); // 数えない
+        let mut repeat = backspace_press(100);
+        repeat.is_repeat = true;
+        e.process_event(repeat); // 数える
+        e.process_event(backspace_press(200));
+        let f = e.calculate_features();
+        assert_eq!(f.keys, 3);
+        assert_eq!(f.bs_keys, 2);
+    }
+
+    #[test]
+    fn tier0_key_counts_use_the_30s_window_ending_at_the_last_event() {
+        // ⚠️★★★ 窓の右端は **バッファ最後のイベント時刻**であって「今」ではない。
+        // cutoff = last_ts − 30_000 なので、last_ts が古いままなら窓も古いまま動かない。
+        let mut e = extractor();
+        e.process_event(key_press(0x41, 0)); // 窓外になる
+        e.process_event(key_press(0x42, 1_000)); // 窓外になる
+        e.process_event(key_press(0x43, 40_000));
+        e.process_event(backspace_press(41_000));
+        // cutoff = 41_000 − 30_000 = 11_000 → 先頭 2 件が落ちる
+        let f = e.calculate_features();
+        assert_eq!(f.keys, 2);
+        assert_eq!(f.bs_keys, 1);
+    }
+
+    #[test]
+    fn tier0_key_counts_freeze_while_silent_because_the_window_follows_the_last_event() {
+        // ⚠️★★★ **沈黙が何秒続いても値は減らない。** `calculate_features()` は
+        // 「今」を知らないので、打鍵が止まった時点の窓をそのまま返し続ける。
+        // ★ これが「feat 行をまたいで keys を足し上げてはいけない」理由である
+        // (実測: tests/snapshots/deep_silence.json は 44 行連続で keys=12)。
+        let mut e = extractor();
+        e.process_event(key_press(0x41, 1_000));
+        e.process_event(backspace_press(2_000));
+        e.process_event(key_press(0x42, 3_000));
+        let first = e.calculate_features();
+        assert_eq!((first.keys, first.bs_keys), (3, 1));
+        // 打鍵を 1 つも足さずに何度呼んでも同じ値が返る (＝毎秒の feat 行が同じ値を書く)。
+        let again = e.calculate_features();
+        assert_eq!((again.keys, again.bs_keys), (3, 1));
+    }
+
+    #[test]
+    fn tier0_synthetic_silence_observation_carries_no_key_counts() {
+        // ★ 合成観測は打鍵を数えていない。呼び出し側 (loop_step) が実測値で上書きする契約。
+        let ctx = high_friction_features();
+        let f = extractor()
+            .make_silence_observation(10.0, Some(&ctx))
+            .unwrap();
+        assert_eq!(f.keys, 0);
+        assert_eq!(f.bs_keys, 0);
     }
 
     #[test]

@@ -164,8 +164,12 @@ Q1/Q2 が共に中央 2 値 (3–4) に集中した結果、象限分割の境�
   X→Q1 が全員 ≤0.52 という一貫した弱さは**警戒すべき前兆**だが、ラベル分散が枯渇した状態の
   C-index は交絡しており、モデル側の反証にならない。
 - **順序**: ②でラベル品質を回復 → ①で母数を満たす → 再判定。そこで初めて GATE3 が意味を持つ。
-- 将来 HMM_VERSION を bump する場合: golden **3本** (`minimal.json` / `phase1_ime_heavy.json` /
-  `category_coverage.json`) を全て再生成し `cargo test --bin gse-replay` を通すこと。
+- 将来 HMM_VERSION を bump する場合: golden **4本** (`minimal.json` / `phase1_ime_heavy.json` /
+  `category_coverage.json` / `deep_silence.json`) を全て再生成し `cargo test --bin gse-replay` を通すこと。
+  ⚠️★ **2026-08-16 訂正**: 本項は当初「**3本**」と書いていたが、その後 `deep_silence.json` が
+  追加されて **4本**になっていた（★ 実測。`.steering/20260815-tier0-keys-wiring/` で発覚）。
+  ★ 3 本だけ再生成すると `deep_silence` が取り残されて `cargo test` が落ちる。
+  ⚠️ 実行は `cd src-tauri` してから（★ repo 直下に `Cargo.toml` は無い）。
 
 ### ④ 本分析で判明した**コード/運用の follow-up** (別タスク候補)
 1. **`label_pool` フィルタ不在** (中): `calibration_eval.rs` は `track`/`source` で絞るが

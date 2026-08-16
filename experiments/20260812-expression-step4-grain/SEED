@@ -1,0 +1,41 @@
+# SEED — experiments/20260812-expression-step4-grain
+
+`reproducibility-discipline` ルール 2（ランダム要素があれば seed を固定）。
+
+⚠️★★★ **Step 3 の SEED ファイルは「乱数を使っていない」と書いてあった。本 Step は違う。**
+★ **グラニュラー合成は乱数を使う**（D18 / S3-D15 が明示している）。
+→ **以下が実際に使われている seed の値である**（「固定してある」という記述ではなく実値）。
+
+| 用途 | seed | どこで使われるか |
+|---|---|---|
+| **粒子の周波数・位相・発火ジッタ** | **20260812** | `step4.config.json` `layer2.seed` → `player/grain-processor.js` の `mulberry32(seed)` |
+| **盲検トライアルの出題順** | **20260812** | `step4.config.json` `blind_test.order_seed` → `player/step4.html` の `buildOrder()` |
+
+## 出題順の実際の導出（★ 事後に再現できる形で書く）
+
+盲検は分離案ごとに順序を変える（同じ順序が 3 回続くと順序を覚えてしまうため）:
+
+```text
+案ごとの seed = order_seed + (separation_plans.options 内の index) * 977
+  none    → index 0 → 20260812         （★ 対照。盲検の対象ではない）
+  plan_a  → index 1 → 20261789
+  plan_b  → index 2 → 20262766
+  plan_c  → index 3 → 20263743
+```
+
+その seed で `mulberry32` を作り、
+`[layer0 ×4, layer2 ×4, catch ×2]` を **Fisher-Yates** でシャッフルしたものが出題順である。
+★ **実際に出た順序は `results/blind-<plan>.json` の `order` に保存される。**
+
+## 乱数を使っていないもの（★ 使っていないことも書く）
+
+- **層 0 の合成**（正弦の足し算・LFO）— 決定的
+- **平滑化**（`expr_smooth.py`）— 決定的
+- **変調スペクトルの検算**（`OfflineAudioContext` ＋ Hann 窓 DFT）— 決定的
+  ⚠️ ただし**層 2 を含めた検算は粒子の乱数を通る**ので、
+  ★ **同じ seed なら同じ値が出るが、seed を変えれば値は変わる**（`_grain_note` 参照）。
+
+## ⚠️ 実測されていないこと
+
+★ **本 SEED の再現性（同じ seed で同じ音になること）は、まだ 2 回走らせて突き合わせていない。**
+**未実測である。**（`verify-before-claiming`: 確認できていないことを確認したと書かない）

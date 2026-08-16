@@ -496,6 +496,21 @@ python scripts/check_schema_parity.py --dataset C:/gse-dataset --machine-readabl
 ロジックを Python 1 本に集約しているため、将来の拡張 (tier-1 への応用・
 variant 互換性判定など) は helper 側のみ編集する。ps1/sh は薄い呼出しラッパ。
 
+#### 10.3.2 ⚠️★★★ 解析側が知っておくべき欠測・意味の落とし穴
+
+★ schema が additive なので**古いログも新しい schema で通る**。⚠️ **通ることと、
+値が同じ意味を持つことは別**である。★ 解析 (Python / DuckDB / notebook) を書く前に読むこと。
+
+| フィールド | 導入 | ⚠️ 落とし穴 |
+|---|---|---|
+| `feat.keys` / `feat.bs_keys` | **2026-08-16 (Tier 0 配線)** | ★★★ **それ以前のログには存在しない。** `gse-replay --metrics` は欠測を **`0`** として読むので、**「実測 0 打」と区別できない**。★ 該当セッションでは `gse-replay` が `feat entries have no keys/bs_keys (pre-Tier0-wiring log)` を warn する。⚠️ **`progress_proxy` (= `keys − bs_keys`) をそのセッションから計算しないこと。** |
+| `feat.keys` / `feat.bs_keys` | 同上 | ★★★ **累積カウンタではない。窓の右端は `t` ではなく「最後の打鍵時刻」**である。**沈黙中は同じ値が毎秒くり返し出る**（実測: `tests/snapshots/deep_silence.json` は 44 行連続で `keys=12`）。→ ⚠️ **feat 行をまたいで足し上げると同じ打鍵を数十回二重計上する。** |
+| `feat.keys` / `feat.bs_keys` | 同上 | ⚠️ **IME 変換中の打鍵は数えない**（特徴量ウィンドウ自体が IME ポーズ中は蓄積しない）。★ 日本語入力主体のセッションでは系統的に過小になる。 |
+| `feat.keys` / `feat.bs_keys` | 同上 | ⚠️ **リングバッファ 600 イベント（実質 ~300 打）で頭打ち**になる。BS 長押し等で超えると過小計上 ＋ 窓長が 30 秒未満に切り詰められる。 |
+| `paste.external_paste_chars` | capture-schema-freeze 以前 | ⚠️ 取得不能時は `null`。`0` ではない。 |
+
+★ 意味の正本は `src-tauri/src/analysis/loop_step.rs` の `FeatSnapshot::keys` の doc コメント。
+
 ### 10.4 プライバシー原則
 
 - `raw/` ディレクトリは gse-dataset 側の `.gitignore` で永続的に除外

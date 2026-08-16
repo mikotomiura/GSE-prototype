@@ -1129,6 +1129,9 @@ mod tests {
             ewma_y,
             obs: 0,
             alpha: 0.3,
+            // ★ Tier 0 (記録のみ)。較正評価は本フィールドを読まない。
+            keys: 0,
+            bs_keys: 0,
         }
     }
 

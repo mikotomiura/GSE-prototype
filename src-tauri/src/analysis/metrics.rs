@@ -840,6 +840,9 @@ mod tests {
             ewma_y: 0.0,
             obs: 0,
             alpha: 0.0,
+            // ★ Tier 0 (記録のみ)。metrics は本フィールドを読まない。
+            keys: 0,
+            bs_keys: 0,
         }
     }
 

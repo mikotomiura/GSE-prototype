@@ -1,0 +1,51 @@
+{
+  "schema": "expression-power-config/v1",
+  "purpose": "PS-Q1『表現層の第 1 版を 1 要素に絞るか』を n=3-10 の検出力として数字にする",
+  "anchors": {
+    "hmm_version": "0.3.0",
+    "expr_version": "0.3.0-step4",
+    "repo_commit": "ad697f1",
+    "hmm_version_source": "src-tauri/src/analysis/engine.rs:45",
+    "expr_version_source": ".steering/20260811-expression-prototype-step0/scripts/expr_smooth.py:59"
+  },
+  "alpha": 0.05,
+  "target_power": 0.8,
+  "block_minutes": 5,
+  "block_minutes_source": "experiments/20260801-controlled-friction-task (G1) の 5 分ブロック",
+  "grid": {
+    "blocks": [4, 6, 8, 10, 12, 16, 32],
+    "participants": [1, 2, 3, 4, 5, 6, 8, 10],
+    "k_values": [1, 2, 4, 8, 12]
+  },
+  "k_values_note": "12 は .steering/20260815-public-space-and-media-art/discussion.md §2 が数えた現在の表現層の要素数",
+  "delta_probe": [0.5, 1.0, 1.5, 2.0],
+  "monte_carlo": {
+    "sims": 500,
+    "perms": 500,
+    "individual_sims": 600,
+    "tolerance": 0.06,
+    "tolerance_note": "sims=500 のとき検出力推定の標準誤差は最大 0.022。許容差はその約 2.7 倍",
+    "cells": [
+      { "n": 3, "blocks": 8, "delta": 1.0 },
+      { "n": 5, "blocks": 8, "delta": 0.9 },
+      { "n": 10, "blocks": 8, "delta": 0.6 },
+      { "n": 5, "blocks": 16, "delta": 0.65 }
+    ]
+  },
+  "monte_carlo_primary": {
+    "_note": "★ 主経路。並べ替え検定をそのまま模擬して δ80 を解く（numpy 必須）。解析式は楽観側の下界",
+    "sims": 2500,
+    "perms": 1200,
+    "null_sims": 4000,
+    "k_values": [1, 4, 12],
+    "cells": [[3, 8], [5, 8], [10, 8], [3, 10], [5, 10], [10, 10], [3, 16], [5, 16], [10, 16], [10, 32]],
+    "dismantling_cells": [[4, 10, 5], [4, 10, 10], [4, 20, 5], [4, 20, 10]],
+    "null_cells": [[3, 8], [5, 8], [10, 16]]
+  },
+  "identification": {
+    "delta": 1.0,
+    "delta_note": "『k 要素のうち 1 つだけが真に効く』シナリオ。δ=1.0 はブロック水準 SD 1 個分",
+    "blocks": [8, 16, 32],
+    "participants": [3, 5, 10]
+  }
+}
