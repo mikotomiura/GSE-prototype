@@ -36,7 +36,8 @@
 - [ ] B: **プール倍率の実数を取る小規模な募集テスト**（★ **A-Q3 の解除条件 ①** はこれ待ち）
 - [ ] D: **T0-Q2（Δ）→ T0-Q1（Tier 1 の置き場）**（★ D-Q1 の実測が先・P1 データ待ち）
 - [ ] D: `task_kind`→β 配線（★ **A-Q3 の解除条件 ②**・★ B のパイロットより前）
-- [ ] 未担当: **PreReg-1 尺度教示の再設計**を誰が持つか決める
+- [x] 未担当: **PreReg-1 尺度教示の再設計** → ★ **研究者判断で次セッションの主題に決定**
+      （`.steering/_handoff/next-session-prompt-prereg1-scale-instructions.md`）
 
 ## 記録・レビュー
 - [x] `decisions.md` に Step 0 の採否と却下理由を残す
