@@ -31,9 +31,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use gse_next_lib::analysis::calibration_eval::{
-    compute_calibration_metrics, format_calibration_pretty, AggSpec, ProbeRecord, ProbeSourceKind,
-    QuadrantKind, SessionData, SkipReasonKind, TrackKind, VignetteRecord,
-    HOLDOUT_CALIBRATION_SESSIONS,
+    compute_calibration_metrics, format_calibration_pretty, is_valid_opaque_id, AggSpec,
+    ProbeRecord, ProbeSourceKind, QuadrantKind, SessionData, SkipReasonKind, TrackKind,
+    VignetteRecord, HOLDOUT_CALIBRATION_SESSIONS,
 };
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
@@ -214,11 +214,17 @@ enum ReplayEvent {
     /// v0.3 較正スモーク: 尺度理解テスト回答。`--calibration` で VignetteRecord 化する。
     #[serde(rename = "vignette_response")]
     VignetteResponse {
-        #[allow(dead_code)]
         vignette_id: String,
         expected_quadrant: String,
         q1_friction: u8,
         q2_progress: u8,
+        /// 2026-08-17 以降のログにのみ存在。⚠️ **旧ログでは `None`** であり、
+        /// `0`（＝即答）と混同してはならない
+        /// (`deny_unknown_fields` を付けていないので前方互換・後方互換とも壊れない)。
+        #[serde(default)]
+        elapsed_ms: Option<u64>,
+        #[serde(default)]
+        changes: Option<u16>,
         #[allow(dead_code)]
         ts: u64,
     },
@@ -1522,9 +1528,12 @@ fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, Strin
                 });
             }
             ReplayEvent::VignetteResponse {
+                vignette_id,
                 expected_quadrant,
                 q1_friction,
                 q2_progress,
+                elapsed_ms,
+                changes,
                 ..
             } => {
                 let Some(expected) = QuadrantKind::parse(&expected_quadrant) else {
@@ -1536,7 +1545,18 @@ fn load_calibration_session(session_path: &PathBuf) -> Result<SessionData, Strin
                     out_of_range_lines += 1;
                     continue;
                 }
+                // ⚠️ `vignette_id` は `split_attempts` が施行の境界に使うため、
+                //    **読込側でも**書込側 (`lib.rs`) と同じ不透明 ID 規則で検証する。
+                //    本 CLI は任意のローカル NDJSON を読むので、手編集ファイル経由で
+                //    任意長の文字列が入りうる (`security-checker` LOW)。
+                if !is_valid_opaque_id(&vignette_id) {
+                    out_of_range_lines += 1;
+                    continue;
+                }
                 vignettes.push(VignetteRecord {
+                    vignette_id,
+                    elapsed_ms,
+                    changes,
                     expected,
                     q1_friction,
                     q2_progress,

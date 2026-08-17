@@ -79,6 +79,23 @@ gse-dataset にも commit していない (`.gitignore` の `*.age` / `P[0-9]*_*
 そもそも収集していない (`vignette.total=0`)。この理由文は **成立しない自動判定のアーティファクト**であり、
 実質的な判定根拠ではない。
 
+> ⚠️★★★ **2026-08-17 追記 — この誤読は実際に起きた。**
+> 上の注意書きにもかかわらず、`decision_reason` の逐語だけが引き継ぎに転記され、
+> 次セッションの前提が「**通過率 0.00 ＝ 1 人も通っていない ＝ Phase1 が inconclusive に
+> なった第一原因**」と**丸ごと誤って**設定された
+> (`.steering/_handoff/next-session-prompt-prereg1-scale-instructions.md` §0)。
+> **正しくは「5 名全員が一度も受けていない」**（全員の per-被験者 JSON が
+> `"vignette": {"total": 0, "matched": 0, "passed": false}`）。
+>
+> **原因はコードにあった**: `calibration_eval.rs::score_vignettes_internal` が
+> `passed: matched >= 6` を `total > 0` のガード無しで評価していたため、
+> **未実施が機械的に「不合格」になっていた**。
+> → 2026-08-17 に `VignetteScore.administered` を追加し、コホート側の
+> `decision_reason` が「未達」ではなく「**未実施**」を出すよう修正した。
+> 検査は `all_subjects_unadministered_reports_deferred_not_failure`
+> （反証方向: 1 名でも施行済みなら従来どおり「未達」を出す）。
+> 詳細は `.steering/20260817-prereg1-scale-instructions/`。
+
 ### 2.3 判定の実質 — **DataInsufficient**
 
 パイプラインの `model.verdict` は `kill` だが、これは **GATE3 母数 n=1 の中央値**である。

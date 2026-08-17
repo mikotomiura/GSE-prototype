@@ -27,7 +27,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::analysis::calibration_eval::{measurement_gate, model_gate, MeasurementGate, ModelGate};
+use crate::analysis::calibration_eval::{
+    measurement_gate, model_gate, MeasurementGate, ModelGate, VIGNETTE_PASS_MIN, VIGNETTE_TOTAL,
+};
 
 /// PreReg-1 尺度理解ゲートのコホート通過率 (被験者の 80% 以上が通過)。
 pub const VIGNETTE_COHORT_PASS_FRACTION: f64 = 0.80;
@@ -80,6 +82,42 @@ struct MnarView {
 struct VignetteView {
     #[serde(default)]
     passed: bool,
+    /// 施行済みフラグ (新しい per-被験者 JSON にのみ存在)。
+    #[serde(default)]
+    administered: bool,
+    /// 採点対象施行の回答数。`administered` を持たない旧 JSON からの後方互換にも使う。
+    #[serde(default)]
+    total: usize,
+    /// 採点対象施行の一致数。旧 JSON の `passed` を再導出するために読む。
+    #[serde(default)]
+    matched: usize,
+}
+
+impl VignetteView {
+    /// 尺度理解テストが施行されたか。旧 JSON (`administered` 欠落) は `total > 0` で判定する。
+    fn was_administered(&self) -> bool {
+        self.administered || self.total > 0
+    }
+
+    /// 合格判定を **read 側で再導出**する。
+    ///
+    /// ⚠️ per-被験者 JSON の `passed` をそのまま信用しない。本修正**以前**に生成された
+    /// JSON は完了ガード無しの `matched >= 6` で書かれているため、
+    /// `total: 6, matched: 6, passed: true` のような**部分回答での合格**を持ちうる。
+    /// `was_administered()` はこれを検出しない (`total > 0` は真)。
+    /// 凍結閾値 (`VIGNETTE_PASS_MIN` / `VIGNETTE_TOTAL`) は D 側と同じものを使う。
+    fn passed_recomputed(&self) -> bool {
+        if self.total == 0 {
+            // 集計側が `matched` を出力しない古い形の可能性。施行されていないなら不合格。
+            return false;
+        }
+        self.total >= VIGNETTE_TOTAL && self.matched >= VIGNETTE_PASS_MIN
+    }
+
+    /// per-被験者 JSON の `passed` と、read 側の再導出が食い違うか。
+    fn passed_disagrees(&self) -> bool {
+        self.passed != self.passed_recomputed()
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -142,6 +180,12 @@ pub enum CohortDecision {
 #[derive(Debug, Clone, Serialize)]
 pub struct CohortVignetteGate {
     pub passed_subjects: usize,
+    /// 尺度理解テストを**施行済み**の主指標被験者数。
+    ///
+    /// ⚠️ `0` は「全員が不合格」ではなく「**誰も受けていない**」を意味する。
+    /// GATE1 は現行スモークでは延期されており (`docs/research-positioning.md` §5)、
+    /// Phase1 (P010–P014) は 5 名全員がこれに該当した。
+    pub administered_subjects: usize,
     pub total_subjects: usize,
     pub pass_fraction: f64,
     /// 被験者の 80% 以上が通過したか。
@@ -236,6 +280,9 @@ pub struct CohortReport {
 /// 2. 提示ランダムプローブ 0 件 → `DataInsufficient` (測定不能。回答率0を Kill と誤断定しないため
 ///    PreReg-1 より前に置く)。
 /// 3. PreReg-1 尺度理解未達 (通過率 <80%) → `Inconclusive` (教示再設計)。
+///    ⚠️ ただし **誰も施行していない場合は本ゲートを素通しする** (GATE1 は延期中であり、
+///    未実施は不合格ではない)。代わりに最終判定で **`Go` への昇格だけを抑止**し、
+///    施行状況 (`n/N 名`) を `decision_reason` に必ず織り込む (`decide_overall`)。
 /// 4. PreReg-2 測定法 Kill → `Kill`。
 /// 5. PreReg-5 充足被験者なし → `DataInsufficient` (データ拡充)。
 /// 6. モデルゲート結果。ただし充足被験者が一部だけなら Go に昇格させず `Inconclusive`。
@@ -266,7 +313,30 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
     }
 
     // ---- PreReg-1 尺度理解ゲート (コホート) ----
-    let vignette_passed_subjects = included.iter().filter(|s| s.view.vignette.passed).count();
+    // ⚠️ 施行済み被験者数を分けて数える。0 は「全員不合格」ではなく「誰も受けていない」。
+    // ⚠️ 合否は per-被験者 JSON の `passed` を鵜呑みにせず read 側で再導出する
+    //    (旧 JSON は完了ガード無しの `matched >= 6` で書かれており、部分回答での合格を持ちうる)。
+    for s in &included {
+        if s.view.vignette.passed_disagrees() {
+            notes.push(format!(
+                "subject {}: vignette.passed={} だが再導出は {} (total={} matched={})。\
+                 完了ガード導入前の JSON の可能性 → 再集計を推奨",
+                s.subject_id,
+                s.view.vignette.passed,
+                s.view.vignette.passed_recomputed(),
+                s.view.vignette.total,
+                s.view.vignette.matched,
+            ));
+        }
+    }
+    let vignette_passed_subjects = included
+        .iter()
+        .filter(|s| s.view.vignette.passed_recomputed())
+        .count();
+    let vignette_administered_subjects = included
+        .iter()
+        .filter(|s| s.view.vignette.was_administered())
+        .count();
     let vignette_total = included.len();
     let vignette_fraction = if vignette_total == 0 {
         0.0
@@ -275,10 +345,23 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
     };
     let vignette_gate = CohortVignetteGate {
         passed_subjects: vignette_passed_subjects,
+        administered_subjects: vignette_administered_subjects,
         total_subjects: vignette_total,
         pass_fraction: vignette_fraction,
         passed: vignette_total > 0 && vignette_fraction >= VIGNETTE_COHORT_PASS_FRACTION,
     };
+    if vignette_administered_subjects == 0 && vignette_total > 0 {
+        notes.push(
+            "PreReg-1: 尺度理解テストの回答が 1 件も無い (未実施)。\
+             pass_fraction=0.00 は不合格ではなく未施行を意味する (GATE1 は延期中)"
+                .to_string(),
+        );
+    } else if vignette_administered_subjects < vignette_total {
+        notes.push(format!(
+            "PreReg-1: 尺度理解テストの施行は {}/{} 名のみ (未施行者の pass_fraction 寄与は不合格ではない)",
+            vignette_administered_subjects, vignette_total
+        ));
+    }
 
     // ---- PreReg-2 測定法ゲート (コホート) ----
     let total_presented: usize = included
@@ -368,7 +451,7 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
             prereg5_eval_ok,
             prereg5_probe_ok,
             gate_eligible,
-            vignette_passed: v.vignette.passed,
+            vignette_passed: v.vignette.passed_recomputed(),
             mnar_caution: v.mnar.caution,
             mnar_invalid: v.mnar.invalid,
             bidimensionality_verifiable: v.bidimensionality.verifiable,
@@ -445,6 +528,56 @@ fn decide_overall(
     gate_eligible_count: usize,
     model: ModelGate,
 ) -> (CohortDecision, String) {
+    let (decision, reason) = decide_overall_inner(
+        included_count,
+        vignette,
+        measurement,
+        overall_answer_rate,
+        total_presented_probes,
+        gate_eligible_count,
+        model,
+    );
+    // ⚠️ 施行が全員に行き渡っていないときの後処理。
+    //    (a) **判定理由そのもの**に施行状況を書く。`notes` に置くだけでは足りない
+    //        —— 2026-08-17 の事故は「`decision_reason` の逐語だけが引き継ぎに転記された」
+    //        ことで起きた。読まれるのはこの 1 行である。
+    //    (b) GATE1 を飛ばしたまま Go に昇格させない。
+    if included_count == 0 || vignette.administered_subjects >= vignette.total_subjects {
+        return (decision, reason);
+    }
+
+    let status = if vignette.administered_subjects == 0 {
+        format!(
+            "PreReg-1 **未実施** (尺度理解テストの回答が {} 名全員で 0 件。GATE1 は延期中であり、\
+             pass_fraction {:.2} は不合格ではない)",
+            vignette.total_subjects, vignette.pass_fraction
+        )
+    } else {
+        format!(
+            "PreReg-1 は **{}/{} 名のみ施行** (未施行者は不合格ではない。pass_fraction {:.2} を\
+             通過率として読まないこと)",
+            vignette.administered_subjects, vignette.total_subjects, vignette.pass_fraction
+        )
+    };
+
+    if decision == CohortDecision::Go {
+        return (
+            CohortDecision::Inconclusive,
+            format!("{reason} ／ ただし {status} のため Go に昇格させない"),
+        );
+    }
+    (decision, format!("{reason} ／ {status}"))
+}
+
+fn decide_overall_inner(
+    included_count: usize,
+    vignette: &CohortVignetteGate,
+    measurement: MeasurementGate,
+    overall_answer_rate: f64,
+    total_presented_probes: usize,
+    gate_eligible_count: usize,
+    model: ModelGate,
+) -> (CohortDecision, String) {
     if included_count == 0 {
         return (
             CohortDecision::DataInsufficient,
@@ -459,7 +592,14 @@ fn decide_overall(
             "提示ランダムプローブ 0 件のため回答率を測定できない → データ拡充".to_string(),
         );
     }
-    if !vignette.passed {
+    // ⚠️ 未実施 (誰も受けていない) を「未達」と混同しない。
+    //    GATE1 は現行スモークでは延期されており (`docs/research-positioning.md` §5)、
+    //    Phase1 (P010–P014) は 5 名全員が未実施だった。旧実装はこれを
+    //    「通過率 0.00 < 0.80 → 教示文再設計」と出力し、次セッションの前提を誤らせた。
+    //    未実施は後続ゲートの報告を止めない (延期中の運用に合わせる) が、
+    //    **Go への昇格は許さない** (GATE1 を飛ばして Go が出る穴を塞ぐ)。
+    let vignette_deferred = vignette.administered_subjects == 0;
+    if !vignette_deferred && !vignette.passed {
         return (
             CohortDecision::Inconclusive,
             format!(
@@ -582,6 +722,9 @@ mod tests {
             Some(v) => format!("{v}"),
             None => "null".to_string(),
         };
+        // ⚠️ read 側は `passed` を再導出する (`passed_recomputed`) ので、
+        //    `matched` を `passed` と整合させないとテストが意図と食い違う。
+        let vignette_matched = if vignette_passed { 7 } else { 4 };
         let json = format!(
             r#"{{
                 "schema": "calibration/v0.3",
@@ -612,7 +755,7 @@ mod tests {
                     "eval_pair_source_count": 20
                 }},
                 "mnar": {{ "point": 0.66, "lower": 0.5, "upper": 0.8, "no_answer_rate": 0.05, "caution": false, "invalid": false }},
-                "vignette": {{ "total": 8, "matched": 7, "passed": {vignette_passed} }},
+                "vignette": {{ "total": 8, "matched": {vignette_matched}, "passed": {vignette_passed}, "attempts": 1, "administered": true, "elapsed_ms_median": 9000, "elapsed_ms_min": 6000, "changes_total": 24 }},
                 "bidimensionality": {{ "flow": 1, "stuck": 1, "incubation": 1, "idle": 1, "ambiguous": 0, "incubation_fraction": 0.25, "off_diagonal_fraction": 0.3, "verifiable": true }},
                 "recall": {{ "reported": false, "positive_episode_count": 3, "reason": "withheld" }},
                 "notes": []
@@ -623,6 +766,188 @@ mod tests {
             subject_id: id.to_string(),
             view,
         }
+    }
+
+    /// PreReg-1 が **未実施**の被験者 (`vignette.total == 0`) を作る。
+    ///
+    /// ⚠️ `administered` / `attempts` を持たない **Phase1 当時の JSON 形を実際に serde に通す**。
+    /// 構造体を直接組み立てると `#[serde(default)]` の後方互換 (`total > 0` fallback) が
+    /// 検証されず、フィールド rename を静かに飲み込む。
+    fn subject_no_vignette(
+        id: &str,
+        answer_rate: f64,
+        random_probe_total: usize,
+        random_probe_answered: usize,
+        eval_sessions: usize,
+        session_median: Option<f64>,
+    ) -> CohortSubject {
+        let mut s = subject(
+            id,
+            true,
+            false,
+            answer_rate,
+            random_probe_total,
+            random_probe_answered,
+            eval_sessions,
+            session_median,
+        );
+        // Phase1 (2026-07-31) の実出力そのままの形: administered / attempts が無い。
+        s.view.vignette = serde_json::from_str(r#"{"total": 0, "matched": 0, "passed": false}"#)
+            .expect("旧 JSON 形の vignette が read-model でパースできない");
+        assert!(
+            !s.view.vignette.was_administered(),
+            "旧 JSON 形 (administered 欠落 / total=0) が未実施と判定されない"
+        );
+        s
+    }
+
+    /// ⚠️ **本タスクの発端**。Phase1 (P010–P014) は 5 名全員が尺度理解テストを受けて
+    /// いなかった (`vignette.total == 0`) のに、`decision_reason` が
+    /// 「PreReg-1 尺度理解未達: 通過率 0.00 < 0.80 → 教示文再設計」と出力され、
+    /// 引き継ぎで「1 人も通っていない」と読まれて次セッションの前提を丸ごと誤らせた。
+    #[test]
+    fn all_subjects_unadministered_reports_deferred_not_failure() {
+        let subjects = vec![
+            subject_no_vignette("P010", 0.99, 104, 103, 10, Some(0.45)),
+            subject_no_vignette("P011", 1.00, 21, 21, 3, None),
+            subject_no_vignette("P012", 0.97, 36, 35, 5, None),
+        ];
+        let r = cohort_verdict(&subjects);
+
+        assert_eq!(r.vignette.administered_subjects, 0, "未実施のはず");
+        assert_eq!(r.vignette.pass_fraction, 0.0);
+        assert!(
+            r.decision_reason.contains("未実施"),
+            "判定理由に「未実施」が無い: {}",
+            r.decision_reason
+        );
+        assert!(
+            !r.decision_reason.contains("未達"),
+            "未実施を「未達」と呼んではいけない: {}",
+            r.decision_reason
+        );
+        assert!(
+            r.notes.iter().any(|n| n.contains("未実施")),
+            "notes に未実施の注記が無い: {:?}",
+            r.notes
+        );
+
+        // ⚠️ 反証方向 (検査が「常に未実施と言う」空振りでないこと):
+        //    1 名でも施行して不合格なら、従来どおり「未達」を出す。
+        let mixed = vec![
+            subject("P010", true, false, 0.99, 104, 103, 10, Some(0.45)),
+            subject_no_vignette("P011", 1.00, 21, 21, 3, None),
+        ];
+        let rm = cohort_verdict(&mixed);
+        assert_eq!(rm.vignette.administered_subjects, 1);
+        assert!(
+            rm.decision_reason.contains("未達"),
+            "施行済みの不合格は「未達」であるべき: {}",
+            rm.decision_reason
+        );
+        assert!(!rm.decision_reason.contains("未実施"));
+    }
+
+    /// ⚠️ **部分施行**も `decision_reason` そのものに書く (code-reviewer MEDIUM)。
+    /// 2026-08-17 の事故は「`decision_reason` の逐語だけが引き継ぎに転記された」ことで
+    /// 起きたので、`notes` にしか書かないと同じ誤読が再発する。
+    #[test]
+    fn partial_administration_is_stated_in_decision_reason() {
+        // 5 名中 1 名だけ施行して合格 → pass_fraction 0.20 で従来は「未達」だけが出ていた。
+        let mut subjects = vec![subject("P010", true, true, 0.99, 104, 103, 10, Some(0.45))];
+        for id in ["P011", "P012", "P013", "P014"] {
+            subjects.push(subject_no_vignette(id, 0.99, 40, 39, 8, Some(0.60)));
+        }
+        let r = cohort_verdict(&subjects);
+
+        assert_eq!(r.vignette.administered_subjects, 1);
+        assert_eq!(r.vignette.total_subjects, 5);
+        assert!(
+            r.decision_reason.contains("1/5 名のみ施行"),
+            "判定理由に施行状況が無い: {}",
+            r.decision_reason
+        );
+        assert!(
+            r.decision_reason.contains("未施行者は不合格ではない"),
+            "未施行を不合格と読ませない注記が無い: {}",
+            r.decision_reason
+        );
+
+        // ⚠️ 反証方向: 全員施行済みなら余計な注記は付かない (空振りしていない)。
+        let all: Vec<CohortSubject> = ["P010", "P011", "P012", "P013", "P014"]
+            .iter()
+            .map(|id| subject(id, true, true, 0.99, 40, 39, 8, Some(0.60)))
+            .collect();
+        let ra = cohort_verdict(&all);
+        assert_eq!(ra.vignette.administered_subjects, 5);
+        assert!(
+            !ra.decision_reason.contains("のみ施行"),
+            "全員施行済みなのに部分施行の注記が付いた: {}",
+            ra.decision_reason
+        );
+    }
+
+    /// ⚠️ 完了ガード導入**前**の JSON (`total: 6, matched: 6, passed: true`) を
+    /// そのまま信用しない (code-reviewer MEDIUM)。read 側で再導出し、食い違いを notes に出す。
+    #[test]
+    fn stale_partial_pass_is_recomputed_not_trusted() {
+        let mut s = subject("P010", true, true, 0.99, 40, 39, 8, Some(0.70));
+        // 旧実装 (`matched >= 6` のみ) が書きうる「6 問だけ答えて 6 問一致 → 合格」。
+        s.view.vignette =
+            serde_json::from_str(r#"{"total": 6, "matched": 6, "passed": true}"#).unwrap();
+        assert!(
+            !s.view.vignette.passed_recomputed(),
+            "部分回答 (6/8 未満の総数) を合格と再導出してはいけない"
+        );
+
+        let r = cohort_verdict(&[s]);
+        assert_eq!(
+            r.vignette.passed_subjects, 0,
+            "旧 JSON の passed を鵜呑みにした"
+        );
+        assert!(
+            r.notes.iter().any(|n| n.contains("再集計を推奨")),
+            "食い違いの警告が notes に無い: {:?}",
+            r.notes
+        );
+
+        // ⚠️ 反証方向: 8 問そろった正しい JSON は警告を出さず合格として数える。
+        let mut ok = subject("P011", true, true, 0.99, 40, 39, 8, Some(0.70));
+        ok.view.vignette =
+            serde_json::from_str(r#"{"total": 8, "matched": 6, "passed": true}"#).unwrap();
+        assert!(ok.view.vignette.passed_recomputed());
+        let ro = cohort_verdict(&[ok]);
+        assert_eq!(ro.vignette.passed_subjects, 1);
+        assert!(
+            !ro.notes.iter().any(|n| n.contains("再集計を推奨")),
+            "正しい JSON で警告が出た (空振り): {:?}",
+            ro.notes
+        );
+    }
+
+    /// 未実施のまま後続ゲートが Go 条件を満たしても、`Go` に昇格させない
+    /// (GATE1 を飛ばして Go が出る穴を塞ぐ)。
+    #[test]
+    fn unadministered_vignette_blocks_promotion_to_go() {
+        // 全員 C-index 0.70 (≥0.65 かつ全員 >0.55) & PreReg-5 充足 = 本来 Go。
+        let go_ready = |id: &str| subject(id, true, true, 0.95, 40, 38, 8, Some(0.70));
+        let passing = vec![go_ready("P001"), go_ready("P002"), go_ready("P003")];
+        let r_go = cohort_verdict(&passing);
+        assert_eq!(r_go.overall, CohortDecision::Go, "前提: 施行済みなら Go");
+
+        // ⚠️ 同じ数値で、ビネットだけ未実施にすると Go に昇格しない。
+        let unadministered: Vec<CohortSubject> = ["P001", "P002", "P003"]
+            .iter()
+            .map(|id| subject_no_vignette(id, 0.95, 40, 38, 8, Some(0.70)))
+            .collect();
+        let r = cohort_verdict(&unadministered);
+        assert_eq!(
+            r.overall,
+            CohortDecision::Inconclusive,
+            "PreReg-1 未実施のまま Go を出してはいけない: {}",
+            r.decision_reason
+        );
+        assert!(r.decision_reason.contains("未実施"));
     }
 
     /// read-model を D の **実シリアライザ**出力に結合させる drift ガード。

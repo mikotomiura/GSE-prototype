@@ -667,6 +667,8 @@
       "description": "v0.3 較正スモーク: 尺度理解テスト回答 (ビネット)。常に回答あり (q1/q2 は 1..=5)。 `expected_quadrant` は教示の正解ラベル (`UserLabelKindDto` とは別物で `idle` を含む)。",
       "type": "object",
       "required": [
+        "changes",
+        "elapsed_ms",
         "expected_quadrant",
         "q1_friction",
         "q2_progress",
@@ -675,6 +677,18 @@
         "vignette_id"
       ],
       "properties": {
+        "changes": {
+          "description": "Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。",
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "elapsed_ms": {
+          "description": "場面の表示から**記録に成功するまで**の所要時間 (ms)。読まずに送った回答の事後分離用。 送信に失敗して再送した場合は、初回表示からの累積になる。",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "expected_quadrant": {
           "$ref": "#/definitions/ExpectedQuadrantDto"
         },

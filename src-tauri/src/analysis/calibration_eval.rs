@@ -21,6 +21,8 @@
 //! (`model_gate` / `measurement_gate`) は複数被験者が必要なため純関数として提供し、実データの
 //! 多被験者オーケストレーション (P000/P001/... 走査) は Task E が担う。
 
+use std::collections::HashSet;
+
 use serde::Serialize;
 
 use crate::analysis::loop_step::FeatSnapshot;
@@ -183,9 +185,35 @@ pub struct ProbeRecord {
     pub window_end_ms: u64,
 }
 
+/// 不透明 ID (`vignette_id` 等) の妥当性規則 —— `[A-Za-z0-9_-]` の 1..=16 文字。
+///
+/// **本関数が規則の単一の置き場**。IPC 境界 (`lib.rs::is_valid_opaque_id`) と
+/// NDJSON 読込境界 (`gse-replay`) の両方がこれを使う。
+/// ⚠️ `gse-replay` は**任意のローカル NDJSON を読む CLI** なので、書込側が守られていても
+/// 手編集ファイル経由で任意長 ID が入りうる (`security-checker` LOW)。読込側でも弾く。
+pub fn is_valid_opaque_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 16
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
 /// 1 つの `vignette_response` (尺度理解テスト)。
 #[derive(Debug, Clone)]
 pub struct VignetteRecord {
+    /// 不透明なビネット ID (`v2f1` 等)。**同じ ID の再出現が「再受験」の境界**になる
+    /// (`split_attempts`)。PreReg-1 は「不合格時は教示文を作り直して**再施行**する」と
+    /// 定めており、再施行は前回とは別の 1 回として採点しなければならない。
+    pub vignette_id: String,
+    /// 場面の表示から記録成功までの所要時間 (ms)。
+    /// **「読まずに送った回答」の事後分離に使う**唯一の手がかり。
+    ///
+    /// ⚠️ `None` は「**記録されていない**」であって「0 ms で答えた」ではない。
+    /// 2026-08-17 より前のログには本フィールドが無いので、`0` に潰すと
+    /// **旧データが一律「即答」に見えてしまう**。
+    pub elapsed_ms: Option<u64>,
+    /// Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。`None` = 未記録。
+    pub changes: Option<u16>,
     pub expected: QuadrantKind,
     pub q1_friction: u8,
     pub q2_progress: u8,
@@ -564,16 +592,49 @@ pub struct MnarBounds {
 }
 
 /// ビネット採点 (PreReg-1)。
+///
+/// ⚠️ `total` / `matched` は **採点対象の 1 施行分**であり、被験者の全回答の合計ではない。
+/// 再受験があった場合は**最後の施行**だけを採点する (`split_attempts` / `attempts`)。
 #[derive(Debug, Clone, Serialize)]
 pub struct VignetteScore {
     pub total: usize,
     pub matched: usize,
-    /// 6/8 以上 (被験者単位の通過)。
+    /// 施行回数 (`vignette_id` の再出現で切る)。`0` = 未実施、`2` 以上 = 再受験あり。
+    ///
+    /// ⚠️ 再受験は PreReg-1 が明示的に許した手続き (「不合格時は教示文を作り直して**再施行**」)
+    /// だが、**回答を合算してはいけない**。合算すると 4/8 で落ちた被験者が同じ成績で
+    /// 再受験して 8/16 となり、`total >= 8 && matched >= 6` を満たして**合格してしまう**。
+    pub attempts: usize,
+    /// 採点対象施行の回答所要時間の中央値 (ms)。未実施なら `None`。
+    ///
+    /// ⚠️ **記述統計であって合否には一切使わない** (PreReg-1 の合格条件は 6/8 で凍結)。
+    /// 用途は「読まずに送った回答」の事後分離 ——
+    /// `notes.md` §4 の straight-lining は 6/8 では落ちても *なぜ* 落ちたかを語らない。
+    /// `realtime_label.latency_ms` (PreReg-2 で使用中) と同クラスの応答潜時。
+    pub elapsed_ms_median: Option<u64>,
+    /// 採点対象施行の最短回答時間 (ms)。未実施なら `None`。
+    /// 中央値が正常でも 1 問だけ極端に速い、を拾う。
+    pub elapsed_ms_min: Option<u64>,
+    /// 採点対象施行のスライダー値変更回数の合計。未実施なら `None`。
+    /// `0` に近いほど「既定位置のまま送った」に近い。
+    pub changes_total: Option<u32>,
+    /// 尺度理解テストが一度でも施行されたか (`total > 0`)。
+    ///
+    /// ⚠️ **未実施と不合格を分けるために必要**。GATE1 は現行スモークでは延期されており
+    /// (`docs/research-positioning.md` §5)、Phase1 (P010–P014) は 5 名全員が `total == 0` だった。
+    /// このフラグが無かったため `passed == false` が「全員不合格」と誤読され、
+    /// `cohort_20260731_225531.json` の `decision_reason` が次セッションの前提を誤らせた。
+    pub administered: bool,
+    /// 8 問すべてに回答し、うち 6 問以上が想定象限 (被験者単位の通過)。
     pub passed: bool,
 }
 
-/// 6/8 の合格最小一致数。
+/// 6/8 の合格最小一致数 (PreReg-1 凍結値・変更禁止)。
 pub const VIGNETTE_PASS_MIN: usize = 6;
+
+/// ビネットの総問数 (PreReg-1 逐語「**8 ビネット中** 6 問以上」)。
+/// 中断による部分回答を合格にしないための完了ガード。
+pub const VIGNETTE_TOTAL: usize = 8;
 
 /// 二軸性 (PreReg-8・報告併走)。realtime_label の (q1,q2) 象限分布。
 #[derive(Debug, Clone, Serialize)]
@@ -909,19 +970,83 @@ fn compute_mnar_bounds(obs: &[ProbeObservation]) -> MnarBounds {
     }
 }
 
-/// ビネット採点 (PreReg-1): 全セッションの vignette_response を集計 (通常は最初のセッションに 8 問)。
+/// ビネット回答列を**施行 (attempt) 単位**に切る。
+///
+/// 境界は「**現在の施行で既に見た `vignette_id` が再び現れたとき**」。
+/// 8 問は `vignette_id` が一意なので、同じ ID の再出現は必ず次の施行を意味する。
+///
+/// ⚠️ 「直近 8 件」で切らない理由: 中断した施行 (例 4 問) の直後に完走した施行 (8 問) が
+/// 来ると、直近 8 件は **2 つの施行にまたがってしまう**。ID で切れば混ざらない。
+fn split_attempts<'a>(vignettes: &[&'a VignetteRecord]) -> Vec<Vec<&'a VignetteRecord>> {
+    let mut attempts: Vec<Vec<&VignetteRecord>> = Vec::new();
+    let mut current: Vec<&VignetteRecord> = Vec::new();
+    let mut seen: HashSet<&str> = HashSet::new();
+    for v in vignettes {
+        if !seen.insert(v.vignette_id.as_str()) {
+            attempts.push(std::mem::take(&mut current));
+            seen.clear();
+            seen.insert(v.vignette_id.as_str());
+        }
+        current.push(v);
+    }
+    if !current.is_empty() {
+        attempts.push(current);
+    }
+    attempts
+}
+
+/// ビネット採点 (PreReg-1): 全セッションの vignette_response から**最後の施行**を採点する。
+///
+/// ⚠️ 全回答を合算しない。PreReg-1 は「不合格時は教示文を作り直して**再施行**する」と
+/// 定めており、再施行は前回とは別の 1 回である。合算すると
+/// **4/8 で落ちた被験者が同じ成績で再受験して 8/16 になり、合格してしまう**
+/// (`VignetteTest.tsx` の結果画面が「再度受けることを推奨します」と再受験を促すため、
+/// 到達可能な経路である)。
 fn score_vignettes_internal(sessions: &[SessionData]) -> VignetteScore {
     let vignettes: Vec<&VignetteRecord> =
         sessions.iter().flat_map(|s| s.vignettes.iter()).collect();
-    let total = vignettes.len();
-    let matched = vignettes
+    let attempts = split_attempts(&vignettes);
+    let scored: &[&VignetteRecord] = attempts.last().map(|a| a.as_slice()).unwrap_or(&[]);
+
+    let total = scored.len();
+    let matched = scored
         .iter()
         .filter(|v| infer_quadrant(v.q1_friction, v.q2_progress) == Some(v.expected))
         .count();
+
+    // 回答挙動メタ (記述統計・合否には使わない)。
+    // ⚠️ 書くだけで読まないフィールドを残さない —— NDJSON に `elapsed_ms` / `changes` を
+    //    足した目的は「読まずに送った回答の事後分離」であり、集計に載せて初めて成立する
+    //    (`security-checker` MEDIUM: 目的限定・データ最小化)。
+    // ⚠️ 未記録 (`None`) を 0 に潰さない。2026-08-17 より前のログには本フィールドが無く、
+    //    0 として扱うと**旧データが一律「即答」に見える**。
+    let mut elapsed: Vec<u64> = scored.iter().filter_map(|v| v.elapsed_ms).collect();
+    elapsed.sort_unstable();
+    let elapsed_ms_median = median_u64(&elapsed);
+    let elapsed_ms_min = elapsed.first().copied();
+    let recorded_changes: Vec<u32> = scored
+        .iter()
+        .filter_map(|v| v.changes.map(u32::from))
+        .collect();
+    let changes_total = if recorded_changes.is_empty() {
+        None
+    } else {
+        Some(recorded_changes.iter().sum())
+    };
+
     VignetteScore {
         total,
         matched,
-        passed: matched >= VIGNETTE_PASS_MIN,
+        attempts: attempts.len(),
+        elapsed_ms_median,
+        elapsed_ms_min,
+        changes_total,
+        administered: !attempts.is_empty(),
+        // ⚠️ `total >= VIGNETTE_TOTAL` のガードが要る。これが無いと
+        //    (a) 未実施 (total=0) が「不合格」と見分けられず、
+        //    (b) 中断して 6 問だけ答えて 6 問一致した被験者が合格になる。
+        //    閾値 (VIGNETTE_PASS_MIN) 自体は PreReg-1 凍結値のまま動かしていない。
+        passed: total >= VIGNETTE_TOTAL && matched >= VIGNETTE_PASS_MIN,
     }
 }
 
@@ -1054,12 +1179,39 @@ pub fn format_calibration_pretty(r: &CalibrationReport) -> String {
         },
     ));
     out.push_str("\n-- ビネット (PreReg-1) --\n");
-    out.push_str(&format!(
-        "  {}/{} matched -> {}\n",
-        r.vignette.matched,
-        r.vignette.total,
-        if r.vignette.passed { "PASS" } else { "FAIL" },
-    ));
+    if !r.vignette.administered {
+        // ⚠️ 未実施を「0/0 matched -> FAIL」と出さない。Phase1 でこの表示が
+        //    「全員不合格」と誤読され、次セッションの前提を丸ごと誤らせた。
+        out.push_str("  未実施 (回答 0 件) — GATE1 は延期中。不合格ではない\n");
+    } else {
+        out.push_str(&format!(
+            "  {}/{} matched -> {}{}\n",
+            r.vignette.matched,
+            r.vignette.total,
+            if r.vignette.passed { "PASS" } else { "FAIL" },
+            if r.vignette.attempts > 1 {
+                format!(" (施行 {} 回中の最終回のみ採点)", r.vignette.attempts)
+            } else {
+                String::new()
+            },
+        ));
+        // 回答挙動 (記述統計・合否には使わない)。「読まずに送った」の事後分離用。
+        out.push_str(&format!(
+            "  回答時間 median {} / min {} | スライダー変更 計 {}\n",
+            r.vignette
+                .elapsed_ms_median
+                .map(|m| format!("{} ms", m))
+                .unwrap_or_else(|| "n/a".to_string()),
+            r.vignette
+                .elapsed_ms_min
+                .map(|m| format!("{} ms", m))
+                .unwrap_or_else(|| "n/a".to_string()),
+            r.vignette
+                .changes_total
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "n/a".to_string()),
+        ));
+    }
     out.push_str("\n-- 二軸性 (PreReg-8) --\n");
     out.push_str(&format!(
         "  flow {} / stuck {} / incubation {} / idle {} / ambiguous {}\n",
@@ -1333,48 +1485,18 @@ mod tests {
                 });
             }
             let vignettes = if with_vignettes {
-                vec![
-                    VignetteRecord {
-                        expected: QuadrantKind::Flow,
-                        q1_friction: 1,
-                        q2_progress: 5,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Flow,
-                        q1_friction: 2,
-                        q2_progress: 4,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Stuck,
-                        q1_friction: 5,
-                        q2_progress: 1,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Stuck,
-                        q1_friction: 4,
-                        q2_progress: 2,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Incubation,
-                        q1_friction: 5,
-                        q2_progress: 5,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Incubation,
-                        q1_friction: 4,
-                        q2_progress: 4,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Idle,
-                        q1_friction: 1,
-                        q2_progress: 1,
-                    },
-                    VignetteRecord {
-                        expected: QuadrantKind::Idle,
-                        q1_friction: 2,
-                        q2_progress: 2,
-                    },
-                ]
+                // 提示順 (flow→stuck→incubation→idle ×2) と `vignette_id` を
+                // frontend `VignetteTest.tsx` に一致させる。ID は施行の境界に使われる。
+                vignette_records(&[
+                    (1, 5),
+                    (5, 1),
+                    (5, 5),
+                    (1, 1),
+                    (2, 4),
+                    (4, 2),
+                    (4, 4),
+                    (2, 2),
+                ])
             } else {
                 Vec::new()
             };
@@ -1398,6 +1520,256 @@ mod tests {
         ]
     }
 
+    // =========================================================================
+    // PreReg-1 ビネット採点 (未実施 / 完了ガード / straight-lining)
+    //
+    // ⚠️ すべて**反証方向を対で**置く。旧実装は `total == 0` を無条件に
+    //    `passed: false` にしており、「未実施」が「全員不合格」として
+    //    `cohort_20260731_225531.json` の `decision_reason` に現れ、次セッションの
+    //    前提を誤らせた。検査が空振りしていないことを H0 が偽の側でも確かめる。
+    // =========================================================================
+
+    /// 8 問ぶんの `VignetteRecord` を (q1, q2) の列から作る。
+    /// 想定象限と `vignette_id` は frontend `VignetteTest.tsx` の提示順に一致させる
+    /// (flow→stuck→incubation→idle ×2)。
+    fn vignette_records(answers: &[(u8, u8)]) -> Vec<VignetteRecord> {
+        const ORDER: [QuadrantKind; 8] = [
+            QuadrantKind::Flow,
+            QuadrantKind::Stuck,
+            QuadrantKind::Incubation,
+            QuadrantKind::Idle,
+            QuadrantKind::Flow,
+            QuadrantKind::Stuck,
+            QuadrantKind::Incubation,
+            QuadrantKind::Idle,
+        ];
+        const IDS: [&str; 8] = [
+            "v2f1", "v2s1", "v2i1", "v2d1", "v2f2", "v2s2", "v2i2", "v2d2",
+        ];
+        answers
+            .iter()
+            .enumerate()
+            .map(|(i, &(q1, q2))| VignetteRecord {
+                vignette_id: IDS[i].to_string(),
+                // 回答挙動メタは既定で「熟慮した回答」相当の値にしておく。
+                // 速答検出のテストは `vignette_behaviour_meta_is_summarised` が明示的に上書きする。
+                elapsed_ms: Some(8_000 + (i as u64) * 500),
+                changes: Some(3),
+                expected: ORDER[i],
+                q1_friction: q1,
+                q2_progress: q2,
+            })
+            .collect()
+    }
+
+    fn session_with_vignettes(vignettes: Vec<VignetteRecord>) -> SessionData {
+        SessionData {
+            track: TrackKind::Main,
+            probes: Vec::new(),
+            vignettes,
+            feats: Vec::new(),
+            random_probe_assignment_count: 0,
+            session_start_ms: None,
+            skipped_parse: 0,
+            skipped_out_of_range: 0,
+            skipped_unknown_enum: 0,
+        }
+    }
+
+    /// 想定象限どおりの 8 問。全問一致 = 8/8。
+    const PERFECT: [(u8, u8); 8] = [
+        (1, 5),
+        (5, 1),
+        (5, 5),
+        (1, 1),
+        (1, 5),
+        (5, 1),
+        (5, 5),
+        (1, 1),
+    ];
+
+    #[test]
+    fn vignette_not_administered_is_not_a_failure() {
+        // H0: 未実施 (total=0) は「不合格」ではない。
+        let r = score_vignettes_internal(&[session_with_vignettes(Vec::new())]);
+        assert_eq!(r.total, 0);
+        assert!(!r.administered, "未実施なのに administered=true");
+        assert!(!r.passed, "回答 0 件で passed になってはいけない");
+
+        // ⚠️ 反証方向: 施行していれば administered は true になる (検査が常に false を
+        //    返す空振りでないことの確認)。
+        let ok = score_vignettes_internal(&[session_with_vignettes(vignette_records(&PERFECT))]);
+        assert!(ok.administered, "8 問回答済みなのに administered=false");
+        assert!(ok.passed);
+        assert_eq!(ok.matched, 8);
+    }
+
+    #[test]
+    fn vignette_partial_completion_does_not_pass() {
+        // H0: 7 問しか回答していなければ、6 問一致でも合格にしない
+        //     (PreReg-1 逐語「**8 ビネット中** 6 問以上」)。
+        let seven: Vec<(u8, u8)> = PERFECT[..7].to_vec();
+        let r = score_vignettes_internal(&[session_with_vignettes(vignette_records(&seven))]);
+        assert_eq!(r.total, 7);
+        assert_eq!(r.matched, 7);
+        assert!(r.administered, "7 問でも施行はされている");
+        assert!(!r.passed, "8 問未満で passed になってはいけない");
+
+        // ⚠️ 反証方向: 8 問そろえば同じ一致数で合格する。
+        let full = score_vignettes_internal(&[session_with_vignettes(vignette_records(&PERFECT))]);
+        assert!(full.passed);
+    }
+
+    /// ⚠️ **書くだけで読まないフィールドを残さない** (security-checker MEDIUM)。
+    /// NDJSON に `elapsed_ms` / `changes` を足した目的は「読まずに送った回答の事後分離」であり、
+    /// 集計に載って初めて成立する。**採点対象の 1 施行**だけを要約することも確認する。
+    #[test]
+    fn vignette_behaviour_meta_is_summarised() {
+        // 未実施なら None (0 を「速答」と誤読させない)。
+        let none = score_vignettes_internal(&[session_with_vignettes(Vec::new())]);
+        assert_eq!(none.elapsed_ms_median, None);
+        assert_eq!(none.elapsed_ms_min, None);
+        assert_eq!(none.changes_total, None);
+
+        // 「読まずに送った」施行: 全問 200ms・スライダー操作は 1 回ずつ。
+        let mut fast = vignette_records(&PERFECT);
+        for r in fast.iter_mut() {
+            r.elapsed_ms = Some(200);
+            r.changes = Some(1);
+        }
+        let f = score_vignettes_internal(&[session_with_vignettes(fast.clone())]);
+        assert_eq!(f.elapsed_ms_median, Some(200));
+        assert_eq!(f.elapsed_ms_min, Some(200));
+        assert_eq!(f.changes_total, Some(8));
+        // ⚠️ 記述統計であって合否ではない。速答でも 8/8 なら合格する
+        //    (PreReg-1 の合格条件は 6/8 で凍結されており、潜時をゲートにしない)。
+        assert!(f.passed, "elapsed_ms を合否に混ぜてはいけない");
+
+        // ⚠️ 反証方向: 熟慮した施行では値が変わる (定数を返す空振りでない)。
+        let slow = score_vignettes_internal(&[session_with_vignettes(vignette_records(&PERFECT))]);
+        assert!(
+            slow.elapsed_ms_median.unwrap() > 1_000,
+            "熟慮した施行の中央値が速答と同じ: {:?}",
+            slow.elapsed_ms_median
+        );
+
+        // ⚠️ 要約は**採点対象の 1 施行**だけ。速答 → 熟慮 の再受験で、遅い方が出る。
+        let mut retake = fast;
+        retake.extend(vignette_records(&PERFECT));
+        let r = score_vignettes_internal(&[session_with_vignettes(retake)]);
+        assert_eq!(r.attempts, 2);
+        assert_eq!(
+            r.elapsed_ms_median, slow.elapsed_ms_median,
+            "施行をまたいで要約している"
+        );
+
+        // ⚠️ 2026-08-17 より前のログ (フィールドが無い) を「0 ms で答えた」にしない。
+        //    0 に潰すと旧データが一律「即答」= straight-lining 疑いに見えてしまう。
+        let mut legacy = vignette_records(&PERFECT);
+        for rec in legacy.iter_mut() {
+            rec.elapsed_ms = None;
+            rec.changes = None;
+        }
+        let l = score_vignettes_internal(&[session_with_vignettes(legacy)]);
+        assert!(l.passed, "旧ログでも採点自体はできる");
+        assert_eq!(
+            l.elapsed_ms_median, None,
+            "未記録を 0 ms と報告してはいけない"
+        );
+        assert_eq!(l.elapsed_ms_min, None);
+        assert_eq!(l.changes_total, None, "未記録を 0 回と報告してはいけない");
+    }
+
+    /// ⚠️ **完了ガードが作った穴を塞げているか** (code-reviewer HIGH)。
+    /// `score_vignettes_internal` は全セッションの vignette を合算するので、
+    /// 素朴に `total >= 8 && matched >= 6` とすると
+    /// **4/8 で落ちた被験者が同じ成績で再受験して 8/16 で合格する**。
+    /// `VignetteTest.tsx` の結果画面が再受験を促すため、到達可能な経路である。
+    #[test]
+    fn vignette_retake_is_scored_per_attempt_not_summed() {
+        // 4/8 しか合わない成績 (中点 4 問で不一致)。
+        let mut half = PERFECT.to_vec();
+        for slot in half.iter_mut().take(4) {
+            *slot = (3, 3);
+        }
+        let one = score_vignettes_internal(&[session_with_vignettes(vignette_records(&half))]);
+        assert_eq!(one.matched, 4);
+        assert!(!one.passed, "前提: 4/8 は不合格");
+
+        // 同じ成績で 2 回受けても合格しない (旧実装では 8/16 で合格していた)。
+        let mut twice = vignette_records(&half);
+        twice.extend(vignette_records(&half));
+        let r = score_vignettes_internal(&[session_with_vignettes(twice)]);
+        assert_eq!(r.attempts, 2, "再受験が 2 施行として切れていない");
+        assert_eq!(r.total, 8, "採点対象は最後の 1 施行 (8 問) のはず");
+        assert_eq!(r.matched, 4, "施行をまたいで合算してはいけない");
+        assert!(!r.passed, "⚠️ 再受験の合算で合格した (完了ガードの穴)");
+
+        // ⚠️ 反証方向: 2 回目で本当に良くなれば合格する (再施行は PreReg-1 が許した手続き)。
+        let mut improved = vignette_records(&half);
+        improved.extend(vignette_records(&PERFECT));
+        let ok = score_vignettes_internal(&[session_with_vignettes(improved)]);
+        assert_eq!(ok.attempts, 2);
+        assert_eq!(ok.matched, 8);
+        assert!(ok.passed, "2 回目で 8/8 なら合格するべき");
+
+        // 中断した施行 (4 問) の直後に完走した施行が来ても混ざらない。
+        // 「直近 8 件」で切ると 2 施行にまたがるが、vignette_id で切れば混ざらない。
+        let mut partial_then_full = vignette_records(&PERFECT[..4]);
+        partial_then_full.extend(vignette_records(&PERFECT));
+        let m = score_vignettes_internal(&[session_with_vignettes(partial_then_full)]);
+        assert_eq!(m.attempts, 2);
+        assert_eq!(m.total, 8, "最後の完走施行だけを採点するはず");
+        assert!(m.passed);
+    }
+
+    #[test]
+    fn vignette_exactly_six_matches_passes_and_five_does_not() {
+        // 凍結閾値 VIGNETTE_PASS_MIN=6 の境界を両側から刺す。
+        // 2 問だけ中点 (3,3) にして不一致にする → 6/8 一致。
+        let mut six = PERFECT.to_vec();
+        six[0] = (3, 3);
+        six[1] = (3, 3);
+        let r = score_vignettes_internal(&[session_with_vignettes(vignette_records(&six))]);
+        assert_eq!(r.matched, 6);
+        assert!(r.passed, "6/8 は PreReg-1 の合格条件");
+
+        // ⚠️ 反証方向: 5/8 は落ちる。
+        let mut five = six.clone();
+        five[2] = (3, 3);
+        let r5 = score_vignettes_internal(&[session_with_vignettes(vignette_records(&five))]);
+        assert_eq!(r5.matched, 5);
+        assert!(!r5.passed, "5/8 で合格してはいけない");
+    }
+
+    #[test]
+    fn vignette_straight_lining_cannot_reach_pass_threshold() {
+        // ⚠️ **空振り検査**。`notes.md` §4 で実測された straight-lining
+        //    (P012: 35 件中 34 件が "3" / P013: 7 件すべて "1") を、この器が
+        //    実際に落とせるかを確かめる。
+        //    2×2 象限を 2 問ずつ均等配置しているので、どの定数 (q1,q2) を置いても
+        //    一致は最大 2/8 にしかならない = 6/8 に構造的に届かない。
+        for q1 in 1..=5u8 {
+            for q2 in 1..=5u8 {
+                let constant: Vec<(u8, u8)> = vec![(q1, q2); 8];
+                let r = score_vignettes_internal(&[session_with_vignettes(vignette_records(
+                    &constant,
+                ))]);
+                assert!(
+                    r.matched <= 2,
+                    "定数回答 ({q1},{q2}) で {}/8 一致 — 均等配置が崩れている",
+                    r.matched
+                );
+                assert!(!r.passed, "定数回答 ({q1},{q2}) が合格した");
+            }
+        }
+
+        // ⚠️ 反証方向: 想定どおり答えれば 8/8 通る (検査が「常に落とす」空振りでない)。
+        let ok = score_vignettes_internal(&[session_with_vignettes(vignette_records(&PERFECT))]);
+        assert_eq!(ok.matched, 8);
+        assert!(ok.passed);
+    }
+
     #[test]
     fn compute_calibration_strong_concordance() {
         let sessions = make_subject_sessions();
@@ -1418,6 +1790,7 @@ mod tests {
         // ビネット 8/8 一致。
         assert_eq!(r.vignette.matched, 8);
         assert_eq!(r.vignette.total, 8);
+        assert!(r.vignette.administered);
         assert!(r.vignette.passed);
         // MNAR: 無回答なし → point=lower=upper=1.0。
         assert_eq!(r.mnar.point, Some(1.0));

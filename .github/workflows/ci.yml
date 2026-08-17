@@ -172,6 +172,19 @@ jobs:
         run: npx tsc --noEmit
       - name: Vite production build
         run: npm run build
+      # ★ PreReg-1 ビネット構成の機械検査 (禁止語 / 隣接象限 / 均等配置 / 不透明 ID)。
+      #   ⚠️ 均等配置 (4 象限 ×2 問) が崩れると straight-lining の一致上限 2/8 が
+      #   保証されなくなり、`notes.md` §4 で実測された定数回答が 6/8 を通り抜けうる。
+      #   → 合格条件と同じ重さで CI に置く。
+      #   ⚠️ `--self-test` を先に走らせ、検査自体が空振り (常に緑) でないことを確かめる。
+      - name: Vignette self-test (検査が H0 偽で赤になるか)
+        run: python3 scripts/check_vignettes.py --self-test
+        env:
+          PYTHONUTF8: "1"
+      - name: Vignette structure check (PreReg-1)
+        run: python3 scripts/check_vignettes.py
+        env:
+          PYTHONUTF8: "1"
 
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:
