@@ -96,6 +96,31 @@
 ★ 併せて、**自己検査が主経路を守っていない**（EP-Q9 と同型）欠陥を本セッションでも作り込んだ。
 → ⚠️ **検査を書いたら「H0 が偽のとき赤になるか」「空振りで緑になっていないか」を必ず確かめる。**
 
+## §4.7 ★ 2026-08-16 の寄り道 — Windows self-hosted CI（★ **閉じた**。次セッションは触らない）
+
+⚠️ 本流（設計議論）とは別に、研究者の指示で **`issue-windows-selfhosted-ci-never-activated.md`** を片付けた。
+★ **PR #103**（`chore/ci-selfhosted-activate`）。★ **次セッションで再着手する必要は無い。**
+
+| 検査 | 判定ログ（逐語） | 実行先 | 結果 |
+|---|---|---|---|
+| **A（陽性）** | `resolved runs-on = ["self-hosted","gse-win"]` | **G-GEAR** | ★ success（全 8 ステップ緑） |
+| **B（本命）** | `gse-win did not come online within 30s -> hosted (fallback)` | `windows-latest` | ★ success（**約 27.7 秒**） |
+
+★ **これで `check` は win / mac とも self-hosted で回る。**★ ランナーが落ちていれば 30 秒で hosted へ逃げる。
+
+⚠️★★★ **次に self-hosted を触る人へ — 「登録すれば動く」ではない。**
+★ 緑にするまでに **3 回失敗**し、いずれも **hosted には有って self-hosted に無いもの**だった:
+
+1. **サービス（`NETWORK SERVICE`）はユーザー PATH を見ない** —— システム PATH に
+   `C:\Program Files\Git\bin` が要る。⚠️ **対話シェルで `where bash` が通ることは証拠にならない。**
+2. **実行ポリシーが `Restricted`** —— Actions は `shell:` 未指定のステップを生成 `.ps1` で走らせる。
+   `LocalMachine` を `RemoteSigned` に（`CurrentUser` では効かない）。
+3. ⚠️ **この機は `Microsoft.PowerShell.Security` が壊れていて `Get-/Set-ExecutionPolicy` が無反応**。
+   確認はレジストリプロバイダで。⚠️ **`reg query "HKLM\..."` を bash から叩かない**
+   （バックスラッシュが壊れて構文エラーになり、**それを「値が無い」と読み違える**）。
+
+★ 詳細は `.steering/20260815-ci-selfhosted-windows/tasklist.md`（★ 正本。`svc.cmd` の誤りも訂正済み）。
+
 ## §5 ⚠️ 未決のまま次に渡すもの
 
 | # | 未決 | 状態 |
