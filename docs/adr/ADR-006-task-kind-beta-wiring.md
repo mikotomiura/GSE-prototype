@@ -1,7 +1,7 @@
 # ADR-006: task_kind → β baseline 配線 or IME 状態を代理とするか
 
 - **ステータス**: **Accepted（枠組み = Alternative C「分離」＋下位決定 #2/#3 も確定・研究者採択 2026-07-24）**。
-  実装は Phase1 完了後（Epic 2）。
+  ★ **実装済み（2026-08-18・2a 抽出 / 2b 配線の 2 コミット）** — 下記「実施記録」参照。
 - **日付**: 2026-07-24（提起 → 枠組み C 採択 → 下位決定 #2/#3 確定、すべて同日）
 - **対応**: Epic 2（Writing Adapter 抽出）の分岐点。roadmap ADR-006。
 - **関連**: ADR-001（HMM 降格）/ ADR-002（domain-local inference）/ `docs/architecture/domain-adapter-boundary.md §Layer 3-4`
@@ -164,6 +164,49 @@ match session.task_kind {
    差分が意図通りか `.steering/` に記録（`git-workflow`/`ml-workflow`）。
 5. `schema_dto.rs` は additive のみ（task_kind enum は 4 変種維持・`emit_schema` diff を確認）。
 6. Coding head 追加（Phase2）で初めて task_kind が baseline 選択に効く。cross-domain contamination guard は Epic 5。
+
+## 実施記録（2026-08-18・`.steering/20260818-adr006-head-extraction-wiring/`）
+
+Phase1 が **収集打ち切りで終了**（verdict = `inconclusive` / GATE3 = `DataInsufficient`）し
+凍結が解除されたため、Migration step 1 の条件が成立して着手した。**2 コミットに分けた**（逐語どおり）。
+
+| サブフェーズ | コミット | `HMM_VERSION` | ゴールデン |
+|---|---|---|---|
+| **2a 抽出** | `refactor(engine): β を Writing head へ移送し β_coding を β_writing_latin に改名する` | `0.3.0` **不変** | 4 本 **byte-equal**（＋全 10 fixture が対 main で byte-equal） |
+| **2b 配線** | `feat(engine): task_kind を head 選択へ配線し Coding head v0 を追加する` | `0.3.0` → **`0.4.0`** | 既存 4 本 **byte-equal のまま**・新規 `vibe_coding_ime_mixed` を追加して 5 本 |
+
+### ★ 本 ADR に書かれていなかった点で、実装時に決めたこと
+
+| # | 論点 | 決定 | 記録 |
+|---|---|---|---|
+| **D-3** | ⚠️ 本 ADR は BS ペナルティ gate を「Writing 固有」と書いたが **Coding 側の扱いを書いていない** | Coding head v0 も **同じ `!ime_open` gate を持つ**。2b の目的は β の取り違えを直すことであって BS 挙動を変えることではない | `decisions.md` D-3 |
+| **D-4** | ⚠️ `engine.rs` の SemVer 定義（MAJOR/MINOR/PATCH）は**すべて「既存ログ」基準**で、「まだ存在しない入力クラスにだけ挙動が出る」今回のケースを覆っていなかった | **`0.4.0`（MINOR）** とし、**SemVer 定義そのものに 1 行足して穴を埋めた** | `decisions.md` D-4 |
+| **D-5** | ⚠️ 既存ゴールデン 4 本は全て argumentative 相当なので **2b でも byte-equal のまま**＝ Migration step 4 が要求する「差分」が存在しない | `vibe_coding_ime_mixed` を**新規追加**。既存 4 本の byte-equal は「無関係な副作用が無いこと」の証明に使い、新規 1 本が「意図した差分」を担う | `decisions.md` D-5 / `diff-intent-2b.md` |
+| **D-6** | ⚠️ 下位決定 #3 は「Creative に打鍵 β を持たせない」と決めたが、**代替 head がまだ無い**ので字義どおり実装すると Creative で推論が出せない | Writing head へ流し、`head_id = writing_fallback` を刻んで**事後に分離できる**ようにした。**#3 からの意図的な逸脱**。数値挙動は Writing と完全に同一 | `decisions.md` D-6 |
+| **D-8** | ADR-002 の trait 範囲 | `DomainInferenceHead` のみ実装。`DomainAdapter`（`ingest`/`privacy_audit`）は Epic 4/5 | `decisions.md` D-8 / ADR-002 |
+
+### ★ 実装上の発見（次に触る人へ）
+
+1. ⚠️ **engine はアプリ起動時に 1 個だけ作られ、`start_session` の `reset()` は head に触れない**（実測）。
+   `task_kind` は `start_session` の**後**に `record_session_meta` で届くので、
+   構築時に head を固定すると本番では永久に Writing head のままになる。
+   → head を `Arc<Mutex<Arc<dyn DomainInferenceHead>>>` にして `set_domain()` で差し替える形にした。
+   ⚠️ **`start_session` と `record_session_meta` の間の 1Hz tick は Writing head で走る**（窓は 1 秒未満）。
+   塞ぐには `start_session` に `task_kind` を持たせる必要があり、フロントの IPC 契約変更を伴う（未実施）。
+2. ⚠️ **`head_id` は `FeatSnapshot` ではなく `session_meta` に置く。** `FeatSnapshot` に足すと
+   ゴールデン snapshot が全滅し、2b の acceptance（既存 4 本 byte-equal）が消滅する。
+3. ⚠️ **`bin/replay.rs` は `session_meta` を読み飛ばしていた**（`timestamp() == None` でソート対象外）。
+   `task_kind` を engine 生成前に抽出する配線を足さないと、**リプレイが本番の挙動を再現できない**。
+4. ★ **`task_kind` → `TaskDomain` の変換は `logger.rs` に 1 本だけ置く**（`impl From<TaskKind>`）。
+   本番（`lib.rs`）とリプレイ（`bin/replay.rs`）が同じ経路を通らないと、ゴールデンが守っている保証が嘘になる。
+
+### ⚠️ まだ効いていないこと
+
+★ `App.tsx` の **argumentative lock が残っている**ため、実運用では `vibe_coding` セッションが発生せず、
+2b は「**lock を外した瞬間に効く**」状態で置いてある。lock 解除は Phase2 の募集・教示・条件割付の
+運用設計とセットの別タスク（`decisions.md` D-9）。
+★ また `research-positioning.md §9` A-Q3 の解除条件②は、**Coding head が自前 β を持って初めて実質的に満たされる**
+——これは 2b で満たした。もう片方の条件①（B-a プール倍率の実数）は未了のままである。
 
 ## 研究者判断（すべて確定・2026-07-24）
 - ~~Alternative A / B / C~~ → **C（分離）採択**。

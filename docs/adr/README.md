@@ -13,17 +13,24 @@ Migration** を持つ。SSOT のアーキテクチャ概要は `docs/architectur
 > **前提**: すべて Phase1 完了 + 研究者承認が前提。Epic 1（本 ADR 群）は**コード変更ゼロ**。凍結対象
 > （`schema_dto.rs`/`schema/current.json`・`engine.rs` HMM_VERSION・`intervention.rs` 閾値・`probe_scheduler.rs`・
 > `App.tsx` argumentative lock・`preregistration-v0.3.md`）は Phase1 完了まで変更禁止。
+>
+> ★★★ **2026-08-18 更新: Phase1 は収集打ち切りで終了した**（verdict = `inconclusive` /
+> GATE3 = `DataInsufficient`）。**凍結は解除**され、ADR-002 / ADR-006 の実装（`engine.rs` の
+> `HMM_VERSION` は `0.4.0` へ bump）を実施した。
+> ⚠️ ただし **`App.tsx` の argumentative lock は解除していない** —— 外すには Phase2 の
+> 募集・教示・条件割付の運用設計が要るため、別タスクとして残っている。
+> ⚠️ また **`intervention.rs` の閾値**も本タスクでは触っていない。
 
 ## 一覧
 
 | ADR | 主題 | ステータス | 対応 Epic |
 |---|---|---|---|
 | [ADR-001](ADR-001-hmm-as-writing-baseline.md) | HMM を Writing baseline へ降格・三状態表示の降格 | Accepted（実装は後続） | Epic 1→2 |
-| [ADR-002](ADR-002-domain-local-inference.md) | domain-local inference / DomainAdapter 境界 | Proposed | Epic 2 |
+| [ADR-002](ADR-002-domain-local-inference.md) | domain-local inference / DomainAdapter 境界 | **Accepted（2026-08-18・trait 範囲は `DomainInferenceHead` のみに限定）** | Epic 2 |
 | [ADR-003](ADR-003-accountability-outside-core.md) | Accountability を core 外の opt-in extension に分離 | Proposed（採否は Deferred・第4ラウンド待ち） | Epic 3.5+ |
 | [ADR-004](ADR-004-decision-engine-boundary.md) | Decision Engine 境界（pure function 化）+ Consent 軸 | Accepted（Consent 実装は Epic 3） | Epic 3 |
 | [ADR-005](ADR-005-event-envelope-versioning.md) | Event Envelope schema versioning | Proposed | Epic 2/5 |
-| [**ADR-006**](ADR-006-task-kind-beta-wiring.md) | **task_kind → β baseline 配線 or IME 代理を正とするか** | **Accepted（枠組み C「分離」＋下位決定 #2/#3 確定 2026-07-24）・実装は Phase1 後** | Epic 2 分岐点 |
+| [**ADR-006**](ADR-006-task-kind-beta-wiring.md) | **task_kind → β baseline 配線 or IME 代理を正とするか** | **Accepted（枠組み C 2026-07-24）・★ 実装済み 2026-08-18（`HMM_VERSION` 0.4.0）** | Epic 2 分岐点 |
 | [ADR-007](ADR-007-receptivity-decomposed-vs-unified.md) | receptivity 統合スコア化 or 分解維持 | Accepted（分解維持を推奨） | Epic 3 |
 | [ADR-008](ADR-008-online-learning-boundary.md) | オンライン学習の境界（PersonalizationStore / OnlineUpdater / ContextBuilder・PreReg-5 との両立基準） | Proposed | Epic 2+ / Phase1 後 |
 | [ADR-009](ADR-009-recovery-risk-axis-and-latent-state.md) | X 軸を `self_directed_recovery_risk` へ再定義し、潜在状態の数を決めない | Proposed | Epic 2+ / Phase1 後 |

@@ -191,6 +191,13 @@ GSE が主張するのは「摩擦が能力・学習を**育てる**」ではな
 `loop_step.rs`) / 介入閾値(`intervention.rs` 定数) / プローブ機構(`probe_scheduler.rs`) / argumentative lock
 (`App.tsx`) / PreReg 契約(`preregistration-v0.3.md`)。
 
+> ★★★ **2026-08-18: Phase1 は収集打ち切りで終了し、凍結は解除された**（verdict = `inconclusive` /
+> GATE3 = `DataInsufficient`）。ADR-002 / ADR-006 を実装し、`HMM_VERSION` は **`0.4.0`** へ bump、
+> NDJSON schema には `session_meta.head_id` を **additive** に追加した
+> （`.steering/20260818-adr006-head-extraction-wiring/`）。
+> ⚠️ **`intervention.rs` 閾値 / `probe_scheduler.rs` / `App.tsx` argumentative lock /
+> `preregistration-v0.3.md` は今も未変更**である（解除されたが、まだ触っていない）。
+
 | Epic | 内容 | 状態 |
 |---|---|---|
 | Epic 0 | Repository Reality Check（コード変更なし） | ✅ 完了（PR #70） |
