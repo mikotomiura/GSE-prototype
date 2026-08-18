@@ -121,6 +121,28 @@ impl VignetteView {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+struct AxisDispersionView {
+    #[serde(default)]
+    n: usize,
+    #[serde(default)]
+    degenerate: bool,
+}
+
+/// 回答分散 (D 側の `ResponseDispersion` の部分ビュー)。
+///
+/// ⚠️ PreReg-1 (ビネット) を施行しない運用では、**これが straight-lining の
+/// 唯一の検出手段**になる。合否には使わず、報告項目として併走させる。
+///
+/// ⚠️ **読まないフィールドを宣言しない**。コホート集計が使うのは
+/// **確証の核である X<->Q1 の軸 (`q1`) だけ**なので、`q2` や `distinct_values` は
+/// ここに置かない (per-被験者レポートには両軸分とも出ている)。
+#[derive(Debug, Clone, Default, Deserialize)]
+struct DispersionView {
+    #[serde(default)]
+    q1: AxisDispersionView,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
 struct BidimView {
     #[serde(default)]
     verifiable: bool,
@@ -141,6 +163,8 @@ pub struct SubjectCalibrationView {
     pub evaluation_session_count: usize,
     #[serde(default)]
     measurement: MeasurementView,
+    #[serde(default)]
+    dispersion: DispersionView,
     #[serde(default)]
     cindex: CindexView,
     #[serde(default)]
@@ -259,6 +283,11 @@ pub struct CohortReport {
     pub overall: CohortDecision,
     pub decision_reason: String,
     /// PreReg-7: 無回答率 >30% (主分析不成立) の主指標被験者数。
+    /// ⚠️ Q1 の回答が定数化している主指標被験者数 (C-index が算術的に算出不能)。
+    ///
+    /// PreReg-1 (ビネット) を施行しない運用では、straight-lining はここにしか現れない。
+    /// ⚠️ **判定には使わない** (事後に閾値を足すのは forking paths)。報告専用。
+    pub q1_degenerate_count: usize,
     pub mnar_invalid_count: usize,
     /// PreReg-7: 無回答率 >20% (注意) の主指標被験者数。
     pub mnar_caution_count: usize,
@@ -488,6 +517,22 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
         );
     }
 
+    // ---- 回答分散 (straight-lining の事後検出・報告併走) ----
+    let q1_degenerate_count = included
+        .iter()
+        .filter(|s| s.view.dispersion.q1.degenerate && s.view.dispersion.q1.n > 0)
+        .count();
+    for s in &included {
+        let d = &s.view.dispersion.q1;
+        if d.degenerate && d.n > 0 {
+            notes.push(format!(
+                "subject {}: Q1 の回答 {} 件がすべて同一値 — X<->Q1 の C-index は算術的に算出不能 \
+                 (straight-lining / 尺度未使用の疑い。PreReg-1 が本来捕捉する失敗モード)",
+                s.subject_id, d.n,
+            ));
+        }
+    }
+
     // ---- 最終判定の合成 (PreReg §2 フロー) ----
     let gate_eligible_count = gate_cindices.len();
     let (overall, decision_reason) = decide_overall(
@@ -510,6 +555,7 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
         model: model_gate_report,
         overall,
         decision_reason,
+        q1_degenerate_count,
         mnar_invalid_count,
         mnar_caution_count,
         bidimensionality_verifiable_count,
@@ -948,6 +994,52 @@ mod tests {
             r.decision_reason
         );
         assert!(r.decision_reason.contains("未実施"));
+    }
+
+    /// ⚠️ PreReg-1 (ビネット) を施行しない運用では、**これが straight-lining の
+    /// 唯一の検出手段**になる。`notes.md` §4 で実測された P013
+    /// (有効 7 件がすべて "1") をコホート集計が拾えるかを刑す。
+    #[test]
+    fn degenerate_q1_is_counted_and_noted() {
+        let mut s1 = subject("P013", true, true, 0.99, 40, 39, 8, Some(0.70));
+        s1.view.dispersion = serde_json::from_str(
+            r#"{"q1": {"n": 7, "distinct_values": 1, "degenerate": true},
+                 "q2": {"n": 7, "degenerate": false}}"#,
+        )
+        .expect("dispersion view がパースできない");
+        let r = cohort_verdict(&[s1]);
+        assert_eq!(r.q1_degenerate_count, 1, "定数化した被験者を数えていない");
+        assert!(
+            r.notes
+                .iter()
+                .any(|n| n.contains("P013") && n.contains("算出不能")),
+            "notes に警告が無い: {:?}",
+            r.notes
+        );
+
+        // ⚠️ 反証方向: 分散が良好なら数えないし警告も出ない (空振りでない)。
+        let mut ok = subject("P011", true, true, 0.99, 40, 39, 8, Some(0.70));
+        ok.view.dispersion = serde_json::from_str(
+            r#"{"q1": {"n": 21, "distinct_values": 5, "degenerate": false},
+                 "q2": {"n": 21, "degenerate": false}}"#,
+        )
+        .unwrap();
+        let ro = cohort_verdict(&[ok]);
+        assert_eq!(ro.q1_degenerate_count, 0);
+        assert!(
+            !ro.notes.iter().any(|n| n.contains("算出不能")),
+            "良好な分散で警告が出た: {:?}",
+            ro.notes
+        );
+
+        // 回答 0 件 (旧 JSON / dispersion フィールドなし) を
+        // 「定数化」と誤検出しない — 未実施を不合格と読むのと同型の誤りを作らない。
+        let legacy = subject("P010", true, true, 0.99, 40, 39, 8, Some(0.70));
+        let rl = cohort_verdict(&[legacy]);
+        assert_eq!(
+            rl.q1_degenerate_count, 0,
+            "dispersion 未記録を定数化と誤検出した"
+        );
     }
 
     /// read-model を D の **実シリアライザ**出力に結合させる drift ガード。

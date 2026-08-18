@@ -636,6 +636,85 @@ pub const VIGNETTE_PASS_MIN: usize = 6;
 /// 中断による部分回答を合格にしないための完了ガード。
 pub const VIGNETTE_TOTAL: usize = 8;
 
+/// 1 軸ぶんの回答分散 (ラベル品質の記述統計・報告併走)。
+///
+/// ⚠️ **合否判定には一切使わない。** PreReg-1〜8 に本指標の閾値は存在せず、
+/// 事後に閾値を足すのは forking paths にあたる。数値をそのまま報告し、判断は人間が行う。
+///
+/// **なぜ要るか**: Phase1 (P010–P014) では Q1 の回答が定数化した被験者が 2 名おり
+/// (P012 は 35 件中 34 件が "3"、P013 は 7 件すべて "1")、順序 C-index が
+/// **数学的に算出不能**になって GATE3 母数が 5 名中 1 名に落ちた
+/// (`experiments/20260731-phase1-calibration-analysis/notes.md` §4)。
+/// この表は当時**手計算**で作られており、集計コードには入っていなかった。
+/// → 被験者に追加の負担をかけず (既存のプローブ回答から計算するだけ)、
+///   反応性も持たない (測るだけで被験者に見せない) 検出手段として常設する。
+#[derive(Debug, Clone, Serialize)]
+pub struct AxisDispersion {
+    /// 回答数 (この軸に値が入っている realtime_label の件数)。
+    pub n: usize,
+    /// 使われた相異なる値の数 (1..=5)。
+    pub distinct_values: usize,
+    /// 最頻値。回答が無ければ `None`。
+    pub modal_value: Option<u8>,
+    /// 最頻値の占有率 (0.0..=1.0)。回答が無ければ `None`。
+    /// ⚠️ **閾値は無い**。P012 の 0.97 と P010 の 0.57 を並べて人間が読むための数値。
+    pub modal_share: Option<f64>,
+    /// 順序 C-index の比較可能ペア数 (`q_i != q_j` のペア)。
+    pub comparable_pairs: usize,
+    /// ⚠️ **順序 C-index が原理的に計算できない** (`distinct_values <= 1`)。
+    ///
+    /// これは判断を含む閾値ではなく**算術的事実**である
+    /// (比較可能ペアが 0 なら concordance は定義されない)。
+    /// 事前登録の閾値を新設していないので forking paths にあたらない。
+    pub degenerate: bool,
+}
+
+/// Q1 / Q2 の回答分散 (PreReg-1 を施行しない運用での straight-lining 検出手段)。
+///
+/// 母数は `measurement` と同じ **main セッションの回答済みランダムプローブ**
+/// (`notes.md` §4 の「有効回答 n」と同じスコープ)。
+#[derive(Debug, Clone, Serialize)]
+pub struct ResponseDispersion {
+    pub q1: AxisDispersion,
+    pub q2: AxisDispersion,
+}
+
+/// 1 軸の回答列から分散指標を作る。
+fn axis_dispersion(values: &[u8]) -> AxisDispersion {
+    let n = values.len();
+    let mut counts = [0usize; 6]; // index 1..=5 を使う
+    for &v in values {
+        if (1..=5).contains(&v) {
+            counts[v as usize] += 1;
+        }
+    }
+    let distinct_values = counts.iter().skip(1).filter(|&&c| c > 0).count();
+    let modal = counts
+        .iter()
+        .enumerate()
+        .skip(1)
+        .max_by_key(|&(_, &c)| c)
+        .filter(|&(_, &c)| c > 0)
+        .map(|(v, &c)| (v as u8, c));
+    let modal_value = modal.map(|(v, _)| v);
+    let modal_share = modal.map(|(_, c)| c as f64 / n as f64);
+    // 比較可能ペア = 値が異なるペアの数 = C(n,2) - Σ C(count_v, 2)
+    let total_pairs = n.saturating_mul(n.saturating_sub(1)) / 2;
+    let tied_pairs: usize = counts
+        .iter()
+        .skip(1)
+        .map(|&c| c.saturating_mul(c.saturating_sub(1)) / 2)
+        .sum();
+    AxisDispersion {
+        n,
+        distinct_values,
+        modal_value,
+        modal_share,
+        comparable_pairs: total_pairs.saturating_sub(tied_pairs),
+        degenerate: distinct_values <= 1,
+    }
+}
+
 /// 二軸性 (PreReg-8・報告併走)。realtime_label の (q1,q2) 象限分布。
 #[derive(Debug, Clone, Serialize)]
 pub struct Bidimensionality {
@@ -681,6 +760,9 @@ pub struct CalibrationReport {
     pub evaluation_session_count: usize,
     pub agg: AggSpecReport,
     pub measurement: MeasurementStats,
+    /// Q1/Q2 の回答分散 (ラベル品質の記述統計)。
+    /// ⚠️ 合否には使わない。PreReg-1 を施行しない運用での straight-lining 検出手段。
+    pub dispersion: ResponseDispersion,
     pub cindex: SubjectCindex,
     pub mnar: MnarBounds,
     pub vignette: VignetteScore,
@@ -815,6 +897,41 @@ pub fn compute_calibration_metrics(sessions: &[SessionData], spec: AggSpec) -> C
         per_subject_pass,
     };
 
+    // --- 回答分散 (ラベル品質の記述統計・報告併走) ---
+    // ⚠️ 母数は `measurement` と同じ「main セッションの回答済みランダムプローブ」で、
+    //    `notes.md` §4 の「有効回答 n」と一致させる (P010=103 等と突き合わせられるように)。
+    //    合否には使わない (事後に閾値を足すと forking paths になる)。
+    let dispersion = ResponseDispersion {
+        q1: axis_dispersion(
+            &random_obs
+                .iter()
+                .filter(|o| o.answered)
+                .filter_map(|o| o.q1)
+                .collect::<Vec<u8>>(),
+        ),
+        q2: axis_dispersion(
+            &random_obs
+                .iter()
+                .filter(|o| o.answered)
+                .filter_map(|o| o.q2)
+                .collect::<Vec<u8>>(),
+        ),
+    };
+    if dispersion.q1.degenerate && dispersion.q1.n > 0 {
+        notes.push(format!(
+            "Q1 の回答が {} 件すべて同一値 ({}) — 順序 C-index は算術的に算出不能              (straight-lining / 尺度未使用の疑い。PreReg-1 が本来捕捉する失敗モード)",
+            dispersion.q1.n,
+            dispersion.q1.modal_value.unwrap_or(0),
+        ));
+    }
+    if dispersion.q2.degenerate && dispersion.q2.n > 0 {
+        notes.push(format!(
+            "Q2 の回答が {} 件すべて同一値 ({}) — Y<->Q2 の C-index は算術的に算出不能",
+            dispersion.q2.n,
+            dispersion.q2.modal_value.unwrap_or(0),
+        ));
+    }
+
     // --- 被験者内 C-index (評価セッションのみ) ---
     let eval_obs: Vec<ProbeObservation> = eval
         .iter()
@@ -903,6 +1020,7 @@ pub fn compute_calibration_metrics(sessions: &[SessionData], spec: AggSpec) -> C
             stat: spec.stat_str().to_string(),
         },
         measurement,
+        dispersion,
         cindex,
         mnar,
         vignette,
@@ -1178,6 +1296,27 @@ pub fn format_calibration_pretty(r: &CalibrationReport) -> String {
             ""
         },
     ));
+    out.push_str("\n-- 回答分散 (ラベル品質・記述統計) --\n");
+    for (label, d) in [("Q1 摩擦", &r.dispersion.q1), ("Q2 前進", &r.dispersion.q2)] {
+        out.push_str(&format!(
+            "  {}: n={} | 相異なる値 {} | 最頻値 {} ({}) | 比較可能ペア {}{}\n",
+            label,
+            d.n,
+            d.distinct_values,
+            d.modal_value
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "n/a".to_string()),
+            d.modal_share
+                .map(|f| format!("{:.0}%", f * 100.0))
+                .unwrap_or_else(|| "n/a".to_string()),
+            d.comparable_pairs,
+            if d.degenerate && d.n > 0 {
+                "  [DEGENERATE: C-index 算出不能]"
+            } else {
+                ""
+            },
+        ));
+    }
     out.push_str("\n-- ビネット (PreReg-1) --\n");
     if !r.vignette.administered {
         // ⚠️ 未実施を「0/0 matched -> FAIL」と出さない。Phase1 でこの表示が
@@ -1518,6 +1657,71 @@ mod tests {
             make_session(TrackKind::Main, false), // session 3 (eval)
             make_session(TrackKind::Main, false), // session 4 (eval)
         ]
+    }
+
+    // =========================================================================
+    // 回答分散 (straight-lining の事後検出)
+    //
+    // ⚠️ PreReg-1 を施行しない運用では、これが唯一の検出手段になる。
+    //    `notes.md` §4 の実測値をそのまま再現できるかを刑す。
+    // =========================================================================
+
+    #[test]
+    fn axis_dispersion_reproduces_phase1_measurements() {
+        // P013: 有効 7 件がすべて "1" → 相異なる値 1 / 比較可能ペア 0 / degenerate。
+        let p013 = axis_dispersion(&[1, 1, 1, 1, 1, 1, 1]);
+        assert_eq!(p013.n, 7);
+        assert_eq!(p013.distinct_values, 1);
+        assert_eq!(p013.modal_value, Some(1));
+        assert_eq!(p013.modal_share, Some(1.0));
+        assert_eq!(p013.comparable_pairs, 0, "定数回答に比較可能ペアは無い");
+        assert!(p013.degenerate, "C-index 算出不能を検出できていない");
+
+        // P012: 35 件中 34 件が "3"、1 件が "1"。
+        let mut p012 = vec![3u8; 34];
+        p012.push(1);
+        let d = axis_dispersion(&p012);
+        assert_eq!(d.n, 35);
+        assert_eq!(d.distinct_values, 2);
+        assert_eq!(d.modal_value, Some(3));
+        assert!(
+            (d.modal_share.unwrap() - 34.0 / 35.0).abs() < 1e-9,
+            "最頻値占有率が notes.md §4 と合わない: {:?}",
+            d.modal_share
+        );
+        // 比較可能ペア = C(35,2) - C(34,2) - C(1,2) = 595 - 561 - 0 = 34。
+        assert_eq!(d.comparable_pairs, 34);
+        // ⚠️ degenerate ではない (2 値あるので C-index 自体は定義される)。
+        //    「危ういが算出はできる」を degenerate と呼ばない = 閾値を新設しない。
+        assert!(!d.degenerate);
+
+        // ⚠️ 反証方向: 良好な分散 (P011) では degenerate にならず、占有率も下がる。
+        //    検査が「常に degenerate と言う」空振りでないことを確かめる。
+        let p011 = axis_dispersion(&[
+            1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5,
+        ]);
+        assert_eq!(p011.n, 21);
+        assert_eq!(p011.distinct_values, 5);
+        assert!(
+            p011.modal_share.unwrap() < 0.4,
+            "良好な分散なのに占有率が高い: {:?}",
+            p011.modal_share
+        );
+        assert!(p011.comparable_pairs > 150);
+        assert!(!p011.degenerate);
+    }
+
+    #[test]
+    fn axis_dispersion_handles_empty_input() {
+        // 回答 0 件を「定数回答」と混同しない
+        // (未実施を不合格と読むのと同型の誤りを作らない)。
+        let d = axis_dispersion(&[]);
+        assert_eq!(d.n, 0);
+        assert_eq!(d.distinct_values, 0);
+        assert_eq!(d.modal_value, None, "回答 0 件で最頻値を名乗ってはいけない");
+        assert_eq!(d.modal_share, None);
+        assert_eq!(d.comparable_pairs, 0);
+        // degenerate は true になるが、notes への警告は `n > 0` でガードしている。
     }
 
     // =========================================================================

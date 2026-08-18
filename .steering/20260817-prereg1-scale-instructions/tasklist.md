@@ -148,3 +148,38 @@
 - [ ] ⚠️ `check_citations.py` の CI 接続は**未実施のまま**（`_handoff` §5「検査の常設化」）。
       本タスクの射程外だが、同型の負債として残っている
 - [ ] ⚠️ **D-10 の完了ガード（8 問そろわないと不合格）の採否を研究者が確認する**
+
+
+---
+
+## 9. 2026-08-18 追記 — 運用方針の確定と回答分散メトリクス
+
+研究者判断で **ビネットテストは施行せず、事前説明で代える**ことが決まった (D-20)。
+⚠️ 事前登録とは矛盾しない (GATE1 は今も「延期」で、発効は比較条件実装段)。
+
+- [x] 事前登録との整合を一次で確認 (`research-positioning.md:397` 逐語)
+- [x] 8 ビネットと `VignetteTest` 画面は **残す** (使わないが削らない・研究者判断)
+- [x] 教示文は **アプリ内のまま**でよい (研究者判断・別途 docs へ切り出さない)
+- [x] `ResponseDispersion` (Q1/Q2 の回答分散) を per-被験者レポートに常設
+      - `n` / `distinct_values` / `modal_value` / `modal_share` / `comparable_pairs` / `degenerate`
+      - 母数は `measurement` と同じ「main セッションの回答済みランダムプローブ」
+        (`notes.md` §4 の「有効回答 n」と一致させ、P010=103 等と突き合わせ可能にする)
+- [x] コホートに `q1_degenerate_count` と per-被験者 notes を追加
+- [x] `gse-replay --calibration` の pretty 出力に回答分散を表示
+- [x] ⚠️ **閾値を新設していない**ことを確認 (`degenerate` は算術的事実・`modal_share` は数値報告のみ)
+- [x] テスト: `axis_dispersion_reproduces_phase1_measurements`
+      (P013 の 7/7 "1" と P012 の 34/35 "3" を実測値どおり再現 + 反証方向に P011 の良好分散)
+- [x] テスト: `axis_dispersion_handles_empty_input` (回答 0 件を「定数回答」と混同しない)
+- [x] テスト: `degenerate_q1_is_counted_and_noted` (+ 反証 2 方向: 良好分散 / dispersion 未記録)
+- [x] ⚠️ 読まないフィールドを read-model に宣言しない
+      (`q2` / `distinct_values` を `DispersionView` から外し、clippy の dead_code を解消)
+
+### 検証 (2026-08-18・実測)
+
+- [x] `cargo test --workspace` → **373 passed / 0 failed**
+- [x] `cargo clippy --workspace --all-targets` → 警告 **49 件 = main と同数**(新規ゼロ)
+- [x] `gse-replay` ゴールデン **4 本**すべて byte-equal
+- [x] `emit_schema` → **NDJSON schema は変更なし** (回答分散は metrics.json 側のため)
+- [x] `npx tsc --noEmit` → exit 0
+- [x] `check_vignettes.py` → OK
+- [x] 凍結値 `VIGNETTE_PASS_MIN = 6` / `VIGNETTE_COHORT_PASS_FRACTION = 0.80` **不変**
