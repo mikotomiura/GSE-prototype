@@ -28,11 +28,106 @@
 //! - `docs/adr/ADR-006-task-kind-beta-wiring.md`
 //! - `docs/architecture/domain-adapter-boundary.md` §Layer 3-4
 
+pub mod coding;
 pub mod writing;
 
+pub use coding::CodingHeadV0;
 pub use writing::WritingHead;
 
+use std::sync::Arc;
+
 use crate::analysis::features::Features;
+
+/// どの domain head を走らせるかを決めるルーティング信号。
+///
+/// ⚠️ **`logger::TaskKind` をそのまま持ち込まない。** `analysis/` は `logger` に依存しない
+/// （`docs/repository-structure.md` §4 依存方向）。逆向きの
+/// `impl From<TaskKind> for TaskDomain` は **`logger.rs` に 1 本だけ**置いてある
+/// （`logger` は既に `analysis::engine::HMM_VERSION` を参照しており、この向きの依存は既存）。
+/// 本番 (`lib.rs`) もリプレイ (`bin/replay.rs`) も**その 1 本を通す** —— 2 箇所に書くと
+/// 片方だけ更新されて本番とリプレイの head 選択がずれ、ゴールデンが守っている保証が嘘になる。
+///
+/// 「宣言 (`task_kind`) が head を選び、観測 (`ime_open`) は head 内部の信号」という
+/// ADR-006 Alternative C の役割分離を型で表している。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TaskDomain {
+    /// `argumentative` / `correspondence` → Writing head。
+    #[default]
+    Writing,
+    /// `creative` → Writing head だが `head_id` で分離できるようにする（ADR-006 #3 からの
+    /// 意図的な逸脱・`.steering/` D-6）。**数値挙動は `Writing` と同一。**
+    WritingFallback,
+    /// `vibe_coding` → Coding head v0。
+    Coding,
+}
+
+impl TaskDomain {
+    /// 全 variant。`schema_dto::HeadIdDto` との対応をテストで網羅するために使う。
+    ///
+    /// ⚠️ variant を足したらここにも足すこと（足し忘れは
+    /// `all_task_domains_map_to_schema_head_ids` が検出する）。
+    pub const ALL: [TaskDomain; 3] = [
+        TaskDomain::Writing,
+        TaskDomain::WritingFallback,
+        TaskDomain::Coding,
+    ];
+
+    /// この domain で走る head の識別子。engine を作らずに求められる
+    /// (`session_meta` を書く時点ではまだ engine を触りたくないため)。
+    pub fn head_id(self) -> HeadId {
+        match self {
+            TaskDomain::Writing => HeadId::Writing,
+            TaskDomain::WritingFallback => HeadId::WritingFallback,
+            TaskDomain::Coding => HeadId::CodingV0,
+        }
+    }
+}
+
+/// どの head がセッションを採点したかの識別子。
+///
+/// ⚠️ **`&str` ではなく enum にしている理由**: この値は `logger.rs` の**手書き NDJSON ライタ**
+/// (`format!` ベースでエスケープしない) に渡る。`&str` のままだと、将来ここに動的文字列が
+/// 流れ込んだときに `"` や改行で行が壊れる・偽の NDJSON 行を注入できる余地が残る。
+/// 固定カテゴリを型で閉じておけば、その経路自体が存在しなくなる
+/// (security-checker 指摘・2026-08-18)。`schema_dto::HeadIdDto` と対で維持すること。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadId {
+    /// `argumentative` / `correspondence` を Writing head で採点した。
+    Writing,
+    /// **Creative を Writing head で採点した。**
+    ///
+    /// ⚠️ ADR-006 下位決定 #3 は「Creative には打鍵 β を持たせない」と決めているが、
+    /// 代替 head がまだ存在しないため Writing head へ流している (#3 からの意図的な逸脱・
+    /// `.steering/20260818-adr006-head-extraction-wiring/decisions.md` D-6)。
+    /// この識別子を `session_meta` に刻んでおくことで「**適合していない head で採点された
+    /// セッション**」を事後に分離でき、Epic 6 で Creative の feasibility を評価するときの
+    /// 一次データになる。**数値挙動は `Writing` と完全に同一。**
+    WritingFallback,
+    /// `vibe_coding` を Coding head v0 で採点した。
+    CodingV0,
+}
+
+impl HeadId {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HeadId::Writing => "writing",
+            HeadId::WritingFallback => "writing_fallback",
+            HeadId::CodingV0 => "coding_v0",
+        }
+    }
+}
+
+/// ルーティング表。ADR-006 Alternative C の「task_kind が head を選ぶ」の実体。
+///
+/// ⚠️ ここに `_ => ` を書かないこと。variant を足したら**必ず head を決めさせる**ため、
+/// 網羅性検査をコンパイラに効かせる。
+pub fn head_for(domain: TaskDomain) -> Arc<dyn DomainInferenceHead> {
+    match domain {
+        TaskDomain::Writing => Arc::new(WritingHead::new()),
+        TaskDomain::WritingFallback => Arc::new(WritingHead::fallback()),
+        TaskDomain::Coding => Arc::new(CodingHeadV0::new()),
+    }
+}
 
 /// ドメイン推論ヘッド。
 ///
@@ -40,7 +135,7 @@ use crate::analysis::features::Features;
 /// (X = Cognitive Friction, Y = Engagement) を算出する。
 pub trait DomainInferenceHead: Send + Sync {
     /// head の識別子。どの head がそのセッションを採点したかを記録するために使う。
-    fn head_id(&self) -> &'static str;
+    fn head_id(&self) -> HeadId;
 
     /// 潜在二軸 (X = Friction, Y = Engagement) を算出する。
     ///
@@ -57,4 +152,36 @@ pub trait DomainInferenceHead: Send + Sync {
     /// gate だけ暗黙の既定に落とすのは非対称であり、ADR-006 の「β は head の所有物」
     /// という決定と整合しない (code-reviewer 指摘・2026-08-18)。
     fn applies_backspace_penalty(&self, ime_open: bool) -> bool;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ⚠️ **`schema_dto::HeadIdDto` と `HeadId` の対応を機械で固定する。**
+    ///
+    /// `head_id` は NDJSON に出るので、新しい head を足して新しい文字列を返すようになったのに
+    /// `HeadIdDto` を更新し忘れると、`emit_schema` の drift check は「DTO を直せば通る」ため
+    /// **schema が実際の出力と食い違ったまま緑になる**（code-reviewer 指摘・2026-08-18）。
+    /// ここで全 `TaskDomain` variant の `head_id` が既知集合に含まれることを assert する。
+    #[test]
+    fn all_task_domains_map_to_schema_head_ids() {
+        // schema/current.json の HeadIdDto enum と同じ集合（変えたら両方直す）
+        const SCHEMA_HEAD_IDS: [&str; 3] = ["writing", "writing_fallback", "coding_v0"];
+
+        for domain in TaskDomain::ALL {
+            let via_domain = domain.head_id();
+            let via_head = head_for(domain).head_id();
+            assert_eq!(
+                via_domain, via_head,
+                "TaskDomain::head_id() と head_for().head_id() がずれている: {domain:?}"
+            );
+            assert!(
+                SCHEMA_HEAD_IDS.contains(&via_domain.as_str()),
+                "{:?} の head_id {:?} が schema_dto::HeadIdDto に無い",
+                domain,
+                via_domain.as_str()
+            );
+        }
+    }
 }

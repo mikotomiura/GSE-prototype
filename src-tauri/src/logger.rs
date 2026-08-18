@@ -8,6 +8,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
 use rand::Rng;
 
+use crate::analysis::heads::{HeadId, TaskDomain};
+
 /// ユーザーが付与する Ground Truth ラベルの種別
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserLabelKind {
@@ -87,6 +89,32 @@ impl TaskKind {
             "creative" => Some(Self::Creative),
             "vibe_coding" => Some(Self::VibeCoding),
             _ => None,
+        }
+    }
+}
+
+/// ADR-006 Alternative C のルーティング: **宣言された `task_kind` が domain head を選ぶ**。
+///
+/// ⚠️ **変換をここに 1 本だけ置く。** `lib.rs` (本番) も `bin/replay.rs` (リプレイ) も
+/// この経路を通す。2 箇所に書くと片方だけ更新されて本番とリプレイの挙動がずれる
+/// (= ゴールデンが守れなくなる)。
+///
+/// ⚠️ 依存方向: `logger` → `analysis` は既存 (`HMM_VERSION` を参照している) なので
+/// この向きで置く。逆に `analysis` 側へ `TaskKind` を持ち込むと
+/// `analysis` が `logger` に依存してしまい `docs/repository-structure.md` §4 に反する。
+///
+/// ⚠️ `_ =>` を書かないこと。`TaskKind` に variant を足したら**必ず head を決めさせる**。
+impl From<TaskKind> for TaskDomain {
+    fn from(kind: TaskKind) -> Self {
+        match kind {
+            // 論述・文通は Writing head (Phase1 で走っていた挙動そのもの)
+            TaskKind::Argumentative | TaskKind::Correspondence => TaskDomain::Writing,
+            // Creative は打鍵 β が原理的に不適 (ADR-006 #3) だが代替 head がまだ無い。
+            // 数値挙動は Writing と同一のまま、head_id だけ分けて事後に分離可能にする
+            // (.steering/20260818-adr006-head-extraction-wiring/decisions.md D-6)
+            TaskKind::Creative => TaskDomain::WritingFallback,
+            // ここが 2b で実際に挙動が変わる唯一の分岐
+            TaskKind::VibeCoding => TaskDomain::Coding,
         }
     }
 }
@@ -502,6 +530,7 @@ fn format_intervention_response_line(
 }
 
 /// `LogEntry::SessionMeta` の NDJSON 1 行を生成する純粋関数。
+#[allow(clippy::too_many_arguments)]
 fn format_session_meta_line(
     timestamp: u64,
     track: Track,
@@ -510,15 +539,17 @@ fn format_session_meta_line(
     intervention_enabled: bool,
     condition: Option<Condition>,
     label_pool: Option<LabelPool>,
+    head_id: HeadId,
 ) -> String {
     format!(
-        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","monk_mode":{},"intervention_enabled":{},"condition":{},"label_pool":{},"ts":{}}}"#,
+        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","monk_mode":{},"intervention_enabled":{},"condition":{},"label_pool":{},"head_id":"{}","ts":{}}}"#,
         track.as_str(),
         task_kind.as_str(),
         monk_mode,
         intervention_enabled,
         json_opt_str(condition.map(|c| c.as_str())),
         json_opt_str(label_pool.map(|p| p.as_str())),
+        head_id.as_str(),
         timestamp,
     )
 }
@@ -754,6 +785,17 @@ pub enum LogEntry {
         intervention_enabled: bool,
         condition: Option<Condition>,
         label_pool: Option<LabelPool>,
+        /// ★ ADR-006 Phase 2b: **どの domain head がこのセッションを採点したか**。
+        ///
+        /// `task_kind` から機械的に決まる (`TaskDomain::from`) が、両方を残す。
+        /// `task_kind` は**被験者の宣言**、`head_id` は**実際に走った推論器**であり、
+        /// ルーティング表が変われば同じ `task_kind` でも別の head になる。
+        /// 特に `writing_fallback` (= Creative を Writing head で採点している) を
+        /// 事後に分離するために要る (`.steering/.../decisions.md` D-6)。
+        ///
+        /// ⚠️ `FeatSnapshot` ではなくここに置く。`FeatSnapshot` に足すと
+        /// ゴールデン snapshot が全滅して 2b の acceptance (既存 4 本 byte-equal) が消える。
+        head_id: HeadId,
     },
     /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。
     /// 「モデル非依存・一様ランダム」を後から検証するため scheduled/shown を両方残す。
@@ -1450,6 +1492,7 @@ impl SessionLogger {
                             intervention_enabled,
                             condition,
                             label_pool,
+                            head_id,
                         } => {
                             let _ = writeln!(
                                 writer,
@@ -1461,7 +1504,8 @@ impl SessionLogger {
                                     monk_mode,
                                     intervention_enabled,
                                     condition,
-                                    label_pool
+                                    label_pool,
+                                    head_id
                                 ),
                             );
                             dirty = true;
@@ -2729,6 +2773,93 @@ mod tests {
         assert_eq!(ExpectedQuadrant::parse("focused"), None);
     }
 
+    // ---- ADR-006 Phase 2b: task_kind -> domain head のルーティング表 ----
+
+    /// ★ 2b のルーティング表そのものを固定する。
+    ///
+    /// この表が変わるということは「同じ task_kind が別の推論器で採点される」という
+    /// **挙動変更**であり、`HMM_VERSION` の bump とゴールデン再生成を伴う。
+    #[test]
+    fn task_kind_routes_to_expected_domain() {
+        assert_eq!(
+            TaskDomain::from(TaskKind::Argumentative),
+            TaskDomain::Writing
+        );
+        assert_eq!(
+            TaskDomain::from(TaskKind::Correspondence),
+            TaskDomain::Writing
+        );
+        assert_eq!(
+            TaskDomain::from(TaskKind::Creative),
+            TaskDomain::WritingFallback
+        );
+        assert_eq!(TaskDomain::from(TaskKind::VibeCoding), TaskDomain::Coding);
+    }
+
+    /// Creative / Correspondence は Writing head で走る (ADR-006 #3 からの逸脱・D-6)。
+    /// Creative は識別子だけ `writing_fallback` に分かれる。
+    #[test]
+    fn creative_and_correspondence_route_to_writing_head() {
+        use crate::analysis::heads::head_for;
+
+        assert_eq!(
+            head_for(TaskDomain::from(TaskKind::Correspondence))
+                .head_id()
+                .as_str(),
+            "writing"
+        );
+        assert_eq!(
+            head_for(TaskDomain::from(TaskKind::Creative))
+                .head_id()
+                .as_str(),
+            "writing_fallback"
+        );
+    }
+
+    /// Creative は **数値挙動が Writing と完全に同一**である。
+    /// 分かれているのは head_id だけ = ゴールデンへの影響はゼロ。
+    #[test]
+    fn creative_latent_axes_match_writing_head() {
+        use crate::analysis::features::Features;
+        use crate::analysis::heads::head_for;
+
+        let f = Features {
+            f1_flight_time_median: 200.0,
+            f3_correction_rate: 0.12,
+            f4_burst_length: 6.0,
+            f5_pause_count: 3.0,
+            f6_pause_after_del_rate: 0.15,
+            keys: 0,
+            bs_keys: 0,
+        };
+        let writing = head_for(TaskDomain::Writing);
+        let creative = head_for(TaskDomain::WritingFallback);
+
+        for ime_open in [true, false] {
+            assert_eq!(
+                writing.latent_axes(&f, ime_open),
+                creative.latent_axes(&f, ime_open),
+                "Creative は Writing head へ流すので数値は一致するはず (ime_open={ime_open})"
+            );
+        }
+    }
+
+    /// `task_kind` が未知の文字列なら `TaskKind::parse` が None を返し、
+    /// 呼び出し側 (`lib.rs` / `bin/replay.rs`) が Writing へフォールバックする。
+    /// ★ 既存 Phase1 ログはそもそも `session_meta` を持たないため、この経路が
+    ///   ゴールデン 4 本の byte-equal を支えている。
+    #[test]
+    fn unknown_task_kind_falls_back_to_writing() {
+        use crate::analysis::heads::head_for;
+
+        let domain = match TaskKind::parse("hand_writing_on_paper") {
+            Some(kind) => TaskDomain::from(kind),
+            None => TaskDomain::Writing,
+        };
+        assert_eq!(domain, TaskDomain::Writing);
+        assert_eq!(head_for(domain).head_id().as_str(), "writing");
+    }
+
     // ---- session_meta ----
 
     #[test]
@@ -2742,10 +2873,11 @@ mod tests {
             true,
             None,
             None,
+            HeadId::CodingV0,
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":null,"label_pool":null,"ts":1700000000000}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":null,"label_pool":null,"head_id":"coding_v0","ts":1700000000000}"#
         );
     }
 
@@ -2759,10 +2891,11 @@ mod tests {
             false,
             None,
             None,
+            HeadId::Writing,
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","monk_mode":true,"intervention_enabled":false,"condition":null,"label_pool":null,"ts":42}"#
+            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","monk_mode":true,"intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":42}"#
         );
     }
 
@@ -2776,10 +2909,11 @@ mod tests {
             true,
             Some(Condition::BlindCalibration),
             Some(LabelPool::CalibrationBlind),
+            HeadId::WritingFallback,
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"main","task_kind":"creative","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","ts":7}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"creative","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","head_id":"writing_fallback","ts":7}"#
         );
     }
 
@@ -3192,6 +3326,7 @@ mod tests {
             intervention_enabled: true,
             condition: Some(Condition::BlindCalibration),
             label_pool: Some(LabelPool::CalibrationBlind),
+            head_id: HeadId::CodingV0,
         })
         .unwrap();
         tx.send(LogEntry::InterventionResponse {
@@ -3247,7 +3382,7 @@ mod tests {
         let _ = fs::remove_file(&path);
 
         assert!(contents.contains(
-            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","ts":1000}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","head_id":"coding_v0","ts":1000}"#
         ), "session_meta 行が不正 (引数取り違えの可能性):\n{contents}");
         assert!(
             contents.contains(

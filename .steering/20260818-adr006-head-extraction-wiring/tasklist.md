@@ -27,50 +27,51 @@
 - [x] `cargo run --bin emit_schema` → `schema/current.json` と byte-equal（schema 無変更）
 - [x] `cargo clippy --workspace` の警告数が変更前と同数
 - [x] `docs/glossary.md` に Writing head / β_writing_latin / DomainInferenceHead を追記
-- [ ] code-reviewer + security-checker を**並列**起動
-- [ ] `/cross-review`（Codex 独立レビュー）
-- [ ] コミット: `refactor(engine): β を Writing head へ移送し β_coding を β_writing_latin に改名する`
+- [x] code-reviewer + security-checker を**並列**起動 → HIGH 1 / MEDIUM 8 を反映
+- [x] `/cross-review`（Codex 独立レビュー）→ 4 件中 3 件を反映、1 件は D-6c に記録
+- [x] コミット: `f31b8fb refactor(engine): β を Writing head へ移送し β_coding を β_writing_latin に改名する`
+- [x] `679cbb8 chore(codex): cross-review 実行分の予算計上を反映する`（1 コミット 1 論理単位のため分離）
 
 ## 2b — 配線（挙動変更・`HMM_VERSION` → `0.4.0`）
 
-- [ ] `analysis/heads/mod.rs` に `TaskDomain` enum と `head_for()` を追加
-- [ ] `analysis/heads/coding.rs` に `CodingHeadV0` を追加
+- [x] `analysis/heads/mod.rs` に `TaskDomain` enum と `head_for()` を追加
+- [x] `analysis/heads/coding.rs` に `CodingHeadV0` を追加
       （β は β_writing_latin と**同値の別定数**として二重定義・理由をコメントに明記）
-- [ ] `engine.rs`: `CognitiveStateEngine::new_for_domain(TaskDomain)` を追加（`new()` は Writing 既定を維持）
-- [ ] `lib.rs`: `logger::TaskKind` → `TaskDomain` 変換を境界に置き、engine 生成へ渡す
-- [ ] `bin/replay.rs`: `SessionMeta.task_kind` を読んで engine に渡す（`:257` の読み飛ばしを修正）
+- [x] `engine.rs`: `CognitiveStateEngine::new_for_domain(TaskDomain)` を追加（`new()` は Writing 既定を維持）
+- [x] `lib.rs`: `logger::TaskKind` → `TaskDomain` 変換を境界に置き、engine 生成へ渡す
+- [x] `bin/replay.rs`: `SessionMeta.task_kind` を読んで engine に渡す（`:257` の読み飛ばしを修正）
       / 欠落・未知は `Writing` へフォールバックし `tracing::warn!`
-- [ ] `logger.rs` + `schema_dto.rs`: `session_meta` に `head_id` を **additive** に追加
+- [x] `logger.rs` + `schema_dto.rs`: `session_meta` に `head_id` を **additive** に追加
       （★ **`FeatSnapshot` には入れない** — ゴールデンが全滅する）
-- [ ] `engine.rs:45` を `"0.4.0"` へ / `:36-40` の SemVer コメントに MINOR の 1 行を追記
-- [ ] ゴールデン `tests/fixtures/vibe_coding_ime_mixed.ndjson` + snapshot を新規作成
+- [x] `engine.rs:45` を `"0.4.0"` へ / `:36-40` の SemVer コメントに MINOR の 1 行を追記
+- [x] ゴールデン `tests/fixtures/vibe_coding_ime_mixed.ndjson` + snapshot を新規作成
       （IME on/off 混在 + IME on 区間で backspace streak ≥14）
-- [ ] `bin/replay.rs:2916` の `cases` に 5 本目を追加
-- [ ] テスト追加: `vibe_coding_uses_coding_beta_regardless_of_ime` /
+- [x] `bin/replay.rs:2916` の `cases` に 5 本目を追加
+- [x] テスト追加: `vibe_coding_uses_coding_beta_regardless_of_ime` /
       `creative_and_correspondence_route_to_writing_head` /
       `creative_latent_axes_match_writing_head` /
       `unknown_task_kind_falls_back_to_writing` / `hmm_version_is_0_4_0`
-- [ ] **既存ゴールデン 4 本が byte-equal のまま**であることを確認（★ ここが 2b の肝）
-- [ ] `cargo test --workspace` 緑 / clippy 新規ゼロ
-- [ ] schema: `cargo run --bin emit_schema > schema/current.json` →
+- [x] **既存ゴールデン 4 本が byte-equal のまま**であることを確認（★ ここが 2b の肝）
+- [x] `cargo test --workspace` 緑 / clippy 新規ゼロ
+- [x] schema: `cargo run --bin emit_schema > schema/current.json` →
       `PYTHONUTF8=1 python scripts/check_schema_parity.py --dataset /c/gse-dataset` →
       **gse-dataset 側にも cp してコミット**
-- [ ] `docs/glossary.md`: Coding head v0 / head_id を追記、`:157` の `hmm_version` を `0.4.0` へ、
+- [x] `docs/glossary.md`: Coding head v0 / head_id を追記、`:157` の `hmm_version` を `0.4.0` へ、
       `:120` の「ベースライン (β)」の説明を head 所有の形に更新
-- [ ] `docs/wbs-verification-halfyear.md:232` の `HMM_VERSION=0.3.0` を更新
-- [ ] 差分が意図通りかを本ディレクトリに記録（ADR-006 Migration step 4）
+- [x] `docs/wbs-verification-halfyear.md:232` の `HMM_VERSION=0.3.0` を更新
+- [x] 差分が意図通りかを本ディレクトリに記録（ADR-006 Migration step 4）→ `diff-intent-2b.md`
 - [ ] code-reviewer + security-checker を**並列**起動 / `/cross-review`
 - [ ] コミット: `feat(engine): task_kind を head 選択へ配線し Coding head v0 を追加する (v0.4.0)`
 
 ## 文書
 
-- [ ] `docs/adr/ADR-002-domain-local-inference.md` を **Accepted** へ昇格
+- [x] `docs/adr/ADR-002-domain-local-inference.md` を **Accepted** へ昇格
       （trait 範囲は `DomainInferenceHead` のみ・`infer -> WorkStateEstimate` は ADR-004 と同時＝D-8 を明記）
-- [ ] `docs/adr/ADR-006-task-kind-beta-wiring.md` に実施記録を追記
+- [x] `docs/adr/ADR-006-task-kind-beta-wiring.md` に実施記録を追記
       （Creative の扱い D-6 / BS gate D-3 / bump 幅 D-4 / ゴールデン方針 D-5）
-- [ ] `docs/adr/README.md`: ADR-002 のステータス行を更新 /
+- [x] `docs/adr/README.md`: ADR-002 のステータス行を更新 /
       冒頭の凍結注記を「Phase1 は 2026-08-18 に収集打ち切りで終了」へ更新
-- [ ] `experiments/20260731-phase1-calibration-analysis/notes.md` §5① に
+- [x] `experiments/20260731-phase1-calibration-analysis/notes.md` §5① に
       「2026-08-18 に収集打ち切りで終了」を追記（★ 「収集継続」の記述が現状と食い違うため）
 - [ ] コミット: `docs(adr): ADR-002 を Accepted に昇格し ADR-006 に実施記録を追記する`
 

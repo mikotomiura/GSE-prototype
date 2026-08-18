@@ -191,6 +191,9 @@ pub enum LogEntryDto {
         intervention_enabled: bool,
         condition: Option<ConditionDto>,
         label_pool: Option<LabelPoolDto>,
+        /// ADR-006 Phase 2b: どの domain head がこのセッションを採点したか。
+        /// 旧フィクスチャ互換のため省略可 (`null`)。
+        head_id: Option<HeadIdDto>,
         ts: u64,
     },
     /// v0.3 較正スモーク: ランダムプローブ割当の監査記録。
@@ -272,6 +275,20 @@ pub enum TaskKindDto {
     Correspondence,
     Creative,
     VibeCoding,
+}
+
+/// ADR-006 Phase 2b: どの domain head がセッションを採点したか (session_meta)。
+///
+/// `task_kind` (被験者の宣言) と対にして残す。ルーティング表が変われば
+/// 同じ `task_kind` でも別の head になるため、実際に走った推論器を記録する。
+/// `writing_fallback` = Creative を Writing head で採点している状態
+/// (ADR-006 #3 からの意図的な逸脱)。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HeadIdDto {
+    Writing,
+    WritingFallback,
+    CodingV0,
 }
 
 /// `realtime_label` の出所。`random_probe` = backend 割当、`self_marker` = 自発 hotkey。

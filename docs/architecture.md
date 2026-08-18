@@ -169,9 +169,27 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 ### 4.4 analysis::engine — HMM エンジン
 
 - **責務**: 特徴量 → 行動シグナル由来の作業状態スコア推定。Flow / Incubation / Stuck は脳内状態の直接分類ではなく、Need 判定に使う参考確率として扱う
-- **依存先**: analysis::features
-- **インターフェース**: `update()`, `update_silence()`, `register_keystroke()`, `state_probs()`
-- **状態管理**: HMM 内部状態（forward 確率、EWMA 軸値、display_probs）を Mutex で保護
+- **依存先**: analysis::features, **analysis::heads**（§4.4b）
+- **インターフェース**: `new_for_domain()`, `set_domain()`, `head_id()`, `update()`, `update_silence()`, `register_keystroke()`, `state_probs()`
+- **状態管理**: HMM 内部状態（forward 確率、EWMA 軸値、display_probs、**走行中の head**）を Mutex で保護
+
+### 4.4b analysis::heads — ドメイン推論ヘッド（ADR-002 / ADR-006・2026-08-18 追加）
+
+- **責務**: β baseline を所有し、特徴量から潜在二軸 (X=Friction / Y=Engagement) を算出する。
+  **どの head を走らせるかは宣言された `task_kind` が決め**、`ime_open`（観測）は
+  Writing head 内部の within-writing 信号として使う（両者の役割は直交する）
+- **依存先**: analysis::features のみ（OS API 非依存）
+- **構成**:
+  - `DomainInferenceHead` trait — `head_id()` / `latent_axes()` / `applies_backspace_penalty()`
+  - `WritingHead` — `β_writing`（IME on）/ `β_writing_latin`（IME off・旧 `β_coding` の改名）
+  - `CodingHeadV0` — `β_coding` シードを `ime_open` に関わらず適用（主信号の coding イベントは Epic 4）
+  - `TaskDomain` / `head_for()` — ルーティング表（`_ =>` 禁止で網羅性をコンパイラに強制）
+- **データフロー**: `logger::TaskKind` → `TaskDomain`（変換は `logger.rs` の `From` 1 本のみ）
+  → `head_for()` → `CognitiveStateEngine::set_domain()`。
+  ⚠️ 本番（`lib.rs::record_session_meta`）とリプレイ（`bin/replay.rs`）が**同じ変換経路**を通ることが、
+  ゴールデンによる回帰保護が成立する前提である
+- **記録**: 実際に走った head は `session_meta` の `head_id` に残る。
+  ⚠️ `FeatSnapshot` には入れない（ゴールデン snapshot が壊れるため）
 
 ### 4.5 analysis::intervention — Opportunity MVP
 

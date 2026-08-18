@@ -119,6 +119,9 @@
 | F6: 削除後休止率 | Pause-After-Delete Rate | (削除の後に 2 秒以上の沈黙) / 総削除数 | 特徴量 |
 | ベースライン (β) | Baseline | 特徴量の正規化基準値。**各 domain head が所有する** (ADR-006 Alternative C)。Writing head は `β_writing` (IME on) と `β_writing_latin` (IME off) を持ち `ime_open` で切り替える | 正規化関数 φ, Writing head |
 | ドメイン推論ヘッド | DomainInferenceHead | `analysis::heads` の trait。特徴量から潜在二軸 (X=Friction / Y=Engagement) を算出する。head の選択は `task_kind` (宣言) が決め、`ime_open` (観測) は head 内部の信号として使う | ADR-002, ADR-006 |
+| Coding head v0 | Coding head v0 | エージェントコーディングドメインの推論ヘッド (`analysis::heads::coding`)。現 `β_coding` を**初期シードとして所有**し、`ime_open` に関わらず適用する。⚠️ 主信号である coding イベント (accept/reject/test/revert) は Epic 4 で、v0 は打鍵 β のみ | DomainInferenceHead, ADR-006 #3 |
+| 課題ドメイン | TaskDomain | `task_kind` (宣言) から決まる head のルーティング信号 (`Writing` / `WritingFallback` / `Coding`)。変換は `logger.rs` の `From<TaskKind>` に 1 本だけ置く | TaskKind, DomainInferenceHead |
+| head 識別子 | head_id | どの head がそのセッションを採点したかの識別子 (`writing` / `writing_fallback` / `coding_v0`)。`session_meta` NDJSON に記録。⚠️ `FeatSnapshot` には入れない (ゴールデン snapshot が壊れる) | TaskDomain, schema |
 | Writing head | Writing head | 論述・文章作成ドメインの推論ヘッド (`analysis::heads::writing`)。Phase1 (task_kind=argumentative 固定) で走っていた挙動そのもの | DomainInferenceHead, β_writing_latin |
 | `β_writing_latin` | writing latin baseline | Writing head 内の **IME off (ラテン直接入力: 英字引用・数式・URL) 用サブ baseline**。値は旧 `β_coding` をそのまま改名 (F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08)。⚠️ **Coding の baseline ではない** — 「IME off の日本語論述」を Writing head 内に再スコープしたもの (ADR-006 下位決定 #2) | ベースライン (β), Writing head |
 | 正規化関数 φ | Normalization Function φ | φ(x, β) = clamp((x − β) / (κ · β), 0, 1)。κ=2.0 | ベースライン |
@@ -157,7 +160,7 @@
 | DC | Defer Correctness | defer 正答率 = W 秒以内に p_flow>0.5 へ回復した defer 区間 / 全 defer 区間。見送り判断が自己回復で支持された割合 | recovered_at, ACT/HOLD |
 | Burden | — | 介入評価の過介入代理 = ACT 回数 / セッション分 | HIR |
 | intervention_eval | — | v2 介入ポリシーのオフライン反実仮想評価モジュール (`analysis::intervention_eval`)。`gse-replay --intervention` から呼ばれ HIR/Precision/DC/Burden を算出。screening 用途 | HIR, DC, intervention_decision |
-| hmm_version | — | `analysis::engine::HMM_VERSION` の SemVer 値 (現行 `0.3.0`)。meta NDJSON エントリに埋まる、gse-replay が版不一致を WARN | HMM, schema |
+| hmm_version | — | `analysis::engine::HMM_VERSION` の SemVer 値 (現行 `0.4.0`)。meta NDJSON エントリに埋まる、gse-replay が版不一致を WARN | HMM, schema |
 | schema_dto | — | `logger::LogEntry` の `schemars::JsonSchema` 派生専用ミラー型 (`schema_dto::LogEntryDto`)。production path に影響させず JSON Schema を機械生成するための DTO | emit_schema, current.json |
 | intervention_decision | — | MVP Opportunity の NDJSON ログ種別。action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by を含む | InterventionDecision, schema |
 | metrics.json | — | `gse-replay --metrics --json` の出力 (1 KB/session)。gse-dataset repo の `metrics/P*/<os>/` に配置する共有アーティファクト | aggregate_metrics, UC-GT3 |

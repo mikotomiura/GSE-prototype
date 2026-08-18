@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::analysis::features::Features;
-use crate::analysis::heads::{DomainInferenceHead, WritingHead};
+use crate::analysis::heads::{head_for, DomainInferenceHead, HeadId, TaskDomain};
 
 // ============================================================================
 // TUNE: HMM チューニング定数
@@ -40,10 +40,22 @@ use crate::analysis::heads::{DomainInferenceHead, WritingHead};
 /// - MAJOR: 既存セッションログの確率列が大幅に変わる（状態優勢の逆転等）
 /// - MINOR: 確率列は動くが同じラベル付けになる範囲の調整
 /// - PATCH: ログ形式のみの変更（数値挙動不変）
+/// - ★ MINOR: **既存ログの確率列は 1 ビットも変わらないが、新しい入力クラス
+///   （`task_kind` 等）に対して挙動の分岐条件が増える場合**
+///   （2026-08-18 追加。上の 3 つは「既存ログ」基準で書かれており、
+///   「まだ存在しない入力クラスにだけ挙動が出る」ケースを覆っていなかった。
+///   根拠は `.steering/20260818-adr006-head-extraction-wiring/decisions.md` D-4）
 ///
 /// `logger.rs` の session_start meta エントリに書き出され、
 /// `gse-replay` がゴールデンスナップショットと突き合わせる際に検証する。
-pub const HMM_VERSION: &str = "0.3.0";
+///
+/// # 変更履歴
+///
+/// - `0.4.0` (2026-08-18): ADR-006 Phase 2b。`task_kind` が domain head を選ぶようになり、
+///   `vibe_coding` セッションが `ime_open` に関わらず Coding head の β で採点される。
+///   ⚠️ **既存ログ（全て `argumentative`）の確率列は変わらない**ためゴールデン 4 本は
+///   byte-equal のまま。挙動が変わるのは `task_kind=vibe_coding` の入力のみ。
+pub const HMM_VERSION: &str = "0.4.0";
 
 /// TUNE: 初期事前確率 [Flow, Incubation, Stuck]
 ///
@@ -118,14 +130,35 @@ pub struct CognitiveStateEngine {
     // ADR-006 Alternative C: β baseline は「1 関数内の 2 択 if」ではなく
     // **head の所有物**である。どの head を走らせるかは task_kind (宣言) が決め、
     // ime_open (観測) は Writing head 内部の within-writing 信号として使う。
+    // task_kind 不明時 (既存 Phase1 ログ等) は Writing head = Phase1 と完全に同じ挙動。
     //
-    // 2a (抽出) では常に WritingHead が入る = Phase1 と完全に同じ挙動。
-    // task_kind → head 選択の配線は 2b。
-    head: Arc<dyn DomainInferenceHead>,
+    // ⚠️ **Mutex で包む理由**: engine はアプリ起動時に 1 個だけ作られ、Tauri managed State と
+    //   分析スレッドで Arc 共有される (lib.rs)。セッション開始のたびに作り直す経路が無く、
+    //   task_kind は start_session の**後**に record_session_meta で届くため、
+    //   構築時に固定すると本番では永久に Writing head のままになる。
+    head: Arc<Mutex<Arc<dyn DomainInferenceHead>>>,
+}
+
+impl Default for CognitiveStateEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CognitiveStateEngine {
+    /// 既定 (Writing head) で engine を作る。
+    ///
+    /// Phase1 は `task_kind = argumentative` 固定だったのでこれが唯一の経路だった。
+    /// `task_kind` が分かる場合は [`Self::new_for_domain`] を使う。
     pub fn new() -> Self {
+        Self::new_for_domain(TaskDomain::Writing)
+    }
+
+    /// 走らせる domain head を指定して engine を作る (ADR-006 Phase 2b)。
+    ///
+    /// HMM 本体 (遷移行列・放出行列・初期確率) は domain 非依存で共通。
+    /// domain によって変わるのは **β baseline = 潜在二軸の算出**だけである。
+    pub fn new_for_domain(domain: TaskDomain) -> Self {
         // TUNE: 遷移確率行列 (row-major, 3×3)
         // FLOW -> FLOW: 0.75  (escape time 1/(1-0.75)=4s; reduced from 0.80 to mitigate Flow Gravity)
         // FLOW -> INCUBATION: 0.17
@@ -217,9 +250,47 @@ impl CognitiveStateEngine {
             axes_ewma: Arc::new(Mutex::new(INITIAL_AXES_EWMA)),
             // display_probs は INITIAL_PROBS と同値で初期化
             display_probs: Arc::new(Mutex::new(INITIAL_PROBS)),
-            // ADR-006 2a: 既定は Writing head (Phase1 と同一挙動)。
-            head: Arc::new(WritingHead::new()),
+            // ADR-006 2b: task_kind (宣言) が選んだ head を積む。
+            head: Arc::new(Mutex::new(head_for(domain))),
         }
+    }
+
+    /// 現在の head を取り出す (Arc の clone なので安い)。
+    ///
+    /// A-3 と同じく Mutex ポイズニングでも停止しない (`into_inner` で続行する)。
+    fn head(&self) -> Arc<dyn DomainInferenceHead> {
+        match self.head.lock() {
+            Ok(h) => Arc::clone(&h),
+            Err(poisoned) => Arc::clone(&poisoned.into_inner()),
+        }
+    }
+
+    /// この engine がどの head で採点しているか。`session_meta` に刻むために使う。
+    pub fn head_id(&self) -> HeadId {
+        self.head().head_id()
+    }
+
+    /// 走らせる domain head を差し替える (ADR-006 Phase 2b)。
+    ///
+    /// `record_session_meta` (= 宣言された `task_kind` が届く場所) から呼ぶ。
+    ///
+    /// ⚠️ **`start_session` → `record_session_meta` の順で呼ばれるため、両者の間に挟まる
+    /// 1Hz tick は直前の `reset()` が戻した Writing head で採点される。**
+    /// `App.tsx` は `start_session` 成功直後に `record_session_meta` を invoke するので
+    /// 実測上この窓は 1 秒未満だが、ゼロではない。窓を消すにはフロントの呼び出し順を
+    /// 変えるか、`start_session` 自体に task_kind を持たせる必要がある (本タスクの射程外)。
+    /// 戻り値は**反映後の** `head_id`。呼び出し側が `set_domain` → `head_id()` と
+    /// 2 回ロックを取ると、その隙間に別の差し替えが入って「記録した head_id と
+    /// 実際に走る head が違う」状態になりうるため、1 回で返す
+    /// (security-checker 指摘・2026-08-18)。
+    pub fn set_domain(&self, domain: TaskDomain) -> HeadId {
+        let next = head_for(domain);
+        let id = next.head_id();
+        match self.head.lock() {
+            Ok(mut h) => *h = next,
+            Err(poisoned) => *poisoned.into_inner() = next,
+        }
+        id
     }
 
     /// HMM確率・EWMA・backspace_streakを初期値に戻す。
@@ -240,6 +311,10 @@ impl CognitiveStateEngine {
         self.backspace_streak.store(0, Ordering::Relaxed);
         self.has_pending_penalty.store(false, Ordering::Release);
         self.is_paused.store(false, Ordering::Release);
+        // ⚠️ head も既定 (Writing) に戻す。engine は起動時 1 個をセッション間で使い回すため、
+        //   戻さないと「前のセッションが vibe_coding だった」だけで次のセッションが
+        //   Coding head で採点され続ける (task_kind 未宣言のセッションで顕在化する)。
+        let _ = self.set_domain(TaskDomain::Writing);
     }
 
     pub fn set_paused(&self, paused: bool) {
@@ -295,10 +370,15 @@ impl CognitiveStateEngine {
         // ここではフラグを消費（swap false）し、ペナルティビン（obs=25）を適用する。
         // IMEガード: ime_open=true 時はペナルティを無効化。IME変換修正のBS連打は
         // 認知的Stuckではなく正常操作のため。
-        let pending = self.has_pending_penalty.swap(false, Ordering::AcqRel);
-        let apply_backspace_penalty = pending && self.head.applies_backspace_penalty(ime_open);
+        // ⚠️ head は **1 tick に 1 回だけ**取る。2 回に分けて取ると、その隙間に
+        //   `set_domain` が入ったとき BS ペナルティ gate と潜在二軸が**別 head 由来**になる
+        //   (security-checker 指摘・2026-08-18)。
+        let head = self.head();
 
-        let (raw_x, raw_y) = self.head.latent_axes(features, ime_open);
+        let pending = self.has_pending_penalty.swap(false, Ordering::AcqRel);
+        let apply_backspace_penalty = pending && head.applies_backspace_penalty(ime_open);
+
+        let (raw_x, raw_y) = head.latent_axes(features, ime_open);
 
         // TUNE: EWMA 平滑化 α = 0.3 (通常 update)
         // s_t = 0.3 * raw_t + 0.7 * s_{t-1}
@@ -420,7 +500,7 @@ impl CognitiveStateEngine {
             return None;
         }
 
-        let (raw_x, raw_y) = self.head.latent_axes(features, ime_open);
+        let (raw_x, raw_y) = self.head().latent_axes(features, ime_open);
 
         // TUNE: サイレンス時の動的 EWMA α — 沈黙深さに応じて段階的加速
         //   α=0.15: silence < 15s   (初期サイレンス、緩やかに推移)
@@ -721,31 +801,29 @@ mod tests {
 
     // ---------- ADR-006 Phase 2a: 抽出が挙動を変えていないことのガード ----------
 
-    /// 抽出 (Writing head への β 移送) は **挙動不変**でなければならない。
-    /// `HMM_VERSION` が動いていたら、それは抽出ではなく配線 (2b) を混ぜている。
+    /// `HMM_VERSION` のピン留め。HMM 挙動を変えたら**必ずここも更新する**
+    /// （更新を忘れると、同じ版で 2 つの挙動が存在することになり
+    /// `gse-replay` の版検証が意味を失う）。
     ///
-    /// 根拠: ADR-006 Migration step 3 / ADR-002 Consequences
-    /// (acceptance = replay --snapshot byte-equal / calibration parity / HMM_VERSION 不変)
+    /// - `0.3.0`: Phase1。ADR-006 Phase 2a (抽出) は挙動不変なので据え置いた
+    /// - `0.4.0`: ADR-006 Phase 2b。`task_kind` → head 配線 + Coding head v0
     #[test]
-    fn hmm_version_is_unchanged_by_extraction() {
-        assert_eq!(
-            HMM_VERSION, "0.3.0",
-            "2a (抽出) で HMM_VERSION を bump してはならない。bump が要るのは 2b (task_kind → head 配線) であり、別コミットに分ける。"
-        );
+    fn hmm_version_is_0_4_0() {
+        assert_eq!(HMM_VERSION, "0.4.0");
     }
 
     /// 既定の engine は Writing head を積む = Phase1 と同一経路。
     #[test]
     fn default_engine_uses_writing_head() {
         let e = CognitiveStateEngine::new();
-        assert_eq!(e.head.head_id(), "writing");
+        assert_eq!(e.head_id(), crate::analysis::heads::HeadId::Writing);
     }
 
     /// backspace ペナルティ gate は head 経由になっても `!ime_open` のままである。
     #[test]
     fn backspace_penalty_gate_is_delegated_to_head() {
         let e = CognitiveStateEngine::new();
-        assert!(e.head.applies_backspace_penalty(false));
-        assert!(!e.head.applies_backspace_penalty(true));
+        assert!(e.head().applies_backspace_penalty(false));
+        assert!(!e.head().applies_backspace_penalty(true));
     }
 }

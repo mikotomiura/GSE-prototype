@@ -37,6 +37,7 @@ use gse_next_lib::analysis::calibration_eval::{
 };
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
 use gse_next_lib::analysis::features::InputEvent;
+use gse_next_lib::analysis::heads::TaskDomain;
 use gse_next_lib::analysis::intervention::InterventionThresholds;
 use gse_next_lib::analysis::intervention_eval::{
     compute_correction_floor_report, compute_intervention_metrics, compute_intervention_sweep,
@@ -52,6 +53,7 @@ use gse_next_lib::analysis::metrics::{
     segment_stuck_episodes, KeyPress, LabelClass, OutcomeConfig, PasteEvent, RangeLabel,
     UserLabelEvent,
 };
+use gse_next_lib::logger::TaskKind;
 
 /// 入力 NDJSON のサイズ上限 (500 MB)。
 ///
@@ -1673,6 +1675,65 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
         .or_else(|| events.iter().find_map(|e| e.timestamp()))
         .ok_or_else(|| "no events with timestamps found".to_string())?;
 
+    // ★ ADR-006 Phase 2b: 宣言された task_kind が domain head を選ぶ。
+    //   ⚠️ **この抽出を省くとリプレイが本番の挙動を再現できない** (session_meta 行は
+    //     timestamp() == None で下のソート対象から落ちるため、メインループでは見えない)。
+    //   ⚠️ ファイルの 2 パス読みではない。events は既に全行メモリ上にある。
+    //   task_kind が無い / 未知の場合は Writing head へフォールバックする
+    //   (既存 Phase1 ログはそもそも session_meta を持たない)。
+    let declared_task_kinds: Vec<&str> = events
+        .iter()
+        .filter_map(|e| match e {
+            ReplayEvent::SessionMeta { task_kind, .. } => Some(task_kind.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    // ⚠️★ **1 ファイルに相異なる task_kind が複数あるなら、黙って先頭勝ちにしない。**
+    //   非 G1 モードではログをローテートしないため、「開始 → 戻る → 別 task_kind で開始」で
+    //   1 ファイルに複数の session_meta が並びうる。本番は 2 個目で head を差し替えるが、
+    //   replay は区間を持たないので先頭を全区間へ適用してしまい、**本番挙動を再現しない**。
+    //   再現できないものを再現したふりをするのが最悪なので、明示的に落とす。
+    //   (security-checker 指摘・2026-08-18)
+    let mut distinct: Vec<&str> = declared_task_kinds.clone();
+    distinct.sort_unstable();
+    distinct.dedup();
+    if distinct.len() > 1 {
+        return Err(format!(
+            "session_meta declares {} different task_kinds in one file ({:?}) —              replay cannot reproduce per-session head switching. Split the file per session.",
+            distinct.len(),
+            distinct
+        ));
+    }
+
+    // ⚠️ session_meta が 1 種類でも、session_start が複数あるなら同じ理由で再現できない
+    //   (本番は start_session ごとに engine.reset() = head を Writing へ戻す)。
+    let session_start_count = events
+        .iter()
+        .filter(|e| matches!(e, ReplayEvent::SessionStart { .. }))
+        .count();
+    if !declared_task_kinds.is_empty() && session_start_count > 1 {
+        return Err(format!(
+            "file has {session_start_count} session_start rows with a session_meta declaration —              production resets the head on each start, replay cannot. Split the file per session."
+        ));
+    }
+
+    let domain = match declared_task_kinds.first() {
+        None => TaskDomain::Writing,
+        Some(s) => match TaskKind::parse(s) {
+            Some(kind) => TaskDomain::from(kind),
+            None => {
+                // ⚠️ 全長を出さない (1 行は最大 MAX_SESSION_BYTES まで許容されるため)。
+                let shown: String = s.chars().take(32).collect();
+                tracing::warn!(
+                    "unknown task_kind {:?} in session_meta — falling back to writing head",
+                    shown
+                );
+                TaskDomain::Writing
+            }
+        },
+    };
+
     // 時刻順にソート（既存 Feat は timestamp() == None で除外）
     let mut ordered: Vec<ReplayEvent> = events
         .into_iter()
@@ -1682,7 +1743,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
 
     // state + engine を初期化
     let mut state = AnalysisState::new(session_start_ms, 600);
-    let engine = CognitiveStateEngine::new();
+    let engine = CognitiveStateEngine::new_for_domain(domain);
     let mut ime_open = false;
     let mut snapshots: Vec<FeatSnapshot> = Vec::new();
     // vk も category も解決できなかった不正 key 行の件数 (内容は出さず件数のみ warn)。
@@ -2913,6 +2974,103 @@ mod tests {
     ///                        ★ SilencePath (`f1` = 2000.0) を踏むのは `phase1_ime_heavy` だけである。
     ///                        ★ SilencePath の分岐そのものは `analysis/loop_step.rs` の
     ///                        unit test が直接カバーしている。
+    /// - `vibe_coding_ime_mixed`: ★ **ADR-006 Phase 2b** (`task_kind` → head 配線)。
+    ///   `task_kind=vibe_coding` の宣言により Coding head v0 が選ばれ、
+    ///   **IME on/off に関わらず β が切り替わらない**ことを固定する。
+    ///   ⚠️ 実測 (2026-08-18): 1〜8s の IME off 区間は Writing head と**完全一致**する
+    ///   (β_writing_latin と Coding シードが同値のため)。判別が出るのは 9〜24s の
+    ///   IME **on** 区間で、ここが `research-positioning.md §8` の交絡そのものである。
+    ///   16〜20s の backspace 16 連打は IME on なので obs=25 は**出ない** (D-3 の gate)。
+    ///   28〜30s の IME off 区間でのみ obs=25 が発火する。
+    /// - `argumentative_ime_mixed`: ★ **ルーティング表そのものの回帰保護**。
+    ///   ⚠️ 既存 4 本は `session_meta` を 1 行も持たないため、`Argumentative → Coding` に
+    ///   ルーティングが壊れても**全て緑のまま通ってしまう**（code-reviewer 実測・2026-08-18）。
+    ///   本 fixture は `vibe_coding_ime_mixed` と `task_kind` **だけ**が違う双子で、
+    ///   「宣言があっても Writing 挙動は不変」を固定する。2 本を対で維持すること
+    ///   （片方だけ再生成すると、ルーティングの壊れが差分として現れなくなる）。
+    /// ⚠️ **1 ファイルに相異なる `task_kind` が並んだら、黙って先頭勝ちにせず落とす。**
+    ///
+    /// 非 G1 モードはログをローテートしないため「開始 → 戻る → 別 task_kind で開始」で
+    /// 実際に起こりうる。本番は 2 個目の `session_meta` で head を差し替えるが replay は
+    /// 区間を持たないので再現できない。**再現できないものを再現したふりをする**のが
+    /// 一番危ないので、明示的に `Err` にする (security-checker 指摘・2026-08-18)。
+    #[test]
+    fn multiple_distinct_task_kinds_in_one_file_is_rejected() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "gse_replay_multi_meta_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            concat!(
+                r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.4.0"}"#,
+                "
+",
+                r#"{"type":"session_meta","track":"main","task_kind":"argumentative","monk_mode":false,"intervention_enabled":false,"ts":1700000000000}"#,
+                "
+",
+                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":1700000010000}"#,
+                "
+",
+                r#"{"type":"key","t":1700000000200,"vk":65,"press":true}"#,
+                "
+",
+            ),
+        )
+        .expect("write temp fixture");
+
+        let result = run_replay(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let err = result.expect_err("相異なる task_kind が 2 つあるファイルは Err になるべき");
+        assert!(
+            err.contains("different task_kinds"),
+            "エラー文が理由を説明していない: {err}"
+        );
+    }
+
+    /// `session_meta` が 1 種類でも、`session_start` が複数あれば同じ理由で再現できない
+    /// (本番は start_session ごとに `engine.reset()` = head を Writing へ戻す)。
+    #[test]
+    fn multiple_session_starts_with_declared_task_kind_is_rejected() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "gse_replay_multi_start_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            concat!(
+                r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.4.0"}"#,
+                "
+",
+                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":1700000000000}"#,
+                "
+",
+                r#"{"type":"session_start","t":1700000000000}"#,
+                "
+",
+                r#"{"type":"session_start","t":1700000020000}"#,
+                "
+",
+                r#"{"type":"key","t":1700000000200,"vk":65,"press":true}"#,
+                "
+",
+            ),
+        )
+        .expect("write temp fixture");
+
+        let result = run_replay(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let err = result.expect_err("session_start が 2 つあるファイルは Err になるべき");
+        assert!(
+            err.contains("session_start rows"),
+            "エラー文が理由を説明していない: {err}"
+        );
+    }
+
     #[test]
     fn replay_snapshot_goldens_byte_equal() {
         let cases = [
@@ -2920,6 +3078,11 @@ mod tests {
             ("phase1_ime_heavy.ndjson", "phase1_ime_heavy.json"),
             ("category_coverage.ndjson", "category_coverage.json"),
             ("deep_silence.ndjson", "deep_silence.json"),
+            ("vibe_coding_ime_mixed.ndjson", "vibe_coding_ime_mixed.json"),
+            (
+                "argumentative_ime_mixed.ndjson",
+                "argumentative_ime_mixed.json",
+            ),
         ];
         for (fixture, golden) in cases {
             let snaps = run_replay(&fixture_path(fixture))

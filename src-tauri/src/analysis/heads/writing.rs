@@ -11,11 +11,8 @@
 //! Coding の baseline ではない、という**概念的分離**であり、**数値変更を伴わない**。
 //! Coding head が持つ β は別の定数として独立に所有される (以後 Coding 側で再チューニングされる)。
 
-use super::DomainInferenceHead;
+use super::{DomainInferenceHead, HeadId};
 use crate::analysis::features::{phi, Features};
-
-/// Writing head の識別子。
-pub const HEAD_ID_WRITING: &str = "writing";
 
 // TUNE: β_writing — 日本語 IME 入力のベースライン
 // Calibrated from real session data (Mac/Windows, 2026-03).
@@ -42,18 +39,40 @@ const BETA_WRITING_LATIN_F6: f64 = 0.08; // Pause-after-delete rate
 /// 論述・文章作成ドメインの推論ヘッド。
 ///
 /// Phase1 (task_kind = argumentative 固定) で走っていたのはこの head の挙動そのものである。
-#[derive(Debug, Clone, Copy, Default)]
-pub struct WritingHead;
+///
+/// ⚠️ `id` は **識別子だけ**を切り替える。`writing` と `writing_fallback` で
+/// **数値挙動は完全に同一**である (Creative を Writing head で採点している事実を
+/// ログ上で分離できるようにするためだけのもの・D-6)。
+#[derive(Debug, Clone, Copy)]
+pub struct WritingHead {
+    id: HeadId,
+}
 
 impl WritingHead {
+    /// 論述・文通向け (`argumentative` / `correspondence`)。
     pub fn new() -> Self {
-        Self
+        Self {
+            id: HeadId::Writing,
+        }
+    }
+
+    /// Creative 向けのフォールバック。**数値挙動は `new()` と同一**で、識別子だけが違う。
+    pub fn fallback() -> Self {
+        Self {
+            id: HeadId::WritingFallback,
+        }
+    }
+}
+
+impl Default for WritingHead {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl DomainInferenceHead for WritingHead {
-    fn head_id(&self) -> &'static str {
-        HEAD_ID_WRITING
+    fn head_id(&self) -> HeadId {
+        self.id
     }
 
     /// 潜在二軸 (X = Cognitive Friction, Y = Engagement) を算出する。

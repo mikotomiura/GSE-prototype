@@ -34,6 +34,7 @@ pub mod tray;
 pub mod wall_server;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
+use crate::analysis::heads::TaskDomain;
 use crate::analysis::intervention::{
     InterventionAction, InterventionDecision, InterventionInput, InterventionPolicyState,
 };
@@ -1661,6 +1662,10 @@ fn parse_dismiss_reason(s: Option<&str>) -> Result<DismissReason, String> {
 }
 
 /// v0.3 較正: セッション開始宣言を記録する (§3・§14)。固定カテゴリのみ許可。
+// ⚠️ 引数はフロントとの IPC 契約 (`invoke("record_session_meta", {...})`) そのものなので、
+//   構造体へまとめると App.tsx 側の呼び出し形が変わる。ADR-006 2b で engine を 1 つ足した
+//   結果 7 個を超えたが、契約を守るためここは許可する。
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 fn record_session_meta(
     track: String,
@@ -1670,10 +1675,16 @@ fn record_session_meta(
     condition: Option<String>,
     label_pool: Option<String>,
     log: State<'_, Arc<Mutex<LogState>>>,
+    engine: State<'_, CognitiveStateEngine>,
 ) -> Result<(), String> {
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
         TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+    // ★ ADR-006 Phase 2b: 宣言された task_kind が domain head を選ぶ。
+    //   ここでは **head_id を求めるだけ**で engine には触らない。差し替えは
+    //   検証がすべて通り、session_meta 行の送信に成功した**後**に行う (下記)。
+    let domain = TaskDomain::from(task_kind);
+    let head_id = domain.head_id();
     // 省略可。指定時のみ固定カテゴリへ検証し、未知値はエラーにする (黙って捨てない)。
     let condition = parse_optional_condition(condition.as_deref())?;
     let label_pool = parse_optional_label_pool(label_pool.as_deref())?;
@@ -1701,12 +1712,32 @@ fn record_session_meta(
             intervention_enabled,
             condition,
             label_pool,
+            head_id,
         })
         .map_err(log_send_error)?;
+
+    // ⚠️★ **head の差し替えはここで初めて行う。**
+    //   検証エラーやログチャネル満杯で早期 return した場合に engine だけ切り替わると、
+    //   「Coding head で採点された feat 行が、head 宣言の無いファイルに書かれる」状態になる。
+    //   そのファイルを gse-replay に食わせると task_kind 不在で Writing head へフォールバックし、
+    //   **本番とリプレイの採点が食い違う** (= Replay-as-Truth の破れ)。
+    //   security-checker 指摘・2026-08-18。
+    //
+    //   ⚠️ 残る窓: start_session (engine.reset() で Writing に戻る) と本コマンドの間に挟まる
+    //     1Hz tick は Writing head で採点される。App.tsx が start_session 成功直後に
+    //     invoke するので実測 1 秒未満だが、ゼロではない (塞ぐには start_session に
+    //     task_kind を持たせる必要があり、フロントの IPC 契約変更を伴う)。
+    let applied = engine.set_domain(domain);
+    debug_assert_eq!(
+        applied, head_id,
+        "記録した head_id と反映した head が食い違った"
+    );
+
     tracing::info!(
-        "session_meta recorded: track={} task_kind={}",
+        "session_meta recorded: track={} task_kind={} head_id={}",
         track.as_str(),
-        task_kind.as_str()
+        task_kind.as_str(),
+        head_id.as_str()
     );
     Ok(())
 }
