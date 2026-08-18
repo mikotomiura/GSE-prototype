@@ -525,7 +525,7 @@
           ]
         },
         "head_id": {
-          "description": "ADR-006 Phase 2b: どの domain head がこのセッションを採点したか。\n\n⚠️ **read-optional / write-required**: 現行の logger は**常に出力する**。 `Option` なのは **2026-08-18 以前に収集した旧ログを読むため**だけであり、 「省略してよい出力」という意味ではない。下流は `null` を 「ADR-006 Phase 2b より前のログ = Writing head 相当」と解釈すること (正常系の欠測ではない)。",
+          "description": "ADR-006 Phase 2b: どの domain head がこのセッションを採点したか。\n\n⚠️ **read-optional / write-required**: 現行の logger は**常に出力する** (`LogEntry::SessionMeta.head_id` は `Option` ではなく `HeadId` 型なので、 出力側の必須性は型で守られている)。`Option` なのは **ADR-006 Phase 2b 以前に収集した旧ログを読むため**だけである。\n\n⚠️★ **下流での `null` の解釈は `meta` 行の `hmm_version` で判別すること**: - `hmm_version < 0.4.0` かつ `head_id == null` → **旧ログ。Writing head 相当** - `hmm_version >= 0.4.0` かつ `head_id == null` → ⚠️ **バグ。Writing 相当に丸めない**\n\n「`null` は常に Writing 相当」と一律に解釈すると、将来の欠測やバグ由来の `null` まで 同じ意味に潰れる (cross-review Codex 指摘・2026-08-18)。",
           "anyOf": [
             {
               "$ref": "#/definitions/HeadIdDto"
