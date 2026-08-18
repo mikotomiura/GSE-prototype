@@ -132,7 +132,7 @@ GSE-prototype/
 #### `src-tauri/src/analysis/`
 
 - **目的**: キーストローク分析と認知状態推定
-- **置くべきもの**: 特徴量抽出、HMM エンジン、`loop_step`、`intervention` (Opportunity MVP)、`intervention_eval` (オフライン評価)、`probe_scheduler` (v0.3 純スケジューリング)、`metrics` (Phase 1 GT 集計)、`calibration_eval` (v0.3 較正解析: C-index/2段ゲート/MNAR)、将来の ML 推論
+- **置くべきもの**: 特徴量抽出、HMM エンジン、`heads/` (ADR-002/006 ドメイン推論ヘッド: β baseline を所有し潜在二軸を算出)、`loop_step`、`intervention` (Opportunity MVP)、`intervention_eval` (オフライン評価)、`probe_scheduler` (v0.3 純スケジューリング)、`metrics` (Phase 1 GT 集計)、`calibration_eval` (v0.3 較正解析: C-index/2段ゲート/MNAR)、将来の ML 推論
 - **置くべきでないもの**: OS API 呼び出し、入力イベント捕捉、タイムスタンプ生成 (`SystemTime` は `lib.rs` で付与)
 
 #### `src-tauri/src/g1.rs` (2026-08)

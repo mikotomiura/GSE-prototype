@@ -117,7 +117,10 @@
 | F4: バースト長 | Burst Length | 打鍵間隔 < 200ms の連続入力の平均文字数 | 特徴量 |
 | F5: 休止回数 | Pause Count | 2 秒以上の沈黙の回数 (30 秒ウィンドウ内) | 特徴量 |
 | F6: 削除後休止率 | Pause-After-Delete Rate | (削除の後に 2 秒以上の沈黙) / 総削除数 | 特徴量 |
-| ベースライン (β) | Baseline | 特徴量の正規化基準値。IME 状態に応じて coding β と writing β を切替 | IME, 正規化関数 φ |
+| ベースライン (β) | Baseline | 特徴量の正規化基準値。**各 domain head が所有する** (ADR-006 Alternative C)。Writing head は `β_writing` (IME on) と `β_writing_latin` (IME off) を持ち `ime_open` で切り替える | 正規化関数 φ, Writing head |
+| ドメイン推論ヘッド | DomainInferenceHead | `analysis::heads` の trait。特徴量から潜在二軸 (X=Friction / Y=Engagement) を算出する。head の選択は `task_kind` (宣言) が決め、`ime_open` (観測) は head 内部の信号として使う | ADR-002, ADR-006 |
+| Writing head | Writing head | 論述・文章作成ドメインの推論ヘッド (`analysis::heads::writing`)。Phase1 (task_kind=argumentative 固定) で走っていた挙動そのもの | DomainInferenceHead, β_writing_latin |
+| `β_writing_latin` | writing latin baseline | Writing head 内の **IME off (ラテン直接入力: 英字引用・数式・URL) 用サブ baseline**。値は旧 `β_coding` をそのまま改名 (F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08)。⚠️ **Coding の baseline ではない** — 「IME off の日本語論述」を Writing head 内に再スコープしたもの (ADR-006 下位決定 #2) | ベースライン (β), Writing head |
 | 正規化関数 φ | Normalization Function φ | φ(x, β) = clamp((x − β) / (κ · β), 0, 1)。κ=2.0 | ベースライン |
 | バックスペースペナルティ | Backspace Penalty | 連続 14 回以上のバックスペースで obs=25（ペナルティビン）を強制発火。IME 変換中は抑制 | HMM, 観測ビン |
 | 摩擦フロア | Friction Floor | サイレンス時に合成される最小摩擦値。Stuck 状態の侵食を防止 | サイレンス検出 |

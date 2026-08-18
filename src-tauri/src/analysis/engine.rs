@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::analysis::features::{phi, Features};
+use crate::analysis::features::Features;
+use crate::analysis::heads::{DomainInferenceHead, WritingHead};
 
 // ============================================================================
 // TUNE: HMM チューニング定数
@@ -113,6 +114,14 @@ pub struct CognitiveStateEngine {
     // α = 0.40 for normal updates (~2.5s time-constant).
     // α = 0.60 for backspace-penalty bin (faster Stuck response).
     display_probs: Arc<Mutex<[f64; 3]>>,
+
+    // ADR-006 Alternative C: β baseline は「1 関数内の 2 択 if」ではなく
+    // **head の所有物**である。どの head を走らせるかは task_kind (宣言) が決め、
+    // ime_open (観測) は Writing head 内部の within-writing 信号として使う。
+    //
+    // 2a (抽出) では常に WritingHead が入る = Phase1 と完全に同じ挙動。
+    // task_kind → head 選択の配線は 2b。
+    head: Arc<dyn DomainInferenceHead>,
 }
 
 impl CognitiveStateEngine {
@@ -208,6 +217,8 @@ impl CognitiveStateEngine {
             axes_ewma: Arc::new(Mutex::new(INITIAL_AXES_EWMA)),
             // display_probs は INITIAL_PROBS と同値で初期化
             display_probs: Arc::new(Mutex::new(INITIAL_PROBS)),
+            // ADR-006 2a: 既定は Writing head (Phase1 と同一挙動)。
+            head: Arc::new(WritingHead::new()),
         }
     }
 
@@ -261,90 +272,11 @@ impl CognitiveStateEngine {
         self.is_paused.load(Ordering::Acquire)
     }
 
-    /// X軸 (Friction / 摩擦) と Y軸 (Engagement / 没入度) を算出する。
-    /// 返値はそれぞれ [0.0, 1.0] にクランプ済み。
-    ///
-    /// X (Friction) — 高いほど「つまずき」を表す。重み合計 = 1.0
-    ///   0.30 × φ(F3: 修正率)
-    ///   0.25 × φ(F6: 削除後停止率)
-    ///   0.25 × φ(F1: Flight Time)
-    ///   0.20 × φ(F5: ポーズ回数)
-    ///
-    /// Y (Engagement) — 高いほど「滑らかな出力」を表す。重み合計 = 1.0
-    ///   0.40 × φ(F4: バースト長)
-    ///   0.35 × (1 − φ(F1))   … 短いFT = 高エンゲージ
-    ///   0.25 × (1 − φ(F5))   … 少ないポーズ = 高エンゲージ
-    ///
-    /// # Context-specific β (dual baseline)
-    ///
-    /// `ime_open = true`  → β_writing: Japanese typing baseline.
-    ///   Slower flight times and shorter bursts are normal during Japanese composition.
-    ///   Normalizing against a tighter baseline prevents systematic Flow over-detection
-    ///   when the user is simply typing romaji at their natural Japanese pace.
-    ///
-    /// `ime_open = false` → β_coding: Alphanumeric/coding baseline.
-    ///   Faster flight times and longer bursts are the reference for fluent coding.
-    ///   A coder who is "slow" relative to their coding norm signals friction correctly.
-    ///
-    /// Both sets are population-level estimates; future work can adapt them per-session
-    /// using EWMA updates (update only the matching β when IME state is known).
-    fn calculate_latent_axes(&self, features: &Features, ime_open: bool) -> (f64, f64) {
-        // TUNE: β_coding — reference values for alphanumeric / coding input
-        // Source: Dhakal et al. (2018) general population medians, coding-adjusted.
-        const BETA_CODING_F1: f64 = 150.0; // Flight Time median (ms)
-        const BETA_CODING_F3: f64 = 0.06; // Correction rate (6%)
-        const BETA_CODING_F4: f64 = 5.0; // Burst length (chars)
-        const BETA_CODING_F5: f64 = 2.0; // Pause count (per 30 s)
-        const BETA_CODING_F6: f64 = 0.08; // Pause-after-delete rate
-
-        // TUNE: β_writing — reference values for Japanese IME writing input
-        // Calibrated from real session data (Mac/Windows, 2026-03).
-        // Typical Japanese typing: F1=100-130ms, F3=3-10%, F4=2.8-3.5, F5=1-4.
-        // β must be at or below the typical range so phi() produces non-zero values,
-        // otherwise all phi→0 and the observation bin collapses to a single Flow bin.
-        const BETA_WRITING_F1: f64 = 100.0; // Flight Time median (ms) — at lower bound of typical range
-        const BETA_WRITING_F3: f64 = 0.10; // Correction rate (10%) — IME normal correction 3-15%
-        const BETA_WRITING_F4: f64 = 2.5; // Burst length — shorter (composition in segments)
-        const BETA_WRITING_F5: f64 = 1.0; // Pause count — low threshold for sensitivity
-        const BETA_WRITING_F6: f64 = 0.12; // Pause-after-delete rate
-
-        let (beta_f1, beta_f3, beta_f4, beta_f5, beta_f6) = if ime_open {
-            (
-                BETA_WRITING_F1,
-                BETA_WRITING_F3,
-                BETA_WRITING_F4,
-                BETA_WRITING_F5,
-                BETA_WRITING_F6,
-            )
-        } else {
-            (
-                BETA_CODING_F1,
-                BETA_CODING_F3,
-                BETA_CODING_F4,
-                BETA_CODING_F5,
-                BETA_CODING_F6,
-            )
-        };
-
-        let phi1 = phi(features.f1_flight_time_median, beta_f1);
-        let phi3 = phi(features.f3_correction_rate, beta_f3);
-        let phi4 = phi(features.f4_burst_length, beta_f4);
-        let phi5 = phi(features.f5_pause_count, beta_f5);
-        let phi6 = phi(features.f6_pause_after_del_rate, beta_f6);
-
-        // X: Friction (高いほど「つまずき」)  重み合計 = 1.0
-        let x = (0.30 * phi3 + 0.25 * phi6 + 0.25 * phi1 + 0.20 * phi5).clamp(0.0, 1.0);
-
-        // Y: Engagement (高いほど「滑らかな出力」)  重み合計 = 1.0
-        let y = (0.40 * phi4 + 0.35 * (1.0 - phi1) + 0.25 * (1.0 - phi5)).clamp(0.0, 1.0);
-
-        (x, y)
-    }
-
     /// B-5: HMM Update (2軸 Friction × Engagement、25+1ビン モデル)
     ///
     /// `ime_open`: true = Japanese IME is in Japanese-input mode (あ/カ).
-    /// Used to select context-appropriate β values in `calculate_latent_axes`.
+    /// Head 内部で context-appropriate な β の選択に使われる
+    /// (Writing head: β_writing / β_writing_latin の切替)。
     pub fn update(&self, features: &Features, ime_open: bool) -> Option<UpdateDiagnostics> {
         if self.get_paused() {
             return None;
@@ -364,9 +296,9 @@ impl CognitiveStateEngine {
         // IMEガード: ime_open=true 時はペナルティを無効化。IME変換修正のBS連打は
         // 認知的Stuckではなく正常操作のため。
         let pending = self.has_pending_penalty.swap(false, Ordering::AcqRel);
-        let apply_backspace_penalty = pending && !ime_open;
+        let apply_backspace_penalty = pending && self.head.applies_backspace_penalty(ime_open);
 
-        let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
+        let (raw_x, raw_y) = self.head.latent_axes(features, ime_open);
 
         // TUNE: EWMA 平滑化 α = 0.3 (通常 update)
         // s_t = 0.3 * raw_t + 0.7 * s_{t-1}
@@ -488,7 +420,7 @@ impl CognitiveStateEngine {
             return None;
         }
 
-        let (raw_x, raw_y) = self.calculate_latent_axes(features, ime_open);
+        let (raw_x, raw_y) = self.head.latent_axes(features, ime_open);
 
         // TUNE: サイレンス時の動的 EWMA α — 沈黙深さに応じて段階的加速
         //   α=0.15: silence < 15s   (初期サイレンス、緩やかに推移)
@@ -785,5 +717,35 @@ mod tests {
         assert!((probs[0] - 0.80).abs() < 1e-9);
         assert!((probs[1] - 0.15).abs() < 1e-9);
         assert!((probs[2] - 0.05).abs() < 1e-9);
+    }
+
+    // ---------- ADR-006 Phase 2a: 抽出が挙動を変えていないことのガード ----------
+
+    /// 抽出 (Writing head への β 移送) は **挙動不変**でなければならない。
+    /// `HMM_VERSION` が動いていたら、それは抽出ではなく配線 (2b) を混ぜている。
+    ///
+    /// 根拠: ADR-006 Migration step 3 / ADR-002 Consequences
+    /// (acceptance = replay --snapshot byte-equal / calibration parity / HMM_VERSION 不変)
+    #[test]
+    fn hmm_version_is_unchanged_by_extraction() {
+        assert_eq!(
+            HMM_VERSION, "0.3.0",
+            "2a (抽出) で HMM_VERSION を bump してはならない。bump が要るのは 2b (task_kind → head 配線) であり、別コミットに分ける。"
+        );
+    }
+
+    /// 既定の engine は Writing head を積む = Phase1 と同一経路。
+    #[test]
+    fn default_engine_uses_writing_head() {
+        let e = CognitiveStateEngine::new();
+        assert_eq!(e.head.head_id(), "writing");
+    }
+
+    /// backspace ペナルティ gate は head 経由になっても `!ime_open` のままである。
+    #[test]
+    fn backspace_penalty_gate_is_delegated_to_head() {
+        let e = CognitiveStateEngine::new();
+        assert!(e.head.applies_backspace_penalty(false));
+        assert!(!e.head.applies_backspace_penalty(true));
     }
 }

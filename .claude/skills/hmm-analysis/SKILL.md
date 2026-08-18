@@ -8,7 +8,7 @@ description: >
   - X軸 (Cognitive Friction) / Y軸 (Engagement) の合成式を変更するとき
   - 観測ビン (obs=0..25) の量子化ロジックを変更するとき
   - EWMA / ヒステリシス EMA の α 値を調整するとき
-  - β ベースライン (coding β / writing β) を変更するとき
+  - β ベースライン (β_writing / β_writing_latin・Coding head の β) を変更するとき
   - 摩擦フロア・サイレンス検出・バックスペースペナルティを修正するとき
   - 30秒ローリングウィンドウのバッファ管理を変更するとき
 allowed-tools: Read, Grep, Glob, Edit
@@ -82,10 +82,16 @@ display_probs → Frontend に返す
 φ(x, β) = clamp((x − β) / (κ · β), 0.0, 1.0)    κ = 2.0
 ```
 
-- **coding β**: 英数字入力時のベースライン（IME_OPEN = false）
-- **writing β**: 日本語入力時のベースライン（IME_OPEN = true）
+β は **各 domain head の所有物**である（ADR-006 Alternative C・実装は `analysis/heads/`）。
 
-IME_OPEN フラグが切り替わったとき、次の 1Hz サイクルから β が変わる。
+- **Writing head**（論述・文章作成。Phase1 はこれのみ稼働）
+  - `β_writing`: 日本語 IME 入力時のベースライン（IME_OPEN = true）
+  - `β_writing_latin`: IME off のラテン直接入力（英字引用・数式・URL）のベースライン
+    （IME_OPEN = false）。⚠️ **旧 `β_coding` を改名したもので、Coding の baseline ではない**
+    （ADR-006 下位決定 #2 の再スコープ）
+- IME_OPEN フラグが切り替わったとき、次の 1Hz サイクルから β が変わる。
+  この切替は **Writing head 内部の within-writing 信号**であり、
+  「どの head を走らせるか」を決める `task_kind` とは役割が直交する。
 
 ---
 
@@ -105,7 +111,7 @@ EWMA で平滑化（α = 0.15 通常時、サイレンス時に段階的変化�
 ```
 X軸: 0..1 → x_bin = 0..4 (5分割)
 Y軸: 0..1 → y_bin = 0..4 (5分割)
-obs = y_bin * 5 + x_bin   (0..24)
+obs = x_bin * 5 + y_bin   (0..24)   ★ 実装 (engine.rs) はこの順序
 
 特例: バックスペース 14 連続以上 → obs = 25 (ペナルティビン)
       IME_ACTIVE = true 時はペナルティ抑制

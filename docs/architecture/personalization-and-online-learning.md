@@ -117,7 +117,8 @@ paste の頻度は被験者間で **97 倍**（8.99 vs 0.09 / 1000 打鍵）。�
 
 1. **X の重みが手決め**: `X = 0.30φ(F3)+0.25φ(F6)+0.25φ(F1)+0.20φ(F5)`（`engine.rs:336`）。
    データ由来の根拠が無い。`Y = 0.40φ(F4)+0.35(1−φ(F1))+0.25(1−φ(F5))` も同様。
-2. **β が母集団定数**: `BETA_WRITING_*` / `BETA_CODING_*` がハードコードされ、切替は **IME on/off の 2 値のみ**。
+2. **β が母集団定数**: `BETA_WRITING_*` / `BETA_WRITING_LATIN_*` (旧 `BETA_CODING_*`・ADR-006 下位決定 #2 で改名) が
+   `analysis/heads/writing.rs` にハードコードされ、Writing head 内の切替は **IME on/off の 2 値のみ**。
    `engine.rs` のコメント自身が `future work can adapt them per-session` と書いている。
 3. **HMM の遷移行列(3×3)・放出行列(3×26) も全て手書き定数**（`TUNE:`）。
    → **現状は「HMM の形をしたルールベース」であり、学習は一箇所も無い**。
