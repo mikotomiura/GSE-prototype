@@ -60,8 +60,10 @@
       `:120` の「ベースライン (β)」の説明を head 所有の形に更新
 - [x] `docs/wbs-verification-halfyear.md:232` の `HMM_VERSION=0.3.0` を更新
 - [x] 差分が意図通りかを本ディレクトリに記録（ADR-006 Migration step 4）→ `diff-intent-2b.md`
-- [ ] code-reviewer + security-checker を**並列**起動 / `/cross-review`
-- [ ] コミット: `feat(engine): task_kind を head 選択へ配線し Coding head v0 を追加する (v0.4.0)`
+- [x] code-reviewer + security-checker を**並列**起動 → HIGH 2 / MEDIUM 8 / LOW 多数を反映
+- [x] `/cross-review`（Codex）→ 4 件中 2 件を反映、2 件は既知の制約として記録
+- [x] コミット: `8d6b4a8 feat(engine): task_kind を head 選択へ配線し Coding head v0 を追加する`
+- [x] `e77ad27 test(engine): head 差し替えと reset の不変条件をテストで固定する`（cross-review 反映）
 
 ## 文書
 
@@ -73,12 +75,14 @@
       冒頭の凍結注記を「Phase1 は 2026-08-18 に収集打ち切りで終了」へ更新
 - [x] `experiments/20260731-phase1-calibration-analysis/notes.md` §5① に
       「2026-08-18 に収集打ち切りで終了」を追記（★ 「収集継続」の記述が現状と食い違うため）
-- [ ] コミット: `docs(adr): ADR-002 を Accepted に昇格し ADR-006 に実施記録を追記する`
+- [x] コミット: `92a2b9a docs(adr): ADR-002 を Accepted に昇格し ADR-006 に実施記録を追記する`
 
 ## 完了処理
 
-- [ ] `/finish-task`
-- [ ] PR 作成（★ `git push` / `gh pr merge` は deny → 研究者に `! <command>` で叩いてもらう）
+- [x] `/finish-task` — schema parity OK / test-runner 421 passed / tsc 通過 / release ビルド成功 / cross-review 3 回
+- [ ] PR 作成 ← **研究者の操作待ち**
+      ⚠️ セッション中に `.claude/settings.json` が変更され `git push` / `gh pr merge` が
+      deny から外れている（未コミット）。この変更の採否も判断が要る
 - [ ] CI 全ジョブ緑を確認
 
 ## 次タスクの候補（本タスクでは Out）
