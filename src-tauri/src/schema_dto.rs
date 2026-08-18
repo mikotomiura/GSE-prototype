@@ -228,6 +228,11 @@ pub enum LogEntryDto {
         expected_quadrant: ExpectedQuadrantDto,
         q1_friction: u8,
         q2_progress: u8,
+        /// 場面の表示から**記録に成功するまで**の所要時間 (ms)。読まずに送った回答の事後分離用。
+        /// 送信に失敗して再送した場合は、初回表示からの累積になる。
+        elapsed_ms: u64,
+        /// Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。
+        changes: u16,
         ts: u64,
     },
 }

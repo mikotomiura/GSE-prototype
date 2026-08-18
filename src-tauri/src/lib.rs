@@ -1599,11 +1599,11 @@ fn record_user_label(
 
 /// 受領した不透明 ID (vignette_id 等) の検証。本文/ウィンドウタイトル由来の文字列が
 /// ID に混入するのを境界で遮断する (`[A-Za-z0-9_-]`・1..=16 文字)。
+///
+/// ⚠️ 規則の本体は `analysis::calibration_eval::is_valid_opaque_id` に 1 つだけ置く。
+/// NDJSON 読込側 (`gse-replay`) も同じ関数を使うので、**規則が二重管理にならない**。
 fn is_valid_opaque_id(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 16
-        && s.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    crate::analysis::calibration_eval::is_valid_opaque_id(s)
 }
 
 /// 受領した (source, probe_id) を検証して `ProbeRef` を構築する (DC-3 / cross-review #7)。
@@ -1836,6 +1836,8 @@ fn record_vignette_response(
     expected_quadrant: String,
     q1_friction: u8,
     q2_progress: u8,
+    elapsed_ms: u64,
+    changes: u16,
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
     let quadrant = ExpectedQuadrant::parse(&expected_quadrant)
@@ -1852,6 +1854,8 @@ fn record_vignette_response(
             quadrant,
             q1_friction,
             q2_progress,
+            elapsed_ms,
+            changes,
         ))
         .map_err(log_send_error)?;
     Ok(())

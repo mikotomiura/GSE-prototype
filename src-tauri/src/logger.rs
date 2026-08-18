@@ -598,17 +598,21 @@ fn format_vignette_response_line(
     expected_quadrant: ExpectedQuadrant,
     q1_friction: u8,
     q2_progress: u8,
+    elapsed_ms: u64,
+    changes: u16,
 ) -> String {
     debug_assert!(
         (1..=5).contains(&q1_friction) && (1..=5).contains(&q2_progress),
         "vignette_response: q1/q2 が 1..=5 外"
     );
     format!(
-        r#"{{"type":"vignette_response","vignette_id":{},"expected_quadrant":"{}","q1_friction":{},"q2_progress":{},"ts":{}}}"#,
+        r#"{{"type":"vignette_response","vignette_id":{},"expected_quadrant":"{}","q1_friction":{},"q2_progress":{},"elapsed_ms":{},"changes":{},"ts":{}}}"#,
         json_opt_str(Some(vignette_id)),
         expected_quadrant.as_str(),
         q1_friction,
         q2_progress,
+        elapsed_ms,
+        changes,
         timestamp,
     )
 }
@@ -777,12 +781,20 @@ pub enum LogEntry {
     },
     /// v0.3 較正スモーク: 尺度理解テスト回答 (ビネット 8 問)。
     /// 常に回答あり (q1/q2 は 1..=5)。`expected_quadrant` は教示の正解ラベル。
+    ///
+    /// `elapsed_ms` / `changes` は「読まずに送った」回答を事後に分離するための
+    /// content-free な回答挙動メタ (data-privacy ルール 1: 数値のみ・本文を含まない)。
     VignetteResponse {
         timestamp: u64,
         vignette_id: String,
         expected_quadrant: ExpectedQuadrant,
         q1_friction: u8,
         q2_progress: u8,
+        /// 場面の表示から**記録に成功するまで**の所要時間 (ms)。
+        /// 送信失敗による再送があった場合は初回表示からの累積。
+        elapsed_ms: u64,
+        /// Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。
+        changes: u16,
     },
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
@@ -875,6 +887,8 @@ impl LogEntry {
         expected_quadrant: ExpectedQuadrant,
         q1_friction: u8,
         q2_progress: u8,
+        elapsed_ms: u64,
+        changes: u16,
     ) -> Self {
         LogEntry::VignetteResponse {
             timestamp,
@@ -882,6 +896,8 @@ impl LogEntry {
             expected_quadrant,
             q1_friction: q1_friction.clamp(1, 5),
             q2_progress: q2_progress.clamp(1, 5),
+            elapsed_ms,
+            changes,
         }
     }
 }
@@ -1502,6 +1518,8 @@ impl SessionLogger {
                             expected_quadrant,
                             q1_friction,
                             q2_progress,
+                            elapsed_ms,
+                            changes,
                         } => {
                             let _ = writeln!(
                                 writer,
@@ -1511,7 +1529,9 @@ impl SessionLogger {
                                     &vignette_id,
                                     expected_quadrant,
                                     q1_friction,
-                                    q2_progress
+                                    q2_progress,
+                                    elapsed_ms,
+                                    changes
                                 ),
                             );
                             dirty = true;
@@ -3081,27 +3101,42 @@ mod tests {
 
     #[test]
     fn vignette_response_line_basic() {
-        let line =
-            format_vignette_response_line(1_700_000_000_000, "v1", ExpectedQuadrant::Flow, 2, 5);
+        let line = format_vignette_response_line(
+            1_700_000_000_000,
+            "v2f1",
+            ExpectedQuadrant::Flow,
+            2,
+            5,
+            8_400,
+            3,
+        );
         assert_eq!(
             line,
-            r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"flow","q1_friction":2,"q2_progress":5,"ts":1700000000000}"#
+            r#"{"type":"vignette_response","vignette_id":"v2f1","expected_quadrant":"flow","q1_friction":2,"q2_progress":5,"elapsed_ms":8400,"changes":3,"ts":1700000000000}"#
         );
     }
 
     #[test]
     fn vignette_response_line_idle_quadrant() {
-        let line = format_vignette_response_line(99, "v8", ExpectedQuadrant::Idle, 1, 1);
+        let line = format_vignette_response_line(99, "v2d2", ExpectedQuadrant::Idle, 1, 1, 0, 2);
         assert_eq!(
             line,
-            r#"{"type":"vignette_response","vignette_id":"v8","expected_quadrant":"idle","q1_friction":1,"q2_progress":1,"ts":99}"#
+            r#"{"type":"vignette_response","vignette_id":"v2d2","expected_quadrant":"idle","q1_friction":1,"q2_progress":1,"elapsed_ms":0,"changes":2,"ts":99}"#
         );
     }
 
     #[test]
     fn vignette_response_constructor_clamps_q_to_1_5() {
         // DC-4: 構築子経由で q1/q2 が 1..=5 に clamp される (0→1, 9→5)。
-        let entry = LogEntry::vignette_response(7, "v3".to_string(), ExpectedQuadrant::Stuck, 0, 9);
+        let entry = LogEntry::vignette_response(
+            7,
+            "v2s1".to_string(),
+            ExpectedQuadrant::Stuck,
+            0,
+            9,
+            1_200,
+            4,
+        );
         let LogEntry::VignetteResponse {
             q1_friction,
             q2_progress,
@@ -3193,10 +3228,12 @@ mod tests {
         .unwrap();
         tx.send(LogEntry::VignetteResponse {
             timestamp: 4000,
-            vignette_id: "v1".to_string(),
+            vignette_id: "v2s1".to_string(),
             expected_quadrant: ExpectedQuadrant::Stuck,
             q1_friction: 5,
             q2_progress: 1,
+            elapsed_ms: 6_500,
+            changes: 5,
         })
         .unwrap();
         tx.send(LogEntry::End).unwrap();
@@ -3231,7 +3268,7 @@ mod tests {
             r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":500,"analysis_window_start_ms":2969,"analysis_window_end_ms":2999,"ts":3000}"#
         ), "realtime_label 行が不正:\n{contents}");
         assert!(contents.contains(
-            r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"ts":4000}"#
+            r#"{"type":"vignette_response","vignette_id":"v2s1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"elapsed_ms":6500,"changes":5,"ts":4000}"#
         ), "vignette_response 行が不正:\n{contents}");
     }
 
