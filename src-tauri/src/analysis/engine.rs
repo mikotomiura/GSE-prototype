@@ -819,6 +819,47 @@ mod tests {
         assert_eq!(e.head_id(), crate::analysis::heads::HeadId::Writing);
     }
 
+    /// ⚠️ **`reset()` は head を既定 (Writing) に戻す。**
+    ///
+    /// engine は起動時 1 個をセッション間で使い回すので、戻さないと
+    /// 「前のセッションが vibe_coding だった」だけで次のセッションが Coding head で
+    /// 採点され続ける (task_kind 未宣言のセッションで顕在化する)。
+    #[test]
+    fn reset_restores_writing_head() {
+        use crate::analysis::heads::HeadId;
+
+        let e = CognitiveStateEngine::new_for_domain(TaskDomain::Coding);
+        assert_eq!(e.head_id(), HeadId::CodingV0);
+
+        e.reset();
+
+        assert_eq!(
+            e.head_id(),
+            HeadId::Writing,
+            "reset() 後に前セッションの head が残っている"
+        );
+    }
+
+    /// `set_domain()` は**反映後の** `head_id` を返す。
+    ///
+    /// 呼び出し側が `set_domain` → `head_id()` と 2 回ロックを取ると、その隙間に
+    /// 別の差し替えが入って「記録した head_id と実際に走る head が違う」状態になりうる。
+    #[test]
+    fn set_domain_returns_the_applied_head_id() {
+        use crate::analysis::heads::HeadId;
+
+        let e = CognitiveStateEngine::new();
+        for (domain, expected) in [
+            (TaskDomain::Coding, HeadId::CodingV0),
+            (TaskDomain::WritingFallback, HeadId::WritingFallback),
+            (TaskDomain::Writing, HeadId::Writing),
+        ] {
+            let applied = e.set_domain(domain);
+            assert_eq!(applied, expected);
+            assert_eq!(e.head_id(), expected, "戻り値と実際の head がずれている");
+        }
+    }
+
     /// backspace ペナルティ gate は head 経由になっても `!ime_open` のままである。
     #[test]
     fn backspace_penalty_gate_is_delegated_to_head() {

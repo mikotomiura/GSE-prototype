@@ -192,7 +192,12 @@ pub enum LogEntryDto {
         condition: Option<ConditionDto>,
         label_pool: Option<LabelPoolDto>,
         /// ADR-006 Phase 2b: どの domain head がこのセッションを採点したか。
-        /// 旧フィクスチャ互換のため省略可 (`null`)。
+        ///
+        /// ⚠️ **read-optional / write-required**: 現行の logger は**常に出力する**。
+        /// `Option` なのは **2026-08-18 以前に収集した旧ログを読むため**だけであり、
+        /// 「省略してよい出力」という意味ではない。下流は `null` を
+        /// 「ADR-006 Phase 2b より前のログ = Writing head 相当」と解釈すること
+        /// (正常系の欠測ではない)。
         head_id: Option<HeadIdDto>,
         ts: u64,
     },
