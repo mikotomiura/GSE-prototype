@@ -18,6 +18,16 @@ lerna-debug.log*
 node_modules
 /dist
 /dist-ssr
+# ⚠️★★ 2026-08-20: 実験の配布物ディレクトリ (`make-common-app-zip.sh` /
+#   `make-distribution.sh` の出力)。★ 上の `/dist` は repo 直下への錨止め (S0-D9) なので
+#   `experiments/<exp>/dist/` には効かない。
+#   ⚠️★★★ **`**/g1-submit*.json` だけでは守れない** —— 配布 zip は **中に**
+#   `g1-submit.json` (共有シークレット) を含むが、git は zip の中身を見ないため
+#   `G1_実施用_macOS.zip` / `G1_実施用_Windows.zip` は**無視対象にならない**。
+#   → 実測 (2026-08-20): `git status --untracked-files=all` で dist 配下 439 ファイルが
+#     追跡候補になっており、`git add -A` 1 回で secret 入り zip が commit される経路が開いていた。
+#   ★ 階層を限定したパターンにしてある (素の `dist` にしない = S0-D9 の教訓を壊さない)。
+experiments/*/dist/
 *.local
 
 # Editor directories and files
