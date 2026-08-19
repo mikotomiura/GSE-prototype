@@ -1,0 +1,17 @@
+{
+  "hmm_version": "0.4.0",
+  "input_manifest": {
+    "files": 63,
+    "manifest_sha256": "120e1a5e16447449c52c1313a2fa058b99949cc055d42354a3760b26ae50fa3b",
+    "total_bytes": 61949775
+  },
+  "n_gaps": 776,
+  "n_gaps_excluded_unobservable": 776,
+  "n_gaps_l3_eligible": 0,
+  "n_gaps_presence_observable": 0,
+  "n_gaps_rehook": 0,
+  "n_gaps_with_suspect": 0,
+  "schema": "silence-presence-analyze/v1",
+  "stop": "⚠️ 計器が無い: 対象ログに `hook_health` 行が 1 行も存在しない（presence が観測可能なギャップ = 0 / 776）。★ これは『presence が無かった』ではなく『測る器がまだ無かった』である。→ L3 を出さない。L1/L2 の沈黙時間は **unknown** として集計される。",
+  "stop_kind": "instrument_absent"
+}

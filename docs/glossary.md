@@ -61,6 +61,12 @@
 | 判断エピソード | Decision Episode | ML の収集単位。全打鍵でなく session start / phase change / pause onset・recovery / externalization / revision loop / intervention decision・outcome / session end を境界とする短い区間。種別・時間・回数・遷移のみを保存する | 「raw event でなく Decision Episode 単位で ContextSnapshot を作る」 |
 | 個人プロファイル保管 | PersonalizationStore | `user × task_kind × phase` の個人プロファイル（基準値・写像係数・介入効用）を**ローカル保持**する部品。外部送信しない。更新するのは `OnlineUpdater` で、**潜在状態の構造は更新しない**（**ADR-008**） | 「PersonalizationStore の永続化には同意と削除 UI が要る」 |
 | 打ち切り | censoring（recovery ラベル） | content-free 制約下では検索・別デバイス・口頭相談などの外部化が観測できないため、focus 喪失・アプリ切替（**回数のみ**）を打ち切り指標として記録し、「自力回復」と「観測外で解決して戻った」を区別できないことを明示する運用 | 「打ち切り率が閾値を超えたら recovery ラベルは使えない（反証ゲート G2）」 |
+| 沈黙ギャップ | silence gap | 連続する 2 つの打鍵のあいだの無打鍵区間。⚠️ 既存 NDJSON から成分分解できるのは **30 秒以上**のものだけである（`lib.rs:2923` が `hook_health` 行を状態変化時のみ出力し、`liveness.rs` の `log_after_ms` が 30 秒であるため） | 「micro 帯（2–15 秒）の沈黙ギャップは既存ログでは分解できない」 |
+| 在席×非打鍵 | present_not_typing | 沈黙ギャップのうち、**OS が入力を観測しているのに自前の打鍵フックが呼ばれていない**時間。`liveness.rs::step` が `starved_ms` を進める区間そのもので、マウス・トラックパッド等の非キーボード入力を含む。⚠️ **「作業している」ことの証明ではない**（入力デバイスに触れたことしか言えない） | 「この沈黙は在席×非打鍵が 80% を占める」 |
+| 入力皆無 | no_input | 沈黙ギャップのうち、**OS の最終入力時刻が動かない**時間。`liveness.rs::step` が `starved_ms` を凍結する区間。⚠️ **離席・静止した読書・思考を区別しない** | 「入力皆無が長い沈黙は離席とは限らない」 |
+| 在席割合 | presence_ratio | 沈黙ギャップにおける `peak_starved_ms / gap_duration_ms`。0 に近いほど入力皆無、1 に近いほど在席×非打鍵。⚠️ 30 秒未満の starvation は記録されないため**下側が切れている** | 「presence_ratio を T0（沈黙長のみ）に足して勝ち幅を測る」 |
+| 打鍵再開 | typing_resumption | 沈黙ギャップが打鍵によって終わること。⚠️★ **回復（recovery）ではない**——別作業を始めただけの可能性を排除できないため、`self_directed_recovery` と同一視しない | 「typing_resumption は recovery proxy であって recovery ではない」 |
+| 探索トラック | exploratory track | 事前登録の適格性ゲート（`keydown ≥ 100`）を適用しない解析系統。⚠️ **確証主張には使わない**。確証トラック（ゲート適用済み）と結果を混ぜない | 「本実験は探索トラックなので確証主張に使わない」 |
 | アウェイアイドル | away_idle | `idle_ms ≥ 180秒` で**介入を全停止**するサプレッション (席を離れたら黙る=不便益)。一次抑制は idle 閾値そのもの。加えて放置で p_stuck も低下するため二重に介入は出ない (idle≠Stuck) | 「10分放置で介入が出ないのは away_idle で正常」 |
 | 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
 | defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |

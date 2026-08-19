@@ -1,0 +1,38 @@
+{
+  "schema": "silence-presence-decomposition-config/v1",
+  "frozen_on": "2026-08-19",
+  "window_minutes": 5,
+  "gap_min_ms": 30000,
+  "bin_ms": 10000,
+  "time_pieces_ms": [
+    30000,
+    120000,
+    180000
+  ],
+  "horizon_primary_ms": 180000,
+  "horizon_secondary_ms": 600000,
+  "admin_censor_ms": 120000,
+  "t0_lookback_ms": 30000,
+  "t0_burst_gap_ms": 200,
+  "t0_pause_ms": 2000,
+  "suspect_ms": 30000,
+  "down_ms": 120000,
+  "selftest_null_tolerance": 0.01,
+  "stop_min_gaps": 30,
+  "stop_min_suspect_gaps": 10,
+  "seed_file": "SEED",
+  "notes": {
+    "gap_min_ms": "30000 は hook_health の log_after_ms(=30_000, liveness.rs:63) と一致させた。これ未満の在席×非打鍵は既存ログに 1 行も残らない。",
+    "admin_censor_ms": "120000 は lib.rs:2914 が request_reinstall() を呼ぶ時刻。ここで行政的に打ち切ると、測定器が一度も介入していない区間だけを見られる。",
+    "time_pieces_ms": "区分定数の境界。[30s,120s) / [120s,3min) / [3min,inf)。事前に固定し、実データで動かさない ([V83] の『尺度の場当たり変換』回避)。",
+    "horizon_primary_ms": "[P121] の short(15-180s) と mid(3-10min) の境界。GSE の外で決まった値。",
+    "horizon_secondary_ms": "[P121] の mid(3-10min) と long(>10min) の境界。",
+    "gate_keydown": "適用しない。本実験は探索トラックであり G1 事前登録 §2.9 の適格性ゲートを使わない (decisions.md D-4)。",
+    "selftest_alt_min_ratio": "S3 は絶対値の閾値を置かない。per-bin ハザードの Brier 改善幅は基準率に依存するため、帰無の |Δ| に対する比と 5 名全員の符号一致で判定する。",
+    "instrument_since_utc_ms": "計器 (hook_health) の導入日 = liveness.rs の追加コミット 2026-08-09 の UTC 00:00。⚠️ 計器の有無を hook_health 行の有無で判定してはならない (循環): lib.rs:2923 は状態変化時にしか行を出さないので、『計器はあるが presence が終始 30 秒未満だった』セッションも 0 行になる。→ そのセッションは void ではなく unknown に倒れ、silence_void_only_ms が構造的に 0 になる (code-reviewer HIGH)。",
+    "hmm_version": "reproducibility-discipline ルール 3: HMM_VERSION を config と結果の両方に刻む。"
+  },
+  "selftest_alt_min_ratio": 3.0,
+  "hmm_version": "0.4.0",
+  "instrument_since_utc_ms": 1786233600000
+}

@@ -35,6 +35,7 @@ Migration** を持つ。SSOT のアーキテクチャ概要は `docs/architectur
 | [ADR-008](ADR-008-online-learning-boundary.md) | オンライン学習の境界（PersonalizationStore / OnlineUpdater / ContextBuilder・PreReg-5 との両立基準） | Proposed | Epic 2+ / Phase1 後 |
 | [ADR-009](ADR-009-recovery-risk-axis-and-latent-state.md) | X 軸を `self_directed_recovery_risk` へ再定義し、潜在状態の数を決めない | Proposed | Epic 2+ / Phase1 後 |
 | [ADR-010](ADR-010-task-scope-gating.md) | 「どの head も当てはまらない」— head 相対 `scope_fit` / 宣言と観測の役割分離（**ADR-006 の拡張であって改訂ではない**） | Proposed | Epic 2+ / Phase1 後 |
+| [**ADR-011**](ADR-011-low-typing-window-track.md) | **低打鍵窓の扱い**— 沈黙を「在席×非打鍵 / 入力皆無」に分解する**探索トラック**を `§8` 段別表の外に新設し、`paste`/`keys` を推論へ流す「**読む実装**」は G1 判定まで出さない（★ **コード変更ゼロ**） | **Accepted（2026-08-19）** | Epic 2+ / G1 前後 |
 
 > ADR-008 / ADR-009 は一体で読む。背景・段階計画・評価指標・反証ゲートは
 > `docs/architecture/personalization-and-online-learning.md`（統合設計文書）を参照。
