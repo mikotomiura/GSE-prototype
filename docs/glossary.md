@@ -67,6 +67,10 @@
 | 在席割合 | presence_ratio | 沈黙ギャップにおける `peak_starved_ms / gap_duration_ms`。0 に近いほど入力皆無、1 に近いほど在席×非打鍵。⚠️ 30 秒未満の starvation は記録されないため**下側が切れている** | 「presence_ratio を T0（沈黙長のみ）に足して勝ち幅を測る」 |
 | 打鍵再開 | typing_resumption | 沈黙ギャップが打鍵によって終わること。⚠️★ **回復（recovery）ではない**——別作業を始めただけの可能性を排除できないため、`self_directed_recovery` と同一視しない | 「typing_resumption は recovery proxy であって recovery ではない」 |
 | 探索トラック | exploratory track | 事前登録の適格性ゲート（`keydown ≥ 100`）を適用しない解析系統。⚠️ **確証主張には使わない**。確証トラック（ゲート適用済み）と結果を混ぜない | 「本実験は探索トラックなので確証主張に使わない」 |
+| 形成的研究 | formative research / measurement development | ★ **何を測るべきかを決めるための研究**。⚠️ **効果や利得を推定しない**ため `§9` A-Q3 の解除条件は発動しないが、**利得を一言でも主張した瞬間に発動する**（**ADR-012**） | 「これは形成的研究なので利得を主張しない」 |
+| 沈黙被覆率 | silence coverage | ★ **≥30 秒の沈黙ギャップの総時間のうち、あるチャネル集合のイベントが覆った割合**（各イベント時刻 `t` が `[t−w, t+w]` を覆うとし、重なりは和集合で 1 度だけ数える）。⚠️ **分母から打鍵の時間を定義上除いている**ため、「頻度が高い操作＝打鍵」が再び選ばれる退行が起きない。⚠️ **「入力があった」ことしか言わず「作業していた」ことの証明ではない**（**ADR-012 D1**） | 「この層の沈黙被覆率は全員で θ を超えた」 |
+| 限界寄与 | marginal contribution | ★ **あるチャネルを候補集合から抜いたときの沈黙被覆率の低下**。superset への採否をこれで決める（**ADR-012 D8**）。⚠️ 学習器を当てるのではなく記述統計である | 「限界寄与が δ 未満なので superset に入れない」 |
+| 計器の自己記述 | instrument self-description | ★ **そのログを出したビルドが「何を記録できたか」をログ自身に刻むこと**（`meta.capabilities` ＋ `app_version`）。これにより解析側が「**信号が無い**（宣言あり・行 0）」と「**計器が無い**（宣言なし）」を機械判定できる。⚠️ **`hmm_version` では代用できない**（HMM の版であって記録能力ではない）。⚠️ **送出元ベースで決め `#[cfg]` を反映する**（**ADR-013 D1/D2**） | 「capabilities に無いので、これは信号が無いのではなく計器が無い」 |
 | アウェイアイドル | away_idle | `idle_ms ≥ 180秒` で**介入を全停止**するサプレッション (席を離れたら黙る=不便益)。一次抑制は idle 閾値そのもの。加えて放置で p_stuck も低下するため二重に介入は出ない (idle≠Stuck) | 「10分放置で介入が出ないのは away_idle で正常」 |
 | 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
 | defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |

@@ -800,7 +800,7 @@ dismiss・再発火・早期離脱 / 短い自己申告 helpful/unhelpful。
 >
 > ★★★ **代わりに、G1 に依存しない経路を新設した**:
 > `experiments/20260819-silence-presence-decomposition/` は、**既存 `hook_health` 行の `starved_ms`** から
-> 沈黙を「**在席×非打鍵 / 入力皆無**」に分解する。`liveness.rs:86-103` の `step()` が
+> 沈黙を「**在席×非打鍵 / 入力皆無**」に分解する。`liveness.rs:86-104` の `step()` が
 > `system_input_seen && !hook_event_seen` でのみ進み入力皆無では凍結するため、
 > **「沈黙のあいだ入力デバイスに触れていた累積時間」がそのまま量として取れる**。
 > ★ **`src-tauri/` のコード変更ゼロ・`HMM_VERSION` 不変・ゴールデン不変・schema 不変** であり、
@@ -820,6 +820,30 @@ dismiss・再発火・早期離脱 / 短い自己申告 helpful/unhelpful。
 > → ★★★ **収集済み信号を使う設計では、必ず「対象ログの行種を数える」を最初に置くこと。**
 > ★ 探索トラックの L3 は事前登録どおり Stop し、model-free の L1/L2 のみが結論を出した
 > （`experiments/20260819-silence-presence-decomposition/notes.md`）。
+>
+> ★★★ **2026-08-19 追記その 2（ADR-013）— 上の注意を「人の規律」から「機械判定」へ移す。**
+>
+> ⚠️★★★ **本節の警告は書いてあったのに `hook_health` には適用されなかった。**
+> ★ したがって「解析側は対象ログが配線以降かを別途確認すること」という**人の規律のままでは
+> 3 件目が起きる**（既に `keys`/`bs_keys` と `hook_health` の 2 件）。
+>
+> → ★ **ADR-013 を Accepted にした**: `meta` 行に **`capabilities`（このビルドの送出元が実在する行種）**
+> と **`app_version`** を additive に刻み、解析側が
+> **「宣言あり＋行 0 ＝ 信号が無い」/「宣言なし ＝ 計器が無い」**を**機械判定**できるようにする。
+> ⚠️ **`hmm_version` では代用できない**（HMM の版であって記録能力ではない）。
+>
+> ⚠️★★★ **`capabilities` は writer 側から導出してはならない**（ADR-013 D2・本タスクで実測）:
+> **`LogEntry::ImeShadow` は両 OS でコンパイルされるが送出元は
+> `lib.rs:2257,2270` の `#[cfg(target_os = "windows")] fn emit_ime_shadow` だけ**であり
+> （macOS の `input/ime_macos.rs:114` は `ImeState` しか送らない）、
+> **variant 由来だと macOS で `ime_shadow` を過大申告する** ＝ **「計器が無い」を「信号が無い」に化けさせる**。
+> → ★ **送出元ベースで決め、`#[cfg]` を反映する。**
+>
+> ★ **副産物**: この方式は上表の未解決項目「`ime_nav` / `ime_abandon` の復旧 ——
+> **macOS で常時ゼロ。実装バグか仕様か未確定**」を**構造的に決着させる**
+> （capabilities に無ければ仕様、あってゼロならバグ）。
+>
+> ⚠️ **実装は G1 完了後、かつ次コホートの *収集開始* 前**（ADR-013 D5）。★ 本注記時点でコード変更ゼロ。
 
 ### 5.3 `ContextSnapshot`（案）
 

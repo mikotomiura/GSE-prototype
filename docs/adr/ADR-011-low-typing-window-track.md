@@ -86,7 +86,7 @@ G1 の残り 2 名は募集に依存し、期日が読めない。
 「**「ゼロ打鍵窓＝離席/非打鍵作業」は解釈であって観測ではない**」）。
 
 ★ **「在席×非打鍵 / 入力皆無」だけが、既存ログから構造的に決まる。**
-`src-tauri/src/input/liveness.rs:86-103` の `step()` は
+`src-tauri/src/input/liveness.rs:86-104` の `step()` は
 `system_input_seen && !hook_event_seen` でのみ `starved_ms` を進め、`!system_input_seen` では**凍結する**。
 → **`starved_ms` は「沈黙のあいだ入力デバイスに触れていた累積時間」そのものである。**
 
@@ -219,5 +219,14 @@ Phase1 の `session_meta.task_kind` は **全 40 セッションが `argumentati
    （計器不在）。L1/L2 の model-free な結果を `notes.md` に記述した。
 3b. ⚠️ **未了**: 本パイプラインを **`liveness.rs` 導入以降のログ（G1 コホート）** で走らせる。
    ★ コードと自己検査は揃っており、入力を差し替えるだけで動く。
+   → ★★★ **2026-08-19 追記（ADR-012）**: この実走は **ADR-012 の Stage 0** を兼ねる
+   （★ 打鍵タスクの沈黙被覆率 `C_write` ＝ 形成的トラックの閾値 θ の出所になる）。
+   ★ **G1 ログが来たらすぐ始められる引き継ぎを用意した**:
+   `.steering/_handoff/next-session-prompt-g1-cohort-silence-decomposition.md`。
+   ⚠️★★ **ただし期待値は下げておくこと（2026-08-19 に直接計数した実測）**:
+   **ローカルの NDJSON 76 ファイル（P000 13 + Phase1 63）すべてで `hook_health` が 0 行**であり、
+   **G1 P010 も 10 ブロック中 9 ブロックで 0 行**である
+   （`experiments/20260801-controlled-friction-task/notes.md:1808`）。
+   → ★ **`C_write ≈ 0` になりうる**ので、ADR-012 は事前登録で `θ_floor = 0.20` を置いてある。
 4. **G1 が判定を出したら**、本 ADR の D4 を見直し、「読む実装」の順序を再検討する。
 5. `§8` 段別表の T1/T2 昇格は、探索トラックの結果を材料に**別途裁く**（本 ADR では昇格しない）。
