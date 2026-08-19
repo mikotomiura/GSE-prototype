@@ -34,6 +34,7 @@ GSE-prototype/
 │   │   ├── logger.rs             #     NDJSON セッションロガー
 │   │   │                         #       + UserLabelKind enum / LogEntry::UserLabel (Phase 1)
 │   │   ├── schema_dto.rs         #     [NEW Phase 1] LogEntry ミラー DTO (schemars 派生専用)
+│   │   ├── capabilities.rs       #     [NEW 2026-08-19] このビルドが何を記録できるかの宣言表 (ADR-013)
 │   │   ├── g1.rs                 #     [NEW 2026-08] G1 統制タスク実験モードの判定 (OS API 非依存)
 │   │   ├── participant_id.rs     #     participant_id 検証の単一情報源 (feature 非依存)
 │   │   ├── packaging.rs          #     匿名化 + age 暗号化 SSOT (#[cfg(feature = "package")] gated)
@@ -135,11 +136,25 @@ GSE-prototype/
 - **置くべきもの**: 特徴量抽出、HMM エンジン、`heads/` (ADR-002/006 ドメイン推論ヘッド: β baseline を所有し潜在二軸を算出)、`loop_step`、`intervention` (Opportunity MVP)、`intervention_eval` (オフライン評価)、`probe_scheduler` (v0.3 純スケジューリング)、`metrics` (Phase 1 GT 集計)、`calibration_eval` (v0.3 較正解析: C-index/2段ゲート/MNAR)、将来の ML 推論
 - **置くべきでないもの**: OS API 呼び出し、入力イベント捕捉、タイムスタンプ生成 (`SystemTime` は `lib.rs` で付与)
 
+#### `src-tauri/src/capabilities.rs` (2026-08-19)
+
+- **置くべきもの**: 「**このビルドが何を記録できるか**」の宣言表 (ADR-013 D1/D2)。
+  `KNOWN_LINE_TYPES` (全行種の候補集合) / `unconditional()` / `THRESHOLD_GATED` / `app_version()`
+- **置くべきでないもの**: ⚠️ OS API 呼び出し。★ `#[cfg]` を**反映**はするが**呼ばない**
+- ⚠️★★★ **導出元は「送出元があるか」であって writer ではない**。
+  `LogEntry` の variant や `logger.rs` が書ける行種から導出すると
+  **macOS で `ime_shadow` を過大申告する** (送出元は Windows 限定)
+- ★ 腐りは**テストが止める**: 網羅 (`logger.rs` の `"type":"<x>"` 走査) / OS 対 /
+  宣言集合が `KNOWN_LINE_TYPES` を過不足なく割ること
+- 詳細: `docs/adr/ADR-013-collection-self-description.md` /
+  `.steering/20260819-g1-reboot-and-instrument-fix/`
+
 #### `src-tauri/src/g1.rs` (2026-08)
 
 - **置くべきもの**: 「いま G1 統制タスク実験の実施中か」の**判定だけ**。
   `g1.mode` マーカーの探索パス計算 (純関数)、`GSE_G1_MODE` の解釈 (純関数)、
-  `BLOCK_DURATION_MS` / `G1Source`、プロセス列挙の出力パース (純関数)
+  `BLOCK_DURATION_MS` / `G1Source`、プロセス列挙の出力パース (純関数)、
+  ★ **`decide_start_action`**「開始する」押下時にログをどう扱うか (純関数・2026-08-19 G-1)
 - **置くべきでないもの**: ★ **効果の適用**。ローテートも 5 分タイマーもプローブ停止も
   `lib.rs` が行う (このモジュールは「判定」だけを持つ)
 - ⚠️ **プラットフォーム分岐は引数に出す**: `exe_to_folder_levels()` が階層数を返し、

@@ -37,7 +37,7 @@ Migration** を持つ。SSOT のアーキテクチャ概要は `docs/architectur
 | [ADR-010](ADR-010-task-scope-gating.md) | 「どの head も当てはまらない」— head 相対 `scope_fit` / 宣言と観測の役割分離（**ADR-006 の拡張であって改訂ではない**） | Proposed | Epic 2+ / Phase1 後 |
 | [**ADR-011**](ADR-011-low-typing-window-track.md) | **低打鍵窓の扱い**— 沈黙を「在席×非打鍵 / 入力皆無」に分解する**探索トラック**を `§8` 段別表の外に新設し、`paste`/`keys` を推論へ流す「**読む実装**」は G1 判定まで出さない（★ **コード変更ゼロ**） | **Accepted（2026-08-19）** | Epic 2+ / G1 前後 |
 | [**ADR-012**](ADR-012-nonkeystroke-observation-formative-track.md) | **非打鍵タスクの観測空間を「実測で」決める** — ★ **ADR-008 D1 が空白にした「どう superset を決めるか」**を埋める形成的トラック。判定量は**沈黙被覆率**、閾値は**打鍵タスクの実測値から導く**（人が選ばない）。`§8` **T3 行の降格先列のみ**を改訂（★ **T1/T2 と A-Q3 は不変**・**コード変更ゼロ**） | **Accepted（2026-08-19）** | Epic 6 / G1 非依存 |
-| [**ADR-013**](ADR-013-collection-self-description.md) | **収集仕様の自己記述性** — 「**信号が無い**」と「**計器が無い**」をログだけで機械判定できるようにする（`meta.capabilities` / `starve_window` / `dropped_delta`・すべて **additive**）。⚠️ **実装は G1 完了後、次コホートの *収集開始* 前** | **Accepted（2026-08-19）** | Epic 5 / G1 後 |
+| [**ADR-013**](ADR-013-collection-self-description.md) | **収集仕様の自己記述性** — 「**信号が無い**」と「**計器が無い**」をログだけで機械判定できるようにする（`meta.capabilities` / `starve_window` / `dropped_delta`・すべて **additive**）。★ **実装済み（2026-08-19・G1 リブート前の停止期間）**。⚠️ 残ゲートは**同意文書の突合**（収集開始前） | **Accepted（2026-08-19）** | 実装済み |
 
 > ADR-008 / ADR-009 は一体で読む。背景・段階計画・評価指標・反証ゲートは
 > `docs/architecture/personalization-and-online-learning.md`（統合設計文書）を参照。

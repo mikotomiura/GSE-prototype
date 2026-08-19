@@ -1,6 +1,9 @@
 # ADR-013: 収集仕様の自己記述性 — 「信号が無い」と「計器が無い」をログだけで区別する
 
-- **ステータス**: **Accepted**（2026-08-19・研究者決定）。⚠️ **本 ADR ではコード変更ゼロ。実装は G1 完了後**（D5）。
+- **ステータス**: **Accepted**（2026-08-19・研究者決定）。
+  ★ **実装済み（2026-08-19・同日）** —— ⚠️★★★ **G1 リブートによりゲートが「G1 完了後」から
+  「*リブート前の停止期間*」へ変わった**ため（下記 D5 の追記）。
+  作業記録: `.steering/20260819-g1-reboot-and-instrument-fix/`
 - **日付**: 2026-08-19
 - **関連**: **ADR-012**（本 ADR が支える形成的トラック・一体で読む）/ ADR-005（additive schema versioning）/
   ADR-011（`hook_health` / `starved_ms` に依存する探索トラック）/
@@ -48,9 +51,15 @@
 ⚠️ G1 では「**版の特定はできなかった**（★ 出せないものは出せないと書く）」という
 **回復不能な情報損失**として現れた。★ 本 ADR D1 の `app_version` はその起票への回答である。
 
-### 3. ⚠️ G1 は実施中であり、いま記録仕様を変えられない
+### 3. ⚠️ G1 は実施中であり、いま記録仕様を変えられない（★ **2026-08-19 に解消した**）
 
-**確証標本 1/3 名**（`experiments/20260801-controlled-friction-task/data.md:4`）。
+> ⚠️★★★ **本節の制約は同日中に外れた。** 研究者が **G1 のリブート**を決定したため
+> （`preregistration.md` 第 17 版）、★ **実施中ではなくなり、停止期間がそのまま実装窓になった**。
+> → ★ D1 / D2 / D4 は **2026-08-19 に実装済み**である。
+> ★ 以下は**決定当時の状況**として残す（消さない）。
+
+~~**確証標本 1/3 名**（`experiments/20260801-controlled-friction-task/data.md:4`）。~~
+★ 現在は **確証標本 0/3 名**（P010 はパイロットへ移動・削除はしていない）。
 ⚠️ 実施中に記録仕様を変えるとブロック間の比較可能性が壊れ、
 `preregistration.md §3.6` が**ブロックの事後除外を禁じている**ため**回復不能**になる。
 
@@ -90,11 +99,11 @@
 {"type":"meta","session_start":1720000000000,"hmm_version":"0.4.0",
  "app_version":"0.x.y",
  "capabilities":{
-   "unconditional":["key","feat","paste","ime_state","ime_shadow","session_start",
-                    "session_meta","probe_assignment","realtime_label","user_label",
-                    "review_marker","intervention_decision","intervention_response",
-                    "vignette_response"],
-   "threshold_gated":["hook_health","starve_window"]}}
+   "unconditional":["feat","ime_shadow","ime_state","key","paste","review_marker",
+                    "session_meta","session_start","user_label","vignette_response"],
+   "threshold_gated":["hook_health","starve_window"],
+   "config_gated":["probe_assignment","realtime_label",
+                   "intervention_decision","intervention_response"]}}
 ```
 
 ⚠️★★★ **列挙する要素は「行種名」であり、`meta` 行のフィールド名ではない。**
@@ -103,7 +112,26 @@
 ★ 列挙は現行 **16 行種**の実測に合わせ、`"meta"` 自身は**この行がその `meta` なので載せない**。
 ★ `ime_shadow` は **Windows ビルドでのみ**入る（D2）。
 
-★★★ **`unconditional` と `threshold_gated` を分ける理由（⚠️ 分けないと本 ADR は自己矛盾する）**:
+> ### ⚠️★★★ 2026-08-19 改訂 — **第 3 群 `config_gated` を足した**（実装時に発見）
+>
+> ★ 本 ADR は当初 **2 群**（`unconditional` / `threshold_gated`）で凍結したが、
+> ⚠️ **実装レビューで穴が見つかった**（code-reviewer HIGH）:
+>
+> | 行種 | ⚠️ 設定で丸ごと止まる条件 | 実測 |
+> |---|---|---|
+> | `probe_assignment` / `realtime_label` | ⚠️★★★ **G1 実施中は常に止まる** | `lib.rs`: `probes_disabled = disabled_by_env \|\| disabled_by_g1.is_some()` |
+> | `intervention_decision` / `intervention_response` | ⚠️ **盲検較正では常に止まる** | `lib.rs`: `if !INTERVENTION_ENABLED { return safe_default(); }` |
+>
+> → ⚠️★★★ **これらを `unconditional` に置くと、G1 ログを下の判定表に掛けたときに
+> `probe_assignment` 0 行が「信号が無かった（測れて、無かった）」という *偽の結論* になる。**
+> ★ **本 ADR が潰そうとした取り違えそのもの**であり、しかも
+> **「計器が無い」より質が悪い**（★ *測ったふりをする*）。
+>
+> ★ `threshold_gated` を分けた理屈（「0 行は判定不能」）は **設定ゲートにもそのまま当てはまる**。
+> → ★ **第 3 群として分ける**。`config_gated` の 0 行は **判定不能**として扱う。
+> ⚠️ 旧ログには本キーが無いので `Option`（`required` に入れない・additive）。
+
+★★★ **`unconditional` と `threshold_gated`（★ および `config_gated`）を分ける理由（⚠️ 分けないと本 ADR は自己矛盾する）**:
 
 ⚠️ §Context-2 の**穴 C 自身**が「**計器が動いていて 30 秒未満しか starve しなかったセッションも 0 行になる**」
 と書いている。→ ★ **閾値ゲート付きの行種では「0 行」は「信号が無かった」を意味しない。**
@@ -116,6 +144,7 @@
 | `unconditional` に有 | 0 行 | ★ **信号が無かった**（測れて、無かった） |
 | `unconditional` に有 | ≥1 行 | ★ 通常 |
 | **`threshold_gated` に有** | **0 行** | ⚠️★★★ **判定不能**（`signal_absent` と **閾値未達**を区別できない）。★ **「信号が無かった」と書いてはならない** |
+| **`config_gated` に有** | **0 行** | ⚠️★★★ **判定不能**（★ **設定で送出元ごと止まっていた**可能性がある。例: G1 では probe 系が常に 0 行） |
 | `threshold_gated` に有 | ≥1 行 | ★ 通常（★ 閾値を越えた分のみ） |
 | 無 | 0 行 | ⚠️ **計器が無かった**（測っていない）← ★ **2 件の失敗はここ** |
 | 無 | ≥1 行 | ⚠️ **宣言のバグ** → `app_version` で追跡する |
@@ -141,7 +170,7 @@
 
 ### D3. ⚠️★ **acceptance にテストを含める**（★ 人の規律に頼らない）
 
-実装タスク（G1 完了後）の acceptance に、次を**必須**で含める:
+実装タスク（★ **2026-08-19・リブート前の停止期間に実施**）の acceptance に、次を**必須**で含める:
 
 1. ★ **網羅テスト**: `logger.rs` のソース中の `"type":"<x>"` リテラルを走査し、
    **`capabilities` の候補集合に現れない行種があれば落ちる**
@@ -207,7 +236,22 @@
 ⚠️ **改名（`dropped_total`）は採らない** —— breaking であり、
 `validate_blocks.py` 等の解析側を同時に直す必要がある。★ 併記で誤読は消える。
 
-### D5. 実装時期 — **G1 完了後に始め、次コホートの *収集開始* 前に終える**
+### D5. 実装時期 — ~~G1 完了後~~ ★ **リブート前の停止期間**に始め、次コホートの *収集開始* 前に終える
+
+> ### ⚠️★★★ 2026-08-19 追記 — **ゲートが「G1 完了後」から「リブート前の停止期間」へ変わった**
+>
+> ★ 研究者が同日 **G1 のリブート**を決定した（`preregistration.md` 第 17 版）。
+> → ⚠️ 本 ADR が待っていたのは **G1 が *実施中* であること**であって **G1 の *判定*** ではない。
+> ★ したがって **リブートによる停止がそのままゲートを開ける**。
+>
+> ⚠️★★★ **口頭で済ませず、ここに記録する**（本追記がその記録である）。
+>
+> ★ **さらに、この順序でなければ得られない利得がある**:
+> **ADR-013 実装 → リブート**の順にすると、**新 G1 ログに `starve_window` が載る**。
+> → ★ **ADR-012 Stage 0 の左打ち切り問題が緩和される**（`C_write` を下界だけでなく幅で出せる）。
+> ⚠️ **逆順（リブート → 実装）にするとこの利得を失う。**
+>
+> ★ **実施**: D1 / D2 / D4 を 2026-08-19 に実装。⚠️ **収集開始前の残ゲートは下の 2b（同意文書）である。**
 
 ⚠️★★★ **締切は募集開始ではなく収集開始である。**
 ★ 本 ADR の動機がまさに「**計器がコホートより後に作られた**」だからである。
@@ -222,7 +266,8 @@ participant-guide に `starve_window`（＝「毎分の短い中断の回数と�
 ⚠️ **repo には同型の事故の実績がある** —— 「`.gs` を直しただけでは実フォームは変わらない／
 3 文書を同時に直す」（`consent.md:153-191`）。★ **同じ轍を踏まない。**
 
-⚠️ **G1 実施中は着手しない**（§Context-3）。
+~~⚠️ **G1 実施中は着手しない**（§Context-3）。~~
+★ **2026-08-19 のリブートで実施中ではなくなったので着手した**（上の追記）。
 ★ ADR-012 の **Stage 0（既存計器・募集ゼロ）と Stage 1 の別計測器は本 gate に縛られない**
 （別プロセス・`src-tauri/` に触れないため）。
 
@@ -258,6 +303,9 @@ participant-guide に `starve_window`（＝「毎分の短い中断の回数と�
 - **1Hz で全 starvation を残す**: ⚠️ ログ量・バッテリ。★ 値の大半が 0。却下（D6）。
 - **G1 実施中に実装する**: ⚠️ ブロック間の比較可能性が壊れ、`preregistration.md §3.6` により
   **回復不能**。却下（D5）。
+  ★ **2026-08-19 注**: この却下は**いまも有効**である。⚠️ リブートで変わったのは
+  「**いま実施中かどうか**」であって、この規則そのものではない。
+  → ★ **収集を再開したら、また触れなくなる**（だから収集開始前に終える・D5）。
 
 ---
 
@@ -282,7 +330,20 @@ participant-guide に `starve_window`（＝「毎分の短い中断の回数と�
 ## Migration
 
 1. ★ **実施済み（2026-08-19）**: 本 ADR を Accepted で凍結した。**コード変更ゼロ。**
-2. ⚠️ **未了（G1 完了後）**: D1 / D2 / D4 を additive に実装する。
+2. ★ **実施済み（2026-08-19・リブート前の停止期間）**: D1 / D2 / D4 を additive に実装した。
+   - `src-tauri/src/capabilities.rs`（**新規**・`#[cfg]` を反映した送出元ベースの宣言表）
+   - `logger.rs`: `meta` に `app_version` / `capabilities` を**末尾に**追記、
+     `LogEntry::StarveWindow` 新設、`HookHealth` に `dropped_delta` を併記
+   - `input/liveness.rs`: `MicroStarveWindow`（**純関数**・`n_lt30 == 0` の窓は出さない）
+   - `lib.rs`: 窓集計を **`continue` より前**に配線（⚠️ 後ろだと窓がまるごと消える）、
+     `dropped_at_last_line` を `prev_dropped` と**分けて**保持（⚠️ 流用すると「前回行からの差分」にならない）
+   - ⚠️★★★ **`emit_schema` の diff で `dropped_delta` が `required` に入ったのを検出し、
+     DTO を `Option` に直した** —— そのままだと**旧ログが schema 検証に落ち**、
+     本 ADR の「`required` を増やさないので旧ログは読めるまま」に反していた。
+   - ★ 検証: `cargo test --workspace` 緑（407）/ ゴールデン **6 本 byte-equal** /
+     `HMM_VERSION` は **`0.4.0` 据え置き**（additive の裏付け）/ schema parity 緑 /
+     `validate_blocks.py --selftest` 緑。
+   ~~⚠️ **未了（G1 完了後）**~~
    ★ acceptance は **D3 の 5 テスト**（網羅 / OS 対 / **仕様の回帰**（`n_lt30==0` 非出力・`dropped_delta` の差分・**`hook_health` 意味論の不変**）/ **過大申告の逆アサート** / schema parity）を必須とする。
 2b. ⚠️★★★ **未了（収集開始前・実装と対で必須）**: **同意文書・participant-guide の記録項目表**に
    `starve_window` と `app_version` を追記し、**配布済みの電子同意フォームと突合する**（D5）。
