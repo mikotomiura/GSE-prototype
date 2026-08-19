@@ -728,6 +728,68 @@ pub enum LogEntry {
         /// ★ フックが呼ばれていても channel が詰まれば記録は失われる。
         /// 「呼ばれた」と「記録できた」は別なので、両方を残す。
         dropped: u64,
+        /// ⚠️★★★ **前の `hook_health` 行からの `dropped` の増分** (ADR-013 D4・穴 B)。
+        ///
+        /// ★ `dropped` は**累積カウンタ**なのに、解析側が「この区間で落ちた」と読む誤りが
+        /// **実際に起きた** (前タスクの除外規則・code-reviewer HIGH で修正)。
+        /// → ⚠️ 改名 (`dropped_total`) は breaking なので採らず、**併記で誤読を消す**。
+        ///
+        /// ★ 最初の行では「プロセス開始からの増分」＝ `dropped` と同値になる。
+        dropped_delta: u64,
+    },
+    /// ★ **30 秒未満の在席×非打鍵 (micro 帯) を 60 秒窓で数えた行** (ADR-013 D4・穴 A)。
+    ///
+    /// ## なぜ要るか
+    ///
+    /// ⚠️ `hook_health` は `liveness::Thresholds::log_after_ms`(30 秒) を越えないと 1 行も出ない。
+    /// → ★ **30 秒未満の帯について永久に何も言えない**状態を埋める。
+    ///
+    /// ## ⚠️★★★ **何を測っていないか** (★ 過大に読ませない・2026-08-19 レビュー指摘)
+    ///
+    /// `liveness::step` は **`system_input_seen == false` のとき値を凍結する**。
+    /// → ★ 本行が数えるのは「**端末に触れてはいるのに打鍵が来ていない**」時間であり、
+    /// ⚠️ **マウスにも触れず静止して考えている時間は、ほぼ 0 ms しか計上されない。**
+    ///
+    /// ⚠️ したがって **[P121] の「局所思考」をそのまま測るものではない。**
+    /// ★ 投資判断に使うなら**過小評価の向き**であることを併記すること
+    /// (★ 「micro 帯はこれだけしか無い」と読むと誤る)。
+    ///
+    /// ⚠️ **在席の判定にマウス等の入力が効く**（`GetLastInputInfo` /
+    /// `CGEventSourceSecondsSinceLastEventType` は**キー以外も含む**）。
+    /// ★ マウスの動き自体は**記録しない**が、この値を左右することは同意文書に開示してある。
+    ///
+    /// ## ⚠️★★★ `n_lt30 == 0` の窓は出力しない
+    ///
+    /// 理由は 2 つ: ① ログ量が減る、② **毎分必ず 1 行出す形にしない**。
+    ///
+    /// ⚠️★★★ **ただし「空窓を出さない」を *プライバシー統制として* 数えてはならない**
+    /// (security-checker MEDIUM・2026-08-19 の訂正)。★ 窓は連続しており行は壁時計 `t` を持つので、
+    /// **1 行でも出れば窓グリッドの位相が定まり、以後の各窓について「出た/出なかった」の
+    /// 二値列が復元できる** —— ★ **出さないこと自体が信号**である。
+    ///
+    /// ★ **実際に効いている統制はこちら**:
+    /// - **60 秒に集計して *位置* を落としている** (本数と合計しか残らない)
+    /// - 共有物では `analysis::anonymize` が `t` を `session_start` 相対へ直すので
+    ///   **壁時計 (何時に働いたか) は出ない**
+    /// - **計測中しか出ない** (セッション外は 1 行も出ない)
+    /// - raw はローカル保持 ＋ **ブロック単位のオプトイン送信**
+    ///
+    /// ★ なお「分単位で打鍵していたか」は **`key` 行から既に完全に導出できる**ので、
+    /// 本行の限界情報増分はその軸ではほぼゼロである。⚠️ 新しいのは `sum_lt30_ms` の側 (上記)。
+    ///
+    /// ## ★ `hook_health` の意味論は 1 文字も変えていない
+    ///
+    /// ⚠️ 変えると **ADR-011 の探索トラックと ADR-012 Stage 0 が再計算**になる。
+    /// ★ 本行は別トラックとして足すだけなので、**≥30 秒トラックの旧ログ (G1 を含む) と
+    /// 新ログが同一意味論のまま比較できる**。
+    StarveWindow {
+        timestamp: u64,
+        /// 窓の長さ (ms)。固定 60_000。
+        win_ms: u64,
+        /// この窓で**閉じた** micro エピソードの本数。⚠️ ★ 0 なら行を出さない。
+        n_lt30: u64,
+        /// その合計時間 (ms)。⚠️ **失うのは micro 沈黙の *位置*** (本数と合計は残る)。
+        sum_lt30_ms: u64,
     },
     /// ユーザーが「開始する」を押した時刻 (セッション境界マーカー)
     SessionStart { timestamp: u64 },
@@ -1076,30 +1138,47 @@ fn temp_fallback_path(primary: &Path) -> PathBuf {
 ///   手書き JSON なのでエスケープが無く、将来ここへ参加者 ID のような外部由来の文字列が
 ///   渡ると **NDJSON の 1 行が黙って壊れ**、解析側 (`validate_blocks.py` / `anonymize`) が
 ///   誤読する。★ 値域を型で閉じてその経路を作らせない (security review MEDIUM)。
-///   ⚠️ ★ **`None` のときの出力は従来と 1 バイトも変わらない**
-///   (`skip_serializing_if` 相当を手書きで担保している)。ゴールデンと既存フィクスチャの
-///   非回帰がこれに依存しているので、キーの順序を含めて変えないこと。
+///   ⚠️ ★ **`None` のときは `g1_mode` キーを出さない** (`skip_serializing_if` 相当を手書きで担保)。
+///   ★ キーの順序を含めて既存キーの並びを変えないこと。
+/// - `app_version` / `capabilities` は **2026-08-19 に ADR-013 D1 で追加**した。
+///   ⚠️★★ **上の「従来と 1 バイトも変わらない」という記述はこの追加で成り立たなくなったので消した。**
+///   ★ 代わりに確かめた事実 (2026-08-19 実測):
+///   ゴールデン (`tests/snapshots/*.json`) は `FeatSnapshot` の配列で **`meta` を含まない**、
+///   読み手 (`anonymize.rs:111` / `validate_blocks.py:409`) は **JSON パース**である。
+///   → ★ additive なフィールド追加は**どちらも壊さない**。
 fn write_meta_start(
     writer: &mut impl Write,
     session_start: u64,
     g1_mode: Option<crate::g1::G1Source>,
 ) {
+    // ⚠️★★★ **`app_version` と `capabilities` は必ず末尾に足す** (ADR-013 D1)。
+    //   既存キーの順序を動かすと、`g1_mode` を足したときに担保した
+    //   「G1 でないときの出力は従来と 1 バイトも変わらない」という性質のうち、
+    //   ★ **キー順に依存している読み手** (目視 diff / 過去ログとの突き合わせ) が壊れる。
+    // ★ なお `anonymize.rs:111` も `validate_blocks.py:409` も **JSON パース**なので、
+    //   additive なフィールド追加そのものは安全である (2026-08-19 実測)。
+    let app_version = crate::capabilities::app_version();
+    let capabilities = crate::capabilities::capabilities_json();
     match g1_mode.map(|s| s.as_str()) {
         None => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}"}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","app_version":"{}","capabilities":{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
+                app_version,
+                capabilities,
             );
         }
         Some(source) => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}"}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}","app_version":"{}","capabilities":{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
                 source,
+                app_version,
+                capabilities,
             );
         }
     }
@@ -1387,11 +1466,27 @@ impl SessionLogger {
                             starved_ms,
                             rehook,
                             dropped,
+                            dropped_delta,
+                        } => {
+                            // ⚠️★ `dropped` (累積) は**そのまま残す** (非破壊)。`dropped_delta` を
+                            //   **末尾に併記**する (ADR-013 D4)。改名は breaking なので採らない。
+                            let _ = writeln!(
+                                writer,
+                                r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{},"dropped":{},"dropped_delta":{}}}"#,
+                                timestamp, alive, starved_ms, rehook, dropped, dropped_delta,
+                            );
+                            dirty = true;
+                        }
+                        LogEntry::StarveWindow {
+                            timestamp,
+                            win_ms,
+                            n_lt30,
+                            sum_lt30_ms,
                         } => {
                             let _ = writeln!(
                                 writer,
-                                r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{},"dropped":{}}}"#,
-                                timestamp, alive, starved_ms, rehook, dropped,
+                                r#"{{"type":"starve_window","t":{},"win_ms":{},"n_lt30":{},"sum_lt30_ms":{}}}"#,
+                                timestamp, win_ms, n_lt30, sum_lt30_ms,
                             );
                             dirty = true;
                         }
@@ -2529,6 +2624,154 @@ mod tests {
         let _ = fs::remove_file(&p);
     }
 
+    /// ⚠️★★★ **G-1 の回帰テスト**: セッション実行中の「開始する」再押下 (＝ `RotateForRestart`)。
+    ///
+    /// ## ★ 何を再現しているか (P010 block07・実発生)
+    ///
+    /// 従来はローテートせずに `SessionStart` だけを積んでいたため、
+    /// **1 ファイルに 2 セッション**が入った (`protocol.md §1`「1 ブロック = 1 ファイル」の破れ)。
+    /// → ★ いまは `Rotate` が送られるので、`BlockEnd` が来ていなくても
+    /// **前のファイルが `session_end` で閉じ、新しいファイルが開く**。
+    ///
+    /// ⚠️ ここが本命: **1 本目に `session_start` エントリが 2 本入らないこと**。
+    /// ★ 同じ性質を解析側の `validate_blocks.py` も独立に検査している。
+    #[test]
+    fn double_start_rotates_and_closes_previous() {
+        let p1 = rot_test_path("restart", 1);
+        let p2 = rot_test_path("restart", 2);
+        let (_logger, tx, shutdown_rx, status) = SessionLogger::start(p1.clone(), None);
+        assert_eq!(status, LogStatus::Ok);
+
+        // ① ブロック開始 → 打鍵。
+        tx.send(LogEntry::SessionStart { timestamp: 1000 }).unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 65,
+            timestamp: 1100,
+            is_press: true,
+        })
+        .unwrap();
+
+        // ② ⚠️ **`BlockEnd` を送らない** (＝ ブロックは実行中のまま)。ここで再押下が起きる。
+        thread::sleep(Duration::from_millis(5));
+        tx.send(LogEntry::Rotate {
+            new_path: p2.clone(),
+        })
+        .unwrap();
+        tx.send(LogEntry::SessionStart { timestamp: 2000 }).unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 66,
+            timestamp: 2100,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c1 = fs::read_to_string(&p1).expect("1 本目");
+        let c2 = fs::read_to_string(&p2).expect("2 本目");
+
+        // ★★★ 本命: 1 本目の `session_start` エントリは **1 本だけ**。
+        assert_eq!(
+            c1.matches(r#"{"type":"session_start""#).count(),
+            1,
+            "★ 1 ファイルに 2 セッションが入っている (P010 block07 の再発):\n{c1}"
+        );
+        // ★ `BlockEnd` を送っていなくても `Rotate` が閉じる。
+        assert_eq!(
+            c1.matches(r#""type":"meta","session_end""#).count(),
+            1,
+            "前のセッションが閉じられていない:\n{c1}"
+        );
+        assert!(c1.contains(r#""vk":65"#), "1 本目の打鍵が無い:\n{c1}");
+        assert!(
+            !c1.contains(r#""vk":66"#),
+            "再押下後の打鍵が 1 本目に混ざった:\n{c1}"
+        );
+
+        // ★ 2 本目は自分の meta と自分の打鍵を持つ。
+        assert_eq!(c2.matches(r#""type":"meta","session_start""#).count(), 1);
+        assert_eq!(c2.matches(r#"{"type":"session_start""#).count(), 1);
+        assert!(c2.contains(r#""vk":66"#), "2 本目の打鍵が無い:\n{c2}");
+
+        let _ = fs::remove_file(&p1);
+        let _ = fs::remove_file(&p2);
+    }
+
+    /// ★ ADR-013 D4 (穴 B): `dropped_delta` は **前回行からの差分**として書かれる。
+    ///
+    /// ⚠️ `dropped` (累積) は**そのまま残る** (非破壊)。
+    /// ★ 差分の計算は `lib.rs` の監視スレッドが行うので、ここでは
+    /// 「合成した値がそのままの意味で 1 行に並ぶ」ことを固定する。
+    #[test]
+    fn dropped_delta_is_written_alongside_cumulative_dropped() {
+        let p = rot_test_path("dropdelta", 0);
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+
+        // 1 行目: 累積 3 / 増分 3 (プロセス開始からの増分)。
+        tx.send(LogEntry::HookHealth {
+            timestamp: 1000,
+            alive: true,
+            starved_ms: 0,
+            rehook: false,
+            dropped: 3,
+            dropped_delta: 3,
+        })
+        .unwrap();
+        // 2 行目: 累積 10 / 増分 7。⚠️ ここを累積で読むと「10 個落ちた区間」と誤読される。
+        tx.send(LogEntry::HookHealth {
+            timestamp: 2000,
+            alive: true,
+            starved_ms: 0,
+            rehook: false,
+            dropped: 10,
+            dropped_delta: 7,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        assert!(c.contains(r#""dropped":3,"dropped_delta":3"#), "{c}");
+        assert!(c.contains(r#""dropped":10,"dropped_delta":7"#), "{c}");
+        // ★ 手書き書式なのでパースを確かめる。
+        for line in c.lines().filter(|l| l.contains(r#""type":"hook_health""#)) {
+            let v: serde_json::Value = serde_json::from_str(line).unwrap();
+            assert!(v["dropped_delta"].is_u64(), "{line}");
+        }
+        let _ = fs::remove_file(&p);
+    }
+
+    /// ★ ADR-013 D4 (穴 A): `starve_window` 行の形を固定する。
+    #[test]
+    fn starve_window_line_shape_is_stable() {
+        let p = rot_test_path("starvewin", 0);
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::StarveWindow {
+            timestamp: 1_700_000_060_000,
+            win_ms: 60_000,
+            n_lt30: 7,
+            sum_lt30_ms: 4_200,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        assert!(
+            c.contains(
+                r#"{"type":"starve_window","t":1700000060000,"win_ms":60000,"n_lt30":7,"sum_lt30_ms":4200}"#
+            ),
+            "{c}"
+        );
+        let _ = fs::remove_file(&p);
+    }
+
     /// ⚠️ `BlockEnd` の直後に `End` (アプリ終了) が来ても `session_end` は **1 行だけ**。
     /// 二重に書くと解析側がブロック終端を取り違える。
     #[test]
@@ -2550,19 +2793,49 @@ mod tests {
         let _ = fs::remove_file(&p);
     }
 
-    /// ★★ 非回帰の要: `g1_mode` が `None` のとき `meta` 行は **従来と 1 バイトも変わらない**。
-    /// ⚠️ ゴールデンスナップショットと既存フィクスチャがこの形に依存している。
+    /// ★★ 非回帰の要: `g1_mode` が `None` のとき `meta` 行に **`g1_mode` キーが出ない**。
+    ///
+    /// ## ⚠️★★★ 2026-08-19 に期待値を更新した (ADR-013 D1)
+    ///
+    /// 本テストは元々「**従来と 1 バイトも変わらない**」を固定していた。
+    /// ★ ADR-013 D1 が `app_version` / `capabilities` の追記を決めたので、
+    /// **その主張はもう成り立たない**。→ 主張を弱めるのではなく、**何が守られているかを書き直す**:
+    ///
+    /// 1. ★ `g1_mode` は G1 のときにしか出ない (**元々の意図**。ここは不変)
+    /// 2. ★ **キーの順序**が固定されている (追記は必ず末尾)
+    /// 3. ★ 手書き JSON が**パースできる**
+    ///
+    /// ⚠️ 更新の根拠 (2026-08-19 実測): ゴールデン (`tests/snapshots/*.json`) は
+    /// `FeatSnapshot` の配列で **`meta` を含まない**ため、この行の変更では壊れない。
+    /// 読み手 (`anonymize.rs` / `validate_blocks.py`) も **JSON パース**である。
     #[test]
     fn meta_line_is_byte_identical_when_not_g1() {
         let mut buf: Vec<u8> = Vec::new();
         write_meta_start(&mut buf, 1234, None);
-        assert_eq!(
-            String::from_utf8(buf).unwrap(),
-            format!(
-                "{{\"type\":\"meta\",\"session_start\":1234,\"hmm_version\":\"{}\"}}\n",
-                crate::analysis::engine::HMM_VERSION
-            )
+        let s = String::from_utf8(buf).unwrap();
+
+        // ★ キー順まで含めて固定する (追記は必ず末尾であること)。
+        let expected = format!(
+            "{{\"type\":\"meta\",\"session_start\":1234,\"hmm_version\":\"{}\",\
+             \"app_version\":\"{}\",\"capabilities\":{}}}\n",
+            crate::analysis::engine::HMM_VERSION,
+            crate::capabilities::app_version(),
+            crate::capabilities::capabilities_json(),
         );
+        assert_eq!(s, expected);
+
+        // ⚠️★ **元々の意図**: G1 でないログに `g1_mode` を混ぜない。
+        assert!(
+            !s.contains("g1_mode"),
+            "G1 でないのに g1_mode が出ている: {s}"
+        );
+
+        // ★ 手書き書式なので毎回パースを確かめる。
+        let v: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+        assert_eq!(v["type"], "meta");
+        assert!(v.get("g1_mode").is_none());
+        assert!(v["capabilities"]["unconditional"].is_array());
+        assert!(v["capabilities"]["threshold_gated"].is_array());
     }
 
     /// ★ G1 のときだけ引き金を刻む (マーカーが外れたことを事後に検出できるようにする)。

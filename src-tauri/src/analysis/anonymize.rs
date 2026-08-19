@@ -304,4 +304,39 @@ mod tests {
         assert!(o2.contains("\"t\":5000"));
         assert!(o2.contains("\"label\":\"stuck\""));
     }
+
+    /// ⚠️★★★ ADR-013 で足した行種・フィールドが匿名化を**素通りしない**こと。
+    ///
+    /// ★ `anonymize_line` は未知フィールドを serde の往復でそのまま通すので、
+    /// **新しい行種を足したときに絶対 epoch がそのまま残る**経路が生まれうる。
+    /// → ⚠️ `starve_window` の `t` が相対化されることを固定する
+    /// (★ 相対化が外れると**セッションの実時刻**が匿名化済みデータに載る)。
+    #[test]
+    fn adr013_lines_are_anonymised_too() {
+        // ① starve_window: `t` は相対化、`win_ms` / 件数は**そのまま** (相対化してはならない)。
+        let sw =
+            r#"{"type":"starve_window","t":1060000,"win_ms":60000,"n_lt30":7,"sum_lt30_ms":4200}"#;
+        let o = anonymize_line(sw, 1_000_000).unwrap();
+        assert!(o.contains("\"t\":60000"), "t が相対化されていない: {o}");
+        assert!(o.contains("\"win_ms\":60000"), "{o}");
+        assert!(o.contains("\"n_lt30\":7"), "{o}");
+        assert!(o.contains("\"sum_lt30_ms\":4200"), "{o}");
+
+        // ② hook_health の dropped_delta は件数なので不変。
+        let hh = r#"{"type":"hook_health","t":1002000,"alive":true,"starved_ms":0,"rehook":false,"dropped":10,"dropped_delta":7}"#;
+        let o2 = anonymize_line(hh, 1_000_000).unwrap();
+        assert!(o2.contains("\"t\":2000"), "{o2}");
+        assert!(o2.contains("\"dropped_delta\":7"), "{o2}");
+
+        // ③ meta の capabilities / app_version は**保たれる** (解析側の機械判定に要る)。
+        //    ⚠️ 落とすと「計器が無い」と誤判定される。
+        let meta = r#"{"type":"meta","session_start":1000000,"hmm_version":"0.4.0","app_version":"0.1.26","capabilities":{"unconditional":["key"],"threshold_gated":["hook_health"]}}"#;
+        let o3 = anonymize_line(meta, 1_000_000).unwrap();
+        assert!(o3.contains("\"session_start\":0"), "{o3}");
+        assert!(o3.contains("\"app_version\":\"0.1.26\""), "{o3}");
+        assert!(
+            o3.contains("\"threshold_gated\""),
+            "capabilities が落ちた: {o3}"
+        );
+    }
 }

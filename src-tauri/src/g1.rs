@@ -265,6 +265,136 @@ pub fn other_instance_running() -> bool {
     }
 }
 
+// ---------------------------------------------------------------------------
+// 「開始する」を押したときにログをどうするか (G-1・2026-08-19)
+// ---------------------------------------------------------------------------
+
+/// 「開始する」の押下に対して**ログファイルをどう扱うか**。
+///
+/// ★ 判定だけをここに置き、効果 (実際の送信・カウンタ操作) は `lib.rs` が適用する
+/// (本モジュール冒頭の方針どおり)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartAction {
+    /// ★ **通常運用 (G1 でない)。** ローテートも計数もしない ＝ 挙動を 1 バイトも変えない。
+    NotG1,
+    /// G1 の**このプロセスで最初のブロック**。起動時に開いたファイルをそのまま使う
+    /// (ローテートしない) が、★ `G1_BLOCKS_STARTED` は**増やす**。
+    FirstBlock,
+    /// 新しいブロックとしてローテートする。★ `G1_BLOCKS_STARTED` を**増やす**経路。
+    RotateForNewBlock,
+    /// ⚠️★★★ **セッション実行中に再び「開始する」が押された** (＝ G-1)。
+    /// 前のセッションを閉じてから新しいファイルを開く。★ カウンタは**増やさない**。
+    RotateForRestart,
+    /// ⚠️★★★ **`record_session_meta` が失敗した直後の再押下**。
+    /// ★ **ログを 1 行も書かない** (ローテートもしないし `session_start` も積まない)。
+    ///
+    /// ## なぜ独立の経路が要るか (code-reviewer HIGH・2026-08-19)
+    ///
+    /// `record_session_meta` が失敗すると、フロントは `isStarted` へ進まず
+    /// **明示的に再押下を促す**。⚠️ このとき backend の `session_active` は**既に true**なので、
+    /// 素朴に書くと [`StartAction::RotateForRestart`] に落ちて**ローテートしてしまう**。
+    /// → ⚠️ **中身がほぼ空のファイルが 1 本増える**（旧 code-review HIGH が防いでいた「孤児」）。
+    ///
+    /// ⚠️★★★ **`packaging::has_any_data_row` は孤児を止められない。**（★ 2026-08-19 に実測）
+    /// 同関数が読み飛ばすのは `meta` / `hook_health` / `ime_state` **だけ**で、
+    /// **`session_start` 行があるファイルは `true` を返す** → `.age` に包まれ**提出され、
+    /// ブロック番号を 1 つ消費する**。
+    /// ★ したがって「提出側で二重化されている」という従来の説明は**成り立たない**。
+    ///
+    /// ★ **本経路の解**: 何も書かずに `Ok` を返す。
+    /// → ファイルは `session_start` **1 本**のまま保たれ（`protocol.md §1` を満たす）、
+    /// フロントは `record_session_meta` を natural に再試行できる。
+    RetryAfterMetaFailure,
+}
+
+impl StartAction {
+    /// ローテート (＝ 前を閉じて新ファイルを開く) が要るか。
+    pub fn rotates(self) -> bool {
+        matches!(
+            self,
+            StartAction::RotateForNewBlock | StartAction::RotateForRestart
+        )
+    }
+
+    /// `G1_BLOCKS_STARTED` を増やす経路か。
+    ///
+    /// ⚠️★ **`RotateForRestart` は増やさない。** 二度押しは「新しい最初のブロック」ではなく、
+    /// ★ 数えると code-review HIGH が指摘した「孤児ファイルを 1 本増やす」形に戻る。
+    pub fn counts_block(self) -> bool {
+        matches!(
+            self,
+            StartAction::FirstBlock | StartAction::RotateForNewBlock
+        )
+    }
+
+    /// `session_start` 行を積むか。
+    ///
+    /// ⚠️★★★ [`StartAction::RetryAfterMetaFailure`] だけが **false** である。
+    /// ★ 積むと**同じファイルに 2 本目の `session_start`** が入り、
+    /// `protocol.md §1` の破れを `validate_blocks.py` が FAIL として検出する状態になる。
+    pub fn writes_session_start(self) -> bool {
+        !matches!(self, StartAction::RetryAfterMetaFailure)
+    }
+}
+
+/// 「開始する」押下時の扱いを決める**純関数**。
+///
+/// ## ⚠️★★★ なぜ要るか (P010 block07 で実発生した破れ)
+///
+/// 従来は `if g1_mode().is_some() && !was_active` でしかローテートしなかったため、
+/// **セッション実行中に「開始する」が押されると、ローテートせずに `SessionStart` だけが積まれた**。
+/// → ⚠️ **1 ファイルに 2 セッション**となり、`protocol.md §1`「1 ブロック = 1 ファイル」が破れる。
+///
+/// ★ 実測 (`notes.md:1750-1800`): 第 1 セッションは 3 分 17 秒**打鍵ゼロ**、`starved_ms` が
+/// 165,312 ms まで伸びて `HookHealth::Down` → トレイが「⚠ 計測できていません」に変わり、
+/// **参加者が見て押し直した**と読むのが最も素直である
+/// (⚠️ **推論であって観測ではない**)。`268.5s + 300s = 568.5s` に対し実際の `session_end` が
+/// `569.05s` ＝ **2 回目の押下でタイマーが引き直された**。
+///
+/// ## ⚠️★★★ `!was_active` を単純に外してはならない
+///
+/// その条件が置かれた理由は「`record_session_meta` 失敗時の文言は**明示的に再押下を促す**ので、
+/// 無条件に**数える**と孤児ファイルが 1 本増える」(code-review HIGH) である。
+/// → ★ [`StartAction::RotateForRestart`] は**数えない** (カウンタを触らない) ので、
+/// この指摘とは別の解になっている。
+///
+/// ## ★ カウンタを増やさなくてもファイルは 1 本ずつ増える (検算)
+///
+/// | 押下 | `was_active` | `blocks_started` | → | ファイル |
+/// |---|---|---|---|---|
+/// | block1 開始 | false | 0 | `FirstBlock` | file1 (起動時のもの) |
+/// | 二度押し | **true** | 1 | `RotateForRestart` | file2 |
+/// | block2 開始 | false | 1 (>0) | `RotateForNewBlock` | file3 |
+///
+/// → ★ **衝突も孤児も出ない。**
+pub fn decide_start_action(
+    g1_mode: bool,
+    was_active: bool,
+    blocks_started: u64,
+    meta_recorded: bool,
+) -> StartAction {
+    if !g1_mode {
+        // ⚠️★ 通常運用 (Phase1) では「戻る → 開始する」でファイルが分かれると困る。
+        //   ★ 既定の挙動を 1 バイトも変えない (研究者決定 #2: リブートの範囲は G1 の計器＋運用)。
+        return StartAction::NotG1;
+    }
+    if was_active {
+        // ⚠️★★★ **「二度押し」と「meta 再送」を分ける。**
+        //   ★ `record_session_meta` がまだ成功していないなら、そのブロックは
+        //     **まだ始まっていない** —— フロントが明示的に再押下を促した結果である。
+        //   → ログを 1 行も書かない (孤児ファイルを作らない)。
+        if !meta_recorded {
+            return StartAction::RetryAfterMetaFailure;
+        }
+        return StartAction::RotateForRestart;
+    }
+    if blocks_started > 0 {
+        StartAction::RotateForNewBlock
+    } else {
+        StartAction::FirstBlock
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449,5 +579,165 @@ mod tests {
     #[test]
     fn block_duration_is_five_minutes() {
         assert_eq!(BLOCK_DURATION_MS, 300_000);
+    }
+
+    // -----------------------------------------------------------------------
+    // G-1: 「開始する」押下時の扱い (2026-08-19)
+    // -----------------------------------------------------------------------
+
+    /// ⚠️★★★ **通常運用 (G1 でない) の挙動を 1 バイトも変えない。**
+    ///
+    /// ★ `was_active` にも `blocks_started` にも一切依存せず、常に `NotG1` であること。
+    /// ⚠️ ここが崩れると Phase1 の「戻る → 開始する」でファイルが分かれ、
+    /// **前半が提出されなくなる**。
+    #[test]
+    fn normal_mode_never_rotates_or_counts() {
+        for was_active in [false, true] {
+            for blocks in [0u64, 1, 9] {
+                let a = decide_start_action(false, was_active, blocks, true);
+                assert_eq!(
+                    a,
+                    StartAction::NotG1,
+                    "was_active={was_active} blocks={blocks}"
+                );
+                assert!(!a.rotates());
+                assert!(!a.counts_block());
+            }
+        }
+    }
+
+    /// ★ G1 の 1 ブロック目は**ローテートしない**が**数える** (起動時のファイルを使う)。
+    #[test]
+    fn g1_first_block_counts_without_rotating() {
+        let a = decide_start_action(true, false, 0, true);
+        assert_eq!(a, StartAction::FirstBlock);
+        assert!(!a.rotates());
+        assert!(a.counts_block());
+    }
+
+    /// ★ G1 の 2 ブロック目以降はローテートして数える (従来どおり)。
+    #[test]
+    fn g1_later_blocks_rotate_and_count() {
+        for blocks in [1u64, 2, 9] {
+            let a = decide_start_action(true, false, blocks, true);
+            assert_eq!(a, StartAction::RotateForNewBlock, "blocks={blocks}");
+            assert!(a.rotates());
+            assert!(a.counts_block());
+        }
+    }
+
+    /// ⚠️★★★ **G-1 の本命**: セッション実行中の再押下は
+    /// **ローテートするが数えない**。
+    ///
+    /// ★ 数えないことが重要である —— 数えると code-review HIGH が指摘した
+    /// 「`record_session_meta` 失敗後の再押下で孤児ファイルが 1 本増える」形に戻る。
+    #[test]
+    fn g1_restart_while_active_rotates_without_counting() {
+        for blocks in [0u64, 1, 9] {
+            let a = decide_start_action(true, true, blocks, true);
+            assert_eq!(a, StartAction::RotateForRestart, "blocks={blocks}");
+            assert!(
+                a.rotates(),
+                "★ ここが false だと 1 ファイルに 2 セッションが入る (P010 block07)"
+            );
+            assert!(!a.counts_block());
+        }
+    }
+
+    /// ⚠️★★★ **`record_session_meta` 失敗後の再押下では、ログを 1 行も書かない**
+    /// (code-reviewer HIGH・2026-08-19)。
+    ///
+    /// ★ フロントは失敗時に `isStarted` へ進まず**再押下を促す**が、backend の
+    /// `session_active` は既に true なので、素朴に書くと `RotateForRestart` に落ちて
+    /// ⚠️ **中身がほぼ空の孤児ファイルが 1 本増える**。
+    /// ⚠️ **`packaging::has_any_data_row` はこれを止められない**
+    /// (`session_start` 行があるファイルは通る・2026-08-19 実測)。
+    #[test]
+    fn retry_after_meta_failure_writes_nothing() {
+        for blocks in [0u64, 1, 9] {
+            let a = decide_start_action(true, true, blocks, false);
+            assert_eq!(a, StartAction::RetryAfterMetaFailure, "blocks={blocks}");
+            assert!(!a.rotates(), "★ ローテートすると孤児ファイルが 1 本増える");
+            assert!(!a.counts_block());
+            assert!(
+                !a.writes_session_start(),
+                "★ 積むと同じファイルに 2 本目の session_start が入る"
+            );
+        }
+    }
+
+    /// ★ 対照: **握手が済んでいれば**同じ `was_active == true` でも本物の二度押しである。
+    #[test]
+    fn restart_is_distinguished_from_meta_retry_by_the_handshake() {
+        assert_eq!(
+            decide_start_action(true, true, 1, true),
+            StartAction::RotateForRestart
+        );
+        assert_eq!(
+            decide_start_action(true, true, 1, false),
+            StartAction::RetryAfterMetaFailure
+        );
+    }
+
+    /// ★ 新規ブロックの経路は握手の有無に**依存しない** (⚠️ was_active=false なら常に新規)。
+    #[test]
+    fn new_block_paths_do_not_depend_on_the_handshake() {
+        for meta in [true, false] {
+            assert_eq!(
+                decide_start_action(true, false, 0, meta),
+                StartAction::FirstBlock
+            );
+            assert_eq!(
+                decide_start_action(true, false, 3, meta),
+                StartAction::RotateForNewBlock
+            );
+            assert_eq!(
+                decide_start_action(false, true, 3, meta),
+                StartAction::NotG1
+            );
+        }
+    }
+
+    /// ★ `decide_start_action` の検算表 (doc コメント) をそのまま実行する。
+    ///
+    /// ⚠️ 「カウンタを増やさなくてもファイルが 1 本ずつ増える」ことを、
+    /// **押下の並び**に対して確かめる (ここが崩れると衝突か孤児が出る)。
+    #[test]
+    fn g1_press_sequence_yields_one_file_per_press() {
+        let mut blocks: u64 = 0;
+        let mut files: u64 = 1; // ★ 起動時に 1 本開いている。
+
+        // ① block1 開始 (was_active=false)
+        let a = decide_start_action(true, false, blocks, true);
+        assert_eq!(a, StartAction::FirstBlock);
+        if a.counts_block() {
+            blocks += 1;
+        }
+        if a.rotates() {
+            files += 1;
+        }
+        assert_eq!((blocks, files), (1, 1));
+
+        // ② 二度押し (was_active=true)
+        let a = decide_start_action(true, true, blocks, true);
+        assert_eq!(a, StartAction::RotateForRestart);
+        if a.counts_block() {
+            blocks += 1;
+        }
+        if a.rotates() {
+            files += 1;
+        }
+        assert_eq!((blocks, files), (1, 2), "★ 数えずにファイルだけ増える");
+
+        // ③ block2 開始 (停止後なので was_active=false)
+        let a = decide_start_action(true, false, blocks, true);
+        assert_eq!(a, StartAction::RotateForNewBlock);
+        if a.counts_block() {
+            blocks += 1;
+        }
+        if a.rotates() {
+            files += 1;
+        }
+        assert_eq!((blocks, files), (2, 3), "★ 衝突も孤児も出ない");
     }
 }

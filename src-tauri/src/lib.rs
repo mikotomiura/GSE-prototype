@@ -2,6 +2,9 @@ pub mod analysis;
 // アプリ本体の診断ログ (tracing) をファイルに残す writer。
 // ⚠️ stdout だけだと Finder 起動の .app では**どこにも残らない** (2026-08-08 実測)。
 pub mod applog;
+// ★ **このビルドが何を記録できるか**の単一情報源 (ADR-013 D1/D2)。OS API 非依存の宣言表。
+// ⚠️ 送出元ベースで決め `#[cfg]` を反映する (writer から導出すると macOS で ime_shadow を過大申告する)。
+pub mod capabilities;
 // G1 統制タスク実験の「G1 モード」判定 (OS API 非依存の純ロジック + current_exe のみ)。
 // 効果 (ローテート / 5 分でのブロック終了 / プローブ停止 / 二重起動 fail-loud) は lib.rs が適用する。
 pub mod g1;
@@ -123,6 +126,16 @@ static G1_MODE: std::sync::OnceLock<Option<&'static str>> = std::sync::OnceLock:
 /// このプロセスで開始したブロック数。2 回目以降の `start_session` がローテートする判断に使う。
 /// ⚠️ ★ **`session_active` が false→true になったときだけ**増やす (連打・再試行で増やさない)。
 static G1_BLOCKS_STARTED: AtomicU64 = AtomicU64::new(0);
+
+/// ⚠️★★★ **いまのセッションで `record_session_meta` が成功したか** (2026-08-19・G-1)。
+///
+/// ★ 用途は 1 つだけ: 「**二度押し**」と「**`record_session_meta` 失敗後の再押下**」を分ける。
+/// ⚠️ 後者でローテートすると**中身がほぼ空の孤児ファイルが 1 本増える**
+/// (★ 旧 code-review HIGH が防いでいたもの)。
+/// ⚠️ **`packaging::has_any_data_row` はこれを止められない** —— 同関数が読み飛ばすのは
+/// `meta` / `hook_health` / `ime_state` だけで、**`session_start` 行があるファイルは通る**
+/// (2026-08-19 実測)。★ したがって「提出側で二重化されている」という説明は成り立たない。
+static SESSION_META_RECORDED: AtomicBool = AtomicBool::new(false);
 
 /// 分析スレッドがドレイン (非アクティブ) 分岐に入っているか。
 ///
@@ -1739,6 +1752,10 @@ fn record_session_meta(
         task_kind.as_str(),
         head_id.as_str()
     );
+    // ⚠️★★★ G-1: **`Ok` を返す直前**に立てる。フロントはこの `Ok` を見て `isStarted` へ進み、
+    //   失敗時にだけ**再押下を促す**。→ ★ この旗が「握手が済んだか」と一対一に対応する。
+    //   以後の再押下は**本物の二度押し**として扱ってよい (`g1::decide_start_action`)。
+    SESSION_META_RECORDED.store(true, Ordering::Release);
     Ok(())
 }
 
@@ -1947,6 +1964,29 @@ fn spawn_duplicate_instance_check(app: tauri::AppHandle, delay: Duration, when: 
     });
 }
 
+/// ログ channel に `needed` 通ぶんの空きがあるか。
+///
+/// ⚠️★ **`try_send` してから失敗を拾うのでは遅い**場面がある (`start_session` は巻き戻せない
+/// 副作用を先に出す)。★ そこで**送る前に**空きを見る。
+///
+/// `capacity()` は bounded なら必ず `Some` を返す (`logger.rs` の `bounded(512)`)。
+/// ⚠️ 万一 `None` (unbounded) なら常に空きがあるとみなす。
+///
+/// ## ⚠️★★★ これは **予約ではなく確認**である (Codex MEDIUM・2026-08-19)
+///
+/// 空きを見てから実際に送るまでのあいだに**他の送信者 (分析スレッド等) が割り込める**ので、
+/// ★ **原子的な保証にはならない**。→ 「`Rotate` は通ったが `SessionStart` だけ落ちる」は
+/// **確率が下がるだけで消えない**。
+/// ⚠️ だから送信側の失敗処理 (`Rotate` は fail-loud で中止 / `SessionStart` は `ERROR` ログ) を
+/// **省いてはならない**。★ 本関数の役目は「巻き戻せない副作用を出す前に、
+/// **明らかに詰まっているとき**を弾く」ことだけである。
+fn log_channel_has_room(tx: &Sender<LogEntry>, needed: usize) -> bool {
+    match tx.capacity() {
+        Some(cap) => cap.saturating_sub(tx.len()) >= needed,
+        None => true,
+    }
+}
+
 /// 「開始する」ボタン押下時に呼ばれる。
 /// 1. セッションアクティブフラグをセット (分析スレッドのドレインを終了)
 /// 2. CognitiveStateEngine を初期状態にリセット
@@ -1975,6 +2015,29 @@ fn start_session(
         crate::submission::read_g1_participant_id().as_deref(),
     )?;
 
+    // ⚠️★★★ **「触る前に断る」** (G-1・2026-08-19)。
+    //
+    // ★ ここから下の `engine.reset()` / `reset_signal` / `latest_feat` / `intervention` は
+    //   `swap` より**前**に置かなければならない (下のコメント参照: 分析スレッドとの可視性順序)。
+    //   → ⚠️ したがって**それらを実行した後に送信が失敗しても巻き戻せない**。
+    //   ★ そこで「これから最大 2 通 (`Rotate` + `SessionStart`) 送る」ぶんの空きを、
+    //     **状態を 1 つも触る前に**確かめて、足りなければここで断る。
+    // ⚠️ 残る失敗は `Disconnected` (ロガースレッドが死んでいる) だけで、それはどの道記録できない。
+    //
+    // ⚠️★★★ **G1 モードのときだけ検査する。** 通常運用では `Rotate` を送らないので
+    //   「2 通の途中で切れる」失敗様式がそもそも無く、★ ここで弾くと
+    //   **これまで開始できていた場面で開始できなくなる** = 既定の挙動の変更になる
+    //   (研究者決定 #2「リブートの範囲は計器＋運用」の外)。
+    if g1_mode().is_some() {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+        if !log_channel_has_room(&guard.tx, 2) {
+            tracing::error!("start_session: log channel is full; refusing to start a block");
+            return Err("ログの書き込みが詰まっています。ブロックを開始できません。\
+                 このブロックはまだ始まっていません。少し待ってからもう一度「開始する」を押してください。"
+                .to_string());
+        }
+    }
+
     // リセットシグナルを先にセットしてからセッションを有効化する。
     // 分析スレッドが active=true を Acquire で読んだ時点で、
     // それより前に Release された reset=true も可視であることが保証される。
@@ -1983,57 +2046,133 @@ fn start_session(
     engine.reset();
     reset_signal.0.store(true, Ordering::Release);
     // ★ 旧値を取る。⚠️ 既に true (= 連打・record_session_meta 失敗後の再押下) なら
-    //   **新しいブロックではない**ので、下のローテートを回してはならない (code-review HIGH)。
-    let was_active = session_active.0.swap(true, Ordering::Release);
+    //   **新しいブロックではない**。
+    // ⚠️★★★ **2026-08-19 に意味が変わった (G-1)。** 従来はこの場合「何もしない」＝
+    //   ローテートせずに `SessionStart` だけを積んでいたため、**1 ファイルに 2 セッション**が
+    //   入った (P010 block07 で実発生・`protocol.md §1` の破れ)。
+    //   → ★ いまは **`RotateForRestart`** として「前を閉じてから新しいファイルを開く」。
+    //   ★ ただし **数えない** ので、code-review HIGH の指摘 (無条件に数えると孤児が増える) は
+    //   引き続き満たしている。判定は `g1::decide_start_action` を見ること。
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
+    // ⚠️★ **ログのロックより前に**済ませる。★ `intervention` → `log` の順で取る箇所が
+    //   既にある (`force_wall_decision` 周辺) ので、ここで `log` → `intervention` と
+    //   入れ子にすると**ロック順序が反転**する。→ 入れ子にしない。
     *latest_feat.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
     *intervention.0.lock().unwrap_or_else(|p| p.into_inner()) = InterventionPolicyState::new(now);
     // ★ ロックは**ログへ送る間だけ**保持する (follow-up F-2 / code-review LOW)。
     //   以前は `win.show()` を含む関数末尾まで持っていた。デッドロックはしないが、
     //   ⚠️ ロック中にウィンドウ操作 (別スレッドへ波及しうる) を行う形は残さない。
+    let was_active;
     {
         let guard = log.lock().unwrap_or_else(|p| p.into_inner());
 
-        // ★ G1: 2 ブロック目以降はログをローテートする (1 ブロック = NDJSON 1 ファイル・protocol.md §1)。
+        // ⚠️★★★ **`swap` はログのロックの *中* で行う** (2026-08-19・G-1 の詰め)。
+        //
+        // ★ 「開始する」は送信中に disabled にならないので、**2 回続けて押すと
+        //   `start_session` が並行に走りうる**。`swap` だけでは
+        //   「どちらが新規か」は決まるが、⚠️ **ログへ書く順序までは決まらない**。
+        //   → 素直に書くと次の交錯が残る:
+        //     A(新規) が swap → B(再押下) が swap → **B が先にロックを取って
+        //     ローテート** → B が `SessionStart` → **その後 A が `SessionStart`**
+        //     ＝ ⚠️ **新しいファイルに `session_start` が 2 本**（P010 block07 と同じ形）。
+        // ★ ロックの中で swap すれば「誰が新規か」と「何を書くか」が**同時に**決まるので、
+        //   押した順に file1 → (閉じる) → file2 と必ず 1 本ずつになる。
+        was_active = session_active.0.swap(true, Ordering::Release);
+
+        // ★ G1: ログのローテート方針は**純関数** `g1::decide_start_action` が決める
+        //   (1 ブロック = NDJSON 1 ファイル・protocol.md §1)。効果だけをここで適用する。
         //   ⚠️ ★ **G1 モードでないときは何もしない。** 通常運用 (Phase1) では「戻る → 開始する」で
         //   ファイルが分かれてしまうと、`gse-submit` が最新 1 本しか出さないため
         //   **前半が提出されなくなる**。既定の挙動を 1 バイトも変えないこと。
-        // ⚠️★ **`was_active` が false のときだけ**ローテートする。
-        //   「開始する」は送信中に disabled にならず、record_session_meta 失敗時の文言は
-        //   **明示的に再押下を促す**ので、無条件に数えると孤児ファイルが 1 本増える
-        //   (= protocol.md §1「1 ブロック = 1 ファイル」の破れ・code-review HIGH)。
-        if g1_mode().is_some() && !was_active {
-            let blocks_started = G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel);
-            if blocks_started > 0 {
-                // ⚠️ ファイル名は秒粒度。衝突回避は **logger スレッド側**でも行う
-                // (ここは別スレッドなので exists 判定と create の間に窓がある・code-review MEDIUM)。
-                let new_path = logger::next_session_path();
-                tracing::info!(
-                    "G1: rotating session log for block #{} -> {:?}",
-                    blocks_started + 1,
-                    new_path
-                );
-                if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
-                    // ⚠️★★ **ここで進んではならない** (cross-review HIGH・Claude と Codex が一致)。
-                    // channel (bounded 512) が満杯だと Rotate だけが落ち、直後の SessionStart 以降が
-                    // **既に `session_end` を書き終えた旧ファイル**に積まれる。
-                    // = protocol.md §1 が (b) を却下した「沈黙して間違った結果を出す」失敗そのもの。
-                    // ★ 触った状態を**全部巻き戻して** Err を返し、画面に出す (start_session の
-                    // 失敗はフロントが「開始に失敗しました」と表示する)。
-                    tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+        // ⚠️★ **`!was_active` の枝は従来のまま**である。そこに置かれた
+        //   「無条件に**数える**と孤児ファイルが 1 本増える」(code-review HIGH) という指摘は
+        //   ★ **数えることへの指摘**なので、数えない `RotateForRestart` とは両立する。
+        let action = crate::g1::decide_start_action(
+            g1_mode().is_some(),
+            was_active,
+            G1_BLOCKS_STARTED.load(Ordering::Acquire),
+            SESSION_META_RECORDED.load(Ordering::Acquire),
+        );
+
+        // ⚠️★★★ **`record_session_meta` 失敗後の再押下では、ログを 1 行も書かない。**
+        //   ★ 書くと (a) ローテートすれば**中身がほぼ空の孤児ファイル**が 1 本増え、
+        //   (b) ローテートしなければ**同じファイルに 2 本目の `session_start`** が入る。
+        //   ⚠️ (a) は `has_any_data_row` では止まらない (`session_start` 行があるファイルは通る)。
+        //   → ★ 何も書かずに戻り、フロントに `record_session_meta` を再試行させる。
+        if !action.writes_session_start() {
+            tracing::info!(
+                "G1: start pressed again before session_meta was recorded; \
+                 not touching the log (retry path)"
+            );
+            // ★ ここで抜けるので `SESSION_START_MS` は**引き直さない**
+            //   (ブロックの 5 分は 1 回目の押下から数える = ログの `session_start` と一致する)。
+            //   ★ オーバーレイも 1 回目で既に出ている。
+            return Ok(());
+        }
+
+        // ★ これから新しい (または開き直した) ブロックが始まる。握手はこれからなので落とす。
+        SESSION_META_RECORDED.store(false, Ordering::Release);
+        // ★ カウンタは「新しいブロックを始めた」経路だけが進める。
+        //   ⚠️★★★ 二度押し (`RotateForRestart`) は**増やさない** —— 数えると
+        //   code-review HIGH が指摘した「孤児ファイルを 1 本増やす」形に戻る。
+        let blocks_started = if action.counts_block() {
+            G1_BLOCKS_STARTED.fetch_add(1, Ordering::AcqRel) + 1
+        } else {
+            G1_BLOCKS_STARTED.load(Ordering::Acquire)
+        };
+
+        // ★ `Rotate` 1 通で「前を閉じる → 新ファイル → `meta`」が全部済む
+        //   (`logger.rs` の `Rotate` 処理が `write_meta_end` → `open_log_target` →
+        //   `write_meta_start` を順に行う)。★ 失敗した試行も別ファイルとして残る (捨てない)。
+        if action.rotates() {
+            let reason = if action == crate::g1::StartAction::RotateForRestart {
+                "restart while active (G-1)".to_string()
+            } else {
+                format!("block #{blocks_started}")
+            };
+            // ⚠️ ファイル名は秒粒度。衝突回避は **logger スレッド側**でも行う
+            // (ここは別スレッドなので exists 判定と create の間に窓がある・code-review MEDIUM)。
+            let new_path = logger::next_session_path();
+            tracing::info!("G1: rotating session log ({}) -> {:?}", reason, new_path);
+            if let Err(e) = guard.tx.try_send(LogEntry::Rotate { new_path }) {
+                // ⚠️★★ **ここで進んではならない** (cross-review HIGH・Claude と Codex が一致)。
+                // channel (bounded 512) が満杯だと Rotate だけが落ち、直後の SessionStart 以降が
+                // **既に `session_end` を書き終えた旧ファイル**に積まれる。
+                // = protocol.md §1 が (b) を却下した「沈黙して間違った結果を出す」失敗そのもの。
+                // ★ 上の容量ガードでほぼ到達しないが、**到達したら必ず止める**。
+                tracing::error!("G1: FAILED to rotate session log: {}", log_send_error(e));
+                if action == crate::g1::StartAction::RotateForNewBlock {
                     G1_BLOCKS_STARTED.fetch_sub(1, Ordering::AcqRel);
-                    session_active.0.store(false, Ordering::Release);
-                    return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
-                         このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
-                        .to_string());
                 }
+                // ⚠️★★★ **巻き戻し方が枝で違う。**
+                //   `RotateForNewBlock`: このブロックは始まっていない → `false` に戻す。
+                //   `RotateForRestart` : ★ **`true` のままにする** —— 前のセッションは
+                //     まだ開いており計測も続いている。`false` にすると
+                //     「`session_end` の無い開きっぱなしのファイル」を計測停止扱いにしてしまう。
+                if action != crate::g1::StartAction::RotateForRestart {
+                    session_active.0.store(false, Ordering::Release);
+                }
+                return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
+                     このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
+                    .to_string());
             }
         }
 
-        let _ = guard.tx.try_send(LogEntry::SessionStart { timestamp: now });
+        // ⚠️★★ **落ちたことを黙らせない** (code-reviewer MEDIUM・2026-08-19)。
+        //   `Rotate` は成功したのに `SessionStart` が落ちると、新ファイルは `meta` だけを持ち
+        //   `session_start` を持たない。★ `validate_blocks.py` は **0 本を FAIL にしない**設計
+        //   (旧版のログを赤にしないため) なので、⚠️ **黙って通ってしまう**。
+        //   ★ ここまで来ると巻き戻せないので `Err` は返さず、診断ログに必ず残す。
+        if let Err(e) = guard.tx.try_send(LogEntry::SessionStart { timestamp: now }) {
+            tracing::error!(
+                "FAILED to record session_start: {} \
+                 (the block will look like it never started)",
+                log_send_error(e)
+            );
+        }
     }
 
     // ★ G1: **ブロックを始めるたびに**二重起動を見に行く (follow-up F-1 / code-review M6)。
@@ -2857,6 +2996,18 @@ pub fn run() {
                     //   **復帰行が `starved_ms: 0` になり「何秒落ちていたか」が消える**
                     //   (code-reviewer MEDIUM)。★ 測った量を残すのが本行の存在理由なので保持する。
                     let mut peak_starved_ms: u64 = 0;
+                    // ★ ADR-013 D4 (穴 A): 30 秒未満の在席×非打鍵を 60 秒窓で数える。
+                    //   ⚠️ `hook_health` の出力条件・意味論は 1 文字も変えない (別トラックとして足すだけ)。
+                    let mut micro_window = liveness::MicroStarveWindow::new();
+                    // ⚠️★★★ ADR-013 D4 (穴 B): **前の `hook_health` 行からの** dropped 増分。
+                    //   ★ 下の `prev_dropped` は「`tracing` に出したとき」だけ更新されるので**流用できない**。
+                    //   混ぜると `dropped_delta` が「前回行からの差分」ではなくなる。
+                    let mut dropped_at_last_line: u64 = 0;
+                    // ★ ブロック境界を見るための 1 tick 前の**セッション開始時刻**。
+                    //   ⚠️★★★ `session_active` の立ち上がりでは**足りない** ——
+                    //   実行中の再押下 (`RotateForRestart`) は `true` のままなので発火しない
+                    //   (Codex HIGH・2026-08-19)。→ `liveness::is_new_block_epoch` を見よ。
+                    let mut prev_session_start_ms: u64 = 0;
 
                     loop {
                         thread::sleep(Duration::from_millis(TICK_MS));
@@ -2895,6 +3046,7 @@ pub fn run() {
                         let elapsed_ms = last_tick_at.elapsed().as_millis() as u64;
                         last_tick_at = Instant::now();
 
+                        let prev_starved_ms = starv.starved_ms;
                         starv = liveness::step(
                             starv,
                             session_active,
@@ -2904,6 +3056,58 @@ pub fn run() {
                         );
                         let health = liveness::health(starv, th);
                         peak_starved_ms = peak_starved_ms.max(starv.starved_ms);
+
+                        // ⚠️★★★ **窓集計は下の `continue` より前に置く。**
+                        //   `if health == prev_health && !rehook { continue; }` は 1Hz ループの
+                        //   残りを全部飛ばすので、後ろに置くと **窓がまるごと消える**
+                        //   (health が変わらない = 平常時こそ micro 帯が出る区間である)。
+                        // ⚠️★★★ **ブロック境界で計器の状態を揃える**
+                        //   (security-checker MEDIUM ＋ Codex HIGH)。
+                        //   ★ 新しいブロックが始まったら `dropped_delta` の基準を引き直し、
+                        //   集計途中の窓は**捨てる**。そうしないと、ローテート後の最初の行の差分が
+                        //   **前のブロックのファイルにある行からの差分**になり、
+                        //   ⚠️ `dropped_delta` / `starve_window` が消そうとした「区間の取り違え」を
+                        //   **ファイル境界で再導入する** (`validate_blocks.py` はブロック単位で読む)。
+                        //
+                        // ⚠️★★★ **`session_active` の立ち上がりで見てはならない。**
+                        //   実行中の再押下 (`RotateForRestart`) は `true` のままなので
+                        //   **その経路でだけ発火しない** (＝ G-1 で新設した経路そのもの)。
+                        let session_start_ms = SESSION_START_MS.load(Ordering::Acquire);
+                        if liveness::is_new_block_epoch(prev_session_start_ms, session_start_ms) {
+                            dropped_at_last_line = dropped;
+                            micro_window = liveness::MicroStarveWindow::new();
+                        }
+                        prev_session_start_ms = session_start_ms;
+
+                        if let Some(tally) = micro_window.tick(
+                            session_active,
+                            prev_starved_ms,
+                            starv.starved_ms,
+                            th,
+                            elapsed_ms,
+                        ) {
+                            if liveness_log_tx
+                                .try_send(LogEntry::StarveWindow {
+                                    timestamp: SystemTime::now()
+                                        .duration_since(UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_millis()
+                                        as u64,
+                                    // ★ **実測の窓長**を載せる (公称 60_000 ではない)。
+                                    //   ⚠️ 公称を書くと `n_lt30 / win_ms` が過大評価になる。
+                                    win_ms: tally.win_ms,
+                                    n_lt30: tally.n_lt30,
+                                    sum_lt30_ms: tally.sum_lt30_ms,
+                                })
+                                .is_err()
+                            {
+                                // ★ 落ちても致命ではない (micro 帯は投資判断の材料であって合否ではない)。
+                                //   ⚠️ ただし黙って消さない。
+                                tracing::warn!(
+                                    "failed to record a starve_window line (log queue full)"
+                                );
+                            }
+                        }
 
                         // ★ トレイはこのフラグを見る (`tray::current_state`)。
                         crate::input::hook::HOOK_STARVED
@@ -2963,17 +3167,30 @@ pub fn run() {
                                 starved_ms: reported_starved_ms,
                                 rehook,
                                 dropped,
+                                // ★ 前の **行** からの増分 (ADR-013 D4・穴 B)。
+                                //   ★ ブロック内の最初の行では「**ブロック開始**からの増分」になる
+                                //   (⚠️ 基準はブロック開始で引き直す。ファイル境界をまたがせない)。
+                                dropped_delta: dropped.saturating_sub(dropped_at_last_line),
                             })
                             .is_err()
                         {
                             // ⚠️★ この行は「そのブロックが有効か」を判断する唯一の証跡なので、
                             //   落ちたことだけは残す (監視スレッドなのでログ制約は無い)。
                             tracing::error!("failed to record a hook_health line (log queue full)");
+                            // ⚠️★★★ **落ちたときは「行が出た」ことを前提にした状態を 1 つも進めない。**
+                            //   ★ `dropped_at_last_line` / `peak_starved_ms` / `prev_health` は
+                            //   すべて「直前の行が持ち去った情報」を表す。
+                            //   ⚠️ 進めると、`prev_health` が一致して次の tick が `continue` に落ち、
+                            //   **「何秒落ちていたか」と状態遷移そのものが永久に消える**
+                            //   (code-reviewer MEDIUM・2026-08-19)。
+                            //   → ★ 据え置けば次の tick で**同じ行を出し直せる**。
+                        } else {
+                            dropped_at_last_line = dropped;
+                            if health == HookHealth::Ok {
+                                peak_starved_ms = 0;
+                            }
+                            prev_health = health;
                         }
-                        if health == HookHealth::Ok {
-                            peak_starved_ms = 0;
-                        }
-                        prev_health = health;
                     }
                 });
             }
@@ -3458,6 +3675,39 @@ mod task_c_command_tests {
         let disc = tx.try_send(2).unwrap_err();
         let disc_msg = log_send_error(disc);
         assert!(disc_msg.contains("disconnected"), "got: {}", disc_msg);
+    }
+
+    /// ⚠️★★★ **「触る前に断る」ためのガード** (G-1・2026-08-19)。
+    ///
+    /// ## ★ なぜ `try_send` の失敗を拾うだけでは足りないか
+    ///
+    /// `start_session` は `engine.reset()` / `reset_signal` / `latest_feat` / `intervention` を
+    /// **`session_active` の `swap` より前に**書き換える (分析スレッドとの可視性順序のため・
+    /// この順序は動かせない)。→ ⚠️ **送信が失敗した時点では、もう巻き戻せない副作用が出ている。**
+    /// → ★ そこで「これから送るぶんの空きがあるか」を**状態を 1 つも触る前に**確かめる。
+    #[test]
+    fn log_capacity_guard_rejects_when_full() {
+        let (tx, _rx) = crossbeam_channel::bounded::<LogEntry>(3);
+        // 空: 2 通ぶんの空きがある。
+        assert!(log_channel_has_room(&tx, 2));
+
+        tx.try_send(LogEntry::SessionStart { timestamp: 1 })
+            .unwrap();
+        // 残り 2: ちょうど足りる (境界)。
+        assert!(log_channel_has_room(&tx, 2));
+
+        tx.try_send(LogEntry::SessionStart { timestamp: 2 })
+            .unwrap();
+        // 残り 1: ⚠️ 足りない → ここで断らないと Rotate だけが落ちて
+        //   SessionStart が**閉じ終わった旧ファイル**に積まれる。
+        assert!(!log_channel_has_room(&tx, 2));
+        assert!(log_channel_has_room(&tx, 1));
+
+        tx.try_send(LogEntry::SessionStart { timestamp: 3 })
+            .unwrap();
+        assert!(!log_channel_has_room(&tx, 1));
+        // ★ 0 通は常に真 (何も送らないなら空きは要らない)。
+        assert!(log_channel_has_room(&tx, 0));
     }
 
     #[test]

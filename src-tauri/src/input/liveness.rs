@@ -236,6 +236,155 @@ pub fn last_system_input_tick() -> Option<u32> {
     None
 }
 
+// ---------------------------------------------------------------------------
+// micro 帯 (30 秒未満) の窓集計 — ADR-013 D4 / 穴 A
+// ---------------------------------------------------------------------------
+
+/// **新しいブロックが始まったか** を、セッション開始時刻の変化から判定する純関数。
+///
+/// ## ⚠️★★★ なぜ `session_active` の立ち上がりでは足りないか (Codex HIGH・2026-08-19)
+///
+/// G-1 の「実行中の再押下」(`g1::StartAction::RotateForRestart`) は
+/// **`session_active` を `true` のまま維持する**。→ ★ `false → true` の縁を見ていると
+/// **この経路でだけ発火しない**。
+///
+/// ⚠️ 結果、`dropped_at_last_line` と `MicroStarveWindow` が**旧ファイルから新ファイルへ
+/// 持ち越され**、`dropped_delta` / `starve_window` が**ファイル境界をまたいだ値**になる
+/// —— ★ **まさに `dropped_delta` を足して消そうとした誤帰属**である。
+///
+/// → ★ **セッション開始時刻 (`SESSION_START_MS`) の変化**を見る。これは
+/// 通常のブロック開始 (`0 → t`) でも、実行中の再押下 (`t1 → t2`) でも**必ず動く**。
+///
+/// ⚠️ `now == 0` (ブロック終了で 0 に戻された) は**新しいブロックではない**ので false。
+pub fn is_new_block_epoch(prev_session_start_ms: u64, now_session_start_ms: u64) -> bool {
+    now_session_start_ms != 0 && now_session_start_ms != prev_session_start_ms
+}
+
+/// `starve_window` 行の窓の長さ (ms)。
+///
+/// ⚠️ 1Hz の全 tick を残す案は採らない —— ★ **値の大半が 0** でログ量とバッテリに見合わない
+/// (ADR-013 D6)。★ 窓集計で「micro 帯が何割あるか」＝**投資判断の材料としては足りる**。
+pub const STARVE_WINDOW_MS: u64 = 60_000;
+
+/// 窓が閉じたときの集計結果。⚠️ ★ `n_lt30 == 0` の窓は**呼び出し側が出力しない**。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct StarveWindowTally {
+    /// この窓で**閉じた** micro エピソードの本数。
+    pub n_lt30: u64,
+    /// その合計時間 (ms)。
+    pub sum_lt30_ms: u64,
+    /// ⚠️★★★ **この窓の実測の長さ** (ms)。
+    ///
+    /// ★ 公称 [`STARVE_WINDOW_MS`] を書いてはならない。窓は実測 `tick_ms` の累積で閉じるので
+    /// **常に 60 秒以上**になり、⚠️ スリープ復帰後は 1 tick で数十分ぶん進んで即閉じることもある。
+    /// → ★ `n_lt30 / win_ms` を「micro 帯の割合」として読む解析
+    /// (**本行の存在理由そのもの**) が**過大評価**になる (code-reviewer MEDIUM・2026-08-19)。
+    pub win_ms: u64,
+}
+
+/// micro 帯 (`0 < peak < log_after_ms`) のエピソードを 60 秒窓で数える累算器。
+///
+/// ## ★ 何を 1 エピソードと数えるか
+///
+/// [`step`] は **フックが呼ばれた瞬間に `starved_ms` を 0 に戻す**。
+/// → ★ **エピソードの終わり = 値が正から 0 に落ちた tick**であり、その直前値がピークである。
+///
+/// ⚠️★★★ **`peak >= log_after_ms` のものは数えない。** それらは `hook_health`
+/// (`Suspect` 以上) が既に記録しており、★ **2 つのトラックは閾値できれいに分割される**
+/// (＝二重計上しない)。
+///
+/// ## ★ 時計を読まない
+///
+/// 窓の進行は**実測経過 `tick_ms` の累積**で決める。[`step`] と同じく純関数なので、
+/// ★ 両 OS で境界をテストできる (`docs/agent-shared.md`「OS ごとに規則が違うロジックは
+/// 両 OS に対のテストを置く」の趣旨に沿って、そもそも OS 差を持ち込まない)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MicroStarveWindow {
+    elapsed_ms: u64,
+    tally: StarveWindowTally,
+}
+
+impl MicroStarveWindow {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 1 tick 進める。★ **純関数的** (時計もグローバルも触らない)。
+    ///
+    /// - `session_active`: 計測中か。⚠️★★★ **窓をブロックに閉じるために要る**（下記）。
+    /// - `prev_starved_ms` / `now_starved_ms`: [`step`] の**前後**の `starved_ms`。
+    /// - `th`: 閾値。⚠️ ★ **30_000 を直書きしない** —— `hook_health` 側と同じ値を使うことで、
+    ///   閾値を動かしたときに 2 トラックの分割が自動で追随する。
+    ///
+    /// 戻り値が `Some` なら**窓が閉じた**。⚠️ ★ `n_lt30 == 0` の窓は `None` を返す
+    /// (＝行を出さない・ADR-013 D4)。
+    ///
+    /// ## ⚠️★★★ なぜ `session_active` を見るか (security-checker MEDIUM・2026-08-19)
+    ///
+    /// 見ないと **2 つの誤りが出る**:
+    ///
+    /// 1. ⚠️ **偽エピソードを 1 本計上する。** [`step`] は `!session_active` でも
+    ///    `starved_ms` を 0 に落とすので、ブロック終了の tick が
+    ///    「正 → 0」に見え、**打鍵で終わっていないエピソード**が数えられる
+    ///    (最大 +29,999 ms)。★ ブロックごとに毎回起きる**系統誤差**である。
+    /// 2. ⚠️ **窓がブロックをまたぐ。** 1 分休憩とローテートを越えて走り続けるので、
+    ///    **ブロック N で貯めた集計がブロック N+1 のファイルに書かれる**、または
+    ///    `session_end` の後ろに 1 行付く。→ ★ 「1 ブロック = 1 ファイル」
+    ///    (`protocol.md §1`) の前提で読む解析が**誤帰属**する。
+    ///
+    /// → ★ **非計測になったら窓ごと捨てる。**
+    /// ⚠️ **既知の切り捨て**: ブロック末尾の 60 秒未満の端数に入っていた本数は**失われる**
+    /// (★ 数え漏らしは下側に振れる)。⚠️ ここで「端数を吐く」ようにすると、
+    /// `session_end` との**順序が保証されない**ため誤帰属のほうが起きる。
+    /// ★ **誤帰属より既知の切り捨てを採る**。
+    #[must_use]
+    pub fn tick(
+        &mut self,
+        session_active: bool,
+        prev_starved_ms: u64,
+        now_starved_ms: u64,
+        th: Thresholds,
+        tick_ms: u64,
+    ) -> Option<StarveWindowTally> {
+        if !session_active {
+            // ★ 窓をブロックに閉じる。⚠️ 計上もしない (この 0 復帰は打鍵由来ではない)。
+            *self = Self::default();
+            return None;
+        }
+        // ★ エピソードが閉じた瞬間だけを拾う。
+        if now_starved_ms == 0 && prev_starved_ms > 0 && prev_starved_ms < th.log_after_ms {
+            self.tally.n_lt30 = self.tally.n_lt30.saturating_add(1);
+            self.tally.sum_lt30_ms = self.tally.sum_lt30_ms.saturating_add(prev_starved_ms);
+        }
+
+        self.elapsed_ms = self.elapsed_ms.saturating_add(tick_ms);
+        if self.elapsed_ms < STARVE_WINDOW_MS {
+            return None;
+        }
+
+        let mut tally = self.tally;
+        // ★ **実測の窓長**を載せる (公称 60_000 ではない)。分母を嘘にしない。
+        tally.win_ms = self.elapsed_ms;
+        // ⚠️ ★ 窓は必ず閉じる (集計をゼロに戻す)。**出力しないだけ**で、数え漏らしにはしない。
+        //
+        // ⚠️★★ **超過分を次の窓へ繰り越してはならない。** 一見「窓が毎回 1 tick ぶん長くなる
+        //   系統誤差」を消せそうに見えるが (code-reviewer LOW)、★ 繰り越した時間は
+        //   **直前の窓の `win_ms` に既に数えられている**ので、次の窓でも数えると
+        //   **経過時間を二重計上する** (窓長の総和が実時間を超える)。
+        //   → ★ 0 に戻し、**各窓は自分の実測長を正直に申告する**。窓長がばらつくこと自体は
+        //   誤差ではない (分母が正しいので割合の計算は歪まない)。
+        self.elapsed_ms = 0;
+        self.tally = StarveWindowTally::default();
+
+        // ⚠️★★★ 空の窓は出さない (在席の連続タイムラインを作らない・security-checker MEDIUM)。
+        if tally.n_lt30 == 0 {
+            None
+        } else {
+            Some(tally)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380,6 +529,243 @@ mod tests {
         }
         assert_eq!(s.starved_ms, 0);
         assert_eq!(health(s, th()), HookHealth::Ok);
+    }
+    // -----------------------------------------------------------------------
+    // micro 帯の窓集計 (ADR-013 D4 / 穴 A)
+    // -----------------------------------------------------------------------
+
+    /// 窓が閉じるまで `tick` を回す補助。`episodes` は (ピーク値) の並び。
+    ///
+    /// ★ 1 エピソードにつき「ピークまで上げて 0 に落とす」を 1 回ずつ行う。
+    fn run_window(episodes: &[u64], filler_ticks: usize) -> Option<StarveWindowTally> {
+        let mut w = MicroStarveWindow::new();
+        let mut out = None;
+        let mut ticks = 0usize;
+        for &peak in episodes {
+            // ★ 落ちる瞬間だけが数えられる (prev>0 かつ now==0)。
+            let r = w.tick(true, peak, 0, th(), TICK);
+            out = out.or(r);
+            ticks += 1;
+        }
+        for _ in ticks..filler_ticks {
+            let r = w.tick(true, 0, 0, th(), TICK);
+            out = out.or(r);
+        }
+        out
+    }
+
+    /// ⚠️★★★ **`n_lt30 == 0` の窓は 1 行も出さない** (ADR-013 D4)。
+    ///
+    /// ★ 理由は「在席の連続タイムラインを作らない」ことである
+    /// (毎分必ず出すと労務監視的な二次利用に転用されうる・security-checker MEDIUM)。
+    #[test]
+    fn starve_window_omits_empty_windows() {
+        // 60 秒ぶん回しても micro エピソードが 0 本なら None。
+        assert_eq!(run_window(&[], 60), None);
+        // ★ 念のため 3 窓ぶん回しても出ないこと。
+        let mut w = MicroStarveWindow::new();
+        for _ in 0..180 {
+            assert_eq!(w.tick(true, 0, 0, th(), TICK), None, "空の窓が出力された");
+        }
+    }
+
+    /// ⚠️★★★ **ブロック終了の 0 復帰を micro エピソードとして数えない**
+    /// (security-checker MEDIUM・2026-08-19)。
+    ///
+    /// ★ `step` は `!session_active` でも `starved_ms` を 0 に落とすので、
+    /// 素直に書くと**打鍵で終わっていないエピソード**が毎ブロック 1 本混入する
+    /// (＝ **系統誤差**)。
+    #[test]
+    fn block_end_does_not_count_a_fake_episode() {
+        let mut w = MicroStarveWindow::new();
+        // 計測中に 5 秒 starve していた状態から、**ブロック終了**で 0 に落ちる。
+        assert_eq!(w.tick(false, 5_000, 0, th(), TICK), None);
+        // ★ その後 1 窓ぶん回しても、偽エピソードが計上されていないので何も出ない。
+        let mut out = None;
+        for _ in 0..60 {
+            out = out.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        assert_eq!(out, None, "ブロック終了の 0 復帰が計上されている");
+    }
+
+    /// ⚠️★★★ **窓はブロックをまたがない** (security-checker MEDIUM・2026-08-19)。
+    ///
+    /// ★ またぐと **ブロック N の集計がブロック N+1 のファイルに書かれる**、または
+    /// `session_end` の後ろに 1 行付く ＝ 「1 ブロック = 1 ファイル」の前提で読む解析が
+    /// **誤帰属**する。
+    #[test]
+    fn window_is_closed_at_block_boundary() {
+        let mut w = MicroStarveWindow::new();
+        // ブロック N: 59 tick のあいだに micro を 3 本ためる (★ まだ窓は閉じていない)。
+        for _ in 0..3 {
+            assert_eq!(w.tick(true, 4_000, 0, th(), TICK), None);
+        }
+        for _ in 3..59 {
+            assert_eq!(w.tick(true, 0, 0, th(), TICK), None);
+        }
+        // ★ ブロック終了 → 窓ごと捨てる (⚠️ 端数は失われる = 既知の切り捨て)。
+        assert_eq!(w.tick(false, 0, 0, th(), TICK), None);
+
+        // ブロック N+1: 1 本だけ。⚠️ 前ブロックの 3 本が混ざっていないこと。
+        let mut out = None;
+        out = out.or(w.tick(true, 6_000, 0, th(), TICK));
+        for _ in 1..60 {
+            out = out.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        let t = out.expect("N+1 の窓が閉じるはず");
+        assert_eq!(t.n_lt30, 1, "前ブロックの集計が持ち越されている: {t:?}");
+        assert_eq!(t.sum_lt30_ms, 6_000);
+    }
+
+    /// ★ micro 帯 (`0 < peak < log_after_ms`) だけを数える。
+    ///
+    /// ⚠️ `peak >= log_after_ms` は `hook_health` (Suspect 以上) が既に記録しているので
+    /// **二重計上しない**。★ 2 つのトラックは閾値できれいに分割される。
+    #[test]
+    fn starve_window_counts_only_micro_episodes() {
+        // 2 秒 / 15 秒 = micro、30 秒 (境界) と 45 秒 = hook_health 側。
+        let t = run_window(&[2_000, 30_000, 15_000, 45_000], 60).expect("窓が出るはず");
+        assert_eq!(t.n_lt30, 2, "micro だけを数えること");
+        assert_eq!(t.sum_lt30_ms, 17_000);
+    }
+
+    /// ⚠️★★★ **`win_ms` は実測の窓長であって公称 60_000 ではない**
+    /// (code-reviewer MEDIUM・2026-08-19)。
+    ///
+    /// ★ `n_lt30 / win_ms` を「micro 帯の割合」として読む解析が**過大評価**にならないため。
+    #[test]
+    fn win_ms_reports_the_measured_window_length() {
+        // ① 1 秒 tick ちょうど 60 回 → 実測も 60_000。
+        let t = run_window(&[3_000], 60).expect("窓が閉じるはず");
+        assert_eq!(t.win_ms, 60_000);
+
+        // ② ⚠️ スリープ復帰などで 1 tick が巨大な場合。
+        //    ★ 公称を書いていたらここが 60_000 のまま嘘になる。
+        let mut w = MicroStarveWindow::new();
+        assert_eq!(w.tick(true, 5_000, 0, th(), 1_000), None);
+        let t2 = w
+            .tick(true, 0, 0, th(), 3_600_000)
+            .expect("巨大 tick で窓が閉じるはず");
+        assert_eq!(t2.n_lt30, 1);
+        assert_eq!(t2.win_ms, 3_601_000, "実測の窓長を載せること");
+    }
+
+    /// ⚠️★★★ **実行中の再押下 (`RotateForRestart`) でも「新しいブロック」と判定できること**
+    /// (Codex HIGH・2026-08-19)。
+    ///
+    /// ★ この経路は `session_active` を `true` のまま維持するので、
+    /// ⚠️ `false → true` の縁を見ていると**発火しない** ＝ 計器の状態が旧ファイルから
+    /// 持ち越され、`dropped_delta` / `starve_window` がファイル境界をまたぐ。
+    #[test]
+    fn new_block_epoch_fires_on_rotate_while_active() {
+        // ★ 通常のブロック開始 (0 → t)。
+        assert!(is_new_block_epoch(0, 1_700_000_000_000));
+        // ★★★ 本命: 実行中の再押下 (t1 → t2)。どちらも非ゼロ。
+        assert!(is_new_block_epoch(1_700_000_000_000, 1_700_000_268_500));
+        // ⚠️ 同じブロックのあいだは発火しない (毎 tick リセットしてはならない)。
+        assert!(!is_new_block_epoch(1_700_000_000_000, 1_700_000_000_000));
+        // ⚠️ ブロック終了 (t → 0) は「新しいブロック」ではない。
+        assert!(!is_new_block_epoch(1_700_000_000_000, 0));
+        assert!(!is_new_block_epoch(0, 0));
+    }
+
+    /// ⚠️★★★ **窓長の総和が実経過時間を超えない** (＝ 経過時間を二重計上しない)。
+    ///
+    /// ★ 「超過分を次の窓へ繰り越す」案を**採らない**根拠である ——
+    /// 繰り越した時間は**直前の窓の `win_ms` に既に数えられている**ので、
+    /// 次の窓でも数えると総和が実時間を超える。
+    #[test]
+    fn window_lengths_never_double_count_elapsed_time() {
+        let mut w = MicroStarveWindow::new();
+        const TICKS: u64 = 27;
+        const TICK_MS: u64 = 7_000;
+        let mut sum = 0u64;
+        for _ in 0..TICKS {
+            if let Some(t) = w.tick(true, 2_000, 0, th(), TICK_MS) {
+                sum += t.win_ms;
+            }
+        }
+        assert!(
+            sum <= TICKS * TICK_MS,
+            "窓長の総和 {sum} が実経過 {} を超えている (二重計上)",
+            TICKS * TICK_MS
+        );
+        // ★ どの窓も 60 秒以上ではある (閾値を下回って閉じない)。
+        assert!(sum >= 60_000, "1 窓も閉じていない: {sum}");
+    }
+
+    /// ⚠️ 境界値: `log_after_ms` **ちょうど**は micro ではない (`<` であって `<=` ではない)。
+    #[test]
+    fn starve_window_boundary_is_exclusive() {
+        assert_eq!(run_window(&[29_999], 60).map(|t| t.n_lt30), Some(1));
+        assert_eq!(run_window(&[30_000], 60), None);
+    }
+
+    /// ★ 窓は 60 秒で閉じ、集計は持ち越さない。
+    #[test]
+    fn starve_window_resets_between_windows() {
+        let mut w = MicroStarveWindow::new();
+        // 1 窓目: 1 本。
+        let mut first = None;
+        for i in 0..60 {
+            let r = if i == 0 {
+                w.tick(true, 5_000, 0, th(), TICK)
+            } else {
+                w.tick(true, 0, 0, th(), TICK)
+            };
+            first = first.or(r);
+        }
+        assert_eq!(first.map(|t| t.n_lt30), Some(1));
+        // 2 窓目: 0 本 → 出力しない (⚠️ 1 窓目の集計が残っていたらここで出てしまう)。
+        let mut second = None;
+        for _ in 0..60 {
+            second = second.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        assert_eq!(second, None, "前の窓の集計が持ち越されている");
+    }
+
+    /// ⚠️★★★ **`hook_health` の意味論が変わっていないこと** (ADR-013 D3-3a ③)。
+    ///
+    /// ★ ここが壊れると **ADR-011 の探索トラックと ADR-012 Stage 0 が再計算**になる。
+    /// → ★ `step` / `health` / 既定閾値を「動かしていない」ことを値で固定する。
+    #[test]
+    fn hook_health_semantics_unchanged() {
+        // ① 既定閾値は 30 秒 / 120 秒の二段のまま。
+        let d = Thresholds::default();
+        assert_eq!(d.log_after_ms, 30_000);
+        assert_eq!(d.down_after_ms, 120_000);
+
+        // ② `step` の 3 規則: 非計測は 0 / フック到達は 0 / システム入力が無ければ凍結。
+        let s = Starvation { starved_ms: 7_000 };
+        assert_eq!(step(s, false, true, false, TICK).starved_ms, 0);
+        assert_eq!(step(s, true, true, true, TICK).starved_ms, 0);
+        assert_eq!(step(s, true, false, false, TICK).starved_ms, 7_000);
+        assert_eq!(step(s, true, true, false, TICK).starved_ms, 8_000);
+
+        // ③ `health` の境界 (`>=`)。
+        assert_eq!(health(Starvation { starved_ms: 29_999 }, d), HookHealth::Ok);
+        assert_eq!(
+            health(Starvation { starved_ms: 30_000 }, d),
+            HookHealth::Suspect
+        );
+        assert_eq!(
+            health(
+                Starvation {
+                    starved_ms: 119_999
+                },
+                d
+            ),
+            HookHealth::Suspect
+        );
+        assert_eq!(
+            health(
+                Starvation {
+                    starved_ms: 120_000
+                },
+                d
+            ),
+            HookHealth::Down
+        );
     }
 }
 

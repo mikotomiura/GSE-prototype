@@ -58,6 +58,20 @@ pub enum LogEntryDto {
         /// (`preregistration.md §5.4` 第 10 版 / `.steering/20260805-g1-app-mode-and-log-rotation`)。
         #[serde(skip_serializing_if = "Option::is_none")]
         g1_mode: Option<String>,
+        /// ★ アプリの版 (**粗い semver のみ**)。**start 形状のみ** (ADR-013 D1)。
+        ///
+        /// ⚠️ git SHA / ビルドホスト名 / ビルド時刻 / マシン GUID は
+        /// **フィンガープリントになる**ので入れない (D6)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        app_version: Option<String>,
+        /// ★★★ **このビルドが何を記録できたか** (ADR-013 D1)。**start 形状のみ**。
+        ///
+        /// ⚠️ 解析側は `unconditional` の行が 0 行なら「**信号が無かった**」、
+        /// `threshold_gated` の行が 0 行なら「**判定不能**」、
+        /// どちらにも無いなら「**計器が無かった**」と機械判定する。
+        /// ★ `hmm_version` では代用できない (HMM の版であって記録能力ではない)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        capabilities: Option<CapabilitiesDto>,
     },
     /// ユーザーが「開始する」ボタンを押した時刻。
     SessionStart { t: u64 },
@@ -134,6 +148,31 @@ pub enum LogEntryDto {
         /// 分析スレッドへ渡せずに捨てた打鍵イベントの累計。
         /// ★ 「フックが呼ばれた」と「記録できた」は別なので両方残す。
         dropped: u64,
+        /// ⚠️★ **前の `hook_health` 行からの `dropped` の増分** (ADR-013 D4・穴 B)。
+        /// ★ `dropped` は累積なのに解析側が「この区間で落ちた」と読む誤りが実際に起きたため、
+        /// 改名 (breaking) ではなく**併記**で誤読を消す。
+        ///
+        /// ## ⚠️★★★ なぜ `Option` なのか (現行コードは**必ず**書くのに)
+        ///
+        /// ★ 本 DTO は「**このバージョンが出す形**」ではなく「**NDJSON がとりうる形**」を表す。
+        /// ⚠️ **2026-08-19 より前のログには本フィールドが無い**ので、`required` に入れると
+        /// **旧ログが schema 検証に落ちる** ＝ ADR-005 の additive-only と、ADR-013 Consequences
+        /// 逐語「`required` を増やさないので**旧ログは読めるまま**」に反する。
+        /// ★ 実際 `emit_schema` の diff で `required` に入ったのを見て `Option` へ直した
+        /// (2026-08-19)。★ `g1_mode` が `Option` なのと同じ理由である。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dropped_delta: Option<u64>,
+    },
+    /// ★ 30 秒未満の在席×非打鍵 (micro 帯) の 60 秒窓集計 (ADR-013 D4・穴 A)。
+    ///
+    /// ⚠️ **`n_lt30 == 0` の窓は出力されない** —— 毎分必ず 1 行出すと
+    /// 「分単位の在席/中断の連続タイムライン」になり労務監視的な二次利用に転用されうるため。
+    /// ★ したがって本行が無いことは「micro 沈黙が無かった」を意味しない。
+    StarveWindow {
+        t: u64,
+        win_ms: u64,
+        n_lt30: u64,
+        sum_lt30_ms: u64,
     },
     /// Phase 1 Ground Truth ユーザーラベル。
     /// `recovered_at` はログ記録時は常に null、`gse-replay --metrics` で後付け算出。
@@ -249,6 +288,36 @@ pub enum LogEntryDto {
         changes: u16,
         ts: u64,
     },
+}
+
+/// ★ 収集仕様の自己記述 (ADR-013 D1)。`meta`(session_start) 行にのみ現れる。
+///
+/// ## ⚠️★★★ 2 群を分ける理由 (分けないと自己矛盾する)
+///
+/// 閾値ゲート付きの行種では **「0 行」は「信号が無かった」を意味しない**
+/// (閾値未達と区別できない)。★ 単一の集合にすると、
+/// **本 ADR が防ごうとした取り違えを判定表が再導入する** (code-reviewer HIGH)。
+///
+/// ⚠️ 列挙されるのは **行種名**であって `meta` 行のフィールド名ではない
+/// (`"session_start"` は `{"type":"session_start"}` という*行種*を指し、
+/// 同名の `meta.session_start` *フィールド*とは別物である)。
+#[derive(Serialize, JsonSchema)]
+pub struct CapabilitiesDto {
+    /// このビルドが**無条件に**出せる行種。★ 0 行なら「信号が無かった」と言える。
+    pub unconditional: Vec<String>,
+    /// ⚠️ 閾値ゲート付きの行種。★ 0 行は「**判定不能**」であって信号皆無ではない。
+    pub threshold_gated: Vec<String>,
+    /// ⚠️★★★ **設定で丸ごと止まる**行種 (2026-08-19 追加・code-reviewer HIGH)。
+    ///
+    /// ★ 0 行は「**判定不能**」である。例: `probe_assignment` は **G1 実施中は常に 0 行**
+    /// (`probes_disabled`)、`intervention_decision` は **盲検較正では常に 0 行**
+    /// (`intervention_enabled = false`)。
+    /// ⚠️ これらを `unconditional` に置くと「**測れて、無かった**」という**偽の結論**が
+    /// 機械的に出る —— ★ 「計器が無い」より質が悪い (**測ったふりをする**)。
+    ///
+    /// ⚠️ **旧ログには本フィールドが無い**ので `Option` にしてある (additive・`required` に入れない)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_gated: Option<Vec<String>>,
 }
 
 /// Ground Truth ラベルの種別。NDJSON 文字列は "flow" / "incubation" / "stuck"。
