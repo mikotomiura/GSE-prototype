@@ -395,6 +395,90 @@ pub fn decide_start_action(
     }
 }
 
+// ---------------------------------------------------------------------------
+// ブロックの自動終了 — D-1 (自動終了スレッド × 「開始する」押下の競合)
+// ---------------------------------------------------------------------------
+
+/// ブロック自動終了スレッドが、いま何をすべきか。
+///
+/// ★ 判定だけをここに置き、効果 (`session_active` の停止・`BlockEnd` の送信) は
+/// `lib.rs` が適用する ([`decide_start_action`] と同じ流儀)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockEndAction {
+    /// ブロックが始まっていない (`SESSION_START_MS == 0`)。★ 何もしない。
+    NotStarted,
+    /// まだ [`BLOCK_DURATION_MS`] に達していない。★ 回り続ける。
+    KeepRunning,
+    /// ★ 閉じてよい。
+    EndBlock,
+    /// ⚠️★★★ **観測した時点とは別のブロックになっている** → **中止する**。
+    ///
+    /// ★ 「開始する」が押されて新しいブロックが始まった (通常のブロック開始でも、
+    /// 実行中の再押下 [`StartAction::RotateForRestart`] でも起きる)。
+    /// ⚠️ ここで進むと **始まったばかりのブロックへ `session_end` を書く**。
+    Superseded,
+}
+
+/// ブロックを自動終了してよいかを決める**純関数**。
+///
+/// ## ⚠️★★★ なぜ「観測した時点」と「いまの時点」を分けて渡すのか (D-1)
+///
+/// 自動終了スレッドは 500 ms ごとに `SESSION_START_MS` を読み、5 分を越えていたら
+/// ブロックを閉じる。⚠️ **その判断と実際に閉じる操作の間には窓がある** ——
+/// その窓で「開始する」が押されると、次の 2 通りに壊れる:
+///
+/// | 交錯 | ⚠️ 何が起きるか |
+/// |---|---|
+/// | **押下が後** | 自動終了が `session_active=false` にした後で押されるので `was_active == false` → [`StartAction::RotateForNewBlock`] → **`Rotate` が先に届く** → 直後の `BlockEnd` が**新しいファイルへ `session_end` を書く** (`logger.rs` の `Rotate` が `block_closed` を `false` に戻すため) |
+/// | **押下が先** | 自動終了の `SESSION_START_MS.store(0)` が**始まったばかりのブロックの開始時刻を消す** → ★ 分析が止まり、`start == 0` で `continue` するので**自動終了も二度と来ない** |
+///
+/// ★ **pre-existing** だが、⚠️ G-1 修正で「実行中の押下」が**想定内の操作**になったぶん
+/// 確率が上がった。⚠️★★★ **これはリブートの原因と同じ失敗クラス (ブロック境界の破れ) である。**
+/// `preregistration.md §3.6` がブロックの事後除外を禁じているので、走り出したら**回復不能**。
+///
+/// → ★ **「押下が後」は排他 (`lib.rs` の `BLOCK_TRANSITION`) が順序を作って閉じる。**
+/// → ★ **「押下が先」は本関数が [`BlockEndAction::Superseded`] として閉じる。**
+///
+/// ⚠️ **排他だけでは足りない**: 先に排他を取った自動終了が、
+/// 既に交代済みのブロックを閉じてしまう。★ だから**照合**が要る。
+/// ⚠️ **照合だけでも足りない**: `start_session` は `Rotate` を**ログのロックの中**で送り、
+/// `SESSION_START_MS` を**ロックを抜けた後**で書くので、
+/// ★ 「`Rotate` は送られたが `SESSION_START_MS` はまだ 0」という窓が実在する。
+/// → ⚠️★★★ **排他と照合の両方が要る。**
+///
+/// ## 引数
+///
+/// - `observed_start_ms`: ★ ポーリング時に観測した `SESSION_START_MS`。
+/// - `current_start_ms`: ⚠️★ **排他を取った後**に読み直した `SESSION_START_MS`。
+///   ポーリング時点の判定では `observed_start_ms` と同じ値を渡す
+///   (＝ そこでは交代を判定しない)。
+/// - `now_ms`: いまの epoch ms。
+/// - `limit_ms`: 1 ブロックの長さ ([`BLOCK_DURATION_MS`])。
+///
+/// ⚠️ ★ `now_ms < observed_start_ms` (時計の巻き戻し) は `saturating_sub` で 0 になり、
+/// [`BlockEndAction::KeepRunning`] に倒れる。★ **勝手に閉じないほうが安全側**である
+/// (閉じ損ねは次のポーリングで拾えるが、誤って閉じたブロックは `§3.6` により戻せない)。
+pub fn decide_block_end(
+    observed_start_ms: u64,
+    current_start_ms: u64,
+    now_ms: u64,
+    limit_ms: u64,
+) -> BlockEndAction {
+    if observed_start_ms == 0 {
+        return BlockEndAction::NotStarted;
+    }
+    // ⚠️★★★ **経過時間より先に照合する。** 逆にすると、交代後の (まだ 5 分に達していない)
+    //   ブロックに対して `KeepRunning` を返してしまい、★ 呼び出し側が
+    //   「まだ時間じゃないだけ」と読んで**同じブロックをもう一度閉じようとする**。
+    if current_start_ms != observed_start_ms {
+        return BlockEndAction::Superseded;
+    }
+    if now_ms.saturating_sub(observed_start_ms) < limit_ms {
+        return BlockEndAction::KeepRunning;
+    }
+    BlockEndAction::EndBlock
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -739,5 +823,205 @@ mod tests {
             files += 1;
         }
         assert_eq!((blocks, files), (2, 3), "★ 衝突も孤児も出ない");
+    }
+
+    // -----------------------------------------------------------------------
+    // ブロックの自動終了 (D-1) — ⚠️★★★ 交錯の 2 方向をそれぞれ固定する
+    // -----------------------------------------------------------------------
+
+    /// 5 分ぴったりの開始時刻。★ 値そのものに意味は無い (非ゼロであることだけ)。
+    const T1: u64 = 1_700_000_000_000;
+    /// ★ 交代後のブロックの開始時刻 (T1 とは別の値)。
+    const T2: u64 = 1_700_000_268_500;
+
+    /// ⚠️★★★ **交錯 ①「押下が先」**: 観測してから排他を取るまでに新しいブロックが始まった
+    /// → **中止する** (`Superseded`)。
+    ///
+    /// ★ ここで進むと `SESSION_START_MS.store(0)` が**始まったばかりのブロックを殺し**、
+    /// ⚠️ `start == 0` で `continue` するので**自動終了も二度と来ない**。
+    #[test]
+    fn block_end_is_aborted_when_a_new_block_started() {
+        // 通常のブロック開始で交代した (前が閉じてから押された)。
+        assert_eq!(
+            decide_block_end(T1, T2, T1 + BLOCK_DURATION_MS, BLOCK_DURATION_MS),
+            BlockEndAction::Superseded,
+        );
+        // ⚠️★ 実行中の再押下 (`RotateForRestart`) でも交代する。
+        //   ★ この経路は `session_active` を true のまま維持するので、
+        //   `session_active` を見ていると気づけない (Codex HIGH・2026-08-19 と同じ罠)。
+        assert_eq!(
+            decide_block_end(T1, T2, T1 + BLOCK_DURATION_MS * 3, BLOCK_DURATION_MS),
+            BlockEndAction::Superseded,
+        );
+        // ⚠️★★★ **経過時間より照合が先**であること。交代後のブロックがまだ 5 分に
+        //   達していなくても `KeepRunning` ではなく `Superseded` を返す
+        //   (★ `KeepRunning` だと呼び出し側が「まだ時間じゃないだけ」と読んで再挑戦する)。
+        assert_eq!(
+            decide_block_end(T1, T2, T2 + 1_000, BLOCK_DURATION_MS),
+            BlockEndAction::Superseded,
+            "★ 交代の判定は経過時間より先"
+        );
+    }
+
+    /// ⚠️★★★ **交錯 ②「押下が後」**: 排他を取った時点で**まだ同じブロック**なら
+    /// **閉じてよい** (`EndBlock`)。
+    ///
+    /// ★ この後に押される分は `lib.rs` の `BLOCK_TRANSITION` が待たせるので、
+    /// `Rotate` は必ず `BlockEnd` の**後ろ**に回る。
+    /// ⚠️ 純関数はここまでしか言えない —— **順序を作るのは排他の仕事**である。
+    #[test]
+    fn block_end_proceeds_for_the_same_block() {
+        assert_eq!(
+            decide_block_end(T1, T1, T1 + BLOCK_DURATION_MS, BLOCK_DURATION_MS),
+            BlockEndAction::EndBlock,
+            "★ 5 分ちょうどで閉じる (>= 境界)"
+        );
+        assert_eq!(
+            decide_block_end(T1, T1, T1 + BLOCK_DURATION_MS * 2, BLOCK_DURATION_MS),
+            BlockEndAction::EndBlock,
+        );
+    }
+
+    /// まだ 5 分に達していないブロックは閉じない。
+    #[test]
+    fn block_end_waits_until_the_limit() {
+        assert_eq!(
+            decide_block_end(T1, T1, T1 + BLOCK_DURATION_MS - 1, BLOCK_DURATION_MS),
+            BlockEndAction::KeepRunning,
+            "★ 1 ms 手前ではまだ閉じない"
+        );
+        assert_eq!(
+            decide_block_end(T1, T1, T1, BLOCK_DURATION_MS),
+            BlockEndAction::KeepRunning,
+        );
+    }
+
+    /// ブロックが始まっていなければ何もしない。
+    #[test]
+    fn block_end_ignores_an_unstarted_block() {
+        assert_eq!(
+            decide_block_end(0, 0, T1, BLOCK_DURATION_MS),
+            BlockEndAction::NotStarted,
+        );
+        // ⚠️ 観測が 0 なら、いま非ゼロでも「未開始」として扱う
+        //   (★ そのブロックは次のポーリングが観測する)。
+        assert_eq!(
+            decide_block_end(0, T2, T1, BLOCK_DURATION_MS),
+            BlockEndAction::NotStarted,
+        );
+    }
+
+    /// ⚠️★ **時計が巻き戻っても勝手に閉じない** (安全側)。
+    ///
+    /// ★ 閉じ損ねは次のポーリングで拾えるが、⚠️ 誤って閉じたブロックは
+    /// `preregistration.md §3.6` (事後除外の禁止) により**戻せない**。
+    #[test]
+    fn block_end_does_not_fire_when_the_clock_goes_backwards() {
+        assert_eq!(
+            decide_block_end(T1, T1, T1 - 60_000, BLOCK_DURATION_MS),
+            BlockEndAction::KeepRunning,
+        );
+    }
+
+    /// ★ ポーリング時点の呼び出し (`observed == current`) では `Superseded` になりえない。
+    /// ⚠️ ここが崩れると、排他の外で中止判定が起き**ブロックが閉じなくなる**。
+    #[test]
+    fn polling_call_never_reports_superseded() {
+        for now in [0u64, T1, T1 + BLOCK_DURATION_MS, u64::MAX] {
+            let a = decide_block_end(T1, T1, now, BLOCK_DURATION_MS);
+            assert_ne!(a, BlockEndAction::Superseded, "now={now}");
+        }
+    }
+
+    /// ⚠️★★★ **配線の不変条件を固定する** (D-1)。
+    ///
+    /// [`decide_block_end`] は「押下が**先**」の交錯しか閉じられない。
+    /// ★ 「押下が**後**」を閉じるのは `lib.rs` の `BLOCK_TRANSITION` が作る**順序**であり、
+    /// それは純関数テストでは表現できない。→ ⚠️ **ソース走査で位置関係を固定する。**
+    ///
+    /// 固定する不変条件は 2 つ:
+    ///
+    /// 1. `start_session` が、`Rotate` を送る**前**に排他を取り、
+    ///    `SESSION_START_MS.store(now)` の**後**に離す
+    ///    (★ 「`Rotate` は送られたが `SESSION_START_MS` はまだ 0」の窓を消すため)
+    /// 2. 自動終了スレッドが、`BlockEnd` を送る**前**に排他を取り、**後**に離す
+    ///
+    /// ⚠️★ **本テストは回帰検知であって設計保証ではない** (Codex 指摘 3・2026-08-21)。
+    /// ★ 位置関係しか見ていないので、「同じ guard が本当に保持されている」ことは証明しないし、
+    /// ⚠️ ヘルパ関数化やログ文の変更で**壊れる**。
+    /// → ★ 壊れたときは「テストが古い」と断じる前に、
+    ///   **上の 2 つの不変条件がまだ成り立っているか**を目で確かめること。
+    ///
+    /// ⚠️ ★ **バイト数でスライスしない** —— 日本語コメントで文字境界 panic する
+    /// (`.steering/20260819-g1-reboot-and-instrument-fix/blockers.md` B-4 で実際に踏んだ)。
+    /// → `match_indices` が返す位置を**比較するだけ**にする。
+    #[test]
+    fn block_transition_is_held_across_the_whole_block_boundary() {
+        const SRC: &str = include_str!("lib.rs");
+        let pos =
+            |needle: &str| -> Vec<usize> { SRC.match_indices(needle).map(|(i, _)| i).collect() };
+
+        // ⚠️★ **呼び出し回数で数える** (code-reviewer LOW・2026-08-21)。
+        //   ★ binding 名 (`let block_transition = ...`) で数えると、
+        //   `let _g = lock_block_transition();` のような別名追加が**素通りする**。
+        let acquire = pos("lock_block_transition();");
+        let release = pos("drop(block_transition);");
+        assert_eq!(
+            acquire.len(),
+            2,
+            "★ 排他を取るのは start_session と自動終了スレッドの 2 箇所だけ"
+        );
+        assert_eq!(release.len(), 2, "★ 明示的に離すのも 2 箇所");
+
+        // ⚠️★★★ **照合も固定する** (code-reviewer MEDIUM・2026-08-21)。
+        //   ★ 変異テストで実測: ロック配置を壊す 5 変異はすべて赤になったが、
+        //     **再照合を潰す変異は緑のまま**だった。
+        //   → 設計は「排他と照合の**両方**が要る」と言っているのに、
+        //     ⚠️ 固定されていたのは排他だけだった。
+        let recheck = pos("let current_start_ms = SESSION_START_MS.load(Ordering::Acquire);");
+        let rotate = pos("LogEntry::Rotate { new_path }");
+        let start_ms = pos("SESSION_START_MS.store(now, Ordering::Release);");
+        let block_end = pos("block_log_tx.try_send(LogEntry::BlockEnd)");
+        assert_eq!(rotate.len(), 1);
+        assert_eq!(start_ms.len(), 1);
+        assert_eq!(block_end.len(), 1);
+
+        // ① start_session: 取る → Rotate → SESSION_START_MS → 離す
+        assert!(
+            acquire[0] < rotate[0],
+            "⚠️ start_session が Rotate を送った後で排他を取っている              (★ Rotate と SESSION_START_MS の間に窓が残る)"
+        );
+        assert!(
+            start_ms[0] < release[0],
+            "⚠️ SESSION_START_MS.store(now) の前に排他を離している              (★ 自動終了が「まだ 0」を見て新しいファイルへ session_end を書く)"
+        );
+        assert!(rotate[0] < start_ms[0], "★ 送信は SESSION_START_MS より前");
+
+        // ② 自動終了スレッド: 取る → BlockEnd → 離す
+        assert!(
+            acquire[1] < block_end[0],
+            "⚠️ BlockEnd を送った後で排他を取っている (★ 順序を作れていない)"
+        );
+        assert!(
+            block_end[0] < release[1],
+            "⚠️ BlockEnd を送る前に排他を離している              (★ その隙に Rotate が割り込むと session_end が新しいファイルへ行く)"
+        );
+
+        // ③ ⚠️★★★ 照合は**排他の中**で、かつ `BlockEnd` より**前**に行う。
+        assert_eq!(
+            recheck.len(),
+            1,
+            "★ 排他を取った後の再照合が見つからない (「押下が先」の交錯が閉じない)"
+        );
+        assert!(
+            acquire[1] < recheck[0] && recheck[0] < block_end[0],
+            "⚠️★★★ 再照合が排他の外にあるか、BlockEnd より後にある。             ★ 排他だけでは『先に排他を取った自動終了が、既に交代済みのブロックを閉じる』             を防げない —— 照合が要る"
+        );
+
+        // ④ ⚠️ 2 箇所が入れ子になっていないこと (★ start_session が先・自動終了が後)。
+        assert!(
+            release[0] < acquire[1],
+            "⚠️ 2 つの臨界区間がソース上で入れ子に見える。★ 位置関係の前提が崩れた"
+        );
     }
 }
