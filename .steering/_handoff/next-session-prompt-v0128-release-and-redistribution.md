@@ -19,13 +19,24 @@
 | **T-2** | ADR-013 Migration 3/4 | ★ `scripts/capabilities_gate.py` を CI 込みで実装。Migration 2b/2c/3/4 完了 |
 | **T-3** | X 軸再定義の議論 | ★ ADR-009 は **Proposed のまま ＋ Accepted 条件を明文化**。⚠️ **実装していない** |
 
-★ **ブランチ `fix/precollection-close-and-x-axis` に 3 コミット。⚠️ 未 push・未マージ。**
+### ✅ **PR #108 は 2026-08-21 にマージ済み**（★ §2-1 は完了している）
 
 ```
+1d0a6b2 Merge pull request #108 from mikotomiura/fix/precollection-close-and-x-axis
+e6198fa docs(steering): Windows 側の次を作業場行動メモの仕分けと議論に差し替える
+ff49117 docs(steering): 次の 2 セッション (Mac=リリース / Windows=表現層) の引き継ぎを書く
 c5a8e17 docs(adr): ADR-009 に Accepted 条件を明文化する (T-3・議論のみ)
 987fcac feat(analysis): capabilities の機械判定ゲートを追加する (ADR-013 Migration 3/4)
 c42b0e4 fix(g1): ブロック遷移を直列化し、自動終了と押下の競合を閉じる
 ```
+
+★ CI は**全ジョブ緑**だった。⚠️ 特に **`check` が win / mac の self-hosted 両方で**
+`Cargo build` / `Cargo test --workspace` / `Snapshot regression` / `Schema drift check` を通した
+（★ 「手元の検証は CI の代替にならない」への答え）。
+`frontend-check` には**今回追加した capabilities gate の 2 ステップ**が含まれ、これも緑。
+
+→ ⚠️★★★ **本セッションは §2-2（バージョン bump）から始める。**
+★ 最初に `git checkout main && git pull` すること。
 
 検証は全部緑: `cargo test --workspace` **468 passed** / ゴールデン **6 本 byte-equal** /
 `HMM_VERSION` **0.4.0 据え置き** / `emit_schema` **byte-equal** / schema parity **exit 0** /
@@ -50,21 +61,16 @@ Python **83 tests** / `--self-test` 2 本 / `check_citations` 緑。
 
 ## §2 ★ 手順（★ この順に実行する）
 
-### §2-1 PR → CI → main マージ
+### ~~§2-1 PR → CI → main マージ~~ ✅ **完了済み（2026-08-21・PR #108）**
 
-```bash
-git checkout fix/precollection-close-and-x-axis
-git push -u origin fix/precollection-close-and-x-axis
-gh pr create --fill   # ★ 本文に .steering/20260821-precollection-close-and-x-axis/ を参照させる
-```
+★ **やることは無い。** 最初に `git checkout main && git pull` して
+`1d0a6b2` 以降になっていることだけ確認し、**§2-2 へ進む**。
 
-⚠️★★ **CI が全ジョブ緑になるまでマージしない。**
-`check` は **win / mac とも self-hosted**（`gse-win=G-GEAR` / `gse-mac`）で走る。
-→ ★ **その Mac がオンラインである必要がある**（本セッションを Mac でやるなら好都合）。
+⚠️ 参考（次に PR を出すときのため）: `check` は **win / mac とも self-hosted**
+（`gse-win=G-GEAR` / `gse-mac`）で走る。★ **その Mac がオンラインである必要がある**。
 ⚠️ Windows 側が offline なら 30 秒で hosted へ fallback する（`decide-win-runner`）。
-
-★ `frontend-check` には**今回追加した 2 ステップ**がある
-（`capabilities_gate.py --self-test` ／ 単体テスト）。⚠️ ここが赤ならマージしない。
+⚠️★ **cache 保存ステップ（`Post Run rust-cache`）が長い** —— 実測で
+**実質的な検査が全部 ✓ になってから 30 分以上**かかった。★ 止まっているのではない。
 
 ### §2-2 バージョンを 0.1.28 へ上げる
 
