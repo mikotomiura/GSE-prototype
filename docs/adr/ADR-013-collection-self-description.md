@@ -32,9 +32,9 @@
 
 | # | 穴 | 実測の根拠（`file:line`） |
 |---|---|---|
-| **A** | ⚠️ **30 秒未満の非打鍵は 1 行も残らない** | `src-tauri/src/lib.rs:2924`（`if health == prev_health && !rehook { continue; }`）＋ `src-tauri/src/input/liveness.rs:64`（`log_after_ms: 30_000`）→ **[P121] が「局所思考」と位置づけた micro 帯（2–15 秒）について永久に何も言えない** |
+| **A** | ⚠️ **30 秒未満の非打鍵は 1 行も残らない** | `src-tauri/src/lib.rs` の間引き（`if health == prev_health && !rehook { continue; }`）＋ `src-tauri/src/input/liveness.rs` の `log_after_ms: 30_000`（`log_after_ms: 30_000`）→ **[P121] が「局所思考」と位置づけた micro 帯（2–15 秒）について永久に何も言えない** |
 | **B** | ⚠️ **`dropped` は累積カウンタ**なのに解析側は「この区間で落ちた」と読む | `src-tauri/src/input/hook.rs:140`（`EVENTS_DROPPED: AtomicU64`）を `lib.rs:2883` が読み `:2965` で**そのまま**搬送。★ **前タスクの除外規則が実際に誤読していた**（code-reviewer HIGH で修正） |
-| **C** | ⚠️★★★ **計器の有無を「その計器が出す行の有無」で判定できない** | `lib.rs:2924` は状態変化時にしか出さないので、**計器が動いていて 30 秒未満しか starve しなかったセッションも 0 行**になる。★ 前タスクはこれを「入力皆無だった」と報告しかけた |
+| **C** | ⚠️★★★ **計器の有無を「その計器が出す行の有無」で判定できない** | `lib.rs` の間引き（`if health == prev_health && !rehook { continue; }`） は状態変化時にしか出さないので、**計器が動いていて 30 秒未満しか starve しなかったセッションも 0 行**になる。★ 前タスクはこれを「入力皆無だった」と報告しかけた |
 
 ★ **C の一般形が本 ADR の核心**である。
 
@@ -211,7 +211,7 @@
 という新しい粒度が生まれ、労務監視的な二次利用に転用されうる**（security-checker MEDIUM）。
 → ★ 本 ADR は **micro 帯の量を測る**ためのものであって、**在席を連続記録するためのものではない。**
 
-★★★ **決定的な利点**: `lib.rs:2924` の出力条件を変えないので、
+★★★ **決定的な利点**: `lib.rs` の間引き（`if health == prev_health && !rehook { continue; }`） の出力条件を変えないので、
 **≥30 秒トラックの旧ログ（G1 を含む）と新ログが同一意味論のまま比較できる。**
 → ⚠️ **ADR-011 の探索トラックが再計算にならず**、
 `experiments/20260819-silence-presence-decomposition/env.md` の「依存している実装」表を壊さない。
@@ -345,12 +345,41 @@ participant-guide に `starve_window`（＝「毎分の短い中断の回数と�
      `validate_blocks.py --selftest` 緑。
    ~~⚠️ **未了（G1 完了後）**~~
    ★ acceptance は **D3 の 5 テスト**（網羅 / OS 対 / **仕様の回帰**（`n_lt30==0` 非出力・`dropped_delta` の差分・**`hook_health` 意味論の不変**）/ **過大申告の逆アサート** / schema parity）を必須とする。
-2b. ⚠️★★★ **未了（収集開始前・実装と対で必須）**: **同意文書・participant-guide の記録項目表**に
-   `starve_window` と `app_version` を追記し、**配布済みの電子同意フォームと突合する**（D5）。
-   ⚠️ **これが終わるまで次コホートの収集を始めない。**
-3. ⚠️ **未了**: `docs/development-guidelines.md` §10 と `docs/architecture/personalization-and-online-learning.md §5.2`
-   に「**収集済み信号を使う解析は、最初に `capabilities` を機械判定する**」を追記する。
-4. ⚠️ **未了**: `experiments/` 側の解析テンプレートに **`capabilities` 判定を前処理の先頭**として入れる
-   （★ 「対象ログの行種を数える」を人の手順ではなくコードにする）。
+2b. ★ **実施済み（2026-08-20）**: **同意文書・participant-guide の記録項目表**に
+   `starve_window`（「1 分ごとの**短い中断**の回数と合計時間」・⚠️ 0 回の分は記録しない）と
+   `app_version`（「アプリの版」）を追記し、**配布済みの電子同意フォームと突合した**（D5）。
+   - ★ **GAS の自己申告ではなく、被験者が見る公開 viewform を外から読んで確認した**
+     （新文言 4 種が出て旧文言が消えたことを**対照つき**で実測）。
+   - ★ 既存回答 6 件は不変。提出経路も生存確認済み（`onG1ConsentSubmit` がトリガー経由で完了）。
+   - 一次記録: `.steering/20260820-consent-form-live-sync/`
+2c. ★ **実施済み（2026-08-21）**: ⚠️★★★ **`starve_window` の実発火を初めて実測した**（陽性対照）。
+   ★ 本 ADR の D1 が `starve_window` を `threshold_gated` に置いた以上、**0 行は「判定不能」としか読めない**
+   —— つまり ⚠️ **計器が壊れていても気づけない**。→ ★ 配線の鎖（フック → `CALLBACK_COUNT` →
+   `liveness::step` → `MicroStarveWindow::tick` → `LogEntry::StarveWindow` → `logger` → NDJSON）が
+   **両端まで通っていること**を実機で確認した。
+   - 条件: Windows 11 / `meta.g1_mode = "marker"`（**配布形と同じ経路**）/ `app_version = 0.1.27`
+   - 実測: `starve_window` **1 行**（`win_ms = 60000` / `n_lt30 = 3` / `sum_lt30_ms = 21000`）、
+     `hook_health` **0 行**（★ 30 秒に達していないので期待どおり ＝ **2 トラックが閾値で分割されている**実証）
+   - 一次記録: `.steering/20260821-precollection-close-and-x-axis/t0-result.md`
+     （⚠️ **生 NDJSON は repo に置かない**・値のみ転記）
+   - ⚠️ `n_lt30 = 3` に対し操作は 5 回。★ **下側に偏るのは仕様**（1 Hz 分解能・所見 B）。
+3. ★ **実施済み（2026-08-21）**: `docs/development-guidelines.md` **§10.5**（新設・判定表と使い方の SSOT）と
+   `docs/architecture/personalization-and-online-learning.md §5.2`（表の冒頭に警告）に
+   「**収集済み信号を使う解析は、最初に `capabilities` を機械判定する**」を追記した。
+4. ★ **実施済み（2026-08-21）**: 判定を**コード**にした。
+   - `scripts/capabilities_gate.py`（**新規**）—— 3 群 ＋「表に無い」＋ **旧ログ**（`capabilities` キー欠如）
+     ＋ ⚠️★★★ **`MIXED`**（コホート内で宣言が食い違う＝過去 2 件の失敗様式）を判定する。
+     `preflight()` で Python から、CLI で `run.sh` から呼べる。**exit code で止まる**。
+   - `experiments/_template/`（**新規**）—— `run.sh` の **Step 0** がこのゲートである。
+     `docs/experiment-tracking.md` のディレクトリ規約・再現性チェックリストにも反映した。
+   - `scripts/tests/test_capabilities_gate.py`（**新規**・20 テスト）＋ `--self-test`（空振り検査）。
+   - ⚠️★★ **CI に載せた**（`.github/workflows/ci.yml` の `frontend-check`）——
+     ★ 本 ADR の診断が「規約は書いてあったのに適用しなかった」である以上、
+     **検査が空振りしていないことまで機械が見る**必要がある。
+   - ⚠️ **実ログで検算した**（2026-08-21）: 新ログ（v0.1.27）は `key=PRESENT` /
+     `starve_window=PRESENT` / `probe_assignment=UNDECIDABLE`（exit 3）、
+     旧ログ（2026-08-10）は `key=PRESENT` / `starve_window=INSTRUMENT_ABSENT`（exit 4）、
+     新旧混在は `MIXED`（exit 6）。★ **空振りしていない。**
 5. ★ **次コホートの収集開始前**に 2〜4 が終わっていることを確認する（D5）。
    ⚠️ **終わっていなければ収集を始めない。**
+   → ★ **2026-08-21 時点で 2 / 2b / 2c / 3 / 4 はすべて完了**している。

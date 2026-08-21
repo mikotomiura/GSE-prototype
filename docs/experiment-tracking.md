@@ -36,10 +36,20 @@ experiments/<YYYYMMDD>-<exp-name>/
 ├── data.md              — 入力 NDJSON の version/hash と被験者/OS（gse-dataset の commit hash で固定）
 ├── env.md               — 環境固定（Cargo.lock / rustc version / OS、Python 使用時は requirements.txt 等）
 ├── run.sh               — 実行コマンド（gse-replay / gse-cohort の起点。再現のエントリ）
+│                          ⚠️★★★ **Step 0 は `scripts/capabilities_gate.py`**（ADR-013 Migration 4）
 ├── results/             — 生成物（metrics.json / calib.json / cohort.json / segments.txt 等）
 ├── metrics.json         — 主要指標（gse-dataset の metrics/P*/<os>/ へ置く共有値と同一）
 └── notes.md             — 所感・逸脱・気づき + 下記リンク
 ```
+
+★ **雛形は `experiments/_template/`**（`run.sh` / `README.md`）。新しい実験はここをコピーして始める。
+
+⚠️★★★ **`run.sh` の Step 0 (`capabilities_gate.py`) を消さないこと。**
+「収集済み信号を使う解析は、最初に `capabilities` を機械判定する」という規約を、
+★ **人の手順ではなくコード**にしたものである（判定表と使い方の SSOT は
+`docs/development-guidelines.md §10.5`）。
+⚠️ ADR-013 自身の診断は逐語で「**規約は書いてあったのに適用しなかった**」であり、
+★ 「計器がコホートを跨げなかった」失敗は既に **2 件**起きている。
 
 `notes.md` に必須リンク:
 - **検証する仮説**: `docs/research-positioning.md` §5 の H? へのリンク
@@ -69,6 +79,9 @@ experiments/<YYYYMMDD>-<exp-name>/
 - [ ] `run.sh` / `scripts/repro.sh` で 1 コマンド再現できるか
 - [ ] HMM_VERSION を config と結果に刻んだか
 - [ ] 結果が research-positioning.md の仮説（§5 H?）と PreReg 番号に対応づいているか
+- [ ] ⚠️★★★ **前処理の先頭で `capabilities_gate.py` を通したか**（ADR-013）。
+      ★ 0 行を「信号が無かった」と読んでいないか。`--allow-undecidable` を使ったなら、
+      `notes.md` の結論を「無かった」ではなく**「判定不能」**と書いたか
 
 ## scripts/repro.sh の方針
 

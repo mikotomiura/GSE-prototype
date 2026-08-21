@@ -185,6 +185,19 @@ jobs:
         run: python3 scripts/check_vignettes.py
         env:
           PYTHONUTF8: "1"
+      # ⚠️★★★ ADR-013 Migration 4: 解析の前処理ゲート (capabilities の機械判定)。
+      #   ★ 「計器がコホートを跨げなかった」失敗が 2 件起きており、ADR-013 自身の診断は
+      #     「規約は書いてあったのに適用しなかった」である。→ 検査を**コードにした**以上、
+      #     ⚠️ その検査が空振りしていないことを CI で担保する。
+      #   ⚠️ 生ログは CI に無いので、走らせるのは `--self-test` と単体テストだけである。
+      - name: Capabilities gate self-test (検査が空振りしていないか)
+        run: python3 scripts/capabilities_gate.py --self-test
+        env:
+          PYTHONUTF8: "1"
+      - name: Capabilities gate unit tests (ADR-013 判定表)
+        run: python3 -m unittest scripts.tests.test_capabilities_gate
+        env:
+          PYTHONUTF8: "1"
 
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:
