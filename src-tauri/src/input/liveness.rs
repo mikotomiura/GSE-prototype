@@ -260,6 +260,85 @@ pub fn is_new_block_epoch(prev_session_start_ms: u64, now_session_start_ms: u64)
     now_session_start_ms != 0 && now_session_start_ms != prev_session_start_ms
 }
 
+/// 新しいブロックのエポックの tick で、[`MicroStarveWindow::tick`] へ渡す
+/// `prev_starved_ms` を**抑止**する純関数 (事後レビュー所見 C・2026-08-19)。
+///
+/// ## ⚠️★★★ 何が起きていたか
+///
+/// [`MicroStarveWindow::tick`] は「**正 → 0**」の tick を 1 エピソードとして数える。
+/// ⚠️ ところが **`RotateForRestart` (実行中の再押下) だけは `session_active` が
+/// `true` のまま**なので、[`is_new_block_epoch`] で窓を捨てた**同じ tick**に、
+/// ★ **捨てる前に貯まっていた `prev_starved_ms`** が「正 → 0」として
+/// **新しい窓へ**計上されうる。
+///
+/// → ⚠️ **二度押し 1 回につきエピソードが 1 本、前のブロックから新しいブロックへ
+/// 誤帰属する。**
+///
+/// ## ⚠️ 直す理由は実害の大きさではない (★ 一貫性の破れである)
+///
+/// ★ 実害は**二度押し 1 回につき 1 本**で、既に受け入れている所見 B
+/// (1 Hz 分解能 → `n_lt30` は系統的に下側へ偏る) より**小さい**。
+/// しかも `starve_window` が支えるのは ADR-012 Stage 0 の**形成的な投資判断**であって
+/// 確証の判定基準ではない。→ ★ **直しても直さなくても結論は動かない。**
+///
+/// ⚠️ それでも直すのは「**コードが宣言どおりに振る舞う**」ためである ——
+/// [`MicroStarveWindow::tick`] の docstring は
+/// 「★ **誤帰属より既知の切り捨てを採る**」と方針を明記しているのに、
+/// ⚠️★★★ **新設した二度押し経路だけがその例外**という状態を残すと、
+/// 次に読む人が方針を信じられなくなる。
+///
+/// ## ★ 通常のブロック境界には効かない (対照)
+///
+/// `RotateForNewBlock` ではブロック終了時に `session_active` が `false` になり、
+/// [`MicroStarveWindow::tick`] が**その時点で窓ごと捨てて計上もしない**。
+/// → ★ 本関数が効くのは**再押下の経路だけ**である。
+pub fn starved_ms_carried_into_new_window(new_block_epoch: bool, prev_starved_ms: u64) -> u64 {
+    if new_block_epoch {
+        // ★ そのティックのエピソード判定を抑止する (`prev > 0` が成り立たなくなる)。
+        0
+    } else {
+        prev_starved_ms
+    }
+}
+
+/// 新しいブロックのエポックで **starvation の累積そのものを 0 に戻す**純関数。
+///
+/// ## ⚠️★★★ なぜ [`starved_ms_carried_into_new_window`] だけでは足りないか
+/// (code-reviewer HIGH・2026-08-21)
+///
+/// ★ [`step`] が `starved_ms` を 0 に落とすのは **打鍵が届いた tick** か
+/// **非計測になった tick** だけである。
+/// ⚠️ ところが `RotateForRestart` は「開始する」ボタンの**マウス押下**で起きるので、
+/// ★ **エポックの tick では `starved_ms` は 0 ではなく、増え続けている。**
+///
+/// → ⚠️ 抑止を「その tick の `prev`」にしか掛けないと、**1 tick ずれて同じ誤帰属が起きる**:
+///
+/// | tick | 何が起きるか | `prev` | `now` | 結果 |
+/// |---|---|---|---|---|
+/// | N (押下) | マウスなので `step` は進める | 8000 | 9000 | ★ 抑止が効いて計上なし |
+/// | N+1 (打鍵) | ここで初めて 0 に落ちる | **9000** | 0 | ⚠️★★★ **前ブロックの 9000 ms が新窓へ計上される** |
+///
+/// → ★ **エポックで累積そのものを 0 に戻す。** これは通常のブロック境界で
+/// `session_active = false` により [`step`] が行っていることと**同じ**であり、
+/// ⚠️ 再押下経路だけがその例外だったのを揃えるだけである。
+///
+/// ## ⚠️ `hook_health` への影響 (★ 隠さず書く)
+///
+/// ★ 閾値 (30 秒 / 120 秒) も [`step`] / [`health`] の規則も **1 文字も変えていない**。
+/// 変わるのは「**再押下がブロック境界として扱われる**」ことだけで、
+/// ★ 通常のブロック境界では**元々そうなっている**。
+///
+/// ⚠️ **`peak_starved_ms` は呼び出し側で 0 に戻さないこと。** 戻すと復帰行の
+/// `starved_ms` が 0 になり、★ **「何秒落ちていたか」という測った量が消える**
+/// (＝ 誤帰属ではなく**嘘**になる)。
+pub fn reset_starvation_at_new_block(new_block_epoch: bool, starv: Starvation) -> Starvation {
+    if new_block_epoch {
+        Starvation::default()
+    } else {
+        starv
+    }
+}
+
 /// `starve_window` 行の窓の長さ (ms)。
 ///
 /// ⚠️ 1Hz の全 tick を残す案は採らない —— ★ **値の大半が 0** でログ量とバッテリに見合わない
@@ -667,6 +746,200 @@ mod tests {
         // ⚠️ ブロック終了 (t → 0) は「新しいブロック」ではない。
         assert!(!is_new_block_epoch(1_700_000_000_000, 0));
         assert!(!is_new_block_epoch(0, 0));
+    }
+
+    /// ⚠️★★★ **事後レビュー所見 C**: 実行中の再押下 (`RotateForRestart`) の tick で、
+    /// 前のブロックで貯まっていた starvation を**新しい窓へ計上しない**。
+    ///
+    /// ★ この経路だけ `session_active` が `true` のまま維持されるので、
+    /// ⚠️ 窓を捨てた**同じ tick** に「正 → 0」が成立し、**前ブロックのエピソードが
+    /// 新ブロックへ誤帰属**しうる。
+    #[test]
+    fn restart_epoch_does_not_carry_starvation_into_the_new_window() {
+        // ★ 二度押しの tick を再現する: lib.rs は窓を捨ててから tick を回す。
+        let mut w = MicroStarveWindow::new();
+        // 前のブロックで 8 秒 starve していた状態から、この tick で打鍵が届いた (→ 0)。
+        let prev = starved_ms_carried_into_new_window(true, 8_000);
+        assert_eq!(prev, 0, "★ 新エポックでは prev を 0 とみなす");
+        assert_eq!(w.tick(true, prev, 0, th(), TICK), None);
+        // ★ 新しい窓を最後まで回しても、誤帰属した 1 本は出てこない。
+        let mut out = None;
+        for _ in 1..60 {
+            out = out.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        assert_eq!(
+            out, None,
+            "前ブロックのエピソードが新ブロックへ誤帰属している"
+        );
+    }
+
+    /// ⚠️★★★ **配線と同じ順序で回す**補助 (code-reviewer HIGH・2026-08-21)。
+    ///
+    /// ★ `lib.rs` の 1 Hz ループは毎 tick この順で進む。**テストも同じ鎖を通す**:
+    ///
+    /// ```text
+    /// prev = starv.starved_ms
+    ///   → step(...)                                  (打鍵が来た tick だけ 0 に落ちる)
+    ///   → reset_starvation_at_new_block(epoch, ...)  (エポックで累積を揃える)
+    ///   → tick(active, carried(epoch, prev), starv.starved_ms, ...)
+    /// ```
+    ///
+    /// ⚠️ 前の版のテストは `now_starved_ms` に **0 を手で渡していた**ので、
+    /// ★ **`step()` を通っておらず配線を検証していなかった**（実際にそこを見落とした）。
+    ///
+    /// `hook_seen` は各 tick で打鍵が届いたか。`epoch_at` はブロック境界の tick 番号。
+    fn run_liveness_chain(
+        hook_seen: &[bool],
+        epoch_at: Option<usize>,
+    ) -> (Option<StarveWindowTally>, Vec<u64>) {
+        let mut starv = Starvation::default();
+        let mut w = MicroStarveWindow::new();
+        let mut out = None;
+        let mut trace = Vec::new();
+        for (i, &seen) in hook_seen.iter().enumerate() {
+            let prev = starv.starved_ms;
+            // ★ システム入力は常にあり (マウスを動かしている)。
+            starv = step(starv, true, true, seen, TICK);
+            let epoch = epoch_at == Some(i);
+            starv = reset_starvation_at_new_block(epoch, starv);
+            let r = w.tick(
+                true,
+                starved_ms_carried_into_new_window(epoch, prev),
+                starv.starved_ms,
+                th(),
+                TICK,
+            );
+            out = out.or(r);
+            trace.push(starv.starved_ms);
+        }
+        (out, trace)
+    }
+
+    /// ⚠️★★★ **本命の回帰**: 再押下（**マウス**）の**次の tick**で打鍵しても、
+    /// 前ブロックの starvation が新しい窓へ計上されないこと。
+    ///
+    /// ★ これが code-reviewer HIGH が突いた穴である ——
+    /// 抑止を「その tick の `prev`」にしか掛けないと **1 tick ずれて同じ誤帰属が起きる**。
+    #[test]
+    fn restart_epoch_does_not_leak_starvation_on_the_next_tick() {
+        // 8 tick 無打鍵で 8 秒ためる → 9 tick 目（i=8）が再押下（★ マウスなので無打鍵）
+        // → 10 tick 目（i=9）で打鍵 → ここで「正 → 0」が成立する。
+        let mut hook_seen = vec![false; 8];
+        hook_seen.push(false); // i=8: 再押下の tick (マウス)
+        hook_seen.push(true); // i=9: 打鍵
+        hook_seen.extend(std::iter::repeat(true).take(60)); // 窓を閉じる
+        let (out, trace) = run_liveness_chain(&hook_seen, Some(8));
+
+        assert_eq!(
+            trace[7], 8_000,
+            "★ 前提: エポック直前に 8 秒たまっている: {trace:?}"
+        );
+        assert_eq!(
+            trace[8], 0,
+            "⚠️ エポックで累積が揃っていない (次の tick で漏れる): {trace:?}"
+        );
+        assert_eq!(
+            out, None,
+            "⚠️★★★ 前ブロックの starvation が新しい窓へ計上されている: {out:?}"
+        );
+    }
+
+    /// ⚠️ **対照**: エポックが無ければ、同じ入力で**ちゃんと 1 本数える**。
+    ///
+    /// ★ これが無いと上のテストは「常に None」でも緑になる（＝空振り）。
+    #[test]
+    fn the_same_sequence_is_counted_when_no_block_boundary_happens() {
+        let mut hook_seen = vec![false; 8];
+        hook_seen.push(false);
+        hook_seen.push(true);
+        hook_seen.extend(std::iter::repeat(true).take(60));
+        let (out, _) = run_liveness_chain(&hook_seen, None);
+        let t = out.expect("エポックが無いなら窓が出るはず");
+        assert_eq!(t.n_lt30, 1);
+        assert_eq!(t.sum_lt30_ms, 9_000, "9 tick ぶんの starvation を数える");
+    }
+
+    /// ⚠️★ **`peak_starved_ms` は呼び出し側で戻さない**という判断を、値で固定する。
+    ///
+    /// ★ エポックで累積は 0 に戻るが、[`reset_starvation_at_new_block`] は
+    /// **ピークを預かっていない** —— ⚠️ 戻すと復帰行の `starved_ms` が 0 になり、
+    /// 「何秒落ちていたか」という**測った量が消える**（誤帰属ではなく嘘になる）。
+    #[test]
+    fn resetting_at_the_epoch_does_not_touch_the_peak() {
+        let s = Starvation {
+            starved_ms: 165_312,
+        };
+        // ★ 呼び出し側が保持するピーク。純関数はこれに触れない。
+        let peak = s.starved_ms;
+        let after = reset_starvation_at_new_block(true, s);
+        assert_eq!(after.starved_ms, 0, "累積は揃える");
+        assert_eq!(peak, 165_312, "★ ピークは呼び出し側のもの (関数は触らない)");
+        // ⚠️ エポックでなければ 1 バイトも変えない。
+        assert_eq!(reset_starvation_at_new_block(false, s), s);
+    }
+
+    /// ⚠️ **対照 ①**: 通常の tick では**従来どおり数える**。
+    ///
+    /// ★ 抑止が「新エポックの tick だけ」に効いていることを固定する
+    /// (⚠️ 常に 0 を渡していたら `starve_window` は 1 行も出なくなる ＝ 計器の全損)。
+    #[test]
+    fn a_normal_tick_still_counts_its_episode() {
+        assert_eq!(starved_ms_carried_into_new_window(false, 8_000), 8_000);
+
+        let mut w = MicroStarveWindow::new();
+        let prev = starved_ms_carried_into_new_window(false, 8_000);
+        assert_eq!(w.tick(true, prev, 0, th(), TICK), None);
+        let mut out = None;
+        for _ in 1..60 {
+            out = out.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        let t = out.expect("通常の tick では窓が出るはず");
+        assert_eq!(t.n_lt30, 1);
+        assert_eq!(t.sum_lt30_ms, 8_000);
+    }
+
+    /// ⚠️ **対照 ②**: **通常のブロック境界** (`RotateForNewBlock`) の挙動は 1 バイトも変わらない。
+    ///
+    /// ★ そちらでは `session_active` が `false` に落ちるので、
+    /// [`MicroStarveWindow::tick`] が**その時点で窓ごと捨てて計上もしない**
+    /// (`block_end_does_not_count_a_fake_episode` が既に固定している)。
+    /// → ⚠️ 本修正が**そこへ余計な影響を与えていない**ことを確認する。
+    #[test]
+    fn normal_block_boundary_is_unaffected_by_the_fix() {
+        let mut w = MicroStarveWindow::new();
+        // ブロック終了: session_active=false。★ 新エポックではないので抑止は効かない。
+        let prev = starved_ms_carried_into_new_window(false, 9_000);
+        assert_eq!(
+            prev, 9_000,
+            "★ ブロック終了の tick は「新しいブロック」ではない"
+        );
+        assert_eq!(w.tick(false, prev, 0, th(), TICK), None);
+        // ★ 次のブロック: 偽エピソードが混ざっていないこと。
+        let mut out = None;
+        for _ in 0..60 {
+            out = out.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        assert_eq!(out, None, "ブロック終了の 0 復帰が計上されている");
+    }
+
+    /// ⚠️★ 抑止は **`prev` にだけ**効く。★ 新エポックの tick でも、
+    /// **その tick から始まる新しいエピソード**は普通に数え始められる。
+    #[test]
+    fn the_suppression_only_hides_the_previous_blocks_value() {
+        // 新エポックの tick で starvation が「0 → 正」に立ち上がる場合。
+        let mut w = MicroStarveWindow::new();
+        let prev = starved_ms_carried_into_new_window(true, 0);
+        assert_eq!(prev, 0);
+        assert_eq!(w.tick(true, prev, 1_000, th(), TICK), None);
+        // 次の tick でそのエピソードが閉じる → ★ 新しい窓で正しく 1 本数える。
+        assert_eq!(w.tick(true, 1_000, 0, th(), TICK), None);
+        let mut out = None;
+        for _ in 2..60 {
+            out = out.or(w.tick(true, 0, 0, th(), TICK));
+        }
+        let t = out.expect("新エポック後の本物のエピソードは数えるはず");
+        assert_eq!(t.n_lt30, 1);
+        assert_eq!(t.sum_lt30_ms, 1_000);
     }
 
     /// ⚠️★★★ **窓長の総和が実経過時間を超えない** (＝ 経過時間を二重計上しない)。

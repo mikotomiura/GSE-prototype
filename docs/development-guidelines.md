@@ -516,3 +516,62 @@ variant 互換性判定など) は helper 側のみ編集する。ps1/sh は薄�
 - `raw/` ディレクトリは gse-dataset 側の `.gitignore` で永続的に除外
 - 外部被験者 P001+ のデータは暗号化ローカル保管、GitHub (private 含む) 経路を使わない
 - `anonymize.py` はスクリプトとして存在するが、Phase 1 では出力を commit しない
+
+### 10.5 ⚠️★★★ 収集済み信号を使う解析は、**最初に `capabilities` を機械判定する** (ADR-013)
+
+> **SSOT**: `docs/adr/ADR-013-collection-self-description.md` D1 / Migration 3・4。
+> **実装**: `scripts/capabilities_gate.py` (`--self-test` つき) / `src-tauri/src/capabilities.rs`。
+
+#### なぜ規約ではなくコードなのか
+
+⚠️ **「計器がコホートを跨げなかった」失敗は既に 2 件起きている。**
+
+1. `feat.keys` / `feat.bs_keys` の配線は **2026-08-16**。★ Phase1 ログはそれ以前なので**存在しない**。
+2. `hook_health` / `starved_ms` は Phase1 コホート (63 ファイル) に **1 行も無い**
+   —— 記録期間 2026-07-04〜07-24 に対し `input/liveness.rs` の追加は **2026-08-09**
+   (＝ **収集の 16 日後**)。
+
+★ 教訓の逐語: **「既存ログにある」は *現行コードが出す* の意味であって、
+*対象コホートにある* の意味ではない。**
+
+⚠️ これは「規約が無かった」失敗ではない —— ★ **規約は書いてあったのに適用しなかった**。
+→ ⚠️ 人が適用し忘れられる形のままでは 3 件目が起きるので、**検査をコードにする**。
+
+#### 判定表 (3 群 ＋「表に無い」)
+
+| `meta.capabilities` の群 | 該当行 0 行の意味 |
+|---|---|
+| `unconditional` | ★ **信号が無かった** (測れて、無かった) |
+| `threshold_gated` | ⚠️ **判定不能** —— 閾値未達と区別できない (`hook_health` / `starve_window`) |
+| `config_gated` | ⚠️★★★ **判定不能** —— 設定で送出元ごと止まっていた可能性 (例: **G1 では probe 系が常に 0 行**) |
+| どれにも無い | ⚠️ **計器が無かった** (★ 過去 2 件の失敗はここ) |
+| どれにも無いが **≥1 行ある** | ⚠️ **宣言のバグ** → `meta.app_version` で追跡する |
+
+⚠️ **旧ログには `capabilities` キー自体が無い** → ★ 「**計器が無かった**」に倒す。
+⚠️ **`hmm_version` では代用できない** —— HMM の版であって「何を記録できるか」ではない。
+⚠️★★ **新旧が混ざったコホートは `MIXED` で止める** —— 「一部のファイルにだけ計器がある」
+状態で平均を取ると、★ 過去 2 件と同じ結論の誤りが**より見つけにくい形**で再生産される。
+
+#### 使い方 (★ 前処理の**先頭**に置く)
+
+```bash
+# ⚠️ PYTHONUTF8=1 必須 (Windows コンソールは cp932)
+PYTHONUTF8=1 python scripts/capabilities_gate.py "$GSE_DATASET/raw" \
+  --require key --require feat --require starve_window
+echo $?    # ★ 0 以外なら 0 行を誤読しうる。⚠️ `| tail` にパイプすると $? が tail のものになる
+```
+
+Python の解析からは `preflight()` を **1 行目で**呼ぶ:
+
+```python
+from capabilities_gate import preflight
+preflight([dataset_dir], required=["key", "starve_window"])   # ⚠️ 誤読しうるなら例外
+```
+
+★ `experiments/_template/run.sh` の **Step 0** がこれである。⚠️ **消さないこと。**
+
+#### 「判定不能」を受け入れる場合
+
+★ `--allow-undecidable` を付けてよいのは、**解析が明示的にそれを受け入れる**ときだけである。
+⚠️ その場合、`notes.md` の結論は「**無かった**」ではなく **「判定不能」**と書く。
+★ 書き分けないなら、フラグを付ける意味が無い。

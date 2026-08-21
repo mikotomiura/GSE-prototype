@@ -148,6 +148,50 @@ static SESSION_META_RECORDED: AtomicBool = AtomicBool::new(false);
 /// → **分析スレッドがドレインに入ったことを観測してから** `BlockEnd` を送る。
 static ANALYSIS_IDLE: AtomicBool = AtomicBool::new(true);
 
+/// ⚠️★★★ **ブロック遷移の直列化点** (D-1・2026-08-21)。
+///
+/// 「開始する」の押下 ([`start_session`]) と **ブロックの自動終了**は、この 1 本を通る。
+///
+/// ## ★ 守っているのは値ではなく **順序** である
+///
+/// > **`BlockEnd` は、次のブロックの `Rotate` より前にログ channel へ入る。**
+///
+/// ⚠️ これが破れると `protocol.md §1`「1 ブロック = 1 ファイル」が壊れる ——
+/// ★ **G1 リブートの原因 (P010 block07) と同じ失敗クラス**である。
+/// `preregistration.md §3.6` がブロックの事後除外を禁じているので、走り出したら**回復不能**。
+///
+/// ## ⚠️ なぜ原子変数の比較だけでは足りないか
+///
+/// [`start_session`] は `Rotate` / `SessionStart` を**ログのロックの中**で送るが、
+/// `SESSION_START_MS.store(now)` は**ロックを抜けた後**で行う。
+/// → ★ 「**`Rotate` は送られたが `SESSION_START_MS` はまだ 0**」という窓が実在するので、
+/// ⚠️ `compare_exchange` や再確認では「押下が後」の交錯を閉じられない。
+/// (`logger.rs` の `Rotate` は `block_closed` を `false` に戻すため、
+/// 直後の `BlockEnd` が**新しいファイルへ `session_end` を書く**。)
+///
+/// ## ⚠️★★ ロック順序 (★ 反転させない)
+///
+/// ```text
+/// BLOCK_TRANSITION  →  latest_feat  →  intervention  →  log
+/// ```
+///
+/// ★ **最も外側**に置く。⚠️ 自動終了スレッドは `log` の `Mutex` を**取らない**
+/// (自分の `Sender` clone を持っている) ので、★ **循環はそもそも作れない**。
+///
+/// ## ★ 通常運用 (G1 でない) への影響はゼロ
+///
+/// 自動終了スレッドは `if g1_mode().is_some()` の中でしか spawn されないので、
+/// ★ 非 G1 では **他に取る者がいない = 無競合**である。観測可能な挙動は 1 バイトも変わらない。
+static BLOCK_TRANSITION: Mutex<()> = Mutex::new(());
+
+/// [`BLOCK_TRANSITION`] を取る唯一の入口。★ poison を repo 全体の流儀で扱う。
+///
+/// ⚠️ poison しても**諦めない**: 遷移の排他を落とすと、この関数が防いでいる
+/// ブロック境界の破れがそのまま戻る。
+fn lock_block_transition() -> std::sync::MutexGuard<'static, ()> {
+    BLOCK_TRANSITION.lock().unwrap_or_else(|p| p.into_inner())
+}
+
 /// G1 モードか (引き金つき)。`None` なら通常運用。
 fn g1_mode() -> Option<&'static str> {
     *G1_MODE.get().unwrap_or(&None)
@@ -2015,6 +2059,21 @@ fn start_session(
         crate::submission::read_g1_participant_id().as_deref(),
     )?;
 
+    // ⚠️★★★ **ブロック遷移の排他をここで取る** (D-1・2026-08-21)。
+    //
+    // ★ ここから `SESSION_START_MS.store(now)` までが**ひと続き**になる。
+    //   ⚠️ そうしないと「`Rotate` は送られたが `SESSION_START_MS` はまだ 0」という窓が残り、
+    //   ブロック自動終了スレッドの `BlockEnd` が**新しいファイルへ `session_end` を書く**
+    //   (`logger.rs` の `Rotate` が `block_closed` を `false` に戻すため)。
+    //
+    // ⚠️★★ **ログのロックより前に取る。** ロック順序は
+    //   `BLOCK_TRANSITION` → `latest_feat` → `intervention` → `log` で固定してある。
+    // ⚠️ 自動終了スレッドがアイドル待ち中なら最大 1500 ms 待たされるが、
+    //   ★ その待ちは「押下を待たせている」のではなく「**押下が壊れないように待たせている**」。
+    // ★ 途中の `return` でも RAII で必ず解放される。オーバーレイの `win.show()` の
+    //   **前**に明示的に `drop` する (ロック中にウィンドウ操作をしない・follow-up F-2 と同じ判断)。
+    let block_transition = lock_block_transition();
+
     // ⚠️★★★ **「触る前に断る」** (G-1・2026-08-19)。
     //
     // ★ ここから下の `engine.reset()` / `reset_signal` / `latest_feat` / `intervention` は
@@ -2114,7 +2173,14 @@ fn start_session(
         }
 
         // ★ これから新しい (または開き直した) ブロックが始まる。握手はこれからなので落とす。
-        SESSION_META_RECORDED.store(false, Ordering::Release);
+        // ⚠️★★ **旧値を控えておく** (code-reviewer HIGH・2026-08-21)。
+        //   ★ 下の `Rotate` 送信が失敗したとき、ここを `false` にしたままにすると
+        //     次の押下が `decide_start_action(g1, was_active=true, _, meta_recorded=false)`
+        //     → **`RetryAfterMetaFailure`** に落ちる。⚠️ その経路は `Ok(())` を返すのに
+        //     **ログを 1 行も書かず restart もしない**ので、フロントは `record_session_meta` へ進み、
+        //     ⚠️★★★ **旧ファイルに 2 本目の `session_meta`** が入る (`protocol.md §1` の破れ)。
+        //   ★ `session_active` を枝ごとに戻しているのと同じ形で、ここも戻す。
+        let meta_recorded_before = SESSION_META_RECORDED.swap(false, Ordering::AcqRel);
         // ★ カウンタは「新しいブロックを始めた」経路だけが進める。
         //   ⚠️★★★ 二度押し (`RotateForRestart`) は**増やさない** —— 数えると
         //   code-review HIGH が指摘した「孤児ファイルを 1 本増やす」形に戻る。
@@ -2155,6 +2221,12 @@ fn start_session(
                 if action != crate::g1::StartAction::RotateForRestart {
                     session_active.0.store(false, Ordering::Release);
                 }
+                // ⚠️★★★ **握手の状態も戻す** (code-reviewer HIGH・2026-08-21)。
+                //   ★ 戻さないと `RotateForRestart` の失敗後に `RetryAfterMetaFailure` へ落ち、
+                //     **旧ファイルに 2 本目の `session_meta`** が入る。
+                //   ★ 戻せば次の押下は同じ `RotateForRestart` として**素直に再試行**される
+                //     (文言「もう一度『開始する』を押してください」と一致する)。
+                SESSION_META_RECORDED.store(meta_recorded_before, Ordering::Release);
                 return Err("ログの切り替えに失敗しました。ブロックを開始できません。\
                      このブロックはまだ始まっていません。もう一度「開始する」を押してください。"
                     .to_string());
@@ -2191,6 +2263,13 @@ fn start_session(
     // record_session_meta が来るまで較正プロファイル選択は確定しない (race 排除)。明示リセットは不要
     // (世代照合が staleness を吸収する)。
     SESSION_START_MS.store(now, Ordering::Release);
+
+    // ⚠️★★★ **ここでブロック遷移の排他を離す** (D-1)。
+    //   ★ `Rotate` / `SessionStart` の送信と `SESSION_START_MS` の更新が
+    //     ひと続きで済んだので、自動終了スレッドはこの先で
+    //     `decide_block_end` の照合により `Superseded` を返して**中止する**。
+    //   ⚠️ 下の `win.show()` は**ロックの外**で行う (ロック中にウィンドウ操作をしない)。
+    drop(block_transition);
 
     // setup() で事前生成されたオーバーレイウィンドウを show する (サイズ制御は Overlay.tsx)。
     // ウィンドウ生成自体は setup() (メインスレッド) で行うことで、
@@ -3073,15 +3152,35 @@ pub fn run() {
                         //   実行中の再押下 (`RotateForRestart`) は `true` のままなので
                         //   **その経路でだけ発火しない** (＝ G-1 で新設した経路そのもの)。
                         let session_start_ms = SESSION_START_MS.load(Ordering::Acquire);
-                        if liveness::is_new_block_epoch(prev_session_start_ms, session_start_ms) {
+                        let new_block_epoch =
+                            liveness::is_new_block_epoch(prev_session_start_ms, session_start_ms);
+                        if new_block_epoch {
                             dropped_at_last_line = dropped;
                             micro_window = liveness::MicroStarveWindow::new();
+                            // ⚠️★★★ **累積 starvation もここで揃える** (code-reviewer HIGH・2026-08-21)。
+                            //   ★ `step()` が 0 に落とすのは**打鍵が届いた tick**か**非計測の tick**だけ。
+                            //   ⚠️ 再押下は**マウス**なので、エポックの tick では `starved_ms` は
+                            //     増え続けており、★ **次の tick (打鍵) で「正 → 0」が成立して
+                            //     前ブロックの値が新窓へ計上される**。
+                            //   → ★ 通常のブロック境界 (`session_active = false`) と同じ形に揃える。
+                            //   ⚠️ **`peak_starved_ms` は戻さない** —— 戻すと復帰行の `starved_ms` が
+                            //     0 になり、「何秒落ちていたか」という**測った量が消える**。
+                            starv = liveness::reset_starvation_at_new_block(new_block_epoch, starv);
                         }
                         prev_session_start_ms = session_start_ms;
 
                         if let Some(tally) = micro_window.tick(
                             session_active,
-                            prev_starved_ms,
+                            // ⚠️★★★ **事後レビュー所見 C** (2026-08-19)。
+                            //   実行中の再押下 (`RotateForRestart`) は `session_active` を
+                            //   `true` のまま維持するので、★ 窓を捨てた**同じ tick**に
+                            //   捨てる前の `prev_starved_ms` が「正 → 0」として
+                            //   **新しい窓へ**計上されうる (= 前ブロックのエピソードの誤帰属)。
+                            //   → ★ `tick()` の方針「**誤帰属より既知の切り捨てを採る**」に揃える。
+                            liveness::starved_ms_carried_into_new_window(
+                                new_block_epoch,
+                                prev_starved_ms,
+                            ),
                             starv.starved_ms,
                             th,
                             elapsed_ms,
@@ -3207,15 +3306,65 @@ pub fn run() {
                     );
                     loop {
                         thread::sleep(Duration::from_millis(500));
+                        // ★ 判定は純関数 `g1::decide_block_end` が持つ (`decide_start_action` と同じ流儀)。
                         let start = SESSION_START_MS.load(Ordering::Acquire);
-                        if start == 0 {
-                            continue; // ブロック未開始
-                        }
                         let now = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .unwrap_or_default()
                             .as_millis() as u64;
-                        if now.saturating_sub(start) < crate::g1::BLOCK_DURATION_MS {
+                        // ★ ポーリング時点では交代を判定しない (`observed == current` を渡す)。
+                        if crate::g1::decide_block_end(
+                            start,
+                            start,
+                            now,
+                            crate::g1::BLOCK_DURATION_MS,
+                        ) != crate::g1::BlockEndAction::EndBlock
+                        {
+                            continue; // 未開始 / まだ 5 分に達していない
+                        }
+
+                        // ⚠️★★★ **ここから 4) までがブロック遷移の臨界区間**である (D-1)。
+                        //   ★ 「開始する」の押下 (`start_session`) と直列化することで、
+                        //     `BlockEnd` が**次のブロックの `Rotate` より前**にログ channel へ入る
+                        //     ことを保証する。⚠️ これが破れると `session_end` が
+                        //     **新しいファイル**へ書かれる (`protocol.md §1` の破れ = リブートの原因と同型)。
+                        //   ⚠️ `emit` / `spawn_reconcile` は**外に出す** (ブロックとブロックの間の
+                        //     処理であり排他は要らない。ロックを長く持たない)。
+                        let block_transition = lock_block_transition();
+
+                        // ⚠️★★★ **排他を取ってから交代を照合する** (D-1「押下が先」の交錯)。
+                        //   ★ ポーリングと排他の取得の間に「開始する」が押されて
+                        //     **新しいブロックが始まっていた**なら、ここで進むと
+                        //     `SESSION_START_MS.store(0)` が**始まったばかりのブロックを殺す**
+                        //     —— しかも `start == 0` で `continue` するので
+                        //     ⚠️ **自動終了も二度と来ない**。
+                        //   ⚠️ 実行中の再押下 (`RotateForRestart`) は `session_active` を
+                        //     `true` のまま維持するので、★ **`session_active` を見ていては気づけない**。
+                        //     照合するのは `SESSION_START_MS` (どちらの経路でも必ず動く) である。
+                        //   ⚠️★★ **`EndBlock` 以外はすべて中止する** (Codex 指摘・2026-08-21)。
+                        //   ★ `== Superseded` と書くと、将来 `decide_block_end` の分類が増えたときに
+                        //     **新しい枝が黙って「閉じてよい」側へ倒れる**。
+                        //   ⚠️ 判定が増えるほど危険側へ倒れる形にしない (fail-closed)。
+                        //   ★ `now` は**排他を取った後に採り直す** (code-reviewer MEDIUM・2026-08-21)。
+                        //   ⚠️ 押下と競合して最大 ~1.5 秒待たされたとき、古い `now` で判定し、
+                        //     古い値をログに残すことになる。
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let current_start_ms = SESSION_START_MS.load(Ordering::Acquire);
+                        let recheck = crate::g1::decide_block_end(
+                            start,
+                            current_start_ms,
+                            now,
+                            crate::g1::BLOCK_DURATION_MS,
+                        );
+                        if recheck != crate::g1::BlockEndAction::EndBlock {
+                            tracing::info!(
+                                "G1: aborting the auto-end ({:?}); \
+                                 the block that is running now is left intact",
+                                recheck
+                            );
                             continue;
                         }
 
@@ -3264,6 +3413,14 @@ pub fn run() {
                                 true
                             }
                         };
+
+                        // ⚠️★★★ **ここで臨界区間を抜ける** (D-1)。
+                        //   ★ `BlockEnd` は channel へ入った。以後に「開始する」が押されても、
+                        //     その `Rotate` は **`BlockEnd` の後ろ**に並ぶので
+                        //     `session_end` は**閉じたブロックのファイル**に書かれる。
+                        //   ⚠️ 以下 (番兵・`emit`・自動提出) は**ブロックとブロックの間**の処理であり、
+                        //     排他は要らない。★ ロックを必要以上に長く持たない。
+                        drop(block_transition);
 
                         // ⚠️★★ 4) の **前**に番兵を立てる (code-reviewer HIGH-2)。
                         //   スタート画面が出た瞬間から `sending: true` にしないと、

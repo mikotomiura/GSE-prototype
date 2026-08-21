@@ -2393,6 +2393,10 @@ mod tests {
     // -----------------------------------------------------------------------
 
     /// テスト用の一意なログパス (同時実行しても衝突しない)。
+    /// `session_end` を数えるときの目印。
+    /// ★ テスト間で共有する (リテラルを複製しない)。
+    const SESSION_END_NEEDLE: &str = r#""type":"meta","session_end""#;
+
     fn rot_test_path(tag: &str, n: u32) -> PathBuf {
         std::env::temp_dir().join("GSE-rot-test").join(format!(
             "gse_{}_{}_{}.ndjson",
@@ -2791,6 +2795,64 @@ mod tests {
             "session_end must appear exactly once:\n{c}"
         );
         let _ = fs::remove_file(&p);
+    }
+
+    /// ⚠️★★★ **D-1 が守っている順序の「意味」をここで固定する** (2026-08-21・Codex 指摘 4)。
+    ///
+    /// ★ `lib.rs` の `BLOCK_TRANSITION` が保証するのは
+    /// 「**`BlockEnd` は次のブロックの `Rotate` より前に channel へ入る**」だけである。
+    /// ⚠️ **なぜそれが要るのか**は logger 側の挙動で決まっているので、**ここでテストする**。
+    ///
+    /// ★ 本テストが赤くなるのは、`Rotate` 処理の `block_closed = false` を消したときである。
+    /// ⚠️ そのとき `lib.rs` の排他は**要らなくなるのではなく意味が変わる** —— 気づけるようにしておく。
+    ///
+    /// ⚠️ ★ 純関数テスト (`g1::decide_block_end`) は「押下が**先**」しか閉じられない。
+    /// **「押下が**後**」の帰結**——順序が逆転したときに何が壊れるか——は本テストが持つ。
+    #[test]
+    fn a_rotate_before_block_end_moves_session_end_into_the_new_file() {
+        let first = rot_test_path("order", 10);
+        let second = rot_test_path("order", 11);
+        let _ = fs::remove_file(&first);
+        let _ = fs::remove_file(&second);
+
+        let (_logger, tx, shutdown_rx, _status) = SessionLogger::start(first.clone(), None);
+        // ⚠️★★★ **順序が逆転した場合**を再現する: 先に `Rotate`、後から `BlockEnd`。
+        tx.send(LogEntry::Rotate {
+            new_path: second.clone(),
+        })
+        .unwrap();
+        tx.send(LogEntry::BlockEnd).unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let old_file = fs::read_to_string(&first).unwrap();
+        // ⚠️ `Rotate` は衝突回避で別名へ振りうる (`unique_path_from`) ので、
+        //   ★ 実際に開かれたファイルを**名前で決め打ちしない**。
+        let new_file = fs::read_to_string(&second)
+            .unwrap_or_else(|_| panic!("rotate 先が開かれていない: {second:?}"));
+
+        // ★ 旧ファイルは `Rotate` の時点で 1 回だけ閉じられている (ここは正しい)。
+        assert_eq!(
+            old_file.matches(SESSION_END_NEEDLE).count(),
+            1,
+            "旧ファイルの session_end が 1 本でない:\n{old_file}"
+        );
+        // ⚠️★★★ **これが壊れ方である**: 後から来た `BlockEnd` が
+        //   **始まったばかりの新しいファイル**へ `session_end` を書く。
+        //   ★ `protocol.md §1`「1 ブロック = 1 ファイル」の破れであり、
+        //     以後の `key` / `feat` は `session_end` の**後ろ**に積まれる。
+        assert_eq!(
+            new_file.matches(SESSION_END_NEEDLE).count(),
+            1,
+            "★ Rotate が block_closed を false に戻すので、後続の BlockEnd は\n\
+             新ファイルへ session_end を書く。⚠️ ここが 0 になったなら logger の挙動が\n\
+             変わっている (lib.rs の BLOCK_TRANSITION の前提も見直すこと):\n{new_file}"
+        );
+
+        let _ = fs::remove_file(&first);
+        let _ = fs::remove_file(&second);
     }
 
     /// ★★ 非回帰の要: `g1_mode` が `None` のとき `meta` 行に **`g1_mode` キーが出ない**。
