@@ -44,6 +44,14 @@
 
 ## レビュー
 
-- [ ] `code-reviewer` + `security-checker` を**並列**起動 → HIGH 対応
-- [ ] `/cross-review` (⚠️ パス限定。`findings-*.md` は外部へ渡さない)
-- [ ] `/finish-task`
+- [x] `code-reviewer` + `security-checker` を**並列**起動 → HIGH 3 件すべて対応
+- [x] `/cross-review` (Codex・パス限定 `a5de3e3..HEAD -- src-tauri/src/input/*.rs`) → 重大 1 + 中 2 に対応
+      ⚠️ `findings-*.md` は外部へ渡していない (★ 渡したのは `.rs` の diff のみ)
+- [ ] `/finish-task` (⚠️ **実測 D/F と実起動確認が残っているため未実行**)
+
+## ⚠️★★★ 残り (★ 人が要る。これが埋まるまで収集を始めない)
+
+- [ ] 実測 D/F の 60 秒 (`cargo run --example ime_winevent_probe`・日本語入力あり)
+- [ ] → 辺の向きの確定 / `FOLD_GAP_MS` の確定 / pause 率の実測
+- [ ] 実起動で `ime_shadow` が出る (★ **G1 画面 = GSE 自身の窓でも**確認すること)
+- [ ] 実起動・無操作 60 秒で `ime_shadow` が 1 行も出ない
