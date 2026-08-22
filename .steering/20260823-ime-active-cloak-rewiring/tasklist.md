@@ -35,8 +35,8 @@
 - [x] ⚠️★★★ **辺の向きの確定** (実測G) → **`UNCLOAKED` = 候補表示。実装は正しい**
 - [x] ⚠️★★★ **`FOLD_GAP_MS` の確定** (実測F) → **150 ms** (★ 最小ギャップ 308ms の約 1/2)
 - [x] ⚠️★★★ **pause 区間の割合の実測** → 52.1% (⚠️ **計測手順の産物。代表値ではない**・findings §4.4)
-- [ ] ⚠️★★★ **実起動ログで `ime_shadow` 行が実際に出る**
-- [ ] ⚠️★★★ **無操作 60 秒で `ime_shadow` が 1 行も出ない** (実起動での回帰確認)
+- [x] ✅ **実起動ログで `ime_shadow` 行が実際に出る** (通常 6 行 / G1 45 行)
+- [x] ✅ **無操作 60 秒で `ime_shadow` が 1 行も出ない** (★ 通常 60.3 秒 / G1 とも 0 行)
 
 ## A-2 (判断のみ)
 
@@ -45,7 +45,16 @@
 ## レビュー
 
 - [x] `code-reviewer` + `security-checker` を**並列**起動 → HIGH 3 件すべて対応
-- [x] `/cross-review` (Codex・パス限定 `a5de3e3..HEAD -- src-tauri/src/input/*.rs`) → 重大 1 + 中 2 に対応
+- [x] `/cross-review` (Codex・パス限定) → 重大 1 + 中 2 に対応 (1 回目)
+- [x] `/finish-task` Step 3: `/cross-review` ∥ `security-checker` 再実行 → 下記に対応
+      - ★ **HIGH**: `const _: () = assert!()` が **ファイル間でリンクしていなかった**
+        → `MONITOR_SAFETY_VALVE_MS` を `pub(crate)` にし `lib.rs` を導出に変更
+      - ★ 存在しないシンボル `LEGACY_IME_EVENT_SEEN` の参照 2 箇所を修正
+      - ★ assert メッセージ / `lib.rs` の「8 秒」コメント腐りを修正
+      - ★ nav 計数の混入窓が 8s → 20s に広がった旨を明記
+      - ★ 打ち切り時にカウンタも畳む (⚠️ 現状漏れないが不変条件を局所化)
+      - ★ wall-clock 依存を doc 化 (外側 valve のみ monotonic)
+      - ⚠️ **未決 → D-12**: 介入が IME 変換中に発火しうる (研究者判断)
       ⚠️ `findings-*.md` は外部へ渡していない (★ 渡したのは `.rs` の diff のみ)
 - [ ] `/finish-task` (★ 実測・実起動確認とも完了。⚠️ 残るは PR → CI → main → Mac)
 

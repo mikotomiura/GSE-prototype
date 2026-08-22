@@ -166,19 +166,29 @@ pub const FOLD_GAP_MS: u64 = 150;
 /// ⚠️ pause を外した (`decisions.md` D-10) ので、長く立ちっぱなしでも推論は止まらない。
 pub const MAX_SESSION_MS: u64 = 20_000;
 
-/// ★ `lib.rs` の IME Monitor が `IME_ACTIVE` を強制リセットする閾値。
+/// ⚠️★★★ **`lib.rs` の IME Monitor が `IME_ACTIVE` を強制リセットする閾値 (ms)。**
 ///
-/// ⚠️ **ここに写しを置くのは、下の静的表明で不変条件を固定するためだけ**である。
-/// ★ 値そのものの持ち主は `lib.rs` の IME モニタースレッド。
-/// ⚠️ **片方だけ動かすとビルドが落ちる**ように下で表明してある。
-const MONITOR_SAFETY_VALVE_MS: u64 = 25_000;
+/// ★ **この定数が唯一の持ち主である。** ⚠️ `lib.rs` 側は
+/// `Duration::from_millis(MONITOR_SAFETY_VALVE_MS)` としてここから導出すること。
+///
+/// # ⚠️★★★ なぜ `pub(crate)` にしてあるのか (2026-08-23・cross-review HIGH)
+///
+/// ⚠️ 初版はここに**写しの private const** を置き、`lib.rs` 側には
+/// `Duration::from_secs(25)` を**別途ハードコード**していた。
+/// → ★ 下の静的表明は **同じファイル内の 2 定数を比べていただけ**で、
+/// ⚠️★★★ **`lib.rs` の実値を 1 バイトも参照していなかった。**
+/// ★ つまり `lib.rs` の `25` だけを将来動かすと、**ビルドは緑のまま不変条件が黙って破れる**。
+/// → ★ 「コンパイル時に固定した」という主張が**ファイル間では成立していなかった**。
+///
+/// ⚠️ 公開して `lib.rs` に使わせることで、初めて**本当に cross-file の不変条件**になる。
+pub(crate) const MONITOR_SAFETY_VALVE_MS: u64 = 25_000;
 
 // ⚠️★★★ **コンパイル時に固定する。** ★ どちらかを動かした瞬間にビルドが落ちる。
 //   ★ 揃えたり逆転させたりすると 1 変換で `ime_shadow` が 2 行出る
 //   ([`MAX_SESSION_MS`] の doc を参照)。★ 100ms ポーリング + 配送遅延を吸収する余裕も要る。
 const _: () = assert!(
     MAX_SESSION_MS + 1_000 <= MONITOR_SAFETY_VALVE_MS,
-    "CloakFold の上限は lib.rs の 8 秒 valve より 1 秒以上内側でなければならない"
+    "CloakFold の上限は lib.rs の safety valve より 1 秒以上内側でなければならない"
 );
 
 /// ⚠️★★★ **cloak/uncloak を「1 変換 = 1 セッション」へ畳む純粋な状態機械。**
@@ -270,6 +280,15 @@ impl CloakFold {
     /// ⚠️ resolver スレッドは受信の合間に**必ずこれを呼ぶ**こと。
     /// ★ 呼ばないと「最後の uncloak のあと二度とイベントが来ない」ケースで
     /// セッションが閉じない (= 永久 pause)。
+    ///
+    /// # ⚠️ 時計について (2026-08-23・cross-review)
+    ///
+    /// ⚠️ `now_ms` は呼び出し側が **wall-clock (`SystemTime`)** から渡している
+    /// (★ `IME_COMPOSITION_START_MS` が epoch ms で NDJSON に載るため)。
+    /// → ⚠️ **システム時計が巻き戻ると `MAX_SESSION_MS` の自己修復が効かなくなる。**
+    /// ★ 最終防御は `lib.rs` の safety valve で、あちらは **monotonic な `Instant`** を
+    /// 使っているので巻き戻りの影響を受けない ([`MONITOR_SAFETY_VALVE_MS`])。
+    /// ★ 二重防御の**外側だけが monotonic** である、と理解しておくこと。
     pub fn on_tick(&mut self, now_ms: u64) -> Option<FoldAction> {
         let start = self.session_start_ms?;
         // ⚠️★ 上限超過は最優先。★ 取りこぼしても必ず自分で治る。

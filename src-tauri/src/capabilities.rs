@@ -113,7 +113,7 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// **`hook_windows.rs` の WinEvent コールバック 1 か所だけ**である」と書いていたが、
 /// ★ 現在は **2 か所**ある —— 文書化された `EVENT_OBJECT_IME_*` 経路と、
 /// **cloak/uncloak 経路** (`input/ime_cloak.rs` + `ime_windows.rs::spawn_cloak_resolver_thread`)。
-/// ⚠️ 2 つは `hook.rs::LEGACY_IME_EVENT_SEEN` で**排他**にしてある (同時には駆動しない)。
+/// ⚠️ 2 つは `hook.rs::LEGACY_IME_EVENT_MS` で**排他**にしてある (同時には駆動しない)。
 /// ⚠️★★★ ところが実機計測（2026-08-22・`examples/ime_winevent_probe.rs`）で
 /// **`EVENT_OBJECT_IME_SHOW/HIDE/CHANGE`(0x8027-0x8029) が 60 秒間 1 件も飛ばない**ことが分かった
 /// —— 同じ時間に `TEXTSELECTIONCHANGED` 298 件・`VALUECHANGE` 246 件・

@@ -379,7 +379,7 @@ fn resolved_cloak_state(dwm: Option<bool>, event_cloaked: bool) -> bool {
 /// `IME_ACTIVE` を cloak 経路から書くのは**ここだけ**である。
 /// ⚠️ 文書化された経路 (`hook_windows.rs` の `win_event_callback`) が 1 度でも飛んだ端末では、
 /// コールバック側が `try_send` しなくなるので**このスレッドは何も受け取らない**
-/// (`hook.rs::LEGACY_IME_EVENT_SEEN` を参照)。
+/// (`hook.rs::LEGACY_IME_EVENT_MS` を参照)。
 ///
 /// # ⚠️ `IME_OPEN` は**触らない**
 ///
@@ -527,6 +527,14 @@ fn apply_fold_action(action: FoldAction) {
             //   (`lib.rs::emit_ime_shadow` は `start > 0` のときだけ送る)。
             //   ⚠️ 1 行失う方が、上限そのものを dwell と偽る 1 行より安全である。
             hook::IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
+            // ⚠️★ **打ち切った区間のカウンタもここで畳む** (2026-08-23・security-checker MEDIUM)。
+            //   ★ 実際には次の `Begin` が `IME_ACTIVE` を立てる**前に**両方 0 に戻すので、
+            //   ⚠️ **現状の経路では次の行へ漏れない** (★ `emit_ime_shadow` は `READY` か
+            //   `START_MS > 0` でしか読まず、打ち切りはどちらも落としている)。
+            //   → ★ それでもここで畳むのは、**不変条件を遠くの `Begin` に依存させない**ため。
+            //   ⚠️ 将来ここに読み手が増えたときに黙って壊れる形にしない。
+            hook::IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
+            hook::IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
             hook::IME_ACTIVE.store(false, Ordering::Release);
             tracing::debug!(
                 dwell_ms,

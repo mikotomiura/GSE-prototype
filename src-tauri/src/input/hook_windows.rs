@@ -623,7 +623,13 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
 
             // Phase 2b: IME 変換中のナビゲーション・放棄をカウント
             // 既知の制約: WH_KEYBOARD_LL はシステムグローバルなため、IME_ACTIVE 中に
-            // 別ウィンドウで押された矢印/ESC もカウントされる。8s stale valve で緩和。
+            // 別ウィンドウで押された矢印/ESC もカウントされる。
+            // ⚠️★★★ **2026-08-23: 緩和の窓が 8 秒 → 20 秒に広がった** (security-checker MEDIUM)。
+            //   ★ 旧文は「8s stale valve で緩和」と書いていたが、`IME_ACTIVE` を下ろすのは
+            //   いま `CloakFold::MAX_SESSION_MS` (20 秒) が先で、`lib.rs` の valve は 25 秒である。
+            //   → ⚠️ **他ウィンドウの混入が最大 20 秒ぶんまで載りうる。**
+            //   ★ `nav` / `abandon` は ADR-011 D4 により **記録専用 (Tier 0)** で推論へは流れないため
+            //   影響は記録の質に限られるが、⚠️ **解析時にこの上限を知っている必要がある。**
             // WinEvent IME_SHOW と hook_callback のタイミングずれにより、変換セッション
             // 最初の 1-2 キーが拾えない場合がある。Phase 2b は shadow-only なので許容。
             if is_press && IME_ACTIVE.load(Ordering::Relaxed) {

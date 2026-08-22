@@ -2455,7 +2455,8 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 ///
 /// 2 つの経路で emit が発生する:
 /// 1. 正常: WinEvent IME_HIDE が到着し IME_SHADOW_READY=true → dwell は事前計算済み
-/// 2. Stale: IME_HIDE が取りこぼされ 8s タイムアウト → START_MS > 0 なら独自に dwell 計算
+/// 2. Stale: IME_HIDE が取りこぼされ safety valve のタイムアウト
+///    (`input::ime_cloak::MONITOR_SAFETY_VALVE_MS`) → START_MS > 0 なら独自に dwell 計算
 #[cfg(target_os = "windows")]
 fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     use std::sync::atomic::Ordering::Relaxed;
@@ -2723,8 +2724,8 @@ pub fn run() {
     thread::spawn(move || {
         tracing::info!("IME Monitor thread started");
         let monitor = input::ime::ImeMonitor::new();
-        // IME_ACTIVE が true になった時刻。8 秒以上続いたら EVENT_OBJECT_IME_HIDE
-        // 取りこぼしと判断してフラグを自動リセットする。
+        // IME_ACTIVE が true になった時刻。`MONITOR_SAFETY_VALVE_MS` 以上続いたら
+        // EVENT_OBJECT_IME_HIDE 取りこぼしと判断してフラグを自動リセットする。
         let mut ime_active_since: Option<Instant> = None;
         // IME_ACTIVE 変更検出: 状態が変化した際に ImeState ログを送出
         let mut last_active: Option<bool> = None;
@@ -2732,8 +2733,8 @@ pub fn run() {
             let active = monitor.is_candidate_window_open();
 
             // Safety valve: EVENT_OBJECT_IME_HIDE はフォーカス変更やクラッシュ時に
-            // 取りこぼすことがある。IME_ACTIVE が 8 秒以上 true のままなら stale と
-            // みなしてリセット。実際の IME 変換は数秒以内に確定/キャンセルされる。
+            // 取りこぼすことがある。IME_ACTIVE が `MONITOR_SAFETY_VALVE_MS` 以上
+            // true のままなら stale とみなしてリセットする。
             if active {
                 let since = ime_active_since.get_or_insert_with(Instant::now);
                 // ⚠️★★★ **2026-08-23: 8 秒 → 25 秒。**
@@ -2744,8 +2745,18 @@ pub fn run() {
                 //   内側にすると fold より先に発火して **1 変換で 2 行**出る
                 //   (★ `ime_cloak.rs` の `MAX_SESSION_MS` doc を参照)。
                 //   ★ pause を外した (上記) ので、長く立ちっぱなしでも推論は止まらない。
-                if since.elapsed() > Duration::from_secs(25) {
-                    tracing::warn!("IME_ACTIVE stale for >25s — auto-resetting");
+                // ⚠️★★★ **値は `ime_cloak::MONITOR_SAFETY_VALVE_MS` から導出する。**
+                //   ★ ここに数値をハードコードすると、あちらの `const _: () = assert!()` が
+                //   **同じファイル内の 2 定数を比べるだけ**になり、
+                //   ⚠️ 「fold が valve の内側で発火する」不変条件が**黙って破れる**
+                //   (2026-08-23・cross-review HIGH)。
+                if since.elapsed()
+                    > Duration::from_millis(input::ime_cloak::MONITOR_SAFETY_VALVE_MS)
+                {
+                    tracing::warn!(
+                        valve_ms = input::ime_cloak::MONITOR_SAFETY_VALVE_MS,
+                        "IME_ACTIVE stale — auto-resetting"
+                    );
                     input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
                     ime_active_since = None;
                     // ⚠️★ `set_paused(false)` は呼ばない —— ★ IME で pause しなくなったので
