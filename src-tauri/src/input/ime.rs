@@ -23,6 +23,13 @@ mod ime_macos;
 #[cfg(target_os = "windows")]
 pub use ime_windows::{spawn_ime_open_polling_thread, ImeMonitor};
 
+// ⚠️★★★ cloak/uncloak から `IME_ACTIVE` を駆動する resolver スレッド (2026-08-23)。
+//   ★ この Windows 11 では文書化された `EVENT_OBJECT_IME_*` が 1 件も飛ばないため、
+//   実質こちらが `IME_ACTIVE` の唯一の駆動源になる
+//   (`ime_cloak.rs` のモジュール doc を参照)。⚠️ macOS に対応物は無い。
+#[cfg(target_os = "windows")]
+pub use ime_windows::spawn_cloak_resolver_thread;
+
 // ⚠️★ `#[doc(hidden)]`: 公開 API ではなく **診断用の出口**である、と型レベルで示す
 //   (2026-08-22・cross-review 低 / security-checker LOW)。★ example から呼ぶために `pub` は要る。
 #[cfg(target_os = "windows")]

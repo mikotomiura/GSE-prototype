@@ -5,6 +5,7 @@ use crossbeam_channel::Sender;
 use windows::{
     core::*,
     Win32::Foundation::{BOOL, HWND, LPARAM},
+    Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED},
     Win32::System::Com::*,
     Win32::UI::Accessibility::*,
     Win32::UI::Input::Ime::{ImmGetContext, ImmGetOpenStatus, ImmReleaseContext},
@@ -13,6 +14,9 @@ use windows::{
     },
 };
 
+use crate::input::ime_cloak::{
+    candidate_shown_from_cloak, is_ime_cloak_class, CloakFold, FoldAction, FOLD_GAP_MS,
+};
 use crate::logger::LogEntry;
 
 pub struct ImeMonitor {
@@ -102,7 +106,11 @@ impl ImeMonitor {
         // confirms a visible candidate window, the IME_ACTIVE flag is stale.
         // This happens when EVENT_OBJECT_IME_HIDE was missed (e.g. focus change, crash).
         // Reset it here to prevent permanently pausing all keystroke analysis.
-        if is_stale_winevent_active(winevent_active, enumwindows_active, uia_active) {
+        //
+        // ⚠️★★★ **2026-08-23: cloak 経路が駆動している端末では*この判定を使わない*。**
+        //   ★ 理由は `is_stale_winevent_active` の doc を参照 (前提が実測で崩れている)。
+        let legacy_path = crate::input::hook::LEGACY_IME_EVENT_SEEN.load(Ordering::Acquire);
+        if is_stale_winevent_active(winevent_active, enumwindows_active, uia_active, legacy_path) {
             crate::input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
             return false;
         }
@@ -167,12 +175,32 @@ pub fn is_ime_active_check() -> bool {
 ///
 /// ⚠️★ stale のまま放置すると、二度と `EVENT_OBJECT_IME_HIDE` が来ない限り
 /// 分析が永久に一時停止する (fail-open ではなく fail-stuck になる)。
+///
+/// # ⚠️★★★ 2026-08-23: `legacy_path` で必ず絞ること
+///
+/// ★ この判定の**前提**は「本当に候補が出ているなら EnumWindows か UIA が裏を取れるはずだ」
+/// である。⚠️ **その前提は cloak 経路では成り立たない**:
+///
+/// | 裏取り手段 | 実測 |
+/// |---|---|
+/// | `EnumWindows` (`is_ime_candidate_window_visible`) | ⚠️ **0/2400** (立ち上がり 0) |
+/// | UI Automation のフォーカス要素 | ⚠️ **0** |
+///
+/// → ⚠️★★★ **裏取りが構造的に 0 の世界では、この式は「常に stale」に退化する。**
+/// ★ つまり cloak 経路が `IME_ACTIVE=true` を立てた 100ms 後に必ず折られ、
+/// **`ime_shadow` は 1 行も出ない。**
+///
+/// ★ そこで **文書化された経路 (0x8027-29) が実際に飛んだ端末に限って**この判定を使う。
+/// ⚠️ 時間切れ判定 (fail-stuck の防止) は失われない:
+/// `lib.rs` の 8 秒 safety valve と
+/// [`crate::input::ime_cloak::MAX_SESSION_MS`] が別々に効いている。
 fn is_stale_winevent_active(
     winevent_active: bool,
     enumwindows_active: bool,
     uia_active: bool,
+    legacy_path: bool,
 ) -> bool {
-    winevent_active && !enumwindows_active && !uia_active
+    legacy_path && winevent_active && !enumwindows_active && !uia_active
 }
 
 /// IME 候補ウィンドウのクラス名判定。
@@ -278,6 +306,150 @@ pub fn spawn_ime_open_polling_thread(
     });
 }
 
+// ---------------------------------------------------------------------------
+// ⚠️★★★ cloak resolver — cloak/uncloak から `IME_ACTIVE` を駆動する (2026-08-23)
+// ---------------------------------------------------------------------------
+
+/// ★ 窓のクラス名を取る。⚠️ 取れなければ `None` (★ 失敗を空文字に丸めない)。
+///
+/// ⚠️ **privacy**: ★ クラス名は判定に使うだけで、**ログにも NDJSON にも出さない**。
+/// ⚠️ ウィンドウタイトル (`GetWindowTextW`) も PID も取得しない。
+fn class_name_of(hwnd: HWND) -> Option<String> {
+    let mut buf = [0u16; 256];
+    // SAFETY: hwnd は WinEvent が渡したもの。buf は自前のスタック配列で、
+    //   `GetClassNameW` は書き込んだ長さを返す (失敗時 0)。
+    let len = unsafe { GetClassNameW(hwnd, &mut buf) };
+    if len <= 0 {
+        // ⚠️ WINEVENT_OUTOFCONTEXT の配送は非同期なので、到達時に窓が消えていればここ。
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buf[..len as usize]))
+}
+
+/// ⚠️★★★ **DWM に「その窓はいま cloak されているか」を聞く。**
+///
+/// ★ **なぜイベントの種類 (`CLOAKED`/`UNCLOAKED`) をそのまま信じないか**:
+/// `WINEVENT_OUTOFCONTEXT` の配送は**非同期**で、resolver に届くまでに
+/// 状態がさらに変わっていることがある。★ **OS に聞いた現在値が唯一の真実。**
+///
+/// ⚠️ 取得に失敗したら `None`。★ 「cloak されていない」に丸めない (判定を汚す)。
+fn dwm_is_cloaked(hwnd: HWND) -> Option<bool> {
+    let mut v: u32 = 0;
+    // SAFETY: hwnd は WinEvent が渡したもの。出力先は自前の u32 で、サイズも一致させている。
+    let hr = unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAKED,
+            (&mut v as *mut u32).cast(),
+            std::mem::size_of::<u32>() as u32,
+        )
+    };
+    if hr.is_ok() {
+        Some(v != 0)
+    } else {
+        None
+    }
+}
+
+/// ⚠️★★★ **cloak/uncloak を受け取り、`IME_ACTIVE` と IME Shadow の atomics を駆動する。**
+///
+/// # なぜ専用スレッドなのか
+///
+/// ★ 判定にはウィンドウクラス名が要るが、⚠️ `hook-constraints` **Win-1** により
+/// **WinEvent コールバック内で `GetClassNameW` は呼べない** (Atomic ＋ `try_send` のみ)。
+/// → ★ コールバックは HWND を `try_send` するだけにして、**解決はここでやる**。
+///
+/// # ⚠️ このスレッドが唯一の書き手であること
+///
+/// ★ `IME_COMPOSITION_START_MS` / `IME_SHADOW_DWELL_MS` / `IME_SHADOW_READY` /
+/// `IME_ACTIVE` を cloak 経路から書くのは**ここだけ**である。
+/// ⚠️ 文書化された経路 (`hook_windows.rs` の `win_event_callback`) が 1 度でも飛んだ端末では、
+/// コールバック側が `try_send` しなくなるので**このスレッドは何も受け取らない**
+/// (`hook.rs::LEGACY_IME_EVENT_SEEN` を参照)。
+///
+/// # ⚠️ `IME_OPEN` は**触らない**
+///
+/// ★ `IME_OPEN` (日本語モードか英数か) には別の正しい持ち主が居る
+/// (`VK_DBE_*` キー ＋ `ImmGetOpenStatus` ポーリング)。
+/// ⚠️★★★ 旧実装が「無関係な窓の cloak で `IME_OPEN` まで立てていた」のが
+/// 2026-08-21 に見つかった計器不良そのものである。★ 同じ誤りを繰り返さない。
+pub fn spawn_cloak_resolver_thread() {
+    // ⚠️ 有界チャネル。★ 溢れたらコールバック側が捨てる (フックを絶対に詰まらせない)。
+    let (tx, rx) = crossbeam_channel::bounded::<crate::input::hook::CloakEvent>(256);
+    crate::input::hook::set_cloak_event_sender(tx);
+
+    std::thread::spawn(move || {
+        tracing::info!("IME cloak resolver thread started");
+        let mut fold = CloakFold::new();
+        // ★ debounce の満了を見逃さない程度に細かく起こす。
+        let tick = std::time::Duration::from_millis(FOLD_GAP_MS.max(1) / 4 + 1);
+        loop {
+            match rx.recv_timeout(tick) {
+                Ok(ev) => {
+                    let hwnd = HWND(ev.hwnd as *mut std::ffi::c_void);
+                    // ★ 1) クラスで絞る。⚠️ 取れなければ捨てる (短命な窓)。
+                    let Some(class) = class_name_of(hwnd) else {
+                        continue;
+                    };
+                    if !is_ime_cloak_class(&class) {
+                        continue;
+                    }
+                    // ★ 2) 辺の名前ではなく **OS に現在状態を聞く**。
+                    //   ⚠️ 聞けなかったときだけ、届いた辺を保険で使う。
+                    let cloaked = dwm_is_cloaked(hwnd).unwrap_or(ev.cloaked);
+                    let shown = candidate_shown_from_cloak(cloaked);
+                    let now = now_ms();
+                    if let Some(action) = fold.on_event(ev.hwnd, shown, now) {
+                        apply_fold_action(action);
+                    }
+                }
+                Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
+                Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                    // ⚠️ 送信端は `OnceLock` に置かれ落ちないので、実際にはここへ来ない。
+                    tracing::warn!("cloak resolver channel disconnected — thread exits");
+                    return;
+                }
+            }
+            // ★ 受信の有無に関わらず**必ず**時間側を進める
+            //   (⚠️ 呼ばないと最後の uncloak のあとセッションが閉じない)。
+            if let Some(action) = fold.on_tick(now_ms()) {
+                apply_fold_action(action);
+            }
+        }
+    });
+}
+
+/// ★ [`FoldAction`] を atomics へ反映する。⚠️ **書き手はここだけ。**
+///
+/// ★ 更新順は既存の `win_event_callback` (IME_SHOW / IME_HIDE) と**同じ形**にしてある
+/// —— `IME_SHADOW_READY` の `Release` store が先行する Relaxed store 群を可視化する
+/// フェンスになる (`hook.rs::IME_SHADOW_READY` の Ordering 設計を参照)。
+fn apply_fold_action(action: FoldAction) {
+    use crate::input::hook;
+    match action {
+        FoldAction::Begin(start_ms) => {
+            hook::IME_COMPOSITION_START_MS.store(start_ms, Ordering::Relaxed);
+            // ★ 前セッションのカウンターを畳む (既存 IME_SHOW 経路と同じ)。
+            hook::IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
+            hook::IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
+            hook::IME_ACTIVE.store(true, Ordering::Relaxed);
+        }
+        FoldAction::End(dwell_ms) => {
+            hook::IME_SHADOW_DWELL_MS.store(dwell_ms, Ordering::Relaxed);
+            hook::IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
+            hook::IME_SHADOW_READY.store(true, Ordering::Release);
+            hook::IME_ACTIVE.store(false, Ordering::Relaxed);
+        }
+    }
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
 /// Emit a `LogEntry::ImeState` to the logger channel with the current wall-clock time.
 fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool) {
     let ts = SystemTime::now()
@@ -304,28 +476,43 @@ fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool) {
 mod tests {
     use super::*;
 
+    /// ⚠️ 以下 4 件は 2026-08-23 に `legacy_path` 引数が増えたが、**判定内容は変えていない**。
+    /// ★ 文書化された経路 (0x8027-29) が飛ぶ端末＝従来の世界を `true` で表している。
     #[test]
     fn stale_when_only_winevent_signals_active() {
         assert!(
-            is_stale_winevent_active(true, false, false),
+            is_stale_winevent_active(true, false, false, true),
             "★ WinEvent だけが active なら stale とみなし、放置せずリセットする"
         );
     }
 
     #[test]
     fn not_stale_when_enumwindows_confirms() {
-        assert!(!is_stale_winevent_active(true, true, false));
+        assert!(!is_stale_winevent_active(true, true, false, true));
     }
 
     #[test]
     fn not_stale_when_uia_confirms() {
-        assert!(!is_stale_winevent_active(true, false, true));
+        assert!(!is_stale_winevent_active(true, false, true, true));
     }
 
     #[test]
     fn not_stale_when_winevent_itself_is_false() {
         // WinEvent が false のときは「stale」という概念自体が当てはまらない。
-        assert!(!is_stale_winevent_active(false, false, false));
+        assert!(!is_stale_winevent_active(false, false, false, true));
+    }
+
+    /// ⚠️★★★ **本タスクの中核の回帰テスト。**
+    ///
+    /// ★ cloak 経路が駆動している端末 (`legacy_path=false`) では、
+    /// EnumWindows も UIA も**構造的に 0** なので、この判定を効かせると
+    /// `IME_ACTIVE` が立った 100ms 後に必ず折られ **`ime_shadow` が 1 行も出ない**。
+    #[test]
+    fn never_stale_on_cloak_driven_machines() {
+        assert!(
+            !is_stale_winevent_active(true, false, false, false),
+            "★ 裏取りが構造的に 0 の世界では『常に stale』に退化する → 効かせない"
+        );
     }
 
     #[test]

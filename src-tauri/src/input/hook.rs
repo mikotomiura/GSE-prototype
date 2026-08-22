@@ -75,6 +75,21 @@ pub static IME_CANDIDATE_NAV_COUNT: AtomicU32 = AtomicU32::new(0);
 #[cfg(target_os = "windows")]
 pub static IME_SHADOW_ABANDON: AtomicBool = AtomicBool::new(false);
 
+/// ⚠️★★★ **文書化された IME WinEvent (0x8027-0x8029) が 1 度でも届いたか。**
+///
+/// ★ **なぜ要るか** (2026-08-23): この端末の Windows 11 は IME 候補 UI の表示/非表示を
+/// `EVENT_OBJECT_IME_*` ではなく **DWM の cloak/uncloak** で行っており、0x8027-29 は
+/// 60 秒 × 8 回の実測で **1 件も飛ばない**
+/// (`.steering/20260822-ime-active-rewiring/findings-enumwindows-probe.md` §15-16)。
+/// → ★ そこで cloak/uncloak を第 2 の駆動源として足したが、
+/// ⚠️ **両方飛ぶ端末では `IME_COMPOSITION_START_MS` などに書き手が 2 人できる。**
+/// ★ この repo が過去に踏んだ事故 (無関係な窓の cloak で `IME_ACTIVE` が立つ) の型そのもの。
+///
+/// → ★ **優先順位を固定する**: 文書化された経路が 1 度でも飛んだ端末では、
+/// cloak 経路は**一切手を出さない**。壊れる方向ではなく正しい方が勝つ。
+#[cfg(target_os = "windows")]
+pub static LEGACY_IME_EVENT_SEEN: AtomicBool = AtomicBool::new(false);
+
 /// IME Shadow データの emit 準備完了フラグ。WinEvent IME_HIDE で store(true, Release)。
 /// IME Monitor スレッドが swap(false, AcqRel) で読み取り、LogEntry::ImeShadow を送出。
 ///
@@ -164,6 +179,40 @@ pub static POLL_WAKE_TX: OnceLock<Sender<()>> = OnceLock::new();
 /// Must be called before `init_hook` so the sender is ready when the hook fires.
 pub fn set_poll_wake_sender(tx: Sender<()>) {
     let _ = POLL_WAKE_TX.set(tx);
+}
+
+/// ⚠️★★★ **cloak/uncloak イベントを resolver スレッドへ渡すチャネル。**
+///
+/// ★ **なぜチャネルなのか**: 判定にはウィンドウクラス名が要るが、
+/// ⚠️ `hook-constraints` Win-1 により **WinEvent コールバック内で `GetClassNameW` は呼べない**
+/// (Atomic 操作と `try_send` のみ)。→ ★ **HWND を送り、別スレッドで解決する。**
+///
+/// ⚠️ `HWND` は `Send` ではないので **`isize` で運ぶ** (★ `ThreadSafeHook` と同じ発想)。
+/// ⚠️★ resolver は hwnd を**クラス解決と cloak 状態の問い合わせにしか使わず、
+/// 保存も送出もしない** (`data-privacy`: ウィンドウタイトルも PID も取らない)。
+#[cfg(target_os = "windows")]
+pub static CLOAK_EVENT_TX: OnceLock<Sender<CloakEvent>> = OnceLock::new();
+
+/// ★ cloak/uncloak の生イベント。⚠️ **窓の識別子以外は何も運ばない** (content-free)。
+#[cfg(target_os = "windows")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CloakEvent {
+    /// ⚠️ `HWND` の生値。★ resolver がクラス解決に使うだけで、ログにも NDJSON にも出ない。
+    pub hwnd: isize,
+    /// ★ 届いた辺 (`EVENT_OBJECT_CLOAKED` なら true)。
+    ///
+    /// ⚠️★ **これは参考でしかない。** 配送は `WINEVENT_OUTOFCONTEXT` の非同期配送なので、
+    /// resolver に届いた時点の実状態と食い違いうる。
+    /// → ★ resolver は `DwmGetWindowAttribute(DWMWA_CLOAKED)` で **OS に聞き直す**。
+    pub cloaked: bool,
+}
+
+/// resolver スレッドの受信端を作り、送信端を登録する。
+///
+/// ⚠️ **`init_hook` より前に呼ぶこと** (★ フックが飛び始めたときに sender が居るように)。
+#[cfg(target_os = "windows")]
+pub fn set_cloak_event_sender(tx: Sender<CloakEvent>) {
+    let _ = CLOAK_EVENT_TX.set(tx);
 }
 
 // ---------------------------------------------------------------------------

@@ -2981,6 +2981,16 @@ pub fn run() {
             input::hook::set_poll_wake_sender(poll_wake_tx);
             input::ime::spawn_ime_open_polling_thread(ime_poll_log_tx, poll_wake_rx);
 
+            // ⚠️★★★ cloak resolver スレッド (Windows 限定・2026-08-23)。
+            //   ★ この Windows 11 の IME 候補 UI は `ShowWindow` ではなく **DWM の
+            //   cloak/uncloak** で表示制御されており、文書化された
+            //   `EVENT_OBJECT_IME_*`(0x8027-29) は実測で 1 件も飛ばない。
+            //   → ★ cloak を第 2 の駆動源にする (`input/ime_cloak.rs` のモジュール doc)。
+            //   ⚠️ **`init_hook` より前に呼ぶこと** —— チャネルの送信端が
+            //   `CLOAK_EVENT_TX` に載る前にフックが飛ぶと、その分を取りこぼす。
+            #[cfg(target_os = "windows")]
+            input::ime::spawn_cloak_resolver_thread();
+
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);
 

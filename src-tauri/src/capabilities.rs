@@ -108,8 +108,12 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 ///
 /// ⚠️★★★ **2026-08-22 追加: `ime_shadow` もここに入る**（★ 実測で判明）。
 ///
-/// ★ `ime_shadow` は `IME_ACTIVE` が `true` になったときにだけ出る。⚠️ その `true` を書くのは
-/// **`hook_windows.rs` の WinEvent コールバック 1 か所だけ**である。
+/// ★ `ime_shadow` は `IME_ACTIVE` が `true` になったときにだけ出る。
+/// ⚠️★ **2026-08-23 訂正**: 旧文は「その `true` を書くのは
+/// **`hook_windows.rs` の WinEvent コールバック 1 か所だけ**である」と書いていたが、
+/// ★ 現在は **2 か所**ある —— 文書化された `EVENT_OBJECT_IME_*` 経路と、
+/// **cloak/uncloak 経路** (`input/ime_cloak.rs` + `ime_windows.rs::spawn_cloak_resolver_thread`)。
+/// ⚠️ 2 つは `hook.rs::LEGACY_IME_EVENT_SEEN` で**排他**にしてある (同時には駆動しない)。
 /// ⚠️★★★ ところが実機計測（2026-08-22・`examples/ime_winevent_probe.rs`）で
 /// **`EVENT_OBJECT_IME_SHOW/HIDE/CHANGE`(0x8027-0x8029) が 60 秒間 1 件も飛ばない**ことが分かった
 /// —— 同じ時間に `TEXTSELECTIONCHANGED` 298 件・`VALUECHANGE` 246 件・
@@ -148,8 +152,27 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// → ★ **どちらにせよ `IsWindowVisible` ＋ クラス名では変換中と非変換中を分離できない。**
 /// ★ つまり第 2 経路は「まだ試していない当て」ではなく、**試して外れた当て**である。
 ///
+/// # ⚠️★★★ 2026-08-23: cloak 経路を入れた。**それでも `config_gated` は据え置く**
+///
+/// ★ 上の「仮説 B（常駐窓を cloak している）」が **実測で確定した**
+/// (`findings-enumwindows-probe.md` §15-16)。→ ★ `IME_ACTIVE` を
+/// `EVENT_OBJECT_CLOAKED`/`UNCLOAKED` ＋ クラス完全一致 `IME` で駆動し直し、
+/// **`ime_shadow` は実際に出るようになった**。
+///
+/// ⚠️★★★ **それでも `unconditional` へは戻さない。** 理由:
+///
+/// | # | ⚠️ 未解決 |
+/// |---|---|
+/// | 1 | ★ **1 台・1 アプリでしか確認していない。** 被験者環境で再現するかは未検証 |
+/// | 2 | ⚠️ cloak が飛ぶのは**候補ウィンドウが出るとき**であって、ローマ字入力中ではない —— ★ 「変換しない打ち方」の被験者では 0 行になりうる |
+/// | 3 | ⚠️ macOS には送出元が構造的に無い (`emit_ime_shadow` が Windows 限定) |
+///
+/// → ★ **0 行は依然「判定不能」であって「信号が無かった」ではない。**
+/// ⚠️ 複数台で再現を確認するまで `config_gated` のまま据え置く。
+///
 /// ★ 詳細: `.steering/20260821-workspace-behavior-triage/findings-instrument-defects.md`
 /// ★ EnumWindows 追試: `.steering/20260822-ime-active-rewiring/findings-enumwindows-probe.md`
+/// ★ cloak 経路の復旧: `.steering/20260823-ime-active-cloak-rewiring/`
 pub fn config_gated() -> Vec<&'static str> {
     let mut v = vec![
         "probe_assignment",
