@@ -295,11 +295,20 @@ pub fn step(
                 engine.register_keystroke(event.is_backspace);
             }
         }
-        Some(LoopInput::ImeActivate { active }) => {
-            // replay 用: NDJSON の ime_state から pause 状態を再構成する。
-            // production は IME Monitor スレッドが直接 set_paused するため、
-            // production の `step()` 呼び出しではこのバリアントを生成しない。
-            engine.set_paused(active);
+        Some(LoopInput::ImeActivate { active: _ }) => {
+            // ⚠️★★★ **2026-08-23: ここでの `set_paused` を外した (研究者判断)。**
+            //
+            // ★ 旧コードは `engine.set_paused(active)` で NDJSON の `ime_state.active`
+            //   から pause を再構成していた。⚠️ **live 側で pause をやめたので、
+            //   ここに残すと replay だけが止まり Replay-as-Truth が壊れる。**
+            //
+            // ★ なぜ live で pause をやめたか: 実測で `IME_ACTIVE` は
+            //   「候補リスト表示」ではなく **変換セッション全体** を覆い、
+            //   ⚠️ pause すると日本語論述の推定窓が約 56〜60% 消えるため
+            //   (`lib.rs` の IME Monitor スレッドのコメント / decisions D-10)。
+            //
+            // ⚠️★ **バリアント自体は残す** —— `ime_state` 行は読み飛ばさず、
+            //   将来 pause を復活させるならここに戻す、という位置を保つ。
         }
         None => {}
     }

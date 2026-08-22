@@ -100,6 +100,15 @@ GSE は 8 つのスレッド/タスクで構成される (★ G1 モード時の
 | **G1 Block End** | ★ **G1 モード時のみ起動**。`g1::BLOCK_DURATION_MS` (5 分) でブロックの記録を終了し、`BlockEnd` 送信 + `g1-block-ended` emit | Atomic SESSION_START_MS / ANALYSIS_IDLE, LogEntry Sender, AppHandle emit | 低 |
 | **G1 Duplicate Check** | ★ **G1 モード時のみ・起動 1 回**。他の GSE プロセスを OS に問い合わせ (`pgrep` / `tasklist`)、居れば `second-instance-blocked` emit | AppHandle emit | 低 |
 
+⚠️★★★ **2026-08-23: `IME_ACTIVE` は推論を止めない (記録のみ)。**
+★ 旧設計は「IME 候補ウィンドウ表示中は HMM 推論を一時停止する」だったが、
+⚠️ 実測でこの信号は**候補リスト表示ではなく変換セッション全体**(ローマ字入力〜確定)を
+覆うと分かった。→ ★ pause すると日本語論述の推定窓が **約 56〜60%** 消える
+(⚠️ 実データ fixture `phase1_ime_heavy` では **94%**)。
+→ ★ 研究者判断で `lib.rs` と `analysis/loop_step.rs` の両方から `set_paused` を外した
+(`HMM_VERSION` 0.4.0 → **0.5.0**)。詳細は
+`.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10。
+
 純スケジューリング (指数間隔・thinning・窓計算・不透明 ProbeId 生成) は `analysis/probe_scheduler.rs` に隔離し OS API を呼ばない。スレッド起動・実時刻取得・emit・hotkey 配線は `lib.rs` 側に閉じる (architecture-rules)。
 
 Wall Server は Lv2 介入時にのみ起動する一時的なスレッド。
@@ -120,7 +129,7 @@ Hook Thread ──InputEvent──► crossbeam channel ──► Analysis Threa
      ├── Atomic IME_OPEN ─────────────────────────────►│ (β 切替)
      │  [mac] IME_COMPOSING ──────────────────────────►│ (変換中検出)
      │                                                │
-IME Monitor ── Atomic IME_ACTIVE ─────────────────────►│ (pause 検出)
+IME Monitor ── Atomic IME_ACTIVE ─────────────────────►│ (記録のみ)
      │  Win: WinEvent + EnumWindows + UIAutomation     │
      │  mac: (CGEventTap 内で処理 — 別スレッド不要)     │
 IME Polling ── Atomic IME_OPEN ───────────────────────►│

@@ -2581,7 +2581,8 @@ pub fn run() {
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
-    let engine_for_monitor = engine.clone();
+    // ⚠️★ IME Monitor 用の clone は **2026-08-23 に不要になった** ——
+    //   IME で `set_paused` を駆動しなくなったため (decisions D-10)。
     let log_tx_ime_poll = log_tx.clone();
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
@@ -2735,11 +2736,20 @@ pub fn run() {
             // みなしてリセット。実際の IME 変換は数秒以内に確定/キャンセルされる。
             if active {
                 let since = ime_active_since.get_or_insert_with(Instant::now);
-                if since.elapsed() > Duration::from_secs(8) {
-                    tracing::warn!("IME_ACTIVE stale for >8s — auto-resetting");
+                // ⚠️★★★ **2026-08-23: 8 秒 → 25 秒。**
+                //   ★ 旧値 8 秒は「候補ウィンドウ表示は数秒以内」という前提だったが、
+                //   ⚠️ 実測でこの信号は **変換セッション全体** を覆い、
+                //   自然な打鍵で **6974ms** の区間が出た。★ 8 秒では実データを切る。
+                //   ⚠️ `CloakFold::MAX_SESSION_MS` (20 秒) より**外側**に置くこと ——
+                //   内側にすると fold より先に発火して **1 変換で 2 行**出る
+                //   (★ `ime_cloak.rs` の `MAX_SESSION_MS` doc を参照)。
+                //   ★ pause を外した (上記) ので、長く立ちっぱなしでも推論は止まらない。
+                if since.elapsed() > Duration::from_secs(25) {
+                    tracing::warn!("IME_ACTIVE stale for >25s — auto-resetting");
                     input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
                     ime_active_since = None;
-                    engine_for_monitor.set_paused(false);
+                    // ⚠️★ `set_paused(false)` は呼ばない —— ★ IME で pause しなくなったので
+                    //   ここで解除するものが無い (上のコメント / decisions D-10)。
                     last_active = Some(false);
                     let ts = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -2796,10 +2806,26 @@ pub fn run() {
                 emit_ime_shadow(&log_tx_for_monitor, ts);
             }
 
-            // IME候補ウィンドウ表示中はHMM推論を一時停止する。
-            // 確率はリセットせず直前の状態を維持する。
-            // 候補選択中の認知状態（Incubation等）を破壊しない。
-            engine_for_monitor.set_paused(active);
+            // ⚠️★★★ **2026-08-23: IME による推論の一時停止を止めた (研究者判断)。**
+            //
+            // ★ 旧コードはここで `engine.set_paused(active)` を呼んでいた。
+            //   意図は「候補選択中の打鍵で推定を汚さない」であり、⚠️ **その意図は正しい**。
+            //
+            // ⚠️★★★ **しかし実測で、この信号は「候補リスト表示」ではなく
+            //   「IME 変換セッション全体 (ローマ字入力〜確定)」を覆うことが分かった。**
+            //   ★ 自然な打鍵 60 秒 (打鍵 281) での uncloaked 区間:
+            //   6464 / 5714 / 5004 / 3456 / 6974 / 3279 ms —— ★ 候補を眺める時間ではない。
+            //   ★ 打鍵中のサンプルの **69% が uncloaked** (実測G)。
+            //
+            // → ⚠️★★★ **これで pause すると、日本語論述の推定窓が約 56〜60% 消える。**
+            //   ★ G1 の主タスクは日本語論述なので、較正データを半分以上捨てることになる。
+            //   ⚠️ 引き継ぎ §3.2 の「15〜20%」は、信号を候補表示だと誤解していた時の見積り。
+            //
+            // ★ **決定 (研究者・2026-08-23)**: **記録はする。pause はしない。**
+            //   ⚠️ `analysis/loop_step.rs` の replay 経路も**同時に外してある**
+            //   (★ 外さないと live と replay が食い違い Replay-as-Truth が壊れる)。
+            //
+            // ★ 詳細: `.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10。
             thread::sleep(std::time::Duration::from_millis(100));
         }
     });
