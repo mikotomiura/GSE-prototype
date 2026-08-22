@@ -120,3 +120,34 @@
       —— ⚠️ **収集開始前に。リリースは止めない**
 - [ ] ⚠️ **0x8030 の採否**（★ 問い 2 の結果次第。⚠️ 入れるなら収集開始前に限る）
 - [ ] ★ Mac: タグ push → build → zip → **旧配布物削除 → Drive 差し替え**
+
+## Step 9 — ★ IME 実機計測と capabilities の是正（2026-08-22）
+
+### 9a. 実機計測（★ 3 回・60 秒ずつ）
+- [x] 1 回目 → ⚠️ **全 0**（★ 基準チャネルまで 0 ＝ **測定不成立**と判定）
+- [x] 2 回目（★ 生存確認チャネル追加）→ `alive=891` / ⚠️ IME イベント 0
+- [x] 3 回目（★ ヒストグラム ＋ IMM ポーリング追加）→ ★★★ **確定**
+
+| 実測 | 数値 |
+|---|---|
+| フックの生存 | `alive = 6544` |
+| ★ **日本語入力は行われた** | `TEXTSELECTIONCHANGED` **298** / `VALUECHANGE` **246** / `CREATE`=`DESTROY` **680** |
+| ⚠️★★★ **IME イベントは 0** | `IME_SHOW`/`HIDE`/`CHANGE`/`CONV_TARGET` すべて 0 |
+| ⚠️ `ImmGetContext` | 試行 120 / **成功 0** |
+| ⚠️ **旧定数の誤検知率** | `CLOAKED` 84 ＋ `UNCLOAKED` 88 = **60 秒で 172 件** |
+
+### 9b. 判定
+- [x] ⚠️ **0x8030 は入れない**（★ 実測 0 件。**測ってから決めた**）
+- [x] ★ 問い 1（`SKIPOWNPROCESS`）は **moot**（IME イベント自体が飛ばないため）
+- [x] ★★★ **`EVENT_OBJECT_IME_*` は元から機能していなかった**と確定
+
+### 9c. A（実施）
+- [x] `capabilities.rs`: `ime_shadow` を **`unconditional` → `config_gated`**
+- [x] `CONFIG_GATED`（const）→ `config_gated()`（fn・★ `#[cfg]` のため）
+- [x] 回帰テスト 2 本（Windows / 非 Windows の対）＋ 既存テスト 1 本を更新
+- [x] 検証: **441 passed** / ★ ゴールデン **byte-equal** / schema 同一 / parity **exit 0** / fmt 緑
+
+### 9d. ⚠️ B は次セッションへ分離（★ 研究者判断）
+- [ ] ⚠️★★★ **`IME_ACTIVE` の配線修正** —— ★ 働く検出器（`EnumWindows`）が
+      **「無効化用」にしか繋がっていない**。→ `_handoff/next-session-prompt-ime-active-rewiring-and-idea-followups.md`
+- [ ] ★ `.idea` の残り論点 ＋ **ADR-014 の研究者判断 6 件** も同セッション
