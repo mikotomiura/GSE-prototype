@@ -510,7 +510,7 @@ ADR-006 実施記録の発見 1 逐語 ——
 
 | 事実 | 出所 |
 |---|---|
-| `KeyCategory::from_vk()` が VK を 11 カテゴリへ写像し、`vk` フィールドを**除去**する | `src-tauri/src/analysis/anonymize.rs:31-91` |
+| `KeyCategory::from_vk()` が VK を 11 カテゴリへ写像し、`vk` フィールドを**除去**する（★ 当時。⚠️ 本判断で **14** になった） | `src-tauri/src/analysis/anonymize.rs` |
 | ★ **匿名化後の replay が生ログと同じ特徴量を再現する**（D6 Replay-as-Truth）ことがテストで固定 | `src-tauri/src/bin/replay.rs:2873` / `:2911` |
 | ⚠️ ただし適用点は **transfer 境界（`gse-package`）** であって **logger の書き出し境界ではない** | `src/bin/package.rs:71` |
 
@@ -535,8 +535,18 @@ ADR-006 実施記録の発見 1 逐語 ——
 
 | variant | VK レンジ | ★ 数 |
 |---|---|---|
-| **`Punctuation`** | `0x6A..=0x6F`（テンキー演算子）/ `0xBA..=0xC0`（`; = , - . / \``）/ `0xDB..=0xDF`（`[ \ ] '` OEM_8）/ `0xE2`（OEM_102） | **19 VK** |
+| **`Punctuation`** | `0x6A..=0x6F`（テンキー演算子）/ `0xBA` `0xBB` `0xBD` `0xBF` `0xC0` / `0xDB..=0xDF` / `0xE2` | **17 VK** |
+| **`SentencePunctuation`** | `0xBE`（`.`）/ `0xBC`（`,`） | **2 VK** |
 | **`Tab`** | `0x09` | 1 |
+
+⚠️★★★ **`SentencePunctuation` を分けたのは 2 件目の代償を見つけたためである**（2026-08-23・研究者判断）。
+★ `personalization-and-online-learning.md §5.2` は **boundary keys を「採用（弁別の前提条件）」**に
+格上げしており（[P121] N=475・2 独立文脈）、接地は散文の階層 **語内 < 語間 < 文間 < 段落間**。
+⚠️ **`Punctuation` へ一括で畳むと「文間」の段だけが失われる**（`[` `=` `-` と同じラベルになる）。
+⚠️★★★ **R3 も同じ量子化を課すので、G1 と R3 の両方で永久に取れなくなるところだった。**
+★ 選択肢 4 案（分けない / 0xBE のみ / 0xBE+0xBC / 移さない）から **0xBE+0xBC** を採った。
+⚠️ **完全な文末判定ではない**（修飾キー状態を記録していないので `.` と `>` は区別できない。
+★ 0xBE は文末の**代理**であり、日本語ローマ字入力では `。` が 0xBE から出るので代理としては強い）。
 
 ★ **これで `is_text_producing` が true な VK は 1 つ残らず非 `Other` に入る**
 → ⚠️ **過小評価はゼロになった**（`replay.rs` の代表 VK `other => 0x07` も**厳密に正しく**なった）。
@@ -546,14 +556,26 @@ ADR-006 実施記録の発見 1 逐語 ——
 **`from_vk` が 1 つも割り当てていなかった**（＝ 仕様と実装のずれ。2026-08-23 に両方向で正した）。
 
 ⚠️★ **プライバシーの向きを明記する**: 判断 6 の実装は **正味でプライバシーを改善する** ——
-★ 今日ローカル NDJSON に書いているのは **生 VK（キー個体）**であり、変更後は **12 カテゴリ**になる。
+★ 今日ローカル NDJSON に書いているのは **生 VK（キー個体）**であり、変更後は **14 カテゴリ**になる。
 `Punctuation` を足しても **今日より粗い**。⚠️ 「`Punctuation` を足すと情報が増える」は
 **`Other` 全畳み込み版との比較**であって、**現状との比較ではない**。
 
 ★ 不変条件は 4 つともテストで固定した（`anonymization.md §不変条件`）。
 
-⚠️★★★ **残っているのは適用点の移動である** —— ★ 量子化は **transfer 境界（`gse-package`）** で
-効いており、**logger の書き出し境界へ移す作業は別タスク**（Migration 8）。
+### ✅ 適用点の移動 — **2026-08-23 に実施済み**
+
+★ `logger.rs` の `writeln!` で `KeyCategory::from_vk()` を通すようにした。
+⚠️ **ローカル NDJSON に生 VK が 1 つも出なくなった**（`key_line_records_category_and_never_raw_vk` が回帰ロック）。
+
+| 項目 | ★ 結果 |
+|---|---|
+| `HMM_VERSION` | ★ **不変**（推論は in-memory 経路で NDJSON を通らない） |
+| ゴールデン replay | ★ **15 snapshots 一致** |
+| 後方互換 | ★ **旧ログはそのまま読める**（`resolve_key_vk` が `vk` 優先） |
+| schema | ⚠️ `Key { t, vk, press }` → `Key { t, category, press }`。★ **gse-dataset と parity 同期済み** |
+| `analyze.py`（G1 解析） | ★ **変更不要**（既に `category` を優先していた） |
+| `extract.py`（沈黙分解実験） | ⚠️ **後方互換で修正**（`vk` 優先・無ければ `category`）→ 旧入力の再現結果は不変 |
+| `pilot-smoke.sh` の `"vk"` 混入検査 | ★ **より強く通る** |
 
 ---
 ## Migration
@@ -581,10 +603,11 @@ ADR-006 実施記録の発見 1 逐語 ——
    - (ii) ⚠️★★★ **自然作業の `task_kind` 宣言 UI を設計する** —— ★ **ADR-010 D3 が「観測から推定しない」と
      決めている**ので、R3 でも種別は**宣言から**取る。⚠️ 常時収集で毎回宣言させる形は非現実的であり、
      **宣言の頻度・粒度・未宣言時の扱い（`unknown` を残すか）が未設計である**
-8. ✅ **`KeyCategory` に `Punctuation` / `Tab` を足した**（2026-08-23・実装済み・テスト緑）。
-   ⚠️★★★ **残: 判断 6 の本体 —— 量子化の適用点を transfer 境界（`gse-package`）から
-   `logger` の書き出し境界へ移す**（別タスク）。★ 着手条件は **G1 の収集開始前であること**
-   （⚠️ 収集が始まると `preregistration.md §3.6` により回復不能）。
+8. ✅ **判断 6 を実装しきった**（2026-08-23・テスト緑）。
+   - `KeyCategory` に `Punctuation` / `SentencePunctuation` / `Tab` を追加（**14 カテゴリ**）
+   - 量子化の適用点を **transfer 境界 → `logger` の書き出し境界**へ移動
+   - `schema_dto.rs` の `Key` を `vk` → `category` へ。★ **gse-dataset と parity 同期済み**
+   ⚠️ **残: gse-dataset 側の `schema/current.json` をコミットすること**（★ ファイルは配置済み）。
 9. ⚠️ **推論への配線（段 3）は本 ADR では行わない。** ★ **ADR-011 D4「読む実装は G1 判定後」**に従い、別途裁く。
 10. ★ **役割カテゴリは本 ADR では入れない**（D4 の禁止表のまま）。⚠️ 技術調査の結果は
     `.steering/20260823-r3-accept-and-role-category/role-category-feasibility.md`。
