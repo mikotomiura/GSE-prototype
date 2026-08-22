@@ -66,12 +66,13 @@
 cd /c/GSE-prototype/src-tauri && cargo run
 ```
 
-- [ ] ★ **通常のアプリ**(メモ帳等) で日本語変換 → セッション NDJSON に `ime_shadow` 行が**出る**
+- [x] ✅ **通常のアプリ**で日本語変換 → `ime_shadow` **6 行** (dwell 中央 2502ms)
 - [ ] ⚠️★★★ **G1 画面 (GSE 自身の窓)** で日本語変換 → ★ **ここでも出る**
       (⚠️ `WINEVENT_SKIPOWNPROCESS` を外したのがこの経路のため。★ 落ちると G1 でだけ 0 行)
-- [ ] ★ **無操作 60 秒** → `ime_shadow` が **1 行も出ない**
-- [ ] ★ アプリログに `IME cloak session truncated` が**ほとんど出ない**
-      (⚠️ 打鍵をやめるたびに出るなら辺の向きを疑う。→ `findings.md` §4.2.1)
+- [x] ✅ **無操作 60.3 秒** → `ime_shadow` **0 行**
+- [x] ✅ `IME cloak session truncated` **0 件** / legacy 切替 **0 件** / stale reset **0 件**
+      (★ 打ち切り 0 は辺の向きの独立した裏取りでもある。→ `findings.md` §4.6.1)
+- [x] ✅ `feat` **90 行 / 89 秒** = pause を外したことの確認 (→ §4.6.2)
 
 ```bash
 # ★ 行数の数え方 (⚠️ 生ログは外部 LLM に渡さない)
