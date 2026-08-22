@@ -85,7 +85,7 @@
 
 ## 3. スレッドモデル
 
-GSE は 7 つのスレッド/タスクで構成される (★ G1 モード時のみ 2 つ増える)。
+GSE は 8 つのスレッド/タスクで構成される (★ G1 モード時のみ 2 つ増える。⚠️ **Cloak Resolver は Windows のみ**)。
 
 | スレッド | 責務 | 通信方式 | 優先度 |
 |---|---|---|---|
@@ -94,10 +94,20 @@ GSE は 7 つのスレッド/タスクで構成される (★ G1 モード時の
 | **Analysis** | 1Hz 特徴量抽出 + HMM 推論、最新 FeatSnapshot 更新 | crossbeam Receiver, Mutex<Engine> 書込 | 通常 |
 | **IME Monitor** | Win: 候補ウィンドウ検出 / mac: フック内で処理（別スレッド不要） | Atomic IME_ACTIVE | 低 |
 | **IME Polling** | Win: ImmGet\* / mac: TIS ポーリング (GCD メインキュー経由) | Atomic IME_OPEN | 低 |
+| **Cloak Resolver** | ★ **Windows のみ**。`EVENT_OBJECT_CLOAKED`/`UNCLOAKED` を受け、ウィンドウクラスを解決して (完全一致 `IME`) `IME_ACTIVE` を駆動する。⚠️ フックコールバックでは `GetClassNameW` を呼べない (`hook-constraints` Win-1) ための分離。畳み込みは `input/ime_cloak.rs` (OS 非依存) | `CLOAK_EVENT_TX` (bounded 256), Atomic IME_ACTIVE / IME_SHADOW_\* | 低 |
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
 | **Probe Scheduler** | v0.3 較正: ランダム時点プローブの一様時刻生成 (Poisson+thinning) → `probe_assignment` ログ + `probe_triggered` emit。純ロジックは `analysis/probe_scheduler.rs` (OS API 非依存) | Atomic SESSION_START_MS 読取, LogEntry Sender, AppHandle emit | 低 |
 | **G1 Block End** | ★ **G1 モード時のみ起動**。`g1::BLOCK_DURATION_MS` (5 分) でブロックの記録を終了し、`BlockEnd` 送信 + `g1-block-ended` emit | Atomic SESSION_START_MS / ANALYSIS_IDLE, LogEntry Sender, AppHandle emit | 低 |
 | **G1 Duplicate Check** | ★ **G1 モード時のみ・起動 1 回**。他の GSE プロセスを OS に問い合わせ (`pgrep` / `tasklist`)、居れば `second-instance-blocked` emit | AppHandle emit | 低 |
+
+⚠️★★★ **2026-08-23: `IME_ACTIVE` は推論を止めない (記録のみ)。**
+★ 旧設計は「IME 候補ウィンドウ表示中は HMM 推論を一時停止する」だったが、
+⚠️ 実測でこの信号は**候補リスト表示ではなく変換セッション全体**(ローマ字入力〜確定)を
+覆うと分かった。→ ★ pause すると日本語論述の推定窓が **約 56〜60%** 消える
+(⚠️ 実データ fixture `phase1_ime_heavy` では **94%**)。
+→ ★ 研究者判断で `lib.rs` と `analysis/loop_step.rs` の両方から `set_paused` を外した
+(`HMM_VERSION` 0.4.0 → **0.5.0**)。詳細は
+`.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10。
 
 純スケジューリング (指数間隔・thinning・窓計算・不透明 ProbeId 生成) は `analysis/probe_scheduler.rs` に隔離し OS API を呼ばない。スレッド起動・実時刻取得・emit・hotkey 配線は `lib.rs` 側に閉じる (architecture-rules)。
 
@@ -119,7 +129,7 @@ Hook Thread ──InputEvent──► crossbeam channel ──► Analysis Threa
      ├── Atomic IME_OPEN ─────────────────────────────►│ (β 切替)
      │  [mac] IME_COMPOSING ──────────────────────────►│ (変換中検出)
      │                                                │
-IME Monitor ── Atomic IME_ACTIVE ─────────────────────►│ (pause 検出)
+IME Monitor ── Atomic IME_ACTIVE ─────────────────────►│ (記録のみ)
      │  Win: WinEvent + EnumWindows + UIAutomation     │
      │  mac: (CGEventTap 内で処理 — 別スレッド不要)     │
 IME Polling ── Atomic IME_OPEN ───────────────────────►│

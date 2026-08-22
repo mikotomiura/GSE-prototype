@@ -75,6 +75,63 @@ pub static IME_CANDIDATE_NAV_COUNT: AtomicU32 = AtomicU32::new(0);
 #[cfg(target_os = "windows")]
 pub static IME_SHADOW_ABANDON: AtomicBool = AtomicBool::new(false);
 
+/// ⚠️★★★ **文書化された IME WinEvent (0x8027-0x8029) が最後に届いた時刻 (epoch ms)。**
+///
+/// ★ **なぜ要るか** (2026-08-23): この端末の Windows 11 は IME 候補 UI の表示/非表示を
+/// `EVENT_OBJECT_IME_*` ではなく **DWM の cloak/uncloak** で行っており、0x8027-29 は
+/// 60 秒 × 8 回の実測で **1 件も飛ばない**
+/// (`.steering/20260822-ime-active-rewiring/findings-enumwindows-probe.md` §15-16)。
+/// → ★ そこで cloak/uncloak を第 2 の駆動源として足したが、
+/// ⚠️ **両方飛ぶ端末では `IME_COMPOSITION_START_MS` などに書き手が 2 人できる。**
+/// ★ この repo が過去に踏んだ事故 (無関係な窓の cloak で `IME_ACTIVE` が立つ) の型そのもの。
+///
+/// → ★ **優先順位を固定する**: 文書化された経路が**現に駆動している間**は、
+/// cloak 経路は一切手を出さない。壊れる方向ではなく正しい方が勝つ。
+///
+/// # ⚠️★★★ なぜ「1 度でも飛んだか」の `bool` ではないのか
+///
+/// ★ 初版は `AtomicBool` の**不可逆ラッチ**だった。⚠️ しかしそれだと
+/// **無関係なアプリが 0x8027 を 1 件上げただけで、プロセス寿命の残り全部で
+/// cloak 経路が無言で停止する。** ⚠️ その端末で `ime_shadow` が 0 行に戻っても、
+/// 解析側は「変換しなかった」と「ラッチで黙った」を**区別できない**
+/// (★ この repo が繰り返してきた「計器が黙っていたのに 0 を信号と読む」事故)。
+///
+/// → ★ **時刻にして recency で判定する** ([`legacy_path_is_driving`])。
+/// ★ 本当に legacy が生きている端末ではイベントが来続けるので恒久的に勝ち、
+/// ⚠️ 単発の混入なら [`LEGACY_PATH_RECENCY_MS`] 後に cloak 経路が復帰する。
+///
+/// ⚠️ `0` = **一度も届いていない**。
+#[cfg(target_os = "windows")]
+pub static LEGACY_IME_EVENT_MS: AtomicU64 = AtomicU64::new(0);
+
+/// ★ 「文書化された経路が現に駆動している」とみなす窓 (ms)。
+///
+/// ⚠️ 実測の IME 変換間隔 (60 秒で 9〜17 回) より十分長く、
+/// ★ かつ「さっき 1 件混ざっただけ」を恒久化しない長さにする。
+///
+/// # ⚠️ トレードオフ (2026-08-23・cross-review 中)
+///
+/// ★ `LEGACY_IME_EVENT_MS` は **SHOW / HIDE / CHANGE の 3 つすべて**で更新する。
+/// ⚠️ 「`HIDE` 単発でも 60 秒 cloak 経路が止まる」という指摘はそのとおりである。
+/// ★ それでも 3 つ全部にしているのは、**どれか 1 つでも飛ぶなら文書化された経路は
+/// 生きている**とみなす方が安全だからである
+/// (⚠️ SHOW/CHANGE だけに絞ると、`HIDE` しか上げない IME で書き手が 2 人になる)。
+/// ★ 損失は**最大 60 秒ぶんの `ime_shadow`** に有界で、切替は `tracing::warn!` に残る。
+#[cfg(target_os = "windows")]
+pub const LEGACY_PATH_RECENCY_MS: u64 = 60_000;
+
+/// ★ 文書化された経路が**現に駆動しているか**。
+///
+/// ⚠️ 純関数にしてあるのはテストのため (★ 時刻を注入する)。
+#[cfg(target_os = "windows")]
+pub fn legacy_path_is_driving(last_legacy_ms: u64, now_ms: u64) -> bool {
+    if last_legacy_ms == 0 {
+        // ★ 一度も届いていない = cloak 経路に任せる。
+        return false;
+    }
+    now_ms.saturating_sub(last_legacy_ms) <= LEGACY_PATH_RECENCY_MS
+}
+
 /// IME Shadow データの emit 準備完了フラグ。WinEvent IME_HIDE で store(true, Release)。
 /// IME Monitor スレッドが swap(false, AcqRel) で読み取り、LogEntry::ImeShadow を送出。
 ///
@@ -164,6 +221,81 @@ pub static POLL_WAKE_TX: OnceLock<Sender<()>> = OnceLock::new();
 /// Must be called before `init_hook` so the sender is ready when the hook fires.
 pub fn set_poll_wake_sender(tx: Sender<()>) {
     let _ = POLL_WAKE_TX.set(tx);
+}
+
+/// ⚠️★★★ **cloak/uncloak イベントを resolver スレッドへ渡すチャネル。**
+///
+/// ★ **なぜチャネルなのか**: 判定にはウィンドウクラス名が要るが、
+/// ⚠️ `hook-constraints` Win-1 により **WinEvent コールバック内で `GetClassNameW` は呼べない**
+/// (Atomic 操作と `try_send` のみ)。→ ★ **HWND を送り、別スレッドで解決する。**
+///
+/// ⚠️ `HWND` は `Send` ではないので **`isize` で運ぶ** (★ `ThreadSafeHook` と同じ発想)。
+/// ⚠️★ resolver は hwnd を**クラス解決と cloak 状態の問い合わせにしか使わず、
+/// 保存も送出もしない** (`data-privacy`: ウィンドウタイトルも PID も取らない)。
+#[cfg(target_os = "windows")]
+pub static CLOAK_EVENT_TX: OnceLock<Sender<CloakEvent>> = OnceLock::new();
+
+/// ★ cloak/uncloak の生イベント。⚠️ **窓の識別子以外は何も運ばない** (content-free)。
+#[cfg(target_os = "windows")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CloakEvent {
+    /// ⚠️ `HWND` の生値。★ resolver がクラス解決に使うだけで、ログにも NDJSON にも出ない。
+    pub hwnd: isize,
+    /// ★ 届いた辺 (`EVENT_OBJECT_CLOAKED` なら true)。
+    ///
+    /// ⚠️★ **これは参考でしかない。** 配送は `WINEVENT_OUTOFCONTEXT` の非同期配送なので、
+    /// resolver に届いた時点の実状態と食い違いうる。
+    /// → ★ resolver は `DwmGetWindowAttribute(DWMWA_CLOAKED)` で **OS に聞き直す**。
+    pub cloaked: bool,
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod legacy_path_tests {
+    use super::{legacy_path_is_driving, LEGACY_PATH_RECENCY_MS};
+
+    #[test]
+    fn never_seen_means_cloak_path_drives() {
+        assert!(
+            !legacy_path_is_driving(0, 1_000_000),
+            "★ 0 = 一度も届いていない → cloak 経路に任せる"
+        );
+    }
+
+    #[test]
+    fn recent_legacy_event_wins() {
+        let now = 1_000_000;
+        assert!(legacy_path_is_driving(now, now));
+        assert!(legacy_path_is_driving(now - LEGACY_PATH_RECENCY_MS, now));
+    }
+
+    /// ⚠️★★★ **単発の混入で cloak 経路が永久に黙らないこと。**
+    ///
+    /// ★ 初版は不可逆ラッチで、無関係なアプリの 0x8027 が 1 件飛べば
+    /// プロセス寿命の残り全部で cloak 経路が停止していた。
+    /// ⚠️ その端末で `ime_shadow` が 0 行に戻っても
+    /// 「変換しなかった」と「黙った」を解析側が区別できない。
+    #[test]
+    fn stale_legacy_event_releases_the_cloak_path() {
+        let now = 1_000_000;
+        assert!(
+            !legacy_path_is_driving(now - LEGACY_PATH_RECENCY_MS - 1, now),
+            "★ 窓を過ぎたら cloak 経路が復帰しなければならない"
+        );
+    }
+
+    /// ⚠️ 時計が巻き戻っても panic しないこと (`saturating_sub`)。
+    #[test]
+    fn clock_going_backwards_is_not_a_panic() {
+        assert!(legacy_path_is_driving(2_000_000, 1_000_000));
+    }
+}
+
+/// resolver スレッドの受信端を作り、送信端を登録する。
+///
+/// ⚠️ **`init_hook` より前に呼ぶこと** (★ フックが飛び始めたときに sender が居るように)。
+#[cfg(target_os = "windows")]
+pub fn set_cloak_event_sender(tx: Sender<CloakEvent>) {
+    let _ = CLOAK_EVENT_TX.set(tx);
 }
 
 // ---------------------------------------------------------------------------

@@ -12,16 +12,17 @@ use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVE
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    EVENT_OBJECT_IME_CHANGE, EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW, HHOOK, KBDLLHOOKSTRUCT,
-    MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
-    WM_SYSKEYUP,
+    EVENT_OBJECT_CLOAKED, EVENT_OBJECT_IME_CHANGE, EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW,
+    EVENT_OBJECT_UNCLOAKED, HHOOK, KBDLLHOOKSTRUCT, MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL,
+    WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
 use super::{
-    CALLBACK_COUNT, EVENTS_DROPPED, EVENT_SENDER, HOOK_ACTIVE, IME_ACTIVE, IME_CANDIDATE_NAV_COUNT,
-    IME_COMPOSITION_START_MS, IME_OPEN, IME_SHADOW_ABANDON, IME_SHADOW_DWELL_MS, IME_SHADOW_READY,
-    IME_STATE_DIRTY, LAST_KEY_MS, POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR,
-    VK_DBE_HIRAGANA, VK_DBE_KATAKANA, VK_DBE_SBCSCHAR, VK_KANJI,
+    CloakEvent, CALLBACK_COUNT, CLOAK_EVENT_TX, EVENTS_DROPPED, EVENT_SENDER, HOOK_ACTIVE,
+    IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSITION_START_MS, IME_OPEN, IME_SHADOW_ABANDON,
+    IME_SHADOW_DWELL_MS, IME_SHADOW_READY, IME_STATE_DIRTY, LAST_KEY_MS, LEGACY_IME_EVENT_MS,
+    POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
+    VK_DBE_SBCSCHAR, VK_KANJI,
 };
 use crate::analysis::features::InputEvent;
 
@@ -69,6 +70,18 @@ fn unhook_all() {
         // SAFETY: 同上 (`SetWinEventHook` の戻り値を同じスレッドで解放する)。
         if !unsafe { UnhookWinEvent(h.0) }.as_bool() {
             tracing::warn!("UnhookWinEvent failed (already removed by the OS?)");
+        }
+    }
+    // ⚠️★ cloak 用の 2 本目も**必ず**外す。★ 外し忘れると再設置のたびに積み上がり、
+    //   1 回の cloak で `cloak_event_callback` が複数回呼ばれる (= dwell が壊れる)。
+    if let Some(h) = CLOAK_HOOK_HANDLE
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .take()
+    {
+        // SAFETY: 同上。
+        if !unsafe { UnhookWinEvent(h.0) }.as_bool() {
+            tracing::warn!("UnhookWinEvent (cloak) failed (already removed by the OS?)");
         }
     }
 }
@@ -202,6 +215,8 @@ unsafe impl Sync for ThreadSafeWinEventHook {}
 lazy_static! {
     static ref HOOK_HANDLE: Mutex<Option<ThreadSafeHook>> = Mutex::new(None);
     static ref WINEVENT_HOOK_HANDLE: Mutex<Option<ThreadSafeWinEventHook>> = Mutex::new(None);
+    /// ★ cloak/uncloak 用の 2 本目 (`cloak_event_callback` の doc を参照)。
+    static ref CLOAK_HOOK_HANDLE: Mutex<Option<ThreadSafeWinEventHook>> = Mutex::new(None);
 }
 
 /// WinEvent callback for cross-process IME composition detection.
@@ -214,6 +229,16 @@ unsafe extern "system" fn win_event_callback(
     _id_event_thread: u32,
     _dwms_event_time: u32,
 ) {
+    // ⚠️★★★ **文書化された経路が生きている端末では cloak 経路を黙らせる** (`hook.rs` の
+    //   `LEGACY_IME_EVENT_MS` doc を参照)。★ ここは「いつ届いたか」だけを刻む。
+    //   ⚠️ 不可逆ラッチにしない —— 単発の混入で cloak 経路が永久に黙るのを避けるため。
+    LEGACY_IME_EVENT_MS.store(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+        Ordering::Release,
+    );
     match event {
         EVENT_OBJECT_IME_SHOW | EVENT_OBJECT_IME_CHANGE => {
             IME_ACTIVE.store(true, Ordering::Relaxed);
@@ -260,6 +285,59 @@ unsafe extern "system" fn win_event_callback(
             IME_ACTIVE.store(false, Ordering::Relaxed);
         }
         _ => {}
+    }
+}
+
+/// ⚠️★★★ **cloak/uncloak 用の 2 本目の WinEvent コールバック。**
+///
+/// ## なぜ 2 本目を張るのか (★ 範囲を広げないのか)
+///
+/// ★ `SetWinEventHook` の `eventMin`/`eventMax` は**単一の連続区間**しか取れない。
+/// `EVENT_OBJECT_CLOAKED`(0x8017) / `EVENT_OBJECT_UNCLOAKED`(0x8018) は
+/// 既存の IME 範囲 `0x8027..=0x8029` と**連続していない**。
+/// ⚠️ 広げて `0x8017..=0x8029` にすると、間の
+/// `EVENT_OBJECT_TEXTSELECTIONCHANGED`(0x8020) など**高頻度イベントが全部届く**。
+/// → ★ **2 本目なら購読するイベント ID は 2 個だけ**で済む。
+///
+/// ## ⚠️ Win-1 (`hook-constraints`)
+///
+/// ★ 判定にはウィンドウクラス名が要るが、**ここでは `GetClassNameW` を呼べない**。
+/// → ★ **`try_send` で HWND を resolver スレッドへ渡すだけ**にする。
+/// ⚠️ `HWND` は `Send` でないので `isize` に落として運ぶ。
+unsafe extern "system" fn cloak_event_callback(
+    _hook: HWINEVENTHOOK,
+    event: u32,
+    hwnd: HWND,
+    id_object: i32,
+    id_child: i32,
+    _id_event_thread: u32,
+    _dwms_event_time: u32,
+) {
+    // ⚠️ **ウィンドウ本体のイベントだけ**に絞る (`OBJID_WINDOW`=0 / `CHILDID_SELF`=0)。
+    // ★ 付けないとキャレットやリストアイテムの子オブジェクトで水増しされる
+    //   (`examples/ime_winevent_probe.rs` の診断 B と同じ絞り)。
+    if id_object != 0 || id_child != 0 || hwnd.0.is_null() {
+        return;
+    }
+    // ★ 文書化された経路が**現に駆動している**なら、そちらに任せて何も送らない。
+    //   ⚠️ ここでは時刻比較のみ (`hook-constraints` Win-1)。★ resolver 側でも再確認する。
+    let last_legacy = LEGACY_IME_EVENT_MS.load(Ordering::Acquire);
+    if last_legacy != 0 {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        if super::legacy_path_is_driving(last_legacy, now) {
+            return;
+        }
+    }
+    let cloaked = event == EVENT_OBJECT_CLOAKED;
+    if let Some(tx) = CLOAK_EVENT_TX.get() {
+        // ⚠️ ノンブロッキング。★ 溢れたら捨てる (フックを絶対に詰まらせない)。
+        let _ = tx.try_send(CloakEvent {
+            hwnd: hwnd.0 as isize,
+            cloaked,
+        });
     }
 }
 
@@ -347,6 +425,45 @@ pub(super) fn start() {
                                 .lock()
                                 .unwrap_or_else(|p| p.into_inner());
                             *handle = Some(ThreadSafeWinEventHook(ime_hook));
+                        }
+
+                        // --- Step 2b: cloak/uncloak 用の 2 本目 ---
+                        // ⚠️★★★ この Windows 11 では IME 候補 UI が `ShowWindow` ではなく
+                        //   **DWM の cloak/uncloak** で表示制御されており、上の 0x8027-29 は
+                        //   60 秒 × 8 回の実測で **1 件も飛ばない**。
+                        //   詳細は `cloak_event_callback` の doc と
+                        //   `.steering/20260823-ime-active-cloak-rewiring/design.md`。
+                        // ★ 範囲は 0x8017..=0x8018 の **2 個だけ**。
+                        //
+                        // ⚠️★★★ **`WINEVENT_SKIPOWNPROCESS` を付けない** (★ 1 本目とは違う)。
+                        //   ★ 理由: IMM32 は **GUI スレッドごとに `IME` クラスの窓を作る**ので、
+                        //   **GSE 自身の窓に日本語を打つと、cloak するのは GSE 自身の窓**である。
+                        //   ⚠️★★★ G1 統制タスクは**被験者が GSE の入力画面に打つ**設計なので、
+                        //   自プロセスを飛ばすと **G1 でだけ `ime_shadow` が構造的に 0 行**になる。
+                        //   → ⚠️ それを「変換しなかった」と読む事故は `capabilities.rs` が
+                        //   繰り返し警告している型そのもの。
+                        //   ★ privacy 上の増分は無い —— **クラス名しか見ず**、
+                        //   タイトルも PID も取らない (`cloak_event_callback` / `class_name_of`)。
+                        let cloak_hook = SetWinEventHook(
+                            EVENT_OBJECT_CLOAKED,
+                            EVENT_OBJECT_UNCLOAKED,
+                            HMODULE::default(),
+                            Some(cloak_event_callback),
+                            0,
+                            0,
+                            WINEVENT_OUTOFCONTEXT,
+                        );
+                        if cloak_hook.is_invalid() {
+                            // ⚠️ 致命ではない (★ 文書化された経路が生きている端末もある)。
+                            tracing::warn!("Failed to install cloak WinEvent hook");
+                        } else {
+                            tracing::info!(
+                                "Cloak WinEvent hook installed (IME candidate UI detection active)"
+                            );
+                            let mut handle = (*CLOAK_HOOK_HANDLE)
+                                .lock()
+                                .unwrap_or_else(|p| p.into_inner());
+                            *handle = Some(ThreadSafeWinEventHook(cloak_hook));
                         }
 
                         // フック成功 → HOOK_ACTIVE を true に
@@ -506,7 +623,13 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
 
             // Phase 2b: IME 変換中のナビゲーション・放棄をカウント
             // 既知の制約: WH_KEYBOARD_LL はシステムグローバルなため、IME_ACTIVE 中に
-            // 別ウィンドウで押された矢印/ESC もカウントされる。8s stale valve で緩和。
+            // 別ウィンドウで押された矢印/ESC もカウントされる。
+            // ⚠️★★★ **2026-08-23: 緩和の窓が 8 秒 → 20 秒に広がった** (security-checker MEDIUM)。
+            //   ★ 旧文は「8s stale valve で緩和」と書いていたが、`IME_ACTIVE` を下ろすのは
+            //   いま `CloakFold::MAX_SESSION_MS` (20 秒) が先で、`lib.rs` の valve は 25 秒である。
+            //   → ⚠️ **他ウィンドウの混入が最大 20 秒ぶんまで載りうる。**
+            //   ★ `nav` / `abandon` は ADR-011 D4 により **記録専用 (Tier 0)** で推論へは流れないため
+            //   影響は記録の質に限られるが、⚠️ **解析時にこの上限を知っている必要がある。**
             // WinEvent IME_SHOW と hook_callback のタイミングずれにより、変換セッション
             // 最初の 1-2 キーが拾えない場合がある。Phase 2b は shadow-only なので許容。
             if is_press && IME_ACTIVE.load(Ordering::Relaxed) {

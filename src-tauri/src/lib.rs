@@ -2455,7 +2455,8 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 ///
 /// 2 つの経路で emit が発生する:
 /// 1. 正常: WinEvent IME_HIDE が到着し IME_SHADOW_READY=true → dwell は事前計算済み
-/// 2. Stale: IME_HIDE が取りこぼされ 8s タイムアウト → START_MS > 0 なら独自に dwell 計算
+/// 2. Stale: IME_HIDE が取りこぼされ safety valve のタイムアウト
+///    (`input::ime_cloak::MONITOR_SAFETY_VALVE_MS`) → START_MS > 0 なら独自に dwell 計算
 #[cfg(target_os = "windows")]
 fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     use std::sync::atomic::Ordering::Relaxed;
@@ -2581,7 +2582,8 @@ pub fn run() {
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
-    let engine_for_monitor = engine.clone();
+    // ⚠️★ IME Monitor 用の clone は **2026-08-23 に不要になった** ——
+    //   IME で `set_paused` を駆動しなくなったため (decisions D-10)。
     let log_tx_ime_poll = log_tx.clone();
     let log_tx_for_monitor = log_tx.clone();
     let log_tx_probe = log_tx.clone();
@@ -2722,8 +2724,8 @@ pub fn run() {
     thread::spawn(move || {
         tracing::info!("IME Monitor thread started");
         let monitor = input::ime::ImeMonitor::new();
-        // IME_ACTIVE が true になった時刻。8 秒以上続いたら EVENT_OBJECT_IME_HIDE
-        // 取りこぼしと判断してフラグを自動リセットする。
+        // IME_ACTIVE が true になった時刻。`MONITOR_SAFETY_VALVE_MS` 以上続いたら
+        // EVENT_OBJECT_IME_HIDE 取りこぼしと判断してフラグを自動リセットする。
         let mut ime_active_since: Option<Instant> = None;
         // IME_ACTIVE 変更検出: 状態が変化した際に ImeState ログを送出
         let mut last_active: Option<bool> = None;
@@ -2731,15 +2733,34 @@ pub fn run() {
             let active = monitor.is_candidate_window_open();
 
             // Safety valve: EVENT_OBJECT_IME_HIDE はフォーカス変更やクラッシュ時に
-            // 取りこぼすことがある。IME_ACTIVE が 8 秒以上 true のままなら stale と
-            // みなしてリセット。実際の IME 変換は数秒以内に確定/キャンセルされる。
+            // 取りこぼすことがある。IME_ACTIVE が `MONITOR_SAFETY_VALVE_MS` 以上
+            // true のままなら stale とみなしてリセットする。
             if active {
                 let since = ime_active_since.get_or_insert_with(Instant::now);
-                if since.elapsed() > Duration::from_secs(8) {
-                    tracing::warn!("IME_ACTIVE stale for >8s — auto-resetting");
+                // ⚠️★★★ **2026-08-23: 8 秒 → 25 秒。**
+                //   ★ 旧値 8 秒は「候補ウィンドウ表示は数秒以内」という前提だったが、
+                //   ⚠️ 実測でこの信号は **変換セッション全体** を覆い、
+                //   自然な打鍵で **6974ms** の区間が出た。★ 8 秒では実データを切る。
+                //   ⚠️ `CloakFold::MAX_SESSION_MS` (20 秒) より**外側**に置くこと ——
+                //   内側にすると fold より先に発火して **1 変換で 2 行**出る
+                //   (★ `ime_cloak.rs` の `MAX_SESSION_MS` doc を参照)。
+                //   ★ pause を外した (上記) ので、長く立ちっぱなしでも推論は止まらない。
+                // ⚠️★★★ **値は `ime_cloak::MONITOR_SAFETY_VALVE_MS` から導出する。**
+                //   ★ ここに数値をハードコードすると、あちらの `const _: () = assert!()` が
+                //   **同じファイル内の 2 定数を比べるだけ**になり、
+                //   ⚠️ 「fold が valve の内側で発火する」不変条件が**黙って破れる**
+                //   (2026-08-23・cross-review HIGH)。
+                if since.elapsed()
+                    > Duration::from_millis(input::ime_cloak::MONITOR_SAFETY_VALVE_MS)
+                {
+                    tracing::warn!(
+                        valve_ms = input::ime_cloak::MONITOR_SAFETY_VALVE_MS,
+                        "IME_ACTIVE stale — auto-resetting"
+                    );
                     input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
                     ime_active_since = None;
-                    engine_for_monitor.set_paused(false);
+                    // ⚠️★ `set_paused(false)` は呼ばない —— ★ IME で pause しなくなったので
+                    //   ここで解除するものが無い (上のコメント / decisions D-10)。
                     last_active = Some(false);
                     let ts = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -2796,10 +2817,26 @@ pub fn run() {
                 emit_ime_shadow(&log_tx_for_monitor, ts);
             }
 
-            // IME候補ウィンドウ表示中はHMM推論を一時停止する。
-            // 確率はリセットせず直前の状態を維持する。
-            // 候補選択中の認知状態（Incubation等）を破壊しない。
-            engine_for_monitor.set_paused(active);
+            // ⚠️★★★ **2026-08-23: IME による推論の一時停止を止めた (研究者判断)。**
+            //
+            // ★ 旧コードはここで `engine.set_paused(active)` を呼んでいた。
+            //   意図は「候補選択中の打鍵で推定を汚さない」であり、⚠️ **その意図は正しい**。
+            //
+            // ⚠️★★★ **しかし実測で、この信号は「候補リスト表示」ではなく
+            //   「IME 変換セッション全体 (ローマ字入力〜確定)」を覆うことが分かった。**
+            //   ★ 自然な打鍵 60 秒 (打鍵 281) での uncloaked 区間:
+            //   6464 / 5714 / 5004 / 3456 / 6974 / 3279 ms —— ★ 候補を眺める時間ではない。
+            //   ★ 打鍵中のサンプルの **69% が uncloaked** (実測G)。
+            //
+            // → ⚠️★★★ **これで pause すると、日本語論述の推定窓が約 56〜60% 消える。**
+            //   ★ G1 の主タスクは日本語論述なので、較正データを半分以上捨てることになる。
+            //   ⚠️ 引き継ぎ §3.2 の「15〜20%」は、信号を候補表示だと誤解していた時の見積り。
+            //
+            // ★ **決定 (研究者・2026-08-23)**: **記録はする。pause はしない。**
+            //   ⚠️ `analysis/loop_step.rs` の replay 経路も**同時に外してある**
+            //   (★ 外さないと live と replay が食い違い Replay-as-Truth が壊れる)。
+            //
+            // ★ 詳細: `.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10。
             thread::sleep(std::time::Duration::from_millis(100));
         }
     });
@@ -2980,6 +3017,16 @@ pub fn run() {
             let (poll_wake_tx, poll_wake_rx) = crossbeam_channel::bounded::<()>(1);
             input::hook::set_poll_wake_sender(poll_wake_tx);
             input::ime::spawn_ime_open_polling_thread(ime_poll_log_tx, poll_wake_rx);
+
+            // ⚠️★★★ cloak resolver スレッド (Windows 限定・2026-08-23)。
+            //   ★ この Windows 11 の IME 候補 UI は `ShowWindow` ではなく **DWM の
+            //   cloak/uncloak** で表示制御されており、文書化された
+            //   `EVENT_OBJECT_IME_*`(0x8027-29) は実測で 1 件も飛ばない。
+            //   → ★ cloak を第 2 の駆動源にする (`input/ime_cloak.rs` のモジュール doc)。
+            //   ⚠️ **`init_hook` より前に呼ぶこと** —— チャネルの送信端が
+            //   `CLOAK_EVENT_TX` に載る前にフックが飛ぶと、その分を取りこぼす。
+            #[cfg(target_os = "windows")]
+            input::ime::spawn_cloak_resolver_thread();
 
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);

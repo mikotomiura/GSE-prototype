@@ -3,12 +3,17 @@
 //! ⚠️★★★ **これは計器ではない。** `cargo run --example` でしか動かず、
 //! `cargo build --release` にも tauri のバンドルにも含まれない。
 //!
-//! ## 何を答えるためのものか（★ 2 つの問いを 1 回で閉じる）
+//! ## 何を答えるためのものか（★ 3 つの問いを 1 回で閉じる）
 //!
 //! | # | 問い | ★ どう答えるか |
 //! |---|---|---|
 //! | 1 | ⚠️ `WINEVENT_SKIPOWNPROCESS` が **GSE 自身の画面での入力**を落としてしまわないか | ★ **SKIP 有り / 無しの 2 本**を同時に張り、到達数を比べる |
 //! | 2 | ★ `EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED`(0x8030) が**実際に飛ぶか** | ★ 範囲を `0x8027..=0x8030` にして**イベント別に数える** |
+//! | **3** | ⭐★★★ **`is_ime_candidate_window_visible()` (EnumWindows 経路) は効くか** | ★ **本番の関数そのもの**を 25ms で叩き、検出率と遷移回数を数える |
+//!
+//! ⚠️★★★ **問い 3 が本命** (2026-08-22 の実測で IME WinEvent は 0 件だったため)。
+//! ★ `IME_ACTIVE` の駆動源を WinEvent から EnumWindows へ移せるかどうかは、**この数字だけ**で決める。
+//! ⚠️ プローブ側に検出ロジックを**複製しない** —— 複製を測っても本番経路の可否は答えられない。
 //!
 //! ⚠️ 2 は「どの IME か」ではなく「**どのアプリの入力欄か**」に依存する
 //! （★ 発火主体はアプリ側の UIA プロバイダ）。→ **アプリごとに測る必要がある。**
@@ -26,8 +31,23 @@
 //!
 //! ## ⚠️ privacy
 //!
-//! ★ **記録するのはイベント ID と件数だけ。** ⚠️ ウィンドウタイトルもプロセス名も
-//! **取得しない**。⚠️ PID は「自分と同じか」の **bool 判定にだけ**使い、値は出力しない。
+//! ★ 記録するのは **イベント ID・件数・ウィンドウクラス名**だけ。
+//! ⚠️ **ウィンドウタイトル (`GetWindowTextW`) は取得しない。** PID は「自分と同じか」の
+//! **bool 判定にだけ**使い、値は出力しない。
+//!
+//! ⚠️★★★ **クラス名は「プロセス名を含まない」とは言い切れない** (2026-08-22・security review)。
+//! ★ **WPF** はトップレベル窓を `HwndWrapper[<AppDomain 名>;;<GUID>]` で登録し、
+//! **AppDomain 名は通常 実行ファイル名** (例 `devenv.exe`) である。
+//! ★ **WinForms** も `WindowsForms10.Window.8.app.0.<hash>` の形でアプリ固有の識別子を含む。
+//! → ★ そこで **出力前に [`normalize_class_name`] で正規化する** (角括弧以降を落とし、
+//! WinForms は先頭 2 セグメントに切る)。⚠️ **生のクラス名は保存も出力もしない。**
+//!
+//! ⚠️★★★ **正規化は万能ではない** (2026-08-22・cross-review 中)。
+//! ★ WPF/WinForms 以外にも、任意のアプリが**アプリ名・ユーザー名・拡張機能名・社内識別子**を
+//! クラス名に入れうる。⚠️ **allowlist 化もハッシュ化もしていない。**
+//! → ★★★ **本ツールの出力は「ローカルで研究者が読むもの」である。**
+//! ⚠️ **repo / gse-dataset / 外部 LLM へ貼る前に、必ず目で見てレビューすること。**
+//! ★ 出力は可視ウィンドウクラスの一覧を含み、**利用中アプリの指紋になりうる**。
 //!
 //! ★ 出力は `gse-replay` と同じく `std::io::stdout()` へ直接書く
 //! （⚠️ マクロ経由の標準出力は CLAUDE.md 制約 8 で禁止されている）。
@@ -49,19 +69,69 @@ fn main() -> std::io::Result<()> {
 
 #[cfg(windows)]
 mod windows_probe {
+    use std::collections::{BTreeMap, BTreeSet};
     use std::io::Write;
+    use std::sync::atomic::AtomicU64;
     use std::sync::atomic::{AtomicU32, Ordering};
-    use std::time::{Duration, Instant};
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED,
+    };
     use windows::Win32::System::Threading::GetCurrentProcessId;
-    use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
+    use windows::Win32::UI::Accessibility::{
+        CUIAutomation, IUIAutomation, SetWinEventHook, UIA_TextChildPatternId,
+        UIA_TextEditPatternId, UIA_TextPatternId, UnhookWinEvent, HWINEVENTHOOK,
+    };
     use windows::Win32::UI::Input::Ime::{ImmGetContext, ImmGetOpenStatus, ImmReleaseContext};
     use windows::Win32::UI::WindowsAndMessaging::{
-        DispatchMessageW, GetForegroundWindow, GetWindowThreadProcessId, PeekMessageW,
-        EVENT_OBJECT_IME_CHANGE, EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW,
-        EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED, MSG, PM_REMOVE,
+        CallNextHookEx, DispatchMessageW, EnumWindows, GetClassNameW, GetForegroundWindow,
+        GetWindowThreadProcessId, IsWindowVisible, PeekMessageW, SetWindowsHookExW,
+        UnhookWindowsHookEx, EVENT_OBJECT_CLOAKED, EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE,
+        EVENT_OBJECT_IME_CHANGE, EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW, EVENT_OBJECT_SHOW,
+        EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED, EVENT_OBJECT_UNCLOAKED, HHOOK, MSG,
+        PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
     };
+
+    /// ⚠️★★★ **CREATE / SHOW / HIDE したウィンドウのクラス名**（★ 2026-08-22 追加）。
+    ///
+    /// ★ なぜ足したか: 初回計測で `CREATE 583 = DESTROY 583` と**確かに何かが出入りしている**のに、
+    /// クラス名センサスには**常時可視の 2 クラスしか写らなかった**。
+    /// ⚠️ センサスが `looks_ime_like` で**絞ってから**数えていたため、
+    /// 候補ウィンドウのクラス名がその語に当たらなければ**構造的に見えない**。
+    /// → ★ **絞らずに、イベントで捕まえた瞬間のクラス名をそのまま数える。**
+    ///
+    /// ★ これはポーリングより**取りこぼしにくい**: 候補ウィンドウが 100ms 未満で
+    /// 生成・破棄されても、CREATE/SHOW はイベントとして届きうる。
+    ///
+    /// ⚠️★★★ **ただし「必ず捕まる」とは言えない** (2026-08-22・cross-review 高)。
+    /// ★ `WINEVENT_OUTOFCONTEXT` の配送は**非同期**で、到達時に窓が消えていれば
+    /// `GetClassNameW` が失敗する ([`N_EVENT_CLASS_UNAVAIL`] で数える)。
+    /// ⚠️ さらに本ツールはメッセージポンプと `EnumWindows` が**同じスレッド**なので、
+    /// 負荷次第で配送が遅れうる。→ ★ **0 件を主張する前に `N_EVENT_CLASS_UNAVAIL` を見ること。**
+    ///
+    /// ⚠️ **privacy**: ★ クラス名のみ ([`normalize_class_name`] で正規化)。
+    /// ⚠️ ウィンドウタイトルは取得しない。
+    ///
+    /// ⚠️★★★ **この形を本番 (`src/input/`) へ持ち込んではならない。**
+    /// ★ WinEvent コールバック内で `format!` (ヒープ確保) と `Mutex::lock()` を行っており、
+    /// `hook-constraints` **Win-1** (コールバック内は Atomic ＋ `try_send` のみ) に反する。
+    /// ★ ここで許されるのは **プローブ専用**だからである
+    /// (⚠️ 本番へ配線するなら HWND を `try_send` し、別スレッドでクラス名を解決すること)。
+    #[allow(clippy::type_complexity)]
+    fn event_classes() -> &'static Mutex<BTreeMap<(&'static str, String), u32>> {
+        static MAP: OnceLock<Mutex<BTreeMap<(&'static str, String), u32>>> = OnceLock::new();
+        MAP.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ EnumWindows 経路を叩く間隔。⚠️ **本番 (`lib.rs` の IME Monitor) は 100ms** だが、
+    /// ★ ここでは 25ms で取って「**本番の 100ms では取りこぼすか**」を別途換算する。
+    const ENUM_PERIOD_MS: u32 = 25;
+    /// ★ 本番相当の間引き (25ms × 4 = 100ms)。
+    const ENUM_PROD_DIVISOR: u32 = 4;
 
     const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
     const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
@@ -104,6 +174,373 @@ mod windows_probe {
     static N_IMM_OPEN: AtomicU32 = AtomicU32::new(0);
 
     static OUR_PID: AtomicU32 = AtomicU32::new(0);
+
+    /// ⚠️★★★ **UIA プロバイダの「起こし」統計** (2026-08-22 追加)。
+    ///
+    /// ★ **なぜ要るか**: `EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED`(0x8030) の
+    /// 発火主体は IME ではなく **アプリ側の UIA プロバイダ**である
+    /// (逐語「required to be raised by Microsoft UI Automation elements supporting
+    /// the TextEdit pattern」)。
+    /// ⚠️ **Chromium 系 (Chrome / WebView2) はアクセシビリティツリーを遅延生成する**ので、
+    /// WinEvent フックを張っただけでは **プロバイダが起きず、0 件が「出ない」なのか
+    /// 「起こしていない」なのか区別できない**。
+    /// → ★ `accevent.exe` が本物の UIA クライアントとして行っていることを、ここで再現する。
+    static N_UIA_POKE: AtomicU32 = AtomicU32::new(0);
+    /// ★ `ElementFromHandle` が要素を返した回数 (＝ プロバイダが応答した)。
+    static N_UIA_ELEMENT_OK: AtomicU32 = AtomicU32::new(0);
+    /// ★★★ **テキスト系パターンが取れた回数** —— ⚠️ これが 0 なら、
+    /// そのアプリには **テキストプロバイダが無い**ので 0x8030 は原理的に出ない。
+    static N_UIA_TEXT_OK: AtomicU32 = AtomicU32::new(0);
+    /// ★ `TextEdit` パターンが取れた回数 (⚠️ 0x8030 を上げる資格そのもの)。
+    static N_UIA_TEXTEDIT_OK: AtomicU32 = AtomicU32::new(0);
+
+    /// ⚠️★★★ **フォーカス要素側**のパターン統計 (2026-08-22 訂正で追加)。
+    ///
+    /// ⚠️ **初版は トップレベル窓の要素にだけパターンを要求して数えていた。これは誤り。**
+    /// ★ `ElementFromHandle(hwnd)` が返すのは **ブラウザのフレーム**であり、
+    /// `TextPattern` は**その内側の入力欄**に付く。
+    /// → ⚠️ **フレームに Text が無いのは正常**で、「アプリにテキストプロバイダが無い」証拠にならない。
+    /// ★ 判定に使えるのは **フォーカス要素側**である。
+    static N_UIA_FOCUS_OK: AtomicU32 = AtomicU32::new(0);
+    static N_UIA_FOCUS_TEXT_OK: AtomicU32 = AtomicU32::new(0);
+    static N_UIA_FOCUS_TEXTEDIT_OK: AtomicU32 = AtomicU32::new(0);
+
+    /// ⚠️★★★ **打鍵数** —— ★ 「入力が実際に行われたか」の**唯一信頼できる指標** (2026-08-22 訂正)。
+    ///
+    /// ⚠️ **初版は `TEXTSELECTIONCHANGED`/`VALUECHANGE` を入力の証拠に使ったが、これは誤り。**
+    /// ★ どちらも**アプリ依存**で、Notepad のような RichEdit 系は打鍵ごとには上げない。
+    /// → ⚠️ **実際に日本語を打った 60 秒が「入力なし」と判定される**事故が起きた
+    ///    (★ `VALUECHANGE=2` で 60 秒間不動)。
+    ///
+    /// ★ **打鍵は `WH_KEYBOARD_LL` で直接数える。** アプリに依存しない。
+    ///
+    /// ⚠️ **privacy**: ★ **数えるだけ。** ⚠️ `KBDLLHOOKSTRUCT` を**一切参照しない**ので、
+    /// ★★★ **どのキーを押したかはプロセス内に一度も現れない** (content-free が構造的)。
+    static N_KEYS: AtomicU32 = AtomicU32::new(0);
+
+    /// ⚠️★★★ **v0.1.27 以前の `IME_ACTIVE` 駆動をそのまま再現する状態**。
+    ///
+    /// ★ 旧コードは `IME_SHOW=0x8017`(=`CLOAKED`) で **単一のグローバル**
+    /// `IME_COMPOSITION_START_MS` を刻み、`IME_HIDE=0x8018`(=`UNCLOAKED`) で
+    /// `dwell = now - start` を計算していた (⚠️ **HWND 別ではない。last-writer-wins**)。
+    /// → ★★★ **ここで同じことをすれば、当時 `ime_dwell_med` に何が入っていたかが直接見える。**
+    static LEGACY_START_MS: AtomicU64 = AtomicU64::new(0);
+
+    /// ⚠️★★★ **直近の打鍵時刻 (epoch ms)**。★ cloak が「変換中」に起きたか「無操作中」に起きたかを分ける。
+    static LAST_KEY_MS: AtomicU64 = AtomicU64::new(0);
+
+    /// ★ 「打鍵の近く」とみなす閾値。⚠️ 変換は打鍵の直後に起きるので、
+    /// これを超えて離れた cloak は **変換とは無関係** = false positive 候補である。
+    const NEAR_KEY_MS: u64 = 2000;
+
+    /// ⚠️★★★ **クラス別 cloak 統計** —— ★ C の 2 つの問いに答えるためのもの。
+    ///
+    /// 問い 1: ⚠️ **変換していないときに `IME` が cloak されないか** (false positive の確認)
+    /// 問い 2: ★ 34 = 17 × 2 の内訳 (dwell の分布に 2 山が出るか)
+    #[derive(Default, Clone)]
+    struct CloakStat {
+        cloaks: u32,
+        uncloaks: u32,
+        /// ★ 直近打鍵から `NEAR_KEY_MS` 以内に起きた cloak
+        near_key: u32,
+        /// ⚠️ 打鍵から離れて起きた cloak (★ **これが false positive 候補**)
+        far_key: u32,
+        /// ★ 未確定の cloak 開始時刻 (クラス単位の近似)
+        pending: u64,
+        /// ★ cloak → uncloak の滞在時間
+        dwells: Vec<u64>,
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn cloak_stats() -> &'static Mutex<BTreeMap<String, CloakStat>> {
+        static M: OnceLock<Mutex<BTreeMap<String, CloakStat>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ 再現した「旧 `ime_shadow`」の dwell 列 (ms)。
+    fn legacy_dwells() -> &'static Mutex<Vec<u64>> {
+        static V: OnceLock<Mutex<Vec<u64>>> = OnceLock::new();
+        V.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    /// ⚠️★★★ **実測D — cloak/uncloak の *順序* を記録する。**
+    ///
+    /// ★ **なぜ要るか (2026-08-23)**: 実測C までは cloak と uncloak を**件数でしか**見ておらず、
+    /// ⚠️ **どちらの辺が「候補ウィンドウが見えている」状態なのかを一度も確かめていない**。
+    /// ★ DWM の意味論では `CLOAKED` = 隠す / `UNCLOAKED` = 見せる であり、
+    /// ⚠️ 旧コード (`IME_SHOW=0x8017`=`CLOAKED` で active=true) は**その逆**を仮定していた。
+    ///
+    /// ⚠️★★★ **ここを取り違えると `ime_dwell` は「候補の滞在時間」ではなく
+    /// 「変換と変換のあいだ (候補が隠れている時間)」を測ることになる。**
+    /// ★ 件数はどちらでも同じに見えるので、**順序を見るまで区別できない**。
+    ///
+    /// ★ 判定手順: 候補ウィンドウを**出したまま数秒わざと止める**。
+    /// その長い滞在がどちらの辺で挟まれているかで決まる。
+    #[derive(Clone)]
+    struct TraceRow {
+        /// ★ プローブ開始からの相対 ms (⚠️ 絶対時刻は出さない)
+        rel_ms: u64,
+        class: String,
+        /// ★ "CLOAK" / "UNCLOAK"
+        edge: &'static str,
+        /// ★ **同じ窓を追うための不透明な連番** (⚠️ HWND の値そのものは出さない)。
+        /// ★ これが無いと「別々の窓の交互発火」と「1 つの窓の往復」が区別できない。
+        hwnd_id: u32,
+        /// ⚠️★★★ **イベント直後に DWM へ聞いた実際の cloak 状態**。
+        /// ★ 辺の名前ではなく **OS が答えた状態**なので、ここが最終的な根拠になる。
+        cloaked_now: Option<bool>,
+        /// ★ その窓が**静止時センサスに居たか** (★ 常駐窓か、変換のたびに作られる窓か)。
+        resident: bool,
+        /// ★ 直近打鍵からの経過 ms
+        since_key: u64,
+    }
+
+    /// ★ HWND → 不透明な連番。⚠️ 生の HWND 値は出力しない。
+    #[allow(clippy::type_complexity)]
+    fn hwnd_ids() -> &'static Mutex<BTreeMap<isize, u32>> {
+        static M: OnceLock<Mutex<BTreeMap<isize, u32>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ 静止時センサスで見えた HWND の集合 (★ 「常駐窓か否か」の判定に使う)。
+    fn resident_hwnds() -> &'static Mutex<BTreeSet<isize>> {
+        static M: OnceLock<Mutex<BTreeSet<isize>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeSet::new()))
+    }
+
+    /// ⚠️★★★ **実測G — 追跡対象の窓を定期サンプリングし、「打鍵から遠いとき」の
+    /// cloak 状態を測る。**
+    ///
+    /// ★ **なぜ要るか (2026-08-23・2 回目の計測後)**: 実測 D で順序は取れたが、
+    /// ⚠️ **辺の向きが決まらなかった** —— cloak/uncloak は綺麗に交互で、
+    /// 「長い滞在」が両側に出るため、どちらが「候補が見えている」か区別できない。
+    ///
+    /// ★ **決め手**: **打鍵から十分離れているとき (= 変換していないとき) の状態**である。
+    ///
+    /// | ⚠️ 打鍵から遠いとき | → ★ 結論 |
+    /// |---|---|
+    /// | ほぼ **uncloaked** | ★ `CLOAKED` = 候補表示 (⚠️ **旧コードの仮定どおり。実装を反転させる**) |
+    /// | ほぼ **cloaked** | ★ `UNCLOAKED` = 候補表示 (★ 現在の実装が正しい) |
+    ///
+    /// ⚠️ 実測 E (静止時センサス) との違い: あちらは**開始時の 1 点**しか見ておらず、
+    /// ★ **変換に関与した当の窓を見ていない** (`常駐=no` だった)。
+    /// ★ こちらは**遷移した窓そのもの**を追う。
+    #[derive(Default, Clone, Copy)]
+    struct DwellSample {
+        /// ★ 打鍵から `IDLE_KEY_MS` 以上離れたサンプルのうち cloaked だった数
+        idle_cloaked: u32,
+        /// ★ 同・uncloaked だった数
+        idle_uncloaked: u32,
+        /// ★ 打鍵の近く (`NEAR_KEY_MS` 以内) で cloaked だった数
+        near_cloaked: u32,
+        /// ★ 同・uncloaked だった数
+        near_uncloaked: u32,
+    }
+
+    /// ★ 「変換していない」とみなす打鍵からの距離。⚠️ `NEAR_KEY_MS` より十分長くする。
+    const IDLE_KEY_MS: u64 = 4000;
+
+    /// ★ サンプリング周期。
+    const SAMPLE_PERIOD_MS: u64 = 250;
+
+    /// ★ 実測 D で遷移が観測された窓 (hwnd → クラス)。⚠️ これだけをサンプリングする。
+    #[allow(clippy::type_complexity)]
+    fn tracked_hwnds() -> &'static Mutex<BTreeMap<isize, String>> {
+        static M: OnceLock<Mutex<BTreeMap<isize, String>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ クラス別の集計。
+    #[allow(clippy::type_complexity)]
+    fn dwell_samples() -> &'static Mutex<BTreeMap<String, DwellSample>> {
+        static M: OnceLock<Mutex<BTreeMap<String, DwellSample>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ 追跡中の窓を 1 巡サンプリングする (⚠️ メッセージループ側から呼ぶ。コールバック内では呼ばない)。
+    fn sample_tracked_windows() {
+        let snapshot: Vec<(isize, String)> = match tracked_hwnds().lock() {
+            Ok(m) => m.iter().map(|(k, v)| (*k, v.clone())).collect(),
+            Err(_) => return,
+        };
+        if snapshot.is_empty() {
+            return;
+        }
+        let since_key = now_ms().saturating_sub(LAST_KEY_MS.load(Ordering::Relaxed));
+        for (hwnd, class) in snapshot {
+            let h = HWND(hwnd as *mut std::ffi::c_void);
+            let Some(cloaked) = dwm_is_cloaked(h) else {
+                // ⚠️ 窓が消えていれば追跡から外す (★ 幽霊を数えない)。
+                if let Ok(mut m) = tracked_hwnds().lock() {
+                    m.remove(&hwnd);
+                }
+                continue;
+            };
+            if let Ok(mut m) = dwell_samples().lock() {
+                let e = m.entry(class).or_default();
+                if since_key >= IDLE_KEY_MS {
+                    if cloaked {
+                        e.idle_cloaked += 1;
+                    } else {
+                        e.idle_uncloaked += 1;
+                    }
+                } else if since_key <= NEAR_KEY_MS {
+                    if cloaked {
+                        e.near_cloaked += 1;
+                    } else {
+                        e.near_uncloaked += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /// ⚠️★★★ **実測F 用の生イベント列** —— `(hwnd, shown, epoch_ms)`。
+    ///
+    /// ★ **なぜ貯めるか**: 60 秒の計測を 1 回やれば、**本番の [`CloakFold`] をそのまま**
+    /// 複数の debounce 幅で回して比べられる。
+    /// ⚠️ **プローブ側に畳み込みを複製しない** —— 複製を測っても本番の挙動は答えられない
+    /// (★ `is_ime_candidate_window_visible` を本番から呼んでいるのと同じ規律)。
+    fn ime_class_events() -> &'static Mutex<Vec<(isize, bool, u64)>> {
+        static V: OnceLock<Mutex<Vec<(isize, bool, u64)>>> = OnceLock::new();
+        V.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    /// ★ 上限付きリングではなく単純な上限打ち切り (⚠️ 60 秒で溢れる量ではない)。
+    const TRACE_CAP: usize = 600;
+
+    fn trace() -> &'static Mutex<Vec<TraceRow>> {
+        static V: OnceLock<Mutex<Vec<TraceRow>>> = OnceLock::new();
+        V.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    /// ★ プローブ開始時刻 (epoch ms)。⚠️ 出力は相対値のみに使う。
+    static PROBE_START_MS: AtomicU64 = AtomicU64::new(0);
+
+    /// ★ 実測D で順序を追うクラス (⚠️ 実測C で候補 UI と同じ周期だと分かった 3 つ)。
+    fn is_traced_class(class: &str) -> bool {
+        class == "IME" || class == "Xaml_WindowedPopupClass" || class == "ApplicationFrameWindow"
+    }
+
+    /// ⚠️★★★ **実測E — 「休んでいるとき」の cloak 状態を DWM に直接聞く。**
+    ///
+    /// ★ **なぜ要るか**: 実測C/D は `CLOAKED`/`UNCLOAKED` の**遷移**しか見ていない。
+    /// ⚠️ 遷移だけでは「どちらの辺が候補表示か」が決まらない。
+    /// ★ ところが **変換していない今この瞬間の状態**が分かれば一発で決まる:
+    ///
+    /// | ★ 静止時の `IME` 窓 | → ★ 結論 |
+    /// |---|---|
+    /// | **cloaked** (隠れている) | ★ `UNCLOAKED` = 候補表示 (⚠️ **旧コードの仮定は逆**) |
+    /// | **uncloaked** (見えている) | ★ `CLOAKED` = 候補表示 (★ 旧コードの仮定どおり) |
+    ///
+    /// ⚠️ `DWMWA_CLOAKED` は**戻り値が 0 以外なら cloak されている**
+    /// (逐語: "the window is cloaked" / 0 = not cloaked)。
+    ///
+    /// ⚠️ **privacy**: ★ クラス名は [`normalize_class_name`] を通す。タイトルも PID も取らない。
+    fn dwm_is_cloaked(hwnd: HWND) -> Option<bool> {
+        let mut v: u32 = 0;
+        // SAFETY: hwnd は EnumWindows が渡したもの。出力先は自前の u32。
+        let hr = unsafe {
+            DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_CLOAKED,
+                (&mut v as *mut u32).cast(),
+                std::mem::size_of::<u32>() as u32,
+            )
+        };
+        if hr.is_ok() {
+            Some(v != 0)
+        } else {
+            // ⚠️ 失敗を「cloak されていない」に丸めない (★ 判定を汚す)。
+            None
+        }
+    }
+
+    /// ★ 静止時センサス: トップレベル窓を列挙し、クラス別に cloak 状態を数える。
+    #[allow(clippy::type_complexity)]
+    fn rest_cloak_census() -> BTreeMap<String, (u32, u32, u32)> {
+        // (cloaked, uncloaked, 取得失敗)
+        unsafe extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let mut buf = [0u16; 256];
+            let len = GetClassNameW(hwnd, &mut buf);
+            if len > 0 {
+                let class = normalize_class_name(&String::from_utf16_lossy(&buf[..len as usize]));
+                if is_traced_class(&class) {
+                    // ★ 「静止時から居た窓」を覚えておく (★ 実測D の resident 列)。
+                    if let Ok(mut set) = resident_hwnds().lock() {
+                        set.insert(hwnd.0 as isize);
+                    }
+                    // SAFETY: lparam は下の呼び出し側スタックの BTreeMap への生ポインタ。
+                    let m = &mut *(lparam.0 as *mut BTreeMap<String, (u32, u32, u32)>);
+                    let e = m.entry(class).or_insert((0, 0, 0));
+                    match dwm_is_cloaked(hwnd) {
+                        Some(true) => e.0 += 1,
+                        Some(false) => e.1 += 1,
+                        None => e.2 += 1,
+                    }
+                }
+            }
+            BOOL(1)
+        }
+        let mut m: BTreeMap<String, (u32, u32, u32)> = BTreeMap::new();
+        // SAFETY: cb は列挙中しか呼ばれず、m はこのスコープで生存している。
+        unsafe {
+            let _ = EnumWindows(Some(cb), LPARAM(&mut m as *mut _ as isize));
+        }
+        m
+    }
+
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
+
+    /// ⚠️ `WH_KEYBOARD_LL` コールバック。★ Atomic の加算と `CallNextHookEx` のみ
+    /// (`hook-constraints` Win-1 準拠)。
+    unsafe extern "system" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code >= 0 {
+            let msg = wparam.0 as u32;
+            if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
+                // ⚠️★ lparam (KBDLLHOOKSTRUCT) には**触れない**。★ 数えるだけ。
+                N_KEYS.fetch_add(1, Ordering::Relaxed);
+                LAST_KEY_MS.store(now_ms(), Ordering::Relaxed);
+            }
+        }
+        // ★ Win-2: どの経路でも必ず呼ぶ。
+        CallNextHookEx(None, code, wparam, lparam)
+    }
+
+    /// ⚠️ **診断B 側**で `GetClassNameW` がクラス名を返せなかった回数。
+    ///
+    /// ★ **なぜ数えるか**: WinEvent の `WINEVENT_OUTOFCONTEXT` 配送は**非同期**なので、
+    /// コールバック到達時に窓が既に破棄されていると必ずここに落ちる。
+    /// ⚠️★★★ ＝ **短命な窓ほど系統的に取りこぼす**。★ 0 でない限り「診断B は全数だ」と言えない。
+    static N_EVENT_CLASS_UNAVAIL: AtomicU32 = AtomicU32::new(0);
+
+    /// ⚠️ **診断A (センサス) 側**で `GetClassNameW` が失敗した回数。
+    ///
+    /// ⚠️★★★ **診断B と混ぜてはならない** (2026-08-22・cross-review 高)。
+    /// ★ こちらは列挙中に窓が消えた等であり、**「短命な窓の取りこぼし」の根拠にはならない**。
+    /// ⚠️ 1 つのカウンタで両方を数えると、出力の意味が混ざって結論を誤らせる。
+    static N_CENSUS_CLASS_UNAVAIL: AtomicU32 = AtomicU32::new(0);
+
+    /// ⚠️★★★ **クラス名からアプリ固有の識別子を落とす** (2026-08-22・security review)。
+    ///
+    /// ★ **WPF**: `HwndWrapper[<AppDomain 名>;;<GUID>]` —— **AppDomain 名は通常 実行ファイル名**。
+    /// ★ **WinForms**: `WindowsForms10.Window.8.app.0.<hash>` —— アプリ固有の hash を含む。
+    /// → ⚠️ **生値をそのまま出すと「プロセス名を記録しない」という前提が崩れる。**
+    ///
+    /// ★ 落とし方は保守的に 2 手だけ: (i) 最初の `[` 以降を捨てる /
+    /// (ii) `WindowsForms` 始まりは先頭 2 セグメントに切る。
+    fn normalize_class_name(class: &str) -> String {
+        let head = class.split('[').next().unwrap_or(class);
+        if head.starts_with("WindowsForms") {
+            return head.split('.').take(2).collect::<Vec<_>>().join(".");
+        }
+        head.to_string()
+    }
 
     fn tally(slot: usize, event: u32, hwnd: HWND) {
         let bucket = if event == EVENT_OBJECT_IME_SHOW {
@@ -154,19 +591,139 @@ mod windows_probe {
         tally(1, event, hwnd);
     }
 
-    /// ★ 生存確認 ＋ イベント ID のヒストグラム。⚠️ 数えるだけで hwnd に触れない。
+    /// ★ 生存確認 ＋ イベント ID のヒストグラム ＋ **CREATE/SHOW/HIDE のクラス名**。
     unsafe extern "system" fn cb_alive(
         _h: HWINEVENTHOOK,
         event: u32,
-        _hwnd: HWND,
-        _o: i32,
-        _c: i32,
+        hwnd: HWND,
+        id_object: i32,
+        id_child: i32,
         _t: u32,
         _ms: u32,
     ) {
         N_ALIVE.fetch_add(1, Ordering::Relaxed);
         if (HIST_MIN..=HIST_MAX).contains(&event) {
             HIST[(event - HIST_MIN) as usize].fetch_add(1, Ordering::Relaxed);
+        }
+
+        // ⚠️ **ウィンドウ本体のイベントだけ**に絞る (OBJID_WINDOW=0 / CHILDID_SELF=0)。
+        // ★ これを付けないとキャレットやリストアイテムの子オブジェクトで水増しされる。
+        // ⚠️★★★ **旧 v0.1.27 の駆動をそのまま再現する。**
+        // ★ 旧コードは HWND を見ずグローバル 1 個で start/dwell を回していた (last-writer-wins)。
+        if event == EVENT_OBJECT_CLOAKED {
+            LEGACY_START_MS.store(now_ms(), Ordering::Relaxed);
+        } else if event == EVENT_OBJECT_UNCLOAKED {
+            let start = LEGACY_START_MS.swap(0, Ordering::Relaxed);
+            if start > 0 {
+                let d = now_ms().saturating_sub(start);
+                if let Ok(mut v) = legacy_dwells().lock() {
+                    v.push(d);
+                }
+            }
+        }
+
+        let is_window_level = id_object == 0 && id_child == 0;
+        let is_lifecycle = event == EVENT_OBJECT_CREATE
+            || event == EVENT_OBJECT_SHOW
+            || event == EVENT_OBJECT_HIDE
+            || event == EVENT_OBJECT_CLOAKED
+            || event == EVENT_OBJECT_UNCLOAKED;
+        if !is_window_level || !is_lifecycle || hwnd.0.is_null() {
+            return;
+        }
+
+        let mut buf = [0u16; 256];
+        // SAFETY: hwnd は OS がコールバックへ渡したもの。buf は自前のスタック配列。
+        let len = GetClassNameW(hwnd, &mut buf);
+        if len <= 0 {
+            // ⚠️ 配送が非同期なので、到達時に窓が消えているとここに来る。★ 黙って捨てない。
+            N_EVENT_CLASS_UNAVAIL.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        let class = normalize_class_name(&String::from_utf16_lossy(&buf[..len as usize]));
+        let tag = if event == EVENT_OBJECT_CREATE {
+            "CREATE"
+        } else if event == EVENT_OBJECT_SHOW {
+            "SHOW"
+        } else if event == EVENT_OBJECT_HIDE {
+            "HIDE"
+        } else if event == EVENT_OBJECT_CLOAKED {
+            "CLOAK"
+        } else {
+            "UNCLOAK"
+        };
+        // ⚠️★★★ クラス別 cloak 統計 (★ C の実測)。
+        if event == EVENT_OBJECT_CLOAKED || event == EVENT_OBJECT_UNCLOAKED {
+            let t = now_ms();
+            let since_key = t.saturating_sub(LAST_KEY_MS.load(Ordering::Relaxed));
+            if let Ok(mut m) = cloak_stats().lock() {
+                let e = m.entry(class.clone()).or_default();
+                if event == EVENT_OBJECT_CLOAKED {
+                    e.cloaks += 1;
+                    if since_key <= NEAR_KEY_MS {
+                        e.near_key += 1;
+                    } else {
+                        e.far_key += 1;
+                    }
+                    e.pending = t;
+                } else {
+                    e.uncloaks += 1;
+                    if e.pending > 0 {
+                        e.dwells.push(t.saturating_sub(e.pending));
+                        e.pending = 0;
+                    }
+                }
+            }
+
+            // ⚠️★★★ 実測D: **順序**を残す (★ 件数では辺の向きが決まらない)。
+            if is_traced_class(&class) {
+                // ★ 辺の名前を信じず、**OS に今の状態を聞く** (★ これが最終根拠)。
+                let cloaked_now = dwm_is_cloaked(hwnd);
+                let key = hwnd.0 as isize;
+                let id = match hwnd_ids().lock() {
+                    Ok(mut m) => {
+                        let next = m.len() as u32 + 1;
+                        *m.entry(key).or_insert(next)
+                    }
+                    Err(_) => 0,
+                };
+                let resident = resident_hwnds()
+                    .lock()
+                    .map(|set| set.contains(&key))
+                    .unwrap_or(false);
+                // ★ 実測G: 遷移した窓を追跡対象に入れる (⚠️ サンプリングはループ側で行う)。
+                if let Ok(mut m) = tracked_hwnds().lock() {
+                    m.insert(key, class.clone());
+                }
+                // ⚠️★★★ 実測F: 本番の絞り (`is_ime_cloak_class`) を通ったものだけ貯める。
+                if gse_next_lib::input::ime_cloak::is_ime_cloak_class(&class) {
+                    let shown = gse_next_lib::input::ime_cloak::candidate_shown_from_cloak(
+                        cloaked_now.unwrap_or(event == EVENT_OBJECT_CLOAKED),
+                    );
+                    if let Ok(mut v) = ime_class_events().lock() {
+                        v.push((key, shown, t));
+                    }
+                }
+                if let Ok(mut v) = trace().lock() {
+                    if v.len() < TRACE_CAP {
+                        let start = PROBE_START_MS.load(Ordering::Relaxed);
+                        v.push(TraceRow {
+                            rel_ms: t.saturating_sub(start),
+                            class: class.clone(),
+                            edge: tag,
+                            hwnd_id: id,
+                            cloaked_now,
+                            resident,
+                            since_key,
+                        });
+                    }
+                }
+            }
+        }
+
+        // ⚠️ ロックはこの中で完結させる (★ DispatchMessageW を跨いで保持しない)。
+        if let Ok(mut map) = event_classes().lock() {
+            *map.entry((tag, class)).or_insert(0) += 1;
         }
     }
 
@@ -195,9 +752,195 @@ mod windows_probe {
         }
     }
 
+    /// ⚠️★★★ **入力が実際に行われたかの独立確認** (2026-08-22 追加)。
+    ///
+    /// ★ `alive` は「フックが生きているか」しか答えない。
+    /// ⚠️★★★ **「被験者が本当に文字を入力したか」は別の問い**であり、初版は出していなかった。
+    /// → ⚠️ **入力が無かった 60 秒の 0 件を「0x8030 は出ない」と読む事故**が実際に起きた。
+    ///
+    /// ★ 使うのは `EVENT_OBJECT_TEXTSELECTIONCHANGED`(0x8014) と
+    /// `EVENT_OBJECT_VALUECHANGE`(0x800E)。★ どちらも**文字が入力欄に入ると飛ぶ**。
+    /// ⚠️ 引数に文字列は無く content-free である。
+    fn typing_evidence() -> (u32, u32) {
+        let sel = HIST[(0x8014 - HIST_MIN) as usize].load(Ordering::Relaxed);
+        let val = HIST[(0x800E - HIST_MIN) as usize].load(Ordering::Relaxed);
+        (sel, val)
+    }
+
+    /// ⚠️★★★ **AccEvent 相当 — UIA プロバイダを起こす。**
+    ///
+    /// ★ 前面ウィンドウに対して `ElementFromHandle` を呼ぶと `WM_GETOBJECT` が飛び、
+    /// **Chromium はその時点でアクセシビリティを有効化する**。
+    /// ★ さらに **Text / TextEdit / TextChild パターンを要求**してテキスト系まで上げる
+    /// (⚠️ Chromium の AXMode は段階的に上がるため、要素を取るだけでは足りない)。
+    ///
+    /// ⚠️ **privacy**: ★ パターンを **要求するだけ**で、
+    /// ⚠️ `TextPattern::DocumentRange` も `GetText()` も **呼ばない** ——
+    /// ★★★ **本文を 1 文字も読まない。** 数えるのは「取れたか」の bool だけである。
+    fn poke_uia_provider(automation: &IUIAutomation) {
+        N_UIA_POKE.fetch_add(1, Ordering::Relaxed);
+        // SAFETY: いずれも読み取り専用の COM 呼び出し。返る interface は Drop で解放される。
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            if hwnd.0.is_null() {
+                return;
+            }
+            if let Ok(element) = automation.ElementFromHandle(hwnd) {
+                N_UIA_ELEMENT_OK.fetch_add(1, Ordering::Relaxed);
+                if element.GetCurrentPattern(UIA_TextPatternId).is_ok() {
+                    N_UIA_TEXT_OK.fetch_add(1, Ordering::Relaxed);
+                }
+                if element.GetCurrentPattern(UIA_TextEditPatternId).is_ok() {
+                    N_UIA_TEXTEDIT_OK.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+            // ⚠️★★★ **判定に使うのはこちら。** ★ フォーカス要素が実際の入力欄である。
+            if let Ok(focused) = automation.GetFocusedElement() {
+                N_UIA_FOCUS_OK.fetch_add(1, Ordering::Relaxed);
+                if focused.GetCurrentPattern(UIA_TextPatternId).is_ok() {
+                    N_UIA_FOCUS_TEXT_OK.fetch_add(1, Ordering::Relaxed);
+                }
+                if focused.GetCurrentPattern(UIA_TextEditPatternId).is_ok() {
+                    N_UIA_FOCUS_TEXTEDIT_OK.fetch_add(1, Ordering::Relaxed);
+                }
+                // ★ TextChild は「テキストの子孫である」ことを示す。要求のみ (数えない)。
+                let _ = focused.GetCurrentPattern(UIA_TextChildPatternId);
+            }
+        }
+    }
+
+    /// ⚠️★★★ **絞らずに**、可視トップレベルウィンドウのクラス名を**全部**数える。
+    ///
+    /// ⚠️ ★ 2026-08-22 の初回計測では `looks_ime_like` で**絞ってから**数えていた。
+    /// → **候補ウィンドウのクラス名がその語に当たらなければ最初から見えない**という
+    /// 構造的な盲点があり、「0 件」を「候補ウィンドウが無い」の根拠にできなかった。
+    /// ★ いまは全件数え、`looks_ime_like` は**印を付けるだけ**に降格した。
+    ///
+    /// ★ これがある理由: 問い 3 が **0 件だったとき**に
+    /// 「**候補ウィンドウがそもそも無い**」のか
+    /// 「**候補ウィンドウはあるが `is_ime_candidate_class_name` の網 (`Candidate` 部分一致)
+    /// が細すぎて漏れている**」のかを区別するため。
+    /// ⚠️ 前者なら B は不成立だが、後者なら**網を広げれば成立する**——結論が正反対になる。
+    ///
+    /// ⚠️ **privacy**: ★ `GetClassNameW` の**クラス名のみ**を、
+    /// [`normalize_class_name`] で**正規化してから**数える (⚠️ WPF/WinForms はクラス名に
+    /// 実行ファイル名を埋め込むため・モジュール doc 参照)。
+    /// ⚠️ ウィンドウタイトルは取得しない。
+    fn census_visible_classes(map: &mut BTreeMap<String, u32>) {
+        unsafe extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            if !IsWindowVisible(hwnd).as_bool() {
+                return BOOL(1);
+            }
+            let mut buf = [0u16; 256];
+            let len = GetClassNameW(hwnd, &mut buf);
+            if len > 0 {
+                // SAFETY: lparam は直下の EnumWindows 呼び出しで渡した `&mut BTreeSet`
+                // そのもの。列挙は呼び出しスレッドで同期的に走るので借用は生きており、
+                // 他スレッドからの同時アクセスも無い。
+                let seen = &mut *(lparam.0 as *mut BTreeSet<String>);
+                seen.insert(normalize_class_name(&String::from_utf16_lossy(
+                    &buf[..len as usize],
+                )));
+            } else {
+                N_CENSUS_CLASS_UNAVAIL.fetch_add(1, Ordering::Relaxed);
+            }
+            BOOL(1)
+        }
+
+        // ⚠️★ **1 ポーリング内で重複排除する。** ★ 同じクラスの窓が N 個あっても 1 と数える。
+        // ⚠️ そうしないと `Chrome_WidgetWin_1 4800/600` のように分母を超え、
+        // 「600/600 は常時可視」という凡例と矛盾して読者を誤らせる。
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        // SAFETY: `seen` はこの呼び出しの間だけ生きている有効な参照。
+        unsafe {
+            let _ = EnumWindows(
+                Some(cb),
+                LPARAM(&mut seen as *mut BTreeSet<String> as isize),
+            );
+        }
+        for class in seen {
+            *map.entry(class).or_insert(0) += 1;
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::normalize_class_name;
+
+        /// ★ 実行: `cargo test --example ime_winevent_probe`
+        /// (⚠️ 既定の `cargo test` は example 内の `#[test]` を **実行しない**。コンパイルのみ)
+        #[test]
+        fn wpf_class_drops_appdomain_and_guid() {
+            // ⚠️★★★ AppDomain 名は通常 **実行ファイル名**。★ 落とせていないと privacy 前提が崩れる。
+            assert_eq!(
+                normalize_class_name(
+                    "HwndWrapper[devenv.exe;;a1b2c3d4-0000-1111-2222-333344445555]"
+                ),
+                "HwndWrapper"
+            );
+        }
+
+        #[test]
+        fn winforms_class_keeps_only_two_segments() {
+            assert_eq!(
+                normalize_class_name("WindowsForms10.Window.8.app.0.141b42a_r6_ad1"),
+                "WindowsForms10.Window"
+            );
+        }
+
+        #[test]
+        fn ordinary_class_is_unchanged() {
+            assert_eq!(
+                normalize_class_name("Chrome_WidgetWin_1"),
+                "Chrome_WidgetWin_1"
+            );
+            assert_eq!(normalize_class_name("Notepad"), "Notepad");
+            // ★ ドットを含むが WinForms ではないものは切らない。
+            assert_eq!(
+                normalize_class_name("Windows.UI.Core.CoreWindow"),
+                "Windows.UI.Core.CoreWindow"
+            );
+        }
+
+        #[test]
+        fn degenerate_inputs_do_not_panic() {
+            assert_eq!(normalize_class_name(""), "");
+            // ⚠️ 先頭が `[` = 角括弧より前が空。★ panic せず空を返す。
+            assert_eq!(normalize_class_name("[whatever]"), "");
+            // ⚠️ 閉じ括弧が無い壊れた形でも切る。
+            assert_eq!(
+                normalize_class_name("HwndWrapper[unterminated"),
+                "HwndWrapper"
+            );
+            // ⚠️ WinForms 始まりでセグメントが 2 未満。
+            assert_eq!(normalize_class_name("WindowsForms10"), "WindowsForms10");
+        }
+    }
+
+    /// ⚠️ **意図的に本番 (`is_ime_candidate_class_name`) より広い。**
+    /// ★ 本番は `Candidate` 部分一致のみ。ここは「IME っぽい」を広く拾って**診断**に使う。
+    /// ⚠️ この関数を本番へ持ち込んではならない —— `MSCTFIME UI` (言語バー) を拾うため、
+    /// そのまま使うと分析が永久停止する既知の事故を再発させる。
+    fn looks_ime_like(class: &str) -> bool {
+        let lower = class.to_ascii_lowercase();
+        const NEEDLES: [&str; 8] = [
+            "cand",             // CandidateUI / ...Candidate...  (★ 本番が見ているもの)
+            "ime",              // MSCTFIME UI / IME / ...
+            "msctf",            // TSF 系
+            "tsf",              //
+            "inputexperience",  // Windows Input Experience
+            "textinput",        // TextInputHost
+            "windows.ui.core",  // CoreWindow (UWP 候補 UI の実体)
+            "applicationframe", // UWP のホストフレーム
+        ];
+        NEEDLES.iter().any(|needle| lower.contains(needle))
+    }
+
     pub fn run() -> std::io::Result<()> {
         // SAFETY: 引数を取らない純粋な状態取得。
         OUR_PID.store(unsafe { GetCurrentProcessId() }, Ordering::Relaxed);
+        // ★ 実測D の相対時刻の原点。⚠️ 絶対時刻は出力しない。
+        PROBE_START_MS.store(now_ms(), Ordering::Relaxed);
 
         let stdout = std::io::stdout();
         let mut out = stdout.lock();
@@ -230,6 +973,54 @@ mod windows_probe {
             "  - ★ GSE 本体の G1 入力画面でも同じことをすると slot 差が見えます"
         )?;
         writeln!(out)?;
+        writeln!(
+            out,
+            "⚠️★★★ 実測D (辺の向きの判定) — ★ これを 2〜3 回やってください:"
+        )?;
+        writeln!(
+            out,
+            "  1. ローマ字を打つ → 2. スペースで変換 → 3. ★ **候補が出たまま 3 秒以上止まる**"
+        )?;
+        writeln!(
+            out,
+            "  4. Enter で確定 → 5. ★ **何も押さずに 3 秒以上あける**"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ **最後の 10 秒はキーボードから完全に手を離してください** (実測G の決め手)"
+        )?;
+        writeln!(
+            out,
+            "  → ★ 長い滞在がどちらの辺に挟まれているかで CLOAK/UNCLOAK の意味が決まります"
+        )?;
+        writeln!(out)?;
+
+        // ---- ⚠️★★★ 実測E: 静止時の cloak 状態 (★ 打鍵不要でここだけで辺の向きが決まる) ----
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測E: **いま (変換していない状態) の cloak 状態** =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 静止時に cloaked なら → UNCLOAK = 候補表示 / uncloaked なら → CLOAK = 候補表示"
+        )?;
+        writeln!(
+            out,
+            "  {:<28} {:>9} {:>10} {:>8}",
+            "クラス", "cloaked", "uncloaked", "取得不可"
+        )?;
+        let census = rest_cloak_census();
+        if census.is_empty() {
+            writeln!(
+                out,
+                "  (なし) ⚠️ 対象クラスのトップレベル窓が 1 つも列挙されなかった"
+            )?;
+        } else {
+            for (class, (c, u, e)) in census.iter() {
+                writeln!(out, "  {class:<28} {c:>9} {u:>10} {e:>8}")?;
+            }
+        }
+        writeln!(out)?;
         out.flush()?;
 
         // SAFETY: 同一スレッドで張り、同一スレッドで外す (Win32 の要件)。
@@ -260,15 +1051,88 @@ mod windows_probe {
         };
 
         if h_skip.is_invalid() || h_all.is_invalid() || h_alive.is_invalid() {
-            writeln!(out, "⚠️ SetWinEventHook に失敗しました。")?;
-            return Ok(());
+            // ⚠️★★★ 成功した分だけ外してから抜ける (★ 張りっぱなしにしない)。
+            // SAFETY: 張ったスレッドと同じスレッドで外す。無効ハンドルは外さない。
+            unsafe {
+                for h in [h_skip, h_all, h_alive] {
+                    if !h.is_invalid() {
+                        let _ = UnhookWinEvent(h);
+                    }
+                }
+            }
+            // ⚠️★★★ `Ok(())` で返してはならない。
+            // ★ 本ツールは **null 結果 (0 件) を根拠にする**ので、
+            // 「測って 0 だった」と「そもそも測れなかった」が
+            // **終了コードで区別できなければならない**。
+            // ⚠️★ `anyhow` は使わない —— **このリポジトリは anyhow を依存に持たない**
+            // (`overlay_panel.rs` 逐語「このリポジトリは anyhow を依存に持たず
+            // Result<_,String>/tauri::Result」・`bin/replay.rs` も同旨)。
+            return Err(std::io::Error::other(
+                "SetWinEventHook に失敗した (★ 測定は不成立。0 件を根拠にしないこと)",
+            ));
         }
+
+        // ⚠️★★★ 打鍵カウント用の低レベルフック。★ 数えるだけで内容は見ない。
+        // SAFETY: 同一スレッドで張り、同一スレッドで外す。メッセージループは下の PeekMessageW。
+        let h_keys: HHOOK =
+            unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_hook), None, 0) }
+                .unwrap_or_default();
 
         let started = Instant::now();
         let deadline = started + Duration::from_secs(60);
         let mut next_tick = started + Duration::from_secs(5);
         let mut next_imm = started;
+        let mut next_enum = started;
+        let mut next_census = started;
+        let mut next_poke = started;
+        // ★ 実測G のサンプリング時刻。
+        let mut next_sample = started;
         let mut msg = MSG::default();
+
+        // ---- 問い 3: EnumWindows 経路 (★ 本番の関数をそのまま叩く) ----
+        // ★ 25ms 実測ぶん
+        let mut enum_poll = 0u32;
+        let mut enum_hit = 0u32;
+        let mut enum_rise = 0u32;
+        let mut enum_prev = false;
+        let mut enum_tick = 0u32;
+        // ★ 本番相当 (100ms) へ間引いたぶん。⚠️ 「25ms なら見えるが本番では見えない」を検出する。
+        let mut prod_poll = 0u32;
+        let mut prod_hit = 0u32;
+        let mut prod_rise = 0u32;
+        let mut prod_prev = false;
+        // ★ 候補ウィンドウが開いていた時間 (25ms 刻みの近似)。
+        let mut dwell_cur_ms = 0u32;
+        let mut dwell_max_ms = 0u32;
+        let mut dwell_total_ms = 0u32;
+        // ★ 診断用クラス名センサス。
+        let mut census: BTreeMap<String, u32> = BTreeMap::new();
+        let mut census_polls = 0u32;
+
+        // ⚠️★★★ **本番の完全な述語** `is_candidate_window_open()` (2026-08-22 追加)。
+        //
+        // ★ なぜ要るか: `is_ime_candidate_window_visible()` は **EnumWindows 経路だけ**であり、
+        //   本番が実際に使うのは `WinEvent || EnumWindows || **UIAutomation**` の OR である。
+        // ⚠️★★★ **UIA 経路だけ一度も測っていなかった** —— ★ EnumWindows が 0 でも
+        //   UIA が拾っていれば `IME_ACTIVE` の配線は成立しうる。
+        // → ★ **両方を同時に取り、差分を UIA の寄与として読む。**
+        let monitor = gse_next_lib::input::ime::ImeMonitor::new();
+        // ⚠️★★★ **AccEvent 相当の UIA クライアント**を自前で持つ。
+        // ★ `ImeMonitor` も内部で IUIAutomation を作るが、⚠️ それは `GetFocusedElement()` を
+        //   呼ぶだけで **テキストパターンを要求しない** ため、Chromium の AXMode が
+        //   テキスト系まで上がらない可能性がある。→ ★ ここで明示的に起こす。
+        // SAFETY: COM の初期化と生成。★ `ImeMonitor::new()` が既に CoInitializeEx 済みでも
+        //   多重呼び出しは S_FALSE を返すだけで問題ない。
+        let uia: Option<IUIAutomation> = unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok()
+        };
+        let mut full_poll = 0u32;
+        let mut full_hit = 0u32;
+        let mut full_rise = 0u32;
+        let mut full_prev = false;
+        // ★ 「本番の述語は true だが EnumWindows は false」＝ **UIA (または WinEvent) の寄与**。
+        let mut uia_only_hit = 0u32;
         while Instant::now() < deadline {
             // SAFETY: 自スレッドのメッセージキューを読むだけ。
             while unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) }.as_bool() {
@@ -292,14 +1156,97 @@ mod windows_probe {
                     N_CONV[0].load(Ordering::Relaxed),
                     N_CONV[1].load(Ordering::Relaxed),
                 )?;
+                // ⚠️★★★ 問い 3 は打ちながら見えたほうがよい (★ 反応が無いなら入力方法を変える)。
+                writeln!(
+                    out,
+                    "            enum(25ms) hit={}/{} 立ち上がり={}  ★ ここが 0 のままなら EnumWindows は効いていない",
+                    enum_hit, enum_poll, enum_rise
+                )?;
+                // ⚠️★★★ **入力が届いているかを打ちながら見せる。**
+                // ★ ここが 0 のまま進むと、その 60 秒は 0x8030 の判定に使えない。
+                let (sel, val) = typing_evidence();
+                writeln!(
+                    out,
+                    "            ⚠️ 打鍵={}  (参考 textsel={} valuechange={})  ★ 打鍵が伸びなければ入力先が違う",
+                    N_KEYS.load(Ordering::Relaxed),
+                    sel,
+                    val
+                )?;
                 out.flush()?;
                 next_tick += Duration::from_secs(5);
+            }
+            // ★ 実測G: 追跡中の窓の cloak 状態を定期サンプリングする。
+            //   ⚠️ **ここ (メッセージループ側) で行う** —— WinEvent コールバック内で
+            //   DWM の RPC を回すと `LowLevelHooksTimeout` に触れて打鍵計数を落としうる。
+            if Instant::now() >= next_sample {
+                next_sample += Duration::from_millis(SAMPLE_PERIOD_MS);
+                sample_tracked_windows();
             }
             if Instant::now() >= next_imm {
                 poll_imm();
                 next_imm += Duration::from_millis(500);
             }
-            std::thread::sleep(Duration::from_millis(10));
+            // ⚠️★★★ 問い 3。★ **本番の `is_ime_candidate_window_visible()` を直接呼ぶ。**
+            if Instant::now() >= next_enum {
+                let hit = gse_next_lib::input::ime::is_ime_candidate_window_visible();
+                enum_poll += 1;
+                if hit {
+                    enum_hit += 1;
+                    dwell_cur_ms += ENUM_PERIOD_MS;
+                    dwell_total_ms += ENUM_PERIOD_MS;
+                    if !enum_prev {
+                        enum_rise += 1;
+                    }
+                } else {
+                    if dwell_cur_ms > dwell_max_ms {
+                        dwell_max_ms = dwell_cur_ms;
+                    }
+                    dwell_cur_ms = 0;
+                }
+                enum_prev = hit;
+
+                // ★ 本番 (100ms) 相当へ間引く。
+                enum_tick += 1;
+                if enum_tick.is_multiple_of(ENUM_PROD_DIVISOR) {
+                    prod_poll += 1;
+                    if hit {
+                        prod_hit += 1;
+                        if !prod_prev {
+                            prod_rise += 1;
+                        }
+                    }
+                    prod_prev = hit;
+                }
+                // ⚠️★★★ 同じ tick で **本番の完全な述語**も取る (★ 時刻をずらさない)。
+                let full = monitor.is_candidate_window_open();
+                full_poll += 1;
+                if full {
+                    full_hit += 1;
+                    if !full_prev {
+                        full_rise += 1;
+                    }
+                    if !hit {
+                        // ★ EnumWindows が false なのに本番が true → UIA / WinEvent の寄与。
+                        uia_only_hit += 1;
+                    }
+                }
+                full_prev = full;
+
+                next_enum += Duration::from_millis(ENUM_PERIOD_MS as u64);
+            }
+            if Instant::now() >= next_census {
+                census_visible_classes(&mut census);
+                census_polls += 1;
+                next_census += Duration::from_millis(100);
+            }
+            // ⚠️★★★ UIA プロバイダを定期的に起こす (★ COM 呼び出しなので 250ms 間隔)。
+            if Instant::now() >= next_poke {
+                if let Some(a) = uia.as_ref() {
+                    poke_uia_provider(a);
+                }
+                next_poke += Duration::from_millis(250);
+            }
+            std::thread::sleep(Duration::from_millis(5));
         }
 
         // SAFETY: 張ったスレッドと同じスレッドで外す。
@@ -307,6 +1254,9 @@ mod windows_probe {
             let _ = UnhookWinEvent(h_skip);
             let _ = UnhookWinEvent(h_all);
             let _ = UnhookWinEvent(h_alive);
+            if !h_keys.is_invalid() {
+                let _ = UnhookWindowsHookEx(h_keys);
+            }
         }
 
         let g = |a: &[AtomicU32; SLOTS], i: usize| a[i].load(Ordering::Relaxed);
@@ -355,6 +1305,61 @@ mod windows_probe {
             "生存確認 alive (0x800B)  {:>8}   ★ これが 0 なら測定不成立",
             N_ALIVE.load(Ordering::Relaxed)
         )?;
+        let (n_sel, n_val) = typing_evidence();
+        let n_keys = N_KEYS.load(Ordering::Relaxed);
+        // ⚠️★★★ **有効性の閾値。** ★ 日本語を変換しながら 60 秒打てば軽く超える数。
+        // ⚠️ 初版は「textsel/valuechange のどちらかが 1 以上」で、
+        //   **2 件で「入力は届いている」と誤判定した** (★ 実際に起きた)。
+        const MIN_KEYS_FOR_VALID_RUN: u32 = 30;
+        writeln!(
+            out,
+            "⚠️★★★ 入力の証拠  **打鍵={}**  (参考 textsel={} valuechange={})",
+            n_keys, n_sel, n_val
+        )?;
+        if h_keys.is_invalid() {
+            writeln!(
+                out,
+                "   ⚠️★★★ **打鍵フックの設置に失敗した。この回の有効性は判定できない。**"
+            )?;
+        } else if n_keys < MIN_KEYS_FOR_VALID_RUN {
+            writeln!(
+                out,
+                "   ⚠️★★★ **打鍵が {MIN_KEYS_FOR_VALID_RUN} 未満 = 実質入力していない。この 60 秒は判定に使えない。**"
+            )?;
+        } else {
+            writeln!(
+                out,
+                "   ★ 入力は確かに行われた。→ **下の CONV_TARGET の 0 は「出なかった」と読んでよい。**"
+            )?;
+        }
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ UIA プロバイダの起こし (★ accevent.exe 相当・0x8030 の前提) =="
+        )?;
+        writeln!(
+            out,
+            "  起こし試行={}  窓要素の取得成功={}",
+            N_UIA_POKE.load(Ordering::Relaxed),
+            N_UIA_ELEMENT_OK.load(Ordering::Relaxed)
+        )?;
+        writeln!(
+            out,
+            "  ⚠️ 窓(フレーム)側  Text={} TextEdit={}   ★ ここが 0 なのは**正常**",
+            N_UIA_TEXT_OK.load(Ordering::Relaxed),
+            N_UIA_TEXTEDIT_OK.load(Ordering::Relaxed)
+        )?;
+        writeln!(
+            out,
+            "     (★ ElementFromHandle が返すのはブラウザのフレーム。TextPattern は内側の入力欄に付く)"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ フォーカス要素側  取得={} Text={} TextEdit={}   ★ **判定に使うのはこちら**",
+            N_UIA_FOCUS_OK.load(Ordering::Relaxed),
+            N_UIA_FOCUS_TEXT_OK.load(Ordering::Relaxed),
+            N_UIA_FOCUS_TEXTEDIT_OK.load(Ordering::Relaxed)
+        )?;
         writeln!(out)?;
         writeln!(
             out,
@@ -363,6 +1368,568 @@ mod windows_probe {
             N_IMM_OK.load(Ordering::Relaxed),
             N_IMM_OPEN.load(Ordering::Relaxed)
         )?;
+        writeln!(out)?;
+        // ★ 打ち終わった瞬間に候補が開いたままなら、最後の滞在を取りこぼさないよう畳む。
+        if dwell_cur_ms > dwell_max_ms {
+            dwell_max_ms = dwell_cur_ms;
+        }
+        writeln!(
+            out,
+            "== ⚠️★★★ 問い3: EnumWindows 経路 (is_ime_candidate_window_visible) =="
+        )?;
+        let pct = |hit: u32, poll: u32| -> f64 {
+            if poll == 0 {
+                0.0
+            } else {
+                100.0 * f64::from(hit) / f64::from(poll)
+            }
+        };
+        writeln!(
+            out,
+            "  25ms 実測    ポーリング={:>5} 検出={:>5} ({:>5.1}%) 立ち上がり={:>4}",
+            enum_poll,
+            enum_hit,
+            pct(enum_hit, enum_poll),
+            enum_rise
+        )?;
+        writeln!(
+            out,
+            "  100ms 本番相当 ポーリング={:>5} 検出={:>5} ({:>5.1}%) 立ち上がり={:>4}  ★ 本番はこちら",
+            prod_poll,
+            prod_hit,
+            pct(prod_hit, prod_poll),
+            prod_rise
+        )?;
+        writeln!(
+            out,
+            "  候補ウィンドウ滞在  合計={} ms  最長={} ms  (25ms 刻みの近似)",
+            dwell_total_ms, dwell_max_ms
+        )?;
+        // ⚠️★ 滞在は「回数 × 25ms」なので、ループが滑ると**過小**になる。
+        // ★ 期待ポーリング数と突き合わせて、滑っていないことを言えるようにする。
+        let expected_polls = 60_000 / ENUM_PERIOD_MS;
+        writeln!(
+            out,
+            "  ⚠️ ポーリング実測={} / 期待={}  ★ 一致していれば滑りなし (滞在 ms が信頼できる)",
+            enum_poll, expected_polls
+        )?;
+        writeln!(
+            out,
+            "  ★ 本番の完全な述語 is_candidate_window_open()  検出={}/{} ({:>5.1}%) 立ち上がり={}",
+            full_hit,
+            full_poll,
+            pct(full_hit, full_poll),
+            full_rise
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ うち EnumWindows が false だった回数={}  ★ これが UIA 経路の寄与",
+            uia_only_hit
+        )?;
+        writeln!(
+            out,
+            "  ⚠️ クラス名取得の失敗  診断B={} / 診断A={}  ★ 診断B が 0 でなければ短命な窓を取りこぼしている",
+            N_EVENT_CLASS_UNAVAIL.load(Ordering::Relaxed),
+            N_CENSUS_CLASS_UNAVAIL.load(Ordering::Relaxed)
+        )?;
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== 診断A: 可視だったトップレベルウィンドウのクラス (全件・センサス {census_polls} 回) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ **出現の少ない順**。⚠️ 一過性のもの (= 変換中だけ出た可能性) が上に来る。"
+        )?;
+        writeln!(
+            out,
+            "     {census_polls}/{census_polls} は常時可視 (デスクトップの常駐窓) なので候補 UI ではない。"
+        )?;
+        if census.is_empty() {
+            writeln!(out, "  (なし)")?;
+        } else {
+            let mut rows: Vec<(&String, &u32)> = census.iter().collect();
+            rows.sort_by(|a, b| a.1.cmp(b.1).then(a.0.cmp(b.0)));
+            for (class, count) in rows.iter().take(60) {
+                let mut mark = String::new();
+                if class.contains("Candidate") {
+                    mark.push_str(" ★本番の網に掛かる");
+                } else if looks_ime_like(class) {
+                    mark.push_str(" ☆IMEらしい");
+                }
+                writeln!(out, "  {count:>5}/{census_polls:<5} {class}{mark}")?;
+            }
+            if rows.len() > 60 {
+                writeln!(out, "  ... 他 {} 件", rows.len() - 60)?;
+            }
+        }
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 診断B: CREATE / SHOW / HIDE したウィンドウのクラス (イベント駆動) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ ポーリングより取りこぼしにくい (100ms 未満で消える窓も届きうる)。★ 出現の多い順。"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️ ここに候補 UI が居なければ、候補ウィンドウは**トップレベル窓として存在しない**。"
+        )?;
+        match event_classes().lock() {
+            Ok(map) if map.is_empty() => {
+                writeln!(out, "  (なし)")?;
+            }
+            Ok(map) => {
+                #[allow(clippy::type_complexity)]
+                let mut rows: Vec<(&(&'static str, String), &u32)> = map.iter().collect();
+                rows.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+                for ((tag, class), count) in rows.iter().take(40) {
+                    // ⚠️★ 判定は **クラス側だけ**に掛ける。
+                    // ★ タグ付き文字列に掛けると、将来 `MINIMIZE` 等を足したときに
+                    //   タグの "ime" に当たって全行が誤マークされる。
+                    let mark = if class.contains("Candidate") {
+                        " ★本番の網に掛かる"
+                    } else if looks_ime_like(class) {
+                        " ☆IMEらしい"
+                    } else {
+                        ""
+                    };
+                    writeln!(out, "  {count:>5}  {tag:<6} {class}{mark}")?;
+                }
+                if rows.len() > 40 {
+                    writeln!(out, "  ... 他 {} 件", rows.len() - 40)?;
+                }
+            }
+            Err(_) => {
+                // ⚠️★ 「中毒」と「空」を出し分ける (★ 黙って (なし) にしない)。
+                writeln!(
+                    out,
+                    "  ⚠️ 集計が取得できません (Mutex poisoned) — ★ 測定は不成立"
+                )?;
+            }
+        }
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測C: クラス別 cloak と「打鍵からの距離」 (★ false positive の確認) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 近い = 直近打鍵から {NEAR_KEY_MS}ms 以内 / ⚠️ 遠い = それ以上 (= 変換と無関係の疑い)"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ 『遠い』が多いクラスは絞り込みに使えない (無操作中にも cloak する)"
+        )?;
+        match cloak_stats().lock() {
+            Ok(m) if m.is_empty() => {
+                writeln!(out, "  (なし)")?;
+            }
+            Ok(m) => {
+                let mut rows: Vec<(&String, &CloakStat)> = m.iter().collect();
+                rows.sort_by(|a, b| b.1.cloaks.cmp(&a.1.cloaks).then(a.0.cmp(b.0)));
+                writeln!(
+                    out,
+                    "  {:<28} {:>6} {:>8} {:>6} {:>6}  {:>10}",
+                    "クラス", "cloak", "uncloak", "近い", "遠い", "dwell中央"
+                )?;
+                for (class, st) in rows.iter().take(20) {
+                    let med = if st.dwells.is_empty() {
+                        0
+                    } else {
+                        let mut d = st.dwells.clone();
+                        d.sort_unstable();
+                        d[d.len() / 2]
+                    };
+                    let far_mark = if st.far_key > st.near_key {
+                        " ⚠️遠いが優勢"
+                    } else {
+                        ""
+                    };
+                    writeln!(
+                        out,
+                        "  {:<28} {:>6} {:>8} {:>6} {:>6}  {:>8} ms{}",
+                        class, st.cloaks, st.uncloaks, st.near_key, st.far_key, med, far_mark
+                    )?;
+                }
+                writeln!(out)?;
+                // ⚠️★★★ 問い 2: `IME` クラスの dwell 分布 (34 = 17 x 2 の内訳)
+                if let Some(st) = m.get("IME") {
+                    if !st.dwells.is_empty() {
+                        let mut d = st.dwells.clone();
+                        d.sort_unstable();
+                        writeln!(out, "  ★ `IME` クラスの dwell 分布 (n={}):", d.len())?;
+                        for p in [0.0_f64, 0.25, 0.5, 0.75, 0.9, 1.0] {
+                            let k = ((d.len() - 1) as f64 * p).round() as usize;
+                            writeln!(out, "     p{:>3.0} = {:>8} ms", p * 100.0, d[k])?;
+                        }
+                        writeln!(
+                            out,
+                            "     ⚠️ 分布が 2 山なら 34 = 17 x 2 の内訳が見える (候補表示 / 別周期)"
+                        )?;
+                    }
+                }
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+
+        // ---- ⚠️★★★ 実測D: cloak/uncloak の順序 (★ 辺の向きの判定) ----
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測D: cloak/uncloak の **順序** (★ どちらの辺が「候補が見えている」か) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 読み方: `IME` 行だけを上から追い、**長い滞在 (3 秒級) がどの辺の後ろにあるか**を見る。"
+        )?;
+        writeln!(
+            out,
+            "  ★ UNCLOAK の後ろに長い滞在 → UNCLOAK = 候補表示 (⚠️ 旧コードの仮定は逆だった)"
+        )?;
+        writeln!(
+            out,
+            "  ★ CLOAK   の後ろに長い滞在 → CLOAK   = 候補表示 (★ 旧コードの仮定どおり)"
+        )?;
+        writeln!(
+            out,
+            "  ★ `DWM状態` は **イベント直後に OS へ聞いた実際の cloak 状態** (★ 辺の名前より強い根拠)"
+        )?;
+        writeln!(
+            out,
+            "  ★ `窓` は同じ窓を追うための連番 / `常駐` = 静止時センサスにも居た窓"
+        )?;
+        writeln!(
+            out,
+            "  {:>8} {:<26} {:<8} {:>4} {:>6} {:>8} {:>10} {:>10}",
+            "rel_ms", "クラス", "辺", "窓", "常駐", "DWM状態", "前の辺から", "直近打鍵から"
+        )?;
+        match trace().lock() {
+            Ok(v) if v.is_empty() => {
+                writeln!(out, "  (なし) ★ 対象クラスの cloak/uncloak が 1 件も無い")?;
+            }
+            Ok(v) => {
+                let mut prev_per_class: BTreeMap<String, u64> = BTreeMap::new();
+                for r in v.iter() {
+                    // ⚠️★ 「前の辺から」は **同じ窓** で測る (★ クラス単位だと別窓が混ざる)。
+                    let pkey = format!("{}#{}", r.class, r.hwnd_id);
+                    let gap = prev_per_class
+                        .get(&pkey)
+                        .map(|p| r.rel_ms.saturating_sub(*p));
+                    prev_per_class.insert(pkey, r.rel_ms);
+                    let gap_s = match gap {
+                        Some(g) => format!("{g} ms"),
+                        None => "-".to_string(),
+                    };
+                    // ★ 3 秒以上あいた辺に印を付ける (⚠️ これが「わざと止めた」区間である)。
+                    let mark = if gap.is_some_and(|g| g >= 3000) {
+                        "  ★長"
+                    } else {
+                        ""
+                    };
+                    let dwm = match r.cloaked_now {
+                        Some(true) => "cloaked",
+                        Some(false) => "見えてる",
+                        None => "不明",
+                    };
+                    writeln!(
+                        out,
+                        "  {:>8} {:<26} {:<8} {:>4} {:>6} {:>8} {:>10} {:>10}{}",
+                        r.rel_ms,
+                        r.class,
+                        r.edge,
+                        r.hwnd_id,
+                        if r.resident { "yes" } else { "no" },
+                        dwm,
+                        gap_s,
+                        format!("{} ms", r.since_key),
+                        mark
+                    )?;
+                }
+                if v.len() >= TRACE_CAP {
+                    writeln!(
+                        out,
+                        "  ⚠️ {TRACE_CAP} 件で打ち切った (★ 以降は記録していない)"
+                    )?;
+                }
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+
+        // ---- ⚠️★★★ 実測G: 打鍵から遠いときの cloak 状態 (★ 辺の向きの決め手) ----
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測G: **打鍵から遠いとき (= 変換していないとき) の cloak 状態** =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 遷移した窓そのものを {SAMPLE_PERIOD_MS}ms ごとに DWM へ問い合わせた結果。"
+        )?;
+        writeln!(
+            out,
+            "  ★ 遠い = 直近打鍵から {IDLE_KEY_MS}ms 以上 / 近い = {NEAR_KEY_MS}ms 以内"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ **判定**: 『遠い』がほぼ uncloaked → CLOAKED が候補表示 (実装を反転させる)"
+        )?;
+        writeln!(
+            out,
+            "           　　　『遠い』がほぼ cloaked   → UNCLOAKED が候補表示 (現在の実装が正しい)"
+        )?;
+        match dwell_samples().lock() {
+            Ok(m) if m.is_empty() => {
+                writeln!(
+                    out,
+                    "  (なし) ⚠️ 遷移した窓が無いか、打鍵から離れた区間が無かった"
+                )?;
+            }
+            Ok(m) => {
+                writeln!(
+                    out,
+                    "  {:<28} {:>12} {:>12} {:>12} {:>12}",
+                    "クラス", "遠い:cloak", "遠い:見えてる", "近い:cloak", "近い:見えてる"
+                )?;
+                for (class, d) in m.iter() {
+                    let idle_total = d.idle_cloaked + d.idle_uncloaked;
+                    let verdict = if idle_total == 0 {
+                        "  ⚠️ 遠いサンプルが無く判定不能"
+                    } else if d.idle_cloaked == 0 {
+                        "  ★ 遠い=全部見えてる → CLOAK が候補表示"
+                    } else if d.idle_uncloaked == 0 {
+                        "  ★ 遠い=全部cloak → UNCLOAK が候補表示"
+                    } else {
+                        "  ⚠️ 混在 (★ 比率で読む)"
+                    };
+                    writeln!(
+                        out,
+                        "  {:<28} {:>12} {:>12} {:>12} {:>12}{}",
+                        class,
+                        d.idle_cloaked,
+                        d.idle_uncloaked,
+                        d.near_cloaked,
+                        d.near_uncloaked,
+                        verdict
+                    )?;
+                }
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+
+        // ---- ⚠️★★★ 実測F: **本番の CloakFold** を実データで回す (★ debounce 幅の掃き出し) ----
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測F: **本番の `CloakFold`** をこの 60 秒の実イベントで回した結果 =="
+        )?;
+        writeln!(
+            out,
+            "  ★ プローブ側に畳み込みを複製せず、`input::ime_cloak::CloakFold` **そのもの**を呼ぶ。"
+        )?;
+        writeln!(
+            out,
+            "  ★ `行` = 出るはずの ime_shadow 行数 / `pause率` = 60 秒に占める推定停止区間の割合"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ **`pause率` が引き継ぎ §3.2 の「打鍵時間の 15〜20%」に当たる実測値である。**"
+        )?;
+        {
+            let evs = match ime_class_events().lock() {
+                Ok(v) => v.clone(),
+                Err(_) => Vec::new(),
+            };
+            writeln!(
+                out,
+                "  ★ 本番の絞り (クラス完全一致 `IME`) を通ったイベント: {} 件",
+                evs.len()
+            )?;
+            if evs.is_empty() {
+                writeln!(
+                    out,
+                    "  (なし) ⚠️ 変換していないか、この端末では `IME` クラスが cloak されない"
+                )?;
+            } else {
+                writeln!(
+                    out,
+                    "  {:>10} {:>6} {:>12} {:>12} {:>10}",
+                    "debounce", "行", "dwell中央", "dwell合計", "pause率"
+                )?;
+                // ★ 既定値を含めて掃く。⚠️ 選んだ値は decisions.md に根拠付きで残すこと。
+                for gap in [0_u64, 100, 250, 500, 1000, 2000] {
+                    let mut fold = gse_next_lib::input::ime_cloak::CloakFold::with_gap(gap);
+                    let mut dwells: Vec<u64> = Vec::new();
+                    // ⚠️★ 打ち切り (`forced`) は本番が**行を出さない**ので、ここでも数えない。
+                    let mut forced = 0u32;
+                    let mut push = |a: gse_next_lib::input::ime_cloak::FoldAction| {
+                        if let gse_next_lib::input::ime_cloak::FoldAction::End {
+                            dwell_ms,
+                            forced: f,
+                        } = a
+                        {
+                            if f {
+                                forced += 1;
+                            } else {
+                                dwells.push(dwell_ms);
+                            }
+                        }
+                    };
+                    // ⚠️★★★ **イベントの合間も `on_tick` を刻む。**
+                    //   ★ 本番の resolver は `recv_timeout` で **{TICK}ms ごとに必ず**
+                    //   `on_tick` を呼ぶので、debounce はイベントが来なくても満了する。
+                    //   ⚠️ イベント時刻でしか tick しないと、次の `shown` が
+                    //   **必ず debounce を取り消してしまい**、セッションが永久に閉じない
+                    //   (★ 2026-08-23 に実際にこれで「どの debounce でも 0 行」になった)。
+                    const TICK_MS: u64 = 63;
+                    let mut clock = evs.first().map(|e| e.2).unwrap_or(0);
+                    for (hwnd, shown, t) in evs.iter() {
+                        // ★ このイベントまで時間を進める。
+                        while clock + TICK_MS <= *t {
+                            clock += TICK_MS;
+                            if let Some(a) = fold.on_tick(clock) {
+                                push(a);
+                            }
+                        }
+                        clock = *t;
+                        if let Some(a) = fold.on_event(*hwnd, *shown, *t) {
+                            push(a);
+                        }
+                        if let Some(a) = fold.on_tick(*t) {
+                            push(a);
+                        }
+                    }
+                    // ★ 最後のセッションを閉じる (★ 本番でも tick が閉じる)。
+                    let last = evs.last().map(|e| e.2).unwrap_or(0);
+                    let mut tail = clock;
+                    while tail <= last + gap + TICK_MS {
+                        tail += TICK_MS;
+                        if let Some(a) = fold.on_tick(tail) {
+                            push(a);
+                        }
+                    }
+                    let total: u64 = dwells.iter().sum();
+                    let med = if dwells.is_empty() {
+                        0
+                    } else {
+                        let mut d = dwells.clone();
+                        d.sort_unstable();
+                        d[d.len() / 2]
+                    };
+                    let pause_pct = total as f64 / 60_000.0 * 100.0;
+                    writeln!(
+                        out,
+                        "  {:>8} ms {:>6} {:>9} ms {:>9} ms {:>9.1}%  {}",
+                        gap,
+                        dwells.len(),
+                        med,
+                        total,
+                        pause_pct,
+                        if forced > 0 {
+                            format!("⚠️ 打ち切り {forced} 件 (行にしない)")
+                        } else {
+                            String::new()
+                        }
+                    )?;
+                }
+                writeln!(
+                    out,
+                    "  ★ 読み方: debounce を上げると行が減り dwell が伸びる。**変換回数と一致する行数**を選ぶ。"
+                )?;
+                // ⚠️★★★ debounce を勘で選ばないための材料 —— **候補が隠れている区間**の分布。
+                //   ★ debounce はこれより短くないと、別々の変換を 1 行に融合してしまう。
+                {
+                    let mut hidden: Vec<u64> = Vec::new();
+                    let mut last_hide: Option<u64> = None;
+                    let mut open = 0i32;
+                    for (_h, shown, t) in evs.iter() {
+                        if *shown {
+                            open += 1;
+                            if open == 1 {
+                                if let Some(h) = last_hide.take() {
+                                    hidden.push(t.saturating_sub(h));
+                                }
+                            }
+                        } else {
+                            open -= 1;
+                            if open <= 0 {
+                                open = 0;
+                                last_hide = Some(*t);
+                            }
+                        }
+                    }
+                    if hidden.is_empty() {
+                        writeln!(out, "  ⚠️ 候補が隠れている区間が取れなかった")?;
+                    } else {
+                        hidden.sort_unstable();
+                        writeln!(
+                            out,
+                            "  ⚠️★★★ **候補が隠れている区間 (= 変換と変換のあいだ) の分布** (n={}):",
+                            hidden.len()
+                        )?;
+                        for (label, p) in [("最小", 0.0_f64), ("p10", 0.10), ("中央", 0.5)] {
+                            let k = ((hidden.len() - 1) as f64 * p).round() as usize;
+                            writeln!(out, "     {:<4} = {:>8} ms", label, hidden[k])?;
+                        }
+                        writeln!(
+                            out,
+                            "     ★ debounce は **最小値より小さく**すること (⚠️ 超えると別の変換が 1 行に融合する)"
+                        )?;
+                    }
+                }
+            }
+        }
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 旧 v0.1.27 の駆動を再現した「ime_shadow」 (★ CLOAK→UNCLOAK) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 当時 ime_dwell_med に何が入っていたかを直接見る。★ 比較対象 (実データの中央値):"
+        )?;
+        writeln!(out, "     P010=100ms / P011=183ms / P013=838ms")?;
+        match legacy_dwells().lock() {
+            Ok(v) if v.is_empty() => {
+                writeln!(out, "  (なし) ★ cloak/uncloak の対が 1 度も成立しなかった")?;
+            }
+            Ok(v) => {
+                let mut d: Vec<u64> = v.clone();
+                d.sort_unstable();
+                let pick = |p: f64| -> u64 {
+                    let k = ((d.len() - 1) as f64 * p).round() as usize;
+                    d[k]
+                };
+                writeln!(
+                    out,
+                    "  ★ 再現された行数={}  dwell 中央値={} ms  p90={} ms  最大={} ms",
+                    d.len(),
+                    pick(0.5),
+                    pick(0.9),
+                    d[d.len() - 1]
+                )?;
+                writeln!(
+                    out,
+                    "  ⚠️ 打鍵={} に対する比  = {:.3} 行/打鍵",
+                    n_keys,
+                    if n_keys > 0 {
+                        d.len() as f64 / f64::from(n_keys)
+                    } else {
+                        0.0
+                    }
+                )?;
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
         writeln!(out)?;
         writeln!(
             out,
@@ -428,6 +1995,43 @@ mod windows_probe {
         writeln!(
             out,
             "   ⚠️ 0 なら、そのアプリの UIA プロバイダが上げていない (採用しない根拠)。"
+        )?;
+        writeln!(
+            out,
+            "⚠️★★★ 問い3: 100ms 本番相当の「立ち上がり」が 1 以上 → EnumWindows は効く (B は成立)。"
+        )?;
+        writeln!(
+            out,
+            "   ★ 0 のとき: 上のクラス名センサスに候補 UI らしきものが居れば「網が細い」、"
+        )?;
+        writeln!(
+            out,
+            "     居なければ「候補ウィンドウを別プロセスが所有していて EnumWindows に出ない」。"
+        )?;
+        writeln!(
+            out,
+            "   ⚠️ 後者なら IME_ACTIVE は取れないと結論し、capabilities は config_gated 据え置き。"
+        )?;
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️ 本ツールの限界 (★ null 結果を主張する前に読む) =="
+        )?;
+        writeln!(
+            out,
+            "1. ⚠️ メッセージポンプと EnumWindows が**同じスレッド**を共有している。"
+        )?;
+        writeln!(
+            out,
+            "   ★ alive は「フックが生きている」ことしか示さず、**OS 側の欠落は検出できない**。"
+        )?;
+        writeln!(
+            out,
+            "2. ⚠️ 診断A は 100ms ポーリングなので、**それより短命な窓は写らない** (診断B は写る)。"
+        )?;
+        writeln!(
+            out,
+            "3. ⚠️ クラス名は正規化して出している (WPF/WinForms が実行ファイル名を埋めるため)。"
         )?;
         out.flush()?;
         Ok(())

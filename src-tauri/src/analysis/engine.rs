@@ -55,7 +55,7 @@ use crate::analysis::heads::{head_for, DomainInferenceHead, HeadId, TaskDomain};
 ///   `vibe_coding` セッションが `ime_open` に関わらず Coding head の β で採点される。
 ///   ⚠️ **既存ログ（全て `argumentative`）の確率列は変わらない**ためゴールデン 4 本は
 ///   byte-equal のまま。挙動が変わるのは `task_kind=vibe_coding` の入力のみ。
-pub const HMM_VERSION: &str = "0.4.0";
+pub const HMM_VERSION: &str = "0.5.0";
 
 /// TUNE: 初期事前確率 [Flow, Incubation, Stuck]
 ///
@@ -807,9 +807,16 @@ mod tests {
     ///
     /// - `0.3.0`: Phase1。ADR-006 Phase 2a (抽出) は挙動不変なので据え置いた
     /// - `0.4.0`: ADR-006 Phase 2b。`task_kind` → head 配線 + Coding head v0
+    /// - `0.5.0`: ⚠️★★★ **IME による推論の一時停止をやめた** (2026-08-23・研究者判断)。
+    ///   ★ `lib.rs` の IME Monitor と `analysis/loop_step.rs` の両方から
+    ///   `set_paused` を外したので、**同じ入力 NDJSON から出る `FeatSnapshot` 列が変わる**。
+    ///   ⚠️ 実データ fixture `phase1_ime_heavy` は **6 → 98 スナップショット**
+    ///   (＝旧挙動は推論窓の **94%** を潰していた)。
+    ///   ★ 理由: 実測でこの信号は「候補リスト表示」ではなく**変換セッション全体**を覆う
+    ///   (`.steering/20260823-ime-active-cloak-rewiring/decisions.md` D-10)。
     #[test]
-    fn hmm_version_is_0_4_0() {
-        assert_eq!(HMM_VERSION, "0.4.0");
+    fn hmm_version_is_0_5_0() {
+        assert_eq!(HMM_VERSION, "0.5.0");
     }
 
     /// 既定の engine は Writing head を積む = Phase1 と同一経路。

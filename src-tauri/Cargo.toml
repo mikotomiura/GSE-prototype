@@ -1,6 +1,6 @@
 [package]
 name = "gse-next"
-version = "0.1.28"
+version = "0.1.29"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -138,6 +138,10 @@ windows = { version = "0.58", features = [
     "Win32_UI_Accessibility",
     "Win32_System_Com",
     "Win32_System_Variant",
+    # ★ `DwmGetWindowAttribute(DWMWA_CLOAKED)` —— IME 候補 UI は `ShowWindow` ではなく
+    #   DWM の cloak/uncloak で表示制御されるため、**現在 cloak されているか**を
+    #   OS に直接聞くのに使う (`.steering/20260823-ime-active-cloak-rewiring/`)。
+    "Win32_Graphics_Dwm",
 ] }
 lazy_static = "1.4"
 

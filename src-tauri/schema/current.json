@@ -432,7 +432,7 @@
       }
     },
     {
-      "description": "IME 変換セッションの影ログ (Phase 2b, Windows のみ)。 `dwell_ms` は IME 候補ウィンドウ表示〜非表示の時間、 `nav` は変換中の矢印キー押下回数、`abandon` は ESC による変換放棄。",
+      "description": "IME 変換セッションの影ログ (Phase 2b, Windows のみ)。 `dwell_ms` は IME 変換セッションの長さ (ローマ字入力の開始から確定まで)、 `nav` は変換中の矢印キー押下回数、`abandon` は ESC による変換放棄。 2026-08-23 訂正: 旧文は「IME 候補ウィンドウ表示〜非表示の時間」としていたが、 実測でこの区間は候補リスト表示だけでなく変換セッション全体を覆うと分かった。",
       "type": "object",
       "required": [
         "abandon",

@@ -52,7 +52,8 @@ GSE-prototype/
 │   │   │   ├── hook_windows.rs   #       Windows: WH_KEYBOARD_LL + WinEvent フック
 │   │   │   ├── hook_macos.rs     #       macOS: CGEventTap + CFRunLoop + IME 状態機械 + TCC
 │   │   │   ├── ime.rs            #       IME platform dispatch (#[cfg] + #[path])
-│   │   │   ├── ime_windows.rs    #       Windows: ImmGet* + WinEvent + UIAutomation
+│   │   │   ├── ime_cloak.rs      #       cloak/uncloak の畳み込み (★ OS 非依存・両 OS でテスト)
+│   │   │   ├── ime_windows.rs    #       Windows: ImmGet* + WinEvent + UIAutomation + cloak resolver
 │   │   │   └── ime_macos.rs      #       macOS: TIS ポーリング + GCD dispatch
 │   │   └── analysis/             #     認知状態推定層 (プラットフォーム非依存)
 │   │       ├── mod.rs            #       モジュールエクスポート
@@ -228,7 +229,8 @@ lib.rs (Tauri commands, thread orchestration)
     │    ├── hook_windows.rs  (Win: WH_KEYBOARD_LL)
     │    └── hook_macos.rs    (mac: CGEventTap + IME 状態機械)
     ├──► input::ime     (IME 検出)
-    │    ├── ime_windows.rs   (Win: WinEvent + ImmGet*)
+    │    ├── ime_cloak.rs     (★ OS 非依存: cloak の畳み込み)
+    │    ├── ime_windows.rs   (Win: WinEvent + ImmGet* + cloak resolver)
     │    └── ime_macos.rs     (mac: TIS + GCD)
     ├──► analysis::features (特徴量抽出)
     ├──► analysis::engine   (HMM 推論)
