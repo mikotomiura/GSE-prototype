@@ -75,8 +75,25 @@ pub enum LogEntryDto {
     },
     /// ユーザーが「開始する」ボタンを押した時刻。
     SessionStart { t: u64 },
-    /// キーストロークイベント (raw VK コード + 押下/離上)。
-    Key { t: u64, vk: u32, press: bool },
+    /// キーストロークイベント (**キー種別カテゴリ** + 押下/離上)。
+    ///
+    /// ⚠️★★★ **2026-08-23 (ADR-014 判断 6): `vk` (生 VK コード) から `category` へ変えた。**
+    /// `consent.md` の記録項目表は「キーの**種類**」と約束しており、生 VK (キー個体) を
+    /// ローカル NDJSON に残すのは文言とずれていた。量子化は従来 transfer 境界
+    /// (`gse-package`) でのみ効いていたが、`logger.rs` の書き出し境界へ前倒しした。
+    ///
+    /// 値は `analysis::anonymize::KeyCategory::as_str()` の 14 種:
+    /// `alphabetic` / `numeric` / `punctuation` / `sentence_punctuation` / `tab` /
+    /// `backspace` / `delete` / `space` / `enter` / `navigation` / `modifier` /
+    /// `function` / `escape` / `other`。
+    ///
+    /// ⚠️ **旧ログ (`vk` を持つ) は `gse-replay` がそのまま読める** (`resolve_key_vk` が
+    /// `vk` を優先し、無ければ `category` を代表 VK へ逆写像する)。
+    Key {
+        t: u64,
+        category: String,
+        press: bool,
+    },
     /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻と文字数。
     /// AI 依存度指標 (D4) 向けに**回数** (行数) を、(b) 自力解決率 (v0.4 §4.2
     /// `manual_contribution_ratio`) 向けに `external_paste_chars` (ペースト**文字数=整数のみ**)

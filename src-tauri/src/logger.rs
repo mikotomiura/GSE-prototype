@@ -8,6 +8,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
 use rand::Rng;
 
+use crate::analysis::anonymize::KeyCategory;
 use crate::analysis::heads::{HeadId, TaskDomain};
 
 /// ユーザーが付与する Ground Truth ラベルの種別
@@ -1384,10 +1385,20 @@ impl SessionLogger {
                             timestamp,
                             is_press,
                         } => {
+                            // ⚠️★★★ **書き出し境界で VK をカテゴリへ量子化する** (ADR-014 判断 6)。
+                            // `consent.md` の記録項目表は「キーの**種類**」と約束しており、
+                            // 生 VK (キー個体) をローカル NDJSON に残すのは文言とずれていた。
+                            // 匿名化 (`analysis::anonymize`) は従来 transfer 境界 (`gse-package`)
+                            // でのみ効いていたが、ここへ前倒しする。
+                            //
+                            // **失われないもの**: `is_backspace` / `is_text_producing` は
+                            // 14 カテゴリから完全復元できる (`replay.rs` の代表 VK 逆写像)。
+                            // 推論は in-memory 経路 (`InputEvent.is_backspace`) なので無影響。
+                            let category = KeyCategory::from_vk(vk_code).as_str();
                             let _ = writeln!(
                                 writer,
-                                r#"{{"type":"key","t":{},"vk":{},"press":{}}}"#,
-                                timestamp, vk_code, is_press,
+                                r#"{{"type":"key","t":{},"category":"{}","press":{}}}"#,
+                                timestamp, category, is_press,
                             );
                             dirty = true;
                         }
@@ -2406,6 +2417,60 @@ mod tests {
         ))
     }
 
+    /// ⚠️★★★ **ADR-014 判断 6 の核心の回帰**: `key` 行に **生 VK が 1 つも出ない**。
+    ///
+    /// `consent.md` の記録項目表は「キーの**種類**（文字キー / バックスペース / 空白 / 改行 など）」と
+    /// 約束している。量子化は従来 transfer 境界 (`gse-package`) でのみ効いており、
+    /// **ローカル NDJSON には生 VK (キー個体) が残っていた**。2026-08-23 に書き出し境界へ前倒しした。
+    ///
+    /// ★ 併せて **カテゴリの弁別が生きている**ことも見る (全部 `other` に潰れていないか)。
+    #[test]
+    fn key_line_records_category_and_never_raw_vk() {
+        let p = rot_test_path("keycat", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+
+        tx.send(LogEntry::SessionStart { timestamp: 1000 }).unwrap();
+        // 弁別が要る 4 種を送る: 英字 / バックスペース / 文末句読点 / 語内記号。
+        for (i, vk) in [0x41u32, 0x08, 0xBE, 0xDB].iter().enumerate() {
+            tx.send(LogEntry::Key {
+                vk_code: *vk,
+                timestamp: 1100 + i as u64,
+                is_press: true,
+            })
+            .unwrap();
+        }
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        // ⚠️★★★ 生 VK が 1 つも残っていない。
+        assert!(
+            !c.contains(r#""vk""#),
+            "raw vk leaked into the local NDJSON:
+{c}"
+        );
+        // ★ カテゴリが出ており、4 種が別々に弁別されている。
+        for cat in [
+            r#""category":"alphabetic""#,
+            r#""category":"backspace""#,
+            r#""category":"sentence_punctuation""#,
+            r#""category":"punctuation""#,
+        ] {
+            assert!(
+                c.contains(cat),
+                "missing {cat} in:
+{c}"
+            );
+        }
+        // ★ 全部 `other` に潰れていない。
+        assert!(!c.contains(r#""category":"other""#), "{c}");
+    }
+
     /// ★★ 本タスクの核心の回帰: `Rotate` で **2 本のファイルに分かれ**、
     /// **それぞれが自分の `meta`(session_start) と `session_end` を 1 行ずつ持つ**。
     ///
@@ -2435,7 +2500,7 @@ mod tests {
         .unwrap();
         tx.send(LogEntry::SessionStart { timestamp: 2000 }).unwrap();
         tx.send(LogEntry::Key {
-            vk_code: 66,
+            vk_code: 0x08, // VK_BACK -> category "backspace"
             timestamp: 2100,
             is_press: true,
         })
@@ -2457,9 +2522,15 @@ mod tests {
             "b1:\n{c1}"
         );
         assert_eq!(c1.matches(r#""type":"meta","session_end""#).count(), 1);
-        assert!(c1.contains(r#""vk":65"#), "b1 missing its key:\n{c1}");
+        assert!(
+            c1.contains(r#""category":"alphabetic""#),
+            "b1 missing its key:\n{c1}"
+        );
         // ★ 2 本目の打鍵が 1 本目に混ざっていないこと (= ブロックが本当に分かれた)。
-        assert!(!c1.contains(r#""vk":66"#), "b1 leaked b2 key:\n{c1}");
+        assert!(
+            !c1.contains(r#""category":"backspace""#),
+            "b1 leaked b2 key:\n{c1}"
+        );
 
         // 2 本目: 自分の meta / 自分の key / session_end。
         assert_eq!(
@@ -2468,8 +2539,14 @@ mod tests {
             "b2:\n{c2}"
         );
         assert_eq!(c2.matches(r#""type":"meta","session_end""#).count(), 1);
-        assert!(c2.contains(r#""vk":66"#), "b2 missing its key:\n{c2}");
-        assert!(!c2.contains(r#""vk":65"#), "b2 leaked b1 key:\n{c2}");
+        assert!(
+            c2.contains(r#""category":"backspace""#),
+            "b2 missing its key:\n{c2}"
+        );
+        assert!(
+            !c2.contains(r#""category":"alphabetic""#),
+            "b2 leaked b1 key:\n{c2}"
+        );
 
         // ★ 2 本目の meta が **新ファイルの実時刻** で書かれている (引き継ぎでない)。
         let meta_ts = |c: &str| -> u64 {
@@ -2514,7 +2591,7 @@ mod tests {
         let current = logger.target.lock().unwrap().path.clone();
         tx.send(LogEntry::Rotate { new_path: current }).unwrap();
         tx.send(LogEntry::Key {
-            vk_code: 66,
+            vk_code: 0x08, // VK_BACK -> category "backspace"
             timestamp: 2,
             is_press: true,
         })
@@ -2527,11 +2604,14 @@ mod tests {
         let c1 = fs::read_to_string(&p).unwrap();
         // ★ 前半の打鍵が生きている = **truncate されていない**。
         assert!(
-            c1.contains(r#""vk":65"#),
+            c1.contains(r#""category":"alphabetic""#),
             "rotate truncated the block:\n{c1}"
         );
         // ★ 後半の打鍵が混ざっていない = **マージされていない**。
-        assert!(!c1.contains(r#""vk":66"#), "blocks were merged:\n{c1}");
+        assert!(
+            !c1.contains(r#""category":"backspace""#),
+            "blocks were merged:\n{c1}"
+        );
         assert_eq!(
             c1.matches(r#""type":"meta","session_end""#).count(),
             1,
@@ -2542,8 +2622,8 @@ mod tests {
         let rotated = logger.target.lock().unwrap().path.clone();
         assert_ne!(rotated, p, "rotation must land on a different path");
         let c2 = fs::read_to_string(&rotated).unwrap();
-        assert!(c2.contains(r#""vk":66"#), "{c2}");
-        assert!(!c2.contains(r#""vk":65"#), "{c2}");
+        assert!(c2.contains(r#""category":"backspace""#), "{c2}");
+        assert!(!c2.contains(r#""category":"alphabetic""#), "{c2}");
 
         let _ = fs::remove_file(&p);
         let _ = fs::remove_file(&rotated);
@@ -2596,7 +2676,7 @@ mod tests {
             "合図の時点で session_end が読めなければならない:\n{c}"
         );
         assert!(
-            c.contains(r#""vk":65"#),
+            c.contains(r#""category":"alphabetic""#),
             "直前の行も flush されていること:\n{c}"
         );
         drop(logger);
@@ -2614,7 +2694,7 @@ mod tests {
             tx.send(LogEntry::BlockEnd).unwrap();
         }
         tx.send(LogEntry::Key {
-            vk_code: 66,
+            vk_code: 0x08, // VK_BACK -> category "backspace"
             timestamp: 2,
             is_press: true,
         })
@@ -2624,7 +2704,7 @@ mod tests {
             .recv_timeout(Duration::from_secs(5))
             .expect("logger stalled on the block-end ack");
         let c = fs::read_to_string(&p).unwrap();
-        assert!(c.contains(r#""vk":66"#), "{c}");
+        assert!(c.contains(r#""category":"backspace""#), "{c}");
         let _ = fs::remove_file(&p);
     }
 
@@ -2663,7 +2743,7 @@ mod tests {
         .unwrap();
         tx.send(LogEntry::SessionStart { timestamp: 2000 }).unwrap();
         tx.send(LogEntry::Key {
-            vk_code: 66,
+            vk_code: 0x08, // VK_BACK -> category "backspace"
             timestamp: 2100,
             is_press: true,
         })
@@ -2688,16 +2768,22 @@ mod tests {
             1,
             "前のセッションが閉じられていない:\n{c1}"
         );
-        assert!(c1.contains(r#""vk":65"#), "1 本目の打鍵が無い:\n{c1}");
         assert!(
-            !c1.contains(r#""vk":66"#),
+            c1.contains(r#""category":"alphabetic""#),
+            "1 本目の打鍵が無い:\n{c1}"
+        );
+        assert!(
+            !c1.contains(r#""category":"backspace""#),
             "再押下後の打鍵が 1 本目に混ざった:\n{c1}"
         );
 
         // ★ 2 本目は自分の meta と自分の打鍵を持つ。
         assert_eq!(c2.matches(r#""type":"meta","session_start""#).count(), 1);
         assert_eq!(c2.matches(r#"{"type":"session_start""#).count(), 1);
-        assert!(c2.contains(r#""vk":66"#), "2 本目の打鍵が無い:\n{c2}");
+        assert!(
+            c2.contains(r#""category":"backspace""#),
+            "2 本目の打鍵が無い:\n{c2}"
+        );
 
         let _ = fs::remove_file(&p1);
         let _ = fs::remove_file(&p2);

@@ -87,15 +87,18 @@
       }
     },
     {
-      "description": "キーストロークイベント (raw VK コード + 押下/離上)。",
+      "description": "キーストロークイベント (**キー種別カテゴリ** + 押下/離上)。\n\n⚠️★★★ **2026-08-23 (ADR-014 判断 6): `vk` (生 VK コード) から `category` へ変えた。** `consent.md` の記録項目表は「キーの**種類**」と約束しており、生 VK (キー個体) を ローカル NDJSON に残すのは文言とずれていた。量子化は従来 transfer 境界 (`gse-package`) でのみ効いていたが、`logger.rs` の書き出し境界へ前倒しした。\n\n値は `analysis::anonymize::KeyCategory::as_str()` の 14 種: `alphabetic` / `numeric` / `punctuation` / `sentence_punctuation` / `tab` / `backspace` / `delete` / `space` / `enter` / `navigation` / `modifier` / `function` / `escape` / `other`。\n\n⚠️ **旧ログ (`vk` を持つ) は `gse-replay` がそのまま読める** (`resolve_key_vk` が `vk` を優先し、無ければ `category` を代表 VK へ逆写像する)。",
       "type": "object",
       "required": [
+        "category",
         "press",
         "t",
-        "type",
-        "vk"
+        "type"
       ],
       "properties": {
+        "category": {
+          "type": "string"
+        },
         "press": {
           "type": "boolean"
         },
@@ -109,11 +112,6 @@
           "enum": [
             "key"
           ]
-        },
-        "vk": {
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0.0
         }
       }
     },
