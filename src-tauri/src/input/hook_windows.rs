@@ -11,9 +11,10 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK,
-    KBDLLHOOKSTRUCT, MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT,
-    WM_SYSKEYDOWN, WM_SYSKEYUP,
+    CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
+    EVENT_OBJECT_IME_CHANGE, EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW, HHOOK, KBDLLHOOKSTRUCT,
+    MSG, PM_NOREMOVE, PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
+    WM_SYSKEYUP,
 };
 
 use super::{
@@ -169,10 +170,19 @@ fn is_ime_mode_key(vk_code: u32) -> bool {
     )
 }
 
-// IME WinEvent constants (winuser.h, Windows 8+)
-const EVENT_OBJECT_IME_CHANGE: u32 = 0x8016;
-const EVENT_OBJECT_IME_SHOW: u32 = 0x8017;
-const EVENT_OBJECT_IME_HIDE: u32 = 0x8018;
+// IME WinEvent constants: `windows` crate の生成バインディングを使う。
+//
+// ⚠️★★★ **2026-08-22 修正 (収集開始前)**: ここは自前 `const` で
+//   `IME_CHANGE = 0x8016 / IME_SHOW = 0x8017 / IME_HIDE = 0x8018`
+// と書かれており、**3 つとも別のイベントを指していた**:
+//   0x8016 = EVENT_SYSTEM_ARRANGMENTPREVIEW / 0x8017 = EVENT_OBJECT_CLOAKED /
+//   0x8018 = EVENT_OBJECT_UNCLOAKED
+// 正しい値は 0x8027 / 0x8028 / 0x8029 (winuser.h)。
+// → **背景ウィンドウの cloak (UWP のサスペンド・仮想デスクトップ切替等) で
+//    `IME_ACTIVE` / `IME_OPEN` が立っていた**。詳細と影響範囲は
+//    `.steering/20260821-workspace-behavior-triage/findings-instrument-defects.md`。
+//
+// ★ 自前 const を置かず crate から import するのは、**同じ事故を再発させないため**。
 const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
 
@@ -312,9 +322,14 @@ pub(super) fn start() {
                         }
 
                         // --- Step 2: Install WinEvent hook for cross-process IME composition ---
+                        // ⚠️★★★ 範囲は [eventMin, eventMax] の**単一連続区間**である。
+                        // 正しい値では SHOW(0x8027) < HIDE(0x8028) < CHANGE(0x8029) なので、
+                        // **SHOW を min・CHANGE を max** に置く。
+                        // ⚠️ 旧コードの (IME_CHANGE, IME_HIDE) をそのまま正しい値へ差し替えると
+                        //    0x8029 > 0x8028 の**空レンジ**になり、1 件も届かなくなる。
                         let ime_hook = SetWinEventHook(
+                            EVENT_OBJECT_IME_SHOW,
                             EVENT_OBJECT_IME_CHANGE,
-                            EVENT_OBJECT_IME_HIDE,
                             HMODULE::default(),
                             Some(win_event_callback),
                             0,
@@ -724,5 +739,53 @@ mod tests {
     #[test]
     fn ime_mode_key_excludes_typing_keys() {
         assert!(!is_ime_mode_key(0x41), "A キーは IME モードキーではない");
+    }
+
+    /// ⚠️★★★ **IME WinEvent 定数を固定する**（2026-08-22 の回帰テスト）。
+    ///
+    /// ★ 旧実装は自前 `const` で `0x8016 / 0x8017 / 0x8018` と書いており、
+    /// **3 つとも別のイベント**（ARRANGMENTPREVIEW / CLOAKED / UNCLOAKED）を指していた。
+    /// → 背景ウィンドウの cloak で `IME_ACTIVE` / `IME_OPEN` が立つ事故になった。
+    /// ⚠️ **自前 const を復活させないために値を直接固定する。**
+    #[test]
+    fn ime_winevent_constants_are_the_real_ime_events() {
+        assert_eq!(EVENT_OBJECT_IME_SHOW, 0x8027, "IME_SHOW は 0x8027");
+        assert_eq!(EVENT_OBJECT_IME_HIDE, 0x8028, "IME_HIDE は 0x8028");
+        assert_eq!(EVENT_OBJECT_IME_CHANGE, 0x8029, "IME_CHANGE は 0x8029");
+
+        // ⚠️ 旧実装が誤って購読していた 3 つと衝突しないことを明示する。
+        for wrong in [0x8016u32, 0x8017, 0x8018] {
+            assert!(
+                ![
+                    EVENT_OBJECT_IME_SHOW,
+                    EVENT_OBJECT_IME_HIDE,
+                    EVENT_OBJECT_IME_CHANGE
+                ]
+                .contains(&wrong),
+                "0x{wrong:04X} は IME イベントではない (cloak / arrangement preview)"
+            );
+        }
+    }
+
+    /// ⚠️★★ `SetWinEventHook` の範囲は **単一の連続区間**である。
+    ///
+    /// ★ SHOW を min、CHANGE を max に置くと 3 つとも入る。
+    /// ⚠️ 旧コードの (CHANGE, HIDE) を正しい値へ差し替えると **空レンジ**になる。
+    #[test]
+    fn ime_winevent_range_covers_all_three() {
+        let (min, max) = (EVENT_OBJECT_IME_SHOW, EVENT_OBJECT_IME_CHANGE);
+        assert!(min <= max, "eventMin <= eventMax でないと 1 件も届かない");
+        for e in [
+            EVENT_OBJECT_IME_SHOW,
+            EVENT_OBJECT_IME_HIDE,
+            EVENT_OBJECT_IME_CHANGE,
+        ] {
+            assert!(min <= e && e <= max, "0x{e:04X} が範囲外");
+        }
+        // ⚠️ 旧コードの組合せをそのまま使うと空になることを固定する。
+        assert!(
+            EVENT_OBJECT_IME_CHANGE > EVENT_OBJECT_IME_HIDE,
+            "(CHANGE, HIDE) を min/max にすると空レンジになる"
+        );
     }
 }
