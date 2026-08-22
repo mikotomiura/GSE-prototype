@@ -88,3 +88,35 @@
 ⚠️★★★ **サーヴェイが答えるべきは 3 問**（`survey-input-channels.md §0`）:
 **(1) 識別子なしで遷移時刻だけ取れるか / (2) 座標なしでポインタ量だけ取れるか /
 (3) アイドル時間をキーボードとマウスで分離できるか。**
+
+## Step 8 — ★ v0.1.28 リリース（研究者指示 2026-08-22）
+
+### 8a. 計器修正
+- [x] ⚠️★★★ **G1 への影響を判定**（★ 連鎖を `obs`/`p_*` まで追った）→ **影響する**
+- [x] ★ **収集開始前であることを確認**（確証標本 **0/3 名**）→ **今が唯一のタイミング**
+- [x] `hook_windows.rs` の IME 定数を crate import へ差し替え ＋ 範囲を `(SHOW, CHANGE)` へ
+- [x] 回帰テスト 2 本
+- [x] `examples/ime_winevent_probe.rs`（★ SKIPOWNPROCESS と 0x8030 を 1 回で測る診断ツール）
+
+### 8b. バージョン
+- [x] `package.json` / `tauri.conf.json` / `Cargo.toml` を **0.1.28**
+- [x] `Cargo.lock` を `cargo build` で更新（★ 手書きしない）
+
+### 8c. 検証（★ 実測）
+- [x] `cargo test --workspace` **440 passed**
+- [x] ★★★ ゴールデン **`15 snapshots match` byte-equal**
+- [x] ★ `emit_schema` が `schema/current.json` と**同一**
+- [x] ★ schema parity（gse-dataset）**exit 0**（`26510 bytes canonical`）
+- [x] `HMM_VERSION` **0.4.0** 据え置き / `cargo fmt --check` 緑 / example ビルド緑
+
+### 8d. 引き継ぎ・PR
+- [x] Mac 引き継ぎを更新（★ **bump は Windows 側完了**・§2-3 から / ⚠️ **旧配布物を先に削除**）
+- [x] `§4-2` に **IME 修正の実機確認手順**を追加
+- [x] 3 コミット（fix / chore(release) / docs）→ push → **PR #109**
+- [ ] ⚠️ CI 全緑 → **main へマージ**
+
+### 8e. ⚠️ 残る宿題
+- [ ] ⚠️★★★ **`ime_winevent_probe` の実機実行**（★ 問い 1: SKIPOWNPROCESS / 問い 2: 0x8030）
+      —— ⚠️ **収集開始前に。リリースは止めない**
+- [ ] ⚠️ **0x8030 の採否**（★ 問い 2 の結果次第。⚠️ 入れるなら収集開始前に限る）
+- [ ] ★ Mac: タグ push → build → zip → **旧配布物削除 → Drive 差し替え**
