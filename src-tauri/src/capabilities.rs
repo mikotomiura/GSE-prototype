@@ -123,7 +123,33 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// ⚠️ **「原理的に不可能」ではない**（別の IME / アプリなら上がりうる）ので、
 /// ★ `config_gated`（**0 行は判定不能**）が正しい群である。
 ///
+/// ⚠️★★★ **2026-08-22 追試: 「WinEvent の代わりに EnumWindows で駆動する」案は潰れた。**
+/// ★ `ime_windows.rs` には検出の第 2 経路 (`is_ime_candidate_window_visible`) があり、
+/// これは生きているので **`IME_ACTIVE` の駆動源をそちらへ移せば `ime_shadow` が復活する**
+/// ように見える。⚠️ **実機で測ったら 0 だった。**
+///
+/// ★ **実測 (60 秒 × 2 回・2 回目の値)**:
+/// **検出 0 / 2400 回 (0.0%)・立ち上がり 0**、本番相当の 100ms 間引きでも **0 / 600**。
+/// ★ 同時に取った可視トップレベル窓のセンサスに **`Candidate` を含むクラス名は 1 件も無い**。
+///
+/// ⚠️★★★ **「候補 UI がトップレベル窓に無い」とまでは実測できていない。**
+/// ★ 対立仮説がある —— `Windows.UI.Core.CoreWindow` が **600/600 で常時可視**かつ
+/// 窓レベル `SHOW` 20 件 / `HIDE` 0 件であり、これは
+/// 「候補 UI は**常駐トップレベル窓**で、表示/非表示ではなく **DWM の cloak/uncloak** で
+/// 出入りしている」とも整合する（⚠️ `IsWindowVisible` は cloaked な窓に **TRUE** を返す）。
+///
+/// ★ **ただし結論は対立仮説のどちらでも変わらない**:
+/// - 仮説 A（トップレベル窓に無い）→ `EnumWindows` は列挙対象外なので**見えない**。
+/// - 仮説 B（常駐窓を cloak している）→ **常時可視なので可視性が信号を運ばない。**
+///   ⚠️ そのクラス名を網に入れると**常時 true** になり、
+///   `excludes_language_bar_and_imm32_system_window` が固定した
+///   **「分析が永久停止する」事故を再発させる。**
+///
+/// → ★ **どちらにせよ `IsWindowVisible` ＋ クラス名では変換中と非変換中を分離できない。**
+/// ★ つまり第 2 経路は「まだ試していない当て」ではなく、**試して外れた当て**である。
+///
 /// ★ 詳細: `.steering/20260821-workspace-behavior-triage/findings-instrument-defects.md`
+/// ★ EnumWindows 追試: `.steering/20260822-ime-active-rewiring/findings-enumwindows-probe.md`
 pub fn config_gated() -> Vec<&'static str> {
     let mut v = vec![
         "probe_assignment",
