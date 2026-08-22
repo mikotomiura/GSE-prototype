@@ -587,14 +587,27 @@ ADR-006 実施記録の発見 1 逐語 ——
    ⚠️ **残: ADR-013 D6 の当該行へ「ADR-014 D4 が R3 の範囲で条件付き解除」を追記する**（§Consequences）。
 3. ★ **R3 の段 1（候補チャネル）を実データを見る前に凍結する**（D4）。
    ⚠️ **凍結した後で候補を足さない**（★ 足すなら別 ADR）。
-4. ★ R3 の事前登録を `experiments/<YYYYMMDD>-<name>/preregistration.md` に凍結する（D3）——
-   **合格基準（D4c: G2 の上下界の幅）/ 除外規則 / Stop 条件 / 分割条件**。
+4. ★ R3 の事前登録を **`experiments/<YYYYMMDD>-left-observation-decomposition/preregistration.md`** に
+   凍結する（D3）—— **合格基準（D4c: G2 の上下界の幅）/ 除外規則 / Stop 条件 / 分割条件**。
+   ★ **slug は 2026-08-23 に確定**（研究者判断）。⚠️ 日付部分は**ディレクトリを作る日**であり、
+   **G1 の収集完了後**になる（判断 4）。
+   ★ **被験者向けの呼称は「R3 普段の作業の長期記録」**（consent 文書のタイトル。
+   ⚠️ G1 の「G1 統制タスク実験」と対をなす）。
 5. ★ 同意文書の R3 版を作る（D7 の 3 点セット・⚠️ 研究者判断 2）。
+   ★ タイトルは **「説明・同意文書（R3 普段の作業の長期記録）」**。
    ⚠️ **`data-privacy` Skill の拡張（区間指定削除 ＋ 非打鍵チャネル）はここまでに終える。**
 6. ★ **R3-a を実装する**（`task_kind` 非依存・`left_observation` の内訳）。⚠️ acceptance:
-   - **L-c**: `EVENT_SYSTEM_FOREGROUND` を購読する。⚠️ **HWND を `win_event_callback` の外へ出さない**
-     （★ 既存 IME 用 `SetWinEventHook` の範囲拡張であり、フックを増やすわけではない）
-   - **L-b**: 新規の低レベルマウスフック。⚠️ **`hook-constraints` の制約**（Atomic ＋ channel send のみ・ブロッキング禁止）
+   - **L-c**: `EVENT_SYSTEM_FOREGROUND`(0x0003) を購読する。⚠️ **HWND を callback の外へ出さない**
+     ⚠️★★★ **2026-08-23 訂正**: 旧文「**既存 IME 用 `SetWinEventHook` の範囲拡張であり、フックを増やすわけではない**」は
+     **誤り**である。★ `SetWinEventHook` の `eventMin`/`eventMax` は**単一の連続区間しか取れず**
+     （`hook_windows.rs:295` が既に仕様として明記）、**0x0003 は IME 範囲 0x8027..=0x8029 と遠く離れている**。
+     ⚠️ 広げると間の全イベントが届く。→ ★ **3 本目の独立したフックを張る**
+     （★ 既に 2 本ある: IME 用 0x8027..=0x8029 ／ cloak 用 0x8017..=0x8018）。
+   - **L-b**: ⚠️★★★ **2026-08-23 訂正**: 旧文「**新規の低レベルマウスフック**」は **D4 と矛盾していた**。
+     ★ D4 は逐語「⚠️ **`WH_MOUSE_LL` は採らない**（システム全体のマウス入力を直列化・
+     `LowLevelHooksTimeout` で**通知なく外される**）」と決めている。
+     → ★ **Raw Input**（`RIDEV_INPUTSINK` + `GetRawInputBuffer`・**マウスのみ登録**）を使う。
+     ⚠️ **`hook-constraints` の制約**（Atomic ＋ channel send のみ・ブロッキング禁止）は同じく効く。
    - **ゼロ抑制**（D5）／**`capabilities` への自己刻印**（ADR-013 D1）／**`HMM_VERSION` 不変**／
      **ゴールデンの差分は新フィールドの追加のみ**（D4b）／`check_schema_parity.py` が緑
    - ⚠️ **D6 の穴**（`start_session` 無し経路で `task_kind` が届かない／IPC 契約変更）
