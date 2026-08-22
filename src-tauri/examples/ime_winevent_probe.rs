@@ -71,9 +71,10 @@ fn main() -> std::io::Result<()> {
 mod windows_probe {
     use std::collections::{BTreeMap, BTreeSet};
     use std::io::Write;
+    use std::sync::atomic::AtomicU64;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::{Mutex, OnceLock};
-    use std::time::{Duration, Instant};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::Com::{
@@ -88,10 +89,10 @@ mod windows_probe {
     use windows::Win32::UI::WindowsAndMessaging::{
         CallNextHookEx, DispatchMessageW, EnumWindows, GetClassNameW, GetForegroundWindow,
         GetWindowThreadProcessId, IsWindowVisible, PeekMessageW, SetWindowsHookExW,
-        UnhookWindowsHookEx, EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE, EVENT_OBJECT_IME_CHANGE,
-        EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW, EVENT_OBJECT_SHOW,
-        EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED, HHOOK, MSG, PM_REMOVE, WH_KEYBOARD_LL,
-        WM_KEYDOWN, WM_SYSKEYDOWN,
+        UnhookWindowsHookEx, EVENT_OBJECT_CLOAKED, EVENT_OBJECT_CREATE, EVENT_OBJECT_HIDE,
+        EVENT_OBJECT_IME_CHANGE, EVENT_OBJECT_IME_HIDE, EVENT_OBJECT_IME_SHOW, EVENT_OBJECT_SHOW,
+        EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED, EVENT_OBJECT_UNCLOAKED, HHOOK, MSG,
+        PM_REMOVE, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
     };
 
     /// ⚠️★★★ **CREATE / SHOW / HIDE したウィンドウのクラス名**（★ 2026-08-22 追加）。
@@ -216,6 +217,58 @@ mod windows_probe {
     /// ★★★ **どのキーを押したかはプロセス内に一度も現れない** (content-free が構造的)。
     static N_KEYS: AtomicU32 = AtomicU32::new(0);
 
+    /// ⚠️★★★ **v0.1.27 以前の `IME_ACTIVE` 駆動をそのまま再現する状態**。
+    ///
+    /// ★ 旧コードは `IME_SHOW=0x8017`(=`CLOAKED`) で **単一のグローバル**
+    /// `IME_COMPOSITION_START_MS` を刻み、`IME_HIDE=0x8018`(=`UNCLOAKED`) で
+    /// `dwell = now - start` を計算していた (⚠️ **HWND 別ではない。last-writer-wins**)。
+    /// → ★★★ **ここで同じことをすれば、当時 `ime_dwell_med` に何が入っていたかが直接見える。**
+    static LEGACY_START_MS: AtomicU64 = AtomicU64::new(0);
+
+    /// ⚠️★★★ **直近の打鍵時刻 (epoch ms)**。★ cloak が「変換中」に起きたか「無操作中」に起きたかを分ける。
+    static LAST_KEY_MS: AtomicU64 = AtomicU64::new(0);
+
+    /// ★ 「打鍵の近く」とみなす閾値。⚠️ 変換は打鍵の直後に起きるので、
+    /// これを超えて離れた cloak は **変換とは無関係** = false positive 候補である。
+    const NEAR_KEY_MS: u64 = 2000;
+
+    /// ⚠️★★★ **クラス別 cloak 統計** —— ★ C の 2 つの問いに答えるためのもの。
+    ///
+    /// 問い 1: ⚠️ **変換していないときに `IME` が cloak されないか** (false positive の確認)
+    /// 問い 2: ★ 34 = 17 × 2 の内訳 (dwell の分布に 2 山が出るか)
+    #[derive(Default, Clone)]
+    struct CloakStat {
+        cloaks: u32,
+        uncloaks: u32,
+        /// ★ 直近打鍵から `NEAR_KEY_MS` 以内に起きた cloak
+        near_key: u32,
+        /// ⚠️ 打鍵から離れて起きた cloak (★ **これが false positive 候補**)
+        far_key: u32,
+        /// ★ 未確定の cloak 開始時刻 (クラス単位の近似)
+        pending: u64,
+        /// ★ cloak → uncloak の滞在時間
+        dwells: Vec<u64>,
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn cloak_stats() -> &'static Mutex<BTreeMap<String, CloakStat>> {
+        static M: OnceLock<Mutex<BTreeMap<String, CloakStat>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ 再現した「旧 `ime_shadow`」の dwell 列 (ms)。
+    fn legacy_dwells() -> &'static Mutex<Vec<u64>> {
+        static V: OnceLock<Mutex<Vec<u64>>> = OnceLock::new();
+        V.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
+
     /// ⚠️ `WH_KEYBOARD_LL` コールバック。★ Atomic の加算と `CallNextHookEx` のみ
     /// (`hook-constraints` Win-1 準拠)。
     unsafe extern "system" fn keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -224,6 +277,7 @@ mod windows_probe {
             if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
                 // ⚠️★ lparam (KBDLLHOOKSTRUCT) には**触れない**。★ 数えるだけ。
                 N_KEYS.fetch_add(1, Ordering::Relaxed);
+                LAST_KEY_MS.store(now_ms(), Ordering::Relaxed);
             }
         }
         // ★ Win-2: どの経路でも必ず呼ぶ。
@@ -326,10 +380,26 @@ mod windows_probe {
 
         // ⚠️ **ウィンドウ本体のイベントだけ**に絞る (OBJID_WINDOW=0 / CHILDID_SELF=0)。
         // ★ これを付けないとキャレットやリストアイテムの子オブジェクトで水増しされる。
+        // ⚠️★★★ **旧 v0.1.27 の駆動をそのまま再現する。**
+        // ★ 旧コードは HWND を見ずグローバル 1 個で start/dwell を回していた (last-writer-wins)。
+        if event == EVENT_OBJECT_CLOAKED {
+            LEGACY_START_MS.store(now_ms(), Ordering::Relaxed);
+        } else if event == EVENT_OBJECT_UNCLOAKED {
+            let start = LEGACY_START_MS.swap(0, Ordering::Relaxed);
+            if start > 0 {
+                let d = now_ms().saturating_sub(start);
+                if let Ok(mut v) = legacy_dwells().lock() {
+                    v.push(d);
+                }
+            }
+        }
+
         let is_window_level = id_object == 0 && id_child == 0;
         let is_lifecycle = event == EVENT_OBJECT_CREATE
             || event == EVENT_OBJECT_SHOW
-            || event == EVENT_OBJECT_HIDE;
+            || event == EVENT_OBJECT_HIDE
+            || event == EVENT_OBJECT_CLOAKED
+            || event == EVENT_OBJECT_UNCLOAKED;
         if !is_window_level || !is_lifecycle || hwnd.0.is_null() {
             return;
         }
@@ -347,9 +417,37 @@ mod windows_probe {
             "CREATE"
         } else if event == EVENT_OBJECT_SHOW {
             "SHOW"
-        } else {
+        } else if event == EVENT_OBJECT_HIDE {
             "HIDE"
+        } else if event == EVENT_OBJECT_CLOAKED {
+            "CLOAK"
+        } else {
+            "UNCLOAK"
         };
+        // ⚠️★★★ クラス別 cloak 統計 (★ C の実測)。
+        if event == EVENT_OBJECT_CLOAKED || event == EVENT_OBJECT_UNCLOAKED {
+            let t = now_ms();
+            let since_key = t.saturating_sub(LAST_KEY_MS.load(Ordering::Relaxed));
+            if let Ok(mut m) = cloak_stats().lock() {
+                let e = m.entry(class.clone()).or_default();
+                if event == EVENT_OBJECT_CLOAKED {
+                    e.cloaks += 1;
+                    if since_key <= NEAR_KEY_MS {
+                        e.near_key += 1;
+                    } else {
+                        e.far_key += 1;
+                    }
+                    e.pending = t;
+                } else {
+                    e.uncloaks += 1;
+                    if e.pending > 0 {
+                        e.dwells.push(t.saturating_sub(e.pending));
+                        e.pending = 0;
+                    }
+                }
+            }
+        }
+
         // ⚠️ ロックはこの中で完結させる (★ DispatchMessageW を跨いで保持しない)。
         if let Ok(mut map) = event_classes().lock() {
             *map.entry((tag, class)).or_insert(0) += 1;
@@ -1077,6 +1175,116 @@ mod windows_probe {
                     out,
                     "  ⚠️ 集計が取得できません (Mutex poisoned) — ★ 測定は不成立"
                 )?;
+            }
+        }
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測C: クラス別 cloak と「打鍵からの距離」 (★ false positive の確認) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 近い = 直近打鍵から {NEAR_KEY_MS}ms 以内 / ⚠️ 遠い = それ以上 (= 変換と無関係の疑い)"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ 『遠い』が多いクラスは絞り込みに使えない (無操作中にも cloak する)"
+        )?;
+        match cloak_stats().lock() {
+            Ok(m) if m.is_empty() => {
+                writeln!(out, "  (なし)")?;
+            }
+            Ok(m) => {
+                let mut rows: Vec<(&String, &CloakStat)> = m.iter().collect();
+                rows.sort_by(|a, b| b.1.cloaks.cmp(&a.1.cloaks).then(a.0.cmp(b.0)));
+                writeln!(
+                    out,
+                    "  {:<28} {:>6} {:>8} {:>6} {:>6}  {:>10}",
+                    "クラス", "cloak", "uncloak", "近い", "遠い", "dwell中央"
+                )?;
+                for (class, st) in rows.iter().take(20) {
+                    let med = if st.dwells.is_empty() {
+                        0
+                    } else {
+                        let mut d = st.dwells.clone();
+                        d.sort_unstable();
+                        d[d.len() / 2]
+                    };
+                    let far_mark = if st.far_key > st.near_key {
+                        " ⚠️遠いが優勢"
+                    } else {
+                        ""
+                    };
+                    writeln!(
+                        out,
+                        "  {:<28} {:>6} {:>8} {:>6} {:>6}  {:>8} ms{}",
+                        class, st.cloaks, st.uncloaks, st.near_key, st.far_key, med, far_mark
+                    )?;
+                }
+                writeln!(out)?;
+                // ⚠️★★★ 問い 2: `IME` クラスの dwell 分布 (34 = 17 x 2 の内訳)
+                if let Some(st) = m.get("IME") {
+                    if !st.dwells.is_empty() {
+                        let mut d = st.dwells.clone();
+                        d.sort_unstable();
+                        writeln!(out, "  ★ `IME` クラスの dwell 分布 (n={}):", d.len())?;
+                        for p in [0.0_f64, 0.25, 0.5, 0.75, 0.9, 1.0] {
+                            let k = ((d.len() - 1) as f64 * p).round() as usize;
+                            writeln!(out, "     p{:>3.0} = {:>8} ms", p * 100.0, d[k])?;
+                        }
+                        writeln!(
+                            out,
+                            "     ⚠️ 分布が 2 山なら 34 = 17 x 2 の内訳が見える (候補表示 / 別周期)"
+                        )?;
+                    }
+                }
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 旧 v0.1.27 の駆動を再現した「ime_shadow」 (★ CLOAK→UNCLOAK) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 当時 ime_dwell_med に何が入っていたかを直接見る。★ 比較対象 (実データの中央値):"
+        )?;
+        writeln!(out, "     P010=100ms / P011=183ms / P013=838ms")?;
+        match legacy_dwells().lock() {
+            Ok(v) if v.is_empty() => {
+                writeln!(out, "  (なし) ★ cloak/uncloak の対が 1 度も成立しなかった")?;
+            }
+            Ok(v) => {
+                let mut d: Vec<u64> = v.clone();
+                d.sort_unstable();
+                let pick = |p: f64| -> u64 {
+                    let k = ((d.len() - 1) as f64 * p).round() as usize;
+                    d[k]
+                };
+                writeln!(
+                    out,
+                    "  ★ 再現された行数={}  dwell 中央値={} ms  p90={} ms  最大={} ms",
+                    d.len(),
+                    pick(0.5),
+                    pick(0.9),
+                    d[d.len() - 1]
+                )?;
+                writeln!(
+                    out,
+                    "  ⚠️ 打鍵={} に対する比  = {:.3} 行/打鍵",
+                    n_keys,
+                    if n_keys > 0 {
+                        d.len() as f64 / f64::from(n_keys)
+                    } else {
+                        0.0
+                    }
+                )?;
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
             }
         }
         writeln!(out)?;
