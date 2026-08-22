@@ -77,6 +77,7 @@ mod windows_probe {
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED,
     };
@@ -262,6 +263,146 @@ mod windows_probe {
         V.get_or_init(|| Mutex::new(Vec::new()))
     }
 
+    /// ⚠️★★★ **実測D — cloak/uncloak の *順序* を記録する。**
+    ///
+    /// ★ **なぜ要るか (2026-08-23)**: 実測C までは cloak と uncloak を**件数でしか**見ておらず、
+    /// ⚠️ **どちらの辺が「候補ウィンドウが見えている」状態なのかを一度も確かめていない**。
+    /// ★ DWM の意味論では `CLOAKED` = 隠す / `UNCLOAKED` = 見せる であり、
+    /// ⚠️ 旧コード (`IME_SHOW=0x8017`=`CLOAKED` で active=true) は**その逆**を仮定していた。
+    ///
+    /// ⚠️★★★ **ここを取り違えると `ime_dwell` は「候補の滞在時間」ではなく
+    /// 「変換と変換のあいだ (候補が隠れている時間)」を測ることになる。**
+    /// ★ 件数はどちらでも同じに見えるので、**順序を見るまで区別できない**。
+    ///
+    /// ★ 判定手順: 候補ウィンドウを**出したまま数秒わざと止める**。
+    /// その長い滞在がどちらの辺で挟まれているかで決まる。
+    #[derive(Clone)]
+    struct TraceRow {
+        /// ★ プローブ開始からの相対 ms (⚠️ 絶対時刻は出さない)
+        rel_ms: u64,
+        class: String,
+        /// ★ "CLOAK" / "UNCLOAK"
+        edge: &'static str,
+        /// ★ **同じ窓を追うための不透明な連番** (⚠️ HWND の値そのものは出さない)。
+        /// ★ これが無いと「別々の窓の交互発火」と「1 つの窓の往復」が区別できない。
+        hwnd_id: u32,
+        /// ⚠️★★★ **イベント直後に DWM へ聞いた実際の cloak 状態**。
+        /// ★ 辺の名前ではなく **OS が答えた状態**なので、ここが最終的な根拠になる。
+        cloaked_now: Option<bool>,
+        /// ★ その窓が**静止時センサスに居たか** (★ 常駐窓か、変換のたびに作られる窓か)。
+        resident: bool,
+        /// ★ 直近打鍵からの経過 ms
+        since_key: u64,
+    }
+
+    /// ★ HWND → 不透明な連番。⚠️ 生の HWND 値は出力しない。
+    #[allow(clippy::type_complexity)]
+    fn hwnd_ids() -> &'static Mutex<BTreeMap<isize, u32>> {
+        static M: OnceLock<Mutex<BTreeMap<isize, u32>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ 静止時センサスで見えた HWND の集合 (★ 「常駐窓か否か」の判定に使う)。
+    fn resident_hwnds() -> &'static Mutex<BTreeSet<isize>> {
+        static M: OnceLock<Mutex<BTreeSet<isize>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeSet::new()))
+    }
+
+    /// ⚠️★★★ **実測F 用の生イベント列** —— `(hwnd, shown, epoch_ms)`。
+    ///
+    /// ★ **なぜ貯めるか**: 60 秒の計測を 1 回やれば、**本番の [`CloakFold`] をそのまま**
+    /// 複数の debounce 幅で回して比べられる。
+    /// ⚠️ **プローブ側に畳み込みを複製しない** —— 複製を測っても本番の挙動は答えられない
+    /// (★ `is_ime_candidate_window_visible` を本番から呼んでいるのと同じ規律)。
+    fn ime_class_events() -> &'static Mutex<Vec<(isize, bool, u64)>> {
+        static V: OnceLock<Mutex<Vec<(isize, bool, u64)>>> = OnceLock::new();
+        V.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    /// ★ 上限付きリングではなく単純な上限打ち切り (⚠️ 60 秒で溢れる量ではない)。
+    const TRACE_CAP: usize = 600;
+
+    fn trace() -> &'static Mutex<Vec<TraceRow>> {
+        static V: OnceLock<Mutex<Vec<TraceRow>>> = OnceLock::new();
+        V.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    /// ★ プローブ開始時刻 (epoch ms)。⚠️ 出力は相対値のみに使う。
+    static PROBE_START_MS: AtomicU64 = AtomicU64::new(0);
+
+    /// ★ 実測D で順序を追うクラス (⚠️ 実測C で候補 UI と同じ周期だと分かった 3 つ)。
+    fn is_traced_class(class: &str) -> bool {
+        class == "IME" || class == "Xaml_WindowedPopupClass" || class == "ApplicationFrameWindow"
+    }
+
+    /// ⚠️★★★ **実測E — 「休んでいるとき」の cloak 状態を DWM に直接聞く。**
+    ///
+    /// ★ **なぜ要るか**: 実測C/D は `CLOAKED`/`UNCLOAKED` の**遷移**しか見ていない。
+    /// ⚠️ 遷移だけでは「どちらの辺が候補表示か」が決まらない。
+    /// ★ ところが **変換していない今この瞬間の状態**が分かれば一発で決まる:
+    ///
+    /// | ★ 静止時の `IME` 窓 | → ★ 結論 |
+    /// |---|---|
+    /// | **cloaked** (隠れている) | ★ `UNCLOAKED` = 候補表示 (⚠️ **旧コードの仮定は逆**) |
+    /// | **uncloaked** (見えている) | ★ `CLOAKED` = 候補表示 (★ 旧コードの仮定どおり) |
+    ///
+    /// ⚠️ `DWMWA_CLOAKED` は**戻り値が 0 以外なら cloak されている**
+    /// (逐語: "the window is cloaked" / 0 = not cloaked)。
+    ///
+    /// ⚠️ **privacy**: ★ クラス名は [`normalize_class_name`] を通す。タイトルも PID も取らない。
+    fn dwm_is_cloaked(hwnd: HWND) -> Option<bool> {
+        let mut v: u32 = 0;
+        // SAFETY: hwnd は EnumWindows が渡したもの。出力先は自前の u32。
+        let hr = unsafe {
+            DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_CLOAKED,
+                (&mut v as *mut u32).cast(),
+                std::mem::size_of::<u32>() as u32,
+            )
+        };
+        if hr.is_ok() {
+            Some(v != 0)
+        } else {
+            // ⚠️ 失敗を「cloak されていない」に丸めない (★ 判定を汚す)。
+            None
+        }
+    }
+
+    /// ★ 静止時センサス: トップレベル窓を列挙し、クラス別に cloak 状態を数える。
+    #[allow(clippy::type_complexity)]
+    fn rest_cloak_census() -> BTreeMap<String, (u32, u32, u32)> {
+        // (cloaked, uncloaked, 取得失敗)
+        unsafe extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let mut buf = [0u16; 256];
+            let len = GetClassNameW(hwnd, &mut buf);
+            if len > 0 {
+                let class = normalize_class_name(&String::from_utf16_lossy(&buf[..len as usize]));
+                if is_traced_class(&class) {
+                    // ★ 「静止時から居た窓」を覚えておく (★ 実測D の resident 列)。
+                    if let Ok(mut set) = resident_hwnds().lock() {
+                        set.insert(hwnd.0 as isize);
+                    }
+                    // SAFETY: lparam は下の呼び出し側スタックの BTreeMap への生ポインタ。
+                    let m = &mut *(lparam.0 as *mut BTreeMap<String, (u32, u32, u32)>);
+                    let e = m.entry(class).or_insert((0, 0, 0));
+                    match dwm_is_cloaked(hwnd) {
+                        Some(true) => e.0 += 1,
+                        Some(false) => e.1 += 1,
+                        None => e.2 += 1,
+                    }
+                }
+            }
+            BOOL(1)
+        }
+        let mut m: BTreeMap<String, (u32, u32, u32)> = BTreeMap::new();
+        // SAFETY: cb は列挙中しか呼ばれず、m はこのスコープで生存している。
+        unsafe {
+            let _ = EnumWindows(Some(cb), LPARAM(&mut m as *mut _ as isize));
+        }
+        m
+    }
+
     fn now_ms() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -443,6 +584,47 @@ mod windows_probe {
                     if e.pending > 0 {
                         e.dwells.push(t.saturating_sub(e.pending));
                         e.pending = 0;
+                    }
+                }
+            }
+
+            // ⚠️★★★ 実測D: **順序**を残す (★ 件数では辺の向きが決まらない)。
+            if is_traced_class(&class) {
+                // ★ 辺の名前を信じず、**OS に今の状態を聞く** (★ これが最終根拠)。
+                let cloaked_now = dwm_is_cloaked(hwnd);
+                let key = hwnd.0 as isize;
+                let id = match hwnd_ids().lock() {
+                    Ok(mut m) => {
+                        let next = m.len() as u32 + 1;
+                        *m.entry(key).or_insert(next)
+                    }
+                    Err(_) => 0,
+                };
+                let resident = resident_hwnds()
+                    .lock()
+                    .map(|set| set.contains(&key))
+                    .unwrap_or(false);
+                // ⚠️★★★ 実測F: 本番の絞り (`is_ime_cloak_class`) を通ったものだけ貯める。
+                if gse_next_lib::input::ime_cloak::is_ime_cloak_class(&class) {
+                    let shown = gse_next_lib::input::ime_cloak::candidate_shown_from_cloak(
+                        cloaked_now.unwrap_or(event == EVENT_OBJECT_CLOAKED),
+                    );
+                    if let Ok(mut v) = ime_class_events().lock() {
+                        v.push((key, shown, t));
+                    }
+                }
+                if let Ok(mut v) = trace().lock() {
+                    if v.len() < TRACE_CAP {
+                        let start = PROBE_START_MS.load(Ordering::Relaxed);
+                        v.push(TraceRow {
+                            rel_ms: t.saturating_sub(start),
+                            class: class.clone(),
+                            edge: tag,
+                            hwnd_id: id,
+                            cloaked_now,
+                            resident,
+                            since_key,
+                        });
                     }
                 }
             }
@@ -666,6 +848,8 @@ mod windows_probe {
     pub fn run() -> std::io::Result<()> {
         // SAFETY: 引数を取らない純粋な状態取得。
         OUR_PID.store(unsafe { GetCurrentProcessId() }, Ordering::Relaxed);
+        // ★ 実測D の相対時刻の原点。⚠️ 絶対時刻は出力しない。
+        PROBE_START_MS.store(now_ms(), Ordering::Relaxed);
 
         let stdout = std::io::stdout();
         let mut out = stdout.lock();
@@ -697,6 +881,50 @@ mod windows_probe {
             out,
             "  - ★ GSE 本体の G1 入力画面でも同じことをすると slot 差が見えます"
         )?;
+        writeln!(out)?;
+        writeln!(
+            out,
+            "⚠️★★★ 実測D (辺の向きの判定) — ★ これを 2〜3 回やってください:"
+        )?;
+        writeln!(
+            out,
+            "  1. ローマ字を打つ → 2. スペースで変換 → 3. ★ **候補が出たまま 3 秒以上止まる**"
+        )?;
+        writeln!(
+            out,
+            "  4. Enter で確定 → 5. ★ **何も押さずに 3 秒以上あける**"
+        )?;
+        writeln!(
+            out,
+            "  → ★ 長い滞在がどちらの辺に挟まれているかで CLOAK/UNCLOAK の意味が決まります"
+        )?;
+        writeln!(out)?;
+
+        // ---- ⚠️★★★ 実測E: 静止時の cloak 状態 (★ 打鍵不要でここだけで辺の向きが決まる) ----
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測E: **いま (変換していない状態) の cloak 状態** =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 静止時に cloaked なら → UNCLOAK = 候補表示 / uncloaked なら → CLOAK = 候補表示"
+        )?;
+        writeln!(
+            out,
+            "  {:<28} {:>9} {:>10} {:>8}",
+            "クラス", "cloaked", "uncloaked", "取得不可"
+        )?;
+        let census = rest_cloak_census();
+        if census.is_empty() {
+            writeln!(
+                out,
+                "  (なし) ⚠️ 対象クラスのトップレベル窓が 1 つも列挙されなかった"
+            )?;
+        } else {
+            for (class, (c, u, e)) in census.iter() {
+                writeln!(out, "  {class:<28} {c:>9} {u:>10} {e:>8}")?;
+            }
+        }
         writeln!(out)?;
         out.flush()?;
 
@@ -1241,6 +1469,179 @@ mod windows_probe {
             }
             Err(_) => {
                 writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+
+        // ---- ⚠️★★★ 実測D: cloak/uncloak の順序 (★ 辺の向きの判定) ----
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測D: cloak/uncloak の **順序** (★ どちらの辺が「候補が見えている」か) =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 読み方: `IME` 行だけを上から追い、**長い滞在 (3 秒級) がどの辺の後ろにあるか**を見る。"
+        )?;
+        writeln!(
+            out,
+            "  ★ UNCLOAK の後ろに長い滞在 → UNCLOAK = 候補表示 (⚠️ 旧コードの仮定は逆だった)"
+        )?;
+        writeln!(
+            out,
+            "  ★ CLOAK   の後ろに長い滞在 → CLOAK   = 候補表示 (★ 旧コードの仮定どおり)"
+        )?;
+        writeln!(
+            out,
+            "  ★ `DWM状態` は **イベント直後に OS へ聞いた実際の cloak 状態** (★ 辺の名前より強い根拠)"
+        )?;
+        writeln!(
+            out,
+            "  ★ `窓` は同じ窓を追うための連番 / `常駐` = 静止時センサスにも居た窓"
+        )?;
+        writeln!(
+            out,
+            "  {:>8} {:<26} {:<8} {:>4} {:>6} {:>8} {:>10} {:>10}",
+            "rel_ms", "クラス", "辺", "窓", "常駐", "DWM状態", "前の辺から", "直近打鍵から"
+        )?;
+        match trace().lock() {
+            Ok(v) if v.is_empty() => {
+                writeln!(out, "  (なし) ★ 対象クラスの cloak/uncloak が 1 件も無い")?;
+            }
+            Ok(v) => {
+                let mut prev_per_class: BTreeMap<String, u64> = BTreeMap::new();
+                for r in v.iter() {
+                    // ⚠️★ 「前の辺から」は **同じ窓** で測る (★ クラス単位だと別窓が混ざる)。
+                    let pkey = format!("{}#{}", r.class, r.hwnd_id);
+                    let gap = prev_per_class
+                        .get(&pkey)
+                        .map(|p| r.rel_ms.saturating_sub(*p));
+                    prev_per_class.insert(pkey, r.rel_ms);
+                    let gap_s = match gap {
+                        Some(g) => format!("{g} ms"),
+                        None => "-".to_string(),
+                    };
+                    // ★ 3 秒以上あいた辺に印を付ける (⚠️ これが「わざと止めた」区間である)。
+                    let mark = if gap.is_some_and(|g| g >= 3000) {
+                        "  ★長"
+                    } else {
+                        ""
+                    };
+                    let dwm = match r.cloaked_now {
+                        Some(true) => "cloaked",
+                        Some(false) => "見えてる",
+                        None => "不明",
+                    };
+                    writeln!(
+                        out,
+                        "  {:>8} {:<26} {:<8} {:>4} {:>6} {:>8} {:>10} {:>10}{}",
+                        r.rel_ms,
+                        r.class,
+                        r.edge,
+                        r.hwnd_id,
+                        if r.resident { "yes" } else { "no" },
+                        dwm,
+                        gap_s,
+                        format!("{} ms", r.since_key),
+                        mark
+                    )?;
+                }
+                if v.len() >= TRACE_CAP {
+                    writeln!(
+                        out,
+                        "  ⚠️ {TRACE_CAP} 件で打ち切った (★ 以降は記録していない)"
+                    )?;
+                }
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+
+        // ---- ⚠️★★★ 実測F: **本番の CloakFold** を実データで回す (★ debounce 幅の掃き出し) ----
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測F: **本番の `CloakFold`** をこの 60 秒の実イベントで回した結果 =="
+        )?;
+        writeln!(
+            out,
+            "  ★ プローブ側に畳み込みを複製せず、`input::ime_cloak::CloakFold` **そのもの**を呼ぶ。"
+        )?;
+        writeln!(
+            out,
+            "  ★ `行` = 出るはずの ime_shadow 行数 / `pause率` = 60 秒に占める推定停止区間の割合"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ **`pause率` が引き継ぎ §3.2 の「打鍵時間の 15〜20%」に当たる実測値である。**"
+        )?;
+        {
+            let evs = match ime_class_events().lock() {
+                Ok(v) => v.clone(),
+                Err(_) => Vec::new(),
+            };
+            writeln!(
+                out,
+                "  ★ 本番の絞り (クラス完全一致 `IME`) を通ったイベント: {} 件",
+                evs.len()
+            )?;
+            if evs.is_empty() {
+                writeln!(
+                    out,
+                    "  (なし) ⚠️ 変換していないか、この端末では `IME` クラスが cloak されない"
+                )?;
+            } else {
+                writeln!(
+                    out,
+                    "  {:>10} {:>6} {:>12} {:>12} {:>10}",
+                    "debounce", "行", "dwell中央", "dwell合計", "pause率"
+                )?;
+                // ★ 既定値を含めて掃く。⚠️ 選んだ値は decisions.md に根拠付きで残すこと。
+                for gap in [0_u64, 100, 250, 500, 1000, 2000] {
+                    let mut fold = gse_next_lib::input::ime_cloak::CloakFold::with_gap(gap);
+                    let mut dwells: Vec<u64> = Vec::new();
+                    let mut push = |a: gse_next_lib::input::ime_cloak::FoldAction| {
+                        if let gse_next_lib::input::ime_cloak::FoldAction::End(d) = a {
+                            dwells.push(d);
+                        }
+                    };
+                    for (hwnd, shown, t) in evs.iter() {
+                        if let Some(a) = fold.on_event(*hwnd, *shown, *t) {
+                            push(a);
+                        }
+                        // ★ 本番の resolver と同じく、受信ごとに時間側も進める。
+                        if let Some(a) = fold.on_tick(*t) {
+                            push(a);
+                        }
+                    }
+                    // ★ 最後のセッションを閉じる (★ 本番では tick が閉じる)。
+                    let last = evs.last().map(|e| e.2).unwrap_or(0);
+                    if let Some(a) = fold.on_tick(last + gap + 1) {
+                        push(a);
+                    }
+                    let total: u64 = dwells.iter().sum();
+                    let med = if dwells.is_empty() {
+                        0
+                    } else {
+                        let mut d = dwells.clone();
+                        d.sort_unstable();
+                        d[d.len() / 2]
+                    };
+                    let pause_pct = total as f64 / 60_000.0 * 100.0;
+                    writeln!(
+                        out,
+                        "  {:>8} ms {:>6} {:>9} ms {:>9} ms {:>9.1}%",
+                        gap,
+                        dwells.len(),
+                        med,
+                        total,
+                        pause_pct
+                    )?;
+                }
+                writeln!(
+                    out,
+                    "  ★ 読み方: debounce を上げると行が減り dwell が伸びる。**変換回数と一致する行数**を選ぶ。"
+                )?;
             }
         }
         writeln!(out)?;
