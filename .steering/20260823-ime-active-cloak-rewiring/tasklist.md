@@ -51,7 +51,50 @@
 
 ## ⚠️★★★ 残り (★ 人が要る。これが埋まるまで収集を始めない)
 
-- [x] 実測 D/G/F の 60 秒 × 2 (打鍵 270 / 257)
-- [ ] ★ **自然な打鍵**での pause 率 (⚠️ 現在の 52.1% は「候補を 3 秒保持」の指示による産物)
-- [ ] 実起動で `ime_shadow` が出る (★ **G1 画面 = GSE 自身の窓でも**確認すること)
-- [ ] 実起動・無操作 60 秒で `ime_shadow` が 1 行も出ない
+### ★ 順序 (⚠️ この順にしないと配布が空振りする)
+
+```
+1. 実起動確認 (Windows)          ← ★ ここが落ちたら 2 以降は無意味
+2. 代表値の pause 率 (Windows)   ← ★ 自然な打鍵で 60 秒
+3. push → PR → CI 緑 → main     ← ★ v0.1.29
+4. Mac: タグ / リリース / zip / Drive  ← `_handoff/next-session-prompt-v0129-...md`
+```
+
+### 1. ⚠️★★★ 実起動確認 (Windows)
+
+```bash
+cd /c/GSE-prototype/src-tauri && cargo run
+```
+
+- [ ] ★ **通常のアプリ**(メモ帳等) で日本語変換 → セッション NDJSON に `ime_shadow` 行が**出る**
+- [ ] ⚠️★★★ **G1 画面 (GSE 自身の窓)** で日本語変換 → ★ **ここでも出る**
+      (⚠️ `WINEVENT_SKIPOWNPROCESS` を外したのがこの経路のため。★ 落ちると G1 でだけ 0 行)
+- [ ] ★ **無操作 60 秒** → `ime_shadow` が **1 行も出ない**
+- [ ] ★ アプリログに `IME cloak session truncated` が**ほとんど出ない**
+      (⚠️ 打鍵をやめるたびに出るなら辺の向きを疑う。→ `findings.md` §4.2.1)
+
+```bash
+# ★ 行数の数え方 (⚠️ 生ログは外部 LLM に渡さない)
+grep -c '"type":"ime_shadow"' <セッション NDJSON>
+grep -c "IME cloak session truncated" <app log>
+```
+
+### 2. ★ 代表値の pause 率 (⚠️ 現在の 52.1% は計測手順の産物)
+
+```bash
+cd /c/GSE-prototype/src-tauri
+cargo run --example ime_winevent_probe > C:/Users/johnd/probe-natural.txt
+```
+
+⚠️★★★ **今度は「候補を 3 秒保持」を *やらない*。** ★ **普段どおり日本語を書く 60 秒**。
+→ ★ 実測F の `pause率` が代表値になる。⚠️ `findings.md` §4.4 を置き換える。
+
+### 3. ★ push → PR → CI 緑 → main マージ (v0.1.29)
+
+⚠️ ブランチ `chore/ime-active-enumwindows-probe` は**未 push**。
+★ CI の `check` は win / mac とも self-hosted なので、**Mac がオンラインである必要がある**。
+
+### 4. ★ Mac 側 (⚠️ 別セッション)
+
+★ `_handoff/next-session-prompt-v0129-release-and-redistribution.md`
+(⚠️ 旧 `...-v0128-...md` は無効化済み。`git tag v0.1.28` を実行させない)
