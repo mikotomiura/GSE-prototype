@@ -442,16 +442,24 @@ fn is_backspace(vk: u32) -> bool {
 /// `category_representative_vk_roundtrips` テストが lib の `KeyCategory::from_vk` で drift を検出する。
 /// 未知 category は `None` (forward-compat、呼び出し側で件数を warn してスキップ)。
 ///
-/// **`is_text_producing` との関係 (decisions.md D-RC3)**: 10 個の非 `other` category は
-/// 代表 VK が is_text_producing も raw と一致する (text-producing = alphabetic/numeric/space/enter)。
-/// `other` のみ raw 側に text-producing キー (OEM 句読点/Tab/テンキー演算子) と非 text-producing が
-/// 混在するが、匿名化で区別が失われるため代表 `0x07` は **非 text-producing 側に倒す** (保守的)。
-/// これは `--metrics` のみに影響し run_replay 特徴量 (D6) には無影響。
+/// **`is_text_producing` との関係 (decisions.md D-RC3 / ADR-014 判断 6)**:
+/// **2026-08-23 に D-RC3 の制約は解消した。** `KeyCategory` に `Punctuation` (OEM 句読点/記号 +
+/// テンキー演算子) と `Tab` を足したので、**`is_text_producing` が true な VK は 1 つ残らず
+/// 非 `other` category に入る**。したがって `other` の代表 `0x07` (非 text-producing) は
+/// **保守的な倒し込みではなく厳密に正しい**値になり、`--metrics` の `manual_insert` 系の
+/// 過小評価 (旧: OEM 句読点/Tab/テンキー演算子の件数分) は **ゼロ**になった。
+///
+/// 旧仕様: これらは `Other` へ畳まれ、匿名化後に text-producing と判別できなかった。
+/// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**であり、
+/// 構造的な過小評価は研究上許容できない (`.steering/20260823-r3-accept-and-role-category/` D-7)。
 fn category_representative_vk(category: &str) -> Option<u32> {
     // anonymize.rs `KeyCategory::from_vk` の逆。各 category の代表 VK を 1 つ選ぶ。
     let vk = match category {
         "alphabetic" => 0x41, // 'A' (0x41..=0x5A) — text-producing
         "numeric" => 0x30,    // '0' (0x30..=0x39) — text-producing
+        // VK_OEM_PERIOD (0xBA..=0xC0 の一部) — text-producing。
+        "punctuation" => 0xBE,
+        "tab" => 0x09,        // VK_TAB — text-producing
         "backspace" => 0x08,  // VK_BACK — is_backspace
         "delete" => 0x2E,     // VK_DELETE — is_backspace
         "space" => 0x20,      // VK_SPACE — text-producing
@@ -460,8 +468,8 @@ fn category_representative_vk(category: &str) -> Option<u32> {
         "modifier" => 0x10,   // VK_SHIFT
         "function" => 0x70,   // VK_F1 (0x70..=0x7B)
         "escape" => 0x1B,     // VK_ESCAPE
-        // from_vk の既定 (どのレンジにも入らず Other へ) かつ !is_text_producing。
-        // raw の Other には text-producing キーも混在するが匿名化で復元不可 (D-RC3)。
+        // from_vk の既定 (どのレンジにも入らず Other へ)。
+        // 2026-08-23 以降、raw の Other に text-producing キーは混在しない (上記 doc)。
         "other" => 0x07,
         _ => return None,
     };
@@ -2766,6 +2774,8 @@ mod tests {
         let categories = [
             "alphabetic",
             "numeric",
+            "punctuation",
+            "tab",
             "backspace",
             "delete",
             "space",
@@ -2793,9 +2803,13 @@ mod tests {
                 expect_bs,
                 "is_backspace mismatch for category {cat}"
             );
-            // is_text_producing 不変条件 (D-RC3): text-producing category は
-            // alphabetic/numeric/space/enter のみ。`other` は保守的に非 text-producing。
-            let expect_text = matches!(cat, "alphabetic" | "numeric" | "space" | "enter");
+            // is_text_producing 不変条件 (ADR-014 判断 6): text-producing category は
+            // alphabetic/numeric/punctuation/tab/space/enter。`other` は厳密に非 text-producing
+            // (text-producing な VK は 1 つ残らず上記 6 category のいずれかに入るため)。
+            let expect_text = matches!(
+                cat,
+                "alphabetic" | "numeric" | "punctuation" | "tab" | "space" | "enter"
+            );
             assert_eq!(
                 gse_next_lib::analysis::metrics::is_text_producing(vk),
                 expect_text,
@@ -3101,13 +3115,19 @@ mod tests {
         }
     }
 
-    /// **`--metrics` 経路の既知の制約を明示・回帰ロックする (D-RC3)**。匿名化は `is_text_producing`
-    /// より粗い `KeyCategory` を使うため、OEM 句読点・Tab・テンキー演算子 (= raw では text-producing
-    /// だが匿名化で `Other`) が匿名化後に text-producing と判別できず、`collect_key_events` →
-    /// manual_insert 系がちょうどその件数だけ過小評価される。これは #27 の匿名化設計に内在し
-    /// replay では復元不可。**backspace/delete 判定は完全一致**することも併せて確認する。
+    /// **`--metrics` 経路の text-producing 判定が匿名化後も raw と完全一致することを回帰ロックする**
+    /// (ADR-014 判断 6 / `.steering/20260823-r3-accept-and-role-category/` D-7)。
+    ///
+    /// **旧仕様 (2026-08-23 以前)**: 匿名化は `is_text_producing` より粗い `KeyCategory` を使い、
+    /// OEM 句読点・Tab・テンキー演算子 (= raw では text-producing だが匿名化で `Other`) が
+    /// 匿名化後に判別できず、`collect_key_events` → manual_insert 系がその件数だけ過小評価された。
+    /// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**であり、
+    /// 構造的な過小評価は研究上許容できない。
+    ///
+    /// **現仕様**: `Punctuation` / `Tab` category を足したので過小評価は **ゼロ**。
+    /// **backspace/delete 判定が完全一致**することも併せて確認する。
     #[test]
-    fn anonymized_metrics_text_producing_undercounts_other_folded_keys() {
+    fn anonymized_metrics_text_producing_matches_raw_exactly() {
         use gse_next_lib::analysis::metrics::{is_backspace, is_text_producing};
 
         let raw_path = fixture_path("category_coverage.ndjson");
@@ -3130,12 +3150,11 @@ mod tests {
         let raw_text_keys = raw_keys.iter().filter(|k| is_text_producing(k.vk)).count();
         let anon_text_keys = anon_keys.iter().filter(|k| is_text_producing(k.vk)).count();
         // raw の text-producing: A,0,numpad7,space,enter,comma,Tab,numpad* = 8。
-        // 匿名化後: alphabetic,numeric,numeric(numpad7),space,enter = 5
-        //   (comma/Tab/numpad* は Other → 0x07 → 非 text-producing)。差 = 3。
+        // 匿名化後も 8 — comma/numpad* は `punctuation`、Tab は `tab` へ入るため。
         assert_eq!(raw_text_keys, 8, "raw text-producing key count");
         assert_eq!(
-            anon_text_keys, 5,
-            "anonymized undercounts the 3 Other-folded text keys (comma/Tab/numpad*)"
+            anon_text_keys, raw_text_keys,
+            "anonymized text-producing count must match raw exactly (no Other-folding loss)"
         );
 
         // backspace/delete 判定は完全一致 (専用 category)。raw に backspace+delete = 2。

@@ -16,6 +16,20 @@ use serde_json::Value;
 pub enum KeyCategory {
     Alphabetic,
     Numeric,
+    /// OEM 句読点・記号とテンキー演算子 (`; = , - . / ` [ \ ] '` と `* + - . / separator`)。
+    ///
+    /// **なぜ独立の category か (ADR-014 判断 6 / D-7)**: これらは raw では
+    /// `is_text_producing` が true だが、旧版は `Other` へ畳んでいたため匿名化後に
+    /// text-producing と判別できず、`manual_insert` 系がその件数だけ過小評価されていた。
+    /// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**である。
+    ///
+    /// **本文再構成不能は保たれる**: **19 個の異なる VK** が 1 つの category へ畳まれるため
+    /// (US 配列では shift 併用で約 38 文字ぶん)、`.` と `,` と `[` を区別できない
+    /// (どの句読点かは残さない)。⚠️ この畳み込み数が小さくなると識別性が上がる
+    /// (`punctuation_folds_many_distinct_keys` が回帰ロックしている)。
+    Punctuation,
+    /// Tab。`is_text_producing` が true なので `Other` に畳まない (同上)。
+    Tab,
     Backspace,
     Delete,
     Space,
@@ -32,6 +46,11 @@ impl KeyCategory {
         match vk {
             0x41..=0x5A => Self::Alphabetic,
             0x30..=0x39 | 0x60..=0x69 => Self::Numeric,
+            // OEM 句読点/記号 (0xBA-0xC0 = ; = , - . / `, 0xDB-0xDF = [ \ ] ' OEM_8,
+            // 0xE2 = OEM_102) とテンキー演算子 (0x6A-0x6F = * + separator - . /)。
+            // いずれも is_text_producing == true。Numeric (0x60..=0x69) とは互いに素。
+            0x6A..=0x6F | 0xBA..=0xC0 | 0xDB..=0xDF | 0xE2 => Self::Punctuation,
+            0x09 => Self::Tab,
             0x08 => Self::Backspace,
             0x2E => Self::Delete,
             0x20 => Self::Space,
@@ -49,6 +68,8 @@ impl KeyCategory {
         match self {
             Self::Alphabetic => "alphabetic",
             Self::Numeric => "numeric",
+            Self::Punctuation => "punctuation",
+            Self::Tab => "tab",
             Self::Backspace => "backspace",
             Self::Delete => "delete",
             Self::Space => "space",
@@ -154,7 +175,56 @@ mod tests {
         assert_eq!(KeyCategory::from_vk(0x10), KeyCategory::Modifier);
         assert_eq!(KeyCategory::from_vk(0x1B), KeyCategory::Escape);
         assert_eq!(KeyCategory::from_vk(0x70), KeyCategory::Function);
-        assert_eq!(KeyCategory::from_vk(0xBC), KeyCategory::Other); // 記号
+        // ADR-014 判断 6: OEM 句読点/記号とテンキー演算子は Punctuation、Tab は Tab。
+        assert_eq!(KeyCategory::from_vk(0x09), KeyCategory::Tab); // VK_TAB
+        for vk in [0x6A, 0x6F, 0xBA, 0xBC, 0xBE, 0xC0, 0xDB, 0xDF, 0xE2] {
+            assert_eq!(
+                KeyCategory::from_vk(vk),
+                KeyCategory::Punctuation,
+                "vk 0x{vk:02X} must be Punctuation"
+            );
+        }
+        // 境界の外は Punctuation に落ちない (レンジの取り違え検出)。
+        assert_eq!(KeyCategory::from_vk(0x69), KeyCategory::Numeric); // numpad 9
+        assert_eq!(KeyCategory::from_vk(0xB9), KeyCategory::Other);
+        assert_eq!(KeyCategory::from_vk(0xC1), KeyCategory::Other);
+        assert_eq!(KeyCategory::from_vk(0xDA), KeyCategory::Other);
+        assert_eq!(KeyCategory::from_vk(0xE0), KeyCategory::Other);
+    }
+
+    /// **ADR-014 判断 6 の不変条件**: `is_text_producing` が true な VK は
+    /// **1 つ残らず非 `Other` category に入る**。
+    ///
+    /// これが崩れると匿名化後に text-producing と判別できないキーが復活し、
+    /// `--metrics` の `manual_insert` 系 (→ `manual_contribution_ratio` =
+    /// `research-positioning.md §5` **H-Y の主要アウトカム**) が構造的に過小評価される。
+    /// `replay.rs` の `category_representative_vk("other") == 0x07` の正しさもこれに依存する。
+    #[test]
+    fn every_text_producing_vk_has_a_non_other_category() {
+        for vk in 0u32..=0xFF {
+            if crate::analysis::metrics::is_text_producing(vk) {
+                assert_ne!(
+                    KeyCategory::from_vk(vk),
+                    KeyCategory::Other,
+                    "text-producing vk 0x{vk:02X} fell into Other;                      manual_insert would be undercounted after anonymization"
+                );
+            }
+        }
+    }
+
+    /// 本文再構成不能の回帰ロック: `Punctuation` は **19 個の異なる VK** を 1 つの
+    /// category へ畳む (どの句読点かは残さない)。⚠️ ここが小さくなると識別性が上がるので、
+    /// レンジを分割する変更は本テストで落ちる。
+    #[test]
+    fn punctuation_folds_many_distinct_keys() {
+        let n = (0u32..=0xFF)
+            .filter(|&vk| KeyCategory::from_vk(vk) == KeyCategory::Punctuation)
+            .count();
+        // 0x6A..=0x6F (6) + 0xBA..=0xC0 (7) + 0xDB..=0xDF (5) + 0xE2 (1) = 19
+        assert_eq!(
+            n, 19,
+            "Punctuation fold width changed; splitting ranges raises identifiability"
+        );
     }
 
     #[test]
