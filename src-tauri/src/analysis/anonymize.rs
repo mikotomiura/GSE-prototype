@@ -23,11 +23,25 @@ pub enum KeyCategory {
     /// text-producing と判別できず、`manual_insert` 系がその件数だけ過小評価されていた。
     /// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**である。
     ///
-    /// **本文再構成不能は保たれる**: **19 個の異なる VK** が 1 つの category へ畳まれるため
-    /// (US 配列では shift 併用で約 38 文字ぶん)、`.` と `,` と `[` を区別できない
-    /// (どの句読点かは残さない)。⚠️ この畳み込み数が小さくなると識別性が上がる
-    /// (`punctuation_folds_many_distinct_keys` が回帰ロックしている)。
+    /// **本文再構成不能は保たれる**: **17 個の異なる VK** が 1 つの category へ畳まれるため、
+    /// `[` と `=` と `;` を区別できない (どの記号かは残さない)。⚠️ この畳み込み数が小さくなると
+    /// 識別性が上がる (`punctuation_folds_many_distinct_keys` が回帰ロックしている)。
     Punctuation,
+    /// 文/節の境界を担う句読点キー — `VK_OEM_PERIOD`(0xBE) と `VK_OEM_COMMA`(0xBC)。
+    ///
+    /// **なぜ `Punctuation` から分けるか (2026-08-23 研究者判断)**:
+    /// `personalization-and-online-learning.md §5.2` は **boundary keys を「採用 (弁別の前提条件)」**
+    /// に格上げしており ([P121] N=475・2 独立文脈)、その接地は散文の階層
+    /// **語内 < 語間 < 文間 < 段落間** である。`Punctuation` へ一括で畳むと **「文間」の段だけが
+    /// 失われる** (`[` `=` `-` と同じラベルになるため)。⚠️ **収集後は取り返せない。**
+    ///
+    /// ⚠️ **完全な文末判定ではない**: 修飾キー状態を記録していないので `.` と `>`、`,` と `<` は
+    /// 区別できない。★ 0xBE は文末の**代理**である (日本語ローマ字入力では `。` が 0xBE から出るので
+    /// 代理としては強い)。
+    ///
+    /// ⚠️ **識別性**: 2 VK のカテゴリは文のリズムを見せる。★ ただし**どの文字かは残らない**ので
+    /// 本文再構成は不能であり、文の区切りは `Space` / `Enter` からも既に推定できる。
+    SentencePunctuation,
     /// Tab。`is_text_producing` が true なので `Other` に畳まない (同上)。
     Tab,
     Backspace,
@@ -46,8 +60,10 @@ impl KeyCategory {
         match vk {
             0x41..=0x5A => Self::Alphabetic,
             0x30..=0x39 | 0x60..=0x69 => Self::Numeric,
-            // OEM 句読点/記号 (0xBA-0xC0 = ; = , - . / `, 0xDB-0xDF = [ \ ] ' OEM_8,
-            // 0xE2 = OEM_102) とテンキー演算子 (0x6A-0x6F = * + separator - . /)。
+            // 文/節の境界キー。⚠️ Punctuation より **先に** 判定する (レンジが重なるため)。
+            0xBC | 0xBE => Self::SentencePunctuation,
+            // 残りの OEM 記号 (0xBA ; / 0xBB = / 0xBD - / 0xBF / / 0xC0 `,
+            // 0xDB-0xDF = [ \ ] ' OEM_8, 0xE2 = OEM_102) とテンキー演算子 (0x6A-0x6F)。
             // いずれも is_text_producing == true。Numeric (0x60..=0x69) とは互いに素。
             0x6A..=0x6F | 0xBA..=0xC0 | 0xDB..=0xDF | 0xE2 => Self::Punctuation,
             0x09 => Self::Tab,
@@ -69,6 +85,7 @@ impl KeyCategory {
             Self::Alphabetic => "alphabetic",
             Self::Numeric => "numeric",
             Self::Punctuation => "punctuation",
+            Self::SentencePunctuation => "sentence_punctuation",
             Self::Tab => "tab",
             Self::Backspace => "backspace",
             Self::Delete => "delete",
@@ -177,14 +194,17 @@ mod tests {
         assert_eq!(KeyCategory::from_vk(0x70), KeyCategory::Function);
         // ADR-014 判断 6: OEM 句読点/記号とテンキー演算子は Punctuation、Tab は Tab。
         assert_eq!(KeyCategory::from_vk(0x09), KeyCategory::Tab); // VK_TAB
-        for vk in [0x6A, 0x6F, 0xBA, 0xBC, 0xBE, 0xC0, 0xDB, 0xDF, 0xE2] {
+        for vk in [0x6A, 0x6F, 0xBA, 0xBB, 0xBD, 0xBF, 0xC0, 0xDB, 0xDF, 0xE2] {
             assert_eq!(
                 KeyCategory::from_vk(vk),
                 KeyCategory::Punctuation,
                 "vk 0x{vk:02X} must be Punctuation"
             );
         }
-        // 境界の外は Punctuation に落ちない (レンジの取り違え検出)。
+        // 文/節の境界キーは Punctuation から分離されている (boundary keys の「文間」)。
+        assert_eq!(KeyCategory::from_vk(0xBE), KeyCategory::SentencePunctuation); // .
+        assert_eq!(KeyCategory::from_vk(0xBC), KeyCategory::SentencePunctuation); // ,
+                                                                                  // 境界の外は Punctuation に落ちない (レンジの取り違え検出)。
         assert_eq!(KeyCategory::from_vk(0x69), KeyCategory::Numeric); // numpad 9
         assert_eq!(KeyCategory::from_vk(0xB9), KeyCategory::Other);
         assert_eq!(KeyCategory::from_vk(0xC1), KeyCategory::Other);
@@ -212,18 +232,41 @@ mod tests {
         }
     }
 
-    /// 本文再構成不能の回帰ロック: `Punctuation` は **19 個の異なる VK** を 1 つの
-    /// category へ畳む (どの句読点かは残さない)。⚠️ ここが小さくなると識別性が上がるので、
-    /// レンジを分割する変更は本テストで落ちる。
+    /// ★ カテゴリ数の回帰ロック。⚠️ **`schema_dto.rs` の `Key` doc と `anonymization.md` が
+    /// 数を明記している**ので、増減したら両方を直すこと。
+    #[test]
+    fn category_count_is_stable() {
+        use std::collections::BTreeSet;
+        let cats: BTreeSet<&str> = (0u32..=0xFF)
+            .map(|vk| KeyCategory::from_vk(vk).as_str())
+            .collect();
+        assert_eq!(
+            cats.len(),
+            14,
+            "KeyCategory count changed; update schema_dto.rs Key doc and anonymization.md: {cats:?}"
+        );
+    }
+
+    /// 本文再構成不能の回帰ロック: `Punctuation` は **17 個の異なる VK** を 1 つの
+    /// category へ畳み、`SentencePunctuation` は **2 個だけ** である。
+    /// ⚠️ 畳み込み幅が小さくなると識別性が上がるので、レンジを分割する変更は本テストで落ちる。
     #[test]
     fn punctuation_folds_many_distinct_keys() {
         let n = (0u32..=0xFF)
             .filter(|&vk| KeyCategory::from_vk(vk) == KeyCategory::Punctuation)
             .count();
-        // 0x6A..=0x6F (6) + 0xBA..=0xC0 (7) + 0xDB..=0xDF (5) + 0xE2 (1) = 19
+        // 0x6A..=0x6F (6) + {0xBA,0xBB,0xBD,0xBF,0xC0} (5) + 0xDB..=0xDF (5) + 0xE2 (1) = 17
         assert_eq!(
-            n, 19,
+            n, 17,
             "Punctuation fold width changed; splitting ranges raises identifiability"
+        );
+        let sentence = (0u32..=0xFF)
+            .filter(|&vk| KeyCategory::from_vk(vk) == KeyCategory::SentencePunctuation)
+            .count();
+        // ⚠️ ここを広げると「どの記号か」に近づく。狭めると boundary keys の「文間」が痩せる。
+        assert_eq!(
+            sentence, 2,
+            "SentencePunctuation must stay exactly {{0xBC, 0xBE}}"
         );
     }
 

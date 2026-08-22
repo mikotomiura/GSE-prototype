@@ -457,8 +457,10 @@ fn category_representative_vk(category: &str) -> Option<u32> {
     let vk = match category {
         "alphabetic" => 0x41, // 'A' (0x41..=0x5A) — text-producing
         "numeric" => 0x30,    // '0' (0x30..=0x39) — text-producing
-        // VK_OEM_PERIOD (0xBA..=0xC0 の一部) — text-producing。
-        "punctuation" => 0xBE,
+        // VK_OEM_1 (';') — text-producing。⚠️ 0xBE / 0xBC は SentencePunctuation なので使えない。
+        "punctuation" => 0xBA,
+        // VK_OEM_PERIOD ('.') — text-producing。boundary keys の「文間」。
+        "sentence_punctuation" => 0xBE,
         "tab" => 0x09,        // VK_TAB — text-producing
         "backspace" => 0x08,  // VK_BACK — is_backspace
         "delete" => 0x2E,     // VK_DELETE — is_backspace
@@ -2775,6 +2777,7 @@ mod tests {
             "alphabetic",
             "numeric",
             "punctuation",
+            "sentence_punctuation",
             "tab",
             "backspace",
             "delete",
@@ -2808,7 +2811,13 @@ mod tests {
             // (text-producing な VK は 1 つ残らず上記 6 category のいずれかに入るため)。
             let expect_text = matches!(
                 cat,
-                "alphabetic" | "numeric" | "punctuation" | "tab" | "space" | "enter"
+                "alphabetic"
+                    | "numeric"
+                    | "punctuation"
+                    | "sentence_punctuation"
+                    | "tab"
+                    | "space"
+                    | "enter"
             );
             assert_eq!(
                 gse_next_lib::analysis::metrics::is_text_producing(vk),
@@ -3124,7 +3133,7 @@ mod tests {
     /// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**であり、
     /// 構造的な過小評価は研究上許容できない。
     ///
-    /// **現仕様**: `Punctuation` / `Tab` category を足したので過小評価は **ゼロ**。
+    /// **現仕様**: `Punctuation` / `SentencePunctuation` / `Tab` category を足したので過小評価は **ゼロ**。
     /// **backspace/delete 判定が完全一致**することも併せて確認する。
     #[test]
     fn anonymized_metrics_text_producing_matches_raw_exactly() {
@@ -3150,7 +3159,8 @@ mod tests {
         let raw_text_keys = raw_keys.iter().filter(|k| is_text_producing(k.vk)).count();
         let anon_text_keys = anon_keys.iter().filter(|k| is_text_producing(k.vk)).count();
         // raw の text-producing: A,0,numpad7,space,enter,comma,Tab,numpad* = 8。
-        // 匿名化後も 8 — comma/numpad* は `punctuation`、Tab は `tab` へ入るため。
+        // 匿名化後も 8 — comma は `sentence_punctuation`、numpad* は `punctuation`、
+        // Tab は `tab` へ入るため。
         assert_eq!(raw_text_keys, 8, "raw text-producing key count");
         assert_eq!(
             anon_text_keys, raw_text_keys,
