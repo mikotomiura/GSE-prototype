@@ -83,8 +83,22 @@ pub fn candidate_shown_from_cloak(cloaked: bool) -> bool {
 pub enum FoldAction {
     /// ★ 候補ウィンドウのセッションが始まった (値 = 開始時刻 epoch ms)。
     Begin(u64),
-    /// ★ セッションが終わった (値 = dwell ms)。
-    End(u64),
+    /// ★ セッションが終わった。
+    End {
+        /// ★ 候補ウィンドウの滞在時間 (ms)。
+        dwell_ms: u64,
+        /// ⚠️★★★ **`true` = uncloak を取りこぼし、[`MAX_SESSION_MS`] で打ち切った。**
+        ///
+        /// ★ **この区別が無いと計器が嘘をつく**: 打ち切りで出た `dwell_ms` は
+        /// 「候補を眺めていた時間」ではなく**上限そのもの**なのに、
+        /// ⚠️ NDJSON では本物の変換と**見分けがつかない 1 行**になる。
+        /// → ★ `ime_dwell_med` が計器由来の値で汚れ、⚠️ 解析側に検知手段が無い
+        /// (`ime_dwell_med` が別物を測っていた 2026-08-22 の失敗と同型)。
+        ///
+        /// ★ 呼び出し側は `forced` のとき **行を出さない** こと。
+        /// ⚠️ 1 行失う方が、偽の dwell を 1 行足すより安全である。
+        forced: bool,
+    },
 }
 
 /// ⚠️★ **debounce の幅** —— この時間内に候補が戻ってきたら「同じ変換の続き」とみなす。
@@ -98,10 +112,37 @@ pub const FOLD_GAP_MS: u64 = 250;
 
 /// ⚠️★★ **セッションの上限** —— これを超えたら取りこぼしとみなして強制終了する。
 ///
-/// ★ `lib.rs` の IME Monitor にも 8 秒の safety valve があるが、
+/// ★ `lib.rs` の IME Monitor にも **8 秒**の safety valve があるが、
 /// ⚠️ **あちらは `IME_ACTIVE` を戻すだけで、この状態機械の中身は直せない。**
 /// → ★ 自分で治せるようにしておく (fail-open。⚠️ fail-stuck にしない)。
-pub const MAX_SESSION_MS: u64 = 8_000;
+///
+/// # ⚠️★★★ なぜ 8 秒ではなく **6 秒**なのか
+///
+/// ★ 8 秒に揃えると **`lib.rs` の valve と競走**する。⚠️ あちらが先に発火すると:
+///
+/// 1. valve が `emit_ime_shadow` を呼ぶ → `IME_SHADOW_READY` はまだ false なので
+///    stale 経路に落ち、`IME_COMPOSITION_START_MS` から dwell を出して**1 行目**を送る
+/// 2. その直後に本状態機械が `End` を出し `IME_SHADOW_READY=true` にする
+///    → Monitor の READY ポーリングが**2 行目**を送る
+///
+/// → ⚠️ **1 回の変換で `ime_shadow` が 2 行出る。**
+/// ★ 明確に内側 (6 秒) を先に発火させ、**8 秒の valve は外側の保険**に徹させる。
+/// ⚠️ 実測の dwell は p90 = 2090ms なので、6 秒で切っても通常の変換は削らない。
+pub const MAX_SESSION_MS: u64 = 6_000;
+
+/// ★ `lib.rs` の IME Monitor が `IME_ACTIVE` を強制リセットする閾値。
+///
+/// ⚠️ **ここに写しを置くのは、下の静的表明で不変条件を固定するためだけ**である。
+/// ★ 値そのものの持ち主は `lib.rs` の IME モニタースレッド。
+const MONITOR_SAFETY_VALVE_MS: u64 = 8_000;
+
+// ⚠️★★★ **コンパイル時に固定する。** ★ どちらかを動かした瞬間にビルドが落ちる。
+//   ★ 揃えたり逆転させたりすると 1 変換で `ime_shadow` が 2 行出る
+//   ([`MAX_SESSION_MS`] の doc を参照)。★ 100ms ポーリング + 配送遅延を吸収する余裕も要る。
+const _: () = assert!(
+    MAX_SESSION_MS + 1_000 <= MONITOR_SAFETY_VALVE_MS,
+    "CloakFold の上限は lib.rs の 8 秒 valve より 1 秒以上内側でなければならない"
+);
 
 /// ⚠️★★★ **cloak/uncloak を「1 変換 = 1 セッション」へ畳む純粋な状態機械。**
 ///
@@ -200,14 +241,21 @@ impl CloakFold {
             let end = self.empty_since_ms.unwrap_or(now_ms);
             let dwell = end.saturating_sub(start);
             self.reset();
-            return Some(FoldAction::End(dwell));
+            // ⚠️★★★ **打ち切りであることを必ず伝える** (`FoldAction::End::forced` の doc)。
+            return Some(FoldAction::End {
+                dwell_ms: dwell,
+                forced: true,
+            });
         }
         if let Some(empty_since) = self.empty_since_ms {
             if self.shown.is_empty() && now_ms.saturating_sub(empty_since) >= self.gap_ms {
                 // ★ dwell は **debounce の待ち時間を含めない** (候補が消えた時刻まで)。
                 let dwell = empty_since.saturating_sub(start);
                 self.reset();
-                return Some(FoldAction::End(dwell));
+                return Some(FoldAction::End {
+                    dwell_ms: dwell,
+                    forced: false,
+                });
             }
         }
         None
@@ -275,7 +323,10 @@ mod tests {
         assert_eq!(f.on_tick(1_700 + FOLD_GAP_MS - 1), None);
         assert_eq!(
             f.on_tick(1_700 + FOLD_GAP_MS),
-            Some(FoldAction::End(700)),
+            Some(FoldAction::End {
+                dwell_ms: 700,
+                forced: false
+            }),
             "★ dwell は debounce の待ち時間を含めない"
         );
         assert!(!f.is_active());
@@ -293,7 +344,10 @@ mod tests {
         assert_eq!(f.on_event(1, false, 900), None);
         assert_eq!(
             f.on_tick(900 + FOLD_GAP_MS),
-            Some(FoldAction::End(900)),
+            Some(FoldAction::End {
+                dwell_ms: 900,
+                forced: false
+            }),
             "★ 2 周期がまとめて 1 行 (dwell は最後に消えた時刻まで)"
         );
     }
@@ -308,7 +362,13 @@ mod tests {
         assert_eq!(f.on_event(1, false, 400), None);
         assert_eq!(f.on_tick(400 + FOLD_GAP_MS + 100), None, "★ まだ空ではない");
         assert_eq!(f.on_event(2, false, 800), None);
-        assert_eq!(f.on_tick(800 + FOLD_GAP_MS), Some(FoldAction::End(800)));
+        assert_eq!(
+            f.on_tick(800 + FOLD_GAP_MS),
+            Some(FoldAction::End {
+                dwell_ms: 800,
+                forced: false
+            })
+        );
     }
 
     /// ⚠️ debounce を**超えて**戻ってきたら別セッションになること。
@@ -317,7 +377,13 @@ mod tests {
         let mut f = CloakFold::new();
         assert_eq!(f.on_event(1, true, 0), Some(FoldAction::Begin(0)));
         assert_eq!(f.on_event(1, false, 500), None);
-        assert_eq!(f.on_tick(500 + FOLD_GAP_MS), Some(FoldAction::End(500)));
+        assert_eq!(
+            f.on_tick(500 + FOLD_GAP_MS),
+            Some(FoldAction::End {
+                dwell_ms: 500,
+                forced: false
+            })
+        );
         let t = 500 + FOLD_GAP_MS + 1;
         assert_eq!(f.on_event(1, true, t), Some(FoldAction::Begin(t)));
     }
@@ -331,7 +397,11 @@ mod tests {
         assert_eq!(f.on_tick(MAX_SESSION_MS - 1), None);
         assert_eq!(
             f.on_tick(MAX_SESSION_MS),
-            Some(FoldAction::End(MAX_SESSION_MS))
+            Some(FoldAction::End {
+                dwell_ms: MAX_SESSION_MS,
+                forced: true
+            }),
+            "⚠️★★★ 打ち切りは forced=true でなければならない (行を出させないため)"
         );
         assert!(!f.is_active(), "★ 上限で必ず解ける");
     }
@@ -352,6 +422,12 @@ mod tests {
         assert_eq!(f.on_event(1, true, 0), Some(FoldAction::Begin(0)));
         assert_eq!(f.on_event(1, true, 50), None);
         assert_eq!(f.on_event(1, false, 200), None);
-        assert_eq!(f.on_tick(200 + FOLD_GAP_MS), Some(FoldAction::End(200)));
+        assert_eq!(
+            f.on_tick(200 + FOLD_GAP_MS),
+            Some(FoldAction::End {
+                dwell_ms: 200,
+                forced: false
+            })
+        );
     }
 }

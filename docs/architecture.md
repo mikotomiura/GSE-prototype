@@ -85,7 +85,7 @@
 
 ## 3. スレッドモデル
 
-GSE は 7 つのスレッド/タスクで構成される (★ G1 モード時のみ 2 つ増える)。
+GSE は 8 つのスレッド/タスクで構成される (★ G1 モード時のみ 2 つ増える。⚠️ **Cloak Resolver は Windows のみ**)。
 
 | スレッド | 責務 | 通信方式 | 優先度 |
 |---|---|---|---|
@@ -94,6 +94,7 @@ GSE は 7 つのスレッド/タスクで構成される (★ G1 モード時の
 | **Analysis** | 1Hz 特徴量抽出 + HMM 推論、最新 FeatSnapshot 更新 | crossbeam Receiver, Mutex<Engine> 書込 | 通常 |
 | **IME Monitor** | Win: 候補ウィンドウ検出 / mac: フック内で処理（別スレッド不要） | Atomic IME_ACTIVE | 低 |
 | **IME Polling** | Win: ImmGet\* / mac: TIS ポーリング (GCD メインキュー経由) | Atomic IME_OPEN | 低 |
+| **Cloak Resolver** | ★ **Windows のみ**。`EVENT_OBJECT_CLOAKED`/`UNCLOAKED` を受け、ウィンドウクラスを解決して (完全一致 `IME`) `IME_ACTIVE` を駆動する。⚠️ フックコールバックでは `GetClassNameW` を呼べない (`hook-constraints` Win-1) ための分離。畳み込みは `input/ime_cloak.rs` (OS 非依存) | `CLOAK_EVENT_TX` (bounded 256), Atomic IME_ACTIVE / IME_SHADOW_\* | 低 |
 | **Logger** | NDJSON バッファリング + フラッシュ | Bounded channel (512) | 低 |
 | **Probe Scheduler** | v0.3 較正: ランダム時点プローブの一様時刻生成 (Poisson+thinning) → `probe_assignment` ログ + `probe_triggered` emit。純ロジックは `analysis/probe_scheduler.rs` (OS API 非依存) | Atomic SESSION_START_MS 読取, LogEntry Sender, AppHandle emit | 低 |
 | **G1 Block End** | ★ **G1 モード時のみ起動**。`g1::BLOCK_DURATION_MS` (5 分) でブロックの記録を終了し、`BlockEnd` 送信 + `g1-block-ended` emit | Atomic SESSION_START_MS / ANALYSIS_IDLE, LogEntry Sender, AppHandle emit | 低 |

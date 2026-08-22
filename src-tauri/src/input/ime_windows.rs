@@ -109,7 +109,10 @@ impl ImeMonitor {
         //
         // ⚠️★★★ **2026-08-23: cloak 経路が駆動している端末では*この判定を使わない*。**
         //   ★ 理由は `is_stale_winevent_active` の doc を参照 (前提が実測で崩れている)。
-        let legacy_path = crate::input::hook::LEGACY_IME_EVENT_SEEN.load(Ordering::Acquire);
+        let legacy_path = crate::input::hook::legacy_path_is_driving(
+            crate::input::hook::LEGACY_IME_EVENT_MS.load(Ordering::Acquire),
+            now_ms(),
+        );
         if is_stale_winevent_active(winevent_active, enumwindows_active, uia_active, legacy_path) {
             crate::input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
             return false;
@@ -383,8 +386,44 @@ pub fn spawn_cloak_resolver_thread() {
         let mut fold = CloakFold::new();
         // ★ debounce の満了を見逃さない程度に細かく起こす。
         let tick = std::time::Duration::from_millis(FOLD_GAP_MS.max(1) / 4 + 1);
+        // ★ 「legacy に道を譲った」ことを **1 回だけ**警告するための記憶。
+        //   ⚠️ 毎周期出すとログが埋まる。★ 出さないと 0 行の理由が誰にも分からない。
+        let mut warned_legacy = false;
         loop {
-            match rx.recv_timeout(tick) {
+            // ⚠️★★★ **セッション中でなければブロックして待つ** (★ バッテリ)。
+            //   ★ 非活性のときは `on_tick` にやる仕事が無いので、起こす意味が無い。
+            let received = if fold.is_active() {
+                rx.recv_timeout(tick)
+                    .map_err(|e| matches!(e, crossbeam_channel::RecvTimeoutError::Disconnected))
+            } else {
+                rx.recv().map_err(|_| true)
+            };
+
+            // ⚠️★★★ **resolver 側でも排他を確認する** (code-review / security-checker MEDIUM)。
+            //   ★ コールバックだけで弾くと、**cloak セッションが開いている最中に**
+            //   legacy が飛んだ場合に、このスレッドが `IME_ACTIVE=false` を書きに来て
+            //   legacy 側の `true` を最大 `MAX_SESSION_MS` のあいだ潰しうる。
+            let legacy_now = crate::input::hook::legacy_path_is_driving(
+                crate::input::hook::LEGACY_IME_EVENT_MS.load(Ordering::Acquire),
+                now_ms(),
+            );
+            if legacy_now {
+                if !warned_legacy {
+                    warned_legacy = true;
+                    tracing::warn!(
+                        "IME driver switched to the documented EVENT_OBJECT_IME_* path —                          cloak driver stands down (ime_shadow rows now come from the legacy path)"
+                    );
+                }
+                // ★ 自分が立てた `IME_ACTIVE` は自分で下ろしてから黙る。
+                if fold.is_active() {
+                    crate::input::hook::IME_ACTIVE.store(false, Ordering::Release);
+                }
+                fold = CloakFold::new();
+                continue;
+            }
+            warned_legacy = false;
+
+            match received {
                 Ok(ev) => {
                     let hwnd = HWND(ev.hwnd as *mut std::ffi::c_void);
                     // ★ 1) クラスで絞る。⚠️ 取れなければ捨てる (短命な窓)。
@@ -402,12 +441,21 @@ pub fn spawn_cloak_resolver_thread() {
                     if let Some(action) = fold.on_event(ev.hwnd, shown, now) {
                         apply_fold_action(action);
                     }
+                    // ⚠️★ **`IME_ACTIVE` を冪等に再表明する。**
+                    //   ★ `lib.rs` の 8 秒 valve が外から false に戻すことがあり、
+                    //   そのあと `Begin` は二度と出ない (セッションは続いている) ので、
+                    //   ここで言い直さないと **pause が復帰しない**。
+                    if fold.is_active() {
+                        crate::input::hook::IME_ACTIVE.store(true, Ordering::Release);
+                    }
                 }
-                Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
-                Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                Err(true) => {
                     // ⚠️ 送信端は `OnceLock` に置かれ落ちないので、実際にはここへ来ない。
                     tracing::warn!("cloak resolver channel disconnected — thread exits");
                     return;
+                }
+                Err(false) => {
+                    // ★ タイムアウト。★ 下の `on_tick` だけを走らせる。
                 }
             }
             // ★ 受信の有無に関わらず**必ず**時間側を進める
@@ -430,15 +478,47 @@ fn apply_fold_action(action: FoldAction) {
         FoldAction::Begin(start_ms) => {
             hook::IME_COMPOSITION_START_MS.store(start_ms, Ordering::Relaxed);
             // ★ 前セッションのカウンターを畳む (既存 IME_SHOW 経路と同じ)。
+            //   ⚠️ 直前の End の行を Monitor が拾う前 (≤100ms) に次が始まると
+            //   カウントが失われる —— ★ 既存 `IME_SHOW` 経路と**同型の既知制約**である。
             hook::IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
             hook::IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
-            hook::IME_ACTIVE.store(true, Ordering::Relaxed);
+            // ⚠️★ `Release` にする (`hook-constraints` 共通-2)。★ 先行する 3 つの
+            //   Relaxed store を分析スレッド側の Acquire 読みに対して可視化する。
+            hook::IME_ACTIVE.store(true, Ordering::Release);
+            // ★ `IME_OPEN` は書かない (D-6) が、**正しい持ち主を起こす**のはよい。
+            //   ⚠️ 候補が出た＝日本語モードのはずなので、ここで叩けば
+            //   `ImmGetOpenStatus` の確認が最大 100ms 早くなる。
+            if let Some(tx) = hook::POLL_WAKE_TX.get() {
+                let _ = tx.try_send(());
+            }
         }
-        FoldAction::End(dwell_ms) => {
+        FoldAction::End {
+            dwell_ms,
+            forced: true,
+        } => {
+            // ⚠️★★★ **取りこぼしの打ち切り。行は出さない。**
+            //   ★ `IME_SHADOW_READY` を立てないので `emit_ime_shadow` の正常経路は動かず、
+            //   `IME_COMPOSITION_START_MS` を 0 に戻すので **stale 経路も動かない**
+            //   (`lib.rs::emit_ime_shadow` は `start > 0` のときだけ送る)。
+            //   ⚠️ 1 行失う方が、上限そのものを dwell と偽る 1 行より安全である。
+            hook::IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
+            hook::IME_ACTIVE.store(false, Ordering::Release);
+            tracing::debug!(
+                dwell_ms,
+                "IME cloak session truncated (missed uncloak) — ime_shadow row suppressed"
+            );
+        }
+        FoldAction::End {
+            dwell_ms,
+            forced: false,
+        } => {
             hook::IME_SHADOW_DWELL_MS.store(dwell_ms, Ordering::Relaxed);
             hook::IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
+            // ⚠️★ `IME_ACTIVE` を **`READY` より先に**下ろす。
+            //   ★ Monitor は「`!active` かつ `READY`」で行を送るので、この順序でないと
+            //   1 周期 (100ms) 待たされる。
+            hook::IME_ACTIVE.store(false, Ordering::Release);
             hook::IME_SHADOW_READY.store(true, Ordering::Release);
-            hook::IME_ACTIVE.store(false, Ordering::Relaxed);
         }
     }
 }

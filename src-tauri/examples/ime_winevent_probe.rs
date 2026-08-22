@@ -1600,9 +1600,19 @@ mod windows_probe {
                 for gap in [0_u64, 100, 250, 500, 1000, 2000] {
                     let mut fold = gse_next_lib::input::ime_cloak::CloakFold::with_gap(gap);
                     let mut dwells: Vec<u64> = Vec::new();
+                    // ⚠️★ 打ち切り (`forced`) は本番が**行を出さない**ので、ここでも数えない。
+                    let mut forced = 0u32;
                     let mut push = |a: gse_next_lib::input::ime_cloak::FoldAction| {
-                        if let gse_next_lib::input::ime_cloak::FoldAction::End(d) = a {
-                            dwells.push(d);
+                        if let gse_next_lib::input::ime_cloak::FoldAction::End {
+                            dwell_ms,
+                            forced: f,
+                        } = a
+                        {
+                            if f {
+                                forced += 1;
+                            } else {
+                                dwells.push(dwell_ms);
+                            }
                         }
                     };
                     for (hwnd, shown, t) in evs.iter() {
@@ -1630,12 +1640,17 @@ mod windows_probe {
                     let pause_pct = total as f64 / 60_000.0 * 100.0;
                     writeln!(
                         out,
-                        "  {:>8} ms {:>6} {:>9} ms {:>9} ms {:>9.1}%",
+                        "  {:>8} ms {:>6} {:>9} ms {:>9} ms {:>9.1}%  {}",
                         gap,
                         dwells.len(),
                         med,
                         total,
-                        pause_pct
+                        pause_pct,
+                        if forced > 0 {
+                            format!("⚠️ 打ち切り {forced} 件 (行にしない)")
+                        } else {
+                            String::new()
+                        }
                     )?;
                 }
                 writeln!(

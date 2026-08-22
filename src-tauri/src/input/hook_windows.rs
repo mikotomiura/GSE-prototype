@@ -20,7 +20,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use super::{
     CloakEvent, CALLBACK_COUNT, CLOAK_EVENT_TX, EVENTS_DROPPED, EVENT_SENDER, HOOK_ACTIVE,
     IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSITION_START_MS, IME_OPEN, IME_SHADOW_ABANDON,
-    IME_SHADOW_DWELL_MS, IME_SHADOW_READY, IME_STATE_DIRTY, LAST_KEY_MS, LEGACY_IME_EVENT_SEEN,
+    IME_SHADOW_DWELL_MS, IME_SHADOW_READY, IME_STATE_DIRTY, LAST_KEY_MS, LEGACY_IME_EVENT_MS,
     POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
     VK_DBE_SBCSCHAR, VK_KANJI,
 };
@@ -230,8 +230,15 @@ unsafe extern "system" fn win_event_callback(
     _dwms_event_time: u32,
 ) {
     // ⚠️★★★ **文書化された経路が生きている端末では cloak 経路を黙らせる** (`hook.rs` の
-    //   `LEGACY_IME_EVENT_SEEN` doc を参照)。★ ここは「届いた」という事実だけを刻む。
-    LEGACY_IME_EVENT_SEEN.store(true, Ordering::Release);
+    //   `LEGACY_IME_EVENT_MS` doc を参照)。★ ここは「いつ届いたか」だけを刻む。
+    //   ⚠️ 不可逆ラッチにしない —— 単発の混入で cloak 経路が永久に黙るのを避けるため。
+    LEGACY_IME_EVENT_MS.store(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+        Ordering::Release,
+    );
     match event {
         EVENT_OBJECT_IME_SHOW | EVENT_OBJECT_IME_CHANGE => {
             IME_ACTIVE.store(true, Ordering::Relaxed);
@@ -312,9 +319,17 @@ unsafe extern "system" fn cloak_event_callback(
     if id_object != 0 || id_child != 0 || hwnd.0.is_null() {
         return;
     }
-    // ★ 文書化された経路が生きているなら、そちらに任せて何も送らない。
-    if LEGACY_IME_EVENT_SEEN.load(Ordering::Acquire) {
-        return;
+    // ★ 文書化された経路が**現に駆動している**なら、そちらに任せて何も送らない。
+    //   ⚠️ ここでは時刻比較のみ (`hook-constraints` Win-1)。★ resolver 側でも再確認する。
+    let last_legacy = LEGACY_IME_EVENT_MS.load(Ordering::Acquire);
+    if last_legacy != 0 {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        if super::legacy_path_is_driving(last_legacy, now) {
+            return;
+        }
     }
     let cloaked = event == EVENT_OBJECT_CLOAKED;
     if let Some(tx) = CLOAK_EVENT_TX.get() {
@@ -419,6 +434,16 @@ pub(super) fn start() {
                         //   詳細は `cloak_event_callback` の doc と
                         //   `.steering/20260823-ime-active-cloak-rewiring/design.md`。
                         // ★ 範囲は 0x8017..=0x8018 の **2 個だけ**。
+                        //
+                        // ⚠️★★★ **`WINEVENT_SKIPOWNPROCESS` を付けない** (★ 1 本目とは違う)。
+                        //   ★ 理由: IMM32 は **GUI スレッドごとに `IME` クラスの窓を作る**ので、
+                        //   **GSE 自身の窓に日本語を打つと、cloak するのは GSE 自身の窓**である。
+                        //   ⚠️★★★ G1 統制タスクは**被験者が GSE の入力画面に打つ**設計なので、
+                        //   自プロセスを飛ばすと **G1 でだけ `ime_shadow` が構造的に 0 行**になる。
+                        //   → ⚠️ それを「変換しなかった」と読む事故は `capabilities.rs` が
+                        //   繰り返し警告している型そのもの。
+                        //   ★ privacy 上の増分は無い —— **クラス名しか見ず**、
+                        //   タイトルも PID も取らない (`cloak_event_callback` / `class_name_of`)。
                         let cloak_hook = SetWinEventHook(
                             EVENT_OBJECT_CLOAKED,
                             EVENT_OBJECT_UNCLOAKED,
@@ -426,7 +451,7 @@ pub(super) fn start() {
                             Some(cloak_event_callback),
                             0,
                             0,
-                            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+                            WINEVENT_OUTOFCONTEXT,
                         );
                         if cloak_hook.is_invalid() {
                             // ⚠️ 致命ではない (★ 文書化された経路が生きている端末もある)。
