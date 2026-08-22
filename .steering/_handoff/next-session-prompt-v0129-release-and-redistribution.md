@@ -135,7 +135,7 @@ macOS でも緑であることを確認する。
 |---|---|
 | `ime_cloak.rs` が macOS でコンパイルできない | ⚠️ `std::collections::BTreeSet` しか使っていないはず。OS 依存が混入していないか |
 | dead_code 警告 | ★ `pub mod ime_cloak` 経由で公開されているので出ないはず。出るなら `input/mod.rs` を見る |
-| `const _: () = assert!(...)` で落ちる | ★ `MAX_SESSION_MS + 1000 <= 8000` の不変条件。⚠️ 意図的な静的表明なので**消さない** |
+| `const _: () = assert!(...)` で落ちる | ★ `MAX_SESSION_MS(20s) + 1000 <= 25000` の不変条件 (fold が `lib.rs` の valve より内側)。⚠️ 意図的な静的表明なので**消さない** |
 
 ★ ⚠️ **macOS 側に「修正」は原則要らない見込み**である（Win32 呼び出しは
 `ime_windows.rs` / `hook_windows.rs` に隔離してある）。⚠️ **ただし Windows では確かめられない。**
