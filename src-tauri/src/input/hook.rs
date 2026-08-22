@@ -108,6 +108,15 @@ pub static LEGACY_IME_EVENT_MS: AtomicU64 = AtomicU64::new(0);
 ///
 /// ⚠️ 実測の IME 変換間隔 (60 秒で 9〜17 回) より十分長く、
 /// ★ かつ「さっき 1 件混ざっただけ」を恒久化しない長さにする。
+///
+/// # ⚠️ トレードオフ (2026-08-23・cross-review 中)
+///
+/// ★ `LEGACY_IME_EVENT_MS` は **SHOW / HIDE / CHANGE の 3 つすべて**で更新する。
+/// ⚠️ 「`HIDE` 単発でも 60 秒 cloak 経路が止まる」という指摘はそのとおりである。
+/// ★ それでも 3 つ全部にしているのは、**どれか 1 つでも飛ぶなら文書化された経路は
+/// 生きている**とみなす方が安全だからである
+/// (⚠️ SHOW/CHANGE だけに絞ると、`HIDE` しか上げない IME で書き手が 2 人になる)。
+/// ★ 損失は**最大 60 秒ぶんの `ime_shadow`** に有界で、切替は `tracing::warn!` に残る。
 #[cfg(target_os = "windows")]
 pub const LEGACY_PATH_RECENCY_MS: u64 = 60_000;
 

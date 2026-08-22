@@ -354,6 +354,17 @@ fn dwm_is_cloaked(hwnd: HWND) -> Option<bool> {
     }
 }
 
+/// ★ 「DWM に聞けた現在値」と「届いた辺」から、採用する cloak 状態を決める。
+///
+/// ⚠️ **OS の答えが最優先**。★ 配送は `WINEVENT_OUTOFCONTEXT` の非同期なので、
+/// 届いた辺は resolver に着いた時点の実状態と食い違いうる。
+/// ⚠️ ただし窓が既に消えている等で聞けないことがあるので、そのときだけ辺を使う。
+///
+/// ★ 純関数にしてあるのはテストのため (⚠️ Win32 を呼ぶ経路は単体で回せない)。
+fn resolved_cloak_state(dwm: Option<bool>, event_cloaked: bool) -> bool {
+    dwm.unwrap_or(event_cloaked)
+}
+
 /// ⚠️★★★ **cloak/uncloak を受け取り、`IME_ACTIVE` と IME Shadow の atomics を駆動する。**
 ///
 /// # なぜ専用スレッドなのか
@@ -377,6 +388,16 @@ fn dwm_is_cloaked(hwnd: HWND) -> Option<bool> {
 /// ⚠️★★★ 旧実装が「無関係な窓の cloak で `IME_OPEN` まで立てていた」のが
 /// 2026-08-21 に見つかった計器不良そのものである。★ 同じ誤りを繰り返さない。
 pub fn spawn_cloak_resolver_thread() {
+    // ⚠️★★ **2 回目以降は何もしない** (2026-08-23・cross-review 中)。
+    //   ★ 送信端は `OnceLock` なので 2 回目の `set` は**黙って捨てられる**。
+    //   ⚠️ そのまま進むと、新しい `rx` に誰も送らない**受信しないスレッド**が増える
+    //   (★ そして「動いているのに 0 行」という最悪の形になる)。
+    if crate::input::hook::CLOAK_EVENT_TX.get().is_some() {
+        tracing::warn!(
+            "cloak resolver already started — ignoring the second spawn              (the sender is a OnceLock; a second receiver would never be fed)"
+        );
+        return;
+    }
     // ⚠️ 有界チャネル。★ 溢れたらコールバック側が捨てる (フックを絶対に詰まらせない)。
     let (tx, rx) = crossbeam_channel::bounded::<crate::input::hook::CloakEvent>(256);
     crate::input::hook::set_cloak_event_sender(tx);
@@ -414,10 +435,14 @@ pub fn spawn_cloak_resolver_thread() {
                         "IME driver switched to the documented EVENT_OBJECT_IME_* path —                          cloak driver stands down (ime_shadow rows now come from the legacy path)"
                     );
                 }
-                // ★ 自分が立てた `IME_ACTIVE` は自分で下ろしてから黙る。
-                if fold.is_active() {
-                    crate::input::hook::IME_ACTIVE.store(false, Ordering::Release);
-                }
+                // ⚠️★★★ **atomics には一切触らずに黙る** (2026-08-23・cross-review 重大)。
+                //   ★ 初版は「自分が立てた `IME_ACTIVE` は自分で下ろす」として
+                //   `store(false)` していたが、⚠️ **AtomicBool に所有者は書いていない。**
+                //   ★ 直前に legacy の `IME_SHOW` が `true` を立てていた場合、
+                //   ここで下ろすと **legacy 側の変換中 pause と dwell 計測を壊す**。
+                //   → ★ 譲るなら完全に譲る。★ 万一 cloak が立てた `true` が残っても、
+                //   `lib.rs` の 8 秒 safety valve が設計どおり回収する
+                //   (⚠️ 「取りこぼした IME_HIDE」と同じ形なので、既存の経路がそのまま効く)。
                 fold = CloakFold::new();
                 continue;
             }
@@ -435,7 +460,7 @@ pub fn spawn_cloak_resolver_thread() {
                     }
                     // ★ 2) 辺の名前ではなく **OS に現在状態を聞く**。
                     //   ⚠️ 聞けなかったときだけ、届いた辺を保険で使う。
-                    let cloaked = dwm_is_cloaked(hwnd).unwrap_or(ev.cloaked);
+                    let cloaked = resolved_cloak_state(dwm_is_cloaked(hwnd), ev.cloaked);
                     let shown = candidate_shown_from_cloak(cloaked);
                     let now = now_ms();
                     if let Some(action) = fold.on_event(ev.hwnd, shown, now) {
@@ -593,6 +618,22 @@ mod tests {
             !is_stale_winevent_active(true, false, false, false),
             "★ 裏取りが構造的に 0 の世界では『常に stale』に退化する → 効かせない"
         );
+    }
+
+    /// ⚠️★ OS の答えが取れたときは**必ずそちらを採る**こと。
+    #[test]
+    fn dwm_answer_wins_over_the_delivered_edge() {
+        // ★ 辺は CLOAKED だが OS は「もう cloak されていない」と答えた → OS を採る。
+        assert!(!resolved_cloak_state(Some(false), true));
+        // ★ 辺は UNCLOAKED だが OS は「まだ cloak されている」と答えた → OS を採る。
+        assert!(resolved_cloak_state(Some(true), false));
+    }
+
+    /// ★ 聞けなかったときだけ辺にフォールバックすること。
+    #[test]
+    fn falls_back_to_the_edge_when_dwm_is_unavailable() {
+        assert!(resolved_cloak_state(None, true));
+        assert!(!resolved_cloak_state(None, false));
     }
 
     #[test]
