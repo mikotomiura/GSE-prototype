@@ -116,6 +116,10 @@ codesign --verify --strict "$M/gse-next.app" || die "フォルダへ置いた後
 
 ( cd "$OUT" && ditto -c -k --sequesterRsrc --keepParent "G1_実施用_macOS" "G1_実施用_macOS.zip" ) \
   || die "macOS の zip を作れません"
+# ⚠️★ `--sequesterRsrc` は AppleDouble (`._*`) を撒かない代わりに `__MACOSX/` へ集める。
+#   ★ 集めただけで消えてはいないので、配る前に取り除く（2026-08-23 実測: 51 エントリ中 25 件が混入）。
+zip -d "$OUT/G1_実施用_macOS.zip" "__MACOSX/*" > /dev/null \
+  || die "macOS zip から __MACOSX を除去できません"
 
 # --- 4. Windows（★ 日本語ファイル名の文字化けを避けるため、こちらも zip で配る） ----
 # ⚠️ Windows に実行ビットの問題は無いが、Drive の「フォルダをダウンロード」で
@@ -172,7 +176,20 @@ for phrase in "右クリック" "開発元を確認できません"; do
 done
 
 rm -rf "$V"
-note "macOS: 展開して検査 ✅（署名 / 実行ビット / g1.mode / セットアップ自己検査 / README 文言）"
+
+# ★ macOS zip 自体にも余計なものが無いことを機械で確かめる（Windows 側と対称の検査）。
+#   ⚠️ `--sequesterRsrc` は __MACOSX/ へ集めるだけで消さない。`zip -d` 後にここで確定させる。
+python3 - "$OUT/G1_実施用_macOS.zip" <<'PY' || exit 1
+import sys, zipfile
+p = sys.argv[1]
+names = zipfile.ZipFile(p).namelist()
+junk = [n for n in names if "__MACOSX" in n or n.endswith("/.DS_Store") or n == ".DS_Store"]
+if junk:
+    sys.exit(f"[make-common-app-zip] ✗ macOS zip に余計なものが入っています: {junk[:3]}")
+print(f"[make-common-app-zip] macOS: 余計なもの無し ✅ ({len(names)} エントリ)")
+PY
+
+note "macOS: 展開して検査 ✅（署名 / 実行ビット / g1.mode / セットアップ自己検査 / README 文言 / __MACOSX 不在）"
 
 # ★ Windows zip は「Windows で化けないこと」を機械で確かめる。
 #   ⚠️ 目で見て判断しない（macOS の unzip は化けて見えても Windows では正しいことがある）。
