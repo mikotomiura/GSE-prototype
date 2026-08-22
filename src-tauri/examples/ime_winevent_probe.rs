@@ -308,6 +308,93 @@ mod windows_probe {
         M.get_or_init(|| Mutex::new(BTreeSet::new()))
     }
 
+    /// ⚠️★★★ **実測G — 追跡対象の窓を定期サンプリングし、「打鍵から遠いとき」の
+    /// cloak 状態を測る。**
+    ///
+    /// ★ **なぜ要るか (2026-08-23・2 回目の計測後)**: 実測 D で順序は取れたが、
+    /// ⚠️ **辺の向きが決まらなかった** —— cloak/uncloak は綺麗に交互で、
+    /// 「長い滞在」が両側に出るため、どちらが「候補が見えている」か区別できない。
+    ///
+    /// ★ **決め手**: **打鍵から十分離れているとき (= 変換していないとき) の状態**である。
+    ///
+    /// | ⚠️ 打鍵から遠いとき | → ★ 結論 |
+    /// |---|---|
+    /// | ほぼ **uncloaked** | ★ `CLOAKED` = 候補表示 (⚠️ **旧コードの仮定どおり。実装を反転させる**) |
+    /// | ほぼ **cloaked** | ★ `UNCLOAKED` = 候補表示 (★ 現在の実装が正しい) |
+    ///
+    /// ⚠️ 実測 E (静止時センサス) との違い: あちらは**開始時の 1 点**しか見ておらず、
+    /// ★ **変換に関与した当の窓を見ていない** (`常駐=no` だった)。
+    /// ★ こちらは**遷移した窓そのもの**を追う。
+    #[derive(Default, Clone, Copy)]
+    struct DwellSample {
+        /// ★ 打鍵から `IDLE_KEY_MS` 以上離れたサンプルのうち cloaked だった数
+        idle_cloaked: u32,
+        /// ★ 同・uncloaked だった数
+        idle_uncloaked: u32,
+        /// ★ 打鍵の近く (`NEAR_KEY_MS` 以内) で cloaked だった数
+        near_cloaked: u32,
+        /// ★ 同・uncloaked だった数
+        near_uncloaked: u32,
+    }
+
+    /// ★ 「変換していない」とみなす打鍵からの距離。⚠️ `NEAR_KEY_MS` より十分長くする。
+    const IDLE_KEY_MS: u64 = 4000;
+
+    /// ★ サンプリング周期。
+    const SAMPLE_PERIOD_MS: u64 = 250;
+
+    /// ★ 実測 D で遷移が観測された窓 (hwnd → クラス)。⚠️ これだけをサンプリングする。
+    #[allow(clippy::type_complexity)]
+    fn tracked_hwnds() -> &'static Mutex<BTreeMap<isize, String>> {
+        static M: OnceLock<Mutex<BTreeMap<isize, String>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ クラス別の集計。
+    #[allow(clippy::type_complexity)]
+    fn dwell_samples() -> &'static Mutex<BTreeMap<String, DwellSample>> {
+        static M: OnceLock<Mutex<BTreeMap<String, DwellSample>>> = OnceLock::new();
+        M.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    /// ★ 追跡中の窓を 1 巡サンプリングする (⚠️ メッセージループ側から呼ぶ。コールバック内では呼ばない)。
+    fn sample_tracked_windows() {
+        let snapshot: Vec<(isize, String)> = match tracked_hwnds().lock() {
+            Ok(m) => m.iter().map(|(k, v)| (*k, v.clone())).collect(),
+            Err(_) => return,
+        };
+        if snapshot.is_empty() {
+            return;
+        }
+        let since_key = now_ms().saturating_sub(LAST_KEY_MS.load(Ordering::Relaxed));
+        for (hwnd, class) in snapshot {
+            let h = HWND(hwnd as *mut std::ffi::c_void);
+            let Some(cloaked) = dwm_is_cloaked(h) else {
+                // ⚠️ 窓が消えていれば追跡から外す (★ 幽霊を数えない)。
+                if let Ok(mut m) = tracked_hwnds().lock() {
+                    m.remove(&hwnd);
+                }
+                continue;
+            };
+            if let Ok(mut m) = dwell_samples().lock() {
+                let e = m.entry(class).or_default();
+                if since_key >= IDLE_KEY_MS {
+                    if cloaked {
+                        e.idle_cloaked += 1;
+                    } else {
+                        e.idle_uncloaked += 1;
+                    }
+                } else if since_key <= NEAR_KEY_MS {
+                    if cloaked {
+                        e.near_cloaked += 1;
+                    } else {
+                        e.near_uncloaked += 1;
+                    }
+                }
+            }
+        }
+    }
+
     /// ⚠️★★★ **実測F 用の生イベント列** —— `(hwnd, shown, epoch_ms)`。
     ///
     /// ★ **なぜ貯めるか**: 60 秒の計測を 1 回やれば、**本番の [`CloakFold`] をそのまま**
@@ -604,6 +691,10 @@ mod windows_probe {
                     .lock()
                     .map(|set| set.contains(&key))
                     .unwrap_or(false);
+                // ★ 実測G: 遷移した窓を追跡対象に入れる (⚠️ サンプリングはループ側で行う)。
+                if let Ok(mut m) = tracked_hwnds().lock() {
+                    m.insert(key, class.clone());
+                }
                 // ⚠️★★★ 実測F: 本番の絞り (`is_ime_cloak_class`) を通ったものだけ貯める。
                 if gse_next_lib::input::ime_cloak::is_ime_cloak_class(&class) {
                     let shown = gse_next_lib::input::ime_cloak::candidate_shown_from_cloak(
@@ -896,6 +987,10 @@ mod windows_probe {
         )?;
         writeln!(
             out,
+            "  ⚠️★★★ **最後の 10 秒はキーボードから完全に手を離してください** (実測G の決め手)"
+        )?;
+        writeln!(
+            out,
             "  → ★ 長い滞在がどちらの辺に挟まれているかで CLOAK/UNCLOAK の意味が決まります"
         )?;
         writeln!(out)?;
@@ -990,6 +1085,8 @@ mod windows_probe {
         let mut next_enum = started;
         let mut next_census = started;
         let mut next_poke = started;
+        // ★ 実測G のサンプリング時刻。
+        let mut next_sample = started;
         let mut msg = MSG::default();
 
         // ---- 問い 3: EnumWindows 経路 (★ 本番の関数をそのまま叩く) ----
@@ -1077,6 +1174,13 @@ mod windows_probe {
                 )?;
                 out.flush()?;
                 next_tick += Duration::from_secs(5);
+            }
+            // ★ 実測G: 追跡中の窓の cloak 状態を定期サンプリングする。
+            //   ⚠️ **ここ (メッセージループ側) で行う** —— WinEvent コールバック内で
+            //   DWM の RPC を回すと `LowLevelHooksTimeout` に触れて打鍵計数を落としうる。
+            if Instant::now() >= next_sample {
+                next_sample += Duration::from_millis(SAMPLE_PERIOD_MS);
+                sample_tracked_windows();
             }
             if Instant::now() >= next_imm {
                 poll_imm();
@@ -1557,6 +1661,69 @@ mod windows_probe {
             }
         }
 
+        // ---- ⚠️★★★ 実測G: 打鍵から遠いときの cloak 状態 (★ 辺の向きの決め手) ----
+        writeln!(out)?;
+        writeln!(
+            out,
+            "== ⚠️★★★ 実測G: **打鍵から遠いとき (= 変換していないとき) の cloak 状態** =="
+        )?;
+        writeln!(
+            out,
+            "  ★ 遷移した窓そのものを {SAMPLE_PERIOD_MS}ms ごとに DWM へ問い合わせた結果。"
+        )?;
+        writeln!(
+            out,
+            "  ★ 遠い = 直近打鍵から {IDLE_KEY_MS}ms 以上 / 近い = {NEAR_KEY_MS}ms 以内"
+        )?;
+        writeln!(
+            out,
+            "  ⚠️★★★ **判定**: 『遠い』がほぼ uncloaked → CLOAKED が候補表示 (実装を反転させる)"
+        )?;
+        writeln!(
+            out,
+            "           　　　『遠い』がほぼ cloaked   → UNCLOAKED が候補表示 (現在の実装が正しい)"
+        )?;
+        match dwell_samples().lock() {
+            Ok(m) if m.is_empty() => {
+                writeln!(
+                    out,
+                    "  (なし) ⚠️ 遷移した窓が無いか、打鍵から離れた区間が無かった"
+                )?;
+            }
+            Ok(m) => {
+                writeln!(
+                    out,
+                    "  {:<28} {:>12} {:>12} {:>12} {:>12}",
+                    "クラス", "遠い:cloak", "遠い:見えてる", "近い:cloak", "近い:見えてる"
+                )?;
+                for (class, d) in m.iter() {
+                    let idle_total = d.idle_cloaked + d.idle_uncloaked;
+                    let verdict = if idle_total == 0 {
+                        "  ⚠️ 遠いサンプルが無く判定不能"
+                    } else if d.idle_cloaked == 0 {
+                        "  ★ 遠い=全部見えてる → CLOAK が候補表示"
+                    } else if d.idle_uncloaked == 0 {
+                        "  ★ 遠い=全部cloak → UNCLOAK が候補表示"
+                    } else {
+                        "  ⚠️ 混在 (★ 比率で読む)"
+                    };
+                    writeln!(
+                        out,
+                        "  {:<28} {:>12} {:>12} {:>12} {:>12}{}",
+                        class,
+                        d.idle_cloaked,
+                        d.idle_uncloaked,
+                        d.near_cloaked,
+                        d.near_uncloaked,
+                        verdict
+                    )?;
+                }
+            }
+            Err(_) => {
+                writeln!(out, "  ⚠️ 集計が取得できません (Mutex poisoned)")?;
+            }
+        }
+
         // ---- ⚠️★★★ 実測F: **本番の CloakFold** を実データで回す (★ debounce 幅の掃き出し) ----
         writeln!(out)?;
         writeln!(
@@ -1615,19 +1782,38 @@ mod windows_probe {
                             }
                         }
                     };
+                    // ⚠️★★★ **イベントの合間も `on_tick` を刻む。**
+                    //   ★ 本番の resolver は `recv_timeout` で **{TICK}ms ごとに必ず**
+                    //   `on_tick` を呼ぶので、debounce はイベントが来なくても満了する。
+                    //   ⚠️ イベント時刻でしか tick しないと、次の `shown` が
+                    //   **必ず debounce を取り消してしまい**、セッションが永久に閉じない
+                    //   (★ 2026-08-23 に実際にこれで「どの debounce でも 0 行」になった)。
+                    const TICK_MS: u64 = 63;
+                    let mut clock = evs.first().map(|e| e.2).unwrap_or(0);
                     for (hwnd, shown, t) in evs.iter() {
+                        // ★ このイベントまで時間を進める。
+                        while clock + TICK_MS <= *t {
+                            clock += TICK_MS;
+                            if let Some(a) = fold.on_tick(clock) {
+                                push(a);
+                            }
+                        }
+                        clock = *t;
                         if let Some(a) = fold.on_event(*hwnd, *shown, *t) {
                             push(a);
                         }
-                        // ★ 本番の resolver と同じく、受信ごとに時間側も進める。
                         if let Some(a) = fold.on_tick(*t) {
                             push(a);
                         }
                     }
-                    // ★ 最後のセッションを閉じる (★ 本番では tick が閉じる)。
+                    // ★ 最後のセッションを閉じる (★ 本番でも tick が閉じる)。
                     let last = evs.last().map(|e| e.2).unwrap_or(0);
-                    if let Some(a) = fold.on_tick(last + gap + 1) {
-                        push(a);
+                    let mut tail = clock;
+                    while tail <= last + gap + TICK_MS {
+                        tail += TICK_MS;
+                        if let Some(a) = fold.on_tick(tail) {
+                            push(a);
+                        }
                     }
                     let total: u64 = dwells.iter().sum();
                     let med = if dwells.is_empty() {
@@ -1657,6 +1843,47 @@ mod windows_probe {
                     out,
                     "  ★ 読み方: debounce を上げると行が減り dwell が伸びる。**変換回数と一致する行数**を選ぶ。"
                 )?;
+                // ⚠️★★★ debounce を勘で選ばないための材料 —— **候補が隠れている区間**の分布。
+                //   ★ debounce はこれより短くないと、別々の変換を 1 行に融合してしまう。
+                {
+                    let mut hidden: Vec<u64> = Vec::new();
+                    let mut last_hide: Option<u64> = None;
+                    let mut open = 0i32;
+                    for (_h, shown, t) in evs.iter() {
+                        if *shown {
+                            open += 1;
+                            if open == 1 {
+                                if let Some(h) = last_hide.take() {
+                                    hidden.push(t.saturating_sub(h));
+                                }
+                            }
+                        } else {
+                            open -= 1;
+                            if open <= 0 {
+                                open = 0;
+                                last_hide = Some(*t);
+                            }
+                        }
+                    }
+                    if hidden.is_empty() {
+                        writeln!(out, "  ⚠️ 候補が隠れている区間が取れなかった")?;
+                    } else {
+                        hidden.sort_unstable();
+                        writeln!(
+                            out,
+                            "  ⚠️★★★ **候補が隠れている区間 (= 変換と変換のあいだ) の分布** (n={}):",
+                            hidden.len()
+                        )?;
+                        for (label, p) in [("最小", 0.0_f64), ("p10", 0.10), ("中央", 0.5)] {
+                            let k = ((hidden.len() - 1) as f64 * p).round() as usize;
+                            writeln!(out, "     {:<4} = {:>8} ms", label, hidden[k])?;
+                        }
+                        writeln!(
+                            out,
+                            "     ★ debounce は **最小値より小さく**すること (⚠️ 超えると別の変換が 1 行に融合する)"
+                        )?;
+                    }
+                }
             }
         }
         writeln!(out)?;

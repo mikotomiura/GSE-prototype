@@ -107,8 +107,41 @@ pub enum FoldAction {
 /// (`IME` 18 : 候補 UI 9 : ホストフレーム 9 = 2 : 1 : 1)。
 /// ⚠️ そのまま流すと `ime_shadow` が **変換 1 回につき 2 行**出る。
 ///
-/// ⚠️★★★ **この値は実測 D のギャップ分布から決めること。勘で置かない。**
-pub const FOLD_GAP_MS: u64 = 250;
+/// # ⚠️★★★ 2026-08-23 の実測で **前提が変わった** (★ それでも残す理由)
+///
+/// ★ 実測 D (打鍵 257・変換 12 回) で、`IME` : 候補UI : ホストフレーム = 2 : 1 : 1 は
+/// **「1 変換 = 2 周期」ではなかった**と分かった。
+/// ⚠️ 正しくは **`IME` クラスの窓が 2 個あり、候補 UI・ホストフレームと
+/// *同じミリ秒で同時に* cloak/uncloak している** (★ 4 窓が完全同期)。
+/// → ★ 畳むべきは「連続 2 往復」ではなく **「窓の重なり」**であり、
+/// それは [`CloakFold`] の **HWND 別の集合**が既に処理している。
+///
+/// ★ **したがって debounce の当初の存在理由は消えた。** ⚠️ それでも 0 にしないのは、
+/// **1 変換の途中に出る短い明滅**を吸収するためである
+/// (★ 別の計測で 116ms だけ見えて消える区間を観測している)。
+///
+/// # ★ 値の根拠 (⚠️ 勘で置いていない)
+///
+/// ★ 実測 D の**候補が隠れている区間 (= 変換と変換のあいだ)** の分布 (n=11):
+///
+/// ```text
+/// 最小 = 308 ms / p10 = 345 ms / 中央 = 1185 ms
+/// ```
+///
+/// ★ 同じ実データを**本番の [`CloakFold`] そのもの**に流した掃き出し:
+///
+/// | debounce | 行 | ⚠️ 判定 |
+/// |---|---|---|
+/// | 0〜250 ms | **12** | ★ 変換回数と一致 (★ どの値でも結果は同一) |
+/// | 300 ms | 11 | ⚠️ **最小ギャップ 308ms を跨いで融合し始める** |
+/// | 400 ms | 9 (+打切 1) | ⚠️ 明確に壊れる |
+///
+/// → ★ **150 ms を採る**: ⚠️ 観測された最小ギャップ 308ms に対し **約 2 倍の余裕**があり、
+/// ★ かつ debounce 中は `IME_ACTIVE` が立ったままなので
+/// **pause の水増しを 1 変換あたり 150ms に抑える** (250ms だと 12 変換で 3 秒)。
+///
+/// ⚠️ **1 台・1 名・60 秒の実測である。** ★ 被験者環境で再確認すること。
+pub const FOLD_GAP_MS: u64 = 150;
 
 /// ⚠️★★ **セッションの上限** —— これを超えたら取りこぼしとみなして強制終了する。
 ///
@@ -404,6 +437,146 @@ mod tests {
             "⚠️★★★ 打ち切りは forced=true でなければならない (行を出させないため)"
         );
         assert!(!f.is_active(), "★ 上限で必ず解ける");
+    }
+
+    // -----------------------------------------------------------------------
+    // ⚠️★★★ 実データ回帰 — 2026-08-23 の実測 D をそのまま流す
+    // -----------------------------------------------------------------------
+
+    /// ★ 2026-08-23 の実測 D で記録した **`IME` クラスの cloak/uncloak 列**。
+    ///
+    /// `(プローブ開始からの ms, 窓の連番, 見えているか)`。
+    /// ★ 打鍵 257・日本語変換 12 回の 60 秒。⚠️ 窓が **2 個 (3 と 4)** あり、
+    /// **同じミリ秒で同時に**動いているのが読み取れる (★ これが 2:1:1 の正体)。
+    ///
+    /// ⚠️ **privacy**: ★ 時刻・不透明な連番・bool だけ。打鍵内容もクラス名も含まない。
+    const RECORDED_IME_EVENTS: &[(u64, isize, bool)] = &[
+        (7180, 3, true),
+        (7180, 4, true),
+        (10521, 3, false),
+        (10521, 4, false),
+        (12904, 3, true),
+        (12904, 4, true),
+        (16142, 3, false),
+        (16142, 4, false),
+        (16487, 3, true),
+        (16487, 4, true),
+        (19516, 3, false),
+        (19516, 4, false),
+        (19824, 3, true),
+        (19824, 4, true),
+        (21114, 3, false),
+        (21114, 4, false),
+        (22337, 3, true),
+        (22337, 4, true),
+        (24298, 3, false),
+        (24298, 4, false),
+        (24649, 3, true),
+        (24649, 4, true),
+        (25669, 3, false),
+        (25669, 4, false),
+        (26854, 3, true),
+        (26854, 4, true),
+        (28926, 3, false),
+        (28926, 4, false),
+        (30536, 3, true),
+        (30536, 4, true),
+        (32454, 3, false),
+        (32454, 4, false),
+        (33172, 3, true),
+        (33172, 4, true),
+        (35585, 3, false),
+        (35585, 4, false),
+        (38172, 3, true),
+        (38172, 4, true),
+        (42272, 3, false),
+        (42272, 4, false),
+        (42873, 3, true),
+        (42873, 4, true),
+        (45194, 3, false),
+        (45194, 4, false),
+        (47580, 3, true),
+        (47580, 4, true),
+        (52129, 3, false),
+        (52129, 4, false),
+    ];
+
+    /// ★ 本番の resolver と同じ刻み (`FOLD_GAP_MS/4+1`) で時間を進めながら流す。
+    fn replay(gap_ms: u64) -> (Vec<u64>, u32) {
+        let tick = gap_ms.max(1) / 4 + 1;
+        let mut fold = CloakFold::with_gap(gap_ms);
+        let mut dwells = Vec::new();
+        let mut forced = 0u32;
+        let mut sink = |a: FoldAction| match a {
+            FoldAction::End {
+                dwell_ms,
+                forced: true,
+            } => {
+                let _ = dwell_ms;
+                forced += 1;
+            }
+            FoldAction::End {
+                dwell_ms,
+                forced: false,
+            } => dwells.push(dwell_ms),
+            FoldAction::Begin(_) => {}
+        };
+        let mut clock = RECORDED_IME_EVENTS[0].0;
+        for (t, hwnd, shown) in RECORDED_IME_EVENTS {
+            while clock + tick <= *t {
+                clock += tick;
+                if let Some(a) = fold.on_tick(clock) {
+                    sink(a);
+                }
+            }
+            clock = *t;
+            if let Some(a) = fold.on_event(*hwnd, *shown, *t) {
+                sink(a);
+            }
+            if let Some(a) = fold.on_tick(*t) {
+                sink(a);
+            }
+        }
+        let last = RECORDED_IME_EVENTS[RECORDED_IME_EVENTS.len() - 1].0;
+        while clock <= last + gap_ms + MAX_SESSION_MS {
+            clock += tick;
+            if let Some(a) = fold.on_tick(clock) {
+                sink(a);
+            }
+        }
+        (dwells, forced)
+    }
+
+    /// ⚠️★★★ **実データで「行数 = 変換回数」になること。**
+    ///
+    /// ★ 60 秒で日本語変換を **12 回**行った記録である。
+    #[test]
+    fn recorded_session_yields_one_row_per_conversion() {
+        let (dwells, forced) = replay(FOLD_GAP_MS);
+        assert_eq!(
+            dwells.len(),
+            12,
+            "★ 実測の変換回数と一致しなければならない (得られた dwell: {dwells:?})"
+        );
+        assert_eq!(forced, 0, "⚠️ 実データで打ち切りが出てはならない");
+        // ★ 明滅由来の極端に短い行が混じっていないこと。
+        assert!(
+            dwells.iter().all(|d| *d >= 300),
+            "⚠️ 300ms 未満の行は明滅の取り込みを疑う: {dwells:?}"
+        );
+    }
+
+    /// ⚠️★★★ **`FOLD_GAP_MS` を上げすぎると別々の変換が 1 行に融合すること**を固定する。
+    ///
+    /// ★ 実測の「候補が隠れている区間」の最小は **308ms** だった。
+    /// → ⚠️ 300ms 以上にすると融合が始まる。★ この境界がテストで見えるようにしておく。
+    #[test]
+    fn too_large_a_debounce_merges_separate_conversions() {
+        assert_eq!(replay(FOLD_GAP_MS).0.len(), 12, "★ 採用値では 12 行");
+        assert!(
+            replay(400).0.len() < 12,
+            "⚠️ 400ms では融合が起きるはず (この境界が動いたら FOLD_GAP_MS の根拠を測り直す)"
+        );
     }
 
     /// ⚠️ セッション外の uncloak で状態が壊れないこと。
