@@ -1,9 +1,33 @@
 # 次セッション開始プロンプト（**Windows 側**）— 作業場行動メモを既決に突き合わせ、空いている所だけを議論する
 
-> ## ★★★ 2026-08-21 実施済み — `.steering/20260821-workspace-behavior-triage/`
+> ## ★★★ 2026-08-21〜22 実施済み — `.steering/20260821-workspace-behavior-triage/`
 >
-> ★ 成果物: `triage.md`（突き合わせ表）/ **`docs/adr/ADR-014`**（常時収集レジーム R3・**Proposed**）/
-> `docs/glossary.md` 3 語 / `.idea` 末尾の「2026-08-21 追記」。⚠️ **コード変更ゼロ**。
+> ### ★ 成果物
+>
+> | 何 | 中身 |
+> |---|---|
+> | `triage.md` | メモ全 42 行の突き合わせ表（既決=一致 27 / 却下 2 / 衝突 6 / 空 9） |
+> | **`docs/adr/ADR-014`**（Proposed） | 常時収集レジーム **R3**。⚠️ **確証に使わない**／★ **非打鍵チャネルを段 1 として凍結した分だけ・記録のみ** |
+> | `survey-input-channels.md` | ★ **Windows / macOS の入力チャネル一次資料サーヴェイ**（subagent 5 本）。★ 識別子ゼロの遷移時刻取得は**両 OS で成立**／⚠️ **アイドルの種別分離は macOS のみ**（★ Raw Input で Windows も可能にする設計）／⚠️★★★ **TSF では他プロセスの composition を観測できない**ことを一次資料で確定 |
+> | `findings-instrument-defects.md` | ⚠️★★★ **既存計器の欠陥 2 件** |
+> | `docs/agent-shared.md` #7 | ⚠️ **「UIPI でブロック」という理由付けの誤りを訂正**（★ 禁止の結論は不変） |
+>
+> ### ⚠️★★★ **コード変更ゼロではなくなった**（2026-08-22・研究者指示）
+>
+> ★ **IME WinEvent 定数が 3 つとも別イベントを指していた**バグを修正した（**PR #109 / v0.1.28**）。
+> ⚠️ **G1 の `obs` / `p_*` に直結**しており、★ **確証標本 0/3 名＝収集開始前**だったので直せた。
+> ⚠️ **収集開始後は `preregistration.md §3.6` により回復不能だった。**
+>
+> ★ 検証: **440 tests** / ⚠️★★★ **ゴールデン byte-equal** / schema drift ゼロ /
+> schema parity exit 0 / `HMM_VERSION` 0.4.0 据え置き。
+>
+> ### ⚠️ 残る宿題
+>
+> 1. ⚠️★★★ **`cargo run --example ime_winevent_probe`**（★ 60 秒・日本語入力）
+>    —— ★ **SKIPOWNPROCESS の取りこぼし**と **0x8030 の発火**を 1 回で測る。**収集開始前に。**
+> 2. ⚠️ **0x8030 の採否**（★ 1 の結果次第。⚠️ 入れるなら収集開始前に限る）
+> 3. ★ **Mac**: タグ push → build → zip → ⚠️ **旧配布物を削除してから** Drive 差し替え
+>    → `_handoff/next-session-prompt-v0128-release-and-redistribution.md`
 >
 > ⚠️★★★ **本ファイル自身に誤りが 2 件あった**（★ 実施時に一次資料で検証・`decisions.md` D-14）:
 >
