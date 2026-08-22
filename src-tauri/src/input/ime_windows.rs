@@ -115,7 +115,13 @@ impl ImeMonitor {
 ///
 /// マッチ判定そのもの (どのクラス名を候補ウィンドウとみなすか、"MSCTFIME UI" や
 /// 完全一致 "IME" をなぜ除外するか) は `is_ime_candidate_class_name` の doc を参照。
-fn is_ime_candidate_window_visible() -> bool {
+///
+/// ⚠️★★★ **2026-08-22 に `pub` へ上げた (収集開始前)。**
+/// ★ 理由: `examples/ime_winevent_probe.rs` から**この関数そのもの**を叩いて
+/// 実機での検出率を測るため。⚠️ プローブ側にロジックを**複製すると
+/// 「複製の方が動いた」という無意味な計測**になり、本番経路の可否を答えられない。
+/// ★ 公開したのは可視性だけで、シグネチャも中身も変えていない。
+pub fn is_ime_candidate_window_visible() -> bool {
     // The callback sets *lparam to true and stops enumeration when an IME window is found.
     unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
         // Skip invisible windows
