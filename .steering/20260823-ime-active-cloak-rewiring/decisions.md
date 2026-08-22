@@ -104,15 +104,28 @@ false positive の点では区別がつかなかった。★ 決め手は**名�
 
 ---
 
-## D-4: 2 経路の**排他** (`LEGACY_IME_EVENT_SEEN`)
+## D-4: 2 経路の**排他** (`LEGACY_IME_EVENT_MS` + recency)
 
-**決定**: 文書化された `EVENT_OBJECT_IME_*`(0x8027-29) が **1 度でも飛んだ端末では、
+**決定**: 文書化された `EVENT_OBJECT_IME_*`(0x8027-29) が **直近 60 秒に飛んでいる端末では、
 cloak 経路は一切手を出さない**。
 
 **理由**: 両方が `IME_COMPOSITION_START_MS` / `IME_SHADOW_*` を書くと**書き手が 2 人**になる。
 ⚠️ この repo が過去に踏んだ事故 (無関係な窓の cloak で `IME_ACTIVE` が立つ) の型そのもの。
 ★ 優先順位を固定すれば、他の IME / OS ビルドで 0x8027-29 が飛ぶ場合に
 **壊れる方向ではなく正しい方 (文書化された経路) が勝つ**。
+
+**⚠️ 初版は不可逆ラッチ (`AtomicBool`) だった。レビューで潰した** ——
+★ それだと**無関係なアプリが 0x8027 を 1 件上げただけで、プロセス寿命の残り全部で
+cloak 経路が無言で停止する**。⚠️ その端末で `ime_shadow` が 0 行に戻っても、解析側は
+「変換しなかった」と「黙った」を**区別できない** (★ この repo が繰り返してきた事故の型)。
+→ ★ **最終到達時刻 + `legacy_path_is_driving()` の recency 判定 (窓 60 秒)** に置換し、
+切替時に `tracing::warn!` を 1 回出す。
+
+**⚠️ 譲るときは atomics に一切触らない** (★ cross-review 重大)。
+初版は「自分が立てた `IME_ACTIVE` は自分で下ろす」としていたが、
+⚠️ **`AtomicBool` に所有者は書かれていない** —— 直前に legacy が立てた `true` を
+潰して legacy 側の pause と dwell 計測を壊しうる。★ 残った `true` は
+`lib.rs` の 8 秒 valve が設計どおり回収する。
 
 ---
 
@@ -128,7 +141,18 @@ cloak 経路は一切手を出さない**。
 `IME_ACTIVE=true` を立てた 100ms 後に必ず折られ、**`ime_shadow` は 1 行も出ない**。
 
 ⚠️ **fail-stuck の防止は失われていない**: `lib.rs` の 8 秒 safety valve と
-`CloakFold::MAX_SESSION_MS` (8 秒) が別々に効く。
+`CloakFold::MAX_SESSION_MS` (**6 秒**) が別々に効く。
+
+★ **6 秒にした理由** (⚠️ 8 秒に揃えない): 揃えると `lib.rs` の valve と**競走**し、
+あちらが先に発火すると **1 回の変換で `ime_shadow` が 2 行**出る
+(★ valve の stale 経路が 1 行 → その直後に fold の `End` が `READY` を立てて 2 行目)。
+⚠️ `const _: () = assert!(MAX_SESSION_MS + 1_000 <= 8_000)` で**コンパイル時に固定**した。
+
+★ **打ち切りは行を出さない**: `FoldAction::End { forced: true }` のときは
+`IME_SHADOW_READY` を立てず `IME_COMPOSITION_START_MS` も 0 に戻す。
+⚠️ そうしないと **`dwell_ms` = 上限そのものの行**が本物の変換と区別できない形で
+NDJSON に入り、`ime_dwell_med` を計器由来の値で汚す。
+★ **1 行失う方が、偽の dwell を 1 行足すより安全である。**
 
 ---
 
