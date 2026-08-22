@@ -105,12 +105,38 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 ///
 /// ★ `threshold_gated` を分けた理屈（「0 行は判定不能」）は、閾値だけでなく
 /// **設定ゲート**にもそのまま当てはまる。→ **第 3 群として分ける。**
-pub const CONFIG_GATED: &[&str] = &[
-    "probe_assignment",
-    "realtime_label",
-    "intervention_decision",
-    "intervention_response",
-];
+///
+/// ⚠️★★★ **2026-08-22 追加: `ime_shadow` もここに入る**（★ 実測で判明）。
+///
+/// ★ `ime_shadow` は `IME_ACTIVE` が `true` になったときにだけ出る。⚠️ その `true` を書くのは
+/// **`hook_windows.rs` の WinEvent コールバック 1 か所だけ**である。
+/// ⚠️★★★ ところが実機計測（2026-08-22・`examples/ime_winevent_probe.rs`）で
+/// **`EVENT_OBJECT_IME_SHOW/HIDE/CHANGE`(0x8027-0x8029) が 60 秒間 1 件も飛ばない**ことが分かった
+/// —— 同じ時間に `TEXTSELECTIONCHANGED` 298 件・`VALUECHANGE` 246 件・
+/// `CREATE`/`DESTROY` 各 680 件が飛んでおり、**日本語入力は確かに行われていた**。
+/// ★ この Windows 11 の IME は候補 UI を**汎用イベント**で表現し、MSAA の IME イベントを上げない。
+///
+/// → ⚠️ **`ime_shadow` は「環境（IME / アプリ）によって丸ごと出ない」**。
+/// ★ `unconditional`（0 行 ＝ 信号が無かった）に置くと **「測れて、無かった」という偽の結論**になる。
+/// ⚠️ これは ADR-013 が防ごうとした**過大申告**そのものである。
+///
+/// ⚠️ **「原理的に不可能」ではない**（別の IME / アプリなら上がりうる）ので、
+/// ★ `config_gated`（**0 行は判定不能**）が正しい群である。
+///
+/// ★ 詳細: `.steering/20260821-workspace-behavior-triage/findings-instrument-defects.md`
+pub fn config_gated() -> Vec<&'static str> {
+    let mut v = vec![
+        "probe_assignment",
+        "realtime_label",
+        "intervention_decision",
+        "intervention_response",
+    ];
+    // ⚠️ ★ 送出元 (`emit_ime_shadow`) が Windows 限定なので、宣言も Windows 限定にする (D2)。
+    #[cfg(target_os = "windows")]
+    v.push("ime_shadow");
+    v.sort_unstable();
+    v
+}
 
 /// ⚠️ ★ **`meta` 行自身**。[`unconditional`] に載せない (その行がこの `meta` なので)。
 /// ★ production では参照しない (載せない、という**不在**の宣言なので) — テストだけが使う。
@@ -119,8 +145,7 @@ const SELF_LINE_TYPE: &str = "meta";
 
 /// このビルドで**送出元が実在し、閾値ゲートが無い**行種。
 ///
-/// ⚠️ ★ **`ime_shadow` は Windows ビルドにしか入らない** (D2)。
-/// 送出元は `lib.rs` の `#[cfg(target_os = "windows")] fn emit_ime_shadow` だけである。
+/// ⚠️★★★ **`ime_shadow` はここに入らない** —— [`config_gated`] へ移した (2026-08-22)。
 pub fn unconditional() -> Vec<&'static str> {
     let mut v = vec![
         "key",
@@ -133,10 +158,9 @@ pub fn unconditional() -> Vec<&'static str> {
         "review_marker",
         "vignette_response",
     ];
-    // ⚠️ ★ **ここが D2 の実体**: `ime_shadow` の送出元は Windows 限定なので、
-    //   宣言も Windows 限定にする。★ 文 (statement) への `#[cfg]` は stable で使える。
-    #[cfg(target_os = "windows")]
-    v.push("ime_shadow");
+    // ⚠️★★★ **2026-08-22: `ime_shadow` はここから [`config_gated`] へ移した。**
+    //   ★ 実機計測で「環境によって丸ごと出ない」ことが分かったため
+    //   (0 行を「信号が無かった」と読ませてはならない)。
     v.sort_unstable();
     v
 }
@@ -176,7 +200,7 @@ pub fn capabilities_json() -> String {
         r#"{{"unconditional":[{}],"threshold_gated":[{}],"config_gated":[{}]}}"#,
         quoted(&unconditional()),
         quoted(THRESHOLD_GATED),
-        quoted(CONFIG_GATED)
+        quoted(&config_gated())
     )
 }
 
@@ -211,7 +235,7 @@ mod tests {
         unconditional()
             .into_iter()
             .chain(THRESHOLD_GATED.iter().copied())
-            .chain(CONFIG_GATED.iter().copied())
+            .chain(config_gated())
             .collect()
     }
 
@@ -312,7 +336,11 @@ mod tests {
     /// 宣言と実装が別々に動いて食い違う経路を塞ぐ (ADR-013 §Context-4)。
     #[test]
     fn ime_shadow_is_declared_only_where_its_emitter_is_compiled() {
-        let declared_here = unconditional().contains(&"ime_shadow");
+        // ⚠️★★★ 2026-08-22: 宣言先を `unconditional` から `config_gated` へ移した
+        //   (実機計測で「環境によって丸ごと出ない」ことが判明したため)。
+        //   ★ このテストが見るのは **OS との整合**であって群ではないので、
+        //   `declared()`（3 群の合併）で判定する。
+        let declared_here = declared().contains("ime_shadow");
         assert_eq!(
             declared_here,
             cfg!(target_os = "windows"),
@@ -347,12 +375,12 @@ mod tests {
     #[test]
     fn capability_groups_are_disjoint() {
         let u: BTreeSet<&str> = unconditional().into_iter().collect();
-        for t in THRESHOLD_GATED.iter().chain(CONFIG_GATED.iter()) {
-            assert!(!u.contains(t), "{t:?} が unconditional と重複している");
+        for t in THRESHOLD_GATED.iter().copied().chain(config_gated()) {
+            assert!(!u.contains(&t), "{t:?} が unconditional と重複している");
         }
-        for t in CONFIG_GATED {
+        for t in config_gated() {
             assert!(
-                !THRESHOLD_GATED.contains(t),
+                !THRESHOLD_GATED.contains(&t),
                 "{t:?} が threshold_gated と重複している"
             );
         }
@@ -382,8 +410,42 @@ mod tests {
                 !u.contains(t),
                 "{t:?} は設定で止まるので unconditional に置いてはならない"
             );
-            assert!(CONFIG_GATED.contains(&t), "{t:?} が config_gated に無い");
+            assert!(config_gated().contains(&t), "{t:?} が config_gated に無い");
         }
+    }
+
+    /// ⚠️★★★ **`ime_shadow` を `unconditional` に戻させない** (2026-08-22)。
+    ///
+    /// ★ 実機計測（`examples/ime_winevent_probe.rs`）で、この Windows 11 の IME が
+    /// **`EVENT_OBJECT_IME_SHOW/HIDE/CHANGE` を 1 件も上げない**ことが分かった
+    /// （⚠️ 同じ 60 秒に `TEXTSELECTIONCHANGED` 298 件・`VALUECHANGE` 246 件が飛んでおり、
+    /// **日本語入力は確かに行われていた**）。
+    /// → ⚠️ `IME_ACTIVE` が `true` にならず `ime_shadow` は **0 行**になる。
+    ///
+    /// ★ `unconditional` に置くと「**測れて、無かった**」という**偽の結論**を機械的に出す。
+    /// ⚠️ ADR-013 が防ごうとした**過大申告**そのものである。
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn ime_shadow_is_config_gated_not_unconditional() {
+        let u: BTreeSet<&str> = unconditional().into_iter().collect();
+        assert!(
+            !u.contains("ime_shadow"),
+            "ime_shadow を unconditional に戻してはならない (0 行が「信号が無かった」と誤読される)"
+        );
+        assert!(
+            config_gated().contains(&"ime_shadow"),
+            "ime_shadow が config_gated に無い (0 行は判定不能でなければならない)"
+        );
+    }
+
+    /// ⚠️ macOS には `emit_ime_shadow` が無いので、**どの群にも宣言しない**。
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn ime_shadow_is_not_declared_on_non_windows() {
+        assert!(
+            !declared().contains("ime_shadow"),
+            "macOS に送出元が無い ime_shadow を宣言してはならない (ADR-013 D2)"
+        );
     }
 
     /// ★ `app_version` は**粗い semver** であること (D6)。

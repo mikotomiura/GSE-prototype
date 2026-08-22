@@ -29,10 +29,13 @@
 >
 > ### ⚠️★★ Windows 側に残っている宿題（★ Mac は待たなくてよい）
 >
-> ★ `WINEVENT_SKIPOWNPROCESS` が **GSE 自身の画面での入力**を落とさないかが**未確認**。
-> ⚠️ 落としているなら、定数を直しても `IME_ACTIVE` は立たない。
-> → ★ **Windows 側が `cargo run --example ime_winevent_probe` で実測する**（§4-2）。
-> ⚠️ **これはリリースを止めない**（★ 修正は入れておいて損が無く、実測は配布後でも間に合う）。
+> ⚠️★★★ **`IME_ACTIVE` の配線を直す（B）** —— ★ **働く検出器（`EnumWindows`）が「無効化用」に
+> しか繋がっておらず、データを産む側は死んだ経路（WinEvent）に繋がっている。**
+> → ★ **別セッションで実施する**
+> （`_handoff/next-session-prompt-ime-active-rewiring-and-idea-followups.md`）。
+>
+> ⚠️ **これはリリースを止めない** —— ★ **A（`config_gated` への移動）で安全側に倒してある**ので、
+> **0 行が「信号が無かった」と誤読されることはもう無い**。
 >
 > → ⚠️★★★ **本セッションは `git checkout main && git pull` の後、`§2-3`（タグ push）から始める。**
 
@@ -228,34 +231,28 @@ dist/_common/G1_実施用_Windows.zip
 - [ ] G-1 二度押しで前ファイルが閉じ、新ファイルができる
 - [ ] ⚠️ 生 NDJSON は repo に置かない（★ 値だけを `.steering/` に転記）
 
-### §4-2 ⚠️★★★ **IME 修正が実際に効いているかの確認**（★ 2026-08-22 追加）
+### §4-2 ✅ **IME の実機計測は完了済み**（2026-08-22・★ Windows 側で実施）
 
-⚠️ **「定数を直した」と「G1 で効く」は別である。** ★ `WINEVENT_SKIPOWNPROCESS` が
-**GSE 自身の画面での入力**を落としていないかを実測する。
+⚠️★★★ **結果は「IME イベントは 1 件も飛ばない」だった**（★ 60 秒 × 3 回）。
 
-```bash
-cd src-tauri
-cargo run --example ime_winevent_probe   # ★ 60 秒間、日本語を入力する
-```
+| 実測 | 数値 |
+|---|---|
+| ★ フックは生きている | `alive = 6544` |
+| ★★★ 日本語入力は確かに行われた | `TEXTSELECTIONCHANGED` **298** / `VALUECHANGE` **246** / `CREATE`=`DESTROY` **680** |
+| ⚠️★★★ **IME イベントは 0** | `IME_SHOW`/`HIDE`/`CHANGE`/`CONV_TARGET` すべて **0** |
+| ⚠️ 旧定数の誤検知率 | `CLOAKED` 84 ＋ `UNCLOAKED` 88 = **60 秒で 172 件** |
 
-★ **2 回走らせる**:
+→ ★ **対処は済んでいる**: `capabilities` の `ime_shadow` を **`config_gated`** へ移した（A）。
+⚠️ **0 行が「信号が無かった」と誤読されることはもう無い。**
+→ ★ **配線の修正（B）は別セッション**（`_handoff/next-session-prompt-ime-active-rewiring-and-idea-followups.md`）。
 
-| # | どこで日本語入力するか | ★ 何が分かるか |
-|---|---|---|
-| 1 | **メモ帳 / Word 等の別アプリ** | ★ 基準（★ SKIP 有無で差が出ないはず） |
-| 2 | ⚠️★★★ **GSE 本体の G1 入力画面** | ★★★ **SKIP 有 だけ 0 なら、修正しても G1 では効かない** |
+⚠️★ **`EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED`(0x8030) は入れない**と決めた
+（★ 実測で **0 件**だったため）。⚠️ **測ってから決めた**ので、根拠は推測ではない。
 
-- [ ] ★ **問い 1**: SKIP有 と SKIP無 の `IME_SHOW`/`IME_HIDE` が**同数**か
-      （★ 同数 → **修正は G1 で効く**。⚠️ SKIP有 だけ 0 → **効かない・別対処が要る**）
-- [ ] ★ **問い 2**: `CONV_TARGET`(0x8030) が **1 件以上**出るか
-      （★ 出る → 採用を検討する価値がある。⚠️ 0 → **そのアプリの UIA プロバイダが上げていない**）
-- [ ] ★ 実起動ログの `ime_state` 行で **`active` が日本語変換中に `true`** になるか
+### §4-3 ★ 配布後に Windows 側で見ること
 
-⚠️★ **`EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED`(0x8030) は v0.1.28 に入れていない。**
-★ 理由: **記録仕様の変更**（`capabilities`・ADR-013 D1）であり、⚠️ **G1 の入力欄は WebView2（Chromium）**
-なので **UIA の TextEdit パターンを上げない可能性が高い**。
-→ ★ **問い 2 が「出る」なら、採否を別途裁く**（⚠️ 収集開始前に限る）。
-★ 根拠と設計は `.steering/20260821-workspace-behavior-triage/survey-input-channels.md §7`。
+- [ ] ⚠️ 実起動ログの `meta` 行で **`capabilities.config_gated` に `ime_shadow` が入っている**こと
+- [ ] ★ `app_version = 0.1.28`
 
 ## §5 ⚠️ 落とし穴（★ 実測）
 
