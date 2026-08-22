@@ -50,7 +50,29 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 4. **フックコールバック**: Atomic 操作 + channel send のみ。ブロッキング禁止 (Win/mac 共通)
 5. **GCD dispatch_sync_f**: メインスレッドからの呼び出し禁止 (デッドロック)
 6. **TCC 権限**: Input Monitoring → Accessibility のフォールバックチェーンを維持
-7. **グローバル TSF フック禁止**: UIPI でブロックされる (Windows のみ)
+7. **他プロセスの TSF composition は観測不可 / グローバルフックによる `WM_IME_*` 傍受も禁止** (Windows のみ)
+   - ⚠️★★★ **2026-08-22 に理由を訂正した。** 旧文は「グローバル TSF フック禁止: **UIPI でブロックされる**」だったが、
+     ★ **UIPI の禁止リスト**（*Windows Integrity Mechanism Design* 逐語: window handle validation /
+     `SendMessage`・`PostMessage` / thread hooks / journal hooks / **DLL injection** の 5 項目）に
+     **TSF も COM も WinEvent out-of-context も含まれていない**。⚠️ かつ UIPI は
+     「**at the same privilege (or integrity) level では一切干渉しない**」ので、
+     同一整合性レベルの通常環境では**発動すらしない**。→ ★ **禁止の結論は変えないが、理由が違う。**
+   - ★ **真の障壁はアーキテクチャである**: `ITfThreadMgr::Activate` は逐語
+     「**Activates TSF for the calling thread**」であり、`ITfSource::AdviseSink` に
+     **リモート対象を指定する引数が構文上存在しない**。Microsoft 自身が
+     「**To access the composition string managed in TSF, the assistive technology products must create
+     the `ITfThreadMgr` in the process of creating the target TSF-enabled applications**」と明記している
+     (*IME and TSF Accessibility in Windows XP*)。
+     ⚠️ **権限を上げても・UIAccess を付けても・管理者で実行しても取得できない**（そういう API が無い）。
+   - ⚠️ **唯一の迂回は自前 TIP（in-proc COM DLL）を全プロセスに常駐させること**だが、
+     **仮名漢字変換エンジンの自作**・**32/64bit 二重配布**（⚠️ 片方欠けると*無音で失敗*）・
+     コード署名・EDR 誤検知・被験者の入力方式の置換という代償があり、**採用しない**。
+   - ⚠️ **DLL 注入を伴うグローバルフック**（`WH_GETMESSAGE` / `WH_CALLWNDPROC`）で `WM_IME_*` を拾うのは
+     **別途禁止** —— ★ こちらは **UIPI 第 5 項（DLL injection）に直撃**する（旧文が部分的に指していたのはこれ）。
+   - ★ **採る手段は WinEvent (`WINEVENT_OUTOFCONTEXT`)**: DLL 注入不要・プロセス跨ぎ可・
+     **コールバック引数に文字列が 1 つも無く content-free が構造的に保証される**。
+     詳細と macOS 側（**公開 API が存在しない**）は
+     `.steering/20260821-workspace-behavior-triage/survey-input-channels.md §7`。
 8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
 9. **エラーハンドリング**: `anyhow::Result` を使用
 10. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
