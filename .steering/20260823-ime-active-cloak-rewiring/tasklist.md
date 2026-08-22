@@ -79,15 +79,11 @@ grep -c '"type":"ime_shadow"' <セッション NDJSON>
 grep -c "IME cloak session truncated" <app log>
 ```
 
-### 2. ★ 代表値の pause 率 (⚠️ 現在の 52.1% は計測手順の産物)
+### 2. ✅ 代表値の pause 率 — **実施済み (2026-08-23)**
 
-```bash
-cd /c/GSE-prototype/src-tauri
-cargo run --example ime_winevent_probe > C:/Users/johnd/probe-natural.txt
-```
-
-⚠️★★★ **今度は「候補を 3 秒保持」を *やらない*。** ★ **普段どおり日本語を書く 60 秒**。
-→ ★ 実測F の `pause率` が代表値になる。⚠️ `findings.md` §4.4 を置き換える。
+★ 自然な打鍵 60 秒 (打鍵 281)。→ **58.7%**（⚠️ 15〜20% ではなかった）。
+→ ★ **信号が「変換セッション全体」を覆うと判明し、pause 自体をやめた**
+(`decisions.md` D-10 / `findings.md` §4.4)。
 
 ### 3. ★ push → PR → CI 緑 → main マージ (v0.1.29)
 

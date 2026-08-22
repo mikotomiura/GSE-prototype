@@ -58,12 +58,35 @@
 | # | ⚠️ 何が変わるか |
 |---|---|
 | 1 | ★ **`ime_shadow` 行が復活する**（v0.1.27 以前は誤った量、v0.1.28 は 0 行） |
-| 2 | ⚠️★★★ **変換中に推論が pause する**（`engine.set_paused`）——★ 設計意図どおりだが、**推定窓が減る** |
+| 2 | ⚠️★★★ **IME による推論の一時停止を *やめた*** —— ★ 旧設計と**逆向きの変更**である |
+| 3 | ⚠️★★★ **`HMM_VERSION` 0.4.0 → 0.5.0** |
 
-★ pause の割合は**自然な打鍵で約 15〜20%** の見積り。
-⚠️ **2026-08-23 の計測で出た 52.1% は採らない** —— ★ 辺の向きを判定するために
-「候補を出したまま 3 秒止まる」を指示した結果であり、**計測手順の産物**である
-（`findings.md` §4.4）。★ 代表値は Windows 側が自然な打鍵で別途取る。
+### ⚠️★★★ 2 について（★ 引き継ぎの当初方針を覆した）
+
+★ 当初は「変換中は pause する（設計意図どおり）」で進める予定だった。
+⚠️ **自然な打鍵の実測でその前提が崩れた** —— この信号は「候補リスト表示」ではなく
+**IME 変換セッション全体**（ローマ字入力の開始〜確定）を覆う。
+
+| ★ 実測 | 値 |
+|---|---|
+| 自然な打鍵での pause 率 | ⚠️ **58.7%**（★ 見積りの 15〜20% ではない） |
+| 実データ fixture `phase1_ime_heavy` | ⚠️★★★ 旧 pause は**推論窓の 94%** を潰していた（6 → 98） |
+
+→ ★ **研究者判断（2026-08-23）: 記録はする。pause はしない。**
+`lib.rs` と `analysis/loop_step.rs` の両方から `set_paused` を外した。
+
+### ⚠️★★★ 3 について — **`gse-dataset` 側に未コミットの変更がある**
+
+★ `ime_dwell` の定義を「候補ウィンドウ滞在」→「**IME 変換セッション長**」へ訂正した。
+⚠️ この doc は `emit_schema` 経由で **`schema/current.json` に載る**ため、
+★ **`gse-dataset/schema/current.json` も更新済み**（⚠️ **未コミット**）。
+
+→ ⚠️★★★ **`gse-dataset` を commit + push しないと CI の parity が落ちる。**
+★ 本タスクで最初に確認すること:
+
+```bash
+cd C:/gse-dataset && git status --short   # ★ schema/current.json が M になっているはず
+```
 
 ### 1.3 ⚠️★★★ **Windows 側の宿題が終わっているか確認してから始める**
 
@@ -100,7 +123,11 @@ cargo fmt --all -- --check
 ```
 
 ★ 期待: **すべて exit 0**。⚠️ Windows 側での実測 exit code は
-`findings.md` §6 にある（test 462 passed / clippy 0 / fmt 0）。
+`findings.md` §6 にある（test 460 + 29 + 1 passed / clippy 0 / fmt 0）。
+
+⚠️★ **ゴールデンは `phase1_ime_heavy` の 1 本だけ再生成されている**（6 → 98）。
+★ 他の 5 本は byte-equal のまま。→ `replay_snapshot_goldens_byte_equal` が
+macOS でも緑であることを確認する。
 
 ⚠️★ **落ちた場合の切り分け**:
 
@@ -213,6 +240,7 @@ dist/_common/G1_実施用_Windows.zip
 
 ## §6 ★ 受け入れ条件（Done）
 
+- [ ] ⚠️★★★ **`gse-dataset` の `schema/current.json` を commit + push した**（→ §1.3 の下）
 - [ ] ★ **macOS で `cargo build` / `cargo test --workspace` / `clippy` / `fmt --check` が全部 0**
 - [ ] ★ PR の CI が**全ジョブ緑**（`frontend-check` の capabilities gate 2 ステップを含む）
 - [ ] ★ `main` にマージされ、`v0.1.29` が main の祖先
