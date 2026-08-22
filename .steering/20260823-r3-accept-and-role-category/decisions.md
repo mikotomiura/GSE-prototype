@@ -283,3 +283,29 @@ raw でも `.` と `>`、`?` と `/` は区別できない。★ 0xBE は**文�
 → ⚠️ **logger → replay の形式契約が直接には検査されていない。**
 ★ 対応案: **静的フィクスチャではなく往復テスト**（logger を実際に走らせて書いたログをそのまま replay する）。
 ★ 理由: **形式ドリフトに強い**（フィクスチャは手で古くなる）。
+
+## D-19: ★ cross-review（Claude × Codex）の結果と対応（2026-08-23）
+
+★ 対象: `4d95db2..HEAD` の 5 パス（348 行）。⚠️ **両者一致の HIGH はゼロ**だった。
+★ Codex 消費: 74,466 → 100,982 / 200,000（予算内）。
+
+| # | 出所 | 指摘 | ★ 判定 | 対応 |
+|---|---|---|---|---|
+| 1 | Claude | `replay.rs` の `collect_key_events` doc が**旧仕様のまま**（D-RC3 の過小評価記述が残存）。同ファイル内の `category_representative_vk` doc とは矛盾 | ★ **採用** | ✅ 修正（解消の経緯と旧仕様を併記） |
+| 2 | Claude | `extract.py` の `_key_vk`（category 優先分岐）に**テストが無い** | ★ **採用** | ✅ `selftest.py` に **S6** を追加（vk / category / 未知 category の 3 経路） |
+| 3 | Codex | ⚠️ **[HIGH]** `schema_dto.rs` の `category: String` 必須化で旧 `{"vk":65}` ログの deserialize が壊れる | ⚠️★★★ **却下（誤検知）** | ★ `LogEntryDto` は **`Deserialize` を実装していない**（`Serialize` + `JsonSchema` のみ）。実読み込みは `ReplayEvent::Key { vk: Option, category: Option }`。⚠️ Codex は **repo を読めず diff hunk 外のモジュール doc を見られない**ため |
+| 4 | Codex | `key_line_records_...` が `contains()` の**文字列一致**で構造検証でない | ★ **採用** | ✅ `serde_json::Value` の**フィールド集合**検査へ置換（`{type,t,category,press}` ちょうど） |
+| 5 | Codex | `SentencePunctuation` の識別性トレードオフ | ★ **却下（対応済み）** | ★ variant doc と `anonymization.md` に明記済み。⚠️ **独立に同じ論点へ到達したこと自体は健全**として記録する |
+| 6 | Codex | `schema_dto` の `category` が **enum でなく String** で、生成 schema が値域を表現できない | ⚠️ **要確認（follow-up）** | ★ 実読み込み側（`replay.rs`）は許可リストで厳密検証済み。⚠️ **やるなら schema 再生成 ＋ gse-dataset 再同期がもう 1 往復要る** → 研究者判断へ |
+| 7 | 自前（D-18） | `category` ＋ **絶対**時刻（logger が今書く形）の replay 検査が無い | ★ **採用** | ✅ **往復テスト**を追加（実際に logger を走らせ、14 カテゴリ全部が 1 度ずつ出ること・時刻が絶対のままであることを検査） |
+
+### ★ 検証（対応後・すべて緑）
+
+`cargo test --workspace` **465 passed / 0 failed** ／ `cargo fmt --check` OK ／
+ゴールデン replay **15 snapshots 一致** ／ schema parity **in sync** ／ `selftest.py` **全項目 ok**。
+
+### ⚠️ cross-review の使い方について分かったこと
+
+⚠️★★★ **Codex は repo を読めないので、diff hunk の外にある事実（モジュール doc・型の derive）を
+根拠にした指摘は誤検知になりやすい。** ★ 本件の HIGH がまさにそれだった。
+→ ★ **Codex の指摘は「repo を読まないと確かめられないか」で先に振り分けると速い。**

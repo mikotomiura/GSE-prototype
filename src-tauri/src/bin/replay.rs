@@ -1364,18 +1364,23 @@ fn collect_paste_events(session_path: &PathBuf) -> Result<(Vec<PasteEvent>, u32)
 
 /// v0.4: NDJSON の `{"type":"key", ...}` 行から press イベントを `KeyPress` 列として抽出する。
 ///
-/// raw は `vk` を保持し (data-privacy ルール1 で記録許可)、匿名化 NDJSON は `category` を
-/// 代表 VK へ逆写像する (`resolve_key_vk`)。Unicode 内容には触れない。
+/// **旧ログ**は `vk` を保持し、**現行の logger と匿名化 NDJSON** は `category` を書く。
+/// どちらも `resolve_key_vk` が吸収する (`vk` を優先し、無ければ代表 VK へ逆写像)。
+/// Unicode 内容には触れない。
 ///
-/// **backspace/delete 判定 (`metrics::is_backspace`) は raw と完全一致**する (backspace/delete
-/// は専用 category)。一方 **文字生成キー判定 (`metrics::is_text_producing`) は匿名化データで
-/// やや過小評価**しうる: `KeyCategory` の粒度は `is_text_producing` より粗く、OEM 句読点
-/// (0xBA-0xC0/0xDB-0xDF/0xE2)・Tab(0x09)・テンキー演算子(0x6A-0x6F) を `Other` に畳み込むため、
-/// これらは匿名化後 text-producing と判別できない (代表 VK 0x07 = 非 text-producing)。これは
-/// #27 の匿名化設計に内在する不可逆な損失で replay 側では復元不可。`--metrics` の
-/// manual_insert_chars 系のみに影響し、**`--snapshot` / 特徴量再計算 (D6) には無影響**
-/// (run_replay は is_text_producing を使わない)。詳細は
-/// `.steering/20260624-replay-category/decisions.md` D-RC3。
+/// ⚠️★★★ **2026-08-23 (ADR-014 判断 6) で D-RC3 の過小評価は解消した。**
+/// `KeyCategory` に `Punctuation` / `SentencePunctuation` / `Tab` を足したので、
+/// **`is_text_producing` が true な VK は 1 つ残らず非 `Other` の category に入る**。
+/// → **`is_backspace` も `is_text_producing` も raw と完全一致する**
+/// (代表 VK `other => 0x07` は「保守的な倒し込み」ではなく**厳密に正しい**値になった)。
+///
+/// **旧仕様 (2026-08-23 以前)**: OEM 句読点 (0xBA-0xC0/0xDB-0xDF/0xE2)・Tab(0x09)・
+/// テンキー演算子(0x6A-0x6F) が `Other` へ畳まれ、匿名化後に text-producing と判別できず、
+/// `--metrics` の manual_insert 系がその件数だけ過小評価されていた
+/// (`.steering/20260624-replay-category/decisions.md` D-RC3)。
+/// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**である。
+///
+/// ★ **`--snapshot` / 特徴量再計算 (D6) には元から無影響** (run_replay は is_text_producing を使わない)。
 fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;

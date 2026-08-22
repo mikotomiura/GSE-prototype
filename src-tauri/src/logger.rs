@@ -2448,27 +2448,111 @@ mod tests {
         drop(logger);
         let _ = fs::remove_file(&p);
 
-        // ⚠️★★★ 生 VK が 1 つも残っていない。
-        assert!(
-            !c.contains(r#""vk""#),
-            "raw vk leaked into the local NDJSON:
-{c}"
-        );
-        // ★ カテゴリが出ており、4 種が別々に弁別されている。
-        for cat in [
-            r#""category":"alphabetic""#,
-            r#""category":"backspace""#,
-            r#""category":"sentence_punctuation""#,
-            r#""category":"punctuation""#,
-        ] {
-            assert!(
-                c.contains(cat),
-                "missing {cat} in:
-{c}"
+        // ⚠️★★★ 文字列 `contains` ではなく **フィールド集合** で検査する
+        //   (cross-review 2026-08-23 の指摘: `!contains("\"vk\"")` は
+        //    「他フィールド名が `vk` を部分文字列に持たない」という暗黙の前提に依存する)。
+        let mut cats: Vec<String> = Vec::new();
+        for line in c.lines().filter(|l| !l.trim().is_empty()) {
+            let v: serde_json::Value =
+                serde_json::from_str(line).unwrap_or_else(|e| panic!("bad json {line}: {e}"));
+            let obj = v.as_object().expect("each line is an object");
+            if obj.get("type").and_then(|t| t.as_str()) != Some("key") {
+                continue;
+            }
+            // ⚠️★★★ `key` 行のキー集合は {type, t, category, press} ちょうど。
+            let keys: std::collections::BTreeSet<&str> = obj.keys().map(|k| k.as_str()).collect();
+            let want: std::collections::BTreeSet<&str> =
+                ["type", "t", "category", "press"].into_iter().collect();
+            assert_eq!(keys, want, "key line field set changed: {line}");
+            cats.push(
+                obj["category"]
+                    .as_str()
+                    .expect("category is a string")
+                    .to_string(),
             );
         }
-        // ★ 全部 `other` に潰れていない。
-        assert!(!c.contains(r#""category":"other""#), "{c}");
+
+        // ★ 4 種が別々に弁別されている (全部 `other` に潰れていない)。
+        assert_eq!(
+            cats,
+            vec![
+                "alphabetic".to_string(),
+                "backspace".to_string(),
+                "sentence_punctuation".to_string(),
+                "punctuation".to_string(),
+            ],
+            "categories were not discriminated as expected"
+        );
+    }
+
+    /// ⚠️★★★ **logger → replay の形式契約**を往復で固定する。
+    ///
+    /// ★ 既存の category 経路は `anonymize_ndjson` を通るため **時刻が相対化された形**
+    /// しか検査していなかった。⚠️ **logger が今書く形（category ＋ *絶対* 時刻）** は
+    /// どのフィクスチャにも無く、形式ドリフトを検知できなかった
+    /// (`.steering/20260823-r3-accept-and-role-category/` D-18)。
+    ///
+    /// ★ 静的フィクスチャではなく **実際に logger を走らせて書いたログ** を検査するので、
+    /// 書き出し側が変わればここが落ちる。
+    #[test]
+    fn logger_output_keeps_absolute_time_and_all_categories() {
+        use crate::analysis::anonymize::KeyCategory;
+
+        let p = rot_test_path("roundtrip", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+
+        // ★ 全 14 カテゴリの代表 VK を 1 つずつ送る。
+        let vks: [u32; 14] = [
+            0x41, 0x30, 0xBA, 0xBE, 0x09, 0x08, 0x2E, 0x20, 0x0D, 0x25, 0x10, 0x70, 0x1B, 0x07,
+        ];
+        tx.send(LogEntry::SessionStart {
+            timestamp: 1_700_000_000_000,
+        })
+        .unwrap();
+        for (i, vk) in vks.iter().enumerate() {
+            tx.send(LogEntry::Key {
+                vk_code: *vk,
+                timestamp: 1_700_000_000_000 + i as u64 * 100,
+                is_press: true,
+            })
+            .unwrap();
+        }
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        let mut seen: Vec<String> = Vec::new();
+        for line in c.lines().filter(|l| !l.trim().is_empty()) {
+            let v: serde_json::Value = serde_json::from_str(line).expect("valid json");
+            if v.get("type").and_then(|t| t.as_str()) != Some("key") {
+                continue;
+            }
+            // ⚠️ 時刻が **絶対のまま** であること (logger は相対化しない)。
+            let t = v["t"].as_u64().expect("t is u64");
+            assert!(
+                t >= 1_700_000_000_000,
+                "logger must keep absolute time: {t}"
+            );
+            seen.push(v["category"].as_str().unwrap().to_string());
+        }
+
+        // ★ 送った VK の category 列と、書かれた category 列が完全一致する。
+        let want: Vec<String> = vks
+            .iter()
+            .map(|vk| KeyCategory::from_vk(*vk).as_str().to_string())
+            .collect();
+        assert_eq!(
+            seen, want,
+            "logger category output drifted from KeyCategory"
+        );
+        // ★ 14 カテゴリすべてが 1 度ずつ現れている (代表 VK の取り違え検出)。
+        let distinct: std::collections::BTreeSet<&String> = seen.iter().collect();
+        assert_eq!(distinct.len(), 14, "representative vks collided: {seen:?}");
     }
 
     /// ★★ 本タスクの核心の回帰: `Rotate` で **2 本のファイルに分かれ**、

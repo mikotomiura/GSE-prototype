@@ -332,6 +332,70 @@ def s4() -> None:
           f"lower={lo['X'].shape} upper={up['X'].shape}")
 
 
+# --------------------------------------------------------------------------
+# S6: key 行の形式 (vk / category) の後方互換
+# --------------------------------------------------------------------------
+def _read_synth(lines: list[dict]) -> dict:
+    """合成 NDJSON を一時ファイルに書き、`extract.read_records` に通す。"""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "synth-keyfmt.ndjson")
+        with open(p, "w", encoding="utf-8") as fh:
+            for o in lines:
+                fh.write(json.dumps(o) + chr(10))
+        return extract.read_records(p)
+
+
+
+def s6_key_format() -> None:
+    """★ ADR-014 判断 6 で logger が `vk` でなく `category` を書くようになった。
+
+    ⚠️ `extract.py` は BS/Del の判定に VK を使うので、**両形式で同じ結果**にならないと
+    旧コホートと新コホートの数字が静かにずれる。★ cross-review (2026-08-23) の指摘。
+    """
+    print("S6 key 行が vk / category のどちらでも同じ presses を返す")
+    t0 = 1_000_000
+    # 英字 / BS / Del / 文末句読点 の 4 種。★ category 側は logger が実際に書く綴りを使う。
+    raw = [
+        {"type": "meta", "session_start": t0, "hmm_version": "0.4.0"},
+        {"type": "session_start", "t": t0},
+        {"type": "key", "t": t0 + 1_000, "vk": 0x41, "press": True},
+        {"type": "key", "t": t0 + 2_000, "vk": 0x08, "press": True},
+        {"type": "key", "t": t0 + 3_000, "vk": 0x2E, "press": True},
+        {"type": "key", "t": t0 + 4_000, "vk": 0xBE, "press": True},
+    ]
+    cat = [
+        {"type": "meta", "session_start": t0, "hmm_version": "0.4.0"},
+        {"type": "session_start", "t": t0},
+        {"type": "key", "t": t0 + 1_000, "category": "alphabetic", "press": True},
+        {"type": "key", "t": t0 + 2_000, "category": "backspace", "press": True},
+        {"type": "key", "t": t0 + 3_000, "category": "delete", "press": True},
+        {"type": "key", "t": t0 + 4_000, "category": "sentence_punctuation", "press": True},
+    ]
+    r_raw = _read_synth(raw)
+    r_cat = _read_synth(cat)
+    # ★ BS/Del の件数が一致する (これが下流の n_bs に効く)。
+    bs_raw = sum(1 for (_, vk) in r_raw["presses"] if extract.is_backspace(vk))
+    bs_cat = sum(1 for (_, vk) in r_cat["presses"] if extract.is_backspace(vk))
+    check(bs_raw == 2, "raw 側の BS/Del が 2 件", f"got {bs_raw}")
+    check(bs_cat == bs_raw, "category 側の BS/Del が raw と一致", f"raw={bs_raw} cat={bs_cat}")
+    # ★ press の総数と時刻列も一致する。
+    check(
+        [t for (t, _) in r_raw["presses"]] == [t for (t, _) in r_cat["presses"]],
+        "press の時刻列が一致",
+    )
+    # ⚠️ 未知 category は -1 に落ち、BS/Del とは判定されない (静かに混ざらない)。
+    unknown = [
+        {"type": "meta", "session_start": t0, "hmm_version": "0.4.0"},
+        {"type": "session_start", "t": t0},
+        {"type": "key", "t": t0 + 1_000, "category": "not_a_real_category", "press": True},
+    ]
+    r_unk = _read_synth(unknown)
+    check(
+        len(r_unk["presses"]) == 1 and not extract.is_backspace(r_unk["presses"][0][1]),
+        "未知 category は press として数えるが BS/Del にはしない",
+    )
+
+
 def main() -> int:
     print("== 自己検査 (silence-presence-decomposition) ==")
     s1a()
@@ -341,6 +405,7 @@ def main() -> int:
     s4()
     s4b()
     s5_codex()
+    s6_key_format()
     print()
     if FAILURES:
         print(f"!! {len(FAILURES)} 件失敗:")
