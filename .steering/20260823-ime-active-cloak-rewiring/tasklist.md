@@ -47,7 +47,7 @@
 - [x] `code-reviewer` + `security-checker` を**並列**起動 → HIGH 3 件すべて対応
 - [x] `/cross-review` (Codex・パス限定 `a5de3e3..HEAD -- src-tauri/src/input/*.rs`) → 重大 1 + 中 2 に対応
       ⚠️ `findings-*.md` は外部へ渡していない (★ 渡したのは `.rs` の diff のみ)
-- [ ] `/finish-task` (⚠️ **実測 D/F と実起動確認が残っているため未実行**)
+- [ ] `/finish-task` (★ 実測・実起動確認とも完了。⚠️ 残るは PR → CI → main → Mac)
 
 ## ⚠️★★★ 残り (★ 人が要る。これが埋まるまで収集を始めない)
 
@@ -67,8 +67,8 @@ cd /c/GSE-prototype/src-tauri && cargo run
 ```
 
 - [x] ✅ **通常のアプリ**で日本語変換 → `ime_shadow` **6 行** (dwell 中央 2502ms)
-- [ ] ⚠️★★★ **G1 画面 (GSE 自身の窓)** で日本語変換 → ★ **ここでも出る**
-      (⚠️ `WINEVENT_SKIPOWNPROCESS` を外したのがこの経路のため。★ 落ちると G1 でだけ 0 行)
+- [x] ✅ ⚠️★★★ **G1 画面 (GSE 自身の窓)** で日本語変換 → ★★★ **45 行出た**
+      (★ `meta` に `hmm_version=0.5.0` / `app_version=0.1.29` が刻まれている)
 - [x] ✅ **無操作 60.3 秒** → `ime_shadow` **0 行**
 - [x] ✅ `IME cloak session truncated` **0 件** / legacy 切替 **0 件** / stale reset **0 件**
       (★ 打ち切り 0 は辺の向きの独立した裏取りでもある。→ `findings.md` §4.6.1)
