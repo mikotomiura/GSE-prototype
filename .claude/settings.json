@@ -109,10 +109,9 @@
     ]
   },
   "permissions": {
+    "defaultMode": "auto",
     "deny": [
       "Bash(chmod -R:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(git push:*)",
       "Bash(git rebase:*)",
       "Bash(git reset --hard:*)",
       "Bash(rm -rf:*)",

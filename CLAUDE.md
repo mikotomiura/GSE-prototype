@@ -56,8 +56,8 @@
 | `hook-constraints` | `hook_*.rs` / `ime_*.rs` のコールバック内 / Atomic フラグ操作 |
 | `hmm-analysis` | `features.rs` / `engine.rs` の特徴量・遷移/放出行列・量子化 |
 | `ml-workflow` | HMM チューニング根拠 / ONNX 移行 / Python 学習スクリプト |
-| `intervention-design` | Nudge / Wall / Zen Timer / `wall_server.rs` |
-| `data-privacy` | `logger.rs` / `hook.rs` / `wall_server.rs` / 外部送信・ML データ収集 |
+| `intervention-design` | Nudge / 介入判定 / HIR (⚠️ Wall は ADR-015 で削除) |
+| `data-privacy` | `logger.rs` / `hook.rs` / 匿名化 / 外部送信・ML データ収集 |
 | `git-workflow` | コミット / ブランチ / バージョン / `.steering/` 記録 |
 | `physical-anchor` | Lv3/Lv4 Physical Anchor / Flutter 連携 |
 | `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
