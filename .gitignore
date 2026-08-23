@@ -55,7 +55,7 @@ src-tauri/target/
 issue.md
 .claude/commands/commands_setup_research_inloop
 .claude/commands/commands_setup/
-.idea/*.md
+.idea/
 # Python
 __pycache__/
 *.pyc
