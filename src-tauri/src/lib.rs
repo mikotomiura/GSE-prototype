@@ -3140,7 +3140,10 @@ pub fn run() {
             let (focus_tx, focus_rx) = crossbeam_channel::bounded::<u64>(256);
             let (pointer_tx, pointer_rx) =
                 crossbeam_channel::bounded::<crate::analysis::pointer_bin::PointerBin>(256);
-            input::observe::start(focus_tx, pointer_tx);
+            // ⚠️★★★ `secure_input` は macOS のみ実装がある（Windows/その他では送信元が無い）。
+            //   容量は小さくてよい（★ 状態が変化したときにしか送られない）。
+            let (secure_tx, secure_rx) = crossbeam_channel::bounded::<bool>(16);
+            input::observe::start(focus_tx, pointer_tx, secure_tx);
 
             // ★ ドレインスレッド: 観測 → `LogEntry`。⚠️ 判断も集計もしない (そのまま流すだけ)。
             let log_tx_observe = log_tx_for_observe;
@@ -3162,6 +3165,29 @@ pub fn run() {
                                 buttons: bin.buttons,
                                 wheel: bin.wheel,
                             });
+                        }
+                        Err(_) => break,
+                    },
+                    recv(secure_rx) -> msg => match msg {
+                        Ok(on) => {
+                            let timestamp = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis() as u64;
+                            // ⚠️★★★ cross-review (Codex) 指摘: `secure_input` は edge-encoded な
+                            //   区間フラグであり、`observe_macos.rs` 側のチャネル送信は
+                            //   HIGH-1 是正で保護済みだが、この 2 段目（ロガーへの送信）は
+                            //   focus/pointer と同じ「送れなくても待たない」パターンのままだった。
+                            //   ★ ここが落ちても致命的ではない (edge を失っても次回の変化で
+                            //   復帰する) が、focus/pointer と違って**検知手段が無い**ままだと
+                            //   ADR-013 の「黙って消さない」原則に反するため、少なくとも数える。
+                            if log_tx_observe
+                                .try_send(LogEntry::SecureInput { timestamp, on })
+                                .is_err()
+                            {
+                                crate::input::observe::OBSERVATIONS_DROPPED
+                                    .fetch_add(1, Ordering::Relaxed);
+                            }
                         }
                         Err(_) => break,
                     },

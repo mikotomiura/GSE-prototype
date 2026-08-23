@@ -152,6 +152,14 @@ lazy_static = "1.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = { version = "0.24", features = ["highsierra"] }
 core-foundation = "0.10"
+# O1 L-c フォーカス遷移 (`NSWorkspace.didActivateApplicationNotification`) 用。
+# Cocoa/AppKit API は Carbon の `#[link] extern "C"` パターン (ime_macos.rs/hook_macos.rs)
+# では書けない (C シムが無い)。バージョンは Tauri の macOS バックエンド (tao/wry) が既に
+# 推移依存として Cargo.lock に解決しているものに合わせ、新たな解決リスクを増やさない。
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = "0.3"
+block2 = "0.6"
 # overlay 窓を非アクティブ NSPanel 化し、フォーカスを奪わずクリックを webview へ配送する
 # (透明 overlay 窓のクリック無反応の真因対処。decisions D7)。crates.io 未掲載のため git 固定。
 # v2 ブランチ = 既存窓を `WebviewWindowExt::to_panel()` で変換する API。
