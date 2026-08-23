@@ -259,40 +259,55 @@ pub fn step(
                 return out;
             }
 
-            state.extractor.process_event(event);
+            // ⚠️★★★ **ゲート分割の内側**（ADR-016 **D8**・2026-08-23）。
+            //
+            // ★ ここから下が「特徴量へ流す」処理である。⚠️ **`out.key` は既に上で立てて
+            //   あるので、このゲートに落ちたキーも *記録* はされる**（＝ 修飾キー / F1–F12 /
+            //   Esc / 矢印を「種類だけ」NDJSON に残す）。
+            //
+            // ⚠️★★★ **本番と `gse-replay` の両方がこの関数を通る**ので、ゲートはここ 1 か所で足りる。
+            //   ★ replay 側に書き足すと 2 つの真実ができ、片方だけ直して静かにずれる。
+            //
+            // ⚠️ **1Hz ゲート（下の `next_engine_update_ms` の節）へは落とさない** ——
+            //   ★ `return` すると観測専用キーが来たティックで feat の発火が 1 回遅れる。
+            //   ⚠️ それは「特徴量に流さない」ではなく「**出力のタイミングを変える**」であり、
+            //   本ゲートの約束（特徴量は 1 バイトも変わらない）を破る。
+            if crate::analysis::key_gate::is_feature_key(event.vk_code) {
+                state.extractor.process_event(event);
 
-            // ポーズ→復帰遷移: バッファをクリアして stale なフライトタイムを排除。
-            if state.was_paused {
-                state.was_paused = false;
-                state.extractor.reset();
-                state.last_event_time_ms = now_ms;
-                state.presses_since_silence = 0;
-                tracing::debug!("IME pause ended — buffer cleared for clean restart");
-            }
-
-            if event.is_press {
-                // Silence-break protection (non-repeat only):
-                // 10 秒以上の沈黙後、3 打鍵以上の連続入力で初めて
-                // last_event_time をリセットし「タイピング復帰」と判定する。
-                if !event.is_repeat {
-                    let elapsed_ms = now_ms.saturating_sub(state.last_event_time_ms);
-                    if elapsed_ms > 10_000 {
-                        state.presses_since_silence += 1;
-                        if state.presses_since_silence >= 3 {
-                            state.last_event_time_ms = now_ms;
-                            state.presses_since_silence = 0;
-                            // Phase 2a: 長沈黙からの復帰時に古い文脈をクリア
-                            state.pre_silence_features = None;
-                        }
-                    } else {
-                        state.last_event_time_ms = now_ms;
-                        state.presses_since_silence = 0;
-                    }
+                // ポーズ→復帰遷移: バッファをクリアして stale なフライトタイムを排除。
+                if state.was_paused {
+                    state.was_paused = false;
+                    state.extractor.reset();
+                    state.last_event_time_ms = now_ms;
+                    state.presses_since_silence = 0;
+                    tracing::debug!("IME pause ended — buffer cleared for clean restart");
                 }
 
-                // Backspace ストリークカウント（1Hz gate の外側で全打鍵）
-                // リピートイベントも含める: BS 長押しによる一気消しでペナルティを発動させる
-                engine.register_keystroke(event.is_backspace);
+                if event.is_press {
+                    // Silence-break protection (non-repeat only):
+                    // 10 秒以上の沈黙後、3 打鍵以上の連続入力で初めて
+                    // last_event_time をリセットし「タイピング復帰」と判定する。
+                    if !event.is_repeat {
+                        let elapsed_ms = now_ms.saturating_sub(state.last_event_time_ms);
+                        if elapsed_ms > 10_000 {
+                            state.presses_since_silence += 1;
+                            if state.presses_since_silence >= 3 {
+                                state.last_event_time_ms = now_ms;
+                                state.presses_since_silence = 0;
+                                // Phase 2a: 長沈黙からの復帰時に古い文脈をクリア
+                                state.pre_silence_features = None;
+                            }
+                        } else {
+                            state.last_event_time_ms = now_ms;
+                            state.presses_since_silence = 0;
+                        }
+                    }
+
+                    // Backspace ストリークカウント（1Hz gate の外側で全打鍵）
+                    // リピートイベントも含める: BS 長押しによる一気消しでペナルティを発動させる
+                    engine.register_keystroke(event.is_backspace);
+                }
             }
         }
         Some(LoopInput::ImeActivate { active: _ }) => {

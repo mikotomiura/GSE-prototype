@@ -166,6 +166,28 @@ enum ReplayEvent {
     /// 回帰は `hook_health_line_is_skipped_by_run_replay` が張っている。
     #[serde(rename = "hook_health")]
     HookHealth(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️★★★ **O1 (R3) で足した 4 行種**。★ どれも **読み飛ばし専用**である。
+    ///
+    /// ## ★ なぜ variant を足さなければならないのか（⚠️ 「読まないなら不要」ではない）
+    ///
+    /// ★ `run_replay` は**未知タグを `Err` にして中断する**（`--metrics` 側だけが lenient）。
+    /// → ⚠️★★★ **行種を足したのにここへ足し忘れると、その形式のログが 1 本も replay できなくなる**
+    /// （= Replay-as-Truth が切れる）。★ 2026-08-09 に `hook_health` で実測済みの失敗様式である。
+    ///
+    /// ## ⚠️ 特徴量には 1 バイトも流さない（ADR-014 **D4b**）
+    ///
+    /// ★ `timestamp()` が `None` を返すので時刻順ソートからも外れ、`step()` を 1 度も呼ばない。
+    #[serde(rename = "recording_pause")]
+    RecordingPause(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️ 読み飛ばし専用（上記 `RecordingPause` の doc を参照）。
+    #[serde(rename = "focus_transition")]
+    FocusTransition(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️ 読み飛ばし専用（同上）。
+    #[serde(rename = "pointer_bin")]
+    PointerBin(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️ 読み飛ばし専用（同上）。
+    #[serde(rename = "secure_input")]
+    SecureInput(#[allow(dead_code)] serde_json::Value),
     /// v0.3 較正スモーク: セッション宣言。`--calibration` 経路で track を抽出する。
     /// snapshot/run_replay 経路では `timestamp()==None` で読み飛ばす。
     #[serde(rename = "session_meta")]
@@ -174,7 +196,6 @@ enum ReplayEvent {
         #[allow(dead_code)]
         task_kind: String,
         #[allow(dead_code)]
-        monk_mode: bool,
         #[allow(dead_code)]
         intervention_enabled: bool,
         // 新フィールド (WBS 0.11 / 0.4)。旧フィクスチャ互換のため `#[serde(default)]`。
@@ -254,6 +275,12 @@ impl ReplayEvent {
             ReplayEvent::InterventionResponse(_) => None,
             // 診断行。ゲート進行を動かさないので時刻順ソートから除外する。
             ReplayEvent::HookHealth(_) => None,
+            // ⚠️★★★ O1 (R3) の 4 行種。★ **記録のみ・推論に 1 バイトも流さない**
+            //   (ADR-014 D4b) ので、`None` を返して時刻順ソートから外す。
+            ReplayEvent::RecordingPause(_) => None,
+            ReplayEvent::FocusTransition(_) => None,
+            ReplayEvent::PointerBin(_) => None,
+            ReplayEvent::SecureInput(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
             // run_replay (snapshot 経路) の時刻順ソートからは除外する (UserLabel と同方針)。
             ReplayEvent::SessionMeta { .. } => None,
@@ -442,16 +469,26 @@ fn is_backspace(vk: u32) -> bool {
 /// `category_representative_vk_roundtrips` テストが lib の `KeyCategory::from_vk` で drift を検出する。
 /// 未知 category は `None` (forward-compat、呼び出し側で件数を warn してスキップ)。
 ///
-/// **`is_text_producing` との関係 (decisions.md D-RC3)**: 10 個の非 `other` category は
-/// 代表 VK が is_text_producing も raw と一致する (text-producing = alphabetic/numeric/space/enter)。
-/// `other` のみ raw 側に text-producing キー (OEM 句読点/Tab/テンキー演算子) と非 text-producing が
-/// 混在するが、匿名化で区別が失われるため代表 `0x07` は **非 text-producing 側に倒す** (保守的)。
-/// これは `--metrics` のみに影響し run_replay 特徴量 (D6) には無影響。
+/// **`is_text_producing` との関係 (decisions.md D-RC3 / ADR-014 判断 6)**:
+/// **2026-08-23 に D-RC3 の制約は解消した。** `KeyCategory` に `Punctuation` (OEM 句読点/記号 +
+/// テンキー演算子) と `Tab` を足したので、**`is_text_producing` が true な VK は 1 つ残らず
+/// 非 `other` category に入る**。したがって `other` の代表 `0x07` (非 text-producing) は
+/// **保守的な倒し込みではなく厳密に正しい**値になり、`--metrics` の `manual_insert` 系の
+/// 過小評価 (旧: OEM 句読点/Tab/テンキー演算子の件数分) は **ゼロ**になった。
+///
+/// 旧仕様: これらは `Other` へ畳まれ、匿名化後に text-producing と判別できなかった。
+/// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**であり、
+/// 構造的な過小評価は研究上許容できない (`.steering/20260823-r3-accept-and-role-category/` D-7)。
 fn category_representative_vk(category: &str) -> Option<u32> {
     // anonymize.rs `KeyCategory::from_vk` の逆。各 category の代表 VK を 1 つ選ぶ。
     let vk = match category {
         "alphabetic" => 0x41, // 'A' (0x41..=0x5A) — text-producing
         "numeric" => 0x30,    // '0' (0x30..=0x39) — text-producing
+        // VK_OEM_1 (';') — text-producing。⚠️ 0xBE / 0xBC は SentencePunctuation なので使えない。
+        "punctuation" => 0xBA,
+        // VK_OEM_PERIOD ('.') — text-producing。boundary keys の「文間」。
+        "sentence_punctuation" => 0xBE,
+        "tab" => 0x09,        // VK_TAB — text-producing
         "backspace" => 0x08,  // VK_BACK — is_backspace
         "delete" => 0x2E,     // VK_DELETE — is_backspace
         "space" => 0x20,      // VK_SPACE — text-producing
@@ -460,8 +497,8 @@ fn category_representative_vk(category: &str) -> Option<u32> {
         "modifier" => 0x10,   // VK_SHIFT
         "function" => 0x70,   // VK_F1 (0x70..=0x7B)
         "escape" => 0x1B,     // VK_ESCAPE
-        // from_vk の既定 (どのレンジにも入らず Other へ) かつ !is_text_producing。
-        // raw の Other には text-producing キーも混在するが匿名化で復元不可 (D-RC3)。
+        // from_vk の既定 (どのレンジにも入らず Other へ)。
+        // 2026-08-23 以降、raw の Other に text-producing キーは混在しない (上記 doc)。
         "other" => 0x07,
         _ => return None,
     };
@@ -1354,18 +1391,23 @@ fn collect_paste_events(session_path: &PathBuf) -> Result<(Vec<PasteEvent>, u32)
 
 /// v0.4: NDJSON の `{"type":"key", ...}` 行から press イベントを `KeyPress` 列として抽出する。
 ///
-/// raw は `vk` を保持し (data-privacy ルール1 で記録許可)、匿名化 NDJSON は `category` を
-/// 代表 VK へ逆写像する (`resolve_key_vk`)。Unicode 内容には触れない。
+/// **旧ログ**は `vk` を保持し、**現行の logger と匿名化 NDJSON** は `category` を書く。
+/// どちらも `resolve_key_vk` が吸収する (`vk` を優先し、無ければ代表 VK へ逆写像)。
+/// Unicode 内容には触れない。
 ///
-/// **backspace/delete 判定 (`metrics::is_backspace`) は raw と完全一致**する (backspace/delete
-/// は専用 category)。一方 **文字生成キー判定 (`metrics::is_text_producing`) は匿名化データで
-/// やや過小評価**しうる: `KeyCategory` の粒度は `is_text_producing` より粗く、OEM 句読点
-/// (0xBA-0xC0/0xDB-0xDF/0xE2)・Tab(0x09)・テンキー演算子(0x6A-0x6F) を `Other` に畳み込むため、
-/// これらは匿名化後 text-producing と判別できない (代表 VK 0x07 = 非 text-producing)。これは
-/// #27 の匿名化設計に内在する不可逆な損失で replay 側では復元不可。`--metrics` の
-/// manual_insert_chars 系のみに影響し、**`--snapshot` / 特徴量再計算 (D6) には無影響**
-/// (run_replay は is_text_producing を使わない)。詳細は
-/// `.steering/20260624-replay-category/decisions.md` D-RC3。
+/// ⚠️★★★ **2026-08-23 (ADR-014 判断 6) で D-RC3 の過小評価は解消した。**
+/// `KeyCategory` に `Punctuation` / `SentencePunctuation` / `Tab` を足したので、
+/// **`is_text_producing` が true な VK は 1 つ残らず非 `Other` の category に入る**。
+/// → **`is_backspace` も `is_text_producing` も raw と完全一致する**
+/// (代表 VK `other => 0x07` は「保守的な倒し込み」ではなく**厳密に正しい**値になった)。
+///
+/// **旧仕様 (2026-08-23 以前)**: OEM 句読点 (0xBA-0xC0/0xDB-0xDF/0xE2)・Tab(0x09)・
+/// テンキー演算子(0x6A-0x6F) が `Other` へ畳まれ、匿名化後に text-producing と判別できず、
+/// `--metrics` の manual_insert 系がその件数だけ過小評価されていた
+/// (`.steering/20260624-replay-category/decisions.md` D-RC3)。
+/// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**である。
+///
+/// ★ **`--snapshot` / 特徴量再計算 (D6) には元から無影響** (run_replay は is_text_producing を使わない)。
 fn collect_key_events(session_path: &PathBuf) -> Result<Vec<KeyPress>, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
@@ -1788,6 +1830,11 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::InterventionDecision(_)
             | ReplayEvent::InterventionResponse(_)
             | ReplayEvent::HookHealth(_)
+            // ⚠️★★★ O1 (R3) の 4 行種は **読み飛ばす**。★ 特徴量へ流さない (ADR-014 D4b)。
+            | ReplayEvent::RecordingPause(_)
+            | ReplayEvent::FocusTransition(_)
+            | ReplayEvent::PointerBin(_)
+            | ReplayEvent::SecureInput(_)
             | ReplayEvent::SessionMeta { .. }
             | ReplayEvent::ProbeAssignment { .. }
             | ReplayEvent::RealtimeLabel { .. }
@@ -2327,6 +2374,54 @@ mod tests {
     /// (`parse error: unknown variant 'hook_health'`)。
     /// ⚠️ ゴールデン fixture は全て旧形式なので、**ゴールデンが緑でもこの事故は検出できない**。
     #[test]
+    /// ⚠️★★★ **O1 (R3) の 4 行種が `--snapshot` 経路を落とさない**こと。
+    ///
+    /// ★ `run_replay` は**未知タグを `Err` にして中断する**ので、行種を足して
+    /// `ReplayEvent` に足し忘れると **その形式のログが 1 本も replay できなくなる**。
+    /// ⚠️ 2026-08-09 に `hook_health` で実測した失敗様式の再発防止である。
+    ///
+    /// ★ 併せて **FeatSnapshot 列が 1 件も変わらない**ことを見る ——
+    /// ⚠️ ADR-014 **D4b**（記録のみ・推論に 1 バイトも流さない）が実行可能な契約になる。
+    #[test]
+    fn o1_observation_lines_are_skipped_by_run_replay() {
+        let lines = [
+            r#"{"type":"recording_pause","t":120000,"paused":true}"#,
+            r#"{"type":"focus_transition","t":120100}"#,
+            r#"{"type":"pointer_bin","t":120200,"moved":3,"buttons":1,"wheel":0}"#,
+            r#"{"type":"secure_input","t":120300,"on":true}"#,
+        ];
+        for line in lines {
+            let ev: ReplayEvent = serde_json::from_str(line).unwrap_or_else(|e| {
+                panic!("O1 の行がパースできない: {line} ({e})");
+            });
+            assert_eq!(
+                ev.timestamp(),
+                None,
+                "O1 の行は時刻順ソートから除外する: {line}"
+            );
+        }
+
+        let mut ndjson =
+            std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read minimal fixture");
+        for line in lines {
+            ndjson.push_str(line);
+            ndjson.push_str("\n");
+        }
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_o1_observation_replay_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let with_lines = run_replay(&tmp).expect("run_replay must accept O1 observation lines");
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+        assert_eq!(
+            with_lines, baseline,
+            "O1 の観測行は FeatSnapshot 列を 1 ビットも変えてはならない (ADR-014 D4b)"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
     fn hook_health_line_is_skipped_by_run_replay() {
         let line =
             r#"{"type":"hook_health","t":120000,"alive":false,"starved_ms":120000,"rehook":true}"#;
@@ -2766,6 +2861,9 @@ mod tests {
         let categories = [
             "alphabetic",
             "numeric",
+            "punctuation",
+            "sentence_punctuation",
+            "tab",
             "backspace",
             "delete",
             "space",
@@ -2793,9 +2891,19 @@ mod tests {
                 expect_bs,
                 "is_backspace mismatch for category {cat}"
             );
-            // is_text_producing 不変条件 (D-RC3): text-producing category は
-            // alphabetic/numeric/space/enter のみ。`other` は保守的に非 text-producing。
-            let expect_text = matches!(cat, "alphabetic" | "numeric" | "space" | "enter");
+            // is_text_producing 不変条件 (ADR-014 判断 6): text-producing category は
+            // alphabetic/numeric/punctuation/tab/space/enter。`other` は厳密に非 text-producing
+            // (text-producing な VK は 1 つ残らず上記 6 category のいずれかに入るため)。
+            let expect_text = matches!(
+                cat,
+                "alphabetic"
+                    | "numeric"
+                    | "punctuation"
+                    | "sentence_punctuation"
+                    | "tab"
+                    | "space"
+                    | "enter"
+            );
             assert_eq!(
                 gse_next_lib::analysis::metrics::is_text_producing(vk),
                 expect_text,
@@ -3007,10 +3115,10 @@ mod tests {
                 r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.4.0"}"#,
                 "
 ",
-                r#"{"type":"session_meta","track":"main","task_kind":"argumentative","monk_mode":false,"intervention_enabled":false,"ts":1700000000000}"#,
+                r#"{"type":"session_meta","track":"main","task_kind":"argumentative","intervention_enabled":false,"ts":1700000000000}"#,
                 "
 ",
-                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":1700000010000}"#,
+                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","intervention_enabled":false,"ts":1700000010000}"#,
                 "
 ",
                 r#"{"type":"key","t":1700000000200,"vk":65,"press":true}"#,
@@ -3045,7 +3153,7 @@ mod tests {
                 r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.4.0"}"#,
                 "
 ",
-                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":1700000000000}"#,
+                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","intervention_enabled":false,"ts":1700000000000}"#,
                 "
 ",
                 r#"{"type":"session_start","t":1700000000000}"#,
@@ -3101,13 +3209,19 @@ mod tests {
         }
     }
 
-    /// **`--metrics` 経路の既知の制約を明示・回帰ロックする (D-RC3)**。匿名化は `is_text_producing`
-    /// より粗い `KeyCategory` を使うため、OEM 句読点・Tab・テンキー演算子 (= raw では text-producing
-    /// だが匿名化で `Other`) が匿名化後に text-producing と判別できず、`collect_key_events` →
-    /// manual_insert 系がちょうどその件数だけ過小評価される。これは #27 の匿名化設計に内在し
-    /// replay では復元不可。**backspace/delete 判定は完全一致**することも併せて確認する。
+    /// **`--metrics` 経路の text-producing 判定が匿名化後も raw と完全一致することを回帰ロックする**
+    /// (ADR-014 判断 6 / `.steering/20260823-r3-accept-and-role-category/` D-7)。
+    ///
+    /// **旧仕様 (2026-08-23 以前)**: 匿名化は `is_text_producing` より粗い `KeyCategory` を使い、
+    /// OEM 句読点・Tab・テンキー演算子 (= raw では text-producing だが匿名化で `Other`) が
+    /// 匿名化後に判別できず、`collect_key_events` → manual_insert 系がその件数だけ過小評価された。
+    /// `manual_contribution_ratio` は `research-positioning.md §5` **H-Y の主要アウトカム**であり、
+    /// 構造的な過小評価は研究上許容できない。
+    ///
+    /// **現仕様**: `Punctuation` / `SentencePunctuation` / `Tab` category を足したので過小評価は **ゼロ**。
+    /// **backspace/delete 判定が完全一致**することも併せて確認する。
     #[test]
-    fn anonymized_metrics_text_producing_undercounts_other_folded_keys() {
+    fn anonymized_metrics_text_producing_matches_raw_exactly() {
         use gse_next_lib::analysis::metrics::{is_backspace, is_text_producing};
 
         let raw_path = fixture_path("category_coverage.ndjson");
@@ -3130,12 +3244,12 @@ mod tests {
         let raw_text_keys = raw_keys.iter().filter(|k| is_text_producing(k.vk)).count();
         let anon_text_keys = anon_keys.iter().filter(|k| is_text_producing(k.vk)).count();
         // raw の text-producing: A,0,numpad7,space,enter,comma,Tab,numpad* = 8。
-        // 匿名化後: alphabetic,numeric,numeric(numpad7),space,enter = 5
-        //   (comma/Tab/numpad* は Other → 0x07 → 非 text-producing)。差 = 3。
+        // 匿名化後も 8 — comma は `sentence_punctuation`、numpad* は `punctuation`、
+        // Tab は `tab` へ入るため。
         assert_eq!(raw_text_keys, 8, "raw text-producing key count");
         assert_eq!(
-            anon_text_keys, 5,
-            "anonymized undercounts the 3 Other-folded text keys (comma/Tab/numpad*)"
+            anon_text_keys, raw_text_keys,
+            "anonymized text-producing count must match raw exactly (no Other-folding loss)"
         );
 
         // backspace/delete 判定は完全一致 (専用 category)。raw に backspace+delete = 2。

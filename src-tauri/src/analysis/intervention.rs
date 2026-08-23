@@ -1,20 +1,14 @@
 use serde::Serialize;
 
 const NUDGE_NEED_THRESHOLD: f64 = 0.60;
-const WALL_NEED_THRESHOLD: f64 = 0.70;
-const WALL_SLACK_THRESHOLD: f64 = 0.50;
 const NUDGE_OPPORTUNITY_THRESHOLD: f64 = 0.35;
-const WALL_OPPORTUNITY_THRESHOLD: f64 = 0.45;
-const WALL_ACCUMULATION_MS: u64 = 30_000;
 const NUDGE_COOLDOWN_MS: u64 = 10 * 60 * 1000;
-const WALL_COOLDOWN_MS: u64 = 60 * 60 * 1000;
 const RECENT_DISMISS_MS: u64 = 20 * 60 * 1000;
 const SHORT_PAUSE_MIN_MS: u64 = 2_000;
 const SHORT_PAUSE_MAX_MS: u64 = 8_000;
 const MEDIUM_PAUSE_MAX_MS: u64 = 30_000;
 const AWAY_IDLE_MS: u64 = 180_000;
 const NUDGE_DAILY_CAP: u32 = 6;
-const WALL_DAILY_CAP: u32 = 1;
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -22,7 +16,6 @@ const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 pub enum InterventionAction {
     None,
     Nudge,
-    Wall,
     Defer,
 }
 
@@ -31,7 +24,6 @@ impl InterventionAction {
         match self {
             Self::None => "none",
             Self::Nudge => "nudge",
-            Self::Wall => "wall",
             Self::Defer => "defer",
         }
     }
@@ -40,7 +32,6 @@ impl InterventionAction {
         match value {
             "none" => Some(Self::None),
             "nudge" => Some(Self::Nudge),
-            "wall" => Some(Self::Wall),
             "defer" => Some(Self::Defer),
             _ => None,
         }
@@ -104,10 +95,7 @@ impl OpportunityReason {
 #[derive(Debug, Clone, Copy)]
 pub struct InterventionThresholds {
     pub nudge_need: f64,
-    pub wall_need: f64,
-    pub wall_slack: f64,
     pub nudge_opportunity: f64,
-    pub wall_opportunity: f64,
     /// 評価用 correction_after_pause veto フロア (既定 `None` = production 不変)。
     /// `Some(fl)` のとき、`correction_after_pause` の Nudge を `f4 < fl` なら抑制する。
     /// `correction_f6_floor` と **OR** で評価し、どちらか下回れば defer に落とす。
@@ -122,10 +110,7 @@ impl Default for InterventionThresholds {
     fn default() -> Self {
         Self {
             nudge_need: NUDGE_NEED_THRESHOLD,
-            wall_need: WALL_NEED_THRESHOLD,
-            wall_slack: WALL_SLACK_THRESHOLD,
             nudge_opportunity: NUDGE_OPPORTUNITY_THRESHOLD,
-            wall_opportunity: WALL_OPPORTUNITY_THRESHOLD,
             correction_f4_floor: None,
             correction_f6_floor: None,
         }
@@ -139,7 +124,6 @@ pub struct InterventionDecision {
     pub opportunity_score: f64,
     pub p_stuck: f64,
     pub idle_ms: u64,
-    pub wall_accum_ms: u64,
     pub reason: String,
     pub suppressed_by: Vec<String>,
     /// Opportunity 層の加点理由 (機械可読)。`#[serde(skip)]` で NDJSON schema /
@@ -157,7 +141,6 @@ impl InterventionDecision {
             opportunity_score: 0.0,
             p_stuck: 0.0,
             idle_ms: 0,
-            wall_accum_ms: 0,
             reason: "safe_default".to_string(),
             suppressed_by: Vec::new(),
             opportunity_reason: OpportunityReason::LowOpportunity,
@@ -173,8 +156,6 @@ pub struct InterventionInput {
     pub f4_burst_length: f64,
     pub f6_pause_after_del_rate: f64,
     pub idle_ms: u64,
-    pub monk_mode: bool,
-    pub wall_active: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -187,14 +168,11 @@ pub struct DecisionResult {
 pub struct InterventionPolicyState {
     day_index: u64,
     nudge_count_today: u32,
-    wall_count_today: u32,
     last_tick_ms: Option<u64>,
     last_nudge_at_ms: Option<u64>,
-    last_wall_at_ms: Option<u64>,
     last_dismiss_at_ms: Option<u64>,
     last_dismiss_action: Option<InterventionAction>,
     current_action: InterventionAction,
-    wall_accum_ms: u64,
     last_decision: InterventionDecision,
     last_log_key: Option<String>,
     last_log_at_ms: Option<u64>,
@@ -213,14 +191,11 @@ impl InterventionPolicyState {
         Self {
             day_index: day_index(now_ms),
             nudge_count_today: 0,
-            wall_count_today: 0,
             last_tick_ms: None,
             last_nudge_at_ms: None,
-            last_wall_at_ms: None,
             last_dismiss_at_ms: None,
             last_dismiss_action: None,
             current_action: InterventionAction::None,
-            wall_accum_ms: 0,
             last_decision: InterventionDecision::safe_default(),
             last_log_key: None,
             last_log_at_ms: None,
@@ -232,46 +207,9 @@ impl InterventionPolicyState {
         self.last_decision.clone()
     }
 
-    /// デバッグ用: HMM 状態に依らず Wall 決定を強制する。
-    /// `force_wall` コマンド経由でのみ呼ばれ、Wall→QR→スマホ解除→介入応答捕捉の
-    /// end-to-end 検証に使う。`reason="debug_force"` で通常判定と区別でき、解析時に除外可能。
-    ///
-    /// 通常判定経路 (`decide`) は変更しない。状態への作用は以下の 2 つのみ:
-    /// - `last_wall_at_ms = now_ms`: 実 Wall 同様 **cooldown を開始**する。これを立てないと解除直後に
-    ///   p_stuck が高いまま wall_accum が再び溜まり**即再発火**する (ユーザー報告の修正・#22 D2 から方針変更)。
-    /// - `last_decision = wall`: overlay ウィンドウが `last_decision()` 経由で wall を拾うため。
-    ///
-    /// **意図的に触れない**もの: `wall_count_today` (daily_cap は forced では消費しない=実 Wall の 1日上限を
-    /// 食わない) と `current_action` (App が isWallActive→次 tick の `wall_active` 分岐で Wall に設定・維持し、
-    /// 解除後の通常 `decide` が candidate に戻す)。
-    pub fn force_wall_decision(&mut self, now_ms: u64, idle_ms: u64) -> InterventionDecision {
-        let decision = InterventionDecision {
-            action: InterventionAction::Wall,
-            need_score: 0.0,
-            opportunity_score: 1.0,
-            p_stuck: 0.0,
-            idle_ms,
-            wall_accum_ms: 0,
-            reason: "debug_force".to_string(),
-            suppressed_by: Vec::new(),
-            // opportunity_reason は #[serde(skip)] で NDJSON/IPC に出ない in-memory 専用。
-            // forced wall に対応する variant は無く、強制の真の標識は reason="debug_force"。
-            // ここは placeholder (値は解析に使われない)。
-            opportunity_reason: OpportunityReason::LowOpportunity,
-        };
-        // forced wall も実 Wall と同様に cooldown を開始する。さもないと解除直後に p_stuck が
-        // 高いままだと wall_accum が再び溜まって**即座に再発火**する (ユーザー報告)。
-        // last_wall_at_ms を立てれば apply_wall_suppressions の cooldown で抑止される。
-        // (#22 では cooldown 非汚染としていたが、再発火回避を優先して方針変更。)
-        self.last_wall_at_ms = Some(now_ms);
-        self.last_decision = decision.clone();
-        decision
-    }
-
-    /// デバッグ用: 強制 Nudge 判定を返す (`force_wall_decision` の Nudge 版)。
+    /// デバッグ用: 強制 Nudge 判定を返す (デバッグ用の強制介入)。
     /// `get_intervention_decision` の overlay 分岐がワンショットで消費し、その場で overlay へ**直接返す**。
-    /// `force_wall_decision` と違い `last_decision` も cooldown も**更新しない** (真のワンショット):
-    /// Wall は overlay が `last_decision()` 経由で拾う必要があるため更新必須だが、Nudge は overlay 分岐が
+    /// `last_decision` も cooldown も**更新しない** (真のワンショット): Nudge は overlay 分岐が
     /// 戻り値を直接返し且つ Overlay 側が `nudgeVisible` を保持するため、`last_decision` に残すと後続 poll で
     /// もう一度 nudge を返してしまう。`&self` で副作用なし (`reason="debug_force"` で解析時に除外可能)。
     pub fn force_nudge_decision(&self, idle_ms: u64) -> InterventionDecision {
@@ -281,7 +219,6 @@ impl InterventionPolicyState {
             opportunity_score: 1.0,
             p_stuck: 0.0,
             idle_ms,
-            wall_accum_ms: 0,
             reason: "debug_force".to_string(),
             suppressed_by: Vec::new(),
             // opportunity_reason は #[serde(skip)] で NDJSON/IPC に出ない in-memory 専用 placeholder。
@@ -290,7 +227,7 @@ impl InterventionPolicyState {
     }
 
     pub fn record_dismiss(&mut self, action: InterventionAction, now_ms: u64) {
-        if matches!(action, InterventionAction::Nudge | InterventionAction::Wall) {
+        if matches!(action, InterventionAction::Nudge) {
             self.last_dismiss_at_ms = Some(now_ms);
             self.last_dismiss_action = Some(action);
             if self.current_action == action {
@@ -302,34 +239,7 @@ impl InterventionPolicyState {
     pub fn decide(&mut self, input: InterventionInput) -> DecisionResult {
         self.reset_daily_if_needed(input.now_ms);
 
-        if input.wall_active {
-            self.wall_accum_ms = 0;
-            // wall_active 分岐は早期 return し update_wall_accumulation を通らないため、
-            // ここで last_tick_ms を進めておく。さもないと Wall 解除後の次 tick で
-            // elapsed = (Wall 表示全期間) となり wall_accum が一気に閾値超え → 即時再発火する
-            // (cross-review HIGH-A。force_wall で顕在化した既存バグ)。
-            self.last_tick_ms = Some(input.now_ms);
-            self.current_action = InterventionAction::Wall;
-            let decision = InterventionDecision {
-                action: InterventionAction::Wall,
-                need_score: clean_score(input.p_stuck),
-                opportunity_score: 1.0,
-                p_stuck: clean_score(input.p_stuck),
-                idle_ms: input.idle_ms,
-                wall_accum_ms: 0,
-                reason: "wall_active".to_string(),
-                suppressed_by: Vec::new(),
-                opportunity_reason: OpportunityReason::LowOpportunity,
-            };
-            let should_log = self.should_log(input.now_ms, &decision);
-            self.last_decision = decision.clone();
-            return DecisionResult {
-                decision,
-                should_log,
-            };
-        }
-
-        self.update_wall_accumulation(&input);
+        self.advance_tick(&input);
 
         let p_stuck = clean_score(input.p_stuck);
         let need_score = p_stuck;
@@ -341,26 +251,13 @@ impl InterventionPolicyState {
             InterventionAction::None
         } else if need_score < self.thresholds.nudge_need {
             InterventionAction::None
-        } else if need_score >= self.thresholds.wall_need
-            && self.wall_accum_ms >= WALL_ACCUMULATION_MS
-        {
-            if opportunity_score >= self.thresholds.wall_opportunity {
-                InterventionAction::Wall
-            } else {
-                InterventionAction::Defer
-            }
         } else if opportunity_score >= self.thresholds.nudge_opportunity {
             InterventionAction::Nudge
         } else {
             InterventionAction::Defer
         };
 
-        if candidate == InterventionAction::Wall {
-            self.apply_wall_suppressions(input.now_ms, input.monk_mode, &mut suppressed_by);
-            if !suppressed_by.is_empty() {
-                candidate = InterventionAction::Defer;
-            }
-        } else if candidate == InterventionAction::Nudge {
+        if candidate == InterventionAction::Nudge {
             self.apply_nudge_suppressions(input.now_ms, &mut suppressed_by);
             if !suppressed_by.is_empty() {
                 candidate = InterventionAction::Defer;
@@ -405,7 +302,6 @@ impl InterventionPolicyState {
             opportunity_score,
             p_stuck,
             idle_ms: input.idle_ms,
-            wall_accum_ms: self.wall_accum_ms,
             reason,
             suppressed_by,
             opportunity_reason,
@@ -425,30 +321,14 @@ impl InterventionPolicyState {
         if current_day != self.day_index {
             self.day_index = current_day;
             self.nudge_count_today = 0;
-            self.wall_count_today = 0;
         }
     }
 
-    fn update_wall_accumulation(&mut self, input: &InterventionInput) {
-        let elapsed_ms = self
-            .last_tick_ms
-            .map(|last| input.now_ms.saturating_sub(last))
-            .unwrap_or(0);
+    /// ⚠️ 旧 `update_wall_accumulation`。Wall 削除 (2026-08-23) で累積は無くなり、
+    /// **`last_tick_ms` を進めるだけ**になった。★ 関数を残すのは呼び出し位置 (early return より前) を
+    /// 変えないためである。
+    fn advance_tick(&mut self, input: &InterventionInput) {
         self.last_tick_ms = Some(input.now_ms);
-
-        if input.monk_mode {
-            self.wall_accum_ms = 0;
-            return;
-        }
-
-        let p_stuck = clean_score(input.p_stuck);
-        if p_stuck >= self.thresholds.wall_need {
-            self.wall_accum_ms = self.wall_accum_ms.saturating_add(elapsed_ms);
-        } else if p_stuck < self.thresholds.wall_slack {
-            self.wall_accum_ms = self
-                .wall_accum_ms
-                .saturating_sub(elapsed_ms.saturating_mul(2));
-        }
     }
 
     fn apply_nudge_suppressions(&self, now_ms: u64, suppressed_by: &mut Vec<String>) {
@@ -461,28 +341,6 @@ impl InterventionPolicyState {
             }
         }
         if self.recently_dismissed(now_ms, InterventionAction::Nudge) {
-            suppressed_by.push("recent_dismiss".to_string());
-        }
-    }
-
-    fn apply_wall_suppressions(
-        &self,
-        now_ms: u64,
-        monk_mode: bool,
-        suppressed_by: &mut Vec<String>,
-    ) {
-        if monk_mode {
-            suppressed_by.push("monk_mode".to_string());
-        }
-        if self.current_action != InterventionAction::Wall {
-            if self.wall_count_today >= WALL_DAILY_CAP {
-                suppressed_by.push("daily_cap".to_string());
-            }
-            if recently(now_ms, self.last_wall_at_ms, WALL_COOLDOWN_MS) {
-                suppressed_by.push("cooldown".to_string());
-            }
-        }
-        if self.recently_dismissed(now_ms, InterventionAction::Wall) {
             suppressed_by.push("recent_dismiss".to_string());
         }
     }
@@ -502,11 +360,6 @@ impl InterventionPolicyState {
             InterventionAction::Nudge => {
                 self.nudge_count_today = self.nudge_count_today.saturating_add(1);
                 self.last_nudge_at_ms = Some(now_ms);
-            }
-            InterventionAction::Wall => {
-                self.wall_count_today = self.wall_count_today.saturating_add(1);
-                self.last_wall_at_ms = Some(now_ms);
-                self.wall_accum_ms = 0;
             }
             InterventionAction::None | InterventionAction::Defer => {}
         }
@@ -598,7 +451,6 @@ fn reason_for(
         }
         InterventionAction::None => "suppressed_or_away".to_string(),
         InterventionAction::Nudge => opportunity_reason.as_str().to_string(),
-        InterventionAction::Wall => "sustained_stuck".to_string(),
         InterventionAction::Defer if opportunity_score < thresholds.nudge_opportunity => {
             "high_need_but_low_opportunity".to_string()
         }
@@ -636,8 +488,6 @@ mod tests {
             f4_burst_length: 5.0,
             f6_pause_after_del_rate: 0.0,
             idle_ms,
-            monk_mode: false,
-            wall_active: false,
         }
     }
 
@@ -647,10 +497,7 @@ mod tests {
     fn default_thresholds_equal_production_consts() {
         let t = InterventionThresholds::default();
         assert_eq!(t.nudge_need, NUDGE_NEED_THRESHOLD);
-        assert_eq!(t.wall_need, WALL_NEED_THRESHOLD);
-        assert_eq!(t.wall_slack, WALL_SLACK_THRESHOLD);
         assert_eq!(t.nudge_opportunity, NUDGE_OPPORTUNITY_THRESHOLD);
-        assert_eq!(t.wall_opportunity, WALL_OPPORTUNITY_THRESHOLD);
     }
 
     /// OpportunityReason::as_str が production の reason 文字列を再生すること。
@@ -716,71 +563,18 @@ mod tests {
         assert_eq!(result.decision.reason, "high_need_but_low_opportunity");
     }
 
-    #[test]
-    fn wall_after_sustained_stuck_and_opportunity() {
-        let mut policy = InterventionPolicyState::new(0);
-        policy.decide(input(0, 0.75, 3_000));
-        let result = policy.decide(input(WALL_ACCUMULATION_MS + 1, 0.75, 3_000));
-        assert_eq!(result.decision.action, InterventionAction::Wall);
-        assert_eq!(result.decision.reason, "sustained_stuck");
-    }
-
-    #[test]
-    fn monk_mode_suppresses_wall() {
-        let mut policy = InterventionPolicyState::new(0);
-        policy.decide(input(0, 0.75, 3_000));
-        let mut next = input(WALL_ACCUMULATION_MS + 1, 0.75, 3_000);
-        next.monk_mode = true;
-        let result = policy.decide(next);
-        assert_ne!(result.decision.action, InterventionAction::Wall);
-        assert_eq!(result.decision.wall_accum_ms, 0);
-    }
-
-    #[test]
-    fn wall_active_advances_last_tick_no_accum_blowup_on_dismiss() {
-        // HIGH-A 回帰: Wall が長時間 active → 解除直後の通常 decide で wall_accum が
-        // Wall 全期間ぶん一気に積まれて即時再発火しないこと。
-        let mut p = InterventionPolicyState::new(0);
-        p.decide(input(0, 0.10, 0)); // last_tick = 0
-        let mut wa = input(1_000, 0.95, 0);
-        wa.wall_active = true;
-        p.decide(wa); // Wall active, last_tick → 1_000
-        let mut wa2 = input(301_000, 0.95, 0); // 5 分後もまだ Wall active
-        wa2.wall_active = true;
-        p.decide(wa2); // last_tick → 301_000
-                       // 解除: wall_active=false, 高 stuck, last_tick から 1 秒後
-        let d = p.decide(input(302_000, 0.95, 1_000));
-        assert!(
-            d.decision.wall_accum_ms < WALL_ACCUMULATION_MS,
-            "wall_accum blew up after dismiss: {}",
-            d.decision.wall_accum_ms
-        );
-    }
-
-    #[test]
-    fn force_wall_decision_returns_wall_and_starts_cooldown() {
-        let mut policy = InterventionPolicyState::new(0);
-        let d = policy.force_wall_decision(0, 1234);
-        assert_eq!(d.action, InterventionAction::Wall);
-        assert_eq!(d.reason, "debug_force");
-        assert_eq!(d.idle_ms, 1234);
-        // overlay ウィンドウが拾えるよう last_decision も wall になる。
-        assert_eq!(policy.last_decision().action, InterventionAction::Wall);
-        // forced wall は cooldown を開始する → 解除直後に p_stuck が高くても即再発火しない
-        // (cooldown で抑止される)。ユーザー報告の「解除後また Wall」回避。
-        policy.decide(input(0, 0.75, 3_000));
-        let after = policy.decide(input(WALL_ACCUMULATION_MS + 1, 0.75, 3_000));
-        assert_ne!(after.decision.action, InterventionAction::Wall);
-        assert!(after
-            .decision
-            .suppressed_by
-            .contains(&"cooldown".to_string()));
-    }
+    // ⚠️★★★ **Wall 削除 (2026-08-23) で以下 4 本を削除した**（★ 無断削除ではない・研究者判断）:
+    //   - `wall_after_sustained_stuck_and_opportunity`（Wall 発火判定）
+    //   - `monk_mode_suppresses_wall`（★ Monk Mode の *唯一* の作用だった → Monk Mode ごと削除）
+    //   - `wall_active_advances_last_tick_no_accum_blowup_on_dismiss`（wall_accum の再発火回帰）
+    //   - `force_wall_decision_returns_wall_and_starts_cooldown`（デバッグ強制 Wall）
+    // ★ 削除の記録は `.steering/20260823-wall-removal/decisions.md`。
+    // ⚠️ **`advance_tick` が `last_tick_ms` を進めること自体は下の Nudge 系テストが踏んでいる。**
 
     #[test]
     fn force_nudge_decision_is_pure_one_shot() {
         // #1 層2: debug 強制 Nudge は overlay 分岐が戻り値を直接返すため、last_decision も
-        // cooldown も汚さない (真のワンショット)。force_wall と異なり副作用を持たないこと。
+        // cooldown も汚さない (真のワンショット)。副作用を持たないこと。
         let mut policy = InterventionPolicyState::new(0);
         let before = policy.last_decision().action;
         let d = policy.force_nudge_decision(4321);

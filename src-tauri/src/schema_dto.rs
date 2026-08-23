@@ -72,11 +72,41 @@ pub enum LogEntryDto {
         /// ★ `hmm_version` では代用できない (HMM の版であって記録能力ではない)。
         #[serde(skip_serializing_if = "Option::is_none")]
         capabilities: Option<CapabilitiesDto>,
+        /// ★ **キーボードレイアウトの識別子**（O1 / ADR-014 D4）。**start 形状のみ**。
+        ///
+        /// 例: Windows `00000411`（日本語）/ macOS `com.apple.keylayout.US`。
+        ///
+        /// ## ⚠️★★★ なぜ要るのか
+        ///
+        /// ★ **文境界の妥当性が配列に依存する** —— macOS の keycode は**物理キー位置**なので、
+        /// Dvorak では `.` が US の `E` の位置に来る。→ ★ どの配列だったかが後から要る。
+        ///
+        /// ⚠️★★★ **文字への変換はしていない**（`ToUnicodeEx` / `UCKeyTranslate` を呼ばない）。
+        /// ★ 取れなかった端末では**フィールドごと出ない**（0 値で埋めない）。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        keyboard_layout: Option<String>,
     },
     /// ユーザーが「開始する」ボタンを押した時刻。
     SessionStart { t: u64 },
-    /// キーストロークイベント (raw VK コード + 押下/離上)。
-    Key { t: u64, vk: u32, press: bool },
+    /// キーストロークイベント (**キー種別カテゴリ** + 押下/離上)。
+    ///
+    /// ⚠️★★★ **2026-08-23 (ADR-014 判断 6): `vk` (生 VK コード) から `category` へ変えた。**
+    /// `consent.md` の記録項目表は「キーの**種類**」と約束しており、生 VK (キー個体) を
+    /// ローカル NDJSON に残すのは文言とずれていた。量子化は従来 transfer 境界
+    /// (`gse-package`) でのみ効いていたが、`logger.rs` の書き出し境界へ前倒しした。
+    ///
+    /// 値は `analysis::anonymize::KeyCategory::as_str()` の 14 種:
+    /// `alphabetic` / `numeric` / `punctuation` / `sentence_punctuation` / `tab` /
+    /// `backspace` / `delete` / `space` / `enter` / `navigation` / `modifier` /
+    /// `function` / `escape` / `other`。
+    ///
+    /// ⚠️ **旧ログ (`vk` を持つ) は `gse-replay` がそのまま読める** (`resolve_key_vk` が
+    /// `vk` を優先し、無ければ `category` を代表 VK へ逆写像する)。
+    Key {
+        t: u64,
+        category: String,
+        press: bool,
+    },
     /// ペーストイベント (Ctrl+V / Cmd+V) の発生時刻と文字数。
     /// AI 依存度指標 (D4) 向けに**回数** (行数) を、(b) 自力解決率 (v0.4 §4.2
     /// `manual_contribution_ratio`) 向けに `external_paste_chars` (ペースト**文字数=整数のみ**)
@@ -134,6 +164,49 @@ pub enum LogEntryDto {
     },
     /// IME 入力モード/候補ウィンドウ状態の切替。
     ImeState { t: u64, on: bool, active: bool },
+    /// ⚠️★★★ **記録の一時停止 / 再開の遷移** (O1 / ADR-014 **D7-ii**)。
+    ///
+    /// ★ 被験者が「止める」「再開する」を押した**瞬間**に 1 行。`paused=true` が停止、
+    /// `false` が再開である。⚠️ **状態が変わらない押下では出ない**（★ 回数を残さない）。
+    ///
+    /// ⚠️★★★ **これが無いと「被験者が止めていた時間」と「信号が無かった時間」を
+    /// 事後に区別できない**（ADR-013 D1 と同じ理屈）。
+    /// ★ 一時停止中も本行と `meta` だけは書かれる（`recording::is_writable_while_paused`）。
+    RecordingPause { t: u64, paused: bool },
+    /// ⚠️★★★ **フォーカス遷移の時刻**（O1 / ADR-014 **D4** の L-c）。
+    ///
+    /// ★ フィールドは `t` **だけ**である。⚠️ HWND / PID / アプリ識別子 / ウィンドウタイトル /
+    /// 通し番号は 1 バイトも含まない（★ 擬似識別子になるため・D4 の禁止表）。
+    ///
+    /// ⚠️★★★ **「注意の逸脱の頻度」として読んではならない** ——
+    /// ★ 同一アプリ内のウィンドウ切替も同じ 1 行になり、両 OS とも識別子なしには分離できない。
+    /// ★ 言えるのは **遷移の時刻**と、2 時刻の差である**離脱の滞在時間**まで。
+    FocusTransition { t: u64 },
+    /// ⚠️★★★ **ポインタ活動の 1 秒ビン**（O1 / ADR-014 **D4** の L-b）。
+    ///
+    /// ★ すべて**粗い量子化スカラ**である。⚠️ 座標・軌跡・方向・速度・解像度は含まない
+    /// （★ 累積すれば軌跡が復元でき画面内容の代理になるため）。
+    ///
+    /// ⚠️ **ゼロ抑制**されている（D5）—— 活動が無い秒には**行が無い**。
+    /// → ★ 「行が無い＝活動が無かった」と読んでよい（⚠️ ただし `capabilities` に
+    /// `pointer_bin` がある場合に限る。無ければ「計器が無かった」である）。
+    PointerBin {
+        t: u64,
+        /// 移動量のバケット `0..=7`（★ `Σ(|dx|+|dy|)` の対数的な階級。⚠️ 単位はデバイス依存）。
+        moved: u8,
+        /// ボタン**押下**回数（★ `0..=15` に飽和）。⚠️ どのボタンかは含まない。
+        buttons: u8,
+        /// ホイールの刻み回数（★ `0..=15` に飽和）。⚠️ 向きは含まない。
+        wheel: u8,
+    },
+    /// ⚠️★★★ **`EnableSecureEventInput` の区間フラグ**（O1 / **macOS のみ**）。
+    ///
+    /// ★ 有効な間は **tap が「有効」のまま KeyDown だけが届かない**ので、
+    /// ⚠️ この行が無いと「**打鍵ゼロ**」と「**打鍵が見えない**」を混同する。
+    ///
+    /// ⚠️ **2026-08-23 時点で送出元は無い**（macOS 実装がスタブ）。
+    /// ★ `capabilities` にも宣言していないので、0 行は「**計器が無かった**」と読む。
+    SecureInput { t: u64, on: bool },
     /// ⚠️★ キーボードフックの生存状態の変化 (`input::liveness`)。
     ///
     /// `alive=false` は「フックは設置済みだが、システムに入力があるのに
@@ -204,16 +277,14 @@ pub enum LogEntryDto {
         opportunity_score: f64,
         p_stuck: f64,
         idle_ms: u64,
-        wall_accum_ms: u64,
         reason: String,
         suppressed_by: Vec<String>,
     },
     /// 介入提示に対するユーザー応答 (reason)。`intervention_decision` (判定側) とは別の
     /// 「ユーザー応答側」ログ (WBS 0.8 / v0.4 §9)。Nudge dismiss は Need/Opportunity 誤りを分離、
-    /// Wall は早期解除/通常解除(順守) を区別する (Phase A2)。固定カテゴリ + 時刻のみ。本文は含まない。
-    /// `elapsed_ms` = Wall 提示(/shake)〜解除(/unlock) の経過時間。Nudge dismiss では省略 (`null`)。
-    /// `action="wall"` かつ `elapsed_ms=null` は通常フロー外解除 (/shake 未経由) を意味し、
-    /// 後段解析は経過時間を持つ実 early_unlock と区別できる。
+    /// 固定カテゴリ + 時刻のみ。本文は含まない。
+    /// ⚠️★★★ **`elapsed_ms` を書く経路は Wall だけだった** (2026-08-23 に Wall 削除)。
+    /// ★ additive なフィールドなので schema には残すが、**現状 production では常に `null`** である。
     InterventionResponse {
         t: u64,
         action: InterventionActionDto,
@@ -228,7 +299,6 @@ pub enum LogEntryDto {
     SessionMeta {
         track: TrackDto,
         task_kind: TaskKindDto,
-        monk_mode: bool,
         intervention_enabled: bool,
         condition: Option<ConditionDto>,
         label_pool: Option<LabelPoolDto>,
@@ -337,7 +407,6 @@ pub enum UserLabelKindDto {
 pub enum InterventionActionDto {
     None,
     Nudge,
-    Wall,
     Defer,
 }
 
@@ -403,8 +472,7 @@ pub enum ExpectedQuadrantDto {
 /// `intervention_response` の理由 (reason)。
 /// Nudge dismiss (WBS 0.8 / v0.4 §9): `not_stuck` = Need 誤り、`want_to_struggle` = Opportunity 誤り、
 /// `just_close` = 単に閉じる、`silent` = 理由未選択 (フェードアウト)。
-/// Wall 応答 (Phase A2): `early_unlock` = 早期解除 (非順守)、`completed` = 通常解除 (順守)、
-/// `idle_timeout` = 長時間アイドル自動解除 (enum 予約のみ・現状未配線)。
+/// ⚠️★★★ Wall 応答 (`early_unlock` / `completed` / `idle_timeout`) は 2026-08-23 に削除した。
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DismissReasonDto {
@@ -412,9 +480,6 @@ pub enum DismissReasonDto {
     WantToStruggle,
     JustClose,
     Silent,
-    EarlyUnlock,
-    Completed,
-    IdleTimeout,
 }
 
 /// `session_meta` の実験条件 (WBS 0.11)。Phase 1b=`blind_calibration`、Phase 2 AB/BA=`a`/`b`、

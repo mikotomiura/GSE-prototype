@@ -76,6 +76,13 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     "vignette_response",
     "intervention_decision",
     "intervention_response",
+    // ⚠️★★★ O1 (R3): 被験者が記録を止めた / 再開した遷移 (ADR-014 D7-ii)。
+    "recording_pause",
+    // ⚠️★★★ O1 (R3-a): 非打鍵チャネル (ADR-014 D4 の段 1)。
+    //   ★ `secure_input` は **macOS 専用**で、⚠️ **まだ送出元が無い** (`observe_macos.rs` はスタブ)。
+    "focus_transition",
+    "pointer_bin",
+    "secure_input",
 ];
 
 /// **閾値ゲート付き**の行種 (ADR-013 D1)。
@@ -183,6 +190,26 @@ pub fn config_gated() -> Vec<&'static str> {
     // ⚠️ ★ 送出元 (`emit_ime_shadow`) が Windows 限定なので、宣言も Windows 限定にする (D2)。
     #[cfg(target_os = "windows")]
     v.push("ime_shadow");
+
+    // ⚠️★★★ **O1 (R3-a) の非打鍵チャネルは `config_gated` に置く。**
+    //
+    // ★ なぜ `unconditional` ではないのか:
+    // - ⚠️ 計器の設置は**実行時に失敗しうる** (`SetWinEventHook` / `RegisterRawInputDevices`)。
+    //   → ★ `unconditional` に置くと、設置に失敗した端末の 0 行が
+    //   **「測れて、無かった」という偽の結論**になる (`ime_shadow` を移した理由と同型)。
+    // - ⚠️ `pointer_bin` は**ゼロ抑制**されるので、そもそも「無活動 = 0 行」である。
+    // → ★ **0 行は判定不能**、が正しい読みである。
+    //
+    // ⚠️ 宣言は **`observe` 側の実装有無と 1 対 1** にする (★ 過大申告を作らない)。
+    if crate::input::observe::FOCUS_AVAILABLE {
+        v.push("focus_transition");
+    }
+    if crate::input::observe::POINTER_AVAILABLE {
+        v.push("pointer_bin");
+    }
+    // ⚠️★★★ `secure_input` は **宣言しない** —— ★ macOS 実装がスタブで送出元が無い。
+    //   ★ 実装したら `crate::input::observe::SECURE_INPUT_AVAILABLE` を見て push すること。
+
     v.sort_unstable();
     v
 }
@@ -206,6 +233,11 @@ pub fn unconditional() -> Vec<&'static str> {
         "user_label",
         "review_marker",
         "vignette_response",
+        // ⚠️★★★ O1 (R3): `recording_pause` は **`unconditional`** である。
+        //   ★ 0 行 = 「**一度も止めなかった**」と読んでよい (`paste` と同じ形)。
+        //   ⚠️ `config_gated` に置くと「止めたかどうか判定不能」になり、
+        //   ★ **被験者が消した区間と信号が無い区間の区別**という本行の存在理由が消える。
+        "recording_pause",
     ];
     // ⚠️★★★ **2026-08-22: `ime_shadow` はここから [`config_gated`] へ移した。**
     //   ★ 実機計測で「環境によって丸ごと出ない」ことが分かったため
@@ -362,11 +394,19 @@ mod tests {
     /// ⚠️ 右辺の最後の集合を `#[cfg]` で書き下すので、**OS ごとの過大/過小申告が両方向で落ちる**。
     #[test]
     fn declaration_partitions_known_line_types() {
+        // ⚠️★★★ `secure_input` は **両 OS で送出元が無い** (macOS 実装がスタブ・2026-08-23)。
+        //   ★ 実装したら**この行から外す**こと (⚠️ 外し忘れると過小申告のまま気付けない)。
         #[cfg(target_os = "windows")]
-        let emitterless: &[&str] = &[];
+        let emitterless: &[&str] = &["secure_input"];
         // ⚠️ macOS には `emit_ime_shadow` (Windows 限定) が無い。`ime_macos.rs` は `ImeState` だけを送る。
+        //   ⚠️★★★ O1 の非打鍵チャネルも macOS では**未実装**である (`observe_macos.rs` はスタブ)。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &["ime_shadow"];
+        let emitterless: &[&str] = &[
+            "ime_shadow",
+            "secure_input",
+            "focus_transition",
+            "pointer_bin",
+        ];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);

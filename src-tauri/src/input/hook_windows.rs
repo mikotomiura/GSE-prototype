@@ -86,20 +86,45 @@ fn unhook_all() {
     }
 }
 
-/// タイピングリズムに関連するキーかどうかを判定する（Windows固有のVKコード）。
-fn is_typing_key(vk_code: u32) -> bool {
+/// ★★★ **分析チャネルへ送るキー**かどうか（Windows 固有の VK コード）。
+///
+/// ## ⚠️★★★ 2026-08-23: `is_typing_key` から改名し、**広げた**（ADR-016 **D8** / 研究者判断 5）
+///
+/// ★ 旧 `is_typing_key` は「特徴量に使うキー」と「記録するキー」を **1 本のゲートで兼ねていた**。
+/// ⚠️ O1（普段の作業の長期記録）は、図面 / 動画編集 / 3D のような**打鍵が薄い作業**を
+/// 「離席」と取り違えないことを保証しなければならず、そのために
+/// **修飾キー / F1–F12 / Esc / 矢印**も *記録* する必要がある。
+///
+/// → ★ ゲートを 2 本に割った:
+/// - **ここ（観測）**: 広い集合を分析スレッドへ送る → `logger` が category 量子化して `key` 行に残す
+/// - **[`crate::analysis::key_gate::is_feature_key`]（特徴量）**: ⚠️ **旧 `is_typing_key` と同一集合**
+///
+/// ⚠️★★★ **したがって特徴量は 1 バイトも変わらない**（`HMM_VERSION` 不変・ゴールデン byte-equal）。
+///
+/// ## ⚠️ 修飾キーは **左右を区別した VK** で来る
+///
+/// ★ `WH_KEYBOARD_LL` の `KBDLLHOOKSTRUCT.vkCode` は `VK_LSHIFT`(0xA0) …… `VK_RMENU`(0xA5) を返す。
+/// ⚠️ 汎用の 0x10/0x11/0x12 は**通常この経路では来ない**が、注入イベント等での到達に備えて両方入れる。
+/// ★ `KeyCategory::from_vk` は 2026-08-23 に `0xA0..=0xA5` を `Modifier` へ写すよう拡張した。
+///
+/// ## ⚠️ 記録するのは「種類」だけである
+///
+/// ★ `logger` が書き出し境界で 14 カテゴリへ量子化するので、⚠️ **どのキーかは残らない**
+/// （`data-privacy` ルール 1 / 同意文書 注 A）。
+fn is_observed_key(vk_code: u32) -> bool {
+    // ★ 特徴量に使う集合は **単一情報源**から引く (⚠️ ここに書き写さない)。
+    if crate::analysis::key_gate::is_feature_key(vk_code) {
+        return true;
+    }
     matches!(
         vk_code,
-        0x41..=0x5A       // Letters A-Z
-        | 0x30..=0x39     // Digits 0-9
-        | 0x60..=0x6F     // Numpad keys
-        | 0xBA..=0xC0     // Symbol / punctuation keys (OEM)
-        | 0xDB..=0xDF
-        | 0x08            // Backspace
-        | 0x0D            // Enter
-        | 0x20            // Space
-        | 0x09            // Tab
-        | 0x2E            // Delete
+        // ── ★ 観測のみ (⚠️ 特徴量には流れない) ─────────────────────────
+        0x10 | 0x11 | 0x12          // VK_SHIFT / VK_CONTROL / VK_MENU (汎用)
+        | 0x5B | 0x5C               // VK_LWIN / VK_RWIN
+        | 0xA0..=0xA5               // VK_LSHIFT..VK_RMENU (⚠️ LL フックが返す形)
+        | 0x21..=0x28               // PgUp / PgDn / End / Home / ←↑→↓ (Navigation)
+        | 0x1B                      // VK_ESCAPE
+        | 0x70..=0x7B               // F1..F12
     )
 }
 
@@ -656,7 +681,7 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             // CLAUDE.md 制約 (3): フックコールバック内は Atomic + channel send のみ。
             // リピート検出は分析スレッド側で HashSet を使って実行する。
             // フックコールバックからは is_repeat = false 固定で全イベントを送信。
-            if is_typing_key(vk_code) {
+            if is_observed_key(vk_code) {
                 let is_backspace = vk_code == 0x08 || vk_code == 0x2E;
                 // ペースト検出: V(0x56) 押下時に Ctrl が「今まさに」押されていれば Ctrl+V とみなす。
                 // 判定の瞬間に GetAsyncKeyState(VK_CONTROL) で実状態を読むことで、左右 Ctrl の
@@ -712,48 +737,104 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
 mod tests {
     use super::*;
 
+    /// ★ 観測ゲートは従来の打鍵キーを**すべて**通す (非回帰)。
     #[test]
-    fn typing_key_covers_letters_digits_and_control_keys() {
-        assert!(is_typing_key(0x41), "A");
-        assert!(is_typing_key(0x5A), "Z");
-        assert!(is_typing_key(0x30), "0");
-        assert!(is_typing_key(0x39), "9");
-        assert!(is_typing_key(0x08), "Backspace");
-        assert!(is_typing_key(0x0D), "Enter");
-        assert!(is_typing_key(0x20), "Space");
-        assert!(is_typing_key(0x09), "Tab");
-        assert!(is_typing_key(0x2E), "Delete");
-        assert!(is_typing_key(0x60), "Numpad 0 (範囲下端)");
-        assert!(is_typing_key(0x6F), "Numpad Divide (範囲上端)");
-        assert!(is_typing_key(0xBA), "OEM 記号 (範囲下端)");
-        assert!(is_typing_key(0xC0), "OEM 記号 (範囲上端)");
-        assert!(is_typing_key(0xDB), "OEM 記号 2群目 (範囲下端)");
-        assert!(is_typing_key(0xDF), "OEM 記号 2群目 (範囲上端)");
+    fn observed_key_covers_letters_digits_and_control_keys() {
+        assert!(is_observed_key(0x41), "A");
+        assert!(is_observed_key(0x5A), "Z");
+        assert!(is_observed_key(0x30), "0");
+        assert!(is_observed_key(0x39), "9");
+        assert!(is_observed_key(0x08), "Backspace");
+        assert!(is_observed_key(0x0D), "Enter");
+        assert!(is_observed_key(0x20), "Space");
+        assert!(is_observed_key(0x09), "Tab");
+        assert!(is_observed_key(0x2E), "Delete");
+        assert!(is_observed_key(0x60), "Numpad 0 (範囲下端)");
+        assert!(is_observed_key(0x6F), "Numpad Divide (範囲上端)");
+        assert!(is_observed_key(0xBA), "OEM 記号 (範囲下端)");
+        assert!(is_observed_key(0xC0), "OEM 記号 (範囲上端)");
+        assert!(is_observed_key(0xDB), "OEM 記号 2群目 (範囲下端)");
+        assert!(is_observed_key(0xDF), "OEM 記号 2群目 (範囲上端)");
     }
 
+    /// ⚠️★★★ **ゲート分割の中身** (ADR-016 D8): 観測はする / 特徴量には流さない。
+    ///
+    /// ★ 「両方を同時に」確かめるのが要点である —— ⚠️ 片方だけ見ると、
+    /// **広げたつもりで特徴量まで変えていた**（= `HMM_VERSION` bump）ことに気付けない。
     #[test]
-    fn typing_key_excludes_non_typing_keys() {
-        assert!(!is_typing_key(0x25), "VK_LEFT はタイピングキーではない");
-        assert!(!is_typing_key(0x1B), "VK_ESCAPE はタイピングキーではない");
+    fn observed_but_not_feature_keys_are_split_correctly() {
+        use crate::analysis::key_gate::is_feature_key;
+        for (vk, why) in [
+            (0xA0u32, "VK_LSHIFT (⚠️ LL フックが返す形)"),
+            (0xA5, "VK_RMENU"),
+            (0x10, "VK_SHIFT (汎用)"),
+            (0x11, "VK_CONTROL"),
+            (0x12, "VK_MENU"),
+            (0x5B, "VK_LWIN"),
+            (0x5C, "VK_RWIN"),
+            (0x21, "VK_PRIOR (Navigation 下端)"),
+            (0x25, "VK_LEFT"),
+            (0x28, "VK_DOWN (Navigation 上端)"),
+            (0x1B, "VK_ESCAPE"),
+            (0x70, "VK_F1"),
+            (0x7B, "VK_F12"),
+        ] {
+            assert!(is_observed_key(vk), "{why} は観測する");
+            assert!(!is_feature_key(vk), "{why} を特徴量へ流してはならない");
+        }
+    }
+
+    /// ⚠️ 広げても**まだ通さない**もの (★ 観測ゲートにも上限がある)。
+    #[test]
+    fn observed_key_still_excludes_ime_mode_and_unlisted_keys() {
         assert!(
-            !is_typing_key(VK_KANJI),
-            "IME モードキー自体はタイピングキーではない"
+            !is_observed_key(VK_KANJI),
+            "IME モードキー自体は分析チャネルへ送らない (IME 状態として別経路で扱う)"
         );
+        assert!(
+            !is_observed_key(0x14),
+            "VK_CAPITAL (CapsLock) は段 1 に無い"
+        );
+        assert!(
+            !is_observed_key(0x2C),
+            "VK_SNAPSHOT (PrintScreen) は段 1 に無い"
+        );
+        assert!(!is_observed_key(0x7C), "VK_F13 (F12 の直後) は段 1 に無い");
+        assert!(!is_observed_key(0x20 - 1), "VK_CANCEL 近傍の未指定キー");
     }
 
     /// ★ 範囲判定の off-by-one を捕まえる (境界の 1 つ外側)。
+    ///
+    /// ⚠️ **特徴量ゲート側**を見る (★ 観測ゲートは広いので境界が違う)。
     #[test]
-    fn typing_key_range_boundaries_are_exclusive_outside() {
-        assert!(!is_typing_key(0x40), "A-Z 範囲の直前");
-        assert!(!is_typing_key(0x5B), "A-Z 範囲の直後");
-        assert!(!is_typing_key(0x2F), "0-9 範囲の直前");
-        assert!(!is_typing_key(0x3A), "0-9 範囲の直後");
-        assert!(!is_typing_key(0x5F), "Numpad 範囲の直前");
-        assert!(!is_typing_key(0x70), "Numpad 範囲の直後 (F1 = VK_F1)");
-        assert!(!is_typing_key(0xB9), "OEM 記号 1群目の直前");
-        assert!(!is_typing_key(0xC1), "OEM 記号 1群目の直後");
-        assert!(!is_typing_key(0xDA), "OEM 記号 2群目の直前");
-        assert!(!is_typing_key(0xE0), "OEM 記号 2群目の直後");
+    fn feature_key_range_boundaries_are_exclusive_outside() {
+        use crate::analysis::key_gate::is_feature_key;
+        assert!(!is_feature_key(0x40), "A-Z 範囲の直前");
+        assert!(!is_feature_key(0x5B), "A-Z 範囲の直後");
+        assert!(!is_feature_key(0x2F), "0-9 範囲の直前");
+        assert!(!is_feature_key(0x3A), "0-9 範囲の直後");
+        assert!(!is_feature_key(0x5F), "Numpad 範囲の直前");
+        assert!(!is_feature_key(0x70), "Numpad 範囲の直後 (F1 = VK_F1)");
+        assert!(!is_feature_key(0xB9), "OEM 記号 1群目の直前");
+        assert!(!is_feature_key(0xC1), "OEM 記号 1群目の直後");
+        assert!(!is_feature_key(0xDA), "OEM 記号 2群目の直前");
+        assert!(!is_feature_key(0xE0), "OEM 記号 2群目の直後");
+    }
+
+    /// ⚠️★★★ **OS 非対称の対テスト（Windows 側）** —— テンキーは **Windows では通る**。
+    ///
+    /// ★ 対になるのは `hook_macos.rs::numpad_is_not_observed_on_macos` である。
+    /// ⚠️ 詳細と「なぜ mac では通さないか」は macOS 側のテストの doc が正本。
+    #[test]
+    fn numpad_is_observed_and_is_a_feature_key_on_windows() {
+        use crate::analysis::key_gate::is_feature_key;
+        for vk in [0x60u32, 0x65, 0x6F] {
+            assert!(is_observed_key(vk), "{vk:#04X} は Windows では観測する");
+            assert!(
+                is_feature_key(vk),
+                "{vk:#04X} は Windows では従来どおり特徴量にも入る (⚠️ 非回帰)"
+            );
+        }
     }
 
     #[test]

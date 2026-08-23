@@ -7,3 +7,6 @@ pub mod ime;
 //   ⚠️ Win32 呼び出しは `ime_windows.rs` 側にあり、ここには 1 つも無い。
 pub mod ime_cloak;
 pub mod liveness;
+// ⚠️★★★ O1 (R3-a) の非打鍵チャネル (ADR-014 D4 の段 1)。
+//   ★ OS 依存は `observe_{windows,macos}.rs` に閉じ、ここ (`observe.rs`) は受け口だけ。
+pub mod observe;

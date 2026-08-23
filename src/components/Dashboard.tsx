@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { invoke } from "@tauri-apps/api/core";
-import { emit, listen } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import RecordingControls from "./RecordingControls";
 
 interface DiagnosticInfo {
   hook_active: string;
@@ -44,7 +45,6 @@ interface DashboardProps {
   onQuit: () => void;
   /** アプリを終了せずスタート画面へ戻る (設定変更・尺度理解テスト・再開のため)。 */
   onBack?: () => void;
-  isMonkMode: boolean;
   keyboardIdleMs: number;
   hookActive: boolean | null;
   /**
@@ -53,15 +53,9 @@ interface DashboardProps {
    * 既定 false (通常 / デバッグ表示)。
    */
   calibrationMode?: boolean;
-  /**
-   * セッションが介入を有効化しているか (session_meta.intervention_enabled)。
-   * false のとき backend は全介入を gate するため Monk Mode (Wall mute) は no-op。
-   * → 効かない操作を見せないよう、false のとき Monk Mode トグルを非表示にする。既定 false。
-   */
-  interventionEnabled?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, isMonkMode, keyboardIdleMs, hookActive, calibrationMode = false, interventionEnabled = false }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, keyboardIdleMs, hookActive, calibrationMode = false }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -211,12 +205,6 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
       ? 'Active'
       : `Idle ${Math.floor(keyboardIdleMs / 1000)}s`;
 
-  const handleMonkModeToggle = () => {
-    // Monk Mode トグル: ON/OFF を broadcast → 両ウィンドウが isMonkMode を同期
-    // ON 時は LV2 Wall タイマーが無効化される
-    emit("monk-mode-changed", !isMonkMode).catch(() => {});
-  };
-
   // デバッグ表示ゲート。被験者には一切のデバッグ/モデル出力を見せない。
   // ⚠ import.meta.env.DEV ではなく明示的な VITE_GSE_DEBUG=1 で判定する: 起動方法
   // (`npm run tauri dev` か `tauri build` 本番バイナリか) に依存せず、被験者は既定で常にブラインド。
@@ -252,6 +240,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
           </div>
         </div>
       )}
+
+      {/* ⚠️★★★ O1: 被験者の 3 点セット (ADR-014 D7)。★ **判断 3 の根拠 3 がここに立っている。**
+          稼働中インジケータ / 即時の一時停止 / 事後の区間指定削除。 */}
+      <RecordingControls />
 
       {/* キーボードフック状態警告 (両プラットフォーム共通) */}
       {hookActive === false && (
@@ -510,21 +502,6 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
         </>
       )}
 
-      {/* Monk Mode トグル: ON=Wall無効, OFF=通常。
-          介入無効セッションでは backend が全介入を gate し no-op になるため非表示にする
-          (効かない操作を見せない・interventionEnabled=true のときのみ表示)。 */}
-      {interventionEnabled && (
-        <button
-          className={`monk-mode-toggle ${isMonkMode ? 'on' : 'off'}`}
-          onClick={handleMonkModeToggle}
-        >
-          <span>{isMonkMode ? 'Monk Mode: ON' : 'Monk Mode: OFF'}</span>
-          <span className="monk-mode-label">
-            {isMonkMode ? 'Wall intervention disabled' : 'Wall intervention active'}
-          </span>
-        </button>
-      )}
-
       {showModelOutput && (
         <div className="info-box">
           <p>Type naturally. The engine analyzes your keystroke dynamics.</p>
@@ -553,29 +530,12 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
         {stuckMarked ? '✓ 記録しました' : '🔴 今とても詰まっている'}
       </button>
 
-      {/* デバッグ: Wall を HMM と切り離して強制発動する (debugView=VITE_GSE_DEBUG のみ表示)。
-          Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。
-          showModelOutput と同じ debugView gate で、起動方法に依存せず被験者バンドルから除外する
-          (`npm run tauri dev` で被験者が回す場合でもボタンは出ない。cross-review HIGH-B 強化)。
-          強制発動は NDJSON に reason="debug_force" で残り、解析時にも除外できる。 */}
-      {debugView && (
-        <button
-          className="debug-force-wall-button"
-          onClick={() =>
-            invoke("force_wall").catch((e) => console.error("force_wall failed:", e))
-          }
-          title="HMM を介さず Wall を強制発動 (動作確認用・reason=debug_force でログ)"
-        >
-          🧱 Wall 強制発動 (デバッグ)
-        </button>
-      )}
-
       {/* デバッグ (#1 repro): プローブカード / Nudge を即時に出す。card→回答/skip→record_realtime_*
-          と nudge→dismiss→record_intervention_dismiss の経路を能動的に検証する。force_wall と同じ
+          と nudge→dismiss→record_intervention_dismiss の経路を能動的に検証する。
           debugView gate で被験者バンドルから除外する。reason="debug_force" でログに残り解析時に除外可。 */}
       {debugView && (
         <button
-          className="debug-force-wall-button"
+          className="debug-force-button"
           onClick={() =>
             invoke("debug_force_probe").catch((e) =>
               console.error("debug_force_probe failed:", e)
@@ -589,7 +549,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, i
 
       {debugView && (
         <button
-          className="debug-force-wall-button"
+          className="debug-force-button"
           onClick={() =>
             invoke("force_nudge").catch((e) => console.error("force_nudge failed:", e))
           }

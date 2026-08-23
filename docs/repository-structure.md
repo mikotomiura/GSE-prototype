@@ -39,7 +39,6 @@ GSE-prototype/
 │   │   ├── participant_id.rs     #     participant_id 検証の単一情報源 (feature 非依存)
 │   │   ├── packaging.rs          #     匿名化 + age 暗号化 SSOT (#[cfg(feature = "package")] gated)
 │   │   ├── overlay_panel.rs      #     macOS: overlay 窓の NSPanel 化 FFI グルー (#[cfg(macos)] gated)
-│   │   ├── wall_server.rs        #     Lv2 Wall HTTP サーバー + QR + Zen Timer
 │   │   ├── sensors.rs            #     センサーモジュール dispatch (#[cfg(macos)] gated)
 │   │   ├── sensors_macos.rs      #     macOS: SensorManager stub (CoreMotion 予約)
 │   │   ├── bin/                  #     サブコマンド実装
@@ -205,7 +204,7 @@ GSE-prototype/
 
 | 種類 | 規則 | 例 |
 |---|---|---|
-| Rust ソース | snake_case.rs | `wall_server.rs`, `features.rs` |
+| Rust ソース | snake_case.rs | `wall_server.rs`(削除済), `features.rs` |
 | Rust プラットフォーム固有 | {module}\_{platform}.rs | `hook_windows.rs`, `hook_macos.rs`, `ime_macos.rs` |
 | Rust モジュール | ディレクトリ + mod.rs | `input/mod.rs` |
 | React コンポーネント | PascalCase.tsx | `Dashboard.tsx`, `Overlay.tsx` |
@@ -242,7 +241,6 @@ lib.rs (Tauri commands, thread orchestration)
     ├──► analysis::calibration_eval (v0.3: 較正解析、gse-replay --calibration で使用、オフライン)
     ├──► analysis::cohort   (v0.3 Task E: 被験者横断判定、gse-cohort で使用、calibration_eval の gate 再利用)
     ├──► logger         (セッションログ, UserLabel / probe_assignment 等のバリアント含む)
-    └──► wall_server    (Lv2 介入)
 
 schema_dto (Phase 1, production path と独立)
     │

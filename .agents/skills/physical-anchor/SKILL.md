@@ -2,17 +2,25 @@
 name: physical-anchor
 description: >
   GSE の Lv3/Lv4 介入である Physical Anchor の設計規則。Flutter アプリとの連携・
-  歩数/移動距離/歩行速度の計測設計・Wall Server からの拡張パターン。
-  Physical Anchor 機能を設計する・Flutter 連携プロトコルを実装する・
-  歩数センサー API を組み込むときに必須参照。以下の状況で必須参照:
+  歩数/移動距離/歩行速度の計測設計。⚠️★★★ wall_server.rs は 2026-08-23 に削除され
+  (ADR-015)、Physical Anchor は運搬路を失っている。実装前に境界クラスの再設計が要る。
+  以下の状況で必須参照:
   - Flutter アプリと Tauri バックエンドの通信プロトコルを設計するとき
-  - 歩数・移動距離・歩行速度の計測 API を選定・実装するとき
+  - ⚠️ Physical Anchor の境界クラス (PC↔スマホの経路) を再設計するとき
+  - 歩数・移動距離・速度の計測 API を選定・実装するとき
   - Lv3 (軽度の身体活動) / Lv4 (積極的な外出) の介入ロジックを設計するとき
-  - wall_server.rs を Physical Anchor 用に拡張するとき
   - Flutter の pedometer / geolocator プラグインを使うとき
 allowed-tools: Read, Grep, Glob, Edit
 ---
 
+
+
+> ⚠️★★★ **2026-08-23: `wall_server.rs` は削除された**（**ADR-015**）。
+> ★ 本 Skill の「**Wall Server から拡張する**」パターンは**無効**である。
+> ⚠️★★★ **PM-D11（2026-08-15）の「既存の Wall Server の 1 ビット経路がそのまま使える・
+> 新しい境界クラスを作らない」という前提は覆った** —— ★ **Physical Anchor は運搬路を失っている。**
+> ⚠️ 実装前に **境界クラスの再設計**が要る（`data-privacy` ＋ PM-D4 の「状態を常時流すのは一段大きい」判定）。
+> ★ **PM-D11 の他の条件（量は二値のみ / 完了条件は時間・往復 / GPS は歩数と別扱い）は不変**である。
 # Physical Anchor 設計規則
 
 ## このスキルの目的

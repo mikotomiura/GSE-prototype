@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -121,7 +121,7 @@ const PHASE_WEEKS: WeekConfig[] = [
   {
     value: "week2_intervention",
     label: "第2週 (介入)",
-    description: "Wall + 2分タイマーが実発火。介入下のラベルを別プールで収集 (post_intervention)。",
+    description: "介入が実発火。介入下のラベルを別プールで収集 (post_intervention)。",
     interventionEnabled: true,
     calibrationMode: false,
     condition: "baseline",
@@ -135,7 +135,7 @@ interface CognitiveStateRaw {
   stuck: number;
 }
 
-type InterventionAction = "none" | "nudge" | "wall" | "defer";
+type InterventionAction = "none" | "nudge" | "defer";
 
 interface InterventionDecision {
   action: InterventionAction;
@@ -143,7 +143,6 @@ interface InterventionDecision {
   opportunity_score: number;
   p_stuck: number;
   idle_ms: number;
-  wall_accum_ms: number;
   reason: string;
   suppressed_by: string[];
 }
@@ -154,7 +153,6 @@ const DEFAULT_INTERVENTION_DECISION: InterventionDecision = {
   opportunity_score: 0,
   p_stuck: 0,
   idle_ms: 0,
-  wall_accum_ms: 0,
   reason: "safe_default",
   suppressed_by: [],
 };
@@ -168,8 +166,6 @@ function App() {
   const [interventionDecision, setInterventionDecision] = useState<InterventionDecision>(
     DEFAULT_INTERVENTION_DECISION
   );
-  const [isWallActive, setIsWallActive] = useState(false);
-  const [isMonkMode, setIsMonkMode] = useState(false);
   // Overlay ウィンドウは start_session 時に動的生成されるため、
   // overlay なら最初からセッション開始済みとして扱う。
   const currentWindow = useMemo(() => getCurrentWindow(), []);
@@ -241,14 +237,7 @@ function App() {
   const { interventionEnabled, calibrationMode } = weekConfig;
   // Ref mirrors: setInterval 内からステート最新値を参照するため
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
-  const isWallActiveRef = useRef(isWallActive);
-  const isMonkModeRef = useRef(isMonkMode);
-  // Wall を「1 エピソードにつき 1 回だけ」起動するためのエッジ検出フラグ。
-  // 解除 (sensor-accelerometer) 後も判定が "wall" のまま lingering する
   // (特に overlay は last_decision を読む) ため、これが無いと毎ポーリングで再起動してしまう。
-  const wallHandledRef = useRef(false);
-  useEffect(() => { isWallActiveRef.current = isWallActive; }, [isWallActive]);
-  useEffect(() => { isMonkModeRef.current = isMonkMode; }, [isMonkMode]);
 
   // D-1: currentWindow / windowLabel は isStarted 初期値算出のため上方で宣言済み
 
@@ -274,7 +263,6 @@ function App() {
   // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + intervention decision
   //    単一の setInterval 内で Promise.all で並行取得し、同じブロック内で
   //    Rust 側の Opportunity 判定結果を UI に反映する。
-  //    isWallActive/isMonkMode は Ref 経由で Rust に渡し、依存配列に含めない。
   //    これにより interval の破棄・再作成が発生せず、タイマー精度が向上する。
   useEffect(() => {
     if (!isStarted) return;
@@ -286,26 +274,12 @@ function App() {
           invoke<number>("get_keyboard_idle_ms"),
           invoke<InterventionDecision>("get_intervention_decision", {
             windowLabel,
-            isMonkMode: isMonkModeRef.current,
-            isWallActive: isWallActiveRef.current,
           }),
         ]);
         setCognitiveState(state);
         setKeyboardIdleMs(idle);
         setInterventionDecision(decision);
 
-        // Wall は新エピソードの立ち上がり (非 wall → wall) でのみ起動する。
-        // 解除後も判定が "wall" のまま続く (overlay は last_decision を読むため lingering)
-        // ケースで毎回再発火していたのを、wallHandledRef のエッジ検出で防ぐ。
-        if (decision.action === "wall") {
-          if (!isWallActiveRef.current && !wallHandledRef.current) {
-            wallHandledRef.current = true;
-            setIsWallActive(true);
-          }
-        } else {
-          // 判定が wall を離れたら次のエピソードを許可する (cooldown 明け等)。
-          wallHandledRef.current = false;
-        }
       } catch (e) {
         console.error("Failed to fetch state:", e);
         setCognitiveState({ flow: 1.0, incubation: 0.0, stuck: 0.0 });
@@ -315,26 +289,6 @@ function App() {
 
     return () => clearInterval(interval);
   }, [isStarted, windowLabel]);
-
-  // 4. Sensor Integration (Unlock Logic)
-  //    Wall解除後にメインウィンドウをフォーカス:
-  //    オーバーレイが透過に戻っても、ユーザーがクリックしないと
-  //    メインウィンドウに操作が戻らないため、自動でフォーカスする。
-  useEffect(() => {
-    const unlisten = listen("sensor-accelerometer", (event) => {
-      if (event.payload === "move") {
-        setIsWallActive(false);
-        // メインウィンドウ側でのみフォーカスを取り直す
-        if (windowLabel !== "overlay") {
-          currentWindow.setFocus().catch(() => {});
-        }
-      }
-    });
-
-    return () => {
-      unlisten.then((f) => f());
-    };
-  }, [windowLabel, currentWindow]);
 
   // 4b. G1 モードの取得 (起動時 1 回)。null なら通常運用で、画面には何も足さない。
   //     ⚠️ ★ G1 実施者は「G1 モード」の表示が出ていることを開始前に確認する
@@ -400,7 +354,6 @@ function App() {
   //     (protocol.md §4.4「残り時間のアナウンスをしない」/ §2.2 が却下した時間圧)。
   useEffect(() => {
     const unlisten = listen("g1-block-ended", () => {
-      setIsWallActive(false);
       setIsStarted(false);
       setBlockEnded(true);
       setG1BlocksDone((n) => n + 1);
@@ -422,29 +375,13 @@ function App() {
     };
   }, []);
 
-  // 5. Monk Mode: Dashboard のトグルから monk-mode-changed を受け取り isMonkMode を更新。
-  //    両ウィンドウ(main/overlay)がこのイベントをリッスンし状態を同期する。
-  //    Monk Mode ON 時は LV2 Wall タイマーが無効化される。
-  useEffect(() => {
-    const unlisten = listen("monk-mode-changed", (event) => {
-      setIsMonkMode(event.payload as boolean);
-    });
-
-    return () => {
-      unlisten.then((f) => f());
-    };
-  }, []);
-
   // 6-7. (削除) Overlay は start_session 時に Rust 側で動的生成されるため、
   // session-started イベント購読と window.show() は不要。
 
   // Render based on Window Label
   if (windowLabel === "overlay") {
     return (
-      <Overlay
-        interventionDecision={interventionDecision}
-        isWallActive={isWallActive}
-      />
+      <Overlay interventionDecision={interventionDecision} />
     );
   }
 
@@ -491,7 +428,6 @@ function App() {
       await invoke("record_session_meta", {
         track: "main",
         taskKind,
-        monkMode: isMonkMode,
         interventionEnabled,
         condition: weekConfig.condition,
         labelPool: weekConfig.labelPool,
@@ -1024,13 +960,11 @@ function App() {
 
   // Default to Main Dashboard (較正モード時は blind/minimal 表示)
   // onBack: アプリを終了せずスタート画面へ戻る (作業種別の変更・尺度理解テスト・再開のため)。
-  //   戻る瞬間に Wall が出ていたら overlay が残らないよう介入もクリアする。
   const handleBack = () => {
-    setIsWallActive(false);
     setIsStarted(false);
   };
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} onBack={handleBack} isMonkMode={isMonkMode} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} interventionEnabled={interventionEnabled} />
+    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} onBack={handleBack} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} />
   );
 }
 

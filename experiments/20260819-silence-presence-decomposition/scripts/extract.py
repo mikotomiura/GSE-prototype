@@ -46,6 +46,23 @@ RECOVERY_SEARCH_MS = 3 * TICK_MS
 PROBE_TYPES = ("probe_assignment", "realtime_label", "vignette_response")
 
 
+# ADR-014 判断 6 (2026-08-23): logger が生 VK ではなく category を書くようになった。
+# 旧ログ (vk を持つ) の再現結果を 1 ビットも変えないため **vk を優先**し、
+# 無いときだけ category から代表 VK を引く (src-tauri/src/bin/replay.rs の逆写像と同義)。
+_CATEGORY_TO_VK = {"backspace": 0x08, "delete": 0x2E}
+
+
+def _key_vk(o: dict) -> int:
+    """key 行の実効 VK を解決する (raw / category 両対応)。未知は -1。"""
+    if "vk" in o:
+        return int(o["vk"])
+    cat = o.get("category")
+    if isinstance(cat, str):
+        # backspace/delete 以外は本スクリプトの判定に使わないので -1 で足りる。
+        return _CATEGORY_TO_VK.get(cat, -1)
+    return -1
+
+
 def is_backspace(vk: int) -> bool:
     """`src-tauri/src/bin/replay.rs:428` の逐語複製 (Windows 規約)。"""
     return vk == 0x08 or vk == 0x2E
@@ -94,7 +111,7 @@ def read_records(path: str) -> dict:
             last_t = t
             if typ == "key":
                 if o.get("press") is True:
-                    presses.append((int(t), int(o.get("vk", -1))))
+                    presses.append((int(t), _key_vk(o)))
             elif typ == "hook_health":
                 health.append(
                     {

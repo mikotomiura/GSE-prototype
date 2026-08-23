@@ -1,0 +1,125 @@
+//! 記録の **即時一時停止 / 再開** (ADR-014 **D7-ii**)。
+//!
+//! ## ⚠️★★★ なぜ独立モジュールなのか
+//!
+//! ★ フラグを読むのは **`logger`** で、書くのは **`lib.rs` の IPC**、表示するのは
+//! **Frontend** である。⚠️ どれか 1 つの中に置くと、他の 2 つがそのモジュールへ
+//! 依存することになり `architecture-rules` ルール 1（依存は一方向）に触れる。
+//! → ★ **依存を 1 つも持たない葉モジュール**にして、誰からも読めるようにする。
+//!
+//! ## ★★★ どこで止めるか — **ロガーの書き出し点**である
+//!
+//! ⚠️ フックの送信点では止めない。★ 理由:
+//!
+//! | 案 | ⚠️ 問題 |
+//! |---|---|
+//! | フックの送信を止める | ⚠️ 分析スレッドから見ると**沈黙**と区別が付かず、`starved_ms` / 介入判定が
+//!   「離席した」と誤解する。★ 再開時に特徴量バッファを捨てる後始末も要る |
+//! | ★ **ロガーの書き出しを止める**（採用） | ★ 被験者への約束は逐語「**すぐ止める**（記録を止める）」であり、
+//!   **ファイルに 1 バイトも書かない**ことがその約束の実体である |
+//!
+//! → ★ 一時停止中も画面の表示（いまの状態）は動く。⚠️ **ディスクには何も残らない。**
+//!
+//! ## ⚠️★★★ 「止めた」と「信号が無かった」を混同させない
+//!
+//! ★ ADR-013 **D1** の原則（「**信号が無い**」と「**計器が無い**」を分ける）と同じ理屈で、
+//! **遷移のたびに `recording_pause` 行を書く**。⚠️ 書かないと、解析側は
+//! 「被験者が止めた 3 時間」と「本当に何も起きなかった 3 時間」を**永久に区別できない**。
+//!
+//! ★ `recording_pause` 行は**一時停止中でも書く**（★ そうしないと「再開した」が記録できない）。
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// 記録を一時停止しているか。
+///
+/// ⚠️ ★ 既定は `false`（＝ 記録する）。★ アプリを起動し直すと **必ず記録側に戻る** ——
+/// ⚠️ 「止めたつもりが次回も止まったままで、何も取れていなかった」を作らないため。
+/// ★ 被験者は稼働中インジケータで現在値を常に確認できる（D7-i）。
+static RECORDING_PAUSED: AtomicBool = AtomicBool::new(false);
+
+/// いま一時停止中か。
+pub fn is_paused() -> bool {
+    RECORDING_PAUSED.load(Ordering::Acquire)
+}
+
+/// 一時停止 / 再開を設定し、**直前の値**を返す。
+///
+/// ★ 呼び出し側は「値が変わったときだけ `recording_pause` 行を書く」ために直前値を使う。
+pub fn set_paused(paused: bool) -> bool {
+    RECORDING_PAUSED.swap(paused, Ordering::AcqRel)
+}
+
+/// 一時停止中に**それでも書いてよい**行種か。
+///
+/// ★ 純関数にして、判断を 1 か所に閉じる（⚠️ ロガーの match 腕に条件を散らさない）。
+///
+/// | 通すもの | ★ 理由 |
+/// |---|---|
+/// | `recording_pause` | ⚠️ **再開したことを記録できなくなる** |
+/// | `meta` | ★ `session_end` / `capabilities` はファイルの**整合性**そのもの。
+///   ⚠️ 落とすと「閉じていないファイル」が残り `reconcile` が提出候補から外す |
+///
+/// ⚠️★★★ **それ以外は 1 行も書かない。** ★ `key` / `feat` / `paste` / `pointer_bin` /
+/// `focus_transition` はすべて落ちる（＝ 被験者への約束「すぐ止める」の実体）。
+pub fn is_writable_while_paused(line_type: &str) -> bool {
+    matches!(line_type, "recording_pause" | "meta")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ⚠️★★★ 記録される側の行は 1 つも通さない。
+    #[test]
+    fn paused_blocks_every_data_line_type() {
+        for t in [
+            "key",
+            "feat",
+            "paste",
+            "ime_state",
+            "ime_shadow",
+            "hook_health",
+            "starve_window",
+            "user_label",
+            "review_marker",
+            "session_start",
+            "session_meta",
+            "probe_assignment",
+            "realtime_label",
+            "vignette_response",
+            "intervention_decision",
+            "intervention_response",
+            "focus_transition",
+            "pointer_bin",
+            "secure_input",
+        ] {
+            assert!(
+                !is_writable_while_paused(t),
+                "{t:?} が一時停止中に書けてしまう"
+            );
+        }
+    }
+
+    /// ★ 「再開した」を書けること / ファイルを閉じられること。
+    #[test]
+    fn paused_still_allows_the_marker_and_meta() {
+        assert!(is_writable_while_paused("recording_pause"));
+        assert!(is_writable_while_paused("meta"));
+    }
+
+    /// ★ `swap` が直前値を返すこと（★ 遷移したときだけ行を書くために要る）。
+    ///
+    /// ⚠️ グローバルな Atomic を触る唯一のテストである（★ 他のテストは純関数のみ）。
+    #[test]
+    fn set_paused_returns_the_previous_value() {
+        set_paused(false);
+        assert!(!set_paused(true), "false → true の直前値は false");
+        assert!(is_paused());
+        assert!(
+            set_paused(true),
+            "true → true の直前値は true (遷移していない)"
+        );
+        assert!(set_paused(false), "true → false の直前値は true");
+        assert!(!is_paused());
+    }
+}

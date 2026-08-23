@@ -1,19 +1,25 @@
 ---
 name: intervention-design
 description: >
-  GSE の段階的介入システム設計規則。Lv1 Nudge / Lv2 Wall / Zen Timer /
-  Monk Mode / Early Unlock の実装を書く・修正する・デバッグするときに必須参照。
+  GSE の段階的介入システム設計規則。⚠️ Lv2 Wall / Zen Timer / Monk Mode / Early Unlock は
+  2026-08-23 に削除された (ADR-015)。★ 現行は Lv1 Nudge と none/defer のみ。
   以下の状況で必須参照:
   - Overlay.tsx の Nudge 表示ロジックを変更するとき
-  - Wall 起動トリガー (p_stuck > 0.70, 累積30秒) を変更するとき
-  - wall_server.rs の HTTP エンドポイント (POST /unlock) を修正するとき
-  - Zen Timer の 2分カウントダウンを変更するとき
-  - Monk Mode のトグルロジックを変更するとき
-  - Early Unlock ボタンの表示条件を変更するとき
-  - graceful degradation (Wall Server 起動失敗) を修正するとき
+  - 介入の発火トリガー・cooldown・daily cap を変更するとき
+  - HIR (有害介入率) / dismiss 率の算出を変更するとき
+  - intervention.rs の decide() / suppression を修正するとき
+  - 介入 UI の非ブロック性 (クリック透過・box 化) を変更するとき
 allowed-tools: Read, Grep, Glob, Edit
 ---
 
+
+
+> ⚠️★★★ **2026-08-23: Lv2 Wall と Monk Mode は削除された**（**ADR-015**）。
+> ★ 本 Skill の **Wall / Monk Mode / Early Unlock / QR / Zen Timer に関する記述はすべて無効**である。
+> ⚠️ **ルール 5（Monk Mode は Wall を無効化するだけ）も無効** —— Monk Mode 自体が存在しない。
+> ★ **有効なのは Lv1 Nudge と `none` / `defer` の扱いだけ**である。
+> ⚠️ **HIR（有害介入率）は残る**（ADR-015 D3。★ ACT = `{nudge}` になった）。
+> ★ Physical Anchor の運搬路は **ADR-015 D4 で空いた**（`physical-anchor` Skill 参照）。
 # 段階的介入設計規則
 
 ## このスキルの目的

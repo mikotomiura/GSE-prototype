@@ -22,7 +22,8 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 入力層 (`input/`) が OS 固有のキーボード/IME フックでイベントを捕捉し、Atomic + channel で
 分析層 (`analysis/`) に渡す。分析層は 30 秒ローリングウィンドウで 5 特徴量を抽出し、HMM
 (Forward Algorithm) で 3 状態確率を推定、1Hz ゲートで `FeatSnapshot` を生成する。`intervention`
-が介入要否を判定し、`logger` が NDJSON にセッションを記録、`wall_server` が Lv2 Wall を提供する。
+が介入要否を判定し、`logger` が NDJSON にセッションを記録する。
+⚠️ **Lv2 Wall と `wall_server.rs` は 2026-08-23 に削除された** (ADR-015)。現行の介入は Lv1 Nudge のみ。
 `analysis/` は **プラットフォーム非依存** (OS API は `input/` + `sensors*.rs` に隔離)。
 詳細は `docs/architecture.md`。
 
@@ -31,7 +32,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 - `src/` — React/TypeScript フロントエンド (UI / Tauri IPC のみ。ビジネスロジック禁止)
 - `src-tauri/src/input/` — OS レベル入力キャプチャ (`hook_*` / `ime_*`、プラットフォーム固有)
 - `src-tauri/src/analysis/` — 認知状態推定 (features / engine / loop_step / intervention / probe_scheduler / metrics、OS 非依存)
-- `src-tauri/src/` — `lib.rs` (統合・IPC・スレッド起動)、`logger.rs`、`wall_server.rs`、`schema_dto.rs`、
+- `src-tauri/src/` — `lib.rs` (統合・IPC・スレッド起動)、`logger.rs`、`schema_dto.rs`、
   `g1.rs` (G1 統制タスク実験モードの判定・OS API 非依存)
 - `src-tauri/bin/` — `gse-replay` (回帰/評価 CLI)、`emit_schema` (JSON Schema 生成)
 - `docs/` — 永続ドキュメント (5 ファイル + `external-skills.md` + 設計書 PDF)
@@ -167,8 +168,9 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (ADR-001〜007) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (ADR-001〜016) の根拠を確認したい時 |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
+| `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |
 
 ## 公式 Skill (Phase 2 で導入)
 
