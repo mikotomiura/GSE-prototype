@@ -174,7 +174,6 @@ enum ReplayEvent {
         #[allow(dead_code)]
         task_kind: String,
         #[allow(dead_code)]
-        monk_mode: bool,
         #[allow(dead_code)]
         intervention_enabled: bool,
         // 新フィールド (WBS 0.11 / 0.4)。旧フィクスチャ互換のため `#[serde(default)]`。
@@ -3035,10 +3034,10 @@ mod tests {
                 r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.4.0"}"#,
                 "
 ",
-                r#"{"type":"session_meta","track":"main","task_kind":"argumentative","monk_mode":false,"intervention_enabled":false,"ts":1700000000000}"#,
+                r#"{"type":"session_meta","track":"main","task_kind":"argumentative","intervention_enabled":false,"ts":1700000000000}"#,
                 "
 ",
-                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":1700000010000}"#,
+                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","intervention_enabled":false,"ts":1700000010000}"#,
                 "
 ",
                 r#"{"type":"key","t":1700000000200,"vk":65,"press":true}"#,
@@ -3073,7 +3072,7 @@ mod tests {
                 r#"{"type":"meta","session_start":1700000000000,"hmm_version":"0.4.0"}"#,
                 "
 ",
-                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":false,"ts":1700000000000}"#,
+                r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","intervention_enabled":false,"ts":1700000000000}"#,
                 "
 ",
                 r#"{"type":"session_start","t":1700000000000}"#,

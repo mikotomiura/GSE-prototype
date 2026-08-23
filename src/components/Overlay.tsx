@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import ProbeCard from "./ProbeCard";
 
 // プローブ/Nudge 単独表示時、overlay 窓は「カードの実寸ちょうど」に縮める (logical px)。
@@ -26,14 +25,14 @@ const OFFSCREEN_POS = -20000;
 
 // overlay のクリック受理切替。macOS では NSPanel 化窓で JS の setIgnoreCursorEvents が実効しない
 // ため、Rust 権威の set_overlay_interactive コマンド経由で ignoresMouseEvents を設定する (D9)。
-// interactive=true: カード/Wall がクリックを捕捉 / false: 背後アプリへ透過。
+// interactive=true: カードがクリックを捕捉 / false: 背後アプリへ透過。
 const setOverlayInteractive = (interactive: boolean): Promise<unknown> =>
     invoke("set_overlay_interactive", { interactive });
 
 // show 時のモニタ解決。idle 退避 (画面外 -20000,-20000) で窓がどのモニタとも交差しないと
 // macOS の currentMonitor() は null を返す (NSWindow.screen()==nil) ため、primaryMonitor() へ
-// フォールバックする。これがないと退避後の初回 probe/Wall で setPosition がスキップされ、
-// カードが画面外に留まる / Wall が全画面化しない退行が起きる (窓位置に依存しない解決にする)。
+// フォールバックする。これがないと退避後の初回 probe で setPosition がスキップされ、
+// カードが画面外に留まる退行が起きる (窓位置に依存しない解決にする)。
 const resolveShowMonitor = async () => (await currentMonitor()) ?? (await primaryMonitor());
 
 // Nudge は応答 (dismiss ボタン) があるまで消えない。無応答が続いたらこの時間で
@@ -80,10 +79,9 @@ const auditWindowState = (tag: string, delayMs = 0): void => {
 
 interface OverlayProps {
     interventionDecision: InterventionDecision;
-    isWallActive: boolean;
 }
 
-type InterventionAction = "none" | "nudge" | "wall" | "defer";
+type InterventionAction = "none" | "nudge" | "defer";
 
 // 介入応答 (dismiss) の固定カテゴリ。Need 誤りと Opportunity 誤りを分離する (WBS 0.8 / v0.4 §9)。
 // Rust 側 `DismissReason` (logger.rs) と文字列を一致させること。
@@ -95,23 +93,15 @@ interface InterventionDecision {
     opportunity_score: number;
     p_stuck: number;
     idle_ms: number;
-    wall_accum_ms: number;
     reason: string;
     suppressed_by: string[];
 }
 
-interface WallServerInfo {
-    url: string;
-    qr_svg: string;
-}
 
-const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive }) => {
+const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
     // Nudge は「表示中か」を真偽で持つ (live action から切り離す)。一度出たら応答/タイムアウト
     // まで保持し、p_stuck 振動で action が変わっても消さない (= 勝手に消えるバグの修正)。
     const [nudgeVisible, setNudgeVisible] = useState(false);
-    const [wallServerInfo, setWallServerInfo] = useState<WallServerInfo | null>(null);
-    const [showTypingWarning, setShowTypingWarning] = useState(false);
-    const [phoneConnected, setPhoneConnected] = useState(false);
     // Task C: プローブカード表示中フラグ。表示中は cursor events を受け付け、overlay を可視化する。
     const [probeActive, setProbeActive] = useState(false);
     // プローブ/Nudge カードの実描画サイズ (logical px)。overlay 窓をこの実寸へ縮め透明余白を消す。
@@ -163,10 +153,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         }
     };
 
-    // Wall発動中のキーボード打鍵検知に使うref群
-    const wallStartTimeRef = useRef<number>(0);
-    const lastWarnedKeyAtRef = useRef<number>(0);
-    const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ProbeCard から実寸通知を受ける安定コールバック (ProbeCard 側 effect deps の identity 維持)。
     // サイズ未変化なら同一参照を返し、不要な窓再配置 effect を起こさない。
@@ -197,15 +183,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         return () => ro.disconnect();
     }, []);
 
-    // スマートフォン接続イベントの購読
-    useEffect(() => {
-        const unlisten = listen("wall-phone-connected", () => {
-            setPhoneConnected(true);
-        });
-        return () => {
-            unlisten.then((f) => f());
-        };
-    }, []);
 
     // マウント直後に即座にクリック透過を有効化 (初期状態保証)
     // React の useEffect は最初のレンダー後に実行されるため、起動時に
@@ -217,29 +194,25 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
         setOverlayInteractive(false).catch(() => {});
     }, []);
 
-    // オーバーレイ窓の表示モードを (wall / probe / nudge) から決める統合 effect。
-    //   - Wall:            全画面 + クリックブロック (QR スキャンまで操作不可・現状維持)
+    // オーバーレイ窓の表示モードを (probe / nudge) から決める統合 effect。
     //   - プローブ/Nudge:   右上の小ボックスに縮小 + カード以外は OS レベルでクリック透過
     //                       (被験者は作業を続けながら任意のタイミングで応答できる=非ブロック)
-    //   - Wall+他 同時:     全画面 (Wall 優先)
-    //   - いずれも無し:     hide()
-    // box 化が失敗した環境では安全側 (全画面 + ブロック=現状挙動) にフォールバックする。
+    //   - いずれも無し:     退避 (hide() は使わない)
+    // ⚠️★★★ **Wall 削除 (2026-08-23) で「全画面 + クリックブロック」は通常経路から消えた。**
+    // ★ `applyFullscreenBlock` は **box 化が失敗した環境の縮退路としてのみ**残す。
     useEffect(() => {
         const win = currentWindow;
-        const visible = isWallActive || probeActive || nudgeVisible;
-        // Wall 以外 (probe / nudge) は右上の小 box にして非ブロック化する。
-        const widgetOnly = (probeActive || nudgeVisible) && !isWallActive;
+        const visible = probeActive || nudgeVisible;
         let cancelled = false;
 
-        // 全画面化は「モニタ全域へ明示 setPosition + setSize」で行う。physical 座標で扱い DPI 二重
+        // ⚠️ 縮退路専用。全画面化は「モニタ全域へ明示 setPosition + setSize」で行う。physical 座標で扱い DPI 二重
         // 変換を避ける。**maximize() は使わない**: macOS で overlay は NSPanel 化済み (decisions D7) で、
         // maximize() が内部で setStyleMask: を呼ぶと WKWebView の contentLayoutRect オブザーバ解除に
-        // 失敗して NSRangeException でクラッシュする (実機確認・D8)。明示サイズはタスクバーごと全被覆=
-        // Wall の全ブロック意図にも合致する。
+        // 失敗して NSRangeException でクラッシュする (実機確認・D8)。
         const applyFullscreenBlock = async () => {
             // 退避後は窓が画面外のため currentMonitor() が null になりうる。primaryMonitor()
             // フォールバックで mon を必ず得て setPosition/setSize を確実に走らせる
-            // (mon が null だと Wall が 1x1 offscreen のまま=全画面ブロック不成立になる退行を防ぐ)。
+            // (mon が null だと 1x1 offscreen のまま縮退が成立しない退行を防ぐ)。
             const mon = await resolveShowMonitor();
             if (cancelled) return;
             if (mon) {
@@ -256,7 +229,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             // orderOut (hide) すると webview の JS が休眠し、probe_triggered を取りこぼして
             // カードが出ない (実機の診断ログで setOverlayInteractive(true) 不到達=リスナー休眠を確認)。
             // 代わりに「画面に出したまま透明 + クリック透過 (ignoresMouseEvents=true)」にして JS を生かす。
-            // overlay の中身は idle 時すべて非表示 (ProbeCard=null / Nudge=opacity0 / Wall 非描画) なので
+            // overlay の中身は idle 時すべて非表示 (ProbeCard=null / Nudge=opacity0) なので
             // 透明窓として不可視・無害。被験者のクリックは背後アプリへ透過する。
             if (!visible) {
                 // 一次ガード (幾何退避): 窓を画面外 + 1x1 へ退避し、背後アプリと重なる領域を
@@ -292,7 +265,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             try {
                 await win.show();
                 if (cancelled) return;
-                if (widgetOnly) {
+                {
                     // 窓を「表示中カードの実寸ちょうど」に縮め、右上へ置く → 窓=カードで透明余白ゼロ。
                     // カード外 (窓外) は他アプリへクリックが通り、カード footprint だけが操作対象になる
                     // (Windows: 透明余白でもクリックを奪う #11461 を、退避でなく実寸縮小で根治)。
@@ -329,11 +302,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                     await setOverlayInteractive(true);
                     // 計装: カード実寸 show 後の実窓位置/サイズ (窓=カード実寸に縮んだか)。debug のみ。
                     auditWindowState(`widget-show probe=${probeActive} nudge=${nudgeVisible}`);
-                } else {
-                    // Wall (単独 or 他と同時): 全画面 + クリックブロック。
-                    await applyFullscreenBlock();
-                    // 計装: Wall 全画面化後の実窓位置/サイズ (モニタ全域か)。debug のみ。
-                    auditWindowState("fullscreen-wall");
                 }
             } catch (e) {
                 // 既にこの effect がキャンセル済み (新 state へ遷移済み) なら何もしない。
@@ -357,82 +325,13 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
 
         return () => { cancelled = true; };
         // probeCardSize/nudgeCardSize: 実寸測定が出たら窓をカード実寸へ縮め直す (透明余白を消す)。
-    }, [isWallActive, probeActive, nudgeVisible, currentWindow, probeCardSize, nudgeCardSize]);
+    }, [probeActive, nudgeVisible, currentWindow, probeCardSize, nudgeCardSize]);
 
-    // Wall 発動時はプローブカード・Nudge を畳む (Wall が支配)。
-    // ProbeCard はアンマウントされ onActiveChange(false) を呼ばないので probeActive を明示リセット。
-    useEffect(() => {
-        if (isWallActive) {
-            setProbeActive(false);
-            if (nudgeTimerRef.current) {
-                clearTimeout(nudgeTimerRef.current);
-                nudgeTimerRef.current = null;
-            }
-            setNudgeVisible(false);
-            // Wall 割込みで畳む際、保持していたエラー/送信中フラグも掃除する (次サイクルへ持ち越さない)。
-            setNudgeError(null);
-            setNudgeSubmitting(false);
-            dismissInFlightRef.current = false;
-        }
-    }, [isWallActive]);
-
-    // Wall発動/解除に連動してWall Serverを起動/停止する
-    useEffect(() => {
-        if (isWallActive) {
-            invoke<WallServerInfo>("start_wall_server")
-                .then(info => setWallServerInfo(info))
-                .catch(e => console.error("Failed to start wall server:", e));
-        } else {
-            invoke("stop_wall_server").catch(console.error);
-            setWallServerInfo(null);
-        }
-    }, [isWallActive]);
-
-    // Wall発動時刻を記録し、Wall解除時にリセット
-    useEffect(() => {
-        if (isWallActive) {
-            wallStartTimeRef.current = Date.now();
-            lastWarnedKeyAtRef.current = 0;
-            setShowTypingWarning(false);
-        }
-    }, [isWallActive]);
-
-    // Wall発動中のキーボード打鍵検知: 打鍵を検知したら警告バナーを2.5秒表示
-    // lastKeyAt = Date.now() - idle が wallStartTime より後なら Wall後の打鍵
-    // 同一バーストへの重複警告を防ぐため1秒のデバウンスを設ける
-    useEffect(() => {
-        if (!isWallActive) {
-            setShowTypingWarning(false);
-            return;
-        }
-        const interval = setInterval(async () => {
-            try {
-                // get_last_keypress_timestamp() は Rust の LAST_KEY_MS をエポックmsで直接返す。
-                // Date.now() - idle_ms の逆算より精度が高い (advice.md §D)
-                const lastKeyAt = await invoke<number>("get_last_keypress_timestamp");
-                if (
-                    lastKeyAt > wallStartTimeRef.current &&
-                    lastKeyAt > lastWarnedKeyAtRef.current + 1000
-                ) {
-                    lastWarnedKeyAtRef.current = lastKeyAt;
-                    setShowTypingWarning(true);
-                    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-                    warningTimerRef.current = setTimeout(() => setShowTypingWarning(false), 2500);
-                }
-            } catch (_) {}
-        }, 300);
-        return () => {
-            clearInterval(interval);
-            if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-        };
-    }, [isWallActive]);
-
-    // Nudge は「一度出たら応答 (dismiss) かタイムアウトまで保持」する。
-    // live action が none/defer/wall に変わっても消さない (= ボタンを押す前に勝手に消える問題の修正)。
+    // live action が none/defer に変わっても消さない (= ボタンを押す前に勝手に消える問題の修正)。
     useEffect(() => {
         // probe 表示中は nudge を出さない (同じ box に重ねない・MEDIUM 対応)。probe 応答後に出る。
         const isNudge =
-            interventionDecision.action === "nudge" && !isWallActive && !probeActive;
+            interventionDecision.action === "nudge" && !probeActive;
         if (isNudge && !nudgeVisible && !nudgeDismissed) {
             // 新規 nudge を表示。無応答が続いたら NUDGE_TIMEOUT_MS で silent としてフェードアウト。
             setNudgeVisible(true);
@@ -470,7 +369,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
             // それを検知して dismissed を解除し、次の nudge (cooldown 後) を再表示可能にする。
             setNudgeDismissed(false);
         }
-    }, [interventionDecision, isWallActive, probeActive, nudgeVisible, nudgeDismissed]);
+    }, [interventionDecision, probeActive, nudgeVisible, nudgeDismissed]);
 
     // アンマウント時にタイマーを掃除する。
     useEffect(() => {
@@ -482,10 +381,9 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
     return (
         <div className="overlay-root">
             {/* Task C: v0.3 較正のプローブ回答カード (probe_triggered を listen)。
-                Wall 発動中は表示しない (上の effect で probeActive もリセット)。
                 overlay 窓は tauri-nspanel で非アクティブ Panel 化しクリックを webview へ配送する
                 (透明窓でもクリックが届く・フォーカスは奪わない。decisions D7)。 */}
-            {!isWallActive && <ProbeCard onActiveChange={setProbeActive} onResize={handleProbeResize} />}
+            <ProbeCard onActiveChange={setProbeActive} onResize={handleProbeResize} />
 
             <aside
                 ref={nudgeRef}
@@ -537,43 +435,6 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision, isWallActive })
                 )}
             </aside>
 
-            {/* The Wall (Blocking Layer) — 即時不透明でなく数秒かけてゆっくり減光 (穏やかな onset)。 */}
-            {isWallActive && (
-                <div className="wall-layer wall-dim-in">
-                    <h1>Time to Move!</h1>
-                    <p>Scan the QR code with your phone to unlock</p>
-
-                    {wallServerInfo ? (
-                        <div className="qr-container">
-                            <img src={wallServerInfo.qr_svg} alt="QR Code" className="qr-code" />
-                            <p className="qr-hint">
-                                Open camera app and point at QR code
-                            </p>
-                            {wallServerInfo.url && (
-                                <p className="qr-url">{wallServerInfo.url}</p>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="qr-loading">Starting unlock server...</p>
-                    )}
-
-                    <p className="wall-network-hint">
-                        PCとスマホが同じWi-Fiに接続されていることを確認してください
-                    </p>
-                    {/* スマートフォン接続バッジ */}
-                    {phoneConnected && (
-                        <div className="phone-connected-badge">
-                            Phone connected — Zen Timer running
-                        </div>
-                    )}
-                    {/* Wall発動中の打鍵警告バナー */}
-                    {showTypingWarning && (
-                        <div className="wall-typing-warning">
-                            いまは手を止めて、ひと休みしましょう
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 };

@@ -210,21 +210,14 @@ impl ExpectedQuadrant {
 /// `not_stuck` = 詰まっていない (Need 誤り)、`want_to_struggle` = 今はもがきたい (Opportunity 誤り)、
 /// `just_close` = 単に閉じる、`silent` = 理由を選ばず閉じた/フェードアウト。
 ///
-/// **Wall 応答** (Phase A2・⏸/順守の捕捉):
-/// `early_unlock` = 2分タイマー完走前に解除 (非順守)、`completed` = 2分完走後に解除 (順守)、
-/// `idle_timeout` = 長時間アイドルによる自動解除 (enum 予約のみ・現状未配線)。
+/// ⚠️★★★ **Wall 応答 (`early_unlock` / `completed` / `idle_timeout`) は 2026-08-23 に削除した**
+/// (Wall 自体の削除に伴う・`.steering/20260823-wall-removal/`)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DismissReason {
     NotStuck,
     WantToStruggle,
     JustClose,
     Silent,
-    /// Wall: 2分タイマー完走前の早期解除 (非順守)。
-    EarlyUnlock,
-    /// Wall: 2分タイマー完走後の通常解除 (順守)。
-    Completed,
-    /// Wall: 長時間アイドルによる自動解除。enum 予約のみ (現状未配線・将来用)。
-    IdleTimeout,
 }
 
 impl DismissReason {
@@ -234,9 +227,6 @@ impl DismissReason {
             Self::WantToStruggle => "want_to_struggle",
             Self::JustClose => "just_close",
             Self::Silent => "silent",
-            Self::EarlyUnlock => "early_unlock",
-            Self::Completed => "completed",
-            Self::IdleTimeout => "idle_timeout",
         }
     }
 
@@ -246,9 +236,6 @@ impl DismissReason {
             "want_to_struggle" => Some(Self::WantToStruggle),
             "just_close" => Some(Self::JustClose),
             "silent" => Some(Self::Silent),
-            "early_unlock" => Some(Self::EarlyUnlock),
-            "completed" => Some(Self::Completed),
-            "idle_timeout" => Some(Self::IdleTimeout),
             _ => None,
         }
     }
@@ -385,22 +372,13 @@ fn format_intervention_decision_line(
     opportunity_score: f64,
     p_stuck: f64,
     idle_ms: u64,
-    wall_accum_ms: u64,
     reason: &str,
     suppressed_by: &[String],
 ) -> String {
     let suppressed = serde_json::to_string(suppressed_by).unwrap_or_else(|_| "[]".to_string());
     format!(
-        r#"{{"type":"intervention_decision","t":{},"action":"{}","need_score":{:.4},"opportunity_score":{:.4},"p_stuck":{:.4},"idle_ms":{},"wall_accum_ms":{},"reason":"{}","suppressed_by":{}}}"#,
-        timestamp,
-        action,
-        need_score,
-        opportunity_score,
-        p_stuck,
-        idle_ms,
-        wall_accum_ms,
-        reason,
-        suppressed,
+        r#"{{"type":"intervention_decision","t":{},"action":"{}","need_score":{:.4},"opportunity_score":{:.4},"p_stuck":{:.4},"idle_ms":{},"reason":"{}","suppressed_by":{}}}"#,
+        timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, reason, suppressed,
     )
 }
 
@@ -536,17 +514,15 @@ fn format_session_meta_line(
     timestamp: u64,
     track: Track,
     task_kind: TaskKind,
-    monk_mode: bool,
     intervention_enabled: bool,
     condition: Option<Condition>,
     label_pool: Option<LabelPool>,
     head_id: HeadId,
 ) -> String {
     format!(
-        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","monk_mode":{},"intervention_enabled":{},"condition":{},"label_pool":{},"head_id":"{}","ts":{}}}"#,
+        r#"{{"type":"session_meta","track":"{}","task_kind":"{}","intervention_enabled":{},"condition":{},"label_pool":{},"head_id":"{}","ts":{}}}"#,
         track.as_str(),
         task_kind.as_str(),
-        monk_mode,
         intervention_enabled,
         json_opt_str(condition.map(|c| c.as_str())),
         json_opt_str(label_pool.map(|p| p.as_str())),
@@ -823,7 +799,6 @@ pub enum LogEntry {
         opportunity_score: f64,
         p_stuck: f64,
         idle_ms: u64,
-        wall_accum_ms: u64,
         reason: String,
         suppressed_by: Vec<String>,
     },
@@ -844,7 +819,6 @@ pub enum LogEntry {
         timestamp: u64,
         track: Track,
         task_kind: TaskKind,
-        monk_mode: bool,
         intervention_enabled: bool,
         condition: Option<Condition>,
         label_pool: Option<LabelPool>,
@@ -1554,7 +1528,6 @@ impl SessionLogger {
                             opportunity_score,
                             p_stuck,
                             idle_ms,
-                            wall_accum_ms,
                             reason,
                             suppressed_by,
                         } => {
@@ -1568,7 +1541,6 @@ impl SessionLogger {
                                     opportunity_score,
                                     p_stuck,
                                     idle_ms,
-                                    wall_accum_ms,
                                     &reason,
                                     &suppressed_by
                                 ),
@@ -1594,7 +1566,6 @@ impl SessionLogger {
                             timestamp,
                             track,
                             task_kind,
-                            monk_mode,
                             intervention_enabled,
                             condition,
                             label_pool,
@@ -1607,7 +1578,6 @@ impl SessionLogger {
                                     timestamp,
                                     track,
                                     task_kind,
-                                    monk_mode,
                                     intervention_enabled,
                                     condition,
                                     label_pool,
@@ -3213,13 +3183,12 @@ mod tests {
             0.32,
             0.78,
             4200,
-            12_000,
             "high_need_but_low_opportunity",
             &["recent_dismiss".to_string()],
         );
         assert_eq!(
             line,
-            r#"{"type":"intervention_decision","t":1700000000000,"action":"defer","need_score":0.7800,"opportunity_score":0.3200,"p_stuck":0.7800,"idle_ms":4200,"wall_accum_ms":12000,"reason":"high_need_but_low_opportunity","suppressed_by":["recent_dismiss"]}"#
+            r#"{"type":"intervention_decision","t":1700000000000,"action":"defer","need_score":0.7800,"opportunity_score":0.3200,"p_stuck":0.7800,"idle_ms":4200,"reason":"high_need_but_low_opportunity","suppressed_by":["recent_dismiss"]}"#
         );
     }
 
@@ -3374,7 +3343,6 @@ mod tests {
             1_700_000_000_000,
             Track::Main,
             TaskKind::VibeCoding,
-            false,
             true,
             None,
             None,
@@ -3382,17 +3350,16 @@ mod tests {
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":null,"label_pool":null,"head_id":"coding_v0","ts":1700000000000}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","intervention_enabled":true,"condition":null,"label_pool":null,"head_id":"coding_v0","ts":1700000000000}"#
         );
     }
 
     #[test]
-    fn session_meta_line_exploratory_monk_mode() {
+    fn session_meta_line_exploratory_track() {
         let line = format_session_meta_line(
             42,
             Track::Exploratory,
             TaskKind::Argumentative,
-            true,
             false,
             None,
             None,
@@ -3400,7 +3367,7 @@ mod tests {
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","monk_mode":true,"intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":42}"#
+            r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":42}"#
         );
     }
 
@@ -3410,7 +3377,6 @@ mod tests {
             7,
             Track::Main,
             TaskKind::Creative,
-            false,
             true,
             Some(Condition::BlindCalibration),
             Some(LabelPool::CalibrationBlind),
@@ -3418,7 +3384,7 @@ mod tests {
         );
         assert_eq!(
             line,
-            r#"{"type":"session_meta","track":"main","task_kind":"creative","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","head_id":"writing_fallback","ts":7}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"creative","intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","head_id":"writing_fallback","ts":7}"#
         );
     }
 
@@ -3503,27 +3469,23 @@ mod tests {
         );
     }
 
+    /// ⚠️★★★ **旧 `intervention_response_line_wall_with_elapsed` を置き換えた**
+    /// (Wall 削除・2026-08-23)。★ 旧テストは Wall の早期解除/通常解除で `elapsed_ms` を
+    /// 検査していた。
+    ///
+    /// ⚠️ **`elapsed_ms` を書く経路は Wall だけだった**ので、現状 **production では常に `None`** である。
+    /// ★ フォーマット自体は additive に残す（NDJSON schema で `elapsed_ms` は optional）ので、
+    /// **書式の契約だけをここで固定する**。⚠️ 使う経路が復活しないなら次の整理で落とす候補。
     #[test]
-    fn intervention_response_line_wall_with_elapsed() {
-        // Wall 早期解除 (elapsed_ms=Some) は経過時間を含む。
+    fn intervention_response_line_can_still_carry_elapsed_ms() {
         assert_eq!(
             format_intervention_response_line(
                 12345,
-                "wall",
-                DismissReason::EarlyUnlock,
+                "nudge",
+                DismissReason::JustClose,
                 Some(45_000)
             ),
-            r#"{"type":"intervention_response","t":12345,"action":"wall","reason":"early_unlock","elapsed_ms":45000}"#
-        );
-        // Wall 通常解除 (順守)。
-        assert_eq!(
-            format_intervention_response_line(
-                67890,
-                "wall",
-                DismissReason::Completed,
-                Some(121_500)
-            ),
-            r#"{"type":"intervention_response","t":67890,"action":"wall","reason":"completed","elapsed_ms":121500}"#
+            r#"{"type":"intervention_response","t":12345,"action":"nudge","reason":"just_close","elapsed_ms":45000}"#
         );
     }
 
@@ -3534,9 +3496,6 @@ mod tests {
             DismissReason::WantToStruggle,
             DismissReason::JustClose,
             DismissReason::Silent,
-            DismissReason::EarlyUnlock,
-            DismissReason::Completed,
-            DismissReason::IdleTimeout,
         ] {
             assert_eq!(DismissReason::parse(r.as_str()), Some(r));
         }
@@ -3812,7 +3771,7 @@ mod tests {
     }
 
     /// writer ループの match アーム経由 (LogEntry → 実ファイル) の end-to-end テスト。
-    /// format 関数の単体テストでは捕捉できない **アーム内の引数取り違え** (例: monk_mode と
+    /// format 関数の単体テストでは捕捉できない **アーム内の引数取り違え** (例: フラグ同士の
     /// intervention_enabled の入れ替え) を read-back で守る。
     #[test]
     fn writer_loop_emits_new_variants_to_file() {
@@ -3827,7 +3786,6 @@ mod tests {
             timestamp: 1000,
             track: Track::Main,
             task_kind: TaskKind::VibeCoding,
-            monk_mode: false,
             intervention_enabled: true,
             condition: Some(Condition::BlindCalibration),
             label_pool: Some(LabelPool::CalibrationBlind),
@@ -3839,13 +3797,6 @@ mod tests {
             action: "nudge".to_string(),
             reason: DismissReason::NotStuck,
             elapsed_ms: None,
-        })
-        .unwrap();
-        tx.send(LogEntry::InterventionResponse {
-            timestamp: 1600,
-            action: "wall".to_string(),
-            reason: DismissReason::Completed,
-            elapsed_ms: Some(122_345),
         })
         .unwrap();
         tx.send(LogEntry::ProbeAssignment {
@@ -3887,19 +3838,13 @@ mod tests {
         let _ = fs::remove_file(&path);
 
         assert!(contents.contains(
-            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","monk_mode":false,"intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","head_id":"coding_v0","ts":1000}"#
+            r#"{"type":"session_meta","track":"main","task_kind":"vibe_coding","intervention_enabled":true,"condition":"blind_calibration","label_pool":"calibration_blind","head_id":"coding_v0","ts":1000}"#
         ), "session_meta 行が不正 (引数取り違えの可能性):\n{contents}");
         assert!(
             contents.contains(
                 r#"{"type":"intervention_response","t":1500,"action":"nudge","reason":"not_stuck"}"#
             ),
             "intervention_response (nudge) 行が不正:\n{contents}"
-        );
-        assert!(
-            contents.contains(
-                r#"{"type":"intervention_response","t":1600,"action":"wall","reason":"completed","elapsed_ms":122345}"#
-            ),
-            "intervention_response (wall) 行が不正:\n{contents}"
         );
         assert!(contents.contains(
             r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000}"#

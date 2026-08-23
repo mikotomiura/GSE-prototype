@@ -90,8 +90,6 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 schemars = "0.8"
 
 # Wall Server: QRコードによるスマートフォン連携Wall解除
-tiny_http = "0.12"
-qrcode = "0.14"
 base64 = "0.22"
 
 # Utilities

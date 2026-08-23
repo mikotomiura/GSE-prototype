@@ -221,16 +221,14 @@ pub enum LogEntryDto {
         opportunity_score: f64,
         p_stuck: f64,
         idle_ms: u64,
-        wall_accum_ms: u64,
         reason: String,
         suppressed_by: Vec<String>,
     },
     /// 介入提示に対するユーザー応答 (reason)。`intervention_decision` (判定側) とは別の
     /// 「ユーザー応答側」ログ (WBS 0.8 / v0.4 §9)。Nudge dismiss は Need/Opportunity 誤りを分離、
-    /// Wall は早期解除/通常解除(順守) を区別する (Phase A2)。固定カテゴリ + 時刻のみ。本文は含まない。
-    /// `elapsed_ms` = Wall 提示(/shake)〜解除(/unlock) の経過時間。Nudge dismiss では省略 (`null`)。
-    /// `action="wall"` かつ `elapsed_ms=null` は通常フロー外解除 (/shake 未経由) を意味し、
-    /// 後段解析は経過時間を持つ実 early_unlock と区別できる。
+    /// 固定カテゴリ + 時刻のみ。本文は含まない。
+    /// ⚠️★★★ **`elapsed_ms` を書く経路は Wall だけだった** (2026-08-23 に Wall 削除)。
+    /// ★ additive なフィールドなので schema には残すが、**現状 production では常に `null`** である。
     InterventionResponse {
         t: u64,
         action: InterventionActionDto,
@@ -245,7 +243,6 @@ pub enum LogEntryDto {
     SessionMeta {
         track: TrackDto,
         task_kind: TaskKindDto,
-        monk_mode: bool,
         intervention_enabled: bool,
         condition: Option<ConditionDto>,
         label_pool: Option<LabelPoolDto>,
@@ -354,7 +351,6 @@ pub enum UserLabelKindDto {
 pub enum InterventionActionDto {
     None,
     Nudge,
-    Wall,
     Defer,
 }
 
@@ -420,8 +416,7 @@ pub enum ExpectedQuadrantDto {
 /// `intervention_response` の理由 (reason)。
 /// Nudge dismiss (WBS 0.8 / v0.4 §9): `not_stuck` = Need 誤り、`want_to_struggle` = Opportunity 誤り、
 /// `just_close` = 単に閉じる、`silent` = 理由未選択 (フェードアウト)。
-/// Wall 応答 (Phase A2): `early_unlock` = 早期解除 (非順守)、`completed` = 通常解除 (順守)、
-/// `idle_timeout` = 長時間アイドル自動解除 (enum 予約のみ・現状未配線)。
+/// ⚠️★★★ Wall 応答 (`early_unlock` / `completed` / `idle_timeout`) は 2026-08-23 に削除した。
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DismissReasonDto {
@@ -429,9 +424,6 @@ pub enum DismissReasonDto {
     WantToStruggle,
     JustClose,
     Silent,
-    EarlyUnlock,
-    Completed,
-    IdleTimeout,
 }
 
 /// `session_meta` の実験条件 (WBS 0.11)。Phase 1b=`blind_calibration`、Phase 2 AB/BA=`a`/`b`、

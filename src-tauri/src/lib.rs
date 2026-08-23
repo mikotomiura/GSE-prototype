@@ -34,7 +34,6 @@ pub mod sensors;
 // メニューバー / タスクトレイの常駐アイコン (計測中かの表示 + いつでも終了)。
 // ⚠️ 窓を閉じると UI ごと消えるのに計測は生きている、という穴を塞ぐ。
 pub mod tray;
-pub mod wall_server;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
 use crate::analysis::heads::TaskDomain;
@@ -46,7 +45,6 @@ use crate::logger::{
     Condition, DismissReason, ExpectedQuadrant, LabelPool, LogEntry, LogStatus, ProbeRef,
     ProbeSource, SharedLogTarget, SkipReason, TaskKind, Track, UserLabelKind,
 };
-use crate::wall_server::WallServerState;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
 #[allow(unused_imports)]
 use std::collections::{HashMap, HashSet};
@@ -97,10 +95,7 @@ const PROBE_META_READY_GRACE_MS: u64 = 5_000;
 // main/overlay の両ウィンドウが同コマンドを叩くため単一情報源で抑止される (cross-review)。
 static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
 
-// デバッグ用: 次回の get_intervention_decision (main) で Wall を一度だけ強制発動するフラグ。
-// `force_wall` コマンドが true にし、main ウィンドウの判定が swap で消費する (ワンショット)。
 // 通常は false のまま = 既存挙動と完全同一 (pilot 非汚染)。
-static FORCE_WALL: AtomicBool = AtomicBool::new(false);
 
 // 終了処理が既に走っているか。⚠️ ★ 終了の入口は 3 つある
 // (画面の「セッション終了」/ トレイの「終了」/ main 窓の ×)。二重に走らせると
@@ -211,7 +206,7 @@ pub(crate) struct LogState {
 }
 
 impl LogState {
-    /// サーバスレッド (wall_server) に渡すためロガー Sender を clone して返す。
+    /// 他スレッドへ渡すためロガー Sender を clone して返す。
     /// 生の `tx` を公開せず「スレッドへ move する用途の clone」だけを意図として露出する。
     pub(crate) fn clone_log_tx(&self) -> Sender<LogEntry> {
         self.tx.clone()
@@ -246,7 +241,7 @@ struct SessionActive(Arc<AtomicBool>);
 struct LatestFeatState(Arc<Mutex<Option<FeatSnapshot>>>);
 
 /// MVP Opportunity のポリシー状態。
-/// cooldown / daily cap / recent dismiss / Wall 累積時間を保持する。
+/// cooldown / daily cap / recent dismiss を保持する。
 struct InterventionState(Arc<Mutex<InterventionPolicyState>>);
 
 /// ログ書込先の状態 (fail-loud バナー用)。`run()` が SessionLogger の共有ハンドルを
@@ -322,9 +317,6 @@ fn get_cognitive_state(state: State<CognitiveStateEngine>) -> HashMap<String, f6
     map
 }
 
-/// デバッグ用: 次回の `get_intervention_decision` (main) で Wall を強制発動する。
-/// Wall→QR→スマホ解除→介入応答 (A2) 捕捉の end-to-end 検証用。較正/開発時に
-/// Dashboard のデバッグボタンからのみ呼ぶ。フラグを立てるだけで挙動は判定側がワンショット消費する。
 /// デバッグ専用コマンドのバックエンド側ゲート (defense-in-depth・cross-review 両者一致指摘)。
 /// フロントの `VITE_GSE_DEBUG` 表示 gate に加え、ランタイム env `GSE_DEBUG=1` を要求する。
 /// 被験者が DevTools から直接 invoke しても env 未設定なら拒否され、実験ログ汚染を防ぐ。
@@ -337,16 +329,9 @@ fn ensure_debug_enabled() -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-fn force_wall() -> Result<(), String> {
-    ensure_debug_enabled()?;
-    FORCE_WALL.store(true, Ordering::Release);
-    Ok(())
-}
-
 /// デバッグ用: 次回の `get_intervention_decision` (overlay) で Nudge を一度だけ強制表示する。
 /// nudge→dismiss→`record_intervention_dismiss` の経路を能動的に検証するため (#1 repro)。
-/// `force_wall` と同方式のワンショットフラグ。Dashboard の debugView gate からのみ呼ぶ。
+/// ワンショットフラグ方式。Dashboard の debugView gate からのみ呼ぶ。
 #[tauri::command]
 fn force_nudge() -> Result<(), String> {
     ensure_debug_enabled()?;
@@ -547,8 +532,6 @@ fn get_log_status(status: State<'_, LogStatusState>) -> LogStatusDto {
 #[tauri::command]
 fn get_intervention_decision(
     window_label: String,
-    is_monk_mode: bool,
-    is_wall_active: bool,
     engine: State<CognitiveStateEngine>,
     latest_feat: State<LatestFeatState>,
     intervention: State<InterventionState>,
@@ -556,8 +539,7 @@ fn get_intervention_decision(
 ) -> InterventionDecision {
     // overlay WebView は表示専用。main 側ポーリングだけが policy state を進める。
     if window_label == "overlay" {
-        // デバッグ強制 Nudge。**consumer は overlay 分岐**である点が FORCE_WALL と非対称:
-        //   - FORCE_WALL  → main (非 overlay) 分岐で消費 (下記)。App が isWallActive を立て持続。
+        // デバッグ強制 Nudge。**consumer は overlay 分岐**である。
         //   - FORCE_NUDGE → overlay 分岐 (ここ) で消費。overlay が自分の poll で nudge を直接返すため
         //     main の decide() 上書きと race しない。Overlay 側が nudgeVisible を保持し持続させる。
         // どちらもワンショット (swap)・reason="debug_force" でログし解析時に除外可能。
@@ -576,7 +558,6 @@ fn get_intervention_decision(
                     opportunity_score: decision.opportunity_score,
                     p_stuck: decision.p_stuck,
                     idle_ms: decision.idle_ms,
-                    wall_accum_ms: decision.wall_accum_ms,
                     reason: decision.reason.clone(),
                     suppressed_by: decision.suppressed_by.clone(),
                 },
@@ -588,32 +569,6 @@ fn get_intervention_decision(
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .last_decision();
-    }
-
-    // デバッグ強制 Wall (main ウィンドウのみ・ワンショット)。HMM 状態や介入トグルに依らず
-    // 一度だけ action=wall を返す。App が isWallActive=true にすると次 tick から既存の
-    // wall_active 分岐が Wall を維持する。reason="debug_force" でログし解析時に除外可能。
-    if FORCE_WALL.swap(false, Ordering::AcqRel) {
-        let now = epoch_ms();
-        let idle_ms = get_keyboard_idle_ms();
-        let decision = {
-            let mut guard = intervention.0.lock().unwrap_or_else(|p| p.into_inner());
-            guard.force_wall_decision(now, idle_ms)
-        };
-        let _ = log.lock().unwrap_or_else(|p| p.into_inner()).tx.try_send(
-            LogEntry::InterventionDecision {
-                timestamp: now,
-                action: decision.action.as_str().to_string(),
-                need_score: decision.need_score,
-                opportunity_score: decision.opportunity_score,
-                p_stuck: decision.p_stuck,
-                idle_ms: decision.idle_ms,
-                wall_accum_ms: decision.wall_accum_ms,
-                reason: decision.reason.clone(),
-                suppressed_by: decision.suppressed_by.clone(),
-            },
-        );
-        return decision;
     }
 
     // Task C: セッションが介入無効を宣言した場合は policy を進めず none を返す。
@@ -646,8 +601,6 @@ fn get_intervention_decision(
         f4_burst_length: f4,
         f6_pause_after_del_rate: f6,
         idle_ms,
-        monk_mode: is_monk_mode,
-        wall_active: is_wall_active,
     };
 
     let mut guard = intervention.0.lock().unwrap_or_else(|p| p.into_inner());
@@ -661,7 +614,6 @@ fn get_intervention_decision(
                 opportunity_score: result.decision.opportunity_score,
                 p_stuck: result.decision.p_stuck,
                 idle_ms: result.decision.idle_ms,
-                wall_accum_ms: result.decision.wall_accum_ms,
                 reason: result.decision.reason.clone(),
                 suppressed_by: result.decision.suppressed_by.clone(),
             },
@@ -696,7 +648,7 @@ fn record_intervention_dismiss(
             timestamp: now,
             action: parsed_action.as_str().to_string(),
             reason,
-            // Nudge dismiss は経過時間を持たない (Wall 応答のみ elapsed_ms を埋める)。
+            // Nudge dismiss は経過時間を持たない (elapsed_ms は埋めない)。
             elapsed_ms: None,
         })
         .map_err(log_send_error)?;
@@ -1727,7 +1679,6 @@ fn parse_dismiss_reason(s: Option<&str>) -> Result<DismissReason, String> {
 fn record_session_meta(
     track: String,
     task_kind: String,
-    monk_mode: bool,
     intervention_enabled: bool,
     condition: Option<String>,
     label_pool: Option<String>,
@@ -1765,7 +1716,6 @@ fn record_session_meta(
             timestamp: epoch_ms(),
             track,
             task_kind,
-            monk_mode,
             intervention_enabled,
             condition,
             label_pool,
@@ -1954,7 +1904,7 @@ fn record_vignette_response(
 }
 
 /// overlay (macOS は NSPanel) のクリック受理を切り替える (decisions D9)。
-/// `interactive=true` でカード/Wall がクリックを捕捉、`false` で背後アプリへ透過。
+/// `interactive=true` でカードがクリックを捕捉、`false` で背後アプリへ透過。
 /// macOS は `ignoresMouseEvents` を panel に Rust 権威で設定する (JS の setIgnoreCursorEvents は
 /// NSPanel 化窓で実効しないため)。非 macOS は従来の set_ignore_cursor_events に委譲 (Windows 非回帰)。
 #[tauri::command]
@@ -1973,7 +1923,7 @@ fn set_overlay_interactive(app: tauri::AppHandle, interactive: bool) -> Result<(
                 .set_ignore_cursor_events(!interactive)
                 .map_err(|e| e.to_string())?,
             // macOS 経路 (get_webview_panel 失敗) と成否契約を揃える: overlay 窓が無い
-            // (setup 失敗等) と box/Wall のクリックブロックが無音で効かなくなるため可視化する
+            // (setup 失敗等) と box のクリック処理が無音で効かなくなるため可視化する
             // (code-reviewer 指摘)。Windows 非回帰のため Err には倒さず warn に留める。
             None => tracing::warn!("set_overlay_interactive: overlay window not found"),
         }
@@ -2117,7 +2067,7 @@ fn start_session(
         .unwrap_or_default()
         .as_millis() as u64;
     // ⚠️★ **ログのロックより前に**済ませる。★ `intervention` → `log` の順で取る箇所が
-    //   既にある (`force_wall_decision` 周辺) ので、ここで `log` → `intervention` と
+    //   既にある (デバッグ強制系の周辺) ので、ここで `log` → `intervention` と
     //   入れ子にすると**ロック順序が反転**する。→ 入れ子にしない。
     *latest_feat.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
     *intervention.0.lock().unwrap_or_else(|p| p.into_inner()) = InterventionPolicyState::new(now);
@@ -2289,14 +2239,13 @@ fn start_session(
 }
 
 /// アプリ終了。終了前に以下を順に実行する:
-///   1. WallServer を停止 (ファイアウォールルール削除)
-///   2. セッションログを閉じる (LogEntry::End を送信)
-///   3. shutdown_rx でロガー完了を待機 (固定 sleep の代わり)
-///   4. behavioral_gt.py でラベリング分析を実行 (Python が PATH にある場合)
-///   5. セッションフォルダを Explorer で開く
+///   1. セッションログを閉じる (LogEntry::End を送信)
+///   2. shutdown_rx でロガー完了を待機 (固定 sleep の代わり)
+///   3. behavioral_gt.py でラベリング分析を実行 (Python が PATH にある場合)
+///   4. セッションフォルダを Explorer で開く
 #[tauri::command]
-fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>, wall: State<WallServerState>) {
-    shutdown(&app, &log, &wall);
+fn quit_app(app: tauri::AppHandle, log: State<Arc<Mutex<LogState>>>) {
+    shutdown(&app, &log);
 }
 
 /// 終了処理が始まっているか。★ トレイの更新スレッドが抜けるために見る。
@@ -2337,19 +2286,15 @@ fn wants_researcher_exit_flow(not_g1: bool, session_path: &str) -> bool {
 /// `AppHandle` から State を引くので、コマンド以外からも呼べる。
 pub(crate) fn shutdown_and_exit(app: &tauri::AppHandle) {
     let log = app.state::<Arc<Mutex<LogState>>>();
-    let wall = app.state::<WallServerState>();
-    shutdown(app, &log, &wall);
+    shutdown(app, &log);
 }
 
-fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>, wall: &WallServerState) {
+fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
     if !claim_shutdown(&SHUTTING_DOWN) {
         tracing::info!("shutdown already in progress; ignoring the second request");
         return;
     }
     tracing::info!("shutdown requested");
-
-    // WallServer を先に停止してファイアウォールルールを削除
-    wall.stop();
 
     // ログ終了マーカーを送信し、shutdown_rx を取得
     let (session_path, shutdown_rx) = {
@@ -3771,7 +3716,6 @@ pub fn run() {
         })
         .manage(engine)
         .manage(log_state)
-        .manage(WallServerState::new())
         .manage(ResetSignal(should_reset))
         .manage(SessionActive(session_active))
         .manage(LatestFeatState(latest_feat))
@@ -3781,7 +3725,6 @@ pub fn run() {
             greet,
             get_cognitive_state,
             get_intervention_decision,
-            force_wall,
             force_nudge,
             debug_force_probe,
             debug_overlay_window_state,
@@ -3811,8 +3754,6 @@ pub fn run() {
             record_realtime_skip,
             record_self_marker,
             record_vignette_response,
-            wall_server::start_wall_server,
-            wall_server::stop_wall_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

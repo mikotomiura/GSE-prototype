@@ -14,10 +14,8 @@
 //! - **Burden** = ACT 回数 / セッション分。
 //!
 //! # 限界
-//! - cadence: production は 500ms ポーリング、本評価は feat 1Hz ステップ。wall 累積
+//! - cadence: production は 500ms ポーリング、本評価は feat 1Hz ステップ。
 //!   タイミングに微差が出る (HIR の定性結論は頑健だが数値は近似)。
-//! - `wall_active` を常に false とみなす: 本評価は「実際には wall を提示していない」
-//!   反実仮想なので、wall 提示中 (`wall_active=true`) の状態遷移は再現しない。
 //! - フィードバック効果 (誤介入が後続打鍵を変える相互作用) は再現不可。
 //! - GT は旧 3 クラス自己申告由来 → 本評価は verdict ではなく screening。
 
@@ -53,7 +51,7 @@ pub const DEFAULT_SWEEP_NUDGE_NEED: [f64; 9] =
 /// sweep 下限。これ未満の `nudge_need` は DC 不変条件を壊すため拒否する。
 pub const MIN_SWEEP_NUDGE_NEED: f64 = 0.50;
 
-/// 二値化した decision。ACT={nudge, wall} / HOLD={none, defer}。
+/// 二値化した decision。ACT={nudge} / HOLD={none, defer}。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DecisionBinary {
     Hold,
@@ -62,7 +60,7 @@ enum DecisionBinary {
 
 fn binarize_action(action: InterventionAction) -> DecisionBinary {
     match action {
-        InterventionAction::Nudge | InterventionAction::Wall => DecisionBinary::Act,
+        InterventionAction::Nudge => DecisionBinary::Act,
         InterventionAction::None | InterventionAction::Defer => DecisionBinary::Hold,
     }
 }
@@ -86,7 +84,6 @@ fn binarize_label(label: LabelClass) -> GtBinary {
 pub struct ActionCounts {
     pub none: u32,
     pub nudge: u32,
-    pub wall: u32,
     pub defer: u32,
 }
 
@@ -187,7 +184,7 @@ pub struct InterventionMetrics {
     /// ステップした feat (= decision) の総数。
     pub total_decisions: u32,
     pub action_counts: ActionCounts,
-    /// ACT (nudge+wall) 回数。
+    /// ACT (nudge) 回数。
     pub act_count: u32,
     /// HOLD (none+defer) 回数。
     pub hold_count: u32,
@@ -370,8 +367,6 @@ pub fn compute_intervention_metrics(
             f4_burst_length: f.f4,
             f6_pause_after_del_rate: f.f6,
             idle_ms: idle_ms_at(f.timestamp, key_press_ts),
-            monk_mode: false,
-            wall_active: false,
         };
         let decision = policy.decide(input).decision;
         decisions.push(EvalDecision {
@@ -394,7 +389,6 @@ pub fn compute_intervention_metrics(
         match d.action {
             InterventionAction::None => counts.none += 1,
             InterventionAction::Nudge => counts.nudge += 1,
-            InterventionAction::Wall => counts.wall += 1,
             InterventionAction::Defer => counts.defer += 1,
         }
         let act = binarize_action(d.action);
@@ -435,7 +429,7 @@ pub fn compute_intervention_metrics(
         }
     }
 
-    let act_count = counts.nudge + counts.wall;
+    let act_count = counts.nudge;
     let hold_count = counts.none + counts.defer;
     let act_labeled = cm.fp + cm.tp;
     let hir = if act_labeled > 0 {
@@ -570,12 +564,8 @@ pub fn format_intervention_pretty(m: &InterventionMetrics) -> String {
     let mut out = String::new();
     out.push_str("InterventionMetrics (offline counterfactual replay)\n");
     out.push_str(&format!(
-        "  Decisions: {} (none:{}, nudge:{}, wall:{}, defer:{})\n",
-        m.total_decisions,
-        m.action_counts.none,
-        m.action_counts.nudge,
-        m.action_counts.wall,
-        m.action_counts.defer,
+        "  Decisions: {} (none:{}, nudge:{}, defer:{})\n",
+        m.total_decisions, m.action_counts.none, m.action_counts.nudge, m.action_counts.defer,
     ));
     out.push_str(&format!("  ACT: {}  HOLD: {}\n", m.act_count, m.hold_count));
     out.push_str(&format!(
@@ -1036,8 +1026,6 @@ pub fn compute_nudge_diagnostic(
                 f4_burst_length: f.f4,
                 f6_pause_after_del_rate: f.f6,
                 idle_ms: idle,
-                monk_mode: false,
-                wall_active: false,
             };
             let decision = policy.decide(input).decision;
             if binarize_action(decision.action) != DecisionBinary::Act {
