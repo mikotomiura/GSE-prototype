@@ -473,15 +473,11 @@ mod tests {
     /// ⚠️★★★ **既存の WinEvent 2 本と範囲が重ならない**こと。
     ///
     /// ★ 重なっていたら「3 本目を張る」判断そのものが崩れる（★ 範囲を広げれば済む話になる）。
-    #[test]
-    fn foreground_event_is_far_from_the_existing_winevent_ranges() {
-        // IME 用 0x8027..=0x8029 ／ cloak 用 0x8017..=0x8018 (`hook_windows.rs`)。
-        assert!(
-            EVENT_SYSTEM_FOREGROUND < 0x8017,
-            "既存の範囲と連続していない"
-        );
-        assert_eq!(EVENT_SYSTEM_FOREGROUND, 0x0003);
-    }
+    // ★ IME 用 0x8027..=0x8029 ／ cloak 用 0x8017..=0x8018 (`hook_windows.rs`) と
+    //   連続していないこと。⚠️ 実行時 assert にすると定数畳み込みで意味を失うので
+    //   **コンパイル時に固定する**（★ そのぶん強い）。
+    const _: () = assert!(EVENT_SYSTEM_FOREGROUND < 0x8017);
+    const _: () = assert!(EVENT_SYSTEM_FOREGROUND == 0x0003);
 
     /// ★ ビンの長さは 1 秒である (ADR-014 D4 の L-b 仕様)。
     #[test]
@@ -494,12 +490,10 @@ mod tests {
         let mut ri: RAWINPUT = unsafe { std::mem::zeroed() };
         ri.header.dwType = RIM_TYPEMOUSE.0;
         ri.header.dwSize = std::mem::size_of::<RAWINPUT>() as u32;
-        // SAFETY: `dwType` を `RIM_TYPEMOUSE` にしたので `mouse` を書いてよい。
-        unsafe {
-            ri.data.mouse.lLastX = dx;
-            ri.data.mouse.lLastY = dy;
-            ri.data.mouse.Anonymous.Anonymous.usButtonFlags = button_flags;
-        }
+        // ★ union への**書き込み**は安全である (⚠️ 読み出しだけが unsafe)。
+        ri.data.mouse.lLastX = dx;
+        ri.data.mouse.lLastY = dy;
+        ri.data.mouse.Anonymous.Anonymous.usButtonFlags = button_flags;
         ri
     }
 
