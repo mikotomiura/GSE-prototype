@@ -2,14 +2,15 @@
 name: data-privacy
 description: >
   GSE のキーストロークデータ・セッションログのプライバシー規約。logger.rs / hook.rs /
-  wall_server.rs を書く・修正するとき、セッションログの外部送信・ML データ収集機能を
-  実装するときに必須参照。以下の状況で必須参照:
+  redaction.rs / recording.rs を書く・修正するとき、セッションログの外部送信・
+  非打鍵チャネル・ML データ収集機能を実装するときに必須参照。以下の状況で必須参照:
   - InputEvent に新しいフィールドを追加するとき（文字内容の記録禁止確認）
   - セッションログ (NDJSON) のフォーマットを変更するとき
   - 外部エンドポイントへのデータ送信機能を実装するとき
-  - Wall Server に新しいエンドポイントを追加するとき
   - ML 学習データ収集パスを設計・実装するとき
   - Tauri CSP を変更するとき
+  - ★ **区間指定削除 / 一時停止**（redaction.rs / recording.rs / RecordingControls.tsx）を触るとき
+  - ★ **非打鍵チャネル**（ポインタ / フォーカス遷移 / secure_input / レイアウト識別子）を実装するとき
 allowed-tools: Read, Grep, Glob
 ---
 
@@ -27,7 +28,11 @@ GSE はキーボード入力を常時監視するアプリケーションであ�
 - `hook.rs` の InputEvent 生成・記録
 - `logger.rs` の NDJSON ログ設計
 - 将来の ML データ収集パス
-- Wall Server の通信設計
+- ★ **`redaction.rs` / `recording.rs`**（被験者の削除・停止経路・ルール 6）
+- ★ **非打鍵チャネル**（`pointer_bin` / `focus_transition` / `secure_input`・ルール 7）
+
+> ⚠️★★★ **Wall Server は 2026-08-23 に削除された**（ADR-015）。★ 下の**ルール 4 は歴史的記述**であり、
+> 現行 repo に `wall_server.rs` は無い（実測。⚠️ 復活させるならルール 4 を先に読むこと）。
 
 ### 適用しないもの
 - ローカルの UI 表示（ユーザー自身に見えるデータ）
@@ -129,13 +134,82 @@ default-src 'self'; style-src 'self' 'unsafe-inline'
 
 ---
 
+### ルール 6: ★★★ 被験者は **止められる・消せる** —— この 3 つを壊さない (O1 / ADR-014 D7)
+
+⚠️★★★ **ADR-014 判断 3（倫理審査は不要）の根拠 3 がこの 3 つで立っている。**
+逐語の崩れる条件 ——「⚠️ **削除 UI が実装されないまま収集を始めた時点で崩れる**」。
+
+| # | 要件 | 実装 | ⚠️ 壊す変更の例 |
+|---|---|---|---|
+| i | **稼働中インジケータ** | `RecordingControls.tsx`（★ 常時表示） | ⚠️ 「止まっている」を黙って「記録中」に見せる fallback |
+| ii | **即時の一時停止** | `recording.rs` + `logger.rs` の書き出しゲート | ⚠️ 新しい行種を `is_writable_while_paused` に足す |
+| iii | **事後の区間指定削除** | `redaction.rs` + `delete_time_range` | ⚠️ 削除の引数に**理由**を足す |
+
+```rust
+// ❌ 禁止: 削除に理由を求める
+fn delete_time_range(from_ms: u64, to_ms: u64, reason: String)  // ⚠️ 同意文書 §4 違反
+
+// ✅ 正しい: 理由を取らない (UI にも入力欄を置かない)
+fn delete_time_range(from_ms: u64, to_ms: u64)
+```
+
+**削除の台帳 (`redaction_ledger.jsonl`) に書いてよいのは 5 つの数だけ**:
+`requested_at` / `from` / `to` / `files_touched` / `lines_removed`。
+
+```rust
+// ❌ 禁止: 何を消したかを台帳に残す (削除の意味が消える)
+{"from":.., "to":.., "removed_categories":["alphabetic","backspace"], "app":"..."}
+
+// ✅ 正しい: 「消した」という事実だけ
+{"requested_at":..,"from":..,"to":..,"files_touched":2,"lines_removed":37}
+```
+
+⚠️ **台帳を `gse_*.ndjson` にしない** —— `reconcile.rs` が提出候補として拾い、
+★ **削除を要求した事実そのものが研究者へ渡る**。
+
+⚠️ **新しい行種を足したら `LogEntry::line_type()` に足す。**
+★ 足し忘れると一時停止ゲートを素通りし、**止めたはずの記録が黙って残る**。
+
+---
+
+### ルール 7: ★★★ 非打鍵チャネルは **段 1 の凍結表の中だけ** (O1 / ADR-014 D4)
+
+★ 記録してよいのは以下**だけ**である（⚠️ **1 本も足さない**。足すなら別 ADR）:
+
+| チャネル | ★ 記録してよい | ⚠️★★★ 記録してはならない |
+|---|---|---|
+| **フォーカス遷移** | ★ **遷移が起きた時刻のみ** | ⚠️ HWND / PID / アプリ識別子 / ウィンドウタイトル / **ウィンドウ通し番号**（★ 擬似識別子） |
+| **ポインタ** | ★ **1 秒固定ビンの量子化スカラ**（移動量 / ボタン / ホイール）・⚠️ **ゼロ抑制** | ⚠️★★★ **絶対座標・軌跡・符号付き dx/dy・解像度・マルチモニタ配置**（★ 累積で軌跡が復元でき画面内容の代理になる）／⚠️ **イベント単位の移動量＋時刻の列**（★ mouse dynamics は**個人識別可能な生体特徴**） |
+| **`secure_input`**（mac） | ★ **区間フラグ**（on/off の時刻） | ⚠️ 中身は一切取得しない |
+| **レイアウト識別子** | ★ セッション開始時に **1 回だけ・識別子のみ** | ⚠️★★★ **`ToUnicodeEx` / `UCKeyTranslate` を呼ばない**（★ 呼んだ瞬間に**入力文字そのものがプロセス内に出現する**） |
+
+```rust
+// ❌ 禁止: HWND をコールバックの外へ出す / 座標を持つ
+struct FocusEvent { t: u64, hwnd: isize }          // ⚠️ 擬似識別子
+struct PointerEvent { t: u64, x: i32, y: i32 }     // ⚠️ 軌跡が復元できる
+
+// ✅ 正しい: 時刻だけ / 1 秒ビンの量子化スカラだけ
+struct FocusTransition { t: u64 }
+struct PointerBin { t: u64, moved: u8, buttons: u8, wheel: u8 }
+```
+
+⚠️★★★ **役割カテゴリ（`editor` / `terminal` / `browser`）を入れない** ——
+★ 入れた瞬間に **判断 3 の根拠 1（content-free）が崩れる**（ADR-009 D2 の順序は「G2 が落ちてから」）。
+
+⚠️ **`WH_MOUSE_LL` を使わない**（★ システム全体のマウス入力を直列化し、
+`LowLevelHooksTimeout` で**通知なく外される**）。→ ★ Windows は **Raw Input**、mac は**別 tap**。
+
+---
+
 ## チェックリスト
 
 - [ ] InputEvent に Unicode 文字・ウィンドウタイトルが含まれていないか
 - [ ] セッション中にリアルタイム外部送信がないか
 - [ ] ML 収集パスにオプトイン同意・匿名化・バッチ送信の 3 条件があるか
-- [ ] Wall Server にランダムトークン認証があるか
 - [ ] Tauri CSP が外部リソースを禁止しているか
+- [ ] ★ 削除経路が**理由を取っていない**か / 台帳が **5 つの数だけ**か (ルール 6)
+- [ ] ★ 新しい行種を `LogEntry::line_type()` に足したか (ルール 6・一時停止ゲート)
+- [ ] ★ 非打鍵チャネルが**段 1 の凍結表の中だけ**か / 座標・識別子が漏れていないか (ルール 7)
 
 ---
 
@@ -146,4 +220,4 @@ default-src 'self'; style-src 'self' 'unsafe-inline'
 ## 関連する他の Skill
 
 - `ml-workflow` — ML データ収集・ONNX 移行の設計規則
-- `rust-standards` — anyhow エラーハンドリング
+- `rust-standards` — エラーハンドリング (⚠️ 本 repo は `anyhow` を依存に持たず `Result<_, String>` を使う)

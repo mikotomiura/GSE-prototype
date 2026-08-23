@@ -166,6 +166,28 @@ enum ReplayEvent {
     /// 回帰は `hook_health_line_is_skipped_by_run_replay` が張っている。
     #[serde(rename = "hook_health")]
     HookHealth(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️★★★ **O1 (R3) で足した 4 行種**。★ どれも **読み飛ばし専用**である。
+    ///
+    /// ## ★ なぜ variant を足さなければならないのか（⚠️ 「読まないなら不要」ではない）
+    ///
+    /// ★ `run_replay` は**未知タグを `Err` にして中断する**（`--metrics` 側だけが lenient）。
+    /// → ⚠️★★★ **行種を足したのにここへ足し忘れると、その形式のログが 1 本も replay できなくなる**
+    /// （= Replay-as-Truth が切れる）。★ 2026-08-09 に `hook_health` で実測済みの失敗様式である。
+    ///
+    /// ## ⚠️ 特徴量には 1 バイトも流さない（ADR-014 **D4b**）
+    ///
+    /// ★ `timestamp()` が `None` を返すので時刻順ソートからも外れ、`step()` を 1 度も呼ばない。
+    #[serde(rename = "recording_pause")]
+    RecordingPause(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️ 読み飛ばし専用（上記 `RecordingPause` の doc を参照）。
+    #[serde(rename = "focus_transition")]
+    FocusTransition(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️ 読み飛ばし専用（同上）。
+    #[serde(rename = "pointer_bin")]
+    PointerBin(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️ 読み飛ばし専用（同上）。
+    #[serde(rename = "secure_input")]
+    SecureInput(#[allow(dead_code)] serde_json::Value),
     /// v0.3 較正スモーク: セッション宣言。`--calibration` 経路で track を抽出する。
     /// snapshot/run_replay 経路では `timestamp()==None` で読み飛ばす。
     #[serde(rename = "session_meta")]
@@ -253,6 +275,12 @@ impl ReplayEvent {
             ReplayEvent::InterventionResponse(_) => None,
             // 診断行。ゲート進行を動かさないので時刻順ソートから除外する。
             ReplayEvent::HookHealth(_) => None,
+            // ⚠️★★★ O1 (R3) の 4 行種。★ **記録のみ・推論に 1 バイトも流さない**
+            //   (ADR-014 D4b) ので、`None` を返して時刻順ソートから外す。
+            ReplayEvent::RecordingPause(_) => None,
+            ReplayEvent::FocusTransition(_) => None,
+            ReplayEvent::PointerBin(_) => None,
+            ReplayEvent::SecureInput(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
             // run_replay (snapshot 経路) の時刻順ソートからは除外する (UserLabel と同方針)。
             ReplayEvent::SessionMeta { .. } => None,
@@ -1802,6 +1830,11 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::InterventionDecision(_)
             | ReplayEvent::InterventionResponse(_)
             | ReplayEvent::HookHealth(_)
+            // ⚠️★★★ O1 (R3) の 4 行種は **読み飛ばす**。★ 特徴量へ流さない (ADR-014 D4b)。
+            | ReplayEvent::RecordingPause(_)
+            | ReplayEvent::FocusTransition(_)
+            | ReplayEvent::PointerBin(_)
+            | ReplayEvent::SecureInput(_)
             | ReplayEvent::SessionMeta { .. }
             | ReplayEvent::ProbeAssignment { .. }
             | ReplayEvent::RealtimeLabel { .. }
@@ -2341,6 +2374,54 @@ mod tests {
     /// (`parse error: unknown variant 'hook_health'`)。
     /// ⚠️ ゴールデン fixture は全て旧形式なので、**ゴールデンが緑でもこの事故は検出できない**。
     #[test]
+    /// ⚠️★★★ **O1 (R3) の 4 行種が `--snapshot` 経路を落とさない**こと。
+    ///
+    /// ★ `run_replay` は**未知タグを `Err` にして中断する**ので、行種を足して
+    /// `ReplayEvent` に足し忘れると **その形式のログが 1 本も replay できなくなる**。
+    /// ⚠️ 2026-08-09 に `hook_health` で実測した失敗様式の再発防止である。
+    ///
+    /// ★ 併せて **FeatSnapshot 列が 1 件も変わらない**ことを見る ——
+    /// ⚠️ ADR-014 **D4b**（記録のみ・推論に 1 バイトも流さない）が実行可能な契約になる。
+    #[test]
+    fn o1_observation_lines_are_skipped_by_run_replay() {
+        let lines = [
+            r#"{"type":"recording_pause","t":120000,"paused":true}"#,
+            r#"{"type":"focus_transition","t":120100}"#,
+            r#"{"type":"pointer_bin","t":120200,"moved":3,"buttons":1,"wheel":0}"#,
+            r#"{"type":"secure_input","t":120300,"on":true}"#,
+        ];
+        for line in lines {
+            let ev: ReplayEvent = serde_json::from_str(line).unwrap_or_else(|e| {
+                panic!("O1 の行がパースできない: {line} ({e})");
+            });
+            assert_eq!(
+                ev.timestamp(),
+                None,
+                "O1 の行は時刻順ソートから除外する: {line}"
+            );
+        }
+
+        let mut ndjson =
+            std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read minimal fixture");
+        for line in lines {
+            ndjson.push_str(line);
+            ndjson.push_str("\n");
+        }
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_o1_observation_replay_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let with_lines = run_replay(&tmp).expect("run_replay must accept O1 observation lines");
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+        assert_eq!(
+            with_lines, baseline,
+            "O1 の観測行は FeatSnapshot 列を 1 ビットも変えてはならない (ADR-014 D4b)"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
     fn hook_health_line_is_skipped_by_run_replay() {
         let line =
             r#"{"type":"hook_health","t":120000,"alive":false,"starved_ms":120000,"rehook":true}"#;

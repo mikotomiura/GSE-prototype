@@ -875,6 +875,50 @@ pub enum LogEntry {
         /// Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。
         changes: u16,
     },
+    /// ⚠️★★★ **記録の一時停止 / 再開の遷移マーカー** (O1 / ADR-014 **D7-ii**)。
+    ///
+    /// ★ 被験者が「止める」「再開する」を押した**瞬間**に 1 行だけ書く。
+    /// ⚠️ 状態が変わらない押下（連打）では**書かない** —— ★ 押した回数は研究に要らないし、
+    /// **回数を残すと「何回止めたか」という行動記録になる**（同意文書に無い記録）。
+    ///
+    /// ## ⚠️★★★ なぜ「止めた」を記録するのか（★ 一見矛盾している）
+    ///
+    /// ★ ADR-013 **D1** と同じ理屈である —— ⚠️ 書かないと解析側は
+    /// 「**被験者が止めていた 3 時間**」と「**本当に何も起きなかった 3 時間**」を
+    /// **永久に区別できない**。→ ★ `left_observation` の内訳を割るという O1 の目的が壊れる。
+    ///
+    /// ⚠️ **記録するのは遷移の時刻と向きだけ**である。★ 理由は聞かないし、書かない。
+    RecordingPause { timestamp: u64, paused: bool },
+    /// ⚠️★★★ **フォーカス遷移の時刻**（O1 / ADR-014 **D4** の L-c）。
+    ///
+    /// ★ 持つのは **時刻 1 個だけ**である。⚠️ HWND / PID / アプリ識別子 /
+    /// ウィンドウタイトル / 通し番号は **1 バイトも持たない**（D4 の禁止表）。
+    ///
+    /// ## ⚠️ これで何が言えて、何が言えないか
+    ///
+    /// | ★ 言える | ⚠️ 言えない |
+    /// |---|---|
+    /// | 遷移が**いつ**起きたか / **離脱の滞在時間**（2 時刻の差） | ⚠️ **どこへ行ったか**（アプリ・用途・役割） |
+    /// | 遷移の**頻度分布** | ⚠️★★★ **「注意の逸脱の頻度」ではない** —— ★ 同一アプリ内のウィンドウ切替も同じ 1 行になる（両 OS とも識別子なしには分離不能・D4 の禁止表） |
+    FocusTransition { timestamp: u64 },
+    /// ⚠️★★★ **ポインタ活動の 1 秒ビン**（O1 / ADR-014 **D4** の L-b）。
+    ///
+    /// ★ 中身は [`crate::analysis::pointer_bin::PointerBin`] の量子化スカラだけ。
+    /// ⚠️ **ゼロ抑制**されているので、活動が無い秒には行が無い（D5）。
+    PointerBin {
+        timestamp: u64,
+        moved: u8,
+        buttons: u8,
+        wheel: u8,
+    },
+    /// ⚠️★★★ **`EnableSecureEventInput` の区間フラグ**（O1 / **macOS のみ**）。
+    ///
+    /// ★ 有効な間は **tap が「有効」のまま KeyDown だけが届かない**。
+    /// → ⚠️ この行が無いと「**打鍵ゼロ**」と「**打鍵が見えない**」を混同し、
+    /// **パスワード入力の直後に必ず Stuck / Incubation へ倒れる系統的バイアス**が入る。
+    ///
+    /// ⚠️ **中身は一切取得しない。** ★ on/off の遷移だけである。
+    SecureInput { timestamp: u64, on: bool },
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
     ///
@@ -896,6 +940,45 @@ pub enum LogEntry {
 }
 
 impl LogEntry {
+    /// このエントリが NDJSON に書く `"type"` の値。★ **制御用の内部エントリは `None`**。
+    ///
+    /// ## ⚠️★★★ なぜ要るのか
+    ///
+    /// ★ 一時停止 (`recording::is_writable_while_paused`) の判断を **1 か所**に閉じるため。
+    /// ⚠️ 判断を writer の match 腕（19 個）に散らすと、★ **新しい行種を足した人が
+    /// 一時停止の考慮を忘れ、止めたはずの記録が黙って残る**。
+    ///
+    /// ★ 値は `capabilities::KNOWN_LINE_TYPES` と一致していなければならない
+    /// （[`tests::line_type_matches_known_line_types`] が機械的に固定する）。
+    pub fn line_type(&self) -> Option<&'static str> {
+        Some(match self {
+            LogEntry::Key { .. } => "key",
+            LogEntry::Paste { .. } => "paste",
+            LogEntry::Feat { .. } => "feat",
+            LogEntry::ImeState { .. } => "ime_state",
+            LogEntry::ImeShadow { .. } => "ime_shadow",
+            LogEntry::HookHealth { .. } => "hook_health",
+            LogEntry::StarveWindow { .. } => "starve_window",
+            LogEntry::SessionStart { .. } => "session_start",
+            LogEntry::UserLabel { .. } => "user_label",
+            LogEntry::ReviewMarker { .. } => "review_marker",
+            LogEntry::SessionMeta { .. } => "session_meta",
+            LogEntry::ProbeAssignment { .. } => "probe_assignment",
+            LogEntry::RealtimeLabel { .. } => "realtime_label",
+            LogEntry::VignetteResponse { .. } => "vignette_response",
+            LogEntry::InterventionDecision { .. } => "intervention_decision",
+            LogEntry::InterventionResponse { .. } => "intervention_response",
+            LogEntry::RecordingPause { .. } => "recording_pause",
+            LogEntry::FocusTransition { .. } => "focus_transition",
+            LogEntry::PointerBin { .. } => "pointer_bin",
+            LogEntry::SecureInput { .. } => "secure_input",
+            // ★ ここから下は**行を書かない制御エントリ**である
+            //   (`BlockEnd` / `Rotate` は `meta`(session_end/session_start) を副作用で書くが、
+            //   ⚠️ それは `meta` 行であってこのエントリ自身の行ではない)。
+            LogEntry::BlockEnd | LogEntry::Rotate { .. } | LogEntry::End => return None,
+        })
+    }
+
     /// `RealtimeLabel` (回答あり) を不変条件を満たして構築する。
     /// q1/q2 は `1..=5` に clamp、`answered=true`、`skip_reason=None` を設定する。
     /// `probe`/`source` の整合 (self_marker⇒probe_id=null) は `ProbeRef` が型で保証する。
@@ -1121,6 +1204,42 @@ fn temp_fallback_path(primary: &Path) -> PathBuf {
 ///   ゴールデン (`tests/snapshots/*.json`) は `FeatSnapshot` の配列で **`meta` を含まない**、
 ///   読み手 (`anonymize.rs:111` / `validate_blocks.py:409`) は **JSON パース**である。
 ///   → ★ additive なフィールド追加は**どちらも壊さない**。
+/// セッション開始時に **1 回だけ** `meta` へ刻むキーボードレイアウト識別子。
+///
+/// ## ⚠️★★★ なぜ `OnceLock` で外から入れるのか
+///
+/// ★ 値の取得は **OS API**（Win: `GetKeyboardLayoutNameW` / mac: TIS）なので
+/// `input/` の中でしか呼べない（`architecture-rules` ルール 2）。
+/// ⚠️ `logger` から `input` を直接呼ぶと依存が増えるので、
+/// ★ **`lib.rs` が起動時に解決して入れる**形にする。
+///
+/// ⚠️ **未設定なら `meta` にフィールドを出さない** —— ★ 「取れなかった」と
+/// 「取っていない」を無理に 0 値で埋めない（ADR-013 D1 の趣旨）。
+static KEYBOARD_LAYOUT_ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// キーボードレイアウト識別子を登録する（★ 起動時に 1 回だけ）。
+///
+/// ⚠️ **識別子のみ**。★ 文字変換の結果を入れてはならない（`data-privacy` ルール 7）。
+pub fn set_keyboard_layout_id(id: String) {
+    let _ = KEYBOARD_LAYOUT_ID.set(id);
+}
+
+/// `meta` に足すレイアウト断片（★ 未設定なら空文字列 = 従来と 1 バイトも変わらない）。
+fn keyboard_layout_fragment() -> String {
+    match KEYBOARD_LAYOUT_ID.get() {
+        // ⚠️ 識別子は英数字とハイフン/ドットしか来ない想定だが、★ 念のため
+        //   ★ **英数字と `.` `-` `_` 以外を落とす** (⚠️ JSON を壊す文字を通さない)。
+        Some(id) => {
+            let safe: String = id
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+                .collect();
+            format!(r#","keyboard_layout":"{}""#, safe)
+        }
+        None => String::new(),
+    }
+}
+
 fn write_meta_start(
     writer: &mut impl Write,
     session_start: u64,
@@ -1134,26 +1253,30 @@ fn write_meta_start(
     //   additive なフィールド追加そのものは安全である (2026-08-19 実測)。
     let app_version = crate::capabilities::app_version();
     let capabilities = crate::capabilities::capabilities_json();
+    // ★ O1: セッション開始時に 1 回だけ。⚠️ 未設定なら空文字列で、従来の出力と同一になる。
+    let layout = keyboard_layout_fragment();
     match g1_mode.map(|s| s.as_str()) {
         None => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","app_version":"{}","capabilities":{}}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","app_version":"{}","capabilities":{}{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
                 app_version,
                 capabilities,
+                layout,
             );
         }
         Some(source) => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}","app_version":"{}","capabilities":{}}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}","app_version":"{}","capabilities":{}{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
                 source,
                 app_version,
                 capabilities,
+                layout,
             );
         }
     }
@@ -1344,6 +1467,10 @@ impl SessionLogger {
             // どの順で来ても **`session_end` を 1 ファイルにつき 1 行だけ**にするための状態。
             let mut block_closed = false;
 
+            // ⚠️★★★ **記録の一時停止状態**（O1 / ADR-014 D7-ii）。
+            // ★ **ストリーム内の `RecordingPause` 行だけ**で進める（上のゲートの doc を参照）。
+            let mut recording_paused = false;
+
             tracing::info!("SessionLogger: writing to {:?}", actual_path);
 
             let flush_interval = Duration::from_secs(5);
@@ -1353,387 +1480,464 @@ impl SessionLogger {
             loop {
                 let timeout = flush_interval.saturating_sub(last_flush.elapsed());
                 match rx.recv_timeout(timeout) {
-                    Ok(entry) => match entry {
-                        LogEntry::Key {
-                            vk_code,
-                            timestamp,
-                            is_press,
-                        } => {
-                            // ⚠️★★★ **書き出し境界で VK をカテゴリへ量子化する** (ADR-014 判断 6)。
-                            // `consent.md` の記録項目表は「キーの**種類**」と約束しており、
-                            // 生 VK (キー個体) をローカル NDJSON に残すのは文言とずれていた。
-                            // 匿名化 (`analysis::anonymize`) は従来 transfer 境界 (`gse-package`)
-                            // でのみ効いていたが、ここへ前倒しする。
-                            //
-                            // **失われないもの**: `is_backspace` / `is_text_producing` は
-                            // 14 カテゴリから完全復元できる (`replay.rs` の代表 VK 逆写像)。
-                            // 推論は in-memory 経路 (`InputEvent.is_backspace`) なので無影響。
-                            let category = KeyCategory::from_vk(vk_code).as_str();
-                            let _ = writeln!(
-                                writer,
-                                r#"{{"type":"key","t":{},"category":"{}","press":{}}}"#,
-                                timestamp, category, is_press,
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::Paste {
-                            timestamp,
-                            external_paste_chars,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_paste_line(timestamp, external_paste_chars),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::Feat {
-                            timestamp,
-                            f1,
-                            f3,
-                            f4,
-                            f5,
-                            f6,
-                            p_flow,
-                            p_inc,
-                            p_stuck,
-                            raw_x,
-                            raw_y,
-                            ewma_x,
-                            ewma_y,
-                            obs,
-                            alpha,
-                            keys,
-                            bs_keys,
-                        } => {
-                            // ★ field init shorthand なので、名前が一致しない限りコンパイルが通らない
-                            // (13 個の連続する f64 の取り違えを型システムに弾かせる)。
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_feat_line(&FeatLine {
-                                    timestamp,
-                                    f1,
-                                    f3,
-                                    f4,
-                                    f5,
-                                    f6,
-                                    p_flow,
-                                    p_inc,
-                                    p_stuck,
-                                    raw_x,
-                                    raw_y,
-                                    ewma_x,
-                                    ewma_y,
-                                    obs,
-                                    alpha,
-                                    keys,
-                                    bs_keys,
-                                }),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::ImeState {
-                            timestamp,
-                            on,
-                            active,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
-                                timestamp, on, active,
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::HookHealth {
-                            timestamp,
-                            alive,
-                            starved_ms,
-                            rehook,
-                            dropped,
-                            dropped_delta,
-                        } => {
-                            // ⚠️★ `dropped` (累積) は**そのまま残す** (非破壊)。`dropped_delta` を
-                            //   **末尾に併記**する (ADR-013 D4)。改名は breaking なので採らない。
-                            let _ = writeln!(
-                                writer,
-                                r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{},"dropped":{},"dropped_delta":{}}}"#,
-                                timestamp, alive, starved_ms, rehook, dropped, dropped_delta,
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::StarveWindow {
-                            timestamp,
-                            win_ms,
-                            n_lt30,
-                            sum_lt30_ms,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                r#"{{"type":"starve_window","t":{},"win_ms":{},"n_lt30":{},"sum_lt30_ms":{}}}"#,
-                                timestamp, win_ms, n_lt30, sum_lt30_ms,
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::SessionStart { timestamp } => {
-                            let _ = writeln!(
-                                writer,
-                                r#"{{"type":"session_start","t":{}}}"#,
-                                timestamp,
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::UserLabel {
-                            timestamp,
-                            label,
-                            recovered_at,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_user_label_line(timestamp, label, recovered_at),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::ReviewMarker { timestamp } => {
-                            let _ = writeln!(
-                                writer,
-                                r#"{{"type":"review_marker","t":{}}}"#,
-                                timestamp,
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::ImeShadow {
-                            timestamp,
-                            dwell_ms,
-                            candidate_nav_count,
-                            abandon,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_ime_shadow_line(
-                                    timestamp,
-                                    dwell_ms,
-                                    candidate_nav_count,
-                                    abandon
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::InterventionDecision {
-                            timestamp,
-                            action,
-                            need_score,
-                            opportunity_score,
-                            p_stuck,
-                            idle_ms,
-                            reason,
-                            suppressed_by,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_intervention_decision_line(
-                                    timestamp,
-                                    &action,
-                                    need_score,
-                                    opportunity_score,
-                                    p_stuck,
-                                    idle_ms,
-                                    &reason,
-                                    &suppressed_by
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::InterventionResponse {
-                            timestamp,
-                            action,
-                            reason,
-                            elapsed_ms,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_intervention_response_line(
-                                    timestamp, &action, reason, elapsed_ms
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::SessionMeta {
-                            timestamp,
-                            track,
-                            task_kind,
-                            intervention_enabled,
-                            condition,
-                            label_pool,
-                            head_id,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_session_meta_line(
-                                    timestamp,
-                                    track,
-                                    task_kind,
-                                    intervention_enabled,
-                                    condition,
-                                    label_pool,
-                                    head_id
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::ProbeAssignment {
-                            probe_id,
-                            scheduled_ts,
-                            session_elapsed_ms,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_probe_assignment_line(
-                                    &probe_id,
-                                    scheduled_ts,
-                                    session_elapsed_ms
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::RealtimeLabel {
-                            timestamp,
-                            probe_id,
-                            source,
-                            q1_friction,
-                            q2_progress,
-                            answered,
-                            skip_reason,
-                            latency_ms,
-                            analysis_window_start_ms,
-                            analysis_window_end_ms,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_realtime_label_line(
-                                    timestamp,
-                                    probe_id.as_deref(),
-                                    source,
-                                    q1_friction,
-                                    q2_progress,
-                                    answered,
-                                    skip_reason,
-                                    latency_ms,
-                                    analysis_window_start_ms,
-                                    analysis_window_end_ms,
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::VignetteResponse {
-                            timestamp,
-                            vignette_id,
-                            expected_quadrant,
-                            q1_friction,
-                            q2_progress,
-                            elapsed_ms,
-                            changes,
-                        } => {
-                            let _ = writeln!(
-                                writer,
-                                "{}",
-                                format_vignette_response_line(
-                                    timestamp,
-                                    &vignette_id,
-                                    expected_quadrant,
-                                    q1_friction,
-                                    q2_progress,
-                                    elapsed_ms,
-                                    changes
-                                ),
-                            );
-                            dirty = true;
-                        }
-                        LogEntry::BlockEnd => {
-                            // ★ 閉じるだけ。次のファイルは開かない (11 本目の空ファイル対策)。
-                            if !block_closed {
-                                write_meta_end(&mut writer, now_ms());
-                                block_closed = true;
+                    Ok(entry) => {
+                        // ⚠️★★★ **一時停止中はここで落とす** (O1 / ADR-014 D7-ii)。
+                        //
+                        // ★ 被験者への約束は逐語「**すぐ止める**」であり、その実体は
+                        //   **ファイルに 1 バイトも書かないこと**である。→ ★ **書き出しの唯一の入口**で
+                        //   落とす（⚠️ 19 個の match 腕に条件を散らさない）。
+                        // ★ 通すのは `recording_pause`（＝ 再開を記録できなくなる）と
+                        //   `meta`（＝ ファイルの整合性）だけ。判断は `recording` の純関数が持つ。
+                        // ⚠️ 制御エントリ (`BlockEnd` / `Rotate` / `End`) は `line_type()` が `None` を返し、
+                        //   ★ **常に通る**（止めている間もアプリは正しく終了できなければならない）。
+                        //
+                        // ## ⚠️★★★ なぜグローバル Atomic を読まないのか（★ テストで再現して直した）
+                        //
+                        // ⚠️ `recording::is_paused()` をここで読むと、**キューに積まれた順序**と
+                        //   **フラグが切り替わる時刻**がずれる —— ★ 停止中に積まれた行が、
+                        //   ロガーが取り出す前に被験者が再開すると **書かれてしまう**
+                        //   (2026-08-23 に `paused_logger_writes_no_data_rows` で実際に再現した)。
+                        // → ★ **ストリーム内の `RecordingPause` 行で状態を進める。**
+                        //   ⚠️ これなら「積まれた順」と「止まっていた区間」が定義上ずれない。
+                        //   ★ グローバル Atomic は UI の稼働中インジケータ専用である。
+                        if recording_paused {
+                            if let Some(t) = entry.line_type() {
+                                if !crate::recording::is_writable_while_paused(t) {
+                                    continue;
+                                }
                             }
-                            let _ = writer.flush();
-                            last_flush = Instant::now();
-                            dirty = false;
-                            // ★ **flush の後**に知らせる。⚠️ 先に知らせると、収束器が
-                            //   `session_end` の無いファイルを見て「まだ閉じていない」と
-                            //   判断してしまう (待った意味が消える)。
-                            //   `try_send` なので誰も待っていなくてもここで止まらない。
-                            let _ = block_end_tx.try_send(());
                         }
-                        LogEntry::Rotate { new_path } => {
-                            // ⚠️★ **一意化を先に行う。** 呼び出し側 (UI スレッド) の exists 判定と
-                            // 実作成の間には窓があり、ファイル名は秒粒度なので同じパスが来うる。
-                            // ★ ここで先に別名へ振ることで、下の「同一パス」判定に落ちる
-                            // = **2 つの論理ブロックが 1 ファイルに黙って混ざる**経路を消す
-                            // (cross-review: Codex 指摘)。logger スレッドは単一なので窓が閉じる。
-                            let new_path = unique_path_from(new_path);
-
-                            // ⚠️★ **ここに「同一パスなら skip」のガードは置かない。**
-                            // 上の一意化が先に走るので、書きかけのファイルは必ず存在する
-                            // → `unique_path_from` が別名を返す → 同一パスには**なりえない**。
-                            // ★ 実際、ガードを書いて**わざと壊しても赤にならなかった**（到達不能）。
-                            // 発火しない検査を残すと「守られているつもり」を作るので置かない。
-                            // 唯一同一パスになりうるのは現ファイルがディスク上に無いとき
-                            // （外部削除 / LogStatus::Disabled の sink）で、その場合は開き直すほうが正しい。
-                            if !block_closed {
-                                write_meta_end(&mut writer, now_ms());
-                            }
-                            let _ = writer.flush();
-
-                            // ★ 旧ファイルはここで drop される (writer の差し替えで閉じる)。
-                            let (boxed, actual, new_status) = open_log_target(&new_path);
-                            writer = BufWriter::new(boxed);
-
-                            // ⚠️ ★ **新ファイルの実時刻**で meta を書く。
-                            // anonymize.rs の find_session_start がこの行を `t` の基点にするため、
-                            // 前ファイルの値を引き継ぐと匿名化後の時刻が全部ずれる。
-                            write_meta_start(&mut writer, now_ms(), g1_mode);
-                            let _ = writer.flush();
-
-                            if new_status != LogStatus::Ok {
-                                // ⚠️ ★ ローテート先が書けなかった。UI のバナーへ伝える必要がある
-                                // (起動時 Ok のまま黙って temp に書き続けるのが #1 の再発)。
-                                tracing::error!(
-                                    "SessionLogger: rotate to {:?} degraded: {:?}",
-                                    new_path,
-                                    new_status
+                        match entry {
+                            LogEntry::Key {
+                                vk_code,
+                                timestamp,
+                                is_press,
+                            } => {
+                                // ⚠️★★★ **書き出し境界で VK をカテゴリへ量子化する** (ADR-014 判断 6)。
+                                // `consent.md` の記録項目表は「キーの**種類**」と約束しており、
+                                // 生 VK (キー個体) をローカル NDJSON に残すのは文言とずれていた。
+                                // 匿名化 (`analysis::anonymize`) は従来 transfer 境界 (`gse-package`)
+                                // でのみ効いていたが、ここへ前倒しする。
+                                //
+                                // **失われないもの**: `is_backspace` / `is_text_producing` は
+                                // 14 カテゴリから完全復元できる (`replay.rs` の代表 VK 逆写像)。
+                                // 推論は in-memory 経路 (`InputEvent.is_backspace`) なので無影響。
+                                let category = KeyCategory::from_vk(vk_code).as_str();
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"key","t":{},"category":"{}","press":{}}}"#,
+                                    timestamp, category, is_press,
                                 );
-                            } else {
-                                tracing::info!("SessionLogger: rotated to {:?}", actual);
+                                dirty = true;
                             }
-                            // ⚠️ poison でも黙って諦めない。他の箇所と同じく into_inner で
-                            // データを取り出して更新する (ここだけ握り潰すと、ローテート先が
-                            // temp に落ちたことが UI に届かない・cross-review: Codex 指摘)。
-                            {
-                                let mut t =
-                                    target_for_thread.lock().unwrap_or_else(|e| e.into_inner());
-                                t.path = actual;
-                                t.status = new_status;
+                            LogEntry::Paste {
+                                timestamp,
+                                external_paste_chars,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_paste_line(timestamp, external_paste_chars),
+                                );
+                                dirty = true;
                             }
+                            LogEntry::Feat {
+                                timestamp,
+                                f1,
+                                f3,
+                                f4,
+                                f5,
+                                f6,
+                                p_flow,
+                                p_inc,
+                                p_stuck,
+                                raw_x,
+                                raw_y,
+                                ewma_x,
+                                ewma_y,
+                                obs,
+                                alpha,
+                                keys,
+                                bs_keys,
+                            } => {
+                                // ★ field init shorthand なので、名前が一致しない限りコンパイルが通らない
+                                // (13 個の連続する f64 の取り違えを型システムに弾かせる)。
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_feat_line(&FeatLine {
+                                        timestamp,
+                                        f1,
+                                        f3,
+                                        f4,
+                                        f5,
+                                        f6,
+                                        p_flow,
+                                        p_inc,
+                                        p_stuck,
+                                        raw_x,
+                                        raw_y,
+                                        ewma_x,
+                                        ewma_y,
+                                        obs,
+                                        alpha,
+                                        keys,
+                                        bs_keys,
+                                    }),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ImeState {
+                                timestamp,
+                                on,
+                                active,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"ime_state","t":{},"on":{},"active":{}}}"#,
+                                    timestamp, on, active,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::HookHealth {
+                                timestamp,
+                                alive,
+                                starved_ms,
+                                rehook,
+                                dropped,
+                                dropped_delta,
+                            } => {
+                                // ⚠️★ `dropped` (累積) は**そのまま残す** (非破壊)。`dropped_delta` を
+                                //   **末尾に併記**する (ADR-013 D4)。改名は breaking なので採らない。
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"hook_health","t":{},"alive":{},"starved_ms":{},"rehook":{},"dropped":{},"dropped_delta":{}}}"#,
+                                    timestamp, alive, starved_ms, rehook, dropped, dropped_delta,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::StarveWindow {
+                                timestamp,
+                                win_ms,
+                                n_lt30,
+                                sum_lt30_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"starve_window","t":{},"win_ms":{},"n_lt30":{},"sum_lt30_ms":{}}}"#,
+                                    timestamp, win_ms, n_lt30, sum_lt30_ms,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::SessionStart { timestamp } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"session_start","t":{}}}"#,
+                                    timestamp,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::UserLabel {
+                                timestamp,
+                                label,
+                                recovered_at,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_user_label_line(timestamp, label, recovered_at),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ReviewMarker { timestamp } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"review_marker","t":{}}}"#,
+                                    timestamp,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ImeShadow {
+                                timestamp,
+                                dwell_ms,
+                                candidate_nav_count,
+                                abandon,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_ime_shadow_line(
+                                        timestamp,
+                                        dwell_ms,
+                                        candidate_nav_count,
+                                        abandon
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::InterventionDecision {
+                                timestamp,
+                                action,
+                                need_score,
+                                opportunity_score,
+                                p_stuck,
+                                idle_ms,
+                                reason,
+                                suppressed_by,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_intervention_decision_line(
+                                        timestamp,
+                                        &action,
+                                        need_score,
+                                        opportunity_score,
+                                        p_stuck,
+                                        idle_ms,
+                                        &reason,
+                                        &suppressed_by
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::InterventionResponse {
+                                timestamp,
+                                action,
+                                reason,
+                                elapsed_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_intervention_response_line(
+                                        timestamp, &action, reason, elapsed_ms
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::SessionMeta {
+                                timestamp,
+                                track,
+                                task_kind,
+                                intervention_enabled,
+                                condition,
+                                label_pool,
+                                head_id,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_session_meta_line(
+                                        timestamp,
+                                        track,
+                                        task_kind,
+                                        intervention_enabled,
+                                        condition,
+                                        label_pool,
+                                        head_id
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ProbeAssignment {
+                                probe_id,
+                                scheduled_ts,
+                                session_elapsed_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_probe_assignment_line(
+                                        &probe_id,
+                                        scheduled_ts,
+                                        session_elapsed_ms
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::RealtimeLabel {
+                                timestamp,
+                                probe_id,
+                                source,
+                                q1_friction,
+                                q2_progress,
+                                answered,
+                                skip_reason,
+                                latency_ms,
+                                analysis_window_start_ms,
+                                analysis_window_end_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_realtime_label_line(
+                                        timestamp,
+                                        probe_id.as_deref(),
+                                        source,
+                                        q1_friction,
+                                        q2_progress,
+                                        answered,
+                                        skip_reason,
+                                        latency_ms,
+                                        analysis_window_start_ms,
+                                        analysis_window_end_ms,
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::VignetteResponse {
+                                timestamp,
+                                vignette_id,
+                                expected_quadrant,
+                                q1_friction,
+                                q2_progress,
+                                elapsed_ms,
+                                changes,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_vignette_response_line(
+                                        timestamp,
+                                        &vignette_id,
+                                        expected_quadrant,
+                                        q1_friction,
+                                        q2_progress,
+                                        elapsed_ms,
+                                        changes
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::RecordingPause { timestamp, paused } => {
+                                // ★ **書いてから状態を進める。** ⚠️ 先に進めると「止める」の行自身が
+                                //   ゲートに落ちて、**止めた事実が記録されない**。
+                                recording_paused = paused;
+                                // ⚠️★★★ **遷移の時刻と向きだけ**。理由も回数も書かない
+                                //   (`LogEntry::RecordingPause` の doc)。
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"recording_pause","t":{},"paused":{}}}"#,
+                                    timestamp, paused,
+                                );
+                                // ★ **すぐ flush する。** ⚠️ 5 秒バッファのままだと、
+                                //   「止めた」直後にアプリが落ちたときに**止めた事実が消え**、
+                                //   その先の空白が「信号が無かった」と読まれる。
+                                let _ = writer.flush();
+                                last_flush = Instant::now();
+                                dirty = false;
+                            }
+                            LogEntry::FocusTransition { timestamp } => {
+                                // ⚠️★★★ **時刻しか書けない形**にしてある (variant にそれしか無い)。
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"focus_transition","t":{}}}"#,
+                                    timestamp,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::PointerBin {
+                                timestamp,
+                                moved,
+                                buttons,
+                                wheel,
+                            } => {
+                                // ★ 量子化スカラだけ。⚠️ 座標・向き・速度は型として存在しない。
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"pointer_bin","t":{},"moved":{},"buttons":{},"wheel":{}}}"#,
+                                    timestamp, moved, buttons, wheel,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::SecureInput { timestamp, on } => {
+                                let _ = writeln!(
+                                    writer,
+                                    r#"{{"type":"secure_input","t":{},"on":{}}}"#,
+                                    timestamp, on,
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::BlockEnd => {
+                                // ★ 閉じるだけ。次のファイルは開かない (11 本目の空ファイル対策)。
+                                if !block_closed {
+                                    write_meta_end(&mut writer, now_ms());
+                                    block_closed = true;
+                                }
+                                let _ = writer.flush();
+                                last_flush = Instant::now();
+                                dirty = false;
+                                // ★ **flush の後**に知らせる。⚠️ 先に知らせると、収束器が
+                                //   `session_end` の無いファイルを見て「まだ閉じていない」と
+                                //   判断してしまう (待った意味が消える)。
+                                //   `try_send` なので誰も待っていなくてもここで止まらない。
+                                let _ = block_end_tx.try_send(());
+                            }
+                            LogEntry::Rotate { new_path } => {
+                                // ⚠️★ **一意化を先に行う。** 呼び出し側 (UI スレッド) の exists 判定と
+                                // 実作成の間には窓があり、ファイル名は秒粒度なので同じパスが来うる。
+                                // ★ ここで先に別名へ振ることで、下の「同一パス」判定に落ちる
+                                // = **2 つの論理ブロックが 1 ファイルに黙って混ざる**経路を消す
+                                // (cross-review: Codex 指摘)。logger スレッドは単一なので窓が閉じる。
+                                let new_path = unique_path_from(new_path);
 
-                            block_closed = false;
-                            last_flush = Instant::now();
-                            dirty = false;
-                        }
-                        LogEntry::End => {
-                            // ★ 直前に BlockEnd が来ていたら二重に書かない。
-                            if !block_closed {
-                                write_meta_end(&mut writer, now_ms());
+                                // ⚠️★ **ここに「同一パスなら skip」のガードは置かない。**
+                                // 上の一意化が先に走るので、書きかけのファイルは必ず存在する
+                                // → `unique_path_from` が別名を返す → 同一パスには**なりえない**。
+                                // ★ 実際、ガードを書いて**わざと壊しても赤にならなかった**（到達不能）。
+                                // 発火しない検査を残すと「守られているつもり」を作るので置かない。
+                                // 唯一同一パスになりうるのは現ファイルがディスク上に無いとき
+                                // （外部削除 / LogStatus::Disabled の sink）で、その場合は開き直すほうが正しい。
+                                if !block_closed {
+                                    write_meta_end(&mut writer, now_ms());
+                                }
+                                let _ = writer.flush();
+
+                                // ★ 旧ファイルはここで drop される (writer の差し替えで閉じる)。
+                                let (boxed, actual, new_status) = open_log_target(&new_path);
+                                writer = BufWriter::new(boxed);
+
+                                // ⚠️ ★ **新ファイルの実時刻**で meta を書く。
+                                // anonymize.rs の find_session_start がこの行を `t` の基点にするため、
+                                // 前ファイルの値を引き継ぐと匿名化後の時刻が全部ずれる。
+                                write_meta_start(&mut writer, now_ms(), g1_mode);
+                                let _ = writer.flush();
+
+                                if new_status != LogStatus::Ok {
+                                    // ⚠️ ★ ローテート先が書けなかった。UI のバナーへ伝える必要がある
+                                    // (起動時 Ok のまま黙って temp に書き続けるのが #1 の再発)。
+                                    tracing::error!(
+                                        "SessionLogger: rotate to {:?} degraded: {:?}",
+                                        new_path,
+                                        new_status
+                                    );
+                                } else {
+                                    tracing::info!("SessionLogger: rotated to {:?}", actual);
+                                }
+                                // ⚠️ poison でも黙って諦めない。他の箇所と同じく into_inner で
+                                // データを取り出して更新する (ここだけ握り潰すと、ローテート先が
+                                // temp に落ちたことが UI に届かない・cross-review: Codex 指摘)。
+                                {
+                                    let mut t =
+                                        target_for_thread.lock().unwrap_or_else(|e| e.into_inner());
+                                    t.path = actual;
+                                    t.status = new_status;
+                                }
+
+                                block_closed = false;
+                                last_flush = Instant::now();
+                                dirty = false;
                             }
-                            break;
+                            LogEntry::End => {
+                                // ★ 直前に BlockEnd が来ていたら二重に書かない。
+                                if !block_closed {
+                                    write_meta_end(&mut writer, now_ms());
+                                }
+                                break;
+                            }
                         }
-                    },
+                    }
                     Err(RecvTimeoutError::Timeout) => {
                         // 5秒間アイドル → バッファフラッシュ
                     }
@@ -2453,6 +2657,161 @@ mod tests {
             ],
             "categories were not discriminated as expected"
         );
+    }
+
+    /// ⚠️★★★ `line_type()` が `capabilities::KNOWN_LINE_TYPES` と食い違わないこと。
+    ///
+    /// ★ 一時停止 (`recording::is_writable_while_paused`) の判断は `line_type()` の
+    /// 文字列に乗っているので、⚠️ **綴りがずれると止めたはずの行が黙って書かれる。**
+    #[test]
+    fn line_type_matches_known_line_types() {
+        use std::collections::BTreeSet;
+        let known: BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
+            .iter()
+            .copied()
+            .collect();
+        // ★ 代表を 1 つずつ作って `line_type()` を通す (⚠️ 全 variant を列挙する)。
+        let entries = sample_entries_for_line_type();
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        for e in &entries {
+            if let Some(t) = e.line_type() {
+                assert!(known.contains(t), "{t:?} が KNOWN_LINE_TYPES に無い");
+                seen.insert(t);
+            }
+        }
+        // ⚠️★★★ **新しい行種を足したら KNOWN にも足す**、を機械的に固定する。
+        //   ★ 逆方向 (KNOWN の全部に variant があるか) は `capabilities` 側の
+        //   「logger.rs が書く行種リテラルと突き合わせる網羅テスト」が既に見ている。
+        assert!(
+            seen.contains("recording_pause"),
+            "recording_pause が漏れている"
+        );
+        assert!(seen.contains("key"));
+    }
+
+    /// ⚠️★★★ **一時停止中はデータ行が 1 行も書かれない** (ADR-014 D7-ii)。
+    ///
+    /// ★ 被験者への約束「すぐ止める」の実体を、**実際に logger を走らせて**固定する。
+    /// ⚠️ 通ってよいのは `recording_pause` と `meta` だけである。
+    #[test]
+    fn paused_logger_writes_no_data_rows() {
+        let p = rot_test_path("paused", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+
+        // ★ 「止める」の遷移行 → その後のデータ行 → 「再開する」→ データ行。
+        tx.send(LogEntry::RecordingPause {
+            timestamp: 1_700_000_000_000,
+            paused: true,
+        })
+        .unwrap();
+        // ⚠️ ここで `recording::set_paused` を呼ばない —— ★ ロガーの判断は
+        //   **ストリーム内の `RecordingPause` 行**だけで決まる（グローバル Atomic は UI 用）。
+        tx.send(LogEntry::Key {
+            vk_code: 0x41,
+            timestamp: 1_700_000_000_100,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::SessionStart {
+            timestamp: 1_700_000_000_150,
+        })
+        .unwrap();
+        tx.send(LogEntry::RecordingPause {
+            timestamp: 1_700_000_000_200,
+            paused: false,
+        })
+        .unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 0x42,
+            timestamp: 1_700_000_000_300,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c = fs::read_to_string(&p).unwrap();
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        let types: Vec<String> = c
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| {
+                let v: serde_json::Value = serde_json::from_str(l).expect("valid json");
+                v["type"].as_str().unwrap().to_string()
+            })
+            .collect();
+
+        // ⚠️ 停止中に送った `key` / `session_start` が 1 行も無いこと。
+        assert_eq!(
+            types.iter().filter(|t| *t == "session_start").count(),
+            0,
+            "一時停止中の session_start が書かれている: {types:?}"
+        );
+        assert_eq!(
+            types.iter().filter(|t| *t == "key").count(),
+            1,
+            "書かれてよい key は再開後の 1 行だけ: {types:?}"
+        );
+        // ★ 遷移は 2 行とも残る (⚠️ 「止めた」も「再開した」も記録できなければ意味が無い)。
+        assert_eq!(
+            types.iter().filter(|t| *t == "recording_pause").count(),
+            2,
+            "遷移行が欠けている: {types:?}"
+        );
+    }
+
+    /// ★ `line_type_matches_known_line_types` 用の代表エントリ (全 variant)。
+    fn sample_entries_for_line_type() -> Vec<LogEntry> {
+        vec![
+            LogEntry::Key {
+                vk_code: 0x41,
+                timestamp: 1,
+                is_press: true,
+            },
+            LogEntry::Paste {
+                timestamp: 1,
+                external_paste_chars: None,
+            },
+            LogEntry::Feat {
+                timestamp: 1,
+                f1: 0.0,
+                f3: 0.0,
+                f4: 0.0,
+                f5: 0.0,
+                f6: 0.0,
+                p_flow: 0.0,
+                p_inc: 0.0,
+                p_stuck: 0.0,
+                raw_x: 0.0,
+                raw_y: 0.0,
+                ewma_x: 0.0,
+                ewma_y: 0.0,
+                obs: 0,
+                alpha: 0.0,
+                keys: 0,
+                bs_keys: 0,
+            },
+            LogEntry::ImeState {
+                timestamp: 1,
+                on: false,
+                active: false,
+            },
+            LogEntry::SessionStart { timestamp: 1 },
+            LogEntry::ReviewMarker { timestamp: 1 },
+            LogEntry::RecordingPause {
+                timestamp: 1,
+                paused: true,
+            },
+            LogEntry::BlockEnd,
+            LogEntry::Rotate {
+                new_path: PathBuf::from("x"),
+            },
+            LogEntry::End,
+        ]
     }
 
     /// ⚠️★★★ **logger → replay の形式契約**を往復で固定する。

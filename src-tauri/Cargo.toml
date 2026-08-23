@@ -130,6 +130,9 @@ windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
+    # ⚠️★★★ O1 (R3-a): Raw Input (`RIDEV_INPUTSINK` + `GetRawInputBuffer`・マウスのみ)。
+    #   ★ `WH_MOUSE_LL` は採らない (ADR-014 D4: 入力を直列化し通知なく外される)。
+    "Win32_UI_Input",
     "Win32_UI_Input_Ime",
     "Win32_System_Threading",
     "Win32_System_LibraryLoader",
@@ -140,6 +143,9 @@ windows = { version = "0.58", features = [
     #   DWM の cloak/uncloak で表示制御されるため、**現在 cloak されているか**を
     #   OS に直接聞くのに使う (`.steering/20260823-ime-active-cloak-rewiring/`)。
     "Win32_Graphics_Dwm",
+    # ⚠️ O1 (R3-a): `WNDCLASSW` は `HBRUSH`/`HICON`/`HCURSOR` を持つため GDI 側に置かれている。
+    #   ★ メッセージ専用ウィンドウ (Raw Input の `hwndTarget`) を作るのに要る。
+    "Win32_Graphics_Gdi",
 ] }
 lazy_static = "1.4"
 

@@ -25,6 +25,12 @@ pub mod submission;
 // age と HTTP を使うので package feature 側 (`gse-submit --reconcile` が実行主体)。
 #[cfg(feature = "package")]
 pub mod reconcile;
+// ⚠️★★★ O1 (R3): 記録の **即時一時停止 / 再開** (ADR-014 D7-ii)。
+//   ★ 依存を 1 つも持たない葉モジュール (logger / lib.rs / Frontend の 3 者から読まれる)。
+pub mod recording;
+// ⚠️★★★ O1 (R3): 被験者による **区間指定削除** (ADR-014 D7-iii / 判断 3 の根拠 3)。
+//   ★ OS API を呼ばない純粋なファイル層なので `input/` にも `analysis/` にも入れない。
+pub mod redaction;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -900,6 +906,138 @@ fn open_accessibility_settings() -> String {
 #[tauri::command]
 fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
     log.lock().unwrap_or_else(|p| p.into_inner()).current_path()
+}
+
+// --- O1 (R3): 被験者の 3 点セット (ADR-014 D7) ---------------------------------------
+//
+// ⚠️★★★ **この 3 つが揃っていることが、ADR-014 判断 3（倫理審査は不要）の根拠 3 である。**
+// 逐語「⚠️ **削除 UI が実装されないまま収集を始めた時点で崩れる**」。
+//
+// | # | 要件 | ★ ここでの実装 |
+// |---|---|---|
+// | i | 稼働中インジケータ | [`get_recording_status`]（Frontend が常時ポーリングして表示） |
+// | ii | 即時の一時停止 | [`set_recording_paused`] |
+// | iii | 事後の区間指定削除 | [`delete_time_range`]（⚠️ **理由を引数に取らない**） |
+
+/// 稼働中インジケータ (D7-i) が表示するもの。
+#[derive(serde::Serialize)]
+struct RecordingStatusDto {
+    /// ⚠️ いま**一時停止中**か。★ `false` なら記録している。
+    paused: bool,
+    /// いま書いているセッションファイル (UI が「これは消せない」と示すために使う)。
+    current_file: String,
+    /// セッション NDJSON を置いているディレクトリ。
+    session_dir: String,
+}
+
+/// 記録の稼働状態を返す (D7-i: 稼働中インジケータ)。
+///
+/// ⚠️★★★ **Frontend で判定しない。** `typescript-standards` / `architecture-rules` ルール 3 に従い、
+/// 「記録しているか」の判断は Rust 側が持ち、UI は受け取った真偽値を描くだけにする。
+#[tauri::command]
+fn get_recording_status(log: State<Arc<Mutex<LogState>>>) -> RecordingStatusDto {
+    let (dir, _participant_id) = crate::logger::session_log_dir();
+    RecordingStatusDto {
+        paused: crate::recording::is_paused(),
+        current_file: log.lock().unwrap_or_else(|p| p.into_inner()).current_path(),
+        session_dir: dir.display().to_string(),
+    }
+}
+
+/// 記録を即時に一時停止 / 再開する (D7-ii)。★ **戻り値は適用後の状態**。
+///
+/// ⚠️★★★ **理由を聞かない。** ★ 同意文書 §4 の逐語「**理由を聞きません**」。
+///
+/// ★ 状態が**変わったときだけ** `recording_pause` 行を書く（⚠️ 連打の回数を残さない）。
+/// ⚠️ 「止める」方向の行は **`set_paused` の前**に送る —— ★ 後に送ると自分自身が
+/// 一時停止ゲートに落ちて、**止めた事実が記録されない**。
+#[tauri::command]
+fn set_recording_paused(paused: bool, log: State<Arc<Mutex<LogState>>>) -> bool {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    // ★ 先に「遷移するのか」を知る必要があるが、⚠️ 判定と適用の間に別スレッドが
+    //   割り込む経路は無い (UI からの単一コマンド) ので `swap` 1 回で足りる。
+    let previous = crate::recording::set_paused(paused);
+    if previous != paused {
+        // ⚠️ `recording_pause` は `is_writable_while_paused` が通す行種なので、
+        //   ★ 停止中に送っても書かれる (再開の記録が消えない)。
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+        if let Err(e) = guard.tx.try_send(LogEntry::RecordingPause {
+            timestamp: now,
+            paused,
+        }) {
+            // ⚠️ 記録できなくても**状態は変える**。★ 被験者の「止めて」を、
+            //   ログが詰まっているという内部事情で断らない。
+            tracing::warn!("failed to log recording_pause transition: {e:?}");
+        }
+    }
+    paused
+}
+
+/// 区間指定削除の結果 (D7-iii)。
+#[derive(serde::Serialize)]
+struct RedactionOutcomeDto {
+    files_touched: usize,
+    lines_removed: usize,
+    /// ⚠️ 書きかけなので触らなかったファイル数 (★ ふつうは 0 か 1)。
+    files_skipped: usize,
+}
+
+/// ⚠️★★★ **時間帯を指定して記録を削除する** (D7-iii)。
+///
+/// ★ 同意文書 §4 の逐語「**時間帯を指定して削除できます（例:「昨日の 14:00〜15:00」）。
+/// ⚠️ 理由を説明する必要はありません。**」
+///
+/// - ⚠️ **引数に理由が無い。** ★ 追加してはならない。
+/// - ⚠️ **いま書いているファイルは触らない** —— ★ 書き込み中に差し替えるとロガーの
+///   `BufWriter` がすでに開いている fd へ書き続け、**削除したはずの行が復活する**。
+///   → ★ UI は「先に一時停止してください」と促し、`files_skipped>0` をそのまま表示する。
+/// - ★ 台帳へ「消した事実」を 1 行残す（⚠️ **何を消したかは書かない**）。
+#[tauri::command]
+fn delete_time_range(
+    from_ms: u64,
+    to_ms: u64,
+    log: State<Arc<Mutex<LogState>>>,
+) -> Result<RedactionOutcomeDto, String> {
+    if from_ms > to_ms {
+        return Err("開始時刻が終了時刻より後になっています。".to_string());
+    }
+    let (dir, _participant_id) = crate::logger::session_log_dir();
+    let current = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
+    let current_path = PathBuf::from(&current);
+    let skip = if current.is_empty() {
+        None
+    } else {
+        Some(current_path.as_path())
+    };
+
+    let summary = crate::redaction::redact_dir(&dir, from_ms, to_ms, skip).map_err(|e| {
+        tracing::error!("delete_time_range failed: {e:?}");
+        "記録の削除に失敗しました。".to_string()
+    })?;
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    if let Err(e) = crate::redaction::append_ledger(&dir, now, from_ms, to_ms, &summary) {
+        // ⚠️ 台帳が書けなくても**削除は成功している**。★ 削除を失敗扱いにして
+        //   「消えていないのでは」と被験者に思わせない。
+        tracing::warn!("failed to append redaction ledger: {e:?}");
+    }
+    tracing::info!(
+        files_touched = summary.files_touched,
+        lines_removed = summary.lines_removed,
+        files_skipped = summary.files_skipped,
+        "delete_time_range completed"
+    );
+    Ok(RedactionOutcomeDto {
+        files_touched: summary.files_touched,
+        lines_removed: summary.lines_removed,
+        files_skipped: summary.files_skipped,
+    })
 }
 
 // --- アプリ内提出 (案A sidecar / mac Gatekeeper 根絶) -------------------------------
@@ -2534,6 +2672,8 @@ pub fn run() {
     let log_tx_probe = log_tx.clone();
     let log_tx_g1 = log_tx.clone();
     let log_tx_liveness = log_tx.clone();
+    // ★ O1 (R3-a): 非打鍵チャネルのドレインスレッド用。
+    let log_tx_for_observe = log_tx.clone();
     let log_tx_analysis = log_tx;
 
     // 分析スレッド
@@ -2941,6 +3081,18 @@ pub fn run() {
             //   → ★ 2 個目のプロセスは **NDJSON を作らずに死ぬ**。
             // ⚠️ これは提出側の `has_any_data_row` を**置き換えるものではない**。
             //   起動直後のクラッシュ等でも空ファイルは出るので、両方残す。
+            // ⚠️★★★ **ロガーを起こす *前* にレイアウトを解決する。**
+            //
+            // ★ `meta`(session_start) はロガースレッドが**起動直後に書く**ので、
+            //   後から `set_keyboard_layout_id` を呼んでも**間に合わない**
+            //   (2026-08-23 に実機で確認: `keyboard_layout` が meta に載らなかった)。
+            // ⚠️ 識別子のみ。★ 文字変換 (`ToUnicodeEx` / `UCKeyTranslate`) は呼ばない。
+            //   ⚠️ 取れなければ `meta` にフィールドを出さない (0 値で埋めない・ADR-013 D1)。
+            if let Some(layout) = input::observe::keyboard_layout_id() {
+                tracing::info!(keyboard_layout = %layout, "O1: keyboard layout recorded");
+                logger::set_keyboard_layout_id(layout);
+            }
+
             let (session_logger, log_status) = log_channel.start(log_path, g1_source);
             if log_status != LogStatus::Ok {
                 tracing::error!(
@@ -2975,6 +3127,46 @@ pub fn run() {
 
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
             input::hook::init_hook(hook_tx);
+
+            // ── ⚠️★★★ O1 (R3-a): 非打鍵チャネル (ADR-014 D4 の段 1) ──────────────
+            //
+            // ★ **記録のみ。推論には 1 バイトも流さない** (ADR-014 **D4b**)。
+            //   → ⚠️ ここで作るチャネルは `logger` へ直行し、`analysis` を**通らない**。
+            //   ★ Tier 0 配線 (`keys` / `bs_keys`) と同じ形である。
+            //
+            // ⚠️ 容量を大きめ (256) に取る理由: ★ ドレインは 1 本のスレッドが回すが、
+            //   フォアグラウンド遷移は**まとめて飛ぶ**ことがある (ウィンドウの復元時など)。
+            //   ⚠️ 溢れたぶんは `observe::OBSERVATIONS_DROPPED` が数える (★ 黙って消さない)。
+            let (focus_tx, focus_rx) = crossbeam_channel::bounded::<u64>(256);
+            let (pointer_tx, pointer_rx) =
+                crossbeam_channel::bounded::<crate::analysis::pointer_bin::PointerBin>(256);
+            input::observe::start(focus_tx, pointer_tx);
+
+            // ★ ドレインスレッド: 観測 → `LogEntry`。⚠️ 判断も集計もしない (そのまま流すだけ)。
+            let log_tx_observe = log_tx_for_observe;
+            thread::spawn(move || loop {
+                crossbeam_channel::select! {
+                    recv(focus_rx) -> msg => match msg {
+                        Ok(timestamp) => {
+                            // ⚠️ 送れなくても**待たない** (★ ログが詰まって観測が滞留するのを避ける)。
+                            let _ = log_tx_observe
+                                .try_send(LogEntry::FocusTransition { timestamp });
+                        }
+                        Err(_) => break,
+                    },
+                    recv(pointer_rx) -> msg => match msg {
+                        Ok(bin) => {
+                            let _ = log_tx_observe.try_send(LogEntry::PointerBin {
+                                timestamp: bin.timestamp,
+                                moved: bin.moved,
+                                buttons: bin.buttons,
+                                wheel: bin.wheel,
+                            });
+                        }
+                        Err(_) => break,
+                    },
+                }
+            });
 
             // ★★ G1: 他の GSE が動いていないかを OS に聞く（プラグインの**穴を埋める**）。
             //
@@ -3747,6 +3939,11 @@ pub fn run() {
             set_overlay_interactive,
             quit_app,
             get_session_file,
+            // ⚠️★★★ O1 (R3): ADR-014 D7 の 3 点セット (稼働中インジケータ / 即時の一時停止 /
+            //   事後の区間指定削除)。★ **判断 3 の根拠 3 がこの 3 つで立っている。**
+            get_recording_status,
+            set_recording_paused,
+            delete_time_range,
             submit_latest_session,
             record_user_label,
             record_session_meta,

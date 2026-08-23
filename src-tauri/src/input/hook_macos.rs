@@ -151,11 +151,37 @@ use super::{
 //   0x0B..=0x33: 英字・数字・記号・編集キー (B,Q,W,..,Tab,Space,`,Delete)
 //   0x75:        Forward Delete
 // ---------------------------------------------------------------------------
-fn is_typing_key(mac_vk: u64) -> bool {
+/// ★★★ **分析チャネルへ送るキー**かどうか（macOS の生 `CGKeyCode`）。
+///
+/// ## ⚠️★★★ 2026-08-23: `is_typing_key` から改名し、**広げた**（ADR-016 **D8**）
+///
+/// ★ Windows 側 `hook_windows.rs::is_observed_key` と**対**である。狙いは同じ ——
+/// 「打鍵が薄い作業」を「離席」と取り違えないために、**Esc / 矢印 / F1–F12 も種類だけ記録する**。
+/// ⚠️ 特徴量へ流す集合は [`crate::analysis::key_gate::is_feature_key`] のままで**変えない**。
+///
+/// ## ⚠️★★★ Windows と**同じにできない** 2 つ（★ 対のテストで固定してある）
+///
+/// | 何 | ⚠️ macOS でどうなるか | ★ なぜ入れないか |
+/// |---|---|---|
+/// | **修飾キー** | ❌ **そもそも届かない** | ★ tap の mask が `KeyDown`/`KeyUp` だけで、修飾は `FlagsChanged` で来る。⚠️ mask に足すと `LAST_KEY_MS` と IME 状態機械へ波及し、**特徴量経路に触れる** |
+/// | **テンキー** | ❌ **入れない** | ⚠️★★★ [`macos_vk_to_vk`] の既定が `other => other as u32` の**素通し**であり、`kVK_ANSI_Keypad0`(0x52) は **`0x52` = `VK_R`（英字！）** に化ける。★ 明示写像を足して `0x60..=0x6F` にすると **`is_feature_key` の中**に入り、⚠️ **macOS の特徴量が変わる**（= `HMM_VERSION` bump）。→ ★ **どちらの道も塞がっている** |
+///
+/// ⚠️ **この非対称は「決めた状態」であって「気付いていない穴」ではない。**
+/// ★ 研究者へ返す事項として `.steering/20260823-o1-instrument-r3a/decisions.md` D-A に記録した。
+fn is_observed_key(mac_vk: u64) -> bool {
     matches!(mac_vk,
+        // ── ★ 従来から通していた集合 (⚠️ 特徴量に入る) ──────────────────
         0x00..=0x09   // kVK_ANSI_A .. kVK_ANSI_V (letters)
         | 0x0B..=0x33 // kVK_ANSI_B .. kVK_Delete (letters, digits, symbols, Return, Tab, Space, Backspace)
         | 0x75        // kVK_ForwardDelete
+        // ── ★ 2026-08-23 に足した観測のみの集合 (⚠️ 特徴量には流れない) ──
+        // ⚠️ すべて `macos_vk_to_vk` に**明示写像がある**ものだけを入れる
+        //   (★ 素通しに落ちると英字・数字の VK に化けて特徴量を汚す)。
+        | 0x35        // kVK_Escape           → 0x1B
+        | 0x7B..=0x7E // kVK_LeftArrow..DownArrow → 0x25..0x28
+        // F1..F12 (⚠️ mac の keycode は連続していない)
+        | 0x7A | 0x78 | 0x63 | 0x76 | 0x60 | 0x61
+        | 0x62 | 0x64 | 0x65 | 0x6D | 0x67 | 0x6F
     )
 }
 
@@ -408,7 +434,7 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
     //   - F3（修正率）も長押し削除を1回としかカウントしない
     // これは「長押し = 意図的な一括削除 ≠ フラストレーション」という設計判断に基づく。
     // 連打（タップ連射）のみが Stuck シグナルとして検出される。
-    if !is_repeat && is_typing_key(mac_vk) {
+    if !is_repeat && is_observed_key(mac_vk) {
         if let Some(sender) = EVENT_SENDER.get() {
             // macOS: kVK_Delete(Backspace) = 0x33, kVK_ForwardDelete = 0x75
             // OS 固有キーコードからフラグを生成し、共通コアにはフラグのみ渡す。
@@ -913,6 +939,134 @@ pub fn start() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── ★★★ ゲート分割の macOS 側 (ADR-016 D8) ────────────────────────────
+    //
+    // ⚠️★★★ **これは Windows では 1 行も走らない** (`hook_macos.rs` は
+    //   `#[cfg(target_os = "macos")]` でしかコンパイルされない)。
+    //   ★ 対になる Windows 側は `hook_windows.rs` の
+    //   `numpad_is_observed_and_is_a_feature_key_on_windows` /
+    //   `observed_but_not_feature_keys_are_split_correctly` である。
+    //   → ★ **両 OS の CI がそれぞれ片側を守る**形になっている
+    //     (`docs/agent-shared.md`「OS ごとに規則が違うロジックは両 OS に対のテストを置く」)。
+
+    /// ★ 従来通していた集合は**すべて**通す (非回帰)。
+    #[test]
+    fn observed_key_covers_the_frozen_typing_set() {
+        for (mac_vk, why) in [
+            (0x00u64, "kVK_ANSI_A"),
+            (0x09, "kVK_ANSI_V (範囲上端)"),
+            (0x0B, "kVK_ANSI_B (範囲下端)"),
+            (0x33, "kVK_Delete (Backspace・範囲上端)"),
+            (0x75, "kVK_ForwardDelete"),
+        ] {
+            assert!(is_observed_key(mac_vk), "{why} は従来どおり観測する");
+        }
+        assert!(
+            !is_observed_key(0x0A),
+            "kVK_ISO_Section は従来どおり通さない"
+        );
+    }
+
+    /// ⚠️★★★ **観測はする / 特徴量には流さない**（★ ゲート分割の中身）。
+    ///
+    /// ★ `macos_vk_to_vk` の写像先まで見て、⚠️ **写像後の VK が
+    /// `is_feature_key` の外**であることを確かめる —— ここが本当の安全条件である。
+    #[test]
+    fn escape_arrows_and_function_keys_are_observed_but_never_features() {
+        use crate::analysis::key_gate::is_feature_key;
+        let cases: [(u64, &str); 17] = [
+            (0x35, "kVK_Escape"),
+            (0x7B, "kVK_LeftArrow"),
+            (0x7C, "kVK_RightArrow"),
+            (0x7D, "kVK_DownArrow"),
+            (0x7E, "kVK_UpArrow"),
+            (0x7A, "kVK_F1"),
+            (0x78, "kVK_F2"),
+            (0x63, "kVK_F3"),
+            (0x76, "kVK_F4"),
+            (0x60, "kVK_F5"),
+            (0x61, "kVK_F6"),
+            (0x62, "kVK_F7"),
+            (0x64, "kVK_F8"),
+            (0x65, "kVK_F9"),
+            (0x6D, "kVK_F10"),
+            (0x67, "kVK_F11"),
+            (0x6F, "kVK_F12"),
+        ];
+        for (mac_vk, why) in cases {
+            assert!(is_observed_key(mac_vk), "{why} は観測する");
+            let mapped = macos_vk_to_vk(mac_vk);
+            assert!(
+                !is_feature_key(mapped),
+                "{why} が {mapped:#04X} へ写り、特徴量に流れてしまう"
+            );
+        }
+    }
+
+    /// ⚠️★★★ **テンキーは macOS では観測しない**（★ Windows との非対称・意図的）。
+    ///
+    /// ## ★ なぜ入れられないのか（⚠️ 「忘れている」のではない）
+    ///
+    /// [`macos_vk_to_vk`] の既定は `other => other as u32` の**素通し**である。
+    /// ⚠️ mac のテンキーの keycode は **英字の Windows VK と正面衝突する**:
+    ///
+    /// | mac keycode | 素通しで得る値 | ⚠️ Windows での意味 |
+    /// |---|---|---|
+    /// | `kVK_ANSI_Keypad0` = 0x52 | 0x52 | **`VK_R`（英字 R）** |
+    /// | `kVK_ANSI_Keypad1` = 0x53 | 0x53 | **`VK_S`** |
+    /// | `kVK_ANSI_KeypadDecimal` = 0x41 | 0x41 | **`VK_A`** |
+    ///
+    /// → ★ 素通しのまま観測すると **`is_feature_key` の中に入り、特徴量が変わる**。
+    /// → ★ 明示写像を足して `0x60..=0x6F` にしても **やはり `is_feature_key` の中**である。
+    /// → ⚠️★★★ **どちらの道も `HMM_VERSION` bump になるので、入れない。**
+    ///
+    /// ⚠️ **同意文書 注 A の「テンキー」は Windows でのみ真**である（★ 研究者へ返す）。
+    #[test]
+    fn numpad_is_not_observed_on_macos() {
+        use crate::analysis::key_gate::is_feature_key;
+        for (mac_vk, why) in [
+            (0x52u64, "kVK_ANSI_Keypad0"),
+            (0x53, "kVK_ANSI_Keypad1"),
+            (0x5C, "kVK_ANSI_Keypad9"),
+            (0x41, "kVK_ANSI_KeypadDecimal"),
+            (0x4B, "kVK_ANSI_KeypadDivide"),
+        ] {
+            assert!(!is_observed_key(mac_vk), "{why} は macOS では観測しない");
+        }
+        // ⚠️★★★ **衝突が実在することを実行可能な形で残す** ——
+        //   ★ これが「入れない」理由そのものなので、素通しの写像が変わったら落ちてほしい。
+        assert_eq!(macos_vk_to_vk(0x52), 0x52, "素通しの既定が変わった");
+        assert!(
+            is_feature_key(macos_vk_to_vk(0x52)),
+            "⚠️ kVK_ANSI_Keypad0 を素通しで観測すると英字として特徴量に入る"
+        );
+    }
+
+    /// ⚠️★★★ **修飾キーは macOS では届かない**（★ tap の mask が `KeyDown`/`KeyUp` だけ）。
+    ///
+    /// ★ 届かないので観測集合にも入れない。⚠️ `FlagsChanged` を mask に足せば取れるが、
+    /// `handle_event` は送信の**前**に `LAST_KEY_MS` と IME 状態機械を触るので、
+    /// **特徴量経路（沈黙検出・starvation）に波及する**。→ ★ 本タスクでは足さない。
+    #[test]
+    fn modifiers_are_not_observed_on_macos() {
+        for (mac_vk, why) in [
+            (0x38u64, "kVK_Shift"),
+            (0x3B, "kVK_Control"),
+            (0x3A, "kVK_Option"),
+            (0x37, "kVK_Command"),
+            (0x39, "kVK_CapsLock"),
+        ] {
+            assert!(!is_observed_key(mac_vk), "{why} は macOS では観測しない");
+        }
+    }
+
+    /// ⚠️ IME モードキーは分析チャネルへ送らない (★ 従来どおり)。
+    #[test]
+    fn ime_mode_keys_are_not_observed() {
+        assert!(!is_observed_key(0x66), "kVK_JIS_Eisu");
+        assert!(!is_observed_key(0x68), "kVK_JIS_Kana");
+    }
 
     /// ★★ **回帰テストの本体。**
     ///

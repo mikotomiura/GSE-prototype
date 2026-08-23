@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import RecordingControls from "./RecordingControls";
 
 interface DiagnosticInfo {
   hook_active: string;
@@ -239,6 +240,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
           </div>
         </div>
       )}
+
+      {/* ⚠️★★★ O1: 被験者の 3 点セット (ADR-014 D7)。★ **判断 3 の根拠 3 がここに立っている。**
+          稼働中インジケータ / 即時の一時停止 / 事後の区間指定削除。 */}
+      <RecordingControls />
 
       {/* キーボードフック状態警告 (両プラットフォーム共通) */}
       {hookActive === false && (

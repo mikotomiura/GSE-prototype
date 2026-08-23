@@ -73,7 +73,17 @@ impl KeyCategory {
             0x0D => Self::Enter,
             // 矢印 (0x25-0x28) + PgUp/PgDown/End/Home (0x21-0x24) = 0x21..=0x28。
             0x21..=0x28 => Self::Navigation,
-            0x10 | 0x11 | 0x12 | 0x5B | 0x5C => Self::Modifier,
+            // ⚠️★★★ **`0xA0..=0xA5` を 2026-08-23 に足した** (O1 / ADR-016 D8 のゲート分割)。
+            //
+            // ★ `WH_KEYBOARD_LL` が返すのは **左右を区別した VK** (`VK_LSHIFT`=0xA0 /
+            //   `VK_RSHIFT`=0xA1 / `VK_LCONTROL`=0xA2 / `VK_RCONTROL`=0xA3 /
+            //   `VK_LMENU`=0xA4 / `VK_RMENU`=0xA5) であって、汎用の 0x10/0x11/0x12 ではない。
+            // ⚠️ 足さないと、観測ゲートを広げた瞬間に**修飾キーが `other` として記録され**、
+            //   ★ 「修飾キーの種類だけ記録する」という同意文書 注 A の説明と食い違う。
+            //
+            // ⚠️ **既存ログへの影響はゼロ** —— ★ 旧 `is_typing_key` はこれらを 1 つも通していないので、
+            //   既存の raw NDJSON に `0xA0..=0xA5` は現れない (⚠️ 匿名化の写像が変わる行が無い)。
+            0x10 | 0x11 | 0x12 | 0x5B | 0x5C | 0xA0..=0xA5 => Self::Modifier,
             0x1B => Self::Escape,
             0x70..=0x7B => Self::Function,
             _ => Self::Other,
