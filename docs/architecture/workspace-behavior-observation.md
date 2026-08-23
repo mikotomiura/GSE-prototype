@@ -262,6 +262,16 @@ R3 は数日〜数週間走るため成立する（ADR-014 D9）。
 > → ★ 「時間的に重ならない」は**制約 4 からは導けない**。⚠️ 本当の障害は §9.5 の 3 件である。
 >
 > ★ **7-a / 7-c の帰結は §9.4 / ADR-016 / §9.6 にある。**
+>
+> ⚠️★★★ **2026-08-24 追記 — 7-b の①（macOS 実機確認）が閉じ、macOS 側の実装（§2.1 の
+> `observe_macos.rs`）が完了した。** ★ `CGEventTap` の2プロセス同時稼働は実機で確認済み
+> （合成入力で計数が完全一致）。`keyboard_layout_id`/`secure_input_enabled`/
+> `NSWorkspace.didActivateApplicationNotification`（objc2 経由）/ 別 tap によるポインタ観測
+> をすべて実装し、実機で `pointer_bin`/`focus_transition`/`keyboard_layout` の出力を確認した
+> （`.steering/20260824-o1-macos-instrument/decisions.md`）。
+> ⚠️ **7-b の②（二重記録の同意）③（録画との重なり明示）は依然未承認のまま。**
+> ⚠️ **CGEventTapIsEnabled の「完全失効時の tap 再作成」は未実装**（即再有効化のみ実装。
+> 次セッション送り・同 decisions.md 判断4）。
 
 ### 9.3 ⚠️ 決めてはいけないこと（★ 先に固定する）
 

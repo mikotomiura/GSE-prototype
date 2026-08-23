@@ -41,6 +41,12 @@ pub static FOCUS_TX: OnceLock<Sender<u64>> = OnceLock::new();
 /// 1 秒ビンのポインタ活動を送る先（★ ゼロ抑制済み）。
 pub static POINTER_TX: OnceLock<Sender<PointerBin>> = OnceLock::new();
 
+/// `secure_input` の **区間フラグ**（on/off）を送る先。
+///
+/// ⚠️★★★ **`bool` 1 個しか流れない**（★ `FOCUS_TX` と同じ作法）。
+/// ★ 変化したときだけ送る（送出側が edge-detection する。ADR-014 D4 の段1）。
+pub static SECURE_INPUT_TX: OnceLock<Sender<bool>> = OnceLock::new();
+
 /// ⚠️ 送れずに捨てた観測の累計（★ フォーカス + ポインタの合計）。
 ///
 /// ★ `hook.rs::EVENTS_DROPPED` と同じ作法 —— コールバック内ではカウンタを上げるだけで、
@@ -71,16 +77,28 @@ mod imp {
     }
     pub const FOCUS_AVAILABLE: bool = false;
     pub const POINTER_AVAILABLE: bool = false;
+    pub const SECURE_INPUT_AVAILABLE: bool = false;
 }
+
+/// ⚠️ 二重に `start()` が呼ばれても `imp::start()` を 1 回しか実行しない
+/// （security-checker LOW-L2）。★ `imp::start()`（特に macOS 側）は observer/tap を
+/// 設置する副作用を持ち、二重設置すると同じ Atomic カウンタを 2 系統が加算して
+/// `pointer_bin`/`focus_transition` の値が水増しされる。
+static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// 観測を開始する。★ 送信端を先に登録してから呼ぶこと。
 ///
 /// ⚠️ 専用スレッドを起こして即座に返る（★ `init_hook` と同じ作法）。
-pub fn start(focus_tx: Sender<u64>, pointer_tx: Sender<PointerBin>) {
+pub fn start(focus_tx: Sender<u64>, pointer_tx: Sender<PointerBin>, secure_tx: Sender<bool>) {
     // ⚠️ 二重初期化しても壊れないように `OnceLock` の失敗は無視する
     //   (★ 2 回目の `start` は「既に動いている」が正しい振る舞い)。
     let _ = FOCUS_TX.set(focus_tx);
     let _ = POINTER_TX.set(pointer_tx);
+    let _ = SECURE_INPUT_TX.set(secure_tx);
+    if STARTED.swap(true, std::sync::atomic::Ordering::AcqRel) {
+        tracing::warn!("O1: observe::start() called more than once; ignoring the second call");
+        return;
+    }
     imp::start();
 }
 
@@ -119,4 +137,9 @@ pub const FOCUS_AVAILABLE: bool = imp::FOCUS_AVAILABLE;
 pub const POINTER_AVAILABLE: bool = imp::POINTER_AVAILABLE;
 
 /// このビルドで **`secure_input` の計器があるか**（★ macOS のみ真になりうる）。
-pub const SECURE_INPUT_AVAILABLE: bool = cfg!(target_os = "macos");
+///
+/// ⚠️★★★ **`imp::` 経由**にする（`cfg!(target_os = "macos")` の直書きをやめた・
+/// security-checker/code-reviewer MEDIUM-4）。★ `FOCUS_AVAILABLE`/`POINTER_AVAILABLE` と
+/// 同じ「宣言は `observe` 側の実装有無と 1 対 1」というルールに揃える —— 直書きのままだと
+/// 将来 macOS 実装を消しても宣言だけ `true` に残り、過大申告になる。
+pub const SECURE_INPUT_AVAILABLE: bool = imp::SECURE_INPUT_AVAILABLE;

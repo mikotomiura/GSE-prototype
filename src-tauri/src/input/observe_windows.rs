@@ -35,6 +35,8 @@ use super::{FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX};
 /// ★ Windows では両方とも実装がある（ADR-013 D1 の自己刻印に使う）。
 pub const FOCUS_AVAILABLE: bool = true;
 pub const POINTER_AVAILABLE: bool = true;
+/// ⚠️ Windows に `EnableSecureEventInput` に相当するものは無い。
+pub const SECURE_INPUT_AVAILABLE: bool = false;
 
 /// `EVENT_SYSTEM_FOREGROUND`。
 ///
@@ -432,6 +434,21 @@ pub fn secure_input_enabled() -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ⚠️★★★ **Windows では `secure_input_enabled` が常に `None` を返す**（★ macOS 対テスト）。
+    ///
+    /// ★ macOS 側の対: `observe_macos.rs::secure_input_enabled_returns_some_on_macos`
+    /// （code-reviewer LOW 指摘・`docs/agent-shared.md`「OS ごとに規則が違うロジックは
+    /// 両 OS に対のテストを置く」）。⚠️ `None` は「計器が無い」であって「secure ではない」
+    /// ではない (ADR-013 D1) —— `Some(false)` を返すようになったら過大申告になる。
+    #[test]
+    fn secure_input_enabled_always_none_on_windows() {
+        assert_eq!(
+            secure_input_enabled(),
+            None,
+            "Windows には EnableSecureEventInput 相当の計器が無い"
+        );
+    }
 
     /// ⚠️★★★ **押下マスクに離上が 1 ビットも入っていない**こと。
     ///

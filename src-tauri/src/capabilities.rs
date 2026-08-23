@@ -207,8 +207,10 @@ pub fn config_gated() -> Vec<&'static str> {
     if crate::input::observe::POINTER_AVAILABLE {
         v.push("pointer_bin");
     }
-    // ⚠️★★★ `secure_input` は **宣言しない** —— ★ macOS 実装がスタブで送出元が無い。
-    //   ★ 実装したら `crate::input::observe::SECURE_INPUT_AVAILABLE` を見て push すること。
+    // ⚠️★★★ 2026-08-24: macOS 側の送出元を実装したので `SECURE_INPUT_AVAILABLE` を見て push する。
+    if crate::input::observe::SECURE_INPUT_AVAILABLE {
+        v.push("secure_input");
+    }
 
     v.sort_unstable();
     v
@@ -394,19 +396,15 @@ mod tests {
     /// ⚠️ 右辺の最後の集合を `#[cfg]` で書き下すので、**OS ごとの過大/過小申告が両方向で落ちる**。
     #[test]
     fn declaration_partitions_known_line_types() {
-        // ⚠️★★★ `secure_input` は **両 OS で送出元が無い** (macOS 実装がスタブ・2026-08-23)。
-        //   ★ 実装したら**この行から外す**こと (⚠️ 外し忘れると過小申告のまま気付けない)。
+        // ⚠️★★★ `secure_input` は **Windows には送出元が無い** (Windows に
+        //   `EnableSecureEventInput` 相当の API が存在しない・`observe_windows.rs` は常に `None`)。
         #[cfg(target_os = "windows")]
         let emitterless: &[&str] = &["secure_input"];
         // ⚠️ macOS には `emit_ime_shadow` (Windows 限定) が無い。`ime_macos.rs` は `ImeState` だけを送る。
-        //   ⚠️★★★ O1 の非打鍵チャネルも macOS では**未実装**である (`observe_macos.rs` はスタブ)。
+        //   ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
+        //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &[
-            "ime_shadow",
-            "secure_input",
-            "focus_transition",
-            "pointer_bin",
-        ];
+        let emitterless: &[&str] = &["ime_shadow"];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
