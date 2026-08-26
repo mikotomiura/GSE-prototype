@@ -127,6 +127,8 @@ gh run rerun 32982437780     # 14:47 に success で完走した run
 ★ 18:01:30Z 時点で `githubstatus.com` incidents API は `"incidents": []`、Actions コンポーネントは `operational` — ★ **インシデント解消を確認**（開始 15:11:58Z → 解消 18:01:30Z より前、実測 ~2h50min）。
 → ★ 手動再実行 (`gh run rerun`) は行わなかった（「緑の記録を壊しうる」教訓 #3 を踏まえ、自然発火の run が既に success だったため不要と判断）。
 
+| 5 | 2026-08-26T18:25:54Z | `decide-win-runner` self-hosted 化 (`adbf178`) push（**自然発火の `pull_request`**） | 1 件 (`32999649870`) | ✅ **success**（18:32:41Z 完走）。`decide-win-runner` は `gse-mac`(`macbook-air-m-arm64`)上で 2 秒で `gse-win` online を検知し正しく self-hosted へ解決。`check(win)`=`g-gear-win-x64` success / `check(mac)`=`macbook-air-m-arm64` success。★ **self-hosted 化の実 run 検証完了** |
+
 ---
 
 ## ✅★★★ 決着（2026-08-27）— **GitHub Actions の major outage だった**
@@ -191,6 +193,6 @@ active incidents: 1  — "Incident with Actions" (investigating)
 - [x] ⚠️ **原因が特定されたこと** → ✅ **GitHub Actions の major outage**（2026-08-27・`githubstatus.com`）
 - [x] ★ **障害の復旧後、イベント起因の run が作られること**を 1 回以上確認する → ✅ 観測台帳 #4
 - [x] ★ PR #119 を緑にしてマージする → ✅ 観測台帳 #4 の自然発火 run が success（`gh run rerun` 不要と判断）。マージは本節末尾で実施
-- [ ] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと
-- [ ] ⚠️ **`decide-win-runner` の self-hosted 化** —— ★ **障害の復旧後に、他の残作業とまとめて扱う**
-      （★ 研究者決定・2026-08-27。⚠️ **いま単独では起票しない** = 新しい `.steering/` ディレクトリは作らず、本ディレクトリ内で `design.md`/`tasklist.md` を追加して実施する）
+- [ ] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと（PR #119 の main マージ後に確認）
+- [x] ⚠️ **`decide-win-runner` の self-hosted 化** —— ✅ **実施・実 run 検証済み**（観測台帳 #5、`adbf178`）。
+      design.md / tasklist.md 参照。code-reviewer + security-checker + `/cross-review` 済み

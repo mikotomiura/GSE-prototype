@@ -10,8 +10,8 @@
 - [x] 変更理由・新しいトレードオフをコメントで明記する
 
 ## テスト
-- [ ] 本ブランチへ push し、実 run で `decide-win-runner` が `gse-mac` 上で解決されることを確認
-- [ ] `check(win)` / `check(mac)` が従来どおり success することを確認
+- [x] 本ブランチへ push し、実 run で `decide-win-runner` が `gse-mac` 上で解決されることを確認 → run 32999649870, `macbook-air-m-arm64` 上で success、2秒で gse-win online 検知
+- [x] `check(win)` / `check(mac)` が従来どおり success することを確認 → win: `g-gear-win-x64` success / mac: `macbook-air-m-arm64` success
 
 ## レビュー
 - [x] code-reviewer によるレビュー → HIGH 2件・MEDIUM 2件を反映済み（design.md 参照）
