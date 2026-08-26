@@ -51,5 +51,8 @@
   - [x] 宣言 → ローテート → 新ファイルに宣言 (logger 統合テスト) ＋ `gse-replay` 受理
   - [ ] ⚠️ **`key` 行**: 本機ではフックが注入入力を受け取らないため**未確認**
   - [ ] ⚠️ **一時停止 → 「停止中（記録していません）」**: UI 操作が要るため未確認 (純関数テストで固定)
-- [ ] V-8 `code-reviewer` + `security-checker` 並列 → `/cross-review`
+- [x] V-8 `code-reviewer` + `security-checker` 並列 → `/cross-review` (Codex)
+  - [x] 並列レビュー: HIGH/MEDIUM 10 件を修正、9 件を研究者へ返す (`decisions.md`)
+  - [x] `/cross-review`: Codex が 3 件を追加で指摘 → すべて修正 (`decisions.md` X-1〜X-3)
+  - [x] ⚠️ secrets-filter は `--ack-filtered` で迂回せず、**フィクスチャ名を架空形式へ寄せて**通した
 - [ ] V-9 CI の状態を確認 (⚠️ **未実行なら「緑」と書かない**)

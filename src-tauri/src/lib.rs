@@ -1274,16 +1274,49 @@ fn delete_time_range(
     //   失うものは停止前の分だけであり、**再開すれば次の削除で必ず届く**。
     //   ⚠️ 画面は `files_skipped` をそのまま出すので、黙って取りこぼすことはない。
     if crate::o1::is_o1() && !crate::recording::is_paused() {
-        if let Err(e) = o1_rotate(
+        // ⚠️★★★ **ローテートの *完了* を待つ** (cross-review / Codex MEDIUM・2026-08-27)。
+        //
+        // ★ `o1_rotate` は `LogEntry::Rotate` を**チャネルに積むだけ**で、実際に
+        //   `session_end` を書いて新しいファイルを開くのは**ロガースレッド**である。
+        //   → ⚠️ 待たずに `current_path()` を読むと、**まだ旧ファイルを指している**ので
+        //   ★ **閉じたはずのファイルを `skip` に渡してしまい、消したかった当のものが残る**。
+        //   ⚠️ さらに悪いことに、ロガーが旧ファイルの fd へ書いている最中に
+        //   `redact_file` が置き換えると **消したはずの行が復活する**。
+        //
+        // ★ 待ち方: `logger` は `Rotate` の処理で
+        //   `write_meta_end` → flush → 新ファイルを開く → `write_meta_start` → flush →
+        //   **最後に `target.path` を更新する**。→ ★ **パスが変わったことが「完了」の証拠**である。
+        let before = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
+        match o1_rotate(
             &log,
             &engine,
             &reset_signal,
             O1Declaration::KeepCurrent,
             "before redaction",
         ) {
-            tracing::warn!(
-                "O1: could not close the current log before redaction ({e});                  the newest file will be skipped"
-            );
+            Ok(()) => {
+                // ⚠️ 無限には待たない。★ 待てなかったら `files_skipped` に出るだけで、
+                //   **黙って旧ファイルを壊しに行くことはない** (安全側)。
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                loop {
+                    let now_path = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
+                    if now_path != before {
+                        break;
+                    }
+                    if std::time::Instant::now() >= deadline {
+                        tracing::warn!(
+                            "O1: the rotation before redaction did not complete in time;                              the newest file will be skipped"
+                        );
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(20));
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "O1: could not close the current log before redaction ({e});                      the newest file will be skipped"
+                );
+            }
         }
     }
 
@@ -2152,6 +2185,18 @@ fn record_session_meta(
     log: State<'_, Arc<Mutex<LogState>>>,
     engine: State<'_, CognitiveStateEngine>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では受け付けない** (cross-review / Codex HIGH・2026-08-27)。
+    //
+    // ★ O1 の宣言経路は `declare_task_kind` **1 本だけ**である。こちらを通されると:
+    //   1. ⚠️ `intervention_enabled` を引数で受けるので **判断 O1-5 (介入を出さない) が破れる**
+    //   2. ⚠️ **ローテートしないまま** `session_meta` を積むので、宣言を変えると
+    //      1 ファイルに相異なる `task_kind` が 2 つ入り **`gse-replay` が `Err`** になる
+    //   3. ⚠️ 未宣言を「行の不在」で表す判断 4b-3 が壊れる
+    if crate::o1::is_o1() {
+        tracing::warn!("O1: record_session_meta rejected (use declare_task_kind instead)");
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
         TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
@@ -2463,6 +2508,22 @@ fn start_session(
     intervention: State<InterventionState>,
     log: State<Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では「開始する」を受け付けない** (cross-review / Codex HIGH・2026-08-27)。
+    //
+    // ★ UI 側では判定が済むまでスタート画面を出さない (fail-closed) が、
+    //   ⚠️ **IPC は残っている**ので、将来の UI 変更や直接呼び出しで到達しうる。
+    //   → ★ `submit_latest_session` と同じく **両方で塞ぐ**。
+    //
+    // ⚠️★★★ 到達したときの帰結が重い: `SESSION_START_MS` が立つが、
+    //   **O1 にはブロック自動終了スレッドが無い** (`if g1_mode().is_some()` の中でしか起きない)
+    //   ので **0 に戻す経路が存在しない**。→ `spawn_reconcile_with_guard` が
+    //   「ブロック中なので走らせない」で **プロセスの寿命いっぱい skip し続け、
+    //   自動提出が黙って止まる**。
+    if crate::o1::is_o1() {
+        tracing::warn!("O1: start_session rejected (recording is always on in O1 mode)");
+        return Err("この記録は常に動いています。開始の操作は要りません。".to_string());
+    }
+
     // ★★ G1: 参加者 ID が無いまま**ブロックを始めさせない** (`requirement.md` 受け入れ条件 1)。
     //
     // ⚠️ ★ **何も触る前に**返す。ここから先はログのローテートまで進むので、途中で止めると

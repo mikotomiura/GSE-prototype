@@ -275,6 +275,18 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
     use std::io::BufRead;
     let f = std::fs::File::open(path).ok()?;
     let mut session_end: Option<u64> = None;
+    // ⚠️★★★ **`session_start` 行を 1 本でも持つファイルは O1 ではない**
+    //   (cross-review / Codex HIGH・2026-08-27)。
+    //
+    // ★ Codex の指摘: O1 の識別が**ファイル名だけ**だと、⚠️ セッション置き場は
+    //   **被験者が書き込めるフォルダ**なので、Phase1 の記録を `gse_o1_*` にリネームすると
+    //   **承認なしで自動送信される**。
+    // → ★ **構造的な弁別子を足す**: O1 は `start_session` を通らない
+    //   (`lib.rs` が O1 で拒否する) ので **`{"type":"session_start"}` 行が 1 本も出ない**。
+    //   ⚠️ 対して Phase1 / G1 の「中身のある」ファイルは**必ず 1 本以上持つ**
+    //   (★ 押下しないと打鍵が記録されないので、押下の痕跡なしにデータ行は存在しえない)。
+    //   ★ schema を 1 バイトも変えずに効く (⚠️ 完全ではない —— `decisions.md` R-1 参照)。
+    let mut has_session_start = false;
     for line in std::io::BufReader::new(f).lines() {
         // ⚠️★★★ **1 行の読み取り失敗で関数ごと諦めない** (code-reviewer MEDIUM・2026-08-27)。
         //   ★ 以前は `line.ok()?` で、**UTF-8 として不正な 1 行があるだけで `None`** を返した。
@@ -284,6 +296,9 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
             Ok(l) => l,
             Err(_) => continue,
         };
+        if line.contains(r#""type":"session_start""#) {
+            has_session_start = true;
+        }
         if !line.contains(r#""type":"meta""#) {
             continue;
         }
@@ -296,6 +311,16 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
         if let Some(v) = parse_meta_u64(&line, "session_end") {
             session_end = Some(v);
         }
+    }
+    if has_session_start {
+        // ⚠️★★★ **押下の痕跡があるファイルは O1 ではない。** ★ 名前だけを頼りにしない
+        //   (★ セッション置き場は被験者が書き込めるフォルダである)。
+        tracing::warn!(
+            "reconcile: {:?} is named like an O1 session but carries session_start rows; \
+             refusing to submit it as O1",
+            path.file_name()
+        );
+        return None;
     }
     session_end
 }
@@ -1400,6 +1425,38 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&d);
         let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ **名前だけを頼りにしない** —— リネームした Phase1 の記録を O1 として送らない
+    /// (cross-review / Codex HIGH・2026-08-27)。
+    ///
+    /// ★ セッション置き場は**被験者が書き込めるフォルダ**なので、`gse_o1_*` へのリネームは
+    /// 事故でも故意でも起こりうる。⚠️ 通すと **承認を経ていない別研究の記録が自動送信される**。
+    /// → ★ O1 は `start_session` を通らないので **`session_start` 行を 1 本も持たない**。
+    #[test]
+    fn a_renamed_phase1_session_is_not_submitted_as_o1() {
+        let d = tmpdir("o1renamed");
+        // ⚠️ Phase1 相当 (`g1_mode` は無いが `session_start` 行を持つ) を O1 の名前で置く
+        std::fs::write(
+            d.join("gse_o1_00000000_101112.ndjson"),
+            "{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\"}\n\
+             {\"type\":\"session_start\",\"t\":1000}\n\
+             {\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n\
+             {\"type\":\"meta\",\"session_end\":9000}\n",
+        )
+        .unwrap();
+        assert!(
+            closed_o1_sessions(&d, u64::MAX / 2, GRACE).is_empty(),
+            "⚠️★★★ リネームだけで O1 の自動提出に載せられてはならない"
+        );
+
+        // ★ 対照: 本物の O1 (押下の痕跡が無い) は拾われる
+        write_closed_o1(&d, "gse_o1_00000000_202020.ndjson", 9000);
+        let found = closed_o1_sessions(&d, u64::MAX / 2, GRACE);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].to_string_lossy().contains("202020"));
+
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// ⚠️★ **UTF-8 として不正な 1 行があっても、そのファイルを黙って捨てない。**
