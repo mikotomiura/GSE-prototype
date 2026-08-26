@@ -118,6 +118,18 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
     // ★ 初期値を決め打ちにしない。⚠️ `false, false` と書くと、setup の順序が変わったときに
     //   **最大 1 秒間だけ嘘を表示する**（2026-08-08 の cross-review）。実際の値から始める。
     let initial = current_state(&session_active);
+    // ⚠️★★ **初期状態もログに残す** (2026-08-27)。★ 更新スレッドは**変化したときだけ**
+    //   書くので、初期値のまま動き続けたセッションは `gse-app.log` から
+    //   「トレイに何が出ていたか」を**事後に確認できなかった**。
+    //   ★ O1 は「記録しているのに『記録していません』と出ていないか」を後から検証する
+    //   必要がある (同意文書 §4 の逐語) ので、1 行だけ残す。
+    tracing::info!(
+        o1_mode = ?crate::o1::mode(),
+        paused = crate::recording::is_paused(),
+        "tray state (initial) -> {:?} ({})",
+        initial,
+        measure_label(initial)
+    );
 
     // ★ 状態表示は**押せない項目**にする（押しても何も起きないのに押させない）。
     let status = MenuItem::with_id(

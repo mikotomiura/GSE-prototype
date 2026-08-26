@@ -2931,6 +2931,105 @@ mod tests {
         assert_eq!(distinct.len(), 14, "representative vks collided: {seen:?}");
     }
 
+    /// ⚠️★★★ **O1 の宣言変更 1 回が、replay できる形の 2 本に割れる** (ADR-016 判断 4b-1 / 4b-3)。
+    ///
+    /// ★ `lib.rs::o1_rotate` が送る順序 (**`Rotate` → `SessionMeta`**) をそのまま再現し、
+    /// 次の 3 つを固定する:
+    ///
+    /// 1. ⚠️ **未宣言の区間には `session_meta` 行が 1 本も無い** (判断 4b-3: 行の*不在*で表す)
+    /// 2. ★ **宣言は新しいファイルの側に入る** —— ⚠️ 逆順に送ると宣言が旧ファイルへ落ち、
+    ///    「大半がその宣言ではないファイル」と「宣言の無いファイル」ができて意味が反転する
+    /// 3. ⚠️★★★ **どちらのファイルにも相異なる `task_kind` が 2 つ入らない**
+    ///    (★ 入ると `gse-replay` が `Err` で落ちる —— ローテートが要る理由そのもの)
+    #[test]
+    fn o1_declaration_puts_the_meta_in_the_new_file_and_leaves_the_old_one_undeclared() {
+        let p1 = rot_test_path("o1decl", 1);
+        let p2 = rot_test_path("o1decl", 2);
+        let (logger, tx, shutdown_rx, status) = SessionLogger::start(p1.clone(), None);
+        assert_eq!(status, LogStatus::Ok);
+
+        // ── 未宣言の区間 (★ O1 は `session_start` を積まない: 押下が無い) ──
+        tx.send(LogEntry::Key {
+            vk_code: 65,
+            timestamp: 1100,
+            is_press: true,
+        })
+        .unwrap();
+
+        // ── 宣言 1 回 = `o1_rotate` と同じ順序で 2 通 ──
+        thread::sleep(Duration::from_millis(5));
+        tx.send(LogEntry::Rotate {
+            new_path: p2.clone(),
+        })
+        .unwrap();
+        tx.send(LogEntry::SessionMeta {
+            timestamp: 2000,
+            track: Track::Main,
+            task_kind: TaskKind::VibeCoding,
+            // ⚠️★ O1 では常に false (判断 O1-5)。
+            intervention_enabled: false,
+            condition: None,
+            label_pool: None,
+            head_id: TaskDomain::from(TaskKind::VibeCoding).head_id(),
+        })
+        .unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 66,
+            timestamp: 2100,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c1 = fs::read_to_string(&p1).expect("file 1");
+        let c2 = fs::read_to_string(&p2).expect("file 2");
+
+        // ① 未宣言の区間は `session_meta` を 1 行も持たない
+        assert_eq!(
+            c1.matches(r#""type":"session_meta""#).count(),
+            0,
+            "⚠️ 未宣言の区間に宣言が書かれている (判断 4b-3 の破れ):\n{c1}"
+        );
+        // ★ それでも「いつ・どの版で取ったか」は残る (ADR-013 D1)
+        assert_eq!(c1.matches(r#""type":"meta","session_start""#).count(), 1);
+        assert_eq!(c1.matches(r#""type":"meta","session_end""#).count(), 1);
+
+        // ② 宣言は**新しい**ファイルに 1 本だけ入る
+        assert_eq!(
+            c2.matches(r#""type":"session_meta""#).count(),
+            1,
+            "⚠️ 宣言が新しいファイルに入っていない:\n{c2}"
+        );
+        assert!(c2.contains(r#""task_kind":"vibe_coding""#), "{c2}");
+        assert!(c2.contains(r#""head_id":"coding_v0""#), "{c2}");
+        assert!(
+            c2.contains(r#""intervention_enabled":false"#),
+            "⚠️ O1 で介入が有効のまま記録されている (判断 O1-5):\n{c2}"
+        );
+
+        // ③ ⚠️★★★ どちらのファイルにも `task_kind` は高々 1 種類
+        //    (★ 2 種類あると `gse-replay` が Err で落ちる = ローテートが要る理由)
+        for (name, c) in [("file1", &c1), ("file2", &c2)] {
+            let kinds: std::collections::BTreeSet<&str> =
+                ["argumentative", "correspondence", "creative", "vibe_coding"]
+                    .into_iter()
+                    .filter(|k| c.contains(&format!(r#""task_kind":"{k}""#)))
+                    .collect();
+            assert!(
+                kinds.len() <= 1,
+                "⚠️ {name} に相異なる task_kind が {} 種類ある: {kinds:?}",
+                kinds.len()
+            );
+        }
+
+        drop(logger);
+        let _ = fs::remove_file(&p1);
+        let _ = fs::remove_file(&p2);
+    }
+
     /// ★★ 本タスクの核心の回帰: `Rotate` で **2 本のファイルに分かれ**、
     /// **それぞれが自分の `meta`(session_start) と `session_end` を 1 行ずつ持つ**。
     ///

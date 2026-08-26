@@ -1678,6 +1678,9 @@ fn spawn_reconcile_with_guard(
     //   ★ **無表示の窓**ができる (今回潰そうとしている沈黙そのもの)。
     //   `approve_pending_submissions` はこの関数を呼んでから返るので、
     //   ★ フロントが押下直後に読む状態には既に `sending: true` が乗っている。
+    // ⚠️★ **ラベルをモードに合わせる** (2026-08-27)。★ O1 でもこの経路を使うようになったので、
+    //   「G1 auto-submit」と固定で書くと ⚠️ **ログを読む人がモードを取り違える**。
+    let mode_label = if crate::o1::is_o1() { "O1" } else { "G1" };
     thread::spawn(move || {
         // ★ スレッドが終わるとき (下の early return も含め) に必ず戻す。
         let _in_flight = in_flight;
@@ -1687,7 +1690,8 @@ fn spawn_reconcile_with_guard(
         //   ★ 見送っても損失にならない (次のブロック終了で必ず拾われる)。
         if SESSION_START_MS.load(Ordering::Acquire) != 0 {
             tracing::info!(
-                "G1 auto-submit ({}): skipped (a block is running; will run at block end)",
+                "{} auto-submit ({}): skipped (a block is running; will run at block end)",
+                mode_label,
                 reason
             );
             return;
@@ -1696,20 +1700,21 @@ fn spawn_reconcile_with_guard(
         let mut slot = SUBMIT_LAST_ERROR.lock().unwrap_or_else(|p| p.into_inner());
         match outcome {
             Ok(Some(summary)) => {
-                tracing::info!("G1 auto-submit ({}): {}", reason, summary);
+                tracing::info!("{} auto-submit ({}): {}", mode_label, reason, summary);
                 *slot = None;
             }
             Ok(None) => {
                 // ★ 何もしなかった (ID 未登録)。⚠️ **失敗ではないので画面に出さない。**
                 //   ⚠️ ★ 直前の失敗を **消しもしない** (成功していないため)。
                 tracing::info!(
-                    "G1 auto-submit ({}): skipped (participant id not registered yet)",
+                    "{} auto-submit ({}): skipped (participant id not registered yet)",
+                    mode_label,
                     reason
                 );
             }
             Err(e) => {
                 // ⚠️ ログだけにしない。★ 画面へ出すために保持する。
-                tracing::error!("G1 auto-submit ({}) FAILED: {}", reason, e);
+                tracing::error!("{} auto-submit ({}) FAILED: {}", mode_label, reason, e);
                 *slot = Some(e);
             }
         }
