@@ -55,4 +55,10 @@
   - [x] 並列レビュー: HIGH/MEDIUM 10 件を修正、9 件を研究者へ返す (`decisions.md`)
   - [x] `/cross-review`: Codex が 3 件を追加で指摘 → すべて修正 (`decisions.md` X-1〜X-3)
   - [x] ⚠️ secrets-filter は `--ack-filtered` で迂回せず、**フィクスチャ名を架空形式へ寄せて**通した
-- [ ] V-9 CI の状態を確認 (⚠️ **未実行なら「緑」と書かない**)
+- [x] V-9 CI の状態を確認: ⚠️★★★ **未実行** (★ ブランチを push していないため run が 0 件)
+  - ★ GitHub Actions **自体は operational** (2026-08-26 18:01Z にインシデント解消・
+    self-hosted ランナー `g-gear-win-x64` / `macbook-air-m-arm64` とも online)
+  - ★ ⚠️ **PR #119 は既に main へマージ済み** (`decide-win-runner` の self-hosted 化 ＋
+    `/finish-task` Step 5)。→ 本ブランチは **origin/main より後ろ**なので rebase が要る
+  - ⚠️ **「CI 緑」とは書かない。** ローカルで 552 テスト / ゴールデン 6 本 /
+    schema drift / clippy / fmt / npm build を確認したのみ
