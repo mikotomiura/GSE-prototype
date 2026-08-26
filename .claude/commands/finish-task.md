@@ -1,11 +1,12 @@
 ---
 description: >
   タスクの完了処理を行う。steering 最終化・テスト実行・コミット提案までを実行する。
+  Step 5 で main へマージした場合の CI 発火確認を行う (2026-08-27 の取りこぼし事象への対処)。
   Step 3 で schema parity check (tier-3 workflow guard) が走り、
   src-tauri/src/schema_dto.rs または src-tauri/schema/current.json に変更がある場合は
   gse-dataset 側との JSON 意味同値を検証する。drift 検出時は Step 4 に進まず停止する。
   /add-feature, /fix-bug, /refactor の完了後に必ず実行する。
-allowed-tools: Read, Write, Edit, Bash(git *), Bash(python scripts/check_schema_parity.py*), Bash(python3 scripts/check_schema_parity.py*), Task
+allowed-tools: Read, Write, Edit, Bash(git *), Bash(gh api*), Bash(gh run*), Bash(python scripts/check_schema_parity.py*), Bash(python3 scripts/check_schema_parity.py*), Task
 ---
 
 # /finish-task
@@ -125,7 +126,43 @@ type: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
 
 ---
 
-## Step 5: 完了通知
+## Step 5: ⚠️★★★ main へマージした場合の **CI 発火確認**
+
+> ★ **本タスクで PR を main へマージした場合だけ実行する**（★ コミットしただけなら不要）。
+> ⚠️ 出所: 2026-08-27 に **マージしたのに `main` の workflow run が 1 件も作られない**事象が起きた
+> （`.steering/20260827-main-ci-push-event-missing/`）。★ ref は更新され、PR 側の CI は緑だったが、
+> ⚠️ **`PushEvent` が配信されず Actions のトリガが発火しなかった**。
+> → ★★★ **CI が回らないまま main が進むのに、誰も気づかない**という失敗様式である。
+
+```bash
+# ⚠️ マージ直後は run の作成に数十秒かかる。1 度 0 件でも、30 秒待って再実行してから判断する。
+git fetch -q origin main
+head="$(git rev-parse origin/main)"
+short="$(git rev-parse --short origin/main)"
+runs="$(gh api "repos/{owner}/{repo}/actions/runs?head_sha=$head" --jq '.total_count' 2>/dev/null)"
+if [ "${runs:-0}" -eq 0 ]; then
+  echo "[finish-task] WARN: main ($short) に対する workflow run が 0 件 — CI が発火していない"
+else
+  echo "[finish-task] OK: main ($short) の run = ${runs} 件"
+fi
+```
+
+| 結果 | ★ やること |
+|---|---|
+| run ≥ 1 | ★ そのまま Step 6 へ |
+| ⚠️ **run = 0**（30 秒後も） | ★ **完了報告に明記する**。⚠️ **「CI は緑」と書かない** —— ★ 代わりに **PR 側の run と `main` の tree ハッシュが一致するか**を確認し、一致するなら「同一 tree で検証済み」と書く。⚠️ 一致しないなら **main は未検証である** |
+
+```bash
+# ★ tree 一致の確認（run が 0 件だったときだけ）
+git rev-parse origin/main^{tree} <PR ブランチ head>^{tree}
+```
+
+⚠️★★★ **2 回以上続けて run = 0 になったら、一過性ではない。**
+★ `.steering/20260827-main-ci-push-event-missing/` に日時と sha を追記し、原因調査へ回すこと。
+
+---
+
+## Step 6: 完了通知
 
 ```
 完了しました。
@@ -139,6 +176,7 @@ type: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
 - **codex review (`/cross-review`) を省略しない**。安全ゲート (proprietary/機密/予算/jq・codex 不在) で
   ブロックされた場合のみ Claude 単独へ縮退し、**理由を完了報告に明記**する
 - **Step 3 の schema parity check が失敗した状態で Step 4 に進まない**
+- ⚠️★★★ **main へマージしたなら Step 5 の CI 発火確認を省略しない**。★ run = 0 のまま「CI は緑」と報告しない
   (helper の出力に従って修復 → 再度 /finish-task を実走する)
 - ユーザー承認なしで commit しない
 - steering の記録を省略しない

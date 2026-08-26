@@ -64,7 +64,46 @@ jobs:
   decide-win-runner:
     # ★ `check` と同じ条件にする (ここが skip されると `check` も skip されるため)。
     if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
+    # ⚠️★★★ 2026-08-15 時点は `ubuntu-latest` (hosted) だったが、2026-08-26 の GitHub Actions
+    #   major outage (githubstatus.com, 15:11-18:01Z) で判明した実測 (`.steering/
+    #   20260827-main-ci-push-event-missing/requirement.md` 観測3・「決着」節): 障害中、
+    #   hosted 2 ジョブは 15 分キューで `runner_name` 空のまま `cancelled`（hosted 側の
+    #   割り当てが機能していない）だった一方、**self-hosted 2 台 (gse-win/gse-mac) は
+    #   `online, busy=false` のまま無事**だった。つまり self-hosted 実機は動ける状態なのに、
+    #   判定役の本ジョブが hosted のせいで割り当てられず、`check` (needs: decide-win-runner)
+    #   ごと道連れでブロックされていた。→ 本ジョブを self-hosted (`gse-mac`) へ移す。
+    # ⚠️ 本変更が効く範囲は限定的だと明記する: 障害中は run 自体は作られたが job 割り当てが
+    #   死ぬケース (上記) と、**run 自体が空 (job が 1 件も作られない) ケース**の両方が
+    #   観測された (後者の実例: run 32985752839, 15:39Z 作成、jobs 0 件)。後者は
+    #   Actions のジョブ生成そのものが止まっているため、runs-on をどこに向けても救えない。
+    #   本変更が救うのは前者 (job は生成されるが hosted 割り当てだけ死ぬ) のみ。
+    # ★ `gse-win` ではなく `gse-mac` を選ぶ: 本ジョブは `gse-win` の online/offline を
+    #   probe する役目なので、`gse-win` 自身の上で実行すると `gse-win` が offline のときに
+    #   probe ジョブ自体が self-hosted のキュー滞留 (L46-50 参照、timeout-minutes は
+    #   キュー待ちに効かず 24-48h 後にしかキャンセルされない) に巻き込まれ判定不能になる。
+    #   `gse-mac` は下記 `check` ジョブの mac 側 `runs-on` が既に fallback 無しで無条件に
+    #   ジョブを出す前提の機体であり、新しい信頼を増やすものではない。
+    #   ⚠️ ただしその前提には条件が付く: `.idea/20260801-self-hosted-runner-setup.md:70-71`
+    #   に「Mac の電源とネットワークが前提。スリープ中はジョブがキューに溜まる」と明記あり
+    #   (蓋を閉じれば止まる。`caffeinate` か「電源接続時スリープ無効」設定が要る)。
+    #   gse-win の「たまにシャットダウンしている」と対比して「mac は無条件に安全」とまでは
+    #   言えない — 運用前提 (常時電源・スリープ無効) が守られている場合に限る。
+    # ⚠️ トレードオフ 1: `gse-mac` が offline/スリープだと本ジョブごとキューに滞留し、
+    #   `check(win)` / `check(mac)` の**両方**がブロックされる (`needs:` で連鎖するため)。
+    #   従来は `gse-mac` offline の影響は `check(mac)` のみだった。この広がりは許容する
+    #   (mac の運用前提が守られていれば稀であり、hosted outage の方が発生時の影響が
+    #   大きく気づきにくいため)。
+    # ⚠️ トレードオフ 2 (security-checker / code-reviewer 指摘, 2026-08-26): `gse-mac` の
+    #   runner スロットは実機 1 台 (1 同時実行) しかなく、`check(mac-selfhosted)` (最大30分)
+    #   / `build-macos` (最大40分) と**同じスロットを奪い合う**。別ブランチの run が並走中だと、
+    #   本ジョブは offline でなくても busy でキューに並び、最大その分だけ開始が遅れる
+    #   (ただし check/build 側に timeout-minutes があるため上限は有限で、offline/スリープ時の
+    #   24-48h 滞留とは性質が異なる)。従来 win レグの起動は mac の状態と完全に独立だったが、
+    #   本変更後は mac のビルド時間に律速されうる。
+    #   → ★ 恒久対策は `gse-mac` に probe 専用の別ラベル runner (例 `gse-mac-probe`) を
+    #   追加登録すること。物理マシンへのアクセスが要るため本変更の範囲外とし、
+    #   `.steering/20260827-main-ci-push-event-missing/design.md` に follow-up として記録する。
+    runs-on: [self-hosted, gse-mac]
     timeout-minutes: 5
     outputs:
       runs_on: ${{ steps.probe.outputs.runs_on }}
@@ -90,6 +129,19 @@ jobs:
             decide "$HOSTED"
           fi
 
+          # ⚠️★★★ self-hosted 化 (2026-08-26) で追加: `gh`/`jq` は macOS に同梱されないため
+          #   `gse-mac` 実機での導入有無は未検証。下の probe ループは `gh`/`jq` 不在でも
+          #   `2>/dev/null || true` / `|| echo 0` で例外は出さず完走するが、**そのまま放置すると
+          #   「online 判定できない」と「gse-win が実際に offline」の区別が付かないログになる**
+          #   (code-reviewer 指摘: jq 不在時、判定不能なのに「30秒以内に online にならなかった」
+          #   という事実と異なる notice が出る)。→ 原因を可視化してから即 fail-safe する。
+          for t in gh jq; do
+            if ! command -v "$t" >/dev/null 2>&1; then
+              echo "::warning::$t not found on probe runner (${RUNNER_NAME:-unknown}) -> hosted (fail-safe)"
+              decide "$HOSTED"
+            fi
+          done
+
           # 5s x 6 = 最大 30s。★ 起き上がりかけを拾うためポーリングにしている。
           for i in 1 2 3 4 5 6; do
             body="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners" 2>/dev/null || true)"
@@ -113,7 +165,14 @@ jobs:
   check:
     # ★ 手動発火では走らせない (self-hosted の macOS ランナーが offline だとキューへ滞留するため。
     #   手動発火の目的は Windows の exe を 1 個作ることだけである)。
-    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+    # ⚠️★★★ 2026-08-26 追加: `decide-win-runner` を self-hosted 化した副作用として、その
+    #   ジョブが「失敗」する経路が新たに生まれた (hosted VM は使い捨てなので実質失敗しな
+    #   かったが、self-hosted 実機はジョブ中に接続が切れて failure になりうる)。デフォルトの
+    #   `needs:` 挙動 (暗黙の success() 要求) のままだと `decide-win-runner` failure で
+    #   `check` が win/mac 両方 skip され CI シグナルが消える。`!cancelled()` にして
+    #   failure でも走らせ、下の runs-on 側で出力欠落を hosted へフォールバックする
+    #   (code-reviewer 指摘、2026-08-26)。
+    if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
     # ⚠️ mac 側も decide の完了を待つ (最大 30 秒)。両 OS を 1 matrix に保つための代償。
     needs: decide-win-runner
     strategy:
@@ -125,7 +184,9 @@ jobs:
           - runner: gse-mac-selfhosted
             target: aarch64-apple-darwin
     # ⚠️ matrix が 2 本である前提の三項式。★ 3 本目を足すときはここを必ず書き換えること。
-    runs-on: ${{ matrix.runner == 'gse-mac-selfhosted' && fromJSON('["self-hosted","gse-mac"]') || fromJSON(needs.decide-win-runner.outputs.runs_on) }}
+    # ⚠️ `|| '["windows-latest"]'` は decide-win-runner が failure/skip で outputs.runs_on を
+    #   一度も書けなかった場合のフォールバック (空文字列は fromJSON に渡すと失敗するため)。
+    runs-on: ${{ matrix.runner == 'gse-mac-selfhosted' && fromJSON('["self-hosted","gse-mac"]') || fromJSON(needs.decide-win-runner.outputs.runs_on || '["windows-latest"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
