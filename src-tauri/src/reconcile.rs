@@ -276,7 +276,14 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
     let f = std::fs::File::open(path).ok()?;
     let mut session_end: Option<u64> = None;
     for line in std::io::BufReader::new(f).lines() {
-        let line = line.ok()?;
+        // ⚠️★★★ **1 行の読み取り失敗で関数ごと諦めない** (code-reviewer MEDIUM・2026-08-27)。
+        //   ★ 以前は `line.ok()?` で、**UTF-8 として不正な 1 行があるだけで `None`** を返した。
+        //   → ⚠️ そのファイルが **黙って提出候補から永久に外れる** (fail-silent)。
+        //   ★ `meta` 行は ASCII の固定形なので、壊れた行を飛ばしても判定は成立する。
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
         if !line.contains(r#""type":"meta""#) {
             continue;
         }
@@ -504,8 +511,21 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                 &opts.submission_dir,
                 &opts.participant,
             ),
+            // ⚠️★★★ **O1 の提出物だけを送る** (code-reviewer / security-checker が一致して指摘)。
+            //   ★ `unsent_age_files` は名前が `<participant>_block<NN>_….age` かだけを見るので、
+            //   ⚠️ 絞らないと **同じ端末に残っている G1 の未承認 `.age`** が
+            //   **承認なしに送られる** = D-14 の承認ゲートが O1 経由で無効化される。
+            //   ★ `closed_o1_sessions` が `g1_mode` を弾いているのと**対**の排他である。
             CollectionMode::O1 => {
                 crate::submission::unsent_age_files(&opts.submission_dir, &opts.participant)
+                    .into_iter()
+                    .filter(|p| {
+                        p.file_name()
+                            .and_then(|s| s.to_str())
+                            .map(crate::o1::is_o1_age_file_name)
+                            .unwrap_or(false)
+                    })
+                    .collect()
             }
         };
         for age in to_send {
@@ -539,7 +559,22 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         }
     }
 
-    report.unsent = unsent_count(&opts.submission_dir, &opts.participant);
+    // ⚠️★ **数える対象と送る対象を同じ規則にする** (`submission.rs` の drift 防止の趣旨)。
+    //   ★ O1 で全部数えると、**送らない G1 の `.age`** まで「まだ届いていない」に出る。
+    report.unsent = match opts.mode {
+        CollectionMode::G1 => unsent_count(&opts.submission_dir, &opts.participant),
+        CollectionMode::O1 => {
+            crate::submission::unsent_age_files(&opts.submission_dir, &opts.participant)
+                .iter()
+                .filter(|p| {
+                    p.file_name()
+                        .and_then(|s| s.to_str())
+                        .map(crate::o1::is_o1_age_file_name)
+                        .unwrap_or(false)
+                })
+                .count()
+        }
+    };
     // ⚠️★ **O1 に「確認待ち」は無い** (承認ゲートを通らないので、数えると画面に嘘が出る)。
     report.awaiting_approval = match opts.mode {
         CollectionMode::G1 => {
@@ -1321,6 +1356,79 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&d);
         let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ **O1 の収束が、承認していない G1 の提出物を送らない。**
+    ///
+    /// ★ 提出物フォルダは participant 単位の**共有ディレクトリ**なので、
+    /// 同じ端末・同じ ID で G1 を先にやった被験者の未承認 `.age` が残りうる。
+    /// ⚠️ 送ってしまうと **D-14 の承認ゲートが O1 経由で無効化され、
+    /// 別研究の同意範囲のデータが送られる** (code-reviewer / security-checker が一致して指摘)。
+    #[test]
+    fn o1_never_sends_an_unapproved_g1_submission() {
+        let d = tmpdir("o1notg1");
+        let o = tmpdir("o1notg1_out");
+        let end = 1_000_000_000_000_u64;
+        let r = test_recipient();
+
+        // ① G1 のブロックを 1 本包む (⚠️ 承認しない = `.age.ok` を置かない)
+        write_closed(&d, "gse_20260827_010101.ndjson");
+        let g1 = reconcile(&opts(&d, &o, &r), None);
+        assert_eq!(g1.packaged, 1, "{:?}", g1.errors);
+
+        // ② O1 のファイルを 1 本置き、猶予明けに O1 モードで回す
+        write_closed_o1(&d, "gse_o1_20260827_020202.ndjson", end);
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+
+        assert_eq!(report.packaged, 1, "{:?}", report.errors);
+        let sent = up.0.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "★ 送ってよいのは O1 の 1 本だけ: {sent:?}");
+        assert!(
+            sent[0].contains("gse_o1_"),
+            "⚠️★★★ 未承認の G1 提出物が O1 経由で送られた: {sent:?}"
+        );
+        // ⚠️ 画面に出る件数も O1 のものだけを数える (送る対象と同じ規則)
+        assert_eq!(report.unsent, 0, "★ O1 の未送信は 0 のはず");
+
+        // ★ G1 の `.age` は**残っている** (失われていない・承認すれば送られる)
+        assert_eq!(
+            crate::submission::unsent_count(&o, "P012"),
+            1,
+            "★ G1 の未承認分はローカルに残るだけで、失われてはならない"
+        );
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★ **UTF-8 として不正な 1 行があっても、そのファイルを黙って捨てない。**
+    ///
+    /// ★ 以前は `line.ok()?` で `None` を返し、**提出候補から永久に外れた** (fail-silent)。
+    #[test]
+    fn a_single_invalid_utf8_line_does_not_hide_the_whole_file() {
+        use std::io::Write;
+        let d = tmpdir("o1badutf8");
+        let end = 1_000_000_000_000_u64;
+        let path = d.join("gse_o1_20260827_030303.ndjson");
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(b"{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\"}\n")
+                .unwrap();
+            // ⚠️ 不正な UTF-8 を 1 行混ぜる
+            f.write_all(&[0xff, 0xfe, 0x00, b'\n']).unwrap();
+            f.write_all(b"{\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n")
+                .unwrap();
+            f.write_all(format!("{{\"type\":\"meta\",\"session_end\":{end}}}\n").as_bytes())
+                .unwrap();
+        }
+        let found = closed_o1_sessions(&d, end + GRACE, GRACE);
+        assert_eq!(
+            found.len(),
+            1,
+            "⚠️ 壊れた 1 行でファイルごと提出候補から外れている (fail-silent)"
+        );
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// `meta` 行から `session_end` を読む手書きパーサの健全性。

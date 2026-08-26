@@ -271,6 +271,25 @@ pub fn is_o1_session_file_name(name: &str) -> bool {
         && !name.ends_with(".anon.ndjson")
 }
 
+/// ⚠️★★★ **この提出物 (`.age`) が O1 のものか** (純関数)。
+///
+/// ## なぜ要るか (★ code-reviewer / security-checker が**一致して**指摘・2026-08-27)
+///
+/// `submission::unsent_age_files` は **ファイル名が `<participant>_block<NN>_….age` か**
+/// だけで絞り、⚠️ **中身が G1 か O1 かを見ていない**。
+/// ★ 提出物フォルダは participant 単位の**共有ディレクトリ**なので、
+/// 同じ端末・同じ ID で **G1 を先にやった被験者が「送信する」を押さずに残した `.age`** が、
+/// ⚠️★★★ **O1 の収束で承認なしに送られる** —— D-14 の承認ゲートが O1 経由で無効化され、
+/// **別研究の同意範囲のデータが送られる**。
+///
+/// → ★ `closed_o1_sessions` が `g1_mode` を弾いているのと**対**になる排他を送信側にも置く。
+///
+/// ★ 判定材料は `submission::age_file_name` が名前に**元の stem を残している**ことである
+/// (`<participant>_block<NN>_<stem>.age`・台帳が消えても対応づけを復元するための設計)。
+pub fn is_o1_age_file_name(name: &str) -> bool {
+    name.ends_with(".age") && name.contains(&format!("_{SESSION_FILE_PREFIX}"))
+}
+
 // ---------------------------------------------------------------------------
 // 起動時に 1 回だけ確定するモード
 // ---------------------------------------------------------------------------
@@ -571,5 +590,32 @@ mod tests {
     #[test]
     fn o1_files_still_match_the_generic_session_prefix() {
         assert!(SESSION_FILE_PREFIX.starts_with("gse_"));
+    }
+
+    /// ⚠️★★★ **O1 の送信対象に G1 の提出物が 1 本も混ざらない。**
+    ///
+    /// ★ 提出物フォルダは participant 単位の共有ディレクトリなので、同じ端末に
+    /// G1 の未承認 `.age` が残りうる。⚠️ 混ざると **D-14 の承認ゲートが O1 経由で無効化される**。
+    #[test]
+    fn o1_age_files_are_distinguishable_from_g1_ones() {
+        // O1 (stem が gse_o1_*)
+        assert!(is_o1_age_file_name(
+            "P012_block01_gse_o1_20260827_101112.age"
+        ));
+        assert!(is_o1_age_file_name(
+            "P012_block07_gse_o1_20260827_101112_2.age"
+        ));
+        // ⚠️ G1 / Phase1 (stem が gse_*)
+        assert!(!is_o1_age_file_name("P012_block01_gse_20260827_101112.age"));
+        // ⚠️ 旧形式 (手動提出・ブロック番号なし)
+        assert!(!is_o1_age_file_name("P012_gse_20260827_101112.age"));
+        // ⚠️ 送信済みの印・その他
+        assert!(!is_o1_age_file_name(
+            "P012_block01_gse_o1_20260827_101112.age.sent"
+        ));
+        assert!(!is_o1_age_file_name("manifest.jsonl"));
+        // ⚠️★ 参加者 ID そのものが `gse_o1_` を含んでも誤判定しない
+        //   (★ ID は `^[A-Za-z0-9]{1,16}$` なので `_` を含めない = 構造的に起きない)
+        assert!(!is_o1_age_file_name("gseo1_block01_gse_20260827.age"));
     }
 }

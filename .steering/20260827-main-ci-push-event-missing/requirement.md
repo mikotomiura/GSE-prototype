@@ -193,6 +193,6 @@ active incidents: 1  — "Incident with Actions" (investigating)
 - [x] ⚠️ **原因が特定されたこと** → ✅ **GitHub Actions の major outage**（2026-08-27・`githubstatus.com`）
 - [x] ★ **障害の復旧後、イベント起因の run が作られること**を 1 回以上確認する → ✅ 観測台帳 #4
 - [x] ★ PR #119 を緑にしてマージする → ✅ 観測台帳 #4 の自然発火 run が success（`gh run rerun` 不要と判断）。マージは本節末尾で実施
-- [ ] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと（PR #119 の main マージ後に確認）
+- [x] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと → ✅ `[finish-task] OK: main (d6ff124) の run = 1 件`（PR #119 マージ後、run `33000927868` success）
 - [x] ⚠️ **`decide-win-runner` の self-hosted 化** —— ✅ **実施・実 run 検証済み**（観測台帳 #5、`adbf178`）。
       design.md / tasklist.md 参照。code-reviewer + security-checker + `/cross-review` 済み

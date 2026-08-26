@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 /**
@@ -140,6 +140,18 @@ const RecordingControls: React.FC = () => {
 
   // ★ O1: 登録済みの参加者 ID を復元する (⚠️ 通常運用 / G1 では呼ばない)。
   const o1Mode = status?.o1_mode ?? null;
+
+  // ⚠️★★★ ADR-016 **判断 4b-1** の逐語「**起動時に 1 回促す** ＋ 被験者が任意のタイミングで
+  //   変更できる（⚠️ **強制しない**）」。★ 促さないと未宣言のまま数日走るのが既定になる。
+  //   ⚠️ **1 回だけ**開く (`promptedRef`)。★ 閉じたら二度と自分からは開かない = 強制しない。
+  const promptedRef = useRef(false);
+  useEffect(() => {
+    if (!o1Mode || promptedRef.current) return;
+    if (status?.task_kind === null) {
+      promptedRef.current = true;
+      setPickingTaskKind(true);
+    }
+  }, [o1Mode, status?.task_kind]);
   useEffect(() => {
     if (!o1Mode) return;
     invoke<string | null>("get_g1_participant_id")
@@ -413,11 +425,23 @@ const RecordingControls: React.FC = () => {
           )}
         </div>
 
-        {/* ⚠️★★★ いま書いているファイルは触れない。★ 先に止めてもらう導線を出す。 */}
-        {!paused && (
-          <p style={{ fontSize: "0.85em", marginTop: "0.4rem" }}>
-            ⚠️ いま記録中のファイルは消せません。さきに「すぐ止める」を押してください。
-          </p>
+        {/* ⚠️★★★ 案内を実態に合わせる (code-reviewer / security-checker HIGH・2026-08-27)。
+            ★ O1 では削除の直前に**現行ファイルを閉じてから**消すので、いまの記録も消せる。
+            ⚠️ 逆に**止めているあいだは閉じられない**ので、そのときだけ再開を促す。
+            ★ 通常運用 / G1 は従来どおり「先に止める」を出す (挙動を変えていない)。 */}
+        {o1Mode ? (
+          paused && (
+            <p style={{ fontSize: "0.85em", marginTop: "0.4rem" }}>
+              ⚠️ 記録を止めているあいだは、いちばん新しい記録だけ消せません。
+              「記録を再開する」を押してからもう一度実行すると、そこまで消せます。
+            </p>
+          )
+        ) : (
+          !paused && (
+            <p style={{ fontSize: "0.85em", marginTop: "0.4rem" }}>
+              ⚠️ いま記録中のファイルは消せません。さきに「すぐ止める」を押してください。
+            </p>
+          )
         )}
 
         {outcome && (

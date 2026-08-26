@@ -177,6 +177,35 @@ static DECLARED_TASK_KIND: Mutex<Option<logger::TaskKind>> = Mutex::new(None);
 /// ★ 0 = まだ開いていない (日次ローテートは動かない)。
 static O1_LOG_OPENED_MS: AtomicU64 = AtomicU64::new(0);
 
+/// ⚠️★★★ **O1 のローテートを 1 本に直列化する排他** (code-reviewer MEDIUM・2026-08-27)。
+///
+/// ★ 入口は 2 つある —— **宣言 UI** (`declare_task_kind`) と **日次ローテートスレッド**。
+/// ⚠️ ログのロックだけでは足りない: `DECLARED_TASK_KIND` の読みと `O1_LOG_OPENED_MS` の
+/// 更新がその外にあると、交錯したときに
+/// **ファイルに書かれた `session_meta` と UI / engine head が食い違う**
+/// (★ 日次スレッドが「未宣言」を読んだ直後に宣言が入り、
+/// **宣言したばかりのファイルを未宣言として閉じ直す**)。
+///
+/// ★ ロック順序は **`O1_ROTATE` → `LogState` → `DECLARED_TASK_KIND`** で固定する。
+/// ⚠️ 他の箇所 (`get_recording_status`) はこの 3 つを**入れ子にしない**ので、循環はできない。
+///
+/// ★ G1 の [`BLOCK_TRANSITION`] と同じ役割・同じ流儀である
+/// (⚠️ ★ **通常運用 / G1 では誰も取らない** = 無競合)。
+static O1_ROTATE: Mutex<()> = Mutex::new(());
+
+/// ローテート 1 回で宣言をどう扱うか。
+///
+/// ⚠️ ★ **`Option<TaskKind>` にしない。** ★ 「新しく宣言する」と「いまの宣言を引き継ぐ」は
+/// 意味が違い、⚠️ 後者は **ロックの中で現在値を読む**必要がある (上記の交錯を避けるため)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum O1Declaration {
+    /// ★ 宣言 UI からの 1 回。**この値を新しいファイルへ書き、確定させる**。
+    Set(logger::TaskKind),
+    /// ★ 日次ローテート。**いまの宣言をそのまま引き継ぐ**。
+    /// ⚠️ 未宣言 (`None`) なら `session_meta` を 1 行も書かない (判断 4b-3)。
+    KeepCurrent,
+}
+
 /// 宣言されている作業の種類を読む (`None` = 未宣言)。
 fn declared_task_kind() -> Option<logger::TaskKind> {
     *DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner())
@@ -1015,63 +1044,112 @@ fn o1_rotate(
     log: &Arc<Mutex<LogState>>,
     engine: &CognitiveStateEngine,
     reset_signal: &ResetSignal,
-    task_kind: Option<logger::TaskKind>,
+    declaration: O1Declaration,
     reason: &str,
 ) -> Result<(), String> {
+    // ⚠️★★★ **一時停止中は 1 バイトも書かない** (同意文書 §4 の逐語「すぐ止める」)。
+    //
+    // ★ `Rotate` は制御エントリなので停止ゲートを**通る**が、`SessionMeta` は
+    //   `recording::is_writable_while_paused` が**落とす** (`recording.rs`)。
+    //   → ⚠️ そのまま進むと **`head_id` がファイルに 1 行も残らないまま head だけ切り替わり**、
+    //   再開後の `feat` 行は宣言 head で採点されるのにファイルは無宣言になる
+    //   ＝ ★ **本番とリプレイの採点が食い違う** (本関数が防ごうとしている当の破れ)。
+    //   ⚠️ UI も「作業の種類: ○○」と出したままログは未宣言になる。
+    // → ★ **止めているあいだはローテートしない。** 日次ローテートは次の tick で再試行され、
+    //   宣言はエラーとして被験者に返す (⚠️ 黙って落とさない)。
+    if crate::recording::is_paused() {
+        return Err(
+            "記録を止めているあいだは変更できません。「記録を再開する」を押してからお試しください。"
+                .to_string(),
+        );
+    }
+
+    // ⚠️★★★ **ローテートは丸ごと 1 本に直列化する** (code-reviewer MEDIUM・2026-08-27)。
+    //   ★ 入口は 2 つある —— 宣言 UI (`declare_task_kind`) と日次ローテートスレッド。
+    //   ⚠️ ログのロックだけでは足りない: `DECLARED_TASK_KIND` の読みと
+    //   `O1_LOG_OPENED_MS` の更新がその外にあると、交錯したときに
+    //   **ファイルに書かれた `session_meta` と UI / engine head が食い違う**。
+    let _serialize = O1_ROTATE.lock().unwrap_or_else(|p| p.into_inner());
+
     let new_path = logger::next_session_path();
     let now = epoch_ms();
 
-    {
-        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
-        // ⚠️★★ **容量を先に見る** (`start_session` と同じ形)。`Rotate` だけが落ちると、
-        //   直後の `SessionMeta` が **既に `session_end` を書き終えた旧ファイル**に積まれる。
-        //   ★ 沈黙して間違った結果を出すのが最悪なので、到達したら必ず止める。
-        if !log_channel_has_room(&guard.tx, 2) {
-            tracing::error!("O1: log channel is full; refusing to rotate ({reason})");
-            return Err(
-                "ログの書き込みが詰まっています。少し待ってからもう一度お試しください。"
-                    .to_string(),
-            );
-        }
-        tracing::info!("O1: rotating session log ({reason}) -> {:?}", new_path);
-        guard
-            .tx
-            .try_send(LogEntry::Rotate { new_path })
-            .map_err(log_send_error)?;
-
-        // ★ ここから新しいファイルである。⚠️ **reset は `set_domain` より前** (上記 2)。
-        engine.reset();
-        reset_signal.0.store(true, Ordering::Release);
-
-        if let Some(kind) = task_kind {
-            let domain = TaskDomain::from(kind);
-            let head_id = domain.head_id();
-            guard
-                .tx
-                .try_send(LogEntry::SessionMeta {
-                    timestamp: now,
-                    track: Track::Main,
-                    task_kind: kind,
-                    // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。** ★ ここを引数にしない
-                    //   (フロントから `true` を渡せる形にすると、自然作業に介入が混ざる経路ができる)。
-                    intervention_enabled: false,
-                    condition: None,
-                    label_pool: None,
-                    head_id,
-                })
-                .map_err(log_send_error)?;
-            // ★ 送信に成功した**後**に head を差し替える (上記 3)。
-            let applied = engine.set_domain(domain);
-            debug_assert_eq!(
-                applied, head_id,
-                "記録した head_id と反映した head が食い違った"
-            );
-        }
+    let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+    // ⚠️★★ **容量を先に見る** (`start_session` と同じ形)。`Rotate` だけが落ちると、
+    //   直後の `SessionMeta` が **既に `session_end` を書き終えた旧ファイル**に積まれる。
+    //   ★ 沈黙して間違った結果を出すのが最悪なので、到達したら必ず止める。
+    if !log_channel_has_room(&guard.tx, 2) {
+        tracing::error!("O1: log channel is full; refusing to rotate ({reason})");
+        return Err(
+            "ログの書き込みが詰まっています。少し待ってからもう一度お試しください。".to_string(),
+        );
     }
 
-    // ★ 日次ローテートの基準を引き直す。⚠️ ロガースレッドが実際に開くのは少し後だが、
-    //   ずれは高々 flush 間隔であり 24 時間に対して無視できる (★ 二重ローテートは起きない)。
+    // ★ **宣言の読みもロックの中で行う。** ⚠️ 外で読むと、日次スレッドが「未宣言」を
+    //   読んだ直後に宣言が入り、**宣言したばかりのファイルを未宣言として閉じ直す**。
+    let mut declared = DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner());
+    let kind = match declaration {
+        O1Declaration::Set(k) => Some(k),
+        // ⚠️★★★ **宣言を捏造しない。** 未宣言のまま日をまたいだファイルには書かない
+        //   (判断 4b-3: 行の**不在**で未宣言を表す)。
+        O1Declaration::KeepCurrent => *declared,
+    };
+
+    tracing::info!("O1: rotating session log ({reason}) -> {:?}", new_path);
+    guard
+        .tx
+        .try_send(LogEntry::Rotate { new_path })
+        .map_err(log_send_error)?;
+
+    // ⚠️★★ **ローテートはここで成立している。** ★ 基準を先に引き直す ——
+    //   引き直さないと、下の `SessionMeta` が落ちたときに日次スレッドが 60 秒ごとに
+    //   再試行し、⚠️ **失敗のたびに新しい NDJSON が増える** (ロガーが詰まっている、
+    //   つまり最も再現しやすい状況で churn する・code-reviewer HIGH)。
     O1_LOG_OPENED_MS.store(now, Ordering::Release);
+
+    // ★ ここから新しいファイルである。⚠️ **reset は `set_domain` より前** (上記 2)。
+    engine.reset();
+    reset_signal.0.store(true, Ordering::Release);
+
+    if let Some(k) = kind {
+        let domain = TaskDomain::from(k);
+        let head_id = domain.head_id();
+        if let Err(e) = guard.tx.try_send(LogEntry::SessionMeta {
+            timestamp: now,
+            track: Track::Main,
+            task_kind: k,
+            // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。** ★ ここを引数にしない
+            //   (フロントから `true` を渡せる形にすると、自然作業に介入が混ざる経路ができる)。
+            intervention_enabled: false,
+            condition: None,
+            label_pool: None,
+            head_id,
+        }) {
+            // ⚠️★★★ **宣言を「無し」に巻き戻す** (code-reviewer HIGH・2026-08-27)。
+            //   ★ 新しいファイルの**真の状態は未宣言**である。巻き戻さないと
+            //   `get_recording_status` が「宣言済み」と嘘をつき、⚠️ **翌日のローテートが
+            //   被験者の選んでいない種別を新ファイルに書く**。
+            //   ★ engine の head は `reset()` で既に Writing へ戻っており、ここでは
+            //   `set_domain` を**呼ばない**ので、ログと engine の状態は一致したままである。
+            *declared = None;
+            tracing::error!(
+                "O1: rotated but FAILED to record the declaration: {}",
+                log_send_error(e)
+            );
+            return Err("作業の種類を記録できませんでした。もう一度選んでください。".to_string());
+        }
+        // ★ 送信に成功した**後**に head を差し替える (上記 3)。
+        let applied = engine.set_domain(domain);
+        debug_assert_eq!(
+            applied, head_id,
+            "記録した head_id と反映した head が食い違った"
+        );
+    }
+
+    // ★ ログへ積めた後に**初めて**宣言を確定させる (⚠️ ロックの中なので交錯しない)。
+    if let O1Declaration::Set(k) = declaration {
+        *declared = Some(k);
+    }
     Ok(())
 }
 
@@ -1102,12 +1180,9 @@ fn declare_task_kind(
                 &log,
                 &engine,
                 &reset_signal,
-                Some(kind),
+                O1Declaration::Set(kind),
                 &format!("declaration -> {}", kind.as_str()),
             )?;
-            // ★ ログへ積めた後に**初めて**宣言を確定させる。⚠️ 先に入れると、
-            //   ローテートに失敗したときに UI だけが「宣言済み」になる。
-            *DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner()) = Some(kind);
             tracing::info!("O1: task_kind declared: {}", kind.as_str());
             Ok(())
         }
@@ -1170,10 +1245,48 @@ fn delete_time_range(
     from_ms: u64,
     to_ms: u64,
     log: State<Arc<Mutex<LogState>>>,
+    engine: State<'_, CognitiveStateEngine>,
+    reset_signal: State<'_, ResetSignal>,
 ) -> Result<RedactionOutcomeDto, String> {
     if from_ms > to_ms {
         return Err("開始時刻が終了時刻より後になっています。".to_string());
     }
+
+    // ⚠️★★★ **O1 では先に現行ファイルを閉じる** (code-reviewer / security-checker が一致して指摘)。
+    //
+    // ★ 下の `skip` は「いま書いているファイル」を常に除外する。Phase1 / G1 の現行ファイルは
+    //   1 セッション〜5 分ぶんなので実害が小さいが、⚠️★★★ **O1 の現行ファイルは
+    //   日次ローテートまで最大 24 時間ぶん**である。
+    //   → ⚠️ **直近 24 時間を 1 行も消せない**。しかも `RecordingControls` は
+    //   「さきに『すぐ止める』を押してください」と案内するのに、⚠️ **一時停止しても
+    //   `current_path` は変わらないので消せるようにならない** (実行不能な回避策)。
+    //   ★ 同意文書 §4-3 は逐語で「送られる前（＝ **その日**と、その次の 2 日ほど）…
+    //   **あなたの端末の上で消えます**」と約束しており、**ADR-014 判断 3 の根拠 3 がここで崩れる**。
+    //
+    // → ★ **ローテートしてから消す。** 閉じた瞬間から 48 時間の猶予が始まるので、
+    //   ⚠️ 提出側も安全側に倒れる (★ いま閉じたファイルはまだ包まれない)。
+    // ⚠️ 失敗しても**削除は続ける** —— ★ 消せる範囲だけでも消すほうが、
+    //   「消えませんでした」と返すより被験者の要求に近い (`files_skipped` で正直に出る)。
+    //
+    // ⚠️★ **一時停止中はローテートしない。** ★ 停止中は `session_meta` が停止ゲートに落ちるので
+    //   (`recording::is_writable_while_paused`)、回すと**宣言が黙って失われる**。
+    //   ★ 停止中に「いまの区間」を消したい場合は、⚠️ そもそも停止後の記録が無いので
+    //   失うものは停止前の分だけであり、**再開すれば次の削除で必ず届く**。
+    //   ⚠️ 画面は `files_skipped` をそのまま出すので、黙って取りこぼすことはない。
+    if crate::o1::is_o1() && !crate::recording::is_paused() {
+        if let Err(e) = o1_rotate(
+            &log,
+            &engine,
+            &reset_signal,
+            O1Declaration::KeepCurrent,
+            "before redaction",
+        ) {
+            tracing::warn!(
+                "O1: could not close the current log before redaction ({e});                  the newest file will be skipped"
+            );
+        }
+    }
+
     let (dir, _participant_id) = crate::logger::session_log_dir();
     let current = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
     let current_path = PathBuf::from(&current);
@@ -1861,6 +1974,26 @@ async fn submit_latest_session(
     app: tauri::AppHandle,
     participant_id: String,
 ) -> Result<SubmitOutcome, String> {
+    // ⚠️★★★ **O1 では手動提出を受け付けない** (security-checker HIGH-1・2026-08-27)。
+    //
+    // ★ この経路は `gse-submit` を**引数なし**で起こし、`packaging::find_latest_session_ndjson`
+    //   が **`session_end` を要求せずに最新の `gse_*.ndjson` を選ぶ**。
+    //   → ⚠️ O1 では **いま書いている最大 24 時間ぶんのファイル**がその場で `.age` に包まれる。
+    //
+    // ⚠️★★★ 帰結が 2 つとも重い:
+    //   1. **48 時間の猶予を丸ごと迂回する** —— `redact_dir` は `.age` を触らないので、
+    //      ★ **その瞬間から被験者は消せない** (同意文書 §4-3 の逐語の破れ ＝ 判断 3 の根拠 3)。
+    //   2. `submission::age_for_stem` が「既に包んである」と判定するため、
+    //      ⚠️ **猶予明けの収束器がその stem を二度と包まない** → 静かなデータ欠落。
+    //
+    // ★ O1 の提出経路は収束器 (`--reconcile --o1`) **1 本だけ**にする。
+    //   ⚠️ UI 側 (`Dashboard.tsx`) でも当該セクションを出さないが、**両方で塞ぐ**
+    //   (画面だけの対処にすると、次に画面をいじった人が黙って穴を開け直す)。
+    if crate::o1::is_o1() {
+        tracing::warn!("O1: manual submit rejected (auto-submission handles O1 after the grace)");
+        return Err("この記録は自動で提出されます。手動での提出は使いません。".to_string());
+    }
+
     let id = participant_id.trim().to_string();
     if !crate::participant_id::is_valid_participant_id(&id) {
         return Err(
@@ -3392,14 +3525,24 @@ pub fn run() {
                         ) {
                             continue;
                         }
+                        // ⚠️★★★ **止めているあいだは回さない。** ★ 止めている間は 1 行も
+                        //   書かれないので閉じる意味が無く、`SessionMeta` だけが停止ゲートに
+                        //   落ちて**宣言が黙って失われる**。再開後の tick で必ず拾われる。
+                        if crate::recording::is_paused() {
+                            continue;
+                        }
                         // ⚠️★★★ **宣言を捏造しない。** 未宣言のまま日をまたいだファイルには
                         //   `session_meta` を書かない (判断 4b-3: 行の**不在**で未宣言を表す)。
                         //   ★ 宣言済みなら書き直す —— `engine.reset()` が head を Writing に
                         //   戻すので、⚠️ 書き直さないと**翌日から宣言が黙って失われる**。
-                        let kind = declared_task_kind();
-                        if let Err(e) =
-                            o1_rotate(&o1_log, &o1_engine, &o1_reset, kind, "daily rotation")
-                        {
+                        //   ★ 現在値の読みは `o1_rotate` がロックの中で行う (交錯を避けるため)。
+                        if let Err(e) = o1_rotate(
+                            &o1_log,
+                            &o1_engine,
+                            &o1_reset,
+                            O1Declaration::KeepCurrent,
+                            "daily rotation",
+                        ) {
                             // ⚠️ 失敗しても基準は引き直さない → 次の tick で再試行する
                             //   (★ 収束型。1 回落ちても翌分で拾う)。
                             tracing::error!("O1: daily rotation failed: {e}");
@@ -4174,7 +4317,18 @@ pub fn run() {
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
             // macOS: Cmd+Shift+Option+F/I/S、Windows/Linux: Ctrl+Shift+Alt+F/I/S。
             // 失敗は warn に落として起動を継続する(録画ラベリングなしでも運用可)。
-            {
+            //
+            // ⚠️★★★ **O1 では登録しない** (security-checker MEDIUM・2026-08-27)。★ 理由は 2 つ:
+            //   1. ⚠️ O1 は数日〜数週間の常時稼働なので、**被験者の業務アプリから
+            //      6 通りの打鍵を数週間奪う**。
+            //   2. ⚠️★★★ 誤爆すると **同意文書 §3 の記録項目表に無い `user_label` /
+            //      `review_marker` 行**が残る。★ 「記録するもの」を文書より広げてはならない。
+            //   ★ プローブが O1 で構造的に発火しない (D-5) のと同じ筋である。
+            if crate::o1::is_o1() {
+                tracing::info!(
+                    "O1: global shortcuts are NOT registered                      (they would take 6 key combinations away for weeks and could write                      user_label / review_marker rows that the consent form does not list)"
+                );
+            } else {
                 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
                 #[cfg(target_os = "macos")]
                 let mods = Modifiers::SUPER | Modifiers::SHIFT | Modifiers::ALT;

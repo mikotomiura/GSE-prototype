@@ -323,9 +323,12 @@ function App() {
     invoke<string | null>("get_o1_mode")
       .then((mode) => setO1Mode(mode))
       .catch((e) => {
-        // ⚠️ 判定に失敗したら通常運用として扱う (判定前のまま固まらせない)。
-        console.error("get_o1_mode failed:", e);
-        setO1Mode(null);
+        // ⚠️★★★ **通常運用へ fail-open しない。** ★ 本当に O1 なのに `null` に倒すと
+        //   スタート画面が出て「開始する」を押され、上記 3 つの破れを踏む。
+        //   ⚠️ IPC が落ちるのはアプリが壊れているときなので、**押せない画面のまま**にする。
+        //   ★ 通常運用 (Phase1) では `get_o1_mode` は `null` を **成功で**返すので
+        //   この経路には入らない = 既存の起動が固まることはない。
+        console.error("get_o1_mode failed (staying on the loading screen):", e);
       });
   }, []);
 
@@ -475,6 +478,25 @@ function App() {
     }
     setIsStarted(true);
   };
+
+  // ⚠️★★★ **O1 の判定が済むまでスタート画面を出さない** (code-reviewer HIGH・2026-08-27)。
+  //
+  // ★ `get_g1_mode` と `get_o1_mode` は**別々の `useEffect` で並行に走る**ので、
+  //   `g1Mode` だけが先に `null` で解決した窓では、⚠️ **O1 なのに「開始する」が押せる**。
+  //   押されたときの帰結が 3 つとも重い:
+  //     1. `record_session_meta` が `INTERVENTION_ENABLED` を `true` に戻す (判断 O1-5 の破れ)
+  //     2. ⚠️★★★ `SESSION_START_MS` が立つ。**O1 にはブロック自動終了スレッドが無い**ので
+  //        0 に戻す経路が存在せず、収束器が以後 **プロセスの寿命いっぱい skip** し続ける
+  //        ＝ **自動提出が黙って止まる**
+  //     3. 宣言済みの O1 ファイルに 2 本目の `session_meta` が入り `gse-replay` が `Err`
+  //   → ★ 判定が済むまでは**何も押せない画面**を出す (fail-closed)。
+  if (!isStarted && o1Mode === undefined) {
+    return (
+      <div className="start-screen">
+        <p className="start-description">起動しています…</p>
+      </div>
+    );
+  }
 
   // Task C: 尺度理解テスト (ビネット) フロー
   if (!isStarted && showVignette) {
@@ -950,7 +972,12 @@ function App() {
           className="start-button"
           onClick={handleStart}
           disabled={
-            g1Mode === undefined || (!!g1Mode && !isValidParticipantId(g1ParticipantId.trim()))
+            // ⚠️★ **判定前は押させない。** `o1Mode` を足さないと、O1 の判定が返る前に
+            //   押されて上記 3 つの破れを踏む (code-reviewer HIGH)。
+            g1Mode === undefined ||
+            o1Mode === undefined ||
+            !!o1Mode ||
+            (!!g1Mode && !isValidParticipantId(g1ParticipantId.trim()))
           }
           title={
             !!g1Mode && !isValidParticipantId(g1ParticipantId.trim())
@@ -1011,6 +1038,8 @@ function App() {
       //   被験者はそれを見て行動を変える (= 観測しようとしている当の行動が変わる)。
       //   `preregistration.md §2.12` がトレイに状態を出さないと決めたのと同じ趣旨である。
       calibrationMode={o1Mode ? true : calibrationMode}
+      // ⚠️★★★ O1 では手動提出の節を出さない (48 時間の猶予を迂回するため・security HIGH-1)。
+      o1Mode={!!o1Mode}
     />
   );
 }
