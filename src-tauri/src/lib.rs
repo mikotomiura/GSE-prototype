@@ -10,6 +10,11 @@ pub mod capabilities;
 pub mod g1;
 pub mod input;
 pub mod logger;
+// ⚠️★★★ O1 (R3-a・自然作業の常時収集) の「O1 モード」判定と、そのモードでだけ変わる方針
+//   (ADR-014 D6 / ADR-016 判断 4b-0)。★ `g1` と同層の純判定モジュールで、
+//   効果 (門を通す / 常時のインジケータ / 宣言でのローテート / 猶予つき自動提出) は
+//   `lib.rs` と `reconcile` が適用する。
+pub mod o1;
 // 提出ファイル名ラベル用 participant_id 検証の単一情報源 (feature 非依存)。
 // packaging (提出 CLI) と submit_latest_session (アプリ内提出) の双方が参照する。
 pub mod participant_id;
@@ -148,6 +153,34 @@ static SESSION_META_RECORDED: AtomicBool = AtomicBool::new(false);
 /// 誤った根拠に基づいていた——待つべきは `recv_timeout` の上限である)。
 /// → **分析スレッドがドレインに入ったことを観測してから** `BlockEnd` を送る。
 static ANALYSIS_IDLE: AtomicBool = AtomicBool::new(true);
+
+// ---------------------------------------------------------------------------
+// O1 (R3-a) 自然作業の常時収集 — 宣言と日次ローテート
+// ---------------------------------------------------------------------------
+
+/// ⚠️★★★ **いま宣言されている作業の種類。`None` = 未宣言。**
+///
+/// ★ ADR-016 **判断 4b-3**: `unknown` を enum に足さず、**`session_meta` 行の *不在***で
+/// 未宣言を表す。→ この値が `None` のあいだ、⚠️ **`session_meta` 行を 1 本も書かない**。
+///
+/// ⚠️ **推測して埋めない** —— 同意文書 §2 逐語「こちらで勝手に推測して埋めることはしません」。
+/// ★ 観測から推定して埋めるのは **ADR-010 D3 の閉ループ禁止**にも触れる。
+///
+/// ★ 日次ローテートが `session_meta` を書き直すかどうかもこの値で決まる
+/// (⚠️ 未宣言のまま日をまたいだファイルに、宣言を捏造しない)。
+static DECLARED_TASK_KIND: Mutex<Option<logger::TaskKind>> = Mutex::new(None);
+
+/// ⚠️★ **いま書いているセッションファイルを開いた時刻** (epoch ms)。日次ローテートの基準。
+///
+/// ★ `Instant` ではなく **epoch ms** にしてあるのは、スリープ / 休止のあいだも
+/// 経過に含めるためである (⚠️ `Instant` は OS によって止まる)。
+/// ★ 0 = まだ開いていない (日次ローテートは動かない)。
+static O1_LOG_OPENED_MS: AtomicU64 = AtomicU64::new(0);
+
+/// 宣言されている作業の種類を読む (`None` = 未宣言)。
+fn declared_task_kind() -> Option<logger::TaskKind> {
+    *DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner())
+}
 
 /// ⚠️★★★ **ブロック遷移の直列化点** (D-1・2026-08-21)。
 ///
@@ -928,6 +961,14 @@ struct RecordingStatusDto {
     current_file: String,
     /// セッション NDJSON を置いているディレクトリ。
     session_dir: String,
+    /// ★ O1 モードの引き金 (`"marker"` / `"env"`)。⚠️ 通常運用では `None`。
+    o1_mode: Option<&'static str>,
+    /// ⚠️★★★ **いま宣言されている作業の種類** (`None` = **未宣言**)。
+    ///
+    /// ★ ADR-016 判断 4b-3: `unknown` を enum に足さず、**`session_meta` 行の *不在*** で
+    /// 未宣言を表す。→ ここも `None` のままにし、⚠️ **UI が「未設定」と描く**。
+    /// ★ こちらで勝手に推測して埋めない (同意文書 §2 の逐語)。
+    task_kind: Option<&'static str>,
 }
 
 /// 記録の稼働状態を返す (D7-i: 稼働中インジケータ)。
@@ -941,6 +982,135 @@ fn get_recording_status(log: State<Arc<Mutex<LogState>>>) -> RecordingStatusDto 
         paused: crate::recording::is_paused(),
         current_file: log.lock().unwrap_or_else(|p| p.into_inner()).current_path(),
         session_dir: dir.display().to_string(),
+        o1_mode: crate::o1::mode().map(|s| s.as_str()),
+        task_kind: declared_task_kind().map(|k| k.as_str()),
+    }
+}
+
+/// O1 モードか (引き金つき)。★ `get_g1_mode` の鏡像。通常運用では `None`。
+#[tauri::command]
+fn get_o1_mode() -> Option<&'static str> {
+    crate::o1::mode().map(|s| s.as_str())
+}
+
+/// ⚠️★★★ O1 の**ローテート 1 回**を実行する (宣言の変更 / 日次ローテートの共通経路)。
+///
+/// ★ ADR-016 **判断 4b-1** が要求する 3 点を **1 アクションで**行う:
+/// **`session_meta` 出力 → ログのローテート → `engine.reset()`**。
+///
+/// ## ⚠️★★★ 順序が意味を持つ (★ 3 つとも実測に基づく)
+///
+/// 1. **`Rotate` を先に送る。** ⚠️ 先に `SessionMeta` を書くと、宣言が**旧ファイル**に落ちて
+///    新ファイルが未宣言になる —— ★ 意味が逆になる (旧ファイルの大半はその宣言ではない)。
+/// 2. **`engine.reset()` は `set_domain` より前。** ⚠️ `reset()` は逐語
+///    「head も既定 (Writing) に戻す」(`analysis/engine.rs`) ので、
+///    ★ 後に呼ぶと**宣言した head が黙って取り消される**。
+/// 3. **`set_domain` はログ送信に成功した後。** ★ 送信に失敗したまま head だけ切り替わると
+///    「Coding head で採点された `feat` 行が、head 宣言の無いファイルに書かれる」状態になり、
+///    ⚠️ **本番とリプレイの採点が食い違う** (= Replay-as-Truth の破れ・security-checker 2026-08-18)。
+///
+/// `task_kind` が `None` (= 未宣言) のときは **`session_meta` を 1 行も書かない**
+/// (★ 判断 4b-3: 行の**不在**で未宣言を表す)。
+fn o1_rotate(
+    log: &Arc<Mutex<LogState>>,
+    engine: &CognitiveStateEngine,
+    reset_signal: &ResetSignal,
+    task_kind: Option<logger::TaskKind>,
+    reason: &str,
+) -> Result<(), String> {
+    let new_path = logger::next_session_path();
+    let now = epoch_ms();
+
+    {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+        // ⚠️★★ **容量を先に見る** (`start_session` と同じ形)。`Rotate` だけが落ちると、
+        //   直後の `SessionMeta` が **既に `session_end` を書き終えた旧ファイル**に積まれる。
+        //   ★ 沈黙して間違った結果を出すのが最悪なので、到達したら必ず止める。
+        if !log_channel_has_room(&guard.tx, 2) {
+            tracing::error!("O1: log channel is full; refusing to rotate ({reason})");
+            return Err(
+                "ログの書き込みが詰まっています。少し待ってからもう一度お試しください。"
+                    .to_string(),
+            );
+        }
+        tracing::info!("O1: rotating session log ({reason}) -> {:?}", new_path);
+        guard
+            .tx
+            .try_send(LogEntry::Rotate { new_path })
+            .map_err(log_send_error)?;
+
+        // ★ ここから新しいファイルである。⚠️ **reset は `set_domain` より前** (上記 2)。
+        engine.reset();
+        reset_signal.0.store(true, Ordering::Release);
+
+        if let Some(kind) = task_kind {
+            let domain = TaskDomain::from(kind);
+            let head_id = domain.head_id();
+            guard
+                .tx
+                .try_send(LogEntry::SessionMeta {
+                    timestamp: now,
+                    track: Track::Main,
+                    task_kind: kind,
+                    // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。** ★ ここを引数にしない
+                    //   (フロントから `true` を渡せる形にすると、自然作業に介入が混ざる経路ができる)。
+                    intervention_enabled: false,
+                    condition: None,
+                    label_pool: None,
+                    head_id,
+                })
+                .map_err(log_send_error)?;
+            // ★ 送信に成功した**後**に head を差し替える (上記 3)。
+            let applied = engine.set_domain(domain);
+            debug_assert_eq!(
+                applied, head_id,
+                "記録した head_id と反映した head が食い違った"
+            );
+        }
+    }
+
+    // ★ 日次ローテートの基準を引き直す。⚠️ ロガースレッドが実際に開くのは少し後だが、
+    //   ずれは高々 flush 間隔であり 24 時間に対して無視できる (★ 二重ローテートは起きない)。
+    O1_LOG_OPENED_MS.store(now, Ordering::Release);
+    Ok(())
+}
+
+/// ⚠️★★★ O1: **作業の種類を宣言する / 宣言し直す** (ADR-016 判断 4 / 4b-1 / 4b-2 / 4b-3)。
+///
+/// ★ 同意文書 §2 の逐語「作業が変わったら、そのつど選び直してください」に対応する唯一の経路。
+///
+/// ⚠️ **`record_session_meta` には手を触れていない** —— そちらは「開始する」押下から呼ばれる
+/// Phase1 / G1 の経路であり、★ **O1 の分岐を混ぜない** (G1 / Phase1 を 1 バイトも変えない)。
+#[tauri::command]
+fn declare_task_kind(
+    task_kind: String,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    engine: State<'_, CognitiveStateEngine>,
+    reset_signal: State<'_, ResetSignal>,
+) -> Result<(), String> {
+    // ⚠️ 新 enum 値は足さない (判断 4b-2)。未知値は**黙って捨てず**エラーにする。
+    let kind = logger::TaskKind::parse(&task_kind)
+        .ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+
+    match crate::o1::decide_declaration_action(crate::o1::is_o1(), g1_mode().is_some()) {
+        crate::o1::DeclarationAction::NotO1 => {
+            // ⚠️ 通常運用 / G1 では宣言 UI 自体が出ない。★ ここへ来たら呼び出し側の誤りである。
+            Err("この画面は O1 モードでのみ使えます。".to_string())
+        }
+        crate::o1::DeclarationAction::RotateAndDeclare => {
+            o1_rotate(
+                &log,
+                &engine,
+                &reset_signal,
+                Some(kind),
+                &format!("declaration -> {}", kind.as_str()),
+            )?;
+            // ★ ログへ積めた後に**初めて**宣言を確定させる。⚠️ 先に入れると、
+            //   ローテートに失敗したときに UI だけが「宣言済み」になる。
+            *DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner()) = Some(kind);
+            tracing::info!("O1: task_kind declared: {}", kind.as_str());
+            Ok(())
+        }
     }
 }
 
@@ -1282,6 +1452,11 @@ enum ReconcileReason {
     Startup = 1,
     BlockEnd = 2,
     Approval = 3,
+    /// ⚠️★★★ O1 (R3-a): **日次ローテートでファイルが 1 本閉じた**。
+    /// ★ 閉じた直後は猶予 (48 時間) の中なので **まだ包まれない**。
+    /// ⚠️ それでも回すのは、**前々日ぶんが猶予を抜けている**からである
+    /// (`design.md` §1「起動のきっかけはヒント」と同じ収束型の考え方)。
+    O1DailyRotation = 4,
 }
 
 impl ReconcileReason {
@@ -1291,6 +1466,7 @@ impl ReconcileReason {
             ReconcileReason::Startup => "at startup",
             ReconcileReason::BlockEnd => "after block",
             ReconcileReason::Approval => "after approval",
+            ReconcileReason::O1DailyRotation => "after daily rotation",
         }
     }
 }
@@ -1462,13 +1638,21 @@ fn set_g1_participant_id(id: String) -> Result<(), String> {
 /// 収束器 (`gse-submit --reconcile`) を **別スレッドで** 1 回起こす。
 ///
 /// ★ `reason` はログ用のきっかけ名 (`"at startup"` / `"after block"`)。
-/// ⚠️ ★ **G1 モードでなければ何もしない** (通常運用の挙動を 1 バイトも変えない)。
+/// ⚠️ ★ **G1 でも O1 でもなければ何もしない** (通常運用 = Phase1 の挙動を 1 バイトも変えない)。
 /// ★ 何度呼んでも安全 (収束器はべき等) なので、二重起動を気にしなくてよい。
 fn spawn_reconcile(app: tauri::AppHandle, reason: ReconcileReason) {
-    if g1_mode().is_none() {
+    if !auto_submit_enabled() {
         return;
     }
     spawn_reconcile_with_guard(app, reason, InFlightGuard::new(reason));
+}
+
+/// 自動提出の経路が開いているか。
+///
+/// ⚠️★★★ **G1 と O1 の 2 つだけ**である。★ 通常運用 (Phase1) では
+/// `.age` を作りも送りもしない (従来どおり手動提出だけ)。
+fn auto_submit_enabled() -> bool {
+    g1_mode().is_some() || crate::o1::is_o1()
 }
 
 /// ★★ 番兵を **呼び出し側で作ってから**渡す版。
@@ -1485,7 +1669,7 @@ fn spawn_reconcile_with_guard(
     reason: ReconcileReason,
     in_flight: InFlightGuard,
 ) {
-    if g1_mode().is_none() {
+    if !auto_submit_enabled() {
         return;
     }
     let reason = reason.label();
@@ -1551,6 +1735,13 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
 
     let mut cmd = std::process::Command::new(&submit_bin);
     cmd.arg("--reconcile");
+    // ⚠️★★★ O1 は **別の規則**で収束させる (`gse_o1_*` を対象・48 時間の猶予・承認なし)。
+    //   ★ 判定は**アプリ側の 1 か所**で行って渡す —— `gse-submit` の `current_exe()` は
+    //   macOS のバンドル内 sidecar だとアプリ本体と階層が違い、⚠️ 自前で `o1.mode` を
+    //   探させると**静かに G1 の規則で包む**ことになる。
+    if crate::o1::is_o1() {
+        cmd.arg("--o1");
+    }
     cmd.env("GSE_PARTICIPANT_ID", &id);
     if let Some(r) = resolve_bundled_recipient(app) {
         cmd.env("GSE_RECIPIENT", r);
@@ -2607,6 +2798,42 @@ pub fn run() {
         );
     }
 
+    // ★ O1 モード (R3-a・自然作業の常時収集) の判定 —— **起動時に 1 回だけ**読む。
+    //   ⚠️★★★ **G1 と同時には立てない** (`o1::resolve` が G1 を勝たせる)。理由は
+    //   `preregistration.md §3.6` がブロックの事後除外を禁じており、G1 の 1 ブロックは
+    //   **取り返しがつかない**ためである。★ 起動そのものは止めない (g1.rs の倒し方と同じ)。
+    let o1_detected = crate::o1::detect_from_env();
+    if crate::o1::modes_conflict(g1_source, o1_detected) {
+        // ⚠️★★★ 事故だが**静かに壊れてはならない**。診断ログに必ず残す。
+        tracing::error!(
+            "BOTH g1.mode and o1.mode are present in the distribution folder \
+             (g1={:?}, o1={:?}). O1 mode is DISABLED and this run behaves as G1. \
+             Remove one marker; a G1 block cannot be excluded after the fact \
+             (preregistration.md 3.6).",
+            g1_source,
+            o1_detected
+        );
+    }
+    let o1_source = crate::o1::resolve(g1_source, o1_detected);
+    crate::o1::set_mode(o1_source);
+    if let Some(src) = o1_source {
+        tracing::warn!(
+            "O1 MODE ENABLED (source={}): recording runs WITHOUT pressing start \
+             (ADR-016 4b-0), the session log rotates every {} ms, closed logs are held \
+             {} ms before submission, and interventions are OFF. \
+             See docs/adr/ADR-014-continuous-natural-work-collection.md D6/D8.",
+            src.as_str(),
+            crate::o1::ROTATE_AFTER_MS,
+            crate::o1::SUBMIT_GRACE_MS
+        );
+        // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。**
+        //   ★ 既定値は `true` (下の `INTERVENTION_ENABLED`) で、O1 は
+        //   `record_session_meta` を通らないので **何もしなければ Nudge が出る**。
+        //   → ★ ここで明示的に落とす。理由は (1) 介入が入ると自然作業ではなくなる
+        //   (観測している行動を介入が変える) (2) 同意文書に「助言が出ることがある」旨が無い。
+        INTERVENTION_ENABLED.store(false, Ordering::Release);
+    }
+
     // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
     //
     // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
@@ -2636,6 +2863,10 @@ pub fn run() {
         target: log_target.clone(),
         shutdown_rx: log_shutdown_rx,
     }));
+    // ★ O1 (R3-a): 日次ローテートスレッド用 (⚠️ O1 モードでしか起こさない)。
+    //   ★ `o1_rotate` は `start_session` と同じく **ログのロックの中**で
+    //   `Rotate` → `SessionMeta` を送るので、`LogState` そのものが要る。
+    let o1_log_state = log_state.clone();
 
     // キーストローク入力チャネル
     let (tx, rx) = crossbeam_channel::bounded::<crate::analysis::features::InputEvent>(64);
@@ -2643,6 +2874,8 @@ pub fn run() {
     // セッション開始リセットシグナル (start_session → 分析スレッド)
     let should_reset = Arc::new(AtomicBool::new(false));
     let should_reset_for_thread = should_reset.clone();
+    // ★ O1 (R3-a): 日次ローテートスレッド用 (⚠️ O1 モードでしか起こさない)。
+    let should_reset_for_o1 = should_reset.clone();
 
     // セッションアクティブフラグ (start_session まで false → 分析スレッドがドレイン)
     let session_active = Arc::new(AtomicBool::new(false));
@@ -2665,6 +2898,8 @@ pub fn run() {
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
+    // ★ O1 (R3-a): 日次ローテートスレッド用 (⚠️ O1 モードでしか起こさない)。
+    let engine_for_o1 = engine.clone();
     // ⚠️★ IME Monitor 用の clone は **2026-08-23 に不要になった** ——
     //   IME で `set_paused` を駆動しなくなったため (decisions D-10)。
     let log_tx_ime_poll = log_tx.clone();
@@ -2708,9 +2943,20 @@ pub fn run() {
 
         let mut state = AnalysisState::new(now_ms(), 600);
 
+        // ⚠️★★★ O1 (R3-a): **門を外すかどうかは起動時に決まる** (`o1::mode` は OnceLock)。
+        //   ★ ループの中で毎回読まず、ここで 1 回だけ確定させる (実行時トグルではない)。
+        let o1_always_on = crate::o1::is_o1();
+
         loop {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
-            if !session_active_for_thread.load(Ordering::Acquire) {
+            // ⚠️★★★ O1 では門を通す (ADR-016 判断 4b-0 の「(B) 常時収集」)。
+            //   ★ `LogEntry::Key` はこのループの**中でしか出ない**ので、門を外さないと
+            //   打鍵チャネルが丸ごと空になり、⚠️ **計器の欠損が「非打鍵区間」に化ける**。
+            //   ★ 非 O1 では `session_active` そのものなので G1 / Phase1 は 1 バイトも変わらない。
+            if !crate::o1::analysis_gate_open(
+                o1_always_on,
+                session_active_for_thread.load(Ordering::Acquire),
+            ) {
                 while rx.try_recv().is_ok() {}
                 // ★ G1: 「もうこのスレッドは LogEntry を投げない」ことの表明。
                 //   ブロック終了スレッドがこれを観測してから session_end を書く。
@@ -3105,6 +3351,62 @@ pub fn run() {
             // consumer スレッドは走り続ける (従来 `run()` 末尾での drop と同じ挙動)。
             drop(session_logger);
 
+            // ── ⚠️★★★ O1 (R3-a): 日次ローテート (判断 O1-2 の実施条件 1) ──────────
+            //
+            // ★ **閉じないファイルは提出候補にならない。** `write_meta_end`(`session_end`) は
+            //   **Rotate / BlockEnd (G1 限定) / アプリ終了**でしか書かれず、⚠️ O1 は
+            //   「開始する」を押さないので、**アプリを終了しない被験者のファイルは何日も
+            //   開いたまま**になる (`reconcile` は `session_end` を持つファイルしか触らない)。
+            //
+            // ⚠️ **O1 モードでしか起こさない。** ★ 通常運用 / G1 のログは 1 行も動かない。
+            if crate::o1::is_o1() {
+                let now = epoch_ms();
+                O1_LOG_OPENED_MS.store(now, Ordering::Release);
+                let o1_log = o1_log_state;
+                let o1_engine = engine_for_o1;
+                let o1_reset = ResetSignal(should_reset_for_o1);
+                let o1_app = app.handle().clone();
+                thread::spawn(move || {
+                    tracing::info!("O1 daily-rotate thread started");
+                    loop {
+                        // ★ 60 秒粒度で足りる (24 時間に対して 0.07%)。⚠️ スリープからの復帰でも
+                        //   epoch ms の差で判定するので、寝ていたぶんも経過に入る。
+                        thread::sleep(Duration::from_secs(60));
+                        if is_shutting_down() {
+                            tracing::info!("O1 daily-rotate thread stopping (shutdown)");
+                            return;
+                        }
+                        let opened = O1_LOG_OPENED_MS.load(Ordering::Acquire);
+                        if opened == 0 {
+                            continue;
+                        }
+                        if !crate::o1::should_rotate_daily(
+                            opened,
+                            epoch_ms(),
+                            crate::o1::ROTATE_AFTER_MS,
+                        ) {
+                            continue;
+                        }
+                        // ⚠️★★★ **宣言を捏造しない。** 未宣言のまま日をまたいだファイルには
+                        //   `session_meta` を書かない (判断 4b-3: 行の**不在**で未宣言を表す)。
+                        //   ★ 宣言済みなら書き直す —— `engine.reset()` が head を Writing に
+                        //   戻すので、⚠️ 書き直さないと**翌日から宣言が黙って失われる**。
+                        let kind = declared_task_kind();
+                        if let Err(e) =
+                            o1_rotate(&o1_log, &o1_engine, &o1_reset, kind, "daily rotation")
+                        {
+                            // ⚠️ 失敗しても基準は引き直さない → 次の tick で再試行する
+                            //   (★ 収束型。1 回落ちても翌分で拾う)。
+                            tracing::error!("O1: daily rotation failed: {e}");
+                            continue;
+                        }
+                        // ★ 1 本閉じたので収束器を回す。⚠️ いま閉じたファイルは猶予の中なので
+                        //   **まだ包まれない** —— 拾われるのは **48 時間前に閉じた分**である。
+                        spawn_reconcile(o1_app.clone(), ReconcileReason::O1DailyRotation);
+                    }
+                });
+            }
+
             // --- キーボードフック・IME ポーリングの初期化 ---
             // Tauri の setup() はメインスレッドで、Tauri ランタイム初期化完了後に実行される。
             // ウィンドウシステムが完全に初期化された後にフックをインストールすることで、
@@ -3222,6 +3524,16 @@ pub fn run() {
                 spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
             }
 
+            // ⚠️★★★ O1 (R3-a): 起動時にも収束器を回す (研究者判断 O1-2 の自動提出)。
+            //
+            // ★ 収束型なので「起動」は**ヒントにすぎない**。⚠️ ここが落ちても、
+            //   次の日次ローテートの後で拾われる。
+            // ★ 猶予 (48 時間) を過ぎたファイルだけが包まれるので、
+            //   ⚠️ **起動直後に「昨日の記録」がいきなり送られることはない**。
+            if crate::o1::is_o1() {
+                spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
+            }
+
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。
             //
             // ⚠️ ★ なぜアプリ側に置くか (D-6 の「見直しタイミング」の決着):
@@ -3304,7 +3616,18 @@ pub fn run() {
                             return;
                         }
 
-                        let session_active = liveness_session_active.load(Ordering::Acquire);
+                        // ⚠️★★★ O1 (R3-a): **`session_active` をそのまま使わない。**
+                        //   ★ `liveness::step` は第 2 引数が false のとき `starved_ms` を
+                        //   **0 に落とす**。O1 では `session_active` が永久に false なので、
+                        //   ⚠️ そのまま渡すと **フックが死んでも永久に検出できない**
+                        //   (★ mac の `CGEventTap` 失効が無検出になる = 事前登録 §7 E1 の穴)。
+                        //   ★ 一時停止中は数えない (打鍵が来なくて当たり前・元の意図と同じ)。
+                        //   ⚠️ 非 O1 は `session_active` そのもの (挙動は 1 バイトも変わらない)。
+                        let session_active = crate::o1::recording_active(
+                            crate::o1::is_o1(),
+                            liveness_session_active.load(Ordering::Acquire),
+                            crate::recording::is_paused(),
+                        );
 
                         // ★ 生 tick の「変化」だけを見る (絶対時刻へ変換しない = ラップアラウンド安全)。
                         let tick = liveness::last_system_input_tick();
@@ -3970,6 +4293,10 @@ pub fn run() {
             get_recording_status,
             set_recording_paused,
             delete_time_range,
+            // ⚠️★★★ O1 (R3): 作業の種類の宣言 (ADR-016 判断 4 / 4b)。
+            //   ★ O1 モードの画面からしか呼ばれない (非 O1 では `Err` を返す)。
+            get_o1_mode,
+            declare_task_kind,
             submit_latest_session,
             record_user_label,
             record_session_meta,

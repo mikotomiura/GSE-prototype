@@ -25,6 +25,48 @@ interface RecordingStatusDto {
   paused: boolean;
   current_file: string;
   session_dir: string;
+  /** ★ O1 モードの引き金 (`"marker"` / `"env"`)。⚠️ 通常運用 / G1 では `null`。 */
+  o1_mode: string | null;
+  /**
+   * ⚠️★★★ いま宣言されている作業の種類。**`null` = 未宣言**。
+   *
+   * ★ ADR-016 判断 4b-3: `unknown` を enum に足さず、`session_meta` 行の *不在* で
+   * 未宣言を表す。→ ⚠️ 画面は「**未設定**」と描き、**こちらで推測して埋めない**
+   * (同意文書 §2 の逐語)。
+   */
+  task_kind: string | null;
+}
+
+/**
+ * ⚠️★★★ O1 の宣言 4 択 (ADR-016 **判断 4b-2**: 既存 4 値をそのまま出す)。
+ *
+ * ★ ラベルと補足は **同意文書 §2 の表と逐語で一致させる**。
+ * ⚠️ **新しい値を足さない** —— `task_kind` は `schema/current.json` で 4 値の enum に
+ * 制約されており、足すと gse-dataset の parity 更新が要る (判断 4b-3)。
+ *
+ * ⚠️★ `creative` の語は **「創作」を捨てて「デザイン・映像・制作作業」**にした
+ * (判断 O1-3)。★ 「制作」も執筆と読めうるので、**補足を 1 行必ず添える**。
+ */
+const O1_TASK_KINDS: { value: string; label: string; note: string }[] = [
+  { value: "argumentative", label: "論述", note: "意見や説明を組み立てて書く作業" },
+  { value: "correspondence", label: "通信文", note: "メール・チャットなどのやりとり" },
+  {
+    value: "creative",
+    label: "デザイン・映像・制作作業",
+    note: "図面・動画編集・3D など、文字をあまり打たない作業",
+  },
+  { value: "vibe_coding", label: "vibe coding", note: "AI と対話しながらのコーディング" },
+];
+
+/** 宣言値 → 画面に出す語。⚠️ 未宣言 (`null`) は「未設定」。 */
+function taskKindLabel(value: string | null): string {
+  if (value === null) return "未設定";
+  return O1_TASK_KINDS.find((k) => k.value === value)?.label ?? value;
+}
+
+/** 参加者 ID の妥当性。★ backend `participant_id::is_valid_participant_id` と同じ規則。 */
+function isValidParticipantId(id: string): boolean {
+  return /^[A-Za-z0-9]{1,16}$/.test(id);
 }
 
 /** backend `delete_time_range` / `RedactionOutcomeDto` と同期。 */
@@ -66,6 +108,13 @@ const RecordingControls: React.FC = () => {
   const [outcome, setOutcome] = useState<RedactionOutcomeDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // ⚠️★★★ O1: 宣言 4 択を開いているか。★ 既定は閉じている (1 行だけ出す)。
+  const [pickingTaskKind, setPickingTaskKind] = useState(false);
+  // ★ O1: 研究者が割り当てた参加者 ID。⚠️ **これが無いと自動提出が動かない**
+  //   (`run_reconcile_blocking` が「ID 未登録なので何もしない」で帰る)。
+  const [participantId, setParticipantId] = useState("");
+  const [participantIdSaved, setParticipantIdSaved] = useState<string | null>(null);
+  const [participantIdError, setParticipantIdError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     invoke<RecordingStatusDto>("get_recording_status")
@@ -88,6 +137,57 @@ const RecordingControls: React.FC = () => {
     const id = setInterval(refresh, 2000);
     return () => clearInterval(id);
   }, [refresh]);
+
+  // ★ O1: 登録済みの参加者 ID を復元する (⚠️ 通常運用 / G1 では呼ばない)。
+  const o1Mode = status?.o1_mode ?? null;
+  useEffect(() => {
+    if (!o1Mode) return;
+    invoke<string | null>("get_g1_participant_id")
+      .then((id) => {
+        if (id) {
+          setParticipantId(id);
+          setParticipantIdSaved(id);
+        }
+      })
+      .catch((e) => console.error("get_g1_participant_id failed:", e));
+  }, [o1Mode]);
+
+  /**
+   * ⚠️★★★ 作業の種類を宣言する / 宣言し直す。
+   *
+   * ★ backend の 1 コマンドが **3 つ同時に**行う (ADR-016 判断 4b-1):
+   * `session_meta` 出力 → ログのローテート → `engine.reset()`。
+   * ⚠️ Frontend 側で 3 回に分けて呼ばない —— 途中で失敗すると
+   * 「宣言はしたがローテートしていない」状態になり、`gse-replay` が落ちる。
+   */
+  const declare = (taskKind: string) => {
+    setBusy(true);
+    setError(null);
+    invoke("declare_task_kind", { taskKind })
+      .then(() => {
+        setPickingTaskKind(false);
+        refresh();
+      })
+      .catch((e) => setError(typeof e === "string" ? e : String(e)))
+      .finally(() => setBusy(false));
+  };
+
+  /** ★ O1: 参加者 ID を保存する。⚠️ 妥当でなければ**保存しない** (fail-closed)。 */
+  const saveParticipantId = () => {
+    const id = participantId.trim();
+    if (!isValidParticipantId(id)) {
+      setParticipantIdError("英数字のみ・1〜16 文字で入力してください (例: P012)。");
+      return;
+    }
+    setBusy(true);
+    setParticipantIdError(null);
+    invoke("set_g1_participant_id", { id })
+      .then(() => setParticipantIdSaved(id))
+      .catch((e) =>
+        setParticipantIdError(typeof e === "string" ? e : String(e)),
+      )
+      .finally(() => setBusy(false));
+  };
 
   const togglePause = () => {
     if (!status) return;
@@ -161,6 +261,96 @@ const RecordingControls: React.FC = () => {
           {paused ? "記録を再開する" : "すぐ止める"}
         </button>
       </div>
+
+      {/* ── ⚠️★★★ O1 (R3-a): 作業の種類の宣言 (ADR-016 判断 4 / 4b) ───────────── */}
+      {/* ★ 同意文書 §2 の逐語「記録中はいつも、画面のすみに『記録中 · 作業の種類: ○○』と
+          出ています。そこを押すと、次の 4 つから選べます」を、この 1 行で満たす。
+          ⚠️ 通常運用 / G1 では **1 行も出さない** (o1_mode === null なら描画しない)。 */}
+      {o1Mode && (
+        <div style={{ marginTop: "0.5rem" }}>
+          <div
+            role="status"
+            aria-live="polite"
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
+            <span>
+              記録中 · 作業の種類:{" "}
+              <strong>{taskKindLabel(status?.task_kind ?? null)}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setPickingTaskKind((v) => !v)}
+              disabled={busy || status === null}
+            >
+              {pickingTaskKind ? "閉じる" : "選ぶ・変える"}
+            </button>
+          </div>
+
+          {pickingTaskKind && (
+            <div style={{ marginTop: "0.5rem" }}>
+              <p style={{ fontSize: "0.85em", opacity: 0.85, margin: "0 0 0.4rem" }}>
+                いま何の作業をしているかを選んでください。
+                {/* ⚠️★★★ 「選ばなくてもよい」と「忘れても記録は続く」を明示する。
+                    ★ 同意文書 §2 の逐語と一致させる (書いたことを画面でも守る)。 */}
+                選ばなくてもかまいません（記録は止まりません）。
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                {O1_TASK_KINDS.map((k) => (
+                  <button
+                    key={k.value}
+                    type="button"
+                    onClick={() => declare(k.value)}
+                    disabled={busy}
+                    aria-pressed={status?.task_kind === k.value}
+                    style={{
+                      textAlign: "left",
+                      padding: "0.4rem 0.6rem",
+                      borderRadius: "6px",
+                      border:
+                        status?.task_kind === k.value
+                          ? "2px solid #4caf50"
+                          : "1px solid #888",
+                      background:
+                        status?.task_kind === k.value
+                          ? "rgba(76,175,80,0.15)"
+                          : "transparent",
+                      cursor: busy ? "default" : "pointer",
+                    }}
+                  >
+                    <strong>{k.label}</strong>
+                    <span style={{ opacity: 0.8 }}>（{k.note}）</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ⚠️★★★ 参加者 ID —— **これが無いと自動提出が 1 本も動かない。**
+              ★ 研究者が割り当てた記号を 1 回だけ入れてもらう (以後は復元される)。 */}
+          {participantIdSaved === null && (
+            <div style={{ marginTop: "0.6rem" }}>
+              <label style={{ fontSize: "0.85em" }}>
+                参加者 ID（研究者からお伝えした記号）{" "}
+                <input
+                  type="text"
+                  value={participantId}
+                  onChange={(e) => setParticipantId(e.target.value)}
+                  placeholder="P012"
+                  style={{ width: "8rem" }}
+                />
+              </label>{" "}
+              <button type="button" onClick={saveParticipantId} disabled={busy}>
+                保存する
+              </button>
+              {participantIdError && (
+                <p role="alert" style={{ color: "#ff6b6b", marginTop: "0.3rem" }}>
+                  {participantIdError}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── D7-iii: 事後の区間指定削除 ──────────────────────────────── */}
       {/* ⚠️★★★ **理由の入力欄を置かない。** 同意文書 §4 の逐語

@@ -79,11 +79,23 @@ pub fn measure_title(state: MeasureState) -> &'static str {
 /// 2026-08-09 の Windows 実機では前者だけが `true` のまま、5 分間 0 打のブロックが
 /// 「● 計測中」の表示で自動提出された (`windows-verification.md` §5-7)。
 /// ★ 純関数 `measure_state()` の意味 (第 2 引数 = 「フックが生きているか」) は変えていない。
+/// ⚠️★★★ **O1 (R3-a) では第 1 引数が `session_active` ではない。**
+///
+/// ★ O1 は「開始する」を押さないので `session_active` は **永久に false** である。
+/// そのまま渡すと `measure_state(false, _) == Stopped` → 逐語
+/// 「**GSE — 停止中（記録していません）**」を出しながら**実際には記録し続ける**。
+/// → ⚠️ **同意文書 §4 の逐語「印が出ていないときは記録していません」と正面から矛盾する。**
+/// ★ 判定は `o1::recording_active` (純関数) に置いてある。⚠️ **非 O1 は従来どおり
+/// `session_active` そのもの**なので、Phase1 / G1 の表示は 1 バイトも変わらない。
 fn current_state(session_active: &AtomicBool) -> MeasureState {
     let installed = crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed);
     let starved = crate::input::hook::HOOK_STARVED.load(Ordering::Relaxed);
     measure_state(
-        session_active.load(Ordering::Acquire),
+        crate::o1::recording_active(
+            crate::o1::is_o1(),
+            session_active.load(Ordering::Acquire),
+            crate::recording::is_paused(),
+        ),
         installed && !starved,
     )
 }

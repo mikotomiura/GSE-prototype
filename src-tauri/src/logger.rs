@@ -2230,7 +2230,31 @@ pub fn default_log_path() -> PathBuf {
     );
 
     let ts = chrono_like_filename();
-    dir.join(format!("gse_{}.ndjson", ts))
+    dir.join(session_file_name(crate::o1::is_o1(), &ts))
+}
+
+/// セッション NDJSON のファイル名 (純関数)。
+///
+/// ## ⚠️★★★ O1 だけ接頭辞が変わる
+///
+/// ★ `reconcile` は「閉じ終わった NDJSON」を**ディスクの状態だけ**から拾う収束器で、
+/// G1 のときは `meta` 行の `g1_mode` を根拠に「これは G1 の記録である」と判定している
+/// (⚠️ 共有フォルダに Phase1 の較正セッションが同居するため・code-review HIGH)。
+/// → ★ **O1 にも同じ強さの根拠が要る。**
+///
+/// ⚠️ 本来は `g1_mode` と同じく `meta` 行に `o1_mode` を刻むほうが強い (事後検証ができる) が、
+/// それは `schema_dto.rs` → `schema/current.json` の変更を伴い、**gse-dataset の parity 更新**が要る。
+/// ★ 本タスクは「schema を 1 バイトも変えない」制約下にあるので、**ファイル名で表す**。
+/// (→ 研究者へ返す論点として `.steering/20260827-o1-collection-enablement/decisions.md` に記録。)
+///
+/// ★ **`gse_` 接頭辞は保つ。** ⚠️ 外すと `redaction::is_redactable_session_file` の
+/// フィルタから外れ、**被験者の区間指定削除が O1 のファイルに効かなくなる** (削除保証の破れ)。
+fn session_file_name(o1_mode: bool, ts: &str) -> String {
+    if o1_mode {
+        format!("{}{}.ndjson", crate::o1::SESSION_FILE_PREFIX, ts)
+    } else {
+        format!("gse_{}.ndjson", ts)
+    }
 }
 
 /// セッションログを置くディレクトリと、決定に使った参加者 ID を返す。
@@ -2372,6 +2396,29 @@ mod tests {
 
     /// ★ 診断ログは **セッション NDJSON と同じフォルダ**に置く、が唯一の要件である。
     ///
+    /// ⚠️★★★ O1 (R3-a): **ファイル名だけが O1 の目印である** (schema を変えないため)。
+    ///
+    /// ★ ここが崩れると 2 つ同時に壊れる:
+    /// 1. `reconcile::closed_o1_sessions` が O1 の記録を拾えない (= **提出されない**)
+    /// 2. `redaction::is_redactable_session_file` が外れる (= **被験者が消せない**)
+    #[test]
+    fn o1_sessions_are_named_apart_but_keep_the_gse_prefix() {
+        let o1 = session_file_name(true, "20260827_101112");
+        let normal = session_file_name(false, "20260827_101112");
+        assert_eq!(o1, "gse_o1_20260827_101112.ndjson");
+        assert_eq!(normal, "gse_20260827_101112.ndjson");
+        assert_ne!(o1, normal);
+        // ★ `reconcile` / `redaction` の共通フィルタを通り抜けること
+        for name in [o1.as_str(), normal.as_str()] {
+            assert!(name.starts_with("gse_"), "{name}");
+            assert!(name.ends_with(".ndjson"), "{name}");
+            assert!(!name.ends_with(".anon.ndjson"), "{name}");
+        }
+        // ★ O1 だけが O1 判定を通ること
+        assert!(crate::o1::is_o1_session_file_name(&o1));
+        assert!(!crate::o1::is_o1_session_file_name(&normal));
+    }
+
     /// ⚠️ ★ `log_dir_for` を 2 か所から呼んでいるので、片方だけ直すと静かにフォルダが割れる。
     /// ここで両分岐を突き合わせておく (env を触らないので並列テストで安全)。
     #[test]

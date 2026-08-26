@@ -34,6 +34,10 @@ struct Args {
     input: Option<PathBuf>,
     /// ★ 収束モード: ディスクの状態を突き合わせ、足りない `.age` を作り、未送信を送る。
     reconcile: bool,
+    /// ⚠️★★★ **O1 (R3-a) の収束である** —— `gse_o1_*.ndjson` を対象にし、
+    /// `session_end` から **48 時間**の猶予を置いてから包み、⚠️ **承認を求めずに送る**
+    /// (研究者判断 O1-2 / 同意文書 §5)。★ 既定 (未指定) は従来どおり G1。
+    o1: bool,
     help: bool,
 }
 
@@ -53,12 +57,18 @@ fn parse_args_from<I: IntoIterator<Item = String>>(args: I) -> Result<Args, Stri
                 a.input = Some(PathBuf::from(it.next().ok_or("--input requires a value")?))
             }
             "--reconcile" => a.reconcile = true,
+            "--o1" => a.o1 = true,
             "-h" | "--help" => a.help = true,
             other => return Err(format!("unknown arg: {other}")),
         }
     }
     if a.reconcile && a.input.is_some() {
         return Err("--reconcile と --input は同時に使えません".to_string());
+    }
+    // ⚠️★ `--o1` は収束モード専用である。★ 黙って無視すると
+    //   「O1 のつもりで指定したのに G1 の規則で包まれた」が静かに起こる。
+    if a.o1 && !a.reconcile {
+        return Err("--o1 は --reconcile と一緒にのみ使えます".to_string());
     }
     Ok(a)
 }
@@ -93,11 +103,13 @@ fn resolve_recipient_source(cli_recipient: Option<String>) -> Result<String, Str
 
 const USAGE: &str =
     "usage: gse-submit [--recipient <age1...|file>] [--out <dir>] [--input <ndjson>]\n\
-       gse-submit --reconcile [--recipient <age1...|file>] [--out <dir>]\n\
+       gse-submit --reconcile [--o1] [--recipient <age1...|file>] [--out <dir>]\n\
      既定 (ゼロ引数): 最新セッションを自動検出して匿名化+暗号化し提出物 (.age) を生成します。\n\
      --input:     包む NDJSON を明示します (既定の「最新 1 本」を使いません)。\n\
      --reconcile: 閉じ終わった全セッションについて、足りない .age を作り、未送信を送ります\n\
-                  (★ 何度実行しても同じ状態に収束します)。";
+                  (★ 何度実行しても同じ状態に収束します)。\n\
+     --o1:        O1 (自然作業の常時収集) の収束を行います。gse_o1_*.ndjson を対象にし、\n\
+                  session_end から 48 時間おいてから包み、承認を求めずに送ります。";
 
 /// 生成した `.age` をファイルマネージャで **選択状態** で開く (best-effort)。
 /// 被験者が「ファイルが見当たらない」事故 (OneDrive/iCloud の Documents リダイレクトで
@@ -284,11 +296,27 @@ fn run_reconcile(args: Args) -> Result<gse_next_lib::reconcile::ReconcileReport,
         None => None,
     };
 
+    // 5) ⚠️★★★ どの収集か。★ **`--o1` はアプリ (`lib.rs`) が O1 モードのときだけ付ける。**
+    //    ⚠️ ここで `o1::detect_from_env()` を呼んで自前判定しないのは、
+    //    ★ `gse-submit` の `current_exe()` が **アプリ本体と同じ階層とは限らない**
+    //    (macOS のバンドル内 sidecar) ためである。→ **判定はアプリが 1 か所で行い、渡す。**
+    let mode = if args.o1 {
+        gse_next_lib::reconcile::CollectionMode::O1
+    } else {
+        gse_next_lib::reconcile::CollectionMode::G1
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
     let opts = ReconcileOptions {
         session_dir,
         submission_dir,
         participant,
         recipient,
+        mode,
+        now_ms,
     };
     Ok(reconcile(
         &opts,
