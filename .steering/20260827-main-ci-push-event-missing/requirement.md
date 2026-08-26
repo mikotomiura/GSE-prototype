@@ -167,7 +167,8 @@ active incidents: 1  — "Incident with Actions" (investigating)
 
 - ⚠️★★★ **`decide-win-runner` を self-hosted へ移す** —— ★ `runs-on: ubuntu-latest`（`ci.yml:67`）であり、
   ⚠️ **hosted が死ぬと self-hosted の `check` まで skip される**。★ しかも fallback 先が
-  `windows-latest`（hosted）なので **hosted 障害時に二重で効く**。→ ★ **別タスクとして起票する。**
+  `windows-latest`（hosted）なので **hosted 障害時に二重で効く**。
+  → ★★★ **復旧後に、下の残作業とまとめて扱う**（★ 研究者決定・2026-08-27）。⚠️ **単独では起票しない。**
 - ★ 復旧後に PR #119 を `gh run rerun` して緑を取り、マージする。
 
 ---
@@ -187,4 +188,5 @@ active incidents: 1  — "Incident with Actions" (investigating)
 - [ ] ★ **障害の復旧後、イベント起因の run が作られること**を 1 回以上確認する
 - [ ] ★ PR #119 を `gh run rerun` で緑にしてマージする
 - [ ] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと
-- [ ] ⚠️ **`decide-win-runner` の self-hosted 化を別タスクとして起票する**
+- [ ] ⚠️ **`decide-win-runner` の self-hosted 化** —— ★ **障害の復旧後に、他の残作業とまとめて扱う**
+      （★ 研究者決定・2026-08-27。⚠️ **いま単独では起票しない**）
