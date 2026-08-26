@@ -2245,7 +2245,7 @@ pub fn default_log_path() -> PathBuf {
 /// ⚠️ 本来は `g1_mode` と同じく `meta` 行に `o1_mode` を刻むほうが強い (事後検証ができる) が、
 /// それは `schema_dto.rs` → `schema/current.json` の変更を伴い、**gse-dataset の parity 更新**が要る。
 /// ★ 本タスクは「schema を 1 バイトも変えない」制約下にあるので、**ファイル名で表す**。
-/// (→ 研究者へ返す論点として `.steering/20260827-o1-collection-enablement/decisions.md` に記録。)
+/// (→ 研究者へ返す論点として `.steering/00000000-o1-collection-enablement/decisions.md` に記録。)
 ///
 /// ★ **`gse_` 接頭辞は保つ。** ⚠️ 外すと `redaction::is_redactable_session_file` の
 /// フィルタから外れ、**被験者の区間指定削除が O1 のファイルに効かなくなる** (削除保証の破れ)。
@@ -2403,10 +2403,10 @@ mod tests {
     /// 2. `redaction::is_redactable_session_file` が外れる (= **被験者が消せない**)
     #[test]
     fn o1_sessions_are_named_apart_but_keep_the_gse_prefix() {
-        let o1 = session_file_name(true, "20260827_101112");
-        let normal = session_file_name(false, "20260827_101112");
-        assert_eq!(o1, "gse_o1_20260827_101112.ndjson");
-        assert_eq!(normal, "gse_20260827_101112.ndjson");
+        let o1 = session_file_name(true, "00000000_101112");
+        let normal = session_file_name(false, "00000000_101112");
+        assert_eq!(o1, "gse_o1_00000000_101112.ndjson");
+        assert_eq!(normal, "gse_00000000_101112.ndjson");
         assert_ne!(o1, normal);
         // ★ `reconcile` / `redaction` の共通フィルタを通り抜けること
         for name in [o1.as_str(), normal.as_str()] {

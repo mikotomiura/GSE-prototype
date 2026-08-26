@@ -1217,7 +1217,7 @@ mod tests {
     fn o1_candidates_appear_only_after_the_grace_window() {
         let d = tmpdir("o1grace");
         let end = 1_000_000_000_000_u64;
-        write_closed_o1(&d, "gse_o1_20260827_010101.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_010101.ndjson", end);
 
         // 閉じた直後: まだ候補にならない
         assert!(closed_o1_sessions(&d, end, GRACE).is_empty());
@@ -1238,7 +1238,7 @@ mod tests {
     fn o1_deletion_during_the_grace_window_removes_the_data_before_packaging() {
         let d = tmpdir("o1delete");
         let end = 1_000_000_000_000_u64;
-        let name = "gse_o1_20260827_020202.ndjson";
+        let name = "gse_o1_00000000_020202.ndjson";
         write_closed_o1(&d, name, end);
 
         // ① 猶予の中なので、まだ `.age` は作られていない
@@ -1273,18 +1273,18 @@ mod tests {
     fn o1_and_g1_candidate_sets_do_not_overlap() {
         let d = tmpdir("o1mix");
         let end = 1_000_000_000_000_u64;
-        write_closed(&d, "gse_20260827_030303.ndjson"); // G1
-        write_closed_non_g1(&d, "gse_20260827_040404.ndjson"); // Phase1
-        write_closed_o1(&d, "gse_o1_20260827_050505.ndjson", end); // O1
-        write_open(&d, "gse_o1_20260827_060606.ndjson"); // O1 書きかけ
+        write_closed(&d, "gse_00000000_030303.ndjson"); // G1
+        write_closed_non_g1(&d, "gse_00000000_040404.ndjson"); // Phase1
+        write_closed_o1(&d, "gse_o1_00000000_050505.ndjson", end); // O1
+        write_open(&d, "gse_o1_00000000_060606.ndjson"); // O1 書きかけ
 
         let g1 = closed_sessions(&d);
         assert_eq!(g1.len(), 1);
-        assert!(g1[0].to_string_lossy().contains("gse_20260827_030303"));
+        assert!(g1[0].to_string_lossy().contains("gse_00000000_030303"));
 
         let o1 = closed_o1_sessions(&d, end + GRACE, GRACE);
         assert_eq!(o1.len(), 1, "★ 書きかけ / G1 / Phase1 を拾ってはならない");
-        assert!(o1[0].to_string_lossy().contains("gse_o1_20260827_050505"));
+        assert!(o1[0].to_string_lossy().contains("gse_o1_00000000_050505"));
 
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -1294,7 +1294,7 @@ mod tests {
     #[test]
     fn o1_never_picks_up_a_file_marked_as_g1() {
         let d = tmpdir("o1g1mark");
-        write_closed(&d, "gse_o1_20260827_070707.ndjson"); // 名前は O1・中身は G1
+        write_closed(&d, "gse_o1_00000000_070707.ndjson"); // 名前は O1・中身は G1
         assert!(closed_o1_sessions(&d, u64::MAX / 2, GRACE).is_empty());
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -1307,7 +1307,7 @@ mod tests {
         let d = tmpdir("o1auto");
         let o = tmpdir("o1auto_out");
         let end = 1_000_000_000_000_u64;
-        write_closed_o1(&d, "gse_o1_20260827_080808.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_080808.ndjson", end);
         let r = test_recipient();
 
         // ★ G1 モードでは O1 のファイルを 1 本も見ない (包みもしない)
@@ -1338,7 +1338,7 @@ mod tests {
         let d = tmpdir("o1idem");
         let o = tmpdir("o1idem_out");
         let end = 1_000_000_000_000_u64;
-        write_closed_o1(&d, "gse_o1_20260827_090909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_090909.ndjson", end);
         let r = test_recipient();
         let now = end + GRACE;
 
@@ -1372,12 +1372,12 @@ mod tests {
         let r = test_recipient();
 
         // ① G1 のブロックを 1 本包む (⚠️ 承認しない = `.age.ok` を置かない)
-        write_closed(&d, "gse_20260827_010101.ndjson");
+        write_closed(&d, "gse_00000000_010101.ndjson");
         let g1 = reconcile(&opts(&d, &o, &r), None);
         assert_eq!(g1.packaged, 1, "{:?}", g1.errors);
 
         // ② O1 のファイルを 1 本置き、猶予明けに O1 モードで回す
-        write_closed_o1(&d, "gse_o1_20260827_020202.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_020202.ndjson", end);
         let up = OkUploader(Mutex::new(Vec::new()));
         let report = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
 
@@ -1410,7 +1410,7 @@ mod tests {
         use std::io::Write;
         let d = tmpdir("o1badutf8");
         let end = 1_000_000_000_000_u64;
-        let path = d.join("gse_o1_20260827_030303.ndjson");
+        let path = d.join("gse_o1_00000000_030303.ndjson");
         {
             let mut f = std::fs::File::create(&path).unwrap();
             f.write_all(b"{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\"}\n")

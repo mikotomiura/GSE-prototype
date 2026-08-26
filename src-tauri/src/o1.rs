@@ -256,7 +256,7 @@ pub fn grace_elapsed(session_end_ms: u64, now_ms: u64, grace_ms: u64) -> bool {
 /// ★ **本来は `g1_mode` と同じく `meta` 行に刻むほうが強い** (事後検証ができる)。
 /// ⚠️ しかしそれは `schema_dto.rs` → `schema/current.json` の変更を伴い、
 /// **gse-dataset との parity 更新**が要る。本タスクは「schema を 1 バイトも変えない」制約下にある。
-/// → ★ **研究者へ返す論点として `.steering/20260827-o1-collection-enablement/decisions.md` に残す。**
+/// → ★ **研究者へ返す論点として `.steering/00000000-o1-collection-enablement/decisions.md` に残す。**
 ///
 /// ★ 失敗様式は同じく fail-loud である: マーカーが外れれば `gse_<ts>.ndjson` になり、
 /// ⚠️ **提出候補から外れて研究者に届かない** (無音で増えることはない)。
@@ -573,15 +573,15 @@ mod tests {
 
     #[test]
     fn o1_session_file_names_are_distinguishable() {
-        assert!(is_o1_session_file_name("gse_o1_20260827_101112.ndjson"));
-        assert!(is_o1_session_file_name("gse_o1_20260827_101112_2.ndjson"));
+        assert!(is_o1_session_file_name("gse_o1_00000000_101112.ndjson"));
+        assert!(is_o1_session_file_name("gse_o1_00000000_101112_2.ndjson"));
         // ⚠️ 通常運用 / G1 のファイルは拾わない
-        assert!(!is_o1_session_file_name("gse_20260827_101112.ndjson"));
+        assert!(!is_o1_session_file_name("gse_00000000_101112.ndjson"));
         // ⚠️ 派生ファイルは拾わない
         assert!(!is_o1_session_file_name(
-            "gse_o1_20260827_101112.anon.ndjson"
+            "gse_o1_00000000_101112.anon.ndjson"
         ));
-        assert!(!is_o1_session_file_name("gse_o1_20260827_101112.age"));
+        assert!(!is_o1_session_file_name("gse_o1_00000000_101112.age"));
         assert!(!is_o1_session_file_name("gse-app.log"));
     }
 
@@ -600,22 +600,22 @@ mod tests {
     fn o1_age_files_are_distinguishable_from_g1_ones() {
         // O1 (stem が gse_o1_*)
         assert!(is_o1_age_file_name(
-            "P012_block01_gse_o1_20260827_101112.age"
+            "P012_block01_gse_o1_00000000_101112.age"
         ));
         assert!(is_o1_age_file_name(
-            "P012_block07_gse_o1_20260827_101112_2.age"
+            "P012_block07_gse_o1_00000000_101112_2.age"
         ));
         // ⚠️ G1 / Phase1 (stem が gse_*)
-        assert!(!is_o1_age_file_name("P012_block01_gse_20260827_101112.age"));
+        assert!(!is_o1_age_file_name("P012_block01_gse_00000000_101112.age"));
         // ⚠️ 旧形式 (手動提出・ブロック番号なし)
-        assert!(!is_o1_age_file_name("P012_gse_20260827_101112.age"));
+        assert!(!is_o1_age_file_name("P012_gse_00000000_101112.age"));
         // ⚠️ 送信済みの印・その他
         assert!(!is_o1_age_file_name(
-            "P012_block01_gse_o1_20260827_101112.age.sent"
+            "P012_block01_gse_o1_00000000_101112.age.sent"
         ));
         assert!(!is_o1_age_file_name("manifest.jsonl"));
         // ⚠️★ 参加者 ID そのものが `gse_o1_` を含んでも誤判定しない
         //   (★ ID は `^[A-Za-z0-9]{1,16}$` なので `_` を含めない = 構造的に起きない)
-        assert!(!is_o1_age_file_name("gseo1_block01_gse_20260827.age"));
+        assert!(!is_o1_age_file_name("gseo1_block01_gse_00000000.age"));
     }
 }
