@@ -122,6 +122,10 @@ gh run rerun 32982437780     # 14:47 に success で完走した run
 | 1 | 2026-08-26T15:04:42Z | main へのマージ `f90c90e` | **0 件** | ❌ 発火せず（★ tree 一致で検証は代替） |
 | 2 | 2026-08-26T15:29:06Z | PR #119 作成 `cb65631` | **0 件** | ❌ 発火せず（⚠️ `pull_request` でも起きる） |
 | 3 | 2026-08-26T15:31:40Z | run 32982437780 の**手動再実行** | 1 件 | ❌ **`startup_failure`・job 0 件**（★ 決定的） |
+| 4 | 2026-08-26T17:47:38Z | PR #119 `a6583e5`（**自然発火の `pull_request` イベント**） | 1 件 (`32996144273`) | ✅ **success**（18:03:00Z 完走。`decide-win-runner`/`frontend-check`/`check(win-selfhosted)`/`check(mac-selfhosted)` すべて success）。★ **障害復旧後、イベント起因の run が作られることを確認** |
+
+★ 18:01:30Z 時点で `githubstatus.com` incidents API は `"incidents": []`、Actions コンポーネントは `operational` — ★ **インシデント解消を確認**（開始 15:11:58Z → 解消 18:01:30Z より前、実測 ~2h50min）。
+→ ★ 手動再実行 (`gh run rerun`) は行わなかった（「緑の記録を壊しうる」教訓 #3 を踏まえ、自然発火の run が既に success だったため不要と判断）。
 
 ---
 
@@ -185,8 +189,8 @@ active incidents: 1  — "Incident with Actions" (investigating)
 ## 受け入れ条件（★ この起票を閉じてよい条件）
 
 - [x] ⚠️ **原因が特定されたこと** → ✅ **GitHub Actions の major outage**（2026-08-27・`githubstatus.com`）
-- [ ] ★ **障害の復旧後、イベント起因の run が作られること**を 1 回以上確認する
-- [ ] ★ PR #119 を `gh run rerun` で緑にしてマージする
+- [x] ★ **障害の復旧後、イベント起因の run が作られること**を 1 回以上確認する → ✅ 観測台帳 #4
+- [x] ★ PR #119 を緑にしてマージする → ✅ 観測台帳 #4 の自然発火 run が success（`gh run rerun` 不要と判断）。マージは本節末尾で実施
 - [ ] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと
 - [ ] ⚠️ **`decide-win-runner` の self-hosted 化** —— ★ **障害の復旧後に、他の残作業とまとめて扱う**
-      （★ 研究者決定・2026-08-27。⚠️ **いま単独では起票しない**）
+      （★ 研究者決定・2026-08-27。⚠️ **いま単独では起票しない** = 新しい `.steering/` ディレクトリは作らず、本ディレクトリ内で `design.md`/`tasklist.md` を追加して実施する）
