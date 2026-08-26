@@ -112,6 +112,66 @@
 3. ⚠️★★ **両 OS に対のテストを置く** —— ★ macOS では `hook_windows.rs` が 1 行もコンパイルされない。
 4. ⚠️ **`cargo` は `src-tauri/` から叩く**（★ repo 直下に `Cargo.toml` は無い）。
 5. ⚠️ **ゴールデン byte-equal と `emit_schema` の parity を必ず確認する**。
+6. ⚠️★★★ **CI が緑にならないことがある（★ CI の問題であって実装の問題ではない場合がある）** → 下記 §4b。
+
+---
+
+## §4b ⚠️★★★ CI の状態を先に疑う（★ 2026-08-27 の実測）
+
+> ★ 出所: `.steering/20260827-main-ci-push-event-missing/`。
+> ⚠️ **「テストが緑にならない」と焦る前に、CI 側が生きているかを 1 回確認すること。**
+
+★ **2026-08-27 に GitHub Actions の major outage が起きた**（`githubstatus.com` → `Actions: major_outage`）。
+そのとき観測された症状:
+
+| 症状 | ★ 見え方 |
+|---|---|
+| main へのマージで **run が 1 件も作られない** | ⚠️ 「CI が通った」も「落ちた」も出ない。★ **無言** |
+| PR の 1 コミット目で run が作られず、2 コミット目では作られた | ⚠️ **断続的**なので「直った」と誤認しやすい |
+| hosted ジョブ（`ubuntu-latest`）が **15 分キューに座って cancelled** | ⚠️ run 全体は `failure` になるが、**ログは空**（`runner_name` が空 = 割り当て前に落ちている） |
+| ★ self-hosted ランナーは **online / idle のまま無事** | ⚠️ **しかし `check` は hosted の `decide-win-runner` に依存する**ので道連れで `skipped` |
+
+### ★ 確認コマンド（★ まずこれを見る）
+
+```bash
+# ★ いま見ている sha に対して run があるか（⚠️ push のたびに head_sha は変わる）
+head="$(git rev-parse HEAD)"
+gh api "repos/{owner}/{repo}/actions/runs?head_sha=$head" --jq '.total_count'
+
+# ★ ジョブがランナーを掴んでいるか（runner=none なら割り当て前で死んでいる）
+gh api "repos/{owner}/{repo}/actions/runs/<run_id>/jobs"   --jq '.jobs[] | "\(.status)/\(.conclusion // "-") \(.name) runner=\(.runner_name // "none")"'
+
+# ★ self-hosted が生きているか
+gh api "repos/{owner}/{repo}/actions/runners" --jq '.runners[] | "\(.name) \(.status) busy=\(.busy)"'
+
+# ⚠️ GitHub 側の障害を疑う（★ status は途中で変わる。1 回見て確定させない）
+curl -s https://www.githubstatus.com/api/v2/summary.json | python -c "import json,sys; d=json.load(sys.stdin); print(d['status']['description'], [c['status'] for c in d['components'] if c['name']=='Actions'])"
+```
+
+### ⚠️★★★ 2026-08-27 に実際にやらかした診断の失敗（★ 繰り返さない）
+
+1. ⚠️ **古い `head_sha` を照会し続けた** —— PR に 2 コミット目を push した後も 1 コミット目の sha を見ており、
+   ★ **実際には作られていた run を「作られていない」と誤認**した。→ ★ **必ず現在の HEAD で引き直す。**
+2. ⚠️ **`githubstatus` を早い時刻に 1 回見て「障害ではない」と確定させた** —— ★ **後からインシデントが立った。**
+   → ★ **障害の有無は、症状が続く限り何度でも引き直す。**
+3. ⚠️★★★ **診断のために `gh run rerun` を打ち、成功済み run の記録を `success` → `startup_failure` に上書きした。**
+   → ★ **緑の記録が残っている run を、診断目的で再実行しない。**
+   ⚠️ マージ済み PR の run は `refs/pull/<n>/merge` が解決できず `startup_failure` になるので、**情報も得られない。**
+
+### ★ CI が死んでいるときの実装セッションの進め方
+
+- ★ **ローカルで回して進める**: `cargo test --manifest-path src-tauri/Cargo.toml --workspace` /
+  `cargo clippy --all-targets` / ゴールデン byte-equal。⚠️ **CI の代わりにはならない**が、止まる理由にはならない。
+- ⚠️★★★ **完了報告に「CI は緑」と書かない。** ★ 「**CI は GitHub 障害で未実行。ローカルで X を確認**」と書く。
+- ⚠️ **マージは CI 復旧後に回す**（★ 研究者の指示がある場合を除く）。
+
+### ★ 復旧後に片付ける別タスク候補（⚠️ 本セッションではやらない）
+
+- ⚠️★★★ **`decide-win-runner` を self-hosted へ移す** —— ★ 現状 `runs-on: ubuntu-latest`（`ci.yml:67`）で、
+  ⚠️ **hosted が死ぬと self-hosted の `check` まで skip される**。★ しかも fallback 先が `windows-latest`（hosted）
+  なので **hosted 障害時に二重で効く**。→ ★ 既存の fallback 設計を壊さない形で移すこと。
+- ⚠️ **PR #119（`/finish-task` Step 5 の追加）が未マージのまま残っている可能性がある。**
+  ★ マージされていれば `/finish-task` が「マージ後の CI 発火確認」をやってくれる。
 
 ---
 
@@ -124,4 +184,5 @@
 - [ ] ⚠️ **宣言変更 → ローテート → reset の 3 つが 1 アクションで揃うことを実機で確認したか**
 - [ ] ⚠️ **48 時間の猶予が「送信前なら消える」を実際に守ることをテストで固定したか**
 - [ ] ★ `code-reviewer` + `security-checker` の並列レビューと **`/cross-review`** を通したか
+- [ ] ⚠️★★★ **CI の状態**（★ 緑 / 赤 / **未実行**）。⚠️ **未実行なら「緑」と書かない**（→ §4b）
 - [ ] ⚠️ **やらなかったこと / 落としたもの**を明示

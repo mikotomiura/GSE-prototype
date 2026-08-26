@@ -123,7 +123,56 @@ gh run rerun 32982437780     # 14:47 に success で完走した run
 | 2 | 2026-08-26T15:29:06Z | PR #119 作成 `cb65631` | **0 件** | ❌ 発火せず（⚠️ `pull_request` でも起きる） |
 | 3 | 2026-08-26T15:31:40Z | run 32982437780 の**手動再実行** | 1 件 | ❌ **`startup_failure`・job 0 件**（★ 決定的） |
 
-## ⚠️★★★ 次にやること（★ 2026-08-27 時点・**研究者の操作が要る**）
+---
+
+## ✅★★★ 決着（2026-08-27）— **GitHub Actions の major outage だった**
+
+★ **17:07Z 時点の `githubstatus.com`**:
+
+```
+overall : Partial System Outage
+Actions : major_outage
+active incidents: 1  — "Incident with Actions" (investigating)
+```
+
+⚠️★★★ **15:14Z に同じ API を見たときは `operational` だった。** ★ 後からインシデントが立った
+（もしくは反映が遅れた）。→ ⚠️ **「1 回見て障害ではないと確定させた」のが誤りだった。**
+
+### ★ すべての症状がこれで説明できる
+
+| 観測 | ★ 説明 |
+|---|---|
+| main マージ `f90c90e` で run 0 件 | ★ 障害によるイベント処理の取りこぼし |
+| PR #119 の 1 コミット目で run 0 件、2 コミット目 (`e5cb04f`) では run あり | ★ **断続的**に落ちていた |
+| hosted 2 ジョブが 15 分キューで `cancelled`（`runner_name` 空） | ★ hosted の割り当てが機能していない |
+| 再実行しても 17 分間 `queued` のまま job が 1 件も作られない | ★ 現在進行形（★ 17:07Z 時点） |
+| self-hosted 2 台は `online / busy=false` | ★ **self-hosted は無事**。⚠️ ただし `check` は hosted の `decide-win-runner` に依存し道連れ |
+
+### ⚠️ 前の節「観測 3」の解釈も差し替える
+
+★ PR #118 の run を再実行して `startup_failure` になった件は、**PR がマージ済みで
+`refs/pull/118/merge` が解決できなかった**ためと読むほうが自然である。
+⚠️ **「Actions 全体が壊れている証拠」としては使えない。**
+
+### ⚠️★★★ 診断の過程で犯した誤り（★ 記録して繰り返さない）
+
+| # | 誤り | ★ 教訓 |
+|---|---|---|
+| 1 | ⚠️ **古い `head_sha`（`cb65631`）を照会し続け、実際には作られていた run を「作られていない」と誤認した** | ★ **push のたびに `head_sha` は変わる。必ず現在の HEAD で引き直す** |
+| 2 | ⚠️ **`githubstatus` を早い時刻に 1 回見て「障害ではない」と潰した** | ★ **症状が続く限り、障害の有無は何度でも引き直す** |
+| 3 | ⚠️★★★ **診断のための `gh run rerun` が、success だった run の記録を `startup_failure` に上書きした** | ★ **緑の記録が残っている run を診断目的で再実行しない**（⚠️ しかもマージ済み PR では情報も得られない） |
+| 4 | ⚠️ 結論を 3 回出し直した（枠 → run 作成不能 → hosted 不調 → 障害） | ★ **単発の観測で原因を確定させない**。⚠️ 2 件目・3 件目を取ってから言う |
+
+### ★ 残る作業（★ 障害とは独立）
+
+- ⚠️★★★ **`decide-win-runner` を self-hosted へ移す** —— ★ `runs-on: ubuntu-latest`（`ci.yml:67`）であり、
+  ⚠️ **hosted が死ぬと self-hosted の `check` まで skip される**。★ しかも fallback 先が
+  `windows-latest`（hosted）なので **hosted 障害時に二重で効く**。→ ★ **別タスクとして起票する。**
+- ★ 復旧後に PR #119 を `gh run rerun` して緑を取り、マージする。
+
+---
+
+## ⚠️ 参考: 障害前に検討していた次手（★ 決着したので実行不要）
 
 1. ⚠️★★★ **GitHub の Settings → Billing で Actions の残枠と支払い状態を確認する**（★ dev には見えない）。
 2. ★ または `gh auth refresh -h github.com -s user` で `user` scope を付け、
@@ -134,6 +183,8 @@ gh run rerun 32982437780     # 14:47 に success で完走した run
 
 ## 受け入れ条件（★ この起票を閉じてよい条件）
 
-- [ ] ⚠️ **原因が特定されたこと**（★ 課金枠 / 支払い / それ以外）
-- [ ] ★ **イベント起因の run が再び作られること**を 1 回以上確認したこと
+- [x] ⚠️ **原因が特定されたこと** → ✅ **GitHub Actions の major outage**（2026-08-27・`githubstatus.com`）
+- [ ] ★ **障害の復旧後、イベント起因の run が作られること**を 1 回以上確認する
+- [ ] ★ PR #119 を `gh run rerun` で緑にしてマージする
 - [ ] ★ `/finish-task` Step 5 の検査が、復旧後に `OK` を返すこと
+- [ ] ⚠️ **`decide-win-runner` の self-hosted 化を別タスクとして起票する**
