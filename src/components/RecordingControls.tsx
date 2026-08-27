@@ -35,6 +35,17 @@ interface RecordingStatusDto {
    * (同意文書 §2 の逐語)。
    */
   task_kind: string | null;
+  /**
+   * ⚠️★★★ **実際に記録できているか** (研究者判断 R-11)。
+   *
+   * ★ `paused` だけを見ると、⚠️ **フックが死んでいても「記録しています」と出る**。
+   * → ★ 同意文書 §4 の逐語「印が出ていないときは記録していません」を守るため、
+   * **「止めた」と「壊れている」を分けて描く**。⚠️ 判定は Rust 側が持つ
+   * (`architecture-rules` ルール 3 / `typescript-standards` ルール 2)。
+   */
+  health: "recording" | "paused" | "broken";
+  /** ⚠️ `health === "broken"` のとき、何が壊れているかの 1 行。 */
+  health_detail: string | null;
 }
 
 /**
@@ -62,6 +73,14 @@ const O1_TASK_KINDS: { value: string; label: string; note: string }[] = [
 function taskKindLabel(value: string | null): string {
   if (value === null) return "未設定";
   return O1_TASK_KINDS.find((k) => k.value === value)?.label ?? value;
+}
+
+/** backend `get_o1_enrollment` / `O1EnrollmentDto` と同期 (研究者判断 R-7)。 */
+interface O1EnrollmentDto {
+  /** ★ 1 回きりの同意確認が済んでいるか。⚠️ 済むまで送信経路は開かない。 */
+  consent_acknowledged: boolean;
+  /** ★ O1 専用の参加者 ID (未登録なら null)。 */
+  participant_id: string | null;
 }
 
 /** 参加者 ID の妥当性。★ backend `participant_id::is_valid_participant_id` と同じ規則。 */
@@ -113,8 +132,9 @@ const RecordingControls: React.FC = () => {
   // ★ O1: 研究者が割り当てた参加者 ID。⚠️ **これが無いと自動提出が動かない**
   //   (`run_reconcile_blocking` が「ID 未登録なので何もしない」で帰る)。
   const [participantId, setParticipantId] = useState("");
-  const [participantIdSaved, setParticipantIdSaved] = useState<string | null>(null);
   const [participantIdError, setParticipantIdError] = useState<string | null>(null);
+  // ⚠️★★★ O1 の開始前ゲート (研究者判断 R-7)。null = まだ読んでいない。
+  const [enrollment, setEnrollment] = useState<O1EnrollmentDto | null>(null);
 
   const refresh = useCallback(() => {
     invoke<RecordingStatusDto>("get_recording_status")
@@ -152,17 +172,21 @@ const RecordingControls: React.FC = () => {
       setPickingTaskKind(true);
     }
   }, [o1Mode, status?.task_kind]);
+  // ★ O1: 開始前ゲートの状態を読む (⚠️ 通常運用 / G1 では呼ばない)。
+  const refreshEnrollment = useCallback(() => {
+    invoke<O1EnrollmentDto>("get_o1_enrollment")
+      .then((e) => {
+        setEnrollment(e);
+        if (e.participant_id) setParticipantId(e.participant_id);
+      })
+      // ⚠️ 読めないときは **null のまま** = ゲートを描かない。
+      //   ★ 「確認してください」を出せないだけで、送信は backend が塞いでいる (fail-closed)。
+      .catch((e) => console.error("get_o1_enrollment failed:", e));
+  }, []);
   useEffect(() => {
     if (!o1Mode) return;
-    invoke<string | null>("get_g1_participant_id")
-      .then((id) => {
-        if (id) {
-          setParticipantId(id);
-          setParticipantIdSaved(id);
-        }
-      })
-      .catch((e) => console.error("get_g1_participant_id failed:", e));
-  }, [o1Mode]);
+    refreshEnrollment();
+  }, [o1Mode, refreshEnrollment]);
 
   /**
    * ⚠️★★★ 作業の種類を宣言する / 宣言し直す。
@@ -184,8 +208,14 @@ const RecordingControls: React.FC = () => {
       .finally(() => setBusy(false));
   };
 
-  /** ★ O1: 参加者 ID を保存する。⚠️ 妥当でなければ**保存しない** (fail-closed)。 */
-  const saveParticipantId = () => {
+  /**
+   * ⚠️★★★ O1: **同意確認と参加者 ID を 1 アクションで登録する** (研究者判断 R-7)。
+   *
+   * ★ 被験者が押すのは**この 1 回だけ**である。⚠️ backend は ID が妥当でなければ
+   * **確認の印も置かない** (fail-closed) —— ★ 「確認は済んだが ID が無いので送られない」
+   * という中途半端な状態を作らない。
+   */
+  const acknowledgeEnrollment = () => {
     const id = participantId.trim();
     if (!isValidParticipantId(id)) {
       setParticipantIdError("英数字のみ・1〜16 文字で入力してください (例: P012)。");
@@ -193,11 +223,9 @@ const RecordingControls: React.FC = () => {
     }
     setBusy(true);
     setParticipantIdError(null);
-    invoke("set_g1_participant_id", { id })
-      .then(() => setParticipantIdSaved(id))
-      .catch((e) =>
-        setParticipantIdError(typeof e === "string" ? e : String(e)),
-      )
+    invoke("acknowledge_o1_enrollment", { participantId: id })
+      .then(() => refreshEnrollment())
+      .catch((e) => setParticipantIdError(typeof e === "string" ? e : String(e)))
       .finally(() => setBusy(false));
   };
 
@@ -238,6 +266,9 @@ const RecordingControls: React.FC = () => {
   };
 
   const paused = status?.paused === true;
+  // ⚠️★★★ 止めていないのに記録できていない (フックの死 / 書込不可)。
+  //   ★ backend が判定した値をそのまま描く (Frontend で判定しない)。
+  const broken = status?.health === "broken";
 
   return (
     <div className="recording-controls" style={{ marginTop: "1.5rem" }}>
@@ -256,13 +287,20 @@ const RecordingControls: React.FC = () => {
           border: "1px solid rgba(255,255,255,0.15)",
         }}
       >
-        <span aria-hidden="true">{paused ? "⏸" : "●"}</span>
-        <strong>
+        {/* ⚠️★★★ **3 値で描く** (R-11)。★ 「止めた」と「壊れている」を分ける ——
+            混ぜると、⚠️ **1 行も書けていないのに「記録しています」と出る**
+            (同意文書 §4 の逐語と正面から矛盾する)。 */}
+        <span aria-hidden="true">
+          {status === null ? "…" : broken ? "⚠" : paused ? "⏸" : "●"}
+        </span>
+        <strong style={broken ? { color: "#ff6b6b" } : undefined}>
           {status === null
             ? "記録の状態を確認しています…"
-            : paused
-              ? "記録を止めています（このあいだは何も記録されません）"
-              : "記録しています"}
+            : broken
+              ? "記録できていません"
+              : paused
+                ? "記録を止めています（このあいだは何も記録されません）"
+                : "記録しています"}
         </strong>
         <button
           type="button"
@@ -273,6 +311,13 @@ const RecordingControls: React.FC = () => {
           {paused ? "記録を再開する" : "すぐ止める"}
         </button>
       </div>
+
+      {/* ⚠️★★★ **黙って赤くしない。** ★ 何が壊れているかと、次に何をすればよいかを出す。 */}
+      {broken && status?.health_detail && (
+        <p role="alert" style={{ color: "#ff6b6b", margin: "0.4rem 0 0" }}>
+          {status.health_detail}
+        </p>
+      )}
 
       {/* ── ⚠️★★★ O1 (R3-a): 作業の種類の宣言 (ADR-016 判断 4 / 4b) ───────────── */}
       {/* ★ 同意文書 §2 の逐語「記録中はいつも、画面のすみに『記録中 · 作業の種類: ○○』と
@@ -337,11 +382,42 @@ const RecordingControls: React.FC = () => {
             </div>
           )}
 
-          {/* ⚠️★★★ 参加者 ID —— **これが無いと自動提出が 1 本も動かない。**
-              ★ 研究者が割り当てた記号を 1 回だけ入れてもらう (以後は復元される)。 */}
-          {participantIdSaved === null && (
-            <div style={{ marginTop: "0.6rem" }}>
-              <label style={{ fontSize: "0.85em" }}>
+          {/* ⚠️★★★ **開始前ゲート — 1 回きり** (研究者判断 R-7)。
+              ★ D-14 の `.age.ok` (毎回の送信確認) は O1 では外した (R-2・同意文書 §5 の
+              逐語「**自動的に**送ります」を守るため)。⚠️ しかしそれは
+              「**同意手続きを経ていない人が配布ビルドを起動する経路を塞ぐ**」役も担っていた。
+              ⚠️★★★ 実測: **G1 をやった端末に O1 ビルドを置くだけで、人の操作ゼロで
+              常時記録＋48 時間後の自動送信が始まる**。→ ★ **確認が済むまで送信経路を開かない。**
+              ⚠️ `.age` は作られる (★ データは失われず、確認すればそのまま送られる)。 */}
+          {enrollment !== null && !enrollment.consent_acknowledged && (
+            <div
+              role="alert"
+              style={{
+                marginTop: "0.75rem",
+                padding: "0.6rem 0.9rem",
+                borderRadius: "6px",
+                border: "1px solid #ffb74d",
+              }}
+            >
+              <strong>研究者へ送る前に、1 回だけ確認させてください。</strong>
+              <p style={{ fontSize: "0.9em", margin: "0.4rem 0" }}>
+                この記録は、1 日ごとにひとまとまりにして、
+                <strong>そこから 48 時間おいてから</strong>
+                暗号化して研究者へ送られます。
+                <br />
+                {/* ⚠️★★★ 同意文書 §4-3 の逐語と揃える (★ 書いたことを画面でも守る)。 */}
+                送られる前なら、「この時間帯の記録を消す」でご自身の端末の上で消せます。
+                理由を聞くことはありません。
+              </p>
+              <p style={{ fontSize: "0.9em", margin: "0.4rem 0" }}>
+                説明を受け、記録と自動送信に同意される場合は、
+                研究者からお伝えした記号を入れて「確認しました」を押してください。
+                <br />
+                <span style={{ opacity: 0.85 }}>
+                  ⚠️ 押されるまで、研究者へは 1 本も送られません。
+                </span>
+              </p>
+              <label style={{ fontSize: "0.9em" }}>
                 参加者 ID（研究者からお伝えした記号）{" "}
                 <input
                   type="text"
@@ -351,8 +427,8 @@ const RecordingControls: React.FC = () => {
                   style={{ width: "8rem" }}
                 />
               </label>{" "}
-              <button type="button" onClick={saveParticipantId} disabled={busy}>
-                保存する
+              <button type="button" onClick={acknowledgeEnrollment} disabled={busy}>
+                確認しました
               </button>
               {participantIdError && (
                 <p role="alert" style={{ color: "#ff6b6b", marginTop: "0.3rem" }}>

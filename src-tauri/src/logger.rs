@@ -1240,6 +1240,18 @@ fn keyboard_layout_fragment() -> String {
     }
 }
 
+/// `meta` に足す O1 モードの断片 (★ 非 O1 なら空文字列 = 従来と 1 バイトも変わらない)。
+///
+/// ⚠️★★★ **`g1_mode` の直後・`app_version` の前**に置く (★ キー順を固定する)。
+/// ★ 値域は `O1Source` で型に閉じているので、⚠️ 外部由来の文字列が JSON を壊す経路は無い
+/// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
+fn o1_mode_fragment() -> String {
+    match crate::o1::mode() {
+        Some(src) => format!(r#","o1_mode":"{}""#, src.as_str()),
+        None => String::new(),
+    }
+}
+
 fn write_meta_start(
     writer: &mut impl Write,
     session_start: u64,
@@ -1255,13 +1267,16 @@ fn write_meta_start(
     let capabilities = crate::capabilities::capabilities_json();
     // ★ O1: セッション開始時に 1 回だけ。⚠️ 未設定なら空文字列で、従来の出力と同一になる。
     let layout = keyboard_layout_fragment();
+    // ★ O1: 実施時にしか出ない (⚠️ 通常運用 / G1 の出力は 1 バイトも変わらない・R-1)。
+    let o1 = o1_mode_fragment();
     match g1_mode.map(|s| s.as_str()) {
         None => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","app_version":"{}","capabilities":{}{}}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}"{},"app_version":"{}","capabilities":{}{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
+                o1,
                 app_version,
                 capabilities,
                 layout,
@@ -1270,10 +1285,11 @@ fn write_meta_start(
         Some(source) => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}","app_version":"{}","capabilities":{}{}}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}"{},"app_version":"{}","capabilities":{}{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
                 source,
+                o1,
                 app_version,
                 capabilities,
                 layout,
@@ -2229,6 +2245,10 @@ pub fn default_log_path() -> PathBuf {
         "session log path resolved"
     );
 
+    // ⚠️★★★ 同意文書 §5「クラウド同期フォルダには置きません」の**実装上の担保**（R-10）。
+    //   ★ 保存先が確定したこの 1 か所で見る（⚠️ 起動のたびに 1 回だけ）。
+    warn_if_cloud_synced(&dir);
+
     let ts = chrono_like_filename();
     dir.join(session_file_name(crate::o1::is_o1(), &ts))
 }
@@ -2356,6 +2376,59 @@ fn fallback_log_dir() -> PathBuf {
     PathBuf::from(base).join("Documents").join("GSE-sessions")
 }
 
+/// ⚠️★★★ **クラウド同期フォルダの名前**（研究者判断 R-10・2026-08-26）。
+///
+/// ★ 同意文書 §5 は逐語で「⚠️ **クラウド同期フォルダ（OneDrive 等）には置きません**」と
+/// 約束しているが、⚠️ **実装上の担保が 1 つも無かった**（security-checker MEDIUM-6）——
+/// `fallback_log_dir()` は `Documents` を**文字列で組み立てるだけ**で、
+/// ★ Windows の「ドキュメントを OneDrive にリダイレクト」やジャンクションを検査していない。
+/// → ⚠️ **O1 は数日〜数週間ぶんの平文 NDJSON が残る**ので、同期対象になると影響が大きい。
+/// ⚠️★★★ **実際のパスの形に合わせること。** ★ 2026-08-26 にテストで実際に踏んだ:
+/// macOS の iCloud Drive は逐語 `Library/Mobile Documents/com~apple~CloudDocs` であり、
+/// ⚠️ **`icloud` という語はパスに 1 度も現れない**。Google Drive も **空白入り**である。
+/// → ★ 「それらしい語」ではなく **実在するディレクトリ名**を並べる。
+const CLOUD_SYNC_MARKERS: [&str; 7] = [
+    "onedrive",
+    // ⚠️ macOS の iCloud Drive (★ `icloud` ではない)
+    "com~apple~clouddocs",
+    "mobile documents",
+    "dropbox",
+    // ⚠️ 空白入り (★ `googledrive` では当たらない)
+    "google drive",
+    "box sync",
+    "creative cloud files",
+];
+
+/// ★ 解決済みの保存先が**クラウド同期の下にあるか**（純関数）。
+///
+/// ⚠️ ★ 判定は**小文字化した実パスの部分一致**である。★ 完全ではないが、
+/// **無検査よりはるかに良く、誤検知しても失うのは警告 1 行だけ**である
+/// （⚠️ 記録は止めない —— 止めると「気づいたら何も取れていない」を作る）。
+pub fn looks_cloud_synced(path: &Path) -> Option<&'static str> {
+    let lower = path.to_string_lossy().to_lowercase();
+    CLOUD_SYNC_MARKERS.into_iter().find(|m| lower.contains(m))
+}
+
+/// ⚠️★★★ 保存先がクラウド同期の下なら **fail-loud で警告する**（起動時 1 回）。
+///
+/// ★ **止めない。** ⚠️ 記録を止めると「気づいたら何も取れていなかった」になり、
+/// ★ ADR-012 D-4 が「被験者側の停止スイッチ」を却下したのと同じ失敗様式に落ちる。
+/// → ★ **`tracing::error!` で残し、判断は人に返す**（`g1::other_instance_running` と同じ流儀）。
+///
+/// ⚠️ **実パスで見る**（`canonicalize`）—— ★ リダイレクトやジャンクションは
+/// 組み立てた文字列には現れない。取れなければ元のパスで見る（★ 検査できないことを
+/// 理由に「安全」と言わない）。
+pub fn warn_if_cloud_synced(dir: &Path) {
+    let resolved = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    if let Some(marker) = looks_cloud_synced(&resolved) {
+        tracing::error!(
+            resolved_log_dir = %resolved.display(),
+            marker = marker,
+            "SESSION LOGS ARE INSIDE A CLOUD-SYNCED FOLDER.              The consent form promises they are not (O1 keeps weeks of plaintext NDJSON).              Move the folder out of the sync root, or set GSE_DATASET to a local path."
+        );
+    }
+}
+
 /// chrono 非依存のタイムスタンプ文字列生成 (標準ライブラリのみ)
 fn chrono_like_filename() -> String {
     // UNIX時刻から YYYYMMDD_HHMMSS を近似生成
@@ -2396,6 +2469,55 @@ mod tests {
 
     /// ★ 診断ログは **セッション NDJSON と同じフォルダ**に置く、が唯一の要件である。
     ///
+    /// ⚠️★★★ **同意文書 §5「クラウド同期フォルダには置きません」の実装上の担保** (R-10)。
+    ///
+    /// ★ O1 は数日〜数週間ぶんの**平文 NDJSON** が残るので、同期対象になると影響が大きい。
+    #[test]
+    fn cloud_synced_paths_are_recognised() {
+        use std::path::Path;
+        // ⚠️ Windows の「ドキュメントを OneDrive にリダイレクト」の実際の形
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"C:\Users\x\OneDrive\Documents\GSE-sessions")),
+            Some("onedrive")
+        );
+        // ⚠️★★★ macOS の iCloud Drive —— ★ **逐語で `com~apple~CloudDocs`**。
+        //   ⚠️ 「icloud」という語はパスに 1 度も現れない (★ ここを実際に踏んだ)。
+        assert_eq!(
+            looks_cloud_synced(Path::new(
+                "/Users/x/Library/Mobile Documents/com~apple~CloudDocs/GSE-sessions"
+            )),
+            Some("com~apple~clouddocs")
+        );
+        // ⚠️ Google Drive は**空白入り** (★ `googledrive` では当たらない)
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"G:\My Drive\GSE-sessions")),
+            None,
+            "★ マウントドライブは名前から判別できない (⚠️ 既知の限界)"
+        );
+        assert_eq!(
+            looks_cloud_synced(Path::new("/Users/x/Google Drive/GSE-sessions")),
+            Some("google drive")
+        );
+        assert_eq!(
+            looks_cloud_synced(Path::new("/Users/x/Dropbox/GSE-sessions")),
+            Some("dropbox")
+        );
+        // ★ 大文字小文字を問わない
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"C:\Users\x\onedrive - contoso\GSE-sessions")),
+            Some("onedrive")
+        );
+        // ★ ふつうのローカル保存先は通す (⚠️ 誤検知で毎回警告を出さない)
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"C:\Users\x\Documents\GSE-sessions")),
+            None
+        );
+        assert_eq!(
+            looks_cloud_synced(Path::new("/Users/x/Documents/GSE-sessions")),
+            None
+        );
+    }
+
     /// ⚠️★★★ O1 (R3-a): **ファイル名だけが O1 の目印である** (schema を変えないため)。
     ///
     /// ★ ここが崩れると 2 つ同時に壊れる:

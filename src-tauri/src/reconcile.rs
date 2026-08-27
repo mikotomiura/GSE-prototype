@@ -287,6 +287,10 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
     //   (★ 押下しないと打鍵が記録されないので、押下の痕跡なしにデータ行は存在しえない)。
     //   ★ schema を 1 バイトも変えずに効く (⚠️ 完全ではない —— `decisions.md` R-1 参照)。
     let mut has_session_start = false;
+    // ⚠️★★★ **`meta` 行の `o1_mode` を第 1 の根拠にする** (研究者判断 R-1・2026-08-26)。
+    //   ★ ファイル名は被験者が書き換えられるが、⚠️ **`meta` 行は記録の中身**である。
+    //   ★ `g1_mode` と同じ形。→ 2026-08-26 以降に O1 で書いたファイルは必ず持つ。
+    let mut has_o1_mode = false;
     for line in std::io::BufReader::new(f).lines() {
         // ⚠️★★★ **1 行の読み取り失敗で関数ごと諦めない** (code-reviewer MEDIUM・2026-08-27)。
         //   ★ 以前は `line.ok()?` で、**UTF-8 として不正な 1 行があるだけで `None`** を返した。
@@ -306,11 +310,25 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
             // ⚠️ G1 の記録である。★ O1 の経路では 1 本も触らない。
             return None;
         }
+        if line.contains(r#""o1_mode""#) {
+            has_o1_mode = true;
+        }
         // ⚠️ ★ **最後の `session_end` を採る。** 1 ファイルに 2 本入ることは無い設計だが、
         //   もし混ざったら「より新しい方」= 安全側 (猶予が長くなる) に倒れる。
         if let Some(v) = parse_meta_u64(&line, "session_end") {
             session_end = Some(v);
         }
+    }
+    if !has_o1_mode {
+        // ⚠️★★★ **`o1_mode` を持たないファイルは O1 として提出しない** (R-1)。
+        //   ★ 名前は書き換えられるが、`meta` 行の中身は記録そのものである。
+        //   ⚠️ 2026-08-26 より前に O1 で書いたファイルはこれを持たないが、
+        //   ★ **収集はまだ始まっていない**ので実データは存在しない (移行の心配は無い)。
+        tracing::warn!(
+            "reconcile: {:?} is named like an O1 session but its meta row has no o1_mode;              refusing to submit it as O1",
+            path.file_name()
+        );
+        return None;
     }
     if has_session_start {
         // ⚠️★★★ **押下の痕跡があるファイルは O1 ではない。** ★ 名前だけを頼りにしない
@@ -392,6 +410,48 @@ pub fn next_block_number(submission_dir: &Path, participant: &str) -> u32 {
         .max()
         .unwrap_or(0);
     from_files.max(from_manifest) + 1
+}
+
+/// ⚠️★★★ **O1 の次の日番号**を決める (R-13)。★ `next_block_number` の鏡像。
+///
+/// ★ `.age` の名前と台帳の**両方の最大値 + 1** を採る (⚠️ 片方が欠けても番号が戻らない)。
+pub fn next_o1_day_number(submission_dir: &Path, participant: &str) -> u32 {
+    let from_files = crate::submission::list_age_files(submission_dir)
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|s| s.to_str()))
+        .filter_map(|n| crate::submission::parse_o1_day_number(n, participant))
+        .max()
+        .unwrap_or(0);
+    let from_manifest = read_manifest_days(submission_dir, participant)
+        .into_iter()
+        .max()
+        .unwrap_or(0);
+    from_files.max(from_manifest) + 1
+}
+
+/// 台帳から、その参加者の **O1 日番号**を読む。
+///
+/// ⚠️ ★ 台帳の `block` 欄は G1 と共有だが、`age` の名前で**どちらの名前空間か**が分かる。
+fn read_manifest_days(submission_dir: &Path, participant: &str) -> Vec<u32> {
+    let path = submission_dir.join(MANIFEST_FILE_NAME);
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(_) => return Vec::new(),
+    };
+    text.lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l.trim()).ok())
+        .filter(|v| v.get("participant").and_then(|x| x.as_str()) == Some(participant))
+        // ⚠️★ **`age` の名前で名前空間を判定する。** ★ `block` 欄だけを見ると
+        //   G1 の番号を O1 の最大値として拾い、⚠️ **番号が飛ぶ**。
+        .filter(|v| {
+            v.get("age")
+                .and_then(|x| x.as_str())
+                .map(|n| crate::submission::parse_o1_day_number(n, participant).is_some())
+                .unwrap_or(false)
+        })
+        .filter_map(|v| v.get("block").and_then(|x| x.as_u64()))
+        .map(|n| n as u32)
+        .collect()
 }
 
 /// 台帳から、その参加者のブロック番号を読む。壊れた行は飛ばす (★ 台帳は append-only で、
@@ -483,8 +543,22 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         if age_for_stem(&opts.submission_dir, &stem).is_some() {
             continue; // 既に包んである (手動提出で作った旧形式も含む)
         }
-        let block = next_block_number(&opts.submission_dir, &opts.participant);
-        let out_name = age_file_name(&opts.participant, block, &stem);
+        // ⚠️★★★ **O1 は G1 と別の名前空間で採番する** (研究者判断 R-13)。
+        //   ★ 共有すると番号を食い合い、⚠️ 研究者から見て「何ブロック目か」が意味を失う。
+        //   ★ O1 の単位は**ブロック (5 分) ではなく日**なので `block` の語自体が嘘になる。
+        let (block, out_name) = match opts.mode {
+            CollectionMode::G1 => {
+                let n = next_block_number(&opts.submission_dir, &opts.participant);
+                (n, age_file_name(&opts.participant, n, &stem))
+            }
+            CollectionMode::O1 => {
+                let n = next_o1_day_number(&opts.submission_dir, &opts.participant);
+                (
+                    n,
+                    crate::submission::o1_age_file_name(&opts.participant, n, &stem),
+                )
+            }
+        };
         let out_path = opts.submission_dir.join(&out_name);
         if out_path.exists() {
             // ⚠️ ★ **黙って上書きしない。** 1 本も失えない (`design.md` §3)。
@@ -537,20 +611,12 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                 &opts.participant,
             ),
             // ⚠️★★★ **O1 の提出物だけを送る** (code-reviewer / security-checker が一致して指摘)。
-            //   ★ `unsent_age_files` は名前が `<participant>_block<NN>_….age` かだけを見るので、
-            //   ⚠️ 絞らないと **同じ端末に残っている G1 の未承認 `.age`** が
+            //   ★ 絞らないと **同じ端末に残っている G1 の未承認 `.age`** が
             //   **承認なしに送られる** = D-14 の承認ゲートが O1 経由で無効化される。
-            //   ★ `closed_o1_sessions` が `g1_mode` を弾いているのと**対**の排他である。
+            //   ★ R-13 で名前空間を分けたので、**`o1day<NN>` の形かどうか**で構造的に切れる
+            //   (⚠️ `closed_o1_sessions` が `g1_mode` を弾いているのと対の排他)。
             CollectionMode::O1 => {
-                crate::submission::unsent_age_files(&opts.submission_dir, &opts.participant)
-                    .into_iter()
-                    .filter(|p| {
-                        p.file_name()
-                            .and_then(|s| s.to_str())
-                            .map(crate::o1::is_o1_age_file_name)
-                            .unwrap_or(false)
-                    })
-                    .collect()
+                crate::submission::unsent_o1_age_files(&opts.submission_dir, &opts.participant)
             }
         };
         for age in to_send {
@@ -589,15 +655,7 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
     report.unsent = match opts.mode {
         CollectionMode::G1 => unsent_count(&opts.submission_dir, &opts.participant),
         CollectionMode::O1 => {
-            crate::submission::unsent_age_files(&opts.submission_dir, &opts.participant)
-                .iter()
-                .filter(|p| {
-                    p.file_name()
-                        .and_then(|s| s.to_str())
-                        .map(crate::o1::is_o1_age_file_name)
-                        .unwrap_or(false)
-                })
-                .count()
+            crate::submission::unsent_o1_age_files(&opts.submission_dir, &opts.participant).len()
         }
     };
     // ⚠️★ **O1 に「確認待ち」は無い** (承認ゲートを通らないので、数えると画面に嘘が出る)。
@@ -754,7 +812,7 @@ mod tests {
         std::fs::write(
             dir.join(name),
             format!(
-                "{{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\"}}\n\
+                "{{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\",\"o1_mode\":\"marker\"}}\n\
                  {{\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}}\n\
                  {{\"type\":\"key\",\"t\":5000,\"vk\":75,\"press\":true}}\n\
                  {{\"type\":\"meta\",\"session_end\":{session_end_ms}}}\n"
@@ -1470,8 +1528,10 @@ mod tests {
         let path = d.join("gse_o1_00000000_030303.ndjson");
         {
             let mut f = std::fs::File::create(&path).unwrap();
-            f.write_all(b"{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\"}\n")
-                .unwrap();
+            f.write_all(
+                b"{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\",\"o1_mode\":\"marker\"}\n",
+            )
+            .unwrap();
             // ⚠️ 不正な UTF-8 を 1 行混ぜる
             f.write_all(&[0xff, 0xfe, 0x00, b'\n']).unwrap();
             f.write_all(b"{\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n")

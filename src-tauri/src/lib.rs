@@ -292,6 +292,13 @@ impl LogState {
             .to_string_lossy()
             .to_string()
     }
+
+    /// ⚠️★★★ **いま実際に書けているか** (R-11)。★ ローテートで変わるので共有ハンドルから読む。
+    ///
+    /// `LogStatus::Ok` 以外 (temp へフォールバック / 破棄) は **`false`** である。
+    fn status(&self) -> bool {
+        self.target.lock().unwrap_or_else(|p| p.into_inner()).status == LogStatus::Ok
+    }
 }
 
 /// 分析スレッドへのリセットシグナル。
@@ -998,6 +1005,22 @@ struct RecordingStatusDto {
     /// 未宣言を表す。→ ここも `None` のままにし、⚠️ **UI が「未設定」と描く**。
     /// ★ こちらで勝手に推測して埋めない (同意文書 §2 の逐語)。
     task_kind: Option<&'static str>,
+    /// ⚠️★★★ **実際に記録できているか** (研究者判断 R-11・2026-08-26)。
+    ///
+    /// ★ 旧実装は `paused` だけを見ており、⚠️ **フックが死んでいても
+    /// 「記録しています」と出した** (security-checker MEDIUM-2)。
+    /// ★ トレイ (`tray::current_state`) は見ているのに**アプリ内バッジだけが見ていなかった**。
+    /// → ★ 同意文書 §4 の逐語「印が出ていないときは記録していません」を守るには、
+    /// **「止めた」と「壊れている」を分けて出す**必要がある (トレイの `MeasureState` と同じ理屈)。
+    ///
+    /// | 値 | 意味 |
+    /// |---|---|
+    /// | `"recording"` | ★ 記録できている |
+    /// | `"paused"` | ★ 被験者が止めている |
+    /// | `"broken"` | ⚠️★★★ **止めていないのに記録できていない** (フックの死 / 書込不可) |
+    health: &'static str,
+    /// ⚠️ `health == "broken"` のとき、**何が壊れているか**を被験者に出す 1 行。
+    health_detail: Option<String>,
 }
 
 /// 記録の稼働状態を返す (D7-i: 稼働中インジケータ)。
@@ -1007,19 +1030,105 @@ struct RecordingStatusDto {
 #[tauri::command]
 fn get_recording_status(log: State<Arc<Mutex<LogState>>>) -> RecordingStatusDto {
     let (dir, _participant_id) = crate::logger::session_log_dir();
+    let paused = crate::recording::is_paused();
+    // ⚠️★★★ **「止めた」と「壊れている」を分ける** (R-11)。★ 材料はトレイと同じ 3 つ:
+    //   `HOOK_ACTIVE` (設置できたか) / `!HOOK_STARVED` (実際に届いているか) /
+    //   `LogStatus` (書けているか)。
+    // ★ ロックは 1 回だけ取る (⚠️ 2 回取ると、その間のローテートでパスと状態が食い違う)。
+    let (current_file, log_ok) = {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+        (guard.current_path(), guard.status())
+    };
+    let (health, health_detail) = recording_health(
+        paused,
+        crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed),
+        crate::input::hook::HOOK_STARVED.load(Ordering::Relaxed),
+        log_ok,
+    );
     RecordingStatusDto {
-        paused: crate::recording::is_paused(),
-        current_file: log.lock().unwrap_or_else(|p| p.into_inner()).current_path(),
+        paused,
+        current_file,
         session_dir: dir.display().to_string(),
         o1_mode: crate::o1::mode().map(|s| s.as_str()),
         task_kind: declared_task_kind().map(|k| k.as_str()),
+        health,
+        health_detail,
     }
+}
+
+/// 稼働中インジケータの 3 値を決める**純関数** (R-11)。
+///
+/// ⚠️★★★ **順序が意味を持つ**: ★ 「被験者が止めた」が最優先である ——
+/// 止めているあいだフックが遊んでいるのは**当たり前**なので、
+/// ⚠️ そこで「壊れています」と出すと**被験者が自分の操作を故障と誤解する**。
+///
+/// ★ `installed && !starved` はトレイの `current_state` と**同じ式**である
+/// (⚠️ 2 か所で違う式を書くと、片方だけ直して静かに食い違う)。
+fn recording_health(
+    paused: bool,
+    hook_installed: bool,
+    hook_starved: bool,
+    log_ok: bool,
+) -> (&'static str, Option<String>) {
+    if paused {
+        return ("paused", None);
+    }
+    if !log_ok {
+        return (
+            "broken",
+            Some("記録の保存先に書き込めていません。研究者に連絡してください。".to_string()),
+        );
+    }
+    if !hook_installed || hook_starved {
+        return (
+            "broken",
+            Some("キーボードの記録ができていません。研究者に連絡してください。".to_string()),
+        );
+    }
+    ("recording", None)
 }
 
 /// O1 モードか (引き金つき)。★ `get_g1_mode` の鏡像。通常運用では `None`。
 #[tauri::command]
 fn get_o1_mode() -> Option<&'static str> {
     crate::o1::mode().map(|s| s.as_str())
+}
+
+/// ⚠️★★★ O1 の**開始前ゲート**の状態 (研究者判断 R-7)。
+#[derive(serde::Serialize)]
+struct O1EnrollmentDto {
+    /// ★ 1 回きりの同意確認が済んでいるか。
+    consent_acknowledged: bool,
+    /// ★ O1 専用の参加者 ID (未登録なら `None`)。
+    participant_id: Option<String>,
+}
+
+/// O1 の開始前ゲートを読む。
+#[tauri::command]
+fn get_o1_enrollment() -> O1EnrollmentDto {
+    O1EnrollmentDto {
+        consent_acknowledged: crate::submission::o1_consent_acknowledged(),
+        participant_id: crate::submission::read_o1_participant_id(),
+    }
+}
+
+/// ⚠️★★★ O1 の**同意確認と参加者 ID を 1 アクションで登録する** (研究者判断 R-7)。
+///
+/// ★ 被験者が押すのは**この 1 回だけ**である。⚠️ 以後は再確認しない
+/// (同意文書 §5 の逐語「**自動的に**送ります」を守るため)。
+///
+/// ⚠️ **ID が妥当でなければ確認も記録しない** (fail-closed) —— ★ 「確認は済んだが
+/// ID が無いので送られない」という**中途半端な状態を作らない**。
+#[tauri::command]
+fn acknowledge_o1_enrollment(participant_id: String) -> Result<(), String> {
+    if !crate::o1::is_o1() {
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+    // ★ 先に ID を検証して保存する (⚠️ 失敗したら確認の印を置かない)。
+    crate::submission::write_o1_participant_id(&participant_id)?;
+    crate::submission::write_o1_consent_ack(epoch_ms())?;
+    tracing::info!("O1: enrollment acknowledged (participant id registered)");
+    Ok(())
 }
 
 /// ⚠️★★★ O1 の**ローテート 1 回**を実行する (宣言の変更 / 日次ローテートの共通経路)。
@@ -1797,8 +1906,20 @@ fn spawn_reconcile(app: tauri::AppHandle, reason: ReconcileReason) {
 ///
 /// ⚠️★★★ **G1 と O1 の 2 つだけ**である。★ 通常運用 (Phase1) では
 /// `.age` を作りも送りもしない (従来どおり手動提出だけ)。
+///
+/// ## ⚠️★★★ O1 は **1 回きりの同意確認**が済むまで開かない (研究者判断 R-7)
+///
+/// ★ D-14 の `.age.ok` (毎回の送信確認) は O1 では外した (R-2)。⚠️ しかしそれは
+/// 「**同意手続きを経ていない人が配布ビルドを起動する経路を塞ぐ**」役も担っていた。
+/// ⚠️★★★ security-checker HIGH-4 の実測: **G1 をやった端末に O1 ビルドを置くだけで、
+/// 人の操作ゼロで常時記録＋48 時間後の自動送信が始まる**
+/// (★ `~/.gse/g1_participant_id` が既に残っているため)。
+/// → ★ **確認が済むまで送信経路を開かない。** ⚠️ `.age` は作られる (データは失われない)。
 fn auto_submit_enabled() -> bool {
-    g1_mode().is_some() || crate::o1::is_o1()
+    if crate::o1::is_o1() {
+        return crate::submission::o1_consent_acknowledged();
+    }
+    g1_mode().is_some()
 }
 
 /// ★★ 番兵を **呼び出し側で作ってから**渡す版。
@@ -1878,7 +1999,13 @@ fn spawn_reconcile_with_guard(
 /// ★ この時点で失うものは無い: ID が要るのは `.age` の名前だけで、
 /// ID が入るまでブロックは 1 つも始められない (`g1_start_gate`)。
 fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, String> {
-    let id = match crate::submission::read_g1_participant_id() {
+    // ⚠️★★★ **O1 は専用の ID ファイルを読む** (研究者判断 R-7)。
+    //   ★ `g1_participant_id` を流用すると、G1 をやった端末で **ID 入力の操作すら要らなくなる**。
+    let id = match if crate::o1::is_o1() {
+        crate::submission::read_o1_participant_id()
+    } else {
+        crate::submission::read_g1_participant_id()
+    } {
         Some(id) => id,
         None => return Ok(None),
     };
@@ -4517,6 +4644,8 @@ pub fn run() {
             //   ★ O1 モードの画面からしか呼ばれない (非 O1 では `Err` を返す)。
             get_o1_mode,
             declare_task_kind,
+            get_o1_enrollment,
+            acknowledge_o1_enrollment,
             submit_latest_session,
             record_user_label,
             record_session_meta,
@@ -4596,6 +4725,48 @@ mod task_c_command_tests {
     ///
     /// ## ★ なぜ `try_send` の失敗を拾うだけでは足りないか
     ///
+    /// ⚠️★★★ **稼働中インジケータの 3 値** (研究者判断 R-11・2026-08-26)。
+    ///
+    /// ★ 同意文書 §4 の逐語「印が出ていないときは記録していません」を守るには、
+    /// ⚠️ **「止めた」と「壊れている」を分けて出す**必要がある
+    /// (★ トレイの `MeasureState` が `Stopped` と `HookDown` を分けたのと同じ理屈)。
+    #[test]
+    fn recording_health_separates_paused_from_broken() {
+        // ★ 正常
+        assert_eq!(recording_health(false, true, false, true).0, "recording");
+        // ★ 被験者が止めた —— ⚠️ **最優先**。止めているあいだフックが遊ぶのは当たり前なので、
+        //   ここで「壊れています」と出すと**自分の操作を故障と誤解する**。
+        for installed in [false, true] {
+            for starved in [false, true] {
+                for log_ok in [false, true] {
+                    assert_eq!(
+                        recording_health(true, installed, starved, log_ok).0,
+                        "paused",
+                        "paused=true のとき常に paused であること"
+                    );
+                }
+            }
+        }
+        // ⚠️★★★ 止めていないのに記録できていない = **broken**
+        //   (★ 旧実装はここを "recording" と出していた)
+        assert_eq!(recording_health(false, false, false, true).0, "broken");
+        assert_eq!(recording_health(false, true, true, true).0, "broken");
+        assert_eq!(recording_health(false, true, false, false).0, "broken");
+        // ★ broken のときは必ず被験者向けの 1 行が付く (⚠️ 黙って赤くしない)
+        for args in [
+            (false, false, false, true),
+            (false, true, true, true),
+            (false, true, false, false),
+        ] {
+            let (h, d) = recording_health(args.0, args.1, args.2, args.3);
+            assert_eq!(h, "broken");
+            assert!(d.is_some(), "broken なのに説明が無い: {args:?}");
+        }
+        // ★ 正常 / 停止では説明を付けない
+        assert!(recording_health(false, true, false, true).1.is_none());
+        assert!(recording_health(true, true, false, true).1.is_none());
+    }
+
     /// `start_session` は `engine.reset()` / `reset_signal` / `latest_feat` / `intervention` を
     /// **`session_active` の `swap` より前に**書き換える (分析スレッドとの可視性順序のため・
     /// この順序は動かせない)。→ ⚠️ **送信が失敗した時点では、もう巻き戻せない副作用が出ている。**

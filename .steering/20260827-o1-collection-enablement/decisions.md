@@ -224,3 +224,20 @@
 | 配布 zip | ⚠️ `make-participant-zip.sh` は `o1.mode` を知らない |
 | 同意文書 | ⚠️ 【ドラフト・未承認】／**研究責任者・所属・連絡先が空欄** |
 | 削除台帳（R-14） | ⚠️ 未作成 |
+
+
+---
+
+## ✅ 確定した 7 件を **実装した**（2026-08-26）
+
+| # | 何をしたか | ★ 検証 |
+|---|---|---|
+| **R-1** | `MetaDto` に `o1_mode: Option<String>` を足し、`write_meta_start` が `g1_mode` と同じ形で刻む。`reconcile` は **`meta` 行の `o1_mode` を第 1 の根拠**にし、無いファイルは O1 として提出しない | ★ 実機の `meta` 行に `"o1_mode":"env"` を確認。⚠️ schema は **additive・`required` 不変**。★ **gse-dataset も同期しコミット済み**（`4a02dda`）／`check_schema_parity.py` OK |
+| **R-7** | O1 専用 ID (`~/.gse/o1_participant_id`) ＋ **1 回きりの同意確認** (`~/.gse/o1_consent_ack`)。`auto_submit_enabled()` の O1 枝を確認済みかで gate。UI は「確認しました」1 アクションで ID と確認を同時登録（⚠️ ID が不正なら**確認の印も置かない** = fail-closed） | ★ **両方向を実機で確認**: 確認なし → **自動提出の行が 1 本も出ない**／確認あり → `O1 auto-submit (at startup)` が走る |
+| **R-8** | 同意文書 §3 に「**上の記録から計算した『作業の状態』の推定値**」の行と**注 C** を追加。⚠️ 「新しく何かを記録するわけではない」「**助言や通知は一切出さない**」「能力の評価ではない」を明記 | ★ 配布前チェックリストも実態に更新（実装済み ↔ 未構築のインフラ） |
+| **R-10** | `logger::warn_if_cloud_synced` を `default_log_path` に追加。⚠️ **実パスを `canonicalize` してから**判定し、`tracing::error!` で残す（★ **止めない**） | ⚠️★ テストが**実装の誤りを実際に捕まえた** —— macOS の iCloud は逐語 `com~apple~CloudDocs` で「icloud」の語は現れず、Google Drive は**空白入り**だった。→ ★ **実在するディレクトリ名**に直した |
+| **R-11** | `recording_health` (純関数) で 3 値化し `RecordingStatusDto` に `health` / `health_detail` を追加。UI が「記録しています / 止めています / ⚠️ **記録できていません**」を描く | ★ 真理値表テスト。⚠️ **`paused` が最優先**（止めているあいだフックが遊ぶのは当たり前なので、そこで「故障」と出すと自分の操作を故障と誤解する） |
+| **R-12** | `redaction::line_timestamp` が **`meta` 行を常に `None`** にする（行種で弾くので、将来 `meta` に時刻が増えても自動的に守られる） | ★ 「全区間を消しても `session_start` / `session_end` が残る」通しテスト |
+| **R-13** | `o1_age_file_name` / `parse_o1_day_number` / `next_o1_day_number` を追加し、O1 は **`<participant>_o1day<NN>_<stem>.age`**。⚠️ 台帳の読みも **`age` の名前で名前空間を判定**する（★ `block` 欄だけ見ると番号が飛ぶ） | ★ 送信対象も `unsent_o1_age_files` に切り替え、**G1 の未承認分と構造的に交わらない** |
+
+⚠️★★★ **R-14（送信済み分の削除台帳）と R-15（時計の前進）は実装していない**（研究者判断どおり）。
