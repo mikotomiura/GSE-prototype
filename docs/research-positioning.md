@@ -496,6 +496,21 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   （`experiments/20260731-phase1-calibration-analysis/notes.md` §4）。
   ⚠️ ただし **straight-lining の原因はプローブ過負荷**（P012 は 11 件中 10 件で「多すぎた」）であり、
   尺度教示だけでは解けない（同 §6.2）。**尺度理解ゲートは離脱を防ぐ器ではなく、落とす器**である。
+- ⚠️★★ **「プローブ反応性」の文献的裏づけは、これまで想定していたより弱い（2026-08-27 追記・第 2 ラウンド）**:
+  本節冒頭は「**問われること自体が打鍵・状態を変える**」を前提に置いてきた。★ その理論側の出典は
+  [V91] Hauser, Ellsworth & Gonzalez (2018)（逐語「a manipulation check … is **not simply a measure,
+  but also a new event for the participant**」）だが、⚠️★★★ **同論文が挙げる一次実証の中核 [V96] Kühnen (2010)
+  は、本拠地のメタ分析 [V95] Weingarten & Hutchinson (2018)（142 論文 / 263 研究 / **582 効果量**）で
+  再現されていない** —— 逐語「**contrary to what Kühnen (2010) argues, we found only a small,
+  non-significant effect** of the subjective ease question appearing before the dependent measure …
+  **in any dataset**」。★ [V91] はこの反証に**触れずに** [V96] を引いている。
+  → ⚠️ **「反応性は実証されている」とは書けない。** ★ ただし ⚠️ **「反応性は無い」とも書けない**
+  （[V96] は一次未取得の `provisional`・[V95] が扱うのは ease-of-retrieval という特定パラダイムのみ）。
+  ★★ **経路の有無は設計で決まる**: G1 の操作チェックは**ブロック終了後**に聞くので
+  「問い → 打鍵」の経路が**構造的に存在しない**が、⚠️ **L0 のプローブは作業中に挟まるので経路は実在する。**
+  → ★ **したがって本節の軽減策（時間隔離窓 t−31s..t−1s）は「念のため」ではなく、
+  *経路が実在する側にだけ効く構造的な手当て* として正しい**（★ 根拠が理論から設計論へ移った）。
+  詳細は `docs/literature/20260827-manipulation-check-attainability-and-task-complexity.md` カード 10。
 - **課題種別（task type）による停滞の質の差は理論的に予期されるが、現状は未統制・未検証**: 停滞（L1 Stuck）の
   質はタスク種別で異なると予期される——論述（expository/argumentative）は **knowledge-transforming＝
   内容/修辞の二問題空間を往復する高認知負荷**で「行き詰まり→再構成」が濃く起こり [P16][P17][P18]、物語・
