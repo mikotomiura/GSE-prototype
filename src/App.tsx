@@ -182,6 +182,18 @@ function App() {
   //   「開始する」が押せてしまう (バックエンドの gate が受け止めるが、
   //   出る文言が ID の赤字ではなく汎用エラーになる)。
   const [g1Mode, setG1Mode] = useState<string | null | undefined>(undefined);
+  // ⚠️★★★ O1 (R3-a) 自然作業の常時収集モード。null = 通常運用、"marker" / "env" = O1。
+  //
+  // ★ O1 では **記録は「開始する」の押下に依存しない** (ADR-016 判断 4b-0)。
+  //   → ⚠️ スタート画面を出すと 2 つ同時に壊れる:
+  //     1. 押下で `record_session_meta` が走り、**未宣言を表せなくなる** (判断 4b-3 の破れ)
+  //     2. 被験者は「押していないから記録されていない」と誤解する
+  //        (⚠️ 実際には既に記録している = 同意文書 §4 の逐語と食い違う)
+  //   → ★ **O1 では最初からダッシュボードを出す。** 宣言は `RecordingControls` から行う。
+  //
+  // ⚠️ ★ `undefined` = **まだ判定していない** (g1Mode と同じ理由で 3 値にする)。
+  //   判定前に `null` として描くと、O1 でも 1 フレームだけスタート画面が見える。
+  const [o1Mode, setO1Mode] = useState<string | null | undefined>(undefined);
   // G1: このプロセスで終了したブロック数 (5 分での自動終了ごとに増える)。
   const [g1BlocksDone, setG1BlocksDone] = useState(0);
   // G1: 直前のブロックが 5 分で自動終了したか (スタート画面に「終わった」だけを出す)。
@@ -303,6 +315,29 @@ function App() {
         setG1Mode(null);
       });
   }, []);
+
+  // 4b-0. ⚠️★★★ O1 モードの取得 (起動時 1 回)。null なら通常運用で、画面には何も足さない。
+  //       ★ backend は G1 と O1 を排他にしている (`o1::resolve` が G1 を勝たせる) ので、
+  //       ⚠️ ここで両方が真になることはない。
+  useEffect(() => {
+    invoke<string | null>("get_o1_mode")
+      .then((mode) => setO1Mode(mode))
+      .catch((e) => {
+        // ⚠️★★★ **通常運用へ fail-open しない。** ★ 本当に O1 なのに `null` に倒すと
+        //   スタート画面が出て「開始する」を押され、上記 3 つの破れを踏む。
+        //   ⚠️ IPC が落ちるのはアプリが壊れているときなので、**押せない画面のまま**にする。
+        //   ★ 通常運用 (Phase1) では `get_o1_mode` は `null` を **成功で**返すので
+        //   この経路には入らない = 既存の起動が固まることはない。
+        console.error("get_o1_mode failed (staying on the loading screen):", e);
+      });
+  }, []);
+
+  // 4b-0b. ⚠️★★★ O1 ではスタート画面を飛ばす (上の `o1Mode` のコメント参照)。
+  //        ★ `start_session` も `record_session_meta` も **呼ばない** ——
+  //        記録は backend で既に走っており、宣言は被験者が任意のときに行う。
+  useEffect(() => {
+    if (o1Mode) setIsStarted(true);
+  }, [o1Mode]);
 
   // 4b-2. G1: 登録済みの参加者 ID を復元する (次回起動で入力し直させない)。
   //       ⚠️ ★ 通常運用では **呼ばない** (g1Mode === null なら何も起きない)。
@@ -443,6 +478,25 @@ function App() {
     }
     setIsStarted(true);
   };
+
+  // ⚠️★★★ **O1 の判定が済むまでスタート画面を出さない** (code-reviewer HIGH・2026-08-27)。
+  //
+  // ★ `get_g1_mode` と `get_o1_mode` は**別々の `useEffect` で並行に走る**ので、
+  //   `g1Mode` だけが先に `null` で解決した窓では、⚠️ **O1 なのに「開始する」が押せる**。
+  //   押されたときの帰結が 3 つとも重い:
+  //     1. `record_session_meta` が `INTERVENTION_ENABLED` を `true` に戻す (判断 O1-5 の破れ)
+  //     2. ⚠️★★★ `SESSION_START_MS` が立つ。**O1 にはブロック自動終了スレッドが無い**ので
+  //        0 に戻す経路が存在せず、収束器が以後 **プロセスの寿命いっぱい skip** し続ける
+  //        ＝ **自動提出が黙って止まる**
+  //     3. 宣言済みの O1 ファイルに 2 本目の `session_meta` が入り `gse-replay` が `Err`
+  //   → ★ 判定が済むまでは**何も押せない画面**を出す (fail-closed)。
+  if (!isStarted && o1Mode === undefined) {
+    return (
+      <div className="start-screen">
+        <p className="start-description">起動しています…</p>
+      </div>
+    );
+  }
 
   // Task C: 尺度理解テスト (ビネット) フロー
   if (!isStarted && showVignette) {
@@ -918,7 +972,12 @@ function App() {
           className="start-button"
           onClick={handleStart}
           disabled={
-            g1Mode === undefined || (!!g1Mode && !isValidParticipantId(g1ParticipantId.trim()))
+            // ⚠️★ **判定前は押させない。** `o1Mode` を足さないと、O1 の判定が返る前に
+            //   押されて上記 3 つの破れを踏む (code-reviewer HIGH)。
+            g1Mode === undefined ||
+            o1Mode === undefined ||
+            !!o1Mode ||
+            (!!g1Mode && !isValidParticipantId(g1ParticipantId.trim()))
           }
           title={
             !!g1Mode && !isValidParticipantId(g1ParticipantId.trim())
@@ -960,11 +1019,28 @@ function App() {
 
   // Default to Main Dashboard (較正モード時は blind/minimal 表示)
   // onBack: アプリを終了せずスタート画面へ戻る (作業種別の変更・尺度理解テスト・再開のため)。
+  // ⚠️★★★ O1 では戻れない —— スタート画面は「開始する」を押させる画面であり、
+  //   ★ O1 では押下が記録の門ではない (押させると未宣言を表せなくなる・判断 4b-3)。
   const handleBack = () => {
+    if (o1Mode) return;
     setIsStarted(false);
   };
   return (
-    <Dashboard cognitiveState={cognitiveState} onQuit={handleQuit} onBack={handleBack} keyboardIdleMs={keyboardIdleMs} hookActive={hookActive} calibrationMode={calibrationMode} />
+    <Dashboard
+      cognitiveState={cognitiveState}
+      onQuit={handleQuit}
+      // ⚠️ O1 では「戻る」を出さない (押しても何も起きないボタンを見せない)。
+      onBack={o1Mode ? undefined : handleBack}
+      keyboardIdleMs={keyboardIdleMs}
+      hookActive={hookActive}
+      // ⚠️★★★ O1 では**常にブラインド**にする。
+      //   ★ 自然作業を数日〜数週間観測するあいだ推定状態が画面に出ていると、
+      //   被験者はそれを見て行動を変える (= 観測しようとしている当の行動が変わる)。
+      //   `preregistration.md §2.12` がトレイに状態を出さないと決めたのと同じ趣旨である。
+      calibrationMode={o1Mode ? true : calibrationMode}
+      // ⚠️★★★ O1 では手動提出の節を出さない (48 時間の猶予を迂回するため・security HIGH-1)。
+      o1Mode={!!o1Mode}
+    />
   );
 }
 

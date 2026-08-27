@@ -36,6 +36,7 @@ GSE-prototype/
 │   │   ├── schema_dto.rs         #     [NEW Phase 1] LogEntry ミラー DTO (schemars 派生専用)
 │   │   ├── capabilities.rs       #     [NEW 2026-08-19] このビルドが何を記録できるかの宣言表 (ADR-013)
 │   │   ├── g1.rs                 #     [NEW 2026-08] G1 統制タスク実験モードの判定 (OS API 非依存)
+│   │   ├── o1.rs                 #     [NEW 2026-08-27] O1 (R3-a) 常時収集モードの判定と方針 (OS API 非依存)
 │   │   ├── participant_id.rs     #     participant_id 検証の単一情報源 (feature 非依存)
 │   │   ├── packaging.rs          #     匿名化 + age 暗号化 SSOT (#[cfg(feature = "package")] gated)
 │   │   ├── overlay_panel.rs      #     macOS: overlay 窓の NSPanel 化 FFI グルー (#[cfg(macos)] gated)
@@ -162,6 +163,21 @@ GSE-prototype/
 - ⚠️ **OS 依存はプロセス列挙だけ**（`pgrep` / `tasklist` を**絶対パス**で起動する。
   相対名だと Windows が `current_exe()` のディレクトリを System32 より先に探すため）
 - 詳細: `docs/architecture.md §4.12` / `.steering/20260805-g1-app-mode-and-log-rotation/`
+
+#### `src-tauri/src/o1.rs` (2026-08-27)
+
+- **置くべきもの**: 「いま O1 (R3-a・自然作業の常時収集) か」の判定と、
+  ★ **そのモードでだけ変わる方針の純関数**——
+  `analysis_gate_open` (門を通すか)、`recording_active` (稼働中インジケータと `liveness` の真値)、
+  `decide_declaration_action` (宣言 1 回でローテートするか)、
+  `should_rotate_daily` / `grace_elapsed` (日次ローテートと 48 時間の猶予)、
+  `is_o1_session_file_name` (`gse_o1_*` の判定)、`ROTATE_AFTER_MS` / `SUBMIT_GRACE_MS`
+- **置くべきでないもの**: ★ **効果の適用**。門・インジケータ・ローテート・提出は
+  `lib.rs` / `tray.rs` / `reconcile.rs` が行う (`g1.rs` と同じ流儀)
+- ⚠️★★★ **G1 との相互排他はここが持つ** (`resolve` / `modes_conflict`)。★ **G1 が勝つ**
+- ⚠️ **階層計算は `g1::exe_to_folder_levels` / `g1::folder_up` を再利用する**
+  (★ 複製すると macOS のバンドル階層が変わったとき片方だけ直り、**無音で失敗する**)
+- 詳細: `docs/architecture.md §4.14` / `.steering/20260827-o1-collection-enablement/`
 
 #### `src-tauri/src/schema_dto.rs` (Phase 1)
 

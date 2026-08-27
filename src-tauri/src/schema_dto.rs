@@ -58,6 +58,24 @@ pub enum LogEntryDto {
         /// (`preregistration.md §5.4` 第 10 版 / `.steering/20260805-g1-app-mode-and-log-rotation`)。
         #[serde(skip_serializing_if = "Option::is_none")]
         g1_mode: Option<String>,
+        /// ⚠️★★★ O1 (R3-a・自然作業の常時収集) モードの引き金 (`"marker"` | `"env"`)。
+        /// **start 形状のみ**。
+        ///
+        /// ⚠️ ★ **O1 実施時にしか出ない**ので、通常運用 / G1 の NDJSON は従来と byte 単位で
+        /// 同一である (★ ゴールデンスナップショットと既存フィクスチャの非回帰がこれに依存する)。
+        ///
+        /// ## ★ なぜ記録するか (研究者判断 R-1・2026-08-26)
+        ///
+        /// ⚠️ 当初はファイル名 (`gse_o1_*`) だけで表していたが、
+        /// ★ **提出物そのものを見て「O1 モードで取れていたか」を事後に判定できない**。
+        /// ⚠️ セッション置き場は**被験者が書き込めるフォルダ**なので、
+        /// リネームは事故でも故意でも起こりうる (cross-review / Codex 指摘)。
+        /// → ★ `g1_mode` と**同じ形**で `meta` 行に刻み、**記録の中身を根拠にする**。
+        ///
+        /// ⚠️ **`Option` である** —— ★ 2026-08-26 より前の NDJSON には本フィールドが無いので、
+        /// `required` に入れると**旧ログが schema 検証に落ちる** (ADR-005 の additive-only 違反)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        o1_mode: Option<String>,
         /// ★ アプリの版 (**粗い semver のみ**)。**start 形状のみ** (ADR-013 D1)。
         ///
         /// ⚠️ git SHA / ビルドホスト名 / ビルド時刻 / マシン GUID は

@@ -79,11 +79,23 @@ pub fn measure_title(state: MeasureState) -> &'static str {
 /// 2026-08-09 の Windows 実機では前者だけが `true` のまま、5 分間 0 打のブロックが
 /// 「● 計測中」の表示で自動提出された (`windows-verification.md` §5-7)。
 /// ★ 純関数 `measure_state()` の意味 (第 2 引数 = 「フックが生きているか」) は変えていない。
+/// ⚠️★★★ **O1 (R3-a) では第 1 引数が `session_active` ではない。**
+///
+/// ★ O1 は「開始する」を押さないので `session_active` は **永久に false** である。
+/// そのまま渡すと `measure_state(false, _) == Stopped` → 逐語
+/// 「**GSE — 停止中（記録していません）**」を出しながら**実際には記録し続ける**。
+/// → ⚠️ **同意文書 §4 の逐語「印が出ていないときは記録していません」と正面から矛盾する。**
+/// ★ 判定は `o1::recording_active` (純関数) に置いてある。⚠️ **非 O1 は従来どおり
+/// `session_active` そのもの**なので、Phase1 / G1 の表示は 1 バイトも変わらない。
 fn current_state(session_active: &AtomicBool) -> MeasureState {
     let installed = crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed);
     let starved = crate::input::hook::HOOK_STARVED.load(Ordering::Relaxed);
     measure_state(
-        session_active.load(Ordering::Acquire),
+        crate::o1::recording_active(
+            crate::o1::is_o1(),
+            session_active.load(Ordering::Acquire),
+            crate::recording::is_paused(),
+        ),
         installed && !starved,
     )
 }
@@ -106,6 +118,18 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
     // ★ 初期値を決め打ちにしない。⚠️ `false, false` と書くと、setup の順序が変わったときに
     //   **最大 1 秒間だけ嘘を表示する**（2026-08-08 の cross-review）。実際の値から始める。
     let initial = current_state(&session_active);
+    // ⚠️★★ **初期状態もログに残す** (2026-08-27)。★ 更新スレッドは**変化したときだけ**
+    //   書くので、初期値のまま動き続けたセッションは `gse-app.log` から
+    //   「トレイに何が出ていたか」を**事後に確認できなかった**。
+    //   ★ O1 は「記録しているのに『記録していません』と出ていないか」を後から検証する
+    //   必要がある (同意文書 §4 の逐語) ので、1 行だけ残す。
+    tracing::info!(
+        o1_mode = ?crate::o1::mode(),
+        paused = crate::recording::is_paused(),
+        "tray state (initial) -> {:?} ({})",
+        initial,
+        measure_label(initial)
+    );
 
     // ★ 状態表示は**押せない項目**にする（押しても何も起きないのに押させない）。
     let status = MenuItem::with_id(

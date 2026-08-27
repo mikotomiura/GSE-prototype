@@ -979,23 +979,46 @@ mod tests {
         //   → 設計は「排他と照合の**両方**が要る」と言っているのに、
         //     ⚠️ 固定されていたのは排他だけだった。
         let recheck = pos("let current_start_ms = SESSION_START_MS.load(Ordering::Acquire);");
-        let rotate = pos("LogEntry::Rotate { new_path }");
         let start_ms = pos("SESSION_START_MS.store(now, Ordering::Release);");
         let block_end = pos("block_log_tx.try_send(LogEntry::BlockEnd)");
-        assert_eq!(rotate.len(), 1);
         assert_eq!(start_ms.len(), 1);
         assert_eq!(block_end.len(), 1);
 
+        // ⚠️★★★ **`Rotate` の送信点は 2 つある** (2026-08-27 に O1 が増えた)。
+        //   ① `start_session` …… G1 のブロック境界 (★ 本テストが守っている当のもの)
+        //   ② `o1_rotate` ……… O1 の宣言変更 / 日次ローテート
+        //       ★ O1 は `start_session` を通らず、`g1_mode` とは**排他**である
+        //       (`o1::resolve` が G1 を勝たせる) ので、⚠️ ブロック境界とは競合しない。
+        //   → ★ 「1 個しか無い」ではなく「**排他区間の中に 1 個ある**」で固定する
+        //     (⚠️ こちらのほうが強い: 位置関係そのものを見ている)。
+        let rotate = pos("LogEntry::Rotate { new_path }");
+        assert!(
+            !rotate.is_empty(),
+            "★ start_session の Rotate 送信が見つからない"
+        );
+        let rotate_in_block: Vec<usize> = rotate
+            .iter()
+            .copied()
+            .filter(|p| *p > acquire[0] && *p < release[0])
+            .collect();
+        assert_eq!(
+            rotate_in_block.len(),
+            1,
+            "⚠️ start_session の排他区間 (取る → 離す) の中にある Rotate が 1 個ではない \
+             (★ 区間の外に出ると Rotate と SESSION_START_MS の間に窓が残る)"
+        );
+        let rotate0 = rotate_in_block[0];
+
         // ① start_session: 取る → Rotate → SESSION_START_MS → 離す
         assert!(
-            acquire[0] < rotate[0],
+            acquire[0] < rotate0,
             "⚠️ start_session が Rotate を送った後で排他を取っている              (★ Rotate と SESSION_START_MS の間に窓が残る)"
         );
         assert!(
             start_ms[0] < release[0],
             "⚠️ SESSION_START_MS.store(now) の前に排他を離している              (★ 自動終了が「まだ 0」を見て新しいファイルへ session_end を書く)"
         );
-        assert!(rotate[0] < start_ms[0], "★ 送信は SESSION_START_MS より前");
+        assert!(rotate0 < start_ms[0], "★ 送信は SESSION_START_MS より前");
 
         // ② 自動終了スレッド: 取る → BlockEnd → 離す
         assert!(

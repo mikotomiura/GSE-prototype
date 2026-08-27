@@ -33,6 +33,26 @@ pub trait Uploader {
     fn upload(&self, file_name: &str, bytes: &[u8]) -> Result<(), String>;
 }
 
+/// ⚠️★★★ **どの収集の提出物を収束させるか** (2026-08-27 / ADR-014 D8 の上書き)。
+///
+/// ★ G1 と O1 では **3 つの規則が違う**。⚠️ 混ぜると片方の契約が黙って壊れるので型で分ける。
+///
+/// | | **G1** (統制タスク) | **O1** (自然作業の常時収集) |
+/// |---|---|---|
+/// | 候補にする NDJSON | `meta` 行に `g1_mode` があるもの | ★ ファイル名が `gse_o1_*` のもの |
+/// | 包むまでの猶予 | ★ **無し** (5 分ブロックが閉じたらすぐ) | ⚠️★★★ **48 時間** (`o1::SUBMIT_GRACE_MS`) |
+/// | 送る条件 | ★ 被験者が「送信する」を押した (`.age.ok`) | ★ **自動** (同意文書 §5 の逐語) |
+///
+/// ⚠️ **既定は `G1`** —— ★ 呼び出し側が何も言わなければ従来と 1 バイトも変わらない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CollectionMode {
+    /// G1 統制タスク実験 (★ 従来の挙動)。
+    #[default]
+    G1,
+    /// ⚠️★★★ O1 (R3-a) 自然作業の常時収集。
+    O1,
+}
+
 /// 収束器への入力。
 pub struct ReconcileOptions {
     /// セッション NDJSON があるディレクトリ。
@@ -43,6 +63,13 @@ pub struct ReconcileOptions {
     pub participant: String,
     /// age 公開鍵 (`age1...` かファイルパス)。
     pub recipient: String,
+    /// ★ どの収集の提出物か ([`CollectionMode`])。⚠️ **既定は `G1`** (従来の挙動)。
+    pub mode: CollectionMode,
+    /// ★ **いまの時刻** (epoch ms)。⚠️ O1 の 48 時間猶予を測るために要る。
+    ///
+    /// ★ 引数にしてあるのは **テストが時計を進められるようにする**ためである
+    /// (⚠️ 「48 時間待たないと検証できない」テストは書かれないまま腐る)。
+    pub now_ms: u64,
 }
 
 /// 収束の結果。★ **画面に出すためのもの**である (`design.md` §4: 送信先から成否を追えない)。
@@ -197,6 +224,144 @@ pub fn closed_sessions(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+/// ⚠️★★★ **O1 で書かれ、閉じ終わり、猶予を過ぎた**セッション NDJSON を名前昇順で列挙する。
+///
+/// 条件は 5 つ (★ [`closed_sessions`] の 4 条件に **猶予**を足した形):
+/// 1. ★ ファイル名が **`gse_o1_*.ndjson`** (`.anon.ndjson` 等の派生は除く)
+/// 2. ★ `meta.session_end` を持つ = **もう書かれない**
+/// 3. ⚠️ `meta` 行に **`g1_mode` が無い** (★ 万一 G1 の記録が同名で紛れても拾わない)
+/// 4. `meta` 以外の行がある (`has_any_data_row`)
+/// 5. ⚠️★★★ **`session_end` から `grace_ms` 以上が経っている**
+///
+/// ## ⚠️★★★ 猶予を「包む前」に効かせる理由 (★ ここを間違えると削除保証が崩れる)
+///
+/// `delete_time_range` → `redact_dir` は **ローカルの `gse_*.ndjson` だけ**を書き換え、
+/// **`.age` は対象外**である (`redaction.rs`)。
+/// → ★ **48 時間より前に `.age` を作ると、その後に被験者が消しても `.age` には残り、送られる。**
+/// ⚠️ ADR-014 **判断 3 の根拠 3**「被験者が停止・削除できる」が崩れる。
+/// ★ したがって猶予は **③ 送信ではなく ② 包む**ところに置く。
+pub fn closed_o1_sessions(dir: &Path, now_ms: u64, grace_ms: u64) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = match std::fs::read_dir(dir) {
+        Ok(rd) => rd
+            .flatten()
+            .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|s| s.to_str())
+                    .map(crate::o1::is_o1_session_file_name)
+                    .unwrap_or(false)
+            })
+            .filter(|p| match closed_o1_session_end(p) {
+                Some(end) => crate::o1::grace_elapsed(end, now_ms, grace_ms),
+                None => false,
+            })
+            .filter(|p| has_any_data_row(p))
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    out.sort();
+    out
+}
+
+/// NDJSON が **O1 で閉じ終わっている**なら、その `session_end` (epoch ms) を返す。
+///
+/// ★ 読むのは **`meta` 行の形だけ**である (打鍵の内容も時刻も解釈しない・data-privacy)。
+/// 読めないファイルは `None` (= 触らない) に倒す。
+///
+/// ⚠️ `g1_mode` を持つファイルは **`None`** を返す —— ★ G1 の提出経路 (承認つき・猶予なし) と
+/// 二重に拾わないための構造的な排他である。
+fn closed_o1_session_end(path: &Path) -> Option<u64> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(path).ok()?;
+    let mut session_end: Option<u64> = None;
+    // ⚠️★★★ **`session_start` 行を 1 本でも持つファイルは O1 ではない**
+    //   (cross-review / Codex HIGH・2026-08-27)。
+    //
+    // ★ Codex の指摘: O1 の識別が**ファイル名だけ**だと、⚠️ セッション置き場は
+    //   **被験者が書き込めるフォルダ**なので、Phase1 の記録を `gse_o1_*` にリネームすると
+    //   **承認なしで自動送信される**。
+    // → ★ **構造的な弁別子を足す**: O1 は `start_session` を通らない
+    //   (`lib.rs` が O1 で拒否する) ので **`{"type":"session_start"}` 行が 1 本も出ない**。
+    //   ⚠️ 対して Phase1 / G1 の「中身のある」ファイルは**必ず 1 本以上持つ**
+    //   (★ 押下しないと打鍵が記録されないので、押下の痕跡なしにデータ行は存在しえない)。
+    //   ★ schema を 1 バイトも変えずに効く (⚠️ 完全ではない —— `decisions.md` R-1 参照)。
+    let mut has_session_start = false;
+    // ⚠️★★★ **`meta` 行の `o1_mode` を第 1 の根拠にする** (研究者判断 R-1・2026-08-26)。
+    //   ★ ファイル名は被験者が書き換えられるが、⚠️ **`meta` 行は記録の中身**である。
+    //   ★ `g1_mode` と同じ形。→ 2026-08-26 以降に O1 で書いたファイルは必ず持つ。
+    let mut has_o1_mode = false;
+    for line in std::io::BufReader::new(f).lines() {
+        // ⚠️★★★ **1 行の読み取り失敗で関数ごと諦めない** (code-reviewer MEDIUM・2026-08-27)。
+        //   ★ 以前は `line.ok()?` で、**UTF-8 として不正な 1 行があるだけで `None`** を返した。
+        //   → ⚠️ そのファイルが **黙って提出候補から永久に外れる** (fail-silent)。
+        //   ★ `meta` 行は ASCII の固定形なので、壊れた行を飛ばしても判定は成立する。
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        if line.contains(r#""type":"session_start""#) {
+            has_session_start = true;
+        }
+        if !line.contains(r#""type":"meta""#) {
+            continue;
+        }
+        if line.contains(r#""g1_mode""#) {
+            // ⚠️ G1 の記録である。★ O1 の経路では 1 本も触らない。
+            return None;
+        }
+        if line.contains(r#""o1_mode""#) {
+            has_o1_mode = true;
+        }
+        // ⚠️ ★ **最後の `session_end` を採る。** 1 ファイルに 2 本入ることは無い設計だが、
+        //   もし混ざったら「より新しい方」= 安全側 (猶予が長くなる) に倒れる。
+        if let Some(v) = parse_meta_u64(&line, "session_end") {
+            session_end = Some(v);
+        }
+    }
+    if !has_o1_mode {
+        // ⚠️★★★ **`o1_mode` を持たないファイルは O1 として提出しない** (R-1)。
+        //   ★ 名前は書き換えられるが、`meta` 行の中身は記録そのものである。
+        //   ⚠️ 2026-08-26 より前に O1 で書いたファイルはこれを持たないが、
+        //   ★ **収集はまだ始まっていない**ので実データは存在しない (移行の心配は無い)。
+        tracing::warn!(
+            "reconcile: {:?} is named like an O1 session but its meta row has no o1_mode;              refusing to submit it as O1",
+            path.file_name()
+        );
+        return None;
+    }
+    if has_session_start {
+        // ⚠️★★★ **押下の痕跡があるファイルは O1 ではない。** ★ 名前だけを頼りにしない
+        //   (★ セッション置き場は被験者が書き込めるフォルダである)。
+        tracing::warn!(
+            "reconcile: {:?} is named like an O1 session but carries session_start rows; \
+             refusing to submit it as O1",
+            path.file_name()
+        );
+        return None;
+    }
+    session_end
+}
+
+/// `meta` 行から数値フィールドを 1 つ取り出す (★ 手書きパーサ)。
+///
+/// ⚠️ ★ `serde_json` を使わないのは、`reconcile` が **1 行を丸ごとメモリに載せない**
+/// 走査で済ませているためである (★ 1 行は最大 `MAX_SESSION_BYTES` まで許容される)。
+/// ★ `meta` 行は `logger::write_meta_end` が**手書きで固定形**に出しているので、
+/// `"<key>":<digits>` を探せば足りる。
+fn parse_meta_u64(line: &str, key: &str) -> Option<u64> {
+    let needle = format!("\"{key}\":");
+    let start = line.find(&needle)? + needle.len();
+    let digits: String = line[start..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    if digits.is_empty() {
+        return None;
+    }
+    digits.parse::<u64>().ok()
+}
+
 /// NDJSON が **G1 で書かれ、かつ `session_end` を持つ**か (1 パスで両方見る)。
 ///
 /// ★ 読むのは **`meta` 行の形だけ**である (打鍵の内容も時刻も解釈しない・data-privacy)。
@@ -245,6 +410,48 @@ pub fn next_block_number(submission_dir: &Path, participant: &str) -> u32 {
         .max()
         .unwrap_or(0);
     from_files.max(from_manifest) + 1
+}
+
+/// ⚠️★★★ **O1 の次の日番号**を決める (R-13)。★ `next_block_number` の鏡像。
+///
+/// ★ `.age` の名前と台帳の**両方の最大値 + 1** を採る (⚠️ 片方が欠けても番号が戻らない)。
+pub fn next_o1_day_number(submission_dir: &Path, participant: &str) -> u32 {
+    let from_files = crate::submission::list_age_files(submission_dir)
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|s| s.to_str()))
+        .filter_map(|n| crate::submission::parse_o1_day_number(n, participant))
+        .max()
+        .unwrap_or(0);
+    let from_manifest = read_manifest_days(submission_dir, participant)
+        .into_iter()
+        .max()
+        .unwrap_or(0);
+    from_files.max(from_manifest) + 1
+}
+
+/// 台帳から、その参加者の **O1 日番号**を読む。
+///
+/// ⚠️ ★ 台帳の `block` 欄は G1 と共有だが、`age` の名前で**どちらの名前空間か**が分かる。
+fn read_manifest_days(submission_dir: &Path, participant: &str) -> Vec<u32> {
+    let path = submission_dir.join(MANIFEST_FILE_NAME);
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(_) => return Vec::new(),
+    };
+    text.lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l.trim()).ok())
+        .filter(|v| v.get("participant").and_then(|x| x.as_str()) == Some(participant))
+        // ⚠️★ **`age` の名前で名前空間を判定する。** ★ `block` 欄だけを見ると
+        //   G1 の番号を O1 の最大値として拾い、⚠️ **番号が飛ぶ**。
+        .filter(|v| {
+            v.get("age")
+                .and_then(|x| x.as_str())
+                .map(|n| crate::submission::parse_o1_day_number(n, participant).is_some())
+                .unwrap_or(false)
+        })
+        .filter_map(|v| v.get("block").and_then(|x| x.as_u64()))
+        .map(|n| n as u32)
+        .collect()
 }
 
 /// 台帳から、その参加者のブロック番号を読む。壊れた行は飛ばす (★ 台帳は append-only で、
@@ -322,13 +529,36 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
     };
 
     // --- ② 閉じ終わった NDJSON に .age が無ければ作る --------------------------
-    for input in closed_sessions(&opts.session_dir) {
+    // ⚠️★★★ O1 は **48 時間の猶予**を過ぎたものだけを候補にする。
+    //   ★ 猶予は「包む前」に効かせる —— `.age` にしてしまうと `delete_time_range` が
+    //   届かなくなり (`redaction.rs` は `.age` を触らない)、判断 3 の根拠 3 が崩れる。
+    let candidates = match opts.mode {
+        CollectionMode::G1 => closed_sessions(&opts.session_dir),
+        CollectionMode::O1 => {
+            closed_o1_sessions(&opts.session_dir, opts.now_ms, crate::o1::SUBMIT_GRACE_MS)
+        }
+    };
+    for input in candidates {
         let stem = session_stem(&input);
         if age_for_stem(&opts.submission_dir, &stem).is_some() {
             continue; // 既に包んである (手動提出で作った旧形式も含む)
         }
-        let block = next_block_number(&opts.submission_dir, &opts.participant);
-        let out_name = age_file_name(&opts.participant, block, &stem);
+        // ⚠️★★★ **O1 は G1 と別の名前空間で採番する** (研究者判断 R-13)。
+        //   ★ 共有すると番号を食い合い、⚠️ 研究者から見て「何ブロック目か」が意味を失う。
+        //   ★ O1 の単位は**ブロック (5 分) ではなく日**なので `block` の語自体が嘘になる。
+        let (block, out_name) = match opts.mode {
+            CollectionMode::G1 => {
+                let n = next_block_number(&opts.submission_dir, &opts.participant);
+                (n, age_file_name(&opts.participant, n, &stem))
+            }
+            CollectionMode::O1 => {
+                let n = next_o1_day_number(&opts.submission_dir, &opts.participant);
+                (
+                    n,
+                    crate::submission::o1_age_file_name(&opts.participant, n, &stem),
+                )
+            }
+        };
         let out_path = opts.submission_dir.join(&out_name);
         if out_path.exists() {
             // ⚠️ ★ **黙って上書きしない。** 1 本も失えない (`design.md` §3)。
@@ -368,10 +598,28 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
     // ⚠️★ **被験者が「送信する」を押した分だけ**送る (D-14: 同意の担保)。
     //   ★ 確認が無いものも ② で `.age` にはなっている = **データは失われない**。
     //   送られないだけであり、後から確認すればそのまま送られる (収束型のまま)。
+    // ⚠️★★★ **O1 は承認を求めない** (研究者判断 O1-2 / 同意文書 §5)。
+    //   ★ 逐語「1 日ごとにひとまとまりにした記録を、48 時間おいてから暗号化して
+    //   **自動的に**研究者へ送ります」。⚠️ 毎日「送信する」を押させると**その逐語が嘘になる**。
+    //   ★ `.age.ok` が担っていた「同意手続きを経ていない人が起動する経路を塞ぐ」役割は、
+    //   O1 では **配布フォルダのマーカー (`o1.mode`)** が担う (G1 の `g1.mode` と同じ形)。
+    //   ⚠️ G1 は `approved_unsent_age_files` のまま —— 1 バイトも変えない。
     if let Some(up) = uploader {
-        for age in
-            crate::submission::approved_unsent_age_files(&opts.submission_dir, &opts.participant)
-        {
+        let to_send = match opts.mode {
+            CollectionMode::G1 => crate::submission::approved_unsent_age_files(
+                &opts.submission_dir,
+                &opts.participant,
+            ),
+            // ⚠️★★★ **O1 の提出物だけを送る** (code-reviewer / security-checker が一致して指摘)。
+            //   ★ 絞らないと **同じ端末に残っている G1 の未承認 `.age`** が
+            //   **承認なしに送られる** = D-14 の承認ゲートが O1 経由で無効化される。
+            //   ★ R-13 で名前空間を分けたので、**`o1day<NN>` の形かどうか**で構造的に切れる
+            //   (⚠️ `closed_o1_sessions` が `g1_mode` を弾いているのと対の排他)。
+            CollectionMode::O1 => {
+                crate::submission::unsent_o1_age_files(&opts.submission_dir, &opts.participant)
+            }
+        };
+        for age in to_send {
             let name = match age.file_name().and_then(|s| s.to_str()) {
                 Some(n) => n.to_string(),
                 None => continue,
@@ -402,9 +650,21 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         }
     }
 
-    report.unsent = unsent_count(&opts.submission_dir, &opts.participant);
-    report.awaiting_approval =
-        crate::submission::awaiting_approval_count(&opts.submission_dir, &opts.participant);
+    // ⚠️★ **数える対象と送る対象を同じ規則にする** (`submission.rs` の drift 防止の趣旨)。
+    //   ★ O1 で全部数えると、**送らない G1 の `.age`** まで「まだ届いていない」に出る。
+    report.unsent = match opts.mode {
+        CollectionMode::G1 => unsent_count(&opts.submission_dir, &opts.participant),
+        CollectionMode::O1 => {
+            crate::submission::unsent_o1_age_files(&opts.submission_dir, &opts.participant).len()
+        }
+    };
+    // ⚠️★ **O1 に「確認待ち」は無い** (承認ゲートを通らないので、数えると画面に嘘が出る)。
+    report.awaiting_approval = match opts.mode {
+        CollectionMode::G1 => {
+            crate::submission::awaiting_approval_count(&opts.submission_dir, &opts.participant)
+        }
+        CollectionMode::O1 => 0,
+    };
     report
 }
 
@@ -545,6 +805,22 @@ mod tests {
         .unwrap();
     }
 
+    /// ⚠️★★★ **O1 で** 閉じたセッションを 1 本書く。
+    /// ★ O1 は `meta` 行に `g1_mode` を刻まない (schema を変えないため) ので、
+    /// **ファイル名 (`gse_o1_*`)** が O1 であることの根拠になる。
+    fn write_closed_o1(dir: &Path, name: &str, session_end_ms: u64) {
+        std::fs::write(
+            dir.join(name),
+            format!(
+                "{{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\",\"o1_mode\":\"marker\"}}\n\
+                 {{\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}}\n\
+                 {{\"type\":\"key\",\"t\":5000,\"vk\":75,\"press\":true}}\n\
+                 {{\"type\":\"meta\",\"session_end\":{session_end_ms}}}\n"
+            ),
+        )
+        .unwrap();
+    }
+
     /// 書きかけのセッション (session_end 無し)。
     fn write_open(dir: &Path, name: &str) {
         std::fs::write(
@@ -583,6 +859,18 @@ mod tests {
             submission_dir: subm.to_path_buf(),
             participant: "P012".to_string(),
             recipient: recipient.to_string(),
+            // ★ 既定は G1 = 従来の挙動。⚠️ 既存のテストは 1 本も意味が変わらない。
+            mode: CollectionMode::G1,
+            now_ms: 0,
+        }
+    }
+
+    /// ⚠️★★★ O1 用の入力。★ **時計を引数で渡す**ので、48 時間を待たずに検証できる。
+    fn o1_opts(sess: &Path, subm: &Path, recipient: &str, now_ms: u64) -> ReconcileOptions {
+        ReconcileOptions {
+            mode: CollectionMode::O1,
+            now_ms,
+            ..opts(sess, subm, recipient)
         }
     }
 
@@ -994,6 +1282,283 @@ mod tests {
         assert!(
             !response_is_ok(r#"{"ok":"true"}"#),
             "文字列の \"true\" は真ではない"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ⚠️★★★ O1 (R3-a): 48 時間の猶予つき自動提出 (研究者判断 O1-2)
+    // -----------------------------------------------------------------------
+
+    const GRACE: u64 = crate::o1::SUBMIT_GRACE_MS;
+
+    /// ⚠️★★★ **猶予の中にあるファイルは候補にならない。**
+    ///
+    /// ★ これが本機能の値打ちである: 包んでしまうと `delete_time_range` が
+    /// `.age` に届かないので (`redaction.rs` は `.age` を触らない)、
+    /// ⚠️ **ADR-014 判断 3 の根拠 3「被験者が消せる」が崩れる。**
+    #[test]
+    fn o1_candidates_appear_only_after_the_grace_window() {
+        let d = tmpdir("o1grace");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_010101.ndjson", end);
+
+        // 閉じた直後: まだ候補にならない
+        assert!(closed_o1_sessions(&d, end, GRACE).is_empty());
+        // 47 時間 59 分 59.999 秒: まだ
+        assert!(closed_o1_sessions(&d, end + GRACE - 1, GRACE).is_empty());
+        // ちょうど 48 時間: 候補になる
+        assert_eq!(closed_o1_sessions(&d, end + GRACE, GRACE).len(), 1);
+
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★★★ **猶予の中なら、被験者が消したものは送られない** (削除保証の実体)。
+    ///
+    /// ★ 「閉じた → 被験者が区間指定削除 → 猶予が明ける」の順で走らせ、
+    /// **包まれた `.age` に消した行が入っていないこと**を、
+    /// ⚠️ **`.age` が作られる前に消せること**として固定する。
+    #[test]
+    fn o1_deletion_during_the_grace_window_removes_the_data_before_packaging() {
+        let d = tmpdir("o1delete");
+        let end = 1_000_000_000_000_u64;
+        let name = "gse_o1_00000000_020202.ndjson";
+        write_closed_o1(&d, name, end);
+
+        // ① 猶予の中なので、まだ `.age` は作られていない
+        assert!(closed_o1_sessions(&d, end + 1000, GRACE).is_empty());
+
+        // ② 被験者が「この時間帯を消して」を実行する (★ `key` 行の t=1200 を含む区間)
+        let outcome = crate::redaction::redact_dir(&d, 1_100, 1_300, None).unwrap();
+        assert_eq!(
+            outcome.lines_removed, 1,
+            "★ 区間指定削除が O1 のファイルに効かなければ削除保証が崩れる"
+        );
+
+        // ③ 猶予が明けた。★ ファイルは候補になるが、消した行はもう無い
+        let found = closed_o1_sessions(&d, end + GRACE, GRACE);
+        assert_eq!(found.len(), 1);
+        let text = std::fs::read_to_string(&found[0]).unwrap();
+        assert!(
+            !text.contains("\"t\":1200"),
+            "⚠️ 消したはずの行が提出候補に残っている: {text}"
+        );
+        // ★ 消していない行は残る (⚠️ 削除が「全消し」に化けていないこと)
+        assert!(text.contains("\"t\":5000"), "{text}");
+
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★★★ **G1 と O1 が互いのファイルを拾わない。**
+    ///
+    /// ★ `~/Documents/GSE-sessions` は participant 非依存の共有ディレクトリなので、
+    /// 同じ端末に Phase1 / G1 / O1 の記録が同居しうる。
+    #[test]
+    fn o1_and_g1_candidate_sets_do_not_overlap() {
+        let d = tmpdir("o1mix");
+        let end = 1_000_000_000_000_u64;
+        write_closed(&d, "gse_00000000_030303.ndjson"); // G1
+        write_closed_non_g1(&d, "gse_00000000_040404.ndjson"); // Phase1
+        write_closed_o1(&d, "gse_o1_00000000_050505.ndjson", end); // O1
+        write_open(&d, "gse_o1_00000000_060606.ndjson"); // O1 書きかけ
+
+        let g1 = closed_sessions(&d);
+        assert_eq!(g1.len(), 1);
+        assert!(g1[0].to_string_lossy().contains("gse_00000000_030303"));
+
+        let o1 = closed_o1_sessions(&d, end + GRACE, GRACE);
+        assert_eq!(o1.len(), 1, "★ 書きかけ / G1 / Phase1 を拾ってはならない");
+        assert!(o1[0].to_string_lossy().contains("gse_o1_00000000_050505"));
+
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★ **`g1_mode` を持つファイルは、名前が `gse_o1_*` でも O1 では拾わない。**
+    /// ★ 二重に提出される経路を構造的に消す。
+    #[test]
+    fn o1_never_picks_up_a_file_marked_as_g1() {
+        let d = tmpdir("o1g1mark");
+        write_closed(&d, "gse_o1_00000000_070707.ndjson"); // 名前は O1・中身は G1
+        assert!(closed_o1_sessions(&d, u64::MAX / 2, GRACE).is_empty());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★★★ **O1 は承認を求めずに送る** (同意文書 §5 の逐語「自動的に…送ります」)。
+    ///
+    /// ★ 対照として、同じ状態を G1 モードで回すと **1 本も送られない** ことも見る。
+    #[test]
+    fn o1_sends_without_the_approval_marker_while_g1_still_requires_it() {
+        let d = tmpdir("o1auto");
+        let o = tmpdir("o1auto_out");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_080808.ndjson", end);
+        let r = test_recipient();
+
+        // ★ G1 モードでは O1 のファイルを 1 本も見ない (包みもしない)
+        let g1_report = reconcile(&opts(&d, &o, &r), None);
+        assert_eq!(g1_report.packaged, 0);
+
+        // ★ O1 モード: 猶予明けに包み、⚠️ `.age.ok` が無くても送る
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+        assert_eq!(report.packaged, 1, "{:?}", report.errors);
+        assert_eq!(report.sent, 1, "{:?}", report.errors);
+        assert_eq!(report.unsent, 0);
+        // ⚠️ O1 に「確認待ち」は無い (画面に嘘を出さない)
+        assert_eq!(report.awaiting_approval, 0);
+
+        // ★ 対照: 同じ `.age` を G1 の規則で送ろうとすると、承認が無いので送らない
+        let up2 = OkUploader(Mutex::new(Vec::new()));
+        let g1_again = reconcile(&opts(&d, &o, &r), Some(&up2));
+        assert_eq!(g1_again.sent, 0);
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ★ 何度回しても同じ状態に収束する (べき等) —— O1 でも壊れない。
+    #[test]
+    fn o1_reconcile_is_idempotent() {
+        let d = tmpdir("o1idem");
+        let o = tmpdir("o1idem_out");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_090909.ndjson", end);
+        let r = test_recipient();
+        let now = end + GRACE;
+
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let first = reconcile(&o1_opts(&d, &o, &r, now), Some(&up));
+        assert_eq!((first.packaged, first.sent), (1, 1), "{:?}", first.errors);
+        let second = reconcile(&o1_opts(&d, &o, &r, now), Some(&up));
+        assert_eq!(
+            (second.packaged, second.sent),
+            (0, 0),
+            "{:?}",
+            second.errors
+        );
+        assert_eq!(up.0.lock().unwrap().len(), 1, "★ 二重送信しない");
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ **O1 の収束が、承認していない G1 の提出物を送らない。**
+    ///
+    /// ★ 提出物フォルダは participant 単位の**共有ディレクトリ**なので、
+    /// 同じ端末・同じ ID で G1 を先にやった被験者の未承認 `.age` が残りうる。
+    /// ⚠️ 送ってしまうと **D-14 の承認ゲートが O1 経由で無効化され、
+    /// 別研究の同意範囲のデータが送られる** (code-reviewer / security-checker が一致して指摘)。
+    #[test]
+    fn o1_never_sends_an_unapproved_g1_submission() {
+        let d = tmpdir("o1notg1");
+        let o = tmpdir("o1notg1_out");
+        let end = 1_000_000_000_000_u64;
+        let r = test_recipient();
+
+        // ① G1 のブロックを 1 本包む (⚠️ 承認しない = `.age.ok` を置かない)
+        write_closed(&d, "gse_00000000_010101.ndjson");
+        let g1 = reconcile(&opts(&d, &o, &r), None);
+        assert_eq!(g1.packaged, 1, "{:?}", g1.errors);
+
+        // ② O1 のファイルを 1 本置き、猶予明けに O1 モードで回す
+        write_closed_o1(&d, "gse_o1_00000000_020202.ndjson", end);
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+
+        assert_eq!(report.packaged, 1, "{:?}", report.errors);
+        let sent = up.0.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "★ 送ってよいのは O1 の 1 本だけ: {sent:?}");
+        assert!(
+            sent[0].contains("gse_o1_"),
+            "⚠️★★★ 未承認の G1 提出物が O1 経由で送られた: {sent:?}"
+        );
+        // ⚠️ 画面に出る件数も O1 のものだけを数える (送る対象と同じ規則)
+        assert_eq!(report.unsent, 0, "★ O1 の未送信は 0 のはず");
+
+        // ★ G1 の `.age` は**残っている** (失われていない・承認すれば送られる)
+        assert_eq!(
+            crate::submission::unsent_count(&o, "P012"),
+            1,
+            "★ G1 の未承認分はローカルに残るだけで、失われてはならない"
+        );
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ **名前だけを頼りにしない** —— リネームした Phase1 の記録を O1 として送らない
+    /// (cross-review / Codex HIGH・2026-08-27)。
+    ///
+    /// ★ セッション置き場は**被験者が書き込めるフォルダ**なので、`gse_o1_*` へのリネームは
+    /// 事故でも故意でも起こりうる。⚠️ 通すと **承認を経ていない別研究の記録が自動送信される**。
+    /// → ★ O1 は `start_session` を通らないので **`session_start` 行を 1 本も持たない**。
+    #[test]
+    fn a_renamed_phase1_session_is_not_submitted_as_o1() {
+        let d = tmpdir("o1renamed");
+        // ⚠️ Phase1 相当 (`g1_mode` は無いが `session_start` 行を持つ) を O1 の名前で置く
+        std::fs::write(
+            d.join("gse_o1_00000000_101112.ndjson"),
+            "{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\"}\n\
+             {\"type\":\"session_start\",\"t\":1000}\n\
+             {\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n\
+             {\"type\":\"meta\",\"session_end\":9000}\n",
+        )
+        .unwrap();
+        assert!(
+            closed_o1_sessions(&d, u64::MAX / 2, GRACE).is_empty(),
+            "⚠️★★★ リネームだけで O1 の自動提出に載せられてはならない"
+        );
+
+        // ★ 対照: 本物の O1 (押下の痕跡が無い) は拾われる
+        write_closed_o1(&d, "gse_o1_00000000_202020.ndjson", 9000);
+        let found = closed_o1_sessions(&d, u64::MAX / 2, GRACE);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].to_string_lossy().contains("202020"));
+
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// ⚠️★ **UTF-8 として不正な 1 行があっても、そのファイルを黙って捨てない。**
+    ///
+    /// ★ 以前は `line.ok()?` で `None` を返し、**提出候補から永久に外れた** (fail-silent)。
+    #[test]
+    fn a_single_invalid_utf8_line_does_not_hide_the_whole_file() {
+        use std::io::Write;
+        let d = tmpdir("o1badutf8");
+        let end = 1_000_000_000_000_u64;
+        let path = d.join("gse_o1_00000000_030303.ndjson");
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(
+                b"{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.5.0\",\"o1_mode\":\"marker\"}\n",
+            )
+            .unwrap();
+            // ⚠️ 不正な UTF-8 を 1 行混ぜる
+            f.write_all(&[0xff, 0xfe, 0x00, b'\n']).unwrap();
+            f.write_all(b"{\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n")
+                .unwrap();
+            f.write_all(format!("{{\"type\":\"meta\",\"session_end\":{end}}}\n").as_bytes())
+                .unwrap();
+        }
+        let found = closed_o1_sessions(&d, end + GRACE, GRACE);
+        assert_eq!(
+            found.len(),
+            1,
+            "⚠️ 壊れた 1 行でファイルごと提出候補から外れている (fail-silent)"
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// `meta` 行から `session_end` を読む手書きパーサの健全性。
+    #[test]
+    fn meta_u64_parser_reads_only_the_named_key() {
+        let line = r#"{"type":"meta","session_end":1700000000000}"#;
+        assert_eq!(parse_meta_u64(line, "session_end"), Some(1_700_000_000_000));
+        assert_eq!(parse_meta_u64(line, "session_start"), None);
+        // ⚠️ 数字が無い / 壊れている行では None (★ 0 に倒さない = 猶予を勝手に満了させない)
+        assert_eq!(parse_meta_u64(r#"{"session_end":}"#, "session_end"), None);
+        assert_eq!(
+            parse_meta_u64(r#"{"session_end":"x"}"#, "session_end"),
+            None
         );
     }
 }

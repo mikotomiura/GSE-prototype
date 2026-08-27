@@ -56,24 +56,37 @@ pub struct RedactionSummary {
     pub files_skipped: usize,
 }
 
-/// NDJSON 1 行が「いつの記録か」を返す。
+/// NDJSON 1 行が「いつの記録か」を返す。⚠️ ★ **`meta` 行は常に `None`** である。
 ///
-/// ★ 対象は 3 つのキーだけである:
-/// - `t` …… ほぼ全ての行種（`key` / `feat` / `paste` / …）
-/// - `session_start` / `session_end` …… `meta` 行の 2 形状（`schema_dto.rs` の `Meta`）
+/// ★ 対象は `t` だけである（`key` / `feat` / `paste` / `pointer_bin` / …）。
 ///
-/// ⚠️ **時刻を持たない行は `None`** を返す。→ [`retain_outside_range`] は **残す**。
-/// ★ そうしないと `meta` の版情報ごと消えて、⚠️ **残った行が「いつ・どの版で取られたか」
-/// 分からなくなる**（ADR-013 D1 が防ごうとしている状態そのもの）。
+/// ## ⚠️★★★ 2026-08-26: **`meta` 行を削除対象から外した**（研究者判断 R-12）
+///
+/// > ⚠️ **旧実装は `session_start` / `session_end` も時刻として読み、`meta` 行を消していた。**
+///
+/// ★ security-checker が実測した壊れ方（LOW-2）:
+/// **ローテート境界をまたぐ区間**を指定すると `meta`(session_end) が消え、
+/// ⚠️★★★ `reconcile::closed_o1_session_end` が `None` を返して
+/// **そのファイルが永久に提出されない**。★ 被験者にも研究者にも通知は出ない（静かな全損）。
+///
+/// ★ 外してよい理由: **`meta` 行は行動の中身を 1 バイトも持たない** ——
+/// 持っているのは**セッションの境界時刻**と**版情報**（`hmm_version` / `app_version` /
+/// `capabilities` / `keyboard_layout`）だけである。
+/// → ★ 消しても被験者のプライバシーは 1 ミリも増えず、⚠️ **消すと
+/// 「いつ・どの版で・何を記録できる計器で取ったか」が失われる** ——
+/// ★ これは **ADR-013 D1**（「**信号が無い**」と「**計器が無い**」を分ける）が
+/// 防ごうとしている状態そのものである。
+///
+/// ⚠️ **時刻を持たない行も `None`** を返す。→ [`retain_outside_range`] は **残す**。
 pub fn line_timestamp(line: &str) -> Option<u64> {
     let v: serde_json::Value = serde_json::from_str(line).ok()?;
     let obj = v.as_object()?;
-    for key in ["t", "session_start", "session_end"] {
-        if let Some(n) = obj.get(key).and_then(serde_json::Value::as_u64) {
-            return Some(n);
-        }
+    // ⚠️★★★ **`meta` 行は消さない**（上記 R-12）。★ 行種で弾くので、将来 `meta` に
+    //   時刻フィールドが増えても**自動的に守られる**。
+    if obj.get("type").and_then(serde_json::Value::as_str) == Some("meta") {
+        return None;
     }
-    None
+    obj.get("t").and_then(serde_json::Value::as_u64)
 }
 
 /// `[from_ms, to_ms]`（★ **両端を含む**）に入る行を落とし、残す行だけを返す。
@@ -81,7 +94,8 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
 /// ★ 純関数。⚠️ ファイル I/O を持たないので、境界条件をテストで固定できる。
 ///
 /// - ⚠️ `from_ms > to_ms` の場合は**何も落とさない**（★ 空区間として扱い、黙って全消ししない）。
-/// - ⚠️ 時刻を持たない行（`meta` の `hmm_version` 単独形など）は**残す**（[`line_timestamp`] の doc）。
+/// - ⚠️★★★ **`meta` 行は常に残す**（[`line_timestamp`] の doc・研究者判断 R-12）。
+///   ★ 消すと `session_end` を失ったファイルが**永久に提出されなくなる**。
 pub fn retain_outside_range<'a>(
     lines: impl IntoIterator<Item = &'a str>,
     from_ms: u64,
@@ -239,19 +253,55 @@ mod tests {
     }
 
     #[test]
-    fn line_timestamp_reads_t_and_meta_shapes() {
+    fn line_timestamp_reads_t_on_data_rows() {
         assert_eq!(
             line_timestamp(r#"{"type":"key","t":1000,"category":"alphabetic","press":true}"#),
             Some(1000)
         );
         assert_eq!(
+            line_timestamp(r#"{"type":"pointer_bin","t":2000,"moved":3,"buttons":0,"wheel":0}"#),
+            Some(2000)
+        );
+    }
+
+    /// ⚠️★★★ **`meta` 行は時刻を持っていても削除対象にしない**（研究者判断 R-12）。
+    ///
+    /// ★ 消すと `reconcile::closed_o1_session_end` が `session_end` を見つけられず、
+    /// ⚠️ **そのファイルが永久に提出されない**（★ 被験者にも研究者にも通知が出ない）。
+    /// ★ `meta` 行は行動の中身を 1 バイトも持たず、⚠️ 失うのは
+    /// 「いつ・どの版で・何を記録できる計器で取ったか」だけである（ADR-013 D1）。
+    #[test]
+    fn meta_rows_are_never_redacted_even_though_they_carry_a_time() {
+        assert_eq!(
             line_timestamp(r#"{"type":"meta","session_start":500,"hmm_version":"0.5.0"}"#),
-            Some(500)
+            None
         );
         assert_eq!(
             line_timestamp(r#"{"type":"meta","session_end":9000}"#),
-            Some(9000)
+            None
         );
+    }
+
+    /// ⚠️★★★ **ローテート境界をまたぐ削除でも `session_end` が残る**（★ 通しの回帰）。
+    ///
+    /// ★ これが崩れると、提出候補の述語が「閉じていない」と読んで
+    /// **そのファイルを永久に拾わなくなる**。
+    #[test]
+    fn a_range_spanning_the_whole_file_still_leaves_the_session_boundary() {
+        let (kept, removed) = retain_outside_range(
+            [
+                r#"{"type":"meta","session_start":1000,"hmm_version":"0.5.0"}"#,
+                r#"{"type":"key","t":1200,"category":"alphabetic","press":true}"#,
+                r#"{"type":"key","t":5000,"category":"alphabetic","press":true}"#,
+                r#"{"type":"meta","session_end":9000}"#,
+            ],
+            0,
+            u64::MAX,
+        );
+        assert_eq!(removed, 2, "★ データ行は 2 本とも消える");
+        assert_eq!(kept.len(), 2);
+        assert!(kept[0].contains("session_start"), "{kept:?}");
+        assert!(kept[1].contains("session_end"), "{kept:?}");
     }
 
     /// ⚠️ 時刻の無い行・壊れた行は `None` → **残す**。

@@ -1240,6 +1240,18 @@ fn keyboard_layout_fragment() -> String {
     }
 }
 
+/// `meta` に足す O1 モードの断片 (★ 非 O1 なら空文字列 = 従来と 1 バイトも変わらない)。
+///
+/// ⚠️★★★ **`g1_mode` の直後・`app_version` の前**に置く (★ キー順を固定する)。
+/// ★ 値域は `O1Source` で型に閉じているので、⚠️ 外部由来の文字列が JSON を壊す経路は無い
+/// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
+fn o1_mode_fragment() -> String {
+    match crate::o1::mode() {
+        Some(src) => format!(r#","o1_mode":"{}""#, src.as_str()),
+        None => String::new(),
+    }
+}
+
 fn write_meta_start(
     writer: &mut impl Write,
     session_start: u64,
@@ -1255,13 +1267,16 @@ fn write_meta_start(
     let capabilities = crate::capabilities::capabilities_json();
     // ★ O1: セッション開始時に 1 回だけ。⚠️ 未設定なら空文字列で、従来の出力と同一になる。
     let layout = keyboard_layout_fragment();
+    // ★ O1: 実施時にしか出ない (⚠️ 通常運用 / G1 の出力は 1 バイトも変わらない・R-1)。
+    let o1 = o1_mode_fragment();
     match g1_mode.map(|s| s.as_str()) {
         None => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","app_version":"{}","capabilities":{}{}}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}"{},"app_version":"{}","capabilities":{}{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
+                o1,
                 app_version,
                 capabilities,
                 layout,
@@ -1270,10 +1285,11 @@ fn write_meta_start(
         Some(source) => {
             let _ = writeln!(
                 writer,
-                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}","app_version":"{}","capabilities":{}{}}}"#,
+                r#"{{"type":"meta","session_start":{},"hmm_version":"{}","g1_mode":"{}"{},"app_version":"{}","capabilities":{}{}}}"#,
                 session_start,
                 crate::analysis::engine::HMM_VERSION,
                 source,
+                o1,
                 app_version,
                 capabilities,
                 layout,
@@ -2229,8 +2245,36 @@ pub fn default_log_path() -> PathBuf {
         "session log path resolved"
     );
 
+    // ⚠️★★★ 同意文書 §5「クラウド同期フォルダには置きません」の**実装上の担保**（R-10）。
+    //   ★ 保存先が確定したこの 1 か所で見る（⚠️ 起動のたびに 1 回だけ）。
+    warn_if_cloud_synced(&dir);
+
     let ts = chrono_like_filename();
-    dir.join(format!("gse_{}.ndjson", ts))
+    dir.join(session_file_name(crate::o1::is_o1(), &ts))
+}
+
+/// セッション NDJSON のファイル名 (純関数)。
+///
+/// ## ⚠️★★★ O1 だけ接頭辞が変わる
+///
+/// ★ `reconcile` は「閉じ終わった NDJSON」を**ディスクの状態だけ**から拾う収束器で、
+/// G1 のときは `meta` 行の `g1_mode` を根拠に「これは G1 の記録である」と判定している
+/// (⚠️ 共有フォルダに Phase1 の較正セッションが同居するため・code-review HIGH)。
+/// → ★ **O1 にも同じ強さの根拠が要る。**
+///
+/// ⚠️ 本来は `g1_mode` と同じく `meta` 行に `o1_mode` を刻むほうが強い (事後検証ができる) が、
+/// それは `schema_dto.rs` → `schema/current.json` の変更を伴い、**gse-dataset の parity 更新**が要る。
+/// ★ 本タスクは「schema を 1 バイトも変えない」制約下にあるので、**ファイル名で表す**。
+/// (→ 研究者へ返す論点として `.steering/00000000-o1-collection-enablement/decisions.md` に記録。)
+///
+/// ★ **`gse_` 接頭辞は保つ。** ⚠️ 外すと `redaction::is_redactable_session_file` の
+/// フィルタから外れ、**被験者の区間指定削除が O1 のファイルに効かなくなる** (削除保証の破れ)。
+fn session_file_name(o1_mode: bool, ts: &str) -> String {
+    if o1_mode {
+        format!("{}{}.ndjson", crate::o1::SESSION_FILE_PREFIX, ts)
+    } else {
+        format!("gse_{}.ndjson", ts)
+    }
 }
 
 /// セッションログを置くディレクトリと、決定に使った参加者 ID を返す。
@@ -2332,6 +2376,59 @@ fn fallback_log_dir() -> PathBuf {
     PathBuf::from(base).join("Documents").join("GSE-sessions")
 }
 
+/// ⚠️★★★ **クラウド同期フォルダの名前**（研究者判断 R-10・2026-08-26）。
+///
+/// ★ 同意文書 §5 は逐語で「⚠️ **クラウド同期フォルダ（OneDrive 等）には置きません**」と
+/// 約束しているが、⚠️ **実装上の担保が 1 つも無かった**（security-checker MEDIUM-6）——
+/// `fallback_log_dir()` は `Documents` を**文字列で組み立てるだけ**で、
+/// ★ Windows の「ドキュメントを OneDrive にリダイレクト」やジャンクションを検査していない。
+/// → ⚠️ **O1 は数日〜数週間ぶんの平文 NDJSON が残る**ので、同期対象になると影響が大きい。
+/// ⚠️★★★ **実際のパスの形に合わせること。** ★ 2026-08-26 にテストで実際に踏んだ:
+/// macOS の iCloud Drive は逐語 `Library/Mobile Documents/com~apple~CloudDocs` であり、
+/// ⚠️ **`icloud` という語はパスに 1 度も現れない**。Google Drive も **空白入り**である。
+/// → ★ 「それらしい語」ではなく **実在するディレクトリ名**を並べる。
+const CLOUD_SYNC_MARKERS: [&str; 7] = [
+    "onedrive",
+    // ⚠️ macOS の iCloud Drive (★ `icloud` ではない)
+    "com~apple~clouddocs",
+    "mobile documents",
+    "dropbox",
+    // ⚠️ 空白入り (★ `googledrive` では当たらない)
+    "google drive",
+    "box sync",
+    "creative cloud files",
+];
+
+/// ★ 解決済みの保存先が**クラウド同期の下にあるか**（純関数）。
+///
+/// ⚠️ ★ 判定は**小文字化した実パスの部分一致**である。★ 完全ではないが、
+/// **無検査よりはるかに良く、誤検知しても失うのは警告 1 行だけ**である
+/// （⚠️ 記録は止めない —— 止めると「気づいたら何も取れていない」を作る）。
+pub fn looks_cloud_synced(path: &Path) -> Option<&'static str> {
+    let lower = path.to_string_lossy().to_lowercase();
+    CLOUD_SYNC_MARKERS.into_iter().find(|m| lower.contains(m))
+}
+
+/// ⚠️★★★ 保存先がクラウド同期の下なら **fail-loud で警告する**（起動時 1 回）。
+///
+/// ★ **止めない。** ⚠️ 記録を止めると「気づいたら何も取れていなかった」になり、
+/// ★ ADR-012 D-4 が「被験者側の停止スイッチ」を却下したのと同じ失敗様式に落ちる。
+/// → ★ **`tracing::error!` で残し、判断は人に返す**（`g1::other_instance_running` と同じ流儀）。
+///
+/// ⚠️ **実パスで見る**（`canonicalize`）—— ★ リダイレクトやジャンクションは
+/// 組み立てた文字列には現れない。取れなければ元のパスで見る（★ 検査できないことを
+/// 理由に「安全」と言わない）。
+pub fn warn_if_cloud_synced(dir: &Path) {
+    let resolved = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    if let Some(marker) = looks_cloud_synced(&resolved) {
+        tracing::error!(
+            resolved_log_dir = %resolved.display(),
+            marker = marker,
+            "SESSION LOGS ARE INSIDE A CLOUD-SYNCED FOLDER.              The consent form promises they are not (O1 keeps weeks of plaintext NDJSON).              Move the folder out of the sync root, or set GSE_DATASET to a local path."
+        );
+    }
+}
+
 /// chrono 非依存のタイムスタンプ文字列生成 (標準ライブラリのみ)
 fn chrono_like_filename() -> String {
     // UNIX時刻から YYYYMMDD_HHMMSS を近似生成
@@ -2372,6 +2469,84 @@ mod tests {
 
     /// ★ 診断ログは **セッション NDJSON と同じフォルダ**に置く、が唯一の要件である。
     ///
+    /// ⚠️★★★ **同意文書 §5「クラウド同期フォルダには置きません」の実装上の担保** (R-10)。
+    ///
+    /// ★ O1 は数日〜数週間ぶんの**平文 NDJSON** が残るので、同期対象になると影響が大きい。
+    ///
+    /// ⚠️★ **ここは `\` で書いてよい**（★ `o1.rs` の階層テストとは事情が違う）——
+    /// `looks_cloud_synced` は `to_string_lossy().to_lowercase().contains(..)` の
+    /// **文字列包含**であって、⚠️ **パスのコンポーネント演算をしていない**。
+    /// → ★ 実際の Windows パスの見た目のまま書くほうが**検査として正しい**。
+    /// ⚠️ スラッシュに「直す」と、実環境の形を検査しなくなる。
+    #[test]
+    fn cloud_synced_paths_are_recognised() {
+        use std::path::Path;
+        // ⚠️ Windows の「ドキュメントを OneDrive にリダイレクト」の実際の形
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"C:\Users\x\OneDrive\Documents\GSE-sessions")),
+            Some("onedrive")
+        );
+        // ⚠️★★★ macOS の iCloud Drive —— ★ **逐語で `com~apple~CloudDocs`**。
+        //   ⚠️ 「icloud」という語はパスに 1 度も現れない (★ ここを実際に踏んだ)。
+        assert_eq!(
+            looks_cloud_synced(Path::new(
+                "/Users/x/Library/Mobile Documents/com~apple~CloudDocs/GSE-sessions"
+            )),
+            Some("com~apple~clouddocs")
+        );
+        // ⚠️ Google Drive は**空白入り** (★ `googledrive` では当たらない)
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"G:\My Drive\GSE-sessions")),
+            None,
+            "★ マウントドライブは名前から判別できない (⚠️ 既知の限界)"
+        );
+        assert_eq!(
+            looks_cloud_synced(Path::new("/Users/x/Google Drive/GSE-sessions")),
+            Some("google drive")
+        );
+        assert_eq!(
+            looks_cloud_synced(Path::new("/Users/x/Dropbox/GSE-sessions")),
+            Some("dropbox")
+        );
+        // ★ 大文字小文字を問わない
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"C:\Users\x\onedrive - contoso\GSE-sessions")),
+            Some("onedrive")
+        );
+        // ★ ふつうのローカル保存先は通す (⚠️ 誤検知で毎回警告を出さない)
+        assert_eq!(
+            looks_cloud_synced(Path::new(r"C:\Users\x\Documents\GSE-sessions")),
+            None
+        );
+        assert_eq!(
+            looks_cloud_synced(Path::new("/Users/x/Documents/GSE-sessions")),
+            None
+        );
+    }
+
+    /// ⚠️★★★ O1 (R3-a): **ファイル名だけが O1 の目印である** (schema を変えないため)。
+    ///
+    /// ★ ここが崩れると 2 つ同時に壊れる:
+    /// 1. `reconcile::closed_o1_sessions` が O1 の記録を拾えない (= **提出されない**)
+    /// 2. `redaction::is_redactable_session_file` が外れる (= **被験者が消せない**)
+    #[test]
+    fn o1_sessions_are_named_apart_but_keep_the_gse_prefix() {
+        let o1 = session_file_name(true, "00000000_101112");
+        let normal = session_file_name(false, "00000000_101112");
+        assert_eq!(o1, "gse_o1_00000000_101112.ndjson");
+        assert_eq!(normal, "gse_00000000_101112.ndjson");
+        assert_ne!(o1, normal);
+        // ★ `reconcile` / `redaction` の共通フィルタを通り抜けること
+        for name in [o1.as_str(), normal.as_str()] {
+            assert!(name.starts_with("gse_"), "{name}");
+            assert!(name.ends_with(".ndjson"), "{name}");
+            assert!(!name.ends_with(".anon.ndjson"), "{name}");
+        }
+        // ★ O1 だけが O1 判定を通ること
+        assert!(crate::o1::is_o1_session_file_name(&o1));
+        assert!(!crate::o1::is_o1_session_file_name(&normal));
+    }
+
     /// ⚠️ ★ `log_dir_for` を 2 か所から呼んでいるので、片方だけ直すと静かにフォルダが割れる。
     /// ここで両分岐を突き合わせておく (env を触らないので並列テストで安全)。
     #[test]
@@ -2882,6 +3057,105 @@ mod tests {
         // ★ 14 カテゴリすべてが 1 度ずつ現れている (代表 VK の取り違え検出)。
         let distinct: std::collections::BTreeSet<&String> = seen.iter().collect();
         assert_eq!(distinct.len(), 14, "representative vks collided: {seen:?}");
+    }
+
+    /// ⚠️★★★ **O1 の宣言変更 1 回が、replay できる形の 2 本に割れる** (ADR-016 判断 4b-1 / 4b-3)。
+    ///
+    /// ★ `lib.rs::o1_rotate` が送る順序 (**`Rotate` → `SessionMeta`**) をそのまま再現し、
+    /// 次の 3 つを固定する:
+    ///
+    /// 1. ⚠️ **未宣言の区間には `session_meta` 行が 1 本も無い** (判断 4b-3: 行の*不在*で表す)
+    /// 2. ★ **宣言は新しいファイルの側に入る** —— ⚠️ 逆順に送ると宣言が旧ファイルへ落ち、
+    ///    「大半がその宣言ではないファイル」と「宣言の無いファイル」ができて意味が反転する
+    /// 3. ⚠️★★★ **どちらのファイルにも相異なる `task_kind` が 2 つ入らない**
+    ///    (★ 入ると `gse-replay` が `Err` で落ちる —— ローテートが要る理由そのもの)
+    #[test]
+    fn o1_declaration_puts_the_meta_in_the_new_file_and_leaves_the_old_one_undeclared() {
+        let p1 = rot_test_path("o1decl", 1);
+        let p2 = rot_test_path("o1decl", 2);
+        let (logger, tx, shutdown_rx, status) = SessionLogger::start(p1.clone(), None);
+        assert_eq!(status, LogStatus::Ok);
+
+        // ── 未宣言の区間 (★ O1 は `session_start` を積まない: 押下が無い) ──
+        tx.send(LogEntry::Key {
+            vk_code: 65,
+            timestamp: 1100,
+            is_press: true,
+        })
+        .unwrap();
+
+        // ── 宣言 1 回 = `o1_rotate` と同じ順序で 2 通 ──
+        thread::sleep(Duration::from_millis(5));
+        tx.send(LogEntry::Rotate {
+            new_path: p2.clone(),
+        })
+        .unwrap();
+        tx.send(LogEntry::SessionMeta {
+            timestamp: 2000,
+            track: Track::Main,
+            task_kind: TaskKind::VibeCoding,
+            // ⚠️★ O1 では常に false (判断 O1-5)。
+            intervention_enabled: false,
+            condition: None,
+            label_pool: None,
+            head_id: TaskDomain::from(TaskKind::VibeCoding).head_id(),
+        })
+        .unwrap();
+        tx.send(LogEntry::Key {
+            vk_code: 66,
+            timestamp: 2100,
+            is_press: true,
+        })
+        .unwrap();
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+
+        let c1 = fs::read_to_string(&p1).expect("file 1");
+        let c2 = fs::read_to_string(&p2).expect("file 2");
+
+        // ① 未宣言の区間は `session_meta` を 1 行も持たない
+        assert_eq!(
+            c1.matches(r#""type":"session_meta""#).count(),
+            0,
+            "⚠️ 未宣言の区間に宣言が書かれている (判断 4b-3 の破れ):\n{c1}"
+        );
+        // ★ それでも「いつ・どの版で取ったか」は残る (ADR-013 D1)
+        assert_eq!(c1.matches(r#""type":"meta","session_start""#).count(), 1);
+        assert_eq!(c1.matches(r#""type":"meta","session_end""#).count(), 1);
+
+        // ② 宣言は**新しい**ファイルに 1 本だけ入る
+        assert_eq!(
+            c2.matches(r#""type":"session_meta""#).count(),
+            1,
+            "⚠️ 宣言が新しいファイルに入っていない:\n{c2}"
+        );
+        assert!(c2.contains(r#""task_kind":"vibe_coding""#), "{c2}");
+        assert!(c2.contains(r#""head_id":"coding_v0""#), "{c2}");
+        assert!(
+            c2.contains(r#""intervention_enabled":false"#),
+            "⚠️ O1 で介入が有効のまま記録されている (判断 O1-5):\n{c2}"
+        );
+
+        // ③ ⚠️★★★ どちらのファイルにも `task_kind` は高々 1 種類
+        //    (★ 2 種類あると `gse-replay` が Err で落ちる = ローテートが要る理由)
+        for (name, c) in [("file1", &c1), ("file2", &c2)] {
+            let kinds: std::collections::BTreeSet<&str> =
+                ["argumentative", "correspondence", "creative", "vibe_coding"]
+                    .into_iter()
+                    .filter(|k| c.contains(&format!(r#""task_kind":"{k}""#)))
+                    .collect();
+            assert!(
+                kinds.len() <= 1,
+                "⚠️ {name} に相異なる task_kind が {} 種類ある: {kinds:?}",
+                kinds.len()
+            );
+        }
+
+        drop(logger);
+        let _ = fs::remove_file(&p1);
+        let _ = fs::remove_file(&p2);
     }
 
     /// ★★ 本タスクの核心の回帰: `Rotate` で **2 本のファイルに分かれ**、

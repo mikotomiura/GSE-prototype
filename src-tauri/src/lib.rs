@@ -10,6 +10,11 @@ pub mod capabilities;
 pub mod g1;
 pub mod input;
 pub mod logger;
+// ⚠️★★★ O1 (R3-a・自然作業の常時収集) の「O1 モード」判定と、そのモードでだけ変わる方針
+//   (ADR-014 D6 / ADR-016 判断 4b-0)。★ `g1` と同層の純判定モジュールで、
+//   効果 (門を通す / 常時のインジケータ / 宣言でのローテート / 猶予つき自動提出) は
+//   `lib.rs` と `reconcile` が適用する。
+pub mod o1;
 // 提出ファイル名ラベル用 participant_id 検証の単一情報源 (feature 非依存)。
 // packaging (提出 CLI) と submit_latest_session (アプリ内提出) の双方が参照する。
 pub mod participant_id;
@@ -149,6 +154,63 @@ static SESSION_META_RECORDED: AtomicBool = AtomicBool::new(false);
 /// → **分析スレッドがドレインに入ったことを観測してから** `BlockEnd` を送る。
 static ANALYSIS_IDLE: AtomicBool = AtomicBool::new(true);
 
+// ---------------------------------------------------------------------------
+// O1 (R3-a) 自然作業の常時収集 — 宣言と日次ローテート
+// ---------------------------------------------------------------------------
+
+/// ⚠️★★★ **いま宣言されている作業の種類。`None` = 未宣言。**
+///
+/// ★ ADR-016 **判断 4b-3**: `unknown` を enum に足さず、**`session_meta` 行の *不在***で
+/// 未宣言を表す。→ この値が `None` のあいだ、⚠️ **`session_meta` 行を 1 本も書かない**。
+///
+/// ⚠️ **推測して埋めない** —— 同意文書 §2 逐語「こちらで勝手に推測して埋めることはしません」。
+/// ★ 観測から推定して埋めるのは **ADR-010 D3 の閉ループ禁止**にも触れる。
+///
+/// ★ 日次ローテートが `session_meta` を書き直すかどうかもこの値で決まる
+/// (⚠️ 未宣言のまま日をまたいだファイルに、宣言を捏造しない)。
+static DECLARED_TASK_KIND: Mutex<Option<logger::TaskKind>> = Mutex::new(None);
+
+/// ⚠️★ **いま書いているセッションファイルを開いた時刻** (epoch ms)。日次ローテートの基準。
+///
+/// ★ `Instant` ではなく **epoch ms** にしてあるのは、スリープ / 休止のあいだも
+/// 経過に含めるためである (⚠️ `Instant` は OS によって止まる)。
+/// ★ 0 = まだ開いていない (日次ローテートは動かない)。
+static O1_LOG_OPENED_MS: AtomicU64 = AtomicU64::new(0);
+
+/// ⚠️★★★ **O1 のローテートを 1 本に直列化する排他** (code-reviewer MEDIUM・2026-08-27)。
+///
+/// ★ 入口は 2 つある —— **宣言 UI** (`declare_task_kind`) と **日次ローテートスレッド**。
+/// ⚠️ ログのロックだけでは足りない: `DECLARED_TASK_KIND` の読みと `O1_LOG_OPENED_MS` の
+/// 更新がその外にあると、交錯したときに
+/// **ファイルに書かれた `session_meta` と UI / engine head が食い違う**
+/// (★ 日次スレッドが「未宣言」を読んだ直後に宣言が入り、
+/// **宣言したばかりのファイルを未宣言として閉じ直す**)。
+///
+/// ★ ロック順序は **`O1_ROTATE` → `LogState` → `DECLARED_TASK_KIND`** で固定する。
+/// ⚠️ 他の箇所 (`get_recording_status`) はこの 3 つを**入れ子にしない**ので、循環はできない。
+///
+/// ★ G1 の [`BLOCK_TRANSITION`] と同じ役割・同じ流儀である
+/// (⚠️ ★ **通常運用 / G1 では誰も取らない** = 無競合)。
+static O1_ROTATE: Mutex<()> = Mutex::new(());
+
+/// ローテート 1 回で宣言をどう扱うか。
+///
+/// ⚠️ ★ **`Option<TaskKind>` にしない。** ★ 「新しく宣言する」と「いまの宣言を引き継ぐ」は
+/// 意味が違い、⚠️ 後者は **ロックの中で現在値を読む**必要がある (上記の交錯を避けるため)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum O1Declaration {
+    /// ★ 宣言 UI からの 1 回。**この値を新しいファイルへ書き、確定させる**。
+    Set(logger::TaskKind),
+    /// ★ 日次ローテート。**いまの宣言をそのまま引き継ぐ**。
+    /// ⚠️ 未宣言 (`None`) なら `session_meta` を 1 行も書かない (判断 4b-3)。
+    KeepCurrent,
+}
+
+/// 宣言されている作業の種類を読む (`None` = 未宣言)。
+fn declared_task_kind() -> Option<logger::TaskKind> {
+    *DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner())
+}
+
 /// ⚠️★★★ **ブロック遷移の直列化点** (D-1・2026-08-21)。
 ///
 /// 「開始する」の押下 ([`start_session`]) と **ブロックの自動終了**は、この 1 本を通る。
@@ -229,6 +291,13 @@ impl LogState {
             .path
             .to_string_lossy()
             .to_string()
+    }
+
+    /// ⚠️★★★ **いま実際に書けているか** (R-11)。★ ローテートで変わるので共有ハンドルから読む。
+    ///
+    /// `LogStatus::Ok` 以外 (temp へフォールバック / 破棄) は **`false`** である。
+    fn status(&self) -> bool {
+        self.target.lock().unwrap_or_else(|p| p.into_inner()).status == LogStatus::Ok
     }
 }
 
@@ -928,6 +997,30 @@ struct RecordingStatusDto {
     current_file: String,
     /// セッション NDJSON を置いているディレクトリ。
     session_dir: String,
+    /// ★ O1 モードの引き金 (`"marker"` / `"env"`)。⚠️ 通常運用では `None`。
+    o1_mode: Option<&'static str>,
+    /// ⚠️★★★ **いま宣言されている作業の種類** (`None` = **未宣言**)。
+    ///
+    /// ★ ADR-016 判断 4b-3: `unknown` を enum に足さず、**`session_meta` 行の *不在*** で
+    /// 未宣言を表す。→ ここも `None` のままにし、⚠️ **UI が「未設定」と描く**。
+    /// ★ こちらで勝手に推測して埋めない (同意文書 §2 の逐語)。
+    task_kind: Option<&'static str>,
+    /// ⚠️★★★ **実際に記録できているか** (研究者判断 R-11・2026-08-26)。
+    ///
+    /// ★ 旧実装は `paused` だけを見ており、⚠️ **フックが死んでいても
+    /// 「記録しています」と出した** (security-checker MEDIUM-2)。
+    /// ★ トレイ (`tray::current_state`) は見ているのに**アプリ内バッジだけが見ていなかった**。
+    /// → ★ 同意文書 §4 の逐語「印が出ていないときは記録していません」を守るには、
+    /// **「止めた」と「壊れている」を分けて出す**必要がある (トレイの `MeasureState` と同じ理屈)。
+    ///
+    /// | 値 | 意味 |
+    /// |---|---|
+    /// | `"recording"` | ★ 記録できている |
+    /// | `"paused"` | ★ 被験者が止めている |
+    /// | `"broken"` | ⚠️★★★ **止めていないのに記録できていない** (フックの死 / 書込不可) |
+    health: &'static str,
+    /// ⚠️ `health == "broken"` のとき、**何が壊れているか**を被験者に出す 1 行。
+    health_detail: Option<String>,
 }
 
 /// 記録の稼働状態を返す (D7-i: 稼働中インジケータ)。
@@ -937,10 +1030,271 @@ struct RecordingStatusDto {
 #[tauri::command]
 fn get_recording_status(log: State<Arc<Mutex<LogState>>>) -> RecordingStatusDto {
     let (dir, _participant_id) = crate::logger::session_log_dir();
+    let paused = crate::recording::is_paused();
+    // ⚠️★★★ **「止めた」と「壊れている」を分ける** (R-11)。★ 材料はトレイと同じ 3 つ:
+    //   `HOOK_ACTIVE` (設置できたか) / `!HOOK_STARVED` (実際に届いているか) /
+    //   `LogStatus` (書けているか)。
+    // ★ ロックは 1 回だけ取る (⚠️ 2 回取ると、その間のローテートでパスと状態が食い違う)。
+    let (current_file, log_ok) = {
+        let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+        (guard.current_path(), guard.status())
+    };
+    let (health, health_detail) = recording_health(
+        paused,
+        crate::input::hook::HOOK_ACTIVE.load(Ordering::Relaxed),
+        crate::input::hook::HOOK_STARVED.load(Ordering::Relaxed),
+        log_ok,
+    );
     RecordingStatusDto {
-        paused: crate::recording::is_paused(),
-        current_file: log.lock().unwrap_or_else(|p| p.into_inner()).current_path(),
+        paused,
+        current_file,
         session_dir: dir.display().to_string(),
+        o1_mode: crate::o1::mode().map(|s| s.as_str()),
+        task_kind: declared_task_kind().map(|k| k.as_str()),
+        health,
+        health_detail,
+    }
+}
+
+/// 稼働中インジケータの 3 値を決める**純関数** (R-11)。
+///
+/// ⚠️★★★ **順序が意味を持つ**: ★ 「被験者が止めた」が最優先である ——
+/// 止めているあいだフックが遊んでいるのは**当たり前**なので、
+/// ⚠️ そこで「壊れています」と出すと**被験者が自分の操作を故障と誤解する**。
+///
+/// ★ `installed && !starved` はトレイの `current_state` と**同じ式**である
+/// (⚠️ 2 か所で違う式を書くと、片方だけ直して静かに食い違う)。
+fn recording_health(
+    paused: bool,
+    hook_installed: bool,
+    hook_starved: bool,
+    log_ok: bool,
+) -> (&'static str, Option<String>) {
+    if paused {
+        return ("paused", None);
+    }
+    if !log_ok {
+        return (
+            "broken",
+            Some("記録の保存先に書き込めていません。研究者に連絡してください。".to_string()),
+        );
+    }
+    if !hook_installed || hook_starved {
+        return (
+            "broken",
+            Some("キーボードの記録ができていません。研究者に連絡してください。".to_string()),
+        );
+    }
+    ("recording", None)
+}
+
+/// O1 モードか (引き金つき)。★ `get_g1_mode` の鏡像。通常運用では `None`。
+#[tauri::command]
+fn get_o1_mode() -> Option<&'static str> {
+    crate::o1::mode().map(|s| s.as_str())
+}
+
+/// ⚠️★★★ O1 の**開始前ゲート**の状態 (研究者判断 R-7)。
+#[derive(serde::Serialize)]
+struct O1EnrollmentDto {
+    /// ★ 1 回きりの同意確認が済んでいるか。
+    consent_acknowledged: bool,
+    /// ★ O1 専用の参加者 ID (未登録なら `None`)。
+    participant_id: Option<String>,
+}
+
+/// O1 の開始前ゲートを読む。
+#[tauri::command]
+fn get_o1_enrollment() -> O1EnrollmentDto {
+    O1EnrollmentDto {
+        consent_acknowledged: crate::submission::o1_consent_acknowledged(),
+        participant_id: crate::submission::read_o1_participant_id(),
+    }
+}
+
+/// ⚠️★★★ O1 の**同意確認と参加者 ID を 1 アクションで登録する** (研究者判断 R-7)。
+///
+/// ★ 被験者が押すのは**この 1 回だけ**である。⚠️ 以後は再確認しない
+/// (同意文書 §5 の逐語「**自動的に**送ります」を守るため)。
+///
+/// ⚠️ **ID が妥当でなければ確認も記録しない** (fail-closed) —— ★ 「確認は済んだが
+/// ID が無いので送られない」という**中途半端な状態を作らない**。
+#[tauri::command]
+fn acknowledge_o1_enrollment(participant_id: String) -> Result<(), String> {
+    if !crate::o1::is_o1() {
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+    // ★ 先に ID を検証して保存する (⚠️ 失敗したら確認の印を置かない)。
+    crate::submission::write_o1_participant_id(&participant_id)?;
+    crate::submission::write_o1_consent_ack(epoch_ms())?;
+    tracing::info!("O1: enrollment acknowledged (participant id registered)");
+    Ok(())
+}
+
+/// ⚠️★★★ O1 の**ローテート 1 回**を実行する (宣言の変更 / 日次ローテートの共通経路)。
+///
+/// ★ ADR-016 **判断 4b-1** が要求する 3 点を **1 アクションで**行う:
+/// **`session_meta` 出力 → ログのローテート → `engine.reset()`**。
+///
+/// ## ⚠️★★★ 順序が意味を持つ (★ 3 つとも実測に基づく)
+///
+/// 1. **`Rotate` を先に送る。** ⚠️ 先に `SessionMeta` を書くと、宣言が**旧ファイル**に落ちて
+///    新ファイルが未宣言になる —— ★ 意味が逆になる (旧ファイルの大半はその宣言ではない)。
+/// 2. **`engine.reset()` は `set_domain` より前。** ⚠️ `reset()` は逐語
+///    「head も既定 (Writing) に戻す」(`analysis/engine.rs`) ので、
+///    ★ 後に呼ぶと**宣言した head が黙って取り消される**。
+/// 3. **`set_domain` はログ送信に成功した後。** ★ 送信に失敗したまま head だけ切り替わると
+///    「Coding head で採点された `feat` 行が、head 宣言の無いファイルに書かれる」状態になり、
+///    ⚠️ **本番とリプレイの採点が食い違う** (= Replay-as-Truth の破れ・security-checker 2026-08-18)。
+///
+/// `task_kind` が `None` (= 未宣言) のときは **`session_meta` を 1 行も書かない**
+/// (★ 判断 4b-3: 行の**不在**で未宣言を表す)。
+fn o1_rotate(
+    log: &Arc<Mutex<LogState>>,
+    engine: &CognitiveStateEngine,
+    reset_signal: &ResetSignal,
+    declaration: O1Declaration,
+    reason: &str,
+) -> Result<(), String> {
+    // ⚠️★★★ **一時停止中は 1 バイトも書かない** (同意文書 §4 の逐語「すぐ止める」)。
+    //
+    // ★ `Rotate` は制御エントリなので停止ゲートを**通る**が、`SessionMeta` は
+    //   `recording::is_writable_while_paused` が**落とす** (`recording.rs`)。
+    //   → ⚠️ そのまま進むと **`head_id` がファイルに 1 行も残らないまま head だけ切り替わり**、
+    //   再開後の `feat` 行は宣言 head で採点されるのにファイルは無宣言になる
+    //   ＝ ★ **本番とリプレイの採点が食い違う** (本関数が防ごうとしている当の破れ)。
+    //   ⚠️ UI も「作業の種類: ○○」と出したままログは未宣言になる。
+    // → ★ **止めているあいだはローテートしない。** 日次ローテートは次の tick で再試行され、
+    //   宣言はエラーとして被験者に返す (⚠️ 黙って落とさない)。
+    if crate::recording::is_paused() {
+        return Err(
+            "記録を止めているあいだは変更できません。「記録を再開する」を押してからお試しください。"
+                .to_string(),
+        );
+    }
+
+    // ⚠️★★★ **ローテートは丸ごと 1 本に直列化する** (code-reviewer MEDIUM・2026-08-27)。
+    //   ★ 入口は 2 つある —— 宣言 UI (`declare_task_kind`) と日次ローテートスレッド。
+    //   ⚠️ ログのロックだけでは足りない: `DECLARED_TASK_KIND` の読みと
+    //   `O1_LOG_OPENED_MS` の更新がその外にあると、交錯したときに
+    //   **ファイルに書かれた `session_meta` と UI / engine head が食い違う**。
+    let _serialize = O1_ROTATE.lock().unwrap_or_else(|p| p.into_inner());
+
+    let new_path = logger::next_session_path();
+    let now = epoch_ms();
+
+    let guard = log.lock().unwrap_or_else(|p| p.into_inner());
+    // ⚠️★★ **容量を先に見る** (`start_session` と同じ形)。`Rotate` だけが落ちると、
+    //   直後の `SessionMeta` が **既に `session_end` を書き終えた旧ファイル**に積まれる。
+    //   ★ 沈黙して間違った結果を出すのが最悪なので、到達したら必ず止める。
+    if !log_channel_has_room(&guard.tx, 2) {
+        tracing::error!("O1: log channel is full; refusing to rotate ({reason})");
+        return Err(
+            "ログの書き込みが詰まっています。少し待ってからもう一度お試しください。".to_string(),
+        );
+    }
+
+    // ★ **宣言の読みもロックの中で行う。** ⚠️ 外で読むと、日次スレッドが「未宣言」を
+    //   読んだ直後に宣言が入り、**宣言したばかりのファイルを未宣言として閉じ直す**。
+    let mut declared = DECLARED_TASK_KIND.lock().unwrap_or_else(|p| p.into_inner());
+    let kind = match declaration {
+        O1Declaration::Set(k) => Some(k),
+        // ⚠️★★★ **宣言を捏造しない。** 未宣言のまま日をまたいだファイルには書かない
+        //   (判断 4b-3: 行の**不在**で未宣言を表す)。
+        O1Declaration::KeepCurrent => *declared,
+    };
+
+    tracing::info!("O1: rotating session log ({reason}) -> {:?}", new_path);
+    guard
+        .tx
+        .try_send(LogEntry::Rotate { new_path })
+        .map_err(log_send_error)?;
+
+    // ⚠️★★ **ローテートはここで成立している。** ★ 基準を先に引き直す ——
+    //   引き直さないと、下の `SessionMeta` が落ちたときに日次スレッドが 60 秒ごとに
+    //   再試行し、⚠️ **失敗のたびに新しい NDJSON が増える** (ロガーが詰まっている、
+    //   つまり最も再現しやすい状況で churn する・code-reviewer HIGH)。
+    O1_LOG_OPENED_MS.store(now, Ordering::Release);
+
+    // ★ ここから新しいファイルである。⚠️ **reset は `set_domain` より前** (上記 2)。
+    engine.reset();
+    reset_signal.0.store(true, Ordering::Release);
+
+    if let Some(k) = kind {
+        let domain = TaskDomain::from(k);
+        let head_id = domain.head_id();
+        if let Err(e) = guard.tx.try_send(LogEntry::SessionMeta {
+            timestamp: now,
+            track: Track::Main,
+            task_kind: k,
+            // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。** ★ ここを引数にしない
+            //   (フロントから `true` を渡せる形にすると、自然作業に介入が混ざる経路ができる)。
+            intervention_enabled: false,
+            condition: None,
+            label_pool: None,
+            head_id,
+        }) {
+            // ⚠️★★★ **宣言を「無し」に巻き戻す** (code-reviewer HIGH・2026-08-27)。
+            //   ★ 新しいファイルの**真の状態は未宣言**である。巻き戻さないと
+            //   `get_recording_status` が「宣言済み」と嘘をつき、⚠️ **翌日のローテートが
+            //   被験者の選んでいない種別を新ファイルに書く**。
+            //   ★ engine の head は `reset()` で既に Writing へ戻っており、ここでは
+            //   `set_domain` を**呼ばない**ので、ログと engine の状態は一致したままである。
+            *declared = None;
+            tracing::error!(
+                "O1: rotated but FAILED to record the declaration: {}",
+                log_send_error(e)
+            );
+            return Err("作業の種類を記録できませんでした。もう一度選んでください。".to_string());
+        }
+        // ★ 送信に成功した**後**に head を差し替える (上記 3)。
+        let applied = engine.set_domain(domain);
+        debug_assert_eq!(
+            applied, head_id,
+            "記録した head_id と反映した head が食い違った"
+        );
+    }
+
+    // ★ ログへ積めた後に**初めて**宣言を確定させる (⚠️ ロックの中なので交錯しない)。
+    if let O1Declaration::Set(k) = declaration {
+        *declared = Some(k);
+    }
+    Ok(())
+}
+
+/// ⚠️★★★ O1: **作業の種類を宣言する / 宣言し直す** (ADR-016 判断 4 / 4b-1 / 4b-2 / 4b-3)。
+///
+/// ★ 同意文書 §2 の逐語「作業が変わったら、そのつど選び直してください」に対応する唯一の経路。
+///
+/// ⚠️ **`record_session_meta` には手を触れていない** —— そちらは「開始する」押下から呼ばれる
+/// Phase1 / G1 の経路であり、★ **O1 の分岐を混ぜない** (G1 / Phase1 を 1 バイトも変えない)。
+#[tauri::command]
+fn declare_task_kind(
+    task_kind: String,
+    log: State<'_, Arc<Mutex<LogState>>>,
+    engine: State<'_, CognitiveStateEngine>,
+    reset_signal: State<'_, ResetSignal>,
+) -> Result<(), String> {
+    // ⚠️ 新 enum 値は足さない (判断 4b-2)。未知値は**黙って捨てず**エラーにする。
+    let kind = logger::TaskKind::parse(&task_kind)
+        .ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
+
+    match crate::o1::decide_declaration_action(crate::o1::is_o1(), g1_mode().is_some()) {
+        crate::o1::DeclarationAction::NotO1 => {
+            // ⚠️ 通常運用 / G1 では宣言 UI 自体が出ない。★ ここへ来たら呼び出し側の誤りである。
+            Err("この画面は O1 モードでのみ使えます。".to_string())
+        }
+        crate::o1::DeclarationAction::RotateAndDeclare => {
+            o1_rotate(
+                &log,
+                &engine,
+                &reset_signal,
+                O1Declaration::Set(kind),
+                &format!("declaration -> {}", kind.as_str()),
+            )?;
+            tracing::info!("O1: task_kind declared: {}", kind.as_str());
+            Ok(())
+        }
     }
 }
 
@@ -1000,10 +1354,81 @@ fn delete_time_range(
     from_ms: u64,
     to_ms: u64,
     log: State<Arc<Mutex<LogState>>>,
+    engine: State<'_, CognitiveStateEngine>,
+    reset_signal: State<'_, ResetSignal>,
 ) -> Result<RedactionOutcomeDto, String> {
     if from_ms > to_ms {
         return Err("開始時刻が終了時刻より後になっています。".to_string());
     }
+
+    // ⚠️★★★ **O1 では先に現行ファイルを閉じる** (code-reviewer / security-checker が一致して指摘)。
+    //
+    // ★ 下の `skip` は「いま書いているファイル」を常に除外する。Phase1 / G1 の現行ファイルは
+    //   1 セッション〜5 分ぶんなので実害が小さいが、⚠️★★★ **O1 の現行ファイルは
+    //   日次ローテートまで最大 24 時間ぶん**である。
+    //   → ⚠️ **直近 24 時間を 1 行も消せない**。しかも `RecordingControls` は
+    //   「さきに『すぐ止める』を押してください」と案内するのに、⚠️ **一時停止しても
+    //   `current_path` は変わらないので消せるようにならない** (実行不能な回避策)。
+    //   ★ 同意文書 §4-3 は逐語で「送られる前（＝ **その日**と、その次の 2 日ほど）…
+    //   **あなたの端末の上で消えます**」と約束しており、**ADR-014 判断 3 の根拠 3 がここで崩れる**。
+    //
+    // → ★ **ローテートしてから消す。** 閉じた瞬間から 48 時間の猶予が始まるので、
+    //   ⚠️ 提出側も安全側に倒れる (★ いま閉じたファイルはまだ包まれない)。
+    // ⚠️ 失敗しても**削除は続ける** —— ★ 消せる範囲だけでも消すほうが、
+    //   「消えませんでした」と返すより被験者の要求に近い (`files_skipped` で正直に出る)。
+    //
+    // ⚠️★ **一時停止中はローテートしない。** ★ 停止中は `session_meta` が停止ゲートに落ちるので
+    //   (`recording::is_writable_while_paused`)、回すと**宣言が黙って失われる**。
+    //   ★ 停止中に「いまの区間」を消したい場合は、⚠️ そもそも停止後の記録が無いので
+    //   失うものは停止前の分だけであり、**再開すれば次の削除で必ず届く**。
+    //   ⚠️ 画面は `files_skipped` をそのまま出すので、黙って取りこぼすことはない。
+    if crate::o1::is_o1() && !crate::recording::is_paused() {
+        // ⚠️★★★ **ローテートの *完了* を待つ** (cross-review / Codex MEDIUM・2026-08-27)。
+        //
+        // ★ `o1_rotate` は `LogEntry::Rotate` を**チャネルに積むだけ**で、実際に
+        //   `session_end` を書いて新しいファイルを開くのは**ロガースレッド**である。
+        //   → ⚠️ 待たずに `current_path()` を読むと、**まだ旧ファイルを指している**ので
+        //   ★ **閉じたはずのファイルを `skip` に渡してしまい、消したかった当のものが残る**。
+        //   ⚠️ さらに悪いことに、ロガーが旧ファイルの fd へ書いている最中に
+        //   `redact_file` が置き換えると **消したはずの行が復活する**。
+        //
+        // ★ 待ち方: `logger` は `Rotate` の処理で
+        //   `write_meta_end` → flush → 新ファイルを開く → `write_meta_start` → flush →
+        //   **最後に `target.path` を更新する**。→ ★ **パスが変わったことが「完了」の証拠**である。
+        let before = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
+        match o1_rotate(
+            &log,
+            &engine,
+            &reset_signal,
+            O1Declaration::KeepCurrent,
+            "before redaction",
+        ) {
+            Ok(()) => {
+                // ⚠️ 無限には待たない。★ 待てなかったら `files_skipped` に出るだけで、
+                //   **黙って旧ファイルを壊しに行くことはない** (安全側)。
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                loop {
+                    let now_path = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
+                    if now_path != before {
+                        break;
+                    }
+                    if std::time::Instant::now() >= deadline {
+                        tracing::warn!(
+                            "O1: the rotation before redaction did not complete in time;                              the newest file will be skipped"
+                        );
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(20));
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "O1: could not close the current log before redaction ({e});                      the newest file will be skipped"
+                );
+            }
+        }
+    }
+
     let (dir, _participant_id) = crate::logger::session_log_dir();
     let current = log.lock().unwrap_or_else(|p| p.into_inner()).current_path();
     let current_path = PathBuf::from(&current);
@@ -1282,6 +1707,11 @@ enum ReconcileReason {
     Startup = 1,
     BlockEnd = 2,
     Approval = 3,
+    /// ⚠️★★★ O1 (R3-a): **日次ローテートでファイルが 1 本閉じた**。
+    /// ★ 閉じた直後は猶予 (48 時間) の中なので **まだ包まれない**。
+    /// ⚠️ それでも回すのは、**前々日ぶんが猶予を抜けている**からである
+    /// (`design.md` §1「起動のきっかけはヒント」と同じ収束型の考え方)。
+    O1DailyRotation = 4,
 }
 
 impl ReconcileReason {
@@ -1291,6 +1721,7 @@ impl ReconcileReason {
             ReconcileReason::Startup => "at startup",
             ReconcileReason::BlockEnd => "after block",
             ReconcileReason::Approval => "after approval",
+            ReconcileReason::O1DailyRotation => "after daily rotation",
         }
     }
 }
@@ -1462,13 +1893,33 @@ fn set_g1_participant_id(id: String) -> Result<(), String> {
 /// 収束器 (`gse-submit --reconcile`) を **別スレッドで** 1 回起こす。
 ///
 /// ★ `reason` はログ用のきっかけ名 (`"at startup"` / `"after block"`)。
-/// ⚠️ ★ **G1 モードでなければ何もしない** (通常運用の挙動を 1 バイトも変えない)。
+/// ⚠️ ★ **G1 でも O1 でもなければ何もしない** (通常運用 = Phase1 の挙動を 1 バイトも変えない)。
 /// ★ 何度呼んでも安全 (収束器はべき等) なので、二重起動を気にしなくてよい。
 fn spawn_reconcile(app: tauri::AppHandle, reason: ReconcileReason) {
-    if g1_mode().is_none() {
+    if !auto_submit_enabled() {
         return;
     }
     spawn_reconcile_with_guard(app, reason, InFlightGuard::new(reason));
+}
+
+/// 自動提出の経路が開いているか。
+///
+/// ⚠️★★★ **G1 と O1 の 2 つだけ**である。★ 通常運用 (Phase1) では
+/// `.age` を作りも送りもしない (従来どおり手動提出だけ)。
+///
+/// ## ⚠️★★★ O1 は **1 回きりの同意確認**が済むまで開かない (研究者判断 R-7)
+///
+/// ★ D-14 の `.age.ok` (毎回の送信確認) は O1 では外した (R-2)。⚠️ しかしそれは
+/// 「**同意手続きを経ていない人が配布ビルドを起動する経路を塞ぐ**」役も担っていた。
+/// ⚠️★★★ security-checker HIGH-4 の実測: **G1 をやった端末に O1 ビルドを置くだけで、
+/// 人の操作ゼロで常時記録＋48 時間後の自動送信が始まる**
+/// (★ `~/.gse/g1_participant_id` が既に残っているため)。
+/// → ★ **確認が済むまで送信経路を開かない。** ⚠️ `.age` は作られる (データは失われない)。
+fn auto_submit_enabled() -> bool {
+    if crate::o1::is_o1() {
+        return crate::submission::o1_consent_acknowledged();
+    }
+    g1_mode().is_some()
 }
 
 /// ★★ 番兵を **呼び出し側で作ってから**渡す版。
@@ -1485,7 +1936,7 @@ fn spawn_reconcile_with_guard(
     reason: ReconcileReason,
     in_flight: InFlightGuard,
 ) {
-    if g1_mode().is_none() {
+    if !auto_submit_enabled() {
         return;
     }
     let reason = reason.label();
@@ -1494,6 +1945,9 @@ fn spawn_reconcile_with_guard(
     //   ★ **無表示の窓**ができる (今回潰そうとしている沈黙そのもの)。
     //   `approve_pending_submissions` はこの関数を呼んでから返るので、
     //   ★ フロントが押下直後に読む状態には既に `sending: true` が乗っている。
+    // ⚠️★ **ラベルをモードに合わせる** (2026-08-27)。★ O1 でもこの経路を使うようになったので、
+    //   「G1 auto-submit」と固定で書くと ⚠️ **ログを読む人がモードを取り違える**。
+    let mode_label = if crate::o1::is_o1() { "O1" } else { "G1" };
     thread::spawn(move || {
         // ★ スレッドが終わるとき (下の early return も含め) に必ず戻す。
         let _in_flight = in_flight;
@@ -1503,7 +1957,8 @@ fn spawn_reconcile_with_guard(
         //   ★ 見送っても損失にならない (次のブロック終了で必ず拾われる)。
         if SESSION_START_MS.load(Ordering::Acquire) != 0 {
             tracing::info!(
-                "G1 auto-submit ({}): skipped (a block is running; will run at block end)",
+                "{} auto-submit ({}): skipped (a block is running; will run at block end)",
+                mode_label,
                 reason
             );
             return;
@@ -1512,20 +1967,21 @@ fn spawn_reconcile_with_guard(
         let mut slot = SUBMIT_LAST_ERROR.lock().unwrap_or_else(|p| p.into_inner());
         match outcome {
             Ok(Some(summary)) => {
-                tracing::info!("G1 auto-submit ({}): {}", reason, summary);
+                tracing::info!("{} auto-submit ({}): {}", mode_label, reason, summary);
                 *slot = None;
             }
             Ok(None) => {
                 // ★ 何もしなかった (ID 未登録)。⚠️ **失敗ではないので画面に出さない。**
                 //   ⚠️ ★ 直前の失敗を **消しもしない** (成功していないため)。
                 tracing::info!(
-                    "G1 auto-submit ({}): skipped (participant id not registered yet)",
+                    "{} auto-submit ({}): skipped (participant id not registered yet)",
+                    mode_label,
                     reason
                 );
             }
             Err(e) => {
                 // ⚠️ ログだけにしない。★ 画面へ出すために保持する。
-                tracing::error!("G1 auto-submit ({}) FAILED: {}", reason, e);
+                tracing::error!("{} auto-submit ({}) FAILED: {}", mode_label, reason, e);
                 *slot = Some(e);
             }
         }
@@ -1543,7 +1999,13 @@ fn spawn_reconcile_with_guard(
 /// ★ この時点で失うものは無い: ID が要るのは `.age` の名前だけで、
 /// ID が入るまでブロックは 1 つも始められない (`g1_start_gate`)。
 fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, String> {
-    let id = match crate::submission::read_g1_participant_id() {
+    // ⚠️★★★ **O1 は専用の ID ファイルを読む** (研究者判断 R-7)。
+    //   ★ `g1_participant_id` を流用すると、G1 をやった端末で **ID 入力の操作すら要らなくなる**。
+    let id = match if crate::o1::is_o1() {
+        crate::submission::read_o1_participant_id()
+    } else {
+        crate::submission::read_g1_participant_id()
+    } {
         Some(id) => id,
         None => return Ok(None),
     };
@@ -1551,6 +2013,13 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
 
     let mut cmd = std::process::Command::new(&submit_bin);
     cmd.arg("--reconcile");
+    // ⚠️★★★ O1 は **別の規則**で収束させる (`gse_o1_*` を対象・48 時間の猶予・承認なし)。
+    //   ★ 判定は**アプリ側の 1 か所**で行って渡す —— `gse-submit` の `current_exe()` は
+    //   macOS のバンドル内 sidecar だとアプリ本体と階層が違い、⚠️ 自前で `o1.mode` を
+    //   探させると**静かに G1 の規則で包む**ことになる。
+    if crate::o1::is_o1() {
+        cmd.arg("--o1");
+    }
     cmd.env("GSE_PARTICIPANT_ID", &id);
     if let Some(r) = resolve_bundled_recipient(app) {
         cmd.env("GSE_RECIPIENT", r);
@@ -1665,6 +2134,26 @@ async fn submit_latest_session(
     app: tauri::AppHandle,
     participant_id: String,
 ) -> Result<SubmitOutcome, String> {
+    // ⚠️★★★ **O1 では手動提出を受け付けない** (security-checker HIGH-1・2026-08-27)。
+    //
+    // ★ この経路は `gse-submit` を**引数なし**で起こし、`packaging::find_latest_session_ndjson`
+    //   が **`session_end` を要求せずに最新の `gse_*.ndjson` を選ぶ**。
+    //   → ⚠️ O1 では **いま書いている最大 24 時間ぶんのファイル**がその場で `.age` に包まれる。
+    //
+    // ⚠️★★★ 帰結が 2 つとも重い:
+    //   1. **48 時間の猶予を丸ごと迂回する** —— `redact_dir` は `.age` を触らないので、
+    //      ★ **その瞬間から被験者は消せない** (同意文書 §4-3 の逐語の破れ ＝ 判断 3 の根拠 3)。
+    //   2. `submission::age_for_stem` が「既に包んである」と判定するため、
+    //      ⚠️ **猶予明けの収束器がその stem を二度と包まない** → 静かなデータ欠落。
+    //
+    // ★ O1 の提出経路は収束器 (`--reconcile --o1`) **1 本だけ**にする。
+    //   ⚠️ UI 側 (`Dashboard.tsx`) でも当該セクションを出さないが、**両方で塞ぐ**
+    //   (画面だけの対処にすると、次に画面をいじった人が黙って穴を開け直す)。
+    if crate::o1::is_o1() {
+        tracing::warn!("O1: manual submit rejected (auto-submission handles O1 after the grace)");
+        return Err("この記録は自動で提出されます。手動での提出は使いません。".to_string());
+    }
+
     let id = participant_id.trim().to_string();
     if !crate::participant_id::is_valid_participant_id(&id) {
         return Err(
@@ -1823,6 +2312,18 @@ fn record_session_meta(
     log: State<'_, Arc<Mutex<LogState>>>,
     engine: State<'_, CognitiveStateEngine>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では受け付けない** (cross-review / Codex HIGH・2026-08-27)。
+    //
+    // ★ O1 の宣言経路は `declare_task_kind` **1 本だけ**である。こちらを通されると:
+    //   1. ⚠️ `intervention_enabled` を引数で受けるので **判断 O1-5 (介入を出さない) が破れる**
+    //   2. ⚠️ **ローテートしないまま** `session_meta` を積むので、宣言を変えると
+    //      1 ファイルに相異なる `task_kind` が 2 つ入り **`gse-replay` が `Err`** になる
+    //   3. ⚠️ 未宣言を「行の不在」で表す判断 4b-3 が壊れる
+    if crate::o1::is_o1() {
+        tracing::warn!("O1: record_session_meta rejected (use declare_task_kind instead)");
+        return Err("この画面はこの記録では使いません。".to_string());
+    }
+
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
         TaskKind::parse(&task_kind).ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
@@ -2134,6 +2635,22 @@ fn start_session(
     intervention: State<InterventionState>,
     log: State<Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では「開始する」を受け付けない** (cross-review / Codex HIGH・2026-08-27)。
+    //
+    // ★ UI 側では判定が済むまでスタート画面を出さない (fail-closed) が、
+    //   ⚠️ **IPC は残っている**ので、将来の UI 変更や直接呼び出しで到達しうる。
+    //   → ★ `submit_latest_session` と同じく **両方で塞ぐ**。
+    //
+    // ⚠️★★★ 到達したときの帰結が重い: `SESSION_START_MS` が立つが、
+    //   **O1 にはブロック自動終了スレッドが無い** (`if g1_mode().is_some()` の中でしか起きない)
+    //   ので **0 に戻す経路が存在しない**。→ `spawn_reconcile_with_guard` が
+    //   「ブロック中なので走らせない」で **プロセスの寿命いっぱい skip し続け、
+    //   自動提出が黙って止まる**。
+    if crate::o1::is_o1() {
+        tracing::warn!("O1: start_session rejected (recording is always on in O1 mode)");
+        return Err("この記録は常に動いています。開始の操作は要りません。".to_string());
+    }
+
     // ★★ G1: 参加者 ID が無いまま**ブロックを始めさせない** (`requirement.md` 受け入れ条件 1)。
     //
     // ⚠️ ★ **何も触る前に**返す。ここから先はログのローテートまで進むので、途中で止めると
@@ -2607,6 +3124,42 @@ pub fn run() {
         );
     }
 
+    // ★ O1 モード (R3-a・自然作業の常時収集) の判定 —— **起動時に 1 回だけ**読む。
+    //   ⚠️★★★ **G1 と同時には立てない** (`o1::resolve` が G1 を勝たせる)。理由は
+    //   `preregistration.md §3.6` がブロックの事後除外を禁じており、G1 の 1 ブロックは
+    //   **取り返しがつかない**ためである。★ 起動そのものは止めない (g1.rs の倒し方と同じ)。
+    let o1_detected = crate::o1::detect_from_env();
+    if crate::o1::modes_conflict(g1_source, o1_detected) {
+        // ⚠️★★★ 事故だが**静かに壊れてはならない**。診断ログに必ず残す。
+        tracing::error!(
+            "BOTH g1.mode and o1.mode are present in the distribution folder \
+             (g1={:?}, o1={:?}). O1 mode is DISABLED and this run behaves as G1. \
+             Remove one marker; a G1 block cannot be excluded after the fact \
+             (preregistration.md 3.6).",
+            g1_source,
+            o1_detected
+        );
+    }
+    let o1_source = crate::o1::resolve(g1_source, o1_detected);
+    crate::o1::set_mode(o1_source);
+    if let Some(src) = o1_source {
+        tracing::warn!(
+            "O1 MODE ENABLED (source={}): recording runs WITHOUT pressing start \
+             (ADR-016 4b-0), the session log rotates every {} ms, closed logs are held \
+             {} ms before submission, and interventions are OFF. \
+             See docs/adr/ADR-014-continuous-natural-work-collection.md D6/D8.",
+            src.as_str(),
+            crate::o1::ROTATE_AFTER_MS,
+            crate::o1::SUBMIT_GRACE_MS
+        );
+        // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。**
+        //   ★ 既定値は `true` (下の `INTERVENTION_ENABLED`) で、O1 は
+        //   `record_session_meta` を通らないので **何もしなければ Nudge が出る**。
+        //   → ★ ここで明示的に落とす。理由は (1) 介入が入ると自然作業ではなくなる
+        //   (観測している行動を介入が変える) (2) 同意文書に「助言が出ることがある」旨が無い。
+        INTERVENTION_ENABLED.store(false, Ordering::Release);
+    }
+
     // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
     //
     // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
@@ -2636,6 +3189,10 @@ pub fn run() {
         target: log_target.clone(),
         shutdown_rx: log_shutdown_rx,
     }));
+    // ★ O1 (R3-a): 日次ローテートスレッド用 (⚠️ O1 モードでしか起こさない)。
+    //   ★ `o1_rotate` は `start_session` と同じく **ログのロックの中**で
+    //   `Rotate` → `SessionMeta` を送るので、`LogState` そのものが要る。
+    let o1_log_state = log_state.clone();
 
     // キーストローク入力チャネル
     let (tx, rx) = crossbeam_channel::bounded::<crate::analysis::features::InputEvent>(64);
@@ -2643,6 +3200,8 @@ pub fn run() {
     // セッション開始リセットシグナル (start_session → 分析スレッド)
     let should_reset = Arc::new(AtomicBool::new(false));
     let should_reset_for_thread = should_reset.clone();
+    // ★ O1 (R3-a): 日次ローテートスレッド用 (⚠️ O1 モードでしか起こさない)。
+    let should_reset_for_o1 = should_reset.clone();
 
     // セッションアクティブフラグ (start_session まで false → 分析スレッドがドレイン)
     let session_active = Arc::new(AtomicBool::new(false));
@@ -2665,6 +3224,8 @@ pub fn run() {
     // エンジン初期化
     let engine = CognitiveStateEngine::new();
     let engine_for_thread = engine.clone();
+    // ★ O1 (R3-a): 日次ローテートスレッド用 (⚠️ O1 モードでしか起こさない)。
+    let engine_for_o1 = engine.clone();
     // ⚠️★ IME Monitor 用の clone は **2026-08-23 に不要になった** ——
     //   IME で `set_paused` を駆動しなくなったため (decisions D-10)。
     let log_tx_ime_poll = log_tx.clone();
@@ -2708,9 +3269,20 @@ pub fn run() {
 
         let mut state = AnalysisState::new(now_ms(), 600);
 
+        // ⚠️★★★ O1 (R3-a): **門を外すかどうかは起動時に決まる** (`o1::mode` は OnceLock)。
+        //   ★ ループの中で毎回読まず、ここで 1 回だけ確定させる (実行時トグルではない)。
+        let o1_always_on = crate::o1::is_o1();
+
         loop {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
-            if !session_active_for_thread.load(Ordering::Acquire) {
+            // ⚠️★★★ O1 では門を通す (ADR-016 判断 4b-0 の「(B) 常時収集」)。
+            //   ★ `LogEntry::Key` はこのループの**中でしか出ない**ので、門を外さないと
+            //   打鍵チャネルが丸ごと空になり、⚠️ **計器の欠損が「非打鍵区間」に化ける**。
+            //   ★ 非 O1 では `session_active` そのものなので G1 / Phase1 は 1 バイトも変わらない。
+            if !crate::o1::analysis_gate_open(
+                o1_always_on,
+                session_active_for_thread.load(Ordering::Acquire),
+            ) {
                 while rx.try_recv().is_ok() {}
                 // ★ G1: 「もうこのスレッドは LogEntry を投げない」ことの表明。
                 //   ブロック終了スレッドがこれを観測してから session_end を書く。
@@ -3105,6 +3677,72 @@ pub fn run() {
             // consumer スレッドは走り続ける (従来 `run()` 末尾での drop と同じ挙動)。
             drop(session_logger);
 
+            // ── ⚠️★★★ O1 (R3-a): 日次ローテート (判断 O1-2 の実施条件 1) ──────────
+            //
+            // ★ **閉じないファイルは提出候補にならない。** `write_meta_end`(`session_end`) は
+            //   **Rotate / BlockEnd (G1 限定) / アプリ終了**でしか書かれず、⚠️ O1 は
+            //   「開始する」を押さないので、**アプリを終了しない被験者のファイルは何日も
+            //   開いたまま**になる (`reconcile` は `session_end` を持つファイルしか触らない)。
+            //
+            // ⚠️ **O1 モードでしか起こさない。** ★ 通常運用 / G1 のログは 1 行も動かない。
+            if crate::o1::is_o1() {
+                let now = epoch_ms();
+                O1_LOG_OPENED_MS.store(now, Ordering::Release);
+                let o1_log = o1_log_state;
+                let o1_engine = engine_for_o1;
+                let o1_reset = ResetSignal(should_reset_for_o1);
+                let o1_app = app.handle().clone();
+                thread::spawn(move || {
+                    tracing::info!("O1 daily-rotate thread started");
+                    loop {
+                        // ★ 60 秒粒度で足りる (24 時間に対して 0.07%)。⚠️ スリープからの復帰でも
+                        //   epoch ms の差で判定するので、寝ていたぶんも経過に入る。
+                        thread::sleep(Duration::from_secs(60));
+                        if is_shutting_down() {
+                            tracing::info!("O1 daily-rotate thread stopping (shutdown)");
+                            return;
+                        }
+                        let opened = O1_LOG_OPENED_MS.load(Ordering::Acquire);
+                        if opened == 0 {
+                            continue;
+                        }
+                        if !crate::o1::should_rotate_daily(
+                            opened,
+                            epoch_ms(),
+                            crate::o1::ROTATE_AFTER_MS,
+                        ) {
+                            continue;
+                        }
+                        // ⚠️★★★ **止めているあいだは回さない。** ★ 止めている間は 1 行も
+                        //   書かれないので閉じる意味が無く、`SessionMeta` だけが停止ゲートに
+                        //   落ちて**宣言が黙って失われる**。再開後の tick で必ず拾われる。
+                        if crate::recording::is_paused() {
+                            continue;
+                        }
+                        // ⚠️★★★ **宣言を捏造しない。** 未宣言のまま日をまたいだファイルには
+                        //   `session_meta` を書かない (判断 4b-3: 行の**不在**で未宣言を表す)。
+                        //   ★ 宣言済みなら書き直す —— `engine.reset()` が head を Writing に
+                        //   戻すので、⚠️ 書き直さないと**翌日から宣言が黙って失われる**。
+                        //   ★ 現在値の読みは `o1_rotate` がロックの中で行う (交錯を避けるため)。
+                        if let Err(e) = o1_rotate(
+                            &o1_log,
+                            &o1_engine,
+                            &o1_reset,
+                            O1Declaration::KeepCurrent,
+                            "daily rotation",
+                        ) {
+                            // ⚠️ 失敗しても基準は引き直さない → 次の tick で再試行する
+                            //   (★ 収束型。1 回落ちても翌分で拾う)。
+                            tracing::error!("O1: daily rotation failed: {e}");
+                            continue;
+                        }
+                        // ★ 1 本閉じたので収束器を回す。⚠️ いま閉じたファイルは猶予の中なので
+                        //   **まだ包まれない** —— 拾われるのは **48 時間前に閉じた分**である。
+                        spawn_reconcile(o1_app.clone(), ReconcileReason::O1DailyRotation);
+                    }
+                });
+            }
+
             // --- キーボードフック・IME ポーリングの初期化 ---
             // Tauri の setup() はメインスレッドで、Tauri ランタイム初期化完了後に実行される。
             // ウィンドウシステムが完全に初期化された後にフックをインストールすることで、
@@ -3222,6 +3860,16 @@ pub fn run() {
                 spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
             }
 
+            // ⚠️★★★ O1 (R3-a): 起動時にも収束器を回す (研究者判断 O1-2 の自動提出)。
+            //
+            // ★ 収束型なので「起動」は**ヒントにすぎない**。⚠️ ここが落ちても、
+            //   次の日次ローテートの後で拾われる。
+            // ★ 猶予 (48 時間) を過ぎたファイルだけが包まれるので、
+            //   ⚠️ **起動直後に「昨日の記録」がいきなり送られることはない**。
+            if crate::o1::is_o1() {
+                spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
+            }
+
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。
             //
             // ⚠️ ★ なぜアプリ側に置くか (D-6 の「見直しタイミング」の決着):
@@ -3304,7 +3952,18 @@ pub fn run() {
                             return;
                         }
 
-                        let session_active = liveness_session_active.load(Ordering::Acquire);
+                        // ⚠️★★★ O1 (R3-a): **`session_active` をそのまま使わない。**
+                        //   ★ `liveness::step` は第 2 引数が false のとき `starved_ms` を
+                        //   **0 に落とす**。O1 では `session_active` が永久に false なので、
+                        //   ⚠️ そのまま渡すと **フックが死んでも永久に検出できない**
+                        //   (★ mac の `CGEventTap` 失効が無検出になる = 事前登録 §7 E1 の穴)。
+                        //   ★ 一時停止中は数えない (打鍵が来なくて当たり前・元の意図と同じ)。
+                        //   ⚠️ 非 O1 は `session_active` そのもの (挙動は 1 バイトも変わらない)。
+                        let session_active = crate::o1::recording_active(
+                            crate::o1::is_o1(),
+                            liveness_session_active.load(Ordering::Acquire),
+                            crate::recording::is_paused(),
+                        );
 
                         // ★ 生 tick の「変化」だけを見る (絶対時刻へ変換しない = ラップアラウンド安全)。
                         let tick = liveness::last_system_input_tick();
@@ -3846,7 +4505,18 @@ pub fn run() {
             // Phase 1 Ground Truth: グローバルホットキー 3 本を登録。
             // macOS: Cmd+Shift+Option+F/I/S、Windows/Linux: Ctrl+Shift+Alt+F/I/S。
             // 失敗は warn に落として起動を継続する(録画ラベリングなしでも運用可)。
-            {
+            //
+            // ⚠️★★★ **O1 では登録しない** (security-checker MEDIUM・2026-08-27)。★ 理由は 2 つ:
+            //   1. ⚠️ O1 は数日〜数週間の常時稼働なので、**被験者の業務アプリから
+            //      6 通りの打鍵を数週間奪う**。
+            //   2. ⚠️★★★ 誤爆すると **同意文書 §3 の記録項目表に無い `user_label` /
+            //      `review_marker` 行**が残る。★ 「記録するもの」を文書より広げてはならない。
+            //   ★ プローブが O1 で構造的に発火しない (D-5) のと同じ筋である。
+            if crate::o1::is_o1() {
+                tracing::info!(
+                    "O1: global shortcuts are NOT registered                      (they would take 6 key combinations away for weeks and could write                      user_label / review_marker rows that the consent form does not list)"
+                );
+            } else {
                 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
                 #[cfg(target_os = "macos")]
                 let mods = Modifiers::SUPER | Modifiers::SHIFT | Modifiers::ALT;
@@ -3970,6 +4640,12 @@ pub fn run() {
             get_recording_status,
             set_recording_paused,
             delete_time_range,
+            // ⚠️★★★ O1 (R3): 作業の種類の宣言 (ADR-016 判断 4 / 4b)。
+            //   ★ O1 モードの画面からしか呼ばれない (非 O1 では `Err` を返す)。
+            get_o1_mode,
+            declare_task_kind,
+            get_o1_enrollment,
+            acknowledge_o1_enrollment,
             submit_latest_session,
             record_user_label,
             record_session_meta,
@@ -4049,6 +4725,48 @@ mod task_c_command_tests {
     ///
     /// ## ★ なぜ `try_send` の失敗を拾うだけでは足りないか
     ///
+    /// ⚠️★★★ **稼働中インジケータの 3 値** (研究者判断 R-11・2026-08-26)。
+    ///
+    /// ★ 同意文書 §4 の逐語「印が出ていないときは記録していません」を守るには、
+    /// ⚠️ **「止めた」と「壊れている」を分けて出す**必要がある
+    /// (★ トレイの `MeasureState` が `Stopped` と `HookDown` を分けたのと同じ理屈)。
+    #[test]
+    fn recording_health_separates_paused_from_broken() {
+        // ★ 正常
+        assert_eq!(recording_health(false, true, false, true).0, "recording");
+        // ★ 被験者が止めた —— ⚠️ **最優先**。止めているあいだフックが遊ぶのは当たり前なので、
+        //   ここで「壊れています」と出すと**自分の操作を故障と誤解する**。
+        for installed in [false, true] {
+            for starved in [false, true] {
+                for log_ok in [false, true] {
+                    assert_eq!(
+                        recording_health(true, installed, starved, log_ok).0,
+                        "paused",
+                        "paused=true のとき常に paused であること"
+                    );
+                }
+            }
+        }
+        // ⚠️★★★ 止めていないのに記録できていない = **broken**
+        //   (★ 旧実装はここを "recording" と出していた)
+        assert_eq!(recording_health(false, false, false, true).0, "broken");
+        assert_eq!(recording_health(false, true, true, true).0, "broken");
+        assert_eq!(recording_health(false, true, false, false).0, "broken");
+        // ★ broken のときは必ず被験者向けの 1 行が付く (⚠️ 黙って赤くしない)
+        for args in [
+            (false, false, false, true),
+            (false, true, true, true),
+            (false, true, false, false),
+        ] {
+            let (h, d) = recording_health(args.0, args.1, args.2, args.3);
+            assert_eq!(h, "broken");
+            assert!(d.is_some(), "broken なのに説明が無い: {args:?}");
+        }
+        // ★ 正常 / 停止では説明を付けない
+        assert!(recording_health(false, true, false, true).1.is_none());
+        assert!(recording_health(true, true, false, true).1.is_none());
+    }
+
     /// `start_session` は `engine.reset()` / `reset_signal` / `latest_feat` / `intervention` を
     /// **`session_active` の `swap` より前に**書き換える (分析スレッドとの可視性順序のため・
     /// この順序は動かせない)。→ ⚠️ **送信が失敗した時点では、もう巻き戻せない副作用が出ている。**

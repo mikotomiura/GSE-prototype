@@ -53,9 +53,18 @@ interface DashboardProps {
    * 既定 false (通常 / デバッグ表示)。
    */
   calibrationMode?: boolean;
+  /**
+   * ⚠️★★★ O1 (R3-a) の常時収集モードか (`true` = O1)。
+   *
+   * ★ O1 では **手動提出の節を出さない**。—— その経路は
+   * `session_end` を要求せずに **いま書いているファイル**をその場で
+   * `.age` に包むので、⚠️ **48 時間の猶予を丸ごと迂回し、被験者が消せなくなる**
+   * (同意文書 §4-3 の逐語の破れ)。★ backend も `submit_latest_session` で拒否する。
+   */
+  o1Mode?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, keyboardIdleMs, hookActive, calibrationMode = false }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, keyboardIdleMs, hookActive, calibrationMode = false, o1Mode = false }) => {
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -562,6 +571,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
       {/* アプリ内提出 (案A sidecar / mac Gatekeeper 根絶): 既に承認済みのアプリから同梱 gse-submit
           を起動し、最新セッションを匿名化+暗号化して .age を生成する。被験者ビルドで表示する
           (debug 機能ではない)。失敗は fail-loud で赤字表示しリトライ可能。 */}
+      {!o1Mode && (
       <div className="submit-section">
         <h4 className="submit-title">セッションの提出</h4>
         <p className="submit-help">
@@ -613,6 +623,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
           </div>
         )}
       </div>
+      )}
 
       {/* ナビ: アプリ終了 (quit_app) とは別に、スタート画面へ戻る導線を用意する
           (作業種別の変更・尺度理解テスト・再開のため。アプリは終了しない)。 */}

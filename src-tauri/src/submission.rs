@@ -69,6 +69,25 @@ pub const SUBMIT_CONFIG_FILE_NAME: &str = "g1-submit.json";
 /// 上書きすると **保存先が変わる**。★ 用途が違うものを同じ場所に置かない。
 pub const G1_ID_FILE_NAME: &str = "g1_participant_id";
 
+/// ⚠️★★★ **O1 専用の参加者 ID ファイル名**（研究者判断 R-7・2026-08-26）。
+///
+/// ★ `g1_participant_id` を**流用しない**。security-checker HIGH-4 の実測:
+/// ⚠️ **G1 をやった端末には既に `g1_participant_id` が残っている**ので、
+/// そこへ O1 ビルドを置くだけで **人の操作ゼロで常時記録＋48 時間後の自動送信が始まる**。
+/// → ★ 別ファイルにすれば、⚠️ **O1 の ID を入れる操作が必ず 1 回は要る**。
+pub const O1_ID_FILE_NAME: &str = "o1_participant_id";
+
+/// ⚠️★★★ **O1 の同意確認の印**（研究者判断 R-7）。
+///
+/// ★ D-14 の `.age.ok`（毎回の送信確認）は O1 では外した（R-2・同意文書 §5 の逐語
+/// 「**自動的に**送ります」を守るため）。⚠️ しかしそれは
+/// 「**同意手続きを経ていない人が配布ビルドを起動する経路を塞ぐ**」役も担っていた。
+/// → ★ **1 回きりの確認**でその役だけを引き継ぐ。⚠️ 毎日押させないので §5 は嘘にならない。
+///
+/// ⚠️ ★ **これが無いあいだ `.age` は作られるが送られない** —— ★ データは失われず、
+/// 確認すればそのまま送られる（`.age.ok` と同じ「収束型のまま」の性質）。
+pub const O1_CONSENT_FILE_NAME: &str = "o1_consent_ack";
+
 /// home ディレクトリ。`USERPROFILE` → `HOME` の順で引く (logger.rs `fallback_log_dir` と一致。
 /// Windows git-bash で両方設定された場合に解決先が割れないよう順序を揃える)。
 pub fn home_dir() -> Option<PathBuf> {
@@ -117,6 +136,78 @@ pub fn read_g1_participant_id() -> Option<String> {
         .filter(|s| crate::participant_id::is_valid_participant_id(s))
 }
 
+/// ⚠️★★★ **O1 参加者 ID の保存先**（`~/.gse/o1_participant_id`）。
+pub fn o1_participant_id_path() -> Option<PathBuf> {
+    home_dir().map(|h| h.join(".gse").join(O1_ID_FILE_NAME))
+}
+
+/// O1 参加者 ID を読む。★ env `GSE_O1_PARTICIPANT_ID` を優先する（検証経路）。
+///
+/// ⚠️★★★ **`g1_participant_id` へフォールバックしない。** ★ するとこの分離の意味が消える。
+pub fn read_o1_participant_id() -> Option<String> {
+    if let Ok(v) = std::env::var("GSE_O1_PARTICIPANT_ID") {
+        let v = v.trim().to_string();
+        if crate::participant_id::is_valid_participant_id(&v) {
+            return Some(v);
+        }
+    }
+    o1_participant_id_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| crate::participant_id::is_valid_participant_id(s))
+}
+
+/// O1 参加者 ID を保存する。妥当でない ID は **書かずに** `Err` を返す (fail-closed)。
+pub fn write_o1_participant_id(id: &str) -> Result<(), String> {
+    let id = id.trim();
+    if !crate::participant_id::is_valid_participant_id(id) {
+        return Err(
+            "参加者 ID が正しくありません (英数字のみ・1〜16 文字。例: P012)。".to_string(),
+        );
+    }
+    let path = o1_participant_id_path().ok_or("保存先 (~/.gse) を解決できませんでした。")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("保存先を作成できません: {e}"))?;
+    }
+    std::fs::write(
+        &path,
+        format!(
+            "{id}
+"
+        ),
+    )
+    .map_err(|e| format!("参加者 ID を保存できません: {e}"))
+}
+
+/// ⚠️★★★ **O1 の同意確認が済んでいるか**（R-7）。
+pub fn o1_consent_acknowledged() -> bool {
+    home_dir()
+        .map(|h| h.join(".gse").join(O1_CONSENT_FILE_NAME))
+        .map(|p| p.is_file())
+        .unwrap_or(false)
+}
+
+/// ⚠️★★★ **O1 の同意確認を記録する**（★ 1 回きり・以後は再確認しない）。
+///
+/// ⚠️ 中身は**時刻だけ**である。★ 誰が何に同意したかは**研究者側の同意文書が持つ**ので、
+/// 端末には「確認された」という事実以上を残さない（`data-privacy` の台帳と同じ考え方）。
+pub fn write_o1_consent_ack(now_ms: u64) -> Result<(), String> {
+    let path = home_dir()
+        .map(|h| h.join(".gse").join(O1_CONSENT_FILE_NAME))
+        .ok_or("保存先 (~/.gse) を解決できませんでした。")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("保存先を作成できません: {e}"))?;
+    }
+    std::fs::write(
+        &path,
+        format!(
+            "{{\"acknowledged_at\":{now_ms}}}
+"
+        ),
+    )
+    .map_err(|e| format!("確認を保存できません: {e}"))
+}
+
 /// G1 参加者 ID を保存する。妥当でない ID は **書かずに** `Err` を返す (fail-closed)。
 pub fn write_g1_participant_id(id: &str) -> Result<(), String> {
     let id = id.trim();
@@ -163,6 +254,35 @@ pub fn g1_start_gate(g1_mode: bool, participant_id: Option<&str>) -> Result<(), 
 /// (`age_for_stem`)。台帳が消えても対応づけが復元できる。
 pub fn age_file_name(participant: &str, block: u32, stem: &str) -> String {
     format!("{participant}_block{block:02}_{stem}.age")
+}
+
+/// ⚠️★★★ **O1 の提出物名**（研究者判断 R-13・2026-08-26）。
+///
+/// ★ G1 の `block<NN>` とは**別の名前空間**にする。⚠️ 共有すると:
+/// - **同じ端末で G1 → O1 とやった被験者**で番号を食い合い、
+///   ★ 研究者から見て「これは何ブロック目か」が**意味を失う**
+/// - ⚠️ O1 の単位は**ブロック（5 分）ではなく日**なので、`block` という語自体が嘘になる
+///
+/// 形: `<participant>_o1day<NN>_<stem>.age`
+pub fn o1_age_file_name(participant: &str, day: u32, stem: &str) -> String {
+    format!("{participant}_o1day{day:02}_{stem}.age")
+}
+
+/// O1 の提出物名から日番号を読む。`participant` が一致しなければ `None`。
+///
+/// ★ `parse_block_number` の鏡像。⚠️ **G1 の `block<NN>` は読まない**（名前空間が別）。
+pub fn parse_o1_day_number(file_name: &str, participant: &str) -> Option<u32> {
+    let prefix = format!("{participant}_o1day");
+    let rest = file_name.strip_prefix(&prefix)?;
+    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        return None;
+    }
+    // 番号の直後は必ず `_`（ステムが続く）。
+    if !rest[digits.len()..].starts_with('_') {
+        return None;
+    }
+    digits.parse::<u32>().ok()
 }
 
 /// 提出物のファイル名からブロック番号を読む。`participant` が一致しなければ `None`。
@@ -235,6 +355,30 @@ pub fn owned_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
                 .and_then(|n| parse_block_number(n, participant))
                 .is_some()
         })
+        .collect()
+}
+
+/// ⚠️★★★ **O1 の**提出物だけを列挙する（R-13）。★ `owned_age_files` の鏡像。
+///
+/// ⚠️ **G1 の `block<NN>` は 1 本も拾わない** —— ★ 名前空間が別であることが、
+/// そのまま「G1 の未承認分を O1 経由で送らない」構造的な排他になる。
+pub fn owned_o1_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
+    list_age_files(dir)
+        .into_iter()
+        .filter(|p| {
+            p.file_name()
+                .and_then(|s| s.to_str())
+                .and_then(|n| parse_o1_day_number(n, participant))
+                .is_some()
+        })
+        .collect()
+}
+
+/// O1 でまだ送っていない提出物（`.sent` が無いもの）。
+pub fn unsent_o1_age_files(dir: &Path, participant: &str) -> Vec<PathBuf> {
+    owned_o1_age_files(dir, participant)
+        .into_iter()
+        .filter(|p| !sent_marker_path(p).exists())
         .collect()
 }
 
