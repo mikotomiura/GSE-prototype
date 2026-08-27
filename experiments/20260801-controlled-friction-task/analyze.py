@@ -645,11 +645,14 @@ def analyse_subject(subject: str, blocks: list[dict]) -> dict:
     g1 = [b for b in blocks if b["condition"] in ("HI", "LO")]
     order = sorted(blocks, key=lambda b: b["block"])
 
+    smf = list(blocks[0].get("structurally_missing_features") or [])
     result: dict = {
         "subject": subject,
         "arrangement": blocks[0].get("arrangement"),
         "n_blocks": len(blocks),
         "eligibility": elig,
+        # ★ 潰したなら**必ず出す**（黙って通さない・`§5.1-3` と同じ作法）。
+        "structurally_missing_features": smf,
         "block_summary": [
             {"block": b["block"], "condition": b["condition"], "topic_id": b.get("topic_id"),
              "n_keydowns": b["n_keydowns"], "span_ms": b["span_ms"],
@@ -909,6 +912,51 @@ def cohort_verdict(per_subject: list[dict], interpretable: bool, reason: str) ->
 
 
 # ---------------------------------------------------------------------------
+# ★★★ 計器が被験者内で変わった場合の宣言済みの潰し（`§5.1` の拡張・2026-08-27）
+# ---------------------------------------------------------------------------
+def structurally_missing_features(spec: dict) -> list[str]:
+    """割付ファイルの `structurally_missing_features` を検証して返す。
+
+    ★ **なぜ要るか（P007 で実発生した）**: `§5.1` は「実施条件によっては**被験者内で定数**に
+    なる特徴がある」として `degenerate_features` を用意しているが、
+    ⚠️ **被験者内で計器が変わる**場合を想定していない。
+
+    P007 は block1–9 を Windows、**block10 だけを研究者の macOS 機**で実施した。
+    `ime_shadow` は `lib.rs` の `emit_ime_shadow` が `#[cfg(target_os = "windows")]` なので、
+    ★ **block10 の `ime_dwell_med` だけが構造的に 0** になる。
+    ⚠️ これは定数ではないので `degenerate_features` に載らず、
+    **計器由来の 0 が課題由来の差として黙って判定に入る**。
+    ⚠️ しかも block10 は `§2.5` の positive control（copy）である。
+
+    ★ **宣言する扱い（研究者決定 2026-08-27・判定を 1 つも見る前に決めた）**:
+    その被験者の当該特徴を**全ブロックで欠測扱い（0.0）にする**。
+    → 被験者内で分散 0 になるので `§5.1-2`（標準化後 0）と `§5.1-3`
+    （`degenerate_features` に必ず出す）の**既存の経路にそのまま乗る**。
+
+    ⚠️★ **これは判定を緩める変更ではない**: 特徴量セット（FS-B = 14）は変えず、
+    **情報を減らす**方向にしか働かない。新しく通る経路は 1 つも増えていない
+    （`§5.3` の封印を入れたときと同じ論法）。
+
+    ⚠️ **名前は FS-B の中になければ止まる**。綴り間違いを黙って無視すると、
+    「潰したつもりで潰れていない」が起こる（`silent-failure-in-guard-scripts`）。
+    """
+    raw = spec.get("structurally_missing_features")
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
+        raise SystemExit(
+            f"[NG] {spec.get('subject')}: structurally_missing_features が文字列のリストでない "
+            f"(実際: {raw!r})")
+    bad = [x for x in raw if x not in FS_B]
+    if bad:
+        raise SystemExit(
+            f"[NG] {spec.get('subject')}: structurally_missing_features に FS-B に無い名前がある: "
+            f"{bad}。★ 綴り間違いを黙って無視すると『潰したつもりで潰れていない』が起こる。\n"
+            f"     使えるのは: {FS_B}")
+    return list(dict.fromkeys(raw))
+
+
+# ---------------------------------------------------------------------------
 # 入出力
 # ---------------------------------------------------------------------------
 def load_subject_blocks(spec: dict, dataset: pathlib.Path,
@@ -924,6 +972,7 @@ def load_subject_blocks(spec: dict, dataset: pathlib.Path,
     使った事実は結果に刻む（`--unseal` の `confirmatory_status_forfeited` と同じ作法）。
     """
     subject = spec["subject"]
+    forced = structurally_missing_features(spec)
     out = []
     for b in spec["blocks"]:
         if "file" not in b:
@@ -957,9 +1006,15 @@ def load_subject_blocks(spec: dict, dataset: pathlib.Path,
                 f"     ⚠️ このまま読むと全行が混ざるのに restart_handling には"
                 f"「最終セッションを採った」と刻まれる ＝ 結果が嘘をつく。\n"
                 f"     ★ NDJSON を人が確認すること（preregistration.md §3.10）。")
+        # ⚠️★★★ 計器が被験者内で変わったときの宣言済みの潰し（`§5.1` の拡張・下記 docstring）。
+        #   ★ 全ブロックを 0 にするので **その被験者では分散 0 になり**、
+        #   既存の `degenerate_features` がそのまま拾って出力に載せる（黙って通らない）。
+        for name in forced:
+            blk["features"][name] = 0.0
         blk.update({"block": b["block"], "condition": b["condition"],
                     "topic_id": b.get("topic_id"), "arrangement": spec.get("arrangement"),
-                    "produced_chars": b.get("produced_chars")})
+                    "produced_chars": b.get("produced_chars"),
+                    "structurally_missing_features": list(forced)})
         out.append(blk)
     return out
 
@@ -1544,6 +1599,51 @@ def selftest() -> int:
         except SystemExit as e:
             if "起点" not in str(e):
                 fails.append(f"止まる理由が「起点が決められない」だと分からない: {e}")
+
+        # ⚠️★★★ 8-b) structurally_missing_features（`§5.1` の拡張・2026-08-27・P007 で実発生）
+        #   ★ **陽性対照つき**で見る: 宣言しなければ値が残り、宣言したら 0 になること。
+        #     片方だけだと「もともと 0 だった」と区別がつかない（`measurement-instrument-false-positives`）。
+        with_shadow = (head
+                       + json.dumps({"type": "session_start", "t": 0}) + "\n"
+                       + json.dumps({"type": "key", "t": 10, "category": "alphabetic",
+                                     "press": True}) + "\n"
+                       + json.dumps({"type": "key", "t": 20, "category": "alphabetic",
+                                     "press": True}) + "\n"
+                       + json.dumps({"type": "ime_shadow", "t": 15, "dwell_ms": 700}) + "\n")
+        (raw / "shadow.ndjson").write_text(with_shadow, encoding="utf-8")
+        spec_sh = dict(spec, blocks=[dict(spec["blocks"][0], file="shadow.ndjson")])
+        base = load_subject_blocks(spec_sh, d)[0]
+        # ★ 陽性対照: 宣言しなければ ime_dwell_med は 700 のまま
+        if base["features"]["ime_dwell_med"] != 700.0:
+            fails.append("★ 陽性対照が立たない: 宣言なしで ime_dwell_med が 700 でない "
+                         f"({base['features']['ime_dwell_med']})。潰しの検査が無意味になる")
+        if base["structurally_missing_features"] != []:
+            fails.append("宣言していないのに structurally_missing_features が空でない")
+        # ★★ 宣言したら 0 になり、**その事実がブロックに刻まれる**
+        forced = load_subject_blocks(
+            dict(spec_sh, structurally_missing_features=["ime_dwell_med"]), d)[0]
+        if forced["features"]["ime_dwell_med"] != 0.0:
+            fails.append("★★ structurally_missing_features を宣言しても潰れていない "
+                         f"({forced['features']['ime_dwell_med']})")
+        if forced["structurally_missing_features"] != ["ime_dwell_med"]:
+            fails.append("★ 潰した事実がブロックに刻まれていない（黙って通る経路が残る）")
+        # ⚠️ ★ 対照: **他の特徴は 1 つも巻き込まない**
+        for k, v in base["features"].items():
+            if k != "ime_dwell_med" and forced["features"][k] != v:
+                fails.append(f"★ 巻き込み事故: {k} が {v} → {forced['features'][k]} に変わった")
+        # ⚠️★ 綴り間違いは**黙って無視せず止まる**（潰したつもりで潰れていない、を防ぐ）
+        try:
+            load_subject_blocks(dict(spec_sh, structurally_missing_features=["ime_dwel_med"]), d)
+            fails.append("★ FS-B に無い特徴名を黙って受け入れてはならない（綴り間違いが素通りする）")
+        except SystemExit as e:
+            if "FS-B" not in str(e):
+                fails.append(f"止まる理由が「FS-B に無い名前」だと分からない: {e}")
+        # ⚠️★ 型違いも止める
+        try:
+            load_subject_blocks(dict(spec_sh, structurally_missing_features="ime_dwell_med"), d)
+            fails.append("★ structurally_missing_features が文字列でも通ってしまう")
+        except SystemExit:
+            pass
 
     # ⚠️★★ 9) 確証標本の roster（`§2.4` / `§2.8`・2026-08-10 追加）
     #    ★ **誰が確証標本か**をコードで強制する。それまで `analyze.py` は
