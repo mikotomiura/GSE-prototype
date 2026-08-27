@@ -389,6 +389,19 @@ mod tests {
     /// ⚠️★★ **両 OS の形を片方の OS 上で検算する**
     /// (★ macOS では `hook_windows.rs` が 1 行もコンパイルされないので、
     /// `#[cfg]` に頼るテストは相手側の OS で走らない)。
+    ///
+    /// ## ⚠️★★★ **区切りは必ず `/` で書く**（★ 2026-08-27 に macOS CI で実際に落ちた）
+    ///
+    /// ★ 本テストが見ているのは **階層数**（mac は 4 つ上・Windows は 1 つ上）であって、
+    /// 区切り文字ではない。⚠️ ところが初版は Windows 形を `C:\dist\O1-app\gse-next.exe` と
+    /// **バックスラッシュ**で書いていた ——
+    /// ★ **Unix では `\` は区切りではない**ので、この文字列は**丸ごと 1 コンポーネント**になり、
+    /// `parent()` が空を返して `marker_path_for` が `"o1.mode"` を返す。
+    /// → ⚠️★★★ **「両 OS で検算する」ための テストが、片方の OS でしか通らなかった。**
+    ///
+    /// ★ `g1.rs` の同種テストは最初から `/c/G1-app/gse-next.exe` と**スラッシュ**で書いてある。
+    /// ⚠️ **その先例に揃えること。** ★ `/` は Windows でも区切りとして解釈されるので、
+    /// **両 OS で同じコンポーネント列**になる = これが「両 OS で検算する」の実体である。
     #[test]
     fn marker_path_matches_the_distribution_layout_on_both_os() {
         // macOS: …/O1-app/gse-next.app/Contents/MacOS/gse-next → 4 階層上が O1-app
@@ -397,11 +410,12 @@ mod tests {
             marker_path_for(&mac_exe, 4),
             Some(PathBuf::from("/Users/x/O1-app").join(MARKER_FILE_NAME))
         );
-        // Windows: …\O1-app\gse-next.exe → 1 階層上が O1-app
-        let win_exe = PathBuf::from(r"C:\dist\O1-app\gse-next.exe");
+        // Windows: …/O1-app/gse-next.exe → 1 階層上が O1-app
+        // ⚠️ **`\` で書かない**（上記）。★ `g1.rs` と同じ `/c/...` の形に揃える。
+        let win_exe = PathBuf::from("/c/O1-app/gse-next.exe");
         assert_eq!(
             marker_path_for(&win_exe, 1),
-            Some(PathBuf::from(r"C:\dist\O1-app").join(MARKER_FILE_NAME))
+            Some(PathBuf::from("/c/O1-app").join(MARKER_FILE_NAME))
         );
         // ★ 階層が足りなければ None (落とさない)
         assert_eq!(marker_path_for(Path::new("gse-next"), 4), None);

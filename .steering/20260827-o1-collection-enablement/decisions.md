@@ -241,3 +241,49 @@
 | **R-13** | `o1_age_file_name` / `parse_o1_day_number` / `next_o1_day_number` を追加し、O1 は **`<participant>_o1day<NN>_<stem>.age`**。⚠️ 台帳の読みも **`age` の名前で名前空間を判定**する（★ `block` 欄だけ見ると番号が飛ぶ） | ★ 送信対象も `unsent_o1_age_files` に切り替え、**G1 の未承認分と構造的に交わらない** |
 
 ⚠️★★★ **R-14（送信済み分の削除台帳）と R-15（時計の前進）は実装していない**（研究者判断どおり）。
+
+
+---
+
+## ⚠️★★★ PR #120 の CI で見つかったもの（2026-08-27）
+
+### F-11. **「両 OS で検算する」テストが、片方の OS でしか通らなかった**
+
+★ `o1::tests::marker_path_matches_the_distribution_layout_on_both_os` が
+**macOS の self-hosted CI で落ちた**（★ Windows は緑）。
+
+⚠️ 原因: Windows 形の入力を `C:\dist\O1-app\gse-next.exe` と**バックスラッシュ**で書いていた。
+★ **Unix では `\` は区切りではない**ので文字列が**丸ごと 1 コンポーネント**になり、
+`parent()` が空を返して `marker_path_for` が `"o1.mode"` を返す。
+→ ⚠️★★★ **テスト名が `on_both_os` なのに、両 OS を検算できていなかった。**
+
+★ 直し方: `g1.rs` の同種テストは最初から `/c/G1-app/gse-next.exe` と**スラッシュ**で書いてある。
+⚠️ **その先例に揃える**（★ `/` は Windows でも区切りとして解釈されるので、
+両 OS で**同じコンポーネント列**になる = これが「両 OS で検算する」の実体）。
+
+⚠️ **区別すべき例外**: `logger::cloud_synced_paths_are_recognised` は
+`\` のままでよい —— ★ `looks_cloud_synced` は**文字列包含**であって
+**パスのコンポーネント演算をしていない**。⚠️ スラッシュに「直す」と実環境の形を検査しなくなる。
+→ ★ 両方のテストに**なぜそう書くのか**をコメントで残した。
+
+### ⚠️★★★ F-12. **`reconcile` のテストが CI で 1 本も走っていない**（★ 既存の穴）
+
+| | |
+|---|---|
+| CI のコマンド | `cargo test --workspace --target …`（⚠️ **`--features package` が無い**） |
+| `reconcile` モジュール | `#[cfg(feature = "package")]` で gate されている（`lib.rs:31`） |
+| 実測 | ★ feature 無し **522 件** / feature あり **556 件** → ⚠️ **34 件が CI で走っていない** |
+
+⚠️★★★ **走っていないものの中に「48 時間の猶予」がある** ——
+★ ADR-014 **判断 3 の根拠 3**（被験者が消せる）を守っている当の機構であり、
+`o1_candidates_appear_only_after_the_grace_window` /
+`o1_deletion_during_the_grace_window_removes_the_data_before_packaging` /
+`o1_never_sends_an_unapproved_g1_submission` /
+`a_renamed_phase1_session_is_not_submitted_as_o1` が**すべて CI の外**にある。
+
+⚠️ **これは本 PR が作った穴ではない**（★ `reconcile` は最初から feature gate の中）。
+★ しかし **privacy critical な機構が CI に守られていない**ことは記録する。
+
+→ ★ **研究者判断を求める**: CI に `--features package` を足すか。
+⚠️ 代償: `age` ＋ `reqwest`（TLS）を self-hosted の両ランナーでビルドすることになり、
+**CI 時間が増える**。★ 本 PR では**変えない**（⚠️ 緑の PR を無関係な理由で赤にしないため）。
