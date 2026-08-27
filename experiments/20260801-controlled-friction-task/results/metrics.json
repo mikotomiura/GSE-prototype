@@ -1,0 +1,773 @@
+{
+  "experiment": "20260801-controlled-friction-task",
+  "gate": "G1",
+  "preregistration": "preregistration.md (frozen; authoritative over this output)",
+  "preregistration_revision": 17,
+  "decision_status": "MANIPULATION_CHECK_FAILED",
+  "decision_status_values": {
+    "INTERPRETABLE": "3.4 order satisfied; read the 3.3 verdict",
+    "MANIPULATION_CHECK_NOT_SUPPLIED": "3.4-1 not read yet",
+    "MANIPULATION_CHECK_FAILED": "2.6 failed; do not interpret separation",
+    "POSITIVE_CONTROL_NOT_RUN": "no eligible 10-block subject",
+    "G1_VOID": "2.5: positive control failed AND the test could have rejected -> instrument fault suspected",
+    "VERDICT_WITHHELD": "2.5 (since revision 3): positive control failed but the test could NOT have rejected for any failing subject -> underpower, NOT an instrument fault"
+  },
+  "restart_handling": {
+    "rule": "last session only (preregistration.md 3.10; frozen before any analysis run)",
+    "flag_used": false,
+    "blocks": []
+  },
+  "sample_roster_applied": {
+    "source": "config.json sample_roster (single source of truth; blocks/*.json is NOT consulted)",
+    "n_subjects_frozen": 3,
+    "analysed": [
+      "P007",
+      "P014",
+      "P016"
+    ],
+    "excluded": [
+      {
+        "subject": "P009",
+        "reason": "pilot"
+      }
+    ]
+  },
+  "reading_order_3_4": [
+    "1_manipulation_check",
+    "2_positive_control",
+    "3_feature_sets"
+  ],
+  "1_manipulation_check": {
+    "P007": {
+      "n_answers": 7,
+      "n_cross_condition_pairs_DENOMINATOR": 6,
+      "n_same_condition_pairs_excluded": 1,
+      "hi_chosen_as_harder": 3,
+      "rate": 0.5,
+      "threshold": 0.7,
+      "passed": false,
+      "note": "Denominator is cross-condition pairs only (preregistration.md 2.6). This is NOT part of the verdict, but it is read FIRST (3.4)."
+    },
+    "P014": {
+      "n_answers": 7,
+      "n_cross_condition_pairs_DENOMINATOR": 4,
+      "n_same_condition_pairs_excluded": 3,
+      "hi_chosen_as_harder": 3,
+      "rate": 0.75,
+      "threshold": 0.7,
+      "passed": true,
+      "note": "Denominator is cross-condition pairs only (preregistration.md 2.6). This is NOT part of the verdict, but it is read FIRST (3.4)."
+    },
+    "P016": {
+      "n_answers": 7,
+      "n_cross_condition_pairs_DENOMINATOR": 5,
+      "n_same_condition_pairs_excluded": 2,
+      "hi_chosen_as_harder": 0,
+      "rate": 0.0,
+      "threshold": 0.7,
+      "passed": false,
+      "note": "Denominator is cross-condition pairs only (preregistration.md 2.6). This is NOT part of the verdict, but it is read FIRST (3.4)."
+    }
+  },
+  "2_positive_control": {
+    "P007": {
+      "observed_auc": 1.0,
+      "n_permutations": 45,
+      "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+      "n_ge_observed": 3,
+      "p_value": 0.066667,
+      "theoretical_min_p": 0.022222,
+      "attainable_min_p_for_this_subject": 0.066667,
+      "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 3/45 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+      "test_can_reject_at_all": false,
+      "null_auc_median": 0.5,
+      "null_auc_p95": 0.9375,
+      "alpha": 0.05,
+      "significant": false,
+      "one_sided": "larger AUC = more separation",
+      "max_abs_coefficient": 0.6046,
+      "folds_with_perfect_training_separation": 16,
+      "n_folds": 16,
+      "labels": "copy(2) vs writing(8)",
+      "known_limitation": "copy blocks are position-fixed, so this separation is confounded with position. FLOOR CHECK on instrument health only; no effect size is claimed.",
+      "passed": false
+    },
+    "P014": {
+      "observed_auc": 1.0,
+      "n_permutations": 45,
+      "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+      "n_ge_observed": 2,
+      "p_value": 0.044444,
+      "theoretical_min_p": 0.022222,
+      "attainable_min_p_for_this_subject": 0.044444,
+      "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/45 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+      "test_can_reject_at_all": true,
+      "null_auc_median": 0.5,
+      "null_auc_p95": 0.9375,
+      "alpha": 0.05,
+      "significant": true,
+      "one_sided": "larger AUC = more separation",
+      "max_abs_coefficient": 0.6293,
+      "folds_with_perfect_training_separation": 16,
+      "n_folds": 16,
+      "labels": "copy(2) vs writing(8)",
+      "known_limitation": "copy blocks are position-fixed, so this separation is confounded with position. FLOOR CHECK on instrument health only; no effect size is claimed.",
+      "passed": true
+    },
+    "P016": {
+      "observed_auc": 0.6875,
+      "n_permutations": 45,
+      "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+      "n_ge_observed": 18,
+      "p_value": 0.4,
+      "theoretical_min_p": 0.022222,
+      "attainable_min_p_for_this_subject": 0.044444,
+      "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/45 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+      "test_can_reject_at_all": true,
+      "null_auc_median": 0.5,
+      "null_auc_p95": 0.9375,
+      "alpha": 0.05,
+      "significant": false,
+      "one_sided": "larger AUC = more separation",
+      "max_abs_coefficient": 0.6059,
+      "folds_with_perfect_training_separation": 16,
+      "n_folds": 16,
+      "labels": "copy(2) vs writing(8)",
+      "known_limitation": "copy blocks are position-fixed, so this separation is confounded with position. FLOOR CHECK on instrument health only; no effect size is claimed.",
+      "passed": false
+    }
+  },
+  "3_verdict": {
+    "interpretable": false,
+    "interpretability_reason": "manipulation check FAILED (2.6): the friction was not manipulated; redesign the task.",
+    "sealed": true,
+    "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+  },
+  "per_subject": [
+    {
+      "subject": "P007",
+      "arrangement": "A",
+      "n_blocks": 10,
+      "eligibility": {
+        "threshold_keydowns_per_block": 100,
+        "evaluated": "BEFORE any model is fitted (preregistration.md 2.9)",
+        "keydowns_per_block": {
+          "1": 616,
+          "2": 414,
+          "3": 453,
+          "4": 432,
+          "5": 516,
+          "6": 418,
+          "7": 638,
+          "8": 582,
+          "9": 690,
+          "10": 730
+        },
+        "blocks_below_threshold_g1": [],
+        "blocks_below_threshold_any": [],
+        "eligible_for_primary": true,
+        "eligible_for_positive_control": true,
+        "note": "Blocks are never dropped; the SUBJECT is excluded so that HI4/LO4 and C(8,4)=70 survive. Excluded subjects are not replaced (preregistration.md 2.4-7)."
+      },
+      "structurally_missing_features": [
+        "ime_dwell_med"
+      ],
+      "block_summary": [
+        {
+          "block": 1,
+          "condition": "copy",
+          "topic_id": "copy",
+          "n_keydowns": 616,
+          "span_ms": 279176,
+          "n_feat_rows": 289,
+          "produced_chars": null
+        },
+        {
+          "block": 2,
+          "condition": "HI",
+          "topic_id": "topic04",
+          "n_keydowns": 414,
+          "span_ms": 191425,
+          "n_feat_rows": 193,
+          "produced_chars": null
+        },
+        {
+          "block": 3,
+          "condition": "LO",
+          "topic_id": "topic07",
+          "n_keydowns": 453,
+          "span_ms": 238899,
+          "n_feat_rows": 244,
+          "produced_chars": null
+        },
+        {
+          "block": 4,
+          "condition": "HI",
+          "topic_id": "topic02",
+          "n_keydowns": 432,
+          "span_ms": 195465,
+          "n_feat_rows": 206,
+          "produced_chars": null
+        },
+        {
+          "block": 5,
+          "condition": "LO",
+          "topic_id": "topic05",
+          "n_keydowns": 516,
+          "span_ms": 262482,
+          "n_feat_rows": 266,
+          "produced_chars": null
+        },
+        {
+          "block": 6,
+          "condition": "LO",
+          "topic_id": "topic08",
+          "n_keydowns": 418,
+          "span_ms": 224442,
+          "n_feat_rows": 227,
+          "produced_chars": null
+        },
+        {
+          "block": 7,
+          "condition": "HI",
+          "topic_id": "topic01",
+          "n_keydowns": 638,
+          "span_ms": 244282,
+          "n_feat_rows": 249,
+          "produced_chars": null
+        },
+        {
+          "block": 8,
+          "condition": "LO",
+          "topic_id": "topic06",
+          "n_keydowns": 582,
+          "span_ms": 268995,
+          "n_feat_rows": 272,
+          "produced_chars": null
+        },
+        {
+          "block": 9,
+          "condition": "HI",
+          "topic_id": "topic03",
+          "n_keydowns": 690,
+          "span_ms": 234867,
+          "n_feat_rows": 238,
+          "produced_chars": null
+        },
+        {
+          "block": 10,
+          "condition": "copy",
+          "topic_id": "copy",
+          "n_keydowns": 730,
+          "span_ms": 290899,
+          "n_feat_rows": 296,
+          "produced_chars": null
+        }
+      ],
+      "production_by_condition": {
+        "HI": {
+          "n_blocks": 4,
+          "keys_median": 535.0,
+          "keys_min": 414,
+          "keys_max": 690,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "LO": {
+          "n_blocks": 4,
+          "keys_median": 484.5,
+          "keys_min": 418,
+          "keys_max": 582,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "copy": {
+          "n_blocks": 2,
+          "keys_median": 673.0,
+          "keys_min": 616,
+          "keys_max": 730,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "warning": "produced_chars not supplied. preregistration.md 3.5 requires reporting the realised output per condition (block `keys` AND final character count). The app never stores the written text (content-free), so the experimenter must record the character count on the recording sheet (protocol.md 2.2) and put it into the blocks file."
+      },
+      "positive_control": {
+        "observed_auc": 1.0,
+        "n_permutations": 45,
+        "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+        "n_ge_observed": 3,
+        "p_value": 0.066667,
+        "theoretical_min_p": 0.022222,
+        "attainable_min_p_for_this_subject": 0.066667,
+        "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 3/45 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+        "test_can_reject_at_all": false,
+        "null_auc_median": 0.5,
+        "null_auc_p95": 0.9375,
+        "alpha": 0.05,
+        "significant": false,
+        "one_sided": "larger AUC = more separation",
+        "max_abs_coefficient": 0.6046,
+        "folds_with_perfect_training_separation": 16,
+        "n_folds": 16,
+        "labels": "copy(2) vs writing(8)",
+        "known_limitation": "copy blocks are position-fixed, so this separation is confounded with position. FLOOR CHECK on instrument health only; no effect size is claimed.",
+        "passed": false
+      },
+      "primary": {
+        "FS_A": {
+          "n_permutations": 70,
+          "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+          "theoretical_min_p": 0.014286,
+          "attainable_min_p_for_this_subject": 0.028571,
+          "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/70 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+          "test_can_reject_at_all": true,
+          "null_auc_median": 0.5,
+          "null_auc_p95": 0.9375,
+          "alpha": 0.05,
+          "one_sided": "larger AUC = more separation",
+          "n_features": 5,
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        },
+        "FS_B": {
+          "n_permutations": 70,
+          "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+          "theoretical_min_p": 0.014286,
+          "attainable_min_p_for_this_subject": 0.114286,
+          "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 0.9375, and 8/70 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+          "test_can_reject_at_all": false,
+          "null_auc_median": 0.4375,
+          "null_auc_p95": 0.9375,
+          "alpha": 0.05,
+          "one_sided": "larger AUC = more separation",
+          "n_features": 14,
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        },
+        "keys_alone_DESCRIPTIVE": {
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        }
+      }
+    },
+    {
+      "subject": "P014",
+      "arrangement": "B",
+      "n_blocks": 10,
+      "eligibility": {
+        "threshold_keydowns_per_block": 100,
+        "evaluated": "BEFORE any model is fitted (preregistration.md 2.9)",
+        "keydowns_per_block": {
+          "1": 866,
+          "2": 473,
+          "3": 452,
+          "4": 752,
+          "5": 780,
+          "6": 898,
+          "7": 838,
+          "8": 818,
+          "9": 831,
+          "10": 951
+        },
+        "blocks_below_threshold_g1": [],
+        "blocks_below_threshold_any": [],
+        "eligible_for_primary": true,
+        "eligible_for_positive_control": true,
+        "note": "Blocks are never dropped; the SUBJECT is excluded so that HI4/LO4 and C(8,4)=70 survive. Excluded subjects are not replaced (preregistration.md 2.4-7)."
+      },
+      "structurally_missing_features": [],
+      "block_summary": [
+        {
+          "block": 1,
+          "condition": "copy",
+          "topic_id": "copy",
+          "n_keydowns": 866,
+          "span_ms": 282428,
+          "n_feat_rows": 289,
+          "produced_chars": null
+        },
+        {
+          "block": 2,
+          "condition": "LO",
+          "topic_id": "topic03",
+          "n_keydowns": 473,
+          "span_ms": 205084,
+          "n_feat_rows": 254,
+          "produced_chars": null
+        },
+        {
+          "block": 3,
+          "condition": "HI",
+          "topic_id": "topic06",
+          "n_keydowns": 452,
+          "span_ms": 157268,
+          "n_feat_rows": 174,
+          "produced_chars": null
+        },
+        {
+          "block": 4,
+          "condition": "HI",
+          "topic_id": "topic05",
+          "n_keydowns": 752,
+          "span_ms": 232563,
+          "n_feat_rows": 250,
+          "produced_chars": null
+        },
+        {
+          "block": 5,
+          "condition": "LO",
+          "topic_id": "topic04",
+          "n_keydowns": 780,
+          "span_ms": 273479,
+          "n_feat_rows": 288,
+          "produced_chars": null
+        },
+        {
+          "block": 6,
+          "condition": "LO",
+          "topic_id": "topic01",
+          "n_keydowns": 898,
+          "span_ms": 288280,
+          "n_feat_rows": 291,
+          "produced_chars": null
+        },
+        {
+          "block": 7,
+          "condition": "HI",
+          "topic_id": "topic08",
+          "n_keydowns": 838,
+          "span_ms": 261534,
+          "n_feat_rows": 266,
+          "produced_chars": null
+        },
+        {
+          "block": 8,
+          "condition": "HI",
+          "topic_id": "topic07",
+          "n_keydowns": 818,
+          "span_ms": 257675,
+          "n_feat_rows": 263,
+          "produced_chars": null
+        },
+        {
+          "block": 9,
+          "condition": "LO",
+          "topic_id": "topic02",
+          "n_keydowns": 831,
+          "span_ms": 274121,
+          "n_feat_rows": 276,
+          "produced_chars": null
+        },
+        {
+          "block": 10,
+          "condition": "copy",
+          "topic_id": "copy",
+          "n_keydowns": 951,
+          "span_ms": 288856,
+          "n_feat_rows": 297,
+          "produced_chars": null
+        }
+      ],
+      "production_by_condition": {
+        "HI": {
+          "n_blocks": 4,
+          "keys_median": 785.0,
+          "keys_min": 452,
+          "keys_max": 838,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "LO": {
+          "n_blocks": 4,
+          "keys_median": 805.5,
+          "keys_min": 473,
+          "keys_max": 898,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "copy": {
+          "n_blocks": 2,
+          "keys_median": 908.5,
+          "keys_min": 866,
+          "keys_max": 951,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "warning": "produced_chars not supplied. preregistration.md 3.5 requires reporting the realised output per condition (block `keys` AND final character count). The app never stores the written text (content-free), so the experimenter must record the character count on the recording sheet (protocol.md 2.2) and put it into the blocks file."
+      },
+      "positive_control": {
+        "observed_auc": 1.0,
+        "n_permutations": 45,
+        "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+        "n_ge_observed": 2,
+        "p_value": 0.044444,
+        "theoretical_min_p": 0.022222,
+        "attainable_min_p_for_this_subject": 0.044444,
+        "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/45 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+        "test_can_reject_at_all": true,
+        "null_auc_median": 0.5,
+        "null_auc_p95": 0.9375,
+        "alpha": 0.05,
+        "significant": true,
+        "one_sided": "larger AUC = more separation",
+        "max_abs_coefficient": 0.6293,
+        "folds_with_perfect_training_separation": 16,
+        "n_folds": 16,
+        "labels": "copy(2) vs writing(8)",
+        "known_limitation": "copy blocks are position-fixed, so this separation is confounded with position. FLOOR CHECK on instrument health only; no effect size is claimed.",
+        "passed": true
+      },
+      "primary": {
+        "FS_A": {
+          "n_permutations": 70,
+          "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+          "theoretical_min_p": 0.014286,
+          "attainable_min_p_for_this_subject": 0.028571,
+          "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/70 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+          "test_can_reject_at_all": true,
+          "null_auc_median": 0.5,
+          "null_auc_p95": 0.875,
+          "alpha": 0.05,
+          "one_sided": "larger AUC = more separation",
+          "n_features": 5,
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        },
+        "FS_B": {
+          "n_permutations": 70,
+          "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+          "theoretical_min_p": 0.014286,
+          "attainable_min_p_for_this_subject": 0.057143,
+          "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 4/70 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+          "test_can_reject_at_all": false,
+          "null_auc_median": 0.4375,
+          "null_auc_p95": 0.9375,
+          "alpha": 0.05,
+          "one_sided": "larger AUC = more separation",
+          "n_features": 14,
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        },
+        "keys_alone_DESCRIPTIVE": {
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        }
+      }
+    },
+    {
+      "subject": "P016",
+      "arrangement": "B",
+      "n_blocks": 10,
+      "eligibility": {
+        "threshold_keydowns_per_block": 100,
+        "evaluated": "BEFORE any model is fitted (preregistration.md 2.9)",
+        "keydowns_per_block": {
+          "1": 1011,
+          "2": 695,
+          "3": 931,
+          "4": 973,
+          "5": 692,
+          "6": 996,
+          "7": 740,
+          "8": 801,
+          "9": 1062,
+          "10": 1269
+        },
+        "blocks_below_threshold_g1": [],
+        "blocks_below_threshold_any": [],
+        "eligible_for_primary": true,
+        "eligible_for_positive_control": true,
+        "note": "Blocks are never dropped; the SUBJECT is excluded so that HI4/LO4 and C(8,4)=70 survive. Excluded subjects are not replaced (preregistration.md 2.4-7)."
+      },
+      "structurally_missing_features": [],
+      "block_summary": [
+        {
+          "block": 1,
+          "condition": "copy",
+          "topic_id": "copy",
+          "n_keydowns": 1011,
+          "span_ms": 295920,
+          "n_feat_rows": 296,
+          "produced_chars": null
+        },
+        {
+          "block": 2,
+          "condition": "HI",
+          "topic_id": "topic06",
+          "n_keydowns": 695,
+          "span_ms": 207641,
+          "n_feat_rows": 213,
+          "produced_chars": null
+        },
+        {
+          "block": 3,
+          "condition": "LO",
+          "topic_id": "topic02",
+          "n_keydowns": 931,
+          "span_ms": 289438,
+          "n_feat_rows": 291,
+          "produced_chars": null
+        },
+        {
+          "block": 4,
+          "condition": "LO",
+          "topic_id": "topic03",
+          "n_keydowns": 973,
+          "span_ms": 290310,
+          "n_feat_rows": 293,
+          "produced_chars": null
+        },
+        {
+          "block": 5,
+          "condition": "HI",
+          "topic_id": "topic08",
+          "n_keydowns": 692,
+          "span_ms": 193284,
+          "n_feat_rows": 196,
+          "produced_chars": null
+        },
+        {
+          "block": 6,
+          "condition": "LO",
+          "topic_id": "topic01",
+          "n_keydowns": 996,
+          "span_ms": 290499,
+          "n_feat_rows": 292,
+          "produced_chars": null
+        },
+        {
+          "block": 7,
+          "condition": "HI",
+          "topic_id": "topic05",
+          "n_keydowns": 740,
+          "span_ms": 175985,
+          "n_feat_rows": 178,
+          "produced_chars": null
+        },
+        {
+          "block": 8,
+          "condition": "HI",
+          "topic_id": "topic07",
+          "n_keydowns": 801,
+          "span_ms": 248707,
+          "n_feat_rows": 269,
+          "produced_chars": null
+        },
+        {
+          "block": 9,
+          "condition": "LO",
+          "topic_id": "topic04",
+          "n_keydowns": 1062,
+          "span_ms": 289506,
+          "n_feat_rows": 292,
+          "produced_chars": null
+        },
+        {
+          "block": 10,
+          "condition": "copy",
+          "topic_id": "copy",
+          "n_keydowns": 1269,
+          "span_ms": 295779,
+          "n_feat_rows": 298,
+          "produced_chars": null
+        }
+      ],
+      "production_by_condition": {
+        "HI": {
+          "n_blocks": 4,
+          "keys_median": 717.5,
+          "keys_min": 692,
+          "keys_max": 801,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "LO": {
+          "n_blocks": 4,
+          "keys_median": 984.5,
+          "keys_min": 931,
+          "keys_max": 1062,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "copy": {
+          "n_blocks": 2,
+          "keys_median": 1140.0,
+          "keys_min": 1011,
+          "keys_max": 1269,
+          "produced_chars_median": null,
+          "produced_chars_reported": 0
+        },
+        "warning": "produced_chars not supplied. preregistration.md 3.5 requires reporting the realised output per condition (block `keys` AND final character count). The app never stores the written text (content-free), so the experimenter must record the character count on the recording sheet (protocol.md 2.2) and put it into the blocks file."
+      },
+      "positive_control": {
+        "observed_auc": 0.6875,
+        "n_permutations": 45,
+        "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+        "n_ge_observed": 18,
+        "p_value": 0.4,
+        "theoretical_min_p": 0.022222,
+        "attainable_min_p_for_this_subject": 0.044444,
+        "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/45 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+        "test_can_reject_at_all": true,
+        "null_auc_median": 0.5,
+        "null_auc_p95": 0.9375,
+        "alpha": 0.05,
+        "significant": false,
+        "one_sided": "larger AUC = more separation",
+        "max_abs_coefficient": 0.6059,
+        "folds_with_perfect_training_separation": 16,
+        "n_folds": 16,
+        "labels": "copy(2) vs writing(8)",
+        "known_limitation": "copy blocks are position-fixed, so this separation is confounded with position. FLOOR CHECK on instrument health only; no effect size is claimed.",
+        "passed": false
+      },
+      "primary": {
+        "FS_A": {
+          "n_permutations": 70,
+          "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+          "theoretical_min_p": 0.014286,
+          "attainable_min_p_for_this_subject": 0.028571,
+          "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 1.0, and 2/70 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+          "test_can_reject_at_all": true,
+          "null_auc_median": 0.5625,
+          "null_auc_p95": 0.9375,
+          "alpha": 0.05,
+          "one_sided": "larger AUC = more separation",
+          "n_features": 5,
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        },
+        "FS_B": {
+          "n_permutations": 70,
+          "enumeration": "EXHAUSTIVE (not sampled) -> seed-independent",
+          "theoretical_min_p": 0.014286,
+          "attainable_min_p_for_this_subject": 0.057143,
+          "attainable_min_p_note": "LABEL-FREE diagnostic: the largest AUC any label assignment can reach is 0.9375, and 4/70 assignments tie there. No labelling, however perfect, can produce a p below this floor.",
+          "test_can_reject_at_all": false,
+          "null_auc_median": 0.4375,
+          "null_auc_p95": 0.875,
+          "alpha": 0.05,
+          "one_sided": "larger AUC = more separation",
+          "n_features": 14,
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        },
+        "keys_alone_DESCRIPTIVE": {
+          "sealed": true,
+          "sealed_note": "SEALED: the 3.4 viewing order was not satisfied (see interpretability_reason). Label-dependent results are withheld so that a corrected re-run remains CONFIRMATORY. Re-run with --unseal to look anyway; doing so stamps confirmatory_status_forfeited=true."
+        }
+      }
+    }
+  ],
+  "subjects_with_invalid_assignment_files": [],
+  "constants": {
+    "lambda": 1.0,
+    "silence_ms": 2000,
+    "min_keydowns_per_block": 100,
+    "auc_median_min": 0.7,
+    "alpha": 0.05
+  },
+  "hmm_version": "TO_BE_STAMPED_AT_EXECUTION (env.md)",
+  "privacy": "no session timestamps, no file names, no written text appear in this output",
+  "verdict_sealed": true
+}

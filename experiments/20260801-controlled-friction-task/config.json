@@ -1,7 +1,7 @@
 {
   "schema_version": "2",
   "experiment_id": "20260801-controlled-friction-task",
-  "status": "CONFIRMATORY_IN_PROGRESS_1_OF_3",
+  "status": "CONFIRMATORY_COLLECTION_COMPLETE_3_OF_3",
   "gate": "G1",
   "executable_after": "phase1_complete_and_researcher_approval",
   "revision": {
@@ -682,13 +682,17 @@
     "instrument": "Form_G1 G1-S"
   },
   "sample_roster": {
-    "_note": "誰が確証標本かの単一の正。analyze.py はここだけを見る (blocks/*.json は gitignore 対象でこの端末にしか無いため参照しない)。preregistration.md 2.4 / 2.8。shakedown は第 16 版で該当者なし (P010 は確証標本へ移した)",
+    "_note": "誰が確証標本かの単一の正。analyze.py はここだけを見る (blocks/*.json は gitignore 対象でこの端末にしか無いため参照しない)。preregistration.md 2.4 / 2.8。*** 2026-08-26 更新: (1) 第 17 版のリブート (P010 を確証標本からパイロットへ降格) が本 roster に反映されていなかったので反映した。(2) P009 を pilot へ入れた -- P009 は研究者本人であり PILOT-mac を実施した被験者なので、preregistration.md 2.4-3 逐語『パイロット被験者(研究者本人)は確証標本に再利用しない』に該当する。*** これは 3.6 が禁じる事後除外ではない: 2.4-3 は誰が確証標本になれるかの事前規則であり、結果を一つも見ずに判定できる。決定時点で results/ は .gitkeep のみ (analyze.py は一度も判定を出していない)。経緯は notes.md の該当節。",
     "confirmatory": [
-      "P010"
+      "P007",
+      "P014",
+      "P016"
     ],
     "pilot": [
       "PILOT-mac",
-      "PILOT-win"
+      "PILOT-win",
+      "P009",
+      "P010"
     ],
     "shakedown": []
   }
