@@ -24,7 +24,8 @@
 - [x] **すぐ止める** → `recording_pause` 2 行／★ **停止 7.2 秒のあいだ `feat` 行 0 本**／トレイ `Stopped`
 - [x] **開始前ゲート** → ★ **両方向を実測**（押す前は `O1 auto-submit` 行が 0／押した後は出る）
   - [x] ★ 副産物: `packaged:0`（48 時間の猶予が効いている）／`upload_disabled:true`（外に出ていない）
-- [ ] ⚠️ **「この時間帯の記録を消す」** — ★ **未実施**（削除前ローテートが効くかは未確認）
+- [ ] ⚠️ **「この時間帯の記録を消す」** — ★ **未実施のまま確定**（2026-08-28 03:03Z にアプリ終了。
+      ★ 検算: `redaction_ledger.jsonl` が**生成されていない** ＝ 削除 UI は 1 度も使われていない）
 - [ ] ⚠️ 後始末: 検証で作られた `~/.gse/o1_participant_id`（`P009`）と `o1_consent_ack` を消す
 
 ## C. 配備インフラ
@@ -91,6 +92,6 @@
 - [x] clippy（`submission.rs` 指摘 0）／ fmt（差分なし）
 - [x] ゲート `--selftest` → 18/18 ／ 打ち間違い `--selftst` → exit 2
 - [x] code-reviewer + security-checker（**並列**）→ 指摘 11 件を修正・5 件を起票
-- [ ] ⚠️ `cargo test --workspace`（★ **未実行**。手順 B 用のアプリが `gse-next.exe` を掴んでいるため）
+- [x] `cargo test --features package --workspace` → **597 passed / 0 failed**（lib 557 ＋ 統合 40）
 - [ ] ⚠️ CI（★ **未実行**。走らせるまで「緑」と書かない）
 - [ ] `/cross-review`（Codex 系統）
