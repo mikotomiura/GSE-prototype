@@ -85,7 +85,12 @@
   - [x] ⚠️★★ アンケートが**動機を尋ねていた**（★ 同意 §4 違反）→ 設問と検査の両方を直した
   - [x] ⚠️★★ `grep -q` の **SIGPIPE fail-open**（★ 400KB で実測）→ `grep -c` ＋ 陰性対照
   - [x] ⚠️★★ `GmailApp` が **Gmail 全体のスコープ**を要求する → コードから削除
-- [ ] ⚠️ **CI 未実行**（★ ブランチは未 push。★ 走らせるまで「緑」と書かない）
+- [x] ★ **CI 緑**（run `33143273205` / 2026-08-28・★ 研究者の承認を得て push した）
+      - ✅ `check (gse-win-selfhosted, x86_64-pc-windows-msvc)` 10m3s
+      - ✅ `check (gse-mac-selfhosted, aarch64-apple-darwin)` 8m19s
+      - ✅ `frontend-check` 21s ／ ✅ `decide-win-runner` 12s
+      - ⚠️ `build-macos` / `build-windows` / `release` は **skipped**（★ `v*` タグ push 用のジョブ）
+      - ⚠️ ★ 本コミットは Rust を 1 行も変えていないので、CI が見たのは**非回帰**である
 - [x] `/cross-review`（Codex 系統）→ ⚠️ **高 1 / 中 2 / 低 1**（★ Claude の 2 エージェントが見落とした分）
       → ★ 高・中の 3 件を修正、低 1 件は**境界をテストで固定**（詳細は `decisions.md` 判断 X）
 
