@@ -107,6 +107,19 @@ case "$MODE" in
     ;;
 esac
 
+# ★ モードに依らず使うもの。⚠️ **「両方の配布物に入る」ではない**（code-reviewer LOW・2026-08-28）:
+#   `MAC_SETUP_SRC` は macOS 側だけ、`PUBKEY_SRC` は Windows 側だけに入る
+#   （★ macOS は鍵を `.app` の中に持つ。selftest #7b がこの非対称を検査している）。⚠️★★ **変数にする**（E-5・2026-08-28）:
+#   ★ 旧版は `--selftest-dump` の中に実パスを**もう一度リテラルで**書いていたので、
+#     ⚠️ 本文の `cp` を変えても dump が古いままになりえた（★ ずれても誰も気づかない）。
+#   → ★ dump も本文も**この変数だけ**を見る。
+MAC_SETUP_SRC="$HERE/初回セットアップ_mac.sh"
+PUBKEY_SRC="$REPO/src-tauri/resources/pubkey.txt"
+# ⚠️★ 同梱物の単一の真実源。★ `--selftest` の 1 番は「**この表に載ったファイルが実在するか**」を見る。
+#   ⚠️ **`cp` 文との対応までは見ていない**（★ `$CONFIG` や `$CACHE/gse-*.exe` は表の外にある）。
+MANIFEST=( "$MAC_README_SRC" "$WIN_LAUNCHER_SRC" "$MAC_SETUP_SRC" "$PUBKEY_SRC" )
+[ -n "$WIN_README_SRC" ] && MANIFEST+=( "$WIN_README_SRC" )
+
 # ★ macOS の README が**被験者を守る文言**を落としていないことを機械で確かめる（下の検査で使う）。
 #   ⚠️★ 表記ゆれで検査が空回りしないよう、**README 側の文言をこの表に合わせる**こと
 #     （2026-08-08 に「壊れてはいません」と書いて grep が 0 件になった）。
@@ -125,9 +138,7 @@ README_MUST_NOT=( "右クリック" "開発元を確認できません" )
 # ★ 内部ダンプ: このモードで同梱するファイルの実パスを 1 行ずつ出す。
 #   ⚠️ ★ ここが `--selftest` の 1 番の検査対象である（★ 表と実体のずれを捕まえる）。
 if [ "$SELFTEST_DUMP" -eq 1 ]; then
-  printf '%s\n' "$MAC_README_SRC" "$WIN_LAUNCHER_SRC" "$HERE/初回セットアップ_mac.sh" \
-                "$REPO/src-tauri/resources/pubkey.txt"
-  [ -n "$WIN_README_SRC" ] && printf '%s\n' "$WIN_README_SRC"
+  printf '%s\n' "${MANIFEST[@]}"
   exit 0
 fi
 
@@ -232,6 +243,81 @@ if [ "$SELFTEST" -eq 1 ]; then
     ng_ "o1: Windows README に pubkey.txt が無い（★ Windows 配布物には入る）"
   fi
 
+  # 8b. ⚠️★★ **持ち物の二重管理へ戻っていないこと**（E-5・2026-08-28）。
+  #     ★ 実パスがスクリプト内に 2 度以上現れたら、⚠️ dump と本文がずれる余地が復活している。
+  # ⚠️★★★ **`grep -vc` の戻り値で死なせない**（security-checker HIGH・2026-08-28 に実測）:
+  #   一致 0 件だと `grep` が exit 1 を返し、`set -euo pipefail`（冒頭）で
+  #   ★ **集計行を出さないままスクリプトごと終了する** ——「✅ が並んで終わった」ように見える。
+  #   → ★ `|| true` で受け、⚠️ **0 件は「二重管理でない」ではなく「アンカーを見失った」**として赤にする。
+  dup=""
+  for lit in '"$HERE/初回セットアップ_mac.sh"' '"$REPO/src-tauri/resources/pubkey.txt"'; do
+    # ⚠️★ **この検査自身の行を数に入れない**（★ 入れると常に 2 件になり、必ず赤くなる）。
+    n=$(grep -F "$lit" "$SELF" | grep -vc 'for lit in' || true)
+    n=${n:-0}
+    if [ "$n" -eq 0 ]; then
+      dup="$dup $lit(★ 見失った)"
+    elif [ "$n" -gt 1 ]; then
+      dup="$dup $lit(${n}回)"
+    fi
+  done
+  if [ -z "$dup" ]; then
+    ok_ "同梱物の実パスが 1 か所にまとまっている（★ dump と本文が同じ表を見る）"
+  else
+    ng_ "同梱物の実パスが二重管理に戻っている / アンカーを見失った:$dup"
+  fi
+
+  # 8c. ⚠️★★ **Windows の launcher が BOM ＋ CRLF であること**（E-4・2026-08-28）。
+  #     ★ 実際に配っている G1 の launcher が `EF BB BF` ＋ CRLF なので、⚠️ O1 だけ違う形にしない
+  #       （★ 日本語 Windows で **文字化け / 改行の解釈**の差が出る経路である）。
+  #     ★ CRLF は `.gitattributes` の `*.bat text eol=crlf` が checkout 時に担保している。
+  #       ⚠️ ここで**もう一度測る**のは、その行が消えたときに**配布物の側で**気づくためである
+  #       （★ BOM のほうは「内容」なので git が保持する = 検査の意味が異なる）。
+  #     ⚠️ 実機の表示そのものは**まだ確認していない**（★ ここで測れるのはバイト形式だけ）。
+  # ⚠️★★ **`grep` で CR を探さない。** ★ git-bash の grep は CR を落としてから比較するので、
+  #   CRLF のファイルでも当たらない（2026-08-28 に両 launcher で実測）。→ ★ バイトを数える。
+  # ⚠️★★★ **`tr -cd '\\r'` と書くと空回りする**（code-reviewer HIGH・2026-08-28 に実測で発覚）:
+  #   GNU tr は集合を「バックスラッシュと r の 2 文字」と読むので、⚠️ `rem` 行の `r` を数えてしまい、
+  #   ★ **LF only のファイルでも必ず通る**。→ ★ バックスラッシュは **1 個**である。
+  bom_crlf_ok () {
+    head -c 3 "$1" 2>/dev/null | od -An -tx1 | grep -q 'ef bb bf' || return 1
+    # ⚠️★★ **CR が 1 個でもあれば通す、にしない**（Codex /cross-review 指摘・2026-08-28）。
+    #   ★ 大半が LF only でも 1 行だけ CRLF なら合格してしまう。
+    #   → ★ **全行が CRLF**（CR の数 == LF の数、かつ 0 でない）を要求する。
+    local cr lf
+    cr=$(tr -cd '\r' < "$1" | wc -c)
+    lf=$(tr -cd '\n' < "$1" | wc -c)
+    [ "$cr" -gt 0 ] && [ "$cr" -eq "$lf" ] || return 1
+    return 0
+  }
+  batbad=""
+  for b in "$HERE/launch-g1-windows.bat" "$HERE/launch-o1-windows.bat"; do
+    bom_crlf_ok "$b" || batbad="$batbad $(basename "$b")"
+  done
+  if [ -z "$batbad" ]; then
+    ok_ "両モードの Windows launcher が BOM ＋ CRLF である"
+  else
+    ng_ "launcher のバイト形式がそろっていない:$batbad"
+  fi
+
+  # 8d. ⚠️★★★ **上の検査自身が空回りしていないか**（★ 陽性対照。2026-08-28 に実際に空回りしていた）。
+  #     ★ 本物を 1 バイトも変えず、**壊した複製**で必ず落ちることを測る。
+  ctl="$(mktemp)"; ctl2="$(mktemp)"
+  ctl3="$(mktemp)"
+  tr -d '\r' < "$HERE/launch-g1-windows.bat" > "$ctl"          # CR を全部剥いだ複製
+  tail -c +4 "$HERE/launch-g1-windows.bat" > "$ctl2"       # BOM を外した複製
+  # ⚠️★ **1 行だけ LF にした複製**（Codex 指摘: 「CR が 1 個でもあれば通る」を塞いだことの対照）
+  sed '2s/$\r//' "$HERE/launch-g1-windows.bat" > "$ctl3" 2>/dev/null || cp "$HERE/launch-g1-windows.bat" "$ctl3"
+  ctlbad=""
+  bom_crlf_ok "$ctl"  && ctlbad="$ctlbad CR欠落を見逃す"
+  bom_crlf_ok "$ctl2" && ctlbad="$ctlbad BOM欠落を見逃す"
+  bom_crlf_ok "$ctl3" && ctlbad="$ctlbad 1行だけLFを見逃す"
+  rm -f "$ctl" "$ctl2" "$ctl3"
+  if [ -z "$ctlbad" ]; then
+    ok_ "バイト形式の検査は壊れた複製を捕まえる（★ 陽性対照）"
+  else
+    ng_ "★ バイト形式の検査が空回りしている:$ctlbad"
+  fi
+
   # 8. ★ O1 の README がドラフトであることを明示しているか（★ 承認前配布の抑止）
   if grep -q "【ドラフト・未承認】" "$HERE/dist-readme-macos-o1.txt" \
      && grep -q "【ドラフト・未承認】" "$HERE/dist-readme-windows-o1.txt"; then
@@ -314,7 +400,7 @@ sed "s/@DMG@/$DMG/g" "$MAC_README_SRC" > "$M/README_先に読む.txt"
 # ★★ 初回セットアップスクリプト（preregistration.md 第 13 版 §2.14）。
 #   ⚠️ 手打ちの `xattr` の置き換え。★ ドラッグして実行するのでパスを打たない。
 #   ⚠️ quarantine が付いていても `bash <パス>` なら動く（2026-08-08 実測）。
-cp "$HERE/初回セットアップ_mac.sh" "$M/" || die "初回セットアップ_mac.sh を入れられません"
+cp "$MAC_SETUP_SRC" "$M/" || die "初回セットアップ_mac.sh を入れられません"
 bash "$M/初回セットアップ_mac.sh" --selftest > /dev/null \
   || die "★ 初回セットアップ_mac.sh の自己検査が赤い。壊れたものを配らない"
 
@@ -352,7 +438,7 @@ cp "$WIN_LAUNCHER_SRC" "$W/$WIN_LAUNCHER_DST" || die "launcher を入れられ�
 if [ -n "$WIN_README_SRC" ]; then
   cp "$WIN_README_SRC" "$W/README_先に読む.txt" || die "Windows の README を入れられません"
 fi
-cp "$REPO/src-tauri/resources/pubkey.txt" "$W/"
+cp "$PUBKEY_SRC" "$W/"
 cp "$CONFIG" "$W/g1-submit.json"   # ⚠️★ O1 でも名前は g1-submit.json のまま
 # ⚠️★★★ macOS 側と同じ理由で literal で書く（★ ゲートの grep から見えるようにする）。
 if [ "$MODE" = o1 ]; then

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 rem ★ chcp は日本語より前に置く（Phase1 の launcher 文字化けの再発防止）
 chcp 65001 > nul
 setlocal

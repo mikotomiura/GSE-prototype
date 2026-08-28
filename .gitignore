@@ -76,6 +76,13 @@ cross_section.parquet
 g1-submit.json
 **/g1-submit*.json
 
+# ★★ O1 の Drive フォルダ ID の手控え (研究者のローカル)。⚠️ **コミットしない。**
+#   ★ 上と同じ理由である: 本リポジトリは一時 public にする運用があり、⚠️ 履歴からは消せない。
+#   ⚠️ `FOLDER_ID` は **Apps Script のスクリプト プロパティ**に置く規約なので、
+#     ★ repo 側には「名前」だけを書き、値はここに置かない
+#     (`.steering/20260828-o1-gate-closeout-and-deployment/deployment-runbook.md` §0)。
+Form_O1/
+
 # age secret keys (gse-unpack --keygen, pilot-runbook §2) — never commit private keys.
 # Public keys (age1...) are safe to distribute; only the secret identity is sensitive.
 *age-identity*
