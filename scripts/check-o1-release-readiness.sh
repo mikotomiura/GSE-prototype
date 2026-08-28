@@ -45,6 +45,9 @@ CONSENT=".steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md"
 LEDGER="docs/o1-deletion-ledger.md"
 RECEIVER="Form_G1/GSE_O1_Submit.gs"
 RECEIVER_TEST="Form_G1/o1_submit_guard_test.cjs"
+FORM_BUILDER="Form_G1/GSE_O1_Form_Builder.gs"
+FORM_BUILDER_TEST="Form_G1/o1_form_builder_test.cjs"
+SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 
 run_checks () {
 
@@ -126,12 +129,25 @@ fi
 # --- 4. ⚠️ まだ作っていないもの（★ 未着手を機械に持たせる）--------------------
 head_ 4 "⚠️ 配備インフラ（★ ここが赤いあいだは被験者を走らせない）"
 
-# ⚠️★ 限界を隠さない: ここは**ファイルの存在**しか見ていない。空ファイルでも緑になる。
-#   → ★ フォームを作る人は、ガード検査を併せて置き、本チェックをそれに差し替えること。
-if [ -s Form_G1/GSE_O1_Form_Builder.gs ] 2>/dev/null; then
-  ok "O1 のフォームビルダーがある（⚠️ 中身の妥当性は測っていない）"
-else
+# ★★ 2026-08-28: **ファイルの存在だけを見る検査から、ガード検査の実行に差し替えた**
+#   （旧版のコメントが「フォームを作る人は本チェックを差し替えること」と指示していたもの）。
+#   ⚠️ 存在だけを見ていた頃は**空ファイルでも緑になった**。
+#   ★ いま見ているのは「G1 のフォームを壊さないか」「被験者への約束を破っていないか」である。
+if [ ! -s "$FORM_BUILDER" ]; then
   ng "O1 のフォーム類が無い（参加登録・P-ID 採番・受付メール・終了後アンケート）"
+elif [ ! -f "$FORM_BUILDER_TEST" ]; then
+  ng "O1 フォームビルダーのガード検査が無い: $FORM_BUILDER_TEST"
+elif ! command -v node > /dev/null 2>&1; then
+  ng "node が無いので O1 フォームビルダーのガード検査を実行できない"   # ⚠️ 飛ばさず赤にする
+else
+  out=$(node "$FORM_BUILDER_TEST" "$FORM_BUILDER" 2>&1); rc=$?
+  n=$(printf '%s\n' "$out" | sed -n 's/^全 \([0-9]*\) ケース期待どおり$/\1/p' | tail -1)
+  if [ "$rc" -eq 0 ]; then
+    ok "O1 のフォームビルダーがあり、ガード検査が緑（${n:-件数不明} ケース）"
+  else
+    ng "O1 フォームビルダーのガード検査が赤"
+    printf '%s\n' "$out" | grep '^NG' | sed 's/^/       /'   # ★ 原因を画面に出す
+  fi
 fi
 
 # ⚠️★ 限界: **書き込み文**を要求する（コメントに `o1.mode` と書くだけでは緑にしない）。
@@ -155,10 +171,25 @@ for f in scripts/sync-session.sh scripts/sync-session.ps1; do
   [ -f "$f" ] || { sync_ok=0; break; }
   grep -q 'gse_o1_' "$f" || sync_ok=0
 done
-if [ "$sync_ok" -eq 1 ]; then
-  ok "sync-session.sh / .ps1 の両方が gse_o1_ に言及している（⚠️ 弾くことまでは測っていない）"
-else
+if [ "$sync_ok" -ne 1 ]; then
   ng "sync-session.sh / .ps1 に O1 を弾くガードが無い（★ 通すと削除が git 履歴の書き換えになる）"
+elif [ ! -f "$SYNC_GUARD_TEST" ]; then
+  # ⚠️★★ 2026-08-28: 旧版はここで緑にしていたが、それは「語が出てくる」しか見ていない。
+  #   ★ **弾くことを示すテストを要求する**（旧版のコメントが自分で要求していたもの）。
+  ng "O1 ガードの検査が無い: $SYNC_GUARD_TEST（⚠️ 語の存在だけでは弾く証拠にならない）"
+else
+  out=$(bash "$SYNC_GUARD_TEST" 2>&1); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    # ⚠️★ PowerShell の無い機械では .ps1 が**未実行**のまま緑になる。★ そのことを画面に出す。
+    if printf '%s\n' "$out" | grep -q '未実行'; then
+      ok "sync-session が O1 を実際に弾く（⚠️ ★ .ps1 は未実行。Windows で 1 回は走らせること）"
+    else
+      ok "sync-session.sh / .ps1 の両方が O1 を実際に弾く（★ 陽性対照つき）"
+    fi
+  else
+    ng "sync-session の O1 ガードが弾いていない"
+    printf '%s\n' "$out" | grep '❌' | sed 's/^/     /'
+  fi
 fi
 
 # ★ 「マウスのみの作業で誤警告が出る」問題（2026-08-28 に実測）。
@@ -208,6 +239,11 @@ selftest () {
     cp "$SCRIPT_PATH" "$fix/w/scripts/gate.sh"
     cp "$repo/$LEDGER" "$fix/w/docs/" 2>/dev/null
     cp "$repo/$RECEIVER" "$repo/$RECEIVER_TEST" "$fix/w/Form_G1/" 2>/dev/null
+    # ★ フォームビルダーとその検査。⚠️ 検査は G1 のビルダー（拒否リストの突き合わせ）と
+    #   同意文書（連絡先の突き合わせ）も読むので、**3 つとも**写す。
+    cp "$repo/$FORM_BUILDER" "$repo/$FORM_BUILDER_TEST" \
+       "$repo/Form_G1/GSE_G1_Form_Builder.gs" "$fix/w/Form_G1/" 2>/dev/null
+    cp "$repo/$SYNC_GUARD_TEST" "$fix/w/scripts/" 2>/dev/null
     cp "$repo/$CONSENT" "$fix/w/$CONSENT" 2>/dev/null
     cp "$repo/scripts/sync-session.sh" "$fix/w/scripts/" 2>/dev/null
     cp "$repo/scripts/sync-session.ps1" "$fix/w/scripts/" 2>/dev/null
@@ -245,26 +281,37 @@ selftest () {
   build; sed -i 's/^- 所属: \*\*.*\*\*$/- 所属: **/' "$cons";                  expect_red "所属が埋まっていない" "所属"
   build; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
   build; rm -f "$fix/w/docs/o1-deletion-ledger.md";                            expect_red "削除台帳が無い" "削除台帳の欠落"
-  build; sed -i 's/^<!-- o1-retention: unset -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
+  build; sed -i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
   build; rm -f "$fix/w/Form_G1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
   build; sed -i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_G1/GSE_O1_Submit.gs"; expect_red "直書きされている" ".gs への秘密直書き"
   build; sed -i 's/_o1day/_block/' "$fix/w/Form_G1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
   build; rm -f "$fix/w/Form_G1/o1_submit_guard_test.cjs";                      expect_red "ガード検査が無い" "ガード検査の欠落"
   build; echo 'let th = SomethingElse::new();' > "$fix/w/src-tauri/src/lib.rs"; expect_red "目印.*が見つからない" "liveness アンカーの喪失"
+  # ★★ 2026-08-28 に緑になった 3 件。⚠️ **緑になったものは selftest 2 から 1 へ移す**
+  #   （satisfy 側に置いたままだと「もともと緑」を「満たしたから緑」と読み違える）。
+  build; sed -i 's/^<!-- o1-retention: set -->$/<!-- o1-retention: unset -->/' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "保管上限が未確定" "保管上限を未確定へ戻す"
+  build; rm -f "$fix/w/Form_G1/GSE_O1_Form_Builder.gs";                        expect_red "フォーム類が無い" "フォームビルダーの欠落"
+  build; rm -f "$fix/w/Form_G1/o1_form_builder_test.cjs";                      expect_red "ガード検査が無い" "フォームビルダーの検査の欠落"
+  # ⚠️★★★ **中身を壊しても赤になること。** ★ 存在するだけで緑になっていた旧版の再発防止。
+  build; sed -i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_G1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
+  # ⚠️★ 行は**字下げされている**。`^` で固定すると変異が当たらず、
+  #   ★ 「壊したつもりで壊れていない」偽の合格になる（2026-08-28 に実際に踏んだ）。
+  build; sed -i 's|: > "$M/o1.mode"|: > "$M/DISABLED"|; s|: > "$W/o1.mode"|: > "$W/DISABLED"|'               "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"; expect_red "o1.mode を置かない" "o1.mode の書き出しの喪失"
+  build; rm -f "$fix/w/scripts/sync_session_o1_guard_test.sh";                 expect_red "O1 ガードの検査が無い" "sync ガードの検査の欠落"
+  # ⚠️★★ **語だけ残してガードの実体を消しても赤になること**（★ 旧版はここを緑にしていた）。
+  build; sed -i 's/^    exit 4$/    return 0/' "$fix/w/scripts/sync-session.sh";  expect_red "弾いていない" "sync ガードが弾かなくなる"
 
   echo
   echo "=== selftest 2: 未達を満たすと緑に変わるか（★ 陽性対照）==="
-  build; sed -i 's/^<!-- o1-retention: unset -->$/<!-- o1-retention: set -->/' "$fix/w/docs/o1-deletion-ledger.md"; expect_green "保管上限が埋まっている" "保管上限"
-  build; echo '# gse_o1_ は同期しない' >> "$fix/w/scripts/sync-session.sh"
-         echo '# gse_o1_ は同期しない' >> "$fix/w/scripts/sync-session.ps1"; expect_green "sync-session" "sync-session の両方"
-  build; echo 'x' > "$fix/w/Form_G1/GSE_O1_Form_Builder.gs";                 expect_green "フォームビルダーがある" "フォームビルダー"
-  build; echo ': > "$M/o1.mode"' >> "$fix/w/experiments/20260801-controlled-friction-task/make-distribution.sh"; expect_green "o1.mode を書き出す" "o1.mode の書き出し"
   build; echo 'const O1_LIVENESS: u64 = 1;' >> "$fix/w/src-tauri/src/lib.rs"; expect_green "別扱いになっている" "liveness の別扱い"
   build; printf 'x\n.timeout(std::time::Duration::from_secs(600))\n' > "$fix/w/src-tauri/src/reconcile.rs"; expect_green "timeout が見直されている" "送信 timeout"
 
   echo
   echo "=== selftest 3: 片方だけでは緑にしない（★ 部分的な修正で騙されないか）==="
-  build; echo '# gse_o1_ は同期しない' >> "$fix/w/scripts/sync-session.sh"; expect_red "sync-session" "sh だけ直しても赤のまま"
+  # ⚠️★★ Windows が O1 の主ターゲットである。★ `.ps1` だけ壊れていても**必ず赤にする**
+  #   （片方だけ見ていると、もう片方の OS から O1 が dataset へ漏れる）。
+  build; sed -i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.ps1"; expect_red "sync-session" "ps1 だけ壊しても赤になる"
+  build; sed -i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.sh";  expect_red "sync-session" "sh だけ壊しても赤になる"
 
   echo
   echo "────────────────────────────────────────"

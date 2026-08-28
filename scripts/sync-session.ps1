@@ -44,7 +44,7 @@
 .NOTES
     実行ポリシー拒否時: pwsh -NoProfile -ExecutionPolicy Bypass で起動
     関連: .steering/20260415-windows-onboarding/ Stage E、docs/development-guidelines.md §10.2
-    Exit codes: 0=OK, 1=cargo fail, 2=schema fail, 3=git fail
+    Exit codes: 0=OK, 1=cargo fail, 2=schema fail, 3=git fail, 4=O1 セッションを弾いた
 #>
 #Requires -Version 5.1
 [CmdletBinding()]
@@ -64,6 +64,7 @@ $EXIT_OK     = 0
 $EXIT_CARGO  = 1
 $EXIT_SCHEMA = 2
 $EXIT_GIT    = 3
+$EXIT_O1     = 4   # ★ O1 セッションを弾いた
 
 function Write-Step([string]$Message) { Write-Host "[sync-session] $Message" -ForegroundColor Cyan }
 
@@ -108,6 +109,40 @@ function Get-PersistedParticipantId {
 if (-not (Test-Path -LiteralPath $SessionPath)) {
     Write-Warning "session not found: $SessionPath"
     exit $EXIT_CARGO
+}
+
+# === ⚠️★★★ O1 (R3-a) を gse-dataset へ出さないガード ==========================
+#
+# ★ なぜ止めるのか (docs/o1-deletion-ledger.md §4):
+#   ⚠️ gse-dataset の metrics/ は git で追跡され push されている (2026-08-28 に 34 件を実測)。
+#   ★ O1 の同意文書は「あとから『この時間帯を消して』と言える」と約束している。
+#   → ⚠️★★★ 一度 push すると、その削除は **git 履歴の書き換え**になる。
+#     ★ 「消せます」と言った約束を、実務上守れない形にしてしまう。
+#
+# ⚠️ ★ 弾く根拠を 2 本持つ (片方だけだとすり抜ける)。sync-session.sh と**同じ規則**:
+#   1. ファイル名が gse_o1_ で始まる (logger.rs: session_file_name)
+#   2. ★ meta 行に o1_mode がある (reconcile.rs が O1 判定の第 1 の根拠にしているもの)
+#
+# ⚠️★ **両方の実装を同時に直すこと。** 片方だけ直すと、もう片方の OS から漏れる。
+$o1Why = $null
+if ([System.IO.Path]::GetFileName($SessionPath) -like 'gse_o1_*') {
+    $o1Why = 'ファイル名が gse_o1_ で始まる'
+} else {
+    try {
+        # ⚠️ ★ meta 行は 1 行目とは限らないので先頭 20 行を見る。
+        $head = Get-Content -LiteralPath $SessionPath -TotalCount 20 -ErrorAction Stop
+        if ($head -match '"o1_mode"') { $o1Why = 'meta 行に o1_mode がある' }
+    } catch {
+        # ★ 読めないファイルはここでは判定しない (下流の cargo が正しいエラーを出す)。
+    }
+}
+if ($o1Why) {
+    Write-Warning "O1 のセッションは gse-dataset に同期しません ($o1Why)"
+    Write-Warning "  ★ 理由: metrics/ は追跡・push されるため、あとからの削除要求が"
+    Write-Warning "     **git 履歴の書き換え**になります (docs/o1-deletion-ledger.md §4)。"
+    Write-Warning "  ★ O1 の記録は自動提出 (reconcile) で研究者へ届きます。ここを通す必要はありません。"
+    Write-Warning "  ⚠️ どうしても必要なら、先に台帳 §4 の運用規則を読み、同意文書を改訂してください。"
+    exit $EXIT_O1
 }
 
 # === 参加者 ID 解決 (パス導出 → -ParticipantId/GSE_PID → 永続化 → P000) ===
