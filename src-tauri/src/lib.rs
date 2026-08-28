@@ -777,11 +777,26 @@ fn get_diagnostics() -> HashMap<String, String> {
     );
     // ⚠️★★ 「設置できた」(`hook_active`) と「届いている」(`!hook_starved`) は別概念である
     //   (`input::liveness`)。★ 研究者向けの診断には**両方**出す。
-    //   ⚠️ ★ 一方 `get_hook_status`（= 被験者の画面のバナー）は **意図的に変えていない**:
-    //   マウスのみの作業で誤検知しうるため、被験者の画面に警告を増やすと
-    //   盲検と介入規制 (`protocol.md` / decisions D-5) に触れる。トレイ表示までに留める。
+    //   ⚠️★★★ **旧注記を訂正した (2026-08-28)。** 旧文は
+    //   「`get_hook_status`（= 被験者の画面のバナー）は意図的に変えていない」と書いていたが、
+    //   ★ `get_hook_status` は `HOOK_ACTIVE` しか読んでいない (定義を見よ)。
+    //   ⚠️ 実際に被験者の画面を作っているのは **`get_recording_status` → `recording_health`**
+    //   であり、そちらは `HOOK_STARVED` を読む。
+    //   → ★ 「被験者に見せるもの」(`HOOK_STARVED`) と「研究者が見るもの」
+    //     (`HOOK_NOT_DELIVERING`) を**別の旗**に分けてある。
+    // ⚠️★★ **生の判定を出す** (`HOOK_NOT_DELIVERING`)。★ `HOOK_STARVED` は 2026-08-28 から
+    //   「被験者に見せるか」を持つ旗になり、O1 では 30 分まで false のままなので、
+    //   ⚠️ そちらを出すと**この診断の意味が O1 のあいだだけ変わる** (判断 D-6 に反する)。
     diag.insert(
         "hook_starved".into(),
+        crate::input::hook::HOOK_NOT_DELIVERING
+            .load(Ordering::Relaxed)
+            .to_string(),
+    );
+    // ★ 参考: **被験者に見えている状態**。⚠️ 通常運用 / G1 では上と必ず一致し、
+    //   O1 でだけ「まだ見せていない」区間が出る (★ 研究者が両方を突き合わせられるようにする)。
+    diag.insert(
+        "hook_starved_shown".into(),
         crate::input::hook::HOOK_STARVED
             .load(Ordering::Relaxed)
             .to_string(),
@@ -3900,6 +3915,21 @@ pub fn run() {
             //   環境では検知ごと消える** (`Failed to build the tray icon` は実在する経路)。
             //   ⚠️ 判断は `input::liveness` の純関数に閉じてあり、ここは配線だけを持つ。
             {
+                /// ⚠️★★★ **O1 でトレイ警告を出すまでの starvation** (研究者判断 2026-08-28)。
+                ///
+                /// ★ 30 分。⚠️ **ログ (30 秒) と再設置 (120 秒) は変えない** ——
+                /// 変えているのは「**被験者の画面に警告を出すまで**」だけである。
+                ///
+                /// ★ 根拠: O1 の宣言 4 択には「デザイン・映像・制作作業」があり、
+                /// ⚠️ そこでは「マウスだけで 2 分」が**常態**になる
+                /// (2026-08-28 に実機で「⚠ 計測できていません」＋生存中フックの再設置を実測)。
+                /// ★ 誤警告は被験者の作業を直接壊すが、⚠️ 再設置の遅れは**復旧力を削る**ので、
+                /// **同じ数字にしてはならない** (`liveness::participant_visible_starved` の doc を見よ)。
+                ///
+                /// ⚠️ 値を変えるときは `input/liveness.rs` の
+                /// `o1_tray_threshold_matches_lib_rs` が赤くなる。★ 両方そろえて直すこと。
+                const O1_LIVENESS_TRAY_AFTER_MS: u64 = 1_800_000;
+
                 let liveness_session_active = session_active_for_liveness;
                 let liveness_log_tx = log_tx_liveness;
                 thread::spawn(move || {
@@ -3908,6 +3938,15 @@ pub fn run() {
                     const TICK_MS: u64 = 1000;
 
                     let th = Thresholds::default();
+                    // ⚠️★★★ **O1 のときだけ、被験者の目に入るトレイ警告を遅らせる**
+                    //   (研究者判断 2026-08-28・`O1_LIVENESS_TRAY_AFTER_MS`)。
+                    //   ★ `None` = 通常運用 / G1 = 従来どおり `Down` と同義。
+                    //   ⚠️ ログ (30 秒) と再設置 (120 秒) は **O1 でも据え置き**である。
+                    let o1_tray_after_ms = if crate::o1::is_o1() {
+                        Some(O1_LIVENESS_TRAY_AFTER_MS)
+                    } else {
+                        None
+                    };
                     let mut starv = Starvation::default();
                     let mut prev_tick = liveness::last_system_input_tick();
                     let mut prev_callbacks =
@@ -4077,8 +4116,23 @@ pub fn run() {
                             }
                         }
 
-                        // ★ トレイはこのフラグを見る (`tray::current_state`)。
-                        crate::input::hook::HOOK_STARVED
+                        // ⚠️★★★ **このフラグは「被験者に見えるもの」を表す** (2026-08-28)。
+                        //   ★ 読み手は **2 つ**ある (⚠️ 「トレイだけ」ではない ——
+                        //     code-reviewer / security-checker が一致して指摘):
+                        //     1. `tray::current_state` … トレイの「⚠ 計測できていません」
+                        //     2. `get_recording_status` → `recording_health` …
+                        //        **アプリ内のバッジ**と「キーボードの記録ができていません」
+                        //   → ★ どちらも被験者向けなので、O1 ではまとめて 30 分まで遅らせる。
+                        //   ⚠️ **`health` は触らない**ので、この直後の再設置と
+                        //     NDJSON の `alive` は **1 ミリも変わらない**。
+                        crate::input::hook::HOOK_STARVED.store(
+                            liveness::participant_visible_starved(health, starv, o1_tray_after_ms),
+                            Ordering::Relaxed,
+                        );
+                        // ⚠️★★ **研究者向けの診断はモードに依らず「届いていない」を指す** (D-6)。
+                        //   ★ 上の旗は O1 で 30 分遅れるので、⚠️ そのまま診断に出すと
+                        //     `hook_starved` が **O1 のあいだだけ意味を変える**。
+                        crate::input::hook::HOOK_NOT_DELIVERING
                             .store(health == HookHealth::Down, Ordering::Relaxed);
 
                         // ★ Down になった最初の 1 回だけ、既存の再設置経路を起こす (D-3)。
@@ -4765,6 +4819,61 @@ mod task_c_command_tests {
         // ★ 正常 / 停止では説明を付けない
         assert!(recording_health(false, true, false, true).1.is_none());
         assert!(recording_health(true, true, false, true).1.is_none());
+    }
+
+    /// ⚠️★★★ **O1 では「被験者に見えるもの」だけが遅れる** (研究者判断 2026-08-28)。
+    ///
+    /// ★ このテストが要る理由 (security-checker HIGH・2026-08-28): `HOOK_STARVED` の読み手は
+    /// トレイだけでなく **`recording_health` 経由のアプリ内バッジ**でもある。
+    /// ⚠️ その連鎖は `liveness` の単体テストからも `recording_health` の単体テストからも
+    /// **見えない**ので、★ ここで**つないだ形**を固定する。
+    ///
+    /// - 2 分: O1 は `"recording"` のまま (⚠️ 誤警告を出さない) / 通常運用は従来どおり `"broken"`
+    /// - 30 分: ★ O1 でも `"broken"` になる (⚠️ **永久には隠さない**)
+    #[test]
+    fn o1_delays_the_broken_badge_but_normal_mode_is_unchanged() {
+        use crate::input::liveness::{self, HookHealth, Starvation, Thresholds};
+        const O1_TRAY_AFTER_MS: u64 = 1_800_000;
+
+        let th = Thresholds::default();
+        let at_2min = Starvation {
+            starved_ms: 120_000,
+        };
+        let at_30min = Starvation {
+            starved_ms: O1_TRAY_AFTER_MS,
+        };
+
+        // ★ 前提: 2 分で `Down` である (= 再設置と NDJSON は動いている)。
+        assert_eq!(liveness::health(at_2min, th), HookHealth::Down);
+
+        // ⚠️ O1: 2 分では**見せない** → バッジは "recording" のまま。
+        let shown_o1 = liveness::participant_visible_starved(
+            liveness::health(at_2min, th),
+            at_2min,
+            Some(O1_TRAY_AFTER_MS),
+        );
+        assert!(!shown_o1, "O1 で 2 分の誤警告を出してはならない");
+        assert_eq!(recording_health(false, true, shown_o1, true).0, "recording");
+
+        // ★ 通常運用 / G1: 従来どおり "broken" (⚠️ 挙動を変えていないことの対照)。
+        let shown_normal =
+            liveness::participant_visible_starved(liveness::health(at_2min, th), at_2min, None);
+        assert!(shown_normal);
+        assert_eq!(
+            recording_health(false, true, shown_normal, true).0,
+            "broken"
+        );
+
+        // ⚠️★ 30 分に達したら O1 でも "broken" になる (★ 隠し続けない)。
+        let shown_late = liveness::participant_visible_starved(
+            liveness::health(at_30min, th),
+            at_30min,
+            Some(O1_TRAY_AFTER_MS),
+        );
+        assert!(shown_late, "O1 でも 30 分で被験者に知らせること");
+        let (h, d) = recording_health(false, true, shown_late, true);
+        assert_eq!(h, "broken");
+        assert!(d.is_some(), "broken なのに説明が無い");
     }
 
     /// `start_session` は `engine.reset()` / `reset_signal` / `latest_feat` / `intervention` を

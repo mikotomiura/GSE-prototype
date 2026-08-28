@@ -200,8 +200,15 @@ jobs:
       - name: Cargo build (${{ matrix.target }})
         run: cargo build --target ${{ matrix.target }}
         working-directory: src-tauri
-      - name: Cargo test --workspace
-        run: cargo test --workspace --target ${{ matrix.target }}
+      # ⚠️★★★ `--features package` を落とすと **`reconcile` のテストが 1 つも走らない**
+      #   (2026-08-28 に実測: 付けると **34 件**多く走る —— `reconcile.rs` の 25 件 ＋
+      #    `packaging.rs` の 9 件。`reconcile::` は 25 → **0** になる)。
+      #   ★ `reconcile` は **O1 の「48 時間の猶予」を守る当の機構**なので、
+      #   ⚠️ そこが CI の外にあるのは「見えないまま緑」そのものだった。
+      #   ★ ビルド (上の `cargo build`) には**付けない** —— 盲検アプリ本体に age / reqwest を
+      #   載せない隔離方針 (`Cargo.toml` の features の注記) を変えないため。
+      - name: Cargo test --workspace (--features package)
+        run: cargo test --features package --workspace --target ${{ matrix.target }}
         working-directory: src-tauri
       - name: Snapshot regression (gse-replay --snapshot)
         run: cargo run --bin gse-replay --target ${{ matrix.target }} -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json

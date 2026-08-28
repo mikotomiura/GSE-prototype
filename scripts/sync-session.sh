@@ -23,6 +23,7 @@
 #   1  cargo 失敗
 #   2  schema 失敗
 #   3  git 失敗
+#   4  ★ O1 セッションを弾いた (下記)
 #
 # 関連: docs/development-guidelines.md §10.2、.steering/20260415-windows-onboarding/ Stage E
 
@@ -111,6 +112,60 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATASET_ROOT="${GSE_DATASET:-$REPO_ROOT/../gse-dataset}"
+
+# === ⚠️★★★ O1 (R3-a) を gse-dataset へ出さないガード ==========================
+#
+# ★ なぜ止めるのか（`docs/o1-deletion-ledger.md` §4）:
+#   ⚠️ gse-dataset の `metrics/` は **git で追跡され push されている**（2026-08-28 に 34 件を実測）。
+#   ★ O1 の同意文書は「あとから『この時間帯を消して』と言える」と約束している。
+#   → ⚠️★★★ 一度 push すると、その削除は **git 履歴の書き換え**になる
+#     （remote の force-push ＋ clone 済みの全員の作業のやり直し）。
+#     ★ 「消せます」と言った約束を、実務上守れない形にしてしまう。
+#
+# ⚠️ ★ 弾く根拠を **2 本**持つ（片方だけだとすり抜ける）:
+#   1. ファイル名が `gse_o1_` で始まる（`logger.rs: session_file_name`）
+#   2. ★ `meta` 行に `o1_mode` がある（`reconcile.rs` が O1 判定の第 1 の根拠にしているもの）
+#      ⚠️ 名前を変えられても、中身は変わらない。
+#
+# ★ 抜け道を隠さない: これは**この入口 1 か所**のガードである。
+#   ⚠️ 手で `gse-replay --metrics` を回して `metrics/` へ置く経路は塞げない
+#   （★ そちらは台帳 §4 の運用規則が担う）。
+o1_guard () {
+    local sp="$1"
+    local base
+    base="$(basename "$sp")"
+    local why=""
+    # ⚠️★ **大文字小文字を区別しない**。PowerShell 側の `-like` は元から区別しないので、
+    #   区別すると `GSE_O1_*.ndjson` が「Windows では弾かれ macOS では通る」という
+    #   ★ **片方の OS だけ漏れる**状態になる（code-reviewer / security-checker が一致して指摘）。
+    #   ⚠️ `shopt -s nocasematch` はスコープが広く副作用が出るので、文字クラスで書く。
+    case "$base" in
+        [Gg][Ss][Ee]_[Oo]1_*) why="ファイル名が gse_o1_ で始まる" ;;
+    esac
+    # ⚠️ ★ `meta` 行は 1 行目とは限らないので先頭 20 行を見る。
+    #   ★ 読めないファイルはここでは判定しない（下流の cargo が正しいエラーを出す）。
+    # ⚠️★★ `head | grep -q` にしない。`grep -q` は一致した瞬間に閉じるので `head` が
+    #   **SIGPIPE で死に**、`set -o pipefail` のもとでパイプ全体が 141 になる。
+    #   → ★ 「一致したのに弾かない」という **fail-open** になる
+    #     （`make-common-app-zip.sh` が同じ罠を自分で注記している）。
+    #   ★ `grep -c` は最後まで読むので SIGPIPE が起きない。
+    if [[ -z "$why" && -r "$sp" ]]; then
+        local n_meta
+        n_meta="$(head -n 20 "$sp" 2>/dev/null | grep -c '"o1_mode"' || true)"
+        if [[ "${n_meta:-0}" -gt 0 ]]; then
+            why="meta 行に o1_mode がある"
+        fi
+    fi
+    [[ -n "$why" ]] || return 0
+
+    echo "[sync-session] ⛔ O1 のセッションは gse-dataset に同期しません（$why）" >&2
+    echo "  ★ 理由: metrics/ は追跡・push されるため、あとからの削除要求が" >&2
+    echo "     **git 履歴の書き換え**になります（docs/o1-deletion-ledger.md §4）。" >&2
+    echo "  ★ O1 の記録は自動提出（reconcile）で研究者へ届きます。ここを通す必要はありません。" >&2
+    echo "  ⚠️ どうしても必要なら、先に台帳 §4 の運用規則を読み、同意文書を改訂してください。" >&2
+    exit 4
+}
+o1_guard "$SESSION_PATH"
 
 # 参加者 ID 解決: パス導出 → GSE_PID → 永続化値 → P000 (上記ヘッダ参照)
 PID=""

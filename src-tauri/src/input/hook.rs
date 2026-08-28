@@ -177,6 +177,20 @@ pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// トレイはこの 2 つの AND を「計測中」として表示する。
 pub static HOOK_STARVED: AtomicBool = AtomicBool::new(false);
 
+/// ⚠️★★ **研究者向けの「生の」判定** (2026-08-28)。
+///
+/// ★ 上の `HOOK_STARVED` は 2026-08-28 から「**被験者に見せるか**」を持つ旗になった
+/// (O1 ではトレイ警告を 30 分まで遅らせる —— `liveness::participant_visible_starved`)。
+/// ⚠️ そのままだと `get_diagnostics` の `hook_starved` が **O1 のあいだだけ意味を変える**。
+/// ★ 2026-08-09 の判断 **D-6** は逐語で
+/// 「`hook_starved` / `callback_count` は `get_diagnostics`（研究者向け）に出し、
+/// 被験者側はトレイ表示までに留める」と決めており、
+/// → ★ **研究者の診断は「届いていない」を指し続けなければならない。**
+///
+/// ★ したがってこちらは **常に `liveness::health() == Down` と同義**である
+/// (⚠️ モードに依らない)。★ 被験者の画面・トレイはこちらを見ない。
+pub static HOOK_NOT_DELIVERING: AtomicBool = AtomicBool::new(false);
+
 /// キーボードフックのコールバックが呼ばれた回数（診断 + 生存監視）。
 ///
 /// 0 のままなら「フックは作成されたがイベントが届いていない」ことを示す。
