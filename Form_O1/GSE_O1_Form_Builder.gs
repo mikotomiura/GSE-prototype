@@ -22,9 +22,20 @@
  * ★ 配備手順 (⚠️ **研究者が手で行う**。自動操作は関数セレクタに効かない)
  * ============================================================================
  *   1. Google Forms で **空のフォームを 2 本**作る (O1 用・G1 のものを使い回さない)。
- *   2. それぞれの編集 URL `https://docs.google.com/forms/d/<ここ>/edit` の `<ここ>` を
- *      下の `FORM_ID_O1_CONSENT` / `FORM_ID_O1_SURVEY` に貼る。
- *   3. `O1_APP_DOWNLOAD_URL` に **O1 用の**配布フォルダ URL を貼る (⚠️ G1 のを指さない)。
+ *   2. ⚠️★★★ **このファイルは編集しない。** ★ 設定は ⚙️ プロジェクトの設定 →
+ *      **スクリプト プロパティ**に入れる (受け口 `GSE_O1_Submit.gs` と同じ規約)。
+ *
+ *        | キー | 値 |
+ *        |---|---|
+ *        | `FORM_ID_O1_CONSENT`   | O1-C の編集 URL `.../forms/d/<ここ>/edit` の `<ここ>` |
+ *        | `FORM_ID_O1_SURVEY`    | O1-S の同上 |
+ *        | `O1_APP_DOWNLOAD_URL`  | **O1 用の**配布フォルダ URL (⚠️ G1 のを指さない) |
+ *        | `PHASE1_MGMT_SHEET_ID` | Phase1 の参加者ロスターの ID (★ 下の注記を読むこと) |
+ *
+ *   3. ★ **なぜソースに書かないか**: ⚠️ `.gs` に貼ると、**repo のコードと Apps Script 上の
+ *      コードが必ず食い違う** (★ この repo が繰り返し踏んでいる事故の型)。
+ *      ⚠️ さらに配布フォルダ URL は「リンクを知る全員=閲覧者」で、その中に
+ *      提出設定 (共有シークレット) が入りうるため、**追跡ファイルに置いてはならない**。
  *   4. ⚠️★★★ **`checkO1FormConfig()` を必ず実行する** (読み取り専用)。
  *      ★ 未設定と打ち間違いは**同じ症状**になるので、機械に見分けさせる。
  *   5. `setupO1Forms()` を実行 → フォーム 2 本が構築される。
@@ -38,8 +49,12 @@
  * ⚠️ 秘密を置かない
  * ============================================================================
  *   ★ 提出の受け口 (`GSE_O1_Submit.gs`) が持つ `FOLDER_ID` / `SHARED_SECRET` を
- *     **このファイルに書かない**。★ ここが持つのは公開情報だけである
- *     (フォーム ID とシート ID は URL に出るので秘密ではない)。
+ *     **このファイルに書かない**。
+ *   ⚠️★★★ **「シート ID は秘密ではない」は誤り**（2026-08-29 に訂正）。
+ *     ★ フォーム ID は**拒否リストとして**意図的にソースへ置く（公開情報・`gate:allow-id`）が、
+ *     ⚠️ **ロスターのシート ID は参加者 PII への直接ポインタ**であり、
+ *     ★ スクリプト プロパティに置く（→ `o1Config_()` の注記）。
+ *     ⚠️ 混同すると「シート ID は秘密じゃない」を根拠に貼り戻される。
  *
  * 関連: .steering/20260828-o1-forms-and-distribution/
  *       .steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md (★ 文面の上流)
@@ -48,12 +63,51 @@
  */
 
 // ============================================================
-// 設定 (★ 実行前に埋める)
+// 設定 (★ **スクリプト プロパティ**に入れる。⚠️ このファイルは編集しない)
 // ============================================================
+//
+// ⚠️★★★ **配備ごとに変わる値をソースに書かない** (研究者判断 2026-08-29)。
+//   ★ 受け口 `GSE_O1_Submit.gs` が `FOLDER_ID` / `SHARED_SECRET` で採っている規約に揃える。
+//   ★ 理由は 3 つ:
+//     1. ⚠️ `.gs` に貼ると **repo のコードと Apps Script 上のコードが食い違う**
+//        (★ 「直したはずが配備物に届いていない」を繰り返し生む形である)。
+//     2. ⚠️ 配布フォルダ URL は「リンクを知る全員=閲覧者」で、★ その中に提出設定
+//        (共有シークレット) が入りうる。→ **追跡ファイルに置いてはならない**
+//        (★ `.gitignore` 逐語:「一時的に public にする運用がある」「履歴からは消せない」)。
+//     3. ⚠️ ロスターの ID は **参加者 PII への直接ポインタ**である。
+//
+// ⚠️★★ **ここに移していないもの**は、移すと**安全装置か機械検査が壊れる**ものである:
+//   - `G1_FORM_IDS_DO_NOT_TOUCH` … ★ プロパティ未設定 = **拒否リストが空** = 防波堤が黙って無効。
+//   - `O1_CONTACT_*` / 保管上限 / 設問文 … ★ 同意文書との一致を `o1_form_builder_test.cjs` が照合。
+//   - `O1_AUTO_SEND` / `O1_ALLOW_REBUILD_WITH_RESPONSES` … ★ fail-closed の既定値。
 
-// ★ O1 用の**空フォーム 2 本**の ID。⚠️ 空のままだと fail-closed で止まる (量産防止)。
-var FORM_ID_O1_CONSENT = ""; // O1-C 参加登録＝説明・同意 (★ 同意の正本)
-var FORM_ID_O1_SURVEY = ""; // O1-S 終了後アンケート
+/**
+ * スクリプト プロパティから設定を読む。★ ソースには配備固有の値を置かない。
+ *
+ * ⚠️ 未設定は **空文字** で返す (★ `null` を配らない)。判定は `o1ConfigProblems_()` に集約し、
+ * ⚠️ **空のまま構築系を走らせない** (fail-closed)。
+ */
+function o1Config_() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    // O1 用の**空フォーム 2 本**の ID。⚠️ 空のままだと fail-closed で止まる (量産防止)。
+    consentFormId: String(props.getProperty("FORM_ID_O1_CONSENT") || "").trim(), // O1-C (★ 同意の正本)
+    surveyFormId: String(props.getProperty("FORM_ID_O1_SURVEY") || "").trim(), // O1-S 終了後アンケート
+    // ★ O1 用のアプリ配布フォルダ (⚠️ **G1 のフォルダを指さない**)。
+    //   ⚠️ O1 の配布物は `o1.mode` を含み、G1 のものとは中身が違う
+    //      (`experiments/20260801-controlled-friction-task/make-common-app-zip.sh --mode o1`)。
+    //   ★ 空なら受付メールは止まる (fail-closed)。⚠️ 空のまま登録させると、被験者は
+    //     P-ID だけ受け取ってアプリを入手できない。
+    appDownloadUrl: String(props.getProperty("O1_APP_DOWNLOAD_URL") || "").trim(),
+    // ★★ P-ID の採番元は **Phase1 のロスターただ 1 つ**である (研究者判断 2026-08-28: G1 と共有)。
+    //   ⚠️ 2 か所で採番すると相手の最大値が見えないので**必ず衝突する**。
+    //   ⚠️★★ Drive に「【非公開】GSE_Phase1_運用管理シート」が **2 つある** (2026-08-03 実測)。
+    //     ✅ 1ND5HSXZ...  参加者ロスター = P006.. (現行)
+    //     ❌ 12T8WU4D...  古い (⚠️ 指すと実在の P-ID と衝突する)
+    //   ★ 見分け方: 「参加者ロスター」タブに P010 以降が入っているほうが正。
+    rosterSheetId: String(props.getProperty("PHASE1_MGMT_SHEET_ID") || "").trim(),
+  };
+}
 
 // ============================================================
 // ⚠️★★★ G1 のフォームを**絶対に触らせない**拒否リスト
@@ -65,10 +119,13 @@ var FORM_ID_O1_SURVEY = ""; // O1-S 終了後アンケート
 // ★ フォーム ID は URL に出るので秘密ではない (`GSE_G1_Form_Builder.gs` にも同じ値がある)。
 // ⚠️ G1 側のフォームを増やしたら**ここにも足す**。
 var G1_FORM_IDS_DO_NOT_TOUCH = {
-  "1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE":
+  // ★ gate:allow-id —— ⚠️ **この 3 本は意図的にソースへ置く**。
+  //   ★ フォーム ID は URL に出るので秘密ではなく、⚠️ **拒否リストはコードと一緒に運ばれ
+  //     なければ意味が無い**（プロパティ化すると未設定で防波堤が黙って無効になる）。
+  "1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE": // gate:allow-id
     "G1-C 説明・同意 (⚠️ 2026-08-07 に全設問を消した事故の当事者)",
-  "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA": "G1-M 強制比較",
-  "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU": "G1-S 終了後アンケート",
+  "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA": "G1-M 強制比較", // gate:allow-id
+  "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU": "G1-S 終了後アンケート", // gate:allow-id
 };
 
 // 既存設問を毎回作り直すか (通常 true)。
@@ -100,20 +157,8 @@ var O1_CONTACT = O1_CONTACT_NAME + "（" + O1_CONTACT_EMAIL + "）";
 //     下書きの代わりは `previewO1RegisterAckEmail()`（★ ログに出すだけ）が担う。
 var O1_AUTO_SEND = true;
 
-// ★★ P-ID の採番元は **Phase1 のロスターただ 1 つ**である (研究者判断 2026-08-28: G1 と共有)。
-//   ⚠️ 2 か所で採番すると相手の最大値が見えないので**必ず衝突する**。
-//   ⚠️★★ Drive に「【非公開】GSE_Phase1_運用管理シート」が **2 つある** (2026-08-03 実測)。
-//     ✅ 1ND5HSXZ...  参加者ロスター = P006.. (現行)
-//     ❌ 12T8WU4D...  古い (⚠️ 指すと実在の P-ID と衝突する)
-//   ★ 見分け方: 「参加者ロスター」タブに P010 以降が入っているほうが正。
-var PHASE1_MGMT_SHEET_ID = "1ND5HSXZcD_9vHjKAcM8K8Ow9VFVVwuP4L3pulP6ud7Y";
-
-// ★ O1 用のアプリ配布フォルダ (⚠️ **G1 のフォルダを指さない**)。
-//   ⚠️ O1 の配布物は `o1.mode` を含み、G1 のものとは中身が違う
-//      (`experiments/20260801-controlled-friction-task/make-common-app-zip.sh --mode o1`)。
-//   ★ 空なら受付メールは止まる (fail-closed)。⚠️ 空のまま登録させると、被験者は
-//     P-ID だけ受け取ってアプリを入手できない。
-var O1_APP_DOWNLOAD_URL = "";
+// ⚠️ `PHASE1_MGMT_SHEET_ID` と `O1_APP_DOWNLOAD_URL` は **スクリプト プロパティ**へ移した
+//   (2026-08-29)。★ 注記は `o1Config_()` の中に置いてある。
 
 // ★ 想定期間 (`consent-draft-o1.md` §2 の逐語と揃える)。
 var O1_PERIOD_TEXT = "数日〜数週間";
@@ -200,17 +245,32 @@ function o1G1FormLabel_(id) {
     : null;
 }
 
+/**
+ * ⚠️★★ **古いほうの Phase1 管理シート**か（★ 拒否リスト）。
+ *
+ * ⚠️ Drive に「【非公開】GSE_Phase1_運用管理シート」が **2 つある**（2026-08-03 実測）。
+ * ★ 古いほうを指すと**実在の P-ID と衝突する**。⚠️ 値をプロパティへ移した以上、
+ * ★ 「正しいほうを選べたか」を機械で支えるのはここだけである。
+ * ★ 前方一致で見るのは、⚠️ 全長をソースに書かないためである（→ 起票 T-20 / T-21）。
+ */
+function o1IsKnownWrongRoster_(id) {
+  return String(id || "").indexOf("12T8WU4D") === 0;
+}
+
 /** 設定の問題を配列で返す。★ `checkO1FormConfig` と `setupO1Forms` が共有する。 */
 function o1ConfigProblems_() {
+  var cfg = o1Config_();
   var out = [];
   [
-    ["FORM_ID_O1_CONSENT", FORM_ID_O1_CONSENT],
-    ["FORM_ID_O1_SURVEY", FORM_ID_O1_SURVEY],
+    ["FORM_ID_O1_CONSENT", cfg.consentFormId],
+    ["FORM_ID_O1_SURVEY", cfg.surveyFormId],
   ].forEach(function (pair) {
     var name = pair[0];
     var id = pair[1];
     if (!id) {
-      out.push(name + " が空です（★ 空フォームを作って編集 URL の ID を貼る）");
+      out.push(
+        "スクリプト プロパティ " + name + " が空です（★ 空フォームを作って編集 URL の ID を入れる）"
+      );
       return;
     }
     var g1Label = o1G1FormLabel_(id);
@@ -224,17 +284,33 @@ function o1ConfigProblems_() {
       );
     }
   });
-  if (FORM_ID_O1_CONSENT && FORM_ID_O1_CONSENT === FORM_ID_O1_SURVEY) {
+  if (cfg.consentFormId && cfg.consentFormId === cfg.surveyFormId) {
     out.push(
       "⚠️ FORM_ID_O1_CONSENT と FORM_ID_O1_SURVEY が同じ ID です（★ 片方がもう片方を上書きします）"
     );
   }
-  if (!PHASE1_MGMT_SHEET_ID) {
-    out.push("PHASE1_MGMT_SHEET_ID が空です（★ P-ID の採番元。空だと登録しても発番できません）");
-  }
-  if (!O1_APP_DOWNLOAD_URL) {
+  if (!cfg.rosterSheetId) {
     out.push(
-      "O1_APP_DOWNLOAD_URL が空です（⚠️ 受付メールが止まります。★ O1 用の配布フォルダを指すこと）"
+      "スクリプト プロパティ PHASE1_MGMT_SHEET_ID が空です（★ P-ID の採番元。空だと登録しても発番できません）"
+    );
+  } else if (o1IsKnownWrongRoster_(cfg.rosterSheetId)) {
+    // ⚠️★★★ **古いほうの管理シートを弾く**（code-reviewer MEDIUM・2026-08-29）。
+    //   ★ 値をプロパティへ移した結果、⚠️ 「2 つあるうちの正しいほう」を選ぶ**機械的な支え**が
+    //     消えていた（注記は残っていたが、注記は実行されない）。
+    //   ★ `G1_FORM_IDS_DO_NOT_TOUCH` と同じ「拒否リスト」の形で戻す。
+    out.push(
+      "⚠️★★★ PHASE1_MGMT_SHEET_ID が **古いほうの管理シート**を指しています" +
+        "（★ 実在の P-ID と衝突します）。★「参加者ロスター」タブに P010 以降が入っているほうが正です。"
+    );
+  }
+  if (!cfg.appDownloadUrl) {
+    out.push(
+      "スクリプト プロパティ O1_APP_DOWNLOAD_URL が空です（⚠️ 受付メールが止まります。★ O1 用の配布フォルダを指すこと）"
+    );
+  } else if (o1AppDownloadUrlIsBad_(cfg.appDownloadUrl)) {
+    // ⚠️★ 打ち間違い（フォルダ ID だけを貼る等）は「未設定」と**同じ症状**になるので機械で分ける。
+    out.push(
+      "スクリプト プロパティ O1_APP_DOWNLOAD_URL が URL ではありません（★ https:// で始まる配布フォルダの URL を入れる）"
     );
   }
   if (!O1_CONTACT_EMAIL || O1_CONTACT_EMAIL.indexOf("@") < 0) {
@@ -521,7 +597,7 @@ function o1ConsentItemTitles_() {
 }
 
 function buildO1ConsentForm() {
-  var form = o1OpenFixed_(FORM_ID_O1_CONSENT, "FORM_ID_O1_CONSENT");
+  var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
   if (O1_CLEAR_EXISTING) {
     o1AssertSafeToRebuild_(form, "O1-C 説明・同意");
     o1ClearForm_(form);
@@ -611,7 +687,7 @@ function buildO1ConsentForm() {
  * ★ 説明文とタイトルは上書きする（文面の訂正はこれで届く）。
  */
 function migrateO1ConsentForm() {
-  var form = o1OpenFixed_(FORM_ID_O1_CONSENT, "FORM_ID_O1_CONSENT");
+  var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
   form.setTitle(o1ConsentFormTitle_());
   form.setDescription(o1ConsentFormDescription_());
 
@@ -660,7 +736,7 @@ function migrateO1ConsentForm() {
 //   → ★ 回数だけを聞き、⚠️ **理由を尋ねる設問を置かない**。
 //     `o1_form_builder_test.cjs` がこれを機械で検査している。
 function buildO1PostSurveyForm() {
-  var form = o1OpenFixed_(FORM_ID_O1_SURVEY, "FORM_ID_O1_SURVEY");
+  var form = o1OpenFixed_(o1Config_().surveyFormId, "FORM_ID_O1_SURVEY");
   if (O1_CLEAR_EXISTING) {
     o1AssertSafeToRebuild_(form, "O1-S 終了後アンケート");
     o1ClearForm_(form);
@@ -960,14 +1036,15 @@ function o1WithRosterLock_(fn) {
 
 /** ★ ロスターのシートを開く。⚠️ 無ければ null（★ 呼び出し側が中止する）。 */
 function o1OpenRoster_() {
-  if (!PHASE1_MGMT_SHEET_ID) {
+  var rosterSheetId = o1Config_().rosterSheetId;
+  if (!rosterSheetId) {
     Logger.log(
-      "❌ PHASE1_MGMT_SHEET_ID が空です。採番元は Phase1 の参加者ロスターただ 1 つです。\n" +
+      "❌ スクリプト プロパティ PHASE1_MGMT_SHEET_ID が空です。採番元は Phase1 の参加者ロスターただ 1 つです。\n" +
         "⚠️ O1 側にロスターを作って採番すると、2 か所採番になり必ず衝突します。"
     );
     return null;
   }
-  var sheet = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
+  var sheet = SpreadsheetApp.openById(rosterSheetId).getSheetByName("参加者ロスター");
   if (!sheet) {
     Logger.log("❌ Phase1 の管理シートに「参加者ロスター」タブがありません。ID を確認してください。");
     return null;
@@ -1008,11 +1085,44 @@ function o1RegisterAckSubject_() {
   return "【GSE 研究】ご登録ありがとうございます（参加者IDとアプリのご案内）";
 }
 
-function o1RegisterAckBody_(pid) {
-  if (!O1_APP_DOWNLOAD_URL) {
+/**
+ * 配布 URL が「URL として使えない」か。★ 純関数（⚠️ 値そのものはログにも例外にも出さない）。
+ *
+ * ⚠️★★ **判定をここ 1 か所に置く理由**（security-checker MEDIUM・2026-08-29）:
+ * ★ 書式検査を `o1ConfigProblems_()` にだけ置くと、⚠️ **トリガ設置後に**プロパティを
+ * 「フォルダ ID だけ」に書き換えられたとき**誰も止めない** —— 以後の登録者全員に
+ * 辿れない「入手先」を書いた受付メールが送られる。
+ * → ★ **受付メールを作る当の関数**（`o1RegisterAckBody_`）からも同じ判定を呼ぶ。
+ */
+function o1AppDownloadUrlIsBad_(url) {
+  return String(url || "").indexOf("https://") !== 0;
+}
+
+/**
+ * 受付メールの本文。★ `appDownloadUrlOpt` を渡すと**その値**を使う。
+ *
+ * ⚠️★★★ **渡せるようにした理由**（code-reviewer MEDIUM・2026-08-29）:
+ * ★ `onO1ConsentSubmit` は「本文を作れるか」を**ダミー ID で先に試して**から採番する。
+ * ⚠️ ところが設定を毎回読み直すと、**事前確認と本送信のあいだにプロパティを書き換えられた**
+ * とき、★ **P-ID を焼いた後で throw する** —— 「発番済み・通知なし」という、
+ * その事前確認が防ぐために置かれた当の状態になる。
+ * → ★ 呼び出し側が **1 回読んだ値**を両方へ渡せるようにする（＝同じスナップショットで判断する）。
+ */
+function o1RegisterAckBody_(pid, appDownloadUrlOpt) {
+  var appDownloadUrl =
+    appDownloadUrlOpt === undefined ? o1Config_().appDownloadUrl : appDownloadUrlOpt;
+  if (!appDownloadUrl) {
     throw new Error(
-      "★ O1_APP_DOWNLOAD_URL が空です。アプリの入手先を書けないので受付メールを作りません（fail-closed）。\n" +
+      "★ スクリプト プロパティ O1_APP_DOWNLOAD_URL が空です。アプリの入手先を書けないので受付メールを作りません（fail-closed）。\n" +
         "⚠️ 空のまま登録させると、被験者は参加者IDだけ受け取ってアプリを入手できません。"
+    );
+  }
+  if (o1AppDownloadUrlIsBad_(appDownloadUrl)) {
+    // ⚠️★★ トリガ設置**後**に書き換えられた場合、ここが最後の砦である。
+    //   ★ 値そのものは載せない（★ ログ・例外へ配布 URL を出さない）。
+    throw new Error(
+      "★ スクリプト プロパティ O1_APP_DOWNLOAD_URL が URL ではありません（https:// で始まる形にしてください）。\n" +
+        "⚠️ そのまま送ると、被験者は辿れない「入手先」を受け取ります。"
     );
   }
   return [
@@ -1024,7 +1134,7 @@ function o1RegisterAckBody_(pid) {
     "⚠️ この記号は氏名とは別に保管され、記録には氏名もメールアドレスも入りません。",
     "",
     "▼ アプリの入手",
-    "    " + O1_APP_DOWNLOAD_URL,
+    "    " + appDownloadUrl,
     "★ ご利用の OS のファイル（O1_実施用_Windows.zip / O1_実施用_macOS.zip）を",
     "  ダウンロードし、**展開したフォルダをそのまま**デスクトップなどに置いてください。",
     "⚠️ フォルダの中のファイルは 1 つも消したり動かしたりしないでください。",
@@ -1105,9 +1215,10 @@ function installO1ConsentTrigger() {
     );
   }
   removeO1ConsentTriggers();
-  o1AssertNotG1Form_(FORM_ID_O1_CONSENT, "FORM_ID_O1_CONSENT");
+  var consentFormId = o1Config_().consentFormId;
+  o1AssertNotG1Form_(consentFormId, "FORM_ID_O1_CONSENT");
   ScriptApp.newTrigger("onO1ConsentSubmit")
-    .forForm(FormApp.openById(FORM_ID_O1_CONSENT))
+    .forForm(FormApp.openById(consentFormId))
     .onFormSubmit()
     .create();
   Logger.log("✅ onO1ConsentSubmit トリガを O1-C に設定しました");
@@ -1187,8 +1298,10 @@ function onO1ConsentSubmit(e) {
   //   ★ 以前は採番してから本文作成に失敗していた。⚠️ すると「発番済み・通知なし」が
   //     **設定ミスだけで量産される**（★ ロスターは埋まるのに被験者は何も受け取らない）。
   //   ★ ダミー ID で「作れるか」だけを確かめる（⚠️ 送信はしない）。
+  // ★ 設定は **ここで 1 回だけ**読む（⚠️ 下の本送信にも同じ値を渡す）。
+  var ackUrlSnapshot = o1Config_().appDownloadUrl;
   try {
-    o1RegisterAckBody_("P000");
+    o1RegisterAckBody_("P000", ackUrlSnapshot);
   } catch (cfgErr) {
     Logger.log(
       "⛔ 受付メールを作れない設定なので**発番しません**（★ P-ID を焼かない）: " + cfgErr + "\n" +
@@ -1254,7 +1367,7 @@ function onO1ConsentSubmit(e) {
   //   ★ ログに **P-ID と OS を必ず残す**（研究者が手で送れるようにする）。
   try {
     var subject = o1RegisterAckSubject_();
-    var body = o1RegisterAckBody_(pid);
+    var body = o1RegisterAckBody_(pid, ackUrlSnapshot);
     if (O1_AUTO_SEND) {
       MailApp.sendEmail(a.email, subject, body);
       Logger.log("📧 受付メールを送信しました → " + o1MaskEmail_(a.email) + "（OS: " + a.os + "）");

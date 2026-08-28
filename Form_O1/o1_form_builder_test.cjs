@@ -292,12 +292,20 @@ function makeResponse(pairs) {
   };
 }
 
-const G1_CONSENT_ID = "1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE";
-const G1_MCHECK_ID = "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA";
-const G1_SURVEY_ID = "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU";
+// ★ gate:allow-id —— ⚠️ **G1 の実フォーム ID をここに置くのは意図的**である。
+//   ★ この 3 本は「O1 が G1 のフォームを拒否するか」を突き合わせる**照合相手**であり、
+//     ⚠️ ビルダーの拒否リストと**同じ値でなければ検査が成立しない**。
+//   ★ フォーム ID は URL に出るので秘密ではない（`GSE_O1_Form_Builder.gs` の注記）。
+const G1_CONSENT_ID = "1Hs3NtuOB3IRKHaU6xspL8jd1y4BdVKFK0s4JxHTQdsE"; // gate:allow-id
+const G1_MCHECK_ID = "1iDcr0uc_51dEEI_idyJhcozYMX02N3ug-JQ7zSVMHIA"; // gate:allow-id
+const G1_SURVEY_ID = "1ScM_420irB8DUA8EFYyDJBaPBR-_lOa4evtveQBVWjU"; // gate:allow-id
 const O1_C = "O1FORMCONSENT";
 const O1_S = "O1FORMSURVEY";
-const ROSTER_ID = "1ND5HSXZcD_9vHjKAcM8K8Ow9VFVVwuP4L3pulP6ud7Y";
+// ⚠️★★★ **実在のシート ID を書かない**（security-checker HIGH・2026-08-29）。
+//   ★ スタブは「キーとして一致していればよい」だけで、⚠️ **中身に意味は無い**。
+//   ★ 実 ID を追跡ファイルに置くと、一時 public 運用のとき
+//     **参加者ロスター（PII）への直接ポインタ**になる（→ 起票 T-20 / T-21）。
+const ROSTER_ID = "SHEET-ID-STUB-NOT-REAL";
 
 /** 設定が全部揃った文脈を作る（★ 陽性対照の土台）。 */
 function makeReadyCtx(extra) {
@@ -310,9 +318,12 @@ function makeReadyCtx(extra) {
     [ROSTER_ID]: { 参加者ロスター: makeSheet(o.roster || [["P006", "既存", "old@example.com"]]) },
   };
   const ctx = makeCtx({ forms, sheets, lockFails: o.lockFails });
-  ctx.FORM_ID_O1_CONSENT = O1_C;
-  ctx.FORM_ID_O1_SURVEY = O1_S;
-  ctx.O1_APP_DOWNLOAD_URL = "https://drive.example/o1";
+  // ⚠️★★ 設定は **スクリプト プロパティ**から読む (2026-08-29 に移した)。
+  //   ★ ロスター ID も .gs の既定値ではなくなったので、ここで明示的に入れる。
+  ctx.__props.FORM_ID_O1_CONSENT = O1_C;
+  ctx.__props.FORM_ID_O1_SURVEY = O1_S;
+  ctx.__props.O1_APP_DOWNLOAD_URL = "https://drive.example/o1";
+  ctx.__props.PHASE1_MGMT_SHEET_ID = ROSTER_ID;
   return ctx;
 }
 
@@ -351,7 +362,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 {
   // ★ setupO1Forms がフォームを 1 つも開かないこと。
   const ctx = makeReadyCtx();
-  ctx.FORM_ID_O1_CONSENT = G1_CONSENT_ID;
+  ctx.__props.FORM_ID_O1_CONSENT = G1_CONSENT_ID;
   const r = attempt(() => ctx.setupO1Forms());
   push("§1 ★ setupO1Forms は G1 の ID があるとフォームを 1 つも開かない", r.threw && ctx.__openedFormIds.length === 0, {
     threw: r.threw,
@@ -361,7 +372,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 
 {
   const ctx = makeReadyCtx();
-  ctx.FORM_ID_O1_SURVEY = G1_SURVEY_ID;
+  ctx.__props.FORM_ID_O1_SURVEY = G1_SURVEY_ID;
   const problems = ctx.o1ConfigProblems_();
   push(
     "§1 checkO1FormConfig が G1 の ID を問題として報告する",
@@ -377,7 +388,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   //     （＝ ガードを外しても検査が赤くならない。2026-08-28 の変異テストで実測した穴）。
   const ctx = makeReadyCtx();
   ctx.__forms[G1_CONSENT_ID] = makeForm(G1_CONSENT_ID, { responses: 3 });
-  ctx.FORM_ID_O1_CONSENT = G1_CONSENT_ID;
+  ctx.__props.FORM_ID_O1_CONSENT = G1_CONSENT_ID;
   const r = attempt(() => ctx.installO1ConsentTrigger());
   push(
     "§1 installO1ConsentTrigger も G1 の ID を拒否する（★ 開ける状態で測る）",
@@ -392,7 +403,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   const g1 = makeForm(G1_CONSENT_ID, { responses: 0 }); // ⚠️ 回答 0 = 段 3 では止まらない
   g1.__items.push(makeItem("TEXT"));
   ctx.__forms[G1_CONSENT_ID] = g1;
-  ctx.FORM_ID_O1_CONSENT = G1_CONSENT_ID;
+  ctx.__props.FORM_ID_O1_CONSENT = G1_CONSENT_ID;
   const r = attempt(() => ctx.buildO1ConsentForm());
   push(
     "§1 ★★★ 回答 0 件の G1 フォームでも設問を 1 つも消さない（★ 段 2 だけが止める場面）",
@@ -498,7 +509,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 {
   const ctx = makeReadyCtx();
   const base = ctx.o1ConfigProblems_().length;
-  ctx.PHASE1_MGMT_SHEET_ID = "";
+  ctx.__props.PHASE1_MGMT_SHEET_ID = "";
   const withEmpty = ctx.o1ConfigProblems_();
   push(
     "§3 PHASE1_MGMT_SHEET_ID が空だと問題として報告される",
@@ -509,7 +520,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 
 {
   const ctx = makeReadyCtx();
-  ctx.O1_APP_DOWNLOAD_URL = "";
+  ctx.__props.O1_APP_DOWNLOAD_URL = "";
   const problems = ctx.o1ConfigProblems_();
   push(
     "§3 O1_APP_DOWNLOAD_URL が空だと問題として報告される",
@@ -519,9 +530,78 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 }
 
 {
+  // ⚠️★★ **打ち間違いは「未設定」と同じ症状になる**（2026-08-29 に検査を追加）。
+  //   ★ 配布フォルダの **ID だけ**を貼るのは実際にやりがちで、
+  //     ⚠️ 受付メールには「入手先」としてそのまま載るため被験者が辿れない。
+  const ctx = makeReadyCtx();
+  // ⚠️★★★ **実在の ID を書かない**（security-checker 指摘・2026-08-29）。
+  //   ★ 最初この行に**研究者の実フォルダ ID** を入れてしまった（未コミットで止めた）。
+  //   ⚠️ 検査が見るのは「`https://` で始まるか」だけなので、★ 実在の形すら要らない。
+  ctx.__props.O1_APP_DOWNLOAD_URL = "not-a-url-just-an-id"; // ★ URL でない値の代表
+  const problems = ctx.o1ConfigProblems_();
+  push(
+    "§3 ★ O1_APP_DOWNLOAD_URL が URL でないと問題として報告される",
+    problems.some((p) => p.indexOf("O1_APP_DOWNLOAD_URL") >= 0 && p.indexOf("URL ではありません") >= 0),
+    { problems }
+  );
+}
+
+{
+  // ★ 陽性対照: ちゃんとした URL なら問題として挙げない（⚠️ 何でも赤にする実装を弾く）。
+  const ctx = makeReadyCtx();
+  ctx.__props.O1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/EXAMPLE"; // gate:allow-id ★ 明白な偽値
+  const problems = ctx.o1ConfigProblems_();
+  push(
+    "§3 ★ 正しい URL なら O1_APP_DOWNLOAD_URL を問題にしない（陽性対照）",
+    !problems.some((p) => p.indexOf("O1_APP_DOWNLOAD_URL") >= 0),
+    { problems }
+  );
+}
+
+{
+  // ⚠️★★★ **古いほうの管理シート**を指したら止める（2026-08-29 に機械化）。
+  //   ★ Drive に同名のシートが 2 つあり、⚠️ 古いほうは**実在の P-ID と衝突する**。
+  const ctx = makeReadyCtx();
+  ctx.__props.PHASE1_MGMT_SHEET_ID = "12T8WU4D-fake-old";
+  const problems = ctx.o1ConfigProblems_();
+  push(
+    "§3 ★ 古いほうの Phase1 管理シートを指すと問題として報告される",
+    problems.some((p) => p.indexOf("古いほうの管理シート") >= 0),
+    { problems }
+  );
+}
+
+{
+  // ★ 陽性対照: 正しい側のシートは問題にしない（⚠️ 何でも赤にする実装を弾く）。
+  const ctx = makeReadyCtx();
+  const problems = ctx.o1ConfigProblems_();
+  push(
+    "§3 ★ 正しい管理シートなら問題にしない（陽性対照）",
+    !problems.some((p) => p.indexOf("古いほうの管理シート") >= 0),
+    { problems }
+  );
+}
+
+{
+  // ⚠️★★★ **受付メールは「渡されたスナップショット」を使う**（2026-08-29）。
+  //   ★ 事前確認と本送信のあいだにプロパティが書き換わると、
+  //     ⚠️ **P-ID を焼いた後で throw する**（＝「発番済み・通知なし」）。
+  //   → ★ 呼び出し側が 1 回読んだ値を渡せること、⚠️ **渡した値が実際に使われること**を測る。
+  const ctx = makeReadyCtx();
+  const snapshot = "https://drive.example/snapshot-url";
+  ctx.__props.O1_APP_DOWNLOAD_URL = "https://drive.example/CHANGED-AFTER";
+  const body = ctx.o1RegisterAckBody_("P015", snapshot);
+  push(
+    "§9 ★ 受付メールは渡されたスナップショットの URL を使う",
+    body.indexOf(snapshot) >= 0 && body.indexOf("CHANGED-AFTER") < 0,
+    {}
+  );
+}
+
+{
   // ⚠️ 同じ ID を 2 本に貼ると片方がもう片方を上書きする。
   const ctx = makeReadyCtx();
-  ctx.FORM_ID_O1_SURVEY = O1_C;
+  ctx.__props.FORM_ID_O1_SURVEY = O1_C;
   const problems = ctx.o1ConfigProblems_();
   push("§3 2 本のフォーム ID が同じだと問題として報告される", problems.length >= 1, {
     problems: problems.length,
@@ -538,7 +618,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 {
   // ★ 受付メールは URL が無ければ作らない（P-ID だけ渡す事態を防ぐ）。
   const ctx = makeReadyCtx();
-  ctx.O1_APP_DOWNLOAD_URL = "";
+  ctx.__props.O1_APP_DOWNLOAD_URL = "";
   const r = attempt(() => ctx.o1RegisterAckBody_("P015"));
   push("§3 ★ 配布 URL が無ければ受付メールを作らない", r.threw, { threw: r.threw });
 }
@@ -711,7 +791,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 
 {
   const ctx = makeReadyCtx();
-  ctx.PHASE1_MGMT_SHEET_ID = "";
+  ctx.__props.PHASE1_MGMT_SHEET_ID = "";
   const r = attempt(() =>
     ctx.onO1ConsentSubmit(
       makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "x@example.com" })
@@ -825,7 +905,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   // ⚠️★★★ **設定ミスで P-ID だけ焼かれる**のを防ぐ（code-reviewer 指摘・2026-08-28）。
   //   ★ 受付メールの本文が作れない設定なら、採番の**前に**止まること。
   const ctx = makeReadyCtx();
-  ctx.O1_APP_DOWNLOAD_URL = "";
+  ctx.__props.O1_APP_DOWNLOAD_URL = "";
   const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
   ctx.onO1ConsentSubmit(
     makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "x@example.com" })
@@ -845,7 +925,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 {
   // ⚠️★★★ トリガ設置も fail-closed であること（★ 一番危ない入口が一番緩かった）。
   const ctx = makeReadyCtx();
-  ctx.O1_APP_DOWNLOAD_URL = "";
+  ctx.__props.O1_APP_DOWNLOAD_URL = "";
   ctx.__triggers.push({ getHandlerFunction: () => "onO1ConsentSubmit" });
   const r = attempt(() => ctx.installO1ConsentTrigger());
   push(
@@ -1108,7 +1188,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   const ctx = makeReadyCtx();
   const body = ctx.o1RegisterAckBody_("P015");
   push("§9 受付メールに参加者 ID が入る", body.indexOf("P015") >= 0, {});
-  push("§9 受付メールに配布 URL が入る", body.indexOf(ctx.O1_APP_DOWNLOAD_URL) >= 0, {});
+  push("§9 受付メールに配布 URL が入る", body.indexOf(ctx.__props.O1_APP_DOWNLOAD_URL) >= 0, {});
   push("§9 ★ 自動起動の案内が入る（研究者判断 2026-08-28）", body.indexOf("自動で立ち上がる") >= 0, {});
   push(
     "§9 ★ 3 点セット（印・一時停止・時間帯の削除）が入る",
@@ -1135,7 +1215,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 // §10 ⚠️ 秘密を置かない
 // ============================================================
 {
-  const hardcoded = /(SHARED_SECRET|FOLDER_ID)\s*=\s*['"][^'"]+['"]/.test(src);
+  const hardcoded = /(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|FORM_ID_O1_CONSENT|FORM_ID_O1_SURVEY)\s*=\s*['"][^'"]+['"]/.test(src);
   push("§10 ⚠️ .gs にシークレット / フォルダ ID を直書きしていない", !hardcoded, { hardcoded });
 }
 
@@ -1160,9 +1240,11 @@ cases.forEach((c) => {
 // ⚠️ ★ 「NG が 0 件なら緑」だけだと、**ケースを 0 件にしても緑になる**。★ 下限を置く。
 // ⚠️★ 下限は**実数に近づける**（code-reviewer 指摘・2026-08-28）。
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
-if (cases.length < 85) {
+// ⚠️★ 実数に近づけて保つ（★ 2026-08-29: 98 件なので下限 95）。
+//   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
+if (cases.length < 95) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（85 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（95 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

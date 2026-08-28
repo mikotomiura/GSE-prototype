@@ -202,6 +202,60 @@ else
   fi
 fi
 
+# ⚠️★★ **配備ごとに変わる値が `.gs` に直書きされていないか**（2026-08-29 追加・起票 T-18）。
+#   ★ 受け口は前から `FOLDER_ID` / `SHARED_SECRET` をスクリプト プロパティに置いていたが、
+#     ⚠️ **ビルダーは `.gs` の `var` に貼る設計**で、そこに検査が無かった。
+#   ★ 2026-08-29 にビルダーも同じ規約へ移したので、⚠️ **戻ってこないように機械で止める**。
+#   ⚠️ 直書きが危ないのは 2 つの理由である:
+#     1. repo のコードと Apps Script 上のコードが**食い違う**（★ 直したつもりが届かない）
+#     2. 配布フォルダ URL は「リンクを知る全員=閲覧者」で、★ その中に提出設定が入りうる
+# ⚠️★★ **`.gs` だけでは足りない**（security-checker MEDIUM・2026-08-29 に実測で判明）:
+#   ★ `.gs` から実ロスター ID を消したのに、**隣のテストが同じ値をフルで持っていた**。
+#   → ★ `Form_O1/` の `.cjs` / `.sh` も走査する。
+#   ⚠️ **限界を隠さない**: これは「**鍵名**の直書き」を見る検査なので、
+#     ★ 変数名を変えれば素通りする（実際 `ROSTER_ID` が素通りしていた）。
+# ⚠️★★ **鍵名ではなく「ID の形」で見る**（2026-08-29 に差し替え）。
+#   ★ 最初は鍵名（`FOLDER_ID` 等）で見ていたが、⚠️ **変数名を変えれば素通り**した
+#     （実際 `ROSTER_ID = "<実 ID>"` が素通りしていた）。★ 逆にスタブ値を誤検知もした。
+#   → ★ Google の ID は **25 文字以上の `[A-Za-z0-9_-]`** である。この**形**を見る。
+#   ⚠️ 正当な例外（G1 の拒否リスト・テストの固定値）は **`gate:allow-id` を同じ行に書く**。
+#     ★ 例外を「見えるところに 1 行で」置くのが要点である（★ 黙って除外しない）。
+# ⚠️★★★ **2 つの規則を「併置」する**（code-reviewer HIGH・2026-08-29 に訂正）。
+#   ★ 一度 ID 形だけに**置き換えた**が、⚠️ URL は `://` を含むため
+#     「引用符に隣接した 25 文字の連なり」にならず、★ **当初の動機だった
+#     `O1_APP_DOWNLOAD_URL = "https://…"` の直書きを見逃していた**（実測で確認）。
+#   → ★ 鍵名規則（`.gs` のみ）と ID 形規則（全ファイル）の**両方**を回す。
+#   ⚠️ 鍵名規則を `.gs` に限るのは、★ テストが `ctx.__props.X = "スタブ"` と書くためである
+#     （= production の `.gs` に「設定の代入」があってはならない、という規則）。
+#
+# ⚠️★★ **`grep -q` をパイプの下流に置かない**（code-reviewer MEDIUM・2026-08-29）:
+#   `set -o pipefail` の下で `grep -q` が早期終了すると上流が SIGPIPE(141) を返し、
+#   ★ **入力が大きいときだけ黙って見逃す**。→ 変数に受けて中身の有無で判定する。
+hardcoded=""
+scan_ () { # $1 = ファイル / $2 = 正規表現 / $3 = ラベル
+  local hits
+  hits=$(grep -nE "$2" "$1" 2>/dev/null | grep -v 'gate:allow-id' || true)
+  [ -z "$hits" ] && return 0
+  hardcoded="$hardcoded $1:$(printf '%s' "$hits" | cut -d: -f1 | tr '\n' ',')($3)"
+}
+for f in "$RECEIVER" "$FORM_BUILDER"; do
+  [ -f "$f" ] || continue
+  # (a) ★ `.gs` に「設定の代入」があってはならない（⚠️ 空文字の代入は対象外）。
+  scan_ "$f" "(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|ROSTER_ID|FORM_ID_O1_(CONSENT|SURVEY))[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" "設定の直書き"
+done
+for f in "$RECEIVER" "$FORM_BUILDER" Form_O1/*.cjs Form_O1/*.sh; do
+  [ -f "$f" ] || continue
+  # (b) ★ Google の ID の形（25 文字以上の `[A-Za-z0-9_-]`）
+  scan_ "$f" "['\"][A-Za-z0-9_-]{25,}['\"]" "ID 形"
+  # (c) ⚠️ Drive のフォルダ URL（★ T-15 と同じ形を O1 で作らせない）
+  scan_ "$f" "drive\.google\.com/drive/folders/" "Drive URL"
+done
+if [ -z "$hardcoded" ]; then
+  ok "O1 のファイルに ID / URL の直書きが無い（★ 例外は gate:allow-id で明示）"
+else
+  ng "★ O1 のファイルに ID / URL が直書きされている（⚠️ スクリプト プロパティへ。正当なら gate:allow-id を付ける）:$hardcoded"
+fi
+
 # ⚠️★★★ **提出設定（endpoint ＋ secret）が git に入っていないか**（2026-08-29 追加）。
 #   ★ 動機は仮定ではない: 同日、`Form_O1/o1_submit.json`（**実 endpoint ＋ 実 secret**）が
 #     `.gitignore` の網から外れ、⚠️ **`git add -A` の対象になっていた**
@@ -476,6 +530,35 @@ selftest () {
   build; rm -f "$fix/w/Form_O1/o1_form_builder_test.cjs";                      expect_red "ガード検査が無い" "フォームビルダーの検査の欠落"
   # ⚠️★★★ **中身を壊しても赤になること。** ★ 存在するだけで緑になっていた旧版の再発防止。
   build; sed -i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_O1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
+  # ⚠️★★ **ビルダーへの直書きが戻ったら赤になること**（2026-08-29・起票 T-18）。
+  build; printf %s "
+var O1_APP_DOWNLOAD_URL = \"https://drive.google.com/drive/folders/EXAMPLE\";
+" >> "$fix/w/$FORM_BUILDER"; expect_red "直書きされている" "ビルダーへの配備値の直書き"
+  build; printf %s "
+var PHASE1_MGMT_SHEET_ID = \"FAKE_SHEET_ID_FOR_SELFTEST_00000\";
+" >> "$fix/w/$FORM_BUILDER"; expect_red "直書きされている" "ビルダーへのロスター ID の直書き"
+  # ⚠️★ **受け口側も撃つ**（security-checker 指摘・2026-08-29）: 既存の SHARED_SECRET 変異は
+  #   旧検査でも赤くなるため、★ 新しい「ID の形」の検査が**受け口を見ているか**は未実測だった。
+  # ⚠️★★ **`gate:allow-id` 自体の対照**（code-reviewer MEDIUM・2026-08-29）。
+  #   ★ 除外の仕組みを selftest から 1 度も撃っていなかった。
+  #   ⚠️ 無制限の自己申告除外は、このゲートが戒めている「黙って緑にする」手段そのものになる。
+  #   → ★ (1) 印を外すと赤になること (2) **例外の件数が増えていないこと**を測る。
+  build; sed -i 's|// gate:allow-id||g' "$fix/w/$FORM_BUILDER"; expect_red "ID 形" "allow-id を外すと赤になる"
+  # ⚠️★★ **散文中の言及を数えない**（2026-08-29 に実測して判明）。
+  #   ★ 数えるべきは「**実際に検出を抑えている行**」＝ 検出パターンに当たり、かつ印がある行。
+  #   ⚠️ 印という語がコメントに出ただけで上限を超えると、★ 検査が「オオカミ少年」になる。
+  allow_n=$(cat Form_O1/*.gs Form_O1/*.cjs Form_O1/*.sh 2>/dev/null \
+    | grep -E "['\"][A-Za-z0-9_-]{25,}['\"]|drive\.google\.com/drive/folders/" \
+    | grep -c 'gate:allow-id' || true)
+  allow_n=${allow_n:-0}
+  if [ "$allow_n" -le 8 ]; then
+    echo "  ✅ 例外の件数が増えていない: 実効 $allow_n 行（★ 上限 8）"; sp=$((sp+1))
+  else
+    echo "  ❌ 例外が増えている: 実効 $allow_n 行（★ 上限 8。⚠️ 増やすなら根拠を書いて上限も上げること）"; sf=$((sf+1))
+  fi
+  build; printf %s "
+var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
+" >> "$fix/w/$RECEIVER"; expect_red "直書きされている" "受け口への ID の直書き"
   # ⚠️★ 行は**字下げされている**。`^` で固定すると変異が当たらず、
   #   ★ 「壊したつもりで壊れていない」偽の合格になる（2026-08-28 に実際に踏んだ）。
   build; sed -i 's|: > "$M/o1.mode"|: > "$M/DISABLED"|; s|: > "$W/o1.mode"|: > "$W/DISABLED"|'               "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"; expect_red "o1.mode を置かない" "o1.mode の書き出しの喪失"

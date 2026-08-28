@@ -23,6 +23,8 @@ FAIL=0
 
 # 変異を 1 つ適用して、テストが**赤になる**ことを確かめる。
 # $1 = 変異の名前 / $2.. = 一時コピーに対して走らせる perl の式
+SEEN_HASHES=""
+
 mutate () {
   local name="$1"; shift
   local f="$TMP/mutant.gs"
@@ -34,6 +36,21 @@ mutate () {
     FAIL=$((FAIL+1))
     return
   fi
+  # ⚠️★★★ **別の変異と同じ結果になっていないか**（code-reviewer HIGH・2026-08-29）。
+  #   ★ 複合の `s///; s///` は**片方だけ当たっても** `cmp -s` を通ってしまうので、
+  #     ⚠️ 「二重とも外す」つもりの変異が**片方だけの変異と byte 同一**になっていた。
+  #   → ★ 生成物のハッシュを覚えておき、⚠️ **重複したら赤にする**
+  #     （= どこかの置換が当たっていない、という構造的な証拠である）。
+  local h
+  h=$(cksum < "$f" | tr -d ' ')
+  case " $SEEN_HASHES " in
+    *" $h "*)
+      echo "  ❌ 別の変異と同じ結果になった（★ 置換のどれかが当たっていない）: $name"
+      FAIL=$((FAIL+1))
+      return
+      ;;
+  esac
+  SEEN_HASHES="$SEEN_HASHES $h"
   if node "$TEST" "$f" > /dev/null 2>&1; then
     echo "  ❌ 壊しても緑のまま（★ 検査の穴）: $name"
     FAIL=$((FAIL+1))
@@ -63,7 +80,7 @@ mutate "設定チェックから G1 の ID 検出を外す" \
 #   ★ 片方だけ外しても、もう片方が止めるので赤にならない —— それは**穴ではなく多層防御**である。
 #   → ★ 意味のある変異は「**両方**外す」。⚠️ それでも緑なら本物の穴。
 mutate "installO1ConsentTrigger の G1 検証を**二重とも**外す" \
-  's/    if \(g1Label\) \{/    if (false) {/; s/  o1AssertNotG1Form_\(FORM_ID_O1_CONSENT, "FORM_ID_O1_CONSENT"\);\n//'
+  's/    if \(g1Label\) \{/    if (false) {/; s/  o1AssertNotG1Form_\(consentFormId, "FORM_ID_O1_CONSENT"\);\n//'
 
 # --- §2 回答の保全 ------------------------------------------------------------
 mutate "o1AssertSafeToRebuild_ を素通りにする" \
@@ -76,8 +93,20 @@ mutate "回答数を確認できないときに 0 件として続行する" \
 mutate "空のフォーム ID でも開きにいく" \
   's/  if \(!id\) \{\n    throw new Error\(\n      "★ " \+\n        varName \+\n        " が空です。フォームを量産しないため停止しました/  if (false) {\n    throw new Error(\n      "★ " +\n        varName +\n        " が空です。フォームを量産しないため停止しました/'
 
-mutate "配布 URL が空でも受付メールを作る" \
-  's/  if \(!O1_APP_DOWNLOAD_URL\) \{\n    throw new Error\(/  if (false) {\n    throw new Error(/'
+mutate "古いほうの管理シートを素通りにする" \
+  's/  return String\(id \|\| ""\)\.indexOf\("12T8WU4D"\) === 0;/  return false;/'
+
+mutate "受付メールがスナップショットを無視して毎回読み直す" \
+  's/    appDownloadUrlOpt === undefined \? o1Config_\(\)\.appDownloadUrl : appDownloadUrlOpt;/    o1Config_().appDownloadUrl;/'
+
+mutate "配布 URL が URL でなくても通す（打ち間違いを見逃す）" \
+  's/  return String\(url \|\| ""\)\.indexOf\("https:\/\/"\) !== 0;/  return false;/'
+
+# ⚠️★★ **空検査だけを外しても赤にならなくなった**（2026-08-29）:
+#   ★ 直後に `o1AppDownloadUrlIsBad_` が空文字も弾くため（= 多層防御が効いている）。
+#   → ★ 変異は「**fail-closed を全部外す**」に変える（⚠️ 片方だけでは意味が無い）。
+mutate "配布 URL の fail-closed を全部外す" \
+  's/  if \(!appDownloadUrl\) \{/  if (false) {/; s/  if \(o1AppDownloadUrlIsBad_\(appDownloadUrl\)\) \{/  if (false) {/'
 
 # --- §4/§5 採番と冪等 ----------------------------------------------------------
 mutate "採番が 1 行だけのロスターを見落とす（G1 の last > 1 に戻す）" \
@@ -113,10 +142,10 @@ mutate "「理由は聞かない」の明記を消す" \
 
 # --- §8/§10 -------------------------------------------------------------------
 mutate "migrate が既存設問を消すようにする" \
-  's/(function migrateO1ConsentForm\(\) \{\n  var form = o1OpenFixed_\(FORM_ID_O1_CONSENT, "FORM_ID_O1_CONSENT"\);)/$1\n  o1ClearForm_(form);/'
+  's/(function migrateO1ConsentForm\(\) \{\n  var form = o1OpenFixed_\(o1Config_\(\)\.consentFormId, "FORM_ID_O1_CONSENT"\);)/$1\n  o1ClearForm_(form);/'
 
 mutate ".gs にシークレットを直書きする" \
-  's/(var O1_AUTO_SEND = true;)/$1\nvar SHARED_SECRET = "abcdefghijklmnopqrstuvwxyz123456";/'
+  's/(var O1_AUTO_SEND = true;)/$1\nvar SHARED_SECRET = "abcdefghijklmnopqrstuvwxyz123456";/'  # gate:allow-id ★ 変異が注入する偽の秘密（アルファベット順）
 
 # --- ★ 2026-08-28 のレビュー指摘で入れたガード -------------------------------
 mutate "★ 申告された P-ID をメール検証なしで信用する（他人の ID を名乗れる）"   's/      if \(!rowEmail\) return \{ pid: rowPid, row: i \+ 1 \};.*
@@ -128,9 +157,9 @@ mutate "★ P-ID 列が空の行で appendRow に落とす（1 人に 2 つの I
       if (false) {/'
 
 mutate "★ 受付メールを作れない設定でも先に採番する"   's/  try \{
-    o1RegisterAckBody_\("P000"\);
+    o1RegisterAckBody_\("P000", ackUrlSnapshot\);
   \} catch \(cfgErr\) \{/  try {
-    if (false) o1RegisterAckBody_("P000");
+    if (false) o1RegisterAckBody_("P000", ackUrlSnapshot);
   } catch (cfgErr) {/'
 
 mutate "★ 設定が欠けていてもトリガを張る"   's/  var problems = o1ConfigProblems_\(\);
