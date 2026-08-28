@@ -133,7 +133,7 @@ pub fn health(s: Starvation, th: Thresholds) -> HookHealth {
 ///    - `tray::current_state` … トレイの「⚠ 計測できていません」
 ///    - `get_recording_status` → `recording_health` … **アプリ内のバッジ**
 ///      (`RecordingControls.tsx` の `⚠` と「キーボードの記録ができていません」)
-///    → ★ **どちらも被験者向けなので、まとめて遅らせるのが本関数の意図**である。
+///      → ★ **どちらも被験者向けなので、まとめて遅らせるのが本関数の意図**である。
 /// 2. `request_reinstall()` = **フックの再設置** (＋ NDJSON の `alive:false`)
 ///
 /// ⚠️ O1 (R3-a・自然作業の常時収集) の宣言 4 択には「デザイン・映像・制作作業」があり、
