@@ -116,7 +116,7 @@ if [ ! -f "$RECEIVER" ]; then
 else
   ok "受け口がある: $RECEIVER"
   if grep -qE "(SHARED_SECRET|FOLDER_ID)[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" "$RECEIVER"; then
-    ng "★ 受け口の .gs にシークレット / フォルダ ID が直書きされている"
+    ng "★ 受け口の .gs に秘密が直書きされている（★ スクリプト プロパティへ移すこと）"
   else
     ok "受け口の .gs に秘密が直書きされていない"
   fi
@@ -457,6 +457,9 @@ selftest () {
     fi
   }
 
+  # ⚠️★★ **照合語はメッセージ固有にする**（code-reviewer LOW・2026-08-29）。
+  #   ★ `expect_red` は「その語を含む ❌ 行があるか」しか見ないので、
+  #   ⚠️ 複数の検査が同じ語を使うと、**別の理由で出た ❌ を拾って偽の合格**になる。
   echo "=== selftest 1: ✅ を 1 つずつ壊す（★ 赤にならなければゲートが空回りしている）==="
   build; sed -i 's/^- 所属: \*\*.*\*\*$/- 所属: **（実施前に記入）**/' "$cons"; expect_red "同意文書に未記入" "同意文書の空欄"
   build; sed -i 's/^- 連絡先: .*/- 連絡先: **（未定）**/' "$cons";             expect_red "連絡先が埋まっていない" "連絡先"
@@ -465,7 +468,7 @@ selftest () {
   build; rm -f "$fix/w/docs/o1-deletion-ledger.md";                            expect_red "削除台帳が無い" "削除台帳の欠落"
   build; sed -i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
   build; rm -f "$fix/w/Form_O1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
-  build; sed -i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_O1/GSE_O1_Submit.gs"; expect_red "直書きされている" ".gs への秘密直書き"
+  build; sed -i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_O1/GSE_O1_Submit.gs"; expect_red "秘密が直書き" ".gs への秘密直書き"
   build; sed -i 's/_o1day/_block/' "$fix/w/Form_O1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
   build; rm -f "$fix/w/Form_O1/o1_submit_guard_test.cjs";                      expect_red "ガード検査が無い" "ガード検査の欠落"
   build; echo 'let th = SomethingElse::new();' > "$fix/w/src-tauri/src/lib.rs"; expect_red "目印.*が見つからない" "liveness アンカーの喪失"
@@ -533,10 +536,10 @@ selftest () {
   # ⚠️★★ **ビルダーへの直書きが戻ったら赤になること**（2026-08-29・起票 T-18）。
   build; printf %s "
 var O1_APP_DOWNLOAD_URL = \"https://drive.google.com/drive/folders/EXAMPLE\";
-" >> "$fix/w/$FORM_BUILDER"; expect_red "直書きされている" "ビルダーへの配備値の直書き"
+" >> "$fix/w/$FORM_BUILDER"; expect_red "ID / URL が直書き" "ビルダーへの配備値の直書き"
   build; printf %s "
 var PHASE1_MGMT_SHEET_ID = \"FAKE_SHEET_ID_FOR_SELFTEST_00000\";
-" >> "$fix/w/$FORM_BUILDER"; expect_red "直書きされている" "ビルダーへのロスター ID の直書き"
+" >> "$fix/w/$FORM_BUILDER"; expect_red "ID / URL が直書き" "ビルダーへのロスター ID の直書き"
   # ⚠️★ **受け口側も撃つ**（security-checker 指摘・2026-08-29）: 既存の SHARED_SECRET 変異は
   #   旧検査でも赤くなるため、★ 新しい「ID の形」の検査が**受け口を見ているか**は未実測だった。
   # ⚠️★★ **`gate:allow-id` 自体の対照**（code-reviewer MEDIUM・2026-08-29）。
@@ -558,7 +561,7 @@ var PHASE1_MGMT_SHEET_ID = \"FAKE_SHEET_ID_FOR_SELFTEST_00000\";
   fi
   build; printf %s "
 var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
-" >> "$fix/w/$RECEIVER"; expect_red "直書きされている" "受け口への ID の直書き"
+" >> "$fix/w/$RECEIVER"; expect_red "ID / URL が直書き" "受け口への ID の直書き"
   # ⚠️★ 行は**字下げされている**。`^` で固定すると変異が当たらず、
   #   ★ 「壊したつもりで壊れていない」偽の合格になる（2026-08-28 に実際に踏んだ）。
   build; sed -i 's|: > "$M/o1.mode"|: > "$M/DISABLED"|; s|: > "$W/o1.mode"|: > "$W/DISABLED"|'               "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"; expect_red "o1.mode を置かない" "o1.mode の書き出しの喪失"
