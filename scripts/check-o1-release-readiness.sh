@@ -48,6 +48,7 @@ RECEIVER_TEST="Form_G1/o1_submit_guard_test.cjs"
 FORM_BUILDER="Form_G1/GSE_O1_Form_Builder.gs"
 FORM_BUILDER_TEST="Form_G1/o1_form_builder_test.cjs"
 SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
+MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
 
 run_checks () {
 
@@ -196,14 +197,25 @@ fi
 #   ⚠️ O1 の対象作業（図面 / 動画編集）では常態になる。
 #   ⚠️★ **アンカー喪失を緑にしない**（code-reviewer 指摘）: `Thresholds::default()` が
 #     改名・移動しただけで「別扱いになっている」に落ちるのを防ぐ。
+# ⚠️★★ **定数があるだけでは緑にしない**（2026-08-28 に強化）。
+#   ★ 旧版は `grep O1_LIVENESS` ただ 1 本だったので、**どこかに定数を 1 行足すだけ**で緑になった。
+#   ⚠️ 定数が**トレイに配線されていなければ**、被験者の画面は 1 ミリも変わらない。
+#   → ★ 目印（定数）と**配線**（`HOOK_STARVED` が O1 を見る純関数を通る）の**両方**を見る。
+#   ⚠️★★ `HOOK_STARVED` の読み手は **2 つ**ある（トレイ ＋ アプリ内バッジ）。
+#     ★ どちらも被験者向けなので、まとめて遅らせるのが意図である（`liveness.rs` の doc を見よ）。
+#   ★ 純関数の実在はコンパイラが保証する（配線行が呼んでいるので、無ければ CI が赤くなる）。
 if [ ! -f src-tauri/src/lib.rs ]; then
   ng "src-tauri/src/lib.rs が読めない（liveness 閾値を確かめられない）"
-elif grep -q "O1_LIVENESS\|o1_liveness_thresholds" src-tauri/src/lib.rs; then
-  ok "O1 の liveness 閾値が別扱いになっている"
-elif grep -q "Thresholds::default()" src-tauri/src/lib.rs; then
-  ng "★ O1 で liveness の閾値が G1 と同じ（マウスのみ 2 分で「計測できていません」が出る）"
+elif ! grep -q "O1_LIVENESS\|o1_liveness_thresholds" src-tauri/src/lib.rs; then
+  if grep -q "Thresholds::default()" src-tauri/src/lib.rs; then
+    ng "★ O1 で liveness の閾値が G1 と同じ（マウスのみ 2 分で「計測できていません」が出る）"
+  else
+    ng "liveness 閾値の目印（Thresholds::default）が見つからない（★ 移動/改名したら本検査を直す）"
+  fi
+elif ! grep -q "liveness::participant_visible_starved" src-tauri/src/lib.rs; then
+  ng "★ O1 の閾値の目印はあるが、被験者に見える表示（HOOK_STARVED）に配線されていない"
 else
-  ng "liveness 閾値の目印（Thresholds::default）が見つからない（★ 移動/改名したら本検査を直す）"
+  ok "O1 の liveness 閾値が別扱いになっている（★ 被験者に見える表示への配線まで確認）"
 fi
 
 # ⚠️★★★ 転送路の実力（code-reviewer 指摘・2026-08-28）。
@@ -211,12 +223,39 @@ fi
 #     `reconcile.rs` の timeout は **180 秒固定**、実測は 300KB/1.45s ≒ 207KB/s。
 #     → 実測の 1 日ぶん 18MB でも base64 24MB ≒ 116 秒＝ timeout の 2/3。
 #     ⚠️ しかもこの実測は **Drive 保存時間を含まない**。
-if grep -q "from_secs(180)" src-tauri/src/reconcile.rs 2>/dev/null; then
-  ng "★ 送信 timeout が 180 秒固定のまま（★ 1 日ぶんが入りきるか未実測。.gs 手順 8 を実施すること）"
+#
+# ⚠️★★★ **旧版の検査は `grep from_secs(180)` ただ 1 本だった**（2026-08-28 に差し替え）。
+#   ★ それだと **数字を書き換えるだけで緑になる** ——
+#   ⚠️ 実測しないまま緑にできる検査は、本リポジトリがいちばん嫌う「**見えないまま緑**」を
+#   **ゲート自身**に作る。→ ★ **実測の記録**と**コードの修正**の**両方**でだけ緑にする。
+#   ★ 記録票は `<!-- gate:o1-upload-timeout -->` の直後のブロックだけを読む
+#   （⚠️ 同じ文書の「記入例」を誤って拾わないため）。
+measure_block=""
+[ -f "$MEASURE" ] && measure_block=$(sed -n '/<!-- gate:o1-upload-timeout -->/,/^$/p' "$MEASURE")
+# ★ 記録票の 1 欄が埋まっているか。⚠️ 空欄の目印（（未記入））は `[^（*]` で弾く。
+mfield () { printf '%s\n' "$measure_block" | grep -qE "$1"; }
+if [ ! -f "$MEASURE" ]; then
+  ng "★ 送信 timeout の実測記録票が無い: $MEASURE（★ .gs 手順 8 の「1 日ぶんの通し確認」）"
+elif ! mfield '^- 状態: \*\*実測済み\*\*$'; then
+  ng "★ 送信 timeout が未実測（記録票の「状態」が「実測済み」でない。★ .gs 手順 8 を実施すること）"
+elif ! mfield '^- 実測日: \*\*[0-9]{4}-[0-9]{2}-[0-9]{2}\*\*$' \
+  || ! mfield '^- 送信バイト数 \(base64 後\): \*\*[^*]*[0-9][^*]*\*\*$' \
+  || ! mfield '^- 所要時間 \(Drive 保存を含む\): \*\*[^*]*[0-9][^*]*\*\*$' \
+  || ! mfield '^- 実効スループット: \*\*[^*]*[0-9][^*]*\*\*$' \
+  || ! mfield '^- 採用した timeout: \*\*[^*]*[0-9][^*]*\*\*$'; then
+  # ⚠️★ 値に **数字を 1 つ以上**要求する（code-reviewer LOW・2026-08-28）。
+  #   ★ そうしないと `**未定**` や `** **` が「埋まっている」として通る。
+  ng "★ 実測記録票の必須欄が埋まっていない（実測日 / 送信バイト数 / 所要時間 / 実効スループット / 採用した timeout）"
+elif [ ! -f src-tauri/src/reconcile.rs ]; then
+  # ⚠️★★ **アンカー喪失を緑にしない**（code-reviewer MEDIUM・2026-08-28）。
+  #   ★ 旧版は `grep -q ... 2>/dev/null` だけだったので、⚠️ **ファイルが消えても偽 → `else` → ✅**
+  #     になった（★ liveness 側では同じ穴を塞いでいるのに、ここだけ空いていた）。
+  ng "★ src-tauri/src/reconcile.rs が読めない（★ 移動/改名したら本検査を直す）"
+elif grep -q "from_secs(180)" src-tauri/src/reconcile.rs; then
+  ng "★ 実測は記録されたのに送信 timeout が 180 秒固定のまま（★ 記録票の「採用した timeout」を反映すること）"
 else
-  ok "送信 timeout が見直されている"
+  ok "送信 timeout が実測にもとづいて見直されている"
 fi
-
 }
 
 # =============================================================================
@@ -250,9 +289,29 @@ selftest () {
     cp "$repo/experiments/20260801-controlled-friction-task/make-distribution.sh" \
        "$repo/experiments/20260801-controlled-friction-task/make-common-app-zip.sh" \
        "$fix/w/experiments/20260801-controlled-friction-task/" 2>/dev/null
-    echo 'let th = Thresholds::default();' > "$fix/w/src-tauri/src/lib.rs"
+    # ⚠️★★ **本物の `lib.rs` を写す**（2026-08-28 に差し替え）。
+    #   ★ 以前はスタブ 1 行だったので、liveness の検査は「未達を満たすと緑になるか」しか
+    #   測れなかった。⚠️ いまは repo 側が緑なので、**壊すと赤になるか**を測る側へ移す。
+    cp "$repo/src-tauri/src/lib.rs" "$fix/w/src-tauri/src/lib.rs" 2>/dev/null
     printf 'x\n.timeout(std::time::Duration::from_secs(180))\n' > "$fix/w/src-tauri/src/reconcile.rs"
+    cp "$repo/$MEASURE" "$fix/w/$MEASURE" 2>/dev/null
     cons="$fix/w/$CONSENT"
+  }
+
+  # ★ 実測記録票を「実測済み」で埋める（⚠️ **selftest の中だけ**。本物は 1 バイトも触らない）。
+  fill_measure () {
+    sed -i \
+      -e 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' \
+      -e 's/^- 実測日: \*\*（未記入）\*\*$/- 実測日: **2026-09-01**/' \
+      -e 's/^- 送信バイト数 (base64 後): \*\*（未記入）\*\*$/- 送信バイト数 (base64 後): **24 MB**/' \
+      -e 's/^- 所要時間 (Drive 保存を含む): \*\*（未記入）\*\*$/- 所要時間 (Drive 保存を含む): **210 秒**/' \
+      -e 's/^- 実効スループット: \*\*（未記入）\*\*$/- 実効スループット: **117 KB\/s**/' \
+      -e 's/^- 採用した timeout: \*\*（未記入）\*\*$/- 採用した timeout: **固定 900 秒**/' \
+      "$fix/w/$MEASURE"
+  }
+  # ★ 送信側を実測にもとづいて直した状態（= 180 秒固定でなくなった）。
+  fix_timeout () {
+    printf 'x\n.timeout(std::time::Duration::from_secs(900))\n' > "$fix/w/src-tauri/src/reconcile.rs"
   }
 
   local sp=0 sf=0
@@ -287,6 +346,14 @@ selftest () {
   build; sed -i 's/_o1day/_block/' "$fix/w/Form_G1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
   build; rm -f "$fix/w/Form_G1/o1_submit_guard_test.cjs";                      expect_red "ガード検査が無い" "ガード検査の欠落"
   build; echo 'let th = SomethingElse::new();' > "$fix/w/src-tauri/src/lib.rs"; expect_red "目印.*が見つからない" "liveness アンカーの喪失"
+  # ⚠️★★ **O1 の目印を消したら赤になること**（★ 2026-08-28 に緑になったので satisfy 側から移した）。
+  build; sed -i 's/O1_LIVENESS_TRAY_AFTER_MS/RENAMED_AWAY_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "G1 と同じ" "O1 の liveness の目印の喪失"
+  # ⚠️★★★ **定数が残っていても、配線が消えたら赤になること**（★ 被験者の画面は配線でしか変わらない）。
+  build; sed -i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
+  # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
+  build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
+  # ⚠️★★ **アンカー喪失を緑にしない**（★ 記録票を埋めた後に顕在化する穴だった）。
+  build; fill_measure; rm -f "$fix/w/src-tauri/src/reconcile.rs";              expect_red "reconcile.rs が読めない" "reconcile.rs のアンカー喪失"
   # ★★ 2026-08-28 に緑になった 3 件。⚠️ **緑になったものは selftest 2 から 1 へ移す**
   #   （satisfy 側に置いたままだと「もともと緑」を「満たしたから緑」と読み違える）。
   build; sed -i 's/^<!-- o1-retention: set -->$/<!-- o1-retention: unset -->/' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "保管上限が未確定" "保管上限を未確定へ戻す"
@@ -303,8 +370,10 @@ selftest () {
 
   echo
   echo "=== selftest 2: 未達を満たすと緑に変わるか（★ 陽性対照）==="
-  build; echo 'const O1_LIVENESS: u64 = 1;' >> "$fix/w/src-tauri/src/lib.rs"; expect_green "別扱いになっている" "liveness の別扱い"
-  build; printf 'x\n.timeout(std::time::Duration::from_secs(600))\n' > "$fix/w/src-tauri/src/reconcile.rs"; expect_green "timeout が見直されている" "送信 timeout"
+  # ⚠️★★★ **実測の記録とコードの修正が「両方そろって」初めて緑にする。**
+  #   ★ 旧版は `grep from_secs(180)` ただ 1 本だったので、**数字を書き換えるだけで緑**になった。
+  #   ★ liveness の陽性対照は selftest 1（壊すと赤）へ移した（= repo 側が緑になったため）。
+  build; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
 
   echo
   echo "=== selftest 3: 片方だけでは緑にしない（★ 部分的な修正で騙されないか）==="
@@ -312,6 +381,11 @@ selftest () {
   #   （片方だけ見ていると、もう片方の OS から O1 が dataset へ漏れる）。
   build; sed -i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.ps1"; expect_red "sync-session" "ps1 だけ壊しても赤になる"
   build; sed -i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.sh";  expect_red "sync-session" "sh だけ壊しても赤になる"
+  # ⚠️★★★ **A-2 の肝**: 片方だけでは緑にしない（★「見えないまま緑」への抜け道を塞ぐ）。
+  build; fix_timeout;   expect_red "未実測"           "コードだけ直しても赤になる（実測が無い）"
+  build; fill_measure;  expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
+  # ★「状態」だけ実測済みにして必須欄が空なら赤（⚠️ 中身の無い記録で緑にしない）。
+  build; sed -i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
 
   echo
   echo "────────────────────────────────────────"
