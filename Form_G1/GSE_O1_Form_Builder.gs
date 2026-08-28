@@ -578,7 +578,14 @@ function buildO1ConsentForm() {
   pid.setTitle(Q_O1_PID);
   pid.setHelpText(
     "以前 GSE の検証（Phase1 / G1）にご参加いただいた方は、そのときお伝えした " +
-      "P から始まる記号をご記入ください。初めての方は空欄で構いません。"
+      "P から始まる記号（例: P015）をご記入ください。初めての方は空欄で構いません。"
+  );
+  // ⚠️★ 形式を**フォームでも**検証する（Codex 指摘・2026-08-28）。
+  //   ★ 打ち間違いは提出前に本人が直せるのがいちばん安い。
+  //   ⚠️ 必須ではないので**空欄は通る**（★ 初参加の人を止めない）。
+  //   ★ 後段（`onO1ConsentSubmit`）でも同じ規則で検証する（★ 二重に持つ）。
+  pid.setValidation(
+    FormApp.createTextValidation().requireTextMatchesPattern("^[PpＰｐ]?[0-9０-９]*$").build()
   );
   form.addTextItem().setTitle(Q_O1_NAME).setRequired(true);
   var mail = form.addTextItem();
@@ -881,7 +888,16 @@ function o1FindInPhase1Roster_(sheet, opts) {
     for (i = 0; i < rows.length; i++) {
       rowEmail = String(rows[i][2]).trim().toLowerCase();
       if (rowEmail && rowEmail === email) {
-        return { pid: String(rows[i][0]).trim().toUpperCase(), row: i + 1 };
+        rowPid = String(rows[i][0]).trim().toUpperCase();
+        // ⚠️★★ **A 列の値をそのまま P-ID として返さない**（Codex 指摘・2026-08-28）。
+        //   ★ 空なら後段が採番して埋める（正当な経路）。
+        //   ⚠️ 空でないのに `P<数字>` でないなら、見出し行・手入力ミス・別の記法である。
+        //     → ★ その値で受付メールを送ると、被験者は**存在しない ID**を信じて入力する。
+        //     ⚠️ 自動で直すと本当の ID を上書きしうるので、**研究者に判断させる**。
+        if (rowPid && !o1IsValidPid_(rowPid)) {
+          return { conflict: true, pid: rowPid, row: i + 1, reason: "invalid-pid-in-roster" };
+        }
+        return { pid: rowPid, row: i + 1 };
       }
     }
   }
@@ -899,6 +915,14 @@ function o1FindInPhase1Roster_(sheet, opts) {
   }
 
   return null;
+}
+
+/**
+ * ★ P-ID の形式（`P` ＋ 数字）。⚠️ **採番規則と同じ形**であること
+ * （`o1NextParticipantId_` が `^P(\d+)$` で読むので、そこと食い違わせない）。
+ */
+function o1IsValidPid_(v) {
+  return /^P\d+$/.test(String(v == null ? "" : v).trim().toUpperCase());
 }
 
 /** ログに実アドレスを残さない (data-privacy)。 */
@@ -1141,6 +1165,21 @@ function onO1ConsentSubmit(e) {
   var a = o1ConsentAnswers_(e.response);
   if (!a.email) {
     Logger.log("⛔ O1-C 提出: メールアドレスが空のため発番しません");
+    return;
+  }
+
+  // ⚠️★★ **申告された P-ID の形式を検証する**（Codex 指摘・2026-08-28）。
+  //   ★ `Q_O1_PID` は自由記入なので `P15` `p-015` `015` のような打ち間違いが入る。
+  //   ⚠️ 旧実装はロスターに一致しないだけで**黙って「新規参加者」として扱い**、
+  //     ★ メールが未登録の既存参加者に **2 つ目の P-ID を発番**しうる。
+  //   → ★ 形式が違うなら**何もせず止める**（⚠️ 勝手に解釈して直さない）。
+  if (a.pid && !o1IsValidPid_(a.pid)) {
+    Logger.log(
+      "⛔⚠️ 申告された参加者IDの形式が違います: 「" + a.pid + "」（★ 期待する形は P と数字）。\n" +
+        "   ★ 発番も受付メールも行いませんでした（⚠️ 黙って新規発番しない）。\n" +
+        "   ★ 研究者が本人に確認し、正しい ID で再提出してもらってください。\n" +
+        "   提出者: " + o1MaskEmail_(a.email)
+    );
     return;
   }
 

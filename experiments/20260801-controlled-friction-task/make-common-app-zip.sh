@@ -464,9 +464,32 @@ names = zipfile.ZipFile(p).namelist()
 junk = [n for n in names if "__MACOSX" in n or n.endswith("/.DS_Store")]
 if junk:
     sys.exit(f"[make-common-app-zip] ✗ Windows zip に余計なものが入っています: {junk[:3]}")
-if not any(n.startswith(f"{sys.argv[2]}_実施用_Windows/") for n in names):
+label = sys.argv[2]
+root = f"{label}_実施用_Windows/"
+if not any(n.startswith(root) for n in names):
     sys.exit("[make-common-app-zip] ✗ Windows zip の中のフォルダ名が壊れています")
-print(f"[make-common-app-zip] Windows: UTF-8 フラグ ✅ / 余計なもの無し ✅ ({len(names)} エントリ)")
+
+# ⚠️★★ **中身も見る**（Codex 指摘・2026-08-28）。★ 旧版はフォルダ名・UTF-8・ゴミしか見ておらず、
+#   macOS 側（展開してマーカー / 署名 / README を検査）より**明らかに弱かった**。
+#   ⚠️ O1 は **Windows が主ターゲット**なので、弱いほうが本命という逆転が起きていた。
+base = {n[len(root):] for n in names if n.startswith(root)}
+mode = "o1" if label == "O1" else "g1"
+other = "g1" if mode == "o1" else "o1"
+missing = [f for f in (f"{mode}.mode", "gse-next.exe", "pubkey.txt", "g1-submit.json") if f not in base]
+if missing:
+    sys.exit(f"[make-common-app-zip] ✗ Windows zip に足りないものがあります: {missing}")
+if f"{other}.mode" in base:
+    sys.exit(f"[make-common-app-zip] ✗ Windows zip に {other}.mode が混ざっています（★ マーカーの取り違え）")
+if not any(n.endswith(".bat") for n in base):
+    sys.exit("[make-common-app-zip] ✗ Windows zip に launcher (.bat) がありません")
+if mode == "o1" and "README_先に読む.txt" not in base:
+    sys.exit("[make-common-app-zip] ✗ O1 の Windows zip に README_先に読む.txt がありません")
+if any(n.startswith("block") and n.endswith(".html") for n in base):
+    sys.exit("[make-common-app-zip] ✗ Windows zip に課題ページが入っています（共通側に入れてはならない）")
+print(
+    f"[make-common-app-zip] Windows: UTF-8 フラグ ✅ / 余計なもの無し ✅ / "
+    f"{mode}.mode ＋ launcher ＋ 必須ファイル ✅ ({len(names)} エントリ)"
+)
 PY
 
 echo

@@ -65,9 +65,9 @@
 
 ## 検証（★ 実行した結果）
 
-- [x] `node Form_G1/o1_form_builder_test.cjs` → **89 / 89**
+- [x] `node Form_G1/o1_form_builder_test.cjs` → **96 / 96**
 - [x] `bash Form_G1/o1_form_builder_mutation_test.sh` → **25 変異すべて赤**
-- [x] `bash scripts/sync_session_o1_guard_test.sh` → **11 / 11**（★ `.ps1` も実行済み）
+- [x] `bash scripts/sync_session_o1_guard_test.sh` → **13 / 13**（★ `.ps1` も実行済み）
 - [x] `bash make-common-app-zip.sh --selftest` → **14 / 14**
 - [x] `bash -n` — `make-common-app-zip.sh` / `run.sh` / `sync-session.sh` / `check-o1-release-readiness.sh`
 - [x] ★ G1 非回帰: `guard_test` 4 / `submit_guard_test` 33 / `o1_submit_guard_test` 44 /
@@ -86,7 +86,8 @@
   - [x] ⚠️★★ `grep -q` の **SIGPIPE fail-open**（★ 400KB で実測）→ `grep -c` ＋ 陰性対照
   - [x] ⚠️★★ `GmailApp` が **Gmail 全体のスコープ**を要求する → コードから削除
 - [ ] ⚠️ **CI 未実行**（★ ブランチは未 push。★ 走らせるまで「緑」と書かない）
-- [ ] `/cross-review`（Codex 系統）
+- [x] `/cross-review`（Codex 系統）→ ⚠️ **高 1 / 中 2 / 低 1**（★ Claude の 2 エージェントが見落とした分）
+      → ★ 高・中の 3 件を修正、低 1 件は**境界をテストで固定**（詳細は `decisions.md` 判断 X）
 
 ## ⚠️ 外界に触っていないこと（★ 明示する）
 

@@ -742,6 +742,82 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 }
 
 {
+  // ⚠️★★ **申告された P-ID の形式**（Codex 指摘・2026-08-28）。
+  //   ★ `P15` `p-015` `015` のような打ち間違いを、旧実装は**黙って「新規参加者」扱い**にし、
+  //     ⚠️ メール未登録の既存参加者に **2 つ目の P-ID** を発番しえた。
+  [
+    ["P15A", "英字混じり"],
+    ["p-015", "ハイフン入り"],
+    ["015", "P が無い"],
+    ["PP015", "P が 2 つ"],
+  ].forEach(([bad, label]) => {
+    const ctx = makeReadyCtx();
+    const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+    ctx.onO1ConsentSubmit(
+      makeResponse({
+        [ctx.Q_O1_NAME]: "新規",
+        [ctx.Q_O1_EMAIL]: "typo@example.com",
+        [ctx.Q_O1_PID]: bad,
+        [ctx.Q_O1_OS]: "Windows",
+      })
+    );
+    push(
+      `§5 ★★ 形式の違う P-ID（${label}）では発番も送信もしない`,
+      roster.__rows.length === 1 && ctx.__mails.length === 0,
+      { bad, rows: roster.__rows.length, mails: ctx.__mails.length }
+    );
+  });
+}
+
+{
+  // ★ 陽性対照: 正しい形式（小文字）は通る。⚠️ 形式検証で全部止めていないこと。
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", ""]] });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "既存",
+      [ctx.Q_O1_EMAIL]: "ok@example.com",
+      [ctx.Q_O1_PID]: "p006",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§5 ★ 陽性対照: 正しい形式（小文字 p006）は通る",
+    ctx.__mails.length === 1 && ctx.__mails[0].body.indexOf("P006") >= 0,
+    { mails: ctx.__mails.length }
+  );
+}
+
+{
+  // ⚠️★★ **ロスターの A 列が壊れている行**にメールが一致した場合（Codex 指摘）。
+  //   ★ その値をそのまま受付メールに書くと、被験者は**存在しない ID**を信じて入力する。
+  const ctx = makeReadyCtx({ roster: [["見出し", "既存", "broken@example.com"]] });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "既存",
+      [ctx.Q_O1_EMAIL]: "broken@example.com",
+      [ctx.Q_O1_OS]: "Windows",
+    })
+  );
+  push(
+    "§5 ★★ ロスターの P-ID 列が壊れている行では送信しない",
+    ctx.__mails.length === 0,
+    { mails: ctx.__mails.length }
+  );
+}
+
+{
+  // ★ フォーム側にも形式検証が入っていること（★ 提出前に本人が直せるのがいちばん安い）。
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const pidItem = ctx.__forms[O1_C].__items.find((i) => i.__title === ctx.Q_O1_PID);
+  push(
+    "§6 ★ 参加者ID 欄にフォーム側の形式検証がある",
+    !!pidItem && !!pidItem.__validation && !!pidItem.__validation.__pattern,
+    { pattern: pidItem && pidItem.__validation && pidItem.__validation.__pattern }
+  );
+}
+
+{
   // ⚠️★★★ **設定ミスで P-ID だけ焼かれる**のを防ぐ（code-reviewer 指摘・2026-08-28）。
   //   ★ 受付メールの本文が作れない設定なら、採番の**前に**止まること。
   const ctx = makeReadyCtx();
