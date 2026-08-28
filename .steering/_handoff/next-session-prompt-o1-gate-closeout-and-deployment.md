@@ -149,14 +149,21 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 22/22 になるは
 
 ### D. ★ macOS 実機で配布物を組む（⚠️ Windows では検算できない）
 
-```bash
-cd experiments/20260801-controlled-friction-task
-./make-common-app-zip.sh --mode o1 --config <O1 用の g1-submit.json>
-```
+⚠️★★★ **これは別の引き継ぎに切り出した**（★ 手順が長く、実施する機械が違うため）:
 
-⚠️ `ditto` / `hdiutil` / `codesign` が要る。★ 2026-08-28 の実装は
-**モード分岐と README 文言までしか検算していない**（`--selftest` 14/14 はその範囲）。
-⚠️ ★ **dmg のマウント・署名検証・zip 化は 1 度も実行していない。**
+> ★ `.steering/_handoff/next-session-prompt-o1-macos-distribution.md`
+
+★ 要点だけ:
+
+- ⚠️ `ditto` / `hdiutil` / `codesign` が要る。★ 2026-08-28 の実装は
+  **モード分岐と README 文言までしか検算していない**（`--selftest` 14/14 はその範囲）。
+  ⚠️ **dmg のマウント・署名検証・zip 化は 1 度も実行していない。**
+- ⚠️★★ **`--tag` を明示する。** ★ 既定は `v0.1.24` だが、実在する最新は **`v0.1.29`**
+  （★ 資産は `gse-next_0.1.29_aarch64.dmg`）。
+  ⚠️ **既定値は書き換えない**（★ G1 が実施中で、既定を変えると G1 の配布物が黙って変わる）。
+- ⚠️★★ **dmg は `aarch64` のみ**。→ **Intel Mac の被験者には配れるものが無い**（★ 起票）。
+- ★ **本番の zip は B-1（受け口のデプロイ）に依存する**が、
+  ⚠️ **形だけ整えたダミー設定での検算はいま進められる**（★ その zip は配らない）。
 
 ### E. ★ 起票の消化（⚠️ **E-1 が実施順の 1 番**）
 
