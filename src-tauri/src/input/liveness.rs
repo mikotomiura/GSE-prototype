@@ -41,7 +41,10 @@ pub enum HookHealth {
     Ok,
     /// ⚠️ 疑わしい。★ ログにだけ残す段階 (トレイは変えない)。
     Suspect,
-    /// ⚠️★ 届いていないとみなす段階。トレイを「計測できていません」にし、再設置を要求する。
+    /// ⚠️★ 届いていないとみなす段階。**再設置を要求**し、NDJSON に `alive:false` を残す。
+    ///
+    /// ⚠️★★ **被験者に見える表示は `Down` と同義ではない** (2026-08-28 以降)。
+    /// ★ O1 では表示だけ遅らせる —— `participant_visible_starved` を見よ。
     Down,
 }
 
@@ -50,15 +53,20 @@ pub enum HookHealth {
 pub struct Thresholds {
     /// この時間 starve したら `Suspect` (ログに 1 回だけ `ERROR`)。
     pub log_after_ms: u64,
-    /// この時間 starve したら `Down` (トレイ表示 + 再設置)。
+    /// この時間 starve したら `Down` (**再設置** ＋ NDJSON の `alive:false`)。
+    /// ⚠️ ★ **被験者に見える表示はここでは決まらない** (`participant_visible_starved`)。
     pub down_after_ms: u64,
 }
 
 impl Default for Thresholds {
     /// 既定は 30 秒 / 120 秒 (二段)。
     ///
-    /// ⚠️ ★ トレイ側を長く取るのは、**被験者の目に入る警告**だからである
+    /// ⚠️ ★ `Down` 側を長く取るのは、**被験者の目に入る警告**だからである
     /// (マウス中心の作業で誤検知しうる)。ログ側は研究者が後から読むので短くてよい。
+    ///
+    /// ⚠️★★ **O1 ではこの 120 秒が「見せる時刻」ではなくなった** (2026-08-28)。
+    /// ★ 120 秒は再設置とログの時刻であり、**見せる時刻は 30 分**である
+    /// (`lib.rs` の `O1_LIVENESS_TRAY_AFTER_MS` / `participant_visible_starved`)。
     fn default() -> Self {
         Self {
             log_after_ms: 30_000,
@@ -111,6 +119,52 @@ pub fn health(s: Starvation, th: Thresholds) -> HookHealth {
         HookHealth::Suspect
     } else {
         HookHealth::Ok
+    }
+}
+
+/// ★ **被験者に「計測できていません」と見せるか**。⚠️ `health()` とは別の判断である。
+///
+/// ## ⚠️★★★ なぜ `health()` から分けるか (研究者判断 2026-08-28)
+///
+/// `lib.rs` は `HookHealth::Down` から **2 つ**を同時に起こしていた:
+///
+/// 1. `HOOK_STARVED` = **被験者の目に入るもの**。⚠️ ★ **読み手は 2 つある**
+///    (code-reviewer / security-checker が一致して指摘・2026-08-28):
+///    - `tray::current_state` … トレイの「⚠ 計測できていません」
+///    - `get_recording_status` → `recording_health` … **アプリ内のバッジ**
+///      (`RecordingControls.tsx` の `⚠` と「キーボードの記録ができていません」)
+///    → ★ **どちらも被験者向けなので、まとめて遅らせるのが本関数の意図**である。
+/// 2. `request_reinstall()` = **フックの再設置** (＋ NDJSON の `alive:false`)
+///
+/// ⚠️ O1 (R3-a・自然作業の常時収集) の宣言 4 択には「デザイン・映像・制作作業」があり、
+/// ★ そこでは「マウスだけで数分」が**常態**である
+/// (下の `mouse_only_work_is_a_known_false_positive` が**仕様として固定している既知の誤検知**)。
+/// → ⚠️ 2 分で警告を出すと、**正常な作業のたびに嘘の警告を被験者へ見せる**ことになる。
+///
+/// ★ かといって `down_after_ms` を伸ばすと、⚠️ **本当に死んだときの再設置まで同じだけ遅れる**。
+/// → ★ したがって **見せる閾値だけ**を別に取る。⚠️ ログ・再設置・NDJSON は 1 つも変えない。
+///
+/// ⚠️★★ **研究者向けの診断はこれを見ない** —— `hook::HOOK_NOT_DELIVERING` (常に `Down` と同義)
+/// を見る (★ 2026-08-09 の判断 D-6「`hook_starved` は研究者向けに出す」を守るため)。
+///
+/// - `o1_tray_after_ms = None` … 通常運用 / G1。★ 従来どおり `Down` と同義 (**挙動不変**)。
+/// - `o1_tray_after_ms = Some(ms)` … O1。★ この時間 starve して初めて見せる。
+///
+/// ★ 第 1 引数に `health` を取るのは、⚠️ **`Down` の定義を 2 か所に書かない**ためである
+/// (code-reviewer LOW・2026-08-28)。
+pub fn participant_visible_starved(
+    health: HookHealth,
+    s: Starvation,
+    o1_tray_after_ms: Option<u64>,
+) -> bool {
+    match o1_tray_after_ms {
+        // ⚠️★★ **`Down` であることも要る** (Codex `/cross-review` 指摘・2026-08-28)。
+        //   ★ 既定値では 30 分 >= 120 秒なので、いまは `starved_ms` の比較だけでも同じ結果になる。
+        //   ⚠️ しかし `down_after_ms` を O1 の閾値より長くすると、
+        //     **システムが `Down` と思っていないのに被験者へ警告を出す**設計になってしまう。
+        //   → ★ 「見せるのは `Down` の部分集合」を**式で固定する** (doc と実装を一致させる)。
+        Some(after_ms) => health == HookHealth::Down && s.starved_ms >= after_ms,
+        None => health == HookHealth::Down,
     }
 }
 
@@ -551,6 +605,151 @@ mod tests {
             HookHealth::Down,
             "マウスのみの作業は Down に化ける (既知の限界)"
         );
+    }
+
+    /// ★ O1 の既定値 (`lib.rs` の `O1_LIVENESS_TRAY_AFTER_MS`)。⚠️ ここは**テスト側の写し**なので、
+    /// 値の正本は `lib.rs` にある。★ 下の `o1_tray_threshold_matches_lib_rs` が食い違いを捕まえる。
+    const O1_TRAY_AFTER_MS: u64 = 1_800_000;
+
+    /// ⚠️★★★ 本命: **マウスのみ 2 分で被験者に警告を見せない。しかし再設置は起きる。**
+    ///
+    /// ★ これが A-1 (研究者判断 2026-08-28) の全部である。⚠️ 片方でも崩れたら直しが失敗している。
+    #[test]
+    fn o1_delays_what_the_participant_sees_but_not_the_reinstall() {
+        let mut s = Starvation::default();
+        for _ in 0..120 {
+            // マウスだけ動いている (system_input_seen = true / hook_event_seen = false)
+            s = step(s, true, true, false, TICK);
+        }
+        assert_eq!(s.starved_ms, 120_000);
+
+        // ★ 再設置とログは従来どおり 120 秒で起きる (`lib.rs` は `health()` を見ている)。
+        assert_eq!(
+            health(s, th()),
+            HookHealth::Down,
+            "O1 でも再設置経路 (health == Down) は 120 秒で起きること"
+        );
+
+        // ⚠️ しかし被験者に見えるもの (トレイ ＋ アプリ内バッジ) は、O1 では**まだ変えない**。
+        assert!(
+            !participant_visible_starved(health(s, th()), s, Some(O1_TRAY_AFTER_MS)),
+            "O1 でマウスのみ 2 分の誤警告を出してはならない"
+        );
+
+        // ★ 通常運用 / G1 は**従来どおり**出す (挙動を変えていないことの対照)。
+        assert!(
+            participant_visible_starved(health(s, th()), s, None),
+            "通常運用 / G1 の挙動を変えてはならない"
+        );
+    }
+
+    /// ⚠️★★ **見せるものは必ず `Down` の部分集合である** (Codex `/cross-review` 指摘・2026-08-28)。
+    ///
+    /// ★ 既定値 (120 秒 / 30 分) では差が出ないので、**閾値をひっくり返して**測る:
+    /// `down_after_ms` を O1 の表示閾値より**長く**したら、⚠️ 30 分の時点では
+    /// システムはまだ `Down` と思っていない → ★ **被験者に警告を出してはならない**。
+    #[test]
+    fn what_the_participant_sees_is_always_a_subset_of_down() {
+        let long_down = Thresholds {
+            log_after_ms: 30_000,
+            down_after_ms: 3_600_000, // ★ 1 時間 (O1 の表示閾値 30 分より長い)
+        };
+        let at_30min = Starvation {
+            starved_ms: O1_TRAY_AFTER_MS,
+        };
+        assert_ne!(
+            health(at_30min, long_down),
+            HookHealth::Down,
+            "前提: この閾値では 30 分は Down ではない"
+        );
+        assert!(
+            !participant_visible_starved(
+                health(at_30min, long_down),
+                at_30min,
+                Some(O1_TRAY_AFTER_MS)
+            ),
+            "Down でないのに被験者へ警告を出してはならない"
+        );
+    }
+
+    /// 境界: O1 の表示は 30 分**ちょうど**で立つ (⚠️ 1 秒前は立たない)。
+    #[test]
+    fn o1_visible_boundary_is_inclusive_at_30_minutes() {
+        let just_before = Starvation {
+            starved_ms: O1_TRAY_AFTER_MS - 1_000,
+        };
+        let at = Starvation {
+            starved_ms: O1_TRAY_AFTER_MS,
+        };
+        assert!(!participant_visible_starved(
+            health(just_before, th()),
+            just_before,
+            Some(O1_TRAY_AFTER_MS)
+        ));
+        assert!(participant_visible_starved(
+            health(at, th()),
+            at,
+            Some(O1_TRAY_AFTER_MS)
+        ));
+    }
+
+    /// ★ 通常運用の境界は **1 ミリも動いていない** (`Down` と同義のまま)。
+    #[test]
+    fn normal_mode_visible_boundary_is_unchanged() {
+        let below = Starvation {
+            starved_ms: 119_000,
+        };
+        let at = Starvation {
+            starved_ms: 120_000,
+        };
+        assert!(!participant_visible_starved(
+            health(below, th()),
+            below,
+            None
+        ));
+        assert!(participant_visible_starved(health(at, th()), at, None));
+        // ★ 同じ入力で `health()` と一致すること (= 定義が二重化していない)。
+        for s in [below, at] {
+            assert_eq!(
+                participant_visible_starved(health(s, th()), s, None),
+                health(s, th()) == HookHealth::Down
+            );
+        }
+    }
+
+    /// 復帰したら**どちらのモードでも**すぐ消える (⚠️ 警告が残り続けない)。
+    #[test]
+    fn recovery_clears_what_the_participant_sees_in_both_modes() {
+        let mut s = Starvation {
+            starved_ms: 3_600_000,
+        };
+        assert!(participant_visible_starved(
+            health(s, th()),
+            s,
+            Some(O1_TRAY_AFTER_MS)
+        ));
+        assert!(participant_visible_starved(health(s, th()), s, None));
+        // ★ 打鍵が 1 つ届いた tick。
+        s = step(s, true, true, true, TICK);
+        assert_eq!(s.starved_ms, 0);
+        assert!(!participant_visible_starved(
+            health(s, th()),
+            s,
+            Some(O1_TRAY_AFTER_MS)
+        ));
+        assert!(!participant_visible_starved(health(s, th()), s, None));
+    }
+
+    /// ⚠️★★ **値の正本は `lib.rs`** である。★ 片方だけ直したら赤にする。
+    /// (`lib.rs` は OS 依存の配線を持つので、ここからは**ソースを読んで**突き合わせる。)
+    #[test]
+    fn o1_tray_threshold_matches_lib_rs() {
+        let src = include_str!("../lib.rs");
+        assert!(
+            src.contains("const O1_LIVENESS_TRAY_AFTER_MS: u64 = 1_800_000;"),
+            "lib.rs の O1_LIVENESS_TRAY_AFTER_MS が 1_800_000 でない              (★ 変えたなら本テストの O1_TRAY_AFTER_MS も同時に直すこと)"
+        );
+        assert_eq!(O1_TRAY_AFTER_MS, 1_800_000);
     }
 
     /// 計測していないときは数えない。
