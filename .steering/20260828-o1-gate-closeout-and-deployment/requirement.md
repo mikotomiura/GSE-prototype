@@ -49,5 +49,5 @@
 
 - `.steering/_handoff/next-session-prompt-o1-gate-closeout-and-deployment.md`（★ 本タスクの上流）
 - `src-tauri/src/input/liveness.rs`（★ 閾値の一次資料）
-- `Form_G1/GSE_O1_Submit.gs` / `Form_G1/GSE_O1_Form_Builder.gs`（★ 配備手順の一次資料）
+- `Form_O1/GSE_O1_Submit.gs` / `Form_O1/GSE_O1_Form_Builder.gs`（★ 配備手順の一次資料）
 - `docs/o1-deletion-ledger.md`

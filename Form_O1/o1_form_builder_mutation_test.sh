@@ -7,14 +7,14 @@
 #
 # ★ 本物の `GSE_O1_Form_Builder.gs` は 1 バイトも変更しない（一時ディレクトリで壊す）。
 #
-# 使い方: bash Form_G1/o1_form_builder_mutation_test.sh
+# 使い方: bash Form_O1/o1_form_builder_mutation_test.sh
 # 終了コード: 0 = 全変異が赤になった / 1 = 赤にならない変異がある（★ 検査の穴）
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-SRC="Form_G1/GSE_O1_Form_Builder.gs"
-TEST="Form_G1/o1_form_builder_test.cjs"
+SRC="Form_O1/GSE_O1_Form_Builder.gs"
+TEST="Form_O1/o1_form_builder_test.cjs"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

@@ -44,7 +44,7 @@
  * 関連: .steering/20260828-o1-forms-and-distribution/
  *       .steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md (★ 文面の上流)
  *       docs/o1-deletion-ledger.md (★ 保管上限と削除手順の正本)
- *       Form_G1/GSE_O1_Submit.gs (★ 提出の受け口・別ファイル)
+ *       Form_O1/GSE_O1_Submit.gs (★ 提出の受け口・別ファイル)
  */
 
 // ============================================================

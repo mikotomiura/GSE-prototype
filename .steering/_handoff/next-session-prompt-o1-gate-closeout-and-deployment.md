@@ -38,7 +38,7 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 22/22 になるは
 
 | 何 | 状態 | 出所 |
 |---|---|---|
-| **C-4 O1 のフォーム類** | ✅ `Form_G1/GSE_O1_Form_Builder.gs`（参加登録＝**同意の正本** ／ 終了後アンケート ／ P-ID 採番 ／ 受付メール） | `20260828-o1-forms-and-distribution/` |
+| **C-4 O1 のフォーム類** | ✅ `Form_O1/GSE_O1_Form_Builder.gs`（参加登録＝**同意の正本** ／ 終了後アンケート ／ P-ID 採番 ／ 受付メール） | `20260828-o1-forms-and-distribution/` |
 | ├ ガード検査 | ✅ `o1_form_builder_test.cjs` **96 ケース** | 同 |
 | ├ 変異テスト | ✅ `o1_form_builder_mutation_test.sh` **25 変異すべて赤** | 同 |
 | └ ★ G1 保護 3 段 | ✅ 別プロジェクト／G1 の**フォーム ID を拒否**／回答があれば作り直さない | 判断 A |
@@ -101,7 +101,7 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 22/22 になるは
 
 - ⚠️ 現状: `src-tauri/src/reconcile.rs` の `HttpUploader` が **`from_secs(180)` 固定**
 - ★ 実測（`gas-measurements.md`）: 300KB / 1.45s ≒ **207 KB/s**
-- ★ 受け口の上限: `Form_G1/GSE_O1_Submit.gs` の `MAX_BYTES = 48 MB`
+- ★ 受け口の上限: `Form_O1/GSE_O1_Submit.gs` の `MAX_BYTES = 48 MB`
 - ⚠️ 計算: 実測の 1 日ぶん 18MB → base64 **24MB ≒ 116 秒**（★ timeout の 2/3）。
   ⚠️★★ **上限いっぱいの 48MB なら base64 64MB ≒ 309 秒**で**確実に足りない**。
   ⚠️★★★ **しかもこの実測は Drive 保存時間を含まない。**
@@ -113,7 +113,7 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 22/22 になるは
 
 #### B-1. O1 の受け口（GAS `doPost`）
 
-★ 手順は `Form_G1/GSE_O1_Submit.gs` のヘッダに 1〜8 まで全部書いてある。要点:
+★ 手順は `Form_O1/GSE_O1_Submit.gs` のヘッダに 1〜8 まで全部書いてある。要点:
 
 1. ⚠️ **新規プロジェクト**に貼る（`GSE_Gate1_submit` にも `GSE_Gate1` にも貼らない）
 2. **O1 専用の** Drive 受け取りフォルダを作り `FOLDER_ID` に入れる（⚠️ G1 のを指さない）
@@ -126,7 +126,7 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 22/22 になるは
 
 #### B-2. O1 のフォーム（★ 2026-08-28 に**コードは書けた**。⚠️ 実体はまだ 0 本）
 
-★ 手順は `Form_G1/GSE_O1_Form_Builder.gs` のヘッダに 1〜8 まで書いてある。要点:
+★ 手順は `Form_O1/GSE_O1_Form_Builder.gs` のヘッダに 1〜8 まで書いてある。要点:
 
 1. Google Forms で **空フォームを 2 本**作る（⚠️ G1 のものを使い回さない）
 2. 編集 URL の ID を `FORM_ID_O1_CONSENT` / `FORM_ID_O1_SURVEY` に貼る

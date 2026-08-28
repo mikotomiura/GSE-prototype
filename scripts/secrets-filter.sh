@@ -64,7 +64,7 @@ SECRET_PATTERNS=(
   # ⚠️★★★ 2026-08-14 `/cross-review`（HIGH）が実測した **既知の副作用（over-block）**:
   #   ★ 既存の**合成テストフィクスチャ**が同じ形をしており、下記が実際に当たる（実測）——
   #     src-tauri/src/reconcile.rs (9) / submission.rs (6) / docs/pilot-runbook.md (7) /
-  #     Form_G1/*.cjs / Form_Phase1/*.gs / docs/participant-setup-guide.md
+  #     Form_G1/*.cjs / Form_O1/*.cjs / Form_Phase1/*.gs / docs/participant-setup-guide.md
   #   → ⚠️ **これらに触れる将来の diff は `/cross-review` でほぼ確実に rc=2 になる。**
   #   ⚠️★★ S5C-D8 が明記した設計哲学（「架空名まで止めると人がフィルタを迂回する動機を作る」）と
   #     **正面から衝突するリスク**である。

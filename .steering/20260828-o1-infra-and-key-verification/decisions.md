@@ -216,7 +216,7 @@ NDJSON で検算:
 
 ---
 
-## 判断 C-1 実装 — ★ O1 専用の受け口 `Form_G1/GSE_O1_Submit.gs` を新規に作った
+## 判断 C-1 実装 — ★ O1 専用の受け口 `Form_O1/GSE_O1_Submit.gs` を新規に作った
 
 ★ 研究者判断「別に立てる（新プロジェクト C）」に沿って、**G1 の `.gs` を 1 バイトも変えずに**新設した。
 
@@ -246,7 +246,7 @@ NDJSON で検算:
 「実測では 50 MB でも通った（上限未到達）」と書くが、**base64 本文かデコード後かはその記録から決まらない**。
 → ★ **配備時に 1 日ぶんの実サイズで通し確認する**（`.gs` の配備手順 8 に書いた）。
 
-### ★ 検査 — `Form_G1/o1_submit_guard_test.cjs`（41 ケース・`run.sh §4` に接続済み）
+### ★ 検査 — `Form_O1/o1_submit_guard_test.cjs`（41 ケース・`run.sh §4` に接続済み）
 
 ⚠️ **緑であることは根拠にしていない。** ★ 各ガードを 1 つずつ壊して**赤になることを実測した**
 （`verify-before-claiming` ルール 5b）:
@@ -384,7 +384,7 @@ ADR-014 D8 制約 3 は「削除要求経路と**保管上限**を台帳に載�
 
 | 何 | 結果 |
 |---|---|
-| `node Form_G1/o1_submit_guard_test.cjs` | ✅ **全 44 ケース**（41 → 44） |
+| `node Form_O1/o1_submit_guard_test.cjs` | ✅ **全 44 ケース**（41 → 44） |
 | `node Form_G1/submit_guard_test.cjs`（G1 非回帰） | ✅ 全 33 ケース |
 | `bash scripts/check-o1-release-readiness.sh --selftest` | ✅ **18 / 18**（壊すと赤 11・満たすと緑 6・片方だけでは緑にしない 1） |
 | 打ち間違い `--selftst` | ✅ `exit 2`（★ 黙って通常実行しない） |

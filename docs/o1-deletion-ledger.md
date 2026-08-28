@@ -71,7 +71,7 @@
 
 | # | 場所 | 何を消すか | 根拠 |
 |---|---|---|---|
-| A-1 | **Drive の O1 受け取りフォルダ** | `<pid>_o1day<NN>_gse_o1_*.age`。⚠️ **`_dup-<epoch>.age` も探す**（受け口は重複を消さず別名で並べる） | `Form_G1/GSE_O1_Submit.gs` `saveWithoutOverwriting_` |
+| A-1 | **Drive の O1 受け取りフォルダ** | `<pid>_o1day<NN>_gse_o1_*.age`。⚠️ **`_dup-<epoch>.age` も探す**（受け口は重複を消さず別名で並べる） | `Form_O1/GSE_O1_Submit.gs` `saveWithoutOverwriting_` |
 | A-2 | ⚠️ **Drive のゴミ箱** | A-1 で消したものを**完全に削除**する | ★ ゴミ箱経由にしない（ADR-012 D12-b 4） |
 | A-3 | 研究者端末・受領した `.age` | ダウンロードフォルダ等の `.age`。⚠️ **実名が混入して改名した版**も探す | `docs/pilot-runbook.md:159-165` |
 | A-4 | 研究者端末・**復号済み平文 NDJSON** | `gse-unpack` の出力。⚠️ ★ **`--out` 省略時は `.age` と同じフォルダに落ちる**。慣行の置き場は repo 直下 `inbox/` | `src-tauri/src/bin/unpack.rs:83-86, 197-207` |
@@ -161,17 +161,17 @@ ADR-014 D8 制約 3 は逐語「削除要求経路と**保管上限**を台帳�
 | # | 場所 | 何のため |
 |---|---|---|
 | 1 | ★ **本表**（`docs/o1-deletion-ledger.md` §5） | ★ **正本** |
-| 2 | `Form_G1/GSE_O1_Form_Builder.gs` の `O1_RETENTION_*` | ⚠️★★ **被験者が実際に読む同意フォーム**（＝ 同意の正本） |
+| 2 | `Form_O1/GSE_O1_Form_Builder.gs` の `O1_RETENTION_*` | ⚠️★★ **被験者が実際に読む同意フォーム**（＝ 同意の正本） |
 | 3 | `.steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md` §5 | ★ フォーム文面の上流の雛形 |
 
 ⚠️ 2 と食い違うと、**被験者への約束のほうが優先される**（先に約束したものが効く）。
-★ `Form_G1/o1_form_builder_test.cjs` は 2 の値が同意本文と同意項目の**両方**に出ることを
+★ `Form_O1/o1_form_builder_test.cjs` は 2 の値が同意本文と同意項目の**両方**に出ることを
 検査しているが、⚠️ **1 と 2 の数値が同じかまでは検査していない**（★ 人が揃える）。
 
 
 ### §5b ⚠️★★★ P-ID↔個人の対応表は **どこにあるか**（★ A-11 の実体）
 
-★ 2026-08-28 に O1 の参加登録（`Form_G1/GSE_O1_Form_Builder.gs`）が入ったので、
+★ 2026-08-28 に O1 の参加登録（`Form_O1/GSE_O1_Form_Builder.gs`）が入ったので、
 ⚠️ 「同型のものができる」ではなく**実体を名指しする**。
 
 | # | 場所 | 中身 | ⚠️ 注意 |

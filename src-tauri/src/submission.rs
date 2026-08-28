@@ -769,11 +769,11 @@ mod tests {
     ///
     /// ★ `generated_names_fit_the_endpoint_name_rule` の鏡像である。
     /// 規約は **2 か所**にある (`o1_age_file_name` ＋ `logger::unique_path_from` と、
-    /// `Form_G1/GSE_O1_Submit.gs` の `sanitizeName_`)。⚠️ 片方だけ動くと `bad name` が
+    /// `Form_O1/GSE_O1_Submit.gs` の `sanitizeName_`)。⚠️ 片方だけ動くと `bad name` が
     /// 毎回返り、★ **その日は永久に届かない** (送信先から成否を追えないので誰も気づけない)。
     ///
     /// ⚠️ ここでは受け口の正規表現を**書き写して**照合する (Rust から `.gs` は動かせない)。
-    /// ★ 受け口側の陽性対照は `Form_G1/o1_submit_guard_test.cjs` §4b にある。
+    /// ★ 受け口側の陽性対照は `Form_O1/o1_submit_guard_test.cjs` §4b にある。
     /// **片方を変えたら両方直す。**
     ///
     /// ⚠️★★★ **G1 の名前を落とすことも固定する** —— ★ これが「2 研究を混ぜない」の担保である

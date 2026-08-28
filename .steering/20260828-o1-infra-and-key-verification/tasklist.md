@@ -32,9 +32,9 @@
 
 - [x] **C-1 研究者判断**: O1 は **別に立てる**（新プロジェクト C ＋ 専用 Drive フォルダ ＋ 専用 secret）
   - [x] ⚠️ 前提の誤りを実測で発見（G1 の `sanitizeName_` は O1 名を **`bad name` で全弾き**）
-  - [x] `Form_G1/GSE_O1_Submit.gs` を新規作成（★ G1 の `.gs` は 1 バイトも変えていない）
+  - [x] `Form_O1/GSE_O1_Submit.gs` を新規作成（★ G1 の `.gs` は 1 バイトも変えていない）
   - [x] `MAX_BYTES` を**実測**で決定（`.age` 5,730,783 B / 7.21h → 24h 換算 約 18 MB → 48 MB 採用）
-  - [x] `Form_G1/o1_submit_guard_test.cjs`（41 ケース）＋ ★ **変異テスト 11/11 赤**
+  - [x] `Form_O1/o1_submit_guard_test.cjs`（41 ケース）＋ ★ **変異テスト 11/11 赤**
   - [x] `run.sh §4` に接続（`guard_count()` が 41 と読めることを実測）
   - [ ] ⚠️ **配備は未実施**（★ Apps Script への貼り付け・スクリプトプロパティ・デプロイは研究者）
 - [x] **C-2 研究者判断**: age 公開鍵は **G1 と共用**（現行 `resources/pubkey.txt`・追加作業なし）
@@ -80,7 +80,7 @@
 
 ## 検証
 
-- [x] `node Form_G1/o1_submit_guard_test.cjs` → 41/41
+- [x] `node Form_O1/o1_submit_guard_test.cjs` → 41/41
 - [x] ★ 変異テスト 11/11 赤（ガードが空回りしていない）
 - [x] ★ ケース数下限が効く（5 件に削ると exit 1）
 - [x] `bash -n run.sh`（構文 OK）

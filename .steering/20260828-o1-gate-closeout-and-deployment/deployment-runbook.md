@@ -38,7 +38,7 @@
 
 ## §1 B-1: 提出の受け口（GAS `doPost`）
 
-★ 手順の正本は `Form_G1/GSE_O1_Submit.gs` のヘッダ 1〜8。⚠️ ここは ID を差し込んだ写しである。
+★ 手順の正本は `Form_O1/GSE_O1_Submit.gs` のヘッダ 1〜8。⚠️ ここは ID を差し込んだ写しである。
 
 1. **新規** Apps Script プロジェクトを作る。
    ⚠️★★★ `GSE_Gate1_submit` にも `GSE_Gate1` にも**貼らない**。
@@ -78,7 +78,7 @@
 
 ## §3 B-2: フォーム 2 本
 
-★ 手順の正本は `Form_G1/GSE_O1_Form_Builder.gs` のヘッダ 1〜8。
+★ 手順の正本は `Form_O1/GSE_O1_Form_Builder.gs` のヘッダ 1〜8。
 
 > ⚠️★★★ **`GSE_G1_Form_Builder.gs` と同じプロジェクトに置かない。**
 > ★ 2026-08-07 に `setupG1Forms` の誤実行で **G1-C の全設問が消えた**（⚠️ Forms に版履歴は無い）。

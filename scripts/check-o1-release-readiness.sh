@@ -43,12 +43,21 @@ head_() { echo; echo "[$1] $2"; }
 
 CONSENT=".steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md"
 LEDGER="docs/o1-deletion-ledger.md"
-RECEIVER="Form_G1/GSE_O1_Submit.gs"
-RECEIVER_TEST="Form_G1/o1_submit_guard_test.cjs"
-FORM_BUILDER="Form_G1/GSE_O1_Form_Builder.gs"
-FORM_BUILDER_TEST="Form_G1/o1_form_builder_test.cjs"
+RECEIVER="Form_O1/GSE_O1_Submit.gs"
+RECEIVER_TEST="Form_O1/o1_submit_guard_test.cjs"
+FORM_BUILDER="Form_O1/GSE_O1_Form_Builder.gs"
+FORM_BUILDER_TEST="Form_O1/o1_form_builder_test.cjs"
 SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
+
+# ★ 秘密検出の**判定器**。⚠️★★ **トップレベルに置く**（2026-08-29 に実測で判明）:
+#   `run_checks` の中に置くと `--selftest` からは**見えない**（★ selftest は `run_checks` を
+#   呼ばないため）。⚠️ 見えないまま比較すると、**対照が常に失敗する / 常に通る**ことになる。
+leak_name_hits () { grep -iE '(^|/)[go]1[-_]submit[^/]*\.json$' || true; }
+# ⚠️ **実物の** Apps Script デプロイ ID（★ 40 文字以上）。
+#   ★ プレースホルダを誤検知しない閾値: 本 repo の `DRYRUN_NOT_A_REAL_DEPLOYMENT` は **28 文字**、
+#   実物は 57〜72 文字（★ 2026-08-29 に実測して 40 で分離できることを確認）。
+leak_url_re='script\.google\.com/macros/s/[A-Za-z0-9_-]{40,}/exec'
 
 run_checks () {
 
@@ -193,6 +202,63 @@ else
   fi
 fi
 
+# ⚠️★★★ **提出設定（endpoint ＋ secret）が git に入っていないか**（2026-08-29 追加）。
+#   ★ 動機は仮定ではない: 同日、`Form_O1/o1_submit.json`（**実 endpoint ＋ 実 secret**）が
+#     `.gitignore` の網から外れ、⚠️ **`git add -A` の対象になっていた**
+#     （★ code-reviewer / security-checker が独立に実測で検出。⚠️ コミット前に止めた）。
+#   ⚠️ 既存の秘密検査は `.gs` **1 本**しか読まないので、★ **`.json` は素通り**だった。
+#   ★ `.gitignore` は自身のコメントで「本リポジトリは**一時 public にする運用がある**」
+#     「⚠️ **履歴からは消せない**」と書いている。→ ★ **入る前に止めるしかない。**
+secret_leak=""
+# (a) 提出設定そのもののファイル名（★ g1 / o1 の両方・`-` と `_` の両方を見る）
+leak_files=$(git ls-files | leak_name_hits)
+[ -z "$leak_files" ] || secret_leak="$secret_leak 提出設定:$(printf '%s' "$leak_files" | tr '\n' ' ')"
+# (b) 追跡ファイルに実物のデプロイ ID が無いか
+leak_url=$(git grep -lIE "$leak_url_re" 2>/dev/null || true)
+[ -z "$leak_url" ] || secret_leak="$secret_leak 実 endpoint:$(printf '%s' "$leak_url" | tr '\n' ' ')"
+# (c) ⚠️★★★ **作業ツリーに提出設定があるのに「無視されていない」**状態
+#     （★ `git add -A` 一発で入る = 2026-08-29 に実際に踏みかけた状態そのもの）。
+#     ★ `--others --exclude-standard` は「未追跡かつ無視されていない」ものだけを出す。
+#     ⚠️ (a)(b) は **git に入った後**しか見ないので、この 1 本が**入る前**を受け持つ。
+leak_pending=$(git ls-files --others --exclude-standard | leak_name_hits)
+[ -z "$leak_pending" ] || secret_leak="$secret_leak 未無視:$(printf '%s' "$leak_pending" | tr '\n' ' ')"
+# ⚠️★ **検査の射程を誇張しない**（Codex 指摘）: ここが見るのは
+#   「**いまの**追跡ツリー」と「**いま**無視されていない未追跡ファイル」だけである。
+#   ★ **過去のコミットに混入したもの**は見ていない（→ 混入したら履歴の書き換えが要る）。
+if [ -z "$secret_leak" ]; then
+  ok "提出設定（endpoint / secret）が git に入っておらず、入る手前でもない"
+else
+  ng "⚠️★★★ 秘密が git に入る（★ push 前に止めること。⚠️ 入ると履歴からは消せない）:$secret_leak"
+fi
+
+# ⚠️★★★ **O1 のファイルが git に追跡されているか**（2026-08-29 追加）。
+#   ★ 動機（⚠️ 2026-08-29 に**実測して確かめた挙動**。推測ではない）:
+#     - 実験A: 無視されたディレクトリに **新規** ファイルを置いて `git add` すると
+#       **拒否される**（`The following paths are ignored`）。⚠️ `git add -A` は**黙って飛ばす**。
+#     - 実験B: **すでに追跡されている**ファイルは `.gitignore` を足しても**外れない**
+#       （★ したがって `git mv` で移したものは残る）。
+#   → ⚠️ 危ないのは「`Form_O1/` を無視したまま **新しい O1 ファイルを足す**」場合と、
+#     「`git mv` ではなく素の `mv` ＋ `git add -A` で移す」場合である。
+#     ★ どちらも**手元にはファイルがある**ので、上の `[ -f ... ]` 検査は**全部緑のまま通る**。
+#     気づけるのは「clone した機械で配備が失敗したとき」になる。
+#   → ★ 存在ではなく **追跡** を見る。⚠️ これが「見えないまま緑」の代表例である。
+# ⚠️★★ **列挙せず、ディスクを走査する**（code-reviewer MEDIUM・2026-08-29）。
+#   ★ 既知の 5 本だけを見ると、⚠️ **6 本目**が `.gitignore` に飲まれても気づけない
+#     （★ `.gitignore` は名前列挙のホワイトリストなので、足し忘れが起こりうる形である）。
+untracked=""
+# ⚠️★ **射程を誇張しない**（Codex 指摘・2026-08-29）: 見ているのは `.gs` / `.cjs` / `.sh` の 3 種。
+#   ★ `.gitignore` は `README.md` も通しているが、⚠️ **それは検査していない**
+#   （= README を足し忘れても赤くならない）。新しい種類を足すならここにも足すこと。
+for f in Form_O1/*.gs Form_O1/*.cjs Form_O1/*.sh; do
+  [ -e "$f" ] || continue          # ★ glob が展開されなかった場合
+  git ls-files --error-unmatch "$f" > /dev/null 2>&1 || untracked="$untracked $f"
+done
+if [ -z "$untracked" ]; then
+  ok "O1 のファイルが git に追跡されている（★ .gitignore に飲まれていない）"
+else
+  ng "★ O1 のファイルが git に追跡されていない（⚠️ .gitignore を確認すること）:$untracked"
+fi
+
 # ★ 「マウスのみの作業で誤警告が出る」問題（2026-08-28 に実測）。
 #   ⚠️ O1 の対象作業（図面 / 動画編集）では常態になる。
 #   ⚠️★ **アンカー喪失を緑にしない**（code-reviewer 指摘）: `Thresholds::default()` が
@@ -272,16 +338,19 @@ selftest () {
 
   build () {
     rm -rf "${fix:?}/w"
-    mkdir -p "$fix/w/scripts" "$fix/w/docs" "$fix/w/Form_G1" \
+    # ⚠️★ **`Form_O1/` も作る** (2026-08-29 に O1 のファイルを移した)。
+    #   ★ 作らないと `cp` が黙って失敗し、⚠️ selftest が**空回りする**。
+    mkdir -p "$fix/w/scripts" "$fix/w/docs" "$fix/w/Form_G1" "$fix/w/Form_O1" \
              "$fix/w/$(dirname "$CONSENT")" \
              "$fix/w/experiments/20260801-controlled-friction-task" "$fix/w/src-tauri/src"
     cp "$SCRIPT_PATH" "$fix/w/scripts/gate.sh"
     cp "$repo/$LEDGER" "$fix/w/docs/" 2>/dev/null
-    cp "$repo/$RECEIVER" "$repo/$RECEIVER_TEST" "$fix/w/Form_G1/" 2>/dev/null
-    # ★ フォームビルダーとその検査。⚠️ 検査は G1 のビルダー（拒否リストの突き合わせ）と
+    cp "$repo/$RECEIVER" "$repo/$RECEIVER_TEST" "$fix/w/Form_O1/" 2>/dev/null
+    # ★ フォームビルダーとその検査は `Form_O1/` へ。
+    #   ⚠️ ただし検査は **G1 のビルダー**（拒否リストの突き合わせ・`Form_G1/` に残る）と
     #   同意文書（連絡先の突き合わせ）も読むので、**3 つとも**写す。
-    cp "$repo/$FORM_BUILDER" "$repo/$FORM_BUILDER_TEST" \
-       "$repo/Form_G1/GSE_G1_Form_Builder.gs" "$fix/w/Form_G1/" 2>/dev/null
+    cp "$repo/$FORM_BUILDER" "$repo/$FORM_BUILDER_TEST" "$fix/w/Form_O1/" 2>/dev/null
+    cp "$repo/Form_G1/GSE_G1_Form_Builder.gs" "$fix/w/Form_G1/" 2>/dev/null
     cp "$repo/$SYNC_GUARD_TEST" "$fix/w/scripts/" 2>/dev/null
     cp "$repo/$CONSENT" "$fix/w/$CONSENT" 2>/dev/null
     cp "$repo/scripts/sync-session.sh" "$fix/w/scripts/" 2>/dev/null
@@ -341,10 +410,10 @@ selftest () {
   build; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
   build; rm -f "$fix/w/docs/o1-deletion-ledger.md";                            expect_red "削除台帳が無い" "削除台帳の欠落"
   build; sed -i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
-  build; rm -f "$fix/w/Form_G1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
-  build; sed -i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_G1/GSE_O1_Submit.gs"; expect_red "直書きされている" ".gs への秘密直書き"
-  build; sed -i 's/_o1day/_block/' "$fix/w/Form_G1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
-  build; rm -f "$fix/w/Form_G1/o1_submit_guard_test.cjs";                      expect_red "ガード検査が無い" "ガード検査の欠落"
+  build; rm -f "$fix/w/Form_O1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
+  build; sed -i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_O1/GSE_O1_Submit.gs"; expect_red "直書きされている" ".gs への秘密直書き"
+  build; sed -i 's/_o1day/_block/' "$fix/w/Form_O1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
+  build; rm -f "$fix/w/Form_O1/o1_submit_guard_test.cjs";                      expect_red "ガード検査が無い" "ガード検査の欠落"
   build; echo 'let th = SomethingElse::new();' > "$fix/w/src-tauri/src/lib.rs"; expect_red "目印.*が見つからない" "liveness アンカーの喪失"
   # ⚠️★★ **O1 の目印を消したら赤になること**（★ 2026-08-28 に緑になったので satisfy 側から移した）。
   build; sed -i 's/O1_LIVENESS_TRAY_AFTER_MS/RENAMED_AWAY_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "G1 と同じ" "O1 の liveness の目印の喪失"
@@ -352,15 +421,61 @@ selftest () {
   build; sed -i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
+  # ⚠️★★ **追跡の検査は fixture では測れない**（$fix/w は git 管理下に無く、常に「未追跡」になる）。
+  #   → ★ 代わりに **本物の repo で陽性・陰性の対照**を取る（⚠️ 1 バイトも変更しない）。
+  #   ⚠️★★★ 陰性対照は「**存在するのに追跡されていない**」でなければならない
+  #     （code-reviewer MEDIUM・2026-08-29）: ★ 旧版は無視対象の手控えを使っていたが、
+  #     それは fresh clone では**単に存在しない**ので、⚠️ **実在しない任意のパスでも通った**
+  #     （= 対照になっていなかった）。
+  #   ⚠️ 対照に使えるファイルが無い環境では **skip と明示する**（★ 黙って緑にしない）。
+  # ⚠️★★★ **`neg` を見つけるだけで終わらせない**（Codex 指摘・2026-08-29）:
+  #   ★ 旧版は候補を探した後 `$RECEIVER` しか assert しておらず、
+  #   ⚠️ **陰性側が常に緑になる壊れ方**（判定器が何でも「追跡済み」と言う）を検出できなかった。
+  #   → ★ 「候補が在るのに陰性が 1 つも取れない」も**赤**にする。
+  cand=""; neg=""
+  for c in "Form_O1/o1_submit.json" "Form_O1/Drive関連情報.md"; do
+    [ -f "$c" ] || continue
+    cand="$c"
+    git ls-files --error-unmatch "$c" > /dev/null 2>&1 || { neg="$c"; break; }
+  done
+  if [ -z "$cand" ]; then
+    echo "  ⏭️ skip: 追跡の検査の陰性対照（★ 対照に使えるファイルがこの機械に無い）"
+  elif [ -z "$neg" ]; then
+    echo "  ❌ 見分けられない: 候補 ($cand) が在るのに全部「追跡済み」と判定された"; sf=$((sf+1))
+  elif git ls-files --error-unmatch "$RECEIVER" > /dev/null 2>&1 \
+       && ! git ls-files --error-unmatch "$neg" > /dev/null 2>&1; then
+    echo "  ✅ 判定器が両側を見分ける: 追跡の検査（★ 追跡済み=是 / 実在するが未追跡=非）"; sp=$((sp+1))
+  else
+    echo "  ❌ 見分けられない: 追跡の検査（★ 常に緑 or 常に赤になっている）"; sf=$((sf+1))
+  fi
+
+  # ⚠️★★ **秘密検出そのものに陽性・陰性の対照を置く**（Codex 指摘・2026-08-29）。
+  #   ★ 本体は `git ls-files` を読むので fixture では撃てない。→ **検出関数を直接撃つ**。
+  if [ "$(printf 'Form_O1/o1_submit.json\nnotes.md\n' | leak_name_hits)" = "Form_O1/o1_submit.json" ] \
+     && [ -z "$(printf 'Form_O1/README.md\ndocs/o1.md\n' | leak_name_hits)" ] \
+     && [ "$(printf 'g1-submit.json\n' | leak_name_hits)" = "g1-submit.json" ]; then
+    echo "  ✅ 判定器が両側を見分ける: 提出設定のファイル名検出（★ o1_ / g1- を拾い、無関係は拾わない）"; sp=$((sp+1))
+  else
+    echo "  ❌ 見分けられない: 提出設定のファイル名検出"; sf=$((sf+1))
+  fi
+  # ★ URL 側: **実物の長さ**は拾い、⚠️ 本 repo のプレースホルダ (28 文字) は拾わないこと。
+  real_url="https://script.google.com/macros/s/AKfycb$(printf 'x%.0s' $(seq 1 60))/exec"
+  fake_url="https://script.google.com/macros/s/DRYRUN_NOT_A_REAL_DEPLOYMENT/exec"
+  if printf '%s\n' "$real_url" | grep -qE "$leak_url_re" \
+     && ! printf '%s\n' "$fake_url" | grep -qE "$leak_url_re"; then
+    echo "  ✅ 判定器が両側を見分ける: 実 endpoint 検出（★ 実物=是 / プレースホルダ=非）"; sp=$((sp+1))
+  else
+    echo "  ❌ 見分けられない: 実 endpoint 検出（★ 閾値 40 文字を確かめること）"; sf=$((sf+1))
+  fi
   # ⚠️★★ **アンカー喪失を緑にしない**（★ 記録票を埋めた後に顕在化する穴だった）。
   build; fill_measure; rm -f "$fix/w/src-tauri/src/reconcile.rs";              expect_red "reconcile.rs が読めない" "reconcile.rs のアンカー喪失"
   # ★★ 2026-08-28 に緑になった 3 件。⚠️ **緑になったものは selftest 2 から 1 へ移す**
   #   （satisfy 側に置いたままだと「もともと緑」を「満たしたから緑」と読み違える）。
   build; sed -i 's/^<!-- o1-retention: set -->$/<!-- o1-retention: unset -->/' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "保管上限が未確定" "保管上限を未確定へ戻す"
-  build; rm -f "$fix/w/Form_G1/GSE_O1_Form_Builder.gs";                        expect_red "フォーム類が無い" "フォームビルダーの欠落"
-  build; rm -f "$fix/w/Form_G1/o1_form_builder_test.cjs";                      expect_red "ガード検査が無い" "フォームビルダーの検査の欠落"
+  build; rm -f "$fix/w/Form_O1/GSE_O1_Form_Builder.gs";                        expect_red "フォーム類が無い" "フォームビルダーの欠落"
+  build; rm -f "$fix/w/Form_O1/o1_form_builder_test.cjs";                      expect_red "ガード検査が無い" "フォームビルダーの検査の欠落"
   # ⚠️★★★ **中身を壊しても赤になること。** ★ 存在するだけで緑になっていた旧版の再発防止。
-  build; sed -i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_G1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
+  build; sed -i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_O1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
   # ⚠️★ 行は**字下げされている**。`^` で固定すると変異が当たらず、
   #   ★ 「壊したつもりで壊れていない」偽の合格になる（2026-08-28 に実際に踏んだ）。
   build; sed -i 's|: > "$M/o1.mode"|: > "$M/DISABLED"|; s|: > "$W/o1.mode"|: > "$W/DISABLED"|'               "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"; expect_red "o1.mode を置かない" "o1.mode の書き出しの喪失"

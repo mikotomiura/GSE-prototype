@@ -10,7 +10,7 @@
 //   2. ★ **被験者への約束をコードが破っていないこと**（§6 / §7）。
 //      同意文書 §4 は逐語「理由を聞きません」。⚠️ 事後アンケートで理由を聞けば実質が破れる。
 //
-// 実行: node Form_G1/o1_form_builder_test.cjs
+// 実行: node Form_O1/o1_form_builder_test.cjs
 const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
@@ -19,7 +19,11 @@ const REPO = path.join(__dirname, "..");
 const BUILDER = process.argv[2] || path.join(__dirname, "GSE_O1_Form_Builder.gs");
 const src = fs.readFileSync(BUILDER, "utf8");
 
-const G1_BUILDER_PATH = path.join(__dirname, "GSE_G1_Form_Builder.gs");
+// ⚠️★★★ **G1 のビルダーは `Form_G1/` に残る** (2026-08-29 に O1 を `Form_O1/` へ移した)。
+//   ★ `__dirname` 基準にすると `Form_O1/GSE_G1_Form_Builder.gs` を探して **必ず落ちる**。
+//   → ★ repo 基準で指す。⚠️ この検査は「O1 が G1 のフォーム ID を拒否しているか」を
+//     突き合わせる本体なので、⚠️ **落ちると拒否リストの検査ごと消える**。
+const G1_BUILDER_PATH = path.join(REPO, "Form_G1", "GSE_G1_Form_Builder.gs");
 const CONSENT_DOC = path.join(
   REPO,
   ".steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md"

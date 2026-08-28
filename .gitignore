@@ -81,7 +81,29 @@ g1-submit.json
 #   ⚠️ `FOLDER_ID` は **Apps Script のスクリプト プロパティ**に置く規約なので、
 #     ★ repo 側には「名前」だけを書き、値はここに置かない
 #     (`.steering/20260828-o1-gate-closeout-and-deployment/deployment-runbook.md` §0)。
-Form_O1/
+#
+# ⚠️★★★ **既定は「無視」。ソースだけを明示的に通す（ホワイトリスト）。**
+#   ★ 2026-08-29: 当初 `Form_O1/` をやめて `Drive関連情報.md` 1 本だけ無視にしたが、
+#     ⚠️ **その直後に `Form_O1/o1_submit.json`（実 endpoint ＋ 実 secret）が置かれ、
+#     `git add -A` の対象になっていた**（code-reviewer が実測で検出・未コミットで停止）。
+#   → ★ 「危ないものを列挙する」方式は**次に置かれる 1 本**を必ず取り逃がす。
+#     ⚠️ ここは研究者の手控え（Drive ID / endpoint / secret）が集まる場所なので、
+#     ★ **通すものを列挙する**側に倒す。
+#   ⚠️ 新しい種類のソースを足すときは、ここに `!` 行を 1 本足すこと
+#     （★ 足し忘れはゲートの「git に追跡されているか」検査が赤で知らせる）。
+#   ⚠️★★ 拡張子ではなく **ファイル名を列挙する**（security-checker M-1・2026-08-29）。
+#     ★ 拡張子で通すと、⚠️ 将来 `.sh` や `.cjs` に秘密を書いた手控えが素通りする。
+#     ★ ここのソースは 5 本で安定しているので、列挙の維持費は小さい。
+#   ⚠️ 新しいソースを足したら `!` 行も足すこと。★ 忘れても
+#     `check-o1-release-readiness.sh` の「git に追跡されているか」検査が**赤で知らせる**
+#     （★ ディスク上の `.gs` / `.cjs` / `.sh` を走査して照合している）。
+Form_O1/*
+!Form_O1/GSE_O1_Submit.gs
+!Form_O1/GSE_O1_Form_Builder.gs
+!Form_O1/o1_submit_guard_test.cjs
+!Form_O1/o1_form_builder_test.cjs
+!Form_O1/o1_form_builder_mutation_test.sh
+!Form_O1/README.md
 
 # age secret keys (gse-unpack --keygen, pilot-runbook §2) — never commit private keys.
 # Public keys (age1...) are safe to distribute; only the secret identity is sensitive.
