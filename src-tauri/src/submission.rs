@@ -690,10 +690,15 @@ mod tests {
     /// ⚠️ ここでは受け口の正規表現を**書き写して**照合する (Rust から `.gs` は動かせない)。
     /// ★ 受け口側の陽性対照は `Form_G1/submit_guard_test.cjs` §4b にある。
     /// **片方を変えたら両方直す。**
-    #[test]
-    fn generated_names_fit_the_endpoint_name_rule() {
+    /// G1 の受け口 `GSE_G1_Submit.gs` の `sanitizeName_` を書き写した照合器。
+    ///
+    /// ⚠️★ **テストモジュールの直下に置いてある**のは、O1 側のテスト
+    /// (`generated_o1_names_fit_the_o1_endpoint_name_rule`) が
+    /// 「★ O1 の提出物が **G1 の受け口には入らない**」を確かめるのにも使うためである。
+    /// ★ 2 つ書くと片方だけ直して分離の主張が空回りする。
+    fn g1_rule_accepts(name: &str) -> bool {
         // GSE_G1_Submit.gs: /^[A-Za-z0-9]{1,16}_block\d{2,3}_gse_\d{8}_\d{6}(_\d{1,10})?\.age$/
-        fn accepted_by_endpoint(name: &str) -> bool {
+        {
             let body = match name.strip_suffix(".age") {
                 Some(b) => b,
                 None => return false,
@@ -730,6 +735,11 @@ mod tests {
                     && parts[3].len() <= 10
                     && parts[3].chars().all(|c| c.is_ascii_digit()))
         }
+    }
+
+    #[test]
+    fn generated_names_fit_the_endpoint_name_rule() {
+        let accepted_by_endpoint = g1_rule_accepts;
 
         // ★ 陰性対照: 照合器が「何でも通す」実装になっていないこと。
         assert!(!accepted_by_endpoint("evil.age"));
@@ -749,6 +759,106 @@ mod tests {
                 let name = age_file_name("P012", block, stem);
                 assert!(
                     accepted_by_endpoint(&name),
+                    "受け口が弾く名前を端末が作っている: {name}"
+                );
+            }
+        }
+    }
+
+    /// ⚠️★★ **O1 版**。端末が作る名前が、O1 の受け口の通す形に収まっているか。
+    ///
+    /// ★ `generated_names_fit_the_endpoint_name_rule` の鏡像である。
+    /// 規約は **2 か所**にある (`o1_age_file_name` ＋ `logger::unique_path_from` と、
+    /// `Form_G1/GSE_O1_Submit.gs` の `sanitizeName_`)。⚠️ 片方だけ動くと `bad name` が
+    /// 毎回返り、★ **その日は永久に届かない** (送信先から成否を追えないので誰も気づけない)。
+    ///
+    /// ⚠️ ここでは受け口の正規表現を**書き写して**照合する (Rust から `.gs` は動かせない)。
+    /// ★ 受け口側の陽性対照は `Form_G1/o1_submit_guard_test.cjs` §4b にある。
+    /// **片方を変えたら両方直す。**
+    ///
+    /// ⚠️★★★ **G1 の名前を落とすことも固定する** —— ★ これが「2 研究を混ぜない」の担保である
+    /// (研究者判断 C-1・2026-08-28)。
+    #[test]
+    fn generated_o1_names_fit_the_o1_endpoint_name_rule() {
+        // GSE_O1_Submit.gs:
+        //   /^[A-Za-z0-9]{1,16}_o1day\d{2,3}_gse_o1_\d{8}_\d{6}(_\d{1,10})?\.age$/
+        fn accepted_by_o1_endpoint(name: &str) -> bool {
+            let body = match name.strip_suffix(".age") {
+                Some(b) => b,
+                None => return false,
+            };
+            let (pid, rest) = match body.split_once("_o1day") {
+                Some(x) => x,
+                None => return false,
+            };
+            if pid.is_empty() || pid.len() > 16 || !pid.chars().all(|c| c.is_ascii_alphanumeric()) {
+                return false;
+            }
+            let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if digits.len() < 2 || digits.len() > 3 {
+                return false;
+            }
+            let stem = match rest[digits.len()..].strip_prefix('_') {
+                Some(s) => s,
+                None => return false,
+            };
+            // ★ ステムは `gse_o1_<8>_<6>` + 任意の連番。⚠️ G1 は `gse_<8>_<6>` なので落ちる。
+            let parts: Vec<&str> = stem.split('_').collect();
+            let shape_ok = matches!(parts.len(), 4 | 5)
+                && parts[0] == "gse"
+                && parts[1] == "o1"
+                && parts[2].len() == 8
+                && parts[3].len() == 6
+                && parts[2..4]
+                    .iter()
+                    .all(|p| p.chars().all(|c| c.is_ascii_digit()));
+            if !shape_ok {
+                return false;
+            }
+            parts.len() == 4
+                || (!parts[4].is_empty()
+                    && parts[4].len() <= 10
+                    && parts[4].chars().all(|c| c.is_ascii_digit()))
+        }
+
+        // ★ 陰性対照: 照合器が「何でも通す」実装になっていないこと。
+        assert!(!accepted_by_o1_endpoint("evil.age"));
+        assert!(!accepted_by_o1_endpoint(
+            "P012_o1day02_gse_o1_20260828_012103_x.age"
+        ));
+        assert!(!accepted_by_o1_endpoint(
+            "P012_o1day1_gse_o1_20260828_012103.age"
+        ));
+
+        // ⚠️★★★ **G1 の提出物は O1 の受け口に入らない**（同意範囲の分離）。
+        for g1 in [
+            "P012_block01_gse_20260808_101112.age",
+            "P012_block100_gse_20260808_101112.age",
+            "P012_block02_gse_20260808_101112_2.age",
+        ] {
+            assert!(
+                !accepted_by_o1_endpoint(g1),
+                "O1 の受け口が G1 の提出物を通してしまう: {g1}"
+            );
+        }
+        // ★ 逆向き: O1 の提出物が G1 の受け口に入らないことは
+        //   `generated_names_fit_the_endpoint_name_rule` の照合器で確かめる。
+        assert!(
+            !g1_rule_accepts("P012_o1day01_gse_o1_20260828_012103.age"),
+            "G1 の受け口が O1 の提出物を通してしまう"
+        );
+
+        // ★ 端末が実際に作る名前 (`logger::unique_path_from` の 3 形 × 日番号)。
+        for stem in [
+            "gse_o1_20260828_012103",   // ★ 2026-08-28 の実走で生成された stem
+            "gse_o1_20260828_012103_2", // 同じ秒に 2 度ローテート
+            "gse_o1_20260828_012103_999",
+            "gse_o1_20260828_012103_48213", // 1000 本衝突 → pid 後置
+        ] {
+            for day in [1u32, 10, 100] {
+                let name = o1_age_file_name("P012", day, stem);
+                assert!(
+                    accepted_by_o1_endpoint(&name),
                     "受け口が弾く名前を端末が作っている: {name}"
                 );
             }

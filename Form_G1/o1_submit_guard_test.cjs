@@ -244,18 +244,40 @@ function check(name, fn, expectOk) {
 //     raw 6,388,517 B / 7.21 時間（打鍵 0 本）→ `.age` 5,730,783 B → 24 時間換算 約 18 MB。
 //   ★ 下の 2 ケースは「1 日ぶんが通り、青天井ではない」を同時に固定する。
 {
-  const ctx = makeCtx(makeFolder(), SECRET);
+  // ⚠️★ `ok===false` だけを見ると赤にならない（名前ガードが壊れても同じ結果になる）。
+  //   ★ **どの理由で断ったか**と**保存されていないこと**まで固定する（code-reviewer 指摘）。
+  const folder = makeFolder();
+  const ctx = makeCtx(folder, SECRET);
   ctx.MAX_BYTES = 1024;
-  check(
-    "上限を超える大きさ",
-    () =>
-      post(ctx, {
-        secret: SECRET,
-        name: "P012_o1day01_gse_o1_20260828_012103.age",
-        b64: b64(2048),
-      }),
-    false
-  );
+  const res = post(ctx, {
+    secret: SECRET,
+    name: "P012_o1day01_gse_o1_20260828_012103.age",
+    b64: b64(2048),
+  });
+  cases.push({
+    name: "上限を超える大きさは 'too large' で断り、保存しない",
+    ok: res.ok === false && res.error === "too large" && folder.files.length === 0,
+    expectOk: true,
+    got: { error: res.error, files: folder.files.length },
+  });
+}
+{
+  // ★ `decodedLength_` の境界（padding 0 / 1 / 2）。⚠️ ここが 2 バイトずれても
+  //   上のケースだけでは誰も赤にできない（code-reviewer 指摘）。
+  const ctx = makeCtx(makeFolder(), SECRET);
+  [
+    [3, "AAAA"], // padding 0
+    [2, "AAA="], // padding 1
+    [1, "AA=="], // padding 2
+  ].forEach(([expected, b64s]) => {
+    const got = ctx.decodedLength_(b64s);
+    cases.push({
+      name: `decodedLength_("${b64s}") == ${expected}`,
+      ok: got === expected,
+      expectOk: true,
+      got: { got, expected },
+    });
+  });
 }
 {
   // ★ **実測に基づく回帰**: 1 日ぶん（実測 24h 換算 約 18 MB）が上限に当たらないこと。

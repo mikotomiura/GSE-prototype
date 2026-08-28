@@ -186,23 +186,21 @@ else
   fi
   rm -f "$TMP_S"
 
-  # ★ O1 (R3-a) 自動提出の**受け口**（GAS `doPost` / プロジェクト C）のガード。
-  #   ⚠️★★★ **G1 とは別の受け口である**（研究者判断 C-1・2026-08-28）。
-  #      ★ G1 の `sanitizeName_` は `_block<NN>_gse_` 形しか通さず、O1 の
-  #        `<pid>_o1day<NN>_gse_o1_….age` を **`bad name` で全弾き**する（実測）。
-  #   ⚠️ ここが守っている最重要の 2 点:
-  #      1. **G1 の提出物を O1 のフォルダに入れない**（同意範囲の違うデータを混ぜない）
-  #      2. **1 日ぶん（実測 24h 換算 ≒ 18 MB）が上限に当たらない**
-  #         ★ G1 の 8 MB に戻すと赤になる（⚠️ 戻すと毎日 `too large` で永久に届かない）
-  #   ★ 変異テストで **10 / 10 のガードが壊すと赤になる**ことを実測済み（2026-08-28）。
-  TMP_O=$(mktemp)
-  if node ../../Form_G1/o1_submit_guard_test.cjs > "$TMP_O" 2>&1; then
-    ok "O1 提出受け口 (doPost) のガードが効いている（$(guard_count "$TMP_O") ケース全通過）"
-  else
-    sed 's/^/    /' "$TMP_O"
-    bad "O1 提出受け口 (doPost) のガードが期待どおり動いていない"
+  # ★ O1 (R3-a) の受け口のガードは **ここでは赤にしない**（⚠️ 2026-08-28 に方針を決めた）。
+  #   ⚠️★★★ 本スクリプトは冒頭で宣言しているとおり **G1 の技術的準備だけ**を見る。
+  #     ★ O1 だけの未達で **実施中の G1 のゲートを赤にすると、G1 の判断が濁る**
+  #       (code-reviewer 指摘)。
+  #   → ★ O1 の受け口の検査は `scripts/check-o1-release-readiness.sh` が回す（そちらが正）。
+  #     ここでは **気づけるように報告だけ**する。
+  if [ -f ../../Form_G1/o1_submit_guard_test.cjs ]; then
+    TMP_O=$(mktemp)
+    if node ../../Form_G1/o1_submit_guard_test.cjs > "$TMP_O" 2>&1; then
+      note "（参考・G1 の合否には影響しない）O1 受け口のガードは緑（$(guard_count "$TMP_O") ケース）"
+    else
+      note "（参考・G1 の合否には影響しない）⚠️ O1 受け口のガードが赤。★ bash scripts/check-o1-release-readiness.sh を見ること"
+    fi
+    rm -f "$TMP_O"
   fi
-  rm -f "$TMP_O"
 
   # ★ 配布まわり（受付メール 1 通運用・課題ページのフォルダ探索・共有し忘れの検出）。
   #   ⚠️★ 2026-08-07 のレビューで **このテストがどのランナーからも呼ばれていない**ことが
