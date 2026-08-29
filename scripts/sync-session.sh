@@ -149,10 +149,19 @@ o1_guard () {
     #   → ★ 「一致したのに弾かない」という **fail-open** になる
     #     （`make-common-app-zip.sh` が同じ罠を自分で注記している）。
     #   ★ `grep -c` は最後まで読むので SIGPIPE が起きない。
+    #   ⚠️★★★ **`|| true` で rc を丸ごと飲まない**（security-checker MEDIUM・2026-08-29）:
+    #     ★ `grep -c` は **0 件で rc=1** を返すので `|| true` 自体は要るが、
+    #     ⚠️ 旧版は **rc=2（正規表現/読み取りエラー）や rc=127（grep 不在）まで飲んで**いた。
+    #     → その場合 `n_meta` が空 → `${n_meta:-0}` で 0 → ★ **弾かない**（fail-open）。
+    #     ⚠️ 番人が「判定できなかった」ときは **安全側（弾く）に倒す**。
     if [[ -z "$why" && -r "$sp" ]]; then
-        local n_meta
-        n_meta="$(head -n 20 "$sp" 2>/dev/null | grep -c '"o1_mode"' || true)"
-        if [[ "${n_meta:-0}" -gt 0 ]]; then
+        local n_meta grep_rc
+        n_meta="$(head -n 20 "$sp" 2>/dev/null | grep -c '"o1_mode"')" || grep_rc=$?
+        grep_rc="${grep_rc:-0}"
+        if [[ "$grep_rc" -gt 1 ]]; then
+            # ★ 0 = 一致あり / 1 = 一致なし。⚠️ それ以外は **grep が働けなかった**。
+            why="meta の判定に失敗した（grep rc=${grep_rc}・★ 安全側で弾く）"
+        elif [[ "${n_meta:-0}" -gt 0 ]]; then
             why="meta 行に o1_mode がある"
         fi
     fi

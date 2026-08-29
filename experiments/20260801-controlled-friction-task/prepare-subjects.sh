@@ -230,9 +230,10 @@ NDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 DEPTH=$(find "$DRIVE" -mindepth 2 -maxdepth 2 -type d || true)
 [ -z "$DEPTH" ] || die "入れ子のフォルダがあります（★ 平らでなければならない）:
 $(show5 "$DEPTH")"
-# ⚠️★ `${DRIVE}` と**必ず括る**。★ macOS 標準の bash 3.2 は全角文字を**変数名の一部**として
-#   読むので、括らずに書くと「DRIVE ＋ 全角括弧」という別の（存在しない）変数になり、
-#   `set -u` で落ちる（実測）。★ 括れば後続バイトの解釈に依存しない。
+# ⚠️★ `${DRIVE}` と**必ず括る**。★ macOS 標準の bash 3.2 は
+#   **多バイト文字（0x80 以上のバイト）**を**変数名の一部**として読むので、括らずに書くと
+#   「DRIVE ＋ 括弧のバイト」という別の（存在しない）変数になり、`set -u` で落ちる（実測）。
+#   ★ 括れば後続バイトの解釈に依存しない。
 #   ⚠️ この規約はリポジトリ全体に効く。`scripts/check-shell-portability.sh` が機械で見張る。
 note "ドラッグ用: ${DRIVE}（${#SUBJECTS[@]} フォルダ・課題ページのみ ✅）"
 

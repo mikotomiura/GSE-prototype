@@ -212,8 +212,11 @@ fi
 if [ ! -f scripts/check-shell-portability.sh ]; then
   ng "シェル移植性ゲートが無い: scripts/check-shell-portability.sh"
 else
-  sp_out=$(bash scripts/check-shell-portability.sh 2>&1); sp_rc=$?
-  if [ "$sp_rc" -eq 0 ]; then
+  # ⚠️★ `if` の条件部で受ける（★ Codex /cross-review 指摘・2026-08-29）。
+  #   ★ 本スクリプトは現在 `set -uo pipefail`（`-e` 無し）なので `sp_out=$(...)` でも動くが、
+  #   ⚠️ **あとで `set -e` が足された瞬間に、この検査は代入行で死んで黙って飛ぶ**。
+  #   ★ 「ゲートが黙って飛ぶ」はこのプロジェクトが最も踏んでいる型なので、形のほうを堅くする。
+  if sp_out=$(bash scripts/check-shell-portability.sh 2>&1); then
     ok "シェルスクリプトが bash 3.2 で壊れる書き方をしていない（★ 陽性/陰性対照つき）"
   else
     ng "★ bash 3.2 で壊れる書き方が残っている（★ \${name} と括ること）"
@@ -397,6 +400,35 @@ else
 fi
 }
 
+# ⚠️★★★ **`sed -i` を直接書かない**（security-checker HIGH・2026-08-29 に macOS で実測）:
+#   ★ GNU sed は `-i` の直後に式を取るが、⚠️ **BSD(macOS) sed は次の引数を「バックアップ拡張子」
+#     として食う**ため、`sed_i 's/a/b/' f` は `sed: 1: "f": invalid command code` で落ちる。
+#   ⚠️ 実害: 本ファイルの `--selftest` が macOS で **通過 18 / 失敗 17** になっており、
+#     ★ そのなかに「**O1 ガードが空回りしていないことを示す唯一の変異試験**」
+#     （`sync ガードが弾かなくなる`）が含まれていた。→ ⚠️ **macOS では 1 度も実行されていなかった。**
+#   ★ `-i ''` は BSD では通るが GNU では「'' というファイル」と解される。→ どちらでも同義になる
+#     **一時ファイルへ書いて置き換える**形に統一する。
+#   ⚠️ 引数の並びは `sed` と同じ（最後の引数が対象ファイル）。
+sed_i () {
+  local n=$# f tmp i
+  eval "f=\${${n}}"
+  local args=()
+  i=1
+  while [ "${i}" -lt "${n}" ]; do
+    eval "args+=(\"\${${i}}\")"
+    i=$((i + 1))
+  done
+  tmp="$(mktemp)"
+  # ⚠️★ 置き換えは成功したときだけ（★ 失敗して空ファイルにすると変異試験が意味を失う）。
+  if sed "${args[@]}" "${f}" > "${tmp}"; then
+    cat "${tmp}" > "${f}"        # ★ mv でなく上書き（⚠️ パーミッションと inode を保つ）
+    rm -f "${tmp}"
+  else
+    rm -f "${tmp}"
+    return 1
+  fi
+}
+
 # =============================================================================
 # ★ selftest — ⚠️ **ゲート自身が空回りしていないか**を測る（`verify-before-claiming` 5b）
 # =============================================================================
@@ -437,12 +469,21 @@ selftest () {
     cp "$repo/src-tauri/src/lib.rs" "$fix/w/src-tauri/src/lib.rs" 2>/dev/null
     printf 'x\n.timeout(std::time::Duration::from_secs(180))\n' > "$fix/w/src-tauri/src/reconcile.rs"
     cp "$repo/$MEASURE" "$fix/w/$MEASURE" 2>/dev/null
+    # ⚠️★★★ **移植性ゲートも写す**（security-checker 指摘・2026-08-29）。
+    #   ★ 写さないと selftest 中は常に「ゲートが無い」で赤になり、
+    #     ⚠️ **新しく足した検査だけ変異試験が無い**状態になる（★ 本ゲートが戒めている型そのもの）。
+    cp "$repo/scripts/check-shell-portability.sh" "$fix/w/scripts/" 2>/dev/null
+    # ⚠️★★ **一時ツリーを git リポジトリにする**。
+    #   ★ 移植性ゲートは `git ls-files` で対象を集めるので、⚠️ 非 git のままだと
+    #     **必ず「検査できなかった」になり、壊しても壊さなくても赤**＝ 変異試験が成立しない。
+    #   ★ `init` だけでよい（⚠️ commit は不要。`--others` で未追跡も集まる）。
+    git -C "$fix/w" init -q 2>/dev/null || true
     cons="$fix/w/$CONSENT"
   }
 
   # ★ 実測記録票を「実測済み」で埋める（⚠️ **selftest の中だけ**。本物は 1 バイトも触らない）。
   fill_measure () {
-    sed -i \
+    sed_i \
       -e 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' \
       -e 's/^- 実測日: \*\*（未記入）\*\*$/- 実測日: **2026-09-01**/' \
       -e 's/^- 送信バイト数 (base64 後): \*\*（未記入）\*\*$/- 送信バイト数 (base64 後): **24 MB**/' \
@@ -480,21 +521,21 @@ selftest () {
   #   ★ `expect_red` は「その語を含む ❌ 行があるか」しか見ないので、
   #   ⚠️ 複数の検査が同じ語を使うと、**別の理由で出た ❌ を拾って偽の合格**になる。
   echo "=== selftest 1: ✅ を 1 つずつ壊す（★ 赤にならなければゲートが空回りしている）==="
-  build; sed -i 's/^- 所属: \*\*.*\*\*$/- 所属: **（実施前に記入）**/' "$cons"; expect_red "同意文書に未記入" "同意文書の空欄"
-  build; sed -i 's/^- 連絡先: .*/- 連絡先: **（未定）**/' "$cons";             expect_red "連絡先が埋まっていない" "連絡先"
-  build; sed -i 's/^- 所属: \*\*.*\*\*$/- 所属: **/' "$cons";                  expect_red "所属が埋まっていない" "所属"
+  build; sed_i 's/^- 所属: \*\*.*\*\*$/- 所属: **（実施前に記入）**/' "$cons"; expect_red "同意文書に未記入" "同意文書の空欄"
+  build; sed_i 's/^- 連絡先: .*/- 連絡先: **（未定）**/' "$cons";             expect_red "連絡先が埋まっていない" "連絡先"
+  build; sed_i 's/^- 所属: \*\*.*\*\*$/- 所属: **/' "$cons";                  expect_red "所属が埋まっていない" "所属"
   build; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
   build; rm -f "$fix/w/docs/o1-deletion-ledger.md";                            expect_red "削除台帳が無い" "削除台帳の欠落"
-  build; sed -i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
+  build; sed_i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
   build; rm -f "$fix/w/Form_O1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
-  build; sed -i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_O1/GSE_O1_Submit.gs"; expect_red "秘密が直書き" ".gs への秘密直書き"
-  build; sed -i 's/_o1day/_block/' "$fix/w/Form_O1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
+  build; sed_i "s/^var MAX_BYTES/var SHARED_SECRET = 'abcdefghijklmnopqrstuvwxyz012345';\nvar MAX_BYTES/" "$fix/w/Form_O1/GSE_O1_Submit.gs"; expect_red "秘密が直書き" ".gs への秘密直書き"
+  build; sed_i 's/_o1day/_block/' "$fix/w/Form_O1/GSE_O1_Submit.gs";          expect_red "ガード検査が赤" "受け口の名前ガード"
   build; rm -f "$fix/w/Form_O1/o1_submit_guard_test.cjs";                      expect_red "ガード検査が無い" "ガード検査の欠落"
   build; echo 'let th = SomethingElse::new();' > "$fix/w/src-tauri/src/lib.rs"; expect_red "目印.*が見つからない" "liveness アンカーの喪失"
   # ⚠️★★ **O1 の目印を消したら赤になること**（★ 2026-08-28 に緑になったので satisfy 側から移した）。
-  build; sed -i 's/O1_LIVENESS_TRAY_AFTER_MS/RENAMED_AWAY_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "G1 と同じ" "O1 の liveness の目印の喪失"
+  build; sed_i 's/O1_LIVENESS_TRAY_AFTER_MS/RENAMED_AWAY_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "G1 と同じ" "O1 の liveness の目印の喪失"
   # ⚠️★★★ **定数が残っていても、配線が消えたら赤になること**（★ 被験者の画面は配線でしか変わらない）。
-  build; sed -i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
+  build; sed_i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
   # ⚠️★★ **追跡の検査は fixture では測れない**（$fix/w は git 管理下に無く、常に「未追跡」になる）。
@@ -547,11 +588,11 @@ selftest () {
   build; fill_measure; rm -f "$fix/w/src-tauri/src/reconcile.rs";              expect_red "reconcile.rs が読めない" "reconcile.rs のアンカー喪失"
   # ★★ 2026-08-28 に緑になった 3 件。⚠️ **緑になったものは selftest 2 から 1 へ移す**
   #   （satisfy 側に置いたままだと「もともと緑」を「満たしたから緑」と読み違える）。
-  build; sed -i 's/^<!-- o1-retention: set -->$/<!-- o1-retention: unset -->/' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "保管上限が未確定" "保管上限を未確定へ戻す"
+  build; sed_i 's/^<!-- o1-retention: set -->$/<!-- o1-retention: unset -->/' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "保管上限が未確定" "保管上限を未確定へ戻す"
   build; rm -f "$fix/w/Form_O1/GSE_O1_Form_Builder.gs";                        expect_red "フォーム類が無い" "フォームビルダーの欠落"
   build; rm -f "$fix/w/Form_O1/o1_form_builder_test.cjs";                      expect_red "ガード検査が無い" "フォームビルダーの検査の欠落"
   # ⚠️★★★ **中身を壊しても赤になること。** ★ 存在するだけで緑になっていた旧版の再発防止。
-  build; sed -i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_O1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
+  build; sed_i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_O1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
   # ⚠️★★ **ビルダーへの直書きが戻ったら赤になること**（2026-08-29・起票 T-18）。
   build; printf %s "
 var O1_APP_DOWNLOAD_URL = \"https://drive.google.com/drive/folders/EXAMPLE\";
@@ -565,7 +606,7 @@ var PHASE1_MGMT_SHEET_ID = \"FAKE_SHEET_ID_FOR_SELFTEST_00000\";
   #   ★ 除外の仕組みを selftest から 1 度も撃っていなかった。
   #   ⚠️ 無制限の自己申告除外は、このゲートが戒めている「黙って緑にする」手段そのものになる。
   #   → ★ (1) 印を外すと赤になること (2) **例外の件数が増えていないこと**を測る。
-  build; sed -i 's|// gate:allow-id||g' "$fix/w/$FORM_BUILDER"; expect_red "ID 形" "allow-id を外すと赤になる"
+  build; sed_i 's|// gate:allow-id||g' "$fix/w/$FORM_BUILDER"; expect_red "ID 形" "allow-id を外すと赤になる"
   # ⚠️★★ **散文中の言及を数えない**（2026-08-29 に実測して判明）。
   #   ★ 数えるべきは「**実際に検出を抑えている行**」＝ 検出パターンに当たり、かつ印がある行。
   #   ⚠️ 印という語がコメントに出ただけで上限を超えると、★ 検査が「オオカミ少年」になる。
@@ -583,10 +624,21 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
 " >> "$fix/w/$RECEIVER"; expect_red "ID / URL が直書き" "受け口への ID の直書き"
   # ⚠️★ 行は**字下げされている**。`^` で固定すると変異が当たらず、
   #   ★ 「壊したつもりで壊れていない」偽の合格になる（2026-08-28 に実際に踏んだ）。
-  build; sed -i 's|: > "$M/o1.mode"|: > "$M/DISABLED"|; s|: > "$W/o1.mode"|: > "$W/DISABLED"|'               "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"; expect_red "o1.mode を置かない" "o1.mode の書き出しの喪失"
+  build; sed_i 's|: > "$M/o1.mode"|: > "$M/DISABLED"|; s|: > "$W/o1.mode"|: > "$W/DISABLED"|'               "$fix/w/experiments/20260801-controlled-friction-task/make-common-app-zip.sh"; expect_red "o1.mode を置かない" "o1.mode の書き出しの喪失"
   build; rm -f "$fix/w/scripts/sync_session_o1_guard_test.sh";                 expect_red "O1 ガードの検査が無い" "sync ガードの検査の欠落"
   # ⚠️★★ **語だけ残してガードの実体を消しても赤になること**（★ 旧版はここを緑にしていた）。
-  build; sed -i 's/^    exit 4$/    return 0/' "$fix/w/scripts/sync-session.sh";  expect_red "弾いていない" "sync ガードが弾かなくなる"
+  build; sed_i 's/^    exit 4$/    return 0/' "$fix/w/scripts/sync-session.sh";  expect_red "弾いていない" "sync ガードが弾かなくなる"
+
+  # ⚠️★★★ **移植性ゲート自身の変異試験**（2026-08-29 に追加）。
+  #   ★ 新しく足した検査に対照を付けないと、⚠️ **それが空回りしても誰も気づかない**。
+  #   ⚠️ ★ **`sed_i` を使わない**: 仕込むのは「変数 ＋ 多バイト」であり、
+  #     ★ 置換文字列にそれを書くと**このファイル自身が移植性ゲートに引っかかる**。
+  #     → 全角括弧を `printf` の引数として渡し、追記する。
+  build; printf '\n# %s\necho "$why%s"\n' "仕込み" '）' >> "$fix/w/scripts/sync-session.sh"
+  expect_red "壊れる書き方が残っている" "★ 移植性ゲート: 括り忘れを仕込むと赤になる"
+
+  build; rm -f "$fix/w/scripts/check-shell-portability.sh"
+  expect_red "シェル移植性ゲートが無い" "★ 移植性ゲート自体が消えたら赤になる"
 
   echo
   echo "=== selftest 2: 未達を満たすと緑に変わるか（★ 陽性対照）==="
@@ -599,13 +651,13 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   echo "=== selftest 3: 片方だけでは緑にしない（★ 部分的な修正で騙されないか）==="
   # ⚠️★★ Windows が O1 の主ターゲットである。★ `.ps1` だけ壊れていても**必ず赤にする**
   #   （片方だけ見ていると、もう片方の OS から O1 が dataset へ漏れる）。
-  build; sed -i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.ps1"; expect_red "sync-session" "ps1 だけ壊しても赤になる"
-  build; sed -i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.sh";  expect_red "sync-session" "sh だけ壊しても赤になる"
+  build; sed_i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.ps1"; expect_red "sync-session" "ps1 だけ壊しても赤になる"
+  build; sed_i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.sh";  expect_red "sync-session" "sh だけ壊しても赤になる"
   # ⚠️★★★ **A-2 の肝**: 片方だけでは緑にしない（★「見えないまま緑」への抜け道を塞ぐ）。
   build; fix_timeout;   expect_red "未実測"           "コードだけ直しても赤になる（実測が無い）"
   build; fill_measure;  expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
   # ★「状態」だけ実測済みにして必須欄が空なら赤（⚠️ 中身の無い記録で緑にしない）。
-  build; sed -i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
+  build; sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
 
   echo
   echo "────────────────────────────────────────"
