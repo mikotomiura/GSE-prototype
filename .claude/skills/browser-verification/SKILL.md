@@ -109,6 +109,31 @@ JSON.stringify({
 ⚠️ **`control` が 0 なら、`target` が 0 でも何も言えない。** 先に control を直す。
 ★ これはリポジトリ側の「検査が空回りしていないか実測する」（`--selftest` の作法）と同じ思想である。
 
+### 2.0a ⚠️★★★ **最初に `visibilityState` を見る**（★ 2026-08-29 に実測・最も高くついた誤読）
+
+⚠️ **タブが `hidden` だと、入力イベントだけが黙って落ちる。**
+★ スクリーンショットも `javascript_tool` も **正常に通る**ので、
+「クリックしたのに反応しない ⇒ この UI は自動操作できない」と**誤読する**。
+
+> #### ★ 実際に何が起きたか
+> 2026-08-28 に「**Apps Script の関数セレクタは実クリックが着弾しても発火しない**」と
+> `deployment-runbook.md` に記録し、⚠️ **「配備は AI にはできない」という結論**を丸ごと 1 日ぶん残した。
+> ★ 2026-08-29 に `visibilityState` を見たら **`hidden`** だった。前面に出したら
+> **貼り付け・関数選択・実行・プロパティ編集がすべて動いた**（§3 の 1〜7 を完走）。
+> ⚠️ 誤った断定が、**できることを「できない」と封じていた**。
+
+⚠️ **隠れる原因はたいてい「ユーザーが全画面ターミナルで打っている」**である。
+★ 作業中は **Chrome とターミナルを左右に並べてもらう**こと。⚠️ セッション中に何度でも `hidden` に戻る。
+
+```js
+// ★ 操作の前に毎回これを見る（クリックの直前が望ましい）
+JSON.stringify({vis: document.visibilityState, hasFocus: document.hasFocus(),
+                vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio})
+```
+
+- `vis !== 'visible'` なら **操作せず、ウィンドウを前面に出してもらう**（★ 拡張機能から前面化はできない）
+- ⚠️ ウィンドウ幅も一緒に変わる（実測 958 → 1920）。★ **座標は前面化した後に取り直す**
+
 ### 2.0b ★ クリックが効かないときは、**着弾したかを先に見る**
 
 ⚠️ `computer` に渡す座標と `getBoundingClientRect()` の CSS px が**一致しない環境がある**
@@ -195,8 +220,44 @@ JSON.stringify({values: [...document.querySelectorAll('input[type="text"]')].map
    （`cmd+Down` で末尾へ飛び、スクショ 1 枚）。ヘッダが
    「変更が保存されていません」→「ドライブに保存しました」に変わることも見る
 
-★ **コードは必ずクリップボード経由で貼る**（`pbcopy < file.gs`）。
+★ **コードは必ずクリップボード経由で貼る**（mac: `pbcopy < file.gs` ／
+Windows: `powershell -c "Set-Clipboard -Value (Get-Content -Raw -Encoding UTF8 <path>)"`）。
 ⚠️ `computer type` で直接打つと、エディタの自動インデント・括弧補完が働いて**壊れる**。
+⚠️★ **クリップボードは先に退避する**（Windows: `Get-Clipboard -Raw > clip.bak` → 終わったら戻す）。
+★ 2026-08-29 の実例: 退避したら**ユーザーが貼ろうとしていた ID** が入っていた（★ 消していたら戻せない）。
+
+> #### ★★ 2026-08-29 追記: 検証は **`monaco.getValue()` のハッシュ**でやる（スクショ不要）
+>
+> ★ Apps Script のエディタは Monaco で、**`window.monaco` がページに露出している**。
+> ⚠️ 行番号を目で数える必要はない。**リポジトリのファイルと SHA-256 を突き合わせられる**。
+>
+> ```js
+> const m = window.monaco.editor.getModels()[0];
+> const lf = m.getValue().replace(/\r\n/g, '\n');
+> const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(lf));
+> JSON.stringify({chars: m.getValue().length, lines: m.getLineCount(),
+>   sha: [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,16)});
+> ```
+>
+> - ⚠️ **`chars` は UTF-16 単位**。Python の `len()`（コードポイント）とは**非 BMP 文字の数だけずれる**
+>   （★ 実測: 絵文字 4 個ぶん 48,449 → 48,453）。★ ハッシュで比べれば影響しない。
+> - ⚠️★★ **保存の確認は表示を信じない。** 「プロジェクトを保存しています…」は常駐要素で残る。
+>   ★ **ページをリロードして再ハッシュ**する（＝ サーバが返した中身を見る）のが唯一確実。
+
+### 2.3b ⚠️★★★ リロードすると関数セレクタは**先頭の関数**に戻る（2026-08-29 実測）
+
+★ Apps Script の実行対象セレクタは、**ページを読み込み直すと先頭（`setupO1Forms` 等）に戻る**。
+⚠️ **2026-08-07 に G1-C の全設問が消えた事故と同じ形**（「選択が反映されないまま
+`setupG1Forms` が走った」）。
+
+→ ★ **実行ボタンを押す直前に、セレクタの表示を必ず読み直す**:
+
+```js
+JSON.stringify({selector: (document.elementFromPoint(637, 84)||{}).innerText})
+```
+
+⚠️ セレクタは `div[role="listbox"]`（`select` ではない）。★ 選択肢は `[role="option"]` で、
+**開いていないと座標が `0,0` で返る**（＝ 見つかっても押せない）。開いたことを確かめてから押す。
 
 ### 2.4 ★ 実行ログはエディタでなく「実行数」ページで読む
 
