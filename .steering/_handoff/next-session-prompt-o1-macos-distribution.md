@@ -13,13 +13,44 @@
 
 ### 0-1. ★ 機械が状態を持っている
 
+> ⚠️★★★ **2026-08-30 更新: 旧記載の数字（readiness 16/1・selftest 14/14）は
+> macOS で測った値ではなかった。** ★ 実機で走らせたら **15/2・16/1** で、
+> ⚠️ 差分 3 件はすべて「**macOS でだけ壊れる**」欠陥だった（★ うち 1 件は本番コード）。
+> → ★ **PR #128 で修正済み**。詳細は `.steering/20260829-macos-shell-portability/`。
+>
+> ★ 何が壊れていたか（⚠️ 次に同じ型を踏まないために）:
+> - ⚠️★★ `sync-session.sh` の **O1 ガードが `exit 4` に到達できず `exit 1`** を返していた
+>   （★ macOS 標準の bash 3.2 が多バイト文字を変数名に食い、`set -u` で落ちる）
+> - ★ `bom_crlf_ok` の BOM 検査が **BSD の `od` の区切り幅**で常に外れ、正常な launcher を赤にしていた
+> - ⚠️★★ `check-o1-release-readiness.sh --selftest` が **17 箇所の `sed -i`（GNU 形式）** で
+>   macOS では死んでおり（**18/17**）、★ **O1 ガードの変異試験が 1 度も走っていなかった**
+
 ```bash
-bash scripts/check-o1-release-readiness.sh            # ★ 通過 16 / 未達 1 のはず（2026-08-29 実測）
-bash experiments/20260801-controlled-friction-task/make-common-app-zip.sh --selftest   # ★ 14/14
+# ★ 2026-08-30 に macOS 実機で実測した期待値
+bash scripts/check-o1-release-readiness.sh            # ★ 通過 17 / 未達 1（残るは「送信 timeout 未実測」のみ）
+bash scripts/check-o1-release-readiness.sh --selftest # ★ 37/0（⚠️ 旧: macOS では 18/17 で死んでいた）
+bash scripts/check-shell-portability.sh               # ★ 7/0（新設・陽性/陰性対照つき）
+bash scripts/sync_session_o1_guard_test.sh            # ★ 10/0（⚠️ .ps1 は未実行）
+bash experiments/20260801-controlled-friction-task/make-common-app-zip.sh --selftest   # ★ 17/17
 ```
 
 ⚠️ `README` / `docs` / 本メモを一次資料にしない。★ 実体とゲートで確かめる。
+⚠️★★★ **この節の数字も「書かれた時点の値」である。** ★ 必ず自分で走らせること
+（★ 上の事故は、まさに**メモの数字を信じずに走らせたから**見つかった）。
 ★ 残り 1 件は「**送信 timeout が未実測**」で、⚠️ **macOS 側の作業では消えない**（→ §0-2）。
+
+### 0-1b. ⚠️★ **まだ実行されていない検査**（★ 緑と混同しない）
+
+| 何 | なぜ未実行か | ★ いつやるか |
+|---|---|---|
+| `scripts/sync-session.ps1` の O1 ガード | ⚠️ この Mac に PowerShell が無い | ★ **Windows で 1 回**（O1 の主ターゲットは Windows） |
+| `sync-all.ps1` 側の O1 スキップ | ★ 下記の起票と対で直す | ★ Windows で検証できるとき |
+
+⚠️★★ **起票済み（`.steering/20260829-macos-shell-portability/decisions.md` 判断 6）**:
+`sync-all.sh` は Step 1 で **ガードより前に O1 の生 NDJSON を gse-dataset の作業ツリーへコピーする**。
+★ `.gitignore` の `raw/**/*.ndjson` と Step 2 の中断で **push には至らない（fail-closed）**が、
+⚠️ 生ログが常駐し、★ **以後毎回 `FAILED>0` で全同期が止まり続ける**（→ ガード無効化の運用圧力）。
+⚠️ `.ps1` と**対で**直さないと「片方の OS だけ漏れる」型になるので、**Windows で検証できるとき**に。
 
 ### 0-2. ✅ **2026-08-29 更新: 受け口はデプロイ済み。本番の配布物を作ってよい**
 
@@ -93,7 +124,23 @@ done
 ★ 対象者に Intel Mac がいるなら、(a) universal / x86_64 のビルドを足す
 (b) その人は Windows で参加してもらう —— の**どちらかを研究者が決める**（★ 起票）。
 
-### C. ★ **検算ラン**（⚠️ 受け口のデプロイ前でもここまでは進む）
+### C. ★ **検算ラン** — ✅ **2026-08-30 に実施済み（★ やり直す必要はない）**
+
+> ★ `--mode o1 --tag v0.1.29 --config <ダミー>` を macOS 実機で実行し、**下表の 8 項目を全部実測した**。
+> ⚠️ **送信は 1 度もしていない**（★ endpoint は `DRYRUN_NOT_A_REAL_DEPLOYMENT`）。
+> ★ 生成物（`dist/_common/O1_実施用_*`）は**削除済み・未配布**。
+>
+> ★ 実測できたこと: 署名 `valid on disk` ＋ `satisfies its Designated Requirement` /
+> 展開後も署名有効 / 実行ビット残存 / `o1.mode` あり・**`g1.mode` なし** /
+> セットアップ自己検査 / README 文言（★ ドラフト表記も保持）/ Windows zip の中身 /
+> `__MACOSX`・`.DS_Store` なし。
+> ★ さらに **`--mode o1` が G1 の zip を作り直していない**ことをタイムスタンプで確認した
+> （★ G1 は 08-23 / 08-27 のまま＝ **既定 g1 の経路は不変**）。
+>
+> ⚠️★★★ **残っているのは §1-D（実機通し確認）と §1-E（本番 zip ＋ 送信 timeout）である。**
+
+<details>
+<summary>★ 当時の手順（参考・再実行する場合）</summary>
 
 ★ 形だけ整えたダミー設定を作る（⚠️ **repo の中に置かない**・`.gitignore` の外に出さない）:
 
@@ -129,6 +176,8 @@ cd experiments/20260801-controlled-friction-task
 
 ⚠️ 終わったら `rm -f /tmp/o1-dryrun-submit.json` と `dist/_common/O1_実施用_*` を消す。
 ★ **ダミー設定の入った zip を Drive に上げない。**
+
+</details>
 
 ### D. ★ **macOS 実機での通し確認**（⚠️ ここが本命。★ 研究者が操作する）
 
