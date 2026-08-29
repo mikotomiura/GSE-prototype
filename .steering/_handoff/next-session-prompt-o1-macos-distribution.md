@@ -41,10 +41,24 @@ bash experiments/20260801-controlled-friction-task/make-common-app-zip.sh --self
 
 ### 0-1b. ⚠️★ **まだ実行されていない検査**（★ 緑と混同しない）
 
-| 何 | なぜ未実行か | ★ いつやるか |
+| 何 | 状態 | ★ いつやるか |
 |---|---|---|
-| `scripts/sync-session.ps1` の O1 ガード | ⚠️ この Mac に PowerShell が無い | ★ **Windows で 1 回**（O1 の主ターゲットは Windows） |
+| `sync-session.ps1` の O1 ガード | ⚠️ **PowerShell Core 7.6.5 でのみ検証済み**（2026-08-30・`brew install powershell`）。★ 3 ケース緑 | ⚠️★ **Windows PowerShell 5.1 (Desktop) は未検証**。★ Windows 作業のついでに 1 回 |
 | `sync-all.ps1` 側の O1 スキップ | ★ 下記の起票と対で直す | ★ Windows で検証できるとき |
+
+> ⚠️★★ **なぜ Core で緑でも足りないのか**（★ 「片方だけ緑で安心する」型を避ける）:
+> ★ `pwsh`（7+ = **Core**）と `powershell.exe`（5.1 = **Desktop**）は**別物**である。
+> ⚠️ 5.1 は BOM 無しスクリプトを **CP932** で読むため、★ **日本語のバイト列で parse が壊れる**
+> （`docs/development-guidelines.md` §10.2 に実害の記録）。
+> `sync-session.ps1` は日本語コメントを多く含むので、まさにこの差が効く。
+>
+> ★ **Windows でやること（git-bash から 1 行）**:
+> ```bash
+> bash scripts/sync_session_o1_guard_test.sh
+> ```
+> ★ 見つかった実行系を**全部**走らせる作りなので、Windows なら `powershell` も自動で回る。
+> ⚠️ 末尾の `PS1_VERIFIED:` に **`desktop/5.1.x`** が出れば検証完了
+> （★ `check-o1-release-readiness.sh` もこの行を読んで表示を変える）。
 
 ⚠️★★ **起票済み（`.steering/20260829-macos-shell-portability/decisions.md` 判断 6）**:
 `sync-all.sh` は Step 1 で **ガードより前に O1 の生 NDJSON を gse-dataset の作業ツリーへコピーする**。

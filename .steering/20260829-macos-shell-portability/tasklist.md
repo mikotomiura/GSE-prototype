@@ -29,7 +29,9 @@
 - [x] `check-shell-portability.sh` → **5/0**
 - [x] ⚠️★ ゲートの **3 状態**確認（正常=緑 / 違反を仕込む=赤 / 復元=緑・`cmp` で完全復元を確認）
 - [x] `check-o1-release-readiness.sh` → **通過 17 / 未達 1**（★ 残るは「送信 timeout 未実測」のみ）
-- [ ] ⚠️★★ **`sync-session.ps1` は未実行**（★ PowerShell がこの Mac に無い。Windows で 1 回走らせること）
+- [x] ⚠️★ **`sync-session.ps1` を PowerShell Core 7.6.5 で検証**（2026-08-30・`brew install powershell`）
+      → ★ 3 ケース緑（名前で弾く / meta で弾く / 陽性対照）。**通過 13 / 失敗 0**
+- [ ] ⚠️★★ **Windows PowerShell 5.1 (Desktop) は未検証**（★ Windows 作業のついでに 1 回）
 - [ ] ⚠️ **Windows CI で赤が出ないこと**の確認（★ push 後）
 
 ## 検算ラン（§1-C・⚠️ ダミー設定・送信ゼロ）
