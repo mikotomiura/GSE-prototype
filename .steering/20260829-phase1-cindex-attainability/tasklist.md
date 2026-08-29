@@ -62,8 +62,8 @@
 ## 完了処理
 - [x] design.md の最終化
 - [x] decisions.md の最終化 (§5 議題を含む・判断 2 は当初実装の恒真バグと修正内容を記録)
-- [x] git commit (`ef8286d`)
-- [ ] `/finish-task` (Step 3 の `/cross-review` を飛ばさない。main へマージしないなら
-      Step 5 の CI 発火確認は N/A と明記する)
-- [ ] `! git fetch origin && git rebase origin/main && git push -u origin feat/phase1-cindex-attainability`
-      を研究者に渡す形で提示する (push/rebase は dev から実行できない)
+- [x] git commit (`ef8286d`, `5807ad5`)
+- [x] `/finish-task` (Step 3 の `/cross-review` 実施済み。main へマージしていないため
+      Step 5 の CI 発火確認は **N/A**)
+- [x] `! git fetch origin && git rebase origin/main && git push -u origin feat/phase1-cindex-attainability`
+      を研究者に渡す形で提示する (push/rebase は dev から実行できない) — 完了報告に記載
