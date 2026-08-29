@@ -104,6 +104,29 @@ cd ..
 - **秘密鍵ファイルは絶対にコミット/共有しない**。`.gitignore` に `*age-identity*` / `*.agekey` を
   登録済 (多層防御)。Windows では共有フォルダ・Dropbox 同期下に置かない。
 
+### 2.1 配布パッケージの作成 (★混入チェック必須)
+
+被験者に配る zip は **配布専用の空フォルダに必要物だけをコピー**して作る。`~/.gse/` を含む
+フォルダごと固めると、秘密鍵 (`age-identity.txt`) や端末固有の `participant_id` まで巻き込むため厳禁。
+
+**入れてよいもの (これだけ)**:
+- Windows: `gse-next.exe` (portable) + `gse-package.exe` + `pubkey.txt`
+- macOS:   `gse-next_*_aarch64.dmg` + `gse-package` + `pubkey.txt`
+
+**絶対に入れないもの**:
+- `~/.gse/age-identity.txt` — age 秘密鍵 (全データ復号可・致命的)
+- `~/.gse/participant_id` — 端末固有の自動生成ID。被験者が使うとアプリ内ログIDが**あなたのID**で
+  記録され混線する (解決優先順で永続化値が最優先のため。`logger.rs`)
+- `.gse/` フォルダそのもの・`*.agekey`・GSE_DATASET 配下のセッションログ(`gse_*.ndjson`)
+
+**作成後チェック (固めた zip を必ず検証)**:
+```bash
+# 配布 zip を展開したフォルダで、危険物が混入していないか確認
+find . \( -name 'age-identity.txt' -o -name 'participant_id' -o -name '*.agekey' -o -name '.gse' \) -print
+#   → 何も出力されなければ OK。1 つでも出たら削除して作り直す。
+#   特に age-identity.txt が出た場合は鍵漏洩 → 鍵ペアを作り直して再配布する。
+```
+
 ---
 
 ## 3. 被験者手順 (3 ステップ — 非技術者向け)
