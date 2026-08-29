@@ -60,4 +60,5 @@
 - [x] ⚠️ 修正後に 3 検査を再実行（101 / 28 / 16・未達 1）
 
 ## 完了処理
-- [ ] git commit
+- [x] git commit（`7faa2b7` ／ ブランチ `docs/o1-roster-key-decision`）
+- [ ] ⚠️ `main` への取り込み（★ 研究者が判断。fast-forward で足りる）
