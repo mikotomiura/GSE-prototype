@@ -62,12 +62,22 @@ struct MeasurementView {
     per_subject_pass: bool,
 }
 
+/// ⚠️ **読まないフィールドを宣言しない**。到達可能性診断
+/// (`.steering/20260829-phase1-cindex-attainability/`) のうち、cohort が使うのは
+/// **母数の各被験者が何ペアの上に立っているか**を示す集約値だけなので、
+/// 生の `x_q1_session_comparable_pairs` (Vec) はここに置かない (per-被験者レポートには出ている)。
 #[derive(Debug, Clone, Default, Deserialize)]
 struct CindexView {
     #[serde(default)]
     x_q1_pooled: Option<f64>,
     #[serde(default)]
     x_q1_session_median: Option<f64>,
+    #[serde(default)]
+    x_q1_session_min_comparable_pairs: Option<u64>,
+    #[serde(default)]
+    x_q1_session_median_comparable_pairs: Option<u64>,
+    #[serde(default)]
+    x_q1_gate_attainable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -248,6 +258,12 @@ pub struct CohortSubjectSummary {
     pub included_in_primary: bool,
     pub x_q1_session_median: Option<f64>,
     pub x_q1_pooled: Option<f64>,
+    /// `x_q1_session_median` に寄与したセッションの最小比較可能ペア数
+    /// (到達可能性診断・`.steering/20260829-phase1-cindex-attainability/`)。
+    pub x_q1_session_min_comparable_pairs: Option<u64>,
+    pub x_q1_session_median_comparable_pairs: Option<u64>,
+    /// ゲート閾値への理論的到達可能性 (`§3` 判断 1: 判定には使わない・報告専用)。
+    pub x_q1_gate_attainable: Option<bool>,
     pub answer_rate: f64,
     /// PreReg-2 被験者要件 (回答率≥0.80 & latency≤10s & 有効≥20)。
     pub per_subject_pass: bool,
@@ -473,6 +489,9 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
             included_in_primary: v.included_in_primary,
             x_q1_session_median: v.cindex.x_q1_session_median,
             x_q1_pooled: v.cindex.x_q1_pooled,
+            x_q1_session_min_comparable_pairs: v.cindex.x_q1_session_min_comparable_pairs,
+            x_q1_session_median_comparable_pairs: v.cindex.x_q1_session_median_comparable_pairs,
+            x_q1_gate_attainable: v.cindex.x_q1_gate_attainable,
             answer_rate: v.measurement.answer_rate,
             per_subject_pass: v.measurement.per_subject_pass,
             evaluation_session_count: v.evaluation_session_count,
@@ -1157,6 +1176,50 @@ mod tests {
         assert_eq!(s.view.measurement.random_probe_answered, 18);
         assert!((s.view.measurement.answer_rate - 0.9).abs() < 1e-9);
         assert_eq!(s.view.cindex.x_q1_session_median, Some(0.70));
+    }
+
+    #[test]
+    fn read_model_defaults_attainability_fields_when_absent_old_json() {
+        // 旧 JSON (到達可能性フィールド追加前) でもパースが壊れないこと (#[serde(default)])。
+        let s = subject("P000", true, true, 0.9, 20, 18, 8, Some(0.70));
+        assert_eq!(s.view.cindex.x_q1_session_min_comparable_pairs, None);
+        assert_eq!(s.view.cindex.x_q1_session_median_comparable_pairs, None);
+        assert_eq!(s.view.cindex.x_q1_gate_attainable, None);
+    }
+
+    #[test]
+    fn read_model_parses_attainability_fields_when_present_new_json() {
+        let json = r#"{
+            "schema": "calibration/v0.3",
+            "included_in_primary": true,
+            "evaluation_session_count": 8,
+            "measurement": {
+                "random_probe_total": 20, "random_probe_answered": 18,
+                "answer_rate": 0.9, "per_subject_pass": true
+            },
+            "cindex": {
+                "x_q1_pooled": 0.66,
+                "x_q1_session_median": 0.70,
+                "x_q1_session_min_comparable_pairs": 1,
+                "x_q1_session_median_comparable_pairs": 21,
+                "x_q1_gate_attainable": true
+            }
+        }"#;
+        let view: SubjectCalibrationView = serde_json::from_str(json).expect("parse");
+        assert_eq!(view.cindex.x_q1_session_min_comparable_pairs, Some(1));
+        assert_eq!(view.cindex.x_q1_session_median_comparable_pairs, Some(21));
+        assert_eq!(view.cindex.x_q1_gate_attainable, Some(true));
+    }
+
+    #[test]
+    fn cohort_subject_summary_carries_attainability_fields() {
+        // cohort_verdict() の構築箇所で正しく配線されていること (subject() ヘルパは
+        // 到達可能性フィールドを含まない旧 JSON 形なので None のまま通ることを確認する)。
+        let subjects = vec![subject("P000", true, true, 0.9, 20, 18, 8, Some(0.70))];
+        let r = cohort_verdict(&subjects);
+        assert_eq!(r.subjects.len(), 1);
+        assert_eq!(r.subjects[0].x_q1_session_min_comparable_pairs, None);
+        assert_eq!(r.subjects[0].x_q1_gate_attainable, None);
     }
 
     #[test]
