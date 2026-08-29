@@ -40,7 +40,7 @@
      G1 側 (`attainable_min_p_for_this_subject` / `test_can_reject_at_all`) との対称性が崩れる。
      選択肢 C は明確に forking paths (新しい閾値の事後追加) にあたるため却下。
 
-- **トレードオフ**: `x_q1_gate_attainable` は「この被験者のゲート値への理論的到達可能性」を
+- **トレードオフ**: `x_q1_min_session_gate_attainable` は「この被験者のゲート値への理論的到達可能性」を
   示すのみで、「実際に (コホート全体として) ゲートを通ったか」の判定は引き続き `model_gate` /
   `cohort_verdict` が別途行う。読み手が両者を混同しないよう、フィールド名とドキュメントコメントに
   「理論的到達可能性」であることを明記する。
@@ -53,7 +53,7 @@
   提案が出た場合は、それは判定基準の変更にあたるため、本判断の前提(「報告専用」)が崩れる。
   その時点で改めて forking paths の検討が必要。
 
-## 判断 2: 当初の `x_q1_gate_attainable` は恒真関数だった → 「完全一致でなくても超えられるか」に定義し直した
+## 判断 2: 当初の `x_q1_min_session_gate_attainable` は恒真関数だった → 「完全一致でなくても超えられるか」に定義し直した
 
 - **判断日時**: 2026-08-29
 - **背景**: 実装前に「G1 の `attainable_min_p_for_this_subject` / `test_can_reject_at_all` と対称な
@@ -68,7 +68,7 @@
   関わらず常に `1.0`** になる。`CINDEX_GO_MEDIAN` / `CINDEX_GO_ALL_MIN` はいずれも `1.0` 未満
   なので、「最良値がゲートを超えるか」を問う当初の判定は「寄与するセッションが 1 つ以上ある」
   場合に事実上常に `Some(true)` を返していた——G1 との構造的な非対称性を見落としていた。
-- **修正 (`calibration_eval.rs` の `cindex_gate_attainable`)**: 問いを
+- **修正 (`calibration_eval.rs` の `cindex_min_session_gate_attainable`)**: 問いを
   「**最良値が超えるか**」(恒真) から「**1 段階だけ劣化した次善値 `(2k-1)/(2k)` でもなお
   `CINDEX_GO_ALL_MIN` を超えるか**」に変更した。`k` に依存する非自明な判定になり、
   `k=1` (P013 感度の実例) では次善値が `0.5` で `0.55` を超えないため `Some(false)`
@@ -84,6 +84,43 @@
   見込みがあるか」という**要約**を添えるものである。
 - **見直しタイミング**: 本判断は完了したものとして扱う。`§5` 議題 4 (旧: リネーム検討) は
   本修正で実質的に解消したため取り下げる。
+
+## 判断 3: 判断 2 の修正はスコープを超えて「この被験者」を主張していた → フィールド名を再スコープした
+
+- **判断日時**: 2026-08-29
+- **背景**: `/cross-review` (Claude 独立検証 + Codex `gpt-5.5`) が、判断 2 で修正した
+  `cindex_gate_attainable()` の docstring に対し**両者独立に同じ根本原因の指摘**をした
+  (両者一致は優先度最高。`cross-review` skill の運用方針通り採用)。
+- **反例 (Claude が数式から構成し実測はしていないが `median_f64` / `concordance_index_detailed`
+  の定義から数学的に導出できることを確認)**: セッション A (`k=1`, X タイ → C-index `0.5`) と
+  セッション B (`k=10`, 9 concordant/1 discordant → C-index `0.9`) を持つ被験者の
+  `x_q1_session_median = (0.5+0.9)/2 = 0.7`。これは `CINDEX_GO_ALL_MIN=0.55` を
+  **非完全一致のまま**超えている。しかし `min(1,10)=1` を渡された旧
+  `cindex_gate_attainable(Some(1))` は `Some(false)` を返し、docstring は「この被験者が
+  ゲートを超えるには完璧な結果以外あり得ない」と主張していた——**現に超えているのに、
+  である。** 関数自体の算術 (次善値 `(2k-1)/(2k)`) は判断 2 の時点で既に正しかったが、
+  **「最小ペア数セッション 1 本の余裕度」を「被験者全体の到達可能性」であるかのように
+  docstring とフィールド名が過大主張していた**ことが根本原因。
+- **修正**:
+  1. 関数名・フィールド名を `cindex_gate_attainable` / `x_q1_gate_attainable` から
+     `cindex_min_session_gate_attainable` / `x_q1_min_session_gate_attainable` に変更し、
+     「最小ペア数セッション単体」に対する値であることを名前自体に固定した。
+  2. `calibration_eval.rs` の docstring と `SubjectCindex` / `CohortSubjectSummary` の
+     フィールド doc に、上記の反例と「これは被験者全体の到達可能性ではない」という
+     警告を明記した。
+  3. 判定ロジック (`model_gate` / `cohort_verdict`) には元々使われておらず (判断 1)、
+     合否判定への実害はゼロ。修正は名前・ドキュメントの是正のみで、算術ロジックは不変
+     (回帰テストは既存のまま全緑)。
+  4. あわせて Codex 指摘 (LOW): `(2*k-1)/(2*k)` の乗算をやめ `1.0 - 0.5/k` に書き換え、
+     大きな `k` での乗算オーバーフロー経路を構造的に無くした (挙動は数学的に同一)。
+  5. あわせて Codex 指摘 (MEDIUM): `cohort_verdict()` を経由して `Some(...)` 値が
+     `CohortSubjectSummary` まで正しく伝播することの end-to-end テスト
+     (`cohort_subject_summary_propagates_some_attainability_values_through_verdict`) を追加した
+     (既存テストは `None` の伝播しか検証していなかった)。
+- **見直しタイミング**: 「最小ペア数セッション単体」という限定されたスコープでも、
+  研究者が引き続き誤読するようであれば、判断 2 で検討した「中央値全体を考慮した再設計」
+  (最小ペア数セッションだけを次善値に固定し他は実測値のまま中央値を再計算) を次回実装で
+  検討する。本タスクでは report-only の原則 (判断 1) を優先し、最小修正 (名前の是正) に留めた。
 
 ---
 
@@ -101,11 +138,11 @@
 | | 被験者を増やすほど通りにくくなる (G1 の `analyze.py` の `all(m["passed"])` と同じ構造)。 | |
 | 2 | Kill 条件に**計器側の枝**を足す —— 比較可能ペアが極小の被験者を `Kill` でなく | [V90] Fayant 逐語「a failed MC could be attributed to |
 | | `InstrumentInsufficient` として扱えるか。本タスクで追加した `x_q1_session_min_comparable_pairs` / | measurement problems」 |
-| | `x_q1_gate_attainable` はこの判断のための**材料**であり、判定ロジックには組み込んでいない。 | |
+| | `x_q1_min_session_gate_attainable` はこの判断のための**材料**であり、判定ロジックには組み込んでいない。 | |
 | 3 | `notes.md` の「X→Q1 は 5 名全員で 0.52 以下」に**ペア数を併記**する | 2026-08-28 の実測 (`§2-3`) |
 | | (P013 感度は **1 ペア**由来であることを、生の観測値と一緒に読めるようにする)。 | |
 | ~~4~~ | ~~判断 2 で発見した恒真バグ~~ → **実装時に修正済み** (`code-reviewer` HIGH 指摘への対応)。 | 本タスクの実装 (2026-08-29) |
-| | `x_q1_gate_attainable` は「完全一致でなくても `CINDEX_GO_ALL_MIN` を超えられるか」を問う | |
+| | `x_q1_min_session_gate_attainable` は「完全一致でなくても `CINDEX_GO_ALL_MIN` を超えられるか」を問う | |
 | | `k` 依存の非自明な判定に定義し直した (判断 2 参照)。研究者側の追加対応は不要。 | |
 
 ⚠️ **1・2 は研究者判断である。こちらで決めない。**

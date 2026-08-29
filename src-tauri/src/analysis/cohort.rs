@@ -77,7 +77,7 @@ struct CindexView {
     #[serde(default)]
     x_q1_session_median_comparable_pairs: Option<u64>,
     #[serde(default)]
-    x_q1_gate_attainable: Option<bool>,
+    x_q1_min_session_gate_attainable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -262,8 +262,9 @@ pub struct CohortSubjectSummary {
     /// (到達可能性診断・`.steering/20260829-phase1-cindex-attainability/`)。
     pub x_q1_session_min_comparable_pairs: Option<u64>,
     pub x_q1_session_median_comparable_pairs: Option<u64>,
-    /// ゲート閾値への理論的到達可能性 (`§3` 判断 1: 判定には使わない・報告専用)。
-    pub x_q1_gate_attainable: Option<bool>,
+    /// 最小ペア数セッション単体の理論的到達可能性 (被験者全体の中央値の到達可能性ではない。
+    /// `calibration_eval::cindex_min_session_gate_attainable` 参照)。判定には使わない・報告専用。
+    pub x_q1_min_session_gate_attainable: Option<bool>,
     pub answer_rate: f64,
     /// PreReg-2 被験者要件 (回答率≥0.80 & latency≤10s & 有効≥20)。
     pub per_subject_pass: bool,
@@ -491,7 +492,7 @@ pub fn cohort_verdict(subjects: &[CohortSubject]) -> CohortReport {
             x_q1_pooled: v.cindex.x_q1_pooled,
             x_q1_session_min_comparable_pairs: v.cindex.x_q1_session_min_comparable_pairs,
             x_q1_session_median_comparable_pairs: v.cindex.x_q1_session_median_comparable_pairs,
-            x_q1_gate_attainable: v.cindex.x_q1_gate_attainable,
+            x_q1_min_session_gate_attainable: v.cindex.x_q1_min_session_gate_attainable,
             answer_rate: v.measurement.answer_rate,
             per_subject_pass: v.measurement.per_subject_pass,
             evaluation_session_count: v.evaluation_session_count,
@@ -1184,7 +1185,7 @@ mod tests {
         let s = subject("P000", true, true, 0.9, 20, 18, 8, Some(0.70));
         assert_eq!(s.view.cindex.x_q1_session_min_comparable_pairs, None);
         assert_eq!(s.view.cindex.x_q1_session_median_comparable_pairs, None);
-        assert_eq!(s.view.cindex.x_q1_gate_attainable, None);
+        assert_eq!(s.view.cindex.x_q1_min_session_gate_attainable, None);
     }
 
     #[test]
@@ -1202,13 +1203,13 @@ mod tests {
                 "x_q1_session_median": 0.70,
                 "x_q1_session_min_comparable_pairs": 1,
                 "x_q1_session_median_comparable_pairs": 21,
-                "x_q1_gate_attainable": true
+                "x_q1_min_session_gate_attainable": true
             }
         }"#;
         let view: SubjectCalibrationView = serde_json::from_str(json).expect("parse");
         assert_eq!(view.cindex.x_q1_session_min_comparable_pairs, Some(1));
         assert_eq!(view.cindex.x_q1_session_median_comparable_pairs, Some(21));
-        assert_eq!(view.cindex.x_q1_gate_attainable, Some(true));
+        assert_eq!(view.cindex.x_q1_min_session_gate_attainable, Some(true));
     }
 
     #[test]
@@ -1219,7 +1220,41 @@ mod tests {
         let r = cohort_verdict(&subjects);
         assert_eq!(r.subjects.len(), 1);
         assert_eq!(r.subjects[0].x_q1_session_min_comparable_pairs, None);
-        assert_eq!(r.subjects[0].x_q1_gate_attainable, None);
+        assert_eq!(r.subjects[0].x_q1_min_session_gate_attainable, None);
+    }
+
+    #[test]
+    fn cohort_subject_summary_propagates_some_attainability_values_through_verdict() {
+        // /cross-review (Codex) 指摘: 上のテストは None の伝播しか検証していなかった。
+        // 新 JSON 形 (到達可能性フィールドあり) が cohort_verdict() の構築 (`cohort.rs`
+        // `subject_summaries.push` 箇所) を経由して `Some(...)` のまま最後まで届くことを確認する。
+        let json = r#"{
+            "schema": "calibration/v0.3",
+            "included_in_primary": true,
+            "evaluation_session_count": 8,
+            "measurement": {
+                "random_probe_total": 20, "random_probe_answered": 18,
+                "answer_rate": 0.9, "per_subject_pass": true
+            },
+            "cindex": {
+                "x_q1_pooled": 0.66,
+                "x_q1_session_median": 0.70,
+                "x_q1_session_min_comparable_pairs": 1,
+                "x_q1_session_median_comparable_pairs": 21,
+                "x_q1_min_session_gate_attainable": false
+            },
+            "vignette": { "total": 8, "matched": 7, "passed": true, "administered": true }
+        }"#;
+        let view: SubjectCalibrationView = serde_json::from_str(json).expect("parse");
+        let subjects = vec![CohortSubject {
+            subject_id: "P000".to_string(),
+            view,
+        }];
+        let r = cohort_verdict(&subjects);
+        assert_eq!(r.subjects.len(), 1);
+        assert_eq!(r.subjects[0].x_q1_session_min_comparable_pairs, Some(1));
+        assert_eq!(r.subjects[0].x_q1_session_median_comparable_pairs, Some(21));
+        assert_eq!(r.subjects[0].x_q1_min_session_gate_attainable, Some(false));
     }
 
     #[test]

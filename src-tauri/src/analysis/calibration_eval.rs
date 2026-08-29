@@ -324,7 +324,7 @@ pub fn concordance_index(pairs: &[(f64, u8)]) -> Option<f64> {
 /// [`concordance_index`] の比較可能ペア数つき版。
 ///
 /// 比較可能ペア数 `k` が分かれば、C-index は `0.5/k` 刻みの値しか取れないという
-/// 算術的事実が導ける。この粒度は [`cindex_gate_attainable`]
+/// 算術的事実が導ける。この粒度は [`cindex_min_session_gate_attainable`]
 /// (`.steering/20260829-phase1-cindex-attainability/`) がゲート到達可能性の判定に使う。
 /// 戻り値の第 1 要素は `concordance_index` と常に一致する。
 pub fn concordance_index_detailed(pairs: &[(f64, u8)]) -> Option<(f64, u64)> {
@@ -542,35 +542,40 @@ pub fn model_gate(subject_cindices: &[f64]) -> ModelGate {
     }
 }
 
-/// ゲート閾値 `CINDEX_GO_ALL_MIN` を**完全一致でなくても**超えられるか
-/// (Phase1 C-index 到達可能性診断・`.steering/20260829-phase1-cindex-attainability/`)。
+/// **最小ペア数セッション単体**が、ゲート閾値 `CINDEX_GO_ALL_MIN` を完全一致でなくても
+/// 超えられるか (Phase1 C-index 到達可能性診断・`.steering/20260829-phase1-cindex-attainability/`)。
 ///
-/// C-index は `k` 個の比較可能ペアがあれば `m / (2k)` (`m = 0..=2k`) 刻みの値しか取れない。
-/// 最良値 `1.0` (全ペア concordant) は `k` の大小に関わらず常に到達可能——それ自体は自明で
-/// 判別力を持たない (`k=1` でも `k=707` でも `true` になってしまい、G1 の `test_can_reject_at_all`
-/// のような「サンプル数由来の到達不能な下限」を再現できない。当初実装の恒真バグ・
+/// ⚠️ **これは「この被験者がゲートを超えられるか」ではない。** 被験者の
+/// `x_q1_session_median` は複数セッションの中央値なので、この関数が `false` を返す
+/// (= 最小ペア数セッション単体では完璧でないと超えられない) 場合でも、**他のセッションが
+/// 十分な `k` を持てば中央値そのものは非完全一致でゲートを超えうる**。
+/// 具体例 (`/cross-review` 2026-08-29 で Claude/Codex 双方が独立に発見した反例):
+/// セッション A (`k=1`, タイ → `0.5`) とセッション B (`k=10`, `0.9`) の中央値は `0.7` で
+/// `CINDEX_GO_ALL_MIN=0.55` を**非完全一致のまま**超えているが、`min(1,10)=1` に対する
+/// 本関数は `false` を返す。**「最も脆弱な 1 セッションの余裕度」を見る診断であり、
+/// 中央値全体の到達可能性を代表する値ではない** (当初はこの区別を欠いた恒真バグもあった。
 /// `decisions.md` 判断 2 参照)。
 ///
-/// 本関数が実際に問うのは「**1 段階だけ劣化した次善値 `(2k-1)/(2k)` でもなお閾値を超えるか**」
-/// である。超えないなら、この被験者がゲートを超えるには**文字通り完璧な結果以外あり得ない**
+/// C-index は `k` 個の比較可能ペアがあれば `m / (2k)` (`m = 0..=2k`) 刻みの値しか取れない。
+/// 本関数が問うのは「**1 段階だけ劣化した次善値 `1.0 - 0.5/k` でもなお閾値を超えるか**」である。
+/// 超えないなら、**このセッション単体**がゲートに寄与するには文字通り完璧な結果以外あり得ない
 /// —— そのような C-index は「信号」ではなく「たった 1 ペアの偶然」を測っている疑いが強い
-/// (`k=1` の被験者は必ずここで `false` になる。P013 感度がまさにこの実例)。`k` に依存する
-/// 非自明な判定になるよう、既存の凍結定数 `CINDEX_GO_ALL_MIN` のみを参照する。
+/// (`k=1` は必ず `false`。P013 感度がまさにこの実例)。既存の凍結定数 `CINDEX_GO_ALL_MIN`
+/// のみを参照する (`CINDEX_GO_MEDIAN` はコホート横断条件であり被験者 1 人のペア数からは
+/// 語れないため、ここでは判定しない)。
 ///
-/// ⚠️ `CINDEX_GO_MEDIAN` (コホート横断の中央値条件) はここでは判定しない。それは
-/// 被験者 1 人の比較可能ペア数からは語れない性質であり、cohort 層
-/// (`model_gate` / `cohort_verdict`) が母数全体に対して判定する。
-///
-/// `min_comparable_pairs` (中央値に寄与したセッションのうち最小のペア数。中央値の
-/// 脆弱性を示す最も厳しい制約) が `None` (寄与セッション無し) なら `None`。
-fn cindex_gate_attainable(min_comparable_pairs: Option<u64>) -> Option<bool> {
+/// `min_comparable_pairs` (中央値に寄与したセッションのうち最小のペア数) が `None`
+/// (寄与セッション無し) なら `None`。
+fn cindex_min_session_gate_attainable(min_comparable_pairs: Option<u64>) -> Option<bool> {
     let k = min_comparable_pairs?;
     if k == 0 {
         // 比較可能ペアが無いセッションはそもそも C-index が `None` になり
         // 中央値の母数に入らない (呼び出し元では発生しないが、関数単体として自己完結させる)。
         return Some(false);
     }
-    let near_best = (2 * k - 1) as f64 / (2 * k) as f64;
+    // `(2k-1)/(2k)` を乗算せずに書いた形 (Codex 指摘: 大きな k での乗算オーバーフロー経路を
+    // 構造的に無くす)。
+    let near_best = 1.0 - 0.5 / k as f64;
     Some(near_best > CINDEX_GO_ALL_MIN)
 }
 
@@ -630,12 +635,17 @@ pub struct SubjectCindex {
     pub x_q1_session_min_comparable_pairs: Option<u64>,
     /// `x_q1_session_comparable_pairs` の中央値 (偶数個は 2 値の整数中央値。切り捨て。`median_u64`)。
     pub x_q1_session_median_comparable_pairs: Option<u64>,
-    /// `CINDEX_GO_ALL_MIN` を**完全一致でなくても**超えられるか ([`cindex_gate_attainable`] 参照)。
+    /// `x_q1_session_min_comparable_pairs` の**そのセッション単体**が `CINDEX_GO_ALL_MIN` を
+    /// 完全一致でなくても超えられるか ([`cindex_min_session_gate_attainable`] 参照)。
     ///
-    /// ⚠️ **判定には使わない** (合否経路を増やさない・`decisions.md` 判断 1)。
-    /// `CINDEX_GO_MEDIAN` (コホート横断条件) はここでは判定しない (判断 2)。
-    /// `x_q1_session_min_comparable_pairs` が `None` (寄与セッション無し) なら `None`。
-    pub x_q1_gate_attainable: Option<bool>,
+    /// ⚠️ **「この被験者がゲートを超えられるか」ではない**——中央値は複数セッションの
+    /// 集約なので、本フィールドが `false` でも他セッションのおかげで
+    /// `x_q1_session_median` 自体は非完全一致でゲートを超えうる (`/cross-review` 2026-08-29
+    /// で判明した反例。`decisions.md` 判断 3 参照)。**判定には使わない**
+    /// (合否経路を増やさない・判断 1)。`CINDEX_GO_MEDIAN` (コホート横断条件) はここでは
+    /// 判定しない (判断 2)。`x_q1_session_min_comparable_pairs` が `None`
+    /// (寄与セッション無し) なら `None`。
+    pub x_q1_min_session_gate_attainable: Option<bool>,
 }
 
 /// MNAR 上下限 (PreReg-7)。未回答 q を 全高(5)/全低(1) に置いた X↔Q1 C-index の範囲。
@@ -1040,7 +1050,9 @@ pub fn compute_calibration_metrics(sessions: &[SessionData], spec: AggSpec) -> C
         y_q2_pooled,
         y_q2_session_median: median_f64(&per_session_y_q2),
         eval_pair_source_count: eval_pairs_x_q1.len(),
-        x_q1_gate_attainable: cindex_gate_attainable(x_q1_session_min_comparable_pairs),
+        x_q1_min_session_gate_attainable: cindex_min_session_gate_attainable(
+            x_q1_session_min_comparable_pairs,
+        ),
         x_q1_session_comparable_pairs,
         y_q2_session_comparable_pairs,
         x_q1_session_min_comparable_pairs,
@@ -1588,11 +1600,11 @@ mod tests {
         assert_eq!(concordance_index_detailed(&[(0.1, 3u8), (0.9, 3)]), None);
     }
 
-    // ---- cindex_gate_attainable ----
+    // ---- cindex_min_session_gate_attainable ----
 
     #[test]
     fn gate_attainable_none_when_no_contributing_sessions() {
-        assert_eq!(cindex_gate_attainable(None), None);
+        assert_eq!(cindex_min_session_gate_attainable(None), None);
     }
 
     #[test]
@@ -1600,24 +1612,24 @@ mod tests {
         // k=1: 取りうる値は {0.0, 0.5, 1.0} のみ。次善値 0.5 は CINDEX_GO_ALL_MIN=0.55 を
         // 超えないので、この被験者がゲートを超えるには文字通り完璧な結果 (1.0) しかない。
         // → 到達可能性診断としては「実質的に判別力を持たない」ことを示す false。
-        assert_eq!(cindex_gate_attainable(Some(1)), Some(false));
+        assert_eq!(cindex_min_session_gate_attainable(Some(1)), Some(false));
     }
 
     #[test]
     fn gate_attainable_true_when_a_non_perfect_result_could_still_pass() {
         // k=2: 次善値 (2*2-1)/(2*2) = 0.75 > 0.55 → 完璧でなくても超えられる。
-        assert_eq!(cindex_gate_attainable(Some(2)), Some(true));
+        assert_eq!(cindex_min_session_gate_attainable(Some(2)), Some(true));
         // k が大きいほど刻みが細かくなり、次善値は 1.0 に近づく一方 (2k-1)/(2k) 自体は
         // 単調増加するので、より小さい k で通れば大きい k でも通る。
-        assert_eq!(cindex_gate_attainable(Some(21)), Some(true));
-        assert_eq!(cindex_gate_attainable(Some(707)), Some(true));
+        assert_eq!(cindex_min_session_gate_attainable(Some(21)), Some(true));
+        assert_eq!(cindex_min_session_gate_attainable(Some(707)), Some(true));
     }
 
     #[test]
     fn gate_attainable_is_self_contained_for_zero_pairs() {
         // 上流 (`concordance_index_detailed`) は comparable=0 を None にして中央値の母数から
         // 除外するため通常発生しないが、関数単体としても 0 除算せず false を返す。
-        assert_eq!(cindex_gate_attainable(Some(0)), Some(false));
+        assert_eq!(cindex_min_session_gate_attainable(Some(0)), Some(false));
     }
 
     // ---- aggregate_window ----
@@ -1862,7 +1874,7 @@ mod tests {
         assert_eq!(r.cindex.x_q1_session_median_comparable_pairs, Some(1));
         // k=1 は次善値 0.5 が CINDEX_GO_ALL_MIN=0.55 を超えないので、この被験者は
         // 完璧な結果以外ではゲートを超えられない (P013 感度が実例)。
-        assert_eq!(r.cindex.x_q1_gate_attainable, Some(false));
+        assert_eq!(r.cindex.x_q1_min_session_gate_attainable, Some(false));
     }
 
     #[test]
@@ -1882,7 +1894,7 @@ mod tests {
         assert!(r.cindex.x_q1_session_comparable_pairs.is_empty());
         assert_eq!(r.cindex.x_q1_session_min_comparable_pairs, None);
         assert_eq!(r.cindex.x_q1_session_median_comparable_pairs, None);
-        assert_eq!(r.cindex.x_q1_gate_attainable, None);
+        assert_eq!(r.cindex.x_q1_min_session_gate_attainable, None);
     }
 
     #[test]
@@ -1922,7 +1934,7 @@ mod tests {
         assert_eq!(r.cindex.y_q2_session_comparable_pairs, vec![3, 3]);
         assert_eq!(r.cindex.x_q1_session_min_comparable_pairs, Some(3));
         assert_eq!(r.cindex.x_q1_session_median_comparable_pairs, Some(3));
-        assert_eq!(r.cindex.x_q1_gate_attainable, Some(true));
+        assert_eq!(r.cindex.x_q1_min_session_gate_attainable, Some(true));
     }
 
     // =========================================================================
