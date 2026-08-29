@@ -36,5 +36,16 @@
 - [x] ⚠️ Phase1 プロジェクトには**触らない**（★ 読み取りのみ実施）
 
 ## レビュー / 完了処理
-- [ ] レビュー
-- [ ] git commit
+- [x] `/cross-review`（Claude ∥ Codex）→ ⚠️ Codex HIGH「T-24 は race-safe でない（TOCTOU）」を採用し、
+      「fail-closed」という強い表現を撤回。★ 起票 T-27 / T-28
+- [x] `security-checker` → ⚠️★★★ **HIGH: ロスターへの数式インジェクション**（`=IMPORTDATA(...)` で
+      全参加者の氏名・メールが流出しうる）→ `o1PlainText_()` で 3 か所を無害化
+- [x] ⚠️ MEDIUM: 拒否リストが**書き込み経路で見られていなかった** → `o1OpenRoster_` /
+      `checkO1RosterShape` の両方に配線
+- [x] ⚠️ MEDIUM: 引き継ぎに書いた Apps Script プロジェクト ID を削除（★ **履歴からも消した**）
+- [x] LOW 3 件（ログのセル値を 20 文字に / 点検関数の「書き込まない」を throw で撃つ / 台帳 §5b に OS 列）
+- [x] git commit → `cbb152a`（★ 履歴から ID を消すため 1 本に再構成）
+- [x] push → **PR #122** → CI 全緑 → **マージ `abeb572`**
+- [x] ⚠️ `main` の CI 発火確認（run = 1 件）
+- [x] ★ GAS 同期 → **SHA `15d31a83ce04fdd5` で一致**／`checkO1RosterShape()` ✅／`checkO1FormConfig()` ✅
+      （⚠️ 1 度目の貼り付けが壊れたが、**保存前にハッシュで気づき `ctrl+z` で復元**）
