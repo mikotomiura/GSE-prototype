@@ -2366,14 +2366,6 @@ mod tests {
         );
     }
 
-    /// ⚠️★★ `hook_health` 行 (フック生存診断) を含む NDJSON が **`run_replay` を通る**こと。
-    ///
-    /// ★ この回帰が要る理由 (2026-08-09 に実測で踏んだ): `run_replay` は未知タグを
-    /// `Err` にして**中断する**ため、`logger.rs` に行型を足して `ReplayEvent` に足し忘れると
-    /// **その版のアプリで採った実セッションが 1 本も replay できなくなる**
-    /// (`parse error: unknown variant 'hook_health'`)。
-    /// ⚠️ ゴールデン fixture は全て旧形式なので、**ゴールデンが緑でもこの事故は検出できない**。
-    #[test]
     /// ⚠️★★★ **O1 (R3) の 4 行種が `--snapshot` 経路を落とさない**こと。
     ///
     /// ★ `run_replay` は**未知タグを `Err` にして中断する**ので、行種を足して
@@ -2422,6 +2414,14 @@ mod tests {
         let _ = std::fs::remove_file(&tmp);
     }
 
+    /// ⚠️★★ `hook_health` 行 (フック生存診断) を含む NDJSON が **`run_replay` を通る**こと。
+    ///
+    /// ★ この回帰が要る理由 (2026-08-09 に実測で踏んだ): `run_replay` は未知タグを
+    /// `Err` にして**中断する**ため、`logger.rs` に行型を足して `ReplayEvent` に足し忘れると
+    /// **その版のアプリで採った実セッションが 1 本も replay できなくなる**
+    /// (`parse error: unknown variant 'hook_health'`)。
+    /// ⚠️ ゴールデン fixture は全て旧形式なので、**ゴールデンが緑でもこの事故は検出できない**。
+    #[test]
     fn hook_health_line_is_skipped_by_run_replay() {
         let line =
             r#"{"type":"hook_health","t":120000,"alive":false,"starved_ms":120000,"rehook":true}"#;
