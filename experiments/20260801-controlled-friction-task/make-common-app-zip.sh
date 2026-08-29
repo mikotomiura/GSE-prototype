@@ -186,7 +186,7 @@ if [ "$SELFTEST" -eq 1 ]; then
     esac
     miss=""
     for p in "${README_MUST_COMMON[@]}"; do
-      grep -q "$p" "$r" 2>/dev/null || miss="$miss 「$p」"
+      grep -q "$p" "$r" 2>/dev/null || miss="$miss 「${p}」"
     done
     if [ -z "$miss" ]; then ok_ "$m: macOS README に共通の 4 語がある"; else ng_ "$m: 欠けている語:$miss"; fi
   done
@@ -194,13 +194,13 @@ if [ "$SELFTEST" -eq 1 ]; then
   # 4. ★ O1 固有の語（★ G1 の README には**無くてよい**ことも測る = 流用の検出）
   miss=""
   for p in "${README_MUST_O1[@]}"; do
-    grep -q "$p" "$HERE/dist-readme-macos-o1.txt" 2>/dev/null || miss="$miss 「$p」"
+    grep -q "$p" "$HERE/dist-readme-macos-o1.txt" 2>/dev/null || miss="$miss 「${p}」"
   done
   if [ -z "$miss" ]; then ok_ "o1: macOS README に O1 固有の語がある"; else ng_ "o1: 欠けている語:$miss"; fi
 
   miss=""
   for p in "${README_MUST_O1[@]}"; do
-    grep -q "$p" "$HERE/dist-readme-windows-o1.txt" 2>/dev/null || miss="$miss 「$p」"
+    grep -q "$p" "$HERE/dist-readme-windows-o1.txt" 2>/dev/null || miss="$miss 「${p}」"
   done
   if [ -z "$miss" ]; then ok_ "o1: Windows README に O1 固有の語がある"; else ng_ "o1: 欠けている語:$miss"; fi
 
@@ -208,7 +208,7 @@ if [ "$SELFTEST" -eq 1 ]; then
   for r in "$HERE/dist-readme-macos.txt" "$HERE/dist-readme-macos-o1.txt"; do
     bad=""
     for p in "${README_MUST_NOT[@]}"; do
-      ! grep -q "$p" "$r" 2>/dev/null || bad="$bad 「$p」"
+      ! grep -q "$p" "$r" 2>/dev/null || bad="$bad 「${p}」"
     done
     if [ -z "$bad" ]; then ok_ "$(basename "$r"): 旧版の案内が無い"; else ng_ "$(basename "$r"): 旧版が残っている:$bad"; fi
   done
@@ -278,8 +278,17 @@ if [ "$SELFTEST" -eq 1 ]; then
   # ⚠️★★★ **`tr -cd '\\r'` と書くと空回りする**（code-reviewer HIGH・2026-08-28 に実測で発覚）:
   #   GNU tr は集合を「バックスラッシュと r の 2 文字」と読むので、⚠️ `rem` 行の `r` を数えてしまい、
   #   ★ **LF only のファイルでも必ず通る**。→ ★ バックスラッシュは **1 個**である。
+  # ⚠️★★★ **`od` の区切り幅に依存しない**（2026-08-29 に macOS 実機で発覚）:
+  #   ★ BSD(macOS) の `od -An -tx1` はバイト間を **2 スペース**で区切るが、GNU coreutils は 1。
+  #   → `grep -q 'ef bb bf'` は **macOS では必ず外れ**、⚠️ **正常な launcher を「BOM 無し」と
+  #     誤判定していた**（★ 偽陽性）。しかも BOM 検査が常に false になるせいで、
+  #     ⚠️ 隣の陽性対照 (8d) まで自動的に緑になり、空回りを検出できなかった。
+  #   → ★ **空白を全部落として完全一致**で比べる。⚠️ 部分一致 (`grep`) もやめる
+  #     （★ 先頭 3 バイト以外に ef bb bf が出たときに通る余地を残さない）。
   bom_crlf_ok () {
-    head -c 3 "$1" 2>/dev/null | od -An -tx1 | grep -q 'ef bb bf' || return 1
+    local head3
+    head3="$(head -c 3 "$1" 2>/dev/null | LC_ALL=C od -An -tx1 | LC_ALL=C tr -d '[:space:]')"
+    [ "$head3" = "efbbbf" ] || return 1
     # ⚠️★★ **CR が 1 個でもあれば通す、にしない**（Codex /cross-review 指摘・2026-08-28）。
     #   ★ 大半が LF only でも 1 行だけ CRLF なら合格してしまう。
     #   → ★ **全行が CRLF**（CR の数 == LF の数、かつ 0 でない）を要求する。
@@ -306,8 +315,17 @@ if [ "$SELFTEST" -eq 1 ]; then
   tr -d '\r' < "$HERE/launch-g1-windows.bat" > "$ctl"          # CR を全部剥いだ複製
   tail -c +4 "$HERE/launch-g1-windows.bat" > "$ctl2"       # BOM を外した複製
   # ⚠️★ **1 行だけ LF にした複製**（Codex 指摘: 「CR が 1 個でもあれば通る」を塞いだことの対照）
-  sed '2s/$\r//' "$HERE/launch-g1-windows.bat" > "$ctl3" 2>/dev/null || cp "$HERE/launch-g1-windows.bat" "$ctl3"
+  # ⚠️★★★ **旧 `sed '2s/$\r//'` は 1 バイトも変えていなかった**（2026-08-29 に macOS で実測）:
+  #   ★ BRE では行頭以外の `$` は**リテラル**、かつ BSD sed は `\r` を**エスケープとして解さない**
+  #     ので、この式は「`$r` という文字列」を探していた。→ ⚠️ 対照が**元ファイルの完全な複製**になり、
+  #     ★ 何も壊していないものを「壊した複製」と呼んでいた。
+  #   ★ 直し方: **リテラルの CR** を `printf` で作って渡す（BSD/GNU の両方で同じ意味になる）。
+  ctl_cr="$(printf '\r')"
+  sed "2s/${ctl_cr}\$//" "$HERE/launch-g1-windows.bat" > "$ctl3"
   ctlbad=""
+  # ⚠️★★ **対照が本当に壊れているかを先に確かめる**（★ 対照の検査）。
+  #   ★ 複製が元と 1 バイトも違わないなら、下の判定は**何も測っていない**。
+  cmp -s "$HERE/launch-g1-windows.bat" "$ctl3" && ctlbad="$ctlbad 対照3が元と同一(壊せていない)"
   bom_crlf_ok "$ctl"  && ctlbad="$ctlbad CR欠落を見逃す"
   bom_crlf_ok "$ctl2" && ctlbad="$ctlbad BOM欠落を見逃す"
   bom_crlf_ok "$ctl3" && ctlbad="$ctlbad 1行だけLFを見逃す"

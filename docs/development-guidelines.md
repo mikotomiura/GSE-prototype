@@ -435,8 +435,33 @@ Step 1 以降に進まず、修復コマンド例を出力して停止する。�
   UTF-16 BOM とは別物。ソースの UTF-8 BOM は必須対応)。検証: `[Management.Automation.Language.Parser]::ParseFile(...)`
   が errors 0 を返すこと。
 
-これらは `scripts/sync-session.ps1` 内のコメントにも併記済み。bash 側 (`sync-session.sh`) は
-`set -euo pipefail` + `bash -n` 構文チェックで十分堅牢 (同種の問題は発生せず)。
+これらは `scripts/sync-session.ps1` 内のコメントにも併記済み。
+
+⚠️★★★ **2026-08-29 訂正: 旧文「bash 側 (`sync-session.sh`) は `set -euo pipefail` +
+`bash -n` 構文チェックで十分堅牢 (同種の問題は発生せず)」は反証された。**
+
+★ bash 側も **同型 (日本語のバイト列でパースが変わる) を踏んでいた**:
+
+- ⚠️ macOS 標準の bash は **3.2** で、**多バイト文字を変数名の一部として読む**。
+  変数を `${...}` で括らずに書き、その直後に全角括弧を置くと、
+  「変数名 + 括弧のバイト」という存在しない変数になり `set -u` で落ちる。
+- ⚠️ 実害: `sync-session.sh` の **O1 ガードが `exit 4` に到達できず `exit 1` を返していた**
+  (`docs/o1-deletion-ledger.md` §4 の約束を支える番人)。
+- ⚠️★ **`bash -n` はこれを検出できない** (実測: 違反ファイルに対し **rc=0**)。
+  構文は正しく、**実行時に unbound variable になる**ので構文検査の管轄外である。
+- ⚠️ `set -euo pipefail` は「落ちること」を保証するだけで、**落ちる場所を選べない**。
+  今回はエラーメッセージを出す行で落ちたため、**exit code の契約ごと壊れた**。
+
+★ **規約**: シェルスクリプトでは **`$name` の直後に多バイト文字が来るなら `${name}` と括る**。
+`${` を見た bash は閉じ `}` まで変数名として読むので、後続バイトの解釈に依存しない
+(bash 3.2 / 5.x / git-bash / zsh で同じ結果)。
+
+★ **機械で見張る**: `scripts/check-shell-portability.sh` が repo 全体を走査する
+(陽性/陰性対照つき)。CI の `frontend-check` と `check-o1-release-readiness.sh` から呼ばれる。
+⚠️ 見ているのは**この 1 型だけ**であり、BSD/GNU のコマンド差 (`od` / `sed -i` / `tr` / `grep`)
+などは対象外である (スクリプト冒頭に「見ていないもの」を列挙してある)。
+
+詳細: `.steering/20260829-macos-shell-portability/`
 
 ### 10.3 Schema 管理 (機械生成)
 

@@ -266,6 +266,18 @@ jobs:
         run: python3 -m unittest scripts.tests.test_capabilities_gate
         env:
           PYTHONUTF8: "1"
+      # ⚠️★★★ シェル移植性ゲート (bash 3.2 の変数名パース)。
+      #   ★ macOS 標準の bash は 3.2 で、**多バイト文字を変数名の一部として読む**。
+      #     → 括らずに書いた変数の直後に全角括弧が来ると `set -u` で落ちる。
+      #   ⚠️ 実害: `scripts/sync-session.sh` の **O1 ガードが `exit 4` に到達できず `exit 1`**
+      #     を返していた (2026-08-29 に macOS 実機で実測)。★ O1 セッションを gse-dataset へ
+      #     出さない番人であり、`docs/o1-deletion-ledger.md` §4 の約束を支えている。
+      #   ⚠️★ **1 箇所ずつ直す方式は効かなかった**: 罠を踏んだ実測コメントが既にあったのに、
+      #     リポジトリ全体では 17 箇所生きていた。→ 機械で見張る。
+      #   ★ 陽性/陰性対照を内蔵しているので、このステップだけで
+      #     「検査が空振りしていないこと」まで見る (上の 2 つの --self-test と同じ思想)。
+      - name: Shell portability gate (bash 3.2 の変数名パース・対照つき)
+        run: bash scripts/check-shell-portability.sh
 
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:
