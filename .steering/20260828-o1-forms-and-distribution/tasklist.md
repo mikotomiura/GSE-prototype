@@ -16,7 +16,7 @@
 
 ## C-4 O1 のフォーム類
 
-- [x] `Form_G1/GSE_O1_Form_Builder.gs` を新規作成（⚠️ G1 の `.gs` は **1 バイトも変えていない**）
+- [x] `Form_O1/GSE_O1_Form_Builder.gs` を新規作成（⚠️ G1 の `.gs` は **1 バイトも変えていない**）
   - [x] **O1-C 参加登録＝説明・同意**（★ 同意の正本）— 同意 11 項目 ＋ 氏名 / メール / P-ID / OS
   - [x] **O1-S 終了後アンケート** — 受容性・負担（ADR-014 D8）＋ 宣言 UI の使い勝手（研究者判断 2）
   - [x] P-ID 採番（★ **Phase1 ロスターただ 1 つ**から・冪等）
@@ -27,8 +27,8 @@
   - [x] 段 1: 別プロジェクトに貼る（配備手順に明記）
   - [x] 段 2: `o1AssertNotG1Form_` が G1 の 3 フォーム ID を**拒否**（★ `openById` より**前**）
   - [x] 段 3: `o1AssertSafeToRebuild_` が回答のあるフォームを守る（既定 fail-closed）
-- [x] `Form_G1/o1_form_builder_test.cjs` → ★ **89 ケース全通過**（★ レビュー後に 10 件追加）
-- [x] `Form_G1/o1_form_builder_mutation_test.sh` → ★ **25 変異すべて赤**（★ レビュー指摘のガードにも変異を追加）
+- [x] `Form_O1/o1_form_builder_test.cjs` → ★ **89 ケース全通過**（★ レビュー後に 10 件追加）
+- [x] `Form_O1/o1_form_builder_mutation_test.sh` → ★ **25 変異すべて赤**（★ レビュー指摘のガードにも変異を追加）
   - [x] ⚠️ 変異テストが**検査の穴を 1 件見つけた**（★ `installO1ConsentTrigger` の検査が
         「G1 フォームが存在しない」で緑になっていた）→ 検査を直した
   - [x] ⚠️ **効いていない変異を 1 件見つけた**（★ 置換後に後続行の連結が生き残っていた）→ 変異を直した
@@ -65,8 +65,8 @@
 
 ## 検証（★ 実行した結果）
 
-- [x] `node Form_G1/o1_form_builder_test.cjs` → **96 / 96**
-- [x] `bash Form_G1/o1_form_builder_mutation_test.sh` → **25 変異すべて赤**
+- [x] `node Form_O1/o1_form_builder_test.cjs` → **96 / 96**
+- [x] `bash Form_O1/o1_form_builder_mutation_test.sh` → **25 変異すべて赤**
 - [x] `bash scripts/sync_session_o1_guard_test.sh` → **13 / 13**（★ `.ps1` も実行済み）
 - [x] `bash make-common-app-zip.sh --selftest` → **14 / 14**
 - [x] `bash -n` — `make-common-app-zip.sh` / `run.sh` / `sync-session.sh` / `check-o1-release-readiness.sh`

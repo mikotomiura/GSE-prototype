@@ -24,10 +24,10 @@
 
 | 対象 | 何をするか | 状態 |
 |---|---|---|
-| `Form_G1/GSE_O1_Submit.gs` | ★ **新規**。O1 専用の受け口（プロジェクト C） | ✅ 作成・検査済み |
-| `Form_G1/o1_submit_guard_test.cjs` | ★ **新規**。受け口のガードを実測する 41 ケース | ✅ 作成・変異 11/11 赤 |
+| `Form_O1/GSE_O1_Submit.gs` | ★ **新規**。O1 専用の受け口（プロジェクト C） | ✅ 作成・検査済み |
+| `Form_O1/o1_submit_guard_test.cjs` | ★ **新規**。受け口のガードを実測する 41 ケース | ✅ 作成・変異 11/11 赤 |
 | `experiments/20260801-controlled-friction-task/run.sh` | §4 に O1 受け口の検査を接続 | ✅ 接続済み |
-| `Form_G1/GSE_O1_Form_Builder.gs`（仮） | C-4: O1 のフォーム 2 本（参加登録 / 終了後） | ⬜ 未着手 |
+| `Form_O1/GSE_O1_Form_Builder.gs`（仮） | C-4: O1 のフォーム 2 本（参加登録 / 終了後） | ⬜ 未着手 |
 | `experiments/.../make-distribution.sh` 系 | C-5: 配布物に `o1.mode` を置く | ⬜ 未着手 |
 | O1 同意文書 | C-6: 研究責任者・所属・連絡先を埋める | ⬜ 研究者の情報待ち |
 | 削除台帳 | C-7 (R-14): 送信済み分の削除手順 | ⬜ 未着手 |
@@ -50,7 +50,7 @@
 
 | 何を | どう測るか |
 |---|---|
-| 受け口のガード | `node Form_G1/o1_submit_guard_test.cjs`（★ 実 Drive にも実エンドポイントにも触らない） |
+| 受け口のガード | `node Form_O1/o1_submit_guard_test.cjs`（★ 実 Drive にも実エンドポイントにも触らない） |
 | ⚠️ ガードが空回りしていないか | ★ **変異テスト**（ガードを 1 つずつ壊して赤になるか）を毎回回す |
 | ⚠️ 検査自体が空回りしていないか | ★ ケース数の下限（30）／`run.sh` の `guard_count()` が件数を読めること |
 | 名前規約の 2 か所整合 | ★ Rust `submission::o1_age_file_name` から導いた名前を**陽性対照**に並べる（実走で生成された stem を含む） |

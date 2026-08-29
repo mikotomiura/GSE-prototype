@@ -1,6 +1,6 @@
 # 設計 — O1 のフォーム類 ＋ 配布物の o1.mode
 
-## 1. C-4 フォーム類 — `Form_G1/GSE_O1_Form_Builder.gs`
+## 1. C-4 フォーム類 — `Form_O1/GSE_O1_Form_Builder.gs`
 
 ### 1-1. ⚠️★★★ **G1 の隣に立たない**
 

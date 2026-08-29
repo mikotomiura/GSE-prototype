@@ -6,9 +6,9 @@
 > |---|---|
 > | 状態 | ⚠️★★★ **ドラフト。⚠️ 研究者の承認まで配布しない**（ADR-014 判断 2） |
 > | 根拠 | ADR-014 **D7**（3 点セット）/ **D8**（保管・⚠️ **2026-08-25 に制約 1 を O1 について上書き**）/ **判断 3**（倫理審査不要の 4 根拠）／ ADR-016 **D9**（二重記録）/ **判断 4・4b**（宣言 UI・2026-08-25）／ ADR-012 **D12**（画面録画） |
-> | ⚠️ 配布前に終えること | ✅ **宣言 UI / (B) 常時収集 / 日次ローテート ＋ 猶予つき自動提出 / §4-3 の区間指定削除 UI は 2026-08-26 に実装済み**（`.steering/20260827-o1-collection-enablement/`）。✅ **2026-08-28 に解消**: 削除台帳 (`docs/o1-deletion-ledger.md`) ／ 研究責任者・所属・連絡先 ／ O1 専用の GAS 受け口 (`Form_G1/GSE_O1_Submit.gs`) ／ age 公開鍵は G1 と共用（研究者判断 C-2）。✅ **2026-08-28 に解消**: **保管上限の数値**（台帳 §5）／ **O1 のフォーム類**（`Form_G1/GSE_O1_Form_Builder.gs`）／ **配布物の `o1.mode`**（`make-common-app-zip.sh --mode o1`）。⚠️ **残り**: **受け口の実配備**（研究者が手で行う）／ **送信先 Drive フォルダ** ／ **O1 の liveness 閾値** ／ **送信 timeout の見直し**。★ 残りは `bash scripts/check-o1-release-readiness.sh` が機械で持つ（⚠️ 緑になるまで配らない）。★ `data-privacy` Skill の拡張は**完了済み**（ルール 6 / 7） |
+> | ⚠️ 配布前に終えること | ✅ **宣言 UI / (B) 常時収集 / 日次ローテート ＋ 猶予つき自動提出 / §4-3 の区間指定削除 UI は 2026-08-26 に実装済み**（`.steering/20260827-o1-collection-enablement/`）。✅ **2026-08-28 に解消**: 削除台帳 (`docs/o1-deletion-ledger.md`) ／ 研究責任者・所属・連絡先 ／ O1 専用の GAS 受け口 (`Form_O1/GSE_O1_Submit.gs`) ／ age 公開鍵は G1 と共用（研究者判断 C-2）。✅ **2026-08-28 に解消**: **保管上限の数値**（台帳 §5）／ **O1 のフォーム類**（`Form_O1/GSE_O1_Form_Builder.gs`）／ **配布物の `o1.mode`**（`make-common-app-zip.sh --mode o1`）。⚠️ **残り**: **受け口の実配備**（研究者が手で行う）／ **送信先 Drive フォルダ** ／ **O1 の liveness 閾値** ／ **送信 timeout の見直し**。★ 残りは `bash scripts/check-o1-release-readiness.sh` が機械で持つ（⚠️ 緑になるまで配らない）。★ `data-privacy` Skill の拡張は**完了済み**（ルール 6 / 7） |
 > | ⚠️ 署名済み原本 | **repo に置かない**（PII）。紙で保管する（★ G1 と同じ作法） |
-> | 雛形の穴 | ✅ **埋めた（2026-08-28）**。✅ **保管上限の数値も確定**（`docs/o1-deletion-ledger.md` §5・本文 §5）。⚠️ ★ **同意の正本は .md ではなくフォーム**である（`Form_G1/GSE_O1_Form_Builder.gs` の `buildO1ConsentForm`）。★ 本ファイルはその上流の雛形 |
+> | 雛形の穴 | ✅ **埋めた（2026-08-28）**。✅ **保管上限の数値も確定**（`docs/o1-deletion-ledger.md` §5・本文 §5）。⚠️ ★ **同意の正本は .md ではなくフォーム**である（`Form_O1/GSE_O1_Form_Builder.gs` の `buildO1ConsentForm`）。★ 本ファイルはその上流の雛形 |
 > | 作業記録 | `.steering/20260823-o1-nonkeystroke-gap-and-prereg/` |
 
 ---

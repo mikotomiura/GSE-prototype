@@ -13,7 +13,7 @@
 `from_secs(180)` が消えている** の**両方**でだけ緑になる。
 ⚠️ 片方だけでは緑にならないことを `--selftest` が陽性対照つきで確かめている。
 
-## 何を測るのか（★ `Form_G1/GSE_O1_Submit.gs` 配備手順 8）
+## 何を測るのか（★ `Form_O1/GSE_O1_Submit.gs` 配備手順 8）
 
 ⚠️★★ **デプロイ済みの受け口が要る**（→ B-1）。★ 手順:
 
@@ -63,7 +63,7 @@
 
 ## 関連
 
-- `Form_G1/GSE_O1_Submit.gs`（★ 受け口・`MAX_BYTES = 48 MB`）
+- `Form_O1/GSE_O1_Submit.gs`（★ 受け口・`MAX_BYTES = 48 MB`）
 - `src-tauri/src/reconcile.rs`（★ 送信側・現在は `from_secs(180)` 固定）
 - `.steering/20260806-g1-auto-submit-on-block-end/gas-measurements.md`（★ 旧実測・Drive 保存を含まない）
 - `.steering/20260828-o1-gate-closeout-and-deployment/design.md`

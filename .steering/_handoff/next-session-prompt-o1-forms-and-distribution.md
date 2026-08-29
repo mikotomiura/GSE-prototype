@@ -43,7 +43,7 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 18/18 になるは
 | **A. 打鍵の実機確認** | ✅ **完了**。`key` 行 184 本・**生 VK 0**・`feat.keys` 最大 70・トレイ「計測中」 | `20260828-…/decisions.md` 判断 A-1 |
 | **B. UI（3/4）** | ✅ 宣言 4 択→ローテート／すぐ止める（★ 停止中 `feat` 0 行）／開始前ゲート（**両方向**） | 同 判断 B-1 |
 | **C-1/C-2 研究者判断** | ✅ O1 は**別プロジェクト C**／age 鍵は **G1 と共用** | 同 |
-| **O1 受け口** | ✅ `Form_G1/GSE_O1_Submit.gs` ＋ 44 ケース検査（★ 変異 11/11 赤） | 同 判断 C-1 実装 |
+| **O1 受け口** | ✅ `Form_O1/GSE_O1_Submit.gs` ＋ 44 ケース検査（★ 変異 11/11 赤） | 同 判断 C-1 実装 |
 | **C-6 連絡先** | ✅ **三浦尊統 / ZEN大学 / mmiura.network@gmail.com** | 同 判断 C-6 |
 | **C-7 削除台帳** | ✅ `docs/o1-deletion-ledger.md`（A-1..A-12 / B-1..B-7） | 同 判断 C-7 |
 | **配布前ゲート** | ✅ `scripts/check-o1-release-readiness.sh`（`--selftest` 18/18） | 同 判断 C-8 |
@@ -80,7 +80,7 @@ bash scripts/check-o1-release-readiness.sh --selftest   # ★ 18/18 になるは
 
 ### C-3. 受け口の実配備（⚠️ **研究者が手で行う**）
 
-★ 手順は `Form_G1/GSE_O1_Submit.gs` のヘッダに全部書いてある（1〜8）。要点:
+★ 手順は `Form_O1/GSE_O1_Submit.gs` のヘッダに全部書いてある（1〜8）。要点:
 
 1. ⚠️ **新規プロジェクト**に貼る（`GSE_Gate1_submit` にも `GSE_Gate1` にも貼らない）
 2. **O1 専用の** Drive 受け取りフォルダを作り `FOLDER_ID` に入れる（⚠️ G1 のを指さない）

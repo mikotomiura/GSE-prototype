@@ -192,9 +192,9 @@ else
   #       (code-reviewer 指摘)。
   #   → ★ O1 の受け口の検査は `scripts/check-o1-release-readiness.sh` が回す（そちらが正）。
   #     ここでは **気づけるように報告だけ**する。
-  if [ -f ../../Form_G1/o1_submit_guard_test.cjs ]; then
+  if [ -f ../../Form_O1/o1_submit_guard_test.cjs ]; then
     TMP_O=$(mktemp)
-    if node ../../Form_G1/o1_submit_guard_test.cjs > "$TMP_O" 2>&1; then
+    if node ../../Form_O1/o1_submit_guard_test.cjs > "$TMP_O" 2>&1; then
       note "（参考・G1 の合否には影響しない）O1 受け口のガードは緑（$(guard_count "$TMP_O") ケース）"
     else
       note "（参考・G1 の合否には影響しない）⚠️ O1 受け口のガードが赤。★ bash scripts/check-o1-release-readiness.sh を見ること"
@@ -208,9 +208,9 @@ else
   #     ⚠️ 赤くなるということは **G1 のフォームが破壊されうる状態**を意味する
   #     （2026-08-07 に G1-C の全設問を消した事故がある）。
   #   ⚠️ それでも G1 の合否は動かさない（上のブロックと同じ方針）。★ 報告だけする。
-  if [ -f ../../Form_G1/o1_form_builder_test.cjs ]; then
+  if [ -f ../../Form_O1/o1_form_builder_test.cjs ]; then
     TMP_FB=$(mktemp)
-    if node ../../Form_G1/o1_form_builder_test.cjs > "$TMP_FB" 2>&1; then
+    if node ../../Form_O1/o1_form_builder_test.cjs > "$TMP_FB" 2>&1; then
       note "（参考・G1 の合否には影響しない）O1 フォームビルダーのガードは緑（$(guard_count "$TMP_FB") ケース）"
     else
       note "（参考・G1 の合否には影響しない）⚠️★★ O1 フォームビルダーのガードが赤。★ G1 のフォームを壊す経路が開いている可能性がある"
@@ -223,8 +223,8 @@ else
   #     ★ この直下のブロックが自分で「呼ばれないテストは無いのと同じ」と書いたのと同じ形の
   #     孤児を 1 本増やしていた。→ ★ 繋ぐ。
   #   ⚠️ 20 変異ぶん node を起動するので数十秒かかる。★ G1 の合否は動かさない。
-  if [ -f ../../Form_G1/o1_form_builder_mutation_test.sh ]; then
-    if bash ../../Form_G1/o1_form_builder_mutation_test.sh > /dev/null 2>&1; then
+  if [ -f ../../Form_O1/o1_form_builder_mutation_test.sh ]; then
+    if bash ../../Form_O1/o1_form_builder_mutation_test.sh > /dev/null 2>&1; then
       note "（参考・G1 の合否には影響しない）O1 フォームビルダーの変異テストは全部赤（＝検査が効いている）"
     else
       note "（参考・G1 の合否には影響しない）⚠️★★ O1 フォームビルダーの変異テストに**すり抜け**がある。★ ガード検査の緑は当てにならない"
