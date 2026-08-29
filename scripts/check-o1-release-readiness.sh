@@ -186,7 +186,7 @@ if [ "$sync_ok" -ne 1 ]; then
 elif [ ! -f "$SYNC_GUARD_TEST" ]; then
   # ⚠️★★ 2026-08-28: 旧版はここで緑にしていたが、それは「語が出てくる」しか見ていない。
   #   ★ **弾くことを示すテストを要求する**（旧版のコメントが自分で要求していたもの）。
-  ng "O1 ガードの検査が無い: $SYNC_GUARD_TEST（⚠️ 語の存在だけでは弾く証拠にならない）"
+  ng "O1 ガードの検査が無い: ${SYNC_GUARD_TEST}（⚠️ 語の存在だけでは弾く証拠にならない）"
 else
   out=$(bash "$SYNC_GUARD_TEST" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then
@@ -199,6 +199,25 @@ else
   else
     ng "sync-session の O1 ガードが弾いていない"
     printf '%s\n' "$out" | grep '❌' | sed 's/^/     /'
+  fi
+fi
+
+# ⚠️★★★ シェルの移植性（★ 上のガードが **macOS でだけ壊れていた**ので足した・2026-08-29）。
+#   ★ 実害: `sync-session.sh` の O1 ガードが `exit 4` に到達できず `exit 1` を返していた。
+#     ⚠️ 真因は macOS 標準の **bash 3.2 が多バイト文字を変数名の一部として読む**こと
+#     （変数を括らずにその直後へ全角括弧を置くと、「変数名 ＋ 括弧のバイト」という
+#       存在しない変数として読まれ、`set -u` で落ちる）。
+#   ⚠️★ **上の検査だけでは足りない**: あれは「弾くか」を見るが、
+#     ★ 同じ罠は**まだ触っていないスクリプト**にも入りうる（実際 17 箇所あった）。
+if [ ! -f scripts/check-shell-portability.sh ]; then
+  ng "シェル移植性ゲートが無い: scripts/check-shell-portability.sh"
+else
+  sp_out=$(bash scripts/check-shell-portability.sh 2>&1); sp_rc=$?
+  if [ "$sp_rc" -eq 0 ]; then
+    ok "シェルスクリプトが bash 3.2 で壊れる書き方をしていない（★ 陽性/陰性対照つき）"
+  else
+    ng "★ bash 3.2 で壊れる書き方が残っている（★ \${name} と括ること）"
+    printf '%s\n' "$sp_out" | grep -E '❌|:[0-9]+:' | sed 's/^/     /'
   fi
 fi
 
@@ -355,7 +374,7 @@ measure_block=""
 # ★ 記録票の 1 欄が埋まっているか。⚠️ 空欄の目印（（未記入））は `[^（*]` で弾く。
 mfield () { printf '%s\n' "$measure_block" | grep -qE "$1"; }
 if [ ! -f "$MEASURE" ]; then
-  ng "★ 送信 timeout の実測記録票が無い: $MEASURE（★ .gs 手順 8 の「1 日ぶんの通し確認」）"
+  ng "★ 送信 timeout の実測記録票が無い: ${MEASURE}（★ .gs 手順 8 の「1 日ぶんの通し確認」）"
 elif ! mfield '^- 状態: \*\*実測済み\*\*$'; then
   ng "★ 送信 timeout が未実測（記録票の「状態」が「実測済み」でない。★ .gs 手順 8 を実施すること）"
 elif ! mfield '^- 実測日: \*\*[0-9]{4}-[0-9]{2}-[0-9]{2}\*\*$' \

@@ -162,7 +162,7 @@ for ID in "${SUBJECTS[@]}"; do
   #   「build_task_pages.py が失敗しました」だけになり、原因が分からない。
   if ! python3 build_task_pages.py --subject "$ID" --out "$TMPD" > "$WORK/build.log" 2>&1; then
     sed 's/^/    /' "$WORK/build.log" >&2 || true
-    die "build_task_pages.py が失敗しました: $ID（★ 上の行に理由が出ています）"
+    die "build_task_pages.py が失敗しました: ${ID}（★ 上の行に理由が出ています）"
   fi
   # ⚠️★ `find` を先に走らせない。★ ディレクトリが無いと `find` が rc=1 → `pipefail` で
   #   代入が失敗 → `set -e` が **メッセージを 1 行も出さずに**殺す（実測: rc=1・出力なし）。
@@ -230,8 +230,10 @@ NDIR=$(find "$DRIVE" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 DEPTH=$(find "$DRIVE" -mindepth 2 -maxdepth 2 -type d || true)
 [ -z "$DEPTH" ] || die "入れ子のフォルダがあります（★ 平らでなければならない）:
 $(show5 "$DEPTH")"
-# ⚠️★ `${DRIVE}` と括る。★ bash は全角文字を**変数名の一部**として読むので、
-#   `$DRIVE（` は `DRIVE（` という別の（存在しない）変数になり、`set -u` で落ちる（実測）。
+# ⚠️★ `${DRIVE}` と**必ず括る**。★ macOS 標準の bash 3.2 は全角文字を**変数名の一部**として
+#   読むので、括らずに書くと「DRIVE ＋ 全角括弧」という別の（存在しない）変数になり、
+#   `set -u` で落ちる（実測）。★ 括れば後続バイトの解釈に依存しない。
+#   ⚠️ この規約はリポジトリ全体に効く。`scripts/check-shell-portability.sh` が機械で見張る。
 note "ドラッグ用: ${DRIVE}（${#SUBJECTS[@]} フォルダ・課題ページのみ ✅）"
 
 # --- 5. 照合表 ---------------------------------------------------------------

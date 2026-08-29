@@ -36,7 +36,7 @@ run_cargo_filter() {
   [ -n "$passed" ] || passed=0
   if [ "$rc" -ne 0 ]; then
     sed 's/^/    /' "$tmp"
-    bad "$label の挙動テストが赤（rc=$rc）"
+    bad "$label の挙動テストが赤（rc=${rc}）"
   elif [ "$passed" -lt "$expect" ]; then
     sed 's/^/    /' "$tmp"
     bad "$label の挙動テストが $passed 本しか通っていない（$expect 本を期待）。★ テストが消えた/改名された可能性"

@@ -158,7 +158,7 @@ o1_guard () {
     fi
     [[ -n "$why" ]] || return 0
 
-    echo "[sync-session] ⛔ O1 のセッションは gse-dataset に同期しません（$why）" >&2
+    echo "[sync-session] ⛔ O1 のセッションは gse-dataset に同期しません（${why}）" >&2
     echo "  ★ 理由: metrics/ は追跡・push されるため、あとからの削除要求が" >&2
     echo "     **git 履歴の書き換え**になります（docs/o1-deletion-ledger.md §4）。" >&2
     echo "  ★ O1 の記録は自動提出（reconcile）で研究者へ届きます。ここを通す必要はありません。" >&2

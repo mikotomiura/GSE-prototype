@@ -93,16 +93,16 @@ rc=$(run_sh "$f")
 if [ "$rc" = "$EXIT_O1" ]; then
   echo "  ✅ ★ meta が 21 行目でも弾けた（★ 期待より強い。本ケースを更新すること）"; PASS=$((PASS+1))
 else
-  echo "  ✅ ⚠️ meta が 21 行目だと見逃す（★ 設計上の限界として固定・exit $rc）"; PASS=$((PASS+1))
+  echo "  ✅ ⚠️ meta が 21 行目だと見逃す（★ 設計上の限界として固定・exit ${rc}）"; PASS=$((PASS+1))
 fi
 
 # --- ⚠️ 読めないファイル: ★ ここで判定せず下流に任せる ---------------------------
 f="$TMP/missing.ndjson"   # ★ 作らない
 rc=$(run_sh "$f")
 if [ "$rc" = "$EXIT_O1" ]; then
-  echo "  ❌ 存在しないファイルを O1 として弾いている（exit $rc）"; FAIL=$((FAIL+1))
+  echo "  ❌ 存在しないファイルを O1 として弾いている（exit ${rc}）"; FAIL=$((FAIL+1))
 else
-  echo "  ✅ ★ 読めないファイルはここで判定しない（下流に任せる・exit $rc）"; PASS=$((PASS+1))
+  echo "  ✅ ★ 読めないファイルはここで判定しない（下流に任せる・exit ${rc}）"; PASS=$((PASS+1))
 fi
 
 # --- 陽性対照: 通常セッションは **弾かない** ------------------------------------
@@ -111,9 +111,9 @@ fi
 f=$(mk "gse_20260828_120000.ndjson" "$META_PLAIN")
 rc=$(run_sh "$f")
 if [ "$rc" = "$EXIT_O1" ]; then
-  echo "  ❌ ★ 陽性対照: 通常セッションまで弾いている（exit $rc）"; FAIL=$((FAIL+1))
+  echo "  ❌ ★ 陽性対照: 通常セッションまで弾いている（exit ${rc}）"; FAIL=$((FAIL+1))
 else
-  echo "  ✅ ★ 陽性対照: 通常セッションは弾かれず先へ進む（exit $rc）"; PASS=$((PASS+1))
+  echo "  ✅ ★ 陽性対照: 通常セッションは弾かれず先へ進む（exit ${rc}）"; PASS=$((PASS+1))
 fi
 
 # --- ⚠️ ガードが dataset の検査より前にあること --------------------------------
@@ -155,9 +155,9 @@ else
   f=$(mk "gse_20260828_ps.ndjson" "$META_PLAIN")
   rc=$(run_ps "$f")
   if [ "$rc" = "$EXIT_O1" ]; then
-    echo "  ❌ ★ 陽性対照: 通常セッションまで弾いている（exit $rc）"; FAIL=$((FAIL+1))
+    echo "  ❌ ★ 陽性対照: 通常セッションまで弾いている（exit ${rc}）"; FAIL=$((FAIL+1))
   else
-    echo "  ✅ ★ 陽性対照: 通常セッションは弾かれず先へ進む（exit $rc）"; PASS=$((PASS+1))
+    echo "  ✅ ★ 陽性対照: 通常セッションは弾かれず先へ進む（exit ${rc}）"; PASS=$((PASS+1))
   fi
 fi
 
