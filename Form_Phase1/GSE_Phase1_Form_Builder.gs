@@ -1705,6 +1705,18 @@ function refreshRosterStatus() {
     return;
   }
   var ss = SpreadsheetApp.openById(ssId);
+
+  // T-25: Phase1 終了後はロスターの集計列(7〜11)を書き換えない。
+  // ⚠️ ロスターは 3 研究の共用なので、Phase1 のフォーム集計を他研究の行へ書き続けない。
+  // ★ ダッシュボード/予定タブは「凍結」表示へ描き替える(黙って止めると、止まったことが分からない)。
+  if (phase1Frozen_(ss)) {
+    Logger.log("🔒 Phase1 は終了のためロスター集計を見送りました(T-25)。" +
+      "再開するには「" + PHASE1_CONTROL_TAB + "」タブのステータスを「" + PHASE1_STATUS_RUNNING + "」に戻してください。");
+    buildDashboardTab_(ss);
+    buildReminderPlanTab_(ss);
+    return;
+  }
+
   var sheet = ss.getSheetByName("参加者ロスター");
   if (!sheet) {
     Logger.log("❌ 「参加者ロスター」タブが見つかりません");
@@ -1805,6 +1817,22 @@ function countByPid_(key, props) {
 // ⚠ 実名はこのタブに出さない(PII 露出面の最小化)。突合は P-ID のみ。実名↔P-ID はロスタータブに閉じる。
 function buildDashboardTab_(ss, f4, f2) {
   var props = PropertiesService.getScriptProperties();
+
+  // T-25: Phase1 終了後は集計しない。★ countByPid_(フォーム全回答の読み出し)より**前**に判定する。
+  if (phase1Frozen_(ss)) {
+    var frozenSh = ss.getSheetByName("進捗ダッシュボード") || ss.insertSheet("進捗ダッシュボード");
+    frozenSh.clear();
+    try { frozenSh.getRange(1, 1, frozenSh.getMaxRows(), frozenSh.getMaxColumns()).breakApart(); } catch (e) { Logger.log("dashboard breakApart スキップ: " + e); }
+    try { frozenSh.setConditionalFormatRules([]); } catch (e) { Logger.log("dashboard CF リセットスキップ: " + e); }
+    try {
+      var fb = frozenSh.getBandings();
+      for (var fi = 0; fi < fb.length; fi++) fb[fi].remove();
+    } catch (e) { Logger.log("dashboard banding 除去スキップ: " + e); }
+    phase1FrozenNotice_(frozenSh, "GSE Phase1 進捗ダッシュボード（凍結）", 6);
+    Logger.log("🔒 Phase1 は終了のため進捗ダッシュボードを凍結しました(T-25)");
+    return;
+  }
+
   if (!f4) f4 = countByPid_("F4", props);
   if (!f2) f2 = countByPid_("F2", props);
 
@@ -2637,6 +2665,19 @@ function reminderPlanDescribe_(c, ev) {
 // ⚠ 実名はこのタブに出さない(PII 露出面の最小化)。突合は P-ID のみ。
 function buildReminderPlanTab_(ss, f4, f2) {
   var props = PropertiesService.getScriptProperties();
+
+  // T-25: Phase1 終了後は予定を組まない。★ countByPid_ より**前**に判定する。
+  // ⚠️ 凍結しないと、ロスター共用のため G1 / O1 の参加者が「未提出」として毎日並ぶ。
+  if (phase1Frozen_(ss)) {
+    var frozenSh = ss.getSheetByName(REMINDER_PLAN_TAB) || ss.insertSheet(REMINDER_PLAN_TAB);
+    frozenSh.clear();
+    try { frozenSh.getRange(1, 1, frozenSh.getMaxRows(), frozenSh.getMaxColumns()).breakApart(); } catch (e) { Logger.log("plan breakApart スキップ: " + e); }
+    try { frozenSh.setConditionalFormatRules([]); } catch (e) { Logger.log("plan CF リセットスキップ: " + e); }
+    phase1FrozenNotice_(frozenSh, "🔔 本日のリマインド予定（凍結）", 5);
+    Logger.log("🔒 Phase1 は終了のためリマインド予定タブを凍結しました(T-25)");
+    return;
+  }
+
   if (!f4) f4 = countByPid_("F4", props);
   if (!f2) f2 = countByPid_("F2", props);
 
@@ -3062,9 +3103,81 @@ function reminderSendingAllowed_() {
   }
 }
 
+// 集計の凍結可否(fail-closed 寄り)。T-25。refreshRosterStatus / buildDashboardTab_ /
+// buildReminderPlanTab_ 専用。
+//
+// ⚠️★★★ なぜ「終了したら数えない」ではなく「終了したら数えてはいけない」なのか:
+//   参加者ロスターは Phase1 / G1 / O1 の**共用**である。ところが集計側は
+//   readRoster_() → active = data.filter(!excluded) で**全行**を Phase1 の母数として数える。
+//   → Phase1 が終わったあとに G1 / O1 の行が増えるほど、NDA 署名率 / F2 完了率 /
+//     F5 完了率 / 平均セッション数が**すべて実際より低く出る**(分母だけ増える)。
+//   → さらに「⚠ 要フォロー」に G1 / O1 の参加者が「NDA未署名」「F2未提出」として毎回並び、
+//     ★ 本当に追うべき Phase1 の未提出者がノイズに埋もれる。
+//   ⚠️ つまり凍結後に出せる数字は「古い」のではなく **端的に誤り**である。
+//   → だから数字を出さず、凍結された旨だけを出す(decisions.md G-1)。
+//
+// ★ fail の倒し方が phase1Status_ と逆である理由:
+//   phase1Status_ は fail-open(読めなければ表示を続ける)。こちらは読めなければ**凍結**する。
+//   ⚠️ 読めないときに集計を続けると、上記の「誤った数字」を出してしまうためである。
+//   ★ ただし「コントロール未設置(初期段階)」は凍結しない —— reminderSendingAllowed_ と同じ扱い。
+function phase1Frozen_(ssOpt) {
+  var ss = ssOpt;
+  if (!ss) {
+    var ssId = PropertiesService.getScriptProperties().getProperty(MGMT_SHEET_PROP);
+    if (!ssId) return false; // シート未作成=初期段階。凍結トグルは存在しない
+    try {
+      ss = SpreadsheetApp.openById(ssId);
+    } catch (e) {
+      Logger.log("⚠️ 管理シートを開けないため集計を見送ります(T-25): " + e);
+      return true; // 開けない=状態不明 → 誤った数字を出さない側に倒す
+    }
+  }
+  var rng;
+  try {
+    rng = ss.getRangeByName(PHASE1_STATUS_RANGE);
+    if (!rng) {
+      var sh = ss.getSheetByName(PHASE1_CONTROL_TAB);
+      rng = sh ? sh.getRange("B2") : null;
+    }
+    if (!rng) return false; // コントロール未設置 → 未終了とみなす(初期段階)
+    return String(rng.getValue()).trim() === PHASE1_STATUS_ENDED;
+  } catch (e) {
+    Logger.log("⚠️ ステータス読取失敗のため集計を見送ります(T-25): " + e);
+    return true; // 読取エラー → 凍結(fail-closed)
+  }
+}
+
+// 凍結タブの描画。★ 数字は 1 つも出さない(出せる数字がすべて誤りであるため・T-25)。
+// 呼び出し側は sh.clear() 済みであること。
+function phase1FrozenNotice_(sh, title, ncol) {
+  var tz = Session.getScriptTimeZone();
+  sh.getRange(1, 1, 1, ncol).merge().setValue(title)
+    .setBackground(UI_HEAD_BG).setFontColor(UI_HEAD_FG).setFontWeight("bold").setFontSize(15)
+    .setVerticalAlignment("middle");
+  sh.setRowHeight(1, 42);
+  var lines = [
+    ["Phase1 は終了しました。この表は凍結されており、更新されません。"],
+    ["再開するには「" + PHASE1_CONTROL_TAB + "」タブのステータスを「" +
+      PHASE1_STATUS_RUNNING + "」に戻してから refreshRosterStatus() を実行してください。"],
+    ["⚠ 凍結中に集計値を表示しない理由: 参加者ロスターは Phase1 / G1 / O1 の共用であり、" +
+      "集計は全行を Phase1 の母数として数えます。Phase1 終了後は G1 / O1 の行が分母に入るため、" +
+      "完了率・平均セッション数がいずれも実際より低く出ます(古い値ではなく誤った値になります)。"],
+    ["Phase1 の確定した結果は metrics.json (gse-dataset) と docs/ を参照してください。"],
+    ["凍結表示の更新 " + Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm")],
+  ];
+  for (var i = 0; i < lines.length; i++) {
+    var r = i + 3;
+    sh.getRange(r, 1, 1, ncol).merge().setValue(lines[i][0])
+      .setBackground(i === 2 ? UI_WARN_BG : UI_ACCENT_BG)
+      .setFontColor("#333333").setFontSize(11).setWrap(true).setVerticalAlignment("top");
+    sh.setRowHeight(r, i === 2 ? 58 : 30);
+  }
+}
+
 // Phase1 運用ステータスを読む(表示用)。名前付き範囲 → タブ B2 の順にフォールバック。
 // シート未作成/読取失敗時は「実施中」を返す(表示を止めない=fail-open)。
 // ★送信可否の判定には使わない。送信は fail-closed な reminderSendingAllowed_() を使う(decisions.md D9)。
+// ★集計の凍結判定にも使わない。凍結は fail-closed な phase1Frozen_() を使う(T-25)。
 // ssOpt を渡すと再オープンを避ける(呼び出し側が既に開いている場合)。
 function phase1Status_(ssOpt) {
   try {
