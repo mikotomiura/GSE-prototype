@@ -1,4 +1,4 @@
-# replay.rs の既存 flaky test を直す（★ 起票のみ・未着手）
+# replay.rs の既存 flaky test を直す（✅ **2026-08-29 完了**）
 
 > ⚠️★★★ **起票日**: 2026-08-25（★ `.steering/20260825-o1-researcher-decisions/` の **判断 O1-7 / D-7** で
 > 「別タスクとして起票する」と研究者が決定）。⚠️ **本ディレクトリは起票であって、着手記録ではない。**
@@ -18,10 +18,32 @@
 
 ## ゴール
 
-- [ ] `src-tauri/src/bin/replay.rs:2385` の**重複した `#[test]` を削除**する
-- [ ] `hook_health_line_is_skipped_by_run_replay`（`replay.rs:2425`）に **`#[test]` を付け直す**
-- [ ] `cargo test --manifest-path src-tauri/Cargo.toml --workspace` を **複数回**回して flaky が消えたことを確認
-- [ ] `duplicated attribute` / `dead_code` の警告が消えたことを確認
+- [x] 重複した `#[test]` を解消した
+- [x] `hook_health_line_is_skipped_by_run_replay` に **`#[test]` を付け直した**
+- [x] `cargo test --workspace` を **5 回**回して緑（★ flaky 再現せず）
+- [x] `duplicated attribute` / 当該 `dead_code` の警告が消えたことを確認
+
+## ⚠️ 起票時の想定より 1 つ多かった（★ 実物を読んで判明・2026-08-29）
+
+★ 起票は「`#[test]` を 1 行消して 1 行足す」としていたが、⚠️ **`hook_health` の doc コメント 7 行も
+一緒に取り残されていた**（`:2369-2375`）。PR #113 は
+**doc コメント + `#[test]` と関数定義の間**に新しい doc + `#[test]` + 関数を挿入していたため、
+★ hook_health を説明する 7 行が **o1 の関数に付いていた**。
+
+→ ⚠️ 属性だけ直すと**説明文がずれたまま**になるので、**doc 7 行 + `#[test]` をまとめて
+`fn hook_health_line_is_skipped_by_run_replay` の直前へ戻した**。
+
+## ★ 実測（★ 直る前 / 直った後）
+
+| | main（修正前） | 修正後 |
+|---|---|---|
+| `o1_observation_lines_are_skipped_by_run_replay` | ⚠️ **2 回**表示（＝二重登録） | ✅ 1 回 |
+| `hook_health_line_is_skipped_by_run_replay` | ⚠️ **実行されない**（`function ... is never used`） | ✅ **実行される** |
+| `cargo test --workspace` × 5 | — | ✅ 5/5 緑 |
+| ゴールデン replay | — | ✅ `OK: 15 snapshots match` |
+
+⚠️★ **CI が実際に赤くなって見つかった**（PR #124 の mac check・2026-08-29）。
+★ Windows は同じコミットで pass しており、⚠️ **race なので OS ではなくタイミングで割れる**。
 
 ## スコープ
 
