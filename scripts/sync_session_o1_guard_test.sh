@@ -126,49 +126,94 @@ echo
 echo "=== sync-session.ps1 ==="
 # ⚠️★ PowerShell が無い機械（CI の macOS 等）では**実行できない**。
 #   ★ そのときは「実行できなかった」と出して**緑にしない**（飛ばしたことを隠さない）。
-PWSH=""
-for c in pwsh powershell; do command -v "$c" > /dev/null 2>&1 && { PWSH="$c"; break; }; done
+# ⚠️★★★ **見つかった実行系を「全部」走らせる**（2026-08-30 に方針変更）:
+#   ★ `pwsh`（PowerShell 7+ = **Core**）と `powershell.exe`（Windows PowerShell 5.1 = **Desktop**）は
+#     **別物**である。⚠️ 5.1 は BOM 無しスクリプトを `[Text.Encoding]::Default`（CP932）で読むため、
+#     ★ **日本語のバイト列で parse が壊れる**（`docs/development-guidelines.md` §10.2 に実害の記録）。
+#     `sync-session.ps1` は日本語コメントを多く含むので、まさにこの差が効く。
+#   ⚠️★★ **旧版は「最初に見つかった 1 つ」だけを使っていた**（`pwsh` 優先）。
+#     → ★ **pwsh を入れた Windows 機では 5.1 が永久に検証されない**ことになる。
+#     ⚠️ このリポジトリが繰り返し踏んでいる「片方だけ緑で安心する」型そのもの。
+#   ★ 機械可読マーカ `PS1_VERIFIED:` に**検証できたエディションを列挙**する
+#     （`check-o1-release-readiness.sh` が読む。⚠️ 文言だけ変えないこと）。
+PS_FOUND=""
+for c in pwsh powershell; do
+  command -v "$c" > /dev/null 2>&1 && PS_FOUND="${PS_FOUND} ${c}"
+done
 
-if [ -z "$PWSH" ]; then
+# ⚠️★★ `-RepoRoot` に実在しないパスを渡す。★ 渡さないと既定が本物の repo になり、
+#   **陽性対照が本物の `cargo run` を走らせる**（実測: ビルドが新しければ約 1 秒だが、
+#   古ければ数分。⚠️ 本テストはゲートから 1 回のゲート実行ごとに呼ばれるので、
+#   そこに実ビルドをぶら下げてはいけない）。
+#   ★ 陽性対照が見たいのは「exit 4 でないこと」だけであり、cargo を走らせる必要は無い。
+run_ps () { # $1 = 実行系 / $2 = セッションパス
+  "$1" -NoProfile -ExecutionPolicy Bypass -File "$PS1F" \
+    -SessionPath "$2" -DatasetRoot "$GSE_DATASET" -RepoRoot "$TMP/no-such-repo" -NoCommit \
+    > /dev/null 2>&1
+  echo $?
+}
+
+PS_EDITIONS=""     # ★ 実際に**全ケース緑**になったエディションだけを積む
+if [ -z "${PS_FOUND# }" ]; then
   echo "  ⚠️ pwsh / powershell が無いので .ps1 は実行できませんでした（★ 飛ばしています）"
   echo "  ⚠️ ★ Windows は O1 の主ターゲットです。★ Windows 上で必ず 1 回は走らせること。"
   SKIPPED=1
 else
   SKIPPED=0
-  # ⚠️★★ `-RepoRoot` に実在しないパスを渡す。★ 渡さないと既定が本物の repo になり、
-  #   **陽性対照が本物の `cargo run` を走らせる**（実測: ビルドが新しければ約 1 秒だが、
-  #   古ければ数分。⚠️ 本テストはゲートから 1 回のゲート実行ごとに呼ばれるので、
-  #   そこに実ビルドをぶら下げてはいけない）。
-  #   ★ 陽性対照が見たいのは「exit 4 でないこと」だけであり、cargo を走らせる必要は無い。
-  run_ps () {
-    "$PWSH" -NoProfile -ExecutionPolicy Bypass -File "$PS1F" \
-      -SessionPath "$1" -DatasetRoot "$GSE_DATASET" -RepoRoot "$TMP/no-such-repo" -NoCommit \
-      > /dev/null 2>&1
-    echo $?
-  }
-  f=$(mk "gse_o1_ps_name.ndjson" "$META_PLAIN")
-  check "名前が gse_o1_ なら弾く" "$EXIT_O1" "$(run_ps "$f")"
+  for PS in ${PS_FOUND}; do
+    ed="$("$PS" -NoProfile -Command '$PSVersionTable.PSEdition' 2>/dev/null | tr -d '\r\n ')"
+    ver="$("$PS" -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>/dev/null | tr -d '\r\n ')"
+    echo "  --- 実行系: ${PS}（${ed:-エディション不明} ${ver:-版不明}）"
+    before_fail=$FAIL
 
-  f=$(mk "renamed_ps.ndjson" "$META_O1")
-  check "★ 名前を変えても meta の o1_mode で弾く" "$EXIT_O1" "$(run_ps "$f")"
+    f=$(mk "gse_o1_ps_name_${PS}.ndjson" "$META_PLAIN")
+    check "[${ed:-?}] 名前が gse_o1_ なら弾く" "$EXIT_O1" "$(run_ps "$PS" "$f")"
 
-  f=$(mk "gse_20260828_ps.ndjson" "$META_PLAIN")
-  rc=$(run_ps "$f")
-  if [ "$rc" = "$EXIT_O1" ]; then
-    echo "  ❌ ★ 陽性対照: 通常セッションまで弾いている（exit ${rc}）"; FAIL=$((FAIL+1))
-  else
-    echo "  ✅ ★ 陽性対照: 通常セッションは弾かれず先へ進む（exit ${rc}）"; PASS=$((PASS+1))
-  fi
+    f=$(mk "renamed_ps_${PS}.ndjson" "$META_O1")
+    check "[${ed:-?}] ★ 名前を変えても meta の o1_mode で弾く" "$EXIT_O1" "$(run_ps "$PS" "$f")"
+
+    f=$(mk "gse_20260828_ps_${PS}.ndjson" "$META_PLAIN")
+    rc=$(run_ps "$PS" "$f")
+    if [ "$rc" = "$EXIT_O1" ]; then
+      echo "  ❌ [${ed:-?}] ★ 陽性対照: 通常セッションまで弾いている（exit ${rc}）"; FAIL=$((FAIL+1))
+    else
+      echo "  ✅ [${ed:-?}] ★ 陽性対照: 通常セッションは弾かれず先へ進む（exit ${rc}）"; PASS=$((PASS+1))
+    fi
+
+    # ★ その実行系で 1 件も落ちなかったときだけ「検証できた」と数える。
+    if [ "$FAIL" -eq "$before_fail" ] && [ -n "${ed}" ]; then
+      PS_EDITIONS="${PS_EDITIONS} $(printf '%s' "${ed}" | tr '[:upper:]' '[:lower:]')/${ver}"
+    fi
+  done
 fi
 
 echo
 echo "────────────────────────────────────────"
 echo "  通過 $PASS 件 / 失敗 $FAIL 件"
+
+# ★ 機械可読マーカ（⚠️ `check-o1-release-readiness.sh` が読む。文言だけ変えないこと）。
+#   ★ 値は**全ケース緑になったエディションの列挙**（例: `core/7.6.5`, `desktop/5.1.x core/7.4.0`）。
+#   ⚠️ `none` = 1 度も走らせていない。
+PS1_LIST="${PS_EDITIONS# }"
+if [ "${SKIPPED:-0}" -eq 1 ] || [ -z "${PS1_LIST}" ]; then
+  echo "PS1_VERIFIED: none"
+else
+  echo "PS1_VERIFIED: ${PS1_LIST}"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   if [ "${SKIPPED:-0}" -eq 1 ]; then
     echo "  ⚠️ sh は緑。★ ただし .ps1 は**未実行**（PowerShell が無い）。"
+  elif printf '%s' "${PS1_LIST}" | grep -q 'desktop/'; then
+    echo "  ✅ 両方のガードが実際に弾いている（★ 検証した実行系: ${PS1_LIST}）。"
+    echo "     ★ Windows PowerShell (Desktop) を含む ＝ 研究者が Windows で実際に使う実行系。"
   else
-    echo "  ✅ 両方のガードが実際に弾いている。"
+    echo "  ✅ .ps1 のガードも弾いている（★ 検証した実行系: ${PS1_LIST}）。"
+    echo "  ⚠️★★ ただし **Windows PowerShell 5.1 (Desktop) は未検証**である。"
+    echo "     ★ 5.1 は BOM 無しを CP932 で読むので、日本語コメントで parse が壊れる型がある"
+    echo "       (docs/development-guidelines.md §10.2)。⚠️ O1 の主ターゲットは Windows。"
+    echo "     ★ Windows で作業するとき、ついでに本スクリプトを 1 回走らせること:"
+    echo "       bash scripts/sync_session_o1_guard_test.sh   （★ git-bash から）"
   fi
   exit 0
 fi

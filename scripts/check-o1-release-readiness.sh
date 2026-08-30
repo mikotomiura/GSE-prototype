@@ -190,12 +190,19 @@ elif [ ! -f "$SYNC_GUARD_TEST" ]; then
 else
   out=$(bash "$SYNC_GUARD_TEST" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then
-    # ⚠️★ PowerShell の無い機械では .ps1 が**未実行**のまま緑になる。★ そのことを画面に出す。
-    if printf '%s\n' "$out" | grep -q '未実行'; then
-      ok "sync-session が O1 を実際に弾く（⚠️ ★ .ps1 は未実行。Windows で 1 回は走らせること）"
-    else
-      ok "sync-session.sh / .ps1 の両方が O1 を実際に弾く（★ 陽性対照つき）"
-    fi
+    # ⚠️★★ **どの PowerShell で検証したかまで見る**（2026-08-30）。
+    #   ★ `pwsh`(Core 7+) と `powershell.exe`(Desktop 5.1) は別物で、
+    #     ⚠️ 5.1 は BOM 無しを CP932 で読むため日本語で parse が壊れる型がある。
+    #   → ★ **Core で緑になっただけで「両方 OK」と言わない。**
+    ps1v="$(printf '%s\n' "$out" | sed -n 's/^PS1_VERIFIED: *//p' | tail -1)"
+    case "${ps1v}" in
+      desktop*)
+        ok "sync-session.sh / .ps1 の両方が O1 を実際に弾く（★ ${ps1v} ＝ 被験者と同じ実行系）" ;;
+      core*)
+        ok "sync-session が O1 を実際に弾く（⚠️ ★ .ps1 は ${ps1v} のみ。**Windows 5.1 は未検証**）" ;;
+      *)
+        ok "sync-session が O1 を実際に弾く（⚠️ ★ .ps1 は未実行。Windows で 1 回は走らせること）" ;;
+    esac
   else
     ng "sync-session の O1 ガードが弾いていない"
     printf '%s\n' "$out" | grep '❌' | sed 's/^/     /'
