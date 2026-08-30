@@ -5,7 +5,12 @@
 **打鍵のしかたから、作業状態と「介入すべきタイミング」を推定する — プライバシー保護型 HCI。**
 
 GSE はあなたの脳内を読みません。読むのは*キーストローク動態*だけ。そこから、
-そっと促す Nudge や、しっかり止める Wall が「今、本当に役立つか」を判断します。
+そっと促す Nudge が「今、本当に役立つか」と、「今は黙っているべきか」を判断します。
+
+> **現況:** 稼働している介入は **Lv1 Nudge のみ**です。全画面の Wall と Monk Mode は
+> **2026-08 に削除しました**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）。
+> Lv3/Lv4 Physical Anchor は**設計済み・未実装**です
+> （[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）。
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)
@@ -30,9 +35,10 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
 | 問い | 名称 | シグナル |
 |---|---|---|
 | *今、介入は役立ちそうか?* | **Need（必要性）** | キーストローク特徴量から得る HMM `p_stuck` |
-| *今は中断コストの低い瞬間か?* | **Opportunity（好機）** | idle・post-burst pause・cooldown・daily cap・recent dismiss・Monk Mode |
+| *今は中断コストの低い瞬間か?* | **Opportunity（好機）** | idle・post-burst pause・cooldown・daily cap・recent dismiss |
 
-**Need × Opportunity** の両方が揃ったときだけ GSE は動きます — `none` / `nudge` / `wall` / `defer`。
+**Need × Opportunity** の両方が揃ったときだけ GSE は動きます — `none` / `nudge` / `defer`。
+`defer`（「いま苦闘の最中だから割り込まない」）は沈黙ではなく、**ログに残る第一級の判断**です。
 
 ウェアラブル不要・カメラ不要・生テキスト不要。OS が既に出している打鍵タイミングだけを使います。
 
@@ -46,13 +52,12 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
                   ▼
               分析スレッド · 1 Hz ゲート
                   │  30 秒ウィンドウで F1/F3–F6
-                  │   → X（認知摩擦） / Y（生産的沈黙）
+                  │   → X（認知摩擦） / Y（生産的な前進）
                   │   → EWMA 平滑化 → HMM 前向き 1 ステップ → ヒステリシス層
                   ▼
               介入ポリシー            Need (p_stuck) × Opportunity
-                  │  → none / nudge / wall / defer
-                  ├──▶ React UI        Dashboard + Overlay（Lv1 Nudge カード · Lv2 Wall）
-                  ├──▶ Wall Server     tiny_http · QR コード → スマホで解除
+                  │  → none / nudge / defer
+                  ├──▶ React UI        Dashboard + Overlay（Lv1 Nudge カード）
                   └──▶ Session logger  NDJSON — 行動特徴量のみ・本文は記録しない
 ```
 
@@ -92,12 +97,23 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 
 | レベル | トリガー | 効果 | 解除 |
 |---|---|---|---|
-| **Lv1 · Nudge** | `action == nudge` | クリック透過の小カード。不透明度は Need に比例 | 受動的 |
-| **Lv2 · Wall** | Need が約 30 秒持続 *(Monk Mode 中は抑制)* | 全画面遮断 +「立って歩こう」 | スマホ QR → Zen Timer → 解除 |
+| **Lv1 · Nudge** | `action == nudge` | クリック透過の小カード。不透明度は Need に比例 | 一定時間で自動消去 |
+| **Lv3/Lv4 · Physical Anchor** | *未実装* | 机から一度離れ、作業へ戻る | — |
+| ~~**Lv2 · Wall**~~ | ~~全画面遮断~~ | **2026-08 に削除** — 下記参照 | — |
 
-Wall の解除は**スマホからのみ**: QR を読み取り、2 分の Zen Timer の後に *Unlock* をタップします
-（緊急時の早期解除ボタンも常時表示）。**Monk Mode** を ON にすると Wall を完全に無効化でき、
-集中したディープワークを邪魔されません。
+**抑制（すべて稼働中）**: 能動的にタイプ中（打鍵間隔 < 2 秒）は `defer` / cooldown 10 分 /
+1 日 6 回まで / 直近 dismiss から 20 分は抑制 / 無入力 180 秒以上で介入を全停止。
+
+**なぜ Wall を消したか**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）: 全画面遮断は
+**AI への近道も、助けを求める行為も、作業そのものも一律に止めてしまう**。抑えたい振る舞いは
+もっと狭く（「答えをそのまま受け取ること」）、画面を塞ぐ手段ではそこを狙えない。
+`wall_server.rs`・QR / スマホ解除の経路・Monk Mode・Zen Timer・早期解除はすべて削除した。
+**HIR（有害介入率）は残してある** — 変わったのは対象集合だけである。
+
+**Physical Anchor**（[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）が実際に労力を
+担う層であり、**まだ実装されていない**。完了条件は**一定時間の離席と作業への復帰**であって
+歩数や距離の達成ではなく、GSE は**身体活動を一切センシングしない**
+（GPS・歩数計・加速度センサを使わない）。
 
 ---
 
@@ -187,7 +203,7 @@ Windows 差分、Google Form ビルダー。
 | フラグ | 種別 | 効果 |
 |---|---|---|
 | `VITE_GSE_DEBUG=1` | ビルド時（Vite） | デバッグボタン表示・week-2 モデル出力表示 |
-| `GSE_DEBUG=1` | 実行時（Rust） | `force_wall` / `force_nudge` / `debug_force_probe` 有効化 |
+| `GSE_DEBUG=1` | 実行時（Rust） | `force_nudge` / `debug_force_probe` 有効化 |
 
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
@@ -230,7 +246,7 @@ src/                 React / TypeScript フロントエンド（UI + IPC のみ�
 src-tauri/src/
   analysis/          engine.rs · features.rs · intervention.rs · loop_step.rs   （OS 非依存）
   input/             hook_* · ime_*                                              （OS 固有）
-  lib.rs · logger.rs · wall_server.rs · schema_dto.rs
+  lib.rs · logger.rs · schema_dto.rs · redaction.rs · recording.rs
 src-tauri/bin/       gse-replay（評価 CLI） · emit_schema
 docs/                architecture · functional-design · design-history · runbooks
 ```

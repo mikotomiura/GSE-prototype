@@ -20,8 +20,12 @@ def esc(s: str) -> str:
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-# --- インライン（**太字** / `コード`） ---------------------------------------
-INLINE = re.compile(r"(\*\*.+?\*\*|`[^`]+`)")
+# --- インライン（**太字** / `コード` / *斜体*） -------------------------------
+# ⚠️ 順序が意味を持つ: `**太字**` と `` `コード` `` を先に食わせてから `*斜体*` を見る。
+#    ★ 先に斜体を見ると `**bold**` が `*` + `*bold*` + `*` に割れる。
+#    ★ コード span を先に取るので、`` `silence_*` / `burst_*` `` のような
+#      **コード内のアスタリスクは斜体にならない**（G1 の資材で実測）。
+INLINE = re.compile(r"(\*\*.+?\*\*|`[^`]+`|\*[^*\n]+?\*)")
 
 
 def runs(text: str, base_bold: bool = False) -> str:
@@ -29,14 +33,18 @@ def runs(text: str, base_bold: bool = False) -> str:
     for part in INLINE.split(text):
         if not part:
             continue
-        bold, mono = base_bold, False
+        bold, mono, italic = base_bold, False, False
         if part.startswith("**") and part.endswith("**") and len(part) > 4:
             bold, part = True, part[2:-2]
         elif part.startswith("`") and part.endswith("`") and len(part) > 2:
             mono, part = True, part[1:-1]
+        elif part.startswith("*") and part.endswith("*") and len(part) > 2:
+            italic, part = True, part[1:-1]
         props = []
         if bold:
             props.append("<w:b/>")
+        if italic:
+            props.append("<w:i/>")
         if mono:
             props.append('<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Yu Gothic"/>')
         rpr = f"<w:rPr>{''.join(props)}</w:rPr>" if props else ""
@@ -235,6 +243,12 @@ if __name__ == "__main__":
             text = text[:text.index(marker)]
         elif arg.startswith("--title="):
             text = f"# {arg.split('=', 1)[1]}\n\n" + text
+        elif arg == "--unescape":
+            # ★ pandoc 由来のバックスラッシュ・エスケープ (`1\.` / `0.054\*`) を外す。
+            # ⚠️ **opt-in にしてある**: 既存の呼び出し元 (G1 の make-handouts.sh) の markdown は
+            #    コードブロック内に `\n` / `\g` / `\<` 等を含んでおり、無条件に外すと壊れる。
+            # ★ 対象は markdown の句読点エスケープのみに絞る (`\n` 等の文字は触らない)。
+            text = re.sub(r"\\([.*_\[\]()#+\-!~<>|`])", r"\1", text)
         elif arg == "--frontmatter-title":
             # ★ 課題文用: front matter を **落として** title と id だけを見出しにする。
             #   ⚠️ `version: lo|hi` と `sources:` を印刷すると条件が被験者に見えてしまう。

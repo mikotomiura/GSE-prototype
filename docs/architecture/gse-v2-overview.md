@@ -41,8 +41,18 @@
 ## 1. 改訂後のプロダクト定義（設計書 §2.1）
 
 > GSE は、タスク固有の操作イベントから、作業上の摩擦・前進・探索・反復と介入可能性を推定し、
-> 本人の自律性を損なわない範囲で「何もしない／待つ／軽く気づかせる／一度離す」を選択する、
+> **本人が自ら是認できる (self-endorsed) 範囲**で「何もしない／待つ／軽く気づかせる／一度離す」を選択する、
 > プライバシー保護型の作業調整基盤である。
+
+> ⚠️★★★ **2026-08-30 訂正（研究者承認）—— 旧文は「本人の *自律性を損なわない範囲で*」だった。**
+> ★ **定義が空で、誤読の危険があった。**★ SDT の autonomy は原典逐語で **"regulation by the self"**、
+> その反対 heteronomy は **"regulation that occurs without self-endorsement"** [P178]。
+> ★★★ *"having many options is not a basic need"* / *"one could have only one option … and yet feel quite
+> autonomous so long as one truly endorses that option"*。
+> → ⚠️★★★ **「選べる／消せるから自律的」は SDT では成立しない。**
+> ★ 正しい根拠は **「本人が事前に *是認 (self-endorse)* している」**ことである。
+> ⚠️ **計器は未確定** —— 唯一の候補は **[V88] METUX の TENS-Interface**（★ Gate H の運用指標。
+> ⚠️ 著者自身が初期版と留保しているので確証には使わない）。詳細は `research-positioning.md` §5 H-Y-b。
 
 ### 維持する独自性（§2.2）
 生産的苦闘を即答で置換しない／本文を読まず作業構造を扱う／介入しないことを価値ある判断とする／

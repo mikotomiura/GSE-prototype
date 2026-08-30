@@ -4,8 +4,12 @@
 
 **Privacy-preserving work-state & intervention timing, inferred from how you type.**
 
-GSE doesn't read your mind. It reads *keystroke dynamics* — and decides when a gentle nudge,
-or a firmer break, is actually likely to help.
+GSE doesn't read your mind. It reads *keystroke dynamics* — and decides when a gentle nudge
+is actually likely to help, and when to stay out of the way.
+
+> **Status:** the shipping intervention is **Lv1 Nudge only**. The full-screen Wall and Monk Mode
+> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Lv3/Lv4 Physical Anchor
+> is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)
@@ -30,9 +34,10 @@ The trick is separating two questions:
 | Question | Name | Signal |
 |---|---|---|
 | *Might an intervention help right now?* | **Need** | HMM `p_stuck` from keystroke features |
-| *Is this a low-cost moment to interrupt?* | **Opportunity** | idle, post-burst pause, cooldown, daily cap, recent dismiss, Monk Mode |
+| *Is this a low-cost moment to interrupt?* | **Opportunity** | idle, post-burst pause, cooldown, daily cap, recent dismiss |
 
-Only when **Need × Opportunity** both line up does GSE act — `none` / `nudge` / `wall` / `defer`.
+Only when **Need × Opportunity** both line up does GSE act — `none` / `nudge` / `defer`.
+`defer` ("you're mid-struggle, don't interrupt") is a **first-class, logged decision**, not silence.
 
 No wearables. No camera. No raw text. Just timing data the OS already exposes.
 
@@ -46,13 +51,12 @@ Any app ──▶ Keyboard hook (Rust)            Win: WH_KEYBOARD_LL · Mac: CG
               ▼
           Analysis thread · 1 Hz gate
               │  F1/F3–F6 over a 30 s window
-              │   → X (Cognitive Friction) / Y (Productive Silence)
+              │   → X (Cognitive Friction) / Y (Productive Engagement)
               │   → EWMA smoothing → HMM forward step → hysteresis layer
               ▼
           Intervention policy        Need (p_stuck) × Opportunity
-              │  → none / nudge / wall / defer
-              ├──▶ React UI         Dashboard + Overlay (Lv1 Nudge card · Lv2 Wall)
-              ├──▶ Wall Server      tiny_http · QR code → phone unlock
+              │  → none / nudge / defer
+              ├──▶ React UI         Dashboard + Overlay (Lv1 Nudge card)
               └──▶ Session logger   NDJSON — behavioral features only, never text
 ```
 
@@ -92,12 +96,23 @@ Matrices, β baselines, quantization, and the tuning history live in **[Design H
 
 | Level | Trigger | Effect | Dismiss |
 |---|---|---|---|
-| **Lv1 · Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | passive |
-| **Lv2 · Wall** | Need sustained ~30 s *(suppressed in Monk Mode)* | Full-screen block + "stand up and walk" | phone QR → Zen Timer → unlock |
+| **Lv1 · Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | auto-dismisses |
+| **Lv3/Lv4 · Physical Anchor** | *not implemented* | Step away from the desk, then come back | — |
+| ~~**Lv2 · Wall**~~ | ~~full-screen block~~ | **Removed 2026-08** — see below | — |
 
-The Wall is unlocked **only from your phone**: scan the QR, a 2-minute Zen Timer runs, then you tap
-*Unlock* (an early-unlock escape hatch is always available). **Monk Mode** disables the Wall entirely
-for uninterrupted deep work.
+**Suppression** (all shipping): `defer` while actively typing (IKI < 2 s), 10-min cooldown,
+daily cap of 6, 20-min recent-dismiss window, and no interventions at all after 180 s idle.
+
+**Why the Wall is gone** ([ADR-015](docs/adr/ADR-015-wall-removal.md)): a full-screen block stops
+*everything* at once — the AI shortcut, asking for help, and the work itself. The behaviour worth
+suppressing is narrower than that ("taking the answer as-is"), and a screen block can't aim at it.
+`wall_server.rs`, the QR/phone-unlock path, Monk Mode, the Zen Timer, and early unlock were all
+removed; **HIR (harmful-intervention rate) was kept** — only its target set changed.
+
+**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is the level that
+actually imposes effort, and it is **not implemented yet**. Its completion condition is
+**time away + return**, never a step or distance target — and GSE **does not sense physical
+activity at all** (no GPS, pedometer, or accelerometer).
 
 ---
 
@@ -187,7 +202,7 @@ Debug features are guarded by two flags; participants run with **none** (fully b
 | Flag | Kind | Effect |
 |---|---|---|
 | `VITE_GSE_DEBUG=1` | build-time (Vite) | renders debug buttons; shows week-2 model output |
-| `GSE_DEBUG=1` | runtime (Rust) | enables `force_wall` / `force_nudge` / `debug_force_probe` |
+| `GSE_DEBUG=1` | runtime (Rust) | enables `force_nudge` / `debug_force_probe` |
 
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
@@ -230,7 +245,7 @@ src/                 React / TypeScript frontend (UI + IPC only)
 src-tauri/src/
   analysis/          engine.rs · features.rs · intervention.rs · loop_step.rs   (OS-agnostic)
   input/             hook_* · ime_*                                              (OS-specific)
-  lib.rs · logger.rs · wall_server.rs · schema_dto.rs
+  lib.rs · logger.rs · schema_dto.rs · redaction.rs · recording.rs
 src-tauri/bin/       gse-replay (eval CLI) · emit_schema
 docs/                architecture · functional-design · design-history · runbooks
 ```
