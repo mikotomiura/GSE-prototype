@@ -48,6 +48,11 @@
   Gatekeeper(xattr+codesign)/SmartScreen/SAC 回避・入力監視・gse-package 暗号化・Dropbox提出・
   アンケート短縮URL・プライバシーFAQ）。配布 zip 同梱 or Drive に置くと初回同席(C)がスムーズ。
   ※ dmg 起動時の「マルウェア検証できません」は ad-hoc 署名のための既知挙動（バグではない）。
+- ⚠ **配布パッケージ混入チェック（2026-06-28 発見）**: 旧 Windows 配布 zip に `~/.gse/participant_id`
+  が混入していた（秘密鍵 age-identity.txt は無し＝鍵漏洩なし・作り直し不要）。zip を 3 点のみで作り直す。
+  再発防止手順を `docs/pilot-runbook.md §2.1` に明文化済み（配布専用空フォルダに3点だけコピー→
+  `find` で age-identity.txt/participant_id/.gse の混入検査）。被験者の P-ID 突合は
+  `gse-package --participant P0XX` の出力ファイル名＋アンケート手入力で成立する。
 
 ## 注意
 - 検証フェーズ。コード変更は対象ファイル列挙でコミット（-A 禁止、.codex/budget.json 等を混ぜない）。
