@@ -712,14 +712,77 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 - **H-Y (システム価値)**: 介入あり(B) は介入なし(A) に比べ、**AI 依存を下げ自力解決を上げる**——
   `paste_after_stuck_rate` ↓ / `self_recovery_without_paste` ↑ / `manual_contribution_ratio` ↑——
   **かつ成果物品質（第三者ブラインド）と NASA-TLX [V11]・自己効力感（GSE scale [P15]・副指標）を悪化させない**。AB/BA クロスオーバーで順序効果を相殺。
+  > ⚠️★★★ **2026-08-30 追加（研究者承認）—— 主観指標だけで「悪化させていない」と判定しない。**
+  > ★ autoplay を無効化した RCT（**N=76**・10–17 日・6 か月履歴をベースライン）で
+  > **1 日の視聴が −21.0 分（p=0.003）／セッション長 −17.6 分（p=0.013）**動いたのに、
+  > ★★★ **事前に 95% が「自分は視聴時間を制御できている」に同意していた** [P135]。
+  > → ★ **「悪化させない」の判定には *行動側の客観指標*（作業ログ・完了率・放棄率・時間超過）を必ず併報する。**
+  > ⚠️ **[P135] はエンタメの継続消費であって介入ではないので、「autoplay が有害だから GSE も有害」は成立しない**
+  > —— ★ **移るのは測定側の含意のみ**である（★ [V35] [P71] [P73] と同じ「主観は動くが客観は動かない／その逆」の型の 4 本目）。
   → **交絡（指摘 D・§8 に詳述）**: 「AI 依存低下」に見える指標は、(i) 諦め／課題放棄、(ii) **別デバイス・別アプリへの計測外移行**、
     (iii) 検索など非ペースト経路での外部依存、(iv) 新規性効果・実験者効果（被験者が「正解の振る舞い」を察知）でも動く。
     `paste_after_stuck_rate` 低下が**自力解決ではなく放棄**である可能性を**直接は棄却できない**。
   → **追加アウトカム（依存低下を放棄と取り違えないため）**: 完了率 / 放棄率 / 時間超過 / 外部支援の自己申告（計測外移行の捕捉）を併報する。
   → **軽減**: washout 期間・実験者の盲検（割付を知らせない）・タスクのカウンターバランス・新規性効果を見るための時系列確認。
-- **H-PA (Physical Anchor)**: 身体的アンカー（離席・歩行・自然）[P2][P8][P10] は、**受容（opt-in 率・拒否理由）と効果
-  （復帰後の手動入力・stuck 再発・主観的リセット感）を分けて**評価し、安全条件（夜間 Outdoor 無効）下で受容かつ有効である。
-- **依存関係**: **確証ゲートは H-X1 / H-X1b（ともに L0 軸）のみ**。H-X1 が not-kill → H-Y / H-X2 / H-PA へ進む（Kill なら特徴量・IME ログ・ラベル UI・対象タスクへ差し戻し）。
+- **H-Y-b (自律性の非毀損・運用指標・2026-08-30 新設)**: 介入あり(B) は介入なし(A) に比べ、
+  **本人の自律性（autonomy）を損なわない**。
+  ⚠️★★★ **ここでいう autonomy は「選べること」ではない** —— SDT 原典逐語で **"regulation by the self"**、
+  反対の heteronomy は **"regulation that occurs without self-endorsement"** [P178]。
+  ★★★ *"having many options is not a basic need"* / *"one could have only one option (which functionally means
+  no choice) and yet feel quite autonomous so long as one truly endorses that option"*。
+  → ⚠️★★★ **「opt-in と dismiss があるから自律性を脅かさない」という論法は使わない。**
+  ★ 正しい書き方は **「本人が事前に *是認 (self-endorse)* しているから」**である。
+  → **操作化**: **[V88] METUX の TENS-Interface の autonomy 下位尺度**を第一候補とする
+    （★ SDT を HCI で運用可能にした唯一の公式枠組み・Ryan 本人が共著）。
+    ⚠️ **著者自身が *"The measures presented are initial iterations that will require more thorough validation
+    and refinement"* と留保している**ので、★ **確証には使わず、`wbs-verification-halfyear.md` Gate H の
+    *運用指標* として使う**（★ Gate H は「悪化した場合、X1 が Go でも介入機能は Go としない」＝ **拒否権付きの反証ゲート**）。
+  → ⚠️ **[P182] を併記する** —— k=99 研究・119 標本のメタ分析レビューが *"contrary to SDT, the variance basic
+    psychological needs account for in some of these outcomes is **statistically significant but practically
+    insignificant**"* と報告している（★ [P99] に対する [P107] と同じ役割）。
+    ★ 一方 **[P182] の方法論的警告は GSE に有利**である: *"We therefore **discourage cross-sectional
+    self-report studies** dealing with basic psychological needs"* —— ★ **GSE の個人内・縦断・日次デザインは
+    SDT 文献が自ら求める方向にある。**
+  → ⚠️★★★ **層をまたぐ矛盾を前提に、層ごとに測る** —— METUX 逐語 *"a technology can support psychological
+    needs at one level while undermining them at another"*。★ **GSE では「表現層で autonomy を支えつつ
+    介入層で損なう」が構造的にありうる。**
+- **H-PA (Physical Anchor)**: 身体的アンカー（離席・歩行）[P2][P8][P10] は、**受容（opt-in 率・拒否理由）と効果
+  （復帰後の手動入力・stuck 再発・主観的リセット感）を分けて**評価し、安全条件（夜間 Outdoor 無効）下で**受容される**。
+  > ★ **2026-08-30 改訂（研究者承認）—— 制約 4 件を明記し、「有効である」を主張から落とす。**
+  > 1. ⚠️★★★ **完了条件は「時間 ＋ 復帰」であって「歩数達成 / 距離達成」ではない**（既決 D11 条件 2）。
+  >    ★ 量で解放を決めると [P99] の performance-contingent（★ 目標に届かなかった群 `d = −0.88`）に入る。
+  >    ⚠️ **「往復」は完了条件の *性質* を指す語であり、「屋外へ出て戻ったこと」は観測できない**
+  >    —— ★ 観測できるのは **「一定時間の離席のあと作業へ戻った」**ことだけである（ADR-017 D3）。
+  > 2. ⚠️★★★ **量（歩数・距離・速度）を本人にも表現層にも渡さない**（既決 D11 条件 1）。
+  >    ★ [P77] 逐語 *"Even in the absence of explicit external incentives, measurement itself can thus have
+  >    similar effects."* ＝ **「報酬ではない」は防御にならない。**
+  > 3. ⚠️★★★ **「歩けば作業成績が上がる」は仮説に入れない** —— micro-break のメタ解析（**22 標本 / N = 2,335**）は
+  >    **活力 d = .36 [.16,.55] / 疲労 d = .35 [.19,.50]** を支持する一方、
+  >    **成績は全体で null（d = .16, 95% CI [−.04,.37], p = .116）**、⚠️ **認知的に負荷の高い課題では d = −.09** [P162]。
+  >    ★ **GSE が「機会の保存」に主張を限定している設計は、この反証を最初から避けている。**
+  >    ⚠️ **逆に「歩けば作業が良くなる」を表現で暗示すると、文献に反する暗示を与えることになる。**
+  > 4. ⚠️ **Phase1 の実体は WoZ ＋ 自己申告**であり、**本フェーズでは「有効である」を主張しない**
+  >    （★ 旧文の「受容かつ**有効**である」から「有効」を落とした）。
+  > ★ 第 1 版の境界の形は **ADR-017 D3**（PC → スマホの一方向・inbound を作らない）。
+- **H-EXPR (表現チャネル・探索的・⚠️ 効果を主張しない・2026-08-30 新設)**: 推定された内的状態を
+  **常在面に非断定的に写す**表現層は、**介入発火数・有害介入率（HIR）を悪化させず**、かつ**本人にとって読める**。
+  ★ **判定は `de-risk 先行`** —— ★ **作品として設計してよいが、効果は主張しない。**
+  ⚠️★★★ **これは逃げではなく、この系譜（Slow Technology → Informative Art → Reflective Design）の
+  標準的な作法である** —— Informative Art の創始者自身が自作物を *"its usefulness as an awareness support is
+  rather limited"* と書いており [P113]、Slow Technology 系で最長の実配備すら **N=3 世帯・14 か月の質的研究** [P186]。
+  → **操作化（3 点）**:
+    1. ★ **ON/OFF の無作為化 ＋ 作業ログの客観指標**で測る（⚠️ **主観だけでは害を検出できない** [P135]）。
+    2. ⚠️★★★ **「表現層のみ」を headline アームにしない** —— 既決 **D8**。★ 表現層が structure 系に留まれるのは
+       「出口を開く」からで、**出口の行き先が Physical Anchor である**（外すと [V40] の information 系
+       `d=0.00 / BF01=33.84` へ落ちる）。⚠️ **不便益の認定条件 1（労力）を満たすのは Physical Anchor だけ** [P170]。
+    3. ⚠️★★★ **displacement を避ける** —— [P187] 逐語 *"risks a **displacement**, wherein reflection is linked
+       with some desired outcome … and **assessment of that outcome is taken as evidence that reflection
+       occurred**"*。→ ★ **行動指標の改善を「反省が起きた証拠」にしない。**
+       ⚠️ 将来「表現層が反省を促した」と言うなら、正しい計器は [V77] TSRI / [V78] RRT / [P191] の水準 R0–R4 である。
+  → **設計 SSOT**: `docs/adr/ADR-017-expression-channel-boundary.md` / `docs/architecture/expression-channel.md`。
+- **依存関係**: **確証ゲートは H-X1 / H-X1b（ともに L0 軸）のみ**。H-X1 が not-kill → H-Y / H-Y-b / H-X2 / H-PA / H-EXPR へ進む（Kill なら特徴量・IME ログ・ラベル UI・対象タスクへ差し戻し）。
+  ★ **H-Y-b（自律性）は Gate H の運用指標であって確証ゲートではない**（⚠️ **[V88] は著者自身が初期版と留保**）。
+  ★ **H-EXPR は探索的で、効果を主張しない**（`de-risk 先行`）。
   **H-X1c（L1 Stuck）・H-X2（L2 Need 判断性能）は探索的**で、Go/Kill ゲートには載せず、L1/L2 の妥当性の所在を可視化して Stage2 設計・将来の直接 GT 収集へ送る。
 
 ## 6. シナリオ（半年版 WBS / M0–M5 に対応）

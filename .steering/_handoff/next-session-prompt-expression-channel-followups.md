@@ -1,4 +1,4 @@
-# 次セッション開始プロンプト — 表現チャネル SSOT 昇格の **積み残し 6 件**
+# 次セッション開始プロンプト — 表現チャネル SSOT 昇格の **積み残し 4 件**
 
 > ★ **本ファイルは `_handoff/next-session-prompt-expression-channel-ssot.md`（2026-08-30）の後続**である。
 > ⚠️ **旧引き継ぎは役目を終えた**（★ 論点 1〜6 は 2026-08-30 に裁定済み。記録は
@@ -19,22 +19,23 @@
 |---|---|
 | `docs/adr/ADR-017-expression-channel-boundary.md` | **D1** 表現チャネルと媒体の分離／**D2** 境界は**イベント**（常時ストリームではない）／**D3** **PC → スマホの一方向**・inbound の「歩いた」二値を作らない／**D4** PC 側に常設 LAN リスナを置かない／**D5** **音声の自動開始は Phase1 の範囲外**／**D6** 曝露予算で表現を 2 層に割る／**D7** 表現層は Physical Anchor を出口に持つ／**D8** 復帰後の差分は「入力 1 = 時計の事実 / 入力 2 = `p_stuck`」に割る／**D9** inbound を開くなら `data-privacy` に位置情報の節が先に要る |
 | `docs/architecture/expression-channel.md` | 設計の SSOT（§0–§8） |
-| `docs/research-positioning.md` §1 / §4 / §7 / §8 / §9 | 主張の温度を一次に合わせた（★ 研究者承認済み） |
+| `docs/research-positioning.md` §1 / §4 / **§5** / §7 / §8 / §9 | 主張の温度を一次に合わせた（★ 研究者承認済み）。★ **§5 は H-Y の測り方 ＋ H-Y-b（自律性・Gate H の計器）新設 ＋ H-PA 改訂 ＋ H-EXPR 新設**。⚠️ **確証の核 H-X1 / H-X1b と PreReg-1〜8 は不変** |
+| `docs/architecture/gse-v2-overview.md` | 製品定義を「**本人が自ら是認できる (self-endorsed) 範囲**で」へ訂正（[P178]） |
 
 ⚠️★★★ **次も 1 バイトも変えない**: `src-tauri/` の記録仕様／凍結済み `docs/preregistration-v0.3.md`・
 G1 事前登録／ADR-009 の X 軸。
 
 ---
 
-## §1 ★ 積み残し 6 件（★ 独立に着手できる）
+## §1 ★ 積み残し（★ **F-4 / F-5 は 2026-08-30 中に完了**。残りは 4 件）
 
 | # | 件 | ★ 何をするか | ⚠️ 難度・依存 |
 |---|---|---|---|
 | **F-1 ★★★** | **`data-privacy` SKILL に位置情報の節が無い** | ★ **位置情報（GPS / 位置履歴）の規定を新設**する。⚠️ **ADR-017 D9 が「inbound のセンサ経路を開く前に要る」とブロッカーとして明示**している。★ PM-D11 条件 3（`geolocator` は `pedometer` と別扱い）が出発点 | ★ 単独で着手可。⚠️ **ADR-017 D3 により第 1 版のブロッカーではない**ので急がないが、**参照先が空のまま**なのは事故のもと |
 | **F-2 ★★★** | **[P6] の書誌が未検証**（`provisional`） | ★ **"Proc. Design Society, 2019" に該当が見つからない。**Kawakami の SICE 論文群 / Springer 2023 / [P176] の共著者 Naito, K. の系列を当たる | ★ サーヴェイ 1 ラウンド。⚠️ **`citation-ssot` の append-only / renumber 禁止 / tombstone 規約を守る** |
 | **F-3 ★★** | **[P170] 図 1 の Objective / Subjective 分類**（判定不能 U-1） | ★ **8 枚の不便益カードのどれが Objective でどれが Subjective か**を一次で確定する。⚠️ **GSE の headline と益カテゴリがずれている可能性がある** | ★ F-2 と同じラウンドで回せる |
-| **F-4 ★★** | **`research-positioning.md` §5 の改訂** | ★ **案は `.steering/20260830-expression-channel-ssot/positioning-section5-draft.md` に完成している**（改訂 1〜5）。★ **研究者が承認したら After ブロックをそのまま適用する** | ⚠️ **研究者確認が要る節**。★ 承認さえ出れば作業は 30 分 |
-| **F-5 ★★** | **`gse-v2-overview.md:44`「本人の自律性を損なわない範囲で」** | ★ 「本人が **自ら是認できる (self-endorsed)** 範囲で」＋ [P178] を引く形へ。⚠️ **SDT では autonomy は「選べること」ではない**（*"having many options is not a basic need"*） | ⚠️ **v2 設計書の製品定義の逐語引用**なので研究者確認が要る |
+| ~~**F-4**~~ | ~~`research-positioning.md` §5 の改訂~~ | ★★★ **2026-08-30 に追加承認され適用済み**（H-Y の測り方 / **H-Y-b 新設** / H-PA 改訂 / **H-EXPR 新設** / 依存関係）。記録は `.../decisions.md` EC-D9 | ★ **完了** |
+| ~~**F-5**~~ | ~~`gse-v2-overview.md:44`~~ | ★★★ **2026-08-30 に適用済み** —— 「本人が **自ら是認できる (self-endorsed)** 範囲で」＋ [P178] の逐語 ＋ ⚠️ **計器未確定**の注記 | ★ **完了** |
 | **F-6 ★** | **`intervention-design` SKILL のルール 5（Monk Mode）** | ⚠️ **ADR-015 D2 で Monk Mode は削除されたのに、ルール 5 が残っている可能性がある**（★ 2026-08-30 は未確認）。★ まず grep で実測する | ★ 小さい。⚠️ **実測してから直す**（`verify-before-claiming`） |
 
 ---

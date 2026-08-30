@@ -46,16 +46,15 @@ PM-D4 は「状態を常時流し続けるのは一段大きい」と判定済�
 ### 含むもの
 - `docs/adr/ADR-017-*`（新設）／`docs/adr/README.md` 一覧への追記
 - `docs/architecture/expression-channel.md`（新設）
-- `docs/research-positioning.md` **§1 / §4 / §7 / §8 / §9**（★ 研究者承認済み・2026-08-30）
+- `docs/research-positioning.md` **§1 / §4 / §5 / §7 / §8 / §9**（★ 研究者承認済み・2026-08-30。★ §5 と `gse-v2-overview.md:44` は同日の追加承認で適用）
 - `docs/glossary.md`（表現チャネル関連の用語追加・禁止用語の ADR-015 追随）
-- `docs/architecture.md`（ADR-015 未追随の 3 箇所）
+- `docs/architecture.md`（ADR-015 未追随の 12 箇所・★ 見積は 3 箇所だった）
 - `docs/agent-shared.md` のリンクハブ
 - `.claude/skills/physical-anchor/SKILL.md` の D11 違反是正（★ 研究者承認済み・2026-08-30）
 - `.idea/20260819-smartphone-computational-media-channel.md` への追記（閉じなかった論点）
 
 ### 含まないもの
 - ⚠️ **実装を一切しない** —— Flutter / スマホ側のコードも `src-tauri/` の配線も書かない
-- ⚠️ **`docs/research-positioning.md` §5 の適用**（★ 研究者判断で「案提示のみ」。改訂案は本ディレクトリに置く）
 - ⚠️ **`src-tauri/` の記録仕様**（2026-08-21 に凍結）／**凍結済み `docs/preregistration-v0.3.md` / G1 事前登録**
   （ADR-015 D5）／**ADR-009 の X 軸**
 - ⚠️ **`data-privacy` SKILL への位置情報節の新設** → 別タスクへ切り出す
@@ -63,13 +62,13 @@ PM-D4 は「状態を常時流し続けるのは一段大きい」と判定済�
 
 ## 受け入れ条件
 
-- [ ] 論点 1〜6 それぞれについて「閉じた / 閉じない（何が埋まれば閉じるか）」が `decisions.md` にある
-- [ ] ADR-017 が Accepted で存在し、`docs/adr/README.md` の一覧に載っている
-- [ ] `docs/architecture/expression-channel.md` が存在し、`docs/agent-shared.md` のリンクハブから辿れる
-- [ ] `research-positioning.md` §1 / §4 / §7 / §8 / §9 が一次の温度に合っている
-- [ ] `PYTHONUTF8=1 python scripts/check_citations.py` が違反ゼロ
-- [ ] 引き継ぎ §5 の 5 件が「裁いた / 切り出した」のどちらかに分類されている
-- [ ] 実装ファイル（`src-tauri/**` / `src/**`）の差分がゼロ
+- [x] 論点 1〜6 それぞれについて「閉じた / 閉じない（何が埋まれば閉じるか）」が `decisions.md` にある
+- [x] ADR-017 が Accepted で存在し、`docs/adr/README.md` の一覧に載っている
+- [x] `docs/architecture/expression-channel.md` が存在し、`docs/agent-shared.md` のリンクハブから辿れる
+- [x] `research-positioning.md` §1 / §4 / §5 / §7 / §8 / §9 が一次の温度に合っている
+- [x] `PYTHONUTF8=1 python scripts/check_citations.py` が違反ゼロ
+- [x] 引き継ぎ §5 の 5 件が「裁いた / 切り出した」のどちらかに分類されている
+- [x] 実装ファイル（`src-tauri/**` / `src/**`）の差分がゼロ
 
 ## 関連ドキュメント
 

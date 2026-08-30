@@ -41,7 +41,7 @@
 
 ## ドキュメント
 - [x] `decisions.md` に論点 1〜6 ＋ EC-D7 と「断定していないこと」を記録
-- [x] `positioning-section5-draft.md` に §5 改訂案（⚠️ **未適用**）
+- [x] `positioning-section5-draft.md` に §5 改訂案 → ★ **同日中に追加承認され適用済み**（EC-D9）
 - [x] 次セッションの引き継ぎを `.steering/_handoff/` に作成
 
 ## 完了処理
