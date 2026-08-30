@@ -37,7 +37,7 @@
 ## 検証
 - [x] `PYTHONUTF8=1 python scripts/check_citations.py` が違反ゼロ
 - [x] `git status --short src-tauri src` が空（★ 実装差分ゼロ）
-- [ ] `/cross-review`（⚠️ **パス限定**で回す。★ Codex は repo を読めないので資料はプロンプトに貼る）
+- [x] `/cross-review`（★ パス限定で実行・exit 0）→ **指摘 4 件＋テスト観点を全件反映**（EC-D8）
 
 ## ドキュメント
 - [x] `decisions.md` に論点 1〜6 ＋ EC-D7 と「断定していないこと」を記録
@@ -46,4 +46,4 @@
 
 ## 完了処理
 - [x] `design.md` の最終化
-- [ ] git commit
+- [x] git commit
