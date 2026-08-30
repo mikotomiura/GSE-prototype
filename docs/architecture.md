@@ -10,7 +10,7 @@
 │                                                              │
 │  ┌──────────────┐    ┌──────────────┐                        │
 │  │ Main Window  │    │   Overlay    │   React 19 / TS        │
-│  │ (Dashboard)  │◄──►│  (Nudge/Wall)│   500ms polling        │
+│  │ (Dashboard)  │◄──►│   (Nudge)    │   500ms polling        │
 │  └──────┬───────┘    └──────┬───────┘                        │
 │         │    Tauri IPC      │    Tauri Events                │
 │ ════════╪═══════════════════╪════════════════════════════════│
@@ -51,18 +51,19 @@
 │    │ mac: (hook内)   │  │ mac: TIS + GCD  │  │           │  │
 │    └─────────────────┘  └─────────────────┘  └───────────┘  │
 │                                                              │
-│    ┌─────────────────────────────────┐                       │
-│    │        Wall Server              │  tiny_http            │
-│    │  QR → Phone → Zen Timer → POST  │  local network        │
-│    └─────────────────────────────────┘                       │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+> ⚠️★★★ **2026-08-23: `wall_server.rs`（QR → Phone → Zen Timer → POST の tiny_http サーバー）は
+> 全削除された**（**ADR-015 D1**）。★ 図からも外してある。
+> ★ **PC ↔ スマホの境界を作り直す場合の設計は `docs/adr/ADR-017-expression-channel-boundary.md`**
+> （★ PC → スマホの一方向イベント / ⚠️ **PC 側に常設の LAN リスナを置かない**）。
 
 ### 採用したパターン
 
 - **アーキテクチャパターン**: マルチスレッド・イベント駆動 + レイヤードモジュール構成
 - **採用理由**: キーボードフックは OS 制約により専用スレッド必須。1Hz 推論と入力収集の分離により、フックコールバックのレイテンシを最小化。Tauri の IPC が自然なレイヤー境界を提供。
-- **トレードオフ**: Clean Architecture のような厳格な依存方向ルールは採用していない。モジュール数が少なく（input, analysis, wall_server, logger）、過度な抽象化よりも直接的な実装を優先。
+- **トレードオフ**: Clean Architecture のような厳格な依存方向ルールは採用していない。モジュール数が少なく（input, analysis, logger）、過度な抽象化よりも直接的な実装を優先。
 
 ## 2. 技術スタック
 
@@ -76,8 +77,8 @@
 | macOS 入力 | core-graphics + core-foundation | 0.24 / 0.10 | CGEventTap + TIS API（macOS のみ） |
 | macOS フレームワーク | ApplicationServices, Carbon, System | OS 提供 | TCC 権限チェック、GCD dispatch、TIS 入力ソースクエリ |
 | スレッド間通信 | crossbeam-channel | 0.5 | 高性能 MPMC チャネル |
-| HTTP サーバー | tiny_http | 0.12 | 最小限の HTTP サーバー（Wall 用） |
-| QR コード | qrcode + base64 | 0.14 / 0.22 | SVG QR コード生成 |
+| ~~HTTP サーバー~~ | ~~tiny_http~~ | — | ⚠️ **2026-08-23 に依存ごと削除**（ADR-015 D1） |
+| ~~QR コード~~ | ~~qrcode + base64~~ | — | ⚠️ **2026-08-23 に依存ごと削除**（ADR-015 D1） |
 | 非同期ランタイム | tokio | full features | Tauri 内部ランタイム。将来の重い I/O・ML 推論タスクで活用予定 |
 | ログ | tracing + tracing-subscriber | 0.3 | 構造化ログ |
 | エラーハンドリング | anyhow | — | アプリケーションレベルのエラー伝搬 |
@@ -111,7 +112,8 @@ GSE は 8 つのスレッド/タスクで構成される (★ G1 モード時の
 
 純スケジューリング (指数間隔・thinning・窓計算・不透明 ProbeId 生成) は `analysis/probe_scheduler.rs` に隔離し OS API を呼ばない。スレッド起動・実時刻取得・emit・hotkey 配線は `lib.rs` 側に閉じる (architecture-rules)。
 
-Wall Server は Lv2 介入時にのみ起動する一時的なスレッド。
+⚠️★★★ **2026-08-23 削除**: 旧文「Wall Server は Lv2 介入時にのみ起動する一時的なスレッド」は
+`wall_server.rs` の全削除により無効（ADR-015 D1）。★ **現行に一時起動スレッドは無い。**
 
 **macOS 固有のスレッド動作:**
 - Hook Thread: CGEventTap を CFRunLoop に登録し、専用スレッドで CFRunLoopRun() をブロッキング実行。タップ無効化時は自動再作成ループ（3 秒ポーリング）
@@ -203,22 +205,31 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 
 ### 4.5 analysis::intervention — Opportunity MVP
 
-- **責務**: Need (`p_stuck`) と Opportunity (`idle_ms`, F3/F4/F6, cooldown, daily cap, recent dismiss, Monk Mode) を統合し、`none` / `nudge` / `wall` / `defer` を返す
+- **責務**: Need (`p_stuck`) と Opportunity (`idle_ms`, F3/F4/F6, cooldown, daily cap, recent dismiss) を統合し、`none` / `nudge` / `defer` を返す
+  （⚠️ **2026-08-23 訂正**: `wall` action と Monk Mode は削除された — ADR-015 D1 / D2。★ **ACT = `{nudge}`**）
 - **依存先**: なし（純粋な計算）。OS API、Tauri、logger には依存しない
 - **インターフェース**:
   - `InterventionPolicyState::decide(input) -> DecisionResult`
   - `InterventionPolicyState::record_dismiss(action, now_ms)`
   - `InterventionDecision` は Tauri IPC で Frontend に返され、NDJSON `intervention_decision` としても記録される
-- **状態管理**: Tauri state の `InterventionState(Arc<Mutex<InterventionPolicyState>>)` が cooldown / daily cap / Wall 累積時間 / last decision を保持する
-- **MVP パラメータ**: Nudge `p_stuck >= 0.60`, Wall `p_stuck >= 0.70` 累積 30 秒, Nudge cooldown 10 分, Wall cooldown 60 分, Nudge cap 6/day, Wall cap 1/day
+- **状態管理**: Tauri state の `InterventionState(Arc<Mutex<InterventionPolicyState>>)` が cooldown / daily cap / last decision を保持する
+  （⚠️ **2026-08-23 訂正**: `wall_accum_ms`（Wall 累積時間）は削除 — ADR-015 D1）
+- **MVP パラメータ**: Nudge `p_stuck >= 0.60`, Nudge cooldown 10 分, Nudge cap 6/day
+  （⚠️ **2026-08-23 訂正**: Wall の閾値 6 種 / cooldown / daily cap は削除 — ADR-015 D1）
 - **設計判断**: Main Window の `get_intervention_decision` 呼び出しだけが policy state を進める。Overlay Window は `last_decision` を読み取るだけにし、2 つの WebView による cooldown / cap の二重進行を防ぐ
 
-### 4.6 wall_server — Wall 介入サーバー
+### 4.6 ⚠️★★★ wall_server — **削除済み**（2026-08-23・ADR-015 D1）
 
-- **責務**: Lv2 介入の HTTP サーバー + QR コード生成 + スマートフォン連携
-- **依存先**: tiny_http, qrcode, base64
-- **インターフェース**: `start()` → WallServerInfo, `stop()`
-- **状態管理**: サーバースレッドのライフサイクル、Win: Windows Defender ファイアウォールルール / mac: 追加管理不要（ユーザースコープポートバインド）
+- ⚠️★★★ **`src-tauri/src/wall_server.rs` は存在しない。**
+  ★ 旧責務（Lv2 介入の HTTP サーバー + QR コード生成 + スマートフォン連携・`start()` / `stop()` ・
+  Windows Defender ファイアウォールルール管理）は**すべて削除された**。依存 `tiny_http` / `qrcode` も外した。
+- ⚠️ **PM-D11 が Physical Anchor の運搬路として再利用する前提だった経路であり、その前提は覆っている**
+  （ADR-015 D4）。
+- ★ **PC ↔ スマホの境界を作り直す場合の設計は `docs/adr/ADR-017-expression-channel-boundary.md`**:
+  **PC → スマホの一方向の抽象状態イベント**（`level` / `seq` / `emitted_at` のみ・`level` 変化時だけ発火）で、
+  ⚠️ **inbound の「歩いた」二値経路を第 1 版で作らない**／⚠️ **PC 側に常設の LAN リスナを置かない**。
+  ★ 表現チャネル全体は `docs/architecture/expression-channel.md`。
+- ⚠️★★★ **削除済みの LAN HTTP サーバを無審査で復活させない**（ADR-017 D4）。
 
 ### 4.7 logger — セッションロガー
 
@@ -246,7 +257,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
   (前ブロックの `truncate` による静かな全損の防止)。
 - **Phase 1 バリアント**: `LogEntry::UserLabel { timestamp, label, recovered_at }` を追加。meta 行に `hmm_version` を埋め込む
 - **Phase 2b バリアント**: `LogEntry::ImeShadow { timestamp, dwell_ms, candidate_nav_count, abandon }` を追加 (Windows のみ)。IME Monitor スレッドが active→false 遷移時に emit。HMM には統合しない
-- **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, wall_accum_ms, reason, suppressed_by }` を追加。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
+- **GSE v2 MVP バリアント**: `LogEntry::InterventionDecision { timestamp, action, need_score, opportunity_score, p_stuck, idle_ms, reason, suppressed_by }` を追加（⚠️ **2026-08-23 に `wall_accum_ms` を削除** — ADR-015 D1・NDJSON schema の破壊的変更として gse-dataset と parity 同期済み）。固定カテゴリと数値のみを記録し、本文・Unicode 文字・ウィンドウタイトルは含めない
 - **v0.3 較正バリアント**: `LogEntry::ProbeAssignment` (プローブ時刻の監査記録) / `LogEntry::ReviewMarker` / `LogEntry::SessionMeta` (track/task_kind 宣言・セッション開始 UI) / `LogEntry::RealtimeLabel` (Q1/Q2 プローブ回答・**アプリ内 ProbeCard 経由**で `record_realtime_answer` から emit) は production で emit される (NDJSON で着地を確認済み)。一方 `LogEntry::VignetteResponse` (尺度理解テスト) は **schema (`schema_dto`) と format 関数・テストには存在するが、UI 経路が未配線でまだ emit されない**。いずれも schema drift check の対象に含まれる
 
 ### 4.8 Ground Truth ラベリング経路 (Phase 1)
@@ -457,21 +468,22 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
 11. Frontend が 500ms ポーリングで get_cognitive_state を呼び出し
 12. ダッシュボード/オーバーレイに反映
 
-### フロー 2: Opportunity 判定と Lv2 Wall 介入
+### フロー 2: Opportunity 判定と Lv1 Nudge 介入
+
+> ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
+> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。★ **現行の介入は Lv1 Nudge のみ**である。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke
-3. Rust が `p_stuck` / `idle_ms` / F3/F4/F6 / cooldown / daily cap / Monk Mode を `analysis::intervention` に渡す
-4. `InterventionPolicyState` が Need + Opportunity + Policy を評価し、`none` / `nudge` / `wall` / `defer` を返す
+3. Rust が `p_stuck` / `idle_ms` / F3/F4/F6 / cooldown / daily cap を `analysis::intervention` に渡す
+4. `InterventionPolicyState` が Need + Opportunity + Policy を評価し、`none` / `nudge` / `defer` を返す
 5. `intervention_decision` を NDJSON に記録（action / need_score / opportunity_score / suppressed_by）
-6. action が `wall` の場合、Frontend が Wall オーバーレイを表示し `start_wall_server` を invoke
-7. Rust が tiny_http サーバーを起動（Win: ファイアウォールルール追加 / mac: 追加設定不要）
-8. QR コード SVG + URL を Frontend に返却
-9. ユーザーがスマートフォンで QR をスキャン
-10. スマートフォンブラウザが /shake にアクセス → Zen Timer HTML を受信
-11. 2 分タイマー完了後、ユーザーが「Unlock Wall」をタップ
-12. POST /unlock → Rust が Tauri イベント発火
-13. Frontend が Wall オーバーレイを解除、stop_wall_server を invoke
+6. action が `nudge` の場合、Overlay がメタ認知質問を**非ブロックで**表示する
+   （⚠️ **クリック透過・自動消失**。★ 画面を塞がない）
+7. ユーザーの dismiss / 無操作を `intervention_response` として記録する
+   （⚠️ **`elapsed_ms` を書く経路は Wall 削除で無くなり、現状 production では常に `null`** — ADR-015 Consequences）
+8. ⚠️ **Lv3/Lv4 Physical Anchor は未実装**。★ 第 1 版の境界の形は **ADR-017 D3** が確定している
+   （PC → スマホの一方向イベント / inbound を作らない / 完了条件は**時間・往復**）
 
 ### フロー 3: Ground Truth ラベル記録 (Phase 1)
 
@@ -536,8 +548,8 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
 | Win: IME API | ImmGetOpenStatus, WinEvent | なし | フォールバック検出（VK_DBE_\* → polling） |
 | mac: TIS API | TISCopyCurrentKeyboardInputSource (Carbon) | なし | dispatch_sync_f で main GCD queue に dispatch（HIToolbox 制約） |
 | mac: TCC System | CGPreflight/CGRequest, AXIsProcessTrusted | OS 権限 | tccutil reset でリカバリ可能。Dashboard に TCC リセットボタンあり |
-| Wall Server (Phone) | HTTP (tiny_http) on random port | ランダムトークン | サーバー起動失敗 → Wall なしで継続 |
-| Win: Defender Firewall | netsh advfirewall (子プロセス) | 管理者権限不要（ユーザースコープ） | ルール追加失敗 → スマートフォン接続不可 |
+| ~~Wall Server (Phone)~~ | — | — | ⚠️★★★ **2026-08-23 に削除**（ADR-015 D1）。★ 再設計は ADR-017 |
+| ~~Win: Defender Firewall~~ | — | — | ⚠️ **Wall Server と共に削除**（ADR-015 D1） |
 | ファイルシステム | std::fs (NDJSON ログ) | なし | 書き込み失敗 → ログドロップ、推定継続 |
 | Win: Global Shortcut | `tauri-plugin-global-shortcut` (RegisterHotKey) | Capabilities 2 件 | 登録失敗 → `tracing::warn!` で継続、GT ラベリングなしでも動作維持 |
 | mac: Global Shortcut | `tauri-plugin-global-shortcut` (Carbon RegisterEventHotKey) | Capabilities 2 件 | 同上 |
@@ -638,8 +650,18 @@ CGPreflightListenEventAccess()
 - **データ収集経路**: セッション終了後にオプトインでローカルログを匿名化し外部エンドポイントへバッチ送信。送信先・プロトコルは未定
 - **前提条件**: 十分なセッションログデータの蓄積（ローカル + 収集サーバー）
 
-### Physical Anchor（ストレッチゴール）
+### Physical Anchor（Lv3/Lv4・未実装）
 
-- **概要**: Lv3/Lv4 介入として身体的活動を促す Flutter アプリ
-- **連携**: Tauri ↔ Flutter 間の通信プロトコル設計が必要
-- **変更箇所**: Wall Server の拡張、または独立サービスとして実装
+- **概要**: Lv3/Lv4 介入として**離席・歩行という身体的回帰**を促す。⚠️ **本フェーズでは未実装**
+  （★ Phase1 の実体は **WoZ ＋ 自己申告**）。
+- ⚠️★★★ **2026-08-30 訂正**: 旧文「**Wall Server の拡張、または独立サービスとして実装**」は無効である
+  —— ★ `wall_server.rs` は ADR-015 D1 で削除され、**Physical Anchor は運搬路を失っていた**（ADR-015 D4）。
+- ★ **境界の形は ADR-017 が確定した**:
+  **PC → スマホの一方向の抽象状態イベント**（`level` / `seq` / `emitted_at`・`level` 変化時だけ発火）。
+  ⚠️ **inbound の「歩いた」二値経路は第 1 版で作らない** —— ★ 完了条件が「**時間・往復**」（既決 D11 条件 2）で
+  センサの量が要らず、**PC が既に離席候補区間 ＋ 復帰を content-free に観測している**ため。
+- ⚠️★★★ **量（歩数・距離・速度）を本人にも表現層にも渡さない**（既決 D11 条件 1）。
+  ⚠️ **歩行を MhD の観測に入れない**（既決 D10・合流点は表現層）。
+- ⚠️★★★ **位置情報は `data-privacy` に規定が入るまで実装しない**（ADR-017 D9・★ 2026-08-30 実測で規定ゼロ）。
+- ★ 詳細: `docs/adr/ADR-017-expression-channel-boundary.md` / `docs/architecture/expression-channel.md` /
+  `.claude/skills/physical-anchor/SKILL.md`。

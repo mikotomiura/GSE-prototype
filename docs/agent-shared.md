@@ -9,7 +9,9 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 
 - **名称**: GSE (Generative Struggle Engine)
 - **目的**: キーストローク動態から認知状態 (Flow / Incubation / Stuck) を推定し、
-  段階的介入 (Lv1 Nudge → Lv4 The Wall + Physical Anchor) で「生産的苦闘」を守る不便益 HCI フレームワーク
+  段階的介入 (Lv1 Nudge → Lv3/Lv4 Physical Anchor) で「生産的苦闘」を守る、**不便益を設計思想として引く** HCI フレームワーク
+  (⚠️★★★ **Lv2 Wall は 2026-08-23 に削除された** — ADR-015。★ **現行で稼働するのは Lv1 Nudge のみ**で、
+  **不便を担う Lv3/Lv4 は未実装**。→ ★ **「不便益 HCI である」とは書かない** — `docs/glossary.md` 禁止用語)
 - **主要技術**: Tauri 2.0 + Rust (Backend: KB Hook / HMM / ONNX) + React/TypeScript (Frontend)
   + Python/PyTorch (ML 学習) + Flutter (ストレッチ: Physical Anchor)
 - **ターゲット**: Windows 11 (Surface Pro 8 + Type Cover) + macOS 13+ (Accessibility / Input Monitoring)
@@ -171,6 +173,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/adr/README.md` | 確定した設計判断 (ADR-001〜016) の根拠を確認したい時 |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |
+| `docs/architecture/expression-channel.md` | 表現チャネル (媒体分離・PC↔スマホ境界・復帰後の差分の扱い・曝露予算) を確認する時。⚠️ 決定は ADR-017 |
 
 ## 公式 Skill (Phase 2 で導入)
 

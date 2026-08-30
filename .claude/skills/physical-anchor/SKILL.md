@@ -1,43 +1,49 @@
 ---
 name: physical-anchor
 description: >
-  GSE の Lv3/Lv4 介入である Physical Anchor の設計規則。Flutter アプリとの連携・
-  歩数/移動距離/歩行速度の計測設計。⚠️★★★ wall_server.rs は 2026-08-23 に削除され
-  (ADR-015)、Physical Anchor は運搬路を失っている。実装前に境界クラスの再設計が要る。
+  GSE の Lv3/Lv4 介入である Physical Anchor の設計規則。⚠️★★★ 2026-08-30 改訂 —— 完了条件は
+  「歩数・距離」ではなく「時間・往復」であり (既決 D11)、量は本人にも表現層にも渡さない。
+  境界クラスは ADR-017 が確定した (PC → スマホの一方向イベント / inbound を作らない)。
   以下の状況で必須参照:
-  - Flutter アプリと Tauri バックエンドの通信プロトコルを設計するとき
-  - ⚠️ Physical Anchor の境界クラス (PC↔スマホの経路) を再設計するとき
-  - 歩数・移動距離・速度の計測 API を選定・実装するとき
   - Lv3 (軽度の身体活動) / Lv4 (積極的な外出) の介入ロジックを設計するとき
-  - Flutter の pedometer / geolocator プラグインを使うとき
+  - ⚠️ Physical Anchor の境界クラス (PC↔スマホの経路) を触るとき
+  - Flutter アプリと Tauri バックエンドの連携を設計するとき
+  - ⚠️★★★ 歩数・距離・速度・位置情報を計測したくなったとき (★ 第 1 版では計測しない)
+  - 表現層と Physical Anchor の関係 (既決 D8) を確認するとき
 allowed-tools: Read, Grep, Glob, Edit
 ---
 
+> ⚠️★★★ **2026-08-30 全面改訂。** ★ 本 Skill は 2 つの既決に違反していた:
+> **(1) Lv3/Lv4 の完了条件が「歩数達成 / 距離達成」＝ 既決 D11 違反**（★ 冒頭バナーは「完了条件は
+> 時間・往復」と書いているのに、同じファイルの表が矛盾していた）／
+> **(2) 通信プロトコル・完了判定・チェックリストが削除済みの `wall_server.rs` に依存していた**（ADR-015）。
+> → ★ **本改訂で両方を是正した。**★ 境界クラスの SSOT は **ADR-017**、
+> 表現チャネル全体は **`docs/architecture/expression-channel.md`**。
 
-
-> ⚠️★★★ **2026-08-23: `wall_server.rs` は削除された**（**ADR-015**）。
-> ★ 本 Skill の「**Wall Server から拡張する**」パターンは**無効**である。
-> ⚠️★★★ **PM-D11（2026-08-15）の「既存の Wall Server の 1 ビット経路がそのまま使える・
-> 新しい境界クラスを作らない」という前提は覆った** —— ★ **Physical Anchor は運搬路を失っている。**
-> ⚠️ 実装前に **境界クラスの再設計**が要る（`data-privacy` ＋ PM-D4 の「状態を常時流すのは一段大きい」判定）。
-> ★ **PM-D11 の他の条件（量は二値のみ / 完了条件は時間・往復 / GPS は歩数と別扱い）は不変**である。
 # Physical Anchor 設計規則
 
 ## このスキルの目的
 
-GSE のストレッチゴールである Lv3/Lv4 介入（身体的活動の促進）を
-一貫したアーキテクチャで実装するための設計規則を定義する。
-現時点では Wall (Lv2) が最高介入レベルだが、将来の拡張に備えてここに仕様を記録する。
+GSE の Lv3/Lv4 介入（**離席・歩行という身体的回帰**）を、既決 D8–D11 と ADR-015 / ADR-017 に整合した
+設計で扱うための規則を定義する。
+
+⚠️★★★ **Physical Anchor は「あれば良い」構成要素ではない。**
+★ 既決 **D8** 逐語: 「Lv2 Wall を主軸から外すのは可。**しかし表現層だけにして Physical Anchor を外すのは
+不可とする**」。★ 理由 3 本のうち 3 本目に一次が付いた ——
+**不便益の認定条件 1（益は不便だからこそ＝労力）を満たすのは Physical Anchor だけである** [P170]
+（⚠️ Lv1 Nudge は非ブロック・自動消失＝労力を課さない）。
 
 ## 適用範囲
 
 ### 適用するもの
+- Lv3 / Lv4 の介入ロジック（トリガー・完了条件・安全条件）
+- PC ↔ スマホの境界（★ **ADR-017 が確定済み**。本 Skill はその再掲と運用規則）
 - Flutter アプリ（Physical Anchor クライアント）の設計
-- `wall_server.rs` の Physical Anchor 拡張
-- 歩数・移動距離・速度の計測 API 設計
 
 ### 適用しないもの
-- 現行の Wall (Lv2) / Zen Timer の実装（→ intervention-design Skill）
+- ⚠️ **Lv2 Wall / Zen Timer / Monk Mode** —— ★ **2026-08-23 に全削除された**（ADR-015 D1 / D2）
+- 表現層の内部仕様（層 0–3 / 禁止帯 / 粒子率）→ `docs/glossary.md` §表現層
+- 介入判断そのもの → `intervention-design` Skill / `docs/architecture/intervention-decision-engine.md`
 
 ---
 
@@ -45,136 +51,152 @@ GSE のストレッチゴールである Lv3/Lv4 介入（身体的活動の促�
 
 | レベル | 名称 | トリガー | 目標活動 | 完了条件 |
 |---|---|---|---|---|
-| Lv2 | Wall + Zen Timer | p_stuck > 0.70 × 30s | 2分間の休息 | タイマー完了 |
-| Lv3 | Physical Anchor Light | p_stuck > 0.80 × 60s (想定) | 室内歩行 50〜100 歩 | 歩数達成 |
-| Lv4 | Physical Anchor Full | p_stuck > 0.80 × 180s (想定) | 屋外散歩 500m 以上 | 距離達成 |
+| Lv1 | Nudge | （`intervention.rs` の既存閾値） | メタ認知質問の提示 | 自動消失 / dismiss |
+| Lv3 | Physical Anchor Light | p_stuck > 0.80 × 60s (想定) | 室内での離席・歩行 | ★ **時間の経過 ＋ 復帰** |
+| Lv4 | Physical Anchor Full | p_stuck > 0.80 × 180s (想定) | 屋外での離席・歩行 | ★ **時間の経過 ＋ 往復（復帰）** |
 
-※ Lv3/Lv4 のトリガー閾値は確定していない。実装時に functional-design.md を更新すること。
+⚠️★★★ **完了条件を「歩数」「距離」にしてはならない**（既決 **D11 条件 2**）——
+★ **量で解放を決めると [P99] の performance-contingent（★ 目標に届かなかった群 `d = −0.88`）に入る。**
+★ Lv2 Zen Timer が「2 分の経過」で*出来*を測っていなかったのと同型である。
+
+⚠️ Lv3/Lv4 のトリガー閾値は確定していない。実装時に `docs/functional-design.md` を更新すること。
+
+⚠️ **Phase1 における Physical Anchor の実体は WoZ ＋ 自己申告**である（既決）。★ 実装は次段。
 
 ---
 
 ## 主要なルール
 
-### ルール 1: 計測指標の定義と単位
+### ルール 1: ★★★ 第 1 版では身体活動を計測しない
 
-| 指標 | 単位 | 計測 API (Flutter) | 備考 |
-|---|---|---|---|
-| 歩数 | 歩 (steps) | `pedometer` プラグイン (StepCount) | セッション開始からの累積 |
-| 移動距離 | メートル (m) | `geolocator` プラグイン (Position) | GPS ベース |
-| 歩行速度 | m/s | 移動距離 / 経過時間 で算出 | 直接 API なし |
-| 活動時間 | 秒 (s) | Flutter タイマー | Physical Anchor 開始からの経過 |
+⚠️★★★ **歩数・距離・速度・位置情報を取得しない。** ★ 使ってよいのは
+**「歩いた / 歩かなかった」の二値のみ**で、⚠️ **量は本人にも表現層にも渡さない**（既決 **D11 条件 1**）。
 
----
+★ 根拠（[P77] Etkin 2016・PDF 全文逐語）:
+- **"Even in the absence of explicit external incentives, measurement itself can thus have similar effects."**
+  → ★ **「報酬ではない」は防御にならない。**
+- ⚠️ **opt-in でも / 任意閲覧でも / 本人が望んでも害が出る**（★ 3 つとも論文内の実験で潰れている）。
+- ⚠️ **撤去後はベースラインを下回る**（実験 6: 読書を**避けるようになった**）。
 
-### ルール 2: 歩行速度の計算方法
+⚠️★★★ **2026-08-30 追加の条件**: [P77] 実験 4 の「仕事枠付けによる減衰」は、
+**枠付けが *無計測時の楽しさ* を先に d ≈ 0.60 下げて買っている**（t(159) = −3.06, p = .003）。
+→ ★ **保護は「本人が work と感じている限り」でしか働かない。★ 歩行（回復）は最も守られない側である。**
 
-Flutter の `geolocator` は速度 (`speed: m/s`) を直接提供するが、
-屋内では GPS 精度が低いため、**歩数ベースの速度推定**を優先する。
+### ルール 2: ★★★ 境界は PC → スマホの一方向イベント（ADR-017 D2 / D3 / D4）
 
-```dart
-// 推奨: 歩数 × 歩幅(推定) / 経過時間
-const double STRIDE_LENGTH_M = 0.75;  // 平均歩幅 75cm
+⚠️★★★ **inbound（スマホ → PC）の「歩いた」二値経路を第 1 版で作らない。**
 
-double estimatedSpeed(int steps, Duration elapsed) {
-  if (elapsed.inSeconds == 0) return 0.0;
-  return (steps * STRIDE_LENGTH_M) / elapsed.inSeconds;
-}
+★ 理由: **完了条件が「時間・往復」なのでセンサの量が要らず**（D11 条件 2）、
+★ **PC は既に離席候補区間 ＋ 復帰を content-free に観測している**。
 
-// GPS 利用可能時はそちらを優先
-double? gpsSpeed = position.speed;  // m/s、室外のみ信頼
-```
+★ **PC → スマホのイベント契約**（★ これ以外を載せない）:
 
----
+| フィールド | 値域 |
+|---|---|
+| `level` | `stable` / `friction_rising` / `stuck` / `intervention_active` |
+| `seq` | 単調増加整数 |
+| `emitted_at` | 秒粒度 |
 
-### ルール 3: Flutter ↔ Tauri 通信プロトコル
+★ **発火は `level` が変わったときだけ**。⚠️ **1Hz を流さない**（PM-D4「常時流し続けるのは一段大きい」）。
 
-Wall Server を拡張して Physical Anchor エンドポイントを提供する。
+⚠️★★★ **この設計が持てるビットは「歩いた」ではなく「離席候補区間があり、復帰した」である。**
+→ ★ **UI も表現層も「あなたは歩いた」と断定してはならない**
+（[P183] *"avoid making the technology, rather than the user, the final authority on what the user is doing"*）。
+★ 「歩いた」の確定が要る場面では**センサではなく自己申告**を使う。
 
-```
-エンドポイント設計:
+★ **運搬路の 4 制約**: (1) ⚠️ PC 側に**常設の LAN リスナを置かない** / (2) on-demand ＋ ティアダウン /
+(3) チャネル不在でも表現が成立する（層 0 へ縮退）/ (4) ⚠️ **チャネルが無い間のフレームを捏造しない**。
+⚠️★★★ **削除済みの `wall_server.rs` 型の LAN HTTP サーバを無審査で復活させない。**
 
-GET  /anchor         → Physical Anchor HTML (Flutter WebView or ブラウザ)
-POST /anchor/start   → Physical Anchor セッション開始通知
-POST /anchor/progress → 進捗報告 (steps, distance_m, speed_ms)
-POST /anchor/complete → 完了通知 → Tauri が Wall 解除
-```
+### ルール 3: 完了条件の判定は Rust 側で行う
 
-```rust
-// wall_server.rs 拡張例
-#[derive(Deserialize)]
-struct AnchorProgress {
-    steps: u32,
-    distance_m: f64,
-    speed_ms: f64,  // m/s
-    elapsed_s: u64,
-}
-
-// POST /anchor/progress を受信したら Tauri イベントで Frontend に通知
-```
-
----
-
-### ルール 4: 完了条件の判定は Rust 側で行う
-
-Flutter から受け取った進捗データをもとに、完了条件の判定は Tauri 側が行う。
-Flutter は計測値を送るだけ。
+★ Flutter / スマホ側は**表現する層**であり、判定を持たない。
 
 ```rust
-// ✅ 正しい設計（wall_server.rs）
-fn check_completion(progress: &AnchorProgress, target: &AnchorTarget) -> bool {
-    match target {
-        AnchorTarget::Steps(n) => progress.steps >= *n,
-        AnchorTarget::Distance(m) => progress.distance_m >= *m,
-    }
+// ✅ 正しい設計（★ 時間と復帰だけで判定する）
+struct AnchorTarget { min_away_ms: u64 }
+
+fn check_completion(away_ms: u64, resumed: bool, target: &AnchorTarget) -> bool {
+    resumed && away_ms >= target.min_away_ms
 }
 
-// ❌ Flutter 側で完了判定しない（サーバーサイドに権限を持たせる）
+// ❌ 歩数・距離で判定しない（既決 D11 条件 2 違反・[P99] performance-contingent）
+// ❌ Flutter 側で完了判定しない（判定は Rust 側に置く）
 ```
+
+### ルール 4: ★★★ 歩行を MhD（推論層）の観測に入れない
+
+★ 既決 **D10**。⚠️ **合流点は表現層に置く** —— `p_stuck` と「離席候補区間があり復帰した」を
+**別入力として表現層で合流**させる。
+
+⚠️★★★ **「歩いたか否か」を復帰後の打鍵から推定して第 2 の入力に使ってはならない** ——
+★ 同じソースを共有するため、ADR-009 D2 の自己言及（「回復した」と「歩いたから推定が下がった」が
+区別できない）が戻る。★ 入力の割り方は **入力 1 = 時計の事実（離席区間の長さ ＋ 復帰の有無）/
+入力 2 = `p_stuck`** に固定する（**ADR-017 D8**）。
+
+### ルール 5: ★★★ 報酬版を採らない
+
+★ 既決 **D9**。⚠️ **「歩くと絵が綺麗になる」形を採らない。**
+★ 連動は**記録版**で実装し、評価に**自己効力感 [P15] だけを使わない**。
+
+⚠️ **「歩いたから作業が良くなった」を暗示しない** —— micro-break のメタ解析（**22 標本 / N = 2,335**）は
+**活力 d = .36 / 疲労 d = .35** を支持する一方、⚠️ **成績は全体で null（d = .16, p = .116）／
+認知負荷の高い課題では d = −.09** である [P162]。
+→ ★ **「散歩が認知作業を回復させる」は文献に支持されていない。**
+
+### ルール 6: ⚠️★★★ 位置情報は `data-privacy` に規定が入るまで実装しない
+
+★ 既決 **D11 条件 3** —— `geolocator`（GPS）は `pedometer` と別扱いにする。
+⚠️ **位置履歴は GSE が扱ってきたどのデータより機微**である。
+
+⚠️★★★ **2026-08-30 実測: `data-privacy` Skill に位置情報の規定は 1 行も無い。**
+→ ★ **参照先が空のまま GPS を実装してはいけない**（**ADR-017 D9** がこれをブロッカーとして明示）。
+
+### ルール 7: 安全条件
+
+- ★ **夜間 22:00–6:00 は Outdoor（Lv4）を無効**にする。
+- ★ **opt-in** を前提にする。⚠️ ただし **「opt-in と dismiss があるから自律性を脅かさない」とは書かない**
+  —— SDT の autonomy は *"regulation by the self"* であって選択肢の多さではなく、原典逐語で
+  **"having many options is not a basic need"** [P178]。★ 正しい書き方は
+  **「本人が事前に *是認 (self-endorse)* しているから」**である。
 
 ---
 
-### ルール 5: Flutter プラグイン選定基準
+## ⚠️ 将来トラック（★ 第 1 版では実装しない）
 
-| プラグイン | 用途 | 対応 OS | 注意点 |
-|---|---|---|---|
-| `pedometer` | 歩数計測 | iOS, Android | Android はバックグラウンド権限が必要 |
-| `geolocator` | GPS 位置・速度 | iOS, Android | 室外のみ高精度。権限ダイアログ必須 |
-| `sensors_plus` | 加速度センサー | iOS, Android | 歩数の代替手段（歩行検出） |
+★ inbound のセンサ経路を開く場合にのみ必要になるもの。⚠️ **開く前に ADR-017 D9 のブロッカーを解くこと。**
 
-Lv3（室内）では `pedometer` のみ使用。Lv4（屋外）では `geolocator` を追加。
-
----
-
-### ルール 6: 目標値はユーザーが設定できるようにする（将来）
-
-歩数・距離の目標値はハードコードせず、設定として保持する。
-
-```rust
-// 設定の例（将来の tauri-plugin-store 導入後）
-pub struct AnchorConfig {
-    pub lv3_steps_target: u32,      // デフォルト: 100 歩
-    pub lv4_distance_target_m: f64, // デフォルト: 500 m
-}
-```
+| プラグイン | 用途 | 注意点 |
+|---|---|---|
+| `pedometer` | 歩数計測 | ⚠️ **量を本人にも表現層にも渡さない**（D11 条件 1）。Android はバックグラウンド権限が必要 |
+| `geolocator` | GPS 位置 | ⚠️★★★ **`data-privacy` に位置情報の節が入るまで使わない**（D11 条件 3 / ADR-017 D9） |
+| `sensors_plus` | 加速度センサー | 歩行検出の代替。⚠️ 同じく量を渡さない |
 
 ---
 
 ## チェックリスト
 
-- [ ] 歩数・距離・速度の単位が統一されているか（steps, m, m/s）
+- [ ] ⚠️ **完了条件が「時間・往復」になっているか**（★ 歩数・距離ではない — D11 条件 2）
+- [ ] ⚠️ **量（歩数・距離・速度）を本人にも表現層にも渡していないか**（D11 条件 1）
+- [ ] ⚠️ **歩行を MhD の観測・特徴量に入れていないか**（D10）
+- [ ] ⚠️ **「歩いた」と断定する文言が UI・表現層に無いか**（ADR-017 D3 / [P183]）
+- [ ] ⚠️ **PC 側に常設の LAN リスナを作っていないか**（ADR-017 D4 / PM-D4）
+- [ ] ⚠️ **位置情報を使う場合、`data-privacy` に規定が入っているか**（ADR-017 D9）
 - [ ] 完了条件の判定が Rust 側にあるか（Flutter 側ではない）
-- [ ] Wall Server の拡張エンドポイントにトークン認証があるか
-- [ ] Flutter プラグインが OS 権限ダイアログを適切に処理しているか
-- [ ] 歩行速度がゼロ除算しないようになっているか
+- [ ] 夜間 22:00–6:00 の Outdoor 無効が効いているか
+- [ ] チャネル不在時に層 0 へ縮退し、フレームを捏造していないか
 
 ---
 
 ## 補足資料
 
-- `flutter-integration.md` — Flutter アプリの実装スケッチ
+- `docs/adr/ADR-017-expression-channel-boundary.md` — ★ **境界クラスの SSOT**
+- `docs/adr/ADR-015-wall-removal.md` — Wall / Monk Mode 削除（D4 が本トラックを開いた）
+- `docs/architecture/expression-channel.md` — 表現チャネル全体・復帰後の差分の扱い
+- `flutter-integration.md` — Flutter アプリの実装スケッチ（⚠️ **wall_server 前提の記述は無効**）
 
 ## 関連する他の Skill
 
-- `intervention-design` — Lv1/Lv2 の介入設計
-- `data-privacy` — 位置情報・歩数データのプライバシー扱い
-- `architecture-rules` — Wall Server 拡張時のモジュール配置
+- `intervention-design` — Lv1 Nudge の介入設計（⚠️ Lv2 Wall / Monk Mode は削除済み）
+- `data-privacy` — 打鍵データのプライバシー扱い（⚠️★★★ **位置情報の規定は未整備**）
+- `architecture-rules` — モジュール配置・レイヤー分離
