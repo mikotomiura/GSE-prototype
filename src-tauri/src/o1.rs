@@ -155,6 +155,29 @@ pub fn analysis_gate_open(o1_mode: bool, session_active: bool) -> bool {
     o1_mode || session_active
 }
 
+/// ⚠️★★★ **自己ラベル (「今とても詰まっている」) を記録してよいか** (純関数)。
+///
+/// ★ O1 では **記録しない**。⚠️ 理由は `lib.rs` が O1 でグローバルショートカットを
+/// 登録しない判断と**同一**である。起動ログ逐語:
+///
+/// > `global shortcuts are NOT registered (… could write user_label / review_marker rows
+/// >  that **the consent form does not list**)`
+///
+/// ## ⚠️ なぜ純関数に切り出すか
+///
+/// ★ `O1_MODE` は `OnceLock` なので、テストから O1 / 非 O1 を切り替えられない。
+/// → ⚠️ 判定を `is_o1()` の呼び出し地点に埋め込むと **両方の分岐を検査できない**
+///   (★ `analysis_gate_open` / `decide_probe_init` と同じ理由・同じ形)。
+///
+/// ## ⚠️ 経緯 (2026-08-30)
+///
+/// ★ 旧実装は **ホットキーだけ**を塞ぎ、Dashboard のボタンは素通りだった。
+/// ⚠️ 実機の画面を見るまで気づかず、**機械検査は 1 つも捕まえなかった**
+/// (配布ゲート 19/19・`--selftest` 19/0 とも緑)。
+pub fn self_marker_allowed(o1_mode: bool) -> bool {
+    !o1_mode
+}
+
 /// ⚠️★★★ **いま記録しているか** (純関数)。稼働中インジケータと `liveness` の両方が使う。
 ///
 /// ## なぜ `session_active` と分けるのか
@@ -443,6 +466,25 @@ mod tests {
     fn analysis_gate_is_always_open_in_o1() {
         assert!(analysis_gate_open(true, false));
         assert!(analysis_gate_open(true, true));
+    }
+
+    /// ⚠️★★★ **O1 では自己ラベルを記録しない** (2026-08-30 の実機発見の掛け金)。
+    ///
+    /// ★ ホットキーだけを塞いでボタンが素通りしていた事故を再発させないための門。
+    /// ⚠️ **UI 側の `{!o1Mode && …}` だけに頼らない** —— 隠し忘れ / 将来の UI 変更 /
+    /// IPC の直叩きでも、backend のここが最後の門になる。
+    #[test]
+    fn self_marker_is_blocked_in_o1() {
+        assert!(!self_marker_allowed(true));
+    }
+
+    /// ⚠️★★ **陰性対照**: 非 O1 (Phase1 / G1) の挙動を 1 バイトも変えていないこと。
+    ///
+    /// ★ これが無いと「全部 false を返す」実装でも上のテストだけは緑になる
+    /// (memory `silent-failure-in-guard-scripts`: 門は広げすぎると誤爆する)。
+    #[test]
+    fn self_marker_is_allowed_when_not_o1() {
+        assert!(self_marker_allowed(false));
     }
 
     /// ⚠️★★★ 「記録しているのに『記録していません』と出る」を消す。

@@ -2520,6 +2520,22 @@ fn record_self_marker_inner(now: u64, tx: &Sender<LogEntry>) -> bool {
 /// 戻り値: 実際に記録したら true、デバウンスで弾かれたら false (UI 側は true の時だけ確認表示)。
 #[tauri::command]
 fn record_self_marker(log: State<'_, Arc<Mutex<LogState>>>) -> Result<bool, String> {
+    // ⚠️★★★ **O1 では記録しない** (2026-08-30)。
+    //   ★ O1 のグローバルショートカットを登録しない判断と**同じ理由**である。逐語:
+    //     「could write user_label / review_marker rows that **the consent form does not list**」
+    //   ⚠️ 旧実装はホットキーだけを塞ぎ、**Dashboard のボタンは素通り**だった
+    //     (★ 2026-08-30 に実機の画面を見て発見。⚠️ 機械検査は 1 つも捕まえなかった)。
+    //   ★ **UI 側だけで隠さない**: 隠し忘れ / 将来の UI 変更 / IPC の直叩きでも
+    //     ここが最後の門になる (`data-privacy`: 同意範囲の外へ出る経路は backend で閉じる)。
+    //   ★ 判定は純関数 `o1::self_marker_allowed` に委譲する (⚠️ `O1_MODE` は OnceLock で
+    //     テストから切り替えられないため。`analysis_gate_open` / `decide_probe_init` と同じ形)。
+    if !crate::o1::self_marker_allowed(crate::o1::is_o1()) {
+        tracing::warn!(
+            "record_self_marker ignored: O1 mode does not collect self labels \
+             (the O1 consent form does not list this row). This is a gate, not a failure."
+        );
+        return Ok(false);
+    }
     let tx = log.lock().unwrap_or_else(|p| p.into_inner()).clone_log_tx();
     Ok(record_self_marker_inner(epoch_ms(), &tx))
 }

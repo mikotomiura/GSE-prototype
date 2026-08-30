@@ -121,6 +121,26 @@ pub fn retain_outside_range<'a>(
 ///
 /// ⚠️ **書き換えは一時ファイル → `rename`** で行う。★ 途中で電源が落ちても原本が残る。
 /// ★ 1 行も落ちないときは**ファイルに触らない**（mtime を動かさない）。
+///
+/// ## ⚠️★★★ パーミッションを引き継ぐ (2026-08-30 の実機で踏んだ)
+///
+/// ★ `logger::create_file_at` はセッション NDJSON を **0600** で作る。逐語:
+/// 「他ユーザーが打鍵ログの**内容**を読めない (data-privacy ルール 2)」。
+///
+/// ⚠️ 旧実装は `fs::File::create(&tmp)` で一時ファイルを作っていた。★ これは既定
+/// パーミッション (umask 適用で通常 **0644**) で作られ、`rename` で原本を置き換えるので、
+/// → ⚠️★★★ **削除を実行したファイルだけが世界読み取り可になっていた。**
+///
+/// ★ 2026-08-30 に macOS 実機で実測（★ 同じディレクトリの他ファイルとの対照）:
+///
+/// ```text
+/// -rw-------  gse_o1_20260830_061725.ndjson   ← 触っていない
+/// -rw-r--r--  gse_o1_20260830_062005.ndjson   ← ⚠️ 削除を適用した
+/// -rw-------  gse_o1_20260830_074040.ndjson   ← 触っていない
+/// ```
+///
+/// ⚠️ **プライバシー機能そのものがプライバシーを緩めていた。**
+/// ★ 同意文書 §7（削除の申し出）に応じる経路が、応じるたびに保護を落としていたことになる。
 pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64) -> Result<usize> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("failed to read session log {}: {e}", path.display()))?;
@@ -131,6 +151,26 @@ pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64) -> Result<usize> {
 
     let tmp = path.with_extension("ndjson.redact-tmp");
     {
+        // ⚠️★★★ 原本のパーミッションを**引き継いでから**書く（上の doc コメント参照）。
+        //   ★ `rename` 後に締めるのでは**窓が開く**（0644 のファイルが一瞬でも原本の位置に立つ）。
+        //   → ★ **作る時点で締める**。⚠️ 原本が読めない場合でも 0600 に倒す（fail-safe）。
+        #[cfg(unix)]
+        let mut f = {
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            let mode = fs::metadata(path)
+                .map(|m| m.permissions().mode() & 0o777)
+                .unwrap_or(0o600);
+            fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(mode)
+                .open(&tmp)
+                .map_err(|e| format!("failed to create temp file {}: {e}", tmp.display()))?
+        };
+        // Windows: NTFS の既定 ACL でユーザープロファイル配下は他ユーザーから読めない
+        // (`logger::create_file_at` と同じ判断・同じ理由でここでも追加制限はしない)。
+        #[cfg(not(unix))]
         let mut f = fs::File::create(&tmp)
             .map_err(|e| format!("failed to create temp file {}: {e}", tmp.display()))?;
         for line in &kept {
@@ -357,6 +397,68 @@ mod tests {
         assert_eq!(removed, 1);
         assert_eq!(fs::read_to_string(&p).unwrap(), "{\"t\":1}\n{\"t\":100}\n");
         assert!(!d.join("gse_20260823_120000.ndjson.redact-tmp").exists());
+    }
+
+    /// ⚠️★★★ **削除しても 0600 が落ちない**（2026-08-30 の実機で踏んだ欠陥の掛け金）。
+    ///
+    /// ★ 旧実装は `fs::File::create` で一時ファイルを作っていたので、`rename` 後の原本が
+    /// umask 既定（通常 0644）になり、⚠️ **削除を実行したファイルだけ世界読み取り可**になった。
+    #[cfg(unix)]
+    #[test]
+    fn redact_file_preserves_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tmp_dir("perm");
+        let p = d.join("gse_20260830_120000.ndjson");
+        fs::write(&p, "{\"t\":1}\n{\"t\":50}\n{\"t\":100}\n").unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+
+        // ★ 前提の確認: 書き換え**前**は 0600 である（⚠️ ここが崩れたらテストが無意味）。
+        assert_eq!(
+            fs::metadata(&p).unwrap().permissions().mode() & 0o777,
+            0o600,
+            "前提が崩れている: 書き換え前から 0600 ではない"
+        );
+
+        assert_eq!(redact_file(&p, 40, 60).unwrap(), 1);
+
+        let mode = fs::metadata(&p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "⚠️ 削除後に 0600 が失われた (mode={mode:o})。\
+             ★ redact_file の一時ファイルが既定パーミッションで作られていないか確認すること"
+        );
+        // ⚠️ 他ユーザーから読めないことを**明示的に**も見る（★ 0640 等を見逃さないため）。
+        assert_eq!(mode & 0o077, 0, "⚠️ group/other にビットが立っている");
+    }
+
+    /// ⚠️★★ **陽性対照**: 上のテストが「実在の欠陥」を本当に捕まえることを確かめる。
+    ///
+    /// ★ 旧実装と同じ作り方（`File::create` → `rename`）を再現し、
+    /// ⚠️ **0600 が失われること**を assert する。→ ★ 失われないなら、上のテストは
+    /// 「何も検査していない」ことになる（memory `measurement-instrument-false-positives`）。
+    #[cfg(unix)]
+    #[test]
+    fn naive_rewrite_would_drop_permissions_positive_control() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tmp_dir("perm-control");
+        let p = d.join("gse_20260830_130000.ndjson");
+        fs::write(&p, "{\"t\":1}\n").unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+
+        // ★ 旧実装の作り方をそのまま再現する。
+        let tmp = p.with_extension("ndjson.naive-tmp");
+        {
+            let mut f = fs::File::create(&tmp).unwrap();
+            writeln!(f, "{{\"t\":1}}").unwrap();
+        }
+        fs::rename(&tmp, &p).unwrap();
+
+        let mode = fs::metadata(&p).unwrap().permissions().mode() & 0o777;
+        assert_ne!(
+            mode, 0o600,
+            "★ この環境では umask が厳しく、素朴な書き換えでも 0600 が保たれる。\
+             ⚠️ その場合 redact_file_preserves_owner_only_permissions は空振りしうる"
+        );
     }
 
     /// ★ 1 行も落ちないならファイルに触らない。

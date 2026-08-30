@@ -451,10 +451,20 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
           第2週もアンカリング回避のためブラインド。表示は開発ビルド (showModelOutput) のみ。 */}
       {!showModelOutput ? (
         <div className="calibration-notice" role="status">
-          <span className="calibration-notice-badge">較正モード</span>
+          {/* ⚠️★★★ O1 では文言を変える (2026-08-30・実機の画面を見て発見)。
+              ★ ブラインドにすること自体は O1 でも正しい (App.tsx の o1Mode コメント参照) が、
+              ⚠️ 旧文はそのまま出すと **2 つの嘘**になっていた:
+                1. 「較正モード」—— O1 は較正ではなく自然作業の常時収集である
+                2. 「画面の問いに回答してください」—— ⚠️ **O1 に問いは出ない**
+                   (probe_assignment を 3 セッションで実測して 0 行)。
+                   → ★ 被験者は永遠に来ない問いを待つことになる。 */}
+          <span className="calibration-notice-badge">
+            {o1Mode ? '記録のみ' : '較正モード'}
+          </span>
           <p>
-            主観回答の独立性を保つため、推定状態 (Flow / Incubation / Stuck) は表示していません。
-            画面の問いに、今の感覚のまま回答してください。
+            {o1Mode
+              ? '推定状態 (Flow / Incubation / Stuck) は表示していません。画面を気にせず、ふだんどおりに作業してください。'
+              : '主観回答の独立性を保つため、推定状態 (Flow / Incubation / Stuck) は表示していません。画面の問いに、今の感覚のまま回答してください。'}
           </p>
         </div>
       ) : (
@@ -519,7 +529,16 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
       )}
 
       {/* 自己ラベル: 「今とても詰まっている」をワンタップで記録 (source=self_marker)。
-          ホットキー Ctrl+Shift+Alt+D でも同じ。X 軸較正の正解ラベルになる (本文は記録しない)。 */}
+          ホットキー Ctrl+Shift+Alt+D でも同じ。X 軸較正の正解ラベルになる (本文は記録しない)。
+
+          ⚠️★★★ **O1 では出さない** (2026-08-30・実機の画面を見て発見)。
+          ★ 同じ機能の**ホットキーは O1 で意図的に登録していない**。起動ログ逐語:
+            「global shortcuts are NOT registered (… could write user_label / review_marker rows
+              that **the consent form does not list**)」
+          → ⚠️ 同意文書に無い行を書くからホットキーを塞いだのに、**ボタンだけ残っていた**。
+             ★ 塞いだ理由はボタンにもそのまま当てはまる。
+          ⚠️ backend `record_self_marker` にも門を足してある (★ **片側だけにしない**)。 */}
+      {!o1Mode && (
       <button
         className={`self-stuck-button ${stuckMarked ? 'marked' : ''}`}
         disabled={stuckMarked}
@@ -538,6 +557,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
       >
         {stuckMarked ? '✓ 記録しました' : '🔴 今とても詰まっている'}
       </button>
+      )}
 
       {/* デバッグ (#1 repro): プローブカード / Nudge を即時に出す。card→回答/skip→record_realtime_*
           と nudge→dismiss→record_intervention_dismiss の経路を能動的に検証する。
@@ -626,17 +646,31 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
       )}
 
       {/* ナビ: アプリ終了 (quit_app) とは別に、スタート画面へ戻る導線を用意する
-          (作業種別の変更・尺度理解テスト・再開のため。アプリは終了しない)。 */}
+          (作業種別の変更・尺度理解テスト・再開のため。アプリは終了しない)。
+
+          ⚠️★★★ **O1 では「セッション終了」を出さない** (2026-08-30・実機の画面を見て発見)。
+          ★ O1 は被験者がセッションを区切る設計ではない (記録は常時・ローテートは 24 時間)。
+          ⚠️ 押した被験者は「今回の分を終えた」つもりで、実際には `quit_app` で
+             **その日の収集を止める**。★ README / 受付メール逐語
+             「アプリが起動していない日は、記録がまるごと空になります」と正面から衝突する。
+          ★ 終了手段は**トレイの「GSE を終了」が既にある** (`tray.rs`) ので、隠しても困らない。
+          ⚠️ `onBack` は既に `App.tsx` 側で O1 のとき undefined にしてある
+             (逐語「押しても何も起きないボタンを見せない」)。
+             → ★ **何も起きないボタンは隠したのに、収集を止めるボタンが残っていた。** */}
+      {!(o1Mode && !onBack) && (
       <div className="dashboard-nav">
         {onBack && (
           <button className="back-button" onClick={onBack}>
             ← 戻る
           </button>
         )}
-        <button className="quit-button" onClick={onQuit}>
-          セッション終了
-        </button>
+        {!o1Mode && (
+          <button className="quit-button" onClick={onQuit}>
+            セッション終了
+          </button>
+        )}
       </div>
+      )}
     </div>
   );
 };
