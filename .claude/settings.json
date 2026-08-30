@@ -110,12 +110,20 @@
   },
   "permissions": {
     "defaultMode": "auto",
+    "allow": [
+      "Bash(git *)",
+      "Bash(gh *)"
+    ],
     "deny": [
       "Bash(chmod -R:*)",
+      "Bash(sudo:*)"
+    ],
+    "ask": [
+      "Bash(rm -rf:*)",
       "Bash(git rebase:*)",
       "Bash(git reset --hard:*)",
-      "Bash(rm -rf:*)",
-      "Bash(sudo:*)"
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
     ]
   }
 }
