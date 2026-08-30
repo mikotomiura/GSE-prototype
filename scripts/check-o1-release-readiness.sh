@@ -169,6 +169,38 @@ else
   ng "配布スクリプトが o1.mode を置かない（★ 対象は make-distribution.sh / make-common-app-zip.sh）"
 fi
 
+# ⚠️★★★ **配れるバイナリが存在するか**（2026-08-30 に本番事故として実測して追加）。
+#
+#   ★ 2026-08-30 に macOS 実機で踏んだ: `--mode o1 --tag v0.1.29` は**最後まで緑で完走**し、
+#     `o1.mode` 入りの正常に見える配布物ができた。⚠️ ところが `v0.1.29`（2026-08-23）は
+#     **`src-tauri/src/o1.rs` を 1 バイトも含まない**（O1 実装は 08-27 の 7a062cc）。
+#   ⚠️ 起動して実測した結果: ファイル名が `gse_o1_*` にならず、`Probe scheduler thread started`
+#     ＝ **黙って通常モードで動き、ランダムプローブが復活していた**
+#     （preregistration.md §5.4-5 が「取り返しがつかない」と書いている事故そのもの）。
+#   ★ 本ゲートは「配ってよいか」の単一の真実源なのに、⚠️ **この状態を 1 度も赤にしていなかった**。
+#
+#   ⚠️★★ **タグの新しさで代用しない。** ★ 見るのは「そのタグに O1 の実装が入っているか」である。
+#     （★ release 資産そのものの検査は `make-common-app-zip.sh` の `strings` 側にある。
+#       ⚠️ ここでは repo だけで判定できることに徹する。）
+o1_release_tag=""
+if git rev-parse --git-dir > /dev/null 2>&1; then
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    if git cat-file -e "${t}:src-tauri/src/o1.rs" 2>/dev/null; then
+      o1_release_tag="$t"
+      break
+    fi
+  done <<< "$(git tag --sort=-v:refname 2>/dev/null)"
+  if [ -n "$o1_release_tag" ]; then
+    ok "O1 実装を含むリリースタグがある（${o1_release_tag}）"
+  else
+    ng "⚠️ O1 実装を含むリリースタグが 1 つも無い（★ 配るバイナリが o1.mode を読めず、黙って通常モードで動く。⚠️ ランダムプローブが復活する）"
+  fi
+else
+  # ⚠️ 判定できないことを緑にしない（memory: silent-failure-in-guard-scripts）。
+  ng "⚠️ git リポジトリではないので O1 実装を含むリリースタグの有無を確かめられない"
+fi
+
 # ⚠️★★★ O1 を gse-dataset へ出さないガード。
 #   ★ 実測（2026-08-28）: sync-session.* に O1 の記述は 0 件で、gse-dataset の
 #     metrics/ は追跡・push されている（34 件）。→ 通すと削除が git 履歴の書き換えになる。
@@ -305,11 +337,58 @@ leak_url=$(git grep -lIE "$leak_url_re" 2>/dev/null || true)
 #     ⚠️ (a)(b) は **git に入った後**しか見ないので、この 1 本が**入る前**を受け持つ。
 leak_pending=$(git ls-files --others --exclude-standard | leak_name_hits)
 [ -z "$leak_pending" ] || secret_leak="$secret_leak 未無視:$(printf '%s' "$leak_pending" | tr '\n' ' ')"
+# (d) ⚠️★★★ **secret の「値」を散文に書いた経路**（security-checker CRITICAL・2026-08-30）。
+#     ★ 動機は仮定ではない: 同日、私が `.steering/.../blockers.md` に
+#       **実 secret の先頭 45 文字**を貼った（⚠️ 未追跡のうちに削除。履歴には未混入）。
+#     ⚠️ (a)(b)(c) は 3 本とも**これを捕まえられない**:
+#       (a)(c) は *ファイル名*、(b) は *endpoint の形* しか見ていない。
+#     ★ `.steering/` は `.gitignore` されておらず、⚠️ CLAUDE.md の運用は
+#       「全作業を `.steering/` に記録・コミット」である ＝ `git add -A` 一発で入る。
+#     ⚠️★ **ゲート自身が secret を出力しない**（★ ヒットはファイル名だけ報告する）。
+#     ⚠️★★★ 射程: 判定できるのは**手元に `o1_submit.json` がある機械だけ**である。
+#       ★ 旧版はここにこのコメントだけを書き、⚠️ **明示する実装を書いていなかった**
+#         （2026-08-30・cross-review の HIGH で検出。★ コメントと実装の不一致）。
+#       ⚠️ (a)〜(d) は 1 つの `secret_leak` に畳み込まれて**単一の緑メッセージ**になるので、
+#         ★ (d) が走らなかったことが**その緑に紛れて見えなくなる**。
+#       → ★ 走ったかどうかを持ち、走らなかったら**必ず画面に出す**
+#         （★ 同ファイルが `git rev-parse --git-dir` で採っている
+#           「判定できないことを緑にしない」原則に揃える）。
+secret_val_checked=0
+if [ -f Form_O1/o1_submit.json ] && command -v python3 > /dev/null 2>&1; then
+  leak_needle=$(python3 -c "
+import json,sys
+try:
+    s=json.load(open('Form_O1/o1_submit.json'))['secret']
+except Exception:
+    sys.exit(0)
+# ★ 16 文字あれば偶然一致しない。⚠️ 短すぎると散文の普通の語に当たる。
+print(s[:16] if len(s)>=16 else '')
+" 2>/dev/null || true)
+  if [ -n "$leak_needle" ]; then
+    leak_val=$({ git ls-files -z; git ls-files -z --others --exclude-standard; } \
+      | xargs -0 grep -lF -- "$leak_needle" 2>/dev/null \
+      | grep -v '^Form_O1/o1_submit.json$' || true)
+    [ -z "$leak_val" ] || secret_leak="$secret_leak 実 secret の値:$(printf '%s' "$leak_val" | tr '\n' ' ')"
+    secret_val_checked=1
+  fi
+fi
 # ⚠️★ **検査の射程を誇張しない**（Codex 指摘）: ここが見るのは
 #   「**いまの**追跡ツリー」と「**いま**無視されていない未追跡ファイル」だけである。
 #   ★ **過去のコミットに混入したもの**は見ていない（→ 混入したら履歴の書き換えが要る）。
+# ⚠️★★ **(d) が走らなかったことを緑に紛れさせない。** ★ ✅/❌ の件数には足さない
+#   （★ この機械では判定できないだけで、欠陥があるとは言っていない）が、
+#   ⚠️ **必ず目に入る**ようにする（memory: `silent-success-is-not-visible`）。
+if [ "$secret_val_checked" -ne 1 ]; then
+  echo "  ⚠️ 未確認: Form_O1/o1_submit.json が無い（か python3 が無い）ので、"
+  echo "     ★ この機械では **実 secret の値が散文に混入していないか**を判定していない。"
+  echo "     ⚠️ 下の緑はこの 1 点を含まない。★ 設定のある機械で走らせ直すこと。"
+fi
 if [ -z "$secret_leak" ]; then
-  ok "提出設定（endpoint / secret）が git に入っておらず、入る手前でもない"
+  if [ "$secret_val_checked" -eq 1 ]; then
+    ok "提出設定（endpoint / secret）が git に入っておらず、入る手前でもなく、値の混入も無い"
+  else
+    ok "提出設定（endpoint / secret）が git に入っておらず、入る手前でもない（⚠️ 値の混入は未判定）"
+  fi
 else
   ng "⚠️★★★ 秘密が git に入る（★ push 前に止めること。⚠️ 入ると履歴からは消せない）:$secret_leak"
 fi
@@ -636,6 +715,41 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   # ⚠️★★ **語だけ残してガードの実体を消しても赤になること**（★ 旧版はここを緑にしていた）。
   build; sed_i 's/^    exit 4$/    return 0/' "$fix/w/scripts/sync-session.sh";  expect_red "弾いていない" "sync ガードが弾かなくなる"
 
+  # ⚠️★★★ **secret の「値」を散文に貼ると赤になること**（2026-08-30 追加）。
+  #   ★ これは 2026-08-30 に**私が実際にやった**事故である（`.steering/` の記録に実値 45 文字）。
+  #   ⚠️ 既存の 3 本（ファイル名 / endpoint の形 / 未無視）は 1 本も捕まえられなかった。
+  #   ★ selftest の中だけで偽の設定を作る（⚠️ 本物の `Form_O1/o1_submit.json` は 1 バイトも読まない）。
+  # ⚠️★★ **設定ファイル自身は無視させる**。★ そうしないと既存の (a)(c)
+  #   （提出設定のファイル名 / 未無視）が先に発火し、⚠️ **別の理由の赤を
+  #   「値の混入を捕まえた」と読み違える**（★ 2026-08-30 に実際にそうなった）。
+  # ⚠️★★★ **対照用の secret を 1 つの文字列でソースに書かない**（2026-08-30 実測）。
+  #   ★ 書くと、写した `scripts/gate.sh` **自身**が針に一致し、⚠️ 陰性対照が常に赤になる
+  #     （= 検査の自己参照。★ 本番では針は実 secret なのでゲートには現れず、起きない）。
+  #   → ★ 実行時に連結して作る。⚠️ 連続した 16 文字がソースに存在しない形にする。
+  plant_secret () { printf '%s%s%s' 'SELFTEST' 'SECRET01' '23456789abcdef'; }
+  plant_config () {
+    printf 'Form_O1/o1_submit.json\n' > "$fix/w/.gitignore"
+    printf '{"endpoint":"https://script.google.com/macros/s/%s/exec","secret":"%s"}\n' \
+      "SELFTESTSELFTESTSELFTESTSELFTESTSELFTESTSELF" "$(plant_secret)" \
+      > "$fix/w/Form_O1/o1_submit.json"
+  }
+  build; plant_config
+  printf 'ここに秘密を貼ってしまった: %s\n' "$(plant_secret | cut -c1-16)" > "$fix/w/docs/leaked-note.md"
+  expect_red "実 secret の値" "★ secret の値を散文に貼ると赤になる"
+  # ⚠️★ 対照: 貼っていなければ緑のまま（★ 検査が常に赤くなる作りになっていないこと）。
+  build; plant_config
+  expect_green "値の混入も無い" "★ 貼っていなければ緑のまま（陰性対照）"
+  # ⚠️★★★ **設定が無い機械では「未判定」と見えること**（cross-review HIGH・2026-08-30）。
+  #   ★ 旧版はここで黙って skip し、⚠️ **一括の緑に紛れて見えなくなっていた**。
+  #   ⚠️ `plant_config` を呼ばない ＝ CI や新しい clone と同じ状態にする。
+  build
+  out=$(bash "$fix/w/scripts/gate.sh" 2>&1)
+  if printf '%s\n' "$out" | grep -q "実 secret の値が散文に混入していないか"; then
+    echo "  ✅ 満たすと緑になる: ★ 設定が無ければ「未判定」と画面に出る"; sp=$((sp+1))
+  else
+    echo "  ❌ 満たしても赤のまま: ★ 設定が無いのに未判定と出ない（★ 緑に紛れている）"; sf=$((sf+1))
+  fi
+
   # ⚠️★★★ **移植性ゲート自身の変異試験**（2026-08-29 に追加）。
   #   ★ 新しく足した検査に対照を付けないと、⚠️ **それが空回りしても誰も気づかない**。
   #   ⚠️ ★ **`sed_i` を使わない**: 仕込むのは「変数 ＋ 多バイト」であり、
@@ -654,6 +768,19 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   #   ★ liveness の陽性対照は selftest 1（壊すと赤）へ移した（= repo 側が緑になったため）。
   build; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
 
+  # ⚠️★★★ **O1 実装を含むタグを作ると緑に変わること**（2026-08-30 追加）。
+  #   ★ 一時ツリーは `git init` しただけでタグが 1 つも無いので、既定では赤い
+  #     ＝ 本物の repo と同じ状態である。→ ★ タグを打って緑に変わることを確かめる。
+  #   ⚠️ `o1.rs` が**そのタグの中にある**ことまで見ているか（＝ タグの新しさで代用していないか）は
+  #     直後の selftest 3 で撃つ。
+  build
+  mkdir -p "$fix/w/src-tauri/src"
+  printf 'pub const MARKER_FILE_NAME: &str = "o1.mode";\n' > "$fix/w/src-tauri/src/o1.rs"
+  git -C "$fix/w" add -A > /dev/null 2>&1
+  git -C "$fix/w" -c user.email=s@e -c user.name=s commit -qm selftest > /dev/null 2>&1
+  git -C "$fix/w" tag v9.9.9 > /dev/null 2>&1
+  expect_green "O1 実装を含むリリースタグがある" "★ O1 を含むタグを切ると緑になる"
+
   echo
   echo "=== selftest 3: 片方だけでは緑にしない（★ 部分的な修正で騙されないか）==="
   # ⚠️★★ Windows が O1 の主ターゲットである。★ `.ps1` だけ壊れていても**必ず赤にする**
@@ -665,6 +792,14 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   build; fill_measure;  expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
   # ★「状態」だけ実測済みにして必須欄が空なら赤（⚠️ 中身の無い記録で緑にしない）。
   build; sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
+  # ⚠️★★★ **タグの新しさで代用していないこと**（2026-08-30 追加・本セッションの事故そのもの）。
+  #   ★ `v0.1.29` は「実在する最新タグ」だったが `o1.rs` を含まなかった。
+  #   → ★ **o1.rs を含まないタグ**を打っても赤のままであることを確かめる。
+  build
+  git -C "$fix/w" add -A > /dev/null 2>&1
+  git -C "$fix/w" -c user.email=s@e -c user.name=s commit -qm selftest > /dev/null 2>&1
+  git -C "$fix/w" tag v9.9.8 > /dev/null 2>&1
+  expect_red "リリースタグが 1 つも無い" "★ o1.rs を含まないタグを打っても赤のまま"
 
   echo
   echo "────────────────────────────────────────"

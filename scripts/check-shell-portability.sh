@@ -109,17 +109,31 @@ def is_shell_by_shebang(first_line):
 #       ★ 冒頭が掲げている fail-closed が**成立しなくなる**（実測: 5/5 緑で通った）。
 #     ⚠️ 陽性/陰性対照はこれを捕まえられない（★ 対照は明示パスを渡すので repo 走査が
 #       空回りしても必ず通る）。→ ★ **走査経路そのものに対照を立てる**（下記 `targets` モード）。
+# ⚠️★★★ **`-z` を使う**（code-reviewer HIGH・2026-08-30 に実測で判明）。
+#   ★ 素の `git ls-files` は **非 ASCII のパスを C-quote して返す**:
+#       "experiments/20260801-controlled-friction-task/\345\210\235\345\233\236…_mac.sh"
+#     ⚠️ その文字列で `open()` すると OSError になり、旧版は `except OSError: continue` で
+#       **無言で除外**していた（★ 緑のまま対象から消える）。
+#   ⚠️★★ 実害: 落ちていた 2 本は `初回セットアップ_mac.sh` と `scripts/submit/提出する_mac.command`
+#     ＝ **どちらも被験者が直接叩くスクリプト**である。★ しかも本セッションで
+#     `初回セットアップ_mac.sh` に入れた違反（括り忘れの `$out` ）を、このゲートが緑のまま見逃した。
+#   → ★ NUL 区切りで受け取れば quote されない。⚠️ あわせて OSError を
+#     **「検査できなかった」として数える**（★ 黙って飛ばさない）。
+SKIPPED = []
+
+
 def targets():
     tracked, untracked = [], []
     for flag, bucket in ((["--cached"], tracked), (["--others", "--exclude-standard"], untracked)):
-        r = subprocess.run(["git", "ls-files"] + flag, capture_output=True, text=True)
+        r = subprocess.run(["git", "ls-files", "-z"] + flag, capture_output=True)
         if r.returncode != 0:
             print("git ls-files %s が失敗 (rc=%d)。★ git リポジトリの中で実行すること。"
                   % (" ".join(flag), r.returncode), file=sys.stderr)
             sys.exit(2)          # ★ 2 = 走査できなかった（⚠️ 違反 0 件と区別する）
-        for f in r.stdout.split("\n"):
-            if not f:
+        for raw in r.stdout.split(b"\0"):
+            if not raw:
                 continue
+            f = raw.decode("utf-8", "surrogateescape")
             if f.endswith(EXTS):
                 bucket.append(f)
                 continue
@@ -129,6 +143,8 @@ def targets():
                 with open(f, "rb") as fh:
                     first = fh.read(256).split(b"\n")[0]
             except OSError:
+                # ⚠️★ 黙って飛ばさない。★ 「開けなかった」を数えて上位で fail-closed にする。
+                SKIPPED.append(f)
                 continue
             if is_shell_by_shebang(first):
                 bucket.append(f)
@@ -145,6 +161,8 @@ def scan(paths):
             with open(f, "rb") as fh:
                 data = fh.read()
         except OSError:
+            # ⚠️★ ここも黙って飛ばさない（★ 収集を直しても読めない物は「検査できなかった」）。
+            SKIPPED.append(f)
             continue
         for i, line in enumerate(data.split(b"\n"), 1):
             for m in PAT.finditer(line):
@@ -166,6 +184,12 @@ if mode == "repo":
         sys.exit(2)
     print("SCANNED %d %d" % (len(tracked), len(untracked)))
     hits = scan(allf)
+    # ⚠️★★ 開けなかったファイルがあれば **違反 0 件でも緑にしない**（fail-closed）。
+    #   ★ 旧版はここが無かったので、非 ASCII 名の 2 本が消えたまま緑だった。
+    if SKIPPED:
+        print("開けなかったファイルがある（★ 検査できていない）: %d 件: %s"
+              % (len(SKIPPED), ", ".join(SKIPPED[:5])), file=sys.stderr)
+        sys.exit(2)
     for f, i, frag in hits:
         mark = "追跡" if f in tracked else "未追跡"
         print("VIOL %s:%d: %s  [%s]" % (f, i, frag, mark))
