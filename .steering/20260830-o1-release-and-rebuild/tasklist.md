@@ -24,8 +24,8 @@
 
 - [x] `openssl rand -base64 32` で新しい値を作る
 - [x] ローカル `Form_O1/o1_submit.json` の `secret` を差し替え
-- [ ] ⚠️ **研究者**が Apps Script のスクリプトプロパティを差し替え（Claude からは不可）
-- [ ] `checkSubmitConfig()` を回して緑を確認
+- [x] ⚠️ **研究者**が Apps Script のスクリプトプロパティを差し替え（2026-08-30 実施）
+- [x] `checkSubmitConfig()` を回して緑を確認（研究者が実行）
 
 ## §1-C 配布物を作り直す
 
@@ -39,27 +39,31 @@
 - [x] 初回セットアップ → `OK: 準備できました（O1 モード）…`
 - [x] `gse-next.app` をダブルクリック（TCC の再要求の有無を記録）
 - [x] ファイル名が `gse_o1_*`
-- [x] `gse-app.log` に `Probe scheduler thread started` が**無い**
+- [x] ⚠️ 判定条件を訂正: NDJSON の `probe_assignment` 型が **0 行**（★ スレッド起動ログは O1 でも必ず出る）
 - [x] 「記録中 · 作業の種類: …」の表示
 - [x] 「開始する」を押していないのに `key` 行が出る
 - [x] `intervention_enabled` が false
 - [x] 宣言 4 択を選び直す → ローテートして新ファイルに `session_meta`
 - [x] 「すぐ止める」→ `recording_pause` / 停止中 `feat` 行 0
-- [ ] ⚠️★★★ 「この時間帯の記録を消す」（一時停止 → 削除の順・`redaction_ledger.jsonl`）
+      （★ 実測: 停止中 57 秒=feat 0 / 再開中 43 分=feat 2604 / 2 回目の停止中=feat 0）
+- [x] ⚠️★★★ 「この時間帯の記録を消す」★ **成功**（★ 全 OS 通じて初）
+      （⚠️ 順序は **一時停止 → 削除ではない**。O1 は**止めずに**消す。詳細は blockers.md B-5）
+      `files_touched=1 lines_removed=3568` / 指定区間の残存 0 行を型で検算 / 台帳 8 行目
+      ⚠️ ★ ここで **0600 が 0644 に落ちる欠陥**を発見（decisions.md D-5）
 - [ ] 自動起動の登録 → 再起動して本当に自動で立ち上がるか
 
 ## §1-E 送信 timeout
 
 - [x] `.idea/issue.md` を読む
 - [x] 圧縮の不在を自分で確かめる（`flate2` / `zstd` / `gzip` / `brotli`）
-- [x] `/reimagine` で「固定値 vs サイズ比例＋下限」を比較
+- [x] 案を比較（固定値 / サイズ比例＋下限 / 運ぶ量を小さくする）→ decisions.md D-3
 - [ ] 実測（合成ペイロードで転送時間）
 - [ ] 記録票を「実測済み」にし、コードを直す
 
 ## §1-F 配布フォルダ
 
-- [ ] zip 2 本を Drive へ置く
-- [ ] リンクを開いて 2 本見えることを確認
+- [x] zip 2 本を Drive へ置く（研究者が D&D）
+- [x] Drive API で 2 本と `fileSize` 一致を照合（★ 旧 `o1_submit.json` も削除済み）
 
 ## §1-G README（⚠️ 承認が要る）
 
