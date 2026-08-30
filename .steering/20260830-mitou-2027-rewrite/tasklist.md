@@ -39,5 +39,5 @@
 ## 完了処理
 - [x] `design.md` の最終化
 - [x] `decisions.md`（D1–D5）
-- [ ] git commit（★ 2027 版 2 文書 ＋ `.steering/`）
+- [x] git commit（★ ブランチ `docs/mitou-2027-rewrite`・3 コミット: 全面改訂 / cross-review 反映 / budget）
 - [ ] ⚠️ **研究者確認**: `decisions.md` D4（ロードマップが WBS §改訂予定＝**未承認**に依拠している）
