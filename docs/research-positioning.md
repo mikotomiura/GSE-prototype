@@ -109,6 +109,89 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 > ⚠️ 暫定地図。網羅精読は `/literature-review` の落合フォーマット深掘りに委ねる。詳細書誌は docs/references.md。
 
 - **不便益 (Benefit of Inconvenience)** [P6]: 川上・内藤。利便性と便益を直交軸とみなす設計思想。GSE の介入哲学の源流。
+- ★★★ **不便益の理論的射程と、その実証の薄さ**
+  （2026-08-30 追加・`docs/literature/20260830-theory-scaffold-inconvenience-sdt-reflection.md`）:
+  ★ **不便益の定義は「不便であること＝労力（物理的／心理的）がかかること」**であり、認定には **3 条件**
+  （条件 1 益は不便だからこそ／条件 2 不便を被るのは受益者本人／条件 3 副次的）が要る [P170]。
+  ★ 益は **8 枚のカード**に整理されている —— `System comprehension` / `Devising ways` / `Improvement` /
+  `Preventing loss of skill` / `Feelings of relaxation and trust` / `Personalization` /
+  `Encouraging initiative` / `Enhancing awareness`（`Objective benefits` と `Subjective benefits` の 2 群）。
+  → ★ **GSE が使う「主体性・気づき・工夫の余地」は 3 枚に literally 一致し、射程に乗る。**
+  ⚠️★★★ **しかし条件 1 が現行実装で満たされない** —— **ADR-015 で Lv2 Wall を削除した後に稼働する介入は
+  Lv1 Nudge のみで、非ブロック・自動消失＝労力を課さない。**
+  ★ **不便を実際に担うのは Lv3/Lv4 Physical Anchor であり、本フェーズでは未実装である**
+  （★ しかも ADR-015 D4 で運搬路を失っている）。
+  ⚠️★★★ **実証はさらに薄い** —— 7 角度の探索で **RCT ゼロ / メタ分析ゼロ / 追試ゼロ**。
+  唯一の統制実験 [P171] は **N=32・1 週間・被験者内**で、
+  ★ **不便版に肯定評点を付けた（＝便益を感じた）のは 32 名中 6 名のみ**、その 6 名は
+  **有能感が有意に高く（Welch t, p=0.015）／熟練度の分散が有意に小さい（F, p=0.027 / 0.023）**。
+  ⚠️ **著者自身が「仮説生成」と明記し、効果量を 1 つも報告していない。**
+  → ★★ **「摩擦の効果は安定した個人特性で調整される」の 3 本目の独立収束**（[P127] Need for Cognition ・
+  [P128] Friction Disposition に続く。⚠️ **ただし本件が最も軽い**）。
+  ★ 川上本人の自制も逐語で記録する [P172]: **「なんでも不便にすれば益が得られるわけではない」**。
+  ⚠️★★★ **不便益は [P45] と同じ「語彙まで」の温度である。効果の出典に使わない。**
+  ⚠️ **併せて [P6] の書誌そのものが未検証であることが判明した**（★ "Proc. Design Society, 2019" に該当が
+  見つからず、`active` → `provisional` に落とした）。★ **不便益を引くときは一次
+  （[P170] 定義 / [P171] 統制実験 / [P172] 総論 / [P174] 英語体系書）を引くこと。**
+- ★★★ **「効果でなく気づきを目的とする設計」の理論的地位と評価方法論**
+  （2026-08-30 追加・同カード）:
+  ★ **GSE の「断定しない・自己状態の外在化に留める」は、HCI に名前を持つ既存の設計原則である** ——
+  Reflective Design 原則 4 の逐語 [P183]:
+  *"Technology that monitors and reports on user activity or experiences should be carefully designed to
+  **avoid making the technology, rather than the user, the final authority on what the user is doing**."*
+  ★ 同原則 5 は *"**Reflection is not a separate activity from action but is folded into it**"* で、
+  **HCI の「使いやすさは反省と背反」という読みを名指しで否定する**
+  → ★ **GSE が *作業中に* Nudge を出す（別画面の振り返りではない）ことの理論的根拠になる。**
+  ⚠️★★★ **したがってこれを新規性として書いてはならない** —— ★ **2005 年に名前が付いた既存原則である。**
+  ★ 書けるのは「**既存原則を、実作業中のリアルタイム推定に適用した**」という形までである。
+  ★ 系譜は Slow Technology [P104] → Informative Art [P113] → Reflective Design [P183] →
+  Ludic Design [P184] と繋がり、**[P113] の一次逐語が両端を結ぶ**:
+  *"**Informative art can be seen as a kind of slow technology, i.e. a technology that promotes moments of
+  concentration and reflection.**"*
+  ★ [P113] はさらに **表現原理**を与える: *"a **mapping between design structure and information structure**
+  rather than a effective presentation of information content"* ＝ ★ **内容でなく構造を写す**
+  （★ GSE の content-free 制約と原理レベルで一致する）。
+  ⚠️★★★ **ただしこの系譜は全体が設計論であり、効果の出典は 1 本も無い** ——
+  ★ **Informative Art の創始者自身が自作物について
+  *"its usefulness as an awareness support is rather limited"* と書いている** [P113]。
+  ★ Slow Technology 系で最長の実配備すら **N=3 世帯・14 か月の質的研究**である [P186]。
+  ★★★ **評価方法論の側から 1 本の警告が来る** [P187]:
+  *"risks a **displacement**, wherein reflection is linked with some desired outcome (e.g., increased
+  learning, improved performance), and **assessment of that outcome is taken as evidence that reflection
+  occurred**."*
+  → ★★ **GSE が行動指標だけを測って学習効果を主張しないのは、この displacement を構造的に回避している**
+  ＝ ★ **主張範囲の限定に方法論的根拠が 1 本増える。**
+  ⚠️ **逆に、将来「表現層が反省を促した」と言いたくなったとき、行動指標の改善をその証拠にしてはならない**
+  （★ その場合の正しい計器は既登録の [V77] TSRI / [V78] RRT、および [P191] の反省の水準 R0–R4）。
+  ⚠️★★★ **GSE は ludic design ではない** —— ludic の定義は *"activities motivated by curiosity,
+  exploration, and reflection **rather than externally-defined tasks**"* [P184] であり、
+  **GSE は externally-defined task（論述執筆）の真っ最中に働く。**
+  ★ **借りるのは「効果でなく *使われ方* を書く」評価作法までである。**
+- ⚠️★★★ **「自律性を脅かさない」の定義 —— 選択肢の多さではなく self-endorsement である**
+  （2026-08-30 追加・同カード）: SDT の autonomy は原典逐語で **"regulation by the self"**、
+  その反対 heteronomy は **"regulation that occurs without self-endorsement"** [P178]。
+  ★★★ *"One can have many options and not feel autonomy … Alternatively, **one could have only one option
+  (which functionally means no choice) and yet feel quite autonomous so long as one truly endorses that
+  option**."* ／ 結論 *"**having many options is not a basic need**, nor is it even always edifying"*。
+  → ⚠️★★★ **「opt-in と dismiss があるから自律性を脅かさない」は SDT では成立しない**（1-2 で否決）。
+  ★ **正しい書き方は「本人が事前に *是認 (self-endorse)* しているから」であって「選べるから」ではない。**
+  ⚠️★★★ **併せて実測**: GSE は **`autonomy loss` を拒否権付きの反証ゲート（`wbs-verification-halfyear.md`
+  Gate H）のアウトカムに据えているのに、SDT の理論本体も測定尺度も 1 行も登録されていなかった** ——
+  ★ **これは「書誌が薄い」ではなく「計器が無い」である。**
+  ★ 唯一の計器候補は **[V88] METUX の TENS-Interface**（★ SDT を HCI で運用可能にした唯一の公式枠組みで、
+  Ryan 本人が共著）だが、⚠️ **著者自身が *"The measures presented are initial iterations that will require
+  more thorough validation"* と留保している** → ★ **確証には使わず Gate の運用指標として使う。**
+  ★ METUX は併せて **層をまたぐ矛盾**を明記している（逐語 *"a technology can support psychological needs at
+  one level while undermining them at another"*）—— ★ **GSE では「表現層で autonomy を支えつつ介入層で損なう」
+  が構造的にありうる。**
+  ⚠️★★★ **そして SDT 自体に反証がある** —— k=99 研究・119 標本のメタ分析レビューは
+  *"contrary to SDT, the variance basic psychological needs account for in some of these outcomes is
+  **statistically significant but practically insignificant**"* と報告する [P182]
+  （★ need satisfaction 全体が attendance の分散の 2% しか説明しない例もある）。
+  → ★ **SDT を引くときは [P182] を併記する**（★ [P99] に対する [P107] と同じ役割）。
+  ★ 一方 **[P182] の方法論的警告は GSE に有利**である: *"We therefore **discourage cross-sectional
+  self-report studies** dealing with basic psychological needs"* ——
+  ★ **GSE の個人内・縦断・日次デザインは、SDT 文献が自ら求める方向にある。**
 - **生産的苦闘 / 望ましい困難** [P12][P9]: Kapur の Productive Failure、Bjork の desirable difficulties。
   「困難は学習のコストではなく学習そのもの」。守るべき摩擦の存在根拠。
 - **キーストローク動態 → 認知プロキシ** [P7][P11][V7]: Park（MCI 判別）、Mehta（LLM 支援検出）、Condrey（タイピング個人署名）。
