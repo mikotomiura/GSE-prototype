@@ -344,6 +344,44 @@ if [ "$SELFTEST" -eq 1 ]; then
     ng_ "o1: README にドラフト表示が無い（★ 承認済みならこの検査を外すこと）"
   fi
 
+  # 9. ⚠️★★★ **確認文言の 3 点を鎖にする**（code-reviewer MEDIUM・2026-08-30）。
+  #   ★ 「配布物そのもので初回セットアップ」検査は `SETUP_MUST` と
+  #     `初回セットアップ_mac.sh` の `expect=` を**手で一致させているだけ**である。
+  #   ⚠️ 片方だけ直すと、フル build（macOS 実機 ＋ dmg ＋ gh）を回すまで赤くならない。
+  #   ⚠️★★ さらに、照合しているのはシェル 2 本の**間だけ**なので、UI 側の文言が変わると
+  #     ★ **被験者に存在しない文字列を探させたまま両ゲートが緑**になる。
+  #   → ★ セットアップ script ＋ 本ファイル ＋ **UI の実装**の 3 つを繋ぐ
+  #     （memory: `name-lookup-only-works-within-one-source`）。
+  chain_bad=""
+  for pair in "G1 モードで動作しています:src/App.tsx" "記録中 · 作業の種類:src/components/RecordingControls.tsx"; do
+    phrase="${pair%%:*}"; ui="$REPO/${pair#*:}"
+    grep -q "$phrase" "$MAC_SETUP_SRC"  || chain_bad="$chain_bad セットアップに「${phrase}」が無い"
+    grep -q "$phrase" "$SELF"           || chain_bad="$chain_bad 本ファイルに「${phrase}」が無い"
+    grep -q "$phrase" "$ui" 2>/dev/null || chain_bad="$chain_bad UI(${pair#*:})に「${phrase}」が無い"
+  done
+  if [ -z "$chain_bad" ]; then
+    ok_ "★ 確認文言が セットアップ / 配布ゲート / UI 実装 の 3 点で一致している"
+  else
+    ng_ "★ 確認文言の鎖が切れている:$chain_bad"
+  fi
+  # 9b. ⚠️★★ **この鎖の検査自身に陽性対照を付ける**（cross-review LOW・2026-08-30）。
+  #   ★ 実ファイルを直接 grep する一発検査なので、⚠️ パスの解決を間違えていても
+  #     「3 点そろっている」と言い続けられる。→ ★ **存在しない文言で同じ判定を回す**。
+  #   ⚠️ 実ファイルは 1 バイトも触らない（★ 判定側に偽の語を通すだけ）。
+  # ⚠️★★★ **対照語を 1 つの文字列でソースに書かない**（2026-08-30 に実測で踏んだ）。
+  #   ★ 書くと `$SELF`（このファイル自身）に一致し、⚠️ 対照が常に「空回りしている」と言う。
+  #   → ★ 実行時に連結して作る（★ `check-o1-release-readiness.sh` の `plant_secret` と同じ手）。
+  chain_ctl=""
+  ctl_phrase="$(printf '%s%s' 'ZZQX-ABSENT-' 'CONTROL-PHRASE')"
+  for f in "$MAC_SETUP_SRC" "$SELF" "$REPO/src/components/RecordingControls.tsx"; do
+    grep -q "$ctl_phrase" "$f" 2>/dev/null && chain_ctl="$chain_ctl ${f}"
+  done
+  if [ -z "$chain_ctl" ]; then
+    ok_ "★ 鎖の検査は存在しない文言を「ある」と言わない（★ 陽性対照）"
+  else
+    ng_ "★ 鎖の検査が空回りしている（存在しない語に一致した）:$chain_ctl"
+  fi
+
   echo
   echo "  selftest: 通過 $sp 件 / 失敗 $sf 件"
   if [ "$sf" -eq 0 ]; then
@@ -355,6 +393,18 @@ if [ "$SELFTEST" -eq 1 ]; then
 fi
 
 # --- 1. 送信先の設定（★ 無ければ止める。無いまま配ると記録が研究者に届かない） -----
+# ⚠️★★★ **`--mode o1` で `--config` の既定を黙って使わせない**（security-checker HIGH・2026-08-30）。
+#   ★ 既定は `$REPO/g1-submit.json`（G1 の設定）である。⚠️ `--mode o1` を渡しても
+#     CONFIG は G1 のままで、下の検査は endpoint の書式と `len(secret) >= 24` しか見ないので
+#     **G1 の endpoint ＋ secret を含む O1 配布物が緑で完成する**。
+#   ⚠️ 被験者の提出は G1 の受け口へ飛び、`GSE_G1_Submit.gs` の `sanitizeName_` が O1 名を
+#     全弾きするので ★ **`bad name` が毎回返り、その被験者のデータは永久に届かない**。
+#     しかも G1 の secret がより広い範囲に配られる。
+#   → ★ O1 では **明示を必須**にする（★ 暗黙の既定採用を禁止する）。
+if [ "$MODE" = o1 ] && [ "$CONFIG" = "$REPO/g1-submit.json" ]; then
+  die "★ --mode o1 では --config を明示すること（⚠️ 既定は G1 の設定なので、黙って G1 の受け口へ飛ぶ配布物ができる）。
+    例: --config \"\$REPO/Form_O1/o1_submit.json\""
+fi
 [ -f "$CONFIG" ] || die "送信先の設定がありません: $CONFIG"
 python3 - "$CONFIG" <<'PY' || exit 1
 import json, sys
@@ -368,10 +418,35 @@ print(f"[make-common-app-zip] 送信先の設定 ✅ (endpoint {len(ep)} 文字 
 PY
 
 # --- 2. タグに自動送信が入っているか（★ サイズや名前では確かめたことにならない） ----
-git -C "$REPO" rev-parse "$TAG" > /dev/null 2>&1 || die "タグがありません: $TAG"
+# ⚠️★ **「ローカルに無い」と「中身が古い」を混ぜない**（code-reviewer MEDIUM・2026-08-30）。
+#   ★ 未取得のタグでも下の cat-file は失敗するので、旧版は「タグを切り直せ」と誤診させた。
+#     ⚠️ 正解は `git fetch --tags` である。
+git -C "$REPO" rev-parse -q --verify "$TAG^{commit}" > /dev/null 2>&1 \
+  || die "タグ $TAG がローカルにありません。★ 先に: git fetch --tags"
 git -C "$REPO" cat-file -e "$TAG:src-tauri/src/reconcile.rs" 2>/dev/null \
   || die "$TAG に reconcile.rs がありません = 自動送信が入っていないビルドです"
 note "タグ $TAG に自動送信あり ✅"
+
+# --- 2b. ⚠️★★★ **タグに O1 実装が入っているか**（2026-08-30 に本番事故として実測） ------
+#   ★ 旧版は「タグが新しいこと」しか見ていなかった。⚠️ `v0.1.29`（2026-08-23）は
+#     **`o1.rs` を 1 バイトも含まない**（O1 実装は 08-27 の 7a062cc）。それでも
+#     `--mode o1 --tag v0.1.29` は**最後まで緑で完走し**、`o1.mode` 入りの zip を作った。
+#   ⚠️★★ 被験者の端末で何が起きるか: マーカーを**読む側のコードが無い**ので
+#     アプリは**黙って通常モードで動く** —— ★ ファイル名は `gse_o1_*` にならず、
+#     日次ローテートも 48 時間猶予も動かず、⚠️ **ランダムプローブが復活する**
+#     （preregistration.md §5.4-5 / 初回セットアップ_mac.sh 冒頭が警告している事故そのもの）。
+#     ★ 画面上は何も壊れて見えないので、**数日〜数週間ぶんが丸ごと無駄になる**まで気づけない。
+#   → ★ ソースの有無を**タグの中身で**確かめる（`reconcile.rs` の検査と同じ形）。
+#     ⚠️ ただしこれだけでは足りない（★ タグにソースがあっても資産が古いことはある）
+#       → 実体の検査は下の「4b」。
+if [ "$MODE" = o1 ]; then
+  git -C "$REPO" cat-file -e "$TAG:src-tauri/src/o1.rs" 2>/dev/null \
+    || die "★ $TAG に src-tauri/src/o1.rs がありません = **O1 を知らないビルド**です。
+    ⚠️ このまま配ると、アプリは o1.mode を読めず**黙って通常モードで動きます**
+       （gse_o1_* にならない / 日次ローテートも自動提出も動かない / ランダムプローブが復活する）。
+    ★ 先に O1 実装を含むタグを切って release 資産を作ること（--tag でそれを指す）。"
+  note "タグ $TAG に O1 実装あり ✅"
+fi
 
 CACHE="$HERE/dist/_release/$TAG"
 mkdir -p "$CACHE"
@@ -434,6 +509,39 @@ rmdir "$MNT" 2>/dev/null || true
 
 codesign --verify --strict "$M/gse-next.app" || die "フォルダへ置いた後に署名が壊れました"
 
+# --- 4b. ⚠️★★★ **実体**に O1 が入っているか（★ 2b のソース検査だけでは足りない） --------
+#   ★ タグにソースがあっても、release 資産が**そのタグより前に作られている**ことはある。
+#     → ⚠️ 「タグが正しい」と「配るバイナリが正しい」は別の主張である。
+#   ★ 2026-08-30 の実測: `v0.1.29` の `gse-next` は
+#       `o1.mode` 0 件 / `GSE_O1_MODE` 0 件 / `gse_o1_` 0 件（`g1.mode` は 3 件あった）。
+#     ⚠️ **文字列が 1 つも無い**ので、マーカーを置いても読む側が存在しない。
+#   ⚠️★ `grep -c` を使う（`grep -q` は SIGPIPE で偽陰性を作る — 既存の gse-submit 検査と同じ理由）。
+if [ "$MODE" = o1 ]; then
+  if command -v strings > /dev/null 2>&1; then
+    MACBIN="$M/gse-next.app/Contents/MacOS/gse-next"
+    [ -f "$MACBIN" ] || die "実体の検査対象がありません: $MACBIN"
+    for lit in 'o1.mode' 'gse_o1_' 'GSE_O1_MODE'; do
+      n=$(strings -a "$MACBIN" | LC_ALL=C grep -cF -- "$lit" || true)
+      [ "${n:-0}" -gt 0 ] || die "★ 配布する gse-next の実体に「${lit}」がありません = **O1 を知らないビルド**です（${TAG}）。
+    ⚠️ マーカーを置いても読む側のコードが無いので、**黙って通常モードで動きます**。
+    ★ O1 実装を含むタグで release 資産を作り直すこと。"
+    done
+    note "gse-next の実体に O1 あり ✅ (o1.mode / gse_o1_)"
+    # ★ 提出側も見る。⚠️ `--o1` が無いと O1 の規則（gse_o1_* 対象・48h 猶予）で包めない。
+    # ⚠️★ **無ければ飛ばす、にしない**（code-reviewer / security-checker MEDIUM・2026-08-30）。
+    #   ★ すぐ上の MACBIN は die なのにここだけ条件付きだと、将来バンドル構成が変わったとき
+    #     **O1 の提出経路が無検査で配られる**（★ このファイルが繰り返し警戒している型）。
+    SUBBIN="$M/gse-next.app/Contents/MacOS/gse-submit"
+    [ -f "$SUBBIN" ] || die "実体の検査対象がありません: $SUBBIN"
+    n=$(strings -a "$SUBBIN" | LC_ALL=C grep -cF -- '--o1' || true)
+    [ "${n:-0}" -gt 0 ] || die "★ gse-submit の実体に「--o1」がありません = O1 の規則で包めないビルドです（${TAG}）"
+    note "gse-submit の実体に --o1 あり ✅ ($n 箇所)"
+  else
+    # ⚠️ 黙って素通りさせない（memory: silent-failure-in-guard-scripts）。
+    die "strings がありません。★ O1 の実体検査ができないので配布物を作りません"
+  fi
+fi
+
 # ⚠️★ 課題ページが紛れていないことを確かめる（共通側に入れてはならない・D-1）
 [ -z "$(echo "$M"/block*.html)" ] || die "共通の配布物に課題ページが入っています（被験者別のはず）"
 
@@ -469,7 +577,20 @@ if command -v strings > /dev/null 2>&1; then
   n=$(strings -a "$W/gse-submit.exe" | grep -c -- 'reconcile' || true)
   [ "${n:-0}" -gt 0 ] || die "gse-submit.exe に reconcile が見当たりません（古いビルド）"
   note "gse-submit.exe の実体に reconcile あり ✅ ($n 箇所)"
+  # ⚠️★★★ O1 は **Windows が主ターゲット**である（`docs/agent-shared.md`）。
+  #   ★ macOS 側だけ検査して安心する型を作らない（memory: windows-only-code-needs-ci の逆向き）。
+  if [ "$MODE" = o1 ]; then
+    for lit in 'o1.mode' 'gse_o1_' 'GSE_O1_MODE'; do
+      n=$(strings -a "$W/gse-next.exe" | LC_ALL=C grep -cF -- "$lit" || true)
+      [ "${n:-0}" -gt 0 ] || die "★ gse-next.exe の実体に「${lit}」がありません = **O1 を知らないビルド**です（${TAG}）"
+    done
+    n=$(strings -a "$W/gse-submit.exe" | LC_ALL=C grep -cF -- '--o1' || true)
+    [ "${n:-0}" -gt 0 ] || die "★ gse-submit.exe の実体に「--o1」がありません = O1 の規則で包めないビルドです（${TAG}）"
+    note "Windows の実体に O1 あり ✅ (o1.mode / gse_o1_ / --o1)"
+  fi
 else
+  # ⚠️ O1 では黙って飛ばさない（★ 飛ばすと「O1 を知らないビルド」を配れてしまう）。
+  [ "$MODE" != o1 ] || die "strings がありません。★ O1 の実体検査ができないので配布物を作りません"
   note "⚠️ strings が無いので実体検査を飛ばしました"
 fi
 [ -z "$(echo "$W"/block*.html)" ] || die "共通の配布物に課題ページが入っています"
@@ -483,6 +604,8 @@ fi
 
 # --- 5. 展開して確かめる（★ 配る前に、配る物そのものを検査する） -----------------
 V=$(mktemp -d)
+# ⚠️★ 新しい die 経路が増えたので後片付けを trap で担保する（★ .app 込みで数十 MB 残る）。
+trap 'rm -rf "${V:?}"' EXIT
 ditto -x -k "$OUT/${LABEL}_実施用_macOS.zip" "$V" || die "macOS zip を展開できません"
 codesign --verify --strict "$V/${LABEL}_実施用_macOS/gse-next.app" || die "展開後に署名が壊れています"
 [ -x "$V/${LABEL}_実施用_macOS/gse-next.app/Contents/MacOS/gse-next" ] || die "展開後に実行ビットが落ちています"
@@ -502,6 +625,33 @@ fi
 [ -f "$V/${LABEL}_実施用_macOS/初回セットアップ_mac.sh" ] || die "展開後に 初回セットアップ_mac.sh がありません"
 bash "$V/${LABEL}_実施用_macOS/初回セットアップ_mac.sh" --selftest > /dev/null \
   || die "展開後の 初回セットアップ_mac.sh が自己検査に落ちました"
+
+# ⚠️★★★ **`--selftest` は「配られる実体」を 1 度も見ていない**（2026-08-30 に本番欠陥として実測）。
+#   ★ `--selftest` は自前の fixture に `g1.mode` を作って回すので、
+#     同梱スクリプトが `g1.mode` 決め打ちのままでも **O1 の配布物ごと緑になっていた**。
+#     ⚠️ 実際に O1 の被験者は README 【1】で必ず `NG: g1.mode が…` に落ちる状態だった。
+#   → ★ **引数なしで、展開したフォルダそのものに対して**走らせる（被験者と同じ実行の仕方）。
+#     ⚠️ この検査は fixture を持たない。★ だから決め打ちを構造的に見逃せない。
+SETUP_OUT=$(bash "$V/${LABEL}_実施用_macOS/初回セットアップ_mac.sh" 2>&1) \
+  || die "★ 配布物そのものに対する初回セットアップが失敗しました（被験者が踏むのはこれ）: ${SETUP_OUT}"
+case "$SETUP_OUT" in
+  OK:*) : ;;
+  *) die "★ 初回セットアップが OK を返しませんでした（被験者が踏むのはこれ）: ${SETUP_OUT}" ;;
+esac
+# ⚠️★★ **モードに合った文面**まで見る。★ 「OK: で始まる」だけでは
+#   G1 の案内を O1 の被験者に読ませる取り違えを捕まえられない。
+case "$MODE" in
+  o1) SETUP_MUST="記録中 · 作業の種類" ; SETUP_MUST_NOT="G1 モードで動作しています" ;;
+  *)  SETUP_MUST="G1 モードで動作しています" ; SETUP_MUST_NOT="記録中 · 作業の種類" ;;
+esac
+case "$SETUP_OUT" in
+  *"$SETUP_MUST"*) : ;;
+  *) die "★ 初回セットアップの案内が ${MODE} 向けではありません（「${SETUP_MUST}」を含むはず）: ${SETUP_OUT}" ;;
+esac
+case "$SETUP_OUT" in
+  *"$SETUP_MUST_NOT"*) die "★ 初回セットアップが他モードの案内を出しています（「${SETUP_MUST_NOT}」）: ${SETUP_OUT}" ;;
+esac
+note "配布物そのもので初回セットアップ ✅（${SETUP_OUT}）"
 
 # ★★ README が**被験者を守る 3 文**を落としていないこと（2026-08-08）。
 #   ⚠️ ★ 「壊れていません」「ゴミ箱に入れないで」が無いと、被験者は
