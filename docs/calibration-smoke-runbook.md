@@ -59,8 +59,13 @@ npm run tauri dev      # もしくは cargo tauri build で配布ビルド
 ### 1.2 デバッグトリガと fail-loud バナーの確認 (#1 検証)
 
 研究者デバッグ起動 (§1.1) の Dashboard には以下が出る:
-- **📝 プローブ強制表示 / 💡 Nudge 強制表示 / 🧱 Wall 強制発動** ボタン。プローブ → 回答/skip →
+- **📝 プローブ強制表示 / 💡 Nudge 強制表示** ボタン。プローブ → 回答/skip →
   `record_realtime_*`、Nudge → dismiss → `record_intervention_dismiss` の経路を能動的にテストできる。
+  > ⚠️★★★ **2026-09-01 訂正 —— 旧文が挙げていた「🧱 Wall 強制発動」ボタンは存在しない。**
+  > ★ ADR-015 (2026-08-23) で Wall ごと削除された (実測: `src/components/Dashboard.tsx:564-587` に
+  > 残るのは `debug_force_probe` と Nudge の 2 つのみ。デバッグ強制 Wall のテスト
+  > `force_wall_decision_returns_wall_and_starts_cooldown` も
+  > `src-tauri/src/analysis/intervention.rs:570` の記録どおり削除済み)。
   強制発火は `reason="debug_force"` で NDJSON に残り、解析時に除外可能。
 - **fail-loud バナー**: ログ書込先が temp フォールバック / 無効に縮退した場合、Dashboard 上部に警告
   バナーが常時表示される (静かな全損の撲滅)。**本番 .app/.dmg は dev と TCC 文脈が異なるため、
