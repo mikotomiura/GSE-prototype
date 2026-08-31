@@ -61,7 +61,24 @@
   - ⚠️ **BSD sed は BRE の `\|` を解さず、エラーも出さずに 0 件マッチ**する
     → ★ `sed -E` に変更。⚠️ 気づかなければ「検出しているつもりで常にフォールバック」だった
     (memory `macos-default-tools-break-gates` と同型)
-- [ ] ⚠️ `/cross-review` (Codex)
+- [x] ⚠️ `/cross-review` (Codex) — **実施。★ 正常終了 (exit 0)**
+      ⚠️ 過去 4 回はすべて secrets-filter の自己ブロックで縮退していた (memory
+      `cross-review-codex-self-block`)。★ 今回は自己ブロック・空 diff のいずれにも該当せず、
+      `[REDACTED]` も 0 件。消費 40180 tokens。
+  - [x] **両者一致の指摘: 0 件**。★ 依頼した 5 観点 (式評価 / composite outputs 契約 /
+        bash / macOS ツール互換 / 黙る経路) は Claude 側の独立読解でも安全と確認された
+  - [x] ⚠️ Codex のみ MEDIUM: **inputs に数値検査が無い** —— ★ `avail_gb` で塞いだ
+        「非数値が `[ -lt ]` を素通りする」fail-open を、**入力側で再現していた**。
+        ⚠️ 現状は `with:` 未使用で到達不能だが、`inputs:` を公開している以上塞ぐ → **修正した**
+  - [x] ⚠️ Codex のみ MEDIUM: **`sweep_dir` だけ path ガードが無い** (`target_dir` は 3 段)。
+        ★ 同じ信頼モデルの入力なのに**防御が非対称**だった → **同じガードに揃えた**
+  - [x] Codex LOW ×2 は却下 (symlink 検査の深さ = 既知のトレードオフで注記済み /
+        週次の 2 本 fail-closed = HIGH 指摘の是正そのもの)
+- [x] ⚠️ 追加検査を**陽性 5 / 陰性 1** で実走 (threshold=abc / floor=空 / days=-3 /
+      sweep_dir=/etc / sweep_dir=../x を全て捕捉、既定値は通過)。既存 4 ケースに退行なし
+- [x] ⚠️★ **測定器の検算**: 上の検証で `shellcheck rc=1` が出たが、正体は**抽出した
+      一時ファイルに shebang が無い (SC2148)** だけで、コード自体は rc=0 だった。
+      ★ 異常値を鵜呑みにせず測り直した
 - [ ] ⚠️ **CI が実際に緑になること** (★ push するまで分からない。予測しない)
 
 ## ⚠️ follow-up として起票するもの (★ 本 PR の外)

@@ -94,17 +94,41 @@ runs:
           fi
         }
 
+        # ⚠️★★★ **入力の数値検査** (Codex 指摘, 2026-08-31 `/cross-review`)。
+        #   ★ `avail_gb` では「`int("ccc")` が 0 を返して素通りする」fail-open を塞いだのに、
+        #   ⚠️ **inputs 側に同じ検査が無かった** —— 非数値が渡ると `[ "$x" -lt "$Y" ]` は
+        #   "integer expression expected" で非 0 を返すが、それが `if` の条件なので
+        #   `set -e` に掛からず**素通りする**。★ 直したばかりの失敗形態を入力側で再現していた。
+        #   ⚠️ 現状は両呼び出し側とも `with:` を付けておらず既定値しか通らない (到達不能) が、
+        #   ★ `inputs:` を公開している以上、将来の上書きで黙って壊れる余地を残さない。
+        for pair in "threshold_gb=$THRESHOLD_GB" "floor_gb=$FLOOR_GB" "sweep_days=$SWEEP_DAYS"; do
+          name="${pair%%=*}"; val="${pair#*=}"
+          case "$val" in
+            '' | *[!0-9]*)
+              echo "::error::${name} が正の整数ではありません ('${val}')"
+              exit 1
+              ;;
+          esac
+        done
+
         # ⚠️★★★ `rm -rf` の対象は **workspace 相対の下向きパスに限る**。
         #   ★ self-hosted は workspace が永続し、ジョブは**研究者本人のユーザー**で走る。
         #   ⚠️ 同じ home に `~/.gse/age-identity.txt` (被験者提出物の復号鍵) がある。
         #   → 絶対パス / `..` を渡されたら **消す前に落とす**。入力は本 repo の workflow 作者しか
         #     書けない (＝ workflow 本体と同じ信頼水準) が、事故は信頼ではなく形で止める。
-        case "$TARGET_DIR" in
-          /* | *..* | '')
-            echo "::error::target_dir が不正です ('${TARGET_DIR}')。workspace 相対の下向きパスのみ許可します"
-            exit 1
-            ;;
-        esac
+        # ⚠️ `sweep_dir` にも**同じ**ガードを掛ける (Codex 指摘, 2026-08-31)。
+        #   ★ 初版は `target_dir` にだけ 3 段の防御を足していた。⚠️ 両者は同じ信頼モデルで
+        #   扱われるべき入力なのに**防御が非対称**で、`target_dir` に多層防御を足した意図と
+        #   矛盾していた。★ `cargo-sweep --recursive` も workspace の外へ出したくない。
+        for pair in "target_dir=$TARGET_DIR" "sweep_dir=$SWEEP_DIR"; do
+          name="${pair%%=*}"; val="${pair#*=}"
+          case "$val" in
+            /* | *..* | '')
+              echo "::error::${name} が不正です ('${val}')。workspace 相対の下向きパスのみ許可します"
+              exit 1
+              ;;
+          esac
+        done
 
         measure before; before="$GB"
         echo "free before: ${before} GiB (threshold=${THRESHOLD_GB} floor=${FLOOR_GB})"
@@ -140,6 +164,9 @@ runs:
               echo "::error::${TARGET_DIR} (または ${parent}) が symlink です。消さずに停止します"
               exit 1
             fi
+            # ⚠️ ★ この検査は `TARGET_DIR` 自身と**直近の親**しか見ない (Codex 指摘・既知の限界)。
+            #   ★ 既定値 `src-tauri/target` では成立する。⚠️ より深い階層を input として
+            #   公開するなら `realpath` / `pwd -P` で workspace 配下に居ることを確かめること。
             echo "--- 空きが ${FLOOR_GB}GiB 未満: ${TARGET_DIR} を全削除してフルビルドに倒す ---"
             rm -rf "$TARGET_DIR"
             wiped=true
