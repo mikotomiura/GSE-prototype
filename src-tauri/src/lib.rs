@@ -2230,6 +2230,20 @@ fn record_user_label(
     label: String,
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では被験者由来のラベル行を記録しない** (2026-08-31)。
+    //   ★ 起動ログが名指ししている当の行型がこれである（逐語 `user_label / review_marker rows
+    //     that the consent form does not list`）。⚠️ それなのに門が無かった。
+    //   ★ `src/` からの参照は 0 件で現時点の到達経路は無いが、
+    //     ⚠️ **コマンドは invoke_handler に登録されたまま**であり、
+    //     ★ 「UI 側だけの対処は次に UI をいじった人が穴を開け直す」という
+    //       2026-08-30 の教訓がそのまま当てはまる。
+    if !crate::o1::label_row_allowed(crate::o1::is_o1()) {
+        tracing::warn!(
+            "record_user_label: ignored in O1 mode (the O1 consent form does not list this row). \
+             This is a gate, not a failure."
+        );
+        return Ok(());
+    }
     let kind = UserLabelKind::parse(&label).ok_or_else(|| format!("invalid label: {:?}", label))?;
     let timestamp = record_label_internal(&*log, kind)?;
     if let Err(e) = app.emit(
@@ -2421,6 +2435,18 @@ fn record_realtime_answer(
     window_end_ms: u64,
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では被験者由来のラベル行を記録しない** (2026-08-31)。
+    //   ★ `record_self_marker` と**同じ判断・同じ純関数**を共有する
+    //     (⚠️ 1 つだけ塞ぐと「塞いだつもり」になる —— 2026-08-30 の事故がその形だった)。
+    //   ⚠️ UI 側だけの対処に頼らない: 次に UI をいじった人が黙って穴を開け直す。
+    if !crate::o1::label_row_allowed(crate::o1::is_o1()) {
+        tracing::warn!(
+            "{}: ignored in O1 mode (the O1 consent form does not list this row). \
+             This is a gate, not a failure.",
+            "record_realtime_answer"
+        );
+        return Ok(());
+    }
     let probe = build_probe_ref(&source, probe_id)?;
     if window_end_ms < window_start_ms {
         return Err("window_end_ms must be >= window_start_ms".to_string());
@@ -2452,6 +2478,18 @@ fn record_realtime_skip(
     window_end_ms: u64,
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では被験者由来のラベル行を記録しない** (2026-08-31)。
+    //   ★ `record_self_marker` と**同じ判断・同じ純関数**を共有する
+    //     (⚠️ 1 つだけ塞ぐと「塞いだつもり」になる —— 2026-08-30 の事故がその形だった)。
+    //   ⚠️ UI 側だけの対処に頼らない: 次に UI をいじった人が黙って穴を開け直す。
+    if !crate::o1::label_row_allowed(crate::o1::is_o1()) {
+        tracing::warn!(
+            "{}: ignored in O1 mode (the O1 consent form does not list this row). \
+             This is a gate, not a failure.",
+            "record_realtime_skip"
+        );
+        return Ok(());
+    }
     let probe = build_probe_ref(&source, probe_id)?;
     if window_end_ms < window_start_ms {
         return Err("window_end_ms must be >= window_start_ms".to_string());
@@ -2552,6 +2590,18 @@ fn record_vignette_response(
     changes: u16,
     log: State<'_, Arc<Mutex<LogState>>>,
 ) -> Result<(), String> {
+    // ⚠️★★★ **O1 では被験者由来のラベル行を記録しない** (2026-08-31)。
+    //   ★ `record_self_marker` と**同じ判断・同じ純関数**を共有する
+    //     (⚠️ 1 つだけ塞ぐと「塞いだつもり」になる —— 2026-08-30 の事故がその形だった)。
+    //   ⚠️ UI 側だけの対処に頼らない: 次に UI をいじった人が黙って穴を開け直す。
+    if !crate::o1::label_row_allowed(crate::o1::is_o1()) {
+        tracing::warn!(
+            "{}: ignored in O1 mode (the O1 consent form does not list this row). \
+             This is a gate, not a failure.",
+            "record_vignette_response"
+        );
+        return Ok(());
+    }
     let quadrant = ExpectedQuadrant::parse(&expected_quadrant)
         .ok_or_else(|| format!("invalid expected_quadrant: {:?}", expected_quadrant))?;
     if !is_valid_opaque_id(&vignette_id) {

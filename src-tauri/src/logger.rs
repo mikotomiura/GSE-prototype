@@ -2249,6 +2249,21 @@ pub fn default_log_path() -> PathBuf {
     //   ★ 保存先が確定したこの 1 か所で見る（⚠️ 起動のたびに 1 回だけ）。
     warn_if_cloud_synced(&dir);
 
+    // ⚠️★★★ **既に世界読み取り可になったファイルを締め直す**（自己修復・2026-08-31）。
+    //   ★ `redaction::redact_file` の修正は**再発を止めるだけ**で、
+    //     ⚠️ 2026-08-30 以前に削除を実行した端末には **0644 のログが残ったまま**になる。
+    //   ⚠️★★ **被験者の端末は研究者が触れない** → ★ アプリ自身が直すしかない。
+    //   ★ 緩める方向には動かない（0600 のものには触らない）。失敗しても起動は止めない。
+    let secured = crate::redaction::secure_existing_files(&dir);
+    if secured > 0 {
+        tracing::warn!(
+            files = secured,
+            dir = %dir.display(),
+            "tightened permissions on session files that were group/other-readable \
+             (self-heal for the pre-2026-08-31 redaction defect)"
+        );
+    }
+
     let ts = chrono_like_filename();
     dir.join(session_file_name(crate::o1::is_o1(), &ts))
 }
