@@ -16,13 +16,22 @@
 - [x] `g1WithRosterLock_` を新設し、`assignG1ParticipantId` を包む
 - [x] `onG1ConsentSubmit` の手書きロックを `g1WithRosterLock_` に寄せる
 - [x] `conflict` 分岐: **発番も受付メールも行わない**
-- [x] `g1RecordRosterConflict_`: `⚠要確認` 行に出す (★ 他人の行を汚さない)
+- [x] `g1RecordRosterConflict_`: 専用行に出す (★ 他人の行を汚さない)
+- [x] ⚠️★★ **その行の P-ID 列は空にした** —— ★ 消費者を grep したら
+      `submissionPids_`(:1069・「行の真実源」) が `⚠要確認` を **参加者 1 人として数えて**いた。
+      → 印は備考の文頭が担う (★ 人には見え、機械は数えない)
 - [x] `g1CountPidRows_`: 採番直後の重複検知 (起票 T-27 の緩和)
 
 ## 検証 (すべて実走)
 
-- [x] `Form_G1/g1_roster_test.cjs` を新設 — **29 ケース / 失敗 0**
-- [x] ★ **変異注入 5 件すべてを捕捉** (M1〜M5)。無変異は緑
+- [x] `Form_G1/g1_roster_test.cjs` を新設 — **35 ケース / 失敗 0**
+- [x] ★ **変異注入 6 件すべてを捕捉** (M1〜M6)。無変異は緑
+- [x] ⚠️★★★ **自分の検査が空回りしていた 2 件を実測で発見して直した**
+  - ★ M6 (P-ID 列に書き戻す) が**当たらなかった** —— 手で組んだシートを渡していたので
+    `g1RecordRosterConflict_` を 1 行も通っていなかった → 端から端まで通す形に直した
+  - ⚠️ スタブに `getLastColumn()` が無く `assertRunHeader_` が例外 →
+    `g1RecordRosterConflict_` が **false を返し続けていた**。
+    ★ 「書けたか」を assert していたから気づけた
 - [x] ★ **`run.sh` の配線の陽性対照** — 変異を入れると `rc=1` / `[FAIL]`
 - [x] ⚠️ 完了行の書式を直して「件数不明」→ **29 ケース**と出るようにした
 - [x] 空回りの番兵 (`pass < 25` で赤) を入れた

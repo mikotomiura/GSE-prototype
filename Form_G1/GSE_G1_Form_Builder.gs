@@ -2051,7 +2051,14 @@ function g1EnsureRunRow_(pid) {
  *
  * ⚠️★★ **申告された P-ID の行には書かない。**
  *   ★ conflict のとき `pid` は**他人のもの**なので、その人のトラッキング行に書くと
- *     ⚠️ **無関係な被験者の記録を汚す**。→ 専用の「⚠要確認」行に積む。
+ *     ⚠️ **無関係な被験者の記録を汚す**。→ 専用の行に積む。
+ *
+ * ⚠️★★★ **その専用行の P-ID 列は「空」にする。** ★ 当初 `⚠要確認` という印を入れたが、
+ *   実際に消費者を grep したところ **`submissionPids_`（:1069・「行の真実源」）が
+ *   `if (pid && ...)` で拾ってしまい、⚠️ 存在しない参加者を 1 人として数える**ことが分かった。
+ *   ★ P-ID 列を空にすれば、`submissionPids_` も `refreshG1RunSheet`(:3406) も
+ *   `g1CollectPendingMaterials_`(:3091) も `if (!pid) continue` 相当で**自然に除外する**。
+ *   → ⚠️ 印は備考の文頭 `⚠★要確認` が担う（★ 人には見え、機械は数えない）。
  *
  * ⚠️ 実名・メールアドレスは**書かない**（`data-privacy`）。マスクした形だけ残す。
  *
@@ -2077,13 +2084,12 @@ function g1RecordRosterConflict_(found, email) {
       Logger.log("❌ ヘッダ不一致のため conflict をシートに出せません（Logger のみ）: " + headerErr);
       return false;
     }
-    var colPid = runCol_("P-ID");
     var colNote = runCol_("備考");
     var row = Math.max(sh.getLastRow() + 1, 3);
-    // ★ 実在の P-ID とぶつからない印にする（⚠️ `^P\d+$` に一致させない）。
-    sh.getRange(row, colPid).setValue("⚠要確認");
+    // ⚠️★★★ **P-ID 列は空のままにする**（上の注記を参照）。
+    //   ★ ここに何か書くと `submissionPids_` が参加者として数える。
     sh.getRange(row, colNote).setValue(
-      "⚠★ ロスター取り違えの疑い（" + (found.reason || "conflict") + "）: " +
+      "⚠★要確認 ロスター取り違えの疑い（" + (found.reason || "conflict") + "）: " +
         "申告ID=" + found.pid + " / ロスター行=" + (found.row || "-") +
         " / 提出者=" + g1MaskEmail_(email) +
         " ★ 発番も受付メールもしていません。研究者が確認してください。"

@@ -53,6 +53,10 @@ function makeSheet(rows) {
   const sheet = {
     __rows: data,
     getLastRow: () => data.length,
+    // ⚠️★ `runHeaderDiff_` が `getLastColumn()` を呼ぶ。★ 実装し忘れると
+    //   `assertRunHeader_` が例外になり、⚠️ **検査が空回りしたまま緑に見える**
+    //   （実際に踏んだ: `g1RecordRosterConflict_` が false を返し続けた）。
+    getLastColumn: () => data.reduce((m, r) => Math.max(m, r.length), 0),
     appendRow: (r) => data.push(widen(r.slice())),
     getRange: (row, col, numRows, numCols) => {
       const nR = numRows == null ? 1 : numRows;
@@ -367,6 +371,54 @@ console.log("\n§6 conflict が研究者の見るシートに出るか");
   check(
     logged.indexOf("b@example.com") < 0,
     "⚠️ ログに **実アドレスをそのまま残さない**（data-privacy）"
+  );
+}
+
+{
+  // ⚠️★★★ **conflict 行が「参加者 1 人」として数えられないこと。**
+  //   ★ 当初 P-ID 列に `⚠要確認` を書いていたが、`submissionPids_`（:1069・「行の真実源」）が
+  //   `if (pid && ...)` で拾い、⚠️ **存在しない参加者を数えていた**。→ P-ID 列は空にした。
+  //
+  // ⚠️★★ **端から端まで通すこと。** 最初この検査を「手で組んだシートを `submissionPids_` に
+  //   渡す」形で書いたが、★ それだと `g1RecordRosterConflict_` が P-ID 列に書き戻す変異を
+  //   入れても**緑のまま**だった（＝ 退行を捕まえられない）。
+  //   → ★ **実際に `g1RecordRosterConflict_` に書かせてから** `submissionPids_` で数える。
+  const ctx = makeCtx();
+  // ★ 本物の RUN_HEADER をそのままヘッダ行(row 2)に使う。⚠️ assertRunHeader_ を通すため。
+  const header = ctx.RUN_HEADER.slice();
+  const blank = () => header.map(() => "");
+  const rowP015 = blank();
+  rowP015[0] = "P015";
+  const run = makeSheet([header.map(() => ""), header, rowP015]);
+  const ctx2 = makeCtx({ sheets: { "G1 実施トラッキング": run } });
+
+  const recorded = ctx2.g1RecordRosterConflict_(
+    { pid: "P015", row: 2, reason: "email-mismatch" },
+    "b@example.com"
+  );
+  check(recorded === true, "★ conflict を実際にシートへ書けた（★ ここが false だと以下が空回り）");
+
+  const pids = ctx2.submissionPids_(run);
+  check(pids.indexOf("P015") >= 0, "★ 実在の P-ID は数える（陰性対照）");
+  check(
+    pids.length === 1,
+    "⚠️ conflict 行が **参加者として数えられない**（★ P-ID 列を空にした理由）"
+  );
+  check(
+    !pids.some((p) => p.indexOf("要確認") >= 0),
+    "⚠️ 「要確認」の印が P-ID として混ざらない"
+  );
+
+  // ★ 人には見える形で残っていること（⚠️ 数えないことと、見えないことは違う）。
+  const noteCol = ctx2.RUN_HEADER.indexOf("備考");
+  const wrote = run.__rows.some(
+    (r) => String(r[noteCol] || "").indexOf("要確認") >= 0
+  );
+  check(wrote, "★ 備考には「要確認」が残る（★ 機械は数えないが人には見える）");
+  const noteText = run.__rows.map((r) => String(r[noteCol] || "")).join("\n");
+  check(
+    noteText.indexOf("b@example.com") < 0,
+    "⚠️ 備考に **実アドレスをそのまま書かない**（data-privacy）"
   );
 }
 
