@@ -12,9 +12,14 @@
 | トラック | ファイル | 状態 |
 |---|---|---|
 | **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ✅ **現行**（2026-08-31） |
-| 未踏 2027 提案書 | `next-session-prompt-mitou-2027-rewrite.md` | ⚠️ 別トラック・PR #135 が進行中 |
+| **未踏 2027 / 研究の主張** | `next-session-research-positioning-fix.md` | ✅ **現行**（2026-09-01）。★ `docs/research-positioning.md` の ADR-018 / ADR-015 未追随 4 件と de Jong 2020 のカード化 |
 | スマホ表現チャネル | `next-session-prompt-smartphone-expression-channel.md` | ⚠️ 別トラック（Windows 側） |
 | 表現チャネル SSOT の積み残し | `next-session-prompt-expression-channel-followups.md` | ⚠️ 別トラック |
+
+★ **セッション引き継ぎではない運用メモ**（★ 上の表の対象外）:
+`mac-runner-disk-cleanup-prompt.md` —— self-hosted mac ランナーのディスク枯渇時に
+Mac 側セッションへ貼る手順。⚠️ **2026-08-31 に一度実行済み**（★ 恒久対策は PR #139 の
+ディスクガードと週次掃除）。
 
 ⚠️ ★ **上の表に無いものは、すべて「過去の記録」として扱う。**
 ★ 読んでよいが、⚠️ **そこに書かれた状態を現在の事実として使わない**。
@@ -28,6 +33,7 @@
 | `next-session-prompt-o1-v0-1-31-and-timeout.md` | ⚠️ 「PR #132 で 0600 欠陥が直った」前提。★ **その修正は不完全で PR #136 で塞ぎ直した**。さらに未対応 HIGH 2 件が抜けている |
 | `next-session-prompt-o1-release-and-rebuild.md` | ⚠️ 判定条件・操作順に**誤りが 4 件**（★ 後継メモの §0-1 に一覧がある） |
 | `next-session-prompt-o1-macos-distribution.md` | ⚠️ 「最新タグ `v0.1.29` を使え」— ★ **`v0.1.29` は O1 を含まない**。この記述が実際に事故を起こした |
+| `next-session-prompt-mitou-2027-rewrite.md` | ⚠️ **PR #135 で完了済み。**★ 前提（参考文献を提案書に置く / 段階呼称 Lv1〜Lv4 / 完了条件は「時間・往復」）が**すべて現行と食い違う**（ADR-018 で完了条件を外した） |
 
 ★ これらは**ファイル冒頭に上書き表示を入れてある**（★ 入っていないものを見つけたら足すこと）。
 
