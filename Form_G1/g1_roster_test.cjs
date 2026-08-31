@@ -638,6 +638,38 @@ console.log("\n§9 共用ロスターへの数式インジェクション");
   check(ctx.g1PlainText_("@A1").charAt(0) === "'", "@ で始まる値を無害化する");
   check(ctx.g1PlainText_("山田 太郎") === "山田 太郎", "★ 普通の氏名は変えない（陰性対照）");
   check(ctx.g1PlainText_("a@example.com") === "a@example.com", "★ 普通のメールは変えない（陰性対照）");
+
+  // ⚠️★★ **マスク済みメールでも数式の起点になりうる**（実測して見つけた）。
+  //   ★ `g1MaskEmail_` は先頭 1 文字を残すので、`=x@evil.com` → `=***@evil.com`。
+  //   ⚠️ 備考が `⚠★要確認` で始まるおかげで今は数式にならないが、
+  //     ★ それは**連結順のおかげ**にすぎない → `g1PlainText_` で包んで順序に依存させない。
+  check(
+    /^[=+\-@]/.test(ctx.g1MaskEmail_("=x@evil.com")),
+    "⚠️ マスク済みメールが数式の起点になりうることを固定する（★ 前提の明示）"
+  );
+  check(
+    ctx.g1PlainText_(ctx.g1MaskEmail_("=x@evil.com")).charAt(0) === "'",
+    "★ それも `g1PlainText_` で無害化できる"
+  );
+}
+
+{
+  // ★ 端から端まで: conflict の備考セルが **数式にならない**
+  const header = makeCtx().RUN_HEADER.slice();
+  const run = makeSheet([header.map(() => ""), header]);
+  const ctx = makeCtx({ sheets: { "G1 実施トラッキング": run } });
+  const wrote = ctx.g1RecordRosterConflict_(
+    { pid: "P015", row: 2, reason: "email-mismatch" },
+    "=x@evil.com", // ⚠️ 数式の起点を含むメール
+    "発番も受付メールもしていません。"
+  );
+  check(wrote === true, "★ 備考を書けた（★ ここが false だと下が空回り）");
+  const noteCol = ctx.RUN_HEADER.indexOf("備考");
+  const cells = run.__rows.map((r) => String(r[noteCol] || "")).filter((v) => v);
+  check(
+    cells.length > 0 && !cells.some((v) => /^[=+\-@\t\r]/.test(v)),
+    "⚠️★ 備考セルが **数式で始まらない**（★ 連結順に依存しない）"
+  );
 }
 
 {

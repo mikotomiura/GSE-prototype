@@ -2154,12 +2154,19 @@ function g1RecordRosterConflict_(found, email, outcome) {
     var row = Math.max(sh.getLastRow() + 1, 3);
     // ⚠️★★★ **P-ID 列は空のままにする**（上の注記を参照）。
     //   ★ ここに何か書くと `submissionPids_` が参加者として数える。
+    // ⚠️★★ **ここも `g1PlainText_` で包む。** 現状この文字列は `⚠★要確認` で始まるので
+    //   数式にはならないが、★ **それは連結順のおかげ**にすぎない。
+    //   ⚠️ 実測: `g1MaskEmail_("=x@evil.com")` は **`=***@evil.com`** を返す ——
+    //   つまり材料の中に数式の起点が混ざりうる。★ 誰かが文言を並べ替えた瞬間に
+    //   **黙って数式になる**。→ 安全を並び順に依存させない。
     sh.getRange(row, colNote).setValue(
+      g1PlainText_(
       "⚠★要確認 ロスター取り違えの疑い（" + (found.reason || "conflict") + "）: " +
         "申告ID=" + found.pid + " / ロスター行=" + (found.row || "-") +
         " / 提出者=" + g1MaskEmail_(email) +
         " ★ " + (outcome || "★ 何をしたかが記録されていません（⚠️ 呼び出し側の不備）") +
         " 研究者が確認してください。"
+      )
     );
     SpreadsheetApp.flush();
     Logger.log("📝 conflict を「G1 実施トラッキング」の " + row + " 行目（P-ID 列は空・備考に ⚠★要確認）に記録しました");
