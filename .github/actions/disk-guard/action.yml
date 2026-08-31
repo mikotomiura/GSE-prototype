@@ -1,0 +1,137 @@
+name: Disk guard (self-hosted)
+description: >-
+  self-hosted 実機の空き容量を測り、不足していれば古い cargo 成果物を掃除する。
+  掃除しても floor を下回るなら target ごと捨て、その事実を `wiped` 出力で呼び出し側に伝える。
+
+# ★ なぜ composite action にしたか (code-reviewer 指摘 #1, 2026-08-31):
+#   初版のガードは `check` ジョブに直書きされていて `build-macos` に掛かっていなかった。
+#   ⚠️ `build-macos` は同じ実機で 40 分・release ＋ dmg を作るので **`check` よりはるかに
+#   ディスクを食い、落ちたときの損害が最大** (配布物が 1 つも作れない)。
+#   → 直書きを 2 か所に複製すると必ず片方だけ直る事故になるため、実体を 1 つにする。
+
+inputs:
+  threshold_gb:
+    description: これを下回ったら古い成果物を掃除する (GiB)
+    required: false
+    default: "15"
+  floor_gb:
+    description: 掃除しても下回るなら target ごと捨てる (GiB)
+    required: false
+    default: "8"
+  target_dir:
+    description: 全削除する target ディレクトリ (workspace 相対)
+    required: false
+    default: src-tauri/target
+  sweep_dir:
+    description: cargo-sweep を再帰的に掛ける起点 (workspace 相対)
+    required: false
+    default: src-tauri
+  sweep_days:
+    description: この日数より古い成果物を cargo-sweep の対象にする
+    required: false
+    default: "7"
+
+outputs:
+  wiped:
+    description: >-
+      floor を下回って target を全削除したなら 'true'。⚠️ 呼び出し側は
+      これが 'true' のときキャッシュ復元を **飛ばす** こと (下記 #2 参照)。
+    value: ${{ steps.guard.outputs.wiped }}
+  free_after_gb:
+    description: 掃除後の空き容量 (GiB)。★ 掃除が効いたかを run ログ以外からも見られるようにする。
+    value: ${{ steps.guard.outputs.free_after_gb }}
+
+runs:
+  using: composite
+  steps:
+    - id: guard
+      shell: bash
+      env:
+        THRESHOLD_GB: ${{ inputs.threshold_gb }}
+        FLOOR_GB: ${{ inputs.floor_gb }}
+        TARGET_DIR: ${{ inputs.target_dir }}
+        SWEEP_DIR: ${{ inputs.sweep_dir }}
+        SWEEP_DAYS: ${{ inputs.sweep_days }}
+      run: |
+        set -euo pipefail
+
+        # ⚠️★★★ fail-closed にした理由 (code-reviewer 指摘 #4, 2026-08-31):
+        #   初版は `avail_gb() { df -k . | awk ... }` を `[ "$(avail_gb)" -lt 15 ]` に直接
+        #   食わせていた。df が失敗すると awk が空を返し、`[ "" -lt 15 ]` は
+        #   **"integer expression expected" で非 0 を返す**。それが `if` の条件だったため
+        #   set -e にも掛からず、**掃除を黙って飛ばして通過**していた (fail-open)。
+        #   → 測れないなら通さない。空き容量を測れない self-hosted 実機は、それ自体が異常である。
+        #
+        # ★ `df -Pk` にした理由: POSIX 出力形式を強制する。`-P` 無しの df は
+        #   デバイス名が長いと **行を折り返す**ことがあり、`NR==2` が数値の無い行を掴む。
+        avail_gb() {
+          local out
+          out="$(df -Pk . | awk 'NR==2 { print int($4 / 1024 / 1024) }')" || return 1
+          case "$out" in
+            '' | *[!0-9]*) return 1 ;;
+          esac
+          printf '%s\n' "$out"
+        }
+
+        # ⚠️★★★ `measure` は **コマンド置換で呼ばない**。$( ) はサブシェルなので、
+        #   (a) 中の `exit 1` はサブシェルを抜けるだけでスクリプトを止めず、
+        #   (b) `::error::` の出力が**呼び出し側の変数に飲まれて run ログに出ない**。
+        #   ★ 結果を大域変数 GB に置き、現在のシェルで走らせる。
+        GB=""
+        measure() {  # $1 = ラベル。結果は $GB に入る
+          if ! GB="$(avail_gb)"; then
+            echo "::error::空き容量を取得できませんでした ($1)。df -Pk . が数値を返しません (fail-closed)"
+            exit 1
+          fi
+        }
+
+        # ⚠️★★★ `rm -rf` の対象は **workspace 相対の下向きパスに限る**。
+        #   ★ self-hosted は workspace が永続し、ジョブは**研究者本人のユーザー**で走る。
+        #   ⚠️ 同じ home に `~/.gse/age-identity.txt` (被験者提出物の復号鍵) がある。
+        #   → 絶対パス / `..` を渡されたら **消す前に落とす**。入力は本 repo の workflow 作者しか
+        #     書けない (＝ workflow 本体と同じ信頼水準) が、事故は信頼ではなく形で止める。
+        case "$TARGET_DIR" in
+          /* | *..* | '')
+            echo "::error::target_dir が不正です ('${TARGET_DIR}')。workspace 相対の下向きパスのみ許可します"
+            exit 1
+            ;;
+        esac
+
+        measure before; before="$GB"
+        echo "free before: ${before} GiB (threshold=${THRESHOLD_GB} floor=${FLOOR_GB})"
+
+        wiped=false
+        if [ "$before" -lt "$THRESHOLD_GB" ]; then
+          if command -v cargo-sweep >/dev/null 2>&1; then
+            echo "--- cargo sweep: ${SWEEP_DAYS} 日以上触られていない成果物を削除 ---"
+            cargo sweep --time "$SWEEP_DAYS" --recursive "$SWEEP_DIR" || \
+              echo "::warning::cargo sweep が失敗しました (続行して floor 判定へ)"
+          else
+            # ⚠️ 初版は echo だけで通過していた。★ 2026-08-31 に実測したところ
+            #   **ランナー実機に cargo-sweep が入っていなかった** —— つまりこの分岐は
+            #   「たまに通る例外」ではなく**常時通っていた**。警告にして run 一覧から見えるようにする。
+            echo "::warning::cargo-sweep 未導入のため掃除できません。scripts/maintenance/install-cargo-sweep-launchd.sh を実行してください"
+          fi
+
+          # ★ 掃除の効果を測り直してから floor を判定する (初版は before のまま判定していた)。
+          measure after-sweep; mid="$GB"
+          echo "free after sweep: ${mid} GiB"
+
+          if [ "$mid" -lt "$FLOOR_GB" ]; then
+            echo "--- 空きが ${FLOOR_GB}GiB 未満: ${TARGET_DIR} を全削除してフルビルドに倒す ---"
+            rm -rf "$TARGET_DIR"
+            wiped=true
+          fi
+        fi
+
+        measure after; after="$GB"
+        echo "free after: ${after} GiB (wiped=${wiped})"
+        echo "wiped=${wiped}" >> "$GITHUB_OUTPUT"
+        echo "free_after_gb=${after}" >> "$GITHUB_OUTPUT"
+
+        # ★ 掃除しきってもなお floor を下回るなら、ここで**理由の分かる形で**落とす。
+        #   ⚠️ 放置すると 20-40 分後に `os error 28` で落ちる。同じ失敗なら早くて読める方がよい。
+        if [ "$after" -lt "$FLOOR_GB" ]; then
+          echo "::error::掃除後も空きが ${after}GiB (floor=${FLOOR_GB}GiB) しかありません。ランナー実機の棚卸しが必要です"
+          exit 1
+        fi
