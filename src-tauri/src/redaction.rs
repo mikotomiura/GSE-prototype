@@ -150,38 +150,126 @@ pub fn redact_file(path: &Path, from_ms: u64, to_ms: u64) -> Result<usize> {
     }
 
     let tmp = path.with_extension("ndjson.redact-tmp");
-    {
-        // ⚠️★★★ 原本のパーミッションを**引き継いでから**書く（上の doc コメント参照）。
-        //   ★ `rename` 後に締めるのでは**窓が開く**（0644 のファイルが一瞬でも原本の位置に立つ）。
-        //   → ★ **作る時点で締める**。⚠️ 原本が読めない場合でも 0600 に倒す（fail-safe）。
-        #[cfg(unix)]
-        let mut f = {
-            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-            let mode = fs::metadata(path)
-                .map(|m| m.permissions().mode() & 0o777)
-                .unwrap_or(0o600);
-            fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(mode)
-                .open(&tmp)
-                .map_err(|e| format!("failed to create temp file {}: {e}", tmp.display()))?
-        };
-        // Windows: NTFS の既定 ACL でユーザープロファイル配下は他ユーザーから読めない
-        // (`logger::create_file_at` と同じ判断・同じ理由でここでも追加制限はしない)。
-        #[cfg(not(unix))]
+
+    // ⚠️★★★ **残骸を必ず消してから開く** (2026-08-31・code-reviewer / security-checker が一致して指摘)。
+    //   ★ `OpenOptions::mode()` は **新規作成時にしか効かない**（実測で確認: 0644 の既存ファイルを
+    //     `O_CREAT|O_TRUNC` ＋ mode 0600 で開き直しても **0644 のまま**）。
+    //   ⚠️ 旧実装が失敗して残した `*.redact-tmp` は **0644** なので、
+    //     → ★ **修正後の初回削除で、その 0644 が原本の位置へ rename される**。
+    //     ＝ ⚠️ **直したはずの欠陥が黙って再現し、しかも回帰テストは緑のまま**だった。
+    let _ = fs::remove_file(&tmp);
+
+    // ★ 書き込みに失敗したら **残骸を残さない**（次回の再現源にしない）。
+    let write_result = (|| -> Result<()> {
         let mut f = fs::File::create(&tmp)
             .map_err(|e| format!("failed to create temp file {}: {e}", tmp.display()))?;
+
+        // ⚠️★★★ 原本のパーミッションを引き継ぐ（上の doc コメント参照）。
+        //   ★ `rename` 後に締めるのでは**窓が開く**（0644 のファイルが一瞬でも原本の位置に立つ）。
+        //   → ★ **rename の前に**、開いたハンドル経由で締める。
+        //   ⚠️ `set_permissions` は **umask に削られない**ので、`OpenOptions::mode()` より確実。
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            // ★ 原本が読めなければ 0600 に倒す（fail-safe。緩い側に倒さない）。
+            // ⚠️ `& 0o700` で **group/other を必ず落とす** —— ★ 原本が何らかの理由で 0644 でも
+            //   それを引き継がない。`logger::create_file_at` は常に 0600 で作るので実運用コストは 0。
+            let mode = fs::metadata(path)
+                .map(|m| m.permissions().mode())
+                .unwrap_or(0o600)
+                & 0o700;
+            f.set_permissions(fs::Permissions::from_mode(mode))
+                .map_err(|e| format!("failed to secure temp file {}: {e}", tmp.display()))?;
+        }
+        // Windows: NTFS の既定 ACL でユーザープロファイル配下は他ユーザーから読めない
+        // (`logger::create_file_at` と同じ判断・同じ理由でここでも追加制限はしない)。
+
         for line in &kept {
             writeln!(f, "{line}").map_err(|e| format!("failed to write {}: {e}", tmp.display()))?;
         }
         f.flush()
             .map_err(|e| format!("failed to flush {}: {e}", tmp.display()))?;
+        // ★ rename の前に **fsync** する。⚠️ doc は「途中で電源が落ちても原本が残る」と主張して
+        //   いるが、flush だけでは**残す側 (kept 行) が失われうる**（code-reviewer LOW）。
+        //   ★ 削除経路は頻度が低いのでコストは無視できる。
+        f.sync_all()
+            .map_err(|e| format!("failed to sync {}: {e}", tmp.display()))?;
+        Ok(())
+    })();
+    if let Err(e) = write_result {
+        let _ = fs::remove_file(&tmp);
+        return Err(e);
     }
-    fs::rename(&tmp, path)
-        .map_err(|e| format!("failed to replace session log {}: {e}", path.display()))?;
+
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("failed to replace session log {}: {e}", path.display())
+    })?;
     Ok(removed)
+}
+
+/// ⚠️★★★ **既に世界読み取り可になったファイルを締め直す**（自己修復・2026-08-31）。
+///
+/// ## なぜ要るのか
+///
+/// ★ [`redact_file`] の修正は**再発を止めるだけ**である。
+/// ⚠️ 2026-08-30 以前に削除を実行した端末には、**0644 のセッションログが残ったまま**になる。
+/// ★ 実機で確認した実例（`~/Documents/GSE-sessions/`）:
+///
+/// ```text
+/// -rw-r--r--  gse_o1_20260830_062005.ndjson   ← ⚠️ 削除を適用した回の残骸
+/// -rw-r--r--  redaction_ledger.jsonl          ← ⚠️ 台帳は最初から 0644 だった
+/// ```
+///
+/// ⚠️★★ **被験者の端末は研究者が触れない。** → ★ アプリ自身が直すしかない。
+///
+/// ## ★ どこから呼ぶか
+///
+/// `logger::default_log_path()`（★ 保存先が確定する**唯一の場所**・起動ごとに 1 回）。
+/// ⚠️ 同じ場所に `warn_if_cloud_synced` があり、**同種の「起動時の点検」**として揃う。
+///
+/// ## ⚠️ 何をしないか
+///
+/// - ⚠️ **緩めない。** 既に 0600 のものには触らない（mtime を動かさない）。
+/// - ⚠️ 失敗しても**起動を止めない**（★ 権限が無い / 別ユーザー所有などで落とさない）。
+/// - ★ 対象は `gse_*.ndjson` と台帳のみ（⚠️ ディレクトリの権限は変えない ——
+///   `logger::create_file_at` の逐語「親ディレクトリの権限は変更しない」と同じ判断）。
+///
+/// 締め直した件数を返す（★ 0 なら何も直す物が無かった）。
+#[cfg(unix)]
+pub fn secure_existing_files(dir: &Path) -> usize {
+    use std::os::unix::fs::PermissionsExt;
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut fixed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_target = is_redactable_session_file(&path)
+            || path.file_name().and_then(|n| n.to_str()) == Some(LEDGER_FILE_NAME);
+        if !is_target {
+            continue;
+        }
+        let Ok(meta) = fs::metadata(&path) else {
+            continue;
+        };
+        let mode = meta.permissions().mode();
+        // ★ group/other にビットが立っているものだけを締める。
+        if mode & 0o077 == 0 {
+            continue;
+        }
+        if fs::set_permissions(&path, fs::Permissions::from_mode(mode & 0o700)).is_ok() {
+            fixed += 1;
+        }
+    }
+    fixed
+}
+
+/// Windows: NTFS の既定 ACL でユーザープロファイル配下は他ユーザーから読めない
+/// （`logger::create_file_at` と同じ判断）。★ 何もしない。
+#[cfg(not(unix))]
+pub fn secure_existing_files(_dir: &Path) -> usize {
+    0
 }
 
 /// セッションディレクトリ全体から区間内の行を落とす。
@@ -272,6 +360,18 @@ pub fn append_ledger(
         .append(true)
         .open(&path)
         .map_err(|e| format!("failed to open redaction ledger {}: {e}", path.display()))?;
+    // ⚠️★★★ 台帳も **0600** で保つ (2026-08-31・security-checker が実機で 0644 を確認)。
+    //   ★ `logger::create_file_at` (`:1162`) と `applog` はどちらも `.mode(0o600)` を付けており、
+    //     ⚠️ **ここだけ外れていた**（＝ 2026-08-30 に直した欠陥と**同一ファイル内の同一クラス**）。
+    //   ★ 中身は数値 5 つだけだが、⚠️ **「被験者がいつ・どの区間の削除を要求したか」**という
+    //     行動メタデータである（`redaction.rs` 冒頭 / `data-privacy` ルール 6）。
+    //   ⚠️ `.mode()` ではなく `set_permissions` を使う —— ★ append なので
+    //     **既存の台帳（既に 0644 のもの）にも効かせる**必要がある（作成時のみでは直らない）。
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = f.set_permissions(fs::Permissions::from_mode(0o600));
+    }
     writeln!(
         f,
         r#"{{"requested_at":{},"from":{},"to":{},"files_touched":{},"lines_removed":{}}}"#,
@@ -452,13 +552,160 @@ mod tests {
             writeln!(f, "{{\"t\":1}}").unwrap();
         }
         fs::rename(&tmp, &p).unwrap();
+        let naive = fs::metadata(&p).unwrap().permissions().mode() & 0o777;
+
+        // ★ 同じ入口を `redact_file` に通す。
+        let q = d.join("gse_20260830_140000.ndjson");
+        fs::write(&q, "{\"t\":1}\n{\"t\":50}\n").unwrap();
+        fs::set_permissions(&q, fs::Permissions::from_mode(0o600)).unwrap();
+        redact_file(&q, 40, 60).unwrap();
+        let fixed = fs::metadata(&q).unwrap().permissions().mode() & 0o777;
+
+        // ⚠️★★ **環境依存で赤にしない** (2026-08-31・code-reviewer MEDIUM)。
+        //   ★ 旧版は `assert_ne!(naive, 0o600)` だったので、⚠️ umask 077 のマシンでは
+        //     `File::create` が 0600 を作り、**欠陥が無いのにテストが落ちた**。
+        //   → ★ 環境によらず成り立つ不変条件を**無条件に**見る。
+        assert_eq!(fixed, 0o600, "★ redact_file 側は必ず 0600 を保つこと");
+        // ★ umask が緩い環境（＝欠陥が観測できる環境）でだけ、**差が出ること**を要求する。
+        //   ⚠️ 厳しい環境では対照が成立しないが、上の無条件 assert が本体を守っている。
+        //   ★ 環境非依存の対照は `stale_temp_file_does_not_defeat_permission_inheritance`
+        //     が担う（そちらは 0644 を**明示的に作る**ので umask に依存しない）。
+        if naive != 0o600 {
+            assert_ne!(
+                fixed, naive,
+                "⚠️ redact_file が素朴な書き換えと同じ結果になっている（mode={fixed:o}）"
+            );
+        }
+    }
+
+    /// ⚠️★★★ **残骸の一時ファイルが 0600 引き継ぎを無効化しない** (2026-08-31)。
+    ///
+    /// ★ `OpenOptions::mode()` は**新規作成時にしか効かない**（★ 実測で確認）。
+    /// ⚠️ 旧実装が失敗して残した `*.redact-tmp`（0644）があると、
+    /// **直したはずの欠陥がそのまま再現し、しかも他のテストは緑のまま**だった。
+    /// ★ code-reviewer (HIGH) と security-checker (MEDIUM) が**独立に**指摘した経路。
+    ///
+    /// ★ 本テストは 0644 を**明示的に作る**ので **umask に依存しない対照**である。
+    #[cfg(unix)]
+    #[test]
+    fn stale_temp_file_does_not_defeat_permission_inheritance() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tmp_dir("perm-stale");
+        let p = d.join("gse_20260831_120000.ndjson");
+        fs::write(&p, "{\"t\":1}\n{\"t\":50}\n{\"t\":100}\n").unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+
+        // ⚠️ **旧実装が残した 0644 の残骸**を置く（★ これが再現の種である）。
+        let tmp = p.with_extension("ndjson.redact-tmp");
+        fs::write(&tmp, "stale\n").unwrap();
+        fs::set_permissions(&tmp, fs::Permissions::from_mode(0o644)).unwrap();
+
+        assert_eq!(redact_file(&p, 40, 60).unwrap(), 1);
 
         let mode = fs::metadata(&p).unwrap().permissions().mode() & 0o777;
-        assert_ne!(
+        assert_eq!(
             mode, 0o600,
-            "★ この環境では umask が厳しく、素朴な書き換えでも 0600 が保たれる。\
-             ⚠️ その場合 redact_file_preserves_owner_only_permissions は空振りしうる"
+            "⚠️ 残骸の 0644 が原本の位置へ rename された（mode={mode:o}）"
         );
+        assert!(!tmp.exists(), "★ 残骸が消えていない");
+        // ★ 残骸の中身が混ざっていないことも見る。
+        let body = fs::read_to_string(&p).unwrap();
+        assert!(!body.contains("stale"), "⚠️ 残骸の中身が混入した");
+    }
+
+    /// ⚠️★★★ 自己修復が **既に劣化したファイルを締め直す**（2026-08-31）。
+    ///
+    /// ★ 修正は再発を止めるだけで、⚠️ **配布済みの被験者端末に残った 0644 は直らない**。
+    #[cfg(unix)]
+    #[test]
+    fn secure_existing_files_tightens_world_readable_logs_and_ledger() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tmp_dir("self-heal");
+        let mode_of = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+
+        let bad_log = d.join("gse_20260830_120000.ndjson");
+        let bad_ledger = d.join(LEDGER_FILE_NAME);
+        let good_log = d.join("gse_20260830_130000.ndjson");
+        // ⚠️ 対象外のものが巻き込まれないことも見る（★ 範囲を広げすぎない）。
+        let unrelated = d.join("notes.txt");
+        let derived = d.join("gse_20260830_140000.anon.ndjson");
+
+        for p in [&bad_log, &bad_ledger, &unrelated, &derived] {
+            fs::write(p, "{}\n").unwrap();
+            fs::set_permissions(p, fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        fs::write(&good_log, "{}\n").unwrap();
+        fs::set_permissions(&good_log, fs::Permissions::from_mode(0o600)).unwrap();
+
+        assert_eq!(
+            secure_existing_files(&d),
+            2,
+            "★ 直すのはログと台帳の 2 件だけ"
+        );
+
+        assert_eq!(
+            mode_of(&bad_log),
+            0o600,
+            "⚠️ セッションログが締まっていない"
+        );
+        assert_eq!(mode_of(&bad_ledger), 0o600, "⚠️ 台帳が締まっていない");
+        assert_eq!(
+            mode_of(&good_log),
+            0o600,
+            "★ もともと 0600 のものは変わらない"
+        );
+        // ⚠️★★ **範囲を広げすぎない**（memory: ゲートは広げすぎると誤爆する）。
+        assert_eq!(mode_of(&unrelated), 0o644, "⚠️ 無関係なファイルに触れた");
+        assert_eq!(mode_of(&derived), 0o644, "⚠️ 派生ファイル (.anon) に触れた");
+
+        // ★ 2 回目は何も直さない（★ mtime を動かさない・冪等）。
+        assert_eq!(secure_existing_files(&d), 0);
+    }
+
+    /// ⚠️★★ **陰性対照**: 自己修復が**緩める方向に動かない**。
+    ///
+    /// ★ これが無いと「全部 0600 にする」実装でも上のテストは緑になるが、
+    /// ⚠️ 実運用では「0400 のものを 0600 に**緩める**」事故がありうる。
+    #[cfg(unix)]
+    #[test]
+    fn secure_existing_files_never_loosens() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tmp_dir("self-heal-tight");
+        let p = d.join("gse_20260830_150000.ndjson");
+        fs::write(&p, "{}\n").unwrap();
+        // ★ owner の read だけ（★ 0600 より厳しい）。
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o400)).unwrap();
+
+        assert_eq!(secure_existing_files(&d), 0, "★ 締まっているものは数えない");
+        assert_eq!(
+            fs::metadata(&p).unwrap().permissions().mode() & 0o777,
+            0o400,
+            "⚠️ 0400 を 0600 へ緩めた"
+        );
+    }
+
+    /// ★ 台帳も 0600 で保つ（⚠️ 既に 0644 で存在していても締め直す）。
+    ///
+    /// ⚠️ security-checker が**実機で 0644 を確認**した（`~/Documents/GSE-sessions/`）。
+    /// ★ 2026-08-30 に直した欠陥と**同一ファイル内の同一クラス**が残っていた。
+    #[cfg(unix)]
+    #[test]
+    fn ledger_is_owner_only_even_if_it_already_exists_world_readable() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tmp_dir("ledger-perm");
+        let ledger = d.join(LEDGER_FILE_NAME);
+        fs::write(&ledger, "{}\n").unwrap();
+        fs::set_permissions(&ledger, fs::Permissions::from_mode(0o644)).unwrap();
+
+        let s = RedactionSummary {
+            files_touched: 1,
+            lines_removed: 2,
+            ..Default::default()
+        };
+        append_ledger(&d, 1, 2, 3, &s).unwrap();
+
+        let mode = fs::metadata(&ledger).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "⚠️ 台帳が 0600 でない（mode={mode:o}）");
     }
 
     /// ★ 1 行も落ちないならファイルに触らない。
