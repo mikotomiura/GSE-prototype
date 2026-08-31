@@ -185,8 +185,41 @@ console.log("\n§1 申告された P-ID を検証なしで信用しないか");
   const r = ctx.g1FindInPhase1Roster_(roster, { pid: "P016", email: "c@example.com" });
   check(
     r && !r.conflict && r.pid === "P016",
-    "★ その行のメールが空なら申告 P-ID を採用する（正当な経路・陰性対照）"
+    "★ **氏名が入っていて**メールが空なら申告 P-ID を採用する（正当な経路・陰性対照）"
   );
+}
+
+{
+  // ⚠️★★★ **裸の行（氏名もメールも空）は申告だけで乗っ取れない**
+  //   (security-checker 指摘 HIGH-1・2026-09-01)。
+  //   ★ `assignG1ParticipantId()` は `appendRow([newPid])` でこの形の行を作る。
+  //   ⚠️ P-ID は連番 3 桁・URL は配布済み・メール収集 OFF → **総当たりで当たる**。
+  const ctx = makeCtx();
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P017", "", ""], // ★ 手動採番が作る裸の行
+  ]);
+  const r = ctx.g1FindInPhase1Roster_(roster, { pid: "P017", email: "attacker@example.com" });
+  check(
+    r && r.conflict === true && r.reason === "bare-row-claim",
+    "⚠️★★★ 裸の行（氏名も空）を名乗ると conflict になる（★ 総当たり乗っ取りを止める）"
+  );
+}
+
+{
+  // ★ 端から端まで: 裸の行を名乗っても **メールを書き込まれない / 受付メールが来ない**
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P017", "", ""],
+  ]);
+  const ctx = submitCtx(roster, { email: "attacker@example.com", pid: "P017" });
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(
+    String(roster.__rows[1][2]).trim() === "",
+    "⚠️★★★ 裸の行に **攻撃者のメールが書き込まれない**（★ 実測）"
+  );
+  check(ctx.__sent.length === 0, "⚠️ 裸の行を名乗っても **受付メールが届かない**");
+  check(roster.__rows.length === 2, "⚠️ 行も増えない（★ 新規発番に落ちない）");
 }
 
 {
