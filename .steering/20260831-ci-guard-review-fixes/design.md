@@ -72,6 +72,45 @@ github.event_name != 'pull_request'
 hosted の `frontend-check` だけが走る。→ ★ 外部 fork をフル検証したいなら
 repo 内のブランチへ取り込んでから PR を出し直す (注記に書く)。
 
+#### ⚠️★★★ security-checker の指摘で **自分の主張を訂正した** (2026-08-31)
+
+初版のコメントに「**fork からの PR では self-hosted ジョブを一切走らせない**」と書いた。
+★ **これは誤りだった。**
+
+⚠️ `pull_request` イベントで使われるワークフロー定義は **base ではなく PR head 側**
+(base に head をマージしたコミット) から読まれる。→ **攻撃者の PR 自身がこの `if` を消せる。**
+
+★ したがって本ゲートが止められるのは「**ci.yml を触らない fork PR**」＝事故・善意の
+コントリビュータだけであり、⚠️ 鍵を狙って ci.yml も書き換える PR は**止まらない**。
+→ ★ 「防御」ではなく「**事故防止**」と書き直した。
+
+⚠️ **本当の境界は 3 つあり、どれも ci.yml の中に無い** (★ 全部自分で実測して裏を取った):
+
+| | 何 | 実測 |
+|---|---|---|
+| 1 | public にしない | `gh repo view` → **PRIVATE** |
+| 2 | public 化直後に fork PR 承認を "all external collaborators" にする | ⚠️ private では**事前に固められない** —— API が `422 Fork PR approval is not allowed for private repositories` |
+| 3 | ★ 候補 **c**: 鍵をランナーと別マシン/別アカウントへ | 未実施 (研究者の運用判断) |
+
+⚠️ さらに `main` に**ブランチ保護も ruleset も無い** (`404 Branch not protected` / `rulesets: []`)。
+
+#### ⚠️ 本ゲートが一切効かない別経路 (★ follow-up)
+
+`allowed_actions: all` / `sha_pinning_required: false` (実測) で、self-hosted で走るジョブが
+`dtolnay/rust-toolchain@stable` (⚠️ **タグでなくブランチ**) / `Swatinem/rust-cache@v2` /
+`actions/checkout@v4` / `softprops/action-gh-release@v2` を**可変参照**のまま使っている。
+→ ⚠️ 上流アカウントが乗っ取られると **push / tag ビルドでも**実機の鍵を読まれる。
+★ fork ゲートはこの経路に**何もしない**。→ commit SHA でのピン留めを follow-up に起票。
+
+### LOW 指摘への対応
+
+| 指摘 | 対応 |
+|---|---|
+| `rm -rf` が **symlink 経由**で workspace 外に出られる (`src-tauri -> $HOME` を commit) | ✅ 塞いだ。`[ -L "$TARGET_DIR" ] || [ -L "$parent" ]` で消す前に停止。⚠️ 陽性対照で victim が生き残ることを確認 |
+| sweep の **check-then-act 競合** (pgrep 判定後に CI が始まると走行中の成果物を消す) | ⚠️ 完全な排他は組めない (CI 側がロックを取らない)。→ ★ sweep 後に再度 `pgrep` して **WARN をログに残す** (無言で通さない) |
+| `workflow_dispatch` で**タグ**を選ぶと `build-macos` ＋ `release` が走る (コメントと食い違い) | ✅ **コメントを実体に合わせて訂正**。⚠️ 挙動は変えていない —— 同一タグの再リリース手順がこれに依存しうるため。★ 締める方法も注記に書いた |
+| ci.yml に鍵の所在 (`~/.gse/age-identity.txt`) を書いた | ★ そのままにする。秘密の**値**は無く、同じ所在情報は既に `docs/pilot-runbook.md` 等にある。⚠️ ただし「鍵の在り処」と「public CI が走る機械」を 1 ファイルに並記した点は認識しておく |
+
 ## テスト戦略
 
 ⚠️★★★ **CI を実際に落として確かめることはできない** (ディスクを枯渇させられない)。

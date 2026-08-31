@@ -13,7 +13,18 @@ on:
   #   (`experiments/20260801-controlled-friction-task/windows-verification.md`) のために
   #   タグを切ると、(a) self-hosted の macOS ランナーが要る、(b) GitHub Release が作られる、
   #   (c) バージョン番号を 1 つ消費する — と副作用が大きい。
-  # ★ 手動発火では `build-windows` だけを走らせる (`check` / `frontend-check` / `release` は動かさない)。
+  # ★ 手動発火では `build-windows` だけを走らせる (`check` / `frontend-check` は動かさない)。
+  #
+  # ⚠️★★★ **訂正 (security-checker 指摘, 2026-08-31)**: 旧文は「`release` も動かさない」と
+  #   書いていたが、★ **それはブランチを選んだ場合にしか成り立たない**。
+  #   `release` の `if` は `startsWith(github.ref, 'refs/tags/v')` だけを見ていて
+  #   `github.event_name` を見ていない。⚠️ したがって **手動発火で「タグ」を選ぶと
+  #   `build-macos` が `gse-mac` 実機で走り、`release` が GitHub Release を作る**。
+  #   ★ 発火できるのは write 権限保持者だけ (現在 collaborator は 1 名) なので権限昇格では
+  #   ないが、⚠️ **「押しても Release はできない」と思って押すと実際にできてしまう**。
+  #   → 挙動そのものは**変えていない** (同一タグの再リリース手順がこれに依存しうるため)。
+  #     ★ 締めたいなら `build-macos` / `release` の `if` に
+  #     `github.event_name != 'workflow_dispatch'` を足す。
   workflow_dispatch:
 
 concurrency:
@@ -41,17 +52,42 @@ env:
 #   ⚠️ しかし上の L33-37 が記録しているとおり、**無料枠回避で一時 public にしていた実績がある**。
 #   → 「今 private だから安全」は運用の偶然であって設計上の防御ではない。
 #
-# ★ そこで **fork からの PR では self-hosted ジョブを一切走らせない**。
+# ★ そこで fork からの PR では self-hosted ジョブを走らせないようにする。
 #   ⚠️ 同一 repo 内のブランチ PR (通常の運用) は `head.repo.full_name == github.repository` を
 #   満たすので**従来どおり走る**。push / tag では `github.event.pull_request` 自体が無く、
 #   `github.event_name != 'pull_request'` が真になるため影響しない。
+#   ★ `head.repo` が null (fork が削除された等) の場合も比較が偽になり **fail-closed**。
+#
+# ⚠️★★★ **このゲートは防御ではない。事故防止である。** (security-checker 指摘, 2026-08-31)
+#   ★ `pull_request` イベントで使われるワークフロー定義は **base ではなく PR head 側**
+#   (base に head をマージしたコミット) から読まれる。⚠️ つまり **攻撃者の PR 自身が
+#   この `if` の行を消せる**。→ 止まるのは「ci.yml を触らない fork PR」(＝事故・善意の
+#   コントリビュータ) だけであり、鍵を狙って ci.yml も書き換える PR は**止まらない**。
+#   ⚠️ 初版のここには「fork からの PR では self-hosted ジョブを**一切**走らせない」と
+#   書いていた。★ **それは誤りだったので訂正した。**
 #
 # ⚠️ 副作用を明記する: 外部 fork の PR では `check` / `build-macos` が skip され、
 #   hosted の `frontend-check` だけが走る。★ 外部 fork の変更をフルに検証したいときは、
 #   その内容を **repo 内のブランチへ取り込んでから** PR を出し直すこと。
 #
-# ⚠️ これは §2 の候補 b であり、**候補 c (鍵をランナーと別マシンへ退避) の代わりではない**。
-#   c が本質的な対策であり、本ゲートは「public 化した瞬間に成立する」経路を塞ぐだけである。
+# ⚠️★★★ **本当の境界は 3 つあり、どれもこのファイルの中に無い**:
+#   (1) リポジトリを **public にしない** (★ 2026-08-31 実測: `gh repo view` = PRIVATE)
+#   (2) public にするなら**その直後に** Settings → Actions → Fork pull request workflows を
+#       **"Require approval for all external collaborators"** にする。
+#       ⚠️ private のうちは事前に固められない —— API が
+#       `422 Fork PR approval is not allowed for private repositories` を返す (実測)。
+#       ★ public 化の既定は「初回コントリビュータのみ承認」であり、**1 度 merge された相手は
+#       以後**無承認で self-hosted に到達する。
+#   (3) ★ 候補 c: `~/.gse/age-identity.txt` を**ランナーと別マシン / 別アカウント**へ退避する。
+#       ⚠️ これが唯一の本質的対策である (ランナーを専用ユーザー or 使い捨て VM にするのも同義)。
+#       ★ GitHub 自身が「self-hosted runner は private repo でのみ使うこと」を推奨している。
+#
+# ⚠️ 未対処として残っている関連リスク (★ 本ゲートは**一切効かない**):
+#   third-party action が可変参照のままである (`dtolnay/rust-toolchain@stable` は**タグでなく
+#   ブランチ**、`Swatinem/rust-cache@v2` / `actions/checkout@v4` / `softprops/action-gh-release@v2`
+#   は可動タグ)。⚠️ repo 設定も `allowed_actions: all` / `sha_pinning_required: false` (実測)。
+#   → 上流アカウントが乗っ取られると push / tag ビルドでも実機の鍵を読まれる。
+#   ★ follow-up: self-hosted で走るジョブの action を commit SHA でピン留めする。
 
 jobs:
   # ── ブランチ push / PR: 両 OS で build + test + snapshot 回帰 ──
@@ -248,6 +284,16 @@ jobs:
       #
       # ★ 2026-08-31 (第 2 版): 実体を `.github/actions/disk-guard` へ移した。
       #   ⚠️ 初版は本ジョブに直書きで、**`build-macos` に掛かっていなかった** (code-reviewer 指摘 #1)。
+      # ⚠️★★ **`gse-win` レグには掛けていない** —— ★ 根拠を書く (code-reviewer 指摘, 2026-08-31)。
+      #   ⚠️ 「self-hosted なのに片方だけ守られている」のは指摘 #1 と同じ構図なので、
+      #   **根拠の無い除外を残さない**ために理由を明示する:
+      #   (1) 枯渇の実測があるのは **mac 側だけ**である (PR #135 / 424MiB)。win 側の空き容量は
+      #       **一度も測っていない**。→ ★ 閾値を推測で置かない。
+      #   (2) ⚠️ 私の手元 (macOS) では **Windows レグを 1 行も実行できない**
+      #       (memory `windows-only-code-needs-ci`)。`df -Pk` / `rm -rf` は git-bash なら動く
+      #       はずだが、**「はず」で fail-closed のガードを入れると CI ごと止まりうる**。
+      #   → ★ follow-up: gse-win の空き容量を実測してから同じガードを掛ける
+      #     (`.steering/20260831-ci-guard-review-fixes/tasklist.md`)。
       - name: Disk guard (self-hosted only)
         id: disk_guard
         if: ${{ matrix.runner == 'gse-mac-selfhosted' }}
@@ -256,8 +302,13 @@ jobs:
       #   初版は `rm -rf src-tauri/target` の**直後に本 step がキャッシュを復元**していたため、
       #   ガードが謳う「フルビルドに倒す」が成立していなかった (捨てた target が即座に戻る)。
       #   ★ floor が発火したときはキャッシュ復元ごと飛ばす。
-      #   ⚠️ mac 以外のレグでは disk_guard 自体が skip され outputs が空文字になるので、
-      #     `!= 'true'` は真 = 従来どおり復元される (Windows レグの挙動は不変)。
+      #   ⚠️ mac 以外のレグでは disk_guard 自体が skip され、outputs は **`null`** になる
+      #     (★ 初版の注記は「空文字」と書いていたが正確には null。結論は同じ)。
+      #     `null != 'true'` は真 = 従来どおり復元される (Windows レグの挙動は不変)。
+      # ⚠️★ **保存 (post ステップ) も一緒に飛ぶ**。★ これは意図どおりである:
+      #   wipe した run のフルビルド結果はキャッシュされず、次回は wipe 前の古いキャッシュが
+      #   復元される。⚠️ 「バグだ」と思って `if:` を消さないこと。キャッシュの更新は
+      #   頻繁に走る通常の run が担う。
       - uses: Swatinem/rust-cache@v2
         if: ${{ steps.disk_guard.outputs.wiped != 'true' }}
         with:
@@ -447,6 +498,13 @@ jobs:
       #   しか掛かっておらず、**本ジョブは無防備だった**。★ 本ジョブは同じ `gse-mac` 実機で
       #   release ＋ dmg を 40 分掛けて作るので `check` よりディスクを食い、
       #   落ちたときの損害が最大 (配布物が 1 つも作れない = リリースが止まる)。
+      # ⚠️★★ **閾値は `check` と同じ (threshold=15 / floor=8) のままである** ——
+      #   ★ code-reviewer 指摘 (2026-08-31): 本ジョブは `check` よりディスクを食うと
+      #   論じておきながら、action が用意した `threshold_gb` / `floor_gb` を上書きしていない。
+      #   ⚠️ 空き 9GiB で通過し、30 分後に dmg 生成で `os error 28` に落ちる余地が残る。
+      #   → ★ **推測で数字を置かない**。release ＋ dmg が実際に何 GiB 使うかを
+      #   `du -sh src-tauri/target` で**実測してから** `with:` を足す。それまでは同値。
+      #   (follow-up: `.steering/20260831-ci-guard-review-fixes/tasklist.md`)
       - name: Disk guard (self-hosted)
         id: disk_guard
         uses: ./.github/actions/disk-guard

@@ -64,9 +64,18 @@ runs:
         #
         # ★ `df -Pk` にした理由: POSIX 出力形式を強制する。`-P` 無しの df は
         #   デバイス名が長いと **行を折り返す**ことがあり、`NR==2` が数値の無い行を掴む。
+        #
+        # ⚠️★★★ 数値検査を **awk の中**でやる理由 (code-reviewer 指摘, 2026-08-31):
+        #   初版は `awk '{ print int($4 …) }'` の**出力**を `case` で数値検査していた。
+        #   ⚠️ ところが `int("ccc")` は awk の仕様で **0 を返す** (実測済み)。
+        #   → 列がずれた df は「0 GiB」という**もっともらしい数値**になって検査を素通りし、
+        #   ★ `free before: 0 GiB` → **target を削除** → 「棚卸しが必要」という**誤った診断**で
+        #   終わっていた。⚠️ `-P` を足して防ごうとしたケースが、まさに破壊に化けていた。
+        #   → ★ `$4` が数字だけの行にしか反応させず、1 行も出せなければ END で非 0 を返す。
         avail_gb() {
           local out
-          out="$(df -Pk . | awk 'NR==2 { print int($4 / 1024 / 1024) }')" || return 1
+          out="$(df -Pk . | awk 'NR==2 && $4 ~ /^[0-9]+$/ { print int($4 / 1024 / 1024); f = 1 }
+                                 END { exit !f }')" || return 1
           case "$out" in
             '' | *[!0-9]*) return 1 ;;
           esac
@@ -104,8 +113,12 @@ runs:
         if [ "$before" -lt "$THRESHOLD_GB" ]; then
           if command -v cargo-sweep >/dev/null 2>&1; then
             echo "--- cargo sweep: ${SWEEP_DAYS} 日以上触られていない成果物を削除 ---"
-            cargo sweep --time "$SWEEP_DAYS" --recursive "$SWEEP_DIR" || \
-              echo "::warning::cargo sweep が失敗しました (続行して floor 判定へ)"
+            # ⚠️ `cargo sweep` (サブコマンド経由) ではなく `cargo-sweep sweep` を直接呼ぶ。
+            #   ★ 在否は `cargo-sweep` で見ているのに実行を `cargo` 経由にすると、**cargo が
+            #   壊れているだけで落ちる**。⚠️ この実機では実際に `~/.cargo/bin/cargo` が
+            #   rustup への壊れた symlink になった実績がある (scripts/maintenance/README.md)。
+            cargo-sweep sweep --time "$SWEEP_DAYS" --recursive "$SWEEP_DIR" || \
+              echo "::warning::cargo-sweep が失敗しました (続行して floor 判定へ)"
           else
             # ⚠️ 初版は echo だけで通過していた。★ 2026-08-31 に実測したところ
             #   **ランナー実機に cargo-sweep が入っていなかった** —— つまりこの分岐は
@@ -118,6 +131,15 @@ runs:
           echo "free after sweep: ${mid} GiB"
 
           if [ "$mid" -lt "$FLOOR_GB" ]; then
+            # ⚠️ `case` ガード (上) は絶対パスと `..` を弾くが、★ **symlink は素通りする**。
+            #   例: repo に `src-tauri -> /Users/johnd` を commit すると `src-tauri/target` が
+            #   `$HOME/target` を指す (security-checker LOW)。⚠️ これを撃てる主体は既に
+            #   `run:` で任意コマンドを実行できる立場なので昇格ではないが、多層防御として弾く。
+            parent="$(dirname "$TARGET_DIR")"
+            if [ -L "$TARGET_DIR" ] || [ -L "$parent" ]; then
+              echo "::error::${TARGET_DIR} (または ${parent}) が symlink です。消さずに停止します"
+              exit 1
+            fi
             echo "--- 空きが ${FLOOR_GB}GiB 未満: ${TARGET_DIR} を全削除してフルビルドに倒す ---"
             rm -rf "$TARGET_DIR"
             wiped=true

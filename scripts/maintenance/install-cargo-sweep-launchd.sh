@@ -156,9 +156,20 @@ echo "  生成: $PLIST"
 # 4) launchd へ積み直す (★ 冪等にするため一度降ろしてから積む)
 uid="$(id -u)"
 launchctl bootout "gui/${uid}/${LABEL}" 2>/dev/null || true
-if launchctl bootstrap "gui/${uid}" "$PLIST" 2>/dev/null; then
-  echo "  launchd: bootstrap 済み"
-else
+
+# ⚠️ `bootout` の直後に `bootstrap` すると、前インスタンスが未解放で
+#   `Bootstrap failed: 5: Input/output error` になることがある (既知の競合)。
+#   ★ 少し待って数回試してから旧 API へ落とす。
+booted=0
+for _ in 1 2 3; do
+  if launchctl bootstrap "gui/${uid}" "$PLIST" 2>/dev/null; then
+    echo "  launchd: bootstrap 済み"
+    booted=1
+    break
+  fi
+  sleep 1
+done
+if [ "$booted" -eq 0 ]; then
   # ★ 古い macOS / 一部の環境では bootstrap が使えないので load へ落とす。
   launchctl load "$PLIST" 2>/dev/null && echo "  launchd: load 済み (旧 API)" \
     || echo "  ⚠️ launchd への登録に失敗しました (下の検査で ❌ になります)"
