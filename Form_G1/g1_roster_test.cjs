@@ -610,6 +610,82 @@ function submitCtx(roster, opts) {
 }
 
 {
+  // ⚠️★★★ **既存行を埋める経路でも重複を検知するか**（cross-review 両者一致 HIGH・2026-09-01）。
+  //   ★ 初版は重複検知を `else`（新規 append）の中にだけ書いていたため、
+  //   ⚠️ **この経路は素通りして重複したまま受付メールを送っていた**。
+  //   ★ 移植元の O1 は pid 確定後に 1 か所だけ見ており、私はカバレッジを落として移植していた。
+  //   ⚠️ **この検査が無かったから見落とした。**
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+    ["", "D", "d@example.com"], // ★ 氏名・メールだけ先に入った行 → ここが埋まる
+  ]);
+  const ctx = submitCtx(roster, { email: "d@example.com", pid: "" });
+  // ⚠️ 埋めた直後に「他プロジェクトが同じ ID を書いた」状態を作る。
+  const origSet = roster.getRange;
+  roster.getRange = function (r, c, nR, nC) {
+    const range = origSet.call(roster, r, c, nR, nC);
+    const origSetValue = range.setValue;
+    range.setValue = function (v) {
+      origSetValue.call(range, v);
+      // ★ P-ID 列(1)に書かれた瞬間に、O1 が同じ ID を append した体にする
+      if (c === 1 && String(v).match(/^P\d+$/)) {
+        roster.appendRow([v, "他プロジェクトが書いた行", "z@example.com"]);
+        roster.getRange = origSet; // ★ 1 回だけ
+      }
+    };
+    return range;
+  };
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(
+    ctx.__sent.length === 0,
+    "⚠️★★★ **既存行を埋める経路でも**重複を検知して受付メールを止める"
+  );
+  // ⚠️★ この経路は **新しく採番している**（`g1NextParticipantId_` を呼ぶ）ので
+  //   `isNew = true`、備考は「発番は済んでいます」が**正確**である。
+  //   ★ 最初「割り当て済み」を期待して書いたが、⚠️ **テストの期待のほうが誤り**だった
+  //   （実測して直した）。→ 「割り当て済み」は既存 ID を再利用する経路の文言（下のケース）。
+  check(
+    ctx.__notes.some((n) => n.indexOf("発番は済んでいます") >= 0),
+    "★ 備考が「発番は済んでいます」（★ この経路は新しく採番しているので正確）"
+  );
+}
+
+{
+  // ★ 既存 ID を**再利用する**経路で重複が見つかったら、文言が変わること。
+  //   ⚠️ ここは発番していないので「発番は済んでいます」と書くと嘘になる。
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P015", "A", "a@example.com"],
+    ["P015", "他プロジェクトが書いた行", "z@example.com"], // ⚠️ 既に重複している
+  ]);
+  const ctx = submitCtx(roster, { email: "a@example.com", pid: "P015" });
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(ctx.__sent.length === 0, "⚠️ 既存 ID の再利用でも、重複していれば受付メールを止める");
+  check(
+    ctx.__notes.some((n) => n.indexOf("割り当て済み") >= 0),
+    "★ 備考は「割り当て済み」（⚠️ ここでは発番していないので「発番は済んでいます」は嘘）"
+  );
+}
+
+{
+  // ⚠️ `onG1ConsentSubmit` のロック取得失敗パス（cross-review MEDIUM・2026-09-01）。
+  const roster = makeSheet([
+    ["P-ID", "氏名", "メール"],
+    ["P014", "先客", "x@example.com"],
+  ]);
+  const ctx = submitCtx(roster, { email: "new@example.com", pid: "" });
+  ctx.__lock.fail = true;
+  ctx.onG1ConsentSubmit({ response: {} });
+  check(roster.__rows.length === 2, "⚠️ ロック取得に失敗したら **1 行も書かない**");
+  check(ctx.__sent.length === 0, "⚠️ ロック取得に失敗したら **受付メールを送らない**");
+  check(
+    ctx.__logs.some((l) => l.indexOf("発番も受付メールも行いませんでした") >= 0),
+    "★ 何もしなかったことを **黙らせない**"
+  );
+}
+
+{
   // ★ 陰性対照: 正常な新規登録では **1 通送る**（⚠️ 全部止める実装でも緑にならないように）
   const roster = makeSheet([
     ["P-ID", "氏名", "メール"],
