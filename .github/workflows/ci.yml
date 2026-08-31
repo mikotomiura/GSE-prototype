@@ -193,6 +193,40 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      # ★ 2026-08-31 追加: ディスク枯渇ガード (self-hosted mac 専用)。
+      #
+      # ⚠️ なぜ要るか: PR #135 (ドキュメントのみ・コード差分ゼロ) の check が
+      #   `failed to build archive ... No space left on device (os error 28)` で落ちた。
+      #   原因は変更内容ではなく **ランナー実機の空き容量** (当時 424MiB)。
+      #   Windows 側は同じコードで SUCCESS しており、mac 実機だけの問題だった。
+      #
+      # ★ self-hosted は GitHub-hosted と違い **workspace が永続する**。使い捨て VM なら
+      #   ジョブごとに消える target が、実機では**誰かが手で消すまで減らない**。
+      #   実測で runner 側 2.7G / 同一マシンのローカルクローン側 31G まで肥大していた。
+      #
+      # ⚠️ この step は toolchain の後・rust-cache の前に置くこと。cargo-sweep の呼び出しに
+      #   cargo が要る一方、キャッシュ復元自体も空き容量を食うため、その前に空けておく必要がある。
+      - name: Disk guard (self-hosted only)
+        if: ${{ matrix.runner == 'gse-mac-selfhosted' }}
+        run: |
+          set -eu
+          threshold_gb=15   # これを下回ったら古い成果物を掃除
+          floor_gb=8        # 掃除しても下回るなら target ごと捨てる
+          avail_gb() { df -k . | awk 'NR==2 { print int($4 / 1024 / 1024) }'; }
+          echo "free before: $(avail_gb) GiB"
+          if [ "$(avail_gb)" -lt "$threshold_gb" ]; then
+            if command -v cargo-sweep >/dev/null 2>&1; then
+              echo "--- cargo sweep: 7 日以上触られていない成果物を削除 ---"
+              cargo sweep --time 7 --recursive src-tauri || true
+            else
+              echo "cargo-sweep 未導入のためスキップ (cargo install cargo-sweep)"
+            fi
+            if [ "$(avail_gb)" -lt "$floor_gb" ]; then
+              echo "--- 空きが ${floor_gb}GiB 未満: target を全削除してフルビルドに倒す ---"
+              rm -rf src-tauri/target
+            fi
+          fi
+          echo "free after: $(avail_gb) GiB"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
