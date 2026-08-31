@@ -211,7 +211,7 @@ struct AwayObservation {
 
 ### ルール 7: 安全条件
 
-- ★ **夜間 22:00–6:00 は Outdoor（Lv4）を無効**にする。
+- ★ **夜間 22:00–6:00 は屋外向けの提示を無効**にする。
 - ★ **opt-in** を前提にする。⚠️ ただし **「opt-in と dismiss があるから自律性を脅かさない」とは書かない**
   —— SDT の autonomy は *"regulation by the self"* であって選択肢の多さではなく、原典逐語で
   **"having many options is not a basic need"** [P178]。★ 正しい書き方は
@@ -261,6 +261,6 @@ struct AwayObservation {
 
 ## 関連する他の Skill
 
-- `intervention-design` — Lv1 Nudge の介入設計（⚠️ Lv2 Wall / Monk Mode は削除済み）
+- `intervention-design` — Nudge の介入設計（⚠️ Wall / Monk Mode は削除済み）
 - `data-privacy` — 打鍵データのプライバシー扱い（⚠️★★★ **位置情報の規定は未整備**）
 - `architecture-rules` — モジュール配置・レイヤー分離

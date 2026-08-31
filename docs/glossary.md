@@ -13,8 +13,8 @@
 | インキュベーション | Incubation | 生産的な沈黙・熟考に近い行動パターンの説明語。現行 HMM の `p_incubation` は incubation-like pause の参考スコア | 「長い休止は Incubation と断定せず介入を defer する」 |
 | スタック | Stuck | 作業停滞・摩擦が強い可能性を表す説明語。`p_stuck` は **MhD（L1）が計算する** Stuck likelihood であり、**Need 層（L2）が `stuck_likelihood` として閾値消費する**（別層・別計算。[[MhD]] 参照） | 「p_stuck が高くても Opportunity が低ければ介入しない」 |
 | 生産的苦闘 | Productive Struggle | 困難に取り組むプロセス自体に学習・成長の価値がある状態。GSE が保護する対象 | 「生産的苦闘を阻害しない介入設計」 |
-| 不便益 | Benefit of Inconvenience | ★ **「不便であること」＝「労力（物理的／心理的）がかかること」から得られる益** [P170]。認定には 3 条件（1 益は不便だからこそ / 2 不便を被るのは受益者本人 / 3 副次的）が要る。⚠️★★★ **GSE の現行実装では条件 1 が満たされない**（Lv1 Nudge は労力を課さない。不便を担う Lv3/Lv4 Physical Anchor は未実装）→ ★ **「不便益を *設計思想として引く*」と書き、「不便益 HCI *である*」とは書かない** | 「不便を担うのは Physical Anchor であって Nudge ではない」 |
-| ナッジ | Nudge (Lv1) | `InterventionDecision.action == "nudge"` で発動する軽度介入。右端から小さく現れるサイドカードとして表示 | 「Nudge が表示されたがユーザーは作業を継続した」 |
+| 不便益 | Benefit of Inconvenience | ★ **「不便であること」＝「労力（物理的／心理的）がかかること」から得られる益** [P170]。認定には 3 条件（1 益は不便だからこそ / 2 不便を被るのは受益者本人 / 3 副次的）が要る。⚠️★★★ **GSE の現行実装では条件 1 が満たされない**（Nudge は労力を課さない。不便を担う Physical Anchor は未実装）→ ★ **「不便益を *設計思想として引く*」と書き、「不便益 HCI *である*」とは書かない** | 「不便を担うのは Physical Anchor であって Nudge ではない」 |
+| ナッジ | Nudge | `InterventionDecision.action == "nudge"` で発動する軽度介入。右端から小さく現れるサイドカードとして表示 | 「Nudge が表示されたがユーザーは作業を継続した」 |
 | ~~ウォール~~ | ~~Wall (Lv2)~~ | ⚠️★★★ **2026-08-23 に削除**（**ADR-015 D1**）。★ 旧義: 全画面ロック + スマートフォンアンロックの強制介入。**現行に画面を塞ぐ介入は存在しない** | ⚠️ **新規に使わない**（★ 履歴記述でのみ可） |
 | ~~ゼンタイマー~~ | ~~Zen Timer~~ | ⚠️★★★ **2026-08-23 に削除**（ADR-015 D1・Wall 専用だった） | ⚠️ **新規に使わない** |
 | ~~モンクモード~~ | ~~Monk Mode~~ | ⚠️★★★ **2026-08-23 に削除**（**ADR-015 D2**）。★ 作用は Wall 抑制だけだったため、Wall 削除で**何もしないトグル**になった | ⚠️ **新規に使わない** |
@@ -95,7 +95,7 @@
 ### 表現層 (メディア表現 / 音)
 
 > 由来: `.steering/20260811-impact-and-cognitive-core-map/media-expression-spec.md` §1–§5、
-> 既決 D13–D21 / S0-D1–S0-D14 / S3-D1–S3-D16 / S4-D1–S4-D7。⚠️ **介入 (Lv1–Lv4) とは別系統**であり、
+> 既決 D13–D21 / S0-D1–S0-D14 / S3-D1–S3-D16 / S4-D1–S4-D7。⚠️ **介入 (Nudge / Physical Anchor) とは別系統**であり、
 > 表現層は**介入判断を行わない**（状態を音に写すだけ）。
 
 | 用語 | 英語表記 | 定義 | 関連用語 |
@@ -239,7 +239,7 @@
 | ~~ロック / ブロック → Wall (Lv2)~~ | — | ⚠️★★★ **2026-08-23 に失効**（ADR-015 D1）。★ **現行に画面を塞ぐ介入は存在しない** |
 | 歩数達成 / 距離達成 / 時間達成 / 完了 / クリア（Physical Anchor の判定語） | **完了条件を課さない**（身体的回帰への**方向づけ**に留める） | ⚠️★★★ **ADR-018 D1**（★ 既決 D11 条件 2 を取り下げた）。★ 単位を量から時間へ替えても**達成判定の構造は残る** —— [P99] の performance-contingent は「届かなかった群」で `d = −0.88`、かつ逐語 *"anticipated evaluation … d = −0.40"* は**肯定的フィードバックでも評価の予期が毀損する**と述べる。★ 完了の宣告は [P183] 原則 4（*"avoid making the technology, rather than the user, the final authority on what the user is doing"*）に直撃し、★ [P163] の反応性機序 3（*"resolving discrepancies between actual and desired behaviour"*）を系の側が作る |
 | 「あなたは歩いた」等の断定（表現層・UI） | 「摩擦の信号が下がった」等の非断定 | ⚠️★★★ 系が持てるビットは **「離席候補区間があり、復帰した」**までである（ADR-017 D3）。[P183] *"avoid making the technology, rather than the user, the final authority on what the user is doing"* |
-| 不便益 HCI **である** | 不便益を**設計思想として引く** HCI | ⚠️★★★ 認定条件 1（益は不便だからこそ＝労力）が現行実装で満たされない [P170]。不便を担う Lv3/Lv4 は未実装 |
+| 不便益 HCI **である** | 不便益を**設計思想として引く** HCI | ⚠️★★★ 認定条件 1（益は不便だからこそ＝労力）が現行実装で満たされない [P170]。不便を担う Physical Anchor は未実装 |
 | 不便益を**測定可能にした** | 不便益を思想として掲げた介入を**行動指標で前向きに検証した** | ⚠️★★★ **不便益に合意された測定尺度は存在しない**。GSE が測るのは行動指標であって不便益ではない |
 | kCGEventTapOptionListenOnly | Input Monitoring tap / ListenOnly tap | API 定数名をそのまま使わず、権限名で説明する |
 | kCGEventTapOptionDefault | Accessibility tap / Default tap | 同上 |
