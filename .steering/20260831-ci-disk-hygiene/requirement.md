@@ -49,12 +49,35 @@ error: could not compile `gse-next` (lib) due to 1 previous error
 
 ## 受け入れ条件
 
+> ⚠️★★★ **2026-08-31 訂正**: 下 2 件は初版で `[x]` にしていたが、**やっていないことを
+> `[x]` にしていた** (code-reviewer 指摘 #3)。★ `verify-before-claiming` 違反そのものなので
+> 実体に合わせて戻す。⚠️ 何を実測して戻したかは `.steering/20260831-ci-guard-review-fixes/` に書く。
+
 - [x] `check` の self-hosted mac で、ビルド前に空き容量を判定し不足時のみ掃除が走る
 - [x] 掃除は走行中のビルド/CI ジョブを壊さない (Runner.Worker / cargo / rustc を検査)
 - [x] `actionlint` (shellcheck 込み) で新規指摘ゼロ
-- [x] 週次の自動掃除がログを残して動作する
+- [ ] ⚠️ **週次の自動掃除がログを残して動作する** —— ★ **成立していない**。
+      launchd への登録自体は済んでいた (`launchctl list local.gse.cargo-sweep` が返る・
+      plist とスクリプトも実在・2026-08-31 11:54 の実行ログもある) が、
+      ⚠️ **`cargo-sweep` が実機から失われており**、以後この週次ジョブは毎回 `exit 1` する。
+      ★ しかも旧スクリプトはログに ERROR を書くだけで、誰も見に行かなければ気づけなかった。
+- [x] ⚠️ **ガードが `build-macos` にも掛かっている** (指摘 #1。初版は `check` のみ)
+- [x] ⚠️ **floor 発火時にキャッシュ復元を飛ばす** (指摘 #2。初版は捨てた直後に復元していた)
+- [x] ⚠️ **空き容量を測れないときに fail-closed** (指摘 #4。初版は黙って掃除を飛ばしていた)
+- [x] ⚠️ **掃除まわりの実体が repo に追跡されている** (指摘 #3。初版は repo 外・未追跡)
+
+★ 上 4 件は `.steering/20260831-ci-guard-review-fixes/` で **完了した**
+(PR: `fix/ci-disk-guard-review-and-fork-gate`)。
+⚠️ ただし 1 件目「週次の自動掃除」は **`[ ]` のまま**である ——
+★ コードは直したが、⚠️ **実機に `cargo-sweep` が無く `rustup` も壊れているため未実行**。
+→ `bash scripts/maintenance/install-cargo-sweep-launchd.sh` を実機で通すまで閉じない。
 
 ## 関連ドキュメント
 
-- `.github/workflows/ci.yml` — `check` ジョブの Disk guard step
-- `~/.local/bin/gse-cargo-sweep.sh` / `~/Library/LaunchAgents/local.gse.cargo-sweep.plist`
+- `.github/actions/disk-guard/action.yml` — ★ ガードの**実体はここ 1 か所**
+  (⚠️ 初版は `ci.yml` の `check` ジョブに直書きだった)
+- `.github/workflows/ci.yml` — `check` / `build-macos` の Disk guard step
+- `scripts/maintenance/gse-cargo-sweep.sh` — ★ 週次掃除スクリプトの**正本**
+- `scripts/maintenance/install-cargo-sweep-launchd.sh` — 導入 / 再導入 / `--verify` 検査
+- ⚠️ `~/.local/bin/gse-cargo-sweep.sh` / `~/Library/LaunchAgents/local.gse.cargo-sweep.plist`
+  は上記インストーラが配置する**複製**である (直すなら repo 側)
