@@ -155,6 +155,63 @@ pub fn analysis_gate_open(o1_mode: bool, session_active: bool) -> bool {
     o1_mode || session_active
 }
 
+/// ⚠️★★★ **自己ラベル (「今とても詰まっている」) を記録してよいか** (純関数)。
+///
+/// ★ O1 では **記録しない**。⚠️ 理由は `lib.rs` が O1 でグローバルショートカットを
+/// 登録しない判断と**同一**である。起動ログ逐語:
+///
+/// > `global shortcuts are NOT registered (… could write user_label / review_marker rows
+/// >  that **the consent form does not list**)`
+///
+/// ## ⚠️ なぜ純関数に切り出すか
+///
+/// ★ `O1_MODE` は `OnceLock` なので、テストから O1 / 非 O1 を切り替えられない。
+/// → ⚠️ 判定を `is_o1()` の呼び出し地点に埋め込むと **両方の分岐を検査できない**
+///   (★ `analysis_gate_open` / `decide_probe_init` と同じ理由・同じ形)。
+///
+/// ## ⚠️ 経緯 (2026-08-30)
+///
+/// ★ 旧実装は **ホットキーだけ**を塞ぎ、Dashboard のボタンは素通りだった。
+/// ⚠️ 実機の画面を見るまで気づかず、**機械検査は 1 つも捕まえなかった**
+/// (配布ゲート 19/19・`--selftest` 19/0 とも緑)。
+pub fn self_marker_allowed(o1_mode: bool) -> bool {
+    label_row_allowed(o1_mode)
+}
+
+/// ⚠️★★★ **被験者由来のラベル行を記録してよいか** (純関数・2026-08-31)。
+///
+/// ★ 対象は `user_label` / `realtime_label` / `review_marker` / `vignette_response` ——
+/// ⚠️ **どれも O1 の同意文書が列挙していない行型**である。
+///
+/// ## ⚠️ なぜ 1 つにまとめるのか
+///
+/// ★ 2026-08-30 に `record_self_marker` **だけ**に門を置いたが、
+/// ⚠️ security-checker が「**兄弟コマンドが素通り**」であることを指摘した (2026-08-31)。
+/// ★ 実測で確認（`#[tauri::command]` 直後の関数だけを数えた）:
+///
+/// ```text
+/// record_user_label         ⚠️ 門なし
+/// record_realtime_answer    ⚠️ 門なし
+/// record_realtime_skip      ⚠️ 門なし
+/// record_vignette_response  ⚠️ 門なし
+/// record_self_marker        ✅ 門あり   ← ここだけ塞いだ
+/// ```
+///
+/// → ⚠️ **1 つだけ塞ぐと「塞いだつもり」になる。** ★ 判定を 1 か所に集めて共有する。
+///
+/// ## ⚠️ 現時点の到達性（★ 正直に書く）
+///
+/// ★ O1 ではプローブが 1 件も出ない（`probe_assignment` を実機 3 セッションで **0 行**確認）ので、
+/// `realtime_*` は UI からは呼ばれない。`record_user_label` は `src/` からの参照が **0 件**。
+/// → ⚠️ **いま被験者に実害が出る経路は無い。**
+///
+/// ★ それでも門を置く理由は、この判断を最初に採ったときと**同じ**である ——
+/// ⚠️ **UI 側だけの対処は、次に UI をいじった人が黙って穴を開け直す。**
+/// ★ 実際に 2026-08-30 の事故がその形だった（ホットキーは塞いだのにボタンが残った）。
+pub fn label_row_allowed(o1_mode: bool) -> bool {
+    !o1_mode
+}
+
 /// ⚠️★★★ **いま記録しているか** (純関数)。稼働中インジケータと `liveness` の両方が使う。
 ///
 /// ## なぜ `session_active` と分けるのか
@@ -443,6 +500,81 @@ mod tests {
     fn analysis_gate_is_always_open_in_o1() {
         assert!(analysis_gate_open(true, false));
         assert!(analysis_gate_open(true, true));
+    }
+
+    /// ⚠️★★★ **O1 では自己ラベルを記録しない** (2026-08-30 の実機発見の掛け金)。
+    ///
+    /// ★ ホットキーだけを塞いでボタンが素通りしていた事故を再発させないための門。
+    /// ⚠️ **UI 側の `{!o1Mode && …}` だけに頼らない** —— 隠し忘れ / 将来の UI 変更 /
+    /// IPC の直叩きでも、backend のここが最後の門になる。
+    #[test]
+    fn self_marker_is_blocked_in_o1() {
+        assert!(!self_marker_allowed(true));
+    }
+
+    /// ⚠️★★ **陰性対照**: 非 O1 (Phase1 / G1) の挙動を 1 バイトも変えていないこと。
+    ///
+    /// ★ これが無いと「全部 false を返す」実装でも上のテストだけは緑になる
+    /// (memory `silent-failure-in-guard-scripts`: 門は広げすぎると誤爆する)。
+    #[test]
+    fn self_marker_is_allowed_when_not_o1() {
+        assert!(self_marker_allowed(false));
+    }
+
+    /// ★ 共有の門も両分岐を見る（⚠️ 陰性対照つき）。
+    #[test]
+    fn label_rows_are_blocked_in_o1_and_allowed_elsewhere() {
+        assert!(!label_row_allowed(true));
+        assert!(label_row_allowed(false));
+    }
+
+    /// ⚠️★★★ **ラベル系コマンドの門の掛け忘れを検出する** (2026-08-31)。
+    ///
+    /// ## なぜソースを読むテストにするのか
+    ///
+    /// ★ 2026-08-30 に `record_self_marker` **だけ**へ門を置き、⚠️ 兄弟 4 つを見落とした。
+    /// ⚠️ **その状態でテストは全部緑だった** —— 純関数のテストは「門があるか」を見ないからである。
+    /// → ★ **「配線されているか」を機械で見る**しかない。
+    ///
+    /// ⚠️ 6 個目のラベル系コマンドを足した人が門を忘れたら、**このテストが赤になる**。
+    ///
+    /// ⚠️★ 対照も置く: 検査対象のコマンドが 1 つも見つからなければ**赤にする**
+    /// (★ 「関数名を変えたら 0 件マッチで黙って緑」を防ぐ。
+    ///  memory `silent-failure-in-guard-scripts` の「0 件マッチ」型)。
+    #[test]
+    fn every_label_command_has_an_o1_gate() {
+        // ★ `include_str!` はコンパイル時に埋め込むので、実行時のパス解決に依存しない。
+        let src = include_str!("lib.rs");
+        let commands = [
+            "record_user_label",
+            "record_realtime_answer",
+            "record_realtime_skip",
+            "record_vignette_response",
+            "record_self_marker",
+        ];
+        let mut checked = 0usize;
+        for name in commands {
+            // ★ `#[tauri::command]` が付いた定義だけを対象にする（`_inner` を拾わない）。
+            let needle = format!("\nfn {name}(");
+            let Some(pos) = src.find(&needle) else {
+                continue;
+            };
+            checked += 1;
+            let body: String = src[pos..].chars().take(1600).collect();
+            assert!(
+                body.contains("label_row_allowed") || body.contains("self_marker_allowed"),
+                "⚠️ {name} に O1 の門が無い。\
+                 ★ `crate::o1::label_row_allowed(crate::o1::is_o1())` を先頭に足すこと \
+                 (同意文書が列挙していない行型を書かせないため)"
+            );
+        }
+        // ⚠️★★ **対照**: 1 つも見つからなければ検査が空回りしている。
+        assert_eq!(
+            checked,
+            commands.len(),
+            "⚠️ ラベル系コマンドの一部が見つからない（改名？）。\
+             ★ 本テストが空回りしている可能性があるので、名前を更新すること"
+        );
     }
 
     /// ⚠️★★★ 「記録しているのに『記録していません』と出る」を消す。
