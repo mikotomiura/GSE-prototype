@@ -1940,6 +1940,25 @@ function assignG1ParticipantId() {
 }
 
 // ログに実アドレスを残さない（data-privacy）。Phase1 の maskEmail_ と同じ考え方。
+/**
+ * ⚠️★★★ **プレーンテキストのメールから Markdown の `**` を落とす**（2026-09-01）。
+ *
+ * ★ `MailApp.sendEmail(to, subject, body)` は **text/plain** で送る。
+ *   ⚠️ したがって本文の `**強調**` は装飾にならず、**記号のまま被験者に見える**。
+ *   ★ 実測（node で本文生成関数を実行）: 受付メール **34〜44 個** / 課題ページメール **18 個**。
+ *
+ * ⚠️★★ **文言そのものは書き換えない。** ★ 本文は `preregistration.md §2.12` の
+ *   開示範囲に合わせて凍結・検査されており（`scripts/check_g1_emails.py`）、
+ *   ⚠️ 語を触ると**その検査と衝突する**。→ ★ **送る直前に記号だけ落とす**。
+ *
+ * ★ 同じ欠陥のページ側は `build_task_pages.py` の `re.S` 修正で閉じた。
+ *   ⚠️ こちらを直すまで「被験者の画面に `**` が出る」は**半分しか塞がっていなかった**。
+ */
+function g1PlainBody_(body) {
+  // ★ 改行をまたぐ強調も落とす（[\s\S] が Python の re.S 相当）。⚠️ 非貪欲にする。
+  return String(body == null ? "" : body).replace(/\*\*([\s\S]+?)\*\*/g, "$1");
+}
+
 function g1MaskEmail_(email) {
   var s = String(email);
   var at = s.indexOf("@");
@@ -1969,10 +1988,10 @@ function sendThankYouEmail(pid, email) {
     G1_CONTACT,
   ].join("\n");
   if (G1_AUTO_SEND) {
-    MailApp.sendEmail(email, subject, body);
+    MailApp.sendEmail(email, subject, g1PlainBody_(body));
     Logger.log("📧 送信しました: " + pid);
   } else {
-    GmailApp.createDraft(email, subject, body);
+    GmailApp.createDraft(email, subject, g1PlainBody_(body));
     Logger.log("📝 下書きを作成しました: " + pid);
   }
   return subject;
@@ -2787,10 +2806,10 @@ function sendTaskMaterialsEmail(pid, email, url) {
   var subject = g1MaterialsSubject_();
   var body = g1MaterialsBody_(pid, url);
   if (G1_AUTO_SEND) {
-    MailApp.sendEmail(email, subject, body);
+    MailApp.sendEmail(email, subject, g1PlainBody_(body));
     Logger.log("📧 事前資料メールを送信しました → " + g1MaskEmail_(email) + "（" + pid + "）");
   } else {
-    GmailApp.createDraft(email, subject, body);
+    GmailApp.createDraft(email, subject, g1PlainBody_(body));
     Logger.log("📝 事前資料メールの下書きを作成しました → " + g1MaskEmail_(email));
     Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
   }
@@ -3815,10 +3834,10 @@ function onG1ConsentSubmit(e) {
       var subject = g1RegisterAckSubject_();
       var body = g1RegisterAckBody_(pid, materials.url);
       if (G1_AUTO_SEND) {
-        MailApp.sendEmail(a.email, subject, body);
+        MailApp.sendEmail(a.email, subject, g1PlainBody_(body));
         Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
       } else {
-        GmailApp.createDraft(a.email, subject, body);
+        GmailApp.createDraft(a.email, subject, g1PlainBody_(body));
         Logger.log("📝 受付メールの下書きを作成しました → " + g1MaskEmail_(a.email));
         Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
       }
