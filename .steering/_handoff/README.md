@@ -11,7 +11,9 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ✅ **現行**（2026-08-31） |
+| **G1 / O1 の収集前の所見** | `g1-o1-precollection-findings.md` | ✅ **現行**（2026-09-01）。★ 調査 2 本の所見。⚠️ **配る O1 バイナリが古い**／被験者の画面に生の `**`／O1 同意文書の版が固定されていない |
+| **G1 / O1 の実物配備** | `next-session-prompt-g1-o1-gas-deployment.md` | ✅ **現行**（2026-09-01）。★ PR #140 を実 Apps Script へ配備し、収集前の穴を埋める。⚠️ **ブラウザ作業あり**（`browser-verification` 必須） |
+| **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ⚠️ **一部消化済み**（2026-08-31）。★ §1（PR を畳む）・§2（fork 遮断）・§3（ディスクガード指摘 4 件）・§7（G1/O1 進捗調査）は **PR #139 で完了**。★ **残っているのは §4 (v0.1.31) / §5 (README 承認) / §6 (送信 timeout) / §8 (積み残し)** —— それらは上の新メモにも引き写してある |
 | **未踏 2027 / 研究の主張** | `next-session-research-positioning-fix.md` | ✅ **現行**（2026-09-01）。★ `docs/research-positioning.md` の ADR-018 / ADR-015 未追随 4 件と de Jong 2020 のカード化 |
 | スマホ表現チャネル | `next-session-prompt-smartphone-expression-channel.md` | ⚠️ 別トラック（Windows 側） |
 | 表現チャネル SSOT の積み残し | `next-session-prompt-expression-channel-followups.md` | ⚠️ 別トラック |
