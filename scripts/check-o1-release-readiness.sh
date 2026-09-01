@@ -192,7 +192,34 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     fi
   done <<< "$(git tag --sort=-v:refname 2>/dev/null)"
   if [ -n "$o1_release_tag" ]; then
-    ok "O1 実装を含むリリースタグがある（${o1_release_tag}）"
+    # ⚠️★★★ **「o1.rs がある」だけでは足りない**（2026-09-01 に実測して判明）。
+    #   ★ 上のコメントは「タグの新しさで代用しない・見るのは実装が入っているか」と
+    #     正しく書いているのに、⚠️ **実装は `git cat-file -e` ＝ファイルの有無しか見ていなかった**。
+    #   → ★ v0.1.30 は `o1.rs` を持つので緑になったが、⚠️ **`label_row_allowed`（O1 で
+    #     出てはいけない UI を塞ぐ門）が 0 件**で、staged 配布物はその古い版だった。
+    #   ⚠️ これは memory `gate-green-but-artifact-broken` ②「タグが新しい ≠ 機能が
+    #     入っている」の**再発**である（★ 前回は o1.rs が 0 バイト、今回は o1.rs が古い）。
+    #
+    # ★ そこで **タグ以降に O1 のコードが動いていないか**を見る。
+    #   ⚠️ 特定の関数名を焼き込まない —— 焼き込むと**次に足した機能でまた素通りする**。
+    #   ★ 「タグ..HEAD に O1 のパスを触ったコミットがあるなら、そのタグは古い」で判定する。
+    o1_paths=(
+      src-tauri/src/o1.rs
+      src-tauri/src/redaction.rs
+      src-tauri/src/reconcile.rs
+      src-tauri/src/recording.rs
+      src/components/Dashboard.tsx
+      src/components/RecordingControls.tsx
+    )
+    stale_commits="$(git log --oneline "${o1_release_tag}..HEAD" -- "${o1_paths[@]}" 2>/dev/null || true)"
+    stale_n="$(printf '%s' "$stale_commits" | grep -c . || true)"
+    if [ "${stale_n:-0}" -gt 0 ]; then
+      ng "⚠️★★★ リリースタグ ${o1_release_tag} は **古い**。★ タグ以降に O1 のコードが ${stale_n} コミット動いている（★ 配るバイナリにその修正が入らない）:
+$(printf '%s' "$stale_commits" | sed 's/^/        /')
+      → ★ **再ビルドして新しいタグを切ること。** ⚠️ 走らせた日は取り返せない。"
+    else
+      ok "O1 実装を含むリリースタグがある（${o1_release_tag}）★ タグ以降に O1 のコード変更なし"
+    fi
   else
     ng "⚠️ O1 実装を含むリリースタグが 1 つも無い（★ 配るバイナリが o1.mode を読めず、黙って通常モードで動く。⚠️ ランダムプローブが復活する）"
   fi
