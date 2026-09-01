@@ -12,7 +12,10 @@ GSE-prototype/
 │   ├── assets/                   #   静的アセット (SVG アイコン等)
 │   └── components/               #   UI コンポーネント
 │       ├── Dashboard.tsx         #     認知状態ダッシュボード
-│       └── Overlay.tsx           #     Nudge/Wall 介入オーバーレイ
+│       ├── Overlay.tsx           #     Probe / Nudge の非ブロック overlay (クリック透過・box 化)
+│       ├── ProbeCard.tsx         #     ランダム時点プローブのカード UI
+│       ├── RecordingControls.tsx #     記録の一時停止・再開・区間指定削除 (ADR-014 D7)
+│       └── VignetteTest.tsx      #     尺度理解テスト (ビネット・PreReg-1)
 │
 ├── src-tauri/                    # Backend ソースコード (Rust/Tauri)
 │   ├── Cargo.toml                #   Rust 依存関係定義
@@ -36,6 +39,12 @@ GSE-prototype/
 │   │   ├── schema_dto.rs         #     [NEW Phase 1] LogEntry ミラー DTO (schemars 派生専用)
 │   │   ├── capabilities.rs       #     [NEW 2026-08-19] このビルドが何を記録できるかの宣言表 (ADR-013)
 │   │   ├── g1.rs                 #     [NEW 2026-08] G1 統制タスク実験モードの判定 (OS API 非依存)
+│   │   ├── recording.rs        #     記録の一時停止・再開 (ADR-014 D7)
+│   │   ├── redaction.rs        #     区間指定削除 (ADR-014 D7)
+│   │   ├── submission.rs       #     提出の状態規則 (.age / .ok / .sent)
+│   │   ├── reconcile.rs        #     提出の突き合わせ
+│   │   ├── applog.rs           #     アプリログ
+│   │   ├── tray.rs             #     システムトレイ (★ 認知状態は出さない)
 │   │   ├── o1.rs                 #     [NEW 2026-08-27] O1 (R3-a) 常時収集モードの判定と方針 (OS API 非依存)
 │   │   ├── participant_id.rs     #     participant_id 検証の単一情報源 (feature 非依存)
 │   │   ├── packaging.rs          #     匿名化 + age 暗号化 SSOT (#[cfg(feature = "package")] gated)
@@ -45,7 +54,10 @@ GSE-prototype/
 │   │   ├── bin/                  #     サブコマンド実装
 │   │   │   ├── replay.rs         #       gse-replay: セッション再実行 + --snapshot / --metrics / --calibration
 │   │   │   ├── cohort.rs         #       [v0.3 Task E] gse-cohort: 被験者横断コホート判定 (calib JSON 集約)
-│   │   │   └── emit_schema.rs    #       [NEW Phase 1] schema_dto → JSON Schema stdout
+│   │   │   ├── emit_schema.rs    #       [NEW Phase 1] schema_dto → JSON Schema stdout
+│   │   │   ├── package.rs        #       gse-package: 匿名化 + age 暗号化 (--features package)
+│   │   │   ├── unpack.rs         #       gse-unpack: .age の復号 (--features package)
+│   │   │   └── submit.rs         #       gse-submit: 提出 (--features package)
 │   │   ├── input/                #     入力キャプチャ層 (プラットフォーム固有コード)
 │   │   │   ├── mod.rs            #       モジュールエクスポート + platform dispatch
 │   │   │   ├── hook.rs           #       共有アトミック変数 + #[cfg] 振り分け
@@ -54,16 +66,28 @@ GSE-prototype/
 │   │   │   ├── ime.rs            #       IME platform dispatch (#[cfg] + #[path])
 │   │   │   ├── ime_cloak.rs      #       cloak/uncloak の畳み込み (★ OS 非依存・両 OS でテスト)
 │   │   │   ├── ime_windows.rs    #       Windows: ImmGet* + WinEvent + UIAutomation + cloak resolver
-│   │   │   └── ime_macos.rs      #       macOS: TIS ポーリング + GCD dispatch
+│   │   │   ├── ime_macos.rs      #       macOS: TIS ポーリング + GCD dispatch
+│   │   │   ├── observe.rs       #       非打鍵チャネルの OS 非依存部
+│   │   │   ├── observe_windows.rs #     Windows: WinEvent (フォーカス遷移・ポインタ)
+│   │   │   ├── observe_macos.rs #       macOS: 同上
+│   │   │   ├── clipboard.rs     #       ペースト文字数のみ取得 (本文は読まない)
+│   │   │   └── liveness.rs      #       フック生存監視 (starved_ms / hook_health)
 │   │   └── analysis/             #     認知状態推定層 (プラットフォーム非依存)
 │   │       ├── mod.rs            #       モジュールエクスポート
 │   │       ├── features.rs       #       5 特徴量抽出 (30s ローリングウィンドウ)
 │   │       ├── engine.rs         #       HMM エンジン (Forward Algorithm)
 │   │       ├── loop_step.rs      #       1Hz ゲート + FeatSnapshot 生成
-│   │       ├── intervention.rs   #       Opportunity MVP (Need/Opportunity → none/nudge/wall/defer)
+│   │       ├── intervention.rs   #       Opportunity MVP (Need/Opportunity → none/nudge/defer)
 │   │       ├── intervention_eval.rs #    v2 介入ポリシーのオフライン反実仮想評価 (HIR/Precision/DC/Burden)
 │   │       ├── probe_scheduler.rs #      [v0.3] ランダム時点プローブの純スケジューリング (Poisson+thinning)
 │   │       ├── metrics.rs        #       [Phase 1] UserLabel × FeatSnapshot 集計
+│   │       ├── heads/          #       ★ ADR-006: task_kind が domain head を選ぶ
+│   │       │   ├── mod.rs      #         HeadId / TaskDomain / ルーティング表
+│   │       │   ├── writing.rs  #         Writing head (β_writing / β_writing_latin を所有)
+│   │       │   └── coding.rs   #         Coding head (β_coding を独立所有)
+│   │       ├── anonymize.rs    #       KeyCategory (14 種・生 VK を書かない・ADR-014 判断 6)
+│   │       ├── key_gate.rs     #       特徴量に数えるキーの門
+│   │       ├── pointer_bin.rs  #       ポインタ活動の 1 秒ビン量子化 (O1・ADR-014 D4)
 │   │       ├── calibration_eval.rs #     [v0.3] 較正解析 (時間隔離窓 C-index/2段ゲート/MNAR/ビネット採点)
 │   │       └── cohort.rs         #       [v0.3 Task E] 被験者横断コホート判定 (純関数・gate 再利用・read-model DTO)
 │   ├── icons/                    #   アプリアイコン (各サイズ)
@@ -76,7 +100,10 @@ GSE-prototype/
 │   ├── repository-structure.md   #   本ファイル
 │   ├── development-guidelines.md #   開発ガイドライン
 │   ├── glossary.md               #   ユビキタス言語定義
-│   └── *.pdf                     #   提案書・技術設計書 (原本)
+│   ├── mitou_docs/               #   未踏提案書・技術設計書 (.docx + 機械抽出 .md)
+│   ├── adr/                      #   ADR-001〜018 + README (確定した設計判断)
+│   ├── architecture/             #   v2 設計文書 7 本 (gse-v2-overview が上位)
+│   └── literature/               #   落合フォーマットの文献カード + _index.md
 │
 ├── .claude/                      # Claude Code 設定
 │   ├── commands/                 #   スラッシュコマンド定義
@@ -220,11 +247,11 @@ GSE-prototype/
 
 | 種類 | 規則 | 例 |
 |---|---|---|
-| Rust ソース | snake_case.rs | `wall_server.rs`(削除済), `features.rs` |
+| Rust ソース | snake_case.rs | `features.rs`, `probe_scheduler.rs`, `key_gate.rs`, `pointer_bin.rs` |
 | Rust プラットフォーム固有 | {module}\_{platform}.rs | `hook_windows.rs`, `hook_macos.rs`, `ime_macos.rs` |
 | Rust モジュール | ディレクトリ + mod.rs | `input/mod.rs` |
 | React コンポーネント | PascalCase.tsx | `Dashboard.tsx`, `Overlay.tsx` |
-| TypeScript ユーティリティ | camelCase.ts | （現在なし） |
+| TypeScript ユーティリティ | camelCase.ts | `probeTypes.ts` |
 | CSS | コンポーネント名.css | `App.css` |
 | ドキュメント | kebab-case.md | `functional-design.md` |
 | 修正レポート | `fix-report-YYYYMMDD-<summary>.md` | `fix-report-20260308-emission-ime-logging.md` |
@@ -250,7 +277,7 @@ lib.rs (Tauri commands, thread orchestration)
     ├──► analysis::features (特徴量抽出)
     ├──► analysis::engine   (HMM 推論)
     ├──► analysis::loop_step (1Hz ゲート + FeatSnapshot)
-    ├──► analysis::intervention (Opportunity MVP: Need/Opportunity → none/nudge/wall/defer)
+    ├──► analysis::intervention (Opportunity MVP: Need/Opportunity → none/nudge/defer)
     ├──► analysis::intervention_eval (gse-replay --intervention で使用、オフライン評価)
     ├──► analysis::probe_scheduler (v0.3: 純スケジューリング、起動/emit は lib.rs 側)
     ├──► analysis::metrics  (Phase 1: GT × FeatSnapshot 集計、gse-replay --metrics で使用)
@@ -265,7 +292,11 @@ bin/emit_schema ──► schema/current.json (CI drift check ─── gse-data
 ```
 
 - **依存方向**: lib.rs が各モジュールを統合。モジュール間の直接依存は最小限。
-- **循環参照**: 禁止。input → analysis の方向のみ（features.rs の型を hook.rs が利用するケースなし）。
+- **循環参照**: 禁止。**input → analysis の片方向のみ**。
+  ⚠️★★★ **2026-09-01 訂正 —— 旧文の括弧「（features.rs の型を hook.rs が利用するケースなし）」は事実と正反対。**
+  ★ 実測: `input/hook.rs:6` が `use crate::analysis::features::InputEvent;`、`hook_windows.rs:116` が
+  `crate::analysis::key_gate::is_feature_key(vk_code)` を呼ぶ（計 6 箇所）。
+  ★ **逆方向（analysis → input）は 0 件**なので「片方向のみ」という結論自体は正しい。
 - **OS 固有コード**: `input/` モジュール + `sensors*.rs` に閉じ込める。`analysis/` は純粋な計算（プラットフォーム非依存）。`hook_macos.rs` 内の CGKeyCode → Windows VK マッピングにより、analysis 層は両プラットフォームで同一の VK コードを受け取る。
 
 ## 5. 新規ファイル追加時のルール
@@ -279,9 +310,9 @@ bin/emit_schema ──► schema/current.json (CI drift check ─── gse-data
 
 ## 6. 禁止パターン
 
-- ❌ `analysis/` 内で Windows API または macOS フレームワークを直接呼ぶ（OS 依存コードは `input/` + `sensors/` に閉じる）
+- ❌ `analysis/` 内で Windows API または macOS フレームワークを直接呼ぶ（OS 依存は `input/` + `sensors*.rs` + `overlay_panel.rs` + `lib.rs` の `#[cfg]` に限る（⚠️ **2026-09-01 訂正: `sensors/` というディレクトリは無い**））
 - ❌ フックコールバック内でブロッキング操作を行う（チャネル send + Atomic store のみ）
 - ❌ `src/` (Frontend) にビジネスロジックを置く（状態推定は Rust 側で完結）
 - ❌ `winapi` crate を使用する（`windows` crate v0.58+ のみ）
-- ❌ グローバル TSF フックを試みる（UIPI でブロックされる）
+- ❌ グローバル TSF フックを試みる（⚠️★★★ **2026-09-01 訂正: UIPI ではなく API 構造上不可能** — `docs/agent-shared.md` 制約 7）
 - ❌ `docs/` に一時的な作業メモを置く（→ `.steering/`）

@@ -54,7 +54,7 @@
 | コホート判定 | cohort verdict | 被験者別 calibration レポートを横断集約し、2段ゲートでコホート全体の Go/Kill/INCONCLUSIVE/DataInsufficient を出す判定 (`gse-cohort` / `analysis::cohort`)。ゲート駆動は各人の C-index 中央値 (PreReg-4)。`model_gate`/`measurement_gate` を再利用 (v0.3 Task E) | 「gse-cohort でコホート判定を出す」 |
 | データ不足判定 | DataInsufficient | コホート判定の値の 1 つ。主指標被験者0名・提示プローブ0件・PreReg-5 最低要件 (eval≥6/probe≥16) 充足者なしのとき、無理に Go/Kill とせず「データ拡充が必要」と正直に報告する状態 (v0.3 §11 主張限界) | 「PreReg-5 未達なので DataInsufficient」 |
 | Need | Need | 介入が必要そうかを表す層。MVP では主に `p_stuck` を `stuck_likelihood` として利用する | 「Need は高いが Opportunity が低い」 |
-| Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode で判定する | 「Opportunity が低いため defer する」 |
+| Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss で判定する（⚠️ **2026-09-01 訂正: 「Monk Mode」を削除** — ADR-015 D2 で機能ごと削除済み） | 「Opportunity が低いため defer する」 |
 | 受容性 | Receptivity | 今このユーザーが介入を受け取れる状態かを表す層。**Layer 5（Opportunity 側）に属する**。現行実装は cooldown + daily_cap + recent_dismiss + idle gate の**分解形**で、統合スコアは持たない（**ADR-007**）。⚠️ **潜在状態（Layer 4）に置かない**——入力がシステム状態と履歴であり潜在状態からの放出ではないため（**ADR-009**） | 「Receptivity は Layer 5。Layer 4 の潜在状態に混ぜない」 |
 | 自力回復リスク | self_directed_recovery_risk | このユーザーが、この task 文脈で、**近い時間範囲（horizon H）内に自力による前進を回復できない確率**。Layer 4 の出力として `WorkStateEstimate` に additive 追加する提案（**ADR-009**・Proposed）。旧 X 軸（Cognitive Friction）の後継候補で、criterion が主観プローブでなく**行動**である点が決定的に異なる | 「recovery risk 単独では強介入を出さない」 |
 | 前進 proxy | progress_proxy | 個人×task_kind×phase 基準で正規化した**純産出の持続**（窓内の 挿入−削除 打鍵数を個人基準で正規化し、T 秒以内に取り消されないこと）。content-free（打鍵数と時刻のみ）。`self_directed_recovery` ラベルの構成要素 | 「progress_proxy が個人基準を超えたら回復とみなす」 |
@@ -87,10 +87,10 @@
 | 参照チャネル | reference channel | ⚠️★★★ **ADR-012 D12 の「参照」は *画面録画* を指す**（検証用サブサンプルのみ・研究者 PC の暗号化領域・**コード化直後に破棄**）。★ `.idea/20260819-…` メモが「**参照計測器**」と呼んでいる*行動*計測器（ADR-012 D7 の別計測器）と**別物である**。⚠️ **同じ「参照」の語で混同しない** | 「参照チャネル（録画）と別計測器（行動）を混同しない」 |
 | 試行の連番 | attempt sequence number | ★ **提出物 `.age` に付くブロック番号が、プロトコルのブロック番号ではなく *起動した試行* の連番であること**。`reconcile.rs::next_block_number` が `.age` 名と `manifest.jsonl` の**最大値 + 1**（ディスク突き合わせ）で決めるため、中断した試行も番号を 1 つ消費する。⚠️ **対応付けは `manifest.jsonl` と NDJSON の中身で復元する** | 「block08 は 8 ブロック目ではなく 8 回目の試行である」 |
 | アウェイアイドル | away_idle | `idle_ms ≥ 180秒` で**介入を全停止**するサプレッション (席を離れたら黙る=不便益)。一次抑制は idle 閾値そのもの。加えて放置で p_stuck も低下するため二重に介入は出ない (idle≠Stuck) | 「10分放置で介入が出ないのは away_idle で正常」 |
-| 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
+| 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `defer`（⚠️ **2026-09-01 訂正: `wall` を削除** — ADR-015 D1。実測 `intervention.rs:16-20`） と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
 | defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |
-| daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Wall daily cap により defer」 |
-| cooldown | cooldown | 介入後の再介入禁止時間。Nudge は 10 分、Wall は 60 分を MVP 初期値とする | 「cooldown 中なので Nudge を抑制」 |
+| daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Nudge daily cap（6 回/日）に達したので defer」（⚠️ **2026-09-01 訂正 —— 旧例は「Wall daily cap により defer」。Wall は ADR-015 D1 で削除済み**） |
+| cooldown | cooldown | 介入後の再介入禁止時間。**Nudge は 10 分**（実測: `src-tauri/src/analysis/intervention.rs:5` `NUDGE_COOLDOWN_MS = 10 * 60 * 1000`）。⚠️ **2026-09-01 訂正 —— 旧文の「Wall は 60 分」は失効**（ADR-015 D1 で Wall ごと削除。★ 現行に Wall 系の定数は 1 つも無い） | 「cooldown 中なので Nudge を抑制」 |
 | recent dismiss | recent dismiss | 直近で介入が拒否された事実。MVP 初期値では 20 分間、同種介入を抑制する | 「recent dismiss により defer」 |
 
 ### 表現層 (メディア表現 / 音)
@@ -177,7 +177,7 @@
 | USING_ACCESSIBILITY_FALLBACK | — | macOS 固有のアトミックフラグ。Input Monitoring から Accessibility へフォールバックしたことを示す | CGEventTap, TCC |
 | FeatSnapshot | — | 1Hz ゲートで生成される特徴量 + HMM 状態確率のスナップショット (`analysis::loop_step::FeatSnapshot`)。NDJSON `feat` レコード + gse-replay 回帰比較の基本単位 | 1Hz ゲート, snapshot |
 | LatestFeatState | — | 直近の FeatSnapshot を Tauri state として保持する構造。`get_intervention_decision` が F3/F4/F6 を読む | InterventionDecision |
-| InterventionPolicyState | — | cooldown / daily cap / recent dismiss / Wall 累積時間 / last decision を保持する Rust 側ポリシー状態 | InterventionDecision |
+| InterventionPolicyState | — | cooldown / daily cap / recent dismiss / last decision を保持する（⚠️ **2026-09-01 訂正 —— 旧文の「Wall 累積時間」は失効**。ADR-015 D1 で `wall_accum_ms` ごと削除） Rust 側ポリシー状態 | InterventionDecision |
 | 混同行列 | Confusion Matrix | `[正解×推定]` の 3×3 行列 (`analysis::metrics::ConfusionMatrix`)。正解ラベルクラス × HMM argmax クラスの件数を格納 | UserLabel, F1 |
 | Macro F1 | — | 各クラスの F1 を単純平均した値。固定分母 3 (scikit-learn 互換)。クラス不均衡に強くない代わりに minority class を重視 | 混同行列 |
 | Micro F1 | — | 総 TP / 総 labels。多クラスでは accuracy と一致。GSE では分母は matched labels のみ (警告行きは除外) | 混同行列 |
@@ -186,7 +186,7 @@
 | 範囲ラベル | RangeLabel | 時間区間 (`{start_ms, end_ms, label}`) 形式の GT ラベル (`analysis::metrics::RangeLabel`)。点ラベルを forward-fill で区間化したもの。1 ラベルから N 個の feat-label ペアを生成し検出力を高める | point label, forward-fill |
 | 点ラベル / forward-fill | point label / forward-fill | point label = 単一時刻の GT ラベル。forward-fill = 次のラベルまで前のラベルを引き延ばし区間 (RangeLabel) 化する手法 (`intervention_eval`) | RangeLabel, PROTECT/STALL |
 | PROTECT / STALL | — | 介入評価の GT 二値化。PROTECT = 旧 Flow/Incubation（守るべき状態）、STALL = 旧 Stuck（介入候補）。`gse-replay --intervention` で point label を forward-fill 区間化して使う | HIR, intervention_eval |
-| ACT / HOLD | — | 介入評価の decision 二値化。ACT = {nudge, wall}（介入する）、HOLD = {none, defer}（控える） | HIR, InterventionDecision |
+| ACT / HOLD | — | 介入評価の decision 二値化。ACT = {nudge}（介入する。⚠️ **2026-09-01 訂正: 旧文の `wall` を削除** — 実測 `intervention_eval.rs:54` 逐語「ACT={nudge}」）、HOLD = {none, defer}（控える） | HIR, InterventionDecision |
 | HIR | Harmful Intervention Rate | 有害介入率 = ACT∩PROTECT / labeled-ACT。PROTECT 区間に介入してしまった割合。v2 介入評価の最重要・安全性指標 (`analysis::intervention_eval`) | PROTECT/STALL, intervention_eval |
 | DC | Defer Correctness | defer 正答率 = W 秒以内に p_flow>0.5 へ回復した defer 区間 / 全 defer 区間。見送り判断が自己回復で支持された割合 | recovered_at, ACT/HOLD |
 | Burden | — | 介入評価の過介入代理 = ACT 回数 / セッション分 | HIR |
@@ -197,7 +197,7 @@
 | metrics.json | — | `gse-replay --metrics --json` の出力 (1 KB/session)。gse-dataset repo の `metrics/P*/<os>/` に配置する共有アーティファクト | aggregate_metrics, UC-GT3 |
 | gse-dataset | — | セッションメトリクスの集約データ repo (`mikotomiura/gse-dataset`, private)。生 NDJSON は絶対に置かず、`metrics/` と機械生成 schema のみ tracked | metrics.json, schema sync |
 | 被験者 ID | Participant ID | データ repo での匿名化識別子。`P000` (開発者自身) / `P001-P005` (Phase 2+ 外部被験者) | IRB, consent |
-| Phase 2a Go/No-Go | — | `aggregate_metrics.py` が出力する判定。Stuck precision 平均 ≥ 0.6 かつ n ≥ 5 で GO、未満は INCONCLUSIVE | metrics.json, baseline_metrics.md |
+| Phase 2a Go/No-Go | — | ⚠️ **2026-09-01 訂正: `aggregate_metrics.py` は存在しない**（実体は `gse-cohort` / `scripts/run-calibration-cohort.sh`）が出力する判定。Stuck precision 平均 ≥ 0.6 かつ n ≥ 5 で GO、未満は INCONCLUSIVE | metrics.json, baseline_metrics.md |
 | 収束器 | reconciler | 「あるべき状態 (desired state)」を宣言し、現状をそこへ寄せる周回処理。冪等が構造で保証される。`src-tauri/src/reconcile.rs` (`.age` の再送・取りこぼし回収) と配布自動化 Stage 2 が同じ形。**⚠️ 表現できない状態は管理してはならない**（「止めたい」を宣言できないなら共有を収束器の管轄に入れない） | desired state, D-7 |
 | desired state | — | 収束器の入力となる宣言。配布自動化では P-ID ごとの「配る / 止める」の 2 値。⚠️「配る」しか表現できない収束器は同意撤回を潰す | 収束器 |
 | spike | — | **実装前に、未検証の前提を実測で潰す使い捨ての検証**。結果は「可 / 否 + 実測値 + 実測日」で書き、⚠️「たぶん」「はず」を残さない。外れたときの行き先を先に決めてから実行する | verify-before-claiming |

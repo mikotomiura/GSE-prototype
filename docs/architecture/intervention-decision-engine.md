@@ -21,7 +21,8 @@ ActiveTyping / PostBurstPause / CorrectionAfterPause / ActiveCorrectionLoop`（`
 
 ### Receptivity（現行 = 分解形で機能）
 候補入力: recent dismiss / dismiss reason / cooldown / daily cap / time of day / intervention history /
-support consent / Monk Mode / current active operation / prior annoyance / task kind / evidence quality。
+support consent / current active operation / prior annoyance / task kind / evidence quality。
+（⚠️ **2026-09-01: 候補から `Monk Mode` を削除** — ADR-015 D2 で削除済み。再導入には新規 ADR が要る）
 
 現行実装は **cooldown + daily_cap + recent_dismiss + idle gate の合成**（統合 receptivity スコアは未実装）。
 統合スコア化 vs 分解維持は **ADR-007**。
@@ -36,12 +37,12 @@ receptivity の**主軸に据えない**（`gse-v2-overview.md §5`）。
 |---|---|---|
 | not_stuck | NotStuck | ◎ |
 | let_me_struggle | WantToStruggle | ◎（**GSE 固有の成功信号**として別集計・失敗ログではない） |
-| emergency_unlock | EarlyUnlock | ◎ |
+| emergency_unlock | — | ✗ **2026-08-23 に削除**（ADR-015 D1 が Wall 応答 `early_unlock` / `completed` / `idle_timeout` を削除）。再導入には新規 ADR |
 | silent_dismiss | Silent | ◎ |
 | bad_timing | — | ✗ 追加候補（additive・Epic 3） |
 | not_helpful | — | ✗ 追加候補（additive・Epic 3） |
 
-他に現行は `JustClose / Completed / IdleTimeout(予約)` を持つ。追加は additive（migration-risk-register）。
+★ **2026-09-01 訂正 —— 現行の `DismissReason` は `NotStuck / WantToStruggle / JustClose / Silent` の 4 値のみ**（実測 `logger.rs:216-221` / `schema_dto.rs:496-501`）。⚠️ **旧文の `Completed` / `IdleTimeout(予約)` は存在しない** ——`schema_dto.rs:493` 逐語「**Wall 応答 (`early_unlock` / `completed` / `idle_timeout`) は 2026-08-23 に削除した**」。★ かつ `completed` は **ADR-018 D3 で UI・表現層・ログのいずれにも置かない語**になった。追加は additive（migration-risk-register）。
 
 ---
 
@@ -66,36 +67,59 @@ enum InterventionAction {
     None,                              // ◎ 実装済（第一級）
     Defer,                             // ◎ 実装済（第一級）
     Nudge { template_id: String },     // ◎（現行は template_id なし）
-    Zen { duration_profile: String },  // Zen Timer（現行 Wall 内 Zen）
-    Wall { profile_id: String },       // ◎
+    Zen { duration_profile: String },  // ✗ 未実装（Zen Timer は ADR-015 D1 で削除済み）
+    Wall { profile_id: String },       // ✗ 2026-08-23 に全削除（ADR-015 D1）
 }
 ```
-現行 `InterventionAction` = `None / Nudge / Wall / Defer`。`none`/`defer` は**第一級で実装済み**。
+⚠️★★★ **2026-09-01 訂正 —— 現行 `InterventionAction` は `None / Nudge / Defer` の 3 値である**
+（実測: `src-tauri/src/analysis/intervention.rs:16-20`）。`none`/`defer` は**第一級で実装済み**。
+> ⚠️ **旧文は「現行 `InterventionAction` = `None / Nudge / Wall / Defer`」と書き、
+> enum ブロックでも `Wall` に `◎`（＝ 実装済の凡例）を付けていた。**
+> ★ **Wall / Zen Timer は ADR-015（2026-08-23）D1 で全削除された** ——
+> `InterventionAction::Wall` / Wall 閾値 6 種 / `wall_accum_ms` / daily cap / cooldown / `force_wall` が対象。
+> ⚠️★★★ **本節は「入力/出力*案*」なので将来案として挙げること自体は禁じないが、
+> 復活させるなら新規 ADR が要る**（★ ADR-015 は削除を決定した ADR であり、上書きには同格の決定が要る）。
 
 ### 最低ルール（設計書 §3.7）
 ```text
 calibration_mode == true            → none
 intervention_enabled == false       → none
-monk_mode == true                   → none   ※ Monk Mode = 介入拒否（Epic 0 で SSOT 確定）
 support_consent == ObserveOnly      → none   ※ 新規（倫理・自律性ゲート・効果主張ではない）
 daily_cap_reached || cooldown_active→ none
 evidence_quality が低い             → none または defer
 Need 高 / breakpoint 低             → defer
 Need 中〜高 / breakpoint 高 / receptivity 高 → nudge
-強介入(Wall/Zen)                    → StrongSupportOptIn かつ domain head 較正済みの場合のみ
+強介入（★ 現行は存在しない）        → 将来 Wall/Zen 相当を再導入するなら新規 ADR ＋ StrongSupportOptIn ＋ domain head 較正済み
 ```
+> ⚠️★★★ **2026-09-01 訂正 —— 最低ルールから `monk_mode == true → none` の行を削除した。**
+> ★ **Monk Mode は ADR-015 D2 で削除済み**（`src-tauri/src/` に `monk_mode` は 0 ヒット）。
+> ⚠️ かつ旧文の「**Monk Mode = 介入拒否（Epic 0 で SSOT 確定）**」という理解自体が
+> **ADR-015 Context-3 で否定されている** —— 逐語「**Monk Mode は Wall を無効化するだけ**」
+> 「**Nudge は引き続き表示される**」。★ **つまり「介入拒否」ではなかった。**
+> ⚠️ `DecisionInput` 案の `monk_mode: bool` フィールドも、再導入には新規 ADR が要る。
 
 ### 重要（設計書の思想・エビデンス整合）
 - `none` は消極的 fallback でなく**第一級の判断**。`defer` は「見逃し」でなく **Opportunity を守る判断**。
   → [V43]（行動指標が受容性を予測・自己申告は予測せず）と整合し、GSE の中核を支える。
-- **Wall は v2 Core の必須機能でなく高リスクの実験介入**。`stuck_likelihood` 単独で Wall を発火しない。
-- **動機が低いことを理由に Wall や義務感 UI を出さない**（動機不足 ≠ 停滞・設計書 §1.4）。
+- ⚠️★★★ **Wall は 2026-08-23 に全削除された（ADR-015 D1）。** ★ 原則としては維持する ——
+  **将来の強介入を `stuck_likelihood` 単独で発火させてはならない**（高リスクの実験介入として扱う）。
+- **動機が低いことを理由に強介入や義務感 UI を出さない**（動機不足 ≠ 停滞・設計書 §1.4）。
 - Consent 軸（`ObserveOnly → none`）は**倫理・自律性ゲート**であって効果エビデンスではない（過大主張しない）。
 
-### 現行閾値（凍結対象・変更禁止・参考）
-`NUDGE_NEED=0.60` / `WALL_NEED=0.70` / `WALL_SLACK=0.50` / `NUDGE_OPP=0.35` / `WALL_OPP=0.45`。
-cooldown / daily_cap / recent_dismiss / idle≥180s で介入全停止。`InterventionThresholds`（`new_with_thresholds`）で
-sweep 可能。Phase1 完了まで**定数変更禁止**（migration-risk-register）。
+### 現行閾値（参考）
+⚠️★★★ **2026-09-01 訂正 —— 実在する閾値定数は 2 本だけである**
+（実測: `src-tauri/src/analysis/intervention.rs:3-4`）:
+`NUDGE_NEED_THRESHOLD=0.60` / `NUDGE_OPPORTUNITY_THRESHOLD=0.35`。
+⚠️ **旧文が挙げていた `WALL_NEED=0.70` / `WALL_SLACK=0.50` / `WALL_OPP=0.45` は存在しない**
+（ADR-015 D1 の「Wall 閾値 6 種」削除に含まれる）。
+★ その他の実在定数: `NUDGE_COOLDOWN_MS=10 分` / `RECENT_DISMISS_MS=20 分` / `NUDGE_DAILY_CAP=6` /
+`AWAY_IDLE_MS=180_000`（idle≥180s で介入全停止）。
+`InterventionThresholds`（`new_with_thresholds`）で sweep 可能。
+★ **加えて評価専用の veto** `correction_f4_floor` / `correction_f6_floor` が `InterventionThresholds` にある
+（既定 `None` ＝ production 不変。`intervention.rs:99-107` / 適用は `:273-288` で `suppressed_by` へ push し `Defer` へ落とす）。
+> ⚠️ **2026-09-01 訂正 —— 旧文の「Phase1 完了まで定数変更禁止」は前提が失効した。**
+> ★ **2026-08-18 に Phase1 は収集打ち切りで終了し、凍結は解除された**（`docs/adr/README.md`）。
+> ★ **定数は現在も未変更**だが、それは「変更禁止だから」ではなく「まだ触っていない」からである。
 
 ---
 
@@ -113,7 +137,7 @@ Gate D（Demand・新規）/ Gate S（Sensing・新規）/ Gate H（Harm・新�
 fn decide(input: &DecisionInput, policy: &PolicyConfig) -> DecisionOutput;
 ```
 現行 `intervention.rs` は既に Need/Opportunity を分離し `new_with_thresholds` で threshold 注入可 = **pure 化の入口はある**。
-ただし `InterventionPolicyState` は day_index / nudge・wall count / last_*_at_ms / wall_accum_ms / current_action /
+ただし `InterventionPolicyState` は day_index / nudge_count_today / last_*_at_ms / wall_accum_ms / current_action /
 last_log_key 等 **十数個の可変状態**を持つため、pure `decide()` への切り出しは「容易」ではなく **state（cooldown/cap/履歴）と
 純粋判定を分離する設計作業**を要する。主作業は **Consent 軸の新設**と **decision reason code のログ化**。
 

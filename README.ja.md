@@ -7,9 +7,9 @@
 GSE はあなたの脳内を読みません。読むのは*キーストローク動態*だけ。そこから、
 そっと促す Nudge が「今、本当に役立つか」と、「今は黙っているべきか」を判断します。
 
-> **現況:** 稼働している介入は **Lv1 Nudge のみ**です。全画面の Wall と Monk Mode は
+> **現況:** 稼働している介入は **Nudge のみ**です。全画面の Wall と Monk Mode は
 > **2026-08 に削除しました**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）。
-> Lv3/Lv4 Physical Anchor は**設計済み・未実装**です
+> Physical Anchor は**設計済み・未実装**です
 > （[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）。
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
@@ -57,7 +57,7 @@ GSE はあなたの脳内を読みません。読むのは*キーストローク
                   ▼
               介入ポリシー            Need (p_stuck) × Opportunity
                   │  → none / nudge / defer
-                  ├──▶ React UI        Dashboard + Overlay（Lv1 Nudge カード）
+                  ├──▶ React UI        Dashboard + Overlay（Nudge カード）
                   └──▶ Session logger  NDJSON — 行動特徴量のみ・本文は記録しない
 ```
 
@@ -97,9 +97,9 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 
 | レベル | トリガー | 効果 | 解除 |
 |---|---|---|---|
-| **Lv1 · Nudge** | `action == nudge` | クリック透過の小カード。不透明度は Need に比例 | 一定時間で自動消去 |
-| **Lv3/Lv4 · Physical Anchor** | *未実装* | 机から一度離れ、作業へ戻る | — |
-| ~~**Lv2 · Wall**~~ | ~~全画面遮断~~ | **2026-08 に削除** — 下記参照 | — |
+| **Nudge** | `action == nudge` | クリック透過の小カード。不透明度は Need に比例 | 一定時間で自動消去 |
+| **Physical Anchor** | *未実装* | 画面から離れることへの**方向づけ** | — |
+| ~~**Wall**~~ | ~~全画面遮断~~ | **2026-08 に削除** — 下記参照 | — |
 
 **抑制（すべて稼働中）**: 能動的にタイプ中（打鍵間隔 < 2 秒）は `defer` / cooldown 10 分 /
 1 日 6 回まで / 直近 dismiss から 20 分は抑制 / 無入力 180 秒以上で介入を全停止。
@@ -111,9 +111,17 @@ Y（生産的沈黙） = 0.40·φ(F4) + 0.35·(1−φ(F1)) + 0.25·(1−φ(F5))
 **HIR（有害介入率）は残してある** — 変わったのは対象集合だけである。
 
 **Physical Anchor**（[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）が実際に労力を
-担う層であり、**まだ実装されていない**。完了条件は**一定時間の離席と作業への復帰**であって
-歩数や距離の達成ではなく、GSE は**身体活動を一切センシングしない**
-（GPS・歩数計・加速度センサを使わない）。
+担う層であり、**まだ実装されていない**。
+★★★ **系はその開始も完了も判定しない**（[ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)）——
+どれだけ離れるか・いつ戻るかに**系の側の閾値を置かず**、**タイマー・カウントダウン・残り時間表示も実装しない**。
+GSE は**身体活動を一切センシングしない**（GPS・歩数計・加速度センサを使わない）。
+
+> ⚠️★★★ **2026-09-01 訂正。** 旧文はここで完了条件を「**一定時間の離席と作業への復帰**」と書いていたが、
+> **ADR-018 D1 がその条件を取り下げた**。★ 歩数の目標を時間の目標に替えても
+> 「**届かなかった**」というセルが残る点は同型であり、そこが内発的動機を最も損なう
+> （[P99] performance-contingent で目標に届かなかった群 `d = −0.88`）。
+> ★ **段階呼称 Lv1〜Lv4 を落としたのも同じ理由** —— Wall が消え完了条件も無くなった結果、
+> **番号を振るべき「強度が単調に上がる段」が現存しない。**
 
 ---
 
