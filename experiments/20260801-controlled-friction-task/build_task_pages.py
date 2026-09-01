@@ -79,7 +79,7 @@ def parse_material(path: pathlib.Path) -> dict:
 
 
 def md_inline(text: str) -> str:
-    """★ 最小限のインライン変換。**強調** だけを見て、それ以外はエスケープする。
+    r"""★ 最小限のインライン変換。**強調** だけを見て、それ以外はエスケープする。
 
     課題文は自前で書いたものしか通さないので、汎用 Markdown 実装は要らない。
     ⚠️ エスケープしてから強調を戻す順序にする（HTML 注入を作らない）。
@@ -425,7 +425,7 @@ def selftest() -> int:
 
     # ⚠️★★★ **改行をまたぐ強調**（2026-09-01 追加）。
     #   ★ ここを 1 行だけで試していたせいで、`re.S` の欠落を **208 枚中 20 枚**に配ってしまった。
-    #   ⚠️ 実材料（HI 8 本すべて）が改行をまたぐ書き方をしているのに、検査は 1 行しか見ていなかった。
+    #   ⚠️ 実材料 (topic04_hi / topic05_hi) が改行をまたぐ書き方をしているのに、検査は 1 行しか見ていなかった。
     doc_ml = {"meta": {}, "sections": [("教示", "下の資料は、**同じ問いに対して\n食い違うこと**を述べています。")]}
     page_ml = build_page(template, 1, doc_ml)
     if "<strong>同じ問いに対して\n食い違うこと</strong>" not in page_ml:
@@ -442,6 +442,16 @@ def selftest() -> int:
         fails.append("強調が接続部へ反転している（re.S の欠落）")
     if "<strong>C</strong>" not in page_inv:
         fails.append("2 つ目の強調が変換されていない")
+
+    # ⚠️★★★ **実材料をすべて通して `**` が残らないこと**（2026-09-01 追加）。
+    #   ★ selftest の「実材料アーム」は 3 本 (topic01_hi / topic01_lo / copy) しか組んでおらず、
+    #     ⚠️ **その 3 本には改行をまたぐ強調が無いので、この欠陥に対して完全に盲目だった**
+    #     (`re.S` を外しても 3 本の生成物に `**` は 1 件も出ない、と code-reviewer が実測)。
+    #   → ★ 合成 fixture だけに検出を頼らず、**材料側の書き方が変わっても捕まえる**形にする。
+    for mat in sorted((HERE / "materials").glob("topic0*.md")):
+        page_m = build_page(template, 1, parse_material(mat))
+        if "**" in page_m:
+            fails.append(f"{mat.name}: 生成物に `**` が残っている（改行をまたぐ強調の可能性）")
 
     # ★★ HTML コメントが生成物に残っていないこと（2026-08-04 追加）
     doc_c = parse_material(HERE / "materials" / "topic01_lo.md")
