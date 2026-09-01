@@ -81,6 +81,43 @@ JSON.stringify({vis: document.visibilityState, hasFocus: document.hasFocus(),
 - ★ `bash experiments/20260801-controlled-friction-task/run.sh` と
   `python3 scripts/check_g1_emails.py` を**実行して**結果を報告させる
 
+### ⚠️★ 調査 A の**一部だけ**が届いている（★ これは使ってよい・根拠つき）
+
+> ⚠️ 調査 A の**サブエージェント 1 本ぶん**（「材料・教示・文言が根本原因の項目」担当）だけが
+> セッション終了後に返ってきた。★ **調査 A / B の本体は未受領**である。
+> ⚠️ **これで調査が済んだことにしない。** §1 の 2 本は走らせ直すこと。
+
+★ **未解決（OPEN）と判定されたのは 3 件**（⚠️ 他 6 件は RESOLVED と実体で確認済み ——
+★ **それらを「未対応」と書き直さないこと**）:
+
+| # | 何 | 根拠 |
+|---|---|---|
+| 1 | ⚠️★★ **`~/Documents` の許可案内が参加者向け文書に無い**。★ v0.1.27 以降は **v0.1.26 で許可済みの被験者も再度求められる**のに、`README_先に読む.txt` にも `participant-guide.md` にも **記述が grep で 0 件**。⚠️ 研究者判断待ちのまま放置されている | `.steering/20260819-mac-build-distribution-zips/decisions.md:94, :99-103` |
+| 2 | ⚠️ **教示は「いつも通り」なのに UI が `task_kind` を `argumentative` にロック**していた。★ タスク宣言が**観測でなく設定**になり、⚠️ **交絡が除去されず「不可視化」された** | `.steering/20260802-task-adaptation-design/decisions.md:85, :88, :92` |
+| 3 | ⚠️★★ **参加者が「対象作業をしていたか」を担保する教示・手続き・除外基準が無い**。★ 対象外の作業でも `progress_proxy` が最大化する。⚠️ 対処方向 4 つ（較正セッションの構造化 / タスク宣言 / out-of-scope 検出 / 除外基準にタスク内容）が挙がっているが **未着手** | `.steering/20260801-recovery-axis-grounding/decisions.md:175, :180, :189-191` |
+
+#### ⚠️★★★ 1 は **G1 だけの話ではない**（★ 2026-09-01 に自分で検算した）
+
+```bash
+grep -cE 'Documents|書類フォルダ|ファイルとフォルダ' \
+  experiments/20260801-controlled-friction-task/dist-readme-macos-o1.txt \
+  experiments/20260801-controlled-friction-task/dist-readme-macos.txt \
+  experiments/20260801-controlled-friction-task/participant-guide.md \
+  docs/participant-setup-guide.md
+```
+
+★ 実測: **被験者が読む 3 本すべて 0 件**。⚠️ **`dist-readme-macos-o1.txt`（O1 の配布物）も 0 件**である。
+→ ⚠️ **O1 を配ると、被験者は案内の無い許可ダイアログに出くわす。**
+
+★ ⚠️ **§6 の README 承認と同じタイミングで直すこと。** 理由:
+README を変えると **zip の作り直しが要る**（★ 文言はスクリプトの grep 検査と結合している）。
+→ ★ §6 で「【ドラフト・未承認】を消す」ために**どのみち 1 回作り直す**ので、
+⚠️ **そこに Documents 許可の段落も一緒に入れれば作り直しは 1 回で済む**
+（★ 別々にやると Drive 差し替えが 2 回になる）。
+
+★ **1 は G1 の再送前に閉じられる**（⚠️ 文書に 1 段落足すだけ・研究者の文言承認が要る）。
+⚠️ 2 と 3 は**設計/事前登録に関わる**ので、`/reimagine` か研究者判断の対象。
+
 ### 調査 B: O1 を配る前に、こちら側で取れる収集
 
 - `o1-upload-timeout-measurement.md` が何を測れと言っているか →
