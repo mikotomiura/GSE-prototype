@@ -83,9 +83,19 @@ def md_inline(text: str) -> str:
 
     課題文は自前で書いたものしか通さないので、汎用 Markdown 実装は要らない。
     ⚠️ エスケープしてから強調を戻す順序にする（HTML 注入を作らない）。
+
+    ⚠️★★★ **`re.S` が要る**（2026-09-01 に実測して見つけた）。
+      ★ `.` は既定で改行に一致しないので、⚠️ **改行をまたぐ `**強調**` が変換されなかった**。
+      → `pages/` 208 枚のうち **20 枚**で `**` が生のまま被験者の画面に出ていた。
+      ⚠️ しかも見え方は「記号が残る」だけでは済まない ——
+        `**A\nB**を述べています。3 本を踏まえて、**C**` のような並びだと
+        ★ **1 つ目の `**` と 2 つ目の `**` が別のペアとして結ばれ、強調が接続部へ反転する**。
+        → ⚠️ HI の要件（「食い違うこと」「1 つの主張」）から太字が外れていた。
+      ★ 改行をまたぐ強調を持つのは **HI 8 本すべて**なので、
+        ⚠️ **HI 条件にだけ出る = 条件 × 体験の交絡**になりうる。
     """
     escaped = html.escape(text)
-    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped, flags=re.S)
 
 
 def render_task_panel(block: int, doc: dict) -> str:
@@ -406,6 +416,26 @@ def selftest() -> int:
         fails.append("課題文中の HTML がエスケープされていない")
     if "<strong>強調</strong>" not in page:
         fails.append("**強調** が変換されていない")
+
+    # ⚠️★★★ **改行をまたぐ強調**（2026-09-01 追加）。
+    #   ★ ここを 1 行だけで試していたせいで、`re.S` の欠落を **208 枚中 20 枚**に配ってしまった。
+    #   ⚠️ 実材料（HI 8 本すべて）が改行をまたぐ書き方をしているのに、検査は 1 行しか見ていなかった。
+    doc_ml = {"meta": {}, "sections": [("教示", "下の資料は、**同じ問いに対して\n食い違うこと**を述べています。")]}
+    page_ml = build_page(template, 1, doc_ml)
+    if "<strong>同じ問いに対して\n食い違うこと</strong>" not in page_ml:
+        fails.append("改行をまたぐ **強調** が変換されていない（re.S が要る）")
+    # ★ 生成物に `**` が 1 つも残らないこと（⚠️ 記号が見えること自体が欠陥である）
+    if "**" in page_ml:
+        fails.append("改行をまたぐ強調の後に `**` が生で残っている")
+
+    # ⚠️★★ **強調の反転**を捕まえる。★ `re.S` が無いと 1 つ目と 2 つ目の `**` が
+    #   別のペアとして結ばれ、**強調が接続部へ移る**（＝ 記号が残るだけでは済まない）。
+    doc_inv = {"meta": {}, "sections": [("教示", "**A\nB**を述べています。**C**にまとめてください。")]}
+    page_inv = build_page(template, 1, doc_inv)
+    if "<strong>を述べています。</strong>" in page_inv:
+        fails.append("強調が接続部へ反転している（re.S の欠落）")
+    if "<strong>C</strong>" not in page_inv:
+        fails.append("2 つ目の強調が変換されていない")
 
     # ★★ HTML コメントが生成物に残っていないこと（2026-08-04 追加）
     doc_c = parse_material(HERE / "materials" / "topic01_lo.md")
