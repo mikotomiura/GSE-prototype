@@ -15,8 +15,12 @@ import sys
 import unicodedata
 
 MITOU = [
-    'docs/mitou_docs/[提案プロジェクト詳細資料]GSE_proposal.docx.md',
-    'docs/mitou_docs/[提案プロジェクト補足資料]GSE技術設計書.docx.md',
+    'docs/mitou_submission/mitou_docs/[提案プロジェクト詳細資料]GSE_proposal.docx.md',
+    'docs/mitou_submission/mitou_docs/[提案プロジェクト補足資料]GSE技術設計書.docx.md',
+    # ★ 2026-09-02: 分割で増えた 3 本も検査対象に入れる（⚠️ 入れないと禁止用語が素通りする）
+    'docs/mitou_submission/mitou_docs/[提案プロジェクト補足資料]GSE検証レポート.docx.md',
+    'docs/mitou_submission/mitou_docs/[提案プロジェクト補足資料]GSE参考文献.docx.md',
+    'docs/mitou_submission/mitou_pptx/[提案プロジェクト補足資料]GSE設計スライド.pptx.md',
 ]
 SSOT = ['docs/glossary.md', '.claude/skills/physical-anchor/SKILL.md']
 

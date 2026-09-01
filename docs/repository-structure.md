@@ -100,7 +100,9 @@ GSE-prototype/
 │   ├── repository-structure.md   #   本ファイル
 │   ├── development-guidelines.md #   開発ガイドライン
 │   ├── glossary.md               #   ユビキタス言語定義
-│   ├── mitou_docs/               #   未踏提案書・技術設計書 (.docx + 機械抽出 .md)
+│   ├── mitou_submission/         #   ★ 未踏提出資料 (2026-09-02 に mitou_docs から改称・種別で分割)
+│   │   ├── mitou_docs/           #     .docx 出力の 4 本 (詳細資料 / 技術設計書 / 検証レポート / 参考文献)
+│   │   └── mitou_pptx/           #     .pptx 出力の 1 本 (設計スライド)
 │   ├── adr/                      #   ADR-001〜018 + README (確定した設計判断)
 │   ├── architecture/             #   v2 設計文書 7 本 (gse-v2-overview が上位)
 │   └── literature/               #   落合フォーマットの文献カード + _index.md

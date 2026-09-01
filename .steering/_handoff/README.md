@@ -12,7 +12,8 @@
 | トラック | ファイル | 状態 |
 |---|---|---|
 | **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ✅ **現行**（2026-08-31） |
-| **未踏 2027 / 研究の主張** | `next-session-research-positioning-fix.md` | ✅ **現行**（2026-09-01）。★ `docs/research-positioning.md` の ADR-018 / ADR-015 未追随 4 件と de Jong 2020 のカード化 |
+| ★★★ **GSE 設計の深掘り（表現 → 身体回帰 → Mh-D 再定義）** | `next-session-gse-design-deepening.md` | ✅ **現行・最優先**（2026-09-02）。★ `.idea/20260901-smartphone-state-externalization-and-physical-return.md`（814 行・GPT との議論）を **subagent で真偽確認** → 研究者と議論して設計確定 → ADR 起票 → **未踏提出資料へ反映**。⚠️ 未マージ 4 ブランチが前提 |
+| 未踏 2027 / 研究の主張 | `next-session-research-positioning-fix.md` | ✅ 完了（2026-09-01・`docs/research-positioning-fix` ブランチ） |
 | スマホ表現チャネル | `next-session-prompt-smartphone-expression-channel.md` | ⚠️ 別トラック（Windows 側） |
 | 表現チャネル SSOT の積み残し | `next-session-prompt-expression-channel-followups.md` | ⚠️ 別トラック |
 

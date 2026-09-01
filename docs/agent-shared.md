@@ -51,7 +51,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   `capabilities.rs` (収集能力の自己記述・ADR-013)、`overlay_panel.rs`
 - `src-tauri/src/bin/` — `gse-replay` (回帰/評価 CLI)、`gse-cohort` (被験者横断判定)、`emit_schema` (JSON Schema 生成)、
   `gse-package` / `gse-unpack` / `gse-submit` (`--features package`)
-- `docs/` — 永続ドキュメント (**20 md** + `architecture/` + `adr/` + `literature/` + `mitou_docs/`)
+- `docs/` — 永続ドキュメント (**20 md** + `architecture/` + `adr/` + `literature/` + `mitou_submission/`)
 - `.steering/` — タスク単位の作業記録 (`[YYYYMMDD]-[task-name]/`)
 - `.claude/` — Claude Code 用 (skills / agents / commands / hooks)
 - `.codex/` — Codex CLI 用 (config.toml / hooks)
