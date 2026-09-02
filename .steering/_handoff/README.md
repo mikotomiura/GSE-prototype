@@ -12,7 +12,8 @@
 | トラック | ファイル | 状態 |
 |---|---|---|
 | **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ✅ **現行**（2026-08-31） |
-| ★★★ **GSE 設計の深掘り（表現 → 身体回帰 → Mh-D 再定義）** | `next-session-gse-design-deepening.md` | ✅ **現行・最優先**（2026-09-02）。★ `.idea/20260901-smartphone-state-externalization-and-physical-return.md`（814 行・GPT との議論）を **subagent で真偽確認** → 研究者と議論して設計確定 → ADR 起票 → **未踏提出資料へ反映**。⚠️ 未マージ 4 ブランチが前提 |
+| ★★★ **表現チャネル（`.idea` §7 の未決事項 8 件）** | `next-session-expression-channel-open-items.md` | ✅ **現行・最優先**（2026-09-02）。★ 前タスクで **B（文献検証）と C（Mh-D / ML）は完了**し **ADR-019 / ADR-020** を起票した。★ 残る **A** をサーヴェイ＋議論で閉じる。⚠️ **`survey-verification.md` の「引くな」判定 6 件を先に読むこと** |
+| GSE 設計の深掘り（表現 → 身体回帰 → Mh-D 再定義） | `next-session-gse-design-deepening.md` | ✅ **完了**（2026-09-02・`docs/mitou-doc-split` ブランチ）。★ B / C を閉じ、**ADR-019 / ADR-020** を起票、`references.md` に **43 件** append、未踏提出資料 3 本を更新。⚠️ **A は積み残し**（→ 上の行） |
 | 未踏 2027 / 研究の主張 | `next-session-research-positioning-fix.md` | ✅ 完了（2026-09-01・`docs/research-positioning-fix` ブランチ） |
 | スマホ表現チャネル | `next-session-prompt-smartphone-expression-channel.md` | ⚠️ 別トラック（Windows 側） |
 | 表現チャネル SSOT の積み残し | `next-session-prompt-expression-channel-followups.md` | ⚠️ 別トラック |

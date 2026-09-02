@@ -28,3 +28,9 @@ google-auth-oauthlib==1.4.0
 
 # テストランナー (drive_client.py の偽 API 単体テスト用)。
 pytest==9.1.1
+
+# ★ 未踏提出資料の .pptx 生成 (`scripts/md2pptx.py`)。
+#   ⚠️★★★ 2026-09-02: 手組み OOXML が **Google Slides で 2 回続けて開けなかった**ため、
+#   実績のあるライブラリへ移した (ADR 外・`.steering/20260902-gse-design-deepening/decisions.md` 判断 6)。
+#   ★ `scripts/md2docx.py` は標準ライブラリのままで、依存を要するのは md2pptx.py だけ。
+python-pptx==1.0.2

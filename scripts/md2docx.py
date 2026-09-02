@@ -13,6 +13,9 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 
+# ★ ZIP エントリの固定日時（★ 出力を再現可能にするため）
+ZIP_TS = (2026, 1, 1, 0, 0, 0)
+
 NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
 
 
@@ -208,12 +211,22 @@ def write_docx(md: str, out: pathlib.Path) -> None:
            '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr>'
            "</w:body></w:document>")
     out.parent.mkdir(parents=True, exist_ok=True)
+    # ⚠️★★★ 2026-09-02: ZIP エントリの日時を固定する。
+    # ★ 既定では `writestr` が **実行時刻**を書くため、内容が 1 バイトも変わっていなくても
+    # 再生成のたびにバイナリが変わり、`git status` に常に差分が出る（2026-09-02 に実測）。
+    # → ★ 「再生成しても中身が同じなら差分ゼロ」を成立させる。
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", CONTENT_TYPES)
-        z.writestr("_rels/.rels", RELS)
-        z.writestr("word/_rels/document.xml.rels", DOC_RELS)
-        z.writestr("word/styles.xml", STYLES)
-        z.writestr("word/document.xml", doc)
+        for name, data in (
+            ("[Content_Types].xml", CONTENT_TYPES),
+            ("_rels/.rels", RELS),
+            ("word/_rels/document.xml.rels", DOC_RELS),
+            ("word/styles.xml", STYLES),
+            ("word/document.xml", doc),
+        ):
+            info = zipfile.ZipInfo(name, date_time=ZIP_TS)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            z.writestr(info, data)
     # ★ 書いた直後に全パートを検証する。壊れた .docx を黙って出荷しない。
     with zipfile.ZipFile(out) as z:
         for name in z.namelist():
