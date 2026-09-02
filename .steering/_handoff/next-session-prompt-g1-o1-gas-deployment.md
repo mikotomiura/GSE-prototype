@@ -135,16 +135,53 @@ git ls-files -z | xargs -0 grep -nF "0.1.30" | grep -v '^\.steering/' | grep -v 
 
 **4. ⚠️★★★ できたバイナリを検算する（★ 今回の事故の再発防止）**
 
+> ### ⚠️★★★ **本手順の初版は壊れていた（2026-09-03 に実測して判明・訂正済み）**
+>
+> ★ 初版は「**`label_row_allowed` が 0 なら、また古いものを配ろうとしている**」と書いていた。
+> ⚠️ **誤りである。** ★ 新旧の dmg を**両方**落として対照した実測:
+>
+> | 検査 | v0.1.30（旧） | v0.1.31（新） |
+> |---|---|---|
+> | ⚠️ `label_row_allowed` | **0** | **0** ← ★ **修正が入っている版でも 0** |
+> | `記録のみ`（新の文言） | 0 | 0 |
+> | `較正モード`（**陰性対照**） | **0** | **0** ← ⚠️ 対照も 0＝検査が成立していない |
+> | `o1.mode` | 4 | **5** ← ★ これは判別できる |
+> | `gse_next_lib`（陽性対照） | 11 | 12 |
+>
+> ★ 理由は 2 つ:
+> 1. ⚠️ `label_row_allowed` は **Rust の関数名**（`o1.rs:211` の `pub fn`）で、release では
+>    インライン化・シンボル除去される。★ 初版の「HEAD は 6 件」は**ソースの grep 結果**だった。
+> 2. ⚠️★★ `2d83304`（O1 の UI を塞ぐ修正）の本体は **`Dashboard.tsx`＝フロントエンド**であり、
+>    ★ Tauri はフロントを**圧縮して**バイナリに埋め込む。実測で `index-`=2 / `stylesheet`=9 は
+>    残るのに `calibration-notice-badge`=0、`\uXXXX` エスケープ形でも 0。
+>    → ★ **UI 修正の有無はバイナリの grep では原理的に判定できない。**
+>
+> → ⚠️ **この規則のままだと、正しいバイナリを必ず「古い」と誤断する。**
+> ★ 詳細は `.steering/20260903-v0131-release/decisions.md` D-1。
+
+★ **代わりにこの 3 段で見る**:
+
 ```bash
-unzip -q O1_実施用_macOS.zip -d /tmp/verify && cd /tmp/verify
-BIN=$(find . -name gse-next -path '*MacOS*')
-for p in o1.mode label_row_allowed GSE_O1_MODE; do
-  printf '%-22s %s\n' "$p" "$(LC_ALL=C grep -ac -- "$p" "$BIN")"; done
-printf '%-22s %s\n' gse_next_lib "$(LC_ALL=C grep -ac gse_next_lib "$BIN")"   # ★ 陽性対照
+# ① 来歴 —— ⚠️ v0.1.29 の失敗形態（ファイルが 0 バイト）まで潰す
+SHA=$(gh api repos/mikotomiura/GSE-prototype/actions/runs/<run_id> -q .head_sha)
+git cat-file -s "${SHA}:src-tauri/src/o1.rs"                          # ★ 0 バイトでないこと
+git show "${SHA}:src/components/Dashboard.tsx" | grep -c 記録のみ      # ★ 1 以上
+for c in <修正コミット...>; do git merge-base --is-ancestor $c "$SHA" && echo "ok $c"; done
+
+# ② 成果物 —— ★ 陽性対照 ＋ **旧版との対照**を必ず取る
+unzip -q O1_実施用_macOS.zip -d /tmp/verify
+BIN=$(find /tmp/verify -name gse-next -path '*MacOS*')
+for p in o1.mode GSE_O1_MODE; do printf '%-16s %s\n' "$p" "$(LC_ALL=C grep -ac -- "$p" "$BIN")"; done
+printf '%-16s %s\n' gse_next_lib "$(LC_ALL=C grep -ac gse_next_lib "$BIN")"  # ★ 0 なら測定器が壊れている
+gh release download <旧タグ> -p '*aarch64.dmg' -D /tmp/old              # ★ 旧版を落として
+cmp -s "$OLD_BIN" "$BIN" && echo "⚠️ 旧と同一＝古いものを配ろうとしている" || echo "✅ 異なる"
+
+# ③ ⚠️★★★ UI は**目視でしか確かめられない**（★ ②が通っても UI の保証にはならない）
 ```
 
 ⚠️★★ **`strings` を使わない。** ★ 日本語で**偽陰性**を出した実績がある。`LC_ALL=C grep -a` を使う。
-⚠️ **`label_row_allowed` が 0 なら、また古いものを配ろうとしている。**
+⚠️★★★ **「バイナリ検算が通ったから UI も正しい」と書かない。**
+→ ★ 初回起動で「**記録のみ**」バッジと O1 用の説明文が出ることを**人が目で見る**（§6 の 2 番と同じ経路）。
 
 **5. 配布物を作り直して Drive を差し替える**
 
