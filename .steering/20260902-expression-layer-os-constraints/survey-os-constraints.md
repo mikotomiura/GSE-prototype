@@ -230,3 +230,85 @@ https://developer.apple.com/tutorials/data/design/human-interface-guidelines/<pa
 | **E** | Android のロック画面の面・アニメーション・secure lock screen・`CompanionDeviceManager` |
 | **F** | iOS の Live Activities / Dynamic Island / AOD / secure lock screen / オフスイッチ |
 | **G** | 曝露量の外的妥当性（★ 顔認証時代・2024 年の視線研究） |
+
+---
+
+## 系統 F — iOS の Live Activities / Dynamic Island / AOD / secure lock screen
+
+### ★★★ 判定 1: **Live Activity の「alert なし更新」は通知に近い提示ではない。⚠️ ただし遠隔開始は alert 必須。**
+
+| # | 逐語（英語原文） | 出典 |
+|---|---|---|
+| 1 | ★ 既定で無音: `func update(_ content:, alertConfiguration: AlertConfiguration? = **nil**) async` | `activitykit/activity/update(_:alertconfiguration:)`（iOS 16.2+） |
+| 2 | ★ alert を付けたときだけ音と点灯: *"Live Activity alerts **light up the screen and by default play the notification sound** … **Alerts also show the expanded presentation in the Dynamic Island** or a banner on devices that don't support the Dynamic Island."* | HIG `live-activities` |
+| 3 | ★ WWDC も同旨: *"**Alerting lights up the screen and plays the standard notification sound** so the update isn't missed."* | WWDC23 10194 |
+| 4 | ⚠️ 無音の選択肢が無い: `AlertConfiguration.AlertSound` の構成メンバは **`named(_:)` と `default` の 2 つのみ**（`.none` 相当なし） | `activitykit/alertconfiguration/alertsound` |
+| 5 | ⚠️★★★ **push-to-start は alert が「requirement」**: *"it comes with the following **requirements**: … **Include an `alert` in the JSON payload.**"* ／ *"**By including an alert … you make sure a person gets alerted** about the started Live Activity"* | `starting-and-updating-live-activities-…` |
+| 6 | ★ push-to-start は iOS 17.2 以降: *"**On devices that run iOS or iPadOS 17.1 and earlier, you can't start Live Activities with ActivityKit push notifications.**"* | 同上 |
+| 7 | ★ アプリ内起動は前景が原則: *"**In general, your app needs to be in the foreground to start a Live Activity.**"*（★ 例外は `LiveActivityIntent`＝人の操作起点） | `displaying-live-data-with-live-activities` |
+| 8 | ★ Dynamic Island は通知と同じ層: *"**like notifications, the Dynamic Island floats on a layer above apps**"* | WWDC23 10194 |
+| 9 | ★ Settings 階層は**通知配下ではない**: *"go to **Settings, tap Apps**, tap the app …, then tap **Live Activities**"* | iPhone ユーザガイド（iOS 26） |
+
+⚠️★★★ **一次の中で衝突している点（★ 未解決・実機検証が要る）**:
+HIG は expanded を **alert に紐づける**が、ActivityKit 記事は *"it **also appears briefly for Live Activity updates**"* と
+**無条件に**書いている。→ ★ **alert なし更新でも一瞬 Dynamic Island が膨らむのかは一次で確定できない。**
+★ 膨らむなら「注意を奪う提示」に寄る。
+
+### ★★★ 判定 2: ⚠️★★★ **A-7（1–3 Hz の持続振動）は現行 iOS の公開 API では成立しない。**
+
+★ **4 本が独立に同じ結論を指す**:
+
+| # | 逐語 | 何を塞ぐか |
+|---|---|---|
+| 1 | ⚠️★★★ *"**On devices that include an Always-On display, the system doesn't perform animations to preserve battery life in Always On.**"* | ★ **AOD ではアニメが 1 フレームも出ない**。★ 「ロック画面に置きっぱなし」が主用途なのだから、**これが本命の潰し** |
+| 2 | ★ パネル自体が落ちる: *"**when not in use, the display efficiently adjusts down to 1Hz**"* | ★ 1 Hz では 1.5 Hz を再現できない |
+| 3 | *"**Animations in widgets and Live Activities have a maximum duration of two seconds.**"* ＋ *"**`Transaction` isn't available**"* | ★ 持続の土台が無い |
+| 4 | *"widget extension is **not continually active**"* ／ *"timeline entries … **at least about 5 minutes apart**"* ／ *"**Widgets don't show real-time information.**"* | ★ ウィジェット経路が塞がる |
+
+⚠️ **さらに HIG が正面から抑制している** —— 逐語:
+*"**unnecessary changes during Always On can be especially distracting on iPhone**, because people often put
+their device face up on a surface, **making motion on the screen visible even when they're not looking directly at it.**"*
+→ ★ **仮に技術的に出せても HIG 違反方向。**
+
+⚠️ **唯一の未確定**: *"`.repeatForever` が Live Activity のビュー内で動くか"* は**一次に記述が無い**。★ 実機検証が要る。
+
+### ★ AOD は被験者間の強い交絡になる
+
+| 逐語 | 含意 |
+|---|---|
+| *"**The Always-On display setting is on by default.** To turn it off, go to Settings > Display & Brightness"* | ★ 既定オン・オフ可 |
+| ⚠️★★★ *"The display **automatically turns off** when iPhone is either **face down or obstructed from view**, **not near a paired Apple Watch**, when a CarPlay session begins, while Continuity Camera is in use, **while Low Power Mode is on**, **while Sleep Focus is on**, or **at your usual bedtime**."* | ⚠️★★★ **被験者の生活条件で表示が消える。★ 曝露量が統制できない** |
+| *"Devices with the Always-On display **render widgets on the Lock Screen with reduced luminance**"* | ⚠️ **明度が唯一の符号なのに、その明度が削られる** |
+| ★ 輝度低下の程度・コンテンツ更新レートの**数値は一次に明記なし** | ⚠️ 未確認 |
+
+### ★ secure lock screen — ★ オフスイッチ要件は満たせる
+
+| 逐語 | 含意 |
+|---|---|
+| *"You can quickly access useful features and information from the Lock Screen, **even while iPhone is locked**."* | ★ ロック中に見える |
+| ★★★ *"users can configure whether to show sensitive data on the Lock Screen … they can **deactivate data access for Lock Screen widgets in the "Allow Access When Locked" section of Settings > Face ID & Passcode**."* | ★ **本人が隠せる**（Apple Platform Security・2024-05-07） |
+| ★ BFU: *"the developer can **add the Data Protection capability to a widget extension**. Until a user unlocks their device …, **WidgetKit displays placeholders instead of the widget content**."* | ★ 初回解錠前は placeholder |
+| ★ 既定クラス: *"**Protected Until First User Authentication** … **This is the default class for all third-party app data**"* | ★ 既定では BFU 後に読める |
+| ★ 個別に消せる: *"**A person can remove your Live Activity from their Lock Screen at any time.**"* | ★ 交渉不可要件を満たす |
+| ★ HIG が要求: *"**make it easy for people to turn them off in your app**"* | ★ アプリ内にも停止 UI が要る |
+
+★ **本人が止める経路は 11 通り確認できた。**
+⚠️ ただし **`Always On Display` オフ・`Allow Access When Locked` オフは日常機能も一緒に落とす**
+（逐語 *"However, **you also lose quick access to the information yourself**."*）
+→ ★ **同意文書では「アプリ単位の停止（Settings > Apps > <app> > Live Activities）が第一の経路」と明示する設計が要る。**
+
+⚠️ **Stolen Device Protection (iOS 17.3+) は該当しない** —— ★ 保護対象の列挙にロック画面ウィジェット /
+Live Activities が**入っていない**（実測）。
+
+### ⚠️ 系統 F で一次に届かなかったもの
+
+1. ⚠️★★★ **alert なし更新で Dynamic Island が一瞬 expanded になるか**（★ 一次内で衝突）
+2. **alert 時に haptic が鳴るか**（★ 一次は「点灯」と「音」しか書いていない）
+3. **`Allow Access When Locked` の項目名と既定値**（★ Apple Platform Security も書いていない）
+4. **Live Activities を一括オフする画面パス**（★ HIG は存在を書くがパスが無い）
+5. **BFU で Data Protection 未指定のウィジェットが描画されるか**
+6. **AOD の輝度低下の数値** / **AOD 中のコンテンツ更新レートの数値**
+7. **`.repeatForever` の可否**（★ 判定 2 の唯一の穴）
+8. **アニメ修飾子を system が無視する条件** —— ⚠️ **一次の 2 ページが矛盾**
+   （WidgetKit 記事は *"For Live Activities … on devices that run **iOS 16 or earlier**"* と限定するが、
+   ActivityKit 記事は **バージョン限定なしで** *"the system ignores any animation modifiers"* と書く）
