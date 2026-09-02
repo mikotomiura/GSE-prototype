@@ -129,7 +129,19 @@ MANIFEST=( "$MAC_README_SRC" "$WIN_LAUNCHER_SRC" "$MAC_SETUP_SRC" "$PUBKEY_SRC" 
 #     ⚠️ 冒頭で `shopt -s nullglob` が有効なので、将来 `*` `?` `[` を含む語
 #     （例:「[注意]」）を足すと **その語が黙って消えて検査が空振りする**。
 #     ★ このファイル自身が繰り返し警戒している「見えないまま緑になる」経路そのもの。
-README_MUST_COMMON=( "研究者と一緒に" "壊れていません" "ゴミ箱に入れないで" "ターミナルの窓へドラッグ" )
+# ⚠️★★★ 「書類」フォルダの許可（2026-09-01 追加）。
+#   ★ 記録の保存先は `~/Documents/GSE-sessions` / `~/Documents/GSE-submissions` なので、
+#     macOS は初回に TCC の許可を求める。⚠️ **許可しないと記録が正しい場所に保存されず、提出できない。**
+#     ★ 正確には「空になる」のではない —— `logger.rs:1108-1127` の `open_log_target()` は
+#       primary に書けないと `$TMPDIR/GSE-sessions/<pid>_<file>` へ**退避**して
+#       `LogStatus::Fallback` を UI に出す。⚠️ つまり **誰も見ない場所に溜まり、提出だけが落ちる**。
+#       (★ 当初 README に「空になります」と書いたが実装と違ったので訂正した・code-reviewer 指摘)
+#   ⚠️ 実測（2026-09-01）: 被験者が読む 3 本（`dist-readme-macos-o1.txt` /
+#     `dist-readme-macos.txt` / `participant-guide.md`）はいずれも **grep 0 件**で、
+#     研究者向けの `docs/participant-setup-guide.md` だけが触れていた。
+#     ★ つまり **O1 の配布物も 0 件**であり、被験者は案内の無いダイアログに出くわす。
+#   → ★ 消えたら赤にする（`.steering/20260819-mac-build-distribution-zips/decisions.md:99-103`）。
+README_MUST_COMMON=( "研究者と一緒に" "壊れていません" "ゴミ箱に入れないで" "ターミナルの窓へドラッグ" '"書類" フォルダ内のファイルにアクセス' )
 # ⚠️★ O1 固有。★ 「毎日動いていること」と「いつでも止められること」が落ちると、
 #   O1 は (a) 記録が空の日ができ (b) 同意文書 §4 の約束が配布物から消える。
 README_MUST_O1=( "自動的に立ち上がる" "すぐ止められます" "時間帯を指定して削除" "記録していません" "48 時間" )
@@ -188,7 +200,7 @@ if [ "$SELFTEST" -eq 1 ]; then
     for p in "${README_MUST_COMMON[@]}"; do
       grep -q "$p" "$r" 2>/dev/null || miss="$miss 「${p}」"
     done
-    if [ -z "$miss" ]; then ok_ "$m: macOS README に共通の 4 語がある"; else ng_ "$m: 欠けている語:$miss"; fi
+    if [ -z "$miss" ]; then ok_ "$m: macOS README に共通の ${#README_MUST_COMMON[@]} 語がある"; else ng_ "$m: 欠けている語:$miss"; fi
   done
 
   # 4. ★ O1 固有の語（★ G1 の README には**無くてよい**ことも測る = 流用の検出）

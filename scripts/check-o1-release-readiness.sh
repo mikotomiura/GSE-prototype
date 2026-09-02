@@ -192,7 +192,57 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     fi
   done <<< "$(git tag --sort=-v:refname 2>/dev/null)"
   if [ -n "$o1_release_tag" ]; then
-    ok "O1 実装を含むリリースタグがある（${o1_release_tag}）"
+    # ⚠️★★★ **「o1.rs がある」だけでは足りない**（2026-09-01 に実測して判明）。
+    #   ★ 上のコメントは「タグの新しさで代用しない・見るのは実装が入っているか」と
+    #     正しく書いているのに、⚠️ **実装は `git cat-file -e` ＝ファイルの有無しか見ていなかった**。
+    #   → ★ v0.1.30 は `o1.rs` を持つので緑になったが、⚠️ **`label_row_allowed`（O1 で
+    #     出てはいけない UI を塞ぐ門）が 0 件**で、staged 配布物はその古い版だった。
+    #   ⚠️ これは memory `gate-green-but-artifact-broken` ②「タグが新しい ≠ 機能が
+    #     入っている」の**再発**である（★ 前回は o1.rs が 0 バイト、今回は o1.rs が古い）。
+    #
+    # ★ そこで **タグ以降にコードが動いていないか**を見る。
+    #   ⚠️ 特定の関数名を焼き込まない —— 焼き込むと**次に足した機能でまた素通りする**。
+    #
+    # ⚠️★★★ **「O1 に関係するファイル」を手で列挙しない**（code-reviewer 指摘・2026-09-01）。
+    #   ★ 初版は `o1.rs` / `redaction.rs` / `Dashboard.tsx` 等を列挙したが、
+    #     ⚠️ **今回の発端 `label_row_allowed` は `o1.rs` と `lib.rs` の両方にあり**、
+    #     `lib.rs` は列挙から漏れていた。★ 実際 `cddbe3a` は `logger.rs` 側が主で、
+    #     ⚠️ **たまたま `o1.rs` も触ったから赤になっただけ**である
+    #     —— `logger.rs`/`lib.rs` だけの O1 修正なら**緑のまま通っていた**。
+    #   → ★ ゲートの問いは「O1 に関係するか」ではなく「**タグのバイナリが現行か**」である。
+    #     ⚠️ 手書きの列挙は「発端の欠陥と同型の取りこぼし」を必ず残す。
+    o1_paths=( src-tauri/src src-tauri/Cargo.toml src )
+
+    # ⚠️★★ 比較先を `HEAD` にしない（code-reviewer 指摘）。
+    #   ★ 「再ビルドのためタグを checkout する」は現実的な手順で、⚠️ その状態だと
+    #     `<tag>..HEAD` が空になり **偽の緑**になる（実測で再現された）。
+    #   → ★ `origin/main`（無ければ `main`）と比べる。
+    cmp_ref=""
+    for r in origin/main main; do
+      if git rev-parse --verify --quiet "$r^{commit}" > /dev/null 2>&1; then cmp_ref="$r"; break; fi
+    done
+    if [ -z "$cmp_ref" ]; then
+      # ⚠️ 判定できないことを緑にしない（memory: silent-failure-in-guard-scripts）
+      ng "⚠️ 比較先 (origin/main / main) が解決できないため、リリースタグの鮮度を判定できません"
+      cmp_ref=""
+    fi
+    stale_commits=""
+    if [ -n "$cmp_ref" ]; then
+      # ⚠️ タグ自体が解決できないなら黙って緑にしない
+      if ! git rev-parse --verify --quiet "${o1_release_tag}^{commit}" > /dev/null 2>&1; then
+        ng "⚠️ リリースタグ ${o1_release_tag} を解決できません（★ 鮮度を判定できない）"
+      else
+        stale_commits="$(git log --oneline "${o1_release_tag}..${cmp_ref}" -- "${o1_paths[@]}" 2>/dev/null || true)"
+      fi
+    fi
+    stale_n="$(printf '%s' "$stale_commits" | grep -c . || true)"
+    if [ "${stale_n:-0}" -gt 0 ]; then
+      ng "⚠️★★★ リリースタグ ${o1_release_tag} は **古い**。★ タグ以降にコードが ${stale_n} コミット動いている（★ 配るバイナリにその修正が入らない）:
+$(printf '%s' "$stale_commits" | sed 's/^/        /')
+      → ★ **再ビルドして新しいタグを切ること。** ⚠️ 走らせた日は取り返せない。"
+    else
+      ok "O1 実装を含むリリースタグがある（${o1_release_tag}）★ タグ以降に配布物のコード変更なし"
+    fi
   else
     ng "⚠️ O1 実装を含むリリースタグが 1 つも無い（★ 配るバイナリが o1.mode を読めず、黙って通常モードで動く。⚠️ ランダムプローブが復活する）"
   fi

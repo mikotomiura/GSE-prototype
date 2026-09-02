@@ -92,6 +92,12 @@ out.ackWithMaterials = g1RegisterAckBody_("P999", "https://example.com/folder");
 //    片方だけ検査すると、もう片方に題材名が書き戻されても緑になる（第 7 版の教訓）。
 out.materialsSubject = g1MaterialsSubject_();
 out.materials = g1MaterialsBody_("P999", "https://example.com/x");
+// ⚠️★★★ **被験者に実際に届く形**（`g1PlainBody_` を通したもの）を測る（2026-09-01）。
+//   ★ MailApp は text/plain なので、`**強調**` は装飾にならず記号のまま見える。
+//   ⚠️ 生の本文だけを検査していたので、この欠陥は 34〜44 個あっても緑のままだった。
+out.ackSent = g1PlainBody_(out.ack);
+out.ackWithMaterialsSent = g1PlainBody_(out.ackWithMaterials);
+out.materialsSent = g1PlainBody_(out.materials);
 var thanks = (function () {
   // sendThankYouEmail は本文を組み立ててから送るので、下書き経路を通して例外が出ないか見る。
   try { G1_CONTACT = G1_CONTACT || "（テスト）"; sendThankYouEmail("P999", "t@example.com"); return "ok"; }
@@ -331,6 +337,21 @@ def main() -> int:
                     f'"{phrase}" が{label}にある。'
                     "★ 事前開示は §2.12 第 11 版で撤回した（当日その場で取り掛かる）"
                 )
+    # ⚠️★★★ **被験者に届く本文に Markdown の `**` が残っていないこと**（2026-09-01 追加）。
+    #   ★ `MailApp.sendEmail` は text/plain なので `**強調**` は装飾にならず記号のまま見える。
+    #   ⚠️ 実測（修正前）: 受付メール 34 / 44 個、課題ページメール 18 個。
+    #   ★ 検査は **生の本文ではなく、送信経路（`g1PlainBody_`）を通した形**を見る
+    #     —— ⚠️ 生を見ていたから今まで緑だった。
+    for label, key in (("受付メール(未用意)", "ackSent"),
+                       ("受付メール(用意済み)", "ackWithMaterialsSent"),
+                       ("課題ページメール", "materialsSent")):
+        n = res[key].count("**")
+        if n:
+            fails.append(f"{label}: 被験者に届く本文に `**` が {n} 個残っている（text/plain では記号のまま見える）")
+    # ★ 陰性対照: 記号を落としても中身の語が消えていないこと（⚠️ 全部消す実装でも緑にしない）
+    if "ダウンロード" not in res["ackSent"]:
+        fails.append("★ 陰性対照が壊れた: 受付メールから「ダウンロード」が消えている（落としすぎ）")
+
     for label, subject in (("受付メール", res["ackSubject"]),
                            ("課題ページメール", res["materialsSubject"])):
         for phrase in ("事前資料", "お読みいただく"):
