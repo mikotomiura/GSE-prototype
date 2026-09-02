@@ -30,8 +30,27 @@
       → ★ 検査が実在の欠陥を捕まえること＋`environment` が実在することの**両方**を確認
 - [ ] ⚠️ **CI 実機**: check (win / mac) が両方緑
 - [ ] ⚠️ job 全体が **10 分未満**
-- [ ] ⚠️ **`Post Run Swatinem/rust-cache@v2` が step 一覧に無い**こと
+- [ ] ⚠️ **`Post Run Swatinem/rust-cache@v2` が step 一覧に無い**こと（★ rust 側は step ごと消える）
+- [ ] ⚠️ npm 側は判定が違う: ★ `setup-node` の post は**登録されるが 0 秒で終わる**
+      （`cache` が空なので primaryKey 未設定で即 return する）→ **「無い」ではなく「0 秒」で判定する**
 - [ ] ★ ログに `runner.environment = self-hosted` が出ること
+
+## ⚠️ code-reviewer 指摘の検算（★ 鵜呑みにしない）
+
+- [x] ⚠️ **HIGH #1 は正しかった** — `build-macos` の rust-cache は v0.1.30 実測で **1 秒 / 0 秒**。
+      ★ 私のコメントは `check` の数値を流用していた。→ 訂正済み
+- [x] ⚠️ **HIGH #2 も正しかった** — `build-windows` の rust-cache も **3 秒**。
+      ★「hosted だから利得がある」は未実証だった。→ 理由を差し替え済み
+- [x] ⚠️ **HIGH #3 も正しかった** — 鍵に job id が入るので「check が更新を担う」は成立しない。
+      ★ `if:` を実測（`build-macos` / `build-windows` は**タグ限定**）→ 既存コメント 2 か所を訂正
+- [x] ★ **中「掃除役が 0 になる」は誇張だった**（⚠️ 自分で検算して**部分的に否定**した）。
+      ★ `Cleaning cargo registry` が走るのは **save が発生する run だけ**である。
+      ⚠️ save=0 秒だった run (33584750446) のログを見ると `Cleaning cargo registry` も
+      `Saving cache` も **1 件も出ていない**（primary key ヒット時は post が即 return する）。
+      → ★ **掃除はもともとほぼ走っていなかった**ので、本 PR で失われる掃除はほぼ無い。
+      ⚠️ ただし 09-02 のような save が走る run では実際に走っていた（ログに実在）。
+- [x] ★ 中「`~/.npm` 永続が未実測」→ 実測した（**3.7GB**・08-25 以降の更新 148 個）
+- [x] ★ 小「`.steering/` が untracked」→ ⚠️ **既に追跡済み**（098ecf2）。レビューが見たのは古い状態
 
 ## レビュー
 

@@ -60,8 +60,12 @@ snapshot regression / schema drift）。⚠️ 落ちたのは post ステップ
 
 1. check job が転送速度に左右されず、**実作業時間（4〜6 分）で完結する**こと。
 2. PR #143 / #144 のマージ経路が開くこと。
-3. ⚠️ hosted フォールバック経路（`decide-win-runner` が `windows-latest` を選ぶ場合）の
-   キャッシュ利得を**壊さない**こと。
+3. ⚠️ hosted フォールバック経路（`decide-win-runner` が `windows-latest` を選ぶ場合）を
+   **壊さない**こと。
+   ★ 訂正（2026-09-02・code-reviewer 指摘を検算）: 初版は「キャッシュ利得を壊さない」と
+   書いたが、⚠️ **半分しか成り立たない**。条件式は hosted 側で正しく真になるものの、
+   `...-check-...` の鍵を**書いていたのは self-hosted の run** なので書き手が消える。
+   → ★ 正しいゴールは「**初回コールドは許容し、2 回目以降は hosted run 自身が温める**」。
 
 ## 受け入れ条件
 

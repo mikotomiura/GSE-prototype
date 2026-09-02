@@ -32,18 +32,39 @@
 | 行 | ジョブ | `runs-on` | 変更 | 理由 |
 |---|---|---|---|---|
 | 312-313 | `check` | self-hosted（win は hosted フォールバック有） | ★ 条件追加 | ⚠️ 今回の timeout の当事者 |
-| 516 | `build-macos` | `[self-hosted, gse-mac]` | ★ 条件追加 | ⚠️ **同じ欠陥を持つ**（下記） |
-| 415-418 | `build-windows` | `windows-latest` | ★ **触らない** | ★ 本当に hosted なので利得がある |
+| 516 | `build-macos` | `[self-hosted, gse-mac]` | ★ 条件追加 | ⚠️ rust 側は**元から no-op**（下記の訂正）。実害は npm 側 |
+| 415-418 | `build-windows` | `windows-latest` | ★ **触らない** | ★ hosted は失敗コストが小さく、変更する根拠が無い |
 
-### ⚠️ `build-macos` も直す理由（★ 実測に基づく）
+### ⚠️★★★ 訂正 — `build-macos` の rust-cache は元から no-op だった
 
-★ `build-macos` は **v0.1.31 の dmg を作る当のジョブ**（引き継ぎメモ §1b 手順 3）。
-- ⚠️ `runs-on: [self-hosted, gse-mac]` で **`check` と同じ実機**を使う（L493 付近）
-- ★ 保存側は既に `save-if: ${{ !startsWith(github.ref, 'refs/tags/v') }}` (L526) で
-  タグ時に無効化されている（⚠️ v0.1.22 の実害への対処）ので、**保存では死なない**
-- ⚠️ **しかし復元は走る**。09-02 の実測で復元は **2m13s〜8m58s** かかって**失敗**した。
-  ★ `timeout-minutes: 40` のうち最大 9 分を無駄にした状態で release ＋ dmg を作ることになる。
-→ ★ **リリースを切る直前なので、ここを開けたまま v0.1.31 を打たない。**
+★ **初版の本節は誤っていた**（code-reviewer 指摘・2026-09-02・自分で検算した）。
+
+⚠️ 初版はここに「復元は **2m13s〜8m58s** かかって失敗する」と書いたが、
+★ **それは `check` ジョブの実測値であり、`build-macos` のものではなかった。**
+
+★ v0.1.30 のリリース run (33293939800) で `build-macos` を実測すると:
+
+| ステップ | 所要 |
+|---|---|
+| `Run Swatinem/rust-cache@v2` | **1 秒** |
+| `Post Run Swatinem/rust-cache@v2` | **0 秒** |
+
+⚠️ 理由（★ 自分で検算した）:
+1. rust-cache の鍵には **job id が入る**（`add-job-id-key: true` が既定）。
+   ★ 実測キーは `v0-rust-x86_64-pc-windows-msvc-`**`check`**`-Windows_NT-x64-...`。
+2. `build-macos` の `if:` は `startsWith(github.ref, 'refs/tags/v')` **のみ**＝**タグでしか走らない**
+   （★ `ruby -ryaml` で実測）。
+3. → `save-if: ${{ !startsWith(github.ref, 'refs/tags/v') }}` は**常に false**
+   → ⚠️ **本ジョブの鍵は一度も保存されたことがない** → 毎回 1 秒で空振り。
+
+→ ★ **条件を足しても `build-macos` の rust 側の挙動は変わらない。**
+   3 か所で同じ規則にし、将来 hosted へ戻したとき自動復帰させるために残す。
+→ ⚠️ **本ジョブの実害は rust 側ではなく npm 側にある**（次節）。
+
+⚠️ ★ **なぜ間違えたか**: `requirement.md` の表（`check` の値）を `build-macos` の
+根拠として使った。★ **自分で `build-macos` を実測しておきながら**（design.md の
+「キー不一致で miss・実質無効」という記述がその痕跡）、コメントには別ジョブの数字を書いた。
+→ ⚠️ memory `name-lookup-only-works-within-one-source` の同型（★ **どちら側を見ているかを問う**）。
 
 ### ⚠️★★★ 調査中に見つかった、より実害の大きい同型（★ npm キャッシュ）
 
@@ -85,7 +106,7 @@ cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
 |---|---|
 | disk-guard が `target` を全削除した直後、キャッシュが無くコールドになる | ★ **退行しない**。⚠️ 現状も wipe 時は `if:` でキャッシュ復元ごと飛ばしている（L300-311 の注記）。条件が 1 つ増えるだけ |
 | self-hosted のビルドが遅くなる | ★ **ならない**。⚠️ 09-02 は復元が全 job で失敗したのに build は 1m48s〜3m06s だった＝速さの出所は永続 `target/`（2.1GB・09-02 付 `.rlib` 237 個を実測） |
-| hosted フォールバック時にキャッシュを失う | ★ **失わない**。`runner.environment` が `github-hosted` を返すため |
+| hosted フォールバック時にキャッシュを失う | ⚠️ ★ **初回は失う**（訂正）。条件式は正しく hosted 側で真になるが、`...-check-...` の鍵を**書いていたのは self-hosted の run** であり、その書き手が消える。さらに rust 系キャッシュは 09-02 に全削除済み。→ ★ **初回だけコールド**（hosted run 自身は `save-if` 既定 true で保存するので 2 回目以降は温まる）。⚠️ **その初回が 30 分に収まるかは未測定**（参考: hosted の cold `tauri build --no-bundle` 12m09s / tools 9m42s）。★ 発火は G-GEAR offline 時だけなので許容する |
 | ランナーを新調したとき初回がコールド | ⚠️ **起きる**。★ ただし 1 回だけであり、許容する |
 
 ## テスト戦略
