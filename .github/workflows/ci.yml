@@ -82,6 +82,14 @@ env:
 #       ⚠️ これが唯一の本質的対策である (ランナーを専用ユーザー or 使い捨て VM にするのも同義)。
 #       ★ GitHub 自身が「self-hosted runner は private repo でのみ使うこと」を推奨している。
 #
+# ⚠️★★ public 化のチェックリストに 1 項目追加する (security-checker 実測, 2026-09-02):
+#   ★ GitHub は **全 self-hosted job のログ冒頭**に `Runner name:` と `Machine name:` を
+#   無条件で出し、REST API `.../actions/runs/<id>/jobs` も `runner_name` を返す。
+#   ⚠️ 実測値の `Machine name: 'MIKOTO-G-GEAR'` は **研究者の実名 (下の名前) を含む**。
+#   → ★ **public 化すると過去ぶんを含む全ログに載る。ci.yml からは除去できない。**
+#   → ⚠️ public 化するなら**その前に** Windows 実機のコンピュータ名とランナー登録名を
+#     非個人名へ変更すること (★ private を維持するならこの項目は発火しない)。
+#
 # ⚠️ 未対処として残っている関連リスク (★ 本ゲートは**一切効かない**):
 #   third-party action が可変参照のままである (`dtolnay/rust-toolchain@stable` は**タグでなく
 #   ブランチ**、`Swatinem/rust-cache@v2` / `actions/checkout@v4` / `softprops/action-gh-release@v2`
@@ -338,11 +346,20 @@ jobs:
       # ★ fail-safe の向き: 値が空でも `'' == 'github-hosted'` は false = キャッシュ無効側に倒れる。
       #   self-hosted (常用経路) では望む挙動であり、hosted (稀) が利得を失うだけで壊れはしない。
       # ⚠️ ただし「倒れる向きが安全」は「値が正しい」の代わりにならない → 下の step でログに出す。
+      # ⚠️ `${{ }}` を bash へ直接展開せず `env:` 経由で渡す (security-checker 指摘, 2026-09-02)。
+      #   ★ `runner.environment` は PR の内容から操作できない (`env:` / `with:` で `runner.*`
+      #   コンテキストを上書きすることはできない) ので**脆弱性ではない**が、
+      #   `.github/actions/disk-guard/action.yml` が既に `env:` マッピングに統一しており、
+      #   ⚠️ **同じ repo で防御の書き方を非対称にしない**。
+      # ★ `runner.name` は出さない —— ⚠️ GitHub 自身が全 self-hosted job のログ 2 行目で
+      #   `Runner name: '...'` を無条件に出しており、REST API も `runner_name` を返す。
+      #   ★ 重複して出す利得が無い。
       - name: Cache decision (runner.environment を証拠として残す)
         shell: bash
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
         run: |
-          echo "runner.environment = ${{ runner.environment }}"
-          echo "runner.name        = ${{ runner.name }}"
+          echo "runner.environment = ${RUNNER_ENV}"
           echo "→ rust-cache は runner.environment == 'github-hosted' のときだけ走る"
       - uses: Swatinem/rust-cache@v2
         if: ${{ steps.disk_guard.outputs.wiped != 'true' && runner.environment == 'github-hosted' }}
@@ -552,11 +569,20 @@ jobs:
       #   **失敗した**。`timeout-minutes: 40` のうち最大 9 分を無駄にした状態で release ＋ dmg を
       #   作ることになる。→ ⚠️ **リリースを切る直前なので、ここを開けたままタグを打たない。**
       #   ★ `build-windows` (hosted) には掛けない —— あちらは本当に hosted で利得がある。
+      # ⚠️ `${{ }}` を bash へ直接展開せず `env:` 経由で渡す (security-checker 指摘, 2026-09-02)。
+      #   ★ `runner.environment` は PR の内容から操作できない (`env:` / `with:` で `runner.*`
+      #   コンテキストを上書きすることはできない) ので**脆弱性ではない**が、
+      #   `.github/actions/disk-guard/action.yml` が既に `env:` マッピングに統一しており、
+      #   ⚠️ **同じ repo で防御の書き方を非対称にしない**。
+      # ★ `runner.name` は出さない —— ⚠️ GitHub 自身が全 self-hosted job のログ 2 行目で
+      #   `Runner name: '...'` を無条件に出しており、REST API も `runner_name` を返す。
+      #   ★ 重複して出す利得が無い。
       - name: Cache decision (runner.environment を証拠として残す)
         shell: bash
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
         run: |
-          echo "runner.environment = ${{ runner.environment }}"
-          echo "runner.name        = ${{ runner.name }}"
+          echo "runner.environment = ${RUNNER_ENV}"
           echo "→ rust-cache は runner.environment == 'github-hosted' のときだけ走る"
       - uses: Swatinem/rust-cache@v2
         if: ${{ steps.disk_guard.outputs.wiped != 'true' && runner.environment == 'github-hosted' }}
