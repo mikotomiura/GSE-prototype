@@ -1,0 +1,142 @@
+{
+  "_comment": "層 A（視覚）試視ハーネスの設定。★ SSOT はこのファイル。player/layerA.html はここから読む。",
+  "expr_visual_version": "0.1.0-layerA",
+  "hmm_version": "0.5.0",
+
+  "_comment_calibration": "★ A-7 の『視角 1°』は物理較正なしには意味を持たない。較正を通すまで試行を開かない。",
+  "calibration": {
+    "reference_card_mm": 85.60,
+    "reference_card_note": "ISO/IEC 7810 ID-1 の公称幅。運転免許証・クレジットカードの短辺ではなく長辺。",
+    "default_viewing_distance_mm": 600,
+    "min_viewing_distance_mm": 200,
+    "max_viewing_distance_mm": 1200
+  },
+
+  "_comment_stimulus": "★ A-1: 設計上限は 2 秒（[P253]）。★ マスクは残像による事後読解を潰すために置く。",
+  "stimulus": {
+    "stimulus_ms": 2000,
+    "mask_ms": 300,
+    "iti_ms": 600,
+    "canvas_css_px": 360,
+    "_comment_canvas": "★ スマホのロック画面のウィジェット領域を模した正方領域。実機ではない（限界として notes.md に書く）。"
+  },
+
+  "_comment_field": "★ 粒子場。★ 音側 Step 4 の『層 2（粒子）』の語彙を視覚へ引き継ぐ。",
+  "field": {
+    "ground_marks": 220,
+    "figure_lattice_cols": 9,
+    "figure_lattice_rows": 9,
+    "figure_region_ratio": 0.62,
+    "mark_radius_px_mean": 2.1,
+    "mark_radius_px_jitter": 0.9,
+    "ground_drift_px_per_s": 1.4,
+    "ground_drift_note": "★ 層 0 の自律変異。状態に応答しない（S3-D12 / ADR-021 D10）。データを担わない。"
+  },
+
+  "_comment_levels": "★ 系が固定する写像。★ 極性 = 組織化が高い方が stable（D3・[P244]）。⚠️ 数値・順位・達成度を出さない（D3）。⚠️ stuck は『疎』であって『荒れ』ではない（[P101] 逐語 no wilting flowers, weeds, or stormy sky）。",
+  "levels": {
+    "layer0": {
+      "has_figure": false,
+      "occupancy": 0.0,
+      "scatter_px": 0.0,
+      "note": "★ 図が無い＝系がいま何も言っていない。⚠️ 空白・消灯にしない（C4）。地は在る。"
+    },
+    "stable": {
+      "has_figure": true,
+      "occupancy": 1.0,
+      "scatter_px": 1.2,
+      "note": "★ 図が格子に収まっている（凝集度 高・占有率 満）。"
+    },
+    "friction_rising": {
+      "has_figure": true,
+      "occupancy": 1.0,
+      "scatter_px": 7.5,
+      "note": "★ 占有率はそのままに格子から外れていく（凝集度 中）。"
+    },
+    "stuck": {
+      "has_figure": true,
+      "occupancy": 0.42,
+      "scatter_px": 7.5,
+      "note": "★ 格子の席が空く（疎）。⚠️ 荒天・枯れ・罰として描かない。"
+    }
+  },
+
+  "_comment_invitation": "★ ADR-021 D4: invitation は level と直交する二値。⚠️ 理由・強度・残り時間を載せない。★ 符号は [P85] G3/G4/G8 のその場振動。",
+  "invitation": {
+    "amplitude_deg_peak_to_peak": 1.0,
+    "amplitude_convention_note": "⚠️ [P85] G3 の逐語は 'approximately 1° of visual angle is highly detectable' で、片振幅か全振幅かを書き分けていない。★ 本ハーネスは【全振幅（peak-to-peak）】として実装した。片振幅解釈なら実効値は半分になる。この曖昧さは結果と一緒に記録する。",
+    "frequency_hz": 1.5,
+    "frequency_source": "[P85] G4 逐語 'periodic frequencies between 1 and 3 Hz'。★ 帯域中央を採った。",
+    "waveform": "sine",
+    "axis": "horizontal",
+    "anchored": true,
+    "anchored_note": "★ [P85] G7 逐語 'travelling motions are significantly more distracting and irritating than anchored motions.' → 正味変位が 1 周期でゼロになる（＝移動しない）ことを selftest が検算する。"
+  },
+
+  "_comment_render": "⚠️ A-6: 色を主符号にしない。★ 既定はグレースケール。配色テーマは D3 の『本人が選ぶ表層』であってデータを担わない。",
+  "render": {
+    "default_theme": "mono",
+    "themes": {
+      "mono":  { "bg": "#121212", "ink": "#e8e8e8" },
+      "warm":  { "bg": "#151109", "ink": "#eee3d2" },
+      "cool":  { "bg": "#0b1216", "ink": "#dceaf0" }
+    },
+    "theme_note": "★ 3 テーマとも ink/bg の輝度差を揃えてある（selftest が検算）。★ 色相はデータを担わない。⚠️★★★ 2026-09-02 修正: mono の bg は #101215 だったが R≠G≠B で真のグレーではなかった（★ ブラウザ実測で発覚。Python 側の検査は色文字列を見ていなかったので緑のままだった）。→ #121212 へ。⚠️★★★ 併せて記録する: iOS はロック画面ウィジェットを強制的に monochrome にする（vibrant）ため、warm/cool の色相は実機のロック画面では消える。★ ADR-021 D3 の「本人が配色テーマを選ぶ」は iOS ロック画面では成立しない。"
+  },
+
+  "_comment_blocks": "★ 順序は固定する（§7.1 の順序固定・[V119]）。1a（自由記述・未教示）→ 1b（盲検強制選択・未教示）→ オンボーディング → 1b'（盲検強制選択・教示後）→ 遷移検知 → 周辺視（任意）。",
+  "variants": [
+    { "id": "natural",  "polarity": 1,  "label": "変種 1" },
+    { "id": "reversed", "polarity": -1, "label": "変種 2" }
+  ],
+  "variant_note": "⚠️ 研究者には『変種 1 / 変種 2』としか見せない。★ reversed は組織化の極性を反転したもの（[P244] の検証）。★ 未教示で natural だけが chance を超えるなら、読みは学習ではなく順序構造から来ている。",
+
+  "free_response": {
+    "context_sentence": "この表示は、あなたがいま何かに取り組んでいるときの『作業の様子』について、スマートフォンのロック画面に出るものです。",
+    "context_note": "★ ISO 9186-1 §6.2 は文脈を言葉で与えることを求める [V112]。⚠️ 写像そのものは言わない。",
+    "prompt": "いま出ている表示は、何を言っていると思いますか。思ったことをそのまま書いてください。",
+    "dont_know_label": "わからない",
+    "dont_know_note": "⚠️ [V112] は『わからない』の明示を求める。無回答と区別する。",
+    "loop_stimulus": true
+  },
+
+  "blind_test": {
+    "order_seed": 20260902,
+    "composition": {
+      "layer0": 6,
+      "stable": 6,
+      "friction_rising": 6,
+      "stuck": 6
+    },
+    "invitation_present_ratio": 0.5,
+    "invitation_note": "★ layer0 は invitation を出さない（チャネル不在なので招待も無い）。★ 残り 3 状態で present/none を半々にする。",
+    "chance_level_4way": 0.25,
+    "chance_level_invitation": 0.5,
+    "feedback_during": false,
+    "feedback_note": "⚠️ 途中で正誤を出さない。"
+  },
+
+  "transition_test": {
+    "order_seed": 20260903,
+    "trials": 16,
+    "catch_trials": 6,
+    "catch_note": "★ catch = 遷移しない試行。★ 『変わった』と答え続ける戦略を潰す。",
+    "pre_ms": 1400,
+    "post_ms": 1400,
+    "transition_ms": 400,
+    "note": "★ A-8 逐語 'The transition from one state to another should be easily perceptible.' [P249]"
+  },
+
+  "peripheral_test": {
+    "order_seed": 20260904,
+    "trials": 16,
+    "eccentricity_deg": 10,
+    "optional": true,
+    "note": "⚠️★★★ [P85] の運動優位は偏心 7°–52° の結果であり、ロック画面は中心視なので層 A では効かない（references.md [P85] の留保）。★ 本ブロックは『周辺視でも壊れないか』の確認であって、運動優位の再現ではない。"
+  },
+
+  "_comment_forbidden": "⚠️★★★ 刺激領域に出してはならないもの（D3 / ADR-018 D3 / glossary 禁止用語）。selftest が DOM を検査する。",
+  "forbidden_in_stimulus": [
+    "数値", "パーセント", "順位", "達成", "完了", "クリア", "残り", "タイマー", "進捗"
+  ]
+}
