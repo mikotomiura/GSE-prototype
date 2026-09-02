@@ -25,13 +25,16 @@
 | 3 | 「fork ゲートで self-hosted を**一切**走らせない」（★ 私が ci.yml に書いた） | ⚠️ **誤り**。workflow 定義は **PR head 側から読まれる**ので攻撃者が消せる |
 | 4 | 「手動発火では `release` は動かさない」（既存コメント） | ⚠️ **誤り**。**タグを選ぶと Release が作られる** |
 | 5 | `.runner` のキーは `workDirectory` | ⚠️ **`workFolder`**。しかも **BSD sed は `\|` を無言で 0 件マッチ**していた |
+| 6 | 「D-5（電子同意フォームの実物更新）が未クローズ」 | ⚠️ **誤り**。★ **2026-08-20 に閉じている**（対照つき実測あり）。⚠️ 当時の `blockers.md` を現在の状態の根拠に使った |
+| 7 | 「改行をまたぐ強調を持つのは **HI 8 本すべて**」 | ⚠️ **誤り**。★ **2 本**（`topic04_hi` / `topic05_hi`）。検出式が「閉じ `**` と次の開き `**` の**隙間**」に当たっていた |
+| 8 | README に「許可しないと記録が**空になります**」 | ⚠️ **実装と違う**。★ `logger.rs:1108-1127` は `$TMPDIR` へ**退避**する（＝誰も見ない場所に溜まり提出だけが落ちる） |
 
 ### 0-2. ★ 現状を測る（⚠️ 下は「書かれた時点の値」）
 
 ```bash
 git log --oneline -3 main
 gh pr list --state open --json number,title,mergeStateStatus -q '.[] | "#\(.number) [\(.mergeStateStatus)] \(.title[:55])"'
-bash scripts/check-o1-release-readiness.sh                    # ★ 前回 18 / 1
+bash scripts/check-o1-release-readiness.sh                    # ★ 2026-09-02 時点 17 / 2
 (cd experiments/20260801-controlled-friction-task && bash run.sh | tail -3)   # ★ 前回 [GREEN]
 node Form_G1/g1_roster_test.cjs | tail -2                     # ★ 前回 74 / 0
 ```
@@ -76,72 +79,89 @@ JSON.stringify({vis: document.visibilityState, hasFocus: document.hasFocus(),
 
 ⚠️ ★ **A は「配備」より前に来る。** ★ B は「配布物の作り直し」より前に来る。
 
-★ 次の 2 本を **並列で** サブエージェントに投げる（`general-purpose`）。
-⚠️ どちらも **read-only を厳守**させ、根拠に `ファイル:行` を要求すること。
+> ⚠️★ **調査の指示文と中間報告は落とした**（2026-09-02）。
+> ★ 両方とも完走し、所見は `g1-o1-precollection-findings.md` に統合済みである。
+> ⚠️ **もう投げ直す必要はない。**
 
-### 調査 A: G1 を再送する前に、文書・材料側で直せること
+---
 
-- `.steering/20260819-g1-reboot-and-instrument-fix/blockers.md` の **D-5 ほか「収集を始めない」条件**を
-  全部列挙し、**現在閉じているか**を実体で判定
-- `docs/preregistration-v0.3.md` の PreReg / GATE のうち **G1 に掛かるもの**の未達
-- 被験者向け文書（`consent.md` / `debrief.md` / `handouts/` / `materials/` / `pages/` /
-  `dist-readme-*` / メール文面）の**未記入欄・プレースホルダ・矛盾・古い記述**
-- `scripts/check_g1_emails.py` が**何を見て何を見ていないか** → ★ **検査の外にある文言**
-- 前回コホートで判明した**材料側の問題**（`.steering/20260804/…0806/…0808/…0809/…0819`）
-- ★ `bash experiments/20260801-controlled-friction-task/run.sh` と
-  `python3 scripts/check_g1_emails.py` を**実行して**結果を報告させる
+## §1b ⚠️★★★ **本セッションの主題 — v0.1.31 を切って配布物を差し替える**
 
-### ⚠️★ 調査 A の**一部だけ**が届いている（★ これは使ってよい・根拠つき）
+> ★ 2026-09-02 更新。⚠️ **§3 のブラウザ配備より、こちらが先**である。
 
-> ⚠️ 調査 A の**サブエージェント 1 本ぶん**（「材料・教示・文言が根本原因の項目」担当）だけが
-> セッション終了後に返ってきた。★ **調査 A / B の本体は未受領**である。
-> ⚠️ **これで調査が済んだことにしない。** §1 の 2 本は走らせ直すこと。
+### ⚠️ 先に片づいた前提（★ もう待たなくてよい）
 
-★ **未解決（OPEN）と判定されたのは 3 件**（⚠️ 他 6 件は RESOLVED と実体で確認済み ——
-★ **それらを「未対応」と書き直さないこと**）:
+| | 状態 |
+|---|---|
+| **Gatekeeper のダイアログ** | ✅ **B 型**と実機で確認（研究者・2026-09-02）。★ 現行 README の記述が正しいと裏づけられた |
+| **O1 README の承認** | ✅ **承認済み**（PR #143）。`【ドラフト・未承認】` を削除し、検査を「**戻っていないこと**」へ反転 |
+| `~/Documents` 許可の段落 | ✅ 両 macOS README に追加済み（PR #142） |
+| 生の `**`（ページ／メール） | ✅ 両方閉じた（PR #142） |
 
-| # | 何 | 根拠 |
-|---|---|---|
-| 1 | ⚠️★★ **`~/Documents` の許可案内が参加者向け文書に無い**。★ v0.1.27 以降は **v0.1.26 で許可済みの被験者も再度求められる**のに、`README_先に読む.txt` にも `participant-guide.md` にも **記述が grep で 0 件**。⚠️ 研究者判断待ちのまま放置されている | `.steering/20260819-mac-build-distribution-zips/decisions.md:94, :99-103` |
-| 2 | ⚠️ **教示は「いつも通り」なのに UI が `task_kind` を `argumentative` にロック**していた。★ タスク宣言が**観測でなく設定**になり、⚠️ **交絡が除去されず「不可視化」された** | `.steering/20260802-task-adaptation-design/decisions.md:85, :88, :92` |
-| 3 | ⚠️★★ **参加者が「対象作業をしていたか」を担保する教示・手続き・除外基準が無い**。★ 対象外の作業でも `progress_proxy` が最大化する。⚠️ 対処方向 4 つ（較正セッションの構造化 / タスク宣言 / out-of-scope 検出 / 除外基準にタスク内容）が挙がっているが **未着手** | `.steering/20260801-recovery-axis-grounding/decisions.md:175, :180, :189-191` |
+★ **これで README が確定したので、配布物の作り直しは 1 回で済む。**
 
-#### ⚠️★★★ 1 は **G1 だけの話ではない**（★ 2026-09-01 に自分で検算した）
+### ★ 手順（1〜5）
 
 ```bash
-grep -cE 'Documents|書類フォルダ|ファイルとフォルダ' \
-  experiments/20260801-controlled-friction-task/dist-readme-macos-o1.txt \
-  experiments/20260801-controlled-friction-task/dist-readme-macos.txt \
-  experiments/20260801-controlled-friction-task/participant-guide.md \
-  docs/participant-setup-guide.md
+# 0. ★ 状態を測る
+git checkout main && git pull
+gh pr list --state open              # ⚠️ #143 が残っていればマージする
+bash scripts/check-o1-release-readiness.sh   # ★ 2026-09-02 時点で 17 / 2
 ```
 
-★ 実測: **被験者が読む 3 本すべて 0 件**。⚠️ **`dist-readme-macos-o1.txt`（O1 の配布物）も 0 件**である。
-→ ⚠️ **O1 を配ると、被験者は案内の無い許可ダイアログに出くわす。**
+⚠️★★★ **1 の前に `rustup` の復旧が要る**（§5-6）。★ `cargo` が起動しないと 2 が測れない。
 
-★ ⚠️ **§6 の README 承認と同じタイミングで直すこと。** 理由:
-README を変えると **zip の作り直しが要る**（★ 文言はスクリプトの grep 検査と結合している）。
-→ ★ §6 で「【ドラフト・未承認】を消す」ために**どのみち 1 回作り直す**ので、
-⚠️ **そこに Documents 許可の段落も一緒に入れれば作り直しは 1 回で済む**
-（★ 別々にやると Drive 差し替えが 2 回になる）。
+**1. PR #143 をマージ**（⚠️ `gh pr checks 143` を自分で見る）
 
-★ **1 は G1 の再送前に閉じられる**（⚠️ 文書に 1 段落足すだけ・研究者の文言承認が要る）。
-⚠️ 2 と 3 は**設計/事前登録に関わる**ので、`/reimagine` か研究者判断の対象。
+**2. バージョンを上げる**（★ 3 ファイル ＋ `Cargo.lock` は `cargo check` が追随）
 
-### 調査 B: O1 を配る前に、こちら側で取れる収集
+```
+package.json / src-tauri/tauri.conf.json / src-tauri/Cargo.toml : 0.1.30 → 0.1.31
+```
 
-- `o1-upload-timeout-measurement.md` が何を測れと言っているか →
-  ⚠️ **合成データで測れるもの / 実参加者が要るもの**に分ける
-- `reconcile.rs` / `bin/package.rs` から**提出物サイズが何で決まるか**、
-  ★ 既存 NDJSON で**今サイズを実測できるか**
-- O1 のプローブ抑止（`lib.rs` の `disabled_by_g1 = g1_mode()`）を**テストで確かめられるか**
-- フックの飢餓（`starved_ms`）の**原因切り分けに配布前に取れる計測**
-- ⚠️★★ **`O1_MGMT_SHEET_ID` の器に何を入れる設計だったか**、
-  ★ **配布後では遡れないもの**があるか
-- `docs/o1-deletion-ledger.md` / `preregistration-v0.3.md` の
-  **収集開始前に確定していないと後から遡れない項目**
-- ★ `bash scripts/check-o1-release-readiness.sh` と `--selftest` を**実行**させる
-  （⚠️ `--selftest` は前々回 0 バイトで完了しなかった実績あり。★ 落ちたらそう書かせる）
+⚠️★ **走査して「直すもの / 残すもの」を目で分ける**:
+
+```bash
+git ls-files -z | xargs -0 grep -nF "0.1.30" | grep -v '^\.steering/' | grep -v '^docs/'
+```
+
+★ `make-common-app-zip.sh` / `check-o1-release-readiness.sh` の過去バージョンは
+**事故の記録としてのコメント**なので**書き換えない**。
+
+**3. タグ push → CI が dmg / exe を作る**
+
+⚠️ **タグ push では `check` / `frontend-check` が走らない**（`if` がタグを除外）。
+→ ★ **PR 段階で緑にしておく。**
+
+**4. ⚠️★★★ できたバイナリを検算する（★ 今回の事故の再発防止）**
+
+```bash
+unzip -q O1_実施用_macOS.zip -d /tmp/verify && cd /tmp/verify
+BIN=$(find . -name gse-next -path '*MacOS*')
+for p in o1.mode label_row_allowed GSE_O1_MODE; do
+  printf '%-22s %s\n' "$p" "$(LC_ALL=C grep -ac -- "$p" "$BIN")"; done
+printf '%-22s %s\n' gse_next_lib "$(LC_ALL=C grep -ac gse_next_lib "$BIN")"   # ★ 陽性対照
+```
+
+⚠️★★ **`strings` を使わない。** ★ 日本語で**偽陰性**を出した実績がある。`LC_ALL=C grep -a` を使う。
+⚠️ **`label_row_allowed` が 0 なら、また古いものを配ろうとしている。**
+
+**5. 配布物を作り直して Drive を差し替える**
+
+```bash
+cd experiments/20260801-controlled-friction-task
+./make-common-app-zip.sh --mode o1 --tag v0.1.31 --config ../../Form_O1/o1_submit.json
+```
+
+⚠️ `--config` は省略不可。⚠️ **G1 の zip が作り直されていないこと**を mtime ＋ sha256 で確認。
+- フォルダ `GSE_ユーザー検証_O1_アプリダウンロードリンク` (`1ovS4L7mAETukMAYxuO7nZkNznFAXILob`)
+- ⚠️ **古い zip を先に消す**（★ 同名でも別ファイルとして 2 本並ぶ）
+- ★ 置いたら Drive API で `fileSize` を照合する
+
+### ★ 完了の判定
+
+★ `bash scripts/check-o1-release-readiness.sh` の **「古いタグ」の赤が消える**こと。
+⚠️ 残る赤は **送信 timeout（§7）だけ**になるはず。
 
 ---
 
@@ -154,6 +174,8 @@ README を変えると **zip の作り直しが要る**（★ 文言はスクリ
 | `.github/actions/disk-guard` (composite action) | ✅ `check` と `build-macos` の両方に配線 |
 | `scripts/maintenance/` (週次掃除の正本 ＋ インストーラ ＋ README) | ✅ 追跡化 |
 | `Form_G1/g1_roster_test.cjs` (74 ケース) を `run.sh` に fail-closed で配線 | ✅ |
+| **PR #142** — 生の `**`（ページ ＋ メール）／ゲートが古いタグで緑／`~/Documents` 許可 | ✅ **MERGED**（2026-09-02） |
+| **PR #143** — O1 README の承認（★ Gatekeeper = B 型を実機確認） | ⚠️ **OPEN**。★ マージ待ち |
 
 ### ⚠️ PR #140 で塞いだ欠陥（★ **まだ実物に配備していない**）
 
@@ -243,23 +265,26 @@ README を変えると **zip の作り直しが要る**（★ 文言はスクリ
 
 ---
 
-## §6 ⏸ 研究者の手が要るもの（★ AI からは実行できない）
+## §6 ✅ README の承認は**済んだ**（2026-09-02）
+
+⚠️ 初版はここに「Gatekeeper のダイアログを踏んでもらう」と書いていた。★ **済んでいる。**
+
+- ✅ **B 型**と確認（「"gse-next" は壊れているため開けません。ゴミ箱に入れる必要があります」）
+  → ★ 現行 README の記述が正しいと裏づけられた
+- ✅ 両 README の `【ドラフト・未承認】` を削除（PR #143）
+- ✅ selftest の検査を「ドラフト表示が**戻っていないこと**」へ**反転**して残した
+  ⚠️ メモは「検査を外して 1 件減らす」と書いていたが、★ **消すと未承認の文面を焼いても
+  誰も気づかない**ので残した。→ ★ 代わりに**両側それぞれ単独で赤になる**ことを実測した
+  （⚠️ 旧検査は `&&` で**片方だけ戻ると素通り**していた —— 反転で検出力が上がった）
+
+### ⚠️ まだ済んでいないもの（★ 研究者の手が要る）
 
 | # | 何 |
 |---|---|
-| 1 | ⚠️★★ **Gatekeeper のダイアログを踏む** —— ★ `com.apple.quarantine` は**ブラウザ経由の DL でしか付かない**。Drive から `O1_実施用_macOS.zip` を落として `gse-next.app` をダブルクリックし、⚠️ **A 型（開発元を確認できない）か B 型（壊れているため開けません）か**を報告してもらう。★ 現行 README は **B 型**を前提 |
-| 2 | 【3】の「システム設定 → 一般 → **ログイン項目と機能拡張**」が macOS 26.5.2 で合っているか |
-| 3 | ⚠️ **自動起動を再起動まで確認**する |
+| 1 | ⚠️ 【3】の「システム設定 → 一般 → **ログイン項目と機能拡張**」が macOS 26.5.2 でこの名前か（★ **未確認**） |
+| 2 | ⚠️★★ **自動起動を再起動まで確認**する（★ §1b の 5 が終わったあと・配布物そのもので） |
+| 3 | ⚠️ 実機で「書類」フォルダの許可ダイアログが**実際に出るか**（★ README は「出ることがあります」と書いてある） |
 
-★ 1 が承認できたら、**3 つを同じコミットで**直す:
-① 両 README の 1 行目「【ドラフト・未承認】」を消す
-② `make-common-app-zip.sh --selftest` の「ドラフト表示の検査」を外す
-③ `--selftest` を回して **1 件減る**ことを確認（★ 検査語の消し忘れの対照）
-
-⚠️ 該当箇所は特定済み: README 各 2 行（`dist-readme-{macos,windows}-o1.txt` の 1 行目と 3 行目）／
-`make-common-app-zip.sh:148-149, 339-344`。★ 前回の `--selftest` は **19 / 0**。
-
----
 
 ## §7 ⚠️ ゲート最後の赤 — 送信 timeout（★ 要 Opus）
 
