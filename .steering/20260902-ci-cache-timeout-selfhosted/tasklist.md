@@ -28,12 +28,16 @@
 - [x] ⚠️ **変異注入**: `runner.enviroment` (typo) に変えると actionlint が
       `property "enviroment" is not defined ... {..., environment: string, ...}` で**赤になる**
       → ★ 検査が実在の欠陥を捕まえること＋`environment` が実在することの**両方**を確認
-- [ ] ⚠️ **CI 実機**: check (win / mac) が両方緑
-- [ ] ⚠️ job 全体が **10 分未満**
-- [ ] ⚠️ **`Post Run Swatinem/rust-cache@v2` が step 一覧に無い**こと（★ rust 側は step ごと消える）
+- [x] ⚠️ **CI 実機**: check (win / mac) が両方緑（★ run **33604121490**）
+- [x] ⚠️ job 全体が **10 分未満** → ★ win **231s (3m51s)** / mac **296s (4m56s)**（⚠️ 従来 24〜31 分）
+- [x] ⚠️ **`Post Run Swatinem/rust-cache@v2` が step 一覧に無い**こと
+      → ★ 実測: `Run Swatinem/rust-cache@v2` = **skipped**、post は **step 一覧に 0 件**
 - [ ] ⚠️ npm 側は判定が違う: ★ `setup-node` の post は**登録されるが 0 秒で終わる**
       （`cache` が空なので primaryKey 未設定で即 return する）→ **「無い」ではなく「0 秒」で判定する**
-- [ ] ★ ログに `runner.environment = self-hosted` が出ること
+      ⚠️ **本 PR では未検証** —— ★ `build-macos` は**タグ限定**なので本ブランチでは発火しない。
+      → ⚠️ **v0.1.31 のタグを打った run で必ず確認する**（★ そこが本命の検証点）
+- [x] ★ ログに `runner.environment = self-hosted` が出ること
+      → ★ 実測: 両ランナーで出力。`disk_guard.outputs.wiped` は mac=`false` / win=`(null)`
 
 ## ⚠️ code-reviewer 指摘の検算（★ 鵜呑みにしない）
 
@@ -54,13 +58,31 @@
 
 ## レビュー
 
-- [ ] `code-reviewer` + `security-checker` を並列起動
-- [ ] `/cross-review`（Codex）
+- [x] `code-reviewer` + `security-checker` を並列起動
+- [x] ★ `/cross-review`（Codex）— ⚠️ **自己ブロックせず完走**（32,412 token / 日次 200,000 内）
+
+### ★ `/cross-review` の結果（★ 一致 HIGH は 0 件）
+
+- [x] ⚠️★★ **Codex のみ HIGH: PII をコードに固定していた** —— ★ 「実名が漏れる」と警告する
+      当のコメントに **Windows 実機名（研究者の実名を含む）を平文で書いていた**。→ ★ 実値を消し、
+      「値は実機か `gh api` の `runner_name` を見よ」に置き換えた。
+      ⚠️ **ただし d1633f3 の履歴には残る**（★ private repo なので許容するが「消えた」とは書かない）。
+- [x] ★ Claude のみ Low: `build-macos` のコメントが `check` ジョブの鍵を自ジョブのものとして
+      引用していた → ★ 「これは本ジョブの鍵ではない」と明記して訂正
+- [x] ★ Claude のみ Low: 本チェックリストが実測に追いついていない → ★ 更新した
+- [x] ⚠️ **Codex の `shell: bash` 指摘は却下（false positive）** —— ★ 同ジョブの既存
+      「Schema drift check」が変更前から両 leg で `shell: bash` を使っており、
+      ★ 本 PR の Windows leg で当の step が**実際に成功している**（実測で反証）
+- [x] ★ Codex Medium「hosted fallback 初回 cold が未測定」→ **部分採用**。
+      ⚠️ 未測定なのは事実（★ 隠してはおらず design.md に明記済み）→ follow-up 化（下記）
 
 ## 外界の操作（★ 研究者承認済み・2026-09-02）
 
-- [ ] Actions キャッシュの **rust 系エントリを削除**（⚠️ `node-cache-*` は残す）
-- [ ] PR 作成
+- [x] ★ Actions キャッシュの **rust 系 16 本（9650MB）を削除** → **10.56 GB → 1.13 GB**
+      （⚠️ `node-cache-*` 3 本は残した）
+- [x] ★ PR **#145** 作成
+- [x] ⚠️ `rustup` 復旧 ＋ `cargo-sweep 0.8.0` 導入 ＋ launchd 再配置（★ 研究者の依頼）
+- [ ] ⚠️ **PR #145 のマージ**（★ 研究者の確認待ち）
 - [ ] ⚠️ マージ後、**#143 / #144 を再実行**して緑を確認
 
 ## ⚠️★★★ CI が露わにした別の欠陥 — テストのレース（★ 本 PR で直した）
@@ -121,6 +143,17 @@ mac で落ちた（553 passed / 1 failed）。⚠️ **CI 変更が原因では�
 
 → ⚠️ **Rust 関連は合計約 10GB** で、使用中 162GB の 6% にすぎない。
 → ★ **週次掃除を直しても空き容量の問題は解けない。** ⚠️ 消すかどうかは研究者の判断が要るので触っていない。
+
+## ⚠️ 本 PR が生んだ follow-up（★ 未測定を未測定として残す）
+
+- [ ] ⚠️★★ **hosted フォールバック初回の実測** —— ★ G-GEAR offline 時に `windows-latest` へ
+      落ちた run が `timeout-minutes: 30` に収まるか。⚠️ **一度も測っていない**
+      （★ 参考値: hosted の cold `tauri build --no-bundle` 12m09s / tools 9m42s）。
+      → ★ 次に G-GEAR が落ちたときの run を必ず見る。
+- [ ] ⚠️ **v0.1.31 のタグ run で `build-macos` の npm キャッシュが 0 秒になること**を確認
+      （★ タグ限定ジョブなので本 PR では発火しなかった＝**本命の検証点が未消化**）
+- [ ] ★ テストロックの将来漏れを構造で防ぐ（⚠️ 現状 4 本は grep で漏れ無しを確認済みだが、
+      新規テストが取り忘れても誰も気づかない）。→ helper 関数化などは別 PR
 
 ## ⚠️ 本 PR の範囲外（★ 引き継ぎメモの残件）
 

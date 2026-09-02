@@ -85,7 +85,10 @@ env:
 # ⚠️★★ public 化のチェックリストに 1 項目追加する (security-checker 実測, 2026-09-02):
 #   ★ GitHub は **全 self-hosted job のログ冒頭**に `Runner name:` と `Machine name:` を
 #   無条件で出し、REST API `.../actions/runs/<id>/jobs` も `runner_name` を返す。
-#   ⚠️ 実測値の `Machine name: 'MIKOTO-G-GEAR'` は **研究者の実名 (下の名前) を含む**。
+#   ⚠️ 実測すると Windows 実機の `Machine name:` の値が **研究者の実名 (下の名前) を含んでいた**。
+#   ★ ⚠️ **ここに実値は書かない** —— 「実名が漏れる」と警告する当のコメントが実名を
+#     repo に刻んでは本末転倒である (Codex 指摘, 2026-09-02 `/cross-review`)。
+#     ★ 値を確かめたいときは実機か `gh api .../actions/runs/<id>/jobs` の `runner_name` を見ること。
 #   → ★ **public 化すると過去ぶんを含む全ログに載る。ci.yml からは除去できない。**
 #   → ⚠️ public 化するなら**その前に** Windows 実機のコンピュータ名とランナー登録名を
 #     非個人名へ変更すること (★ private を維持するならこの項目は発火しない)。
@@ -586,7 +589,11 @@ jobs:
       #     - `Run Swatinem/rust-cache@v2`      **1 秒**
       #     - `Post Run Swatinem/rust-cache@v2` **0 秒**
       #   ⚠️ 理由: rust-cache の鍵には **job id が入る** (`add-job-id-key: true` が既定)。
-      #     実測キーは `v0-rust-x86_64-pc-windows-msvc-`**`check`**`-Windows_NT-x64-...` である。
+      #     ★ 鍵に job 名が入る証拠として実測できたのは **`check` ジョブのもの**である
+      #       (`v0-rust-x86_64-pc-windows-msvc-`**`check`**`-Windows_NT-x64-...`)。
+      #     ⚠️ **これは本ジョブの鍵ではない** (Codex/code-reviewer 指摘, 2026-09-02)。
+      #       ★ 本ジョブの鍵は `...-`**`build-macos`**`-Darwin-arm64-...` に相当するが、
+      #       **一度も保存されていないので実測できない** —— それ自体が下記の根拠である。
       #     ★ 本ジョブの `if:` は `startsWith(github.ref, 'refs/tags/v')` **のみ**＝タグでしか走らず、
       #     下の `save-if` はタグで false になる → ⚠️ **本ジョブの鍵は一度も保存されたことがない**
       #     → 毎回 1 秒で空振りしていた。
