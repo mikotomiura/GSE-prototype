@@ -12,8 +12,10 @@
 | トラック | ファイル | 状態 |
 |---|---|---|
 | **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ✅ **現行**（2026-08-31） |
-| ★★★ **表現チャネル（`.idea` §7 の未決事項 8 件）** | `next-session-expression-channel-open-items.md` | ✅ **現行・最優先**（2026-09-02）。★ 前タスクで **B（文献検証）と C（Mh-D / ML）は完了**し **ADR-019 / ADR-020** を起票した。★ 残る **A** をサーヴェイ＋議論で閉じる。⚠️ **`survey-verification.md` の「引くな」判定 6 件を先に読むこと** |
-| GSE 設計の深掘り（表現 → 身体回帰 → Mh-D 再定義） | `next-session-gse-design-deepening.md` | ✅ **完了**（2026-09-02・`docs/mitou-doc-split` ブランチ）。★ B / C を閉じ、**ADR-019 / ADR-020** を起票、`references.md` に **43 件** append、未踏提出資料 3 本を更新。⚠️ **A は積み残し**（→ 上の行） |
+| ★★★ **表現層の具体設計（OS 制約 → 試視）** | `next-session-expression-layer-concrete.md` | ✅ **現行・最優先**（2026-09-02）。★ **ADR-021 起票後の実行版**。⚠️★★★ **まず用語を直す —— 「認知リソース」は禁止用語**（`glossary.md:247`）で、表現対象は **作業状態（摩擦 / 関与 / `p_stuck`）**である。★ 第 1 目標 = **ロック画面の OS 制約・セキュリティ機構の技術調査**（⚠️ **完全に空白**。★ ADR-021 D10 A-7 のアニメーションが載るかは**生死問題**）／第 2 = **PS-Q5 の試視**。⚠️ **音は開かない** —— PS-Q3 が先に立ちはだかっている |
+| 表現チャネルのその他の繰り越し | `next-session-expression-channel-followups.md` | ✅ **現行**（2026-09-02）。★ 逐語照合の続き（**V106 → P229 → P224 → V104 → P236**）／⚠️ **`.pptx` / `.docx` の実地確認（2 回繰り越し中）**／一次未到達 6 件の入手／Stage 4 の逆側／ADR-019 D6 の実装 |
+| 表現チャネル（`.idea` §7 の未決事項 8 件） | `next-session-expression-channel-open-items.md` | ✅ **完了**（2026-09-02・`d68d302`）。★ **8 件すべて裁定し ADR-021 を起票**。★ 繰り越し 2 / 4 / 5 も閉じた。⚠️ **残りは上の 2 行へ** |
+| GSE 設計の深掘り（表現 → 身体回帰 → Mh-D 再定義） | `next-session-gse-design-deepening.md` | ✅ **完了**（2026-09-02・`d68d302` でコミット済み）。★ B / C を閉じ、**ADR-019 / ADR-020** を起票、`references.md` に **43 件** append、未踏提出資料 3 本を更新。⚠️ **A は積み残し**（→ 上の行） |
 | 未踏 2027 / 研究の主張 | `next-session-research-positioning-fix.md` | ✅ 完了（2026-09-01・`docs/research-positioning-fix` ブランチ） |
 | スマホ表現チャネル | `next-session-prompt-smartphone-expression-channel.md` | ⚠️ 別トラック（Windows 側） |
 | 表現チャネル SSOT の積み残し | `next-session-prompt-expression-channel-followups.md` | ⚠️ 別トラック |
