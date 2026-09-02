@@ -5115,9 +5115,34 @@ mod submission_receipt_tests {
     };
     use std::sync::atomic::Ordering;
 
-    /// ⚠️ 静的変数を共有するので、この 1 関数の中で順に検査する (並列テスト安全)。
+    /// ⚠️★★★ **本モジュールのプロセス共有グローバルを触るテストは、必ずこのロックを取る。**
+    ///
+    /// ★ 対象: `SUBMIT_IN_FLIGHT` / `SUBMIT_IN_FLIGHT_REASON` / `SUBMIT_IN_FLIGHT_SINCE_MS`
+    /// / `SUBMIT_LAST_SENT_MS` / `SUBMIT_LAST_SENT_COUNT`。
+    ///
+    /// ⚠️ `cargo test` は既定で並列に走るので、これらを触るテストが 2 本以上あると
+    /// ★ 互いの値を踏み合って **単独では緑・全体では赤**になる
+    /// (`packaging.rs` の一時ディレクトリ衝突と同じ形)。
+    ///
+    /// ⚠️★★ **2026-09-02 に実際に踏んだ。** 旧版はこのロックを `IN_FLIGHT_TEST_LOCK` と呼び、
+    /// `SUBMIT_IN_FLIGHT*` を触る 2 本にだけ掛けていた。★ 一方
+    /// `SUBMIT_LAST_SENT_*` を書き換える 2 本 (`only_a_real_send_writes_the_receipt` /
+    /// `reset_sent_receipt_clears_both_values`) は **どちらもロックを取っていなかった**
+    /// ——「危険は分かっていたのに防御が半分にしか掛かっていない」形である。
+    /// → ⚠️ CI (mac) で `only_a_real_send_writes_the_receipt` が落ち、
+    ///   手元でも **40 回中 1 回**再現した。★ ロック名を実体に合わせて改名した上で
+    ///   **グローバルを触る 4 本すべて**に掛ける。
+    static SUBMIT_GLOBALS_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// ⚠️★ 旧コメントは「静的変数を共有するので、**この 1 関数の中で**順に検査する
+    /// (並列テスト安全)」と書いていたが、★ **誤りである。**
+    /// 1 関数の中で順に見ても、**別のテスト関数**が同じ static を触れば防げない
+    /// (それが 2026-09-02 に起きたことである)。→ ロックで守る。
     #[test]
     fn only_a_real_send_writes_the_receipt() {
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_LAST_SENT_MS.store(0, Ordering::Relaxed);
         SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Relaxed);
 
@@ -5174,17 +5199,11 @@ mod submission_receipt_tests {
         assert_eq!(summary_count(line, "nope"), None);
     }
 
-    /// ⚠️★★ **`SUBMIT_IN_FLIGHT` はプロセス共有のグローバルである。**
-    /// `cargo test` は既定で並列に走るので、これを触るテストが 2 本以上あると
-    /// ★ 互いのカウンタを踏み合って **単独では緑・全体では赤**になる
-    /// (`packaging.rs` の一時ディレクトリ衝突と同じ形)。→ ここで直列化する。
-    static IN_FLIGHT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     /// ⚠️★ 番兵が panic でも in-flight を戻すこと。
     /// 戻し忘れると画面が「送信しています…」のまま**永久に固まる**。
     #[test]
     fn in_flight_returns_to_zero_even_on_panic() {
-        let _lock = IN_FLIGHT_TEST_LOCK
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
@@ -5220,7 +5239,7 @@ mod submission_receipt_tests {
     /// ⚠️ 内側が落ちた時点で 0 に戻すと、**まだ送っているのに送信中カードが消える**。
     #[test]
     fn nested_guards_keep_the_reason_until_the_last_one_drops() {
-        let _lock = IN_FLIGHT_TEST_LOCK
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
@@ -5252,6 +5271,9 @@ mod submission_receipt_tests {
     /// ★ レシートの根拠を捨てる操作が、両方の値を落とすこと。
     #[test]
     fn reset_sent_receipt_clears_both_values() {
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_LAST_SENT_MS.store(1234, Ordering::Relaxed);
         SUBMIT_LAST_SENT_COUNT.store(7, Ordering::Relaxed);
         reset_sent_receipt();
