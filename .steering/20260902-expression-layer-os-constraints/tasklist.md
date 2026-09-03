@@ -41,11 +41,11 @@
 - [x] `docs/adr/ADR-022` を起票（D1–D9）＋ `docs/adr/README.md` に索引と ADR-021 への改訂注記
 
 ## レビュー
-- [ ] `code-reviewer` + `security-checker` を並列起動
+- [x] `code-reviewer` + `security-checker` を並列起動（★ HIGH 5 件 + MEDIUM 4 件 → **全部対応**）
 - [x] `/cross-review`（★ `docs/adr docs/architecture` の 691 行に限定・exit 0）→ **指摘 5 件を全部反映**（→ decisions 判断 10）
 - [x] `python scripts/check_citations.py` が **違反なし**（★ 2 回実行して確認）
 
 ## 完了処理
 - [x] git commit（★ ハーネスと survey）
-- [ ] `docs/` 追随のコミット
-- [ ] 次セッション用の引き継ぎ
+- [x] `docs/` 追随のコミット
+- [x] 次セッション用の引き継ぎ（`.steering/_handoff/next-session-layerA-shishi.md`）

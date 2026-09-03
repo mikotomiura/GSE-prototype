@@ -2,7 +2,7 @@
 
 > 作成: 2026-09-03 / 前タスク: `.steering/20260902-expression-layer-os-constraints/`（**ADR-022 起票済み**）
 > ★ このファイルを **新セッションで丸ごと読ませてから** 作業を始める。
-> ★ 直前のコミット: `149f147 docs(adr): security-checker の指摘 4 件を反映し、iOS 側の S1/S2/S4 を宿題化する`
+> ★ 直前のコミット: `975496f fix(expression): code-reviewer の HIGH 5 件を直し、試視の妥当性を壊す欠陥を潰す`
 > ★ ブランチ: `docs/expression-layer-os-constraints`
 
 ---
@@ -41,12 +41,15 @@
 
 **判定者（研究者本人）は、ブロック 1b が終わるまで以下を開いてはならない**:
 
-- ❌ `experiments/20260902-expression-layerA-visual/layerA.config.json`（★ **写像そのものが書いてある**）
+- ❌ `experiments/20260902-expression-layerA-visual/layerA.config.json`（★ **数値としての写像が書いてある**）
+- ❌ `experiments/20260902-expression-layerA-visual/layerA.mapping-notes.json`（★★★ **写像の説明文そのもの**）
 - ❌ `player/layerA.html` の `LEVEL_JA` / `levelSpec` / `buildField`
 - ❌ `notes.md` §2 の「視覚語彙」表
 - ❌ `docs/architecture/expression-channel.md` §3.5.1b の表
 
 ⚠️★★★ **封印は CSS の blur とブロック順序ゲートであって、暗号ではない。**
+★ 2026-09-03 に **人間可読な説明だけは別ファイルへ分離**し、**`unseal()` で初めて fetch** するようにした。
+⚠️ **ただし刺激生成に要る数値は `CFG` に残る**ので、DevTools で `CFG.levels` と打てば読める。
 ★ **手続き上の約束として守る。** ⚠️ **エージェントも、実施前にこれらの中身を判定者へ要約してはならない。**
 
 ★ **既に読んでしまっている場合は、それを結果ファイルの `limitations` に書く。**（★ 隠して回すほうが有害）
@@ -55,7 +58,7 @@
 
 ```bash
 cd experiments/20260902-expression-layerA-visual
-bash run.sh check          # ★ 30 項目の機械検査（★ 全緑を確認してから進む）
+bash run.sh check          # ★ 38 項目の機械検査（★ 全緑を確認してから進む）
 bash run.sh serve          # ★ http://127.0.0.1:8931/player/layerA.html を開く
 ```
 
@@ -68,12 +71,12 @@ bash run.sh serve          # ★ http://127.0.0.1:8931/player/layerA.html を開
 | **§1 較正** | カード合わせ ＋ 視距離 | ⚠️★★★ **これを通すまで試行が開かない**（★ 「視角 1°」は物理較正なしに意味を持たない） |
 | **§1b 実機換算** | ★ 見るだけ | ★ **1° がロック画面ウィジェットの何割か**（★ ADR-022 D2 の実感） |
 | **§2 ブロック 1a** | 自由記述（未教示） | ★ **THAT / WHAT の判定材料** |
-| **§3 ブロック 1b** | 盲検・強制選択（未教示）24 試行 | ★★★ **他者が読める上限**（★ chance = 25%） |
+| **§3 ブロック 1b** | 盲検・強制選択（未教示）24 試行 | ★★★ **他者が読める上限**（★ chance = 25%）。⚠️★★★ **「未教示」は「言語ラベルを教えていない」の意味であって、「視覚パターンを一度も見ていない」ではない**（★ 1a で露出済み） |
 | **§4 オンボーディング** | ★ ここで封が解ける | ★ 写像を覚える |
 | **§5 ブロック 1b'** | 盲検・強制選択（教示後）24 試行 | ★★★ **本人が読めるか** |
 | **§6 ブロック 2** | 遷移の検知 16 試行（catch 6） | ★ **A-8** ／ ★ 対 `layer0 ↔ stable` が **E-7** |
 | **§7 結果** | 混同行列 ＋ Wilson 95% CI | — |
-| **§8 機械検算** | 12 項目 | ★ 較正後に走らせる |
+| **§8 機械検算** | 14 項目 | ★ 較正後に走らせる |
 
 ★ **書き出した JSON は `results/` に置く。**
 
@@ -129,6 +132,7 @@ bash run.sh serve          # ★ http://127.0.0.1:8931/player/layerA.html を開
 | **3** | ⚠️ **一次のスナップショット保存**（★ living document 対策） | ADR-022 Migration 9 |
 | **4** | ⚠️ **実機マトリクス**（iPhone AOD 有/無 × Pixel / Samsung） | ADR-022 Migration 10 ／ M-1 / M-7 / M-8 |
 | **5** | ⚠️ **`INV_CODING` の切り替え UI** | `player/layerA.html`（★ 現状は JS 変数） |
+| **6** | ⚠️ **1b' が §3 側の DOM を再利用している**（★ UI の混乱）／**1a・2 に中止ボタンが無い** | `notes.md` §3b の「未対応」 |
 
 ---
 
@@ -155,3 +159,8 @@ bash run.sh serve          # ★ http://127.0.0.1:8931/player/layerA.html を開
 4. ★ **`/cross-review` は範囲を絞れば通る**（★ 691 行で exit 0・予算台帳も自動更新された）。
 5. ⚠️★★★ **機械検査が全緑でも、ブラウザで実際に走らせると欠陥が出る**
    （★ 本タスクで 2 件出た → `experiments/.../notes.md` §3）。
+6. ⚠️★★★ **さらに `code-reviewer` が、機械検査 42 項目が緑のまま見逃していた
+   「実験の妥当性を壊す欠陥」を 5 件出した**（→ `notes.md` **§3b**）。
+   ★ **最悪だったのは出題順の偏り**（★ 本番 seed で level×variant が **1:5**・約 0.9% でしか起きない組）。
+   → ★★★ **「機械検査 → ブラウザ実測 → 独立レビュー」の 3 段すべてが別の欠陥を出した。**
+   ★ **どれも省略できない。**
