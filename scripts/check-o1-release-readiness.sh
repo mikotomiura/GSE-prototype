@@ -352,7 +352,7 @@ scan_ () { # $1 = ファイル / $2 = 正規表現 / $3 = ラベル
 for f in "$RECEIVER" "$FORM_BUILDER"; do
   [ -f "$f" ] || continue
   # (a) ★ `.gs` に「設定の代入」があってはならない（⚠️ 空文字の代入は対象外）。
-  scan_ "$f" "(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|ROSTER_ID|FORM_ID_O1_(CONSENT|SURVEY))[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" "設定の直書き"
+  scan_ "$f" "(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|O1_MGMT_SHEET_ID|ROSTER_ID|FORM_ID_O1_(CONSENT|SURVEY))[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" "設定の直書き"
 done
 for f in "$RECEIVER" "$FORM_BUILDER" Form_O1/*.cjs Form_O1/*.sh; do
   [ -f "$f" ] || continue
@@ -469,6 +469,50 @@ if [ -z "$untracked" ]; then
   ok "O1 のファイルが git に追跡されている（★ .gitignore に飲まれていない）"
 else
   ng "★ O1 のファイルが git に追跡されていない（⚠️ .gitignore を確認すること）:$untracked"
+fi
+
+# ⚠️★★★ O1 の運用管理シート（★ 提出イベントの追記ログ・起票 T-25）が**実装されているか**。
+#   ★ 期限がある: ⚠️ **配布後に作ると、それ以前の提出分が遡って埋まらない**。
+#   ⚠️★ **射程を誇張しない**: ここで見ているのは **repo 側の実装**だけである。
+#     ★ 実物のスクリプト プロパティ `O1_MGMT_SHEET_ID` が入っているかは**見ていない**
+#       （= GAS を叩かないと分からない）。→ ★ そちらは `checkO1FormConfig()` が
+#       fail-closed で止めるので、⚠️ **配備時に実行して確かめること**。
+mgmt_missing=""
+if [ ! -f "$FORM_BUILDER" ]; then
+  mgmt_missing="ビルダーが読めない"
+else
+  # ⚠️★★★ **「キー名が出てくるか」では測れない**（2026-09-03 に 3 状態で実測して判明）。
+  #   ★ 最初はコメント行を除いた `O1_MGMT_SHEET_ID` の出現で測ろうとしたが、
+  #     ⚠️ **エラーメッセージの文字列リテラル**（「スクリプト プロパティ O1_MGMT_SHEET_ID が
+  #     空です」）が非コメント行なので、★ **実際の読み取りを全部消しても緑のまま**だった。
+  #     → ⚠️ 起票時点（= コメント 2 行だけ）の状態を再現しても検出できない＝検査が空回り。
+  #   → ★ **実際にプロパティを読んでいるか**だけを見る。
+  grep -q 'getProperty("O1_MGMT_SHEET_ID")' "$FORM_BUILDER" ||
+    mgmt_missing="$mgmt_missing スクリプト プロパティ O1_MGMT_SHEET_ID を読んでいない"
+  grep -q "function buildO1MgmtSheet" "$FORM_BUILDER" || mgmt_missing="$mgmt_missing buildO1MgmtSheet が無い"
+  grep -q "function o1LogMgmt_" "$FORM_BUILDER" || mgmt_missing="$mgmt_missing o1LogMgmt_ が無い"
+  # ★ 「関数はあるが誰も呼んでいない」を弾く（⚠️ 呼ばれない実装は実装ゼロと同じ）。
+  # ⚠️★ **`[ … ] && x=…` を else ブロックの最終コマンドにしない**（code-reviewer MEDIUM）。
+  #   ★ 健全時に compound が rc=1 で終わる形になり、⚠️ **あとで `set -e` が足された瞬間に
+  #     この検査は代入行で死んで黙って飛ぶ**（★ 本ファイル自身が :306 で戒めている型）。
+  #
+  # ⚠️★★★ **部分一致で数えない**（cross-review MEDIUM・2026-09-03）。
+  #   ★ 旧実装は `grep -c "o1LogMgmt_("` だった。⚠️ ところが `DISABLED_o1LogMgmt_(` も
+  #     **その部分文字列を含む**ので、★ 呼び出しを全部潰す変異を当てても
+  #     **件数が 11 → 11 で変わらなかった**（2026-09-03 に実測）。
+  #   ⚠️ その変異が赤になっていたのは**別の検査**（`function o1LogMgmt_` の消失）が
+  #     先に発火していたからで、★ **この件数ガード自体は一度も検証されていなかった**。
+  #     （★ memory `measurement-instrument-false-positives` の「対照文字列の自己参照」と同型）
+  #   → ★ **直前の文字が識別子でないこと**を要求し、⚠️ 定義行 (`function o1LogMgmt_(kind`) は
+  #     `("` を要求することで除外する（★ 呼び出しは必ず文字列リテラルが第 1 引数）。
+  if [ "$(grep -cE '(^|[^A-Za-z0-9_])o1LogMgmt_\("' "$FORM_BUILDER")" -lt 3 ]; then
+    mgmt_missing="$mgmt_missing o1LogMgmt_ の呼び出しが少なすぎる（★ 提出経路に配線されていない）"
+  fi
+fi
+if [ -z "$mgmt_missing" ]; then
+  ok "O1 の運用管理シート（登録ログ）が実装され、提出経路に配線されている"
+else
+  ng "★ O1 の運用管理シートが未実装（⚠️ 配布後に作ると遡って埋まりません）:$mgmt_missing"
 fi
 
 # ★ 「マウスのみの作業で誤警告が出る」問題（2026-08-28 に実測）。
@@ -674,6 +718,23 @@ selftest () {
   build; sed_i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
+  # ⚠️★★★ 運用管理シート（起票 T-25）—— ★ **3 つの壊し方を別々に撃つ**。
+  #   ⚠️ 1 つだけだと「どれか 1 つでも欠けたら赤」なのか「たまたま拾えた」のか分からない。
+  build; sed_i 's/function buildO1MgmtSheet/function DISABLED_buildO1MgmtSheet/' "$fix/w/$FORM_BUILDER"
+  expect_red "運用管理シートが未実装" "管理シートの構築関数の喪失"
+  build; sed_i 's/o1LogMgmt_(/DISABLED_o1LogMgmt_(/g' "$fix/w/$FORM_BUILDER"
+  expect_red "運用管理シートが未実装" "登録ログの関数と配線の喪失"
+  # ⚠️★★★ **件数ガードだけを撃つ**（cross-review MEDIUM・2026-09-03）。
+  #   ★ 上の変異は `function o1LogMgmt_` も壊すので、⚠️ **別の検査が先に発火していた**
+  #     （＝ 件数ガードは一度も検証されていなかった）。
+  #   → ★ **定義はそのまま残し、呼び出しだけを消す**。
+  #     ⚠️ `assign` の 2 か所だけが残るので 3 未満になり、件数ガードだけで赤になるはず。
+  build; sed_i 's/o1LogMgmt_("register"/o1SkipLog_("register"/g' "$fix/w/$FORM_BUILDER"
+  expect_red "呼び出しが少なすぎる" "★ 定義は残して呼び出しだけ消す（件数ガード単独）"
+  # ⚠️★★★ **「コメントだけ実装」が緑にならないこと**（★ 2026-09-03 以前の実体がこれだった）。
+  #   ★ 実コードの参照を消してコメントだけ残す = 起票時点の状態を再現する。
+  build; sed_i 's/^    mgmtSheetId: String(props.getProperty("O1_MGMT_SHEET_ID").*$/    mgmtSheetId: "",/' "$fix/w/$FORM_BUILDER"
+  expect_red "運用管理シートが未実装" "★ コメントだけ残して実コードを消す（起票時点の再現）"
   # ⚠️★★ **追跡の検査は fixture では測れない**（$fix/w は git 管理下に無く、常に「未追跡」になる）。
   #   → ★ 代わりに **本物の repo で陽性・陰性の対照**を取る（⚠️ 1 バイトも変更しない）。
   #   ⚠️★★★ 陰性対照は「**存在するのに追跡されていない**」でなければならない
