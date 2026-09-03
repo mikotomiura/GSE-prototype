@@ -1,0 +1,356 @@
+{
+  "expr_visual_version": "0.1.0-layerA",
+  "hmm_version": "0.5.0",
+  "config_echo": {
+    "stimulus": {
+      "stimulus_ms": 2000,
+      "mask_ms": 300,
+      "iti_ms": 600,
+      "canvas_css_px": 360,
+      "_comment_canvas": "★ スマホのロック画面のウィジェット領域を模した正方領域。実機ではない（限界として notes.md に書く）。"
+    },
+    "invitation": {
+      "amplitude_deg_peak_to_peak": 1,
+      "amplitude_convention_note": "⚠️ [P85] G3 の逐語は 'approximately 1° of visual angle is highly detectable' で、片振幅か全振幅かを書き分けていない。★ 本ハーネスは【全振幅（peak-to-peak）】として実装した。片振幅解釈なら実効値は半分になる。この曖昧さは結果と一緒に記録する。",
+      "frequency_hz": 1.5,
+      "frequency_source": "[P85] G4 逐語 'periodic frequencies between 1 and 3 Hz'。★ 帯域中央を採った。",
+      "waveform": "sine",
+      "axis": "horizontal",
+      "anchored": true,
+      "anchored_note": "★ [P85] G7 逐語 'travelling motions are significantly more distracting and irritating than anchored motions.' → 正味変位が 1 周期でゼロになる（＝移動しない）ことを selftest が検算する。"
+    },
+    "levels": {
+      "layer0": {
+        "has_figure": false,
+        "occupancy": 0,
+        "scatter_px": 0
+      },
+      "stable": {
+        "has_figure": true,
+        "occupancy": 1,
+        "scatter_px": 1.2
+      },
+      "friction_rising": {
+        "has_figure": true,
+        "occupancy": 1,
+        "scatter_px": 7.5
+      },
+      "stuck": {
+        "has_figure": true,
+        "occupancy": 0.42,
+        "scatter_px": 7.5
+      }
+    },
+    "blind_test": {
+      "order_seed": 20260902,
+      "composition": {
+        "layer0": 6,
+        "stable": 6,
+        "friction_rising": 6,
+        "stuck": 6
+      },
+      "invitation_present_ratio": 0.5,
+      "invitation_note": "★ layer0 は invitation を出さない（チャネル不在なので招待も無い）。★ 残り 3 状態で present/none を半々にする。",
+      "chance_level_4way": 0.25,
+      "chance_level_invitation": 0.5,
+      "feedback_during": false,
+      "feedback_note": "⚠️ 途中で正誤を出さない。"
+    },
+    "transition_test": {
+      "order_seed": 20260903,
+      "trials": 16,
+      "catch_trials": 6,
+      "catch_note": "★ catch = 遷移しない試行。★ 『変わった』と答え続ける戦略を潰す。",
+      "pre_ms": 1400,
+      "post_ms": 1400,
+      "transition_ms": 400,
+      "note": "★ A-8 逐語 'The transition from one state to another should be easily perceptible.' [P249]"
+    }
+  },
+  "started_at": "2026-09-03T02:12:25.893Z",
+  "calibration": {
+    "pxPerMm": 3.9836448598130842,
+    "distMm": 600,
+    "pxPerDeg": 41.72086780739858,
+    "cardPx": 341,
+    "done": true,
+    "mmPerDeg": 10.473038956930552
+  },
+  "theme": "mono",
+  "inv_coding": "aperture",
+  "free_response": [
+    {
+      "variant": "natural",
+      "dont_know": true,
+      "text": "",
+      "at": "2026-09-03T02:19:24.830Z"
+    },
+    {
+      "variant": "reversed",
+      "dont_know": true,
+      "text": "",
+      "at": "2026-09-03T02:19:43.052Z"
+    }
+  ],
+  "blind_untaught": [
+    {
+      "i": 0,
+      "variant": "natural",
+      "true_level": "stable",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": true,
+      "rt_level_ms": 5173,
+      "rt_total_ms": 8409
+    },
+    {
+      "i": 1,
+      "variant": "reversed",
+      "true_level": "stuck",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": true,
+      "rt_level_ms": 2434,
+      "rt_total_ms": 4473
+    },
+    {
+      "i": 2,
+      "variant": "reversed",
+      "true_level": "friction_rising",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": true,
+      "rt_level_ms": 1605,
+      "rt_total_ms": 4551
+    },
+    {
+      "i": 3,
+      "variant": "reversed",
+      "true_level": "stable",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 1307,
+      "rt_total_ms": 1950
+    },
+    {
+      "i": 4,
+      "variant": "natural",
+      "true_level": "stable",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 927,
+      "rt_total_ms": 1446
+    },
+    {
+      "i": 5,
+      "variant": "natural",
+      "true_level": "stuck",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 859,
+      "rt_total_ms": 1533
+    },
+    {
+      "i": 6,
+      "variant": "reversed",
+      "true_level": "stable",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 731,
+      "rt_total_ms": 1877
+    },
+    {
+      "i": 7,
+      "variant": "reversed",
+      "true_level": "stuck",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 622,
+      "rt_total_ms": 1721
+    },
+    {
+      "i": 8,
+      "variant": "reversed",
+      "true_level": "layer0",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 689,
+      "rt_total_ms": 1484
+    },
+    {
+      "i": 9,
+      "variant": "natural",
+      "true_level": "stuck",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 825,
+      "rt_total_ms": 1603
+    },
+    {
+      "i": 10,
+      "variant": "reversed",
+      "true_level": "stuck",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 707,
+      "rt_total_ms": 1498
+    },
+    {
+      "i": 11,
+      "variant": "reversed",
+      "true_level": "layer0",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 939,
+      "rt_total_ms": 1587
+    },
+    {
+      "i": 12,
+      "variant": "natural",
+      "true_level": "friction_rising",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 626,
+      "rt_total_ms": 1645
+    },
+    {
+      "i": 13,
+      "variant": "reversed",
+      "true_level": "friction_rising",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 606,
+      "rt_total_ms": 1314
+    },
+    {
+      "i": 14,
+      "variant": "natural",
+      "true_level": "stable",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 608,
+      "rt_total_ms": 1344
+    },
+    {
+      "i": 15,
+      "variant": "natural",
+      "true_level": "friction_rising",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 656,
+      "rt_total_ms": 1343
+    },
+    {
+      "i": 16,
+      "variant": "natural",
+      "true_level": "stuck",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 2471,
+      "rt_total_ms": 3102
+    },
+    {
+      "i": 17,
+      "variant": "reversed",
+      "true_level": "friction_rising",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 826,
+      "rt_total_ms": 1417
+    },
+    {
+      "i": 18,
+      "variant": "reversed",
+      "true_level": "layer0",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 968,
+      "rt_total_ms": 1608
+    },
+    {
+      "i": 19,
+      "variant": "natural",
+      "true_level": "friction_rising",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 818,
+      "rt_total_ms": 1644
+    },
+    {
+      "i": 20,
+      "variant": "natural",
+      "true_level": "layer0",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 1074,
+      "rt_total_ms": 1961
+    },
+    {
+      "i": 21,
+      "variant": "natural",
+      "true_level": "layer0",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 519,
+      "rt_total_ms": 1408
+    },
+    {
+      "i": 22,
+      "variant": "natural",
+      "true_level": "layer0",
+      "resp_level": "stuck",
+      "true_invitation": false,
+      "resp_invitation": false,
+      "rt_level_ms": 740,
+      "rt_total_ms": 1430
+    },
+    {
+      "i": 23,
+      "variant": "reversed",
+      "true_level": "stable",
+      "resp_level": "stuck",
+      "true_invitation": true,
+      "resp_invitation": false,
+      "rt_level_ms": 645,
+      "rt_total_ms": 1471
+    }
+  ],
+  "blind_taught": [],
+  "transition": [],
+  "selftest": null,
+  "prior_exposure": {
+    "declared": true,
+    "how": "設計セッション中に、エージェントがオンボーディング画面のスクリーンショット（4 状態＋ラベル）を提示し、写像を文章でも説明した（2026-09-03）",
+    "consequence": "⚠️★★★ ブロック 1b（未教示）は無効。★ PS-Q5 の『他者』側は測れていない。★ 1b'（教示後）/ ブロック 2（A-8）/ E-7 は有効。"
+  },
+  "finished_at": "2026-09-03T02:25:56.400Z",
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "dpr": 1,
+  "limitations": [
+    "⚠️★★★ 判定者は実施前に写像を見ていた（自己申告）。★ ブロック 1b（未教示）は無効であり、PS-Q5 の『他者は THAT で止まるか』は本データでは測れていない。★ 埋めるには、写像を見ていない判定者に 1b だけを回す必要がある。★ 経路: 設計セッション中に、エージェントがオンボーディング画面のスクリーンショット（4 状態＋ラベル）を提示し、写像を文章でも説明した（2026-09-03）",
+    "★ 判定者は N=1（研究者本人）。★ 設計文脈を知っており、語彙については盲ではない。",
+    "⚠️ 実機のロック画面ではなく PC のブラウザ上の正方領域で提示している。",
+    "⚠️ iOS はロック画面ウィジェットを強制的に monochrome にする（2026-09-02 一次実測）ため、実機は本ハーネスより符号が痩せる。",
+    "⚠️ 周辺視条件は本ハーネスに実装していない（中心視のみ）。",
+    "⚠️ [P85] G3 の 1° は片振幅か全振幅かを書き分けていない。本ハーネスは全振幅として実装した。"
+  ]
+}

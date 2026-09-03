@@ -39,6 +39,21 @@
   .sealed { filter: blur(9px); pointer-events: none; user-select: none; opacity: .55; }
   .seal-note { color: #e8b562; font-weight: 600; }
   ul { margin: 6px 0; padding-left: 22px; }
+  /* ⚠️★★★ 2026-09-03: 試行中は全画面オーバーレイにする。
+     ★ 旧実装は刺激を §3 の固定位置に出しており、§5 の「1b' を始める」を押すと
+     **押したボタンと違う場所に刺激が出て、画面外で 2 秒が流れていた**。
+     ★ 実測: 1b の 24 試行すべてで同じボタンが押された（＝刺激を見ていない）。
+     → ★ **見る場所を間違えようがない構造にする。** */
+  .trial-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #0b0d10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 24px; overflow-y: auto;
+  }
+  .trial-overlay .note, .trial-overlay .hint { max-width: 640px; text-align: center; }
+  .trial-overlay #stagewrap { background: transparent; }
+  .ovl-tag { position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+             color: #9fb4c7; font-size: 12.5px; }
   li { margin: 3px 0; }
 </style>
 </head>
@@ -613,6 +628,32 @@ const REC = {
   selftest: null
 };
 
+
+/* ============================================================
+ * 6b. ⚠️★★★ 試行の全画面オーバーレイ
+ *   ★ 「押したボタンと違う場所に刺激が出る」を構造的に潰す。
+ * ============================================================ */
+function overlayOn(boxId, label) {
+  const el = $(boxId);
+  el.hidden = false;
+  el.classList.add("trial-overlay");
+  if (!$("ovl-tag")) {
+    const tag = document.createElement("div");
+    tag.id = "ovl-tag"; tag.className = "ovl-tag";
+    document.body.appendChild(tag);
+  }
+  $("ovl-tag").textContent = label;
+  document.body.style.overflow = "hidden";
+}
+function overlayOff(boxId) {
+  const el = $(boxId);
+  el.classList.remove("trial-overlay");
+  el.hidden = true;
+  const tag = $("ovl-tag");
+  if (tag) tag.remove();
+  document.body.style.overflow = "";
+}
+
 /* ============================================================
  * 7. ブロック 1a — 自由記述
  * ★ 変種ごとに 1 画面。層 0 → A → B → C を巡回して見せる（★ 時間変化する表現なので静止画では測れない = E-8）
@@ -627,7 +668,7 @@ function frStart() {
   const rng = mulberry32(CFG.blind_test.order_seed + 31);
   frOrder = shuffle(CFG.variants.map((v) => v.id), rng);
   frIdx = 0;
-  $("fr-box").hidden = false;
+  overlayOn("fr-box", "ブロック 1a — 自由記述（未教示）");
   $("btn-fr-start").disabled = true;
   frShow();
 }
@@ -677,7 +718,7 @@ function frNext(dontKnow) {
   frIdx++;
   if (frIdx >= frOrder.length) {
     cancelAnimationFrame(frRaf);
-    $("fr-box").hidden = true;
+    overlayOff("fr-box");
     $("fr-state").innerHTML = '<span class="ok">完了</span>';
     $("btn-bt-start").disabled = false;
   } else frShow();
@@ -704,7 +745,7 @@ function btStart(taught) {
     i: 0, phase: "idle", raf: 0, t0: 0,
     answerLevel: null
   };
-  $("bt-box").hidden = false;
+  overlayOn("bt-box", taught ? "ブロック 1b′ — 盲検・強制選択（教示後）" : "ブロック 1b — 盲検・強制選択（未教示）");
   $("btn-bt-start").disabled = true;
   $("btn-bt2-start").disabled = true;
   $("btn-bt-abort").disabled = false;
@@ -779,12 +820,37 @@ function btAnswerInv(inv) {
     rt_level_ms: bt.rtLevel,
     rt_total_ms: Math.round(performance.now() - bt.respAt)
   };
-  (bt.taught ? REC.blind_taught : REC.blind_untaught).push(rec);
+  const store = bt.taught ? REC.blind_taught : REC.blind_untaught;
+  store.push(rec);
+
+  // ⚠️★★★ 2026-09-03 追加: **回答の縮退ガード**
+  //   ★ 2026-09-03 の 1 回目の試視で **24 試行すべてが同じボタン**だった。
+  //     ⚠️ 原因は刺激が画面外に出ていたことで、**正答率 25% は「stuck が 6/24 だから」という
+  //     副産物**であり、可読性のデータではなかった。★ 検査が 1 つも無かったので気づけなかった。
+  //   → ★ **同じ回答が連続したら止めて、判定者に知らせる。**
+  const DEGEN_N = 8;
+  if (store.length >= DEGEN_N) {
+    const tail = store.slice(-DEGEN_N);
+    if (tail.every((r) => r.resp_level === tail[0].resp_level)) {
+      cancelAnimationFrame(bt.raf);
+      const taught = bt.taught;
+      bt = null;
+      overlayOff("bt-box");
+      $("btn-bt-abort").disabled = true;
+      $(taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
+      (taught ? REC.blind_taught : REC.blind_untaught).length = 0;
+      $(taught ? "bt2-state" : "bt-state").innerHTML =
+        `<span class="bad">⚠️★★★ 中断しました —— <b>直近 ${DEGEN_N} 試行がすべて同じ回答</b>でした。` +
+        `★ 刺激が見えていない可能性が高いので、回答は破棄しました。` +
+        `<br>★ 画面いっぱいに刺激が出ているか確かめて、もう一度始めてください。</span>`;
+      return;
+    }
+  }
   [...$("bt-lvl").children].forEach((b) => { b.style.borderColor = "#3a424c"; });
   bt.i++;
   if (bt.i >= bt.order.length) {
     cancelAnimationFrame(bt.raf);
-    $("bt-box").hidden = true;
+    overlayOff("bt-box");
     $("btn-bt-abort").disabled = true;
     if (bt.taught) {
       $("bt2-state").innerHTML = '<span class="ok">完了</span>';
@@ -808,7 +874,7 @@ function btAbort() {
   cancelAnimationFrame(bt.raf);
   ($(bt.taught ? "bt2-state" : "bt-state")).innerHTML =
     '<span class="bad">中止 —— ⚠️ 再開すると、ここまでの回答は破棄されます</span>';
-  $("bt-box").hidden = true;
+  overlayOff("bt-box");
   $("btn-bt-abort").disabled = true;
   $(bt.taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
   bt = null;
@@ -868,7 +934,7 @@ let tr = null;
 
 function trStart() {
   tr = { order: buildTransOrder(), i: 0, raf: 0, t0: 0, phase: "idle" };
-  $("tr-box").hidden = false;
+  overlayOn("tr-box", "ブロック 2 — 遷移の検知");
   $("btn-tr-start").disabled = true;
   trTrial();
 }
@@ -926,7 +992,7 @@ function trAnswer(said) {
   tr.i++;
   if (tr.i >= tr.order.length) {
     cancelAnimationFrame(tr.raf);
-    $("tr-box").hidden = true;
+    overlayOff("tr-box");
     $("tr-state").innerHTML = '<span class="ok">完了</span>';
     $("btn-res").disabled = false;
     $("btn-export").disabled = false;
@@ -1046,6 +1112,18 @@ function showResults() {
     }
   }
 
+  // ⚠️★★★ 回答が偏っていたら、正答率より先にそれを出す
+  for (const [name, rows] of [["1b（未教示）", REC.blind_untaught], ["1b′（教示後）", REC.blind_taught]]) {
+    if (!rows.length) continue;
+    const cnt = {};
+    for (const r of rows) cnt[r.resp_level] = (cnt[r.resp_level] || 0) + 1;
+    const top = Math.max(...Object.values(cnt));
+    if (top / rows.length >= 0.7) {
+      h = `<p class="bad"><b>⚠️★★★ ${name}: 回答の ${Math.round(100 * top / rows.length)}% が同じ選択肢に偏っています。</b>` +
+          `★ <b>正答率を可読性の指標として読んではいけません。</b>` +
+          `★ 刺激が見えていたかを先に確かめてください（★ 内訳: ${JSON.stringify(cnt)}）。</p>` + h;
+    }
+  }
   h += `<p class="note warn">⚠️★★★ <b>主張してはいけないこと</b>（§7.1）: ` +
        `「ISO 9186 準拠で 66% を超えたので合格」と書かない（★ その合格スコアは ISO 9186-1 本文に存在しない [V112]）／` +
        `確認的検定を主結果にしない（★ N=17 の被験者内でも検定力 0.49 [V123]）／` +
