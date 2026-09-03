@@ -231,11 +231,17 @@ show real-time information.**"* ★ **しかし一次を並べると、GSE で�
 ★★★ **決め手は「8 時間上限 ＋ push-to-start の alert 必須」の組み合わせである。**
 
 ★ push-to-start の逐語: *"it comes with the following **requirements**: … **Include an `alert` in the JSON
-payload.**"* ／ alert の効果: *"Live Activity alerts **light up the screen and by default play the notification
-sound**"*。⚠️ `AlertConfiguration.AlertSound` の構成メンバは **`named(_:)` と `default` の 2 つのみ**（★ 無音が無い）。
+payload.**"* ／ alert の効果: *"Live Activity alerts **light up the screen** and **by default** play the notification
+sound … **Alerts also show the expanded presentation in the Dynamic Island** or a banner"*。
+⚠️ `AlertConfiguration.AlertSound` の構成メンバは **`named(_:)` と `default` の 2 つのみ**（★ 無音の選択肢が無い）。
+
+⚠️★★★ **音については言い過ぎない**（★ `/cross-review` 指摘・2026-09-03）—— ★ 逐語は *"**by default**"* であり、
+**サイレントスイッチ / Focus / 通知許可の影響は一次で確認できていない**。
+→ ★ **本決定が乗っているのは「音が鳴る」ではなく、逐語で無条件に書かれている
+『**画面が点灯する**』と『**expanded / バナーで提示される**』の 2 つである。** ★ どちらも注意を奪う提示である。
 
 → ⚠️★★★ **Live Activities で 1 日を覆うには 8 時間ごとに再開が要り、遠隔での再開は alert を強制される。
-＝ 技術的理由だけで、1 日 2–3 回「画面を点灯させ通知音を鳴らす提示」が発生する。**
+＝ 技術的理由だけで、1 日 2–3 回「画面を点灯させ、expanded / バナーで提示する」ことが起きる。**
 ★ それは **ADR-017 D5 / ADR-021 D5 の「注意を強く奪う提示は介入である」に該当し、
 Need / Opportunity の判定を通っていない介入**になる。→ ★★★ **設計の根幹に反するので採らない。**
 
@@ -288,9 +294,23 @@ available**"* を投げ、★ **全 7109 行に対する `grep -c directBootAwar
 - ★ 唯一の LAN 直受信・背景常駐 API である **Local Push Connectivity** は、定義上
   *"maintain a persistent network connection to **your server**"* → ⚠️ **PC が常設サーバになるので制約 1 違反。**
 
-★ **採る経路**: **PC → APNs（WidgetKit push）→ ウィジェットのリロード**。
+★ **採る経路**: **PC → APNs → ウィジェットのリロード**。
 ★ PC は `api.push.apple.com` への **outbound HTTPS クライアント**であり、**リスナを開かない**
 → ★ **制約 1 の趣旨（「LAN に開かない」）には合致する。**
+
+⚠️★★★ **ただし『どの push か』がまだ決まっていない**（★ `/cross-review` 指摘・2026-09-03）:
+
+| 候補 | 値を運べるか | 問題 |
+|---|---|---|
+| **WidgetKit push** | ❌ **運べない** —— ★ 本文は `{"aps":{"content-changed": true}}` **だけ** | ⚠️★★★ **リロードを促すだけなので、`level` / `invitation` が *どこから来るか* が決まらない**。★ ウィジェット拡張は *"not continually active"* で、アプリは suspended である |
+| **silent push**（`content-available`） | ✅ 運べる | ⚠️ *"**don't try to send more than two or three per hour**"* ／ *"the system **doesn't guarantee their delivery**"*。★ `level` は 1 日数回なので**回数は足りる**が、**取りこぼす** |
+| ★ 端末から取りに行く | ✅ | ⚠️★★★ **背景で LAN 受信できない**（★ 背景実行モードに無い）→ ★ **前景に出たときしか取れない** |
+
+→ ★★★ **したがって、iOS で「値を APNs に載せずに済ませる」道は、現時点では見つかっていない。**
+⚠️ **本 ADR の初稿は「WidgetKit push は本文を持たないので値を載せずに済む余地がある」と書いていたが、
+それは *リロードの契機* と *値の搬送* を混同していた。★ 撤回する。**
+→ ★ **下の「漏れるもの」#1 は、余地つきではなく *そのまま成立する* と読むこと。**
+⚠️★★★ **W-1 は「どの push を使い、値をどう運ぶか」を決めなければならない。**
 
 #### Android: ★ **ライブ壁紙が「常時通知なしの常駐」を与える**
 
@@ -323,7 +343,7 @@ not supported.**"* ／ `android.companion` 全ソースの `mdns|nsd|dnssd|bonjo
 
 | # | 何 | なぜ |
 |---|---|---|
-| **1** | ⚠️ **`level` / `invitation` / `seq` の値そのものが APNs を通りうる** | ★ push を system が解釈するので **E2E 暗号化できない**。★ **ただし WidgetKit push は本文を持たない**（`{"aps":{"content-changed": true}}` のみ）ので、**値を載せずに済む余地がある**（→ W-1） |
+| **1** | ⚠️★★★ **`level` / `invitation` / `seq` の値そのものが APNs を通る** | ★ push を system が解釈するので **E2E 暗号化できない**。⚠️★★★ **2026-09-03 訂正: 初稿は「WidgetKit push なら値を載せずに済む余地がある」と書いたが、それはリロードの契機と値の搬送を混同していた**（★ `/cross-review` 指摘）。★ **値を運ぶには本文を持つ push が要る。** |
 | **2** | ⚠️★★★ **イベントの発生時刻列**（＝**本人の作業状態が遷移したタイミング**） | ★ **不可避に Apple 側のメタデータになる。避けられない** |
 | **3** | ⚠️ **Apple がペイロードを読めるかは一次で確認できなかった** | ★★★ **「Apple から見えない」と書いてはならない。** ⚠️ *"No confidential or proprietary information is transmitted through APNs."* は **MDM 配備ガイドの文脈** |
 | **4** | ⚠️ **PC 側に APNs provider 資格情報（`.p8` 鍵）を置く**ことになる | ★ 被験者の PC 上に配布する秘密が増える |
@@ -562,3 +582,12 @@ Krippendorff's α = 0.91）。→ ★ **「実際に見ている時間」に近�
 6. ⬜ `data-privacy` Skill — ★ **「iOS では状態遷移の時刻列が外部を通る」を追記**（★ D5）
 7. ⚠️ **`docs/references.md` には登録しない**（★ OS ベンダ文書のため。★ 先例に従う）
 8. ⚠️ **ADR-021 / ADR-017 の本文は書き換えない**（★ 本リポジトリの規約）。★ 本 ADR の追補で受ける。
+9. ⬜ ⚠️★★★ **一次のスナップショットを保存する**（★ `/cross-review` 指摘・2026-09-03）——
+   ★ 本 ADR は **版番号を持たない living document を大量に根拠にしている**。★ URL と取得日だけでは、
+   **将来ページが変わったときに検証できない**。→ ★ **DocC JSON / AOSP のソースを取得時点のまま保存し、
+   URL・取得日・sha256 を添える**（⚠️ ライセンスに注意し、必要なら該当節だけを引用の範囲で残す）。
+10. ⬜ ⚠️★★★ **実機マトリクスを必須項目に格上げする**（★ `/cross-review` 指摘・2026-09-03）——
+   ★ D4 の採用判断は強いのに、**M-7（AOD の `onVisibilityChanged`）/ M-8（OEM 差分）/ M-1（`.repeatForever`）が
+   すべて未実測**である。→ ★ **実装着手の前提条件**として、少なくとも
+   **iPhone（AOD 有 / 無）× Android（Pixel / Samsung）** で「ロック画面に出るか」「BFU で出るか」
+   「lock 専用壁紙と競合しないか」を確認する。

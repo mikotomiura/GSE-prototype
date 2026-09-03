@@ -12,8 +12,8 @@
 - [x] リプレイ・順序（S3）
 - [x] ペアリング（S1）の iOS 側
 - [x] iOS Live Activities / Dynamic Island / AOD / secure lock screen
-- [ ] ⚠️ Android のロック画面の面 / secure lock screen / `CompanionDeviceManager` — **調査中**
-- [ ] ⚠️ 曝露量の外的妥当性（顔認証時代・2024 年の視線研究） — **調査中**
+- [x] Android のロック画面の面 / secure lock screen / `CompanionDeviceManager`（★ ライブ壁紙が唯一の面と判明）
+- [x] 曝露量の外的妥当性（★ [P264] の分母を一次で確認・2024 年の [P268] を追加）
 - [ ] ⚠️ macOS / Windows のファイアウォール on-demand 開閉（S5） — **未着手**（★ W-1 の実装時課題へ送る）
 
 ## 【第 2】層 A（視覚）試視ハーネス
@@ -36,14 +36,14 @@
 
 ## ドキュメント
 - [x] `.steering/` の requirement / design / decisions / survey
-- [ ] `docs/references.md` に新規一次を append（★ 学術文献のみ。⚠️ **DOI で重複を検算してから**）
-- [ ] `docs/architecture/expression-channel.md` を追随（§3.5.1 / §3.5.2 / §7.5 / §8）
-- [ ] `docs/adr/ADR-022-*.md` を起票 ＋ `docs/adr/README.md` に追加
+- [x] `docs/references.md` に `[P268]` を append（★ DOI 重複を検算済み）
+- [x] `docs/architecture/expression-channel.md` を追随（§3.5.1b / §3.5.2b 新設・§4.1 / §7.5 A12–A15 / §8）
+- [x] `docs/adr/ADR-022` を起票（D1–D9）＋ `docs/adr/README.md` に索引と ADR-021 への改訂注記
 
 ## レビュー
 - [ ] `code-reviewer` + `security-checker` を並列起動
-- [ ] `/cross-review`（★ パス限定 `-- docs .steering experiments ':!*.docx' ':!*.pptx'`）
-- [ ] `python scripts/check_citations.py` が違反なし（★ 1 回で全件出ないので反復する）
+- [x] `/cross-review`（★ `docs/adr docs/architecture` の 691 行に限定・exit 0）→ **指摘 5 件を全部反映**（→ decisions 判断 10）
+- [x] `python scripts/check_citations.py` が **違反なし**（★ 2 回実行して確認）
 
 ## 完了処理
 - [x] git commit（★ ハーネスと survey）
