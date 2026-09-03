@@ -66,14 +66,16 @@ def para(text: str, style: str | None = None, ind: int = 0, bold: bool = False) 
 
 
 def table(rows: list[list[str]]) -> str:
-    grid = "".join('<w:gridCol w:w="2000"/>' for _ in rows[0])
+    table_width = 9638
+    col_width = table_width // len(rows[0])
+    grid = "".join(f'<w:gridCol w:w="{col_width}"/>' for _ in rows[0])
     body = []
     for i, row in enumerate(rows):
         cells = []
         for c in row:
             shade = '<w:shd w:val="clear" w:fill="EFEFEF"/>' if i == 0 else ""
             cells.append(
-                "<w:tc><w:tcPr>"
+                f'<w:tc><w:tcPr><w:tcW w:w="{col_width}" w:type="dxa"/>'
                 '<w:tcBorders>'
                 '<w:top w:val="single" w:sz="4" w:color="999999"/>'
                 '<w:left w:val="single" w:sz="4" w:color="999999"/>'
@@ -81,17 +83,64 @@ def table(rows: list[list[str]]) -> str:
                 '<w:right w:val="single" w:sz="4" w:color="999999"/>'
                 "</w:tcBorders>" + shade + "</w:tcPr>"
                 + para(c, bold=(i == 0)) + "</w:tc>")
-        body.append(f"<w:tr>{''.join(cells)}</w:tr>")
-    return (f'<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>'
+        header = '<w:tblHeader/>' if i == 0 else ""
+        row_props = f'<w:trPr><w:cantSplit/>{header}</w:trPr>'
+        body.append(f"<w:tr>{row_props}{''.join(cells)}</w:tr>")
+    return (f'<w:tbl><w:tblPr><w:tblW w:w="{table_width}" w:type="dxa"/>'
+            '<w:tblLayout w:type="fixed"/></w:tblPr>'
             f"<w:tblGrid>{grid}</w:tblGrid>{''.join(body)}</w:tbl><w:p/>")
+
+
+IMAGE_LINE = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)$")
+
+
+def image_block(rid: str, alt: str, cx: int, cy: int, doc_id: int) -> str:
+    """Inline image. Relationships and media are added by write_docx."""
+    safe_alt = esc(alt or "GSE figure")
+    return (
+        '<w:p><w:r><w:drawing>'
+        '<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="{doc_id}" name="{safe_alt}" descr="{safe_alt}"/>'
+        '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="figure.svg"/><pic:cNvPicPr/></pic:nvPicPr>'
+        f'<pic:blipFill><a:blip r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+        f'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+        '</pic:pic></a:graphicData></a:graphic></wp:inline>'
+        '</w:drawing></w:r></w:p><w:p/>'
+    )
 
 
 def split_row(line: str) -> list[str]:
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 
-def convert(md: str) -> str:
+def image_display_size(image_path: pathlib.Path) -> tuple[int, int]:
+    """Fit a PNG/SVG into the A4 text width while retaining its aspect ratio."""
+    width_emu = 6000000
+    if image_path.suffix.lower() == ".png":
+        data = image_path.read_bytes()[:24]
+        if data[:8] != b"\x89PNG\r\n\x1a\n":
+            raise SystemExit(f"[NG] PNGヘッダが不正: {image_path}")
+        pixel_width = int.from_bytes(data[16:20], "big")
+        pixel_height = int.from_bytes(data[20:24], "big")
+    else:
+        svg = image_path.read_text(encoding="utf-8")
+        viewbox = re.search(r'viewBox="[^"]*\\s([0-9.]+)\\s([0-9.]+)"', svg)
+        if not viewbox:
+            raise SystemExit(f"[NG] SVGのviewBoxが読めない: {image_path}")
+        pixel_width, pixel_height = map(float, viewbox.groups())
+    if not pixel_width or not pixel_height:
+        raise SystemExit(f"[NG] 画像サイズが不正: {image_path}")
+    return width_emu, round(width_emu * pixel_height / pixel_width)
+
+
+def convert(md: str, base_dir: pathlib.Path) -> tuple[str, list[tuple[str, pathlib.Path]]]:
     out: list[str] = []
+    images: list[tuple[str, pathlib.Path]] = []
     lines = md.splitlines()
     i = 0
     while i < len(lines):
@@ -108,6 +157,21 @@ def convert(md: str) -> str:
             continue
 
         if not s:
+            i += 1
+            continue
+
+        image_match = IMAGE_LINE.fullmatch(s)
+        if image_match:
+            alt, target = image_match.groups()
+            image_path = (base_dir / target).resolve()
+            if not image_path.is_file():
+                raise SystemExit(f"[NG] 画像が見つからない: {image_path}")
+            rid = f"rId{len(images) + 2}"
+            images.append((rid, image_path))
+            if image_path.suffix.lower() not in {".png", ".svg"}:
+                raise SystemExit(f"[NG] 対応画像形式は PNG / SVG のみ: {image_path}")
+            cx, cy = image_display_size(image_path)
+            out.append(image_block(rid, alt, cx, cy, len(images)))
             i += 1
             continue
 
@@ -154,7 +218,7 @@ def convert(md: str) -> str:
 
         out.append(para(s))
         i += 1
-    return "".join(out)
+    return "".join(out), images
 
 
 STYLES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -185,10 +249,22 @@ STYLES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Yu Gothic"/><w:sz w:val="19"/></w:rPr></w:style>
 </w:styles>"""
 
+COMPACT_STYLES = (STYLES
+    .replace('<w:spacing w:after="120" w:line="276" w:lineRule="auto"/>',
+             '<w:spacing w:after="0" w:line="216" w:lineRule="auto"/>')
+    .replace('<w:spacing w:before="360" w:after="160"/>',
+             '<w:spacing w:before="200" w:after="80"/>')
+    .replace('<w:spacing w:before="320" w:after="140"/>',
+             '<w:spacing w:before="160" w:after="60"/>')
+    .replace('<w:spacing w:before="260" w:after="120"/>',
+             '<w:spacing w:before="140" w:after="50"/>'))
+
 CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
+<Default Extension="png" ContentType="image/png"/>
+<Default Extension="svg" ContentType="image/svg+xml"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 </Types>"""
@@ -198,17 +274,26 @@ RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>"""
 
-DOC_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>"""
+def doc_rels(images: list[tuple[str, pathlib.Path]]) -> str:
+    rels = ['<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>']
+    for index, (rid, image_path) in enumerate(images, start=1):
+        rels.append(
+            f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image{index}{image_path.suffix.lower()}"/>'
+        )
+    return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + ''.join(rels) + '</Relationships>')
 
 
-def write_docx(md: str, out: pathlib.Path) -> None:
+def write_docx(md: str, out: pathlib.Path, base_dir: pathlib.Path, compact: bool = False) -> None:
+    body, images = convert(md, base_dir)
+    margins = ('<w:pgMar w:top="700" w:right="1134" w:bottom="700" w:left="1134"/>'
+               if compact else
+               '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/>')
     doc = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document {NS}>'
-           f"<w:body>{convert(md)}"
+           f"<w:body>{body}"
            '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
-           '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr>'
+           f'{margins}</w:sectPr>'
            "</w:body></w:document>")
     out.parent.mkdir(parents=True, exist_ok=True)
     # ⚠️★★★ 2026-09-02: ZIP エントリの日時を固定する。
@@ -219,14 +304,19 @@ def write_docx(md: str, out: pathlib.Path) -> None:
         for name, data in (
             ("[Content_Types].xml", CONTENT_TYPES),
             ("_rels/.rels", RELS),
-            ("word/_rels/document.xml.rels", DOC_RELS),
-            ("word/styles.xml", STYLES),
+            ("word/_rels/document.xml.rels", doc_rels(images)),
+            ("word/styles.xml", COMPACT_STYLES if compact else STYLES),
             ("word/document.xml", doc),
         ):
             info = zipfile.ZipInfo(name, date_time=ZIP_TS)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o600 << 16
             z.writestr(info, data)
+        for index, (_, image_path) in enumerate(images, start=1):
+            info = zipfile.ZipInfo(f"word/media/image{index}{image_path.suffix.lower()}", date_time=ZIP_TS)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            z.writestr(info, image_path.read_bytes())
     # ★ 書いた直後に全パートを検証する。壊れた .docx を黙って出荷しない。
     with zipfile.ZipFile(out) as z:
         for name in z.namelist():
@@ -243,6 +333,7 @@ if __name__ == "__main__":
     text = src.read_text(encoding="utf-8")
     # ★ 実験者向け注記の切り落とし。--from= 以降 / --until= より前 だけを使う。
     #   ⚠️ マーカーが見つからなければ **黙って通さず落とす**（切り落とし漏れは配布事故になる）。
+    compact = "--compact" in sys.argv[3:]
     for arg in sys.argv[3:]:
         if arg.startswith("--from="):
             marker = arg.split("=", 1)[1]
@@ -275,5 +366,5 @@ if __name__ == "__main__":
             if meta.get("id") and meta["id"] != "copy":
                 head += f"（{meta['id']}）"
             text = f"# {head}\n\n" + m.group(2)
-    write_docx(text, dst)
+    write_docx(text, dst, src.parent, compact=compact)
     print(f"[ok] {dst}  ({dst.stat().st_size:,} bytes)")

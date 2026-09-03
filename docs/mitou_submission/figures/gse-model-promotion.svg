@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="470" viewBox="0 0 1400 470">
+  <rect width="1400" height="470" fill="#ffffff"/>
+  <text x="65" y="62" font-family="Yu Gothic, Meiryo, sans-serif" font-size="34" font-weight="700" fill="#1f2933">モデル更新と昇格のゲート</text>
+  <text x="65" y="101" font-family="Yu Gothic, Meiryo, sans-serif" font-size="21" fill="#52606d">段の軸はモデルの複雑さではなく「何をどの根拠で推定できるか」。1 段ずつしか上げない</text>
+  <defs><marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/></marker></defs>
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="70" y="170" width="355" height="165" rx="10" fill="#e6fffa" stroke="#0f766e" stroke-width="4"/>
+    <text x="247" y="223" font-size="30" font-weight="700" fill="#134e4a">1. 契約を固定する</text>
+    <text x="247" y="265" font-size="23" fill="#134e4a">本文非保存の特徴量</text>
+    <text x="247" y="299" font-size="20" fill="#134e4a">固定baseline / 版数 / hash</text>
+    <rect x="523" y="170" width="355" height="165" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+    <text x="700" y="223" font-size="30" font-weight="700" fill="#1e3a8a">2. 候補を検証する</text>
+    <text x="700" y="263" font-size="21" fill="#1e3a8a">次の段の候補（1 段ずつ）</text>
+    <text x="700" y="292" font-size="17" fill="#1e3a8a">criterion直結 → 個人・タスク適応 → 時系列</text><text x="700" y="316" font-size="17" fill="#1e3a8a">subject / session / episode split</text>
+    <rect x="976" y="170" width="355" height="165" rx="10" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="1153" y="223" font-size="30" font-weight="700" fill="#7c2d12">3. 安全ゲート</text>
+    <text x="1153" y="265" font-size="23" fill="#7c2d12">較正・棄権・有害介入</text>
+    <text x="1153" y="299" font-size="20" fill="#7c2d12">replayで判断を再現</text>
+  </g>
+  <g stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow)"><path d="M425 252 H523"/><path d="M878 252 H976"/></g>
+  <path d="M1153 335 V390 H247 V335" stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <text x="700" y="423" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="23" font-weight="700" fill="#334155">合格: 推論器だけを昇格　/　不合格: 前の段を正として維持</text>
+</svg>
