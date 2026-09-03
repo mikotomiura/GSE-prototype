@@ -208,3 +208,12 @@ service_account.json
 #   ⚠️ 置き場の規約は `~/.venvs/gse-provision`（repo の外）だが、網も張る。
 .venv/
 venv/
+
+# ⚠️★★★ 稼働コスト実測の**生サンプル**は commit しない (2026-09-03・security-checker LOW)。
+#   ★ `ndjson-size.tsv` はファイル名(=セッション開始時刻)・バイト数・mtime を持ち、
+#   ⚠️ **いつ何時間作業したかの時系列**になる。`samples.tsv` も同様に稼働時間帯が出る。
+#   ★ 共有してよいのは集計値だけ (docs/development-guidelines.md §10)。
+#   ⚠️★★ **`experiments/*/results/` を丸ごと無視しない** —— ★ 既存 44 ファイルの
+#   集計 JSON (metrics/calib/cohort) は**意図して追跡されている** (上の §122 の規約)。
+experiments/**/samples.tsv
+experiments/**/ndjson-size.tsv

@@ -300,17 +300,17 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
             Ok(l) => l,
             Err(_) => continue,
         };
-        if line.contains(r#""type":"session_start""#) {
+        if crate::ndjson_scan::is_session_start_row(&line) {
             has_session_start = true;
         }
-        if !line.contains(r#""type":"meta""#) {
+        if !crate::ndjson_scan::is_meta_row(&line) {
             continue;
         }
-        if line.contains(r#""g1_mode""#) {
+        if line.contains(crate::ndjson_scan::NEEDLE_G1_MODE) {
             // ⚠️ G1 の記録である。★ O1 の経路では 1 本も触らない。
             return None;
         }
-        if line.contains(r#""o1_mode""#) {
+        if line.contains(crate::ndjson_scan::NEEDLE_O1_MODE) {
             has_o1_mode = true;
         }
         // ⚠️ ★ **最後の `session_end` を採る。** 1 ファイルに 2 本入ることは無い設計だが、
@@ -350,16 +350,10 @@ fn closed_o1_session_end(path: &Path) -> Option<u64> {
 /// ★ `meta` 行は `logger::write_meta_end` が**手書きで固定形**に出しているので、
 /// `"<key>":<digits>` を探せば足りる。
 fn parse_meta_u64(line: &str, key: &str) -> Option<u64> {
-    let needle = format!("\"{key}\":");
-    let start = line.find(&needle)? + needle.len();
-    let digits: String = line[start..]
-        .chars()
-        .take_while(|c| c.is_ascii_digit())
-        .collect();
-    if digits.is_empty() {
-        return None;
-    }
-    digits.parse::<u64>().ok()
+    // ⚠️★★★ **実装は `crate::ndjson_scan` が単一真実源**である (2026-09-03)。
+    //   ★ `o1::scan_session_shape` が「文字列が在るか」で見ていて食い違ったため、
+    //   ⚠️ **同じ関数を呼ぶ形に寄せた**。★ ここの薄いラッパは既存の呼び出し / テストのため。
+    crate::ndjson_scan::parse_meta_u64(line, key)
 }
 
 /// NDJSON が **G1 で書かれ、かつ `session_end` を持つ**か (1 パスで両方見る)。
@@ -380,13 +374,13 @@ pub fn is_closed_g1_session(path: &Path) -> bool {
             Ok(l) => l,
             Err(_) => return false,
         };
-        if !line.contains(r#""type":"meta""#) {
+        if !crate::ndjson_scan::is_meta_row(&line) {
             continue;
         }
         if line.contains(r#""session_end""#) {
             closed = true;
         }
-        if line.contains(r#""g1_mode""#) {
+        if line.contains(crate::ndjson_scan::NEEDLE_G1_MODE) {
             is_g1 = true;
         }
     }
@@ -1560,5 +1554,69 @@ mod tests {
             parse_meta_u64(r#"{"session_end":"x"}"#, "session_end"),
             None
         );
+    }
+
+    /// ⚠️★★★ **孤児回収 → 収束器 の結合テスト**（★ cross-review で「無い」と指摘された穴）。
+    ///
+    /// ★ 単体テストは「`session_end` が書かれたか」しか見ない。⚠️ 本当に確かめたいのは
+    /// **「閉じたファイルが *実際に* 提出候補になり、しかも *即座には* ならない」**である
+    /// （★ 48 時間の猶予＝削除保証が生きていること）。
+    #[test]
+    fn a_recovered_orphan_becomes_a_candidate_only_after_the_grace_window() {
+        let d = tmpdir("o1_orphan_e2e");
+        // ★ O1 の「開いたまま」のファイル（⚠️ `session_end` が無い）。
+        std::fs::write(
+            d.join("gse_o1_20260901_101112.ndjson"),
+            "{\"type\":\"meta\",\"session_start\":1000,\"hmm_version\":\"0.3.0\",\"o1_mode\":\"marker\"}\n\
+             {\"type\":\"key\",\"t\":1200,\"vk\":74,\"press\":true}\n",
+        )
+        .unwrap();
+
+        let now = 1_788_000_000_000u64;
+        let grace = crate::o1::SUBMIT_GRACE_MS;
+
+        // ⚠️ 回収する前は候補にならない（★ これが今回塞いだ欠陥そのもの）。
+        assert!(
+            closed_o1_sessions(&d, now + grace * 10, grace).is_empty(),
+            "★ 回収前に候補になってはならない"
+        );
+
+        // ★ 回収する。
+        assert_eq!(crate::o1::close_orphaned_sessions(&d, None, now).closed, 1);
+
+        // ⚠️★★★ **直後は候補にならない**（★ 被験者が消せる 48 時間）。
+        assert!(
+            closed_o1_sessions(&d, now, grace).is_empty(),
+            "⚠️ 閉じた直後に提出候補になっている = 削除保証が消えている"
+        );
+        assert!(
+            closed_o1_sessions(&d, now + grace - 1, grace).is_empty(),
+            "⚠️ 猶予が 48 時間より短い"
+        );
+
+        // ★ 48 時間ちょうどで候補になる。
+        let ready = closed_o1_sessions(&d, now + grace, grace);
+        assert_eq!(ready.len(), 1, "★ 猶予を過ぎたら候補になるべき");
+        assert_eq!(
+            ready[0].file_name().and_then(|s| s.to_str()),
+            Some("gse_o1_20260901_101112.ndjson")
+        );
+    }
+
+    /// ⚠️★★ **診断行だけのファイルは回収もされないし候補にもならない**（★ 両側で一致すること）。
+    #[test]
+    fn a_diagnostic_only_orphan_is_ignored_by_both_sides() {
+        let d = tmpdir("o1_orphan_diag");
+        let p = d.join("gse_o1_20260901_101112.ndjson");
+        let body = "{\"type\":\"meta\",\"session_start\":1000,\"o1_mode\":\"marker\"}\n\
+                    {\"type\":\"ime_state\",\"t\":1200,\"open\":false}\n";
+        std::fs::write(&p, body).unwrap();
+        let now = 1_788_000_000_000u64;
+        assert_eq!(
+            crate::o1::close_orphaned_sessions(&d, None, now),
+            crate::o1::OrphanSweep::default()
+        );
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), body);
+        assert!(!has_any_data_row(&p), "★ 収束器側も「中身なし」と見ること");
     }
 }

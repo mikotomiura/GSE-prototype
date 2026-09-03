@@ -185,33 +185,12 @@ pub fn has_any_data_row(path: &Path) -> bool {
             Ok(l) => l,
             Err(_) => return true,
         };
-        let t = line.trim();
-        if t.is_empty() {
-            continue;
-        }
-        // ⚠️★ **診断行はデータ行に数えない。** 数えると「打鍵ゼロのセッション」でも
-        //   提出候補として残り、★ 空ファイル検出の網が緩む (code-reviewer MEDIUM)。
-        //   ここに追加する行型は「それ自体が被験者の作業を表さない」ものに限ること。
-        if t.contains(r#""type":"hook_health""#) {
-            continue;
-        }
-        // ⚠️★★ **`ime_state` も数えない。** 2026-08-10 の macOS 実機で実際に踏んだ:
-        //   ★ IME モニタは **アプリ起動直後**に `ime_state` を 2 行書く。ブロックを一度も
-        //   始めずにアプリを閉じただけの 80 秒 (meta 2 行 + `ime_state` 2 行・261 B) が
-        //   ここを `true` で通り、`.age` に包まれ、**block01 を消費して送信された**。
-        //   → 本物の 1 本目が block02 になった (`.steering/20260810-macos-visual-check-and-distribution/`)。
-        //
-        // ★ 実データで測った根拠 (推測ではない): ブロックを回したセッションで
-        //   `session_start` 行より **前**に出ていた非 meta 行は **`ime_state` だけ**であり、
-        //   開始後には `session_start` / `session_meta` / `feat` / `key` が出る。
-        //   → `ime_state` を落としても、本物のブロックは `feat`/`key` で必ず残る。
-        //
-        // ⚠️★ macOS で重い理由: 初回起動は「起動 → 権限付与 → 再起動」が正規手順なので
-        //   (`README_先に読む.txt`)、★ macOS 参加者はほぼ全員この経路を踏む。
-        if t.contains(r#""type":"ime_state""#) {
-            continue;
-        }
-        if !t.contains(r#""type":"meta""#) {
+        // ⚠️★★★ **判定は `crate::ndjson_scan::is_data_row` が単一真実源**である
+        //   (2026-09-03)。★ 旧版はここに規則を手書きしており、⚠️ `o1::scan_session_shape`
+        //   のコピーとズレていた（★ `meta` ＋ `ime_state` だけのファイルを向こうだけが
+        //   「中身あり」と読み、**収束器が絶対に提出しないファイルを閉じていた**）。
+        //   ⚠️ **ここで規則を書き直さないこと。** 診断行を足すなら `ndjson_scan` 側に足す。
+        if crate::ndjson_scan::is_data_row(&line) {
             return true;
         }
     }
