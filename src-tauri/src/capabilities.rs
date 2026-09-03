@@ -79,7 +79,14 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     // ⚠️★★★ O1 (R3): 被験者が記録を止めた / 再開した遷移 (ADR-014 D7-ii)。
     "recording_pause",
     // ⚠️★★★ O1 (R3-a): 非打鍵チャネル (ADR-014 D4 の段 1)。
-    //   ★ `secure_input` は **macOS 専用**で、⚠️ **まだ送出元が無い** (`observe_macos.rs` はスタブ)。
+    //   ★ `secure_input` は **macOS 専用**。⚠️★★★ **2026-09-03 訂正: 旧コメント
+    //   「まだ送出元が無い (`observe_macos.rs` はスタブ)」は失効している。**
+    //   ★ 送出元は 2026-08-24 に実装済み (`observe_macos.rs` の 1Hz ポーリング。下記
+    //   `SECURE_INPUT_AVAILABLE` 分岐と同ファイル L211 のコメントが正)。
+    //   ⚠️ Windows は相当 API が無く計器を持てない (`observe_windows.rs` の
+    //   `SECURE_INPUT_AVAILABLE = false`)。→ ★ **0 行の意味が OS で違う**。
+    //   ⚠️ 陳腐化したまま残ると、提出文書の「macOS は実装済み」と食い違って見える
+    //   (★ security-checker L-3 で顕在化した)。
     "focus_transition",
     "pointer_bin",
     "secure_input",

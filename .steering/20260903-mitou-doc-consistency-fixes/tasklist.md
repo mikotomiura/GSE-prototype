@@ -191,12 +191,56 @@
 - ★★ Inputlog 韓国語版の論文（⚠️ DOI 未確認・本文未取得）
 - ★ Lu 2020 全文 490 p（★ 本ラウンドは該当章のみ）
 
+## H. /finish-task の検査で出た指摘と対応 (2026-09-03)
+
+★ **`/cross-review` は 2 回目**（★ 1 回目は `b85ebed..cbd3ad0`、今回は **`cbd3ad0..HEAD`**。二重レビューを避けた）。
+★ Codex は **exit 0**・消費 57,330 tokens（当日合計 168,403 / 200,000）。⚠️ **skip なし。**
+
+⚠️★★★ **前回と同じスコープ不一致が再現した** —— `run-codex-review.sh` の固定 PROMPT は
+「バグ / セキュリティ / テスト / 設計」の 4 観点固定で、★ Codex は `md2docx.py` にしか触れない。
+→ ★ **文書の事実検証は Claude 側が担う**前提で投げた（★ §D の記録どおり）。
+
+### ★ security-checker: CRITICAL 0 / HIGH 0 / MEDIUM 3 / LOW 4
+
+| # | 指摘 | 対応 |
+|---|---|---|
+| **M-1** | ⚠️★★★ **`md2docx.py` の `out.unlink()` が `with zipfile.ZipFile(out)` の内側**。★ Windows では開いたまま消せず `PermissionError [WinError 32]` → **意図した `SystemExit` に到達せず壊れた `.docx` が残る** | ★ **修正**（検証を `with` の外へ）。⚠️ **本タスクの画像埋め込みがこの経路を初めて到達可能にしていた** |
+| **M-2** | ⚠️★★★ **私が消した但し書き**。旧文「**未実装である**セキュア入力欄での記録抑止」が `2a0aeb0` の書き換えで落ち、**実装済みに読める**状態だった（★ 実測: `logger.rs` / `recording.rs` に抑止ゲートは無い。macOS は**検出のみ**、Windows は計器自体が無い） | ★ **修正**。§6 に「閉じていない穴を先に書く」を新設し、**OS 別の非対称**まで書いた |
+| **M-3** | ADR-022 D5 の「漏れるもの」は **4 件**なのに、提案書は **2 件**しか書いていなかった | ★ **修正**。⚠️ **`.p8` 鍵が被験者 PC に置かれること**と、⚠️★★★ **鍵スコープ未決（研究全体で 1 本だと他被験者へ push できる）**、★ Android 側のリスナ要件を追記 |
+| **L-1** | 画像パスの境界チェック不在 | ⚠️ **前回 Codex 指摘を親が却下した件**。★ security-checker は **脆弱性としては却下を支持**したが、⚠️★★★ **事故の経路は実在すると実測**（repo 外の絶対パスが**警告なく提出物へ埋め込まれる**）→ ★ **封じ込め assert を追加**（判断を覆した） |
+| **L-2** | `esc()` が `"` を落とさず**属性文脈**で使われる | ★ **修正**（`&quot;` を追加）。★ 実測で `docPr` の属性が割れることを確認 |
+| **L-3** | `capabilities.rs:82` のコメント「まだ送出元が無い」が陳腐化 | ★ **修正**。⚠️ 提出文書が「macOS は実装済み」と外部へ主張した以上、コードが反証に見えるのは避ける |
+| **L-4** | 検証レポートで P014 の属性が仮名に紐づいた | ⚠️ **対応せず記録のみ**。★ 反証に必要な最小限であり（同値の反例そのもの）、repo は private・N=5 |
+
+### ★ cross-review: 両者一致 HIGH 0
+
+| 出所 | 指摘 | 対応 |
+|---|---|---|
+| Codex | `--selftest` が **CI 未統合** | ★ **採用**。`.github/workflows/ci.yml` の `frontend-check` へ **3 ゲート**（`md2docx --selftest` / `check_doc_lexicon` / `check_citations`）を追加。★ 既存の 3 つの self-test と同じ「検査が空振りしていないこと」まで見る思想に揃えた |
+| Codex | `secure_input` の **1Hz ポーリングが短時間区間を取り逃す** | ★ **採用**。技術設計書 §3.2 に限界を追記 |
+| Codex | 非打鍵チャネルの**残余プライバシーリスク**の記述が薄い | ★ **採用**。技術設計書 §3.4 に「**『推論に使っていない』は『リスクが無い』を意味しない**」を追記 |
+| Codex | SVG/PNG の寸法検査が高さしか見ていない | ⚠️ **却下（false positive）**。★ `cx` は常に固定値 `width_emu` なので、比較すべき可変値は `cy` だけ |
+| Codex | 一次資料の生ログを diff に同梱すべき | ⚠️ **却下**。★ 逐語をカード本文に埋める運用が確立している（`docs/literature/` 全体の慣行） |
+| Claude | `[83]` が本文で著者年号形式のみ | ⚠️ **要確認・据え置き**。★ 詳細資料は元からブラケット引用 0 件（`[82]` と同型）。→ **次ラウンドで表記規約を明文化** |
+
+### ★ 検査の実行結果
+
+- `cargo check` = **OK**（★ `capabilities.rs` のコメント変更のみなので念のため）
+- `md2docx --selftest` / `md2pptx --selftest` / `check_doc_lexicon` / `check_citations` = **全緑**
+- ★ **M-1 / L-1 / L-2 は振る舞いで検証した**（★ 壊れた `.docx` が残らない / repo 外画像を弾く / `"` 入り alt で正常生成）
+- schema parity = **skip**（★ `schema_dto.rs` / `current.json` とも非 touch）
+- ⚠️ `cargo test` は**回していない** —— ★ 実コード変更は `scripts/md2docx.py` の 1 ファイルのみで **Rust / TS は無変更**（`design.md` に理由を記録）
+
+### ⚠️ Step 5 (main の CI 発火確認) は該当なし
+
+★ `main` へマージしていない（★ `docs/expression-layer-os-constraints` 上に 7 コミット）。
+
 ## C. 完了処理
 
-- [ ] C-1 `/review-changes`（code-reviewer + security-checker 並列）
+- [x] C-1 `security-checker` 起動（★ `/cross-review` と並列）
 - [x] C-2 `/cross-review`（パス限定。★ 無関係な未コミット変更で fail-closed するため
       `-- docs/mitou_submission docs/references.md docs/adr` の形で回す）
-- [ ] C-3 `/finish-task`
+- [x] C-3 `/finish-task`
 
 ## 別タスクへ送るもの（本タスクのスコープ外）
 

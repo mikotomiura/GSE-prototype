@@ -20,9 +20,17 @@ ZIP_TS = (2026, 1, 1, 0, 0, 0)
 
 NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
 
+# ★ 画像の封じ込め先（★ 本ファイルは `scripts/` 直下にある）。
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 
 def esc(s: str) -> str:
-    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+    # ⚠️★★★ 2026-09-03: `"` を追加した。★ `esc()` は本文だけでなく
+    #   `docPr name="..." descr="..."` のような **属性文脈** でも使うため、
+    #   図の alt に `"` が入ると属性が割れる（★ security-checker が実測）。
+    #   ★ 本文側の出力は変わらない（XML のテキストノードでは `&quot;` も `"` と読まれる）。
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+             .replace('"', "&quot;"))
 
 
 # --- インライン（**太字** / `コード` / *斜体*） -------------------------------
@@ -173,6 +181,16 @@ def convert(md: str, base_dir: pathlib.Path) -> tuple[str, list[tuple[str, pathl
             image_path = (base_dir / target).resolve()
             if not image_path.is_file():
                 raise SystemExit(f"[NG] 画像が見つからない: {image_path}")
+            # ⚠️★★★ 2026-09-03 追加: **repo 外の画像を黙って埋め込まない**。
+            #   ★ 悪意ある入力者は居ないが、**事故の経路は実在する** ——
+            #   `![](C:/Users/.../screenshot.png)` と 1 行貼り付けるだけで
+            #   ⚠️ **外部へ出る提出物にスクリーンショットが入る**（★ security-checker が実測）。
+            try:
+                image_path.relative_to(REPO_ROOT)
+            except ValueError:
+                raise SystemExit(
+                    f"[NG] repo 外の画像は埋め込まない: {image_path} "
+                    "/ ★ 図は repo 内（例: docs/mitou_submission/figures/）へ置くこと")
             rid = f"rId{len(images) + 2}"
             images.append((rid, image_path))
             if image_path.suffix.lower() not in {".png", ".svg"}:
@@ -325,14 +343,26 @@ def write_docx(md: str, out: pathlib.Path, base_dir: pathlib.Path, compact: bool
             info.external_attr = 0o600 << 16
             z.writestr(info, image_path.read_bytes())
     # ★ 書いた直後に全パートを検証する。壊れた .docx を黙って出荷しない。
+    #
+    # ⚠️★★★ 2026-09-03 修正: 旧コードは `out.unlink()` を `with zipfile.ZipFile(out)` の
+    #   **内側**で呼んでいた。★ Windows では開いたままのファイルを消せないので
+    #   `PermissionError: [WinError 32]` が飛び、**意図した SystemExit に到達せず
+    #   壊れた .docx がディスクに残る**（★ security-checker が scratchpad で再現）。
+    #   ⚠️ 画像埋め込みを足したことで、この経路が初めて到達可能になった
+    #   （★ 図の alt に `"` が入ると `docPr` 属性が重複して ParseError になる）。
+    #   → ★ 検証を `with` の外へ出し、**閉じてから消す**。
+    bad = None
     with zipfile.ZipFile(out) as z:
         for name in z.namelist():
             if name.endswith((".xml", ".rels")):
                 try:
                     ET.fromstring(z.read(name))
                 except ET.ParseError as e:
-                    out.unlink(missing_ok=True)
-                    raise SystemExit(f"[NG] {out.name} :: {name} が不正な XML: {e}")
+                    bad = (name, e)
+                    break
+    if bad is not None:
+        out.unlink(missing_ok=True)
+        raise SystemExit(f"[NG] {out.name} :: {bad[0]} が不正な XML: {bad[1]}")
 
 
 def selftest() -> int:
