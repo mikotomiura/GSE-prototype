@@ -223,92 +223,138 @@ https://developer.apple.com/tutorials/data/design/human-interface-guidelines/<pa
 
 ---
 
-## ★ 進行中の再調査（★ rate limit で中断したもの）
+## 系統 E — Android（★ ロック画面の面 / secure lock screen / CompanionDeviceManager）
 
-| 系統 | 内容 |
+### ★★★ 結論: **ロック画面で常時アニメーションできる 3rd-party の面は「ライブ壁紙」一つだけ**
+
+| 面 | 3rd party API | アニメ | 逐語 / 実測 |
+|---|---|---|---|
+| **ライブ壁紙 (`WallpaperService`)** | ✅ 公開 | ✅ **任意 Canvas/GL・レートはアプリ制御** | *"Called to inform you of the wallpaper becoming visible or hidden. **It is very important that a wallpaper only use CPU while it is visible.**"*（`WallpaperService.java` L774-780） |
+| └ ロック画面で見えるか | ✅ **AOSP は見せる** | ✅ | SystemUI `applyKeyguardFlags()`: *"**Show the wallpaper if we're on keyguard/AOD** and the wallpaper is not occluded by a solid backdrop."* → `FLAG_SHOW_WALLPAPER`（`NotificationShadeWindowControllerImpl.java` L361-372） |
+| └ 画面 ON との連動 | — | — | *"As some wallpapers use visibility as a signal to start animations, this makes sure `Engine#onVisibilityChanged` is invoked **only when the display is both on and visible (with brightness on)**."*（L262-270） |
+| └ ⚠️ `FLAG_LOCK` で lock 専用に設定 | ❌ **3rd-party 不可** | — | `setWallpaperComponentWithFlags(name, which)` は `@SystemApi`+`@hide`、`SET_WALLPAPER_COMPONENT` = `signature\|privileged` |
+| └ ⚠️ lock 壁紙が別設定だと隠れる | — | — | *"When called with which=`FLAG_LOCK`, clear the lockscreen wallpaper. **The home screen wallpaper will become visible on the lock screen.**"* |
+| └ 3rd-party の設定経路 | ✅ **本人の確認必須** | — | *"Directly launch live wallpaper preview, **allowing the user to immediately confirm** to switch"*（`ACTION_CHANGE_LIVE_WALLPAPER`・API 16） |
+| **AOD / Ambient** | ❌ **公開 API は存在しない** | — | `<attr name="supportsAmbientMode">`: *"**This feature requires the android.permission.AMBIENT_WALLPAPER permission. @hide @SystemApi**"*（★ 当該権限は `signature\|preinstalled`）。`isInAmbientMode()` / `onAmbientModeChanged()` も `@SystemApi @hide` |
+| └ さらに targetSdk 35+ で封鎖 | — | ❌ | *"This change disables the `DRAW_WAKE_LOCK`, an internal wakelock acquired per-frame duration display DOZE. **It was added to allow animation during AOD.** … it will be removed."*（`@EnabledSince(VANILLA_ICE_CREAM)`） |
+| **ロック画面ウィジェット (glanceable hub)** | △ **実質不可** | △ | `WIDGET_CATEGORY_KEYGUARD` は **API 17・非 deprecated**（★ API 36 で `WIDGET_CATEGORY_NOT_KEYGUARD` 新設）だが、⚠️ `<bool name="config_glanceableHubEnabled">**false**</bool>`／*"The communal scene shows the glanceable hub **when device is locked and docked**."*／CDD *"**MAY support** application widgets on the lock screen."* |
+| └ `updatePeriodMillis` 最小値 | — | — | *"**Updates requested with `updatePeriodMillis` will not be delivered more than once every 30 minutes.**"*（★ AOSP `MIN_UPDATE_PERIOD = 30 * 60 * 1000`）。★ **明示 `updateAppWidget()` は非スロットル** |
+| └ `RemoteViews` の許可リスト | ✅ 限定的 | △ | 逐語 *"**Descendants of these classes are not supported.**"*。★ `ViewFlipper`（`android:flipInterval`）/ `ProgressBar`（`indeterminateDuration`）/ `AnalogClock` で 1–3 Hz は技術的に出せる。⚠️ **面そのものが依存できない** |
+| **オーバーレイ窓** | ❌ **ロック画面の下に敷かれる** | — | 層番号: `TYPE_WALLPAPER` = **1** / `TYPE_APPLICATION_OVERLAY` = **11** / `TYPE_NOTIFICATION_SHADE` = **17** |
+| **Smartspace** | ❌ | — | `@SystemApi` |
+| **DreamService** | ✅ 公開・任意描画 | ✅ | ⚠️ *"launched when a charging device is **idle, or docked in a desk dock**"* ＝ 用途が違う |
+
+### ⚠️★★★ (a)/(b)/(c) で `Engine` は visible になるか（★ 曝露予算の中心）
+
+| 局面 | 判定 | 確度 |
+|---|---|---|
+| **(a) 画面 ON・ロック画面を見ている数秒** | ✅ **visible = true。描画される** | ★ **高**（AOSP 実装コードで直接確認） |
+| **(b) AOD 中** | ❌ **3rd-party はアニメーションできない** | ★ 高（★ ただし `onVisibilityChanged` の実値は **end-to-end 未確認** → **M-7**） |
+| **(c) 画面消灯中** | ❌ 描画されない | ★ 中〜高 |
+
+→ ★★★ **曝露予算を (a) に賭ける設計は正しい。** ★ (a) は AOSP 実装コードで裏が取れている。
+⚠️ **フレームレート上限は見つからなかった**（★ 「無い」ことを網羅確認したわけではない）。
+
+### ★ secure lock screen（Android）
+
+| 項目 | 逐語 / 実測 |
 |---|---|
-| **E** | Android のロック画面の面・アニメーション・secure lock screen・`CompanionDeviceManager` |
-| **F** | iOS の Live Activities / Dynamic Island / AOD / secure lock screen / オフスイッチ |
-| **G** | 曝露量の外的妥当性（★ 顔認証時代・2024 年の視線研究） |
+| 通知の既定 | *"**The default level, `VISIBILITY_PRIVATE`**, … The notification's icon and tickerText … are shown in all situations, but the contents are only available if the device is unlocked"* |
+| チャネル単位はアプリから設定不可 | `setLockscreenVisibility()`: *"**Only modifiable by the system and notification ranker.**"* |
+| `isUserUnlocked()` | *"**On devices with direct boot, a user is unlocked only after they've entered their credentials** … **When a user is locked, only device-protected data storage is available.**"* |
+| ★ **BFU でライブ壁紙は動く**（`directBootAware` 必須） | *"This happens for **wallpapers that are not direct-boot aware**; they can only be rendered after the user unlocks the device for the first time after a reboot. **In the meantime, the default wallpaper is shown instead.**"* ／ ログ *"Wallpaper isn't direct boot aware; using fallback until unlocked"* |
+| ⚠️★★★ **BFU で AppWidget は不可（例外なし）** | `AppWidgetServiceImpl.java` **L1017-1020**: `throw new IllegalStateException("User " + userId + " **must be unlocked for widgets to be available**")` ／ ★ **全 7109 行に対する `grep -c directBootAware` = 0**（★ 実測） |
+| ★ **stopped 状態からの正規の離脱事由** | `ApplicationInfo.FLAG_STOPPED`: *"could also include user actions like adding it as an app widget, **selecting it as a live wallpaper**, selecting it as a keyboard"* → ★ **裏技ではなく OS が想定した常駐の作り方** |
+| ★ 本人が止める経路 | `ACTION_SET_WALLPAPER`（API 1）／ `ACTION_LIVE_WALLPAPER_CHOOSER`（API 7）／ `clear(int)` = *"reverting to the system default"*（API 24） |
+| ⚠️ 常駐と統制のトレードオフ | *"The following types of apps are exempt from entering the restricted bucket … **Apps with active widgets**"* |
+
+### ⚠️★★★ `CompanionDeviceManager` は搬送路にならない（★ 独立証拠 5 件）
+
+| # | 実測 |
+|---|---|
+| ① | `public final class WifiDeviceFilter implements DeviceFilter<**ScanResult**>` —— ★ `android.net.wifi.ScanResult` は**アクセスポイント**。`matches()` は namePattern と BSSID のみ |
+| ② | *"For Bluetooth classic devices this is triggered when the device connects/disconnects. **WiFi devices are not supported.**"*（`startObservingDevicePresence`） |
+| ③ | `android.companion` 全ソース ＋ `services/companion` を `mdns\|nsd\|dns_sd\|dnssd\|bonjour\|zeroconf` で grep → ★ **0 件** |
+| ④ | ⚠️★★★ `android.companion` 全ソースを `picker` で grep → ★ **0 件**。公開 SDK の `FLAG_` 定数は `FLAG_CALL_METADATA = 1` のみ → ★ **前セッションの「`FLAG_SHOW_PICKER` 発見」は誤り。撤回する**（→ ADR-022 D8） |
+| ⑤ | `setSelfManaged()` は `signature\|privileged`、`REQUEST_COMPANION_PROFILE_COMPUTER` も `signature\|privileged`（*"**Not for use by third-party applications.**"*）、`notifyDeviceAppeared()` は `@SystemApi @hide` |
+
+★ **CDM の picker 相当 UI は存在する** —— *"**choose the device to associate the application with** … **confirm the association**"*。
+⚠️ **ただしそれは `IntentSender` 経由の関連付け確認 UI であって、mDNS 探索ではない。**
+
+⚠️★★★ **FGS の「通知要件」は免除されない**（★ 混同しやすい）:
+★ `REQUEST_COMPANION_RUN_IN_BACKGROUND`（protection level **normal**）が免除するのは
+**「BG からの FGS *起動* 制限」**であって、**「常時通知を出す要件」ではない**。
+★ 実測: `ActiveServices.java` の通知ロジックに **companion 条件は 1 つも無い**。
+★ `startForeground()` 逐語: *"supplying **the ongoing notification to be shown to the user** while in this state"* ／
+*"notification Notification: … **This value cannot be null.**"*
+
+⚠️ **関連付け解除 UI は AOSP Settings に存在しない**:
+`BluetoothDetailsCompanionAppsController.isAvailable()` が *"// Do not show this preference for now."* で
+`false` を返す状態が **main / 16 / 15 / 14 / 13 の全ブランチで同一**。
+★ ガイド逐語: *"**The companion app is responsible for clearing its own associations**"*。
+→ ★ **将来 CDM を使うなら解除 UI は自前実装が要る**（★ 同意文書の撤回手段と直結）。
+
+★ **アンインストール / データ消去**: `onPackageRemoved` / `onPackageDataCleared` の両方が全 association を `disassociate()`。
+
+### ⚠️ 系統 E で一次に届かなかったもの（11 項目・★ 主要なもの）
+
+1. **Pixel など実機で glanceable hub が有効か**（★ AOSP 既定 false・有効化は端末 overlay）
+2. **Android 15/16 のロック画面ウィジェット公式発表ページ** —— ★ `/develop/ui/views/appwidgets/lockscreen` 等は **404**
+3. **`WallpaperService` リファレンスの Direct Boot 記述** —— ★ ページ内 0 hits（根拠は AOSP のコメント／ログ文字列のみ）
+4. ⚠️★★★ **CDD にロック画面へ壁紙を出す要件は無い** → ★ **「ロック画面に壁紙が見える」は AOSP 実装の事実であって CDD 保証ではない**（★ OEM が変え得る）
+5. **OEM 固有挙動**（Samsung / Xiaomi の省電力）—— ★ Google 公式は *"Every manufacturer can set their own criteria"* のみ
+6. **Doze 中の bound `CompanionDeviceService` のネットワーク保証**
+7. ⚠️★ **AOD 中に 3rd-party `Engine` へ渡る `onVisibilityChanged` の実値**（→ **M-7**）
+8. ⚠️★ **ロック画面／壁紙固有のフレームレート上限の有無**
 
 ---
 
-## 系統 F — iOS の Live Activities / Dynamic Island / AOD / secure lock screen
+## 系統 G — 曝露量の外的妥当性（★ 顔認証時代）
 
-### ★★★ 判定 1: **Live Activity の「alert なし更新」は通知に近い提示ではない。⚠️ ただし遠隔開始は alert 必須。**
+### ★★★ 結論: **(A) 崩れていない。** ⚠️ ただし限界を 2 つ明記する。
 
-| # | 逐語（英語原文） | 出典 |
-|---|---|---|
-| 1 | ★ 既定で無音: `func update(_ content:, alertConfiguration: AlertConfiguration? = **nil**) async` | `activitykit/activity/update(_:alertconfiguration:)`（iOS 16.2+） |
-| 2 | ★ alert を付けたときだけ音と点灯: *"Live Activity alerts **light up the screen and by default play the notification sound** … **Alerts also show the expanded presentation in the Dynamic Island** or a banner on devices that don't support the Dynamic Island."* | HIG `live-activities` |
-| 3 | ★ WWDC も同旨: *"**Alerting lights up the screen and plays the standard notification sound** so the update isn't missed."* | WWDC23 10194 |
-| 4 | ⚠️ 無音の選択肢が無い: `AlertConfiguration.AlertSound` の構成メンバは **`named(_:)` と `default` の 2 つのみ**（`.none` 相当なし） | `activitykit/alertconfiguration/alertsound` |
-| 5 | ⚠️★★★ **push-to-start は alert が「requirement」**: *"it comes with the following **requirements**: … **Include an `alert` in the JSON payload.**"* ／ *"**By including an alert … you make sure a person gets alerted** about the started Live Activity"* | `starting-and-updating-live-activities-…` |
-| 6 | ★ push-to-start は iOS 17.2 以降: *"**On devices that run iOS or iPadOS 17.1 and earlier, you can't start Live Activities with ActivityKit push notifications.**"* | 同上 |
-| 7 | ★ アプリ内起動は前景が原則: *"**In general, your app needs to be in the foreground to start a Live Activity.**"*（★ 例外は `LiveActivityIntent`＝人の操作起点） | `displaying-live-data-with-live-activities` |
-| 8 | ★ Dynamic Island は通知と同じ層: *"**like notifications, the Dynamic Island floats on a layer above apps**"* | WWDC23 10194 |
-| 9 | ★ Settings 階層は**通知配下ではない**: *"go to **Settings, tap Apps**, tap the app …, then tap **Live Activities**"* | iPhone ユーザガイド（iOS 26） |
+#### ★ [P264] の分母を一次で確認した（★ 想定どおりだった）
 
-⚠️★★★ **一次の中で衝突している点（★ 未解決・実機検証が要る）**:
-HIG は expanded を **alert に紐づける**が、ActivityKit 記事は *"it **also appears briefly for Live Activity updates**"* と
-**無条件に**書いている。→ ★ **alert なし更新でも一瞬 Dynamic Island が膨らむのかは一次で確定できない。**
-★ 膨らむなら「注意を奪う提示」に寄る。
+| 逐語（本文） | 何が分かるか |
+|---|---|
+| *"Overall, this resulted in a dataset of **n=894 unique smartphone use sessions, of which 221 (24.7%) constituted locked phone use**."* | ★ **分母は 221 件＝ロック状態のまま完結した接触** |
+| *"**Lock screen checks ranged between 1s and 22s and lasted 4.2s on average (median 3s, standard deviation 4.1s).**"* | ★ **4.2 秒 / 中央値 3 秒はロック画面での接触の値** |
+| *"We find that about a quarter of smartphone interactions represent using the phone for a very brief amount of time (**3-4s on average**) in a locked state."* | ★ Discussion でも一致 |
 
-### ★★★ 判定 2: ⚠️★★★ **A-7（1–3 Hz の持続振動）は現行 iOS の公開 API では成立しない。**
+★ **測定は端末ログではなく一人称カメラ（Subcam・200 時間超）の行動コーディング**
+（★ 二重コーディング一致率 **94%** / Krippendorff's α = **0.91**）。
+→ ★ **「実際に見ている時間」に近く、本プロジェクトの構成概念に合致する。**
+★ 標本 n=41・**iOS 78%**・UK 2018–2019 収集 → ★ **顔認証普及後の iOS 主体の標本である。**
 
-★ **4 本が独立に同じ結論を指す**:
+#### ★ 2024 年の一次を 1 本追加した（→ `[P268]`）
 
-| # | 逐語 | 何を塞ぐか |
-|---|---|---|
-| 1 | ⚠️★★★ *"**On devices that include an Always-On display, the system doesn't perform animations to preserve battery life in Always On.**"* | ★ **AOD ではアニメが 1 フレームも出ない**。★ 「ロック画面に置きっぱなし」が主用途なのだから、**これが本命の潰し** |
-| 2 | ★ パネル自体が落ちる: *"**when not in use, the display efficiently adjusts down to 1Hz**"* | ★ 1 Hz では 1.5 Hz を再現できない |
-| 3 | *"**Animations in widgets and Live Activities have a maximum duration of two seconds.**"* ＋ *"**`Transaction` isn't available**"* | ★ 持続の土台が無い |
-| 4 | *"widget extension is **not continually active**"* ／ *"timeline entries … **at least about 5 minutes apart**"* ／ *"**Widgets don't show real-time information.**"* | ★ ウィジェット経路が塞がる |
-
-⚠️ **さらに HIG が正面から抑制している** —— 逐語:
-*"**unnecessary changes during Always On can be especially distracting on iPhone**, because people often put
-their device face up on a surface, **making motion on the screen visible even when they're not looking directly at it.**"*
-→ ★ **仮に技術的に出せても HIG 違反方向。**
-
-⚠️ **唯一の未確定**: *"`.repeatForever` が Live Activity のビュー内で動くか"* は**一次に記述が無い**。★ 実機検証が要る。
-
-### ★ AOD は被験者間の強い交絡になる
+★ **Abdrabou et al., CHI EA '24**, doi:10.1145/3613905.3651094（★ 著者版 OA: `eprints.gla.ac.uk/323192`）
+N=21・24 時間 in-the-wild・前面カメラ ＋ Seeso.io（較正不要）・**Android 専用**。
 
 | 逐語 | 含意 |
 |---|---|
-| *"**The Always-On display setting is on by default.** To turn it off, go to Settings > Display & Brightness"* | ★ 既定オン・オフ可 |
-| ⚠️★★★ *"The display **automatically turns off** when iPhone is either **face down or obstructed from view**, **not near a paired Apple Watch**, when a CarPlay session begins, while Continuity Camera is in use, **while Low Power Mode is on**, **while Sleep Focus is on**, or **at your usual bedtime**."* | ⚠️★★★ **被験者の生活条件で表示が消える。★ 曝露量が統制できない** |
-| *"Devices with the Always-On display **render widgets on the Lock Screen with reduced luminance**"* | ⚠️ **明度が唯一の符号なのに、その明度が削られる** |
-| ★ 輝度低下の程度・コンテンツ更新レートの**数値は一次に明記なし** | ⚠️ 未確認 |
+| *"On average, participants took **6.33s for patterns, 5.94s for passwords, 4.51s for PINs, and 4.15s for fingerprints**. Participants unlocked their phones an average number of **37.71 times** (max=58, min=8)."* | ★ 2024 年でも解錠まわりは瞬間的でない |
+| ⚠️★★★ *"attentive techniques having more gaze on the screen (**M = 83.33**; SD = 18.94) than inattentive (**M = 23.53**; SD = 23.87)"*（`U=45, P=.011`） | ⚠️★★★ **指紋解錠では実質 1 秒未満しか画面を見ていない** |
+| ⚠️★★★ *"Using the smartphone's front camera for gaze estimation, our study **couldn't analyse gaze behaviour during FaceID unlock**."* | ⚠️★★★ **Face ID は測れていない** |
 
-### ★ secure lock screen — ★ オフスイッチ要件は満たせる
+⚠️★★★ **構成概念が違うので [P264] と足し合わせてはならない** ——
+★ [P268] が測ったのは **「解錠動作中の視線」**、[P264] は **「ロック画面での滞在時間」**。
+★ 層 A の予算が乗っているのは **「解錠に進まない接触」**（★ [P264] の 24.7% / [P240] の 42.6% / [P263] の 54%）
+であり、[P268] が測ったのは **「解錠に進む接触」**である。→ ★ **別の母集団。**
 
-| 逐語 | 含意 |
-|---|---|
-| *"You can quickly access useful features and information from the Lock Screen, **even while iPhone is locked**."* | ★ ロック中に見える |
-| ★★★ *"users can configure whether to show sensitive data on the Lock Screen … they can **deactivate data access for Lock Screen widgets in the "Allow Access When Locked" section of Settings > Face ID & Passcode**."* | ★ **本人が隠せる**（Apple Platform Security・2024-05-07） |
-| ★ BFU: *"the developer can **add the Data Protection capability to a widget extension**. Until a user unlocks their device …, **WidgetKit displays placeholders instead of the widget content**."* | ★ 初回解錠前は placeholder |
-| ★ 既定クラス: *"**Protected Until First User Authentication** … **This is the default class for all third-party app data**"* | ★ 既定では BFU 後に読める |
-| ★ 個別に消せる: *"**A person can remove your Live Activity from their Lock Screen at any time.**"* | ★ 交渉不可要件を満たす |
-| ★ HIG が要求: *"**make it easy for people to turn them off in your app**"* | ★ アプリ内にも停止 UI が要る |
+#### ⚠️★★★ 引用してはいけないもの（★ 実測で判明）
 
-★ **本人が止める経路は 11 通り確認できた。**
-⚠️ ただし **`Always On Display` オフ・`Allow Access When Locked` オフは日常機能も一緒に落とす**
-（逐語 *"However, **you also lose quick access to the information yourself**."*）
-→ ★ **同意文書では「アプリ単位の停止（Settings > Apps > <app> > Live Activities）が第一の経路」と明示する設計が要る。**
+⚠️ **[P153] の「準備時間 22.7 秒」「未解錠時の平均 71.5 秒」を使ってはならない。**
+★ これらは **[P264] の Related Work による [P153] の要約**であって、**[P153] 本文を直接確認していない**。
+→ ★ **`citation-ssot` の「二次引用を根拠にしない」に該当する。**
 
-⚠️ **Stolen Device Protection (iOS 17.3+) は該当しない** —— ★ 保護対象の列挙にロック画面ウィジェット /
-Live Activities が**入っていない**（実測）。
+#### ⚠️ 探したが見つからなかったもの（★ 検索式を明記）
 
-### ⚠️ 系統 F で一次に届かなかったもの
+⚠️ **本セッションは WebSearch の予算を使い切ったため、Crossref / OpenAlex / Semantic Scholar の API 直叩きのみ**
+（★ 各 2 クエリ程度の軽い探索であり、**網羅的な「存在しない」の証明ではない**）。
 
-1. ⚠️★★★ **alert なし更新で Dynamic Island が一瞬 expanded になるか**（★ 一次内で衝突）
-2. **alert 時に haptic が鳴るか**（★ 一次は「点灯」と「音」しか書いていない）
-3. **`Allow Access When Locked` の項目名と既定値**（★ Apple Platform Security も書いていない）
-4. **Live Activities を一括オフする画面パス**（★ HIG は存在を書くがパスが無い）
-5. **BFU で Data Protection 未指定のウィジェットが描画されるか**
-6. **AOD の輝度低下の数値** / **AOD 中のコンテンツ更新レートの数値**
-7. **`.repeatForever` の可否**（★ 判定 2 の唯一の穴）
-8. **アニメ修飾子を system が無視する条件** —— ⚠️ **一次の 2 ページが矛盾**
-   （WidgetKit 記事は *"For Live Activities … on devices that run **iOS 16 or earlier**"* と限定するが、
-   ActivityKit 記事は **バージョン限定なしで** *"the system ignores any animation modifiers"* と書く）
+1. **Face ID / 生体認証時代（2018 年以降）のロック画面滞在時間の実測（iOS 中心）**
+   —— 検索式 `Face ID unlock duration field study smartphone`（OpenAlex・from 2018-01-01）→ **該当なし**
+2. **「ロック画面止まりの接触割合」の 2018 年以降の再測**
+   —— 検索式 `smartphone screen checks not unlocked percentage field study`（Crossref・from 2018-01-01）→ **該当なし**
+3. **通知がロック画面での視線を横取りする問題の秒単位実測** —— ★ **未着手**（時間予算）
