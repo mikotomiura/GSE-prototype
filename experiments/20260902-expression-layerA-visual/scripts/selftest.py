@@ -122,8 +122,36 @@ def run(cfg_path: Path, html_path: Path) -> None:
           'fetch("../layerA.config.json"' in html, "")
     check("⚠️ fetch 失敗時に停止する（★ フォールバックで別条件を走らせない）",
           "既定値では走りません" in html, "")
+    # ⚠️ 2026-09-03: 旧実装は `html.replace("CAL.pxPerDeg", "CAL.pxPerDeg")` という
+    #   自分自身への no-op 置換で、何も意味していなかった（★ `code-reviewer` MEDIUM 指摘）。
     check("HTML が較正ゲートを持つ（★ 視角 1° は較正なしに意味を持たない）",
-          'btn-cal-apply' in html and 'CAL.pxPerDeg' in html.replace("CAL.pxPerDeg", "CAL.pxPerDeg"), "")
+          "btn-cal-apply" in html and "CAL.pxPerDeg" in html, "")
+
+    # ★ 写像の人間可読な説明が別ファイルへ分離されているか（★ `code-reviewer` HIGH 指摘）
+    notes = cfg_path.parent / "layerA.mapping-notes.json"
+    check("★ 写像の人間可読な説明が別ファイルへ分離されている",
+          notes.exists() and "note" not in cfg["levels"]["stable"], str(notes.name))
+    check("★ 説明を unseal() で初めて fetch する（★ 起動時に読まない）",
+          'fetch("../layerA.mapping-notes.json"' in html
+          and html.index("async function unseal") < html.index('fetch("../layerA.mapping-notes.json"'), "")
+    check("⚠️★★★ 「技術的な封印ではない」と明記している（★ 誤解を防ぐ）",
+          "技術的な封印ではない" in html, "")
+
+    # ★ 出題順が level × variant で均衡しているか（★ HIGH 指摘の再発防止）
+    #   ⚠️ JS の実装を Python から直接は回せないので、**均衡を保証する実装であること**を検査する。
+    check("⚠️★★★ 出題順が level ごとに variant を層別割当している",
+          "vShuffled" in html and "この level の中で variant を均等に作る" in html, "")
+    check("★ ページ内検査が level × variant の均衡を検算している",
+          "level × variant が均衡している" in html, "")
+    # ★ クロスフェードが乗算になっているか
+    check("★ drawField が mix を乗算している（⚠️ 絶対代入でない）",
+          "0.45 * mix" in html and "1.0 * mix" in html, "")
+    # ★ 中止後の再開で結果配列がクリアされるか
+    check("★ 中止後の再開で前回の途中結果を破棄する",
+          "arr.length = 0;" in html, "")
+    # ★ ブロック 1a の露出に上限と順序シャッフルがあるか
+    check("⚠️ ブロック 1a の提示順をシャッフルし、総露出に上限を置いている",
+          "FR_MAX_MS" in html and "const order = shuffle(LEVELS.map" in html, "")
     check("⚠️★★★ 写像がブロック 1b まで封印される（C7）",
           "sealed" in html and "unseal" in html, "")
     check("⚠️ C7 を明文で持っている（事前に『読めますか』と聞かない）",
