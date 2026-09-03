@@ -54,7 +54,7 @@
 | コホート判定 | cohort verdict | 被験者別 calibration レポートを横断集約し、2段ゲートでコホート全体の Go/Kill/INCONCLUSIVE/DataInsufficient を出す判定 (`gse-cohort` / `analysis::cohort`)。ゲート駆動は各人の C-index 中央値 (PreReg-4)。`model_gate`/`measurement_gate` を再利用 (v0.3 Task E) | 「gse-cohort でコホート判定を出す」 |
 | データ不足判定 | DataInsufficient | コホート判定の値の 1 つ。主指標被験者0名・提示プローブ0件・PreReg-5 最低要件 (eval≥6/probe≥16) 充足者なしのとき、無理に Go/Kill とせず「データ拡充が必要」と正直に報告する状態 (v0.3 §11 主張限界) | 「PreReg-5 未達なので DataInsufficient」 |
 | Need | Need | 介入が必要そうかを表す層。MVP では主に `p_stuck` を `stuck_likelihood` として利用する | 「Need は高いが Opportunity が低い」 |
-| Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss、Monk Mode で判定する | 「Opportunity が低いため defer する」 |
+| Opportunity | Opportunity | 今介入してよいかを表す層。idle、post-burst pause、cooldown、daily cap、recent dismiss で判定する（⚠️ **2026-09-01 訂正: 「Monk Mode」を削除** — ADR-015 D2 で機能ごと削除済み） | 「Opportunity が低いため defer する」 |
 | 受容性 | Receptivity | 今このユーザーが介入を受け取れる状態かを表す層。**Layer 5（Opportunity 側）に属する**。現行実装は cooldown + daily_cap + recent_dismiss + idle gate の**分解形**で、統合スコアは持たない（**ADR-007**）。⚠️ **潜在状態（Layer 4）に置かない**——入力がシステム状態と履歴であり潜在状態からの放出ではないため（**ADR-009**） | 「Receptivity は Layer 5。Layer 4 の潜在状態に混ぜない」 |
 | 自力回復リスク | self_directed_recovery_risk | このユーザーが、この task 文脈で、**近い時間範囲（horizon H）内に自力による前進を回復できない確率**。Layer 4 の出力として `WorkStateEstimate` に additive 追加する提案（**ADR-009**・Proposed）。旧 X 軸（Cognitive Friction）の後継候補で、criterion が主観プローブでなく**行動**である点が決定的に異なる | 「recovery risk 単独では強介入を出さない」 |
 | 前進 proxy | progress_proxy | 個人×task_kind×phase 基準で正規化した**純産出の持続**（窓内の 挿入−削除 打鍵数を個人基準で正規化し、T 秒以内に取り消されないこと）。content-free（打鍵数と時刻のみ）。`self_directed_recovery` ラベルの構成要素 | 「progress_proxy が個人基準を超えたら回復とみなす」 |
@@ -68,6 +68,7 @@
 | 入力皆無 | no_input | 沈黙ギャップのうち、**OS の最終入力時刻が動かない**時間。`liveness.rs::step` が `starved_ms` を凍結する区間。⚠️ **離席・静止した読書・思考を区別しない** | 「入力皆無が長い沈黙は離席とは限らない」 |
 | 在席割合 | presence_ratio | 沈黙ギャップにおける `peak_starved_ms / gap_duration_ms`。0 に近いほど入力皆無、1 に近いほど在席×非打鍵。⚠️ 30 秒未満の starvation は記録されないため**下側が切れている** | 「presence_ratio を T0（沈黙長のみ）に足して勝ち幅を測る」 |
 | 打鍵再開 | typing_resumption | 沈黙ギャップが打鍵によって終わること。⚠️★ **回復（recovery）ではない**——別作業を始めただけの可能性を排除できないため、`self_directed_recovery` と同一視しない | 「typing_resumption は recovery proxy であって recovery ではない」 |
+| 関与の再開 | re-engagement | ★★★ **demanding な作業のあとに戻るのは「処理能力」ではなく「投資を続ける意思」である**という枠組み（[P203] Lin et al. 2020・事前登録 4 実験・N=686・拡散モデル: 努力の行使が下げるのは `response caution` であって抑制制御ではない）。★ この低下は**可逆**で、**報酬を上げるだけで行動・P3・瞳孔径が揃って戻る**（[P209] Hopstaken et al. 2015 逐語 *"After increasing the rewards, all measures reverted to higher levels."*）。⚠️★★★ **「回復 / 消耗 / リソースの補充」で言い換えてはならない** —— それらは**限定資源モデル（ego depletion）の語彙**であり、**事前登録・大規模の検定で否定されている**（⚠️ **「死んだ」とは断定しない** —— [P202] は *"the available evidence is **inconclusive**"*、[P204] は **d = 0.10** の小効果を報告している。→ `research-positioning.md` §3 (b) に両方併記）（[P199] d=0.04 / [P200] d=0.06 / [P201] PEESE b=0.003）。★ **注意回復理論（ART）も同じ穴に落ちる**ため理論基盤に使わない（[P10] / [P192]・→ `research-positioning.md` §3）。★ **GSE にとっては技術的にも有利**: 限定資源モデルは単調減衰を予測するが観測されず、生き残った説明が予測する**変動し・文脈依存で・可逆な関与の低下**こそ、30 秒ローリングウィンドウが実際に検出できるものである | 「Physical Anchor が接地するのは*関与の再開*であって回復ではない」 |
 | 探索トラック | exploratory track | 事前登録の適格性ゲート（`keydown ≥ 100`）を適用しない解析系統。⚠️ **確証主張には使わない**。確証トラック（ゲート適用済み）と結果を混ぜない | 「本実験は探索トラックなので確証主張に使わない」 |
 | 形成的研究 | formative research / measurement development | ★ **何を測るべきかを決めるための研究**。⚠️ **効果や利得を推定しない**ため `§9` A-Q3 の解除条件は発動しないが、**利得を一言でも主張した瞬間に発動する**（**ADR-012**） | 「これは形成的研究なので利得を主張しない」 |
 | 沈黙被覆率 | silence coverage | ★ **≥30 秒の沈黙ギャップの総時間のうち、あるチャネル集合のイベントが覆った割合**（各イベント時刻 `t` が `[t−w, t+w]` を覆うとし、重なりは和集合で 1 度だけ数える）。⚠️ **分母から打鍵の時間を定義上除いている**ため、「頻度が高い操作＝打鍵」が再び選ばれる退行が起きない。⚠️ **「入力があった」ことしか言わず「作業していた」ことの証明ではない**（**ADR-012 D1**） | 「この層の沈黙被覆率は全員で θ を超えた」 |
@@ -86,10 +87,10 @@
 | 参照チャネル | reference channel | ⚠️★★★ **ADR-012 D12 の「参照」は *画面録画* を指す**（検証用サブサンプルのみ・研究者 PC の暗号化領域・**コード化直後に破棄**）。★ `.idea/20260819-…` メモが「**参照計測器**」と呼んでいる*行動*計測器（ADR-012 D7 の別計測器）と**別物である**。⚠️ **同じ「参照」の語で混同しない** | 「参照チャネル（録画）と別計測器（行動）を混同しない」 |
 | 試行の連番 | attempt sequence number | ★ **提出物 `.age` に付くブロック番号が、プロトコルのブロック番号ではなく *起動した試行* の連番であること**。`reconcile.rs::next_block_number` が `.age` 名と `manifest.jsonl` の**最大値 + 1**（ディスク突き合わせ）で決めるため、中断した試行も番号を 1 つ消費する。⚠️ **対応付けは `manifest.jsonl` と NDJSON の中身で復元する** | 「block08 は 8 ブロック目ではなく 8 回目の試行である」 |
 | アウェイアイドル | away_idle | `idle_ms ≥ 180秒` で**介入を全停止**するサプレッション (席を離れたら黙る=不便益)。一次抑制は idle 閾値そのもの。加えて放置で p_stuck も低下するため二重に介入は出ない (idle≠Stuck) | 「10分放置で介入が出ないのは away_idle で正常」 |
-| 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `wall` / `defer` と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
+| 介入判断 | InterventionDecision | `analysis::intervention` が返す介入ポリシー出力。`none` / `nudge` / `defer`（⚠️ **2026-09-01 訂正: `wall` を削除** — ADR-015 D1。実測 `intervention.rs:16-20`） と説明スコアを含む | 「InterventionDecision を NDJSON に記録する」 |
 | defer | defer | Need はあるが、今は介入機会ではないため先送りする判断 | 「active typing 中なので defer」 |
-| daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Wall daily cap により defer」 |
-| cooldown | cooldown | 介入後の再介入禁止時間。Nudge は 10 分、Wall は 60 分を MVP 初期値とする | 「cooldown 中なので Nudge を抑制」 |
+| daily cap | daily cap | 1日あたりの介入回数上限。通知疲れと過介入を防ぐ | 「Nudge daily cap（6 回/日）に達したので defer」（⚠️ **2026-09-01 訂正 —— 旧例は「Wall daily cap により defer」。Wall は ADR-015 D1 で削除済み**） |
+| cooldown | cooldown | 介入後の再介入禁止時間。**Nudge は 10 分**（実測: `src-tauri/src/analysis/intervention.rs:5` `NUDGE_COOLDOWN_MS = 10 * 60 * 1000`）。⚠️ **2026-09-01 訂正 —— 旧文の「Wall は 60 分」は失効**（ADR-015 D1 で Wall ごと削除。★ 現行に Wall 系の定数は 1 つも無い） | 「cooldown 中なので Nudge を抑制」 |
 | recent dismiss | recent dismiss | 直近で介入が拒否された事実。MVP 初期値では 20 分間、同種介入を抑制する | 「recent dismiss により defer」 |
 
 ### 表現層 (メディア表現 / 音)
@@ -101,7 +102,7 @@
 | 用語 | 英語表記 | 定義 | 関連用語 |
 |---|---|---|---|
 | 表現層 | expression layer | MhD の出力 (`ewma_x` / `ewma_y` / `p_flow`・`p_inc`・`p_stuck`) を**常時リアルタイムで音・映像に写す**層。★ **推定も介入判断もしない**（出力を入力として使うだけ）。版は `EXPR_VERSION` で刻む | `EXPR_VERSION`, 層 0–3 |
-| 層 0 / 基層 | layer 0 / bed | 55–110 Hz 帯の持続音 ＋ **整数次倍音のみ**（非調和成分ゼロ・sharpness 低）。★ **状態に応答しない**——[P48] が要求する「自分の通常」の参照点。⚠️ **2026-08-12 改訂 (S3-D12)**: 「不動である」ことは役目ではない。**状態と無関係な自律変異は許される**（並置を成り立たせているのは「状態に応答しないこと」であって「変化しないこと」ではない） | 層 1–3, ドローン, 層 0 の自律変異 |
+| 層 0 / 基層 | layer 0 / bed | 55–110 Hz 帯の持続音 ＋ **整数次倍音のみ**（非調和成分ゼロ・sharpness 低）。★ **状態に応答しない**——[P48] が要求する「自分の通常」の参照点。⚠️ **2026-08-12 改訂 (S3-D12)**: 「不動である」ことは役目ではない。**状態と無関係な自律変異は許される**（並置を成り立たせているのは「状態に応答しないこと」であって「変化しないこと」ではない）。⚠️★★★ **2026-09-02 追加 (ADR-021 D10)**: **上記の定義は *音* の層 0 である。**★ スマホ側の**視覚**表現には縮退先が無く、**ADR-017 D4 制約 3（途切れたら層 0 へ縮退）が実行不能だった**。→ ★ **視覚側の層 0 を「状態に応答しない、しかし *在ることが分かる* 基層」と定義する**: ⚠️★★★ **空白・消灯にしない**（★ 「変化なし」を明示的に描かないと本人も他者も「無い」と読む・[P242]）／★ **データを担わない視覚次元を仕様で明示する**（[P101] 逐語 *"a flower's height has **no relation** to the activity's duration"*）／★ **`stable` と弁別できること**（★ ADR-021 D9 の代償を検査可能な要件に変える） | 層 1–3, ドローン, 層 0 の自律変異, 層 A |
 | 層 1 / うねり | layer 1 / swell | 摩擦 (`ewma_x`) を帯域幅・スペクトル重心に写す層。全遷移は時定数 ≥60 秒 | 層 0 |
 | 層 2 / 粒子 | layer 2 / grain | 前進 (`ewma_y`) をグラニュラー密度に写す層。★ **粒子率の下限 100 grains/s**（下回ると粒が個別に聞こえ、リズムとして分節する＝ISE 側） | 分節, 層 0 |
 | 層 3 / 空間 | layer 3 / space | 残響時間・初期反射・定位の広がりで状態の遠近を写す層。★ **音色を変えない** | 層 0 |
@@ -123,7 +124,9 @@
 | 表現チャネル | Expression Channel | ★ **状態 → 表現の対応と、境界の契約を持つ抽象**。媒体（PC 画面内 / スマホ常在面 / 将来の専用オブジェクト）から独立している。⚠️★★★ **媒体は交換可能な実装詳細であり、研究の主張の所在に置かない**（★ スマホ常在面は [P101] [P102] に先行がある）。SSOT は **ADR-017** / `docs/architecture/expression-channel.md` | 常在面, 抽象状態イベント |
 | 常在面 | ambient surface | ★ ロック画面・ホーム画面・壁紙のように、**開きに行かなくても目に入る表示面**。⚠️★★★ **「常在面に置くこと自体」に効能は無い** —— 事前登録 cross-over（N=60）で確証 6 アウトカム全 null・BF₁₀ 0.066–0.433 [P147] | 表現チャネル, 曝露予算 |
 | 抽象状態イベント | abstract state event | ★ **境界を渡る唯一のペイロード**。`level`（`stable` / `friction_rising` / `stuck` / `intervention_active` の 4 値）/ `seq` / `emitted_at`（秒粒度）**のみ**。★ **`level` が変わったときだけ発火**する。⚠️ **1Hz を流さない**（PM-D4「常時流し続けるのは一段大きい」）。⚠️ `p_stuck` などの連続値を載せない | 表現チャネル |
-| 曝露予算 | exposure budget | ★ **表現が実際に読まれる時間の実測制約**。ロック画面の準備時間は **中央値 3.4 秒・大半は 4 秒未満**（N=134・1 か月の端末ログ）[P153]。→ ★ **層 A（強制曝露・≤4 秒で読み取れる）と 層 B（任意閲覧・数十秒）に割る**。⚠️ 同じ表現を両方に流用しない | 常在面 |
+| 曝露予算 | exposure budget | ★ **表現が実際に読まれる時間の実測制約**。ロック画面の準備時間は **中央値 3.4 秒・大半は 4 秒未満**（N=134・1 か月の端末ログ）[P153]。→ ★ **層 A（強制曝露・≤4 秒で読み取れる）と 層 B（任意閲覧・数十秒）に割る**。⚠️ 同じ表現を両方に流用しない。★ **2026-09-02 に別手法で再現**（一人称ビデオ 200 時間超・N=41 で *"lasted **4.2s on average (median 3s)**"*・[P264]）。⚠️★★★ **設計上限は 4 秒ではなく 2 秒に取る**（★ 分野横断の実務基準は 1 目線 ≤2.0 秒・遮蔽法 1.5 秒間隔・[P253]）。★ 要件の全体は `docs/architecture/expression-channel.md` §3.5（**ADR-021 D1 / D10**） | 常在面, 層 A, 層 0 |
+| 層 A / 層 B | layer A / layer B | ★ **表現の曝露予算による 2 分割**（ADR-017 D6）。**層 A = 強制曝露**（アンロック動作に埋め込まれる。1 日 約 40 回・中央値 3.4 秒 [P153] / 平均 4.2 秒・中央値 3 秒 [P264]）／ **層 B = 任意閲覧**（1 日 約 30 回・数十秒）。⚠️ **同じ表現を両方に流用しない。** ⚠️★★★ **層 A はロック画面のような強制曝露面でしか成立しない** —— ★ だから **表示場所を本人の調整項目にしない**（ADR-021 D3）。★ 設計要件 8 本は `expression-channel.md` §3.5.2 | 曝露予算, 層 0, 招待 |
+| 招待 | invitation | ★ **「いま画面から離れる」という選択肢の提示**（ADR-018 D1）。⚠️★★★ **系は開始も完了も判定しない。** ★ **2026-09-02 (ADR-021 D4)**: 境界の契約で **`level` から独立した二値フィールド `invitation`（`none` / `present`）**として運ぶ。⚠️ **理由・強度・残り時間を載せない**（★ 残り時間は ADR-018 D2 が禁じたタイマーそのもの）。★ **差し出す面は PC 側**（ADR-021 D6 —— ⚠️ **文献では決められず**、根拠は観測可能性・境界の一方向性・役割分離）。⚠️★★★ **「起動」「発動」と呼ばない**（★ 系は起動しない）。⚠️★★★ **「招待だから圧力にならない」は文献に支持されていない**（★ 選択肢を開いても圧力・緊張は `d=−0.03`・ns・[P259]） | フィジカルアンカー, 身体的回帰, 層 A |
 | 離席候補区間 | away-candidate interval | ★ 沈黙区間を **「歩行」と断定せず**、離席・外部資源利用・熟考などを含む候補として扱う区間。⚠️★★★ **表現層は「あなたは歩いた」と断定してはならない**（[P183] Reflective Design 原則 4） | 身体的回帰, 離席ギャップ |
 | 身体的回帰 | embodied return | ★ 離席・歩行によってデスクへ戻ること。**Physical Anchor が促す対象**。⚠️★★★ **系は完了を判定しない**（**ADR-018 D1/D2**）—— ★ 「離席候補区間があり、復帰した」は **観測**であって完了判定ではない（D3）。⚠️ **歩数・距離でも時間でも判定しない**（★ 単位を量から時間へ替えても [P99] の performance-contingent が作る「届かなかったセル」（`d = −0.88`）は消えないため）。⚠️★★★ **身体活動のセンシング自体を GSE 本体から恒久的に外した**（**ADR-017 D10**。★ 例外は形成的トラックのみ）。⚠️ **「歩いたから作業が良くなった」を暗示しない**（[P162]: 成績は全体で null d=.16, p=.116） | 離席候補区間, Physical Anchor |
 | 系統 A / 系統 B | pathway A / pathway B | 音に写す入力の 2 経路（`spec` §3）。**A = 推定経由**（`ewma_x`/`ewma_y`/`p_*`。意味は豊かだが外れうる）/ **B = 観測直結**（`f1`/`f3`/`f4`/`f5`/`f6`。★ **HMM の前段なので GATE3 と無関係・MhD が Kill でも生き残る**）。⚠️ `paste` は `FeatSnapshot` に無いため系統 B から落としてある（S4-D6） | 表現層, `FeatSnapshot` |
@@ -153,7 +156,7 @@
 | 課題ドメイン | TaskDomain | `task_kind` (宣言) から決まる head のルーティング信号 (`Writing` / `WritingFallback` / `Coding`)。変換は `logger.rs` の `From<TaskKind>` に 1 本だけ置く | TaskKind, DomainInferenceHead |
 | head 識別子 | head_id | どの head がそのセッションを採点したかの識別子 (`writing` / `writing_fallback` / `coding_v0`)。`session_meta` NDJSON に記録。⚠️ `FeatSnapshot` には入れない (ゴールデン snapshot が壊れる) | TaskDomain, schema |
 | Writing head | Writing head | 論述・文章作成ドメインの推論ヘッド (`analysis::heads::writing`)。Phase1 (task_kind=argumentative 固定) で走っていた挙動そのもの | DomainInferenceHead, β_writing_latin |
-| `β_writing_latin` | writing latin baseline | Writing head 内の **IME off (ラテン直接入力: 英字引用・数式・URL) 用サブ baseline**。値は旧 `β_coding` をそのまま改名 (F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08)。⚠️ **Coding の baseline ではない** — 「IME off の日本語論述」を Writing head 内に再スコープしたもの (ADR-006 下位決定 #2) | ベースライン (β), Writing head |
+| `β_writing_latin` | writing latin baseline | Writing head 内の **IME off (ラテン直接入力: 英字引用・数式・URL) 用サブ baseline**。値は旧 `β_coding` をそのまま改名 (F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08)。★ **F1=150ms の出所は [P269]**（Dhakal et al. 2018・136M 打鍵の一般母集団中央値。実測: `heads/writing.rs:29` 逐語 `Source: Dhakal et al. (2018) general population medians, coding-adjusted.`）。⚠️★★★ **同コーパスは英語タイピングであり日本語 IME の変換過程を含まない** —— ★ 日本語 IME 実測の `β_writing` F1=100ms と **1.5 倍ずれる**ことが、β を 2 系統に割る根拠そのものである。⚠️ **Coding の baseline ではない** — 「IME off の日本語論述」を Writing head 内に再スコープしたもの (ADR-006 下位決定 #2) | ベースライン (β), Writing head |
 | 正規化関数 φ | Normalization Function φ | φ(x, β) = clamp((x − β) / (κ · β), 0, 1)。κ=2.0 | ベースライン |
 | バックスペースペナルティ | Backspace Penalty | 連続 14 回以上のバックスペースで obs=25（ペナルティビン）を強制発火。IME 変換中は抑制 | HMM, 観測ビン |
 | 摩擦フロア | Friction Floor | サイレンス時に合成される最小摩擦値。Stuck 状態の侵食を防止 | サイレンス検出 |
@@ -176,7 +179,7 @@
 | USING_ACCESSIBILITY_FALLBACK | — | macOS 固有のアトミックフラグ。Input Monitoring から Accessibility へフォールバックしたことを示す | CGEventTap, TCC |
 | FeatSnapshot | — | 1Hz ゲートで生成される特徴量 + HMM 状態確率のスナップショット (`analysis::loop_step::FeatSnapshot`)。NDJSON `feat` レコード + gse-replay 回帰比較の基本単位 | 1Hz ゲート, snapshot |
 | LatestFeatState | — | 直近の FeatSnapshot を Tauri state として保持する構造。`get_intervention_decision` が F3/F4/F6 を読む | InterventionDecision |
-| InterventionPolicyState | — | cooldown / daily cap / recent dismiss / Wall 累積時間 / last decision を保持する Rust 側ポリシー状態 | InterventionDecision |
+| InterventionPolicyState | — | cooldown / daily cap / recent dismiss / last decision を保持する（⚠️ **2026-09-01 訂正 —— 旧文の「Wall 累積時間」は失効**。ADR-015 D1 で `wall_accum_ms` ごと削除） Rust 側ポリシー状態 | InterventionDecision |
 | 混同行列 | Confusion Matrix | `[正解×推定]` の 3×3 行列 (`analysis::metrics::ConfusionMatrix`)。正解ラベルクラス × HMM argmax クラスの件数を格納 | UserLabel, F1 |
 | Macro F1 | — | 各クラスの F1 を単純平均した値。固定分母 3 (scikit-learn 互換)。クラス不均衡に強くない代わりに minority class を重視 | 混同行列 |
 | Micro F1 | — | 総 TP / 総 labels。多クラスでは accuracy と一致。GSE では分母は matched labels のみ (警告行きは除外) | 混同行列 |
@@ -185,7 +188,7 @@
 | 範囲ラベル | RangeLabel | 時間区間 (`{start_ms, end_ms, label}`) 形式の GT ラベル (`analysis::metrics::RangeLabel`)。点ラベルを forward-fill で区間化したもの。1 ラベルから N 個の feat-label ペアを生成し検出力を高める | point label, forward-fill |
 | 点ラベル / forward-fill | point label / forward-fill | point label = 単一時刻の GT ラベル。forward-fill = 次のラベルまで前のラベルを引き延ばし区間 (RangeLabel) 化する手法 (`intervention_eval`) | RangeLabel, PROTECT/STALL |
 | PROTECT / STALL | — | 介入評価の GT 二値化。PROTECT = 旧 Flow/Incubation（守るべき状態）、STALL = 旧 Stuck（介入候補）。`gse-replay --intervention` で point label を forward-fill 区間化して使う | HIR, intervention_eval |
-| ACT / HOLD | — | 介入評価の decision 二値化。ACT = {nudge, wall}（介入する）、HOLD = {none, defer}（控える） | HIR, InterventionDecision |
+| ACT / HOLD | — | 介入評価の decision 二値化。ACT = {nudge}（介入する。⚠️ **2026-09-01 訂正: 旧文の `wall` を削除** — 実測 `intervention_eval.rs:54` 逐語「ACT={nudge}」）、HOLD = {none, defer}（控える） | HIR, InterventionDecision |
 | HIR | Harmful Intervention Rate | 有害介入率 = ACT∩PROTECT / labeled-ACT。PROTECT 区間に介入してしまった割合。v2 介入評価の最重要・安全性指標 (`analysis::intervention_eval`) | PROTECT/STALL, intervention_eval |
 | DC | Defer Correctness | defer 正答率 = W 秒以内に p_flow>0.5 へ回復した defer 区間 / 全 defer 区間。見送り判断が自己回復で支持された割合 | recovered_at, ACT/HOLD |
 | Burden | — | 介入評価の過介入代理 = ACT 回数 / セッション分 | HIR |
@@ -196,7 +199,7 @@
 | metrics.json | — | `gse-replay --metrics --json` の出力 (1 KB/session)。gse-dataset repo の `metrics/P*/<os>/` に配置する共有アーティファクト | aggregate_metrics, UC-GT3 |
 | gse-dataset | — | セッションメトリクスの集約データ repo (`mikotomiura/gse-dataset`, private)。生 NDJSON は絶対に置かず、`metrics/` と機械生成 schema のみ tracked | metrics.json, schema sync |
 | 被験者 ID | Participant ID | データ repo での匿名化識別子。`P000` (開発者自身) / `P001-P005` (Phase 2+ 外部被験者) | IRB, consent |
-| Phase 2a Go/No-Go | — | `aggregate_metrics.py` が出力する判定。Stuck precision 平均 ≥ 0.6 かつ n ≥ 5 で GO、未満は INCONCLUSIVE | metrics.json, baseline_metrics.md |
+| Phase 2a Go/No-Go | — | ⚠️ **2026-09-01 訂正: `aggregate_metrics.py` は存在しない**（実体は `gse-cohort` / `scripts/run-calibration-cohort.sh`）が出力する判定。Stuck precision 平均 ≥ 0.6 かつ n ≥ 5 で GO、未満は INCONCLUSIVE | metrics.json, baseline_metrics.md |
 | 収束器 | reconciler | 「あるべき状態 (desired state)」を宣言し、現状をそこへ寄せる周回処理。冪等が構造で保証される。`src-tauri/src/reconcile.rs` (`.age` の再送・取りこぼし回収) と配布自動化 Stage 2 が同じ形。**⚠️ 表現できない状態は管理してはならない**（「止めたい」を宣言できないなら共有を収束器の管轄に入れない） | desired state, D-7 |
 | desired state | — | 収束器の入力となる宣言。配布自動化では P-ID ごとの「配る / 止める」の 2 値。⚠️「配る」しか表現できない収束器は同意撤回を潰す | 収束器 |
 | spike | — | **実装前に、未検証の前提を実測で潰す使い捨ての検証**。結果は「可 / 否 + 実測値 + 実測日」で書き、⚠️「たぶん」「はず」を残さない。外れたときの行き先を先に決めてから実行する | verify-before-claiming |
@@ -213,7 +216,7 @@
 | 略語 | 正式名称 | 意味 |
 |---|---|---|
 | GSE | Generative Struggle Engine | 本プロダクトの名称 |
-| MhD | Mind-house Detector（認知状態検出モデルの総称） | キーストローク行動から作業状態を推定する**検出モデルの総称**。内部で X(Cognitive Friction)/Y(Productive Engagement) 二軸と `p_stuck` を出す。**Stage 1 = 現行のルールベース HMM**（現在地・`engine.rs`）、**Stage 2 = ロジスティック回帰**（昇格は約 50 セッション＋3% 改善の Go/No-Go、未達なら Stage 1 を正＝オッカムの剃刀）。MhD の出力 `p_stuck`（L1 Stuck 計算）を Need 層（L2・`intervention.rs`）が閾値で消費する点に注意（別層・別計算） |
+| MhD | Mind-house Detector（認知状態検出モデルの総称） | キーストローク行動から作業状態を推定する**検出モデルの総称**。内部で X(Cognitive Friction)/Y(Productive Engagement) 二軸と `p_stuck` を出す。⚠️★★★ **2026-09-02 改訂（ADR-019 D1 / D3）**: 段の呼称は ⚠️★★★ **2026-09-02 に再改訂した（ADR-021 D11）** —— **`M1〜M4` は 26 週 WBS のマイルストーン `M0〜M5` （`docs/wbs-verification-halfyear.md` §2）と記号が衝突していた**ため撤回し、**実体名で呼ぶ**（★ ADR-018 D7 の先例）: **固定 baseline**（現行のルールベース HMM・現在地・`engine.rs`・ADR-001）／ **criterion 直結**（観測可能な自力前進の帰結を予測する軽量 risk 推定）／ **個人・タスク適応** ／ **時系列**。★ **「Stage」とも「M1〜M4」とも呼ばない。** ⚠️ **順序は名前ではなく昇格ゲート（ADR-019 D3）が担う。**★ **昇格の Go/No-Go から「Stage 1 比 +3%」を外した** —— ⚠️ 較正スモークは prereg で **n=3–5** であり、**n=100 でも誤差棒は ±10%**（[V95]）なので **+3% は原理的に測れない**。★ 代わりに **(a) subject / session holdout での calibration** と **(b) 上下界が介入判断を反転させないか**（ADR-009 の反証ゲート G2 と同型）を置く。★ **「約 50 セッション」というデータ量の条件は残る**。未達なら **固定 baseline を正＝オッカムの剃刀**。MhD の出力 `p_stuck`（L1 Stuck 計算）を Need 層（L2・`intervention.rs`）が閾値で消費する点に注意（別層・別計算） |
 | HMM | Hidden Markov Model | 隠れマルコフモデル |
 | EWMA | Exponentially Weighted Moving Average | 指数加重移動平均 |
 | IME | Input Method Editor | 日本語入力メソッドエディタ |
@@ -241,6 +244,9 @@
 | 「あなたは歩いた」等の断定（表現層・UI） | 「摩擦の信号が下がった」等の非断定 | ⚠️★★★ 系が持てるビットは **「離席候補区間があり、復帰した」**までである（ADR-017 D3）。[P183] *"avoid making the technology, rather than the user, the final authority on what the user is doing"* |
 | 不便益 HCI **である** | 不便益を**設計思想として引く** HCI | ⚠️★★★ 認定条件 1（益は不便だからこそ＝労力）が現行実装で満たされない [P170]。不便を担う Physical Anchor は未実装 |
 | 不便益を**測定可能にした** | 不便益を思想として掲げた介入を**行動指標で前向きに検証した** | ⚠️★★★ **不便益に合意された測定尺度は存在しない**。GSE が測るのは行動指標であって不便益ではない |
+| 認知リソースの**消耗** / **回復** / リソースの**補充**（★ Physical Anchor・休憩・自然曝露の文脈でのみ禁止） | **関与の低下** / **関与の再開**（→ 用語表） | ⚠️★★★ **限定資源モデル（ego depletion）の語彙であり、その枠組みは死亡が確認済み**（[P199] RRR k=23・N=2,141 で **d=0.04** / [P200] 事前登録 k=36・N=3,531 で **d=0.06** / [P201] PEESE **b=0.003**）。★ **[P200] は操作が成功していたことも示している**（努力感は大きく動いていた。⚠️ **効果量は「二プロトコル平均の切片 d=1.76」としてのみ引ける** —— プロトコル別では d=3.09 / d=0.46 と割れるため、裸の数値は誤導的。→ [P200] 行）＝ **「消耗 → 成績低下」の連結が無い**。⚠️ **注意回復理論（ART）は限定資源モデルそのもの**であり（[P166] 逐語 *"restoration of a limited cognitive resource"* / [P192] が ego depletion へ明示接続）、**事前登録された ART の検定は 5 本すべて null**（[P193]–[P197]）。→ ★ **この語彙で書くと、既に否定された枠組みを再輸入したことになる**。⚠️ **例外**: 既存の指標名 `自力回復率 / productive_manual_recovery_rate`・`打鍵再開` は**「停滞エピソードからの自力での前進」の意味**であって資源の補充ではない（★ 改名しない） |
+| 認知体力 / 作業持続プロファイル / 負荷応答プロファイル（★ 人物に紐づく長期構成概念の名前） | **既存の行動指標の時系列**として書く（`self_recovery_without_paste` / `paste_after_stuck_rate` / `manual_contribution_ratio`） | ⚠️★★★ **ADR-019 D7 / ADR-020 D2**。★ **「体力」は貯蔵量メタファ**（減る・尽きる・回復する）であり、上行の「消耗 / 回復 / 補充」と**同じ限定資源モデルの語彙**である（[P199] d=0.04 / [P200] d=0.06 / [P201] b=0.003、ART は事前登録された検定 5 本すべて null [P193]–[P197]）。⚠️ `.idea` の代替語案「負荷応答と**回復**のプロファイル」は**それ自体が禁止語を含む**。★★★ **名前を与えた瞬間に「人が持つ何か」として読まれる** —— [V111] 逐語 *"**states and traits are method specific**"* が守れるのは、**量が観測方法に紐づいた指標のままである間だけ**。⚠️ 併せて **[P235]**（*"FI effectiveness **decreases as attention moves ... closer to the self**"*・**1/3 超が成績を下げた**）と **[P236]**（**無作為に割り付けたラベルが自己成就的に生理と行動を動かした**）。★ 実測: 2026-09-02 時点で `認知体力` は repo に **1 件も存在しない** |
+| Mh-D 内部の `L1`〜`L4`（★ 層番号の新設） | **既存の 7 層 `Layer 0`–`Layer 7`**（`gse-v2-overview.md §2`） | ⚠️★★★ **ADR-019 D2**。★ repo には **既に L1/L2 を別の意味で使う体系が 3 系統**ある（① 7 層アーキ ② 本表の「MhD（L1）→ Need 層（L2）」 ③ 表現層の「層 0–3」）。★ 新設すると **4 系統目**になり `L2` が 3 通りの意味を持つ。⚠️ かつ `.idea` の L1〜L3 は**既存 Layer 1–4 の別名にすぎない** |
 | kCGEventTapOptionListenOnly | Input Monitoring tap / ListenOnly tap | API 定数名をそのまま使わず、権限名で説明する |
 | kCGEventTapOptionDefault | Accessibility tap / Default tap | 同上 |
 

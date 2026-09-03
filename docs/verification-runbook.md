@@ -89,13 +89,17 @@ dev ログ NDJSON: `~/Documents/GSE-sessions/gse_*.ndjson`。記録成功は同�
 grep -E '"type":"(realtime_label|intervention_response)"' ~/Documents/GSE-sessions/gse_*.ndjson | tail
 ```
 
-### 2.3 Wall 全画面ブロック (非回帰)
-1. Dashboard で Wall を発火 (デバッグ or 条件成立) → **全画面**でクリックブロックされる。
-2. QR をスマホで読む → Zen Timer → unlock → Wall が解除され作業に戻れる。
+### ~~2.3 Wall 全画面ブロック (非回帰)~~ — ⚠️★★★ **2026-09-01 削除**
 
-合格条件:
-- [ ] Wall は全画面でブロック (背後を操作できない)
-- [ ] スマホ接続 → unlock の full flow が通る (NSPanel 化でクラッシュしない)
+⚠️★★★ **この手順は実行不能である。** Wall・Zen Timer・`wall_server.rs` は
+**ADR-015 (2026-08-23) D1 / D2 で全削除**され、`InterventionAction` は
+`None / Nudge / Defer` の 3 値になった (実測: `src-tauri/src/analysis/intervention.rs:16-20`)。
+★ **発火させる経路が無いので、この節は「必ず落ちる非回帰テスト」として残っていた。**
+
+★ **現行で確認すべき介入は Nudge のみ**であり、§2.2 でカバーされている。
+⚠️ **代替の手順を新設していない** —— Physical Anchor は未実装であり、
+ADR-018 D1 で完了条件を持たない「方向づけ」に改められたため、
+**「解除できるか」という形の検証項目自体が存在しない**。
 
 ### 2.4 日本語 IME 合成 (非回帰)
 1. 日本語入力でローマ字 → 変換 → 確定を数回行う。
@@ -114,7 +118,7 @@ overlay の NSPanel 化は **macOS 限定 gate**。Windows は従来の `set_ign
 合格条件:
 - [ ] プローブ/Nudge のクリックが効く (`accept_first_mouse` 既定経路)
 - [ ] §2.2 と同じく起動直後のプローブ記録が着地する (窓 clamp 修正は OS 非依存)
-- [ ] Wall 全画面ブロック・IME (IMM) 合成が非回帰
+- [ ] IME (IMM) 合成が非回帰 (⚠️ **旧文の「Wall 全画面ブロック・」は ADR-015 の削除により失効・2026-09-01**)
 
 ---
 

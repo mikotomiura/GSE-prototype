@@ -67,12 +67,15 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 ```
 
 - **type**: feat, fix, refactor, docs, chore, test
-- **scope**: engine, hook, ime, wall, frontend, logger 等
+- **scope**: engine, hook, ime, overlay, frontend, logger, probe 等（⚠️ **2026-09-01: `wall` を削除** — ADR-015 D1 で該当層が消滅）
 - **例**: `feat(engine): add ONNX Runtime inference path`
 
 ### バージョニング
 
-- README の changelog でバージョンを管理（v2.0〜v2.21+）
+- ⚠️★★★ **2026-09-01 訂正 —— README に changelog 節は存在しない。**
+  ★ **リリース版は `package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` の 3 点を同値に保つ**
+  （実測 2026-09-01: いずれも `0.1.30`）。`v*` タグ push で `ci.yml` の release job が発火する。
+  ★ 設計上の v2.x 系譜は `docs/design-history.md` を正とする（⚠️ **履歴文書であり現行仕様ではない**）
 - コミットメッセージ末尾に `(vX.XX)` を付与（重要な機能変更時）
 
 ## 3. テスト方針
@@ -91,7 +94,14 @@ GSE はゴールデンセッション NDJSON を入力に `gse-replay` CLI で `
 
 ### 使い方
 
+⚠️★★★ **`cd src-tauri` を忘れると必ず失敗する。** ★ `Cargo.toml` は **repo 直下に無く `src-tauri/` にある**
+（実測 2026-09-01: `ls Cargo.toml` → *No such file or directory*）。repo 直下で叩くと
+`error: could not find 'Cargo.toml' in <repo> or any parent directory` で**即座に空振りする**。
+→ ★ repo 直下から動かずに叩くなら `--manifest-path src-tauri/Cargo.toml` を付ける（`run.sh` はこの形）。
+
 ```bash
+cd src-tauri   # ★★★ 以下はすべて src-tauri/ から実行する
+
 # スナップショット生成（初回のみ）
 cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson > tests/snapshots/minimal.json
 
@@ -102,7 +112,11 @@ cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/sna
 # GT メトリクス算出（Phase 1 Task 2、UserLabel 付きセッション向け）
 cargo run --bin gse-replay -- <session.ndjson> --metrics         # pretty-print
 cargo run --bin gse-replay -- <session.ndjson> --metrics --json  # 構造化 JSON
-# --metrics と --snapshot は排他。--json は --metrics 併用時のみ有効。
+# ⚠️ 2026-09-01 訂正 — モード系フラグは 9 本が相互排他:
+#   --metrics / --segment / --segments / --snapshot / --intervention
+#   / --calibration / --sweep / --nudge-diag / --corr-floor
+# --json はこのうち --metrics / --segments / --intervention / --calibration
+#   / --sweep / --nudge-diag / --corr-floor と併用できる（--snapshot とは併用不可）。
 
 # v2 介入ポリシーのオフライン反実仮想評価（gse-v2-intervention-eval）
 cargo run --bin gse-replay -- <session.ndjson> --intervention        # pretty-print
@@ -175,19 +189,37 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
 現状の実例は `input/liveness.rs` の `tick_indicates_input`
 (Windows = 等値比較 / macOS = 250 ms の許容幅) を参照。
 
-⚠️ ★ OS API を直接呼ぶ関数 (`wall_server::add_firewall_rule` 等) はこの規約の対象外である
+⚠️ ★ OS API を直接呼ぶ関数 (`input/clipboard.rs::clipboard_char_count` / `input/observe_windows.rs` 等) はこの規約の対象外である
 (純関数ではないので単体テストの形にならない)。実機手動確認を `.steering/` に残すこと。
 
 ### CI/CD パイプライン
 
 GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `feature/*`)・`pull_request` (main)・`v*` タグで起動する:
 
-- **`check` ジョブ**: matrix ビルド (windows / macOS target)。`cargo build` → `cargo test --workspace` → スナップショット回帰 (`gse-replay --snapshot`) → schema drift check (`emit_schema` vs `schema/current.json`)
-- **`frontend-check` ジョブ**: `npm ci` → TypeScript 型チェック → Vite production ビルド
+- **`check` ジョブ**: matrix ビルド。⚠️★★★ **2026-09-01 訂正 —— runner は self-hosted 実機である。**
+  macOS 側は `runs-on: [self-hosted, gse-mac]`、Windows 側は `decide-win-runner` が probe して
+  self-hosted `gse-win` ↔ hosted `windows-latest` を切り替える（★ offline なら 30 秒で hosted へ fallback・`ci.yml:129-176`）。
+  `cargo build --target` → **`cargo test --features package --workspace --target`**（★ 旧文は `--features package` が抜けていた）
+  → スナップショット回帰 (`gse-replay --snapshot`) → schema drift check (`emit_schema`)
+- **`frontend-check` ジョブ** (`runs-on: ubuntu-latest` ＝ ★ **ここだけ hosted**):
+  `npm ci` → TypeScript 型チェック → Vite production ビルド →
+  ⚠️★★★ **2026-09-01 追記 —— 旧文が落としていた 3 群 5 ステップ**:
+  ビネット構成検査 (`check_vignettes.py --self-test` ＋ 本検査・PreReg-1) →
+  capabilities gate (`capabilities_gate.py --self-test` ＋ `python3 -m unittest scripts.tests.test_capabilities_gate`) →
+  シェル移植性ゲート (`bash scripts/check-shell-portability.sh`)
 - **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Windows は **portable exe** (`--no-bundle`)、macOS は **DMG** をアーティファクト化 (macOS は entitlements 付き再署名 ＋ 研究者専用 CLI の strip)
 - **`release` ジョブ**: 両ビルド成功後に GitHub Release を作成。★ **公開するのは 5 アセットだけ** — 被験者向け `gse-next.exe` / `gse-submit.exe` / `*.dmg` と、研究者専用 `gse-unpack(.exe)`。⚠️ NSIS インストーラと `gse-package` は **Phase1 で使われなかったので配らない** (2026-08-03)
 
-> **運用上の注意**: ⚠️ ★ **クラウド CI は動いている** (2026-08-10 に PR #94 で `check` (windows / macOS) と `frontend-check` の実行を確認。リリースビルドも v0.1.25 で success)。
+> **運用上の注意**: ⚠️★★★ **2026-09-01 訂正 —— 「クラウド CI が動いている」は半分だけ正しい。**
+> ★ **self-hosted 実機 (`gse-win` / `gse-mac`) へ移ったのは `check` と `build-macos` だけである。**
+> ⚠️ **`build-windows` は意図的に hosted (`windows-latest`) のまま**（`ci.yml:405-410` 逐語:
+> 「**本ジョブは hosted のまま**にする。理由: (a) タグ push / 手動発火でしか走らないので恒常的な支出ではない、
+> (b) リリース成果物を作るジョブであり、⚠️ **G-GEAR が途中で落ちるとリリースが壊れる**」）。
+> ★ **`frontend-check` も hosted (`ubuntu-latest`)**
+> (`gse-win` / `gse-mac`) へ移行済みである（移行理由は `ci.yml:138-150` の 2026-08-26 hosted outage の実測コメント）。
+> ⚠️ **したがって self-hosted 機の電源・スリープが CI の前提になっている。** offline 時に fallback するのは Windows 側だけで、
+> **mac 側は fallback 無しで無条件に self-hosted を指す**（`ci.yml:264` の `runs-on` 三項式）。
+> （旧文: 2026-08-10 に PR #94 で `check` (windows / macOS) と `frontend-check` の実行を確認。リリースビルドも v0.1.25 で success)。
 > 過去に無料枠超過で run が数秒で落ちた時期があり、その頃の記述が「CI 利用不可」のまま各所に残っていたので訂正する。
 > ★ **手元の検証は CI の代替にならない**: macOS では `hook_windows.rs` が 1 行もコンパイルされず、逆に OS 別テストは相手側の OS でも走る (上節)。**両方を回すこと。**
 > TCC 権限テストは元々自動化不可で実機手動検証。
@@ -202,7 +234,10 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
 - [ ] unsafe ブロックに安全性コメントがある
 - [ ] Windows: `windows` crate のみ使用（winapi 禁止）/ macOS: `core-graphics` + `core-foundation` + 必要な `#[link]` 宣言
 - [ ] macOS: GCD メインキュー必須 API（TIS\*, AXIsProcessTrustedWithOptions）は `dispatch_sync_f` を使用
-- [ ] プラットフォーム固有コードは `input/` + `sensors/` に閉じている（`analysis/` に OS API なし）
+- [ ] **`analysis/` に OS API が無い**（OS 依存は `input/` + `sensors*.rs` + `overlay_panel.rs` + `lib.rs` の `#[cfg]` ブロックに限る）
+      ⚠️ **2026-09-01 訂正 —— `sensors/` というディレクトリは無い**（実体は `src-tauri/src/sensors.rs` / `sensors_macos.rs`）。
+      ★ かつ `lib.rs` / `overlay_panel.rs` にも OS API があるので「`input/` + `sensors/` に閉じている」は不成立。
+      ★ **不変なのは「`analysis/` に置かない」**であり、これは `pre-edit-banned.sh` が機械ブロックしている
 
 ### 推奨チェック
 
@@ -223,7 +258,6 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
 
 - crossbeam channel の try_send 失敗率（warn ログで追跡）
 - Logger の 5 秒フラッシュ間隔が I/O 負荷を許容範囲に保っているか
-- Wall Server の HTTP レスポンス時間（スマートフォン UX に影響）
 
 ## 6. 依存ライブラリの追加基準
 
@@ -245,7 +279,12 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
   - VK コードの匿名化（キー種別カテゴリへの変換等）
   - 送信先・保存期間の明示
   - 送信タイミングはセッション終了後のバッチ処理（リアルタイム送信禁止）
-- **Wall Server**: ランダムトークンによるアクセス制御。ローカルネットワークのみ。Win: ファイアウォールルールでポートを動的管理 / mac: 追加管理不要。
+- ⚠️★★★ **2026-09-01 訂正 —— GSE は現在いかなるローカル HTTP ポートも開かない。**
+  旧文はここに「**Wall Server**: ランダムトークンによるアクセス制御。ローカルネットワークのみ…」と書いていたが、
+  `wall_server.rs` は **ADR-015 D1 で削除**され、依存 `tiny_http` / `qrcode` も除去済みである。
+  ★ **存在しない攻撃面をセキュリティ節に書き続けるのは、実在する経路から目を逸らす**ので消す。
+  → ★ 現行の外部送信経路は **提出パス 1 本のみ**（`packaging.rs` で age 暗号化 → `submission.rs` が
+  被験者の確認 `.ok` を要求 → `.age.sent`）。⚠️ **PC ↔ スマホの境界を作るときは ADR-017 D4 の S1–S6 を満たすこと。**
 - **macOS TCC 権限**: Input Monitoring / Accessibility 権限は最小限の範囲でリクエストする。`tccutil reset` コマンドによるリカバリパスを維持する。
 - **Tauri CSP**: `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'` (`src-tauri/tauri.conf.json`) — 外部リソースの読み込みを禁止。`img-src` の `data:` は QR コード等のインライン画像のため許可。
 - **Tauri capabilities (権限管理)**: Tauri 2.0 では v1 allowlist を使わず `src-tauri/capabilities/default.json` で権限を宣言する (main + overlay + global-shortcut)。新しい IPC コマンドやプラグイン権限を足すときはここを編集する。
@@ -254,7 +293,9 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
 
 - ❌ `winapi` crate の使用（`windows` crate v0.58+ のみ）
 - ❌ フックコールバック内でのブロッキング操作（Windows WH_KEYBOARD_LL / macOS CGEventTap 共通）
-- ❌ グローバル TSF フック（ITfThreadMgr）の使用（UIPI でブロック）
+- ❌ グローバル TSF フック（`ITfThreadMgr`）の使用 —— ⚠️★★★ **2026-09-01 訂正: 理由は UIPI ではない。**
+  ★ **API 構造上不可能**である（`ITfThreadMgr::Activate` は逐語「Activates TSF for the **calling thread**」であり、
+  `ITfSource::AdviseSink` に**リモート対象を指定する引数が構文上存在しない**）。詳細は `docs/agent-shared.md` 制約 7
 - ❌ キーストロークの文字内容（Unicode テキスト）の記録
 - ❌ リアルタイム推定中のセッションデータ外部送信（学習データ収集はセッション終了後にオプトインで許可）
 - ❌ `println!` / `eprintln!` の使用（`tracing` を使う）

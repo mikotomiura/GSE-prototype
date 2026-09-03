@@ -25,7 +25,7 @@ GSE の実験は主に (a) 較正スモーク（criterion label と MhD 二軸�
 
 - `.steering/<date>-<task>/` — **実装作業**の記録（requirement / design / tasklist）。コード変更の文脈。
 - `experiments/<date>-<exp>/` — **科学的実験**の記録（仮説・データ・結果・再現手順）。研究主張の根拠。
-- 混同しない: 「Wall のバグ修正」は `.steering/`、「介入 ON/OFF で自力回復率を比較」は `experiments/`。
+- 混同しない: 「Nudge のバグ修正」は `.steering/`、「介入 ON/OFF で自力回復率を比較」は `experiments/`。
 
 ## ディレクトリ規約
 

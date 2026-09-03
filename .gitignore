@@ -209,6 +209,14 @@ service_account.json
 .venv/
 venv/
 
+# ⚠️★★★ 2026-09-03 追加。⚠️ **未踏文書の変換作業ディレクトリ**。
+#   ★ `.docx` / `.pptx` を試作するたびに `.tmp/gse-proposal-render-*` 等が増える
+#   （★ 実測: 1 セッションで 15 個。中身は生成物 `.docx` / `.png` と一時 XML）。
+#   ⚠️ 正本は `docs/mitou_submission/mitou_docs/*.docx.md` であり、
+#   **ここに入るものは全て再生成できる**ので追跡しない。
+#   → ★ セッション固有の一時物は本来 scratchpad へ置くこと。
+.tmp/
+
 # ⚠️★★★ 稼働コスト実測の**生サンプル**は commit しない (2026-09-03・security-checker LOW)。
 #   ★ `ndjson-size.tsv` はファイル名(=セッション開始時刻)・バイト数・mtime を持ち、
 #   ⚠️ **いつ何時間作業したかの時系列**になる。`samples.tsv` も同様に稼働時間帯が出る。

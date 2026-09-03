@@ -9,15 +9,28 @@ from __future__ import annotations
 
 import pathlib
 import re
+import shutil
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 
+# ★ ZIP エントリの固定日時（★ 出力を再現可能にするため）
+ZIP_TS = (2026, 1, 1, 0, 0, 0)
+
 NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+
+# ★ 画像の封じ込め先（★ 本ファイルは `scripts/` 直下にある）。
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 def esc(s: str) -> str:
-    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+    # ⚠️★★★ 2026-09-03: `"` を追加した。★ `esc()` は本文だけでなく
+    #   `docPr name="..." descr="..."` のような **属性文脈** でも使うため、
+    #   図の alt に `"` が入ると属性が割れる（★ security-checker が実測）。
+    #   ★ 本文側の出力は変わらない（XML のテキストノードでは `&quot;` も `"` と読まれる）。
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+             .replace('"', "&quot;"))
 
 
 # --- インライン（**太字** / `コード` / *斜体*） -------------------------------
@@ -63,14 +76,16 @@ def para(text: str, style: str | None = None, ind: int = 0, bold: bool = False) 
 
 
 def table(rows: list[list[str]]) -> str:
-    grid = "".join('<w:gridCol w:w="2000"/>' for _ in rows[0])
+    table_width = 9638
+    col_width = table_width // len(rows[0])
+    grid = "".join(f'<w:gridCol w:w="{col_width}"/>' for _ in rows[0])
     body = []
     for i, row in enumerate(rows):
         cells = []
         for c in row:
             shade = '<w:shd w:val="clear" w:fill="EFEFEF"/>' if i == 0 else ""
             cells.append(
-                "<w:tc><w:tcPr>"
+                f'<w:tc><w:tcPr><w:tcW w:w="{col_width}" w:type="dxa"/>'
                 '<w:tcBorders>'
                 '<w:top w:val="single" w:sz="4" w:color="999999"/>'
                 '<w:left w:val="single" w:sz="4" w:color="999999"/>'
@@ -78,17 +93,69 @@ def table(rows: list[list[str]]) -> str:
                 '<w:right w:val="single" w:sz="4" w:color="999999"/>'
                 "</w:tcBorders>" + shade + "</w:tcPr>"
                 + para(c, bold=(i == 0)) + "</w:tc>")
-        body.append(f"<w:tr>{''.join(cells)}</w:tr>")
-    return (f'<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>'
+        header = '<w:tblHeader/>' if i == 0 else ""
+        row_props = f'<w:trPr><w:cantSplit/>{header}</w:trPr>'
+        body.append(f"<w:tr>{row_props}{''.join(cells)}</w:tr>")
+    return (f'<w:tbl><w:tblPr><w:tblW w:w="{table_width}" w:type="dxa"/>'
+            '<w:tblLayout w:type="fixed"/></w:tblPr>'
             f"<w:tblGrid>{grid}</w:tblGrid>{''.join(body)}</w:tbl><w:p/>")
+
+
+IMAGE_LINE = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)$")
+
+
+def image_block(rid: str, alt: str, cx: int, cy: int, doc_id: int) -> str:
+    """Inline image. Relationships and media are added by write_docx."""
+    safe_alt = esc(alt or "GSE figure")
+    return (
+        '<w:p><w:r><w:drawing>'
+        '<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="{doc_id}" name="{safe_alt}" descr="{safe_alt}"/>'
+        '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="figure.svg"/><pic:cNvPicPr/></pic:nvPicPr>'
+        f'<pic:blipFill><a:blip r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+        f'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+        '</pic:pic></a:graphicData></a:graphic></wp:inline>'
+        '</w:drawing></w:r></w:p><w:p/>'
+    )
 
 
 def split_row(line: str) -> list[str]:
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 
-def convert(md: str) -> str:
+def image_display_size(image_path: pathlib.Path) -> tuple[int, int]:
+    """Fit a PNG/SVG into the A4 text width while retaining its aspect ratio."""
+    width_emu = 6000000
+    if image_path.suffix.lower() == ".png":
+        data = image_path.read_bytes()[:24]
+        if data[:8] != b"\x89PNG\r\n\x1a\n":
+            raise SystemExit(f"[NG] PNGヘッダが不正: {image_path}")
+        pixel_width = int.from_bytes(data[16:20], "big")
+        pixel_height = int.from_bytes(data[20:24], "big")
+    else:
+        svg = image_path.read_text(encoding="utf-8")
+        # ⚠️★★★ 2026-09-03 修正: 旧 `\\s` は raw string では「バックスラッシュ + s」であり
+        #   空白メタ文字にならない。★ 実 SVG (`viewBox="0 0 1400 410"`) で必ず
+        #   `[NG] SVGのviewBoxが読めない` に落ちていた (実測)。
+        #   ⚠️ 提出文書は `.png` を参照しているので出力は壊れていなかったが、
+        #   `.svg` を直接参照した瞬間にビルドが止まる。→ `\s` へ直す。
+        viewbox = re.search(r'viewBox="[^"]*\s([0-9.]+)\s([0-9.]+)"', svg)
+        if not viewbox:
+            raise SystemExit(f"[NG] SVGのviewBoxが読めない: {image_path}")
+        pixel_width, pixel_height = map(float, viewbox.groups())
+    if not pixel_width or not pixel_height:
+        raise SystemExit(f"[NG] 画像サイズが不正: {image_path}")
+    return width_emu, round(width_emu * pixel_height / pixel_width)
+
+
+def convert(md: str, base_dir: pathlib.Path) -> tuple[str, list[tuple[str, pathlib.Path]]]:
     out: list[str] = []
+    images: list[tuple[str, pathlib.Path]] = []
     lines = md.splitlines()
     i = 0
     while i < len(lines):
@@ -105,6 +172,31 @@ def convert(md: str) -> str:
             continue
 
         if not s:
+            i += 1
+            continue
+
+        image_match = IMAGE_LINE.fullmatch(s)
+        if image_match:
+            alt, target = image_match.groups()
+            image_path = (base_dir / target).resolve()
+            if not image_path.is_file():
+                raise SystemExit(f"[NG] 画像が見つからない: {image_path}")
+            # ⚠️★★★ 2026-09-03 追加: **repo 外の画像を黙って埋め込まない**。
+            #   ★ 悪意ある入力者は居ないが、**事故の経路は実在する** ——
+            #   `![](C:/Users/.../screenshot.png)` と 1 行貼り付けるだけで
+            #   ⚠️ **外部へ出る提出物にスクリーンショットが入る**（★ security-checker が実測）。
+            try:
+                image_path.relative_to(REPO_ROOT)
+            except ValueError:
+                raise SystemExit(
+                    f"[NG] repo 外の画像は埋め込まない: {image_path} "
+                    "/ ★ 図は repo 内（例: docs/mitou_submission/figures/）へ置くこと")
+            rid = f"rId{len(images) + 2}"
+            images.append((rid, image_path))
+            if image_path.suffix.lower() not in {".png", ".svg"}:
+                raise SystemExit(f"[NG] 対応画像形式は PNG / SVG のみ: {image_path}")
+            cx, cy = image_display_size(image_path)
+            out.append(image_block(rid, alt, cx, cy, len(images)))
             i += 1
             continue
 
@@ -151,7 +243,7 @@ def convert(md: str) -> str:
 
         out.append(para(s))
         i += 1
-    return "".join(out)
+    return "".join(out), images
 
 
 STYLES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -182,10 +274,22 @@ STYLES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Yu Gothic"/><w:sz w:val="19"/></w:rPr></w:style>
 </w:styles>"""
 
+COMPACT_STYLES = (STYLES
+    .replace('<w:spacing w:after="120" w:line="276" w:lineRule="auto"/>',
+             '<w:spacing w:after="0" w:line="216" w:lineRule="auto"/>')
+    .replace('<w:spacing w:before="360" w:after="160"/>',
+             '<w:spacing w:before="200" w:after="80"/>')
+    .replace('<w:spacing w:before="320" w:after="140"/>',
+             '<w:spacing w:before="160" w:after="60"/>')
+    .replace('<w:spacing w:before="260" w:after="120"/>',
+             '<w:spacing w:before="140" w:after="50"/>'))
+
 CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
+<Default Extension="png" ContentType="image/png"/>
+<Default Extension="svg" ContentType="image/svg+xml"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 </Types>"""
@@ -195,41 +299,146 @@ RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>"""
 
-DOC_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>"""
+def doc_rels(images: list[tuple[str, pathlib.Path]]) -> str:
+    rels = ['<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>']
+    for index, (rid, image_path) in enumerate(images, start=1):
+        rels.append(
+            f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image{index}{image_path.suffix.lower()}"/>'
+        )
+    return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + ''.join(rels) + '</Relationships>')
 
 
-def write_docx(md: str, out: pathlib.Path) -> None:
+def write_docx(md: str, out: pathlib.Path, base_dir: pathlib.Path, compact: bool = False) -> None:
+    body, images = convert(md, base_dir)
+    margins = ('<w:pgMar w:top="700" w:right="1134" w:bottom="700" w:left="1134"/>'
+               if compact else
+               '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/>')
     doc = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document {NS}>'
-           f"<w:body>{convert(md)}"
+           f"<w:body>{body}"
            '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
-           '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr>'
+           f'{margins}</w:sectPr>'
            "</w:body></w:document>")
     out.parent.mkdir(parents=True, exist_ok=True)
+    # ⚠️★★★ 2026-09-02: ZIP エントリの日時を固定する。
+    # ★ 既定では `writestr` が **実行時刻**を書くため、内容が 1 バイトも変わっていなくても
+    # 再生成のたびにバイナリが変わり、`git status` に常に差分が出る（2026-09-02 に実測）。
+    # → ★ 「再生成しても中身が同じなら差分ゼロ」を成立させる。
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", CONTENT_TYPES)
-        z.writestr("_rels/.rels", RELS)
-        z.writestr("word/_rels/document.xml.rels", DOC_RELS)
-        z.writestr("word/styles.xml", STYLES)
-        z.writestr("word/document.xml", doc)
+        for name, data in (
+            ("[Content_Types].xml", CONTENT_TYPES),
+            ("_rels/.rels", RELS),
+            ("word/_rels/document.xml.rels", doc_rels(images)),
+            ("word/styles.xml", COMPACT_STYLES if compact else STYLES),
+            ("word/document.xml", doc),
+        ):
+            info = zipfile.ZipInfo(name, date_time=ZIP_TS)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            z.writestr(info, data)
+        for index, (_, image_path) in enumerate(images, start=1):
+            info = zipfile.ZipInfo(f"word/media/image{index}{image_path.suffix.lower()}", date_time=ZIP_TS)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            z.writestr(info, image_path.read_bytes())
     # ★ 書いた直後に全パートを検証する。壊れた .docx を黙って出荷しない。
+    #
+    # ⚠️★★★ 2026-09-03 修正: 旧コードは `out.unlink()` を `with zipfile.ZipFile(out)` の
+    #   **内側**で呼んでいた。★ Windows では開いたままのファイルを消せないので
+    #   `PermissionError: [WinError 32]` が飛び、**意図した SystemExit に到達せず
+    #   壊れた .docx がディスクに残る**（★ security-checker が scratchpad で再現）。
+    #   ⚠️ 画像埋め込みを足したことで、この経路が初めて到達可能になった
+    #   （★ 図の alt に `"` が入ると `docPr` 属性が重複して ParseError になる）。
+    #   → ★ 検証を `with` の外へ出し、**閉じてから消す**。
+    bad = None
     with zipfile.ZipFile(out) as z:
         for name in z.namelist():
             if name.endswith((".xml", ".rels")):
                 try:
                     ET.fromstring(z.read(name))
                 except ET.ParseError as e:
-                    out.unlink(missing_ok=True)
-                    raise SystemExit(f"[NG] {out.name} :: {name} が不正な XML: {e}")
+                    bad = (name, e)
+                    break
+    if bad is not None:
+        out.unlink(missing_ok=True)
+        raise SystemExit(f"[NG] {out.name} :: {bad[0]} が不正な XML: {bad[1]}")
+
+
+def selftest() -> int:
+    """★ 出力を目視せずに壊れを検出するための最小の検算。
+
+    ⚠️★★★ なぜ要るか: 2026-09-03 に 2 件の無音の壊れを実測した。
+      (1) `--compact` を落とすと詳細資料が **10 → 15 ページ**になる
+          （★ 余白 `pgMar` と行送り `w:line` だけが変わり、**本文は 1 文字も変わらない**ので
+          差分を見ても気づけない。⚠️ 規約は 10 ページ以内 = 審査対象外になる）。
+      (2) SVG の `viewBox` 正規表現が `\\s`（バックスラッシュ + s）になっており、
+          **`.svg` を渡すと必ず落ちていた**（★ 提出文書は `.png` 参照なので露見しなかった）。
+    """
+    ng = 0
+
+    def check(label: str, ok: bool, detail: str = "") -> None:
+        nonlocal ng
+        if not ok:
+            ng += 1
+            print(f"[NG] {label} {detail}")
+        else:
+            print(f"[ok] {label}")
+
+    # 1) compact / 非 compact で余白と行送りが実際に変わること
+    check("COMPACT_STYLES が行送りを詰める",
+          'w:line="216"' in COMPACT_STYLES and 'w:line="276"' in STYLES,
+          "(compact=216 / 既定=276 を期待)")
+    check("既定スタイルは詰めない", 'w:line="216"' not in STYLES)
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="md2docx-selftest-"))
+    try:
+        md = "# 見出し\n\n本文である。\n"
+        (tmp / "src.md").write_text(md, encoding="utf-8")
+        got = {}
+        for compact in (False, True):
+            out = tmp / (f"compact-{compact}.docx")
+            write_docx(md, out, tmp, compact=compact)
+            with zipfile.ZipFile(out) as z:
+                doc = z.read("word/document.xml").decode("utf-8")
+                sty = z.read("word/styles.xml").decode("utf-8")
+            got[compact] = (re.search(r'<w:pgMar[^/]*/>', doc).group(0),
+                            'w:line="216"' in sty)
+        check("--compact で余白が縮む",
+              'w:top="700"' in got[True][0] and 'w:top="1134"' in got[False][0],
+              f"compact={got[True][0]} / 既定={got[False][0]}")
+        check("--compact で行送りが縮む", got[True][1] and not got[False][1])
+
+        # 2) SVG / PNG の両方から寸法が読めること（アスペクト比が一致すること）
+        figs = pathlib.Path(__file__).resolve().parent.parent / "docs/mitou_submission/figures"
+        pairs = [(p, p.with_suffix(".svg")) for p in sorted(figs.glob("*.png"))
+                 if p.with_suffix(".svg").is_file()]
+        if not pairs:
+            print("[skip] figures/ に .png/.svg の対が無い")
+        for png, svg in pairs:
+            # ⚠️ `image_display_size` は読めないと SystemExit を投げる。
+            #   ★ ここで捕まえないと 1 枚目で打ち切られ、残りの検査が走らない。
+            try:
+                a, b = image_display_size(png), image_display_size(svg)
+            except SystemExit as e:
+                check(f"寸法一致 {png.stem}", False, str(e))
+                continue
+            check(f"寸法一致 {png.stem}", abs(a[1] - b[1]) <= 1, f"png={a} svg={b}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    print("[OK] selftest 通過" if ng == 0 else f"[FAILED] {ng} 件")
+    return 1 if ng else 0
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
     src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
     text = src.read_text(encoding="utf-8")
     # ★ 実験者向け注記の切り落とし。--from= 以降 / --until= より前 だけを使う。
     #   ⚠️ マーカーが見つからなければ **黙って通さず落とす**（切り落とし漏れは配布事故になる）。
+    compact = "--compact" in sys.argv[3:]
     for arg in sys.argv[3:]:
         if arg.startswith("--from="):
             marker = arg.split("=", 1)[1]
@@ -262,5 +471,5 @@ if __name__ == "__main__":
             if meta.get("id") and meta["id"] != "copy":
                 head += f"（{meta['id']}）"
             text = f"# {head}\n\n" + m.group(2)
-    write_docx(text, dst)
+    write_docx(text, dst, src.parent, compact=compact)
     print(f"[ok] {dst}  ({dst.stat().st_size:,} bytes)")

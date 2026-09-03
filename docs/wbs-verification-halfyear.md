@@ -1,6 +1,6 @@
 # GSE ユーザー検証 マイルストーン & WBS（半年版）
 
-> **この md について**: `docs/wbs_検証用docs/GSE_マイルストーン_WBS_半年版_v2.docx`（2026-06-22・統合元:
+> **この md について**: `GSE_マイルストーン_WBS_半年版_v2.docx（⚠️ **2026-09-01: 本リポジトリには未収録**。研究者ローカル保管。★ SSOT は本 md）`（2026-06-22・統合元:
 > codex-review v0.4 / 検証フェーズ設計企画書 / GSE_v2 概要 / テスター向け資料）を **忠実に markdown 化**した
 > SSOT。以後の改訂は本 md を正とし、.docx は歴史資料として残す。文献番号 `[n]` は本書内の参考文献節を指す
 > （中央書誌は `docs/references.md` の P/V 名前空間。本書 [1][2][3] ≈ [V1][V2]+ESM系、[5]=[V5] 等）。
@@ -150,10 +150,10 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
 | ID | 作業 | 成果物 | メモ |
 |---|---|---|---|
 | 3.1 | AB/BA 割付（半数 A→B、半数 B→A） | 割付表 | 順序効果の相殺 |
-| 3.2 | A=介入なし / B=介入あり の交互運用 | 条件別ログ | 強Wall/Anchorはopt-in |
+| 3.2 | A=介入なし / B=介入あり の交互運用 | 条件別ログ | Physical Anchor は opt-in（⚠️ **2026-09-01: 旧「強Wall/」を削除** — ADR-015 D1）|
 | 3.3 | 主指標：external_paste_count, paste_after_stuck_rate, self_recovery_without_paste, 第三者ブラインド品質 | 効果指標 | |
 | 3.4 | 副指標：task self-efficacy, NASA-TLX, helpfulness, annoyance | 受容指標 | [10][11r] |
-| 3.5 | Physical Anchor：受容/実行/効果/安全を層別評価 | Anchor 受容レポート | 夜間Outdoor無効 [8][9] |
+| 3.5 | Physical Anchor：**招待の受容** / **下流の機会保存指標**（`paste_after_stuck_rate` / `self_recovery_without_paste` / `manual_contribution_ratio`）/ 安全 を層別評価（⚠️★★★ **2026-09-01 訂正: 旧「実行/効果」は ADR-018 D5 が評価量から降ろした。系は実行も完了も判定しない**）| Anchor 受容レポート | 夜間Outdoor無効 [8][9] |
 | 3.6 | post_intervention ラベルを別プールで継続収集 | monitoring データ | X1合算しない |
 
 ### 4.4 M4：Phase 3 X2 介入機会妥当性（W16–W24, MRT）
@@ -216,11 +216,14 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
   コード側の保証は最小ライン＝有効プローブ20件/人（VALID_PROBES_MIN=20）と PreReg-5（評価≥6・ランダムプローブ≥16）、
   回答率≥0.80・中央応答≤10秒のみで、40件・両端8件はコード未実装。
 - **【未確定（AB/BA 構成は設計確定）】AB/BA ブロック長**: 構成は設計確定（半数 A→B・半数 B→A、A＝ログのみ／
-  B＝Lv1–2 介入、Lv3–4 は opt-in）。「1ブロック＝何セッションで条件切替か」はどの設計 doc にも未定義・コード未実装。
+  B＝**Nudge のみ**、Physical Anchor は opt-in・未実装）。⚠️★★★ **2026-09-01 訂正: 旧「Lv1–2 介入、Lv3–4 は opt-in」は Wall 削除（ADR-015 D1）と段階呼称廃止（ADR-018 D7）で二重に失効。**「1ブロック＝何セッションで条件切替か」はどの設計 doc にも未定義・コード未実装。
 - **【未確定（現ポリシーは実装準拠）】Phase 3 の nudge/defer 割付（70/30）**: 設計 doc 上も「例：70/30」の例示どまり、
   最小介入機会数の定義なし。MRT の micro-randomization はコード未実装。現状の intervention.rs は決定論ポリシー：
-  Nudge need≥0.60／Wall need≥0.70（累積30秒）、Opportunity しきい値 nudge≥0.35／wall≥0.45、Nudge cooldown 10分・
-  daily cap 6、Wall cooldown 60分・daily cap 1、recent dismiss 20分、idle≥180秒で介入全停止。
+  Nudge need≥0.60、Opportunity しきい値 nudge≥0.35、Nudge cooldown 10分・
+  daily cap 6、recent dismiss 20分、idle≥180秒で介入全停止（実測 2026-09-01: `intervention.rs:3-12`）。
+  ⚠️★★★ **2026-09-01 訂正 —— 旧文の Wall 系 3 群（need≥0.70 累積30秒 / opp≥0.45 / cooldown 60分・daily cap 1）は
+  存在しない定数である**（ADR-015 D1 が「Wall 閾値 6 種」ごと削除した）。
+  ★ **Nudge 側の 5 定数は実測と一致していた**ので、そこは変えていない。
 - **【設計確定→要実装】夜間 Outdoor 無効化と未成年の保護者同意**: 検証設計で確定（22:00–6:00 は Physical Anchor の
   Outdoor を無効化し Indoor へ縮退、未成年は保護者同意と安全な実施条件を別途）。コード未実装。被験者 ID は
   P000＝開発者本人／P001–P005＝外部、同意は汎用オプトイン＋匿名化のみ整備済み。
@@ -229,7 +232,7 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
   (4) PreReg-2 測定法 Kill（全体回答率<0.80 または 2人以上<0.70）→Kill、(5) PreReg-5 充足被験者ゼロ→DataInsufficient、
   (6) モデルゲート：充足被験者が一部のみなら Go 昇格させず Inconclusive。モデルゲートは Go＝C-index中央値≥0.65 かつ
   全員>0.55、Kill＝中央値≤0.55 または 2人以上≤0.50、いずれも満たさなければ Inconclusive。
-- **【実装なし→要確定】Stage 2 昇格判定**: リポジトリに未実装（現状 Stage 1 ルールベース HMM、HMM_VERSION=0.4.0）。
+- **【実装なし→要確定】Stage 2 昇格判定**: リポジトリに未実装（現状 Stage 1 ルールベース HMM、**HMM_VERSION=0.5.0**。⚠️ **2026-09-01 訂正: 旧文は 0.4.0**。実測 `engine.rs:58`）。
   「約50セッション・+3%」はデッキの参考値どまりで、M5 の昇格判定として別途定義・実装・適用が必要。
 
 ---
@@ -279,7 +282,7 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
 | M0–M2（基盤・Phase1a・Phase1b） | **変更なし**（Phase1 closeout として凍結） | — |
 | — | **M2.5 Phase 1.5 Task Ecology & Demand Discovery**（新規・6–10名・通常作業・原則介入なし・半構造化インタビュー） | **挿入** |
 | M3 Phase2 Y 価値 (AB/BA) | **Phase 2A Adapter Feasibility (Gate S) / 2B Domain-local X1 / 2C Y Value Test** に分割 | **1→3 に分割** |
-| M4 Phase3 X2 (MRT) | 維持。**Wall / Physical Anchor を別実験に分離** | スコープ分割 |
+| M4 Phase3 X2 (MRT) | 維持。**Physical Anchor を別実験に分離**（⚠️ **2026-09-01: 旧案の「Wall /」は ADR-015 D1 で削除済みにつき分離対象から外す**）| スコープ分割 |
 | M5 通算再推定・総括 | 維持 + **Phase 4 Cross-domain Transfer** を末尾追加 | 追加 |
 
 ### ゲート体系の拡張案（本体 §1 の追加・PreReg は不変）

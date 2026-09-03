@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="410" viewBox="0 0 1400 410">
+  <rect width="1400" height="410" fill="#ffffff"/>
+  <text x="62" y="62" font-family="Yu Gothic, Meiryo, sans-serif" font-size="33" font-weight="700" fill="#1f2933">GSEアーキテクチャの情報境界</text>
+  <text x="62" y="100" font-family="Yu Gothic, Meiryo, sans-serif" font-size="20" fill="#52606d">本文を持たない観測から、抽象イベントだけを表現へ渡す</text>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="55" y="162" width="290" height="150" rx="9" fill="#e6fffa" stroke="#0f766e" stroke-width="4"/>
+    <text x="200" y="220" font-size="29" font-weight="700" fill="#134e4a">観測と境界</text><text x="200" y="259" font-size="22" fill="#134e4a">OS入力 / IME</text><text x="200" y="288" font-size="19" fill="#134e4a">本文非保存のイベント</text>
+    <rect x="390" y="162" width="290" height="150" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+    <text x="535" y="220" font-size="29" font-weight="700" fill="#1e3a8a">特徴量と推論</text><text x="535" y="259" font-size="22" fill="#1e3a8a">5特徴量 / HMM / ML</text><text x="535" y="288" font-size="19" fill="#1e3a8a">連続プロキシと不確実性</text>
+    <rect x="725" y="162" width="290" height="150" rx="9" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="870" y="220" font-size="29" font-weight="700" fill="#7c2d12">判断</text><text x="870" y="259" font-size="22" fill="#7c2d12">Need × Opportunity</text><text x="870" y="288" font-size="19" fill="#7c2d12">none / defer / nudge</text>
+    <rect x="1060" y="162" width="290" height="150" rx="9" fill="#fff1f2" stroke="#be123c" stroke-width="4"/>
+    <text x="1205" y="220" font-size="29" font-weight="700" fill="#881337">表現と選択肢</text><text x="1205" y="259" font-size="22" fill="#881337">抽象イベントのみ</text><text x="1205" y="288" font-size="17" fill="#881337">状態表現: スマホ　/　招待: PC</text>
+  </g>
+  <g stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow)"><path d="M345 237 H390"/><path d="M680 237 H725"/><path d="M1015 237 H1060"/></g>
+</svg>

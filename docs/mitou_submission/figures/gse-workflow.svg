@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430">
+  <rect width="1200" height="430" fill="#ffffff"/>
+  <text x="60" y="60" font-family="Yu Gothic, Meiryo, sans-serif" font-size="31" font-weight="700" fill="#1f2933">GSEの基本ワークフロー</text>
+  <text x="60" y="96" font-family="Yu Gothic, Meiryo, sans-serif" font-size="18" fill="#52606d">作業内容を読まずに、推論を本人が選べる環境の変化へ変換する</text>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#64748b"/></marker></defs>
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="55" y="160" width="235" height="180" rx="9" fill="#e6fffa" stroke="#0f766e" stroke-width="4"/>
+    <text x="172" y="218" font-size="31" font-weight="700" fill="#134e4a">1　観測</text><text x="172" y="266" font-size="28" fill="#134e4a">本文を読まず</text><text x="172" y="302" font-size="28" fill="#134e4a">作業の形を見る</text>
+    <rect x="345" y="160" width="235" height="180" rx="9" fill="#eef2ff" stroke="#4f46e5" stroke-width="4"/>
+    <text x="462" y="218" font-size="31" font-weight="700" fill="#312e81">2　推論</text><text x="462" y="266" font-size="28" fill="#312e81">連続プロキシ</text><text x="462" y="302" font-size="28" fill="#312e81">不確実性を含む</text>
+    <rect x="635" y="160" width="235" height="180" rx="9" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="752" y="218" font-size="31" font-weight="700" fill="#7c2d12">3　判断</text><text x="752" y="266" font-size="25" fill="#7c2d12">Need × Opportunity</text><text x="752" y="302" font-size="28" fill="#7c2d12">待つことも選ぶ</text>
+    <rect x="925" y="160" width="235" height="180" rx="9" fill="#fff1f2" stroke="#be123c" stroke-width="4"/>
+    <text x="1042" y="218" font-size="31" font-weight="700" fill="#881337">4　表現</text><text x="1042" y="266" font-size="28" fill="#881337">環境の変化</text><text x="1042" y="302" font-size="28" fill="#881337">選べる招待</text>
+  </g>
+  <g stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow)"><path d="M290 250 H345"/><path d="M580 250 H635"/><path d="M870 250 H925"/></g>
+</svg>

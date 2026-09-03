@@ -7,8 +7,8 @@
 GSE doesn't read your mind. It reads *keystroke dynamics* — and decides when a gentle nudge
 is actually likely to help, and when to stay out of the way.
 
-> **Status:** the shipping intervention is **Lv1 Nudge only**. The full-screen Wall and Monk Mode
-> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Lv3/Lv4 Physical Anchor
+> **Status:** the shipping intervention is **Nudge only**. The full-screen Wall and Monk Mode
+> were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Physical Anchor
 > is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
@@ -56,7 +56,7 @@ Any app ──▶ Keyboard hook (Rust)            Win: WH_KEYBOARD_LL · Mac: CG
               ▼
           Intervention policy        Need (p_stuck) × Opportunity
               │  → none / nudge / defer
-              ├──▶ React UI         Dashboard + Overlay (Lv1 Nudge card)
+              ├──▶ React UI         Dashboard + Overlay (Nudge card)
               └──▶ Session logger   NDJSON — behavioral features only, never text
 ```
 
@@ -96,9 +96,9 @@ Matrices, β baselines, quantization, and the tuning history live in **[Design H
 
 | Level | Trigger | Effect | Dismiss |
 |---|---|---|---|
-| **Lv1 · Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | auto-dismisses |
-| **Lv3/Lv4 · Physical Anchor** | *not implemented* | Step away from the desk, then come back | — |
-| ~~**Lv2 · Wall**~~ | ~~full-screen block~~ | **Removed 2026-08** — see below | — |
+| **Nudge** | `action == nudge` | Small click-through side card; opacity scales with Need | auto-dismisses |
+| **Physical Anchor** | *not implemented* | An invitation to step away from the screen | — |
+| ~~**Wall**~~ | ~~full-screen block~~ | **Removed 2026-08** — see below | — |
 
 **Suppression** (all shipping): `defer` while actively typing (IKI < 2 s), 10-min cooldown,
 daily cap of 6, 20-min recent-dismiss window, and no interventions at all after 180 s idle.
@@ -110,9 +110,17 @@ suppressing is narrower than that ("taking the answer as-is"), and a screen bloc
 removed; **HIR (harmful-intervention rate) was kept** — only its target set changed.
 
 **Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is the level that
-actually imposes effort, and it is **not implemented yet**. Its completion condition is
-**time away + return**, never a step or distance target — and GSE **does not sense physical
-activity at all** (no GPS, pedometer, or accelerometer).
+actually imposes effort, and it is **not implemented yet**.
+**The system judges neither the start nor the completion of it**
+([ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)): there is no threshold on how
+long you stay away or how you come back, and **no timer, countdown, or remaining-time display**.
+GSE **does not sense physical activity at all** (no GPS, pedometer, or accelerometer).
+
+> ⚠️ **Corrected 2026-09-01.** This paragraph used to say the completion condition was
+> *"time away + return"*. ADR-018 D1 **withdrew** that condition: replacing a step target with a
+> time target still creates a cell for "did not reach it", which is exactly what harms intrinsic
+> motivation. The level names Lv1–Lv4 were dropped for the same reason — with the Wall gone and no
+> completion condition, there is no ladder of increasing intensity left to number.
 
 ---
 

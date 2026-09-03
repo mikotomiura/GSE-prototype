@@ -461,6 +461,30 @@ jobs:
       #     「検査が空振りしていないこと」まで見る (上の 2 つの --self-test と同じ思想)。
       - name: Shell portability gate (bash 3.2 の変数名パース・対照つき)
         run: bash scripts/check-shell-portability.sh
+      # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
+      #   ⚠️ 実害の実測: `--compact` を落とすと詳細資料が **10 → 15 ページ**になるが、
+      #     **本文は 1 文字も変わらない**ので diff を見ても気づけない。
+      #     ★ 未踏の規約は 10 ページ以内で、超過は逐語「審査対象外」である。
+      #   ⚠️ もう 1 件: SVG の `viewBox` 正規表現が `\\s` になっており **`.svg` を渡すと必ず落ちていた**
+      #     (★ 提出物は `.png` 参照なので露見しなかった)。→ どちらも `--selftest` が見張る。
+      #   ★ `--selftest` は変異体で落ちることを実測済み (余白を既定へ戻す / `viewBox` を旧 `\\s` へ戻す)
+      #     ＝ 上の 3 つの self-test と同じ「検査が空振りしていないこと」まで見る思想。
+      - name: md2docx selftest (--compact の退行と図の寸法)
+        run: python3 scripts/md2docx.py --selftest
+        env:
+          PYTHONUTF8: "1"
+      # ⚠️ 提出文書の禁止用語・装飾記号・撤回済み主張 (ADR-018 D7 / 研究者指示 / サーヴェイ)。
+      #   ★ 出所: 2026-08-31 の cross-review で、廃止した段階呼称が 3 ファイルに残っていた。
+      - name: Doc lexicon gate (禁止用語・装飾記号・撤回済み主張)
+        run: python3 scripts/check_doc_lexicon.py
+        env:
+          PYTHONUTF8: "1"
+      # ⚠️ 書誌 SSOT の append-only / 欠番 / 重複 key / tombstone 引用。
+      #   ★ 実測: 2026-09-03 に Dhakal がコードと未踏文書で引用済みなのに `references.md` へ未登録だった。
+      - name: Citation SSOT gate (append-only・欠番・重複 key)
+        run: python3 scripts/check_citations.py
+        env:
+          PYTHONUTF8: "1"
 
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:

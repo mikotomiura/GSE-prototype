@@ -1,0 +1,45 @@
+# SEED — experiments/20260902-expression-layerA-visual
+
+`reproducibility-discipline` ルール 2（ランダム要素があれば seed を固定）。
+
+★ **本実験は乱数を使う。**（★ 粒子場の生成・出題順のシャッフル）
+→ 以下が **実際に使われている seed の値**である（「固定してある」という記述ではなく実値）。
+
+| 用途 | seed | どこで使われるか |
+|---|---|---|
+| **盲検（未教示）の出題順** | **20260902** | `layerA.config.json` `blind_test.order_seed` → `player/layerA.html` の `buildBlindOrder(0)` |
+| **盲検（教示後）の出題順** | **20265902** | 同上 `buildBlindOrder(5000)`（★ `order_seed + 5000`） |
+| **遷移検知の出題順** | **20260903** | `transition_test.order_seed` → `buildTransOrder()` |
+| **周辺視（未実装）** | 20260904 | `peripheral_test.order_seed`（★ **本ハーネスは周辺視ブロックを実装していない**） |
+| **自由記述の変種順** | **20260933** | `blind_test.order_seed + 31` → `frStart()` |
+| **各トライアルの粒子場** | `order_seed + offset + i * 977` | `buildField(trialSeed, ...)` の `mulberry32` |
+
+## ★ 出題順の実際の導出（★ 事後に再現できる形で書く）
+
+```text
+未教示: rng = mulberry32(20260902 + 0)
+教示後: rng = mulberry32(20260902 + 5000)
+
+items = [layer0 ×6, stable ×6, friction_rising ×6, stuck ×6]      （★ 計 24）
+  ★ invitation は各状態の i%2==0 に present を割る（layer0 は常に none）
+order = Fisher-Yates(items, rng)
+variant = Fisher-Yates(["natural","reversed"] を交互に並べた列, rng)   ★ 同じ rng を継続して使う
+trialSeed_i = order_seed + offset + i * 977
+```
+
+★ **実際に出た順序は書き出し JSON の `blind_untaught[].` / `blind_taught[].` に
+`variant` / `true_level` / `true_invitation` として全件保存される。**
+
+## ★ 乱数を使っていないもの（★ 使っていないことも書く）
+
+- **振動のオフセット**（`oscOffset`）— 決定的（正弦）
+- **格子の座標**（占有前）— 決定的
+- **遷移の交差フェード** — 決定的
+- **機械検算の全 12 項目** — 決定的（★ マスク描画のみ `mulberry32(trialSeed+7)`）
+
+## ⚠️ seed で固定できていないもの（★ 隠さない）
+
+- ⚠️★★★ **判定者の応答**（★ N=1・研究者本人）。★ 再実行しても同じ答えにはならない。
+- ⚠️ **較正値**（カード合わせのスライダ位置・視距離）。★ 書き出し JSON の `calibration` に実測値を保存する。
+- ⚠️ **`requestAnimationFrame` の実フレーム時刻**。★ 提示時間は `performance.now()` で測るので
+  刺激時間は再現するが、**描画されたフレーム列は端末に依存する**。

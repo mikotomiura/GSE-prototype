@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="500" viewBox="0 0 1400 500">
+  <rect width="1400" height="500" fill="#ffffff"/>
+  <text x="65" y="62" font-family="Yu Gothic, Meiryo, sans-serif" font-size="34" font-weight="700" fill="#1f2933">計測なき身体回帰の表現設計</text>
+  <text x="65" y="101" font-family="Yu Gothic, Meiryo, sans-serif" font-size="21" fill="#52606d">数値や診断ではなく、本人が選べる環境変化として、身体へ移る余地をつくる</text>
+  <defs><marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/></marker></defs>
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="85" y="175" width="360" height="160" rx="10" fill="#eef2ff" stroke="#4f46e5" stroke-width="4"/>
+    <text x="265" y="232" font-size="30" font-weight="700" fill="#312e81">不確実な信号</text>
+    <text x="265" y="274" font-size="23" fill="#312e81">連続プロキシを内部で扱う</text>
+    <text x="265" y="305" font-size="20" fill="#312e81">内面の診断にはしない</text>
+    <rect x="520" y="175" width="360" height="160" rx="10" fill="#e0f2fe" stroke="#0369a1" stroke-width="4"/>
+    <text x="700" y="232" font-size="30" font-weight="700" fill="#0c4a6e">抽象表現と同意</text>
+    <text x="700" y="274" font-size="21" fill="#0c4a6e">状態表現: スマホ　/　招待: PC</text>
+    <text x="700" y="305" font-size="20" fill="#0c4a6e">線・形・小さな動き</text>
+    <rect x="955" y="175" width="360" height="160" rx="10" fill="#fff1f2" stroke="#be123c" stroke-width="4"/>
+    <text x="1135" y="232" font-size="30" font-weight="700" fill="#881337">Physical Anchor</text>
+    <text x="1135" y="274" font-size="23" fill="#881337">画面から離れる選択肢</text>
+    <text x="1135" y="305" font-size="20" fill="#881337">身体活動は追跡・採点しない</text>
+  </g>
+  <g stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow)"><path d="M445 255 H520"/><path d="M880 255 H955"/></g>
+  <rect x="472" y="390" width="456" height="55" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="3" stroke-dasharray="10 8"/>
+  <text x="700" y="426" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="24" font-weight="700" fill="#334155">身体回帰中は意図的な Sensing Gap</text>
+</svg>

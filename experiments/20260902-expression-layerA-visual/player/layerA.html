@@ -1,0 +1,1449 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>GSE 表現層 — 層 A（視覚）試視ハーネス</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 24px 28px 80px; background: #14161a; color: #dfe3e8;
+         font: 14px/1.7 "Segoe UI", "Yu Gothic UI", system-ui, sans-serif; max-width: 1000px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 32px 0 8px; border-bottom: 1px solid #2c3138; padding-bottom: 6px; }
+  fieldset { border: 1px solid #2c3138; border-radius: 6px; margin: 12px 0; padding: 12px 16px; }
+  legend { padding: 0 6px; color: #9fb4c7; font-weight: 600; }
+  .note { color: #93a1ae; font-size: 12.5px; margin: 6px 0; }
+  .warn { color: #e8b562; }
+  .bad  { color: #e87d7d; }
+  .ok   { color: #7fc98a; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  button { background: #232830; color: #dfe3e8; border: 1px solid #3a424c; border-radius: 5px;
+           padding: 7px 13px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  button:hover:not(:disabled) { background: #2c333d; }
+  button:disabled { opacity: .38; cursor: not-allowed; }
+  button.primary { background: #2f4a63; border-color: #43617e; }
+  button.choice { min-width: 132px; padding: 12px 14px; font-size: 14px; }
+  input[type=number], input[type=range], textarea { background: #1b1f25; color: #dfe3e8;
+           border: 1px solid #3a424c; border-radius: 4px; padding: 5px 7px; font-family: inherit; }
+  textarea { width: 100%; min-height: 90px; font-size: 14px; }
+  .stat { color: #9fb4c7; font-size: 12.5px; }
+  table { border-collapse: collapse; margin: 10px 0; font-size: 12.5px; }
+  th, td { border: 1px solid #2c3138; padding: 4px 9px; text-align: right; }
+  th { background: #1b1f25; color: #9fb4c7; }
+  td.lbl, th.lbl { text-align: left; }
+  #stage { display: block; margin: 0 auto; border-radius: 10px; background: #000; }
+  #stagewrap { display: flex; flex-direction: column; align-items: center; gap: 14px;
+               padding: 20px; background: #0b0d10; border-radius: 10px; margin: 12px 0; }
+  .hint { color: #7d8894; font-size: 12.5px; min-height: 20px; }
+  .card { width: 130px; height: 46px; background: #dfe3e8; border-radius: 5px; }
+  code { background: #1b1f25; padding: 1px 5px; border-radius: 3px; font-size: 12.5px; }
+  .sealed { filter: blur(9px); pointer-events: none; user-select: none; opacity: .55; }
+  .seal-note { color: #e8b562; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  /* ⚠️★★★ 2026-09-03: 試行中は全画面オーバーレイにする。
+     ★ 旧実装は刺激を §3 の固定位置に出しており、§5 の「1b' を始める」を押すと
+     **押したボタンと違う場所に刺激が出て、画面外で 2 秒が流れていた**。
+     ★ 実測: 1b の 24 試行すべてで同じボタンが押された（＝刺激を見ていない）。
+     → ★ **見る場所を間違えようがない構造にする。** */
+  .trial-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #0b0d10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 24px; overflow-y: auto;
+  }
+  .trial-overlay .note, .trial-overlay .hint { max-width: 640px; text-align: center; }
+  .trial-overlay #stagewrap { background: transparent; }
+  .ovl-tag { position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+             color: #9fb4c7; font-size: 12.5px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<h1>GSE 表現層 — 層 A（視覚）試視ハーネス</h1>
+<p class="note">
+  実験: <code>experiments/20260902-expression-layerA-visual/</code> ／
+  設定 SSOT: <code>layerA.config.json</code> ／ 版: <b id="hd-ver">—</b>
+</p>
+
+<p class="note warn">
+  ⚠️ <code>file://</code> で開くと <code>fetch</code> が同一オリジン制約で落ちます。
+  <code>bash run.sh serve</code> で配って <code>http://127.0.0.1:8931/player/layerA.html</code> を開いてください。
+</p>
+
+<fieldset>
+  <legend>⚠️★★★ 先に読む — このハーネスが守っている規律</legend>
+  <ul class="note">
+    <li><b>ブロックは順に開きます。</b>飛ばせません（§7.1 の順序固定・[V119]）。</li>
+    <li>⚠️★★★ <b>「読めますか」とは事前に聞きません。</b>強制選択の正答率で判定します（ADR-021 D2 <b>C7</b>）。</li>
+    <li>⚠️★★★ <b>写像（どの見た目がどの状態か）は、ブロック 1b が終わるまで封印されます。</b>
+      <span class="seal-note">それまで <code>layerA.config.json</code> を開かないでください。</span></li>
+    <li>⚠️ <b>途中で正誤は出しません。</b>最後にまとめて出します。</li>
+    <li>★ <b>未教示ブロック = 他者が読み取れる上限</b>／<b>教示後ブロック = 本人</b>、と読み替えます（PS-Q5）。
+      ⚠️ ただし判定者は設計文脈を知っているので<b>語彙については盲ではありません</b>。この限界は結果に刻まれます。</li>
+  </ul>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§1 較正 —— ⚠️★★★ これを通すまで試行は開きません</h2>
+
+<fieldset>
+  <legend>物理較正（★ 「視角 1°」は較正なしには意味を持たない）</legend>
+  <p class="note">
+    ★ カードを画面に当て、下のグレーの矩形の<b>横幅</b>がカードの<b>長辺</b>とぴったり重なるまでスライダを動かしてください。<br>
+    ★ 基準 = ISO/IEC 7810 ID-1 の公称幅 <b id="cal-mm">—</b> mm（クレジットカード / 運転免許証）。
+  </p>
+  <div class="row">
+    <div class="card" id="cal-card"></div>
+    <input type="range" id="cal-slider" min="120" max="700" value="323" step="1" style="width: 320px;">
+    <span class="stat" id="cal-px">—</span>
+  </div>
+  <div class="row">
+    <label class="note">画面から目までの距離（mm）:</label>
+    <input type="number" id="cal-dist" value="600" min="200" max="1200" step="10" style="width: 90px;">
+    <button id="btn-cal-apply" class="primary">較正を確定する</button>
+    <span class="stat" id="cal-state">未較正</span>
+  </div>
+  <p class="note" id="cal-derived">—</p>
+</fieldset>
+
+<fieldset>
+  <legend>★ 実行条件 —— ⚠️★★★ 開始前に必ず設定する</legend>
+  <p class="note">
+    ★ <b>invitation の符号</b>: ⚠️★★★ <b>ADR-022 D1 が A-7（振動）を第 1 版の符号から外した</b>ので、
+    <b><code>aperture</code>（静的・縁の開口）を先に回す</b>。
+    ★ <code>oscillation</code> は「落とした符号がどれだけ読めたか」の対照として後で回す。
+  </p>
+  <div class="row">
+    <label class="note">符号:</label>
+    <select id="sel-inv">
+      <option value="aperture">aperture（静的・縁の開口）★ 既定</option>
+      <option value="oscillation">oscillation（振動・A-7）⚠️ 対照用</option>
+    </select>
+    <span class="stat" id="inv-state">—</span>
+  </div>
+
+  <p class="note warn">
+    ⚠️★★★ <b>事前露出の申告 —— 隠して回すほうが有害である。</b><br>
+    ★ ブロック 1b（未教示）は「写像を知らない状態で読めるか」を測る。
+    ⚠️ <b>もし実施前に写像を見てしまっていたら、1b は無効になる。</b>
+    ★ ここで申告すると <b>結果ファイルの <code>limitations</code> に自動で刻まれる</b>。
+  </p>
+  <div class="row">
+    <label><input type="checkbox" id="chk-exposed"> ★ 実施前に写像を見てしまった（→ 1b を無効として記録する）</label>
+  </div>
+  <div class="row">
+    <label class="note">見た経路（任意・自由記述）:</label>
+    <input type="text" id="txt-exposed" style="width: 420px;" placeholder="例: 設計中のスクリーンショット / config を開いた / 会話で説明を受けた">
+  </div>
+  <p class="note" id="exposed-state">—</p>
+</fieldset>
+
+<fieldset>
+  <legend>⚠️★★★ 実機換算 —— 「視角 1°」を実際のロック画面ウィジェットに当てると何が起きるか</legend>
+  <p class="note">
+    ★ <b>[P85] の 1° は 2003 年の CRT・偏心 7°–52° の周辺視条件で得られた値である。</b>
+    ロック画面のウィジェットは<b>中心視で、しかも物理的に小さい</b>。
+    → ★ <b>同じ「1°」でも意味が違う可能性があるので、ここで換算して確かめる。</b>
+  </p>
+  <div class="row">
+    <label class="note">スマホの視距離（mm）:</label>
+    <input type="number" id="dev-dist" value="300" min="150" max="600" step="10" style="width: 80px;">
+    <label class="note">pt/inch:</label>
+    <input type="number" id="dev-ppi" value="163" min="120" max="200" step="1" style="width: 70px;">
+    <span class="stat warn">⚠️ どちらも一次で確認していない仮定。★ 変えて感度を見ること。</span>
+  </div>
+  <p class="note" id="dev-out">—</p>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§2 ブロック 1a —— 自由記述（未教示）</h2>
+
+<fieldset>
+  <legend>1 画面 1 変種・順序ランダム化・文脈は言葉で与える（[V112] ISO 9186-1 §4 / §6.2）</legend>
+  <p class="note" id="fr-context">—</p>
+  <div class="row">
+    <button id="btn-fr-start" class="primary" disabled>ブロック 1a を始める</button>
+    <span class="stat" id="fr-state">未開始</span>
+  </div>
+  <div id="fr-box" hidden>
+    <div id="stagewrap">
+      <canvas id="stage-fr" width="360" height="360"></canvas>
+      <p class="hint" id="fr-hint">—</p>
+    </div>
+    <p class="note" id="fr-prompt">—</p>
+    <textarea id="fr-text" placeholder="思ったことをそのまま書いてください"></textarea>
+    <div class="row">
+      <button id="btn-fr-submit" class="primary">これで次へ</button>
+      <button id="btn-fr-dk">わからない</button>
+      <span class="stat" id="fr-prog">—</span>
+    </div>
+  </div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§3 ブロック 1b —— 盲検・強制選択（未教示）＝ <span class="warn">他者が読める上限</span></h2>
+
+<fieldset>
+  <legend>2 秒提示 → マスク → 2 つの判断（A-1 / A-3 / E-7）</legend>
+  <p class="note">
+    ★ <b><span id="bt-n">—</span> トライアル</b>／提示 <b><span id="bt-ms">—</span> ms</b>、マスク <b><span id="bt-mask">—</span> ms</b>。<br>
+    ★ 内訳: 基層 <b id="bt-c0">—</b> / A <b id="bt-c1">—</b> / B <b id="bt-c2">—</b> / C <b id="bt-c3">—</b>。
+    ★ チャンス = <b id="bt-ch">—</b>。⚠️ 途中で正誤は出しません。
+  </p>
+  <div class="row">
+    <button id="btn-bt-start" class="primary" disabled>ブロック 1b を始める（未教示）</button>
+    <button id="btn-bt-abort" disabled>中止する</button>
+    <span class="stat" id="bt-state">未開始</span>
+  </div>
+  <div id="bt-box" hidden>
+    <div id="stagewrap">
+      <canvas id="stage-bt" width="360" height="360"></canvas>
+      <p class="hint" id="bt-hint">—</p>
+    </div>
+    <div id="bt-resp" hidden>
+      <p class="note">① いま出ていたのは、次のどれですか。<span class="warn">必ずどれか選んでください。</span></p>
+      <div class="row" id="bt-lvl"></div>
+      <p class="note">② 「出口が差し出されていた」感じはありましたか。</p>
+      <div class="row" id="bt-inv"></div>
+    </div>
+  </div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§4 オンボーディング —— <span class="warn">ここで初めて写像を開きます</span></h2>
+
+<fieldset>
+  <legend>★ A-3: 未学習の抽象表現はチャンスと区別がつかない [P250] → (a) 教える か (b) high-symbolism かの二択</legend>
+  <p class="note seal-note" id="ob-seal">
+    ⚠️ ブロック 1b が終わるまで封印されています。
+  </p>
+  <div id="ob-body" class="sealed">
+    <div class="row">
+      <div><canvas id="ob-0" width="150" height="150"></canvas><p class="note" id="ob-l0">—</p></div>
+      <div><canvas id="ob-1" width="150" height="150"></canvas><p class="note" id="ob-l1">—</p></div>
+      <div><canvas id="ob-2" width="150" height="150"></canvas><p class="note" id="ob-l2">—</p></div>
+      <div><canvas id="ob-3" width="150" height="150"></canvas><p class="note" id="ob-l3">—</p></div>
+    </div>
+    <p class="note" id="ob-inv">—</p>
+    <p class="note" id="ob-nodata">—</p>
+    <div class="row">
+      <button id="btn-ob-done" class="primary" disabled>写像を覚えた（ブロック 1b' へ）</button>
+    </div>
+  </div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§5 ブロック 1b' —— 盲検・強制選択（教示後）＝ <span class="warn">本人</span></h2>
+
+<fieldset>
+  <legend>★ 1b と同一手続き・出題順のみ別 seed</legend>
+  <div class="row">
+    <button id="btn-bt2-start" class="primary" disabled>ブロック 1b' を始める（教示後）</button>
+    <span class="stat" id="bt2-state">未開始</span>
+  </div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§6 ブロック 2 —— 遷移の検知（A-8）</h2>
+
+<fieldset>
+  <legend>★ 逐語 <i>"The transition from one state to another should be easily perceptible."</i> [P249]</legend>
+  <p class="note">
+    ★ <b><span id="tr-n">—</span> トライアル</b>（うち <b id="tr-catch">—</b> は<b>何も変わらない catch</b>）。
+    ★ 提示中に変化が起きたかどうかだけを答えます。
+  </p>
+  <div class="row">
+    <button id="btn-tr-start" class="primary" disabled>ブロック 2 を始める</button>
+    <span class="stat" id="tr-state">未開始</span>
+  </div>
+  <div id="tr-box" hidden>
+    <div id="stagewrap">
+      <canvas id="stage-tr" width="360" height="360"></canvas>
+      <p class="hint" id="tr-hint">—</p>
+    </div>
+    <div class="row" id="tr-resp" hidden>
+      <button class="choice" data-tr="1">変わった</button>
+      <button class="choice" data-tr="0">変わらなかった</button>
+    </div>
+  </div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§7 結果</h2>
+
+<fieldset>
+  <legend>混同行列・状態別正答率・95% CI（Wilson）</legend>
+  <div class="row">
+    <button id="btn-res" disabled>結果を出す</button>
+    <button id="btn-export" disabled>結果を保存（JSON）</button>
+    <span class="stat">★ <code>results/</code> に置いてください</span>
+  </div>
+  <div id="res-body"></div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§8 機械検算 —— <span class="warn">「危険でないと言えない」ことしか示しません</span></h2>
+
+<fieldset>
+  <legend>★ 検査自体を 3 状態で試す（<code>verify-before-claiming</code> ルール 5b）</legend>
+  <div class="row">
+    <button id="btn-self" disabled>機械検算を走らせる</button>
+    <span class="stat" id="self-state">未実行</span>
+  </div>
+  <div id="self-body"></div>
+</fieldset>
+
+<script>
+"use strict";
+
+/* ============================================================
+ * 0. 設定の読み込み
+ * ⚠️ file:// では fetch が落ちる。落ちたら停止して理由を出す（黙って既定値で走らない）。
+ * ============================================================ */
+let CFG = null;
+const $ = (id) => document.getElementById(id);
+
+/* ============================================================
+ * 1. 乱数 — mulberry32（★ 音側 Step 4 と同一。決定的）
+ * ============================================================ */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** Fisher-Yates（★ seed 付き・出題順の再現に使う） */
+function shuffle(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+/** Box-Muller（★ 格子からのずれに使う） */
+function gauss(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/* ============================================================
+ * 2. 較正 — ★ 「視角 1°」を px へ落とす唯一の場所
+ * ============================================================ */
+const CAL = { pxPerMm: null, distMm: null, pxPerDeg: null, cardPx: null, done: false };
+
+function calDerive() {
+  const cardPx = Number($("cal-slider").value);
+  const distMm = Number($("cal-dist").value);
+  const pxPerMm = cardPx / CFG.calibration.reference_card_mm;
+  // ★ 視距離 d における 1° の弧長 ≈ d * tan(1°)
+  const mmPerDeg = distMm * Math.tan(Math.PI / 180);
+  return { cardPx, distMm, pxPerMm, pxPerDeg: pxPerMm * mmPerDeg, mmPerDeg };
+}
+function calRefresh() {
+  const d = calDerive();
+  $("cal-card").style.width = d.cardPx + "px";
+  $("cal-px").textContent = d.cardPx + " px";
+  const amp = CFG.invitation.amplitude_deg_peak_to_peak * d.pxPerDeg;
+  $("cal-derived").innerHTML =
+    `★ ${d.pxPerMm.toFixed(3)} px/mm ／ 視距離 ${d.distMm} mm ／ ` +
+    `<b>1° = ${d.pxPerDeg.toFixed(2)} px</b> ／ ` +
+    `振動の全振幅 ${CFG.invitation.amplitude_deg_peak_to_peak}° = <b>${amp.toFixed(2)} px</b>` +
+    (amp < 3 ? ` <span class="bad">⚠️ 3 px 未満。画面が粗すぎて A-7 を再現できない可能性がある</span>` : "");
+  devRefresh();
+}
+
+/* ★ 実機換算 —— ⚠️ 一次で確認していない仮定（視距離 / pt-per-inch）に依存する。
+ *   ★ ウィジェットの pt 寸法だけは一次（Apple HIG の公式寸法表・2026-09-02 取得）:
+ *     accessoryCircular 76×76 pt / accessoryRectangular 172×76 pt（430×932 pt 端末）。
+ *   ⚠️ 逐語 "The sizes of widgets may vary across devices." */
+const WIDGETS = { "accessoryCircular": [76, 76], "accessoryRectangular": [172, 76] };
+
+function devRefresh() {
+  const dist = Number($("dev-dist").value);
+  const ppi = Number($("dev-ppi").value);
+  const mmPerPt = 25.4 / ppi;
+  const mmPerDeg = dist * Math.tan(Math.PI / 180);
+  const ampDeg = CFG.invitation.amplitude_deg_peak_to_peak;
+  const ampMm = ampDeg * mmPerDeg;
+  let rows = "";
+  for (const [name, [w, h]] of Object.entries(WIDGETS)) {
+    const wMm = w * mmPerPt, hMm = h * mmPerPt;
+    const wDeg = wMm / mmPerDeg;
+    const frac = ampMm / wMm;
+    const flag = frac > 0.25
+      ? `<span class="bad">⚠️★★★ 幅の ${(frac * 100).toFixed(0)}% を動かすことになる</span>`
+      : `<span class="ok">幅の ${(frac * 100).toFixed(0)}%</span>`;
+    rows += `<br>　<b>${name}</b> ${w}×${h} pt = ${wMm.toFixed(1)}×${hMm.toFixed(1)} mm ` +
+            `= <b>${wDeg.toFixed(2)}° × ${(hMm / mmPerDeg).toFixed(2)}°</b> ／ ${flag}`;
+  }
+  $("dev-out").innerHTML =
+    `★ 視距離 ${dist} mm では <b>1° = ${mmPerDeg.toFixed(2)} mm</b>。` +
+    `振動の全振幅 ${ampDeg}° = <b>${ampMm.toFixed(2)} mm</b>。` + rows +
+    `<br>⚠️★★★ <b>幅の 1/4 を超えて動かすなら、それは「小さな揺れ」ではない。</b>` +
+    ` ★ その場合 A-7 の数値をロック画面へそのまま持ち込めない、という所見になる。`;
+}
+
+/* ============================================================
+ * 3. 刺激の生成
+ *    ★ データを担う視覚次元 / 担わない次元 を仕様で分ける（§3.5.3）
+ * ============================================================ */
+const LEVELS = ["layer0", "stable", "friction_rising", "stuck"];
+
+/** ★ 変種の極性を適用する。reversed は組織化の極性だけを反転する（[P244] の検証）。 */
+function levelSpec(level, variantId) {
+  if (level === "layer0") return CFG.levels.layer0;
+  const v = CFG.variants.find((x) => x.id === variantId);
+  if (!v || v.polarity === 1) return CFG.levels[level];
+  // ★ reversed: stable と stuck を入れ替える（friction_rising は中間なので不動）
+  if (level === "stable") return CFG.levels.stuck;
+  if (level === "stuck") return CFG.levels.stable;
+  return CFG.levels[level];
+}
+
+/**
+ * 場を作る。★ 同じ seed からは必ず同じ場が出る。
+ * ground = 状態に応答しない基層（★ 自律変異つき・データを担わない）
+ * figure = 状態を担う図（★ 占有率と格子からのずれだけがデータを担う）
+ */
+function buildField(seed, level, variantId, W, H) {
+  const rng = mulberry32(seed);
+  const F = CFG.field;
+  const spec = levelSpec(level, variantId);
+
+  const ground = [];
+  for (let i = 0; i < F.ground_marks; i++) {
+    ground.push({
+      x: rng() * W, y: rng() * H,
+      r: Math.max(0.6, F.mark_radius_px_mean + (rng() - 0.5) * 2 * F.mark_radius_px_jitter),
+      // ★ 自律変異: 各粒が自分の低周波正弦で「その場で」揺れる（⚠️ travelling にしない・[P85] G7）
+      wobFreq: 0.03 + rng() * 0.05,
+      wobPhase: rng() * Math.PI * 2,
+      wobAxis: rng() * Math.PI * 2,
+      wobAmp: 1.2 + rng() * 2.4
+    });
+  }
+
+  const figure = [];
+  if (spec.has_figure) {
+    const cols = F.figure_lattice_cols, rows = F.figure_lattice_rows;
+    const reg = F.figure_region_ratio;
+    const x0 = W * (1 - reg) / 2, y0 = H * (1 - reg) / 2;
+    const dx = (W * reg) / (cols - 1), dy = (H * reg) / (rows - 1);
+
+    const sites = [];
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) sites.push([c, r]);
+    // ★ 占有する席を seed で選ぶ（★ stuck は席が空く = 疎。⚠️ 荒天・枯れとして描かない）
+    const nOcc = Math.round(sites.length * spec.occupancy);
+    const chosen = shuffle(sites, rng).slice(0, nOcc);
+
+    for (const [c, r] of chosen) {
+      figure.push({
+        x: x0 + c * dx + gauss(rng) * spec.scatter_px,
+        y: y0 + r * dy + gauss(rng) * spec.scatter_px,
+        r: Math.max(0.8, F.mark_radius_px_mean * 1.25 + (rng() - 0.5) * 2 * F.mark_radius_px_jitter)
+      });
+    }
+  }
+  return { ground, figure, spec };
+}
+
+/* ============================================================
+ * 4. 描画
+ * ⚠️ A-6: 色を主符号にしない。★ 既定 mono。
+ *    ⚠️★★★ 加えて iOS はロック画面を強制的に monochrome にする（2026-09-02 実測・survey 参照）
+ *    ＝ グレースケールは「選択」ではなく「制約」である。
+ * ============================================================ */
+let THEME = "mono";
+
+function themeColors() { return CFG.render.themes[THEME] || CFG.render.themes.mono; }
+
+/** invitation の符号: "oscillation"（A-7）または "aperture"（★ 静的な代替）。 */
+let INV_CODING = "oscillation";
+
+/** ★ 振動のオフセット。全振幅 = amplitude_deg * pxPerDeg。★ 1 周期の正味変位は 0（anchored）。 */
+function oscOffset(tSec) {
+  const amp = CFG.invitation.amplitude_deg_peak_to_peak * CAL.pxPerDeg;
+  return (amp / 2) * Math.sin(2 * Math.PI * CFG.invitation.frequency_hz * tSec);
+}
+
+/**
+ * 場を描く。
+ * @param {number} mix ★ 合成係数（0..1）。★ 既定 1 = 通常描画。★ 遷移のクロスフェードで使う。
+ *   ⚠️★★★ 2026-09-03 追加（★ `code-reviewer` HIGH 指摘）——
+ *   ★ **旧実装は `ctx.globalAlpha` を絶対値で上書きしていた**（地 0.45 / 図 1.0）。
+ *   ⚠️ Canvas 2D の `globalAlpha` はスタックしないスカラーなので、
+ *   **呼び出し側が `globalAlpha = k` を設定しても、`drawField` 内で潰されていた。**
+ *   → ★★★ **クロスフェードが機能せず、fB が最初のフレームから等倍で重なっていた。**
+ *   ⚠️ **catch 試行（fA === fB）でも二重合成で密度が濃くなり、
+ *   「遷移した」という答えが *合成アーティファクト* で出せてしまう** ＝ A-8 が測れない。
+ *   ★ **乗算に直した。**
+ * @param {boolean} skipBg ★ true なら背景を塗らない（★ 重ね描き用）
+ */
+function drawField(ctx, field, tSec, invitation, W, H, mix = 1, skipBg = false) {
+  const col = themeColors();
+  ctx.save();
+  if (!skipBg) {
+    ctx.fillStyle = col.bg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  const osc = (invitation && INV_CODING === "oscillation") ? oscOffset(tSec) : 0;
+  ctx.translate(osc, 0);
+  ctx.fillStyle = col.ink;
+
+  // ★ 地（層 0 の基層）— 常に在る。⚠️ 空白・消灯にしない（C4）
+  ctx.globalAlpha = 0.45 * mix;
+  for (const m of field.ground) {
+    const w = m.wobAmp * Math.sin(2 * Math.PI * m.wobFreq * tSec + m.wobPhase);
+    ctx.beginPath();
+    ctx.arc(m.x + w * Math.cos(m.wobAxis), m.y + w * Math.sin(m.wobAxis), m.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ★ 図（状態を担う）
+  ctx.globalAlpha = 1.0 * mix;
+  for (const m of field.figure) {
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // ★ aperture 符号: 環は常に描く（⚠️ 「無」を空白で表さない）。invitation で環が開く。
+  if (INV_CODING === "aperture") {
+    ctx.save();
+    ctx.strokeStyle = col.ink;
+    ctx.globalAlpha = 0.85 * mix;
+    ctx.lineWidth = 2.5;
+    const R = Math.min(W, H) * 0.455;
+    ctx.beginPath();
+    if (invitation) {
+      const gap = Math.PI * 0.30;                    // ★ 開口
+      ctx.arc(W / 2, H / 2, R, -Math.PI / 2 + gap / 2, -Math.PI / 2 - gap / 2 + Math.PI * 2);
+    } else {
+      ctx.arc(W / 2, H / 2, R, 0, Math.PI * 2);      // ★ 閉じた環
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/** マスク（★ 残像による事後読解を潰す） */
+function drawMask(ctx, rng, W, H) {
+  const col = themeColors();
+  ctx.fillStyle = col.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = col.ink;
+  ctx.globalAlpha = 0.8;
+  for (let i = 0; i < 900; i++) {
+    ctx.beginPath();
+    ctx.arc(rng() * W, rng() * H, 1.2 + rng() * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function blank(ctx, W, H) {
+  ctx.fillStyle = themeColors().bg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* ============================================================
+ * 5. 出題順の構築
+ * ============================================================ */
+/**
+ * ⚠️★★★ 2026-09-03 に作り直した（★ `code-reviewer` HIGH 指摘）。
+ *
+ * ★ **旧実装は変種を「全体でシャッフル」して割り当てていた。**
+ *   → ⚠️★★★ **level ごとの内訳がそろわない。** ★ 実測（本番 seed 20260902）で
+ *     `stable {natural:1, reversed:5}` / `stuck {natural:1, reversed:5}` になっていた。
+ *   ⚠️ `reversed` は `levelSpec()` で stable と stuck を入れ替えるので、
+ *     **「真値 = stable」の 6 試行中 5 試行が視覚的には stuck（疎）として提示されていた。**
+ *   → ★★★ **主結果の混同行列が「逆極性条件」に支配される。試視の結論が壊れる。**
+ *   ★ 20,000 seed のシミュレーションで、この偏りは **約 0.9%** でしか起きない。
+ *     ⚠️ **その稀な組が本番 seed として固定されていた。**
+ *
+ * ★ **新実装は level ごとに層別割当（stratified）する。**
+ *   ★ 各 level の n 件を natural / reversed で半分ずつ確定させてからシャッフルする。
+ *   → ★ **どの seed でも level × variant が均衡する。** ★ selftest が検算する。
+ */
+function buildBlindOrder(seedOffset) {
+  const B = CFG.blind_test;
+  const rng = mulberry32(B.order_seed + seedOffset);
+  const vids = CFG.variants.map((v) => v.id);
+  const items = [];
+
+  for (const lv of LEVELS) {
+    const n = B.composition[lv];
+    // ★ この level の中で variant を均等に作る（★ 端数は seed でどの variant に付くかを決める）
+    const vs = [];
+    for (let i = 0; i < n; i++) vs.push(vids[i % vids.length]);
+    const vShuffled = shuffle(vs, rng);
+    for (let i = 0; i < n; i++) {
+      // ★ layer0 は invitation を出さない（チャネル不在なので招待も無い）
+      const inv = (lv === "layer0") ? false : (i % 2 === 0);
+      items.push({ level: lv, invitation: inv, variant: vShuffled[i] });
+    }
+  }
+
+  // ★ 提示順だけを混ぜる（★ level × variant × invitation の内訳はもう確定している）
+  const ord = shuffle(items, rng);
+  return ord.map((o, i) => ({ ...o, trialSeed: B.order_seed + seedOffset + i * 977 }));
+}
+
+function buildTransOrder() {
+  const T = CFG.transition_test;
+  const rng = mulberry32(T.order_seed);
+  const changePairs = [
+    ["stable", "friction_rising"], ["friction_rising", "stuck"],
+    ["friction_rising", "stable"], ["stuck", "friction_rising"],
+    ["layer0", "stable"], ["stable", "layer0"]      // ★ E-7 に効く対
+  ];
+  const items = [];
+  const nChange = T.trials - T.catch_trials;
+  for (let i = 0; i < nChange; i++) {
+    const p = changePairs[i % changePairs.length];
+    items.push({ from: p[0], to: p[1], change: true });
+  }
+  for (let i = 0; i < T.catch_trials; i++) {
+    const lv = LEVELS[(i + 1) % LEVELS.length];
+    items.push({ from: lv, to: lv, change: false });
+  }
+  return shuffle(items, rng).map((o, i) => ({ ...o, variant: "natural", trialSeed: T.order_seed + i * 977 }));
+}
+
+/* ============================================================
+ * 6. 記録
+ * ============================================================ */
+const REC = {
+  started_at: new Date().toISOString(),
+  calibration: null, theme: null, inv_coding: null,
+  free_response: [], blind_untaught: [], blind_taught: [], transition: [],
+  selftest: null
+};
+
+
+/* ============================================================
+ * 6b. ⚠️★★★ 試行の全画面オーバーレイ
+ *   ★ 「押したボタンと違う場所に刺激が出る」を構造的に潰す。
+ * ============================================================ */
+function overlayOn(boxId, label) {
+  const el = $(boxId);
+  el.hidden = false;
+  el.classList.add("trial-overlay");
+  if (!$("ovl-tag")) {
+    const tag = document.createElement("div");
+    tag.id = "ovl-tag"; tag.className = "ovl-tag";
+    document.body.appendChild(tag);
+  }
+  $("ovl-tag").textContent = label;
+  document.body.style.overflow = "hidden";
+}
+function overlayOff(boxId) {
+  const el = $(boxId);
+  el.classList.remove("trial-overlay");
+  el.hidden = true;
+  const tag = $("ovl-tag");
+  if (tag) tag.remove();
+  document.body.style.overflow = "";
+}
+
+/* ============================================================
+ * 7. ブロック 1a — 自由記述
+ * ★ 変種ごとに 1 画面。層 0 → A → B → C を巡回して見せる（★ 時間変化する表現なので静止画では測れない = E-8）
+ * ============================================================ */
+let frOrder = [], frIdx = 0, frRaf = 0;
+/** ⚠️★★★ ブロック 1a の総露出上限。★ 4 状態 × 3 秒 × 3 周 = 36 秒。
+ *  ★ 上限を置く理由: **1a は 1b（盲検）より前にあるので、無制限に眺められると
+ *  「未教示」の意味が「言語ラベルを教えていないだけ」に痩せる**（★ `code-reviewer` HIGH 指摘）。 */
+const FR_MAX_MS = 36000;
+
+function frStart() {
+  const rng = mulberry32(CFG.blind_test.order_seed + 31);
+  frOrder = shuffle(CFG.variants.map((v) => v.id), rng);
+  frIdx = 0;
+  overlayOn("fr-box", "ブロック 1a — 自由記述（未教示）");
+  $("btn-fr-start").disabled = true;
+  frShow();
+}
+function frShow() {
+  const vid = frOrder[frIdx];
+  $("fr-prog").textContent = `${frIdx + 1} / ${frOrder.length}`;
+  $("fr-text").value = "";
+  $("fr-hint").textContent = "★ しばらく眺めてください。表示はゆっくり移り変わります。";
+  const cv = $("stage-fr"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const dwell = 3000;
+
+  // ⚠️★★★ 2026-09-03 修正（★ `code-reviewer` HIGH 指摘）——
+  //   ★ **旧実装は `LEVELS` の固定順（層0 → stable → friction → stuck）で巡回していた。**
+  //   ⚠️★★★ **それは「順序構造そのもの」を、盲検ブロックの前に教えることに等しい。**
+  //   ★ `variant_note` の「未教示で natural だけが chance を超えるなら、読みは順序構造から来ている」
+  //     という分析枠組みが、この事前露出で崩れていた。
+  //   → ★ **提示順を seed でシャッフルする。**
+  const frRng = mulberry32(CFG.blind_test.order_seed + 700 + frIdx * 13);
+  const order = shuffle(LEVELS.map((_, i) => i), frRng);
+  const fields = LEVELS.map((lv, i) => buildField(9100 + frIdx * 17 + i, lv, vid, W, H));
+
+  const t0 = performance.now();
+  cancelAnimationFrame(frRaf);
+  const loop = () => {
+    const el = performance.now() - t0;
+    const k = order[Math.floor(el / dwell) % order.length];
+    // ★ invitation は自由記述では出さない（★ 1 度に 1 つのことだけ聞く）
+    drawField(ctx, fields[k], el / 1000, false, W, H);
+    // ⚠️★★★ 総露出に上限を置く（★ 旧実装は書き終えるまで何周でも眺められた）
+    if (el > FR_MAX_MS) {
+      blank(ctx, W, H);
+      $("fr-hint").innerHTML =
+        '<span class="warn">⚠️ 表示は終了しました。★ 見えたままを書いてください。</span>';
+      return;
+    }
+    frRaf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+function frNext(dontKnow) {
+  REC.free_response.push({
+    variant: frOrder[frIdx],
+    dont_know: !!dontKnow,
+    text: dontKnow ? "" : $("fr-text").value.trim(),
+    at: new Date().toISOString()
+  });
+  frIdx++;
+  if (frIdx >= frOrder.length) {
+    cancelAnimationFrame(frRaf);
+    overlayOff("fr-box");
+    $("fr-state").innerHTML = '<span class="ok">完了</span>';
+    $("btn-bt-start").disabled = false;
+  } else frShow();
+}
+
+/* ============================================================
+ * 8. ブロック 1b / 1b' — 盲検・強制選択
+ * ============================================================ */
+let bt = null;
+
+function btStart(taught) {
+  // ⚠️★★★ 2026-09-03 追加（★ `code-reviewer` HIGH 指摘）——
+  //   ★ **旧実装は中止（`btAbort`）後に再開しても結果配列をクリアしていなかった。**
+  //   ⚠️ 同じ seed で同じ出題順が再生成されるので、**1 回目の途中結果に 2 回目の全 24 件が追記され、
+  //   `confusionTable()` が重複・部分試行をまとめて集計していた**（★ 無警告で結果に混入）。
+  const arr = taught ? REC.blind_taught : REC.blind_untaught;
+  if (arr.length) {
+    logAbort(`⚠️ 前回の途中結果 ${arr.length} 件を破棄して開始します`);
+    arr.length = 0;
+  }
+  bt = {
+    taught,
+    order: buildBlindOrder(taught ? 5000 : 0),
+    i: 0, phase: "idle", raf: 0, t0: 0,
+    answerLevel: null
+  };
+  overlayOn("bt-box", taught ? "ブロック 1b′ — 盲検・強制選択（教示後）" : "ブロック 1b — 盲検・強制選択（未教示）");
+  $("btn-bt-start").disabled = true;
+  $("btn-bt2-start").disabled = true;
+  $("btn-bt-abort").disabled = false;
+  btTrial();
+}
+
+function btTrial() {
+  if (!bt) return;
+  const S = CFG.stimulus;
+  const cv = $("stage-bt"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const tr = bt.order[bt.i];
+  const field = buildField(tr.trialSeed, tr.level, tr.variant, W, H);
+  const maskRng = mulberry32(tr.trialSeed + 7);
+
+  $("bt-resp").hidden = true;
+  bt.answerLevel = null;
+  bt.rtLevel = null;
+  ($(bt.taught ? "bt2-state" : "bt-state")).textContent = `${bt.i + 1} / ${bt.order.length}`;
+  $("bt-hint").textContent = "…";
+
+  bt.t0 = performance.now();
+  bt.phase = "iti";
+  cancelAnimationFrame(bt.raf);
+
+  const loop = () => {
+    if (!bt) return;
+    const el = performance.now() - bt.t0;
+    if (bt.phase === "iti") {
+      blank(ctx, W, H);
+      if (el >= S.iti_ms) { bt.phase = "stim"; bt.t0 = performance.now(); }
+    } else if (bt.phase === "stim") {
+      drawField(ctx, field, el / 1000, tr.invitation, W, H);
+      $("bt-hint").textContent = "見てください";
+      if (el >= S.stimulus_ms) { bt.phase = "mask"; bt.t0 = performance.now(); }
+    } else if (bt.phase === "mask") {
+      drawMask(ctx, maskRng, W, H);
+      $("bt-hint").textContent = "";
+      if (el >= S.mask_ms) {
+        bt.phase = "resp";
+        blank(ctx, W, H);
+        $("bt-hint").textContent = "★ 迷ってもどれか選んでください";
+        $("bt-resp").hidden = false;
+        bt.respAt = performance.now();
+        return;                                   // ★ 応答待ちで rAF を止める
+      }
+    }
+    bt.raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function btAnswerLevel(lv) {
+  if (!bt || bt.phase !== "resp") return;
+  bt.answerLevel = lv;
+  // ★ 水準の RT を個別に取る（★ `code-reviewer` MEDIUM 指摘・2026-09-03）
+  if (bt.rtLevel == null) bt.rtLevel = Math.round(performance.now() - bt.respAt);
+  // ★ ボタンの見た目で選択済みを示す
+  [...$("bt-lvl").children].forEach((b) => { b.style.borderColor = (b.dataset.lv === lv) ? "#7fc98a" : "#3a424c"; });
+}
+function btAnswerInv(inv) {
+  if (!bt || bt.phase !== "resp") return;
+  if (bt.answerLevel === null) {
+    // ★ 黙って無視しない（★ `code-reviewer` MEDIUM 指摘・2026-09-03）
+    $("bt-hint").innerHTML = '<span class="warn">⚠️ 先に ① を選んでください</span>';
+    return;
+  }
+  const tr = bt.order[bt.i];
+  const rec = {
+    i: bt.i, variant: tr.variant,
+    true_level: tr.level, resp_level: bt.answerLevel,
+    true_invitation: tr.invitation, resp_invitation: !!inv,
+    rt_level_ms: bt.rtLevel,
+    rt_total_ms: Math.round(performance.now() - bt.respAt)
+  };
+  const store = bt.taught ? REC.blind_taught : REC.blind_untaught;
+  store.push(rec);
+
+  // ⚠️★★★ 2026-09-03 追加: **回答の縮退ガード**
+  //   ★ 2026-09-03 の 1 回目の試視で **24 試行すべてが同じボタン**だった。
+  //     ⚠️ 原因は刺激が画面外に出ていたことで、**正答率 25% は「stuck が 6/24 だから」という
+  //     副産物**であり、可読性のデータではなかった。★ 検査が 1 つも無かったので気づけなかった。
+  //   → ★ **同じ回答が連続したら止めて、判定者に知らせる。**
+  const DEGEN_N = 8;
+  if (store.length >= DEGEN_N) {
+    const tail = store.slice(-DEGEN_N);
+    if (tail.every((r) => r.resp_level === tail[0].resp_level)) {
+      cancelAnimationFrame(bt.raf);
+      const taught = bt.taught;
+      bt = null;
+      overlayOff("bt-box");
+      $("btn-bt-abort").disabled = true;
+      $(taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
+      (taught ? REC.blind_taught : REC.blind_untaught).length = 0;
+      $(taught ? "bt2-state" : "bt-state").innerHTML =
+        `<span class="bad">⚠️★★★ 中断しました —— <b>直近 ${DEGEN_N} 試行がすべて同じ回答</b>でした。` +
+        `★ 刺激が見えていない可能性が高いので、回答は破棄しました。` +
+        `<br>★ 画面いっぱいに刺激が出ているか確かめて、もう一度始めてください。</span>`;
+      return;
+    }
+  }
+  [...$("bt-lvl").children].forEach((b) => { b.style.borderColor = "#3a424c"; });
+  bt.i++;
+  if (bt.i >= bt.order.length) {
+    cancelAnimationFrame(bt.raf);
+    overlayOff("bt-box");
+    $("btn-bt-abort").disabled = true;
+    if (bt.taught) {
+      $("bt2-state").innerHTML = '<span class="ok">完了</span>';
+      $("btn-tr-start").disabled = false;
+    } else {
+      $("bt-state").innerHTML = '<span class="ok">完了 — 写像の封を解きました</span>';
+      unseal();
+    }
+    bt = null;
+  } else btTrial();
+}
+
+/** ★ 破棄・中止を判定者に見える形で出す（⚠️ 黙って捨てない） */
+function logAbort(msg) {
+  const el = $("bt-state");
+  if (el) el.innerHTML = `<span class="warn">${msg}</span>`;
+}
+
+function btAbort() {
+  if (!bt) return;
+  cancelAnimationFrame(bt.raf);
+  ($(bt.taught ? "bt2-state" : "bt-state")).innerHTML =
+    '<span class="bad">中止 —— ⚠️ 再開すると、ここまでの回答は破棄されます</span>';
+  overlayOff("bt-box");
+  $("btn-bt-abort").disabled = true;
+  $(bt.taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
+  bt = null;
+}
+
+/* ============================================================
+ * 9. オンボーディング（★ 1b 完了で初めて開く）
+ * ============================================================ */
+let MAPPING_NOTES = null;   // ★ unseal() で初めて読み込む（→ 上の注記）
+const LEVEL_JA = {
+  layer0: "基層（系はいま何も言っていない）",
+  stable: "落ち着いて進んでいる",
+  friction_rising: "引っかかりが増えている",
+  stuck: "行き詰まっている"
+};
+
+/**
+ * ⚠️★★★ **これは技術的な封印ではない。手続き上の約束である。**（★ `code-reviewer` HIGH 指摘・2026-09-03）
+ * ★ `CFG` は起動時に全量読み込まれるので、DevTools で `CFG.levels` と打てば数値は読める。
+ *   `http://127.0.0.1:8931/layerA.config.json` を別タブで開いても読める。
+ * ★ **できるのは「うっかり見えてしまう」ことを減らすところまで。**
+ *   → ★ 2026-09-03 に **人間可読な説明（`note`）だけは別ファイルへ分離**し、
+ *     **ここで初めて fetch する**ようにした（★ `layerA.mapping-notes.json`）。
+ *   ⚠️ **数値そのものは刺激生成に要るので `CFG` に残っている。**
+ * → ★★★ **判定者が自分で見に行かないこと、が最後の担保である。**
+ */
+async function unseal() {
+  // ★ 人間可読な説明はここで初めて取りに行く
+  try {
+    const res = await fetch("../layerA.mapping-notes.json", { cache: "no-store" });
+    if (res.ok) MAPPING_NOTES = await res.json();
+  } catch (e) { /* ★ 説明が無くても図は出せる。★ 黙って続ける */ }
+  $("ob-body").classList.remove("sealed");
+  $("ob-seal").innerHTML = '<span class="ok">★ 封を解きました。下の 4 つが写像です。</span>';
+  $("btn-ob-done").disabled = false;
+  LEVELS.forEach((lv, i) => {
+    const cv = $("ob-" + i), ctx = cv.getContext("2d");
+    const f = buildField(4200 + i, lv, "natural", cv.width, cv.height);
+    drawField(ctx, f, 0, false, cv.width, cv.height);
+    const note = (MAPPING_NOTES && MAPPING_NOTES.levels && MAPPING_NOTES.levels[lv]) || "";
+    $("ob-l" + i).innerHTML = `<b>${LEVEL_JA[lv]}</b>` +
+      (note ? `<br><span class="stat">${note}</span>` : "");
+  });
+  $("ob-inv").innerHTML = INV_CODING === "oscillation"
+    ? `★ <b>出口が差し出されている</b>ときは、表示全体が<b>その場で小さく揺れます</b>（全振幅 ${CFG.invitation.amplitude_deg_peak_to_peak}°・${CFG.invitation.frequency_hz} Hz）。⚠️ 移動はしません。`
+    : `★ <b>出口が差し出されている</b>ときは、まわりの<b>環が開きます</b>。差し出されていないときは環が閉じています。`;
+  $("ob-nodata").innerHTML =
+    "⚠️★★★ <b>データを担わない次元</b>（＝意味を読み取ってはいけないもの）: " +
+    "粒の大きさのばらつき／粒の位置の細かな揺れ（基層の自律変異）／配色テーマ。" +
+    "<br>★ 逐語 <i>\"a flower's height has <b>no relation</b> to the activity's duration and <b>varies simply for aesthetics</b>.\"</i> [P101]";
+}
+
+/* ============================================================
+ * 10. ブロック 2 — 遷移検知
+ * ============================================================ */
+let tr = null;
+
+function trStart() {
+  tr = { order: buildTransOrder(), i: 0, raf: 0, t0: 0, phase: "idle" };
+  overlayOn("tr-box", "ブロック 2 — 遷移の検知");
+  $("btn-tr-start").disabled = true;
+  trTrial();
+}
+function trTrial() {
+  if (!tr) return;
+  const T = CFG.transition_test;
+  const cv = $("stage-tr"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const it = tr.order[tr.i];
+  const fA = buildField(it.trialSeed, it.from, it.variant, W, H);
+  const fB = it.change ? buildField(it.trialSeed + 3, it.to, it.variant, W, H) : fA;
+
+  $("tr-resp").hidden = true;
+  $("tr-state").textContent = `${tr.i + 1} / ${tr.order.length}`;
+  tr.t0 = performance.now();
+  tr.phase = "pre";
+  cancelAnimationFrame(tr.raf);
+
+  const total = T.pre_ms + T.transition_ms + T.post_ms;
+  const loop = () => {
+    if (!tr) return;
+    const el = performance.now() - tr.t0;
+    $("tr-hint").textContent = "見てください";
+    if (el < T.pre_ms) {
+      drawField(ctx, fA, el / 1000, false, W, H);
+    } else if (el < T.pre_ms + T.transition_ms) {
+      // ★ 遷移中は交差フェード（★ 位置の飛びで「動き」の手掛かりを作らない）
+      // ⚠️★★★ 2026-09-03 修正: `mix` を渡して *乗算* する（★ 旧実装は `globalAlpha` を
+      //   呼び出し側で立てていたが `drawField` 内の絶対代入に潰されていた）。
+      //   ★ 背景は 1 度だけ塗り、fA を (1-k)、fB を k で重ねる。
+      const k = (el - T.pre_ms) / T.transition_ms;
+      blank(ctx, W, H);
+      drawField(ctx, fA, el / 1000, false, W, H, 1 - k, true);
+      drawField(ctx, fB, el / 1000, false, W, H, k, true);
+    } else if (el < total) {
+      drawField(ctx, fB, el / 1000, false, W, H);
+    } else {
+      blank(ctx, W, H);
+      $("tr-hint").textContent = "★ どちらか選んでください";
+      $("tr-resp").hidden = false;
+      tr.respAt = performance.now();
+      return;
+    }
+    tr.raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+function trAnswer(said) {
+  if (!tr) return;
+  const it = tr.order[tr.i];
+  REC.transition.push({
+    i: tr.i, from: it.from, to: it.to,
+    true_change: it.change, resp_change: !!said,
+    rt_ms: Math.round(performance.now() - tr.respAt)
+  });
+  tr.i++;
+  if (tr.i >= tr.order.length) {
+    cancelAnimationFrame(tr.raf);
+    overlayOff("tr-box");
+    $("tr-state").innerHTML = '<span class="ok">完了</span>';
+    $("btn-res").disabled = false;
+    $("btn-export").disabled = false;
+    $("btn-self").disabled = false;
+    tr = null;
+  } else trTrial();
+}
+
+/* ============================================================
+ * 11. 集計 — Wilson 95% CI
+ * ============================================================ */
+function wilson(k, n) {
+  if (n === 0) return [0, 0];
+  const z = 1.959964, p = k / n, d = 1 + z * z / n;
+  const c = (p + z * z / (2 * n)) / d;
+  const h = (z / d) * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n));
+  return [Math.max(0, c - h), Math.min(1, c + h)];
+}
+function pct(x) { return (x * 100).toFixed(1) + "%"; }
+
+function confusionTable(rows, title, chance) {
+  if (!rows.length) return `<p class="note">${title}: データなし</p>`;
+  const M = {};
+  for (const a of LEVELS) { M[a] = {}; for (const b of LEVELS) M[a][b] = 0; }
+  for (const r of rows) M[r.true_level][r.resp_level]++;
+
+  let h = `<h3 style="font-size:14px;margin:16px 0 4px">${title}（n=${rows.length}・チャンス ${pct(chance)}）</h3>`;
+  h += `<table><tr><th class="lbl">真 ＼ 答</th>${LEVELS.map((l) => `<th>${LEVEL_JA[l].split("（")[0]}</th>`).join("")}<th>正答率</th><th>95% CI</th></tr>`;
+  let tot = 0, cor = 0;
+  for (const a of LEVELS) {
+    const n = LEVELS.reduce((s, b) => s + M[a][b], 0);
+    const k = M[a][a]; tot += n; cor += k;
+    const ci = wilson(k, n);
+    const sig = ci[0] > chance ? ' class="ok"' : "";
+    h += `<tr><td class="lbl">${LEVEL_JA[a].split("（")[0]}</td>` +
+         LEVELS.map((b) => `<td${a === b ? ' style="background:#1e2a20"' : ""}>${M[a][b]}</td>`).join("") +
+         `<td${sig}>${n ? pct(k / n) : "—"}</td><td class="stat">[${pct(ci[0])}, ${pct(ci[1])}]</td></tr>`;
+  }
+  const ci = wilson(cor, tot);
+  h += `<tr><td class="lbl"><b>全体</b></td><td colspan="${LEVELS.length}"></td>` +
+       `<td><b>${pct(cor / tot)}</b></td><td class="stat">[${pct(ci[0])}, ${pct(ci[1])}]</td></tr></table>`;
+  h += ci[0] > chance
+    ? `<p class="note ok">★ 全体の 95% CI 下限がチャンスを上回った。</p>`
+    : `<p class="note warn">⚠️ 全体の 95% CI 下限がチャンスを跨いでいる ＝ <b>チャンスと区別がついていない</b>。</p>`;
+
+  // ★ 変種別（natural / reversed）— [P244] の極性検証
+  h += `<table><tr><th class="lbl">変種</th><th>n</th><th>正答率</th><th>95% CI</th></tr>`;
+  for (const v of CFG.variants) {
+    const sub = rows.filter((r) => r.variant === v.id);
+    const k = sub.filter((r) => r.true_level === r.resp_level).length;
+    const c2 = wilson(k, sub.length);
+    h += `<tr><td class="lbl">${v.label}（<code>${v.id}</code>）</td><td>${sub.length}</td>` +
+         `<td>${sub.length ? pct(k / sub.length) : "—"}</td><td class="stat">[${pct(c2[0])}, ${pct(c2[1])}]</td></tr>`;
+  }
+  h += `</table>`;
+
+  // ★ invitation（★ layer0 を除いて採点する = 基準率を 50/50 に保つ）
+  const iv = rows.filter((r) => r.true_level !== "layer0");
+  const hit = iv.filter((r) => r.true_invitation && r.resp_invitation).length;
+  const nP = iv.filter((r) => r.true_invitation).length;
+  const fa = iv.filter((r) => !r.true_invitation && r.resp_invitation).length;
+  const nA = iv.filter((r) => !r.true_invitation).length;
+  const l0fa = rows.filter((r) => r.true_level === "layer0" && r.resp_invitation).length;
+  const l0n = rows.filter((r) => r.true_level === "layer0").length;
+  h += `<table><tr><th class="lbl">invitation（<code>${INV_CODING}</code>・★ 基層を除外して採点）</th><th>値</th></tr>` +
+       `<tr><td class="lbl">hit（present を present と答えた）</td><td>${hit} / ${nP} = ${nP ? pct(hit / nP) : "—"}</td></tr>` +
+       `<tr><td class="lbl">false alarm（none を present と答えた）</td><td>${fa} / ${nA} = ${nA ? pct(fa / nA) : "—"}</td></tr>` +
+       `<tr><td class="lbl">⚠️ 基層で present と答えた（＝ 誤検出）</td><td>${l0fa} / ${l0n}</td></tr></table>`;
+
+  // ⚠️★★★ 直交性の検査: invitation が level の読みを汚していないか（ADR-021 D4 の主張）
+  const wInv = rows.filter((r) => r.true_invitation), woInv = rows.filter((r) => !r.true_invitation);
+  const acc = (s) => s.length ? s.filter((r) => r.true_level === r.resp_level).length / s.length : NaN;
+  h += `<p class="note">⚠️★★★ <b>直交性の検査</b>（ADR-021 D4 が「1 目盛りの読みを汚さない」と主張した点）: ` +
+       `invitation あり ${wInv.length ? pct(acc(wInv)) : "—"}（n=${wInv.length}） vs なし ${woInv.length ? pct(acc(woInv)) : "—"}（n=${woInv.length}）。` +
+       ` ⚠️ <b>この n では検定しない。記述に留める</b>（[V123]）。</p>`;
+  return h;
+}
+
+function showResults() {
+  const ch = CFG.blind_test.chance_level_4way;
+  let h = "";
+  h += confusionTable(REC.blind_untaught, "ブロック 1b — 未教示（★ 他者が読める上限）", ch);
+  h += confusionTable(REC.blind_taught, "ブロック 1b' — 教示後（★ 本人）", ch);
+
+  // ★ 遷移検知
+  if (REC.transition.length) {
+    const ch2 = REC.transition.filter((r) => r.true_change);
+    const ca = REC.transition.filter((r) => !r.true_change);
+    const hit = ch2.filter((r) => r.resp_change).length;
+    const fa = ca.filter((r) => r.resp_change).length;
+    const ci = wilson(hit, ch2.length);
+    h += `<h3 style="font-size:14px;margin:16px 0 4px">ブロック 2 — 遷移の検知（A-8）</h3><table>` +
+         `<tr><th class="lbl">項目</th><th>値</th><th>95% CI</th></tr>` +
+         `<tr><td class="lbl">hit（変化を検知）</td><td>${hit} / ${ch2.length} = ${pct(hit / ch2.length)}</td><td class="stat">[${pct(ci[0])}, ${pct(ci[1])}]</td></tr>` +
+         `<tr><td class="lbl">⚠️ false alarm（catch で「変わった」）</td><td>${fa} / ${ca.length} = ${pct(fa / ca.length)}</td><td class="stat">—</td></tr></table>`;
+    // ★ 対ごと（★ layer0↔stable が E-7 に効く）
+    const pairs = {};
+    for (const r of REC.transition.filter((x) => x.true_change)) {
+      const k = `${r.from} → ${r.to}`;
+      pairs[k] = pairs[k] || { n: 0, k: 0 };
+      pairs[k].n++; if (r.resp_change) pairs[k].k++;
+    }
+    h += `<table><tr><th class="lbl">遷移対</th><th>検知</th></tr>`;
+    for (const k of Object.keys(pairs)) {
+      const mark = (k.includes("layer0")) ? " ★ E-7" : "";
+      h += `<tr><td class="lbl">${k}${mark}</td><td>${pairs[k].k} / ${pairs[k].n}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+
+  // ★ 自由記述
+  if (REC.free_response.length) {
+    h += `<h3 style="font-size:14px;margin:16px 0 4px">ブロック 1a — 自由記述（★ THAT / WHAT の判定材料）</h3>`;
+    for (const r of REC.free_response) {
+      h += `<p class="note"><b>${r.variant}</b>: ` +
+           (r.dont_know ? '<span class="warn">わからない</span>' : `「${r.text.replace(/</g, "&lt;")}」`) + `</p>`;
+    }
+  }
+
+  // ⚠️★★★ 回答が偏っていたら、正答率より先にそれを出す
+  for (const [name, rows] of [["1b（未教示）", REC.blind_untaught], ["1b′（教示後）", REC.blind_taught]]) {
+    if (!rows.length) continue;
+    const cnt = {};
+    for (const r of rows) cnt[r.resp_level] = (cnt[r.resp_level] || 0) + 1;
+    const top = Math.max(...Object.values(cnt));
+    if (top / rows.length >= 0.7) {
+      h = `<p class="bad"><b>⚠️★★★ ${name}: 回答の ${Math.round(100 * top / rows.length)}% が同じ選択肢に偏っています。</b>` +
+          `★ <b>正答率を可読性の指標として読んではいけません。</b>` +
+          `★ 刺激が見えていたかを先に確かめてください（★ 内訳: ${JSON.stringify(cnt)}）。</p>` + h;
+    }
+  }
+  h += `<p class="note warn">⚠️★★★ <b>主張してはいけないこと</b>（§7.1）: ` +
+       `「ISO 9186 準拠で 66% を超えたので合格」と書かない（★ その合格スコアは ISO 9186-1 本文に存在しない [V112]）／` +
+       `確認的検定を主結果にしない（★ N=17 の被験者内でも検定力 0.49 [V123]）／` +
+       `「表現が理解された＝表現は有効」と書かない。</p>`;
+  $("res-body").innerHTML = h;
+}
+
+/* ============================================================
+ * 12. 機械検算
+ * ⚠️★★★ 「正常なら緑」だけ試さない。★ 不在・壊れの側も作って通す（ルール 5b）。
+ * ============================================================ */
+function selftest() {
+  const out = [];
+  const push = (name, ok, detail) => out.push({ name, ok, detail });
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = CFG.stimulus.canvas_css_px;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  const W = cv.width, H = cv.height;
+
+  /* --- 1. 振動: 全振幅が 1° に一致するか --- */
+  const ampPx = CFG.invitation.amplitude_deg_peak_to_peak * CAL.pxPerDeg;
+  const f = CFG.invitation.frequency_hz;
+  let mn = Infinity, mx = -Infinity;
+  const N = 2000, per = 1 / f;
+  for (let i = 0; i < N; i++) {
+    const v = oscOffset((i / N) * per);
+    mn = Math.min(mn, v); mx = Math.max(mx, v);
+  }
+  push("振動の全振幅 = 1° 相当",
+    Math.abs((mx - mn) - ampPx) < 0.02 * ampPx,
+    `実測 ${(mx - mn).toFixed(3)} px / 期待 ${ampPx.toFixed(3)} px`);
+
+  /* --- 2. anchored: 1 周期の正味変位が 0（⚠️ travelling でない・[P85] G7） --- */
+  let net = 0;
+  for (let i = 0; i < N; i++) net += oscOffset((i / N) * per);
+  push("anchored（1 周期の正味変位 ≈ 0 ＝ 移動しない）",
+    Math.abs(net / N) < 1e-6 * Math.max(1, ampPx),
+    `平均変位 ${(net / N).toExponential(2)} px`);
+
+  /* --- 3. 周波数: ゼロ交差から実測する
+   * ⚠️★★★ 2026-09-02 実測で踏んだ: 最初は「ちょうど 1 周期」を走査して
+   *   `zc === 2` を期待していたが、端点 t=per で sin が浮動小数の誤差により
+   *   ±1e-16 になり、交差を 1 回数え落として **正常な刺激を FAIL と誤判定した**。
+   *   → ★ 4 周期を走査して交差数から周波数を逆算する形に変えた。
+   *   ★ これは「検査が壊れていた」例であって、刺激は最初から正しかった。
+   * ⚠️ 4 周期に直しても交差 7（期待 8）で赤のままだった —— 端点 t=0 と t=4T が
+   *   どちらも「ゼロ点そのもの」なので、境界の 1 回が浮動小数で消えるためである。
+   *   → ★ 走査区間を **1/4 周期ずらす**（＝両端が最大値になり、ゼロ点に当たらない）。 */
+  const PERIODS = 4;
+  const t0 = per / 4;                        // ★ 両端を頂点に置く
+  const span = per * PERIODS;
+  let zc = 0, prev = oscOffset(t0);
+  for (let i = 1; i <= N; i++) {
+    const v = oscOffset(t0 + (i / N) * span);
+    if ((prev < 0 && v >= 0) || (prev > 0 && v < 0)) zc++;
+    prev = v;
+  }
+  const fMeas = zc / 2 / span;              // ★ 交差 2 回 = 1 周期
+  push("周波数が config どおり（1〜3 Hz 帯・[P85] G4）",
+    Math.abs(fMeas - f) < 0.05 && f >= 1 && f <= 3,
+    `実測 ${fMeas.toFixed(3)} Hz / config ${f} Hz（${PERIODS} 周期で交差 ${zc}）`);
+
+  /* --- 4. ⚠️★★★ 層 0 が空白・消灯でない（C4 / §3.5.3） --- */
+  const inkOf = (level, inv) => {
+    const fl = buildField(777, level, "natural", W, H);
+    drawField(ctx, fl, 0, inv, W, H);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const bg = themeColors().bg;
+    const br = parseInt(bg.slice(1, 3), 16);
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - br) > 12) n++;
+    return n;
+  };
+  const ink0 = inkOf("layer0", false);
+  push("⚠️★★★ 層 0 が空白・消灯でない（在ることが分かる）",
+    ink0 > W * H * 0.005, `層 0 のインク画素 ${ink0}（${(100 * ink0 / (W * H)).toFixed(2)}%）`);
+
+  /* --- 5. 層 0 と stable が画素として弁別可能（★ E-7 の必要条件。⚠️ 十分条件ではない） --- */
+  const inkS = inkOf("stable", false);
+  const rel = Math.abs(inkS - ink0) / Math.max(ink0, 1);
+  push("層 0 と stable がインク量で弁別可能（★ 必要条件）",
+    rel > 0.15, `層 0 ${ink0} vs stable ${inkS}（相対差 ${(rel * 100).toFixed(1)}%）`);
+
+  /* --- 6. ⚠️ 3 状態が互いに弁別可能（★ 図の占有と散らばりが効いているか） --- */
+  const inkF = inkOf("friction_rising", false), inkK = inkOf("stuck", false);
+  push("stuck が最も疎（★ 罰ではなく疎として描く・[P101]）",
+    inkK < inkF && inkK < inkS, `stable ${inkS} / friction ${inkF} / stuck ${inkK}`);
+
+  /* --- 7. ⚠️★★★ グレースケール: mono テーマで R=G=B（★ 色を主符号にしない・A-6） --- */
+  const savedTheme = THEME; THEME = "mono";
+  drawField(ctx, buildField(778, "stable", "natural", W, H), 0, false, W, H);
+  const d2 = ctx.getImageData(0, 0, W, H).data;
+  let nonGray = 0;
+  for (let i = 0; i < d2.length; i += 4) if (d2[i] !== d2[i + 1] || d2[i + 1] !== d2[i + 2]) nonGray++;
+  THEME = savedTheme;
+  push("⚠️★★★ mono テーマが真のグレースケール（R=G=B）",
+    nonGray === 0, `非グレー画素 ${nonGray}`);
+
+  /* --- 8. 出題順の均衡（★ config どおりか） --- */
+  const ord = buildBlindOrder(0);
+  const cnt = {}; for (const o of ord) cnt[o.level] = (cnt[o.level] || 0) + 1;
+  const balanced = LEVELS.every((l) => cnt[l] === CFG.blind_test.composition[l]);
+  push("出題順が config の内訳どおり", balanced, JSON.stringify(cnt));
+
+  /* --- 9. 決定性: 同じ seed から同じ順序が出る --- */
+  const ord2 = buildBlindOrder(0);
+  push("出題順が決定的（同 seed → 同順序）",
+    JSON.stringify(ord) === JSON.stringify(ord2), `${ord.length} 件を照合`);
+
+  /* --- 9b. ⚠️★★★ level × variant が均衡しているか
+   * ★ 2026-09-03 追加（★ `code-reviewer` HIGH 指摘）——
+   *   ⚠️ **旧実装は本番 seed で `stable {natural:1, reversed:5}` になっていたのに、
+   *   検査が 1 つも無かったので緑のまま通っていた。** */
+  const cross = {};
+  for (const o of ord) {
+    cross[o.level] = cross[o.level] || {};
+    cross[o.level][o.variant] = (cross[o.level][o.variant] || 0) + 1;
+  }
+  const vids = CFG.variants.map((v) => v.id);
+  const maxDev = Math.max(...LEVELS.map((lv) => {
+    const cs = vids.map((v) => cross[lv][v] || 0);
+    return Math.max(...cs) - Math.min(...cs);
+  }));
+  push("⚠️★★★ level × variant が均衡している（★ 層別割当）",
+    maxDev <= 1, `最大偏差 ${maxDev} / ${JSON.stringify(cross)}`);
+
+  /* --- 9c. ★ 合成係数 mix が効いている（★ クロスフェードの検算）
+   * ⚠️ 旧実装は `globalAlpha` の絶対代入で mix が潰れていた。 */
+  const inkMix = (mix) => {
+    const fl = buildField(779, "stable", "natural", W, H);
+    blank(ctx, W, H);
+    drawField(ctx, fl, 0, false, W, H, mix, true);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const br = parseInt(themeColors().bg.slice(1, 3), 16);
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += Math.abs(d[i] - br);
+    return sum;
+  };
+  const m0 = inkMix(0.0), m5 = inkMix(0.5), m1 = inkMix(1.0);
+  push("★ 合成係数 mix が単調に効いている（★ クロスフェードの検算）",
+    m0 < m5 && m5 < m1 && m0 < m1 * 0.02,
+    `mix=0 → ${m0} / 0.5 → ${m5} / 1.0 → ${m1}`);
+
+  /* --- 10. invitation は layer0 に出ない --- */
+  push("layer0 に invitation を出していない",
+    ord.every((o) => o.level !== "layer0" || o.invitation === false), "—");
+
+  /* --- 11. ⚠️★★★ 検査自体を壊して赤になることを確かめる（ルール 5b） --- */
+  const savedAmp = CFG.invitation.amplitude_deg_peak_to_peak;
+  CFG.invitation.amplitude_deg_peak_to_peak = savedAmp * 2;
+  let mn2 = Infinity, mx2 = -Infinity;
+  for (let i = 0; i < N; i++) { const v = oscOffset((i / N) * per); mn2 = Math.min(mn2, v); mx2 = Math.max(mx2, v); }
+  const brokeDetected = Math.abs((mx2 - mn2) - ampPx) >= 0.02 * ampPx;
+  CFG.invitation.amplitude_deg_peak_to_peak = savedAmp;
+  push("★ 検査 1 は壊れた入力で赤になる（＝検査が効いている）",
+    brokeDetected, `振幅を 2 倍にしたら検出: ${brokeDetected}`);
+
+  /* --- 12. ⚠️ 刺激領域に禁止語が無い（D3 / ADR-018 D3） --- */
+  const stageText = ["stage-bt", "stage-fr", "stage-tr"]
+    .map((id) => $(id)?.parentElement?.textContent || "").join(" ");
+  const hits = CFG.forbidden_in_stimulus.filter((w) => stageText.includes(w));
+  push("⚠️ 刺激領域に禁止語（数値・達成・完了・残り 等）が無い",
+    hits.length === 0, hits.length ? `検出: ${hits.join(", ")}` : "なし");
+
+  REC.selftest = out;
+  const okN = out.filter((o) => o.ok).length;
+  $("self-state").innerHTML = okN === out.length
+    ? `<span class="ok">${okN} / ${out.length} 緑</span>`
+    : `<span class="bad">${okN} / ${out.length} 緑（★ 赤あり）</span>`;
+  $("self-body").innerHTML = "<table><tr><th class='lbl'>検査</th><th>結果</th><th class='lbl'>実測</th></tr>" +
+    out.map((o) => `<tr><td class="lbl">${o.name}</td>` +
+      `<td class="${o.ok ? "ok" : "bad"}">${o.ok ? "PASS" : "FAIL"}</td>` +
+      `<td class="lbl stat">${o.detail}</td></tr>`).join("") + "</table>";
+}
+
+/* ============================================================
+ * 13. 書き出し
+ * ============================================================ */
+function exportJSON() {
+  REC.calibration = { ...CAL };
+  REC.theme = THEME;
+  REC.inv_coding = INV_CODING;
+  // ⚠️★★★ 事前露出の申告を結果に刻む（★ 隠して回すほうが有害）
+  REC.prior_exposure = {
+    declared: $("chk-exposed").checked,
+    how: $("txt-exposed").value.trim(),
+    consequence: $("chk-exposed").checked
+      ? "⚠️★★★ ブロック 1b（未教示）は無効。★ PS-Q5 の『他者』側は測れていない。★ 1b'（教示後）/ ブロック 2（A-8）/ E-7 は有効。"
+      : "★ 未露出の申告あり。"
+  };
+  const payload = {
+    expr_visual_version: CFG.expr_visual_version,
+    hmm_version: CFG.hmm_version,
+    config_echo: {
+      stimulus: CFG.stimulus, invitation: CFG.invitation,
+      levels: CFG.levels, blind_test: CFG.blind_test, transition_test: CFG.transition_test
+    },
+    ...REC,
+    finished_at: new Date().toISOString(),
+    ua: navigator.userAgent,
+    dpr: window.devicePixelRatio,
+    limitations: [
+      ...($("chk-exposed").checked
+        ? ["⚠️★★★ 判定者は実施前に写像を見ていた（自己申告）。★ ブロック 1b（未教示）は無効であり、"
+           + "PS-Q5 の『他者は THAT で止まるか』は本データでは測れていない。"
+           + "★ 埋めるには、写像を見ていない判定者に 1b だけを回す必要がある。"
+           + ($("txt-exposed").value.trim() ? "★ 経路: " + $("txt-exposed").value.trim() : "")]
+        : []),
+      "★ 判定者は N=1（研究者本人）。★ 設計文脈を知っており、語彙については盲ではない。",
+      "⚠️ 実機のロック画面ではなく PC のブラウザ上の正方領域で提示している。",
+      "⚠️ iOS はロック画面ウィジェットを強制的に monochrome にする（2026-09-02 一次実測）ため、実機は本ハーネスより符号が痩せる。",
+      "⚠️ 周辺視条件は本ハーネスに実装していない（中心視のみ）。",
+      "⚠️ [P85] G3 の 1° は片振幅か全振幅かを書き分けていない。本ハーネスは全振幅として実装した。"
+    ]
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `layerA-${INV_CODING}-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+}
+
+/* ============================================================
+ * 14. 起動
+ * ============================================================ */
+async function boot() {
+  try {
+    const res = await fetch("../layerA.config.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    CFG = await res.json();
+  } catch (e) {
+    document.body.insertAdjacentHTML("afterbegin",
+      `<p class="bad"><b>⚠️ 設定を読めませんでした（${e.message}）。</b> ` +
+      `<code>file://</code> で開いていませんか。<code>bash run.sh serve</code> を使ってください。` +
+      `★ 既定値では走りません（黙って別条件で走るほうが有害なので）。</p>`);
+    return;
+  }
+
+  $("hd-ver").textContent = CFG.expr_visual_version;
+  $("cal-mm").textContent = CFG.calibration.reference_card_mm;
+  $("cal-dist").value = CFG.calibration.default_viewing_distance_mm;
+  THEME = CFG.render.default_theme;
+
+  const S = CFG.stimulus;
+  for (const id of ["stage-fr", "stage-bt", "stage-tr"]) {
+    $(id).width = S.canvas_css_px; $(id).height = S.canvas_css_px;
+  }
+  $("bt-n").textContent = LEVELS.reduce((s, l) => s + CFG.blind_test.composition[l], 0);
+  $("bt-ms").textContent = S.stimulus_ms;
+  $("bt-mask").textContent = S.mask_ms;
+  $("bt-c0").textContent = CFG.blind_test.composition.layer0;
+  $("bt-c1").textContent = CFG.blind_test.composition.stable;
+  $("bt-c2").textContent = CFG.blind_test.composition.friction_rising;
+  $("bt-c3").textContent = CFG.blind_test.composition.stuck;
+  $("bt-ch").textContent = pct(CFG.blind_test.chance_level_4way);
+  $("tr-n").textContent = CFG.transition_test.trials;
+  $("tr-catch").textContent = CFG.transition_test.catch_trials;
+  $("fr-context").textContent = "★ 文脈: " + CFG.free_response.context_sentence;
+  $("fr-prompt").textContent = CFG.free_response.prompt;
+  $("btn-fr-dk").textContent = CFG.free_response.dont_know_label;
+
+  // ★ 応答ボタンを組み立てる（⚠️ 順序は固定。★ 「わからない」は強制選択には置かない）
+  $("bt-lvl").innerHTML = LEVELS.map((l) =>
+    `<button class="choice" data-lv="${l}">${LEVEL_JA[l].split("（")[0]}</button>`).join("");
+  $("bt-inv").innerHTML =
+    `<button class="choice" data-inv="1">あった</button><button class="choice" data-inv="0">なかった</button>`;
+  $("bt-lvl").addEventListener("click", (e) => { if (e.target.dataset.lv) btAnswerLevel(e.target.dataset.lv); });
+  $("bt-inv").addEventListener("click", (e) => { if (e.target.dataset.inv) btAnswerInv(e.target.dataset.inv === "1"); });
+  $("tr-resp").addEventListener("click", (e) => { if (e.target.dataset.tr) trAnswer(e.target.dataset.tr === "1"); });
+
+  $("cal-slider").addEventListener("input", calRefresh);
+  $("cal-dist").addEventListener("input", calRefresh);
+  $("btn-cal-apply").addEventListener("click", () => {
+    const d = calDerive();
+    Object.assign(CAL, d, { done: true });
+    $("cal-state").innerHTML = '<span class="ok">較正済み</span>';
+    $("btn-fr-start").disabled = false;
+    $("btn-self").disabled = false;
+  });
+
+  // ★ invitation 符号の選択（★ 既定は aperture = ADR-022 D1 の帰結）
+  INV_CODING = "aperture";
+  $("sel-inv").value = INV_CODING;
+  const invRefresh = () => {
+    INV_CODING = $("sel-inv").value;
+    $("inv-state").innerHTML = INV_CODING === "aperture"
+      ? '<span class="ok">aperture（★ ADR-022 D1 の第 1 版）</span>'
+      : '<span class="warn">⚠️ oscillation（★ 第 1 版の符号ではない。対照用）</span>';
+  };
+  $("sel-inv").addEventListener("change", invRefresh);
+  invRefresh();
+
+  // ★ 事前露出の申告
+  const expRefresh = () => {
+    $("exposed-state").innerHTML = $("chk-exposed").checked
+      ? `<span class="bad">⚠️★★★ ブロック 1b は <b>無効</b>として記録されます（★ 1b&#39; / ブロック 2 / E-7 は有効）</span>`
+      : '<span class="ok">★ 未露出として記録されます</span>';
+  };
+  $("chk-exposed").addEventListener("change", expRefresh);
+  $("txt-exposed").addEventListener("input", expRefresh);
+  expRefresh();
+
+  $("btn-fr-start").addEventListener("click", frStart);
+  $("btn-fr-submit").addEventListener("click", () => frNext(false));
+  $("btn-fr-dk").addEventListener("click", () => frNext(true));
+  $("btn-bt-start").addEventListener("click", () => btStart(false));
+  $("btn-bt2-start").addEventListener("click", () => btStart(true));
+  $("btn-bt-abort").addEventListener("click", btAbort);
+  $("btn-ob-done").addEventListener("click", () => {
+    $("btn-ob-done").disabled = true;
+    $("btn-bt2-start").disabled = false;
+  });
+  $("btn-tr-start").addEventListener("click", trStart);
+  $("btn-res").addEventListener("click", showResults);
+  $("btn-export").addEventListener("click", exportJSON);
+  $("btn-self").addEventListener("click", selftest);
+
+  calRefresh();
+}
+boot();
+</script>
+</body>
+</html>

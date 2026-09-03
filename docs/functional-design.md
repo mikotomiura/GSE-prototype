@@ -5,7 +5,7 @@
 - **プロダクト名**: GSE (Generative Struggle Engine)
 - **解決する課題**: 知識労働者がキーボード作業中に作業停滞へ入り、自覚なく長時間停滞し続ける問題。従来の生産性ツールは作業量の最大化を目指すが、GSE は PC 操作に現れる行動的シグナルから介入判断に必要な作業上の状態を推定し、適切なタイミングでの介入により「生産的苦闘（Productive Struggle）」を保護する。
 - **ターゲットユーザー**: Windows 11 および macOS（13 Ventura 以降）上で日常的にキーボード作業を行う知識労働者（メール、企画書、ドキュメント作成、コーディング等）
-- **コアバリュー**: 不便益（Fubeneki）に基づく HCI フレームワーク — あえて不便を導入することで、ユーザー自身の作業再編・休止・回復を促進する。GSE は脳内の認知状態を直接読むのではなく、行動的シグナルから Need と Opportunity を分離して介入判断を行う。
+- **コアバリュー**: **不便益を設計思想として引く** HCI フレームワーク — あえて不便を導入することで、ユーザー自身の作業再編・休止・**関与の再開**を促す。（⚠️ **2026-09-01: 禁止用語 2 件を是正** —— 「不便益**に基づく**」と「**回復**」は `docs/glossary.md` の禁止用語）GSE は脳内の認知状態を直接読むのではなく、行動的シグナルから Need と Opportunity を分離して介入判断を行う。
 
 ## 2. コア機能一覧
 
@@ -18,7 +18,7 @@
   - 専用スレッドでフックを実行し、メインスレッドをブロックしない
   - crossbeam チャネル経由で分析スレッドへイベントを送信
   - オートリピートキーを識別しフィルタリング可能にする
-  - macOS: Input Monitoring 権限（kCGEventTapOptionListenOnly）を優先し、10 回連続失敗後に Accessibility 権限（kCGEventTapOptionDefault）へ自動フォールバック
+  - macOS: **Input Monitoring tap（ListenOnly tap）** を優先し、**3 回**連続失敗後に **Accessibility tap（Default tap）** へ自動フォールバック（⚠️ **2026-09-01 訂正: 旧文は「10 回」。実測は `hook_macos.rs:686` `consecutive_failures >= 3`**。★ API 定数名は `glossary.md` 禁止用語なので権限名で書く）
   - macOS: CGKeyCode を Windows VK コードにマッピングし、analysis 層のプラットフォーム非依存性を維持
 - **エラー条件**:
   - Windows フック登録失敗時: tracing::error でログ出力、アプリは起動するが推定不能状態
@@ -59,18 +59,17 @@
   - コールドスタート: Flow 寄りの初期確率 [0.80, 0.15, 0.05] で安定起動
   - 長時間無入力: 段階的 α 調整（0.15 → 0.18 → 0.25）で緩やかに遷移
 
-### 機能 4: Opportunity 判定 + 段階的介入
+### 機能 4: Opportunity 判定 + 介入
 
 - **概要**: Need（介入が必要そうか）と Opportunity（今介入してよいか）を分離し、`InterventionDecision` に従って段階的な介入を実施する。
-- **MVP 入力**: `p_stuck`, `idle_ms`, F3/F4/F6, `cooldown`, `daily_cap`, `recent_dismiss`, `Monk Mode`, Wall 累積時間
-- **MVP 出力**: `none` / `nudge` / `wall` / `defer`
+- **MVP 入力**: `p_stuck`, `idle_ms`, F3/F4/F6, `cooldown`, `daily_cap`, `recent_dismiss`
+  （⚠️ **2026-09-01 訂正: `Monk Mode` と `Wall 累積時間` を削除** — ADR-015 D1/D2。実体は `intervention.rs:152-159` の 6 フィールド）
+- **MVP 出力**: `none` / `nudge` / `defer`（実測: `intervention.rs:16-20`。⚠️ **`wall` は ADR-015 D1 で削除**）
 - **初期パラメータ**:
   - Nudge Need: `p_stuck >= 0.60`
-  - Wall Need: `p_stuck >= 0.70` が累積 30 秒
   - Nudge cooldown: 10 分、daily cap: 6 回/日
-  - Wall cooldown: 60 分、daily cap: 1 回/日
   - recent dismiss 抑制: 20 分
-  - away idle: 180 秒以上で**介入全停止**（Wall だけでなく Nudge も `none` 化、`suppressed_by:["away_idle"]`）
+  - away idle: 180 秒以上で**介入を出さない**（`none` 化・`suppressed_by:["away_idle"]`。`intervention.rs:249-251`）
 
 - **発火/非発火の要点（期待ギャップ防止・実機 smoke フィードバック反映）**:
   - **Opportunity ゲート**: Need が高くても「今が好機か」を別途判定する。好機は **2〜30 秒の小休止**
@@ -84,27 +83,25 @@
   - **2 つの介入制御の役割差**:
     - `session_meta.intervention_enabled`: セッション開始時の**マスタ ON/OFF**。`false` なら backend が
       全 `get_intervention_decision` を `none` で gate（較正の既定）。
-    - **Monk Mode**: 実行中トグルで **Lv2 Wall のみ**を無効化（Nudge は出る）。`intervention_enabled=false` 時は
-      no-op のため UI でトグルを表示しない（介入有効時のみ表示）。
+    > ⚠️★★★ **2026-09-01 訂正 —— Monk Mode は 2026-08-23 に削除された**（ADR-015 D2）。
+    > 旧文は「実行中トグルで **Lv2 Wall のみ**を無効化（Nudge は出る）」と書いていたが、
+    > **`session_meta` の `monk_mode` フィールドごと外れている**（実測: `schema_dto.rs:317-337` に無い）。
+    > ★ **介入制御は `session_meta.intervention_enabled` の 1 本だけである。**
 
-#### Lv1: Nudge（視覚的ヒント）
+#### Nudge（視覚的ヒント）— ★ **現行で稼働する唯一の介入**
 - **トリガー**: `InterventionDecision.action == "nudge"`
-- **振る舞い**: オーバーレイウィンドウ右端に小さなサイドカードを表示
-- **解除条件**: `InterventionDecision.action != "nudge"` で自動消失
-
-#### Lv2: Wall（作業ブロック）
-- **トリガー**: `InterventionDecision.action == "wall"`
-- **振る舞い**:
-  - メインウィンドウを全画面ロック
-  - QR コードを表示し、スマートフォンでスキャンを促す
-  - スマートフォン上で Zen Timer（2 分カウントダウン）を起動
-  - タイマー完了後に手動アンロックボタンを表示
-  - Early Unlock ボタンも提供（緊急時）
-- **解除条件**: スマートフォンからの POST /unlock、またはキーボード長時間アイドル
-- **エラー条件**:
-  - Wall Server 起動失敗: ログ出力、Wall なしで継続
-  - スマートフォン未接続: QR コード再表示で対応
-  - 画面オートロック: navigator.wakeLock API で防止
+- **振る舞い**: オーバーレイウィンドウ**右上**に小カード（幅 340px）を表示（`src/App.css:565-572`）。
+  ★ カード以外は **OS レベルでクリック透過**（非ブロック）
+- **解除条件**: 4 択（`not_stuck` / `want_to_struggle` / `just_close` / `silent`）のいずれかを押す、
+  または **60 秒**無応答で `silent` として自動フェードアウト（`src/components/Overlay.tsx:40,340-365`）。
+  いずれも `record_intervention_dismiss` を経て `recent_dismiss`（20 分）が立つ
+  （★ `DismissReason` の実体は `schema_dto.rs:496-501` の 4 値）
+> ⚠️★★★ **2026-09-01 訂正 —— 旧「#### Lv2: Wall（作業ブロック）」の節を全削除した。**
+> ★ **Wall / Zen Timer / Early Unlock / `wall_server.rs` は 2026-08-23 に全削除された**（ADR-015 D1）。
+> 旧節は全画面ロック・QR・Zen Timer・`POST /unlock`・Wall Server 起動失敗時のエラー条件まで
+> **現行仕様として記述していた**が、**発火経路がコードに 1 つも無い**。
+> ★ 段階呼称も外した（`#### Lv1:` → `#### Nudge`。ADR-018 D7）。
+> ★ **不便を担う Physical Anchor は未実装**である（→ §4 将来的な拡張）。
 
 ### 機能 5: セッション管理
 
@@ -114,7 +111,7 @@
 - **振る舞い**:
   - セッション開始時: HMM エンジンリセット、ロガー初期化
   - セッション中: 1Hz で作業状態スコアを更新、500ms で UI が `InterventionDecision` をポーリング
-  - セッション終了時: ログファイルクローズ、Wall Server 停止
+  - セッション終了時: ログファイルの flush とクローズ（⚠️ **2026-09-01: 「Wall Server 停止」を削除** — ADR-015 D1）
 - **エラー条件**:
   - IPC 失敗時: 認知状態を安全なデフォルト値にリセット（flow=1.0, stuck=0.0）
 
@@ -142,7 +139,7 @@
 >
 > **尺度理解テスト (ビネット) は現行スコープでは延期**: schema (`vignette_response`) と format 関数は実装済みだが、初回スモークの最小核スコープからは外され、比較条件を実装した段で発効する (PreReg-1/3 の扱い、`.steering/20260612-retro-labeling-and-corner-intervention/design.md` 参照)。
 >
-> **較正モード blind dashboard (測定独立性)**: v0.3 較正セッションの既定メイン画面は **blind/minimal** にする (`App` の `calibrationMode` state、既定 ON・Start 画面のトグルで切替)。被験者にモデル出力 (推定状態 / Flow・Incubation・Stuck 確率 / p_stuck・X/Y / GT counter / 状態色) を**一切見せない**ことで、主観回答 (criterion label) のアンカリング汚染を防ぐ。較正中に表示してよいのはセッション経過時間 / Keyboard・Hook 状態 / Monk Mode (介入状態) / 終了ボタン / 権限警告のみ。`ProbeCard`/`VignetteTest` は overlay で従来どおり動作。frontend のみの分岐 (backend/schema 不変、`cognitiveState` は取得するが非表示)。`.steering/20260617-calibration-blind-dashboard/` 参照。
+> **較正モード blind dashboard (測定独立性)**: v0.3 較正セッションの既定メイン画面は **blind/minimal** にする (`App` の `calibrationMode` state、既定 ON・Start 画面のトグルで切替)。被験者にモデル出力 (推定状態 / Flow・Incubation・Stuck 確率 / p_stuck・X/Y / GT counter / 状態色) を**一切見せない**ことで、主観回答 (criterion label) のアンカリング汚染を防ぐ。較正中に表示してよいのはセッション経過時間 / Keyboard・Hook 状態 / 終了ボタン / 権限警告のみ。（⚠️ **2026-09-01: 「Monk Mode (介入状態)」を削除** — ADR-015 D2）`ProbeCard`/`VignetteTest` は overlay で従来どおり動作。frontend のみの分岐 (backend/schema 不変、`cognitiveState` は取得するが非表示)。`.steering/20260617-calibration-blind-dashboard/` 参照。
 
 - **概要**: HMM の自動推定とユーザーの主観的認知状態のズレを定量化するため、作業中にリアルタイムで「自覚しているクラス」をラベル付けし、オフラインで混同行列・F1・中央値を算出する (下記はホットキー方式の仕様。v0.3 較正の主データはプローブ方式 — 上記注記参照)
 - **入力経路**:
@@ -236,24 +233,24 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
   6. ユーザーが作業を完了し、アプリを終了する
 - **事後条件**: セッションログが NDJSON ファイルとして保存される
 
-### UC-2: Stuck 検出と段階的介入
+### UC-2: Stuck 検出と介入
 
 - **アクター**: 知識労働者
 - **前提条件**: セッションが進行中
 - **トリガー**: ユーザーが行き詰まり状態に陥る（長時間の修正・削除の繰り返し、長い休止）
 - **基本フロー**:
   1. キーストローク特徴量が Stuck 領域に移行する
-  2. Need と Opportunity が閾値を満たし、Nudge（右端サイドカード）が表示される
-  3. ユーザーが作業を継続し、p_stuck が 0.70 を超える
-  4. 累積 30 秒経過後、Wall が起動する
-  5. ユーザーがスマートフォンで QR コードをスキャンする
-  6. Zen Timer（2 分）が開始される
-  7. タイマー完了後、ユーザーが手動でアンロックする
-  8. ユーザーがリフレッシュされた状態で作業に戻る
+  2. Need と Opportunity が閾値を満たし、Nudge（右上の小カード）が表示される
+  3. ユーザーが 4 択（`not_stuck` / `want_to_struggle` / `just_close` / `silent`）で応答するか、
+     **60 秒**無応答で `silent` として自動フェードアウトする
+  4. `record_intervention_dismiss` が `intervention_response` 行を記録し、`recent_dismiss`（20 分）が立つ
 - **代替フロー**:
-  - 3a. Nudge 表示後に自然回復 → Nudge が消失し基本フローに戻る
-  - 5a. Monk Mode が有効 → Wall は発動せず Nudge のみ
-  - 7a. 緊急時 → Early Unlock ボタンで即時解除
+  - 2a. Nudge 表示前に自然回復 → `below_need_threshold` で `none`（`intervention.rs:449-451`）
+  - 2b. Opportunity が低い（打鍵中など） → `defer`（★ 見逃しではなく **Opportunity を守る判断**）
+  - 2c. idle 180 秒以上 → `suppressed_by:["away_idle"]` で `none`
+> ⚠️★★★ **2026-09-01 訂正 —— 旧フローは Wall 起動 → QR → Zen Timer → 手動アンロックの
+> 5 ステップを「基本フロー」として書いていたが、その経路は ADR-015 D1 で全削除された。**
+> ★ 代替フローの「Monk Mode が有効 → Wall は発動せず」「Early Unlock ボタンで即時解除」も同様に失効。
 - **事後条件**: 介入イベントがセッションログに記録される
 
 ### UC-3: 日本語入力での作業
@@ -281,13 +278,13 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
   1. CGPreflightListenEventAccess() が false を返す
   2. CGRequestListenEventAccess() がシステム設定を開く（Input Monitoring）
   3. ユーザーがシステム設定で GSE に Input Monitoring 権限を付与する
-  4. CGEventTap が kCGEventTapOptionListenOnly で作成される
+  4. CGEventTap が **Input Monitoring tap（ListenOnly tap）** で作成される
   5. フックがアクティブになり、キーストローク収集が開始される
 - **代替フロー**:
   - 3a. Input Monitoring を拒否 → Accessibility 権限チェックへ移行
-  - 3b. ad-hoc 署名で CDHash 不安定 → ListenOnly タップが 10 回連続失敗
+  - 3b. ad-hoc 署名で CDHash 不安定 → ListenOnly tap が **3 回**連続失敗
   - 4a. ListenOnly 失敗 → AXIsProcessTrustedWithOptions ダイアログ（GCD メインキュー経由）を表示
-  - 4b. ユーザーが Accessibility 権限を付与 → kCGEventTapOptionDefault でタップ作成
+  - 4b. ユーザーが Accessibility 権限を付与 → **Accessibility tap（Default tap）** でタップ作成
   - 5a. Dashboard の「システム設定を開く」ボタンから手動で Accessibility を付与
   - 5b. Dashboard の TCC リセットボタンで権限状態をリセットし再試行
   - 5c. ad-hoc 署名ビルドでは CDHash 不安定のため、システム設定で**権限を一度オフにしてから再度オンに戻す**手動操作が必要になる場合がある (Dashboard が再トグル手順を案内)。自動回復はシームレスではない点に注意
@@ -323,7 +320,7 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 - **代替フロー**:
   - 1a. `--metrics --snapshot` を同時指定 → Usage エラーで exit 2
   - 5a. `--json` 指定時: 構造化 JSON を stdout に出力
-- **事後条件**: `SessionMetrics` を人間または機械 (`aggregate_metrics.py`) が消費できる形で標準出力に得る
+- **事後条件**: `SessionMetrics` を人間または機械 (**`gse-cohort`**) が消費できる形で標準出力に得る（⚠️★★★ **2026-09-01 訂正 —— `scripts/aggregate_metrics.py` は存在しない。** 実測で `scripts/` に該当ファイルは 0 件。★ **被験者横断の集計は `gse-cohort`（`src-tauri/src/bin/cohort.rs`）と `scripts/run-calibration-cohort.sh` が担う**。v0.2 期の計画名がそのまま残っていた）
 
 ### UC-GT3: 端末間で metrics を共有し Phase 2a 判定する (Phase 1)
 
@@ -334,11 +331,11 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
   1. 各端末で `--metrics --json` 出力を `gse-dataset/metrics/P000/<macos|windows>/*.metrics.json` に配置
   2. `gse-dataset` で `git commit && git push`
   3. 他端末で `git pull`
-  4. `python scripts/aggregate_metrics.py` で全体集計: セッション数 / Macro F1 平均 / per-class 平均 / Stuck precision 平均
+  4. **`bash scripts/run-calibration-cohort.sh`**（内部で `gse-cohort` を呼ぶ）で全体集計: セッション数 / Macro F1 平均 / per-class 平均 / Stuck precision 平均（⚠️★★★ **2026-09-01 訂正 —— `scripts/aggregate_metrics.py` は存在しない。** 実測で `scripts/` に該当ファイルは 0 件。★ **被験者横断の集計は `gse-cohort`（`src-tauri/src/bin/cohort.rs`）と `scripts/run-calibration-cohort.sh` が担う**。v0.2 期の計画名がそのまま残っていた）
   5. `Phase 2a Go/No-Go (Stuck precision >= 0.6, n >= 5)` の判定行を確認
 - **代替フロー**:
   - 4a. `n < 5`: `INCONCLUSIVE` が出力される → セッション収集を継続
-  - 4b. 破損 metrics.json がある: `aggregate_metrics.py` が `sys.stderr` に WARN を出しスキップ、`skipped` リストに記録
+  - 4b. 破損 metrics.json がある: `gse-cohort` が stderr に警告を出しスキップする
 - **事後条件**: 複数端末のデータが単一の集計値に統合され、`baseline_metrics.md` への転記元になる
 
 ### UC-OM1: 捕捉済み NDJSON から v0.4 アウトカム指標を算出する (Phase B / WBS 0.10)
@@ -348,7 +345,7 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 - **トリガー**: M3 Y 価値検証の (a) AI依存度・(b) 自力解決率を `metrics.json` に載せたい
 - **基本フロー**:
   1. `gse-replay --metrics --json` が `collect_logged_feats` / `collect_paste_events` / `collect_key_events`
-     で content-free な時系列 (p_stuck feat / paste 文字数 / key vk) を収集
+     で content-free な時系列 (p_stuck feat / paste 文字数 / **key category**) を収集
   2. `segment_stuck_episodes` が `p_stuck >= 0.60` の連続区間を merge-gap で統合し **Stuck エピソード**化
   3. `compute_outcome_metrics` が各エピソードについて回復 (p_flow>0.5)・paste 有無・net_diff 正進行を判定し、
      (b) `manual_contribution_ratio` / `productive_manual_recovery_rate`、
@@ -372,20 +369,22 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 - macOS TCC 権限管理（Input Monitoring / Accessibility の自動検出・フォールバック・リセット）
 - 3 状態認知推定（Flow / Incubation / Stuck）の 1Hz 更新
 - 日本語 IME 対応（文脈依存ベースライン切替）
-- Lv1 Nudge 介入（視覚フィードバック）
-- Lv2 Wall 介入（全画面ロック + スマートフォンアンロック + Zen Timer）
+- Nudge 介入（視覚フィードバック）
 - セッションログの NDJSON 永続化
-- Monk Mode（Wall 無効化トグル）
+- 介入のマスタ ON/OFF（`session_meta.intervention_enabled`。⚠️ **2026-09-01: 旧「Monk Mode（Wall 無効化トグル）」を差し替え** — ADR-015 D2 で削除）
 
 ### オプション機能
 
-- セッションログの事後分析スクリプト（behavioral_gt.py）
-- キーボードアイドル検出による Wall 自動解除
 
 ### 将来的な拡張
 
 - **ML モデル推論**: データ蓄積に応じて HMM → ONNX Runtime 経由の学習済みモデルへ段階的移行。学習データはオプトイン同意のもとセッションログを匿名化・集約して収集
-- **Lv3/Lv4 介入**: Physical Anchor（身体的活動の促進）— Flutter アプリとの連携
+- **Physical Anchor**: **身体的回帰への方向づけ**（★ **系は開始も完了も判定しない** — ADR-018 D1/D2。
+  ⚠️ タイマー・カウントダウン・残り時間表示を実装しない）— Flutter アプリとの連携。
+  ⚠️★★★ **身体活動のセンシング（歩数・距離・速度・位置情報）は本体から恒久的に外れている**（ADR-017 D10）。
+  ★ 境界（PC → スマホの一方向）の形は ADR-017 D3 で確定済み。
+  （⚠️ **2026-09-01 訂正: 旧文「Lv3/Lv4 介入: Physical Anchor（身体的活動の促進）」は
+  段階呼称・完了条件・センシングの 3 点で現行の決定と食い違っていた**）
 - **マルチデバイス対応**: タッチパッド、ペン入力の特徴量追加
 
 ## 5. 非機能要件
@@ -398,11 +397,22 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 
 ### セキュリティ・プライバシー
 
-- **キーストロークデータ**: VK コードのみ記録（文字内容は記録しない）
+- **キーストロークデータ**: NDJSON にはキーの**種類**（`KeyCategory` 14 種）と押下/離上のみを記録する。
+  ⚠️★★★ **2026-09-01 訂正 —— 実装は旧文より厳しい。生 VK コードも書かない**
+  （ADR-014 判断 6 で `vk` → `category` へ変更・`logger.rs:1541`。回帰テスト `key_line_records_category_and_never_raw_vk` が固定）
 - **セッションログ（運用時）**: ローカルファイルシステムに保存。リアルタイム推定中の外部送信なし
 - **セッションログ（学習データ収集）**: ML モデル学習目的の外部送信はオプトイン + 匿名化 + セッション終了後バッチのみ許可
-- **Wall Server**: ローカルネットワーク内のみ（Windows: Defender ファイアウォールルール動的管理 / macOS: ユーザースコープポートバインドのため追加のファイアウォール管理不要）
-- **Wall Server トークン**: ランダム生成トークンによるアクセス制御
+> ⚠️★★★ **2026-09-01 訂正 —— GSE は現在いかなるローカル HTTP ポートも開かない。**
+> 旧文はここに「**Wall Server**: ローカルネットワーク内のみ（Windows: Defender ファイアウォールルール動的管理…）」
+> 「**Wall Server トークン**: ランダム生成トークンによるアクセス制御」の 2 行を置いていたが、
+> **`wall_server.rs` は ADR-015 D1 で削除**され、依存 `tiny_http` / `qrcode` も除去済みである。
+> ★ **存在しない攻撃面をセキュリティ節に書き続けると、実在する経路から目が逸れる。**
+- **提出パス（★ 現行で唯一の外部送信経路）**: セッションが閉じた後にのみ、匿名化（`analysis::anonymize`）
+  → age 暗号化（`packaging.rs`）→ `.age` を生成する。★ **被験者の確認（`.ok`）が無ければ送信経路が開かない**
+  （`submission.rs`）。送信済みは `.age.sent` で表す。O1 では 48 時間の猶予後に自動提出する（`o1.rs`）
+- ⚠️ **PC ↔ スマホの境界を将来作るときは ADR-017 D4 の S1–S6 を満たすこと**
+  （S1 明示的ペアリング / S2 送信元認証 / S3 偽造・リプレイ対策 / S4 端末紐付けと失効 / S5 LAN 露出の明示 /
+  S6 ペイロードに本人性を載せない）。★ **常設の LAN リスナを置かない**（ADR-017 D4）
 
 ### 可用性
 
@@ -430,4 +440,10 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 
 - **対応デバイス**: Windows 11（Surface Pro 8 + Type Cover）/ macOS 13 Ventura 以降（MacBook Pro/Air — JIS / ANSI 両キーボード対応）
 - **UI**: ダッシュボードウィンドウ + オーバーレイウィンドウの 2 ウィンドウ構成
-- **操作**: セッション開始/終了とMonk Mode 切替のみ（設定項目を最小化）
+- **操作**: 通常運用は**セッション開始/終了**のみ。加えて **記録の一時停止・再開**（`set_recording_paused`）、
+  **区間指定削除**（`delete_time_range`）、**作業の種類の宣言**（`declare_task_kind`）、
+  **参加者 ID 入力と提出**（`submit_latest_session` / `approve_pending_submissions`）、
+  **自己マーカー**（`record_self_marker`）、macOS の**権限リセット / システム設定を開く**を持つ
+  （★ モードごとに表示を出し分ける）。
+  ⚠️ **2026-09-01 訂正 —— 旧文「セッション開始/終了と Monk Mode 切替のみ」は
+  Monk Mode 削除（ADR-015 D2）と、その後に増えた操作面の両方で古い。**

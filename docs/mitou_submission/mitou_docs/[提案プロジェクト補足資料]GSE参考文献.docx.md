@@ -1,0 +1,127 @@
+# 参考文献 — GSE（Generative Struggle Engine）
+
+本書は『提案プロジェクト詳細資料』および『技術設計書』が共有する書誌である。
+本文中の [n] はすべて本書の通し番号を指す。36〜38 番と 50 番は欠番であり、番号は再利用しない。
+
+**理論的基盤**
+
+[1] Kapur, M. (2008) "Productive Failure." *Cognition and Instruction* 26(3), 379–424. https://doi.org/10.1080/07370000802212669
+[2] Bjork, R. A. (1994) "Memory and Metamemory Considerations in the Training of Human Beings." in Metcalfe & Shimamura (Eds.), *Metacognition*, MIT Press.
+[3] 平岡敏洋 (2021) 「不便益を得るシステムの要件」*計測自動制御学会誌（システム／制御／情報）* 60(12), 835–840.
+[4] 荒木卓・川上浩司・平岡敏洋 (2015) 「システムから不便益を得るユーザ特性に関する実験的考察」*計測自動制御学会論文集* 51(11), 779–784.
+[5] 川上浩司 (2012) 「不便の益を活用するシステムデザイン」*計測自動制御学会誌* 51(8), 699–703.
+
+**AI依存と害の所在**
+
+[6] World Economic Forum (2025) *Future of Jobs Report 2025*.
+[7] GitClear (2024) *Coding on Copilot: 2023 Data Suggests Downward Pressure on Code Quality*.
+[8] Bastani, H. et al. (2025) "Generative AI without guardrails can harm learning: Evidence from high school mathematics." *PNAS*.
+[9] Liu, G. et al. (2026) "AI Assistance Reduces Persistence and Hurts Independent Performance." arXiv preprint（査読前）.
+[10] León Méndez, M. et al. (2024) "Effects of internet and smartphone addiction on cognitive control in adolescents and young adults." *Neurosci. Biobehav. Rev.* 159:105572.
+
+**キーストローク動態**
+
+[11] Park, J. H. (2024) "Discriminant Power of Smartphone-Derived Keystroke Dynamics for MCI." *J. Med. Internet Res.* 26:e59247. https://doi.org/10.2196/59247
+[12] Mehta, A. et al. (2025) "Detecting LLM-Assisted Academic Dishonesty using Keystroke Dynamics." arXiv:2511.12468.
+[13] Giancardo, L. et al. (2015) "Psychomotor Impairment Detection via Finger Interactions with a Computer Keyboard During Natural Typing." *Scientific Reports* 5:9678. https://doi.org/10.1038/srep09678
+[14] Züger, M. et al. (2017) "Reducing Interruptions at Work: A Large-Scale Field Study of FlowLight." *CHI 2017*. https://doi.org/10.1145/3025453.3025662
+[15] Meyer, A. N. et al. (2017) "The Work Life of Developers: Activities, Switches and Perceived Productivity." *IEEE Trans. Softw. Eng.* 43(12), 1178–1193.
+[16] Shrestha, R., Leinonen, J., Zavgorodniaia, A., Hellas, A. & Edwards, J. (2022) "Pausing While Programming: Insights From Keystroke Analysis." *ICSE-SEET 2022*. https://doi.org/10.1145/3510456.3514146
+
+**介入設計とその天井**
+
+[17] Thaler, R. H. & Sunstein, C. R. (2008) *Nudge.* Yale University Press.
+[18] Lyngs, U. et al. (2019) "Self-Control in Cyberspace: Applying Dual Systems Theory to a Review of Digital Self-Control Tools." *CHI 2019*, Paper 131.
+[19] Maier, M. et al. (2022) "No evidence for nudging after adjusting for publication bias." *PNAS* 119(31):e2200300119.
+
+**自律性（SDT）とその反証**
+
+[20] Ryan, R. M. & Deci, E. L. (2006) "Self-Regulation and the Problem of Human Autonomy." *Journal of Personality* 74(6), 1557–1585.
+[21] Peters, D., Calvo, R. A. & Ryan, R. M. (2018) "Designing for Motivation, Engagement and Wellbeing in Digital Experience (METUX)." *Frontiers in Psychology* 9:797.
+[22] Van den Broeck, A. et al. (2016) "A Review of Self-Determination Theory's Basic Psychological Needs at Work." *Journal of Management* 42(5), 1195–1229.
+
+**表現層の系譜と一次証拠**
+
+[23] Sengers, P., Boehner, K., David, S. & Kaye, J. (2005) "Reflective Design." *Proc. Critical Computing '05*, 49–58.
+[24] Hallnäs, L. & Redström, J. (2001) "Slow Technology – Designing for Reflection." *Personal and Ubiquitous Computing* 5(3), 201–212.
+[25] Redström, J., Skog, T. & Hallnäs, L. (2000) "Informative Art: Using Amplified Artworks as Information Displays." *Proc. DARE 2000*.
+[26] Baumer, E. P. S. (2015) "Reflective Informatics." *CHI '15*, 585–594.
+[27] Consolvo, S. et al. (2008) "Flowers or a Robot Army? Encouraging Awareness & Activity with Personal, Mobile Displays." *UbiComp '08*.
+[28] Majeed, N. M. et al. (2026) "Examining the Effects of Viewing Nature and Animal Smartphone Wallpapers on Affect, Behaviour, and Cognition: A Randomised Cross-Over Trial." *Behavioral Sciences* 16(5):623.
+[29] Harbach, M., De Luca, A. & Egelman, S. (2016) "The Anatomy of Smartphone Unlocking: A Field Study of Android Lock Screens." *CHI '16*, 4806–4817.
+
+**身体的回帰の効果と反証**
+
+[30] Albulescu, P. et al. (2022) "'Give me a break!' A systematic review and meta-analysis on the efficacy of micro-breaks." *PLOS ONE* 17(8):e0272460.
+[31] Etkin, J. (2016) "The Hidden Cost of Personal Quantification." *Journal of Consumer Research* 42(6), 967–984.
+[32] Deci, E. L., Koestner, R. & Ryan, R. M. (1999) "A Meta-Analytic Review of Experiments Examining the Effects of Extrinsic Rewards on Intrinsic Motivation." *Psychological Bulletin* 125(6), 627–668.
+
+**学習効果を主張しない根拠**
+
+[33] Sinha, T. & Kapur, M. (2021) "When Problem Solving Followed by Instruction Works." *Review of Educational Research* 91(5).
+[34] Loibl, K., Roll, I. & Rummel, N. (2017) "Towards a Theory of When and How Problem Solving Followed by Instruction Supports Learning." *Educational Psychology Review* 29(4), 693–715.
+[35] Oppezzo, M. & Schwartz, D. L. (2014) "Give your ideas some legs." *J. Exp. Psychol. LMC* 40(4), 1142–1152.　※ **本書では効果量の根拠としては用いず、[30] の反証と併記する。**
+
+**対象タスクの選定根拠**
+
+[39] Scardamalia, M. & Bereiter, C. (1987) "Knowledge Telling and Knowledge Transforming in Written Composition." Cambridge University Press.
+[40] Kellogg, R. T. (1988) "Attentional Overload and Writing Performance." *J. Exp. Psychol. Learn. Mem. Cogn.* 14(3), 355–365.
+
+**検証方法論**
+
+[41] Carnegie Mellon University, Machine Learning Department (2018) *Keystroke dynamics による個人内ストレス分類*, CMU-ML-18-104（PhD thesis）.
+[42] Qian, T. et al. (2021) "The Micro-Randomized Trial for Developing Digital Interventions." arXiv:2107.03544.
+[43] Pejovic, V. et al. (2015) "Mobile-Based Experience Sampling for Behaviour Research." arXiv:1508.03725.
+[44] Hart, S. G. & Staveland, L. E. (1988) "Development of NASA-TLX."
+[45] Schwarzer, R. & Jerusalem, M. (1995) "Generalized Self-Efficacy Scale."
+[46] Poreba, F. & Sobernig, S. (2026) "Interruptibility of software developers and its prediction using psycho-physiological sensors: a replication." *Empirical Software Engineering*.
+[47] Bidargaddi, N. et al. (2018) "To Prompt or Not to Prompt? A Microrandomized Trial of Time-Varying Push Notifications." *JMIR mHealth and uHealth* 6(11):e10123.
+[48] Crotti, R. et al. (2026) "Hylog: A Hybrid Approach to Logging Text Production in Non-alphabetic Scripts." arXiv:2601.17753.
+[49] Schaffner, B. et al. (2025) "An Experimental Study of Netflix Use and the Effects of Autoplay on Watching Behaviors." arXiv:2412.16040.
+
+**その他（本文中で言及）**
+
+[51] Dhakal, V., Feit, A. M., Kristensson, P. O. & Oulasvirta, A. (2018) "Observations on Typing from 136 Million Keystrokes." *CHI 2018*. https://doi.org/10.1145/3173574.3174220　※ ベースライン β の母集団中央値の出所。
+[52] Rabiner, L. R. (1989) "A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition." *Proc. IEEE* 77(2), 257–286.
+[53] Microsoft — *Windows Integrity Mechanism Design* / *Text Services Framework Reference* / *IME and TSF Accessibility in Windows XP*.　※ §3.3 の訂正の根拠。
+
+**認知的資源モデルの再現性（2026年8月30日のサーヴェイで追加）**
+
+[54] König, L. M., Allmeta, A., Christlein, N., Van Emmenis, M. & Sutton, S. (2022) "A systematic review and meta-analysis of studies of reactivity to digital in-the-moment measurement of health behaviour." *Health Psychology Review* 16(4), 551–575. https://doi.org/10.1080/17437199.2022.2047096　※ 11,723件スクリーニング → 30論文 / 31研究。反応性の機序3「実際の行動と望ましい行動との乖離の解消」の出所（§5.4）。
+[55] Hagger, M. S., Chatzisarantis, N. L. D. et al. (2016) "A Multilab Preregistered Replication of the Ego-Depletion Effect." *Perspectives on Psychological Science* 11(4), 546–573. https://doi.org/10.1177/1745691616652873　※ **k=23 lab / N=2,141 で d = 0.04, 95% CI [−0.07, 0.15]。** プロトコルは Baumeister 本人が事前に承認している。
+[56] Vohs, K. D., Schmeichel, B. J. et al. (2021) "A Multisite Preregistered Paradigmatic Test of the Ego-Depletion Effect." *Psychological Science* 32(10), 1566–1581. https://doi.org/10.1177/0956797621989733　※ **k=36 lab / N=3,531 で d = 0.06, 95% CI [−0.02, 0.14]。** 操作チェックは成功していた（努力感 d = 1.76, I² = 0%）。
+[57] Carter, E. C., Kofler, L. M., Forster, D. E. & McCullough, M. E. (2015) "A Series of Meta-Analytic Tests of the Depletion Effect: Self-Control Does Not Seem to Rely on a Limited Resource." *J. Exp. Psychol. General* 144(4), 796–815. https://doi.org/10.1037/xge0000083　※ 116独立効果量。naive g = 0.43 → **PEESE b = 0.003, 95% CI [−0.14, 0.15]。**
+[58] Friese, M., Loschelder, D. D., Gieseler, K., Frankenbach, J. & Inzlicht, M. (2019) "Is Ego Depletion Real? An Analysis of Arguments." *Personality and Social Psychology Review* 23(2), 107–131. https://doi.org/10.1177/1088868318762183　※ 中立の総括。逐語「**the available evidence is inconclusive**」。本書が引く温度はここである。
+[59] Lin, H., Saunders, B., Friese, M., Evans, N. J. & Inzlicht, M. (2020) "Strong Effort Manipulations Reduce Response Caution: A Preregistered Reinvention of the Ego-Depletion Paradigm." *Psychological Science* 31(5), 531–547. https://doi.org/10.1177/0956797620904990　※ **事前登録4実験 / N=686 / 拡散モデル。** 逐語「**effort exertion reduced response caution rather than inhibitory control … people disengage**」。**本書が「関与の低下」を語る一次根拠。**
+[60] Kurzban, R., Duckworth, A., Kable, J. W. & Myers, J. (2013) "An opportunity cost model of subjective effort and task performance." *Behavioral and Brain Sciences* 36(6), 661–679. https://doi.org/10.1017/S0140525X12003196　※ 逐語「**finite but not destroyed with use**」。
+[61] Agrawal, M., Mattar, M. G., Cohen, J. D. & Daw, N. D. (2022) "The temporal dynamics of opportunity costs: A normative account of cognitive fatigue and boredom." *Psychological Review* 129(3), 564–585. https://doi.org/10.1037/rev0000309　※ 逐語「**instead of reflecting the depletion of resources as has often been assumed**」。
+[62] Dang, J., Barker, P. et al. (2021) "A Multilab Replication of the Ego Depletion Effect." *Social Psychological and Personality Science* 12(1), 14–24. https://doi.org/10.1177/1948550619887702　※ 事前登録 / 12 lab / N=1,775 で **d = 0.10（除外後 0.16）**。生き残っている効果はこの大きさである。
+
+**生成AI利用下の認知的関与（2026年8月30日のサーヴェイで追加）**
+
+[63] Lee, H.-P., Sarkar, A., Tankelevitch, L., Drosos, I., Rintel, S., Banks, R. & Wilson, N. (2025) "The Impact of Generative AI on Critical Thinking: Self-Reported Reductions in Cognitive Effort and Confidence Effects From a Survey of Knowledge Workers." *CHI 2025*. https://doi.org/10.1145/3706598.3713778　※ N=319 / 936事例。逐語「**GenAI shifts the nature of critical thinking toward information verification, response integration, and task stewardship**」。
+[64] Burelli, P., Calefato, F., Grassi, D., Hristova, M. Y., Novielli, N., Romano, A. A. & Tell, P. (2026) "Using Biometrics to Understand AI-Assisted Coding Performance and its Perception." arXiv:2606.20598（*Empirical Software Engineering* 投稿中）　※ **N=60 / 被験者内クロスオーバー / 事前登録 / EEG・視線・EDA・HRV。** AI支援下で EEG θ/α 比が低下（β = −1.11, p_BH = .01）。逐語「**consistent with reduced cognitive engagement when developers offload generative effort to the model**」。周辺 R² < 0.10。
+[65] Afshar, M. et al. (2025) "A Pragmatic Randomized Controlled Trial of Ambient Artificial Intelligence to Improve Health Practitioner Well-Being." *NEJM AI* 2(12). https://doi.org/10.1056/AIoa2500945（ClinicalTrials.gov NCT06517082）　※ **24週 / stepped-wedge / 個人無作為化 / N=66 / ITT。** 疲弊は **−0.44, 95% CI [−0.62, −0.25], P < 0.001** と**下がった**。本書が「AI利用は消耗を増やす」と書かない根拠。
+[66] Skitka, L. J., Mosier, K. L. & Burdick, M. (1999) "Does automation bias decision-making?" *Int. J. Human-Computer Studies* 51(5), 991–1006. https://doi.org/10.1006/ijhc.1999.0252　※ **統制実験・N=80・自動化なし対照群あり。**見落とし **41% vs 3%**。逐語「**訓練内容や、100%妥当で入手可能な他の指標に反していてさえ**、自動化された助言に従った」。さらに「信頼していないと答えた被験者でも検証行動は変わらなかった」。
+[67] Parasuraman, R. & Manzey, D. H. (2010) "Complacency and Bias in Human Use of Automation: An Attentional Integration." *Human Factors* 52(3), 381–410. https://doi.org/10.1177/0018720810376055　※ 逐語「**automation bias は素朴な参加者にも専門家にも生じ、訓練や指示では防げない**」「**検証しないこと（生データを見ないこと）は注意の再配分を示す**」。**実行時介入が要ることの根拠。**
+[68] Fan, G., Liu, D., Pan, L. & Zhang, R. (2026) "When Help Hurts: Verification Load and Fatigue with AI Coding Assistants." *CHI '26*, Barcelona, 1–25. https://doi.org/10.1145/3772318.3791176 (CC-BY)　※ **N=60・事前登録・対照群あり。****主結果は「AI で負荷が *下がった*」**（−18.2 TLX, 95% CI [−22.3, −14.0], p<0.001）。本書が引くのは 2 点のみ: **(a)** 検証負荷が疲労上昇を部分媒介（KSS の間接効果 ab = 0.15 [0.06, 0.27]・総効果の約26%。著者は因果同定を主張していない）／**(b)** **ほぼ無検証の受容で正答率が下がる**（受容率の二次項 **β₂ = −0.81, SE = 0.28, p = 0.005**、最適点 0.48 [0.44, 0.53]。著者は exploratory と留保）。著者自身の提言「**行動信号を直接監視し、軽量な閾値を超えたら介入せよ**」。
+[69] Parry, D. A. et al. (2021) "A systematic review and meta-analysis of discrepancies between logged and self-reported digital media use." *Nature Human Behaviour* 5(11), 1535–1547. https://doi.org/10.1038/s41562-021-01117-5　※ **事前登録メタ分析・106 効果量・N=52,007。**自己申告と実測ログの相関 **r = 0.38 [0.33, 0.42]**。ログ平均 ±5% に入った自己申告は **49 件中 3 件（6.12%）**。**乖離の向きは決まらない**（著者は過大・過小のいずれとも結論していない）。
+[70] Murphy-Hill, E. et al. (2021) "What Predicts Software Developers' Productivity?" *IEEE Trans. Softw. Eng.* 47(3), 582–594.　※ Google 内 **n = 3,344**。主観生産性と客観出力の **R² < 3%**。
+[71] Khojah, R., Gomes de Oliveira Neto, F., Mohamad, M., Frattini, J. & Leitner, P. (2026) "（LLM 生成コードのレビュー挙動）" *ASE '26*, arXiv:2606.26505.　※ **反証側。**N=32 実務者・視線計測・ベイズ解析。逐語「**レビューの精査度は変わらなかった**が、LLM とラベルされたコードにはより長く注視した」。→ **「主観と実測の乖離」は支持するが「精査そのものの低下」は否定する。本書は後者を主張しない。**
+
+**モデルの複雑化と評価法（2026年9月2日のサーヴェイで追加。全件 Crossref の raw JSON で書誌を検算した）**
+
+[72] Freihaut, P. & Göritz, A. S. (2024) "Show me How You Use Your Mouse and I Tell You How You Feel? Sensing Affect With the Computer Mouse." *IEEE Trans. Affective Computing* 15(3), 1490–1501. https://doi.org/10.1109/TAFFC.2024.3357733 (CC-BY)　※ **N=179 × 14日 = 10,760 事例の縦断フィールド研究。** 本文逐語「**The inclusion of mouse usage features in the ML models did not enhance affect prediction, but decreased prediction performance as compared to the null model.** This decrease is likely due to **overfitting on random noise** arising from the inclusion of additional, non-informative input features.」および「**Promising results from laboratory settings do not necessarily translate into real-life settings.**」本書が「複雑化は上がる証拠が無い」ではなく「**下がった記録がある**」と書く根拠。
+[73] Freihaut, P. & Göritz, A. S. (2021) "Tracking stress via the computer mouse? Promises and challenges of a potential behavioral stress marker." *Behavior Research Methods* 53(6), 2281–2301. https://doi.org/10.3758/s13428-021-01568-8　※ **N=994・被験者間フィールド実験。** 逐語「**frequentist and machine learning data analysis approaches did not reveal a clear and systematic relationship between mouse usage and stress**」。本文より、条件分類の正答率は4課題で 54% / 54% / 59% / 51%、回帰の R² は全て −0.12〜0.00、**マウス軌跡を画像化した CNN 回帰の R² は −5.22〜−1.10**（平均値予測より大幅に悪い）。
+[74] Koldijk, S., Neerincx, M. A. & Kraaij, W. (2018) "Detecting Work Stress in Offices by Combining Unobtrusive Sensors." *IEEE Trans. Affective Computing* 9(2), 227–239. https://doi.org/10.1109/TAFFC.2016.2610975　※ **N=25 (SWELL-KW)。** 10分割交差検証 90.03% に対し **leave-one-subject-out は 58.89%**（多数決基準 61.76% を下回る。被験者間 SD 11.64 ポイント）。mental effort の回帰は **r=0.8221 → LOSO r=0.0343**。PC 操作18特徴の単独は 65.51%（基準 +3.75 ポイント）。著者逐語「**Computer interactions and physiology, however, showed no gains**」「**Predicting the mental effort of an unseen user is thus difficult.**」被験者識別子を加えると mental effort 回帰は **r 0.8221 → 0.9410**。
+[75] Christodoulou, E., Ma, J., Collins, G. S., Steyerberg, E. W., Verbakel, J. Y. & Van Calster, B. (2019) "A systematic review shows no performance benefit of machine learning over logistic regression for clinical prediction models." *J. Clinical Epidemiology* 110, 12–22. https://doi.org/10.1016/j.jclinepi.2019.02.004　※ 71研究282比較。逐語「**For 145 comparisons at low risk of bias, the difference in logit(AUC) between LR and ML was 0.00** (95% CI, −0.18 to 0.18). For 137 comparisons at high risk of bias, logit(AUC) was 0.34 higher for ML.」※ 対象の機械学習は決定木・ランダムフォレスト・ニューラルネット・SVM であり、系列深層モデルは含まれない。その隙間は [79][80] が埋める。
+[76] Kuvar, V., Kam, J. W. Y., Hutt, S. & Mills, C. (2023) "Detecting When the Mind Wanders Off Task in Real-time: An Overview and Systematic Review." *Proc. ICMI 2023*, 163–173. https://doi.org/10.1145/3577190.3614126　※ **PRISMA 準拠・42研究。** 逐語「models built on **gaze** typically outperform other modalities and that **multimodal models do not present a clear edge over their unimodal counterparts**」。領域の障壁は generalizability。※ 統合推定（メタ分析）は行っていない。最良モダリティは視線であって打鍵ではない。
+[77] Varoquaux, G. (2018) "Cross-validation failure: Small sample sizes lead to large error bars." *NeuroImage* 180, 68–77. https://doi.org/10.1016/j.neuroimage.2017.06.061　※ 逐語「sample sizes of many neuroimaging studies inherently lead to large error bars, **eg ±10% for 100 samples. The standard error across folds strongly underestimates them.**」本書が昇格判定から「+3%」を外した根拠（§4.4）。※ 著者は「段を上げるな」ではなく「判定に必要な N を増やせ」と言っている。
+[78] Hammerla, N. Y. & Plötz, T. (2015) "Let's (not) stick together: pairwise similarity biases cross-validation in activity recognition." *Proc. UbiComp '15*, 1041–1051. https://doi.org/10.1145/2750858.2807551　※ 逐語「the characteristics of segmented time-series data render random cross-validation a poor fit, as **adjacent segments are not statistically independent**」「Results indicate a **significant drop in performance** across a variety of feature extraction and classification methods **if this bias is removed**」。本システムは30秒窓を1Hzで出すため隣接窓の29/30が重複する。標本を Decision Episode 単位で数える根拠（§4.4）。※ 広く流通する DOI 10.1145/2750858.2805940 は解決しない。上記が正しい。
+[79] Middlehurst, M., Schäfer, P. & Bagnall, A. (2024) "Bake off redux: a review and experimental evaluation of recent time series classification algorithms." *Data Mining and Knowledge Discovery* 38, 1958–2031. https://doi.org/10.1007/s10618-024-01022-1　※ UCR 112 ＋ 新規30データセットで深層学習を含めて比較。逐語「**two recently proposed algorithms, MultiROCKET+Hydra and HIVE-COTEv2, perform significantly better than other approaches**」。深層は上位2手法に入っていない。
+[80] Dempster, A., Petitjean, F. & Webb, G. I. (2020) "ROCKET: exceptionally fast and accurate time series classification using random convolutional kernels." *Data Mining and Knowledge Discovery* 34, 1454–1495. https://doi.org/10.1007/s10618-020-00701-z　※ 逐語「**simple linear classifiers using random convolutional kernels achieve state-of-the-art accuracy** with a fraction of the computational expense of existing methods」。畳み込みの利得はカーネルを学習しなくても取れる。M4 の第一候補を差し替えた根拠（§4.5）。
+[81] Ghosh, S., Ganguly, N., Mitra, B. & De, P. (2017) "TapSense: combining self-report patterns and typing characteristics for smartphone based emotion detection." *Proc. MobileHCI '17*, 1–12. https://doi.org/10.1145/3098279.3098564　※ 22名・3週間・4情動状態・**打鍵内容を使わない**。個人化 AUROC **84%（SD 6%）**、打鍵特徴のみの個人化 **71%（SD 11%）**、被験者を跨ぐ集約は **71% だが SD 19%** で著者逐語「**for most of the participants it performs poorly**」。※ 手法推進側の論文であり批判論文ではない。スマートフォンのタッチ入力であり物理キーボードではない。
+
+[82] Maglio, P. P. & Campbell, C. S. (2000) "Tradeoffs in displaying peripheral information." *Proc. CHI 2000*, 241–248. https://doi.org/10.1145/332040.332438　※ 主課題（10分のテキスト編集）と同じ面に周辺情報を置いたときの代償を測った統制実験。主課題の低下は最良の条件（離散提示）でも**26%**、連続スクロールでは**43%**（F(3,32)=10.30, p<0.0001）。一方**周辺情報の記憶率は3実験とも差がない**（F=0.58 / 0.6 / 1.16、いずれも n.s.）。常時の状態表現をPCの作業面に置かずスマートフォン側へ分離する根拠（詳細資料 §3）。※ GSEの招待は状態変化時のみの離散提示であり本研究の最良条件側に相当するため、代償の量は小さいと見込む。これは推論であって実証ではない。
+
+[83] Uto, M., Miyazawa, Y., Kato, Y., Nakajima, K. & Kuwata, H. (2020) "Time- and Learner-Dependent Hidden Markov Model for Writing Process Analysis Using Keystroke Log Data." *International Journal of Artificial Intelligence in Education* 30(2), 271–298. https://doi.org/10.1007/s40593-019-00189-9　※ 本提案の骨格に最も近い先行。**窓幅30秒・ステップ幅10秒**の移動窓ごとに打鍵特徴量を抽出し、HMMで潜在状態を推定する（最良9状態・時間依存＋学習者依存）。被験者72名・reading-to-write課題・45分固定・総打鍵184,916。状態解釈は日本語版（人工知能学会研究会資料 SIG-ALST-B801-10, 2018）にあり「待機／文章化（速筆型・遅筆型）／推敲（修正量多・少・全体・個別）」。※ **したがって「打鍵とHMMで執筆過程を推定すること」自体は本提案の新規性ではない**（詳細資料 §3）。※ ただし**IMEを一語も扱っていない**（全文65,208字で input method / kana / kanji / conversion の出現がいずれもゼロ）。テキスト水準のロガーで、結果テキストだけを見ることでIMEを迂回している。※ 論文は執筆言語を明記していない。被験者は日本の高校生・大学生だが「日本語で書いた」とは書かれていないため、そう断定して引かない。※ 妥当性検証の型が借用できる——専門家2名にリプレイを見せて作業内容分布を評定させ、JS擬距離で比較（0.695 / 0.796 に対し一様分布 1.361）。**一様分布ベースラインを置く**点は本提案の較正評価でも採用しうる。
