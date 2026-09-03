@@ -66,11 +66,19 @@ PYTHONUTF8=1 python scripts/check_doc_lexicon.py
 
 ⚠️★★★ **設計スライドだけ出力が `.pptx` である。** 変換器も別（`md2pptx.py`）。
 
+⚠️★★★ **詳細資料だけ `--compact` が要る。** ★ 4 本を同じコマンドで回してはならない
+（→ 直後の「`--compact` を落とすとどうなるか」）。
+
 ```bash
 cd <repo root>
+MD=docs/mitou_submission/mitou_docs
 
-# (1) .docx.md -> .docx （4 本）
-for f in docs/mitou_submission/mitou_docs/*.docx.md; do
+# (1a) 詳細資料 -> .docx （★ --compact 必須。ページ規約があるのはこの 1 本だけ）
+f="$MD/[提案プロジェクト詳細資料]GSE_proposal.docx.md"
+PYTHONUTF8=1 python scripts/md2docx.py "$f" "${f%.md}" --unescape --compact
+
+# (1b) 補足資料 -> .docx （3 本。★ --compact を付けない）
+for f in "$MD"/*補足資料*.docx.md; do
   PYTHONUTF8=1 python scripts/md2docx.py "$f" "${f%.md}" --unescape
 done
 
@@ -79,6 +87,37 @@ for f in docs/mitou_submission/mitou_pptx/*.pptx.md; do
   PYTHONUTF8=1 python scripts/md2pptx.py "$f" "${f%.md}" --unescape
 done
 ```
+
+### ⚠️★★★ `--compact` を落とすとどうなるか（2026-09-03 実測）
+
+| コマンド | 詳細資料のページ数 |
+|---|---|
+| `--unescape --compact` | **10.0**（★ 規約ぴったり） |
+| `--unescape` のみ | ⚠️★★★ **15**（★ **規約の 1.5 倍。審査対象外**） |
+
+★ `--compact` が変えるのは **余白（`pgMar` 1134 → 700）と行送り（`w:line` 276 → 216）** である
+（`scripts/md2docx.py` の `COMPACT_STYLES` と `write_docx(compact=...)`）。
+⚠️★★★ **本文は 1 文字も変わらないので、差分を見ても気づけない。**
+★ 実測手段: `soffice --headless --convert-to pdf` で PDF 化して数える。
+
+⚠️ **補足資料 3 本に `--compact` を付けてはならない** —— ★ ページ規約が無く、
+**通常の行送りのほうが読みやすい**。★ 実測でも 3 本は `pgMar=1134 / w:line=276`
+（＝非 compact）で生成されている。
+
+⚠️★★★ **ページ数はレンダラ依存である。**（2026-09-03 実測）
+
+| 経路 | 詳細資料 |
+|---|---|
+| `--compact` → **LibreOffice** | **10.0 ページ** |
+| **Google Drive** 表示 | ★ **7 ページ**（研究者確認） |
+
+→ ★★★ **提出に使う経路で最後に 1 回実測すること。**★ どちらか一方の数字を
+「本当のページ数」として扱わない。
+
+⚠️ **現在コミットされている詳細資料 `.docx` は LibreOffice で開いて再保存されている**
+（`word/theme/theme1.xml` 等の LibreOffice 由来パートを持つ）。
+★ **本文テキストは `.md` からの生成物と完全一致することを確認済み**（2026-09-03）なので
+内容の欠落は無い。⚠️ ただし **再生成すると素の `md2docx.py` 出力に戻る**（体裁の微差は出る）。
 
 ★ **`md2pptx.py` は `---`（水平線）で 1 枚に割る。** これが唯一の区切りである。
 ⚠️ **表とコードブロックは行として素朴に流す**（pptx の table までは作らない）。

@@ -156,7 +156,7 @@
 | 課題ドメイン | TaskDomain | `task_kind` (宣言) から決まる head のルーティング信号 (`Writing` / `WritingFallback` / `Coding`)。変換は `logger.rs` の `From<TaskKind>` に 1 本だけ置く | TaskKind, DomainInferenceHead |
 | head 識別子 | head_id | どの head がそのセッションを採点したかの識別子 (`writing` / `writing_fallback` / `coding_v0`)。`session_meta` NDJSON に記録。⚠️ `FeatSnapshot` には入れない (ゴールデン snapshot が壊れる) | TaskDomain, schema |
 | Writing head | Writing head | 論述・文章作成ドメインの推論ヘッド (`analysis::heads::writing`)。Phase1 (task_kind=argumentative 固定) で走っていた挙動そのもの | DomainInferenceHead, β_writing_latin |
-| `β_writing_latin` | writing latin baseline | Writing head 内の **IME off (ラテン直接入力: 英字引用・数式・URL) 用サブ baseline**。値は旧 `β_coding` をそのまま改名 (F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08)。⚠️ **Coding の baseline ではない** — 「IME off の日本語論述」を Writing head 内に再スコープしたもの (ADR-006 下位決定 #2) | ベースライン (β), Writing head |
+| `β_writing_latin` | writing latin baseline | Writing head 内の **IME off (ラテン直接入力: 英字引用・数式・URL) 用サブ baseline**。値は旧 `β_coding` をそのまま改名 (F1=150 / F3=0.06 / F4=5.0 / F5=2.0 / F6=0.08)。★ **F1=150ms の出所は [P269]**（Dhakal et al. 2018・136M 打鍵の一般母集団中央値。実測: `heads/writing.rs:29` 逐語 `Source: Dhakal et al. (2018) general population medians, coding-adjusted.`）。⚠️★★★ **同コーパスは英語タイピングであり日本語 IME の変換過程を含まない** —— ★ 日本語 IME 実測の `β_writing` F1=100ms と **1.5 倍ずれる**ことが、β を 2 系統に割る根拠そのものである。⚠️ **Coding の baseline ではない** — 「IME off の日本語論述」を Writing head 内に再スコープしたもの (ADR-006 下位決定 #2) | ベースライン (β), Writing head |
 | 正規化関数 φ | Normalization Function φ | φ(x, β) = clamp((x − β) / (κ · β), 0, 1)。κ=2.0 | ベースライン |
 | バックスペースペナルティ | Backspace Penalty | 連続 14 回以上のバックスペースで obs=25（ペナルティビン）を強制発火。IME 変換中は抑制 | HMM, 観測ビン |
 | 摩擦フロア | Friction Floor | サイレンス時に合成される最小摩擦値。Stuck 状態の侵食を防止 | サイレンス検出 |
