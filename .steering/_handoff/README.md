@@ -11,6 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| ⚠️★★★ **Windows 実機（G-GEAR 専用）** | `next-session-prompt-windows-runtime-cost-and-orphan-verify.md` | ✅ **現行**（2026-09-03・**未着手**）。★ ① 孤児回収 (PR #151) の実機検証（⚠️ **OS 再起動で `session_end` が書かれるかは未知**）／② 稼働コスト 8h × 2（⚠️ **Windows 側スクリプトは一度も実行されていない**）／③ overlay のクリック奪取。⚠️ **Mac では代替できない仕事だけ** |
+| ⚠️★★ **O1 配布前の残り（Mac 側）** | `next-session-prompt-o1-preflight-4.md` | ⚠️ **一部消化済み**（2026-09-03）。★ ④ 孤児回収は **PR #151 でマージ済み**／① は研究者判断 C で `docs/o1-roster-operations.md` へ／⑤ は**誤りだったので訂正済み**。★ **残 = ② 送信 timeout の実測（リリース判定の唯一の赤）／③ 稼働コストの実測** |
 | **G1 / O1 の収集前の所見** | `g1-o1-precollection-findings.md` | ✅ **現行**（2026-09-01）。★ 調査 2 本の所見。⚠️ **配る O1 バイナリが古い**／被験者の画面に生の `**`／O1 同意文書の版が固定されていない |
 | **G1 / O1 の実物配備** | `next-session-prompt-g1-o1-gas-deployment.md` | ✅ **現行**（2026-09-01）。★ PR #140 を実 Apps Script へ配備し、収集前の穴を埋める。⚠️ **ブラウザ作業あり**（`browser-verification` 必須） |
 | **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ⚠️ **一部消化済み**（2026-08-31）。★ §1（PR を畳む）・§2（fork 遮断）・§3（ディスクガード指摘 4 件）・§7（G1/O1 進捗調査）は **PR #139 で完了**。★ **残っているのは §4 (v0.1.31) / §5 (README 承認) / §6 (送信 timeout) / §8 (積み残し)** —— それらは上の新メモにも引き写してある |
