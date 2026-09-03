@@ -11,13 +11,17 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ✅ **現行**（2026-08-31） |
+| ⚠️★★★ **Windows 実機（G-GEAR 専用）** | `next-session-prompt-windows-runtime-cost-and-orphan-verify.md` | ✅ **現行**（2026-09-03・**未着手**）。★ ① 孤児回収 (PR #151) の実機検証（⚠️ **OS 再起動で `session_end` が書かれるかは未知**）／② 稼働コスト 8h × 2（⚠️ **Windows 側スクリプトは一度も実行されていない**）／③ overlay のクリック奪取。⚠️ **Mac では代替できない仕事だけ** |
+| ⚠️★★ **O1 配布前の残り（Mac 側）** | `next-session-prompt-o1-preflight-4.md` | ⚠️ **一部消化済み**（2026-09-03）。★ ④ 孤児回収は **PR #151 でマージ済み**／① は研究者判断 C で `docs/o1-roster-operations.md` へ／⑤ は**誤りだったので訂正済み**。★ **残 = ② 送信 timeout の実測（リリース判定の唯一の赤）／③ 稼働コストの実測** |
+| **G1 / O1 の収集前の所見** | `g1-o1-precollection-findings.md` | ✅ **現行**（2026-09-01）。★ 調査 2 本の所見。⚠️ **配る O1 バイナリが古い**／被験者の画面に生の `**`／O1 同意文書の版が固定されていない |
+| **G1 / O1 の実物配備** | `next-session-prompt-g1-o1-gas-deployment.md` | ✅ **現行**（2026-09-01）。★ PR #140 を実 Apps Script へ配備し、収集前の穴を埋める。⚠️ **ブラウザ作業あり**（`browser-verification` 必須） |
+| **O1 リリース / 配布** | `next-session-prompt-o1-v0-1-31-and-open-fronts.md` | ⚠️ **一部消化済み**（2026-08-31）。★ §1（PR を畳む）・§2（fork 遮断）・§3（ディスクガード指摘 4 件）・§7（G1/O1 進捗調査）は **PR #139 で完了**。★ **残っているのは §4 (v0.1.31) / §5 (README 承認) / §6 (送信 timeout) / §8 (積み残し)** —— それらは上の新メモにも引き写してある |
+| **未踏 2027 / 研究の主張** | `next-session-research-positioning-fix.md` | ✅ **現行**（2026-09-01）。★ `docs/research-positioning.md` の ADR-018 / ADR-015 未追随 4 件と de Jong 2020 のカード化 |
 | ★★★ **層 A の試視（PS-Q5 を閉じる）** | `next-session-layerA-shishi.md` | ✅ **現行・最優先**（2026-09-03）。★ **試視ハーネスは完成済み**（`experiments/20260902-expression-layerA-visual/`・機械検査 Python 30 / ページ内 12・全緑）。⚠️★★★ **回すのは研究者本人**（★ N=1）。⚠️ **実施前に `layerA.config.json` を開いてはならない**（★ 写像が書いてある）。★ **判定**: 未教示 = 他者が読める上限 / 教示後 = 本人。⚠️ **`aperture`（静的符号）を先に回す**（★ ADR-022 D1 が A-7 を落としたため）。★ 併せて **M-11（`participant-setup-guide.md` / `data-privacy` への周知）＝ 実参加者投入前のブロッカー** |
 | 表現層の具体設計（OS 制約 → 試視） | `next-session-expression-layer-concrete.md` | ✅ **完了**（2026-09-03・`149f147`）。★ **第 1 目標＝ OS 制約の調査を閉じ ADR-022 を起票**（★ D1–D9）。⚠️★★★ **A-7（1–3 Hz の持続振動）は第 1 版の符号から外した** —— iOS では成立せず、Android はライブ壁紙で成立するが**画面点灯中のみ**で、★ **符号が OS で違うと OS が表現と交絡する**ため。★ **表示面は OS ごとに別**（iOS = ロック画面ウィジェット / Android = ライブ壁紙）。⚠️ **第 2 目標＝ PS-Q5 の試視は、ハーネスを作ったが *まだ回していない*** → ★ **下の行へ** |
 | 表現チャネルのその他の繰り越し | `next-session-expression-channel-followups.md` | ✅ **現行**（2026-09-02）。★ 逐語照合の続き（**V106 → P229 → P224 → V104 → P236**）／⚠️ **`.pptx` / `.docx` の実地確認（2 回繰り越し中）**／一次未到達 6 件の入手／Stage 4 の逆側／ADR-019 D6 の実装 |
 | 表現チャネル（`.idea` §7 の未決事項 8 件） | `next-session-expression-channel-open-items.md` | ✅ **完了**（2026-09-02・`d68d302`）。★ **8 件すべて裁定し ADR-021 を起票**。★ 繰り越し 2 / 4 / 5 も閉じた。⚠️ **残りは上の 2 行へ** |
 | GSE 設計の深掘り（表現 → 身体回帰 → Mh-D 再定義） | `next-session-gse-design-deepening.md` | ✅ **完了**（2026-09-02・`d68d302` でコミット済み）。★ B / C を閉じ、**ADR-019 / ADR-020** を起票、`references.md` に **43 件** append、未踏提出資料 3 本を更新。⚠️ **A は積み残し**（→ 上の行） |
-| 未踏 2027 / 研究の主張 | `next-session-research-positioning-fix.md` | ✅ 完了（2026-09-01・`docs/research-positioning-fix` ブランチ） |
 | スマホ表現チャネル | `next-session-prompt-smartphone-expression-channel.md` | ⚠️ 別トラック（Windows 側） |
 | 表現チャネル SSOT の積み残し | `next-session-prompt-expression-channel-followups.md` | ⚠️ 別トラック |
 

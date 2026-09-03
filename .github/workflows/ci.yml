@@ -82,6 +82,17 @@ env:
 #       ⚠️ これが唯一の本質的対策である (ランナーを専用ユーザー or 使い捨て VM にするのも同義)。
 #       ★ GitHub 自身が「self-hosted runner は private repo でのみ使うこと」を推奨している。
 #
+# ⚠️★★ public 化のチェックリストに 1 項目追加する (security-checker 実測, 2026-09-02):
+#   ★ GitHub は **全 self-hosted job のログ冒頭**に `Runner name:` と `Machine name:` を
+#   無条件で出し、REST API `.../actions/runs/<id>/jobs` も `runner_name` を返す。
+#   ⚠️ 実測すると Windows 実機の `Machine name:` の値が **研究者の実名 (下の名前) を含んでいた**。
+#   ★ ⚠️ **ここに実値は書かない** —— 「実名が漏れる」と警告する当のコメントが実名を
+#     repo に刻んでは本末転倒である (Codex 指摘, 2026-09-02 `/cross-review`)。
+#     ★ 値を確かめたいときは実機か `gh api .../actions/runs/<id>/jobs` の `runner_name` を見ること。
+#   → ★ **public 化すると過去ぶんを含む全ログに載る。ci.yml からは除去できない。**
+#   → ⚠️ public 化するなら**その前に** Windows 実機のコンピュータ名とランナー登録名を
+#     非個人名へ変更すること (★ private を維持するならこの項目は発火しない)。
+#
 # ⚠️ 未対処として残っている関連リスク (★ 本ゲートは**一切効かない**):
 #   third-party action が可変参照のままである (`dtolnay/rust-toolchain@stable` は**タグでなく
 #   ブランチ**、`Swatinem/rust-cache@v2` / `actions/checkout@v4` / `softprops/action-gh-release@v2`
@@ -309,8 +320,63 @@ jobs:
       #   wipe した run のフルビルド結果はキャッシュされず、次回は wipe 前の古いキャッシュが
       #   復元される。⚠️ 「バグだ」と思って `if:` を消さないこと。キャッシュの更新は
       #   頻繁に走る通常の run が担う。
+      # ⚠️★★★ 2026-09-02 追加: **self-hosted では rust-cache を回さない**。
+      #
+      # ⚠️ なぜ要るか (実測。`.steering/20260902-ci-cache-timeout-selfhosted/requirement.md`):
+      #   PR #143 の win / PR #144 の mac が `cancelled` になった。★ 原因はコードではない ——
+      #   **実作業 (build / test / snapshot / schema drift) は全ステップ success** で 3m33s〜6m00s。
+      #   落ちたのは post ステップのキャッシュ保存だけである:
+      #     1. 本 action が `Cache hit for: v0-rust-...` を出す
+      #     2. ⚠️ ダウンロードが **0.0〜0.6 MB/s** に落ち、578MB を引き切れず `No cache found.` で諦める
+      #     3. → 復元失敗なので本 action は「保存が必要」と判断する
+      #     4. ⚠️ **578〜730MB を 0.0〜0.1 MB/s でアップロード**し 16〜21 分かかる
+      #     5. `timeout-minutes: 30` に当たり **job ごと cancel**
+      #   ★ #143 と #144(win) の明暗を分けたのは**復元にかかった時間の差だけ**で、コード差ではない。
+      #   ⚠️ つまり緑赤がコイントスになっていた。
+      #
+      # ★ なぜ「無効化」で損をしないか: **self-hosted は workspace が永続する** (L275-276 の注記)。
+      #   実測で runner 側 `src-tauri/target` は 2.1GB あり、09-02 付の `.rlib` が 237 個あった。
+      #   ⚠️ 09-02 は復元が**全 job で失敗した**のに `cargo build` は 1m48s〜3m06s で終わっている
+      #   → ★ 速さの出所はキャッシュではなく永続 `target/` である。キャッシュは利得が重複しており、
+      #   **失敗したときのコストだけが残る**。
+      #   ⚠️ 「キャッシュは常に無意味だった」とは書かない —— ★ 08-30 / 08-31 の run では
+      #   `Cache restored successfully` が実際に出ている。壊れたのは 09-02 の転送速度低下が引き金。
+      #
+      # ⚠️★★ **`matrix.runner` で分岐してはいけない**: `decide-win-runner` が `windows-latest` へ
+      #   フォールバックしても `matrix.runner` は `gse-win-selfhosted` のままなので、
+      #   **hosted へ落ちた run のキャッシュまで殺してしまう**。
+      #   → ★ `runner.environment` は**割り当て後のランナー上で評価される**ので追随する。
+      # ★ fail-safe の向き: 値が空でも `'' == 'github-hosted'` は false = キャッシュ無効側に倒れる。
+      #   self-hosted (常用経路) では望む挙動であり、hosted (稀) が利得を失うだけで壊れはしない。
+      # ⚠️ ただし「倒れる向きが安全」は「値が正しい」の代わりにならない → 下の step でログに出す。
+      #
+      # ⚠️★★ **hosted フォールバック経路は初回コールドになる** (code-reviewer 指摘, 2026-09-02)。
+      #   ★ `...-check-...` の鍵を**書いていたのは self-hosted の run** であり、その書き手が消える。
+      #   ⚠️ さらに rust 系キャッシュは 2026-09-02 に全削除済み (10.56GB → 1.13GB)。
+      #   → ★ G-GEAR offline 時の緊急経路 (`windows-latest`) は **初回だけコールド**になる
+      #     (⚠️ hosted run 自身は `save-if` 既定 true なので保存し、2 回目以降は温まる)。
+      #   ⚠️ **その初回が `timeout-minutes: 30` に収まるかは未測定である**
+      #     (★ 参考値: hosted の cold `tauri build --no-bundle` が 12m09s、tools が 9m42s)。
+      #   → ★ 発火は稀 (G-GEAR が落ちているときだけ) なので許容し、実測されたら見直す。
+      # ⚠️ `${{ }}` を bash へ直接展開せず `env:` 経由で渡す (security-checker 指摘, 2026-09-02)。
+      #   ★ `runner.environment` は PR の内容から操作できない (`env:` / `with:` で `runner.*`
+      #   コンテキストを上書きすることはできない) ので**脆弱性ではない**が、
+      #   `.github/actions/disk-guard/action.yml` が既に `env:` マッピングに統一しており、
+      #   ⚠️ **同じ repo で防御の書き方を非対称にしない**。
+      # ★ `runner.name` は出さない —— ⚠️ GitHub 自身が全 self-hosted job のログ 2 行目で
+      #   `Runner name: '...'` を無条件に出しており、REST API も `runner_name` を返す。
+      #   ★ 重複して出す利得が無い。
+      - name: Cache decision (runner.environment を証拠として残す)
+        shell: bash
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+          DISK_GUARD_WIPED: ${{ steps.disk_guard.outputs.wiped }}
+        run: |
+          echo "runner.environment      = ${RUNNER_ENV}"
+          echo "disk_guard.outputs.wiped = ${DISK_GUARD_WIPED:-(null: guard は skip された)}"
+          echo "→ rust-cache が走るのは wiped != 'true' かつ runner.environment == 'github-hosted' のときだけ"
       - uses: Swatinem/rust-cache@v2
-        if: ${{ steps.disk_guard.outputs.wiped != 'true' }}
+        if: ${{ steps.disk_guard.outputs.wiped != 'true' && runner.environment == 'github-hosted' }}
         with:
           workspaces: src-tauri -> target
           key: ${{ matrix.target }}
@@ -447,8 +513,13 @@ jobs:
           # (`needs.build-macos.result == 'success'`) が弾かれて **dmg がリリースから落ちた**。
           # ⚠️ ここで release 側のゲートを緩めると「本当にビルドが壊れたとき」に
           #    部分的なリリースを黙って公開してしまうので、緩めるのは**保存側**にする。
-          # 復元は従来どおり行うのでビルド時間は変わらない。キャッシュの更新は
-          # 頻繁に走る check ジョブ (main / PR) が担う。
+          # 復元は従来どおり行うのでビルド時間は変わらない。
+          # ⚠️★★★ **旧文はここに「キャッシュの更新は頻繁に走る check ジョブ (main / PR) が担う」
+          #   と書いていたが、実測で誤りだった** (code-reviewer 指摘, 2026-09-02)。
+          #   ★ rust-cache の鍵には **job id が入る** (`add-job-id-key: true` が既定) ので、
+          #   `check` が書いた `...-check-...` の鍵は **`build-*` から一度も参照されない**。
+          #   ⚠️ v0.1.30 の実測で本 action は build-macos 1 秒 / build-windows 3 秒＝
+          #   **何も復元していない**。→ ★ 「check が更新を担う」という分業は成立していない。
           save-if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
       - uses: actions/setup-node@v4
         with:
@@ -533,8 +604,48 @@ jobs:
         id: disk_guard
         uses: ./.github/actions/disk-guard
       # ⚠️ floor 発火時はキャッシュ復元を飛ばす (指摘 #2。理由は `check` 側の注記と同じ)。
+      # ★ 2026-09-02: **self-hosted では rust-cache を回さない** (詳細は `check` 側の注記)。
+      #
+      # ⚠️★★★ **本ジョブの rust-cache は元から実質 no-op である** (code-reviewer 指摘, 2026-09-02)。
+      #   ⚠️ 初版のこのコメントは「復元が 2m13s〜8m58s かかって失敗する」と書いていたが、
+      #   ★ **それは `check` ジョブの実測値であり、本ジョブのものではなかった**。
+      #   ★ v0.1.30 のリリース run (33293939800) で本ジョブを実測すると:
+      #     - `Run Swatinem/rust-cache@v2`      **1 秒**
+      #     - `Post Run Swatinem/rust-cache@v2` **0 秒**
+      #   ⚠️ 理由: rust-cache の鍵には **job id が入る** (`add-job-id-key: true` が既定)。
+      #     ★ 鍵に job 名が入る証拠として実測できたのは **`check` ジョブのもの**である
+      #       (`v0-rust-x86_64-pc-windows-msvc-`**`check`**`-Windows_NT-x64-...`)。
+      #     ⚠️ **これは本ジョブの鍵ではない** (Codex/code-reviewer 指摘, 2026-09-02)。
+      #       ★ 本ジョブの鍵は `...-`**`build-macos`**`-Darwin-arm64-...` に相当するが、
+      #       **一度も保存されていないので実測できない** —— それ自体が下記の根拠である。
+      #     ★ 本ジョブの `if:` は `startsWith(github.ref, 'refs/tags/v')` **のみ**＝タグでしか走らず、
+      #     下の `save-if` はタグで false になる → ⚠️ **本ジョブの鍵は一度も保存されたことがない**
+      #     → 毎回 1 秒で空振りしていた。
+      #   → ★ **条件を足しても挙動は変わらない。** 3 か所で同じ規則にし、将来 hosted へ
+      #     戻したとき自動で復帰させるために残す。
+      # ⚠️★★ **本ジョブの実害は rust 側ではなく npm 側にある** (下の `setup-node` の注記を見ること)。
+      # ★ `build-windows` には掛けない —— ⚠️ 「hosted だから利得がある」とは**書かない**
+      #   (★ 同 run で `build-windows` の rust-cache も **3 秒**＝何も復元していない)。
+      #   ★ 掛けない理由は **hosted は失敗コストが小さく、変更する根拠が無いから**である。
+      # ⚠️ `${{ }}` を bash へ直接展開せず `env:` 経由で渡す (security-checker 指摘, 2026-09-02)。
+      #   ★ `runner.environment` は PR の内容から操作できない (`env:` / `with:` で `runner.*`
+      #   コンテキストを上書きすることはできない) ので**脆弱性ではない**が、
+      #   `.github/actions/disk-guard/action.yml` が既に `env:` マッピングに統一しており、
+      #   ⚠️ **同じ repo で防御の書き方を非対称にしない**。
+      # ★ `runner.name` は出さない —— ⚠️ GitHub 自身が全 self-hosted job のログ 2 行目で
+      #   `Runner name: '...'` を無条件に出しており、REST API も `runner_name` を返す。
+      #   ★ 重複して出す利得が無い。
+      - name: Cache decision (runner.environment を証拠として残す)
+        shell: bash
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+          DISK_GUARD_WIPED: ${{ steps.disk_guard.outputs.wiped }}
+        run: |
+          echo "runner.environment      = ${RUNNER_ENV}"
+          echo "disk_guard.outputs.wiped = ${DISK_GUARD_WIPED:-(null: guard は skip された)}"
+          echo "→ rust-cache が走るのは wiped != 'true' かつ runner.environment == 'github-hosted' のときだけ"
       - uses: Swatinem/rust-cache@v2
-        if: ${{ steps.disk_guard.outputs.wiped != 'true' }}
+        if: ${{ steps.disk_guard.outputs.wiped != 'true' && runner.environment == 'github-hosted' }}
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
@@ -545,13 +656,39 @@ jobs:
           # (`needs.build-macos.result == 'success'`) が弾かれて **dmg がリリースから落ちた**。
           # ⚠️ ここで release 側のゲートを緩めると「本当にビルドが壊れたとき」に
           #    部分的なリリースを黙って公開してしまうので、緩めるのは**保存側**にする。
-          # 復元は従来どおり行うのでビルド時間は変わらない。キャッシュの更新は
-          # 頻繁に走る check ジョブ (main / PR) が担う。
+          # 復元は従来どおり行うのでビルド時間は変わらない。
+          # ⚠️★★★ **旧文はここに「キャッシュの更新は頻繁に走る check ジョブ (main / PR) が担う」
+          #   と書いていたが、実測で誤りだった** (code-reviewer 指摘, 2026-09-02)。
+          #   ★ rust-cache の鍵には **job id が入る** (`add-job-id-key: true` が既定) ので、
+          #   `check` が書いた `...-check-...` の鍵は **`build-*` から一度も参照されない**。
+          #   ⚠️ v0.1.30 の実測で本 action は build-macos 1 秒 / build-windows 3 秒＝
+          #   **何も復元していない**。→ ★ 「check が更新を担う」という分業は成立していない。
           save-if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+      # ⚠️★★★ 2026-09-02: **npm キャッシュも self-hosted では回さない**。
+      #   ★ rust-cache と同じ理由だが、⚠️ **こちらの方が実害が大きい**ことを実測で確認した。
+      #   v0.1.30 のリリース run (33293939800) の本ジョブ 17m54s の内訳:
+      #     - `Build Tauri app`               **6m15s**
+      #     - `Post Run actions/setup-node@v4` **10m39s**  ← ⚠️ **最大のステップが npm キャッシュ保存**
+      #   ★ つまりリリースビルドの所要時間の半分以上を、1097MB の npm キャッシュ転送が占めていた。
+      #   ⚠️ 09-02 に実測した転送速度 (0.0〜0.6 MB/s) では 1097MB は 30 分〜数時間かかる。
+      #   → ★ **その速度が再現すれば `timeout-minutes: 40` を超え、dmg が 1 つも作れず
+      #     リリースが止まる**。⚠️ 「確実に超える」とは書かない —— 09-02 の速度低下は
+      #     「2 台が同一回線で同時送信した時間帯と一致」であり条件依存だからである。
+      #   ⚠️ `npm ci` に必要なものは self-hosted 実機の `~/.npm` に永続する
+      #   (★ 実測 **3.7GB**・08-25 以降に更新されたファイル 148 個)。
+      #   → ★ rust-cache と同じく**利得が重複しており、失敗時のコストだけが残る**。
+      # ★ `cache:` は step の `if:` では切れない (入力値なので) → 空文字を渡して無効化する。
+      #   ⚠️ `actions/setup-node` は `cache` が falsy なら**キャッシュ処理そのものを行わない**。
+      # ★ `frontend-check` (ubuntu-latest) と `build-windows` (windows-latest) は**触らない**。
+      #   ⚠️ ただし理由は 2 つで**立証水準が違う**ので分けて書く:
+      #   - `frontend-check`: ★ **効いている**。run ログで `Cache restored successfully` /
+      #     `Cache restored from key: node-cache-Linux-x64-npm-...` を実測した (32MB・毎 PR で走る)。
+      #   - `build-windows`: ⚠️ **効いているとは言えない** (v0.1.30 の post は 0m06s)。
+      #     ★ 触らない理由は「hosted は失敗コストが小さく、変更する根拠が無い」である。
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
       - run: npm ci
       # リリースゲート: アプリ内提出 (案A sidecar) は同梱 pubkey.txt を recipient に使う。
       # プレースホルダ (age1 行なし) のままリリースすると参加者全員が提出不能になるため、

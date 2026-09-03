@@ -186,9 +186,14 @@ mutate ".gs にシークレットを直書きする" \
   's/(var O1_AUTO_SEND = true;)/$1\nvar SHARED_SECRET = "abcdefghijklmnopqrstuvwxyz123456";/'  # gate:allow-id ★ 変異が注入する偽の秘密（アルファベット順）
 
 # --- ★ 2026-08-28 のレビュー指摘で入れたガード -------------------------------
-mutate "★ 申告された P-ID をメール検証なしで信用する（他人の ID を名乗れる）"   's/      if \(!rowEmail\) return \{ pid: rowPid, row: i \+ 1 \};.*
-      \/\/ .*
-      return \{ conflict: true, pid: rowPid, row: i \+ 1 \};/      return { pid: rowPid, row: i + 1 };/'
+# ⚠️★ 2026-09-03: 対象コードを `bare-row-claim` の修正で書き換えたので、変異も追随させた。
+#   ★ 旧変異は `if (!rowEmail) return {...}` の 1 行を決め打ちしており、
+#   ⚠️ 修正後は**置換対象が消えて「変異が当たらなかった」**になっていた
+#   （★ すり抜けではなく、変異ハーネス側の陳腐化である）。
+mutate "★ 申告された P-ID をメール検証なしで信用する（他人の ID を名乗れる）"   's/      return \{ conflict: true, pid: rowPid, row: i \+ 1, reason: "email-mismatch" \};/      return { pid: rowPid, row: i + 1 };/'
+
+# ⚠️★★★ 裸の行の乗っ取り（2026-09-03 に G1 から移植した修正を壊す）。
+mutate "★ 裸の行（氏名もメールも空）を申告 P-ID だけで渡す（総当たりで取れる）"   's/        if \(!rowName\) \{/        if (false) {/'
 
 mutate "★ P-ID 列が空の行で appendRow に落とす（1 人に 2 つの ID）"   's/      var p = found\.pid;
       if \(!p\) \{/      var p = found.pid;
@@ -212,6 +217,85 @@ mutate "★ アンケートで動機を尋ねる設問を戻す"   's/(  var oth
 $1/'
 
 echo
+# --- ★ 2026-09-03 に足したガード（#1 管理シート / #4 メール重複 / #5 予約トークン） ---
+
+mutate "★ 登録ログの PII 歯止めを外す（@ を含む値をそのまま書く）" \
+  's/(function o1MgmtSafeCell_\(v\) \{)/$1\n  return String(v);/'
+
+mutate "★ 登録ログが「参加者ロスター」タブを持つ表でも書く（2 か所採番の芽）" \
+  's/  if \(ss\.getSheetByName\("参加者ロスター"\)\) \{\n    Logger\.log\(/  if (false) {\n    Logger.log(/'
+
+mutate "★ 登録ログにロスターと同じ ID を指しても問題にしない" \
+  's/  if \(cfg\.rosterSheetId && id === cfg\.rosterSheetId\) \{/  if (false) {/'
+
+mutate "★ 採番元に登録ログと同じ表を指しても開く（逆向きのガードを外す）" \
+  's/  if \(rosterSheetId && o1cfg\.mgmtSheetId && rosterSheetId === o1cfg\.mgmtSheetId\) \{/  if (false) {/'
+
+mutate "★ 構築時に O1_MGMT_SHEET_ID を検査しない（fail-closed を外す）" \
+  's/  var mgmtProblem = o1MgmtConfigProblem_\(cfg\);/  var mgmtProblem = "";/'
+
+mutate "★ 登録ログに書けなかったことを黙って捨てる（silent failure）" \
+  's/    if \(!sheet\) \{\n      Logger\.log\(/    if (false) {\n      Logger.log(/'
+
+# ⚠️★ 2026-09-03: 対象コードを**却下タブ分離**で書き換えたので、変異も追随させた。
+#   ★ 旧変異は `if (last >= O1_MGMT_MAX_ROWS) {` を決め打ちしており、
+#   ⚠️ 変更後は **置換対象が消えて「変異が当たらなかった」**になっていた
+#   （★ ハーネスの `cmp -s` がそれを赤で報告した ＝ 空回りを見逃さなかった）。
+mutate "★ 登録ログの上限を無視して無制限に追記する" \
+  's/    if \(sheet\.getLastRow\(\) >= cap\) \{/    if (false) {/'
+
+mutate "★ ロスターに同じメールが 2 行あっても先頭行を黙って採る" \
+  's/    if \(emailHits\.length > 1\) \{/    if (false) {/'
+
+mutate "★ conflict の文面を理由によらず固定文に戻す（嘘の直し方を案内する）" \
+  's/  switch \(found\.reason\) \{/  switch ("email-mismatch") {/'
+
+mutate "★ 予約トークンを P-ID の形にする（採番に混ざる）" \
+  's/(function o1ReserveToken_\(\) \{)/$1\n  return "P999999";/'
+
+mutate "★ 採番したあと読み返さずに確定する（譲らない = 二重採番を配る）" \
+  's/    if \(o1CountPidRows_\(roster, candidate\) === 1\) return \{ pid: candidate, row: row \};/    if (true) return { pid: candidate, row: row };/'
+
+# --- ★ 2026-09-03 のレビュー指摘で入れたガード -------------------------------
+
+mutate "⚠️★★★ 数える側だけ正規化する（★ 表記ゆれで採番が恒久デッドロック）" \
+  's/    if \(String\(col\[i\]\[0\]\) === pid\) n\+\+;/    if (String(col[i][0]).trim().toUpperCase() === String(pid).trim().toUpperCase()) n++;/'
+
+mutate "★ 候補が進まないときの番人を外す（★ 3 回粘って毎回失敗する形に戻す）" \
+  's/    if \(k > 1 && candidate === lastCandidate\) \{/    if (false) {/'
+
+mutate "★ 採番中の例外を捕まえない（★「採番済み・通知なし・記録なし」に戻す）" \
+  's/  \} catch \(e\) \{\n    Logger\.log\(\n      "❌⚠️★★★ 採番の途中で失敗しました/  } catch (eIgnored) { throw eIgnored; } if (false) { try {} catch (e) {\n    Logger.log(\n      "❌⚠️★★★ 採番の途中で失敗しました/'
+
+mutate "★ 未捕捉の例外を握らない（★ 最も説明の要る失敗が記録されなくなる）" \
+  's/  \} catch \(unexpected\) \{/  } catch (unexpected) { throw unexpected; } if (false) { try {} catch (unexpected2) {/'
+
+mutate "⚠️★★★ 却下を登録ログと同じ枠に書く（★ 監査証跡を第三者が止められる）" \
+  's/    var rejected = result === "blocked";/    var rejected = false;/'
+
+# ⚠️★ 2026-09-03: 対象コードを try/catch 化したので変異も追随させた
+#   （★ ハーネスの `cmp -s` が「変異が当たらなかった」と赤で報告した）。
+mutate "★ 空 P-ID 行の採番だけ読み返しを飛ばす（★ #5 の穴を 1 経路だけ戻す）" \
+  's/          settled = o1SettlePidForToken_\(roster, blankToken\);/          settled = { pid: o1NextParticipantId_(roster), row: found.row };/'
+
+mutate "★ 重複の原因を言い分けない（★ 表記ゆれでも「同時採番」と誤って伝える）" \
+  's/    if \(drifted\.length\) \{/    if (false) {/'
+
+mutate "★ 備考の許可リストを拒否リストへ戻す（★ @ を含まない PII が素通り）" \
+  's/  if \(!O1_MGMT_NOTE_ALLOWED\.test\(probe\)\) \{/  if (probe.indexOf("@") >= 0) {/'
+
+mutate "★ 却下ログ満杯を消えない側に残さない（★ 黙らされたことが黙って消える）" \
+  's/      if \(rejected\) o1NoteRejectLogFull_\(\);/      if (false) o1NoteRejectLogFull_();/'
+
+mutate "★ 送信ログを try の内側へ戻す（★ 送信済みなのに mail-failed と記録しうる）" \
+  's/  o1LogMgmt_\("register", pid, logResult, logReason, outcome\.note\);/  \/* moved *\//'
+
+mutate "★ 空 P-ID 行の採番で例外を捕まえない（★ 中途半端な P-ID が残る）" \
+  's/        \} catch \(blankErr\) \{/        } catch (blankErrIgnored) { throw blankErrIgnored; } if (false) { try {} catch (blankErr) {/'
+
+mutate "★ 登録経路のログ呼び出しだけ消す（★ 定義は残す = 件数ガードの単独検証）" \
+  's/o1LogMgmt_\("register"/o1SkipLog_("register"/g'
+
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
 if [ "$FAIL" -eq 0 ]; then

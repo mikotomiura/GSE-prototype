@@ -8,6 +8,24 @@
 → 位置づけの正本は `preregistration.md §0` と
 `.steering/20260819-low-typing-window-discrimination/decisions.md` **D-3 / D-4**。
 
+> ⚠️★★★ **2026-09-03 の申し送り（★ 本実験を再走 / 拡張する前に読むこと）**
+>
+> ★ O1 に**孤児セッションの回収**が入った（`src-tauri/src/o1.rs` `close_orphaned_sessions`）。
+> アプリが正常終了できなかったファイルは、**次回起動時の時刻**で `meta.session_end` が
+> 書かれる。
+>
+> → ⚠️ `scripts/extract.py:314` の
+> `file_end = rec["session_end"] if rec["session_end"] is not None else rec["last_t"]`
+> は、そのファイルで **実在しない沈黙区間**（最終打鍵〜次回起動まで、★ 数日に及びうる）
+> を観測窓に含めてしまう。
+>
+> ★ **判別方法**: `session_end - last_t` が異常に大きい（★ 数時間〜数日）ファイルは
+> 回収されたものである。⚠️ schema にフラグは足していない（理由は
+> `.steering/20260903-o1-preflight-4/decisions.md` 判断 2）。
+> → ★ O1 のデータを本実験に流すなら、**`file_end = min(session_end, last_t + 猶予)` に
+> するか、該当ファイルを除外すること。**
+> ⚠️ **本実験の既存の結果（Phase1 / G1 由来）は影響を受けない**（★ O1 のファイルを含まない）。
+
 ## 何が新しいか
 
 ★ `src-tauri/src/input/liveness.rs` の `starved_ms` は、

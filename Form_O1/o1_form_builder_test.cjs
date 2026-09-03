@@ -183,6 +183,47 @@ function makeSheet(rows, opts) {
 }
 
 /**
+ * ★ 列数を制限しない汎用シートのスタブ（★ 6 列の「O1 登録ログ」用）。
+ *
+ * ⚠️ `makeSheet` は `norm()` で **4 列に切り詰める**ので、★ 登録ログには使えない
+ *   （⚠️ 使うと「理由」「備考」が黙って消え、検査が空回りする）。
+ */
+function makeWideSheet(rows) {
+  const data = (rows || []).map((r) => r.slice());
+  const sheet = {
+    __grid: data,
+    getLastRow: () => data.length,
+    getMaxColumns: () => 26,
+    getRange: (row, col, numRows, numCols) => {
+      if (numRows === undefined) {
+        return {
+          getValue: () => (data[row - 1] ? data[row - 1][col - 1] : ""),
+          setValue: (v) => {
+            if (data[row - 1]) data[row - 1][col - 1] = v;
+          },
+        };
+      }
+      return {
+        getValues: () => {
+          const out = [];
+          for (let r = row - 1; r < row - 1 + numRows; r++) {
+            const src = data[r] || [];
+            const line = [];
+            for (let c = col - 1; c < col - 1 + (numCols || 1); c++) line.push(src[c] || "");
+            out.push(line);
+          }
+          return out;
+        },
+      };
+    },
+    appendRow: (r) => {
+      data.push(r.slice());
+    },
+  };
+  return sheet;
+}
+
+/**
  * .gs を vm で読み込み、GAS のグローバルをスタブした文脈を返す。
  * ★ `var` 宣言は文脈のプロパティになるので、テスト側から設定値を差し替えられる。
  */
@@ -206,6 +247,8 @@ function makeCtx(opts) {
     __lock: lock,
     __openedFormIds: [],
     __sheets: o.sheets || {},
+    __uuidSeq: 0,
+    __onFlush: o.onFlush || null,
     Logger: { log: (m) => logs.push(String(m)) },
     console: { log: (m) => logs.push(String(m)) },
     FormApp: {
@@ -246,10 +289,28 @@ function makeCtx(opts) {
         return {
           getUrl: () => "https://sheets.example/" + id,
           getSheetByName: (name) => ctx.__sheets[id][name] || null,
+          insertSheet: (name) => {
+            ctx.__sheets[id][name] = makeWideSheet([]);
+            return ctx.__sheets[id][name];
+          },
         };
       },
-      flush: () => {},
+      flush: () => {
+        // ★ 「他プロジェクトが割り込んで append する」状況を再現する差し込み口。
+        //   ⚠️ 実物では起こるが、★ スタブでは**明示的に仕込まないと絶対に起きない**
+        //     （= 仕込まなければ陰性対照になる）。
+        if (typeof ctx.__onFlush === "function") ctx.__onFlush();
+      },
     },
+    // ★ `o1ReserveToken_` が使う。⚠️ **決定的**にする（乱数だとテストが再現しない）。
+    Utilities: {
+      getUuid: () => {
+        ctx.__uuidSeq += 1;
+        return "aaaaaaaa-bbbb-cccc-dddd-" + String(ctx.__uuidSeq).padStart(12, "0");
+      },
+      formatDate: (d, tz, fmt) => "2026-01-01 00:00:00",
+    },
+    Session: { getScriptTimeZone: () => "Asia/Tokyo" },
     MailApp: {
       sendEmail: (to, subject, body) => mails.push({ to, subject, body }),
     },
@@ -330,6 +391,26 @@ const O1_S = "O1FORMSURVEY";
 //   ★ 実 ID を追跡ファイルに置くと、一時 public 運用のとき
 //     **参加者ロスター（PII）への直接ポインタ**になる（→ 起票 T-20 / T-21）。
 const ROSTER_ID = "SHEET-ID-STUB-NOT-REAL";
+/** ★ O1 の登録ログ（⚠️ ロスターとは**別の表**でなければならない）。 */
+const MGMT_ID = "MGMT-ID-STUB-NOT-REAL";
+/** ⚠️ `O1_MGMT_HEAD` と同じ並び。★ ずれたら §12 が赤くなる（= 2 か所に持つ意図的な冗長）。 */
+const MGMT_HEAD_6 = ["記録日時", "種別", "P-ID", "結果", "理由", "備考"];
+
+/** ★ 登録ログ / 却下ログのタブ名（⚠️ .gs の定数と同じ値でなければ検査が空回りする）。 */
+const MGMT_TAB = "O1 登録ログ";
+const MGMT_REJECT_TAB = "O1 却下ログ";
+
+/** ★ ログタブのスタブ（★ バナー + 見出しつき = 実物と同じ形）。 */
+function makeMgmtLog(dataRows) {
+  return makeWideSheet(
+    [["⚠ バナー"], MGMT_HEAD_6.slice()].concat(dataRows || [])
+  );
+}
+/** ★ 追記された**データ行だけ**を返す（⚠️ バナー + 見出しを除く）。 */
+const logRows = (ctx, tab) => {
+  const sh = ctx.__sheets[MGMT_ID] && ctx.__sheets[MGMT_ID][tab || MGMT_TAB];
+  return sh ? sh.__grid.slice(2) : [];
+};
 
 /** 設定が全部揃った文脈を作る（★ 陽性対照の土台）。 */
 function makeReadyCtx(extra) {
@@ -346,13 +427,26 @@ function makeReadyCtx(extra) {
       }),
     },
   };
-  const ctx = makeCtx({ forms, sheets, lockFails: o.lockFails });
+  // ★ 既定では登録ログも「使える状態」にする（⚠️ 既存 §1〜§11 の陰性対照を壊さないため）。
+  //   ★ `o.noMgmtSheet` で不在を、`o.mgmtRows` で中身を差し替えられる。
+  if (!o.noMgmtSheet) {
+    sheets[MGMT_ID] = {
+      [MGMT_TAB]: makeMgmtLog(o.mgmtRows),
+      // ⚠️★★★ **却下は別タブ・別枠**（security-checker HIGH・2026-09-03）。
+      //   ★ 分けないと、⚠️ 認証なしで第三者が `blocked` 行を積み上げて
+      //     **正規の登録の記録まで止められる**（= 監査証跡の遠隔抑止）。
+      [MGMT_REJECT_TAB]: makeMgmtLog(o.mgmtRejectRows),
+    };
+    if (o.mgmtHasRoster) sheets[MGMT_ID]["参加者ロスター"] = makeSheet([["P006", "x", "x@e.com"]]);
+  }
+  const ctx = makeCtx({ forms, sheets, lockFails: o.lockFails, onFlush: o.onFlush });
   // ⚠️★★ 設定は **スクリプト プロパティ**から読む (2026-08-29 に移した)。
   //   ★ ロスター ID も .gs の既定値ではなくなったので、ここで明示的に入れる。
   ctx.__props.FORM_ID_O1_CONSENT = O1_C;
   ctx.__props.FORM_ID_O1_SURVEY = O1_S;
   ctx.__props.O1_APP_DOWNLOAD_URL = "https://drive.example/o1";
   ctx.__props.PHASE1_MGMT_SHEET_ID = ROSTER_ID;
+  if (!o.noMgmtProp) ctx.__props.O1_MGMT_SHEET_ID = o.mgmtSheetId || MGMT_ID;
   return ctx;
 }
 
@@ -1260,7 +1354,7 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 // §10 ⚠️ 秘密を置かない
 // ============================================================
 {
-  const hardcoded = /(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|FORM_ID_O1_CONSENT|FORM_ID_O1_SURVEY)\s*=\s*['"][^'"]+['"]/.test(src);
+  const hardcoded = /(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|O1_MGMT_SHEET_ID|FORM_ID_O1_CONSENT|FORM_ID_O1_SURVEY)\s*=\s*['"][^'"]+['"]/.test(src);
   push("§10 ⚠️ .gs にシークレット / フォルダ ID を直書きしていない", !hardcoded, { hardcoded });
 }
 
@@ -1394,26 +1488,29 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 
 {
   // --- T-24: 同じ P-ID が 2 行あったら受付メールを送らない ---
-  //   ⚠️ 別プロジェクト（G1 / Phase1）が**同時に採番した**状況を、
-  //     ★ ロスターに同じ P-ID を 2 行置くことで再現する。
+  //
+  // ⚠️★★★ **2026-09-03 に前提を書き直した**（★ 検査を弱めたのではない。設計が変わった）。
+  //   ★ 旧テストは `appendRow` を差し替えて「O1 が書いた行と同じ P-ID の 2 行目」を作っていた。
+  //     ⚠️ これは **T-27 の予約トークン方式では成立しない前提**である ——
+  //       ★ 新実装が最初に append するのは **`⏳O1-…`（P-ID ではない）**なので、
+  //       ⚠️ 旧テストの複製は「トークンが 2 行」になるだけで、**P-ID の重複を作らない**。
+  //       → ★ そのまま残すと「衝突を仕込んだつもりで何も仕込んでいない」空回りになる。
+  //   ★ そこで **この検査が今も実在で発火する経路**に置き換えた:
+  //     ⚠️ **既存参加者の経路**（`existing-pid`）は `o1AllocatePidRow_` を通らないので、
+  //       ★ ロスターが既に同じ P-ID を 2 行持っていると**そのまま配ってしまう**。
+  //       → ここを塞いでいるのが T-24 の検査である。
+  //   ★ 新規採番側の衝突は §14 が別に撃つ（⚠️ `__onFlush` で割り込み append を仕込む）。
   const ctx = makeReadyCtx({
     roster: [
       ["P006", "既存", "old@example.com"],
-      ["P007", "先客", "first@example.com"],
+      ["P007", "本人", "dup@example.com"],
+      ["P007", "衝突した別人", "clash@example.com"], // ⚠️ 同じ P-ID の 2 行目
     ],
   });
-  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
-  // ★ 新規が来ると P008 が振られる。⚠️ そのあとで「P008 が既に居た」状態を作る。
-  const sheet = roster;
-  const origAppend = sheet.appendRow;
-  sheet.appendRow = (r) => {
-    origAppend(r);
-    origAppend([r[0], "衝突した別人", "clash@example.com", ""]); // ⚠️ 同じ P-ID の 2 行目
-  };
   ctx.onO1ConsentSubmit(
     makeResponse({
-      [ctx.Q_O1_NAME]: "新規",
-      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_NAME]: "本人",
+      [ctx.Q_O1_EMAIL]: "dup@example.com", // ★ メール一致で P007 に着地する
       [ctx.Q_O1_OS]: "Mac",
     })
   );
@@ -1608,6 +1705,900 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 // --- 出力 ---------------------------------------------------------------------
 // ⚠️★ 末尾 1 行の書式は `o1_submit_guard_test.cjs` と**同一にする**
 //   （`run.sh` / `check-o1-release-readiness.sh` が `^全 <N> ケース期待どおり$` を読む）。
+// ============================================================
+// §12 ⚠️★★★ 裸の行の乗っ取り（`bare-row-claim`）— 2026-09-03 に G1 から移植
+//
+// ⚠️ **この関数 `o1FindInPhase1Roster_` を呼ぶテストは 1 件も無かった**
+//   （★ 129 ケース全部が緑なのに、当の関数は一度も実行されていなかった）。
+//   → ★ 前セッションの教訓「テストが対象関数を一度も呼んでいなかった」の同型なので、
+//     **直接呼ぶ**形で書く。
+//
+// ★ 守っている性質: `o1AssignParticipantId_()` 系が `appendRow([newPid])` で作る
+//   **氏名もメールも空の行**を、その P-ID を申告しただけの第三者が取れてはならない。
+//   ⚠️ ロスターは Phase1 / G1 / O1 で共用なので、被害は O1 に閉じない。
+// ============================================================
+{
+  const ctx = makeCtx({});
+  const find = (roster, opts) => ctx.o1FindInPhase1Roster_(makeSheet(roster), opts);
+
+  // ⚠️ 乗っ取り: 裸の行（氏名もメールも空）を P-ID の申告だけで取ろうとする
+  {
+    const got = find([["P007", "", ""]], { pid: "P007" });
+    push(
+      "§12 ⚠️ 裸の行（氏名もメールも空）は申告 P-ID で取れない",
+      !!(got && got.conflict && got.reason === "bare-row-claim"),
+      got
+    );
+  }
+
+  // ★ 陽性対照: 研究者が氏名を先に入れた行は**通る**
+  //   ⚠️ これが通らないと「全部 conflict にしただけ」になり、検査が意味を失う。
+  {
+    const got = find([["P007", "山田太郎", ""]], { pid: "P007" });
+    push(
+      "§12 ★ 陽性対照: 氏名がある行は埋めてよい（正当な経路）",
+      !!(got && !got.conflict && got.pid === "P007"),
+      got
+    );
+  }
+
+  // ⚠️ 別人のメールが入っている行を名乗る → conflict（reason つき）
+  {
+    const got = find([["P007", "山田太郎", "other@example.com"]], { pid: "P007" });
+    push(
+      "§12 ⚠️ 別人のメールが入る行を名乗ると conflict",
+      !!(got && got.conflict && got.reason === "email-mismatch"),
+      got
+    );
+  }
+
+  // ★ 陽性対照: メール一致の経路は壊れていない（★ 申告 P-ID より優先される）
+  {
+    const got = find([["P007", "山田太郎", "me@example.com"]], {
+      email: "me@example.com",
+      pid: "P999",
+    });
+    push(
+      "§12 ★ 陽性対照: メール一致が最優先で通る（申告 P-ID より強い）",
+      !!(got && !got.conflict && got.pid === "P007"),
+      got
+    );
+  }
+
+  // ⚠️ 空のロスターでは何も返さない（★ 誤って conflict を返さない）
+  {
+    const got = find([], { pid: "P007" });
+    push("§12 ★ 該当なしは null", got === null, { got });
+  }
+}
+
+// ============================================================
+// §13 ⚠️★★★ O1 の運用管理シート（★ 提出イベントの追記ログ・起票 T-25）
+// ============================================================
+// ★ ここで測るのは 3 つ:
+//   1. ⚠️ **提出時は fail-open**（ログが書けなくても登録は通る）
+//   2. ⚠️ **構築時は fail-closed**（設定が無ければ構築系が止まる）
+//   3. ⚠️★★★ **ロスターを指したら書かない**（★ 2 か所採番の芽を摘む）
+{
+  // --- 1. 正常: 登録が通ると 1 行追記される（★ 陽性対照） ---
+  const ctx = makeReadyCtx();
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const log = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  const rows = log.__grid.slice(2); // ★ バナー + 見出しを除く
+  push("§13 ★ 陽性対照: 登録が通ると登録ログに 1 行増える", rows.length === 1, {
+    rows: rows.length,
+  });
+  push(
+    "§13 ★ 追記された行は 種別/P-ID/結果/理由 を持つ",
+    rows.length === 1 && rows[0][1] === "register" && rows[0][2] === "P007" &&
+      rows[0][3] === "ok" && rows[0][4] === "new-pid",
+    { row: rows[0] }
+  );
+  // ⚠️★★★ **氏名・メールが 1 文字も入っていない**（★ これが本節の眼目）。
+  const flat = rows.map((r) => r.join(" ")).join(" ");
+  push(
+    "§13 ⚠️★★★ 登録ログに氏名もメールも入らない（★ PII を持たない）",
+    flat.indexOf("@") < 0 && flat.indexOf("新規") < 0,
+    { flat }
+  );
+  push("§13 ★ 登録ログの見出しは 6 列で氏名・メールの列が無い", ctx.O1_MGMT_HEAD.length === 6 &&
+    ctx.O1_MGMT_HEAD.join("/").indexOf("メール") < 0 &&
+    ctx.O1_MGMT_HEAD.join("/").indexOf("氏名") < 0, { head: ctx.O1_MGMT_HEAD });
+}
+
+{
+  // --- 1b. 弾かれた提出も 1 行になる（★ 「なぜ弾かれたか」が残る） ---
+  const ctx = makeReadyCtx();
+  ctx.onO1ConsentSubmit(
+    makeResponse({ [ctx.Q_O1_NAME]: "誰か", [ctx.Q_O1_EMAIL]: "", [ctx.Q_O1_OS]: "Mac" })
+  );
+  const rows = logRows(ctx, MGMT_REJECT_TAB);
+  push(
+    "§13 ★ メール空で弾かれた提出も blocked/no-email として残る（★ 却下タブ）",
+    rows.length === 1 && rows[0][3] === "blocked" && rows[0][4] === "no-email",
+    { row: rows[0] }
+  );
+  // ⚠️★★★ **却下は登録タブを汚さない**（★ これが分離の目的そのもの）。
+  push("§13 ⚠️★★★ 却下行は登録タブに入らない", logRows(ctx).length === 0, {
+    main: logRows(ctx).length,
+  });
+}
+
+{
+  // --- 2. 不在: ⚠️★★★ ログが書けなくても**登録は通る**（fail-open） ---
+  //   ★ ここを取り違えると、⚠️ ログの不調で被験者が登録できなくなる。
+  const ctx = makeReadyCtx({ noMgmtSheet: true });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§13 ⚠️★★★ 登録ログの表が無くても受付メールは送られる（fail-open）",
+    ctx.__mails.length === 1,
+    { mails: ctx.__mails.length }
+  );
+  push(
+    "§13 ★ 書けなかったことはログに残る（★ 黙って落とさない）",
+    ctx.__logs.some((l) => l.indexOf("登録ログに書けませんでした") >= 0),
+    {}
+  );
+}
+
+{
+  // --- 2b. プロパティ自体が空でも登録は通る（fail-open） ---
+  const ctx = makeReadyCtx({ noMgmtProp: true, noMgmtSheet: true });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§13 ⚠️ O1_MGMT_SHEET_ID が空でも受付メールは送られる（fail-open）",
+    ctx.__mails.length === 1,
+    { mails: ctx.__mails.length }
+  );
+  // ⚠️ 対して**構築時は止まる**（fail-closed）。★ 同じ設定で向きが逆であることを撃つ。
+  push(
+    "§13 ⚠️★★★ 同じ設定でも構築時は問題として報告される（fail-closed）",
+    ctx.o1ConfigProblems_().some((p) => p.indexOf("O1_MGMT_SHEET_ID") >= 0),
+    { problems: ctx.o1ConfigProblems_() }
+  );
+}
+
+{
+  // --- 3. 壊れ: ⚠️★★★ ロスターと同じ ID / ロスタータブを持つ表には書かない ---
+  const same = makeReadyCtx({ mgmtSheetId: ROSTER_ID, noMgmtSheet: true });
+  push(
+    "§13 ⚠️★★★ 登録ログにロスターと同じ ID を指すと構築時に止まる",
+    same.o1ConfigProblems_().some((p) => p.indexOf("同じ表") >= 0),
+    { problems: same.o1ConfigProblems_() }
+  );
+  // ⚠️ 逆向き: ★ ロスター側も「同じ表」なら開かない（発番しない）。
+  const both = makeReadyCtx({ mgmtSheetId: ROSTER_ID });
+  both.onO1ConsentSubmit(
+    makeResponse({
+      [both.Q_O1_NAME]: "新規",
+      [both.Q_O1_EMAIL]: "new@example.com",
+      [both.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§13 ⚠️★★★ 同じ表を指していると発番も送信もしない（逆向きのガード）",
+    both.__mails.length === 0 &&
+      both.__sheets[ROSTER_ID]["参加者ロスター"].__rows.length === 1,
+    { mails: both.__mails.length },
+  );
+}
+
+{
+  // --- 3b. ⚠️★★★ 「参加者ロスター」タブを持つ表は登録ログにしない（★ T-23 の穴） ---
+  //   ★ 拒否リストは**既知の古いシートしか弾けない**ので、
+  //     ⚠️ 「O1 用のロスターを作った」型はここでしか捕まらない。
+  const ctx = makeReadyCtx({ mgmtHasRoster: true });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const log = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  push(
+    "§13 ⚠️★★★ 「参加者ロスター」タブを持つ表には 1 行も書かない",
+    log.__grid.length === 2,
+    { rows: log.__grid.length }
+  );
+  push(
+    "§13 ★ そのとき理由をログに出す（★ 黙って諦めない）",
+    ctx.__logs.some((l) => l.indexOf("「参加者ロスター」タブがあります") >= 0),
+    {}
+  );
+  push(
+    "§13 ★ 陰性対照: それでも登録そのものは通る（fail-open）",
+    ctx.__mails.length === 1,
+    { mails: ctx.__mails.length }
+  );
+  push(
+    "§13 ⚠️ buildO1MgmtSheet もロスタータブを持つ表を拒む",
+    attempt(() => ctx.buildO1MgmtSheet()).threw,
+    {}
+  );
+}
+
+{
+  // --- 4. ⚠️ 上限に達したら**追記をやめる**（★ 消さない） ---
+  const many = [];
+  for (let i = 0; i < 5000; i++) many.push(["t", "register", "P" + i, "ok", "new-pid", ""]);
+  const ctx = makeReadyCtx({ mgmtRows: many });
+  const log = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  const before = log.__grid.length;
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push("§13 ⚠️ 上限を超えたら追記しない（★ 行が増えない）", log.__grid.length === before, {
+    before,
+    after: log.__grid.length,
+  });
+  push(
+    "§13 ⚠️★ **消さない**（★ 既存の行がそのまま残る）",
+    log.__grid.length >= 5002,
+    { rows: log.__grid.length }
+  );
+  push(
+    "§13 ★ 陰性対照: 上限でも登録そのものは通る（fail-open）",
+    ctx.__mails.length === 1,
+    { mails: ctx.__mails.length }
+  );
+}
+
+{
+  // --- 5. ⚠️★★★ 備考に `@` が来たら伏せる（★ PII 混入の機械的な歯止め） ---
+  const ctx = makeReadyCtx();
+  push("§13 ⚠️★★★ `@` を含む値は伏せて書く", ctx.o1MgmtSafeCell_("a@b.com") === "***", {
+    got: ctx.o1MgmtSafeCell_("a@b.com"),
+  });
+  push("§13 ★ 陰性対照: ふつうの値はそのまま", ctx.o1MgmtSafeCell_("行 7 / OS: Mac") === "行 7 / OS: Mac", {
+    got: ctx.o1MgmtSafeCell_("行 7 / OS: Mac"),
+  });
+  // ⚠️★★ 許可リストなので `=X` は**そもそも書かれない**（★ 拒否リスト時代は `'=X` だった）。
+  push("§13 ⚠️ 数式に見える値は許可リストで弾かれる", ctx.o1MgmtSafeCell_("=X") === "***", {
+    got: ctx.o1MgmtSafeCell_("=X"),
+  });
+  // ★ 許可された文字で始まる数式（`-` は許可リストに入っている）は `o1PlainText_` が潰す。
+  //   ⚠️ ここが陽性対照: **許可リストを抜けても数式化しない**という二重化を測る。
+  push("§13 ★ 許可された値でも先頭 `-` は無害化される", ctx.o1MgmtSafeCell_("-1 行") === "'-1 行", {
+    got: ctx.o1MgmtSafeCell_("-1 行"),
+  });
+  // ⚠️★★★ **`@` を含まない PII が素通りしない**（★ 拒否リスト時代の穴）。
+  push("§13 ⚠️★★★ 日本語の氏名は伏せられる（★ `@` を含まなくても）",
+    ctx.o1MgmtSafeCell_("三浦 太郎") === "***", { got: ctx.o1MgmtSafeCell_("三浦 太郎") });
+  push("§13 ⚠️ 電話番号形式も伏せられない/伏せられるを実測",
+    ctx.o1MgmtSafeCell_("090-1234-5678") === "090-1234-5678", {
+      got: ctx.o1MgmtSafeCell_("090-1234-5678"),
+      注: "★ 数字とハイフンは許可（行番号と区別できない）。⚠️ 呼び出し側で渡さないこと",
+    });
+  // ⚠️★ 「弾かれた理由」に自由記入の P-ID を混ぜていないこと（★ bad-pid-format）。
+  const c2 = makeReadyCtx();
+  c2.onO1ConsentSubmit(
+    makeResponse({
+      [c2.Q_O1_NAME]: "誰か",
+      [c2.Q_O1_EMAIL]: "x@example.com",
+      [c2.Q_O1_PID]: "=IMPORTDATA(1)",
+      [c2.Q_O1_OS]: "Mac",
+    })
+  );
+  const r2 = logRows(c2, MGMT_REJECT_TAB);
+  push(
+    "§13 ⚠️ 自由記入の申告 P-ID を登録ログに書かない",
+    r2.length === 1 && r2[0][2] === "" && r2[0][4] === "bad-pid-format",
+    { row: r2[0] }
+  );
+}
+
+// ============================================================
+// §14 ⚠️★★★ ロスター内のメール重複（★ 起票 T-26）
+// ============================================================
+// ★ 眼目: **P-ID 重複と同じ扱いにする**（⚠️ 旧実装は先頭行を黙って採用していた）。
+{
+  const find = (rows, opts) =>
+    makeReadyCtx().o1FindInPhase1Roster_(makeSheet(rows), opts);
+  const got = find(
+    [
+      ["P006", "本人", "dup@example.com"],
+      ["P007", "本人（別経路）", "dup@example.com"],
+    ],
+    { email: "dup@example.com" }
+  );
+  push(
+    "§14 ⚠️★★★ 同じメールが 2 行あると conflict（★ 先頭行を黙って採らない）",
+    got && got.conflict === true && got.reason === "dup-email-in-roster",
+    { got }
+  );
+  push("§14 ★ 重複した行番号を全部返す", got && String(got.rows) === "3,4", { rows: got.rows });
+  const ok = find(
+    [
+      ["P006", "本人", "dup@example.com"],
+      ["P007", "別人", "other@example.com"],
+    ],
+    { email: "dup@example.com" }
+  );
+  push("§14 ★ 陰性対照: 1 行しか無ければ従来どおり通る", ok && ok.pid === "P006", { ok });
+  // ⚠️ 大小文字は同一視する（★ 見逃すと重複を「別のメール」と読む）。
+  const upper = find(
+    [
+      ["P006", "本人", "Dup@Example.com"],
+      ["P007", "本人", "dup@example.com"],
+    ],
+    { email: "DUP@EXAMPLE.COM" }
+  );
+  push("§14 ★ 大小文字を同一視して重複と見なす", upper && upper.conflict === true, { upper });
+}
+
+{
+  // ⚠️★★★ 提出経路でも**発番も送信もしない**（★ 検知するだけで通してはいけない）。
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "本人", "dup@example.com"],
+      ["P007", "本人（別経路）", "dup@example.com"],
+    ],
+  });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "本人",
+      [ctx.Q_O1_EMAIL]: "dup@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§14 ⚠️★★★ メール重複では発番も送信もしない",
+    ctx.__mails.length === 0 && roster.__rows.length === 2,
+    { mails: ctx.__mails.length, rows: roster.__rows.length }
+  );
+  // ⚠️★★ **文面が理由に合っていること**（★ 旧実装は「別のメールが登録されています」固定だった）。
+  push(
+    "§14 ⚠️★★ 文面が「同じメールが N 行」と言う（★ 嘘の指示を出さない）",
+    ctx.__logs.some((l) => l.indexOf("同じメールアドレスがロスターに 2 行あります") >= 0),
+    {}
+  );
+  push(
+    "§14 ⚠️ そのとき「別のメールアドレスが登録されています」とは言わない",
+    !ctx.__logs.some((l) => l.indexOf("別のメールアドレスが登録されています") >= 0),
+    {}
+  );
+  push(
+    "§14 ★ 却下ログに理由が残る",
+    logRows(ctx, MGMT_REJECT_TAB).some(
+      (r) => r[3] === "blocked" && r[4] === "dup-email-in-roster"
+    ),
+    { rows: logRows(ctx, MGMT_REJECT_TAB) }
+  );
+}
+
+{
+  // ⚠️ 理由ごとに文面が変わることを、★ 他の 2 理由でも撃つ（★ 1 つだけだと固定文と区別できない）。
+  const bare = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"], ["P007", "", ""]] });
+  bare.onO1ConsentSubmit(
+    makeResponse({
+      [bare.Q_O1_NAME]: "第三者",
+      [bare.Q_O1_EMAIL]: "attacker@example.com",
+      [bare.Q_O1_PID]: "P007",
+      [bare.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§14 ★ bare-row-claim では「氏名もメールも空」と言う",
+    bare.__logs.some((l) => l.indexOf("**氏名もメールも空**") >= 0),
+    {}
+  );
+  // ⚠️ 有効な P-ID の行を 1 つ残す（★ 無いと `o1RosterShapeProblem_` が**手前で**止めてしまい、
+  //   ★ 「文面の検査を書いたのに、そこまで到達していない」空回りになる）。
+  const bad = makeReadyCtx({
+    roster: [
+      ["P006", "既存", "old@example.com"],
+      ["⏳O1-DEADBEEF", "採番中に中断", "x@example.com"],
+    ],
+  });
+  bad.onO1ConsentSubmit(
+    makeResponse({
+      [bad.Q_O1_NAME]: "誰か",
+      [bad.Q_O1_EMAIL]: "x@example.com",
+      [bad.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§14 ★ invalid-pid-in-roster では「P-ID の形をしていません」と言う",
+    bad.__logs.some((l) => l.indexOf("**P-ID の形をしていません**") >= 0),
+    {}
+  );
+}
+
+// ============================================================
+// §15 ⚠️★★★ 予約トークン方式の採番（★ 起票 T-27）
+// ============================================================
+// ★ 眼目: ⚠️ **他プロジェクトが同じ番号を取ったら、自分が譲って採番し直す**。
+{
+  // --- 1. 陽性対照: 衝突が無ければ従来と同じ P-ID が出る ---
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push("§15 ★ 陽性対照: 衝突が無ければ P007 が出る", roster.__rows[1][0] === "P007", {
+    rows: roster.__rows,
+  });
+  push("§15 ★ 予約トークンは残らない（★ 採番で置き換わる）",
+    roster.__rows.every((r) => String(r[0]).indexOf("⏳") < 0), { rows: roster.__rows });
+  push("§15 ★ 受付メールが送られる", ctx.__mails.length === 1, { mails: ctx.__mails.length });
+}
+
+{
+  // --- 2. ⚠️★★★ 割り込み: 他プロジェクトが同じ番号を先に取る ---
+  //   ★ `__onFlush` で「flush のたびに別プロジェクトが append する」状況を作る。
+  //   ⚠️ 1 回だけ割り込ませる（★ 毎回だと永久に譲り続けて 3 回で諦めてしまう）。
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  let fired = false;
+  ctx.__onFlush = () => {
+    // ★ O1 が P007 を書いた直後に、⚠️ 別プロジェクトが **同じ P007** を append する。
+    if (fired) return;
+    const hasP007 = roster.__rows.some((r) => String(r[0]) === "P007");
+    if (!hasP007) return;
+    fired = true;
+    roster.appendRow(["P007", "G1 の被験者", "g1@example.com", "Win"]);
+  };
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const mine = roster.__rows.filter((r) => String(r[2]) === "new@example.com");
+  push("§15 ⚠️★★★ 割り込まれたら**譲って採番し直す**（P007 → P008）",
+    mine.length === 1 && mine[0][0] === "P008", { rows: roster.__rows });
+  push("§15 ⚠️ 相手の行は書き換えない（★ P007 は G1 の被験者のまま）",
+    roster.__rows.filter((r) => String(r[0]) === "P007").length === 1 &&
+      roster.__rows.some((r) => String(r[0]) === "P007" && String(r[2]) === "g1@example.com"),
+    { rows: roster.__rows });
+  push("§15 ★ 譲ったことをログに残す",
+    ctx.__logs.some((l) => l.indexOf("が重複したので譲りました") >= 0), {});
+  push("§15 ★ 被験者には**新しい ID で**受付メールが届く",
+    ctx.__mails.length === 1 && ctx.__mails[0].body.indexOf("P008") >= 0,
+    { mails: ctx.__mails.length });
+  push("§15 ★ 登録ログには最終的な P-ID が残る",
+    logRows(ctx).some((r) => r[2] === "P008" && r[3] === "ok"),
+    { rows: logRows(ctx) });
+}
+
+{
+  // --- 3. ⚠️ 毎回割り込まれたら**諦めて配らない**（★ 無限に粘らない） ---
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  let busy = false;
+  ctx.__onFlush = () => {
+    if (busy) return; // ★ append が flush を呼ばないので再入はしないが、念のため
+    busy = true;
+    const mine = roster.__rows.filter((r) => String(r[2]) === "new@example.com");
+    const p = mine.length ? String(mine[0][0]) : "";
+    if (/^P\d+$/.test(p) && roster.__rows.filter((r) => String(r[0]) === p).length === 1) {
+      roster.appendRow([p, "しつこい別プロジェクト", "x" + roster.__rows.length + "@e.com", ""]);
+    }
+    busy = false;
+  };
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push("§15 ⚠️★★★ 毎回衝突したら受付メールを送らない", ctx.__mails.length === 0, {
+    mails: ctx.__mails.length,
+  });
+  push(
+    "§15 ⚠️ 自分の行は `⏳O1-` のまま残す（★ どの採番にも混ざらない）",
+    roster.__rows.some((r) => String(r[0]).indexOf("⏳O1-") === 0),
+    { rows: roster.__rows.map((r) => r[0]) }
+  );
+  push(
+    "§15 ★ 研究者向けの直し方をログに出す",
+    ctx.__logs.some((l) => l.indexOf("回とも採番が重複しました") >= 0),
+    {}
+  );
+  push(
+    "§15 ★ 却下ログに reserve-failed が残る",
+    logRows(ctx, MGMT_REJECT_TAB).some((r) => r[4] === "reserve-failed"),
+    { rows: logRows(ctx, MGMT_REJECT_TAB) }
+  );
+}
+
+{
+  // --- 4. ⚠️★★★ 予約トークンが `^P\d+$` に一致しない（★ 方式全体がこれに乗っている） ---
+  const ctx = makeReadyCtx();
+  const t = ctx.o1ReserveToken_();
+  push("§15 ⚠️★★★ 予約トークンは `^P\\d+$` に一致しない", !/^P\d+$/.test(t), { t });
+  push("§15 ★ 予約トークンは o1IsValidPid_ を通らない", ctx.o1IsValidPid_(t) === false, { t });
+  // ★ 3 プロジェクトが同じ規則で濾していることを**実ファイルで**突き合わせる。
+  //   ⚠️ ここが崩れると、★ ⏳ の行が別プロジェクトの採番に混ざる。
+  const g1src = fs.readFileSync(G1_BUILDER_PATH, "utf8");
+  const phase1src = fs.readFileSync(path.join(REPO, "Form_Phase1", "GSE_Phase1_Form_Builder.gs"), "utf8");
+  push(
+    "§15 ⚠️★★★ G1 も Phase1 も A 列を `^P\\d+$` で濾している（★ 実ファイル照合）",
+    /\/\^P\(\\d\+\)\$\//.test(g1src) && /\/\^P\(\\d\+\)\$\//.test(phase1src),
+    { g1: /\/\^P\(\\d\+\)\$\//.test(g1src), phase1: /\/\^P\(\\d\+\)\$\//.test(phase1src) }
+  );
+  // ⚠️ トークンがロスターに残っていても採番は前へ進む（★ 混ざらないことの実測）。
+  const sheet = makeSheet([["P006", "既存", "a@e.com"], ["⏳O1-DEADBEEF", "中断", "b@e.com"]]);
+  push(
+    "§15 ⚠️★★★ ⏳ の行があっても次番号は P007（★ 採番に混ざらない）",
+    ctx.o1NextParticipantId_(sheet) === "P007",
+    { got: ctx.o1NextParticipantId_(sheet) }
+  );
+}
+
+{
+  // --- 5. ★ 手動採番 `assignO1ParticipantId` も同じ経路を通る ---
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  const pid = ctx.assignO1ParticipantId();
+  push("§15 ★ 手動採番も P007 を返す", pid === "P007", { pid });
+  push("§15 ★ 手動採番でも ⏳ が残らない",
+    roster.__rows.every((r) => String(r[0]).indexOf("⏳") < 0), { rows: roster.__rows });
+  push("§15 ★ 手動採番も登録ログに残る",
+    logRows(ctx).some(
+      (r) => r[1] === "assign" && r[2] === "P007"
+    ),
+    { rows: logRows(ctx) });
+}
+
+// ============================================================
+// §16 ⚠️★★★ レビュー (2026-09-03) で「検査が無い」と実測された経路
+// ============================================================
+{
+  // --- HIGH-1: ⚠️ ロスターの表記ゆれで採番が**恒久デッドロック**しないこと ---
+  //   ★ `p007`（小文字）は `o1NextParticipantId_` の `^P(\d+)$` に**一致しない**ので
+  //     候補は毎回 P007 に固定される。⚠️ 数える側が正規化していると毎回 2 行に見え、
+  //     ★ 3 回とも譲って null になり、**以後すべての新規登録が止まる**。
+  ["p007", " P007"].forEach((drift) => {
+    const ctx = makeReadyCtx({
+      roster: [
+        ["P006", "既存", "old@example.com"],
+        [drift, "表記ゆれ", "drift@example.com"],
+      ],
+    });
+    const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+    ctx.onO1ConsentSubmit(
+      makeResponse({
+        [ctx.Q_O1_NAME]: "新規",
+        [ctx.Q_O1_EMAIL]: "new@example.com",
+        [ctx.Q_O1_OS]: "Mac",
+      })
+    );
+    const mine = roster.__rows.filter((r) => String(r[2]) === "new@example.com");
+    push(
+      `§16 ⚠️★★★ A 列に "${drift}" があっても採番は止まらない（★ P007 が出る）`,
+      mine.length === 1 && mine[0][0] === "P007",
+      { rows: roster.__rows.map((r) => r[0]) }
+    );
+    // ⚠️★★ **メールは送らないのが正しい。** ★ `P007` と `p007` は人間には同じ ID に見えるので、
+    //   ⚠️ そのまま配ると 2 人ぶんが 1 つの P-ID に混ざりうる。→ ★ 研究者に直させる。
+    //   ★ 旧実装との違いは「**止まり方**」である: 恒久デッドロックではなく、
+    //     ⚠️ **どの行を直せばよいかを名指しして** 1 回で止まる。
+    push(
+      `§16 ⚠️ "${drift}" では配らない（★ 同じ ID に見える行があるため）`,
+      ctx.__mails.length === 0,
+      { mails: ctx.__mails.length }
+    );
+    push(
+      `§16 ⚠️★★★ "${drift}" で「同時採番ではありません」と正しい原因を言う`,
+      ctx.__logs.some((l) => l.indexOf("これは**同時採番ではありません**") >= 0) &&
+        ctx.__logs.some((l) => l.indexOf("書き方が違います") >= 0),
+      {}
+    );
+    push(
+      `§16 ★ "${drift}" の理由コードは roster-pid-format-drift`,
+      logRows(ctx, MGMT_REJECT_TAB).some((r) => r[4] === "roster-pid-format-drift"),
+      { rows: logRows(ctx, MGMT_REJECT_TAB) }
+    );
+  });
+}
+
+{
+  // --- HIGH-1b: ★ **陰性対照** —— 生値が本当に同じなら「同時採番」と言うこと ---
+  //   ⚠️ 表記ゆれ側だけ緑にして満足しない。★ 2 つの原因を**言い分けている**ことを測る。
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "既存", "old@example.com"],
+      ["P007", "本人", "dup@example.com"],
+      ["P007", "衝突した別人", "clash@example.com"],
+    ],
+  });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "本人",
+      [ctx.Q_O1_EMAIL]: "dup@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§16 ★ 陰性対照: 生値が同じなら「同時採番」と言う（★ 表記ゆれとは言わない）",
+    ctx.__logs.some((l) => l.indexOf("同時に採番された**可能性") >= 0) &&
+      !ctx.__logs.some((l) => l.indexOf("書き方が違います") >= 0),
+    {}
+  );
+  push(
+    "§16 ★ そのときの理由コードは dup-pid",
+    logRows(ctx, MGMT_REJECT_TAB).some((r) => r[4] === "dup-pid"),
+    { rows: logRows(ctx, MGMT_REJECT_TAB) }
+  );
+}
+
+{
+  // --- HIGH-1c: ★ 不変条件の番人が**発火すること**を撃つ ---
+  //   ⚠️ この分岐は、`o1CountPidRows_` と `o1NextParticipantId_` の見方が揃っている限り
+  //     **構造的に到達しない**（★ それが修正の要点である）。
+  //   → ★ だから「見方がずれた未来」を**注入して**撃つ（⚠️ さもないと死んだコードになる）。
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  const token = "⏳O1-TESTTOKN";
+  roster.appendRow([token, "予約", "r@example.com", ""]);
+  ctx.o1CountPidRows_ = () => 2; // ⚠️ 「数える側だけ正規化してしまった」未来を再現
+  const got = ctx.o1SettlePidForToken_(roster, token);
+  push(
+    "§16 ⚠️★★★ 見方がずれたら roster-pid-format-drift で止まる（★ 恒久停止に戻らない）",
+    got && got.pid === null && got.reason === "roster-pid-format-drift",
+    { got }
+  );
+  push(
+    "§16 ★ 3 回粘らず 2 回目で止める（⚠️ 無駄に書き込まない）",
+    ctx.__logs.filter((l) => l.indexOf("が重複したので譲りました") >= 0).length === 1,
+    { yields: ctx.__logs.filter((l) => l.indexOf("が重複したので譲りました") >= 0).length }
+  );
+  push(
+    "§16 ★ 原因として**読み方のずれ**を名指しする",
+    ctx.__logs.some((l) => l.indexOf("違う見方で A 列を読んでいます") >= 0),
+    {}
+  );
+}
+
+{
+  // --- HIGH-2: ⚠️ 例外が出ても**必ず 1 行残る**（★ fail-open の穴） ---
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  ctx.__onFlush = () => {
+    throw new Error("stub: Sheets 一時障害");
+  };
+  const r = attempt(() =>
+    ctx.onO1ConsentSubmit(
+      makeResponse({
+        [ctx.Q_O1_NAME]: "新規",
+        [ctx.Q_O1_EMAIL]: "new@example.com",
+        [ctx.Q_O1_OS]: "Mac",
+      })
+    )
+  );
+  push("§16 ⚠️ 例外はハンドラの外へ漏らさない", !r.threw, { threw: r.threw, msg: r.message });
+  // ★ flush の失敗は `o1AllocatePidRow_` が捕まえるので、⚠️ 理由は `settle-exception`。
+  push(
+    "§16 ⚠️★★★ 採番中の例外でも 1 行残る（settle-exception）",
+    logRows(ctx, MGMT_REJECT_TAB).some((x) => x[4] === "settle-exception"),
+    { rows: logRows(ctx, MGMT_REJECT_TAB) }
+  );
+  push("§16 ★ 受付メールは送らない", ctx.__mails.length === 0, { mails: ctx.__mails.length });
+}
+
+{
+  // --- HIGH-2b: ⚠️ **どこにも捕まらない例外**でも 1 行残ること（★ 最後の網） ---
+  //   ★ 既存参加者の経路で `getValue` を投げさせる（⚠️ ここは try で囲まれていない）。
+  const ctx = makeReadyCtx({ roster: [["P006", "既存", "old@example.com"]] });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  const orig = roster.getRange;
+  roster.getRange = (row, col, nr, nc) => {
+    if (nr === undefined) throw new Error("stub: セルが読めない");
+    return orig(row, col, nr, nc);
+  };
+  const r = attempt(() =>
+    ctx.onO1ConsentSubmit(
+      makeResponse({
+        [ctx.Q_O1_NAME]: "既存",
+        [ctx.Q_O1_EMAIL]: "old@example.com",
+        [ctx.Q_O1_OS]: "Mac",
+      })
+    )
+  );
+  push("§16 ⚠️★★★ 未捕捉の例外もハンドラの外へ漏らさない", !r.threw, {
+    threw: r.threw,
+    msg: r.message,
+  });
+  push(
+    "§16 ⚠️★★★ そのとき登録ログに error / unexpected-exception が残る",
+    logRows(ctx).some((x) => x[3] === "error" && x[4] === "unexpected-exception"),
+    { rows: logRows(ctx) }
+  );
+  push("§16 ★ 受付メールは送らない", ctx.__mails.length === 0, { mails: ctx.__mails.length });
+}
+
+{
+  // --- ⚠️★★★ `o1LogMgmt_` が**絶対に例外を投げない**（★ 変異体で 185 全緑だった穴） ---
+  const ctx = makeReadyCtx();
+  const log = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  log.appendRow = () => {
+    throw new Error("stub: 追記できない");
+  };
+  const r = attempt(() =>
+    ctx.onO1ConsentSubmit(
+      makeResponse({
+        [ctx.Q_O1_NAME]: "新規",
+        [ctx.Q_O1_EMAIL]: "new@example.com",
+        [ctx.Q_O1_OS]: "Mac",
+      })
+    )
+  );
+  push("§16 ⚠️★★★ 追記が投げても登録は止まらない（fail-open）", !r.threw && ctx.__mails.length === 1, {
+    threw: r.threw,
+    mails: ctx.__mails.length,
+  });
+  push(
+    "§16 ★ 追記に失敗したことはログに残る",
+    ctx.__logs.some((l) => l.indexOf("登録ログの追記に失敗しました") >= 0),
+    {}
+  );
+  // ★ `getLastRow` が投げる場合も同じ（⚠️ 別の入口を塞ぎ忘れない）。
+  const c2 = makeReadyCtx();
+  c2.__sheets[MGMT_ID][MGMT_TAB].getLastRow = () => {
+    throw new Error("stub: 読めない");
+  };
+  const r2 = attempt(() =>
+    c2.onO1ConsentSubmit(
+      makeResponse({
+        [c2.Q_O1_NAME]: "新規",
+        [c2.Q_O1_EMAIL]: "new@example.com",
+        [c2.Q_O1_OS]: "Mac",
+      })
+    )
+  );
+  push("§16 ★ getLastRow が投げても登録は止まらない", !r2.threw && c2.__mails.length === 1, {
+    threw: r2.threw,
+    mails: c2.__mails.length,
+  });
+}
+
+{
+  // --- ⚠️★★★ 却下ログが満杯でも**登録ログは書ける**（★ 監査証跡の遠隔抑止を塞ぐ） ---
+  const many = [];
+  for (let i = 0; i < 2000; i++) many.push(["t", "register", "", "blocked", "bad-pid-format", ""]);
+  const ctx = makeReadyCtx({ mgmtRejectRows: many });
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "新規",
+      [ctx.Q_O1_EMAIL]: "new@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  push(
+    "§16 ⚠️★★★ 却下ログが満杯でも正規の登録は記録される",
+    logRows(ctx).some((r) => r[3] === "ok" && r[4] === "new-pid"),
+    { rows: logRows(ctx) }
+  );
+  // ★ 却下側が満杯になったことは、**消えない側**に 1 度だけ残る。
+  const c2 = makeReadyCtx({ mgmtRejectRows: many });
+  c2.onO1ConsentSubmit(
+    makeResponse({ [c2.Q_O1_NAME]: "誰か", [c2.Q_O1_EMAIL]: "", [c2.Q_O1_OS]: "Mac" })
+  );
+  c2.onO1ConsentSubmit(
+    makeResponse({ [c2.Q_O1_NAME]: "誰か", [c2.Q_O1_EMAIL]: "", [c2.Q_O1_OS]: "Mac" })
+  );
+  const noted = logRows(c2).filter((r) => r[4] === "reject-log-full");
+  push("§16 ★ 却下ログ満杯は登録ログに **1 度だけ**記録される", noted.length === 1, {
+    noted: noted.length,
+  });
+  push(
+    "§16 ⚠️ 却下側は上限を超えて増えない（★ 消しもしない）",
+    logRows(c2, MGMT_REJECT_TAB).length === 2000,
+    { rows: logRows(c2, MGMT_REJECT_TAB).length }
+  );
+}
+
+{
+  // --- ⚠️ `filled-blank-pid` の経路も読み返しを通る（★ #5 の穴が 1 経路だけ残っていた） ---
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "既存", "old@example.com"],
+      ["", "先に氏名だけ入れた行", "blank@example.com"],
+    ],
+  });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  let fired = false;
+  ctx.__onFlush = () => {
+    if (fired) return;
+    if (!roster.__rows.some((r) => String(r[0]) === "P007")) return;
+    fired = true;
+    roster.appendRow(["P007", "G1 の被験者", "g1@example.com", "Win"]); // ⚠️ 割り込み
+  };
+  ctx.onO1ConsentSubmit(
+    makeResponse({
+      [ctx.Q_O1_NAME]: "本人",
+      [ctx.Q_O1_EMAIL]: "blank@example.com",
+      [ctx.Q_O1_OS]: "Mac",
+    })
+  );
+  const mine = roster.__rows.filter((r) => String(r[2]) === "blank@example.com");
+  push(
+    "§16 ⚠️★★★ 空 P-ID 行の採番も割り込みで譲る（P007 → P008）",
+    mine.length === 1 && mine[0][0] === "P008",
+    { rows: roster.__rows.map((r) => [r[0], r[2]]) }
+  );
+  push("§16 ★ 相手の行は書き換えない",
+    roster.__rows.some((r) => String(r[0]) === "P007" && String(r[2]) === "g1@example.com"), {});
+  push("§16 ★ 理由は filled-blank-pid のまま",
+    logRows(ctx).some((r) => r[2] === "P008" && r[4] === "filled-blank-pid"),
+    { rows: logRows(ctx) });
+}
+
+{
+  // --- cross-review HIGH: ⚠️ **空 P-ID 行の採番でも例外を捕まえる** ---
+  //   ★ 新規行 (`o1AllocatePidRow_`) には catch があったが、⚠️ **こちらには無かった**。
+  //   ⚠️ 落ちると A 列が「見た目は有効な P-ID」のまま残り、
+  //     ★ `checkO1RosterShape()` の ⏳ 残置検出に**引っかからない**。
+  const ctx = makeReadyCtx({
+    roster: [
+      ["P006", "既存", "old@example.com"],
+      ["", "先に氏名だけ入れた行", "blank@example.com"],
+    ],
+  });
+  const roster = ctx.__sheets[ROSTER_ID]["参加者ロスター"];
+  let n = 0;
+  ctx.__onFlush = () => {
+    n += 1;
+    if (n === 2) throw new Error("stub: 採番中に落ちる"); // ★ トークンを書いた**後**で落とす
+  };
+  const r = attempt(() =>
+    ctx.onO1ConsentSubmit(
+      makeResponse({
+        [ctx.Q_O1_NAME]: "本人",
+        [ctx.Q_O1_EMAIL]: "blank@example.com",
+        [ctx.Q_O1_OS]: "Mac",
+      })
+    )
+  );
+  push("§16 ⚠️ 空 P-ID 行の例外もハンドラの外へ漏らさない", !r.threw, {
+    threw: r.threw,
+    msg: r.message,
+  });
+  push("§16 ★ 受付メールは送らない", ctx.__mails.length === 0, { mails: ctx.__mails.length });
+  // ⚠️★★★ **中途半端な P-ID を残さない**（★ ⏳ に戻っていること）。
+  const target = roster.__rows.filter((x) => String(x[2]) === "blank@example.com")[0];
+  push(
+    "§16 ⚠️★★★ 落ちたら A 列は ⏳ に戻る（★ 見た目だけ有効な P-ID を残さない）",
+    target && String(target[0]).indexOf("⏳O1-") === 0,
+    { colA: target && target[0] }
+  );
+  push(
+    "§16 ★ 理由は settle-exception として残る",
+    logRows(ctx, MGMT_REJECT_TAB).some((x) => x[4] === "settle-exception"),
+    { rows: logRows(ctx, MGMT_REJECT_TAB) }
+  );
+}
+
 let ng = 0;
 cases.forEach((c) => {
   if (!c.ok) ng++;
@@ -1617,11 +2608,11 @@ cases.forEach((c) => {
 // ⚠️ ★ 「NG が 0 件なら緑」だけだと、**ケースを 0 件にしても緑になる**。★ 下限を置く。
 // ⚠️★ 下限は**実数に近づける**（code-reviewer 指摘・2026-08-28）。
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
-// ⚠️★ 実数に近づけて保つ（★ 2026-08-29: security-checker 対応で 129 件なので下限 124）。
+// ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-if (cases.length < 124) {
+if (cases.length < 215) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（124 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（215 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

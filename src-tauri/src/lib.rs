@@ -26,6 +26,10 @@ pub mod packaging;
 // ⚠️ ★ feature gate の外に置く: 盲検アプリ本体も「未送信 N 件」を数えるため
 // (数えるのに age は要らない)。両側が同じ規約を読むことで drift を防ぐ。
 pub mod submission;
+// ⚠️★★★ セッション NDJSON の **行の分類規則の単一真実源** (2026-09-03)。
+//   ★ 同じ規則が packaging / reconcile / o1 の 3 か所に手書きコピーされていて食い違っていた。
+//   ⚠️ feature gate の**外**に置く (盲検アプリ本体の o1 sweep も、package 側の収束器も読む)。
+pub mod ndjson_scan;
 // G1 自動提出の収束器 (ディスクの状態を突き合わせ、足りない仕事だけをする)。
 // age と HTTP を使うので package feature 側 (`gse-submit --reconcile` が実行主体)。
 #[cfg(feature = "package")]
@@ -3947,8 +3951,58 @@ pub fn run() {
             //   次の日次ローテートの後で拾われる。
             // ★ 猶予 (48 時間) を過ぎたファイルだけが包まれるので、
             //   ⚠️ **起動直後に「昨日の記録」がいきなり送られることはない**。
+            //
+            // ⚠️★★★ **収束器を回す *前* に、開いたまま残ったファイルを閉じる** (2026-09-03)。
+            //
+            // ★ `session_end` を書くのは `shutdown()` だけで、そこへ入るのは
+            //   **トレイの終了 / main 窓の × / `quit_app`** の 3 経路しか無い。
+            //   ⚠️ `ExitRequested` / `SIGTERM` / `WM_ENDSESSION` のハンドラは repo に無い。
+            //   → ★ **トレイから終了せずに PC を再起動するだけ**で、その日のファイルは
+            //     永久に提出候補から外れていた (`o1::close_orphaned_sessions` の doc 参照)。
+            // ⚠️ 走査はファイルを読むので **setup() を塞がない**ようスレッドに逃がす。
+            //   ★ 収束器は同じスレッドで**閉じ終わってから**起こす (順序を保証する)。
+            //
+            // ⚠️★★ **sweep が panic しても収束器は必ず走らせる** (cross-review LOW・2026-09-03)。
+            //   ★ 旧版はコメントで「ここが落ちても収束器は走る」と書いていたが、⚠️ **嘘だった**
+            //   —— panic するとスレッドごと死に、`spawn_reconcile` に到達しない
+            //   (= 起動時の収束が丸ごと失われる)。→ ★ `catch_unwind` で包む。
+            //
+            // ⚠️★ **`log_path_str` を「いま書いている先」として使えるのは、これが *起動時 1 回* だから**
+            //   である。★ `logger.rs` は「書き先の権威は `SharedLogTarget.path` であり、
+            //   起動時の値をコピーして持ち回るな」と明示している。
+            //   ⚠️ **sweep をローテート時や定期実行に広げるなら、必ず共有ハンドルから読み直すこと**
+            //   (★ さもないとライブファイルに `session_end` を書く)。
             if crate::o1::is_o1() {
-                spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
+                let sweep_app = app.handle().clone();
+                let sweep_current = std::path::PathBuf::from(&log_path_str);
+                thread::spawn(move || {
+                    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        let dir = sweep_current.parent()?;
+                        Some(crate::o1::close_orphaned_sessions(
+                            dir,
+                            Some(sweep_current.as_path()),
+                            now_epoch_ms(),
+                        ))
+                    }));
+                    match outcome {
+                        Ok(Some(sweep)) if sweep.closed > 0 || sweep.failed > 0 => {
+                            // ⚠️★ **画面にも届ける** —— 権限やディスクで閉じられない端末は
+                            //   ★ 無音で提出ゼロになる (cross-review LOW)。
+                            tracing::warn!(
+                                closed = sweep.closed,
+                                failed = sweep.failed,
+                                "O1 orphan sweep finished"
+                            );
+                        }
+                        Ok(_) => {}
+                        Err(_) => {
+                            tracing::error!(
+                                "O1 orphan sweep panicked; continuing to the reconciler anyway"
+                            );
+                        }
+                    }
+                    spawn_reconcile(sweep_app, ReconcileReason::Startup);
+                });
             }
 
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。
@@ -5115,9 +5169,34 @@ mod submission_receipt_tests {
     };
     use std::sync::atomic::Ordering;
 
-    /// ⚠️ 静的変数を共有するので、この 1 関数の中で順に検査する (並列テスト安全)。
+    /// ⚠️★★★ **本モジュールのプロセス共有グローバルを触るテストは、必ずこのロックを取る。**
+    ///
+    /// ★ 対象: `SUBMIT_IN_FLIGHT` / `SUBMIT_IN_FLIGHT_REASON` / `SUBMIT_IN_FLIGHT_SINCE_MS`
+    /// / `SUBMIT_LAST_SENT_MS` / `SUBMIT_LAST_SENT_COUNT`。
+    ///
+    /// ⚠️ `cargo test` は既定で並列に走るので、これらを触るテストが 2 本以上あると
+    /// ★ 互いの値を踏み合って **単独では緑・全体では赤**になる
+    /// (`packaging.rs` の一時ディレクトリ衝突と同じ形)。
+    ///
+    /// ⚠️★★ **2026-09-02 に実際に踏んだ。** 旧版はこのロックを `IN_FLIGHT_TEST_LOCK` と呼び、
+    /// `SUBMIT_IN_FLIGHT*` を触る 2 本にだけ掛けていた。★ 一方
+    /// `SUBMIT_LAST_SENT_*` を書き換える 2 本 (`only_a_real_send_writes_the_receipt` /
+    /// `reset_sent_receipt_clears_both_values`) は **どちらもロックを取っていなかった**
+    /// ——「危険は分かっていたのに防御が半分にしか掛かっていない」形である。
+    /// → ⚠️ CI (mac) で `only_a_real_send_writes_the_receipt` が落ち、
+    ///   手元でも **40 回中 1 回**再現した。★ ロック名を実体に合わせて改名した上で
+    ///   **グローバルを触る 4 本すべて**に掛ける。
+    static SUBMIT_GLOBALS_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// ⚠️★ 旧コメントは「静的変数を共有するので、**この 1 関数の中で**順に検査する
+    /// (並列テスト安全)」と書いていたが、★ **誤りである。**
+    /// 1 関数の中で順に見ても、**別のテスト関数**が同じ static を触れば防げない
+    /// (それが 2026-09-02 に起きたことである)。→ ロックで守る。
     #[test]
     fn only_a_real_send_writes_the_receipt() {
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_LAST_SENT_MS.store(0, Ordering::Relaxed);
         SUBMIT_LAST_SENT_COUNT.store(0, Ordering::Relaxed);
 
@@ -5174,17 +5253,11 @@ mod submission_receipt_tests {
         assert_eq!(summary_count(line, "nope"), None);
     }
 
-    /// ⚠️★★ **`SUBMIT_IN_FLIGHT` はプロセス共有のグローバルである。**
-    /// `cargo test` は既定で並列に走るので、これを触るテストが 2 本以上あると
-    /// ★ 互いのカウンタを踏み合って **単独では緑・全体では赤**になる
-    /// (`packaging.rs` の一時ディレクトリ衝突と同じ形)。→ ここで直列化する。
-    static IN_FLIGHT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     /// ⚠️★ 番兵が panic でも in-flight を戻すこと。
     /// 戻し忘れると画面が「送信しています…」のまま**永久に固まる**。
     #[test]
     fn in_flight_returns_to_zero_even_on_panic() {
-        let _lock = IN_FLIGHT_TEST_LOCK
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
@@ -5220,7 +5293,7 @@ mod submission_receipt_tests {
     /// ⚠️ 内側が落ちた時点で 0 に戻すと、**まだ送っているのに送信中カードが消える**。
     #[test]
     fn nested_guards_keep_the_reason_until_the_last_one_drops() {
-        let _lock = IN_FLIGHT_TEST_LOCK
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         SUBMIT_IN_FLIGHT.store(0, Ordering::Relaxed);
@@ -5252,6 +5325,9 @@ mod submission_receipt_tests {
     /// ★ レシートの根拠を捨てる操作が、両方の値を落とすこと。
     #[test]
     fn reset_sent_receipt_clears_both_values() {
+        let _lock = SUBMIT_GLOBALS_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         SUBMIT_LAST_SENT_MS.store(1234, Ordering::Relaxed);
         SUBMIT_LAST_SENT_COUNT.store(7, Ordering::Relaxed);
         reset_sent_receipt();
