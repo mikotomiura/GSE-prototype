@@ -92,6 +92,38 @@
 </fieldset>
 
 <fieldset>
+  <legend>★ 実行条件 —— ⚠️★★★ 開始前に必ず設定する</legend>
+  <p class="note">
+    ★ <b>invitation の符号</b>: ⚠️★★★ <b>ADR-022 D1 が A-7（振動）を第 1 版の符号から外した</b>ので、
+    <b><code>aperture</code>（静的・縁の開口）を先に回す</b>。
+    ★ <code>oscillation</code> は「落とした符号がどれだけ読めたか」の対照として後で回す。
+  </p>
+  <div class="row">
+    <label class="note">符号:</label>
+    <select id="sel-inv">
+      <option value="aperture">aperture（静的・縁の開口）★ 既定</option>
+      <option value="oscillation">oscillation（振動・A-7）⚠️ 対照用</option>
+    </select>
+    <span class="stat" id="inv-state">—</span>
+  </div>
+
+  <p class="note warn">
+    ⚠️★★★ <b>事前露出の申告 —— 隠して回すほうが有害である。</b><br>
+    ★ ブロック 1b（未教示）は「写像を知らない状態で読めるか」を測る。
+    ⚠️ <b>もし実施前に写像を見てしまっていたら、1b は無効になる。</b>
+    ★ ここで申告すると <b>結果ファイルの <code>limitations</code> に自動で刻まれる</b>。
+  </p>
+  <div class="row">
+    <label><input type="checkbox" id="chk-exposed"> ★ 実施前に写像を見てしまった（→ 1b を無効として記録する）</label>
+  </div>
+  <div class="row">
+    <label class="note">見た経路（任意・自由記述）:</label>
+    <input type="text" id="txt-exposed" style="width: 420px;" placeholder="例: 設計中のスクリーンショット / config を開いた / 会話で説明を受けた">
+  </div>
+  <p class="note" id="exposed-state">—</p>
+</fieldset>
+
+<fieldset>
   <legend>⚠️★★★ 実機換算 —— 「視角 1°」を実際のロック画面ウィジェットに当てると何が起きるか</legend>
   <p class="note">
     ★ <b>[P85] の 1° は 2003 年の CRT・偏心 7°–52° の周辺視条件で得られた値である。</b>
@@ -1196,6 +1228,14 @@ function exportJSON() {
   REC.calibration = { ...CAL };
   REC.theme = THEME;
   REC.inv_coding = INV_CODING;
+  // ⚠️★★★ 事前露出の申告を結果に刻む（★ 隠して回すほうが有害）
+  REC.prior_exposure = {
+    declared: $("chk-exposed").checked,
+    how: $("txt-exposed").value.trim(),
+    consequence: $("chk-exposed").checked
+      ? "⚠️★★★ ブロック 1b（未教示）は無効。★ PS-Q5 の『他者』側は測れていない。★ 1b'（教示後）/ ブロック 2（A-8）/ E-7 は有効。"
+      : "★ 未露出の申告あり。"
+  };
   const payload = {
     expr_visual_version: CFG.expr_visual_version,
     hmm_version: CFG.hmm_version,
@@ -1208,6 +1248,12 @@ function exportJSON() {
     ua: navigator.userAgent,
     dpr: window.devicePixelRatio,
     limitations: [
+      ...($("chk-exposed").checked
+        ? ["⚠️★★★ 判定者は実施前に写像を見ていた（自己申告）。★ ブロック 1b（未教示）は無効であり、"
+           + "PS-Q5 の『他者は THAT で止まるか』は本データでは測れていない。"
+           + "★ 埋めるには、写像を見ていない判定者に 1b だけを回す必要がある。"
+           + ($("txt-exposed").value.trim() ? "★ 経路: " + $("txt-exposed").value.trim() : "")]
+        : []),
       "★ 判定者は N=1（研究者本人）。★ 設計文脈を知っており、語彙については盲ではない。",
       "⚠️ 実機のロック画面ではなく PC のブラウザ上の正方領域で提示している。",
       "⚠️ iOS はロック画面ウィジェットを強制的に monochrome にする（2026-09-02 一次実測）ため、実機は本ハーネスより符号が痩せる。",
@@ -1279,6 +1325,28 @@ async function boot() {
     $("btn-fr-start").disabled = false;
     $("btn-self").disabled = false;
   });
+
+  // ★ invitation 符号の選択（★ 既定は aperture = ADR-022 D1 の帰結）
+  INV_CODING = "aperture";
+  $("sel-inv").value = INV_CODING;
+  const invRefresh = () => {
+    INV_CODING = $("sel-inv").value;
+    $("inv-state").innerHTML = INV_CODING === "aperture"
+      ? '<span class="ok">aperture（★ ADR-022 D1 の第 1 版）</span>'
+      : '<span class="warn">⚠️ oscillation（★ 第 1 版の符号ではない。対照用）</span>';
+  };
+  $("sel-inv").addEventListener("change", invRefresh);
+  invRefresh();
+
+  // ★ 事前露出の申告
+  const expRefresh = () => {
+    $("exposed-state").innerHTML = $("chk-exposed").checked
+      ? `<span class="bad">⚠️★★★ ブロック 1b は <b>無効</b>として記録されます（★ 1b&#39; / ブロック 2 / E-7 は有効）</span>`
+      : '<span class="ok">★ 未露出として記録されます</span>';
+  };
+  $("chk-exposed").addEventListener("change", expRefresh);
+  $("txt-exposed").addEventListener("input", expRefresh);
+  expRefresh();
 
   $("btn-fr-start").addEventListener("click", frStart);
   $("btn-fr-submit").addEventListener("click", () => frNext(false));

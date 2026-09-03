@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 FAILS: list[str] = []
@@ -152,6 +155,13 @@ def run(cfg_path: Path, html_path: Path) -> None:
     # ★ ブロック 1a の露出に上限と順序シャッフルがあるか
     check("⚠️ ブロック 1a の提示順をシャッフルし、総露出に上限を置いている",
           "FR_MAX_MS" in html and "const order = shuffle(LEVELS.map" in html, "")
+    # ★ 実行条件パネル（★ 2026-09-03 追加）
+    check("★ invitation の符号を UI で選べる（★ 既定 aperture = ADR-022 D1）",
+          'id="sel-inv"' in html and 'INV_CODING = "aperture";' in html, "")
+    check("⚠️★★★ 事前露出の申告欄があり、結果の limitations に刻まれる",
+          'id="chk-exposed"' in html and "prior_exposure" in html
+          and "ブロック 1b（未教示）は無効" in html, "")
+
     check("⚠️★★★ 写像がブロック 1b まで封印される（C7）",
           "sealed" in html and "unseal" in html, "")
     check("⚠️ C7 を明文で持っている（事前に『読めますか』と聞かない）",
@@ -200,6 +210,32 @@ def run(cfg_path: Path, html_path: Path) -> None:
     ghits = [w for w in banned_glossary if w in html or w in json.dumps(cfg, ensure_ascii=False)]
     check("⚠️★★★ 限定資源モデルの語彙を使っていない（glossary 禁止用語）",
           not ghits, f"検出: {ghits}" if ghits else "なし")
+
+    # --- 10b. ⚠️★★★ HTML 内の JS が構文として通るか ----------------------
+    #    ★ 2026-09-03 追加。⚠️ **編集で構文エラーを入れたのが 2 回目だったので置いた。**
+    #      1 回目: コメントの `*/` を重ねた → `REC is not defined`
+    #      2 回目: 単引用符の中に `1b'` を書いた → `SyntaxError: Unexpected number`
+    #    ⚠️★★★ **どちらもブラウザで開くまで分からなかった。**
+    #      ★ Python 側は文字列 grep しかしていないので、**壊れた JS でも緑のまま通っていた。**
+    #    → ★ `verify-before-claiming` ルール 6: 主張のとなりに検査を置く。
+    m = re.search(r"<script>(.*?)</script>", html, re.S)
+    if not m:
+        check("⚠️★★★ HTML 内の JS を抽出できた", False, "<script> ブロックが見つからない")
+    elif shutil.which("node") is None:
+        # ⚠️ node が無いことを「緑」にしない。★ 検査できなかったことを明示する。
+        check("⚠️ HTML 内の JS が構文として通る（★ node 不在でスキップ）", False,
+              "node が見つからない → ★ 構文検査を実行できていない")
+    else:
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+            fh.write(m.group(1))
+            js = Path(fh.name)
+        try:
+            # ★ `--check` は実行せずに構文だけを見る
+            r = subprocess.run(["node", "--check", str(js)], capture_output=True, text=True)
+            detail = "OK" if r.returncode == 0 else (r.stderr.strip().splitlines() or ["?"])[0][:160]
+            check("⚠️★★★ HTML 内の JS が構文として通る（node --check）", r.returncode == 0, detail)
+        finally:
+            js.unlink(missing_ok=True)
 
     # --- 11. ★ 再現性: seed が config に固定されているか -------------------
     check("出題順の seed が config にある（reproducibility ルール 2）",
