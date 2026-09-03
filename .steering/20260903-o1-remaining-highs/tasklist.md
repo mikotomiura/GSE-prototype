@@ -38,18 +38,19 @@
 ## レビュー
 - [x] code-reviewer / security-checker を並列起動
 - [x] HIGH 指摘への対応
-- [ ] `/cross-review`（Codex）
+- [x] `/cross-review`（Codex）— HIGH 1 / MEDIUM 2 / LOW 1 に対応、Codex の 2 件は反証して却下
 
-## 配備（外界）
-- [ ] `GSE_O1_Form_Builder` へ貼り付け（★ SHA-256 照合つき）
-- [ ] スクリプト プロパティ `O1_MGMT_SHEET_ID` を設定
-- [ ] `buildO1MgmtSheet()` を 1 回実行
-- [ ] `checkO1FormConfig()` / `checkO1MgmtSheet()` / `checkO1RosterShape()` で確認
+## 配備（外界）— ★ 完了（詳細は decisions.md「配備記録」）
+- [x] `GSE_O1_Form_Builder` へ貼り付け（★ `a837c284317d1539` / 2558 行・⚠️ リロード後も一致）
+- [x] スクリプト プロパティ `O1_MGMT_SHEET_ID` を設定（★ 7 件目・既存 6 件は無傷）
+- [x] `buildO1MgmtSheet()` を 1 回実行（★ 2 タブ作成）
+- [x] `checkO1FormConfig()` / `checkO1MgmtSheet()` / `checkO1RosterShape()` すべて ✅
+- [x] クリップボードを復元（★ バイト一致を確認）／自分が開いたタブを閉じた
 
 ## 完了処理
 - [x] design.md の最終化（v2 採用の根拠つき）
 - [x] decisions.md
-- [ ] git commit / PR
+- [x] git commit / PR #150（★ CI 全緑 → MERGED・main = `ea0eb70`）
 
 ## ⚠️ 今回やらないこと（★ 完了報告に明記する）
 - #2 G1 側へのロスター形検査の移植（★ 研究者判断でスコープ外）
