@@ -324,7 +324,7 @@ available**"* を投げ、★ **全 7109 行に対する `grep -c directBootAwar
 → ★ **素直な設計は「イベントを PC 側でバッファし、`onVisibilityChanged(true)` を契機に取りに行く」**。
 ★ **曝露予算を「画面が点いている数秒」に賭ける方針と一致する。**
 
-⚠️★★★ **ただし W-1 に宿題が 2 つ残る**:
+⚠️★★★ **ただし W-1 に宿題が 2 つ残る**（★ Android 側）:
 
 1. ⚠️ **「取りに行く」＝ 端末が PC へ接続する ＝ PC 側にリスナが要る。**
    ★ ADR-017 D4 **制約 2 は「on-demand 起動 ＋ 停止時のティアダウン」を明示的に許している**ので、
@@ -333,11 +333,28 @@ available**"* を投げ、★ **全 7109 行に対する `grep -c directBootAwar
    ★ **運ばれる中身は PC → スマホの一方向のまま**だが、★ 接続の向きは逆である。
    → ⚠️ **「inbound を作らない」の意味を W-1 で定義し直す必要がある。**
 
+3. ⚠️★★★ **「on-demand」の粒度がすり替わっていないか**（★ `security-checker` 指摘・2026-09-03）——
+   ★ ADR-017 D4 **制約 2 の on-demand は「Wall Server がファイアウォールルールを削除していた形」**、
+   ★ すなわち **都度開いて都度閉じる**粒度である。⚠️★★★ **本 ADR の初稿は「GSE 稼働中だけ開く」と書いたが、
+   それは作業セッション全体＝数時間であり、先例より 1 桁以上長い。**
+   → ★★★ **W-1 は「転送の都度だけ開く」を既定とし、それが不可能な場合だけセッション粒度を検討すること。**
+
 ⚠️★★★ **`CompanionDeviceManager` は搬送路にならない**（★ 独立証拠 5 件）:
 `WifiDeviceFilter` は `ScanResult`（＝**アクセスポイント**）にしかマッチしない ／
 *"For Bluetooth classic devices this is triggered when the device connects/disconnects. **WiFi devices are
 not supported.**"* ／ `android.companion` 全ソースの `mdns|nsd|dnssd|bonjour|zeroconf` grep = **0 件** ／
 `setSelfManaged()` は `signature|privileged` ／ `notifyDeviceAppeared()` は `@SystemApi @hide`。
+
+#### ⚠️★★★ **iOS 側にも宿題がある**（★ `security-checker` 指摘・2026-09-03）
+
+⚠️★★★ **本 ADR の初稿は、Android 側だけを「W-1 の宿題」として明示し、iOS 側の S1 / S2 / S4 に
+一言も触れていなかった。★ 非対称であり、抜けである。** → ★ **揃える。**
+
+| 要件 | ⚠️ iOS 経路で未決なこと |
+|---|---|
+| **S1 明示的ペアリング** | ⚠️ **APNs の device token を、どうやって「この被験者の端末だ」と PC に安全に登録するか。** ★ token は端末側で発行されるので、**スマホ → PC の初期登録経路が要る**（⚠️ ADR-017 D3 の「一方向」との関係を W-1 が裁く） |
+| **S2 送信元認証** | ⚠️★★★ **`.p8` 鍵のスコープが未定義。** ★ **study 全体で 1 本の共有鍵**なら、**他の被験者の device token を知る者が任意の被験者へ push できる**。→ ★ **参加者ごとに分けるか、鍵を PC に置かずリレーを立てるか**を W-1 が決めること |
+| **S4 失効** | ⚠️ **離脱時に token をどう無効化するか。** ★ アプリ削除で token は失効するが、**PC 側の台帳から消す手順**が要る |
 
 #### ⚠️★★★ 契約に書く「漏れるもの」（★ iOS 側・隠さない）
 
@@ -552,7 +569,9 @@ Krippendorff's α = 0.91）。→ ★ **「実際に見ている時間」に近�
 | ★ **M-6** | ⚠️ macOS / Windows のファイアウォール on-demand 開閉（**S5**） | ★ 未調査 → ★ **W-1 の実装時課題へ送る** |
 | ★ **M-7** | ⚠️★★★ **Android の AOD 中に `onVisibilityChanged` が何を返すか** | ★ **実機で `onVisibilityChanged` をログする**（⚠️ AOSP コードだけでは詰め切れない） |
 | ★ **M-8** | ⚠️ **OEM 差分**（★ ロック画面に壁紙が出るか・省電力の独自制限） | ★ **実機確認**（⚠️ Google 公式は *"Every manufacturer can set their own criteria"* としか書かない） |
-| **W-1** | wire protocol の具体 | ★ 実装着手時の別 ADR（★ **D5 / D6 が前提を足し、宿題を 2 つ足した**） |
+| ★ **M-10** | ⚠️★★★ **iOS 経路の S1 / S2 / S4**（★ device token の登録 / `.p8` 鍵のスコープ / 失効手順） | ★ **W-1**（★ `security-checker` 指摘で追加。⚠️ 初稿は Android 側しか宿題化していなかった） |
+| ★ **M-11** | ⚠️ **`participant-setup-guide.md` と `data-privacy` への周知**（★ Migration 5 / 6） | ⚠️★★★ **実参加者を入れる前のブロッカー**（★ 被験者向け文書は契約） |
+| **W-1** | wire protocol の具体 | ★ 実装着手時の別 ADR（★ **D5 / D6 が前提を足し、宿題を iOS 3 件 ＋ Android 3 件 足した**） |
 
 ⚠️★★★ **A-7 は恒久否決ではない。** ★ 再開条件は **「両 OS で同じ符号として出せるようになる」**こと。
 ⚠️ **片方の OS だけで出せても採らない**（★ D1 理由 3）。
