@@ -137,9 +137,28 @@ PYTHONUTF8=1 python scripts/md2docx.py --selftest
 
 ⚠️★★★ **余白がゼロである。** ★ Google ドキュメント変換で **ちょうど 10 ページ**
 （規約は 10 ページ以内なので**通るが、1 行増えたら落ちる**）。
-★ **2026-09-04 の追記（約 300 字）の前後で両方測り、どちらも 10 ページだった**
+★ **2026-09-04 に 3 版すべてを測り、どれも 10 ページだった**
 （★ **Google ドキュメントの文字カウント**で 追記前 17,964 字 / 追記後 18,270 字。
-★ 追記はページ境界を跨いでいない）。
+★ さらにスマートフォン記述の書き方を直した版 +21 字も 10 ページ。
+★ どの追記もページ境界を跨いでいない）。
+
+⚠️★★★ **文字カウントのダイアログは開かないことがある。** ★ `Ctrl+Shift+C` が
+**同じ文書でも読み込みによって効いたり効かなかったりする**（2026-09-04 に 5 回失敗）。
+★ そのときは**描画から幾何で数える**（⚠️ 目分量ではない・下記）:
+
+```js
+// ★ Google ドキュメントのタブで実行する
+const sc=document.querySelector('.kix-appview-editor');
+const els=[...document.querySelectorAll('.kix-page-paginated')];
+const top=e=>Math.round(e.getBoundingClientRect().top+sc.scrollTop);
+const pitch=top(els[1])-top(els[0]), first=top(els[0]);
+// ★ N ページなら scrollHeight ≒ first + N*pitch - gap + 下余白
+console.log({N_lower:(sc.scrollHeight-2*first)/pitch, N_upper:(sc.scrollHeight-first+10)/pitch});
+```
+
+★ 実測例（2026-09-04）: `scrollHeight=11441 / pitch=1133 / first=145` → **N = 9.84〜9.98 ＝ 10 ページ**。
+⚠️ 11 ページなら `scrollHeight` は **12,743** 付近になるはずで、**1,300px 離れている**。
+→ ★ 境界事例ではないので、この幾何だけで 10 と断定してよい。
 
 ⚠️★★★ **2 種類の「文字数」を混ぜないこと。** ★ 上の表で使っている **19,958 / 20,270 字**は
 **`.docx.md`（markdown 正本）の文字数**であり、`**` や `|` などの記法を含む。
