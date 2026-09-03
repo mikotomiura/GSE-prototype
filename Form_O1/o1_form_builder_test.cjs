@@ -1608,6 +1608,73 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 // --- 出力 ---------------------------------------------------------------------
 // ⚠️★ 末尾 1 行の書式は `o1_submit_guard_test.cjs` と**同一にする**
 //   （`run.sh` / `check-o1-release-readiness.sh` が `^全 <N> ケース期待どおり$` を読む）。
+// ============================================================
+// §12 ⚠️★★★ 裸の行の乗っ取り（`bare-row-claim`）— 2026-09-03 に G1 から移植
+//
+// ⚠️ **この関数 `o1FindInPhase1Roster_` を呼ぶテストは 1 件も無かった**
+//   （★ 129 ケース全部が緑なのに、当の関数は一度も実行されていなかった）。
+//   → ★ 前セッションの教訓「テストが対象関数を一度も呼んでいなかった」の同型なので、
+//     **直接呼ぶ**形で書く。
+//
+// ★ 守っている性質: `o1AssignParticipantId_()` 系が `appendRow([newPid])` で作る
+//   **氏名もメールも空の行**を、その P-ID を申告しただけの第三者が取れてはならない。
+//   ⚠️ ロスターは Phase1 / G1 / O1 で共用なので、被害は O1 に閉じない。
+// ============================================================
+{
+  const ctx = makeCtx({});
+  const find = (roster, opts) => ctx.o1FindInPhase1Roster_(makeSheet(roster), opts);
+
+  // ⚠️ 乗っ取り: 裸の行（氏名もメールも空）を P-ID の申告だけで取ろうとする
+  {
+    const got = find([["P007", "", ""]], { pid: "P007" });
+    push(
+      "§12 ⚠️ 裸の行（氏名もメールも空）は申告 P-ID で取れない",
+      !!(got && got.conflict && got.reason === "bare-row-claim"),
+      got
+    );
+  }
+
+  // ★ 陽性対照: 研究者が氏名を先に入れた行は**通る**
+  //   ⚠️ これが通らないと「全部 conflict にしただけ」になり、検査が意味を失う。
+  {
+    const got = find([["P007", "山田太郎", ""]], { pid: "P007" });
+    push(
+      "§12 ★ 陽性対照: 氏名がある行は埋めてよい（正当な経路）",
+      !!(got && !got.conflict && got.pid === "P007"),
+      got
+    );
+  }
+
+  // ⚠️ 別人のメールが入っている行を名乗る → conflict（reason つき）
+  {
+    const got = find([["P007", "山田太郎", "other@example.com"]], { pid: "P007" });
+    push(
+      "§12 ⚠️ 別人のメールが入る行を名乗ると conflict",
+      !!(got && got.conflict && got.reason === "email-mismatch"),
+      got
+    );
+  }
+
+  // ★ 陽性対照: メール一致の経路は壊れていない（★ 申告 P-ID より優先される）
+  {
+    const got = find([["P007", "山田太郎", "me@example.com"]], {
+      email: "me@example.com",
+      pid: "P999",
+    });
+    push(
+      "§12 ★ 陽性対照: メール一致が最優先で通る（申告 P-ID より強い）",
+      !!(got && !got.conflict && got.pid === "P007"),
+      got
+    );
+  }
+
+  // ⚠️ 空のロスターでは何も返さない（★ 誤って conflict を返さない）
+  {
+    const got = find([], { pid: "P007" });
+    push("§12 ★ 該当なしは null", got === null, { got });
+  }
+}
+
 let ng = 0;
 cases.forEach((c) => {
   if (!c.ok) ng++;

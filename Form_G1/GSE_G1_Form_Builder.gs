@@ -2071,8 +2071,11 @@ function g1FindInPhase1Roster_(sheet, opts) {
         //   - ⚠️ 裸の行（氏名も空）は **conflict** にして研究者に判断させる
         //   ★ 安全側に倒れる: 誤って止めても研究者が確認して再提出してもらえばよい。
         //
-        // ⚠️★★ **O1 も同じ穴を持つ**（`Form_O1/GSE_O1_Form_Builder.gs:1022`）。
-        //   ★ 別 PR で同じ修正を入れること（`.steering/…/tasklist.md` に起票済み）。
+        // ⚠️★★ 旧文は「**O1 も同じ穴を持つ**（`Form_O1/GSE_O1_Form_Builder.gs:1022`）。
+        //   ★ 別 PR で同じ修正を入れること」と書いていた。
+        //   ★ **2026-09-03 に O1 へ移植した**（`bare-row-claim` / `email-mismatch` とも）。
+        //   ⚠️ 移植時に列構成を読み比べ、`O1_ROSTER_HEAD` が G1 と同じ並びであることを確認した。
+        //   → ★ **両側が塞がった。** ⚠️ ただし T-27（プロジェクト跨ぎの二重採番）は別問題で残る。
         var rowName = String(rows[i][1] == null ? "" : rows[i][1]).trim();
         if (!rowName) {
           return { conflict: true, pid: rowPid, row: i + 1, reason: "bare-row-claim" };

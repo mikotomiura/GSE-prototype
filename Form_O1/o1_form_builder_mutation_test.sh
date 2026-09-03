@@ -186,9 +186,14 @@ mutate ".gs にシークレットを直書きする" \
   's/(var O1_AUTO_SEND = true;)/$1\nvar SHARED_SECRET = "abcdefghijklmnopqrstuvwxyz123456";/'  # gate:allow-id ★ 変異が注入する偽の秘密（アルファベット順）
 
 # --- ★ 2026-08-28 のレビュー指摘で入れたガード -------------------------------
-mutate "★ 申告された P-ID をメール検証なしで信用する（他人の ID を名乗れる）"   's/      if \(!rowEmail\) return \{ pid: rowPid, row: i \+ 1 \};.*
-      \/\/ .*
-      return \{ conflict: true, pid: rowPid, row: i \+ 1 \};/      return { pid: rowPid, row: i + 1 };/'
+# ⚠️★ 2026-09-03: 対象コードを `bare-row-claim` の修正で書き換えたので、変異も追随させた。
+#   ★ 旧変異は `if (!rowEmail) return {...}` の 1 行を決め打ちしており、
+#   ⚠️ 修正後は**置換対象が消えて「変異が当たらなかった」**になっていた
+#   （★ すり抜けではなく、変異ハーネス側の陳腐化である）。
+mutate "★ 申告された P-ID をメール検証なしで信用する（他人の ID を名乗れる）"   's/      return \{ conflict: true, pid: rowPid, row: i \+ 1, reason: "email-mismatch" \};/      return { pid: rowPid, row: i + 1 };/'
+
+# ⚠️★★★ 裸の行の乗っ取り（2026-09-03 に G1 から移植した修正を壊す）。
+mutate "★ 裸の行（氏名もメールも空）を申告 P-ID だけで渡す（総当たりで取れる）"   's/        if \(!rowName\) \{/        if (false) {/'
 
 mutate "★ P-ID 列が空の行で appendRow に落とす（1 人に 2 つの ID）"   's/      var p = found\.pid;
       if \(!p\) \{/      var p = found.pid;

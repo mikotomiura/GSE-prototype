@@ -1019,9 +1019,36 @@ function o1FindInPhase1Roster_(sheet, opts) {
       rowPid = String(rows[i][0]).trim().toUpperCase();
       if (rowPid !== pid) continue;
       rowEmail = String(rows[i][2]).trim().toLowerCase();
-      if (!rowEmail) return { pid: rowPid, row: i + 1 }; // ★ 空欄 = 埋めてよい
+      if (!rowEmail) {
+        // ⚠️★★★ **メールが空なだけでは採用しない**（2026-09-03・G1 から移植）。
+        //
+        //   ★ 実測された乗っ取り経路: `o1AssignParticipantId_()` 系は `appendRow([newPid])` で
+        //     **氏名もメールも空の行**を作る。⚠️ 研究者が手入力するまでの間、その P-ID を
+        //     申告した**誰でも**この分岐を通り、その ID を受け取り、**自分のメールがその行に
+        //     書き込まれ**、受付メールが届く。
+        //   ⚠️ P-ID は連番・フォーム URL は配布済み・`setCollectEmail(false)` なので Google 認証も
+        //     無い → ★ **総当たりで当たる**。
+        //   ⚠️★★ しかも **ロスターは Phase1 / G1 / O1 で共用**なので、被害は O1 に閉じない。
+        //
+        // ★ そこで **氏名が入っている行だけ**採用する:
+        //   - 研究者が「氏名を先に入れた行」を埋めるのは**正当な経路**なので通す
+        //   - ⚠️ 裸の行（氏名も空）は **conflict** にして研究者に判断させる
+        //   ★ 安全側に倒れる: 誤って止めても研究者が確認して再提出してもらえばよい。
+        //
+        // ⚠️★★★ **これは G1 (`Form_G1/GSE_G1_Form_Builder.gs` の `bare-row-claim`) の移植である。**
+        //   ★ 移植にあたり**列構成を読み比べて**確認した: `O1_ROSTER_HEAD` は
+        //   `["P-ID", "氏名/ニックネーム", "メール", "OS"]` で G1 と同じ並びであり、
+        //   `rows[i][1]` が氏名・`rows[i][2]` がメールで一致する。
+        //   ⚠️ 列がズレたまま移植すると**氏名欄でないものを氏名として読む**ので、
+        //   ★ `O1_ROSTER_HEAD` を変えるときはこの分岐も一緒に見直すこと。
+        var rowName = String(rows[i][1] == null ? "" : rows[i][1]).trim();
+        if (!rowName) {
+          return { conflict: true, pid: rowPid, row: i + 1, reason: "bare-row-claim" };
+        }
+        return { pid: rowPid, row: i + 1 }; // ★ 氏名がある = 研究者が用意した行
+      }
       // ⚠️★★★ 別人のメールが入っている行を名乗っている。
-      return { conflict: true, pid: rowPid, row: i + 1 };
+      return { conflict: true, pid: rowPid, row: i + 1, reason: "email-mismatch" };
     }
   }
 
