@@ -10,6 +10,7 @@
     PYTHONUTF8=1 python scripts/check_doc_lexicon.py
 終了コード: 0 = 違反なし / 1 = 違反あり
 """
+import os
 import re
 import sys
 import unicodedata
@@ -38,11 +39,7 @@ HISTORICAL = re.compile(
 def scan(paths, pattern, label, allow_historical=True):
     hits = []
     for path in paths:
-        try:
-            lines = open(path, encoding='utf-8').read().split('\n')
-        except FileNotFoundError:
-            print('  [warn] not found: %s' % path)
-            continue
+        lines = open(path, encoding='utf-8').read().split('\n')
         for i, line in enumerate(lines, 1):
             if not pattern.search(line):
                 continue
@@ -51,8 +48,29 @@ def scan(paths, pattern, label, allow_historical=True):
             hits.append((path, i, label, line.strip()[:90]))
     return hits
 
+def missing(paths):
+    """検査対象の不在を列挙する。
+
+    ⚠️★★★ 2026-09-04 追加。旧版は `FileNotFoundError` を `[warn]` にして読み飛ばしており、
+    ★ **対象が 1 本も無くても `=== 違反なし ===` / exit 0 になった**（実測）。
+    → ⚠️ 実際にこれを踏んだ: ブランチが切り替わって `docs/mitou_submission/` が無い状態で
+    回し、**緑だと誤読した**。★ 対象の不在は「違反なし」ではなく **検査の空回り**である。
+    """
+    return [p for p in paths if not os.path.exists(p)]
+
+
 def main():
     violations = []
+
+    gone = missing(MITOU + SSOT)
+    if gone:
+        print('=== 検査が成立していない: 対象 %d 本が見つからない ===' % len(gone))
+        for p in gone:
+            print('  [missing] %s' % p)
+        print()
+        print('★ ブランチ / 作業ディレクトリを確かめること（★ 不在は「違反なし」ではない）。')
+        return 1
+
 
     # 1) 段階呼称 Lv1-4 (ADR-018 D7)
     violations += scan(MITOU + SSOT, re.compile(r'Lv[ ]?[1-4]'), '段階呼称 Lv1-4 (ADR-018 D7)')
