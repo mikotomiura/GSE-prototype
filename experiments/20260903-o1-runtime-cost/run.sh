@@ -48,7 +48,13 @@ echo "★ $RUN を $OS で $((DURATION_S / 3600)) 時間ぶん測ります (間�
 echo "⚠️ 途中で端末を閉じないこと。★ 結果: $OUT"
 
 # ⚠️★ ヘッダは summarize.py が読む。列を増やすなら向こうも直すこと。
-printf 'epoch_s\tcpu_pct\trss_kb\tthreads\tbattery_pct\n' > "$OUT/samples.tsv"
+# ⚠️★★★ **メモリは 2 つ記録する。** ★ OS ごとに「メモリ使用量」の定義が違う:
+#   - macOS `top` の MEM = **phys_footprint**（Activity Monitor の「メモリ」）
+#   - `ps rss` / Windows `WorkingSet64` = **常駐セット**
+#   ⚠️ 2026-09-03 に Finder で実測したら **546M vs 36MB（15 倍差）**だった。
+#   ★ どちらか一方だけ残すと、後から「何を測ったのか」が決められない。
+#   → ★ `rss_kb` = その OS の主指標 / `rss_alt_kb` = 対照（定義は env.md）。
+printf 'epoch_s\tcpu_pct\trss_kb\tthreads\tbattery_pct\trss_alt_kb\n' > "$OUT/samples.tsv"
 
 bash "$HERE/scripts/sample-$OS.sh" "$DURATION_S" "$INTERVAL_S" >> "$OUT/samples.tsv"
 
