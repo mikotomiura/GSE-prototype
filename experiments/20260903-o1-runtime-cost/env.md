@@ -6,7 +6,9 @@
 |---|---|
 | OS (B: macOS) | **macOS 26.5.2 (25F84)** ★ 2026-09-03 実測 |
 | 機種 (macOS) | **Mac16,12 / Apple M4 / 16GB** |
-| ⚠️ 電源 (macOS) | **（測定開始時に記入）** ⚠️★★★ **AC か バッテリー駆動かを必ず書く。** ★ 書かないと指標 3 の対照が成立しない |
+| ⚠️ 電源 (macOS) | ★ **AC 接続**（`pmset -g batt` = `Now drawing from \'AC Power\'`・開始時 75%・not charging）。⚠️★★★ **バッテリー駆動ではないので、指標 3（バッテリー持ち）は測っていない** —— ★ `summarize.py` は対照が無いと `DataInsufficient` を返す |
+| 測定バイナリ (macOS) | ★ **v0.1.31**（`~/Desktop/O1_計測用_macOS/gse-next.app`）。⚠️ 2026-09-03 に `main` の `c9f6fec` から `npx tauri build --bundles app --features package --target aarch64-apple-darwin` でビルド。★ **PR #151（孤児回収）を含む**。⚠️ 配布版 v0.1.30 とは**別物** |
+| ⚠️ 自動提出 | ★ **外してある**（`~/.gse/o1_consent_ack` を `.bak` へ退避）。⚠️ 記録は続くが送信経路は閉じている（`auto_submit_enabled()` が false）→ ★ **計測の代表性は保たれる** |
 | OS (A: Windows) | **（未記入）** ★ `winver` の値をそのまま |
 | 機種 / 電源 (Windows) | **（未記入）** ⚠️ 同上 |
 | GSE のバージョン | **0.1.31**（`src-tauri/Cargo.toml`）★ 実測時に `meta.app_version` で照合する |
