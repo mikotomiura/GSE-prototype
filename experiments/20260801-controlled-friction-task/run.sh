@@ -79,6 +79,19 @@ else
   bad "SEED に BLOCK_ORDER_SEED が無い"
 fi
 
+# ★ 凍結節そのものの検査（第 18 版で新設）。
+# ⚠️ 事前登録は第 2 版から毎版「§3.1/§3.2/§3.4/§3.5/§3.6 は第 1 版のまま」と主張してきたが、
+#    2026-09-03 まで **一度も機械的に検算されていなかった**（しかも文言が不正確だった:
+#    §3.5/§3.6 は byte-identical ではなく append-only である）。
+TMP_FZ=$(mktemp)
+if python3 check_frozen_sections.py > "$TMP_FZ" 2>&1; then
+  ok "凍結節が第 1 版と一致（check_frozen_sections.py）"
+else
+  sed 's/^/    /' "$TMP_FZ"
+  bad "凍結節が第 1 版と一致しない（★ §3 は判定基準の単一真実源であり触ってはならない）"
+fi
+rm -f "$TMP_FZ"
+
 # --- 2. 実施資材 -------------------------------------------------------------
 echo
 echo "[2] 実施資材"

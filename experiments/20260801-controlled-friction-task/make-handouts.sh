@@ -74,6 +74,13 @@ python3 "$M" README.md "handouts/G1_実験の解説.docx"
 python3 "$M" record-sheet-pilot.md "handouts/G1_記録用紙_P1_実験者用.docx" \
   "--from=# G1 パイロット P-1 記録用紙"
 
+# ★ 確証デザイン（10 ブロック）の記録用紙。⚠️ 2026-09-03 に新設した。
+#   ⚠️★★★ **これが無かったため、P007 / P014 / P016 は `produced_chars` が
+#     30 ブロック中 30 とも未記入のまま終わった**（`preregistration.md §3.5` の報告義務）。
+#     ★ 本文は保存しないので**後から復元できない**。
+python3 "$M" record-sheet-confirmatory.md "handouts/G1_記録用紙_確証_実験者用.docx" \
+  "--from=# G1 確証セッション 記録用紙"
+
 # --- 5. 配布事故の機械チェック ----------------------------------------------
 echo
 echo "[check] 被験者に渡すものに、渡してはいけない語が入っていないか"
