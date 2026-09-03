@@ -26,6 +26,10 @@ pub mod packaging;
 // ⚠️ ★ feature gate の外に置く: 盲検アプリ本体も「未送信 N 件」を数えるため
 // (数えるのに age は要らない)。両側が同じ規約を読むことで drift を防ぐ。
 pub mod submission;
+// ⚠️★★★ セッション NDJSON の **行の分類規則の単一真実源** (2026-09-03)。
+//   ★ 同じ規則が packaging / reconcile / o1 の 3 か所に手書きコピーされていて食い違っていた。
+//   ⚠️ feature gate の**外**に置く (盲検アプリ本体の o1 sweep も、package 側の収束器も読む)。
+pub mod ndjson_scan;
 // G1 自動提出の収束器 (ディスクの状態を突き合わせ、足りない仕事だけをする)。
 // age と HTTP を使うので package feature 側 (`gse-submit --reconcile` が実行主体)。
 #[cfg(feature = "package")]
@@ -3947,8 +3951,58 @@ pub fn run() {
             //   次の日次ローテートの後で拾われる。
             // ★ 猶予 (48 時間) を過ぎたファイルだけが包まれるので、
             //   ⚠️ **起動直後に「昨日の記録」がいきなり送られることはない**。
+            //
+            // ⚠️★★★ **収束器を回す *前* に、開いたまま残ったファイルを閉じる** (2026-09-03)。
+            //
+            // ★ `session_end` を書くのは `shutdown()` だけで、そこへ入るのは
+            //   **トレイの終了 / main 窓の × / `quit_app`** の 3 経路しか無い。
+            //   ⚠️ `ExitRequested` / `SIGTERM` / `WM_ENDSESSION` のハンドラは repo に無い。
+            //   → ★ **トレイから終了せずに PC を再起動するだけ**で、その日のファイルは
+            //     永久に提出候補から外れていた (`o1::close_orphaned_sessions` の doc 参照)。
+            // ⚠️ 走査はファイルを読むので **setup() を塞がない**ようスレッドに逃がす。
+            //   ★ 収束器は同じスレッドで**閉じ終わってから**起こす (順序を保証する)。
+            //
+            // ⚠️★★ **sweep が panic しても収束器は必ず走らせる** (cross-review LOW・2026-09-03)。
+            //   ★ 旧版はコメントで「ここが落ちても収束器は走る」と書いていたが、⚠️ **嘘だった**
+            //   —— panic するとスレッドごと死に、`spawn_reconcile` に到達しない
+            //   (= 起動時の収束が丸ごと失われる)。→ ★ `catch_unwind` で包む。
+            //
+            // ⚠️★ **`log_path_str` を「いま書いている先」として使えるのは、これが *起動時 1 回* だから**
+            //   である。★ `logger.rs` は「書き先の権威は `SharedLogTarget.path` であり、
+            //   起動時の値をコピーして持ち回るな」と明示している。
+            //   ⚠️ **sweep をローテート時や定期実行に広げるなら、必ず共有ハンドルから読み直すこと**
+            //   (★ さもないとライブファイルに `session_end` を書く)。
             if crate::o1::is_o1() {
-                spawn_reconcile(app.handle().clone(), ReconcileReason::Startup);
+                let sweep_app = app.handle().clone();
+                let sweep_current = std::path::PathBuf::from(&log_path_str);
+                thread::spawn(move || {
+                    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        let dir = sweep_current.parent()?;
+                        Some(crate::o1::close_orphaned_sessions(
+                            dir,
+                            Some(sweep_current.as_path()),
+                            now_epoch_ms(),
+                        ))
+                    }));
+                    match outcome {
+                        Ok(Some(sweep)) if sweep.closed > 0 || sweep.failed > 0 => {
+                            // ⚠️★ **画面にも届ける** —— 権限やディスクで閉じられない端末は
+                            //   ★ 無音で提出ゼロになる (cross-review LOW)。
+                            tracing::warn!(
+                                closed = sweep.closed,
+                                failed = sweep.failed,
+                                "O1 orphan sweep finished"
+                            );
+                        }
+                        Ok(_) => {}
+                        Err(_) => {
+                            tracing::error!(
+                                "O1 orphan sweep panicked; continuing to the reconciler anyway"
+                            );
+                        }
+                    }
+                    spawn_reconcile(sweep_app, ReconcileReason::Startup);
+                });
             }
 
             // ★ G1: ブロックを 5:00 ちょうどで自動終了する専用スレッド。

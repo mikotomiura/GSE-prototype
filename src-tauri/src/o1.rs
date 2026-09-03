@@ -348,6 +348,332 @@ pub fn is_o1_age_file_name(name: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// ⚠️★★★ 孤児セッションの回収 (2026-09-03・引き継ぎ ④)
+// ---------------------------------------------------------------------------
+
+/// ⚠️★★★ **これより古い「現在時刻」は壊れているとみなす** (2020-01-01T00:00:00Z)。
+///
+/// ★ 孤児回収は `session_end` に現在時刻を書く。⚠️ 時計が壊れて `0` / `1` が来ると
+/// **猶予が最初から経過済み**になり、削除保証がゼロになる。→ ★ 閉じずに見送る。
+/// ⚠️ O1 の収集は 2026 年に始まるので、この境界が正当な値を弾くことはない。
+pub const MIN_PLAUSIBLE_EPOCH_MS: u64 = 1_577_836_800_000;
+
+/// ⚠️★★★ **これより新しい「現在時刻」も壊れているとみなす** (2040-01-01T00:00:00Z)。
+///
+/// ★ 時計が未来にずれた状態で 1 回でも閉じると、⚠️ **未来の `session_end`** が書かれ、
+/// 以後 sweep は「閉じている」と見送り (べき等)、`grace_elapsed` も永久に偽になる ——
+/// ★ **静かに提出されないまま固定する** (⚠️ fail-silent。cross-review MEDIUM)。
+/// → ★ 閉じずに **fail-loud** で見送る (⚠️ 閉じないのは「今までどおり」なので後退しない)。
+///
+/// ⚠️ 固定値なので 2040 年以降は常に赤になるが、★ O1 の収集は 2026 年の研究であり、
+/// **そのころには本コードは無い**。⚠️ 万一残っていたら `tracing::error!` で必ず目に付く。
+pub const MAX_PLAUSIBLE_EPOCH_MS: u64 = 2_208_988_800_000;
+
+/// ⚠️★★★ **時計の高水位マーク**を置くファイル名（★ セッション置き場に置く）。
+///
+/// ★ `gse_` で始まらないので、`reconcile` / `packaging` / `redaction` の走査
+/// (`name.starts_with("gse_")`) には**構造的に掛からない**。
+/// ⚠️ 中身は epoch ms が 1 行だけ。★ 被験者を特定できるものは 1 バイトも書かない。
+pub const CLOCK_HWM_FILE_NAME: &str = ".o1_clock_hwm";
+
+/// ⚠️★★★ 行の分類規則は **`crate::ndjson_scan` が単一真実源**である。
+///
+/// ★ 2026-09-03 の cross-review で、同じ規則が `packaging` / `reconcile` / ここの
+/// **3 か所に手書きコピーされていて食い違っていた**ことが実測された（詳細は
+/// `ndjson_scan` の module doc）。→ ⚠️ **ここで判定を書き直さないこと。**
+use crate::ndjson_scan;
+
+/// NDJSON 1 本の「形」。★ `meta` 行の形と「データ行があるか」だけを見る。
+///
+/// ⚠️ **打鍵の内容も時刻も解釈しない** (`data-privacy`)。★ `reconcile::closed_o1_session_end`
+/// と**同じ弁別子**を持つ (⚠️ 片方だけ緩めると「収束器は O1 と認めないのに、こちらは閉じる」
+/// という食い違いが静かに生まれる)。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct O1SessionShape {
+    /// `meta` 行に `o1_mode` がある = **記録の中身が O1 だと言っている** (R-1)。
+    pub has_o1_mode: bool,
+    /// `meta` 行に `g1_mode` がある = G1 の記録である。
+    pub has_g1_mode: bool,
+    /// `session_start` 行がある = **「開始する」を押した記録** = O1 ではない。
+    pub has_session_start: bool,
+    /// `meta.session_end` がある = **もう閉じている**。
+    pub has_session_end: bool,
+    /// `meta` 以外の行がある = 中身がある。
+    pub has_data_row: bool,
+}
+
+/// ★ この形のファイルを「開いたまま残った O1 セッション」として閉じてよいか (純関数)。
+///
+/// ⚠️ **5 つ全部**が要る。★ どれを外しても、他の研究の記録・空ファイル・二重クローズの
+/// いずれかを踏む。
+pub fn is_closable_orphan(shape: &O1SessionShape) -> bool {
+    shape.has_o1_mode
+        && !shape.has_g1_mode
+        && !shape.has_session_start
+        && !shape.has_session_end
+        && shape.has_data_row
+}
+
+/// NDJSON を 1 パス走査して [`O1SessionShape`] を得る。
+///
+/// ⚠️ **1 行の読み取り失敗で諦めない** (`reconcile.rs:294` と同じ倒し方)。★ 強制終了だと
+/// 最終行が途中で切れていることがあり、そこで諦めると**回収したいファイルほど回収できない**。
+fn scan_session_shape(path: &Path) -> Option<O1SessionShape> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(path).ok()?;
+    let mut shape = O1SessionShape::default();
+    for line in std::io::BufReader::new(f).lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+        if ndjson_scan::is_session_start_row(&line) {
+            shape.has_session_start = true;
+        }
+        // ⚠️★★★ **`packaging::has_any_data_row` と同じ規則**でなければならない
+        //   (★ `hook_health` / `ime_state` はデータ行に数えない)。
+        //   ⚠️ ここが緩いと、**収束器が絶対に提出しないファイル**に `session_end` を書く
+        //   ことになる（★ 2026-09-03 の code-reviewer が実測で見つけた HIGH）。
+        if ndjson_scan::is_data_row(&line) {
+            shape.has_data_row = true;
+        }
+        if !ndjson_scan::is_meta_row(&line) {
+            continue;
+        }
+        if line.contains(ndjson_scan::NEEDLE_G1_MODE) {
+            shape.has_g1_mode = true;
+        }
+        if line.contains(ndjson_scan::NEEDLE_O1_MODE) {
+            shape.has_o1_mode = true;
+        }
+        // ⚠️★★★ **「文字列が在るか」ではなく「数値が取れるか」で見る**
+        //   (★ `reconcile::closed_o1_session_end` と同じ規則)。
+        //   ⚠️ 強制終了が `write_meta_end` の途中に当たり `…"session_end":` で切れた行を
+        //   「閉じている」と読むと、★ sweep は永久に見送り・収束器は数値を取れず、
+        //   **そのファイルは恒久的に提出候補外**になる —— ⚠️ 本実装が塞ごうとしている
+        //   クラッシュ経路そのものである（★ 2026-09-03 の code-reviewer MEDIUM）。
+        if ndjson_scan::parse_meta_u64(&line, "session_end").is_some() {
+            shape.has_session_end = true;
+        }
+    }
+    Some(shape)
+}
+
+/// 回収の結果。★ 呼び出し側がログに出すためだけの値。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OrphanSweep {
+    /// ★ 閉じたファイルの本数。
+    pub closed: usize,
+    /// ⚠️ 閉じようとして**書けなかった**本数 (★ 権限・ディスク)。
+    pub failed: usize,
+}
+
+/// ⚠️★★★ **起動時に「開いたまま」残った O1 セッションを閉じる。**
+///
+/// # なぜ要るか (★ 2026-09-03 にコードで確認した欠陥)
+///
+/// `meta.session_end` を書くのは `lib.rs` の `shutdown()` だけで、そこへ入るのは
+/// **トレイの終了 / main 窓の × / `quit_app`** の 3 経路しか無い。
+/// ⚠️ `ExitRequested` / `SIGTERM` / `WM_ENDSESSION` のハンドラは repo に **1 つも無い**。
+/// → ★ **GSE をトレイから終了せずに PC を再起動するだけ**で、その日のファイルは
+/// `session_end` を持たないまま残り、⚠️ `reconcile` は `session_end` を持つファイルしか
+/// 触らないので **永久に提出候補にならない**。
+/// ★ 日次ローテートも救わない —— 起点 `O1_LOG_OPENED_MS` は**メモリ上の Atomic** で、
+/// 次の起動では**新しいファイル**が開かれるだけである。
+///
+/// ⚠️ データが消えるわけではない (★ ローカルには残る) が、研究者から見ると
+/// 「**記録は取れているのに送られてこない**」、被験者から見ると**何も起きていないように見える**。
+/// ★ 強制終了が習慣の人ほど丸ごと欠測するので、⚠️ **母集団に偏りが入る**。
+///
+/// # ⚠️★★★ なぜ `session_end` に **`now_ms` (検出時刻)** を書くのか
+///
+/// ★ 「最終データ行の時刻」を書くほうが意味的には正しい。⚠️ **しかしそれは削除保証を壊す。**
+/// 猶予は `session_end + SUBMIT_GRACE_MS` で効く (`grace_elapsed`) ので、
+/// 3 日前に落ちたファイルに 3 日前の時刻を書くと ★ **次の起動でいきなり包まれて送られ**、
+/// 被験者に消す窓が 1 秒も残らない —— ⚠️ ADR-014 **判断 3 の根拠 3** が崩れる。
+///
+/// → ★ **検出時刻なら、猶予の起点は「被験者が次にアプリを立ち上げた瞬間」**であり、
+/// ⚠️ **窓は絶対に短くならない** (★ 常に丸 48 時間ある)。
+/// `data-privacy` ルール 6 が禁じているのは「猶予を**縮める / 外す**」変更なので、
+/// ★ 伸ばす向きにしか動かない本実装は ADR-014 判断 3 の再検討を要しない。
+///
+/// ⚠️★★ **代償**: `session_end` が「最後に記録した時刻」ではなくなるので、
+/// `session_start`〜`session_end` を観測窓とみなす下流は**実在しない沈黙区間を数える**
+/// (★ 実例: `experiments/20260819-silence-presence-decomposition/scripts/extract.py:314`)。
+/// ★ 回収されたファイルは `session_end - (最終データ行の t)` が異常に大きいことで**判別できる**。
+/// ⚠️ schema には**フィールドを足さない** (`schema_dto.rs` ＋ `schema/current.json` ＋
+/// gse-dataset の 3 者同期が要り、配布直前に cross-repo の drift を作るほうが危ない)。
+///
+/// # 引数
+///
+/// - `dir` … セッション置き場
+/// - `current` … ⚠️ **いま開いているファイル** (★ 絶対に触らない)
+/// - `now_ms` … 書き込む `session_end` の値 (= 検出時刻)
+///
+/// ★ 同時起動は `tauri-plugin-single-instance` が `Builder::build()` の中で殺す
+/// (`lib.rs:3731`)。⚠️ プラグインを持たない**旧ビルド**は同時に走りうるが、旧ビルドは
+/// O1 ではないので `gse_o1_*` を書かず、`has_o1_mode` で構造的に外れる。
+pub fn close_orphaned_sessions(dir: &Path, current: Option<&Path>, now_ms: u64) -> OrphanSweep {
+    let mut sweep = OrphanSweep::default();
+    // ⚠️★★★ **システム時計が壊れているときは 1 本も閉じない** (fail-closed)。
+    //
+    // ★ `lib.rs` の `now_epoch_ms()` は失敗時に **`1`** を返し (`epoch_ms()` は `0`)、
+    //   ⚠️ そのまま `session_end` に書くと `grace_elapsed(1, now, 48h)` が**必ず真**になり、
+    //   ★ **次の収束で即座に包まれて送られる** —— 被験者に消す窓が 1 秒も残らない。
+    //   → ⚠️ ADR-014 判断 3 の根拠 3 を、まさに守ろうとしている実装が壊すことになる。
+    // ★ 閉じないほうは損失にならない (次の正常な起動で拾われる)。
+    if !(MIN_PLAUSIBLE_EPOCH_MS..=MAX_PLAUSIBLE_EPOCH_MS).contains(&now_ms) {
+        tracing::error!(
+            "O1 orphan sweep: refusing to run; the system clock looks wrong (now_ms={})",
+            now_ms
+        );
+        return sweep;
+    }
+    // ⚠️★★★ **時計が後ろに飛んだ起動では 1 本も閉じない** (security-checker HIGH・2026-09-03)。
+    //
+    // ★ 床 (`MIN_PLAUSIBLE_EPOCH_MS`) だけでは **2020 年以降の任意の過去時刻**が通る。
+    //   ⚠️ 実際に起きる筋: ノート PC の CMOS 電池が切れ、BIOS 既定日 (2020〜2023) で起動
+    //   → sweep が `session_end = 数年前` を書く → NTP が時刻を補正 →
+    //   ★ 次の収束で `grace_elapsed` が**真**になり、⚠️ **被験者に消す窓が 1 秒も残らないまま**
+    //   `.age` が作られ承認なしに送られる。→ ⚠️ 守ろうとしている当の根拠 3 が破れる。
+    //
+    // ★ 高水位マークは**前にしか動かさない**。⚠️ 下回る起動では sweep 全体を見送る
+    //   (★ 見送りは損失にならない —— 時計が直った次の起動で拾われる)。
+    let hwm_path = dir.join(CLOCK_HWM_FILE_NAME);
+    if let Some(hwm) = read_clock_hwm(&hwm_path) {
+        if now_ms < hwm {
+            tracing::error!(
+                "O1 orphan sweep: refusing to run; the clock went backwards \
+                 (now_ms={} < last seen {}). Nothing was closed.",
+                now_ms,
+                hwm
+            );
+            return sweep;
+        }
+    }
+    if let Err(e) = std::fs::write(&hwm_path, format!("{now_ms}\n")) {
+        // ⚠️ ★ **書けなくても止めない。** ★ 書けないのは異常だが、
+        //   ここで止めると「回収されないまま」が続き、本来の欠陥が残る。
+        tracing::warn!(
+            "O1 orphan sweep: cannot update the clock high-water mark: {}",
+            e
+        );
+    }
+    // ⚠️ ★ 現在パスは**正規化して**比べる。相対 / シンボリックリンクで
+    //   すり抜けると、書きかけのファイルに `session_end` を書くことになる。
+    let current_canonical = current.and_then(|p| std::fs::canonicalize(p).ok());
+    let entries = match std::fs::read_dir(dir) {
+        Ok(rd) => rd,
+        // ⚠️ 置き場が読めないのは異常だが、★ ここで落ちても記録は続く。次の起動で拾う。
+        Err(e) => {
+            tracing::warn!("O1 orphan sweep: cannot read {:?}: {}", dir, e);
+            return sweep;
+        }
+    };
+    let mut paths: Vec<PathBuf> = entries
+        .flatten()
+        .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|s| s.to_str())
+                .map(is_o1_session_file_name)
+                .unwrap_or(false)
+        })
+        .collect();
+    paths.sort();
+    for path in paths {
+        // ★ 条件 2: いま開いているファイルは触らない。
+        if let (Some(cur), Ok(here)) = (current_canonical.as_ref(), std::fs::canonicalize(&path)) {
+            if *cur == here {
+                continue;
+            }
+        }
+        // ⚠️ ★ canonicalize が使えない環境でも**名前だけでもう一度**弾く (二重の門)。
+        if let (Some(cur), Some(here)) = (current.and_then(|p| p.file_name()), path.file_name()) {
+            if cur == here {
+                continue;
+            }
+        }
+        let shape = match scan_session_shape(&path) {
+            Some(s) => s,
+            None => continue,
+        };
+        if !is_closable_orphan(&shape) {
+            continue;
+        }
+        match append_session_end(&path, now_ms) {
+            Ok(()) => {
+                sweep.closed += 1;
+                // ⚠️★ **回収した事実をログに残す** (★ schema を変えない代わりの記録)。
+                //   ローカルの `gse-app.log` だけに出る (提出物には載らない)。
+                tracing::warn!(
+                    "O1 orphan sweep: closed {:?} with session_end={} \
+                     (the app did not shut down cleanly last time; \
+                      the 48h deletion window starts now)",
+                    path.file_name(),
+                    now_ms
+                );
+            }
+            Err(e) => {
+                sweep.failed += 1;
+                tracing::error!(
+                    "O1 orphan sweep: cannot close {:?}: {}",
+                    path.file_name(),
+                    e
+                );
+            }
+        }
+    }
+    sweep
+}
+
+/// 時計の高水位マークを読む。⚠️ 読めない / 壊れているときは `None` (= 検査しない)。
+///
+/// ★ `None` に倒すのは、⚠️ **初回起動ではマークが存在しない**からである
+/// (★ そこで止めると、本欠陥がいつまでも直らない)。
+fn read_clock_hwm(path: &Path) -> Option<u64> {
+    std::fs::read_to_string(path)
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+}
+
+/// `{"type":"meta","session_end":<ms>}` を 1 行 append する。
+///
+/// ⚠️★★ **最終行が改行で終わっていないことがある** (★ 強制終了で書き込みが途中で切れた場合)。
+/// そのまま append すると ⚠️ **壊れた行と `meta` 行が 1 行に融合し、`meta` 行が読めなくなる**
+/// (= 回収したはずのファイルがまた提出候補から外れる)。→ ★ 先に `\n` を補う。
+/// 断片は 1 行のゴミとして残るが、`reconcile` の行読みは 1 行の失敗で諦めない。
+fn append_session_end(path: &Path, now_ms: u64) -> std::io::Result<()> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let mut f = std::fs::OpenOptions::new()
+        .read(true)
+        .append(true)
+        .open(path)?;
+    let len = f.metadata()?.len();
+    let mut needs_newline = false;
+    if len > 0 {
+        f.seek(SeekFrom::End(-1))?;
+        let mut last = [0u8; 1];
+        f.read_exact(&mut last)?;
+        needs_newline = last[0] != b'\n';
+    }
+    if needs_newline {
+        f.write_all(b"\n")?;
+    }
+    // ⚠️★★★ **形を手で 2 回書かない。** ★ `logger::write_meta_end` を直接呼ぶ
+    //   (2026-09-03 の cross-review MEDIUM: 同じリテラルが 2 か所にあると、
+    //   ⚠️ `logger` 側だけ変えたときに **両方緑のまま黙って drift する**)。
+    crate::logger::write_meta_end(&mut f, now_ms);
+    f.flush()
+}
+
+// ---------------------------------------------------------------------------
 // 起動時に 1 回だけ確定するモード
 // ---------------------------------------------------------------------------
 
@@ -763,5 +1089,495 @@ mod tests {
         // ⚠️★ 参加者 ID そのものが `gse_o1_` を含んでも誤判定しない
         //   (★ ID は `^[A-Za-z0-9]{1,16}$` なので `_` を含めない = 構造的に起きない)
         assert!(!is_o1_age_file_name("gseo1_block01_gse_00000000.age"));
+    }
+
+    // --- G: 孤児セッションの回収 (2026-09-03・引き継ぎ ④) ------------------
+
+    /// ★ テスト用の一時フォルダ。⚠️ 既存のテスト (reconcile / redaction) と同じ流儀。
+    fn sweep_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("gse_o1_sweep_{}_{}", tag, std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// ★ 現実的な「いま」。⚠️ `MIN_PLAUSIBLE_EPOCH_MS` を超えている必要がある。
+    const NOW: u64 = 1_788_000_000_000;
+
+    fn write(dir: &Path, name: &str, body: &str) -> PathBuf {
+        let p = dir.join(name);
+        std::fs::write(&p, body).unwrap();
+        p
+    }
+
+    /// O1 の「開いたまま」= `o1_mode` あり / `session_end` なし / データ行あり。
+    const OPEN_O1: &str = concat!(
+        r#"{"type":"meta","session_start":1788000000000,"hmm_version":"0.3.0","o1_mode":"marker"}"#,
+        "\n",
+        r#"{"type":"feat","t":1788000001000,"ikiCv":0.1}"#,
+        "\n"
+    );
+
+    // ★ 正常: 孤児が閉じ、`session_end` が **検出時刻**になる。
+    #[test]
+    fn orphan_is_closed_with_the_detection_time() {
+        let d = sweep_dir("normal");
+        let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        let sweep = close_orphaned_sessions(&d, None, NOW);
+        assert_eq!(
+            sweep,
+            OrphanSweep {
+                closed: 1,
+                failed: 0
+            }
+        );
+        let body = std::fs::read_to_string(&p).unwrap();
+        assert!(
+            body.contains(&format!(r#"{{"type":"meta","session_end":{NOW}}}"#)),
+            "★ logger::write_meta_end と 1 バイトも違わない形で書かれていない:\n{body}"
+        );
+        // ⚠️★★★ 猶予の起点が **今** になっている = 窓は必ず丸 48 時間ある。
+        assert!(
+            !grace_elapsed(NOW, NOW, SUBMIT_GRACE_MS),
+            "★ 閉じた直後に猶予が経過していてはならない (削除保証が消える)"
+        );
+        assert!(grace_elapsed(NOW, NOW + SUBMIT_GRACE_MS, SUBMIT_GRACE_MS));
+    }
+
+    /// ⚠️★★★ **陰性対照**: 触ってはならない 5 種が **1 バイトも変わらない**。
+    #[test]
+    fn sweep_never_touches_anything_it_should_not() {
+        let d = sweep_dir("negative");
+        // ① Phase1 (名前が gse_o1_ ではない)
+        let phase1 = write(&d, "gse_20260901_101112.ndjson", OPEN_O1);
+        // ② G1 (meta に g1_mode)
+        let g1 = write(
+            &d,
+            "gse_o1_20260901_101113.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"g1_mode":"marker","o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"feat","t":2}"#,
+                "\n"
+            ),
+        );
+        // ③ 押下の痕跡がある (session_start 行) = O1 ではない
+        let pressed = write(
+            &d,
+            "gse_o1_20260901_101114.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"session_start","t":2}"#,
+                "\n",
+                r#"{"type":"feat","t":3}"#,
+                "\n"
+            ),
+        );
+        // ④ 既に閉じている O1 (二重クローズしない)
+        let closed = write(
+            &d,
+            "gse_o1_20260901_101115.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"feat","t":2}"#,
+                "\n",
+                r#"{"type":"meta","session_end":3}"#,
+                "\n"
+            ),
+        );
+        // ⑤ 中身が無い O1 (meta だけ)
+        let empty = write(
+            &d,
+            "gse_o1_20260901_101116.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n"
+            ),
+        );
+        // ⑥ o1_mode を持たない (名前だけ O1) = R-1 の弁別子
+        let renamed = write(
+            &d,
+            "gse_o1_20260901_101117.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"hmm_version":"0.3.0"}"#,
+                "\n",
+                r#"{"type":"feat","t":2}"#,
+                "\n"
+            ),
+        );
+        let before: Vec<String> = [&phase1, &g1, &pressed, &closed, &empty, &renamed]
+            .iter()
+            .map(|p| std::fs::read_to_string(p).unwrap())
+            .collect();
+        let sweep = close_orphaned_sessions(&d, None, NOW);
+        assert_eq!(
+            sweep,
+            OrphanSweep::default(),
+            "★ 触ってはならないものを閉じた"
+        );
+        for (p, was) in [&phase1, &g1, &pressed, &closed, &empty, &renamed]
+            .iter()
+            .zip(before)
+        {
+            assert_eq!(
+                std::fs::read_to_string(p).unwrap(),
+                was,
+                "⚠️ {:?} が変わっている",
+                p.file_name()
+            );
+        }
+    }
+
+    /// ⚠️★★★ **いま開いているファイルには絶対に書かない**。
+    #[test]
+    fn sweep_never_closes_the_file_that_is_open_right_now() {
+        let d = sweep_dir("current");
+        let current = write(&d, "gse_o1_20260903_090000.ndjson", OPEN_O1);
+        let old = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        let sweep = close_orphaned_sessions(&d, Some(current.as_path()), NOW);
+        assert_eq!(
+            sweep,
+            OrphanSweep {
+                closed: 1,
+                failed: 0
+            }
+        );
+        assert!(
+            !std::fs::read_to_string(&current)
+                .unwrap()
+                .contains("session_end"),
+            "★ 書きかけのファイルを閉じてはならない"
+        );
+        assert!(std::fs::read_to_string(&old)
+            .unwrap()
+            .contains("session_end"));
+    }
+
+    /// ★ 壊れ: **最終行が改行なしで切れている** (強制終了の実際の姿)。
+    ///
+    /// ⚠️ そのまま append すると壊れた行と `meta` 行が融合し、★ 回収したはずのファイルが
+    /// また提出候補から外れる。
+    #[test]
+    fn truncated_last_line_does_not_swallow_the_meta_row() {
+        let d = sweep_dir("truncated");
+        let p = write(
+            &d,
+            "gse_o1_20260901_101112.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"feat","t":2}"#,
+                "\n",
+                r#"{"type":"feat","t":3,"iki"#, // ⚠️ ここで電源が落ちた
+            ),
+        );
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+        let body = std::fs::read_to_string(&p).unwrap();
+        let meta_line = body
+            .lines()
+            .find(|l| l.contains(r#""session_end""#))
+            .expect("★ session_end の行が見つからない");
+        assert_eq!(
+            meta_line,
+            format!(r#"{{"type":"meta","session_end":{NOW}}}"#),
+            "⚠️ 壊れた断片と融合している: {body:?}"
+        );
+    }
+
+    /// ★ 不在: フォルダごと無い / 空のフォルダ。⚠️ 落ちず、何もしない。
+    #[test]
+    fn missing_or_empty_dir_is_a_no_op() {
+        let missing =
+            std::env::temp_dir().join(format!("gse_o1_sweep_none_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&missing);
+        assert_eq!(
+            close_orphaned_sessions(&missing, None, NOW),
+            OrphanSweep::default()
+        );
+        let d = sweep_dir("empty");
+        assert_eq!(
+            close_orphaned_sessions(&d, None, NOW),
+            OrphanSweep::default()
+        );
+    }
+
+    /// ⚠️★★★ **時計が壊れているときは 1 本も閉じない** (fail-closed)。
+    ///
+    /// ★ `now_epoch_ms()` の失敗値 `1` / `epoch_ms()` の `0` をそのまま書くと、
+    /// 猶予が最初から経過済みになり **削除保証がゼロになる**。
+    #[test]
+    fn a_broken_clock_closes_nothing() {
+        for bad in [0u64, 1, MIN_PLAUSIBLE_EPOCH_MS - 1] {
+            let d = sweep_dir(&format!("clock{bad}"));
+            let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+            assert_eq!(
+                close_orphaned_sessions(&d, None, bad),
+                OrphanSweep::default(),
+                "★ now_ms={bad} で閉じてしまった"
+            );
+            assert_eq!(std::fs::read_to_string(&p).unwrap(), OPEN_O1);
+        }
+    }
+
+    /// ★ 純関数 `is_closable_orphan` を 5 条件ぶん個別に落とす (⚠️ どれを外しても閉じない)。
+    #[test]
+    fn every_one_of_the_five_conditions_is_required() {
+        let ok = O1SessionShape {
+            has_o1_mode: true,
+            has_g1_mode: false,
+            has_session_start: false,
+            has_session_end: false,
+            has_data_row: true,
+        };
+        assert!(is_closable_orphan(&ok));
+        let mutants = [
+            (
+                "o1_mode が無い",
+                O1SessionShape {
+                    has_o1_mode: false,
+                    ..ok
+                },
+            ),
+            (
+                "g1_mode がある",
+                O1SessionShape {
+                    has_g1_mode: true,
+                    ..ok
+                },
+            ),
+            (
+                "押下の痕跡がある",
+                O1SessionShape {
+                    has_session_start: true,
+                    ..ok
+                },
+            ),
+            (
+                "既に閉じている",
+                O1SessionShape {
+                    has_session_end: true,
+                    ..ok
+                },
+            ),
+            (
+                "中身が無い",
+                O1SessionShape {
+                    has_data_row: false,
+                    ..ok
+                },
+            ),
+        ];
+        for (why, m) in mutants {
+            assert!(!is_closable_orphan(&m), "⚠️ {why} のに閉じようとした");
+        }
+    }
+
+    /// ⚠️★★ **べき等**: 2 回走らせても `session_end` は 1 行だけ。
+    #[test]
+    fn sweeping_twice_writes_session_end_only_once() {
+        let d = sweep_dir("idempotent");
+        let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+        let after_first = std::fs::read_to_string(&p).unwrap();
+        assert_eq!(close_orphaned_sessions(&d, None, NOW + 1000).closed, 0);
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), after_first);
+        assert_eq!(after_first.matches(r#""session_end""#).count(), 1);
+    }
+
+    /// ⚠️★ 回収したファイルが **`reconcile` の弁別子を満たす**こと
+    /// (★ 「閉じたのに収束器が O1 と認めない」食い違いを固定する)。
+    #[test]
+    fn a_recovered_file_satisfies_the_reconciler_discriminators() {
+        let d = sweep_dir("shape");
+        let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+        let shape = scan_session_shape(&p).unwrap();
+        assert!(shape.has_o1_mode && shape.has_session_end && shape.has_data_row);
+        assert!(!shape.has_g1_mode && !shape.has_session_start);
+    }
+
+    /// ⚠️★★ **`meta` 行の `session_start` *フィールド* を `session_start` *行* と誤認しない**
+    /// (Codex cross-review MEDIUM)。
+    ///
+    /// ★ O1 の meta 開始行は `{"type":"meta","session_start":<ms>,…}` であり、
+    /// ⚠️ 誤認すると **すべての O1 ファイルが「押下の痕跡あり」になって 1 本も閉じない**
+    /// (★ 沈黙して直らない)。
+    #[test]
+    fn the_meta_session_start_field_is_not_a_session_start_row() {
+        let d = sweep_dir("metafield");
+        let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        let shape = scan_session_shape(&p).unwrap();
+        assert!(
+            !shape.has_session_start,
+            "⚠️ meta の session_start フィールドを行と誤認している"
+        );
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+    }
+
+    /// ⚠️ **書き込めないファイルは `failed` に数え、`closed` に数えない**
+    /// (Codex cross-review LOW)。★ 「閉じたつもり」を作らない。
+    #[cfg(unix)]
+    #[test]
+    fn an_unwritable_file_is_counted_as_a_failure() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = sweep_dir("readonly");
+        let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let sweep = close_orphaned_sessions(&d, None, NOW);
+        // ⚠️ root で走ると書けてしまうので、★ **どちらでも「嘘をつかない」ことだけ**を固定する。
+        let body = std::fs::read_to_string(&p).unwrap();
+        if body.contains("session_end") {
+            assert_eq!(
+                sweep,
+                OrphanSweep {
+                    closed: 1,
+                    failed: 0
+                }
+            );
+        } else {
+            assert_eq!(
+                sweep,
+                OrphanSweep {
+                    closed: 0,
+                    failed: 1
+                }
+            );
+        }
+        let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o644));
+    }
+
+    /// ⚠️★★★ **`meta` ＋ 診断行だけのファイルを閉じない**（★ code-reviewer HIGH・実測で発見）。
+    ///
+    /// ★ macOS の初回起動では IME モニタが `ime_state` を 2 行書くので、
+    /// **ブロックを一度も始めずに閉じただけのファイル**が現実に出る。
+    /// ⚠️ 旧実装は `meta` 以外を無条件にデータ行と数えたので、
+    /// **収束器 (`packaging::has_any_data_row`) が絶対に提出しないファイル**に
+    /// `session_end` を書いていた（★ 「触ってはならないものに触っている」）。
+    #[test]
+    fn a_file_with_only_diagnostic_rows_is_not_closed() {
+        let d = sweep_dir("diagnostic");
+        let p = write(
+            &d,
+            "gse_o1_20260901_101112.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"ime_state","t":2,"open":false}"#,
+                "\n",
+                r#"{"type":"ime_state","t":3,"open":true}"#,
+                "\n",
+                r#"{"type":"hook_health","t":4}"#,
+                "\n"
+            ),
+        );
+        let before = std::fs::read_to_string(&p).unwrap();
+        assert_eq!(
+            close_orphaned_sessions(&d, None, NOW),
+            OrphanSweep::default(),
+            "⚠️ 収束器が提出しないファイルを閉じてはならない"
+        );
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), before);
+        // ★ 陰性対照: 本物のデータ行が 1 行でもあれば閉じる。
+        let q = write(
+            &d,
+            "gse_o1_20260901_101113.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"ime_state","t":2,"open":false}"#,
+                "\n",
+                r#"{"type":"feat","t":3,"ikiCv":0.1}"#,
+                "\n"
+            ),
+        );
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+        assert!(std::fs::read_to_string(&q).unwrap().contains("session_end"));
+    }
+
+    /// ⚠️★★★ **`session_end` が途中で切れた行は「閉じている」と読まない**
+    /// （★ code-reviewer MEDIUM・**本実装が塞ごうとしているクラッシュ経路そのもの**）。
+    ///
+    /// ★ 強制終了が `write_meta_end` の途中に当たると `…"session_end":` で切れる。
+    /// ⚠️ 文字列一致で「閉じている」と読むと、sweep は永久に見送り・収束器は数値を取れず、
+    /// **そのファイルは恒久的に提出候補外**になる。
+    #[test]
+    fn a_truncated_session_end_is_not_treated_as_closed() {
+        let d = sweep_dir("truncmeta");
+        let p = write(
+            &d,
+            "gse_o1_20260901_101112.ndjson",
+            concat!(
+                r#"{"type":"meta","session_start":1,"o1_mode":"marker"}"#,
+                "\n",
+                r#"{"type":"feat","t":2,"ikiCv":0.1}"#,
+                "\n",
+                r#"{"type":"meta","session_end":"#, // ⚠️ ここで電源が落ちた
+            ),
+        );
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+        let body = std::fs::read_to_string(&p).unwrap();
+        assert!(
+            body.lines()
+                .any(|l| ndjson_scan::parse_meta_u64(l, "session_end") == Some(NOW)),
+            "★ 数値として読める session_end が無い:\n{body}"
+        );
+    }
+
+    /// ⚠️★★★ **時計が後ろに飛んだ起動では 1 本も閉じない**（★ security-checker HIGH）。
+    ///
+    /// ★ CMOS 電池切れ → BIOS 既定日 (2020〜2023) で起動、という現実の筋。
+    /// ⚠️ 過去の時刻を書くと NTP 補正後に猶予が経過済みになり、削除保証がゼロになる。
+    #[test]
+    fn a_clock_that_went_backwards_closes_nothing() {
+        let d = sweep_dir("backwards");
+        // ★ 1 回目 (正常な時計) — 高水位マークが置かれる。
+        let first = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        assert_eq!(close_orphaned_sessions(&d, None, NOW).closed, 1);
+        assert!(std::fs::read_to_string(&first)
+            .unwrap()
+            .contains("session_end"));
+        assert!(d.join(CLOCK_HWM_FILE_NAME).is_file());
+
+        // ⚠️ 2 回目 (時計が 3 年戻った) — **床は通るが高水位で止まる**。
+        let past = NOW - 3 * 365 * 24 * 3600 * 1000;
+        assert!(
+            past > MIN_PLAUSIBLE_EPOCH_MS,
+            "★ 床では止まらない値であること"
+        );
+        let second = write(&d, "gse_o1_20260902_101112.ndjson", OPEN_O1);
+        assert_eq!(
+            close_orphaned_sessions(&d, None, past),
+            OrphanSweep::default(),
+            "⚠️ 時計が戻っているのに閉じた"
+        );
+        assert_eq!(std::fs::read_to_string(&second).unwrap(), OPEN_O1);
+
+        // ★ 時計が直れば拾われる。
+        assert_eq!(close_orphaned_sessions(&d, None, NOW + 1000).closed, 1);
+    }
+
+    /// ⚠️★★ **時計が未来に飛んだ起動でも閉じない**（★ cross-review MEDIUM の fail-silent 対策）。
+    ///
+    /// ★ 未来の `session_end` を書くと `grace_elapsed` が永久に偽になり、
+    /// ⚠️ **静かに提出されないまま固定**する。→ ★ 閉じずに fail-loud で見送る。
+    #[test]
+    fn a_clock_in_the_far_future_closes_nothing() {
+        let d = sweep_dir("future");
+        let p = write(&d, "gse_o1_20260901_101112.ndjson", OPEN_O1);
+        assert_eq!(
+            close_orphaned_sessions(&d, None, MAX_PLAUSIBLE_EPOCH_MS + 1),
+            OrphanSweep::default()
+        );
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), OPEN_O1);
+    }
+
+    /// ⚠️★ **高水位マークは提出経路の走査に掛からない**（★ `gse_` で始まらない）。
+    #[test]
+    fn the_clock_mark_is_never_mistaken_for_a_session() {
+        assert!(!CLOCK_HWM_FILE_NAME.starts_with("gse_"));
+        assert!(!is_o1_session_file_name(CLOCK_HWM_FILE_NAME));
+        assert!(!is_o1_age_file_name(CLOCK_HWM_FILE_NAME));
     }
 }

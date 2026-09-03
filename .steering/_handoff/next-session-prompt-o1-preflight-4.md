@@ -59,7 +59,7 @@ bash Form_O1/o1_form_builder_mutation_test.sh | tail -3      # ★ 同 64 変異
 |---|---|
 | 根拠 | `Form_O1/GSE_O1_Form_Builder.gs:1094` 付近の起票コメント（★ 実装のすぐ上にある） |
 | 危険度 | ⚠️ **HIGH**（★ 配布前に必須） |
-| 状態 | ⚠️ **未対応**（★ 意図的。`.steering/20260903-o1-remaining-highs/decisions.md` 判断 8） |
+| 状態 | ⚠️★★★ **2026-09-03 に研究者判断で「案 C: 運用で回避（コード変更ゼロ）」を採った。** → ★ 決めごとの単一真実源は **`docs/o1-roster-operations.md`**。⚠️ **コードでは塞がっていない**（★ 機械的に強制されない）。詳細は `.steering/20260903-o1-preflight-4/decisions.md` 判断 3 |
 
 ★ 成立条件が 3 つ揃っている:
 1. P-ID は**連番**（`o1NextParticipantId_` = `最大値 + 1`）
@@ -138,7 +138,21 @@ Gate D（★ in-the-wild の 30 日継続率 中央値 **3.3%** [V41]）にそ�
 | ⚠️ **NDJSON の 1 日あたりのサイズ** | ★ ディスクを食い潰さないか。送信 timeout（②）とも直結する |
 
 ⚠️★★ **`experiments/` の規約に従うこと**（`reproducibility-discipline` Skill）。
-★ 測ったら `experiments/<日付>-o1-runtime-cost/` に置き、⚠️ **seed / 環境 / HMM_VERSION を刻む**。
+
+> ★ **2026-09-03（後続セッション）で *器* を作った**: `experiments/20260903-o1-runtime-cost/`
+> （README / SEED / env.md / data.md / notes.md / run.sh / scripts/ / results/）。
+> ⚠️★★★ **実測はまだ 1 秒もしていない。** ★ 研究者が両 OS で 8 時間ずつ回すこと:
+>
+> ```bash
+> bash experiments/20260903-o1-runtime-cost/run.sh with-gse      # ★ GSE 起動中
+> bash experiments/20260903-o1-runtime-cost/run.sh without-gse   # ★ 対照（翌日）
+> python3 experiments/20260903-o1-runtime-cost/scripts/summarize.py
+> ```
+>
+> ★ 判定表（CPU / RSS の傾き / バッテリー増分 / NDJSON サイズ）は README に**先に**書いてある。
+> ⚠️ **測った後に閾値を動かさない。** ★ 閾値は repo に根拠が無い（恣意的）と明記済み。
+> ⚠️ `summarize.py` は **サンプル不足なら 1 指標も PASS にしない**（★ 実装中に自分の測定器の
+> 偽陽性を 1 件見つけて直した箇所）。
 
 ---
 
@@ -163,9 +177,24 @@ Gate D（★ in-the-wild の 30 日継続率 中央値 **3.3%** [V41]）にそ�
 - ⚠️ 被験者から見ると**何も起きていないように見える**（★ 沈黙する失敗）
 - ⚠️ 強制終了が習慣の人ほど**丸ごと欠測**する（★ 母集団に偏りが入る）
 
+> ⚠️★★★ **2026-09-03（後続セッション）で対応済み。** ★ 採ったのは **A'（起動時に *検出時刻* で閉じる）**。
+> 実装は `src-tauri/src/o1.rs` の `close_orphaned_sessions`／配線は `lib.rs` の起動時。
+> ★ **A（最終行の時刻）を採らなかった理由**: ⚠️ 猶予が既に経過済みになり、被験者に消す窓が
+> 1 秒も残らない = ADR-014 判断 3 の根拠 3 が崩れる。A' は窓が**絶対に短くならない**。
+> ⚠️ **下の「未確認」は解消していないが、翻訳されなくても直る実装にした**（★ 下記）。
+> ⚠️★★ **代償**: `session_end` が「最後に記録した時刻」ではなくなるので、
+> `session_start`〜`session_end` を観測窓とみなす下流（★ 実例
+> `experiments/20260819-silence-presence-decomposition/scripts/extract.py:314`）は
+> **実在しない沈黙区間を数える**。★ 判別は `session_end - 最終データ行の t` が異常に大きいこと。
+> ★ 詳細は `.steering/20260903-o1-preflight-4/decisions.md` 判断 2。
+
 #### ⚠️ 未確認（★ 次セッションで確かめること）
 
 - ⚠️★ **OS の正常なシャットダウンでは、アプリに終了シグナルが届いて `session_end` が書かれるのか。**
+  ★ 2026-09-03 の追加調査: ⚠️ **`ExitRequested` / `SIGTERM` / `WM_ENDSESSION` / `ctrlc` の
+  ハンドラは repo に 1 つも無い**（grep 0 件）ので、★ **コード上その経路は存在しない**。
+  ⚠️ ただし tao が `WM_ENDSESSION` を `CloseRequested` に翻訳する可能性は残るので、
+  **実機確認はまだ要る**（★ 危険度の見積もりが変わるだけで、A' の実装は両方を救う）。
   → ★ **Windows と macOS の両方で実機確認が要る**（⚠️ 片方だけ見て一般化しない ——
   memory `windows-only-code-needs-ci`）。
   ⚠️ 届くなら被害は「電源断・強制終了・クラッシュ」に限られ、危険度が 1 段下がる。
@@ -185,7 +214,26 @@ Gate D（★ in-the-wild の 30 日継続率 中央値 **3.3%** [V41]）にそ�
 
 ---
 
-### ⑤ ⚠️★★★ **トレイが「記録していません」と嘘をつく**（★ 新規・未起票・**実在を確認済み**）
+### ⑤ ~~⚠️★★★ **トレイが「記録していません」と嘘をつく**~~ → ⚠️★★★ **訂正: 誤りだった**
+
+> ⚠️★★★ **2026-09-03（後続セッション）で訂正した。★ 以下の主張は誤りである。**
+>
+> ★ **段 2「トレイには生の `session_active` が渡る」が誤り。**
+> `tray.rs:90-99` の `current_state()` が
+> `crate::o1::recording_active(is_o1(), session_active, recording::is_paused())` を通しており、
+> ★ **2026-08-27 の `7a062cc` で既に修正されていた**（⚠️ このメモが書かれた時点で 1 週間前から main にある）。
+> ★ 「使用箇所は grep で 1 件」も誤りで、**実際は 2 件**（`tray.rs:94` / `lib.rs:4067`）。
+>
+> ⚠️ **なぜ間違えたか**: ★ `tray::setup(app.handle(), session_active_for_tray)` という
+> **呼び出し行**を見て「素通しだ」と結論し、⚠️ **受け側を読まなかった**。
+> → ★ 「何が渡されているか」ではなく「**渡されたものが何に使われているか**」を見ること。
+>
+> ★ 併せて確認: ⚠️ `session_active` を素通しで使う消費者は**他に無い**／
+> `HookDown` も **O1 で出る**。⚠️ ただし **overlay の透明窓のクリック奪取は未検証のまま**。
+>
+> ★ 詳細は `.steering/20260903-o1-preflight-4/decisions.md` 判断 1。
+> ⚠️ **以下は「どう間違えたか」の資産として残す。消さない。**
+
 
 ★ 2026-09-03 に**コードを追って確認した**。⚠️ 推測ではない。
 
