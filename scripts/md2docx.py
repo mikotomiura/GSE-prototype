@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import pathlib
 import re
+import shutil
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -129,7 +131,12 @@ def image_display_size(image_path: pathlib.Path) -> tuple[int, int]:
         pixel_height = int.from_bytes(data[20:24], "big")
     else:
         svg = image_path.read_text(encoding="utf-8")
-        viewbox = re.search(r'viewBox="[^"]*\\s([0-9.]+)\\s([0-9.]+)"', svg)
+        # ⚠️★★★ 2026-09-03 修正: 旧 `\\s` は raw string では「バックスラッシュ + s」であり
+        #   空白メタ文字にならない。★ 実 SVG (`viewBox="0 0 1400 410"`) で必ず
+        #   `[NG] SVGのviewBoxが読めない` に落ちていた (実測)。
+        #   ⚠️ 提出文書は `.png` を参照しているので出力は壊れていなかったが、
+        #   `.svg` を直接参照した瞬間にビルドが止まる。→ `\s` へ直す。
+        viewbox = re.search(r'viewBox="[^"]*\s([0-9.]+)\s([0-9.]+)"', svg)
         if not viewbox:
             raise SystemExit(f"[NG] SVGのviewBoxが読めない: {image_path}")
         pixel_width, pixel_height = map(float, viewbox.groups())
@@ -328,7 +335,75 @@ def write_docx(md: str, out: pathlib.Path, base_dir: pathlib.Path, compact: bool
                     raise SystemExit(f"[NG] {out.name} :: {name} が不正な XML: {e}")
 
 
+def selftest() -> int:
+    """★ 出力を目視せずに壊れを検出するための最小の検算。
+
+    ⚠️★★★ なぜ要るか: 2026-09-03 に 2 件の無音の壊れを実測した。
+      (1) `--compact` を落とすと詳細資料が **10 → 15 ページ**になる
+          （★ 余白 `pgMar` と行送り `w:line` だけが変わり、**本文は 1 文字も変わらない**ので
+          差分を見ても気づけない。⚠️ 規約は 10 ページ以内 = 審査対象外になる）。
+      (2) SVG の `viewBox` 正規表現が `\\s`（バックスラッシュ + s）になっており、
+          **`.svg` を渡すと必ず落ちていた**（★ 提出文書は `.png` 参照なので露見しなかった）。
+    """
+    ng = 0
+
+    def check(label: str, ok: bool, detail: str = "") -> None:
+        nonlocal ng
+        if not ok:
+            ng += 1
+            print(f"[NG] {label} {detail}")
+        else:
+            print(f"[ok] {label}")
+
+    # 1) compact / 非 compact で余白と行送りが実際に変わること
+    check("COMPACT_STYLES が行送りを詰める",
+          'w:line="216"' in COMPACT_STYLES and 'w:line="276"' in STYLES,
+          "(compact=216 / 既定=276 を期待)")
+    check("既定スタイルは詰めない", 'w:line="216"' not in STYLES)
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="md2docx-selftest-"))
+    try:
+        md = "# 見出し\n\n本文である。\n"
+        (tmp / "src.md").write_text(md, encoding="utf-8")
+        got = {}
+        for compact in (False, True):
+            out = tmp / (f"compact-{compact}.docx")
+            write_docx(md, out, tmp, compact=compact)
+            with zipfile.ZipFile(out) as z:
+                doc = z.read("word/document.xml").decode("utf-8")
+                sty = z.read("word/styles.xml").decode("utf-8")
+            got[compact] = (re.search(r'<w:pgMar[^/]*/>', doc).group(0),
+                            'w:line="216"' in sty)
+        check("--compact で余白が縮む",
+              'w:top="700"' in got[True][0] and 'w:top="1134"' in got[False][0],
+              f"compact={got[True][0]} / 既定={got[False][0]}")
+        check("--compact で行送りが縮む", got[True][1] and not got[False][1])
+
+        # 2) SVG / PNG の両方から寸法が読めること（アスペクト比が一致すること）
+        figs = pathlib.Path(__file__).resolve().parent.parent / "docs/mitou_submission/figures"
+        pairs = [(p, p.with_suffix(".svg")) for p in sorted(figs.glob("*.png"))
+                 if p.with_suffix(".svg").is_file()]
+        if not pairs:
+            print("[skip] figures/ に .png/.svg の対が無い")
+        for png, svg in pairs:
+            # ⚠️ `image_display_size` は読めないと SystemExit を投げる。
+            #   ★ ここで捕まえないと 1 枚目で打ち切られ、残りの検査が走らない。
+            try:
+                a, b = image_display_size(png), image_display_size(svg)
+            except SystemExit as e:
+                check(f"寸法一致 {png.stem}", False, str(e))
+                continue
+            check(f"寸法一致 {png.stem}", abs(a[1] - b[1]) <= 1, f"png={a} svg={b}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    print("[OK] selftest 通過" if ng == 0 else f"[FAILED] {ng} 件")
+    return 1 if ng else 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
     src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
     text = src.read_text(encoding="utf-8")
     # ★ 実験者向け注記の切り落とし。--from= 以降 / --until= より前 だけを使う。

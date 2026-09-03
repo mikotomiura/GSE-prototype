@@ -6,8 +6,8 @@
   "manual_approval_threshold_lines": 2000,
   "today": {
     "date": "2026-09-03",
-    "tokens_used": 42495,
-    "invocations": 1
+    "tokens_used": 111073,
+    "invocations": 2
   },
   "history": [
     {

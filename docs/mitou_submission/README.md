@@ -88,6 +88,15 @@ for f in docs/mitou_submission/mitou_pptx/*.pptx.md; do
 done
 ```
 
+★ **検算**（★ 再生成の前に回す。⚠️ **下記 2 件の「無音の壊れ」を機械検出する**）:
+
+```bash
+PYTHONUTF8=1 python scripts/md2docx.py --selftest
+```
+
+★ 見るのは **(1) `--compact` が余白と行送りを実際に変えているか (2) 図の寸法が `.png` と `.svg` で一致するか** の 2 点。
+★ **変異体で落ちることを確認済み**（2026-09-03）—— `--compact` の余白を既定へ戻す／`viewBox` の正規表現を旧 `\\s` へ戻す、のどちらでも `[FAILED]` になる。
+
 ### ⚠️★★★ `--compact` を落とすとどうなるか（2026-09-03 実測）
 
 | コマンド | 詳細資料のページ数 |

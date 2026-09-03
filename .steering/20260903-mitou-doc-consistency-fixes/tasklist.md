@@ -56,10 +56,35 @@
 
 ★ **1・2・4 は査読者が一次を引けば即座に露見する型**であり、事実確認を別エージェントに投げた価値はここにあった。
 
+## D. /cross-review の反映 (2026-09-03)
+
+★ **Codex 系統は exit 0 で実行できた**（予算 68,578 tokens・skip なし）。
+⚠️★★★ **ただし `run-codex-review.sh` の固定 PROMPT は「バグ / セキュリティ / テスト / 設計の歪み」の
+4 観点固定で、文書の事実検証・過大主張・SSOT 整合を問うていない。**
+→ ★ Codex の出力は `scripts/md2docx.py` と `.gitignore` にしか触れず、
+**本タスクの主眼（文書の事実検証）は実質 Claude 単独で担った**。★ これは skip ではなくスコープ不一致である。
+
+| # | 指摘 | 出所 | 対応 |
+|---|---|---|---|
+| 1 | ⚠️★★★ **`md2docx.py` の `viewBox` 正規表現が `\s`（バックスラッシュ + s）で、`.svg` を渡すと必ず落ちる** | **両者一致** | ★ **修正した**（`\s` へ）。★ 実測で確認: 修正前は 4 枚とも `[NG]`、修正後は `.png` と寸法完全一致。⚠️ 提出物は `.png` 参照なので出力は壊れていなかった |
+| 2 | 技術設計書 L627 が「中央値は約100ms」「こちらが測った差」のままで、提案書側の訂正が波及していない | Claude | ★ **修正した**。★ コード実測は `Typical Japanese typing: F1=100-130ms` ＋ `at lower bound of typical range` なので、**「典型域の下端に置いた較正値」へ揃えた**。⚠️ 150ms は文献値（[51]）なので「こちらが測った差」から外した |
+| 3 | `references.md` [P160] の gloss が「言語非依存（**日本語話者に効く**）」のまま | Claude | ★ **修正した**。★ 原文逐語は *"regardless of the content and language of the text typed"* であり **実験言語に日本語は含まれない**。⚠️ **この gloss が未踏文書へそのまま流れていた**ので、SSOT 側にも訂正を残した |
+| 4 | 技術設計書 L90「**136万**打鍵の大規模タイピング調査」 | Claude | ★ **修正した**（→ 1億3600万 / 136M）。⚠️ **100 倍の過小**。★ 同じ論文を新規登録した [P269] は正しく 136M と書いており、同一文書内で 100 倍食い違っていた |
+| 5 | `--compact` の退行を守るテストが無い | Codex | ★ **追加した**（`md2docx.py --selftest`）。★ **変異体で落ちることを確認**（余白を既定へ戻す / `viewBox` を旧 `\s` へ戻す、どちらでも `[FAILED]`）。★ README の再生成手順にも入れた |
+| 6 | 画像パス解決に境界チェックが無い（path traversal） | Codex | ⚠️ **却下**。★ 著者本人が書く markdown を処理するローカルビルドツールであり、外部入力の経路が無い |
+| 7 | SVG 埋め込みの Office 互換性 | Codex | ⚠️ **却下**。★ 実参照は全て `.png`（`.svg)` 参照は 0 件・実測）。#1 と同じ「SVG 経路が薄い」の別角度 |
+| 8 | `.tmp/` の gitignore が広すぎる | Codex | ⚠️ **却下**。★ 中身は全て再生成でき、意図的な設計判断（`.gitignore` のコメントに根拠を明記済み） |
+
+★ **独立検証で裏づけが取れたもの**: README 手順で `.docx` 4 本を再生成し、
+コミット済みバイナリと **`cmp` でバイト完全一致**（cross-reviewer が実測）。
+★ `loop_step.rs:314` / `writing.rs:16-36` / ADR-021 D4 / ADR-022 D1・D3・D4・D5 /
+`expression-channel.md:32,543-548` / `intervention.rs:229` は**全て逐語一致**した。
+⚠️ P013 / P014 の生データのみ本 repo からは検証不能（★ 元データは private な gse-dataset 側・既存のデータガバナンスどおり）。
+
 ## C. 完了処理
 
 - [ ] C-1 `/review-changes`（code-reviewer + security-checker 並列）
-- [ ] C-2 `/cross-review`（パス限定。★ 無関係な未コミット変更で fail-closed するため
+- [x] C-2 `/cross-review`（パス限定。★ 無関係な未コミット変更で fail-closed するため
       `-- docs/mitou_submission docs/references.md docs/adr` の形で回す）
 - [ ] C-3 `/finish-task`
 
