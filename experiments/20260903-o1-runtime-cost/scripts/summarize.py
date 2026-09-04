@@ -28,17 +28,32 @@ THRESHOLDS = {
 MIN_SAMPLES = 480
 
 
+def parse_threads(v: str) -> int:
+    """スレッド数。⚠️★★★ macOS の `top` は `#TH` を **`31/1`（総数/実行中）**で出すことがある。
+
+    ★ 2026-09-04 に実測: 880 行中 **21 行**がこの形で、⚠️ 旧実装は `int(float("31/1"))` が
+    ValueError になり **その行を丸ごと捨てていた**（CPU も RSS も一緒に消えた）。
+    → ★ 先頭の数だけ採る。
+    """
+    return int(str(v).split("/")[0] or 0)
+
+
 def load(run: str):
     d = RESULTS / run
     tsv = d / "samples.tsv"
     if not tsv.is_file():
         return None
     rows = []
+    skipped = []
     for i, line in enumerate(tsv.read_text().splitlines()):
         if i == 0 or not line.strip():
             continue
         parts = line.split("\t")
         if len(parts) < 5:
+            # ⚠️★★ **列不足も「捨てた行」に数える。** ★ 2026-09-04 の陽性対照で発覚:
+            #   ValueError だけ数えていたので、⚠️ **列が足りない行は報告に出ないまま消えた**
+            #   （★ 検査を書いたのに、その検査が空回りしていた）。
+            skipped.append(line)
             continue
         try:
             rows.append(
@@ -46,16 +61,22 @@ def load(run: str):
                     "t": int(parts[0]),
                     "cpu": float(parts[1] or 0),
                     "rss_kb": float(parts[2] or 0),
-                    "threads": int(float(parts[3] or 0)),
+                    "threads": parse_threads(parts[3]),
                     "batt": float(parts[4]) if parts[4].strip() else None,
+                    "rss_alt_kb": float(parts[5]) if len(parts) > 5 and parts[5].strip() else None,
                 }
             )
         except ValueError:
+            # ⚠️★★★ **捨てた行を黙って無かったことにしない。**
+            #   ★ 2026-09-04 に実測: `31/1` の 21 行が丸ごと落ち、
+            #   ⚠️ **CPU も RSS も一緒に消えていた**（★ 幸い平均は動かなかったが、
+            #   偏っていたら結論が変わっていた）。→ ★ 数えて報告する。
+            skipped.append(line)
             continue
     meta = {}
     if (d / "meta.json").is_file():
         meta = json.loads((d / "meta.json").read_text())
-    return {"rows": rows, "meta": meta, "dir": d}
+    return {"rows": rows, "meta": meta, "dir": d, "skipped": skipped}
 
 
 def slope_mb_per_h(rows) -> float | None:
@@ -76,13 +97,24 @@ def slope_mb_per_h(rows) -> float | None:
 
 
 def battery_drop_per_8h(rows) -> float | None:
+    """8 時間あたりのバッテリー低下 (pt)。
+
+    ⚠️★★★ **充電中 / AC 運転なら `None`（測れていない）を返す。**
+    ★ 2026-09-04 に実測: AC で回したら 75% → 100% になり、低下が **-25.03** と出て、
+    ⚠️ 判定関数の `value < good` に当たって **`PASS` と表示された** ——
+    ★ 「測っていない」を「合格」と読ませる、まさに本 repo が嫌う型だった。
+    → ⚠️ **低下していない = この条件では測れていない**、と倒す。
+    """
     pts = [(r["t"], r["batt"]) for r in rows if r["batt"] is not None]
     if len(pts) < 2:
         return None
     hours = (pts[-1][0] - pts[0][0]) / 3600.0
     if hours <= 0:
         return None
-    return (pts[0][1] - pts[-1][1]) / hours * 8.0
+    drop = (pts[0][1] - pts[-1][1]) / hours * 8.0
+    if drop <= 0:
+        return None  # ★ 充電中 / 変化なし = 放電を測れていない
+    return drop
 
 
 def ndjson_mb_per_day(run_dir: pathlib.Path) -> float | None:
@@ -127,6 +159,11 @@ def main() -> int:
         return 1
     rows = with_gse["rows"]
     print(f"★ サンプル数: {len(rows)} (最小 {MIN_SAMPLES})")
+    # ⚠️★★ **読めなかった行は必ず出す。** ★ 黙って捨てると「測れた行だけ」で判定してしまう。
+    n_skipped = len(with_gse.get("skipped", []))
+    if n_skipped:
+        print(f"⚠️★★★ 読めずに捨てた行: {n_skipped} 行 —— ★ 原因を確かめること"
+              f"（例: {with_gse['skipped'][0][:70]!r}）")
     # ⚠️★★★ **サンプルが足りないなら 1 指標も PASS にしない。**
     #   ★ 2026-09-03 に自分の測定器で実測した欠陥: 100 サンプルでも個別欄が PASS と出た
     #     (★ 総合が FAIL になったのは *別の理由* で、たまたま隠れていただけである)。

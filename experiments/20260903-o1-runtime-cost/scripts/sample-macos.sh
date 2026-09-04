@@ -13,7 +13,11 @@ while [ "$(date +%s)" -lt "$end" ]; do
     line=$(top -l 2 -pid "$pid" -stats cpu,mem,th -n 1 2>/dev/null | tail -1 || true)
     cpu=$(printf '%s' "$line" | awk '{print $1}')
     mem=$(printf '%s' "$line" | awk '{print $2}')
-    th=$(printf '%s'  "$line" | awk '{print $3}')
+    # ⚠️★★★ macOS の `top` は `#TH` を **`31/1`（総数/実行中）**で出すことがある。
+    #   ★ 2026-09-04 に実測: 880 サンプル中 **21 行**がこの形だった。
+    #   ⚠️ そのまま書くと集計側が数値に変換できず、**その行を丸ごと捨てる**
+    #   （★ CPU も RSS も一緒に消える）。→ ★ 先頭の数だけ採る。
+    th=$(printf '%s'  "$line" | awk '{print $3}' | cut -d/ -f1)
     # ★ top の mem は "123M" / "546M+" 等。
     # ⚠️★★★ **`+` / `-` の接尾辞が付く**（前回サンプルからの増減の印）。
     #   ★ 2026-09-03 に実測: `pid,command` を stats に入れると `546M+` が出た。
