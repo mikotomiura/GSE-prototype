@@ -99,7 +99,7 @@ pub struct ReconcileReport {
 ///
 /// 収束器の起点は 2 本ある (アプリ起動時 / ブロック終了時)。★ 送信が詰まると
 /// 起動時の 1 回が **ブロック 1 本ぶん (5 分) より長く走りうる**
-/// (⚠️ 送信のタイムアウトは 180 秒 × 未送信本数)。そこへブロック終了の 1 回が重なると:
+/// (⚠️ 送信のタイムアウトは 300 秒 × 未送信本数)。そこへブロック終了の 1 回が重なると:
 ///
 /// - 2 つの収束器が **同じ `next_block_number` を読む** (読み取りと `.age` 作成の間に窓がある)
 /// - → ★ **別々の NDJSON に同じブロック番号が付く** (`P012_block01_A.age` と
@@ -176,7 +176,8 @@ impl Drop for ReconcileLock {
 
 /// ロックが残骸とみなされるまでの時間。
 ///
-/// ★ 送信のタイムアウト (180 秒) × 想定される未送信の最大本数 (10 ブロック) を超える値にする。
+/// ★ 送信のタイムアウト (300 秒・2026-09-05 に実測して決定) × 想定される未送信の最大本数
+/// (10 ブロック) を超える値にする。⚠️ タイムアウトを 600 秒にすると 6000 s > 3600 s で**壊れる**。
 /// ⚠️ 短すぎると、正常に走っている収束器のロックを奪って上の衝突を再現してしまう。
 pub const LOCK_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
@@ -686,9 +687,30 @@ pub struct HttpUploader {
 impl HttpUploader {
     pub fn new(cfg: &crate::submission::SubmitConfig) -> Result<Self, String> {
         let client = reqwest::blocking::Client::builder()
-            // 実測は 300 KB で 1.45 s。⚠️ ★ Drive 保存を含む本番 doPost の所要時間は **未実測**
-            // なので、余裕を大きく取る (`gas-measurements.md` §3)。
-            .timeout(std::time::Duration::from_secs(180))
+            // ★ 2026-09-05 に**実測して決めた** (`experiments/20260801-controlled-friction-task/
+            // o1-upload-timeout-measurement.md`)。⚠️ それまでは「Drive 保存を含む所要時間が
+            // 未実測」のまま 180 秒を置いていた。
+            //
+            // ★ 実測 (Drive 保存を含む・合成ランダムバイト・端末 → 本番の受け口):
+            //   | raw    | 本文    | client   | server  |
+            //   |  1 MB  |  1.4 MB |   7.9 s  |  3.5 s  |
+            //   | 12 MB  | 16.0 MB |  37.5 s  | 17.0 s  |
+            //   | 28 MB  | 37.3 MB |  54.5 s  | 28.1 s  |
+            //   | 36 MB  | 48.0 MB |  97.3 s  | 55.9 s  |  ← ★ **通る最大**
+            //   | 40 MB  | 53.3 MB | ⚠️ HTTP 400 (★ Google が doPost の手前で弾く) |
+            //
+            // ⚠️★★★ **`MAX_BYTES = 48 MB` は到達できない。** ★ Apps Script Web App の
+            // HTTP 本文の上限 (実測で 48.0 MB は通り 53.3 MB は 400) が先に効くので、
+            // 送れる `.age` は **約 37 MB まで**である。→ ★ 受け口側の上限を下げる話は別件
+            // (`o1-upload-timeout-measurement.md` の「⚠️ 併せて見つかった欠陥」)。
+            //
+            // ★ 採用: **300 秒固定**。⚠️ 理由は 2 つ:
+            //   1. ★ 通る最大 (36 MB) の実測が 97.3 s なので **約 3 倍**の余裕になる。
+            //      ⚠️ これ以上長くしても、37 MB 超は timeout ではなく **400 で落ちる**ので
+            //      何も買えない (★ 長い timeout が助けるのは「遅い回線」だけ)。
+            //   2. ⚠️ `LOCK_STALE_AFTER >= timeout * 10` の不変条件 (下のテスト) がある。
+            //      ★ 600 秒にすると 6000 s > 3600 s で**壊れる**。300 s なら 3000 s ≤ 3600 s。
+            .timeout(std::time::Duration::from_secs(300))
             .build()
             .map_err(|e| format!("HTTP クライアントを初期化できません: {e}"))?;
         Ok(Self {
@@ -1244,12 +1266,12 @@ mod tests {
     }
 
     /// ⚠️ ★ 猶予を短くすると、走っている収束器のロックを奪って番号衝突を再現してしまう。
-    /// ★ 送信のタイムアウト (180 秒) × 10 ブロックより十分に長いことを固定する。
+    /// ★ 送信のタイムアウト (300 秒) × 10 ブロックより十分に長いことを固定する。
     #[test]
     fn the_stale_threshold_is_longer_than_a_worst_case_run() {
         assert!(
-            LOCK_STALE_AFTER >= std::time::Duration::from_secs(180 * 10),
-            "LOCK_STALE_AFTER が短すぎる (送信タイムアウト 180s × 10 ブロックを超えること)"
+            LOCK_STALE_AFTER >= std::time::Duration::from_secs(300 * 10),
+            "LOCK_STALE_AFTER が短すぎる (送信タイムアウト 300s × 10 ブロックを超えること)"
         );
     }
 
