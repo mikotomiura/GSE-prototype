@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import pathlib
 import sys
@@ -125,27 +126,89 @@ def battery_drop_per_8h(rows) -> float | None:
     return drop
 
 
-def ndjson_mb_per_day(run_dir: pathlib.Path) -> float | None:
-    tsv = run_dir / "ndjson-size.tsv"
-    if not tsv.is_file():
-        return None
-    total = 0
-    n = 0
-    for i, line in enumerate(tsv.read_text().splitlines()):
+def _read_size_tsv(path: pathlib.Path):
+    """name -> (bytes, mtime) を読む。⚠️ 読めない行は捨てずに返す。"""
+    out, bad = {}, []
+    if not path.is_file():
+        return None, bad
+    for i, line in enumerate(path.read_text().splitlines()):
         if i == 0 or not line.strip():
             continue
         parts = line.split("\t")
-        if len(parts) < 2:
+        if len(parts) < 3:
+            bad.append(line)
             continue
         try:
-            total += int(parts[1])
-            n += 1
+            out[parts[0]] = (int(parts[1]), int(parts[2]))
         except ValueError:
-            continue
-    if n == 0:
-        return None
-    # ★ 1 ファイル = 1 日 (ROTATE_AFTER_MS = 24h)。⚠️ 平均を採る。
-    return total / n / (1024 * 1024)
+            bad.append(line)
+    return out, bad
+
+
+def ndjson_mb_per_day(run_dir: pathlib.Path, meta: dict):
+    """NDJSON の 1 日あたりのサイズ。
+
+    ⚠️★★★ **「1 ファイル = 1 日」で平均を採ってはいけない。** ★ 2026-09-05 に実測した欠陥:
+    `ndjson-size.tsv` には**計測と無関係なファイル**も並ぶ（★ 過去のテストセッション 11.05 MB と
+    **1 分のスモーク 0.06 MB**）。⚠️ 3 本の平均は **5.98 MB/日**、★ 実際にこの 8 時間で
+    書かれた量は **20.5 MB/日** —— **3.4 倍の過小評価**だった。
+
+    ⚠️★★★ **2 つめの欠陥（★ 直したつもりが悪化した）**: 「run の窓の中に mtime がある
+    ファイル」で選んだら、⚠️ **1 分のスモークが窓の中に入り、本番のファイルは
+    サイズ採取が 16 秒遅れたせいで窓の外に落ちた** → 0.17 MB/日 と出た。
+    ★ 「窓の中」は選択基準として間違っている。
+
+    → ★ 正しい基準は「**run の終わりに書かれ続けていたファイル**」＝ **mtime が最大**の 1 本。
+    ★ 開始時のスナップショット (`ndjson-size-start.tsv`) があれば **差分**を使う（⚠️ 厳密）。
+    無ければ run の実時間で外挿し、⚠️ **その前提を印字する**。
+    """
+    sizes, bad = _read_size_tsv(run_dir / "ndjson-size.tsv")
+    if not sizes:
+        return None, ["⚠️ ndjson-size.tsv が無い / 読めない → **測れていない**"]
+    started, dur_s = meta.get("started_utc"), meta.get("duration_s")
+    if not started or not dur_s:
+        return None, ["⚠️ meta.json に started_utc / duration_s が無い → 外挿できない"]
+    t0 = int(datetime.datetime.strptime(started, "%Y-%m-%dT%H:%M:%SZ")
+             .replace(tzinfo=datetime.timezone.utc).timestamp())
+    t1 = t0 + int(dur_s)
+    name, (b_end, m_end) = max(sizes.items(), key=lambda kv: kv[1][1])
+    notes = [f"  ★ 採用: {name}（★ mtime が最大 = run の終わりまで書かれていた 1 本）"]
+    for n in sizes:
+        if n != name:
+            notes.append(f"  ⚠️ 除外: {n}")
+    for line in bad:
+        notes.append(f"  ⚠️★★★ 読めなかった行: {line[:70]!r}")
+    # ⚠️★★ **その 1 本が本当に run の終わりのものか確かめる。**
+    #   ★ 猶予はサンプル間隔の 4 倍（サイズ採取はループの後なので必ず少し遅れる）。
+    slack = 4 * int(meta.get("interval_s") or 30)
+    if not (t1 - slack <= m_end <= t1 + slack):
+        notes.insert(0, "⚠️★★★ 最新の NDJSON が run の終端から離れている"
+                        f"（差 {m_end - t1:+d} s）→ **この run のものではない疑い**")
+        return None, notes
+    start_sizes, _ = _read_size_tsv(run_dir / "ndjson-size-start.tsv")
+    hours = (t1 - t0) / 3600.0
+    grown = None
+    if start_sizes is not None and name in start_sizes:
+        grown = b_end - start_sizes[name][0]
+        notes.append(f"  ★ 開始時 {start_sizes[name][0] / 1048576:.2f} MB → 終了時 "
+                     f"{b_end / 1048576:.2f} MB ＝ 増分 {grown / 1048576:.2f} MB / {hours:.2f} h")
+    if hours <= 0:
+        return None, notes
+    if start_sizes is None or name not in start_sizes:
+        # ⚠️★★★ **推定を実測として返さない。**
+        #   ★ 開始時のサイズが無いと「run 中にゼロから書かれた」と仮定するしかないが、
+        #   ⚠️ その仮定は run ごとに真偽が違う —— 実測: 2 回目は真（起動直後に生成）だが、
+        #   1 回目は **稼働 4h15m 後から測った**ので偽で、外挿すると 11.05 → 33.15 MB/日と
+        #   **3 倍に過大評価**する（★ 合格域を外れて MARGINAL とすら出た）。
+        #   → ★ 参考値として印字はするが、**判定には使わない**。
+        notes.append(f"  ⚠️★★★ 開始時のスナップショット (ndjson-size-start.tsv) が無い"
+                     f" → **判定しない**。★ 参考値（run 中にゼロから書かれた前提）: "
+                     f"{b_end / 1048576 / hours * 24.0:.2f} MB/日"
+                     f"（{b_end / 1048576:.2f} MB / {hours:.2f} h）")
+        notes.append("  ★ 前提が真だと**別の一次資料で確かめられる**なら、"
+                     "その根拠ごと notes.md に手で書くこと。")
+        return None, notes
+    return grown / 1048576 / hours * 24.0, notes
 
 
 def energy_report(rows) -> tuple[str, bool]:
@@ -253,12 +316,13 @@ def main() -> int:
     if not enough:
         print("⚠️★★★ サンプルが足りない。**1 指標も判定しない**（★ 短時間の観測で「軽い」と言わない）。")
     cpus = [r["cpu"] for r in rows]
+    nd_val, nd_notes = ndjson_mb_per_day(with_gse["dir"], with_gse["meta"])
     metrics = {
         "cpu_mean_pct": (sum(cpus) / len(cpus)) if cpus else None,
         "cpu_max_pct": max(cpus) if cpus else None,
         "rss_slope_mb_per_h": slope_mb_per_h(rows),
         "rss_final_mb": (rows[-1]["rss_kb"] / 1024.0) if rows else None,
-        "ndjson_mb_per_day": ndjson_mb_per_day(with_gse["dir"]),
+        "ndjson_mb_per_day": nd_val,
     }
     print()
     worst = "PASS"
@@ -269,6 +333,10 @@ def main() -> int:
         print(f"  {k:26s} {shown:>10s}  {v_:<16s} {why}")
         if order[v_] > order[worst]:
             worst = v_
+    # ⚠️★★ **どのファイルを採り、どれを外したかを必ず出す。**
+    #   ★ 黙って混ぜると「1 分のスモーク」が 1 日ぶんとして平均に入る（2026-09-05 に実測）。
+    for line in nd_notes:
+        print(line)
     print()
 
     # ★ 指標 3: エネルギー影響（⚠️ 閾値は置かない = 判定表に載せない）。
