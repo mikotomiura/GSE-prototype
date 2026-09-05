@@ -338,18 +338,65 @@ pub fn init_hook(sender: Sender<InputEvent>) {
 
 /// フックの再設置を要求する (silent death からの復帰・`decisions.md` D-3)。
 ///
-/// ⚠️★★ **新しい復帰経路は書かない。** 既存の「メッセージループを抜けて
-/// ループ先頭で再設置する」経路 (`hook_windows.rs` の `Keyboard hook message loop exited`)
-/// を**起こすだけ**である。★ 経路を増やすと、どれか 1 つが静かに壊れる。
+/// ⚠️★★ **新しい復帰経路は書かない。** 既存の「メッセージループ / run loop を抜けて
+/// ループ先頭で再設置する」経路 (Windows: `Keyboard hook message loop exited` /
+/// macOS: `CGEventTap CFRunLoop exited`) を**起こすだけ**である。
+/// ★ 経路を増やすと、どれか 1 つが静かに壊れる。
 ///
-/// 戻り値: 要求を送れたら `true`。macOS はタップ失効の再作成を自前で持つので `false`。
+/// ⚠️★★★ **2026-09-05 に macOS を実装した。** ★ それまで macOS は**定数 `false`** で、
+/// 「タップ失効の再作成を自前で持つので不要」と書いてあったが、⚠️ **その自前の再作成は
+/// OS が `TapDisabled*` を届けたときにしか動かない**。
+/// ★ 2026-09-04 の 8 時間実測で、打鍵していた 31 分のうち `starve_window` 8 窓 (合計 114 s)
+/// ＋ 120 s 級の欠測ブロック 2 回が出たのに **1 度も再設置されなかった**
+/// (`experiments/20260903-o1-runtime-cost/notes.md`)。
+///
+/// 戻り値: 要求を送れたら `true`。⚠️ フック起動前は `false` (★ 嘘をつかない)。
 pub fn request_reinstall() -> bool {
     #[cfg(target_os = "windows")]
     {
         hook_windows::request_reinstall()
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        hook_macos::request_reinstall()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         false
+    }
+}
+
+/// OS のフックが「有効」と答えるか。★ **診断専用** (⚠️ 判定に使わない)。
+///
+/// ⚠️★★ 目的は「**飢えの機序を 1 回で決着させる**」ことである。★ 2026-09-04 の実測では
+/// 120 s 級の欠測が「tap が disable されていた」のか「イベントが来なかっただけ」なのかを
+/// **区別する記録が無く**、直す対象の機序が決められなかった。
+///
+/// 戻り値: `None` = その OS では答えられない / フックがまだ無い。
+pub fn hook_reports_enabled() -> Option<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        hook_macos::tap_is_enabled()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // ⚠️ Windows の `WH_KEYBOARD_LL` には「有効か」を聞く API が無い
+        //   (★ `UnhookWindowsHookEx` するまで有効という以上のことは分からない)。
+        //   → ★ **答えられないことを `None` で表す** (⚠️ `Some(true)` と偽らない)。
+        None
+    }
+}
+
+/// フック監視スレッド (層 2) が自力で復帰させた累計回数。★ **診断専用**。
+///
+/// ⚠️ macOS 以外は層 2 を持たないので常に 0 (★ 「0 回起きた」ではなく「機構が無い」)。
+pub fn watchdog_recoveries() -> u32 {
+    #[cfg(target_os = "macos")]
+    {
+        hook_macos::watchdog_reenables()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        0
     }
 }
