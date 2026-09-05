@@ -78,9 +78,95 @@ ls ~/.gse/o1_consent_ack                               # ⚠️ **戻してあ�
 | # | 何 | ★ 見積 | ⚠️ 注意 |
 |---|---|---|---|
 | **A** | ⚠️ **起動時の山を 1 秒間隔で測る** | ★ 5 分 | ★ 8 時間の再測は**不要**。`GSE_COST_DURATION_S=300 GSE_COST_INTERVAL_S=1` で 1 本。⚠️ **サンプラを先に起こしてから GSE を起動**する（★ 35 s 間隔では孤児回収の 1.5 秒の山を拾えないと実測済み） |
+| **A2** | ⚠️★★★ **スリープ跨ぎの検証**（★ 下の §2-1 に手順） | ★ 30 分 | ⚠️ **完全な空白である** —— ★ grep で確認: スリープ/復帰を扱うコードは **0 行**。⚠️ しかも 2026-09-04 の計測では**私が意図的に避けた**（★ バッテリー時は 1 分でスリープするので AC に挿してもらった）→ **1 度も試していない**。⚠️ O1 は数日〜数週間ノート PC で回す研究なので、**ここが抜けたまま配るのは危険** |
 | **B** | ★ 未マージ 2 ブランチの処遇 | ★ 30 分 | `feat/phase1-cindex-attainability`（先 3 / 遅れ **172**）・`docs/g1-verdict-and-friction-survey`（先 7 / 遅れ **242**）。⚠️ **遅れが大きいので単純 merge は危険**。★ cherry-pick か作り直しを検討する |
 | **C** | ★ 廃棄してよい 2 ブランチを消す | ★ 5 分 | `docs/handoff-post-pr132`（先 1 / 遅れ 136）・`feature/phase1-reminder-and-dashboard`（先 5 / 遅れ **713**）。⚠️ **消す前に「先」の中身が main にあるか確かめる**（★ memory: 84 関数すべて main にある、は**当時の**確認） |
 | **D** | ★ 引き継ぎ §3 の古い持ち越し | — | 管理シートの死リンク / `validate_blocks.py --dataset` 17 件赤 / Drive の sha256 照合 / 所要時間が 3 通り |
+
+
+### §2-1 ⚠️★★★ スリープ跨ぎの検証（★ A2 の手順）
+
+★ **何を疑うか**（⚠️ 「動いていそう」で済ませない）:
+
+| # | 疑い | ★ なぜ |
+|---|---|---|
+| 1 | ⚠️ **CGEventTap がスリープで失効する** | ★ memory `macos-tap-idle-away-probe-bug`: tap 失効 → `LAST_KEY_MS=0` → **idle/away が壊れ、ランダムプローブが誤発火**した実績がある |
+| 2 | ⚠️ **復帰直後に starvation の誤検知** | ★ 判定は「システムに入力があるのにフックが呼ばれない」。⚠️ 復帰の瞬間は**入力があってフックがまだ立っていない**ので、**構造的に誤検知しやすい** |
+| 3 | ⚠️ **日次ローテートの起点がずれる** | ★ 起点 `O1_LOG_OPENED_MS` は**メモリ上の Atomic**。⚠️ スリープ中も壁時計は進むので、**復帰した瞬間に 24 h を超えている**ことがありうる |
+| 4 | ⚠️ **NDJSON にスリープ中の偽の行が出る / 巨大な穴が開く** | ★ 1Hz ゲートがスリープ中どう振る舞うか未確認 |
+| 5 | ⚠️ **孤児回収が時計の巻き戻りで止まる** | ★ `.o1_clock_hwm` が `now_ms < hwm` で **sweep を拒否**する（`o1.rs:546`）。⚠️ スリープ復帰で時計が同期し直すと巻き戻りうる |
+
+★ **手順**（⚠️ AC に挿したまま・`pmset` は変更しない）:
+
+```bash
+D=experiments/20260903-o1-runtime-cost
+# ① サンプラを先に起こす（★ 起動前の基線を取る）
+nohup bash $D/run.sh with-gse > /dev/null 2>&1 & disown     # ⚠️ 既存 results があれば先に退避
+sleep 60
+# ② GSE をバイナリ直叩きで起動（⚠️ `open -a` は使わない）
+~/Desktop/O1_計測用_macOS/gse-next.app/Contents/MacOS/gse-next &
+sleep 120                                   # ★ 定常になるまで待つ
+# ③ ★ スリープ前の基線を控える
+date +%s; pgrep -x gse-next
+grep -c "" ~/Documents/GSE-sessions/gse-app.log
+ls -l ~/Documents/GSE-sessions/gse_o1_*.ndjson
+# ④ ★ スリープさせる（⚠️ 3 通り試す）
+pmset sleepnow           # (a) 短い: 5 分後に復帰
+#   (b) 長い: 30 分以上（★ standby へ落ちる）  (c) 蓋を閉じる
+```
+
+★ **復帰後に見るもの**（⚠️ 全部見る。1 つでも欠けたら「確かめた」と書かない）:
+
+```bash
+# ★ 1. プロセスは生きているか
+pgrep -x gse-next || echo "⚠️ 落ちている"
+# ★ 2. 復帰直後のログ（⚠️ starvation の誤検知 / tap の失効）
+grep -E "starved_ms|delivering events again|CGEventTap|orphan sweep|rotate"   ~/Documents/GSE-sessions/gse-app.log | tail -20
+#   ⚠️★★★ **`tap_enabled` を見る**（★ 2026-09-05 に入れた診断が初めて役に立つ場面）
+#     Some(false) → tap が disable された（★ 層 2 の担当）
+#     Some(true)  → disable されていないのに飢えている（⚠️ 再有効化では直らない）
+# ★ 3. NDJSON の連続性（⚠️ 中身は読まない・型と時刻だけ）
+python3 - <<'PY2'
+import json, collections, glob, sys
+fs = sorted(glob.glob('/Users/johnd/Documents/GSE-sessions/gse_o1_*.ndjson'))
+if not fs:                                    # ⚠️ 不在: 落とさずに言う
+    sys.exit("⚠️ O1 の NDJSON が 1 本も無い。★ GSE が O1 モードで動いていない。")
+f = fs[-1]
+ts = []; c = collections.Counter(); bad = 0
+for line in open(f, encoding='utf-8', errors='replace'):
+    if not line.strip():
+        continue
+    try:
+        o = json.loads(line)
+    except Exception:                          # ⚠️ 壊れ: 黙って捨てず数える
+        bad += 1; continue
+    c[o.get('type')] += 1
+    t = o.get('t') or o.get('timestamp')
+    if isinstance(t, (int, float)):
+        ts.append(t)
+print("★ 対象:", f.rsplit('/', 1)[-1])
+print("★ 型:", dict(c))
+if bad:
+    print(f"⚠️★★★ JSON として読めなかった行: {bad}")
+ts.sort()
+if len(ts) < 2:
+    sys.exit("⚠️ 時刻を持つ行が 2 行未満 → 穴は測れない（★ 0 と書かない）")
+gaps = [(ts[i] - ts[i-1]) / 1000 for i in range(1, len(ts))]
+print(f"★ 最大の穴: {max(gaps):.0f} 秒  （★ スリープ時間とほぼ一致するはず）")
+print(f"⚠️ 30 秒超の穴: {sum(1 for g in gaps if g > 30)} 個")
+PY2
+# ★ 4. 打鍵が拾えるか（⚠️ 実際に何か打ってから）
+#     → `key` 行が増えること。⚠️ 増えないなら tap が死んでいる
+# ★ 5. サンプラの列（★ スリープ中の行がどうなったか）
+tail -20 $D/results/with-gse/samples.tsv
+```
+
+⚠️ **陰性対照**: ★ 同じ長さだけ**スリープさせずに**放置した区間と比べる
+（⚠️ 「復帰後に starvation が出た」だけでは、**スリープのせいか元々出るのか**が分からない
+—— ★ 2026-09-04 の実測では、**スリープなしでも 120 s 級の DOWN が出ている**）。
+
+★ **判定の書き方**: ⚠️ 「問題なし」と書かない。
+★ 上の 5 項目について **「見た / 見ていない」** と **「期待どおり / 違った」** を分けて書く。
 
 ---
 
