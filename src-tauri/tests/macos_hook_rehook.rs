@@ -14,6 +14,27 @@ use std::time::{Duration, Instant};
 
 use gse_next_lib::input::hook;
 
+/// ⚠️★★★ **skip を「緑」と読ませないための門。**
+///
+/// ★ 2026-09-05 に実測: CI (self-hosted mac) でこの 2 件は **10.5 秒で終わっていた** ——
+/// ★ それは `wait_for_hook(true, 10s)` が空振りして skip した時間である。
+/// ⚠️ しかも `cargo test` は成功したテストの stdout/stderr を**捨てる**ので、
+/// **skip したことがログに残らない**。→ ★ 「CI が緑」を「検証された」と読めてしまう。
+///
+/// → ★ `GSE_REQUIRE_HOOK_TESTS=1` を立てると **skip を失敗に変える**。
+/// ⚠️ 実機で検証したいときは必ずこれを付ける (★ 付けずに緑を見ても何も分かっていない)。
+fn skip_or_fail(reason: &str) {
+    if std::env::var("GSE_REQUIRE_HOOK_TESTS").as_deref() == Ok("1") {
+        panic!(
+            "⚠️ GSE_REQUIRE_HOOK_TESTS=1 なのに検証できなかった: {reason}\n\
+             ★ Input Monitoring / Accessibility をこのプロセスに付与すること。"
+        );
+    }
+    eprintln!(
+        "⚠️ SKIP: {reason}\n         ★ このテストは **何も検証していない**。⚠️ 検証を強制するなら          GSE_REQUIRE_HOOK_TESTS=1 を付けて再実行すること。"
+    );
+}
+
 fn wait_for_hook(active: bool, limit: Duration) -> bool {
     let t0 = Instant::now();
     while t0.elapsed() < limit {
@@ -43,9 +64,8 @@ fn request_reinstall_actually_restarts_the_tap() {
 
     if !wait_for_hook(true, Duration::from_secs(10)) {
         // ⚠️★★★ **権限が無い環境では検証できない。** ★ 緑にせず、理由を出して skip する。
-        eprintln!(
-            "⚠️ SKIP: CGEventTap を作れなかった (Input Monitoring / Accessibility 未付与)。\
-             ★ 層 3 は **検証していない**。"
+        skip_or_fail(
+            "CGEventTap を作れなかった (Input Monitoring / Accessibility 未付与)。層 3 は未検証",
         );
         return;
     }
@@ -91,7 +111,7 @@ fn watchdog_does_not_touch_a_healthy_tap() {
     let (tx, _rx) = crossbeam_channel::unbounded();
     hook::init_hook(tx);
     if !wait_for_hook(true, Duration::from_secs(10)) {
-        eprintln!("⚠️ SKIP: 権限が無く tap を作れない。★ 層 2 は **検証していない**。");
+        skip_or_fail("権限が無く tap を作れない。層 2 は未検証");
         return;
     }
     let before = hook::watchdog_recoveries();
