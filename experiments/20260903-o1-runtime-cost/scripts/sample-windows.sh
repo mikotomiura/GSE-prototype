@@ -28,6 +28,16 @@ while [ "$(date +%s)" -lt "$end" ]; do
   # ⚠️ PowerShell は "cpu<TAB>ws<TAB>th<TAB>priv" を返す。★ battery を 5 列目に差し込む。
   cpu=$(printf '%s' "$row" | cut -f1); ws=$(printf '%s' "$row" | cut -f2)
   th=$(printf '%s' "$row" | cut -f3); priv=$(printf '%s' "$row" | cut -f4)
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$now" "$cpu" "$ws" "$th" "${batt:-}" "$priv"
+  # ⚠️★★★ **8 列で出す。** ★ 2026-09-04 に `run.sh` のヘッダが 8 列
+  #   (`energy_impact` / `ref_energy_impact`) になったのに、⚠️ 本スクリプトは
+  #   **6 列のままだった** —— そのまま 8 時間回すと集計は必ず DataInsufficient になる
+  #   (★ 2026-09-05 に Windows へ渡す直前の点検で発見。macOS 側で踏んだのと同型の欠陥)。
+  #
+  # ⚠️★★ 7・8 列目は **空**にする（★ `0` ではない）。
+  #   ★ Windows には macOS の「エネルギー影響」(`top -stats power`) に相当する
+  #   **プロセス単位の公開指標が無い**。→ ★ **空 = 「この OS では測れない」**、
+  #   ⚠️ `0` = 「測って 0 だった」。★ この 2 つを混ぜると、集計が
+  #   「測定器が壊れている」と誤報告する (`summarize.py` の `energy_report`)。
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t\t\n' "$now" "$cpu" "$ws" "$th" "${batt:-}" "$priv"
   sleep "$INTERVAL_S"
 done
