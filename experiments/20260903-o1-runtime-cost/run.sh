@@ -56,6 +56,11 @@ echo "⚠️ 途中で端末を閉じないこと。★ 結果: $OUT"
 #   → ★ `rss_kb` = その OS の主指標 / `rss_alt_kb` = 対照（定義は env.md）。
 printf 'epoch_s\tcpu_pct\trss_kb\tthreads\tbattery_pct\trss_alt_kb\tenergy_impact\tref_energy_impact\n' > "$OUT/samples.tsv"
 
+# ⚠️★★★ **開始時のサイズを先に採る。** ★ 2026-09-05 の欠陥: 終了時のサイズしか無いと、
+#   run より前から書かれていたファイルを「run 中に書かれた量」と読んでしまう。
+#   ★ 差分が取れれば外挿の前提が要らなくなる。
+bash "$HERE/scripts/ndjson-size.sh" > "$OUT/ndjson-size-start.tsv" || true
+
 bash "$HERE/scripts/sample-$OS.sh" "$DURATION_S" "$INTERVAL_S" >> "$OUT/samples.tsv"
 
 # ★ NDJSON は **バイト数だけ** 記録する (⚠️ 中身は 1 行も読まない・data.md)。

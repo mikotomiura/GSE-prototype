@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import pathlib
 import sys
@@ -15,17 +16,21 @@ HERE = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = HERE / "results"
 
 # ★ README の判定表。⚠️ 測った後に動かさない。
+# ⚠️★★★ **battery_drop_pt_per_8h は入れない。** ★ README が 2026-09-04 に取り下げた
+#   (AC 運転では放電を測れず、対照も原理的に無意味だった)。→ ★ 参考値として印字はするが、
+#   ⚠️ **判定には一切入れない**（★ 閾値表に無い名前を verdict() に渡すと KeyError で落ちる = 気づける）。
 THRESHOLDS = {
     "cpu_mean_pct": (1.0, 3.0),
     "cpu_max_pct": (15.0, 30.0),
     "rss_slope_mb_per_h": (5.0, 20.0),
     "rss_final_mb": (300.0, None),
-    "battery_drop_pt_per_8h": (5.0, 10.0),
     "ndjson_mb_per_day": (30.0, 48.0),
 }
 # ★ 8 時間ぶんを埋めるのに要る最小サンプル数 (間隔 30s の 8h = 960)。
 #   ⚠️ 半分を切ったら「測れていない」とみなす。
 MIN_SAMPLES = 480
+# ★ 起動コストの読み方に添える注意書き用（⚠️ 実効間隔は top を 2 回叩くぶん延びる）。
+INTERVAL_HINT_S = 35
 
 
 def parse_threads(v: str) -> int:
@@ -64,6 +69,10 @@ def load(run: str):
                     "threads": parse_threads(parts[3]),
                     "batt": float(parts[4]) if parts[4].strip() else None,
                     "rss_alt_kb": float(parts[5]) if len(parts) > 5 and parts[5].strip() else None,
+                    # ⚠️★★★ 2026-09-04 (PR #157) で 7・8 列目が増えた。★ 古い 6 列の
+                    #   samples.tsv も読めるようにする（⚠️ 落とすと 1 回目の実測が読めなくなる）。
+                    "energy": float(parts[6]) if len(parts) > 6 and parts[6].strip() else None,
+                    "ref_energy": float(parts[7]) if len(parts) > 7 and parts[7].strip() else None,
                 }
             )
         except ValueError:
@@ -117,27 +126,154 @@ def battery_drop_per_8h(rows) -> float | None:
     return drop
 
 
-def ndjson_mb_per_day(run_dir: pathlib.Path) -> float | None:
-    tsv = run_dir / "ndjson-size.tsv"
-    if not tsv.is_file():
-        return None
-    total = 0
-    n = 0
-    for i, line in enumerate(tsv.read_text().splitlines()):
+def _read_size_tsv(path: pathlib.Path):
+    """name -> (bytes, mtime) を読む。⚠️ 読めない行は捨てずに返す。"""
+    out, bad = {}, []
+    if not path.is_file():
+        return None, bad
+    for i, line in enumerate(path.read_text().splitlines()):
         if i == 0 or not line.strip():
             continue
         parts = line.split("\t")
-        if len(parts) < 2:
+        if len(parts) < 3:
+            bad.append(line)
             continue
         try:
-            total += int(parts[1])
-            n += 1
+            out[parts[0]] = (int(parts[1]), int(parts[2]))
         except ValueError:
-            continue
-    if n == 0:
-        return None
-    # ★ 1 ファイル = 1 日 (ROTATE_AFTER_MS = 24h)。⚠️ 平均を採る。
-    return total / n / (1024 * 1024)
+            bad.append(line)
+    return out, bad
+
+
+def ndjson_mb_per_day(run_dir: pathlib.Path, meta: dict):
+    """NDJSON の 1 日あたりのサイズ。
+
+    ⚠️★★★ **「1 ファイル = 1 日」で平均を採ってはいけない。** ★ 2026-09-05 に実測した欠陥:
+    `ndjson-size.tsv` には**計測と無関係なファイル**も並ぶ（★ 過去のテストセッション 11.05 MB と
+    **1 分のスモーク 0.06 MB**）。⚠️ 3 本の平均は **5.98 MB/日**、★ 実際にこの 8 時間で
+    書かれた量は **20.5 MB/日** —— **3.4 倍の過小評価**だった。
+
+    ⚠️★★★ **2 つめの欠陥（★ 直したつもりが悪化した）**: 「run の窓の中に mtime がある
+    ファイル」で選んだら、⚠️ **1 分のスモークが窓の中に入り、本番のファイルは
+    サイズ採取が 16 秒遅れたせいで窓の外に落ちた** → 0.17 MB/日 と出た。
+    ★ 「窓の中」は選択基準として間違っている。
+
+    → ★ 正しい基準は「**run の終わりに書かれ続けていたファイル**」＝ **mtime が最大**の 1 本。
+    ★ 開始時のスナップショット (`ndjson-size-start.tsv`) があれば **差分**を使う（⚠️ 厳密）。
+    無ければ run の実時間で外挿し、⚠️ **その前提を印字する**。
+    """
+    sizes, bad = _read_size_tsv(run_dir / "ndjson-size.tsv")
+    if not sizes:
+        return None, ["⚠️ ndjson-size.tsv が無い / 読めない → **測れていない**"]
+    started, dur_s = meta.get("started_utc"), meta.get("duration_s")
+    if not started or not dur_s:
+        return None, ["⚠️ meta.json に started_utc / duration_s が無い → 外挿できない"]
+    t0 = int(datetime.datetime.strptime(started, "%Y-%m-%dT%H:%M:%SZ")
+             .replace(tzinfo=datetime.timezone.utc).timestamp())
+    t1 = t0 + int(dur_s)
+    name, (b_end, m_end) = max(sizes.items(), key=lambda kv: kv[1][1])
+    notes = [f"  ★ 採用: {name}（★ mtime が最大 = run の終わりまで書かれていた 1 本）"]
+    for n in sizes:
+        if n != name:
+            notes.append(f"  ⚠️ 除外: {n}")
+    for line in bad:
+        notes.append(f"  ⚠️★★★ 読めなかった行: {line[:70]!r}")
+    # ⚠️★★ **その 1 本が本当に run の終わりのものか確かめる。**
+    #   ★ 猶予はサンプル間隔の 4 倍（サイズ採取はループの後なので必ず少し遅れる）。
+    slack = 4 * int(meta.get("interval_s") or 30)
+    if not (t1 - slack <= m_end <= t1 + slack):
+        notes.insert(0, "⚠️★★★ 最新の NDJSON が run の終端から離れている"
+                        f"（差 {m_end - t1:+d} s）→ **この run のものではない疑い**")
+        return None, notes
+    start_sizes, _ = _read_size_tsv(run_dir / "ndjson-size-start.tsv")
+    hours = (t1 - t0) / 3600.0
+    grown = None
+    if start_sizes is not None and name in start_sizes:
+        grown = b_end - start_sizes[name][0]
+        notes.append(f"  ★ 開始時 {start_sizes[name][0] / 1048576:.2f} MB → 終了時 "
+                     f"{b_end / 1048576:.2f} MB ＝ 増分 {grown / 1048576:.2f} MB / {hours:.2f} h")
+    if hours <= 0:
+        return None, notes
+    if start_sizes is None or name not in start_sizes:
+        # ⚠️★★★ **推定を実測として返さない。**
+        #   ★ 開始時のサイズが無いと「run 中にゼロから書かれた」と仮定するしかないが、
+        #   ⚠️ その仮定は run ごとに真偽が違う —— 実測: 2 回目は真（起動直後に生成）だが、
+        #   1 回目は **稼働 4h15m 後から測った**ので偽で、外挿すると 11.05 → 33.15 MB/日と
+        #   **3 倍に過大評価**する（★ 合格域を外れて MARGINAL とすら出た）。
+        #   → ★ 参考値として印字はするが、**判定には使わない**。
+        notes.append(f"  ⚠️★★★ 開始時のスナップショット (ndjson-size-start.tsv) が無い"
+                     f" → **判定しない**。★ 参考値（run 中にゼロから書かれた前提）: "
+                     f"{b_end / 1048576 / hours * 24.0:.2f} MB/日"
+                     f"（{b_end / 1048576:.2f} MB / {hours:.2f} h）")
+        notes.append("  ★ 前提が真だと**別の一次資料で確かめられる**なら、"
+                     "その根拠ごと notes.md に手で書くこと。")
+        return None, notes
+    return grown / 1048576 / hours * 24.0, notes
+
+
+def energy_report(rows) -> tuple[str, bool]:
+    """★ エネルギー影響 (`top -stats power`)。
+
+    ⚠️★★★ **閾値を置かない。** ★ Apple 内部の無次元の合成指標 (CPU / wakeup / GPU / ディスク) で、
+    ⚠️ ワットでもバッテリー時間でもない。→ ★ **参照プロセス (Finder) との比**で報告するだけにする。
+    戻り値: (印字する文字列, 測れたか)。
+    """
+    pairs = [(r["energy"], r["ref_energy"]) for r in rows
+             if r["energy"] is not None]
+    if not pairs:
+        return ("⚠️★★★ energy_impact の列が無い（★ 2026-09-04 より前の samples.tsv）"
+                " → **エネルギー影響は測れていない**", False)
+    e = [a for a, _ in pairs]
+    if max(e) == 0:
+        return ("⚠️★★★ energy_impact が **全行 0** —— ★ 測定器が壊れている疑い"
+                "（`top -stats power` の列がずれていないか確かめること）", False)
+    e_mean = sum(e) / len(e)
+    e_max = max(e)
+    # ⚠️★★ **参照が 0 の行では比を採らない。** ★ Finder はアイドルだと 0 を返す
+    #   (2026-09-04 のスモークで実測: 4 行中 2 行が 0)。⚠️ 0 で割ると落ちるし、
+    #   0 を混ぜて平均を採ると「参照が小さい = GSE が重い」と読める偽の比が出る。
+    both = [(a, b) for a, b in pairs if b is not None and b > 0]
+    lines = [f"★ エネルギー影響 (⚠️ 無次元・閾値なし): GSE 平均 {e_mean:.2f} / 最大 {e_max:.2f}"]
+    if both:
+        r_mean = sum(b for _, b in both) / len(both)
+        a_mean = sum(a for a, _ in both) / len(both)
+        ratio = (a_mean / r_mean) if r_mean > 0 else None
+        lines.append(f"  ★ 参照 (Finder) が動いていた {len(both)}/{len(pairs)} 行での比較: "
+                     f"GSE {a_mean:.2f} / Finder {r_mean:.2f}"
+                     + (f" ＝ **{ratio:.2f} 倍**" if ratio is not None else ""))
+    else:
+        lines.append("  ⚠️ 参照 (Finder) が全行 0 —— ★ 比は採れない（★ 単独の数値には意味が無い）")
+    lines.append("  ⚠️ 「ワット」「バッテリー何時間ぶん」には**換算できない**。")
+    return ("\n".join(lines), True)
+
+
+def startup_report(all_rows, present_rows, n_head: int = 5) -> tuple[str, bool]:
+    """★ 起動時のコスト。⚠️ 「GSE 不在の行が先頭にある」ことが**測れた条件**である。
+
+    ⚠️★★★ 起動後から測り始めた samples.tsv では**原理的に測れない**（★ 2026-09-04 の 1 回目）。
+    → ★ 基線が無ければ「測れていない」と倒す（⚠️ 黙って定常値を起動値として出さない）。
+    """
+    if not all_rows or not present_rows:
+        return ("⚠️ 行が無い → 起動コストは測れていない", False)
+    n_absent = len(all_rows) - len(present_rows)
+    if n_absent == 0:
+        return ("⚠️★★★ **起動前の基線が無い**（★ 先頭から GSE が居る）"
+                " → **起動時のコストは測れていない**。"
+                "★ 測るならサンプラを先に起こしてから GSE を起動すること。", False)
+    head = present_rows[:n_head]
+    tail = present_rows[n_head:]
+    h_cpu = sum(r["cpu"] for r in head) / len(head)
+    lines = [f"★ 起動時のコスト: 起動前の基線 {n_absent} 行（★ 全列 0 = 計測器の陰性対照）"]
+    lines.append(f"  ★ 起動直後 {len(head)} サンプルの CPU 平均: {h_cpu:.2f} %")
+    if tail:
+        t_cpu = sum(r["cpu"] for r in tail) / len(tail)
+        lines.append(f"  ★ 以降（定常）の CPU 平均: {t_cpu:.2f} %  → 差 {h_cpu - t_cpu:+.2f} pt")
+    h_rss = [r["rss_kb"] / 1024.0 for r in head if r["rss_kb"] > 0]
+    if h_rss:
+        lines.append(f"  ★ 起動直後の RSS: {h_rss[0]:.1f} MB")
+    lines.append(f"  ⚠️ サンプル間隔は約 {INTERVAL_HINT_S} s なので、"
+                 "★ **それより短い山は取りこぼす**（★ 孤児回収の走査を含む）。")
+    return ("\n".join(lines), True)
 
 
 def verdict(name: str, value):
@@ -152,33 +288,41 @@ def verdict(name: str, value):
 
 
 def main() -> int:
-    with_gse = load("with-gse")
-    without = load("without-gse")
+    # ★ run はコマンドラインで選べる（⚠️ 既定は with-gse）。
+    #   ★ 1 回目の実測を退避してあるので、`results/with-gse-20260904-steady` も読めること。
+    run = sys.argv[1] if len(sys.argv) > 1 else "with-gse"
+    with_gse = load(run)
     if with_gse is None:
-        print("⚠️ results/with-gse/samples.tsv が無い。★ まだ測っていない。")
+        print(f"⚠️ results/{run}/samples.tsv が無い。★ まだ測っていない。")
         return 1
-    rows = with_gse["rows"]
-    print(f"★ サンプル数: {len(rows)} (最小 {MIN_SAMPLES})")
+    all_rows = with_gse["rows"]
+    # ⚠️★★★ **GSE 不在の行を判定に混ぜない。** ★ サンプラは GSE が居ないと全列 0 を書く。
+    #   ★ 2026-09-04 の 2 回目は「起動前の基線」を意図して取っているので、
+    #   ⚠️ 混ぜると CPU 平均が**下振れ**し、RSS 最終行が 0 になる。
+    rows = [r for r in all_rows if r["rss_kb"] > 0 or r["threads"] > 0]
+    n_absent = len(all_rows) - len(rows)
+    print(f"★ 対象: results/{run}")
+    print(f"★ サンプル数: {len(rows)} (最小 {MIN_SAMPLES})"
+          + (f"  ＋ GSE 不在の行 {n_absent}（★ 判定から除外）" if n_absent else ""))
     # ⚠️★★ **読めなかった行は必ず出す。** ★ 黙って捨てると「測れた行だけ」で判定してしまう。
     n_skipped = len(with_gse.get("skipped", []))
     if n_skipped:
         print(f"⚠️★★★ 読めずに捨てた行: {n_skipped} 行 —— ★ 原因を確かめること"
               f"（例: {with_gse['skipped'][0][:70]!r}）")
     # ⚠️★★★ **サンプルが足りないなら 1 指標も PASS にしない。**
-    #   ★ 2026-09-03 に自分の測定器で実測した欠陥: 100 サンプルでも個別欄が PASS と出た
-    #     (★ 総合が FAIL になったのは *別の理由* で、たまたま隠れていただけである)。
+    #   ★ 2026-09-03 に自分の測定器で実測した欠陥: 100 サンプルでも個別欄が PASS と出た。
     #   → ⚠️ memory `measurement-instrument-false-positives` と同型。
     enough = len(rows) >= MIN_SAMPLES
     if not enough:
         print("⚠️★★★ サンプルが足りない。**1 指標も判定しない**（★ 短時間の観測で「軽い」と言わない）。")
     cpus = [r["cpu"] for r in rows]
+    nd_val, nd_notes = ndjson_mb_per_day(with_gse["dir"], with_gse["meta"])
     metrics = {
         "cpu_mean_pct": (sum(cpus) / len(cpus)) if cpus else None,
         "cpu_max_pct": max(cpus) if cpus else None,
         "rss_slope_mb_per_h": slope_mb_per_h(rows),
         "rss_final_mb": (rows[-1]["rss_kb"] / 1024.0) if rows else None,
-        "battery_drop_pt_per_8h": battery_drop_per_8h(rows),
-        "ndjson_mb_per_day": ndjson_mb_per_day(with_gse["dir"]),
+        "ndjson_mb_per_day": nd_val,
     }
     print()
     worst = "PASS"
@@ -189,24 +333,38 @@ def main() -> int:
         print(f"  {k:26s} {shown:>10s}  {v_:<16s} {why}")
         if order[v_] > order[worst]:
             worst = v_
+    # ⚠️★★ **どのファイルを採り、どれを外したかを必ず出す。**
+    #   ★ 黙って混ぜると「1 分のスモーク」が 1 日ぶんとして平均に入る（2026-09-05 に実測）。
+    for line in nd_notes:
+        print(line)
     print()
-    # ⚠️★★★ 対照が無ければバッテリーの結論は出せない。
-    if not enough:
-        worst = "DataInsufficient" if worst != "FAIL" else worst
-    if without is None or len(without["rows"]) < MIN_SAMPLES:
-        print("⚠️★★ 対照 (without-gse) が無い/足りない → **バッテリーの増分は判定できない**。")
-        if worst in ("PASS", "MARGINAL"):
-            worst = "DataInsufficient"
-    else:
-        b_with = battery_drop_per_8h(rows)
-        b_without = battery_drop_per_8h(without["rows"])
-        if b_with is not None and b_without is not None:
-            print(f"★ バッテリー消費の増分: {b_with - b_without:.2f} pt/8h "
-                  f"(with={b_with:.2f} / without={b_without:.2f})")
-        else:
-            print("⚠️ バッテリーの値が取れていない → 増分は判定できない。")
-            worst = "DataInsufficient"
+
+    # ★ 指標 3: エネルギー影響（⚠️ 閾値は置かない = 判定表に載せない）。
+    txt, ok_energy = energy_report(rows)
+    print(txt)
     print()
+    # ★ 指標 5: 起動時のコスト。
+    txt, ok_startup = startup_report(all_rows, rows)
+    print(txt)
+    print()
+
+    # ⚠️★★★ バッテリーは **2026-09-04 に指標として取り下げた**（README）。
+    #   ★ 参考値としてだけ印字し、⚠️ **判定 (worst) には一切効かせない**。
+    #   ★ 対照 (without-gse) も同時に廃止した —— ⚠️ CPU / RSS / NDJSON は GSE のプロセスを
+    #   測るので、GSE が居ない条件では全列が 0 になり、対照は原理的に何も足さない。
+    b = battery_drop_per_8h(rows)
+    print("★ バッテリー低下 (参考・⚠️ 2026-09-04 に指標として取り下げ): "
+          + (f"{b:.2f} pt/8h" if b is not None else "— （★ AC 運転 / 変化なし = 放電を測れていない）"))
+    print()
+
+    # ⚠️★★★ **測れていないものがあるなら総合を PASS にしない。**
+    #   ★ 「6 指標中 5 つ実測」を「合格」と読ませないための門である。
+    if not enough and worst != "FAIL":
+        worst = "DataInsufficient"
+    missing = [n for n, ok in (("エネルギー影響", ok_energy), ("起動時のコスト", ok_startup)) if not ok]
+    if missing and worst in ("PASS", "MARGINAL"):
+        print(f"⚠️★★ 未測定が残っている: {' / '.join(missing)} → **総合は PASS にしない**。")
+        worst = "DataInsufficient"
     print(f"総合: {worst}")
     if worst != "PASS":
         print("⚠️ ★ notes.md に、どの指標がなぜ外れたかを書くこと。")

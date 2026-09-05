@@ -4087,6 +4087,7 @@ pub fn run() {
                     //   ★ 本当に死んでいるなら 1 回で直るか直らないかであり、
                     //     繰り返しても得るものが無い。
                     let mut rehook_done_this_episode = false;
+                    let mut rehook_attempts_this_episode: u32 = 0;
                     // ⚠️★ この starvation エピソードで到達した最大値。
                     //   `step()` は復帰した瞬間に 0 へ戻すので、そのまま書くと
                     //   **復帰行が `starved_ms: 0` になり「何秒落ちていたか」が消える**
@@ -4255,15 +4256,27 @@ pub fn run() {
                         crate::input::hook::HOOK_NOT_DELIVERING
                             .store(health == HookHealth::Down, Ordering::Relaxed);
 
-                        // ★ Down になった最初の 1 回だけ、既存の再設置経路を起こす (D-3)。
+                        // ★ Down の間、既存の再設置経路を起こす (D-3)。
+                        //   ⚠️★★★ **2026-09-05 に「1 回で諦める」をやめた。**
+                        //   ★ 旧実装は戻り値に関わらず `= true` で済みにしていたので、
+                        //   ⚠️ macOS (`request_reinstall` が定数 `false`) では
+                        //   **「試したことにして永久に諦める」**動きだった。
+                        //   → ★ 判定は `liveness` の純関数に出した (両 OS でテストする)。
                         let mut rehook = false;
-                        if health == HookHealth::Down && !rehook_done_this_episode {
+                        if liveness::rehook_should_attempt(
+                            health == HookHealth::Down,
+                            rehook_attempts_this_episode,
+                            rehook_done_this_episode,
+                        ) {
+                            rehook_attempts_this_episode += 1;
                             rehook = crate::input::hook::request_reinstall();
-                            rehook_done_this_episode = true;
+                            // ★ **要求が実際に出たときだけ**済みにする。
+                            rehook_done_this_episode = rehook;
                         }
                         // ★ 本物の復帰 (フックが呼ばれた or 計測終了) でエピソードを閉じる。
-                        if starv.starved_ms == 0 {
+                        if liveness::rehook_episode_closed(starv.starved_ms) {
                             rehook_done_this_episode = false;
+                            rehook_attempts_this_episode = 0;
                         }
 
                         // ★ 1Hz で連発しない。状態が変わったとき、または再設置したときだけ記録する。
@@ -4280,9 +4293,23 @@ pub fn run() {
                                 );
                             }
                             HookHealth::Down if prev_health != HookHealth::Down => {
+                                // ⚠️★★★ **機序を 1 回で決着させるための診断** (2026-09-05)。
+                                //   ★ 2026-09-04 の 8 時間実測では、120 s 級の欠測が
+                                //   「tap が disable されていた」のか「イベントが来なかった
+                                //   だけ」なのかを**区別する記録が無かった**。
+                                //   → ★ `tap_enabled` が `Some(false)` なら層 2 の担当、
+                                //     `Some(true)` なら **disable されていないのに飢えている**
+                                //     (⚠️ 再有効化では直らない = 層 3 の担当) と読める。
+                                //   ⚠️ `None` は「その OS では答えられない」であって
+                                //     「無効」ではない。
+                                let tap_enabled =
+                                    crate::input::hook::hook_reports_enabled();
                                 tracing::error!(
                                     starved_ms = starv.starved_ms,
                                     rehook_requested = rehook,
+                                    tap_enabled = ?tap_enabled,
+                                    watchdog_recoveries =
+                                        crate::input::hook::watchdog_recoveries(),
                                     "keyboard hook is NOT delivering events; keystrokes are NOT \
                                      being recorded for this block"
                                 );

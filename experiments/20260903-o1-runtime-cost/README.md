@@ -37,16 +37,35 @@
 
 ## やり方
 
+⚠️★★★ **順序が指標 5（起動時のコスト）を決める。** ★ GSE を起動した *後* から測ると、
+起動コストは**原理的に測れない**（★ 2026-09-04 の 1 回目がそれで、集計は
+「起動前の基線が無い → 測れていない」と倒す）。→ ★ **サンプラを先に起こす。**
+
 ```bash
-# ★ 1. 計測を仕掛ける（★ GSE を起動した後・8 時間以上放置する）
-bash experiments/20260903-o1-runtime-cost/run.sh with-gse
+D=experiments/20260903-o1-runtime-cost
 
-# ★ 2. 翌日、対照（GSE を終了した状態）を同じ時間だけ回す
-bash experiments/20260903-o1-runtime-cost/run.sh without-gse
+# ★ 0. まず 1 分のスモーク（⚠️ GSE を起動した状態で・8 列に実値が出るか確かめる）
+GSE_COST_DURATION_S=60 GSE_COST_INTERVAL_S=10 bash $D/run.sh with-gse
+cat $D/results/with-gse/samples.tsv    # ⚠️ 全部 0 なら測定器が壊れている
+rm -rf $D/results/with-gse             # ★ スモークは捨てる
 
-# ★ 3. まとめる
-python3 experiments/20260903-o1-runtime-cost/scripts/summarize.py
+# ★ 1. GSE を落とし、**サンプラを先に**起こす（★ 起動前の基線を取るため）
+pkill -x gse-next
+nohup bash $D/run.sh with-gse > /dev/null 2>&1 & disown
+#    ★ 1 分ほど待って基線（全列 0）が数行たまってから、次へ
+
+# ★ 2. GSE を **バイナリ直叩き**で起動する
+#    ⚠️★★★ `open -a` では起動しない（★ 2026-09-03 実測: 1 スレッド / 0% / 窓 0 で固まる）
+~/Desktop/O1_計測用_macOS/gse-next.app/Contents/MacOS/gse-next &
+
+# ★ 3. 8 時間後にまとめる（★ 引数で run 名を選べる）
+python3 $D/scripts/summarize.py            # 既定 = with-gse
+python3 $D/scripts/summarize.py with-gse-20260904-steady   # ★ 1 回目の退避ぶん
 ```
+
+⚠️ **AC に挿しておくこと。** ★ 2026-09-04 に実測: バッテリー駆動時の電源設定は
+`sleep 1`（★ アイドル 1 分でシステムスリープ）＋ `lowpowermode 1`（★ CPU スロットル）で、
+⚠️ **8 時間走らせると途中で死ぬ**うえ、1 回目（AC）と条件が食い違う。
 
 ⚠️ Windows は **git-bash** で `run.sh` を叩く（★ 中で PowerShell を呼ぶ）。
 
