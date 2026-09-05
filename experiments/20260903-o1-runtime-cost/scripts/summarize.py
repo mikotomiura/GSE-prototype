@@ -211,7 +211,7 @@ def ndjson_mb_per_day(run_dir: pathlib.Path, meta: dict):
     return grown / 1048576 / hours * 24.0, notes
 
 
-def energy_report(rows) -> tuple[str, bool]:
+def energy_report(rows, meta: dict | None = None) -> tuple[str, bool]:
     """★ エネルギー影響 (`top -stats power`)。
 
     ⚠️★★★ **閾値を置かない。** ★ Apple 内部の無次元の合成指標 (CPU / wakeup / GPU / ディスク) で、
@@ -221,6 +221,16 @@ def energy_report(rows) -> tuple[str, bool]:
     pairs = [(r["energy"], r["ref_energy"]) for r in rows
              if r["energy"] is not None]
     if not pairs:
+        # ⚠️★★ **「列が無い」と「この OS には指標が無い」を混ぜない。**
+        #   ★ 2026-09-05 に Windows へ渡す直前に判明: `sample-windows.sh` は
+        #   7・8 列目を **空**で出す（★ Windows に macOS の「エネルギー影響」に相当する
+        #   プロセス単位の公開指標が無いため）。⚠️ ここで「列が無い（古い samples.tsv）」と
+        #   だけ言うと、**測れないのか壊れているのかが読み手に分からない**。
+        os_name = (meta or {}).get("os", "")
+        if os_name and os_name != "macos":
+            return (f"⚠️ エネルギー影響は **{os_name} では測れない**"
+                    "（★ macOS の `top -stats power` に相当するプロセス単位の公開指標が無い）"
+                    " → ★ **この OS では指標 3 を欠測として扱う**", False)
         return ("⚠️★★★ energy_impact の列が無い（★ 2026-09-04 より前の samples.tsv）"
                 " → **エネルギー影響は測れていない**", False)
     e = [a for a, _ in pairs]
@@ -340,7 +350,7 @@ def main() -> int:
     print()
 
     # ★ 指標 3: エネルギー影響（⚠️ 閾値は置かない = 判定表に載せない）。
-    txt, ok_energy = energy_report(rows)
+    txt, ok_energy = energy_report(rows, with_gse["meta"])
     print(txt)
     print()
     # ★ 指標 5: 起動時のコスト。
