@@ -21,7 +21,7 @@
 - [x] `docs/literature/20260906-*.md` にカード（落合 6 項目）
 - [x] `docs/literature/_index.md` に 1 行追記
 - [x] `PYTHONUTF8=1 python scripts/check_citations.py` を **「違反なし」まで**繰り返す
-- [ ] ★ サーヴェイを **1 コミット**にする（⚠️ 複数ラウンド同居を避ける）
+- [x] ★ サーヴェイを **1 コミット**にする（⚠️ 複数ラウンド同居を避ける）
 
 ## 段 2: ADR-023 の起票
 - [x] `docs/adr/ADR-023-*.md` を新規作成（Context / Decision / Alternatives / Consequences / Migration）
@@ -47,9 +47,9 @@
       | `gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json` | ★ **15 snapshots match** |
       | `emit_schema` → `schema/current.json` の byte-equal 比較 | ★ **差分なし** |
       ★ ドキュメントのみの変更なので想定どおりだが、⚠️ **走らせて確認した**（`verify-before-claiming` ルール 5）。
-- [ ] `code-reviewer` + `security-checker` を **並列**起動
-- [ ] `/cross-review`（⚠️ **パス限定**: `bash scripts/run-codex-review.sh -- docs/adr/ADR-023-*.md .steering/20260906-expression-adr023/`）
-- [ ] ⚠️★★★ **HIGH 指摘を本タスクで消化**（backlog へ punt しない）
+- [x] `code-reviewer` + `security-checker` を **並列**起動
+- [x] `/cross-review`（⚠️ **パス限定**: `bash scripts/run-codex-review.sh -- docs/adr/ADR-023-*.md .steering/20260906-expression-adr023/`）
+- [x] ⚠️★★★ **HIGH 指摘を本タスクで消化**（backlog へ punt しない）
 - [ ] `/finish-task`
 
 ## ⚠️ サーヴェイ後に判断すること（★ 段 1 の結果を見てから）
