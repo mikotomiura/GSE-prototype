@@ -10,6 +10,7 @@
 #![cfg(target_os = "macos")]
 
 use std::sync::atomic::Ordering;
+use std::sync::Once;
 use std::time::{Duration, Instant};
 
 use gse_next_lib::input::hook;
@@ -35,6 +36,23 @@ fn skip_or_fail(reason: &str) {
     );
 }
 
+/// ⚠️★★★ **フックは 1 プロセスに 1 本だけ立てる。**
+///
+/// ★ 2026-09-06 に CI (self-hosted mac) が **SIGSEGV** で落ちた。⚠️ 原因は
+/// 本ファイルの 2 件が**それぞれ `init_hook` を呼んでいた**こと ——
+/// `cargo test` は既定で**並列**に走らせるので、★ **hook スレッドが 2 本**立ち、
+/// ⚠️ `TAP_PORT` の「同一スレッドで時間的に排他」という前提が破れる (UAF)。
+/// → ★ `init_hook` 側にも門を足したが (`hook.rs`)、**テストも 1 回に絞る**。
+static INIT: Once = Once::new();
+fn init_hook_once() {
+    INIT.call_once(|| {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        // ⚠️ 受信端を捨てると channel が閉じるので、★ 意図的に漏らして生かしておく。
+        std::mem::forget(rx);
+        assert!(hook::init_hook(tx), "1 回目は起動するはず");
+    });
+}
+
 fn wait_for_hook(active: bool, limit: Duration) -> bool {
     let t0 = Instant::now();
     while t0.elapsed() < limit {
@@ -48,19 +66,12 @@ fn wait_for_hook(active: bool, limit: Duration) -> bool {
 
 #[test]
 fn request_reinstall_actually_restarts_the_tap() {
-    // ★ フック未起動なら要求は出せない (⚠️ 嘘をつかない)。
-    assert!(
-        !hook::request_reinstall(),
-        "フック起動前は false のはず (★ 要求を出せていない)"
-    );
-    assert_eq!(
-        hook::hook_reports_enabled(),
-        None,
-        "tap が無いのに Some を返してはいけない"
-    );
-
-    let (tx, _rx) = crossbeam_channel::unbounded();
-    hook::init_hook(tx);
+    // ⚠️★★ **「フック未起動なら false」の検査はここに置かない。**
+    //   ★ 2 件が並列に走るので、⚠️ **もう一方が先にフックを立てていると偽の赤になる**
+    //   (= 順序に依存する検査)。→ ★ その契約は
+    //   `input::liveness::tests::request_reinstall_is_callable_without_a_hook` が
+    //   **両 OS で**見ている (⚠️ 単体テストは 1 プロセス 1 テストなので順序に依存しない)。
+    init_hook_once();
 
     if !wait_for_hook(true, Duration::from_secs(10)) {
         // ⚠️★★★ **権限が無い環境では検証できない。** ★ 緑にせず、理由を出して skip する。
@@ -108,8 +119,7 @@ fn request_reinstall_actually_restarts_the_tap() {
 /// → ★ 数周期ぶん回して、再有効化が **1 回も起きない**ことを確かめる。
 #[test]
 fn watchdog_does_not_touch_a_healthy_tap() {
-    let (tx, _rx) = crossbeam_channel::unbounded();
-    hook::init_hook(tx);
+    init_hook_once();
     if !wait_for_hook(true, Duration::from_secs(10)) {
         skip_or_fail("権限が無く tap を作れない。層 2 は未検証");
         return;
@@ -126,5 +136,24 @@ fn watchdog_does_not_touch_a_healthy_tap() {
         hook::watchdog_recoveries(),
         before,
         "⚠️ 健全な tap を watchdog が触っている (★ 誤判定 = starvation より質が悪い)"
+    );
+}
+
+/// ⚠️★★★ **`init_hook` の門が効いているか**（★ 2026-09-06 の SIGSEGV の再発防止）。
+///
+/// ★ 2 回目の呼び出しが `false` を返し、**hook スレッドを 2 本目にしない**こと。
+/// ⚠️ これが破れると `TAP_PORT` の「同一スレッドで時間的に排他」が成り立たず、
+/// ★ CI が **SIGSEGV** で落ちる（2026-09-06 に実際に落ちた）。
+///
+/// ⚠️ **この検査は macOS でしか実行していない。** ★ 門は `hook.rs` の共有コードなので
+/// Windows でも同じものが走るが、⚠️ **Windows 実機での実行は未検証**である。
+#[test]
+fn init_hook_refuses_to_start_a_second_hook() {
+    init_hook_once();
+    let (tx, rx) = crossbeam_channel::unbounded();
+    std::mem::forget(rx);
+    assert!(
+        !hook::init_hook(tx),
+        "⚠️ 2 回目の init_hook が true を返した = hook スレッドが 2 本立つ (★ UAF の入口)"
     );
 }

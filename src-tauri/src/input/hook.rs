@@ -324,9 +324,36 @@ mod hook_windows;
 #[path = "hook_macos.rs"]
 mod hook_macos;
 
+/// フックが既に起動しているか。⚠️★★★ **2 本目を立てさせないための門**である。
+static HOOK_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Install the platform-specific keyboard hook and begin delivering InputEvents to `sender`.
 /// Spawns a dedicated background thread; returns immediately.
-pub fn init_hook(sender: Sender<InputEvent>) {
+///
+/// ⚠️★★★ **2 回目以降は何もしない。** ★ 2026-09-06 に CI (self-hosted mac) が
+/// **SIGSEGV** で落ちて分かった: `hook_macos::start()` は無条件に `thread::spawn` するので、
+/// 2 回呼ぶと **hook スレッドが 2 本**立つ。
+/// ⚠️ すると `TAP_PORT` の安全性の根拠 —— 「書き込み (本体) と読み出し (callback) は
+/// **同一 hook スレッド**上で起き、**時間的に排他**」(`hook_macos.rs` の doc) —— が**破れる**。
+/// ★ 2 本目が `TAP_PORT` を上書きし、1 本目が `run_current` を抜けて null クリアする、
+/// といった順序が起きうるので、⚠️ **解放済みの port を触りうる** (UAF)。
+///
+/// ★ 本番の呼び出しは `lib.rs` の 1 か所だけ（★ grep で確認）なので実害は無かったが、
+/// ⚠️ **不変条件が「呼び出し規約」でしか守られていなかった**。→ ★ 門にした。
+///
+/// 戻り値: 実際に起動したら `true`。⚠️ 既に起動済みなら `false`（★ 何もしていない）。
+pub fn init_hook(sender: Sender<InputEvent>) -> bool {
+    use std::sync::atomic::Ordering;
+    if HOOK_STARTED
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        // ⚠️ 黙って無視しない（★ 「呼んだのに動いていない」を見えるようにする）。
+        tracing::warn!(
+            "init_hook called twice; the second call does nothing (hook already running)"
+        );
+        return false;
+    }
     let _ = EVENT_SENDER.set(sender);
 
     #[cfg(target_os = "windows")]
@@ -334,6 +361,8 @@ pub fn init_hook(sender: Sender<InputEvent>) {
 
     #[cfg(target_os = "macos")]
     hook_macos::start();
+
+    true
 }
 
 /// フックの再設置を要求する (silent death からの復帰・`decisions.md` D-3)。
