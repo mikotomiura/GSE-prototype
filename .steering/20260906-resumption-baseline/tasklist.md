@@ -37,13 +37,43 @@
 
 ## 検証
 - [x] `--selftest` を 3 状態（正常 / 不在 / 壊れている）で通す
-- [ ] `PYTHONUTF8=1 python scripts/check_citations.py` を「違反なし」まで回す
-- [ ] ★ 「研究名・著者名・年が本文に出ているのに `[Pn]` が無い箇所」を目視で洗う
+- [x] `PYTHONUTF8=1 python scripts/check_citations.py` を「違反なし」まで回す
+- [x] ★ 「研究名・著者名・年が本文に出ているのに `[Pn]` が無い箇所」を目視で洗う（★ 該当 0）
 
 ## レビュー
-- [ ] `code-reviewer` + `security-checker` を**並列**起動
-- [ ] `/cross-review`（★ **コミット後**にパス限定で回す）
-- [ ] HIGH 指摘への対応（⚠️★★★ backlog へ punt しない）
+- [x] `code-reviewer` + `security-checker` を**並列**起動
+- [x] `/cross-review`（★ コミット後にパス限定で回した・指摘 5 件）
+- [x] HIGH 指摘への対応（⚠️★★★ backlog へ punt しない）
 
 ## 完了
-- [ ] `/finish-task`
+- [x] `/finish-task`
+
+## レビュー結果の消化（★ 全件この タスク内で消化した）
+
+| 出所 | 件数 | 消化 |
+|---|---|---|
+| `code-reviewer` | HIGH **2** / MEDIUM **7** / LOW 8 | ★ HIGH・MEDIUM **全件**。LOW は 2 件（絶対パス / gloss の留保） |
+| `security-checker` | HIGH **2** / LOW 1 | ★ **全件** |
+| `/cross-review`（Codex） | 中 **3** / 低 1 / テスト不足 1 | ★ **全件** |
+
+### ⚠️★★★ 系統を分けた意味があった（★ 3 系統が別々の型を見つけた）
+
+- **`code-reviewer` だけが見つけた**: `set -e` 下で `RC=$?` に到達しない silent failure ／
+  検算が赤のとき `metrics.json` を黙って上書きする ／ `AWAY_IDLE_MS` の手写しに検査が無い
+- **`security-checker` だけが見つけた**: ⚠️★★★ **`file_id` は不可逆ではない**
+  （`sha256(ファイル名)[:8]` を **76/76 総当たりで復元された**）／実セッションファイル名の混入
+- **Codex だけが見つけた**: ⚠️ **ソートが元順の異常を隠す** ／ p90 の定義 ／
+  畳み込みの**時間的**不変条件が無い
+
+★ 前セッションの教訓「独立レビューは系統を分ける意味がある」が、本タスクでも再現した。
+
+## ⚠️ 本タスクの範囲外として残したこと（★ 研究者へ申し送り）
+
+1. ⚠️★★★ **`scripts/capabilities_gate.py` の `file_id` は不可逆ではない。**
+   ★ `experiments/_template/README.md:57-61` は逐語で「**不可逆な `file_id`**」と約束しているが、
+   **32bit 切り詰め ＋ ソルト無し ＋ 低エントロピー入力**（擬似 ID ＋ 秒単位の日時）なので
+   **総当たりで戻る**（★ レビューが 76/76 を数分で復元した）。
+   → ★ 本タスクでは **自分の `results/capabilities.json` から `files[]` を落とす**ことで塞いだ。
+   ⚠️ **repo 全体の是正（ソルト付きハッシュにする / 約束の文言を直す）は別タスク**である。
+   ★ 幸い **`capabilities.json` を既にコミットしている実験は 1 つも無い**（★ 実測）。
+2. ⚠️ **M1 の Step 2b（アウトカム本解析）は未実装**（★ `arm1/notes.md` §7 の限界を読んでから）。
