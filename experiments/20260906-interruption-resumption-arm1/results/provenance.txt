@@ -1,6 +1,6 @@
 hmm_version_current_code=0.5.0
 away_idle_ms=180000  (Rust と Python の一致を検査済み)
 probe_sha256=bae13d762054855548a3880f283ebdfdd4c312e05360ad65b39dc97fa6d655eb
-git_head=731b4d6
-git_dirty=33 件の未コミット変更
+git_head=df54f94
+git_dirty=27 件の未コミット変更
 seed=N/A (乱数要素なし)

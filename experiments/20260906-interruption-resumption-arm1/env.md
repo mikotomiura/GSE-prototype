@@ -23,3 +23,14 @@
 ```bash
 GSE_DATASET=C:/gse-dataset bash experiments/20260906-interruption-resumption-arm1/run.sh
 ```
+
+## ⚠️ `results/provenance.txt` は再実行のたびに変わる
+
+★ `git_head` / `git_dirty` を刻むので、**コミットするたびに差分が出る**。
+⚠️ **これは結果が不安定なのではない** —— ★ `results/feasibility.json` と
+`results/capabilities.json` は同じ入力に対して **byte 一致**する（★ 実測）。
+
+⚠️★★★ **`git_dirty` の件数は本タスクの未完了分ではない。**
+★ 本リポジトリの作業ツリーには**別タスク**（未踏提出資料・設計スライド）の
+未コミット変更が同居している。→ ★ 本アームの担当分だけを見るときは
+`git status --porcelain experiments/20260906-interruption-resumption-arm1` を使う。
