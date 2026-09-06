@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import math
 import re
 import statistics
 import sys
@@ -39,6 +40,19 @@ RECOVERY_WINDOW_MS = 5 * 60 * 1000
 PID = re.compile(r"^(P\d+)")
 
 
+def percentile_nearest_rank(values: list[int], q: float) -> int:
+    """nearest-rank パーセンタイル（★ 定義を 1 つに固定する）。
+
+    ⚠️ `sorted(v)[int(q*n)]` は小標本で最大値に張り付く（★ n=10 なら index 9 = 最大）。
+    ★ ここでは **ceil(q*n) 番目（1 始まり）** と定義し、`p90_definition` に書き出す。
+    """
+    if not values:
+        raise ValueError("空列のパーセンタイルは定義しない")
+    ordered = sorted(values)
+    rank = max(1, math.ceil(q * len(ordered)))
+    return ordered[rank - 1]
+
+
 def participant_of(path: Path) -> str:
     m = PID.match(path.name)
     if m:
@@ -59,6 +73,11 @@ def scan(root: Path) -> dict:
     n_paste_lines = 0
     n_malformed = 0            # ⚠️ 壊れた行 (code-reviewer M-5)
     n_boundary_crossing = 0    # ⚠️ セッション境界を跨いだ gap (code-reviewer M-6)
+    # ⚠️★★★ ソートは「元の順序の異常」を**見えなくする** (cross-review 2)。
+    #   ★ clock reset / 複数論理セッションの混在は偽の離席候補を作りうるので、
+    #     **元順のまま**単調性を検査し、境界を持たないファイルも数える。
+    n_nonmonotonic_keys = 0
+    n_files_without_boundary = 0
 
     for path in files:
         pid = participant_of(path)
@@ -97,6 +116,10 @@ def scan(root: Path) -> dict:
                 elif kind == "paste":
                     pastes.append(int(ts))
                     n_paste_lines += 1
+        # ★ ソートする前に、元順の単調性を検査する
+        n_nonmonotonic_keys += sum(1 for a, b in zip(keys, keys[1:]) if b < a)
+        if not boundaries:
+            n_files_without_boundary += 1
         keys.sort()
         pastes.sort()
         boundaries.sort()
@@ -116,6 +139,8 @@ def scan(root: Path) -> dict:
         "files": files, "per_pid_events": per_pid_events, "per_pid_files": per_pid_files,
         "gaps": gaps, "receipt_after": receipt_after, "n_paste_lines": n_paste_lines,
         "n_malformed": n_malformed, "n_boundary": n_boundary_crossing,
+        "n_nonmonotonic_keys": n_nonmonotonic_keys,
+        "n_files_without_boundary": n_files_without_boundary,
         "n_events": len(gaps),
     }
 
@@ -162,6 +187,40 @@ def selftest() -> int:
         print(f"  [2] 境界を跨ぐ 200s gap    -> events={r2['n_events']} boundary={r2['n_boundary']} "
               f"{'PASS' if ok2 else 'FAIL (ガードが空回り)'}")
         failures += 0 if ok2 else 1
+
+        # (2b) ⚠️ 境界が gap の**端**と同時刻のときは跨いでいないので除外しない
+        #      (★ `a < t < b` の狭義不等号が効いているか。cross-review 5)
+        write(root, "a.ndjson", [
+            {"type": "key", "t": 1_000_000},
+            {"type": "session_start", "t": 1_000_000},
+            {"type": "key", "t": 1_200_000},
+        ])
+        r2b = scan(Path(td))
+        ok2b = r2b["n_events"] == 1 and r2b["n_boundary"] == 0
+        print(f"  [2b] 境界が gap の端と同時刻 -> events={r2b['n_events']} boundary={r2b['n_boundary']} "
+              f"{'PASS' if ok2b else 'FAIL'}")
+        failures += 0 if ok2b else 1
+
+        # (2c) ⚠️★★★ 元順が単調でない (clock reset) ことを**見逃していないか**
+        #      ★ ソートすると異常が消えるので、元順で数えているかを確かめる。
+        write(root, "a.ndjson", [
+            {"type": "key", "t": 2_000_000},
+            {"type": "key", "t": 1_000_000},   # ⚠️ 逆行
+        ])
+        r2c = scan(Path(td))
+        ok2c = r2c["n_nonmonotonic_keys"] == 1 and r2c["n_files_without_boundary"] == 1
+        print(f"  [2c] 逆行する timestamp     -> nonmonotonic={r2c['n_nonmonotonic_keys']} "
+              f"no_boundary={r2c['n_files_without_boundary']} "
+              f"{'PASS' if ok2c else 'FAIL (ソートが異常を隠している)'}")
+        failures += 0 if ok2c else 1
+
+        # (2d) ★ p90 の定義: n=10 で最大値に張り付かないこと (cross-review 1)
+        vals = list(range(1, 11))          # 1..10
+        got = percentile_nearest_rank(vals, 0.90)
+        ok2d = got == 9                     # ceil(0.9*10)=9 -> 9 番目 = 9
+        print(f"  [2d] p90(1..10)             -> {got} (期待 9) "
+              f"{'PASS' if ok2d else 'FAIL'}")
+        failures += 0 if ok2d else 1
 
         # (3) 壊れた行を黙って捨てていないか
         with (root / "a.ndjson").open("a", encoding="utf-8") as fh:
@@ -212,6 +271,9 @@ def main() -> int:
             "files_per_participant": dict(sorted(per_pid_files.items())),
             "paste_lines_total": n_paste_lines,
             "malformed_lines": n_malformed,
+            # ⚠️ 元順が単調でないファイルがあると、ソート後の gap は偽の離席候補になりうる
+            "nonmonotonic_key_pairs": res["n_nonmonotonic_keys"],
+            "files_without_session_boundary": res["n_files_without_boundary"],
         },
         "resumption_events": {
             "n": n,
@@ -220,7 +282,10 @@ def main() -> int:
             "excluded_boundary_crossing": n_boundary_crossing,
             "gap_seconds": {
                 "median": round(statistics.median(gaps) / 1000, 1) if gaps else None,
-                "p90": round(sorted(gaps)[int(0.9 * n)] / 1000, 1) if n else None,
+                # ⚠️ `sorted(g)[int(0.9*n)]` は標準的な percentile と一致せず、
+                #   小標本で p90 が最大値に張り付く (cross-review 1)。→ ★ nearest-rank に明示。
+                "p90": round(percentile_nearest_rank(gaps, 0.90) / 1000, 1) if n else None,
+                "p90_definition": "nearest-rank (ceil(0.90*n) 番目・1 始まり)",
                 "max": round(max(gaps) / 1000, 1) if gaps else None,
             },
         },

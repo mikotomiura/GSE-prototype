@@ -78,8 +78,26 @@ GOT="$(sha256_of "$PKG")"
 }
 
 if [ ! -f "$ROWDATA" ]; then
-  PYTHONUTF8=1 "$PY" -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" \
-    "$PKG" "$RAW_DIR"
+  # ⚠️ SHA-256 が一致した zip しか通らないので実害は無いが、★ 本ディレクトリは
+  #   experiments のひな型として複製されうるので **Zip Slip 耐性のある展開**にしておく
+  #   (cross-review 4)。
+  PYTHONUTF8=1 "$PY" - "$PKG" "$RAW_DIR" <<'PYEOF'
+import sys, zipfile
+from pathlib import Path
+pkg, dest = Path(sys.argv[1]), Path(sys.argv[2]).resolve()
+with zipfile.ZipFile(pkg) as zf:
+    for info in zf.infolist():
+        target = (dest / info.filename).resolve()
+        # ★ 展開先が dest の外へ出る名前 (`../` / 絶対パス) を拒否する
+        if not str(target).startswith(str(dest)):
+            raise SystemExit(f"⚠️★★★ zip 内に危険なパスがある: {info.filename}")
+        if info.is_dir():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with zf.open(info) as src, target.open("wb") as out:
+            out.write(src.read())
+print("展開 OK (Zip Slip 検査つき)")
+PYEOF
 fi
 [ -f "$ROWDATA" ] || {
   echo "⚠️ zip は正しいのに rowData.json が展開されていない: $ROWDATA" >&2; exit 1; }

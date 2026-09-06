@@ -89,6 +89,14 @@
         "note": ""
       },
       {
+        "name": "時間的に矛盾した畳み込み",
+        "observed": 0,
+        "expected": 0,
+        "tolerance": 0,
+        "ok": true,
+        "note": "★ 中断 block の終わり <= 再開 block の始まり (cross-review 3)"
+      },
+      {
         "name": "参照回数の下限",
         "observed": 0,
         "expected": 0,
@@ -141,6 +149,7 @@
       "merge_max_pending_depth": 1,
       "merge_orphan_resume_blocks": 0,
       "merge_unresumed_interrupted": 0,
+      "merge_temporal_violations": 0,
       "ext_freq_min": 0,
       "ext_freq_max": 16,
       "ext_freq_avg": 0.651685393258427,

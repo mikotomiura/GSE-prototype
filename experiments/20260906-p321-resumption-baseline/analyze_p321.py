@@ -123,6 +123,9 @@ def build_episodes(sessions: list, diag: dict | None = None) -> list[dict]:
     diag.setdefault("max_pending_depth", 0)   # ★ 同時に開いた episode の最大数
     diag.setdefault("orphan_resume_blocks", 0)  # ⚠️ DF7 なのに畳む先が無かった block
     diag.setdefault("unresumed_interrupted", 0)  # ⚠️ DF4 で終わったまま再開されなかった episode
+    # ⚠️★★★ 件数だけ合っていても、**時間的に矛盾した畳み方**は通ってしまう (cross-review 3)。
+    #   → ★ 「続き」は直前の block より後に始まる、という不変条件を検査する。
+    diag.setdefault("temporal_violations", 0)
 
     episodes: list[dict] = []
     for sess in sessions:
@@ -143,6 +146,10 @@ def build_episodes(sessions: list, diag: dict | None = None) -> list[dict]:
             }
             if DF_START_RESUME in codes and pending:
                 episode = pending.pop()
+                prev = episode["blocks"][-1]
+                # ★ 不変条件: 中断された block の終わり <= 再開 block の始まり
+                if prev["end"] > block["start"]:
+                    diag["temporal_violations"] += 1
                 episode["blocks"].append(block)
             else:
                 if DF_START_RESUME in codes:
@@ -258,6 +265,8 @@ def check_A(episodes: list[dict], diag: dict | None = None) -> tuple[list[dict],
                  note="★ 1 ならば LIFO/FIFO は同値 (config.yaml `merge_order: lifo` の前提)"),
             _chk("畳む先が無い DF7 block", diag["orphan_resume_blocks"], 0, 0),
             _chk("再開されなかった DF4 episode", diag["unresumed_interrupted"], 0, 0),
+            _chk("時間的に矛盾した畳み込み", diag["temporal_violations"], 0, 0,
+                 note="★ 中断 block の終わり <= 再開 block の始まり (cross-review 3)"),
         ]
     return checks, observed
 
