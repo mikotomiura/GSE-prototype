@@ -1,0 +1,37 @@
+{
+  "verdicts": [
+    {
+      "line_type": "key",
+      "verdict": "PRESENT",
+      "rows": 384095,
+      "declared_as": [
+        "<legacy>"
+      ],
+      "note": "⚠️ capabilities を持たない旧ログだが、行は実在する。★ ただし『無い場合』の解釈はこのコホートではできない"
+    },
+    {
+      "line_type": "feat",
+      "verdict": "PRESENT",
+      "rows": 188094,
+      "declared_as": [
+        "<legacy>"
+      ],
+      "note": "⚠️ capabilities を持たない旧ログだが、行は実在する。★ ただし『無い場合』の解釈はこのコホートではできない"
+    },
+    {
+      "line_type": "paste",
+      "verdict": "PRESENT",
+      "rows": 847,
+      "declared_as": [
+        "<legacy>"
+      ],
+      "note": "⚠️ capabilities を持たない旧ログだが、行は実在する。★ ただし『無い場合』の解釈はこのコホートではできない"
+    }
+  ],
+  "files_summary": {
+    "n_files": 76,
+    "n_declaring_capabilities": 0,
+    "malformed_lines_total": 0,
+    "note": "⚠️ file_id は sha256(ファイル名)[:8] で不可逆ではないため、個別の files[] はコミットしない (security-checker HIGH-2)"
+  }
+}

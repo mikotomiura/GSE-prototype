@@ -1,0 +1,8 @@
+p321_version=arXiv:2105.02162v1
+figshare_article=14068802
+figshare_file=26553647
+package_sha256=6f506cba88ef30a7027b367967a6d92628c84e90d80b4a1a343190e1083d04b2
+rowdata_sha256=497df0b4da398c39cc0fd8b28544d4ac1d61c728708f4f9cdaa32469acda78b9
+analyze_sha256=ba94e2b165c85920ba2021df5220c5c441b362d12d33486451edd1a67e19af63
+hmm_version=N/A (本実験は HMM を通さない)
+seed=N/A (乱数要素なし)
