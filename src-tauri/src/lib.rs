@@ -3849,7 +3849,7 @@ pub fn run() {
             input::ime::spawn_cloak_resolver_thread();
 
             // キーボードフック開始 (set_poll_wake_sender の後に呼ぶこと)
-            input::hook::init_hook(hook_tx);
+            let _hook_started = input::hook::init_hook(hook_tx);
 
             // ── ⚠️★★★ O1 (R3-a): 非打鍵チャネル (ADR-014 D4 の段 1) ──────────────
             //
