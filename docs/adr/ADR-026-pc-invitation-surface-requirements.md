@@ -8,7 +8,7 @@
   **ADR-023**（§Migration M5 = `A16` 予約）／ **ADR-025**（D1 / D2）
 - **一次の実測**: `.steering/20260907-pc-invitation-surface/decisions.md` の **F1–F13**
 - **サーヴェイ**: `docs/literature/20260907-pc-invitation-surface-and-peripheral-cost.md`
-  （★ 5 angle 並列・新規登録 **[P341]–[P356]** / **[V145]**）
+  （★ 5 angle 並列・新規登録 **[P341]–[P356]** / **[V145]**。⚠️★★★ **うち `provisional` は 3 本**（**[P347]** / **[P354]** / **[P356]**）で、★ **[P356] は「根拠に使ってはならない」と明記して登録した**（★ **[P92]** と同じ扱い）→ §Consequences 代償 8）
 
 ---
 
