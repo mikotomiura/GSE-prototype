@@ -27,8 +27,8 @@ use crate::analysis::intervention::{
 };
 use crate::analysis::loop_step::FeatSnapshot;
 use crate::analysis::metrics::{
-    compute_recovered_at, LabelClass, RangeLabel, UserLabelEvent, DEFAULT_P_FLOW_THRESHOLD,
-    DEFAULT_RECOVERY_WINDOW_MS,
+    compute_pflow_exit_at, LabelClass, RangeLabel, UserLabelEvent, DEFAULT_PFLOW_EXIT_WINDOW_MS,
+    DEFAULT_P_FLOW_THRESHOLD,
 };
 
 /// defer 区間の回復探索窓の既定値（暫定）。
@@ -36,7 +36,7 @@ use crate::analysis::metrics::{
 /// 回復窓 W の pre-registration は別タスク (スコープ外)。今回は素の指標算出までなので
 /// Stuck 回復と同じ既定値 (15 分) を流用する。セッション長 (1.5–8.5 分) では実質
 /// 「session 末尾までに p_flow>0.5 へ回復したか」を測る (decisions.md D5)。
-pub const DEFAULT_DEFER_RECOVERY_WINDOW_MS: u64 = DEFAULT_RECOVERY_WINDOW_MS;
+pub const DEFAULT_DEFER_RECOVERY_WINDOW_MS: u64 = DEFAULT_PFLOW_EXIT_WINDOW_MS;
 
 /// `nudge_need` 閾値 sweep の既定点 (0.50–0.90, 0.05 刻み, 9 点)。
 ///
@@ -524,7 +524,7 @@ fn reason_index(r: OpportunityReason) -> usize {
 /// `window_ms` 以内に p_flow>0.5 へ回復したかを判定する。
 /// 戻り値 = (defer 区間数, 回復した区間数)。
 ///
-/// 回復起点は run 先頭の timestamp (= defer を初めて下した時刻)。`compute_recovered_at`
+/// 回復起点は run 先頭の timestamp (= defer を初めて下した時刻)。`compute_pflow_exit_at`
 /// は起点以降を走査するため run 内 feat も候補に入るが、defer は `need=p_stuck >=
 /// nudge_need` のときのみ生じる (intervention.rs の分岐順) ため、`nudge_need >= 0.50`
 /// なら run 内 feat は必ず `p_flow <= 1 - nudge_need <= 0.50` で回復閾値 (`> 0.5`) を
@@ -551,7 +551,7 @@ fn evaluate_defer_runs(
         while i < decisions.len() && decisions[i].action == InterventionAction::Defer {
             i += 1;
         }
-        if compute_recovered_at(run_start_ts, feats, window_ms, DEFAULT_P_FLOW_THRESHOLD).is_some()
+        if compute_pflow_exit_at(run_start_ts, feats, window_ms, DEFAULT_P_FLOW_THRESHOLD).is_some()
         {
             recovered += 1;
         }

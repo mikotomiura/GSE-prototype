@@ -116,16 +116,75 @@ OUTCOME_SUM_FIELDS = (
     "excluded_paste_count",
     "manual_insert_chars",
     "stuck_episode_count",
-    "recovered_episode_count",
+    "pflow_exit_episode_count",
+    # ADR-024 primary outcome (receipt_free_resumption): event counts. These are
+    # the parts that CAN be pooled correctly across sessions by SUM.
+    "rfr_event_count",
+    "rfr_source_episode_count",
+    "rfr_receipt_count",
+    "rfr_next_away_candidate_count",
+    "rfr_censored_count",
+    # Diagnostics: read these BEFORE the CIF values.
+    #   degenerate  = resumptions with zero follow-up time (excluded from the CIF)
+    #   n_at_risk_* = events still under follow-up at the horizon; 0 means the
+    #                 per-session CIF value is an extrapolation, not an estimate.
+    "rfr_degenerate_count",
+    "rfr_n_at_risk_at_5min",
+    "rfr_n_at_risk_at_10min",
 )
 OUTCOME_AVG_FIELDS = (
     "manual_contribution_ratio",
-    "productive_manual_recovery_rate",
+    "pflow_exit_manual_gain_rate",
     "large_paste_rate",
     "paste_after_stuck_rate",
-    "self_recovery_without_paste",
+    "pflow_exit_without_receipt",
     "paste_count_per_hour",
+    # ADR-024 primary outcome: per-session CIF-derived values.
+    # WARNING: averaging per-session CIF estimates is NOT the same as pooling the
+    # underlying events. For a proper competing-risks estimate, pool the rfr_*
+    # counts (or re-run gse-replay over the pooled sessions) instead of reading
+    # the _avg columns. The _avg columns are carried for eyeballing only.
+    "rfr_receipt_free_at_5min",
+    "rfr_receipt_free_at_10min",
 )
+
+# Fields nested one level deeper, under outcome["receipt_free_resumption"].
+# Column name = "rfr_" + nested key (see _lift_outcome_field).
+_RFR_PREFIX = "rfr_"
+_RFR_KEY = "receipt_free_resumption"
+
+# Field names emitted by gse-replay BEFORE the ADR-024 rename. Kept so that
+# metrics.json produced by older builds still populate the columns instead of
+# silently landing as all-NULL (this file is not covered by the schema drift
+# check, so a silent break would not be caught by CI).
+LEGACY_FIELD_ALIASES = {
+    "pflow_exit_without_receipt": "self_recovery_without_paste",
+    "pflow_exit_manual_gain_rate": "productive_manual_recovery_rate",
+    "pflow_exit_episode_count": "recovered_episode_count",
+}
+
+
+def _lift_outcome_field(outcome: dict, name: str):
+    """Read one column's value out of the nested ``outcome`` struct.
+
+    Handles three cases: fields nested under ``receipt_free_resumption``
+    (``rfr_`` prefix), fields renamed by ADR-024 (legacy alias fallback), and
+    plain top-level outcome fields. Missing -> None, matching the outcome=None
+    philosophy documented at the top of this module.
+    """
+    if name.startswith(_RFR_PREFIX):
+        nested = outcome.get(_RFR_KEY) or {}
+        return nested.get(name[len(_RFR_PREFIX):]) if isinstance(nested, dict) else None
+    value = outcome.get(name)
+    # NOTE: `is None` deliberately treats "key absent" and "value is JSON null"
+    # the same, so a new-schema file that carries an explicit null still falls
+    # back to the legacy key. No file currently holds both spellings, so this
+    # cannot mask a real new-schema null.
+    if value is None:
+        legacy = LEGACY_FIELD_ALIASES.get(name)
+        if legacy is not None:
+            value = outcome.get(legacy)
+    return value
 # Top-level (non-outcome) HMM-accuracy fields worth carrying for context.
 TOPLEVEL_AVG_FIELDS = ("macro_f1", "micro_f1")
 
@@ -174,18 +233,12 @@ def _collect_metrics_rows(metrics_root: Path) -> tuple[list[tuple], str | None]:
         outcome = data.get("outcome") or {}
         row = (
             participant_id, os_name, session_id,
-            *(outcome.get(name) for name in OUTCOME_SUM_FIELDS),
-            *(outcome.get(name) for name in OUTCOME_AVG_FIELDS),
+            *(_lift_outcome_field(outcome, name) for name in OUTCOME_SUM_FIELDS),
+            *(_lift_outcome_field(outcome, name) for name in OUTCOME_AVG_FIELDS),
             *(data.get(name) for name in TOPLEVEL_AVG_FIELDS),
         )
         rows.append(row)
     return rows, None
-
-
-def _collect_survey_files(survey_root: Path) -> list[Path]:
-    if not survey_root.is_dir():
-        return []
-    return sorted(survey_root.glob("*.csv"))
 
 
 def _collect_survey_files(survey_root: Path) -> list[Path]:

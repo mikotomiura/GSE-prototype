@@ -2269,16 +2269,16 @@ mod tests {
         o.excluded_paste_count = excluded;
         assert_eq!(o.excluded_paste_count, 1);
         assert_eq!(o.stuck_episode_count, 2);
-        assert_eq!(o.recovered_episode_count, 2);
+        assert_eq!(o.pflow_exit_episode_count, 2);
         assert_eq!(o.manual_insert_chars, 3);
         assert_eq!(o.external_paste_chars_total, 60);
         assert_eq!(o.external_paste_count, 1);
         // manual=3, paste=60 → 3/63
         assert!((o.manual_contribution_ratio.unwrap() - 3.0 / 63.0).abs() < 1e-9);
         // recovered=2、productive=1 (ep1 のみ) → 0.5
-        assert_eq!(o.productive_manual_recovery_rate, Some(0.5));
+        assert_eq!(o.pflow_exit_manual_gain_rate, Some(0.5));
         // self_recovery=1 (ep1)、分母=全エピソード2 → 0.5
-        assert_eq!(o.self_recovery_without_paste, Some(0.5));
+        assert_eq!(o.pflow_exit_without_receipt, Some(0.5));
         // paste_after_stuck=1 (ep2 のみ・ep1 の窓には入らない) → 0.5
         assert_eq!(o.paste_after_stuck_rate, Some(0.5));
         // large_paste_rate: 60 >= 50 → 1.0
