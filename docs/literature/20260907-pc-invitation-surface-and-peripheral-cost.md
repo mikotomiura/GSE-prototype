@@ -242,8 +242,8 @@ experimentation** versus those that **merely claim change blindness**."*
 
 | 文書 | 何をしたか |
 |---|---|
-| **ADR-026**（新規・`Accepted`） | ★ `PS-Q7` を閉じ、`PC-1`〜`PC-11` を確定。★ 却下リスト #22–#28 |
-| `expression-channel.md` **§3.6**（新設） | ★ PC 側の設計要件 11 本 ＋ 層 A との対応表 |
+| **ADR-026**（新規・`Accepted`） | ★ `PS-Q7` を閉じ、`PC-1`〜`PC-12` を確定。★ 却下リスト #22–#28 |
+| `expression-channel.md` **§3.6**（新設） | ★ PC 側の設計要件 12 本 ＋ 層 A との対応表 |
 | 同 **§7.5** | ★ 受け入れ観点 **`A18`–`A20`** |
 | 同 **§8** | ★ `PS-Q7` を閉じ、**`PS-Q8` / `PS-Q9` / `E-12` / `E-13`** を起票。★ `E-11` の射程を補正 |
 | 同 **§6.2** | ★ 行番号の訂正（`intervention.rs:229` → **`:237`**）＋ §1 との緊張の明示 |
