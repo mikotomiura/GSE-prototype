@@ -43,10 +43,10 @@
 ## レビュー
 - [x] `code-reviewer` + `security-checker` を **並列**起動
 - [x] HIGH 指摘への対応（⚠️★★★ **backlog へ punt しない**）
-- [ ] `/cross-review`（⚠️ **コミット後 ＋ パス限定**で回す）
+- [x] `/cross-review`（⚠️ **コミット後 ＋ パス限定**で回す）
 
 ## 完了処理
 - [x] design.md の最終化
 - [x] decisions.md（★ grill で作成済み）
-- [ ] git commit（★ design.md §ロールバック計画の 3 本に割る）
-- [ ] 次セッター用ハンドオフの更新
+- [x] git commit（★ design.md §ロールバック計画の 3 本に割る）
+- [x] 次セッター用ハンドオフの更新
