@@ -228,3 +228,27 @@ L4 観測終端を `max()` へ / L6 重複定義の削除 / L7 コメント追�
   コンフリクトマーカー / `git ls-files -u` / 既存 stash の中身で確認済み）。
   → ★★★ **未コミット変更が多いときは `git stash` を使わない。**★ 変更行と指摘行の突き合わせは
   `git diff -U0` の `@@` ハンクで足りる（★ 実際それで判定できた）。
+
+
+---
+
+## 判断 8: `/cross-review`（Codex）の指摘への対応
+
+- **判断日時**: 2026-09-07
+- **実行**: `bash scripts/run-codex-review.sh 170b8e1..HEAD -- src-tauri/src scripts/build_analysis_db.py scripts/tests scripts/fixtures`
+  → **exit 0**（★ **パス限定にしたので 2000 行閾値（実測 1106 行）に掛からず、fail-closed も起きなかった**）。
+  ⚠️ **コミット後に回した**（★ `git diff` は untracked を拾わないので、新規ファイルはコミット前だと空振りする）。
+- **結果**: **High 1 / Medium 2 / Low-Medium 1 ＋ テスト不足の指摘**。
+
+| # | 指摘 | ★ 一次で評価した結果 | 対処 |
+|---|---|---|---|
+| **1 (High)** | `source_episode_count` が `episode_end_ms` だけで dedup しており、終端が同値のエピソードが 2 本あると過小計上する | ★ **現状の `segment_stuck_episodes` は終端の重複を作らない**（★ `episodes_from_sorted_ts` は `merge_gap_ms` 超の間隙でのみ分割するので終端は狭義単調）。⚠️ **ただし `episodes` は引数で渡ってくる**ので、呼び出し側の性質に依存している。→ ★ **指摘は妥当** | ★ `ResumptionEvent` に **`episode_index`** を足し、**添字で数える**ように変更。★ テスト `source_episode_count_uses_index_not_end_timestamp` |
+| **2 (Medium)** | ソート前提が破れても静かに壊れる。かつ `observation_end_ms` だけ「整列前提を持ち込まない」形で方針が混在 | ★ **妥当**（★ 実際に `partition_point` と `windows(2)` が昇順に依存している） | ★ `segment_resumptions` / `classify_resumption` に **`debug_assert!`** を置き、★ `#[should_panic]` テストで**落ちること自体を固定**した |
+| **3 (Medium)** | `classify_resumption` がエピソード境界で paste を絞っておらず、無関係な paste を拾いうる | ⚠️★★★ **これは設計である** —— ★ 推定するのは「**再開してから受領するまで**」であって「エピソード内の受領」ではない（ADR-024 **D4**）。★ 遠い未来の受領は地平の外に落ちて CIF に寄与せず、**その事象を地平まで at risk として残す**という正しい寄与だけを持つ | ★ **変更しない。**★ **意図であることを doc に明記**した（★ 次の実装者が「絞り忘れ」と読まないように） |
+| **4 (Low-Med)** | Rust の JSON 出力フィールド名の変更は下流に破壊的。移行期間だけ旧名も出すか schema version bump が要る | ★ **一次で消費者を全数確認した結果、他に消費者はいない** —— ⚠️ `gse-dataset` の `metrics.json` **46 ファイル中 `"outcome"` を含むもの 0 件**（実測）／`schema_dto.rs`・`schema/current.json`・Tauri IPC・`src/` の TS **すべて 0 件**（実測）／唯一の消費者 `build_analysis_db.py` は**旧名の別名解決を入れてある**。→ ★ **Codex はこの実測を持っていなかった** | ★ **変更しない**（★ 根拠は `impact-rename.md`） |
+| **5** | テスト不足（未ソート入力 / 同一 `episode_end_ms` / 同一 gap に複数エピソードが候補 / `observation_end_ms < resumed_at_ms`） | ★ **妥当** | ★ **3 本追加**（上記 ＋ `resumption_outcome_handles_observation_end_before_t0`）。★ 「同一 gap に複数エピソードが候補」は `source_episode_count_uses_index_not_end_timestamp` が**最も遅いものを採る**ことを同時に固定している |
+
+- **★ セキュリティ面の評価（Codex）**: 逐語「相対時刻のみ serialize する設計は妥当」
+  「絶対時刻を持つ `ResumptionEvent` に `Serialize` を付けていない点も良い防御」。
+- **★ 再検証**: `cargo test --workspace` **569 passed** ／ `--snapshot` **15 件一致** ／
+  `emit_schema` **byte-equal** ／ `unittest` **19 passed** ／ `cargo fmt --check` **緑**。

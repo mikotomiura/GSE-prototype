@@ -393,6 +393,13 @@ pub struct ResumptionEvent {
     pub resumed_at_ms: u64,
     /// 紐づけ先 Stuck エピソードの終端。
     pub episode_end_ms: u64,
+    /// 紐づけ先 Stuck エピソードの添字。
+    ///
+    /// ⚠️ 寄与エピソード数は**これ**で数える (`code-reviewer`(Codex) High・2026-09-07)。
+    /// ★ `episode_end_ms` で dedup すると、終端が同値のエピソードが 2 本あったときに
+    /// 過小計上する。★ 現状 `segment_stuck_episodes` は終端の重複を作らないが、
+    /// `episodes` は引数で渡ってくるので**呼び出し側の性質に依存しない形**にする。
+    pub episode_index: usize,
 }
 
 /// 再開後に最初に起きたこと。競合リスクの 3 分類。
@@ -491,6 +498,14 @@ pub fn segment_resumptions(
     keys: &[KeyPress],
     cfg: &OutcomeConfig,
 ) -> Vec<ResumptionEvent> {
+    debug_assert!(
+        keys.windows(2).all(|w| w[0].timestamp <= w[1].timestamp),
+        "segment_resumptions: keys must be sorted by timestamp"
+    );
+    debug_assert!(
+        episodes.windows(2).all(|w| w[0].start_ms <= w[1].start_ms),
+        "segment_resumptions: episodes must be sorted by start_ms"
+    );
     let mut out = Vec::new();
     for w in keys.windows(2) {
         let gap_start_ms = w[0].timestamp;
@@ -498,15 +513,16 @@ pub fn segment_resumptions(
         if resumed_at_ms.saturating_sub(gap_start_ms) < cfg.away_gap_ms {
             continue;
         }
-        let linked = episodes.iter().rev().find(|ep| {
+        let linked = episodes.iter().enumerate().rev().find(|(_, ep)| {
             gap_start_ms >= ep.start_ms
                 && gap_start_ms <= ep.end_ms.saturating_add(cfg.after_window_ms)
         });
-        if let Some(ep) = linked {
+        if let Some((episode_index, ep)) = linked {
             out.push(ResumptionEvent {
                 gap_start_ms,
                 resumed_at_ms,
                 episode_end_ms: ep.end_ms,
+                episode_index,
             });
         }
     }
@@ -522,6 +538,12 @@ pub fn segment_resumptions(
 /// 同時刻のタイブレークは **受領を優先**する。★ これは保守側である
 /// (`receipt_free_resumption` を高く出さない向き)。
 /// ⚠️ 推定器を一切参照しない。
+///
+/// ⚠️★★★ **受領を「紐づけ先エピソードの内側」に絞らないのは意図的である**
+/// (`code-reviewer`(Codex) Medium・2026-09-07)。★ 推定するのは
+/// 「**再開してから受領するまで**」であって「エピソード内の受領」ではない (ADR-024 D4)。
+/// ★ 遠い未来の受領は地平 (5/10 分) の外に落ちるので CIF には寄与せず、
+/// その事象を **地平まで at risk として残す**という正しい寄与だけを持つ。
 pub fn classify_resumption(
     ev: &ResumptionEvent,
     pastes: &[PasteEvent],
@@ -529,6 +551,10 @@ pub fn classify_resumption(
     observation_end_ms: u64,
     cfg: &OutcomeConfig,
 ) -> ResumptionOutcome {
+    debug_assert!(
+        keys.windows(2).all(|w| w[0].timestamp <= w[1].timestamp),
+        "classify_resumption: keys must be sorted by timestamp"
+    );
     let t0 = ev.resumed_at_ms;
 
     let receipt_at = pastes
@@ -634,7 +660,8 @@ pub fn compute_receipt_free_resumption(
         .map(|ev| classify_resumption(ev, pastes, keys, observation_end_ms, cfg))
         .collect();
 
-    let mut source_episodes: Vec<u64> = events.iter().map(|e| e.episode_end_ms).collect();
+    // ⚠️ 終端の時刻ではなく添字で数える (終端が同値のエピソードでも取りこぼさない)。
+    let mut source_episodes: Vec<usize> = events.iter().map(|e| e.episode_index).collect();
     source_episodes.sort_unstable();
     source_episodes.dedup();
 
@@ -1829,6 +1856,7 @@ mod tests {
             gap_start_ms: 11_000,
             resumed_at_ms: t0,
             episode_end_ms: 11_000,
+            episode_index: 0,
         };
         // t0+1000 で再離席が始まり、同時刻に受領もある
         let keys = vec![kp(t0, 0x41), kp(t0 + 1_000, 0x42), kp(t0 + 181_000, 0x43)];
@@ -1847,6 +1875,7 @@ mod tests {
             gap_start_ms: 11_000,
             resumed_at_ms: t0,
             episode_end_ms: 11_000,
+            episode_index: 0,
         };
         let keys = vec![kp(t0, 0x41), kp(t0 + 1_000, 0x42), kp(t0 + 181_000, 0x43)];
         let out = classify_resumption(&ev, &[], &keys, t0 + 400_000, &cfg);
@@ -1863,6 +1892,7 @@ mod tests {
             gap_start_ms: 11_000,
             resumed_at_ms: t0,
             episode_end_ms: 11_000,
+            episode_index: 0,
         };
         let keys = vec![kp(t0, 0x41), kp(t0 + 1_000, 0x42)];
         let out = classify_resumption(&ev, &[], &keys, t0 + 90_000, &cfg);
@@ -2050,6 +2080,63 @@ mod tests {
         // t0 = 200_000, 受領 = 260_000 → 相対 60_000 (★ 絶対時刻 260_000 ではない)
         assert_eq!(r.outcomes[0].elapsed_ms, 60_000);
         assert_eq!(r.outcomes[0].kind, ResumptionOutcomeKind::Receipt);
+    }
+
+    /// ⚠️ 終端が同値のエピソードが 2 本あっても寄与エピソード数を取りこぼさない
+    /// (`code-reviewer`(Codex) High・2026-09-07)。★ 添字で数えているかを固定する。
+    #[test]
+    fn source_episode_count_uses_index_not_end_timestamp() {
+        let cfg = OutcomeConfig::default();
+        // ⚠️ 人為的に end_ms が同値の 2 エピソードを渡す (呼び出し側の性質に依存しない形か)。
+        let episodes = vec![
+            StuckEpisode {
+                start_ms: 5_000,
+                end_ms: 11_000,
+            },
+            StuckEpisode {
+                start_ms: 10_000,
+                end_ms: 11_000,
+            },
+        ];
+        let keys = vec![kp(11_000, 0x41), kp(200_000, 0x42)];
+        let evs = segment_resumptions(&episodes, &keys, &cfg);
+        assert_eq!(evs.len(), 1);
+        // 条件を満たすエピソードが複数あるときは最も遅いものを採る (= 添字 1)
+        assert_eq!(evs[0].episode_index, 1);
+        assert_eq!(evs[0].episode_end_ms, 11_000);
+    }
+
+    /// ⚠️ 観測終端が再開時刻より前でも破綻しない (`code-reviewer`(Codex) テスト不足・#5)。
+    #[test]
+    fn resumption_outcome_handles_observation_end_before_t0() {
+        let cfg = OutcomeConfig::default();
+        let t0 = 200_000_u64;
+        let ev = ResumptionEvent {
+            gap_start_ms: 11_000,
+            resumed_at_ms: t0,
+            episode_end_ms: 11_000,
+            episode_index: 0,
+        };
+        // observation_end < t0 (壊れたログ / 呼び出し側の取り違え)
+        let out = classify_resumption(&ev, &[], &[kp(t0, 0x41)], t0 - 50_000, &cfg);
+        assert_eq!(out.kind, ResumptionOutcomeKind::Censored);
+        assert_eq!(out.elapsed_ms, 0); // 負にならない (saturating)
+                                       // ★ 追跡時間ゼロなので CIF からは外れる
+        assert!(is_degenerate(&out));
+    }
+
+    /// ⚠️ ソート前提が破れたら `debug_assert` で落ちる (`code-reviewer`(Codex) Medium・#2)。
+    /// ★ 静かに誤分類するより落ちるほうがよい。
+    #[test]
+    #[should_panic(expected = "keys must be sorted")]
+    fn segment_resumptions_rejects_unsorted_keys() {
+        let cfg = OutcomeConfig::default();
+        let episodes = vec![StuckEpisode {
+            start_ms: 10_000,
+            end_ms: 11_000,
+        }];
+        let unsorted = vec![kp(200_000, 0x41), kp(11_000, 0x42)];
+        let _ = segment_resumptions(&episodes, &unsorted, &cfg);
     }
 
     /// ⚠️★★★ 副次指標の**窓長バイアス**を記録として固定する (ADR-024 §計器の問題 2)。
