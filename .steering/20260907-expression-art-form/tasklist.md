@@ -39,9 +39,9 @@
 ## 4. レビュー・完了
 - [x] `code-reviewer` ＋ `security-checker` を**並列**起動
 - [x] ⚠️ **HIGH 指摘は backlog へ punt せず本タスクで消化**（★ HIGH 8 件・全件一次で検算して消化。→ `decisions.md` 判断 7）
-- [ ] コミット（★ パス限定 `git add` —— ⚠️ **未踏スライド作業を巻き込まない**）
-- [ ] `/cross-review`（⚠️ **コミット後 ＋ パス限定**: `bash scripts/run-codex-review.sh <base>..HEAD -- <paths>`）
+- [x] コミット（★ パス限定 `git add` —— ⚠️ **未踏スライド作業を巻き込まない**）
+- [x] `/cross-review`（★ **2 巡実施**。1 巡目 HIGH 3 件 / 2 巡目 HIGH 3 件のうち 1 件は偽陽性と実測。→ `decisions.md` 判断 8）
 - [ ] `/finish-task`
 
 ## 5. 引き継ぎ
-- [ ] 次セッション用プロンプトを `.steering/_handoff/` に置く（★ B-2 / B-3 / D-1 が残る）
+- [x] 次セッション用プロンプトを `.steering/_handoff/next-session-after-adr025.md` に作成
