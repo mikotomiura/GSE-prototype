@@ -113,7 +113,7 @@ new-feature
 
 ```
 // ✅ 重要機能変更（バージョン付与）
-feat(wall): add early-unlock button to Zen Timer phone page (v2.21)
+feat(metrics): add receipt_free_resumption competing-risk outcome (v0.32)
 
 // ✅ 細かい修正（バージョン不要）
 fix(engine): correct typo in emission matrix comment
