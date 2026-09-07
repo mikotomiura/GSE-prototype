@@ -41,7 +41,7 @@
 - [x] ⚠️ **HIGH 指摘は backlog へ punt せず本タスクで消化**（★ HIGH 8 件・全件一次で検算して消化。→ `decisions.md` 判断 7）
 - [x] コミット（★ パス限定 `git add` —— ⚠️ **未踏スライド作業を巻き込まない**）
 - [x] `/cross-review`（★ **2 巡実施**。1 巡目 HIGH 3 件 / 2 巡目 HIGH 3 件のうち 1 件は偽陽性と実測。→ `decisions.md` 判断 8）
-- [ ] `/finish-task`
+- [x] `/finish-task`（★ schema parity は skip —— ⚠️ `schema_dto.rs` / `schema/current.json` を touch していない・実測）
 
 ## 5. 引き継ぎ
 - [x] 次セッション用プロンプトを `.steering/_handoff/next-session-after-adr025.md` に作成
