@@ -44,11 +44,11 @@
 ## レビュー
 - [x] `code-reviewer` ＋ `security-checker` を **並列**起動
 - [x] HIGH 指摘を **本タスクで消化**（★ code-reviewer HIGH 3 件中 2 件が妥当・1 件は stale read。security-checker MEDIUM 1 + LOW 2 も消化）
-- [ ] コミット
-- [ ] `/cross-review` 第 1 巡（★ **コミット後・パス限定**）
-- [ ] `/cross-review` 第 2 巡（★ 他文書との整合）
+- [x] コミット（★ 4 本: 09a2f13 / eb49a36 / 4f71f0b / 6cd44a8）
+- [x] `/cross-review` 第 1 巡（★ Codex 系統・指摘 5 件を処理）
+- [x] `/cross-review` 第 2 巡 — ⚠️ **Codex は日次予算超過でブロック**（exit 1）→ ★ Claude 単独へ縮退し glossary の穴を 1 件発見・是正
 
 ## 完了処理
-- [ ] `design.md` 最終化
+- [x] `design.md` 最終化
 - [x] `decisions.md` 作成
-- [ ] `/finish-task`
+- [x] `/finish-task`（★ 引き継ぎ `_handoff/next-session-after-adr026.md` を作成）
