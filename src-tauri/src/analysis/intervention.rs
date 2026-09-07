@@ -7,7 +7,15 @@ const RECENT_DISMISS_MS: u64 = 20 * 60 * 1000;
 const SHORT_PAUSE_MIN_MS: u64 = 2_000;
 const SHORT_PAUSE_MAX_MS: u64 = 8_000;
 const MEDIUM_PAUSE_MAX_MS: u64 = 30_000;
-const AWAY_IDLE_MS: u64 = 180_000;
+/// 離席候補とみなす無操作の下限: 180 秒。
+///
+/// ⚠️★★★ **本定数は「離席候補」の唯一の真実源 (SSOT) である。**
+/// `analysis::metrics` の `OutcomeConfig::away_gap_ms` もここを既定値として参照する
+/// (ADR-024 D3 / AC-3)。⚠️ **別の場所で 180_000 を再定義しないこと。**
+///
+/// ⚠️ 系は「離席した」と宣言しない (**ADR-018 D1**)。本定数は
+/// (a) 介入の抑制判定と (b) 事後の層別解析の境界にのみ使う。
+pub const AWAY_IDLE_MS: u64 = 180_000;
 const NUDGE_DAILY_CAP: u32 = 6;
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 
