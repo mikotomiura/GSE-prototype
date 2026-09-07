@@ -206,7 +206,7 @@ HMM は Writing Head の**一候補**であり GSE 全体の ontology ではな�
 ### 理論接地 = 機会保存（learning ではない）
 GSE が主張するのは「摩擦が能力・学習を**育てる**」ではなく「**反射的な外部依存（即座の AI/検索オフロード）を
 減らし、自力で解こうとする試行が発生する機会を保存する**」こと。**行動指標**（`external_paste_after_stuck` /
-`self_recovery_without_paste` / `manual_contribution_ratio`）で測る。[P12] Kapur・[P9] Bjork は
+`pflow_exit_without_receipt` / `manual_contribution_ratio`）で測る。[P12] Kapur・[P9] Bjork は
 「**守るべき困難が存在することの根拠**」に用い、「摩擦が学習を生む」の効果的接地には使わない
 （PS-I メタ分析は摩擦単独の学習効果を支持しない [P27][P28]）。学習効果は将来の探索トラック
 （research-positioning §8）。

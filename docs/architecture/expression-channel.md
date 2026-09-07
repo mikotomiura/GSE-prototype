@@ -581,7 +581,7 @@ Physical Anchor のコードを後回しにすること自体は禁じない。*
 > | | 旧 | 新 |
 > |---|---|---|
 > | 何を見るか | Physical Anchor の**実行率 / 完了率** | **① 招待の受容**（提示に対して離席が起きたか・拒否理由）と **② その後の機会保存の行動指標** |
-> | 主要アウトカム | （達成の有無） | `paste_after_stuck_rate` / `self_recovery_without_paste` / `manual_contribution_ratio` |
+> | 主要アウトカム | （達成の有無） | `paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio` |
 > | 自己申告 | 実行したか | 受容と負担（拒否権付きゲート **Gate H** の運用指標） |
 >
 > ★ **これは主張範囲（機会保存）と評価量を一致させる変更である。**

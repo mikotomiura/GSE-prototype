@@ -348,9 +348,9 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
      で content-free な時系列 (p_stuck feat / paste 文字数 / **key category**) を収集
   2. `segment_stuck_episodes` が `p_stuck >= 0.60` の連続区間を merge-gap で統合し **Stuck エピソード**化
   3. `compute_outcome_metrics` が各エピソードについて回復 (p_flow>0.5)・paste 有無・net_diff 正進行を判定し、
-     (b) `manual_contribution_ratio` / `productive_manual_recovery_rate`、
+     (b) `manual_contribution_ratio` / `pflow_exit_manual_gain_rate`、
      (a) `external_paste_count` / `large_paste_rate` / `paste_after_stuck_rate` /
-     `self_recovery_without_paste` / `paste_count_per_hour` (補助) を算出
+     `pflow_exit_without_receipt` / `paste_count_per_hour` (補助) を算出
   4. `SessionMetrics.outcome` (additive・後方互換) として既存メトリクスと同じ `metrics.json` に出力
 - **代替フロー**:
   - 1a. 旧 NDJSON で `external_paste_chars` 欠落の paste: outcome から除外し `excluded_paste_count` に件数を残す
