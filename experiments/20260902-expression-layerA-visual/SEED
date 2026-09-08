@@ -9,8 +9,8 @@
 |---|---|---|
 | **盲検（未教示）の出題順** | **20260902** | `layerA.config.json` `blind_test.order_seed` → `player/layerA.html` の `buildBlindOrder(0)` |
 | **盲検（教示後）の出題順** | **20265902** | 同上 `buildBlindOrder(5000)`（★ `order_seed + 5000`） |
-| **遷移検知の出題順** | **20260903** | `transition_test.order_seed` → `buildTransOrder()` |
-| **周辺視（未実装）** | 20260904 | `peripheral_test.order_seed`（★ **本ハーネスは周辺視ブロックを実装していない**） |
+| **遷移検知の出題順** | **20260903** | `transition_test.order_seed` → `buildTransOrder()`（⚠️★★★ **2026-09-08: `trials` を 16 → 18 に変更した** —— ★ 変化 12 ＝ **6 対 × 2**。★ 旧構成では E-7 の対が **n=1** しか出ていなかった） |
+| **周辺視の出題順** | **20260904** | `peripheral_test.order_seed` → `buildPerOrder()`（★ **2026-09-08 に実装した**） |
 | **自由記述の変種順** | **20260933** | `blind_test.order_seed + 31` → `frStart()` |
 | **各トライアルの粒子場** | `order_seed + offset + i * 977` | `buildField(trialSeed, ...)` の `mulberry32` |
 
@@ -21,7 +21,11 @@
 教示後: rng = mulberry32(20260902 + 5000)
 
 items = [layer0 ×6, stable ×6, friction_rising ×6, stuck ×6]      （★ 計 24）
-  ★ invitation は各状態の i%2==0 に present を割る（layer0 は常に none）
+  ⚠️★★★ 2026-09-08 変更: invitation は **variant の中で交互に**振る（★ 旧: 位置 i%2）——
+    ★ 旧実装は variant がシャッフル済みなので **variant × invitation の交差が運任せ**だった。
+    ★ 新: 各 level 内で variant ごとに present/none を交互に置き、端数の向きを
+      (level 番号 + variant 番号) の偶奇で入れ替える。→ ★ level 内は常に半々（level ⊥ invitation）、
+      かつ **variant × invitation の偏差はどの seed でも 1 以内**（★ ページ内検査が 50 seed で検算）。
 order = Fisher-Yates(items, rng)
 variant = Fisher-Yates(["natural","reversed"] を交互に並べた列, rng)   ★ 同じ rng を継続して使う
 trialSeed_i = order_seed + offset + i * 977
@@ -30,12 +34,34 @@ trialSeed_i = order_seed + offset + i * 977
 ★ **実際に出た順序は書き出し JSON の `blind_untaught[].` / `blind_taught[].` に
 `variant` / `true_level` / `true_invitation` として全件保存される。**
 
+## ★ 周辺視ブロックの出題順（★ 2026-09-08 追加）
+
+```text
+rng = mulberry32(20260904)
+
+偏心条件: 4 状態 × 4 = 16 試行
+  ⚠️★★★ 2026-09-08 変更: **(左右 × invitation) の組**を作ってから組ごとシャッフルする ——
+    cross = [(left,present), (left,none), (right,present), (right,none)]
+    ★ 旧実装は左右と invitation を **別々に** i%2 で決めており、
+      ⚠️ 件数は必ず半々になる（＝ 件数の検査は空回り）のに **交差は保証されていなかった**。
+  ★ layer0 は invitation を常に none にする（★ 左右の均衡はそのまま）
+中心対照:  4 状態 × 4 = 16 試行（★ pos = "center" / 提示時間は偏心と同じ）
+  ⚠️★★★ 2026-09-08: 8 → 16 へ（★ 両腕の n を揃えないと Wilson CI が原理的に重なる）
+order = Fisher-Yates(items, rng)                 ★ 提示順だけを混ぜる
+trialSeed_i = 20260904 + i * 977
+variant = "natural" 固定（★ 仕様。★ ページ内検査が固定を検算する）
+```
+
+★ **実際に出た順序は書き出し JSON の `peripheral[]` に
+`pos` / `eccentric` / `true_level` / `true_invitation` / `variant` として全件保存される。**
+
 ## ★ 乱数を使っていないもの（★ 使っていないことも書く）
 
 - **振動のオフセット**（`oscOffset`）— 決定的（正弦）
 - **格子の座標**（占有前）— 決定的
 - **遷移の交差フェード** — 決定的
-- **機械検算の全 12 項目** — 決定的（★ マスク描画のみ `mulberry32(trialSeed+7)`）
+- **機械検算の全 26 項目** — 決定的（★ マスク描画のみ `mulberry32(trialSeed+7)`）
+- **周辺視の提示位置** — ⚠️ 左右は seed で決まる（★ 決定的）が、**中心 / 偏心の別も決定的**である
 
 ## ⚠️ seed で固定できていないもの（★ 隠さない）
 
@@ -43,3 +69,6 @@ trialSeed_i = order_seed + offset + i * 977
 - ⚠️ **較正値**（カード合わせのスライダ位置・視距離）。★ 書き出し JSON の `calibration` に実測値を保存する。
 - ⚠️ **`requestAnimationFrame` の実フレーム時刻**。★ 提示時間は `performance.now()` で測るので
   刺激時間は再現するが、**描画されたフレーム列は端末に依存する**。
+  ⚠️★★★ **周辺視ブロックはここに敏感である** —— ★ 提示が **150 ms**（≒ 60 Hz で 9 フレーム）しかないため、
+  **フレーム落ちが 1 回起きるだけで提示が 1 割変わる**。★ 実行環境を `env.md` に記録すること。
+- ⚠️★★★ **窓の大きさ**。★ 周辺視ブロックが**開くかどうか**が窓の幅で変わる（→ `env.md`）。
