@@ -117,6 +117,45 @@ expect_blocked "★ 組み立て済みのセッション名の形" \
 expect_blocked "★★ 連結で分割された形 (実際の事故の形)" \
   '         mut_file("run.sh", "", "# 例: P123" + "_gse_" + "20260101_000000")' '20260101_000000'
 
+echo "--- 2d. ★★★ 2026-09-08 security-checker が実測で開けた穴 ---"
+# ⚠️★★★ どれも「引用符バイパス」とは **別の穴**で、同じ日に見つかった。
+#   ★ 教訓: 判定を `diff --git` **1 形式**に結びつけていたこと自体が原因である。
+# H-1: マージ中の git diff / マージ commit の git show は `diff --cc` を出す。
+#   ⚠️ 実測では判定を 1 つも通らず rc=0 で本文が素通りしていた。
+expect_blocked "★★★ diff --cc (combined diff) の proprietary" \
+  'diff --cc x.pptx' ''
+expect_blocked "★★★ diff --combined の proprietary" \
+  'diff --combined x.pptx' ''
+# M-2: `diff --git` を含まない入力（★ run-codex-consult.sh は任意の Markdown を受ける）。
+expect_blocked "★★★ --- / +++ だけの unified diff (ndjson)" \
+  '+++ b/s.ndjson' ''
+expect_blocked "★★★ Binary files 行だけ (proprietary)" \
+  'Binary files a/x.pptx and b/x.pptx differ' ''
+# ⚠️★★★ H-2: **除去したハンクのパスを出力に載せない**。
+#   ★ 決定的な対照: 同じ識別子が **行内なら [REDACTED] に伏せられる**のに、
+#     ヘッダなら素通りしていた ＝ 仕様が伏せると決めた値を自分で外へ出していた。
+#   ★ 第 3 引数 (leak) に識別子を渡すので、出力に残っていれば NG になる。
+expect_blocked "★★★ 除去ヘッダにセッション識別子を載せない" \
+  'diff --git a/data/P123_gse_20260101_000000.ndjson b/data/P123_gse_20260101_000000.ndjson' \
+  'P123_gse_20260101_000000'
+expect_blocked "★★★ 除去ヘッダに資料のファイル名を載せない" \
+  'diff --git a/docs/TOPSECRET_DECK_NAME.pptx b/docs/TOPSECRET_DECK_NAME.pptx' \
+  'TOPSECRET_DECK_NAME'
+# ⚠️ レポート側にもパスを書かないこと (★ --ack-filtered で端末へ出るため)。
+{
+  total=$((total + 1))
+  rep=$(mktemp)
+  printf 'diff --git a/data/P123_gse_20260101_000000.ndjson b/x\n' \
+    | SECRETS_FILTER_REPORT="$rep" "$FILTER" > /dev/null 2>&1
+  if grep -qF 'P123_gse_20260101_000000' "$rep"; then
+    echo "NG   ★ レポートに除去ハンクのパスが書かれている: $(cat "$rep")"
+    ng=$((ng + 1))
+  else
+    echo "OK   ★ レポートにパスを書いていない → $(tr '\n' ' ' < "$rep")"
+  fi
+  rm -f "$rep"
+}
+
 echo "--- 3. ★ 陰性対照 (ふつうのコードは 1 バイトも変えない) ---"
 # ⚠️★★ 架空名は**素通りさせる** —— ここで止めると検査の見本を含む diff が毎回 exit 2 になり、
 #   ★ 人がフィルタを迂回する動機を作る。★ 架空名の約束は「年が 202x でない」こと。
@@ -132,6 +171,12 @@ expect_clean "型注釈のコロン"     'let block: u32 = 3;'
 expect_clean "★ 引用符つきだが普通の .rs"   'diff --git "a/src/æ¥.rs" "b/src/æ¥.rs"'
 expect_clean "★ 引用符つきだが普通の .md"   'diff --git "a/docs/æ¥.md" "b/docs/æ¥.md"'
 # ⚠️ 拡張子の途中一致で誤爆しないこと (★ .key と .keyboard を混同しない)
+# ⚠️ `awk -v` は `\.` を素の `.`（任意 1 文字）へ降格させる。★ 実測で `axpptx` が
+#   over-block されていた。→ ★ `ENVIRON[]` 経由に変えた。★ これはその回帰。
+expect_clean "★ axpptx は .pptx ではない（★ 正規表現の降格検知）" \
+  'diff --git a/axpptx b/axpptx'
+expect_clean "★ xdocx / ypdf も同様" \
+  'diff --git a/notes_xdocx b/notes_xdocx'
 expect_clean "★ .keyboard.rs は .key ではない"   'diff --git a/src/keyboard.rs b/src/keyboard.rs'
 
 echo "--- 4. ★ レポート (SECRETS_FILTER_REPORT) に値そのものを書かない ---"

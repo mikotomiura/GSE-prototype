@@ -80,9 +80,8 @@ SECRET_REGEX=$(IFS='|'; echo "${SECRET_PATTERNS[*]}")
 # ⚠️★★★ 2026-09-08 修正: 終端を `$` にしない。
 #   ★ git は **非 ASCII を含むパスを C-quote して引用符で囲む** (`core.quotepath` の既定 true)。
 #     → 行末が `"` になるので `$` 終端はすべて空振りしていた (★ 下の正規化と対で直す)。
-#   ⚠️ **`([^a-z0-9]|$)` には広げない** —— ★ それだと `.pptx.md` まで止まり、
-#     現行仕様 (`docs/external-skills.md` は拡張子 4 種のみを禁止) を**勝手に拡大**することになる。
-#     ★ `.pptx.md` を送信禁止に含めるかは **別の判断**であり、研究者に委ねる。
+#   ⚠️ **`([^a-z0-9]|$)` には広げない** —— ★ それだと `.pptx` 以外の派生まで巻き込む。
+#     ★ 止めたいのは **`.pptx.md` / `.docx.md`** に限るので `(\.md)?` を明示する。
 #   ★ **2026-09-08 追加: `.pptx.md` / `.docx.md` も止める**（★ 研究者判断）——
 #     ⚠️ 実測: `[提案…]GSE設計スライド.pptx.md` は **中身が pptx の本文そのもの**（md2pptx の入力）で、
 #     ★ `.pptx` バイナリを止めても **Markdown 版から本文 257 行が外へ出ていた**。
@@ -94,8 +93,47 @@ PROPRIETARY_EXTS_REGEX='\.(pdf|docx|xlsx|pptx)(\.md)?([[:space:]]|$)'
 REPORT="${SECRETS_FILTER_REPORT:-}"
 [ -n "$REPORT" ] && : > "$REPORT"
 
-awk -v secret_re="${SECRET_REGEX}" -v prop_re="${PROPRIETARY_EXTS_REGEX}" -v report="${REPORT}" '
-BEGIN { skip_hunk = 0; in_pem = 0; matched = 0 }
+# ⚠️★★★ 2026-09-08: `prop_re` を `-v` で渡さない (security-checker 実測)。
+#   ★ awk の `-v` は代入時にエスケープを 1 段解釈するため、**`\.` が素の `.`（任意 1 文字）へ降格**する
+#     (gawk が `warning: escape sequence '\.' treated as plain '.'` を出す)。
+#   ⚠️ 実測: `a/axpptx` が **rc=2 で over-block** されていた。★ fail-open ではないが誤検出は誤検出である。
+#   → ★ `ENVIRON[]` 経由なら awk の代入解釈を通らない。
+export SF_PROP_RE="${PROPRIETARY_EXTS_REGEX}"
+export SF_SECRET_RE="${SECRET_REGEX}"
+awk -v report="${REPORT}" '
+BEGIN {
+  skip_hunk = 0; in_pem = 0; matched = 0; n_skipped = 0
+  prop_re   = ENVIRON["SF_PROP_RE"]
+  secret_re = ENVIRON["SF_SECRET_RE"]
+}
+
+# ⚠️★★★ 除去したハンクの**パスを出力に載せない** (security-checker HIGH・2026-09-08)。
+#   ★ 旧実装は `print "... SKIPPED hunk: " $0` で **ヘッダ行を原文のまま stdout へ出していた**。
+#   ⚠️ stdout は **そのまま外部 LLM のプロンプトへ行く**。
+#   ★ 決定的だったのは対照である —— 同じセッション識別子が
+#     **行内なら `[REDACTED]` に伏せられるのに、ヘッダなら素通りしていた**（★ 実測）。
+#     ＝ **仕様が「伏せる」と決めている値を、除去の通知として自分で外へ出していた。**
+#   ⚠️ 資料のタイトル（例: 提出物のファイル名）も同様に出ていた。
+#   → ★ **理由の分類と通し番号だけ**を出す。★ 場所は report 側の行番号 (NR) で辿れる。
+function drop_hunk(reason) {
+  n_skipped++
+  matched = 1
+  print "[secrets-filter] SKIPPED hunk #" n_skipped " (" reason ")"
+  note("hunk まるごと除去 #" n_skipped " (" reason ") ⚠️ パスは載せない")
+  skip_hunk = 1
+}
+
+# ★ ヘッダ 1 行から「除去すべきか」を判定する (★ 判定はここ 1 か所に集約する)。
+#   ⚠️ 引用符つきファイル名 (git の C-quote) に効くよう、判定前に引用符を空白へ正規化する。
+function classify(head,   low) {
+  low = tolower(head)
+  gsub(/"/, " ", low)
+  if (low ~ /\.(env|pem|key)([[:space:]]|$)/) return "env/pem/key"
+  if (low ~ /credentials|secret/)              return "credentials"
+  if (low ~ /\.ndjson([^a-z0-9_]|$)/)          return "ndjson"
+  if (low ~ prop_re)                           return "proprietary"
+  return ""
+}
 
 function note(reason) {
   if (report != "") print NR ": " reason > report
@@ -108,33 +146,27 @@ in_pem {
   print "[secrets-filter] SKIPPED PEM block line"; next
 }
 
-/^diff --git/ {
-  skip_hunk = 0
-  lower_head = tolower($0)
-  # ⚠️★★★ 2026-09-08 追加 —— **fail-closed が引用符つきファイル名に対して開いていた。**
-  #   ★ git のヘッダは非 ASCII 名でこうなる (★ 実測):
-  #       diff --git "a/docs/[æ...]GSEè¨­...pptx" "b/..."
-  #   ⚠️ 末尾が `"` なので `$` 終端の判定が当たらず、
-  #     ★ **実物の diff が rc=0 で素通りし、本文 257 行がそのまま出力に残っていた**
-  #     (★ 陽性対照: 同じ内容でも ASCII 名なら rc=2 で止まる ＝ **違いは引用符だけ**)。
-  #   → ★ 判定の前に **引用符を空白へ置き換えて正規化する** (★ 区切りとして働かせる)。
-  #   ⚠️ 既存テストが `a/R.PDF` のような **引用符なしの形しか試していなかった**ため見逃していた。
-  gsub(/"/, " ", lower_head)
-  if (lower_head ~ /\.(env|pem|key)([[:space:]]|$)/) skip_hunk = 1
-  if (lower_head ~ /credentials|secret/) skip_hunk = 1
-  # NDJSON セッションログ (キーストローク動態) は外部 LLM 送信禁止。
-  # 参加者の実データは gitignore で追跡外だが、追跡下の fixture
-  # (src-tauri/tests/fixtures/*.ndjson) は vk コード列を含み diff に乗る。
-  # 規約の単一真実源は docs/agent-shared.md / data-privacy Skill。
-  if (lower_head ~ /\.ndjson([^a-z0-9_]|$)/) skip_hunk = 1
-  if (lower_head ~ prop_re) skip_hunk = 1
-  if (skip_hunk) {
-    print "[secrets-filter] SKIPPED hunk: " $0
-    matched = 1
-    note("hunk まるごと除去: " $0)
-    next
+# ⚠️★★★ 2026-09-08: **`diff --git` だけを見ていた** (security-checker HIGH)。
+#   ★ マージ中の `git diff` / マージ commit の `git show` は **`diff --cc`** を出す。
+#     ⚠️ 実測: `diff --cc x.pptx` は判定を 1 つも通らず **rc=0 で本文が素通り**していた。
+#     ★ 到達経路は現実にある —— `codex-rescue` (worktree + merge) / `loop-issue` (issue 統合)。
+#   ★ さらに **`--- ` / `+++ ` / `Binary files` 単独**の入力も素通りしていた (M-2)。
+#     ⚠️ `run-codex-consult.sh` は **任意の Markdown** を受けるので、人が unified diff を貼れば届く。
+/^diff --(git|cc|combined) / {
+  skip_hunk = 0                      # ★ 新しいファイルの開始 = ここでだけ解除する
+  reason = classify($0)
+  if (reason != "") { drop_hunk(reason); next }
+}
+
+# ⚠️ ヘッダの別形式。★ ここでは **skip を立てるだけで解除しない**
+#   (★ `---` と `+++` は同じファイルの 2 行なので、途中で解除すると揺れる)。
+/^(--- |\+\+\+ |Binary files )/ {
+  if (!skip_hunk) {
+    reason = classify($0)
+    if (reason != "") { drop_hunk(reason); next }
   }
 }
+
 skip_hunk { next }
 
 # 行内マッチング — 機密値を [REDACTED] に置換
