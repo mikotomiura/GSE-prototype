@@ -19,10 +19,12 @@
 
 ## レビュー / 完了処理
 - [ ] `code-reviewer` ＋ `security-checker` を並列起動
-- [ ] `/cross-review`（★ **Codex 使用の許可あり**・⚠️ パス限定）
+- [x] ★ Codex の第二意見（⚠️ **生 diff は渡せない** —— フィルタ本体は自分のファイル名で
+      hunk ごと除去されるため。★ `run-codex-consult.sh` に要点テキストで相談した）
 - [ ] `/finish-task`
 
 ## ★ 研究者の判断（★ 2026-09-08 に確定）
 - [x] ★★★ **`.pptx.md` / `.docx.md` を送信禁止に含める**（→ `decisions.md` 判断 2）
 - [x] ★ `docs/external-skills.md` の「拡張子フィルタは不要」を実態に合わせて訂正（判断 3）
-- [ ] ⚠️ `daily_token_budget` を 300000 のままにするか 200000 へ戻すか（判断 4）
+- [x] ★ `daily_token_budget` は **300000 のまま**（★ 研究者裁定・判断 4）
+- [x] ★★★ `.svg` など本文を持つ別形式は **置き場で塞ぐ**（★ 案 C・判断 7）

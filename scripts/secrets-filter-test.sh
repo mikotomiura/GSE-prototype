@@ -173,6 +173,20 @@ expect_blocked "★★★ git の生出力の形 (C-quote の 8 進表記)" \
 expect_blocked "★★★ 同上・Markdown 版" \
   'diff --git "a/docs/[\346\217\220]x.pptx.md" "b/docs/[\346\217\220]x.pptx.md"' ''
 
+echo "--- 2f. ★★★ 資料の置き場をディレクトリで塞ぐ (2026-09-08 研究者裁定・案 C) ---"
+# ⚠️★★★ 拡張子だけでは追い掛けっこが終わらない（★ .pptx → .pptx.md → .svg → …）。
+#   ★ 図とスライドの置き場を塞ぐ。⚠️ ただし置き場**全体**ではない（→ 下の陰性対照が要）。
+expect_blocked "★★★ figures/ の svg（★ 中身はデッキ本文）" \
+  'diff --git a/docs/mitou_submission/figures/gse-layer-map.svg b/docs/mitou_submission/figures/gse-layer-map.svg' ''
+expect_blocked "★★★ figures/ の png" \
+  'diff --git a/docs/mitou_submission/figures/x.png b/docs/mitou_submission/figures/x.png' ''
+expect_blocked "★★★ mitou_pptx/ 配下（拡張子を問わない）" \
+  'diff --git a/docs/mitou_submission/mitou_pptx/notes.txt b/docs/mitou_submission/mitou_pptx/notes.txt' ''
+expect_blocked "★★★ 引用符つき・日本語名の figures/" \
+  'diff --git "a/docs/mitou_submission/figures/[\346\217\220]zu.svg" "b/docs/mitou_submission/figures/[\346\217\220]zu.svg"' ''
+expect_blocked "★★★ +++ 行だけでも置き場で止まる" \
+  '+++ b/docs/mitou_submission/figures/x.svg' ''
+
 echo "--- 3. ★ 陰性対照 (ふつうのコードは 1 バイトも変えない) ---"
 # ⚠️★★ 架空名は**素通りさせる** —— ここで止めると検査の見本を含む diff が毎回 exit 2 になり、
 #   ★ 人がフィルタを迂回する動機を作る。★ 架空名の約束は「年が 202x でない」こと。
@@ -190,6 +204,13 @@ expect_clean "★ 引用符つきだが普通の .md"   'diff --git "a/docs/æ
 # ⚠️ 拡張子の途中一致で誤爆しないこと (★ .key と .keyboard を混同しない)
 # ⚠️ `awk -v` は `\.` を素の `.`（任意 1 文字）へ降格させる。★ 実測で `axpptx` が
 #   over-block されていた。→ ★ `ENVIRON[]` 経由に変えた。★ これはその回帰。
+# ⚠️★★★ **案 C の要点はここである。**★ 置き場を丸ごと塞ぐ案 (B) を採らなかったのは、
+#   ★ `README.md` のような普通の文書を**レビュー可能なまま**にするためである。
+#   ⚠️ この 2 本が赤くなったら、それは案 B へ滑っている（＝ 裁定と実装がずれた）合図。
+expect_clean "★★★ mitou_submission/README.md は素通り（★ 案 C の要点）" \
+  'diff --git a/docs/mitou_submission/README.md b/docs/mitou_submission/README.md'
+expect_clean "★★★ 別の場所の .svg は止めない（★ 置き場で塞いでいる）" \
+  'diff --git a/docs/architecture/diagram.svg b/docs/architecture/diagram.svg'
 expect_clean "★ --- /dev/null は素通り（★ 新規ファイルの追加）" \
   '--- /dev/null'
 expect_clean "★ 引用符つきの普通の .rs（★ バックスラッシュ境界化で壊れない）" \

@@ -133,6 +133,16 @@ function classify(head,   low) {
   #   ★ 引用符 ＋ **バックスラッシュ系列**（`\346\217\220` のような 8 進表記）を境界にする。
   #   ⚠️ 拡張子は ASCII なので、この正規化で判定が壊れることはない（★ テストで固定）。
   gsub(/["\\]/, " ", low)
+  # ⚠️★★★ 2026-09-08（研究者裁定・案 C）: **資料の置き場をディレクトリで塞ぐ。**
+  #   ★ 経緯: `.pptx` を止め、`.pptx.md` も止めたが、⚠️ **`figures/*.svg` が同じ穴のまま**だった
+  #     （★ `security-checker` の実測: `<text>` にデッキの本文がそのまま入っている）。
+  #   ⚠️★★★ **拡張子の追い掛けっこは終わらない**（★ 次は `.png` の中の文字か、と続く）。
+  #   ★ そこで **置き場で塞ぐ**。⚠️ ただし `docs/mitou_submission/` を丸ごとにはしない ——
+  #     ★ それだと `README.md` のような**普通の文書までレビュー不能**になる。
+  #   → ★ **図とスライドの置き場だけ**（`figures/` と `mitou_pptx/`）を対象にする。
+  #   ⚠️ **限界**: 置き場が増えたら**ここへ追随が要る**（★ テストの陰性対照が守っているのは
+  #     「`README.md` は通る」ことだけである）。
+  if (low ~ /docs\/mitou_submission\/(figures|mitou_pptx)\//) return "deck-assets"
   if (low ~ /\.(env|pem|key)([[:space:]]|$)/) return "env/pem/key"
   if (low ~ /credentials|secret/)              return "credentials"
   if (low ~ /\.ndjson([^a-z0-9_]|$)/)          return "ndjson"
