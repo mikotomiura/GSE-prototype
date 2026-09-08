@@ -6,12 +6,13 @@
 // Runs on a dedicated thread with its own CFRunLoop, mirroring the Windows WH_KEYBOARD_LL design.
 
 use std::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use core_foundation::base::TCFType;
 use core_foundation::mach_port::CFMachPortRef;
-use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
+use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopTimer};
 use core_graphics::event::{
     CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
     CGEventType, EventField,
@@ -47,6 +48,10 @@ extern "C" {
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGEventTapEnable(tap: CFMachPortRef, enable: bool);
+    // ★ 2026-09-05 追加 (層 2 / 診断)。⚠️ **副作用ゼロの read-only チェック**である。
+    //   ★ これが無いと「tap が disable されている」と「runloop が楽をしている」を区別できず、
+    //   ⚠️ 実測 (2026-09-04 の 8 時間) で 120 s 級の欠測がどちらの機序か決められなかった。
+    fn CGEventTapIsEnabled(tap: CFMachPortRef) -> bool;
 }
 
 /// 現在有効な CGEventTap の mach port (CFMachPortRef を `*mut c_void` として保持)。
@@ -66,6 +71,34 @@ extern "C" {
 ///   よって port が指す `tap.mach_port` は callback 実行中 (格納〜null クリアの間) 常に生存する。
 /// `AtomicPtr` は安全な共有セルとして用いる。
 static TAP_PORT: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
+
+/// hook スレッドの `CFRunLoop`。★ **層 3 (`request_reinstall`) の唯一の手掛かり**である。
+///
+/// ⚠️★★★ hook スレッドは `CFRunLoop::run_current()` で**駐車している**ので、
+/// 外のスレッドから触れる手段がこれしか無い。★ `CFRunLoop` は crate 側で
+/// `Send + Sync` が付いており (`core-foundation-0.10.1/src/runloop.rs:29`)、
+/// `CFRunLoopStop` は Apple が「run loop は thread-safe」と明記している数少ない CF 型の操作である。
+///
+/// ★ 1 度だけ格納する: `CFRunLoop::get_current()` は同じスレッドで常に同じ run loop を返すため、
+/// tap を作り直しても (ループを何周しても) 値は変わらない。
+static HOOK_RUNLOOP: OnceLock<CFRunLoop> = OnceLock::new();
+
+/// 層 2 の watchdog timer が tap を再有効化した累計回数 (★ 診断用・単調増加)。
+///
+/// ⚠️ `CONSECUTIVE_REENABLES` (層 1・コールバック内) とは**別物**である。
+/// ★ 層 1 は「OS が `TapDisabled*` を届けてくれたとき」、
+/// 層 2 は「**届かないまま disable されていたとき**」に動く。
+static WATCHDOG_REENABLES: AtomicU32 = AtomicU32::new(0);
+
+/// 層 3 (`request_reinstall`) が要求した累計回数 (★ 診断用・単調増加)。
+static REINSTALL_REQUESTS: AtomicU32 = AtomicU32::new(0);
+
+/// 層 2 の watchdog timer の発火間隔 (秒)。
+///
+/// ★ `hook-constraints` Skill の mac-3 が示す 3 秒に合わせる。
+/// ⚠️ 短くしても `CGEventTapIsEnabled` は read-only の安い呼び出しだが、
+/// ★ runloop を無駄に起こすので 3 秒より短くしない。
+const WATCHDOG_INTERVAL_S: f64 = 3.0;
 
 /// 直近で normal イベントを 1 件も挟まずに連続して tap 再有効化した回数 (F4)。
 ///
@@ -297,7 +330,86 @@ fn macos_vk_to_vk(mac_vk: u64) -> u32 {
 }
 
 // ---------------------------------------------------------------------------
-// CGEventTap callback
+// 層 2: runloop watchdog timer / 層 3: 再設置要求
+// ---------------------------------------------------------------------------
+
+/// 層 2 の watchdog。★ **hook スレッドの runloop 上**で `WATCHDOG_INTERVAL_S` 秒ごとに走る。
+///
+/// ⚠️★★★ **なぜ層 1 (コールバック内の再有効化) だけでは足りないのか。**
+/// ★ 層 1 は OS が `TapDisabledByTimeout` / `ByUserInput` を**届けてくれたときにしか**動かない。
+/// ⚠️ 2026-09-04 の 8 時間実測では、打鍵していた 31 分のうち `starve_window` 8 窓
+/// (合計 114 s) ＋ 120 s 級の欠測ブロック 2 回が出たのに、
+/// ★ **層 1 は一度も発火していない** (`gse-app.log` に `TapDisabled*` 起因の痕跡が無い)。
+/// → ⚠️ 「届かないまま飢える」型には**能動的に見に行く**しかない。
+///
+/// ★ 安全性は `TAP_PORT` の doc と**同じ根拠**による: この callout は
+/// `CFRunLoop::run_current()` 実行中にのみ、**hook スレッド自身の上で**走る。
+/// よって本体 (store / null クリア) と時間的に排他で、port は生存している。
+///
+/// ⚠️★★ **ここで `tracing` を呼ばない。** ★ runloop を止める長さの処理を入れない
+/// (`hook-constraints` 共通-1)。★ 記録は Atomic に置き、**liveness スレッドが読んで**書く。
+extern "C" fn watchdog_timer_callout(
+    _timer: core_foundation::runloop::CFRunLoopTimerRef,
+    _info: *mut std::ffi::c_void,
+) {
+    let port = TAP_PORT.load(Ordering::Acquire);
+    if port.is_null() {
+        return;
+    }
+    // SAFETY: port は同一 hook スレッドで格納/null クリアされる有効な CFMachPortRef
+    // (null チェック済み)。CGEventTapIsEnabled は副作用ゼロの read-only チェック、
+    // CGEventTapEnable は Apple 推奨の軽量な再有効化呼び出しで、どちらも tap の runloop
+    // スレッド (= この callout) から呼ぶのが正しい。
+    unsafe {
+        if !CGEventTapIsEnabled(port as CFMachPortRef) {
+            CGEventTapEnable(port as CFMachPortRef, true);
+            WATCHDOG_REENABLES.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+/// tap が有効か。★ **診断専用** (⚠️ 判定に使わない)。
+///
+/// 戻り値: `None` = tap がそもそも無い (未設置 / 失効直後)。`Some(bool)` = OS に聞いた結果。
+///
+/// ⚠️★★ 呼び出し元は liveness スレッド (hook スレッドではない)。
+/// ★ `CGEventTapIsEnabled` は read-only なので、他スレッドから読んでも tap の状態を変えない。
+/// ⚠️ port が同時に null クリアされうるが、`AtomicPtr` の load が null なら `None` を返すだけで、
+/// **非 null を掴んだ後に無効化される競合は残る** —— ★ だから**診断専用**であり、
+/// この値で復帰を決めない (⚠️ 復帰は層 2 が hook スレッド上で判断する)。
+pub(super) fn tap_is_enabled() -> Option<bool> {
+    let port = TAP_PORT.load(Ordering::Acquire);
+    if port.is_null() {
+        return None;
+    }
+    // SAFETY: 上記 doc のとおり read-only チェックのみ。null チェック済み。
+    Some(unsafe { CGEventTapIsEnabled(port as CFMachPortRef) })
+}
+
+/// 層 2 が tap を再有効化した累計回数 (★ 診断用)。
+pub(super) fn watchdog_reenables() -> u32 {
+    WATCHDOG_REENABLES.load(Ordering::Relaxed)
+}
+
+/// 層 3: フックの再設置を要求する。
+///
+/// ⚠️★★ **新しい復帰経路は書かない** (`hook.rs::request_reinstall` の doc と同じ約束)。
+/// ★ 既存の「`CFRunLoop::run_current()` を抜けて 2 秒後に tap を作り直す」経路
+/// (`hook_macos.rs` の `CGEventTap CFRunLoop exited`) を**起こすだけ**である。
+///
+/// 戻り値: run loop を掴めて停止要求を出せたら `true`。
+/// ⚠️ フック起動前 (`HOOK_RUNLOOP` 未格納) は `false` —— ★ **要求を出せていないので嘘をつかない**。
+pub(super) fn request_reinstall() -> bool {
+    let Some(rl) = HOOK_RUNLOOP.get() else {
+        return false;
+    };
+    REINSTALL_REQUESTS.fetch_add(1, Ordering::Relaxed);
+    // ★ run loop が回っていないタイミングで呼んでも無害 (何も起きない)。
+    //   ⚠️ その場合この要求は落ちるが、liveness は Down が続けば次のエピソードで再度呼ぶ。
+    rl.stop();
+    true
+}
+
 // ---------------------------------------------------------------------------
 fn handle_event(event_type: CGEventType, event: &CGEvent) {
     // F4: tap が OS 都合 (重い処理 / ユーザー入力割り込み) で無効化されたら
@@ -787,6 +899,27 @@ pub fn start() {
                     let run_loop = CFRunLoop::get_current();
                     // SAFETY: kCFRunLoopDefaultMode は CoreFoundation 定数。常に有効。
                     run_loop.add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
+
+                    // ★ 層 3 の手掛かりを 1 度だけ公開する (⚠️ 同じスレッドなので毎周同じ値)。
+                    let _ = HOOK_RUNLOOP.set(run_loop.clone());
+
+                    // ★ 層 2: watchdog timer を **この runloop に** 載せる。
+                    //   ⚠️ timer は tap を作り直すたびに作り直す —— ★ `CFRunLoopTimer` を
+                    //   ループ外の変数に持たせると Drop のタイミングが読みにくく、
+                    //   ⚠️ 「無効化された runloop に残った timer」を掴む余地が出る。
+                    //   ★ 毎周作れば、生存期間が run_current の 1 周と一致する。
+                    let watchdog = CFRunLoopTimer::new(
+                        // ★ 初回発火は 1 周期後 (⚠️ 起動直後は tap.enable() 済みで健全)。
+                        unsafe { core_foundation::date::CFAbsoluteTimeGetCurrent() }
+                            + WATCHDOG_INTERVAL_S,
+                        WATCHDOG_INTERVAL_S,
+                        0,
+                        0,
+                        watchdog_timer_callout,
+                        std::ptr::null_mut(),
+                    );
+                    // SAFETY: kCFRunLoopDefaultMode は CoreFoundation 定数。常に有効。
+                    run_loop.add_timer(&watchdog, unsafe { kCFRunLoopDefaultMode });
 
                     // タップを有効化してから HOOK_ACTIVE をセット。
                     // 50ms 待機でカーネルレベルのタップ活性化を確実にする。

@@ -324,9 +324,36 @@ mod hook_windows;
 #[path = "hook_macos.rs"]
 mod hook_macos;
 
+/// フックが既に起動しているか。⚠️★★★ **2 本目を立てさせないための門**である。
+static HOOK_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Install the platform-specific keyboard hook and begin delivering InputEvents to `sender`.
 /// Spawns a dedicated background thread; returns immediately.
-pub fn init_hook(sender: Sender<InputEvent>) {
+///
+/// ⚠️★★★ **2 回目以降は何もしない。** ★ 2026-09-06 に CI (self-hosted mac) が
+/// **SIGSEGV** で落ちて分かった: `hook_macos::start()` は無条件に `thread::spawn` するので、
+/// 2 回呼ぶと **hook スレッドが 2 本**立つ。
+/// ⚠️ すると `TAP_PORT` の安全性の根拠 —— 「書き込み (本体) と読み出し (callback) は
+/// **同一 hook スレッド**上で起き、**時間的に排他**」(`hook_macos.rs` の doc) —— が**破れる**。
+/// ★ 2 本目が `TAP_PORT` を上書きし、1 本目が `run_current` を抜けて null クリアする、
+/// といった順序が起きうるので、⚠️ **解放済みの port を触りうる** (UAF)。
+///
+/// ★ 本番の呼び出しは `lib.rs` の 1 か所だけ（★ grep で確認）なので実害は無かったが、
+/// ⚠️ **不変条件が「呼び出し規約」でしか守られていなかった**。→ ★ 門にした。
+///
+/// 戻り値: 実際に起動したら `true`。⚠️ 既に起動済みなら `false`（★ 何もしていない）。
+pub fn init_hook(sender: Sender<InputEvent>) -> bool {
+    use std::sync::atomic::Ordering;
+    if HOOK_STARTED
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        // ⚠️ 黙って無視しない（★ 「呼んだのに動いていない」を見えるようにする）。
+        tracing::warn!(
+            "init_hook called twice; the second call does nothing (hook already running)"
+        );
+        return false;
+    }
     let _ = EVENT_SENDER.set(sender);
 
     #[cfg(target_os = "windows")]
@@ -334,22 +361,71 @@ pub fn init_hook(sender: Sender<InputEvent>) {
 
     #[cfg(target_os = "macos")]
     hook_macos::start();
+
+    true
 }
 
 /// フックの再設置を要求する (silent death からの復帰・`decisions.md` D-3)。
 ///
-/// ⚠️★★ **新しい復帰経路は書かない。** 既存の「メッセージループを抜けて
-/// ループ先頭で再設置する」経路 (`hook_windows.rs` の `Keyboard hook message loop exited`)
-/// を**起こすだけ**である。★ 経路を増やすと、どれか 1 つが静かに壊れる。
+/// ⚠️★★ **新しい復帰経路は書かない。** 既存の「メッセージループ / run loop を抜けて
+/// ループ先頭で再設置する」経路 (Windows: `Keyboard hook message loop exited` /
+/// macOS: `CGEventTap CFRunLoop exited`) を**起こすだけ**である。
+/// ★ 経路を増やすと、どれか 1 つが静かに壊れる。
 ///
-/// 戻り値: 要求を送れたら `true`。macOS はタップ失効の再作成を自前で持つので `false`。
+/// ⚠️★★★ **2026-09-05 に macOS を実装した。** ★ それまで macOS は**定数 `false`** で、
+/// 「タップ失効の再作成を自前で持つので不要」と書いてあったが、⚠️ **その自前の再作成は
+/// OS が `TapDisabled*` を届けたときにしか動かない**。
+/// ★ 2026-09-04 の 8 時間実測で、打鍵していた 31 分のうち `starve_window` 8 窓 (合計 114 s)
+/// ＋ 120 s 級の欠測ブロック 2 回が出たのに **1 度も再設置されなかった**
+/// (`experiments/20260903-o1-runtime-cost/notes.md`)。
+///
+/// 戻り値: 要求を送れたら `true`。⚠️ フック起動前は `false` (★ 嘘をつかない)。
 pub fn request_reinstall() -> bool {
     #[cfg(target_os = "windows")]
     {
         hook_windows::request_reinstall()
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        hook_macos::request_reinstall()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         false
+    }
+}
+
+/// OS のフックが「有効」と答えるか。★ **診断専用** (⚠️ 判定に使わない)。
+///
+/// ⚠️★★ 目的は「**飢えの機序を 1 回で決着させる**」ことである。★ 2026-09-04 の実測では
+/// 120 s 級の欠測が「tap が disable されていた」のか「イベントが来なかっただけ」なのかを
+/// **区別する記録が無く**、直す対象の機序が決められなかった。
+///
+/// 戻り値: `None` = その OS では答えられない / フックがまだ無い。
+pub fn hook_reports_enabled() -> Option<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        hook_macos::tap_is_enabled()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // ⚠️ Windows の `WH_KEYBOARD_LL` には「有効か」を聞く API が無い
+        //   (★ `UnhookWindowsHookEx` するまで有効という以上のことは分からない)。
+        //   → ★ **答えられないことを `None` で表す** (⚠️ `Some(true)` と偽らない)。
+        None
+    }
+}
+
+/// フック監視スレッド (層 2) が自力で復帰させた累計回数。★ **診断専用**。
+///
+/// ⚠️ macOS 以外は層 2 を持たないので常に 0 (★ 「0 回起きた」ではなく「機構が無い」)。
+pub fn watchdog_recoveries() -> u32 {
+    #[cfg(target_os = "macos")]
+    {
+        hook_macos::watchdog_reenables()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        0
     }
 }

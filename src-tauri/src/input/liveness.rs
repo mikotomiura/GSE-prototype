@@ -397,6 +397,34 @@ pub fn reset_starvation_at_new_block(new_block_epoch: bool, starv: Starvation) -
 ///
 /// ⚠️ 1Hz の全 tick を残す案は採らない —— ★ **値の大半が 0** でログ量とバッテリに見合わない
 /// (ADR-013 D6)。★ 窓集計で「micro 帯が何割あるか」＝**投資判断の材料としては足りる**。
+/// 1 つの Down エピソードで層 3 (`request_reinstall`) を試す最大回数。
+///
+/// ⚠️★★★ **1 回で打ち切ってはいけないし、無制限にもできない。**
+/// ★ 2026-09-05 以前の実装は「Down を見たら 1 回だけ呼び、**戻り値に関わらず**
+/// 済みにする」だった —— ⚠️ macOS では常に `false` (何もしていない) が返っていたので
+/// **「試したことにして永久に諦める」**動きになっていた。
+/// → ★ **要求が実際に出た (true) ときだけ済みにし、出せなかった (false) ときは
+/// 上限まで再試行する。** ⚠️ 上限が無いと 1Hz で叩き続ける。
+pub const MAX_REHOOK_ATTEMPTS_PER_EPISODE: u32 = 3;
+
+/// 層 3 の再設置要求を今 tick で試すか。★ **OS 非依存の純関数** (⚠️ 両 OS でテストする)。
+///
+/// ★ 引数:
+/// - `is_down`: liveness が `HookHealth::Down` と判定しているか
+/// - `attempts`: この Down エピソードで**既に試した**回数
+/// - `succeeded`: この Down エピソードで**要求が出せた**か (★ 出せたらもう試さない)
+pub fn rehook_should_attempt(is_down: bool, attempts: u32, succeeded: bool) -> bool {
+    is_down && !succeeded && attempts < MAX_REHOOK_ATTEMPTS_PER_EPISODE
+}
+
+/// Down エピソードを閉じてよいか。★ 本物の復帰 (飢えが 0 に戻った) でのみ閉じる。
+///
+/// ⚠️ `HookHealth::Ok` になったかではなく **`starved_ms == 0`** で判断する
+/// (★ 既存の実装と同じ基準。⚠️ Suspect → Down → Suspect を 1 エピソードとして扱う)。
+pub fn rehook_episode_closed(starved_ms: u64) -> bool {
+    starved_ms == 0
+}
+
 pub const STARVE_WINDOW_MS: u64 = 60_000;
 
 /// 窓が閉じたときの集計結果。⚠️ ★ `n_lt30 == 0` の窓は**呼び出し側が出力しない**。
@@ -520,6 +548,70 @@ impl MicroStarveWindow {
 
 #[cfg(test)]
 mod tests {
+    // ⚠️★★★ **両 OS で走るテスト** (★ `cfg` で閉じない)。
+    //   memory `windows-only-code-needs-ci`: `cfg` で片側に閉じると、
+    //   相手側 OS の規則が未検証のまま残る。
+    #[test]
+    fn rehook_is_not_attempted_while_healthy() {
+        assert!(!super::rehook_should_attempt(false, 0, false));
+    }
+
+    #[test]
+    fn rehook_is_attempted_on_first_down_tick() {
+        assert!(super::rehook_should_attempt(true, 0, false));
+    }
+
+    #[test]
+    fn rehook_retries_until_a_request_actually_goes_out() {
+        // ★ 出せなかった (false) 間は上限まで再試行する。
+        //   ⚠️ 2026-09-05 以前は 1 回で諦めており、macOS では
+        //   **常に諦めていた** (request_reinstall が定数 false だったため)。
+        for a in 0..super::MAX_REHOOK_ATTEMPTS_PER_EPISODE {
+            assert!(
+                super::rehook_should_attempt(true, a, false),
+                "attempt {a} should still be allowed"
+            );
+        }
+        assert!(
+            !super::rehook_should_attempt(true, super::MAX_REHOOK_ATTEMPTS_PER_EPISODE, false),
+            "上限を超えたら諦める (1Hz で叩き続けない)"
+        );
+    }
+
+    #[test]
+    fn rehook_stops_once_a_request_went_out() {
+        assert!(!super::rehook_should_attempt(true, 0, true));
+    }
+
+    #[test]
+    fn rehook_episode_closes_only_on_real_recovery() {
+        assert!(super::rehook_episode_closed(0));
+        assert!(!super::rehook_episode_closed(1));
+        assert!(!super::rehook_episode_closed(120_000));
+    }
+
+    // ★ `hook::request_reinstall()` の**契約**を両 OS で確かめる (⚠️ 対のテスト)。
+    //   ⚠️ 実際に再設置は起きない (フック未起動なので macOS は false を返す)。
+    //   ★ 見たいのは「呼んでも落ちない」「bool を返す」という**署名と健全性**である。
+    #[test]
+    fn request_reinstall_is_callable_without_a_hook() {
+        let r = crate::input::hook::request_reinstall();
+        // ⚠️ フックを起動していないので、どちらの OS でも要求は出せない。
+        assert!(!r, "フック未起動なら要求は出せない (★ 嘘をつかない)");
+    }
+
+    #[test]
+    fn hook_reports_enabled_is_none_without_a_hook() {
+        // ★ macOS: tap が無いので None。★ Windows: そもそも答えられないので None。
+        //   ⚠️ どちらも `Some(true)` と偽らないことが要点。
+        assert_eq!(crate::input::hook::hook_reports_enabled(), None);
+    }
+
+    #[test]
+    fn watchdog_recoveries_starts_at_zero() {
+        assert_eq!(crate::input::hook::watchdog_recoveries(), 0);
+    }
+
     use super::*;
 
     const TICK: u64 = 1_000;

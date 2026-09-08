@@ -1,0 +1,12 @@
+2026-09-03T16:30:05Z === chain started (pid 99765) ===
+2026-09-03T16:30:05Z waiting for the with-gse sampler to finish
+2026-09-04T00:20:27Z with-gse finished: 881 lines
+2026-09-04T00:20:28Z stopping gse-next (force kill; no SIGTERM handler exists -> an orphan will be left on purpose)
+2026-09-04T00:20:36Z gse-next is down
+2026-09-04T00:20:36Z starting without-gse
+★ without-gse を macos で 8 時間ぶん測ります (間隔 30s)。
+⚠️ 途中で端末を閉じないこと。★ 結果: /Users/johnd/GSE-prototype/experiments/20260903-o1-runtime-cost/results/without-gse
+★ 終わりました。次: python3 /Users/johnd/GSE-prototype/experiments/20260903-o1-runtime-cost/scripts/summarize.py
+2026-09-04T08:20:41Z without-gse finished: 959 lines
+2026-09-04T08:20:41Z summary written (summarize.py exit=1)
+2026-09-04T08:20:41Z === chain done ===

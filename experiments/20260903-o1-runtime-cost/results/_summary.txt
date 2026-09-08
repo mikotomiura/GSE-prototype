@@ -1,0 +1,13 @@
+★ サンプル数: 880 (最小 480)
+
+  cpu_mean_pct                     0.98  PASS             ★ 合格
+  cpu_max_pct                      4.30  PASS             ★ 合格
+  rss_slope_mb_per_h               0.01  PASS             ★ 合格
+  rss_final_mb                    27.00  PASS             ★ 合格
+  battery_drop_pt_per_8h              —  DataInsufficient ⚠️ 測れていない
+  ndjson_mb_per_day               11.05  PASS             ★ 合格
+
+⚠️ バッテリーの値が取れていない → 増分は判定できない。
+
+総合: DataInsufficient
+⚠️ ★ notes.md に、どの指標がなぜ外れたかを書くこと。

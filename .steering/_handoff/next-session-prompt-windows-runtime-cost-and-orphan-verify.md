@@ -23,14 +23,50 @@
 
 → ★ **数字・状態・手順は必ず自分で確かめ直すこと。**
 
+### 0-1b. ⚠️★★★ **2026-09-05 に前提が変わった**（★ この節が最新・上の 0-1 より優先）
+
+★ Mac 側で 8 時間の再測を 2 本回し、⚠️ **計器の欠陥を 6 件**見つけて直した。
+→ ⚠️ **このメモの下半分（§1 以降）は 2026-09-03 に書かれたもので、手順が古い。**
+
+| ★ 変わったこと | ⚠️ Windows でどう効くか |
+|---|---|
+| ★ 指標 3 が「バッテリー %」→ **プロセス単位のエネルギー影響** (`top -stats power`) | ⚠️ **Windows には相当する公開指標が無い。** ★ `sample-windows.sh` は 7・8 列目を**空**で出し、集計は「**windows では測れない**」と表示する（⚠️ 「壊れている」ではない）。→ ★ **総合は必ず `DataInsufficient` になる。それが正しい。** |
+| ⚠️ **対照 (`without-gse`) は廃止**した | ★ **回さないこと。** ⚠️ GSE が居ない条件では全列 0 になるだけで、8 時間が無駄になる（★ Mac で実際に無駄にした） |
+| ★ `run.sh` が **開始時のスナップショット** (`ndjson-size-start.tsv`) を取るようになった | ★ これが無いと集計は NDJSON を**判定しない**（⚠️ 推定を実測として返さないため）。★ 新しい `run.sh` を使えば自動で取れる |
+| ⚠️ **順序が指標 5（起動コスト）を決める** | ★ **サンプラを先に起こし、1 分の基線（全列 0）を取ってから GSE を起動する。** ⚠️ 起動後から測ると起動コストは**原理的に測れない** |
+| ⚠️ **35 秒間隔では起動の山を拾えない**（★ 孤児回収の走査は約 1.5 秒） | ★ 8 時間の本測とは**別に**、`GSE_COST_DURATION_S=300 GSE_COST_INTERVAL_S=1` の短い run を 1 本足すと山が見える |
+| ★ `request_reinstall()` の判定が変わった（PR #158） | ⚠️ 旧: 戻り値に関わらず 1 回で諦める → 新: **出せたときだけ済み・出せなければ上限 3 回**。★ Windows は元々 `true` を返すので**実質不変のはずだが、実機で確かめること** |
+| ★ 送信 timeout が 180 → **300 秒**（PR #159） | ⚠️ `LOCK_STALE_AFTER >= timeout × 10` の不変条件がある（★ 600 秒にすると壊れる） |
+
+### 0-1c. ⚠️★★★ **走らせる前に必ずやる 1 分スモーク**（★ これを飛ばさない）
+
+⚠️ 2026-09-05 に、**Windows のサンプラが 6 列しか出さない**のに `run.sh` のヘッダが 8 列、という
+欠陥を**渡す直前に見つけた**（★ そのまま 8 時間回していたら丸損だった）。→ ★ 直してあるが、
+⚠️ **自分で確かめること**:
+
+```bash
+cd /path/to/GSE-prototype
+D=experiments/20260903-o1-runtime-cost
+# ★ GSE を起動した状態で 1 分だけ回す
+GSE_COST_DURATION_S=60 GSE_COST_INTERVAL_S=10 bash $D/run.sh with-gse
+cat $D/results/with-gse/samples.tsv
+#   ★ 期待: **8 列**。1〜6 列目に実値、7・8 列目は **空**（⚠️ 0 ではない）
+awk -F'\t' 'NR==2{print "列数 =", NF}' $D/results/with-gse/samples.tsv   # ★ 8 のはず
+rm -rf $D/results/with-gse    # ★ スモークは捨てる
+```
+
+⚠️ **CPU% の意味が macOS と違う**（★ `sample-windows.sh` のコメント）:
+Windows の `% Processor Time` は**全コア合計に対する %**、macOS の `top` は **1 コア = 100%**。
+→ ⚠️ **2 つの OS の CPU 平均を直接比べない。** ★ 比べるならコア数で割って揃える。
+
 ### 0-2. ★ 現状を測る（⚠️ 下は「書かれた時点」の値）
 
 ```bash
 # ⚠️★★★ Windows では **git-bash** を使う（PowerShell では hook もスクリプトも動かない）
 cd /path/to/GSE-prototype
 git fetch origin && git checkout main && git pull --ff-only
-git log --oneline -3                      # ★ 2026-09-03 時点 4a27a5e (PR #151 マージ済み)
-cd src-tauri && cargo test --workspace    # ★ 同 575 緑 (--features package 時)
+git log --oneline -3                      # ★ 2026-09-05 時点 8541497 (PR #158/#159 マージ済み)
+cd src-tauri && cargo test --features package --workspace   # ★ 同 583 緑 (⚠️ --features package を落とすと 34 件走らない)
 ```
 
 ### 0-3. ⚠️★★★ **最初に読む一次資料**（★ これを読まずに始めない）

@@ -303,6 +303,28 @@ function check(name, fn, expectOk) {
   });
 }
 
+{
+  // ⚠️★★★ **上限が「到達可能」であること**（★ 2026-09-05 に実測して足した）。
+  //
+  //   ★ 稼働中の受け口へ実際に POST して測った
+  //   (`experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md`):
+  //     raw 36 MB（本文 48.0 MB）… ★ **通る**（97.3 s）
+  //     raw 40 MB（本文 53.3 MB）… ⚠️ **HTTP 400** —— Apps Script Web App の
+  //       **HTTP 本文の上限が先に効き、Google が `doPost` に届く前に弾く**。
+  //
+  //   ⚠️ そのとき受け口の `too large` は**返らない** = 研究者にも被験者にも理由が伝わらない。
+  //   → ★ `MAX_BYTES` を到達不能な値にすると、**上の「上限の検査」が意味を失う**
+  //     （★ 実際 2026-09-05 まで 48 MB で、⚠️ **一度も到達できなかった**）。
+  const REACHABLE_MAX = 36 * 1024 * 1024; // ★ 実測で通った最大（raw）
+  const ctx = makeCtx(makeFolder(), SECRET);
+  cases.push({
+    name: `上限が到達可能な範囲にある（<= 36 MB・実測）`,
+    ok: ctx.MAX_BYTES <= REACHABLE_MAX,
+    expectOk: true,
+    got: { MAX_BYTES: ctx.MAX_BYTES, reachable_max: REACHABLE_MAX },
+  });
+}
+
 // --- 6. 空 / 壊れた本文 → 止まるべき ------------------------------------------
 {
   const ctx = makeCtx(makeFolder(), SECRET);
