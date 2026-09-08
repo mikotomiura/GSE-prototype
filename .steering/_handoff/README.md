@@ -11,6 +11,10 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| ★★★ **ADR-028 完了後（`W-3` を閉じた・次はこれ）** | `next-session-after-adr028.md` | ✅ **現行**（2026-09-08・**未着手**）。⚠️★★★ **第一候補は B-0「未処理の完了処理 3 件」** —— ★ **設計スライドの `git commit`（4 日間未了・未コミット 24 ファイル）／ `secrets-filter` のレビュー ＋ `/finish-task` ／ 層 A 試視の `/cross-review` ＋ `/finish-task`**。★ 設計トラックの第一候補は **`W-1`（wire protocol・⚠️ ようやく書ける。宿題が 4 つに増えた）**、次いで **`W-4`（`level` への写像定義と実測・`W-1` の前段だが単独で進む）**。★ ほかに `PS-Q10` / `.idea` §4 / `PS-Q8` / `E-12` / M1 Step 2b |
+| ~~ADR-027 完了後~~ | `next-session-after-adr027.md` | ✅ **置換済み**（2026-09-08 → **上の行**）。★ **B-0（secrets-filter）は消化済み**（4 コミット投入・⚠️ **レビューと `/finish-task` だけ残**）／★ **B-4 の `W-3` は ADR-028 で閉じた**（⚠️ **`W-1` は未着手**） |
+| ⚠️★★★ **層 A 試視の準備（一部消化）** | `next-session-layerA-trial-readiness.md` | ⚠️ **一部消化**（2026-09-08）。★ **実装・機械検査・ブラウザ実測・`code-reviewer`/`security-checker` は完了**（`edf2199` ほか）。⚠️ **残は `/cross-review`（コミット後・パス限定）と `/finish-task`** |
+| ~~ADR-026 完了後~~ | `next-session-after-adr026.md` | ✅ **置換済み**（2026-09-08・→ `next-session-after-adr027.md` → さらに `…adr028.md`） |
 | ★★★ **B1 完了後（アートの議論が解禁）** | `next-session-after-b1.md` | ✅ **現行**（2026-09-06・**未着手**）。⚠️★★★ **第一候補は B-0 の未決**（★ 研究者提起: アウトカムを「立ち直った」から**「戻った」**へ寄せるか —— ★ 推定器を 1 か所も通らなくなるが、構成概念は弱くなる **交換**）。★ 次いで、⚠️★★★ **研究者が後回しにした「アート（表現の形）の議論」が解禁されている**。★ 候補は **B-1 アート（第一候補・ADR-023 M9 の未決 2 件）／ B-2 M3（`p_flow` 依存の是正・単独コミット）／B-3 M2（改名）／ B-4 M1 Step 2b（優先度低）**。⚠️ **B1 の結果を GSE の期待値に使わない**（★ 測定手続きが違う） |
 | **B1（再開ベースラインの実測）→ M1（観測設計）** | `next-session-interruption-resumption-experiment.md` | ✅ **完了**（2026-09-06）。★ **B1 = 実行済み**（`experiments/20260906-p321-resumption-baseline/`・[P321] の既報値 **12 項目**で検算済み・**R₀=0.787 / R₁=0.822 / R₀′=0.674**）。★ **M1 = 設計まで**（`experiments/20260906-interruption-resumption-arm1/`）——⚠️★★★ **アウトカムの本解析（Step 2b）は未実装**。★ 主な発見: ⚠️ **分母より分子のほうが 3 倍効く**（−3.5pt ⇄ **+11.2pt**）/ ⚠️ **未 fix の episode ほど外部資源を *より多く* 参照していた**（37.5% ⇄ 17.8%） |
 | **表現層の最終サーヴェイ → ADR-023 の起票** | `next-session-expression-final-survey-and-adr023.md` | ✅ **完了**（2026-09-06）。★ **ADR-023 は Accepted で起票済み**（`docs/adr/ADR-023-coupling-as-primary-outcome.md`・1012 行）。⚠️ 続きは §Migration の M1〜M11 に割られており、**下 2 行**へ引き継いだ |

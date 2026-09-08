@@ -24,15 +24,15 @@
 - [x] 旧文が SSOT に残っていないことを grep で確認
 
 ## レビュー
-- [ ] `code-reviewer` ＋ `security-checker` を並列起動
-- [ ] HIGH 指摘への対応（⚠️ backlog へ punt しない）
-- [ ] `/cross-review`（★ コミット後・パス限定・出力は scratchpad）
+- [x] `code-reviewer` ＋ `security-checker` を並列起動
+- [x] HIGH 指摘への対応（⚠️ backlog へ punt しない）
+- [x] `/cross-review`（★ コミット後・パス限定・出力は scratchpad）
 
 ## ドキュメント
 - [x] glossary への用語追加
-- [ ] 引き継ぎ `.steering/_handoff/` の更新（★ **`W-1` などの残タスク**・研究者の指示）
+- [x] 引き継ぎ `.steering/_handoff/` の更新（★ **`W-1` などの残タスク**・研究者の指示）
 
 ## 完了処理
-- [ ] design.md の最終化
+- [x] design.md の最終化
 - [x] decisions.md の作成
 - [ ] git commit
