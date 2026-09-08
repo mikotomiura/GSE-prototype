@@ -156,6 +156,23 @@ expect_blocked "★★★ 除去ヘッダに資料のファイル名を載せな
   rm -f "$rep"
 }
 
+echo "--- 2e. ★★★ Codex の第二意見で足した陽性対照 ---"
+# ⚠️★★★ 「どの行をパス行とみなすか」が曖昧だと同じ穴がまた開く。
+#   ★ すべて同じ分類関数を通す契約を、テストで固定する。
+expect_blocked "★★★ rename from (proprietary)" 'rename from docs/x.pptx' ''
+expect_blocked "★★★ rename to (proprietary)"   'rename to docs/y.pptx' ''
+expect_blocked "★★★ copy from (ndjson)"        'copy from data/s.ndjson' ''
+expect_blocked "★★★ Index: 行 (proprietary)"    'Index: docs/x.pptx' ''
+expect_blocked "★★★ --no-prefix の裸パス"       'diff --git docs/x.pptx docs/x.pptx' ''
+expect_blocked "★★★ +++ の Markdown 版"         '+++ docs/x.pptx.md' ''
+# ⚠️★★★ **git の生出力の形**（★ security-checker / Codex の両方が指摘）——
+#   ★ 今回の見逃しの原因は「検査の入力の形が実物と違ったこと」そのものである。
+#   ★ 実物は **リテラルのバックスラッシュ ＋ 8 進**（`\346\217\220`）であり、生 UTF-8 ではない。
+expect_blocked "★★★ git の生出力の形 (C-quote の 8 進表記)" \
+  'diff --git "a/docs/[\346\217\220\346\241\210]x.pptx" "b/docs/[\346\217\220\346\241\210]x.pptx"' ''
+expect_blocked "★★★ 同上・Markdown 版" \
+  'diff --git "a/docs/[\346\217\220]x.pptx.md" "b/docs/[\346\217\220]x.pptx.md"' ''
+
 echo "--- 3. ★ 陰性対照 (ふつうのコードは 1 バイトも変えない) ---"
 # ⚠️★★ 架空名は**素通りさせる** —— ここで止めると検査の見本を含む diff が毎回 exit 2 になり、
 #   ★ 人がフィルタを迂回する動機を作る。★ 架空名の約束は「年が 202x でない」こと。
@@ -173,6 +190,10 @@ expect_clean "★ 引用符つきだが普通の .md"   'diff --git "a/docs/æ
 # ⚠️ 拡張子の途中一致で誤爆しないこと (★ .key と .keyboard を混同しない)
 # ⚠️ `awk -v` は `\.` を素の `.`（任意 1 文字）へ降格させる。★ 実測で `axpptx` が
 #   over-block されていた。→ ★ `ENVIRON[]` 経由に変えた。★ これはその回帰。
+expect_clean "★ --- /dev/null は素通り（★ 新規ファイルの追加）" \
+  '--- /dev/null'
+expect_clean "★ 引用符つきの普通の .rs（★ バックスラッシュ境界化で壊れない）" \
+  'diff --git "a/src/[\346\217\220]x.rs" "b/src/[\346\217\220]x.rs"'
 expect_clean "★ axpptx は .pptx ではない（★ 正規表現の降格検知）" \
   'diff --git a/axpptx b/axpptx'
 expect_clean "★ xdocx / ypdf も同様" \

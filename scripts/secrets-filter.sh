@@ -127,7 +127,12 @@ function drop_hunk(reason) {
 #   ⚠️ 引用符つきファイル名 (git の C-quote) に効くよう、判定前に引用符を空白へ正規化する。
 function classify(head,   low) {
   low = tolower(head)
-  gsub(/"/, " ", low)
+  # ⚠️★★★ **パスを「正しく読む」のではなく、危険文字を境界として潰す。**（★ Codex の第二意見）
+  #   ★ awk で C-quote を完全デコードするのは実装ミスの温床であり、
+  #     ★ ここの用途は **パスの復元ではなく遮断**なので、保守的な正規化で足りる。
+  #   ★ 引用符 ＋ **バックスラッシュ系列**（`\346\217\220` のような 8 進表記）を境界にする。
+  #   ⚠️ 拡張子は ASCII なので、この正規化で判定が壊れることはない（★ テストで固定）。
+  gsub(/["\\]/, " ", low)
   if (low ~ /\.(env|pem|key)([[:space:]]|$)/) return "env/pem/key"
   if (low ~ /credentials|secret/)              return "credentials"
   if (low ~ /\.ndjson([^a-z0-9_]|$)/)          return "ndjson"
@@ -160,7 +165,10 @@ in_pem {
 
 # ⚠️ ヘッダの別形式。★ ここでは **skip を立てるだけで解除しない**
 #   (★ `---` と `+++` は同じファイルの 2 行なので、途中で解除すると揺れる)。
-/^(--- |\+\+\+ |Binary files )/ {
+# ★ 2026-09-08 追加（Codex の第二意見）: `rename from/to` / `copy from/to` / `Index:` も通す。
+#   ⚠️ **「どの行をパス行とみなすか」が曖昧だと同じ穴がまた開く** ——
+#   ★ 形式が増えるたびに書き足すのではなく、**すべて同じ分類関数 `classify()` を通す契約**にする。
+/^(--- |\+\+\+ |Binary files |rename (from|to) |copy (from|to) |Index: )/ {
   if (!skip_hunk) {
     reason = classify($0)
     if (reason != "") { drop_hunk(reason); next }
