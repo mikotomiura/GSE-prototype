@@ -184,6 +184,10 @@ client_secret*.json
 #   ★ スクリプトが書くファイルは全てここで塞ぐ (docs/development-guidelines.md §10)。
 out.json
 out.csv
+# ⚠️★★★ 2026-09-08 追加。★ `out.txt` は **第三者論文の本文抽出**が置かれていた
+#   (未追跡かつ ignore 対象外・16KB・実測)。⚠️ 著作物の全文をリポジトリへ入れない。
+#   ★ 抽出は scratchpad で行い、残すのは `docs/literature/` のカードと `docs/references.md` の書誌である。
+out.txt
 snapshot*.json
 *.snapshot.json
 *.feat.csv
