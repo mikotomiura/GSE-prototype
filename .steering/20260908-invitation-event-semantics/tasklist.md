@@ -27,13 +27,13 @@
 ## レビュー
 - [x] `code-reviewer` ＋ `security-checker` を並列起動
 - [x] HIGH 指摘への対応（⚠️ backlog へ punt しない）—— ★ **HIGH 4 件すべて本タスクで消化**
-- [ ] `/cross-review`（★ コミット後・パス限定・出力は scratchpad の絶対パス）
+- [x] `/cross-review`（★ コミット後・パス限定・出力は scratchpad の絶対パス）—— ★ **2 巡実施**（exit 0 / 重大 1 ＋ High 1 を含む 9 件を消化）
 
 ## ドキュメント
 - [x] glossary への用語追加
-- [ ] 引き継ぎ `.steering/_handoff/` の更新
+- [x] 引き継ぎ `.steering/_handoff/` の更新（★ `next-session-after-adr027.md` を新設し、adr026 に置換通知）
 
 ## 完了処理
 - [x] design.md の最終化
 - [x] decisions.md の作成
-- [ ] git commit
+- [x] git commit
