@@ -35,4 +35,4 @@
 ## 完了処理
 - [x] design.md の最終化
 - [x] decisions.md の作成
-- [ ] git commit
+- [x] git commit
