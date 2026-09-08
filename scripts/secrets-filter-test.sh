@@ -66,6 +66,46 @@ expect_blocked ".env"                           'diff --git a/x.env b/x.env'    
 expect_blocked "★ 大文字の proprietary 拡張子"  'diff --git a/R.PDF b/R.PDF'         ''
 expect_blocked "credentials を含む名前"         'diff --git a/my_credentials b/my_credentials' ''
 
+echo "--- 2c. ★★★ 引用符つきのファイル名 (2026-09-08: fail-closed が開いていた形) ---"
+# ⚠️★★★ git は **非 ASCII を含むファイル名を C-quote して引用符で囲む**
+#   (`core.quotepath` の既定は true。★ 本 repo は未設定＝既定なので **常にこの形**)。
+#   ★ ところが判定は行末 `$` に依存しており、末尾が `"` になる引用符つきでは当たらなかった。
+#   ⚠️★★★ **実測 (2026-09-08)**: 作業ツリーの実 diff (日本語名の .pptx / .pptx.md) は
+#     **rc=0 で素通りし、追加行 257 行がそのまま出力に残った**。
+#   ⚠️ 既存ケース (`a/R.PDF` / `a/x.env`) が **引用符なしの形しか試していなかった**ため見逃していた。
+#     → ★ **検査の「入力の形」を実物に合わせる。**
+expect_blocked "★★★ 引用符つき .pptx (日本語名)"   'diff --git "a/docs/æ¥.pptx" "b/docs/æ¥.pptx"' ''
+expect_blocked "★★★ 引用符つき .env"   'diff --git "a/æ¥.env" "b/æ¥.env"' ''
+expect_blocked "★★★ 引用符つき .pem"   'diff --git "a/æ¥.pem" "b/æ¥.pem"' ''
+expect_blocked "★★★ 引用符つき .key"   'diff --git "a/æ¥.key" "b/æ¥.key"' ''
+expect_blocked "★★★ 引用符つき大文字 .PDF"   'diff --git "a/æ¥.PDF" "b/æ¥.PDF"' ''
+# ★ 2026-09-08 (研究者判断): proprietary 資料の **Markdown 版**も止める。
+#   ⚠️ 実測で `.pptx` を止めても `.pptx.md` から本文 257 行が出ていた。
+#   ★ 拡張子が .md なのは変換の都合にすぎず、守るべき中身は同じである。
+#   ⚠️ 副作用を承知で入れている: 未踏提出物に触る diff は毎回 rc=2 になる
+#     → そのときは --ack-filtered (人が中身を確かめてから通す) で運用する。
+expect_blocked "★★★ .pptx.md (proprietary の Markdown 版)" 'diff --git a/docs/deck.pptx.md b/docs/deck.pptx.md' ''
+expect_blocked "★★★ .docx.md (同上)" 'diff --git a/docs/spec.docx.md b/docs/spec.docx.md' ''
+expect_blocked "★★★ 引用符つき .pptx.md (★ 実物の形)" 'diff --git "a/docs/x.pptx.md" "b/docs/x.pptx.md"' ''
+expect_blocked "★★★ 引用符つき .ndjson (★ 元から塞がっていた側の回帰)"   'diff --git "a/æ¥.ndjson" "b/æ¥.ndjson"' ''
+# ⚠️★ **本文が実際に落ちるか**まで見る (★ rc だけ見ると「検出したが出力に残る」を見逃す)。
+{
+  total=$((total + 1))
+  out=$(printf 'diff --git "a/æ¥.pptx" "b/æ¥.pptx"
+@@ -1 +1 @@
++PROPRIETARY_BODY_TEXT
+' | "$FILTER"); rc=$?
+  if [ "$rc" -ne 2 ]; then
+    echo "NG   ★ 引用符つき .pptx の本文除去 → rc=$rc (2 を期待)"
+    ng=$((ng + 1))
+  elif printf '%s' "$out" | grep -qF 'PROPRIETARY_BODY_TEXT'; then
+    echo "NG   ★ 引用符つき .pptx の本文除去 → rc=2 だが **本文が残っている**"
+    ng=$((ng + 1))
+  else
+    echo "OK   ★ 引用符つき .pptx → rc=2 / 本文は残っていない"
+  fi
+}
+
 echo "--- 2b. ★★★ 実セッション名 (2026-08-14: 実際に外部 LLM へ出た形) ---"
 # ⚠️★★★ 下の 2 つは 2026-08-14 まで **rc=0 で素通り**していた。
 #   ★ (b) の連結形が**実際に事故った形**であり、(a) だけ足しても再発を止められない。
@@ -87,6 +127,12 @@ expect_clean "ふつうの Rust"      'pub fn next_block_number(dir: &Path) -> u
 expect_clean "ふつうのコメント"   '// 送信先は配布フォルダの設定ファイルから読む'
 expect_clean "ふつうの diff 見出し" 'diff --git a/src-tauri/src/reconcile.rs b/src-tauri/src/reconcile.rs'
 expect_clean "型注釈のコロン"     'let block: u32 = 3;'
+# ⚠️★★★ 2026-09-08 追加の陰性対照 —— ★ **引用符つきでも「ふつうのファイル」は素通りすること。**
+#   ★ これが無いと「引用符が付いていたら全部止める」実装でも緑になってしまう。
+expect_clean "★ 引用符つきだが普通の .rs"   'diff --git "a/src/æ¥.rs" "b/src/æ¥.rs"'
+expect_clean "★ 引用符つきだが普通の .md"   'diff --git "a/docs/æ¥.md" "b/docs/æ¥.md"'
+# ⚠️ 拡張子の途中一致で誤爆しないこと (★ .key と .keyboard を混同しない)
+expect_clean "★ .keyboard.rs は .key ではない"   'diff --git a/src/keyboard.rs b/src/keyboard.rs'
 
 echo "--- 4. ★ レポート (SECRETS_FILTER_REPORT) に値そのものを書かない ---"
 # ⚠️ レポートは `--ack-filtered` のときに **端末へ出す**。値を書くと

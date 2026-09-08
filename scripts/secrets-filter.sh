@@ -77,7 +77,19 @@ SECRET_PATTERNS=(
 SECRET_REGEX=$(IFS='|'; echo "${SECRET_PATTERNS[*]}")
 
 # Proprietary 拡張子 (docs/external-skills.md の「外部 LLM 送信禁止」と整合)
-PROPRIETARY_EXTS_REGEX='\.(pdf|docx|xlsx|pptx)$'
+# ⚠️★★★ 2026-09-08 修正: 終端を `$` にしない。
+#   ★ git は **非 ASCII を含むパスを C-quote して引用符で囲む** (`core.quotepath` の既定 true)。
+#     → 行末が `"` になるので `$` 終端はすべて空振りしていた (★ 下の正規化と対で直す)。
+#   ⚠️ **`([^a-z0-9]|$)` には広げない** —— ★ それだと `.pptx.md` まで止まり、
+#     現行仕様 (`docs/external-skills.md` は拡張子 4 種のみを禁止) を**勝手に拡大**することになる。
+#     ★ `.pptx.md` を送信禁止に含めるかは **別の判断**であり、研究者に委ねる。
+#   ★ **2026-09-08 追加: `.pptx.md` / `.docx.md` も止める**（★ 研究者判断）——
+#     ⚠️ 実測: `[提案…]GSE設計スライド.pptx.md` は **中身が pptx の本文そのもの**（md2pptx の入力）で、
+#     ★ `.pptx` バイナリを止めても **Markdown 版から本文 257 行が外へ出ていた**。
+#     ⚠️ 拡張子が `.md` なのは *変換の都合* にすぎず、守るべき中身は同じである。
+#   ⚠️ **副作用を承知で入れている**: 未踏提出物に触る diff は毎回 rc=2 になる。
+#     → ★ そのときは `--ack-filtered`（★ 人が [REDACTED] の中身を確かめてから通す）で運用する。
+PROPRIETARY_EXTS_REGEX='\.(pdf|docx|xlsx|pptx)(\.md)?([[:space:]]|$)'
 
 REPORT="${SECRETS_FILTER_REPORT:-}"
 [ -n "$REPORT" ] && : > "$REPORT"
@@ -99,6 +111,15 @@ in_pem {
 /^diff --git/ {
   skip_hunk = 0
   lower_head = tolower($0)
+  # ⚠️★★★ 2026-09-08 追加 —— **fail-closed が引用符つきファイル名に対して開いていた。**
+  #   ★ git のヘッダは非 ASCII 名でこうなる (★ 実測):
+  #       diff --git "a/docs/[æ...]GSEè¨­...pptx" "b/..."
+  #   ⚠️ 末尾が `"` なので `$` 終端の判定が当たらず、
+  #     ★ **実物の diff が rc=0 で素通りし、本文 257 行がそのまま出力に残っていた**
+  #     (★ 陽性対照: 同じ内容でも ASCII 名なら rc=2 で止まる ＝ **違いは引用符だけ**)。
+  #   → ★ 判定の前に **引用符を空白へ置き換えて正規化する** (★ 区切りとして働かせる)。
+  #   ⚠️ 既存テストが `a/R.PDF` のような **引用符なしの形しか試していなかった**ため見逃していた。
+  gsub(/"/, " ", lower_head)
   if (lower_head ~ /\.(env|pem|key)([[:space:]]|$)/) skip_hunk = 1
   if (lower_head ~ /credentials|secret/) skip_hunk = 1
   # NDJSON セッションログ (キーストローク動態) は外部 LLM 送信禁止。
