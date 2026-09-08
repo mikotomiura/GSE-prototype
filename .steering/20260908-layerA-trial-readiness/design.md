@@ -1,30 +1,61 @@
 # 設計
 
-> ⚠️★★★ **未着手である**（★ 2026-09-08 は起票のみで中断した）。
-> ★ **設計を書く前に、`requirement.md` の「含めるか未確定」を裁くこと** ——
-> ★ **`E-12` の二重課題を「層 A のハーネス」と「PC 面の別実験」のどちらへ置くか。**
-> ⚠️ **決めずに設計すると、測った物と閉じたい未決が食い違う。**
+> ★ **2026-09-08（2 セッション目）に実装した。**★ 裁定の根拠は `decisions.md` 判断 1–5、
+> ★ 実測は同 F1–F12。⚠️ **本ファイルは「何をどう作ったか」であって、根拠の SSOT ではない。**
 
 ## 実装アプローチ
 
-★ **次セッションで書く。**★ 入口は `.steering/_handoff/next-session-layerA-trial-readiness.md` §A。
+### 1. ★ 周辺視ブロック（`A-4`）—— **中心対照を同じ提示時間で内蔵する**
 
-## 変更対象（★ 見込み・確定していない）
+⚠️★★★ **本ブロックの背骨は「偏心」ではなく「対照」である。**
+★ 固視を強制できない（アイトラッカーが無い）ので、**提示を短くして視線が届く前に打ち切る**。
+⚠️ しかしそれだけだと **偏心と提示時間が交絡する**（★ 落ちても偏心のせいと言えない）。
+→ ★ **同じ提示時間の中心対照を同じブロックに入れて、偏心だけを動かせるようにした。**
 
-### 修正するファイル
-- `experiments/20260902-expression-layerA-visual/player/layerA.html` — 周辺視ブロック / 中止ボタン / `1b'` の DOM 分離
-- `experiments/20260902-expression-layerA-visual/layerA.config.json` — ⚠️ **周辺視の枠が既にある**（★ 値を埋める）
-- `experiments/20260902-expression-layerA-visual/scripts/selftest.py` — 機械検査の追随
-- `experiments/20260902-expression-layerA-visual/notes.md` — §現況 / §5 の更新
+| 何 | 値 | どこ |
+|---|---|---|
+| 偏心 | **10°**（左右ランダム化・level ごとに層別） | `peripheral_test.eccentricity_deg` / `positions` |
+| 提示 | **150 ms** ＋ マスク 300 ms | `peripheral_test.stimulus_ms`（⚠️ **一次の裏づけ無し**と config に明記） |
+| 内訳 | 偏心 **16** ＋ 中心対照 **8** | `trials` / `control_center_trials` |
+| variant | **`natural` 固定** | `peripheral_test.variant` |
+| 実施可否 | ★ **入らない画面では開かない** | `perGeometry()` / `perSyncButton()` |
 
-## テスト戦略
+### 2. ★ 中止をオーバーレイの中へ（★ 未対応 2 件を 1 つの修正で消す）
 
-- ★ **機械検査を追随させる**（★ Python / ページ内の両方）
-- ⚠️★★★ **検査を「正常 / 不在 / 壊れている」の 3 状態で試す**（`verify-before-claiming` ルール 5b）
-  —— ★ **本ハーネスは「機械検査 42 項目が緑のまま HIGH 5 件を見逃した」実績がある。**
-- ★ **ブラウザ実測**（`browser-verification` —— ⚠️ **機械検査が緑でも読めるかは何も分からない**）
+★ `overlayOn(boxId, label, onAbort)` が **`#ovl-abort`（`z-index: 10000`）を生成**し、
+`overlayOff` が消す。→ ★ **4 ブロック（1a / 1b・1b′ / 2 / 3）すべてが中止できる。**
+★ 中止は **その場で途中結果を破棄**し、**破棄の告知はオーバーレイのラベルに載せる**
+（⚠️ 状態欄は進捗で即上書きされるうえ、試行中はオーバーレイの下にある）。
+
+### 3. ★ `logAbort(msg, taught)` —— 宛先の切り替え
+
+★ 刺激 DOM の共有は**残す**（⚠️ それが「1b と同一手続き」の担保）。★ 直すのは宛先だけ。
+
+### 4. ★ `blockRunning()` —— グローバル参照を関数へ閉じ込める
+
+⚠️ `selftest()` の局所変数 `per`（振動の周期）にグローバルの `per`（周辺視の状態）が隠された。
+→ ★ 参照を関数に閉じ込め、局所名を `oscPeriodSec` に直した。
+
+## 変更したファイル
+
+| ファイル | 何 |
+|---|---|
+| `player/layerA.html` | 周辺視ブロック / 中止のオーバーレイ化 / `logAbort` / 先行手掛かりの除去 / ページ内検査 **14 → 21** |
+| `layerA.config.json` | `peripheral_test` の枠を埋めた（★ 値 ＋ **なぜその値か** の注記） |
+| `scripts/selftest.py` | 検査 **41 → 60** ／ `--selfcheck` に **HTML の壊し 10 件**を新設 |
+| `notes.md` / `SEED` / `env.md` / `data.md` | 現況・出題順・環境要因・生成データの追随（★ stale だった数を実測で直した） |
+
+## テスト戦略（★ 実行した結果）
+
+- ★ `bash run.sh check` → **60 PASS / 0 FAIL**
+- ★ `python scripts/selftest.py --selfcheck` → **config 8 / 8 ＋ HTML 10 / 10**
+- ★ ページ内機械検算 → **21 / 21 緑**（★ ブラウザで実測）
+- ★ ブラウザ実測（`browser-verification`）: 実施可否ゲートの**両側** / 幾何 / 位相の**順序** /
+  中止の **hit-test（対照つき）** / 先行手掛かりの除去（`MutationObserver`）
+- ⚠️★★★ **実時間の提示は測っていない**（★ 背面タブでは `rAF` が止まる）。★ `notes.md` §3c 末尾に明記。
 
 ## ロールバック計画
 
-★ **`experiments/` 配下のみなので `git revert` で戻る。**
-⚠️ ただし **`SEED` を再固定した場合は、過去の結果と比較できなくなる**ので `data.md` に境界を書くこと。
+★ `experiments/` 配下のみなので `git revert` で戻る。
+⚠️ **`SEED` は再固定していない**（★ 既存 seed は 1 つも変えていない。★ 周辺視の `20260904` は
+config に元から書かれていた値である）→ ★ **過去の結果との比較可能性は壊れていない。**
