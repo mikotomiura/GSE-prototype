@@ -66,6 +66,13 @@ liveness 監視）。原因は未特定・実害の事後確認は不可能（�
 既に削除済み）。詳細解釈は `experiments/20260903-o1-runtime-cost/notes.md` を参照
 （本タスクはコード変更なしの検証タスクのため、深掘りは別タスクに起票——`blockers.md`参照）。
 
+## ⚠️★★★ CPU%はWindows/macOSで定義が違う（`decisions.md`判断5で訂正済み）
+
+本ファイル下部のCPU平均2.06%・CPU最大9.32%は**Windowsの「全16論理コア基準」の値**。
+macOSの「1コア=100%」基準に換算する（×16）と平均**33.0%**・最大**149.1%**になり、
+判定表のFAIL閾値相当に達する。詳細・根拠は `experiments/20260903-o1-runtime-cost/notes.md`
+のCPU分析節（★★★訂正節）と `decisions.md` 判断5を参照。
+
 ## NDJSON 実測
 
 - 対象ファイル: `gse_o1_20260909_071630.ndjson`（Birth: `2026-09-09 16:16:30.792` JST =

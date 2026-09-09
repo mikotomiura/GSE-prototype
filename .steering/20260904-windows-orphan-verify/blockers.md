@@ -36,6 +36,23 @@
   `git status` を通す**。「このディレクトリは自分が今作った一時データのはず」という
   思い込みで省略しない。
 
+## ⚠️★★★ `sample-windows.sh`/`summarize.py` がCPU%のOS間定義差を正規化していない
+
+- **発見**: `/finish-task`完了後、ユーザーに `.steering/_handoff/next-session-prompt-post-windows.md`
+  の内容を確認するよう求められ、同ファイル§1-1が事前に警告していた「CPU%をそのままmacと
+  比べていないか」を見落としていたことに気づいた（`decisions.md`判断5・`notes.md`のCPU分析節参照）。
+- **何が起きたか**: `sample-windows.sh`は`Get-Counter`の「全16論理コアに対する%」をそのまま
+  `cpu_pct`列に書く。macOSの`top`は「1コア=100%」。`summarize.py`はこの差を正規化せず、
+  両OSに同じ数値の閾値（`< 1%`/`≥ 3%`等）をそのまま当てる。結果、Windows実測の
+  CPU平均2.06%(MARGINAL)・最大9.32%(PASS)は、macOS基準に換算すると33.0%・149.1%と
+  FAIL相当になる。
+- **本タスクでの対応**: コード変更なし。`notes.md`/`decisions.md`に換算値と訂正を記録した。
+- **提案（次タスクでの修正方針・未実装）**: `sample-windows.sh`に論理プロセッサ数で
+  正規化した列を追加する、または`summarize.py`がOS別（もしくは共通の1コア基準に
+  正規化した上で）閾値を適用するように直す。
+- **優先度**: HIGH（判定ラベルが実態より軽く見える方向に誤っており、O1の「軽いはず」という
+  設計上の想定を検証する実験の目的そのものに関わる）。
+
 ## 次タスクへの具体的なTODO（2回目のcodex-reviewで「文書止まり」と指摘され追加）
 
 - [ ] `run.sh` のガードを `meta.json`/`finished_utc` の存在も見るよう拡張する
@@ -45,3 +62,5 @@
 - [x] O1関連の実機実測で、実セッションNDJSONを削除する前に `meta`(session_start)行の
       `app_version` を記録する手順を明記する → `experiments/20260903-o1-runtime-cost/README.md`
       「やり方」節に追記済み（ドキュメント追加はコード変更に該当しないためスコープ内で対応）
+- [ ] ⚠️★★★ `sample-windows.sh`にコア数正規化列を追加する、または`summarize.py`の
+      閾値をOS間で揃える（上記「CPU%のOS間定義差」参照。次にWindows実測をする前に必須）
