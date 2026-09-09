@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="600" viewBox="0 0 1400 600">
+  <rect width="1400" height="600" fill="#ffffff"/>
+  <text x="65" y="62" font-family="Yu Gothic, Meiryo, sans-serif" font-size="34" font-weight="700" fill="#1f2933">1 Hz のループを流れるデータの形</text>
+  <text x="65" y="101" font-family="Yu Gothic, Meiryo, sans-serif" font-size="21" fill="#52606d">本番の分析スレッドと回帰リプレイは、同じ loop_step::step() を通る</text>
+  <defs><marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/></marker></defs>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="50" y="145" width="280" height="140" rx="10" fill="#e6fffa" stroke="#0f766e" stroke-width="4"/>
+    <text x="190" y="192" font-size="28" font-weight="700" fill="#134e4a">入力捕捉</text>
+    <text x="190" y="228" font-size="20" fill="#134e4a">OS フック（input/）</text>
+    <text x="190" y="260" font-size="19" fill="#134e4a">Atomic と channel だけ</text>
+
+    <rect x="390" y="145" width="280" height="140" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+    <text x="530" y="192" font-size="28" font-weight="700" fill="#1e3a8a">特徴量</text>
+    <text x="530" y="228" font-size="20" fill="#1e3a8a">30 秒ローリング窓</text>
+    <text x="530" y="260" font-size="19" fill="#1e3a8a">features.rs</text>
+
+    <rect x="730" y="145" width="280" height="140" rx="10" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="870" y="192" font-size="28" font-weight="700" fill="#7c2d12">潜在二軸と量子化</text>
+    <text x="870" y="228" font-size="20" fill="#7c2d12">β で正規化して射影</text>
+    <text x="870" y="260" font-size="19" fill="#7c2d12">heads/ ＋ engine.rs</text>
+
+    <rect x="1070" y="145" width="280" height="140" rx="10" fill="#fff1f2" stroke="#be123c" stroke-width="4"/>
+    <text x="1210" y="192" font-size="28" font-weight="700" fill="#881337">推論と記録</text>
+    <text x="1210" y="228" font-size="20" fill="#881337">Forward ＋ 平滑化</text>
+    <text x="1210" y="260" font-size="19" fill="#881337">engine.rs ＋ loop_step.rs</text>
+  </g>
+
+  <g stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow)">
+    <path d="M330 215 H390"/><path d="M670 215 H730"/><path d="M1010 215 H1070"/>
+    <path d="M190 285 V330"/><path d="M530 285 V330"/><path d="M870 285 V330"/><path d="M1210 285 V330"/>
+  </g>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="50" y="340" width="280" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="3"/>
+    <text x="190" y="374" font-size="20" font-weight="700" fill="#334155">InputEvent</text>
+    <text x="190" y="406" font-size="17" fill="#475569">vk_code / timestamp</text>
+    <text x="190" y="432" font-size="17" fill="#475569">is_press / is_repeat</text>
+    <text x="190" y="458" font-size="17" fill="#475569">is_backspace / is_paste</text>
+    <text x="190" y="482" font-size="17" font-weight="700" fill="#b91c1c">文字内容を持たない</text>
+
+    <rect x="390" y="340" width="280" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="3"/>
+    <text x="530" y="374" font-size="20" font-weight="700" fill="#334155">Features</text>
+    <text x="530" y="406" font-size="17" fill="#475569">VecDeque 容量 600</text>
+    <text x="530" y="432" font-size="17" fill="#475569">F1 F3 F4 F5 F6 の 5 値</text>
+    <text x="530" y="458" font-size="17" fill="#475569">＋ keys / bs_keys</text>
+    <text x="530" y="482" font-size="17" font-weight="700" fill="#b91c1c">この 2 つは推論に流れない</text>
+
+    <rect x="730" y="340" width="280" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="3"/>
+    <text x="870" y="374" font-size="20" font-weight="700" fill="#334155">二軸 と 観測ビン</text>
+    <text x="870" y="406" font-size="17" fill="#475569">X, Y はいずれも 0〜1</text>
+    <text x="870" y="432" font-size="17" fill="#475569">5 × 5 に割って obs 0〜24</text>
+    <text x="870" y="458" font-size="17" fill="#475569">連打の是正は obs 25</text>
+    <text x="870" y="482" font-size="17" font-weight="700" fill="#b91c1c">ここで連続値を捨てる</text>
+
+    <rect x="1070" y="340" width="280" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="3"/>
+    <text x="1210" y="374" font-size="20" font-weight="700" fill="#334155">FeatSnapshot</text>
+    <text x="1210" y="406" font-size="17" fill="#475569">3 状態の確率 ＋ 二軸</text>
+    <text x="1210" y="432" font-size="17" fill="#475569">obs / alpha / 特徴量</text>
+    <text x="1210" y="458" font-size="17" fill="#475569">17 フィールド</text>
+    <text x="1210" y="482" font-size="17" font-weight="700" fill="#b91c1c">回帰保護の比較対象</text>
+  </g>
+
+  <text x="700" y="545" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="23" font-weight="700" fill="#334155">窓は「いまの時刻」ではなく「バッファ最後の打鍵時刻」から遡る。だから沈黙中も同じ窓が出続ける</text>
+  <text x="700" y="578" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="20" fill="#52606d">厳密な定義は『技術設計書』3.1 / 4.1 / 4.2</text>
+</svg>

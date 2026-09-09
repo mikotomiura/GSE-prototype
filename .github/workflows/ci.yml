@@ -473,6 +473,19 @@ jobs:
         run: python3 scripts/md2docx.py --selftest
         env:
           PYTHONUTF8: "1"
+      # ⚠️★★★ 2026-09-04 追加。★ `md2pptx.py` は同日に大きく変わった (テンプレート対応 /
+      #   図の埋め込み / 本物の表 / スライド単位のレイアウト / app.xml の補完) のに、
+      #   **検査は手動実行だけに依存していた** —— 上の md2docx を CI に置いたのと同じ穴である。
+      #   ★ selftest は**変異体 10 本**を実際に作って落ちることまで見る (版面の上書き復活 /
+      #     見本スライドの残留 / 図の未埋め込み / 表の非テーブル化 / レイアウト単一化 /
+      #     repo 外画像の素通り 等) ＝ 「検査が空振りしていないこと」まで見る思想。
+      #   ⚠️ `scripts/` の中で外部依存を要するのは本スクリプトだけなので、ここでだけ入れる。
+      - name: Install python-pptx (md2pptx selftest 用)
+        run: python3 -m pip install --disable-pip-version-check "python-pptx==1.0.2"
+      - name: md2pptx selftest (テンプレート・図・表・レイアウトの退行)
+        run: python3 scripts/md2pptx.py --selftest
+        env:
+          PYTHONUTF8: "1"
       # ⚠️ 提出文書の禁止用語・装飾記号・撤回済み主張 (ADR-018 D7 / 研究者指示 / サーヴェイ)。
       #   ★ 出所: 2026-08-31 の cross-review で、廃止した段階呼称が 3 ファイルに残っていた。
       - name: Doc lexicon gate (禁止用語・装飾記号・撤回済み主張)
