@@ -153,6 +153,14 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
 
 - `analysis/` モジュールは OS 非依存なので、通常の `#[cfg(test)]` + `cargo test` で両 OS 共通に検証可能
 - `input/` モジュールは OS フックに依存するため、統合テストは実機で手動確認
+  - ⚠️★★★ **Tauri アプリ本体を実機で手動起動して UI を確認する時、ビルドは
+    `npm run tauri build -- --no-bundle`（または `npm run tauri dev`）を使う。
+    素の `cargo build --release`（`cargo build --release --features package` も含む）は
+    `custom-protocol` Cargo feature が付かず、release プロファイルでもメインウィンドウが
+    Vite devUrl (`http://localhost:1420`) 依存のまま残る**（2026-09-09 実機で発覚・
+    `.steering/20260904-windows-orphan-verify/decisions.md` 判断3）。この feature は
+    `Cargo.toml` に列挙されておらず `tauri-cli` が暗黙で付与するため、bare cargo では
+    再現されない。★ **実配布ビルド（CI の `npx tauri build`）はこの経路を通っており無傷。**
 - **HMM 挙動を変える変更（遷移行列・放出行列・α 値・摩擦フロア等）を加えた際は**:
   1. `analysis::engine::HMM_VERSION` を SemVer で bump（MAJOR/MINOR/PATCH は engine.rs 冒頭コメント参照）
   2. `gse-replay` でゴールデンスナップショットを再生成
