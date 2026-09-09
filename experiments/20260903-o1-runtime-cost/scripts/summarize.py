@@ -30,7 +30,8 @@ THRESHOLDS = {
 #   ⚠️ 半分を切ったら「測れていない」とみなす。
 MIN_SAMPLES = 480
 # ★ 起動コストの読み方に添える注意書き用（⚠️ 実効間隔は top を 2 回叩くぶん延びる）。
-INTERVAL_HINT_S = 35
+# ⚠️ 2026-09-10: 起動コスト節の注記は**実測の中央間隔**を使うようにしたので、
+#   この定数はもう使っていない（★ 残すと次の人が固定値だと思う）。
 
 
 def parse_threads(v: str) -> int:
@@ -292,8 +293,17 @@ def startup_report(all_rows, present_rows, n_head: int = 5) -> tuple[str, bool]:
     h_rss = [r["rss_kb"] / 1024.0 for r in head if r["rss_kb"] > 0]
     if h_rss:
         lines.append(f"  ★ 起動直後の RSS: {h_rss[0]:.1f} MB")
-    lines.append(f"  ⚠️ サンプル間隔は約 {INTERVAL_HINT_S} s なので、"
-                 "★ **それより短い山は取りこぼす**（★ 孤児回収の走査を含む）。")
+    # ⚠️★★ **間隔は固定値でなく実測から出す。** ★ 2026-09-10 に 1 秒間隔の run を回したら
+    #   「約 35 s なので短い山は取りこぼす」と**嘘の注記**が出た（★ 実際は約 8 s）。
+    ts = [r["t"] for r in present_rows]
+    gaps = sorted(ts[i] - ts[i - 1] for i in range(1, len(ts))) if len(ts) > 1 else []
+    med = gaps[len(gaps) // 2] if gaps else None
+    if med is None:
+        lines.append("  ⚠️ サンプルが 2 行未満で間隔を測れない。")
+    else:
+        lines.append(f"  ⚠️ サンプル間隔の中央値は実測 {med} s。"
+                     "★ **CPU は累積カウンタ由来なので山を落とさない**が、"
+                     "⚠️ RSS / power は**この間隔より短い山を取りこぼす**。")
     return ("\n".join(lines), True)
 
 
@@ -343,6 +353,19 @@ def main() -> int:
     # ⚠️★★★ **CPU% の基準を必ず印字する。** ★ 2026-09-10 まで基準はスクリプトの
     #   コメントにしか無く、⚠️ 読んだ人が「Windows は全コア基準」と推測して
     #   **×16 換算して FAIL 相当と誤判定**しかけた。→ ★ 数字の隣に基準を出す。
+    # ⚠️★★★ **壊れた計器で採った CPU を PASS と読ませない。**
+    #   ★ 2026-09-10 に実測: 旧 `sample-macos.sh` の `top -l 2` は 1 コア飽和の
+    #   プロセスを **47.6 %** と報告した（★ 地上真実 99.7 %）＝ 約 2.08 倍の過小報告。
+    #   ⚠️ 古い samples.tsv は `meta.json` に `cpu_source` を持たないので、
+    #   ★ **それを目印に CPU 2 指標だけ判定を落とす**（★ RSS / NDJSON は影響を受けない）。
+    cpu_instrument_broken = (
+        with_gse["meta"].get("os") == "macos" and not with_gse["meta"].get("cpu_source")
+    )
+    if cpu_instrument_broken:
+        print("⚠️★★★ **この run の CPU は壊れた計器で採られている**"
+              "（★ meta.json に cpu_source が無い = 2026-09-10 より前の macOS run）。"
+              "\n   ★ 旧 `top -l 2` は約 **2.08 倍の過小報告**をする（notes.md の訂正節）。"
+              "\n   → ⚠️ **CPU 2 指標は判定しない**。★ 数字が要るなら測り直すこと。")
     basis = with_gse["meta"].get("cpu_pct_basis")
     ncpu = with_gse["meta"].get("logical_processors")
     if basis:
@@ -365,7 +388,10 @@ def main() -> int:
     worst = "PASS"
     order = {"PASS": 0, "MARGINAL": 1, "DataInsufficient": 2, "FAIL": 3}
     for k, v in metrics.items():
-        v_, why = verdict(k, v) if enough else ("DataInsufficient", "⚠️ サンプル不足")
+        if cpu_instrument_broken and k.startswith("cpu_"):
+            v_, why = "DataInsufficient", "⚠️ 計器が壊れていた run（★ 要再測）"
+        else:
+            v_, why = verdict(k, v) if enough else ("DataInsufficient", "⚠️ サンプル不足")
         shown = "—" if v is None else f"{v:.2f}"
         print(f"  {k:26s} {shown:>10s}  {v_:<16s} {why}")
         if order[v_] > order[worst]:

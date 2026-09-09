@@ -225,3 +225,11 @@ venv/
 #   集計 JSON (metrics/calib/cohort) は**意図して追跡されている** (上の §122 の規約)。
 experiments/**/samples.tsv
 experiments/**/ndjson-size.tsv
+# ⚠️★★★ 2026-09-10 に穴を発見: **開始スナップショットが抜けていた。**
+#   ★ `ndjson-size-start.tsv` は `ndjson-size.tsv` と**同じ列**（ファイル名 = セッション
+#   開始時刻 / バイト数 / mtime）を持つのに、⚠️ 2026-09-05 に追加されたとき
+#   `.gitignore` に足されず、★ Windows の run で **2 行が実際に commit された**。
+#   ⚠️ **既に追跡済みのファイルは gitignore では外れない** —— ★ そちらは
+#   notes.md が同じファイル名を**意図して**記録しているので証拠として残す
+#   （★ 研究者自身の計測であり、被験者データではない）。
+experiments/**/ndjson-size-start.tsv
