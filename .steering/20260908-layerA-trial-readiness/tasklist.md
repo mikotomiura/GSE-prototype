@@ -44,7 +44,9 @@
       —— `data.md` の限界項目数を 7+2(最大9) → 8+2(最大10) へ訂正、`notes.md` の
       Python 検査数を 83 → 84 へ訂正。残りは次回タッチ時の低優先度フォロー
       （`sel-inv` のブロック間ロック・`onAbort` の型検証）として `decisions.md` に記録）
-- [ ] `/finish-task`
+- [x] `/finish-task`（`335be59`。schema parity check は対象外ファイル変更なしで skip。
+      Rust/TS 変更 0 件のため `cargo test` 全体の再実行は省略、この実験ハーネス自体の
+      検査 (Python 84/84・ページ内 26/26・`--selfcheck` 8/8+18/18・ブラウザ実測) が回帰網）
 
 ## ★ ついでに潰す軽い項目（★ 引き継ぎ §E-2）
 - [x] `out.txt` を `.gitignore` へ ＋ scratchpad へ退避（★ 削除はしていない）
