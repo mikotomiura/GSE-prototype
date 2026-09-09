@@ -52,24 +52,47 @@ ls ~/.gse/o1_consent_ack                               # ⚠️ **戻してあ�
 
 ## §1 ⚠️★★★ 本セッションの主題 —— **Windows の結果を受けて締める**
 
-### 1-1. ★ Windows から返ってくるはずのもの
+### ⚠️★★★ 2026-09-10 追記: Windows実測は完了した。結果と、本節が事前に警告していた通りに実際踏んだ落とし穴を記録する
 
-★ Windows 側には `.steering/_handoff/next-session-prompt-windows-runtime-cost-and-orphan-verify.md`
-を渡してある。⚠️ **返ってきたものを鵜呑みにしない**。★ 最低限これを確かめる:
+★ Windows側は最終的に `.steering/20260904-windows-orphan-verify/` タスクとして
+`next-session-windows-runtime-cost-8h.md`（本ファイルが指す上記メモの後継・§2だけを
+切り出した引き継ぎ）で実施された。**「返ってきたものを鵜呑みにしない」の実践結果を含め、
+下記1-1の各項目にチェック済みの答えを埋めた。**
 
-| 確認 | ⚠️ なぜ |
+### 1-1. ★ Windows から返ってくるはずのもの（★ 2026-09-10 実測で確認済み）
+
+★ Windows 側には（最終的に）`.steering/_handoff/next-session-windows-runtime-cost-8h.md`
+を渡した。⚠️ **返ってきたものを鵜呑みにしなかった結果、以下が判明した**:
+
+| 確認 | 結果 |
 |---|---|
-| ★ `samples.tsv` が **8 列**か | ⚠️ 6 列なら PR #160 が効いていない（★ 直したが **Windows 実機では 1 度も動かしていない**） |
-| ★ 7・8 列目が **空**か（`0` ではない） | ⚠️ `0` だと「測って 0」と読まれる |
-| ★ 集計が「**windows では測れない**」と出すか | ⚠️ 「壊れている」と出たら列がずれている |
-| ⚠️ **CPU% をそのまま mac と比べていないか** | ★ Windows は**全コア合計に対する %**、mac は 1 コア = 100% |
-| ★ 孤児回収の逐語（`O1 orphan sweep ... closed=N failed=0`） | ⚠️ 陰性対照（既に閉じたファイルが無変化）も見る |
+| ★ `samples.tsv` が **8 列**か | ✅ **8列を確認**（`cpu_pct`/`rss_kb`/`threads`/`battery_pct`/`rss_alt_kb`/`energy_impact`/`ref_energy_impact`） |
+| ★ 7・8 列目が **空**か（`0` ではない） | ✅ **空を確認**（Windowsにはエネルギー影響相当の指標が無いため） |
+| ★ 集計が「**windows では測れない**」と出すか | ✅ `summarize.py`が「⚠️ エネルギー影響は**windowsでは測れない**」と正しく出した |
+| ⚠️ **CPU% をそのまま mac と比べていないか** | ⚠️★★★ **これを最初は見落とした。** Windows実測結果を書き終えて`/finish-task`まで済ませた**後**、ユーザーに「引き継ぎ内容が反映されているか」と問われて本ファイルを読み返し、この行の警告どおりの見落としを自分がしていたことに気づいた。`sample-windows.sh`は全16論理コア基準の%をそのまま出しており、macOSの1コア=100%基準に換算すると**CPU平均2.06%→33.0%、最大9.32%→149.1%**とFAIL相当になる。`experiments/20260903-o1-runtime-cost/notes.md`の「6指標×2OS一覧」節と`decisions.md`判断5に訂正記録済み。**教訓: このチェックリストは実際に効く。次回は最初から全項目を確認すること** |
+| ★ 孤児回収の逐語（`O1 orphan sweep ... closed=N failed=0`） | ✅ 確認済み（`.steering/20260904-windows-orphan-verify/evidence-s1-A-B.md`。§1は本タスクの前半で別途実機確定済み） |
 
-### 1-2. ★ 締め方
+⚠️★★★ **本節に書かれていなかったが実際に踏んだ追加の落とし穴**（次にWindows実測をする
+セッションのために記録）:
+1. **`run.sh`の上書きガードは`samples.tsv`しか見ない**ため、別OS実測の`meta.json`/`finished_utc`
+   （git管理下）を黙って上書きできてしまう。今回はmacOS 2回目実測のメタデータを上書きしかけ、
+   `git checkout`で復旧した（`blockers.md`にMEDIUM起票。CPU%正規化の方はHIGH起票）。
+2. **測定窓の直後（GSE稼働継続中）にフック飢餓クラスタ**（30秒×6・120秒完全停止×1）が発生した。
+   当初「窓内1回のみ・以降再発なし」と誤記し、`/finish-task`のレビューで訂正した。
+   ⚠️ **§2-1のスリープ跨ぎ検証で「復帰直後にフック飢餓が出た」場合、スリープが原因と即断しない
+   こと**——Windows側では通常稼働中（スリープと無関係）にも同種のクラスタが起きている
+   （原因未特定・CPU/スケジューラ競合の可能性を含め相関のみ記録）。
 
-★ Windows の結果を `experiments/20260903-o1-runtime-cost/notes.md` に**追記**し、
-⚠️ 「6 指標 × 2 OS」の表を**埋まっている所と空いている所が一目で分かる形**にする。
-⚠️ **「問題なし」と書かない** —— ★ 「N 件中 M 件を実測、未検証 K 件」で書く。
+### 1-2. ★ 締め方（★ 完了済み）
+
+★ Windows の結果を `experiments/20260903-o1-runtime-cost/notes.md` に**追記した**
+（「結果（2026-09-09/10・Windows・初実測）」節）。⚠️ 「6 指標 × 2 OS」の表も
+**埋まっている所と空いている所が一目で分かる形**で作成した（notes.mdの当該節の直前、
+「★★★ 6指標×2OS 一覧」見出し）。⚠️ 「問題なし」とは書いていない —— 「6指標中5指標で
+両OSの数値が揃ったが、うちCPU平均/CPU最大はOS間定義差により単純比較不可（Windows換算
+FAIL相当）、エネルギー影響はWindowsで原理的に測定不能、起動時のコスト/バッテリーは
+両OS未測定」と明記した。詳細は`notes.md`該当節・`decisions.md`判断4/5・
+`.steering/20260904-windows-orphan-verify/blockers.md`（次タスクへのTODO）を参照。
 
 ---
 
@@ -198,9 +221,16 @@ tail -20 $D/results/with-gse/samples.tsv
       （★ 機序が分かる前に手を入れると、また間違ったものを直す）
 - [ ] ⚠️ **層 2 / 層 3 は CI では検証されていない**（★ `decisions.md` D5。⚠️ 権限が無く skip される）。
       ★ 実機で確かめるなら `GSE_REQUIRE_HOOK_TESTS=1 cargo test --test macos_hook_rehook`
-- [ ] ⚠️ **数日〜数週間のメモリリーク**（★ 8 時間 × 2 本では「傾きほぼ 0」までしか言えない）
-- [ ] ⚠️ **overlay の透明窓のクリック奪取**（★ 両 OS・未検証）
-- [ ] ⚠️ **CPU 最大 5.20 % の原因**（★ 809 行中 1 行・`gse-app.log` に対応する行が無い）
+- [ ] ⚠️ **数日〜数週間のメモリリーク**（★ 8 時間 × 3 本（macOS×2, Windows×1）では
+      「傾きほぼ 0」までしか言えない）
+- [ ] ⚠️ **overlay の透明窓のクリック奪取**（★ Windows は2026-09-09に **idle状態は実機確認済み**
+      （5/5箇所で奪っていない・`.steering/20260904-windows-orphan-verify/evidence-s3-overlay.md`）。
+      ⚠️ **表示状態（Nudge/プローブ中）は両OSとも未検証のまま**）
+- [ ] ⚠️ **CPU 最大 5.20 % の原因**（★ macOSの809行中1行・`gse-app.log`に対応する行が無い）
+- [ ] ⚠️★★★ **Windows実測で新たに発見**（`.steering/20260904-windows-orphan-verify/blockers.md`参照）:
+      (1) CPU%のOS間定義差を`sample-windows.sh`/`summarize.py`が正規化していない（HIGH）
+      (2) `run.sh`の上書きガードが`samples.tsv`の有無しか見ない（MEDIUM）
+      (3) 測定窓直後のフック飢餓クラスタ（30秒×6・120秒完全停止×1、原因未特定）
 
 ## §6 ★ 完了報告に必ず書くこと
 
