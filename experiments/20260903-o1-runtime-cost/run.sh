@@ -26,14 +26,27 @@ done
 [ "$DURATION_S" -gt 0 ] && [ "$INTERVAL_S" -gt 0 ] || { echo "⚠️ 秒数は 1 以上" >&2; exit 2; }
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-OUT="$HERE/results/$RUN"
+
+# ★ 出力ディレクトリ名。⚠️ 既定は `$RUN` だが、★ OS や日付で分けたいときは
+#   `GSE_COST_LABEL` を付ける (例: with-gse-20260910-macos-startup)。
+LABEL="${GSE_COST_LABEL:-$RUN}"
+case "$LABEL" in
+  *[!A-Za-z0-9._-]*|''|.|..) echo "⚠️ GSE_COST_LABEL は英数と . _ - だけ: $LABEL" >&2; exit 2 ;;
+esac
+OUT="$HERE/results/$LABEL"
 mkdir -p "$OUT"
 
 # ⚠️★★★ 既存の結果を黙って上書きしない (★ 対照が消えると実験が成立しない)。
-if [ -s "$OUT/samples.tsv" ]; then
-  echo "⚠️ $OUT/samples.tsv が既にある。★ 消すか別名に退避してから回すこと。" >&2
-  exit 3
-fi
+# ⚠️★★ **`samples.tsv` だけを見てはいけない。** ★ 2026-09-09 に Windows 側が踏んだ:
+#   `samples.tsv` は `.gitignore` 済みなので、⚠️ **git 管理下の `meta.json` /
+#   `finished_utc` を黙って上書きできた**（★ `git checkout` で復旧した）。
+#   → ★ run が「あった痕跡」すべてを門にする。
+for f in samples.tsv meta.json finished_utc ndjson-size.tsv ndjson-size-start.tsv; do
+  if [ -e "$OUT/$f" ]; then
+    echo "⚠️ $OUT/$f が既にある。★ 消すか別名に退避するか、GSE_COST_LABEL で別名にすること。" >&2
+    exit 3
+  fi
+done
 
 case "$(uname -s)" in
   Darwin) OS=macos ;;
@@ -41,8 +54,38 @@ case "$(uname -s)" in
   *)      OS=windows ;;
 esac
 
+# ⚠️★★★ **CPU% の「基準」を meta.json に残す。** ★ 2026-09-10 まで基準は
+#   サンプラの**コメントにしか無く**、⚠️ 読んだ人が Windows を「全コア基準」と推測して
+#   **×16 換算し FAIL 相当と誤判定**しかけた。→ ★ 機械可読にする。
+#   ★ `one_core_100`  = 1 コア飽和で 100 %（全コア飽和なら 100×コア数）。
+#   ⚠️ `all_cores_100` = 全コア飽和で 100 %（Task Manager 方式）。
+case "$OS" in
+  macos)
+    # ★ `ps -o cputime` の増分 / 実時間。⚠️ 校正済 (scripts/calibrate-cpu.sh)。
+    CPU_SOURCE="ps -o cputime delta"
+    CPU_BASIS="one_core_100"
+    NCPU="$(sysctl -n hw.logicalcpu 2>/dev/null || echo '')"
+    ;;
+  windows)
+    # ⚠️★★★ **Windows の基準は 2026-09-10 時点で未確定**。
+    #   ★ Microsoft の逐語 (*Examining Processor Time Data*):
+    #     「the value of the % Processor Time reported for the Process object can
+    #      report values over 100 percent」→ ★ **1 コア = 100 % 基準**を強く示唆。
+    #   ⚠️ ただし**この repo は Windows 実機で確かめていない**。
+    #   → ★ 確かめたら `one_core_100` に確定し、この注記を消すこと。
+    #     手順: .steering/20260910-intake-windows-and-cpu-convention/windows-cpu-convention-probe.md
+    CPU_SOURCE="Get-Counter \\Process(name)\\% Processor Time"
+    CPU_BASIS="${GSE_COST_CPU_BASIS:-one_core_100_unverified}"
+    NCPU="$(powershell.exe -NoProfile -NonInteractive -Command '(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors' 2>/dev/null | tr -d '\r' | tail -1 || echo '')"
+    ;;
+  *)
+    CPU_SOURCE="unknown"; CPU_BASIS="unknown"; NCPU="$(nproc 2>/dev/null || echo '')"
+    ;;
+esac
+case "$NCPU" in ''|*[!0-9]*) NCPU_JSON=null ;; *) NCPU_JSON="$NCPU" ;; esac
+
 started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-printf '%s\n' "{\"run\":\"$RUN\",\"os\":\"$OS\",\"started_utc\":\"$started\",\"duration_s\":$DURATION_S,\"interval_s\":$INTERVAL_S}" > "$OUT/meta.json"
+printf '%s\n' "{\"run\":\"$RUN\",\"label\":\"$LABEL\",\"os\":\"$OS\",\"started_utc\":\"$started\",\"duration_s\":$DURATION_S,\"interval_s\":$INTERVAL_S,\"cpu_source\":\"$CPU_SOURCE\",\"cpu_pct_basis\":\"$CPU_BASIS\",\"logical_processors\":$NCPU_JSON}" > "$OUT/meta.json"
 
 echo "★ $RUN を $OS で $((DURATION_S / 3600)) 時間ぶん測ります (間隔 ${INTERVAL_S}s)。"
 echo "⚠️ 途中で端末を閉じないこと。★ 結果: $OUT"
