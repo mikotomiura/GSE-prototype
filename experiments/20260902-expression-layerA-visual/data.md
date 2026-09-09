@@ -19,7 +19,7 @@
 
 | 何 | どこへ | 中身 |
 |---|---|---|
-| 試視の応答 | `results/layerA-<coding>-<YYYY-MM-DD>.json` | 較正値（`px/mm` / 視距離 / `px/deg`） / テーマ / invitation の符号 / 出題順 / 各トライアルの真値と応答 / RT / 自由記述 / ★ **周辺視（`pos` / `eccentric` を含む）** / 機械検算 **26 項目** / 限界 **7 項目 ＋ 条件つき 2 項目（＝ 最大 9）**（★ 条件つき = 事前露出の申告 / 振動符号が 1 周期未満のとき。★ 実測で数えた） / **`navigator.userAgent`** / **`window.devicePixelRatio`** |
+| 試視の応答 | `results/layerA-<coding>-<YYYY-MM-DD>.json` | 較正値（`px/mm` / 視距離 / `px/deg`） / テーマ / invitation の符号 / 出題順 / 各トライアルの真値と応答 / RT / 自由記述 / ★ **周辺視（`pos` / `eccentric` を含む）** / 機械検算 **26 項目** / 限界 **8 項目 ＋ 条件つき 2 項目（＝ 最大 10）**（★ 条件つき = 事前露出の申告 / 振動符号が 1 周期未満のとき。★ 2026-09-09 cross-review 指摘・`limitations` 配列を実測で数え直した） / **`navigator.userAgent`** / **`window.devicePixelRatio`** |
 
 ★ **書き出し JSON に入る「端末に由来する値」は 3 つである**（★ `security-checker` 指摘・2026-09-08 に数え直した）:
 

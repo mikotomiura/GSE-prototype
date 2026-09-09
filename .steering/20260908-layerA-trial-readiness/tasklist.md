@@ -40,7 +40,10 @@
 - [x] `code-reviewer` ＋ `security-checker` を並列起動
 - [x] HIGH 指摘への対応（★ HIGH 4 件 ＋ security MEDIUM 2 件 ＋ 実験妥当性に効く MEDIUM を**全部**消化）
 - [x] 再検証（★ Python **83 / 0**・ページ内 **26 / 26**・`--selfcheck` **8/8 ＋ 18/18**・ブラウザ実測）
-- [ ] `/cross-review`（★ コミット後・パス限定）
+- [x] `/cross-review`（★ コミット後・パス限定。HIGH 0 件。MEDIUM 2 件を反映
+      —— `data.md` の限界項目数を 7+2(最大9) → 8+2(最大10) へ訂正、`notes.md` の
+      Python 検査数を 83 → 84 へ訂正。残りは次回タッチ時の低優先度フォロー
+      （`sel-inv` のブロック間ロック・`onAbort` の型検証）として `decisions.md` に記録）
 - [ ] `/finish-task`
 
 ## ★ ついでに潰す軽い項目（★ 引き継ぎ §E-2）

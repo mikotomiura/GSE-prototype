@@ -201,3 +201,21 @@
 
 ⚠️★★★ **`verify-before-claiming` ルール 5b は「3 状態で試す」と言うが、それだけでは足りない** ——
 ★ **「壊した状態」を作れない検査は、3 状態のうち 2 つしか存在しない。**
+
+## `/cross-review`（2026-09-09・コミット範囲 `b01ae31^..fd9e68f`・パス限定）
+
+★ **HIGH 0 件。** Claude/Codex の指摘に一致はなく（=「最終防衛線」フェーズとして想定どおり）、
+以下を本タスクで反映した:
+
+- ★ **採用（本タスクで反映済み）**: `data.md` の「限界 7 項目＋条件2（最大9）」を
+  `limitations` 配列の実測に基づき「8 項目＋条件2（最大10）」へ訂正。
+  `notes.md` §現況 の Python 検査数を `bash run.sh check` の実測 **84 PASS** に合わせて
+  83→84 へ訂正（★ §「検査の数」の履歴テーブルは 2026-09-08 時点の記録として不変のまま残す）。
+- ⚠️ **採用・次回タッチ時へ繰り越し（本タスクの回帰ではない既存ギャップ）**:
+  - `INV_CODING`（`sel-inv`）が `lockCalibration()` と違いブロック間でロックされておらず、
+    途中で切り替えると過去ブロックの符号が事後に復元不能になる（Codex 指摘）
+  - `overlayOn(boxId, label, onAbort)` の `onAbort` 必須制約に実行時の型検証がない（Codex 指摘）
+- ⚠️ **却下**: 自由記述欄の innerHTML エスケープ不足（表示前に既にエスケープ済みと確認）、
+  `perGeometry()` の `window.innerWidth/2` 精度（`overflow:hidden` で実害なしと確認）
+
+Codex 生出力: `run-codex-review.sh` 経由、exit 0（secrets-filter ブロックなし）。
