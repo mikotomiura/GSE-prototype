@@ -9,9 +9,10 @@
 | ⚠️ 電源 (macOS) | ★ **AC 接続**（`pmset -g batt` = `Now drawing from \'AC Power\'`・開始時 75%・not charging）。⚠️★★★ **バッテリー駆動ではないので、指標 3（バッテリー持ち）は測っていない** —— ★ `summarize.py` は対照が無いと `DataInsufficient` を返す |
 | 測定バイナリ (macOS) | ★ **v0.1.31**（`~/Desktop/O1_計測用_macOS/gse-next.app`）。⚠️ 2026-09-03 に `main` の `c9f6fec` から `npx tauri build --bundles app --features package --target aarch64-apple-darwin` でビルド。★ **PR #151（孤児回収）を含む**。⚠️ 配布版 v0.1.30 とは**別物** |
 | ⚠️ 自動提出 | ★ **外してある**（`~/.gse/o1_consent_ack` を `.bak` へ退避）。⚠️ 記録は続くが送信経路は閉じている（`auto_submit_enabled()` が false）→ ★ **計測の代表性は保たれる** |
-| OS (A: Windows) | **（未記入）** ★ `winver` の値をそのまま |
-| 機種 / 電源 (Windows) | **（未記入）** ⚠️ 同上 |
-| GSE のバージョン | **0.1.31**（`src-tauri/Cargo.toml`）★ 実測時に `meta.app_version` で照合する |
+| OS (A: Windows) | **Windows 11 Home**（`systeminfo` 実測: `10.0.26200 N/A ビルド 26200`）★ 2026-09-09 実測 |
+| 機種 / 電源 (Windows) | **Micro-Star International Co., Ltd. / MS-7E66**（デスクトップ機）。⚠️★★★ **バッテリーが物理的に存在しない**（`Get-CimInstance Win32_Battery` が空応答＝インスタンス無し。`wmic` はこの機のWindowsビルドに存在せず使えなかった）→ ★ **エネルギー影響/バッテリー系の指標はこの機では原理的に測定不能**（測り忘れではない） |
+| 測定バイナリ (Windows) | commit `22538ccb5654c6e55a6ac0327cf7ece3b2f9dfd9` を `npm run build && npm run tauri build -- --no-bundle` でビルド（`.steering/20260904-windows-orphan-verify/decisions.md` 判断3。素の `cargo build --release` は devUrl 依存の欠陥ビルドになるため使わない）。バイナリ mtime 2026-09-09 15:06。実測時の作業ツリー HEAD は `8146f08`（`22538cc` との間に build-relevant path の変更なし＝ビルドは現HEADと等価と確認済み） |
+| GSE のバージョン | **0.1.33**（`src-tauri/Cargo.toml`、2026-09-09 時点）★ 実測時に `meta.app_version` で照合する |
 | HMM_VERSION | **`0.5.0`**（`src-tauri/src/analysis/engine.rs`・2026-09-03 実測） |
 | Cargo.lock | `src-tauri/Cargo.lock`（★ 本実験はビルド済みバイナリを測るので、**どのビルドか**を app_version で固定する） |
 | Python (macOS) | **3.14.4** ★ `summarize.py` は標準ライブラリのみ（追加依存なし） |
