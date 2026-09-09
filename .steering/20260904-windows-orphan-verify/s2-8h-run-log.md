@@ -2,6 +2,8 @@
 
 > ★ このファイルは実行中の作業メモ（三次資料）。最終結果は `evidence-s2-*.md` /
 > `decisions.md` 判断4 / `experiments/20260903-o1-runtime-cost/env.md` に転記する。
+> ⚠️ 訂正: 下記「16:16:41」はClaude Codeが`tasklist`で確認した時刻で数秒の観測ラグを含む。
+> 正確な起動時刻は`gse-app.log`一次資料の`16:16:30.569`（`evidence-s2-runtime-cost.md`参照）。
 
 ## ビルド確認 (B-0)
 
