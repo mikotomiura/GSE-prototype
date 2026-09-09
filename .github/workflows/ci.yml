@@ -461,6 +461,14 @@ jobs:
       #     「検査が空振りしていないこと」まで見る (上の 2 つの --self-test と同じ思想)。
       - name: Shell portability gate (bash 3.2 の変数名パース・対照つき)
         run: bash scripts/check-shell-portability.sh
+      # ⚠️★★★ secrets-filter 回帰ゲート (2026-09-09 追加。code-reviewer / security-checker 共通 HIGH 指摘)。
+      #   ★ `/cross-review` が Codex へ git diff を送る前段の唯一のフィルタなのに、
+      #     70 ケースの陽性/陰性対照が **手動実行だけに依存していた**。今回の引用符バイパスも
+      #     「陽性対照の入力の形が実物の git 出力と違った」ことで生き残った経緯があり、
+      #     再発防止の要は「テストを書く」ではなく「テストを毎回走らせる」側にある。
+      #   ★ Windows / macOS 両方のジョブで走るため、awk 実装差 (gawk / BWK awk) も同時に検知する。
+      - name: Secrets-filter regression gate (70 ケース・陽性/陰性対照つき)
+        run: bash scripts/secrets-filter-test.sh
       # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
       #   ⚠️ 実害の実測: `--compact` を落とすと詳細資料が **10 → 15 ページ**になるが、
       #     **本文は 1 文字も変わらない**ので diff を見ても気づけない。

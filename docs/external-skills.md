@@ -84,8 +84,8 @@ Codex へ送信した際、そこに含まれる **参加者別の回答傾向**
 | 種別 | 送信 | 理由 |
 |---|---|---|
 | NDJSON 生ログ / キーストローク内容 / 実セッション名 `Pnnn_gse_<日付>_<時刻>` | ❌ **禁止** | 既存規約 (data-privacy) |
-| ★ **未踏提出物などの資料** `.pdf` / `.docx` / `.xlsx` / `.pptx` ＋ ⚠️★★★ **その Markdown 版 `.pptx.md` / `.docx.md`** | ❌ **禁止** | ★ 2026-09-08 追加（研究者判断）。⚠️ `secrets-filter.sh` が hunk ごと除去する |
-| ★★★ **図・スライドの置き場**（`docs/mitou_submission/figures/` と `docs/mitou_submission/mitou_pptx/` 配下・**拡張子を問わない**） | ❌ **禁止** | ★ 2026-09-08 追加（研究者裁定・案 C）。⚠️★★★ **拡張子の追い掛けっこは終わらない**ため置き場で塞ぐ（★ 実測: `figures/*.svg` の `<text>` にデッキ本文がそのまま入っていた）。⚠️ **`docs/mitou_submission/` を丸ごとにはしない** —— ★ `README.md` はレビュー可能なままにする |
+| ★ **未踏提出物などの資料** `.pdf` / `.docx` / `.xlsx` / `.pptx` ＋ ⚠️★★★ **そのMarkdown版**（`.pdf.md` / `.docx.md` / `.xlsx.md` / `.pptx.md`） | ❌ **禁止** | ★ 2026-09-08 追加（研究者判断）。⚠️ `secrets-filter.sh` が hunk ごと除去する（実装は `\.(pdf|docx|xlsx|pptx)(\.md)?` で 4 拡張子とも Markdown 版を含めて塞ぐ） |
+| ★★★ **図・スライド・提出文書の置き場**（`docs/mitou_submission/figures/` / `docs/mitou_submission/mitou_pptx/` / `docs/mitou_submission/mitou_docs/` 配下・**拡張子を問わない**） | ❌ **禁止** | ★ 2026-09-08 追加（研究者裁定・案 C）。⚠️★★★ **拡張子の追い掛けっこは終わらない**ため置き場で塞ぐ（★ 実測: `figures/*.svg` の `<text>` にデッキ本文がそのまま入っていた）。⚠️ **`docs/mitou_submission/` を丸ごとにはしない** —— ★ `README.md` はレビュー可能なままにする。★ 2026-09-09 訂正: `mitou_docs/`（提案書/技術設計書/検証レポートの `.docx`/`.docx.md` の置き場）が漏れていた (code-reviewer 指摘・HIGH) |
 | **参加者 ID を伴う集計統計** (`P012 の C-index` / 窓数 / CV 等) | ⚠️ **原則回避。必要なら ID を落として送る** | ★ ID→被験者の対応表は研究者が別途管理しており (`development-guidelines.md §10.2`)、**対応表を持つ者にとっては n=5 で再識別可能**。★ 統計的な議論に参加者 ID は通常不要 |
 | 参加者 ID を伴わないコホート集計 (中央値・分布・効果量) | ✅ 可 | 個人に紐づかない |
 | 設計文書・文献カード・引用 | ✅ 可 | 公開文献の要約 |

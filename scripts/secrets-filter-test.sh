@@ -65,6 +65,24 @@ expect_blocked "NDJSON セッションログ"          'diff --git a/s.ndjson b/
 expect_blocked ".env"                           'diff --git a/x.env b/x.env'         ''
 expect_blocked "★ 大文字の proprietary 拡張子"  'diff --git a/R.PDF b/R.PDF'         ''
 expect_blocked "credentials を含む名前"         'diff --git a/my_credentials b/my_credentials' ''
+# ⚠️★★★ 2026-09-09 追加 (security-checker 指摘・HIGH): 境界が [[:space:]] だけだと
+#   派生名 (.env.local 等) が素通りしていた。.ndjson と同じ境界へ揃えた回帰。
+expect_blocked "★★★ .env.local（Vite/Tauri の標準的な秘密置き場）" \
+  'diff --git a/.env.local b/.env.local' ''
+expect_blocked "★★★ .env.production" \
+  'diff --git a/src/.env.production b/src/.env.production' ''
+expect_blocked "★★★ .pem.bak" \
+  'diff --git a/x.pem.bak b/x.pem.bak' ''
+expect_blocked "★★★ .key.pub" \
+  'diff --git a/id.key.pub b/id.key.pub' ''
+# ⚠️★★★ 2026-09-09 追加 (security-checker 指摘・HIGH): proprietary 拡張子の後続に
+#   変換・圧縮・バックアップ由来の拡張子が積み重なると素通りしていた。
+expect_blocked "★★★ deck.pptx.gz（圧縮）" \
+  'diff --git a/deck.pptx.gz b/deck.pptx.gz' ''
+expect_blocked "★★★ deck.pptx.txt（テキスト抽出）" \
+  'diff --git a/deck.pptx.txt b/deck.pptx.txt' ''
+expect_blocked "★★★ s.docx.md.bak（Markdown 版のバックアップ）" \
+  'diff --git a/s.docx.md.bak b/s.docx.md.bak' ''
 
 echo "--- 2c. ★★★ 引用符つきのファイル名 (2026-09-08: fail-closed が開いていた形) ---"
 # ⚠️★★★ git は **非 ASCII を含むファイル名を C-quote して引用符で囲む**
@@ -186,6 +204,13 @@ expect_blocked "★★★ 引用符つき・日本語名の figures/" \
   'diff --git "a/docs/mitou_submission/figures/[\346\217\220]zu.svg" "b/docs/mitou_submission/figures/[\346\217\220]zu.svg"' ''
 expect_blocked "★★★ +++ 行だけでも置き場で止まる" \
   '+++ b/docs/mitou_submission/figures/x.svg' ''
+# ⚠️★★★ 2026-09-09 追加 (code-reviewer 指摘・HIGH): mitou_docs/ が figures/・mitou_pptx/
+#   と同格の第3の兄弟ディレクトリなのに規則から漏れていた（拡張子規則だけに頼っていたため
+#   .md/.svg 等を置いた瞬間に穴が開く。実測: 修正前は rc=0 で本文素通りだった）。
+expect_blocked "★★★ mitou_docs/ 配下の .md（拡張子を問わない・提案書/技術設計書の置き場）" \
+  'diff --git a/docs/mitou_submission/mitou_docs/outline.md b/docs/mitou_submission/mitou_docs/outline.md' ''
+expect_blocked "★★★ mitou_docs/ 配下の .svg" \
+  'diff --git a/docs/mitou_submission/mitou_docs/fig.svg b/docs/mitou_submission/mitou_docs/fig.svg' ''
 
 echo "--- 3. ★ 陰性対照 (ふつうのコードは 1 バイトも変えない) ---"
 # ⚠️★★ 架空名は**素通りさせる** —— ここで止めると検査の見本を含む diff が毎回 exit 2 になり、

@@ -88,7 +88,11 @@ SECRET_REGEX=$(IFS='|'; echo "${SECRET_PATTERNS[*]}")
 #     ⚠️ 拡張子が `.md` なのは *変換の都合* にすぎず、守るべき中身は同じである。
 #   ⚠️ **副作用を承知で入れている**: 未踏提出物に触る diff は毎回 rc=2 になる。
 #     → ★ そのときは `--ack-filtered`（★ 人が [REDACTED] の中身を確かめてから通す）で運用する。
-PROPRIETARY_EXTS_REGEX='\.(pdf|docx|xlsx|pptx)(\.md)?([[:space:]]|$)'
+#   ⚠️★★★ 2026-09-09（security-checker 指摘・HIGH）: `(\.md)?` は 1 段しか許さないため
+#     `deck.pptx.gz` / `deck.pptx.txt` / `deck.pptx.json` / `s.docx.md.bak` が rc=0 で素通りしていた
+#     （実測）。★ 変換・圧縮・バックアップで拡張子が積み重なるのは現実にあるため、
+#     後続の `.拡張子` を任意個数まで許す形へ広げる（`axpptx` 等は先頭 `\.` が無いので無関係）。
+PROPRIETARY_EXTS_REGEX='\.(pdf|docx|xlsx|pptx)(\.[a-z0-9]+)*([[:space:]]|$)'
 
 REPORT="${SECRETS_FILTER_REPORT:-}"
 [ -n "$REPORT" ] && : > "$REPORT"
@@ -142,8 +146,16 @@ function classify(head,   low) {
   #   → ★ **図とスライドの置き場だけ**（`figures/` と `mitou_pptx/`）を対象にする。
   #   ⚠️ **限界**: 置き場が増えたら**ここへ追随が要る**（★ テストの陰性対照が守っているのは
   #     「`README.md` は通る」ことだけである）。
-  if (low ~ /docs\/mitou_submission\/(figures|mitou_pptx)\//) return "deck-assets"
-  if (low ~ /\.(env|pem|key)([[:space:]]|$)/) return "env/pem/key"
+  #   ⚠️★★★ 2026-09-09（code-reviewer 指摘・HIGH）: **`mitou_docs/` が漏れていた。**
+  #     ★ `figures/`・`mitou_pptx/` と同格の第3の兄弟ディレクトリ（提案書/技術設計書/
+  #     検証レポートの `.docx`/`.docx.md` の置き場）で、拡張子規則だけに頼っていたため
+  #     `.md`/`.svg` 等を置いた瞬間に同じ穴が開く（実測: rc=0 で本文素通り）。
+  if (low ~ /docs\/mitou_submission\/(figures|mitou_pptx|mitou_docs)\//) return "deck-assets"
+  # ⚠️★★★ 2026-09-09（security-checker 指摘・HIGH）: 境界が `([[:space:]]|$)` だけだと
+  #   `.env.local` / `.env.production`（Vite/Tauri の標準的な秘密置き場）・`.pem.bak`・
+  #   `.key.pub` が rc=0 で素通りしていた（実測）。`.ndjson` 判定と同じ
+  #   `([^a-z0-9]|$)` 境界に揃える（`.keyboard.rs` は次の文字が英数字 `b` なので不変で無関係）。
+  if (low ~ /\.(env|pem|key)([^a-z0-9]|$)/) return "env/pem/key"
   if (low ~ /credentials|secret/)              return "credentials"
   if (low ~ /\.ndjson([^a-z0-9_]|$)/)          return "ndjson"
   if (low ~ prop_re)                           return "proprietary"

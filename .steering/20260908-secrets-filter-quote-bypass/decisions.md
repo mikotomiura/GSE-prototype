@@ -160,3 +160,47 @@
    → ⚠️ `run-codex-review.sh` 側の構造変更を伴うので別タスク。
 3. ★ **golden test 化**（★ Codex 案 6）: 実際に `git diff` / `git show` / `format-patch` /
    merge conflict / `core.quotepath` true・false を**生成して**固定する。
+
+---
+
+## 判断 8: `code-reviewer` / `security-checker` 並列レビューの HIGH 3 件を本タスクで消化する（2026-09-09）
+
+- **判断日時**: 2026-09-09。★ `code-reviewer` と `security-checker` を並列起動した結果、
+  **両者が独立に同一の穴（`mitou_docs/`）を実測で見つけた**（一致 = 優先度最高）。
+- **HIGH-1（両者一致）: `docs/mitou_submission/mitou_docs/` が `deck-assets` 規則から漏れていた**
+  - ★ 判断7が塞いだのは `figures/`・`mitou_pptx/` の2つだけで、提案書・技術設計書・検証レポート・
+    参考文献の `.docx`/`.docx.md` の置き場である**第3の兄弟ディレクトリ**が対象外のままだった。
+  - ⚠️ 実測: `mitou_docs/outline.md` や `mitou_docs/fig.svg` を追加すると **rc=0 で本文素通り**
+    （拡張子規則の巻き添えで `.docx`/`.docx.md` だけ偶然塞がっていたに過ぎない）。
+  - ★ 判断7の限界節が予告していたとおりの再発（「置き場が増えたら `classify()` へ追随が要る」）。
+  - **対応**: `classify()` の正規表現に `mitou_docs` を追加。`docs/external-skills.md` の表も同時更新
+    （判断3と同じ型 —— 表が SSOT なので本文だけ直すと乖離する）。回帰テスト2本追加。
+- **HIGH-2（security-checker）: `.env`/`.pem`/`.key` と proprietary 拡張子の境界が狭すぎた**
+  - ⚠️ 実測: `.env.local` / `.env.production`（Vite/Tauri の標準的な秘密置き場）/ `.pem.bak` /
+    `.key.pub` が境界 `([[:space:]]|$)` で rc=0 素通り。`deck.pptx.gz` / `.txt` / `s.docx.md.bak` も
+    `(\.md)?` が1段しか許さず素通り。
+  - **選択肢**: 判断1が「`([^a-z0-9]|$)` へは広げない」と決めた経緯があるが、⚠️ **判断1が対象に
+    していたのは `.pptx.md` を止めるかどうかという *仕様の範囲* の議論であり、`.env.local` の
+    ような *境界のすり抜け* とは別の論点**である（`.ndjson` 判定は既に `([^a-z0-9_]|$)` を使っている）。
+  - **採用**: env/pem/key を `.ndjson` と同じ `([^a-z0-9]|$)` 境界へ統一。proprietary は
+    `(\.[a-z0-9]+)*` で後続拡張子を任意個数許容。★ `.keyboard.rs` / `axpptx` の陰性対照は不変
+    (次の文字が英数字なら境界にヒットしない) であることを実測確認。回帰テスト7本追加。
+- **HIGH-3（両者が別角度から指摘）: `secrets-filter-test.sh`（70ケース）が CI 未実行**
+  - code-reviewer は「今回の引用符バイパスと同じ構図（テストはあるが誰も走らせていない）で再発する」、
+    security-checker は「陽性対照の入力の形が実物と違ったことで今回のバイパスが生き残った経緯を
+    踏まえると自動化が golden test 化より前に来る」と、異なる理由で同じ結論に至った。
+  - **対応**: `.github/workflows/ci.yml` の `check` ジョブ（Windows/macOS 両方が走る）に
+    `bash scripts/secrets-filter-test.sh` を追加。★ 副次的に LOW（awk 実装差の未検証）も
+    同じ変更で解消する（両OSで実行されるため）。
+- **★ 実測（全修正後）**: `bash scripts/secrets-filter-test.sh` → **70 ケース全緑**。
+- **`/finish-task` の Codex review 必須要件について**: `bash scripts/run-codex-review.sh -- scripts/secrets-filter.sh scripts/secrets-filter-test.sh .github/workflows/ci.yml docs/external-skills.md` を実行し **rc=2 (BLOCKED: secrets-filter detected sensitive content)** を確認した。★ 判断6が既に記録した構造的制約（フィルタ本体・テストが自分自身の判定語 `secret`/`credentials`/`env`/`pem`/`key` を大量に含むため diff が自己遮断される）が今回の追加変更でも再現する。→ ★ Claude 単独（`code-reviewer` + `security-checker` 並列）へ縮退し、Codex の関与は要点テキスト経由の consult（判断6）に留める。フィルタを緩めて自分自身を通す選択肢は判断6が明示的に却下済み。
+
+### ⚠️ 次回タッチ時へ繰り越す MEDIUM/LOW（★ 本タスクでは対応しない）
+
+| # | 指摘 | ⚠️ 内容 | 繰り越す理由 |
+|---|---|---|---|
+| 1 | 両者 | 非 `diff --git` 入力（人が unified diff を貼る `run-codex-consult.sh` 経路）で、危険ファイルの後に続く**安全なファイルの変更が skip_hunk の解除漏れで丸ごと消える**（情報漏洩ではなくレビューの偽陰性） | ★ 判断5 M-2 が既に「`---`/`+++` は同じファイルの2行なので途中で解除すると揺れる」という設計判断を残しており、`---` だけを独立に解除点にする修正は影響範囲の検証（`diff --git` ヘッダ併用時の再ブロック整合性）に追加の実測時間が要る。次回このパスに実際に触るセッションで安全側に倒す |
+| 2 | security-checker | report が「値は[REDACTED]に置換済み」と断言するが、`gsub` は ASCII トークンしか対象にせず**非ASCIIの秘密値は無置換のまま残る**（`--ack-filtered` 運用の判断材料が不正確になりうる） | 本タスクの主題（引用符バイパス）とは独立の欠陥。次回 report まわりを触るときに `line != $0` 判定で警告文言を分岐させる |
+| 3 | code-reviewer | diffstat/summary 行（` create mode ` / ` rename ` / diffstat の `\|`）が `classify()` を通らず、除去対象のパスが残ることがある（H-2 契約と矛盾） | 到達経路は `run-codex-review.sh` 経由では塞がれている（オプション拒否）。`run-codex-consult.sh` / `codex-rescue` 経由のみで実害小 |
+| 4 | code-reviewer（LOW） | `classify()` の注釈が規則本体より長く一覧性が低い（今回 `mitou_docs` を見落とした一因の可能性） | リファクタリングのみでロジック変更を伴わないため、次に規則を足すセッションでまとめて整理する |
+| 5 | 既存（判断6 未決3） | golden test 化（実際の `git` コマンドで diff を生成してテスト入力にする） | 別タスク規模。判断6から継続 |
