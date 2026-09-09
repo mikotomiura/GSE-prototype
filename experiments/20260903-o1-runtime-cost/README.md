@@ -63,6 +63,22 @@ python3 $D/scripts/summarize.py            # 既定 = with-gse
 python3 $D/scripts/summarize.py with-gse-20260904-steady   # ★ 1 回目の退避ぶん
 ```
 
+⚠️★★★ **別OS/別マシンで走らせる前に `results/<run名>/` の既存内容を確認すること。**
+★ 2026-09-09/10 のWindows実測で実際に踏んだ事故: `run.sh` の上書きガードは `samples.tsv`
+の有無しか見ないため、別OS（例: macOS）の実測メタデータ（`meta.json`/`finished_utc`。
+`samples.tsv` 自体は `.gitignore` 対象でクローンに含まれない）が git 管理下に残っている
+ディレクトリへ、ガードに引っかからず上書きしてしまえる。→ ★ 別OS/別マシンで実測するときは
+`results/with-gse-<日付>-<OS等>/` のようにOS入りの別名を使うか、実行前に
+`git status results/<run名>/` を確認すること（詳細:
+`.steering/20260904-windows-orphan-verify/blockers.md`）。
+
+⚠️★★★ **実セッションNDJSONを削除する前に `meta`(session_start)行の `app_version` を
+記録しておくこと。** ★ `run.sh` が書く `meta.json`（この実験自身のメタデータ）には
+`app_version` フィールドが無く、`gse-app.log` にも版数は出力されない。実測に使った
+GSE本体の版数を事後に照合できる唯一の一次資料は**対象セッションNDJSONの `meta` 行**
+だけなので、`env.md` に記録する前にNDJSONを削除すると照合不能になる
+（2026-09-09/10のWindows実測で実際に踏んだ）。
+
 ⚠️ **AC に挿しておくこと。** ★ 2026-09-04 に実測: バッテリー駆動時の電源設定は
 `sleep 1`（★ アイドル 1 分でシステムスリープ）＋ `lowpowermode 1`（★ CPU スロットル）で、
 ⚠️ **8 時間走らせると途中で死ぬ**うえ、1 回目（AC）と条件が食い違う。
