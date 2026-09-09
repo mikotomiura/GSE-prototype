@@ -59,4 +59,4 @@
 
 ## 完了処理
 - [x] `design.md` の最終化
-- [ ] git commit
+- [x] git commit（`9b706d3`）
