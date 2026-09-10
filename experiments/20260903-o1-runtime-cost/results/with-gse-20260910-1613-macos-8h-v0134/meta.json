@@ -1,0 +1,1 @@
+{"run":"with-gse","label":"with-gse-20260910-1613-macos-8h-v0134","os":"macos","started_utc":"2026-09-10T07:13:42Z","duration_s":28800,"interval_s":30,"cpu_source":"ps -o cputime delta","cpu_pct_basis":"one_core_100","logical_processors":10}
