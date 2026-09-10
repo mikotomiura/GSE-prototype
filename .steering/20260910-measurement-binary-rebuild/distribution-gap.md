@@ -67,3 +67,52 @@ O1 orphan sweep: closed ... with session_end=...
 
 ⚠️★★★ **どれを採っても、まず v0.1.30 → 新版の配り直しが要る**
 （★ 初回セットアップからやり直し ＝ 被験者の手間が発生する）。
+
+---
+
+## ⚠️★★★ 5. **ローカルビルドは無署名である**（★ 2026-09-10 に実測・危うく配るところだった）
+
+★ 配布 zip を作ろうとして `codesign --verify --strict` に落ちた:
+
+```
+ローカルビルド出力 (v0.1.34) : ⚠️ NG "code has no resources but signature indicates they must be present"
+計測用に入れた v0.1.34       : ⚠️ NG（★ 同じ実体）
+配布中 v0.1.30（CI 製）      : ★ OK
+```
+
+★ 構造を比べると **`Contents/_CodeSignature` がローカルビルドには無い** ＝ ⚠️ **署名されていない**。
+
+→ ⚠️★★★ **そのまま配ると被験者の初回セットアップが必ず NG になる**
+（★ `初回セットアップ_mac.sh` は逐語で「署名の検証に失敗しました。★ このフォルダは使わず、
+zip を展開し直してください」で止める）。★ **被験者は 1 人も開始できない。**
+
+★ CI は `npx tauri build` の**後に**署名し直していた（`ci.yml`）:
+
+```bash
+for HELPER in gse-submit gse-package gse-unpack; do codesign --force --sign - ".../$HELPER"; done
+codesign --force --sign - --entitlements "$ENTITLEMENTS" "$BINARY"
+codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP"
+```
+
+★ この 3 段をローカルで再現したら `Signature OK` になった。
+
+### ⚠️ ただし CI 製と**同一ではない**
+
+| ★ | flags |
+|---|---|
+| v0.1.30（CI 製） | `0x10002 (adhoc, **runtime**)` |
+| v0.1.34（今回） | `0x2 (adhoc)` |
+
+★ `ci.yml` は逐語で「`--options runtime` は ad-hoc 署名では使用しない（TCC 過剰検証の原因）」
+と書いており、⚠️ **今回の方が現在の CI の意図に一致する**。★ だが v0.1.30 との差である。
+
+### ⚠️★★ 併せて疑うべきこと —— **無署名だと TCC を失いうる**
+
+★ 13:54 に落ちて上がり直したインスタンスは `Accessibility permission not granted` で
+**tap を 20 回以上作れなかった**（★ 実測）。⚠️ TCC の許可は **CDHash に紐づく**ので、
+★ 無署名 / 署名が変わるビルドでは**許可が引き継がれない**ことがある。
+⚠️ **未検証**だが、★ 計測用 app も無署名のまま入れてしまっている（→ 次に入れ替えるときは署名する）。
+
+★ さらに: 今日の `.ips` のうち 3 件は `SIGKILL (Code Signature Invalid)`（02:43 台）だった。
+⚠️ **無署名バイナリは macOS に殺されうる**ことの実例である
+（★ 実際、偽プロセスを `cp /bin/sleep` で作ったら rc=137 で即殺された）。
