@@ -65,6 +65,64 @@ expect_blocked "NDJSON セッションログ"          'diff --git a/s.ndjson b/
 expect_blocked ".env"                           'diff --git a/x.env b/x.env'         ''
 expect_blocked "★ 大文字の proprietary 拡張子"  'diff --git a/R.PDF b/R.PDF'         ''
 expect_blocked "credentials を含む名前"         'diff --git a/my_credentials b/my_credentials' ''
+# ⚠️★★★ 2026-09-09 追加 (security-checker 指摘・HIGH): 境界が [[:space:]] だけだと
+#   派生名 (.env.local 等) が素通りしていた。.ndjson と同じ境界へ揃えた回帰。
+expect_blocked "★★★ .env.local（Vite/Tauri の標準的な秘密置き場）" \
+  'diff --git a/.env.local b/.env.local' ''
+expect_blocked "★★★ .env.production" \
+  'diff --git a/src/.env.production b/src/.env.production' ''
+expect_blocked "★★★ .pem.bak" \
+  'diff --git a/x.pem.bak b/x.pem.bak' ''
+expect_blocked "★★★ .key.pub" \
+  'diff --git a/id.key.pub b/id.key.pub' ''
+# ⚠️★★★ 2026-09-09 追加 (security-checker 指摘・HIGH): proprietary 拡張子の後続に
+#   変換・圧縮・バックアップ由来の拡張子が積み重なると素通りしていた。
+expect_blocked "★★★ deck.pptx.gz（圧縮）" \
+  'diff --git a/deck.pptx.gz b/deck.pptx.gz' ''
+expect_blocked "★★★ deck.pptx.txt（テキスト抽出）" \
+  'diff --git a/deck.pptx.txt b/deck.pptx.txt' ''
+expect_blocked "★★★ s.docx.md.bak（Markdown 版のバックアップ）" \
+  'diff --git a/s.docx.md.bak b/s.docx.md.bak' ''
+
+echo "--- 2c. ★★★ 引用符つきのファイル名 (2026-09-08: fail-closed が開いていた形) ---"
+# ⚠️★★★ git は **非 ASCII を含むファイル名を C-quote して引用符で囲む**
+#   (`core.quotepath` の既定は true。★ 本 repo は未設定＝既定なので **常にこの形**)。
+#   ★ ところが判定は行末 `$` に依存しており、末尾が `"` になる引用符つきでは当たらなかった。
+#   ⚠️★★★ **実測 (2026-09-08)**: 作業ツリーの実 diff (日本語名の .pptx / .pptx.md) は
+#     **rc=0 で素通りし、追加行 257 行がそのまま出力に残った**。
+#   ⚠️ 既存ケース (`a/R.PDF` / `a/x.env`) が **引用符なしの形しか試していなかった**ため見逃していた。
+#     → ★ **検査の「入力の形」を実物に合わせる。**
+expect_blocked "★★★ 引用符つき .pptx (日本語名)"   'diff --git "a/docs/æ¥.pptx" "b/docs/æ¥.pptx"' ''
+expect_blocked "★★★ 引用符つき .env"   'diff --git "a/æ¥.env" "b/æ¥.env"' ''
+expect_blocked "★★★ 引用符つき .pem"   'diff --git "a/æ¥.pem" "b/æ¥.pem"' ''
+expect_blocked "★★★ 引用符つき .key"   'diff --git "a/æ¥.key" "b/æ¥.key"' ''
+expect_blocked "★★★ 引用符つき大文字 .PDF"   'diff --git "a/æ¥.PDF" "b/æ¥.PDF"' ''
+# ★ 2026-09-08 (研究者判断): proprietary 資料の **Markdown 版**も止める。
+#   ⚠️ 実測で `.pptx` を止めても `.pptx.md` から本文 257 行が出ていた。
+#   ★ 拡張子が .md なのは変換の都合にすぎず、守るべき中身は同じである。
+#   ⚠️ 副作用を承知で入れている: 未踏提出物に触る diff は毎回 rc=2 になる
+#     → そのときは --ack-filtered (人が中身を確かめてから通す) で運用する。
+expect_blocked "★★★ .pptx.md (proprietary の Markdown 版)" 'diff --git a/docs/deck.pptx.md b/docs/deck.pptx.md' ''
+expect_blocked "★★★ .docx.md (同上)" 'diff --git a/docs/spec.docx.md b/docs/spec.docx.md' ''
+expect_blocked "★★★ 引用符つき .pptx.md (★ 実物の形)" 'diff --git "a/docs/x.pptx.md" "b/docs/x.pptx.md"' ''
+expect_blocked "★★★ 引用符つき .ndjson (★ 元から塞がっていた側の回帰)"   'diff --git "a/æ¥.ndjson" "b/æ¥.ndjson"' ''
+# ⚠️★ **本文が実際に落ちるか**まで見る (★ rc だけ見ると「検出したが出力に残る」を見逃す)。
+{
+  total=$((total + 1))
+  out=$(printf 'diff --git "a/æ¥.pptx" "b/æ¥.pptx"
+@@ -1 +1 @@
++PROPRIETARY_BODY_TEXT
+' | "$FILTER"); rc=$?
+  if [ "$rc" -ne 2 ]; then
+    echo "NG   ★ 引用符つき .pptx の本文除去 → rc=$rc (2 を期待)"
+    ng=$((ng + 1))
+  elif printf '%s' "$out" | grep -qF 'PROPRIETARY_BODY_TEXT'; then
+    echo "NG   ★ 引用符つき .pptx の本文除去 → rc=2 だが **本文が残っている**"
+    ng=$((ng + 1))
+  else
+    echo "OK   ★ 引用符つき .pptx → rc=2 / 本文は残っていない"
+  fi
+}
 
 echo "--- 2b. ★★★ 実セッション名 (2026-08-14: 実際に外部 LLM へ出た形) ---"
 # ⚠️★★★ 下の 2 つは 2026-08-14 まで **rc=0 で素通り**していた。
@@ -77,6 +135,83 @@ expect_blocked "★ 組み立て済みのセッション名の形" \
 expect_blocked "★★ 連結で分割された形 (実際の事故の形)" \
   '         mut_file("run.sh", "", "# 例: P123" + "_gse_" + "20260101_000000")' '20260101_000000'
 
+echo "--- 2d. ★★★ 2026-09-08 security-checker が実測で開けた穴 ---"
+# ⚠️★★★ どれも「引用符バイパス」とは **別の穴**で、同じ日に見つかった。
+#   ★ 教訓: 判定を `diff --git` **1 形式**に結びつけていたこと自体が原因である。
+# H-1: マージ中の git diff / マージ commit の git show は `diff --cc` を出す。
+#   ⚠️ 実測では判定を 1 つも通らず rc=0 で本文が素通りしていた。
+expect_blocked "★★★ diff --cc (combined diff) の proprietary" \
+  'diff --cc x.pptx' ''
+expect_blocked "★★★ diff --combined の proprietary" \
+  'diff --combined x.pptx' ''
+# M-2: `diff --git` を含まない入力（★ run-codex-consult.sh は任意の Markdown を受ける）。
+expect_blocked "★★★ --- / +++ だけの unified diff (ndjson)" \
+  '+++ b/s.ndjson' ''
+expect_blocked "★★★ Binary files 行だけ (proprietary)" \
+  'Binary files a/x.pptx and b/x.pptx differ' ''
+# ⚠️★★★ H-2: **除去したハンクのパスを出力に載せない**。
+#   ★ 決定的な対照: 同じ識別子が **行内なら [REDACTED] に伏せられる**のに、
+#     ヘッダなら素通りしていた ＝ 仕様が伏せると決めた値を自分で外へ出していた。
+#   ★ 第 3 引数 (leak) に識別子を渡すので、出力に残っていれば NG になる。
+expect_blocked "★★★ 除去ヘッダにセッション識別子を載せない" \
+  'diff --git a/data/P123_gse_20260101_000000.ndjson b/data/P123_gse_20260101_000000.ndjson' \
+  'P123_gse_20260101_000000'
+expect_blocked "★★★ 除去ヘッダに資料のファイル名を載せない" \
+  'diff --git a/docs/TOPSECRET_DECK_NAME.pptx b/docs/TOPSECRET_DECK_NAME.pptx' \
+  'TOPSECRET_DECK_NAME'
+# ⚠️ レポート側にもパスを書かないこと (★ --ack-filtered で端末へ出るため)。
+{
+  total=$((total + 1))
+  rep=$(mktemp)
+  printf 'diff --git a/data/P123_gse_20260101_000000.ndjson b/x\n' \
+    | SECRETS_FILTER_REPORT="$rep" "$FILTER" > /dev/null 2>&1
+  if grep -qF 'P123_gse_20260101_000000' "$rep"; then
+    echo "NG   ★ レポートに除去ハンクのパスが書かれている: $(cat "$rep")"
+    ng=$((ng + 1))
+  else
+    echo "OK   ★ レポートにパスを書いていない → $(tr '\n' ' ' < "$rep")"
+  fi
+  rm -f "$rep"
+}
+
+echo "--- 2e. ★★★ Codex の第二意見で足した陽性対照 ---"
+# ⚠️★★★ 「どの行をパス行とみなすか」が曖昧だと同じ穴がまた開く。
+#   ★ すべて同じ分類関数を通す契約を、テストで固定する。
+expect_blocked "★★★ rename from (proprietary)" 'rename from docs/x.pptx' ''
+expect_blocked "★★★ rename to (proprietary)"   'rename to docs/y.pptx' ''
+expect_blocked "★★★ copy from (ndjson)"        'copy from data/s.ndjson' ''
+expect_blocked "★★★ Index: 行 (proprietary)"    'Index: docs/x.pptx' ''
+expect_blocked "★★★ --no-prefix の裸パス"       'diff --git docs/x.pptx docs/x.pptx' ''
+expect_blocked "★★★ +++ の Markdown 版"         '+++ docs/x.pptx.md' ''
+# ⚠️★★★ **git の生出力の形**（★ security-checker / Codex の両方が指摘）——
+#   ★ 今回の見逃しの原因は「検査の入力の形が実物と違ったこと」そのものである。
+#   ★ 実物は **リテラルのバックスラッシュ ＋ 8 進**（`\346\217\220`）であり、生 UTF-8 ではない。
+expect_blocked "★★★ git の生出力の形 (C-quote の 8 進表記)" \
+  'diff --git "a/docs/[\346\217\220\346\241\210]x.pptx" "b/docs/[\346\217\220\346\241\210]x.pptx"' ''
+expect_blocked "★★★ 同上・Markdown 版" \
+  'diff --git "a/docs/[\346\217\220]x.pptx.md" "b/docs/[\346\217\220]x.pptx.md"' ''
+
+echo "--- 2f. ★★★ 資料の置き場をディレクトリで塞ぐ (2026-09-08 研究者裁定・案 C) ---"
+# ⚠️★★★ 拡張子だけでは追い掛けっこが終わらない（★ .pptx → .pptx.md → .svg → …）。
+#   ★ 図とスライドの置き場を塞ぐ。⚠️ ただし置き場**全体**ではない（→ 下の陰性対照が要）。
+expect_blocked "★★★ figures/ の svg（★ 中身はデッキ本文）" \
+  'diff --git a/docs/mitou_submission/figures/gse-layer-map.svg b/docs/mitou_submission/figures/gse-layer-map.svg' ''
+expect_blocked "★★★ figures/ の png" \
+  'diff --git a/docs/mitou_submission/figures/x.png b/docs/mitou_submission/figures/x.png' ''
+expect_blocked "★★★ mitou_pptx/ 配下（拡張子を問わない）" \
+  'diff --git a/docs/mitou_submission/mitou_pptx/notes.txt b/docs/mitou_submission/mitou_pptx/notes.txt' ''
+expect_blocked "★★★ 引用符つき・日本語名の figures/" \
+  'diff --git "a/docs/mitou_submission/figures/[\346\217\220]zu.svg" "b/docs/mitou_submission/figures/[\346\217\220]zu.svg"' ''
+expect_blocked "★★★ +++ 行だけでも置き場で止まる" \
+  '+++ b/docs/mitou_submission/figures/x.svg' ''
+# ⚠️★★★ 2026-09-09 追加 (code-reviewer 指摘・HIGH): mitou_docs/ が figures/・mitou_pptx/
+#   と同格の第3の兄弟ディレクトリなのに規則から漏れていた（拡張子規則だけに頼っていたため
+#   .md/.svg 等を置いた瞬間に穴が開く。実測: 修正前は rc=0 で本文素通りだった）。
+expect_blocked "★★★ mitou_docs/ 配下の .md（拡張子を問わない・提案書/技術設計書の置き場）" \
+  'diff --git a/docs/mitou_submission/mitou_docs/outline.md b/docs/mitou_submission/mitou_docs/outline.md' ''
+expect_blocked "★★★ mitou_docs/ 配下の .svg" \
+  'diff --git a/docs/mitou_submission/mitou_docs/fig.svg b/docs/mitou_submission/mitou_docs/fig.svg' ''
+
 echo "--- 3. ★ 陰性対照 (ふつうのコードは 1 バイトも変えない) ---"
 # ⚠️★★ 架空名は**素通りさせる** —— ここで止めると検査の見本を含む diff が毎回 exit 2 になり、
 #   ★ 人がフィルタを迂回する動機を作る。★ 架空名の約束は「年が 202x でない」こと。
@@ -87,6 +222,29 @@ expect_clean "ふつうの Rust"      'pub fn next_block_number(dir: &Path) -> u
 expect_clean "ふつうのコメント"   '// 送信先は配布フォルダの設定ファイルから読む'
 expect_clean "ふつうの diff 見出し" 'diff --git a/src-tauri/src/reconcile.rs b/src-tauri/src/reconcile.rs'
 expect_clean "型注釈のコロン"     'let block: u32 = 3;'
+# ⚠️★★★ 2026-09-08 追加の陰性対照 —— ★ **引用符つきでも「ふつうのファイル」は素通りすること。**
+#   ★ これが無いと「引用符が付いていたら全部止める」実装でも緑になってしまう。
+expect_clean "★ 引用符つきだが普通の .rs"   'diff --git "a/src/æ¥.rs" "b/src/æ¥.rs"'
+expect_clean "★ 引用符つきだが普通の .md"   'diff --git "a/docs/æ¥.md" "b/docs/æ¥.md"'
+# ⚠️ 拡張子の途中一致で誤爆しないこと (★ .key と .keyboard を混同しない)
+# ⚠️ `awk -v` は `\.` を素の `.`（任意 1 文字）へ降格させる。★ 実測で `axpptx` が
+#   over-block されていた。→ ★ `ENVIRON[]` 経由に変えた。★ これはその回帰。
+# ⚠️★★★ **案 C の要点はここである。**★ 置き場を丸ごと塞ぐ案 (B) を採らなかったのは、
+#   ★ `README.md` のような普通の文書を**レビュー可能なまま**にするためである。
+#   ⚠️ この 2 本が赤くなったら、それは案 B へ滑っている（＝ 裁定と実装がずれた）合図。
+expect_clean "★★★ mitou_submission/README.md は素通り（★ 案 C の要点）" \
+  'diff --git a/docs/mitou_submission/README.md b/docs/mitou_submission/README.md'
+expect_clean "★★★ 別の場所の .svg は止めない（★ 置き場で塞いでいる）" \
+  'diff --git a/docs/architecture/diagram.svg b/docs/architecture/diagram.svg'
+expect_clean "★ --- /dev/null は素通り（★ 新規ファイルの追加）" \
+  '--- /dev/null'
+expect_clean "★ 引用符つきの普通の .rs（★ バックスラッシュ境界化で壊れない）" \
+  'diff --git "a/src/[\346\217\220]x.rs" "b/src/[\346\217\220]x.rs"'
+expect_clean "★ axpptx は .pptx ではない（★ 正規表現の降格検知）" \
+  'diff --git a/axpptx b/axpptx'
+expect_clean "★ xdocx / ypdf も同様" \
+  'diff --git a/notes_xdocx b/notes_xdocx'
+expect_clean "★ .keyboard.rs は .key ではない"   'diff --git a/src/keyboard.rs b/src/keyboard.rs'
 
 echo "--- 4. ★ レポート (SECRETS_FILTER_REPORT) に値そのものを書かない ---"
 # ⚠️ レポートは `--ack-filtered` のときに **端末へ出す**。値を書くと
