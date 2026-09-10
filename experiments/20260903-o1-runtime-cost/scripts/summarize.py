@@ -30,7 +30,8 @@ THRESHOLDS = {
 #   ⚠️ 半分を切ったら「測れていない」とみなす。
 MIN_SAMPLES = 480
 # ★ 起動コストの読み方に添える注意書き用（⚠️ 実効間隔は top を 2 回叩くぶん延びる）。
-INTERVAL_HINT_S = 35
+# ⚠️ 2026-09-10: 起動コスト節の注記は**実測の中央間隔**を使うようにしたので、
+#   この定数はもう使っていない（★ 残すと次の人が固定値だと思う）。
 
 
 def parse_threads(v: str) -> int:
@@ -64,7 +65,11 @@ def load(run: str):
             rows.append(
                 {
                     "t": int(parts[0]),
-                    "cpu": float(parts[1] or 0),
+                    # ⚠️★★★ **空欄を 0 と読まない。** ★ 2026-09-10 に CPU の測り方を
+                    #   「累積 CPU 時間の増分」に変えたので、**最初の 1 行は前値が無く空**になる。
+                    #   ⚠️ `or 0` のままだと「測って 0 だった」と混ざる（★ Windows の 7・8 列目で
+                    #   踏んだのと同型）。→ ★ None にして下流で除く。
+                    "cpu": float(parts[1]) if parts[1].strip() else None,
                     "rss_kb": float(parts[2] or 0),
                     "threads": parse_threads(parts[3]),
                     "batt": float(parts[4]) if parts[4].strip() else None,
@@ -272,17 +277,33 @@ def startup_report(all_rows, present_rows, n_head: int = 5) -> tuple[str, bool]:
                 "★ 測るならサンプラを先に起こしてから GSE を起動すること。", False)
     head = present_rows[:n_head]
     tail = present_rows[n_head:]
-    h_cpu = sum(r["cpu"] for r in head) / len(head)
+    # ⚠️ CPU が空（測れていない）行を平均に混ぜない。
+    h_cpus = [r["cpu"] for r in head if r["cpu"] is not None]
+    t_cpus = [r["cpu"] for r in tail if r["cpu"] is not None]
     lines = [f"★ 起動時のコスト: 起動前の基線 {n_absent} 行（★ 全列 0 = 計測器の陰性対照）"]
-    lines.append(f"  ★ 起動直後 {len(head)} サンプルの CPU 平均: {h_cpu:.2f} %")
-    if tail:
-        t_cpu = sum(r["cpu"] for r in tail) / len(tail)
+    if not h_cpus:
+        lines.append("  ⚠️ 起動直後の CPU が 1 つも測れていない（★ 0 と書かない）")
+        h_cpu = None
+    else:
+        h_cpu = sum(h_cpus) / len(h_cpus)
+        lines.append(f"  ★ 起動直後 {len(h_cpus)} サンプルの CPU 平均: {h_cpu:.2f} %")
+    if t_cpus and h_cpu is not None:
+        t_cpu = sum(t_cpus) / len(t_cpus)
         lines.append(f"  ★ 以降（定常）の CPU 平均: {t_cpu:.2f} %  → 差 {h_cpu - t_cpu:+.2f} pt")
     h_rss = [r["rss_kb"] / 1024.0 for r in head if r["rss_kb"] > 0]
     if h_rss:
         lines.append(f"  ★ 起動直後の RSS: {h_rss[0]:.1f} MB")
-    lines.append(f"  ⚠️ サンプル間隔は約 {INTERVAL_HINT_S} s なので、"
-                 "★ **それより短い山は取りこぼす**（★ 孤児回収の走査を含む）。")
+    # ⚠️★★ **間隔は固定値でなく実測から出す。** ★ 2026-09-10 に 1 秒間隔の run を回したら
+    #   「約 35 s なので短い山は取りこぼす」と**嘘の注記**が出た（★ 実際は約 8 s）。
+    ts = [r["t"] for r in present_rows]
+    gaps = sorted(ts[i] - ts[i - 1] for i in range(1, len(ts))) if len(ts) > 1 else []
+    med = gaps[len(gaps) // 2] if gaps else None
+    if med is None:
+        lines.append("  ⚠️ サンプルが 2 行未満で間隔を測れない。")
+    else:
+        lines.append(f"  ⚠️ サンプル間隔の中央値は実測 {med} s。"
+                     "★ **CPU は累積カウンタ由来なので山を落とさない**が、"
+                     "⚠️ RSS / power は**この間隔より短い山を取りこぼす**。")
     return ("\n".join(lines), True)
 
 
@@ -325,7 +346,36 @@ def main() -> int:
     enough = len(rows) >= MIN_SAMPLES
     if not enough:
         print("⚠️★★★ サンプルが足りない。**1 指標も判定しない**（★ 短時間の観測で「軽い」と言わない）。")
-    cpus = [r["cpu"] for r in rows]
+    cpus = [r["cpu"] for r in rows if r["cpu"] is not None]
+    n_cpu_missing = len(rows) - len(cpus)
+    if n_cpu_missing:
+        print(f"⚠️ CPU が空だった行: {n_cpu_missing} 行（★ 平均・最大から除いた。⚠️ 0 として混ぜていない）")
+    # ⚠️★★★ **CPU% の基準を必ず印字する。** ★ 2026-09-10 まで基準はスクリプトの
+    #   コメントにしか無く、⚠️ 読んだ人が「Windows は全コア基準」と推測して
+    #   **×16 換算して FAIL 相当と誤判定**しかけた。→ ★ 数字の隣に基準を出す。
+    # ⚠️★★★ **壊れた計器で採った CPU を PASS と読ませない。**
+    #   ★ 2026-09-10 に実測: 旧 `sample-macos.sh` の `top -l 2` は 1 コア飽和の
+    #   プロセスを **47.6 %** と報告した（★ 地上真実 99.7 %）＝ 約 2.08 倍の過小報告。
+    #   ⚠️ 古い samples.tsv は `meta.json` に `cpu_source` を持たないので、
+    #   ★ **それを目印に CPU 2 指標だけ判定を落とす**（★ RSS / NDJSON は影響を受けない）。
+    cpu_instrument_broken = (
+        with_gse["meta"].get("os") == "macos" and not with_gse["meta"].get("cpu_source")
+    )
+    if cpu_instrument_broken:
+        print("⚠️★★★ **この run の CPU は壊れた計器で採られている**"
+              "（★ meta.json に cpu_source が無い = 2026-09-10 より前の macOS run）。"
+              "\n   ★ 旧 `top -l 2` は約 **2.08 倍の過小報告**をする（notes.md の訂正節）。"
+              "\n   → ⚠️ **CPU 2 指標は判定しない**。★ 数字が要るなら測り直すこと。")
+    basis = with_gse["meta"].get("cpu_pct_basis")
+    ncpu = with_gse["meta"].get("logical_processors")
+    if basis:
+        label = {"one_core_100": "★ 1 コア = 100 %（★ 全コア飽和なら 100×コア数）",
+                 "all_cores_100": "⚠️ 全コア = 100 %（★ Task Manager 方式）"}.get(basis, f"⚠️ 不明 ({basis})")
+        print(f"★ CPU% の基準: {label}"
+              + (f"  / 論理プロセッサ数 {ncpu}" if ncpu else ""))
+    else:
+        print("⚠️★★★ **CPU% の基準が meta.json に無い**（★ 古い run）。"
+              "→ ⚠️ 他 OS の数値と直接比べないこと。")
     nd_val, nd_notes = ndjson_mb_per_day(with_gse["dir"], with_gse["meta"])
     metrics = {
         "cpu_mean_pct": (sum(cpus) / len(cpus)) if cpus else None,
@@ -338,7 +388,10 @@ def main() -> int:
     worst = "PASS"
     order = {"PASS": 0, "MARGINAL": 1, "DataInsufficient": 2, "FAIL": 3}
     for k, v in metrics.items():
-        v_, why = verdict(k, v) if enough else ("DataInsufficient", "⚠️ サンプル不足")
+        if cpu_instrument_broken and k.startswith("cpu_"):
+            v_, why = "DataInsufficient", "⚠️ 計器が壊れていた run（★ 要再測）"
+        else:
+            v_, why = verdict(k, v) if enough else ("DataInsufficient", "⚠️ サンプル不足")
         shown = "—" if v is None else f"{v:.2f}"
         print(f"  {k:26s} {shown:>10s}  {v_:<16s} {why}")
         if order[v_] > order[worst]:

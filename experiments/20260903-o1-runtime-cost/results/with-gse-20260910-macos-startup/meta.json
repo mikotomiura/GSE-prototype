@@ -1,0 +1,1 @@
+{"run":"with-gse","label":"with-gse-20260910-macos-startup","os":"macos","started_utc":"2026-09-09T17:47:43Z","duration_s":360,"interval_s":1,"cpu_source":"ps -o cputime delta","cpu_pct_basis":"one_core_100","logical_processors":10}

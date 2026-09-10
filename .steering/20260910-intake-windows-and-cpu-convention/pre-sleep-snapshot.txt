@@ -1,0 +1,6 @@
+epoch=1788976646
+utc=2026-09-09T17:57:26Z
+pid=12833
+applog_lines=295
+ndjson=/Users/johnd/Documents/GSE-sessions/gse_o1_20260909_174803.ndjson 145164
+hwm=1788976083953
