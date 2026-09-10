@@ -472,6 +472,39 @@ jobs:
       #     ★ 旧テストが 22 ケースしか見ていなかったので、**緑のまま穴が生きていた**。
       - name: Secrets filter gate (外部 LLM へ渡す diff の最後の関門)
         run: bash scripts/secrets-filter-test.sh
+      # ⚠️★★★ **「テストは書いたが CI で走らない」を機械で見張る** (2026-09-10 追加)。
+      #   ★ secrets-filter は例外ではなかった —— ⚠️ 同じ状態のテストが **8 本**あった (実測)。
+      #   ★ 意図的に外すものは、check-tests-are-wired.sh の除外表に**理由つきで**書く。
+      - name: Tests-are-wired self-test (検査が空振りしていないか)
+        run: bash scripts/check-tests-are-wired.sh --self-test
+      - name: Tests-are-wired gate (書いたテストが CI で走るか)
+        run: bash scripts/check-tests-are-wired.sh
+      # ⚠️★★ ここから下は 2026-09-10 まで **1 度も CI で走っていなかった** テスト群。
+      #   ★ どれも手元では緑だったが、⚠️ **走っていないテストは緑とは言えない**。
+      - name: O1 sync guard test (gse-dataset へ O1 を出さない番人)
+        run: bash scripts/sync_session_o1_guard_test.sh
+      - name: Participant id parity test (logger ⇄ sync scripts)
+        run: bash scripts/tests/test_participant_id_parity.sh
+      - name: G1 emails / submission tab / manifest tests
+        run: |
+          python3 -m unittest scripts.tests.test_check_g1_emails
+          python3 -m unittest scripts.tests.test_g1_submission_tab
+          python3 -m unittest scripts.tests.test_gen_sessions_manifest
+        env:
+          PYTHONUTF8: "1"
+      - name: Schema parity test (gse-dataset 整合)
+        run: python3 -m unittest scripts.tests.test_check_schema_parity
+        env:
+          PYTHONUTF8: "1"
+      # ⚠️★★★ **duckdb を入れてから走らせる。** ★ 入れないと 16 件中 **15 件が skip** され
+      #   (実測: `skipped 'duckdb not installed'`)、⚠️ **ほぼ何も検査しない緑**になる。
+      #   ★ 入れた状態では 16 件すべて走って OK になることを手元で確認済み。
+      - name: Install duckdb (⚠️ 無いと analysis-db テストが 15/16 skip する)
+        run: python3 -m pip install --quiet duckdb
+      - name: Analysis DB tests (⚠️ skip=0 で走ること)
+        run: python3 -m unittest scripts.tests.test_build_analysis_db
+        env:
+          PYTHONUTF8: "1"
       # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
       #   ⚠️ 実害の実測: `--compact` を落とすと詳細資料が **10 → 15 ページ**になるが、
       #     **本文は 1 文字も変わらない**ので diff を見ても気づけない。
