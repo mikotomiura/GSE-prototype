@@ -114,6 +114,40 @@ GSE_COST_LABEL=with-gse-YYYYMMDD-macos-8h nohup bash run.sh with-gse > /dev/null
 ★ 手順 `.steering/20260910-intake-windows-and-cpu-convention/sleep-test-procedure.md`。
 ⚠️ **基線を採り直してから寝かせること**（★ `post-wake-check.sh` は基線が無いと `exit 2` で止まる）。
 
+### ⚠️★★★ §3-2 —— **「次の Down で決着する」は成立しない**（★ 2026-09-10 に反証した）
+
+⚠️ 前のセッションまでの計画は逐語で「診断 `tap_enabled` を入れたので**次の Down のログで
+機序が決着する**まで待つ」だった。→ ⚠️★★★ **走っているバイナリに `tap_enabled` が無い。**
+
+| ★ 文字列 | `strings` の件数 |
+|---|---|
+| `starved_ms` / `rehook_requested` / `NOT delivering events` / `tap_mode` / `input_monitoring` | ★ **全部あり**（★ **陽性対照**） |
+| ⚠️ **`tap_enabled`** | ⚠️ **0** |
+
+★ 理由は日付: ⚠️ バイナリは **v0.1.31（mtime 2026-09-03）**、
+診断が入ったのは **`cb1aa25`（2026-09-05）**。
+★ NDJSON の **`meta.app_version = 0.1.31`** でも裏を取った。
+→ ⚠️★★★ **すでに 3 回の Down を無駄にしている**（09-05 / 09-09 / 09-10）。
+
+★ **2 段目の防御も動いていない**: `hook_health` **14 件すべて `rehook=false`**
+（⚠️ `alive=false` の 2 件を含む）。★ `cb1aa25` 逐語「`request_reinstall` が定数 false だった」と一致。
+
+★ **頻度を初めて数えた**: 作業中の **31 分で 10 件・うち Down 2 件**（★ 約 3 分に 1 回）。
+⚠️ 打鍵の無い 8.6 時間は **0 件** → ★ **検知は活動量に強く依存する**
+（⚠️「8 時間に 1 回」は打鍵が疎だっただけ）。★ ただし `dropped` は**全件 0**。
+
+⚠️★★★ **もう 1 つの帰結 —— 測っている版が配布物と違う**:
+★ macOS の稼働コストは全部 **v0.1.31**、Windows と**被験者配布は v0.1.33**。
+→ ⚠️ **macOS 側は「配布物の稼働コスト」を測っていない。**
+
+### ★ やること（⚠️ これが先。待っても何も分からない）
+
+1. ★ **mac の計測用バイナリを v0.1.33 相当で作り直す**
+   → ⚠️ **診断・2 段目の防御・配布物との版一致が同時に片づく**
+2. ★ そのうえで次の Down を待つ
+
+★ 詳細は `.steering/20260910-intake-windows-and-cpu-convention/starvation-diagnostic-finding.md`。
+
 ### ⚠️★★★ 陰性対照は **すでに崩れている**
 
 ★ 実測: **スリープなしで** GSE 起動の **65 秒後**に `starved_ms=30074`。
@@ -167,7 +201,7 @@ GSE_COST_LABEL=with-gse-YYYYMMDD-macos-8h nohup bash run.sh with-gse > /dev/null
 | ⚠️ `run.sh` の上書きガード | ★ **閉じた**（blockers #2。`meta.json` 等も見る・`GSE_COST_LABEL` 追加） |
 | ⚠️ `.gitignore` の穴 | ★ `ndjson-size-start.tsv` を追加（⚠️ 既追跡分は意図して残す） |
 | ★ O1 の配布ゲート | ★ **20 件 / 0 件**（⚠️ ただし **CPU 2 指標は「要再測」に降格**した。★ 配布可否は研究者判断） |
-| ⚠️ starvation の機序 | ★ **まだ待つ**（`tap_enabled` の診断が入っている。⚠️ 次の Down のログで決着させる） |
+| ⚠️★★★ starvation の機序 | ⚠️ **「待つ」は成立しない**（★ 2026-09-10 に実測・下の §3-2） |
 
 ## §7 ★ 触らないもの
 
