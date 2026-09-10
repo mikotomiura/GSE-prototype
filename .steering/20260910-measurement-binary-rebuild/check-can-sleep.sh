@@ -8,6 +8,31 @@
 set -uo pipefail
 RC=0
 echo "════════════════════════════════════════"
+
+# ⚠️★★★ **最初にこれを見る。** ★ 2026-09-10 に 2 回スリープ検証を潰した真因である。
+#   ★ `SleepDisabled 1` は `sudo pmset disablesleep 1` の設定で、
+#   ⚠️ **assertion と無関係に、蓋を閉じても含めてスリープを全面的に無効化する**。
+#   ★ 実測: この Mac は `kern.waketime = 0`（★ 2026-07-26 の起動以来 **46 日間 1 度も寝ていない**）、
+#     閉蓋 16 分 / 5 分でも NDJSON の穴は最大 1 秒だった。
+#   ⚠️★★ **私は 2 回とも「音声が妨害している」と書いた。** ★ 妨害者は列挙できていたのに、
+#     **その上位にある system 設定を 1 度も見なかった** —— ⚠️ 順序を間違えると、
+#     潰しても潰しても寝ない理由が分からないまま時間だけ溶ける。
+echo "★ system 設定 (⚠️ assertion より先に効く)"
+SD=$(pmset -g 2>/dev/null | awk '/SleepDisabled/ {print $2}')
+case "${SD:-}" in
+  1)
+    echo "  ⚠️★★★ **SleepDisabled = 1** ＝ ★ **この Mac はそもそも寝ない設定である**"
+    echo "     → ★ 解除 (⚠️ sudo が要る。私からは実行できない):"
+    echo "          sudo pmset -a disablesleep 0"
+    echo "     ★ 解除できたか:  pmset -g | grep SleepDisabled   → 0 になること"
+    RC=3 ;;
+  0)
+    echo "  ★ SleepDisabled = 0（★ 寝られる設定）" ;;
+  *)
+    echo "  ⚠️ SleepDisabled を読めない (値=[${SD:-空}]) → ★ **判定しない**"
+    [ "$RC" -eq 0 ] && RC=1 ;;
+esac
+
 echo "★ いま sleep を止めているもの"
 HOLD=$(pmset -g assertions 2>/dev/null | grep -E "^\s+pid [0-9]+\(" \
        | grep -E "PreventUserIdleSystemSleep|NoIdleSleepAssertion|PreventSystemSleep")
