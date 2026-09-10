@@ -45,33 +45,34 @@ ls -l ~/Documents/GSE-sessions/gse_o1_*.ndjson             # ⚠️ 2026-09-10 1
 
 ---
 
-## §1 ⚠️★★★ 未決 —— **Windows の CPU% 規約を実機で確定する**
+## §1 ✅ **決着済み** —— Windows の CPU% 規約は **1 コア = 100 % 基準**
 
-★ 状態: **一次資料では決着済み・実機実測は未了**。
+⚠️★★★ **本項は 2026-09-10 に Windows 実機で決着した（PR #173）。★ 蒸し返さないこと。**
 
-★ Microsoft *Examining Processor Time Data* 逐語 ——
-「the value of the % Processor Time reported for the **Process object can report values over
-100 percent**」→ ★ **1 コア = 100 % 基準**（macOS と同じ）。⚠️ **×16 換算は誤り**。
+★ 1 コアを `while($true){}` で飽和させたプロセスの `CookedValue`（論理プロセッサ **16**）:
 
-⚠️ ただし `run.sh` は `cpu_pct_basis` を **`one_core_100_unverified`** のままにしてある。
+| # | CookedValue |
+|---|---|
+| 1 | **99.9586042201256** |
+| 2 | **100.392972071849** |
+| 3 | **97.1371636451479** |
 
-### ★ やること（⚠️ 5 分・Windows 側）
+→ ★ **≒ 100**（⚠️ ≒ 6.25 ではない）＝ **1 コア = 100 % 基準**。macOS と同じ規約。
+★ Microsoft の逐語（「the % Processor Time reported for the **Process object can report
+values over 100 percent**」）が**実測で裏付けられた**。
 
-★ 手順は `.steering/20260910-intake-windows-and-cpu-convention/windows-cpu-convention-probe.md`。
-★ busy-loop に同じカウンタを当て、**≒100 なら合計基準 / ≒6.25 なら正規化基準**。
+⚠️ **`×16` は誤り。「macOS 換算 33.0 % で FAIL 相当」は撤回済み。**
+★ `run.sh` の `CPU_BASIS` は `one_core_100` に確定、`sample-windows.sh` の誤ったコメントも訂正済み。
 
-★ 決着したら:
-1. `run.sh` の `CPU_BASIS="${GSE_COST_CPU_BASIS:-one_core_100_unverified}"` を確定値へ
-2. `sample-windows.sh` の**古いコメント**（「全コアに対する % を返す」）を直す
-   —— ⚠️ **このコメントが誤判定の発生源だった**
-3. `notes.md` に実測値を追記（⚠️ 「未実測」の記述を消す）
+### ★★★ で、結局 CPU はどうなのか（★ 両 OS を同じ基準で並べる）
 
-### ⚠️ どちらに転んでも動かないこと
+| ★ OS | CPU 平均 | 閾値 < 1 % に対して |
+|---|---|---|
+| Windows（v0.1.33・8h） | **2.06 %** | ⚠️ **MARGINAL** |
+| macOS（v0.1.31・直した計器・定常 6 分） | **1.31 %** | ⚠️ **MARGINAL** |
 
-★ Windows の 2.06 % は**そのままでも閾値 < 1 % 超 ＝ MARGINAL**。
-→ ⚠️ 「Windows の CPU は PASS」とは書けない。★ 覆るのは **FAIL 相当か MARGINAL か**だけ。
-
----
+→ ★ **両 OS とも MARGINAL。** ⚠️ どちらも「軽い」とは言えず、**「FAIL」でもない**。
+⚠️ macOS の 8h は **§2 で測り直し中**（★ 6 分の値は参考）。
 
 ## §2 ⚠️★★★ 未決 —— **macOS の 8h を直した計器で測り直す**
 
