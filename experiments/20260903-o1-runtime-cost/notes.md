@@ -743,3 +743,70 @@ macOSと同じ1コア基準に換算すると平均33.0%・最大149.1%と、FAI
 - ⚠️★★★ **壊れた計器で採った run が今も `PASS` と表示されていた**
   → ★ `meta.json` に `cpu_source` が無い macOS run は **CPU 2 指標を判定しない**門を入れた
   （★ 3 状態で検査: 旧 macOS run = 落ちる / 新 macOS run = 落ちない / Windows run = 誤爆しない）。
+
+---
+
+# ★★★ 予定外の実測（2026-09-10・macOS・**8.87 時間連続の O1 run**）
+
+★ 6 分の起動プロファイル run のあと、⚠️ **GSE を止め忘れたまま 8.87 時間動き続けた**。
+→ ★ 結果として **macOS の連続稼働の一次資料**が採れた（⚠️ CPU は測っていない。サンプラは 6 分で終了）。
+
+| 項目 | 値 |
+|---|---|
+| 対象 | `gse_o1_20260909_174803.ndjson`（★ 起動前の基線で **O1 ログ 0 本**を確認済み） |
+| 長さ | **8.87 時間**（★ NDJSON の時刻の実測幅） |
+| サイズ | **7.50 MB** → ★ **20.3 MB/日** |
+| 行 | `feat` **31,943** / `key` 160 / `pointer_bin` 225 / `focus_transition` 11 / `hook_health` 7 / `starve_window` 1 |
+| ⚠️ **穴** | ★ **最大 1 秒・30 秒超は 0 個**・壊れ行 0 |
+
+## ★ これで **指標 5（NDJSON/日）が macOS で確定した**
+
+⚠️ 従来の 2 本は `ndjson-size-start.tsv` が無く「run より前から書かれていたかもしれない」ので
+**参考値**扱いだった。★ 今回は **run 開始時に O1 ログが 1 本も無い**ことを実測しているので、
+**ファイルの全生涯が観測窓の中**にある。
+
+| ★ 出どころ | 値 |
+|---|---|
+| macOS 1 回目（参考値） | 20.48 MB/日 |
+| Windows（Birth time で確定） | 20.14 MB/日 |
+| ★ **macOS・今回（前提なしで確定）** | **20.3 MB/日** |
+
+→ ★ **3 本が 20.1〜20.5 に収まった。** ⚠️ 閾値に対して PASS（★ 判定表参照）。
+
+## ⚠️★★★ フック飢餓 —— **7 件出たが `dropped` は全件 0**
+
+```
+t=…148179  alive=true   starved_ms=30074   rehook=false  dropped=0  dropped_delta=0
+t=…623786  alive=FALSE  starved_ms=120279  rehook=false  dropped=0  dropped_delta=0
+t=…701957  alive=true   starved_ms=176403  rehook=false  dropped=0  dropped_delta=0
+t=…812135  alive=true   starved_ms=30036   rehook=false  dropped=0  dropped_delta=0
+t=…883488  alive=true   starved_ms=71195   rehook=false  dropped=0  dropped_delta=0
+t=…947704  alive=true   starved_ms=30097   rehook=false  dropped=0  dropped_delta=0
+t=…954727  alive=true   starved_ms=36114   rehook=false  dropped=0  dropped_delta=0
+```
+
+★ 言えること:
+- ★ **1 Hz ゲートは 8.87 時間 1 度も止まっていない**（★ 穴 0）。
+- ★ `dropped` / `dropped_delta` が **全件 0** ＝ **ロガーは 1 行も捨てていない**。
+- ★ `starve_window` が **1 件**記録された（★ `alive=false` の 120 s の回）。
+
+⚠️★★★ **言ってはいけないこと**:
+- ⚠️ 「打鍵の取りこぼしは無かった」とは**言えない**。★ `feat` は打鍵が無くても 1 Hz で出るので、
+  **`feat` の連続性は「解析ループが生きていた」ことしか示さない**（★ フックの健全性とは別）。
+- ⚠️ この 8.87 時間の `key` は **160 件しかない**（★ 研究者はこの Mac で直接ほとんど打っていない）。
+  → ★ **飢餓の検知は「システムが入力を見たのにフックが呼ばれない」時だけ起きる**ので、
+  ⚠️ **打鍵が少ない区間は検知そのものが疎になる**。★ 8.6 時間ログが無音だったのは
+  「飢えていた」のではなく「判定材料が無かった」可能性が高い。
+
+## ⚠️ スリープ跨ぎは **まだ 1 度も試せていない**
+
+★ `feat` が 8.87 時間ぶん 1 秒の穴も無く並んでいる ＝ ⚠️ **この間このマシンは寝ていない**。
+★ `pmset -g assertions` の再実測でも、**`caffeinate`（親 = `claude`）** に加えて
+⚠️ **`pid 58901(Claude)` の `NoIdleSleepAssertion named: "Electron"`** と `sharingd`(Handoff) が出た。
+→ ★ 手順は `.steering/20260910-intake-windows-and-cpu-convention/sleep-test-procedure.md`。
+
+## ★ 点検スクリプト自身の欠陥（★ その場で直した）
+
+⚠️ `post-wake-check.sh` が基線ファイル名の食い違いで `PRE` を**空**にし、
+`tail -n +1` で **11 日前からのログ全部**を「基線以降のログ」の見出しで出した。
+→ ★ **不在なら `exit 2` で止まる**ようにし、⚠️ **基線を隠す陰性対照**で止まることを実測した。

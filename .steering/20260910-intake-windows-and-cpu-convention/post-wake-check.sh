@@ -2,6 +2,18 @@
 # ★ スリープ復帰後の点検（⚠️ 5 項目すべて見る。1 つでも欠けたら「確かめた」と書かない）
 L=~/Documents/GSE-sessions/gse-app.log
 S="$(dirname "$0")"
+SNAP="$S/pre-sleep-snapshot.txt"
+# ⚠️★★★ **基線が無いなら止まる。** ★ 2026-09-10 に実際に踏んだ:
+#   ファイル名がずれて PRE が空になり、`tail -n +1` が **ログを頭から全部**出した。
+#   ⚠️ しかも「復帰直後のログ」という見出しの下に出たので、★ **11 日前の行を
+#   復帰直後だと読みかけた**。→ ★ 不在は「0」ではなく「測れない」。
+if [ ! -s "$SNAP" ]; then
+  echo "⚠️★★★ 基線 $SNAP が無い。★ スリープ前のスナップショットを採らずに"
+  echo "   復帰後だけ見ても『増えた行』は出せない。→ **判定しない**。"
+  exit 2
+fi
+PRE=$(grep '^applog_lines=' "$SNAP" | cut -d= -f2)
+case "$PRE" in ''|*[!0-9]*) echo "⚠️ 基線の applog_lines が数字でない: [$PRE]" >&2; exit 2 ;; esac
 echo "=== ★ 復帰時刻: $(date '+%F %T %Z') / $(date -u '+%FT%TZ')"
 echo "=== ★ 1. プロセスは生きているか"
 if pgrep -x gse-next > /dev/null; then
@@ -9,8 +21,7 @@ if pgrep -x gse-next > /dev/null; then
 else
   echo "  ⚠️★★★ 落ちている"
 fi
-echo "=== ★ 2. 復帰直後のログ（★ 事前 $(grep '^applog_lines=' "$S/pre-sleep.txt" | cut -d= -f2) 行 → 現在 $(grep -c '' $L) 行）"
-PRE=$(grep '^applog_lines=' "$S/pre-sleep.txt" | cut -d= -f2)
+echo "=== ★ 2. 基線以降のログ（★ 事前 $PRE 行 → 現在 $(grep -c '' $L) 行）"
 tail -n +$((PRE + 1)) "$L" | cut -c1-170 | sed 's/^/  /'
 [ "$(grep -c '' $L)" -eq "$PRE" ] && echo "  ⚠️ 新しい行が 1 行も無い（★ 何も記録されていない）"
 echo "=== ★ 3. スリープ前後の pmset ログ（★ 本当に寝たかの一次資料）"
@@ -37,5 +48,5 @@ for f in fs:
               " ← ★ スリープ時間とほぼ一致するはず")
 PY
 echo "=== ★ 5. 時計の高水位マーク（★ 巻き戻りで sweep が止まっていないか）"
-echo "  事前: $(grep '^hwm=' "$S/pre-sleep.txt" | cut -d= -f2)  現在: $(cat ~/Documents/GSE-sessions/.o1_clock_hwm)"
+echo "  事前: $(grep '^hwm=' "$SNAP" | cut -d= -f2)  現在: $(cat ~/Documents/GSE-sessions/.o1_clock_hwm)"
 echo "=== ⚠️ 6. 打鍵が拾えるか —— ★ これは**人が何か打ってから**でないと判定できない"
