@@ -2,12 +2,33 @@
 
 > ★ このファイルの「===」以下をコピペして開始する。
 > ⚠️ 前セッションから `/clear` して**新セッション**で始めること。
-> ★ モデル: **Sonnet** で足りる（⚠️ §2 の取り込み方針の判断だけ Opus）。
+> ★ ★★★ **実行マシン: mac**（⚠️ 理由は §0-0）。
+> ★ モデル: **Sonnet** で足りる（⚠️ §4 の取り込み方針の判断だけ Opus）。
 > ⚠️★★★ **本メモは `next-session-prompt-intake-windows-and-continue.md` の後継である。**
 
 ---
 
 ===
+
+## §0-0 ★★★ **どのマシンでやるか —— mac**
+
+★ 残っている作業は **ほぼ全部 mac 側**である。
+
+| ★ 作業 | ★ マシン | ⚠️ 理由 |
+|---|---|---|
+| ★★★ **計測用バイナリを v0.1.33 相当で作り直す**（§3-2） | ⚠️ **mac 必須** | ★ `npx tauri build --target aarch64-apple-darwin` は mac でしか通らない |
+| ★ macOS の 8h 再測（§2） | ⚠️ **mac 必須** | ★ 測る対象が mac の GSE |
+| ★ スリープ跨ぎ検証（§3） | ⚠️ **mac 必須**・★ **研究者が叩く** | ⚠️ Claude が sleep assertion を握るので**エージェントからは実行できない** |
+| ★ G-GEAR の残り取り込み（§4） | ★ どちらでも（mac 推奨） | ★ `analysis/` は OS 非依存。⚠️ 両 OS の検証は CI がやる |
+| ★ ブランチ棚卸し（§5） | ★ どちらでも | ★ git だけ |
+
+⚠️★★★ **Windows 側に回すものは、いま無い。**
+★ §1（CPU% 規約）は 2026-09-10 に Windows 実機で**決着済み**（PR #173）。
+⚠️ 唯一 Windows に残るのは `.steering/20260904-windows-orphan-verify/blockers.md` #3
+（★ 測定窓直後のフック飢餓クラスタ・原因未特定）だが、
+★ **mac 側の診断バイナリを作り直す方が先**（§3-2）—— ⚠️ 同じ現象を mac で追える体制がまだ無い。
+
+---
 
 ## §0 ⚠️★★★ 最初に固定すること
 
@@ -45,33 +66,34 @@ ls -l ~/Documents/GSE-sessions/gse_o1_*.ndjson             # ⚠️ 2026-09-10 1
 
 ---
 
-## §1 ⚠️★★★ 未決 —— **Windows の CPU% 規約を実機で確定する**
+## §1 ✅ **決着済み** —— Windows の CPU% 規約は **1 コア = 100 % 基準**
 
-★ 状態: **一次資料では決着済み・実機実測は未了**。
+⚠️★★★ **本項は 2026-09-10 に Windows 実機で決着した（PR #173）。★ 蒸し返さないこと。**
 
-★ Microsoft *Examining Processor Time Data* 逐語 ——
-「the value of the % Processor Time reported for the **Process object can report values over
-100 percent**」→ ★ **1 コア = 100 % 基準**（macOS と同じ）。⚠️ **×16 換算は誤り**。
+★ 1 コアを `while($true){}` で飽和させたプロセスの `CookedValue`（論理プロセッサ **16**）:
 
-⚠️ ただし `run.sh` は `cpu_pct_basis` を **`one_core_100_unverified`** のままにしてある。
+| # | CookedValue |
+|---|---|
+| 1 | **99.9586042201256** |
+| 2 | **100.392972071849** |
+| 3 | **97.1371636451479** |
 
-### ★ やること（⚠️ 5 分・Windows 側）
+→ ★ **≒ 100**（⚠️ ≒ 6.25 ではない）＝ **1 コア = 100 % 基準**。macOS と同じ規約。
+★ Microsoft の逐語（「the % Processor Time reported for the **Process object can report
+values over 100 percent**」）が**実測で裏付けられた**。
 
-★ 手順は `.steering/20260910-intake-windows-and-cpu-convention/windows-cpu-convention-probe.md`。
-★ busy-loop に同じカウンタを当て、**≒100 なら合計基準 / ≒6.25 なら正規化基準**。
+⚠️ **`×16` は誤り。「macOS 換算 33.0 % で FAIL 相当」は撤回済み。**
+★ `run.sh` の `CPU_BASIS` は `one_core_100` に確定、`sample-windows.sh` の誤ったコメントも訂正済み。
 
-★ 決着したら:
-1. `run.sh` の `CPU_BASIS="${GSE_COST_CPU_BASIS:-one_core_100_unverified}"` を確定値へ
-2. `sample-windows.sh` の**古いコメント**（「全コアに対する % を返す」）を直す
-   —— ⚠️ **このコメントが誤判定の発生源だった**
-3. `notes.md` に実測値を追記（⚠️ 「未実測」の記述を消す）
+### ★★★ で、結局 CPU はどうなのか（★ 両 OS を同じ基準で並べる）
 
-### ⚠️ どちらに転んでも動かないこと
+| ★ OS | CPU 平均 | 閾値 < 1 % に対して |
+|---|---|---|
+| Windows（v0.1.33・8h） | **2.06 %** | ⚠️ **MARGINAL** |
+| macOS（v0.1.31・直した計器・定常 6 分） | **1.31 %** | ⚠️ **MARGINAL** |
 
-★ Windows の 2.06 % は**そのままでも閾値 < 1 % 超 ＝ MARGINAL**。
-→ ⚠️ 「Windows の CPU は PASS」とは書けない。★ 覆るのは **FAIL 相当か MARGINAL か**だけ。
-
----
+→ ★ **両 OS とも MARGINAL。** ⚠️ どちらも「軽い」とは言えず、**「FAIL」でもない**。
+⚠️ macOS の 8h は **§2 で測り直し中**（★ 6 分の値は参考）。
 
 ## §2 ⚠️★★★ 未決 —— **macOS の 8h を直した計器で測り直す**
 
@@ -113,6 +135,40 @@ GSE_COST_LABEL=with-gse-YYYYMMDD-macos-8h nohup bash run.sh with-gse > /dev/null
 
 ★ 手順 `.steering/20260910-intake-windows-and-cpu-convention/sleep-test-procedure.md`。
 ⚠️ **基線を採り直してから寝かせること**（★ `post-wake-check.sh` は基線が無いと `exit 2` で止まる）。
+
+### ⚠️★★★ §3-2 —— **「次の Down で決着する」は成立しない**（★ 2026-09-10 に反証した）
+
+⚠️ 前のセッションまでの計画は逐語で「診断 `tap_enabled` を入れたので**次の Down のログで
+機序が決着する**まで待つ」だった。→ ⚠️★★★ **走っているバイナリに `tap_enabled` が無い。**
+
+| ★ 文字列 | `strings` の件数 |
+|---|---|
+| `starved_ms` / `rehook_requested` / `NOT delivering events` / `tap_mode` / `input_monitoring` | ★ **全部あり**（★ **陽性対照**） |
+| ⚠️ **`tap_enabled`** | ⚠️ **0** |
+
+★ 理由は日付: ⚠️ バイナリは **v0.1.31（mtime 2026-09-03）**、
+診断が入ったのは **`cb1aa25`（2026-09-05）**。
+★ NDJSON の **`meta.app_version = 0.1.31`** でも裏を取った。
+→ ⚠️★★★ **すでに 3 回の Down を無駄にしている**（09-05 / 09-09 / 09-10）。
+
+★ **2 段目の防御も動いていない**: `hook_health` **14 件すべて `rehook=false`**
+（⚠️ `alive=false` の 2 件を含む）。★ `cb1aa25` 逐語「`request_reinstall` が定数 false だった」と一致。
+
+★ **頻度を初めて数えた**: 作業中の **31 分で 10 件・うち Down 2 件**（★ 約 3 分に 1 回）。
+⚠️ 打鍵の無い 8.6 時間は **0 件** → ★ **検知は活動量に強く依存する**
+（⚠️「8 時間に 1 回」は打鍵が疎だっただけ）。★ ただし `dropped` は**全件 0**。
+
+⚠️★★★ **もう 1 つの帰結 —— 測っている版が配布物と違う**:
+★ macOS の稼働コストは全部 **v0.1.31**、Windows と**被験者配布は v0.1.33**。
+→ ⚠️ **macOS 側は「配布物の稼働コスト」を測っていない。**
+
+### ★ やること（⚠️ これが先。待っても何も分からない）
+
+1. ★ **mac の計測用バイナリを v0.1.33 相当で作り直す**
+   → ⚠️ **診断・2 段目の防御・配布物との版一致が同時に片づく**
+2. ★ そのうえで次の Down を待つ
+
+★ 詳細は `.steering/20260910-intake-windows-and-cpu-convention/starvation-diagnostic-finding.md`。
 
 ### ⚠️★★★ 陰性対照は **すでに崩れている**
 
@@ -167,7 +223,7 @@ GSE_COST_LABEL=with-gse-YYYYMMDD-macos-8h nohup bash run.sh with-gse > /dev/null
 | ⚠️ `run.sh` の上書きガード | ★ **閉じた**（blockers #2。`meta.json` 等も見る・`GSE_COST_LABEL` 追加） |
 | ⚠️ `.gitignore` の穴 | ★ `ndjson-size-start.tsv` を追加（⚠️ 既追跡分は意図して残す） |
 | ★ O1 の配布ゲート | ★ **20 件 / 0 件**（⚠️ ただし **CPU 2 指標は「要再測」に降格**した。★ 配布可否は研究者判断） |
-| ⚠️ starvation の機序 | ★ **まだ待つ**（`tap_enabled` の診断が入っている。⚠️ 次の Down のログで決着させる） |
+| ⚠️★★★ starvation の機序 | ⚠️ **「待つ」は成立しない**（★ 2026-09-10 に実測・下の §3-2） |
 
 ## §7 ★ 触らないもの
 
