@@ -41,7 +41,7 @@
 
 ---
 
-## D2 ★ Windows の「×16 → FAIL 相当」は **一次資料と矛盾する**（⚠️ 実機実測は未了）
+## D2 ★ Windows の「×16 → FAIL 相当」は **一次資料と矛盾する**（★★★ 2026-09-10 実機実測で確定）
 
 ★ G-GEAR の主張の根拠は `sample-windows.sh` の **コメント逐語**であり、
 ⚠️ **一次資料でも実測でもない**（★ 自分で書いたコメントを引用している）。
@@ -57,11 +57,23 @@
 → ★ **Process オブジェクトの `% Processor Time` は「1 コア = 100 %」基準**（＝ macOS `top` と同じ規約）。
 ⚠️ **`×16` は 16 倍の過大評価**であり、「FAIL 相当」は**偽の警報**である可能性が高い。
 
-### ⚠️ ただし確定はしていない
+### ★★★ 2026-09-10 追記: Windows 実機の busy-loop 実測で確定した
 
-⚠️ **この repo は Windows 実機でこれを確かめていない**（★ この Mac に `powershell.exe` が無い）。
-→ ★ 決着実験の手順を `windows-cpu-convention-probe.md` に用意して研究者へ渡した。
-★ 結果が出るまで `meta.json` の値は `one_core_100_unverified` にしてある。
+`windows-cpu-convention-probe.md` の手順を Windows 実機（論理プロセッサ 16、
+`(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors` で確認）で実行。
+1 コアを `while($true){}` で飽和させた powershell プロセスの
+`Get-Counter \Process(powershell*)\% Processor Time` CookedValue（2 秒間隔 ×3）:
+
+```
+99.9586042201256
+100.392972071849
+97.1371636451479
+```
+
+→ ★★★ **いずれも ≒ 100（90〜105 の範囲）＝ 1 コア = 100 % 基準で確定**。
+⚠️ ≒ 6.25（正規化基準）ではないので **「×16 は誤り」が実機で裏付けられた**。
+`run.sh` の `CPU_BASIS` を `one_core_100_unverified` から `one_core_100` へ確定し、
+`sample-windows.sh` の古いコメント（「全コアに対する %」）も訂正した。
 
 ### ★ 三角測量（⚠️ 証明ではない）
 

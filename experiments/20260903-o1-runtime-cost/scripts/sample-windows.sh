@@ -7,8 +7,8 @@ DURATION_S="$1"; INTERVAL_S="$2"
 read -r -d '' PS <<'PWSH' || true
 $p = Get-Process -Name "gse-next" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($null -eq $p) { "0`t0`t0`t0" } else {
-  # ★ Get-Counter は「全コアに対する %」を返すので、コア数で割って 1 コア相当に揃えない
-  #   (⚠️ macOS の top は 1 コア = 100% なので、比較するときに注意する)。
+  # ★ Get-Counter は macOS の top と同じ「1 コア = 100%」基準を返す (実機実測で確定、
+  #   2026-09-10)。★ コア数で割る変換はしない。
   $c = (Get-Counter -Counter ("\Process(" + $p.ProcessName + ")\% Processor Time") -ErrorAction SilentlyContinue).CounterSamples[0].CookedValue
   if ($null -eq $c) { $c = 0 }
   # ⚠️ 列 6 (rss_alt_kb) = PrivateMemorySize64。★ macOS 側の対照と対になる (env.md)。

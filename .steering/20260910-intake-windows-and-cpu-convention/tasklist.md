@@ -2,7 +2,7 @@
 
 ## §1 CPU% 規約
 - [x] Microsoft 一次資料の逐語を取得（★ Process オブジェクトは 100 % を超えうる）
-- [ ] ⚠️ **Windows 実機の busy-loop 実測**（★ 手順を研究者へ提示済み・**結果待ち**）
+- [x] ⚠️ **Windows 実機の busy-loop 実測**（★ 2026-09-10 実施。CookedValue ≒ 100 → 1コア=100%基準で確定・×16は誤り）
 - [x] `sample-macos.sh` / `run.sh` / `summarize.py` に規約を meta で記録
 - [x] `notes.md` の「FAIL 相当」記述を訂正
 - [x] ⚠️★★★ **予定外**: macOS の計測器が約 2.08 倍過小報告していたのを発見・修正・校正
@@ -19,7 +19,7 @@
 - [x] C/D: ブランチ棚卸し（★ 4 本を実物まで降りて調査。⚠️ **削除はしていない**）
 
 ## ⚠️ 残（★ 次セッションへ）
-- [ ] ⚠️ Windows CPU% 規約の実機決着 → 決着したら `run.sh` の `one_core_100_unverified` を確定
+- [x] ⚠️ Windows CPU% 規約の実機決着 → `run.sh` の `CPU_BASIS` を `one_core_100` に確定済み（2026-09-10）
 - [ ] ⚠️ **macOS の 8h 再測**（★ 直した計器で。⚠️ 旧 2 本の CPU は無効）
 - [ ] ⚠️ スリープ跨ぎ検証の実行
 - [ ] ★ `feature/phase1-reminder-and-dashboard` の steering 記録 4 件を救出してから削除
