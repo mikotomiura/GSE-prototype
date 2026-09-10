@@ -185,3 +185,59 @@ CFRelease(e->runloopsrc);  CFRelease(e->tap);
 - [ ] ⚠️ **被験者影響の評価** —— ★ 落ちると NDJSON が**無言で止まる**（★ 終了ログ無し・tray が消えるだけ）
 - [ ] ⚠️ クラッシュしたプロセスは `responsibleProc: "Code"` ＝ ★ **私が nohup で起こしたもの**。
       ⚠️ **被験者の起動経路（Finder / launcher）で同じかは未確認**
+
+---
+
+## ★★★ 8. **2 例目**が出た（⚠️ 2026-09-10 13:54:06・★ 仕込んでいない再発）
+
+★ `~/Library/Logs/DiagnosticReports/gse-next-2026-09-10-135406.ips`
+
+```
+版 0.1.33 / SIGSEGV / EXC_BAD_ACCESS
+subtype: KERN_INVALID_ADDRESS at 0x0000000000000028   ← ⚠️★★★ **NULL + 0x28**
+faulting stack (thread 20):
+  cg_event_tap_callback_internal ← SkyLight: processEventTapData ← _XPostEventTapData
+  ← eventTapMessageHandler ← CoreFoundation: __CFMachPortPerform
+procLaunch 13:43:48.3478 → captureTime 13:54:02.8138 = ★ **10 分 14 秒**で落ちた
+```
+
+### ⚠️★★★ 2 例が揃って初めて言えること —— **オフセットが一致している**
+
+| ★ | crash #1 (13:42:04) | ★ crash #2 (13:54:06) |
+|---|---|---|
+| fault address | `0x388be2` | ⚠️ **`0x28`** |
+| near レジスタ | `x8 = 0x388bba` | ★ （＝ NULL） |
+| ★ **差** | **`0x28`** | ⚠️ **`0x28`** |
+
+→ ★ **どちらも「あるポインタ ＋ 0x28」を読んで落ちている。**
+★ `CGEventTapCallbackFn` は `Box<dyn Fn>` ＝ **fat pointer**。
+⚠️ trampoline は `(*callback)(...)` で**解放済み Box からデータ側ポインタを読み**、
+★ それが #1 ではゴミ (`0x388bba`)、**#2 では 0 (＝ 解放後にゼロ埋めされた)** になっていて、
+そこから `+0x28` を読もうとして落ちた —— ★ **機序と完全に整合する。**
+
+⚠️ **まだ逆アセンブルはしていない**ので「+0x28 のロード命令」であることは**仮説のまま**。
+★ しかし **独立した 2 例で同じ差が出た**ことは、偶然としては説明しにくい。
+
+### ★ 頻度（⚠️ これが実害の大きさ）
+
+| # | 稼働時間 |
+|---|---|
+| crash #1 | ★ 37 分 38 秒 |
+| crash #2 | ⚠️ **10 分 14 秒** |
+
+→ ⚠️★★★ **「まれに落ちる」ではない。** ★ 打鍵のある作業中は **10〜40 分で落ちうる**。
+⚠️ 被験者配布版 (v0.1.30) で同じ頻度なら、**収集は常時穴だらけである**（★ 未確認）。
+
+### ⚠️ さらに: 落ちた後の再起動で **tap を作れなくなった**
+
+★ 13:54:07 に別プロセスが上がったが（⚠️ **誰が起こしたかは未特定**）、
+
+```
+13:54:14 Accessibility permission not granted. Native prompt dialog shown.
+13:54:14 CGEventTap creation failed via Accessibility (attempt 1), retrying in 2s.
+13:55:39 CGEventTap creation failed 20+ times via Accessibility. Slowing to 10s.
+```
+
+→ ⚠️★★★ **落ちた後に自動で上がっても、記録できるとは限らない。**
+★ これは案 B（`launchd KeepAlive` で自動再起動）の**限界を示す実測**である ——
+⚠️ 「プロセスが居る」を「記録している」と読めないのは、この経路でも同じ。
