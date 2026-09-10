@@ -5,7 +5,7 @@
 //   10回連続失敗後に Accessibility 権限へ自動フォールバックする。
 // Runs on a dedicated thread with its own CFRunLoop, mirroring the Windows WH_KEYBOARD_LL design.
 
-use std::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicI8, AtomicPtr, AtomicU32, Ordering};
 use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -54,6 +54,30 @@ extern "C" {
     fn CGEventTapIsEnabled(tap: CFMachPortRef) -> bool;
 }
 
+// ⚠️★★★ 2026-09-10 追加 —— **SIGSEGV (use-after-free) を塞ぐために要る**。
+//
+// ★ 実測した機序 (`.steering/20260910-measurement-binary-rebuild/sigsegv-finding.md`):
+//   `core-graphics` **0.24** の `CGEventTap` には `Drop` 実装が**無い**
+//   (crate 全体の `impl Drop` は CGSRegion / VecWrapper の 2 件のみ・`CFMachPortInvalidate` は 0 件)。
+//   → tap を drop すると `callback_ref` の `Box` (= `user_info` が指す実体) だけが解放され、
+//   ⚠️ **mach port は invalidate されない**。
+//   ★ さらに CF 内部で `source -> mp` を CFRetain・`mp->_source` が強参照する **retain cycle** が
+//   でき、invalidate しない限り port は **生存かつ valid のまま**である
+//   (Apple 公開ソース `CFMachPort.c` の `CFMachPortCreateRunLoopSource`)。
+//   → ⚠️ 古い port に 1 通でも届くと `__CFMachPortPerform` の valid チェックを**通ってしまい**、
+//   trampoline が解放済み `Box` を deref して落ちる。
+//
+// ★ `CFMachPortInvalidate` は内部で `CFRunLoopSourceInvalidate` + `CFRelease(source)` まで行い、
+//   `__CFMachPortPerform` が callout **直前**に読む valid フラグを落とす。
+//   → ★ **これを呼ぶことだけが、in-flight の配送を止める手段**である。
+//
+// ⚠️ core-graphics 0.25 では crate 側の `Drop` がこれを呼ぶ。★ 0.24 → 0.25 の更新は
+//   `CallbackResult` の破壊的変更を伴うので**別タスク**とし、ここでは自前で呼ぶ。
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    fn CFMachPortInvalidate(port: CFMachPortRef);
+}
+
 /// 現在有効な CGEventTap の mach port (CFMachPortRef を `*mut c_void` として保持)。
 ///
 /// tap 生成・有効化後に格納し、runloop 退出 (失効) 時に null クリアする。callback が
@@ -89,6 +113,21 @@ static HOOK_RUNLOOP: OnceLock<CFRunLoop> = OnceLock::new();
 /// ★ 層 1 は「OS が `TapDisabled*` を届けてくれたとき」、
 /// 層 2 は「**届かないまま disable されていたとき**」に動く。
 static WATCHDOG_REENABLES: AtomicU32 = AtomicU32::new(0);
+
+/// tap が有効かの**スナップショット** (★ `-1` = 不明 / `0` = 無効 / `1` = 有効)。
+///
+/// ⚠️★★★ **なぜ Atomic に写すのか** —— ★ 2026-09-10 の SIGSEGV 調査で分かったこと:
+/// 旧 `tap_is_enabled()` は **liveness スレッド (hook スレッドではない)** から
+/// `TAP_PORT` を load して `CGEventTapIsEnabled(port)` を呼んでいた。
+/// ★ 旧コード自身が「⚠️ **非 null を掴んだ後に無効化される競合は残る**」と認めている。
+///
+/// ⚠️ これは **`CFMachPortInvalidate` を呼んでいなかったから偶然無害だった**だけである
+/// (★ retain cycle で port が永久生存していた)。→ ★ 本コミットで invalidate を呼ぶようにした
+/// **その瞬間に、この競合は本物の use-after-free に昇格する**。
+///
+/// → ★ 値は **hook スレッド自身が書き**、他スレッドは Atomic を読むだけにする。
+/// ⚠️ 最大 `WATCHDOG_INTERVAL_S` 秒古い値になるが、★ この値は**診断専用**なので許容する。
+static TAP_ENABLED_SNAPSHOT: AtomicI8 = AtomicI8::new(-1);
 
 /// 層 3 (`request_reinstall`) が要求した累計回数 (★ 診断用・単調増加)。
 static REINSTALL_REQUESTS: AtomicU32 = AtomicU32::new(0);
@@ -361,29 +400,41 @@ extern "C" fn watchdog_timer_callout(
     // CGEventTapEnable は Apple 推奨の軽量な再有効化呼び出しで、どちらも tap の runloop
     // スレッド (= この callout) から呼ぶのが正しい。
     unsafe {
-        if !CGEventTapIsEnabled(port as CFMachPortRef) {
+        let enabled = CGEventTapIsEnabled(port as CFMachPortRef);
+        // ★ hook スレッド自身が書く唯一の場所 (⚠️ 他スレッドは port を触らない)。
+        TAP_ENABLED_SNAPSHOT.store(i8::from(enabled), Ordering::Release);
+        if !enabled {
             CGEventTapEnable(port as CFMachPortRef, true);
             WATCHDOG_REENABLES.fetch_add(1, Ordering::Relaxed);
+            // ★ 再有効化した直後の状態を写す (⚠️ 次の周期まで古い false を見せない)。
+            TAP_ENABLED_SNAPSHOT.store(
+                i8::from(CGEventTapIsEnabled(port as CFMachPortRef)),
+                Ordering::Release,
+            );
         }
     }
 }
 
 /// tap が有効か。★ **診断専用** (⚠️ 判定に使わない)。
 ///
-/// 戻り値: `None` = tap がそもそも無い (未設置 / 失効直後)。`Some(bool)` = OS に聞いた結果。
+/// 戻り値: `None` = tap がそもそも無い (未設置 / 失効直後)。`Some(bool)` = 直近の観測値。
 ///
-/// ⚠️★★ 呼び出し元は liveness スレッド (hook スレッドではない)。
-/// ★ `CGEventTapIsEnabled` は read-only なので、他スレッドから読んでも tap の状態を変えない。
-/// ⚠️ port が同時に null クリアされうるが、`AtomicPtr` の load が null なら `None` を返すだけで、
-/// **非 null を掴んだ後に無効化される競合は残る** —— ★ だから**診断専用**であり、
-/// この値で復帰を決めない (⚠️ 復帰は層 2 が hook スレッド上で判断する)。
+/// ⚠️★★★ **2026-09-10 に実装を変えた。** ★ 旧版は liveness スレッドから `TAP_PORT` を
+/// load して `CGEventTapIsEnabled(port)` を呼んでいた。★ 旧 doc 自身が
+/// 「⚠️ **非 null を掴んだ後に無効化される競合は残る**」と認めていたが、
+/// ⚠️ それが無害だったのは **`CFMachPortInvalidate` を 1 度も呼んでいなかったから**である
+/// (★ CF 内部の retain cycle で port が永久生存していた)。
+/// → ★ SIGSEGV 修正で invalidate を呼ぶようにした結果、**この競合は本物の UAF になる**。
+///
+/// ★ よって **port には触らず**、hook スレッドが書いた `TAP_ENABLED_SNAPSHOT` を読む。
+/// ⚠️ 最大 `WATCHDOG_INTERVAL_S` 秒古い (★ 診断用途なので許容する)。
 pub(super) fn tap_is_enabled() -> Option<bool> {
-    let port = TAP_PORT.load(Ordering::Acquire);
-    if port.is_null() {
-        return None;
+    match TAP_ENABLED_SNAPSHOT.load(Ordering::Acquire) {
+        0 => Some(false),
+        1 => Some(true),
+        // ★ `-1` = 未設置 / 失効直後。⚠️ 想定外の値も「不明」に倒す (★ 嘘を返さない)。
+        _ => None,
     }
-    // SAFETY: 上記 doc のとおり read-only チェックのみ。null チェック済み。
-    Some(unsafe { CGEventTapIsEnabled(port as CFMachPortRef) })
 }
 
 /// 層 2 が tap を再有効化した累計回数 (★ 診断用)。
@@ -890,7 +941,18 @@ pub fn start() {
                             // (stale port を callback が触らないよう不変条件を経路非依存にする)、
                             // 連続再有効化カウンタもリセットする。
                             TAP_PORT.store(std::ptr::null_mut(), Ordering::Release);
+                            TAP_ENABLED_SNAPSHOT.store(-1, Ordering::Release);
                             CONSECUTIVE_REENABLES.store(0, Ordering::Relaxed);
+                            // ⚠️★ この経路でも port を invalidate してから捨てる。
+                            //   ★ source を作れていないので配送経路は無いが、
+                            //   ⚠️ `core-graphics` 0.24 は Drop で invalidate しないため、
+                            //   ★ **後始末の規則を経路ごとに変えない** (不変条件を 1 つに保つ)。
+                            // SAFETY: tap はここでまだ生存している。invalidate は同一スレッド。
+                            unsafe {
+                                CFMachPortInvalidate(
+                                    tap.mach_port.as_concrete_TypeRef() as CFMachPortRef
+                                );
+                            }
                             std::thread::sleep(std::time::Duration::from_secs(2));
                             continue;
                         }
@@ -926,6 +988,16 @@ pub fn start() {
                     tap.enable();
                     thread::sleep(Duration::from_millis(50));
                     HOOK_ACTIVE.store(true, Ordering::Release);
+                    // ★ 設置直後の状態を写す (⚠️ watchdog の初回発火まで `-1` のままにしない)。
+                    // SAFETY: この時点で tap は生存しており、read-only チェックのみ。
+                    TAP_ENABLED_SNAPSHOT.store(
+                        i8::from(unsafe {
+                            CGEventTapIsEnabled(
+                                tap.mach_port.as_concrete_TypeRef() as CFMachPortRef
+                            )
+                        }),
+                        Ordering::Release,
+                    );
                     // F4: callback (TapDisabled*) から即再有効化できるよう mach port を公開する。
                     // tap はこの loop iteration の間 (run_current 中) 生存しており、退出時に
                     // null クリアするため callback が stale port を触ることはない。
@@ -979,8 +1051,54 @@ pub fn start() {
                     // TAP_PORT は無効化された tap を指したままなので null クリアし、
                     // 次の callback が stale port へ CGEventTapEnable を呼ばないようにする。
                     TAP_PORT.store(std::ptr::null_mut(), Ordering::Release);
+                    // ★ 診断値も「不明」に倒す (⚠️ 失効後に古い `true` を見せない)。
+                    TAP_ENABLED_SNAPSHOT.store(-1, Ordering::Release);
+
+                    // ⚠️★★★ ここからが 2026-09-10 の SIGSEGV 修正である。**順序が本質**。
+                    //
+                    // ★ 実測した機序: この周の `tap` はブロック末尾で drop され、
+                    //   `callback_ref` の `Box` (= `user_info` が指す実体) が**解放される**。
+                    //   ⚠️ ところが `core-graphics` 0.24 の `CGEventTap` には `Drop` が無いので
+                    //   mach port は invalidate されず、★ CF 内部の retain cycle
+                    //   (`source -> mp` を CFRetain / `mp->_source` が強参照) で
+                    //   **port は生存かつ valid のまま**残る。
+                    //   → ⚠️ runloop に残った古い source へ 1 通でも届くと、
+                    //   `__CFMachPortPerform` の valid チェックを**通ってしまい**、
+                    //   trampoline が解放済み `Box` を deref して **SIGSEGV** する
+                    //   (★ 2026-09-10 13:42:04 に実測。`.ips` の faulting stack と一致)。
+                    //
+                    // ⚠️★★★ **drop より前にやらなければ意味が無い。**
+                    //   ★ `tap` は match の binding なので**ブロック末尾で最後に落ちる** ——
+                    //   ★ つまり「解放されてから片付ける」ことはできない。ここでやる。
+                    //
+                    // ⚠️ **1 と 2 は片方だけでは足りない**:
+                    //   ★ 1 (remove) だけ → port は valid のまま残り、cycle も切れない。
+                    //   ★ 2 (invalidate) だけ → 配送は止まるが、runloop に無効な登録が積む。
+                    //   ★ 定番実装 (Hammerspoon `libeventtap.m`) も両方を必ず対で呼んでいる。
+
+                    // --- 1. runloop から明示的に外す (⚠️ Rust 側の drop では外れない) ---
+                    //   ★ `CFRunLoopAddSource` は **retain する set** (`kCFTypeSetCallBacks`) に
+                    //   入れるので、`CFRunLoopSource` の Rust 参照を落としても登録は残る。
+                    //   ⚠️ 旧コメントの「毎周作れば生存期間が run_current の 1 周と一致する」は
+                    //   **成立していなかった** (★ timer も同様に積み上がっていた)。
+                    // SAFETY: kCFRunLoopDefaultMode は CoreFoundation 定数。常に有効。
+                    run_loop.remove_timer(&watchdog, unsafe { kCFRunLoopDefaultMode });
+                    run_loop.remove_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
+
+                    // --- 2. mach port を invalidate する (★ 配送を止める唯一の手段) ---
+                    //   ★ `CFMachPortInvalidate` は内部で `CFRunLoopSourceInvalidate` +
+                    //   `CFRelease(source)` まで行って retain cycle を切り、
+                    //   ★ `__CFMachPortPerform` が callout **直前**に読む valid フラグを落とす。
+                    //   → ⚠️ in-flight のメッセージがあっても callout は呼ばれない。
+                    // SAFETY: `tap` はこの時点でまだ生存しており (drop はブロック末尾)、
+                    // mach_port は有効な CFMachPortRef。invalidate は同一スレッドから呼ぶ。
+                    unsafe {
+                        CFMachPortInvalidate(tap.mach_port.as_concrete_TypeRef() as CFMachPortRef);
+                    }
+
                     tracing::warn!(
                         "CGEventTap CFRunLoop exited (tap invalidated by macOS). \
+                         Cleaned up runloop source/timer and invalidated the mach port. \
                          Re-creating in 2s..."
                     );
                     std::thread::sleep(std::time::Duration::from_secs(2));
@@ -1261,5 +1379,55 @@ mod tests {
             !effective_accessibility_fallback(false, false),
             "ListenOnly で成功しているなら Accessibility フォールバックではない"
         );
+    }
+
+    /// ★ `tap_is_enabled()` が **port を触らず**スナップショットだけを読むこと。
+    ///
+    /// ⚠️★★★ **なぜこのテストが要るか** —— ★ 2026-09-10 の SIGSEGV 修正で
+    /// `CFMachPortInvalidate` を呼ぶようにした。★ もし将来この関数が
+    /// 「`TAP_PORT` を load して `CGEventTapIsEnabled` を呼ぶ」実装に**戻されたら**、
+    /// ⚠️ liveness スレッドが invalidate 済み port を触る **本物の use-after-free** になる。
+    /// → ★ このテストは `TAP_PORT` が **null のまま**でも値が返ることを見る。
+    /// ⚠️ 旧実装なら null で必ず `None` になるので、`Some` を要求する assert が**落ちる**。
+    ///
+    /// ★ 3 状態すべてを見る (⚠️ 正常 / 不在 / 壊れ)。
+    #[test]
+    fn tap_is_enabled_reads_snapshot_not_the_port() {
+        // ⚠️ 前提: このテストは port を一切設置しない (★ null のまま)。
+        assert!(
+            TAP_PORT.load(Ordering::Acquire).is_null(),
+            "★ 前提が崩れている: このテストは port を設置しない"
+        );
+
+        // ★ ① 不在 (-1) → None
+        TAP_ENABLED_SNAPSHOT.store(-1, Ordering::Release);
+        assert_eq!(
+            tap_is_enabled(),
+            None,
+            "★ 未設置は「不明」であって false ではない"
+        );
+
+        // ★ ② 正常 —— ⚠️ port が null でも値が返ること (旧実装ならここで落ちる)
+        TAP_ENABLED_SNAPSHOT.store(1, Ordering::Release);
+        assert_eq!(
+            tap_is_enabled(),
+            Some(true),
+            "⚠️ port を触る実装に戻すと null で None になり、ここが落ちる"
+        );
+        TAP_ENABLED_SNAPSHOT.store(0, Ordering::Release);
+        assert_eq!(tap_is_enabled(), Some(false));
+
+        // ★ ③ 壊れ —— 想定外の値は「不明」に倒す (⚠️ 嘘を返さない)
+        for bad in [2i8, -2, i8::MAX, i8::MIN] {
+            TAP_ENABLED_SNAPSHOT.store(bad, Ordering::Release);
+            assert_eq!(
+                tap_is_enabled(),
+                None,
+                "★ 想定外の値 {bad} は None に倒すこと (⚠️ true/false を捏造しない)"
+            );
+        }
+
+        // ★ 後片付け (⚠️ 他テストへ状態を漏らさない)
+        TAP_ENABLED_SNAPSHOT.store(-1, Ordering::Release);
     }
 }
