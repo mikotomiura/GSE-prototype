@@ -25,7 +25,18 @@ echo "=== ★ 2. 基線以降のログ（★ 事前 $PRE 行 → 現在 $(grep -
 tail -n +$((PRE + 1)) "$L" | cut -c1-170 | sed 's/^/  /'
 [ "$(grep -c '' $L)" -eq "$PRE" ] && echo "  ⚠️ 新しい行が 1 行も無い（★ 何も記録されていない）"
 echo "=== ★ 3. スリープ前後の pmset ログ（★ 本当に寝たかの一次資料）"
-pmset -g log 2>/dev/null | grep -E "Sleep|Wake|DarkWake" | tail -6 | sed 's/^/  /'
+# ⚠️★★★ 2026-09-10 修正: 旧版は `grep -E "Sleep|Wake|DarkWake"` だった。
+#   ★ これは **`NoIdleSleepAssertion` / `PreventUserIdleSystemSleep` の行に当たる**ので、
+#   ⚠️ **1 度も寝ていないのに「スリープのログ」が 6 行出た**（★ 実測）。
+#   → ★ `pmset -g log` の**イベント種別の列**に錨を下ろす。
+SLEEPLOG=$(pmset -g log 2>/dev/null | grep -E "^[0-9-]+ [0-9:]+ [+-][0-9]+ (Sleep|Wake|DarkWake|Start) " | tail -6)
+if [ -n "$SLEEPLOG" ]; then
+  printf '%s\n' "$SLEEPLOG" | sed 's/^/  /'
+else
+  echo "  ⚠️★★★ **スリープ / 復帰のイベントが 1 件も無い** ＝ このマシンは寝ていない。"
+  echo "  ★ 誰が止めているか:"
+  pmset -g assertions 2>/dev/null | grep -E "NoIdleSleep|PreventUserIdleSystemSleep" | grep "pid " | sed 's/^/    /'
+fi
 echo "=== ★ 4. NDJSON の連続性（⚠️ 型と時刻だけ・中身は読まない）"
 python3 - <<'PY'
 import json, collections, glob, sys
