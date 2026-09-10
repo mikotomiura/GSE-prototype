@@ -1,0 +1,286 @@
+# ⚠️★★★ v0.1.33 macOS SIGSEGV —— 機序の特定（★ 3 本の独立調査 ＋ 自分の実測）
+
+★ 2026-09-10。★ `.ips` 精読 / コード監査 / 既知事例 の 3 本を独立に走らせ、
+★ 要となる主張は**私が自分で grep し直して**裏を取った。
+
+---
+
+## ⚠️★★★ 0. まず自分の訂正 —— **読んでいた crate のバージョンが違った**
+
+★ 私は最初 `core-graphics-0.25.0/src/event.rs` を引いて
+「`impl Drop for CGEventTap` が `CFMachPortInvalidate` を呼ぶ」と書いた。⚠️ **これは効かない。**
+
+★ 自分で確かめた一次資料:
+
+```
+src-tauri/Cargo.toml:153   core-graphics = { version = "0.24", features = ["highsierra"] }
+Cargo.lock                 gse-next -> "core-graphics 0.24.0"
+core-graphics-0.24.0 の impl Drop  : CGSRegion (private.rs:22) / VecWrapper (data_provider.rs:131) の 2 件のみ
+                                     → ★ CGEventTap に Drop は **無い**
+core-graphics-0.24.0 の CFMachPortInvalidate : **0 件**
+```
+
+⚠️ **0.25 で追加された安全網が 0.24 には無い。** → ★ **実態は仮説より悪い。**
+（★ `Cargo.lock` には 0.25.0 も居るが、それは `tauri-nspanel` 側であって `hook_macos.rs` は 0.24 にリンクする）
+
+★ 教訓: ⚠️ **crate のソースを引くときは `Cargo.lock` で版を先に確かめる。**
+★ 「registry に置いてある最新版」を読んで断定した（`verify-before-claiming` ルール 1 の失敗）。
+
+---
+
+## ★ 1. クラッシュの事実（★ `.ips` から・実測のみ）
+
+```
+app_version 0.1.33 / EXC_BAD_ACCESS / SIGSEGV
+subtype: KERN_INVALID_ADDRESS at 0x0000000000388be2
+esr    : (Data Abort) byte read Translation fault
+pc     : 0x10346f7f4 = usedImages[0] "gse-next" base 0x102f68000 + imageOffset 5273588
+         → ★ cg_event_tap_callback_internal と厳密一致
+far    : 0x388be2 / x8 = 0x388bba   ← ★ 差 0x28 (40 バイト)
+vmRegionInfo: "0x388be2 is not in any region.  Bytes before following region: 4340970526"
+procLaunch 13:04:27.4469 → captureTime 13:42:05.3604 = ★ 2257.9 秒 (37 分 38 秒)
+extMods: thread_create / thread_set_state / task_for_pid すべて 0 ＝ ★ 外部注入の痕跡なし
+```
+
+★ **スレッドは 32 本。`hook_macos` の runloop は thread 20 の 1 本だけ**
+→ ⚠️ 「古い tap の**スレッド**が残っている」説は**否定された**
+（★ ただし私が疑ったのは同じ runloop に残った **source** なので、これは別の説である）。
+
+⚠️★★ **`0x388be2` はどの region にも属さない**（★ 「解放済み領域」ではなく**一度もマップされていない**）。
+→ ★ **素朴な「解放済み Box を読んだ」だけでは segfault しない**（★ heap ページは残るのでゴミを読むだけ）。
+★ 整合するのは: `user_info` が指す **解放済み Box の中身**（`Box<dyn Fn>` ＝ fat pointer）を読み、
+それがゴミ値 `0x388bba` になっていて、そこから **+0x28** を読もうとして落ちた、という描像。
+
+⚠️ **未確認**: ★ 逆アセンブルはしていないので「+0x28 のロード命令」は**仮説**。
+
+---
+
+## ★ 2. コードの実測（★ 自分で grep し直した・陽性対照つき）
+
+```
+src-tauri/src/ 全体の呼び出し件数
+  remove_source / remove_timer / CFRunLoopSourceInvalidate
+  / CFRunLoopRemoveSource / CFMachPortInvalidate / CFRunLoopTimerInvalidate : ★ すべて 0 件
+  ★ 陽性対照 add_source : 2 / add_timer : 1   ← ★ grep は機能している
+API の実在: core-foundation-0.10.1/src/runloop.rs:107 remove_timer / :123 remove_source
+  → ⚠️ **無いのではなく、呼んでいない**
+```
+
+★ 再作成 1 周（`hook_macos.rs:793-1061`）で**後始末されないもの**:
+
+| ★ 資源 | ★ 生成 | ⚠️ 1 周を抜けるとき |
+|---|---|---|
+| `CGEventTap`（`callback_ref: Box`） | `:847` | ★ drop ＝ **Box が解放**。⚠️ 0.24 なので invalidate も**されない** |
+| `CFRunLoopSource` | `:878` | ⚠️★★★ **runloop から外されない** |
+| runloop への source 登録 | `:901 add_source` | ⚠️★★★ **周回ごとに積み上がる** |
+| `CFRunLoopTimer`（watchdog） | `:909` | ⚠️ 外されない |
+| timer 登録 | `:922 add_timer` | ⚠️ 積み上がる |
+| `TAP_PORT` | `:932` | ★ `:981` で null クリア（★ **唯一きちんと後始末されている**） |
+
+⚠️★★★ **timer には逐語の配慮コメントがあるのに（`:912-916`「無効化された runloop に残った
+timer を掴む余地が出る」）、source には無い。** ★ しかも **その配慮の結論自体が誤り** ——
+`CFRunLoopAddSource` は `kCFTypeSetCallBacks`（**retain する** set）に入れるので、
+⚠️ **Rust 側を drop しても runloop からは外れない**。
+
+★ drop 順は宣言の逆＝ `watchdog` → `run_loop` → `loop_source` → **最後に `tap`**。
+→ ⚠️ **source を外す機会がコード上に存在しない。**
+
+---
+
+## ★ 3. Apple の一次資料（★ 逐語）
+
+**① 公式の回復手順は「作り直す」ではなく「再有効化する」**
+
+> "If an event tap becomes unresponsive... a `kCGEventTapDisabled` event is passed to the event tap
+> callback function. **Event taps may be re-enabled by calling this function.**"
+> — `CGEventTapEnable(tap:enable:)` Discussion
+
+→ ⚠️ GSE の「`run_current()` が返ったら作り直す」は Apple の想定と違う。
+
+**② `CFMachPortInvalidate` は source も無効化し、callout 直前に再チェックが入る**（`CFMachPort.c` 逐語）
+
+```c
+CF_INLINE void __CFMachPortInvalidateLocked(CFRunLoopSourceRef source, CFMachPortRef mp) {
+    ...  CFRunLoopSourceInvalidate(source);  CFRelease(source);
+```
+```c
+CF_PRIVATE void *__CFMachPortPerform(void *msg, ...) {
+    __CFLock(&mp->_lock);  Boolean isValid = __CFMachPortIsValid(mp);  __CFUnlock(&mp->_lock);
+    if (isValid) { mp->_callout(mp, msg, size, context_info); }
+```
+
+→ ★ **invalidate さえされていれば、この再チェックで配送は止まる。**
+⚠️★★★ **0.24 では invalidate が 1 度も呼ばれない** ＝ ★ stale 配送は例外ではなく**正常系**。
+
+**③ invalidate しない限り port は永久に valid**（`CFMachPortCreateRunLoopSource` 逐語）
+
+```c
+context.info = (void *)mp;  context.retain = CFRetain;  context.release = CFRelease;
+mp->_source = CFRunLoopSourceCreate(allocator, order, &context);
+```
+→ ★ `source → mp` を retain、`mp->_source` が source を強参照 ＝ **CF 内部の retain cycle**。
+⚠️ `CFRelease` だけでは切れず、`__CFMachPortDeallocate` は**永久に走らない**。
+
+**④ 定番実装（Hammerspoon）は 4 点セットで外す**
+
+```objc
+CFMachPortInvalidate(e->tap);
+CFRunLoopRemoveSource(CFRunLoopGetMain(), e->runloopsrc, kCFRunLoopCommonModes);
+CFRelease(e->runloopsrc);  CFRelease(e->tap);
+```
+★ かつ timeout / userInput では**作り直さず `CGEventTapEnable(tap, true)` だけ**。
+
+---
+
+## ★★★ 4. 機序（★ 上の実測だけで組み立てた因果連鎖）
+
+1. 周 N: tap T₁ を作る。★ `user_info` = Box₁ のポインタ。source S₁ を runloop に **add**。
+2. OS が tap を無効化 → `run_current()` から復帰 → `TAP_PORT` を null → 2 秒 sleep。
+3. ⚠️ ブロック末尾で T₁ が drop → **Box₁ が解放**。★ 0.24 なので **invalidate は呼ばれない**。
+4. ⚠️★★★ S₁ は runloop に**残ったまま**。★ retain cycle で `mp₁` は**生存かつ valid**。
+5. 周 N+1: T₂ 生成に成功（★ ログの「2 秒後に再作成 → 成功」と一致）。
+6. ⚠️ `mp₁` にメッセージが 1 通届く → `__CFRunLoopDoSource1` → `__CFMachPortPerform`
+   （★ isValid = **true** なので通過）→ `eventTapMessageHandler` → `processEventTapData`
+   → `cg_event_tap_callback_internal(user_info = 解放済み Box₁)` → **deref → SIGSEGV**
+
+★ **`.ips` の faulting stack と 1 対 1 で一致する。**
+
+⚠️ **決めていないこと**: ★ 「無効化された port に**何のメッセージ**が届いたか」は WindowServer 側の
+挙動でありコードからは決まらない。★ **決めなくても結論は変わらない** —— ⚠️ 1 通でも届けば落ちる構造。
+
+---
+
+## ⚠️ 5. 副次的に見つかったもの
+
+| # | 場所 | 内容 |
+|---|---|---|
+| a | `hook_macos.rs:381 tap_is_enabled()` | ⚠️ 非 hook スレッド（liveness）から port を触る。★ 現状は §3-③ の retain cycle で**偶然**無害。⚠️★★★ **0.25 へ上げた瞬間に本物の UAF になる**（Drop が cycle を切るため） |
+| b | `hook_macos.rs:532,615,619,626,635,643,650,664` | ⚠️ **コールバック内で `tracing::debug!` を 8 箇所**呼んでいる ＝ `hook-constraints` 共通-1 違反。★ tap の timeout 無効化を誘発しうる（＝ 3 分に 1 回の Down の一因かもしれない・**未検証**） |
+| c | timer の蓄積 | ★ N 本 × 3 秒周期で冗長発火。⚠️ UAF ではないがリーク |
+| d | `HOOK_RUNLOOP`（`OnceLock`） | ★ **問題なし**（★ `CFRunLoop::get_current()` はスレッドごとに同一。hook スレッドは終了しない）＝ ⚠️ 私が疑った点は**反証された** |
+| e | ⚠️ 再作成の頻度 | ★ `request_reinstall`（2026-09-05 に有効化・`liveness.rs` の `MAX_REHOOK_ATTEMPTS_PER_EPISODE`）で ⚠️ **周回数が実運用で増えた** ＝ 露出が増えている |
+
+---
+
+## ★ 6. 直す方向（⚠️ **まだ直していない**・パッチは書かない）
+
+★ `run_current()` の復帰直後（`:981` の隣）で、**`tap` が drop される前に**:
+
+1. `run_loop.remove_source(&loop_source, kCFRunLoopDefaultMode)` ＋ `remove_timer(&watchdog, ...)`
+2. `tap.mach_port` に `CFMachPortInvalidate` を自前 extern で呼ぶ（★ `:48-55` に宣言を足す）
+3. ⚠️★★★ **順序が本質** —— ★ `tap` は match binding なので**最後に落ちる**。★ 現状の順序では間に合わない。
+4. ⚠️ 2 を入れると §5-a が**現実の UAF に昇格する**ので**同時に**塞ぐ
+5. ⚠️ **1 と 2 は片方だけでは足りない**（★ 1 だけでは port が valid のまま／2 だけでは cycle 由来のリークが残る）
+
+⚠️ **crate を 0.25 へ上げる案は別タスク**: ★ `CallbackResult` の破壊的変更を伴い、
+`tauri-nspanel` との 2 版並存も動く。★ しかも **`remove_source` は 0.25 でも自動化されない**。
+
+---
+
+## ⚠️ 7. まだやっていないこと（★ 「問題なし」と書かないため）
+
+- [ ] ⚠️★★★ **再現していない**（★ tap 失効を意図的に繰り返す陽性対照が要る）
+- [ ] ⚠️ **修正していない**（★ `hook-constraints` を読んだうえで・要承認）
+- [ ] ⚠️ **v0.1.31 以前でも起きるか未確認**（★ 過去の `.ips` 3 件は `SIGKILL (Code Signature Invalid)` で別物）
+- [ ] ⚠️ **被験者影響の評価** —— ★ 落ちると NDJSON が**無言で止まる**（★ 終了ログ無し・tray が消えるだけ）
+- [ ] ⚠️ クラッシュしたプロセスは `responsibleProc: "Code"` ＝ ★ **私が nohup で起こしたもの**。
+      ⚠️ **被験者の起動経路（Finder / launcher）で同じかは未確認**
+
+---
+
+## ★★★ 8. **2 例目**が出た（⚠️ 2026-09-10 13:54:06・★ 仕込んでいない再発）
+
+★ `~/Library/Logs/DiagnosticReports/gse-next-2026-09-10-135406.ips`
+
+```
+版 0.1.33 / SIGSEGV / EXC_BAD_ACCESS
+subtype: KERN_INVALID_ADDRESS at 0x0000000000000028   ← ⚠️★★★ **NULL + 0x28**
+faulting stack (thread 20):
+  cg_event_tap_callback_internal ← SkyLight: processEventTapData ← _XPostEventTapData
+  ← eventTapMessageHandler ← CoreFoundation: __CFMachPortPerform
+procLaunch 13:43:48.3478 → captureTime 13:54:02.8138 = ★ **10 分 14 秒**で落ちた
+```
+
+### ⚠️★★★ 2 例が揃って初めて言えること —— **オフセットが一致している**
+
+| ★ | crash #1 (13:42:04) | ★ crash #2 (13:54:06) |
+|---|---|---|
+| fault address | `0x388be2` | ⚠️ **`0x28`** |
+| near レジスタ | `x8 = 0x388bba` | ★ （＝ NULL） |
+| ★ **差** | **`0x28`** | ⚠️ **`0x28`** |
+
+→ ★ **どちらも「あるポインタ ＋ 0x28」を読んで落ちている。**
+★ `CGEventTapCallbackFn` は `Box<dyn Fn>` ＝ **fat pointer**。
+⚠️ trampoline は `(*callback)(...)` で**解放済み Box からデータ側ポインタを読み**、
+★ それが #1 ではゴミ (`0x388bba`)、**#2 では 0 (＝ 解放後にゼロ埋めされた)** になっていて、
+そこから `+0x28` を読もうとして落ちた —— ★ **機序と完全に整合する。**
+
+⚠️ **まだ逆アセンブルはしていない**ので「+0x28 のロード命令」であることは**仮説のまま**。
+★ しかし **独立した 2 例で同じ差が出た**ことは、偶然としては説明しにくい。
+
+### ★ 頻度（⚠️ これが実害の大きさ）
+
+| # | 稼働時間 |
+|---|---|
+| crash #1 | ★ 37 分 38 秒 |
+| crash #2 | ⚠️ **10 分 14 秒** |
+
+→ ⚠️★★★ **「まれに落ちる」ではない。** ★ 打鍵のある作業中は **10〜40 分で落ちうる**。
+⚠️ 被験者配布版 (v0.1.30) で同じ頻度なら、**収集は常時穴だらけである**（★ 未確認）。
+
+### ⚠️ さらに: 落ちた後の再起動で **tap を作れなくなった**
+
+★ 13:54:07 に別プロセスが上がったが（⚠️ **誰が起こしたかは未特定**）、
+
+```
+13:54:14 Accessibility permission not granted. Native prompt dialog shown.
+13:54:14 CGEventTap creation failed via Accessibility (attempt 1), retrying in 2s.
+13:55:39 CGEventTap creation failed 20+ times via Accessibility. Slowing to 10s.
+```
+
+→ ⚠️★★★ **落ちた後に自動で上がっても、記録できるとは限らない。**
+★ これは案 B（`launchd KeepAlive` で自動再起動）の**限界を示す実測**である ——
+⚠️ 「プロセスが居る」を「記録している」と読めないのは、この経路でも同じ。
+
+---
+
+## ✅★★★ 9. **修正の実証** —— v0.1.34 は **9 時間 51 分クラッシュしなかった**
+
+★ 2026-09-11 00:16 時点の一次資料:
+
+```
+$ cat ~/Documents/GSE-sessions/crash-watch.tsv
+utc                     event   detail
+2026-09-10T05:32:11Z    start   seen_ips=5 pid=27279 version=0.1.34 dur=28800s
+2026-09-10T13:32:15Z    end     seen_ips=5 pid=27279
+                                ★ 8 時間 0 分 4 秒 / ⚠️ seen_ips 不変 / ★ pid 不変
+
+$ ps -o etime=,lstart= -p 27279
+09:51:29   Thu Sep 10 14:26:18 2026
+
+$ ls -1 ~/Library/Logs/DiagnosticReports/ | grep -c '^gse-next-'
+5                       ← ★ 台帳の start 時と同じ ＝ ⚠️ **新しいクラッシュ 0 件**
+$ ls -1t ... | head -1
+gse-next-2026-09-10-135406.ips   ← ★ 最新は **v0.1.33 の 2 例目**（★ 修正前）
+```
+
+### ★ 比較（⚠️ 同じ Mac・同じ日・同じ作業）
+
+| 版 | 稼働 | 結果 |
+|---|---|---|
+| ⚠️ v0.1.33 (1 例目) | **37 分 38 秒** | ⚠️ SIGSEGV |
+| ⚠️ v0.1.33 (2 例目) | **10 分 14 秒** | ⚠️ SIGSEGV |
+| ✅ **v0.1.34** | **9 時間 51 分** | ★ **落ちていない** |
+
+★ しかも v0.1.34 は **マシンのスリープを 5 回跨いだ**（★ 15:15 の検証 1 回 ＋ 15:35〜16:09 の 4 回）。
+★ 打鍵も薄くない（★ この 8 時間で `key` **10,533 件**）＝ ⚠️ 「静かだったから落ちなかった」ではない。
+
+### ⚠️ それでも言い切らないこと
+
+- ⚠️★★ **クラッシュを意図的に再現していない。** ★ これは「9 時間 51 分で 1 度も起きなかった」
+  という**観察**であって、⚠️ **機序が塞がれた証明ではない**。
+  ★ 決定的にするには **tap 失効を繰り返し起こす陽性対照**が要る（★ 未実装）。
+- ⚠️ **台帳の窓が計測窓を完全には覆っていない**（★ 台帳 14:32–22:32 JST /
+  計測 16:13–00:13 JST）。→ ★ **pid が 27279 のまま 9 時間 51 分**であることで埋めた
+  （⚠️ プロセスが同一なら、その間に落ちて上がり直してはいない）。
+- ⚠️ **v0.1.30（被験者配布版）で同じ頻度で落ちるかは未確認。**

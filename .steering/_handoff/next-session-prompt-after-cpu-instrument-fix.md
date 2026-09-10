@@ -164,9 +164,35 @@ GSE_COST_LABEL=with-gse-YYYYMMDD-macos-8h nohup bash run.sh with-gse > /dev/null
 
 ### ★ やること（⚠️ これが先。待っても何も分からない）
 
-1. ★ **mac の計測用バイナリを v0.1.33 相当で作り直す**
-   → ⚠️ **診断・2 段目の防御・配布物との版一致が同時に片づく**
-2. ★ そのうえで次の Down を待つ
+⚠️★★★ **ビルドは 8h 計測を汚す。** ★ 一次資料: notes.md「**CPU 最大 4.30 % は CI 窓の中だけで
+出た値である。窓を除くと 1.80 %**」→ ★ **計測を止めてからビルドすること。**
+
+```bash
+# ① ⚠️ まず現状を機械で見る（★ 今日の実害をそのまま再現する）
+bash scripts/check-measurement-binary.sh
+#    → ⚠️ rc=3 / 版ずれ (repo 0.1.33 vs app 0.1.31) ＋ tap_enabled 0 件 が出るはず
+
+# ② ★ 計測を止める（⚠️ 走っていれば）
+pkill -f sample-macos.sh
+
+# ③ ★ 作り直す
+npx tauri build --bundles app --features package --target aarch64-apple-darwin
+
+# ④ ⚠️★★★ **差し替える前にゲートを通す**
+bash scripts/check-measurement-binary.sh src-tauri/target/aarch64-apple-darwin/release/bundle/macos/gse-next.app
+#    → ★ 版一致 ＋ tap_enabled が 1 件以上 ＋ 陽性対照 4/4 でなければ差し替えない
+
+# ⑤ ★ 差し替えて GSE を再起動し、**もう一度**ゲートを通す
+#    → ⚠️ ③ の照合が「走っているのは別の版」と言うなら **再起動できていない**
+bash scripts/check-measurement-binary.sh
+```
+
+⚠️★★★ **`strings` で 0 件を見ても、それだけで「無い」と書かない。**
+★ ゲートは **同じ経路でログに出る文字列 4 つを陽性対照**に置き、
+⚠️ **それらが出ることを先に確かめてから**目的の文字列の不在を主張する
+（★ 陽性対照が欠けたら `rc=2`＝**判定しない**）。
+
+★ そのうえで次の Down を待つ。
 
 ★ 詳細は `.steering/20260910-intake-windows-and-cpu-convention/starvation-diagnostic-finding.md`。
 
