@@ -1,6 +1,6 @@
-epoch=1789013777
-utc=2026-09-10T04:16:17Z
-pid=16252
-applog_lines=345
-ndjson=/Users/johnd/Documents/GSE-sessions/gse_o1_20260910_040427.ndjson 1299
-hwm=1789013068247
+epoch=1789019197
+utc=2026-09-10T05:46:37Z
+pid=27279
+applog_lines=443
+ndjson=/Users/johnd/Documents/GSE-sessions/gse_o1_20260910_052618.ndjson 2193
+hwm=1789017979671

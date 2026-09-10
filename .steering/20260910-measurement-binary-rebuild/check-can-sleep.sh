@@ -15,11 +15,34 @@ HOLD=$(pmset -g assertions 2>/dev/null | grep -E "^\s+pid [0-9]+\(" \
 # ⚠️ powerd の「画面が点いている間」は蓋を閉じれば消えるので**除外する**（★ 誤検出になる）
 REAL=$(printf '%s\n' "$HOLD" | grep -v "Powerd - Prevent sleep while display is on")
 
+# ⚠️★★★ 2026-09-10 改訂 —— ★ 一律に赤くすると **永久に rc=0 にならない**。
+#   ★ 実際、`sharingd (Handoff)` だけで赤になり進めなくなった。
+#   ⚠️ だが「Handoff は無害」を**私は実証していない**。→ ★ **緑にもしない。**
+#   → ★ 3 段に分ける:
+#      ① 何も握っていない            → rc=0（★ 寝るはず）
+#      ② **実測で寝させなかったもの** → rc=3（⚠️ 潰してから閉じる）
+#      ③ それ以外（効果が未知）      → rc=1（★ **試してよい**が、寝なかったらこれを疑う）
+#   ⚠️ ②の根拠は 2026-09-10 の実測のみ:
+#      閉蓋 16 分のあいだ coreaudiod / AirPlayXPCHelper / Safari の HTMLMediaElement が
+#      握り続け、★ feat は 1 Hz で回り続けた（＝ 一度も寝ていない）。
+#      ★ caffeinate / Claude(Electron) は **pkill しても復活する**ので同格に置く。
+KNOWN_BLOCKERS='caffeinate|\(Claude\)|Electron|coreaudiod|AirPlay|Media Playback|WebKit'
+
 if [ -z "$(printf '%s' "$REAL" | tr -d '[:space:]')" ]; then
   echo "  ★ 何も握っていない → ★ 蓋を閉じれば寝るはず"
 else
-  printf '%s\n' "$REAL" | sed 's/^/  ⚠️ /' | cut -c1-150
-  RC=3
+  BLOCK=$(printf '%s\n' "$REAL" | grep -E "$KNOWN_BLOCKERS")
+  OTHER=$(printf '%s\n' "$REAL" | grep -vE "$KNOWN_BLOCKERS")
+  if [ -n "$(printf '%s' "$BLOCK" | tr -d '[:space:]')" ]; then
+    echo "  ⚠️★★★ **実測で寝させなかったもの**:"
+    printf '%s\n' "$BLOCK" | sed 's/^/    ⚠️ /' | cut -c1-150
+    RC=3
+  fi
+  if [ -n "$(printf '%s' "$OTHER" | tr -d '[:space:]')" ]; then
+    echo "  ⚠️ 効果が**未知**のもの（★ 実証していない）:"
+    printf '%s\n' "$OTHER" | sed 's/^/    ・/' | cut -c1-150
+    [ "$RC" -eq 0 ] && RC=1
+  fi
 fi
 
 echo "── ★ 種類別の対処"
@@ -44,9 +67,11 @@ else
   echo "  ⚠️★★★ gse-next が居ない → ★ 寝かせても検証にならない"; RC=4
 fi
 echo "════════════════════════════════════════"
-if [ "$RC" -eq 0 ]; then
-  echo "✅ ★ 寝られる見込み。→ ★ 蓋を閉じて 5 分以上待つこと。"
-else
-  echo "⚠️★★★ **このまま寝かせても寝ない見込み (rc=$RC)。上の ⚠️ を潰してから閉じること。**"
-fi
+case "$RC" in
+  0) echo "✅ ★ 寝られる見込み。→ ★ 蓋を閉じて 5 分以上待つこと。" ;;
+  1) echo "⚠️ ★ **試してよい (rc=1)。** ★ 既知の妨害は無い。"
+     echo "   ⚠️ ただし上の「効果が未知のもの」が握っている。→ ★ 蓋を閉じて 5 分以上待ち、"
+     echo "   ★ 寝ていなければ (post-wake-check.sh の項目 4 で穴が開いていなければ) それを疑う。" ;;
+  *) echo "⚠️★★★ **このまま寝かせても寝ない見込み (rc=$RC)。上の ⚠️ を潰してから閉じること。**" ;;
+esac
 exit $RC
