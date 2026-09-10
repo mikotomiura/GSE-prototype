@@ -18,7 +18,7 @@ G-GEAR (Windows) 側が `feat/resumption-outcome-arbitration` に Windows 8h 実
 
 ## 受け入れ条件
 
-- [ ] CPU% 規約について **一次資料の逐語** と **Windows 実機の実測値** の両方が notes.md にある
+- [x] CPU% 規約について **一次資料の逐語** と **Windows 実機の実測値** の両方が notes.md にある
       （⚠️ 実測が取れなければ「未実測」と明記する）
 - [ ] `sample-windows.sh` / `sample-macos.sh` の出力に規約が機械可読な形で残る
 - [ ] Windows 実測の steering / results が main に載る

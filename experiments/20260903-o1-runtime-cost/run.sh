@@ -67,15 +67,12 @@ case "$OS" in
     NCPU="$(sysctl -n hw.logicalcpu 2>/dev/null || echo '')"
     ;;
   windows)
-    # ⚠️★★★ **Windows の基準は 2026-09-10 時点で未確定**。
-    #   ★ Microsoft の逐語 (*Examining Processor Time Data*):
-    #     「the value of the % Processor Time reported for the Process object can
-    #      report values over 100 percent」→ ★ **1 コア = 100 % 基準**を強く示唆。
-    #   ⚠️ ただし**この repo は Windows 実機で確かめていない**。
-    #   → ★ 確かめたら `one_core_100` に確定し、この注記を消すこと。
-    #     手順: .steering/20260910-intake-windows-and-cpu-convention/windows-cpu-convention-probe.md
+    # ★ Windows 実機の busy-loop 実測で確定 (2026-09-10)。1 コアを 100% 占有する
+    #   powershell プロセスに対し Get-Counter の CookedValue は 99.96 / 100.39 / 97.14
+    #   （論理プロセッサ数 16）→ ★ **1 コア = 100 % 基準**（macOS と同じ）。×16 換算は誤り。
+    #   手順: .steering/20260910-intake-windows-and-cpu-convention/windows-cpu-convention-probe.md
     CPU_SOURCE="Get-Counter \\Process(name)\\% Processor Time"
-    CPU_BASIS="${GSE_COST_CPU_BASIS:-one_core_100_unverified}"
+    CPU_BASIS="${GSE_COST_CPU_BASIS:-one_core_100}"
     NCPU="$(powershell.exe -NoProfile -NonInteractive -Command '(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors' 2>/dev/null | tr -d '\r' | tail -1 || echo '')"
     ;;
   *)
