@@ -479,6 +479,13 @@ jobs:
         run: bash scripts/check-tests-are-wired.sh --self-test
       - name: Tests-are-wired gate (書いたテストが CI で走るか)
         run: bash scripts/check-tests-are-wired.sh
+      # ⚠️★★★ 2026-09-10 追加。★ `check-tests-are-wired.sh` は **命名パターン**
+      #   (`test_*.py` / `*_test.sh` / `*-test.sh`) しか見ないので、
+      #   ⚠️ `--self-test` を内蔵した script は **番人に見えないまま CI をすり抜ける**。
+      #   ★ 実際、これを足す直前に自分で踏んだ (★ 番人は緑 10/10 のまま新 script を見なかった)。
+      #   → ★ この種の script は**ここに明示的に並べる**。
+      - name: Collection continuity self-test (受領 NDJSON の静かな停止を捕まえるか)
+        run: python3 scripts/check_collection_continuity.py --self-test
       # ⚠️★★ ここから下は 2026-09-10 まで **1 度も CI で走っていなかった** テスト群。
       #   ★ どれも手元では緑だったが、⚠️ **走っていないテストは緑とは言えない**。
       - name: O1 sync guard test (gse-dataset へ O1 を出さない番人)
