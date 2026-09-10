@@ -133,3 +133,94 @@ cpu_source: "ps -o cputime delta" / cpu_pct_basis: "one_core_100"
 ```
 
 ⚠️ **この 8h の最中にビルドを走らせないこと**（★ CI 窓で 4.30 % が出た前例）。
+
+## D8 ⚠️★★★ **スリープ跨ぎ検証は「蓋を閉じたのに寝なかった」で不成立**（★ 一次資料で確定）
+
+★ 2026-09-10 13:16:31 に蓋を閉じ 13:32:31 に開いた（**16 分**）。⚠️ **Mac は寝ていない**:
+
+| ★ 証拠 | ⚠️ 実測 |
+|---|---|
+| ★★★ `feat` の連続性 13:15:00〜13:33:19 | ★ **1,100 行 / 最大の穴 1 秒 / 5 秒超 0 個**（★ 960 秒の閉蓋中も 1 Hz で回り続けた） |
+| ★ `powerd` の lid イベント | ★ `clamshelled: YES` 13:16:31 → `com.apple.powermanagement.lidopen` 13:32:31 |
+| ★ wake 理由（⚠️ 自己参照を除いた後） | ★ **0 件** |
+| ★ `kern.waketime` | ★ **0**（⚠️ `kern.boottime` = 2026-07-26 以来 wake の記録なし） |
+| ★ 電源 / 設定 | ★ Battery Power・`sleep 1` 分（⚠️ それでも寝ていない） |
+
+★ 閉蓋中ずっと `coreaudiod` と `AirPlayXPCHelper` が `PreventUserIdleSystemSleep` を握っていた
+（★ 解放は 13:29:45 / 13:31:54）。⚠️ **音声が止まっていなかった**。
+★ 加えて `caffeinate`（親 = Claude Code）は**殺しても復活する**（★ 新 pid で再出現を実測）。
+
+### ⚠️★★★ 検出器を **3 つ**壊していた（★ 通算 13・14・15 回目）
+
+| # | ⚠️ 壊れ方 | ★ 塞ぎ方 |
+|---|---|---|
+| 1 | ★ `pmset -g log` の Sleep/Wake 行が **この機には 1 行も無い**（⚠️ 種別は Assertions / Notification / BatteryHealth のみ）。→ ⚠️ 前版は「0 件 ＝ **このマシンは寝ていない**」と**断定して出力していた** | ★ **陽性対照**を先に取り、当たらないなら **判定しない** |
+| 2 | ⚠️★★★ **shell で結果が変わる** —— ★ zsh 経由の `log show` は **0 行**、bash では **736,502 行**。⚠️ 私は 0 行を見て「log show は使えない」と**書きかけた** | ★ bash で走らせ、⚠️ **無フィルタの陽性対照**で生死を見る |
+| 3 | ⚠️★★★ **自己参照** —— ★ `log show --predicate '... CONTAINS "Wake reason"'` が**自分のコマンドラインをログに書く**ので、⚠️ **自分自身が 5 件ヒット**した（★ 「寝た証拠が出た」と読みかけた） | ★ `process != "log"` で送り主を除き、⚠️ **検索語は実行時連結**で作る |
+
+→ ★ `post-wake-check.sh` の項目 3 を上記 3 点ぶん書き換え、
+★ 新規 `check-can-sleep.sh` で**寝かせる前に**「寝られるか」を見るゲートを置いた。
+
+## D9 ⚠️★★★ **v0.1.33 が SIGSEGV で落ちた**（★ 収集が無言で止まる）
+
+★ 13:42:04、起動から 37 分で `gse-next` が**クラッシュ**した（⚠️ 終了ログは出ない）。
+★ 一次資料: `~/Library/Logs/DiagnosticReports/gse-next-2026-09-10-134223.ips`
+
+```
+app_version 0.1.33 / Segmentation fault: 11 / EXC_BAD_ACCESS
+KERN_INVALID_ADDRESS at 0x0000000000388be2
+faultingThread 20:
+  gse-next   cg_event_tap_callback_internal     ← ★ CGEventTap コールバックの trampoline
+  SkyLight   processEventTapData
+  SkyLight   _XPostEventTapData
+  SkyLight   eventTapMessageHandler
+  CoreFoundation __CFMachPortPerform → __CFRunLoopDoSource1 → CFRunLoopRun
+```
+
+★ 直前の時系列（★ **新しく入れた診断がここで効いた**）:
+
+```
+13:38:53 WARN  CGEventTap CFRunLoop exited (tap invalidated by macOS). Re-creating in 2s...
+13:38:53 ERROR ... starved_ms=120387 rehook_requested=true tap_enabled=Some(true) watchdog_recoveries=0
+13:38:55 INFO  CGEventTap installed
+13:42:04 ⚠️ SIGSEGV
+```
+
+⚠️ **過去 3 件の `.ips` は別物**（★ `SIGKILL (Code Signature Invalid)`＝未署名バイナリの kill）。
+→ ★ **segfault はこの 1 件だけ**。⚠️ **v0.1.33 で新しく入ったとは言えない**（★ v0.1.31 で
+これだけ長く回した記録が無い）。
+
+### ★ 機序の**仮説**（⚠️ 実測で確かめていない）
+
+★ core-graphics 0.25 の一次資料:
+
+```rust
+pub struct CGEventTap<'tap_life> { mach_port: CFMachPort, _callback: Box<CGEventTapCallbackFn> }
+impl Drop for CGEventTap<'_> { fn drop(&mut self) { CFMachPortInvalidate(...) } }
+unsafe extern "C" fn cg_event_tap_callback_internal(..., user_info: *const c_void) -> ... {
+    let callback = user_info as *mut CGEventTapCallbackFn;
+    let response = (*callback)(proxy, etype, &event);   // ⚠️ 生存確認なしで deref
+}
+```
+
+⚠️ **Drop は mach port を invalidate するが、`_callback` の Box は解放される。**
+★ trampoline は `user_info` を**素で deref する**ので、解放後に 1 度でも配送されれば UAF。
+
+★ `hook_macos.rs` の再作成ループは **`CFRunLoopSource` を毎周 `add_source` するだけで
+1 度も `remove_source` していない**（⚠️ `wc -l` 1265 行中、`remove_source` は **0 件**）。
+★ 同じファイルは **timer については**「⚠️ 無効化された runloop に残った timer を掴む余地が出る」
+と逐語で書いて**毎周作り直している** —— ⚠️ **source だけ同じ配慮が無い**。
+
+→ ⚠️★★★ **仮説**: 前周の tap を Drop → ★ callback の Box が解放 → ⚠️ runloop に**残った
+stale source** 経由で 1 度でも配送されると trampoline が解放済みポインタを deref して落ちる。
+★ スタックが `__CFMachPortPerform → eventTapMessageHandler` である点と整合する。
+
+⚠️ **確かめていないこと**: ★ 落ちたのが「古い tap」か「現在の tap」かは trace からは決まらない。
+→ ★ 再現には **tap 失効を繰り返し起こす**必要がある。
+
+### ⚠️ 影響（★ 事実だけ）
+
+- ★ 落ちると **NDJSON の追記が止まる**（⚠️ 13:42:04 以降 0 バイト増）。
+- ⚠️ **無言で止まる** —— ★ 終了ログが無く、tray アイコンが消えるだけ。
+  → ⚠️ **被験者は気づかない**可能性が高い。
+- ★ 復旧は手動再起動のみ（★ 13:43:49 に再起動して `Measuring` に戻したことを確認）。
