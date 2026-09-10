@@ -190,7 +190,19 @@ faultingThread 20:
 → ★ **segfault はこの 1 件だけ**。⚠️ **v0.1.33 で新しく入ったとは言えない**（★ v0.1.31 で
 これだけ長く回した記録が無い）。
 
-### ★ 機序の**仮説**（⚠️ 実測で確かめていない）
+### ⚠️★★★ **訂正**: 下の仮説は crate の版を間違えて書いた（★ 2026-09-10 13:55）
+
+⚠️ 私は `core-graphics-0.25.0` を引いて「`impl Drop for CGEventTap` が `CFMachPortInvalidate`
+を呼ぶ」と書いた。★ **`Cargo.lock` を見ると gse-next がリンクするのは 0.24.0** であり、
+⚠️ **0.24 に `CGEventTap` の `Drop` は存在しない**（★ crate 全体の `impl Drop` は
+`CGSRegion` と `VecWrapper` の 2 件のみ・`CFMachPortInvalidate` は **0 件**）。
+→ ⚠️★★★ **実態は仮説より悪い。** ★ 機序の確定版は `sigsegv-finding.md` に書いた。
+
+★ 教訓: ⚠️ **crate のソースを引く前に `Cargo.lock` で版を確かめる**
+（★ registry の最新版を読んで断定した＝ `verify-before-claiming` ルール 1 の失敗）。
+
+### ★ 機序の**当初仮説**（⚠️ 上の訂正を読んでから見ること）
+
 
 ★ core-graphics 0.25 の一次資料:
 
