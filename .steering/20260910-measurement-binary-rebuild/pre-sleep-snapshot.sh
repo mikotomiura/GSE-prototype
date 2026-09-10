@@ -33,7 +33,11 @@ bash scripts/check-measurement-binary.sh > /tmp/gate.$$ 2>&1; GRC=$?
 grep -E "app  \(CFBundleShortVersionString\)|診断 tap_enabled|meta.app_version" /tmp/gate.$$ | sed 's/^/  /'
 rm -f /tmp/gate.$$
 if [ "$GRC" -ne 0 ]; then
-  echo "  ⚠️★★★ ゲートが rc=$GRC。★ 版ずれ or 診断欠落のまま寝かせても意味が無い。→ 中止する。"
+  # ⚠️ 波括弧で括ること —— ★ bash 3.2 は、括らない変数参照の直後に多バイト文字が来ると
+  #   それも変数名の一部として食う（★ memory `macos-default-tools-break-gates`）。
+  # ⚠️★ **この注意書きに悪い例を逐語で書かない** —— ★ 検査は本文とコメントを区別しないので、
+  #   例を書いた瞬間に自分で赤くなる（★ 2026-09-11 に実際に踏んだ）。
+  echo "  ⚠️★★★ ゲートが rc=${GRC}。★ 版ずれ or 診断欠落のまま寝かせても意味が無い。→ 中止する。"
   exit 4
 fi
 echo "  ★ ゲート rc=0"
