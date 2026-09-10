@@ -461,6 +461,17 @@ jobs:
       #     「検査が空振りしていないこと」まで見る (上の 2 つの --self-test と同じ思想)。
       - name: Shell portability gate (bash 3.2 の変数名パース・対照つき)
         run: bash scripts/check-shell-portability.sh
+      # ⚠️★★★ secrets-filter のゲート (2026-09-10 追加)。
+      #   ★ `scripts/secrets-filter.sh` は **git diff を外部 LLM (Codex) へ渡す前の最後の関門**で、
+      #     `scripts/secrets-filter-test.sh` という対照つきのテストも**既にあった**。
+      #   ⚠️ **なのに CI に 1 箇所も登録されていなかった** (2026-09-10 に grep で実測: 0 件)。
+      #     → ★ 手で叩かない限り走らない ＝ 退行しても誰も気づかない。
+      #   ⚠️ 実害の実測: main の filter は `.env.local` / `.pem.bak` / `.key.pub` /
+      #     **引用符つき (非 ASCII 名) の `.env` `.pem` `.key` `.pptx`** /
+      #     `diff --cc` / `Binary files` 行 を**素通り**させていた (新テストで 20 件以上が NG)。
+      #     ★ 旧テストが 22 ケースしか見ていなかったので、**緑のまま穴が生きていた**。
+      - name: Secrets filter gate (外部 LLM へ渡す diff の最後の関門)
+        run: bash scripts/secrets-filter-test.sh
       # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
       #   ⚠️ 実害の実測: `--compact` を落とすと詳細資料が **10 → 15 ページ**になるが、
       #     **本文は 1 文字も変わらない**ので diff を見ても気づけない。
