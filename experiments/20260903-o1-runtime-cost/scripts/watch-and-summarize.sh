@@ -26,14 +26,22 @@ while [ ! -s "$DIR/finished_utc" ]; do
     } > "$OUT"
     exit 3
   fi
-  # ⚠️ サンプラが消えたのに finished_utc が無い ＝ 異常終了。★ 黙って待ち続けない
-  if ! pgrep -f sample-macos.sh > /dev/null && [ ! -s "$DIR/finished_utc" ]; then
+  # ⚠️★★★ 「まだ生きているか」は **この run の samples.tsv が伸びているか**で見る。
+  #   ★ 2026-09-10 に弱点を見つけた: 旧版は `pgrep -f sample-macos.sh` を**グローバルに**見ていた
+  #   ので、⚠️ **別の run のサンプラが動いていると「まだ実行中」と誤読する**。
+  #   → ★ 自分の出力ファイルの更新時刻を見れば、他の run と混ざらない。
+  STALE_S=$(( ${GSE_WATCH_STALE_S:-180} ))
+  MT=$(stat -f '%m' "$DIR/samples.tsv" 2>/dev/null || echo 0)
+  if [ "$MT" -gt 0 ] && [ $(( $(date +%s) - MT )) -gt "$STALE_S" ] && [ ! -s "$DIR/finished_utc" ]; then
     sleep 60   # ★ run.sh が最後の書き込みをしている最中かもしれないので 1 分だけ猶予
-    if ! pgrep -f sample-macos.sh > /dev/null && [ ! -s "$DIR/finished_utc" ]; then
+    MT=$(stat -f '%m' "$DIR/samples.tsv" 2>/dev/null || echo 0)
+    if [ $(( $(date +%s) - MT )) -gt "$STALE_S" ] && [ ! -s "$DIR/finished_utc" ]; then
       {
-        echo "⚠️★★★ **サンプラが居ないのに finished_utc が無い** ＝ 途中で死んだ。→ 判定しない。"
+        echo "⚠️★★★ **samples.tsv が ${STALE_S} 秒以上伸びていないのに finished_utc が無い**"
+        echo "   ＝ ★ 途中で死んだ。→ **判定しない**。"
         echo "  samples.tsv の行数: $(grep -c '' "$DIR/samples.tsv" 2>/dev/null || echo 0)"
         echo "  最終更新: $(stat -f '%Sm' -t '%F %T' "$DIR/samples.tsv" 2>/dev/null || echo 不明)"
+        echo "  ⚠️ サンプラ(グローバル): $(pgrep -f sample-macos.sh >/dev/null && echo '別の run が走っている可能性' || echo '居ない')"
       } > "$OUT"
       exit 4
     fi
