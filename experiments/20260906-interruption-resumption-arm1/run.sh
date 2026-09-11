@@ -152,7 +152,8 @@ PYTHONUTF8=1 "$PY" "$EXP_DIR/feasibility_probe.py" \
 #   - `receipt_free_resumption` を **生存時間 / 競合リスク** (5 分 / 10 分の CIF) で出す
 #   - `stuck_exit_without_receipt` は **副次**に留める
 #   - **R0 型 / R0' 型 / R1 型を並べて出す** (★ B1 の知見。notes.md §6)
-#   - `stuck_episode_count` / `recovered_episode_count` / 差分を必ず出す (ADR-023 D8)
+#   - `stuck_episode_count` / `pflow_exit_episode_count` / 差分を必ず出す (ADR-023 D8)
+#     (★ 旧名 `recovered_episode_count` は ADR-024 D2 で改名済み。主要は `receipt_free_resumption`)
 #   - `manual_contribution_ratio` を**必ず併報**する (★ 推定に依存しない唯一の対照)
 #   - ★ §5 の定型文 (p_flow 相補性) をレポートに貼る (ADR-023 D7)
 #

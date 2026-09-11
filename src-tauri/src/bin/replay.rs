@@ -2223,6 +2223,7 @@ fn parse_segments_file(path: &PathBuf) -> Result<Vec<RangeLabel>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gse_next_lib::analysis::metrics::ResumptionOutcomeKind;
     use std::path::PathBuf;
 
     fn fixture_path(name: &str) -> PathBuf {
@@ -2285,6 +2286,94 @@ mod tests {
         assert_eq!(o.large_paste_rate, Some(1.0));
         // paste_count_per_hour: span 200000ms=0.05556h, 1 paste → 18.0/h
         assert!((o.paste_count_per_hour.unwrap() - 18.0).abs() < 1e-6);
+    }
+
+    /// ADR-024 の**主要アウトカム** `receipt_free_resumption` の Replay-as-Truth 回帰。
+    ///
+    /// ⚠️★★★ **これが無かった。** ★ 既存の `outcome_metrics.ndjson` は key 行が
+    /// `t=12000/13000/14000` の 3 本しかなく、`away_gap_ms` (180_000) 以上の間隙を
+    /// **構造的に作れない** —— つまり `receipt_free_resumption` は常に
+    /// `event_count=0` / 全 `None` で、`collect_key_events → segment_resumptions →
+    /// classify_resumption → CIF` の**経路が 1 度も踏まれていなかった**
+    /// (2026-09-11 の `code-reviewer` HIGH 指摘・実測で確認)。
+    /// ⚠️ `OutcomeMetrics` は `schema/current.json` の drift check の外にあるため、
+    /// 壊れても CI は赤くならない。→ ★ ここで固定値として押さえる。
+    ///
+    /// **fixture 設計** (`resumption_outcomes.ndjson`): 3 エピソードがそれぞれ
+    /// 離席候補ギャップ (>= 180s) を 1 本持ち、**3 分類すべて**を踏む。
+    ///
+    /// | 事象 | 再開時刻 | 結末 | 経過 |
+    /// |---|---|---|---|
+    /// | EV1 | 200_000 | `Receipt` (paste@230_000) | 30_000 |
+    /// | EV2 | 600_000 | `NextAwayCandidate` (601_000 から次の離席候補) | 1_000 |
+    /// | EV3 | 1_400_000 | `Censored` (観測終端 2_100_000) | 700_000 |
+    ///
+    /// ★ CIF は**手計算と突き合わせてある**:
+    /// `t=1_000`: n=3, d2=1 → S=2/3 / `t=30_000`: n=2, d1=1 → CIF += (2/3)(1/2) = 1/3
+    /// → `receipt_free = 1 - 1/3 = 2/3`。★ 5 分地平・10 分地平とも同値
+    /// (`t=700_000` は両地平の外なので寄与せず、**at risk として残る**)。
+    #[test]
+    fn receipt_free_resumption_golden_fixture_fixed_values() {
+        let path = fixture_path("resumption_outcomes.ndjson");
+        let feats = collect_logged_feats(&path).expect("collect_logged_feats");
+        let (pastes, _excluded) = collect_paste_events(&path).expect("collect_paste_events");
+        let keys = collect_key_events(&path).expect("collect_key_events");
+        assert_eq!(keys.len(), 8, "eight key presses");
+        assert_eq!(pastes.len(), 2, "two external pastes");
+
+        let cfg = OutcomeConfig::default();
+        let episodes = segment_stuck_episodes(&feats, &cfg);
+        assert_eq!(episodes.len(), 3, "three stuck episodes");
+
+        let o = compute_outcome_metrics(&episodes, &pastes, &keys, &feats, &cfg);
+        let r = &o.receipt_free_resumption;
+
+        // ⚠️ ここが 0 に戻ったら、fixture が経路を踏まなくなっている (退行の本体)。
+        assert_eq!(r.event_count, 3, "three resumption events");
+        assert_eq!(r.source_episode_count, 3, "one event per episode");
+        assert_eq!(r.receipt_count, 1);
+        assert_eq!(r.next_away_candidate_count, 1);
+        assert_eq!(r.censored_count, 1);
+        assert_eq!(r.degenerate_count, 0, "no zero-follow-up event");
+
+        // 打ち切りが 700_000 なので、両地平とも at risk が 1 件残る。
+        assert_eq!(r.n_at_risk_at_5min, 1);
+        assert_eq!(r.n_at_risk_at_10min, 1);
+
+        // 手計算: CIF_receipt = (2/3)*(1/2) = 1/3 → receipt_free = 2/3 (両地平)。
+        let five = r.receipt_free_at_5min.expect("5min horizon reached");
+        let ten = r.receipt_free_at_10min.expect("10min horizon reached");
+        assert!(
+            (five - 2.0 / 3.0).abs() < 1e-9,
+            "receipt_free_at_5min={five}"
+        );
+        assert!(
+            (ten - 2.0 / 3.0).abs() < 1e-9,
+            "receipt_free_at_10min={ten}"
+        );
+
+        // 3 分類の (経過, 種別) を固定する。
+        let mut kinds: Vec<(u64, &str)> = r
+            .outcomes
+            .iter()
+            .map(|o| {
+                let k = match o.kind {
+                    ResumptionOutcomeKind::Receipt => "receipt",
+                    ResumptionOutcomeKind::NextAwayCandidate => "next_away_candidate",
+                    ResumptionOutcomeKind::Censored => "censored",
+                };
+                (o.elapsed_ms, k)
+            })
+            .collect();
+        kinds.sort_unstable();
+        assert_eq!(
+            kinds,
+            vec![
+                (1_000, "next_away_candidate"),
+                (30_000, "receipt"),
+                (700_000, "censored"),
+            ]
+        );
     }
 
     /// 旧 NDJSON (paste/key 行が無い既存 fixture) でも collector が panic せず空を返し、
