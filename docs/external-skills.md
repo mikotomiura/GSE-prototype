@@ -41,8 +41,32 @@ Phase 4 で自前 Skill を作るときは、上表が既にカバーする領�
 ## Codex / 外部 LLM 連携時のルール (Phase 5 / 8 で参照)
 
 全ての導入済み Skill は Apache 2.0 ライセンスであり、外部 LLM への送信制限はない。
-`document-skills` (Proprietary) を未導入のため、Phase 5 / Phase 8 での
-拡張子フィルタ (`.pdf` / `.docx` / `.xlsx` / `.pptx`) は **不要**。
+
+> ### ⚠️★★★ 2026-09-08 訂正 —— 拡張子フィルタは「不要」ではなく **現に別の物を守っている**
+>
+> ★ **旧文**: 逐語「`document-skills` (Proprietary) を未導入のため、Phase 5 / Phase 8 での
+> 拡張子フィルタ (`.pdf` / `.docx` / `.xlsx` / `.pptx`) は **不要**。」
+>
+> ⚠️ **これは実装と食い違っていた。**★ `scripts/secrets-filter.sh` は当該フィルタを
+> **実装しており**（`PROPRIETARY_EXTS_REGEX`）、⚠️ **守っている対象が旧文の想定と違う** ——
+> ★ 実体は **Anthropic の proprietary Skill の出力**ではなく、
+> ★★★ **研究者自身の資料**（`docs/mitou_submission/` の未踏提出物 `.pptx` / `.docx`）である。
+>
+> ★ **2026-09-08 の裁定（研究者判断）**: ⚠️★★★ **`.pptx.md` / `.docx.md`（Markdown 版）も送信禁止に含める。**
+> ★ 理由: **拡張子が `.md` なのは `md2pptx.py` の変換の都合にすぎず、中身は資料の本文そのもの**である
+> （★ 実測: `.pptx` バイナリを止めても、**Markdown 版から本文 257 行が外へ出ていた**）。
+>
+> ⚠️ **副作用を承知で入れている**: 未踏提出物に触る diff は **毎回 `rc=2`** になる。
+> → ★ そのときは **`--ack-filtered`**（★ 人が `[REDACTED]` の中身を確かめてから通す）で運用する。
+> ⚠️★★★ **フィルタを弱めて回避しない**（★ `secrets-filter.sh:64-73` の設計哲学）。
+>
+> ★ **2026-09-08 追記（案 C）**: ⚠️★★★ **拡張子だけでは足りなかった。**
+> ★ `.pptx` を止め `.pptx.md` も止めた後、**`figures/*.svg` が同じ穴のまま**だった
+> （★ 中身はデッキ本文そのもの）。→ ★ **図とスライドの置き場をディレクトリで塞ぐ。**
+> ⚠️ ただし置き場**全体**ではない —— ★ `README.md` のような普通の文書は**レビュー可能なまま**にする。
+> ⚠️ **限界**: ★ 置き場が増えたら `secrets-filter.sh` の `classify()` へ追随が要る。
+>
+> ★ 記録: `.steering/20260908-secrets-filter-quote-bypass/decisions.md` 判断 2 / 未決 M-1 の裁定。
 
 ただし GSE 固有のプライバシー規約として、NDJSON セッションログ・キーストローク内容を
 含むファイルは Codex / 外部 LLM に送信しない (data-privacy Skill 参照)。
@@ -60,6 +84,8 @@ Codex へ送信した際、そこに含まれる **参加者別の回答傾向**
 | 種別 | 送信 | 理由 |
 |---|---|---|
 | NDJSON 生ログ / キーストローク内容 / 実セッション名 `Pnnn_gse_<日付>_<時刻>` | ❌ **禁止** | 既存規約 (data-privacy) |
+| ★ **未踏提出物などの資料** `.pdf` / `.docx` / `.xlsx` / `.pptx` ＋ ⚠️★★★ **そのMarkdown版**（`.pdf.md` / `.docx.md` / `.xlsx.md` / `.pptx.md`） | ❌ **禁止** | ★ 2026-09-08 追加（研究者判断）。⚠️ `secrets-filter.sh` が hunk ごと除去する（実装は `\.(pdf|docx|xlsx|pptx)(\.md)?` で 4 拡張子とも Markdown 版を含めて塞ぐ） |
+| ★★★ **図・スライド・提出文書の置き場**（`docs/mitou_submission/figures/` / `docs/mitou_submission/mitou_pptx/` / `docs/mitou_submission/mitou_docs/` 配下・**拡張子を問わない**） | ❌ **禁止** | ★ 2026-09-08 追加（研究者裁定・案 C）。⚠️★★★ **拡張子の追い掛けっこは終わらない**ため置き場で塞ぐ（★ 実測: `figures/*.svg` の `<text>` にデッキ本文がそのまま入っていた）。⚠️ **`docs/mitou_submission/` を丸ごとにはしない** —— ★ `README.md` はレビュー可能なままにする。★ 2026-09-09 訂正: `mitou_docs/`（提案書/技術設計書/検証レポートの `.docx`/`.docx.md` の置き場）が漏れていた (code-reviewer 指摘・HIGH) |
 | **参加者 ID を伴う集計統計** (`P012 の C-index` / 窓数 / CV 等) | ⚠️ **原則回避。必要なら ID を落として送る** | ★ ID→被験者の対応表は研究者が別途管理しており (`development-guidelines.md §10.2`)、**対応表を持つ者にとっては n=5 で再識別可能**。★ 統計的な議論に参加者 ID は通常不要 |
 | 参加者 ID を伴わないコホート集計 (中央値・分布・効果量) | ✅ 可 | 個人に紐づかない |
 | 設計文書・文献カード・引用 | ✅ 可 | 公開文献の要約 |

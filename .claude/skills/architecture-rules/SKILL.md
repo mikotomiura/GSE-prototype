@@ -41,13 +41,21 @@ lib.rs  ←─── 各モジュールを統合・Tauri コマンド定義
     │
     ├──► input::hook    (OS キャプチャ層)
     ├──► input::ime     (IME 検出層)
-    ├──► analysis::features  (計算層)
-    ├──► analysis::engine    (推論層)
-    ├──► logger         (永続化層)
-    └──► wall_server    (介入サーバー層)
+    ├──► analysis::features       (計算層)
+    ├──► analysis::engine         (推論層)
+    ├──► analysis::intervention   (介入判定層。★ 純粋関数)
+    ├──► logger                   (永続化層)
+    └──► overlay_panel            (Nudge の表示。★ OS 依存)
 ```
 
-**禁止**: モジュール間の直接依存（例: `wall_server` が `analysis::engine` を直接呼ぶ）
+⚠️★★★ **`wall_server` は存在しない。**★ **2026-08-23 に Lv2 Wall ごと削除された**（**ADR-015**）。
+★ 実測（2026-09-07）: `src-tauri/src/wall_server.rs` は**不在**で、コード参照も 0 件。
+→ ★ **現行の介入は Nudge のみ**であり、介入サーバー層という段は無い。
+
+**禁止**: モジュール間の直接依存（例: `logger` が `analysis::engine` を直接呼ぶ）。
+★ ただし **`analysis/` 内のサブモジュール間の参照は可**である
+（★ 実例: `analysis::metrics` が `analysis::loop_step::FeatSnapshot` と
+`analysis::intervention::AWAY_IDLE_MS` を import している）。
 
 ---
 
@@ -93,8 +101,25 @@ const { p_stuck } = await invoke<CognitiveState>("get_cognitive_state");
 
 ### ルール 5: グローバル TSF フック（ITfThreadMgr）は使わない
 
-UIPI（User Interface Privilege Isolation）によりブロックされる。
-IME 検出は `SetWindowsHookEx + WinEvent + ImmGetOpenStatus` を使う。
+⚠️★★★ **2026-08-22 に *理由* を訂正した**（★ **結論は変わらない**。SSOT は
+`docs/agent-shared.md` 技術的制約 7）。
+
+⚠️ **旧文「UIPI によりブロックされる」は誤りである。**
+★ **UIPI の禁止 5 項目**（window handle validation / `SendMessage`・`PostMessage` /
+thread hooks / journal hooks / **DLL injection**）に **TSF も COM も含まれていない**。
+★ かつ UIPI は「**同一の整合性レベルでは一切干渉しない**」ので、通常環境では**発動すらしない**。
+
+★ **真の障壁はアーキテクチャである** —— `ITfThreadMgr::Activate` は逐語
+「**Activates TSF for the calling thread**」であり、`ITfSource::AdviseSink` に
+**リモート対象を指定する引数が構文上存在しない**。
+⚠️ **権限を上げても・UIAccess を付けても・管理者で実行しても取得できない**（そういう API が無い）。
+
+⚠️ **別途禁止**: **DLL 注入を伴うグローバルフック**（`WH_GETMESSAGE` / `WH_CALLWNDPROC`）で
+`WM_IME_*` を拾うこと。★ **こちらは UIPI 第 5 項（DLL injection）に直撃する。**
+
+★ **採る手段**: IME 検出は `SetWindowsHookEx + WinEvent + ImmGetOpenStatus`。
+★ プロセス跨ぎの観測は **WinEvent (`WINEVENT_OUTOFCONTEXT`)** —— DLL 注入不要で、
+★ **コールバック引数に文字列が 1 つも無く content-free が構造的に保証される**。
 
 ---
 

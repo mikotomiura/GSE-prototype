@@ -121,8 +121,17 @@
   },
   "transition_test": {
     "order_seed": 20260903,
-    "trials": 16,
+    "trials": 18,
     "catch_trials": 6,
+    "change_pairs": [
+      ["stable", "friction_rising"],
+      ["friction_rising", "stuck"],
+      ["friction_rising", "stable"],
+      ["stuck", "friction_rising"],
+      ["layer0", "stable"],
+      ["stable", "layer0"]
+    ],
+    "change_pairs_note": "⚠️★★★ 2026-09-08: 対の一覧を player から config へ移した（★ SSOT はこのファイル）。★ 移した理由は【機械で検算できるようにするため】—— ⚠️ 旧構成は trials 16 / catch 6 ＝ 変化 10 を 6 対に i%6 で配っており、【layer0↔stable の 2 対だけが n=1】だった（★ 実測）。⚠️ この 2 対は E-7（層 0 と stable の弁別）に直接効く最重要の対であり、結果表も ★E-7 と印を付けて出す。→ ★ trials を 18 にして 変化 12 ＝ 6 対 × 2 に揃えた。★ Python 検査が (trials - catch_trials) % len(change_pairs) == 0 を強制する。",
     "catch_note": "★ catch = 遷移しない試行。★ 『変わった』と答え続ける戦略を潰す。",
     "pre_ms": 1400,
     "post_ms": 1400,
@@ -132,9 +141,18 @@
   "peripheral_test": {
     "order_seed": 20260904,
     "trials": 16,
+    "control_center_trials": 16,
     "eccentricity_deg": 10,
+    "positions": ["left", "right"],
+    "stimulus_ms": 150,
+    "variant": "natural",
     "optional": true,
-    "note": "⚠️★★★ [P85] の運動優位は偏心 7°–52° の結果であり、ロック画面は中心視なので層 A では効かない（references.md [P85] の留保）。★ 本ブロックは『周辺視でも壊れないか』の確認であって、運動優位の再現ではない。"
+    "note": "⚠️★★★ [P85] の運動優位は偏心 7°–52° の結果であり、ロック画面は中心視なので層 A では効かない（references.md [P85] の留保）。★ 本ブロックは『周辺視でも壊れないか』の確認であって、運動優位の再現ではない。",
+    "control_note": "★★★ 中心対照（control_center_trials）を【同じ提示時間で】同じブロックに入れる。⚠️★★★ 2026-09-08: 8 → 16 へ増やした（★ code-reviewer 指摘）—— ★ 両腕の n が違うと、真に差があっても Wilson 95% CI が原理的にほぼ重なる（★ 実測: 4/16 → [10.2%, 49.5%] vs 6/8 → [40.9%, 92.9%]）。★ 提示は 150 ms なので 8 試行増えても所要はほとんど変わらない。⚠️ これが無いと『偏心』と『短い提示』が交絡し、正答率が落ちても偏心のせいだと言えない。★ 比較は必ずブロック内で行う（⚠️ 1b/1b' は 2000 ms なので直接は比べない）。",
+    "stimulus_ms_note": "⚠️★★★ この値に一次の裏づけは無い。★ 設計判断である。★ 意図は『視線が届く前に打ち切る』ことだが、⚠️★★★ 固視は検証していない（アイトラッカーが無い）ので【保証ではない】。★ だから中心対照を置く。⚠️ 変えるなら SEED / data.md / notes.md §5 を同時に更新すること。",
+    "positions_note": "★ 左右にランダム化する（⚠️ 位置が固定だと、判定者が提示前にそこを見てしまう）。⚠️ 上下は使わない —— ★ 偏心 10° ＋ 刺激の半幅が【画面の高さに入らない】環境が普通にあるため（実測）。",
+    "variant_note": "★ natural 固定。⚠️ reversed を混ぜると、同じ level ラベルの下に【視覚的に別の刺激】が入り、本ブロックが問う『偏心で読めるか』が極性の読みと混ざる。★ 極性は 1b / 1b' が測る。",
+    "eccentricity_note": "★ 10° は [P85] の実測帯（偏心 7°–52°）の内側に取った。⚠️★★★ 画面と較正によっては物理的に提示できない —— ★ その場合はブロックを開かず、必要 px と利用可能 px を出して止める（⚠️ 黙って偏心を縮めて走らせない）。"
   },
   "_comment_forbidden": "⚠️★★★ 刺激領域に出してはならないもの（D3 / ADR-018 D3 / glossary 禁止用語）。selftest が DOM を検査する。",
   "forbidden_in_stimulus": [

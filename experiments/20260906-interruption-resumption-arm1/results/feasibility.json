@@ -1,0 +1,49 @@
+{
+  "kind": "feasibility_probe",
+  "warning": "⚠️★★★ アウトカムの推定値ではない。系の離席判定・p_stuck トリガー・介入割付のいずれも通していない粗い数え上げである。",
+  "thresholds": {
+    "away_idle_ms": 180000,
+    "receipt_window_ms": 300000
+  },
+  "corpus": {
+    "ndjson_files": 76,
+    "participants": 6,
+    "files_per_participant": {
+      "P000": 13,
+      "P010": 17,
+      "P011": 10,
+      "P012": 10,
+      "P013": 15,
+      "P014": 11
+    },
+    "paste_lines_total": 847,
+    "malformed_lines": 0,
+    "nonmonotonic_key_pairs": 0,
+    "files_without_session_boundary": 0
+  },
+  "resumption_events": {
+    "n": 125,
+    "participants_contributing": 6,
+    "per_participant": {
+      "P000": 1,
+      "P010": 42,
+      "P011": 3,
+      "P012": 18,
+      "P013": 23,
+      "P014": 38
+    },
+    "excluded_boundary_crossing": 0,
+    "gap_seconds": {
+      "median": 263.6,
+      "p90": 764.0,
+      "p90_definition": "nearest-rank (ceil(0.90*n) 番目・1 始まり)",
+      "max": 2384.5
+    }
+  },
+  "already_seen_raw_rate": {
+    "receipt_within_window": 66,
+    "n": 125,
+    "rate": 0.528,
+    "caveat": "⚠️ 素の比率。R0/R0'/R1 のいずれでもなく、回復判定 (p_flow) を含まない。"
+  }
+}

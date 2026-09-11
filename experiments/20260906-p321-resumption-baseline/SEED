@@ -1,0 +1,12 @@
+N/A — 乱数要素なし
+
+★ 本実験は [P321] の公開データを決定的に集計するだけで、抽選・サンプリング・
+初期化・並べ替えのいずれにも乱数を使わない。
+⚠️ したがって seed を「置き忘れた」のではなく、**存在しない**。
+(docs/experiment-tracking.md 「seed を固定したか (ランダム要素がある場合)」の読み替え。
+ → notes.md §5)
+
+★ 決定性の担保は seed ではなく以下で行う:
+  - 入力の SHA-256 固定 (data.md / run.sh Step 0')
+  - annotation を時刻順に明示ソート (analyze_p321.py `build_episodes`)
+    ⚠️ 15 セッション中 6 セッションは rowData.json の配列順が時刻順でない (実測)

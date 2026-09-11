@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="700" viewBox="0 0 1400 700">
+  <rect width="1400" height="700" fill="#ffffff"/>
+  <text x="65" y="62" font-family="Yu Gothic, Meiryo, sans-serif" font-size="34" font-weight="700" fill="#1f2933">7 層アーキテクチャと、いま埋まっているところ</text>
+  <text x="65" y="101" font-family="Yu Gothic, Meiryo, sans-serif" font-size="21" fill="#52606d">濃い枠が動いている層。薄い枠はまだ書いていない。埋まっているのは 3 から 6 の連なりである</text>
+  <defs><marker id="arrow6" markerWidth="11" markerHeight="11" refX="9" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/></marker></defs>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif">
+    <rect x="30" y="140" width="310" height="150" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="10 7"/>
+    <text x="52" y="178" font-size="22" font-weight="700" fill="#64748b">0 セッション文脈</text>
+    <text x="52" y="214" font-size="19" fill="#64748b">作業種別を取り、ヘッドを選ぶ</text>
+    <text x="52" y="243" font-size="19" fill="#64748b">同意の軸は未実装</text>
+    <text x="52" y="277" font-size="20" font-weight="700" fill="#94a3b8">一部だけ</text>
+
+    <rect x="370" y="140" width="310" height="150" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="10 7"/>
+    <text x="392" y="178" font-size="22" font-weight="700" fill="#64748b">1 ドメイン適合</text>
+    <text x="392" y="214" font-size="19" fill="#64748b">作業ごとの入力変換</text>
+    <text x="392" y="243" font-size="19" fill="#64748b">いまは直結している</text>
+    <text x="392" y="277" font-size="20" font-weight="700" fill="#94a3b8">未実装</text>
+
+    <rect x="710" y="140" width="310" height="150" rx="10" fill="#e6fffa" stroke="#0f766e" stroke-width="5"/>
+    <text x="732" y="178" font-size="22" font-weight="700" fill="#134e4a">2 情報の境界</text>
+    <text x="732" y="214" font-size="19" fill="#134e4a">本文を保存しない</text>
+    <text x="732" y="243" font-size="19" fill="#134e4a">共通の封筒は未整備</text>
+    <text x="732" y="277" font-size="20" font-weight="700" fill="#0f766e">中核は動いている</text>
+
+    <rect x="1050" y="140" width="310" height="150" rx="10" fill="#e6fffa" stroke="#0f766e" stroke-width="5"/>
+    <text x="1072" y="178" font-size="22" font-weight="700" fill="#134e4a">3 特徴量</text>
+    <text x="1072" y="214" font-size="19" fill="#134e4a">30 秒の窓から 5 つ</text>
+    <text x="1072" y="243" font-size="19" fill="#134e4a">執筆を前提にした形</text>
+    <text x="1072" y="277" font-size="20" font-weight="700" fill="#0f766e">動いている</text>
+
+    <rect x="30" y="345" width="310" height="150" rx="10" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="52" y="383" font-size="22" font-weight="700" fill="#7c2d12">7 結果と害の評価</text>
+    <text x="52" y="419" font-size="19" fill="#7c2d12">守るべき時に出したか</text>
+    <text x="52" y="448" font-size="19" fill="#7c2d12">ほかの指標は未整備</text>
+    <text x="52" y="482" font-size="20" font-weight="700" fill="#c2410c">一部だけ</text>
+
+    <rect x="370" y="345" width="310" height="150" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="5"/>
+    <text x="392" y="383" font-size="22" font-weight="700" fill="#1e3a8a">6 介入の決定</text>
+    <text x="392" y="419" font-size="19" fill="#1e3a8a">出さない／見送る／出す</text>
+    <text x="392" y="448" font-size="19" fill="#1e3a8a">同意の軸は未実装</text>
+    <text x="392" y="482" font-size="20" font-weight="700" fill="#2563eb">動いている</text>
+
+    <rect x="710" y="345" width="310" height="150" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="5"/>
+    <text x="732" y="383" font-size="22" font-weight="700" fill="#1e3a8a">5 好機と受け入れ</text>
+    <text x="732" y="419" font-size="19" fill="#1e3a8a">小休止 と 抑制</text>
+    <text x="732" y="448" font-size="19" fill="#1e3a8a">分解したまま持つ</text>
+    <text x="732" y="482" font-size="20" font-weight="700" fill="#2563eb">動いている</text>
+
+    <rect x="1050" y="345" width="310" height="150" rx="10" fill="#e6fffa" stroke="#0f766e" stroke-width="5"/>
+    <text x="1072" y="383" font-size="22" font-weight="700" fill="#134e4a">4 状態の代理量</text>
+    <text x="1072" y="419" font-size="19" fill="#134e4a">二軸 と 3 状態の確率</text>
+    <text x="1072" y="448" font-size="19" fill="#134e4a">執筆を前提にした形</text>
+    <text x="1072" y="482" font-size="20" font-weight="700" fill="#0f766e">動いている</text>
+  </g>
+
+  <g stroke="#64748b" stroke-width="4" fill="none" marker-end="url(#arrow6)">
+    <path d="M340 215 H370"/><path d="M680 215 H710"/><path d="M1020 215 H1050"/>
+    <path d="M1205 290 V337"/>
+    <path d="M1050 420 H1022"/><path d="M710 420 H682"/><path d="M370 420 H342"/>
+  </g>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif">
+    <rect x="30" y="530" width="1330" height="118" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="10 7"/>
+    <text x="55" y="568" font-size="23" font-weight="700" fill="#64748b">この 7 層の外側 ── 境界の契約だけが確定している 2 本</text>
+    <text x="55" y="602" font-size="20" fill="#64748b">表現チャネル：作業状態 3 値と、招待の有無だけを片方向に送る　／　身体的回帰：開始も終わりも系が判定しない</text>
+    <text x="55" y="634" font-size="20" font-weight="700" fill="#b91c1c">試作と耳での確認の実験はあるが、どちらも本体には配線していない</text>
+  </g>
+
+  <text x="700" y="686" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="20" fill="#52606d">層の呼び名はこの 7 層（層 0〜7）に統一する。ほかの番号体系と混ぜない</text>
+</svg>

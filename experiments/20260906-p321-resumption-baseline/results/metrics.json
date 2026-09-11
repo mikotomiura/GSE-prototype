@@ -1,0 +1,405 @@
+{
+  "source": {
+    "citation": "[P321] Alaboudi, A. & LaToza, T. D. (2021) An Exploratory Study of Debugging Episodes, arXiv:2105.02162",
+    "input_file": "rowData.json",
+    "input_sha256": "497df0b4da398c39cc0fd8b28544d4ac1d61c728708f4f9cdaa32469acda78b9",
+    "sessions": 15
+  },
+  "check_A": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "episode 数",
+        "observed": 89,
+        "expected": 89,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "debugging 活動数",
+        "observed": 2136,
+        "expected": 2137,
+        "tolerance": 1,
+        "ok": true,
+        "note": "⚠️ 論文 2137 に対し実測 2136。★ 1 件差は論文側の丸め/誤記と判断し許容 1 を置く"
+      },
+      {
+        "name": "活動数/episode 平均",
+        "observed": 24,
+        "expected": 24,
+        "tolerance": 0.5,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "起点: 報告された defect",
+        "observed": 10,
+        "expected": 10,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "起点: 自ら埋め込んだ defect",
+        "observed": 79,
+        "expected": 79,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "A: 未 fix 率 (報告 defect)",
+        "observed": 0.5,
+        "expected": 0.5,
+        "tolerance": 0.005,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "A: 未 fix 率 (埋め込み defect)",
+        "observed": 0.13924050632911392,
+        "expected": 0.14,
+        "tolerance": 0.005,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "同時に開く episode の最大数",
+        "observed": 1,
+        "expected": 1,
+        "tolerance": 0,
+        "ok": true,
+        "note": "★ 1 ならば LIFO/FIFO は同値 (config.yaml `merge_order: lifo` の前提)"
+      },
+      {
+        "name": "畳む先が無い DF7 block",
+        "observed": 0,
+        "expected": 0,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "再開されなかった DF4 episode",
+        "observed": 0,
+        "expected": 0,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "時間的に矛盾した畳み込み",
+        "observed": 0,
+        "expected": 0,
+        "tolerance": 0,
+        "ok": true,
+        "note": "★ 中断 block の終わり <= 再開 block の始まり (cross-review 3)"
+      },
+      {
+        "name": "参照回数の下限",
+        "observed": 0,
+        "expected": 0,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "参照回数の上限",
+        "observed": 16,
+        "expected": 16,
+        "tolerance": 0,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "episode 時間に占める割合 (平均)",
+        "observed": 0.0342704850879515,
+        "expected": 0.03,
+        "tolerance": 0.005,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "episode 時間に占める割合 (最大)",
+        "observed": 0.5919282511210763,
+        "expected": 0.59,
+        "tolerance": 0.005,
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "1 回あたりの秒数",
+        "observed": 34.8448275862069,
+        "expected": 35,
+        "tolerance": 1.0,
+        "ok": true,
+        "note": ""
+      }
+    ],
+    "observed": {
+      "episodes": 89,
+      "debug_activities": 2136,
+      "activities_per_episode_avg": 24,
+      "origin_reported": 10,
+      "origin_inserted": 79,
+      "nofix_rate_reported": 0.5,
+      "nofix_rate_inserted": 0.13924050632911392,
+      "nofix_overall": 0.1797752808988764,
+      "merge_max_pending_depth": 1,
+      "merge_orphan_resume_blocks": 0,
+      "merge_unresumed_interrupted": 0,
+      "merge_temporal_violations": 0,
+      "ext_freq_min": 0,
+      "ext_freq_max": 16,
+      "ext_freq_avg": 0.651685393258427,
+      "ext_time_frac_avg": 0.0342704850879515,
+      "ext_time_frac_max": 0.5919282511210763,
+      "ext_occurrence_secs_avg": 34.8448275862069,
+      "ext_occurrence_n": 58
+    }
+  },
+  "outcome_breakdown_last_block": {
+    "DF3": 12,
+    "DF1": 73,
+    "DF5": 2,
+    "DF2": 2
+  },
+  "outcome_by_receipt": {
+    "strict": {
+      "fixed": {
+        "n": 73,
+        "consulted_external": 13,
+        "receipt_free": 60,
+        "consult_rate": 0.1780821917808219,
+        "episode_seconds_median": 165
+      },
+      "not_fixed": {
+        "n": 16,
+        "consulted_external": 6,
+        "receipt_free": 10,
+        "consult_rate": 0.375,
+        "episode_seconds_median": 511.5
+      }
+    },
+    "broad": {
+      "fixed": {
+        "n": 73,
+        "consulted_external": 14,
+        "receipt_free": 59,
+        "consult_rate": 0.1917808219178082,
+        "episode_seconds_median": 165
+      },
+      "not_fixed": {
+        "n": 16,
+        "consulted_external": 6,
+        "receipt_free": 10,
+        "consult_rate": 0.375,
+        "episode_seconds_median": 511.5
+      }
+    }
+  },
+  "block_count_distribution": {
+    "histogram": {
+      "1": 80,
+      "2": 4,
+      "3": 1,
+      "4": 2,
+      "5": 2
+    },
+    "episodes_spanning_interruption": 9,
+    "max_blocks": 5,
+    "total_interruptions": 20
+  },
+  "denominators": {
+    "stuck_episode_count": 89,
+    "recovered_episode_count": 73,
+    "not_recovered_episode_count": 16
+  },
+  "R": {
+    "strict/DF1": {
+      "definition": {
+        "external_resource": "strict",
+        "fixed_includes_DF2": false
+      },
+      "R0_receipt_free_all": {
+        "k": 70,
+        "n": 89,
+        "rate": 0.7865168539325843,
+        "wilson95": [
+          0.6904695876500676,
+          0.8588531297524762
+        ]
+      },
+      "R1_receipt_free_given_fixed": {
+        "k": 60,
+        "n": 73,
+        "rate": 0.821917808219178,
+        "wilson95": [
+          0.7187805780985462,
+          0.892867279312023
+        ]
+      },
+      "R0prime_fixed_and_receipt_free_all": {
+        "k": 60,
+        "n": 89,
+        "rate": 0.6741573033707865,
+        "wilson95": [
+          0.5713403285459205,
+          0.7625617153654295
+        ]
+      },
+      "denominator_effect_R0_minus_R1": -0.03540095428659373,
+      "numerator_effect_R0_minus_R0prime": 0.1123595505617978,
+      "abandonment_in_R0_numerator": {
+        "k": 10,
+        "n": 70,
+        "share": 0.14285714285714285
+      },
+      "per_session_R0": {
+        "n_sessions": 15,
+        "min": 0.0,
+        "median": 0.7777777777777778,
+        "max": 1.0
+      }
+    },
+    "strict/DF1+DF2": {
+      "definition": {
+        "external_resource": "strict",
+        "fixed_includes_DF2": true
+      },
+      "R0_receipt_free_all": {
+        "k": 70,
+        "n": 89,
+        "rate": 0.7865168539325843,
+        "wilson95": [
+          0.6904695876500676,
+          0.8588531297524762
+        ]
+      },
+      "R1_receipt_free_given_fixed": {
+        "k": 61,
+        "n": 75,
+        "rate": 0.8133333333333334,
+        "wilson95": [
+          0.7107120474561753,
+          0.8854199437768794
+        ]
+      },
+      "R0prime_fixed_and_receipt_free_all": {
+        "k": 61,
+        "n": 89,
+        "rate": 0.6853932584269663,
+        "wilson95": [
+          0.58295307963674,
+          0.7724910316237295
+        ]
+      },
+      "denominator_effect_R0_minus_R1": -0.02681647940074905,
+      "numerator_effect_R0_minus_R0prime": 0.101123595505618,
+      "abandonment_in_R0_numerator": {
+        "k": 9,
+        "n": 70,
+        "share": 0.12857142857142856
+      },
+      "per_session_R0": {
+        "n_sessions": 15,
+        "min": 0.0,
+        "median": 0.7777777777777778,
+        "max": 1.0
+      }
+    },
+    "broad/DF1": {
+      "definition": {
+        "external_resource": "broad",
+        "fixed_includes_DF2": false
+      },
+      "R0_receipt_free_all": {
+        "k": 69,
+        "n": 89,
+        "rate": 0.7752808988764045,
+        "wilson95": [
+          0.6782244712364706,
+          0.8495561788169538
+        ]
+      },
+      "R1_receipt_free_given_fixed": {
+        "k": 59,
+        "n": 73,
+        "rate": 0.8082191780821918,
+        "wilson95": [
+          0.7034428294648695,
+          0.8821774595452501
+        ]
+      },
+      "R0prime_fixed_and_receipt_free_all": {
+        "k": 59,
+        "n": 89,
+        "rate": 0.6629213483146067,
+        "wilson95": [
+          0.5597868598433596,
+          0.7525731167188711
+        ]
+      },
+      "denominator_effect_R0_minus_R1": -0.03293827920578729,
+      "numerator_effect_R0_minus_R0prime": 0.1123595505617978,
+      "abandonment_in_R0_numerator": {
+        "k": 10,
+        "n": 69,
+        "share": 0.14492753623188406
+      },
+      "per_session_R0": {
+        "n_sessions": 15,
+        "min": 0.0,
+        "median": 0.7692307692307693,
+        "max": 1.0
+      }
+    },
+    "broad/DF1+DF2": {
+      "definition": {
+        "external_resource": "broad",
+        "fixed_includes_DF2": true
+      },
+      "R0_receipt_free_all": {
+        "k": 69,
+        "n": 89,
+        "rate": 0.7752808988764045,
+        "wilson95": [
+          0.6782244712364706,
+          0.8495561788169538
+        ]
+      },
+      "R1_receipt_free_given_fixed": {
+        "k": 60,
+        "n": 75,
+        "rate": 0.8,
+        "wilson95": [
+          0.695885054488383,
+          0.8748796179687971
+        ]
+      },
+      "R0prime_fixed_and_receipt_free_all": {
+        "k": 60,
+        "n": 89,
+        "rate": 0.6741573033707865,
+        "wilson95": [
+          0.5713403285459205,
+          0.7625617153654295
+        ]
+      },
+      "denominator_effect_R0_minus_R1": -0.024719101123595544,
+      "numerator_effect_R0_minus_R0prime": 0.101123595505618,
+      "abandonment_in_R0_numerator": {
+        "k": 9,
+        "n": 69,
+        "share": 0.13043478260869565
+      },
+      "per_session_R0": {
+        "n_sessions": 15,
+        "min": 0.0,
+        "median": 0.7692307692307693,
+        "max": 1.0
+      }
+    }
+  }
+}

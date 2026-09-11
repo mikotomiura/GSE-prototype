@@ -85,7 +85,9 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   > ★ Wall の削除と Physical Anchor の完了条件撤廃により、**強度が単調に上がる「段」は現存しない**）。
   > **主張範囲の確定（2026-07-24・接地の SSOT）**: GSE が主張するのは「摩擦が能力・学習を**育てる**」ではなく
   > 「**反射的な外部依存（即座の AI/検索オフロード）を減らし、自力で解こうとする試行が発生する機会を保存する**」ことである。
-  > これは学習アウトカムではなく**行動指標**（`paste_after_stuck_rate` / `self_recovery_without_paste` /
+  > ⚠️★★★ **2026-09-07 (ADR-024)**: 主要アウトカムは **`receipt_free_resumption`**（★ 推定器を通らない）。
+  > ★ 以下の `pflow_exit_without_receipt`（旧 `self_recovery_without_paste`）は **`p_flow` 依存の副次**である。
+  > これは学習アウトカムではなく**行動指標**（`paste_after_stuck_rate` / `pflow_exit_without_receipt` /
   > `manual_contribution_ratio`）で測る（＝**機会保存の主張**）。保存された苦闘が実際に能力・学習を生むか（＝**学習効果の主張**）は
   > **さらに将来の探索トラック**であり、後段の consolidation 設計と学習アウトカム測定を要するため本フェーズでは主張しない（§8 参照）。
   > よって [P12] Kapur（生産的苦闘）・[P9] Bjork（望ましい困難）は「**守るべき困難が存在することの根拠**」に用い、
@@ -314,7 +316,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   H-PA（§5）の feasibility を大きく上げる。
   ⚠️ **ただし 2 段で接地し 1 本に圧縮しない**——[P47] は**健康アウトカム（座位・歩数）**であって
   認知回復を測っていない。GSE の H-PA が測るのは **招待の受容**と、その後の**機会保存の行動指標**
-  （`paste_after_stuck_rate` / `self_recovery_without_paste` / `manual_contribution_ratio`）であり
+  （`paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio`）であり
   （→ §5 H-PA・**ADR-018 D5**）、[P47] の効果量を H-PA の期待値に使ってはならない。
   ⚠️★★★ **2026-09-01 訂正 —— 旧文の「復帰後の手動入力・stuck 再発・主観的リセット感」は
   ADR-018 D5 が差し替えた旧評価量であり、§5 と食い違っていた。**また追跡は中央値 8 週で長期は未回答、
@@ -916,7 +918,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 - **H-X1b (二軸性)**: Cognitive Friction(X) と Productive Engagement(Y) は単一軸に縮約されず、**独立した 2 軸**として意味を持つ（PreReg-8）。
 - **H-X1c (L1 Stuck＝`p_stuck` の妥当性・探索的)**: `p_stuck` は X/Y を HMM で非線形合成した MhD 出力であり、**L0 の C-index は p_stuck を直接検証しない**。
   p_stuck の独立妥当性は **(a) self-marker（被験者が「今 Stuck」と押す独立な主観 Stuck 申告、希少・疎な陽性）との時間整合、(b) 行動アウトカム
-  （`paste_after_stuck` / `self_recovery_without_paste`）との照合**で**探索的に**検討する。
+  （`paste_after_stuck` / `pflow_exit_without_receipt`）との照合**で**探索的に**検討する。
   **(c) 派生 criterion（high-Q1×low-Q2）も補助的に併用**するが、これは probe Q1/Q2 由来＝L0 と源を共有するため**独立 GT ではない**（収束的補助）。
   → 注意: self-marker は Recall 分母に混ぜない副データ（v0.3 §4.1）。プローブへの直接 Stuck 項目追加（直接 GT）は**収集変更を伴うため将来課題**。
   → これは確証仮説ではなく **L1 の妥当性の所在を可視化する探索**であり、Go/Kill には縛らない。
@@ -928,7 +930,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
     **HIR（有害介入率＝PROTECT に介入した割合・最重要安全指標）/ Precision / STALL-recall** を算出し、`nudge_need` 閾値 sweep で動作点を点検する（`intervention_eval.rs`、reason 層別）。
     GT は UserLabel（主観・別計器）であり、dismiss_reason（`not_stuck`＝Need 過検出 / `want_to_struggle`＝Opportunity 誤り）と行動アウトカムで三角測量する。
 - **H-Y (システム価値)**: 介入あり(B) は介入なし(A) に比べ、**AI 依存を下げ自力解決を上げる**——
-  `paste_after_stuck_rate` ↓ / `self_recovery_without_paste` ↑ / `manual_contribution_ratio` ↑——
+  `paste_after_stuck_rate` ↓ / `pflow_exit_without_receipt` ↑ / `manual_contribution_ratio` ↑——
   **かつ成果物品質（第三者ブラインド）と NASA-TLX [V11]・自己効力感（GSE scale [P15]・副指標）を悪化させない**。AB/BA クロスオーバーで順序効果を相殺。
   > ⚠️★★★ **2026-08-30 追加（研究者承認）—— 主観指標だけで「悪化させていない」と判定しない。**
   > ★ autoplay を無効化した RCT（**N=76**・10–17 日・6 か月履歴をベースライン）で
@@ -966,7 +968,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
     介入層で損なう」が構造的にありうる。**
 - **H-PA (Physical Anchor)**: 身体的アンカー（画面から離れることへの方向づけ）[P2][P47][P215][P216][P217] は、
   **招待の受容（提示に対して離席が起きたか・拒否理由）と、その後の機会保存の行動指標
-  （`paste_after_stuck_rate` / `self_recovery_without_paste` / `manual_contribution_ratio`）を分けて**評価し、
+  （`paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio`）を分けて**評価し、
   安全条件（夜間 Outdoor 無効）下で**受容される**。
   > ⚠️★★★ **2026-09-01 訂正 2 点。**
   > **(a) 評価量を ADR-018 D5 に合わせた** —— 旧文の「効果（復帰後の手動入力・stuck 再発・主観的リセット感）」を
@@ -1084,7 +1086,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
 
 - **成功**:
   - X1（L0 軸）: GATE2（測定法）→ GATE3（C-index 中央値 ≥0.65 & 全員 >0.55）を通過（**GATE1 尺度理解は現行スモークでは延期**・比較条件段で発効）。
-  - Y: B 条件で `paste_after_stuck_rate` ↓・`self_recovery_without_paste` ↑、**かつ** blind_quality_score と NASA-TLX・自己効力感 [P15] が悪化せず、放棄率・時間超過が増えない。
+  - Y: B 条件で `paste_after_stuck_rate` ↓・`pflow_exit_without_receipt` ↑、**かつ** blind_quality_score と NASA-TLX・自己効力感 [P15] が悪化せず、放棄率・時間超過が増えない。
   - Physical Anchor: opt-in 率・招待の受容と、その後の機会保存の行動指標が基準以上で、dismiss・安全拒否・autonomy loss が少ない。
 - **反証 (falsification)**:
   - C-index 中央値 ≤0.55、または 2 人以上 ≤0.50 → Kill（二軸が行動から復元できない）。
@@ -1345,7 +1347,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
   **GSE は PS-I の前半（苦闘保護）だけを実装し後半（統合）を持たない**。
   → よって主張を 2 層に分離する:
   - **機会保存の主張（本フェーズの headline・探索的 H-Y）**: 反射的な外部依存を減らし、自力解決の試行が
-    発生する機会を保存する。**行動指標**（`paste_after_stuck_rate` / `self_recovery_without_paste` /
+    発生する機会を保存する。**行動指標**（`paste_after_stuck_rate` / `pflow_exit_without_receipt` /
     `manual_contribution_ratio`）で測定し、学習アウトカムを要さない。Phase1 の測定設計と整合。
   - **学習効果の主張（さらに将来の探索トラック・本フェーズでは非主張）**: 保存された苦闘が実際に能力・学習を
     生むか。これには **(a) content-free 制約下の consolidation（本人に想起・言語化させる想起型プローブ。

@@ -19,7 +19,31 @@
 
 | 何 | どこへ | 中身 |
 |---|---|---|
-| 試視の応答 | `results/layerA-<coding>-<YYYY-MM-DD>.json` | 較正値（`px/mm` / 視距離 / `px/deg`） / テーマ / invitation の符号 / 出題順 / 各トライアルの真値と応答 / RT / 自由記述 / 機械検算 12 項目 / 限界 5 項目 / **`navigator.userAgent`** / **`window.devicePixelRatio`** |
+| 試視の応答 | `results/layerA-<coding>-<YYYY-MM-DD>.json` | 較正値（`px/mm` / 視距離 / `px/deg`） / テーマ / invitation の符号 / 出題順 / 各トライアルの真値と応答 / RT / 自由記述 / ★ **周辺視（`pos` / `eccentric` を含む）** / 機械検算 **26 項目** / 限界 **8 項目 ＋ 条件つき 2 項目（＝ 最大 10）**（★ 条件つき = 事前露出の申告 / 振動符号が 1 周期未満のとき。★ 2026-09-09 cross-review 指摘・`limitations` 配列を実測で数え直した） / **`navigator.userAgent`** / **`window.devicePixelRatio`** |
+
+★ **書き出し JSON に入る「端末に由来する値」は 3 つである**（★ `security-checker` 指摘・2026-09-08 に数え直した）:
+
+| 値 | どこから | なぜ入るか |
+|---|---|---|
+| `ua` | `navigator.userAgent` | ★ ブラウザ版の記録（`env.md` の Chrome 版と突き合わせる） |
+| `dpr` | `window.devicePixelRatio` | ★ 1° が何 px になるかは端末依存なので、較正の再現に要る |
+| ★ **窓の大きさ** | `window.innerWidth` / `innerHeight`（★ **`viewport` として明示的に書き出す** ＋ 機械検算の実測欄にも入る） | ⚠️★★★ **周辺視ブロックが開くかどうかが窓の幅で決まる**（→ `env.md` の 6）。★ **入らなかったのか / 落ちたのかを事後に分けるために要る** |
+
+⚠️★★★ **3 つとも端末フィンガープリントになりうる。**★ 判定者が **N=1・研究者本人**なので実害は無いが、
+→ ★★★ **将来この JSON を被験者から集める運用にするなら、`ua` / 窓幅は落とすか粗くすること**
+（★ そのとき **`results/*.json` を追跡し続けるか**も一緒に決める —— ⚠️ 現在 `results/` に
+`.gitignore` は無く、`INVALID-run1-…json` が `ua` を含んだまま追跡されている）。
+
+★ **上表以外に書き出されるもの**（★ 宣言漏れを塞ぐ）: `peripheral_geometry`（★ 偏心 px / 必要 px /
+利用可能 px / 実施可否 —— ⚠️ **「開かなかったのか / 読めなかったのか」を事後に分けるために要る**）/
+`expr_visual_version` / `hmm_version` /
+`config_echo`（★ 2026-09-08 に **`peripheral_test` が加わった**。★ 設計パラメータのみ）/
+`prior_exposure`（★ **`how` は自由記述である** —— ⚠️ 外部 LLM へ送る前に中身を見ること）/
+`started_at` / `finished_at`。
+
+⚠️★★★ **2026-09-08: 上の「12 項目 / 5 項目」は stale だった**（★ 実体は 14 / 6 だった）。
+★ **`data.md` は宣言文書なので、宣言と実体がずれること自体が違反である**（★ 下の注記と同じ理由）。
+→ ★ **項目数を書くなら、触ったときに数え直すこと。**
 
 ⚠️★★★ **`ua` と `dpr` を書き出していることを明記する**（★ `security-checker` 指摘・2026-09-03）——
 ★ 本表は最初この 2 つを落としていた。⚠️ **`data.md` は「固定し忘れと区別がつかない」ことを防ぐ宣言文書**なので、

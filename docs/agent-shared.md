@@ -184,7 +184,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜022**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜026**) の根拠を確認したい時 |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |
 | `docs/o1-deletion-ledger.md` | ⚠️★★★ **進行中の O1 の削除保証台帳**。被験者からの削除要求に対応する時（★ 同意文書が逐語で約束している「記録に残します」の実体） |
@@ -198,7 +198,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/participant-setup-guide.md` | 被験者のセットアップを案内する時（★ **被験者向け文書は契約**） |
 | `docs/loop-engineering.md` | issue 単位の自律ループを回す時（★ 用語 / Done・Stop / budget の SSOT） |
 | `docs/design-history.md` / `docs/design-history.ja.md` | ⚠️ **履歴文書**。過去の実装 (v2.1–v2.22) を調べる時のみ（★ 現行仕様の根拠には使わない） |
-| `docs/architecture/expression-channel.md` | 表現チャネル (媒体分離・PC↔スマホ境界・復帰後の差分の扱い・曝露予算) を確認する時。⚠️★★★ **決定は ADR-017 だけではない** —— ★ **現行の裁定は ADR-021 (未決 11 件を確定) と ADR-022 (層 A の媒体実装制約)**。⚠️ **ADR-017 単独で読むと古い契約を掴む** (例: `level` の 4 値は ADR-021 D4 が「作業状態 3 値 ＋ `invitation` 二値」へ改訂済み)。★ ADR 本文は書き換えない規約なので、**必ず番号の大きい方まで読む** |
+| `docs/architecture/expression-channel.md` | 表現チャネル (媒体分離・PC↔スマホ境界・復帰後の差分の扱い・曝露予算) を確認する時。⚠️★★★ **決定は ADR-017 だけではない** —— ★ **現行の裁定は ADR-021 (未決 11 件を確定) / ADR-022 (層 A の媒体実装制約) / ADR-025 (層 A に数値を添えない) / ADR-026 (招待を差し出す PC 面の要件) / ★★★ ADR-027 (境界イベントの発火・初期同期・解除) / ★★★ ADR-028 (生存を信号で示さず、失効を曝露の契機で判定する ＝ `W-3` を閉じた)**。⚠️ **ADR-017 単独で読むと古い契約を掴む** (例: `level` の 4 値は ADR-021 D4 が「作業状態 3 値 ＋ `invitation` 二値」へ改訂済み。★ **発火条件「`level` が変わったときだけ」も ADR-027 D1 が「意味フィールドの組が変わったとき」へ改訂済み**)。★ ADR 本文は書き換えない規約なので、**必ず番号の大きい方まで読む** |
 
 ## 公式 Skill (Phase 2 で導入)
 

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560">
+  <rect width="1400" height="560" fill="#ffffff"/>
+  <text x="65" y="62" font-family="Yu Gothic, Meiryo, sans-serif" font-size="34" font-weight="700" fill="#1f2933">宣言された作業種別が、正規化の基準を選ぶ</text>
+  <text x="65" y="101" font-family="Yu Gothic, Meiryo, sans-serif" font-size="21" fill="#52606d">合成式はどのヘッドでも同じ。違うのは「その人のふだん」を表す基準値だけ</text>
+  <defs><marker id="arrow3" markerWidth="11" markerHeight="11" refX="9" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/></marker></defs>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif">
+    <text x="70" y="150" font-size="22" font-weight="700" fill="#334155">宣言（セッション開始時）</text>
+    <text x="500" y="150" font-size="22" font-weight="700" fill="#334155">ドメイン</text>
+    <text x="820" y="150" font-size="22" font-weight="700" fill="#334155">推論ヘッドと基準値</text>
+  </g>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif" text-anchor="middle">
+    <rect x="70" y="170" width="330" height="58" rx="8" fill="#e6fffa" stroke="#0f766e" stroke-width="3"/>
+    <text x="235" y="207" font-size="23" fill="#134e4a">論述を書く</text>
+    <rect x="70" y="238" width="330" height="58" rx="8" fill="#e6fffa" stroke="#0f766e" stroke-width="3"/>
+    <text x="235" y="275" font-size="23" fill="#134e4a">やり取りの文面を書く</text>
+    <rect x="70" y="316" width="330" height="58" rx="8" fill="#e6fffa" stroke="#0f766e" stroke-width="3"/>
+    <text x="235" y="353" font-size="23" fill="#134e4a">創作を書く</text>
+    <rect x="70" y="404" width="330" height="58" rx="8" fill="#e6fffa" stroke="#0f766e" stroke-width="3"/>
+    <text x="235" y="441" font-size="23" fill="#134e4a">対話しながら実装する</text>
+
+    <rect x="500" y="188" width="230" height="90" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+    <text x="615" y="222" font-size="25" font-weight="700" fill="#1e3a8a">Writing</text>
+    <text x="615" y="255" font-size="19" fill="#1e3a8a">執筆</text>
+    <rect x="500" y="300" width="230" height="90" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+    <text x="615" y="334" font-size="24" font-weight="700" fill="#1e3a8a">Writing 別枠</text>
+    <text x="615" y="367" font-size="19" fill="#1e3a8a">数値は執筆と同じ</text>
+    <rect x="500" y="404" width="230" height="90" rx="10" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="615" y="438" font-size="25" font-weight="700" fill="#7c2d12">Coding</text>
+    <text x="615" y="471" font-size="19" fill="#7c2d12">実装</text>
+  </g>
+
+  <g stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow3)">
+    <path d="M400 199 H460 V225 H500"/>
+    <path d="M400 267 H460 V241 H500"/>
+    <path d="M400 345 H500"/>
+    <path d="M400 433 H460 V449 H500"/>
+    <path d="M730 233 H800"/><path d="M730 345 H770 V300 H800"/><path d="M730 449 H800"/>
+  </g>
+
+  <g font-family="Yu Gothic, Meiryo, sans-serif">
+    <rect x="800" y="170" width="540" height="130" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+    <text x="825" y="207" font-size="24" font-weight="700" fill="#1e3a8a">執筆ヘッド ── 入力方式で基準値を切り替える</text>
+    <text x="825" y="243" font-size="20" fill="#1e3a8a">かな漢字変換が開いている：打鍵間隔 100 ms／是正率 0.10</text>
+    <text x="825" y="275" font-size="20" fill="#1e3a8a">直接入力：打鍵間隔 150 ms／是正率 0.06</text>
+
+    <rect x="800" y="404" width="540" height="130" rx="10" fill="#fff7ed" stroke="#c2410c" stroke-width="4"/>
+    <text x="825" y="441" font-size="24" font-weight="700" fill="#7c2d12">実装ヘッド ── 入力方式を見ない</text>
+    <text x="825" y="477" font-size="20" fill="#7c2d12">日本語のコメントで変換が開いても、作業は実装のまま</text>
+    <text x="825" y="509" font-size="20" fill="#7c2d12">基準値は直接入力と同じ値を、独立した定数として持つ</text>
+  </g>
+
+  <text x="700" y="552" text-anchor="middle" font-family="Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#334155">作業種別は本人の宣言、入力方式は観測。役割が違うので混ぜない</text>
+</svg>
