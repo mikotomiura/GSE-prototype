@@ -32,7 +32,7 @@
 
 ## 5. レビュー
 - [x] `code-reviewer` + `security-checker` を**並列**起動
-- [ ] `/cross-review` (Codex 独立レビュー) — ★ パス限定で回す
+- [x] `/cross-review` (Codex 独立レビュー) — ★ パス限定で回す
 
 ## 6. 後片付け
 - [x] マージ済みローカルブランチ 26 本を `git branch -d`
