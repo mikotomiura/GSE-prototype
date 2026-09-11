@@ -1032,23 +1032,16 @@ pub fn format_pretty(m: &SessionMetrics) -> String {
 
 // --- internal helpers -----------------------------------------------------
 
-fn nearest_feat<'a>(
-    ts: u64,
-    feats: &'a [FeatSnapshot],
-    window_ms: u64,
-) -> Option<&'a FeatSnapshot> {
+fn nearest_feat(ts: u64, feats: &[FeatSnapshot], window_ms: u64) -> Option<&FeatSnapshot> {
     feats
         .iter()
         .filter(|f| abs_diff(f.timestamp, ts) <= window_ms)
         .min_by_key(|f| abs_diff(f.timestamp, ts))
 }
 
+/// ★ `u64::abs_diff` の薄い別名 (⚠️ 呼び出し側の可読性のために残している)。
 fn abs_diff(a: u64, b: u64) -> u64 {
-    if a >= b {
-        a - b
-    } else {
-        b - a
-    }
+    a.abs_diff(b)
 }
 
 /// HMM argmax 付与。タイブレークは Flow > Incubation > Stuck の固定順（稀だが発生しうる）。
@@ -1127,7 +1120,7 @@ fn median_i64(values: &mut [i64]) -> Option<i64> {
     }
     values.sort_unstable();
     let mid = values.len() / 2;
-    if values.len() % 2 == 0 {
+    if values.len().is_multiple_of(2) {
         // i64 加算のオーバーフロー回避のため i128 経由で計算。
         // (両端が i64::MIN と i64::MAX の両立は LEAD_LAG_WINDOW_MS=60_000
         // で現実には起きないが、関数契約として安全側に倒す)
@@ -1145,7 +1138,7 @@ fn median_u64(values: &mut [u64]) -> Option<u64> {
     }
     values.sort_unstable();
     let mid = values.len() / 2;
-    if values.len() % 2 == 0 {
+    if values.len().is_multiple_of(2) {
         // sort 後なので a <= b、`a + (b - a) / 2` は u64 でも overflow しない。
         let a = values[mid - 1];
         let b = values[mid];

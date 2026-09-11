@@ -40,6 +40,15 @@ pub enum LogEntryDto {
     /// schemars の tagged enum では 2 形状を別 variant にすると同一 tag 衝突が
     /// 発生するため、スキーマ上は loose にして Option 3 つを並列にしている。
     /// validator 側の追加チェックを入れたい場合は外部 JSON Logic で補う。
+    //
+    // ⚠️★★★ **この doc は整形してはならない** (clippy `doc_lazy_continuation`)。
+    //   ★ このファイルの doc コメントは **schemars が JSON Schema の `description` に載せる**
+    //     (⚠️ `schema/current.json` に本文がそのまま入っている・2026-09-12 実測)。
+    //   ★ 連続行は**空白**で連結され、空の `///` 行は **`\n\n`** になる。
+    //     → ⚠️ 字下げも空行の挿入も **description の文字列を変え、schema drift になる**
+    //       (`emit_schema` の byte-equal 比較と gse-dataset 側の parity が同時に落ちる)。
+    //   → ★ 見た目の是正よりも**外部契約の不変**を採り、lint をここだけ黙らせる。
+    #[allow(clippy::doc_lazy_continuation)]
     Meta {
         #[serde(skip_serializing_if = "Option::is_none")]
         session_start: Option<u64>,

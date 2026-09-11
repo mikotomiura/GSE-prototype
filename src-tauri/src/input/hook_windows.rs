@@ -145,7 +145,7 @@ enum ImeNavAction {
 
 fn classify_ime_nav_key(vk_code: u32) -> ImeNavAction {
     match vk_code {
-        0x25 | 0x26 | 0x27 | 0x28 => ImeNavAction::Navigate,
+        0x25..=0x28 => ImeNavAction::Navigate, // VK_LEFT / UP / RIGHT / DOWN
         0x1B => ImeNavAction::Abandon,
         _ => ImeNavAction::Other,
     }

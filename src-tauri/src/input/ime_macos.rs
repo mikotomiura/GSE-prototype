@@ -27,6 +27,14 @@ use crate::logger::LogEntry;
 
 pub struct ImeMonitor;
 
+// ★ Windows 側 (`ime_windows.rs`) と対で置く。⚠️ **片方だけ足すと OS で clippy の結果が割れる**
+//   (`new_without_default` は引数なしの `new()` を持つ型すべてに出るため)。
+impl Default for ImeMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImeMonitor {
     pub fn new() -> Self {
         tracing::info!(

@@ -31,6 +31,7 @@ use crate::analysis::heads::{head_for, DomainInferenceHead, HeadId, TaskDomain};
 /// - `transition_matrix` / `emission_matrix` / `initial_probabilities` の値
 /// - `update()` / `update_silence()` の内部 α 値・ヒステリシス α
 /// - `update_silence()` の silence_secs → α 閾値
+///
 /// また `analysis/features.rs` の `phi` / `make_silence_observation` /
 /// `calculate_features` の数値挙動変更、`analysis/loop_step.rs` の摩擦フロア
 /// 変更も bump 対象。
@@ -423,23 +424,27 @@ impl CognitiveStateEngine {
         // 旧 EMISSION_FLOOR (+0.05 一律加算) は廃止。
         let mut sum_prob = 0.0;
 
-        for j in 0..n_states {
+        // ⚠️★★★ **加算の順序を変えないこと** (2026-09-12)。
+        //   ★ 浮動小数の加算は結合則を満たさないので、`trans_sum` / `sum_prob` の
+        //     足し込む順番を変えると**確率列の下位ビットが動き、ゴールデンが割れる**。
+        //   → ★ `iter().sum()` や `fold` には書き換えない。`enumerate()` で添字を取るだけに留める。
+        for (j, new_prob) in new_probs.iter_mut().enumerate() {
             let mut trans_sum = 0.0;
-            for i in 0..n_states {
+            for (i, &old_prob) in old_probs.iter().enumerate() {
                 let t_prob = self.transitions[i * n_states + j];
-                trans_sum += old_probs[i] * t_prob;
+                trans_sum += old_prob * t_prob;
             }
 
             // 3 states × 26 bins: index = j * 26 + obs
             let e_prob = self.emissions[j * 26 + obs];
-            new_probs[j] = trans_sum * e_prob;
-            sum_prob += new_probs[j];
+            *new_prob = trans_sum * e_prob;
+            sum_prob += *new_prob;
         }
 
         // Normalize
         if sum_prob > 0.0 {
-            for j in 0..n_states {
-                new_probs[j] /= sum_prob;
+            for new_prob in &mut new_probs {
+                *new_prob /= sum_prob;
             }
         }
         // 合計が0になった場合は以前の確率を維持する (フォールバック)
@@ -545,20 +550,21 @@ impl CognitiveStateEngine {
         let n_states = 3;
 
         let mut sum_prob = 0.0;
-        for j in 0..n_states {
+        // ⚠️★★★ `update()` 側と同じ制約 —— **加算の順序を変えないこと**。
+        for (j, new_prob) in new_probs.iter_mut().enumerate() {
             let mut trans_sum = 0.0;
-            for i in 0..n_states {
+            for (i, &old_prob) in old_probs.iter().enumerate() {
                 let t_prob = self.transitions[i * n_states + j];
-                trans_sum += old_probs[i] * t_prob;
+                trans_sum += old_prob * t_prob;
             }
             let e_prob = self.emissions[j * 26 + obs];
-            new_probs[j] = trans_sum * e_prob;
-            sum_prob += new_probs[j];
+            *new_prob = trans_sum * e_prob;
+            sum_prob += *new_prob;
         }
 
         if sum_prob > 0.0 {
-            for j in 0..n_states {
-                new_probs[j] /= sum_prob;
+            for new_prob in &mut new_probs {
+                *new_prob /= sum_prob;
             }
         }
 

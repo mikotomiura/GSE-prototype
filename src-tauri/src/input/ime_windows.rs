@@ -23,6 +23,12 @@ pub struct ImeMonitor {
     automation: Option<IUIAutomation>,
 }
 
+impl Default for ImeMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImeMonitor {
     pub fn new() -> Self {
         unsafe {
@@ -164,11 +170,6 @@ pub fn is_ime_candidate_window_visible() -> bool {
     found
 }
 
-// Kept for API compatibility (unused)
-pub fn is_ime_active_check() -> bool {
-    false
-}
-
 // ---------------------------------------------------------------------------
 // IME candidate window decisions (pure — テストできる形に切り出す)
 // ---------------------------------------------------------------------------
@@ -282,7 +283,7 @@ pub fn spawn_ime_open_polling_thread(
                         imm_succeeded = true;
 
                         // last_state が None (初回) か、前回と異なる場合のみ emit
-                        if last_state.map_or(true, |prev| prev != current_state) {
+                        if last_state.is_none_or(|prev| prev != current_state) {
                             last_state = Some(current_state);
                             crate::input::hook::IME_OPEN.store(current_state, Ordering::Relaxed);
                             emit_ime_state(&log_tx, current_state);
@@ -295,14 +296,14 @@ pub fn spawn_ime_open_polling_thread(
             // Used when ImmGetContext returns NULL (typical cross-process case).
             // IME_OPEN was already updated by the hook; we just need to detect the
             // change and emit the log entry with a fresh timestamp.
-            if !imm_succeeded {
-                if crate::input::hook::IME_STATE_DIRTY.swap(false, Ordering::AcqRel) {
-                    let current_state = crate::input::hook::IME_OPEN.load(Ordering::Acquire);
-                    // last_state が None (初回) か、前回と異なる場合のみ emit
-                    if last_state.map_or(true, |prev| prev != current_state) {
-                        last_state = Some(current_state);
-                        emit_ime_state(&log_tx, current_state);
-                    }
+            // ⚠️ `&&` の短絡により、`swap` は `!imm_succeeded` のときしか実行されない
+            //   (★ dirty フラグを消費する副作用があるので、この順序が意味を持つ)。
+            if !imm_succeeded && crate::input::hook::IME_STATE_DIRTY.swap(false, Ordering::AcqRel) {
+                let current_state = crate::input::hook::IME_OPEN.load(Ordering::Acquire);
+                // last_state が None (初回) か、前回と異なる場合のみ emit
+                if last_state.is_none_or(|prev| prev != current_state) {
+                    last_state = Some(current_state);
+                    emit_ime_state(&log_tx, current_state);
                 }
             }
         }

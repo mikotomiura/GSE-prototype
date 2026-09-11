@@ -1693,7 +1693,7 @@ fn run_submit_blocking(app: tauri::AppHandle, id: String) -> Result<SubmitOutcom
 fn redact_home_path(detail: &str) -> String {
     let homes: Vec<String> = ["USERPROFILE", "HOME"]
         .iter()
-        .filter_map(|k| std::env::var_os(k))
+        .filter_map(std::env::var_os)
         .map(|v| v.to_string_lossy().into_owned())
         .filter(|s| !s.is_empty())
         .collect();
@@ -2303,7 +2303,7 @@ fn record_user_label(
         return Ok(());
     }
     let kind = UserLabelKind::parse(&label).ok_or_else(|| format!("invalid label: {:?}", label))?;
-    let timestamp = record_label_internal(&*log, kind)?;
+    let timestamp = record_label_internal(&log, kind)?;
     if let Err(e) = app.emit(
         "user_label_recorded",
         serde_json::json!({
@@ -3606,7 +3606,7 @@ pub fn run() {
             }
 
             // IME_ACTIVE 状態変化時にログを送出（初回は必ず emit）
-            if last_active.map_or(true, |prev| prev != active) {
+            if last_active.is_none_or(|prev| prev != active) {
                 let was_active = last_active.unwrap_or(false);
                 last_active = Some(active);
                 let ts = std::time::SystemTime::now()

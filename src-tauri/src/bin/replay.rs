@@ -1679,10 +1679,12 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
         }
         let ev: ReplayEvent = serde_json::from_str(&line)
             .map_err(|e| format!("parse error at line {}: {}", lineno + 1, e))?;
-        if let ReplayEvent::Meta { hmm_version, .. } = &ev {
-            if let Some(v) = hmm_version {
-                meta_hmm_version = Some(v.clone());
-            }
+        if let ReplayEvent::Meta {
+            hmm_version: Some(v),
+            ..
+        } = &ev
+        {
+            meta_hmm_version = Some(v.clone());
         }
         events.push(ev);
     }
@@ -1985,10 +1987,9 @@ fn collect_review_markers(path: &PathBuf) -> Vec<u64> {
             Err(_) => continue,
         };
         if line.contains("\"review_marker\"") {
-            if let Ok(ev) = serde_json::from_str::<ReplayEvent>(&line) {
-                if let ReplayEvent::ReviewMarker { t } = ev {
-                    markers.push(t);
-                }
+            if let Ok(ReplayEvent::ReviewMarker { t }) = serde_json::from_str::<ReplayEvent>(&line)
+            {
+                markers.push(t);
             }
         }
     }
@@ -2017,11 +2018,11 @@ fn collect_key_timestamps(path: &PathBuf) -> Vec<u64> {
             Err(_) => continue,
         };
         if line.contains("\"key\"") {
-            if let Ok(ev) = serde_json::from_str::<ReplayEvent>(&line) {
-                if let ReplayEvent::Key { t, press, .. } = ev {
-                    if press {
-                        timestamps.push(t);
-                    }
+            if let Ok(ReplayEvent::Key { t, press, .. }) =
+                serde_json::from_str::<ReplayEvent>(&line)
+            {
+                if press {
+                    timestamps.push(t);
                 }
             }
         }
@@ -2100,7 +2101,7 @@ fn make_segment(start_ms: u64, end_ms: u64, feats: &[&FeatSnapshot], markers: &[
 }
 
 /// .segments.txt 形式の文字列を生成する。
-fn format_segments_txt(session_path: &PathBuf, segments: &[Segment]) -> String {
+fn format_segments_txt(session_path: &Path, segments: &[Segment]) -> String {
     let mut out = String::new();
     let session_name = session_path
         .file_name()
