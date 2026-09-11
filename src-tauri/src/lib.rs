@@ -3503,7 +3503,7 @@ pub fn run() {
             // 1Hz ゲート・沈黙 3 状態機構・Feat 生成をすべて担う。
             // tick_now を 1 度だけ取り step に渡す（code-reviewer 指摘: タイミング一貫性）。
             let tick_now = now_ms();
-            let ime_open = input::hook::IME_OPEN.load(Ordering::Relaxed);
+            let ime_open = input::hook::IME_OPEN.load(Ordering::Acquire);
             let out = step(&mut state, &engine_for_thread, input, tick_now, ime_open);
 
             // 中立記録型 → LogEntry 変換（architecture-rules ルール 6 遵守のため、
@@ -3589,7 +3589,7 @@ pub fn run() {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_millis() as u64;
-                    let ime_on = input::hook::IME_OPEN.load(Ordering::Relaxed);
+                    let ime_on = input::hook::IME_OPEN.load(Ordering::Acquire);
                     let _ = log_tx_for_monitor.try_send(logger::LogEntry::ImeState {
                         timestamp: ts,
                         on: ime_on,
@@ -3609,6 +3609,9 @@ pub fn run() {
             if last_active.is_none_or(|prev| prev != active) {
                 // ⚠️ 使用箇所 (下の `emit_ime_shadow`) が Windows 限定なので、束縛も同じ
                 //    `#[cfg]` に揃える (macOS では unused variable になる)。
+                // ★ **対の関係**: 使用側の `#[cfg]` を外すならこの束縛も外すこと
+                //   (外し忘れると macOS で「未定義の変数」として**即コンパイルエラー**になる
+                //    ＝ 黙って壊れないので安全側だが、原因が分かるように書いておく)。
                 #[cfg(target_os = "windows")]
                 let was_active = last_active.unwrap_or(false);
                 last_active = Some(active);
@@ -3616,7 +3619,7 @@ pub fn run() {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis() as u64;
-                let ime_on = input::hook::IME_OPEN.load(Ordering::Relaxed);
+                let ime_on = input::hook::IME_OPEN.load(Ordering::Acquire);
                 let _ = log_tx_for_monitor.try_send(logger::LogEntry::ImeState {
                     timestamp: ts,
                     on: ime_on,

@@ -420,7 +420,11 @@ jobs:
       # ⚠️★★★ **`--all-targets` を落とさないこと**。★ 落とすと `#[cfg(test)]` が
       #   **一切解析されない** (2026-09-12 に実測: Windows 側で `features.rs` と同じ lint が
       #   `probe_scheduler.rs` のテストに生き残っていた)。
-      #   ★ `.claude/hooks/stop-check.sh` のローカル gate と**同じ範囲**に揃えてある。
+      #   ⚠️★★★ **ローカル gate (`.claude/hooks/stop-check.sh`) と同一ではない。**
+      #   ★ 揃っているのは `--all-targets -D warnings` までで、⚠️ **`--features package` は
+      #   CI 側にしか無い** (ローカルは毎 Stop で走るので age / reqwest の再解析を載せない)。
+      #   → ★ したがって `reconcile.rs` / `packaging.rs` の lint は **CI で初めて赤くなる**。
+      #     ⚠️ 「手元が緑だから CI も緑」と読まないこと (code-reviewer 指摘, 2026-09-12)。
       #
       # ⚠️★★★ **`--features package` を落とさないこと**。★ 上の `cargo test` step と同じ理由で、
       #   落とすと `reconcile.rs` / `packaging.rs` (= O1 の「48 時間の猶予」を守る当の機構) が

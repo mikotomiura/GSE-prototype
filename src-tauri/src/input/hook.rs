@@ -37,8 +37,12 @@ pub fn is_ime_active() -> bool {
 pub static IME_OPEN: AtomicBool = AtomicBool::new(false);
 
 /// Returns true if the Japanese IME is currently in Japanese-input mode.
+///
+/// ⚠️ `Acquire` で読む —— `hook-constraints` 共通-2 が `IME_OPEN` の
+/// store = `Release` / load = `Acquire` と**対で**定めているため。
+/// ★ 片側だけ強めても happens-before は成立しないので、対を崩さないこと。
 pub fn is_ime_open() -> bool {
-    IME_OPEN.load(Ordering::Relaxed)
+    IME_OPEN.load(Ordering::Acquire)
 }
 
 /// Dirty flag: set by hook callback when a VK_DBE_* / VK_KANJI key is pressed.
