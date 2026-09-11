@@ -159,3 +159,25 @@
   ⚠️ ただし `hook_windows.rs:603` は**フックコールバック内**なので、
   `hook-constraints` 共通-1 (ブロッキング禁止) に照らして確認すること
   (★ acquire load は x86 では単なる `mov`・ARM64 では `ldar` で**ブロックしない**)。
+
+### `/cross-review` (Codex 独立レビュー・2026-09-12) — ⚠️ **両者一致の HIGH はゼロ・コード変更不要**
+
+★ `scripts/run-codex-review.sh` exit 0 / 機密フィルタのブロックなし /
+予算 used=57,445 (budget 300,000) ＝ **縮退なしで完走**。
+
+| Codex の指摘 | 判定 | 理由 |
+|---|---|---|
+| MSRV 破壊 (`is_multiple_of` 等) | ⚠️ **却下** | ★ `rust-version = "1.87"` が既に宣言済み。`is_multiple_of` の安定化が**ちょうど 1.87**、他は以前。⚠️ Codex 自身が「最新 stable 前提なら問題なし」と留保していた |
+| CI の clippy scope が既存シグナルと一致しない | ✅ **採用済み** | ★ まさに本 PR で注記を訂正した点 (⚠️ 非対称は意図的) |
+| Ordering のコメントが実態より強く見える | ⚠️ **却下寄り** | ★ `ime_macos.rs` の読み手は `IME_STATE_DIRTY.swap(AcqRel)` → `JIS_KEYBOARD_SEEN.load(Acquire)` → `IME_OPEN.load(Acquire)` の順で読む構造。⚠️ x86/ARM の実機挙動としては差が出にくいという指摘は一理あるが、**Rust の抽象メモリモデル上は正当な強化** |
+| メモリ順序変更に対するテストが無い | ⚠️ **LOW・follow-up** | ★ メモリ順序をユニットテストで検出するのは困難。→ 下記 follow-up へ |
+
+### ★ follow-up 候補 (⚠️ 本 PR では**やらない**)
+
+1. ⚠️ **`stop-check.sh` に `--features package` を足すか** —— ★ 足せば注記の非対称が消えるが、
+   毎 Stop で age / reqwest を再解析するコストが乗る。**研究者判断**。
+2. ⚠️ **default features のみの clippy が CI に無い** (Codex 指摘) —— ★ CI は
+   `--features package` 付きだけを走らせている。⚠️ ローカル gate が default 側を見ているので
+   **穴ではない**が、CI 単独では片方しか見ていない。
+3. ⚠️ `check` job に `permissions: contents: read` を明示 (security-checker MEDIUM・**既存の穴**)。
+4. ⚠️ `IME_ACTIVE` の Ordering 7 箇所 (★ 上の新起票)。
