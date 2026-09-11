@@ -20,13 +20,14 @@ use core_graphics::event::{
 
 use super::{
     EVENT_SENDER, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, JIS_KEYBOARD_SEEN, LAST_KEY_MS,
-    POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
-    VK_DBE_SBCSCHAR, VK_KANJI,
+    POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
 };
 use crate::analysis::features::InputEvent;
 // ★ 確定 / 放棄を分ける判断と、それを Atomic へ書き戻すドライバ。
 //   ⚠️ OS 非依存なので **Windows の CI でもテストが走る**。
 use crate::input::ime_compose;
+// ★ IME モードキー (`VK_DBE_*`) の遷移表 —— **OS 非依存の単一の真実源**。
+use crate::input::ime_mode;
 
 // Input Monitoring permission check/request.
 // These are in the ApplicationServices framework, umbrella-linked via CoreGraphics.
@@ -361,9 +362,19 @@ fn macos_vk_to_vk(mac_vk: u64) -> u32 {
 
         // ── JIS IME toggle keys (CGKeyCode values for JIS keyboards) ──────
         0x66 => VK_DBE_ALPHANUMERIC, // kVK_JIS_Eisu → 英数 (alphanumeric)
-        0x68 => VK_KANJI,            // kVK_JIS_Kana → かな toggle
-        0x90 => VK_DBE_HIRAGANA,     // alternate かな on some JIS layouts
-        0x91 => VK_DBE_KATAKANA,     // alternate カタカナ on some JIS layouts
+        // ⚠️★★★ **かな は「トグル」ではない。無条件に日本語へ切り替えるキーである。**
+        //   ★ 2026-09-12 の macOS 実機検証まで、ここは `VK_KANJI` (= Windows の「半角/全角」)
+        //     へ写像しており、遷移表が `Toggle` を返していた。
+        //   ⚠️ その結果 **かな を偶数回押すと `IME_OPEN` が実体と反転したまま残り**、
+        //     その間の日本語変換が `ime_shadow` から**丸ごと欠測**していた
+        //     (実測: OS の入力ソースは日本語のまま、GSE だけが true/false を交互に往復した)。
+        //   ★ 下の `0x90` が最初から `VK_DBE_HIRAGANA` だったとおり、正しい意味は表の中にあった。
+        //   ⚠️ macOS に「半角/全角」キーは**存在しない** (JIS でも 英数 / かな の別キー)。
+        //     → ★ `VK_KANJI` は Windows 専用であり、macOS からは**二度と生やさない**
+        //       (回帰テスト `macos_never_maps_any_key_to_the_windows_toggle`)。
+        0x68 => VK_DBE_HIRAGANA, // kVK_JIS_Kana → かな (日本語モードへ切り替え)
+        0x90 => VK_DBE_HIRAGANA, // alternate かな on some JIS layouts
+        0x91 => VK_DBE_KATAKANA, // alternate カタカナ on some JIS layouts
 
         // Pass-through for unmapped keys.
         // Key identity is not critical for timing features (F1-F5).
@@ -529,38 +540,32 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
     // Mirrors the Windows VK_DBE_* handler in windows_impl.rs.
     // ANSI keyboards: these codes never arrive; TIS polling in ime_macos.rs
     // handles mode detection instead.
+    // ⚠️★★★ 遷移表は **`ime_mode` (OS 非依存) が単一の真実源**である。
+    //   ★ 以前はここに Windows 側の複製を持っていたが、**macOS でしかコンパイルされず
+    //     テストも無かった**ため、かな キーの意味がずれたまま誰も気づけなかった。
     if is_press {
-        match vk_code {
-            VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => {
+        match ime_mode::ime_open_after_press(vk_code) {
+            ime_mode::ImeOpenTransition::Set(v) => {
                 JIS_KEYBOARD_SEEN.store(true, Ordering::Relaxed);
-                IME_OPEN.store(false, Ordering::Release);
+                IME_OPEN.store(v, Ordering::Release);
                 IME_STATE_DIRTY.store(true, Ordering::Release);
             }
-            VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => {
-                JIS_KEYBOARD_SEEN.store(true, Ordering::Relaxed);
-                IME_OPEN.store(true, Ordering::Release);
-                IME_STATE_DIRTY.store(true, Ordering::Release);
-            }
-            VK_KANJI => {
+            ime_mode::ImeOpenTransition::Toggle => {
+                // ⚠️★★★ **macOS ではここへ来ない** (「半角/全角」キーが存在しないため)。
+                //   ★ 来たとしても壊れないよう、Windows と同じアトミック手段で扱う
+                //     (load→store にすると IME ポーリングスレッドの書き込みを失う)。
                 JIS_KEYBOARD_SEEN.store(true, Ordering::Relaxed);
                 IME_OPEN.fetch_xor(true, Ordering::AcqRel);
                 IME_STATE_DIRTY.store(true, Ordering::Release);
             }
-            _ => {}
+            ime_mode::ImeOpenTransition::None => {}
         }
     }
     // Also handle key-up for JIS IME keys (mirrors Surface Type Cover quirk handling)
     if is_release {
-        match vk_code {
-            VK_DBE_KATAKANA | VK_DBE_HIRAGANA | VK_DBE_DBCSCHAR => {
-                IME_OPEN.store(true, Ordering::Release);
-                IME_STATE_DIRTY.store(true, Ordering::Release);
-            }
-            VK_DBE_ALPHANUMERIC | VK_DBE_SBCSCHAR => {
-                IME_OPEN.store(false, Ordering::Release);
-                IME_STATE_DIRTY.store(true, Ordering::Release);
-            }
-            _ => {}
+        if let Some(new_ime_open) = ime_mode::ime_open_after_release(vk_code) {
+            IME_OPEN.store(new_ime_open, Ordering::Release);
+            IME_STATE_DIRTY.store(true, Ordering::Release);
         }
     }
 
@@ -638,16 +643,7 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
     }
 
     // Wake the IME polling thread on every keypress
-    let is_ime_mode_key = matches!(
-        vk_code,
-        VK_DBE_ALPHANUMERIC
-            | VK_DBE_KATAKANA
-            | VK_DBE_HIRAGANA
-            | VK_DBE_SBCSCHAR
-            | VK_DBE_DBCSCHAR
-            | VK_KANJI
-    );
-    if is_press || (is_release && is_ime_mode_key) {
+    if is_press || (is_release && ime_mode::is_ime_mode_key(vk_code)) {
         if let Some(tx) = POLL_WAKE_TX.get() {
             let _ = tx.try_send(());
         }
@@ -1261,6 +1257,54 @@ mod tests {
     fn ime_mode_keys_are_not_observed() {
         assert!(!is_observed_key(0x66), "kVK_JIS_Eisu");
         assert!(!is_observed_key(0x68), "kVK_JIS_Kana");
+    }
+
+    /// ⚠️★★★ **かな キー (`kVK_JIS_Kana` = `0x68`) は「日本語へ切り替える」であり、トグルではない。**
+    ///
+    /// ★ 2026-09-12 の macOS 実機検証で見つかった欠陥の回帰テスト。
+    /// ⚠️ 旧実装はこれを [`VK_KANJI`] (= Windows の「半角/全角」＝**本物のトグル**) へ写像しており、
+    /// **かな を偶数回押すと `IME_OPEN` が実体と反転したまま残った**。
+    /// → ⚠️ その間の日本語変換が `ime_shadow` から**丸ごと欠測**した
+    ///   (実測: 変換を確定したのに 0 行 / OS の入力ソースは日本語のまま)。
+    #[test]
+    fn the_kana_keycode_maps_to_hiragana_not_the_windows_toggle() {
+        assert_eq!(
+            macos_vk_to_vk(0x68),
+            VK_DBE_HIRAGANA,
+            "かな は日本語モードへの切り替えであってトグルではない"
+        );
+        assert_eq!(
+            ime_mode::ime_open_after_press(macos_vk_to_vk(0x68)),
+            ime_mode::ImeOpenTransition::Set(true),
+            "★ 何回押しても日本語のまま (冪等) でなければならない"
+        );
+    }
+
+    /// ⚠️★★★ **macOS からは `VK_KANJI` を二度と生やさない。**
+    ///
+    /// ★ macOS に「半角/全角」キーは**存在しない** (JIS でも 英数 / かな の別キー) ので、
+    /// 写像先に現れること自体が誤りである。
+    /// ⚠️ 1 つでも現れると [`ime_mode::ime_open_after_press`] が `Toggle` を返し、
+    /// **同じ欠陥が再発する**。
+    #[test]
+    fn macos_never_maps_any_key_to_the_windows_toggle() {
+        for mac_vk in 0u64..=0xFF {
+            assert_ne!(
+                macos_vk_to_vk(mac_vk),
+                crate::input::hook::VK_KANJI,
+                "⚠️ mac keycode {mac_vk:#04x} が Windows のトグルキーへ写像された"
+            );
+        }
+    }
+
+    /// ★ 英数 キーとの対称性 —— こちらは元から無条件 `Set(false)` で正しかった。
+    #[test]
+    fn the_eisu_keycode_closes_the_ime_unconditionally() {
+        assert_eq!(macos_vk_to_vk(0x66), VK_DBE_ALPHANUMERIC);
+        assert_eq!(
+            ime_mode::ime_open_after_press(macos_vk_to_vk(0x66)),
+            ime_mode::ImeOpenTransition::Set(false)
+        );
     }
 
     /// ★★ **回帰テストの本体。**
