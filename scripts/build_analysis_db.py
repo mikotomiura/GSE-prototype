@@ -175,16 +175,18 @@ def _lift_outcome_field(outcome: dict, name: str):
     if name.startswith(_RFR_PREFIX):
         nested = outcome.get(_RFR_KEY) or {}
         return nested.get(name[len(_RFR_PREFIX):]) if isinstance(nested, dict) else None
-    value = outcome.get(name)
-    # NOTE: `is None` deliberately treats "key absent" and "value is JSON null"
-    # the same, so a new-schema file that carries an explicit null still falls
-    # back to the legacy key. No file currently holds both spellings, so this
-    # cannot mask a real new-schema null.
-    if value is None:
-        legacy = LEGACY_FIELD_ALIASES.get(name)
-        if legacy is not None:
-            value = outcome.get(legacy)
-    return value
+    # Fall back to the legacy spelling only when the new key is ABSENT.
+    # An explicit JSON null under the new key is a real value (Option::None for
+    # "no episodes"), and must not be overwritten by a legacy key that happens
+    # to sit in the same file. The previous `value is None` test conflated the
+    # two; it was defended by "no file currently holds both spellings", which is
+    # an observation about today's corpus, not an invariant this code enforces.
+    if name in outcome:
+        return outcome[name]
+    legacy = LEGACY_FIELD_ALIASES.get(name)
+    if legacy is not None:
+        return outcome.get(legacy)
+    return None
 # Top-level (non-outcome) HMM-accuracy fields worth carrying for context.
 TOPLEVEL_AVG_FIELDS = ("macro_f1", "micro_f1")
 

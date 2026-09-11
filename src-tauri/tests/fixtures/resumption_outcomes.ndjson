@@ -1,0 +1,18 @@
+{"type": "meta", "session_start": 0, "hmm_version": "test-resumption"}
+{"type": "feat", "t": 1000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.1, "p_inc": 0.2, "p_stuck": 0.7, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}
+{"type": "feat", "t": 2000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.1, "p_inc": 0.2, "p_stuck": 0.7, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}
+{"type": "key", "t": 2000, "vk": 65, "press": true}
+{"type": "key", "t": 200000, "vk": 65, "press": true}
+{"type": "paste", "t": 230000, "external_paste_chars": 60}
+{"type": "feat", "t": 300000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.1, "p_inc": 0.2, "p_stuck": 0.7, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}
+{"type": "feat", "t": 301000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.1, "p_inc": 0.2, "p_stuck": 0.7, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}
+{"type": "key", "t": 301000, "vk": 65, "press": true}
+{"type": "key", "t": 600000, "vk": 65, "press": true}
+{"type": "key", "t": 601000, "vk": 65, "press": true}
+{"type": "key", "t": 900000, "vk": 65, "press": true}
+{"type": "paste", "t": 1000000, "external_paste_chars": 60}
+{"type": "feat", "t": 1100000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.1, "p_inc": 0.2, "p_stuck": 0.7, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}
+{"type": "feat", "t": 1101000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.1, "p_inc": 0.2, "p_stuck": 0.7, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}
+{"type": "key", "t": 1101000, "vk": 65, "press": true}
+{"type": "key", "t": 1400000, "vk": 65, "press": true}
+{"type": "feat", "t": 2100000, "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0, "p_flow": 0.7, "p_inc": 0.2, "p_stuck": 0.1, "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0, "obs": 0, "alpha": 0.2}

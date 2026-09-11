@@ -410,6 +410,14 @@ jobs:
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────
   frontend-check:
     if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+    # ⚠️★★★ 最小権限を明記する (2026-09-11・security-checker MEDIUM)。
+    #   ★ この job は `pip install python-pptx` / `duckdb` で **PyPI の任意コードを実行する**。
+    #   ⚠️ job レベルの permissions が無いと、リポジトリ既定の GITHUB_TOKEN 権限が
+    #     そのまま渡る (既定が read/write なら CI から repo へ push できてしまう)。
+    #   ★ trigger は pull_request (pull_request_target ではない) なので fork PR に
+    #     secrets は渡らないが、**既定に依存しない**ことを明示する。
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
