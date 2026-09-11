@@ -17,8 +17,19 @@
   1. repo 外の実在 PNG → ✅ 拒む
   2. repo 内の実在 PNG (`docs/mitou_submission/figures/gse-layer-map.png`) → ✅ 通す
   3. symlink な root 配下の PNG → ✅ 通す (★ これが今回の修正点)
-- **影響**: ⚠️ CI の `check` job は **macOS レッグを持つ** (matrix)。
-  ★ この修正なしに md2pptx の CI step を足すと、**macOS が確実に赤になる**。
+- **影響** (⚠️★★★ **2026-09-11 に自分の主張を訂正した**):
+  ★ 当初「CI の `check` job が macOS レッグを持つので確実に赤になる」と書いたが、
+  ⚠️ **誤りだった。** ★ 実測: md2pptx の step が属するのは `check` ではなく
+  **`frontend-check` (`runs-on: ubuntu-latest`)** であり、`check` job の step に
+  `md2pptx` は **0 件**。★ Linux の `/tmp` は symlink ではないので、
+  **この欠陥は CI を赤にしない**。
+- **★ では何が壊れていたか**: ⚠️ **開発機 (macOS) では `--selftest` が必ず落ちる**。
+  ★ つまり「手元で確かめてから CI に出す」という順序が**この検査だけ踏めない**状態で、
+  ⚠️ 実際に**手元で落ちたからこそ気づいた**。→ ★ 修正の価値は変わらないが、
+  **深刻度は「CI が赤」ではなく「手元で検査が使えない」**である。
+- ⚠️★★★ **教訓**: ★ 「CI が緑」と「何を検証したか」は別
+  (memory: `github-pr-ci-mechanics`)。⚠️ **どの job が走らせるかを確かめずに
+  影響範囲を書いた**。★ job の step 一覧を API で引けば 1 コマンドで判る。
 
 ## B-2: `check-o1-release-readiness.sh` が 20/0 → 19/1 に転じた (branch 側の実バグ・修正済み)
 
