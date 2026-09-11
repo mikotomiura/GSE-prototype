@@ -145,7 +145,7 @@ enum ImeNavAction {
 
 fn classify_ime_nav_key(vk_code: u32) -> ImeNavAction {
     match vk_code {
-        0x25 | 0x26 | 0x27 | 0x28 => ImeNavAction::Navigate,
+        0x25..=0x28 => ImeNavAction::Navigate, // VK_LEFT / UP / RIGHT / DOWN
         0x1B => ImeNavAction::Abandon,
         _ => ImeNavAction::Other,
     }
@@ -843,7 +843,10 @@ mod tests {
             assert!(min <= e && e <= max, "0x{e:04X} が範囲外");
         }
         // ⚠️ 旧コードの組合せをそのまま使うと空になることを固定する。
-        assert!(
+        // ★ 定数どうしの比較なので **コンパイル時**に固定する
+        //   (⚠️ 実行時 `assert!` だと clippy `assertions_on_constants` になるうえ、
+        //    ★ このテストを呼ばない限り気づけない。const なら**ビルドが落ちる**)。
+        const _: () = assert!(
             EVENT_OBJECT_IME_CHANGE > EVENT_OBJECT_IME_HIDE,
             "(CHANGE, HIDE) を min/max にすると空レンジになる"
         );

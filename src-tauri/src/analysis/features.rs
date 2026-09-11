@@ -148,7 +148,7 @@ impl FeatureExtractor {
             window_fts
                 .sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let len = window_fts.len();
-            if len % 2 == 0 {
+            if len.is_multiple_of(2) {
                 (window_fts[len / 2 - 1] + window_fts[len / 2]) / 2.0
             } else {
                 window_fts[len / 2]

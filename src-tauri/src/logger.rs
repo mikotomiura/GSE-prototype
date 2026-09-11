@@ -366,6 +366,19 @@ fn format_ime_shadow_line(
 }
 
 /// `LogEntry::InterventionDecision` の NDJSON 1 行を生成する純粋関数。
+///
+/// ⚠️★★★ **手書き JSON なのでエスケープが無い。** ★ `action` / `reason` に
+/// **外部由来の文字列を渡すと NDJSON の 1 行が黙って壊れ**、解析側 (`validate_blocks.py` /
+/// `anonymize`) が誤読する (★ `write_meta_start` の `g1_mode` と同じ security review MEDIUM)。
+/// → ★ 値域は `InterventionAction::as_str()` / `reason_for()` の**固定リテラルに閉じている**。
+/// ⚠️ **引数を増やすときも、この不変条件を必ず保つこと** (★ 下の `#[allow]` は引数の個数だけを
+/// 許しており、値域の緩みを許してはいない)。
+///
+/// ⚠️ **引数 8 個は意図的**（clippy `too_many_arguments` は 7 個まで）。
+/// ★ 本ファイルの `format_*_line` は **NDJSON の 1 行のフィールドと 1:1 に並べる**のが規約で、
+/// 構造体に畳むと「行に何が出るか」がシグネチャから消える。
+/// ⚠️ `intervention_decision` 行はフィールドが 8 つあるので、ここだけ上限を超える。
+#[allow(clippy::too_many_arguments)]
 fn format_intervention_decision_line(
     timestamp: u64,
     action: &str,
@@ -1257,23 +1270,6 @@ fn temp_fallback_path(primary: &Path) -> PathBuf {
     std::env::temp_dir().join("GSE-sessions").join(unique)
 }
 
-/// `meta`(session_start) 行を書く。★ **新しいファイルを開くたびに必ず呼ぶ**
-/// (起動時 / `LogEntry::Rotate` 時)。
-///
-/// - `hmm_version` は `engine.rs` の定数。`gse-replay` がゴールデンスナップショットと
-///   突き合わせる際に同一バージョンであることを検証する。
-/// - `g1_mode` は G1 実施時のみ `Some(..)`。⚠️ ★ **`&str` ではなく `G1Source` を受ける。**
-///   手書き JSON なのでエスケープが無く、将来ここへ参加者 ID のような外部由来の文字列が
-///   渡ると **NDJSON の 1 行が黙って壊れ**、解析側 (`validate_blocks.py` / `anonymize`) が
-///   誤読する。★ 値域を型で閉じてその経路を作らせない (security review MEDIUM)。
-///   ⚠️ ★ **`None` のときは `g1_mode` キーを出さない** (`skip_serializing_if` 相当を手書きで担保)。
-///   ★ キーの順序を含めて既存キーの並びを変えないこと。
-/// - `app_version` / `capabilities` は **2026-08-19 に ADR-013 D1 で追加**した。
-///   ⚠️★★ **上の「従来と 1 バイトも変わらない」という記述はこの追加で成り立たなくなったので消した。**
-///   ★ 代わりに確かめた事実 (2026-08-19 実測):
-///   ゴールデン (`tests/snapshots/*.json`) は `FeatSnapshot` の配列で **`meta` を含まない**、
-///   読み手 (`anonymize.rs:111` / `validate_blocks.py:409`) は **JSON パース**である。
-///   → ★ additive なフィールド追加は**どちらも壊さない**。
 /// セッション開始時に **1 回だけ** `meta` へ刻むキーボードレイアウト識別子。
 ///
 /// ## ⚠️★★★ なぜ `OnceLock` で外から入れるのか
@@ -1322,6 +1318,28 @@ fn o1_mode_fragment() -> String {
     }
 }
 
+/// `meta`(session_start) 行を書く。★ **新しいファイルを開くたびに必ず呼ぶ**
+/// (起動時 / `LogEntry::Rotate` 時)。
+///
+/// - `hmm_version` は `engine.rs` の定数。`gse-replay` がゴールデンスナップショットと
+///   突き合わせる際に同一バージョンであることを検証する。
+/// - `g1_mode` は G1 実施時のみ `Some(..)`。⚠️ ★ **`&str` ではなく `G1Source` を受ける。**
+///   手書き JSON なのでエスケープが無く、将来ここへ参加者 ID のような外部由来の文字列が
+///   渡ると **NDJSON の 1 行が黙って壊れ**、解析側 (`validate_blocks.py` / `anonymize`) が
+///   誤読する。★ 値域を型で閉じてその経路を作らせない (security review MEDIUM)。
+///   ⚠️ ★ **`None` のときは `g1_mode` キーを出さない** (`skip_serializing_if` 相当を手書きで担保)。
+///   ★ キーの順序を含めて既存キーの並びを変えないこと。
+/// - `app_version` / `capabilities` は **2026-08-19 に ADR-013 D1 で追加**した。
+///   ⚠️★★ **上の「従来と 1 バイトも変わらない」という記述はこの追加で成り立たなくなったので消した。**
+///   ★ 代わりに確かめた事実 (2026-08-19 実測):
+///   ゴールデン (`tests/snapshots/*.json`) は `FeatSnapshot` の配列で **`meta` を含まない**、
+///   読み手 (`anonymize.rs:111` / `validate_blocks.py:409`) は **JSON パース**である。
+///   → ★ additive なフィールド追加は**どちらも壊さない**。
+///
+/// ⚠️★★★ **2026-09-12: この doc は `KEYBOARD_LAYOUT_ID` に付いていたのを戻した。**
+///   ★ `9eb1384` (2026-08-24) が doc と `write_meta_start` の**間に** static を挿入し、
+///   doc が static のものになっていた (⚠️ clippy `doc_list_item_without_indentation` が
+///   表面化させた実害)。
 fn write_meta_start(
     writer: &mut impl Write,
     session_start: u64,

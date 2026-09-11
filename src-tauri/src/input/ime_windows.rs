@@ -24,6 +24,13 @@ pub struct ImeMonitor {
 }
 
 impl ImeMonitor {
+    // ⚠️★★★ **`Default` は実装しない** (clippy `new_without_default` をここで黙らせる)。
+    //   ★ `new()` は **COM アパートメントを初期化する** (`CoInitializeEx` + `CoCreateInstance`)。
+    //   ⚠️ `Default` は「安価・副作用なし」が慣習なので、`..Default::default()` や
+    //     ジェネリック経由で **暗黙に COM 初期化が走る入口**を作ってしまう。
+    //   ★ repo の他の `impl Default` (`engine.rs:143` 等) は**純粋な構築**であり、前例にならない。
+    //   ⚠️ macOS 側 (`ime_macos.rs`) も対で同じ扱いにすること (★ 片方だけだと OS で結果が割れる)。
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         unsafe {
             // COM is initialized here for the UIAutomation fallback.
@@ -164,11 +171,6 @@ pub fn is_ime_candidate_window_visible() -> bool {
     found
 }
 
-// Kept for API compatibility (unused)
-pub fn is_ime_active_check() -> bool {
-    false
-}
-
 // ---------------------------------------------------------------------------
 // IME candidate window decisions (pure — テストできる形に切り出す)
 // ---------------------------------------------------------------------------
@@ -282,7 +284,7 @@ pub fn spawn_ime_open_polling_thread(
                         imm_succeeded = true;
 
                         // last_state が None (初回) か、前回と異なる場合のみ emit
-                        if last_state.map_or(true, |prev| prev != current_state) {
+                        if last_state.is_none_or(|prev| prev != current_state) {
                             last_state = Some(current_state);
                             crate::input::hook::IME_OPEN.store(current_state, Ordering::Relaxed);
                             emit_ime_state(&log_tx, current_state);
@@ -295,14 +297,14 @@ pub fn spawn_ime_open_polling_thread(
             // Used when ImmGetContext returns NULL (typical cross-process case).
             // IME_OPEN was already updated by the hook; we just need to detect the
             // change and emit the log entry with a fresh timestamp.
-            if !imm_succeeded {
-                if crate::input::hook::IME_STATE_DIRTY.swap(false, Ordering::AcqRel) {
-                    let current_state = crate::input::hook::IME_OPEN.load(Ordering::Acquire);
-                    // last_state が None (初回) か、前回と異なる場合のみ emit
-                    if last_state.map_or(true, |prev| prev != current_state) {
-                        last_state = Some(current_state);
-                        emit_ime_state(&log_tx, current_state);
-                    }
+            // ⚠️ `&&` の短絡により、`swap` は `!imm_succeeded` のときしか実行されない
+            //   (★ dirty フラグを消費する副作用があるので、この順序が意味を持つ)。
+            if !imm_succeeded && crate::input::hook::IME_STATE_DIRTY.swap(false, Ordering::AcqRel) {
+                let current_state = crate::input::hook::IME_OPEN.load(Ordering::Acquire);
+                // last_state が None (初回) か、前回と異なる場合のみ emit
+                if last_state.is_none_or(|prev| prev != current_state) {
+                    last_state = Some(current_state);
+                    emit_ime_state(&log_tx, current_state);
                 }
             }
         }

@@ -600,7 +600,7 @@ mod tests {
     #[test]
     fn leaving_japanese_mode_closes_the_session_as_confirmed() {
         let (state, ends) = run(&[(A, true, 0), (A, false, 600)]);
-        assert_eq!(emitted(&ends)[0].abandon, false);
+        assert!(!emitted(&ends)[0].abandon);
         assert_eq!(emitted(&ends)[0].dwell_ms, 600);
         assert!(!state.is_composing());
     }

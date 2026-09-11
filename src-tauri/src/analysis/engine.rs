@@ -31,6 +31,7 @@ use crate::analysis::heads::{head_for, DomainInferenceHead, HeadId, TaskDomain};
 /// - `transition_matrix` / `emission_matrix` / `initial_probabilities` の値
 /// - `update()` / `update_silence()` の内部 α 値・ヒステリシス α
 /// - `update_silence()` の silence_secs → α 閾値
+///
 /// また `analysis/features.rs` の `phi` / `make_silence_observation` /
 /// `calculate_features` の数値挙動変更、`analysis/loop_step.rs` の摩擦フロア
 /// 変更も bump 対象。
@@ -416,30 +417,40 @@ impl CognitiveStateEngine {
 
         let old_probs = *current;
         let mut new_probs = [0.0; 3];
-        let n_states = 3;
+        // ⚠️★★★ **配列長から取ること** (2026-09-12・code-reviewer MEDIUM)。
+        //   ★ 旧 `for j in 0..n_states` は `n_states` を増やすと `new_probs[j]` で**即パニック**した。
+        //   ⚠️ `iter_mut()` にした今は**配列長どおり静かに 3 回しか回らない**ので、
+        //     `n_states` だけを直すと `transitions[i * n_states + j]` のストライドがずれ、
+        //     **無音で誤った確率**を返す。→ ★ 両者を 1 つの真実 (配列長) に縛る。
+        let n_states = new_probs.len();
+        debug_assert_eq!(old_probs.len(), n_states);
 
         // Forward Algorithm Step
         // 放射確率は emission テーブルに最小値 0.01 を組み込み済み。
         // 旧 EMISSION_FLOOR (+0.05 一律加算) は廃止。
         let mut sum_prob = 0.0;
 
-        for j in 0..n_states {
+        // ⚠️★★★ **加算の順序を変えないこと** (2026-09-12)。
+        //   ★ 浮動小数の加算は結合則を満たさないので、`trans_sum` / `sum_prob` の
+        //     足し込む順番を変えると**確率列の下位ビットが動き、ゴールデンが割れる**。
+        //   → ★ `iter().sum()` や `fold` には書き換えない。`enumerate()` で添字を取るだけに留める。
+        for (j, new_prob) in new_probs.iter_mut().enumerate() {
             let mut trans_sum = 0.0;
-            for i in 0..n_states {
+            for (i, &old_prob) in old_probs.iter().enumerate() {
                 let t_prob = self.transitions[i * n_states + j];
-                trans_sum += old_probs[i] * t_prob;
+                trans_sum += old_prob * t_prob;
             }
 
             // 3 states × 26 bins: index = j * 26 + obs
             let e_prob = self.emissions[j * 26 + obs];
-            new_probs[j] = trans_sum * e_prob;
-            sum_prob += new_probs[j];
+            *new_prob = trans_sum * e_prob;
+            sum_prob += *new_prob;
         }
 
         // Normalize
         if sum_prob > 0.0 {
-            for j in 0..n_states {
-                new_probs[j] /= sum_prob;
+            for new_prob in &mut new_probs {
+                *new_prob /= sum_prob;
             }
         }
         // 合計が0になった場合は以前の確率を維持する (フォールバック)
@@ -542,23 +553,26 @@ impl CognitiveStateEngine {
 
         let old_probs = *current;
         let mut new_probs = [0.0; 3];
-        let n_states = 3;
+        // ⚠️ `update()` 側と同じ理由で**配列長から取る** (★ ストライドと反復回数を 1 つに縛る)。
+        let n_states = new_probs.len();
+        debug_assert_eq!(old_probs.len(), n_states);
 
         let mut sum_prob = 0.0;
-        for j in 0..n_states {
+        // ⚠️★★★ `update()` 側と同じ制約 —— **加算の順序を変えないこと**。
+        for (j, new_prob) in new_probs.iter_mut().enumerate() {
             let mut trans_sum = 0.0;
-            for i in 0..n_states {
+            for (i, &old_prob) in old_probs.iter().enumerate() {
                 let t_prob = self.transitions[i * n_states + j];
-                trans_sum += old_probs[i] * t_prob;
+                trans_sum += old_prob * t_prob;
             }
             let e_prob = self.emissions[j * 26 + obs];
-            new_probs[j] = trans_sum * e_prob;
-            sum_prob += new_probs[j];
+            *new_prob = trans_sum * e_prob;
+            sum_prob += *new_prob;
         }
 
         if sum_prob > 0.0 {
-            for j in 0..n_states {
-                new_probs[j] /= sum_prob;
+            for new_prob in &mut new_probs {
+                *new_prob /= sum_prob;
             }
         }
 

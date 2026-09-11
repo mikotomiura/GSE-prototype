@@ -28,6 +28,11 @@ use crate::logger::LogEntry;
 pub struct ImeMonitor;
 
 impl ImeMonitor {
+    // ⚠️★★★ **`Default` は実装しない** —— ★ Windows 側 (`ime_windows.rs`) と**対**の扱いである。
+    //   ★ 向こうの `new()` は COM アパートメントを初期化するので `Default` を与えない。
+    //   ⚠️ こちらだけ `Default` を持つと **OS で clippy の結果と API 面が割れる**ので、
+    //     ★ 同じく `#[allow]` にする (`new_without_default` は引数なしの `new()` すべてに出る)。
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         tracing::info!(
             "IME Monitor: keystroke-based composition detection enabled \
