@@ -5,30 +5,24 @@
 > `.steering/20260911-outcome-arbitration-and-o1-preflight/issues/008.md` と
 > `design-008-macos-ime-shadow.md`、`blockers.md` 起票 4 / 6 / 7 にある。
 
-## §0 ⚠️★★★ 最初に読むべき事実 —— **配布済みリリースでは絶対に再現しない**
+## §0 ⚠️★★★ 最初に読むべき事実 —— **配布済みリリースでは再現しない**
 
-★ macOS の `ime_shadow` 送出元は **`main` に無い**。実装は **PR #182 のブランチにしかない**。
+★ **2026-09-11 更新: PR #182 / #184 は main へマージ済み。** → ⚠️ **`main` を pull すればよい。**
 
-| 事実 | 根拠 |
+| 事実 | 意味 |
 |---|---|
-| `main` の `emit_ime_shadow` は **Windows 限定** | `git show main:src-tauri/src/lib.rs` の `#[cfg(target_os = "windows")]` |
-| `input/ime_compose.rs`（状態機械）は **main に存在しない** | `git show main:src-tauri/src/input/ime_compose.rs` → NOT in main |
-| 実装は `feat/macos-ime-shadow`（PR #182）にのみ在る | — |
-| `v0.1.35`（配布済み）は **main 由来** | ★ なので macOS では `ime_shadow` が**構造的に 0 行**になる |
-
-→ ⚠️★★★ **`v0.1.35` の `.app` で試すと「動いていない」ように見えるが、それは実装が入っていないだけである。**
+| macOS の `ime_shadow` 送出元は **PR #182 で入った** | ★ `main` (`8ef67c2` 以降) に在る |
+| Dashboard の生存読み出しは **PR #184 で入った** | ★ `main` (`5e5eccc` 以降) に在る |
+| ⚠️ **配布済み `v0.1.35` はどちらも入る前の版** | ⚠️★★★ **あれで試すと「動いていない」ように見えるが、実装が無いだけ** |
+| CI の macOS ビルド | ✅ **pass**（PR / main とも）。⚠️ ただし**実機の挙動は別**（→ §2） |
 
 ## §1 ⚠️★★★ 最初に実行する
 
 ```bash
-cd ~/<repo>/GSE-prototype          # mac 側の clone
-git fetch origin
-git switch feat/macos-ime-shadow   # ★ main ではない
-git pull
-git log --oneline -1               # 3af47a9 以降であること
+cd ~/<repo>/GSE-prototype
+git switch main && git pull
+git log --oneline -1        # 5e5eccc 以降であること
 ```
-
-⚠️ **PR #182 が既に main へマージ済みなら `main` で構わない**（`git log --oneline main | grep macos-ime-shadow` で確認）。
 
 ## §2 ★ やること 3 件（⚠️ 1 と 2 は実機でしかできない）
 
@@ -36,7 +30,7 @@ git log --oneline -1               # 3af47a9 以降であること
 |---|---|---|
 | **1** | ⚠️★★★ **確定 / 放棄が NDJSON で区別できることの実機確認**（AC 6） | 起票 4 |
 | **2** | ⚠️ **macOS 純正「ライブ変換」下での ESC の意味**を確かめる | 起票 6 |
-| **3** | ★ `gse-dataset` の `schema/current.json` 同期（⚠️ **PR #182 のマージ後だけ**） | 起票 5 |
+| ~~3~~ | ~~`gse-dataset` の schema 同期~~ | ✅ **2026-09-11 に Windows 側で完了**（`gse-dataset` `dc2c76c`）。★ §5 は**読まなくてよい** |
 
 ---
 

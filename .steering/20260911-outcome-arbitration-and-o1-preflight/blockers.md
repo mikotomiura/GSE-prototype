@@ -82,7 +82,7 @@
 ## 起票 5: `schema/current.json` を再生成したので `gse-dataset` 側と drift する
 
 - **起票日**: 2026-09-11
-- **状態**: 未解決（⚠️ **外部 repo なので勝手に書き換えない**）
+- **状態**: ✅ **解決**（2026-09-11・★ PR #182 のマージ後に同期した）
 - **内容**: `schema_dto.rs` の `ImeShadow` doc から「Windows のみ」を外したため、
   `schema/current.json` の `description` が 1 行変わった。
   ★ **構造 (フィールドの追加 / 削除 / 改名) は 1 つも変わっていない**ので既存ログは妥当である。
@@ -94,7 +94,16 @@
   1. `python scripts/check_schema_parity.py --dataset C:/gse-dataset` で drift を確認
   2. ★ スクリプトが出す repair コマンドどおりに `gse-dataset` 側へコピーする
   3. ⚠️ **外部 repo のコミットは研究者が行う**
-- **解決**: （未）
+- **解決**: ✅ 2026-09-11。★ PR #182 が main へマージされた**あと**に実施した
+  （⚠️ マージ前に同期すると **dataset が main を追い越し、main 上の全員に drift が見える**）。
+  - `gse-dataset` の `dc2c76c` —— ★ `schema/current.json` **だけ**をパス指定でコミット
+    （⚠️ 同 repo には別作業の未追跡ファイル `metrics/P000/macos/*.json` があるので `git add -A` を使わない）
+  - ★ `check_schema_parity.py` → `OK: schemas in sync (31994 bytes canonical)`
+  - ⚠️ 差分は **`description` 1 行のみ**で、フィールドの追加 / 削除 / 改名は**ゼロ** →
+    **既存の NDJSON は引き続き妥当**
+  - ★ 副産物: この作業中に `check_schema_parity.py` が **Windows (cp932) で drift の中身を
+    出す前に落ちる**不具合を見つけ、**PR #183** で修正した（⚠️ そうでなければこの同期自体が
+    Windows 上で実行不能だった）
 
 ## 起票 6: ⚠️ macOS 純正「ライブ変換」下での ESC の挙動が未検証
 
