@@ -996,6 +996,60 @@ fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
     log.lock().unwrap_or_else(|p| p.into_inner()).current_path()
 }
 
+// --- ⚠️★★★ 研究者向け: `ime_shadow` の生存読み出し ------------------------------
+//
+// ★ **なぜ要るか** (2026-09-11):
+//   `ime_shadow` は `gse-replay` が**読み飛ばす**ので (`bin/replay.rs`)、
+//   ★ 実機での確認手段が **NDJSON を jq で開くことだけ**だった。
+//   ⚠️ しかも NDJSON は **1 セッションで 2 本できる** (起動時に 1 本 → 「開始する」で
+//   ローテート) ので、**取り違えやすい**。
+//   → ★ 「**いまどのファイルに何行書けているか**」を画面で見られるようにする。
+//
+// ⚠️★★★ **被験者には出さない。** 二重ゲート:
+//   1. backend: `ensure_debug_enabled()` (= `GSE_DEBUG=1`) が無ければ `Err`
+//   2. frontend: `Dashboard.tsx` の `debugView` (= `VITE_GSE_DEBUG=1`) で囲む
+//   ⚠️ **`get_diagnostics` には足さない** —— あの診断パネルは `debugView` で囲まれておらず、
+//   フックが 20 秒以上有効にならないと**被験者にも出る**。★ 放棄回数を被験者に見せない。
+
+/// 研究者向けデバッグ読み出し DTO。
+///
+/// ⚠️ **キーストローク内容は一切含まない** —— ★ 入っているのは
+/// **ファイルパス**と**件数 3 つ**だけである (data-privacy CD1)。
+// ⚠️ `Clone` は付けない —— ★ 値で構築して即返すだけで、state に保持しない。
+#[derive(serde::Serialize)]
+struct ImeShadowDebugDto {
+    /// いま書いている NDJSON の絶対パス (⚠️ ローテート追随)。
+    log_path: String,
+    /// ★ **`log_path` のファイルに書かれた** `ime_shadow` 行の数
+    /// (⚠️ ローテートで 0 に戻る。プロセス累計ではない)。
+    emitted: u64,
+    /// そのうち `abandon = false` (= Enter / その他キーによる確定)。
+    confirmed: u64,
+    /// そのうち `abandon = true` (= ESC による放棄)。
+    abandoned: u64,
+}
+
+/// ⚠️★★★ 研究者向け: `ime_shadow` の生存状況を返す (`GSE_DEBUG=1` 必須)。
+///
+/// ★ `confirmed` は `emitted - abandoned` で**導出する** (別カウンタを持たない) ——
+/// ⚠️ 3 つを別々に増やすと、読み出しが途中に挟まったときに**和が合わない**。
+/// ★ 件数は **`log_path` が指すファイルに実際に書かれた行数**である
+/// (⚠️ ローテートで 0 に戻る。`logger::tally_ime_shadow` の doc が正本)。
+/// ★ `saturating_sub` は**保険**であって根拠ではない ——
+/// 根拠は `logger::ime_shadow_tally` が固定する読み書きの順序のほうにある。
+#[tauri::command]
+fn get_ime_shadow_debug(log: State<Arc<Mutex<LogState>>>) -> Result<ImeShadowDebugDto, String> {
+    ensure_debug_enabled()?;
+    // ★ 読み出しの順序は `logger::ime_shadow_tally` が持つ (⚠️ あちらの doc が正本)。
+    let (emitted, abandoned) = logger::ime_shadow_tally();
+    Ok(ImeShadowDebugDto {
+        log_path: log.lock().unwrap_or_else(|p| p.into_inner()).current_path(),
+        emitted,
+        confirmed: emitted.saturating_sub(abandoned),
+        abandoned,
+    })
+}
+
 // --- O1 (R3): 被験者の 3 点セット (ADR-014 D7) ---------------------------------------
 //
 // ⚠️★★★ **この 3 つが揃っていることが、ADR-014 判断 3（倫理審査は不要）の根拠 3 である。**
@@ -4854,6 +4908,8 @@ pub fn run() {
             get_intervention_decision,
             force_nudge,
             debug_force_probe,
+            // ⚠️★★★ 研究者向け (GSE_DEBUG=1 必須)。被験者ビルドでは Err を返す。
+            get_ime_shadow_debug,
             debug_overlay_window_state,
             get_log_status,
             get_g1_mode,
@@ -5398,5 +5454,182 @@ mod submission_receipt_tests {
         reset_sent_receipt();
         assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 0);
         assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Acquire), 0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ⚠️★★★ 研究者向け読み出しが「被験者に漏れない」ことを固定するテスト
+// ---------------------------------------------------------------------------
+//
+// ★ ここで守る不変条件は **UI と backend にまたがる**ので、型では表せない。
+//   → `capabilities.rs` と同じ様式で **ソースの実物**を検査する (ADR-013 §Context-4)。
+
+#[cfg(test)]
+mod debug_readout_tests {
+    use super::*;
+    use std::sync::atomic::Ordering::Relaxed;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TALLY_LOCK: Mutex<()> = Mutex::new(());
+
+    fn acquire() -> MutexGuard<'static, ()> {
+        let g = TALLY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        logger::reset_ime_shadow_tally();
+        g
+    }
+
+    /// ★ 確定は `emitted - abandoned` で導出できる (別カウンタを持たない設計)。
+    #[test]
+    fn tally_counts_confirmed_and_abandoned() {
+        let _g = acquire();
+        logger::tally_ime_shadow(false);
+        logger::tally_ime_shadow(true);
+        logger::tally_ime_shadow(false);
+        let (emitted, abandoned) = logger::ime_shadow_tally();
+        assert_eq!(emitted, 3);
+        assert_eq!(abandoned, 1);
+        assert_eq!(emitted - abandoned, 2, "確定件数は差で出す");
+    }
+
+    /// ★ ローテートで 0 に戻る (⚠️ `log_path` と意味を揃えるため)。
+    #[test]
+    fn the_tally_resets_on_rotation() {
+        let _g = acquire();
+        logger::tally_ime_shadow(true);
+        logger::tally_ime_shadow(false);
+        assert_eq!(logger::ime_shadow_tally(), (2, 1));
+        logger::reset_ime_shadow_tally();
+        assert_eq!(
+            logger::ime_shadow_tally(),
+            (0, 0),
+            "ローテート後も前ファイルの件数が残っている"
+        );
+    }
+
+    /// ⚠️★★★ **並行下でも `abandoned <= emitted` が破れないこと。**
+    ///
+    /// ★ 2026-09-11 の review HIGH への回帰テスト。
+    /// ⚠️ 旧実装は書き手が `ABANDONED` を**先**に増やしており、
+    /// **共有状態そのものが `abandoned = emitted + 1` を通っていた**
+    /// (★ 5000 万回の実測で 1034 万回の違反が報告された)。
+    /// ⚠️ 旧テストは**単一スレッド**で `n <= n + 1` を見るだけだったので**自明に真**で、
+    /// この欠陥を取り逃がした。→ ★ **書き手を別スレッドに立てて読む**。
+    #[test]
+    fn abandoned_never_exceeds_emitted_under_concurrency() {
+        let _g = acquire();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stop_w = stop.clone();
+        let writer = std::thread::spawn(move || {
+            while !stop_w.load(std::sync::atomic::Ordering::Relaxed) {
+                // ⚠️ **すべて放棄**にするのが最悪条件 (2 つのカウンタが同じ速さで進む)。
+                logger::tally_ime_shadow(true);
+            }
+        });
+        let mut violations = 0u64;
+        for _ in 0..2_000_000 {
+            let (emitted, abandoned) = logger::ime_shadow_tally();
+            if abandoned > emitted {
+                violations += 1;
+            }
+        }
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        writer.join().expect("writer スレッドが panic した");
+        assert_eq!(
+            violations, 0,
+            "abandoned > emitted を {violations} 回観測した (順序の不変条件が破れている)"
+        );
+        logger::reset_ime_shadow_tally();
+    }
+
+    /// ⚠️★★★ **backend ゲートが外れていないこと。**
+    /// ★ `get_ime_shadow_debug` は `ensure_debug_enabled()?` を必ず通る。
+    ///
+    /// ⚠️★★★ **2026-09-11 に fail-open を 2 つ塞いだ** (review MEDIUM):
+    /// 1. 旧版は文字列の**存在**しか見ておらず、`// ensure_debug_enabled()?;` と
+    ///    **コメントアウトされても緑**になった → ★ **最初の文**が一致することを見る。
+    /// 2. 旧版は関数末尾が取れないと `unwrap_or(body.len())` で**ファイル末尾まで**走査し、
+    ///    ⚠️ **このテスト自身のアサーション文字列**に当たって自分で自分を通していた
+    ///    → ★ `expect` にして **fail-closed** にする。
+    #[test]
+    fn the_debug_command_is_gated_on_the_backend() {
+        let src = include_str!("lib.rs");
+        let at = src
+            .find("fn get_ime_shadow_debug(")
+            .expect("get_ime_shadow_debug が lib.rs に無い");
+        let body = &src[at..];
+        let end = body
+            .find(
+                "
+}",
+            )
+            .expect("get_ime_shadow_debug の関数末尾が取れない (検査が無効になっている)");
+        // ★ 関数シグネチャの次から、コメント・空行・`use` を飛ばした **最初の文**。
+        //   ⚠️ `contains` だとコメントアウトされたゲートを弾けない。
+        let first_stmt = body[..end]
+            .lines()
+            .skip(1)
+            .map(str::trim)
+            .find(|l| !l.is_empty() && !l.starts_with("//") && !l.starts_with("use "))
+            .expect("get_ime_shadow_debug の本体が空");
+        assert_eq!(
+            first_stmt, "ensure_debug_enabled()?;",
+            "get_ime_shadow_debug の先頭が backend ゲートでない (被験者ビルドで呼べてしまう)"
+        );
+    }
+
+    /// ⚠️★★★ **被験者に見える診断パネルへ漏れていないこと。**
+    ///
+    /// ★ `get_diagnostics` が返す [`DiagnosticInfo`] は `Dashboard.tsx` で
+    /// `debugView` に囲まれておらず、**フックが 20 秒以上有効にならないと被験者にも出る**。
+    /// ⚠️ しかも `Object.entries` で全フィールドを吐くので、足した瞬間に漏れる。
+    ///
+    /// # ⚠️ 既知の限界 (`capabilities.rs` の同種検査と同じ性質)
+    ///
+    /// ★ これは**直書きの識別子**しか見ない。⚠️ `diag.extend(helper())` のように
+    /// **ヘルパ経由**で入れられると素通りする。★ より強くするなら
+    /// `get_diagnostics()` を実際に呼んでキー集合を固定値と照合する振る舞いテストにする。
+    /// ⚠️ また検査対象は **`get_diagnostics` 1 関数だけ**で、
+    /// 被験者に見える他の面 (`get_log_status` / `get_recording_status`) は保護外である。
+    #[test]
+    fn the_participant_visible_diagnostics_do_not_carry_the_tally() {
+        let src = include_str!("lib.rs");
+        let at = src
+            .find("fn get_diagnostics(")
+            .expect("get_diagnostics が lib.rs に無い");
+        let body = &src[at..];
+        let end = body
+            .find(
+                "
+}",
+            )
+            .unwrap_or(body.len());
+        for forbidden in ["IME_SHADOW_EMITTED", "IME_SHADOW_ABANDONED", "abandoned"] {
+            assert!(
+                !body[..end].contains(forbidden),
+                "get_diagnostics に {forbidden} が入った。                 ★ あの診断は debugView で囲まれておらず被験者にも出る (較正のブラインドが壊れる)"
+            );
+        }
+    }
+
+    /// ⚠️★★★ **frontend ゲートが外れていないこと。**
+    /// ★ 読み出しブロックは `debugView &&` の内側に無ければならない。
+    #[test]
+    fn the_readout_block_is_gated_on_the_frontend() {
+        let src = include_str!("../../src/components/Dashboard.tsx");
+        // ⚠️ ★ **呼び出し箇所**を狙う —— ★ 素朴に `find("get_ime_shadow_debug")` にすると
+        //   interface の doc コメント (ファイル冒頭) に当たり、gate の外だと誤判定する
+        //   (2026-09-11 に本テスト自身が踏んだ)。
+        let at = src
+            .find(r#"invoke<ImeShadowDebug>("get_ime_shadow_debug")"#)
+            .expect("Dashboard.tsx が get_ime_shadow_debug を呼んでいない");
+        // ★ 呼び出しの手前に `debugView &&` が在り、かつその間に閉じ括弧 `)}` が無いこと。
+        let head = &src[..at];
+        let gate = head
+            .rfind("{debugView && (")
+            .expect("読み出しの手前に debugView gate が無い");
+        assert!(
+            !head[gate..].contains(")}"),
+            "debugView gate が読み出しブロックの前で閉じている (被験者に出てしまう)"
+        );
     }
 }

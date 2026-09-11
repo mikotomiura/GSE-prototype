@@ -211,7 +211,7 @@ Windows 差分、Google Form ビルダー。
 | フラグ | 種別 | 効果 |
 |---|---|---|
 | `VITE_GSE_DEBUG=1` | ビルド時（Vite） | デバッグボタン表示・week-2 モデル出力表示 |
-| `GSE_DEBUG=1` | 実行時（Rust） | `force_nudge` / `debug_force_probe` 有効化 |
+| `GSE_DEBUG=1` | 実行時（Rust） | `force_nudge` / `debug_force_probe` / `get_ime_shadow_debug` 有効化 |
 
 ```bash
 VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev

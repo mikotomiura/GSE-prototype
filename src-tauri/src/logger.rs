@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -1085,6 +1086,75 @@ pub enum LogStatus {
     Disabled { error: String },
 }
 
+// ---------------------------------------------------------------------------
+// ⚠️★★★ 研究者向け: `ime_shadow` の生存カウンタ (★ NDJSON には 1 行も出さない)
+// ---------------------------------------------------------------------------
+//
+// ★ **なぜここ (logger) に置くのか** (2026-09-11・review HIGH / security MEDIUM):
+//   ⚠️ 初版は `lib.rs::emit_ime_shadow` の `try_send` 直後で数えていた。
+//   → ★ それは「**出そうとした回数**」であって「**書かれた行数**」ではない:
+//     - ⚠️ チャネルが満杯なら行は落ちるのにカウンタだけ進む
+//     - ⚠️★★★ **被験者が「止める」を押した区間の変換も数える** ——
+//       一時停止ゲートは**この writer ループの中**にあり (`is_writable_while_paused`)、
+//       `ime_shadow` は許可 2 種に入らないので**確実に捨てられる**。
+//       ★ それでもカウンタに残ると、**「止めた区間は痕跡を残さない」(ADR-014 判断 3) が破れる**。
+//   → ★ **実際に `writeln!` した直後に数える**のが唯一正しい位置である。
+//
+// ⚠️★★★ **ローテートで 0 に戻す。** ★ 読み出しは `log_path` と件数を**並べて**出すので、
+//   戻さないと「このファイルに N 件」と読めるのに**別のファイルの件数**を出すことになる
+//   (★ 本機能が消そうとした「2 本できて取り違える」問題の再生産)。
+//
+/// ⚠️★★★ **2 つの数を 1 つの `AtomicU64` に詰める**（上位 32bit = 書いた数 / 下位 32bit = 放棄）。
+///
+/// # ★ なぜ 2 つの Atomic ではないのか（2026-09-11・実測で 2 度も破れた）
+///
+/// ⚠️ **1 度目**: 書き手が `abandoned` を先に増やしていたため、
+/// **共有状態そのものが `abandoned = emitted + 1` を通っていた**
+/// （★ レビューが 5000 万回中 **1034 万回**の違反を実測）。
+///
+/// ⚠️ **2 度目**: 増分の順序を直しても、⚠️ **ローテートの `reset` が読み出しの 2 回の
+/// `load` の間に挟まる**と `abandoned` が大きいまま `emitted` が 0 に見える
+/// （★ 並列テストで **44 万回**観測した。**本番でも起きうる**）。
+///
+/// → ★ **順序で守るのをやめる。** 1 語に詰めれば
+/// **読みも書きもリセットも単一の不可分操作**になり、⚠️ **不変条件が構造的に破れなくなる**。
+/// ★ `Relaxed` で足りる（★ 2 変数間の順序という概念자体が消えるため）。
+///
+/// # ⚠️ 桁あふれ
+///
+/// 下位 32bit が溢れると上位へ繰り上がる。★ ただし 1 ファイルに `ime_shadow` が
+/// **42 億行**必要で（★ 1 行 ≒ 60 byte なので **250 GB 超**）、実運用では到達しない。
+/// ⚠️ ローテートで 0 に戻るので累積もしない。
+static IME_SHADOW_TALLY: AtomicU64 = AtomicU64::new(0);
+
+/// 書いた 1 行ぶんの増分（★ 上位 32bit の 1）。
+const IME_SHADOW_EMITTED_STEP: u64 = 1 << 32;
+
+/// 書いた 1 行を数える。⚠️ **`writeln!` した後にだけ呼ぶ。**
+pub fn tally_ime_shadow(abandon: bool) {
+    // ★ 放棄なら下位も同時に +1。⚠️ **1 回の `fetch_add` で両方**動かすのが要点。
+    let step = if abandon {
+        IME_SHADOW_EMITTED_STEP | 1
+    } else {
+        IME_SHADOW_EMITTED_STEP
+    };
+    IME_SHADOW_TALLY.fetch_add(step, Ordering::Relaxed);
+}
+
+/// ⚠️★★★ ローテートで 0 に戻す (★ `log_path` と意味を揃える)。
+pub fn reset_ime_shadow_tally() {
+    IME_SHADOW_TALLY.store(0, Ordering::Relaxed);
+}
+
+/// 読み出し用スナップショット `(emitted, abandoned)`。
+///
+/// ★ **1 回の `load`** で取るので、⚠️ 書き込みやリセットと競合しても
+/// **`abandoned <= emitted` が必ず成り立つ**。
+pub fn ime_shadow_tally() -> (u64, u64) {
+    let packed = IME_SHADOW_TALLY.load(Ordering::Relaxed);
+    (packed >> 32, packed & 0xFFFF_FFFF)
+}
+
 /// **いま書いている先**。G1 のローテート (`LogEntry::Rotate`) で変わりうるため、
 /// 起動時の値をコピーして持ち回るのではなく共有ハンドル越しに読む。
 ///
@@ -1693,6 +1763,10 @@ impl SessionLogger {
                                         abandon
                                     ),
                                 );
+                                // ★ **書いた後**に数える (研究者向け読み出し用)。
+                                //   ⚠️ 一時停止中はここへ到達しない (上の `continue`) ので、
+                                //   **止めた区間はカウンタにも残らない**。
+                                tally_ime_shadow(abandon);
                                 dirty = true;
                             }
                             LogEntry::InterventionDecision {
@@ -1913,6 +1987,13 @@ impl SessionLogger {
                                     write_meta_end(&mut writer, now_ms());
                                 }
                                 let _ = writer.flush();
+
+                                // ⚠️★★★ **生存カウンタを 0 に戻す** (2026-09-11・review HIGH)。
+                                //   ★ 読み出し (`lib.rs::get_ime_shadow_debug`) は `log_path` と
+                                //   件数を**並べて**出すので、戻さないと
+                                //   「このファイルに N 件」と読めるのに**別のファイルの件数**を出す。
+                                //   ⚠️ 本機能が消そうとした「2 本できて取り違える」問題の再生産になる。
+                                reset_ime_shadow_tally();
 
                                 // ★ 旧ファイルはここで drop される (writer の差し替えで閉じる)。
                                 let (boxed, actual, new_status) = open_log_target(&new_path);

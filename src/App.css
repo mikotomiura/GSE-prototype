@@ -305,6 +305,38 @@ body {
   border-color: rgba(248, 113, 113, 0.8);
 }
 
+/* デバッグ: ime_shadow の生存読み出し (研究者のみ・debugView gate)。
+   ⚠️ 被験者ビルドでは描画されない。等幅にして NDJSON のパスを折り返して読めるようにする。 */
+.debug-ime-shadow {
+  width: 100%;
+  max-width: 400px;
+}
+
+.debug-ime-shadow-body,
+.debug-ime-shadow-error {
+  margin: 0.4rem 0 0;
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.debug-ime-shadow-body {
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px dashed rgba(248, 113, 113, 0.35);
+  opacity: 0.9;
+}
+
+.debug-ime-shadow-error {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.6);
+  color: var(--color-stuck);
+}
+
 /* Dashboard 下部ナビ: 戻る (スタート画面へ) と セッション終了 (アプリ終了) を横並びに。 */
 .dashboard-nav {
   display: flex;
