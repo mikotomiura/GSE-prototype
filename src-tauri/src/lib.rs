@@ -3132,17 +3132,26 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 2b: IME Shadow Features (Windows のみ)
+// Phase 2b: IME Shadow Features (★ 両 OS)
 // ---------------------------------------------------------------------------
 
 /// IME Shadow の Atomic データを読み取り、LogEntry::ImeShadow を送出する。
-/// IME Monitor スレッドの active→false 遷移時に呼ばれる。
+///
+/// ⚠️★★★ **2026-09-11 (issue 008): `#[cfg(target_os = "windows")]` を外した。**
+/// ★ macOS 側も `input/ime_compose.rs::drive` が同じ Atomic を駆動する。
+/// ⚠️ **駆動源は OS で違う** (Windows = 窓イベント / macOS = 打鍵の状態機械)。
+/// 由来の非対称は `capabilities` (ADR-013) と `meta` 行の OS で判別する。
 ///
 /// 2 つの経路で emit が発生する:
-/// 1. 正常: WinEvent IME_HIDE が到着し IME_SHADOW_READY=true → dwell は事前計算済み
+/// 1. 正常: `IME_SHADOW_READY=true` → dwell は事前計算済み
+///    (Windows = WinEvent IME_HIDE / cloak resolver、macOS = 終端キー)
 /// 2. Stale: IME_HIDE が取りこぼされ safety valve のタイムアウト
 ///    (`input::ime_cloak::MONITOR_SAFETY_VALVE_MS`) → START_MS > 0 なら独自に dwell 計算
-#[cfg(target_os = "windows")]
+///
+/// ⚠️★★★ **経路 2 は Windows 限定である** —— ★ 呼び出し側の `#[cfg]` がそれを固定する。
+/// macOS の `IME_ACTIVE` は「候補表示中に別の字を打った」「Backspace」でも false に落ちるが、
+/// それは**セッションの途中**なので、そこで経路 2 に入ると
+/// ⚠️ **途中の偽の行を出したうえ `START_MS` を 0 にしてセッションを壊す**。
 fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     use std::sync::atomic::Ordering::Relaxed;
     // ⚠️★ G1: この経路は IME Monitor スレッドから呼ばれ、**`session_active` を見ていない**
@@ -3151,6 +3160,14 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     // ★ G1 モードのときだけ止める (通常運用の挙動は変えない)。
     // `SESSION_START_MS` はブロック終了時に 0 に戻されるので、これが「ブロック中か」を表す。
     if g1_mode().is_some() && SESSION_START_MS.load(Ordering::Acquire) == 0 {
+        // ⚠️★★★ **捨てることを明示する** (2026-09-11・review MEDIUM)。
+        //   ★ 旧実装はここで素通しており、`IME_SHADOW_READY` が立ったまま残った。
+        //   ⚠️ すると**ブロック外で閉じた変換**が、次ブロック開始後の最初のポーリングで
+        //   **「いまの時刻」で 1 行出る** —— G1 は `t` でブロックを切り分けるので、
+        //   ★ 前ブロックの変換が次ブロックの記録に混ざる。
+        //   ⚠️ `START_MS` も落とす (残すと stale 経路が同じ変換をもう一度出す)。
+        input::hook::IME_SHADOW_READY.store(false, Ordering::Release);
+        input::hook::IME_COMPOSITION_START_MS.store(0, Relaxed);
         return;
     }
     if input::hook::IME_SHADOW_READY.swap(false, Ordering::AcqRel) {
@@ -3166,17 +3183,27 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
         });
     } else {
         // Stale 経路: IME_HIDE が来なかった場合のフォールバック
-        let start = input::hook::IME_COMPOSITION_START_MS.swap(0, Relaxed);
-        if start > 0 {
-            let dwell_ms = timestamp.saturating_sub(start);
-            let candidate_nav_count = input::hook::IME_CANDIDATE_NAV_COUNT.swap(0, Relaxed);
-            let abandon = input::hook::IME_SHADOW_ABANDON.swap(false, Relaxed);
-            let _ = log_tx.try_send(LogEntry::ImeShadow {
-                timestamp,
-                dwell_ms,
-                candidate_nav_count,
-                abandon,
-            });
+        //
+        // ⚠️★★★ **Windows 限定である。** ★ 2026-09-11 まで、この不変条件は
+        //   「呼び出し側の `#[cfg]` が固定する」という**コメントだけ**で守られていた。
+        //   ⚠️ しかし本体は両 OS でコンパイルされ、READY ポーリング経路は両 OS から呼ぶ。
+        //   → 将来 macOS の呼び出し点が 1 つ増えた瞬間に、
+        //   **セッション途中で `START_MS` を 0 にする偽の行**が macOS で出る。
+        //   ★ 不変条件をコメントからコードへ移す (review MEDIUM)。
+        #[cfg(target_os = "windows")]
+        {
+            let start = input::hook::IME_COMPOSITION_START_MS.swap(0, Relaxed);
+            if start > 0 {
+                let dwell_ms = timestamp.saturating_sub(start);
+                let candidate_nav_count = input::hook::IME_CANDIDATE_NAV_COUNT.swap(0, Relaxed);
+                let abandon = input::hook::IME_SHADOW_ABANDON.swap(false, Relaxed);
+                let _ = log_tx.try_send(LogEntry::ImeShadow {
+                    timestamp,
+                    dwell_ms,
+                    candidate_nav_count,
+                    abandon,
+                });
+            }
         }
     }
 }
@@ -3550,8 +3577,19 @@ pub fn run() {
             // リセットするため、Monitor が active→false 遷移を観測できないケースがある。
             // WinEvent IME_HIDE は正しく READY を set するので、遷移に依存せず
             // READY フラグを毎ポーリングでチェックする。
-            #[cfg(target_os = "windows")]
-            if !active && input::hook::IME_SHADOW_READY.load(Ordering::Acquire) {
+            //
+            // ⚠️★★★ **2026-09-11 (issue 008): ここだけ `#[cfg]` を外した。**
+            //   ★ macOS で `ime_shadow` が出るのは**この経路だけ**である
+            //     (上の 2 つ = stale valve / active→false 遷移 は Windows 限定のまま)。
+            //   ⚠️ 理由は `emit_ime_shadow` の doc —— macOS の `IME_ACTIVE` は
+            //     セッション途中でも false に落ちるので、遷移で emit すると記録が壊れる。
+            //   ★ この経路は `READY` が立っているときしか `emit_ime_shadow` を呼ばないので、
+            //     Windows 限定の stale 経路 (`START_MS > 0` 分岐) には入らない。
+            if input::ime_compose::should_drain_ready(
+                input::hook::IME_SHADOW_READY.load(Ordering::Acquire),
+                active,
+                cfg!(target_os = "windows"),
+            ) {
                 let ts = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()

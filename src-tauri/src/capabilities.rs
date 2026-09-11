@@ -28,9 +28,13 @@
 //! ## ⚠️★★★ 導出元は「送出元があるか」であって writer ではない (D2)
 //!
 //! `LogEntry` の variant / `logger.rs` が書ける行種から導出すると、
-//! **macOS で `ime_shadow` を過大申告する** —— variant は両 OS でコンパイルされるが、
-//! 送出元は `lib.rs` の `#[cfg(target_os = "windows")] fn emit_ime_shadow` **だけ**である
-//! (macOS の `input/ime_macos.rs` は `ImeState` しか送らない)。
+//! **送出元を持たない OS で過大申告する** —— variant は両 OS でコンパイルされるからである。
+//!
+//! ⚠️★★★ **2026-09-11 (issue 008) に例が変わった。** 長らくこの節の実例は
+//! 「`ime_shadow` の送出元は Windows 限定」だったが、★ macOS 側にも送出元ができた
+//! (`input/ime_compose.rs::drive` → `lib.rs::emit_ime_shadow`) ので **もう実例ではない**。
+//! ★ 現在の実例は `secure_input` である —— macOS にしか送出元が無い
+//! (`observe_windows.rs::SECURE_INPUT_AVAILABLE = false`)。
 //!
 //! ⚠️ **過大申告は「計器が無い」を「信号が無い」に化けさせる** ——
 //! 本 ADR が防ごうとしている取り違えの、ちょうど裏返しである。
@@ -123,6 +127,9 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// ⚠️★★★ **2026-08-22 追加: `ime_shadow` もここに入る**（★ 実測で判明）。
 ///
 /// ★ `ime_shadow` は `IME_ACTIVE` が `true` になったときにだけ出る。
+/// ⚠️★★★ **以下は Windows 経路の記述である** (2026-09-11 に限定を明記)。
+/// ★ macOS は `IME_ACTIVE` ではなく**打鍵の状態機械**が行を出すので、
+/// **Space を一度も押さなくても行が出る** (`input/ime_compose.rs` のモジュール doc)。
 /// ⚠️★ **2026-08-23 訂正**: 旧文は「その `true` を書くのは
 /// **`hook_windows.rs` の WinEvent コールバック 1 か所だけ**である」と書いていたが、
 /// ★ 現在は **2 か所**ある —— 文書化された `EVENT_OBJECT_IME_*` 経路と、
@@ -179,7 +186,14 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// |---|---|
 /// | 1 | ★ **1 台・1 アプリでしか確認していない。** 被験者環境で再現するかは未検証 |
 /// | 2 | ⚠️ cloak が飛ぶのは**候補ウィンドウが出るとき**であって、ローマ字入力中ではない —— ★ 「変換しない打ち方」の被験者では 0 行になりうる |
-/// | 3 | ⚠️ macOS には送出元が構造的に無い (`emit_ime_shadow` が Windows 限定) |
+/// | 3 | ⚠️~~macOS には送出元が構造的に無い~~ → ★ **2026-09-11 (issue 008) に解消**。ただし `dwell_ms` は**打鍵推論**である |
+///
+/// ⚠️★★★ **0 行の意味は OS で違う** (2026-09-11・security-checker MEDIUM):
+///
+/// | OS | 0 行が意味しうること |
+/// |---|---|
+/// | Windows | ★ 候補ウィンドウが出る変換をしなかった (⚠️ 上の 2 —— 「変換しない打ち方」) / 計器が上がらない環境だった (上の 1) |
+/// | macOS | ⚠️ **`IME_OPEN` が一度も立たなかった** (日本語入力をしなかった / ANSI 環境で TIS ポーリングが取りこぼした)。★ **「変換しない打ち方」では 0 行にならない** —— かな入力を確定するたびに 1 行出るため |
 ///
 /// → ★ **0 行は依然「判定不能」であって「信号が無かった」ではない。**
 /// ⚠️ 複数台で再現を確認するまで `config_gated` のまま据え置く。
@@ -194,8 +208,27 @@ pub fn config_gated() -> Vec<&'static str> {
         "intervention_decision",
         "intervention_response",
     ];
-    // ⚠️ ★ 送出元 (`emit_ime_shadow`) が Windows 限定なので、宣言も Windows 限定にする (D2)。
-    #[cfg(target_os = "windows")]
+    // ⚠️★★★ **2026-09-11 (issue 008): `#[cfg(target_os = "windows")]` を外した。**
+    //   ★ macOS 側に送出元ができた (`input/ime_compose.rs::drive` → `lib.rs::emit_ime_shadow`)。
+    //   ⚠️ **`config_gated` のままである** —— 上の表 3 項目のうち
+    //   「3 = macOS には送出元が構造的に無い」は解消したが、1 (1 台でしか確認していない) と
+    //   2 (変換しない打ち方では 0 行) は残っている。★ 0 行は依然「判定不能」。
+    //
+    // ⚠️★★★ **由来は OS で違う** (★ 解析時に必ず知っている必要がある):
+    //   Windows = 窓イベント (`EVENT_OBJECT_IME_*` / DWM cloak) から `dwell_ms` を取る。
+    //   macOS   = **打鍵の状態機械**から取る (`ime_compose`)。`nav` / `abandon` は両 OS とも打鍵。
+    //
+    // ⚠️★★★ **由来だけでなく「母数」も違う** (2026-09-11・security-checker MEDIUM):
+    //   | | Windows | macOS |
+    //   |---|---|---|
+    //   | 1 行になる変換 | 候補ウィンドウが出たもの | ★ かな入力の一区切り**すべて** (Space 不要) |
+    //   | `nav` を数える区間 | `IME_ACTIVE` 中 | ★ 変換セッション全体 |
+    //   | `abandon` に入るもの | 候補表示中の ESC | ★ **候補を出さずに捨てた ESC も入る** |
+    //   → ⚠️ **`abandon` 率を OS 間で直接比べてはならない。**
+    //   → ★ 行型は両 OS 共通のまま、由来は **この宣言と `meta` 行の OS** で判別する
+    //     (2026-09-11 研究者判断。⚠️ 行に由来フィールドは足さない)。
+    //   ⚠️ `survey-input-channels.md §3.2` 逐語「**同じ `IME_ACTIVE` フィールドでも
+    //   Win=観測値 / mac=推定値であり、両 OS のデータを混ぜて学習・評価してはならない。**」
     v.push("ime_shadow");
 
     // ⚠️★★★ **O1 (R3-a) の非打鍵チャネルは `config_gated` に置く。**
@@ -407,11 +440,13 @@ mod tests {
         //   `EnableSecureEventInput` 相当の API が存在しない・`observe_windows.rs` は常に `None`)。
         #[cfg(target_os = "windows")]
         let emitterless: &[&str] = &["secure_input"];
-        // ⚠️ macOS には `emit_ime_shadow` (Windows 限定) が無い。`ime_macos.rs` は `ImeState` だけを送る。
-        //   ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
+        // ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
         //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
+        // ⚠️★★★ 2026-09-11 (issue 008): `ime_shadow` も外した ——
+        //   macOS 側の送出元ができた (`ime_compose::drive` → `lib.rs::emit_ime_shadow`)。
+        //   → ★ 非 Windows で「送出元が無い行種」は**無くなった**。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &["ime_shadow"];
+        let emitterless: &[&str] = &[];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
@@ -421,28 +456,26 @@ mod tests {
         assert_eq!(lhs, known, "宣言集合が KNOWN_LINE_TYPES を割り切っていない");
     }
 
-    /// ★ ADR-013 D3-2 (OS 対): `ime_shadow` は **Windows でのみ**宣言される。
+    /// ★ ADR-013 D3-2 (OS 対): `ime_shadow` は **両 OS で**宣言される。
+    ///
+    /// ⚠️★★★ **2026-09-11 (issue 008) に反転した。** 旧版は
+    /// 「`ime_shadow` は **Windows でのみ**宣言される」を固定し、`lib.rs` の
+    /// `fn emit_ime_shadow` の直前に `#[cfg(target_os = "windows")]` が**在ること**を
+    /// ソース文字列で確かめていた。★ いまは **無いこと**を確かめる。
     ///
     /// ⚠️ 根拠は `docs/agent-shared.md` 逐語「**OS ごとに規則が違うロジックは両 OS に対のテストを置く**」
     /// (★ 2026-08-10 に macOS 前提のテストが Windows CI で赤になった実績がある)。
     ///
-    /// ★ 併せて **送出元の `#[cfg]` そのもの**をソースで確かめる ——
+    /// ★ 併せて **送出元が両 OS に在ること**をソースの実物で確かめる ——
     /// 宣言と実装が別々に動いて食い違う経路を塞ぐ (ADR-013 §Context-4)。
     #[test]
-    fn ime_shadow_is_declared_only_where_its_emitter_is_compiled() {
-        // ⚠️★★★ 2026-08-22: 宣言先を `unconditional` から `config_gated` へ移した
-        //   (実機計測で「環境によって丸ごと出ない」ことが判明したため)。
-        //   ★ このテストが見るのは **OS との整合**であって群ではないので、
-        //   `declared()`（3 群の合併）で判定する。
-        let declared_here = declared().contains("ime_shadow");
-        assert_eq!(
-            declared_here,
-            cfg!(target_os = "windows"),
-            "ime_shadow の宣言が OS と食い違っている (ADR-013 D2/D3-2)"
+    fn ime_shadow_is_declared_on_both_oses_because_both_have_an_emitter() {
+        assert!(
+            declared().contains("ime_shadow"),
+            "ime_shadow が宣言されていない (両 OS に送出元がある・ADR-013 D2/D3-2)"
         );
 
-        // ★ 送出元が本当に Windows 限定で書かれていることを、ソースの実物で確かめる。
-        // ⚠️ 改行コードに依存しないよう、直前の数十文字を見る形にしてある。
+        // ★ 送出元が **もう Windows 限定ではない**ことを、ソースの実物で確かめる。
         let lib_src = include_str!("lib.rs");
         let at = lib_src
             .find("fn emit_ime_shadow(")
@@ -459,9 +492,21 @@ mod tests {
             .unwrap_or(0);
         let preceding = &head[start..];
         assert!(
-            preceding.contains(r#"#[cfg(target_os = "windows")]"#),
-            "emit_ime_shadow の直前から #[cfg(target_os = \"windows\")] が消えた。\
-             ★ capabilities の宣言も見直すこと (ADR-013 D2)。直前の文字列: {preceding:?}"
+            !preceding.contains(r#"#[cfg(target_os = "windows")]"#),
+            "emit_ime_shadow が再び Windows 限定になった。             ★ capabilities の宣言も見直すこと (ADR-013 D2)。直前の文字列: {preceding:?}"
+        );
+
+        // ★ macOS 側の送出元 (Atomic を駆動する層) が実在することも確かめる。
+        //   ⚠️ `include_str!` は `#[cfg]` と無関係に読めるので、**Windows の CI でも走る**。
+        let compose_src = include_str!("input/ime_compose.rs");
+        assert!(
+            compose_src.contains("IME_SHADOW_READY.store(true, Ordering::Release)"),
+            "ime_compose に READY を立てる送出元が無い (macOS の ime_shadow が 0 行になる)。             ⚠️ 書式変更 (rustfmt / 変数名) で落ちた場合は、送出元の実在を確かめたうえで             この assert の文字列を直すこと (ADR-013 §Context-4 の様式)"
+        );
+        let hook_mac_src = include_str!("input/hook_macos.rs");
+        assert!(
+            hook_mac_src.contains("ime_compose::drive("),
+            "hook_macos が ime_compose::drive を呼んでいない (状態機械が回らない)"
         );
     }
 
@@ -518,8 +563,10 @@ mod tests {
     ///
     /// ★ `unconditional` に置くと「**測れて、無かった**」という**偽の結論**を機械的に出す。
     /// ⚠️ ADR-013 が防ごうとした**過大申告**そのものである。
+    ///
+    /// ⚠️★★★ **2026-09-11 (issue 008): `#[cfg(target_os = "windows")]` を外した。**
+    /// ★ macOS にも送出元ができたので、この不変条件は**両 OS で守る**。
     #[test]
-    #[cfg(target_os = "windows")]
     fn ime_shadow_is_config_gated_not_unconditional() {
         let u: BTreeSet<&str> = unconditional().into_iter().collect();
         assert!(
@@ -532,13 +579,22 @@ mod tests {
         );
     }
 
-    /// ⚠️ macOS には `emit_ime_shadow` が無いので、**どの群にも宣言しない**。
+    /// ⚠️★★★ **2026-09-11 (issue 008) に意味が反転したテスト。**
+    ///
+    /// ★ 旧版は `ime_shadow_is_not_declared_on_non_windows` ——
+    /// 「macOS には `emit_ime_shadow` が無いので、どの群にも宣言しない」を固定していた。
+    /// ⚠️ **いまは macOS 側にも送出元がある** (`ime_compose::drive` → `emit_ime_shadow`)ので、
+    /// ★ 逆向きに固定する: **非 Windows でも宣言されていなければならない**。
+    ///
+    /// ⚠️ 消さずに反転させるのは、**過小申告**も過大申告と同じ事故だからである ——
+    /// 宣言が落ちると、解析側は macOS の `ime_shadow` を「測っていない」と読み、
+    /// ★ **実在する行を捨てる**。
     #[test]
     #[cfg(not(target_os = "windows"))]
-    fn ime_shadow_is_not_declared_on_non_windows() {
+    fn ime_shadow_is_declared_on_non_windows_too() {
         assert!(
-            !declared().contains("ime_shadow"),
-            "macOS に送出元が無い ime_shadow を宣言してはならない (ADR-013 D2)"
+            declared().contains("ime_shadow"),
+            "macOS に送出元があるのに ime_shadow が宣言されていない (過小申告・ADR-013 D2)"
         );
     }
 

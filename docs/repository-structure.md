@@ -62,9 +62,10 @@ GSE-prototype/
 │   │   │   ├── mod.rs            #       モジュールエクスポート + platform dispatch
 │   │   │   ├── hook.rs           #       共有アトミック変数 + #[cfg] 振り分け
 │   │   │   ├── hook_windows.rs   #       Windows: WH_KEYBOARD_LL + WinEvent フック
-│   │   │   ├── hook_macos.rs     #       macOS: CGEventTap + CFRunLoop + IME 状態機械 + TCC
+│   │   │   ├── hook_macos.rs     #       macOS: CGEventTap + CFRunLoop + TCC (⚠️ IME 状態機械は ime_compose.rs へ)
 │   │   │   ├── ime.rs            #       IME platform dispatch (#[cfg] + #[path])
 │   │   │   ├── ime_cloak.rs      #       cloak/uncloak の畳み込み (★ OS 非依存・両 OS でテスト)
+│   │   │   ├── ime_compose.rs    #       変換セッションの畳み込み (★ OS 非依存・両 OS でテスト)
 │   │   │   ├── ime_windows.rs    #       Windows: ImmGet* + WinEvent + UIAutomation + cloak resolver
 │   │   │   ├── ime_macos.rs      #       macOS: TIS ポーリング + GCD dispatch
 │   │   │   ├── observe.rs       #       非打鍵チャネルの OS 非依存部
@@ -172,8 +173,11 @@ GSE-prototype/
   `KNOWN_LINE_TYPES` (全行種の候補集合) / `unconditional()` / `THRESHOLD_GATED` / `app_version()`
 - **置くべきでないもの**: ⚠️ OS API 呼び出し。★ `#[cfg]` を**反映**はするが**呼ばない**
 - ⚠️★★★ **導出元は「送出元があるか」であって writer ではない**。
-  `LogEntry` の variant や `logger.rs` が書ける行種から導出すると
-  **macOS で `ime_shadow` を過大申告する** (送出元は Windows 限定)
+  `LogEntry` の variant や `logger.rs` が書ける行種から導出すると、
+  **送出元を持たない OS で過大申告する** (variant は両 OS でコンパイルされるため)。
+  ★ 現在の実例は `secure_input` (**macOS にしか送出元が無い**)。
+  ⚠️ 2026-09-11 (issue 008) まで実例は `ime_shadow` だったが、
+  **macOS 側に送出元を実装したので両 OS で宣言するようになった**
 - ★ 腐りは**テストが止める**: 網羅 (`logger.rs` の `"type":"<x>"` 走査) / OS 対 /
   宣言集合が `KNOWN_LINE_TYPES` を過不足なく割ること
 - 詳細: `docs/adr/ADR-013-collection-self-description.md` /
@@ -271,9 +275,10 @@ lib.rs (Tauri commands, thread orchestration)
     │
     ├──► input::hook    (OS キャプチャ)
     │    ├── hook_windows.rs  (Win: WH_KEYBOARD_LL)
-    │    └── hook_macos.rs    (mac: CGEventTap + IME 状態機械)
+    │    └── hook_macos.rs    (mac: CGEventTap。⚠️ IME 状態機械は ime_compose.rs)
     ├──► input::ime     (IME 検出)
     │    ├── ime_cloak.rs     (★ OS 非依存: cloak の畳み込み)
+    │    ├── ime_compose.rs   (★ OS 非依存: 確定/放棄の判断 + Atomic ドライバ)
     │    ├── ime_windows.rs   (Win: WinEvent + ImmGet* + cloak resolver)
     │    └── ime_macos.rs     (mac: TIS + GCD)
     ├──► analysis::features (特徴量抽出)

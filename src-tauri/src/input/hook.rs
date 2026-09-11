@@ -56,24 +56,49 @@ pub fn last_key_ms() -> u64 {
 }
 
 // ---------------------------------------------------------------------------
-// Windows-specific atomics — IME Shadow Features (Phase 2b)
+// IME Shadow Features (Phase 2b) — ★ 両 OS
 // ---------------------------------------------------------------------------
+//
+// ⚠️★★★ **2026-09-11: `#[cfg(target_os = "windows")]` を外した** (issue 008)。
+//   ★ macOS 側も同じ Atomic を駆動して `ime_shadow` を送出する。
+//
+// ⚠️ **駆動源は OS で違う** (★ 解析時にこの差を知っている必要がある):
+//
+// | | Windows | macOS |
+// |---|---|---|
+// | セッション境界 | WinEvent `EVENT_OBJECT_IME_SHOW/HIDE` または DWM cloak/uncloak | ★ **打鍵**の状態機械 (`ime_compose::step`) |
+// | `nav` / `abandon` | 打鍵 (`classify_ime_nav_key`) | 打鍵 (`ime_compose::step`) —— **同型** |
+//
+// → ★ 由来の非対称は `capabilities` (ADR-013) と `meta` 行の OS で判別する
+//   (2026-09-11 研究者判断: 行型は両 OS 共通のまま・由来フィールドは足さない)。
 
-/// IME 変換ウィンドウ表示時刻 (epoch ms)。WinEvent IME_SHOW で store。
-#[cfg(target_os = "windows")]
+/// IME 変換セッションの開始時刻 (epoch ms)。⚠️ `0` = セッション中でない。
+///
+/// - Windows: WinEvent `IME_SHOW` で store。
+/// - macOS: ★ 最初の英数字キーで store (`ime_compose::ComposeState::session_start_ms`)。
 pub static IME_COMPOSITION_START_MS: AtomicU64 = AtomicU64::new(0);
 
-/// 計算済み IME 変換滞在時間 (ms)。WinEvent IME_HIDE で store。
-#[cfg(target_os = "windows")]
+/// 計算済み IME 変換滞在時間 (ms)。
+///
+/// - Windows: WinEvent `IME_HIDE` で store。
+/// - macOS: ★ 終端キー (Enter / Escape / その他) で store。
 pub static IME_SHADOW_DWELL_MS: AtomicU64 = AtomicU64::new(0);
 
-/// IME 変換中の候補ナビゲーション回数 (矢印キー)。hook_callback で fetch_add。
-#[cfg(target_os = "windows")]
+/// IME 変換中の候補ナビゲーション回数 (矢印キー)。★ 両 OS ともフックコールバックで更新。
 pub static IME_CANDIDATE_NAV_COUNT: AtomicU32 = AtomicU32::new(0);
 
-/// IME 変換中に ESC で放棄したかどうか。hook_callback で store(true)。
-#[cfg(target_os = "windows")]
+/// ⚠️★★★ IME 変換を **ESC で放棄**したかどうか。★ 両 OS ともフックコールバックで更新。
+///
+/// ★ `false` = 確定 (Enter / その他キーによる自動確定 / IME モード離脱)。
 pub static IME_SHADOW_ABANDON: AtomicBool = AtomicBool::new(false);
+
+// ---------------------------------------------------------------------------
+// Windows-specific atomics — ⚠️ 2 つの WinEvent 経路の排他制御
+// ---------------------------------------------------------------------------
+//
+// ⚠️ ここから下 (`IME_SHADOW_READY` の手前まで) は **Windows 限定**である。
+//   ★ macOS には「文書化された経路」と「cloak 経路」の二重化そのものが無い
+//     (打鍵の状態機械 1 本だけ)。
 
 /// ⚠️★★★ **文書化された IME WinEvent (0x8027-0x8029) が最後に届いた時刻 (epoch ms)。**
 ///
@@ -132,7 +157,11 @@ pub fn legacy_path_is_driving(last_legacy_ms: u64, now_ms: u64) -> bool {
     now_ms.saturating_sub(last_legacy_ms) <= LEGACY_PATH_RECENCY_MS
 }
 
-/// IME Shadow データの emit 準備完了フラグ。WinEvent IME_HIDE で store(true, Release)。
+/// IME Shadow データの emit 準備完了フラグ。★ **両 OS** (2026-09-11・issue 008)。
+///
+/// - Windows: WinEvent `IME_HIDE` (または cloak resolver) で store(true, Release)。
+/// - macOS: ★ 終端キーの検出時に `input/ime_compose.rs::drive` が store(true, Release)。
+///
 /// IME Monitor スレッドが swap(false, AcqRel) で読み取り、LogEntry::ImeShadow を送出。
 ///
 /// **Ordering 設計**: READY の Release store は、先行する DWELL_MS / NAV_COUNT /
@@ -141,17 +170,48 @@ pub fn legacy_path_is_driving(last_legacy_ms: u64, now_ms: u64) -> bool {
 /// READY=true が見えた時点で他の shadow atomics も最新値が保証される。
 /// 100ms ポーリング間隔のため、高速な連続 IME セッションではデータロスの
 /// 可能性があるが、Phase 2b は shadow-only データ収集段階のため許容する。
-#[cfg(target_os = "windows")]
 pub static IME_SHADOW_READY: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
-// macOS-specific atomics
+// macOS が駆動する atomics
 // ---------------------------------------------------------------------------
+//
+// ⚠️★★★ **「macOS でしかコンパイルされない」ではなく「macOS でしか書かれない」。**
+//   ★ `IME_COMPOSING` は 2026-09-11 に `#[cfg]` を外した (下の doc を参照)。
 
-/// IME inline composition state (macOS only): true when the user is actively typing
+/// IME inline composition state: true when the user is actively typing
 /// romaji that the IME is converting to kana (marked/underlined text).
-#[cfg(target_os = "macos")]
+///
+/// ⚠️★★★ **2026-09-11 (issue 008): `#[cfg(target_os = "macos")]` を外した。**
+///
+/// ★ production で**書くのは macOS だけ**である (`ime_compose::drive`)。
+/// ⚠️ それでも両 OS でコンパイルするのは、**Windows の CI でドライバを検証するため**である。
+/// ★ このフラグを macOS 限定にしておくと `ime_compose::drive` も macOS 限定になり、
+/// ⚠️ 「確定 / 放棄を Atomic へ書き戻す層」が **どちらの OS の CI でも 1 行も走らない**。
+/// ★ 実機でしか確かめられないのは「CGEventTap がそのキーを届けるか」だけにしておく。
 pub static IME_COMPOSING: AtomicBool = AtomicBool::new(false);
+
+/// ⚠️★★★ **変換セッション「進行中」の矢印キー押下回数** (macOS が駆動)。
+///
+/// ★ [`IME_CANDIDATE_NAV_COUNT`] と**別に持つ理由**がこの doc の全部である。
+///
+/// ⚠️ 初版は進行中のカウントも `IME_CANDIDATE_NAV_COUNT` に直接書いていた。
+/// → ★ するとセッション開始時のリセットが、**IME Monitor がまだ回収していない
+/// 前セッションの要約を上書きする**。⚠️ しかも `IME_SHADOW_DWELL_MS` は据え置かれるので、
+/// **「前セッションの dwell」＋「0 の nav」＋「false の abandon」という
+/// *存在しない変換* が 1 行出る** —— ★ 行が消えるより悪い (値が偽装される)。
+///
+/// ⚠️ 具体的な再現: ESC で放棄 → 100ms 以内に次の変換を打ち始める
+/// → **`abandon` が `true` から `false` に化ける**。
+/// ★ `ime_shadow` は「放棄したか」を残すための行なので、これは目的そのものを壊す。
+///
+/// → ★ **進行中の値と、回収待ちの要約を、別の置き場に分ける。**
+/// ⚠️ セッション開始でリセットするのは**こちらだけ**である。
+///
+/// ★ 残る競合は「100ms 以内に **2 つの変換が終わる**」場合で、そのときは
+/// 後の要約が前を丸ごと置き換える (**1 行の欠落**。値の偽装は起きない)。
+/// ⚠️ これは Windows 側と同じ既知の挙動である ([`IME_SHADOW_READY`] の doc)。
+pub static IME_COMPOSE_NAV: AtomicU32 = AtomicU32::new(0);
 
 /// Set to true once any JIS IME key has been observed (macOS only).
 /// Disables TIS polling to avoid per-app input source interference.
