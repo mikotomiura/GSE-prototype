@@ -84,7 +84,36 @@ VITE_GSE_DEBUG=1 GSE_DEBUG=1 npm run tauri dev
    連続で打つと**行が 1 本落ちる**のは既知の挙動）
 6. アプリを終了する（★ `session_end` を書かせる）
 
-### 3.5 NDJSON を見る
+### 3.5 ★ まず画面で見る（⚠️ NDJSON を開く前に）
+
+★ **研究者ビルド（`VITE_GSE_DEBUG=1 GSE_DEBUG=1`）なら Dashboard に読み出しボタンがある。**
+
+```
+🔍 IME shadow の生存を確認 (デバッグ)
+```
+
+押すと以下が出る:
+
+```
+log_path : /Users/<user>/Documents/GSE-sessions/gse_20260911_123456.ndjson
+emitted  : 6  (このファイルの行数)
+confirmed: 3  (abandon=false)
+abandoned: 3  (abandon=true / ESC)
+✅ 確定と放棄の両方が出ている
+```
+
+→ ★ **これで AC 6 の合否はその場で付く。**
+⚠️ `log_path` が出るので「**どのファイルを見ればよいか**」で迷わない
+（★ 「開始する」でローテートする問題がここで消える）。
+
+⚠️ **件数は `log_path` のファイルに書かれた行数**である（ローテートで 0 に戻る）。
+⚠️ **被験者ビルド（フラグ無し）にはボタンが無い。** backend も `Err` を返す。
+
+⚠️★★★ **ただし jq は不要にならない。** 次の 2 つは画面では分からない:
+- `dwell_ms` の妥当性（★ 変換にかけた実時間として妥当か）
+- **行数 vs 操作回数**（⚠️ 合算・打ち切りの検出 → 起票 7）
+
+### 3.6 NDJSON を見る
 
 ```bash
 # 保存先: GSE_DATASET があれば $GSE_DATASET/raw/<participant_id>/
@@ -106,7 +135,7 @@ jq -r 'select(.type=="ime_shadow")|.abandon' "$F" | sort | uniq -c
 ⚠️ 上の jq は**リポジトリに記録が無い**（本メモのために組んだもの）。
 ★ 行の形は `{"type":"ime_shadow","t":…,"dwell_ms":…,"nav":…,"abandon":…}`。
 
-### 3.6 ★ 合否
+### 3.7 ★ 合否
 
 | | 期待 |
 |---|---|

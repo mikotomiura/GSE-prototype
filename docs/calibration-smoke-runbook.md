@@ -41,7 +41,7 @@ npm run tauri dev      # もしくは cargo tauri build で配布ビルド
 | フラグ | 種別 | 効果 |
 |---|---|---|
 | `VITE_GSE_DEBUG=1` | Vite **ビルド時** env (フロント JS に焼き込み) | デバッグボタン描画・第2週モデル出力表示 |
-| `GSE_DEBUG=1` | **実行時** env (Rust backend が `ensure_debug_enabled` で読む) | `force_wall`/`force_nudge`/`debug_force_probe` を許可。未設定だと DevTools から直接 invoke しても Err で拒否 |
+| `GSE_DEBUG=1` | **実行時** env (Rust backend が `ensure_debug_enabled` で読む) | `force_wall`/`force_nudge`/`debug_force_probe`/`get_ime_shadow_debug` を許可。未設定だと DevTools から直接 invoke しても Err で拒否 |
 
 - **被験者配布 (本番)**: CI 本番バイナリ (.app/.dmg/nsis) を**フラグなしでそのまま起動**。盲検は両 env 既定 OFF で守られる。
 - **研究者デバッグ (dev)**: 同一コマンドで両方渡す (vite/cargo 両プロセスが継承):

@@ -629,7 +629,12 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
                 .then((d) => setImeShadowDebug(d))
                 .catch((e: unknown) => {
                   setImeShadowDebug(null);
-                  setImeShadowDebugError(String(e));
+                  // backend は Result<_, String> なので通常は文字列。
+                  // Tauri 側のシリアライズ失敗など非文字列で reject されたとき
+                  // `[object Object]` にしない (既存 handleSubmit と同じ作法)。
+                  setImeShadowDebugError(
+                    typeof e === "string" ? e : JSON.stringify(e)
+                  );
                 });
             }}
             title="いま書いている NDJSON と ime_shadow の件数を取得 (研究者用・GSE_DEBUG=1 必須)"
@@ -643,7 +648,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
             <pre className="debug-ime-shadow-body">
               {[
                 `log_path : ${imeShadowDebug.log_path}`,
-                `emitted  : ${imeShadowDebug.emitted}`,
+                `emitted  : ${imeShadowDebug.emitted}  (このファイルの行数)`,
                 `confirmed: ${imeShadowDebug.confirmed}  (abandon=false)`,
                 `abandoned: ${imeShadowDebug.abandoned}  (abandon=true / ESC)`,
                 imeShadowDebug.emitted === 0
