@@ -56,7 +56,7 @@
 ## 起票 4: ⚠️★★★ AC 6 (macOS 実機で確定 / 放棄が区別できること) が未実施
 
 - **起票日**: 2026-09-11
-- **状態**: 未解決（★ **mac 側でしか解けない**）
+- **状態**: ⚠️ **一部解決**（★ CI の macOS ビルドは通った。**実機確認だけが残る**）
 - **内容**: issue 008 の AC 6 は「実機で日本語変換を ①確定 ②ESC 放棄 の 2 通り行い、
   生成された NDJSON の `ime_shadow` 行で `abandon` が区別されていること」を求めるが、
   ⚠️ **本セッションは Windows 機 (G-GEAR) で動いており実施できない**。
@@ -67,8 +67,12 @@
     Windows で 28 テストを緑にしてあるが、⚠️ **CGEventTap が実際にそのキーを届けるか**は
     実機でしか分からない。
 - **どう処理するか**:
-  1. ★ **まず CI (self-hosted macOS runner) で macOS ビルドを通す** —— PR を出せば `check` が走る
-  2. mac 側で実機確認:
+  1. ✅ ★ **CI (self-hosted macOS runner) で macOS ビルドが通った** —— PR #182 /
+     `check (gse-mac-selfhosted, aarch64-apple-darwin)` が **pass (4m54s)**。
+     ⚠️★★★ **これで「macOS でコンパイルすら通していない」という状態は解消した。**
+     ★ ただし CI が保証するのは**コンパイルと `analysis/` のテスト**までで、
+     ⚠️ **CGEventTap が実際にそのキーを届けるか**は依然として実機でしか分からない。
+  2. ⚠️ **残るのはこれ** —— mac 側で実機確認:
      - 日本語変換を ①Enter で確定 ②ESC で放棄
      - NDJSON の `ime_shadow` 行で `abandon` が `false` / `true` に分かれることを確認
      - ⚠️ **macOS 純正の「ライブ変換」でも試す** (起票 6)

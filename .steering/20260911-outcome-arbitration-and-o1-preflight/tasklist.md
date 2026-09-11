@@ -32,7 +32,7 @@
 - [x] `cargo fmt --check` — 差分なし
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` — ★ **main と同じ 29 件で新規ゼロ**（worktree で実測）
 - [ ] ⚠️★★★ **AC 6: macOS 実機での確定 / 放棄の区別** → `blockers.md` 起票 4
-- [ ] ⚠️ **CI (self-hosted macOS) で macOS ビルドを通す** → PR が要る
+- [x] ⚠️ **CI (self-hosted macOS) で macOS ビルドを通す** → ✅ PR #182 で **pass (4m54s)**
 
 ### レビュー
 - [x] `code-reviewer` の指摘対応（HIGH 2 / MEDIUM 4 / LOW 5 — **全件対応**）
@@ -51,7 +51,7 @@
 - [x] `blockers.md` 起票 4〜6
 - [x] `issues/008.md` の Status / Execution Result
 - [x] git commit（`bd5e6b8`）
-- [ ] PR
+- [x] PR → https://github.com/mikotomiura/GSE-prototype/pull/182 (⚠️ **CI 全緑 / MERGEABLE**。マージは研究者判断)
 
 ## issue 007 — 転帰定義の一本化（未着手）
 
