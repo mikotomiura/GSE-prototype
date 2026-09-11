@@ -12,35 +12,49 @@ ls .steering/20260911-*/
 
 | # | task | 内容 | 状態 | 依存 |
 |---|---|---|---|---|
-| **T1** | `20260911-intake-arbitration-branch` | ブランチ取り込み（案 C）・**issue 001–006 分解済み** | ★ **次はこれ** | — |
-| **T2** | `20260911-outcome-arbitration-and-o1-preflight` | 転帰定義の一本化 ＋ O1 配布前の実装 2 件・**issue 007–009 分解済み** | 待機 | T1 |
-| **T3** | `20260911-mhd-inference-ssot` | MhD の推論アーキ・tuning 規約・特徴量 Tier・⚠️ **ADR-008 D8 との衝突裁定**。★ **調査済み・issue 未分解** | 待機 | T1 |
-| **T4** | `20260911-practice-portrait-ssot` | Practice Portrait の SSOT 化。★ **調査済み・issue 未分解** | 待機 | T1 |
+| ~~**T1**~~ | `20260911-intake-arbitration-branch` | ブランチ取り込み（案 C） | ⚠️★★★ **着手不要**（2026-09-11 に **mac 側が先に完了**） | — |
+| **T2** | `20260911-outcome-arbitration-and-o1-preflight` | 転帰定義の一本化 ＋ O1 配布前の実装 2 件・**issue 007–009 分解済み** | ★ **次はこれ** | — |
+| **T3** | `20260911-mhd-inference-ssot` | MhD の推論アーキ・tuning 規約・特徴量 Tier・⚠️ **ADR-008 D8 との衝突裁定**。★ **調査済み・issue 未分解** | 着手可 | — |
+| **T4** | `20260911-practice-portrait-ssot` | Practice Portrait の SSOT 化。★ **調査済み・issue 未分解** | 着手可 | — |
 
-★ **T2〜T4 がいずれも T1 を待つ理由**: 取り込み後の `expression-channel.md`（+337 行）/
-`glossary.md`（+27 行）/ ADR-023〜028 に**既に書かれている可能性があり、重複判定ができない**ため。
+### ⚠️★★★ T1 が不要になった経緯（2026-09-11）
+
+`origin/main` の `287429f`（ADR 023-028・研究記録・スクリプト）と
+`92da378`（`recovery` → `pflow_exit` 改名・`AWAY_IDLE_MS` 一本化）で **mac 側が取り込みを完了した**。
+残差分を系統別に実測した結果:
+
+| 系統 | 残差分 |
+|---|---|
+| `docs/references.md` / `docs/literature/` / `docs/architecture/` / `docs/glossary.md` / `docs/mitou_submission/` / `scripts/secrets-filter.sh` | **0 行（＝取り込み済み）** |
+| `experiments/` | 30 行 |
+
+→ ★ **T2 / T3 / T4 の「T1 完了待ち」という依存は解消済み。すぐ着手してよい。**
+★ mac 側の一次資料は `.steering/_handoff/next-session-prompt-ggear-intake.md`。
 
 ⚠️ **T3 / T4 は issue 未分解。** それぞれの `_survey-*.md`（調査済みの一次資料）を読んでから
 `issue-slicing` skill で分解する。分解と実行は別セッションにする。
 
-## §1 ★ 次のセッションでやること = T1
+## §1 ★ 次のセッションでやること = T2
 
-`.steering/20260911-intake-arbitration-branch/` を開き、この順に読む:
+⚠️★★★ **O1 の配布が目前**（`v0.1.34` が CI で公開済み・配布可否ゲートは **20 件 / 0 件 = 配布してよい状態**。
+mac 側 handoff §3 に「**被験者への配り直し: Release v0.1.34 を配る**」が残雑務として残っている）。
+→ ★ **issue 008 / 009 は「配布前でなければ手遅れ」なので、判断を先送りしない。**
 
-1. `requirement.md` — 背景とゴール
-2. `_issue-plan.md` — **DAG・交差表・実行ウェーブ・引き継ぎ事項**
-3. 着手する `issues/00X.md` — **これが SSOT**
-4. `decisions.md`（判断 6 件・蒸し返さない）/ `blockers.md`（起票 3 件）
+`.steering/20260911-outcome-arbitration-and-o1-preflight/` を開き、この順に読む:
 
-| ウェーブ | issue |
-|---|---|
-| **W1** | **001 単独**（⚠️ ゴールデン・schema の前提を変えるので並列にしない） |
-| W2 | 002 / 003 / 004（002 は 001 完了後） |
-| W3 | 005 / 006（006 は 002 完了後。005 は依存ゼロで前倒し可） |
+1. `requirement.md` — 背景とゴール（転帰定義が 3 つ並立している表）
+2. `issues/007.md` / `008.md` / `009.md` — **これが SSOT**
+3. `decisions.md`（判断 6 件・蒸し返さない）/ `blockers.md`（起票 3 件）
 
-⚠️★★★ **着手前に `blockers.md` 起票 3 を処理すること** —— issue 002/003/005/006 は
-**何も取り込まなくても** `check_doc_lexicon.py` が exit 0 になる。`acceptance.sh` を書かないと
-「客観に見えて無意味な緑」を量産する。
+| 順 | issue | 理由 |
+|---|---|---|
+| **1** | **008**（macOS の IME 確定/放棄判別） | ⚠️ **007 に依存しない**。配布後は `ime_shadow` 相当の情報を**永久に復元できない** |
+| **2** | **007**（転帰定義の一本化） | ★ **`/reimagine` を設計段階で起動する**。009 の要否もここで決まる |
+| **3** | 009（修飾キー同時押下フラグ） | ⚠️ **007 の裁定次第で不要になる**（`revision topology` を主要アウトカムに据えないなら要らない） |
+
+⚠️ **008 / 009 を入れると再ビルド・再配布が要る**（`v0.1.34` は既に公開済み）。
+★ **入れるか否かは研究者の判断**。入れないなら「macOS では IME 確定/放棄を判別しない」ことを
+**明示的に記録してから配布する**（記録しないまま配布するのが最悪）。
 
 ## §2 ⚠️★★★ 絶対にやらないこと
 

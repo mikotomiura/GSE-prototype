@@ -1,3 +1,25 @@
+# intake-arbitration-branch
+
+> ⚠️★★★ **2026-09-11: 本タスクは着手不要になった。mac 側が先に取り込みを完了した。**
+>
+> `origin/main` の `287429f`（ADR 023-028・研究記録・スクリプト）と
+> `92da378`（`recovery` → `pflow_exit` 改名・`AWAY_IDLE_MS` 一本化）で取り込み済み。
+> 残差分を系統別に実測した結果（`git diff --stat origin/main origin/feat/resumption-outcome-arbitration`）:
+>
+> | 系統 | 残差分 |
+> |---|---|
+> | `docs/references.md` / `docs/literature/` / `docs/architecture/` / `docs/glossary.md` / `docs/mitou_submission/` / `scripts/secrets-filter.sh` | **0 行（＝取り込み済み）** |
+> | `experiments/` | 30 行 |
+> | 全体 | 84 files / +124 / **−4,761**（★ 大半は「main の方が新しい」差分。SIGSEGV 修正 PR #175 等） |
+>
+> → ★ **issue 001〜006 は実行しない。** 記録として残す（分解の判断過程と、
+> mac 側の handoff `next-session-prompt-ggear-intake.md` が採った案 C との一致を示す資料）。
+> ★ **後続 T2 / T3 / T4 の「T1 完了待ち」という依存は解消済み**。すぐ着手してよい。
+
+---
+
+（以下は分解時点の記述。★ 上記のとおり実行されなかった）
+
 # idea-to-ssot-intake-and-promotion
 
 ## 背景
