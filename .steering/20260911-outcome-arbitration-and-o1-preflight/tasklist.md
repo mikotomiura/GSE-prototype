@@ -24,9 +24,9 @@
 - [x] `schema/current.json` — 意図的再生成（⚠️ description 1 行のみ・構造は不変）
 
 ### テスト
-- [x] 状態機械の単体テスト 27 本（★ 両 OS で走る。⚠️ 修飾キー 6 本・マウス確定の合算 1 本を含む）
-- [x] Atomic ドライバのテスト 10 本（★ 両 OS で走る。⚠️ 要約の偽装回帰 1 本を含む）
-- [x] `cargo test --workspace` — **643 passed / 0 failed**（ベースライン 577）
+- [x] 状態機械の単体テスト 28 本（★ 両 OS で走る。⚠️ 修飾キー 6 本・マウス確定の合算 1 本を含む）
+- [x] Atomic ドライバのテスト 9 本（★ 両 OS で走る。⚠️ 要約の偽装回帰 1 本・OS 別 drain 方針 1 本を含む）
+- [x] `cargo test --workspace` — **645 passed / 0 failed**（ベースライン 577）
 - [x] ゴールデン `gse-replay --snapshot` — `OK: 15 snapshots match`
 - [x] `emit_schema` parity（CI と同じ `diff -u`）— PASS
 - [x] `cargo fmt --check` — 差分なし
