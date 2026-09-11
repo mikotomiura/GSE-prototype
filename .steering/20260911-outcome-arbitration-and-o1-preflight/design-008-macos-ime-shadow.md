@@ -161,3 +161,34 @@ shadow atomics は `hook.rs`、送出は `lib.rs` にある。→ ★ Allowed Fi
 - ⚠️ ライブ変換下での ESC の意味 → `blockers.md` 起票 6。
 - ★ **再配布はしない**（`decisions.md` 判断 8）。既配布ぶんの macOS の確定 / 放棄は
   `key` 行の `category` から事後再構成する。⚠️ **その実装は別タスクで起票する**。
+
+## 9. レビュー対応（2026-09-11・`code-reviewer` + `security-checker` 並列）
+
+★ セキュリティは **CRITICAL / HIGH ともに 0 件**。content-free 境界・外部送信・
+秘密情報の混入はいずれも検出されず。⚠️ 以下は品質と**記述の正確性**の指摘。
+
+| 優先 | 指摘 | 対応 |
+|---|---|---|
+| **HIGH-1** | ⚠️★★★ 回収前に次の変換が始まると、開始時リセットが未回収の要約を上書きし **`abandon` が `true` → `false` に化ける**（行の欠落ではなく**値の偽装**） | ✅ ★ `hook.rs::IME_COMPOSE_NAV` を新設し、**進行中の値と回収待ちの要約を別の置き場に分けた**。⚠️ 併せて `ComposeState.abandon`（**1 度も読まれない死んだ状態**）を削除。回帰テスト `a_new_session_before_collection_does_not_forge_the_pending_row` |
+| **HIGH-2** | ⚠️★★★ `Cmd+S` / `Ctrl+Z` の VK は**英字キー**なので、修飾を見ないと変換セッションを開始し `dwell_ms` を汚す。`Cmd+Esc` なら**存在しない放棄行**まで作る | ✅ ★ `Chord::{Plain, Modified}` を新設し、**Command / Control を伴う打鍵は完全に透過**させた。⚠️ Shift / Option は含めない（`Shift+A` はただの大文字で変換の素材）。テスト 5 本 |
+| MED-1 | `lib.rs` の `!active` ゲートは macOS では構造的に冗長で、emit を先送りして行を落としうる | ✅ 純関数 `should_drain_ready(ready, active, is_windows)` に切り出し、⚠️ **OS を注入**して両 OS で両分岐を検証。Windows の挙動は不変 |
+| MED-2 | stale 経路が「Windows 限定」であることを**コメントでしか担保していない** | ✅ `else` ブロックごと `#[cfg(target_os = "windows")]` で囲み、不変条件をコードへ移した |
+| MED-3 | G1 の早期 return が `IME_SHADOW_READY` を立てたまま残し、**前ブロックの変換が次ブロックの記録に混ざる** | ✅ 早期 return の前に `READY` / `START_MS` を落とし、**捨てることを明示**した |
+| MED-4 | 候補表示中の数字キー確定は実機では確定だが、本状態機械はセッションを続ける（`dwell_ms` が複数変換を覆う） | ✅ モジュール doc の「⚠️ 拾えないもの」へ明記（★ 旧実装と同値だが `dwell_ms` が計測値になったので意味が変わった） |
+| **SEC-M1** | ⚠️★★★ `capabilities.rs` の「`IME_ACTIVE` が true のときにだけ出る」「『変換しない打ち方』で 0 行」は **macOS では偽**。macOS は Space を押さなくても行が出る | ✅ ★ 当該記述を **Windows 経路の記述**と限定し、**0 行の意味を OS 別の表**に書き分けた |
+| **SEC-M2** | ⚠️★★★ `nav` / `abandon` の**母数が OS で違う**のに「両 OS とも打鍵由来（同型）」とだけ宣言していた | ✅ ★ `capabilities.rs` / `ime_compose.rs` の doc / **schema の `description`** に母数差の表を追加し、⚠️ **「`abandon` 率を OS 間で直接比べてはならない」**を明記。`current.json` を再生成 |
+| LOW ×5 | 実在しない関数名の参照 / assert の行継続 `\` 消失 / コールバック内の `debug_assert!` / 壁時計由来の `dwell_ms == 0` / `include_str!` の逐語一致の脆さ | ✅ 全件対応（`debug_assert!` は**撤去** —— `extern "C"` 越しの panic は abort になるため） |
+
+### ⚠️★★★ SEC-M1 / SEC-M2 が本質的に重要な理由
+
+★ 本タスクは「行型を両 OS 共通にし、由来フィールドは足さない」（判断 9）を採った。
+→ ⚠️ **その代償として、差の全量は `capabilities` と `description` に載っていなければならない。**
+★ 載っていなければ、判断 9 は「混ぜてよい」という誤ったメッセージになる。
+
+**macOS の行集合は Windows の行集合より広い**（Windows = 候補ウィンドウが出た変換 /
+macOS = かな入力の一区切りすべて）。⚠️ **`abandon` 率の OS 間比較は無効**である。
+
+### ⚠️ レビューで確認された、本コミットが**直した**既存の不備
+
+- 旧 `update_compose_state` にあった **CGEventTap コールバック内の `tracing::debug!` 7〜8 か所**
+  （`hook-constraints` 共通-1「コールバック内のログ禁止」の明確な違反）が消えた。

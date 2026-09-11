@@ -24,18 +24,19 @@
 - [x] `schema/current.json` — 意図的再生成（⚠️ description 1 行のみ・構造は不変）
 
 ### テスト
-- [x] 状態機械の単体テスト 20 本（★ 両 OS で走る）
-- [x] Atomic ドライバのテスト 8 本（★ 両 OS で走る）
-- [x] `cargo test --workspace` — **636 passed / 0 failed**（ベースライン 577）
+- [x] 状態機械の単体テスト 25 本（★ 両 OS で走る。⚠️ 修飾キー 5 本を含む）
+- [x] Atomic ドライバのテスト 10 本（★ 両 OS で走る。⚠️ 要約の偽装回帰 1 本を含む）
+- [x] `cargo test --workspace` — **643 passed / 0 failed**（ベースライン 577）
 - [x] ゴールデン `gse-replay --snapshot` — `OK: 15 snapshots match`
 - [x] `emit_schema` parity（CI と同じ `diff -u`）— PASS
 - [x] `cargo fmt --check` — 差分なし
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` — ★ **main と同じ 29 件で新規ゼロ**（worktree で実測）
 - [ ] ⚠️★★★ **AC 6: macOS 実機での確定 / 放棄の区別** → `blockers.md` 起票 4
 - [ ] ⚠️ **CI (self-hosted macOS) で macOS ビルドを通す** → PR が要る
 
 ### レビュー
-- [ ] `code-reviewer` の指摘対応
-- [ ] `security-checker` の指摘対応
+- [x] `code-reviewer` の指摘対応（HIGH 2 / MEDIUM 4 / LOW 5 — **全件対応**）
+- [x] `security-checker` の指摘対応（⚠️ CRITICAL / HIGH は **0 件**。MEDIUM 2 件を対応）
 - [ ] ⚠️ `/cross-review`（Codex + Claude の独立レビュー）— ★ パス限定で回す
 
 ### ドキュメント
