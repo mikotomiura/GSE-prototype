@@ -1,10 +1,46 @@
 {
   "total_labels": 3,
-  "confusion": { "matrix": [[2, 0, 0], [0, 0, 0], [0, 0, 1]] },
+  "confusion": {
+    "matrix": [
+      [
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ]
+  },
   "per_class": [
-    { "class": "flow", "precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 2 },
-    { "class": "incubation", "precision": 0.0, "recall": 0.0, "f1": 0.0, "support": 0 },
-    { "class": "stuck", "precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 1 }
+    {
+      "class": "flow",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 2
+    },
+    {
+      "class": "incubation",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    },
+    {
+      "class": "stuck",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 1
+    }
   ],
   "macro_f1": 0.6666666666666666,
   "micro_f1": 1.0,
@@ -14,15 +50,45 @@
     "manual_insert_chars": 30,
     "external_paste_chars_total": 70,
     "manual_contribution_ratio": 0.3,
-    "productive_manual_recovery_rate": 0.5,
+    "pflow_exit_manual_gain_rate": 0.5,
     "external_paste_count": 5,
     "excluded_paste_count": 0,
     "large_paste_rate": 0.4,
     "paste_after_stuck_rate": 0.6,
-    "self_recovery_without_paste": 0.4,
+    "pflow_exit_without_receipt": 0.4,
     "paste_count_per_hour": 12.5,
     "stuck_episode_count": 4,
-    "recovered_episode_count": 2
+    "pflow_exit_episode_count": 2,
+    "receipt_free_resumption": {
+      "event_count": 4,
+      "source_episode_count": 3,
+      "receipt_count": 2,
+      "next_away_candidate_count": 1,
+      "censored_count": 1,
+      "degenerate_count": 0,
+      "n_at_risk_at_5min": 1,
+      "n_at_risk_at_10min": 0,
+      "receipt_free_at_5min": 0.5,
+      "receipt_free_at_10min": 0.4,
+      "outcomes": [
+        {
+          "elapsed_ms": 45000,
+          "kind": "receipt"
+        },
+        {
+          "elapsed_ms": 120000,
+          "kind": "receipt"
+        },
+        {
+          "elapsed_ms": 200000,
+          "kind": "next_away_candidate"
+        },
+        {
+          "elapsed_ms": 640000,
+          "kind": "censored"
+        }
+      ]
+    }
   },
   "warnings": []
 }

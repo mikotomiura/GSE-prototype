@@ -6,10 +6,15 @@
 
 use serde::Serialize;
 
+use crate::analysis::intervention::AWAY_IDLE_MS;
 use crate::analysis::loop_step::FeatSnapshot;
 
-/// Stuck ラベルからの回復探索の既定ウィンドウ: 15 分。
-pub const DEFAULT_RECOVERY_WINDOW_MS: u64 = 15 * 60 * 1000;
+/// Stuck ラベル時刻以降に `p_flow > 0.5` への遷移を探す既定ウィンドウ: 15 分。
+///
+/// ⚠️ `OutcomeConfig::pflow_exit_window_ms` (既定 **5 分**) とは**別の値**である。
+/// こちらを使うのは `compute_session_metrics` (GT ラベル経路) と
+/// `intervention_eval` の defer/DC 経路だけで、`OutcomeMetrics` の算出には使わない。
+pub const DEFAULT_PFLOW_EXIT_WINDOW_MS: u64 = 15 * 60 * 1000;
 
 /// 回復判定の既定閾値: `p_flow > 0.5`。
 pub const DEFAULT_P_FLOW_THRESHOLD: f64 = 0.5;
@@ -136,8 +141,9 @@ pub struct OutcomeConfig {
     /// 連続 Stuck feat をひとつのエピソードに統合する最大間隙 (ms)。
     /// 1 ローリングウィンドウ = 30s。瞬間的な p_stuck 低下を同一エピソードに吸収する。
     pub merge_gap_ms: u64,
-    /// エピソード後、回復 (p_flow>0.5) を探す窓 (ms)。handoff 指定の 5 分。
-    pub recovery_window_ms: u64,
+    /// エピソード後、`p_flow > 0.5` への遷移を探す窓 (ms)。handoff 指定の 5 分。
+    /// ⚠️ 定数 `DEFAULT_PFLOW_EXIT_WINDOW_MS` (15 分) とは別値。
+    pub pflow_exit_window_ms: u64,
     /// 「net_diff 正進行」とみなす回復窓内 manual_insert_chars 純増の下限 (文字)。
     /// 既定 1 = 最小解釈 (純増 1 文字以上で前進)。ユーザー承認 2026-06-23。
     pub net_diff_min: u64,
@@ -145,6 +151,12 @@ pub struct OutcomeConfig {
     pub large_threshold: u64,
     /// 「after_stuck」= エピソード後この窓 (ms) 内の paste を stuck 起因とみなす。
     pub after_window_ms: u64,
+    /// 「離席候補」とみなす隣接打鍵間隙の下限 (ms)。`receipt_free_resumption` 専用。
+    ///
+    /// ⚠️★★★ **既定値の SSOT は `analysis::intervention::AWAY_IDLE_MS` である。**
+    /// ★ ここで 180_000 を再定義しない (ADR-024 AC-3・`away_gap_default_matches_intervention_ssot`)。
+    /// ⚠️ 系が「離席した」と判定するわけではない (**ADR-018 D1**)。事後の層別境界にすぎない。
+    pub away_gap_ms: u64,
 }
 
 impl Default for OutcomeConfig {
@@ -153,10 +165,11 @@ impl Default for OutcomeConfig {
             trigger: StuckTrigger::PStuckThreshold,
             p_stuck_trigger: 0.60,
             merge_gap_ms: 30_000,
-            recovery_window_ms: 5 * 60 * 1000,
+            pflow_exit_window_ms: 5 * 60 * 1000,
             net_diff_min: 1,
             large_threshold: 50,
             after_window_ms: 120_000,
+            away_gap_ms: AWAY_IDLE_MS,
         }
     }
 }
@@ -198,9 +211,15 @@ pub struct OutcomeMetrics {
     pub external_paste_chars_total: u64,
     /// `manual / (manual + paste)`。分母 0 → None。
     pub manual_contribution_ratio: Option<f64>,
-    /// 回復エピソードのうち「external paste 無し かつ net_diff 正進行」で回復した割合。
-    /// 分母 = 回復したエピソード数。回復 0 → None。
-    pub productive_manual_recovery_rate: Option<f64>,
+    /// `p_flow` が 0.5 を超えたエピソードのうち、「受領 (external paste) 無し
+    /// かつ manual_insert_chars 純増 >= net_diff_min」だった割合。
+    /// 分母 = `pflow_exit_episode_count`。0 → None。
+    ///
+    /// ⚠️★★★ **推定器依存 (ADR-023 D7 / ADR-024)**: 「抜けた」の判定は
+    /// 3 クラス事後確率 `p_flow` であり、トリガー (`p_stuck >= 0.60`) と
+    /// **同じ 3 次元単体の相補的な領域**である。★ 報告時は `receipt_free_resumption`
+    /// および `manual_contribution_ratio` と必ず併記すること。
+    pub pflow_exit_manual_gain_rate: Option<f64>,
     // ── (a) AI依存度 ──
     /// capture 済 external paste (external_paste_chars が Some) の件数。
     pub external_paste_count: u32,
@@ -213,13 +232,35 @@ pub struct OutcomeMetrics {
     pub large_paste_rate: Option<f64>,
     /// エピソード後 after_window 内に paste があったエピソードの割合。episode 0 → None。
     pub paste_after_stuck_rate: Option<f64>,
-    /// 回復窓内に paste 無しで回復したエピソードの割合 (分母 = 全エピソード)。episode 0 → None。
-    pub self_recovery_without_paste: Option<f64>,
+    /// `pflow_exit_window_ms` 内に受領 (external paste) 無しで `p_flow > 0.5` へ
+    /// 抜けたエピソードの割合 (分母 = **全エピソード**)。episode 0 → None。
+    ///
+    /// ⚠️★★★ **旧名 `self_recovery_without_paste`** (ADR-024 D2 で改名)。
+    /// ★ 定義は変えていない。名前が「助けを借りずに解いた」と読めることが害だった
+    /// (ADR-023 D6 / [P126])。
+    ///
+    /// ⚠️★★★ **本指標は副次である。主要アウトカムは `receipt_free_resumption`。**
+    /// 推定器依存が **2 経路**ある (ADR-024 §計器の問題):
+    /// 1. 「抜けた」の判定が `p_flow`(推定器) であり、トリガー `p_stuck` と相補。
+    /// 2. ⚠️★★★ **受領の有無を見る窓 `[end_ms, rec_ts]` の右端そのものが `p_flow` の
+    ///    立ち上がり速度で決まる** —— p_flow が速く上がるほど窓が縮み、
+    ///    paste を拾う機会が減って本指標が**機械的に上がる**。
+    pub pflow_exit_without_receipt: Option<f64>,
     /// 補助指標: 1 時間あたりの external paste 回数。span 0 → None。
     pub paste_count_per_hour: Option<f64>,
     // ── 透明性のための内訳 ──
+    /// トリガー (`p_stuck >= p_stuck_trigger`) で切り出したエピソード数。
+    /// ★ `pflow_exit_without_receipt` と `paste_after_stuck_rate` の分母。
+    /// ⚠️ `pflow_exit_manual_gain_rate` の分母は **`pflow_exit_episode_count` のほう**である
+    /// (★ ADR-023 の指摘 C がまさにこの違いを問題にしていた)。
     pub stuck_episode_count: u32,
-    pub recovered_episode_count: u32,
+    /// うち `pflow_exit_window_ms` 内に `p_flow > 0.5` へ抜けたエピソード数。
+    /// ⚠️ 旧名 `recovered_episode_count` (ADR-024 D2)。★ 「解決した」ではない。
+    pub pflow_exit_episode_count: u32,
+    /// ★★★ **主要アウトカム (ADR-024)**: 離席候補明けの再開を起点に、
+    /// 受領 (external paste) の累積発生関数 (CIF) を competing risks で推定したもの。
+    /// ⚠️★★★ **推定器 (`p_flow`) を一切通らない。**
+    pub receipt_free_resumption: ReceiptFreeResumption,
 }
 
 /// vk コードが「文字生成キー」(印字可能文字を生む) かを content-free に判定する。
@@ -318,6 +359,337 @@ fn has_paste_in(pastes: &[PasteEvent], lo: u64, hi: u64) -> bool {
         .any(|p| p.timestamp >= lo && p.timestamp <= hi)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// receipt_free_resumption (ADR-024) — 推定器 (p_flow) を一切通らない主要アウトカム
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// ★ 構造 (ADR-024 D1 / D4):
+//   トリガー   = Stuck エピソード          … `p_stuck >= 0.60` (★ 実運用で使うと明言された量)
+//   イベント   = 離席候補ギャップ明けの初打鍵 … **時計の事実**
+//   アウトカム = 受領 (external paste) の有無  … **外部の事実**
+//
+// ⚠️★★★ `p_flow` は 1 か所も現れない。これが `pflow_exit_without_receipt` との違いである。
+
+/// `receipt_free_resumption` の観測地平 (ms)。ADR-023 D6 が 5 分 / 10 分と定めた。
+pub const RECEIPT_HORIZON_5MIN_MS: u64 = 5 * 60 * 1000;
+/// 同上 (10 分)。
+pub const RECEIPT_HORIZON_10MIN_MS: u64 = 10 * 60 * 1000;
+
+/// 離席候補ギャップ明けの「再開」1 件。
+///
+/// ⚠️★★★ **系が「離席した」と判定した記録ではない** (**ADR-018 D1**)。
+/// 保持するのは「打鍵が `away_gap_ms` 以上途切れ、また打鍵が始まった」という**時計の事実**だけ。
+/// ★ 同じ観測形になるが身体的回帰でないもの (席で紙を読む / 電話 / 別デバイス) を
+/// 区別する手段は無い。→ ★ **名前は `resumption`(再開) であって `physical_return` ではない。**
+///
+/// ⚠️★★★ **`Serialize` を意図的に derive しない** (`security-checker` LOW-1・2026-09-07)。
+/// ★ 本型は**絶対時刻を 3 本**持つので、derive すると出力側に 1 行足すだけで
+/// 「離席候補のタイムライン」が JSON に載りうる。★ **出せないことを型で担保する。**
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResumptionEvent {
+    /// ギャップ直前の最後の打鍵時刻 (= ギャップ開始)。
+    pub gap_start_ms: u64,
+    /// ギャップ明けの最初の打鍵時刻 (= 時間原点 t0)。
+    pub resumed_at_ms: u64,
+    /// 紐づけ先 Stuck エピソードの終端。
+    pub episode_end_ms: u64,
+    /// 紐づけ先 Stuck エピソードの添字。
+    ///
+    /// ⚠️ 寄与エピソード数は**これ**で数える (`code-reviewer`(Codex) High・2026-09-07)。
+    /// ★ `episode_end_ms` で dedup すると、終端が同値のエピソードが 2 本あったときに
+    /// 過小計上する。★ 現状 `segment_stuck_episodes` は終端の重複を作らないが、
+    /// `episodes` は引数で渡ってくるので**呼び出し側の性質に依存しない形**にする。
+    pub episode_index: usize,
+}
+
+/// 再開後に最初に起きたこと。競合リスクの 3 分類。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResumptionOutcomeKind {
+    /// 主イベント: 受領 (external paste) が起きた。
+    Receipt,
+    /// 競合イベント: 受領を見ないまま、**次の離席候補ギャップ**が始まった。
+    /// ⚠️★★★ 「また離席した」ではない —— ★ 系は離席を判定しない (**ADR-018 D1**)。
+    /// ★ 観測しているのは「打鍵が再び `away_gap_ms` 以上途切れた」ことだけである。
+    NextAwayCandidate,
+    /// 打ち切り: どちらも起きないまま観測が終わった。
+    Censored,
+}
+
+/// 再開 1 件の観測結果 (時間原点からの経過 ms と分類)。
+///
+/// ★ `Serialize` する。⚠️★★★ **セッション別 CIF の平均は Aalen-Johansen ではない**ので、
+/// 被験者を跨いでプールするには **事象単位の (経過時間, 分類) が要る** (`code-reviewer` M1)。
+/// ★ 持つのは **原点からの相対時間**だけで、絶対時刻も文字内容も含まない
+/// (`data-privacy` ルール 1 に抵触しない。⚠️ 絶対時刻を持つ [`ResumptionEvent`] は出さない)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ResumptionOutcome {
+    /// 時間原点 (= 再開時刻) からの経過 ms。
+    pub elapsed_ms: u64,
+    pub kind: ResumptionOutcomeKind,
+}
+
+/// 追跡時間ゼロの事象 (= 再開した瞬間に次の離席候補ギャップへ入った、または観測が終わった)。
+///
+/// ⚠️★★★ **CIF から除外する** (`code-reviewer` H2)。★ 除外しないと、
+/// `t=0` の競合事象が受領より先にリスク集合を食い潰し、**`receipt_free` が 1.0 へ寄る** ——
+/// 「戻ってきて 1 打鍵してまた消えた」が満点になってしまう。
+/// ★ 受領は `t=0` でも情報を持つ (戻って即座に受領した) ので除外しない。
+fn is_degenerate(o: &ResumptionOutcome) -> bool {
+    o.elapsed_ms == 0 && o.kind != ResumptionOutcomeKind::Receipt
+}
+
+/// 地平時点で追跡が残っている事象数。★ **読み手が外挿を棄却するための数値**である。
+fn n_at_risk(outcomes: &[ResumptionOutcome], horizon_ms: u64) -> u32 {
+    outcomes
+        .iter()
+        .filter(|o| o.elapsed_ms >= horizon_ms)
+        .count() as u32
+}
+
+/// ★★★ 主要アウトカム (ADR-024)。⚠️★★★ **`p_flow` に一切依存しない。**
+///
+/// ★ 報告時は **必ず** `manual_contribution_ratio` (推定に一切依存しない対照) を併記し、
+/// 副次の `pflow_exit_without_receipt` との差を示すこと (ADR-023 D7-2 / ADR-024 D2)。
+#[derive(Debug, Clone, Serialize)]
+pub struct ReceiptFreeResumption {
+    /// 事象数 = 離席候補明けの再開のうち Stuck エピソードに紐づいたもの。
+    pub event_count: u32,
+    /// 事象に寄与した Stuck エピソード数。
+    /// ★ 1 エピソードが事象数を支配していないかを読み手が見られるように出す。
+    pub source_episode_count: u32,
+    /// 主イベント (受領) の件数。
+    pub receipt_count: u32,
+    /// 競合イベント (次の離席候補ギャップの開始) の件数。⚠️ 「また離席した」ではない。
+    pub next_away_candidate_count: u32,
+    /// 打ち切り件数。
+    pub censored_count: u32,
+    /// ⚠️ 追跡時間ゼロで CIF から除外した事象数 (→ [`is_degenerate`])。
+    /// ★ 大きいときは「戻ってすぐまた離れた」が多いということであり、**指標より先にこれを見る**。
+    pub degenerate_count: u32,
+    /// 5 分地平で追跡が残っている事象数。⚠️★★★ **0 のときは外挿である**。
+    pub n_at_risk_at_5min: u32,
+    /// 10 分地平で追跡が残っている事象数。⚠️★★★ **0 のときは外挿である**。
+    pub n_at_risk_at_10min: u32,
+    /// `1 - CIF_receipt(5 min)`。事象 0 / 地平まで追跡なし → None (NaN を出さない)。
+    pub receipt_free_at_5min: Option<f64>,
+    /// `1 - CIF_receipt(10 min)`。同上。
+    pub receipt_free_at_10min: Option<f64>,
+    /// 事象単位の観測結果 (原点からの相対時間 ＋ 分類)。
+    ///
+    /// ★ **被験者を跨いで CIF をプールするために出す** (`code-reviewer` M1) ——
+    /// ⚠️★★★ セッション別 CIF の単純平均は Aalen-Johansen ではない。
+    /// ★ 絶対時刻を含まないので `data-privacy` ルール 1 に抵触しない。
+    pub outcomes: Vec<ResumptionOutcome>,
+}
+
+/// 打鍵列から「`away_gap_ms` 以上の間隙 → 再開」を抽出し、Stuck エピソードに紐づける。
+///
+/// **紐づけ規則**: ギャップ開始が `[ep.start_ms, ep.end_ms + after_window_ms]` に入るとき、
+/// そのギャップをそのエピソードに紐づける。条件を満たすエピソードが複数あるときは
+/// **最も遅いもの**を採る。★ 新しいノブを増やさず、既存の `after_window_ms`
+/// (逐語「エピソード後この窓 (ms) 内の paste を stuck 起因とみなす」) の意味を再利用する。
+///
+/// `keys` / `episodes` はともに timestamp 昇順を仮定。
+/// ⚠️ 推定器 (`p_flow` / `p_stuck`) を**この関数の中では**参照しない
+/// (★ `episodes` の切り出しには `p_stuck` が使われている = トリガー側)。
+pub fn segment_resumptions(
+    episodes: &[StuckEpisode],
+    keys: &[KeyPress],
+    cfg: &OutcomeConfig,
+) -> Vec<ResumptionEvent> {
+    debug_assert!(
+        keys.windows(2).all(|w| w[0].timestamp <= w[1].timestamp),
+        "segment_resumptions: keys must be sorted by timestamp"
+    );
+    debug_assert!(
+        episodes.windows(2).all(|w| w[0].start_ms <= w[1].start_ms),
+        "segment_resumptions: episodes must be sorted by start_ms"
+    );
+    let mut out = Vec::new();
+    for w in keys.windows(2) {
+        let gap_start_ms = w[0].timestamp;
+        let resumed_at_ms = w[1].timestamp;
+        if resumed_at_ms.saturating_sub(gap_start_ms) < cfg.away_gap_ms {
+            continue;
+        }
+        let linked = episodes.iter().enumerate().rev().find(|(_, ep)| {
+            gap_start_ms >= ep.start_ms
+                && gap_start_ms <= ep.end_ms.saturating_add(cfg.after_window_ms)
+        });
+        if let Some((episode_index, ep)) = linked {
+            out.push(ResumptionEvent {
+                gap_start_ms,
+                resumed_at_ms,
+                episode_end_ms: ep.end_ms,
+                episode_index,
+            });
+        }
+    }
+    out
+}
+
+/// 再開 1 件を競合リスクの 3 分類へ落とす。
+///
+/// - **主イベント** `Receipt`: `resumed_at_ms` 以降で最初の external paste。
+/// - **競合イベント** `NextAwayCandidate`: 受領より先に、次の離席候補ギャップが始まった。
+/// - **打ち切り** `Censored`: どちらも起きないまま `observation_end_ms` に達した。
+///
+/// 同時刻のタイブレークは **受領を優先**する。★ これは保守側である
+/// (`receipt_free_resumption` を高く出さない向き)。
+/// ⚠️ 推定器を一切参照しない。
+///
+/// ⚠️★★★ **受領を「紐づけ先エピソードの内側」に絞らないのは意図的である**
+/// (`code-reviewer`(Codex) Medium・2026-09-07)。★ 推定するのは
+/// 「**再開してから受領するまで**」であって「エピソード内の受領」ではない (ADR-024 D4)。
+/// ★ 遠い未来の受領は地平 (5/10 分) の外に落ちるので CIF には寄与せず、
+/// その事象を **地平まで at risk として残す**という正しい寄与だけを持つ。
+pub fn classify_resumption(
+    ev: &ResumptionEvent,
+    pastes: &[PasteEvent],
+    keys: &[KeyPress],
+    observation_end_ms: u64,
+    cfg: &OutcomeConfig,
+) -> ResumptionOutcome {
+    debug_assert!(
+        keys.windows(2).all(|w| w[0].timestamp <= w[1].timestamp),
+        "classify_resumption: keys must be sorted by timestamp"
+    );
+    let t0 = ev.resumed_at_ms;
+
+    let receipt_at = pastes
+        .iter()
+        .filter(|p| p.timestamp >= t0)
+        .map(|p| p.timestamp)
+        .min();
+
+    // 次の離席候補ギャップの開始 = t0 以降の打鍵で、次の打鍵との間隙が away_gap_ms 以上のもの。
+    // `keys` は昇順前提なので二分探索で始点を求める (事象ごとに先頭から舐めない)。
+    let from = keys.partition_point(|k| k.timestamp < t0);
+    let next_away_candidate_at = keys[from..]
+        .windows(2)
+        .find(|w| w[1].timestamp.saturating_sub(w[0].timestamp) >= cfg.away_gap_ms)
+        .map(|w| w[0].timestamp);
+
+    let (at, kind) = match (receipt_at, next_away_candidate_at) {
+        (Some(r), Some(l)) if r <= l => (r, ResumptionOutcomeKind::Receipt),
+        (Some(_), Some(l)) => (l, ResumptionOutcomeKind::NextAwayCandidate),
+        (Some(r), None) => (r, ResumptionOutcomeKind::Receipt),
+        (None, Some(l)) => (l, ResumptionOutcomeKind::NextAwayCandidate),
+        (None, None) => (observation_end_ms.max(t0), ResumptionOutcomeKind::Censored),
+    };
+
+    ResumptionOutcome {
+        elapsed_ms: at.saturating_sub(t0),
+        kind,
+    }
+}
+
+/// Aalen–Johansen 推定量による受領の累積発生関数 (CIF)。
+///
+/// ```text
+/// S(t_0) = 1
+/// S(t_j) = S(t_{j-1}) * (1 - (d1_j + d2_j) / n_j)
+/// CIF_receipt(t) = Σ_{t_j <= t}  S(t_{j-1}) * d1_j / n_j
+/// ```
+/// `n_j` = `t_j` 時点のリスク集合 (`elapsed_ms >= t_j`。打ち切りも同時刻なら at risk とする
+/// 標準的な扱い) / `d1_j` = 受領 / `d2_j` = 次の離席候補。
+///
+/// ⚠️★★★ **地平まで追跡が届いていないときは `None` を返す** (`code-reviewer` H1)。
+/// ★ 返さないと、**30 秒で観測が終わっただけ**の集団に対して `CIF = 0.0` →
+/// `receipt_free = 1.0` = 「5 分間 1 件も受領しなかった」と読める値が出てしまう。
+/// ★ 判定は「地平までに事象が 1 件も起きず、かつ地平時点のリスク集合が空」——
+/// ★ このとき推定値は**外挿でしかない**。
+///
+/// 事象 0 のとき `None` (NaN を出さない)。⚠️ 依存 crate を足さない純粋関数。
+fn cif_receipt(outcomes: &[ResumptionOutcome], horizon_ms: u64) -> Option<f64> {
+    if outcomes.is_empty() {
+        return None;
+    }
+    let mut times: Vec<u64> = outcomes
+        .iter()
+        .filter(|o| o.kind != ResumptionOutcomeKind::Censored)
+        .map(|o| o.elapsed_ms)
+        .collect();
+    times.sort_unstable();
+    times.dedup();
+
+    // H1: 追跡が地平に届いておらず、地平までに事象も無い → 推定できない。
+    if !times.iter().any(|&t| t <= horizon_ms) && n_at_risk(outcomes, horizon_ms) == 0 {
+        return None;
+    }
+
+    let mut surv = 1.0_f64; // S(t_{j-1})
+    let mut cif = 0.0_f64;
+    for &t in &times {
+        if t > horizon_ms {
+            break;
+        }
+        // `t` は非打ち切り outcome の経過時間なので、その outcome 自身が必ず at risk。
+        // よって `n_j >= 1` であり 0 除算は起きない。
+        let n_j = outcomes.iter().filter(|o| o.elapsed_ms >= t).count() as f64;
+        let d1 = outcomes
+            .iter()
+            .filter(|o| o.elapsed_ms == t && o.kind == ResumptionOutcomeKind::Receipt)
+            .count() as f64;
+        let d2 = outcomes
+            .iter()
+            .filter(|o| o.elapsed_ms == t && o.kind == ResumptionOutcomeKind::NextAwayCandidate)
+            .count() as f64;
+        cif += surv * (d1 / n_j);
+        surv *= 1.0 - (d1 + d2) / n_j;
+    }
+    Some(cif)
+}
+
+/// `receipt_free_resumption` を算出する純粋関数。
+///
+/// `observation_end_ms` は打ち切り時刻 (= セッションの観測終端)。
+/// ⚠️★★★ **`feats` を受け取らない。**★ これが「推定器を通らない」ことの構造的な保証である
+/// (ADR-024 AC-2)。
+pub fn compute_receipt_free_resumption(
+    episodes: &[StuckEpisode],
+    pastes: &[PasteEvent],
+    keys: &[KeyPress],
+    observation_end_ms: u64,
+    cfg: &OutcomeConfig,
+) -> ReceiptFreeResumption {
+    let events = segment_resumptions(episodes, keys, cfg);
+    let outcomes: Vec<ResumptionOutcome> = events
+        .iter()
+        .map(|ev| classify_resumption(ev, pastes, keys, observation_end_ms, cfg))
+        .collect();
+
+    // ⚠️ 終端の時刻ではなく添字で数える (終端が同値のエピソードでも取りこぼさない)。
+    let mut source_episodes: Vec<usize> = events.iter().map(|e| e.episode_index).collect();
+    source_episodes.sort_unstable();
+    source_episodes.dedup();
+
+    let count_of =
+        |k: ResumptionOutcomeKind| outcomes.iter().filter(|o| o.kind == k).count() as u32;
+
+    // H2: 追跡時間ゼロの事象は CIF から外す (件数は残す)。
+    let tracked: Vec<ResumptionOutcome> = outcomes
+        .iter()
+        .copied()
+        .filter(|o| !is_degenerate(o))
+        .collect();
+
+    ReceiptFreeResumption {
+        event_count: outcomes.len() as u32,
+        source_episode_count: source_episodes.len() as u32,
+        receipt_count: count_of(ResumptionOutcomeKind::Receipt),
+        next_away_candidate_count: count_of(ResumptionOutcomeKind::NextAwayCandidate),
+        censored_count: count_of(ResumptionOutcomeKind::Censored),
+        degenerate_count: outcomes.iter().filter(|o| is_degenerate(o)).count() as u32,
+        n_at_risk_at_5min: n_at_risk(&tracked, RECEIPT_HORIZON_5MIN_MS),
+        n_at_risk_at_10min: n_at_risk(&tracked, RECEIPT_HORIZON_10MIN_MS),
+        receipt_free_at_5min: cif_receipt(&tracked, RECEIPT_HORIZON_5MIN_MS).map(|c| 1.0 - c),
+        receipt_free_at_10min: cif_receipt(&tracked, RECEIPT_HORIZON_10MIN_MS).map(|c| 1.0 - c),
+        outcomes,
+    }
+}
+
 /// v0.4 アウトカム指標を算出する純粋関数。
 /// `feats` は回復判定 (p_flow>0.5) と session span に使う。`episodes` は
 /// `segment_stuck_episodes` 等で得た Stuck 候補区間。すべて timestamp 昇順を仮定。
@@ -352,9 +724,9 @@ pub fn compute_outcome_metrics(
     // エピソード単位の集計
     let episode_count = episodes.len() as u32;
     let mut paste_after_stuck = 0u32;
-    let mut self_recovery_no_paste = 0u32;
-    let mut recovered_count = 0u32;
-    let mut productive_recovery = 0u32;
+    let mut pflow_exit_no_receipt = 0u32;
+    let mut pflow_exit_count = 0u32;
+    let mut pflow_exit_manual_gain = 0u32;
 
     for ep in episodes {
         // after_stuck 窓内の paste
@@ -367,28 +739,42 @@ pub fn compute_outcome_metrics(
         }
 
         // 回復 (p_flow>0.5) を end_ms 以降 recovery_window 内に探す (既存プリミティブ再利用)
-        if let Some(rec_ts) = compute_recovered_at(
+        if let Some(rec_ts) = compute_pflow_exit_at(
             ep.end_ms,
             feats,
-            cfg.recovery_window_ms,
+            cfg.pflow_exit_window_ms,
             DEFAULT_P_FLOW_THRESHOLD,
         ) {
-            recovered_count += 1;
+            pflow_exit_count += 1;
             // 回復までの間 [end_ms, rec_ts] に paste が無いか
             let no_paste = !has_paste_in(pastes, ep.end_ms, rec_ts);
             if no_paste {
-                self_recovery_no_paste += 1;
+                pflow_exit_no_receipt += 1;
                 // net_diff 正進行 (manual 純増 >= net_diff_min) かつ paste 無し
                 if manual_insert_chars_in(keys, ep.end_ms, rec_ts) >= cfg.net_diff_min {
-                    productive_recovery += 1;
+                    pflow_exit_manual_gain += 1;
                 }
             }
         }
     }
 
     let paste_after_stuck_rate = ratio(paste_after_stuck, episode_count);
-    let self_recovery_without_paste = ratio(self_recovery_no_paste, episode_count);
-    let productive_manual_recovery_rate = ratio(productive_recovery, recovered_count);
+    let pflow_exit_without_receipt = ratio(pflow_exit_no_receipt, episode_count);
+    let pflow_exit_manual_gain_rate = ratio(pflow_exit_manual_gain, pflow_exit_count);
+
+    // ★★★ 主要アウトカム (ADR-024): 推定器を通らない receipt_free_resumption。
+    // 打ち切り時刻 = 観測されたイベントの最終時刻。feats / keys / pastes の末尾の最大を採る
+    // (⚠️ feats は「いつまで観測していたか」にだけ使い、p_flow の値は読まない)。
+    // ⚠️ `last()` は昇順を前提にするので、ここでは列全体の最大を採る (整列前提を持ち込まない)。
+    let observation_end_ms = feats
+        .iter()
+        .map(|f| f.timestamp)
+        .chain(keys.iter().map(|k| k.timestamp))
+        .chain(pastes.iter().map(|p| p.timestamp))
+        .max()
+        .unwrap_or(0);
+    let receipt_free_resumption =
+        compute_receipt_free_resumption(episodes, pastes, keys, observation_end_ms, cfg);
 
     // 補助: paste_count_per_hour (feat 列の span をセッション時間とみなす)
     let paste_count_per_hour = match (feats.first(), feats.last()) {
@@ -404,20 +790,21 @@ pub fn compute_outcome_metrics(
     };
 
     OutcomeMetrics {
+        receipt_free_resumption,
         manual_insert_chars,
         external_paste_chars_total,
         manual_contribution_ratio,
-        productive_manual_recovery_rate,
+        pflow_exit_manual_gain_rate,
         external_paste_count,
         // 収集時にしか分からないため compute では 0。`--metrics` 経路 (replay.rs) が
         // collect_paste_events の戻り値で上書きする。
         excluded_paste_count: 0,
         large_paste_rate,
         paste_after_stuck_rate,
-        self_recovery_without_paste,
+        pflow_exit_without_receipt,
         paste_count_per_hour,
         stuck_episode_count: episode_count,
-        recovered_episode_count: recovered_count,
+        pflow_exit_episode_count: pflow_exit_count,
     }
 }
 
@@ -438,7 +825,12 @@ fn fmt_opt_ratio(v: Option<f64>) -> String {
 
 /// Stuck ラベル時刻以降、`p_flow > threshold` に達する最初の FeatSnapshot 時刻を返す。
 /// `window_ms` 以内に到達しなければ `None`。
-pub fn compute_recovered_at(
+///
+/// ⚠️★★★ **旧名 `compute_recovered_at`** (ADR-024 D2 で改名)。★ 返すのは
+/// 「**3 クラス事後分布が flow 側へ移った時刻**」であって「解決した時刻」ではない。
+/// ⚠️ `p_flow > 0.5` は `p_stuck < 0.5` を必然的に含む (事後分布は正規化されている)
+/// ため、これは**トリガーと独立した測定ではない** (ADR-023 D7)。
+pub fn compute_pflow_exit_at(
     stuck_ts: u64,
     feats: &[FeatSnapshot],
     window_ms: u64,
@@ -491,10 +883,10 @@ pub fn compute_session_metrics(
         }
 
         if lbl.label == LabelClass::Stuck {
-            if let Some(rec_ts) = compute_recovered_at(
+            if let Some(rec_ts) = compute_pflow_exit_at(
                 lbl.timestamp,
                 feats,
-                DEFAULT_RECOVERY_WINDOW_MS,
+                DEFAULT_PFLOW_EXIT_WINDOW_MS,
                 DEFAULT_P_FLOW_THRESHOLD,
             ) {
                 recoveries.push(rec_ts.saturating_sub(lbl.timestamp));
@@ -583,8 +975,27 @@ pub fn format_pretty(m: &SessionMetrics) -> String {
     if let Some(o) = &m.outcome {
         out.push_str("  Outcome metrics (v0.4):\n");
         out.push_str(&format!(
-            "    Stuck episodes: {} (recovered: {})\n",
-            o.stuck_episode_count, o.recovered_episode_count
+            "    Stuck episodes: {} (p_flow exit: {})\n",
+            o.stuck_episode_count, o.pflow_exit_episode_count
+        ));
+        // ★★★ 主要アウトカム (ADR-024)。推定器を通らないので先頭に置く。
+        let r = &o.receipt_free_resumption;
+        out.push_str(&format!(
+            "    [PRIMARY] receipt_free_resumption  5min: {}  10min: {}\n",
+            fmt_opt_ratio(r.receipt_free_at_5min),
+            fmt_opt_ratio(r.receipt_free_at_10min)
+        ));
+        out.push_str(&format!(
+            "              events: {} (from {} episodes)  receipt: {}  next_away_cand: {}  censored: {}\n",
+            r.event_count,
+            r.source_episode_count,
+            r.receipt_count,
+            r.next_away_candidate_count,
+            r.censored_count
+        ));
+        out.push_str(&format!(
+            "              degenerate: {}  n_at_risk 5min: {}  10min: {}\n",
+            r.degenerate_count, r.n_at_risk_at_5min, r.n_at_risk_at_10min
         ));
         out.push_str(&format!(
             "    manual_insert_chars: {}  external_paste_chars: {}  external_paste_count: {} (excluded: {})\n",
@@ -594,13 +1005,14 @@ pub fn format_pretty(m: &SessionMetrics) -> String {
             "    manual_contribution_ratio: {}\n",
             fmt_opt_ratio(o.manual_contribution_ratio)
         ));
+        // ⚠️ 以下 2 本は p_flow 依存 (ADR-023 D7 / ADR-024)。主要アウトカムにしない。
         out.push_str(&format!(
-            "    productive_manual_recovery_rate: {}\n",
-            fmt_opt_ratio(o.productive_manual_recovery_rate)
+            "    [pflow-dependent] pflow_exit_manual_gain_rate: {}\n",
+            fmt_opt_ratio(o.pflow_exit_manual_gain_rate)
         ));
         out.push_str(&format!(
-            "    self_recovery_without_paste: {}  paste_after_stuck_rate: {}\n",
-            fmt_opt_ratio(o.self_recovery_without_paste),
+            "    [pflow-dependent] pflow_exit_without_receipt: {}  paste_after_stuck_rate: {}\n",
+            fmt_opt_ratio(o.pflow_exit_without_receipt),
             fmt_opt_ratio(o.paste_after_stuck_rate)
         ));
         out.push_str(&format!(
@@ -854,7 +1266,7 @@ mod tests {
             feat(3000, 0.6, 0.3, 0.1), // p_flow > 0.5
             feat(4000, 0.9, 0.05, 0.05),
         ];
-        let got = compute_recovered_at(1000, &feats, 60_000, 0.5);
+        let got = compute_pflow_exit_at(1000, &feats, 60_000, 0.5);
         assert_eq!(got, Some(3000));
     }
 
@@ -865,7 +1277,7 @@ mod tests {
             feat(1500, 0.1, 0.2, 0.7),
             feat(60_000, 0.9, 0.05, 0.05), // 窓(1000+5000=6000) 外
         ];
-        let got = compute_recovered_at(1000, &feats, 5_000, 0.5);
+        let got = compute_pflow_exit_at(1000, &feats, 5_000, 0.5);
         assert_eq!(got, None);
     }
 
@@ -879,13 +1291,13 @@ mod tests {
             feat(5000, 0.2, 0.2, 0.6),
             feat(7000, 0.7, 0.2, 0.1),
         ];
-        assert_eq!(compute_recovered_at(1000, &feats, 60_000, 0.5), Some(3000));
-        assert_eq!(compute_recovered_at(5000, &feats, 60_000, 0.5), Some(7000));
+        assert_eq!(compute_pflow_exit_at(1000, &feats, 60_000, 0.5), Some(3000));
+        assert_eq!(compute_pflow_exit_at(5000, &feats, 60_000, 0.5), Some(7000));
     }
 
     #[test]
     fn recovered_at_returns_none_on_empty_feats() {
-        assert_eq!(compute_recovered_at(1000, &[], 60_000, 0.5), None);
+        assert_eq!(compute_pflow_exit_at(1000, &[], 60_000, 0.5), None);
     }
 
     #[test]
@@ -1221,16 +1633,16 @@ mod tests {
         assert_eq!(o.manual_insert_chars, 0);
         assert_eq!(o.external_paste_count, 0);
         assert!(o.manual_contribution_ratio.is_none());
-        assert!(o.productive_manual_recovery_rate.is_none());
+        assert!(o.pflow_exit_manual_gain_rate.is_none());
         assert!(o.large_paste_rate.is_none());
         assert!(o.paste_after_stuck_rate.is_none());
-        assert!(o.self_recovery_without_paste.is_none());
+        assert!(o.pflow_exit_without_receipt.is_none());
         assert!(o.paste_count_per_hour.is_none());
         assert_eq!(o.stuck_episode_count, 0);
     }
 
     #[test]
-    fn outcome_self_recovery_without_paste_and_productive() {
+    fn outcome_pflow_exit_without_receipt_and_manual_gain() {
         let cfg = OutcomeConfig::default();
         // Stuck @10_000-11_000、その後 manual で打鍵し p_flow>0.5 に回復 (paste 無し)。
         let feats = vec![
@@ -1244,16 +1656,16 @@ mod tests {
         let keys = vec![kp(12_000, 0x41), kp(13_000, 0x42), kp(14_000, 0x43)];
         let o = compute_outcome_metrics(&episodes, &[], &keys, &feats, &cfg);
         assert_eq!(o.stuck_episode_count, 1);
-        assert_eq!(o.recovered_episode_count, 1);
-        assert_eq!(o.self_recovery_without_paste, Some(1.0));
-        assert_eq!(o.productive_manual_recovery_rate, Some(1.0));
+        assert_eq!(o.pflow_exit_episode_count, 1);
+        assert_eq!(o.pflow_exit_without_receipt, Some(1.0));
+        assert_eq!(o.pflow_exit_manual_gain_rate, Some(1.0));
         assert_eq!(o.paste_after_stuck_rate, Some(0.0));
         // manual のみ → manual_contribution_ratio = 1.0
         assert_eq!(o.manual_contribution_ratio, Some(1.0));
     }
 
     #[test]
-    fn outcome_paste_in_recovery_window_excludes_self_recovery() {
+    fn outcome_paste_in_pflow_exit_window_excludes_receipt_free() {
         let cfg = OutcomeConfig::default();
         let feats = vec![
             feat(10_000, 0.1, 0.2, 0.7),
@@ -1265,9 +1677,9 @@ mod tests {
         let pastes = vec![pe(15_000, 60)];
         let keys = vec![kp(16_000, 0x41)];
         let o = compute_outcome_metrics(&episodes, &pastes, &keys, &feats, &cfg);
-        assert_eq!(o.recovered_episode_count, 1);
-        assert_eq!(o.self_recovery_without_paste, Some(0.0));
-        assert_eq!(o.productive_manual_recovery_rate, Some(0.0)); // 回復1・productive0
+        assert_eq!(o.pflow_exit_episode_count, 1);
+        assert_eq!(o.pflow_exit_without_receipt, Some(0.0));
+        assert_eq!(o.pflow_exit_manual_gain_rate, Some(0.0)); // 回復1・productive0
         assert_eq!(o.paste_after_stuck_rate, Some(1.0)); // end(11_000)+120s 内に paste(15_000)
         assert_eq!(o.external_paste_count, 1);
         assert_eq!(o.large_paste_rate, Some(1.0)); // 60 >= 50
@@ -1295,9 +1707,9 @@ mod tests {
         let episodes = segment_stuck_episodes(&feats, &cfg);
         assert_eq!(episodes.len(), 1);
         let o = compute_outcome_metrics(&episodes, &[], &[], &feats, &cfg);
-        assert_eq!(o.recovered_episode_count, 0);
-        assert!(o.productive_manual_recovery_rate.is_none());
-        assert_eq!(o.self_recovery_without_paste, Some(0.0)); // 分母=全エピソード1
+        assert_eq!(o.pflow_exit_episode_count, 0);
+        assert!(o.pflow_exit_manual_gain_rate.is_none());
+        assert_eq!(o.pflow_exit_without_receipt, Some(0.0)); // 分母=全エピソード1
     }
 
     // ── RangeLabel / compute_range_metrics tests ────────────────────
@@ -1373,5 +1785,400 @@ mod tests {
         let m = compute_range_metrics(&range_labels, &feats);
         assert!(m.detection_lead_ms_median.is_none());
         assert!(m.stuck_recovery_ms_median.is_none());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // receipt_free_resumption (ADR-024)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// AC-3: 離席候補の閾値の SSOT が 1 つであること。
+    /// ⚠️ ここが赤になったら、どこかで 180_000 が再定義されている。
+    ///
+    /// ★ `probe_scheduler` も同じ閾値を使う (離席中はプローブを抑止する)。
+    /// ⚠️★★★ 2026-09-07 の `security-checker` 指摘 LOW-2 —— そちらは `180_000` を
+    /// 独自に持っており、本テストでは検出できなかった。→ SSOT を引くよう直したうえで、
+    /// **同じテストで両方を固定する**。
+    #[test]
+    fn away_gap_default_matches_intervention_ssot() {
+        use crate::analysis::intervention::AWAY_IDLE_MS as SSOT;
+        assert_eq!(OutcomeConfig::default().away_gap_ms, SSOT);
+        assert_eq!(
+            crate::analysis::probe_scheduler::ProbeConfig::default().away_idle_ms,
+            SSOT,
+            "probe_scheduler must not redefine the away-candidate threshold"
+        );
+    }
+
+    /// 境界: away_gap_ms 未満のギャップは事象にならない。
+    #[test]
+    fn resumption_requires_away_gap() {
+        let cfg = OutcomeConfig::default();
+        let episodes = vec![StuckEpisode {
+            start_ms: 10_000,
+            end_ms: 11_000,
+        }];
+        // 179 秒 → 事象なし
+        let short = vec![kp(11_000, 0x41), kp(11_000 + 179_000, 0x42)];
+        assert!(segment_resumptions(&episodes, &short, &cfg).is_empty());
+        // ちょうど 180 秒 → 事象あり (>= 判定)
+        let exact = vec![kp(11_000, 0x41), kp(11_000 + 180_000, 0x42)];
+        assert_eq!(segment_resumptions(&episodes, &exact, &cfg).len(), 1);
+        // 181 秒 → 事象あり
+        let long = vec![kp(11_000, 0x41), kp(11_000 + 181_000, 0x42)];
+        let evs = segment_resumptions(&episodes, &long, &cfg);
+        assert_eq!(evs.len(), 1);
+        assert_eq!(evs[0].gap_start_ms, 11_000);
+        assert_eq!(evs[0].resumed_at_ms, 11_000 + 181_000);
+        assert_eq!(evs[0].episode_end_ms, 11_000);
+    }
+
+    /// 紐づけ規則: ギャップ開始が `end_ms + after_window_ms` を超えたら紐づかない。
+    #[test]
+    fn resumption_links_to_episode_within_after_window() {
+        let cfg = OutcomeConfig::default(); // after_window_ms = 120_000
+        let episodes = vec![StuckEpisode {
+            start_ms: 10_000,
+            end_ms: 11_000,
+        }];
+        let boundary = 11_000 + 120_000; // 131_000 = 窓の右端 (含む)
+        let inside = vec![kp(boundary, 0x41), kp(boundary + 200_000, 0x42)];
+        assert_eq!(segment_resumptions(&episodes, &inside, &cfg).len(), 1);
+        let outside = vec![kp(boundary + 1, 0x41), kp(boundary + 200_001, 0x42)];
+        assert!(segment_resumptions(&episodes, &outside, &cfg).is_empty());
+    }
+
+    /// 同時刻のタイブレークは受領を優先する (保守側)。
+    #[test]
+    fn resumption_outcome_receipt_wins_tie() {
+        let cfg = OutcomeConfig::default();
+        let t0 = 200_000_u64;
+        let ev = ResumptionEvent {
+            gap_start_ms: 11_000,
+            resumed_at_ms: t0,
+            episode_end_ms: 11_000,
+            episode_index: 0,
+        };
+        // t0+1000 で再離席が始まり、同時刻に受領もある
+        let keys = vec![kp(t0, 0x41), kp(t0 + 1_000, 0x42), kp(t0 + 181_000, 0x43)];
+        let pastes = vec![pe(t0 + 1_000, 30)];
+        let out = classify_resumption(&ev, &pastes, &keys, t0 + 400_000, &cfg);
+        assert_eq!(out.kind, ResumptionOutcomeKind::Receipt);
+        assert_eq!(out.elapsed_ms, 1_000);
+    }
+
+    /// 受領が無ければ「次の離席候補ギャップの開始」が競合イベントになる。
+    #[test]
+    fn resumption_outcome_next_away_candidate_is_competing() {
+        let cfg = OutcomeConfig::default();
+        let t0 = 200_000_u64;
+        let ev = ResumptionEvent {
+            gap_start_ms: 11_000,
+            resumed_at_ms: t0,
+            episode_end_ms: 11_000,
+            episode_index: 0,
+        };
+        let keys = vec![kp(t0, 0x41), kp(t0 + 1_000, 0x42), kp(t0 + 181_000, 0x43)];
+        let out = classify_resumption(&ev, &[], &keys, t0 + 400_000, &cfg);
+        assert_eq!(out.kind, ResumptionOutcomeKind::NextAwayCandidate);
+        assert_eq!(out.elapsed_ms, 1_000);
+    }
+
+    /// どちらも起きなければ観測終端で打ち切り。
+    #[test]
+    fn resumption_outcome_censored_at_observation_end() {
+        let cfg = OutcomeConfig::default();
+        let t0 = 200_000_u64;
+        let ev = ResumptionEvent {
+            gap_start_ms: 11_000,
+            resumed_at_ms: t0,
+            episode_end_ms: 11_000,
+            episode_index: 0,
+        };
+        let keys = vec![kp(t0, 0x41), kp(t0 + 1_000, 0x42)];
+        let out = classify_resumption(&ev, &[], &keys, t0 + 90_000, &cfg);
+        assert_eq!(out.kind, ResumptionOutcomeKind::Censored);
+        assert_eq!(out.elapsed_ms, 90_000);
+    }
+
+    fn ro(elapsed_ms: u64, kind: ResumptionOutcomeKind) -> ResumptionOutcome {
+        ResumptionOutcome { elapsed_ms, kind }
+    }
+
+    /// ★★★ 検算: 手計算した Aalen-Johansen の値と一致すること。
+    ///
+    /// 3 事象 (60s 受領 / 120s 再離席 / 180s 受領):
+    ///   t=60:  n=3 d1=1 d2=0 → CIF += 1 * 1/3 = 1/3,  S = 2/3
+    ///   t=120: n=2 d1=0 d2=1 → CIF += 0,              S = 1/3
+    ///   t=180: n=1 d1=1 d2=0 → CIF += 1/3 * 1/1 = 1/3
+    ///   CIF(300s) = 2/3
+    ///   CIF(100s) = 1/3   (t=120 以降は地平の外)
+    #[test]
+    fn cif_receipt_matches_hand_computation() {
+        let outcomes = vec![
+            ro(60_000, ResumptionOutcomeKind::Receipt),
+            ro(120_000, ResumptionOutcomeKind::NextAwayCandidate),
+            ro(180_000, ResumptionOutcomeKind::Receipt),
+        ];
+        let at_300 = cif_receipt(&outcomes, 300_000).unwrap();
+        assert!((at_300 - 2.0 / 3.0).abs() < 1e-12, "got {at_300}");
+        let at_100 = cif_receipt(&outcomes, 100_000).unwrap();
+        assert!((at_100 - 1.0 / 3.0).abs() < 1e-12, "got {at_100}");
+    }
+
+    /// CIF は単調非減少かつ [0,1]。
+    #[test]
+    fn cif_receipt_monotone_and_bounded() {
+        let outcomes = vec![
+            ro(30_000, ResumptionOutcomeKind::Receipt),
+            ro(60_000, ResumptionOutcomeKind::Censored),
+            ro(240_000, ResumptionOutcomeKind::NextAwayCandidate),
+            ro(400_000, ResumptionOutcomeKind::Receipt),
+            ro(500_000, ResumptionOutcomeKind::Censored),
+        ];
+        let a = cif_receipt(&outcomes, RECEIPT_HORIZON_5MIN_MS).unwrap();
+        let b = cif_receipt(&outcomes, RECEIPT_HORIZON_10MIN_MS).unwrap();
+        assert!((0.0..=1.0).contains(&a), "5min out of range: {a}");
+        assert!((0.0..=1.0).contains(&b), "10min out of range: {b}");
+        assert!(b >= a, "CIF must be non-decreasing: {a} -> {b}");
+        // 400s の受領は 5 分地平の外・10 分地平の内 → 厳密に増える
+        assert!(b > a);
+    }
+
+    /// 事象 0 → None (NaN を出さない)。
+    #[test]
+    fn receipt_free_resumption_none_when_no_events() {
+        let cfg = OutcomeConfig::default();
+        let r = compute_receipt_free_resumption(&[], &[], &[], 0, &cfg);
+        assert_eq!(r.event_count, 0);
+        assert_eq!(r.source_episode_count, 0);
+        assert!(r.receipt_free_at_5min.is_none());
+        assert!(r.receipt_free_at_10min.is_none());
+    }
+
+    /// ⚠️★★★ **AC-2**: `receipt_free_resumption` は `p_flow` に依存しない。
+    ///
+    /// `p_stuck` を固定したまま `p_flow` だけを動かすと、
+    /// 副次の `pflow_exit_without_receipt` は **1.0 → 0.0** に変わるのに、
+    /// 主要アウトカムは **1 ビットも動かない**。
+    #[test]
+    fn receipt_free_resumption_has_no_pflow_dependency() {
+        let cfg = OutcomeConfig::default();
+        // p_stuck は両者で完全に同一 → episodes も observation_end も同一。
+        let feats_exit = vec![
+            feat(10_000, 0.1, 0.2, 0.7),
+            feat(11_000, 0.1, 0.2, 0.7),
+            feat(20_000, 0.8, 0.1, 0.1), // p_flow > 0.5 → 抜けたと判定される
+            feat(400_000, 0.8, 0.1, 0.1),
+        ];
+        let feats_no_exit = vec![
+            feat(10_000, 0.1, 0.2, 0.7),
+            feat(11_000, 0.1, 0.2, 0.7),
+            feat(20_000, 0.1, 0.8, 0.1), // p_flow <= 0.5 (p_stuck は同じ 0.1)
+            feat(400_000, 0.1, 0.8, 0.1),
+        ];
+        let episodes = segment_stuck_episodes(&feats_exit, &cfg);
+        assert_eq!(episodes, segment_stuck_episodes(&feats_no_exit, &cfg));
+
+        // 11_000 で打鍵が途切れ、200_000 に再開。260_000 に受領。
+        let keys = vec![kp(11_000, 0x41), kp(200_000, 0x42)];
+        let pastes = vec![pe(260_000, 40)];
+
+        let a = compute_outcome_metrics(&episodes, &pastes, &keys, &feats_exit, &cfg);
+        let b = compute_outcome_metrics(&episodes, &pastes, &keys, &feats_no_exit, &cfg);
+
+        // 副次指標は p_flow に引きずられて動く (これが ADR-023 D7 の問題)
+        assert_eq!(a.pflow_exit_without_receipt, Some(1.0));
+        assert_eq!(b.pflow_exit_without_receipt, Some(0.0));
+
+        // ★★★ 主要アウトカムは 1 ビットも動かない
+        let (ra, rb) = (&a.receipt_free_resumption, &b.receipt_free_resumption);
+        assert_eq!(ra.event_count, 1);
+        assert_eq!(ra.event_count, rb.event_count);
+        assert_eq!(ra.source_episode_count, rb.source_episode_count);
+        assert_eq!(ra.receipt_count, rb.receipt_count);
+        assert_eq!(ra.next_away_candidate_count, rb.next_away_candidate_count);
+        assert_eq!(ra.censored_count, rb.censored_count);
+        assert_eq!(ra.receipt_free_at_5min, rb.receipt_free_at_5min);
+        assert_eq!(ra.receipt_free_at_10min, rb.receipt_free_at_10min);
+        // 受領が再開 60 秒後 (単一事象) → CIF(5min) = 1.0 → receipt_free = 0.0
+        assert_eq!(ra.receipt_count, 1);
+        assert_eq!(ra.receipt_free_at_5min, Some(0.0));
+    }
+
+    /// ⚠️★★★ **H1 の回帰テスト** (`code-reviewer` 2026-09-07)。
+    ///
+    /// ★ 全事象が打ち切りで、しかも追跡が地平に届いていないとき、
+    /// **旧実装は `CIF = 0.0` → `receipt_free = 1.0`** を返していた ——
+    /// つまり「30 秒で観測が終わっただけ」を「5 分間 1 件も受領しなかった」と読める値にしていた。
+    /// ★ いまは `None` を返す。
+    #[test]
+    fn cif_receipt_none_when_followup_short_of_horizon() {
+        // 30 秒で打ち切り 1 件のみ → 5 分地平には全く届いていない
+        let only_censored = vec![ro(30_000, ResumptionOutcomeKind::Censored)];
+        assert_eq!(cif_receipt(&only_censored, RECEIPT_HORIZON_5MIN_MS), None);
+        assert_eq!(n_at_risk(&only_censored, RECEIPT_HORIZON_5MIN_MS), 0);
+
+        // 地平まで追跡が残っていれば、事象ゼロでも 0.0 を返してよい (= 本当に受領が無かった)
+        let censored_past_horizon = vec![ro(400_000, ResumptionOutcomeKind::Censored)];
+        assert_eq!(
+            cif_receipt(&censored_past_horizon, RECEIPT_HORIZON_5MIN_MS),
+            Some(0.0)
+        );
+        assert_eq!(
+            n_at_risk(&censored_past_horizon, RECEIPT_HORIZON_5MIN_MS),
+            1
+        );
+
+        // 地平までに事象が起きていれば、そのあと追跡が尽きても推定してよい
+        let event_within = vec![ro(60_000, ResumptionOutcomeKind::Receipt)];
+        assert_eq!(
+            cif_receipt(&event_within, RECEIPT_HORIZON_5MIN_MS),
+            Some(1.0)
+        );
+    }
+
+    /// ⚠️★★★ **H2 の回帰テスト** (`code-reviewer` 2026-09-07)。
+    ///
+    /// ★ 「戻ってきて 1 打鍵してまた消えた」は追跡時間ゼロの競合事象になる。
+    /// ⚠️ 旧実装はこれを CIF に入れ、**受領が起きる前にリスク集合を食い潰して
+    /// `receipt_free` を 1.0 へ寄せていた**。★ いまは除外し、件数だけ残す。
+    #[test]
+    fn degenerate_resumption_excluded_from_cif() {
+        let cfg = OutcomeConfig::default();
+        let episodes = vec![StuckEpisode {
+            start_ms: 10_000,
+            end_ms: 11_000,
+        }];
+        // 11_000 で途切れ → 192_000 に 1 打鍵だけして → また 181 秒途切れる
+        let keys = vec![kp(11_000, 0x41), kp(192_000, 0x42), kp(373_000, 0x43)];
+        let r = compute_receipt_free_resumption(&episodes, &[], &keys, 400_000, &cfg);
+
+        // 事象としては数えるが……
+        assert_eq!(r.event_count, 1);
+        assert_eq!(r.next_away_candidate_count, 1);
+        // ★ 追跡時間ゼロなので CIF からは外す
+        assert_eq!(r.degenerate_count, 1);
+        assert_eq!(r.n_at_risk_at_5min, 0);
+        // ⚠️ 旧実装はここで Some(1.0) を返していた (満点)
+        assert_eq!(r.receipt_free_at_5min, None);
+        assert_eq!(r.receipt_free_at_10min, None);
+    }
+
+    /// ★ 事象単位の観測結果が出力に載ること (被験者を跨いだプールに要る・`code-reviewer` M1)。
+    /// ⚠️ 絶対時刻ではなく**原点からの相対時間**であることも同時に固定する。
+    #[test]
+    fn receipt_free_resumption_exposes_relative_event_rows() {
+        let cfg = OutcomeConfig::default();
+        let episodes = vec![StuckEpisode {
+            start_ms: 10_000,
+            end_ms: 11_000,
+        }];
+        let keys = vec![kp(11_000, 0x41), kp(200_000, 0x42), kp(210_000, 0x43)];
+        let pastes = vec![pe(260_000, 40)];
+        let r = compute_receipt_free_resumption(&episodes, &pastes, &keys, 400_000, &cfg);
+        assert_eq!(r.outcomes.len(), 1);
+        // t0 = 200_000, 受領 = 260_000 → 相対 60_000 (★ 絶対時刻 260_000 ではない)
+        assert_eq!(r.outcomes[0].elapsed_ms, 60_000);
+        assert_eq!(r.outcomes[0].kind, ResumptionOutcomeKind::Receipt);
+    }
+
+    /// ⚠️ 終端が同値のエピソードが 2 本あっても寄与エピソード数を取りこぼさない
+    /// (`code-reviewer`(Codex) High・2026-09-07)。★ 添字で数えているかを固定する。
+    #[test]
+    fn source_episode_count_uses_index_not_end_timestamp() {
+        let cfg = OutcomeConfig::default();
+        // ⚠️ 人為的に end_ms が同値の 2 エピソードを渡す (呼び出し側の性質に依存しない形か)。
+        let episodes = vec![
+            StuckEpisode {
+                start_ms: 5_000,
+                end_ms: 11_000,
+            },
+            StuckEpisode {
+                start_ms: 10_000,
+                end_ms: 11_000,
+            },
+        ];
+        let keys = vec![kp(11_000, 0x41), kp(200_000, 0x42)];
+        let evs = segment_resumptions(&episodes, &keys, &cfg);
+        assert_eq!(evs.len(), 1);
+        // 条件を満たすエピソードが複数あるときは最も遅いものを採る (= 添字 1)
+        assert_eq!(evs[0].episode_index, 1);
+        assert_eq!(evs[0].episode_end_ms, 11_000);
+    }
+
+    /// ⚠️ 観測終端が再開時刻より前でも破綻しない (`code-reviewer`(Codex) テスト不足・#5)。
+    #[test]
+    fn resumption_outcome_handles_observation_end_before_t0() {
+        let cfg = OutcomeConfig::default();
+        let t0 = 200_000_u64;
+        let ev = ResumptionEvent {
+            gap_start_ms: 11_000,
+            resumed_at_ms: t0,
+            episode_end_ms: 11_000,
+            episode_index: 0,
+        };
+        // observation_end < t0 (壊れたログ / 呼び出し側の取り違え)
+        let out = classify_resumption(&ev, &[], &[kp(t0, 0x41)], t0 - 50_000, &cfg);
+        assert_eq!(out.kind, ResumptionOutcomeKind::Censored);
+        assert_eq!(out.elapsed_ms, 0); // 負にならない (saturating)
+                                       // ★ 追跡時間ゼロなので CIF からは外れる
+        assert!(is_degenerate(&out));
+    }
+
+    /// ⚠️ ソート前提が破れたら `debug_assert` で落ちる (`code-reviewer`(Codex) Medium・#2)。
+    /// ★ 静かに誤分類するより落ちるほうがよい。
+    #[test]
+    #[should_panic(expected = "keys must be sorted")]
+    fn segment_resumptions_rejects_unsorted_keys() {
+        let cfg = OutcomeConfig::default();
+        let episodes = vec![StuckEpisode {
+            start_ms: 10_000,
+            end_ms: 11_000,
+        }];
+        let unsorted = vec![kp(200_000, 0x41), kp(11_000, 0x42)];
+        let _ = segment_resumptions(&episodes, &unsorted, &cfg);
+    }
+
+    /// ⚠️★★★ 副次指標の**窓長バイアス**を記録として固定する (ADR-024 §計器の問題 2)。
+    ///
+    /// **ペーストの挙動は完全に同一**なのに、`p_flow` の立ち上がりが速いだけで
+    /// `pflow_exit_without_receipt` が **0.0 → 1.0** に反転する。
+    /// ★ 受領を見る窓 `[end_ms, rec_ts]` の右端が推定器で決まっているため。
+    /// ⚠️ このテストが緑であること自体がバイアスの存在証明である (仕様として固定する)。
+    #[test]
+    fn pflow_exit_without_receipt_is_biased_by_window_length() {
+        let cfg = OutcomeConfig::default();
+        // 遅い立ち上がり: 40_000 でようやく p_flow > 0.5 → 窓 [11_000, 40_000]
+        let slow = vec![
+            feat(10_000, 0.1, 0.2, 0.7),
+            feat(11_000, 0.1, 0.2, 0.7),
+            feat(30_000, 0.4, 0.3, 0.3),
+            feat(40_000, 0.8, 0.1, 0.1),
+        ];
+        // 速い立ち上がり: 20_000 で p_flow > 0.5 → 窓 [11_000, 20_000]
+        // ⚠️ p_stuck 列は slow と同一 (0.7, 0.7, 0.3, 0.1) にしてトリガーを揃える
+        let fast = vec![
+            feat(10_000, 0.1, 0.2, 0.7),
+            feat(11_000, 0.1, 0.2, 0.7),
+            feat(20_000, 0.8, 0.1, 0.3),
+            feat(40_000, 0.8, 0.1, 0.1),
+        ];
+        // paste は両者で同一時刻・同一文字数
+        let pastes = vec![pe(30_000, 40)];
+
+        let eps_slow = segment_stuck_episodes(&slow, &cfg);
+        let eps_fast = segment_stuck_episodes(&fast, &cfg);
+        assert_eq!(eps_slow, eps_fast); // トリガーは同一
+
+        let o_slow = compute_outcome_metrics(&eps_slow, &pastes, &[], &slow, &cfg);
+        let o_fast = compute_outcome_metrics(&eps_fast, &pastes, &[], &fast, &cfg);
+
+        // 窓が paste を含む → 不成立 / 窓が縮んで paste を跨がない → 成立
+        assert_eq!(o_slow.pflow_exit_without_receipt, Some(0.0));
+        assert_eq!(o_fast.pflow_exit_without_receipt, Some(1.0));
+
+        // ★ 主要アウトカムはどちらも事象 0 (離席候補ギャップが無い) で不変
+        assert_eq!(o_slow.receipt_free_resumption.event_count, 0);
+        assert_eq!(o_fast.receipt_free_resumption.event_count, 0);
     }
 }

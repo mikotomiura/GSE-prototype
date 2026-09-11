@@ -38,6 +38,7 @@
 //!
 //! 自己マーカー (hotkey) はスケジュール対象外で、窓計算 ([`self_marker_window`]) のみ提供する。
 
+use crate::analysis::intervention::AWAY_IDLE_MS;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -150,7 +151,8 @@ pub struct ProbeConfig {
     /// (下回ると候補が gap で連続棄却され意味をなさない)。u64::MAX で打ち切り無効
     /// (= 純・同次 Poisson、テスト用)。
     pub max_gap_ms: u64,
-    /// 離席とみなす idle しきい値 (ms)。既定 180_000 (intervention.rs AWAY_IDLE_MS と一致)。
+    /// 離席とみなす idle しきい値 (ms)。既定は `intervention::AWAY_IDLE_MS` (= 180_000)。
+    /// ⚠️★★★ 値の SSOT はそちらであり、ここで再定義しない (ADR-024 D3)。
     pub away_idle_ms: u64,
     /// ウォームアップ: セッション開始からこの時間が経つまでプローブを発火しない (ms)。
     /// 既定はランダムプローブ窓の全長 31_000ms。これにより分析窓 `[t−31s, t−1s]` の始端が
@@ -167,7 +169,8 @@ impl Default for ProbeConfig {
             cap_window_ms: 20 * 60 * 1000,               // 20 分
             cap_count: 2,
             max_gap_ms: 22 * 60 * 1000, // 22 分 soft max-gap (枯渇防止 DB-15)
-            away_idle_ms: 180_000,      // 3 分
+            // ⚠️ SSOT は intervention::AWAY_IDLE_MS (ADR-024 D3)。ここで再定義しない。
+            away_idle_ms: AWAY_IDLE_MS,
             min_session_elapsed_ms: 31_000, // ランダムプローブ窓 (t−31s) の全長
         }
     }
@@ -198,7 +201,8 @@ impl ProbeConfig {
             // バースト上限としてのみ残し、通常は λ と gap_min が律速)。
             cap_count: 4,
             max_gap_ms: 10 * 60 * 1000, // 10 分 (短セッションの drought 防止・soft censoring 維持)
-            away_idle_ms: 180_000,      // 3 分 (離席除外は default と不変)
+            // ⚠️ SSOT は intervention::AWAY_IDLE_MS (離席除外は default と不変)。
+            away_idle_ms: AWAY_IDLE_MS,
             min_session_elapsed_ms: 31_000, // 31s warm-up (窓が session_start を割らない・DB-8)
         }
     }

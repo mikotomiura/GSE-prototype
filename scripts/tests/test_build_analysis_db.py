@@ -164,6 +164,63 @@ class BuildAnalysisDbTest(unittest.TestCase):
             self.assertEqual(row["external_paste_count_sum"], "")  # NULL, absent
             self.assertEqual(row["macro_f1_avg"], "0.5")  # top-level present
 
+    def test_t8_pre_adr024_field_names_still_populate_columns(self):
+        # ADR-024 renamed three outcome fields. metrics.json produced by older
+        # gse-replay builds still carries the OLD names; the harness must fall
+        # back to them instead of silently emitting all-NULL columns (this file
+        # is not covered by the schema drift check, so a silent break would not
+        # be caught by CI). P104/sess_d is deliberately left on the old names in
+        # the committed fixture to keep this path exercised end-to-end.
+        with TemporaryDirectory() as d:
+            rc, _, csv_path = self._build(Path(d))
+            self.assertEqual(rc, bad.EXIT_OK)
+            row = _row(_read_csv_rows(csv_path), "P104", "unknown")
+            # old "recovered_episode_count": 1 -> new pflow_exit_episode_count
+            self.assertEqual(row["pflow_exit_episode_count_sum"], "1")
+            # old "self_recovery_without_paste": 0.0 (NOT absent) -> 0.0, not ""
+            self.assertEqual(row["pflow_exit_without_receipt_avg"], "0.0")
+            # old "productive_manual_recovery_rate": 0.0 -> 0.0
+            self.assertEqual(row["pflow_exit_manual_gain_rate_avg"], "0.0")
+            # sess_d predates receipt_free_resumption entirely -> NULL, not 0
+            self.assertEqual(row["rfr_event_count_sum"], "")
+
+    def test_t9_receipt_free_resumption_is_lifted_from_nested_struct(self):
+        # ADR-024 primary outcome lives one level deeper, under
+        # outcome["receipt_free_resumption"]. Counts must be SUMmed across the
+        # participant's sessions; the CIF-derived values are carried as _avg.
+        #
+        # sessions.csv maps sess_a -> pre and sess_b -> post, so ("P101","pre")
+        # is sess_a ALONE and every expected value is exact. Asserting exact
+        # values (not just non-NULL) is what catches a column mix-up in
+        # _lift_outcome_field -- e.g. receipt_count landing in rfr_event_count.
+        with TemporaryDirectory() as d:
+            rc, _, csv_path = self._build(Path(d))
+            self.assertEqual(rc, bad.EXIT_OK)
+            row = _row(_read_csv_rows(csv_path), "P101", "pre")
+            self.assertEqual(row["rfr_event_count_sum"], "4")
+            self.assertEqual(row["rfr_source_episode_count_sum"], "3")
+            self.assertEqual(row["rfr_receipt_count_sum"], "2")
+            self.assertEqual(row["rfr_next_away_candidate_count_sum"], "1")
+            self.assertEqual(row["rfr_censored_count_sum"], "1")
+            self.assertEqual(row["rfr_receipt_free_at_5min_avg"], "0.5")
+            self.assertEqual(row["rfr_receipt_free_at_10min_avg"], "0.4")
+
+    def test_t10_extrapolation_diagnostics_are_carried(self):
+        # n_at_risk_at_* is how a reader rejects an extrapolated CIF, and
+        # degenerate_count is how they spot "returned and immediately left
+        # again" inflating the numbers. Both must survive the lift, and a
+        # measured 0 must stay 0 (not become NULL).
+        with TemporaryDirectory() as d:
+            rc, _, csv_path = self._build(Path(d))
+            self.assertEqual(rc, bad.EXIT_OK)
+            rows = _read_csv_rows(csv_path)
+            pre = _row(rows, "P101", "pre")   # sess_a
+            self.assertEqual(pre["rfr_degenerate_count_sum"], "0")
+            self.assertEqual(pre["rfr_n_at_risk_at_5min_sum"], "1")
+            self.assertEqual(pre["rfr_n_at_risk_at_10min_sum"], "0")  # measured 0
+            post = _row(rows, "P101", "post")  # sess_b
+            self.assertEqual(post["rfr_n_at_risk_at_10min_sum"], "1")
+
     def test_t5b_privacy_guard_rejects_japanese_pii_column(self):
         # Real forms are Japanese; the substring guard must catch e.g. お名前.
         for pii_col in ("お名前", "メールアドレス", "email_address"):

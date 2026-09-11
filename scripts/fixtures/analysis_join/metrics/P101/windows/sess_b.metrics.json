@@ -1,10 +1,46 @@
 {
   "total_labels": 2,
-  "confusion": { "matrix": [[2, 0, 0], [0, 0, 0], [0, 0, 0]] },
+  "confusion": {
+    "matrix": [
+      [
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ]
+  },
   "per_class": [
-    { "class": "flow", "precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 2 },
-    { "class": "incubation", "precision": 0.0, "recall": 0.0, "f1": 0.0, "support": 0 },
-    { "class": "stuck", "precision": 0.0, "recall": 0.0, "f1": 0.0, "support": 0 }
+    {
+      "class": "flow",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 2
+    },
+    {
+      "class": "incubation",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    },
+    {
+      "class": "stuck",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    }
   ],
   "macro_f1": 0.3333333333333333,
   "micro_f1": 1.0,
@@ -14,15 +50,33 @@
     "manual_insert_chars": 70,
     "external_paste_chars_total": 30,
     "manual_contribution_ratio": 0.7,
-    "productive_manual_recovery_rate": 1.0,
+    "pflow_exit_manual_gain_rate": 1.0,
     "external_paste_count": 2,
     "excluded_paste_count": 0,
     "large_paste_rate": 0.0,
     "paste_after_stuck_rate": 0.0,
-    "self_recovery_without_paste": 1.0,
+    "pflow_exit_without_receipt": 1.0,
     "paste_count_per_hour": 4.0,
     "stuck_episode_count": 1,
-    "recovered_episode_count": 1
+    "pflow_exit_episode_count": 1,
+    "receipt_free_resumption": {
+      "event_count": 1,
+      "source_episode_count": 1,
+      "receipt_count": 0,
+      "next_away_candidate_count": 0,
+      "censored_count": 1,
+      "degenerate_count": 0,
+      "n_at_risk_at_5min": 1,
+      "n_at_risk_at_10min": 1,
+      "receipt_free_at_5min": 1.0,
+      "receipt_free_at_10min": 1.0,
+      "outcomes": [
+        {
+          "elapsed_ms": 900000,
+          "kind": "censored"
+        }
+      ]
+    }
   },
   "warnings": []
 }
