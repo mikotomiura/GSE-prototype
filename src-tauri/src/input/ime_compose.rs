@@ -51,8 +51,12 @@
 //!
 //! # ⚠️ 拾えないもの (★ 記録しないと「無かった」と誤読される)
 //!
-//! - **マウスで候補を確定した変換** —— 打鍵が無いので終端を観測できない。
-//!   ★ 次の打鍵で「その他キー」として閉じるか、[`MAX_SESSION_MS`] で打ち切られる。
+//! - ⚠️★★★ **マウスで候補を確定した変換** —— 打鍵が無いので終端を観測できない。
+//!   ⚠️ **2026-09-11 訂正 (cross-review / Codex)**: 旧文は「★ 次の打鍵で『その他キー』として
+//!   閉じる」と書いていたが **誤り**。★ マウス確定のあとは**打ち続けるのが普通**であり、
+//!   次の打鍵は英数字なので [`step`] の英数字アームに落ちて **セッションが継続する**。
+//!   → ⚠️ **その変換は「欠測」ではなく、次の変換と合算された 1 行になる**
+//!   (`dwell_ms` が 2 つ以上の変換を覆う)。★ 打ち切りは [`MAX_SESSION_MS`] で効く。
 //! - **ANSI キーボードのセッション先頭** —— `IME_OPEN` が 100ms の TIS ポーリング由来なので、
 //!   変換開始直後の数打鍵が `ime_open = false` として渡りうる (`ime_macos.rs` の Path B)。
 //! - **20 秒を超えた変換** —— [`MAX_SESSION_MS`] で打ち切り、⚠️ **行を出さない**。
@@ -238,20 +242,28 @@ pub fn step(prev: ComposeState, vk: u32, ime_open: bool, chord: Chord, now_ms: u
 
 /// 上限判定を除いた素の遷移。⚠️ [`step`] からのみ呼ぶ。
 fn apply(prev: ComposeState, vk: u32, ime_open: bool, chord: Chord, now_ms: u64) -> ComposeStep {
+    // ★ 日本語入力モードを抜けている = 未確定文字列は確定している。
+    //
+    // ⚠️★★★ **2026-09-11 (cross-review / Codex): `Chord::Modified` の判定より先に置いた。**
+    //   ★ 旧版は Modified を先に見ており、⚠️ `Cmd+Space` (入力ソース切替) の**あと**に
+    //     来る修飾付き打鍵まで透過させていた。→ `IME_OPEN` が false になっても
+    //     セッションが閉じず、**`dwell_ms` が別モードでの作業時間ぶん過大になる**。
+    //   ★ この順なら「モードが変わったあとの**最初の打鍵 (修飾の有無を問わない)**」で閉じる。
+    //   ⚠️ ANSI キーボードでは `IME_OPEN` が 100ms の TIS ポーリング由来なので、
+    //     ★ 遅れは **最大 100ms + 次の打鍵まで**に有界になる (JIS キーは即座に閉じる ——
+    //     `hook_macos.rs` が `VK_DBE_*` で `IME_OPEN` を更新してから `drive` を呼ぶため)。
+    if !ime_open {
+        return finish(prev, false, now_ms);
+    }
+
     // ⚠️★★★ **ショートカットは変換の状態を語らない。** 完全に透過する ([`Chord`] の doc)。
-    //   ★ `!ime_open` の判定より**先**に置く —— `Cmd+Space` (入力ソース切替) のように
-    //     モードを動かすショートカット自体でセッションを閉じないため。
-    //     ⚠️ モードが実際に変わったなら、次の**修飾なし**打鍵が閉じる。
+    //   ★ ここへ来るのは `ime_open == true` のときだけなので、
+    //     「日本語入力中の `Cmd+S`」だけが透過する。
     if matches!(chord, Chord::Modified) {
         return ComposeStep {
             next: prev,
             end: None,
         };
-    }
-
-    // ★ 日本語入力モードを抜けている = 未確定文字列は確定している。
-    if !ime_open {
-        return finish(prev, false, now_ms);
     }
 
     match vk {
@@ -716,6 +728,54 @@ mod tests {
         ]);
         assert!(ends.is_empty());
         assert!(state.is_composing());
+    }
+
+    /// ⚠️★★★ **モード切替のあとは、次の打鍵が修飾付きでもセッションを閉じる。**
+    ///
+    /// ★ 2026-09-11 (cross-review / Codex) の指摘への回帰テスト。
+    /// ⚠️ 旧版は `Chord::Modified` を `!ime_open` より先に見ていたため、
+    ///   `Cmd+Space` で英数へ切り替えたあと**英数モードでの `Cmd+C` / `Cmd+V` が透過し続け**、
+    ///   セッションが閉じずに **`dwell_ms` が別モードでの作業時間ぶん過大になった**。
+    #[test]
+    fn a_modified_key_after_leaving_japanese_mode_closes_the_session() {
+        let (state, ends) = run_chords(&[
+            (A, true, Chord::Plain, 0),
+            // ⚠️ ここで入力ソースが切り替わり、TIS ポーリングが `IME_OPEN` を落とした。
+            (0x43, false, Chord::Modified, 500), // Cmd+C (英数モードでのコピー)
+        ]);
+        assert_eq!(
+            emitted(&ends),
+            vec![ComposeSummary {
+                dwell_ms: 500,
+                nav: 0,
+                abandon: false,
+            }],
+            "モードを抜けたのにセッションが閉じていない (dwell が伸び続ける)"
+        );
+        assert!(!state.is_composing());
+    }
+
+    /// ⚠️★★★ **マウスで候補を確定した変換は「欠測」ではなく、次の変換と合算される。**
+    ///
+    /// ★ 2026-09-11 (cross-review / Codex) が突いた既知の限界を**テストで固定する**。
+    /// ⚠️ 直せる欠陥ではない (打鍵が無いので終端を観測しようがない) が、
+    ///   ★ **挙動を知らないまま解析すると `dwell_ms` を 1 変換分だと誤読する**。
+    #[test]
+    fn a_mouse_confirmed_conversion_merges_into_the_next_one() {
+        // 「ねこ」を打って**マウスで候補をクリック**して確定 → 打鍵イベントは 1 つも無い。
+        // そのまま「いぬ」を打って Enter で確定する。
+        let (_, ends) = run(&[
+            (A, true, 0),       // 1 つ目の変換の開始
+            (SPACE, true, 200), // 候補表示 (このあとマウス確定 = 打鍵なし)
+            (K, true, 3_000),   // 2 つ目の変換 —— ⚠️ **セッションは続いている**
+            (ENTER, true, 3_400),
+        ]);
+        let rows = emitted(&ends);
+        assert_eq!(rows.len(), 1, "2 変換が 1 行に合算される (既知の限界)");
+        assert_eq!(
+            rows[0].dwell_ms, 3_400,
+            "⚠️ dwell は 2 変換ぶんを覆う。1 変換分と誤読してはならない"
+        );
     }
 
     /// ★ 修飾付き打鍵でも**上限の打ち切りは効く** (時間による自己修復を止めない)。

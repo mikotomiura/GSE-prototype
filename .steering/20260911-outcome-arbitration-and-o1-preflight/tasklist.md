@@ -24,7 +24,7 @@
 - [x] `schema/current.json` — 意図的再生成（⚠️ description 1 行のみ・構造は不変）
 
 ### テスト
-- [x] 状態機械の単体テスト 25 本（★ 両 OS で走る。⚠️ 修飾キー 5 本を含む）
+- [x] 状態機械の単体テスト 27 本（★ 両 OS で走る。⚠️ 修飾キー 6 本・マウス確定の合算 1 本を含む）
 - [x] Atomic ドライバのテスト 10 本（★ 両 OS で走る。⚠️ 要約の偽装回帰 1 本を含む）
 - [x] `cargo test --workspace` — **643 passed / 0 failed**（ベースライン 577）
 - [x] ゴールデン `gse-replay --snapshot` — `OK: 15 snapshots match`
@@ -37,7 +37,7 @@
 ### レビュー
 - [x] `code-reviewer` の指摘対応（HIGH 2 / MEDIUM 4 / LOW 5 — **全件対応**）
 - [x] `security-checker` の指摘対応（⚠️ CRITICAL / HIGH は **0 件**。MEDIUM 2 件を対応）
-- [ ] ⚠️ `/cross-review`（Codex + Claude の独立レビュー）— ★ パス限定で回す
+- [x] ⚠️ `/cross-review`（Codex の独立レビュー）— ★ パス限定で実行・exit 0。新規 4 件（1 件は誤検知）を対応（`design-008` §10）
 
 ### ドキュメント
 - [x] `docs/architecture.md` — macOS の IME 状態機械の置き場所と由来の非対称
