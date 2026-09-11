@@ -26,6 +26,7 @@
 - [x] `citation-ssot` の採番衝突を確認
 - [x] commit
 - [x] push ＋ PR 作成
+- [x] 取り込み中に見つけた branch 側の欠陥 2 件を修正 (blockers.md B-1 / B-2)
 
 ## スコープ外 (研究者判断)
 - [ ] 2 本の PR の merge (CI 確認後)
