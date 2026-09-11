@@ -181,3 +181,39 @@
    **穴ではない**が、CI 単独では片方しか見ていない。
 3. ⚠️ `check` job に `permissions: contents: read` を明示 (security-checker MEDIUM・**既存の穴**)。
 4. ⚠️ `IME_ACTIVE` の Ordering 7 箇所 (★ 上の新起票)。
+
+---
+
+## ★★★ 初回 CI 実行の実測 (PR #190・run 34632299473・2026-09-12)
+
+⚠️ **check の両 OS レグ ＋ frontend-check すべて pass**。★ `components: clippy` が効いて
+clippy step が実際に走ったことも、**step が success で終わっている**ことで確認できる。
+
+### 1. clippy step の所要時間 (⚠️ `timeout-minutes: 30` に対する余裕)
+
+| レグ | clippy step | job 全体 | ★ 余裕 |
+|---|---|---|---|
+| `gse-win-selfhosted` | **42 秒** | 4m18s | ★ **25 分以上** |
+| `gse-mac-selfhosted` | **49 秒** | 5m50s | ★ **24 分以上** |
+
+→ ✅ **security-checker / code-reviewer の timeout 懸念は数字で解消**。
+★ clippy は job 全体の **13〜16%** しか足していない (⚠️ 「cold cache で 30 分を圧迫する」
+という見込みは**外れた** —— self-hosted は workspace が永続するため)。
+
+### 2. ⚠️★★★ ディスク —— **ここは余裕が無い**
+
+- ★ 実測 (mac self-hosted): `free before: 18 GiB (threshold=15 floor=8)` → **掃除は走らなかった**。
+- ⚠️ **run 完了後の空きは 16 GiB** (`df -h /`)。★ `src-tauri/target` は **3.0 GiB**
+  (⚠️ security-checker が本 PR 前に実測した 2.1 GiB から**約 0.9 GiB 増**)。
+- ⚠️★★★ **threshold 15 GiB まで残り 1 GiB しかない。**
+  → ★ **次の run で掃除 (cargo-sweep) が走る見込み**である。⚠️ これは
+    ガードが設計どおり働くということであって故障ではないが、**掃除が走った run は遅くなる**。
+  → ⚠️ **「遅い run = 壊れた」と読み違えないこと。** ★ `free before:` の行を先に見る。
+
+### 3. ⚠️★★★ 「clippy が赤」と「timeout で cancel」の見分け方 (★ 実地で使う手順)
+
+1. ★ **step の `conclusion` を見る** —— `gh api repos/.../actions/jobs/<id>` の
+   `.steps[] | "\(.name): \(.conclusion)"`。
+   ⚠️ timeout の場合は **clippy step が `cancelled`** になり、`failure` にはならない。
+2. ★ job の `started_at` → `completed_at` が **30 分ちょうど**なら timeout である。
+3. ⚠️ `gh pr checks` の表示 (`fail`) だけでは**区別がつかない**。必ず step まで降りる。

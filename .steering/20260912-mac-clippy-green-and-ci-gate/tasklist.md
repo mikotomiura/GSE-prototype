@@ -34,13 +34,15 @@
 ## レビュー
 - [x] `code-reviewer` / `security-checker` を並列起動
 - [x] HIGH 指摘への対応 (★ steering をコミット) ＋ MEDIUM 2 件 (load 側 Acquire / ci.yml 注記の訂正)
-- [ ] `/cross-review` (Codex 独立レビュー)
+- [x] `/cross-review` (Codex 独立レビュー) — ⚠️ 両者一致の HIGH ゼロ・縮退なし
 
 ## ドキュメント
 - [x] `requirement.md` / `design.md` / `decisions.md`
 - [x] 起票 10② を閉じたことを `blockers.md` 側にも残す (⚠️ `IME_ACTIVE` は新起票として残)
-- [ ] `_handoff/` の当該メモを「完了」へ更新
+- [x] `_handoff/` の当該メモを「完了」へ更新
 
 ## 完了処理
-- [ ] PR 作成 → **CI の両 OS レグが緑であることを確認** (★ R-1 の受け入れ条件)
-- [ ] R-4 (CI の `USERPROFILE` / `HOME`) の観察結果を研究者へ報告
+- [x] PR #190 作成 → ✅ **CI の両 OS レグ ＋ frontend-check すべて pass** (★ R-1 達成)
+- [x] R-4 の観察 → ⚠️★★★ **構造的に観察できない**と判明 (★ テストが skip を沈黙で表現するため)。研究者へ報告済み
+- [x] 初回 CI 実行の 3 点 (clippy 所要時間 / target 増分 / 赤と timeout の区別) を実測して記録
+- [ ] ⚠️ **main へのマージは研究者判断** (★ 本セッションでは行っていない)
