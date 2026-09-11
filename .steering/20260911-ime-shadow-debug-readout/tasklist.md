@@ -28,9 +28,10 @@
 - [ ] ⚠️ **macOS 実機での動作確認** → ★ mac 引き継ぎで AC 6 と同時に行う
 
 ## レビュー
-- [ ] `code-reviewer` の指摘対応
-- [ ] `security-checker` の指摘対応
-- [ ] `/cross-review`
+- [x] `code-reviewer` の指摘対応（HIGH 2 / MEDIUM 5 / LOW 5 — **全件対応**）
+- [x] `security-checker` の指摘対応（⚠️ CRITICAL / HIGH は **0 件**。MEDIUM 2 件を対応）
+- [ ] ⚠️ `/cross-review` — ★ **未実施**（親 PR #182 で 1 度通しており、本 PR は
+      その上の追加分。⚠️ **やるなら #182 マージ後にパス限定で回す**）
 
 ## ドキュメント
 - [x] `requirement.md` / `design.md`
@@ -39,4 +40,9 @@
 
 ## 完了処理
 - [x] git commit（`1cdfed5`）
-- [ ] PR（⚠️ **#182 の上に積んである**ので、base を何にするか要判断）
+- [x] PR → https://github.com/mikotomiura/GSE-prototype/pull/184
+      （⚠️ **base は `feat/macos-ime-shadow`**。★ #182 の上に積んである）
+- [ ] ⚠️★★★ **#184 では CI が 1 本も走らない** —— `ci.yml` の `pull_request` は
+      **`branches: [main]`** 限定なので、base が `main` でない PR は発火しない。
+      ★ #182 がマージされれば GitHub が #184 を main へ自動 retarget し、そこで CI が走る。
+      ⚠️ **それまでは Windows 手元の検証（652 passed 等）が唯一の根拠**である。
