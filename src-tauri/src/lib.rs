@@ -851,7 +851,7 @@ fn get_diagnostics() -> HashMap<String, String> {
             // バンドルパス: .app まで遡って報告
             let bundle_path = exe
                 .ancestors()
-                .find(|p| p.extension().map_or(false, |e| e == "app"))
+                .find(|p| p.extension().is_some_and(|e| e == "app"))
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|| exe.to_string_lossy().to_string());
             diag.insert("bundle_path".into(), bundle_path);
@@ -859,7 +859,7 @@ fn get_diagnostics() -> HashMap<String, String> {
             // quarantine xattr の有無
             if let Some(app_path) = exe
                 .ancestors()
-                .find(|p| p.extension().map_or(false, |e| e == "app"))
+                .find(|p| p.extension().is_some_and(|e| e == "app"))
             {
                 let has_quarantine = std::process::Command::new("xattr")
                     .args(["-p", "com.apple.quarantine"])
@@ -3607,6 +3607,9 @@ pub fn run() {
 
             // IME_ACTIVE 状態変化時にログを送出（初回は必ず emit）
             if last_active.is_none_or(|prev| prev != active) {
+                // ⚠️ 使用箇所 (下の `emit_ime_shadow`) が Windows 限定なので、束縛も同じ
+                //    `#[cfg]` に揃える (macOS では unused variable になる)。
+                #[cfg(target_os = "windows")]
                 let was_active = last_active.unwrap_or(false);
                 last_active = Some(active);
                 let ts = std::time::SystemTime::now()

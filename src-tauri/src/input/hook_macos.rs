@@ -97,6 +97,7 @@ extern "C" {
 ///   port の store は run_current の前、null クリアは run_current から戻った後で行うため、
 ///   本体と callback は**時間的に排他** (本体が run_current でブロック中だけ callback が走る)。
 ///   よって port が指す `tap.mach_port` は callback 実行中 (格納〜null クリアの間) 常に生存する。
+///
 /// `AtomicPtr` は安全な共有セルとして用いる。
 static TAP_PORT: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
 
@@ -201,7 +202,7 @@ fn ax_prompt_for_trust() -> bool {
     // ctx はスタック上に存在し、dispatch_sync_f は完了まで返らないため有効。
     unsafe {
         dispatch_sync_f(
-            &_dispatch_main_q as *const _ as *const std::ffi::c_void,
+            &_dispatch_main_q as *const std::ffi::c_void,
             &mut ctx as *mut AxPromptCtx as *mut std::ffi::c_void,
             ax_prompt_main_thread,
         );
@@ -1059,7 +1060,7 @@ pub fn start() {
                     // AXIsProcessTrustedWithOptions は現在の trust 状態を返すだけで副作用なし。
                     if use_accessibility
                         && consecutive_failures > 0
-                        && consecutive_failures % 10 == 0
+                        && consecutive_failures.is_multiple_of(10)
                     {
                         // SAFETY: AXIsProcessTrusted は pure read-only チェック。
                         let ax_now = unsafe { AXIsProcessTrusted() };
