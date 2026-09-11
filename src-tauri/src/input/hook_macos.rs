@@ -19,11 +19,14 @@ use core_graphics::event::{
 };
 
 use super::{
-    EVENT_SENDER, IME_ACTIVE, IME_COMPOSING, IME_OPEN, IME_STATE_DIRTY, JIS_KEYBOARD_SEEN,
-    LAST_KEY_MS, POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA,
-    VK_DBE_KATAKANA, VK_DBE_SBCSCHAR, VK_KANJI,
+    EVENT_SENDER, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, JIS_KEYBOARD_SEEN, LAST_KEY_MS,
+    POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_DBCSCHAR, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
+    VK_DBE_SBCSCHAR, VK_KANJI,
 };
 use crate::analysis::features::InputEvent;
+// ★ 確定 / 放棄を分ける判断と、それを Atomic へ書き戻すドライバ。
+//   ⚠️ OS 非依存なので **Windows の CI でもテストが走る**。
+use crate::input::ime_compose;
 
 // Input Monitoring permission check/request.
 // These are in the ApplicationServices framework, umbrella-linked via CoreGraphics.
@@ -562,27 +565,18 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
     }
 
     // ── IME composition / candidate state machine ────────────────────────
-    // Tracks whether the user is navigating the IME candidate window.
-    // Only active when IME_OPEN is true (Japanese input mode).
     //
-    // State transitions (on keyDown only):
-    //   Letter/digit → COMPOSING (inline text being composed)
-    //   Space while COMPOSING → IME_ACTIVE (candidate window shown)
-    //   Enter/Escape → reset both (composition confirmed/cancelled)
-    //   Letter while IME_ACTIVE → reset IME_ACTIVE (candidate accepted, new composition)
-    //   Backspace while IME_ACTIVE → reset IME_ACTIVE (back to editing inline)
-    //   IME mode switch to off → reset both
+    // ⚠️★★★ **2026-09-11 (issue 008): 判断そのものは `input/ime_compose.rs` へ移した。**
+    //   ★ 理由はあちらのモジュール doc —— このファイルの `#[cfg(test)] mod tests` は
+    //     **Windows では 1 行も走らない**ので、状態機械をここに書くと
+    //     ⚠️ **どちらの OS の CI も「確定と放棄を分ける判断」を検証しない**。
+    //   ★ ここに残すのは Atomic の読み書き (= ドライバ) だけである。
+    //
+    // ⚠️★★★ **旧実装にあった `tracing::debug!` は消した。**
+    //   ★ ここは CGEventTap コールバックの中であり、`hook-constraints` 共通-1 が
+    //     **ログを明示的に禁止**している (バッファ操作・アロケーションを伴うため)。
     if is_press {
-        if IME_OPEN.load(Ordering::Acquire) {
-            update_compose_state(vk_code);
-        } else {
-            // IME switched off → reset composition state.
-            let was_composing = IME_COMPOSING.swap(false, Ordering::Release);
-            let was_active = IME_ACTIVE.swap(false, Ordering::Release);
-            if was_composing || was_active {
-                tracing::debug!("IME compose state reset (IME_OPEN=false)");
-            }
-        }
+        ime_compose::drive(vk_code, IME_OPEN.load(Ordering::Acquire), timestamp);
     }
 
     // Send keystroke event to analysis thread (lock-free, non-blocking).
@@ -647,76 +641,10 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
 // ---------------------------------------------------------------------------
 // IME composition state machine
 // ---------------------------------------------------------------------------
-
-/// Update IME_COMPOSING and IME_ACTIVE based on the current keyDown VK code.
-/// Called only when IME_OPEN is true and the event is a keyDown.
-fn update_compose_state(vk: u32) {
-    let composing = IME_COMPOSING.load(Ordering::Relaxed);
-    let active = IME_ACTIVE.load(Ordering::Relaxed);
-
-    // VK_SPACE = 0x20, VK_RETURN = 0x0D, VK_ESCAPE = 0x1B, VK_BACK = 0x08, VK_TAB = 0x09
-    match vk {
-        // Letter keys (A-Z: 0x41-0x5A) and digit keys (0-9: 0x30-0x39)
-        // → Start/continue composition.
-        0x30..=0x39 | 0x41..=0x5A => {
-            if active {
-                // Typing a new character while candidates showing →
-                // accept current candidate, start new composition.
-                IME_ACTIVE.store(false, Ordering::Release);
-                tracing::debug!("IME_ACTIVE → false (new char during candidate)");
-            }
-            if !composing {
-                IME_COMPOSING.store(true, Ordering::Release);
-                tracing::debug!("IME_COMPOSING → true (char typed in Japanese mode)");
-            }
-        }
-        // Space → trigger conversion (show candidate window) if composing.
-        0x20 => {
-            if composing && !active {
-                IME_ACTIVE.store(true, Ordering::Release);
-                tracing::debug!("IME_ACTIVE → true (Space during composition → candidates)");
-            }
-            // If already active, Space cycles to next candidate — stay active.
-        }
-        // Enter → confirm composition/candidate selection.
-        0x0D => {
-            if composing || active {
-                IME_COMPOSING.store(false, Ordering::Release);
-                IME_ACTIVE.store(false, Ordering::Release);
-                tracing::debug!("IME compose/active → false (Enter confirms)");
-            }
-        }
-        // Escape → cancel composition.
-        0x1B => {
-            if composing || active {
-                IME_COMPOSING.store(false, Ordering::Release);
-                IME_ACTIVE.store(false, Ordering::Release);
-                tracing::debug!("IME compose/active → false (Escape cancels)");
-            }
-        }
-        // Backspace while candidating → back to inline editing.
-        0x08 => {
-            if active {
-                IME_ACTIVE.store(false, Ordering::Release);
-                tracing::debug!("IME_ACTIVE → false (Backspace exits candidate)");
-            }
-            // Stay composing (editing inline text).
-        }
-        // Arrow keys (Left/Up/Right/Down: 0x25-0x28) → candidate navigation.
-        // Stay in current state.
-        0x25..=0x28 => {}
-        // IME mode keys — handled elsewhere, ignore here.
-        _ if vk >= 0xF0 || vk == VK_KANJI => {}
-        // Other keys → reset composition state (e.g., Tab, function keys).
-        _ => {
-            if composing || active {
-                IME_COMPOSING.store(false, Ordering::Release);
-                IME_ACTIVE.store(false, Ordering::Release);
-                tracing::debug!("IME compose/active → false (other key: VK=0x{:02X})", vk);
-            }
-        }
-    }
-}
+//
+// ⚠️★★★ **2026-09-11 (issue 008): 判断もドライバも `input/ime_compose.rs` へ移した。**
+//   ★ このファイルに残したのは `handle_event` からの呼び出し 1 行だけである。
+//   ⚠️ ここに戻すと **Windows の CI が 1 行も検証しなくなる** (テストモジュール冒頭を参照)。
 
 // ---------------------------------------------------------------------------
 // Permission decisions (pure — テストできる形に切り出す)

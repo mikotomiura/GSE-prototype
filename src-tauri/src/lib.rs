@@ -3132,17 +3132,26 @@ fn find_behavioral_gt() -> Option<PathBuf> {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 2b: IME Shadow Features (Windows のみ)
+// Phase 2b: IME Shadow Features (★ 両 OS)
 // ---------------------------------------------------------------------------
 
 /// IME Shadow の Atomic データを読み取り、LogEntry::ImeShadow を送出する。
-/// IME Monitor スレッドの active→false 遷移時に呼ばれる。
+///
+/// ⚠️★★★ **2026-09-11 (issue 008): `#[cfg(target_os = "windows")]` を外した。**
+/// ★ macOS 側も `hook_macos.rs::drive_compose_state` が同じ Atomic を駆動する。
+/// ⚠️ **駆動源は OS で違う** (Windows = 窓イベント / macOS = 打鍵の状態機械)。
+/// 由来の非対称は `capabilities` (ADR-013) と `meta` 行の OS で判別する。
 ///
 /// 2 つの経路で emit が発生する:
-/// 1. 正常: WinEvent IME_HIDE が到着し IME_SHADOW_READY=true → dwell は事前計算済み
+/// 1. 正常: `IME_SHADOW_READY=true` → dwell は事前計算済み
+///    (Windows = WinEvent IME_HIDE / cloak resolver、macOS = 終端キー)
 /// 2. Stale: IME_HIDE が取りこぼされ safety valve のタイムアウト
 ///    (`input::ime_cloak::MONITOR_SAFETY_VALVE_MS`) → START_MS > 0 なら独自に dwell 計算
-#[cfg(target_os = "windows")]
+///
+/// ⚠️★★★ **経路 2 は Windows 限定である** —— ★ 呼び出し側の `#[cfg]` がそれを固定する。
+/// macOS の `IME_ACTIVE` は「候補表示中に別の字を打った」「Backspace」でも false に落ちるが、
+/// それは**セッションの途中**なので、そこで経路 2 に入ると
+/// ⚠️ **途中の偽の行を出したうえ `START_MS` を 0 にしてセッションを壊す**。
 fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
     use std::sync::atomic::Ordering::Relaxed;
     // ⚠️★ G1: この経路は IME Monitor スレッドから呼ばれ、**`session_active` を見ていない**
@@ -3550,7 +3559,14 @@ pub fn run() {
             // リセットするため、Monitor が active→false 遷移を観測できないケースがある。
             // WinEvent IME_HIDE は正しく READY を set するので、遷移に依存せず
             // READY フラグを毎ポーリングでチェックする。
-            #[cfg(target_os = "windows")]
+            //
+            // ⚠️★★★ **2026-09-11 (issue 008): ここだけ `#[cfg]` を外した。**
+            //   ★ macOS で `ime_shadow` が出るのは**この経路だけ**である
+            //     (上の 2 つ = stale valve / active→false 遷移 は Windows 限定のまま)。
+            //   ⚠️ 理由は `emit_ime_shadow` の doc —— macOS の `IME_ACTIVE` は
+            //     セッション途中でも false に落ちるので、遷移で emit すると記録が壊れる。
+            //   ★ この経路は `READY` が立っているときしか `emit_ime_shadow` を呼ばないので、
+            //     Windows 限定の stale 経路 (`START_MS > 0` 分岐) には入らない。
             if !active && input::hook::IME_SHADOW_READY.load(Ordering::Acquire) {
                 let ts = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
