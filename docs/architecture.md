@@ -278,7 +278,7 @@ Analysis Thread ── LogEntry channel ──► Logger Thread ──► disk (
 - **責務**: UserLabel と HMM 推定結果を突き合わせ、混同行列・F1・中央値を算出する純粋関数群
 - **インターフェース**:
   - `compute_session_metrics(labels: &[UserLabelEvent], feats: &[FeatSnapshot]) -> SessionMetrics`
-  - `compute_recovered_at(stuck_ts, feats, window_ms, p_flow_threshold) -> Option<u64>` — Stuck ラベル後に p_flow > 0.5 に達する最初の時刻を返す (オフライン後付け算出)
+  - `compute_pflow_exit_at(stuck_ts, feats, window_ms, p_flow_threshold) -> Option<u64>` — Stuck ラベル後に p_flow > 0.5 に達する最初の時刻を返す (オフライン後付け算出)
   - `format_pretty(m: &SessionMetrics) -> String`
 - **計算ロジック**:
   - `argmax_class` のタイブレークは Flow > Incubation > Stuck の固定順
@@ -508,7 +508,7 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
    - `argmax_class` で推定クラスを決定 (Flow > Inc > Stuck のタイブレーク)
    - 混同行列に加算、警告は `warnings` Vec に集約
    - `detection_lead_ms` を ±60 秒窓内の最近傍同クラス feat で計算
-   - Stuck ラベルは `compute_recovered_at` で p_flow > 0.5 到達時刻を探す
+   - Stuck ラベルは `compute_pflow_exit_at` で p_flow > 0.5 到達時刻を探す
 6. `format_pretty` または `serde_json::to_string_pretty(&metrics)` で出力
 7. 開発者が出力を `gse-dataset/metrics/P000/<os>/` にコピーして commit (UC-GT3)
 
