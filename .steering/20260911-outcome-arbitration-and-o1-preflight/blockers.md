@@ -288,7 +288,7 @@
    **最初から正しく書いていた**ことが根拠である。
 2. ✅ **`ime_compose` と同じ形にした** —— ★ 遷移表を **`input/ime_mode.rs`（OS 非依存）へ 1 本化**し、
    `hook_windows.rs` の複製を**削除して**そちらを使わせた。
-   → ★ **両 OS の CI で 11 本のテストが走る**（⚠️ 以前は Windows でしか走らなかった）。
+   → ★ **両 OS の CI で 10 本のテストが走る**（⚠️ 以前は Windows でしか走らなかった）。
 3. ⚠️ **既配布ぶん（`v0.1.34` / `v0.1.35`）で採れたデータへの影響は未見積もり。**
    ★ `ime_state` の `on` と `key` 行の `category` は残っているので、
    ⚠️ **「かな キーの押下回数の偶奇」で事後補正できる可能性がある**（★ **未検証**）。
@@ -300,7 +300,7 @@
 |---|---|
 | ★ **欠陥の修正** | `hook_macos.rs` `0x68 => VK_DBE_HIRAGANA`（⚠️ 旧: `VK_KANJI`） |
 | ★ **再発防止（構造）** | `input/ime_mode.rs` を新設し遷移表を 1 本化。`hook_windows.rs` / `hook_macos.rs` の**複製を両方とも削除** |
-| ★ **回帰テスト（両 OS）** | `ime_mode::tests::the_kana_key_is_idempotent_not_a_toggle` ほか 11 本 |
+| ★ **回帰テスト（両 OS）** | `ime_mode::tests::the_kana_key_is_idempotent_not_a_toggle` ほか 10 本 |
 | ★ **回帰テスト（macOS）** | `the_kana_keycode_maps_to_hiragana_not_the_windows_toggle` / **`macos_never_maps_any_key_to_the_windows_toggle`**（★ `0x00..=0xFF` を全走査し、**macOS から `VK_KANJI` を二度と生やさせない**） |
 
 ⚠️★★★ **テストが本当に欠陥を捕まえることを変異で確かめた**（★ 緑を信用しない）:
@@ -316,3 +316,80 @@ clippy **error 0**（⚠️ Windows 側は**手元でコンパイルされない
 ⚠️★★★ **`HMM_VERSION` は上げていない。** ★ `IME_OPEN` は実行時の β 選択に効くが、
 **`gse-replay` は記録済みの `ime_state` 行を読む**ので過去ログの再生結果は変わらない
 （★ ゴールデン 15 本一致がその実測である）。
+
+### ⚠️ レビュー（`/review-changes` ＋ `/cross-review`・2026-09-12・★ merge **後**に実施）
+
+⚠️★★★ **順序を誤った。** ★ CLAUDE.md / `/finish-task` Step 3 はレビューを **merge 前**に置いている。
+本件は merge 後に走らせたため、指摘への対応が**追加 PR**になった。
+
+★ 結果: **CRITICAL / HIGH は 3 者とも 0 件**。⚠️ 実害のある指摘は **1 件**で、**私が入れた退行**だった。
+
+| 出所 | 重大度 | 指摘 | 対応 |
+|---|---|---|---|
+| code-reviewer | MEDIUM | ⚠️★★★ **`hook_windows.rs:24` の `VK_KANJI` が非テストビルドで未使用** —— 純関数を移した結果、使用箇所がテスト (734 行) だけになった。★ **Windows の `cargo build` で `unused_imports` 警告**（⚠️ macOS からは 1 行もコンパイルされないので気づけない） | ✅ **直した**（`mod tests` の中へ移動） |
+| code-reviewer | MEDIUM | `hook_macos.rs:22` の `IME_ACTIVE` が未使用（★ pre-existing だが、**その import 行自体を編集しておきながら残した**＝ビルド警告を読んでいない徴候） | ✅ **直した** |
+| code-reviewer | MEDIUM | ⚠️ `ime_macos.rs:74` / `ime_windows.rs:287` の `IME_OPEN.store(.., Relaxed)` が `hook-constraints` 共通-2（store=Release）に反する。★ `fetch_xor(AcqRel)` の慎重さが**片側で崩れている** | ⚠️ **未対応**（★ diff 外・pre-existing）→ **起票 10** |
+| code-reviewer | LOW | ★ **key-up 側でも `IME_OPEN` が書かれるようになった**（旧 `VK_KANJI`→`None` / 新 `VK_DBE_HIRAGANA`→`Some(true)`）。冪等だが**意図した副作用として未記録** | ✅ **コメントで明記した** |
+| code-reviewer | LOW | ★ `is_ime_mode_key` の**起床条件が無検証** | ✅ **全走査テストを追加**（下記 ★） |
+| code-reviewer | ⚠️ 事実誤り指摘 | ⚠️★★★ **私が「11 本」と書いたテストは実際には 10 本** | ✅ **記録を訂正した**（実測 `10 passed`） |
+| security-checker | LOW | ★ 素通しアーム経由で**合成 CGEvent が `IME_OPEN` を操作できる**（⚠️ pre-existing）。★ ただし `is_observed_key` が `0xF0..=0xF4` を含まないので**分析チャネルへは 1 件も流れず content-free 境界は破れない** | ⚠️ **未対応**（★ 直すと VK 分布が変わり `HMM_VERSION` 判断が要る）→ **起票 10** |
+| Codex (cross-review) | MEDIUM | 素通しと `VK_KANJI`(0x19) の**数値空間が将来衝突**しうる。⚠️「`0x19` の明示写像を消すと**静かに壊れる**」 | ⚠️★★★ **後半は反証した**（下記 ★★） |
+
+★ **security-checker は CRITICAL / HIGH / MEDIUM すべて 0 件**。content-free 境界について
+`logger.rs` / `schema_dto.rs` / `schema/current.json` が**本レンジで 1 バイトも変わっていない**ことを
+実測で確認している。★ `ime_shadow` の**行数は増える**が、それは**欠測していた変換が記録される
+＝修正の意図そのもの**であり、載る情報（`t`/`dwell_ms`/`nav`/`abandon`）は不変。
+
+#### ⚠️★★★ Codex の MEDIUM は「静かに壊れる」部分が誤りだった（★ 変異で決着）
+
+- 検算: 素通しで `0x19` に化けうる mac keycode は **`0x19` 自身のみ**。
+  それは `hook_macos.rs:317` `0x19 => 0x39 // kVK_ANSI_9` で**明示写像済み**。
+- ★ **変異**: その 1 行を削除すると `macos_never_maps_any_key_to_the_windows_toggle` が
+  **赤になる**（`621 passed / 1 failed` を実測）。
+- → ★ **「静かに壊れる」のではなく、追加したテストが正確に捕まえる。**
+  ⚠️ 名前空間を分離する設計改善そのものは妥当なので**起票 10 に積む**。
+
+#### ★★ 追加した全走査テストが、書く前に知らなかった事実を掘り当てた
+
+`exactly_the_jis_ime_keys_wake_the_polling_thread_on_key_up` —— ★ 「起床するのは 英数/かな/代替 2 つの
+**4 つちょうど**」と予想して書いたら **赤**になった。⚠️ 実際は **`0xF0..=0xF4` も入る**
+（★ 素通しアームが恒等写像で `VK_DBE_*` を作るため）。
+→ ★ **実態を固定するテストに直した**（⚠️ 予想を書いて緑にするのではなく、測って合わせた）。
+★ これは security-checker の LOW と**同じ現象を別角度から捉えたもの**である。
+
+## 起票 10: ⚠️ `macos_vk_to_vk` の素通しアームと `IME_OPEN` の Ordering（★ どちらも pre-existing・別 PR）
+
+- **起票日**: 2026-09-12（★ `/review-changes` ＋ `/cross-review` の指摘から）
+- **状態**: ⚠️ **未対応**（★ **本 PR のスコープ外**。どちらも起票 9 の修正より前から在る）
+- **⚠️ まとめて 1 件にした理由**: ★ 3 者の指摘（code-reviewer MEDIUM / security-checker LOW /
+  Codex MEDIUM）が**同じ場所を別角度から指している**ため。
+
+### ① 素通しアーム `other => other as u32`（`hook_macos.rs:398` 付近）
+
+- ⚠️ mac keycode がそのまま Windows VK 空間へ流れるので、
+  **`0xF0..=0xF4` が恒等写像で `VK_DBE_*` になる**（★ 実測。`exactly_the_jis_ime_keys_...` テストが固定）。
+- ⚠️ `CGEventPost` で注入されると **`IME_OPEN` を外部から操作できる**（security-checker LOW）。
+  ★ ただし `is_observed_key` が `0xF0..=0xF4` を含まないので **分析チャネルへは 1 件も流れず、
+  content-free 境界は破れない**（＝プライバシーではなく**研究データの質**の問題）。
+- ⚠️ Codex はさらに「`VK_KANJI`(0x19) と将来衝突しうる」と指摘。
+  ★ **いまは `macos_never_maps_any_key_to_the_windows_toggle` が守っている**（変異で実証済み）が、
+  ★ **VK 定数を macOS の値域と衝突しない名前空間へ逃がす**（例: `0x100` 以上へオフセット / `enum` 化）
+  設計改善は妥当。
+- ⚠️★★★ **直すと VK 分布が変わりうるので `HMM_VERSION` の判断が要る。**
+  ★ `is_feature_key` の範囲に入る値を動かすと**特徴量が変わる**（`hook_macos.rs:243` の注記参照）。
+  → ⚠️ **軽率に直さないこと。**
+
+### ② `IME_OPEN` の store が `Relaxed`（`ime_macos.rs:74` / `ime_windows.rs:287`）
+
+- ⚠️ `hook-constraints` 共通-2 は `IME_OPEN` の store を **Release** と定めている。
+  ★ フック側は `store(Release)` / `fetch_xor(AcqRel)` で守っているが、
+  **IME ポーリングスレッド側の書き戻しが `Relaxed`** で、片側だけ崩れている。
+- ★ `hook.rs:41` の `is_ime_open()` も `Relaxed` load（⚠️ 近似で許容するなら**理由を doc に書く**べき）。
+
+### ★ どう処理するか
+
+1. ⚠️ **①②を 1 つの PR にしない。** ★ ② は Ordering だけの小さな修正で安全、
+   ① は `HMM_VERSION` 判断を伴うので**研究者の裁定が要る**。
+2. ★ ① は **起票 6（ライブ変換）と同じく idea 議論 / Mh-D 全体の修正に載せる**のが素直
+   （⚠️ どちらも特徴量に触れうるため）。
+- **解決**: （未）
