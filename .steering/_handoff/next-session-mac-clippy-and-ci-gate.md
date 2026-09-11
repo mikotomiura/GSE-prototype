@@ -100,3 +100,81 @@ cargo run --bin emit_schema | diff - schema/current.json && echo "schema OK"
 - ⚠️ **mac 側 clippy の件数すら分かっていない**（→ §1）
 - ⚠️ `ime_macos.rs` の `#[allow(clippy::new_without_default)]` は **Windows で未検証**
 - ⚠️ R-1〜R-5 は **どれも未決**
+
+---
+
+## §7 ★★★ 2026-09-12 追記 — **mac 側で先に測った事実と、研究者が下した判断**
+
+> ⚠️ 本節は **mac セッション (Opus) が着手前に測った実測値と、研究者がその場で下した裁定**である。
+> ★ 実行そのものは**コンテキストの都合で次セッションに送った**ので、**着手は `/start-task` から**。
+
+### 7.1 ★ 研究者判断（★ §5 の R-1 を含む）
+
+| # | 事項 | 裁定 |
+|---|---|---|
+| **S-1** | ★ **スコープ** | ✅ **clippy を `exit 0` にする ＋ `blockers.md` 起票 10②（`IME_OPEN.store` の Ordering）を直す**。⚠️ **起票 10①（素通しアーム）は入れない** |
+| **R-1** | ★ CI (`check` job) に clippy step を足すか | ✅ **足す。ただし「緑にしてから」** —— ★ clippy が両 OS で `exit 0` になったことを確かめた**あと、同じ PR で** `ci.yml` に追加する |
+| R-2〜R-5 | toolchain 固定 / `rust-version` / CI の `HOME` / `run-codex-review.sh` | ⚠️ **未決のまま**（★ この turn では諮っていない） |
+
+### 7.2 ⚠️★★★ なぜ起票 10② を入れ、①を入れないのか（★ 理由まで持っていくこと）
+
+**② を入れる理由 —— 「関連」ではなく *同じブロックの中* だった:**
+
+```rust
+// src-tauri/src/input/ime_macos.rs:77-81  (★ 2026-09-12 時点)
+if last_state.map_or(true, |prev| prev != current_state) {   // ← ★ clippy 指摘 (77 行)
+    last_state = Some(current_state);
+    IME_OPEN.store(current_state, Ordering::Relaxed);        // ← ⚠️ 起票 10② (79 行)
+    ...
+}
+```
+
+★ clippy の `map_or` を直すには **77〜81 行を編集する**ので、79 行は目の前にある。
+★ 判断基準は「**設計上の争点があるか**」——②は `hook-constraints` 共通-2（`IME_OPEN` の store は
+**Release**）に照らして**正誤が決まる**ので争点が無い。
+⚠️★★★ **`ime_windows.rs:289` が対になっている。片方だけ直さないこと**（★ 両 OS で規則を揃える）。
+⚠️ ただし **lint 修正とは別コミットに分ける** —— ★「lint は挙動を 1 ビットも変えない」という
+§4 の不変条件を、後から diff で読めるまま残すため。
+
+**① を入れない理由:**
+⚠️★★★ **VK 分布が変わりうるので `HMM_VERSION` の判断が要る**（`hook_macos.rs:243` の注記）。
+★ §4 は「**ゴールデンがずれたら `HMM_VERSION` を bump するのではなく、その修正が誤っている合図**」を
+受け入れ条件に置いているので、⚠️ **①を混ぜるとこの契約が壊れて赤の意味が読めなくなる。**
+→ ★ ① は **起票 6（ライブ変換）と一緒に idea 議論 / Mh-D 全体の修正**に載せる（`decisions.md` 判断 12）。
+
+### 7.3 ★ mac 側 clippy の実測（2026-09-12・`main` = `8d4b8c3`）
+
+⚠️★★★ **`cargo clippy --quiet --all-targets -- -D warnings` は `exit=101`**（★ 緑ではない）。
+
+★ 内訳は **7 件**（`--message-format=short` で実測）:
+
+| ファイル:行 | lint |
+|---|---|
+| `lib.rs:3610` | `unused variable: was_active` |
+| `lib.rs:854` / `lib.rs:862` | `this map_or can be simplified` |
+| `hook_macos.rs:100` | `doc list item without indentation` |
+| `hook_macos.rs:204` | `casting raw pointers to the same type and constness is unnecessary` |
+| `hook_macos.rs:1062` | `manual implementation of .is_multiple_of()` |
+| `ime_macos.rs:77` | `this map_or can be simplified` ← ★ **起票 10② の 2 行手前** |
+
+⚠️★★★ **「7 件」を受け入れ条件にしないこと。** ★ §2 のとおり
+**lib が緑になるまで bin の指摘は 1 件も見えない**ので、直すと増える。**基準は `exit 0`**。
+
+★ **`lib.rs:854` / `862` は `#[cfg(target_os = "macos")]` ブロック内**（実測）——
+⚠️ **Windows からは原理的に見えなかった**もので、§0 の主張が実地で裏づけられた。
+
+### 7.4 ⚠️ `hook_macos.rs:204` は §3 の第 1 原則に当たる可能性が高い
+
+★ `casting raw pointers ... (*const c_void -> *const c_void)` の help は
+`&_dispatch_main_q as *const _` を勧めてくる。⚠️★★★ **ここは `dispatch_sync_f` に渡す
+GCD のメインキューであり、FFI 境界**である。→ ★ **「書式の指摘」として従わず、
+型が本当に一致しているかを一次資料（`#[link]` 宣言と `dispatch_sync_f` の署名）で
+確かめてから当てること**（§3「lint の help を鵜呑みにしない」）。
+
+### 7.5 ★ 着手時の状態（★ そのまま使える）
+
+- `main` = `8d4b8c3`（PR #188 まで取り込み済み）・作業ツリーはクリーン・OPEN な PR ゼロ
+- `cargo test --workspace` **659 passed / 0 failed** ／ ゴールデン `OK: 15 snapshots match` ／
+  `emit_schema` **drift なし** ／ `cargo fmt --check` clean（★ すべて mac 実機で実測）
+- ⚠️ `ime_macos.rs:35` の `#[allow(clippy::new_without_default)]` は **mac でビルドが通ることを確認済み**
+  （★ §0 が「まずここがビルドを通るか確かめる」と書いていた件 —— **通っている**）
