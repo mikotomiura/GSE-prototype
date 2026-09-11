@@ -68,11 +68,11 @@ outcomes:
 # --- ★ B1 由来: 分子の形を並べて出す (notes.md §6) ------------------------------
 report_forms:
   - id: R0     # 分子=受領なし (成果を要求しない) / 分母=全エピソード
-  - id: R0p    # 分子=回復 かつ 受領なし / 分母=全エピソード  <- self_recovery_without_paste
+  - id: R0p    # 分子=回復 かつ 受領なし / 分母=全エピソード  <- pflow_exit_without_receipt
   - id: R1     # 分子=回復 かつ 受領なし / 分母=回復したエピソード
 denominators_required:                                  # ADR-023 D8
   - stuck_episode_count
-  - recovered_episode_count
+  - pflow_exit_episode_count
   - difference
 
 seed: "N/A (乱数要素なし)"
