@@ -996,6 +996,59 @@ fn get_session_file(log: State<Arc<Mutex<LogState>>>) -> String {
     log.lock().unwrap_or_else(|p| p.into_inner()).current_path()
 }
 
+// --- ⚠️★★★ 研究者向け: `ime_shadow` の生存読み出し ------------------------------
+//
+// ★ **なぜ要るか** (2026-09-11):
+//   `ime_shadow` は `gse-replay` が**読み飛ばす**ので (`bin/replay.rs`)、
+//   ★ 実機での確認手段が **NDJSON を jq で開くことだけ**だった。
+//   ⚠️ しかも NDJSON は **1 セッションで 2 本できる** (起動時に 1 本 → 「開始する」で
+//   ローテート) ので、**取り違えやすい**。
+//   → ★ 「**いまどのファイルに何行書けているか**」を画面で見られるようにする。
+//
+// ⚠️★★★ **被験者には出さない。** 二重ゲート:
+//   1. backend: `ensure_debug_enabled()` (= `GSE_DEBUG=1`) が無ければ `Err`
+//   2. frontend: `Dashboard.tsx` の `debugView` (= `VITE_GSE_DEBUG=1`) で囲む
+//   ⚠️ **`get_diagnostics` には足さない** —— あの診断パネルは `debugView` で囲まれておらず、
+//   フックが 20 秒以上有効にならないと**被験者にも出る**。★ 放棄回数を被験者に見せない。
+
+/// 研究者向けデバッグ読み出し DTO。
+///
+/// ⚠️ **キーストローク内容は一切含まない** —— ★ 入っているのは
+/// **ファイルパス**と**件数 3 つ**だけである (data-privacy CD1)。
+#[derive(serde::Serialize, Clone)]
+struct ImeShadowDebugDto {
+    /// いま書いている NDJSON の絶対パス (⚠️ ローテート追随)。
+    log_path: String,
+    /// 送出した `ime_shadow` 行の累計 (⚠️ **プロセス内**。再起動で 0)。
+    emitted: u64,
+    /// そのうち `abandon = false` (= Enter / その他キーによる確定)。
+    confirmed: u64,
+    /// そのうち `abandon = true` (= ESC による放棄)。
+    abandoned: u64,
+}
+
+/// ⚠️★★★ 研究者向け: `ime_shadow` の生存状況を返す (`GSE_DEBUG=1` 必須)。
+///
+/// ★ `confirmed` は `emitted - abandoned` で**導出する** (別カウンタを持たない) ——
+/// ⚠️ 2 つを別々に増やすと、読み出しが両者の間に挟まったときに**和が合わない**。
+/// ★ `saturating_sub` にしてあるのは、⚠️ 万一 `abandoned` が先に見えても
+/// **負にならず 0 で止まる**ようにするため。
+#[tauri::command]
+fn get_ime_shadow_debug(log: State<Arc<Mutex<LogState>>>) -> Result<ImeShadowDebugDto, String> {
+    use std::sync::atomic::Ordering::Relaxed;
+    ensure_debug_enabled()?;
+    // ⚠️ `emitted` を**先**に読む (`tally_ime_shadow` が `abandoned` → `emitted` の順で
+    //   増やすので、この順なら `abandoned <= emitted` が保たれる)。
+    let emitted = input::hook::IME_SHADOW_EMITTED.load(Relaxed);
+    let abandoned = input::hook::IME_SHADOW_ABANDONED.load(Relaxed);
+    Ok(ImeShadowDebugDto {
+        log_path: log.lock().unwrap_or_else(|p| p.into_inner()).current_path(),
+        emitted,
+        confirmed: emitted.saturating_sub(abandoned),
+        abandoned,
+    })
+}
+
 // --- O1 (R3): 被験者の 3 点セット (ADR-014 D7) ---------------------------------------
 //
 // ⚠️★★★ **この 3 つが揃っていることが、ADR-014 判断 3（倫理審査は不要）の根拠 3 である。**
@@ -3181,6 +3234,7 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
             candidate_nav_count,
             abandon,
         });
+        tally_ime_shadow(abandon);
     } else {
         // Stale 経路: IME_HIDE が来なかった場合のフォールバック
         //
@@ -3203,9 +3257,24 @@ fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {
                     candidate_nav_count,
                     abandon,
                 });
+                tally_ime_shadow(abandon);
             }
         }
     }
+}
+
+/// ⚠️★★★ **研究者向けの生存カウンタを進める** (★ NDJSON には 1 行も出さない)。
+///
+/// ★ `abandoned` を先に、`emitted` を**後に**増やす。
+/// ⚠️ 逆にすると、読み出しが 2 つの load の間に挟まったときに
+/// **`abandoned > emitted`** という**あり得ない値**が見える
+/// (★ この順なら「確定が 1 件多く見える」だけで、符号が壊れない)。
+fn tally_ime_shadow(abandon: bool) {
+    use std::sync::atomic::Ordering::Relaxed;
+    if abandon {
+        input::hook::IME_SHADOW_ABANDONED.fetch_add(1, Relaxed);
+    }
+    input::hook::IME_SHADOW_EMITTED.fetch_add(1, Relaxed);
 }
 
 // ---------------------------------------------------------------------------
@@ -4854,6 +4923,8 @@ pub fn run() {
             get_intervention_decision,
             force_nudge,
             debug_force_probe,
+            // ⚠️★★★ 研究者向け (GSE_DEBUG=1 必須)。被験者ビルドでは Err を返す。
+            get_ime_shadow_debug,
             debug_overlay_window_state,
             get_log_status,
             get_g1_mode,
@@ -5398,5 +5469,128 @@ mod submission_receipt_tests {
         reset_sent_receipt();
         assert_eq!(SUBMIT_LAST_SENT_MS.load(Ordering::Acquire), 0);
         assert_eq!(SUBMIT_LAST_SENT_COUNT.load(Ordering::Acquire), 0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ⚠️★★★ 研究者向け読み出しが「被験者に漏れない」ことを固定するテスト
+// ---------------------------------------------------------------------------
+//
+// ★ ここで守る不変条件は **UI と backend にまたがる**ので、型では表せない。
+//   → `capabilities.rs` と同じ様式で **ソースの実物**を検査する (ADR-013 §Context-4)。
+
+#[cfg(test)]
+mod debug_readout_tests {
+    use super::*;
+    use std::sync::atomic::Ordering::Relaxed;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TALLY_LOCK: Mutex<()> = Mutex::new(());
+
+    fn acquire() -> MutexGuard<'static, ()> {
+        let g = TALLY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        input::hook::IME_SHADOW_EMITTED.store(0, Relaxed);
+        input::hook::IME_SHADOW_ABANDONED.store(0, Relaxed);
+        g
+    }
+
+    /// ★ 確定は `emitted - abandoned` で導出できる (別カウンタを持たない設計)。
+    #[test]
+    fn tally_counts_confirmed_and_abandoned() {
+        let _g = acquire();
+        tally_ime_shadow(false);
+        tally_ime_shadow(true);
+        tally_ime_shadow(false);
+        let emitted = input::hook::IME_SHADOW_EMITTED.load(Relaxed);
+        let abandoned = input::hook::IME_SHADOW_ABANDONED.load(Relaxed);
+        assert_eq!(emitted, 3);
+        assert_eq!(abandoned, 1);
+        assert_eq!(emitted - abandoned, 2, "確定件数は差で出す");
+    }
+
+    /// ⚠️★★★ **`abandoned` が `emitted` を超えてはならない。**
+    /// ★ `tally_ime_shadow` が `abandoned` → `emitted` の順で増やし、読み出しが
+    /// `emitted` → `abandoned` の順で読むので、途中に挟まれても符号は壊れない。
+    #[test]
+    fn abandoned_never_exceeds_emitted() {
+        let _g = acquire();
+        for _ in 0..50 {
+            tally_ime_shadow(true);
+            let emitted = input::hook::IME_SHADOW_EMITTED.load(Relaxed);
+            let abandoned = input::hook::IME_SHADOW_ABANDONED.load(Relaxed);
+            assert!(
+                abandoned <= emitted + 1,
+                "abandoned={abandoned} emitted={emitted} (不変条件違反)"
+            );
+        }
+    }
+
+    /// ⚠️★★★ **backend ゲートが外れていないこと。**
+    /// ★ `get_ime_shadow_debug` は `ensure_debug_enabled()?` を必ず通る。
+    #[test]
+    fn the_debug_command_is_gated_on_the_backend() {
+        let src = include_str!("lib.rs");
+        let at = src
+            .find("fn get_ime_shadow_debug(")
+            .expect("get_ime_shadow_debug が lib.rs に無い");
+        let body = &src[at..];
+        let end = body
+            .find(
+                "
+}",
+            )
+            .unwrap_or(body.len());
+        assert!(
+            body[..end].contains("ensure_debug_enabled()?"),
+            "get_ime_shadow_debug から backend ゲートが消えた (被験者ビルドで呼べてしまう)"
+        );
+    }
+
+    /// ⚠️★★★ **被験者に見える診断パネルへ漏れていないこと。**
+    ///
+    /// ★ `get_diagnostics` が返す [`DiagnosticInfo`] は `Dashboard.tsx` で
+    /// `debugView` に囲まれておらず、**フックが 20 秒以上有効にならないと被験者にも出る**。
+    /// ⚠️ しかも `Object.entries` で全フィールドを吐くので、足した瞬間に漏れる。
+    #[test]
+    fn the_participant_visible_diagnostics_do_not_carry_the_tally() {
+        let src = include_str!("lib.rs");
+        let at = src
+            .find("fn get_diagnostics(")
+            .expect("get_diagnostics が lib.rs に無い");
+        let body = &src[at..];
+        let end = body
+            .find(
+                "
+}",
+            )
+            .unwrap_or(body.len());
+        for forbidden in ["IME_SHADOW_EMITTED", "IME_SHADOW_ABANDONED", "abandoned"] {
+            assert!(
+                !body[..end].contains(forbidden),
+                "get_diagnostics に {forbidden} が入った。                 ★ あの診断は debugView で囲まれておらず被験者にも出る (較正のブラインドが壊れる)"
+            );
+        }
+    }
+
+    /// ⚠️★★★ **frontend ゲートが外れていないこと。**
+    /// ★ 読み出しブロックは `debugView &&` の内側に無ければならない。
+    #[test]
+    fn the_readout_block_is_gated_on_the_frontend() {
+        let src = include_str!("../../src/components/Dashboard.tsx");
+        // ⚠️ ★ **呼び出し箇所**を狙う —— ★ 素朴に `find("get_ime_shadow_debug")` にすると
+        //   interface の doc コメント (ファイル冒頭) に当たり、gate の外だと誤判定する
+        //   (2026-09-11 に本テスト自身が踏んだ)。
+        let at = src
+            .find(r#"invoke<ImeShadowDebug>("get_ime_shadow_debug")"#)
+            .expect("Dashboard.tsx が get_ime_shadow_debug を呼んでいない");
+        // ★ 呼び出しの手前に `debugView &&` が在り、かつその間に閉じ括弧 `)}` が無いこと。
+        let head = &src[..at];
+        let gate = head
+            .rfind("{debugView && (")
+            .expect("読み出しの手前に debugView gate が無い");
+        assert!(
+            !head[gate..].contains(")}"),
+            "debugView gate が読み出しブロックの前で閉じている (被験者に出てしまう)"
+        );
     }
 }

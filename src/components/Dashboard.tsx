@@ -19,6 +19,28 @@ interface DiagnosticInfo {
   codesign_valid?: string;
 }
 
+/**
+ * 研究者向けデバッグ読み出し (backend `get_ime_shadow_debug` / `ImeShadowDebugDto` と同期)。
+ *
+ * ⚠️★★★ **被験者には出さない。** 二重ゲート:
+ *   1. backend が `GSE_DEBUG=1` でなければ `Err` を返す
+ *   2. ここが `debugView` (= `VITE_GSE_DEBUG=1`) で囲まれている
+ *
+ * ⚠️ **既存の診断パネル (`DiagnosticInfo`) には足さない** —— あちらは `debugView` で
+ * 囲まれておらず、フックが 20 秒以上有効にならないと**被験者にも出る**。
+ * ★ 放棄回数は被験者の振る舞いの数値なので、較正のブラインドを壊す。
+ */
+interface ImeShadowDebug {
+  /** いま書いている NDJSON の絶対パス (⚠️ 「開始する」でローテートするので追随が要る)。 */
+  log_path: string;
+  /** 送出した `ime_shadow` 行の累計 (⚠️ プロセス内。再起動で 0)。 */
+  emitted: number;
+  /** そのうち確定 (`abandon = false`)。 */
+  confirmed: number;
+  /** そのうち ESC による放棄 (`abandon = true`)。 */
+  abandoned: number;
+}
+
 /** Phase 1 Ground Truth ラベルの種別 (backend の UserLabelKind と同期)。 */
 type LabelKind = "flow" | "incubation" | "stuck";
 
@@ -74,6 +96,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
   const [hookWaitingSec, setHookWaitingSec] = useState(0);
   // 診断情報 (トラブルシューティング用)
   const [diagnostics, setDiagnostics] = useState<DiagnosticInfo | null>(null);
+  // ⚠️ 研究者向け (debugView gate)。★ 常時ポーリングしない —— ボタンで取りに行く
+  //   (既存の診断情報と同じ作法。被験者ビルドでは描画もコマンドも届かない)。
+  const [imeShadowDebug, setImeShadowDebug] = useState<ImeShadowDebug | null>(null);
+  const [imeShadowDebugError, setImeShadowDebugError] = useState<string | null>(null);
   // TCC リセット実行結果メッセージ
   const [resetResult, setResetResult] = useState<string | null>(null);
   const [resetAxResult, setResetAxResult] = useState<string | null>(null);
@@ -586,6 +612,49 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
         >
           💡 Nudge 強制表示 (デバッグ)
         </button>
+      )}
+
+      {/* ⚠️★★★ 研究者向け: `ime_shadow` の生存読み出し (issue 008 の AC 6 を画面で確かめる)。
+          ★ `gse-replay` は `ime_shadow` を読み飛ばすので、従来の確認手段は NDJSON を jq で
+          開くことだけだった。⚠️ しかも NDJSON は 1 セッションで 2 本できる (起動時に 1 本 →
+          「開始する」でローテート) ので取り違えやすい。→ パスと件数を画面に出す。
+          ⚠️ debugView gate で被験者バンドルから除外する。backend も GSE_DEBUG=1 を要求する。 */}
+      {debugView && (
+        <div className="debug-ime-shadow">
+          <button
+            className="debug-force-button"
+            onClick={() => {
+              setImeShadowDebugError(null);
+              invoke<ImeShadowDebug>("get_ime_shadow_debug")
+                .then((d) => setImeShadowDebug(d))
+                .catch((e: unknown) => {
+                  setImeShadowDebug(null);
+                  setImeShadowDebugError(String(e));
+                });
+            }}
+            title="いま書いている NDJSON と ime_shadow の件数を取得 (研究者用・GSE_DEBUG=1 必須)"
+          >
+            🔍 IME shadow の生存を確認 (デバッグ)
+          </button>
+          {imeShadowDebugError && (
+            <pre className="debug-ime-shadow-error">{imeShadowDebugError}</pre>
+          )}
+          {imeShadowDebug && (
+            <pre className="debug-ime-shadow-body">
+              {[
+                `log_path : ${imeShadowDebug.log_path}`,
+                `emitted  : ${imeShadowDebug.emitted}`,
+                `confirmed: ${imeShadowDebug.confirmed}  (abandon=false)`,
+                `abandoned: ${imeShadowDebug.abandoned}  (abandon=true / ESC)`,
+                imeShadowDebug.emitted === 0
+                  ? "⚠️ 0 件 — 変換していないか、計器が動いていない"
+                  : imeShadowDebug.abandoned === 0
+                    ? "⚠️ 放棄が 0 件 — ESC が拾えていない可能性"
+                    : "✅ 確定と放棄の両方が出ている",
+              ].join("\n")}
+            </pre>
+          )}
+        </div>
       )}
 
       {/* アプリ内提出 (案A sidecar / mac Gatekeeper 根絶): 既に承認済みのアプリから同梱 gse-submit
