@@ -1118,7 +1118,7 @@ mod tests {
         let mut hook_seen = vec![false; 8];
         hook_seen.push(false); // i=8: 再押下の tick (マウス)
         hook_seen.push(true); // i=9: 打鍵
-        hook_seen.extend(std::iter::repeat(true).take(60)); // 窓を閉じる
+        hook_seen.extend(std::iter::repeat_n(true, 60)); // 窓を閉じる
         let (out, trace) = run_liveness_chain(&hook_seen, Some(8));
 
         assert_eq!(
@@ -1143,7 +1143,7 @@ mod tests {
         let mut hook_seen = vec![false; 8];
         hook_seen.push(false);
         hook_seen.push(true);
-        hook_seen.extend(std::iter::repeat(true).take(60));
+        hook_seen.extend(std::iter::repeat_n(true, 60));
         let (out, _) = run_liveness_chain(&hook_seen, None);
         let t = out.expect("エポックが無いなら窓が出るはず");
         assert_eq!(t.n_lt30, 1);

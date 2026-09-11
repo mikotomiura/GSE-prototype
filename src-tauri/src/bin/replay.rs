@@ -2487,7 +2487,7 @@ mod tests {
             std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read minimal fixture");
         for line in lines {
             ndjson.push_str(line);
-            ndjson.push_str("\n");
+            ndjson.push('\n');
         }
         let tmp = std::env::temp_dir().join(format!(
             "gse_o1_observation_replay_{}.ndjson",
@@ -2608,6 +2608,7 @@ mod tests {
     /// があれば warnings > 0 で落ちる。
     /// - fix 前 (regen): warnings=6 / matched=0
     /// - fix 後 (logged): warnings=0 / matched=6 (Phase D-2 実測、2026-04-16)
+    ///
     /// matched 閾値は 6 件全マッチを要件に格上げ (code-reviewer M5 対応)。
     #[test]
     fn real_ime_heavy_fixture_warnings_minimal_and_matches_most_labels() {
@@ -3163,15 +3164,15 @@ mod tests {
     /// - `phase1_ime_heavy` : IME pause + 沈黙経路 (alpha=0.15・f5 pause 蓄積・f1 沈黙フロア・β-writing)
     /// - `category_coverage`: resolve_key_vk + Other 畳み込み + obs 量子化
     /// - `deep_silence`     : 深い沈黙フロア (loop_step.rs 8/10/30s 分岐)。約43秒沈黙で TransitionPath の
-    ///                        ctx フロア (f6/f3 = ctx × time_scale ランプ) を踏む。従来 fixture は
-    ///                        f6 が常に 0 で完全未ガードだった領域 (② golden 監査 row 3)。
-    ///                        ⚠️★ **2026-08-16 訂正**: 本 fixture は **SilencePath を踏まない**。
-    ///                        `FeatureExtractor` は IME pause 遷移でしか `reset()` されず、
-    ///                        窓の右端も「最後の打鍵時刻」なので、沈黙が何秒続いても
-    ///                        `f1` は 150.0 のまま (= 全 51 行が TransitionPath)。
-    ///                        ★ SilencePath (`f1` = 2000.0) を踏むのは `phase1_ime_heavy` だけである。
-    ///                        ★ SilencePath の分岐そのものは `analysis/loop_step.rs` の
-    ///                        unit test が直接カバーしている。
+    ///   ctx フロア (f6/f3 = ctx × time_scale ランプ) を踏む。従来 fixture は
+    ///   f6 が常に 0 で完全未ガードだった領域 (② golden 監査 row 3)。
+    ///   ⚠️★ **2026-08-16 訂正**: 本 fixture は **SilencePath を踏まない**。
+    ///   `FeatureExtractor` は IME pause 遷移でしか `reset()` されず、
+    ///   窓の右端も「最後の打鍵時刻」なので、沈黙が何秒続いても
+    ///   `f1` は 150.0 のまま (= 全 51 行が TransitionPath)。
+    ///   ★ SilencePath (`f1` = 2000.0) を踏むのは `phase1_ime_heavy` だけである。
+    ///   ★ SilencePath の分岐そのものは `analysis/loop_step.rs` の
+    ///   unit test が直接カバーしている。
     /// - `vibe_coding_ime_mixed`: ★ **ADR-006 Phase 2b** (`task_kind` → head 配線)。
     ///   `task_kind=vibe_coding` の宣言により Coding head v0 が選ばれ、
     ///   **IME on/off に関わらず β が切り替わらない**ことを固定する。
@@ -3186,6 +3187,7 @@ mod tests {
     ///   本 fixture は `vibe_coding_ime_mixed` と `task_kind` **だけ**が違う双子で、
     ///   「宣言があっても Writing 挙動は不変」を固定する。2 本を対で維持すること
     ///   （片方だけ再生成すると、ルーティングの壊れが差分として現れなくなる）。
+    ///
     /// ⚠️ **1 ファイルに相異なる `task_kind` が並んだら、黙って先頭勝ちにせず落とす。**
     ///
     /// 非 G1 モードはログをローテートしないため「開始 → 戻る → 別 task_kind で開始」で

@@ -417,7 +417,13 @@ impl CognitiveStateEngine {
 
         let old_probs = *current;
         let mut new_probs = [0.0; 3];
-        let n_states = 3;
+        // ⚠️★★★ **配列長から取ること** (2026-09-12・code-reviewer MEDIUM)。
+        //   ★ 旧 `for j in 0..n_states` は `n_states` を増やすと `new_probs[j]` で**即パニック**した。
+        //   ⚠️ `iter_mut()` にした今は**配列長どおり静かに 3 回しか回らない**ので、
+        //     `n_states` だけを直すと `transitions[i * n_states + j]` のストライドがずれ、
+        //     **無音で誤った確率**を返す。→ ★ 両者を 1 つの真実 (配列長) に縛る。
+        let n_states = new_probs.len();
+        debug_assert_eq!(old_probs.len(), n_states);
 
         // Forward Algorithm Step
         // 放射確率は emission テーブルに最小値 0.01 を組み込み済み。
@@ -547,7 +553,9 @@ impl CognitiveStateEngine {
 
         let old_probs = *current;
         let mut new_probs = [0.0; 3];
-        let n_states = 3;
+        // ⚠️ `update()` 側と同じ理由で**配列長から取る** (★ ストライドと反復回数を 1 つに縛る)。
+        let n_states = new_probs.len();
+        debug_assert_eq!(old_probs.len(), n_states);
 
         let mut sum_prob = 0.0;
         // ⚠️★★★ `update()` 側と同じ制約 —— **加算の順序を変えないこと**。

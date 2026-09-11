@@ -12,10 +12,15 @@ if [ "$CHANGED" -eq 0 ]; then
 fi
 
 # Rust: cargo clippy (変更された .rs ファイルがある場合のみ)
+#
+# ⚠️★★★ --all-targets を付けること (2026-09-12)。
+#   ★ 既定のターゲット (lib + bin) だけだと **#[cfg(test)] のコードが一切解析されない**。
+#   ⚠️ しかも clippy は lib が落ちた時点で止まるので、lib を緑にするまで bin の指摘も見えない。
+#     → 実際にこの穴で 1.94 の lint が 33 + 12 件たまり、片付けるまで存在に気づけなかった。
 if git diff --name-only HEAD 2>/dev/null | grep -q '\.rs$'; then
     if [ -f "$MANIFEST" ]; then
-        if ! cargo clippy --manifest-path "$MANIFEST" --quiet -- -D warnings >/dev/null 2>&1; then
-            echo "[stop] WARN: cargo clippy reported issues. Run 'cargo clippy' to inspect."
+        if ! cargo clippy --manifest-path "$MANIFEST" --quiet --all-targets -- -D warnings >/dev/null 2>&1; then
+            echo "[stop] WARN: cargo clippy reported issues. Run 'cargo clippy --all-targets' to inspect."
         fi
     fi
 fi

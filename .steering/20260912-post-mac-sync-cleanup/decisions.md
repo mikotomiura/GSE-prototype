@@ -76,3 +76,82 @@
      ★ どの HMM 版の出力か**帰属できない** (`reproducibility-discipline` に反する)。
   3. ⚠️ 追跡済みの同ディレクトリのファイルが持つ `.range_metrics.json` の**対が無い**。
 - ⚠️ **削除前に (1) を実地で確認した** (★ `find raw labeled -name "*2026041[567]*"`)。
+
+---
+
+# レビュー後の判断 (code-reviewer / security-checker を並列実行した結果)
+
+★ 両者とも CRITICAL / HIGH の**新規**脆弱性・欠陥は無しと判定。
+⚠️ ただし **私の判断ミスが 2 件**指摘され、どちらも**指摘が正しかったので直した**。
+
+## 判断 8: ⚠️ **`--all-targets` を外したのは誤りだった** (自分の判断を撤回)
+
+- ★ 当初 `requirement.md` で「`--all-targets` はスコープ外 (hook の gate は lib/bin のみ)」と決めた。
+- ⚠️★★★ **これは間違いだった。** ★ code-reviewer の指摘どおり、
+  **コミットメッセージ自身が書いた罠 (「lib を緑にすると bin が見えた」) が、`#[cfg(test)]` の
+  一段下にそのまま残っていた**。
+  ★ 証拠: `features.rs` / `metrics.rs` で潰したのと**同じ** `manual_is_multiple_of` が
+  `probe_scheduler.rs` のテストに生き残っていた。
+- **対応**: `--all-targets` を含めて **12 + 6 = 18 件**を追加で是正し、
+  ★ `.claude/hooks/stop-check.sh` の gate 自体に **`--all-targets` を追加**した
+  (⚠️ **穴の開いた検査を残したままにしない**)。
+- ★ 特筆: `hook_windows.rs` の `assertions_on_constants` は、定数どうしの比較を
+  **実行時 `assert!` から `const _: () = assert!(..)` へ移した** (★ テストを呼ばなくてもビルドが落ちる)。
+  ⚠️ これは mac 側 `d038527` の「範囲の不変条件をコンパイル時へ移す」と同じ作法である。
+
+## 判断 9: ⚠️ **`impl Default for ImeMonitor` は撤回し `#[allow]` にした** (判断 4 の訂正)
+
+- ⚠️★★★ **判断 4 は誤りだった。** ★ `ImeMonitor::new()` は **COM アパートメントを初期化する**
+  (`CoInitializeEx` + `CoCreateInstance`)。`Default` は「安価・副作用なし」が慣習なので、
+  **暗黙に COM 初期化が走る入口**を作ってしまう。
+- ⚠️ しかも**同じコミットの中で判断が不統一**だった —— `too_many_arguments` と
+  `doc_lazy_continuation` は「理由を書いて `#[allow]`」を選んだのに、ここだけ
+  **lint に合わせて公開 API を増やした**。
+- ★ 「repo に `impl Default` が 10 箇所ある」を前例にしたのも誤り。
+  ⚠️ **それらは純粋な構築**であり、副作用のある構築の前例にはならない。
+- **対応**: 両 OS とも `#[allow(clippy::new_without_default)]` + 理由コメントへ置き換えた。
+
+## 判断 10: `n_states` を配列長から取る (loud → silent の退行を塞ぐ)
+
+- ⚠️★★★ **code-reviewer の指摘が正しい。** ★ 旧 `for j in 0..n_states` は `n_states` を
+  4 にすると `new_probs[3]` で**即パニック**した。
+  ⚠️ `iter_mut()` にした後は**配列長どおり静かに 3 回しか回らず**、
+  `transitions[i * n_states + j]` の**ストライドだけがずれて無音で誤った確率**を返す。
+  → ★ 正確性を最重視する層で **loud failure を silent failure に変えてしまっていた**。
+- **対応**: `let n_states = new_probs.len();` ＋ `debug_assert_eq!(old_probs.len(), n_states);`
+  を両関数に置き、**反復回数とストライドを 1 つの真実に縛った**。
+  ★ ゴールデン 226 snapshot は引き続き byte-equal (値は不変)。
+
+## 判断 11: `redact_home_path` に env を読む側のテストを足した (security MEDIUM)
+
+- ⚠️ 従来は純関数 `redact_prefixes` しか覆われておらず、**env を読む経路が無保護**だった。
+  ★ そこが壊れると `homes` が空になり `redact_prefixes(detail, &[])` が**入力をそのまま返す**
+  → ⚠️ 被験者が見る提出失敗メッセージへ **OS ユーザー名を含むフルパスが素通り**する。
+- ★ **env を書かない**読み取り専用テストにした (⚠️ `set_var` は他テストと競合し `unsafe`)。
+  取れない環境では skip する。
+- ★ 併せて `format_intervention_decision_line` の doc に
+  「**手書き JSON なのでエスケープが無い / 値域を型で閉じること**」を明記した
+  (⚠️ `#[allow]` が許すのは**引数の個数だけ**で、値域の緩みではない)。
+
+## 判断 12: MSRV を宣言した (`rust-version = "1.87"`)
+
+- ⚠️ 本タスクの根本原因は toolchain drift なのに、`rust-version` も `rust-toolchain.toml` も無かった。
+  ★ さらに `is_multiple_of` / `is_none_or` / `repeat_n` を導入して**実効 MSRV が上がった**のに
+  どこにも書かれていなかった。
+- ★ **推測で書かず一次資料を読んだ** —— ローカル `rust-src` の `#[stable(since = ...)]`:
+  `is_multiple_of` = **1.87.0** / `is_none_or` = 1.82.0 / `repeat_n` = 1.82.0 / `abs_diff` = 1.60.0。
+- ⚠️ `edition = "2021"` は resolver "2" なので、**依存解決は変わらない** (MSRV 対応 resolver は "3")。
+
+## ⚠️★★★ 研究者判断に委ねる (本タスクでは**やらない**)
+
+| # | 指摘 | なぜ私が決めないか |
+|---|---|---|
+| R-1 | **CI に clippy step を足す** (`check` job) | ⚠️★★★ **mac 側の clippy 状態が未知**である。★ `hook_macos.rs` / `observe_macos.rs` 等は Windows で 1 行もコンパイルされず、**本機からは検証できない**。→ ⚠️ ブロックする gate をいま足すと **main の CI が即赤になり全作業が止まりうる**。★ 安全な順序は **① mac で `cargo clippy --all-targets` を回して緑にする → ② CI に足す**。 |
+| R-2 | **`rust-toolchain.toml` で toolchain を固定** | ⚠️ 「stable に追従するか、版を固定するか」は**運用方針の選択**であり、★ 両マシン + CI (`dtolnay/rust-toolchain@stable`) に波及する。⚠️ 固定すると今回のような lint 増加は止まるが、**セキュリティ修正の追従も止まる**。→ ★ 研究者が決める。 |
+| R-3 | `cargo-audit` の導入 (`verification-runbook.md` へ) | ★ 本コミットは依存を 1 つも動かしていないので**この差分に起因するリスクは無い**。⚠️ 定常スキャン手段の有無は別タスク。 |
+
+★ 却下した指摘 (理由付き):
+- 「`0x25..=0x28` を `windows` crate の `VK_LEFT`/`VK_DOWN` にする」→ ⚠️ **同ファイルは
+  `0x1B` / `0x70..=0x7B` と生の hex で統一**されている。★ 1 箇所だけ定数にすると読みが割れる。
+- 「`schema_dto.rs` はファイル先頭の `#![allow]` にする」→ ⚠️ **変異点を広げない**。
+  ★ 実際に lint が出たのは `Meta` variant だけで、variant 単位の方が「どの doc が外部契約か」が精密に残る。

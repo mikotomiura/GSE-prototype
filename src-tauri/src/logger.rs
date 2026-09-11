@@ -367,6 +367,13 @@ fn format_ime_shadow_line(
 
 /// `LogEntry::InterventionDecision` の NDJSON 1 行を生成する純粋関数。
 ///
+/// ⚠️★★★ **手書き JSON なのでエスケープが無い。** ★ `action` / `reason` に
+/// **外部由来の文字列を渡すと NDJSON の 1 行が黙って壊れ**、解析側 (`validate_blocks.py` /
+/// `anonymize`) が誤読する (★ `write_meta_start` の `g1_mode` と同じ security review MEDIUM)。
+/// → ★ 値域は `InterventionAction::as_str()` / `reason_for()` の**固定リテラルに閉じている**。
+/// ⚠️ **引数を増やすときも、この不変条件を必ず保つこと** (★ 下の `#[allow]` は引数の個数だけを
+/// 許しており、値域の緩みを許してはいない)。
+///
 /// ⚠️ **引数 8 個は意図的**（clippy `too_many_arguments` は 7 個まで）。
 /// ★ 本ファイルの `format_*_line` は **NDJSON の 1 行のフィールドと 1:1 に並べる**のが規約で、
 /// 構造体に畳むと「行に何が出るか」がシグネチャから消える。

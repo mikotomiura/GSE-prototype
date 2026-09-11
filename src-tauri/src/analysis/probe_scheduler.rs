@@ -826,7 +826,11 @@ mod tests {
         let mut fired = 0usize;
         while now <= end {
             // 100 tick ごとに last_key を 0 にリセット (tap 再インストールを模擬)。
-            let last_key = if tick % 100 == 0 { 0 } else { away_last_key };
+            let last_key = if tick.is_multiple_of(100) {
+                0
+            } else {
+                away_last_key
+            };
             let idle = driver_idle_ms(now, last_key, config.away_idle_ms);
             if sched.poll(now, idle).is_some() {
                 fired += 1;

@@ -5237,8 +5237,45 @@ mod task_c_command_tests {
 
 #[cfg(test)]
 mod submit_command_tests {
-    use super::{extract_age_path, redact_prefixes};
+    use super::{extract_age_path, redact_home_path, redact_prefixes};
     // participant_id 検証の規則テストは crate::participant_id (単一情報源) 側に置く。
+
+    /// ⚠️★★★ **env を読む側 (`redact_home_path`) にも検査を置く** (security review MEDIUM, 2026-09-12)。
+    ///
+    /// ★ 従来は純関数 `redact_prefixes` しか覆われておらず、**env を読む経路が無保護**だった。
+    /// ⚠️ そこが壊れると (キー名の typo / `var_os` → `var` 置換など) `homes` が空になり、
+    /// `redact_prefixes(detail, &[])` が**入力をそのまま返す**。
+    /// → ⚠️ 被験者に見せる提出失敗メッセージへ **OS ユーザー名を含むフルパスが素通り**する。
+    /// ★ 黙って壊れる型の欠陥なので、テストで止める。
+    ///
+    /// ⚠️ **env を書かない** (★ `set_var` は他のテストと競合し `unsafe` でもある)。
+    /// 読めない環境では **skip** する。
+    #[test]
+    fn redact_home_path_masks_real_home_from_env() {
+        let Some(home) = ["USERPROFILE", "HOME"]
+            .iter()
+            .filter_map(std::env::var_os)
+            .map(|v| v.to_string_lossy().into_owned())
+            .find(|s| !s.is_empty())
+        else {
+            // ⚠️ CI でも通常は取れるが、取れないなら判定できないので skip する。
+            return;
+        };
+
+        let detail = format!("could not read input {home}/Documents/GSE-sessions/x.ndjson: nope");
+        let masked = redact_home_path(&detail);
+
+        assert!(
+            !masked.contains(&home),
+            "home leaked: home={home} masked={masked}"
+        );
+        assert!(
+            masked.contains("~/Documents/GSE-sessions/x.ndjson"),
+            "got: {masked}"
+        );
+        // ★ ホームを含まない文字列は素通し (⚠️ 過剰な伏せ字で原因が読めなくならないこと)。
+        assert_eq!(redact_home_path("no path here"), "no path here");
+    }
 
     #[test]
     fn redact_prefixes_masks_home_without_touching_env() {
@@ -5520,7 +5557,7 @@ mod debug_readout_tests {
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let stop_w = stop.clone();
         let writer = std::thread::spawn(move || {
-            while !stop_w.load(std::sync::atomic::Ordering::Relaxed) {
+            while !stop_w.load(Relaxed) {
                 // ⚠️ **すべて放棄**にするのが最悪条件 (2 つのカウンタが同じ速さで進む)。
                 logger::tally_ime_shadow(true);
             }
@@ -5532,7 +5569,7 @@ mod debug_readout_tests {
                 violations += 1;
             }
         }
-        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        stop.store(true, Relaxed);
         writer.join().expect("writer スレッドが panic した");
         assert_eq!(
             violations, 0,

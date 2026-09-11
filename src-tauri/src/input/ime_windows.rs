@@ -23,13 +23,14 @@ pub struct ImeMonitor {
     automation: Option<IUIAutomation>,
 }
 
-impl Default for ImeMonitor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ImeMonitor {
+    // ⚠️★★★ **`Default` は実装しない** (clippy `new_without_default` をここで黙らせる)。
+    //   ★ `new()` は **COM アパートメントを初期化する** (`CoInitializeEx` + `CoCreateInstance`)。
+    //   ⚠️ `Default` は「安価・副作用なし」が慣習なので、`..Default::default()` や
+    //     ジェネリック経由で **暗黙に COM 初期化が走る入口**を作ってしまう。
+    //   ★ repo の他の `impl Default` (`engine.rs:143` 等) は**純粋な構築**であり、前例にならない。
+    //   ⚠️ macOS 側 (`ime_macos.rs`) も対で同じ扱いにすること (★ 片方だけだと OS で結果が割れる)。
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         unsafe {
             // COM is initialized here for the UIAutomation fallback.

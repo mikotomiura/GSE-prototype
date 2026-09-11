@@ -4,6 +4,15 @@ version = "0.1.35"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+# ⚠️★★★ **実効 MSRV** (2026-09-12 に宣言)。
+#   ★ 根拠は推測ではなくローカルの `rust-src` の `#[stable(since = ...)]` を読んだ実測:
+#     `u64::is_multiple_of` = **1.87.0** / `Option::is_none_or` = 1.82.0 /
+#     `iter::repeat_n` = 1.82.0 / `u64::abs_diff` = 1.60.0。→ 下限は **1.87**。
+#   ⚠️ これは **clippy 1.94 の提案に従って導入した std API が要求する下限**であって、
+#     「1.87 で全体がビルドできることを実測した」という意味ではない。
+#   ★ `edition = "2021"` は resolver "2" なので、この宣言が**依存解決を変えることはない**
+#     (⚠️ MSRV 対応 resolver は "3" から)。効くのは古い toolchain でのエラーメッセージだけ。
+rust-version = "1.87"
 # `cargo run` / `cargo tauri dev` で本体 Tauri アプリを起動させる。
 # `src/bin/replay.rs` の `gse-replay` と曖昧になるため明示が必須。
 default-run = "gse-next"
