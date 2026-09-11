@@ -130,3 +130,113 @@
 - **トレードオフ**: grill の終了条件を形式的には満たさない。→ 本判断として明示的に記録する。
 - **影響範囲**: なし（Wave 1 の該当 issue が glossary 追記を担当する）。
 - **見直しタイミング**: Wave 1 の用語整理 issue 実行時。
+
+## 判断 7: issue 008 の前提「配布後は原理的に復元できない」は**成立しない**と訂正する
+
+- **判断日時**: 2026-09-11
+- **背景**: issue 008 は冒頭で「⚠️★★★ **O1 の収集器を配布した後では、この情報は原理的に復元できない。**」
+  と書き、これが「O1 配布前でなければ手遅れ」という締切の唯一の根拠になっていた。
+- **実測 (一次資料)**:
+  - `src-tauri/src/schema_dto.rs:116-124` — `key` 行は生 VK ではなく `category` を記録する。
+  - `src-tauri/src/analysis/anonymize.rs:16-56` — `KeyCategory` の 14 種には
+    **`Escape` と `Enter` が別カテゴリとして存在する**。`Alphabetic` / `Numeric` /
+    `Space` / `Backspace` / `Navigation` も別々である。
+  - `src-tauri/src/input/hook_macos.rs::is_observed_key` — Escape (`0x35`) と矢印
+    (`0x7B..=0x7E`) は**観測対象に入っている** (`escape_arrows_and_function_keys_are_observed…` が固定)。
+  - `ime_state` 行が日本語入力モードの区間を与える。
+  - → ★ **旧 `update_compose_state` が食っていた入力は、すべて現行 NDJSON に残っている。**
+    確定 / 放棄は**事後に再構成できる**。
+- **⚠️ ただし完全ではない** (★ 過小主張も過大主張もしない):
+  - キーリピートは `key` 行に出ない (状態機械は駆動する) → リピート分だけズレる
+  - テンキー / ファンクションキーは `is_observed_key` の外 → 「その他キーで自動確定」の一部が見えない
+  - **マウスでの候補確定はどちらの方法でも観測できない** (打鍵が無い)
+  - 再構成ロジックを `gse-replay` 側に書く必要があり、Replay-as-Truth の対象が増える
+- **選択肢**: A: 実装を進める / B: 実装を中止し事後再構成に委ねる
+- **採用**: **A**（研究者判断・2026-09-11）
+- **理由**: 締切は消えたが、アプリ内で厳密に計算する価値は残る
+  (再構成ロジックの二重管理を避けられる / リピート・テンキーのズレが入らない)。
+- **⚠️ ただし締切が消えたので再配布はしない** → 判断 8。
+- **見直しタイミング**: 事後再構成を実装する別タスクを起票するとき
+  (★ 既配布ぶんの macOS データはそちらでしか救えない)。
+
+## 判断 8: 実装は入れるが **v0.1.34 の再配布はしない**
+
+- **判断日時**: 2026-09-11（研究者判断）
+- **背景**: `v0.1.34` は CI で公開済みで、mac 側 handoff に「被験者への配り直し」が残っていた。
+  issue 008 / 009 を入れると再ビルド・再配布が要る。
+- **選択肢**: A: 入れるが再配布しない / B: 入れて再配布する / C: 実装を中止する
+- **採用**: **A**
+- **理由**:
+  - 判断 7 により「配布前でなければ手遅れ」が崩れたので、再配布を急ぐ理由が無い。
+  - ⚠️ 収集中にバージョンを増やすと**データにバージョン混在が入る**。
+    ★ この repo は過去に「版の特定ができなかった」という**回復不能な情報損失**を踏んでいる
+    (`capabilities.rs` の `app_version` doc / `experiments/…/notes.md:1865`)。
+  - 既配布ぶんの macOS の確定 / 放棄は、判断 7 の事後再構成で救える。
+- **トレードオフ**: 既配布ぶんの macOS データには `ime_shadow` 行が 1 行も無い。
+  → ★ `capabilities` が「宣言なし」を記録しているので、**解析側は「計器が無かった」と正しく読める**。
+- **影響範囲**: 次回の配布版に載る。`docs/pilot-runbook.md` の配布手順は変更なし。
+- **見直しタイミング**: 次回リリースを切るとき。
+
+## 判断 9: 行型は両 OS 共通の `ime_shadow` のままにし、**由来フィールドを足さない**
+
+- **判断日時**: 2026-09-11（研究者判断）
+- **背景**: ⚠️★★★ **2026-08-23 の研究者判断 D-9**
+  (`.steering/20260823-ime-active-cloak-rewiring/decisions.md:201-215`) が
+  「**「Windows=観測 / macOS=推定」の非対称を設計として固定する**」と決めており、
+  `survey-input-channels.md §3.2:152` は逐語で
+  「**同じ `IME_ACTIVE` フィールドでも Win=観測値 / mac=推定値であり、
+  両 OS のデータを混ぜて学習・評価してはならない。**」と書いている。
+  ⚠️ **issue 008 はこの判断を引用していない**（分解時の見落とし）。
+- **選択肢**:
+  - A: 同じ `ime_shadow` 行で出し、由来は `meta` の OS と `capabilities` で判別する
+  - B: `src: "winevent" | "keystroke"` を足す (ADR-005 additive versioning)
+  - C: macOS 専用の別行型 (`ime_compose` 等) を作る
+  - D: 実装しない
+- **採用**: **A**
+- **理由**:
+  - `survey-input-channels.md §7.6` 逐語「**NDJSON スキーマは両 OS 共通にし、
+    macOS では該当フィールドを `null`**」— 共通スキーマが既定の方針である。
+  - ADR-013 の `capabilities` + `meta.os` は**まさにこの用途に作られた機構**であり、
+    由来は機械的に復元できる。
+  - B / C は `schema/current.json` の構造変更を伴い、`gse-dataset` 側の同期が必要になる。
+- **トレードオフ**: ⚠️ **行だけを見ると由来が分からない。** 解析側が `meta` を見る規律に依存する。
+  → ★ `schema_dto.rs` の `ImeShadow` doc に「両 OS のデータを混ぜて学習・評価してはならない」を
+    **schema の `description` として刻んだ**ので、機械可読な形でも残る。
+- **影響範囲**: `schema/current.json` は **description 1 行だけ**が変わった (構造は不変)。
+  → ★ 既存ログは引き続き妥当。
+- **見直しタイミング**: macOS の推定精度を Windows の観測値に対して測った (§7.6 の評価設計) とき。
+
+## 判断 10: 判断ロジックとドライバを `input/ime_compose.rs` (OS 非依存) に置く
+
+- **判断日時**: 2026-09-11
+- **背景**: ⚠️ `hook_macos.rs` の `#[cfg(test)] mod tests` は **Windows では 1 行も走らない**
+  (あちらのテストモジュール冒頭が明記)。★ 状態機械をあそこに書くと、
+  **確定 / 放棄を分ける規則をどちらの OS の CI も検証しない**。
+- **選択肢**: A: `hook_macos.rs` 内に書く (issue の Allowed Files どおり) /
+  B: `ime_cloak.rs` と同じ形で OS 非依存モジュールに切り出す
+- **採用**: **B**
+- **理由**:
+  - `docs/agent-shared.md` 逐語「**OS ごとに規則が違うロジックは両 OS に対のテストを置く**」。
+  - `input/mod.rs:5-9` に先例がある (`ime_cloak` は「OS 非依存にしてあるので `#[cfg]` を付けない。
+    そうすると macOS の CI でも `CloakFold` のテストが走る」)。
+  - ★ さらに **Atomic ドライバ (`drive`) も OS 非依存にした** —— そのために
+    `hook.rs::IME_COMPOSING` の `#[cfg(target_os = "macos")]` を外した。
+    ⚠️ これで「確定 / 放棄を Atomic へ書き戻す層」が Windows の CI でも検証される。
+  - **結果**: macOS 専用に残ったのは `hook_macos.rs` の**呼び出し 1 行だけ**になった。
+- **トレードオフ**: Windows に production では書かれない `static` が 1 つ増える。
+- **影響範囲**: Allowed Files が issue 記載より広がった (判断 11)。
+- **見直しタイミング**: なし (先例に揃えた)。
+
+## 判断 11: issue 008 の Allowed Files は実体と食い違っていたので拡張した
+
+- **判断日時**: 2026-09-11
+- **背景**: issue は `ime_macos.rs` / `capabilities.rs` / `schema_dto.rs` / `schema/current.json`
+  の 4 つを挙げるが、⚠️ **macOS の IME 状態機械は `ime_macos.rs` に無い**
+  (あそこは TIS ポーリングと `ImeMonitor` だけ)。実体は `hook_macos.rs` / `hook.rs` / `lib.rs`。
+- **実際に触ったファイル**:
+  `input/ime_compose.rs` (新規) / `input/mod.rs` / `input/hook.rs` / `input/hook_macos.rs` /
+  `lib.rs` / `capabilities.rs` / `schema_dto.rs` / `schema/current.json` /
+  `docs/architecture.md` / `docs/repository-structure.md`
+  ★ **`input/ime_macos.rs` は 1 行も触っていない。**
+- **⚠️ issue 009 との交差**: `hook_macos.rs` / `hook_windows.rs` / `schema_dto.rs` で交差する。
+  → ★ issue 008 を完了させてから 009 に着手する (issue 008 の Dependencies が既にそう指示している)。
