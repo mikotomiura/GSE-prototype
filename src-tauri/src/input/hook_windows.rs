@@ -21,7 +21,7 @@ use super::{
     CloakEvent, CALLBACK_COUNT, CLOAK_EVENT_TX, EVENTS_DROPPED, EVENT_SENDER, HOOK_ACTIVE,
     IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSITION_START_MS, IME_OPEN, IME_SHADOW_ABANDON,
     IME_SHADOW_DWELL_MS, IME_SHADOW_READY, IME_STATE_DIRTY, LAST_KEY_MS, LEGACY_IME_EVENT_MS,
-    POLL_WAKE_TX, VK_KANJI,
+    POLL_WAKE_TX,
 };
 use crate::analysis::features::InputEvent;
 // ★ IME モードキーの遷移表は **OS 非依存**の 1 か所に置いてある。
@@ -679,6 +679,10 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
 #[cfg(test)]
 mod tests {
     use super::*;
+    // ⚠️ `VK_KANJI` は**テストからしか参照しない**。上の `use super::{...}` に置くと
+    //   非テストビルド (`cargo build`) で `unused_imports` 警告になる
+    //   (★ macOS からは 1 行もコンパイルされないので気づけない)。
+    use crate::input::hook::VK_KANJI;
 
     /// ★ 観測ゲートは従来の打鍵キーを**すべて**通す (非回帰)。
     #[test]

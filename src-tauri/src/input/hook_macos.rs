@@ -19,8 +19,8 @@ use core_graphics::event::{
 };
 
 use super::{
-    EVENT_SENDER, IME_ACTIVE, IME_OPEN, IME_STATE_DIRTY, JIS_KEYBOARD_SEEN, LAST_KEY_MS,
-    POLL_WAKE_TX, VK_DBE_ALPHANUMERIC, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
+    EVENT_SENDER, IME_OPEN, IME_STATE_DIRTY, JIS_KEYBOARD_SEEN, LAST_KEY_MS, POLL_WAKE_TX,
+    VK_DBE_ALPHANUMERIC, VK_DBE_HIRAGANA, VK_DBE_KATAKANA,
 };
 use crate::analysis::features::InputEvent;
 // ★ 確定 / 放棄を分ける判断と、それを Atomic へ書き戻すドライバ。
@@ -562,6 +562,12 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
         }
     }
     // Also handle key-up for JIS IME keys (mirrors Surface Type Cover quirk handling)
+    //
+    // ⚠️★ **2026-09-12 の写像修正で、かな (`0x68`) は key-up 側でも書かれるようになった。**
+    //   ★ 旧: `0x68 → VK_KANJI` で `ime_open_after_release` は `None` (何もしない)。
+    //     新: `0x68 → VK_DBE_HIRAGANA` で `Some(true)` を store する。
+    //   ★ press 側が既に `true` にしているので**冪等であり実害はない**が、
+    //     ⚠️ **意図した副作用**なので記録しておく (code-reviewer LOW)。
     if is_release {
         if let Some(new_ime_open) = ime_mode::ime_open_after_release(vk_code) {
             IME_OPEN.store(new_ime_open, Ordering::Release);
@@ -1295,6 +1301,41 @@ mod tests {
                 "⚠️ mac keycode {mac_vk:#04x} が Windows のトグルキーへ写像された"
             );
         }
+    }
+
+    /// ⚠️★ **IME ポーリングスレッドの key-up 起床条件を全走査で固定する。**
+    ///
+    /// ★ `is_ime_mode_key` の共通化 (2026-09-12) でこの集合が変わっていないことを機械で守る。
+    /// ⚠️ 変わると「かな を離したのにポーリングが起きない」= `ime_state` の遅延になるが、
+    /// **無言で劣化する**ので気づけない (code-reviewer LOW)。
+    ///
+    /// ⚠️★ **実集合は素直な 4 つではない** —— 素通しアームのせいで `0xF0..=0xF4` も入る。
+    /// ★ 書く前は 4 つだと思っていたが、**テストを走らせて初めて分かった**ので実態を固定する。
+    #[test]
+    fn exactly_the_jis_ime_keys_wake_the_polling_thread_on_key_up() {
+        let woken: Vec<u64> = (0u64..=0xFF)
+            .filter(|&mac_vk| ime_mode::is_ime_mode_key(macos_vk_to_vk(mac_vk)))
+            .collect();
+        assert_eq!(
+            woken,
+            vec![
+                // ── 実在の JIS キー (★ 明示写像) ──────────────────────────
+                0x66, // kVK_JIS_Eisu  → 英数
+                0x68, // kVK_JIS_Kana  → かな
+                0x90, // alternate かな
+                0x91, // alternate カタカナ
+                // ── ⚠️★★★ **素通しアームの副産物** ───────────────────────
+                // ★ `macos_vk_to_vk` の既定は `other => other as u32` なので、
+                //   mac keycode `0xF0..=0xF4` が **恒等写像で `VK_DBE_*` になる**。
+                // ⚠️ 実機の CGKeyCode は `0x00..=0x7E` なのでこれらは**物理キーでは発生しない**が、
+                //   `CGEventPost` で注入されると `IME_OPEN` を書き換えられる
+                //   (★ security-checker LOW・**本変更で入ったものではなく pre-existing**)。
+                // ★ content-free 境界は破れない —— `is_observed_key` が `0xF0..=0xF4` を
+                //   含まないので分析チャネルへは 1 件も流れない。
+                0xF0, 0xF1, 0xF2, 0xF3, 0xF4,
+            ],
+            "★ ここが変わると『かな を離したのにポーリングが起きない』という無言の劣化になる"
+        );
     }
 
     /// ★ 英数 キーとの対称性 —— こちらは元から無条件 `Set(false)` で正しかった。
