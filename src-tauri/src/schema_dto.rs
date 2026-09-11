@@ -286,6 +286,11 @@ pub enum LogEntryDto {
     /// (input/ime_compose.rs) による推定値である。`nav` / `abandon` は両 OS とも打鍵由来。
     /// 由来は meta 行の os と capabilities 宣言で判別する。両 OS のデータを混ぜて
     /// 学習・評価してはならない。20 秒を超えた変換は打ち切られ行が出ない (両 OS 共通)。
+    /// 由来だけでなく母数も違う: 1 行になる変換は Windows が「候補ウィンドウが出たもの」、
+    /// macOS は「かな入力の一区切りすべて (Space 不要)」。nav を数える区間は Windows が
+    /// IME_ACTIVE 中、macOS は変換セッション全体。abandon には macOS のみ「候補を出さずに
+    /// 未確定文字列を捨てた ESC」が入る。abandon 率を OS 間で直接比べてはならない。
+    /// dwell_ms は壁時計由来なので、時計の巻き戻しで 0 になった行を実測値として扱わないこと。
     ImeShadow {
         t: u64,
         dwell_ms: u64,

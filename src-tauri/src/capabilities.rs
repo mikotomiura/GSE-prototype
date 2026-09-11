@@ -127,6 +127,9 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// ⚠️★★★ **2026-08-22 追加: `ime_shadow` もここに入る**（★ 実測で判明）。
 ///
 /// ★ `ime_shadow` は `IME_ACTIVE` が `true` になったときにだけ出る。
+/// ⚠️★★★ **以下は Windows 経路の記述である** (2026-09-11 に限定を明記)。
+/// ★ macOS は `IME_ACTIVE` ではなく**打鍵の状態機械**が行を出すので、
+/// **Space を一度も押さなくても行が出る** (`input/ime_compose.rs` のモジュール doc)。
 /// ⚠️★ **2026-08-23 訂正**: 旧文は「その `true` を書くのは
 /// **`hook_windows.rs` の WinEvent コールバック 1 か所だけ**である」と書いていたが、
 /// ★ 現在は **2 か所**ある —— 文書化された `EVENT_OBJECT_IME_*` 経路と、
@@ -183,7 +186,14 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// |---|---|
 /// | 1 | ★ **1 台・1 アプリでしか確認していない。** 被験者環境で再現するかは未検証 |
 /// | 2 | ⚠️ cloak が飛ぶのは**候補ウィンドウが出るとき**であって、ローマ字入力中ではない —— ★ 「変換しない打ち方」の被験者では 0 行になりうる |
-/// | 3 | ⚠️~~macOS には送出元が構造的に無い~~ → ★ **2026-09-11 (issue 008) に解消**。ただし macOS の `dwell_ms` は**打鍵推論**であり、⚠️ 「変換しない打ち方」で 0 行になる点 (上の 2) は macOS でも同じ |
+/// | 3 | ⚠️~~macOS には送出元が構造的に無い~~ → ★ **2026-09-11 (issue 008) に解消**。ただし `dwell_ms` は**打鍵推論**である |
+///
+/// ⚠️★★★ **0 行の意味は OS で違う** (2026-09-11・security-checker MEDIUM):
+///
+/// | OS | 0 行が意味しうること |
+/// |---|---|
+/// | Windows | ★ 候補ウィンドウが出る変換をしなかった (⚠️ 上の 2 —— 「変換しない打ち方」) / 計器が上がらない環境だった (上の 1) |
+/// | macOS | ⚠️ **`IME_OPEN` が一度も立たなかった** (日本語入力をしなかった / ANSI 環境で TIS ポーリングが取りこぼした)。★ **「変換しない打ち方」では 0 行にならない** —— かな入力を確定するたびに 1 行出るため |
 ///
 /// → ★ **0 行は依然「判定不能」であって「信号が無かった」ではない。**
 /// ⚠️ 複数台で再現を確認するまで `config_gated` のまま据え置く。
@@ -207,6 +217,14 @@ pub fn config_gated() -> Vec<&'static str> {
     // ⚠️★★★ **由来は OS で違う** (★ 解析時に必ず知っている必要がある):
     //   Windows = 窓イベント (`EVENT_OBJECT_IME_*` / DWM cloak) から `dwell_ms` を取る。
     //   macOS   = **打鍵の状態機械**から取る (`ime_compose`)。`nav` / `abandon` は両 OS とも打鍵。
+    //
+    // ⚠️★★★ **由来だけでなく「母数」も違う** (2026-09-11・security-checker MEDIUM):
+    //   | | Windows | macOS |
+    //   |---|---|---|
+    //   | 1 行になる変換 | 候補ウィンドウが出たもの | ★ かな入力の一区切り**すべて** (Space 不要) |
+    //   | `nav` を数える区間 | `IME_ACTIVE` 中 | ★ 変換セッション全体 |
+    //   | `abandon` に入るもの | 候補表示中の ESC | ★ **候補を出さずに捨てた ESC も入る** |
+    //   → ⚠️ **`abandon` 率を OS 間で直接比べてはならない。**
     //   → ★ 行型は両 OS 共通のまま、由来は **この宣言と `meta` 行の OS** で判別する
     //     (2026-09-11 研究者判断。⚠️ 行に由来フィールドは足さない)。
     //   ⚠️ `survey-input-channels.md §3.2` 逐語「**同じ `IME_ACTIVE` フィールドでも
@@ -483,7 +501,7 @@ mod tests {
         let compose_src = include_str!("input/ime_compose.rs");
         assert!(
             compose_src.contains("IME_SHADOW_READY.store(true, Ordering::Release)"),
-            "ime_compose に READY を立てる送出元が無い (macOS の ime_shadow が 0 行になる)"
+            "ime_compose に READY を立てる送出元が無い (macOS の ime_shadow が 0 行になる)。             ⚠️ 書式変更 (rustfmt / 変数名) で落ちた場合は、送出元の実在を確かめたうえで             この assert の文字列を直すこと (ADR-013 §Context-4 の様式)"
         );
         let hook_mac_src = include_str!("input/hook_macos.rs");
         assert!(

@@ -576,7 +576,23 @@ fn handle_event(event_type: CGEventType, event: &CGEvent) {
     //   ★ ここは CGEventTap コールバックの中であり、`hook-constraints` 共通-1 が
     //     **ログを明示的に禁止**している (バッファ操作・アロケーションを伴うため)。
     if is_press {
-        ime_compose::drive(vk_code, IME_OPEN.load(Ordering::Acquire), timestamp);
+        // ⚠️★★★ **Command / Control を伴う打鍵はショートカットであって変換ではない。**
+        //   ★ `Cmd+S` の VK は `0x53` (= `S`) なので、修飾を見ないと
+        //     `ime_compose::step` の英数字アームに落ちて**変換セッションが始まり**、
+        //     ⚠️ その後の実変換の `dwell_ms` が保存操作の時刻から測られる
+        //     (2026-09-11・code-reviewer HIGH)。
+        //   ⚠️ Shift / Option は**含めない** (`Shift+A` はただの大文字で変換の素材)。
+        //   ★ `get_flags()` は各 KeyDown が運ぶので Atomic 追跡は不要
+        //     (上の `is_paste` が同じ読み方をしている)。
+        let flags = event.get_flags();
+        let chord = if flags.contains(CGEventFlags::CGEventFlagCommand)
+            || flags.contains(CGEventFlags::CGEventFlagControl)
+        {
+            ime_compose::Chord::Modified
+        } else {
+            ime_compose::Chord::Plain
+        };
+        ime_compose::drive(vk_code, IME_OPEN.load(Ordering::Acquire), chord, timestamp);
     }
 
     // Send keystroke event to analysis thread (lock-free, non-blocking).

@@ -29,6 +29,26 @@
 //! → ⚠️ **解析時にこの差を知っている必要がある。** `capabilities` は両 OS とも
 //!   `config_gated` (0 行は**判定不能**) に置いてあり、`unconditional` へは上げない。
 //!
+//! # ⚠️★★★ セッションの母数が Windows と違う (★ ここを読まずに混ぜると誤る)
+//!
+//! ★ Windows の 1 行は **候補ウィンドウが出た変換** に対応する
+//! (`IME_ACTIVE` は cloak/uncloak か `EVENT_OBJECT_IME_*` で立つ)。
+//! ⚠️ macOS の 1 行は **かな入力の一区切り全部**に対応する ——
+//! ★ **Space を一度も押さず確定しただけの入力でも 1 行出る**。
+//!
+//! → ⚠️ **macOS の行集合は Windows の行集合より広い。**
+//! ★ 連鎖して `nav` / `abandon` の母数も違う:
+//!
+//! | | Windows | macOS |
+//! |---|---|---|
+//! | 1 行になる変換 | 候補ウィンドウが出たもの | ★ かな入力の一区切り**すべて** |
+//! | `nav` を数える区間 | `IME_ACTIVE` 中 | ★ 変換セッション全体 |
+//! | `abandon` に入るもの | 候補表示中の ESC | ★ **候補を出さずに未確定文字列を捨てた ESC も入る** |
+//!
+//! ⚠️ **`abandon` 率を OS 間で直接比べてはならない。**
+//! ★ macOS 純正の「ライブ変換」は Space を押さずに変換が進むので、
+//! この差は環境によってさらに開く (`survey-input-channels.md:153`)。
+//!
 //! # ⚠️ 拾えないもの (★ 記録しないと「無かった」と誤読される)
 //!
 //! - **マウスで候補を確定した変換** —— 打鍵が無いので終端を観測できない。
@@ -36,6 +56,13 @@
 //! - **ANSI キーボードのセッション先頭** —— `IME_OPEN` が 100ms の TIS ポーリング由来なので、
 //!   変換開始直後の数打鍵が `ime_open = false` として渡りうる (`ime_macos.rs` の Path B)。
 //! - **20 秒を超えた変換** —— [`MAX_SESSION_MS`] で打ち切り、⚠️ **行を出さない**。
+//! - **数字キーによる候補確定** —— 候補表示中の `1`〜`9` は実機ではその変換を確定するが、
+//!   本状態機械は英数字として扱い**セッションを続ける**。
+//!   ⚠️ → その `dwell_ms` は**複数の変換を覆う**。★ 旧実装と同値だが、
+//!   `dwell_ms` が本 issue で初めて計測値になったので意味が変わった。
+//! - ⚠️ **`now_ms` は壁時計 (`SystemTime`) 由来で単調ではない。**
+//!   ★ 時計が巻き戻ると `saturating_sub` が 0 になり、**`dwell_ms == 0` の行**が黙って出る
+//!   (打ち切りも効かなくなる)。⚠️ 解析側は `dwell_ms == 0` を実測値として扱わないこと。
 
 use super::hook::VK_KANJI;
 
@@ -57,6 +84,31 @@ use super::hook::VK_KANJI;
 /// `ime_cloak.rs` が同じ判断をしている (逐語「1 行失う方が、上限そのものを dwell と
 /// 偽る 1 行より安全である」)。★ 0 行は `config_gated` により「判定不能」と読まれる。
 pub const MAX_SESSION_MS: u64 = super::ime_cloak::MAX_SESSION_MS;
+
+/// ⚠️★★★ **打鍵に Command / Control が伴っていたか。**
+///
+/// ★ **なぜ要るか** (2026-09-11・code-reviewer HIGH):
+/// `Cmd+S` / `Cmd+A` / `Ctrl+Z` は VK としては**英字キー**である。
+/// ⚠️ そのまま [`step`] の英数字アームへ落とすと、日本語入力モード中の保存操作が
+/// **変換セッションを開始し、`dwell_ms` を `Cmd+S` の時刻から測り始める**。
+/// ★ `Cmd+Esc` 系なら**存在しない放棄行**まで作れる。
+///
+/// ⚠️ 旧 `update_compose_state` も同じ穴を持っていたが、`IME_COMPOSING` を
+/// **誰も読んでいなかったので無害だった**。★ 本 issue で初めて計測値になる。
+///
+/// # ⚠️ Shift は含めない
+///
+/// ★ `Shift+A` は**ただの大文字 A** であり、変換の素材である。
+/// ⚠️ Option (Alt) も除く —— macOS では特殊文字入力に使われ、ショートカットとは限らない。
+/// ★ `Ctrl+J` / `Ctrl+K` など IME の変換ショートカットは `Modified` に落ちるが、
+///   **透過 (状態を変えない)** なので変換の途中として正しく扱われる。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Chord {
+    /// 修飾なし (⚠️ Shift / Option は「修飾なし」に数える)。
+    Plain,
+    /// ⚠️ Command または Control を伴う = アプリのショートカット。**変換の状態を語らない**。
+    Modified,
+}
 
 /// 1 回の変換セッションの要約 (= `ime_shadow` 行 1 行ぶん)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,9 +156,14 @@ pub struct ComposeState {
     pub active: bool,
     /// セッション中の矢印キー押下回数。
     pub nav: u32,
-    /// セッション中に ESC が押されたか。
-    pub abandon: bool,
 }
+
+// ⚠️★★★ **`abandon` は状態に持たない。**
+//   ★ ESC は**その場でセッションを閉じる**ので、「セッション中に ESC が押されたか」を
+//     持ち越す必要が無い ([`step`] の `0x1B` 腕が直接 `finish(prev, true, ..)` を呼ぶ)。
+//   ⚠️ 初版は持っていたが **1 度も読まれない死んだ状態**で、
+//     Atomic へ写し戻す経路だけが残って回収待ちの要約を壊していた
+//     (`hook.rs::IME_COMPOSE_NAV` の doc を参照)。
 
 impl ComposeState {
     /// 変換セッション中か (= 旧 `IME_COMPOSING`)。
@@ -129,6 +186,7 @@ pub struct ComposeStep {
 /// - `prev`: 現在の状態 (ドライバが Atomic から読む)
 /// - `vk`: Windows VK に写像済みのキーコード (`hook_macos.rs::macos_vk_to_vk`)
 /// - `ime_open`: 日本語入力モードか (`IME_OPEN`)
+/// - `chord`: ⚠️ Command / Control を伴うか ([`Chord`])
 /// - `now_ms`: epoch ms
 ///
 /// # ⚠️ 遷移表 (★ `ime_open == true` のとき)
@@ -147,9 +205,12 @@ pub struct ComposeStep {
 /// `ime_open == false` のときは、どのキーでも**確定して終了**する
 /// (★ かな → 英数 の切替は未確定文字列を確定させる)。
 ///
+/// ⚠️★★★ **`chord == Modified` の打鍵は完全に透過する** (状態を変えず、行も出さない)。
+/// ★ アプリのショートカットは変換の状態について何も語らないからである ([`Chord`] の doc)。
+///
 /// ⚠️★★★ **上限超過は最優先で処理する。** 先に打ち切ってから、そのキーを
 /// **まっさらな状態に対して**適用する (★ その打鍵が新しいセッションを開始できる)。
-pub fn step(prev: ComposeState, vk: u32, ime_open: bool, now_ms: u64) -> ComposeStep {
+pub fn step(prev: ComposeState, vk: u32, ime_open: bool, chord: Chord, now_ms: u64) -> ComposeStep {
     // ── 1. 上限超過の打ち切り (最優先・自己修復) ──────────────────────────
     if let Some(start) = prev.session_start_ms {
         if now_ms.saturating_sub(start) >= MAX_SESSION_MS {
@@ -159,8 +220,11 @@ pub fn step(prev: ComposeState, vk: u32, ime_open: bool, now_ms: u64) -> Compose
             // ★ まっさらな状態に対して、このキーをもう一度適用する。
             //   ⚠️ まっさらからは `End` が返らない (終了はセッション中にしか起きない) ので、
             //   ここで打ち切りの報告が上書きされることはない。
-            let restarted = apply(ComposeState::default(), vk, ime_open, now_ms);
-            debug_assert!(restarted.end.is_none());
+            // ⚠️ `debug_assert!` は置かない —— ここは CGEventTap コールバックの中であり、
+            //   ★ `extern "C"` 越しの panic は abort になる (2026-09-11・review LOW)。
+            //   ⚠️ まっさらな状態からは `finish` が必ず `None` を返す
+            //   (`session_start_ms` が `None` なので) という不変条件で担保する。
+            let restarted = apply(ComposeState::default(), vk, ime_open, chord, now_ms);
             return ComposeStep {
                 next: restarted.next,
                 end: Some(truncated),
@@ -169,11 +233,22 @@ pub fn step(prev: ComposeState, vk: u32, ime_open: bool, now_ms: u64) -> Compose
     }
 
     // ── 2. 通常の遷移 ──────────────────────────────────────────────────
-    apply(prev, vk, ime_open, now_ms)
+    apply(prev, vk, ime_open, chord, now_ms)
 }
 
 /// 上限判定を除いた素の遷移。⚠️ [`step`] からのみ呼ぶ。
-fn apply(prev: ComposeState, vk: u32, ime_open: bool, now_ms: u64) -> ComposeStep {
+fn apply(prev: ComposeState, vk: u32, ime_open: bool, chord: Chord, now_ms: u64) -> ComposeStep {
+    // ⚠️★★★ **ショートカットは変換の状態を語らない。** 完全に透過する ([`Chord`] の doc)。
+    //   ★ `!ime_open` の判定より**先**に置く —— `Cmd+Space` (入力ソース切替) のように
+    //     モードを動かすショートカット自体でセッションを閉じないため。
+    //     ⚠️ モードが実際に変わったなら、次の**修飾なし**打鍵が閉じる。
+    if matches!(chord, Chord::Modified) {
+        return ComposeStep {
+            next: prev,
+            end: None,
+        };
+    }
+
     // ★ 日本語入力モードを抜けている = 未確定文字列は確定している。
     if !ime_open {
         return finish(prev, false, now_ms);
@@ -192,7 +267,6 @@ fn apply(prev: ComposeState, vk: u32, ime_open: bool, now_ms: u64) -> ComposeSte
                 //   (`hook_windows.rs` が `IME_SHOW` で同じことをしている)。
                 next.session_start_ms = Some(now_ms);
                 next.nav = 0;
-                next.abandon = false;
             }
             ComposeStep { next, end: None }
         }
@@ -272,7 +346,7 @@ fn finish(prev: ComposeState, abandon: bool, now_ms: u64) -> ComposeStep {
 use std::sync::atomic::Ordering;
 
 use super::hook::{
-    IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSING, IME_COMPOSITION_START_MS,
+    IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_COMPOSE_NAV, IME_COMPOSING, IME_COMPOSITION_START_MS,
     IME_SHADOW_ABANDON, IME_SHADOW_DWELL_MS, IME_SHADOW_READY,
 };
 
@@ -282,40 +356,60 @@ use super::hook::{
 /// ここで許されるのは **Atomic 操作だけ**である (ログ・アロケーション・ロックは禁止)。
 /// ★ 判断は [`step`] (純粋関数) が済ませてあるので、ここには分岐が無い。
 ///
-/// # ⚠️ 書き戻しの順序には意味がある
+/// # ⚠️★★★ 進行中の値と、回収待ちの要約は**別の置き場**に書く
 ///
-/// 1. セッションのフィールド (`IME_COMPOSITION_START_MS` / `IME_COMPOSING` / `IME_ACTIVE`)
-/// 2. `nav` / `abandon` —— ⚠️ **セッション中のときだけ**書く
-/// 3. 要約 (`DWELL_MS` / `NAV_COUNT` / `ABANDON`) → 最後に `READY` を **Release** で立てる
+/// | 何 | 置き場 | いつ書くか |
+/// |---|---|---|
+/// | 進行中のセッション | `IME_COMPOSITION_START_MS` / `IME_COMPOSING` / `IME_ACTIVE` / `IME_COMPOSE_NAV` | ★ 毎打鍵 |
+/// | 回収待ちの要約 | `IME_SHADOW_DWELL_MS` / `IME_CANDIDATE_NAV_COUNT` / `IME_SHADOW_ABANDON` / `IME_SHADOW_READY` | ★ **セッション終了時だけ** |
 ///
-/// ★ 2 で「セッション中のときだけ」に絞るのが肝である。⚠️ 絞らないと、セッション終了後に
-/// 英数入力のキーが 1 つ来ただけで `nav` / `abandon` が 0 / false に上書きされ、
-/// **IME Monitor がポーリングする前に放棄フラグが消える**。
-/// ★ Windows 側が「`IME_SHOW` のときだけリセットする」形になっているのと同じ理由。
+/// ⚠️ 分けないと、**セッション開始時のリセットが回収待ちの要約を壊す** ——
+/// ESC で放棄した直後 100ms 以内に次の変換を打ち始めると
+/// **`abandon` が `true` から `false` に化ける**。
+/// ★ 理由と再現手順は `hook.rs::IME_COMPOSE_NAV` の doc が正本。
 ///
-/// ⚠️ 100ms のポーリング間隔より速く次のセッションが始まった場合に前の要約を落とすのは
-/// **Windows と同じ既知の挙動**である (`hook.rs::IME_SHADOW_READY` の doc)。
-pub fn drive(vk: u32, ime_open: bool, now_ms: u64) {
-    let ComposeStep { next, end } = step(load(), vk, ime_open, now_ms);
+/// ⚠️ 要約の書き込み順序には意味がある: 値 3 つ → **最後に `READY` を Release** で立てる。
+/// この Release store が値 3 つを IME Monitor 側へ可視にする。
+///
+/// ⚠️ 100ms のポーリング間隔より速く **2 つの変換が終わった**場合に前の要約が
+/// 置き換わる (= **1 行の欠落**) のは **Windows と同じ既知の挙動**である
+/// (`hook.rs::IME_SHADOW_READY` の doc)。★ 値の偽装は起きない。
+pub fn drive(vk: u32, ime_open: bool, chord: Chord, now_ms: u64) {
+    let ComposeStep { next, end } = step(load(), vk, ime_open, chord, now_ms);
 
-    // 1. セッションのフィールド。
+    // 1. 進行中のセッション。⚠️ ここでは shadow 側の Atomic を一切触らない。
     IME_COMPOSITION_START_MS.store(next.session_start_ms.unwrap_or(0), Ordering::Relaxed);
+    IME_COMPOSE_NAV.store(next.nav, Ordering::Relaxed);
     IME_COMPOSING.store(next.is_composing(), Ordering::Release);
     IME_ACTIVE.store(next.active, Ordering::Release);
 
-    // 2. ⚠️ セッション中のときだけカウンタを写す (上の doc を参照)。
-    if next.is_composing() {
-        IME_CANDIDATE_NAV_COUNT.store(next.nav, Ordering::Relaxed);
-        IME_SHADOW_ABANDON.store(next.abandon, Ordering::Relaxed);
-    }
-
-    // 3. 要約。⚠️ `Truncated` は行を出さない (上限を dwell と偽らないため)。
+    // 2. 回収待ちの要約。⚠️ `Truncated` は行を出さない (上限を dwell と偽らないため)。
     if let Some(ComposeEnd::Emit(summary)) = end {
         IME_SHADOW_DWELL_MS.store(summary.dwell_ms, Ordering::Relaxed);
         IME_CANDIDATE_NAV_COUNT.store(summary.nav, Ordering::Relaxed);
         IME_SHADOW_ABANDON.store(summary.abandon, Ordering::Relaxed);
-        // ⚠️ **必ず最後**。この Release store が上 3 つを IME Monitor 側へ可視にする。
+        // ⚠️ **必ず最後**。
         IME_SHADOW_READY.store(true, Ordering::Release);
+    }
+}
+
+/// ⚠️★★★ **`IME_SHADOW_READY` を回収してよいか** (IME Monitor スレッドの判断)。
+///
+/// ★ 純関数にして `is_windows` を**注入**してあるのは、⚠️ **両 OS の CI で
+/// 両方の分岐を検証するため**である (`#[cfg]` で書くと片側しか走らない)。
+///
+/// | OS | 条件 | なぜ |
+/// |---|---|---|
+/// | Windows | `!active && ready` | ★ `active → false` 遷移経路が先に emit するので、ここは取りこぼしの受け皿。⚠️ 挙動を変えない |
+/// | macOS | `ready` **だけ** | ★ `READY` が立つ時点で `drive` が必ず `IME_ACTIVE=false` を書いている (`finish` が `ComposeState::default()` を返す) ので `!active` は**構造的に冗長**。⚠️ それでも見ると、ポーリングが読んだ `active` が次セッションの `Space` 後だった場合に emit を先送りし、その間に要約が上書きされて**行が消える** |
+pub fn should_drain_ready(ready: bool, active: bool, is_windows: bool) -> bool {
+    if !ready {
+        return false;
+    }
+    if is_windows {
+        !active
+    } else {
+        true
     }
 }
 
@@ -325,20 +419,19 @@ pub fn drive(vk: u32, ime_open: bool, now_ms: u64) {
 /// ★ 純粋層では `Option<u64>` で持つ ([`ComposeState`] の doc)。
 /// 番兵と `Option` の変換は**この 1 か所だけ**で行う。
 ///
-/// ⚠️ セッション中でなければ `nav` / `abandon` は **0 / false として読む** ——
-/// ★ 実際の Atomic には「まだ IME Monitor が回収していない前セッションの要約」が
-/// 入っていることがあり、それを次のセッションへ持ち込ませないため。
+/// ⚠️ `nav` は **`IME_COMPOSE_NAV`** から読む (`IME_CANDIDATE_NAV_COUNT` ではない) ——
+/// ★ 後者は「回収待ちの要約」であって進行中の値ではない。
+/// ⚠️ セッション中でなければ `0` として読み、前セッションの値を持ち込ませない。
 fn load() -> ComposeState {
     let composing = IME_COMPOSING.load(Ordering::Acquire);
     ComposeState {
         session_start_ms: composing.then(|| IME_COMPOSITION_START_MS.load(Ordering::Relaxed)),
         active: IME_ACTIVE.load(Ordering::Acquire),
         nav: if composing {
-            IME_CANDIDATE_NAV_COUNT.load(Ordering::Relaxed)
+            IME_COMPOSE_NAV.load(Ordering::Relaxed)
         } else {
             0
         },
-        abandon: composing && IME_SHADOW_ABANDON.load(Ordering::Relaxed),
     }
 }
 
@@ -366,10 +459,19 @@ mod tests {
 
     /// 打鍵列を順に食わせ、出た `ComposeEnd` を全部集める。
     fn run(keys: &[(u32, bool, u64)]) -> (ComposeState, Vec<ComposeEnd>) {
+        let chorded: Vec<_> = keys
+            .iter()
+            .map(|&(vk, open, t)| (vk, open, Chord::Plain, t))
+            .collect();
+        run_chords(&chorded)
+    }
+
+    /// ★ 修飾キーを明示して打鍵列を流す。
+    fn run_chords(keys: &[(u32, bool, Chord, u64)]) -> (ComposeState, Vec<ComposeEnd>) {
         let mut state = ComposeState::default();
         let mut ends = Vec::new();
-        for &(vk, ime_open, t) in keys {
-            let s = step(state, vk, ime_open, t);
+        for &(vk, ime_open, chord, t) in keys {
+            let s = step(state, vk, ime_open, chord, t);
             state = s.next;
             if let Some(e) = s.end {
                 ends.push(e);
@@ -554,6 +656,78 @@ mod tests {
         assert!(!rows[1].abandon, "前セッションの abandon が漏れている");
     }
 
+    // ── ⚠️★★★ 修飾キー (Command / Control) ────────────────────────────
+
+    /// ⚠️★★★ **`Cmd+S` が変換セッションを開始してはならない。**
+    ///
+    /// ★ `Cmd+S` の VK は `0x53` (= `S`) なので、修飾を見ないと英数字アームに落ちて
+    ///   セッションが始まり、⚠️ **その後の実変換の `dwell_ms` が保存操作の時刻から測られる**。
+    #[test]
+    fn a_command_chord_does_not_open_a_session() {
+        let (state, ends) = run_chords(&[
+            (0x53, true, Chord::Modified, 0),   // Cmd+S
+            (0x41, true, Chord::Modified, 100), // Cmd+A
+        ]);
+        assert!(
+            !state.is_composing(),
+            "ショートカットでセッションが始まっている"
+        );
+        assert!(ends.is_empty());
+    }
+
+    /// ⚠️★★★ **`Cmd+Esc` 系が存在しない放棄行を作ってはならない。**
+    #[test]
+    fn a_command_chord_does_not_forge_an_abandon_row() {
+        let (state, ends) = run_chords(&[
+            (A, true, Chord::Plain, 0),
+            (ESC, true, Chord::Modified, 300), // ⚠️ ショートカットであって放棄ではない
+        ]);
+        assert!(ends.is_empty(), "修飾付き ESC で放棄行が出た");
+        assert!(state.is_composing(), "セッションが不当に閉じられた");
+    }
+
+    /// ★ 変換中の `Cmd+S` (保存) はセッションを**素通り**し、dwell を汚さない。
+    #[test]
+    fn a_command_chord_mid_session_is_transparent() {
+        let (_, ends) = run_chords(&[
+            (A, true, Chord::Plain, 1_000),
+            (0x53, true, Chord::Modified, 1_200), // Cmd+S
+            (SPACE, true, Chord::Plain, 1_400),
+            (ENTER, true, Chord::Plain, 1_800),
+        ]);
+        assert_eq!(
+            emitted(&ends),
+            vec![ComposeSummary {
+                dwell_ms: 800,
+                nav: 0,
+                abandon: false,
+            }],
+            "修飾付き打鍵が dwell を汚している"
+        );
+    }
+
+    /// ⚠️ `Ctrl+J` / `Ctrl+K` (IME の変換ショートカット) もセッションを壊さない。
+    #[test]
+    fn ime_conversion_chords_keep_the_session_alive() {
+        let (state, ends) = run_chords(&[
+            (A, true, Chord::Plain, 0),
+            (0x4A, true, Chord::Modified, 100), // Ctrl+J (ひらがな変換)
+            (0x4B, true, Chord::Modified, 200), // Ctrl+K (カタカナ変換)
+        ]);
+        assert!(ends.is_empty());
+        assert!(state.is_composing());
+    }
+
+    /// ★ 修飾付き打鍵でも**上限の打ち切りは効く** (時間による自己修復を止めない)。
+    #[test]
+    fn truncation_still_fires_on_a_modified_key() {
+        let (_, ends) = run_chords(&[
+            (A, true, Chord::Plain, 0),
+            (0x53, true, Chord::Modified, MAX_SESSION_MS + 1),
+        ]);
+        assert!(matches!(ends[0], ComposeEnd::Truncated { .. }));
+    }
+
     // ── 上限 ────────────────────────────────────────────────────────────
 
     /// ⚠️★★★ 上限を超えた変換は**打ち切り、行を出さない** (上限を dwell と偽らない)。
@@ -610,7 +784,7 @@ mod tests {
             (ESC, true, 30),
             (SPACE, true, 40),
         ] {
-            state = step(state, vk, open, t).next;
+            state = step(state, vk, open, Chord::Plain, t).next;
             assert!(
                 !state.active || state.is_composing(),
                 "active なのにセッションが無い (不変条件 1 違反)"
@@ -628,10 +802,9 @@ mod tests {
             session_start_ms: None,
             active: true,
             nav: 7,
-            abandon: true,
         };
         for &vk in &[ENTER, ESC, TAB] {
-            let s = step(broken, vk, true, 100);
+            let s = step(broken, vk, true, Chord::Plain, 100);
             assert_eq!(
                 s.next,
                 ComposeState::default(),
@@ -640,7 +813,7 @@ mod tests {
             assert!(s.end.is_none(), "セッションが無いのに行を出してはならない");
         }
         // ★ IME モードから抜ける枝でも同じ。
-        let s = step(broken, A, false, 100);
+        let s = step(broken, A, false, Chord::Plain, 100);
         assert_eq!(s.next, ComposeState::default());
         assert!(s.end.is_none());
     }
@@ -704,6 +877,7 @@ mod driver_tests {
         IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
         IME_COMPOSING.store(false, Ordering::Release);
         IME_ACTIVE.store(false, Ordering::Release);
+        IME_COMPOSE_NAV.store(0, Ordering::Relaxed);
         IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
         IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
         IME_SHADOW_READY.store(false, Ordering::Release);
@@ -726,9 +900,9 @@ mod driver_tests {
     #[test]
     fn driver_emits_a_confirmed_row() {
         let _g = acquire();
-        drive(A, true, 100);
-        drive(SPACE, true, 300);
-        drive(ENTER, true, 900);
+        drive(A, true, Chord::Plain, 100);
+        drive(SPACE, true, Chord::Plain, 300);
+        drive(ENTER, true, Chord::Plain, 900);
         assert_eq!(
             collect_row(),
             Some(ComposeSummary {
@@ -745,10 +919,10 @@ mod driver_tests {
     #[test]
     fn driver_emits_an_abandoned_row() {
         let _g = acquire();
-        drive(A, true, 100);
-        drive(SPACE, true, 300);
-        drive(RIGHT, true, 400);
-        drive(ESC, true, 900);
+        drive(A, true, Chord::Plain, 100);
+        drive(SPACE, true, Chord::Plain, 300);
+        drive(RIGHT, true, Chord::Plain, 400);
+        drive(ESC, true, Chord::Plain, 900);
         assert_eq!(
             collect_row(),
             Some(ComposeSummary {
@@ -760,18 +934,14 @@ mod driver_tests {
     }
 
     /// ⚠️★★★ **回収前に英数入力が挟まっても `abandon` が消えない。**
-    ///
-    /// ★ これがドライバの肝である。⚠️ `nav` / `abandon` をセッション外でも書き戻すと、
-    ///   セッション終了直後の 1 打鍵で放棄フラグが false に潰れ、
-    ///   **IME Monitor の 100ms ポーリングが来る前に情報が消える**。
     #[test]
     fn a_keystroke_after_the_session_does_not_erase_the_pending_row() {
         let _g = acquire();
-        drive(A, true, 100);
-        drive(ESC, true, 500);
+        drive(A, true, Chord::Plain, 100);
+        drive(ESC, true, Chord::Plain, 500);
         // ⚠️ ここで IME Monitor はまだ回収していない。英数モードで打鍵が続く。
-        drive(K, false, 520);
-        drive(K, false, 540);
+        drive(K, false, Chord::Plain, 520);
+        drive(K, false, Chord::Plain, 540);
         assert_eq!(
             collect_row(),
             Some(ComposeSummary {
@@ -783,15 +953,46 @@ mod driver_tests {
         );
     }
 
+    /// ⚠️★★★ **回収前に *次の変換が始まっても* 放棄フラグが化けない。**
+    ///
+    /// ★ これがドライバ設計の肝である。⚠️ 進行中の `nav` と回収待ちの要約を
+    ///   同じ Atomic に置くと、**新セッションの開始時リセットが要約を上書きし**、
+    ///   「前セッションの `dwell_ms`」＋「0 の `nav`」＋「`false` の `abandon`」という
+    ///   **存在しない変換が 1 行出る** (★ 行が消えるより悪い —— 値が偽装される)。
+    ///
+    /// ⚠️ 実際の操作: ESC で放棄 → 100ms 以内に次の変換を打ち始める。
+    #[test]
+    fn a_new_session_before_collection_does_not_forge_the_pending_row() {
+        let _g = acquire();
+        drive(A, true, Chord::Plain, 0);
+        drive(RIGHT, true, Chord::Plain, 100);
+        drive(ESC, true, Chord::Plain, 400); // 放棄。READY=true / abandon=true / nav=1
+                                             // ⚠️ IME Monitor が来る前に次の変換が始まる (100ms 以内)。
+        drive(A, true, Chord::Plain, 450);
+        drive(SPACE, true, Chord::Plain, 480);
+        assert_eq!(
+            collect_row(),
+            Some(ComposeSummary {
+                dwell_ms: 400,
+                nav: 1,
+                abandon: true,
+            }),
+            "次の変換の開始で、回収待ちの行が偽装された"
+        );
+        // ★ 2 本目のセッションはそのまま続いていること。
+        assert!(IME_COMPOSING.load(Ordering::Acquire));
+        assert!(IME_ACTIVE.load(Ordering::Acquire));
+    }
+
     /// ★ セッション中は `IME_COMPOSING` / `IME_COMPOSITION_START_MS` が立っている。
     #[test]
     fn driver_mirrors_the_session_fields() {
         let _g = acquire();
-        drive(A, true, 7_000);
+        drive(A, true, Chord::Plain, 7_000);
         assert!(IME_COMPOSING.load(Ordering::Acquire));
         assert_eq!(IME_COMPOSITION_START_MS.load(Ordering::Relaxed), 7_000);
         assert!(!IME_ACTIVE.load(Ordering::Acquire));
-        drive(SPACE, true, 7_100);
+        drive(SPACE, true, Chord::Plain, 7_100);
         assert!(IME_ACTIVE.load(Ordering::Acquire), "Space で候補表示になる");
         assert!(
             collect_row().is_none(),
@@ -803,8 +1004,8 @@ mod driver_tests {
     #[test]
     fn driver_emits_nothing_when_truncated() {
         let _g = acquire();
-        drive(A, true, 0);
-        drive(ENTER, true, MAX_SESSION_MS + 1);
+        drive(A, true, Chord::Plain, 0);
+        drive(ENTER, true, Chord::Plain, MAX_SESSION_MS + 1);
         assert!(collect_row().is_none(), "打ち切りで行を出してはならない");
         assert!(!IME_COMPOSING.load(Ordering::Acquire));
     }
@@ -813,15 +1014,29 @@ mod driver_tests {
     #[test]
     fn a_new_session_resets_nav() {
         let _g = acquire();
-        drive(A, true, 0);
-        drive(RIGHT, true, 50);
-        drive(RIGHT, true, 60);
-        drive(ENTER, true, 100);
+        drive(A, true, Chord::Plain, 0);
+        drive(RIGHT, true, Chord::Plain, 50);
+        drive(RIGHT, true, Chord::Plain, 60);
+        drive(ENTER, true, Chord::Plain, 100);
         let first = collect_row().expect("1 本目が出ていない");
         assert_eq!(first.nav, 2);
-        drive(A, true, 200);
-        drive(ENTER, true, 300);
+        drive(A, true, Chord::Plain, 200);
+        drive(ENTER, true, Chord::Plain, 300);
         assert_eq!(collect_row().expect("2 本目が出ていない").nav, 0);
+    }
+
+    /// ★ `should_drain_ready` の OS 対のテスト (⚠️ **両 OS で両分岐を検証する**)。
+    #[test]
+    fn drain_policy_differs_by_os() {
+        // ⚠️ READY が立っていなければ、どちらの OS でも回収しない。
+        assert!(!should_drain_ready(false, false, true));
+        assert!(!should_drain_ready(false, false, false));
+        // ★ Windows: active が立っている間は遷移経路に任せる (挙動を変えない)。
+        assert!(should_drain_ready(true, false, true));
+        assert!(!should_drain_ready(true, true, true));
+        // ★ macOS: READY だけを見る (⚠️ 先送りすると要約が上書きされて行が消える)。
+        assert!(should_drain_ready(true, false, false));
+        assert!(should_drain_ready(true, true, false));
     }
 
     /// ⚠️ `IME_ACTIVE` を外部 (lib.rs の safety valve) が落としても、
@@ -829,11 +1044,11 @@ mod driver_tests {
     #[test]
     fn an_external_active_reset_does_not_lose_the_session() {
         let _g = acquire();
-        drive(A, true, 0);
-        drive(SPACE, true, 100);
+        drive(A, true, Chord::Plain, 0);
+        drive(SPACE, true, Chord::Plain, 100);
         // ⚠️ safety valve 相当の外部リセット。
         IME_ACTIVE.store(false, Ordering::Release);
-        drive(ENTER, true, 400);
+        drive(ENTER, true, Chord::Plain, 400);
         assert_eq!(
             collect_row(),
             Some(ComposeSummary {
