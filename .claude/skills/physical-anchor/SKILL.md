@@ -177,7 +177,12 @@ struct AwayObservation {
 ```
 
 ★ **評価は達成率ではなく、招待の受容と下流の機会保存指標で行う**（ADR-018 D5）——
-`paste_after_stuck_rate` / `self_recovery_without_paste` / `manual_contribution_ratio`。
+`paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio`。
+
+⚠️★★★ **2026-09-07 (ADR-024)**: ★ **主要アウトカムは `receipt_free_resumption`** になった（★ 離席候補明けの
+再開を起点にした受領の競合リスク CIF・**推定器を通らない**）。★ 上の 3 本のうち `pflow_exit_without_receipt`
+（★ 旧 `self_recovery_without_paste`）は **`p_flow` 依存の副次**であり、報告時は
+`receipt_free_resumption` と `manual_contribution_ratio` を**必ず併記**する。
 
 ### ルール 4: ★★★ 歩行を MhD（推論層）の観測に入れない
 

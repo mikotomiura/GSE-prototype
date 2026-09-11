@@ -116,7 +116,7 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
 | 0.7 | データ分離（Form氏名↔P-ID対応表の物理隔離） | 運用手順書 | [15][16][17] |
 | 0.8 | dismiss 理由 UI（4択: 詰まってない／今はもがきたい／閉じる／無言）の実装とログ化 | dismiss_reason フィールド | Need 誤りと Opportunity 誤りの分離に必須 [v0.4§9] |
 | 0.9 | paste ログ構造化（source_role／external_paste_chars／large_paste_rate／paste_after_stuck_rate、本文・タイトル非保存） | 拡張 paste スキーマ | 現状は回数のみ。Ctrl+V回数は補助指標へ降格 [v0.4§4.1] |
-| 0.10 | 自力解決メトリクス（manual_contribution_ratio／productive_manual_recovery_rate）を gse-replay --metrics に追加 | metrics 拡張 | diff／総打鍵比は廃止 [v0.4§4.2] |
+| 0.10 | 自力解決メトリクス（manual_contribution_ratio／pflow_exit_manual_gain_rate）を gse-replay --metrics に追加 | metrics 拡張 | diff／総打鍵比は廃止 [v0.4§4.2] |
 | 0.11 | session metadata に condition を追加（blind-calibration／A\|B／nudge\|defer） | condition フィールド | task_kind は実装済み [v0.4§9] |
 | 0.12 | 前向き holdout・MNAR 範囲報告の手続き凍結（PreReg 化） | 解析手順書 | gse-replay --holdout／MNAR を運用手順として凍結 [v0.4§1] |
 | 0.13 | 第三者ブラインド品質評価の運用設計（評価者に条件 A/B・GSE 有無・AI 使用量を伏せ、論理／独自／完成度／可読性を5段階） | 評価ルーブリック | blind_quality_score [v0.4§4.2] |
@@ -151,9 +151,9 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
 |---|---|---|---|
 | 3.1 | AB/BA 割付（半数 A→B、半数 B→A） | 割付表 | 順序効果の相殺 |
 | 3.2 | A=介入なし / B=介入あり の交互運用 | 条件別ログ | Physical Anchor は opt-in（⚠️ **2026-09-01: 旧「強Wall/」を削除** — ADR-015 D1）|
-| 3.3 | 主指標：external_paste_count, paste_after_stuck_rate, self_recovery_without_paste, 第三者ブラインド品質 | 効果指標 | |
+| 3.3 | 主指標：external_paste_count, paste_after_stuck_rate, pflow_exit_without_receipt, 第三者ブラインド品質 | 効果指標 | |
 | 3.4 | 副指標：task self-efficacy, NASA-TLX, helpfulness, annoyance | 受容指標 | [10][11r] |
-| 3.5 | Physical Anchor：**招待の受容** / **下流の機会保存指標**（`paste_after_stuck_rate` / `self_recovery_without_paste` / `manual_contribution_ratio`）/ 安全 を層別評価（⚠️★★★ **2026-09-01 訂正: 旧「実行/効果」は ADR-018 D5 が評価量から降ろした。系は実行も完了も判定しない**）| Anchor 受容レポート | 夜間Outdoor無効 [8][9] |
+| 3.5 | Physical Anchor：**招待の受容** / **下流の機会保存指標**（`paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio`）/ 安全 を層別評価（⚠️★★★ **2026-09-01 訂正: 旧「実行/効果」は ADR-018 D5 が評価量から降ろした。系は実行も完了も判定しない**）| Anchor 受容レポート | 夜間Outdoor無効 [8][9] |
 | 3.6 | post_intervention ラベルを別プールで継続収集 | monitoring データ | X1合算しない |
 
 ### 4.4 M4：Phase 3 X2 介入機会妥当性（W16–W24, MRT）

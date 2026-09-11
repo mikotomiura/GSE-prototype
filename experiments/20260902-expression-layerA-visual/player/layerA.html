@@ -31,7 +31,8 @@
   th { background: #1b1f25; color: #9fb4c7; }
   td.lbl, th.lbl { text-align: left; }
   #stage { display: block; margin: 0 auto; border-radius: 10px; background: #000; }
-  #stagewrap { display: flex; flex-direction: column; align-items: center; gap: 14px;
+  /* ⚠️ 2026-09-08: id → class（★ 同じ id が 3 か所にあり HTML として不正だった）。 */
+  .stagewrap { display: flex; flex-direction: column; align-items: center; gap: 14px;
                padding: 20px; background: #0b0d10; border-radius: 10px; margin: 12px 0; }
   .hint { color: #7d8894; font-size: 12.5px; min-height: 20px; }
   .card { width: 130px; height: 46px; background: #dfe3e8; border-radius: 5px; }
@@ -51,9 +52,23 @@
     gap: 16px; padding: 24px; overflow-y: auto;
   }
   .trial-overlay .note, .trial-overlay .hint { max-width: 640px; text-align: center; }
-  .trial-overlay #stagewrap { background: transparent; }
+  .trial-overlay .stagewrap { background: transparent; }
   .ovl-tag { position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
              color: #9fb4c7; font-size: 12.5px; }
+  /* ⚠️★★★ 2026-09-08: 中止ボタンはオーバーレイの【中】に置く。
+     ★ 旧実装は `btn-bt-abort` を §3 の通常フローに置いていたが、**実測で試行中は到達不能だった**:
+       ① 矩形が ビューポートの外（y=1585 / innerHeight=910）で `elementFromPoint` が null
+       ② `overlayOn()` が body の overflow:hidden を立てるので**利用者はスクロールできない**
+       ③ 無理に視野内へ入れても、中心で拾えるのは `DIV#stagewrap`（＝ オーバーレイの中身）
+     ★ かつ **1a / 2 にはそもそも中止が無かった**。→ ★ **1 つの修正で両方が消える。**
+     ★ 記録: .steering/20260908-layerA-trial-readiness/decisions.md 判断 2 / 実測 F11・F12 */
+  .ovl-abort { position: fixed; top: 8px; right: 14px; z-index: 10000; }
+  /* ★ 周辺視ブロック: 固視点を画面中心に固定し、刺激だけを偏心させる */
+  .per-fix { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+             color: #dfe3e8; font-size: 28px; line-height: 1; user-select: none; }
+  .per-stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .per-bottom { position: absolute; left: 0; right: 0; bottom: 20px;
+                display: flex; flex-direction: column; align-items: center; gap: 6px; }
   li { margin: 3px 0; }
 </style>
 </head>
@@ -166,7 +181,7 @@
     <span class="stat" id="fr-state">未開始</span>
   </div>
   <div id="fr-box" hidden>
-    <div id="stagewrap">
+    <div class="stagewrap">
       <canvas id="stage-fr" width="360" height="360"></canvas>
       <p class="hint" id="fr-hint">—</p>
     </div>
@@ -192,11 +207,10 @@
   </p>
   <div class="row">
     <button id="btn-bt-start" class="primary" disabled>ブロック 1b を始める（未教示）</button>
-    <button id="btn-bt-abort" disabled>中止する</button>
     <span class="stat" id="bt-state">未開始</span>
   </div>
   <div id="bt-box" hidden>
-    <div id="stagewrap">
+    <div class="stagewrap">
       <canvas id="stage-bt" width="360" height="360"></canvas>
       <p class="hint" id="bt-hint">—</p>
     </div>
@@ -257,7 +271,7 @@
     <span class="stat" id="tr-state">未開始</span>
   </div>
   <div id="tr-box" hidden>
-    <div id="stagewrap">
+    <div class="stagewrap">
       <canvas id="stage-tr" width="360" height="360"></canvas>
       <p class="hint" id="tr-hint">—</p>
     </div>
@@ -269,7 +283,41 @@
 </fieldset>
 
 <!-- ============================================================ -->
-<h2>§7 結果</h2>
+<h2>§7 ブロック 3 —— 周辺視（<span class="warn">任意</span>・A-4）</h2>
+
+<fieldset>
+  <legend>★ 偏心 <b id="per-ecc">—</b>° で同じ刺激を出す ／ ⚠️★★★ 中心対照を<b>同じ提示時間で</b>内蔵する</legend>
+  <p class="note">
+    ★ <b><span id="per-n">—</span> トライアル</b>（★ 偏心 <b id="per-ne">—</b> ＋ <b>中心対照 <span id="per-nc">—</span></b>）／
+    提示 <b><span id="per-ms">—</span> ms</b>、マスク <b><span id="per-mask">—</span> ms</b>。<br>
+    ⚠️★★★ <b>提示が §3 / §5 より短い。</b>★ 比較は<b>このブロックの中の中心対照との間</b>で行う
+    （⚠️ <b>1b / 1b' とは直接比べない</b> —— ★ 提示時間が違うため）。<br>
+    ⚠️★★★ <b>固視は検証していません</b>（★ アイトラッカーがありません）。
+    ★ <b>画面中央の「＋」から目を離さないでください。</b>
+    ★ 刺激は<b>左右のどちらか</b>に出ます（⚠️ 先読みできないように毎回変わります）。
+  </p>
+  <div class="row">
+    <button id="btn-per-start" class="primary" disabled>ブロック 3 を始める（周辺視・任意）</button>
+    <span class="stat" id="per-state">未開始</span>
+  </div>
+  <p class="note" id="per-geom">—</p>
+  <div id="per-box" hidden>
+    <div class="per-fix" id="per-fix">＋</div>
+    <div class="per-stage" id="per-stage"><canvas id="stage-per" width="360" height="360"></canvas></div>
+    <div class="per-bottom">
+      <p class="hint" id="per-hint">—</p>
+      <div id="per-resp" hidden>
+        <p class="note">① いま出ていたのは、次のどれですか。<span class="warn">必ずどれか選んでください。</span></p>
+        <div class="row" id="per-lvl"></div>
+        <p class="note">② 「出口が差し出されていた」感じはありましたか。</p>
+        <div class="row" id="per-inv"></div>
+      </div>
+    </div>
+  </div>
+</fieldset>
+
+<!-- ============================================================ -->
+<h2>§8 結果</h2>
 
 <fieldset>
   <legend>混同行列・状態別正答率・95% CI（Wilson）</legend>
@@ -282,7 +330,7 @@
 </fieldset>
 
 <!-- ============================================================ -->
-<h2>§8 機械検算 —— <span class="warn">「危険でないと言えない」ことしか示しません</span></h2>
+<h2>§9 機械検算 —— <span class="warn">「危険でないと言えない」ことしか示しません</span></h2>
 
 <fieldset>
   <legend>★ 検査自体を 3 状態で試す（<code>verify-before-claiming</code> ルール 5b）</legend>
@@ -473,31 +521,28 @@ function oscOffset(tSec) {
 
 /**
  * 場を描く。
- * @param {number} mix ★ 合成係数（0..1）。★ 既定 1 = 通常描画。★ 遷移のクロスフェードで使う。
- *   ⚠️★★★ 2026-09-03 追加（★ `code-reviewer` HIGH 指摘）——
- *   ★ **旧実装は `ctx.globalAlpha` を絶対値で上書きしていた**（地 0.45 / 図 1.0）。
- *   ⚠️ Canvas 2D の `globalAlpha` はスタックしないスカラーなので、
- *   **呼び出し側が `globalAlpha = k` を設定しても、`drawField` 内で潰されていた。**
- *   → ★★★ **クロスフェードが機能せず、fB が最初のフレームから等倍で重なっていた。**
- *   ⚠️ **catch 試行（fA === fB）でも二重合成で密度が濃くなり、
- *   「遷移した」という答えが *合成アーティファクト* で出せてしまう** ＝ A-8 が測れない。
- *   ★ **乗算に直した。**
- * @param {boolean} skipBg ★ true なら背景を塗らない（★ 重ね描き用）
+ * ⚠️★★★ **2026-09-08: `mix` / `skipBg` を撤去した**（★ `code-reviewer` HIGH 指摘）。
+ *   ★ 2026-09-03 の版は「1 枚の canvas に fA を `1-k`、fB を `k` で **重ね塗り**」していたが、
+ *   ⚠️★★★ **source-over の重ね塗りは線形補間ではない** —— 同じ画素を α=(1-k) と α=k で
+ *   二度塗ると実効被覆率は `1-(1-a)(1-b) = 1-k+k²` になり、**k=0.5 で 0.75 に沈む**
+ *   （★ 実測: 図の画素 232 → 178 / aperture 環 200 → 161）。
+ *   → ★★★ **catch 試行（fA === fB ＝ 何も変わらないはずの試行）でも全画面が 400 ms 明滅する。**
+ *   ⚠️ **「変わった」と答える正当な手掛かりが出てしまい、catch が A-8 の対照として働かない。**
+ *   → ★ **遷移は *不透明なオフスクリーン 2 枚* を `drawImage` で合成する**（→ `trTrial`）。
+ *     ★ 不透明どうしなら厳密に `A(1-k) + Bk` になり、**fA === fB なら全 k で不変**である。
  */
-function drawField(ctx, field, tSec, invitation, W, H, mix = 1, skipBg = false) {
+function drawField(ctx, field, tSec, invitation, W, H) {
   const col = themeColors();
   ctx.save();
-  if (!skipBg) {
-    ctx.fillStyle = col.bg;
-    ctx.fillRect(0, 0, W, H);
-  }
+  ctx.fillStyle = col.bg;
+  ctx.fillRect(0, 0, W, H);
 
   const osc = (invitation && INV_CODING === "oscillation") ? oscOffset(tSec) : 0;
   ctx.translate(osc, 0);
   ctx.fillStyle = col.ink;
 
   // ★ 地（層 0 の基層）— 常に在る。⚠️ 空白・消灯にしない（C4）
-  ctx.globalAlpha = 0.45 * mix;
+  ctx.globalAlpha = 0.45;
   for (const m of field.ground) {
     const w = m.wobAmp * Math.sin(2 * Math.PI * m.wobFreq * tSec + m.wobPhase);
     ctx.beginPath();
@@ -506,7 +551,7 @@ function drawField(ctx, field, tSec, invitation, W, H, mix = 1, skipBg = false) 
   }
 
   // ★ 図（状態を担う）
-  ctx.globalAlpha = 1.0 * mix;
+  ctx.globalAlpha = 1.0;
   for (const m of field.figure) {
     ctx.beginPath();
     ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
@@ -519,7 +564,7 @@ function drawField(ctx, field, tSec, invitation, W, H, mix = 1, skipBg = false) 
   if (INV_CODING === "aperture") {
     ctx.save();
     ctx.strokeStyle = col.ink;
-    ctx.globalAlpha = 0.85 * mix;
+    ctx.globalAlpha = 0.85;
     ctx.lineWidth = 2.5;
     const R = Math.min(W, H) * 0.455;
     ctx.beginPath();
@@ -579,18 +624,29 @@ function buildBlindOrder(seedOffset) {
   const vids = CFG.variants.map((v) => v.id);
   const items = [];
 
-  for (const lv of LEVELS) {
+  LEVELS.forEach((lv, lvIdx) => {
     const n = B.composition[lv];
     // ★ この level の中で variant を均等に作る（★ 端数は seed でどの variant に付くかを決める）
     const vs = [];
     for (let i = 0; i < n; i++) vs.push(vids[i % vids.length]);
     const vShuffled = shuffle(vs, rng);
+    // ⚠️★★★ 2026-09-08 修正（★ `code-reviewer` HIGH 指摘）——
+    //   ★ 旧実装は invitation を **位置で** 決めていた（`i % 2 === 0`）。
+    //   ⚠️ variant はシャッフル済みなので、**variant × invitation の交差は運任せ**だった
+    //   （★ 本番 seed はたまたま 4:5 で均衡していたが、**偏る seed が存在する**）。
+    //   → ★ **variant ごとに present / none を交互に振る**（★ 端数の向きは level と variant で入れ替える）。
+    //   ★ これで **level 内は常に半々**（＝ level ⊥ invitation を厳密に保つ）まま、
+    //     **variant × invitation の偏差もどの seed でも 1 以内**になる。
+    //   ★ ページ内検査 13 が **50 seed** で検算する（⚠️ 本番 seed 1 本では「偶然の均衡」と区別できない）。
+    const seen = {};
     for (let i = 0; i < n; i++) {
-      // ★ layer0 は invitation を出さない（チャネル不在なので招待も無い）
-      const inv = (lv === "layer0") ? false : (i % 2 === 0);
-      items.push({ level: lv, invitation: inv, variant: vShuffled[i] });
+      const v = vShuffled[i];
+      const c = seen[v] = (seen[v] || 0) + 1;
+      const flip = ((lvIdx + vids.indexOf(v)) % 2) === 0;
+      const inv = (lv === "layer0") ? false : ((c % 2 === 1) === flip);
+      items.push({ level: lv, invitation: inv, variant: v });
     }
-  }
+  });
 
   // ★ 提示順だけを混ぜる（★ level × variant × invitation の内訳はもう確定している）
   const ord = shuffle(items, rng);
@@ -600,11 +656,9 @@ function buildBlindOrder(seedOffset) {
 function buildTransOrder() {
   const T = CFG.transition_test;
   const rng = mulberry32(T.order_seed);
-  const changePairs = [
-    ["stable", "friction_rising"], ["friction_rising", "stuck"],
-    ["friction_rising", "stable"], ["stuck", "friction_rising"],
-    ["layer0", "stable"], ["stable", "layer0"]      // ★ E-7 に効く対
-  ];
+  // ⚠️★★★ 2026-09-08: 対の一覧は **config が SSOT**（★ 機械で検算するため）。
+  //   ★ `layer0 ↔ stable` は **E-7 に直接効く対**であり、旧構成では **n=1 しか出ていなかった**。
+  const changePairs = T.change_pairs;
   const items = [];
   const nChange = T.trials - T.catch_trials;
   for (let i = 0; i < nChange; i++) {
@@ -615,6 +669,14 @@ function buildTransOrder() {
     const lv = LEVELS[(i + 1) % LEVELS.length];
     items.push({ from: lv, to: lv, change: false });
   }
+  // ⚠️★★★ **`variant` は `natural` に固定する（＝ 仕様である）。**★ 2026-09-08 確定（判断 3-B）。
+  //   ★ 混ぜない理由: **結果表が遷移対を `from → to` の *ラベル* で集計している**のに対し、
+  //   `levelSpec()` は `reversed` で `stable` と `stuck` を入れ替えるので、
+  //   ⚠️ **同じラベルの下に *物理的に別の遷移* が入る**（例: `stable → friction_rising` は
+  //   natural では「密→散」、reversed では「疎→散」）。→ ★ **対ごとの検知率が 2 つの遷移の平均になる。**
+  //   ★ `A-8` は極性の読みを問うていないので、混ぜる利得も無い。
+  //   ⚠️ **代償**: `reversed` 側でしか出ない対（`layer0 ↔ stuck`）は測らない（★ notes.md §5）。
+  //   ★ **この固定はページ内検査 15 が検算する**（★ 変えたら赤になる）。
   return shuffle(items, rng).map((o, i) => ({ ...o, variant: "natural", trialSeed: T.order_seed + i * 977 }));
 }
 
@@ -624,16 +686,79 @@ function buildTransOrder() {
 const REC = {
   started_at: new Date().toISOString(),
   calibration: null, theme: null, inv_coding: null,
-  free_response: [], blind_untaught: [], blind_taught: [], transition: [],
+  free_response: [], blind_untaught: [], blind_taught: [], transition: [], peripheral: [],
   selftest: null
 };
+
+/**
+ * ★ 途中結果が残っていたら**破棄して、そのことをオーバーレイのラベルに載せる**。
+ * ⚠️★★★ 2026-09-08: **状態欄（`*-state`）に書くだけでは見えない** ——
+ *   ★ 直後に `*Trial()` が進捗（`3 / 24`）で上書きするうえ、
+ *   ★ 試行中は状態欄そのものが**全画面オーバーレイの下**にある（★ 実測 F11）。
+ *   → ★ **判定者の目に入る唯一の場所は、オーバーレイの上端のラベルである。**
+ */
+/**
+ * ⚠️★★★ 最初のブロックが始まった時点で較正を確定する（★ `code-reviewer` 指摘・2026-09-08）。
+ * ★ 旧実装は `btn-cal-apply` がセッション中ずっと押せた。⚠️ 押すと
+ *   ① **完了済みのブロック 1a を再開可能にして結果を破棄でき**、
+ *   ② **`CAL.pxPerDeg` が変わる** —— ★ 振動の振幅も偏心 px も変わるのに、
+ *      **書き出されるのは最終値だけ**なので、**どの試行がどの較正で出たか復元できない**。
+ */
+function lockCalibration() {
+  if (REC.calibration) return;
+  REC.calibration = { ...CAL };
+  $("btn-cal-apply").disabled = true;
+  $("cal-state").innerHTML =
+    '<span class="ok">較正済み（★ 最初のブロック開始で確定しました）</span>'
+    + '<br><span class="stat">⚠️ 変えるにはページを開き直してください（★ 途中で変えると試行ごとに条件が変わります）</span>';
+}
+
+/**
+ * ★ 中止で **失われるものがあるときだけ** 確認する。
+ * ⚠️ 0 件のときは黙って閉じる（★ 確認の連打は「中止しにくい」＝ ルール 6 に反する方向に効く）。
+ */
+function confirmDiscard(n) {
+  return n === 0 || window.confirm(`⚠️ ここまでの回答 ${n} 件を破棄して中止します。よろしいですか。`);
+}
+
+function discardNotice(arr) {
+  if (!arr.length) return "";
+  const n = arr.length;
+  arr.length = 0;
+  return `⚠️ 前回の途中結果 ${n} 件を破棄しました ／ `;
+}
 
 
 /* ============================================================
  * 6b. ⚠️★★★ 試行の全画面オーバーレイ
  *   ★ 「押したボタンと違う場所に刺激が出る」を構造的に潰す。
  * ============================================================ */
-function overlayOn(boxId, label) {
+/**
+ * @param {function} onAbort ⚠️★★★ **省略しない。**★ 全ブロックが中止できることが要件である。
+ *
+ * ⚠️★★★ 2026-09-08: **中止ボタンをオーバーレイの中へ移した**（★ ブラウザ実測に基づく）。
+ *   ★ 旧実装の `btn-bt-abort` は §3 の通常フローにあり、**試行中は到達不能だった** ——
+ *     ① 矩形がビューポート外（★ 実測 y=1585 / innerHeight=910）で `elementFromPoint` が `null`
+ *     ② 下の `document.body.style.overflow = "hidden"` により**利用者はスクロールできない**
+ *     ③ 無理に視野内へ入れても中心で拾えるのは `DIV#stagewrap`（＝ オーバーレイの中身）で、
+ *        **座標経由のクリックはボタンに届かなかった**
+ *   ⚠️★★★ **ページ内 14 項目・Python 41 項目が緑のまま、これを見逃していた。**
+ *   → ★ §9 の機械検算に **hit-test の検査（対照つき）** を置いた。
+ */
+/**
+ * ★ いま出ているオーバーレイの箱 id（★ 無ければ `null`）。
+ * ⚠️★★★ 2026-09-08（`security-checker` 指摘）: **これが無いと 2 つの穴が開く。**
+ *   ① `blockRunning()` が **ブロック 1a を見落とす**（★ 1a は真偽で判定できる状態オブジェクトを持たない）。
+ *   ② `overlayOff(boxId)` が **`#ovl-tag` / `#ovl-abort` を id で無条件に消す**ので、
+ *      **別の箱に対して呼ぶと、生きているオーバーレイの中止ボタンだけが消える。**
+ *   ⚠️ 実際に届く経路がある: ★ オーバーレイは focus を閉じ込めない（★ `inert` / `tabindex` は 0 件・実測）ので、
+ *      **1a の実行中に Tab → Enter で §9 の「機械検算を走らせる」に届き**、
+ *      検査 16 が `overlayOn("bt-box")` / `overlayOff("bt-box")` を回して **1a の中止ボタンを消す。**
+ *      → ★★★ **本セッションで足したばかりの「1a に中止がある」が、静かに壊れる。**
+ */
+let activeOverlay = null;
+
+function overlayOn(boxId, label, onAbort) {
   const el = $(boxId);
   el.hidden = false;
   el.classList.add("trial-overlay");
@@ -643,15 +768,31 @@ function overlayOn(boxId, label) {
     document.body.appendChild(tag);
   }
   $("ovl-tag").textContent = label;
+  // ★ 中止ボタン: オーバーレイ（z-index 9999）より上に置く
+  let ab = $("ovl-abort");
+  if (!ab) {
+    ab = document.createElement("button");
+    ab.id = "ovl-abort"; ab.className = "ovl-abort";
+    document.body.appendChild(ab);
+  }
+  ab.textContent = "中止する";
+  ab.onclick = onAbort;                        // ★ 付け替え（★ 前ブロックの中止が残らない）
   document.body.style.overflow = "hidden";
+  activeOverlay = boxId;
 }
 function overlayOff(boxId) {
+  // ⚠️★★★ **他人のオーバーレイを片付けない。**★ 下で `#ovl-abort` を id で消すので、
+  //   ★ ガードが無いと「生きている別ブロックの中止ボタンだけが消える」ことが起きる。
+  if (activeOverlay !== null && activeOverlay !== boxId) return;
   const el = $(boxId);
   el.classList.remove("trial-overlay");
   el.hidden = true;
   const tag = $("ovl-tag");
   if (tag) tag.remove();
+  const ab = $("ovl-abort");
+  if (ab) ab.remove();
   document.body.style.overflow = "";
+  activeOverlay = null;
 }
 
 /* ============================================================
@@ -665,12 +806,28 @@ let frOrder = [], frIdx = 0, frRaf = 0;
 const FR_MAX_MS = 36000;
 
 function frStart() {
+  lockCalibration();
+  // ⚠️★★★ 2026-09-08 追加: **中止して再開したときの蓄積を潰す**（★ 1b と同じ型の欠陥が 1a にもあった）。
+  //   ★ 旧実装は 1a に中止が無かったので露出していなかっただけである。
+  const carry = discardNotice(REC.free_response);
   const rng = mulberry32(CFG.blind_test.order_seed + 31);
   frOrder = shuffle(CFG.variants.map((v) => v.id), rng);
   frIdx = 0;
-  overlayOn("fr-box", "ブロック 1a — 自由記述（未教示）");
+  overlayOn("fr-box", carry + "ブロック 1a — 自由記述（未教示）", frAbort);
   $("btn-fr-start").disabled = true;
   frShow();
+}
+
+/** ★ 中止（★ 2026-09-08 追加）。⚠️ 途中結果は**その場で破棄する**（★ 黙って残さない）。 */
+function frAbort() {
+  if (!confirmDiscard(REC.free_response.length)) return;
+  cancelAnimationFrame(frRaf);
+  overlayOff("fr-box");
+  const n = REC.free_response.length;
+  REC.free_response.length = 0;
+  $("fr-state").innerHTML =
+    `<span class="bad">中止 —— ⚠️ ここまでの回答 ${n} 件は破棄しました</span>`;
+  $("btn-fr-start").disabled = false;
 }
 function frShow() {
   const vid = frOrder[frIdx];
@@ -688,7 +845,11 @@ function frShow() {
   //   → ★ **提示順を seed でシャッフルする。**
   const frRng = mulberry32(CFG.blind_test.order_seed + 700 + frIdx * 13);
   const order = shuffle(LEVELS.map((_, i) => i), frRng);
-  const fields = LEVELS.map((lv, i) => buildField(9100 + frIdx * 17 + i, lv, vid, W, H));
+  // ⚠️★★★ 2026-09-08 修正（★ `code-reviewer` 指摘）: **level ごとに seed を変えない。**
+  //   ★ 旧実装は `+ i` していたので、**3 秒ごとに地（220 粒）ごと全画面がハードカット**していた。
+  //   ⚠️ 教示は「ゆっくり移り変わります」であり、⚠️ ブロック 2 の宣言（地で手掛かりを作らない）とも矛盾する。
+  //   ★ 同一 seed なら **変わるのは図だけ**になる。
+  const fields = LEVELS.map((lv) => buildField(9100 + frIdx * 17, lv, vid, W, H));
 
   const t0 = performance.now();
   cancelAnimationFrame(frRaf);
@@ -730,25 +891,24 @@ function frNext(dontKnow) {
 let bt = null;
 
 function btStart(taught) {
+  lockCalibration();
   // ⚠️★★★ 2026-09-03 追加（★ `code-reviewer` HIGH 指摘）——
   //   ★ **旧実装は中止（`btAbort`）後に再開しても結果配列をクリアしていなかった。**
   //   ⚠️ 同じ seed で同じ出題順が再生成されるので、**1 回目の途中結果に 2 回目の全 24 件が追記され、
   //   `confusionTable()` が重複・部分試行をまとめて集計していた**（★ 無警告で結果に混入）。
   const arr = taught ? REC.blind_taught : REC.blind_untaught;
-  if (arr.length) {
-    logAbort(`⚠️ 前回の途中結果 ${arr.length} 件を破棄して開始します`);
-    arr.length = 0;
-  }
+  if (arr.length) logAbort(`⚠️ 前回の途中結果 ${arr.length} 件を破棄して開始します`, taught);
+  const carry = discardNotice(arr);
   bt = {
     taught,
     order: buildBlindOrder(taught ? 5000 : 0),
     i: 0, phase: "idle", raf: 0, t0: 0,
     answerLevel: null
   };
-  overlayOn("bt-box", taught ? "ブロック 1b′ — 盲検・強制選択（教示後）" : "ブロック 1b — 盲検・強制選択（未教示）");
+  overlayOn("bt-box", carry +
+    (taught ? "ブロック 1b′ — 盲検・強制選択（教示後）" : "ブロック 1b — 盲検・強制選択（未教示）"), btAbort);
   $("btn-bt-start").disabled = true;
   $("btn-bt2-start").disabled = true;
-  $("btn-bt-abort").disabled = false;
   btTrial();
 }
 
@@ -836,7 +996,6 @@ function btAnswerInv(inv) {
       const taught = bt.taught;
       bt = null;
       overlayOff("bt-box");
-      $("btn-bt-abort").disabled = true;
       $(taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
       (taught ? REC.blind_taught : REC.blind_untaught).length = 0;
       $(taught ? "bt2-state" : "bt-state").innerHTML =
@@ -851,7 +1010,6 @@ function btAnswerInv(inv) {
   if (bt.i >= bt.order.length) {
     cancelAnimationFrame(bt.raf);
     overlayOff("bt-box");
-    $("btn-bt-abort").disabled = true;
     if (bt.taught) {
       $("bt2-state").innerHTML = '<span class="ok">完了</span>';
       $("btn-tr-start").disabled = false;
@@ -863,21 +1021,34 @@ function btAnswerInv(inv) {
   } else btTrial();
 }
 
-/** ★ 破棄・中止を判定者に見える形で出す（⚠️ 黙って捨てない） */
-function logAbort(msg) {
-  const el = $("bt-state");
+/**
+ * ★ 破棄・中止を判定者に見える形で出す（⚠️ 黙って捨てない）。
+ * ⚠️★★★ 2026-09-08 修正: **宛先が `bt-state` にハードコードされていた** ——
+ *   ★ そのため **`1b′` の破棄メッセージが `1b` の欄に出ていた**（★ これが
+ *   `notes.md` §3b「1b′ が §3 側の DOM を再利用している」の *実害部分* である）。
+ * ★ 刺激 DOM の共有そのものは**残す** —— ⚠️ それが「1b と同一手続き」の担保だからである
+ *   （★ .steering/20260908-layerA-trial-readiness/decisions.md 判断 4）。
+ *   ★ 直すのは **状態メッセージの宛先だけ**。
+ * @param {boolean} taught ★ true なら 1b′（§5）の欄へ出す。
+ */
+function logAbort(msg, taught) {
+  const el = $(taught ? "bt2-state" : "bt-state");
   if (el) el.innerHTML = `<span class="warn">${msg}</span>`;
 }
 
 function btAbort() {
   if (!bt) return;
+  const taught0 = bt.taught;
+  if (!confirmDiscard((taught0 ? REC.blind_taught : REC.blind_untaught).length)) return;
   cancelAnimationFrame(bt.raf);
-  ($(bt.taught ? "bt2-state" : "bt-state")).innerHTML =
-    '<span class="bad">中止 —— ⚠️ 再開すると、ここまでの回答は破棄されます</span>';
+  const taught = bt.taught;
+  const store = taught ? REC.blind_taught : REC.blind_untaught;
+  const n = store.length;
+  store.length = 0;                       // ★ その場で破棄する（⚠️ 再開まで残さない）
   overlayOff("bt-box");
-  $("btn-bt-abort").disabled = true;
-  $(bt.taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
+  $(taught ? "btn-bt2-start" : "btn-bt-start").disabled = false;
   bt = null;
+  logAbort(`中止 —— ⚠️ ここまでの回答 ${n} 件は破棄しました`, taught);
 }
 
 /* ============================================================
@@ -932,19 +1103,78 @@ async function unseal() {
  * ============================================================ */
 let tr = null;
 
+/** ★ 遷移合成用のオフスクリーン 2 枚（★ 毎フレーム作り直さない）。 */
+let trCanvasA = null, trCanvasB = null;
+function trOffscreen(W, H) {
+  if (!trCanvasA || trCanvasA.width !== W || trCanvasA.height !== H) {
+    trCanvasA = document.createElement("canvas"); trCanvasA.width = W; trCanvasA.height = H;
+    trCanvasB = document.createElement("canvas"); trCanvasB.width = W; trCanvasB.height = H;
+  }
+  return [trCanvasA, trCanvasB];
+}
+
+/**
+ * ★ 遷移 1 フレームの合成。⚠️★★★ **本番も機械検算も、合成は必ずこの関数だけを通る。**
+ *   ★ 検査が本番と別の経路を持つと、**検査が通っても本番が壊れている**ことが起きるため。
+ *
+ * ★ **不透明なオフスクリーン 2 枚**を `drawImage` で重ねる。
+ *   ⚠️ 1 枚の canvas への重ね塗り（source-over）は線形補間ではなく `1-k+k²` になり、
+ *   **k=0.5 で 0.75 に沈む**（★ 実測: 図の画素 232 → 178）。
+ *   → ★ 不透明どうしなら厳密に `A(1-k) + Bk` で、**fA === fB なら全 k で不変**である
+ *     （★ 実測: 画素あたり最大差 **0〜1 階調**＝ 8bit の丸めのみ）。
+ */
+function trCompose(ctx, fA, fB, k, tSec, W, H) {
+  const [cA, cB] = trOffscreen(W, H);
+  drawField(cA.getContext("2d"), fA, tSec, false, W, H);
+  drawField(cB.getContext("2d"), fB, tSec, false, W, H);
+  ctx.globalAlpha = 1; ctx.drawImage(cA, 0, 0);
+  ctx.globalAlpha = k; ctx.drawImage(cB, 0, 0);
+  ctx.globalAlpha = 1;
+}
+
+/** ★ 合成 1 フレームの画素を取り出す（★ 機械検算用。★ 合成そのものは `trCompose` に委ねる）。 */
+function trComposePixels(fA, fB, k, W, H) {
+  const out = document.createElement("canvas"); out.width = W; out.height = H;
+  const o = out.getContext("2d", { willReadFrequently: true });
+  trCompose(o, fA, fB, k, 0, W, H);
+  return o.getImageData(0, 0, W, H).data;
+}
+
 function trStart() {
+  lockCalibration();
+  // ⚠️★★★ 2026-09-08 追加: 中止して再開したときの蓄積を潰す（★ 1b と同じ型）。
+  const carry = discardNotice(REC.transition);
   tr = { order: buildTransOrder(), i: 0, raf: 0, t0: 0, phase: "idle" };
-  overlayOn("tr-box", "ブロック 2 — 遷移の検知");
+  overlayOn("tr-box", carry + "ブロック 2 — 遷移の検知", trAbort);
   $("btn-tr-start").disabled = true;
   trTrial();
+}
+
+/** ★ 中止（★ 2026-09-08 追加）。⚠️ 途中結果はその場で破棄する。 */
+function trAbort() {
+  if (!tr) return;
+  if (!confirmDiscard(REC.transition.length)) return;
+  cancelAnimationFrame(tr.raf);
+  tr = null;
+  const n = REC.transition.length;
+  REC.transition.length = 0;
+  overlayOff("tr-box");
+  $("btn-tr-start").disabled = false;
+  $("tr-state").innerHTML = `<span class="bad">中止 —— ⚠️ ここまでの回答 ${n} 件は破棄しました</span>`;
 }
 function trTrial() {
   if (!tr) return;
   const T = CFG.transition_test;
   const cv = $("stage-tr"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
   const it = tr.order[tr.i];
+  // ⚠️★★★ 2026-09-08 修正（★ `code-reviewer` HIGH 指摘）: **fB の seed を fA と同じにする。**
+  //   ★ 旧実装は `it.trialSeed + 3` だった。⚠️ `buildField` は **地（220 粒）を先に**
+  //   同じ rng から生成するので、**seed が違うと地の全座標が別物になる**。
+  //   → ★★★ **図を一切読まずに「地が総入れ替わりしたか」だけで変化を検知できた。**
+  //   ⚠️ しかも catch は `fB = fA` なので地が動かない ＝ **地の挙動が正解と一対一に対応していた。**
+  //   ★ 同一 seed なら **地は完全に一致し、変わるのは図だけ**になる（★ :1090 の宣言どおりになる）。
   const fA = buildField(it.trialSeed, it.from, it.variant, W, H);
-  const fB = it.change ? buildField(it.trialSeed + 3, it.to, it.variant, W, H) : fA;
+  const fB = it.change ? buildField(it.trialSeed, it.to, it.variant, W, H) : fA;
 
   $("tr-resp").hidden = true;
   $("tr-state").textContent = `${tr.i + 1} / ${tr.order.length}`;
@@ -961,19 +1191,20 @@ function trTrial() {
       drawField(ctx, fA, el / 1000, false, W, H);
     } else if (el < T.pre_ms + T.transition_ms) {
       // ★ 遷移中は交差フェード（★ 位置の飛びで「動き」の手掛かりを作らない）
-      // ⚠️★★★ 2026-09-03 修正: `mix` を渡して *乗算* する（★ 旧実装は `globalAlpha` を
-      //   呼び出し側で立てていたが `drawField` 内の絶対代入に潰されていた）。
-      //   ★ 背景は 1 度だけ塗り、fA を (1-k)、fB を k で重ねる。
+      // ⚠️★★★ 2026-09-08 修正: **不透明なオフスクリーン 2 枚を `drawImage` で合成する。**
+      //   ★ 重ね塗り（source-over）だと `1-k+k²` になり **k=0.5 で 0.75 に沈む** ——
+      //   ⚠️ **catch でも全画面が明滅し、「変わった」の手掛かりになっていた。**
+      //   ★ 不透明どうしの合成は厳密に `A(1-k) + Bk` なので、**fA === fB なら全 k で不変**。
+      //   ★ 地の揺らぎを止めないため、**毎フレーム両方を描き直してから**合成する。
       const k = (el - T.pre_ms) / T.transition_ms;
-      blank(ctx, W, H);
-      drawField(ctx, fA, el / 1000, false, W, H, 1 - k, true);
-      drawField(ctx, fB, el / 1000, false, W, H, k, true);
+      trCompose(ctx, fA, fB, k, el / 1000, W, H);
     } else if (el < total) {
       drawField(ctx, fB, el / 1000, false, W, H);
     } else {
       blank(ctx, W, H);
       $("tr-hint").textContent = "★ どちらか選んでください";
       $("tr-resp").hidden = false;
+      tr.phase = "resp";                       // ★ 他 3 ブロックと同型にする
       tr.respAt = performance.now();
       return;
     }
@@ -982,7 +1213,7 @@ function trTrial() {
   loop();
 }
 function trAnswer(said) {
-  if (!tr) return;
+  if (!tr || tr.phase !== "resp") return;     // ★ 提示中の入力を弾く（★ 他 3 ブロックと同型）
   const it = tr.order[tr.i];
   REC.transition.push({
     i: tr.i, from: it.from, to: it.to,
@@ -998,7 +1229,260 @@ function trAnswer(said) {
     $("btn-export").disabled = false;
     $("btn-self").disabled = false;
     tr = null;
+    // ★ 周辺視（任意）はここで開く（★ config `_comment_blocks` の順序どおり）
+    perUnlocked = true;
+    perSyncButton();
   } else trTrial();
+}
+
+/* ============================================================
+ * 10b. ブロック 3 — 周辺視（A-4・任意）
+ *
+ * ★ **何を問うているか**: ⚠️ **偏心で読みが壊れないか**
+ *   （★ [P250]: 学習後の正答率は set size 3 も 7 も 93–98% で差が無いが、
+ *     **周辺視のみでの同定率は 90% → 76%** に落ちる）。
+ * ⚠️★★★ **運動優位（[P85]）の再現ではない**（★ config の `note` 逐語）。
+ *   ★ [P85] の優位は**偏心 7°–52°** の結果で、ロック画面は中心視だからである。
+ *
+ * ⚠️★★★ **固視は検証できない**（★ アイトラッカーが無い）。→ ★ 3 つで凌ぐ:
+ *   ① **提示を短くしてマスクで打ち切る**（⚠️★★★ **保証ではない**。★ 一次の裏づけも無い設計判断である）
+ *   ② **左右をランダム化する**（⚠️ 位置が固定だと提示前にそこを見てしまう）
+ *   ③ ★★★ **同じ提示時間の中心対照を同じブロックに入れる**
+ *      → ★ **提示時間を揃えたまま偏心だけを動かせる。**
+ *      ⚠️ これが無いと「偏心のせい」か「短いせい」かを分けられない。
+ * ============================================================ */
+const PER_MARGIN_PX = 8;
+let per = null;
+
+/**
+ * ★ どれかのブロックが実行中か。
+ * ⚠️★★★ 2026-09-08: **`selftest()` の中で直に `bt || tr || per` と書いたら、
+ *   同関数の局所変数 `per`（＝ 振動の周期 1/f）に隠されて常に真になった**（★ ブラウザ実測で発覚）。
+ *   → ★ **参照を関数へ閉じ込める**（★ 呼び出し側の局所名に影響されない）。
+ * ⚠️★★★ かつ **`activeOverlay` を数える**（★ `security-checker` 指摘）——
+ *   ★ **ブロック 1a は真偽で判定できる状態オブジェクトを持たない**（`frOrder` は完了後も空にならない）ので、
+ *   `bt || tr || per` だけでは **1a の実行中を「非実行中」と誤判定する**。
+ */
+function blockRunning() { return !!(bt || tr || per || activeOverlay); }
+let perUnlocked = false;     // ★ ブロック 2 の完了で開く（★ config の順序どおり）
+
+/** ★ 偏心が物理的にこの画面へ入るか。⚠️★★★ 入らないなら**黙って縮めずに止める**。 */
+function perGeometry() {
+  const eccPx = CFG.peripheral_test.eccentricity_deg * (CAL.pxPerDeg || 0);
+  const need = eccPx + CFG.stimulus.canvas_css_px / 2 + PER_MARGIN_PX;
+  const avail = window.innerWidth / 2;
+  return { eccPx, need, avail, ok: !!CAL.done && need <= avail };
+}
+
+/** ★ 提示時間が invitation の何周期にあたるか（★ oscillation 符号のときだけ意味を持つ）。 */
+function perInvCycles() {
+  return (CFG.peripheral_test.stimulus_ms / 1000) * CFG.invitation.frequency_hz;
+}
+
+function perRefresh() {
+  const g = perGeometry();
+  const P = CFG.peripheral_test;
+  if (!CAL.done) {
+    $("per-geom").innerHTML = "★ 較正を通すと、この画面で偏心 " + P.eccentricity_deg + "° を提示できるかを判定します。";
+    return g;
+  }
+  let h = g.ok
+    ? `<span class="ok">★ 提示できます</span> —— 偏心 ${P.eccentricity_deg}° = <b>${g.eccPx.toFixed(0)} px</b>`
+      + ` ／ 片側に必要 ${g.need.toFixed(0)} px ≤ 利用可能 ${g.avail.toFixed(0)} px`
+    : `<span class="bad">⚠️★★★ この画面では提示できません</span> —— 片側に必要 <b>${g.need.toFixed(0)} px</b>`
+      + ` &gt; 利用可能 <b>${g.avail.toFixed(0)} px</b>。`
+      + `<br>★ 窓を広げる（全画面にする）か、<b>視距離を縮めて較正し直す</b>と入ります。`
+      + `<br>⚠️★★★ <b>偏心を黙って縮めて走らせません</b>（★ それは「別の条件を測って同じ名前で記録する」ことなので）。`;
+  // ⚠️★★★ 振動符号は短い提示と両立しない。★ 黙って測らない。
+  const cyc = perInvCycles();
+  if (INV_CODING === "oscillation" && cyc < 1) {
+    h += `<br><span class="bad">⚠️★★★ 提示 ${P.stimulus_ms} ms は ${CFG.invitation.frequency_hz} Hz の`
+       + ` <b>${cyc.toFixed(2)} 周期</b>しかありません。★ 本ブロックの ② は<b>振動符号を測れていない</b>`
+       + `と考えてください（★ 結果ファイルの limitations にも刻みます）。</span>`;
+  }
+  $("per-geom").innerHTML = h;
+  return g;
+}
+function perSyncButton() {
+  const g = perRefresh();
+  $("btn-per-start").disabled = !(perUnlocked && g.ok);
+  return g;
+}
+
+/**
+ * ★ 出題順。★ 偏心条件は **level ごとに左右を層別割当**する（★ 1b と同じ思想）。
+ * ⚠️ `variant` は config の `natural` 固定（★ 極性は 1b / 1b′ が測る）。
+ */
+function buildPerOrder() {
+  const P = CFG.peripheral_test;
+  const rng = mulberry32(P.order_seed);
+  const items = [];
+  // ⚠️★★★ 2026-09-08 修正（★ `code-reviewer` HIGH 指摘）——
+  //   ★ 旧実装は **左右**を `positions[i%2]` で作ってシャッフルし、**invitation** を別に `i%2` で決めていた。
+  //   ⚠️ 件数は必ず半々になるが（＝ 件数を見る検査は **どの seed でも緑** ＝ 空回り）、
+  //   ⚠️★★★ **左右 × invitation の交差は保証されていなかった** ——
+  //   ★ 実際、シャッフルを外すと **「invitation はすべて左」** という完全交絡が生まれるのに、
+  //     件数の検査は緑のままだった。
+  //   → ★ **(左右 × invitation) の組を作ってから、組ごとシャッフルする。**
+  const cross = [];
+  for (const ps of P.positions) for (const iv of [true, false]) cross.push({ pos: ps, inv: iv });
+  const nEcc = P.trials / LEVELS.length;
+  for (const lv of LEVELS) {
+    const cells = [];
+    for (let i = 0; i < nEcc; i++) cells.push(cross[i % cross.length]);
+    for (const c of shuffle(cells, rng)) {
+      items.push({ level: lv, invitation: (lv === "layer0") ? false : c.inv,
+                   pos: c.pos, eccentric: true, variant: P.variant });
+    }
+  }
+  const nCtr = P.control_center_trials / LEVELS.length;
+  for (const lv of LEVELS) {
+    const cells = [];
+    for (let i = 0; i < nCtr; i++) cells.push(i % 2 === 0);
+    for (const iv of shuffle(cells, rng)) {
+      items.push({ level: lv, invitation: (lv === "layer0") ? false : iv,
+                   pos: "center", eccentric: false, variant: P.variant });
+    }
+  }
+  return shuffle(items, rng).map((o, i) => ({ ...o, trialSeed: P.order_seed + i * 977 }));
+}
+
+function perStart() {
+  const g = perGeometry();
+  if (!g.ok) { perSyncButton(); return; }   // ⚠️ 開始の直前に窓が変わっていることがある
+  lockCalibration();
+  const carry = discardNotice(REC.peripheral);
+  per = { order: buildPerOrder(), i: 0, phase: "idle", raf: 0, t0: 0,
+          answerLevel: null, rtLevel: null, eccPx: g.eccPx };
+  overlayOn("per-box", carry + "ブロック 3 — 周辺視（★ 中央の ＋ から目を離さない）", perAbort);
+  $("btn-per-start").disabled = true;
+  perTrial();
+}
+
+function perTrial() {
+  if (!per) return;
+  const P = CFG.peripheral_test, S = CFG.stimulus;
+  const cv = $("stage-per"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  // ⚠️★★★ **試行のたびに実施可否を確かめる。**★ 窓は試行中にも縮みうる。
+  //   ★ 2026-09-03 の 1 回目の試視は「刺激が画面外で 2 秒が流れていた」ことで壊れた。
+  //   → ★ **同じ形を二度作らない。黙って続けず、破棄して止める。**
+  if (!perGeometry().ok) {
+    perAbort(true);
+    perSyncButton();
+    $("per-state").innerHTML =
+      '<span class="bad">⚠️★★★ 窓が小さくなり、偏心刺激が画面に入らなくなりました —— '
+      + '★ ここまでの回答は破棄しました。★ 窓を広げてやり直してください。</span>';
+    return;
+  }
+  const it = per.order[per.i];
+  const field = buildField(it.trialSeed, it.level, it.variant, W, H);
+  const maskRng = mulberry32(it.trialSeed + 7);
+  const dx = (it.pos === "left") ? -per.eccPx : ((it.pos === "right") ? per.eccPx : 0);
+  $("per-stage").style.transform = `translate(calc(-50% + ${dx.toFixed(1)}px), -50%)`;
+  $("per-stage").style.visibility = "hidden";
+  $("per-fix").style.visibility = "visible";
+  $("per-resp").hidden = true;
+  per.answerLevel = null; per.rtLevel = null;
+  $("per-state").textContent = `${per.i + 1} / ${per.order.length}`;
+  $("per-hint").textContent = "★ 中央の ＋ を見続けてください";
+  blank(ctx, W, H);
+  per.t0 = performance.now();
+  per.phase = "iti";
+  cancelAnimationFrame(per.raf);
+
+  const loop = () => {
+    if (!per) return;
+    const el = performance.now() - per.t0;
+    if (per.phase === "iti") {
+      if (el >= S.iti_ms) {
+        per.phase = "stim"; per.t0 = performance.now();
+        // ⚠️★★★ **描いてから可視にする（★ 順序が逆だと実験が壊れる）。**
+        //   ★ 「可視にして次フレームで描く」と、刺激の 1 フレーム前に **空の矩形**が
+        //   偏心位置に出る ＝ ★★★ **空間的な先行手掛かり（pre-cue）**になり、
+        //   ⚠️ **判定者はそこへ視線を送れてしまう**（＝ 周辺視を測っていない）。
+        //   ★ 2026-09-08 にブラウザで位相機械を回して気づいた（★ 機械検査は緑だった）。
+        drawField(ctx, field, 0, it.invitation, W, H);
+        $("per-stage").style.visibility = "visible";
+        // ⚠️★★★ 提示のあいだ固視点を **両条件とも** 隠す（★ `code-reviewer` 指摘・2026-09-08）。
+        //   ★ `.per-fix` と `.per-stage` はどちらも absolute で z-index 無し ＝ **DOM 順で刺激が上**。
+        //   ⚠️ canvas は不透明なので、**中心条件でだけ固視点が刺激に覆われて消えて**いた。
+        //   → ★ 条件によって中心窩の見えが変わる ＝ **「偏心だけが違う」という対照の前提が崩れる。**
+        $("per-fix").style.visibility = "hidden";
+      }
+    } else if (per.phase === "stim") {
+      if (el >= P.stimulus_ms) {
+        per.phase = "mask"; per.t0 = performance.now();
+        drawMask(ctx, maskRng, W, H);        // ★ 同じフレームでマスクへ切り替える
+      } else {
+        drawField(ctx, field, el / 1000, it.invitation, W, H);
+      }
+    } else if (per.phase === "mask") {
+      drawMask(ctx, maskRng, W, H);
+      if (el >= S.mask_ms) {
+        per.phase = "resp";
+        $("per-stage").style.visibility = "hidden";
+        $("per-fix").style.visibility = "visible";
+        $("per-hint").textContent = "★ 迷ってもどれか選んでください";
+        $("per-resp").hidden = false;
+        per.respAt = performance.now();
+        return;                                  // ★ 応答待ちで rAF を止める
+      }
+    }
+    per.raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function perAnswerLevel(lv) {
+  if (!per || per.phase !== "resp") return;
+  per.answerLevel = lv;
+  if (per.rtLevel == null) per.rtLevel = Math.round(performance.now() - per.respAt);
+  [...$("per-lvl").children].forEach((b) => { b.style.borderColor = (b.dataset.lv === lv) ? "#7fc98a" : "#3a424c"; });
+}
+function perAnswerInv(inv) {
+  if (!per || per.phase !== "resp") return;
+  if (per.answerLevel === null) {
+    $("per-hint").innerHTML = '<span class="warn">⚠️ 先に ① を選んでください</span>';
+    return;
+  }
+  const it = per.order[per.i];
+  REC.peripheral.push({
+    i: per.i, pos: it.pos, eccentric: it.eccentric, variant: it.variant,
+    // ⚠️★★★ 本ブロックは **オンボーディングの後**にしか開かない（`perUnlocked` はブロック 2 の完了で立つ）。
+    //   ★ PS-Q5 の読み替え（未教示 = 他者 / 教示後 = 本人）では **『本人』側**にあたる。
+    taught: true,
+    true_level: it.level, resp_level: per.answerLevel,
+    true_invitation: it.invitation, resp_invitation: !!inv,
+    rt_level_ms: per.rtLevel, rt_total_ms: Math.round(performance.now() - per.respAt)
+  });
+  // ⚠️★★★ **1b の「縮退ガード」はここに置かない（★ 意図的である）。**
+  //   ★ 1b のガードは「刺激が画面外で見えていない」事故を捕まえるためのものだが、
+  //   ⚠️ **本ブロックでは「偏心では読めない」が *正当な所見* であり、同じ答えが続きうる。**
+  //   ★ 止めると所見そのものを捨てることになる。→ ★ **結果側で偏りを告げる**（→ showResults）。
+  [...$("per-lvl").children].forEach((b) => { b.style.borderColor = "#3a424c"; });
+  per.i++;
+  if (per.i >= per.order.length) {
+    cancelAnimationFrame(per.raf);
+    overlayOff("per-box");
+    per = null;
+    $("per-state").innerHTML = '<span class="ok">完了</span>';
+  } else perTrial();
+}
+
+/**
+ * ★ 中止。⚠️ 途中結果はその場で破棄する。
+ * @param {boolean} force ★ true なら確認しない（★ 系が自分で止めるとき）。
+ */
+function perAbort(force) {
+  if (!per) return;
+  if (!force && !confirmDiscard(REC.peripheral.length)) return;
+  cancelAnimationFrame(per.raf);
+  per = null;
+  const n = REC.peripheral.length;
+  REC.peripheral.length = 0;
+  overlayOff("per-box");
+  perSyncButton();
+  $("per-state").innerHTML = `<span class="bad">中止 —— ⚠️ ここまでの回答 ${n} 件は破棄しました</span>`;
 }
 
 /* ============================================================
@@ -1103,6 +1587,49 @@ function showResults() {
     h += `</table>`;
   }
 
+  // ★ 周辺視（★ 比較はブロック内の中心対照との間で行う）
+  if (REC.peripheral.length) {
+    const P = CFG.peripheral_test;
+    const cell = (label, sub) => {
+      const k = sub.filter((r) => r.true_level === r.resp_level).length;
+      const c = wilson(k, sub.length);
+      const iv = sub.filter((r) => r.true_level !== "layer0");
+      const nP = iv.filter((r) => r.true_invitation).length;
+      const hit = iv.filter((r) => r.true_invitation && r.resp_invitation).length;
+      const nA = iv.filter((r) => !r.true_invitation).length;
+      const fa = iv.filter((r) => !r.true_invitation && r.resp_invitation).length;
+      return `<tr><td class="lbl">${label}</td><td>${sub.length}</td>` +
+             `<td>${sub.length ? pct(k / sub.length) : "—"}</td>` +
+             `<td class="stat">[${pct(c[0])}, ${pct(c[1])}]</td>` +
+             `<td>${nP ? `${hit} / ${nP}` : "—"}</td><td>${nA ? `${fa} / ${nA}` : "—"}</td></tr>`;
+    };
+    h += `<h3 style="font-size:14px;margin:16px 0 4px">ブロック 3 — 周辺視（A-4・n=${REC.peripheral.length}` +
+         `・チャンス ${pct(ch)}・提示 ${P.stimulus_ms} ms）</h3>` +
+         `<table><tr><th class="lbl">条件</th><th>n</th><th>正答率</th><th>95% CI</th>` +
+         `<th>invitation hit</th><th>⚠️ false alarm</th></tr>` +
+         cell("★ 中心対照（同じ提示時間）", REC.peripheral.filter((r) => !r.eccentric)) +
+         cell(`⚠️ 偏心 ${P.eccentricity_deg}°`, REC.peripheral.filter((r) => r.eccentric)) +
+         `</table>`;
+    h += `<p class="note warn">⚠️★★★ <b>ブロック 3 は「教示後（本人）」である</b>` +
+         `（★ オンボーディングの後にしか開かない）。★ PS-Q5 の読み替えでは <b>1b′ と同じ側</b>で、` +
+         `⚠️ <b>「他者が読めるか」の材料にはならない</b>。<br>` +
+         `⚠️★★★ <b>比較はこの表の 2 行の *あいだ* で行う。</b>` +
+         `★ 1b / 1b′ とは提示時間が違う（${P.stimulus_ms} ms vs ${CFG.stimulus.stimulus_ms} ms）ので<b>直接は比べない</b>。` +
+         `<br>⚠️★★★ <b>固視は検証していない。</b>★ したがって「偏心で読めた」は「<b>偏心のまま</b>読めた」を意味しない` +
+         `（★ 判定者が視線を動かした可能性を排除できない）。` +
+         `<br>⚠️ N=1 なので<b>検定しない</b>（[V123]）。★ 記述と 95% CI に留める。</p>`;
+    // ⚠️ 偏りは「読めていない」の徴候でもある（★ 1b と違って *所見* でありうる）
+    const cnt = {};
+    for (const r of REC.peripheral.filter((x) => x.eccentric)) cnt[r.resp_level] = (cnt[r.resp_level] || 0) + 1;
+    const nEcc = REC.peripheral.filter((x) => x.eccentric).length;
+    const top = nEcc ? Math.max(...Object.values(cnt)) : 0;
+    if (nEcc && top / nEcc >= 0.7) {
+      h += `<p class="note warn">⚠️ <b>偏心条件の回答の ${Math.round(100 * top / nEcc)}% が同じ選択肢に偏っている</b>` +
+           `（内訳: ${JSON.stringify(cnt)}）。★ <b>これは所見でありうる</b>（＝ 偏心では読めない）が、` +
+           `⚠️ <b>刺激が出ていなかった場合も同じ形になる</b>。★ <b>中心対照の行が同様に偏っていないか</b>を先に見ること。</p>`;
+    }
+  }
+
   // ★ 自由記述
   if (REC.free_response.length) {
     h += `<h3 style="font-size:14px;margin:16px 0 4px">ブロック 1a — 自由記述（★ THAT / WHAT の判定材料）</h3>`;
@@ -1147,9 +1674,9 @@ function selftest() {
   const ampPx = CFG.invitation.amplitude_deg_peak_to_peak * CAL.pxPerDeg;
   const f = CFG.invitation.frequency_hz;
   let mn = Infinity, mx = -Infinity;
-  const N = 2000, per = 1 / f;
+  const N = 2000, oscPeriodSec = 1 / f;
   for (let i = 0; i < N; i++) {
-    const v = oscOffset((i / N) * per);
+    const v = oscOffset((i / N) * oscPeriodSec);
     mn = Math.min(mn, v); mx = Math.max(mx, v);
   }
   push("振動の全振幅 = 1° 相当",
@@ -1158,7 +1685,7 @@ function selftest() {
 
   /* --- 2. anchored: 1 周期の正味変位が 0（⚠️ travelling でない・[P85] G7） --- */
   let net = 0;
-  for (let i = 0; i < N; i++) net += oscOffset((i / N) * per);
+  for (let i = 0; i < N; i++) net += oscOffset((i / N) * oscPeriodSec);
   push("anchored（1 周期の正味変位 ≈ 0 ＝ 移動しない）",
     Math.abs(net / N) < 1e-6 * Math.max(1, ampPx),
     `平均変位 ${(net / N).toExponential(2)} px`);
@@ -1173,8 +1700,8 @@ function selftest() {
    *   どちらも「ゼロ点そのもの」なので、境界の 1 回が浮動小数で消えるためである。
    *   → ★ 走査区間を **1/4 周期ずらす**（＝両端が最大値になり、ゼロ点に当たらない）。 */
   const PERIODS = 4;
-  const t0 = per / 4;                        // ★ 両端を頂点に置く
-  const span = per * PERIODS;
+  const t0 = oscPeriodSec / 4;               // ★ 両端を頂点に置く
+  const span = oscPeriodSec * PERIODS;
   let zc = 0, prev = oscOffset(t0);
   for (let i = 1; i <= N; i++) {
     const v = oscOffset(t0 + (i / N) * span);
@@ -1250,22 +1777,62 @@ function selftest() {
   push("⚠️★★★ level × variant が均衡している（★ 層別割当）",
     maxDev <= 1, `最大偏差 ${maxDev} / ${JSON.stringify(cross)}`);
 
-  /* --- 9c. ★ 合成係数 mix が効いている（★ クロスフェードの検算）
-   * ⚠️ 旧実装は `globalAlpha` の絶対代入で mix が潰れていた。 */
-  const inkMix = (mix) => {
-    const fl = buildField(779, "stable", "natural", W, H);
-    blank(ctx, W, H);
-    drawField(ctx, fl, 0, false, W, H, mix, true);
-    const d = ctx.getImageData(0, 0, W, H).data;
-    const br = parseInt(themeColors().bg.slice(1, 3), 16);
-    let sum = 0;
-    for (let i = 0; i < d.length; i += 4) sum += Math.abs(d[i] - br);
-    return sum;
+  /* --- 9c. ⚠️★★★ catch 試行が合成係数 k によらず **不変** であること
+   * ★ 2026-09-08 に置き換えた（★ `code-reviewer` HIGH 指摘）。
+   * ⚠️ 旧実装は 1 枚の canvas への **重ね塗り**で、実効被覆率が `1-k+k²` になり
+   *   **k=0.5 で図の α が 0.75 に沈んでいた**（★ 実測: 画素 232 → 178）。
+   *   → ★★★ **catch（何も変わらないはずの試行）でも 400 ms 全画面が明滅し、
+   *     「変わった」と答える正当な手掛かりになっていた** ＝ A-8 の対照が壊れていた。
+   * ★ **対照つき**: 変化試行では k で確かに変わることも同時に見る
+   *   （⚠️ でないと「常に同じ値を返す」実装でも緑になる）。 */
+  // ⚠️★★★ **測り方を間違えないこと。**★ 初版は「インク総量の *総和*」で測ったが、
+  //   ⚠️ 総和は「全画素が 1 階調ずれた（＝ 8bit の丸め・不可視）」と
+  //   「インク画素だけが 54 階調沈んだ（＝ 当のバグ・可視）」を **区別できない**
+  //   （★ 実測: 丸めだけで総和は 118,272 動き、初版の検査は誤って赤になった）。
+  //   → ★ **画素あたりの最大差**で測る。★ 丸めなら 1 以下、旧バグなら 54 になる。
+  const fSame = buildField(779, "stable", "natural", W, H);
+  const fDiff = buildField(779, "stuck", "natural", W, H);
+  const maxPixDiff = (x, y) => {
+    let m = 0;
+    for (let i = 0; i < x.length; i += 4) { const d = Math.abs(x[i] - y[i]); if (d > m) m = d; }
+    return m;
   };
-  const m0 = inkMix(0.0), m5 = inkMix(0.5), m1 = inkMix(1.0);
-  push("★ 合成係数 mix が単調に効いている（★ クロスフェードの検算）",
-    m0 < m5 && m5 < m1 && m0 < m1 * 0.02,
-    `mix=0 → ${m0} / 0.5 → ${m5} / 1.0 → ${m1}`);
+  const base = trComposePixels(fSame, fSame, 0, W, H);
+  const catchMax = Math.max(...[0.25, 0.5, 0.75, 1]
+    .map((k) => maxPixDiff(base, trComposePixels(fSame, fSame, k, W, H))));
+  const chgMax = maxPixDiff(trComposePixels(fSame, fDiff, 0, W, H),
+                            trComposePixels(fSame, fDiff, 1, W, H));
+  push("⚠️★★★ catch 試行が合成係数によらず不変（★ 明滅で答えられない・対照つき）",
+    catchMax <= 1 && chgMax > 20,
+    `catch の画素あたり最大差 ${catchMax}（★ 丸めの 1 階調まで許容）／ 対照(変化) ${chgMax}`);
+
+  /* --- 9d. ⚠️★★★ 変化試行でも **地は動かない**（★ HIGH 2 の回帰）
+   * ⚠️ 旧実装は fB の seed が `trialSeed + 3` で、**地 220 粒が丸ごと再抽選**されていた。
+   *   → ★★★ **図を一切読まずに「地が総入れ替わりしたか」だけで変化を検知できた。** */
+  const tOrd = buildTransOrder();
+  const chgTrial = tOrd.find((o) => o.change);
+  const gA = buildField(chgTrial.trialSeed, chgTrial.from, chgTrial.variant, W, H);
+  const gB = buildField(chgTrial.trialSeed, chgTrial.to, chgTrial.variant, W, H);
+  const groundSame = gA.ground.length === gB.ground.length &&
+    gA.ground.every((m, i) => m.x === gB.ground[i].x && m.y === gB.ground[i].y);
+  const figureDiffers = JSON.stringify(gA.figure) !== JSON.stringify(gB.figure);
+  push("⚠️★★★ 変化試行で地が一致し、図だけが変わる（★ 地で答えられない・対照つき）",
+    groundSame && figureDiffers,
+    `地 ${gA.ground.length} 粒一致=${groundSame} ／ 対照(図が変わる)=${figureDiffers}`);
+
+  /* --- 9e. ★ 遷移対ごとの件数が均衡している（★ E-7 の対が単発でないこと）
+   * ⚠️ 旧構成（trials 16 / catch 6）は変化 10 を 6 対に配っており、
+   *   **`layer0 ↔ stable` の 2 対だけが n=1** だった（★ 結果表は ★E-7 と印を付けて出す）。 */
+  const pairN = {};
+  for (const o of tOrd.filter((x) => x.change)) {
+    const k = `${o.from}→${o.to}`;
+    pairN[k] = (pairN[k] || 0) + 1;
+  }
+  const pairVals = Object.values(pairN);
+  push("⚠️★★★ 遷移対ごとの件数が均衡している（★ E-7 の対が単発でない）",
+    pairVals.length === CFG.transition_test.change_pairs.length &&
+    Math.max(...pairVals) === Math.min(...pairVals) && Math.min(...pairVals) >= 2,
+    JSON.stringify(pairN));
 
   /* --- 10. invitation は layer0 に出ない --- */
   push("layer0 に invitation を出していない",
@@ -1273,20 +1840,191 @@ function selftest() {
 
   /* --- 11. ⚠️★★★ 検査自体を壊して赤になることを確かめる（ルール 5b） --- */
   const savedAmp = CFG.invitation.amplitude_deg_peak_to_peak;
-  CFG.invitation.amplitude_deg_peak_to_peak = savedAmp * 2;
-  let mn2 = Infinity, mx2 = -Infinity;
-  for (let i = 0; i < N; i++) { const v = oscOffset((i / N) * per); mn2 = Math.min(mn2, v); mx2 = Math.max(mx2, v); }
-  const brokeDetected = Math.abs((mx2 - mn2) - ampPx) >= 0.02 * ampPx;
-  CFG.invitation.amplitude_deg_peak_to_peak = savedAmp;
+  let brokeDetected;
+  try {
+    CFG.invitation.amplitude_deg_peak_to_peak = savedAmp * 2;
+    let mn2 = Infinity, mx2 = -Infinity;
+    for (let i = 0; i < N; i++) { const v = oscOffset((i / N) * oscPeriodSec); mn2 = Math.min(mn2, v); mx2 = Math.max(mx2, v); }
+    brokeDetected = Math.abs((mx2 - mn2) - ampPx) >= 0.02 * ampPx;
+  } finally {
+    // ⚠️★★★ 戻し損ねると **以降の全試行が振幅 2 倍で走る**（★ 気づけない）。
+    CFG.invitation.amplitude_deg_peak_to_peak = savedAmp;
+  }
   push("★ 検査 1 は壊れた入力で赤になる（＝検査が効いている）",
     brokeDetected, `振幅を 2 倍にしたら検出: ${brokeDetected}`);
 
   /* --- 12. ⚠️ 刺激領域に禁止語が無い（D3 / ADR-018 D3） --- */
-  const stageText = ["stage-bt", "stage-fr", "stage-tr"]
-    .map((id) => $(id)?.parentElement?.textContent || "").join(" ");
+  // ⚠️★★★ 2026-09-08 修正（★ `code-reviewer` 指摘）: **走査対象を「箱」に変えた。**
+  //   ★ 旧実装は `$("stage-per").parentElement` = `#per-stage` を見ていたが、
+  //   ⚠️ **その子は canvas だけなので `textContent` は空文字** ——
+  //   ★ **ブロック 3 の文言は 1 文字も検査されていなかった**（＝ 空回り）。
+  //   → ★ 併せて **箱ごとに「抽出が空でないこと」** を見る（★ 空回りの再発防止）。
+  const boxes = ["fr-box", "bt-box", "tr-box", "per-box"];
+  const boxText = boxes.map((id) => ($(id)?.textContent || "").trim());
+  const emptyBoxes = boxes.filter((id, i) => boxText[i].length < 10);
+  const stageText = boxText.join(" ");
   const hits = CFG.forbidden_in_stimulus.filter((w) => stageText.includes(w));
-  push("⚠️ 刺激領域に禁止語（数値・達成・完了・残り 等）が無い",
-    hits.length === 0, hits.length ? `検出: ${hits.join(", ")}` : "なし");
+  push("⚠️ 刺激領域に禁止語（数値・達成・完了・残り 等）が無い（★ 4 ブロック分）",
+    hits.length === 0 && emptyBoxes.length === 0,
+    (hits.length ? `検出: ${hits.join(", ")}` : "なし")
+    + ` ／ 走査 ${stageText.length} 文字`
+    + (emptyBoxes.length ? ` ⚠️ 空の箱: ${emptyBoxes.join(", ")}` : ""));
+
+  /* --- 13. ★ 出題順の **交差**（★ 2026-09-08 に書き直した）
+   * ⚠️★★★ **書き直した理由**（★ `code-reviewer` HIGH 指摘）——
+   *   ★ 旧検査は「件数が均衡しているか」を見ていたが、⚠️ **件数は構成上どの seed でも必ず合う**
+   *   （`positions[i%2]` / `vids[i%2]` で作ってからシャッフルするので、置換は件数を変えない）。
+   *   → ★★★ **どの seed でも必ず緑 ＝ 空回りの検査だった。**
+   *   ⚠️ 実際、左右のシャッフルを外すと **「invitation はすべて左」という完全交絡**が生まれるのに、
+   *     件数の検査は緑のままだった。
+   * → ★ **危険なのは件数ではなく *交差* である。**★ かつ ⚠️★★★ **本番 seed 1 本で見ても
+   *   「偶然の均衡」と「構造的な均衡」を区別できない**ので、**50 seed で検算する。** */
+  const pord = buildPerOrder();
+  const PT2 = CFG.peripheral_test;
+  const pcross = {};
+  for (const o of pord) {
+    const key = o.eccentric ? "ecc" : "center";
+    pcross[o.level] = pcross[o.level] || {};
+    pcross[o.level][key] = (pcross[o.level][key] || 0) + 1;
+  }
+  const pEccOk = LEVELS.every((l) => pcross[l].ecc === PT2.trials / LEVELS.length);
+  const pCtrOk = LEVELS.every((l) => pcross[l].center === PT2.control_center_trials / LEVELS.length);
+  push("★ 周辺視: level × 条件（偏心 / 中心対照）の件数が config どおり",
+    pord.length === PT2.trials + PT2.control_center_trials && pEccOk && pCtrOk,
+    `${pord.length} 件 / ${JSON.stringify(pcross)}`);
+
+  /** ★ 出題順の交差の偏りを測る（★ 返り値が大きいほど交絡している）。 */
+  const crossDev = (rows, keyA, keyB, valsA) => Math.max(...valsA.map((a) => {
+    const sub = rows.filter((r) => keyA(r) === a);
+    const t = sub.filter(keyB).length, f = sub.length - t;
+    return Math.abs(t - f);
+  }));
+
+  // ⚠️★★★ 左右 × invitation（★ 偏心・layer0 を除く）—— ★ 50 seed で検算する
+  const savedPSeed = CFG.peripheral_test.order_seed;
+  let worstPos = 0, worstPosSeed = savedPSeed;
+  try {
+    for (let k = 0; k < 50; k++) {
+      CFG.peripheral_test.order_seed = savedPSeed + k * 7919;
+      const o = buildPerOrder().filter((x) => x.eccentric && x.level !== "layer0");
+      const d = crossDev(o, (r) => r.pos, (r) => r.invitation, PT2.positions);
+      if (d > worstPos) { worstPos = d; worstPosSeed = CFG.peripheral_test.order_seed; }
+    }
+  } finally {
+    CFG.peripheral_test.order_seed = savedPSeed;    // ⚠️ 戻し損ねると出題順が変わる
+  }
+  push("⚠️★★★ 周辺視: 左右 × invitation が **どの seed でも** 交絡しない（★ 50 seed で検算）",
+    worstPos <= 1, `最悪偏差 ${worstPos}（seed ${worstPosSeed}）`);
+
+  // ⚠️★★★ variant × invitation（★ 1b / 1b′・layer0 を除く）—— ★ 50 seed で検算する
+  const savedBSeed = CFG.blind_test.order_seed;
+  let worstVar = 0, worstVarSeed = savedBSeed;
+  try {
+    for (let k = 0; k < 50; k++) {
+      CFG.blind_test.order_seed = savedBSeed + k * 7919;
+      for (const off of [0, 5000]) {
+        const o = buildBlindOrder(off).filter((x) => x.level !== "layer0");
+        const d = crossDev(o, (r) => r.variant, (r) => r.invitation, vids);
+        if (d > worstVar) { worstVar = d; worstVarSeed = CFG.blind_test.order_seed; }
+      }
+    }
+  } finally {
+    CFG.blind_test.order_seed = savedBSeed;         // ⚠️ 戻し損ねると出題順が変わる
+  }
+  push("⚠️★★★ 1b / 1b′: variant × invitation が **どの seed でも** 交絡しない（★ 50 seed で検算）",
+    worstVar <= 1, `最悪偏差 ${worstVar}（seed ${worstVarSeed}）`);
+
+  push("⚠️ 周辺視・遷移とも variant が natural 固定である（★ 仕様。★ 変えたら赤になる）",
+    pord.every((o) => o.variant === "natural") && buildTransOrder().every((o) => o.variant === "natural"),
+    `周辺視 ${new Set(pord.map((o) => o.variant)).size} 種 / 遷移 ${new Set(buildTransOrder().map((o) => o.variant)).size} 種`);
+
+  /* --- 14. ⚠️★★★ 実施可否ゲートが「入らない偏心」で false になる（ルール 5b の 3 状態） --- */
+  const savedEcc = CFG.peripheral_test.eccentricity_deg;
+  let gZero, gHuge;
+  try {
+    CFG.peripheral_test.eccentricity_deg = 0;   gZero = perGeometry();
+    CFG.peripheral_test.eccentricity_deg = 90;  gHuge = perGeometry();
+  } finally {
+    CFG.peripheral_test.eccentricity_deg = savedEcc;
+  }
+  const gNow = perGeometry();
+  push("⚠️★★★ 偏心の実施可否ゲートが効いている（偏心 0 → 可 / 偏心 90° → 不可）",
+    gZero.ok === true && gHuge.ok === false,
+    `0°→${gZero.ok} / 90°→${gHuge.ok} / 現行 ${savedEcc}°→${gNow.ok}（必要 ${gNow.need.toFixed(0)} px / 利用可能 ${gNow.avail.toFixed(0)} px）`);
+  push("★ 偏心 px が較正から導かれている（1° = pxPerDeg）",
+    Math.abs(gNow.eccPx - savedEcc * CAL.pxPerDeg) < 1e-9,
+    `${gNow.eccPx.toFixed(2)} px = ${savedEcc}° × ${CAL.pxPerDeg.toFixed(2)} px/deg`);
+
+  /* --- 15. ⚠️ 中止メッセージの宛先がブロックごとに分かれている
+   * ★ 2026-09-08 追加。⚠️ **旧実装は `bt-state` にハードコードされており、
+   *   `1b′` の破棄メッセージが `1b` の欄に出ていた**（★ 誰も検査していなかった）。 */
+  const sv1 = $("bt-state").innerHTML, sv2 = $("bt2-state").innerHTML;
+  $("bt-state").innerHTML = ""; $("bt2-state").innerHTML = "";
+  logAbort("ROUTE-PROBE", true);
+  const rT = { a: $("bt-state").innerHTML, b: $("bt2-state").innerHTML };
+  $("bt-state").innerHTML = ""; $("bt2-state").innerHTML = "";
+  logAbort("ROUTE-PROBE", false);
+  const rF = { a: $("bt-state").innerHTML, b: $("bt2-state").innerHTML };
+  $("bt-state").innerHTML = sv1; $("bt2-state").innerHTML = sv2;
+  push("⚠️ 中止・破棄の告知が 1b と 1b′ で別の欄に出る（★ DOM 共有の実害の回帰）",
+    rT.b.includes("ROUTE-PROBE") && !rT.a.includes("ROUTE-PROBE") &&
+    rF.a.includes("ROUTE-PROBE") && !rF.b.includes("ROUTE-PROBE"),
+    `taught→${rT.b ? "1b′" : "?"} / untaught→${rF.a ? "1b" : "?"}`);
+
+  /* --- 16. ⚠️★★★ 中止ボタンが試行中に *押せる位置* にあるか（★ 対照つき）
+   * ★ 2026-09-08 追加。⚠️★★★ **これはブラウザ実測でしか出なかった欠陥である** ——
+   *   旧実装の中止ボタンは §3 の通常フローにあり、**オーバーレイの下 ＋ ビューポート外**で
+   *   到達不能だった。★ **ページ内 14 項目・Python 41 項目が緑のまま見逃していた。**
+   * → ★ `browser-verification` の「実物で出た欠陥は機械側にも置く」を適用する。
+   * ⚠️ 対照（`elementFromPoint` がそもそも効いているか）を同時に見る。 */
+  if (blockRunning()) {
+    push("⚠️★★★ 中止ボタンがオーバーレイ上で hit-test できる（★ 対照つき）", false,
+      "⚠️ ブロック実行中は検査できない（★ 実行中に走らせないこと）");
+  } else {
+    const wasHidden = $("bt-box").hidden;
+    overlayOn("bt-box", "★ 機械検算中（★ 試行ではありません）", () => {});
+    const ab = $("ovl-abort"), ctrl = $("stage-bt");
+    const ctr = (el) => { const b = el.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const hitAb = document.elementFromPoint(...ctr(ab));
+    const hitCt = document.elementFromPoint(...ctr(ctrl));
+    overlayOff("bt-box");
+    $("bt-box").hidden = wasHidden;
+    push("⚠️★★★ 中止ボタンがオーバーレイ上で hit-test できる（★ 対照つき）",
+      !!hitAb && (hitAb === ab || ab.contains(hitAb)) && hitCt === ctrl,
+      `中止=${hitAb ? (hitAb.id || hitAb.tagName) : "null"} / 対照=${hitCt ? (hitCt.id || hitCt.tagName) : "null"}`);
+  }
+
+  /* --- 17. ⚠️★★★ `overlayOff` が「他人のオーバーレイ」を壊さない（★ M-2 の回帰）
+   * ★ 2026-09-08 追加（`security-checker` 指摘）。
+   * ⚠️ 旧実装は `#ovl-abort` を id で無条件に消すので、**生きている別ブロックの中止ボタンが消えた**。
+   * ★ 対照つき: **正しい箱に対して呼べば、ちゃんと片付く**ことも同時に見る
+   *   （⚠️ でないと「常に何もしない」実装でも緑になる）。 */
+  if (blockRunning()) {
+    push("⚠️★★★ overlayOff が他ブロックのオーバーレイを壊さない（★ 対照つき）", false,
+      "⚠️ ブロック実行中は検査できない");
+  } else {
+    const wasHidden2 = $("tr-box").hidden;
+    overlayOn("tr-box", "★ 機械検算中（★ 試行ではありません）", () => {});
+    const survived = (overlayOff("bt-box"), !!$("ovl-abort") && blockRunning());
+    overlayOff("tr-box");                        // ★ 正しい箱なら片付く（＝ 対照）
+    const cleaned = !$("ovl-abort") && !blockRunning();
+    $("tr-box").hidden = wasHidden2;
+    push("⚠️★★★ overlayOff が他ブロックのオーバーレイを壊さない（★ 対照つき）",
+      survived && cleaned,
+      `他の箱で呼んでも生存=${survived} / 正しい箱で片付く=${cleaned}`);
+  }
+
+  /* --- 18. ⚠️★★★ 検査自身が `CFG` を壊したまま終わっていないか
+   * ★ 2026-09-08 追加（★ `code-reviewer` LOW 指摘）。
+   * ⚠️ 本検査は振幅・偏心・seed を **わざと壊して** 効きを見る。
+   *   → ★ **戻し損ねると、以降の試行が黙って別の条件で走る。**★ それを最後に確かめる。 */
+  push("⚠️★★★ 機械検算が CFG を元に戻して終わっている",
+    CFG.invitation.amplitude_deg_peak_to_peak === savedAmp
+    && CFG.peripheral_test.eccentricity_deg === savedEcc
+    && CFG.peripheral_test.order_seed === savedPSeed
+    && CFG.blind_test.order_seed === savedBSeed,
+    `振幅 ${CFG.invitation.amplitude_deg_peak_to_peak} / 偏心 ${CFG.peripheral_test.eccentricity_deg}`
+    + ` / seed ${CFG.peripheral_test.order_seed}・${CFG.blind_test.order_seed}`);
 
   REC.selftest = out;
   const okN = out.filter((o) => o.ok).length;
@@ -1303,7 +2041,7 @@ function selftest() {
  * 13. 書き出し
  * ============================================================ */
 function exportJSON() {
-  REC.calibration = { ...CAL };
+  if (!REC.calibration) REC.calibration = { ...CAL };   // ★ ロック時の値を優先する
   REC.theme = THEME;
   REC.inv_coding = INV_CODING;
   // ⚠️★★★ 事前露出の申告を結果に刻む（★ 隠して回すほうが有害）
@@ -1319,12 +2057,20 @@ function exportJSON() {
     hmm_version: CFG.hmm_version,
     config_echo: {
       stimulus: CFG.stimulus, invitation: CFG.invitation,
-      levels: CFG.levels, blind_test: CFG.blind_test, transition_test: CFG.transition_test
+      levels: CFG.levels, blind_test: CFG.blind_test, transition_test: CFG.transition_test,
+      peripheral_test: CFG.peripheral_test
     },
     ...REC,
     finished_at: new Date().toISOString(),
     ua: navigator.userAgent,
     dpr: window.devicePixelRatio,
+    // ⚠️★★★ `env.md` の項目 6 が「窓の幅で周辺視が開くかが決まる」と宣言したので、**実測値を残す**
+    //   （★ `code-reviewer` 指摘 —— ★ 残さないと「開かなかったのか / 読めなかったのか」を事後に分けられない）。
+    viewport: { innerWidth: window.innerWidth, innerHeight: window.innerHeight },
+    peripheral_geometry: (() => { const g = perGeometry();
+      return { eccentricity_deg: CFG.peripheral_test.eccentricity_deg,
+               ecc_px: +g.eccPx.toFixed(2), need_px: +g.need.toFixed(2),
+               avail_px: +g.avail.toFixed(2), feasible: g.ok }; })(),
     limitations: [
       ...($("chk-exposed").checked
         ? ["⚠️★★★ 判定者は実施前に写像を見ていた（自己申告）。★ ブロック 1b（未教示）は無効であり、"
@@ -1335,7 +2081,19 @@ function exportJSON() {
       "★ 判定者は N=1（研究者本人）。★ 設計文脈を知っており、語彙については盲ではない。",
       "⚠️ 実機のロック画面ではなく PC のブラウザ上の正方領域で提示している。",
       "⚠️ iOS はロック画面ウィジェットを強制的に monochrome にする（2026-09-02 一次実測）ため、実機は本ハーネスより符号が痩せる。",
-      "⚠️ 周辺視条件は本ハーネスに実装していない（中心視のみ）。",
+      "⚠️★★★ 周辺視ブロック（A-4）は【教示後（本人）】である。★ オンボーディングの後にしか開かないので、"
+        + "PS-Q5 の『他者が読める上限』の材料には使えない。",
+      "⚠️★★★ 周辺視ブロック（A-4）の固視は検証していない（★ アイトラッカーが無い）。★ 提示を短くし・左右をランダム化し・"
+        + "同じ提示時間の中心対照を同じブロックに置いて凌いでいるが、★ 判定者が視線を動かした可能性は排除できない。",
+      "⚠️ 周辺視ブロックの提示は " + CFG.peripheral_test.stimulus_ms + " ms で、1b / 1b′ の "
+        + CFG.stimulus.stimulus_ms + " ms とは直接比較できない（★ 比較はブロック内の中心対照との間で行う）。"
+        + " ⚠️ この値に一次の裏づけは無い（★ 設計判断である）。",
+      ...(INV_CODING === "oscillation" && perInvCycles() < 1
+        ? ["⚠️★★★ 周辺視ブロックの提示は振動符号の " + perInvCycles().toFixed(2)
+           + " 周期しかない。★ 本ブロックの invitation は振動符号を測れていない。"]
+        : []),
+      "⚠️ 遷移ブロック（A-8）と周辺視ブロック（A-4）は variant = natural に固定してある（★ 仕様）。"
+        + "★ 逆極性での遷移検知・偏心読解は測っていない。",
       "⚠️ [P85] G3 の 1° は片振幅か全振幅かを書き分けていない。本ハーネスは全振幅として実装した。"
     ]
   };
@@ -1368,7 +2126,7 @@ async function boot() {
   THEME = CFG.render.default_theme;
 
   const S = CFG.stimulus;
-  for (const id of ["stage-fr", "stage-bt", "stage-tr"]) {
+  for (const id of ["stage-fr", "stage-bt", "stage-tr", "stage-per"]) {
     $(id).width = S.canvas_css_px; $(id).height = S.canvas_css_px;
   }
   $("bt-n").textContent = LEVELS.reduce((s, l) => s + CFG.blind_test.composition[l], 0);
@@ -1381,17 +2139,32 @@ async function boot() {
   $("bt-ch").textContent = pct(CFG.blind_test.chance_level_4way);
   $("tr-n").textContent = CFG.transition_test.trials;
   $("tr-catch").textContent = CFG.transition_test.catch_trials;
+  const PT = CFG.peripheral_test;
+  $("per-ecc").textContent = PT.eccentricity_deg;
+  $("per-n").textContent = PT.trials + PT.control_center_trials;
+  $("per-ne").textContent = PT.trials;
+  $("per-nc").textContent = PT.control_center_trials;
+  $("per-ms").textContent = PT.stimulus_ms;
+  $("per-mask").textContent = S.mask_ms;
   $("fr-context").textContent = "★ 文脈: " + CFG.free_response.context_sentence;
   $("fr-prompt").textContent = CFG.free_response.prompt;
   $("btn-fr-dk").textContent = CFG.free_response.dont_know_label;
 
   // ★ 応答ボタンを組み立てる（⚠️ 順序は固定。★ 「わからない」は強制選択には置かない）
-  $("bt-lvl").innerHTML = LEVELS.map((l) =>
+  //   ⚠️★★★ **文言は 1 か所でしか作らない** —— ★ ブロックごとに書くと、
+  //   **片方だけ直して気づかない**（★ 本ハーネスは「同じものが 2 か所」で既に 1 度やられている）。
+  const levelChoicesHTML = () => LEVELS.map((l) =>
     `<button class="choice" data-lv="${l}">${LEVEL_JA[l].split("（")[0]}</button>`).join("");
-  $("bt-inv").innerHTML =
+  const invChoicesHTML = () =>
     `<button class="choice" data-inv="1">あった</button><button class="choice" data-inv="0">なかった</button>`;
+  $("bt-lvl").innerHTML = levelChoicesHTML();
+  $("bt-inv").innerHTML = invChoicesHTML();
+  $("per-lvl").innerHTML = levelChoicesHTML();
+  $("per-inv").innerHTML = invChoicesHTML();
   $("bt-lvl").addEventListener("click", (e) => { if (e.target.dataset.lv) btAnswerLevel(e.target.dataset.lv); });
   $("bt-inv").addEventListener("click", (e) => { if (e.target.dataset.inv) btAnswerInv(e.target.dataset.inv === "1"); });
+  $("per-lvl").addEventListener("click", (e) => { if (e.target.dataset.lv) perAnswerLevel(e.target.dataset.lv); });
+  $("per-inv").addEventListener("click", (e) => { if (e.target.dataset.inv) perAnswerInv(e.target.dataset.inv === "1"); });
   $("tr-resp").addEventListener("click", (e) => { if (e.target.dataset.tr) trAnswer(e.target.dataset.tr === "1"); });
 
   $("cal-slider").addEventListener("input", calRefresh);
@@ -1402,7 +2175,10 @@ async function boot() {
     $("cal-state").innerHTML = '<span class="ok">較正済み</span>';
     $("btn-fr-start").disabled = false;
     $("btn-self").disabled = false;
+    perSyncButton();          // ★ 較正が変われば偏心の実施可否も変わる
   });
+  // ⚠️ 窓の大きさが変われば「偏心が入るか」が変わる（★ 実測: 958 px 幅では入らない）
+  window.addEventListener("resize", () => { if (!per) perSyncButton(); });
 
   // ★ invitation 符号の選択（★ 既定は aperture = ADR-022 D1 の帰結）
   INV_CODING = "aperture";
@@ -1413,7 +2189,7 @@ async function boot() {
       ? '<span class="ok">aperture（★ ADR-022 D1 の第 1 版）</span>'
       : '<span class="warn">⚠️ oscillation（★ 第 1 版の符号ではない。対照用）</span>';
   };
-  $("sel-inv").addEventListener("change", invRefresh);
+  $("sel-inv").addEventListener("change", () => { invRefresh(); perRefresh(); });
   invRefresh();
 
   // ★ 事前露出の申告
@@ -1431,17 +2207,18 @@ async function boot() {
   $("btn-fr-dk").addEventListener("click", () => frNext(true));
   $("btn-bt-start").addEventListener("click", () => btStart(false));
   $("btn-bt2-start").addEventListener("click", () => btStart(true));
-  $("btn-bt-abort").addEventListener("click", btAbort);
   $("btn-ob-done").addEventListener("click", () => {
     $("btn-ob-done").disabled = true;
     $("btn-bt2-start").disabled = false;
   });
   $("btn-tr-start").addEventListener("click", trStart);
+  $("btn-per-start").addEventListener("click", perStart);
   $("btn-res").addEventListener("click", showResults);
   $("btn-export").addEventListener("click", exportJSON);
   $("btn-self").addEventListener("click", selftest);
 
   calRefresh();
+  perRefresh();
 }
 boot();
 </script>

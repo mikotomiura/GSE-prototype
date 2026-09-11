@@ -206,7 +206,7 @@ HMM は Writing Head の**一候補**であり GSE 全体の ontology ではな�
 ### 理論接地 = 機会保存（learning ではない）
 GSE が主張するのは「摩擦が能力・学習を**育てる**」ではなく「**反射的な外部依存（即座の AI/検索オフロード）を
 減らし、自力で解こうとする試行が発生する機会を保存する**」こと。**行動指標**（`external_paste_after_stuck` /
-`self_recovery_without_paste` / `manual_contribution_ratio`）で測る。[P12] Kapur・[P9] Bjork は
+`pflow_exit_without_receipt` / `manual_contribution_ratio`）で測る。[P12] Kapur・[P9] Bjork は
 「**守るべき困難が存在することの根拠**」に用い、「摩擦が学習を生む」の効果的接地には使わない
 （PS-I メタ分析は摩擦単独の学習効果を支持しない [P27][P28]）。学習効果は将来の探索トラック
 （research-positioning §8）。
@@ -252,7 +252,7 @@ Go → Writing Adapter の X1 証拠として保存。Inconclusive/DataInsuffici
   — Phase1 較正の実測を受けた X 軸の再定義（`self_directed_recovery_risk`）、オンライン更新の層別境界、
   潜在状態の扱い、反証ゲート。**本書の 7 層（§2）と Epic ロードマップ（§6）は変更しない**（Layer 4 出力への
   additive 追加の提案に留まる）。決定は ADR-008 / ADR-009
-- 設計判断: `docs/adr/README.md`（**ADR-001〜018**）
+- 設計判断: `docs/adr/README.md`（**ADR-001〜025**）
 - 研究の主張・エビデンス: `docs/research-positioning.md`
 - 現行実態: `.steering/20260724-epic0-repo-reality-check/`
 - 昇格元（歴史資料）: `~/Downloads/GSE_Post_Phase1_Improvement_Design_v0.1.md`

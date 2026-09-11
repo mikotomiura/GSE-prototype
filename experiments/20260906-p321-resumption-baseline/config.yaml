@@ -1,0 +1,52 @@
+# experiments/20260906-p321-resumption-baseline/config.yaml
+#
+# ⚠️★★★ HMM 閾値・α・β・ゲート定数は **存在しない**。
+#   ★ 本実験は GSE の推定器を 1 度も通さない (外部の人手コーディング済みデータの集計)。
+#   → docs/experiment-tracking.md の「全ハイパーパラメータ」は下記の
+#     **抽出上の判断 (operationalization)** に読み替える。→ notes.md §5
+
+source:
+  citation: "[P321]"
+  arxiv: "2105.02162v1"
+  figshare_article: 14068802
+  figshare_file: 26553647
+
+# --- episode の作り方 ------------------------------------------------------
+episode:
+  # ★ 一次: codingBookFSE2021.pdf "Did the developer fix the bug completely?" / "How did the session start ?"
+  # ⚠️ DF7 (returns from other activity) で始まる block は新しい episode ではなく、
+  #    直前に DF4 (interrupted during the episode) で途切れた episode の *続き*。
+  merge_resumed_blocks: true          # 109 block -> 89 episode
+  merge_scope: session                # ★ セッションを跨いで畳まない
+  merge_order: lifo                   # ⚠️ 実測で同時に開く episode は最大 1 なので lifo/fifo は同値
+  sort_annotations_by_start_time: true  # ⚠️ 15 中 6 セッションは配列順 != 時刻順 (実測)
+
+# --- 「fix に至った」の定義 -------------------------------------------------
+fixed:
+  primary: ["DF1"]                    # DF1: Yes.
+  sensitivity: ["DF1", "DF2"]         # ⚠️ DF2 = "Mostly yes, ... decides to leave" は解決と放棄の中間
+
+# --- 「外部資源の参照 (受領の代理)」の定義 ---------------------------------
+external_resource:
+  # ★ 一次: codebook の "Interacting with external resources" (U1..U8)
+  primary: strict                     # sub-annotation title == "Seeking information"
+  sensitivity: broad                  # ⚠️ 加えて title=="Others" かつ記述に U コードがあるもの (実測 19 件)
+
+# --- 検算 (A) の期待値 -----------------------------------------------------
+# ⚠️★★★ ここが合わなければ R0 / R1 を信用しない。run.sh は exit != 0 で止まる。
+check_A:
+  episodes: 89                        # 論文 §4 逐語 "89 distinct debugging episodes"
+  debug_activities: 2137              # 論文 §4 逐語 (⚠️ 実測 2136。許容 1)
+  activities_per_episode_avg: 24      # 論文 §4 逐語 "24 (+-37)"
+  origin_reported: 10
+  origin_inserted: 79                 # 論文 §4.1 逐語 "the remaining 79 debugging episodes"
+  nofix_rate_reported: 0.50           # 論文 §4.1 逐語 "Half of debugging episodes triggered by reported defects"
+  nofix_rate_inserted: 0.14           # 論文 §4.1 逐語 "14% did not conclude with a successful fix"
+  # ★ 活動の対応づけ ("Seeking information" == "Consulting External Resources") の検算
+  ext_freq_range: [0, 16]             # 論文 Table 4
+  ext_time_frac_avg: 0.03             # 論文 Table 4
+  ext_time_frac_max: 0.59             # 論文 Table 4
+  ext_occurrence_secs_avg: 35         # 論文 Table 5
+
+hmm_version: "N/A (HMM を通さない)"
+seed: "N/A (乱数要素なし)"

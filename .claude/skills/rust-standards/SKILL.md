@@ -8,7 +8,7 @@ description: >
   - エラーハンドリング (anyhow::Result) を追加・変更するとき
   - ログ出力 (tracing) を追加・変更するとき
   - 新しい crate を Cargo.toml に追加するとき
-  - hook.rs / ime.rs / features.rs / engine.rs / logger.rs / wall_server.rs を編集するとき
+  - hook.rs / ime.rs / features.rs / engine.rs / logger.rs / metrics.rs を編集するとき
 allowed-tools: Read, Grep, Glob, Edit
 ---
 
@@ -133,7 +133,7 @@ tracing::info!("key pressed");            // バッファ操作を伴う場合�
 | 変数・関数 | snake_case | `last_key_ms`, `start_hook()` |
 | 型・構造体・トレイト | PascalCase | `InputEvent`, `FeatureExtractor` |
 | 定数・static | SCREAMING_SNAKE_CASE | `LAST_KEY_MS`, `IME_OPEN` |
-| ファイル | snake_case.rs | `wall_server.rs`, `features.rs` |
+| ファイル | snake_case.rs | `probe_scheduler.rs`, `features.rs` |
 
 ---
 

@@ -1,0 +1,78 @@
+# experiments/20260906-interruption-resumption-arm1/config.yaml
+#
+# ★ M1: 「中断 → 再開」の観測 (第 1 弾 = 離席候補アームのみ)。
+# ⚠️★★★ 本ファイルは **設計上のパラメータ**であり、Step 2b (本解析) は未実装である。
+
+observation_unit: "interruption -> resumption"   # ADR-023 D2
+
+# --- 粒度 (★ 3 つとも実装済み。⚠️ 第 1 弾は away_candidate のみ使う) ------------
+granularity:
+  pause:
+    threshold_ms: 2000
+    source: "src-tauri/src/analysis/features.rs:276"
+    used_in_arm1: false            # ⚠️ 粒度を混ぜると D4 と同型の相殺が起きうる
+  silence_segment:
+    source: "src-tauri/src/analysis/loop_step.rs:24 (SilencePath)"
+    used_in_arm1: false
+  away_candidate:
+    threshold_ms: 180000           # ★ AWAY_IDLE_MS
+    source: "src-tauri/src/analysis/intervention.rs:10"
+    used_in_arm1: true
+
+# --- アーム (ADR-023 D4: 併合しない) -------------------------------------------
+arms:
+  away_candidate:
+    enabled: true
+deferred:
+  focus_transition:
+    enabled: false
+    # ⚠️★★★ 「0 件だから」ではない。★ 計器が収集の後に作られた。
+    reason: "capabilities_gate.py -> INSTRUMENT_ABSENT (exit 4). observe.rs の初出は 2026-08-24、収集は 2026-04〜07。"
+    unblocked_by: "新規収集 (capabilities 宣言を持つビルド)"
+
+# --- エピソード / 回復の定義 (★ 一次は metrics.rs) ------------------------------
+episode:
+  p_stuck_trigger: 0.60            # metrics.rs:154 (使用箇所 :264)
+  merge_gap_ms: 30000              # metrics.rs
+  recovery_window_ms: 300000       # ★ metrics.rs:156 の `OutcomeConfig::default()` (5 分)
+  # ⚠️★★★ **同名で別物が併存する** (code-reviewer M-7):
+  #   metrics.rs:12 `DEFAULT_RECOVERY_WINDOW_MS = 15 * 60 * 1000` (15 分) は
+  #   `intervention_eval` 側が使う定数であり、★ **本アームが使うのは 5 分のほう**。
+  #   ★ Step 2b の実装者が 15 分を掴まないよう、行番号まで書く。
+  p_flow_threshold: 0.5            # metrics.rs:15 (使用箇所 :451)
+  # ⚠️★★★ トリガーと回復は独立した 2 測定ではなく、同じ事後分布の相補領域である。
+  #   engine.rs:439-444 (Forward 正規化) / engine.rs:465-473 (EMA 凸結合 + 再正規化)
+  #   → notes.md §5 の定型文をレポートに必ず貼る (ADR-023 D7)。
+
+# --- 受領 (receipt) ------------------------------------------------------------
+receipt:
+  implementation: "PasteEvent (timestamp + chars のみ)"   # metrics.rs:166
+  # ⚠️★★★ CGT 挿入 / suggestion accept を足さない (data-privacy ルール 7・別 ADR の主題)
+  forbidden_extensions: ["cgt_insert", "suggestion_accept", "completion_accept"]
+  known_undercount: "スマホで見て手打ちすると立たない (ADR-023 計器の問題 4)"
+
+# --- アウトカム (ADR-023 D6 が決めた名前と形) -----------------------------------
+outcomes:
+  primary:
+    name: receipt_free_resumption
+    form: "生存時間 / 競合リスク (CIF at 5min / 10min)"
+  secondary:
+    name: stuck_exit_without_receipt
+    form: "二値率"
+    note: "⚠️ 主要評価にしない"
+  control_required:
+    name: manual_contribution_ratio
+    source: "metrics.rs:338"
+    note: "★★★ 推定に一切依存しない唯一の指標。必ず併報する"
+
+# --- ★ B1 由来: 分子の形を並べて出す (notes.md §6) ------------------------------
+report_forms:
+  - id: R0     # 分子=受領なし (成果を要求しない) / 分母=全エピソード
+  - id: R0p    # 分子=回復 かつ 受領なし / 分母=全エピソード  <- self_recovery_without_paste
+  - id: R1     # 分子=回復 かつ 受領なし / 分母=回復したエピソード
+denominators_required:                                  # ADR-023 D8
+  - stuck_episode_count
+  - recovered_episode_count
+  - difference
+
+seed: "N/A (乱数要素なし)"

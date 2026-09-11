@@ -56,8 +56,8 @@ GSE の実装タスクに共通する骨格を一箇所に集約し、各ワー�
 | `*.tsx` / `*.ts` を書く / 修正する | `typescript-standards` |
 | `features.rs` / `engine.rs` の特徴量・HMM | `hmm-analysis` |
 | `*.rs` を新規追加 / モジュール境界変更 | `architecture-rules` |
-| `logger.rs` / `hook.rs` / `wall_server.rs` / 外部送信 | `data-privacy` |
-| 介入ロジック / Nudge / Wall | `intervention-design` |
+| `logger.rs` / `hook.rs` / `redaction.rs` / `recording.rs` / 外部送信 | `data-privacy` |
+| 介入ロジック / Nudge（⚠️ Wall は ADR-015 で削除済み） | `intervention-design` |
 | ML チューニング / ONNX 移行 | `ml-workflow` |
 | コミット / ブランチ / PR | `git-workflow` |
 
@@ -156,7 +156,7 @@ Task: test-runner で cargo test --workspace を実行し、失敗・警告の�
 ```
 Task 1: code-reviewer で変更ファイルをレビュー（docs/development-guidelines.md 参照）
 Task 2: security-checker で変更ファイルのセキュリティチェック
-        ※ logger.rs / hook.rs / wall_server.rs を変更した場合は必須
+        ※ logger.rs / hook.rs / redaction.rs / recording.rs を変更した場合は必須
 ```
 
 対応基準:
