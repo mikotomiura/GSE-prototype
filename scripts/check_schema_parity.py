@@ -147,7 +147,38 @@ def _emit_machine_status(rc: int, enabled: bool) -> None:
         print(f"HELPER_EXITCODE={rc}")
 
 
+def _make_stdio_encoding_safe() -> None:
+    """Windows の cp932 コンソールで **drift の中身を出す前に落ちる**のを防ぐ。
+
+    ⚠️★★★ 2026-09-11 に実測した不具合:
+    `schema/current.json` の `description` には日本語の全角ダッシュ (U+2014 `—`) が
+    入っており、cp932 の stdout へ `print(diff)` した瞬間に `UnicodeEncodeError` で
+    **トレースバックだけ出して終わる**。
+
+    → ⚠️ 本スクリプトの唯一の仕事である「**何がどう drift したか**」と
+    「**どう直すか**」が **1 行も表示されない**。★ しかも `sync-all` の pre-flight
+    なので、操作者はここで止まったまま次に何をすべきか分からない。
+
+    ⚠️ 終了コードは Python の例外でも 1 になるため fail-closed 自体は保たれていた
+    (= 壊れたまま同期は進まない)。★ 直すのは**報告の可読性**である。
+
+    `errors="replace"` にしてあるのは、⚠️ **表示できない文字があっても
+    報告を止めない**ため (差分の中身より「止まらないこと」が優先)。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            # ⚠️ 差し替えられた stdout (テストの StringIO 等) には無い。★ 何もしない。
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            # ⚠️ 再設定できない環境でも**本処理は続ける** (報告が化けるだけ)。
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _make_stdio_encoding_safe()
     parser = argparse.ArgumentParser(
         description="Verify schema parity between gse-prototype and gse-dataset.",
     )
