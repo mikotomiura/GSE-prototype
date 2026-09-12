@@ -64,9 +64,33 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 # Owners exempt from SHA pinning, with the reason recorded in ci.yml.
 FIRST_PARTY_PREFIX = "actions/"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+# The exemption is for *release tags*, not for anything at all. `actions/x@main`
+# is a branch, and a branch is exactly what F-8 was raised about
+# (`dtolnay/rust-toolchain@stable` was a branch, not even a tag).
+FIRST_PARTY_TAG_RE = re.compile(r"^v\d+(?:\.\d+){0,2}$")
+# `docker://image@sha256:<64 hex>` is immutable too; saying "not a 40-character
+# commit SHA" about a container digest would be actively misleading.
+DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 # Workflows that must never run on a self-hosted runner.
 HOSTED_ONLY = {"supply-chain.yml"}
+# A hosted runner is named `ubuntu-*` / `windows-*` / `macos-*`. Everything else
+# -- a bare custom label, an expression, a runner group -- is NOT provably
+# hosted. Listing self-hosted labels instead would be a denial list, and
+# `runs-on: gse-win` (no `self-hosted` label at all) would walk straight past it.
+HOSTED_LABEL_RE = re.compile(r"^(?:ubuntu|windows|macos)-[\w.]+$", re.IGNORECASE)
+# Composite actions live outside .github/workflows and are exempt as `./...`,
+# so their own `uses:` lines would otherwise be a blind spot.
+ACTION_DIR = REPO_ROOT / ".github" / "actions"
+
+# Jobs allowed to hold a write scope, and which one. F-5 was not about
+# *declaring* permissions -- it was about not holding broad ones. With a
+# top-level `permissions:` in place, a presence-only check can never fire again,
+# so the breadth is what gets checked.
+WRITE_ALLOWED: Dict[Tuple[str, str], set] = {
+    # Creates the GitHub Release; see the note in ci.yml.
+    ("ci.yml", "release"): {"contents"},
+}
 
 
 class ParseError(RuntimeError):
@@ -91,8 +115,58 @@ def load_workflows(directory: Path) -> List[Tuple[str, dict]]:
     return out
 
 
+def permission_violations(workflow: str, job_name: str, perms: object) -> List[str]:
+    """Invariant (1): an effective, and narrow, `permissions`."""
+    where = workflow + " / " + job_name + ": "
+    if perms is None:
+        return [
+            where + "no effective `permissions`"
+            " (declare it on the job, or once at the top level)"
+        ]
+    if isinstance(perms, str):
+        if perms == "read-all":
+            return []
+        return [
+            where + "`permissions: " + perms + "` grants every scope."
+            " Use `read-all`, or list only the scopes this job needs."
+        ]
+    if not isinstance(perms, dict):
+        return [where + "`permissions` is neither a mapping nor a keyword"]
+    allowed = WRITE_ALLOWED.get((workflow, job_name), set())
+    return [
+        where + "grants `" + str(k) + ": " + str(v) + "`, which is not in the"
+        " allowlist for this job. If it is genuinely needed, add it to"
+        " WRITE_ALLOWED with the reason."
+        for k, v in sorted(perms.items())
+        if str(v) == "write" and k not in allowed
+    ]
+
+
+def _is_provably_hosted(runs_on: object) -> bool:
+    """True only when every label is a GitHub-hosted runner image.
+
+    Deliberately an allow list. `runs-on` has four shapes -- a string, a list, a
+    `{group:, labels:}` mapping, and an expression resolved at run time -- and
+    only the first two can be decided here. Asking "does it say self-hosted?"
+    lets `runs-on: gse-win` (a self-hosted label that never spells out
+    `self-hosted`) and `runs-on: ${{ ... }}` through, which is exactly the shape
+    `ci.yml`'s `check` job already uses.
+    """
+    labels = runs_on if isinstance(runs_on, list) else [runs_on]
+    return bool(labels) and all(
+        isinstance(x, str) and HOSTED_LABEL_RE.match(x.strip()) for x in labels
+    )
+
+
 def _uses_ref(uses: str) -> Tuple[str, str]:
-    """`"owner/repo@ref # comment"` -> `("owner/repo", "ref")`."""
+    """`"owner/repo@ref # comment"` -> `("owner/repo", "ref")`.
+
+    The comment stripping is for hand-written fixtures only: real YAML has
+    already removed `# ...` before this sees the value (measured). The version
+    comment that humans actually rely on is guarded from the raw file text in
+    `TestRealRepository`, not here -- so do not read the comment branch as
+    coverage of that.
+    """
     token = uses.split("#", 1)[0].strip()
     if "@" not in token:
         return token, ""
@@ -100,10 +174,46 @@ def _uses_ref(uses: str) -> Tuple[str, str]:
     return name, ref
 
 
-def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, int]]:
+def load_composite_actions(directory: Path) -> List[Tuple[str, dict]]:
+    """Read `.github/actions/*/action.yml`.
+
+    These are referenced as `./...`, which invariant (2) exempts -- correctly,
+    since they live in this repo. But *their* `uses:` lines are not in this repo
+    and nothing else looks at them, so a third-party action added inside one
+    would be completely invisible. `disk-guard` in particular runs
+    unconditionally on the machine that holds the participant key.
+    """
+    if not directory.is_dir():
+        return []
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover
+        raise ParseError("PyYAML is required: " + str(exc)) from exc
+    out: List[Tuple[str, dict]] = []
+    for path in sorted(directory.glob("*/action.y*ml")):
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ParseError(str(path) + ": " + str(exc)) from exc
+        if not isinstance(data, dict):
+            raise ParseError(str(path) + ": top level is not a mapping")
+        out.append((str(path.relative_to(REPO_ROOT)).replace("\\", "/"), data))
+    return out
+
+
+def check(
+    workflows: Sequence[Tuple[str, dict]],
+    composites: Sequence[Tuple[str, dict]] = (),
+) -> Tuple[List[str], Dict[str, int]]:
     """Return `(violations, counters)`."""
     violations: List[str] = []
-    counters = {"workflows": 0, "jobs": 0, "uses": 0, "third_party": 0}
+    counters = {
+        "workflows": 0,
+        "jobs": 0,
+        "uses": 0,
+        "third_party": 0,
+        "composites": 0,
+    }
 
     for name, data in workflows:
         counters["workflows"] += 1
@@ -119,21 +229,32 @@ def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, i
                 violations.append(name + " / " + job_name + ": job is not a mapping")
                 continue
 
-            # (1) effective permissions
-            if job.get("permissions") is None and top_permissions is None:
-                violations.append(
-                    name + " / " + job_name + ": no effective `permissions`"
-                    " (declare it on the job, or once at the top level)"
-                )
+            # (1) effective permissions -- present AND narrow
+            effective = job.get("permissions")
+            if effective is None:
+                effective = top_permissions
+            violations.extend(permission_violations(name, job_name, effective))
 
             # (3) hosted-only workflows
-            runs_on = str(job.get("runs-on", ""))
-            if name in HOSTED_ONLY and "self-hosted" in runs_on:
+            if name in HOSTED_ONLY and not _is_provably_hosted(job.get("runs-on")):
                 violations.append(
-                    name + " / " + job_name + ": runs on a self-hosted runner."
+                    name + " / " + job_name + ": `runs-on: "
+                    + str(job.get("runs-on"))
+                    + "` is not provably a GitHub-hosted runner."
                     " This workflow must stay hosted -- the self-hosted machine holds"
-                    " the participant decryption key."
+                    " the participant decryption key. Spell out `ubuntu-*` /"
+                    " `windows-*` / `macos-*`; anything undecidable is a violation"
+                    " rather than assumed safe."
                 )
+
+            steps = job.get("steps")
+            if steps is not None and not isinstance(steps, list):
+                violations.append(
+                    name + " / " + job_name + ": `steps` is "
+                    + type(steps).__name__
+                    + ", not a list"
+                )
+                steps = []
 
             # (2) third-party actions pinned to a commit SHA.
             #     A job can reference something in two places: each step's
@@ -143,7 +264,7 @@ def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, i
             #     action, since it brings its own jobs.
             step_uses = [
                 s.get("uses")
-                for s in (job.get("steps") or [])
+                for s in (steps or [])
                 if isinstance(s, dict) and s.get("uses")
             ]
             if job.get("uses"):
@@ -151,9 +272,27 @@ def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, i
             for uses in step_uses:
                 counters["uses"] += 1
                 action, ref = _uses_ref(str(uses))
-                if action.startswith("./") or action.startswith(FIRST_PARTY_PREFIX):
+                if action.startswith("./"):
+                    continue
+                if action.startswith(FIRST_PARTY_PREFIX):
+                    if not FIRST_PARTY_TAG_RE.match(ref):
+                        violations.append(
+                            name + " / " + job_name + ": `" + action
+                            + "` is exempt from SHA pinning only on a release tag"
+                            " (`vN[.N[.N]]`), but is pinned to `"
+                            + (ref or "(nothing)")
+                            + "`. A branch is exactly what F-8 was raised about."
+                        )
                     continue
                 counters["third_party"] += 1
+                if action.startswith("docker://"):
+                    if not DIGEST_RE.match(ref):
+                        violations.append(
+                            name + " / " + job_name + ": container `" + action
+                            + "` is pinned to `" + (ref or "(nothing)")
+                            + "`, not a `sha256:` digest."
+                        )
+                    continue
                 if not SHA_RE.match(ref):
                     violations.append(
                         name + " / " + job_name + ": third-party reference `" + action
@@ -162,15 +301,62 @@ def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, i
                         " A tag or branch can be moved by whoever controls the upstream"
                         " account, and these run where the participant key lives."
                     )
+
+    # Composite actions: only invariant (2) applies (they have no jobs,
+    # permissions or runners of their own).
+    for name, data in composites:
+        counters["composites"] += 1
+        steps = ((data.get("runs") or {}).get("steps")) or []
+        if not isinstance(steps, list):
+            violations.append(name + ": `runs.steps` is not a list")
+            continue
+        for step in steps:
+            if not isinstance(step, dict) or not step.get("uses"):
+                continue
+            counters["uses"] += 1
+            action, ref = _uses_ref(str(step["uses"]))
+            if action.startswith("./"):
+                continue
+            if action.startswith(FIRST_PARTY_PREFIX):
+                if not FIRST_PARTY_TAG_RE.match(ref):
+                    violations.append(
+                        name + ": `" + action + "` is exempt only on a release tag,"
+                        " but is pinned to `" + (ref or "(nothing)") + "`."
+                    )
+                continue
+            counters["third_party"] += 1
+            if not SHA_RE.match(ref):
+                violations.append(
+                    name + ": third-party reference `" + action + "` is pinned to `"
+                    + (ref or "(nothing)")
+                    + "`, not a 40-character commit SHA. This composite action runs"
+                    " where the participant key lives."
+                )
+
     return violations, counters
+
+
+def missing_hosted_only(workflows: Sequence[Tuple[str, dict]]) -> List[str]:
+    """Hosted-only rules whose workflow is not present.
+
+    Renaming `supply-chain.yml` would otherwise disarm invariant (3) in silence.
+    Kept out of `check()` on purpose: `check()` is also called with synthetic
+    fixtures that legitimately contain one workflow, and folding this in would
+    make every one of those fail for an unrelated reason.
+    """
+    present = {n for n, _ in workflows}
+    return sorted(HOSTED_ONLY - present)
 
 
 def report(
     violations: Sequence[str], counters: Dict[str, int], stream=sys.stdout
 ) -> int:
+    counters = {"workflows": 0, "composites": 0, "jobs": 0, "uses": 0,
+                "third_party": 0, **counters}
     print(
-        "scanned       : {workflows} workflow(s), {jobs} job(s), {uses} `uses:` step(s)"
-        " ({third_party} third-party)".format(**counters),
+        "scanned       : {workflows} workflow(s), {composites} composite action(s),"
+        " {jobs} job(s), {uses} `uses:` reference(s) ({third_party} third-party)"
+        .format(**counters),
         file=stream,
     )
     if counters["workflows"] == 0 or counters["jobs"] == 0:
@@ -225,7 +411,8 @@ def self_test() -> int:
                             {"run": "echo hi"},
                         ],
                     },
-                    "b": {"permissions": {"contents": "write"}, "steps": []},
+                    # ★ job 側の宣言が top-level を上書きする形も 1 つ入れておく
+                    "b": {"permissions": {"contents": "read"}, "steps": []},
                 },
             },
         )
@@ -233,7 +420,7 @@ def self_test() -> int:
     v, c = check(clean)
     if v:
         failures.append("(1) a clean workflow must pass, got " + repr(v))
-    if (c["workflows"], c["jobs"], c["uses"], c["third_party"]) != (1, 2, 3, 1):
+    if (c["workflows"], c["jobs"], c["uses"], c["third_party"], c["composites"]) != (1, 2, 3, 1, 0):
         failures.append("(1) counters wrong: " + repr(c))
 
     def one_job(job, wf="ci.yml", top=None):
@@ -242,13 +429,31 @@ def self_test() -> int:
             data["permissions"] = top
         return [(wf, data)]
 
-    # (2) missing permissions
+    # (2) permissions: present AND narrow
     v, _ = check(one_job({"runs-on": "ubuntu-latest", "steps": []}))
-    if not any("permissions" in x for x in v):
+    if not any("no effective" in x for x in v):
         failures.append("(2) a job without permissions must be flagged")
     v, _ = check(one_job({"runs-on": "ubuntu-latest", "steps": []}, top={"contents": "read"}))
     if v:
         failures.append("(2) top-level permissions must satisfy the job")
+    # ⚠️ the part a presence-only check could never catch
+    for perms, want in (
+        ("read-all", False),
+        ("write-all", True),
+        ({"contents": "read"}, False),
+        ({}, False),
+        ({"contents": "write"}, True),
+        ({"contents": "read", "id-token": "write"}, True),
+        (["nope"], True),
+    ):
+        v, _ = check(one_job({"permissions": perms, "runs-on": "ubuntu-latest", "steps": []}))
+        if bool(v) != want:
+            failures.append("(2) permissions " + repr(perms) + " flagged=" + str(bool(v)))
+    # the release job's documented write scope is allowed
+    v, _ = check([("ci.yml", {"jobs": {"release": {
+        "permissions": {"contents": "write"}, "runs-on": "ubuntu-latest", "steps": []}}})])
+    if v:
+        failures.append("(2) the allowlisted write scope must pass: " + repr(v))
 
     # (3) third-party pinned to a tag / branch / nothing
     for bad_ref in ("v2", "stable", "main", "v2.9.2", ""):
@@ -318,6 +523,64 @@ def self_test() -> int:
     if v:
         failures.append("(4) ci.yml on self-hosted must be allowed")
 
+    # (3c) `actions/*` is exempt on a release tag only -- a branch is not
+    for ref, want_flag in (("v4", False), ("v4.1.2", False), ("main", True),
+                           ("master", True), ("attacker", True), ("", True)):
+        step = {"uses": "actions/checkout" + (("@" + ref) if ref else "")}
+        v, _ = check(one_job({"permissions": {}, "runs-on": "x", "steps": [step]}))
+        if bool(v) != want_flag:
+            failures.append("(3c) actions/checkout@" + repr(ref) + " flagged=" + str(bool(v)))
+
+    # (3d) composite actions are scanned (they are exempt as `./`, so their own
+    #      `uses:` would otherwise be invisible)
+    comp = [("a/action.yml", {"runs": {"steps": [{"uses": "attacker/pwn@main"}]}})]
+    v, c = check([], comp)
+    if not any("third-party" in x for x in v):
+        failures.append("(3d) a third-party action inside a composite must be flagged")
+    if c["composites"] != 1 or c["uses"] != 1:
+        failures.append("(3d) composite counters wrong: " + repr(c))
+    v, _ = check([], [("a/action.yml", {"runs": {"steps": [{"uses": "attacker/pwn@" + sha}]}})])
+    if v:
+        failures.append("(3d) a SHA-pinned action inside a composite must pass")
+
+    # (3e) a container reference is pinned by digest, not by commit SHA
+    for ref, want in (("sha256:" + "b" * 64, False), ("latest", True), ("3.18", True)):
+        step = {"uses": "docker://alpine@" + ref if ref.startswith("sha256:")
+                else "docker://alpine:" + ref}
+        v, _ = check(one_job({"permissions": {}, "runs-on": "ubuntu-latest", "steps": [step]}))
+        if bool(v) != want:
+            failures.append("(3e) docker ref " + repr(ref) + " flagged=" + str(bool(v)))
+
+    # (4b) runs-on shapes that cannot be decided statically are violations
+    for runs_on, want in (
+        ("gse-win", True),                       # a custom label alone still reaches it
+        (["self-hosted", "gse-mac"], True),
+        ("${{ matrix.os }}", True),              # undecidable
+        ({"group": "gse-group"}, True),          # undecidable
+        ({"labels": ["gse-mac"]}, True),
+        ("ubuntu-latest", False),
+        (["ubuntu-latest"], False),
+        ("ubuntu-24.04", False),
+        ("macos-15", False),
+        ("my-custom-runner", True),   # ⚠️ 未知ラベルは hosted と証明できない
+        ([], True),
+    ):
+        v, _ = check(one_job({"permissions": {}, "runs-on": runs_on, "steps": []},
+                             wf="supply-chain.yml"))
+        if bool(v) != want:
+            failures.append("(4b) runs-on " + repr(runs_on) + " flagged=" + str(bool(v)))
+
+    # (4c) renaming a hosted-only workflow must not silently disarm the rule
+    if missing_hosted_only([("ci.yml", {})]) != ["supply-chain.yml"]:
+        failures.append("(4c) a renamed hosted-only workflow must be detected")
+    if missing_hosted_only([("ci.yml", {}), ("supply-chain.yml", {})]) != []:
+        failures.append("(4c) a present hosted-only workflow must not be reported")
+
+    # (4d) a non-list `steps` must not be skipped silently
+    v, _ = check(one_job({"permissions": {}, "runs-on": "x", "steps": "oops"}))
+    if not any("not a list" in x for x in v):
+        failures.append("(4d) a malformed `steps` must be flagged")
+
     # (5) an empty scan must not read as "no violations"
     if report([], {"workflows": 0, "jobs": 0, "uses": 0, "third_party": 0},
               stream=_Sink()) != EXIT_NOTHING_SCANNED:
@@ -339,9 +602,10 @@ def self_test() -> int:
             print("NG self-test: " + f, file=sys.stderr)
         return EXIT_USAGE
     print(
-        "OK self-test: 7 groups (clean input + counters / permissions / third-party"
-        " pinning + exemptions / reusable workflows / hosted-only / empty scan /"
-        " exit codes)"
+        "OK self-test: 13 groups (clean input + counters / permissions / third-party"
+        " pinning / reusable workflows / first-party tag-only exemption / composite"
+        " actions / hosted-only runner shapes / renamed hosted-only workflow /"
+        " malformed steps / container digests / empty scan / exit codes)"
     )
     return EXIT_OK
 
@@ -380,7 +644,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("ERROR: " + str(exc), file=sys.stderr)
         return EXIT_PARSE
 
-    violations, counters = check(workflows)
+    try:
+        composites = load_composite_actions(ACTION_DIR)
+    except ParseError as exc:
+        print("ERROR: " + str(exc), file=sys.stderr)
+        return EXIT_PARSE
+
+    violations, counters = check(workflows, composites)
+
+    # ⚠️ Only meaningful against the real directory: renaming a hosted-only
+    # workflow would otherwise retire invariant (3) without a word.
+    if directory.resolve() == WORKFLOW_DIR.resolve():
+        for name in missing_hosted_only(workflows):
+            violations.append(
+                "HOSTED_ONLY names `" + name + "`, which does not exist."
+                " Either it was renamed (update HOSTED_ONLY in the same commit) or"
+                " the rule stopped protecting anything."
+            )
     return report(violations, counters)
 
 

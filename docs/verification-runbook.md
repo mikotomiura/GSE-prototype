@@ -94,8 +94,6 @@ cd <repo> && npm audit --package-lock-only --omit=dev
 #     ⚠️ `cargo update -p <crate>` は**無関係な依存辺も張り替えることがある** (2026-09-12 実測:
 #     `-p h2` が `windows-sys` を 7 crate ぶん巻き戻した)。→ ★ `git diff` を見て意図した
 #     crate だけに絞ること。
-```
-
 
 # (h) ⚠️★★★ workflow の不変条件 ＋ third-party action の版上げ (F-8 / F-9・2026-09-13 追加)
 #   ★ 検査そのものは CI (`frontend-check`) で毎回走る。手元では workflow を触ったときに回す。
@@ -122,6 +120,8 @@ cd <repo> && python3 scripts/check_workflow_invariants.py
 #          ★ `workflow_dispatch` を**ブランチ指定**で発火し `build-windows` を実機確認する
 #            (⚠️ tag を選ぶと Release ができる)。
 #   ⚠️ `actions/*` は**意図的にタグのまま**である (★ 理由は `.github/workflows/ci.yml` の注記)。
+```
+
 
 合格条件:
 - [ ] `cargo test --workspace` パス
@@ -132,6 +132,9 @@ cd <repo> && python3 scripts/check_workflow_invariants.py
 - [ ] ★ **依存を更新した回のみ**: `cargo +<MSRV> check --all-targets --features package` が exit 0
 - [ ] ★ **依存 / toolchain を動かした回のみ**: (g) の 3 本がすべて exit 0
       (⚠️ `check_dependency_audit.py` は **exit 2 = stale な除外**でも落ちる)
+- [ ] ★ **workflow / composite action を触った回のみ**:
+      `python3 scripts/check_workflow_invariants.py` が exit 0
+      (⚠️ **exit 2 = 走査 0 件**＝検査が動いていない。★ 緑として扱わない)
 
 ---
 

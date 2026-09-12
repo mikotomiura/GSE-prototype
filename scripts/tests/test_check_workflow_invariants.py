@@ -53,9 +53,13 @@ class TestUsesParsing(unittest.TestCase):
 
 
 class TestPermissionsInvariant(unittest.TestCase):
+    """⚠️★★★ F-5 が守りたかったのは「**広い権限を持たないこと**」であって
+    「宣言があること」ではない。★ top-level 宣言がある限り、存在だけを見る検査は
+    **二度と発火しない**（2026-09-13 のレビューで実測された）。"""
+
     def test_job_without_permissions_is_flagged(self):
         v, _ = cwi.check(_wf({"runs-on": "ubuntu-latest", "steps": []}))
-        self.assertTrue(any("permissions" in x for x in v), v)
+        self.assertTrue(any("no effective" in x for x in v), v)
 
     def test_top_level_permissions_satisfies_the_job(self):
         v, _ = cwi.check(
@@ -63,10 +67,28 @@ class TestPermissionsInvariant(unittest.TestCase):
         )
         self.assertEqual(v, [])
 
-    def test_job_level_permissions_satisfies_the_job(self):
-        v, _ = cwi.check(
-            _wf({"permissions": {"contents": "write"}, "runs-on": "x", "steps": []})
-        )
+    def test_broad_permissions_are_flagged(self):
+        for perms in ("write-all", {"contents": "write"},
+                      {"contents": "read", "id-token": "write"}, ["nope"]):
+            with self.subTest(perms=perms):
+                v, _ = cwi.check(
+                    _wf({"permissions": perms, "runs-on": "ubuntu-latest", "steps": []})
+                )
+                self.assertTrue(v, "広い権限が素通りした: " + repr(perms))
+
+    def test_narrow_permissions_pass(self):
+        for perms in ("read-all", {"contents": "read"}, {}):
+            with self.subTest(perms=perms):
+                v, _ = cwi.check(
+                    _wf({"permissions": perms, "runs-on": "ubuntu-latest", "steps": []})
+                )
+                self.assertEqual(v, [])
+
+    def test_allowlisted_write_scope_passes(self):
+        # ★ `release` は GitHub Release を作るので `contents: write` が要る。
+        v, _ = cwi.check([("ci.yml", {"jobs": {"release": {
+            "permissions": {"contents": "write"}, "runs-on": "ubuntu-latest",
+            "steps": []}}})])
         self.assertEqual(v, [])
 
 
@@ -130,20 +152,85 @@ class TestReusableWorkflows(unittest.TestCase):
 
 
 class TestHostedOnly(unittest.TestCase):
-    def test_supply_chain_on_self_hosted_is_flagged(self):
+    """⚠️★★★ 否定リスト（"self-hosted" を含むか）では 4 通り迂回できた（実測）。
+    ★ 許可リスト（hosted と**証明できる**か）に反転している。"""
+
+    def _flagged(self, runs_on, name="supply-chain.yml"):
         v, _ = cwi.check(
-            _wf(
-                {"permissions": {}, "runs-on": ["self-hosted", "gse-mac"], "steps": []},
-                name="supply-chain.yml",
-            )
+            _wf({"permissions": {}, "runs-on": runs_on, "steps": []}, name=name)
         )
-        self.assertTrue(any("self-hosted" in x for x in v), v)
+        return bool(v)
+
+    def test_hosted_runners_pass(self):
+        for runs_on in ("ubuntu-latest", ["ubuntu-latest"], "ubuntu-24.04", "macos-15",
+                        "windows-latest"):
+            with self.subTest(runs_on=runs_on):
+                self.assertFalse(self._flagged(runs_on))
+
+    def test_self_hosted_and_undecidable_are_flagged(self):
+        for runs_on in (
+            ["self-hosted", "gse-mac"],
+            "gse-win",                      # ⚠️ self-hosted ラベルを書かない形
+            "${{ matrix.os }}",             # ⚠️ 式 = 静的に決まらない
+            {"group": "gse-group"},         # ⚠️ runner group
+            {"labels": ["gse-mac"]},
+            [],
+            None,
+        ):
+            with self.subTest(runs_on=runs_on):
+                self.assertTrue(self._flagged(runs_on), repr(runs_on) + " が素通りした")
 
     def test_ci_on_self_hosted_is_allowed(self):
-        v, _ = cwi.check(
-            _wf({"permissions": {}, "runs-on": ["self-hosted", "gse-mac"], "steps": []})
+        self.assertFalse(self._flagged(["self-hosted", "gse-mac"], name="ci.yml"))
+
+    def test_renaming_a_hosted_only_workflow_is_detected(self):
+        # ⚠️ ファイル名を変えると不変条件 (3) が**無言で消える**。
+        self.assertEqual(cwi.missing_hosted_only([("ci.yml", {})]), ["supply-chain.yml"])
+        self.assertEqual(
+            cwi.missing_hosted_only([("ci.yml", {}), ("supply-chain.yml", {})]), []
         )
+
+
+class TestCompositeActions(unittest.TestCase):
+    """⚠️★★★ `./` 参照は免除されるので、composite action の**中身**は死角になる。
+    ★ `disk-guard` は鍵のある実機で無条件に走る。"""
+
+    def test_third_party_inside_a_composite_is_flagged(self):
+        v, c = cwi.check([], [("a/action.yml", {"runs": {"steps": [
+            {"uses": "attacker/pwn@main"}]}})])
+        self.assertTrue(any("third-party" in x for x in v), v)
+        self.assertEqual((c["composites"], c["uses"]), (1, 1))
+
+    def test_sha_pinned_inside_a_composite_passes(self):
+        v, _ = cwi.check([], [("a/action.yml", {"runs": {"steps": [
+            {"uses": "attacker/pwn@" + SHA}]}})])
         self.assertEqual(v, [])
+
+    def test_repo_composites_are_scanned(self):
+        comps = cwi.load_composite_actions(cwi.ACTION_DIR)
+        # ⚠️ 0 件なら「違反なし」ではなく「見ていない」。★ 実在を固定する。
+        self.assertGreaterEqual(len(comps), 1)
+
+
+class TestFirstPartyExemption(unittest.TestCase):
+    """★ 免除は**リリースタグ**に限る（⚠️ ブロックは F-8 が問題にした当のもの）。"""
+
+    def _flagged(self, ref):
+        step = {"uses": "actions/checkout" + (("@" + ref) if ref else "")}
+        v, _ = cwi.check(
+            _wf({"permissions": {}, "runs-on": "ubuntu-latest", "steps": [step]})
+        )
+        return bool(v)
+
+    def test_release_tags_are_exempt(self):
+        for ref in ("v4", "v4.1", "v4.1.2"):
+            with self.subTest(ref=ref):
+                self.assertFalse(self._flagged(ref))
+
+    def test_branches_and_missing_refs_are_flagged(self):
+        for ref in ("main", "master", "attacker", ""):
+            with self.subTest(ref=ref):
+                self.assertTrue(self._flagged(ref), repr(ref) + " が素通りした")
 
 
 class TestEmptyScanGuard(unittest.TestCase):
@@ -182,11 +269,22 @@ class TestRealRepository(unittest.TestCase):
 
     def test_pins_look_like_commit_shas_with_a_version_comment(self):
         # ★ 版名コメントは人が更新するための唯一の手がかりなので、形を固定する。
-        text = (cwi.WORKFLOW_DIR / "ci.yml").read_text(encoding="utf-8")
-        pinned = re.findall(r"uses:\s+(\S+)@([0-9a-f]{40})(\s*#\s*\S.*)?$", text, re.M)
-        self.assertGreater(len(pinned), 0)
-        for action, _sha, comment in pinned:
-            self.assertTrue(comment and comment.strip(), action + " に版名コメントが無い")
+        # ⚠️ `ci.yml` 決め打ちにすると、3 枚目の workflow にコメント無しのピンを
+        #    書いても緑になる (2026-09-13 のレビュー指摘)。→ 全 workflow を回す。
+        seen = 0
+        for path in sorted(cwi.WORKFLOW_DIR.glob("*.y*ml")):
+            text = path.read_text(encoding="utf-8")
+            pinned = re.findall(
+                r"uses:\s+(\S+)@([0-9a-f]{40})(\s*#\s*\S.*)?$", text, re.M
+            )
+            seen += len(pinned)
+            for action, _sha, comment in pinned:
+                self.assertTrue(
+                    comment and comment.strip(),
+                    path.name + " の " + action + " に版名コメントが無い",
+                )
+        # ⚠️ 0 件なら「全部コメント付き」ではなく「1 つも見ていない」。
+        self.assertGreater(seen, 0, "SHA 固定が 1 件も見つからない = 検査が空振り")
 
 
 class TestCli(unittest.TestCase):

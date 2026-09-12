@@ -128,9 +128,18 @@ env:
 #   (★ 本ゲートは**一切効かない**)。⚠️ repo 設定も `allowed_actions: all` /
 #   `sha_pinning_required: false` (実測)。
 #
-#   ✅ **2026-09-13 (F-8) に対処した** —— ★ **third-party action 3 本を commit SHA で固定**:
+#   ⚠️★★★ **2026-09-13 (F-8) に対処したのは *third-party だけ* である。**
+#     ★ 実測: 鍵のある実機 (`check` / `build-macos`) で走る `uses:` のうち、
+#     **`actions/checkout@v4` / `setup-node@v4` / `upload-artifact@v4` は可変タグのまま**。
+#     ⚠️ `release` (`contents: write`) の `actions/download-artifact@v4` も同様なので、
+#     **「被験者が落とすバイナリを守った」とまでは言えない** (★ 成果物を用意するのは
+#     download-artifact である)。→ ★ 申し送り: `actions/*` を固定範囲に含めるかは別裁定。
+#
+#   ★ 固定した third-party 3 本:
 #     - `dtolnay/rust-toolchain@6bed076…` (⚠️ 旧 `@stable` は**タグですらなくブランチ**だった)
-#     - `Swatinem/rust-cache@6323deb…` (v2.9.2)
+#     - `Swatinem/rust-cache@6323deb…` (v2.9.2・⚠️ ただし `check` / `build-macos` では
+#       `if: runner.environment == 'github-hosted'` が付いており **self-hosted では走らない**。
+#       ★ 固定が効くのは hosted fallback と `build-windows`)
 #     - `softprops/action-gh-release@3bb1273…` (v2.6.2・⚠️ `contents: write` を持ち
 #       **被験者が落とすバイナリを差し替えうる**ので hosted でも固定した)
 #
@@ -725,13 +734,22 @@ jobs:
       # ⚠️★★★ **workflow の不変条件ゲート** (F-8 / F-9・2026-09-13)。
       #   ★ 汎用 linter は入れない裁定 (⚠️ 第三者 action を増やすのは F-8 と逆行する)。
       #   ★ 代わりに**この repo が実際に決めたこと**を検査する:
-      #     (1) 全 job が実効 `permissions` を持つ (F-5)
-      #     (2) third-party action が **40 桁 commit SHA** で固定されている (F-8)
-      #     (3) `supply-chain.yml` が self-hosted へ向いていない (★ 実機に鍵がある)
+      #     (1) 全 job が実効 `permissions` を持ち、⚠️ **広い権限を持たない** (F-5)
+      #     (2) third-party action / reusable workflow / composite action 内の参照が
+      #         **40 桁 commit SHA** で固定されている (F-8)
+      #     (3) `supply-chain.yml` が **hosted であると証明できる** (★ 実機に鍵がある)
       #     (4) ⚠️ 走査 0 件は「違反なし」ではなく **exit 2**
-      #   ⚠️ ここ (`frontend-check`) に置くのは、**全 PR / push で走る**からである。
+      #   ⚠️★★ **走る範囲を正確に書く**: 本 job は `main` への PR と
+      #     `main` / `feature/*` への push で走る。★ **tag push / 手動発火では走らない**
+      #     (⚠️ つまり `softprops/action-gh-release` が実際に動く実行では検査されない) ——
+      #     ただしマージ経路は PR を必ず通るので、main に入る前には必ず 1 度検査される。
+      # ⚠️ PyYAML は ubuntu-latest 同梱の保証が取れなかったので明示的に入れる
+      #   (★ 2026-09-13 の実測では在ったが、ランナーイメージは変わる)。
+      - name: Install PyYAML (workflow invariants gate)
+        run: python3 -m pip install --quiet "pyyaml==6.0.3"
       - name: Workflow invariants (F-8 / F-9)
         run: |
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
           python3 scripts/check_workflow_invariants.py --self-test
           python3 scripts/check_workflow_invariants.py
           python3 -m unittest scripts.tests.test_check_workflow_invariants
