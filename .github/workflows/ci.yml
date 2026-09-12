@@ -353,6 +353,14 @@ jobs:
             if [ -n "${USERPROFILE:-}" ]; then echo "USERPROFILE: set"; else echo "USERPROFILE: unset"; fi
             if [ -n "${HOME:-}" ]; then echo "HOME: set"; else echo "HOME: unset"; fi
           fi
+      # ⚠️★★★ **実際に cargo が使う版は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
+      #   ★ 実測: repo 直下のファイルは **サブディレクトリでも効く**ので、
+      #   `working-directory: src-tauri` の cargo step すべてが**そのファイルの版**で走る。
+      #   ⚠️ したがって下の `@stable` は「rustup と既定 toolchain を用意する」役割に退いている
+      #   (★ 特に `check` は `decide-win-runner` 失敗時に hosted `windows-latest` へ
+      #   fallback する経路があり、そこで rustup の存在を保証する意味がある)。
+      #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
+      #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -668,6 +676,14 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      # ⚠️★★★ **実際に cargo が使う版は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
+      #   ★ 実測: repo 直下のファイルは **サブディレクトリでも効く**ので、
+      #   `working-directory: src-tauri` の cargo step すべてが**そのファイルの版**で走る。
+      #   ⚠️ したがって下の `@stable` は「rustup と既定 toolchain を用意する」役割に退いている
+      #   (★ 特に `check` は `decide-win-runner` 失敗時に hosted `windows-latest` へ
+      #   fallback する経路があり、そこで rustup の存在を保証する意味がある)。
+      #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
+      #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -755,6 +771,14 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      # ⚠️★★★ **実際に cargo が使う版は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
+      #   ★ 実測: repo 直下のファイルは **サブディレクトリでも効く**ので、
+      #   `working-directory: src-tauri` の cargo step すべてが**そのファイルの版**で走る。
+      #   ⚠️ したがって下の `@stable` は「rustup と既定 toolchain を用意する」役割に退いている
+      #   (★ 特に `check` は `decide-win-runner` 失敗時に hosted `windows-latest` へ
+      #   fallback する経路があり、そこで rustup の存在を保証する意味がある)。
+      #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
+      #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
       - uses: dtolnay/rust-toolchain@stable
       # ⚠️★★★ 2026-08-31 追加 (code-reviewer 指摘 #1): 初版のディスクガードは `check` に
       #   しか掛かっておらず、**本ジョブは無防備だった**。★ 本ジョブは同じ `gse-mac` 実機で

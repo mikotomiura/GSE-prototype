@@ -14,6 +14,12 @@
 
 `src-tauri/` で実行する。**全部 green でなければ先に進まない。**
 
+> ⚠️★★★ **toolchain は `rust-toolchain.toml` (repo 直下) で固定されている**（2026-09-12・R-2）。
+> ★ repo の中で cargo を叩けば **rustup が自動でその版へ切り替える**（未導入なら自動 DL）。
+> → ⚠️ **「手元の rustc が新しいから CI と違う結果になる」は起きない。**
+> ★ 版を上げるときは **`rust-toolchain.toml` を書き換える単独 PR** を立てる（手順はファイル内に記載）。
+> ⚠️ `rust-version`（`src-tauri/Cargo.toml`）とは**別物** —— ★ あちらは利用者に約束する下限。
+
 > ⚠️ ★ **`~/.cargo/bin/cargo` が動かない環境がある**（2026-08-06 に macOS で実測）。
 > `~/.cargo/bin/*` は rustup の shim（symlink）で、`rustup` 本体が消えると**全部 dangling** になり
 > `no such file or directory` で落ちる。⚠️ ★ `ls` ではリンクが見えるので**壊れていると気づきにくい**。
