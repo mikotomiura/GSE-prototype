@@ -68,6 +68,32 @@ cd src-tauri && cargo +<MSRV> check --all-targets --features package
 #   ⚠️ 落ちたら: 宣言が実態より低い。★ エラーが名指しする crate の要求まで `rust-version` を上げる
 #     (⚠️ 下げてはならない —— 下げると「古い toolchain で動く」という嘘の契約になる)。
 #   ⚠️ `+<MSRV>` は `rust-toolchain.toml` を**上書きする**ので、toolchain 固定と両立する (実測済み)。
+
+# (g) ⚠️★★★ supply chain 点検 (F-1 / F-2・2026-09-12 追加) —— ★ **repo 直下から**回す
+#   ★ 週次で `.github/workflows/supply-chain.yml` が同じコマンドを回すが、⚠️ **依存・toolchain を
+#     動かした回は手元でも回す** (CI を待たずにその場で分かる)。
+#   ★ 検査する 3 層:
+#     | 層 | 固定の仕方 | 手段 |
+#     |---|---|---|
+#     | toolchain (rustc/std/cargo) | `rust-toolchain.toml` に**名前のみ** | 下記 1 本目 |
+#     | Rust 依存 630 crate | `Cargo.lock` に **checksum 付き** | 下記 2 本目 |
+#     | フロント npm | `package-lock.json` | 下記 3 本目 |
+cd <repo> && python3 scripts/check_toolchain_advisories.py
+cd <repo> && python3 scripts/check_dependency_audit.py     # 要 `cargo install cargo-audit --locked`
+cd <repo> && npm audit --package-lock-only --omit=dev
+#   ⚠️★★★ **`cargo audit` だけでは足りない** —— ★ cargo-audit が見るのは `Cargo.lock` の依存だけで、
+#     **toolchain 同梱の cargo / rustc / std は見ない**。⚠️ RustSec DB に `std` の advisory は 1 件も無い。
+#   ⚠️★★★ **`cargo audit` を直接叩かない** —— ★ 実測 (0.22.2): `.cargo/audit.toml` の
+#     `[advisories] ignore` に入れた advisory は**出力から跡形もなく消える** (件数すら出ない)。
+#     → ⚠️ 「緑」と「除外したから緑」が区別できない。★ ラッパーは除外 ID を毎回印字し、
+#     **stale な除外** (もう当たらないのに残っている ID) を **exit 2 で赤にする**。
+#   ⚠️ npm の門は **`--omit=dev` (本番依存) だけ**。★ 全体の 7 件は全て devDependencies で
+#     被験者に配る Tauri バイナリの実行時経路ではない (⚠️ 「無い」わけではないので CI は全体も出力する)。
+#   ⚠️ 赤が出たら: `cargo update -p <crate>` を先に試す。★ semver 内に解が無いときだけ
+#     `.cargo/audit.toml` に **ID + 理由 + 依存経路 + 再点検期日**を書いて除外する。
+#     ⚠️ `cargo update -p <crate>` は**無関係な依存辺も張り替えることがある** (2026-09-12 実測:
+#     `-p h2` が `windows-sys` を 7 crate ぶん巻き戻した)。→ ★ `git diff` を見て意図した
+#     crate だけに絞ること。
 ```
 
 合格条件:
@@ -77,6 +103,8 @@ cd src-tauri && cargo +<MSRV> check --all-targets --features package
 - [ ] `tsc --noEmit` エラー 0
 - [ ] `cargo fmt --check` クリーン・**`clippy --all-targets --features package -- -D warnings` が exit 0**
 - [ ] ★ **依存を更新した回のみ**: `cargo +<MSRV> check --all-targets --features package` が exit 0
+- [ ] ★ **依存 / toolchain を動かした回のみ**: (g) の 3 本がすべて exit 0
+      (⚠️ `check_dependency_audit.py` は **exit 2 = stale な除外**でも落ちる)
 
 ---
 

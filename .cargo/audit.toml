@@ -1,0 +1,47 @@
+# cargo-audit の設定 (F-1 / F-2・2026-09-12)。
+#
+# ★ 読まれ方: `cargo-audit audit --file src-tauri/Cargo.lock` を **repo 直下**から実行すると
+#   このファイルが効く (⚠️ 2026-09-12 に実測 —— 除外を入れる前 3 件 → 入れた後 1 件)。
+#   → ★ CI (`.github/workflows/supply-chain.yml`) も手元も **同じ場所から回す**こと。
+#     ⚠️ `src-tauri/` に降りて `cargo audit` を叩くとこのファイルは読まれず、結果が食い違う。
+#
+# ⚠️★★★ **ここに ID を足すと、cargo-audit の出力からその advisory は跡形もなく消える。**
+#   ★ 2026-09-12 に実測 (cargo-audit 0.22.2): 除外した 2 件は**件数すら出ない** ——
+#   「緑」と「除外したから緑」が**出力上まったく区別できない**。
+#   ⚠️ これは R-4 が `panic!` に倒した無音 skip と同じ失敗様式である。
+#   → ★ **だから `scripts/check_dependency_audit.py` を通して回す**。
+#     ★ 同 script は (a) 除外 ID を毎回必ず印字し、(b) **stale な除外**
+#     (= もう報告されない ID がここに残っている) を **exit 2 で赤にする**。
+#     ⚠️ `cargo-audit` 単体ではこの (b) ができない —— 何にも当たらない除外は
+#     **見えないまま永久に残る**。
+#
+# ⚠️ **理由と再点検期日の無い除外は書かない。**
+#
+# ★ 足す前に必ず答えること:
+#   1. **直せないのか** (⚠️ `cargo update -p <crate>` が解を持たないことを実測したか)
+#   2. **どの経路に載るのか** (⚠️ `cargo tree -e normal --target all -i <crate>` で実測したか)
+#   3. **被験者に届くのか** (★ 盲検 Tauri アプリ本体か / `--features package` の提出ツールか)
+#   4. **いつ見直すのか**
+
+[advisories]
+# ⚠️★★★ RUSTSEC-2026-0194 / RUSTSEC-2026-0195 —— `quick-xml 0.38.4`
+#
+# ★ 経路 (実測 2026-09-12・`cargo tree -e normal --target all -i quick-xml`):
+#     quick-xml 0.38.4 <- plist 1.8.0 <- tauri 2.10.2 <- gse-next
+#   ⚠️ **macOS 経路のみ** (Windows のターゲットツリーには現れない)。
+#   ★ 盲検 Tauri アプリ本体に載る (⚠️ `--features package` 側ではない)。
+#
+# ⚠️ **直せない** (実測): 修正版は **0.41.0** で、`plist 1.8.0` が `0.38` 系を要求している。
+#   → `cargo update -p quick-xml` は **`Locking 0 packages`** を返す (= semver 内に解が無い)。
+#   ★ 上流 (tauri / plist) が上げるまで待つしかない。
+#
+# ★ 露出評価: 本 advisory は **未信頼 XML に対する二次関数的処理時間 (DoS)** である。
+#   GSE が `plist` に渡すのは **自前バンドルの `Info.plist`** であって被験者入力ではない。
+#   ⚠️ 「当たらない」と断定はしない —— ★ 到達しうる入力が増えたら評価をやり直すこと。
+#
+# ★ 再点検: **2026-12-12** まで (⚠️ それまでに tauri を上げたら真っ先にここを消して再実行する)。
+#   ⚠️ 期日を過ぎても自動では鳴らない。★ `docs/verification-runbook.md` §1 (g) から辿ること。
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]
