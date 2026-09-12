@@ -286,7 +286,7 @@ pub fn spawn_ime_open_polling_thread(
                         // last_state が None (初回) か、前回と異なる場合のみ emit
                         if last_state.is_none_or(|prev| prev != current_state) {
                             last_state = Some(current_state);
-                            crate::input::hook::IME_OPEN.store(current_state, Ordering::Relaxed);
+                            crate::input::hook::IME_OPEN.store(current_state, Ordering::Release);
                             emit_ime_state(&log_tx, current_state);
                         }
                     }

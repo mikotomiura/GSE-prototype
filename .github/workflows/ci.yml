@@ -276,9 +276,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # ⚠️★★★ `components: clippy` を明示する (2026-09-12)。
+      #   ★ `dtolnay/rust-toolchain` は `--profile minimal` で入れるので、
+      #   **clippy は既定で入らない**。⚠️ 無いまま下の clippy step を置くと
+      #   「lint が走らなかった」のか「lint が緑だった」のか**ログから区別できない**。
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+          components: clippy
       # ★ 2026-08-31 追加: ディスク枯渇ガード (self-hosted mac 専用)。
       #
       # ⚠️ なぜ要るか: PR #135 (ドキュメントのみ・コード差分ゼロ) の check が
@@ -405,6 +410,30 @@ jobs:
         run: |
           cargo run --bin emit_schema --target ${{ matrix.target }} > /tmp/emitted-schema.json
           diff -u schema/current.json /tmp/emitted-schema.json
+        working-directory: src-tauri
+      # ★ 2026-09-12 追加: clippy ゲート (引き継ぎ R-1)。
+      #
+      # ⚠️★★★ **なぜ今まで無かったのに今足せるのか**: 2026-09-12 に Windows 側 51 件 /
+      #   mac 側 7 件を潰して**両 OS が exit 0 になったから**である。⚠️ 赤のまま足すと
+      #   main の CI が即赤になり全作業が止まる (★ 足す順序そのものが受け入れ条件だった)。
+      #
+      # ⚠️★★★ **`--all-targets` を落とさないこと**。★ 落とすと `#[cfg(test)]` が
+      #   **一切解析されない** (2026-09-12 に実測: Windows 側で `features.rs` と同じ lint が
+      #   `probe_scheduler.rs` のテストに生き残っていた)。
+      #   ⚠️★★★ **ローカル gate (`.claude/hooks/stop-check.sh`) と同一ではない。**
+      #   ★ 揃っているのは `--all-targets -D warnings` までで、⚠️ **`--features package` は
+      #   CI 側にしか無い** (ローカルは毎 Stop で走るので age / reqwest の再解析を載せない)。
+      #   → ★ したがって `reconcile.rs` / `packaging.rs` の lint は **CI で初めて赤くなる**。
+      #     ⚠️ 「手元が緑だから CI も緑」と読まないこと (code-reviewer 指摘, 2026-09-12)。
+      #
+      # ⚠️★★★ **`--features package` を落とさないこと**。★ 上の `cargo test` step と同じ理由で、
+      #   落とすと `reconcile.rs` / `packaging.rs` (= O1 の「48 時間の猶予」を守る当の機構) が
+      #   **lint の外に出る**。⚠️ 「見えないまま緑」を作らない。
+      #
+      # ★ 位置は最後 —— ⚠️ ビルド / テスト / ゴールデン / schema の**既存シグナルの順序を変えない**
+      #   ため (lint は新しく足した門なので、先に既存の門を鳴らす)。
+      - name: Clippy (-D warnings, --all-targets)
+        run: cargo clippy --all-targets --features package --target ${{ matrix.target }} -- -D warnings
         working-directory: src-tauri
 
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────

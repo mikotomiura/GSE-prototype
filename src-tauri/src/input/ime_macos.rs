@@ -74,9 +74,9 @@ pub fn spawn_ime_open_polling_thread(
                 ImeSource::TisQuery => is_japanese_ime_open(),
             };
 
-            if last_state.map_or(true, |prev| prev != current_state) {
+            if last_state.is_none_or(|prev| prev != current_state) {
                 last_state = Some(current_state);
-                crate::input::hook::IME_OPEN.store(current_state, Ordering::Relaxed);
+                crate::input::hook::IME_OPEN.store(current_state, Ordering::Release);
                 let active = crate::input::hook::IME_ACTIVE.load(Ordering::Acquire);
                 emit_ime_state(&log_tx, current_state, active);
             }

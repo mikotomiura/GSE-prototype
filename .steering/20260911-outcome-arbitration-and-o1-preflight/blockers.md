@@ -392,4 +392,15 @@ clippy **error 0**（⚠️ Windows 側は**手元でコンパイルされない
    ① は `HMM_VERSION` 判断を伴うので**研究者の裁定が要る**。
 2. ★ ① は **起票 6（ライブ変換）と同じく idea 議論 / Mh-D 全体の修正に載せる**のが素直
    （⚠️ どちらも特徴量に触れうるため）。
-- **解決**: （未）
+- **解決 (② のみ・2026-09-12)**: ✅ ★ **`IME_OPEN` の Ordering は閉じた**
+  (`.steering/20260912-mac-clippy-green-and-ci-gate/`・PR `fix/mac-clippy-green-and-ci-gate`)。
+  - `ime_macos.rs` / `ime_windows.rs` の **store を Release** へ (`5aa05e4`)
+  - ⚠️★★★ **さらに load 4 箇所 (`lib.rs` ×3 / `hook.rs` の `is_ime_open()`) も Acquire へ** (`94e57d3`)
+    —— ★ レビュー指摘: **store だけ直しても happens-before は成立しない**
+    (= 片側修正は silent no-op だった)。★ 実測後 `IME_OPEN.load(Relaxed)` は **0 件**。
+  - ⚠️ ① は**未対応のまま** (★ VK 分布 → `HMM_VERSION` 判断が要るため。起票 6 と一緒に扱う)。
+  - ⚠️★★★ **新たに判明**: `IME_ACTIVE` 側は **store 4 / load 3 の計 7 箇所が Relaxed のまま**で
+    同じ規則に違反している。★ `hook_windows.rs:603` (**フックコールバック内**) を含み、
+    ⚠️ **mac からは 1 行もコンパイルできない**ので **Windows 実機/CI と対で別 PR**にする。
+    → 実測表は `.steering/20260912-mac-clippy-green-and-ci-gate/decisions.md` 末尾。
+- **解決 (① / `IME_ACTIVE`)**: （未）
