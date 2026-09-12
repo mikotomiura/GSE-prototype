@@ -59,14 +59,18 @@
 - [x] 本機の `1.87` toolchain を削除 (★ 約 1.3 GiB 回収・`1.88` は MSRV 検査用に残す)
 - [ ] `/finish-task` (★ PR #194 のマージ後)
 
-## ⚠️ 研究者へ申し送り (★ 本タスクではやらない)
+## ⚠️ 研究者へ申し送り (★ 2026-09-12 に実行機まで裁定済み)
 
-| # | 事項 | なぜ挙げるか |
-|---|---|---|
-| F-1 | ⚠️★★★ **toolchain 由来の advisory を検知する仕組み** | ★ **security-checker と Codex が独立に同じ点を挙げた**。⚠️ `cargo audit` の射程外で、緩和は「版上げ手順 0 で人が見る」だけ。★ 頻度は年 1 件弱だが、**唯一の critical (CVE-2024-24576 / `process::Command`) が GSE の製品コード 20 箇所のクラスに当たる** |
-| F-2 | ⚠️ `cargo-audit` / dependabot の導入 | ★ 本タスクのスコープ外 (requirement.md)。⚠️ 現状 repo に**依存脆弱性の検知経路が無い** |
-| F-3 | ⚠️ `stop-check.sh` に `--features package` を足すか | ★ mac セッションからの積み残し (follow-up 1) |
-| F-4 | ⚠️ default features のみの clippy が CI に無い | ★ 同 follow-up 2 |
-| F-5 | ⚠️ `check` job に `permissions: contents: read` | ★ 同 follow-up 3 (**既存の穴**) |
-| F-6 | ⚠️ `.codex/budget.json` の上限 300,000 を戻すか | ★ 2026-09-08 の一時引き上げが据え置き |
-| F-7 | ⚠️ `git-workflow` Skill の scope 一覧に **`wall` が残っている** | ★ ADR-015 D1 (2026-09-01) で削除済み。`docs/agent-shared.md` は訂正済みだが Skill が追随していない |
+★ **引き継ぎメモは 2 本**:
+`.steering/_handoff/next-session-followups-f1-f5.md`（★ Windows / OS 非依存）と
+`.steering/_handoff/next-session-mac-default-clippy.md`（⚠️ **mac 実機・F-4 の前提**）。
+
+| # | 事項 | 実行機 | 状態 |
+|---|---|---|---|
+| **F-1** | ⚠️★★★ **toolchain 由来 advisory の検知手段**（★ **最優先**） | ★ Windows / OS 非依存 | ⚠️ **未決**。★ security-checker と Codex が**独立に**指摘。⚠️ `cargo audit` の射程外で、緩和は「版上げ手順 0 で人が見る」だけ。★ 頻度は約 7 年で 6 件だが、⚠️ **唯一の critical（CVE-2024-24576 / `process::Command`）が製品コード 20 箇所のクラスに当たる** |
+| **F-2** | `cargo-audit` / dependabot | ★ Windows / OS 非依存 | ⚠️ **未決**。★ **F-1 と一体で設計する**（⚠️ 別々に足すと検知手段が 2 系統に割れる） |
+| **F-3** | `stop-check.sh` に `--features package` | ⚠️ **両機**（★ コストが違う） | ⚠️ **未決**。★ Windows 実測（warm・1.98.1）: **10s → 14s**（+4 秒/Stop）。⚠️ **mac の数字は未測定** |
+| **F-4** | default features の clippy を CI に足す | ⚠️★★★ **mac 先行 → Windows** | ⚠️ **未決**。★ Windows は **exit 0**（実測）／⚠️ **mac は未検証**。⚠️ ローカル hook は WARN のみでブロックしないので**気づけない**。→ ★ **R-1 と同じ順序**（① mac で緑 → ② CI に足す） |
+| **F-5** | `permissions: contents: read` | ★ Windows / OS 非依存 | ⚠️ **未決**。★ 実測: `frontend-check` / `release` のみ保有、⚠️ **`decide-win-runner` / `check` / `build-windows` / `build-macos` の 4 job に無い**（既存の穴）。★ **最も安く独立** |
+| **F-6** | `.codex/budget.json` の上限 300,000 | — | ✅ **裁定済み = 据え置く**（判断 52）。★ 根拠: 履歴 30 日の中央値 **97,558** / ⚠️ **200,000 超が 6 日（20%）** / 本タスク単独で **170,400**。→ ⚠️ 200,000 に戻すと 5 日に 1 日はガードに当たる |
+| **F-7** | `git-workflow` Skill の `wall` 残存 | — | ✅ **完了**（**PR #195** → main `f92be8d`）。⚠️ 直す過程で「SSOT の一覧が実績の大半を覆っていない」ことも判明し、**実測表を併記**した |
