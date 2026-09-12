@@ -99,6 +99,9 @@ env:
 #   その内容を **repo 内のブランチへ取り込んでから** PR を出し直すこと。
 #
 # ⚠️★★★ **本当の境界は 3 つあり、どれもこのファイルの中に無い**:
+#   (0) ⚠️★★★ **workflow は 1 枚ではない** (2026-09-12) —— ★ `supply-chain.yml` が増えた。
+#       ⚠️ 本注記は `ci.yml` の話しかしていないので、public 化を検討するときは
+#       **`.github/workflows/` を全部数えてから**この節を読み直すこと。
 #   (1) リポジトリを **public にしない** (★ 2026-08-31 実測: `gh repo view` = PRIVATE)
 #   (2) public にするなら**その直後に** Settings → Actions → Fork pull request workflows を
 #       **"Require approval for all external collaborators"** にする。
@@ -689,6 +692,17 @@ jobs:
           PYTHONUTF8: "1"
       - name: Schema parity test (gse-dataset 整合)
         run: python3 -m unittest scripts.tests.test_check_schema_parity
+        env:
+          PYTHONUTF8: "1"
+      # ⚠️★★★ **supply-chain 検査器のテストはここでも走らせる** (F-1 / F-2・2026-09-12)。
+      #   ★ `supply-chain.yml` にも配線してあるが、あちらは `paths:` 限定なので
+      #   **依存や toolchain を触らない PR では 1 度も走らない**。
+      #   ⚠️ 検査器が壊れたことに気づくのが「次に依存を触った日」では遅い。
+      #   ★ ここは全 PR / push で走り、cargo-audit も network も要らない。
+      - name: Supply-chain checker tests (F-1 / F-2)
+        run: |
+          python3 -m unittest scripts.tests.test_check_toolchain_advisories
+          python3 -m unittest scripts.tests.test_check_dependency_audit
         env:
           PYTHONUTF8: "1"
       # ⚠️★★★ **duckdb を入れてから走らせる。** ★ 入れないと 16 件中 **15 件が skip** され

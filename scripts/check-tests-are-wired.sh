@@ -14,7 +14,27 @@
 # ★ 意図的に CI から外すものは、**理由つきで** 下の除外表に書く（⚠️ 理由なしは通さない）。
 set -euo pipefail
 
-CI=".github/workflows/ci.yml"
+# ⚠️★★★ **workflow は 1 枚ではない** (2026-09-12・security-checker HIGH)。
+#   ★ `supply-chain.yml` を足した時、ここが `ci.yml` だけを見ていたため、
+#   そちらに配線した 2 本が「CI で 1 度も走らない」と誤判定された。
+#   ⚠️ **この番人が workflow 1 枚ぶん構造的に盲目だった**ということであり、
+#   赤を消す最短経路が「除外表に足す」= 検査器の変異テストを黙って無効化することだった。
+#   → ★ **全 workflow を見る。** ⚠️ 0 件マッチだと `grep` が stdin を読んで固まるので
+#   本数を先に検算する (下記 `CI_FILE_COUNT`)。
+#   ⚠️ 本数はスカラで数える。★ macOS 既定の **bash 3.2 では `set -u` 下で空配列に
+#   `${#arr[@]}` を当てると "unbound variable" で落ちる** ので、空になりうる配列を
+#   参照する前に**カウンタで弾く**（★ 参照そのものが起きない形にする）。
+CI_FILES=()
+CI_FILE_COUNT=0
+while IFS= read -r _wf; do
+  [ -n "$_wf" ] || continue
+  CI_FILES+=("$_wf")
+  CI_FILE_COUNT=$((CI_FILE_COUNT+1))
+done <<< "$(git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml')"
+if [ "$CI_FILE_COUNT" -lt 1 ]; then
+  echo "⚠️ .github/workflows/ に workflow が 1 枚も無い → 判定しない" >&2
+  exit 2
+fi
 
 # ⚠️★★ 除外は「名前<TAB>理由」。★ 理由が空なら**未達として扱う**（⚠️ 黙って外させない）。
 read -r -d '' EXCLUDES <<'EX' || true
@@ -45,8 +65,8 @@ wired() {
   local f="$1" base mod
   base="$(basename "$f")"
   mod="$(printf '%s' "${f%.py}" | tr '/' '.')"
-  grep -qF "$base" "$CI" && return 0
-  [ "${f##*.}" = "py" ] && grep -qF "$mod" "$CI" && return 0
+  grep -qF "$base" "${CI_FILES[@]}" >/dev/null && return 0
+  [ "${f##*.}" = "py" ] && grep -qF "$mod" "${CI_FILES[@]}" >/dev/null && return 0
   return 1
 }
 
@@ -61,6 +81,16 @@ if [ "${1:-}" = "--self-test" ]; then
   n=$((n+1)); if wired "scripts/tests/test_capabilities_gate.py"; then
     echo "  ✅ 陽性対照: モジュールパス指定の .py も拾えた（⚠️ ここを落とすと誤報告する）"; ok=$((ok+1))
   else echo "  ⚠️ モジュールパス指定を拾えていない"; fi
+  # ⚠️★★★ 陽性対照 3: **ci.yml 以外の workflow にしか無い**名前も拾うこと。
+  #   ★ これが無いと「workflow を 1 枚しか見ていない」盲点が**また素通りする**
+  #   (⚠️ 2026-09-12 の実際の見落としが、まさに陽性対照 2 件とも ci.yml 内だったこと由来)。
+  n=$((n+1)); if wired "scripts/tests/test_check_dependency_audit.py"; then
+    echo "  ✅ 陽性対照: ci.yml 以外の workflow に配線された .py も拾えた"; ok=$((ok+1))
+  else echo "  ⚠️ ci.yml 以外の workflow を見ていない（★ CI_FILES の列挙が壊れた）"; fi
+  # ★ 列挙した workflow が 2 枚以上あること（⚠️ 1 枚に戻ったら上の対照が意味を失う）
+  n=$((n+1)); if [ "$CI_FILE_COUNT" -ge 2 ]; then
+    echo "  ✅ workflow を $CI_FILE_COUNT 枚見ている"; ok=$((ok+1))
+  else echo "  ⚠️ workflow を $CI_FILE_COUNT 枚しか見ていない"; fi
   # ★ 陰性対照: 存在しない名前は wired ではないこと
   n=$((n+1)); if wired "scripts/tests/test_this_does_not_exist_$$.py"; then
     echo "  ⚠️ 陰性対照が失敗（★ 何でも wired と言っている）"
@@ -75,7 +105,7 @@ if [ "${1:-}" = "--self-test" ]; then
 fi
 
 echo "════════════════════════════════════════"
-echo "★ scripts/ のテストが CI から呼ばれているか"
+echo "★ scripts/ のテストが CI から呼ばれているか (workflow $CI_FILE_COUNT 枚を走査)"
 miss=0; total=0
 while IFS= read -r f; do
   [ -n "$f" ] || continue
@@ -102,6 +132,6 @@ if [ "$miss" -eq 0 ]; then
   echo "✅ ★ $total 本すべて CI から呼ばれている（★ 除外は理由つき）"
 else
   echo "⚠️★★★ **$total 本中 $miss 本が CI で走らない。**"
-  echo "   → ★ ci.yml に足すか、⚠️ **理由つきで**本スクリプトの除外表に書くこと。"
+  echo "   → ★ **いずれかの workflow** に足すか、⚠️ **理由つきで**本スクリプトの除外表に書くこと。"
   exit 3
 fi
