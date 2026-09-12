@@ -64,6 +64,30 @@ fn wait_for_hook(active: bool, limit: Duration) -> bool {
     false
 }
 
+/// ⚠️★★★ **`None` の 2 つの意味を切り分けるための診断文字列。**
+///
+/// ★ `hook_reports_enabled()` が `None` を返す理由は **2 つあり、値からは区別できない**:
+///
+/// | | 意味 | ★ 見分け方 |
+/// |---|---|---|
+/// | (a) **公開順の穴** | payload がまだ書かれていない | ⚠️ `HOOK_ACTIVE` が **true のまま** |
+/// | (b) **tap の実失効** | run loop が抜けて `-1` に倒された | ★ `HOOK_ACTIVE` が **false に落ちている** |
+///
+/// ⚠️ 2026-09-12 に main の CI が 2 本続けて `left: None` で赤くなったとき、
+/// ★ **この 2 つを区別する情報がログに無く**、原因をコード読解で推定するしかなかった。
+/// → ★ 次に赤くなったときは**ログだけで決着させる**。
+///
+/// ⚠️ `watchdog_recoveries()` も併記する: ★ 層 2 が復帰を試みた形跡があれば (b) の裏づけになる。
+fn tap_diag() -> String {
+    format!(
+        "[診断] HOOK_ACTIVE={} (★ true のまま None なら **公開順の穴 (a)**、\
+         false なら **tap の実失効 (b)**) / watchdog_recoveries={} \
+         (★ 増えていれば層 2 が復帰を試みた = (b) の裏づけ)",
+        hook::HOOK_ACTIVE.load(Ordering::Acquire),
+        hook::watchdog_recoveries(),
+    )
+}
+
 #[test]
 fn request_reinstall_actually_restarts_the_tap() {
     // ⚠️★★ **「フック未起動なら false」の検査はここに置かない。**
@@ -85,7 +109,8 @@ fn request_reinstall_actually_restarts_the_tap() {
     assert_eq!(
         hook::hook_reports_enabled(),
         Some(true),
-        "tap 起動直後は有効のはず"
+        "tap 起動直後は有効のはず {}",
+        tap_diag()
     );
 
     // ★★★ ここが本題: 層 3 を叩くと run loop が抜け、tap が作り直される。
@@ -108,7 +133,8 @@ fn request_reinstall_actually_restarts_the_tap() {
     assert_eq!(
         hook::hook_reports_enabled(),
         Some(true),
-        "再作成後も tap は有効のはず"
+        "再作成後も tap は有効のはず {}",
+        tap_diag()
     );
 }
 
@@ -130,7 +156,8 @@ fn watchdog_does_not_touch_a_healthy_tap() {
     assert_eq!(
         hook::hook_reports_enabled(),
         Some(true),
-        "★ この間 tap は健全だったはず (⚠️ そうでないと陰性対照にならない)"
+        "★ この間 tap は健全だったはず (⚠️ そうでないと陰性対照にならない) {}",
+        tap_diag()
     );
     assert_eq!(
         hook::watchdog_recoveries(),
