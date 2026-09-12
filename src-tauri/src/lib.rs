@@ -3580,7 +3580,7 @@ pub fn run() {
                         valve_ms = input::ime_cloak::MONITOR_SAFETY_VALVE_MS,
                         "IME_ACTIVE stale — auto-resetting"
                     );
-                    input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
+                    input::hook::IME_ACTIVE.store(false, Ordering::Release);
                     ime_active_since = None;
                     // ⚠️★ `set_paused(false)` は呼ばない —— ★ IME で pause しなくなったので
                     //   ここで解除するものが無い (上のコメント / decisions D-10)。

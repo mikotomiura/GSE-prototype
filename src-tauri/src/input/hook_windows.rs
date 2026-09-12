@@ -209,7 +209,6 @@ unsafe extern "system" fn win_event_callback(
     );
     match event {
         EVENT_OBJECT_IME_SHOW | EVENT_OBJECT_IME_CHANGE => {
-            IME_ACTIVE.store(true, Ordering::Relaxed);
             IME_OPEN.store(true, Ordering::Release);
             IME_STATE_DIRTY.store(true, Ordering::Release);
             // Phase 2b: IME 変換セッション開始時刻を記録
@@ -234,6 +233,15 @@ unsafe extern "system" fn win_event_callback(
                 IME_CANDIDATE_NAV_COUNT.store(0, Ordering::Relaxed);
                 IME_SHADOW_ABANDON.store(false, Ordering::Relaxed);
             }
+            // ⚠️★★★ **`IME_ACTIVE` の `Release` は payload の「後」に置く** (2026-09-12)。
+            //   ★ `Release` store が公開するのは **それより前** の書き込みだけである。
+            //   ⚠️ 先頭に置くと、読み手 (`hook_callback` の `Acquire` load) が `true` を見ても
+            //     上の 3 つの `Relaxed` store (START_MS / NAV_COUNT / ABANDON) が
+            //     **見えている保証が無い** —— ★ 規則には合っているのに happens-before を
+            //     確立していない、という最も質の悪い状態になる (code-reviewer HIGH)。
+            //   ★ もう一人の書き手 `ime_windows.rs::apply_fold_action` は**この順序**であり、
+            //     あちらの doc が言う「`win_event_callback` と同じ形」はここで初めて真になる。
+            IME_ACTIVE.store(true, Ordering::Release);
             if let Some(tx) = POLL_WAKE_TX.get() {
                 let _ = tx.try_send(());
             }
@@ -250,7 +258,7 @@ unsafe extern "system" fn win_event_callback(
                 IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
                 IME_SHADOW_READY.store(true, Ordering::Release);
             }
-            IME_ACTIVE.store(false, Ordering::Relaxed);
+            IME_ACTIVE.store(false, Ordering::Release);
         }
         _ => {}
     }
@@ -600,7 +608,7 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             //   影響は記録の質に限られるが、⚠️ **解析時にこの上限を知っている必要がある。**
             // WinEvent IME_SHOW と hook_callback のタイミングずれにより、変換セッション
             // 最初の 1-2 キーが拾えない場合がある。Phase 2b は shadow-only なので許容。
-            if is_press && IME_ACTIVE.load(Ordering::Relaxed) {
+            if is_press && IME_ACTIVE.load(Ordering::Acquire) {
                 match classify_ime_nav_key(vk_code) {
                     ImeNavAction::Navigate => {
                         IME_CANDIDATE_NAV_COUNT.fetch_add(1, Ordering::Relaxed);

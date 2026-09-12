@@ -28,8 +28,18 @@ pub const VK_KANJI: u32 = 0x19; // 半角/全角: Half-width / full-width toggle
 pub static IME_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Returns true if an IME is currently composing text in the foreground application.
+///
+/// ⚠️ `Acquire` で読む —— `hook-constraints` 共通-2 が **`IME_OPEN` と並べて**
+/// store = `Release` / load = `Acquire` と**対で**定めているため。
+/// ★ 片側だけ強めても happens-before は成立しないので、対を崩さないこと
+/// (⚠️ `is_ime_open()` と同じ理由。★ 規則違反は本ファイル末尾の
+/// `ordering_invariant_tests` が機械で止める)。
+///
+/// ⚠️ x86-64 では `Acquire` load は `Relaxed` と**同一命令** (フェンス無し) だが、
+/// ★ aarch64 では `ldar` になる —— **1 命令・フェンス無しなので結論は変わらない**
+/// (⚠️ Windows on ARM を入れるときに再検証させないためにここに書いておく)。
 pub fn is_ime_active() -> bool {
-    IME_ACTIVE.load(Ordering::Relaxed)
+    IME_ACTIVE.load(Ordering::Acquire)
 }
 
 /// Japanese IME input mode: true = あ/カ (Japanese), false = A (alphanumeric/coding).
@@ -491,5 +501,214 @@ pub fn watchdog_recoveries() -> u32 {
     #[cfg(not(target_os = "macos"))]
     {
         0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 共通-2 (Ordering) の回帰テスト
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod ordering_invariant_tests {
+    use std::collections::BTreeSet;
+    use std::path::{Path, PathBuf};
+
+    /// `src/` 配下の `*.rs` を再帰で集める。
+    ///
+    /// ⚠️★★★ **ハードコードの列挙にしない** (code-reviewer / security-checker MEDIUM)。
+    /// ★ 列挙だと**新しいファイルが黙って検査の外に出る** —— それは本テストが
+    /// 批判している「実測はその時点の写像にすぎない」と**同じ弱点を 1 段上に残す**だけである。
+    fn collect_sources(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                collect_sources(&p, out);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                out.push(p);
+            }
+        }
+    }
+
+    /// ⚠️★★★ `IME_OPEN` / `IME_ACTIVE` に弱い Ordering が混ざったら落とす。
+    ///
+    /// # ★ なぜ型で表せないのか
+    ///
+    /// ★ `hook-constraints` 共通-2 は「**この 2 つの static だけ** store = `Release` /
+    /// load = `Acquire`」と定めている (⚠️ `LAST_KEY_MS` / `CONSECUTIVE_TAP_FAILURES` は
+    /// `Relaxed` で**正しい**)。→ 規則は「**どの変数か**」に依存するので、
+    /// `AtomicBool` という型は両者を区別できない。
+    /// ⚠️ したがって [`crate::capabilities`] と同じ様式で **ソースの実物**を検査する。
+    ///
+    /// # ⚠️★★★ なぜ「実測して 0 件」では足りないのか
+    ///
+    /// ★ 2026-09-12 に mac 側 (PR #190) が `IME_OPEN` を閉じ、⚠️ **同じ日に
+    /// `IME_ACTIVE` が 7 箇所 `Relaxed` のまま**であることが判明した。
+    /// → ★ 実測は**その時点の写像**にすぎず、**次に書く人を止めない**。
+    ///
+    /// # ⚠️ なぜ **`#[cfg]` を付けないのか**
+    ///
+    /// ★ 本テストは**ソースを文字列として読む**ので、`hook_windows.rs` が
+    /// 1 行もコンパイルされない macOS でも**中身を検査できる**。
+    /// ⚠️ 逆に `#[cfg]` を付けると**相手側 OS の CI が素通り**し、
+    /// 今回まさに起きた「片 OS でしか見ていない」状態に戻る。
+    ///
+    /// # ★ 針の設計 (⚠️ レビューで塞いだ 3 つの穴)
+    ///
+    /// | 穴 | ⚠️ 何が素通りしたか | ★ 対処 |
+    /// |---|---|---|
+    /// | 針が `Ordering::Relaxed` 固定 | `use ...Ordering::Relaxed;` + **裸の `Relaxed`**。★ `lib.rs` の `emit_ime_shadow` が**実際にこの書き方**をしている | ★ 針を **`Relaxed`** に緩める (⚠️ 名前との AND なので誤検出は増えない) |
+    /// | 1 行 `contains` | ⚠️ rustfmt が引数を折ると**すり抜ける** (★ 同ファイルに 7 行に割れた `store` が実在) | ★ **`;` 区切りのステートメント単位**で見る |
+    /// | ファイルのハードコード列挙 | ⚠️ 新規ファイルが**黙って外に出る** | ★ `read_dir` で `src/` を再帰走査 |
+    /// | `Relaxed` を探す**ブラックリスト** | ⚠️ `let o = Ordering::Relaxed; x.load(o)` で**引数に文字列が現れず素通り** (★ cross-review が実機で実証) | ★ **ホワイトリスト**へ —— 強い Ordering が**リテラルで**書かれていることを要求する |
+    ///
+    /// # ★ 既知の限界
+    ///
+    /// - ⚠️ **行コメントは落とす** (`//` 以降)。★ 規則を説明する文章が自分に引っかかるため。
+    ///   ⚠️ 副作用として `"http://..."` のような**文字列中の `//`** も切るが、
+    ///   ★ そこに保護対象の名前と `Relaxed` が同居することは無い。
+    /// - ★ 見るのは **名前の直後の `.load(..)` / `.store(..)` 等の引数だけ**なので、
+    ///   ⚠️ **静的変数そのものを一度ローカル参照へ束ねてから** `load` する書き方は拾えない
+    ///   (例: `let a = &IME_ACTIVE;` のあと `a.load(..)`)。
+    ///   ★ 現在そのような書き方は repo に無い (⚠️ 増やさないこと)。
+    /// - ⚠️ **`Ordering` を変数へ逃がす**書き方 (`let o = ..; x.load(o)`) は
+    ///   ★ **ホワイトリスト方式で落ちる** (⚠️ 読めない＝許さない方に倒してある)。
+    ///   → ★ これは 2026-09-12 の cross-review が実機で実証した穴で、**塞いである**。
+    #[test]
+    fn guarded_atomics_never_use_weak_ordering() {
+        // ★ 針を `concat!` で割る —— ⚠️ **本ファイル自身も走査対象**なので、
+        //   予防的に自己ヒットの目を潰しておく (★ 将来 1 行の述語に書き直されても効く)。
+        let names = [concat!("IME_", "OPEN"), concat!("IME_", "ACTIVE")];
+        let weak = concat!("Rela", "xed");
+        // ★ atomic のアクセスメソッド (⚠️ `new(..)` 等を巻き込まないための絞り)。
+        const ACCESSORS: &[&str] = &[
+            ".load",
+            ".store",
+            ".swap",
+            ".fetch_and",
+            ".fetch_or",
+            ".fetch_xor",
+            ".compare_exchange",
+            ".compare_exchange_weak",
+        ];
+        // ★ 許される Ordering (⚠️ **リテラルで**書かれていること)。
+        const STRONG: &[&str] = &["Acquire", "Release", "AcqRel", "SeqCst"];
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        collect_sources(&root, &mut files);
+
+        // ⚠️★★★ **走査が空振りしていないことを先に確かめる。**
+        //   ★ 0 件でも `assert!(violations.is_empty())` は緑になる —— それは
+        //   **「検査したが無かった」ではなく「検査していない」**であり、最も危険な緑である。
+        assert!(
+            files.len() >= 20,
+            "ソース走査が空振りしている (found {} files under {}). \
+             ★ 検査していないのに緑になる状態なので落とす。",
+            files.len(),
+            root.display()
+        );
+
+        let mut seen_names: BTreeSet<&str> = BTreeSet::new();
+        let mut violations = Vec::new();
+
+        for path in &files {
+            let Ok(src) = std::fs::read_to_string(path) else {
+                continue;
+            };
+            let rel = path
+                .strip_prefix(&root)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/");
+
+            // ★ 行コメントを落としてから 1 本につなぐ。
+            //   ⚠️ これで rustfmt が折った複数行の呼び出しも 1 本の文字列に戻る。
+            let stripped: String = src
+                .lines()
+                .map(|l| match l.find("//") {
+                    Some(i) => &l[..i],
+                    None => l,
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            // ★ **名前のすぐ後ろの呼び出し式 `( .. )` の中だけ**を見る。
+            //   ⚠️ 当初は `;` でステートメントに割ったが、**`if cond { .. }` のブロック本体まで
+            //     1 断片に入ってしまい**、正しい `Acquire` の行が無関係な
+            //     `NAV_COUNT.fetch_add(.., Relaxed)` と同居して**過検出した** (実測 2 件)。
+            //   ★ 常時赤の検査は**いずれ消される**ので、引数リストまで絞る。
+            for name in names {
+                let mut from = 0usize;
+                while let Some(rel_i) = stripped[from..].find(name) {
+                    let i = from + rel_i;
+                    from = i + name.len();
+                    seen_names.insert(name);
+
+                    // ★ 直後の `(` から対応する `)` までを引数リストとみなす。
+                    let Some(open_rel) = stripped[from..].find('(') else {
+                        break;
+                    };
+                    let open = from + open_rel;
+                    let mut depth = 0usize;
+                    let mut close = None;
+                    for (k, c) in stripped[open..].char_indices() {
+                        match c {
+                            '(' => depth += 1,
+                            ')' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    close = Some(open + k);
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    let Some(close) = close else { break };
+
+                    // ★ **atomic のアクセスメソッドだけ**を対象にする。
+                    //   ⚠️ そうしないと `static IME_ACTIVE: AtomicBool = AtomicBool::new(false)` の
+                    //     `new(false)` まで拾って誤検出する。
+                    let between = stripped[from..open].trim();
+                    if !ACCESSORS.contains(&between) {
+                        continue;
+                    }
+
+                    let args = &stripped[open + 1..close];
+                    let pretty = args.split_whitespace().collect::<Vec<_>>().join(" ");
+
+                    // ⚠️★★★ **ホワイトリストで見る** (2026-09-12・cross-review 両者一致の HIGH)。
+                    //   ★ 当初は `Relaxed` を探す**ブラックリスト**だったが、
+                    //     ⚠️ `let o = Ordering::Relaxed; IME_ACTIVE.load(o);` のように
+                    //     **Ordering を変数へ逃がすと引数に文字列が現れず、素通りする**
+                    //     (★ cross-review が実機で緑のままになることを実証した)。
+                    //   → ★ 「強い Ordering が**リテラルで**書かれていること」を要求する。
+                    //     ⚠️ 変数束縛は**読めない＝許さない**方に倒す (loud)。
+                    if args.contains(weak) || !STRONG.iter().any(|s| args.contains(s)) {
+                        violations.push(format!("{rel} | {name}{between}(…{pretty}…)"));
+                    }
+                }
+            }
+        }
+
+        // ⚠️ 名前を 1 つも見つけられないなら、走査経路か針が壊れている (★ これも「検査していない」)。
+        for n in names {
+            assert!(
+                seen_names.contains(n),
+                "{n} をソースから 1 件も見つけられなかった。★ 走査経路か針が壊れている。"
+            );
+        }
+
+        assert!(
+            violations.is_empty(),
+            "hook-constraints 共通-2 違反: 保護対象の static に弱い Ordering が使われている。\n\
+             ★ store は Release / load は Acquire で **対**にすること \
+             (⚠️ 片側だけ強めても happens-before は成立しない)。\n\
+             ⚠️ 近似値で十分な LAST_KEY_MS 等とは別扱いである。\n{}",
+            violations.join("\n")
+        );
     }
 }

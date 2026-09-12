@@ -121,7 +121,7 @@ impl ImeMonitor {
             now_ms(),
         );
         if is_stale_winevent_active(winevent_active, enumwindows_active, uia_active, legacy_path) {
-            crate::input::hook::IME_ACTIVE.store(false, Ordering::Relaxed);
+            crate::input::hook::IME_ACTIVE.store(false, Ordering::Release);
             return false;
         }
 
@@ -571,7 +571,7 @@ fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    let active = crate::input::hook::IME_ACTIVE.load(Ordering::Relaxed);
+    let active = crate::input::hook::IME_ACTIVE.load(Ordering::Acquire);
     let _ = log_tx.try_send(LogEntry::ImeState {
         timestamp: ts,
         on,
