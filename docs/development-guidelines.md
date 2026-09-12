@@ -207,8 +207,13 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
 - **`check` ジョブ**: matrix ビルド。⚠️★★★ **2026-09-01 訂正 —— runner は self-hosted 実機である。**
   macOS 側は `runs-on: [self-hosted, gse-mac]`、Windows 側は `decide-win-runner` が probe して
   self-hosted `gse-win` ↔ hosted `windows-latest` を切り替える（★ offline なら 30 秒で hosted へ fallback・`ci.yml:129-176`）。
-  `cargo build --target` → **`cargo test --features package --workspace --target`**（★ 旧文は `--features package` が抜けていた）
+  ⚠️★★★ **2026-09-12 追記 —— 旧文が落としていた 2 ステップ**（★ 前後に足されたのに、ここが追随していなかった）:
+  **env 前提の検査**（`redact_home_path` の env 経路テストが無音で skip しないための門・R-4）
+  → `cargo build --target` → **`cargo test --features package --workspace --target`**（★ 旧文は `--features package` が抜けていた）
   → スナップショット回帰 (`gse-replay --snapshot`) → schema drift check (`emit_schema`)
+  → **clippy ゲート**（`cargo clippy --all-targets --features package --target -- -D warnings`・R-1・2026-09-12 追加）
+  ⚠️ **clippy は `-D warnings` なので、toolchain が上がって新 lint が増えると
+  コード差分ゼロでも赤くなりうる**。★ そのときは **lint 修正が先**で、`-D warnings` を外して逃げない。
 - **`frontend-check` ジョブ** (`runs-on: ubuntu-latest` ＝ ★ **ここだけ hosted**):
   `npm ci` → TypeScript 型チェック → Vite production ビルド →
   ⚠️★★★ **2026-09-01 追記 —— 旧文が落としていた 3 群 5 ステップ**:

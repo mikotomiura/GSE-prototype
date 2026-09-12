@@ -5255,7 +5255,17 @@ mod submit_command_tests {
     /// ★ 黙って壊れる型の欠陥なので、テストで止める。
     ///
     /// ⚠️ **env を書かない** (★ `set_var` は他のテストと競合し `unsafe` でもある)。
-    /// 読めない環境では **skip** する。
+    ///
+    /// ⚠️★★★ **2026-09-12 (R-4): env が取れないときは `panic!` する** —— 以前は
+    /// 無音で `return` していた (= skip)。★ しかしそれでは **「通った」と「skip した」が
+    /// CI ログで区別できず**、⚠️ **回帰保護が実質無効なまま緑に見える**。
+    /// ★ これは `silent-success-is-not-visible` と同型の欠陥である。
+    /// ⚠️ 本テストが守っているのは **被験者に見せる提出失敗メッセージへ OS ユーザー名を含む
+    /// フルパスが素通りする経路**なので、「守っているつもりで守っていない」状態が最も悪い。
+    /// → ★ **env の不在は skip の理由ではなく、前提の崩壊として赤にする。**
+    /// ★ CI 側は `check` job の「env 前提の検査」step が先に鳴るので、
+    /// ⚠️ この panic が出たときは「実行環境の前提が変わった」と読む
+    /// (★ どちらの step が赤いかで原因が分かれる)。
     #[test]
     fn redact_home_path_masks_real_home_from_env() {
         let Some(home) = ["USERPROFILE", "HOME"]
@@ -5264,21 +5274,91 @@ mod submit_command_tests {
             .map(|v| v.to_string_lossy().into_owned())
             .find(|s| !s.is_empty())
         else {
-            // ⚠️ CI でも通常は取れるが、取れないなら判定できないので skip する。
-            return;
+            // ⚠️ 値そのものは出さない (★ OS ユーザー名が入る = まさに本テストが守る情報)。
+            panic!(
+                "USERPROFILE / HOME がどちらも読めない。\
+                 ★ このテストは `redact_home_path` の **env を読む経路** の回帰保護であり、\
+                 skip すると保護が無効なまま緑になる。\
+                 → ⚠️ 実行環境に少なくとも一方を立てること (CI は `check` job の検査 step 参照)。"
+            );
         };
 
         let detail = format!("could not read input {home}/Documents/GSE-sessions/x.ndjson: nope");
         let masked = redact_home_path(&detail);
 
+        // ⚠️★★★ **失敗メッセージにも実ホームを出さない** (security review LOW, 2026-09-12)。
+        //   ★ このテストが失敗するのは **`masked` がホームを含んでしまったとき**なので、
+        //   ⚠️ `masked` をそのまま出すと **失敗ログに OS ユーザー名が出る** ——
+        //   ★ つまり **守っている当の情報を、守りが壊れた瞬間に自分で漏らす**。
+        //   ⚠️ CI ログのマスクは登録済み secret にしか効かないので、ここが唯一の防御である。
+        //   → ★ 伏せてもなお「どこが伏せ損ねたか」の**構造は読める**ようにする。
+        //
+        // ⚠️★★★ **ユーザー名単体も伏せる** (code review MEDIUM, 2026-09-12)。
+        //   ★ `home` の完全一致だけを伏せると、**部分的にしか伏せ損ねない退行**を取りこぼす ——
+        //   例: `USERPROFILE` 側だけ置換されて `~\johnd/Documents/...` になった場合、
+        //   ⚠️ 1 つ目の assert は通り (完全一致の `home` を含まない)、
+        //   **2 つ目の assert の失敗メッセージに OS ユーザー名が残る**。
+        let user = std::path::Path::new(&home)
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        // ⚠️★★★ ユーザー名は **パス要素として完全一致するものだけ** 伏せる (cross-review MEDIUM)。
+        //   ★ 素の `replace(&user, "<USER>")` は**部分一致**なので、ユーザー名が短い / 一般語だと
+        //   ⚠️ **診断そのものを壊す**。★ 実測 (2026-09-12):
+        //     user="s"   → `Document<USER>/GSE-<USER>e<USER><USER>ion<USER>/x.ndj<USER>on`
+        //     user="Doc" → `<USER>uments`
+        //   ⚠️ 区切り文字を前に付けるだけ (`/{user}`) でも `Doc` は `/Documents` に当たるので不十分。
+        //   → ★ `/` `\` で区切って **要素ごとに `==` で比較**する (部分一致を原理的に起こさない)。
+        let show = |s: &str| {
+            let t = s.replace(&home, "<HOME>");
+            if user.is_empty() {
+                return t;
+            }
+            let mut out = String::with_capacity(t.len());
+            let mut seg = String::new();
+            for ch in t.chars() {
+                if ch == '/' || ch == '\\' {
+                    out.push_str(if seg == user { "<USER>" } else { seg.as_str() });
+                    out.push(ch);
+                    seg.clear();
+                } else {
+                    seg.push(ch);
+                }
+            }
+            out.push_str(if seg == user { "<USER>" } else { seg.as_str() });
+            out
+        };
+
         assert!(
             !masked.contains(&home),
-            "home leaked: home={home} masked={masked}"
+            "home leaked: masked={}",
+            show(&masked)
         );
         assert!(
             masked.contains("~/Documents/GSE-sessions/x.ndjson"),
-            "got: {masked}"
+            "got: {}",
+            show(&masked)
         );
+        // ⚠️★★★ **区切り文字が `\` の形もカバーする** (cross-review LOW, 2026-09-12)。
+        //   ★ 上の入力は `{home}/Documents/...` と `/` を足しているが、
+        //   ⚠️ **Windows で実際に出るパスは `C:\Users\<user>\Documents\...`** である。
+        //   ★ `redact_home_path` は `home` を前方一致で置換するだけなので区切り文字に依存しない ——
+        //   ⚠️ が、**それはテストが言っていることではなかった**ので、実経路の形も足して固定する。
+        //   ★ この形は macOS でも成立する (home=`/Users/x` → `~\Documents\...`)。
+        let detail_bs =
+            format!(r"could not read input {home}\Documents\GSE-sessions\x.ndjson: nope");
+        let masked_bs = redact_home_path(&detail_bs);
+        assert!(
+            !masked_bs.contains(&home),
+            "home leaked (backslash): masked={}",
+            show(&masked_bs)
+        );
+        assert!(
+            masked_bs.contains(r"~\Documents\GSE-sessions\x.ndjson"),
+            "got (backslash): {}",
+            show(&masked_bs)
+        );
+
         // ★ ホームを含まない文字列は素通し (⚠️ 過剰な伏せ字で原因が読めなくならないこと)。
         assert_eq!(redact_home_path("no path here"), "no path here");
     }

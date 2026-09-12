@@ -39,8 +39,18 @@ cd src-tauri
 # (d) フロント型チェック
 cd .. && npx tsc --noEmit
 
-# (e) 整形・lint (任意だが推奨)
-cd src-tauri && ~/.cargo/bin/cargo fmt --check && ~/.cargo/bin/cargo clippy --workspace
+# (e) 整形・lint (⚠️ CI は -D warnings の門を持つので任意ではない)
+cd src-tauri && ~/.cargo/bin/cargo fmt --check
+cd src-tauri && ~/.cargo/bin/cargo clippy --all-targets --features package -- -D warnings
+
+# (f) ⚠️★★★ MSRV 検査 —— ★ **依存を更新したとき / 新しい std API を使ったときだけ**回す
+#   ★ 継続検査する CI job は**存在しない** (2026-09-12 の研究者裁定: 足さない) ので、
+#     ⚠️ **ここを回さなければ誰も気付かない**。
+#   ★ <MSRV> は `src-tauri/Cargo.toml` の `rust-version` の値 (2026-09-12 時点で 1.88)。
+cd src-tauri && cargo +<MSRV> check --all-targets --features package
+#   ⚠️ 落ちたら: 宣言が実態より低い。★ エラーが名指しする crate の要求まで `rust-version` を上げる
+#     (⚠️ 下げてはならない —— 下げると「古い toolchain で動く」という嘘の契約になる)。
+#   ⚠️ `+<MSRV>` は `rust-toolchain.toml` を**上書きする**ので、toolchain 固定と両立する (実測済み)。
 ```
 
 合格条件:
@@ -48,7 +58,8 @@ cd src-tauri && ~/.cargo/bin/cargo fmt --check && ~/.cargo/bin/cargo clippy --wo
 - [ ] `gse-replay --snapshot` が一致 (HMM 不変)
 - [ ] `emit_schema` 出力が `schema/current.json` と一致 (drift なし)
 - [ ] `tsc --noEmit` エラー 0
-- [ ] `cargo fmt --check` クリーン・`clippy` 新規警告なし
+- [ ] `cargo fmt --check` クリーン・**`clippy --all-targets --features package -- -D warnings` が exit 0**
+- [ ] ★ **依存を更新した回のみ**: `cargo +<MSRV> check --all-targets --features package` が exit 0
 
 ---
 

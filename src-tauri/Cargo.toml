@@ -4,15 +4,41 @@ version = "0.1.35"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
-# ⚠️★★★ **実効 MSRV** (2026-09-12 に宣言)。
-#   ★ 根拠は推測ではなくローカルの `rust-src` の `#[stable(since = ...)]` を読んだ実測:
-#     `u64::is_multiple_of` = **1.87.0** / `Option::is_none_or` = 1.82.0 /
-#     `iter::repeat_n` = 1.82.0 / `u64::abs_diff` = 1.60.0。→ 下限は **1.87**。
-#   ⚠️ これは **clippy 1.94 の提案に従って導入した std API が要求する下限**であって、
-#     「1.87 で全体がビルドできることを実測した」という意味ではない。
-#   ★ `edition = "2021"` は resolver "2" なので、この宣言が**依存解決を変えることはない**
-#     (⚠️ MSRV 対応 resolver は "3" から)。効くのは古い toolchain でのエラーメッセージだけ。
-rust-version = "1.87"
+# ⚠️★★★ **実効 MSRV** —— ★ 2026-09-12 に **ビルドで実証**した (R-3)。
+#
+#   ⚠️★★★ **旧宣言 `1.87` は誤りだった。** ★ 旧根拠はローカル `rust-src` の
+#     `#[stable(since = ...)]` (`u64::is_multiple_of` = 1.87.0 / `Option::is_none_or` = 1.82.0 /
+#     `iter::repeat_n` = 1.82.0 / `u64::abs_diff` = 1.60.0) だけで、
+#     ⚠️ **依存 crate 自身が宣言する `rust-version` を見ていなかった**。
+#
+#   ★ 実測 (`cd src-tauri && cargo +1.87 check --all-targets --features package`):
+#     ```
+#     error: rustc 1.87.0 is not supported by the following packages:
+#       time@0.3.47 / time-core@0.1.8 / time-macros@0.2.27 requires rustc 1.88.0
+#     ```
+#   ★ 実測 (`cargo +1.88 check --all-targets --features package`): **exit 0** (4m58s)。
+#   ★ 依存グラフ全体の走査 (`cargo metadata --all-features` の `rust_version`・424/630 crate が宣言)
+#     でも **最大要求は 1.88.0** (`time` 系 3 本) であることを確認した。
+#
+#   ⚠️★★★ **現在の拘束元は自コードではなく `Cargo.lock` の `time` 系である。**
+#     ★ 自コードの std API 下限は **1.87** のまま (`is_multiple_of`)。
+#     → ⚠️ `time` が依存グラフから外れる / 版が下がると、**この宣言だけが過剰に厳しく残る**。
+#     ★ 依存を動かしたら `docs/verification-runbook.md` §1 (f) の MSRV 検査を回し直すこと。
+#
+#   ⚠️★★ **実証の範囲は「Windows の cfg 集合」に限られる** —— ★ 実測は Windows 実機で行っており、
+#     `hook_macos.rs` / `observe_macos.rs` / `ime_macos.rs` は **1 行もコンパイルされていない**
+#     (`docs/agent-shared.md`「手元の検証は CI の代替にならない」)。
+#     ★ ただし ⚠️ **依存側については留保は不要** —— mac 専用 crate (`core-graphics` / `cocoa` /
+#     `objc2` = 1.71 / `block2` = 1.71) も `--all-features` の**同じグラフに入っており**、
+#     要求はいずれも 1.88 未満であることを確認済み。
+#     → ★ **残る未検証は「GSE 自身の mac ソースが使う std API」だけ**である。
+#   ⚠️ **MSRV を継続検査する CI job は無い** (研究者裁定: 足さない)。
+#     → ★ 新しい std API / 依存を入れたときに自動では気付かない。手で回すこと。
+#
+#   ★ `edition = "2021"` は resolver "2" なので、**この宣言が依存解決を変えることはない**
+#     (⚠️ MSRV 対応 resolver は "3" から)。⚠️ ただし **依存側の宣言は別物**で、
+#     上のとおり cargo が**ハードエラー**にする (★ 旧注記はここを取り違えていた)。
+rust-version = "1.88"
 # `cargo run` / `cargo tauri dev` で本体 Tauri アプリを起動させる。
 # `src/bin/replay.rs` の `gse-replay` と曖昧になるため明示が必須。
 default-run = "gse-next"
