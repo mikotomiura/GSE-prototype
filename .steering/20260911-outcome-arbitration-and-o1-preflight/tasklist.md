@@ -81,6 +81,10 @@
 - [x] AC 7 `昇格元:` — grep 済み
 - [x] AC 8 `/cross-review`（★ パス限定）→ `_codex-review-007.md`
 - [x] `code-reviewer` ＋ `security-checker` を**並列**起動
+- [x] ⚠️★★★ **D3 を 2 回訂正した** —— `/cross-review` HIGH（一律 independent の撤回）→
+      `code-reviewer` HIGH 2 件（**枠組みごと差し替え**・「4 層に割る」「幅が狭まる」の両方を撤回）
+- [x] ⚠️ `security-checker` MEDIUM 4 / LOW 1 を全件反映（★ 起票 14 = 参加者 ID の Codex 送信を記録）
+- [x] ⚠️ `code-reviewer` HIGH 3 / MEDIUM 7 / LOW 5 を反映（★ L5 の ADR-022 行は pre-existing なので触らない）
 - [ ] ⚠️ **AC 1〜3（裁定の妥当性）は研究者承認待ち**
 
 ### 完了処理
