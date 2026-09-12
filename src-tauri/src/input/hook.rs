@@ -254,6 +254,32 @@ pub static JIS_KEYBOARD_SEEN: AtomicBool = AtomicBool::new(false);
 /// **payload を後読みする読み手は `None` を許容すること** (詳細は `hook_macos.rs` の該当コメント)。
 pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+/// ⚠️★★★ **テスト専用**: グローバル `TAP_ENABLED_SNAPSHOT` を触るテストを直列化する門。
+///
+/// ★ `cargo test` は同じ lib テストバイナリ内のテストを**既定で並列**に走らせる。
+/// ⚠️ ところが `TAP_ENABLED_SNAPSHOT` は**プロセス全体で 1 つ**なので、
+/// **書き換えるテスト**と**読んで assert するテスト**が同時に走ると壊れる:
+///
+/// | テスト | 何をするか |
+/// |---|---|
+/// | `hook_macos::tests::tap_is_enabled_reads_snapshot_not_the_port` | ⚠️ `-1` / `1` / `0` / 異常値を**書く** |
+/// | `liveness::tests::hook_reports_enabled_is_none_without_a_hook` | ★ `None` を**assert する** |
+///
+/// ⚠️★★★ **これは机上の心配ではない。** ★ 2026-09-12 に 2 テストだけを
+/// `--test-threads=8` で **40 回**回して **7 回**再現させた
+/// (`assertion left == right failed / left: Some(false) / right: None`)。
+///
+/// → ★ **両方がこの門を取る。** ⚠️ 片方だけが取っても意味が無い。
+///
+/// ★ 置き場所が `hook.rs` (OS 非依存) なのは、⚠️ `mod hook_macos;` が**私有**で
+/// `liveness.rs` から中の static に届かないため (★ 守る対象は macOS 固有だが、
+/// **取る側が両方から見える**必要がある)。
+///
+/// ⚠️ **poison は握りつぶす** (`unwrap_or_else(|p| p.into_inner())`) ——
+/// ★ 片方が panic したときに他方まで落ちると**二重報告**になり、原因が読みにくくなる。
+#[cfg(test)]
+pub(crate) static TAP_SNAPSHOT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// ⚠️★★ true = 「設置済みなのにイベントが届いていない」と監視スレッドが判断した状態。
 ///
 /// `input::liveness` の純関数が `HookHealth::Down` を返したときに立つ。

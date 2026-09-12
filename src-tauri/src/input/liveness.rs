@@ -602,6 +602,16 @@ mod tests {
 
     #[test]
     fn hook_reports_enabled_is_none_without_a_hook() {
+        // ⚠️★★★ **グローバル `TAP_ENABLED_SNAPSHOT` を読むので門を取る。**
+        //   ★ macOS では `hook_macos::tests::tap_is_enabled_reads_snapshot_not_the_port` が
+        //   同じ static を書き換えており、⚠️ 並列に走ると `Some(false)` を読んで落ちる
+        //   (★ 2026-09-12 に 40 回中 7 回 再現)。
+        //   ⚠️ Windows では `hook_reports_enabled()` が常に `None` なので競合しないが、
+        //   ★ **OS で分岐させず両方で取る** (⚠️ `#[cfg]` を増やすほどの理由が無い)。
+        let _guard = crate::input::hook::TAP_SNAPSHOT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+
         // ★ macOS: tap が無いので None。★ Windows: そもそも答えられないので None。
         //   ⚠️ どちらも `Some(true)` と偽らないことが要点。
         assert_eq!(crate::input::hook::hook_reports_enabled(), None);

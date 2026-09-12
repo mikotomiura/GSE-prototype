@@ -1479,6 +1479,16 @@ mod tests {
     /// ★ 3 状態すべてを見る (⚠️ 正常 / 不在 / 壊れ)。
     #[test]
     fn tap_is_enabled_reads_snapshot_not_the_port() {
+        // ⚠️★★★ **グローバル `TAP_ENABLED_SNAPSHOT` を書き換えるので門を取る。**
+        //   ★ 取らないと、並列に走る
+        //   `liveness::tests::hook_reports_enabled_is_none_without_a_hook` が
+        //   ここで書いた `1` / `0` を読んで**間欠的に落ちる**
+        //   (⚠️ 2026-09-12 に 40 回中 7 回 再現させた)。
+        //   ★ guard はテスト終了まで保持する (⚠️ 復元より先に落とさない)。
+        let _guard = crate::input::hook::TAP_SNAPSHOT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+
         // ⚠️ 前提: このテストは port を一切設置しない (★ null のまま)。
         assert!(
             TAP_PORT.load(Ordering::Acquire).is_null(),
