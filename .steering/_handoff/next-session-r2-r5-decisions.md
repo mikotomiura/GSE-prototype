@@ -5,9 +5,9 @@
 >
 > | | 結果 |
 > |---|---|
-> | **R-2** | ★ 裁定 = **固定する**（`channel = "1.94.1"`・⚠️ `targets` は書かない）。**PR-A で実装** |
-> | **R-3** | ⚠️★★★ **`1.87` は誤りだった** —— 依存 (`time@0.3.47` 他) が **1.88.0** を要求。★ **`1.88` へ訂正**し `cargo +1.88 check` exit 0 を実証。★ 手順を `docs/verification-runbook.md` §1 (f) に恒久化 |
-> | **R-4** | ✅ **完了**。★ 無音 skip → `panic!` ＋ CI に env 前提の検査 step。⚠️★★★ **初稿は Windows で空振りだった** —— `pwsh → git-bash` で **MSYS2 が `HOME` を合成する**ので、Windows は `USERPROFILE` だけで判定する形に直した |
+> | **R-2** | ✅ **実装済み**（**PR #194**）。⚠️★★★ **固定先は `1.94.1` ではなく `1.98.1`** —— ★ 初稿は本機の `stable` を見て 1.94.1 と書いたが、**CI は 1.98.1 で走っていた**（本機のローカルが 5.5 か月古かった）。★ `profile = "minimal"` ＋ **明示 `rustup toolchain install` step**（disk guard より前）を 3 job に追加 |
+> | **R-3** | ✅ **完了**（**PR #193** → main `2bcf35d`）。⚠️★★★ **`1.87` は誤りだった** —— 依存 (`time@0.3.47` 他) が **1.88.0** を要求。★ **`1.88` へ訂正**し `cargo +1.88 check` exit 0 を実証。★ 手順を `docs/verification-runbook.md` §1 (f) に恒久化 |
+> | **R-4** | ✅ **完了**（**PR #193** → main `2bcf35d`）。★★★ **CI 実測で元の問いに答えが出た** —— **Windows: `USERPROFILE` = set / macOS: ⚠️ `USERPROFILE` = unset・`HOME` = set**（★ mac 側の保護は `HOME` だけに依存していた）。★ 無音 skip → `panic!` ＋ CI に env 前提の検査 step。⚠️★★★ **初稿は Windows で空振りだった** —— `pwsh → git-bash` で **MSYS2 が `HOME` を合成する**ので、Windows は `USERPROFILE` だけで判定する形に直した |
 > | **R-5** | ✅ **閉じた**。★ `run-codex-review.sh` が **exit 0** で完走し、**予算台帳が自動計上**された（= ラッパー経由の客観証拠）。⚠️ ただし 2 回とも codex-cli **0.152.1** なので、版差か権限差かの切り分けは**未了**（★ 実務上は「使ってよい」で足りる） |
 >
 > ★ 以下は**着手前の記述**（履歴として残す）。⚠️ **§1 の「判断の軸」は決着済み**なので蒸し返さないこと。

@@ -1,0 +1,79 @@
+# ⚠️★★★ **toolchain の固定** (R-2・2026-09-12 に研究者裁定)。
+#
+# ★ なぜ固定するか:
+#   1. 本 repo は `reproducibility-discipline` で **`Cargo.lock` / seed / `HMM_VERSION` を固定**
+#      する規律を敷いている。⚠️ **toolchain だけ浮いているのは一貫していない。**
+#   2. ⚠️★★★ 2026-09-12 に CI へ `cargo clippy ... -D warnings` のゲートが入った (R-1)。
+#      → ★ stable に追従したままだと、**コード差分ゼロでも toolchain 更新日に main が
+#      一斉に赤くなる**。⚠️ そのとき `-D warnings` を外して逃げてはならない
+#      (★ 外した瞬間「見えないまま緑」へ戻る) ので、**不意打ちの側を止める**。
+#   3. ★ 版上げは「別 PR で意図的に」になる —— ⚠️ これは `HMM_VERSION` bump と同じ作法である。
+#
+# ⚠️ 代償 (★ 承知のうえで採っている):
+#   - rustc / std のセキュリティ修正に**自動追従しない**
+#     (★ 依存の脆弱性は `Cargo.lock` 側の話なので、ここで守られるのは rustc / std 由来に限る)。
+#   - ⚠️ ランナーに stable と本版の **2 本**が載る。★ 実測 (2026-09-12・Windows 実機):
+#     **default profile なら 1 本 ≈ 1.3〜1.4 GiB**、⚠️ **うち 726 MiB が `rust-docs`** ——
+#     ★ CI はこれを 1 バイトも使わない。→ **下記 `profile = "minimal"` で落としている。**
+#     ⚠️ mac self-hosted はディスクガードが threshold=15 GiB で、guard 自身の計器による
+#     実測の空きは **20 GiB** (`free before: 20 GiB (threshold=15 floor=8)`)。
+#     → ★ **threshold は割らないが余裕は減る。**
+#     ⚠️★★★ **削減量を数字で断定しない** —— ★ 上は git-bash の `du -sm` (見かけサイズ) で、
+#     guard の `df -Pk` とは計器が違う (★ 過去に 1 GiB 食い違った実績がある)。
+#     → **実際の増分は初回 run の `free before:` 行で測る。**
+#
+# ★ `components` をここに書く理由: ⚠️ `dtolnay/rust-toolchain` は `--profile minimal` で入れるので
+#   **clippy は既定で入らない**。★ ファイル側に書けば rustup が toolchain と**一緒に入れる**ので、
+#   「lint が走らなかった」のか「lint が緑だった」のか分からない穴が**構造的に**閉じる。
+#
+# ★ `profile = "minimal"` を置く理由 (⚠️ code review MEDIUM):
+#   ⚠️ 省略すると **各実機の rustup 既定 profile** が使われる (★ 本機は `default`) ので、
+#   **入る量が機械ごとに変わり決定性が無い**。★ 実測で `rust-docs` (726 MiB) が入っていた。
+#   ⚠️ `components` は profile と**独立に効く**ので、`minimal` でも clippy / rustfmt は入る。
+#
+# ⚠️ `targets` は**書かない** —— ★ 実測 (2026-09-12):
+#   `matrix.target` は **両レグとも host と同一**であり、新規 toolchain には
+#   **host target の std が同梱**される (`rustup target list --installed` で確認)。
+#   ⚠️★★★ **host triple は ci.yml を読んで決めつけず、CI ログで実測した** ——
+#   PR #193 の run ログに `host: aarch64-apple-darwin` (mac) /
+#   `stable-x86_64-pc-windows-msvc` (win) が出ている。
+#   ★ **mac が Intel なら `--target aarch64-apple-darwin` が `can't find crate for core` で即死する**
+#   ので、ここは推測で済ませてはいけない箇所である
+#   (⚠️ `dtolnay` の `targets:` は **stable にしか入らない**ので救わない)。
+#   → ⚠️ ここに両方を書くと**相手 OS の std を両機に入れる**ことになり、ディスクを無駄に食う。
+#
+# ⚠️★★★ **なぜ `1.98.1` なのか (★ 2026-09-12 の実測で決めた)。**
+#   ⚠️ 初稿は `1.94.1` と書いた —— ★ **本機 (G-GEAR) の `stable` がその版だったから**である。
+#   ⚠️★★★ **それは誤りだった。** ★ CI の実ログ (PR #193 / run 34677596718) を見ると、
+#   `dtolnay/rust-toolchain@stable` は**両レグとも `rustc 1.98.1 (2026-09-01)`** を入れていた。
+#   → ⚠️ `1.94.1` に固定すると **現状維持ではなく 4 マイナー (約 5.5 か月) の巻き戻し**になる。
+#   ★ **本機のローカル `stable` が古かった**だけで、CI は追従していた
+#   (⚠️ つまり従来 **ローカル `stop-check.sh` の clippy 1.94 と CI の clippy 1.98 は
+#   別の lint 集合を検査していた**。★ 固定はこの不一致も同時に閉じる)。
+#   → ★ **固定先は「CI が現に使っている版」に合わせる**。
+#
+# ⚠️★★ **MSRV とは別物である。** ★ ここは「CI と手元が使う版」、
+#   `src-tauri/Cargo.toml` の `rust-version` は「利用者に約束する下限」(2026-09-12 時点で **1.88**)。
+#   ★ `cargo +<version>` は**このファイルを上書きする**ので、MSRV 検査は固定と両立する (実測済み)。
+#
+# ★ 版を上げるときの手順:
+#   0. ⚠️★★★ **rust-lang/rust の Security Advisories を確認する** (★ M-1) ——
+#      `gh api /repos/rust-lang/rust/security-advisories --jq '.[] | "\(.cve_id) \(.severity) \(.summary)"'`
+#      ⚠️ **toolchain 由来の脆弱性は `cargo audit` の射程外**である。★ `cargo audit` が見るのは
+#      `Cargo.lock` の依存だけで、**toolchain 同梱の cargo / rustc / std は見ない**。
+#      ⚠️ RustSec DB にも `std` の advisory は 1 件も無い (★ rust-lang/rust の repo advisory にしか無い)。
+#      → ★ **固定するということは、この点検を人が担うということ**である。
+#   1. `channel` を書き換えた**単独 PR** を立てる (⚠️ 他の変更と混ぜない)。
+#   2. `cargo clippy --all-targets --features package -- -D warnings` を**両 OS で**緑にする
+#      (★ `gse-win` = G-GEAR 実機 / `gse-mac` = MacBook Air 実機。⚠️ 片方だけでは足りない ——
+#      `*_macos.rs` は Windows で 1 行もコンパイルされない)。
+#   3. ゴールデン (`gse-replay --snapshot`) が byte-equal であることを確認する。
+#   4. ⚠️★★★ **古い toolchain を消すのは CI ではなく人である。**
+#      `rustup toolchain uninstall <old>` を **`gse-win` / `gse-mac` / 手元の 3 か所**で回す
+#      (★ CI からは実行されないので、放置すると版上げのたびに実機へ積む)。
+#   5. ★ **CI ログの `rustup show active-toolchain` 行で、実際にその版で走ったことを確認する**
+#      (⚠️ 「緑になった」だけでは、どの版で緑なのか分からない)。
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

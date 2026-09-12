@@ -507,3 +507,321 @@
 - ⚠️★★★ **`df -h` の数字で外挿しない** —— ★ `mac-clippy-green-and-ci-gate` §2 で
   自分の計器 (`df -h` = 16 GiB) と guard の計器 (`df -Pk` = 17 GiB) が **1 GiB 食い違い**、
   「次の run で掃除が走る」という**予測を外した**前科がある。
+
+---
+
+# PR-A (R-2) のレビュー結果 — ⚠️★★★ **HIGH 4 件。私の前提が 2 つ崩れた**
+
+## 判断 31: ⚠️★★★ **security HIGH —— 固定先 `1.94.1` は「現状維持」ではなく *巻き戻し* だった**
+
+- ⚠️ 私は commit メッセージにも `decisions.md` にも「**固定前も 1.94.1 だった**」と書いた。
+  ★ 根拠は `rustc --version` を**本機で叩いた**こと。
+- ⚠️★★★ **それは本機にしか当てはまらなかった。** ★ 自分で CI ログを確認した (一次資料):
+
+  | | 版 | 日付 |
+  |---|---|---|
+  | ⚠️ **CI の両レグ** (PR #193 / run 34677596718) | **rustc 1.98.1** | 2026-09-01 |
+  | ★ 本機 (G-GEAR) の `stable` | **rustc 1.94.1** | 2026-03-25 |
+
+  → ⚠️ **本機のローカル `stable` が約 5.5 か月古かった**だけで、**CI は追従していた**。
+  → ⚠️★★★ `1.94.1` に固定すると **4 マイナーの巻き戻し**になる。
+- ★ **副次的に判明した重要な事実**: ⚠️ 従来 **ローカル `stop-check.sh` の clippy 1.94 と
+  CI の clippy 1.98 は、別の lint 集合を検査していた**。→ ★ 固定はこの不一致も同時に閉じる。
+- ★ **対応**: `channel = "1.98.1"` へ訂正。⚠️ R-2 の目的 (不意打ちを止める) は
+  **版番号が何であれ達成される**ので、目的を損なわずに巻き戻しだけが消える。
+- ★ security-checker はさらに「1.94.1 同梱の cargo 0.95.0 は CVE-2026-5222 / 5223
+  (`cargo < 0.97.0`) に該当する」と報告した。⚠️ **発火条件 (third-party registry) は
+  本 repo で不成立** (★ `Cargo.lock` の `source` は全件 crates.io・`[registries]` 置換なし) だが、
+  ★ **巻き戻す理由が無い以上、確かめるまでもなく避けるべき**である。
+
+## 判断 32: ⚠️★★★ **これは本セッション 2 度目の「手元の観測を CI に当てはめた」誤りである**
+
+| # | 誤り | 正しい一次資料 |
+|---|---|---|
+| 1 (判断 19) | ⚠️ `bash → bash` で「`HOME` は合成されない」と測り、**CI の `pwsh → git-bash`** に当てはめた | ★ `pwsh → git-bash` で測り直す → **合成される** |
+| 2 (判断 31) | ⚠️ **本機の `stable`** を見て「CI も 1.94.1」と当てはめた | ★ **CI の run ログ** → **1.98.1** |
+
+- ⚠️★★★ **どちらも `verify-before-claiming` が名指しで禁じている形**である ——
+  「**別の環境で測った値を、当の環境の値として使う**」。
+- ★ **一般化**: ⚠️ **「実測した」と書くときは、*どの環境で* 測ったかを必ず併記する。**
+  ★ CI について論じるなら **CI の run ログが唯一の一次資料**であり、
+  ⚠️ 手元の `rustc --version` / `bash` の挙動は**傍証にすらならない**。
+
+## 判断 33: ★ code review HIGH 3 件を **1 つの step で閉じた**
+
+⚠️ 3 つとも「固定版を *誰がいつ入れるか* が CI に書かれていない」ことに帰着する。
+
+| # | 指摘 | ⚠️ 放置した場合 |
+|---|---|---|
+| H-1 | ★ 固定版を**実際に入れる主体**が CI に無い (暗黙 auto-install 頼み) | ⚠️ `gse-mac` の rustup 版は**未測定**。auto-install が無効なら **全 step の手前で赤** |
+| H-2 | ⚠️ 暗黙 DL は**ディスクガードより後**に起きる | ⚠️★★★ guard の `free before:` が **DL 前の数字**になる = **測りたい増分を測る前に測る** |
+| H-3 | ⚠️ 固定が効いた**証拠が run ログに 1 行も残らない** (★ ci.yml に `rustc --version` は **0 件**) | ⚠️★★★ 「緑になった」だけでは **どの版で緑なのか判別できない** = **見えないまま緑** |
+
+- ★ **対応**: `dtolnay` の直後・**ディスクガードの前**に明示 step を置いた (★ 3 job すべて)。
+
+  ```yaml
+  - name: Install pinned toolchain (rust-toolchain.toml)
+    shell: bash
+    run: |
+      set -euo pipefail
+      rustup toolchain install    # ★ 引数なし = active toolchain
+      rustup show active-toolchain
+      cargo --version
+      cargo clippy --version
+  ```
+
+- ★ **逐語で確認した** (`rustup toolchain install --help`):
+  「Install or update the given toolchains, **or by default the active toolchain**」
+  → ⚠️ 引数なしで **toolchain file が指す版を `profile` / `components` 込みで**入れる。
+- ⚠️★★★ **H-3 は本タスクの主題と同型である** —— ★ R-4 で「走ったか緑だったか区別できない」を
+  潰しに来ておきながら、**同じ形の穴を PR-A で作っていた**。
+
+## 判断 34: ★ `profile = "minimal"` を足した (code review MEDIUM)
+
+- ⚠️ 省略すると**各実機の rustup 既定 profile** が使われる (★ 本機は `default`)。
+  → **入る量が機械ごとに変わり決定性が無い。**
+- ★ 実測: `rustup component list --toolchain 1.94.1` に **`rust-docs` が installed** で、
+  ⚠️ **1.3 GiB のうち 726 MiB が docs** —— ★ CI はこれを **1 バイトも使わない**。
+- ⚠️ `components` は profile と**独立に効く**ので、`minimal` でも clippy / rustfmt は入る。
+- ⚠️★★★ **削減量を数字で断定しない** —— ★ 726 MiB は git-bash の `du -sm` (見かけサイズ) で、
+  guard の `df -Pk` とは計器が違う。→ **実際の増分は初回 run の `free before:` で測る。**
+
+## 判断 35: ★ MEDIUM —— **mac の host triple を CI ログで実測し直した**
+
+- ⚠️ 指摘: 決定 3 (`targets` を書かない) の安全性は **gse-mac が arm64 であること**に
+  全面的に依存するのに、★ 実測 #5 は **`ci.yml` を読んだだけ**だった。
+- ⚠️★★★ **Intel mac なら `--target aarch64-apple-darwin` が `can't find crate for core` で即死する**
+  (★ `dtolnay` の `targets:` は **stable にしか入らない**ので救わない)。
+- ★ **CI ログで実測した** (PR #193 / mac レグ): **`host: aarch64-apple-darwin`**。
+  → ✅ 決定 3 は安全。⚠️ ただし**根拠を一次資料へ差し替えた** (判断 32 の一般化の適用)。
+
+## 判断 36: ★ 残りの MEDIUM / LOW の扱い
+
+| 指摘 | 対応 |
+|---|---|
+| ⚠️ `build-*` の注記が「`working-directory: src-tauri` の cargo step」と書くが、**当 job にそれは無い** (実経路は `npx tauri build`) | ✅ 各 job の実経路を書く形へ訂正 |
+| ⚠️ 「action は **rustup を用意する**」の根拠が未確認 (★ 実際は rustup が既に在る前提) | ✅ 射程を狭めた ——「保証されるのは **`rustup default` が立つこと**」 |
+| ⚠️ runbook の「手元の rustc が新しいから CI と違う結果になる は起きない」が**無条件に読める** | ✅ 「**rustup 管理下の cargo に限る**」を明記。★ `rustup show active-toolchain` で確かめる 1 行を追加。⚠️ かつ「消えるのは rustc 版差だけで **OS 差と `--features package` 差は残る**」を併記 |
+| ⚠️ 版上げ手順 4 に**どの機械で uninstall するか**が無い | ✅ `gse-win` / `gse-mac` / 手元の **3 か所**を名指し。★ 手順 2 も実機名を明記 |
+| ⚠️ 同一 8 行の注記が **3 箇所に複製** (★ disk-guard を composite 化した教訓と同型) | ✅ `check` を**正典**にし、他 2 箇所は **1 行参照**へ縮めた |
+| ★ 版上げ手順に「CI ログで版を確認する」step が無い | ✅ **手順 5** として追加 |
+
+## 判断 37: ⚠️★★★ **判断 15 / 30 の検証指示を訂正する** (★ ただしレビューの提案とは別の形で)
+
+- ⚠️ レビュー指摘 (security M-2 / code H-2): ★ 判断 15 は「**初回 CI で `free before:` を見よ**」と
+  書いたが、⚠️ **暗黙 auto-install はディスクガードより *後* に起きる**ので、
+  **初回の `free before:` は DL 前の数字**であり、**測りたい増分を測る前に測っている**。
+- ★ レビューの提案は「**2 回目以降**の run を見よ」。
+- ⚠️★★★ **私はそれを採らなかった。** ★ 判断 33 で **install step をディスクガードの *前* へ置いた**
+  ので、⚠️ **初回から guard が DL 後の真値を測る**ようになった。
+  → ★ **「2 回目以降を見る」という運用で回避するのではなく、順序そのものを直した。**
+  ⚠️ 回避策は「次からは正しく測れる」だけで、**初回の数字が嘘である事実は消えない**。
+- ★ **したがって正しい検証指示はこうなる**:
+  > ★ **初回 run の `free before:` を見る。** ⚠️ install step が guard より前にあることを
+  > step 順で確認したうえで読む (★ 順序が崩れたら数字は無意味になる)。
+- ⚠️ **他の計器で外挿しない** (★ `df -h` と guard の `df -Pk` が 1 GiB 食い違った前科)。
+
+## 判断 38: ★ レビューが補強した「実測 #1 の交絡が無い」こと
+
+- ★ security-checker の実測: `~/.rustup/settings.toml` の **`[overrides]` が空**。
+- → ⚠️ `rustup show active-toolchain` の `overridden by ...rust-toolchain.toml` は
+  **`rustup override set` (ディレクトリ override) による交絡ではなく、本当にファイル由来**である。
+- ★ **実測 #1 はこの点で正しかった**ことが独立に確認された。
+
+## 判断 39: ★ M-1 の射程を正確化する (★ レビューの自己訂正を採用)
+
+- ⚠️ security-checker は当初「std CVE の 2 クラスが live」と読める書き方をし、**自ら訂正した**:
+
+  | CVE クラス | GSE での出現 | 射程 |
+  |---|---|---|
+  | `std::process::Command` (**CVE-2024-24576 critical**) | ★ **製品コード 20 箇所** (`lib.rs` / `g1.rs` / `bin/submit.rs` / `hook_macos.rs`) | ⚠️ **本当に直撃するのはこちら** |
+  | `std::fs::remove_dir_all` (CVE-2022-21658 high) | ★ **テストコードのみ 10 箇所** | 射程は狭い |
+
+- ★ **どちらも 1.98.1 では修正済み** (⚠️ 1.94.1 でも修正済みだった)。
+- ⚠️★★★ **論拠の形はこう読む**: 「toolchain 由来の脆弱性は **年 1 件弱**と低頻度だが、
+  ★ **唯一の critical (CVE-2024-24576) が GSE の製品コードのクラスに当たった**」。
+  → ⚠️ 「低頻度だから無視してよい」ではなく「**低頻度だが当たれば自分のコードに当たる**」。
+  → ★ だから版上げ手順 0 (advisory 点検) を**人の手順として明文化**した。
+
+## 判断 40: ★★★ **1.98.1 での再検証** — ⚠️ 固定先を変えたので全ゲートを回し直した
+
+★ 本機を 1.98.1 へ切り替えて実測 (2026-09-12・Windows 実機):
+
+```
+1.98.1-x86_64-pc-windows-msvc (overridden by 'C:\GSE-prototype\rust-toolchain.toml')
+rustc  1.98.1 (48a229cea 2026-09-01)
+cargo  1.98.1 (797e8a9bc 2026-08-05)
+clippy 0.1.98 (48a229ceae 2026-09-01)
+```
+
+| ゲート | 結果 |
+|---|---|
+| `cargo fmt --check` | ✅ exit **0** |
+| ⚠️★★★ `cargo clippy --all-targets --features package -- -D warnings` | ✅ exit **0** (4m51s) |
+| `cargo test --features package --workspace` | ✅ **11 スイートすべて ok**・FAILED 0 |
+| ゴールデン | ✅ `OK: 15 snapshots match` |
+| schema | ✅ **byte-equal** |
+
+- ⚠️★★★ **clippy が要点だった** —— ★ 1.94 と 1.98 では lint 集合が違うので、
+  **1.94 で緑だったことは 1.98 で緑であることを保証しない**。→ **実際に回して確かめた。**
+- ★ 併せて **ローカルと CI の lint 集合が初めて一致した**
+  (⚠️ 従来はローカル 1.94 / CI 1.98 で別物を検査していた・判断 31)。
+- ⚠️ `HMM_VERSION` は **bump しない** (★ ゴールデン 15 が byte-equal = 挙動不変)。
+
+---
+
+# ★★★ PR #194 (PR-A) の CI 実測 — ⚠️ **「緑だった」で終わらせずに 4 点を測った**
+
+★ run `34679690117` / 2026-09-12。**check 両レグ ＋ frontend-check すべて pass**
+(mac 7m18s / win 6m19s / frontend 48s)。
+
+## 判断 41: ✅ **① 固定が効いた証拠が CI ログに残った** (★ H-3 の狙いどおり)
+
+```
+[win] 1.98.1-x86_64-pc-windows-msvc (overridden by 'C:\actions-runner\_work\GSE-prototype\GSE-prototype\rust-toolchain.toml')
+      rustc 1.98.1 (48a229cea 2026-09-01) / cargo 1.98.1 (797e8a9bc 2026-08-05)
+[mac] 1.98.1-aarch64-apple-darwin (overridden by '/Users/johnd/actions-runner/_work/.../rust-toolchain.toml')
+      rustc 1.98.1 (48a229cea 2026-09-01) / cargo 1.98.1 (797e8a9bc 2026-08-05)
+```
+
+- ⚠️★★★ **これが無ければ「どの版で緑なのか」は永久に分からなかった。**
+  ★ 従来 `ci.yml` に `rustc --version` を出す step は **0 件**だった。
+- ★ **mac の host triple も改めて確定**した: `1.98.1-**aarch64**-apple-darwin`
+  → ✅ 決定 3 (`targets` を書かない) は安全 (判断 35 の再確認)。
+
+## 判断 42: ✅ **② step 順が正しい** (★ H-2 の狙いどおり)
+
+`3. Env precondition` → `4. dtolnay` → **`5. Install pinned toolchain`** → **`6. Disk guard`**
+
+⚠️ **install が guard より前**にあるので、guard は **DL 後の真値**を測る。
+
+## 判断 43: ✅ **③ ディスクの実増分を guard 自身の計器で測れた**
+
+| run | `free before:` | `wiped=` |
+|---|---|---|
+| PR #193 (★ 固定前・DL なし) | **20 GiB** (threshold=15 floor=8) | false |
+| ⚠️ **PR #194** (★ 固定・初回 DL 後) | **19 GiB** (threshold=15 floor=8) | false |
+
+- ★ **減少は約 1 GiB**。⚠️ threshold 15 GiB に対し **4 GiB の余裕**が残る。→ ✅ **掃除は走らない。**
+- ⚠️★★★ **`du` の見かけ値 (default 1.3 GiB / minimal 見込み 0.6 GiB) で外挿しなかったのが正解だった** ——
+  ★ 実測は **guard 自身の `df -Pk`** で **1 GiB**。⚠️ 2 つの run 間の差なので他の要因も含みうるが、
+  **計器と順序は正しい**。
+- ★ `profile = "minimal"` を入れたので、⚠️ **default profile のままなら約 2 GiB 減っていた**はず
+  (★ 726 MiB の `rust-docs` 分)。→ **判断 34 は効いている。**
+
+## 判断 44: ✅ **④ install step のコストは初回のみ**
+
+| step | win | mac |
+|---|---|---|
+| `Env precondition (R-4)` | **0s** | **0s** |
+| `dtolnay/rust-toolchain@stable` | 6s | 7s |
+| ⚠️ **`Install pinned toolchain`** | **97s** | **86s** |
+| `Disk guard` | (skip) | 1s |
+| `cargo build` | 99s | 129s |
+| **job 全体** | **6m19s** | **7m18s** |
+
+- ★ **97s / 86s は初回 DL の代金**である。⚠️ 2 回目以降は toolchain が実機に残るので
+  **ほぼゼロになる見込み** (★ 次の run で確認すること)。
+- ★ `timeout-minutes: 30` に対し **約 23 分の余裕**。→ ✅ 問題なし。
+
+## 判断 45: ⚠️★★★ **「緑だった」で終わらせない** —— ★ この 4 点は *事前に* 決めてあった
+
+- ★ PR の本文に「**初回 CI で必ず見るもの**」として **4 項目を先に書いてから** CI を回した。
+  ⚠️ **後から「何を見るか」を決めると、都合のよい数字だけを見ることになる。**
+- ★ 4 点すべてが**期待どおり**だった。⚠️ もし ③ が「DL 前の数字のまま」だったら、
+  **緑でも H-2 が閉じていない**と判定するつもりだった。
+
+---
+
+# `/cross-review` (Codex 独立レビュー) — PR-A
+
+## 判断 46: ★★★ **R-5 の 3 回目の成功** (⚠️ 切り分けは依然として未了)
+
+- ★ `scripts/run-codex-review.sh` が **exit 0** で完走。⚠️ **1312 は再現しない** (3 回連続)。
+- ★ 予算は自動計上 (`142,909` → 本レビュー分)。⚠️ 3 回とも **codex-cli 0.152.1** なので、
+  **版差か権限差かの切り分けは依然として未了**である (★ 実務上は「使ってよい」で足りる)。
+
+## 判断 47: ⚠️★★★ **Codex 指摘 1 (HIGH) を採用 —— 不変条件を「コメント」から「step」へ移した**
+
+- ⚠️ 指摘: `dtolnay` の `targets:` が入れるのは **stable 側にだけ**。
+  ★ その後 cargo は固定版へ切り替わるので、⚠️ **固定版の側に target std が無い**と
+  `--target` が `can't find crate for core` で落ちる。
+  → ★ **いまは host == `matrix.target` なので成立しているが、コメント頼みの壊れやすい設計**。
+- ★ **これは正しい**。⚠️ 判断 35 で「Intel mac なら即死する」と自分で書いておきながら、
+  **その不変条件を強制する仕掛けは置いていなかった** (★ 注記に書いただけ)。
+- ★ **対応**: install step へ `--target "${{ matrix.target }}"` を明示。
+  ⚠️ **決定 3 とは矛盾しない** —— ★ ファイルに `targets` を書くと**相手 OS の std を両機に**
+  入れるが、**step 側はレグごとに 1 つだけ**入る。
+- ★ **実機で動作を確認した** (⚠️ 「書いたから動く」で済ませない):
+  `rustup toolchain install --target x86_64-pc-windows-msvc` → **exit 0** /
+  `rustup target list --installed` → `x86_64-pc-windows-msvc`。
+
+## 判断 48: ⚠️★★★ **実行して副作用を見つけた —— この step は rustup 自身を self-update する**
+
+- ⚠️ 上の検証を回したとき、**予期しない出力**が出た:
+
+  ```
+  info: checking for self-update (current version: 1.29.0)
+  info: downloading self-update (new version: 1.29.1)
+  ```
+
+- ⚠️★★★ **`rustup toolchain install` は既定で rustup 本体を更新する。**
+  → ★ **self-hosted 実機のツールを黙って書き換える**うえ、
+  ⚠️ **所要時間が読めなくなる** (= `timeout-minutes` の見積もりが揺れる)。
+  ★ PR #194 の install step が **97s / 86s** かかったのも、一部はこれの可能性がある。
+- ★ **対応**: `--no-self-update` を **3 job すべて**に付けた。
+  ⚠️ rustup の更新は**意図して別途行う**。CI の副作用でやらない。
+- ★ **教訓**: ⚠️ **レビュー指摘を直したら、直したものを動かして出力を読む。**
+  ★ この副作用は**誰の指摘にも無く、実行して初めて見えた**。
+
+## 判断 49: ⚠️ Codex 指摘 2 は **false positive** (★ diff しか見えないことに起因)
+
+- ⚠️ 指摘: 「runbook は clippy を必須化しているが、CI 側に同等条件の step がある保証が
+  **diff から読めない**」。
+- ★ **反証 (一次資料)**: `ci.yml:543` に実在する ——
+  `cargo clippy --all-targets --features package --target ${{ matrix.target }} -- -D warnings`
+  → ⚠️ **runbook と同条件** (★ `--target` の有無だけが違い、これは意図的)。
+- ★ Codex 自身が「**diff 外に該当 step があるなら問題なし**」「誤検知可能性: 中」と留保していた。
+- ⚠️ これは `post-mac-sync-cleanup` 判断 13 の `is_ime_active_check` と**同型の FP** である
+  (★ **Codex は repo を読めない**ので、削除/未変更の行の存在を確認できない)。
+
+## 判断 50: ★ Codex 指摘 3 / 4 の扱い
+
+| 指摘 | 判定 |
+|---|---|
+| ⚠️ **指摘 3**: 固定版運用に**セキュリティ更新の検知ゲートが無い** (CI / 定期チェック) | ★ **既知・裁定済み** (決定 2 / 判断 39)。⚠️ 緩和は `rust-toolchain.toml` の**版上げ手順 0** と runbook。⚠️★★★ **ただし security-checker と Codex が *独立に* 同じ点を挙げた** → ★ **研究者へ follow-up として挙げる** (下記) |
+| ★ **指摘 4** (LOW): 将来 `cargo test` の shell/default が変わると検査と実行環境が乖離しうる | ★ **既に注記済み** (⚠️ `defaults:` が無いことを実測し、変わったら再確認する旨を ci.yml に記載)。⚠️ 「`cargo test` step 側で検証する方が堅い」案は、★ **既存の緑の step を触る**代償に見合わないので採らない |
+
+## 判断 51: ★★★ **cross-review 反映後の CI 実測** — ⚠️ 直したものを動かして確かめた
+
+★ run `34680342872` (head `f71d72a`) / 2026-09-12。**全 job pass** (mac 5m39s / win 4m25s)。
+
+### ★ install step の「証拠ブロック」の実出力
+
+```
+[win] 1.98.1-x86_64-pc-windows-msvc (overridden by 'C:\actions-runner\_work\...\rust-toolchain.toml')
+      cargo 1.98.1 (797e8a9bc 2026-08-05) / clippy 0.1.98 (48a229ceae 2026-09-01)
+      x86_64-pc-windows-msvc                    ← ★ rustup target list --installed
+[mac] 1.98.1-aarch64-apple-darwin (overridden by '/Users/johnd/actions-runner/_work/...')
+      cargo 1.98.1 (797e8a9bc 2026-08-05) / clippy 0.1.98 (48a229ceae 2026-09-01)
+      aarch64-apple-darwin                      ← ★ rustup target list --installed
+```
+
+→ ✅ **固定版に `matrix.target` の std が入っていることが CI ログで確認できる** (判断 47)。
+⚠️ これで「host == matrix」という不変条件は**コメントではなく step とログ**で保証される。
+
+### ⚠️★★★ `--no-self-update` の効果 (★ 判断 48 の検証)
+
+| 項目 | 前 run (`b82d411`) | ⚠️ 今 run (`f71d72a`) |
+|---|---|---|
+| `Install pinned toolchain` | win **97s** / mac **86s** | ✅ win **0s** / mac **1s** |
+| rustup self-update | ⚠️ (ローカル実測で 1.29.0 → 1.29.1 の DL を確認) | ✅ **発生なし** |
+| disk guard `free before:` | 19 GiB (wiped=false) | ✅ **19 GiB** (wiped=false)・安定 |
+
+- ★ **97s / 86s は初回 DL の代金だった** —— ⚠️ 2 回目以降は toolchain が実機に残るので **ほぼゼロ**。
+  → ✅ 判断 44 の見込みが当たった。**定常状態での固定のコストは実質ゼロ**である。
+- ★ ⚠️ **新しく分かったこと**: `dtolnay/rust-toolchain` 自身のコマンドラインは
+  `rustup toolchain install stable --target ... --component clippy --profile minimal --no-self-update`
+  → ★ **action は既に `--no-self-update` と `--profile minimal` を使っていた**。
+  ⚠️ **自己更新を起こしていたのは私が足した step だけ**だった (★ 判断 48 の副作用の出所が確定)。
+  ★ 併せて ci.yml の既存注記「dtolnay は `--profile minimal` で入れる」も**実ログで裏が取れた**。
