@@ -562,21 +562,39 @@ mod ordering_invariant_tests {
     /// | 針が `Ordering::Relaxed` 固定 | `use ...Ordering::Relaxed;` + **裸の `Relaxed`**。★ `lib.rs` の `emit_ime_shadow` が**実際にこの書き方**をしている | ★ 針を **`Relaxed`** に緩める (⚠️ 名前との AND なので誤検出は増えない) |
     /// | 1 行 `contains` | ⚠️ rustfmt が引数を折ると**すり抜ける** (★ 同ファイルに 7 行に割れた `store` が実在) | ★ **`;` 区切りのステートメント単位**で見る |
     /// | ファイルのハードコード列挙 | ⚠️ 新規ファイルが**黙って外に出る** | ★ `read_dir` で `src/` を再帰走査 |
+    /// | `Relaxed` を探す**ブラックリスト** | ⚠️ `let o = Ordering::Relaxed; x.load(o)` で**引数に文字列が現れず素通り** (★ cross-review が実機で実証) | ★ **ホワイトリスト**へ —— 強い Ordering が**リテラルで**書かれていることを要求する |
     ///
     /// # ★ 既知の限界
     ///
     /// - ⚠️ **行コメントは落とす** (`//` 以降)。★ 規則を説明する文章が自分に引っかかるため。
     ///   ⚠️ 副作用として `"http://..."` のような**文字列中の `//`** も切るが、
     ///   ★ そこに保護対象の名前と `Relaxed` が同居することは無い。
-    /// - ★ 見るのは **名前の直後の `( .. )` の中だけ**なので、
-    ///   ⚠️ 名前を**経由しない**書き方 (一度ローカル変数に束ねてから `load` する等) は拾えない。
+    /// - ★ 見るのは **名前の直後の `.load(..)` / `.store(..)` 等の引数だけ**なので、
+    ///   ⚠️ **静的変数そのものを一度ローカル参照へ束ねてから** `load` する書き方は拾えない
+    ///   (例: `let a = &IME_ACTIVE;` のあと `a.load(..)`)。
     ///   ★ 現在そのような書き方は repo に無い (⚠️ 増やさないこと)。
+    /// - ⚠️ **`Ordering` を変数へ逃がす**書き方 (`let o = ..; x.load(o)`) は
+    ///   ★ **ホワイトリスト方式で落ちる** (⚠️ 読めない＝許さない方に倒してある)。
+    ///   → ★ これは 2026-09-12 の cross-review が実機で実証した穴で、**塞いである**。
     #[test]
     fn guarded_atomics_never_use_weak_ordering() {
         // ★ 針を `concat!` で割る —— ⚠️ **本ファイル自身も走査対象**なので、
         //   予防的に自己ヒットの目を潰しておく (★ 将来 1 行の述語に書き直されても効く)。
         let names = [concat!("IME_", "OPEN"), concat!("IME_", "ACTIVE")];
         let weak = concat!("Rela", "xed");
+        // ★ atomic のアクセスメソッド (⚠️ `new(..)` 等を巻き込まないための絞り)。
+        const ACCESSORS: &[&str] = &[
+            ".load",
+            ".store",
+            ".swap",
+            ".fetch_and",
+            ".fetch_or",
+            ".fetch_xor",
+            ".compare_exchange",
+            ".compare_exchange_weak",
+        ];
+        // ★ 許される Ordering (⚠️ **リテラルで**書かれていること)。
+        const STRONG: &[&str] = &["Acquire", "Release", "AcqRel", "SeqCst"];
 
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut files = Vec::new();
@@ -650,12 +668,27 @@ mod ordering_invariant_tests {
                         }
                     }
                     let Some(close) = close else { break };
+
+                    // ★ **atomic のアクセスメソッドだけ**を対象にする。
+                    //   ⚠️ そうしないと `static IME_ACTIVE: AtomicBool = AtomicBool::new(false)` の
+                    //     `new(false)` まで拾って誤検出する。
+                    let between = stripped[from..open].trim();
+                    if !ACCESSORS.contains(&between) {
+                        continue;
+                    }
+
                     let args = &stripped[open + 1..close];
-                    if args.contains(weak) {
-                        violations.push(format!(
-                            "{rel} | {name}(…{}…)",
-                            args.split_whitespace().collect::<Vec<_>>().join(" ")
-                        ));
+                    let pretty = args.split_whitespace().collect::<Vec<_>>().join(" ");
+
+                    // ⚠️★★★ **ホワイトリストで見る** (2026-09-12・cross-review 両者一致の HIGH)。
+                    //   ★ 当初は `Relaxed` を探す**ブラックリスト**だったが、
+                    //     ⚠️ `let o = Ordering::Relaxed; IME_ACTIVE.load(o);` のように
+                    //     **Ordering を変数へ逃がすと引数に文字列が現れず、素通りする**
+                    //     (★ cross-review が実機で緑のままになることを実証した)。
+                    //   → ★ 「強い Ordering が**リテラルで**書かれていること」を要求する。
+                    //     ⚠️ 変数束縛は**読めない＝許さない**方に倒す (loud)。
+                    if args.contains(weak) || !STRONG.iter().any(|s| args.contains(s)) {
+                        violations.push(format!("{rel} | {name}{between}(…{pretty}…)"));
                     }
                 }
             }

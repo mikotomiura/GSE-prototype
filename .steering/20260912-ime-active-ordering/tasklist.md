@@ -14,6 +14,6 @@
 - [x] `cargo fmt --check`
 - [x] `cargo test --workspace` 655 passed / 0 failed
 - [x] ゴールデン 6/6 一致 / `emit_schema` byte-equal
-- [ ] `code-reviewer` + `security-checker` を並列起動
-- [ ] `/cross-review`
+- [x] `code-reviewer` + `security-checker` を並列起動 (★ HIGH 1 / MEDIUM 2 に対応)
+- [x] `/cross-review` (★ 両者一致 HIGH: ブラックリスト→ホワイトリストへ反転)
 - [ ] コミット / PR / CI 緑で merge
