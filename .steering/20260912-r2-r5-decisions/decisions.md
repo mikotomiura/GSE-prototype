@@ -667,3 +667,66 @@ clippy 0.1.98 (48a229ceae 2026-09-01)
 - ★ 併せて **ローカルと CI の lint 集合が初めて一致した**
   (⚠️ 従来はローカル 1.94 / CI 1.98 で別物を検査していた・判断 31)。
 - ⚠️ `HMM_VERSION` は **bump しない** (★ ゴールデン 15 が byte-equal = 挙動不変)。
+
+---
+
+# ★★★ PR #194 (PR-A) の CI 実測 — ⚠️ **「緑だった」で終わらせずに 4 点を測った**
+
+★ run `34679690117` / 2026-09-12。**check 両レグ ＋ frontend-check すべて pass**
+(mac 7m18s / win 6m19s / frontend 48s)。
+
+## 判断 41: ✅ **① 固定が効いた証拠が CI ログに残った** (★ H-3 の狙いどおり)
+
+```
+[win] 1.98.1-x86_64-pc-windows-msvc (overridden by 'C:\actions-runner\_work\GSE-prototype\GSE-prototype\rust-toolchain.toml')
+      rustc 1.98.1 (48a229cea 2026-09-01) / cargo 1.98.1 (797e8a9bc 2026-08-05)
+[mac] 1.98.1-aarch64-apple-darwin (overridden by '/Users/johnd/actions-runner/_work/.../rust-toolchain.toml')
+      rustc 1.98.1 (48a229cea 2026-09-01) / cargo 1.98.1 (797e8a9bc 2026-08-05)
+```
+
+- ⚠️★★★ **これが無ければ「どの版で緑なのか」は永久に分からなかった。**
+  ★ 従来 `ci.yml` に `rustc --version` を出す step は **0 件**だった。
+- ★ **mac の host triple も改めて確定**した: `1.98.1-**aarch64**-apple-darwin`
+  → ✅ 決定 3 (`targets` を書かない) は安全 (判断 35 の再確認)。
+
+## 判断 42: ✅ **② step 順が正しい** (★ H-2 の狙いどおり)
+
+`3. Env precondition` → `4. dtolnay` → **`5. Install pinned toolchain`** → **`6. Disk guard`**
+
+⚠️ **install が guard より前**にあるので、guard は **DL 後の真値**を測る。
+
+## 判断 43: ✅ **③ ディスクの実増分を guard 自身の計器で測れた**
+
+| run | `free before:` | `wiped=` |
+|---|---|---|
+| PR #193 (★ 固定前・DL なし) | **20 GiB** (threshold=15 floor=8) | false |
+| ⚠️ **PR #194** (★ 固定・初回 DL 後) | **19 GiB** (threshold=15 floor=8) | false |
+
+- ★ **減少は約 1 GiB**。⚠️ threshold 15 GiB に対し **4 GiB の余裕**が残る。→ ✅ **掃除は走らない。**
+- ⚠️★★★ **`du` の見かけ値 (default 1.3 GiB / minimal 見込み 0.6 GiB) で外挿しなかったのが正解だった** ——
+  ★ 実測は **guard 自身の `df -Pk`** で **1 GiB**。⚠️ 2 つの run 間の差なので他の要因も含みうるが、
+  **計器と順序は正しい**。
+- ★ `profile = "minimal"` を入れたので、⚠️ **default profile のままなら約 2 GiB 減っていた**はず
+  (★ 726 MiB の `rust-docs` 分)。→ **判断 34 は効いている。**
+
+## 判断 44: ✅ **④ install step のコストは初回のみ**
+
+| step | win | mac |
+|---|---|---|
+| `Env precondition (R-4)` | **0s** | **0s** |
+| `dtolnay/rust-toolchain@stable` | 6s | 7s |
+| ⚠️ **`Install pinned toolchain`** | **97s** | **86s** |
+| `Disk guard` | (skip) | 1s |
+| `cargo build` | 99s | 129s |
+| **job 全体** | **6m19s** | **7m18s** |
+
+- ★ **97s / 86s は初回 DL の代金**である。⚠️ 2 回目以降は toolchain が実機に残るので
+  **ほぼゼロになる見込み** (★ 次の run で確認すること)。
+- ★ `timeout-minutes: 30` に対し **約 23 分の余裕**。→ ✅ 問題なし。
+
+## 判断 45: ⚠️★★★ **「緑だった」で終わらせない** —— ★ この 4 点は *事前に* 決めてあった
+
+- ★ PR の本文に「**初回 CI で必ず見るもの**」として **4 項目を先に書いてから** CI を回した。
+  ⚠️ **後から「何を見るか」を決めると、都合のよい数字だけを見ることになる。**
+- ★ 4 点すべてが**期待どおり**だった。⚠️ もし ③ が「DL 前の数字のまま」だったら、
+  **緑でも H-2 が閉じていない**と判定するつもりだった。
