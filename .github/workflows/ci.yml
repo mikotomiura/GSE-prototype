@@ -389,15 +389,31 @@ jobs:
       #      ★ 従来 ci.yml に `rustc --version` を出す step は **0 件**だったので、
       #      「緑になった」だけでは **どの版で緑なのか判別できない** (= 見えないまま緑)。
       #      → ★ 下で `rustup show active-toolchain` を必ず出す。
+      #   ⚠️★★★ **`--target` を明示する** (★ cross-review HIGH・2026-09-12)。
+      #   ★ 上の `dtolnay` の `targets:` が入れるのは **stable 側にだけ**である。
+      #   ⚠️ その後 cargo は固定版へ切り替わるので、**固定版の側に target std が無い**と
+      #   `--target` が `can't find crate for core` で落ちる。
+      #   ★ いまは **host == `matrix.target`** なので host std の同梱で足りているが
+      #   (⚠️ CI ログで実測済み: win=`x86_64-pc-windows-msvc` / mac=`aarch64-apple-darwin`)、
+      #   ⚠️ **それはコメントに書いてあるだけの不変条件**だった。→ ★ **step 側で強制する。**
+      #   ★ これは決定 3 (ファイルに `targets` を書かない) と矛盾しない ——
+      #   ⚠️ ファイルに書くと**相手 OS の std を両機に入れる**が、ここはレグごとに 1 つだけ入る。
       - name: Install pinned toolchain (rust-toolchain.toml)
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install    # ★ 引数なし = active toolchain (= 固定版) を profile/components 込みで
+          # ★ toolchain 名は渡さない (= active toolchain = 固定版) が、target は明示する。
+          # ⚠️★★★ `--no-self-update` を付ける (★ 2026-09-12 に実行して副作用を見つけた) ——
+          #   この step は既定で **rustup 自身を self-update する** (実測: 1.29.0 → 1.29.1 を
+          #   ダウンロードし始めた)。⚠️ self-hosted 実機のツールを**黙って書き換える**うえ、
+          #   ★ 所要時間が読めなくなる (= `timeout-minutes` の見積もりが揺れる)。
+          #   → ⚠️ rustup の更新は**意図して別途行う**。CI の副作用でやらない。
+          rustup toolchain install --no-self-update --target "${{ matrix.target }}"
           echo "--- 固定が効いていることの証拠 (⚠️ 版上げ PR の受け入れ証拠にもなる) ---"
           rustup show active-toolchain
           cargo --version
           cargo clippy --version
+          rustup target list --installed
       # ★ 2026-08-31 追加: ディスク枯渇ガード (self-hosted mac 専用)。
       #
       # ⚠️ なぜ要るか: PR #135 (ドキュメントのみ・コード差分ゼロ) の check が
@@ -719,7 +735,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install
+          # ⚠️ `--no-self-update`: この step は既定で rustup 自身を self-update する (実測)。
+          #   ★ self-hosted 実機のツールを黙って書き換えないこと (理由は `check` job の同名 step 参照)。
+          # ★ target は指定しない —— 本 job は `--target` を渡さず host 向けに素で作るため。
+          rustup toolchain install --no-self-update
           rustup show active-toolchain
           cargo --version
       - uses: Swatinem/rust-cache@v2
@@ -818,7 +837,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install
+          # ⚠️ `--no-self-update`: この step は既定で rustup 自身を self-update する (実測)。
+          #   ★ self-hosted 実機のツールを黙って書き換えないこと (理由は `check` job の同名 step 参照)。
+          # ★ target は指定しない —— 本 job は `--target` を渡さず host 向けに素で作るため。
+          rustup toolchain install --no-self-update
           rustup show active-toolchain
           cargo --version
       # ⚠️★★★ 2026-08-31 追加 (code-reviewer 指摘 #1): 初版のディスクガードは `check` に

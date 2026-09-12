@@ -730,3 +730,64 @@ clippy 0.1.98 (48a229ceae 2026-09-01)
   ⚠️ **後から「何を見るか」を決めると、都合のよい数字だけを見ることになる。**
 - ★ 4 点すべてが**期待どおり**だった。⚠️ もし ③ が「DL 前の数字のまま」だったら、
   **緑でも H-2 が閉じていない**と判定するつもりだった。
+
+---
+
+# `/cross-review` (Codex 独立レビュー) — PR-A
+
+## 判断 46: ★★★ **R-5 の 3 回目の成功** (⚠️ 切り分けは依然として未了)
+
+- ★ `scripts/run-codex-review.sh` が **exit 0** で完走。⚠️ **1312 は再現しない** (3 回連続)。
+- ★ 予算は自動計上 (`142,909` → 本レビュー分)。⚠️ 3 回とも **codex-cli 0.152.1** なので、
+  **版差か権限差かの切り分けは依然として未了**である (★ 実務上は「使ってよい」で足りる)。
+
+## 判断 47: ⚠️★★★ **Codex 指摘 1 (HIGH) を採用 —— 不変条件を「コメント」から「step」へ移した**
+
+- ⚠️ 指摘: `dtolnay` の `targets:` が入れるのは **stable 側にだけ**。
+  ★ その後 cargo は固定版へ切り替わるので、⚠️ **固定版の側に target std が無い**と
+  `--target` が `can't find crate for core` で落ちる。
+  → ★ **いまは host == `matrix.target` なので成立しているが、コメント頼みの壊れやすい設計**。
+- ★ **これは正しい**。⚠️ 判断 35 で「Intel mac なら即死する」と自分で書いておきながら、
+  **その不変条件を強制する仕掛けは置いていなかった** (★ 注記に書いただけ)。
+- ★ **対応**: install step へ `--target "${{ matrix.target }}"` を明示。
+  ⚠️ **決定 3 とは矛盾しない** —— ★ ファイルに `targets` を書くと**相手 OS の std を両機に**
+  入れるが、**step 側はレグごとに 1 つだけ**入る。
+- ★ **実機で動作を確認した** (⚠️ 「書いたから動く」で済ませない):
+  `rustup toolchain install --target x86_64-pc-windows-msvc` → **exit 0** /
+  `rustup target list --installed` → `x86_64-pc-windows-msvc`。
+
+## 判断 48: ⚠️★★★ **実行して副作用を見つけた —— この step は rustup 自身を self-update する**
+
+- ⚠️ 上の検証を回したとき、**予期しない出力**が出た:
+
+  ```
+  info: checking for self-update (current version: 1.29.0)
+  info: downloading self-update (new version: 1.29.1)
+  ```
+
+- ⚠️★★★ **`rustup toolchain install` は既定で rustup 本体を更新する。**
+  → ★ **self-hosted 実機のツールを黙って書き換える**うえ、
+  ⚠️ **所要時間が読めなくなる** (= `timeout-minutes` の見積もりが揺れる)。
+  ★ PR #194 の install step が **97s / 86s** かかったのも、一部はこれの可能性がある。
+- ★ **対応**: `--no-self-update` を **3 job すべて**に付けた。
+  ⚠️ rustup の更新は**意図して別途行う**。CI の副作用でやらない。
+- ★ **教訓**: ⚠️ **レビュー指摘を直したら、直したものを動かして出力を読む。**
+  ★ この副作用は**誰の指摘にも無く、実行して初めて見えた**。
+
+## 判断 49: ⚠️ Codex 指摘 2 は **false positive** (★ diff しか見えないことに起因)
+
+- ⚠️ 指摘: 「runbook は clippy を必須化しているが、CI 側に同等条件の step がある保証が
+  **diff から読めない**」。
+- ★ **反証 (一次資料)**: `ci.yml:543` に実在する ——
+  `cargo clippy --all-targets --features package --target ${{ matrix.target }} -- -D warnings`
+  → ⚠️ **runbook と同条件** (★ `--target` の有無だけが違い、これは意図的)。
+- ★ Codex 自身が「**diff 外に該当 step があるなら問題なし**」「誤検知可能性: 中」と留保していた。
+- ⚠️ これは `post-mac-sync-cleanup` 判断 13 の `is_ime_active_check` と**同型の FP** である
+  (★ **Codex は repo を読めない**ので、削除/未変更の行の存在を確認できない)。
+
+## 判断 50: ★ Codex 指摘 3 / 4 の扱い
+
+| 指摘 | 判定 |
+|---|---|
+| ⚠️ **指摘 3**: 固定版運用に**セキュリティ更新の検知ゲートが無い** (CI / 定期チェック) | ★ **既知・裁定済み** (決定 2 / 判断 39)。⚠️ 緩和は `rust-toolchain.toml` の**版上げ手順 0** と runbook。⚠️★★★ **ただし security-checker と Codex が *独立に* 同じ点を挙げた** → ★ **研究者へ follow-up として挙げる** (下記) |
+| ★ **指摘 4** (LOW): 将来 `cargo test` の shell/default が変わると検査と実行環境が乖離しうる | ★ **既に注記済み** (⚠️ `defaults:` が無いことを実測し、変わったら再確認する旨を ci.yml に記載)。⚠️ 「`cargo test` step 側で検証する方が堅い」案は、★ **既存の緑の step を触る**代償に見合わないので採らない |
