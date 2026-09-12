@@ -451,3 +451,59 @@
 - ★ **緩和策は入れてある**: `docs/verification-runbook.md` §1 に **(f) MSRV 検査**を追加し、
   ⚠️ **依存を更新した回に回す**手順として恒久化した
   (★ 従来は `Cargo.toml` のコメントにしか無く「回す場所が無い手順」だった)。
+
+---
+
+# ★★★ PR #193 (PR-B) の CI 実測 — ⚠️ **R-4 の元の問いに答えが出た**
+
+★ run `34677596718` / 2026-09-12。**check 両レグ ＋ frontend-check すべて pass**
+(mac 6m4s / win 5m7s / frontend 40s)。
+
+## 判断 28: ⚠️★★★ **R-4 の元の問い「CI 環境で `USERPROFILE` / `HOME` は立っているか」の答え**
+
+★ mac セッション §8.3 が「**観察不能**」と判定した問いに、**ついに答えが出た**。
+
+| レグ | ランナー | `USERPROFILE` | `HOME` |
+|---|---|---|---|
+| Windows | `g-gear-win-x64` | ✅ **set** | (★ 見ない —— MSYS2 が合成するため) |
+| macOS | `macbook-air-m-arm64` | ⚠️★★★ **unset** | ✅ **set** |
+
+- ⚠️★★★ **macOS では `USERPROFILE` が立っていない。**
+  → ★ あの回帰保護は **mac 側では `HOME` だけに依存していた**。
+  ⚠️ もし誰かが「Windows 用だから」と `USERPROFILE` を先に見る実装を
+  `USERPROFILE` **のみ**に狭めたら、**mac 側の保護が丸ごと消えて無音で緑になっていた**。
+- ★ **これが「観察できるようにする」ことの価値である** —— ⚠️ 従来は
+  テストが無音 skip するので、**この事実を知る方法が無かった**。
+- ★ 検査 step の所要時間は **両レグとも 0 秒** (⚠️ fail-fast の代償はゼロ)。
+
+## 判断 29: ★ step 別の所要時間 (⚠️ PR-A の見積もりの基準)
+
+| step | win | mac |
+|---|---|---|
+| checkout | 6s | 4s |
+| ★ **Env precondition (R-4)** | **0s** | **0s** |
+| `dtolnay/rust-toolchain@stable` | **12s** | **2s** |
+| `cargo build` | 120s | 130s |
+| `cargo test` | 101s | 143s |
+| ゴールデン | 10s | 17s |
+| schema | 1s | 2s |
+| clippy | 43s | 49s |
+| **job 全体** | **5m7s** | **6m4s** |
+
+⚠️ `timeout-minutes: 30` に対し **24 分近い余裕**がある。
+→ ★ PR-A で toolchain の初回 DL (★ 1 本 ≈ 1.3〜1.4 GiB) が乗っても十分収まる見込み。
+
+## 判断 30: ⚠️★★★ **ディスクは guard 自身の計器だけで論じる** (★ PR-A の可否)
+
+- ★ 実測 (mac・**guard の出力行そのもの**):
+
+  ```
+  free before: 20 GiB (threshold=15 floor=8)
+  free after:  20 GiB (wiped=false)
+  ```
+
+- → ★ **threshold まで 5 GiB の余裕**。⚠️ PR-A の増分は **約 1.3 GiB** (判断 15) なので、
+  **20 - 1.3 = 18.7 GiB** で threshold を割らない。→ ✅ **PR-A を入れてよい。**
+- ⚠️★★★ **`df -h` の数字で外挿しない** —— ★ `mac-clippy-green-and-ci-gate` §2 で
+  自分の計器 (`df -h` = 16 GiB) と guard の計器 (`df -Pk` = 17 GiB) が **1 GiB 食い違い**、
+  「次の run で掃除が走る」という**予測を外した**前科がある。
