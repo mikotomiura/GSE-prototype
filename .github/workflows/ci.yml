@@ -124,12 +124,29 @@ env:
 #   → ⚠️ public 化するなら**その前に** Windows 実機のコンピュータ名とランナー登録名を
 #     非個人名へ変更すること (★ private を維持するならこの項目は発火しない)。
 #
-# ⚠️ 未対処として残っている関連リスク (★ 本ゲートは**一切効かない**):
-#   third-party action が可変参照のままである (`dtolnay/rust-toolchain@stable` は**タグでなく
-#   ブランチ**、`Swatinem/rust-cache@v2` / `actions/checkout@v4` / `softprops/action-gh-release@v2`
-#   は可動タグ)。⚠️ repo 設定も `allowed_actions: all` / `sha_pinning_required: false` (実測)。
-#   → 上流アカウントが乗っ取られると push / tag ビルドでも実機の鍵を読まれる。
-#   ★ follow-up: self-hosted で走るジョブの action を commit SHA でピン留めする。
+# ⚠️ 関連リスク: third-party action が乗っ取られると、push / tag ビルドでも実機の鍵を読まれる
+#   (★ 本ゲートは**一切効かない**)。⚠️ repo 設定も `allowed_actions: all` /
+#   `sha_pinning_required: false` (実測)。
+#
+#   ✅ **2026-09-13 (F-8) に対処した** —— ★ **third-party action 3 本を commit SHA で固定**:
+#     - `dtolnay/rust-toolchain@6bed076…` (⚠️ 旧 `@stable` は**タグですらなくブランチ**だった)
+#     - `Swatinem/rust-cache@6323deb…` (v2.9.2)
+#     - `softprops/action-gh-release@3bb1273…` (v2.6.2・⚠️ `contents: write` を持ち
+#       **被験者が落とすバイナリを差し替えうる**ので hosted でも固定した)
+#
+#   ⚠️★★★ **`actions/*` は意図的にタグのまま**にしている (★ 無言で非対称にしないため書く):
+#     GitHub 自社所有で、⚠️ **dependabot を入れない裁定 (D12) の下では固定＝更新が完全に手動**に
+#     なり、★ 固定した方が古いまま放置されるリスクの方が大きいと判断した。
+#     → ⚠️ この判断を変えるなら `scripts/check_workflow_invariants.py` の規則も一緒に変えること。
+#
+#   ★ **固定が「決めたきり」にならないよう機械で守っている** ——
+#     `scripts/check_workflow_invariants.py` が **third-party action の可変参照を CI で赤にする**
+#     (⚠️ 新しい action を可動タグで足した瞬間に落ちる)。
+#     ★ 版を上げる手順は `docs/verification-runbook.md` §1 (h)。
+#
+#   ⚠️ **残っている本丸は別にある**: ★ `ci.yml:112` の「候補 c: `~/.gse/age-identity.txt` を
+#     ランナーと別マシン / 別アカウントへ退避する」。⚠️ SHA 固定は**上流乗っ取りを遅らせるだけ**で、
+#     鍵が同じ home にある限り「実機で任意コードが走れば鍵が読める」構図は変わらない。
 
 jobs:
   # ── ブランチ push / PR: 両 OS で build + test + snapshot 回帰 ──
@@ -400,7 +417,7 @@ jobs:
       #   **実態より強い保証を謳うことになる**。
       #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
       #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable ブランチ 2026-09-03
         with:
           targets: ${{ matrix.target }}
           components: clippy
@@ -541,7 +558,7 @@ jobs:
           echo "runner.environment      = ${RUNNER_ENV}"
           echo "disk_guard.outputs.wiped = ${DISK_GUARD_WIPED:-(null: guard は skip された)}"
           echo "→ rust-cache が走るのは wiped != 'true' かつ runner.environment == 'github-hosted' のときだけ"
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: ${{ steps.disk_guard.outputs.wiped != 'true' && runner.environment == 'github-hosted' }}
         with:
           workspaces: src-tauri -> target
@@ -705,6 +722,21 @@ jobs:
           python3 -m unittest scripts.tests.test_check_dependency_audit
         env:
           PYTHONUTF8: "1"
+      # ⚠️★★★ **workflow の不変条件ゲート** (F-8 / F-9・2026-09-13)。
+      #   ★ 汎用 linter は入れない裁定 (⚠️ 第三者 action を増やすのは F-8 と逆行する)。
+      #   ★ 代わりに**この repo が実際に決めたこと**を検査する:
+      #     (1) 全 job が実効 `permissions` を持つ (F-5)
+      #     (2) third-party action が **40 桁 commit SHA** で固定されている (F-8)
+      #     (3) `supply-chain.yml` が self-hosted へ向いていない (★ 実機に鍵がある)
+      #     (4) ⚠️ 走査 0 件は「違反なし」ではなく **exit 2**
+      #   ⚠️ ここ (`frontend-check`) に置くのは、**全 PR / push で走る**からである。
+      - name: Workflow invariants (F-8 / F-9)
+        run: |
+          python3 scripts/check_workflow_invariants.py --self-test
+          python3 scripts/check_workflow_invariants.py
+          python3 -m unittest scripts.tests.test_check_workflow_invariants
+        env:
+          PYTHONUTF8: "1"
       # ⚠️★★★ **F-4 を「やらない」判断の担保** (2026-09-12)。
       #   ★ CI の clippy は `--features package` の **1 本だけ**である。
       #   ⚠️ default features のみの clippy が CI に無くてよいのは、
@@ -789,7 +821,7 @@ jobs:
       #   ★ 説明の正典は `check` job の同名 step にある。⚠️ ここに複製しない。
       #   ★ 本 job で実際に cargo を起動する主経路は `npx tauri build` (cwd = repo 直下) だが、
       #   rustup は cwd から親へ辿るので**同じファイルが効く**。
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable ブランチ 2026-09-03
       # ★ 固定版を明示的に入れる (⚠️ 理由は `check` job の同名 step のコメント参照)。
       - name: Install pinned toolchain (rust-toolchain.toml)
         shell: bash
@@ -801,7 +833,7 @@ jobs:
           rustup toolchain install --no-self-update
           rustup show active-toolchain
           cargo --version
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
@@ -891,7 +923,7 @@ jobs:
       #   ★ 説明の正典は `check` job の同名 step にある。⚠️ ここに複製しない。
       #   ★ 本 job で実際に cargo を起動する主経路は `npx tauri build` (cwd = repo 直下) だが、
       #   rustup は cwd から親へ辿るので**同じファイルが効く**。
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable ブランチ 2026-09-03
       # ★ 固定版を明示的に入れる (⚠️ 理由は `check` job の同名 step のコメント参照)。
       - name: Install pinned toolchain (rust-toolchain.toml)
         shell: bash
@@ -958,7 +990,7 @@ jobs:
           echo "runner.environment      = ${RUNNER_ENV}"
           echo "disk_guard.outputs.wiped = ${DISK_GUARD_WIPED:-(null: guard は skip された)}"
           echo "→ rust-cache が走るのは wiped != 'true' かつ runner.environment == 'github-hosted' のときだけ"
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: ${{ steps.disk_guard.outputs.wiped != 'true' && runner.environment == 'github-hosted' }}
         with:
           workspaces: src-tauri -> target
@@ -1163,7 +1195,7 @@ jobs:
         continue-on-error: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: artifacts/*
           generate_release_notes: true
