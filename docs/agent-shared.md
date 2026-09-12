@@ -158,6 +158,10 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 
 ## CI / 運用上の注意
 
+- ⚠️★★★ **workflow は 2 枚ある** (2026-09-12): `ci.yml` (ビルド / テスト / リリース) と
+  ★ `supply-chain.yml` (**週次**の供給網検知 = toolchain advisory / `cargo audit` / `npm audit`)。
+  ⚠️ 後者は **branch protection が無いので門ではなく信号**であり、赤でもマージは止まらない。
+  ★ 手元で同じ 3 本を回す手順は `docs/verification-runbook.md` §1 (g)。
 - CI は GitHub Actions (`.github/workflows/ci.yml`) で稼働中。⚠️ ★ 2026-08-10 に
   「無料枠 (3000h) 超過でクラウド CI 利用不可」という**古い記述を訂正**した
   (PR #94 で `check` (windows / macOS) / `frontend-check` の実行を確認済み)。

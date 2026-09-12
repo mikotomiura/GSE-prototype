@@ -202,6 +202,14 @@ cargo run --bin gse-replay -- <session.ndjson> --intervention --json # 構造化
 
 ### CI/CD パイプライン
 
+⚠️★★★ **2026-09-12 追記 —— workflow は 2 枚ある。** ★ 長らく `ci.yml` 1 枚だったので、
+「CI」と言ったら `ci.yml` のことだという前提が各所に残っている。**数えてから読むこと。**
+
+| ファイル | 起動 | 役割 |
+|---|---|---|
+| `.github/workflows/ci.yml` | `push` (main / `feature/*`)・`pull_request` (main)・`v*` タグ・手動 | ビルド / テスト / 回帰 / リリース |
+| ★ `.github/workflows/supply-chain.yml` | **週次 `schedule`**・手動・⚠️ **`paths` 限定の PR** | 供給網の検知 (F-1 / F-2) |
+
 GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `feature/*`)・`pull_request` (main)・`v*` タグで起動する:
 
 - **`check` ジョブ**: matrix ビルド。⚠️★★★ **2026-09-01 訂正 —— runner は self-hosted 実機である。**
@@ -221,6 +229,19 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
   capabilities gate (`capabilities_gate.py --self-test` ＋ `python3 -m unittest scripts.tests.test_capabilities_gate`) →
   シェル移植性ゲート (`bash scripts/check-shell-portability.sh`)
 - **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Windows は **portable exe** (`--no-bundle`)、macOS は **DMG** をアーティファクト化 (macOS は entitlements 付き再署名 ＋ 研究者専用 CLI の strip)
+- ★ **`supply-chain` workflow** (`.github/workflows/supply-chain.yml`・**別ファイル**・`ubuntu-latest`):
+  3 層を 1 job で検査する —— **toolchain** (`scripts/check_toolchain_advisories.py` が
+  `rust-toolchain.toml` の `channel` を rust-lang/rust の advisory と突合) /
+  **Rust 依存 630 crate** (`scripts/check_dependency_audit.py` = cargo-audit のラッパー) /
+  **npm 本番依存** (`npm audit --omit=dev`)。
+  ⚠️★★★ **これは「門」ではなく「信号」である** —— ★ `main` に branch protection が無い
+  (2026-09-12 実測: `404 Branch not protected`) ので、赤でもマージは機械的に止まらない。
+  ★ 要は **週次 `schedule`** である (⚠️ 新しい advisory は**コード差分ゼロで現れる**ので、
+  PR 発火だけでは永久に気づかない)。⚠️ PR 発火は `Cargo.lock` / `rust-toolchain.toml` /
+  `package-lock.json` / 検査器そのものを触ったときだけ。
+  ★ 検査器の unittest は **`frontend-check` でも**走る (⚠️ `paths` 限定では
+  「依存を触らない PR」で 1 度も走らないため)。★ 同じ 3 本は手元でも回せる
+  (`docs/verification-runbook.md` §1 (g))。
 - **`release` ジョブ**: 両ビルド成功後に GitHub Release を作成。★ **公開するのは 5 アセットだけ** — 被験者向け `gse-next.exe` / `gse-submit.exe` / `*.dmg` と、研究者専用 `gse-unpack(.exe)`。⚠️ NSIS インストーラと `gse-package` は **Phase1 で使われなかったので配らない** (2026-08-03)
 
 > **運用上の注意**: ⚠️★★★ **2026-09-01 訂正 —— 「クラウド CI が動いている」は半分だけ正しい。**
