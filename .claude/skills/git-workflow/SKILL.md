@@ -66,7 +66,30 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 | test | テストの追加・修正 |
 
 **scope（GSE 固有）:**
-`engine`, `hook`, `ime`, `wall`, `frontend`, `logger`, `features`, `analysis`
+
+★ 規約上の一覧（`docs/agent-shared.md` = **SSOT**）:
+`engine`, `hook`, `ime`, `overlay`, `frontend`, `logger`, `probe` 等
+
+> ⚠️★★★ **`wall` は 2026-09-01 に削除された**（ADR-015 D1 で Wall / Zen Timer /
+> `wall_server.rs` が全削除され、`InterventionAction` は `None / Nudge / Defer` の 3 値になった）。
+> ★ SSOT は `docs/agent-shared.md` の「git ワークフロー基本」節
+> （⚠️ 2026-09-12 まで **この Skill だけが追随していなかった**）。
+> ★ 削除後に `(wall)` を使ったコミットは **0 件**（実測）。
+
+> ⚠️★★★ **上の一覧は「コード領域」だけで、実績の大半を覆っていない。**
+> ★ 直近 400 コミットの実測（2026-09-12・`git log --format=%s | grep -oE '^[a-z]+\([a-z0-9-]+\)'`）:
+>
+> | scope | 件数 | | scope | 件数 |
+> |---|---|---|---|---|
+> | `steering` | **113** | | `g1` | 11 |
+> | `o1` | 24 | | `hook` | 9 |
+> | `experiments` | 22 | | `ime` | 8 |
+> | `mitou` | 17 | | `adr` | 7 |
+> | `ci` | **16** | | `expr` | 6 |
+> | `handoff` | 12 | | | |
+>
+> → ★ **迷ったら実測する**（上のコマンドを叩く）。⚠️ 一覧を暗記して当てはめない。
+> ★ 新しい scope を作るのは、**既存のどれにも当たらないと確かめてから**。
 
 ```
 // ✅ 良い例
