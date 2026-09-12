@@ -97,6 +97,31 @@
 - ★ (c) は cargo-audit 単体では不可能 —— ⚠️ 何にも当たらない除外は**見えないまま永久に残る**。
 - **却下**: workflow の中で `--ignore RUSTSEC-... ` を並べる ——
   ★ コマンドラインには出るが、⚠️ **手元で素の `cargo audit` を叩いた人と結果が食い違う**。
+- ★ cargo-audit は `.cargo/audit.toml` を **cwd 直下しか見ず、親へは遡らない**。
+  実測 —— repo 直下から: `settings.ignore = ['RUSTSEC-2026-0194','RUSTSEC-2026-0195']` /
+  `src-tauri/` から: **`settings.ignore = []`**。
+  ⚠️★★★ **落とし穴**: ★ **`src-tauri/` に降りて `cargo audit` を叩くと除外が効かず赤になる**。
+  → `.cargo/audit.toml` と runbook §1 (g) に「**repo 直下から回す**」と明記した。
+
+- ⚠️★★★ **訂正 (2026-09-12・code-reviewer HIGH)。** ★ 本項の初稿は
+  「**一時ディレクトリに設定が漏れ込む経路は無い**」と書いていたが、**それは誤りだった**。
+  ★ cargo-audit は **`$CARGO_HOME/audit.toml` も読む**。実測 (対照つき):
+
+  | 条件 (cwd はどちらも空の sandbox) | 検出 | `settings.ignore` |
+  |---|---|---|
+  | `$CARGO_HOME/audit.toml` **あり** | **0 件** | `['RUSTSEC-2026-0194','RUSTSEC-2026-0195']` |
+  | `$CARGO_HOME/audit.toml` **なし** | **2 件** | `[]` |
+
+  ⚠️ 私が確かめていたのは「**本機に `~/.cargo/audit.toml` が今は無い**」という*状態*であって、
+  **経路の不在ではなかった**。★ 個人機や self-hosted の誰かが作れば、
+  **repo の除外リストに無い advisory が黙って消えて緑**になる
+  (⚠️ stale 判定で拾えるのは repo 側に書いてある ID だけなので、これは検出できない)。
+- **是正**: ★ ラッパーは `CARGO_HOME` を **sandbox へ向けて**実行し (`--db` で実 DB を明示して
+  再 clone を避ける)、⚠️ **実行後に `settings.ignore` が空だったことを検算**してから結果を採る
+  (★ 空でなければ `RuntimeError` で赤)。
+- ★ **検算 (対照つき変異テスト)**: 個人設定が 2 件を除外・repo 側は除外ゼロ、という条件で
+  —— **ラッパー: 2 件 blocking / exit 1** ⇔ **素の cargo-audit: 0 件**。
+  → ⚠️ 「同じ結果が出るから大丈夫」ではなく、**差が出る条件**で確かめた。
 
 ## D8: ⚠️ npm は **`--omit=dev` だけを門にする**
 
@@ -136,9 +161,33 @@
 - **実測**: `rust-toolchain.toml` 手順 0 の `gh api /repos/rust-lang/rust/security-advisories` は、
   git-bash (MSYS2) が**先頭スラッシュ**を Windows パスへ書き換えるため
   `invalid API endpoint: "C:/Program Files/Git/repos/..."` で落ちる。
-- **決定**: 手順 0 を script 呼び出しへ差し替えた (★ script は先頭スラッシュ無しで呼ぶ)。
+- **決定**: 手順 0 を script 呼び出しへ差し替えた。
+  ⚠️★★★ **さらにレビュー反映で `gh` 依存そのものを外した** (★ code-reviewer / Codex の
+  「fork PR には secret が渡らない」指摘) —— ★ script は `urllib` で公開 API を直接叩く。
+  実測: **認証なしでも HTTP 200 / 6 件**取れるので、トークンは
+  **60 req/hr の IP 単位制限を上げるためだけ**に使う (⚠️ hosted runner は IP を共有する)。
+  → ★ MSYS2 のパス書き換え問題も、`gh` が居ない環境も、まとめて消えた。
   ⚠️ さらに「一覧を目で見て判断する」形をやめた —— ★ 範囲が `>= 1.87.0, < 1.89.0` のような
   **閉区間**のとき「修正版より新しいから安全」は成り立たず、**人が誤りやすい**。
+
+## D13: ⚠️ `/cross-review` が **fail-closed BLOCKED** —— 研究者確認のうえ `--ack-filtered`
+
+- **事実**: `scripts/run-codex-review.sh` がパス限定でも exit 2 (BLOCKED) を返した。
+- ★ **ヒットは 1 行だけ** —— `supply-chain.yml` の
+  `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` が `secrets-filter.sh` の
+  `gh_token` / `github_token` パターンに当たった。
+- ⚠️★★★ **これは Actions の式参照であって、値は diff に存在しない**
+  (★ GitHub が実行時に差し込む)。→ 実体のある機密ではない。
+- ★ **構造的な over-block である**: ⚠️ `gh` にトークンを渡す workflow は
+  **env 名が `GH_TOKEN` である限り必ず当たる** (★ `${{ github.token }}` に書き換えても同じ)。
+  → ⚠️ フィルタを弱めない (★ `secrets-filter.sh` 自身が「架空名まで止めると人が迂回する動機を
+  作る」と書いているとおり、ここで緩めるのは最悪手)。
+- **決定**: ★ **研究者が該当行を確認したうえで** `--ack-filtered` で再実行した
+  (⚠️ 規約どおり自動では付けていない)。
+- ★ **却下**: `gh` をやめて `urllib` で無認証取得にする ——
+  ⚠️ 実測では無認証でも **HTTP 200 / 6 件**取れる (★ アクセス権の問題ではない) が、
+  無認証は **60 req/hr の IP 単位制限**で、hosted runner は IP を共有するため
+  週次 job が不安定になる。→ ★ トークンは残す。
 
 ## D12: ★ dependabot は**入れない** (⚠️ 申し送りに残す)
 
@@ -147,3 +196,49 @@
   ⚠️ 2-3 人チームに自動更新 PR のノイズが勝る。
 - ⚠️ **ただし別論点が残る**: ★ `ci.yml` / `supply-chain.yml` が使う **GitHub Actions の版は
   タグ参照 (`@v4`) のままで SHA 固定していない**。→ ★ 申し送り (F-8) として残す。
+
+---
+
+## D14: ★ レビュー 3 系統の反映 (⚠️ code-reviewer / security-checker を並列 ＋ Codex cross-review)
+
+★ **一致した指摘は優先度高** という運用どおり、⚠️ **3 系統のうち 2 系統以上が独立に挙げた点**を
+最優先で直した。
+
+| # | 出所 | 指摘 | 対応 |
+|---|---|---|---|
+| **H-1** | ⚠️ **code-reviewer ＋ security-checker (一致)** | `scripts/check-tests-are-wired.sh` が `ci.yml` しか見ず、新テスト 2 本が「CI で走らない」判定 → **`frontend-check` が赤になる** | ★ **両方やった**: (a) 番人を**全 workflow 走査**へ (b) 検査器の unittest を **`frontend-check` にも配線** (⚠️ `supply-chain.yml` は `paths` 限定なので、依存を触らない PR では 1 度も走らない) |
+| **H-2** | code-reviewer | ⚠️★★★ **`$CARGO_HOME/audit.toml` が sandbox に効く** (= D7 の私の記述が誤り) | ★ `CARGO_HOME` を sandbox へ ＋ **実行後に `settings.ignore` が空だったことを検算**。⚠️ 対照つき変異テストで実証 |
+| **M** | ⚠️ **code-reviewer ＋ Codex (一致)** | `read_ignore_list` が `[advisories]` を見ず最初の `ignore` を拾う / シングルクォートを読めない | ★ `tomllib` 優先 ＋ section 追跡の fallback。⚠️ **両経路を 7 ケースで突き合わせ**て一致を確認 |
+| **M** | security-checker | ⚠️ 再点検期日を**機械が読まない** → 上流が直さない限り**永久に緑** | ★ `# review-by: YYYY-MM-DD` を必須化。**無ければ exit 4 / 過ぎれば exit 2** |
+| **M** | security-checker | ⚠️ ラッパーが `ignore` 以外の設定を**黙って捨てる** (= 締める設定が無効化される) | ★ `[advisories] ignore` 以外のキーがあれば **exit 4** で拒否。⚠️ 1 ファイルが 2 つの答えを出すより拒否する |
+| **M** | code-reviewer | ⚠️ `--advisories-file` に list 以外 → 未捕捉例外の **exit 1 = EXIT_HIT と同値** (★ D10 と同じ失敗様式が file 経路に残っていた) | ★ `coerce_advisories()` を両経路で共用し **exit 3** へ |
+| **M** | code-reviewer | ⚠️ `.cargo/audit.toml` の実測値 (3→1) が**現在の状態で再現しない** (h2 修正後は 2→0) | ★ **両方の数字**を時点つきで併記 |
+| **M** | code-reviewer | `supply-chain.yml` だけ Node 版が未固定 | ★ `setup-node@v4` / `node-version: 22` (`frontend-check` と同じ) |
+| **M** | code-reviewer | 新 workflow が `docs/development-guidelines.md` の CI 章に載っていない | ★ 追記 ＋ `docs/agent-shared.md` にも。⚠️ **「workflow は 2 枚ある」を表で明示** |
+| **L** | ⚠️ **code-reviewer ＋ security-checker (一致)** | informational (warnings) の ID を除外すると誤って **stale** 判定 → 誤った削除指示 | ★ `found_ids` に warnings 側の ID も含める |
+| **L** | security-checker | `db_count == 0` が緑になる / DB の鮮度が出ない | ★ `db_count == 0` も exit 3 ＋ `last-updated` を出力 |
+| **L** | code-reviewer | `withdrawn_at` を見ていない (★ 取り下げ advisory で将来の偽赤) | ★ withdrawn は `wdrw` として印字しスキップ |
+| **L** | code-reviewer | レポート行に**対象パッケージ名が出ない** (`std` / `rustc` / `Rust` の 3 種がある) | ★ 列を追加 |
+| **L** | code-reviewer | `cancel-in-progress: true` は週次走査を捨てうる | ★ **false** に (⚠️ cancelled は赤に見えない) |
+| **L** | security-checker | `supply-chain.yml` に fork ゲートが無い | ⚠️ **足さない** —— ★ `ci.yml` 自身が「そのゲートは防御ではない (PR head が行を消せる)」と記録済み。**効果ゼロの防御を増やさず**、hosted 限定である旨と `ci.yml` の議論への導線を注記した |
+| **L** | security-checker | action の版が可動タグ | ★ **hosted 使い捨て ＋ `contents: read` なので SHA ピンの対象外**と**理由を書いた** (⚠️ 無言で非対称にしない) |
+| **FP** | Codex HIGH-1 | `GH_TOKEN: ${{ [REDACTED] }}` は構文エラー | ⚠️ **false positive** —— ★ Codex は secrets-filter で伏字化された diff を見ている。実ファイルは `${{ secrets.GITHUB_TOKEN }}` で YAML パースも通る (実測)。★ Codex 自身が「提示用の伏字なら誤検知」と併記していた |
+
+### ★ 反映の過程で自分で見つけたもの
+
+- ⚠️ `# review-by:` の正規表現が **1 要素配列 (`ignore = ["X"]  # review-by: ...`)** を
+  拾えず「期日なし」に化けていた (★ 追加したテストが即座に捕まえた) → `[,\]]?` を許す形へ。
+- ⚠️ `check-tests-are-wired.sh` の配列参照が **macOS 既定の bash 3.2 + `set -u`** で
+  空配列に当たると落ちうる → ★ **スカラのカウンタで弾き、参照そのものが起きない形**にした
+  (⚠️ `check-shell-portability.sh` はこの型を見ないので、ゲートは通っていた)。
+- ⚠️ self-test の中で `main()` を呼んだせいで、**緑の self-test の中に `ERROR:` 行が出ていた**
+  → ★ 期待される標準エラーを握り潰した (⚠️ CI ログを読む人を誤解させる)。
+
+## D15: ★ Codex の指摘のうち**採らなかった**もの
+
+- ⚠️ **actionlint を CI に足す (Codex テスト不足 6)**: ★ 採らない。
+  理由: (a) ⚠️ **供給網の PR で新しい第三者 action / バイナリ配布を増やすのは本末転倒**、
+  (b) ★ Codex が根拠にした HIGH-1 は**伏字由来の false positive** であって実在の構文エラーではない、
+  (c) ★ YAML 妥当性は `yaml.safe_load` と **GitHub 自身の受理**で確認している
+  (⚠️ `ci.yml` は dispatch 実行で、`supply-chain.yml` は PR #197 の実行で確かめる)。
+  → ★ **申し送り F-9** として残す (⚠️ 「やらない」ではなく「別途裁定する」)。

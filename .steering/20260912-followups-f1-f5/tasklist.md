@@ -48,9 +48,18 @@
 
 ## Phase 3: レビューと後片付け
 
-- [ ] `code-reviewer` + `security-checker` を**並列**起動 → 反映
-- [ ] `/cross-review` (★ ラッパー優先・パス限定)
-- [ ] `decisions.md` を最終化
+- [x] `code-reviewer` + `security-checker` を**並列**起動 → ⚠️ HIGH 2 / MEDIUM 9 / LOW 6 を反映
+- [x] `/cross-review` —— ⚠️ 1 巡目は **secrets-filter で fail-closed BLOCKED**
+      (★ ヒットは `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` の 1 行のみ = Actions の式参照)。
+      ★ **研究者確認のうえ** `--ack-filtered` で再実行 → HIGH 2 / MEDIUM 3 / テスト不足 2 を得た
+- [x] ⚠️★★★ **H-1 (2 系統一致)**: `check-tests-are-wired.sh` が `ci.yml` しか見ず
+      **`frontend-check` が赤になる**状態だった → 全 workflow 走査へ ＋ 検査器テストを
+      `frontend-check` にも配線 (★ `paths` 限定では依存を触らない PR で 1 度も走らない)
+- [x] ⚠️★★★ **H-2**: `$CARGO_HOME/audit.toml` が sandbox に効くことが判明
+      (= **D7 の私の記述が誤りだった**) → `CARGO_HOME` 隔離 ＋ 実行後の検算。
+      ★ 対照つき変異テストで実証 (ラッパー 2 件赤 ⇔ 素の実行 0 件)
+- [x] ★ 再検証: 52 テスト / 全ゲート exit 0 (wired / portability / self-test x2 / live x2 / npm)
+- [x] `decisions.md` を最終化 (D1〜D15)
 - [ ] ⚠️ `_handoff/next-session-followups-f1-f5.md` に結果を追記 (★ F-4 だけ残ることを明記)
 - [ ] ⚠️ 未マージの `docs/handoff-followups-f1-f5` ブランチ (`1b8f500`) の扱いを研究者に確認
 - [ ] `/finish-task`
