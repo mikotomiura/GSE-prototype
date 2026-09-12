@@ -353,18 +353,51 @@ jobs:
             if [ -n "${USERPROFILE:-}" ]; then echo "USERPROFILE: set"; else echo "USERPROFILE: unset"; fi
             if [ -n "${HOME:-}" ]; then echo "HOME: set"; else echo "HOME: unset"; fi
           fi
-      # ⚠️★★★ **実際に cargo が使う版は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
-      #   ★ 実測: repo 直下のファイルは **サブディレクトリでも効く**ので、
-      #   `working-directory: src-tauri` の cargo step すべてが**そのファイルの版**で走る。
-      #   ⚠️ したがって下の `@stable` は「rustup と既定 toolchain を用意する」役割に退いている
-      #   (★ 特に `check` は `decide-win-runner` 失敗時に hosted `windows-latest` へ
-      #   fallback する経路があり、そこで rustup の存在を保証する意味がある)。
+      # ⚠️★★★ **toolchain は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
+      #   ★ ここが**正典の説明**。⚠️ `build-windows` / `build-macos` は 1 行でここを参照する
+      #   (★ 同じ 8 行を 3 箇所へ複製すると、必ず片方だけ直る —— disk-guard を composite action へ
+      #   切り出したときの教訓と同型)。
+      #
+      #   ★ repo 直下のファイルは **サブディレクトリでも効く** (rustup は cwd から上へ辿る) ので、
+      #   `working-directory: src-tauri` の cargo step も、`npx tauri build` が内部で起動する
+      #   cargo も、**すべてファイルが指す版**で走る。
+      #   ⚠️ 下の `@stable` に残る役割は **「`stable` を入れて `rustup default` に据えること」**
+      #   だけである (★ 実測: `~/.rustup/settings.toml` に
+      #   `default_toolchain = "stable-x86_64-pc-windows-msvc"` が実在する)。
+      #   ⚠️★ **「rustup そのものを用意する」とは書かない** —— ★ action が rustup を導入するか
+      #   どうかの一次資料を取れていないうえ、hosted には同梱・self-hosted には既に在るので、
+      #   **実態より強い保証を謳うことになる**。
       #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
       #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
           components: clippy
+      # ⚠️★★★ **固定版を「明示的に」入れる** (★ code review HIGH ×3 をまとめて閉じる・2026-09-12)。
+      #
+      #   ★ 逐語 (`rustup toolchain install --help`):
+      #   「Install or update the given toolchains, **or by default the active toolchain**」
+      #   → ⚠️ 引数なしで **`rust-toolchain.toml` が指す版を `profile` / `components` 込みで**入れる。
+      #
+      #   ⚠️ なぜ「最初の cargo 呼び出しでの暗黙 auto-install」に任せないか:
+      #   1. ★ auto-install の成否は **各実機の rustup の版と設定に依存**する。
+      #      ⚠️ `gse-mac` の rustup 版は**一度も測っていない**。無効なら **全 step の手前で赤**になる。
+      #   2. ⚠️★★★ **暗黙 DL は下のディスクガードより *後* に起きる。**
+      #      → ★ guard の `free before:` が **DL 前の数字**になり、**測りたい増分を測る前に測る**
+      #      ことになる (⚠️ 実効 floor / threshold がその分ズレる)。→ **guard より前に置く。**
+      #   3. ⚠️★★★ **固定が効いた証拠が run ログに 1 行も残らない。**
+      #      ★ 従来 ci.yml に `rustc --version` を出す step は **0 件**だったので、
+      #      「緑になった」だけでは **どの版で緑なのか判別できない** (= 見えないまま緑)。
+      #      → ★ 下で `rustup show active-toolchain` を必ず出す。
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install    # ★ 引数なし = active toolchain (= 固定版) を profile/components 込みで
+          echo "--- 固定が効いていることの証拠 (⚠️ 版上げ PR の受け入れ証拠にもなる) ---"
+          rustup show active-toolchain
+          cargo --version
+          cargo clippy --version
       # ★ 2026-08-31 追加: ディスク枯渇ガード (self-hosted mac 専用)。
       #
       # ⚠️ なぜ要るか: PR #135 (ドキュメントのみ・コード差分ゼロ) の check が
@@ -676,15 +709,19 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      # ⚠️★★★ **実際に cargo が使う版は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
-      #   ★ 実測: repo 直下のファイルは **サブディレクトリでも効く**ので、
-      #   `working-directory: src-tauri` の cargo step すべてが**そのファイルの版**で走る。
-      #   ⚠️ したがって下の `@stable` は「rustup と既定 toolchain を用意する」役割に退いている
-      #   (★ 特に `check` は `decide-win-runner` 失敗時に hosted `windows-latest` へ
-      #   fallback する経路があり、そこで rustup の存在を保証する意味がある)。
-      #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
-      #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
+      # ⚠️ **toolchain は `rust-toolchain.toml` (repo 直下) が決める** (R-2)。
+      #   ★ 説明の正典は `check` job の同名 step にある。⚠️ ここに複製しない。
+      #   ★ 本 job で実際に cargo を起動する主経路は `npx tauri build` (cwd = repo 直下) だが、
+      #   rustup は cwd から親へ辿るので**同じファイルが効く**。
       - uses: dtolnay/rust-toolchain@stable
+      # ★ 固定版を明示的に入れる (⚠️ 理由は `check` job の同名 step のコメント参照)。
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install
+          rustup show active-toolchain
+          cargo --version
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -771,15 +808,19 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      # ⚠️★★★ **実際に cargo が使う版は `rust-toolchain.toml` (repo 直下) が決める** (R-2・2026-09-12)。
-      #   ★ 実測: repo 直下のファイルは **サブディレクトリでも効く**ので、
-      #   `working-directory: src-tauri` の cargo step すべてが**そのファイルの版**で走る。
-      #   ⚠️ したがって下の `@stable` は「rustup と既定 toolchain を用意する」役割に退いている
-      #   (★ 特に `check` は `decide-win-runner` 失敗時に hosted `windows-latest` へ
-      #   fallback する経路があり、そこで rustup の存在を保証する意味がある)。
-      #   ⚠️ **`@stable` を `@<version>` に変えないこと** —— ★ 版番号が ci.yml 3 箇所 ＋
-      #   `rust-toolchain.toml` の計 4 箇所に分散し、版上げで**黙って食い違う**。
+      # ⚠️ **toolchain は `rust-toolchain.toml` (repo 直下) が決める** (R-2)。
+      #   ★ 説明の正典は `check` job の同名 step にある。⚠️ ここに複製しない。
+      #   ★ 本 job で実際に cargo を起動する主経路は `npx tauri build` (cwd = repo 直下) だが、
+      #   rustup は cwd から親へ辿るので**同じファイルが効く**。
       - uses: dtolnay/rust-toolchain@stable
+      # ★ 固定版を明示的に入れる (⚠️ 理由は `check` job の同名 step のコメント参照)。
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install
+          rustup show active-toolchain
+          cargo --version
       # ⚠️★★★ 2026-08-31 追加 (code-reviewer 指摘 #1): 初版のディスクガードは `check` に
       #   しか掛かっておらず、**本ジョブは無防備だった**。★ 本ジョブは同じ `gse-mac` 実機で
       #   release ＋ dmg を 40 分掛けて作るので `check` よりディスクを食い、

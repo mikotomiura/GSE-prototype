@@ -15,8 +15,19 @@
 `src-tauri/` で実行する。**全部 green でなければ先に進まない。**
 
 > ⚠️★★★ **toolchain は `rust-toolchain.toml` (repo 直下) で固定されている**（2026-09-12・R-2）。
-> ★ repo の中で cargo を叩けば **rustup が自動でその版へ切り替える**（未導入なら自動 DL）。
-> → ⚠️ **「手元の rustc が新しいから CI と違う結果になる」は起きない。**
+> ★ repo の中で cargo を叩けば **rustup がその版へ切り替える**（未導入なら自動 DL）。
+> → ★ **rustc の版差に由来する食い違いは消える。**
+>
+> ⚠️★★ **ただし成立するのは「rustup 管理下の cargo を使っている」場合だけ**である。
+> ★ Homebrew / apt / MSYS 由来の cargo や、下記の shim 破損時は **ファイルが無音で無視される**。
+> → ★ **まず `rustup show active-toolchain` を叩き、`overridden by .../rust-toolchain.toml` が
+> 出ることを確かめる**（⚠️ 出なければ以下の結果は CI と比較できない）。
+>
+> ⚠️★★★ **これは「手元の検証が CI の代替になる」という意味ではない。**
+> ★ 消えるのは **rustc の版差だけ**で、⚠️ **OS 差**（`*_macos.rs` は Windows で 1 行も
+> コンパイルされない）と **`--features package` の有無**は残る
+> （`docs/agent-shared.md`「手元の検証は CI の代替にならない」）。
+>
 > ★ 版を上げるときは **`rust-toolchain.toml` を書き換える単独 PR** を立てる（手順はファイル内に記載）。
 > ⚠️ `rust-version`（`src-tauri/Cargo.toml`）とは**別物** —— ★ あちらは利用者に約束する下限。
 
