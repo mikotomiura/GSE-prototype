@@ -276,10 +276,75 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      # ⚠️★★★ `components: clippy` を明示する (2026-09-12)。
-      #   ★ `dtolnay/rust-toolchain` は `--profile minimal` で入れるので、
-      #   **clippy は既定で入らない**。⚠️ 無いまま下の clippy step を置くと
-      #   「lint が走らなかった」のか「lint が緑だった」のか**ログから区別できない**。
+      # ⚠️★★★ 2026-09-12 (R-4): `cargo test` (下方) の **env 前提** を、job の先頭で検査する。
+      #
+      # ★ なぜ要るか: `redact_home_path_masks_real_home_from_env` は
+      #   **env (`USERPROFILE` / `HOME`) を読む経路**の回帰保護であり、そこが壊れると
+      #   ⚠️ 被験者に見せる提出失敗メッセージへ **OS ユーザー名を含むフルパスが素通り**する。
+      #   ⚠️ 従来このテストは env が取れないと**無音で skip** しており、CI ログでは
+      #   「通った」と「skip した」が**区別できなかった** (= 見えないまま緑)。
+      #   → ★ テスト側は `panic!` に倒した。本 step はその前提を**先に・単独で**鳴らす。
+      #   ★ job の先頭に置くのは、⚠️ 前提が崩れているときに **数分のフルビルドを消費してから
+      #   落ちる**のを避けるため (★ `timeout-minutes: 30`)。
+      #
+      # ⚠️★★★ **`env:` で HOME / USERPROFILE を上書きしてはならない。**
+      #   ★ `CARGO_HOME` / `RUSTUP_HOME` の既定は `$HOME/.cargo` / `$HOME/.rustup` なので、
+      #   `HOME` を差し替えると **self-hosted mac が toolchain を丸ごと再取得**し、
+      #   ディスクガード (threshold=15GiB) を直撃する。★ しかも自分で立てた値を観測しても
+      #   「実機に立っているか」という当の問いの答えにならない。→ **検査だけする。**
+      #
+      # ⚠️★★★ **Windows で `HOME` を見てはならない (★ 2026-09-12 に実測)。**
+      #   ★ `cargo test` step は `shell:` 未指定 (`defaults:` ブロックも無い) なので
+      #   **Windows では pwsh・macOS では bash** で走る。
+      #   ⚠️ ところが **pwsh → git-bash で起動すると MSYS2 ランタイムが `HOME` を合成する**:
+      #   Windows 側に `HOME` / `USERPROFILE` / `HOMEDRIVE` / `HOMEPATH` が **1 つも無くても**、
+      #   git-bash の中では `HOME=/c/Users/<user>` が見える (★ 本機で再現済み)。
+      #   → ⚠️★★★ bash で `HOME` を検査すると **Windows レグでは構造的に失敗しえない**
+      #   (= **検査が空振り**。★ まさに本 step が潰そうとしている欠陥クラスそのもの)。
+      #   ★ 一方 **`USERPROFILE` は合成されない** (★ 同じ実測で `unset` のままだった) ので、
+      #   **Windows の判定は `USERPROFILE` だけで行う** —— ⚠️ これが pwsh 側の実態と一致する。
+      #   ★ macOS は `cargo test` も bash なので、bash での観測がそのまま忠実である。
+      #
+      #   ⚠️ **却下案: Windows だけ `shell: pwsh` にする** —— ★ 観測は最も忠実になるが、
+      #   `pwsh` (PowerShell **Core**) は self-hosted 実機で WindowsApps 経由の導入であり、
+      #   ⚠️ **ランナーサービスの PATH で解決できるかが未検証**。★ ci.yml に前例も無い。
+      #   → ★ 実績のある `shell: bash` (ci.yml 内に Windows レグでの前例あり) を保ち、
+      #   **見る変数の側を正す**方を採った。
+      #
+      # ⚠️ **値は絶対に出力しない** —— ★ 値には OS ユーザー名が入る。
+      #   それは**まさに `redact_home_path` が伏せている当の情報**である
+      #   (★ 根拠は `data-privacy` Skill ＋ 当該テストの doc コメント。
+      #    ⚠️ ルール 7 は**非打鍵チャネルの凍結表**であって env 由来のパスは射程外なので引かない)。
+      #   ⚠️★★★ **GitHub Actions のログマスクは当てにできない** —— ★ マスクが効くのは
+      #   登録済み secret と `::add-mask::` だけで、`USERPROFILE` / `HOME` は secret ではない。
+      #   → ★ 「出さない」ことが唯一の防御であり、set / unset の別だけを出す。
+      #   ⚠️ `${VAR:+set}${VAR:-unset}` という「三項演算子もどき」を使わないこと ——
+      #   ★ **set のときに `${VAR:-unset}` が値そのものを展開する** (2026-09-12 に初稿で踏んだ)。
+      - name: Env precondition for redact_home_path test (R-4)
+        shell: bash
+        env:
+          # ★ `runner.os` を bash へ直接展開せず `env:` 経由で渡す
+          #   (⚠️ ci.yml L375 付近の既存 step と同じ作法)。
+          GSE_RUNNER_OS: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+          if [ "${GSE_RUNNER_OS:-}" = "Windows" ]; then
+            # ⚠️ HOME は git-bash が合成するので見ない (上の注記)。
+            if [ -z "${USERPROFILE:-}" ]; then
+              echo "::error title=env precondition::USERPROFILE が未設定です。redact_home_path の env 経路テストが前提を失います。"
+              exit 1
+            fi
+            echo "USERPROFILE: set"
+          else
+            if [ -z "${USERPROFILE:-}" ] && [ -z "${HOME:-}" ]; then
+              echo "::error title=env precondition::USERPROFILE / HOME がどちらも未設定です。redact_home_path の env 経路テストが前提を失います。"
+              exit 1
+            fi
+            # ⚠️★★★ 値は出さない (OS ユーザー名を含むため)。
+            #   ★ `${VAR:-unset}` と書くと **set のときに値そのものが出る**ので使わない。
+            if [ -n "${USERPROFILE:-}" ]; then echo "USERPROFILE: set"; else echo "USERPROFILE: unset"; fi
+            if [ -n "${HOME:-}" ]; then echo "HOME: set"; else echo "HOME: unset"; fi
+          fi
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -388,13 +453,6 @@ jobs:
       - name: Cargo build (${{ matrix.target }})
         run: cargo build --target ${{ matrix.target }}
         working-directory: src-tauri
-      # ⚠️★★★ `--features package` を落とすと **`reconcile` のテストが 1 つも走らない**
-      #   (2026-08-28 に実測: 付けると **34 件**多く走る —— `reconcile.rs` の 25 件 ＋
-      #    `packaging.rs` の 9 件。`reconcile::` は 25 → **0** になる)。
-      #   ★ `reconcile` は **O1 の「48 時間の猶予」を守る当の機構**なので、
-      #   ⚠️ そこが CI の外にあるのは「見えないまま緑」そのものだった。
-      #   ★ ビルド (上の `cargo build`) には**付けない** —— 盲検アプリ本体に age / reqwest を
-      #   載せない隔離方針 (`Cargo.toml` の features の注記) を変えないため。
       - name: Cargo test --workspace (--features package)
         run: cargo test --features package --workspace --target ${{ matrix.target }}
         working-directory: src-tauri
