@@ -1,25 +1,39 @@
 # セッション開始プロンプト — **R-2〜R-5 の申し送り F-1〜F-5 を片付ける**
 
-> ⚠️ **一部消化済み**（作成 2026-09-12・Windows 機 = G-GEAR。★ **F-4 だけが残っている** —— 下記「結果」節を先に読むこと）。
+> ✅ **消化済み**（作成 2026-09-12・Windows 機 = G-GEAR / 完了 2026-09-12・mac）。
+> ⚠️★★★ **F-1〜F-5 はすべて決着した。**残るのは**新規に起票した F-8 / F-9 だけ**である。
+> ⚠️ **本メモの §1 以降は着手前の記述**であり、⚠️ **F-3 / F-4 の結論は下記「結果」節で覆っている**。
 > ⚠️★★★ **このメモを一次資料にしない。** 実体は
 > `.steering/20260912-r2-r5-decisions/decisions.md`（★ 判断 52〜54 が本メモの根拠）と
 > 同ディレクトリの `tasklist.md` 末尾の申し送り表にある。
 >
 > ⚠️ **mac 実機が要るのは F-4 だけ**である（★ 判断 53 で一次資料から判定した）。
-> ★ **F-4 は先に `next-session-mac-default-clippy.md` を mac で回してから**着手すること。
+> ~~★ **F-4 は先に `next-session-mac-default-clippy.md` を mac で回してから**着手すること。~~
+> → ✅ **実施済み**（PR #199 で mac の default features clippy = **exit 0** を実証し、
+> その上で **F-4 はやらない**と裁定した）。
 
 ---
 
-## ✅ 2026-09-12 の結果（★ **F-1 / F-2 / F-3 / F-5 は決着。残りは F-4 だけ**）
+## ✅ 2026-09-12 の結果（★ **F-1〜F-5 すべて決着**）
 
 | | 結果 | main |
 |---|---|---|
 | **F-1 + F-2** | ✅ `.github/workflows/supply-chain.yml` を新設（3 層を 1 job・**週次 schedule**） | PR **#197** → `6239d5b` |
-| **F-3** | ✅ **裁定 = 足さない**（⚠️ lint 結果は互いに上位集合でないので片側追加では非対称が消えない） | — |
+| **F-3** | ⚠️★★★ **足した**（★ 研究者裁定で**覆った**）—— `stop-check.sh` の clippy を `--features package` へ**置き換え**（実測 +1〜2 秒）。★ 本丸は scope ではなく「**出力を捨てないこと**」だった | PR **#203** |
 | **F-5** | ✅ `ci.yml` **top-level** に `permissions: contents: read` | PR **#196** → `757b663` |
-| ⚠️ **F-4** | ⚠️ **未着手**（★ **mac 先行が必須** → `next-session-mac-default-clippy.md`） | — |
+| **F-4** | ✅ **やらない**（★ 研究者裁定）—— ⚠️ `cfg(not(feature = "package"))` が **0 件**なので default は `--features package` の**真部分集合**で、足しても被覆は増えない。★ 代わりに `scripts/check_default_feature_subset.py` が**前提が破れたら CI で赤くする** | PR **#199** / **#203** |
 
 ★ 実体は `.steering/20260912-followups-f1-f5/decisions.md`（**D1〜D15**）にある。
+
+### ⚠️★★★ **私（Windows 側）の裁定のうち、覆ったもの**
+
+| | 私の当初の裁定 | ★ 現行 | ⚠️ 見落としていた点 |
+|---|---|---|---|
+| **F-3** | 足さない | ★ **足す**（PR #203） | ⚠️ ローカル hook は CI の真部分集合しか見ておらず、**提出経路（`packaging.rs` / `reconcile.rs` / `gse-package` / `gse-unpack` / `gse-submit`）がローカルで 1 度も lint されていなかった**。★ 私は「対称性」だけで論じたが、本当の問題は「**何が一度も検査されていないか**」だった |
+| **F-4** | mac 先行のうえ CI に足す | ★ **やらない ＋ 前提を機械で守る** | ⚠️ 私の論拠「lint 結果は互いに上位集合にならない」は**弱かった** —— 本 crate は **lib** なので `pub` 項目は `dead_code` にならず、**想定した非対称は実際には生じていない**（★ 実測: default features の clippy で該当警告 **0 件**） |
+
+★ 一次資料は `.steering/20260912-f3-f4-clippy-scope/` と `.steering/20260912-mac-default-clippy-green/`。
+⚠️ `.steering/20260912-followups-f1-f5/decisions.md` の **D4 は失効**している（★ 同節に注記済み）。
 
 ### ⚠️★★★ 次に読む人が取り違えやすい 4 点
 
