@@ -791,3 +791,37 @@ clippy 0.1.98 (48a229ceae 2026-09-01)
 |---|---|
 | ⚠️ **指摘 3**: 固定版運用に**セキュリティ更新の検知ゲートが無い** (CI / 定期チェック) | ★ **既知・裁定済み** (決定 2 / 判断 39)。⚠️ 緩和は `rust-toolchain.toml` の**版上げ手順 0** と runbook。⚠️★★★ **ただし security-checker と Codex が *独立に* 同じ点を挙げた** → ★ **研究者へ follow-up として挙げる** (下記) |
 | ★ **指摘 4** (LOW): 将来 `cargo test` の shell/default が変わると検査と実行環境が乖離しうる | ★ **既に注記済み** (⚠️ `defaults:` が無いことを実測し、変わったら再確認する旨を ci.yml に記載)。⚠️ 「`cargo test` step 側で検証する方が堅い」案は、★ **既存の緑の step を触る**代償に見合わないので採らない |
+
+## 判断 51: ★★★ **cross-review 反映後の CI 実測** — ⚠️ 直したものを動かして確かめた
+
+★ run `34680342872` (head `f71d72a`) / 2026-09-12。**全 job pass** (mac 5m39s / win 4m25s)。
+
+### ★ install step の「証拠ブロック」の実出力
+
+```
+[win] 1.98.1-x86_64-pc-windows-msvc (overridden by 'C:\actions-runner\_work\...\rust-toolchain.toml')
+      cargo 1.98.1 (797e8a9bc 2026-08-05) / clippy 0.1.98 (48a229ceae 2026-09-01)
+      x86_64-pc-windows-msvc                    ← ★ rustup target list --installed
+[mac] 1.98.1-aarch64-apple-darwin (overridden by '/Users/johnd/actions-runner/_work/...')
+      cargo 1.98.1 (797e8a9bc 2026-08-05) / clippy 0.1.98 (48a229ceae 2026-09-01)
+      aarch64-apple-darwin                      ← ★ rustup target list --installed
+```
+
+→ ✅ **固定版に `matrix.target` の std が入っていることが CI ログで確認できる** (判断 47)。
+⚠️ これで「host == matrix」という不変条件は**コメントではなく step とログ**で保証される。
+
+### ⚠️★★★ `--no-self-update` の効果 (★ 判断 48 の検証)
+
+| 項目 | 前 run (`b82d411`) | ⚠️ 今 run (`f71d72a`) |
+|---|---|---|
+| `Install pinned toolchain` | win **97s** / mac **86s** | ✅ win **0s** / mac **1s** |
+| rustup self-update | ⚠️ (ローカル実測で 1.29.0 → 1.29.1 の DL を確認) | ✅ **発生なし** |
+| disk guard `free before:` | 19 GiB (wiped=false) | ✅ **19 GiB** (wiped=false)・安定 |
+
+- ★ **97s / 86s は初回 DL の代金だった** —— ⚠️ 2 回目以降は toolchain が実機に残るので **ほぼゼロ**。
+  → ✅ 判断 44 の見込みが当たった。**定常状態での固定のコストは実質ゼロ**である。
+- ★ ⚠️ **新しく分かったこと**: `dtolnay/rust-toolchain` 自身のコマンドラインは
+  `rustup toolchain install stable --target ... --component clippy --profile minimal --no-self-update`
+  → ★ **action は既に `--no-self-update` と `--profile minimal` を使っていた**。
+  ⚠️ **自己更新を起こしていたのは私が足した step だけ**だった (★ 判断 48 の副作用の出所が確定)。
+  ★ 併せて ci.yml の既存注記「dtolnay は `--profile minimal` で入れる」も**実ログで裏が取れた**。
