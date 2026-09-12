@@ -209,7 +209,7 @@ unsafe extern "system" fn win_event_callback(
     );
     match event {
         EVENT_OBJECT_IME_SHOW | EVENT_OBJECT_IME_CHANGE => {
-            IME_ACTIVE.store(true, Ordering::Relaxed);
+            IME_ACTIVE.store(true, Ordering::Release);
             IME_OPEN.store(true, Ordering::Release);
             IME_STATE_DIRTY.store(true, Ordering::Release);
             // Phase 2b: IME 変換セッション開始時刻を記録
@@ -250,7 +250,7 @@ unsafe extern "system" fn win_event_callback(
                 IME_COMPOSITION_START_MS.store(0, Ordering::Relaxed);
                 IME_SHADOW_READY.store(true, Ordering::Release);
             }
-            IME_ACTIVE.store(false, Ordering::Relaxed);
+            IME_ACTIVE.store(false, Ordering::Release);
         }
         _ => {}
     }
@@ -600,7 +600,7 @@ unsafe extern "system" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARA
             //   影響は記録の質に限られるが、⚠️ **解析時にこの上限を知っている必要がある。**
             // WinEvent IME_SHOW と hook_callback のタイミングずれにより、変換セッション
             // 最初の 1-2 キーが拾えない場合がある。Phase 2b は shadow-only なので許容。
-            if is_press && IME_ACTIVE.load(Ordering::Relaxed) {
+            if is_press && IME_ACTIVE.load(Ordering::Acquire) {
                 match classify_ime_nav_key(vk_code) {
                     ImeNavAction::Navigate => {
                         IME_CANDIDATE_NAV_COUNT.fetch_add(1, Ordering::Relaxed);

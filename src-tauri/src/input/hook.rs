@@ -28,8 +28,13 @@ pub const VK_KANJI: u32 = 0x19; // 半角/全角: Half-width / full-width toggle
 pub static IME_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Returns true if an IME is currently composing text in the foreground application.
+///
+/// ⚠️ `Acquire` で読む —— `hook-constraints` 共通-2 が **`IME_OPEN` と並べて**
+/// store = `Release` / load = `Acquire` と**対で**定めているため。
+/// ★ 片側だけ強めても happens-before は成立しないので、対を崩さないこと
+/// (⚠️ `is_ime_open()` と同じ理由。★ 規則違反は下の [`tests`] が機械で止める)。
 pub fn is_ime_active() -> bool {
-    IME_ACTIVE.load(Ordering::Relaxed)
+    IME_ACTIVE.load(Ordering::Acquire)
 }
 
 /// Japanese IME input mode: true = あ/カ (Japanese), false = A (alphanumeric/coding).
@@ -491,5 +496,80 @@ pub fn watchdog_recoveries() -> u32 {
     #[cfg(not(target_os = "macos"))]
     {
         0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 共通-2 (Ordering) の回帰テスト
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod ordering_invariant_tests {
+    /// ⚠️★★★ `IME_OPEN` / `IME_ACTIVE` に弱い Ordering が混ざったら落とす。
+    ///
+    /// # ★ なぜ型で表せないのか
+    ///
+    /// ★ `hook-constraints` 共通-2 は「**この 2 つの static だけ** store = `Release` /
+    /// load = `Acquire`」と定めている (⚠️ `LAST_KEY_MS` 等は `Relaxed` で**正しい**)。
+    /// → ★ 規則は「どの変数か」に依存するので `AtomicBool` の型では分けられない。
+    /// ⚠️ したがって `capabilities.rs` と同じ様式で **ソースの実物**を検査する。
+    ///
+    /// # ⚠️★★★ なぜ「実測して 0 件」では足りないのか
+    ///
+    /// ★ 2026-09-12 に mac 側 (PR #190) が `IME_OPEN` を閉じ、⚠️ **同じ日に
+    /// `IME_ACTIVE` が 7 箇所 `Relaxed` のまま**であることが判明した。
+    /// → ★ 実測は**その時点の写像**にすぎず、**次に書く人を止めない**。
+    ///
+    /// # ⚠️ なぜ **`#[cfg]` を付けないのか**
+    ///
+    /// ★ 本テストは**ソースを文字列として読む**ので、`hook_windows.rs` が
+    /// 1 行もコンパイルされない macOS でも**中身を検査できる**。
+    /// ⚠️ 逆に `#[cfg]` を付けると**相手側 OS の CI が素通り**し、
+    /// 今回まさに起きた「片 OS でしか見ていない」状態に戻る。
+    ///
+    /// # ★ 既知の限界
+    ///
+    /// ⚠️ **コメント行は除外する** (★ 規則を説明する文章が自分自身に引っかかるため)。
+    /// ★ したがって「コメントに書いた違反例」は検出しない —— それは
+    /// **落ちすぎない方向**であり、⚠️ 実コードの見落としは生まない。
+    #[test]
+    fn guarded_atomics_never_use_weak_ordering() {
+        // ★ 針を `concat!` で割っておく —— ⚠️ そうしないと**このテスト自身の
+        //   リテラルが検査対象に引っかかる** (本ファイルも走査対象であるため)。
+        let names = [concat!("IME_", "OPEN"), concat!("IME_", "ACTIVE")];
+        let weak = concat!("Ordering::", "Relaxed");
+
+        let sources = [
+            ("input/hook.rs", include_str!("hook.rs")),
+            ("input/hook_windows.rs", include_str!("hook_windows.rs")),
+            ("input/hook_macos.rs", include_str!("hook_macos.rs")),
+            ("input/ime_windows.rs", include_str!("ime_windows.rs")),
+            ("input/ime_macos.rs", include_str!("ime_macos.rs")),
+            ("input/ime_compose.rs", include_str!("ime_compose.rs")),
+            ("lib.rs", include_str!("../lib.rs")),
+        ];
+
+        let mut violations = Vec::new();
+        for (file, src) in sources {
+            for (i, line) in src.lines().enumerate() {
+                let t = line.trim_start();
+                // ⚠️ コメント行は除外 (★ 上の「既知の限界」)。
+                if t.starts_with("//") || t.starts_with("*") {
+                    continue;
+                }
+                if line.contains(weak) && names.iter().any(|n| line.contains(n)) {
+                    violations.push(format!("{file}:{} | {}", i + 1, t));
+                }
+            }
+        }
+
+        assert!(
+            violations.is_empty(),
+            "hook-constraints 共通-2 違反: 保護対象の static に弱い Ordering が使われている。\n\
+             ★ store は Release / load は Acquire で **対**にすること \
+             (⚠️ 片側だけ強めても happens-before は成立しない)。\n\
+             ⚠️ 近似値で十分な LAST_KEY_MS 等とは別扱いである。\n{}",
+            violations.join("\n")
+        );
     }
 }
