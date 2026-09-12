@@ -880,7 +880,9 @@ pub fn start() {
                                 "Failed to create CFRunLoop source from CGEventTap, \
                                  retrying in 2s..."
                             );
-                            HOOK_ACTIVE.store(false, Ordering::Relaxed);
+                            // ★ 下ろすのは payload クリアより先 (⚠️ 3 経路すべてで同じ向き)。
+                            //   `Ordering` は `Release` —— 観測側は `Acquire` で読む (共通-2)。
+                            HOOK_ACTIVE.store(false, Ordering::Release);
                             // F4: LAST_KEY_MS は最後の物理打鍵時刻 (セッション非依存)。
                             // OS 都合の一時失効はキーボード活動と無関係なので 0 に倒さず保持し、
                             // idle/away の連続性を保つ (離席中のプローブ誤発火を防ぐ)。
@@ -934,7 +936,23 @@ pub fn start() {
                     // 50ms 待機でカーネルレベルのタップ活性化を確実にする。
                     tap.enable();
                     thread::sleep(Duration::from_millis(50));
-                    HOOK_ACTIVE.store(true, Ordering::Release);
+                    // ⚠️★★★ **`HOOK_ACTIVE` は payload を全部書いた後に立てる (2026-09-12)。**
+                    //
+                    // ★ `HOOK_ACTIVE` は「フックが立っているか」を外へ知らせる**公開フラグ**であり、
+                    //   観測側はこれを `Acquire` で読んでから `TAP_ENABLED_SNAPSHOT` /
+                    //   `TAP_PORT` を読む。⚠️ release/acquire の happens-before は
+                    //   「**フラグを書く前に書いたもの**」しか運ばないので、
+                    //   ★ **フラグを先に立てると、フラグを見た側が payload の初期値を読みうる**。
+                    //
+                    // ⚠️ **実際に main の CI を赤くした**: `tests/macos_hook_rehook.rs` は
+                    //   `HOOK_ACTIVE` が true になるのを待ってから `hook_reports_enabled()` を
+                    //   読むが、★ **snapshot がまだ `-1` (= `None`)** で落ちた
+                    //   (2026-09-12 の main run 2 本。⚠️ 起動直後と再作成後の**両方**で出た)。
+                    //
+                    // ★ これは PR #191 が `IME_ACTIVE` に対して行った修正と**同じ欠陥クラス**
+                    //   (⚠️「Release の位置を payload の後へ移す」)。
+                    //   → ★ **不変条件: 公開フラグは payload の後に立て、payload より先に下ろす。**
+                    //
                     // ★ 設置直後の状態を写す (⚠️ watchdog の初回発火まで `-1` のままにしない)。
                     // SAFETY: この時点で tap は生存しており、read-only チェックのみ。
                     TAP_ENABLED_SNAPSHOT.store(
@@ -952,6 +970,8 @@ pub fn start() {
                         tap.mach_port.as_concrete_TypeRef() as *mut std::ffi::c_void,
                         Ordering::Release,
                     );
+                    // ★ payload (snapshot / port) を書き終えた**後**に公開フラグを立てる。
+                    HOOK_ACTIVE.store(true, Ordering::Release);
                     // ⚠️★★ **`CALLBACK_COUNT` を 0 に戻さない。**
                     //   2026-08-09 以降、このカウンタは `input::liveness` が
                     //   「フックが呼ばれ続けているか」を見る**単調増加の生存信号**になった。
@@ -991,7 +1011,12 @@ pub fn start() {
                     CFRunLoop::run_current();
 
                     // CFRunLoopRun returned — tap was disabled or invalidated.
-                    HOOK_ACTIVE.store(false, Ordering::Relaxed);
+                    // ★ **下ろすのは payload より先**でよい (⚠️ 立てるときと逆向き) ——
+                    //   観測側が「フラグ true」を見ている間は payload が有効である、
+                    //   という不変条件をどちらの向きでも保つため。
+                    // ⚠️ `Ordering` は `Relaxed` ではなく `Release`: 観測側は `Acquire` で
+                    //   読んでおり、`Relaxed` だと**対になっていない** (★ 共通-2 の規約)。
+                    HOOK_ACTIVE.store(false, Ordering::Release);
                     // F4: LAST_KEY_MS は 0 に倒さない (上の理由と同じ)。失効前の最終打鍵時刻を
                     // 保持することで Dashboard idle カウンタの突然の 0 リセット・離席判定の崩れ・
                     // ランダムプローブの離席中誤発火を防ぐ。
