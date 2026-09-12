@@ -58,12 +58,25 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # ⚠️ `ci.yml` と違って **false** にする —— ★ 週次の走査を後続の push で捨てると、
+  #   「その週は 1 度も検査していない」のに誰も気づかない (★ cancelled は赤に見えない)。
+  cancel-in-progress: false
 
 jobs:
   audit:
     # ★ hosted で回す —— ⚠️ self-hosted 実機 (`gse-win` / `gse-mac`) を週次で占有しない。
     #   ★ 本 job は OS 依存の検査を 1 つも含まない (lockfile と advisory DB を読むだけ)。
+    #
+    # ⚠️★★★ **この job を self-hosted に向けてはならない。** ★ self-hosted ランナーは
+    #   研究者の home で動いており、そこには被験者提出物を復号できる鍵がある。
+    #   ⚠️ 向け先を変えるなら、**先に `ci.yml` の env 直下 (fork PR と self-hosted の境界) の
+    #   長い注記を読むこと**。★ なお `if:` による fork ゲートを**ここには足さない** ——
+    #   `ci.yml` 自身が「そのゲートは防御ではない (PR head が行を消せる)」と記録しており、
+    #   hosted 限定の本 job に足しても**効果ゼロの防御が 1 つ増えるだけ**である。
+    #
+    # ★ action の版について: 本 job は **hosted の使い捨て環境** ＋ `contents: read` なので、
+    #   `ci.yml` の follow-up (self-hosted で走る job の action を SHA ピンする) の対象外とする。
+    #   ⚠️ 無言で非対称にしないために、ここに理由を書いておく。
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -103,6 +116,10 @@ jobs:
       #   → ⚠️ 「緑」と「除外したから緑」が区別できない。
       #   ★ ラッパーは (a) 除外 ID を毎回印字し、(b) **stale な除外** (もう当たらないのに
       #   残っている ID) を **exit 2 で赤にする**。⚠️ (b) は cargo-audit 単体では出せない。
+      #   ★ さらに: ラッパーは `CARGO_HOME` を一時ディレクトリへ向けて cargo-audit を回す。
+      #   ⚠️ 2026-09-12 実測 —— **`$CARGO_HOME/audit.toml` (個人設定) も効く**ので、
+      #   cwd の隔離だけでは repo に書いていない除外が黙って適用されうる。
+      #   ★ 実行後に「ignore が空だったこと」を検算して初めて結果を採る。
       - name: Rust dependency audit (src-tauri/Cargo.lock)
         run: |
           cargo-audit --version
@@ -115,6 +132,13 @@ jobs:
       #   @babel/core / baseline-browser-mapping) で、⚠️ **被験者に配る Tauri バイナリの
       #   実行時経路ではない**。
       #   ⚠️ ただし「無い」ことにはしないので、**全体も必ず出力する** (下の step)。
+      # ★ Node を固定する —— ⚠️ `frontend-check` は `node-version: 22` で固定しており
+      #   (`ci.yml`)、ここだけランナー既定に任せると **npm の版が変わった日に監査結果が
+      #   黙って変わる**。★ 同じ版に揃える。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: npm audit (production dependencies -- this is the gate)
         run: npm audit --package-lock-only --omit=dev
 

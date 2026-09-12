@@ -42,11 +42,15 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import io
 import json
+import os
 import re
-import subprocess
 import sys
+import urllib.error
+import urllib.request
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
@@ -153,44 +157,124 @@ def read_channel(path: Path) -> str:
     return matches[0]
 
 
-def fetch_advisories(repo: str = REPO) -> List[dict]:
-    """`gh api repos/<repo>/security-advisories --paginate`.
+def parse_pages(raw: str) -> List[dict]:
+    """Parse one or more concatenated JSON arrays into a single list.
 
-    No leading slash: git-bash on Windows rewrites `/repos/...` into
-    `C:/Program Files/Git/repos/...` and `gh` rejects it (measured 2026-09-12).
+    The REST API returns one array per page. `gh api --paginate` concatenates
+    them (`[...][...]`), so a single `json.loads` succeeds only when there
+    happens to be exactly one page -- a silent single-page assumption. This
+    decodes repeatedly instead, which handles both shapes the same way.
     """
-    cmd = ["gh", "api", "repos/" + repo + "/security-advisories", "--paginate"]
-    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
-    if proc.returncode != 0:
-        raise RuntimeError(
-            " ".join(cmd)
-            + " failed (exit "
-            + str(proc.returncode)
-            + "): "
-            + proc.stderr.strip()[:500]
-        )
-    raw = proc.stdout.strip()
+    raw = raw.strip()
     if not raw:
-        raise RuntimeError("gh returned empty output")
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        # `--paginate` concatenates one JSON array per page; stitch them.
-        data = []
-        decoder = json.JSONDecoder()
-        idx = 0
-        while idx < len(raw):
-            obj, end = decoder.raw_decode(raw, idx)
-            data.extend(obj if isinstance(obj, list) else [obj])
-            idx = end
-            while idx < len(raw) and raw[idx] in " \t\r\n":
-                idx += 1
-    if not isinstance(data, list):
-        raise RuntimeError("unexpected payload type " + type(data).__name__)
-    return data
+        raise RuntimeError("empty response body")
+    out: List[dict] = []
+    decoder = json.JSONDecoder()
+    idx = 0
+    while idx < len(raw):
+        obj, end = decoder.raw_decode(raw, idx)
+        if isinstance(obj, list):
+            out.extend(obj)
+        elif isinstance(obj, dict):
+            out.append(obj)
+        else:
+            raise RuntimeError("unexpected payload type " + type(obj).__name__)
+        idx = end
+        while idx < len(raw) and raw[idx] in " \t\r\n":
+            idx += 1
+    return out
+
+
+def _next_link(link_header: Optional[str]) -> Optional[str]:
+    """Extract the `rel="next"` URL from a RFC 5988 `Link` header."""
+    if not link_header:
+        return None
+    for part in link_header.split(","):
+        segments = part.split(";")
+        if len(segments) < 2:
+            continue
+        url = segments[0].strip()
+        if not (url.startswith("<") and url.endswith(">")):
+            continue
+        for attr in segments[1:]:
+            if attr.strip().replace(" ", "") in ('rel="next"', "rel=next"):
+                return url[1:-1]
+    return None
+
+
+def fetch_advisories(repo: str = REPO, token: Optional[str] = None) -> List[dict]:
+    """Fetch `repos/<repo>/security-advisories` over plain HTTPS.
+
+    Deliberately **not** shelling out to `gh`:
+
+    - `gh` is an extra dependency, and on a fork pull request the repository
+      secrets are not provided, so a `gh`-based step would fail for a reason
+      that has nothing to do with security.
+    - Measured 2026-09-12: this endpoint answers **HTTP 200 with all 6
+      advisories unauthenticated**, so a token is only needed to lift the
+      60-requests-per-hour per-IP limit (which matters on shared CI runners).
+    - It also sidesteps a real trap: git-bash on Windows rewrites a leading
+      `/repos/...` argument into `C:/Program Files/Git/repos/...`, and `gh`
+      then rejects it (measured; this is why the old manual procedure did not
+      run on the Windows machine).
+
+    `token` defaults to `$GH_TOKEN` / `$GITHUB_TOKEN` when either is set.
+    """
+    if token is None:
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or None
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "gse-prototype-supply-chain-check",
+    }
+    if token:
+        headers["Authorization"] = "Bearer " + token
+
+    url = "https://api.github.com/repos/" + repo + "/security-advisories?per_page=100"
+    out: List[dict] = []
+    seen = 0
+    while url:
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = response.read().decode("utf-8")
+                link = response.headers.get("Link")
+        except urllib.error.HTTPError as exc:  # pragma: no cover - network
+            raise RuntimeError(
+                "GET " + url + " -> HTTP " + str(exc.code) + " " + str(exc.reason)
+            ) from exc
+        except urllib.error.URLError as exc:  # pragma: no cover - network
+            raise RuntimeError("GET " + url + " failed: " + str(exc.reason)) from exc
+        out.extend(parse_pages(body))
+        seen += 1
+        if seen > 20:  # pragma: no cover - defensive
+            raise RuntimeError("refusing to follow more than 20 pages")
+        url = _next_link(link)
+    return out
 
 
 # --- evaluation ---------------------------------------------------------------
+
+
+def coerce_advisories(data: object) -> List[dict]:
+    """Accept only a list of advisory objects.
+
+    `--advisories-file` can be handed anything -- an error payload such as
+    `{"message": "Not Found"}` used to reach `evaluate()` and die with an
+    uncaught `AttributeError`, which exits 1: **the same code as "an advisory
+    applies"**. That is precisely the confusion this script exists to prevent,
+    so the shape is checked before it is used.
+    """
+    if not isinstance(data, list):
+        raise RangeError(
+            "expected a JSON array of advisories, got " + type(data).__name__
+        )
+    for item in data:
+        if not isinstance(item, dict):
+            raise RangeError(
+                "advisory entries must be objects, found " + type(item).__name__
+            )
+    return data
 
 
 def evaluate(
@@ -200,6 +284,16 @@ def evaluate(
     lines: List[str] = []
     hits: List[str] = []
     for adv in advisories:
+        # A withdrawn advisory is one GitHub has retracted; treating it as a hit
+        # would be a false red that nobody can act on.
+        if adv.get("withdrawn_at"):
+            lines.append(
+                "  wdrw"
+                + (adv.get("cve_id") or adv.get("ghsa_id") or "(no id)").ljust(21)
+                + "withdrawn by the publisher on "
+                + str(adv.get("withdrawn_at"))
+            )
+            continue
         ident = adv.get("cve_id") or adv.get("ghsa_id") or "(no id)"
         severity = adv.get("severity") or "?"
         summary = (adv.get("summary") or "").replace("\n", " ")
@@ -218,9 +312,20 @@ def evaluate(
         if matched:
             hits.append(ident)
         verdict = "HIT " if matched else "ok  "
+        packages = sorted(
+            {
+                str((v.get("package") or {}).get("name") or "?")
+                for v in vulns
+            }
+        )
         lines.append(
-            "  {}{:<20} {:<8} [{}]  {}".format(
-                verdict, ident, severity, " | ".join(all_ranges), summary[:70]
+            "  {}{:<20} {:<8} {:<6} [{}]  {}".format(
+                verdict,
+                ident,
+                severity,
+                ",".join(packages)[:6],
+                " | ".join(all_ranges),
+                summary[:60],
             )
         )
     return lines, hits
@@ -399,9 +504,70 @@ def self_test() -> int:
     # (9) `1.98` (two components) compares as `1.98.0`
     if parse_version("1.98") != (1, 98, 0):
         failures.append("(9) `1.98` must normalise to (1, 98, 0)")
-    # (10) an empty advisory list must not look like "nothing applies"
-    if code_for("1.98.1", []) != EXIT_OK:
-        failures.append("(10) report() on an empty list should not crash")
+    # (10) an empty advisory list must not read as "nothing applies".
+    #      The guard lives in main(), not report(), so pin main() itself here --
+    #      otherwise this case would quietly certify the wrong layer.
+    with tempfile.TemporaryDirectory() as td:
+        empty = Path(td) / "empty.json"
+        empty.write_text("[]", encoding="utf-8")
+        # Swallow the expected error text: an "ERROR:" line inside a passing
+        # self-test reads as a failure to anyone skimming the CI log.
+        with contextlib.redirect_stderr(io.StringIO()):
+            code = main(["--channel", "1.98.1", "--advisories-file", str(empty)])
+        if code != EXIT_FETCH_OR_PARSE:
+            failures.append("(10) an empty advisory list must exit 3, not 0")
+
+    # (11) concatenated pages (what `--paginate` style output looks like)
+    if len(parse_pages('[{"a":1}] [{"b":2},{"c":3}]')) != 3:
+        failures.append("(11) concatenated JSON arrays must all be parsed")
+    if len(parse_pages('[{"a":1}]')) != 1:
+        failures.append("(11) a single page must still parse")
+    for bad_body in ("", "   "):
+        try:
+            parse_pages(bad_body)
+        except RuntimeError:
+            pass
+        else:
+            failures.append("(11) an empty body must raise, not yield []")
+
+    # (13) a non-list payload must not reach evaluate() (it would exit 1 = HIT)
+    for bad_payload in ({"message": "Not Found"}, "nope", 3, None):
+        try:
+            coerce_advisories(bad_payload)
+        except RangeError:
+            pass
+        else:
+            failures.append("(13) " + repr(bad_payload) + " must be refused")
+    if coerce_advisories([]) != []:
+        failures.append("(13) an empty list is a valid shape (main() guards emptiness)")
+    try:
+        coerce_advisories(["not-an-object"])
+    except RangeError:
+        pass
+    else:
+        failures.append("(13) a list of non-objects must be refused")
+
+    # (14) a withdrawn advisory must never be reported as a hit
+    withdrawn = [
+        {
+            "cve_id": "CVE-2099-0001",
+            "severity": "critical",
+            "summary": "retracted",
+            "withdrawn_at": "2026-01-01T00:00:00Z",
+            "vulnerabilities": [{"vulnerable_version_range": "< 99.0.0"}],
+        }
+    ]
+    if code_for("1.98.1", withdrawn) != EXIT_OK:
+        failures.append("(14) a withdrawn advisory must not count as a hit")
+
+    # (12) Link header parsing (pagination must not stop after page 1 silently)
+    nxt = _next_link('<https://api.github.com/x?page=2>; rel="next", <https://x?page=9>; rel="last"')
+    if nxt != "https://api.github.com/x?page=2":
+        failures.append("(12) rel=next must be extracted, got " + repr(nxt))
+    if _next_link('<https://x?page=9>; rel="last"') is not None:
+        failures.append("(12) a header without rel=next must yield None")
+    if _next_link(None) is not None:
+        failures.append("(12) a missing Link header must yield None")
 
     if failures:
         for f in failures:
@@ -410,9 +576,9 @@ def self_test() -> int:
     print(
         "OK self-test: "
         + str(len(_FIXTURE))
-        + " fixture advisories x 10 groups (pinned / closed-range / upper bound / "
+        + " fixture advisories x 14 groups (pinned / closed-range / upper bound / "
         "critical / uncomparable channel / bad range / empty advisory / operators / "
-        "normalisation / empty list)"
+        "normalisation / empty list / page concatenation / Link header / payload shape / withdrawn)"
     )
     return EXIT_OK
 
@@ -471,12 +637,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         if args.advisories_file:
-            advisories = json.loads(
-                Path(args.advisories_file).read_text(encoding="utf-8")
+            advisories = coerce_advisories(
+                json.loads(Path(args.advisories_file).read_text(encoding="utf-8"))
             )
         else:
-            advisories = fetch_advisories()
-    except (OSError, RuntimeError, json.JSONDecodeError) as exc:
+            advisories = coerce_advisories(fetch_advisories())
+    except (OSError, RuntimeError, RangeError, json.JSONDecodeError) as exc:
         print("ERROR: could not obtain advisories: " + str(exc), file=sys.stderr)
         return EXIT_FETCH_OR_PARSE
 

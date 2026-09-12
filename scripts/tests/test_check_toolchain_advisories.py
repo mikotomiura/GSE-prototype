@@ -110,6 +110,72 @@ class TestChannelReading(unittest.TestCase):
                 cta.read_channel(p)
 
 
+class TestPayloadShape(unittest.TestCase):
+    """⚠️★★★ list 以外が `evaluate()` に届くと `AttributeError` で **exit 1** になり、
+    ★ 「advisory が当たった」と**外形上まったく区別が付かない**。"""
+
+    def test_non_list_payloads_are_refused(self):
+        for bad in ({"message": "Not Found"}, "nope", 3, None, True):
+            with self.subTest(bad=bad):
+                with self.assertRaises(cta.RangeError):
+                    cta.coerce_advisories(bad)
+
+    def test_list_of_non_objects_is_refused(self):
+        with self.assertRaises(cta.RangeError):
+            cta.coerce_advisories(["x"])
+
+    def test_empty_list_is_a_valid_shape(self):
+        # ★ 空であること自体は main() が exit 3 で弾く (層を分けている)。
+        self.assertEqual(cta.coerce_advisories([]), [])
+
+
+class TestPagination(unittest.TestCase):
+    """⚠️ ページが 1 枚だけという暗黙の前提を置かないこと。"""
+
+    def test_concatenated_arrays(self):
+        self.assertEqual(len(cta.parse_pages('[{"a":1}] [{"b":2},{"c":3}]')), 3)
+
+    def test_single_array(self):
+        self.assertEqual(len(cta.parse_pages('[{"a":1}]')), 1)
+
+    def test_bare_object(self):
+        self.assertEqual(len(cta.parse_pages('{"a":1}')), 1)
+
+    def test_empty_body_raises(self):
+        for bad in ("", "   ", "\n"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(RuntimeError):
+                    cta.parse_pages(bad)
+
+    def test_scalar_payload_raises(self):
+        with self.assertRaises(RuntimeError):
+            cta.parse_pages("3")
+
+    def test_next_link(self):
+        header = '<https://api.github.com/x?page=2>; rel="next", <https://x?page=9>; rel="last"'
+        self.assertEqual(cta._next_link(header), "https://api.github.com/x?page=2")
+        self.assertIsNone(cta._next_link('<https://x?page=9>; rel="last"'))
+        self.assertIsNone(cta._next_link(None))
+        self.assertIsNone(cta._next_link(""))
+
+
+class TestWithdrawn(unittest.TestCase):
+    def test_withdrawn_advisory_is_not_a_hit(self):
+        # ⚠️ 取り下げられた advisory で赤にすると、誰も直しようがない偽赤になる。
+        withdrawn = [
+            {
+                "cve_id": "CVE-2099-0001",
+                "severity": "critical",
+                "summary": "retracted",
+                "withdrawn_at": "2026-01-01T00:00:00Z",
+                "vulnerabilities": [{"vulnerable_version_range": "< 99.0.0"}],
+            }
+        ]
+        lines, hits = cta.evaluate((1, 98, 1), withdrawn)
+        self.assertEqual(hits, [])
+        self.assertIn("withdrawn", " ".join(lines))
+
+
 class TestExitCodes(unittest.TestCase):
     """⚠️★★★ 本体。★ script が **赤になるべきときに赤になる**ことを固定する。"""
 
