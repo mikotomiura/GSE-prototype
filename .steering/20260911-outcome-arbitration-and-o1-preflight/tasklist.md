@@ -53,11 +53,48 @@
 - [x] git commit（`bd5e6b8`）
 - [x] PR → https://github.com/mikotomiura/GSE-prototype/pull/182 (⚠️ **CI 全緑 / MERGEABLE**。マージは研究者判断)
 
-## issue 007 — 転帰定義の一本化（未着手）
+## issue 007 — 転帰定義の一本化（★ **ADR-029 を書いて完了**・2026-09-13）
 
-⚠️ `/reimagine` を設計段階で起動する（`requirement.md` 運用メモ）。
+### 準備
+- [x] `requirement.md` / `issues/007.md` / `decisions.md` 判断 3・7〜12 / `blockers.md` 起票 1〜9 を読む
+- [x] `verify-before-claiming` / `citation-ssot` Skill を参照
+- [x] ADR-009（374 行）/ ADR-024（370 行）を**メインが全文**読む
+- [x] ★ サブエージェント 3 本を**並列**起動（`.idea` 語彙調査 / `metrics.rs` 実装現況 / 設計文書と README 書式）
+- [x] ⚠️★★★ **ADR-014（O1 の定義）/ ADR-016（O1 の非打鍵区間）/ ADR-025 を追加で読む** ——
+      ★ **ここで issue 007 の前提 2 件が崩れた**（`decisions.md` 判断 13）
 
-## issue 009 — 修飾キー同時押下フラグ（未着手）
+### 設計（★ `/reimagine` 1 回目）
+- [x] 初回案 `design.md` を書く → `design-v1.md` へ退避
+- [x] `requirement.md` のゴールのみから v2 を再生成
+- [x] `design-comparison.md` で 2 案を比較
+- [x] ★ **研究者が v2 を採用**（2026-09-13）／★ ESM 監査 criterion は **起票のみ**と決定
 
-⚠️ 007 の裁定次第で不要になる。★ 008 と `hook_macos.rs` / `hook_windows.rs` /
-`schema_dto.rs` で交差するので、**008 の PR がマージされてから**着手する。
+### 実装（★ コード変更ゼロ / 新観測ゼロ）
+- [x] `docs/adr/ADR-029-outcome-role-arbitration.md`（新規・D1〜D6 / Alternatives A1〜A7 / 禁止 #15〜#21）
+- [x] `docs/adr/README.md` ① ADR-029 の行 ② ADR-009 行の重ね書き注記
+      ③ ADR-024 行の重ね書き注記 ④ **転帰定義の連鎖注記ブロック**（★ 表現チャネル連鎖と同型）
+
+### テスト（⚠️ 機械 AC は**衛生条件**）
+- [x] AC 4 `check_doc_lexicon.py` — **exit 0**（⚠️★★★ **ただし ADR は検査対象外**・実行記録に明記）
+- [x] AC 5 `check_citations.py` — **exit 0**（★ 2 巡とも。`docs/**` 再帰走査なので ADR-029 は対象内）
+- [x] AC 6 README の行 ＋ ファイル実在 — grep 済み
+- [x] AC 7 `昇格元:` — grep 済み
+- [x] AC 8 `/cross-review`（★ パス限定）→ `_codex-review-007.md`
+- [x] `code-reviewer` ＋ `security-checker` を**並列**起動
+- [ ] ⚠️ **AC 1〜3（裁定の妥当性）は研究者承認待ち**
+
+### 完了処理
+- [x] `decisions.md` 判断 13
+- [x] `blockers.md` 起票 10（ESM 監査 criterion）/ 11（セッション終了の independent 仮定）/ 12（設計文書 2 本の未反映）
+- [x] `issues/007.md` の Status / Execution Result
+- [x] git commit
+
+## issue 009 — 修飾キー同時押下フラグ（⚠️★★★ **不要として閉じた**・2026-09-13）
+
+- [x] ★ **issue 007 の裁定（ADR-029）を確認** —— ⚠️ `revision topology` を主要アウトカムに据えていない
+- [x] ⚠️★★★ **不要と判定し `issues/009.md` の Execution Result に根拠を明記**
+      （★ 予測トラックも報告トラックも **undo / redo を使わない** ／
+      `.idea/20260910-criterion:94` は T2 を「**privacy/feasibility 未確定**」の候補と自認 ／
+      `:202` 逐語「**追加観測は別 ADR / 別計測器で裁く**」）
+- [x] ★ 将来 T2 を採る場合に必要なこと（`KeyCategory` 量子化 / ADR-005 / `data-privacy` 再評価）を記録
+- ★ 副産物: ⚠️ issue 008 との `hook_macos.rs` / `hook_windows.rs` / `schema_dto.rs` 交差も解消した
