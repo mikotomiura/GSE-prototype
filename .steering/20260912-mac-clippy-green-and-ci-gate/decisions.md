@@ -205,10 +205,27 @@ clippy step が実際に走ったことも、**step が success で終わって�
 - ★ 実測 (mac self-hosted): `free before: 18 GiB (threshold=15 floor=8)` → **掃除は走らなかった**。
 - ⚠️ **run 完了後の空きは 16 GiB** (`df -h /`)。★ `src-tauri/target` は **3.0 GiB**
   (⚠️ security-checker が本 PR 前に実測した 2.1 GiB から**約 0.9 GiB 増**)。
-- ⚠️★★★ **threshold 15 GiB まで残り 1 GiB しかない。**
-  → ★ **次の run で掃除 (cargo-sweep) が走る見込み**である。⚠️ これは
-    ガードが設計どおり働くということであって故障ではないが、**掃除が走った run は遅くなる**。
-  → ⚠️ **「遅い run = 壊れた」と読み違えないこと。** ★ `free before:` の行を先に見る。
+- ⚠️★★★ **ここで私は予測を外した（★ 記録として残す）。**
+  「`df -h /` の avail が 16 GiB だから threshold 15 GiB まで残り 1 GiB、**次の run で掃除が走る**」
+  と書いたが、⚠️ **merge 後の main run (`5900ab4`) の実測は
+  `free before: 20 GiB (wiped=false)`** ——**空きは 18 → 20 GiB に増えていた**。
+- ⚠️★★★ **原因は自分の計器を guard の計器と突き合わせなかったこと**である:
+  | 計器 | 同時刻の値 |
+  |---|---|
+  | 私が使った `df -h /` の avail | **16 GiB** |
+  | guard が使う `df -Pk . \| awk '{int($4/1024/1024)}'` | **17 GiB** |
+  ★ macOS の purgeable space の扱いが違うため一致しない。
+  ⚠️ **「残り 1 GiB」と断じた根拠の 1 GiB は、計器差の中に収まっていた。**
+- → ★ **ディスクの余裕を語るなら guard 自身の `free before:` 行だけを根拠にする。**
+  ⚠️ 他の計器の数字で threshold との距離を外挿しない (`measurement-instrument-false-positives` と同型)。
+- ★ 掃除が走った run は遅くなるので、**「遅い run = 壊れた」と読み違えないこと**
+  (★ `free before:` / `wiped=` の行を先に見る)。
+
+### 4. ★ merge 後の main run (`5900ab4` / run 34669503214) — ✅ **success**
+
+★ clippy step **48 秒** (mac)。⚠️ **`/finish-task` が警告する「merge しても CI が発火しない」
+取りこぼしは起きていない** (★ `gh run list --branch main` で `push` イベントの run を確認)。
+★ **clippy ゲートが main で実際に稼働していることを確認**した。
 
 ### 3. ⚠️★★★ 「clippy が赤」と「timeout で cancel」の見分け方 (★ 実地で使う手順)
 

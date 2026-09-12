@@ -242,10 +242,21 @@ GCD のメインキューであり、FFI 境界**である。→ ★ **「書式
 | Windows | **42 秒** | 4m18s | ★ 25 分以上 |
 | macOS | **49 秒** | 5m50s | ★ 24 分以上 |
 
-⚠️★★★ **ディスクだけは余裕が無い**: `free before: 18 GiB (threshold=15 floor=8)` →
-run 後の空きは **16 GiB**、`src-tauri/target` は **3.0 GiB**（★ 本 PR 前の実測 2.1 GiB から +0.9 GiB）。
-→ ⚠️ **次の run で cargo-sweep が走る見込み**。★ ガードが設計どおり働くだけだが、
-  **掃除が走った run は遅くなる**ので「遅い＝壊れた」と読み違えないこと（★ `free before:` を先に見る）。
+★ ディスク: PR #190 の run は `free before: 18 GiB (threshold=15 floor=8)` で掃除は走らず、
+`src-tauri/target` は **3.0 GiB**（★ 本 PR 前の実測 2.1 GiB から +0.9 GiB）。
+
+⚠️★★★ **2026-09-12 訂正 — 「次の run で cargo-sweep が走る」という私の予測は外れた。**
+★ merge 後の main run (`5900ab4`) の実測は **`free before: 20 GiB (wiped=false)`** で、
+**空きは減るどころか 18 → 20 GiB に増えていた**。
+- ⚠️ 外した原因は **自分の計器を guard の計器と突き合わせずに外挿したこと**である。
+  ★ 私が根拠にした `df -h /` の avail は **16 GiB**、しかし guard が使う
+  `df -Pk . | awk '{int($4/1024/1024)}'` を同じ時刻に回すと **17 GiB** で、**一致しない**
+  （★ macOS の purgeable space の扱いが違う）。
+  ⚠️ **1 GiB 差を根拠に「threshold まで残り 1 GiB」と言ったが、その 1 GiB は計器差の中にあった。**
+- → ★ **ディスクの余裕を語るなら guard 自身の `free before:` 行だけを根拠にする**
+  (⚠️ `df -h` の数字で外挿しない)。
+- ★ 掃除が走った run は遅くなるので、そのときは「遅い＝壊れた」と読み違えないこと
+  （★ `free before:` / `wiped=` を先に見る）。
 
 ⚠️★★★ **「clippy が赤」と「timeout で cancel」は `gh pr checks` では区別がつかない。**
 ★ `gh api repos/.../actions/jobs/<id>` の `.steps[].conclusion` まで降りる
