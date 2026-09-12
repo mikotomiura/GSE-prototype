@@ -1,45 +1,72 @@
-# タスクリスト: R-2〜R-5
+# タスクリスト: R-2〜R-5 (✅ **完了**)
 
 ## Phase 0: grill (✅ 完了)
 
 - [x] 一次資料 3 本を読む (handoff を一次資料にしない)
 - [x] 実測 6 件で判断分岐を潰す (design.md の表)
-- [x] 研究者裁定を 7 件記録 (decisions.md)
+- [x] 研究者裁定を 7 件記録 (decisions.md 決定 1〜7)
 
-## Phase 1: PR-B — R-3 ＋ R-4 (`fix/msrv-proof-and-loud-redact-test`)
+## Phase 1: PR-B = **PR #193** — R-3 ＋ R-4 (✅ **main へマージ済み `2bcf35d`**)
 
-### R-3
-- [x] `cd src-tauri && cargo +1.87 check --all-targets --features package` を実測
-- [x] 結果を `Cargo.toml` の `rust-version` 注記へ反映 (⚠️ Windows cfg 集合のみの実証と明記)
-- [x] ⚠️ exit != 0 なら真の下限へ `rust-version` を修正し根拠を記録
+### R-3 (✅ 完了)
+- [x] `cargo +1.87 check --all-targets --features package` を実測 → ⚠️ **exit 101**
+- [x] ⚠️ **真の下限を特定** —— `time@0.3.47` 他が **1.88.0** を要求 (`cargo metadata` で全数走査)
+- [x] `rust-version` を **1.88** へ訂正 ＋ 注記を全面改訂
+- [x] `cargo +1.88 check` → **exit 0** (4m58s)
+- [x] ⚠️ 手順を `docs/verification-runbook.md` §1 (f) に恒久化 (★ 回す場所が無い手順は回らない)
 
-### R-4
-- [x] `lib.rs:5260` の `else { return; }` → `else { panic!(..) }`
-- [x] `ci.yml` `check` job に env 前提の検査 step (⚠️ 値は出さない・`if [ -n .. ]`。★ 判断 10 で `${VAR:+set}` は却下)
-- [x] `cargo test --features package --workspace` が exit 0
-- [x] 変異テスト: `return` に戻すと検査 step が意味を失うことを実証
+### R-4 (✅ 完了)
+- [x] `lib.rs` の `else { return; }` → `else { panic!(..) }`
+- [x] `ci.yml` `check` job の**先頭**に env 前提の検査 step
+- [x] ⚠️★★★ **Windows の空振りを修正** (`pwsh → git-bash` で MSYS2 が `HOME` を合成する)
+- [x] ⚠️ 既存の値漏れも修正 (assert の失敗メッセージ ＋ 要素完全一致マスク ＋ `\` 形)
+- [x] 変異テスト **6 形態**で実証
+- [x] ★ repo 内の裸 `return;` を全数走査 (修正前 1 / 修正後 0・検出器を検算)
 
-### 共通
-- [x] `cargo clippy --all-targets --features package -- -D warnings` が exit 0
-- [x] ゴールデン `gse-replay --snapshot` が byte-equal
-- [ ] code-reviewer + security-checker を**並列**起動
-- [ ] `/cross-review` (⚠️ **ラッパーを先に試す** = R-5 の検証)
-- [ ] PR 作成 → CI 緑 → main へマージ
+### 共通 (✅ 完了)
+- [x] fmt / clippy `-D warnings` / test / ゴールデン / schema すべて緑
+- [x] code-reviewer + security-checker を**並列**起動 → HIGH 1 / MEDIUM 5 / LOW 4 を反映
+- [x] `/cross-review` (★ **ラッパーを先に試した** = R-5 の検証)
+- [x] PR #193 → **CI 全緑** → **main へマージ** → main run も success
 
-## Phase 2: PR-A — R-2 (`chore/pin-rust-toolchain`)
+## Phase 2: PR-A = **PR #194** — R-2 (🔄 **CI 確認中**)
 
-- [ ] repo 直下に `rust-toolchain.toml` (channel 1.94.1 / components・⚠️ targets は書かない)
-- [ ] `ci.yml` 3 箇所に注記 (⚠️ action は残す)
-- [ ] `rustup show active-toolchain` が `overridden by` を返すことを確認
-- [ ] ゴールデン byte-equal / clippy exit 0
-- [ ] code-reviewer + security-checker を並列起動
-- [ ] PR 作成 → ⚠️ **初回 CI で必ず見る**: ディスクガードの `free before:` / `wiped=` 行、
-      clippy step の所要時間、toolchain DL の有無
-- [ ] main へマージ → main run が success
+- [x] repo 直下に `rust-toolchain.toml`
+- [x] ⚠️★★★ **固定先を 1.98.1 へ訂正** (★ 1.94.1 は本機の値で、CI は 1.98.1 だった)
+- [x] `profile = "minimal"` (★ 1.3 GiB のうち 726 MiB が `rust-docs`)
+- [x] ⚠️ `targets` はファイルに書かない ＋ ★ **step 側で `--target` を強制**
+- [x] ⚠️★★★ **明示 `rustup toolchain install` step を 3 job へ** (★ disk guard より**前**)
+- [x] ⚠️ `--no-self-update` (★ 実行して副作用を発見)
+- [x] `ci.yml` 3 箇所の注記 (★ `check` を正典・他は 1 行参照)
+- [x] 1.98.1 で全ゲート緑 (⚠️ clippy の lint 集合が違うので回し直した)
+- [x] code-reviewer + security-checker を並列起動 → **HIGH 4 件**を反映
+- [x] `/cross-review` → HIGH 1 件を反映 / FP 1 件を反証
+- [x] ⚠️ **初回 CI で見る 4 点**を**事前に PR 本文へ書いてから**実測 → すべて期待どおり
+- [ ] 🔄 cross-review 反映後の CI 緑を確認
+- [ ] main へマージ (★ 研究者判断)
 
-## Phase 3: 後片付け
+## R-5 (✅ **閉じた**・PR 不要)
 
-- [x] ⚠️ handoff `next-session-mac-clippy-and-ci-gate.md` §8.6 の失効行を訂正 (handoff §6)
-- [ ] `.steering/_handoff/next-session-r2-r5-decisions.md` を「済」に更新 or 削除
-- [ ] R-5 の結論を記録 (2 回連続成功なら閉じる)
-- [ ] `/finish-task`
+- [x] ラッパー `run-codex-review.sh` が **exit 0** で完走 (★ **3 回連続**)
+- [x] **予算台帳が自動計上**された = ラッパー経由の客観証拠
+- [x] ⚠️ 切り分け (版差 / 権限差) は**未了**と明記 (★ 3 回とも codex-cli 0.152.1)
+
+## Phase 3: 後片付け (✅ 完了)
+
+- [x] handoff `next-session-mac-clippy-and-ci-gate.md` の失効行を訂正
+- [x] ⚠️ `_handoff/README.md` の**同一失効文**も訂正 (★ 索引側の方が読まれる)
+- [x] handoff `next-session-r2-r5-decisions.md` に結果表を追加
+- [x] 本機の `1.87` toolchain を削除 (★ 約 1.3 GiB 回収・`1.88` は MSRV 検査用に残す)
+- [ ] `/finish-task` (★ PR #194 のマージ後)
+
+## ⚠️ 研究者へ申し送り (★ 本タスクではやらない)
+
+| # | 事項 | なぜ挙げるか |
+|---|---|---|
+| F-1 | ⚠️★★★ **toolchain 由来の advisory を検知する仕組み** | ★ **security-checker と Codex が独立に同じ点を挙げた**。⚠️ `cargo audit` の射程外で、緩和は「版上げ手順 0 で人が見る」だけ。★ 頻度は年 1 件弱だが、**唯一の critical (CVE-2024-24576 / `process::Command`) が GSE の製品コード 20 箇所のクラスに当たる** |
+| F-2 | ⚠️ `cargo-audit` / dependabot の導入 | ★ 本タスクのスコープ外 (requirement.md)。⚠️ 現状 repo に**依存脆弱性の検知経路が無い** |
+| F-3 | ⚠️ `stop-check.sh` に `--features package` を足すか | ★ mac セッションからの積み残し (follow-up 1) |
+| F-4 | ⚠️ default features のみの clippy が CI に無い | ★ 同 follow-up 2 |
+| F-5 | ⚠️ `check` job に `permissions: contents: read` | ★ 同 follow-up 3 (**既存の穴**) |
+| F-6 | ⚠️ `.codex/budget.json` の上限 300,000 を戻すか | ★ 2026-09-08 の一時引き上げが据え置き |
+| F-7 | ⚠️ `git-workflow` Skill の scope 一覧に **`wall` が残っている** | ★ ADR-015 D1 (2026-09-01) で削除済み。`docs/agent-shared.md` は訂正済みだが Skill が追随していない |
