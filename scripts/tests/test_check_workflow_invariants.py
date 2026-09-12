@@ -98,6 +98,37 @@ class TestThirdPartyPinning(unittest.TestCase):
                 self.assertEqual(v, [])
 
 
+class TestReusableWorkflows(unittest.TestCase):
+    """⚠️★★★ job 直下の `uses:` (reusable workflow 呼び出し) も見ること。
+
+    ★ step の `uses:` だけを見ていると、**第三者の reusable workflow が素通り**する ——
+    ⚠️ しかも reusable workflow は action より強く、**自前の job を持ち込む**。
+    ★ 2026-09-13 に実装の穴として実際に見つけた。
+    """
+
+    def test_third_party_reusable_workflow_is_flagged(self):
+        v, c = cwi.check(
+            [("x.yml", {"permissions": {}, "jobs": {
+                "call": {"uses": "evil/repo/.github/workflows/w.yml@v1"}}})]
+        )
+        self.assertTrue(any("third-party" in x for x in v), v)
+        self.assertEqual((c["uses"], c["third_party"]), (1, 1))
+
+    def test_sha_pinned_reusable_workflow_passes(self):
+        v, _ = cwi.check(
+            [("x.yml", {"permissions": {}, "jobs": {
+                "call": {"uses": "org/repo/.github/workflows/w.yml@" + SHA}}})]
+        )
+        self.assertEqual(v, [])
+
+    def test_local_reusable_workflow_is_exempt(self):
+        v, _ = cwi.check(
+            [("x.yml", {"permissions": {}, "jobs": {
+                "call": {"uses": "./.github/workflows/local.yml"}}})]
+        )
+        self.assertEqual(v, [])
+
+
 class TestHostedOnly(unittest.TestCase):
     def test_supply_chain_on_self_hosted_is_flagged(self):
         v, _ = cwi.check(

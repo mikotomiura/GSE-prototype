@@ -135,13 +135,20 @@ def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, i
                     " the participant decryption key."
                 )
 
-            # (2) third-party actions pinned to a commit SHA
-            for step in job.get("steps") or []:
-                if not isinstance(step, dict):
-                    continue
-                uses = step.get("uses")
-                if not uses:
-                    continue
+            # (2) third-party actions pinned to a commit SHA.
+            #     A job can reference something in two places: each step's
+            #     `uses:`, and the job's own `uses:` when it calls a reusable
+            #     workflow. Checking only steps leaves the second wide open --
+            #     a third-party reusable workflow is *more* privileged than an
+            #     action, since it brings its own jobs.
+            step_uses = [
+                s.get("uses")
+                for s in (job.get("steps") or [])
+                if isinstance(s, dict) and s.get("uses")
+            ]
+            if job.get("uses"):
+                step_uses.append(job["uses"])
+            for uses in step_uses:
                 counters["uses"] += 1
                 action, ref = _uses_ref(str(uses))
                 if action.startswith("./") or action.startswith(FIRST_PARTY_PREFIX):
@@ -149,7 +156,7 @@ def check(workflows: Sequence[Tuple[str, dict]]) -> Tuple[List[str], Dict[str, i
                 counters["third_party"] += 1
                 if not SHA_RE.match(ref):
                     violations.append(
-                        name + " / " + job_name + ": third-party action `" + action
+                        name + " / " + job_name + ": third-party reference `" + action
                         + "` is pinned to `" + (ref or "(nothing)")
                         + "`, not a 40-character commit SHA."
                         " A tag or branch can be moved by whoever controls the upstream"
@@ -277,6 +284,22 @@ def self_test() -> int:
         if v:
             failures.append("(3) " + exempt + " must be exempt, got " + repr(v))
 
+    # (3b) a job-level `uses:` (reusable workflow) is checked too
+    v, c = check([("x.yml", {"permissions": {}, "jobs": {"call": {
+        "uses": "evil/repo/.github/workflows/w.yml@v1"}}})])
+    if not any("third-party" in x for x in v):
+        failures.append("(3b) a third-party reusable workflow must be flagged")
+    if c["uses"] != 1 or c["third_party"] != 1:
+        failures.append("(3b) a job-level uses must be counted: " + repr(c))
+    v, _ = check([("x.yml", {"permissions": {}, "jobs": {"call": {
+        "uses": "evil/repo/.github/workflows/w.yml@" + sha}}})])
+    if v:
+        failures.append("(3b) a SHA-pinned reusable workflow must pass: " + repr(v))
+    v, _ = check([("x.yml", {"permissions": {}, "jobs": {"call": {
+        "uses": "./.github/workflows/local.yml"}}})])
+    if v:
+        failures.append("(3b) a local reusable workflow must be exempt: " + repr(v))
+
     # (4) hosted-only workflow on a self-hosted runner
     v, _ = check(
         one_job(
@@ -316,8 +339,9 @@ def self_test() -> int:
             print("NG self-test: " + f, file=sys.stderr)
         return EXIT_USAGE
     print(
-        "OK self-test: 6 groups (clean input + counters / permissions / third-party"
-        " pinning + exemptions / hosted-only / empty scan / exit codes)"
+        "OK self-test: 7 groups (clean input + counters / permissions / third-party"
+        " pinning + exemptions / reusable workflows / hosted-only / empty scan /"
+        " exit codes)"
     )
     return EXIT_OK
 
