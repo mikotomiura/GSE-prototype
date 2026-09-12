@@ -1,0 +1,149 @@
+name: Supply chain audit
+
+# ⚠️★★★ **なぜ `ci.yml` に足さず独立させたのか** (F-1 / F-2・2026-09-12)
+#
+# ★ 本 workflow の要は `schedule` である —— ⚠️ 新しい advisory は**コード差分ゼロで現れる**ので、
+#   PR 発火だけでは永久に気づかない。
+#   ⚠️ しかし `ci.yml` に `schedule:` を足すと **ci.yml の全 job が週次で発火**してしまう
+#   (★ `check` / `build-macos` / `decide-win-runner` は **self-hosted 実機**)。
+#   各 job の `if` をさらに増やして抑えるのは、既に複雑な条件群をもう一段複雑にする。
+#   → ★ **独立したファイルにする。**
+#
+# ⚠️★★★ **本 workflow は「門」ではなく「信号」である。**
+#   ★ 実測 (2026-09-12): `gh api repos/mikotomiura/GSE-prototype/branches/main/protection`
+#   → **`404 Branch not protected`**。⚠️ つまり required check は 1 つも無く、
+#   本 job が赤でもマージは機械的には止まらない。
+#   → ★ だからこそ `continue-on-error` は**書かない** (⚠️ 書くと「赤」が「緑」に見え、
+#     唯一の信号が消える)。⚠️ 赤を見たら人が動くこと。
+#
+# ★ 検査する 3 層 (⚠️ 別々に足すと検知経路が 2 系統に割れるので 1 job にまとめた):
+#   | 層                         | 固定の仕方                     | 手段 |
+#   |---|---|---|
+#   | toolchain (rustc/std/cargo) | `rust-toolchain.toml` に**名前のみ** | `scripts/check_toolchain_advisories.py` |
+#   | Rust 依存 630 crate         | `Cargo.lock` に **checksum 付き**   | `scripts/check_dependency_audit.py` (cargo-audit) |
+#   | フロント npm                | `package-lock.json`              | `npm audit --omit=dev` |
+#
+# ⚠️★★★ **`cargo audit` を入れれば足りる、は成立しない** —— ★ cargo-audit が見るのは
+#   `Cargo.lock` の依存だけで、**toolchain 同梱の cargo / rustc / std は見ない**。
+#   ⚠️ RustSec DB に `std` の advisory は **1 件も無い** (★ rust-lang/rust の repo advisory にしかない)。
+#
+# ★ どの step も **手元で同じコマンドが回る** (`docs/verification-runbook.md` §1 (g))。
+#   ⚠️ 「回す場所が無い手順は回らない」を繰り返さないための条件である。
+
+on:
+  schedule:
+    # ★ 毎週月曜 03:17 UTC (= 12:17 JST)。⚠️ 正時を避けるのは GitHub 側の混雑で
+    #   遅延・間引きが起きやすいため。
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    # ★ 依存・toolchain・検査そのものを動かした PR でだけ走らせる
+    #   (⚠️ 全 PR で回すと advisory DB の取得分だけ無駄に遅くなる)。
+    paths:
+      - "src-tauri/Cargo.lock"
+      - "src-tauri/Cargo.toml"
+      - "rust-toolchain.toml"
+      - "package.json"
+      - "package-lock.json"
+      - ".cargo/audit.toml"
+      - "scripts/check_toolchain_advisories.py"
+      - "scripts/check_dependency_audit.py"
+      - "scripts/tests/test_check_toolchain_advisories.py"
+      - "scripts/tests/test_check_dependency_audit.py"
+      - ".github/workflows/supply-chain.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # ⚠️ `ci.yml` と違って **false** にする —— ★ 週次の走査を後続の push で捨てると、
+  #   「その週は 1 度も検査していない」のに誰も気づかない (★ cancelled は赤に見えない)。
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    # ★ hosted で回す —— ⚠️ self-hosted 実機 (`gse-win` / `gse-mac`) を週次で占有しない。
+    #   ★ 本 job は OS 依存の検査を 1 つも含まない (lockfile と advisory DB を読むだけ)。
+    #
+    # ⚠️★★★ **この job を self-hosted に向けてはならない。** ★ self-hosted ランナーは
+    #   研究者の home で動いており、そこには被験者提出物を復号できる鍵がある。
+    #   ⚠️ 向け先を変えるなら、**先に `ci.yml` の env 直下 (fork PR と self-hosted の境界) の
+    #   長い注記を読むこと**。★ なお `if:` による fork ゲートを**ここには足さない** ——
+    #   `ci.yml` 自身が「そのゲートは防御ではない (PR head が行を消せる)」と記録しており、
+    #   hosted 限定の本 job に足しても**効果ゼロの防御が 1 つ増えるだけ**である。
+    #
+    # ★ action の版について: 本 job は **hosted の使い捨て環境** ＋ `contents: read` なので、
+    #   `ci.yml` の follow-up (self-hosted で走る job の action を SHA ピンする) の対象外とする。
+    #   ⚠️ 無言で非対称にしないために、ここに理由を書いておく。
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # ⚠️★★★ **検査自身が空振りしていないか**を先に確かめる。
+      #   ★ 本 repo は「何も起きていない」を「成功した」と読む失敗を 3 回踏んでいる。
+      #   → 検査器の変異テストを**本番検査より先に**置き、ここが赤なら以降を信用しない。
+      - name: Self-test the checkers (mutation cases)
+        run: |
+          set -euo pipefail
+          python3 scripts/check_toolchain_advisories.py --self-test
+          python3 scripts/check_dependency_audit.py --self-test
+          python3 -m unittest scripts.tests.test_check_toolchain_advisories
+          python3 -m unittest scripts.tests.test_check_dependency_audit
+
+      # --- 層 1: toolchain (rustc / std / cargo / clippy) -----------------------
+      # ⚠️ `cargo audit` の射程外。★ `rust-toolchain.toml` の `channel` を
+      #   rust-lang/rust の Security Advisories と突合する。
+      #   ★ `channel` が版として読めない値 (`stable` 等) なら **緑にせず落ちる**。
+      - name: Toolchain advisories (rust-lang/rust)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/check_toolchain_advisories.py
+
+      # --- 層 2: Rust 依存 630 crate -------------------------------------------
+      # ★ cargo-audit の版を固定する (⚠️ 検査器が黙って変わると結果の比較ができない)。
+      #   ★ `runner.temp` で実行するのは、repo 直下の `rust-toolchain.toml` に引っ張られて
+      #   固定 toolchain の丸ごとダウンロードが走るのを避けるため
+      #   (⚠️ 本 step が要るのは「cargo-audit の実行ファイル」だけで、GSE のビルドではない)。
+      - name: Install cargo-audit (pinned)
+        working-directory: ${{ runner.temp }}
+        run: cargo install cargo-audit --locked --version 0.22.2
+
+      # ⚠️★★★ **なぜラッパー経由なのか**: ★ 実測 (cargo-audit 0.22.2) —— `[advisories] ignore`
+      #   に入れた advisory は **出力から跡形もなく消える** (件数すら出ない)。
+      #   → ⚠️ 「緑」と「除外したから緑」が区別できない。
+      #   ★ ラッパーは (a) 除外 ID を毎回印字し、(b) **stale な除外** (もう当たらないのに
+      #   残っている ID) を **exit 2 で赤にする**。⚠️ (b) は cargo-audit 単体では出せない。
+      #   ★ さらに: ラッパーは `CARGO_HOME` を一時ディレクトリへ向けて cargo-audit を回す。
+      #   ⚠️ 2026-09-12 実測 —— **`$CARGO_HOME/audit.toml` (個人設定) も効く**ので、
+      #   cwd の隔離だけでは repo に書いていない除外が黙って適用されうる。
+      #   ★ 実行後に「ignore が空だったこと」を検算して初めて結果を採る。
+      - name: Rust dependency audit (src-tauri/Cargo.lock)
+        run: |
+          cargo-audit --version
+          python3 scripts/check_dependency_audit.py
+
+      # --- 層 3: フロント npm ---------------------------------------------------
+      # ⚠️★★★ **門にするのは `--omit=dev` (本番依存) だけ**である。
+      #   ★ 実測 (2026-09-12): 全体では 7 件 (high 4 / moderate 1 / low 2) 出るが、
+      #   **すべて devDependencies** (vite / postcss / nanoid / browserslist / esbuild /
+      #   @babel/core / baseline-browser-mapping) で、⚠️ **被験者に配る Tauri バイナリの
+      #   実行時経路ではない**。
+      #   ⚠️ ただし「無い」ことにはしないので、**全体も必ず出力する** (下の step)。
+      # ★ Node を固定する —— ⚠️ `frontend-check` は `node-version: 22` で固定しており
+      #   (`ci.yml`)、ここだけランナー既定に任せると **npm の版が変わった日に監査結果が
+      #   黙って変わる**。★ 同じ版に揃える。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: npm audit (production dependencies -- this is the gate)
+        run: npm audit --package-lock-only --omit=dev
+
+      - name: npm audit (all dependencies -- informational, never fails)
+        # ★ dev 依存を門にしない代わりに、**毎回必ず目に入る場所**へ出す。
+        #   ⚠️ ここが赤くならないことを理由に「dev 依存に問題は無い」と読まないこと。
+        if: always()
+        run: npm audit --package-lock-only || true

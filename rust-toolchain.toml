@@ -57,12 +57,29 @@
 #   ★ `cargo +<version>` は**このファイルを上書きする**ので、MSRV 検査は固定と両立する (実測済み)。
 #
 # ★ 版を上げるときの手順:
-#   0. ⚠️★★★ **rust-lang/rust の Security Advisories を確認する** (★ M-1) ——
-#      `gh api /repos/rust-lang/rust/security-advisories --jq '.[] | "\(.cve_id) \(.severity) \(.summary)"'`
+#   0. ⚠️★★★ **rust-lang/rust の Security Advisories を確認する** (★ M-1 / F-1) ——
+#      ```
+#      python3 scripts/check_toolchain_advisories.py                 # 現在の channel を突合
+#      python3 scripts/check_toolchain_advisories.py --channel 1.99.0 # 上げ先を先に試す
+#      ```
 #      ⚠️ **toolchain 由来の脆弱性は `cargo audit` の射程外**である。★ `cargo audit` が見るのは
 #      `Cargo.lock` の依存だけで、**toolchain 同梱の cargo / rustc / std は見ない**。
 #      ⚠️ RustSec DB にも `std` の advisory は 1 件も無い (★ rust-lang/rust の repo advisory にしか無い)。
-#      → ★ **固定するということは、この点検を人が担うということ**である。
+#
+#      ⚠️★★★ **2026-09-12 に手順を script に置き換えた。** ★ 理由は 2 つある:
+#        (a) ⚠️ **旧文の生コマンドは本機で動かなかった** —— `gh api /repos/...` の
+#            **先頭スラッシュ**を git-bash (MSYS2) が Windows パスへ書き換え、
+#            `invalid API endpoint: "C:/Program Files/Git/repos/..."` で落ちる (実測)。
+#            ★ script は先頭スラッシュ無しで呼ぶので両 OS で動く。
+#        (b) ⚠️ 一覧を**目で見て**「当たっていない」と判断するのは、範囲が
+#            `>= 1.87.0, < 1.89.0` のような**閉区間**のときに誤りやすい
+#            (★ 「修正版より新しいから安全」は閉区間では成り立たない)。
+#            → ★ script が範囲を機械的に評価し、**当たれば exit 1** で落ちる。
+#
+#      ★ **この点検は人の記憶に頼らない** —— `.github/workflows/supply-chain.yml` が
+#        **週次**で同じ script を回す (⚠️ 新しい advisory はコード差分ゼロで現れるため)。
+#        ⚠️ ただし `main` に branch protection は無い (実測) ので、**赤は自動では止めない**。
+#      → ★ **固定するということは、この点検を持ち続けるということ**である。
 #   1. `channel` を書き換えた**単独 PR** を立てる (⚠️ 他の変更と混ぜない)。
 #   2. `cargo clippy --all-targets --features package -- -D warnings` を**両 OS で**緑にする
 #      (★ `gse-win` = G-GEAR 実機 / `gse-mac` = MacBook Air 実機。⚠️ 片方だけでは足りない ——
