@@ -305,6 +305,14 @@ jobs:
       #   **Windows の判定は `USERPROFILE` だけで行う** —— ⚠️ これが pwsh 側の実態と一致する。
       #   ★ macOS は `cargo test` も bash なので、bash での観測がそのまま忠実である。
       #
+      #   ⚠️★★★ **「Windows で HOME を見ない」は *この bash step の話* であって、
+      #   Rust テスト側の話ではない** (★ cross-review 指摘への回答・2026-09-12)。
+      #   ★ テスト本体は `["USERPROFILE", "HOME"]` の順で読み、**OS 分岐しない**。それでよい ——
+      #   ⚠️ 合成が起きるのは **git-bash の中だけ**で、pwsh から起動される `cargo test` は
+      #   合成されない素の env を見るからである。★ 開発者が git-bash から `cargo test` を
+      #   回した場合は合成 `HOME` を拾うが、⚠️ それは**実在するホームの値**なので検査は成立する。
+      #   → ★ **テスト側に OS 分岐を足さないこと** (⚠️ 足すと本物の env 経路を検査しなくなる)。
+      #
       #   ⚠️ **却下案: Windows だけ `shell: pwsh` にする** —— ★ 観測は最も忠実になるが、
       #   `pwsh` (PowerShell **Core**) は self-hosted 実機で WindowsApps 経由の導入であり、
       #   ⚠️ **ランナーサービスの PATH で解決できるかが未検証**。★ ci.yml に前例も無い。

@@ -5302,13 +5302,31 @@ mod submit_command_tests {
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
+        // ⚠️★★★ ユーザー名は **パス要素として完全一致するものだけ** 伏せる (cross-review MEDIUM)。
+        //   ★ 素の `replace(&user, "<USER>")` は**部分一致**なので、ユーザー名が短い / 一般語だと
+        //   ⚠️ **診断そのものを壊す**。★ 実測 (2026-09-12):
+        //     user="s"   → `Document<USER>/GSE-<USER>e<USER><USER>ion<USER>/x.ndj<USER>on`
+        //     user="Doc" → `<USER>uments`
+        //   ⚠️ 区切り文字を前に付けるだけ (`/{user}`) でも `Doc` は `/Documents` に当たるので不十分。
+        //   → ★ `/` `\` で区切って **要素ごとに `==` で比較**する (部分一致を原理的に起こさない)。
         let show = |s: &str| {
             let t = s.replace(&home, "<HOME>");
             if user.is_empty() {
-                t
-            } else {
-                t.replace(&user, "<USER>")
+                return t;
             }
+            let mut out = String::with_capacity(t.len());
+            let mut seg = String::new();
+            for ch in t.chars() {
+                if ch == '/' || ch == '\\' {
+                    out.push_str(if seg == user { "<USER>" } else { seg.as_str() });
+                    out.push(ch);
+                    seg.clear();
+                } else {
+                    seg.push(ch);
+                }
+            }
+            out.push_str(if seg == user { "<USER>" } else { seg.as_str() });
+            out
         };
 
         assert!(
@@ -5321,6 +5339,26 @@ mod submit_command_tests {
             "got: {}",
             show(&masked)
         );
+        // ⚠️★★★ **区切り文字が `\` の形もカバーする** (cross-review LOW, 2026-09-12)。
+        //   ★ 上の入力は `{home}/Documents/...` と `/` を足しているが、
+        //   ⚠️ **Windows で実際に出るパスは `C:\Users\<user>\Documents\...`** である。
+        //   ★ `redact_home_path` は `home` を前方一致で置換するだけなので区切り文字に依存しない ——
+        //   ⚠️ が、**それはテストが言っていることではなかった**ので、実経路の形も足して固定する。
+        //   ★ この形は macOS でも成立する (home=`/Users/x` → `~\Documents\...`)。
+        let detail_bs =
+            format!(r"could not read input {home}\Documents\GSE-sessions\x.ndjson: nope");
+        let masked_bs = redact_home_path(&detail_bs);
+        assert!(
+            !masked_bs.contains(&home),
+            "home leaked (backslash): masked={}",
+            show(&masked_bs)
+        );
+        assert!(
+            masked_bs.contains(r"~\Documents\GSE-sessions\x.ndjson"),
+            "got (backslash): {}",
+            show(&masked_bs)
+        );
+
         // ★ ホームを含まない文字列は素通し (⚠️ 過剰な伏せ字で原因が読めなくならないこと)。
         assert_eq!(redact_home_path("no path here"), "no path here");
     }
