@@ -241,6 +241,17 @@ pub static JIS_KEYBOARD_SEEN: AtomicBool = AtomicBool::new(false);
 /// 2026-08-09 の Windows 実機で、OS が低レベルフックを黙って外したあとも本フラグは
 /// `true` のままで、5 分間 0 打のブロックが「正常」として提出された
 /// (`windows-verification.md` §5-7)。★ 届いているかどうかは `HOOK_STARVED` を見ること。
+///
+/// ## ⚠️★★ 読み手の `Ordering` 規約 (2026-09-12)
+///
+/// | 読み方 | `Ordering` |
+/// |---|---|
+/// | ★ 本フラグ**だけ**を表示・判定に使う (⚠️ 現状の本番 4 か所はすべてこれ) | `Relaxed` で**よい** |
+/// | ⚠️ 本フラグを見た**後に payload を読む** (`hook_reports_enabled()` 等) | **`Acquire` が要る** |
+///
+/// ★ 書き手 (macOS) は `hook_macos.rs` で **payload を書き終えた後に**本フラグを立てる。
+/// ⚠️ ただし**下ろす側は Ordering では閉じられない** (★ 読み手は古い `true` を見うる) ので、
+/// **payload を後読みする読み手は `None` を許容すること** (詳細は `hook_macos.rs` の該当コメント)。
 pub static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// ⚠️★★ true = 「設置済みなのにイベントが届いていない」と監視スレッドが判断した状態。

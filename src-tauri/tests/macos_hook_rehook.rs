@@ -64,28 +64,73 @@ fn wait_for_hook(active: bool, limit: Duration) -> bool {
     false
 }
 
-/// ⚠️★★★ **`None` の 2 つの意味を切り分けるための診断文字列。**
+/// ⚠️★★★ **`None` の 2 つの意味を切り分けるための観測。**
 ///
 /// ★ `hook_reports_enabled()` が `None` を返す理由は **2 つあり、値からは区別できない**:
 ///
 /// | | 意味 | ★ 見分け方 |
 /// |---|---|---|
-/// | (a) **公開順の穴** | payload がまだ書かれていない | ⚠️ `HOOK_ACTIVE` が **true のまま** |
+/// | (a) **不変条件の退行** | payload が公開される前にフラグが立った | ⚠️ `HOOK_ACTIVE` が **前後とも true** |
 /// | (b) **tap の実失効** | run loop が抜けて `-1` に倒された | ★ `HOOK_ACTIVE` が **false に落ちている** |
 ///
 /// ⚠️ 2026-09-12 に main の CI が 2 本続けて `left: None` で赤くなったとき、
 /// ★ **この 2 つを区別する情報がログに無く**、原因をコード読解で推定するしかなかった。
 /// → ★ 次に赤くなったときは**ログだけで決着させる**。
 ///
-/// ⚠️ `watchdog_recoveries()` も併記する: ★ 層 2 が復帰を試みた形跡があれば (b) の裏づけになる。
-fn tap_diag() -> String {
-    format!(
-        "[診断] HOOK_ACTIVE={} (★ true のまま None なら **公開順の穴 (a)**、\
-         false なら **tap の実失効 (b)**) / watchdog_recoveries={} \
-         (★ 増えていれば層 2 が復帰を試みた = (b) の裏づけ)",
-        hook::HOOK_ACTIVE.load(Ordering::Acquire),
-        hook::watchdog_recoveries(),
-    )
+/// ## ⚠️★★★ なぜ「読んだ後に診断を採る」ではいけないか (★ レビュー指摘・2026-09-12)
+///
+/// ⚠️ 初版は `assert_eq!(hook_reports_enabled(), Some(true), "... {}", tap_diag())` と書いていた。
+/// ★ この形だと **payload を読んだ「後」に `HOOK_ACTIVE` を読む**ので、
+/// ⚠️ **その間に hook スレッドが進みうる** —— ちょうど狙っている遷移期
+/// (run loop 退出 → 2 秒 → 再設置) だと、**(b) で落ちたのに `HOOK_ACTIVE=true` を出して
+/// (a) と誤読させる**。→ ⚠️ **診断の存在意義を計器自身が壊していた。**
+///
+/// ★ そこで **フラグ → payload → フラグ の二度読み** (double-check) にした。
+/// ⚠️ これは完全な atomic snapshot ではない (★ 複数 atomic なので原理的に不可能) が、
+/// **前後のフラグが一致していれば、その間に遷移が無かったことの十分に強い証拠**になる。
+/// ⚠️ 一致しない場合は「**遷移中 (判定不能)**」と正直に出す —— ★ **嘘の断定より良い。**
+fn observe_tap() -> (Option<bool>, String) {
+    // ★ ① フラグ → ② payload → ③ フラグ の順で捕まえる (⚠️ 順序が本質)。
+    let before = hook::HOOK_ACTIVE.load(Ordering::Acquire);
+    let observed = hook::hook_reports_enabled();
+    let after = hook::HOOK_ACTIVE.load(Ordering::Acquire);
+    let recoveries = hook::watchdog_recoveries();
+
+    // ⚠️★★★ **アームの順序に注意 (★ 陽性対照が実際にここの取り違えを捕まえた)。**
+    //   ⚠️ 初版は `(_, false, _) | (false, _, _)` を先に置いたため、
+    //   **`before != after` (遷移中) が (b) に吸われて誤ラベルされていた**。
+    //   → ★ **まず「前後が一致しているか」で切る。** 一致していない観測は
+    //   *どちらとも言えない* のだから、⚠️ **(b) と断定してはいけない。**
+    let verdict = if before != after {
+        // ⚠️ 観測中に遷移した = payload をどちらの状態で読んだか分からない。★ 判定しない。
+        "⚠️ **判定不能** —— 観測の前後で HOOK_ACTIVE が変化した (★ 遷移中)。\
+         ⚠️ payload をどちらの状態で読んだか決まらないので断定しない。再実行して傾向を見よ"
+    } else {
+        match (before, observed) {
+            // ⚠️ 前後とも true なのに payload が無い = 不変条件が破られている (退行を疑え)。
+            (true, None) => {
+                "⚠️★★★ **(a) 不変条件の退行** —— HOOK_ACTIVE は前後とも true なのに payload が無い。\
+                 ★ `hook_macos.rs` の「公開フラグは payload の後に立てる」が破られていないか見よ"
+            }
+            // ★ 前後とも false = そもそもフックが立っていない / 実失効している。
+            (false, _) => {
+                "★ **(b) tap の実失効** —— HOOK_ACTIVE が前後とも false。run loop が抜けている。\
+                 ⚠️ これは公開順の問題ではない (★ ランナー上で tap が短命な可能性)"
+            }
+            // ★ payload は読めている。⚠️ 値が期待と違うだけなので、公開順とは無関係。
+            (true, Some(_)) => {
+                "★ payload は読めている (⚠️ 値が期待と違うだけ) —— 公開順の問題ではない。\
+                 ★ tap が `CGEventTapIsEnabled` で false を報告していないか見よ"
+            }
+        }
+    };
+
+    let diag = format!(
+        "[診断] HOOK_ACTIVE: before={before} after={after} / observed={observed:?} \
+         / watchdog_recoveries={recoveries} (★ 増えていれば層 2 が復帰を試みた = (b) の裏づけ)\n\
+         [判定] {verdict}"
+    );
+    (observed, diag)
 }
 
 #[test]
@@ -106,12 +151,8 @@ fn request_reinstall_actually_restarts_the_tap() {
     }
 
     // ★ tap が立っている ＝ 診断は Some(true) を返すはず。
-    assert_eq!(
-        hook::hook_reports_enabled(),
-        Some(true),
-        "tap 起動直後は有効のはず {}",
-        tap_diag()
-    );
+    let (observed, diag) = observe_tap();
+    assert_eq!(observed, Some(true), "tap 起動直後は有効のはず\n{diag}");
 
     // ★★★ ここが本題: 層 3 を叩くと run loop が抜け、tap が作り直される。
     assert!(
@@ -130,12 +171,8 @@ fn request_reinstall_actually_restarts_the_tap() {
         wait_for_hook(true, Duration::from_secs(20)),
         "⚠️ 再作成されない = 既存の復帰経路が壊れている"
     );
-    assert_eq!(
-        hook::hook_reports_enabled(),
-        Some(true),
-        "再作成後も tap は有効のはず {}",
-        tap_diag()
-    );
+    let (observed, diag) = observe_tap();
+    assert_eq!(observed, Some(true), "再作成後も tap は有効のはず\n{diag}");
 }
 
 /// ⚠️★★★ **陰性対照**: 健全なときに層 2 の watchdog が**余計なことをしない**か。
@@ -153,11 +190,11 @@ fn watchdog_does_not_touch_a_healthy_tap() {
     let before = hook::watchdog_recoveries();
     // ★ WATCHDOG_INTERVAL_S = 3 s なので、12 秒で **4 周期ぶん**回る。
     std::thread::sleep(Duration::from_secs(12));
+    let (observed, diag) = observe_tap();
     assert_eq!(
-        hook::hook_reports_enabled(),
+        observed,
         Some(true),
-        "★ この間 tap は健全だったはず (⚠️ そうでないと陰性対照にならない) {}",
-        tap_diag()
+        "★ この間 tap は健全だったはず (⚠️ そうでないと陰性対照にならない)\n{diag}"
     );
     assert_eq!(
         hook::watchdog_recoveries(),

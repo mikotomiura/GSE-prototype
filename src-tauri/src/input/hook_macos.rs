@@ -880,8 +880,10 @@ pub fn start() {
                                 "Failed to create CFRunLoop source from CGEventTap, \
                                  retrying in 2s..."
                             );
-                            // ★ 下ろすのは payload クリアより先 (⚠️ 3 経路すべてで同じ向き)。
-                            //   `Ordering` は `Release` —— 観測側は `Acquire` で読む (共通-2)。
+                            // ★ 下ろすのは payload クリアより先 (⚠️ **下ろす 2 経路** = 本行と `:1019`。
+                            //   ★ grep `HOOK_ACTIVE.store(false` で確認できる)。
+                            //   `Ordering` は規約統一のため `Release` (共通-2) ——
+                            //   ⚠️ ただし `:1019` のコメントどおり、**これで窓が閉じるわけではない**。
                             HOOK_ACTIVE.store(false, Ordering::Release);
                             // F4: LAST_KEY_MS は最後の物理打鍵時刻 (セッション非依存)。
                             // OS 都合の一時失効はキーボード活動と無関係なので 0 に倒さず保持し、
@@ -938,20 +940,38 @@ pub fn start() {
                     thread::sleep(Duration::from_millis(50));
                     // ⚠️★★★ **`HOOK_ACTIVE` は payload を全部書いた後に立てる (2026-09-12)。**
                     //
-                    // ★ `HOOK_ACTIVE` は「フックが立っているか」を外へ知らせる**公開フラグ**であり、
-                    //   観測側はこれを `Acquire` で読んでから `TAP_ENABLED_SNAPSHOT` /
-                    //   `TAP_PORT` を読む。⚠️ release/acquire の happens-before は
-                    //   「**フラグを書く前に書いたもの**」しか運ばないので、
-                    //   ★ **フラグを先に立てると、フラグを見た側が payload の初期値を読みうる**。
+                    // ## ★ ここで言う "payload" の定義 (⚠️ 曖昧にしない)
                     //
-                    // ⚠️ **実際に main の CI を赤くした**: `tests/macos_hook_rehook.rs` は
-                    //   `HOOK_ACTIVE` が true になるのを待ってから `hook_reports_enabled()` を
-                    //   読むが、★ **snapshot がまだ `-1` (= `None`)** で落ちた
-                    //   (2026-09-12 の main run 2 本。⚠️ 起動直後と再作成後の**両方**で出た)。
+                    //   **`TAP_ENABLED_SNAPSHOT` と `TAP_PORT` の 2 つだけ**を指す。
+                    //   ⚠️ `USING_ACCESSIBILITY_FALLBACK` (下方) は**含まない** ——
+                    //   ★ あれは独立した診断値で、「フラグを見てから読む」契約を持つ読み手が無い。
+                    //   → ⚠️ だから `HOOK_ACTIVE` より後に書かれていても本不変条件に反しない。
+                    //
+                    // ## ★ 不変条件
+                    //
+                    //   **公開フラグは payload の後に立てる。** ⚠️ 逆向き (下ろす) については
+                    //   下の `:1019` のコメントを見よ —— ★ **そちらは「保証」ではなく「窓を縮める」だけ**。
+                    //
+                    //   ★ 根拠: release/acquire の happens-before は
+                    //   「**フラグを書く前に書いたもの**」しか運ばない。
+                    //   → ⚠️ **フラグを先に立てると、フラグを見た側が payload の初期値を読みうる。**
+                    //   ⚠️ しかも旧コードはメモリモデル以前に、2 つのストアの間に
+                    //   **`CGEventTapIsEnabled` の FFI 呼び出しが挟まる**という
+                    //   **プログラム順としての実窓**があった (★ プリエンプトされれば ms 級に開く)。
+                    //
+                    // ## ⚠️★★ 現時点で、この順序に依存しているのは**結合テストだけ**である
+                    //
+                    //   ★ 本番の `HOOK_ACTIVE` 読み手は `lib.rs:381` / `:774` / `:1117` /
+                    //   `tray.rs:91` の 4 か所で、⚠️ **いずれも `Relaxed` の単独読み**であり
+                    //   **payload を後読みしない** (→ だから `Relaxed` で正しい)。
+                    //   ⚠️ `Acquire` で読んでから payload を読むのは
+                    //   `tests/macos_hook_rehook.rs` だけ。
+                    //   → ⚠️★★★ **「本番に同じ穴があった」と読まないこと。**
+                    //   ★ ただし不変条件を立てておく価値はある: **次に payload を後読みする
+                    //   読み手が現れたとき、黙って壊れないため**である。
                     //
                     // ★ これは PR #191 が `IME_ACTIVE` に対して行った修正と**同じ欠陥クラス**
                     //   (⚠️「Release の位置を payload の後へ移す」)。
-                    //   → ★ **不変条件: 公開フラグは payload の後に立て、payload より先に下ろす。**
                     //
                     // ★ 設置直後の状態を写す (⚠️ watchdog の初回発火まで `-1` のままにしない)。
                     // SAFETY: この時点で tap は生存しており、read-only チェックのみ。
@@ -1011,11 +1031,22 @@ pub fn start() {
                     CFRunLoop::run_current();
 
                     // CFRunLoopRun returned — tap was disabled or invalidated.
-                    // ★ **下ろすのは payload より先**でよい (⚠️ 立てるときと逆向き) ——
-                    //   観測側が「フラグ true」を見ている間は payload が有効である、
-                    //   という不変条件をどちらの向きでも保つため。
-                    // ⚠️ `Ordering` は `Relaxed` ではなく `Release`: 観測側は `Acquire` で
-                    //   読んでおり、`Relaxed` だと**対になっていない** (★ 共通-2 の規約)。
+                    //
+                    // ⚠️★★★ **下ろす側は「保証」ではなく「窓を縮める」だけである。**
+                    //   ★ 2026-09-12 のレビューで 3 系統から同じ指摘を受けたので明記する ——
+                    //   **立てる側と違い、下ろす側は Ordering では閉じられない**:
+                    //     1. ⚠️ `Release` ストアは**後続**のストア (payload クリア) が
+                    //        他スレッドから先に観測されるのを**禁じない** (★ 片方向バリア)。
+                    //     2. ⚠️ より根本的に、読み手の load は**古い `true` を返しうる**ので、
+                    //        「フラグを見る → payload を読む」の check-then-act の窓は**原理的に残る**。
+                    //   → ★ **読み手は `None` を許容すること。** `tap_is_enabled()` は
+                    //     **診断専用**であり、判定に使わない (★ その旨は関数の doc にもある)。
+                    //   ⚠️ 一貫した snapshot が要るなら seqlock / version か読み側の
+                    //     double-check が要る (★ 結合テストは後者を採った)。
+                    //
+                    // ★ `Ordering` を `Relaxed` → `Release` にしたのは**規約の統一** (共通-2) であり、
+                    //   ⚠️ **これ自体が上の窓を閉じるわけではない** (★ 「対になっている」とは書かない ——
+                    //   `Acquire` で `true` を読んだ側は、この `false` ストアとは同期しない)。
                     HOOK_ACTIVE.store(false, Ordering::Release);
                     // F4: LAST_KEY_MS は 0 に倒さない (上の理由と同じ)。失効前の最終打鍵時刻を
                     // 保持することで Dashboard idle カウンタの突然の 0 リセット・離席判定の崩れ・
