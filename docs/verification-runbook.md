@@ -96,6 +96,33 @@ cd <repo> && npm audit --package-lock-only --omit=dev
 #     crate だけに絞ること。
 ```
 
+
+# (h) ⚠️★★★ workflow の不変条件 ＋ third-party action の版上げ (F-8 / F-9・2026-09-13 追加)
+#   ★ 検査そのものは CI (`frontend-check`) で毎回走る。手元では workflow を触ったときに回す。
+cd <repo> && python3 scripts/check_workflow_invariants.py
+#   ★ 検査する 4 点: (1) 全 job が実効 permissions を持つ (2) third-party action が
+#     **40 桁 commit SHA** で固定 (3) `supply-chain.yml` が self-hosted へ向いていない
+#     (4) ⚠️ 走査 0 件は exit 2 (= 「違反なし」と読ませない)
+#
+#   ⚠️★★★ **third-party action の版上げは人が回す** (★ dependabot を入れない裁定 = D12)。
+#     ⚠️ 固定したまま放置すると上流のセキュリティ修正が**自動では来ない**。
+#     ★ 手順 (⚠️ 先頭スラッシュ無しで `gh api` を呼ぶ —— git-bash が書き換えるため):
+#       1. 新しい SHA を引く (⚠️ **annotated tag はタグオブジェクトの SHA で、commit ではない**):
+#            gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq '.object.type, .object.sha'
+#          → `type` が `tag` なら さらに:
+#            gh api repos/<owner>/<repo>/git/tags/<その sha> --jq '.object.sha'
+#          ★ `dtolnay/rust-toolchain` は**ブランチ**なので:
+#            gh api repos/dtolnay/rust-toolchain/branches/stable --jq '.commit.sha'
+#          ⚠️ その際 **`action.yml` の `toolchain` 既定が `stable` のまま**かを確認する
+#            (★ 意味が変わると toolchain が黙って切り替わる)。
+#       2. `uses:` 行だけを書き換え、⚠️ **版名コメントを必ず付ける** (`# v2.9.2` 等)。
+#          ★ コメント中の言及や過去の CI ログ引用は**書き換えない** (2026-09-13 に一度壊した)。
+#       3. `python3 scripts/check_workflow_invariants.py` が exit 0 であること。
+#       4. ⚠️ `build-macos` / `release` は **tag でしか走らない**ので PR では検証できない。
+#          ★ `workflow_dispatch` を**ブランチ指定**で発火し `build-windows` を実機確認する
+#            (⚠️ tag を選ぶと Release ができる)。
+#   ⚠️ `actions/*` は**意図的にタグのまま**である (★ 理由は `.github/workflows/ci.yml` の注記)。
+
 合格条件:
 - [ ] `cargo test --workspace` パス
 - [ ] `gse-replay --snapshot` が一致 (HMM 不変)
