@@ -31,6 +31,34 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ⚠️★★★ **`GITHUB_TOKEN` の既定権限を最小にする** (F-5・2026-09-12)。
+#
+# ★ 直したい失敗様式は「**job を足したとき `permissions:` を書き忘れ、repo 既定の広い権限を
+#   継ぐ**」である。⚠️ 実測 (2026-09-12・`ci.yml` を yaml パース): `decide-win-runner` /
+#   `check` / `build-windows` / `build-macos` の **4 job に `permissions:` が無かった**。
+#   → ★ **個別付与ではなく top-level に置く** —— 個別付与は今ある 4 job しか直さないが、
+#   top-level は**今後足す job も既定で最小**になる。
+#
+# ★ job 側の宣言は top-level を**上書きする**ので、既存 2 job の挙動は変わらない:
+#   `frontend-check` = `contents: read` (冗長だが明示のまま残す) /
+#   `release` = `contents: write` (⚠️ GitHub Release の作成に必要)。
+#
+# ★ `contents: read` で足りる根拠 (⚠️ 使用 action を全数列挙して確認した):
+#   `actions/checkout` (★ これだけが `contents: read` を要る) /
+#   `dtolnay/rust-toolchain` / `Swatinem/rust-cache` / `actions/setup-node` /
+#   `actions/upload-artifact` / `actions/download-artifact` / `./.github/actions/disk-guard`。
+#   ⚠️ artifact と cache は **Actions ランタイムトークン**を使い `GITHUB_TOKEN` を使わない。
+#   ★ `decide-win-runner` の `gh api .../actions/runners` は
+#   **`secrets.RUNNER_STATUS_TOKEN` (別 PAT)** を使っており (下記 L196 付近)、本設定の影響外
+#   (⚠️ そもそも `GITHUB_TOKEN` では取得できないと L137 に実測が記録されている)。
+#
+# ⚠️★★★ **検証の限界**: ★ `build-windows` / `build-macos` / `release` は `if` により
+#   **tag push か `workflow_dispatch` でしか走らない**ので、**通常の PR 実行では検証できない**。
+#   → ★ `workflow_dispatch` を**ブランチ指定で**発火して `build-windows` を実機確認した
+#   (⚠️ tag を選ぶと Release ができるので選ばない。上の L33-46 の注記を参照)。
+permissions:
+  contents: read
+
 env:
   CARGO_BUILD_JOBS: 2
   CARGO_TERM_COLOR: always
