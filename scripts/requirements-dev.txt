@@ -34,3 +34,6 @@ pytest==9.1.1
 #   実績のあるライブラリへ移した (ADR 外・`.steering/20260902-gse-design-deepening/decisions.md` 判断 6)。
 #   ★ `scripts/md2docx.py` は標準ライブラリのままで、依存を要するのは md2pptx.py だけ。
 python-pptx==1.0.2
+# workflow 不変条件ゲート (scripts/check_workflow_invariants.py・F-8 / F-9)。
+# ⚠️ ubuntu-latest に同梱されている保証は取れなかったので明示的に入れる。
+pyyaml==6.0.3

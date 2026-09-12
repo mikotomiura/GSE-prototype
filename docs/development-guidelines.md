@@ -227,7 +227,10 @@ GitHub Actions (`.github/workflows/ci.yml`) で構成済み。`push` (main / `fe
   ⚠️★★★ **2026-09-01 追記 —— 旧文が落としていた 3 群 5 ステップ**:
   ビネット構成検査 (`check_vignettes.py --self-test` ＋ 本検査・PreReg-1) →
   capabilities gate (`capabilities_gate.py --self-test` ＋ `python3 -m unittest scripts.tests.test_capabilities_gate`) →
-  シェル移植性ゲート (`bash scripts/check-shell-portability.sh`)
+  シェル移植性ゲート (`bash scripts/check-shell-portability.sh`) →
+  ★ **supply-chain 検査器のテスト** (F-1 / F-2) →
+  ★ **workflow 不変条件ゲート** (`check_workflow_invariants.py --self-test` ＋ 本検査 ＋ unittest・F-8 / F-9。
+  ⚠️ permissions の**広さ** / third-party の SHA 固定 / `supply-chain.yml` が hosted であることを検査する)
 - **`build-windows` / `build-macos` ジョブ**: `v*` タグ時のみ。Windows は **portable exe** (`--no-bundle`)、macOS は **DMG** をアーティファクト化 (macOS は entitlements 付き再署名 ＋ 研究者専用 CLI の strip)
 - ★ **`supply-chain` workflow** (`.github/workflows/supply-chain.yml`・**別ファイル**・`ubuntu-latest`):
   3 層を 1 job で検査する —— **toolchain** (`scripts/check_toolchain_advisories.py` が
