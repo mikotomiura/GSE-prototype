@@ -705,6 +705,24 @@ jobs:
           python3 -m unittest scripts.tests.test_check_dependency_audit
         env:
           PYTHONUTF8: "1"
+      # ⚠️★★★ **F-4 を「やらない」判断の担保** (2026-09-12)。
+      #   ★ CI の clippy は `--features package` の **1 本だけ**である。
+      #   ⚠️ default features のみの clippy が CI に無くてよいのは、
+      #     **default スコープが package スコープの真部分集合**だからで、
+      #     ★ それが成り立つ条件は「`cfg(not(feature = "package"))` が 0 件」の**1 点のみ**。
+      #   → ⚠️ 人の記憶で守らない。**破れたら赤くする。**
+      #
+      # ★ 自己テストを**先に**置く (⚠️ `check_vignettes` 等と同じ作法) ——
+      #   検査器が壊れていたら、本検査の緑は何も意味しないため。
+      #   ⚠️ 自己テストには「**対象が 0 ファイルでも緑にしない**」対照が入っている。
+      - name: Default-feature subset guard — self-test (F-4 の代替)
+        run: python3 -m unittest scripts.tests.test_check_default_feature_subset
+        env:
+          PYTHONUTF8: "1"
+      - name: Default-feature subset guard (F-4 の代替)
+        run: python3 scripts/check_default_feature_subset.py
+        env:
+          PYTHONUTF8: "1"
       # ⚠️★★★ **duckdb を入れてから走らせる。** ★ 入れないと 16 件中 **15 件が skip** され
       #   (実測: `skipped 'duckdb not installed'`)、⚠️ **ほぼ何も検査しない緑**になる。
       #   ★ 入れた状態では 16 件すべて走って OK になることを手元で確認済み。
