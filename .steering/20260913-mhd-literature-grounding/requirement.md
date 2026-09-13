@@ -49,16 +49,20 @@
 
 ## 受け入れ条件
 
-- [ ] **AC1**: 起票 11 の研究者判断が `.steering/20260911-.../blockers.md` に落ち、
+- [x] **AC1**: 起票 11 の研究者判断が `.steering/20260911-.../blockers.md` に落ち、
       ★ **選ばれなかった選択肢と、選んだ場合の残作業（①〜④）が読める**
-- [ ] **AC2**: 「強い反証」3 本が **一次確認**され `docs/references.md` に append 登録された
+- [x] **AC2**: 「強い反証」3 本が **一次確認**され `docs/references.md` に append 登録された
       （⚠️ 未確認は `provisional`・**捏造 URL ゼロ**）
-- [ ] **AC3**: 起票 5 の食い違いに **一次で決着**が付いた（★ または「両方とも一次未確認」と確定した）
-- [ ] **AC4**: `docs/literature/<date>-<slug>.md` が落合 6 項目で生成され `_index.md` に 1 行追記された
-- [ ] **AC5**: ADR-030 `Context-3b` に inline `[Pn]` が足された（⚠️ **D1〜D11 の中身は 1 文字も変えない**）
-- [ ] **AC6**: `PYTHONUTF8=1 python scripts/check_citations.py` が **「違反なし」まで**通った
+- [x] **AC3**: 起票 5 の食い違いに **一次で決着**が付いた（★ または「両方とも一次未確認」と確定した）
+- [x] **AC4**: `docs/literature/<date>-<slug>.md` が落合 6 項目で生成され `_index.md` に 1 行追記された
+- [x] **AC5**: ADR-030 `Context-3b` に inline `[Pn]` が足された（⚠️ **D1〜D11 の中身は 1 文字も変えない**）
+- [x] **AC6**: `PYTHONUTF8=1 python scripts/check_citations.py` が **「違反なし」まで**通った
       （⚠️ **1 回で全件出ない** → 是正→再実行を繰り返す）
-- [ ] **AC7**: `docs/research-positioning.md` への還元（★ または「還元不要」の判断）が明示された
+- [x] **AC7**: `docs/research-positioning.md` への還元（★ または「還元不要」の判断）が明示された
+      → ⚠️★★★ **`code-reviewer` HIGH で消費者が 3 箇所漏れていたことが判明し、追加で還元した**:
+      **`docs/references.md` [P273]**（SSOT に旧結論が生きていた）／
+      **未踏提出 2 文書**（`GSE技術設計書.docx.md` / `GSE_proposal.docx.md`）。
+      ★ 教訓: **還元の消費者を `grep` で機械的に洗う**（★ `docs/mitou_submission/**` まで含める）
 
 ## ⚠️ 射程外（★ やらない）
 

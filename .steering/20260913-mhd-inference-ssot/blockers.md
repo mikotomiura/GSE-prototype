@@ -80,8 +80,8 @@ D4（「絶対秒数で固定しない」）と衝突するため。
 - **[V146]** 逐語「**two sub-problems** … a) detecting task sessions … b) **linking related task sessions together**」
   ＝ **「断片の検出」と「束ねる」を分けないと過剰分割に落ちる**
 
-⚠️ **残り**: `.idea/survey §13` の未登録は **21 → 17 件**。★ 次の優先は
-**Putter et al. (2024)**（複数 Fine-Gray の非整合）／**Coman & Sillitti 原典**／**Conijn et al. (2021)**／**Therneau (1993)**。
+⚠️ **残り**: `.idea/survey §13` の未登録は **21 → 14 件**（★ 33 中 19 登録済み・**2026-09-13 に機械で数え直した**。⚠️★★★ 初稿の「17 件」は自分で検算しておらず誤りだった。★ かつ `Carl et al. (2016), ENJA15` の 1 行は **2 論文を取り違えている**ため数え方が一意でない ——**LREC 論文として数えれば 15 件**）。★ 次の優先は
+**Putter et al. (2024)**（複数 Fine-Gray の非整合）／**Coman & Sillitti 原典**／**Conijn et al. (2021)**／**[V150] Therneau (1993) の書誌特定**。
 
 ### 何が無いか
 
@@ -238,7 +238,7 @@ D4（「絶対秒数で固定しない」）と衝突するため。
   [V148] Fine & Gray (1999) にも無い。**
 - ★ **併せて分かった出典の取り違え**: ⚠️★★★ **`cluster-robust SE` / `frailty` の出典に [V147] を使えない。**
   ★ W&S 自身は採用しておらず、逐語 *"there are **no readily accessible replacements** …
-  **continue in the explicit knowledge that the problem exists**"*。→ ★ 出典は **Therneau (1993)**（未登録）／ **[V59]**。
+  **continue in the explicit knowledge that the problem exists**"*。→ ★ 出典は **[V150]**（Therneau 1993・⚠️ `provisional`・書誌未確認）。⚠️★★★ **[V59]** Allison は *問題の所在* の出典であって手当てではない。
 - ⚠️★★★ **[V147] が GSE に投げる最大の弱点**（★ 著者自身の言明）:
   *"the same dependence also occurs **across consecutive time periods within a single spell**"*
   → ★ **GSE は 1Hz で期を刻むので、エピソード内の期間従属は年単位より遥かに強い。**
