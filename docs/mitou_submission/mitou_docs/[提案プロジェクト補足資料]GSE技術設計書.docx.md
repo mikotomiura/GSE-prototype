@@ -638,7 +638,9 @@ Expression Channel  ← 抽象。状態 → 表現の対応と、境界の契約
 
 **2026年9月13日に、ここでもう一つ降ろした。** 旧文は「IMEの変換過程を含む公開データセットが見当たらない（ENJA15 も IME の扱いを一語も書いていない）」と書いていたが、**やり残しだった生ログの直接確認を実行した結果、この主張は成立しない。** ENJA15 の公開 XML には変換過程が残っている——ローマ字打鍵が `Type="IME"` として、確定文字が `insert` として二重に記録され、変換中の打ち直しと候補選択も含まれる。方法論論文も逐語で同じ仕様を述べる（Zou & Carl, 2026）。**したがって「公開データセットが見当たらない」とは書かない。**
 
-**確認できたのは一点である。** **既存の書字過程ロガーが構造的に IME を扱えない**——Hylog [48] は逐語で "none supports non-alphabetic writing, as they cannot identify logograms and symbols introduced by IMEs" と述べる。**ただしこの記述と ENJA15 の生ログは正面から食い違っており、未決として残す**（生ログの確定 insert には漢字が入っている）。Hylog 自身は**未確定文字列を取るために本文の読み取りへ全面的に依存**しており、逐語 "make it possible to reconstruct the full state of the text at any given time"、**本文非保存と両立しない**。対象は簡体字中国語で、日本語は将来課題として一行触れられているだけである。
+**2026年9月14日に、未決として残していた食い違いも解消した。** 旧文は「既存の書字過程ロガーが構造的に IME を扱えない」と書き、Hylog [48] の "none supports non-alphabetic writing, as they cannot identify logograms and symbols introduced by IMEs" を根拠に置いていた。**しかしこの引用は主語を取り違えていた。** 原文は対句であり、直前で "Translog II, the only text logger, is the only tool that supports non-alphabetic writing" と述べたうえで、"On the hand, all keyloggers ... but none supports non-alphabetic writing" と続く。**つまり "none" が指すのは keylogger であって、Translog-II は明示的に除外され、かつ肯定されている。** 同論文の比較表も Translog-II を "Non alphabetic support: Yes" と置き、Inputlog・GenoGraphiX-Log・CyWrite・ScriptLog をすべて No としている。**したがって正しい言い方は「既存のキーロガーは IME の確定文字を扱えない」である。**
+
+**そして、IME を扱える二つはどちらも本文を保存する。** Translog-II は自前エディタの中でしか動かず、一般のアプリを横断しない。Hylog は**未確定文字列を取るために本文の読み取りへ全面的に依存**しており、逐語 "make it possible to reconstruct the full state of the text at any given time"、**本文非保存と両立しない**（対象は簡体字中国語で、日本語は将来課題として一行触れられているだけである）。**差分はここにある——IME を扱う能力と本文非保存が、既存のどの系でも両立していない。**
 
 **したがって差分は、文献の不在でも公開データの不在でもない。** ENJA15 は本文と入力列を保持する統制翻訳データであり、自然作業の停滞と回復を測る基準を持たない。**差分は、内容非保存であること、一般アプリを横断すること、自然作業であること、未来の回復へ接続することの四点にある。**なお需要が無いわけではない——国立国語研究所は約600名×4年規模の日本語打鍵ログを実際に収集しているが、公開物には含めていない。打鍵データ一般については、生体情報としての機微性を理由に公開しないと明記した先行もある。ただしそれは英語圏でも同じであり、英語では大規模公開が繰り返し成立しているため、**日本語だけが空いている理由の説明にはならない。**
 
