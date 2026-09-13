@@ -70,34 +70,35 @@ mod tests {
     use super::*;
 
     /// ⚠️★★★ 記録される側の行は 1 つも通さない。
+    ///
+    /// ## ⚠️★★★ 2026-09-14: **ハードコード列挙をやめた** (ADR-031 D4-3)
+    ///
+    /// ★ 旧実装は行種名を**手で並べていた**ので、⚠️ **新しい行種を足しても
+    /// このテストは何も言わなかった**（★ 列に足し忘れれば、ただ検査されないだけ）。
+    /// → ★ **宣言（`capabilities::KNOWN_LINE_TYPES`）から導出する。**
+    /// ⚠️ こうすると「行種を足して `KNOWN_LINE_TYPES` に載せた瞬間」から
+    /// **自動的に一時停止ゲートの検査対象に入る**。
     #[test]
     fn paused_blocks_every_data_line_type() {
-        for t in [
-            "key",
-            "feat",
-            "paste",
-            "ime_state",
-            "ime_shadow",
-            "hook_health",
-            "starve_window",
-            "user_label",
-            "review_marker",
-            "session_start",
-            "session_meta",
-            "probe_assignment",
-            "realtime_label",
-            "vignette_response",
-            "intervention_decision",
-            "intervention_response",
-            "focus_transition",
-            "pointer_bin",
-            "secure_input",
-        ] {
+        // ★ 通してよい 2 つ（⚠️ [`paused_still_allows_the_marker_and_meta`] が対で固定する）。
+        const ALLOWED: [&str; 2] = ["meta", "recording_pause"];
+        let mut checked = 0usize;
+        for t in crate::capabilities::KNOWN_LINE_TYPES {
+            if ALLOWED.contains(t) {
+                continue;
+            }
             assert!(
                 !is_writable_while_paused(t),
                 "{t:?} が一時停止中に書けてしまう"
             );
+            checked += 1;
         }
+        // ⚠️★★★ **検査が空回りしていないこと**（★ `verify-before-claiming` ルール 6）。
+        //   ★ `KNOWN_LINE_TYPES` が壊れて空になっても緑にならないようにする。
+        assert!(
+            checked >= 19,
+            "検査した行種が少なすぎる ({checked} 件)。★ KNOWN_LINE_TYPES が壊れていないか見ること"
+        );
     }
 
     /// ★ 「再開した」を書けること / ファイルを閉じられること。

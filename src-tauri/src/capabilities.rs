@@ -78,6 +78,10 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     "probe_assignment",
     "realtime_label",
     "vignette_response",
+    // ⚠️★★★ O1 の**監査 criterion** (ADR-031 D1 / D4)。★ 自己申告の行動カテゴリ 6 択。
+    //   ★ `realtime_label` (主データ) とは**別の行種**にしてある —— ⚠️ フィールドとして足すと
+    //   `capabilities` に現れず、**「計器が無い」と「答えなかった」が分離できない**。
+    "activity_label",
     "intervention_decision",
     "intervention_response",
     // ⚠️★★★ O1 (R3): 被験者が記録を止めた / 再開した遷移 (ADR-014 D7-ii)。
@@ -205,6 +209,9 @@ pub fn config_gated() -> Vec<&'static str> {
     let mut v = vec![
         "probe_assignment",
         "realtime_label",
+        // ⚠️★★★ ADR-031 D4: `activity_label` も**プローブが止まれば丸ごと出ない**。
+        //   ★ `unconditional` へ入れてはならない (0 行 = 「判定不能」であって信号皆無ではない)。
+        "activity_label",
         "intervention_decision",
         "intervention_response",
     ];

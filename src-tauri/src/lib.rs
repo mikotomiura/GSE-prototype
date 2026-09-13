@@ -4777,6 +4777,10 @@ pub fn run() {
                                     probe_id: fired.probe_id.as_str().to_string(),
                                     scheduled_ts: fired.scheduled_ts,
                                     session_elapsed_ms: fired.session_elapsed_ms,
+                                    // ⚠️★★★ 現行スケジューラは**一様ランダムのみ**である
+                                    //   (ADR-031 D2 の `low_operation_end` / `resumption` は
+                                    //   §Migration M5 で配線する)。★ ここで嘘の層を書かない。
+                                    stratum: crate::logger::ProbeStratum::Random,
                                 });
                                 // (3) frontend へ emit (回答カード表示は Task C)。
                                 if let Err(e) = app_handle.emit(

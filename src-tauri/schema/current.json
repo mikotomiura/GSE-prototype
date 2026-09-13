@@ -758,6 +758,7 @@
         "probe_id",
         "scheduled_ts",
         "session_elapsed_ms",
+        "stratum",
         "type"
       ],
       "properties": {
@@ -773,6 +774,14 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
+        },
+        "stratum": {
+          "description": "このプローブが**なぜ発火したか** (ADR-031 D2)。\n\n⚠️★★★ **`Option` にしない。** `random` を含む 3 値を常に書くので、 **キーの不在がそのまま「本フィールドを持たない古いビルド」を意味する** (⚠️ `capabilities` は行種粒度でしか宣言できず、フィールドの有無を宣言しない。 → `meta` 行の `app_version` と併せて判定する)。\n\n⚠️★★★ **推定器の出力 (`p_stuck` / HMM 状態) で層化してはならない** —— 監査 criterion が主 criterion に依存し、criterion の二重化が意味を失う。",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ProbeStratumDto"
+            }
+          ]
         },
         "type": {
           "type": "string",
@@ -909,9 +918,97 @@
           "type": "string"
         }
       }
+    },
+    {
+      "description": "O1 の**監査 criterion** (ADR-031 D1): 「直前は何をしていたか」の自己申告。\n\n**主データ (`realtime_label`) とは別の行種である。** 前者は 1..5 の Likert 2 問で、本行は固定 6 択の行動カテゴリを 1 つ持つ。 別の行種にしてあるのは、`capabilities` が**行種粒度でしか能力を宣言しない**ためで、 `realtime_label` のフィールドとして足すと「計器が無かった (古いビルド)」と 「被験者が答えなかった」を機械的に分離できなくなる (ADR-013 D1 / ADR-031 D4)。\n\n**content-free の保証 (ADR-031 D3)**: 自由記述・相手の識別子・アプリ名・URL・ 理由のいずれも持たない。持つのは時刻と 6 択のどれかだけである。\n\n**時刻キーは `t` である** (ADR-031 D6)。`redaction::line_timestamp` が 区間指定削除でこの行を拾えるようにするためで、`ts` にすると**消えない行**になる。",
+      "type": "object",
+      "required": [
+        "answered",
+        "category",
+        "latency_ms",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "answered": {
+          "type": "boolean"
+        },
+        "category": {
+          "$ref": "#/definitions/ActivityCategoryDto"
+        },
+        "latency_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "probe_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "activity_label"
+          ]
+        }
+      }
     }
   ],
   "definitions": {
+    "ActivityCategoryDto": {
+      "description": "`activity_label` の行動カテゴリ (ADR-031 D3)。固定 6 択で、増やすには別 ADR が要る。\n\n語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の 「熟考・詰まり・外部資料・会話・離席・回答不能」に対応する。\n\n⚠️ 同メモ `:236` は「外部参照 / 観測不能」という別語で同じ並びを書いているが、 そちらは**解析側の混同率のカテゴリ**であって被験者に出す選択肢ではない (ADR-031 Context-1)。\n\n⚠️★★★ `external_material` と `conversation` は、計器由来なら ADR-014 D4 が禁じている 役割カテゴリ (`editor` / `terminal` / `browser`) と**意味的に等価**である。 自己申告経由に限って許可されており、条件は `data-privacy` ルール 7 にある。",
+      "oneOf": [
+        {
+          "description": "熟考: 手は止まっていたが考えていた。",
+          "type": "string",
+          "enum": [
+            "deliberating"
+          ]
+        },
+        {
+          "description": "詰まり: 先に進めずにいた。",
+          "type": "string",
+          "enum": [
+            "stuck"
+          ]
+        },
+        {
+          "description": "外部資料: 本・書類・画面などを読んでいた。",
+          "type": "string",
+          "enum": [
+            "external_material"
+          ]
+        },
+        {
+          "description": "会話: 会話・通話・打ち合わせをしていた。",
+          "type": "string",
+          "enum": [
+            "conversation"
+          ]
+        },
+        {
+          "description": "離席: その場を離れていた。",
+          "type": "string",
+          "enum": [
+            "away"
+          ]
+        },
+        {
+          "description": "回答不能: 思い出せない・当てはまらない。",
+          "type": "string",
+          "enum": [
+            "cannot_answer"
+          ]
+        }
+      ]
+    },
     "CapabilitiesDto": {
       "description": "★ 収集仕様の自己記述 (ADR-013 D1)。`meta`(session_start) 行にのみ現れる。\n\n## ⚠️★★★ 2 群を分ける理由 (分けないと自己矛盾する)\n\n閾値ゲート付きの行種では **「0 行」は「信号が無かった」を意味しない** (閾値未達と区別できない)。★ 単一の集合にすると、 **本 ADR が防ごうとした取り違えを判定表が再導入する** (code-reviewer HIGH)。\n\n⚠️ 列挙されるのは **行種名**であって `meta` 行のフィールド名ではない (`\"session_start\"` は `{\"type\":\"session_start\"}` という*行種*を指し、 同名の `meta.session_start` *フィールド*とは別物である)。",
       "type": "object",
@@ -1010,6 +1107,15 @@
       "enum": [
         "random_probe",
         "self_marker"
+      ]
+    },
+    "ProbeStratumDto": {
+      "description": "`probe_assignment` の層化理由 (ADR-031 D2)。\n\n`random` = 既存のランダム枠、`low_operation_end` = 低操作区間が終わった時点、 `resumption` = フォーカスが戻ったあとに打鍵が戻った時点。\n\n⚠️★★★ **いずれも「時計と操作の事実」だけで決まる。** 推定器の出力は 1 バイトも読まない。",
+      "type": "string",
+      "enum": [
+        "random",
+        "low_operation_end",
+        "resumption"
       ]
     },
     "SkipReasonDto": {
