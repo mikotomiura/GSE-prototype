@@ -49,6 +49,8 @@ FORM_BUILDER="Form_O1/GSE_O1_Form_Builder.gs"
 FORM_BUILDER_TEST="Form_O1/o1_form_builder_test.cjs"
 SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
+# ★ 収集仕様の自己記述（ADR-013 D1）。★ 6 択 ESM の計器が**この版に在るか**を見る。
+CAPS="src-tauri/src/capabilities.rs"
 
 # ★ 秘密検出の**判定器**。⚠️★★ **トップレベルに置く**（2026-08-29 に実測で判明）:
 #   `run_checks` の中に置くと `--selftest` からは**見えない**（★ selftest は `run_checks` を
@@ -88,6 +90,26 @@ else
     ng "同意文書の状態表に『⚠️ **未了』が残っている（★ 本文と食い違っていないか確かめる）"
   else
     ok "同意文書の状態表に未了が残っていない"
+  fi
+  # ⚠️★★★ **計器と同意を機械で連動させる**（ADR-031 D1 / D5 保証 3・2026-09-14 追加）。
+  #   ★ 6 択 ESM（`activity_label`）は**画面に問いを出す**ので、同意文書 §3 注 C の逐語
+  #     「この記録では画面に何も出しません」を**破る**。
+  #   → ★ **計器がこの版に在るなら、同意の ESM 追補が承認済みでなければ配れない。**
+  #   ⚠️ 承認マーカ `<!-- o1-esm-consent: approved -->` は**研究者が入れる**
+  #     （★ dev が案を書いただけでは緑にしない ＝ 承認の代理をさせない）。
+  if [ ! -f "$CAPS" ]; then
+    ng "収集仕様の自己記述が無い: $CAPS（★ 計器と同意の連動を判定できない）"
+  elif grep -q '"activity_label"' "$CAPS"; then
+    # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
+    #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
+    #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
+    if grep -qE '^<!-- o1-esm-consent: approved -->[[:space:]]*$' "$CONSENT"; then
+      ok "6 択 ESM の計器がある版で、同意の ESM 追補が承認済み"
+    else
+      ng "6 択 ESM の計器があるのに同意の ESM 追補が未承認（★ 注 D ＋ 承認マーカを研究者が入れること）"
+    fi
+  else
+    ok "6 択 ESM の計器がまだ無い（★ 同意の ESM 追補は不要）"
   fi
 fi
 
@@ -647,6 +669,10 @@ selftest () {
     #   ★ 以前はスタブ 1 行だったので、liveness の検査は「未達を満たすと緑になるか」しか
     #   測れなかった。⚠️ いまは repo 側が緑なので、**壊すと赤になるか**を測る側へ移す。
     cp "$repo/src-tauri/src/lib.rs" "$fix/w/src-tauri/src/lib.rs" 2>/dev/null
+    # ⚠️★★★ **収集仕様の自己記述も写す**（ADR-031・2026-09-14）。
+    #   ★ 写さないと「計器があるか」の判定が常に「ファイルが無い」で赤になり、
+    #     ⚠️ **連動の検査だけ変異試験が成立しない**（★ 本ゲートが戒めている型そのもの）。
+    cp "$repo/$CAPS" "$fix/w/$CAPS" 2>/dev/null
     printf 'x\n.timeout(std::time::Duration::from_secs(180))\n' > "$fix/w/src-tauri/src/reconcile.rs"
     cp "$repo/$MEASURE" "$fix/w/$MEASURE" 2>/dev/null
     # ⚠️★★★ **移植性ゲートも写す**（security-checker 指摘・2026-08-29）。
@@ -672,6 +698,20 @@ selftest () {
       -e 's/^- 採用した timeout: \*\*（未記入）\*\*$/- 採用した timeout: **固定 900 秒**/' \
       "$fix/w/$MEASURE"
   }
+  # ⚠️★★★ **記録票を「未実測」へ戻す**（★ 2026-09-14 追加）。
+  #   ★ なぜ要るか: `fill_measure` は「空欄を埋める」変異だったが、⚠️ **実物の記録票は
+  #     2026-09-05 に実測済みで埋まった**。→ ★ 「埋める」変異はもう**状態を何も変えない**ので、
+  #     ⚠️ **selftest 3 の 2 本が「壊しても緑のまま」と報告し続けていた**（★ 空回り）。
+  #   → ★ いまは **逆向き（空に戻す）** が正しい変異である。
+  blank_measure () {
+    sed_i       -e 's/^- 状態: \*\*実測済み\*\*$/- 状態: **未実施**/'       -e 's/^- 実測日: \*\*.*\*\*$/- 実測日: **（未記入）**/'       -e 's/^- 送信バイト数 (base64 後): \*\*.*\*\*$/- 送信バイト数 (base64 後): **（未記入）**/'       -e 's/^- 所要時間 (Drive 保存を含む): \*\*.*\*\*$/- 所要時間 (Drive 保存を含む): **（未記入）**/'       -e 's/^- 実効スループット: \*\*.*\*\*$/- 実効スループット: **（未記入）**/'       -e 's/^- 採用した timeout: \*\*.*\*\*$/- 採用した timeout: **（未記入）**/'       "$fix/w/$MEASURE"
+  }
+  # ★ 「状態」だけ実測済みのまま、値の欄を空に戻す（⚠️ 中身の無い記録で緑にしないことの対照）。
+  blank_measure_fields () {
+    blank_measure
+    sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"
+  }
+
   # ★ 送信側を実測にもとづいて直した状態（= 180 秒固定でなくなった）。
   fix_timeout () {
     printf 'x\n.timeout(std::time::Duration::from_secs(900))\n' > "$fix/w/src-tauri/src/reconcile.rs"
@@ -718,6 +758,8 @@ selftest () {
   build; sed_i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
+  # ⚠️★★★ ADR-031: **計器があるのに同意が未承認なら赤**（★ repo の現状がこれである）。
+  build;                                                                        expect_red "ESM の計器があるのに同意" "計器と同意の連動（未承認）"
   # ⚠️★★★ 運用管理シート（起票 T-25）—— ★ **3 つの壊し方を別々に撃つ**。
   #   ⚠️ 1 つだけだと「どれか 1 つでも欠けたら赤」なのか「たまたま拾えた」のか分からない。
   build; sed_i 's/function buildO1MgmtSheet/function DISABLED_buildO1MgmtSheet/' "$fix/w/$FORM_BUILDER"
@@ -877,7 +919,16 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   # ⚠️★★★ **実測の記録とコードの修正が「両方そろって」初めて緑にする。**
   #   ★ 旧版は `grep from_secs(180)` ただ 1 本だったので、**数字を書き換えるだけで緑**になった。
   #   ★ liveness の陽性対照は selftest 1（壊すと赤）へ移した（= repo 側が緑になったため）。
-  build; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
+  build; blank_measure; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
+
+  # ⚠️★★★ ADR-031: **承認マーカを入れると緑になること**（★ 陽性対照）。
+  build; printf '
+<!-- o1-esm-consent: approved -->
+' >> "$cons"
+  expect_green "同意の ESM 追補が承認済み" "計器と同意の連動（承認あり）"
+  # ★ 逆側: **計器がまだ無い版では追補を要求しない**（⚠️ 常に赤くする検査にしない）。
+  build; sed_i 's/"activity_label",//' "$fix/w/$CAPS"
+  expect_green "ESM の計器がまだ無い" "計器と同意の連動（計器なし）"
 
   # ⚠️★★★ **O1 実装を含むタグを作ると緑に変わること**（2026-08-30 追加）。
   #   ★ 一時ツリーは `git init` しただけでタグが 1 つも無いので、既定では赤い
@@ -899,10 +950,10 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   build; sed_i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.ps1"; expect_red "sync-session" "ps1 だけ壊しても赤になる"
   build; sed_i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.sh";  expect_red "sync-session" "sh だけ壊しても赤になる"
   # ⚠️★★★ **A-2 の肝**: 片方だけでは緑にしない（★「見えないまま緑」への抜け道を塞ぐ）。
-  build; fix_timeout;   expect_red "未実測"           "コードだけ直しても赤になる（実測が無い）"
-  build; fill_measure;  expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
+  build; blank_measure; fix_timeout; expect_red "未実測" "コードだけ直しても赤になる（実測が無い）"
+  build; blank_measure; fill_measure; expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
   # ★「状態」だけ実測済みにして必須欄が空なら赤（⚠️ 中身の無い記録で緑にしない）。
-  build; sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
+  build; blank_measure_fields; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
   # ⚠️★★★ **タグの新しさで代用していないこと**（2026-08-30 追加・本セッションの事故そのもの）。
   #   ★ `v0.1.29` は「実在する最新タグ」だったが `o1.rs` を含まなかった。
   #   → ★ **o1.rs を含まないタグ**を打っても赤のままであることを確かめる。
