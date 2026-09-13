@@ -62,14 +62,14 @@
 | `physical-anchor` | Lv3/Lv4 Physical Anchor / Flutter 連携 |
 | `project-status` | 現在の git / タスク / 進捗を動的に把握したい時 |
 | `implementation-workflow` | 実装タスクの共通骨格 (調査→設計→実装→テスト→レビュー) |
-| ★ `verify-before-claiming` | **事実を断定する前**（「不要」「壊れる」「既知」「〜になる」）／削除・簡略化の提案／memory を根拠に使う時 |
+| ★ `verify-before-claiming` | **事実を断定する前**（「不要」「壊れる」「既知」「〜になる」）／削除・簡略化の提案／memory を根拠に使う時 ／ ★★★ **ADR・裁定・仕様を確定する時**（⚠️ **長い一次資料を 1 節だけ読んで代表させない**＝ルール 7 ／ ⚠️ **「核心」「閉じた」と書く前に同じ語で全文 grep**＝ルール 8。★ 2026-09-13 に ADR-030 で 2 回踏み抜いた） |
 | ★ `browser-verification` | **`mcp__claude-in-chrome__*` を使う時**（最初の 1 回で必ず）／GAS・フォーム・シートの配備検証／生成 HTML の表示確認 |
 
 ### 研究トラック Skill (docs/ の研究文書・`experiments/` を触る時)
 
 | Skill | いつ参照するか |
 |---|---|
-| `citation-ssot` | 理論・手法・先行研究に依拠する記述を書く (`[Pn]`/`[Vn]` 採番・append-only) |
+| `citation-ssot` | 理論・手法・先行研究に依拠する記述を書く (`[Pn]`/`[Vn]` 採番・append-only)。⚠️★★★ **ADR も対象**（★ 先例 `ADR-010 D5` は [V66]/[V68]/[V69]/[V72] に接地。⚠️ ADR-030 は引用ゼロで書いて後から接地し直した） |
 | `literature-card` | 論文/文献を精読してカード化する (`docs/literature/`・落合フォーマット) |
 | `reproducibility-discipline` | `experiments/` 配下・較正スモーク・seed/lockfile/HMM_VERSION 固定 |
 | `empirical-prompt-tuning` | Skill / コマンド / プロンプトを新規作成・大幅改訂した直後の検証 |
