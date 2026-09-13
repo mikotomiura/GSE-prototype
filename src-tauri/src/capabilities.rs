@@ -209,9 +209,6 @@ pub fn config_gated() -> Vec<&'static str> {
     let mut v = vec![
         "probe_assignment",
         "realtime_label",
-        // ⚠️★★★ ADR-031 D4: `activity_label` も**プローブが止まれば丸ごと出ない**。
-        //   ★ `unconditional` へ入れてはならない (0 行 = 「判定不能」であって信号皆無ではない)。
-        "activity_label",
         "intervention_decision",
         "intervention_response",
     ];
@@ -445,15 +442,22 @@ mod tests {
     fn declaration_partitions_known_line_types() {
         // ⚠️★★★ `secure_input` は **Windows には送出元が無い** (Windows に
         //   `EnableSecureEventInput` 相当の API が存在しない・`observe_windows.rs` は常に `None`)。
+        // ⚠️★★★ **`activity_label` は *まだ送出元が無い*** (2026-09-14・code-reviewer HIGH)。
+        //   ★ `logger.rs` に writer はあるが、`LogEntry::activity_label_*` を呼ぶ production
+        //   コードが **1 か所も無い** (★ プローブ発火と 6 択 UI の配線は ADR-031 §Migration M5)。
+        //   → ⚠️ **宣言すると ADR-013 D2 の過大申告になる**
+        //   (逐語「導出元は『送出元があるか』であって writer ではない」)。
+        //   ★ M5 で送出元ができたら [`activity_label_has_no_emitter_until_it_is_wired`] が赤になり、
+        //   **宣言の追加を強制する**。
         #[cfg(target_os = "windows")]
-        let emitterless: &[&str] = &["secure_input"];
+        let emitterless: &[&str] = &["secure_input", "activity_label"];
         // ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
         //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
         // ⚠️★★★ 2026-09-11 (issue 008): `ime_shadow` も外した ——
         //   macOS 側の送出元ができた (`ime_compose::drive` → `lib.rs::emit_ime_shadow`)。
         //   → ★ 非 Windows で「送出元が無い行種」は**無くなった**。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &[];
+        let emitterless: &[&str] = &["activity_label"];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
@@ -461,6 +465,40 @@ mod tests {
 
         let known: BTreeSet<&str> = KNOWN_LINE_TYPES.iter().copied().collect();
         assert_eq!(lhs, known, "宣言集合が KNOWN_LINE_TYPES を割り切っていない");
+    }
+
+    /// ⚠️★★★ **`activity_label` の送出元がまだ無いことを固定する** (ADR-031 §Migration M5)。
+    ///
+    /// ## ★ なぜ「無いこと」を固定するのか
+    ///
+    /// ★ `capabilities` は **「このビルドが何を記録できるか」**の宣言である (ADR-013 D1)。
+    /// ⚠️ `logger.rs` に writer があっても、**それを呼ぶ production コードが無ければ
+    /// このビルドは 1 行も記録できない**。→ ★ 宣言すると**過大申告**になる
+    /// (ADR-013 D2 逐語「導出元は『送出元があるか』であって writer ではない」)。
+    ///
+    /// ## ⚠️★★★ このテストは「赤くなるために」置いてある
+    ///
+    /// ★ ADR-031 **M5** でプローブ発火と 6 択 UI を配線すると、**本テストが落ちる**。
+    /// → ★ そのとき [`config_gated`] へ `"activity_label"` を足し、
+    /// [`declaration_partitions_known_line_types`] の `emitterless` から外し、本テストを消すこと。
+    /// ⚠️ **順序を間違えると、記録できないものを「測ったが 0 行」と読ませることになる。**
+    #[test]
+    fn activity_label_has_no_emitter_until_it_is_wired() {
+        const LIB: &str = include_str!("lib.rs");
+        assert!(
+            !LIB.contains("activity_label_answered(") && !LIB.contains("activity_label_skipped("),
+            "★ `activity_label` の送出元ができた (ADR-031 M5)。
+             → ⚠️ capabilities の宣言を更新すること: 
+             1. `config_gated()` に \"activity_label\" を足す
+             2. `declaration_partitions_known_line_types` の `emitterless` から外す
+             3. 本テストを消す"
+        );
+        // ⚠️★★★ **検査が空回りしていないこと** —— ★ 対照として、送出元が実在する行種で
+        //   同じ探し方をすると見つかることを見る (`verify-before-claiming` ルール 5b)。
+        assert!(
+            LIB.contains("emit_ime_shadow"),
+            "対照が見つからない。★ 探し方が壊れているので、上の assert は何も言っていない"
+        );
     }
 
     /// ★ ADR-013 D3-2 (OS 対): `ime_shadow` は **両 OS で**宣言される。

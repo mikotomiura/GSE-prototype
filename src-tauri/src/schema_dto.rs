@@ -374,7 +374,15 @@ pub enum LogEntryDto {
         ///
         /// ⚠️★★★ **推定器の出力 (`p_stuck` / HMM 状態) で層化してはならない** ——
         /// 監査 criterion が主 criterion に依存し、criterion の二重化が意味を失う。
-        stratum: ProbeStratumDto,
+        ///
+        /// ⚠️★★★ **DTO 側だけ `Option` である** (2026-09-14・code-reviewer HIGH)。
+        /// 旧ログ (本フィールドを持たない `probe_assignment` 行) を `required` で弾くと
+        /// **ADR-005 の additive versioning が成立しない** —— 実測で `gse-dataset` 側の
+        /// 既存ファイルが `validate_schema.py` で落ちた。
+        /// 書き手 (`logger::LogEntry::ProbeAssignment.stratum`) は **非 `Option` のまま**で、
+        /// ADR-031 D4 の「3 値を常に書く / キーの不在 = 古いビルド」は writer 側で保たれる。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stratum: Option<ProbeStratumDto>,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     ///

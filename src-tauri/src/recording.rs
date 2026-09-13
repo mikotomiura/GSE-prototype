@@ -95,9 +95,12 @@ mod tests {
         }
         // ⚠️★★★ **検査が空回りしていないこと**（★ `verify-before-claiming` ルール 6）。
         //   ★ `KNOWN_LINE_TYPES` が壊れて空になっても緑にならないようにする。
-        assert!(
-            checked >= 19,
-            "検査した行種が少なすぎる ({checked} 件)。★ KNOWN_LINE_TYPES が壊れていないか見ること"
+        // ⚠️★★★ **魔法数を置かない**（2026-09-14・code-reviewer LOW）。
+        //   ★ `>= 19` だと 1 件消えても緑のままだった。→ **宣言から導いて厳密に一致させる。**
+        assert_eq!(
+            checked,
+            crate::capabilities::KNOWN_LINE_TYPES.len() - ALLOWED.len(),
+            "検査した行種の数が宣言と合わない。★ KNOWN_LINE_TYPES か ALLOWED が壊れていないか見ること"
         );
     }
 

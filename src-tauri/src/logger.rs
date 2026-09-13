@@ -3203,27 +3203,76 @@ mod tests {
 
     /// ⚠️★★★ **`activity_label` の 1 行に content-free 以外のものが入らない** (ADR-031 D3)。
     ///
-    /// ★ `data-privacy` ルール 7 の 4 条件のうち **(ii) 自由記述なし / (iii) 相手・アプリ・URL なし /
-    /// (iv) 理由なし** を、**出力文字列そのもの**に対して固定する。
+    /// ## ⚠️★★★ 2026-09-14: **denylist をやめて allowlist にした** (code-reviewer MEDIUM)
+    ///
+    /// ★ 旧版は禁止語 8 個 (`reason` / `note` / `text` / …) を当てていたが、
+    /// ⚠️ `partner` / `detail` / `memo` のような**新しいフィールドは素通り**した。
+    /// ★ プライバシー保証の要 (ADR-031 **D5 保証 1** = 第三者を識別可能にしない) を
+    /// 支える検査としては弱すぎる。
+    /// → ★ **キー集合の完全一致**にする。⚠️ **1 つでも増えたら赤になる。**
     #[test]
     fn activity_label_line_is_content_free() {
+        use std::collections::BTreeSet;
+        // ★ 出してよいキーは**これだけ**である。⚠️ 増やすには ADR が要る。
+        let allowed: BTreeSet<&str> = [
+            "type",
+            "t",
+            "probe_id",
+            "category",
+            "answered",
+            "latency_ms",
+        ]
+        .into_iter()
+        .collect();
         for cat in ActivityCategory::ALL {
             let line = format_activity_label_line(1_700_000_000_000, Some("p-1"), cat, true, 120);
-            assert!(
-                line.starts_with(r#"{"type":"activity_label","t":1700000000000,"#),
-                "{line}"
+            let v: serde_json::Value =
+                serde_json::from_str(&line).expect("activity_label は JSON でなければならない");
+            let obj = v.as_object().expect("object");
+            let got: BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+            assert_eq!(
+                got, allowed,
+                "★ activity_label のキー集合が変わった (ADR-031 D3 / data-privacy ルール 7)。
+                 ⚠️ 自由記述・相手の識別子・アプリ名・URL・理由を持たせてはならない。
+                 line = {line}"
             );
-            for forbidden in [
-                "reason", "note", "text", "app", "url", "title", "with", "free",
-            ] {
-                assert!(
-                    !line.contains(&format!(r#""{forbidden}""#)),
-                    "禁止フィールド {forbidden:?} が出力に現れた: {line}"
-                );
-            }
             // ★ 6 択の値そのものは出てよい (⚠️ それが唯一の意味情報である)。
-            assert!(line.contains(cat.as_str()), "{line}");
+            assert_eq!(obj["category"], serde_json::json!(cat.as_str()));
+            assert_eq!(obj["t"], serde_json::json!(1_700_000_000_000u64));
         }
+        // ⚠️★★★ **自発の記録 (probe_id なし) でもキー集合は変わらない。**
+        let line = format_activity_label_line(1, None, ActivityCategory::Away, true, 0);
+        let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+        let got: BTreeSet<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(
+            got, allowed,
+            "probe_id が null でもキーは落とさない: {line}"
+        );
+    }
+
+    /// ★ `ProbeStratum` / `ActivityCategory` の `as_str` ⇄ `parse` が往復すること。
+    ///
+    /// ⚠️ 既存 5 enum には往復テストがあるのに、新 enum 2 つだけ無かった
+    /// (2026-09-14・code-reviewer MEDIUM)。★ 綴り誤りを誰も止められない状態だった。
+    #[test]
+    fn probe_stratum_and_activity_category_round_trip() {
+        for c in ActivityCategory::ALL {
+            assert_eq!(ActivityCategory::parse(c.as_str()), Some(c), "{c:?}");
+        }
+        assert_eq!(ActivityCategory::parse("bogus"), None);
+        assert_eq!(ActivityCategory::parse(""), None);
+        // ⚠️ 6 択であることそのものを固定する (★ 増やすには ADR-031 D3 条件 i の改訂が要る)。
+        assert_eq!(ActivityCategory::ALL.len(), 6);
+
+        for st in [
+            ProbeStratum::Random,
+            ProbeStratum::LowOperationEnd,
+            ProbeStratum::Resumption,
+        ] {
+            assert_eq!(ProbeStratum::parse(st.as_str()), Some(st), "{st:?}");
+        }
+        assert_eq!(ProbeStratum::parse("p_stuck"), None);
+        assert_eq!(ProbeStratum::parse(""), None);
     }
 
     /// ⚠️★★★ **未回答は行を書かないのではなく `cannot_answer` で残す** (ADR-031 D7)。

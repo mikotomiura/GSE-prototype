@@ -166,6 +166,16 @@ enum ReplayEvent {
     /// 回帰は `hook_health_line_is_skipped_by_run_replay` が張っている。
     #[serde(rename = "hook_health")]
     HookHealth(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️★★★ **沈黙窓の診断行**（`input::liveness`・`THRESHOLD_GATED`）。★ 読み飛ばし専用。
+    ///
+    /// ⚠️★★★ **2026-09-14 に *既存の* 欠落として発見した**（★ 新設した
+    /// [`tests::every_known_line_type_is_accepted_by_replay_event`] が掘り当てた）。
+    /// ★ `logger.rs` は `starve_window` を書くのに、ここに variant が無かった。
+    /// → ⚠️ **`starve_window` 行を 1 本でも含む NDJSON は `--snapshot` が丸ごと落ちていた**
+    /// （実測: 逐語 `parse error at line 32: unknown variant 'starve_window'`）。
+    /// ★ これは `hook_health`（2026-08-09）/ `activity_label`（2026-09-14）と**同一の失敗様式で 3 件目**である。
+    #[serde(rename = "starve_window")]
+    StarveWindow(#[allow(dead_code)] serde_json::Value),
     /// ⚠️★★★ **O1 (R3) で足した 4 行種**。★ どれも **読み飛ばし専用**である。
     ///
     /// ## ★ なぜ variant を足さなければならないのか（⚠️ 「読まないなら不要」ではない）
@@ -188,6 +198,19 @@ enum ReplayEvent {
     /// ⚠️ 読み飛ばし専用（同上）。
     #[serde(rename = "secure_input")]
     SecureInput(#[allow(dead_code)] serde_json::Value),
+    /// ⚠️★★★ **O1 の監査 criterion**（ADR-031 D1）。★ 読み飛ばし専用。
+    ///
+    /// ⚠️★★★ **2026-09-14 に足し忘れて実測で踏んだ。**★ `activity_label` 行を 1 本足した
+    /// NDJSON を `--snapshot` に掛けると逐語
+    /// `replay failed: parse error at line 32: unknown variant 'activity_label'`
+    /// で**丸ごと落ちた** —— ★ 上の `HookHealth` の doc が「2026-08-09 に実測済みの失敗様式」として
+    /// 名指ししているものと**同一**である（★ 同じ轍を 2 度踏んだ）。
+    /// ⚠️ **ゴールデンが緑でもこの事故は検出できない**（★ 既存 fixture に行が無いため）。
+    /// → ★ 回帰は [`tests::activity_label_line_is_skipped_by_run_replay`] が張る。
+    ///
+    /// ★ 自己申告は **記録のみ・推論に 1 バイトも流さない**（ADR-014 D4b / ADR-031 D2）。
+    #[serde(rename = "activity_label")]
+    ActivityLabel(#[allow(dead_code)] serde_json::Value),
     /// v0.3 較正スモーク: セッション宣言。`--calibration` 経路で track を抽出する。
     /// snapshot/run_replay 経路では `timestamp()==None` で読み飛ばす。
     #[serde(rename = "session_meta")]
@@ -275,12 +298,15 @@ impl ReplayEvent {
             ReplayEvent::InterventionResponse(_) => None,
             // 診断行。ゲート進行を動かさないので時刻順ソートから除外する。
             ReplayEvent::HookHealth(_) => None,
+            ReplayEvent::StarveWindow(_) => None,
             // ⚠️★★★ O1 (R3) の 4 行種。★ **記録のみ・推論に 1 バイトも流さない**
             //   (ADR-014 D4b) ので、`None` を返して時刻順ソートから外す。
             ReplayEvent::RecordingPause(_) => None,
             ReplayEvent::FocusTransition(_) => None,
             ReplayEvent::PointerBin(_) => None,
             ReplayEvent::SecureInput(_) => None,
+            // ⚠️★★★ 監査 criterion（ADR-031）。★ 記録のみで推論へ流さない。
+            ReplayEvent::ActivityLabel(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
             // run_replay (snapshot 経路) の時刻順ソートからは除外する (UserLabel と同方針)。
             ReplayEvent::SessionMeta { .. } => None,
@@ -1832,11 +1858,14 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::InterventionDecision(_)
             | ReplayEvent::InterventionResponse(_)
             | ReplayEvent::HookHealth(_)
+            | ReplayEvent::StarveWindow(_)
             // ⚠️★★★ O1 (R3) の 4 行種は **読み飛ばす**。★ 特徴量へ流さない (ADR-014 D4b)。
             | ReplayEvent::RecordingPause(_)
             | ReplayEvent::FocusTransition(_)
             | ReplayEvent::PointerBin(_)
             | ReplayEvent::SecureInput(_)
+            // ⚠️★★★ 監査 criterion (ADR-031)。★ 記録のみで推論へ流さない。
+            | ReplayEvent::ActivityLabel(_)
             | ReplayEvent::SessionMeta { .. }
             | ReplayEvent::ProbeAssignment { .. }
             | ReplayEvent::RealtimeLabel { .. }
@@ -2546,6 +2575,160 @@ mod tests {
             "hook_health 行は FeatSnapshot 列を 1 件も変えてはならない"
         );
         let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// ⚠️★★★ **`activity_label` 行が `run_replay` を落とさない**（ADR-031 D1）。
+    ///
+    /// ★ 2026-09-14 に足し忘れて実測で踏んだ失敗様式の回帰である
+    /// （逐語 `unknown variant 'activity_label'` で `--snapshot` が丸ごと落ちた）。
+    /// ⚠️ **ゴールデンが緑でも検出できない**ので、**行を足して通す**形でなければ意味がない。
+    #[test]
+    fn activity_label_line_is_skipped_by_run_replay() {
+        let line = r#"{"type":"activity_label","t":120000,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120}"#;
+        let ev: ReplayEvent = serde_json::from_str(line).expect("parse activity_label");
+        assert!(
+            matches!(ev, ReplayEvent::ActivityLabel(_)),
+            "expected ReplayEvent::ActivityLabel, got {ev:?}"
+        );
+        assert_eq!(
+            ev.timestamp(),
+            None,
+            "activity_label は時刻順ソートから除外する"
+        );
+
+        let mut ndjson =
+            std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read minimal fixture");
+        ndjson.push_str(line);
+        ndjson.push('\n');
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_activity_label_replay_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let with_line = run_replay(&tmp).expect("run_replay must accept activity_label lines");
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+        assert_eq!(
+            with_line.len(),
+            baseline.len(),
+            "activity_label 行は FeatSnapshot 列を 1 件も変えてはならない"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// ⚠️★★★ **3 度目を止める**: `KNOWN_LINE_TYPES` の全行種が `ReplayEvent` で受理できること。
+    ///
+    /// ★ `hook_health`（2026-08-09）と `activity_label`（2026-09-14）で **同じ失敗を 2 回**踏んだ。
+    /// ⚠️ どちらも「新しい行種を足したのに `replay.rs` へ足し忘れる」形で、
+    /// **ゴールデンが緑のまま**すり抜けた。→ ★ **宣言側から機械的に当てる。**
+    ///
+    /// ⚠️ 本テストは「**タグを受理できるか**」だけを見る（★ 中身の妥当性は各行種のテストが見る）。
+    /// ★ `meta` は `session_start` / `session_end` の 2 形状があるので代表を 1 つ置く。
+    #[test]
+    fn every_known_line_type_is_accepted_by_replay_event() {
+        // ★ 行種ごとの**最小の代表行**。⚠️ 新しい行種を足したらここにも足す
+        //   （足さないと下の網羅チェックが赤になるので、忘れられない）。
+        let samples: &[(&str, &str)] = &[
+            (
+                "meta",
+                r#"{"type":"meta","session_start":1,"hmm_version":"0.5.0"}"#,
+            ),
+            ("session_start", r#"{"type":"session_start","t":1}"#),
+            (
+                "key",
+                r#"{"type":"key","t":1,"category":"alphabetic","press":true}"#,
+            ),
+            (
+                "paste",
+                r#"{"type":"paste","t":1,"external_paste_chars":3}"#,
+            ),
+            (
+                "feat",
+                r#"{"type":"feat","t":1,"f1":0.0,"f3":0.0,"f4":0.0,"f5":0.0,"f6":0.0,"p_flow":0.0,"p_inc":0.0,"p_stuck":0.0,"raw_x":0.0,"raw_y":0.0,"ewma_x":0.0,"ewma_y":0.0,"obs":0,"alpha":0.0,"keys":0,"bs_keys":0}"#,
+            ),
+            (
+                "ime_state",
+                r#"{"type":"ime_state","t":1,"on":false,"active":false}"#,
+            ),
+            (
+                "ime_shadow",
+                r#"{"type":"ime_shadow","t":1,"dwell_ms":0,"nav":0,"abandon":0}"#,
+            ),
+            (
+                "hook_health",
+                r#"{"type":"hook_health","t":1,"alive":true,"starved_ms":0,"rehook":false,"dropped":0,"dropped_delta":0}"#,
+            ),
+            (
+                "starve_window",
+                r#"{"type":"starve_window","t":1,"win_ms":1,"n_lt30":0,"sum_lt30_ms":0}"#,
+            ),
+            (
+                "user_label",
+                r#"{"type":"user_label","t":1,"label":"stuck","recovered_at":null}"#,
+            ),
+            ("review_marker", r#"{"type":"review_marker","t":1}"#),
+            (
+                "session_meta",
+                r#"{"type":"session_meta","track":"main","task_kind":"writing","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":1}"#,
+            ),
+            (
+                "probe_assignment",
+                r#"{"type":"probe_assignment","probe_id":"p","scheduled_ts":1,"session_elapsed_ms":1,"stratum":"random"}"#,
+            ),
+            (
+                "realtime_label",
+                r#"{"type":"realtime_label","probe_id":"p","source":"random_probe","q1_friction":3,"q2_progress":3,"answered":true,"skip_reason":"none","latency_ms":1,"analysis_window_start_ms":0,"analysis_window_end_ms":0,"ts":1}"#,
+            ),
+            (
+                "vignette_response",
+                r#"{"type":"vignette_response","vignette_id":"v","expected_quadrant":"flow","q1_friction":3,"q2_progress":3,"elapsed_ms":1,"changes":0,"ts":1}"#,
+            ),
+            (
+                "activity_label",
+                r#"{"type":"activity_label","t":1,"probe_id":null,"category":"away","answered":true,"latency_ms":1}"#,
+            ),
+            (
+                "intervention_decision",
+                r#"{"type":"intervention_decision","t":1,"action":"none","need_score":0.0,"opportunity_score":0.0,"p_stuck":0.0,"idle_ms":0,"reason":"x","suppressed_by":null}"#,
+            ),
+            (
+                "intervention_response",
+                r#"{"type":"intervention_response","t":1,"action":"nudge","reason":"silent"}"#,
+            ),
+            (
+                "recording_pause",
+                r#"{"type":"recording_pause","t":1,"paused":true}"#,
+            ),
+            ("focus_transition", r#"{"type":"focus_transition","t":1}"#),
+            (
+                "pointer_bin",
+                r#"{"type":"pointer_bin","t":1,"moved":0,"buttons":0,"wheel":0}"#,
+            ),
+            ("secure_input", r#"{"type":"secure_input","t":1,"on":true}"#),
+        ];
+
+        // ★ (1) 代表行がすべて deserialize できること。
+        for (name, line) in samples {
+            serde_json::from_str::<ReplayEvent>(line).unwrap_or_else(|e| {
+                panic!(
+                    "{name} が ReplayEvent で受理できない: {e}
+★ replay.rs に variant を足すこと (Replay-as-Truth が切れる)"
+                )
+            });
+        }
+
+        // ★ (2) ⚠️ 宣言側 (`KNOWN_LINE_TYPES`) に対して**取りこぼしが無い**こと。
+        //   → ★ これが「足し忘れ」を止める本体である。
+        let covered: std::collections::BTreeSet<&str> = samples.iter().map(|(n, _)| *n).collect();
+        let missing: Vec<&str> = gse_next_lib::capabilities::KNOWN_LINE_TYPES
+            .iter()
+            .copied()
+            .filter(|t| !covered.contains(t))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "KNOWN_LINE_TYPES にあるのに replay の受理検査から漏れている行種: {missing:?}"
+        );
     }
 
     /// `intervention_response` 行 (Phase A2 の Wall 応答 + 旧 Nudge dismiss) が deserialize でき、

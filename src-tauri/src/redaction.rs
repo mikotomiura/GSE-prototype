@@ -80,9 +80,14 @@ pub struct RedactionSummary {
 ///
 /// ## ⚠️★★★ `session_meta` は `meta` と同じく残す（ADR-031 D6 決定 3）
 ///
-/// ★ `gse-replay` は 1 セッション 1 本の `session_meta` を前提にしている
-/// （`src/App.tsx` 逐語「2 本目の `session_meta` が入り `gse-replay` が `Err`」）。
-/// ⚠️ **0 本になったときの挙動は未検証**なので、**触らない側に倒す**（fail-safe）。
+/// ⚠️★★★ **2026-09-14 に理由を実測で訂正した**（code-reviewer MEDIUM）。
+/// ★ 初出は「`gse-replay` が 1 セッション 1 本を前提。**0 本の挙動は未検証**」と書いたが、
+/// ⚠️ **実測すると 0 本は `Err` にならない** —— `bin/replay.rs` は
+/// `track = TrackKind::Main` を既定にし、逐語 `"no session_meta found — assuming track=main"` と
+/// **warn するだけ**である。
+/// → ★★★ **実害は「落ちること」ではなく「O1 / exploratory が黙って `main` として読まれること」**である。
+/// ⚠️ `Err` になるのは **2 本目以降で `task_kind` が割れたとき**（同ファイルの `bail!`）。
+/// → ★ 結論（残す）は変わらないが、**根拠はこちらが正しい**。
 /// ★ `session_meta` が持つのは `track` / `task_kind` / `condition` / `head_id` ——
 /// **被験者の行動の中身ではなく、そのセッションの条件**である。
 ///
@@ -475,6 +480,76 @@ mod tests {
         assert_eq!(kept.len(), 2);
         assert!(kept[0].contains("session_start"), "{kept:?}");
         assert!(kept[1].contains("session_end"), "{kept:?}");
+    }
+
+    /// ⚠️★★★ **`line_timestamp` の行種列挙が `logger.rs` の書式と一致していること**
+    /// (ADR-031 **D6 決定 4** / `verify-before-claiming` ルール 6)。
+    ///
+    /// ## ★ なぜ要るのか
+    ///
+    /// ★ ADR-031 §Alternatives **A8** は「汎用実装は採らず明示列挙にする。
+    /// **足し忘れれば『消えない』側に倒れるが、それは検査で止める**」と書いた。
+    /// ⚠️ **その「検査」が無かった** (2026-09-14・code-reviewer HIGH)。
+    ///
+    /// ## ★ 何を突き合わせるか
+    ///
+    /// `logger.rs` の書式文字列を行単位で走査し、**その行が書く時刻キー**を
+    /// [`line_timestamp`] が実際に拾えることを 1 行通して確かめる。
+    /// ⚠️ 拾えない行種は**区間指定削除で永久に消えない** (= 同意文書 §4-3 の約束が破れる)。
+    #[test]
+    fn every_logger_line_type_uses_the_time_key_that_redaction_looks_for() {
+        const LOGGER: &str = include_str!("logger.rs");
+        const NEEDLE: &str = "{{\"type\":\"";
+        let mut checked = 0usize;
+        let mut problems: Vec<String> = Vec::new();
+
+        for src_line in LOGGER.lines() {
+            let Some(i) = src_line.find(NEEDLE) else {
+                continue;
+            };
+            let rest = &src_line[i + NEEDLE.len()..];
+            let Some(q) = rest.find('"') else { continue };
+            let line_type = &rest[..q];
+
+            // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
+            if matches!(line_type, "meta" | "session_meta") {
+                continue;
+            }
+
+            // ★ この行が実際に書いている時刻キーを拾う (★ 走査は 1 行に閉じる)。
+            let key = if src_line.contains("\"scheduled_ts\":") {
+                "scheduled_ts"
+            } else if src_line.contains("\"t\":") {
+                "t"
+            } else if src_line.contains("\"ts\":") {
+                "ts"
+            } else {
+                continue; // ★ 時刻を持たない行は対象外。
+            };
+
+            checked += 1;
+            let probe = format!("{{\"type\":\"{line_type}\",\"{key}\":4242}}");
+            if line_timestamp(&probe) != Some(4242) {
+                problems.push(format!(
+                    "{line_type}: logger は {key} を書くのに line_timestamp が拾わない"
+                ));
+            }
+        }
+
+        assert!(
+            problems.is_empty(),
+            "⚠️★★★ 区間指定削除で消えない行種がある (同意文書 §4-3 が破れる):
+{}",
+            problems.join(
+                "
+"
+            )
+        );
+        // ⚠️★★★ **検査が空回りしていないこと** (`verify-before-claiming` ルール 5b)。
+        assert!(
+            checked >= 15,
+            "突き合わせた行種が少なすぎる ({checked} 件)。★ 走査の目印が壊れていないか見ること"
+        );
     }
 
     /// ⚠️★★★ **自己申告行も区間指定削除の対象である** (ADR-031 **D6** 決定 2 / 4)。
