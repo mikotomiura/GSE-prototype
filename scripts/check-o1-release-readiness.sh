@@ -252,6 +252,23 @@ else
     opt_missing="$opt_missing migrateO1ConsentForm の本体を読めない"
   elif ! printf '%s\n' "$mig_body" | grep -q 'setHelpText(o1ConsentSecondaryUseHelp_())'; then
     opt_missing="$opt_missing ★ migrate が既存の任意項目へ文言を当て直していない（訂正が正本に届かない）"
+  elif ! printf '%s\n' "$mig_body" | grep -q 'setRequired(false)'; then
+    # ⚠️★★★ **当て直し側でも「任意」を再主張していること**（★ 2026-09-13）。
+    #   ★ `setRequired(false)` は **2 か所**ある（新規追加 ＋ 当て直し）。
+    #   ⚠️ 当て直し側が欠けると、**Forms の編集 UI で必須にされたまま戻らない**
+    #     （★ 新規構築だけ見ていると気づけない）。
+    opt_missing="$opt_missing ★ migrate が既存の任意項目の必須を解除していない"
+    # ⚠️★★ **照合語を `O1_OPTIONAL_CONSENT_CHOICE` にしてはならない**（★ 2026-09-13 に実測）——
+    #   ★ その語は**比較の条件式にも出る**ので、⚠️ **戻す 1 行を消しても緑のまま**だった
+    #   （★ selftest が「壊しても緑のまま」と言って捕まえた）。→ ★ **動作**のほうを見る。
+  elif ! printf '%s\n' "$mig_body" | grep -q 'createChoice(O1_OPTIONAL_CONSENT_CHOICE)'; then
+    # ⚠️★★★ **選択肢も戻していること**（★ cross-review 指摘 2）。
+    #   ★ 「同意しません」を手で足されると、⚠️ **拒否が同意として記録される。**
+    #   ⚠️★★ **照合語の選び方に 2 回失敗した**（★ 2026-09-13 に陽性/陰性の対照で実測）:
+    #     1. `O1_OPTIONAL_CONSENT_CHOICE` … ⚠️ **比較の条件式にも出る**ので、戻す 1 行を消しても緑
+    #     2. `setChoices(` … ⚠️ **migrate 内の必須ループも呼ぶ**ので、やはり緑
+    #     → ★ **戻す動作にしか現れない形**（`createChoice(<定数>)`）で綴る。
+    opt_missing="$opt_missing ★ migrate が既存の任意項目の選択肢を戻していない（拒否が同意になる）"
   fi
   # ⚠️★★★ **撤回の経路が在ること**（★ 2026-09-13）。
   #   ★ 同意文言は逐語「あとから『**使わないでください**』とお申し出いただけます」と約束しており、
@@ -892,6 +909,12 @@ selftest () {
   #   ⚠️★★★ **文言の当て直しを消す**（★ 訂正が配備済みフォームへ届かなくなる）。
   build; sed_i 's/    q.setHelpText(o1ConsentSecondaryUseHelp_());$//' "$fix/w/$FORM_BUILDER"
   expect_red "訂正が正本に届かない" "⚠️★★★ 壊れている: migrate の文言の当て直しを消す"
+  #   ⚠️★★★ **当て直し側の「任意」の再主張を消す**（★ 編集 UI で必須にされたまま戻らない）。
+  build; sed_i 's/^    q.setRequired(false);$//' "$fix/w/$FORM_BUILDER"
+  expect_red "必須を解除していない" "⚠️★★★ 壊れている: migrate の必須解除を消す"
+  #   ⚠️★★★ **選択肢の戻しを消す**（★ 「同意しません」を足されると拒否が同意になる）。
+  build; sed_i 's/      q.setChoices(\[q.createChoice(O1_OPTIONAL_CONSENT_CHOICE)\]);//' "$fix/w/$FORM_BUILDER"
+  expect_red "選択肢を戻していない" "⚠️★★★ 壊れている: migrate の選択肢の戻しを消す"
   build; sed_i 's/^  return \[Q_O1_SECONDARY_USE\];$/  return [];/' "$fix/w/$FORM_BUILDER"
   sed_i 's/^    "上記すべてに同意し、この記録と研究利用に同意します。",$/    "上記すべてに同意し、この記録と研究利用に同意します。",\n    Q_O1_SECONDARY_USE,/' "$fix/w/$FORM_BUILDER"
   expect_red "断れない同意は同意ではない" "⚠️★★★ 壊れている: 任意項目を必須群に混ぜる"
