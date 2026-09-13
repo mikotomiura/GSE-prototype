@@ -367,12 +367,14 @@ semiparametric 比例ハザードモデル（JASA 1999）。
 **6. 次に読むべき論文は?**
 ★ **RUC17 生データ**（★ 中国語・`Type="IME"` 834 を実測済み）／ Lu (2020) [P272]（既登録）。
 
-**★ やり残し** ⚠️★★★ **[V5] との緊張を本ラウンドでは裁かなかった。**
-★ [V5] Hylog は一次で *"none supports non-alphabetic writing, as they cannot identify logograms and symbols
-introduced by IMEs"* と述べ、**Translog-II もその「既存ロガー」に含まれる**とされてきた。
-⚠️ しかし [P360] の生ログでは **確定 insert の `Value` に logogram（`年` / `２００２年`）が入っている**。
-→ ⚠️★★★ **文としては両立しない。**★ ただし **[V5] の全文を本ラウンドで再読していない**ので、
-★ [V5] が指すのが「**未確定表示状態の再構成**」という別の能力である可能性を排除できない。
+**★ やり残し（⚠️★★★ 2026-09-14 に閉じた）** —— ★ 本ラウンドは [V5] との緊張を裁かず起票 15 に送った。
+⚠️★★★ **次ラウンドで [V5] 全文（21 頁）を再読した結果、緊張そのものが存在しなかった。**
+★ **引用の主語を取り違えていた** —— 原文は対句で、直前が
+*"**Translog II, the only text logger, is the only tool that supports non-alphabetic writing**"*、
+*"none"* は **"all keyloggers"** を指す。★ **Table III** も `Translog II | Non alphabetic support: **Yes**`。
+→ ★★★ **[V5] は [P360] を否定せず追認する**（★ [V5] Fig. 2 の Translog-II ログは [P360] と同一形式）。
+⚠️ 逆に **[V5] が Translog-II を実際に誤る点が 2 つ**見つかり、どちらも [P360] / [P359] が否決する。
+★ 詳細は `docs/references.md` の [V5] / [P273] / [P359] / [P360] 行（2026-09-14）。
 → ★★★ **裁定せず起票する**（⚠️ 一節だけを見て裁かない —— `verify-before-claiming` ルール 7）。
 
 ---

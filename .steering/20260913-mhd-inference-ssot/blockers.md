@@ -175,7 +175,34 @@ D4（「絶対秒数で固定しない」）と衝突するため。
   → ⚠️ **一節だけを見て裁かない**（`verify-before-claiming` ルール 7 / `feedback_no_partial_primary_source`）。
 - **どう処理するか**: ★ **[V5] 全文（21 頁）を再読**し、(a) 「logograms を identify できない」の射程が
   *確定文字* か *未確定表示状態* かを確定する → (b) [V5] / [P273] / [P359] の gloss を整合させる。
-- **解決**: （未）
+- **解決**: ✅ **2026-09-14 に裁定した。** ⚠️★★★ **(a) でも (b) でもなく、*前提が誤っていた*。**
+
+  ★ **引用の主語を取り違えていた。** [V5] の原文は対句であり、問題の文の**直前**が
+  *"On one hand, **Translog II, the only text logger, is the only tool that supports non-alphabetic
+  writing**, but it is not ecological …"* で、続く *"On the hand, **all keyloggers** … but **none**
+  supports non-alphabetic writing, as they cannot identify logograms and symbols introduced by IMEs."*
+  → ★★★ **`none` の主語は `all keyloggers` であり、Translog-II は明示的に除外されたうえ *肯定* されている。**
+
+  ★ **Table III が表で確定する**（★ メインが arXiv accepted version の PDF から直接抽出して確認）:
+  `Translog II | Text logger | Ecological: No | **Non alphabetic support: Yes** | keyup/keydown: No`
+  （⚠️ Inputlog / GenoGraphiX-Log / CyWrite / ScriptLog / tool-custom は全て **No**）。
+
+  → ★ **[V5] は [P360] を否定せず *追認* する**（★ [V5] **Fig. 2** の Translog-II ログは [P360] と同一形式）。
+  ★ 射程は **(a) 確定文字**（§IV-B）。⚠️ **(b)「未確定表示状態の再構成」は誰の主張でもない** ——
+  Hylog も候補一覧を記録せず**推論**で確定を検出する（★ ゆえに precision/recall の検証がある）。
+
+  ⚠️★★★ **逆に [V5] が Translog-II を *実際に* 誤る点が 2 つ見つかった**:
+  §I *"miss keyboard events that do not manifest visually … non-printing keys"*（← [P360] の
+  `[ProcessKey]` 22 / `[Back]` 87 が反証）／ §II-C *"does not have visibility of keyup and keydown
+  events"*（← **keydown は記録されている**。[P359] 逐語 *"records keydown events but not keyup events"*）。
+
+  ⚠️★★★ **[P359] の「名指し訂正」の記述も本起票では不正確だった** —— 主たる対象は
+  **Muñoz Martín, Sun, Du & Puerini, "Keylogging", *Research Methods in CTIS*, 2025** という**別著作**で、
+  [V5] への指摘は「**text logger と *だけ* 分類した**」という**分類**の問題である。
+
+  ★ **波及を是正した**: `docs/references.md`（[V5] / [P273] / [P359] / [P360]）／文献カード 2 本／
+  `docs/research-positioning.md`／⚠️★★★ **未踏 技術設計書・詳細資料**（★ **外部提出物が誤っていた**）。
+  ★ 記録: `.steering/20260913-esm-audit-criterion-gate/`
 
 ## 起票 16: ⚠️★★★ `t0` の「束ね方」を不応期の長さ 1 つで代表させてよいかが未検証
 

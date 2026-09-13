@@ -151,7 +151,12 @@ collected no sensitive personal data, and posed no foreseeable risk"* の 1 文�
 - ★ **在る側**: **ENJA15**（Carl, Aizawa & Yamada 2016・CRITT TPR-DB）。**EN→JA 翻訳・55 時間超**・
   Translog-II の打鍵＋視線・**CC ライセンスで公開**（★ 公開ページを直接確認）。
   ⚠️★★★ **ただし IME / かな漢字変換の扱いは 1 語も書かれていない**（★ 実測）。
-  ★ かつ Hylog が一次で *"**none supports non-alphabetic writing, as they cannot identify logograms and symbols introduced by IMEs**"* と述べており、**Translog-II もその「既存ロガー」に含まれる**。
+  ⚠️★★★ **2026-09-14 訂正**: 旧文はここに「Hylog が *"none supports non-alphabetic writing …"* と述べており、
+  **Translog-II もその『既存ロガー』に含まれる**」と書いていたが、★ **引用の主語を取り違えていた**。
+  ★ [V5] の原文は対句で、直前が *"**Translog II, the only text logger, is the only tool that supports
+  non-alphabetic writing**"* であり、*"none"* は **"all keyloggers"** を指す。
+  ★ 同論文 **Table III** も `Translog II | Non alphabetic support: **Yes**` と置く。
+  → ★★★ **Translog-II は含まれない。**（→ `docs/references.md` [V5] 行の 2026-09-14 裁定）
 - ⚠️ **供給が止まっている側**: **NINJAL の W-CoLeJa** は打鍵記録ソフト（EssayLoggerTS・約 600 名 × 4 年）を
   **持ちながら、配布物に含めていない**（配布は作文本文・テスト結果・アンケートのみ）。
 - ★ キーストロークダイナミクスの網羅サーヴェイ（Shadman et al. arXiv:2303.04605）の公開データセット表 **16 件に日本語は 0 件**。
@@ -171,7 +176,11 @@ collected no sensitive personal data, and posed no foreseeable risk"* の 1 文�
 | **Kaggle "Linking Writing Processes"**（KLICKE 由来・CC BY 4.0） | ★ 英数字キーを全部 `q` に置換した **"Q-type"** 形式 |
 
 → ★★★ **「本文非保存だから公開しやすい」を差分として書いてはならない。**
-★ 差分は **「既存ロガーが構造的に扱えない日本語 IME という領域で content-free を成立させること」**に置く。
+★ 差分は **「IME を扱う能力と本文非保存が、既存のどの系でも両立していないこと」**に置く
+（⚠️★★★ **2026-09-14 に言い換えた** —— ★ 旧文「既存ロガーが構造的に扱えない」は
+[V5] Table III が **Translog-II を非アルファベット対応と認めている**ので成立しない。
+★ 正しくは **既存 *キーロガー* が扱えない**一方、**扱える 2 つ（Translog-II / Hylog）は
+どちらも本文を保存する**）。
 ⚠️ Q-type の逐語は一次 PDF が 403 で未取得（**PLAUSIBLE**）。★ ただし**先例の存在自体は 3 系統あるので結論は動かない**。
 
 ---
