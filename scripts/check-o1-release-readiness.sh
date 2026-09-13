@@ -51,6 +51,8 @@ SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
 # ★ 収集仕様の自己記述（ADR-013 D1）。★ 6 択 ESM の計器が**この版に在るか**を見る。
 CAPS="src-tauri/src/capabilities.rs"
+# ★ 6 択 ESM の**送出元**（★ 呼ぶ側）。⚠️ writer（`logger.rs`）ではない。
+EMITTER="src-tauri/src/lib.rs"
 
 # ★ 秘密検出の**判定器**。⚠️★★ **トップレベルに置く**（2026-08-29 に実測で判明）:
 #   `run_checks` の中に置くと `--selftest` からは**見えない**（★ selftest は `run_checks` を
@@ -97,19 +99,33 @@ else
   #   → ★ **計器がこの版に在るなら、同意の ESM 追補が承認済みでなければ配れない。**
   #   ⚠️ 承認マーカ `<!-- o1-esm-consent: approved -->` は**研究者が入れる**
   #     （★ dev が案を書いただけでは緑にしない ＝ 承認の代理をさせない）。
-  if [ ! -f "$CAPS" ]; then
-    ng "収集仕様の自己記述が無い: ${CAPS}（★ 計器と同意の連動を判定できない）"
-  elif grep -q '"activity_label"' "$CAPS"; then
+  #
+  # ⚠️★★★ **引き金は「送出元があるか」である**（2026-09-14 訂正・`/cross-review` HIGH）。
+  #   ★ 初版は `capabilities.rs` に語が在るかを見ていたが、⚠️ **schema と writer が在っても
+  #     呼ぶ側が無ければ 1 行も記録されない** —— ★ それを「計器がある」と読むと、
+  #     **記録できない計器のためにゲートが赤くなる**（＝ 偽の赤）。
+  #   ★ ADR-013 D2 の「導出元は *送出元があるか* であって writer ではない」と基準を揃える。
+  if [ ! -f "$EMITTER" ]; then
+    ng "送出元の判定対象が無い: ${EMITTER}（★ 計器と同意の連動を判定できない）"
+  elif grep -qE 'activity_label_(answered|skipped)\(' "$EMITTER"; then
     # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
     #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
     #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
     if grep -qE '^<!-- o1-esm-consent: approved -->[[:space:]]*$' "$CONSENT"; then
-      ok "6 択 ESM の計器がある版で、同意の ESM 追補が承認済み"
+      ok "6 択 ESM の送出元がある版で、同意の ESM 追補が承認済み"
     else
-      ng "6 択 ESM の計器があるのに同意の ESM 追補が未承認（★ 注 D ＋ 承認マーカを研究者が入れること）"
+      ng "6 択 ESM の送出元があるのに同意の ESM 追補が未承認（★ 注 D ＋ 承認マーカを研究者が入れること）"
+    fi
+    # ⚠️★★★ **送出元があるなら、同意の門を通していなければならない**（ADR-031 M5）。
+    #   ★ `o1::activity_label_allowed(o1_mode, consent_approved)` を経由せずに記録すると、
+    #     **同意承認と実際の記録が結びつかない穴**になる（★ `/cross-review` の「テスト不足」）。
+    if grep -q 'activity_label_allowed(' "$EMITTER"; then
+      ok "6 択 ESM の記録が同意の門（activity_label_allowed）を通っている"
+    else
+      ng "6 択 ESM の送出元が同意の門を通っていない（★ o1::activity_label_allowed を経由すること）"
     fi
   else
-    ok "6 択 ESM の計器がまだ無い（★ 同意の ESM 追補は不要）"
+    ok "6 択 ESM の送出元がまだ無い（★ 同意の ESM 追補は不要）"
   fi
 fi
 
@@ -758,8 +774,9 @@ selftest () {
   build; sed_i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
-  # ⚠️★★★ ADR-031: **計器があるのに同意が未承認なら赤**（★ repo の現状がこれである）。
-  build;                                                                        expect_red "ESM の計器があるのに同意" "計器と同意の連動（未承認）"
+  # ⚠️★★★ ADR-031: **送出元を足すと、承認が無い限り赤になる**（★ M5 が来た瞬間に門が効く）。
+  build; printf '\nfn wired() { activity_label_answered(); activity_label_allowed(true, true); }\n' >> "$fix/w/$EMITTER"
+  expect_red "同意の ESM 追補が未承認" "計器と同意の連動（送出元あり・未承認）"
   # ⚠️★★★ 運用管理シート（起票 T-25）—— ★ **3 つの壊し方を別々に撃つ**。
   #   ⚠️ 1 つだけだと「どれか 1 つでも欠けたら赤」なのか「たまたま拾えた」のか分からない。
   build; sed_i 's/function buildO1MgmtSheet/function DISABLED_buildO1MgmtSheet/' "$fix/w/$FORM_BUILDER"
@@ -921,16 +938,14 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   #   ★ liveness の陽性対照は selftest 1（壊すと赤）へ移した（= repo 側が緑になったため）。
   build; blank_measure; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
 
-  # ⚠️★★★ ADR-031: **承認マーカを入れると緑になること**（★ 陽性対照）。
-  build; printf '
-<!-- o1-esm-consent: approved -->
-' >> "$cons"
-  expect_green "同意の ESM 追補が承認済み" "計器と同意の連動（承認あり）"
-  # ★ 逆側: **計器がまだ無い版では追補を要求しない**（⚠️ 常に赤くする検査にしない）。
-  # ⚠️ 1 か所を消すだけでは足りない（★ テスト側のメッセージにも語が出るため）。
-  #   → ★ 語を含む行を**全部**落として「計器がまだ無い版」を作る。
-  build; sed_i '/activity_label/d' "$fix/w/$CAPS"
-  expect_green "ESM の計器がまだ無い" "計器と同意の連動（計器なし）"
+  # ⚠️★★★ ADR-031: **送出元 ＋ 承認マーカ ＋ 同意の門がそろうと緑**（★ M5 後の正しい姿）。
+  build; printf '\nfn wired() { activity_label_answered(); activity_label_allowed(true, true); }\n' >> "$fix/w/$EMITTER"
+  printf '\n<!-- o1-esm-consent: approved -->\n' >> "$cons"
+  expect_green "同意の ESM 追補が承認済み" "計器と同意の連動（送出元 ＋ 承認）"
+  # ⚠️★★★ **送出元があるのに同意の門を通していないと赤**（★ M5 の穴）。
+  build; printf '\nfn wired() { activity_label_answered(); }\n' >> "$fix/w/$EMITTER"
+  printf '\n<!-- o1-esm-consent: approved -->\n' >> "$cons"
+  expect_red "同意の門を通っていない" "送出元はあるが同意の門を通していない"
 
   # ⚠️★★★ **O1 実装を含むタグを作ると緑に変わること**（2026-08-30 追加）。
   #   ★ 一時ツリーは `git init` しただけでタグが 1 つも無いので、既定では赤い

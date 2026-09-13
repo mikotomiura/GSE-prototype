@@ -689,12 +689,24 @@ fn format_activity_label_line(
     recall_window_start_ms: u64,
     recall_window_end_ms: u64,
 ) -> String {
-    // ★ 安全網: 未回答なら「回答不能」でなければならない
-    //   (⚠️ コンストラクタを経由しない直接構築を捕まえる)。
-    debug_assert!(
-        answered || matches!(category, ActivityCategory::CannotAnswer),
-        "answered=false なのに category が cannot_answer ではない"
-    );
+    // ⚠️★★★ **release でも不変条件を守る** (2026-09-14・`/cross-review` MEDIUM)。
+    //   ★ 旧版は `debug_assert!` だけだったので、⚠️ **release では
+    //   `answered=false` かつ `category=Conversation` の行が書けた**
+    //   (`LogEntry::ActivityLabel` は pub variant なので直接構築できる)。
+    //   → ★ それは **「答えていないのに会話と申告された」行**であり、
+    //   ⚠️ 回答率 / MNAR の解析 (ADR-031 D7) を壊すだけでなく、
+    //   ★★★ **第三者の在席を、被験者が選んでいないのに残す**ことになる。
+    //   → ★ **assert ではなく正規化する** (★ `realtime_label_skipped` の `skip_reason`
+    //   正規化と同じ作法)。⚠️ 握りつぶさず `tracing::warn!` を残す。
+    let category = if answered || matches!(category, ActivityCategory::CannotAnswer) {
+        category
+    } else {
+        tracing::warn!(
+            got = category.as_str(),
+            "activity_label: answered=false なのに category が cannot_answer でない              → cannot_answer に正規化した (呼び出し側バグの可能性)"
+        );
+        ActivityCategory::CannotAnswer
+    };
     format!(
         r#"{{"type":"activity_label","t":{},"probe_id":{},"category":"{}","answered":{},"latency_ms":{},"recall_window_start_ms":{},"recall_window_end_ms":{}}}"#,
         timestamp,
@@ -3312,6 +3324,43 @@ mod tests {
             got, allowed,
             "probe_id が null でもキーは落とさない: {line}"
         );
+    }
+
+    /// ⚠️★★★ **release でも「答えていない会話」を書けないこと**（2026-09-14・`/cross-review` MEDIUM）。
+    ///
+    /// ★ `LogEntry::ActivityLabel` は pub variant なので**直接構築できる**。
+    /// ⚠️ `debug_assert!` は release で無効なので、**正規化で守る**。
+    #[test]
+    fn unanswered_activity_label_is_normalised_even_when_built_directly() {
+        // ★ コンストラクタを通さずに「未回答なのに会話」を作る（＝ 攻撃面そのもの）。
+        let line = format_activity_label_line(
+            10,
+            Some("p-1"),
+            ActivityCategory::Conversation,
+            false, // ⚠️ answered=false
+            0,
+            1,
+            9,
+        );
+        let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            v["category"],
+            serde_json::json!("cannot_answer"),
+            "⚠️★★★ 答えていないのに第三者の在席が残った: {line}"
+        );
+        assert_eq!(v["answered"], serde_json::json!(false));
+        // ⚠️★★★ **対照**: `answered=true` なら正規化しない（★ 常に潰す実装ではないこと）。
+        let ok_line = format_activity_label_line(
+            10,
+            Some("p-1"),
+            ActivityCategory::Conversation,
+            true,
+            0,
+            1,
+            9,
+        );
+        let v2: serde_json::Value = serde_json::from_str(&ok_line).unwrap();
+        assert_eq!(v2["category"], serde_json::json!("conversation"));
     }
 
     /// ★ `ProbeStratum` / `ActivityCategory` の `as_str` ⇄ `parse` が往復すること。

@@ -551,7 +551,7 @@ mod tests {
     fn every_logger_line_type_uses_the_time_key_that_redaction_looks_for() {
         const LOGGER: &str = include_str!("logger.rs");
         const NEEDLE: &str = "{{\"type\":\"";
-        let mut checked = 0usize;
+        let mut checked: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
         let mut problems: Vec<String> = Vec::new();
 
         for src_line in LOGGER.lines() {
@@ -578,7 +578,7 @@ mod tests {
                 continue; // ★ 時刻を持たない行は対象外。
             };
 
-            checked += 1;
+            checked.insert(line_type);
             let probe = format!("{{\"type\":\"{line_type}\",\"{key}\":4242}}");
             if line_timestamp(&probe) != Some(4242) {
                 problems.push(format!(
@@ -596,10 +596,20 @@ mod tests {
 "
             )
         );
-        // ⚠️★★★ **検査が空回りしていないこと** (`verify-before-claiming` ルール 5b)。
-        assert!(
-            checked >= 15,
-            "突き合わせた行種が少なすぎる ({checked} 件)。★ 走査の目印が壊れていないか見ること"
+        // ⚠️★★★ **検査が空回りしていないこと** —— ★ 魔法数ではなく**宣言と一致**させる
+        //   (2026-09-14・`/cross-review` MEDIUM「フォーマット文字列走査は脆い」への対処)。
+        //   ★ `logger.rs` の書式が複数行化・serde 化して走査が空振りしたら、
+        //   **ここで検出される**（★ 見逃しではなく赤になる）。
+        let expected: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
+            .iter()
+            .copied()
+            .filter(|t| !matches!(*t, "meta" | "session_meta"))
+            .collect();
+        assert_eq!(
+            checked, expected,
+            "★ 走査できた行種が宣言と一致しない。
+             ⚠️ `logger.rs` の書式文字列の形が変わって走査が空振りしている可能性がある 
+             (★ そのときは *見逃し* ではなく本アサートで止まる)。"
         );
     }
 
