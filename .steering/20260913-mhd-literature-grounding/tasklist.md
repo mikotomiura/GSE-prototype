@@ -7,7 +7,9 @@
 - [x] ⚠️★★★ **研究者へ 2 択（＋縮約案）を提示して判断を取る**
       → ★★★ **2026-09-13 決定 = 「(a) 6 択フルを取る」**
 - [x] 判断と **残作業 ①〜④** を `.steering/20260911-.../blockers.md` へ落とす
-- [ ] ★ 引き継ぎ／全体順序（§6 の 1b）へ反映する（⚠️ **レビュー結果を織り込んでから新引き継ぎを書く**）
+- [x] ★ 引き継ぎ／全体順序（§6 の 1b）へ反映する
+      → ★ `next-session-mhd-feature-redesign-ssot.md` の stale な「研究者判断待ち」を更新 ＋
+        **`next-session-after-literature-grounding.md` を新規作成** ＋ 消費済みメモに完了マーク
 
 ## 順序 1: 文献接地（起票 4 / 起票 5）
 
@@ -51,4 +53,6 @@
 - [x] 起票 4 / 起票 5 を `.steering/20260913-mhd-inference-ssot/blockers.md` で解決へ
 - [x] `decisions.md` に本ラウンドの判断を記録
 - [x] ⚠️★★★ **即コミット**（★ 複数ラウンドが同居すると `git add -p` で分離できない）
-- [ ] `code-reviewer` ＋ `security-checker` を並列 → `/cross-review`（2 巡・パス限定）
+- [x] `code-reviewer` ＋ `security-checker` を並列 → `/cross-review`（2 巡・パス限定）
+      → ★ 4 本すべて反映済み。⚠️★★★ **`/cross-review` は `docs/external-skills.md` を除外して送った**
+        （★ 規約の例示文に `P012` が出るため・目視ゲート）。⚠️ **`docs/mitou_submission/**` は送信禁止**
