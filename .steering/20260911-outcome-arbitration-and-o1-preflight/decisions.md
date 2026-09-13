@@ -473,3 +473,56 @@ D4 の向きの論証は数学的に妥当 ／ 「新観測ゼロ・学習ゼロ
 | 2–5 | T0/T1 実装 → leakage 規律 → 計器変更一式 ＋ ESM → T4 | 同上 §8 | — |
 
 ⚠️★★★ **1 セッション 1 タスク。分解と実行は別セッション**（`CLAUDE.md`）。
+
+## 判断 15: Loop Engineering は**タスク 2 だけ**に適用する（★ モード C の初回）
+
+- **判断日時**: 2026-09-13（★ 研究者判断）
+- **背景**: ★ 研究者提案「**0-1、2-5 を各それぞれ Loop で一貫して実施するのはどう？**」
+  → ⚠️★★★ **その切り方は Loop 適合性の境界と直交していた**ので対案を出し、
+  ★ 研究者が「**ok. Loop Engineering を本格的に実施する形をとろう**」と承認した。
+- **選択肢**:
+  - A: **0-1 を 1 Loop、2-5 を 1 Loop**（★ 研究者の初案）
+  - B: **タスク 2 だけを Loop に載せ、0 / 1 / 3 / 5 は通常セッション**（★ 4 は人が裁定した後に残る実装のみ）
+  - C: 全タスクを通常セッションで回す（Loop を使わない）
+- **採用**: **B**
+- **理由**:
+  - ⚠️★★★ **基準 4（検証可能性）を満たさないタスクが A では混ざる。** 逐語「**AC は exit code か
+    test 名で言える。AC↔test マッピングが空の issue は issue ではない。**」
+    → ★ タスク **0**（⚠️ 文言の適否は研究者承認・**被験者向け文書は契約**）／**1**（裁定）／
+    **3**（文書。⚠️ かつ `check_doc_lexicon.py` は **ADR を検査しない**ので衛生条件すら空振り）／
+    **5**（裁定 ＋ ADR-020 D3 照合）は **AC を exit code で言えない**。
+  - ★★★ **判断 1 が既にこれを裁いており、本タスクで *実証された*。**
+    ⚠️ ADR-029 の機械 AC（`check_doc_lexicon.py` / `check_citations.py`）は
+    **初版から最終版まで一貫して exit 0** だったが、⚠️★★★ **中身は HIGH 3 件で枠組みごと差し替わった**
+    （★ `/cross-review` HIGH 1 件 ＋ `code-reviewer` HIGH 2 件）。
+    → ★ **Loop に載せていたら初版で `issue_done` になっていた。**
+    ★ 中身を壊したのは **exit code ではなく判断**（Opus / gpt-5.5）である。
+  - ⚠️ **DAG がほぼ一直線**（`0` 独立 ／ `1 → 2`・`1 → 3` ／ `2,3 → 4` ／ `4 → 5`）なので、
+    ★ 実効並列度は 1〜2 で **Loop の利点（worktree 並列 ＋ 簿記の外部化）がほとんど立たない**。
+  - ★ **タスク 2 だけは Loop の理想形である** —— **特徴群ごとに縦切りできる** ／ AC が test 名で言える ／
+    `cargo test` ＋ ゴールデンで exit code を回収できる ／ ★ **計器を変えないので配布判断が入らない** ／
+    `HMM_VERSION` 不変。→ ★ **失敗しても被害が小さいので「初回」に最適**
+    （★ SSOT 逐語「**新しい実行モードを初めて使う時は、最も安い issue 1 本を `parallel=1` で回して
+    基盤を検証する**」）。
+- **トレードオフ**: ⚠️ 自動化の恩恵はタスク 2 に限られ、0 / 1 / 3 / 5 は人のレビューがボトルネックのまま。
+  ★ 代わりに **「客観に見えて無意味な緑」を量産しない**。
+- **影響範囲**: `_handoff/next-session-mhd-feature-redesign-ssot.md` **§8b**（★ 前提監査と着手順を格納）。
+- **見直しタイミング**: ★ **タスク 2 の Loop を 1 周回した後**（⚠️ retrospective を見て、
+  裁定系にも広げられるかを判断する。★ ただし判断 1 / 本判断の論拠は「exit code で言えるか」であり、
+  **検証手段が増えない限り結論は変わらない**）。
+
+### ⚠️★★★ 前提監査で見つかった穴（★ 2026-09-13 実測・→ §8b に詳細）
+
+| # | 穴 | ★ 対処 |
+|---|---|---|
+| **1** | ⚠️★★★ **`.claude/settings.json` の `permissions.deny` が README 必須リストから 5 件欠けている**（`git push` / `gh pr merge` / `git reset --hard` / `git rebase` / `rm -rf`。現状は `chmod -R` / `sudo` の 2 件） | ★ **worktree の `.claude/settings.local.json` に入れる**（⚠️ main checkout の `settings.json` に入れると**対話セッションでも `git push` が塞がれる**）。★ `.gitignore:46` で ignore 済みなので worktree ごとに別物にできる |
+| **2** | ⚠️★★★ **その deny を worktree へ入れる仕組みが無い**（`loop-spawn.sh` / `loop-run.sh` を grep して `settings` は 0 件） | ★ **タスク 2 の着手順 1** として先に作る |
+| **3** | ⚠️ **私の前言が不正確だった** —— 「Loop を一度も回していない」 | ★ **訂正**: `.steering/` に実行記録は無いが、★ `loop-config.README.md` 逐語「**実測（claude 2.1.220）では最初の 2 回の無人実行がコード 0 行のまま終了した（約 $11 を消費）**」＝ **2 回試して両方死んでいる**（★ 原因は `allowed_tools` を `null` にしたこと・テンプレは修正済み） |
+
+### ★ ベースライン（★ 前提③・2026-09-13 実測）
+
+`cargo test --workspace` **655 passed / 0 failed** ／ ゴールデン **`OK: 15 snapshots match`** ／
+`emit_schema` **SCHEMA PARITY OK** ／ `cargo fmt --check` 差分なし ／
+`cargo clippy --workspace --all-targets -- -D warnings` **exit 0**。
+⚠️ replay は `session hmm_version = 0.2.0, current engine = 0.5.0. snapshots may not be comparable.`
+を出すが **exit 0 / 15 一致**で、★ **これが既存のベースラインである**（⚠️ 「無視してよい」と断定しない）。
