@@ -253,6 +253,12 @@ else
   elif ! printf '%s\n' "$mig_body" | grep -q 'setHelpText(o1ConsentSecondaryUseHelp_())'; then
     opt_missing="$opt_missing ★ migrate が既存の任意項目へ文言を当て直していない（訂正が正本に届かない）"
   fi
+  # ⚠️★★★ **撤回の経路が在ること**（★ 2026-09-13）。
+  #   ★ 同意文言は逐語「あとから『**使わないでください**』とお申し出いただけます」と約束しており、
+  #     `docs/o1-deletion-ledger.md` §2b はその実行を `recordO1SecondaryUseChange()` に委ねている。
+  #   ⚠️ 関数が消えると、**約束はしたのに実行手段が無い**状態になる（★ しかも誰も赤にできない）。
+  grep -q "function recordO1SecondaryUseChange" "$FORM_BUILDER" ||
+    opt_missing="$opt_missing ★ 撤回を記録する関数（recordO1SecondaryUseChange）が無い"
   # ⚠️ 必須の一括同意に**混ぜていない**こと（★ 混ぜると断れなくなる）。
   if grep -q 'Q_O1_SECONDARY_USE' "$FORM_BUILDER"; then
     req_body="$(awk '/^function o1ConsentItemTitles_/{f=1} f{print} f&&/^}$/{exit}' "$FORM_BUILDER")"
@@ -874,6 +880,9 @@ selftest () {
   build; sed_i 's|^  o1AddOptionalConsentItem_(form, title);$|  // o1AddOptionalConsentItem_(form, title);|' "$fix/w/$FORM_BUILDER"
   sed_i 's|^      o1AddOptionalConsentItem_(form, title);$|      // o1AddOptionalConsentItem_(form, title);|' "$fix/w/$FORM_BUILDER"
   expect_red "配線されていない" "⚠️★★ 壊れている: 呼び出しをコメント化する（件数の水増しに騙されない）"
+  #   ⚠️★★★ **撤回の経路を消す**（★ 約束はしたのに実行手段が無い状態）。
+  build; sed_i 's/function recordO1SecondaryUseChange/function DISABLED_recordO1SecondaryUseChange/' "$fix/w/$FORM_BUILDER"
+  expect_red "撤回を記録する関数" "⚠️★★★ 壊れている: 撤回の経路を消す"
   #   ⚠️ 必須群に混ぜる（★ 「上記すべてに同意し…」に飲み込ませる）。
   #   ⚠️★★★ **必須ループの「前」へ移す**（★ 上記すべてに飲み込ませる）。
   #     ★ 2026-09-13 まで**独立側はこれを捕まえていなかった**（code-reviewer MEDIUM）。

@@ -719,11 +719,19 @@ function o1ConsentSecondaryUseHelp_() {
  *   ★ `buildO1ConsentForm` と `migrateO1ConsentForm` の**両方**がこれを呼ぶ
  *     （⚠️ 2 か所で別々に組み立てると、片方だけ必須になる事故が起きる）。
  */
+/**
+ * ⚠️★★★ 任意項目の選択肢は **肯定 1 つだけ**である。
+ * ★ `o1ConsentAnswers_` は「値が空でなければ同意」と読むので、
+ *   ⚠️ **否定の選択肢を足した瞬間に「拒否」が「同意」として記録される。**
+ *   → ★ 定数にして build / migrate の両方から同じものを使い、**検査で固定する**。
+ */
+var O1_OPTIONAL_CONSENT_CHOICE = "同意します（任意）";
+
 function o1AddOptionalConsentItem_(form, title) {
   var q = form.addCheckboxItem();
   q.setTitle(title);
   q.setHelpText(o1ConsentSecondaryUseHelp_());
-  q.setChoices([q.createChoice("同意します（任意）")]);
+  q.setChoices([q.createChoice(O1_OPTIONAL_CONSENT_CHOICE)]);
   // ⚠️★★★ **ここを true にしてはならない。** ★ 任意であることが約束の本体である。
   q.setRequired(false);
   return q;
@@ -853,10 +861,10 @@ function buildO1ConsentForm() {
  * ★ 説明文とタイトルは上書きする（文面の訂正はこれで届く）。
  */
 /**
- * ★ 任意ブロック（見出し ＋ 任意項目）の**現在の位置**を返す。
- * @return {{idx: number[], isLast: boolean}} ⚠️ `idx` が空なら任意ブロックはまだ無い。
+ * ★ 任意ブロック（見出し ＋ 任意項目）が今どこに在るかを返す。
+ * @return {number[]} ⚠️ 空なら任意ブロックはまだ無い。
  */
-function o1OptionalBlockPos_(form) {
+function o1OptionalBlockIdx_(form) {
   var titles = o1ConsentOptionalItemTitles_();
   var items = form.getItems();
   var idx = [];
@@ -864,15 +872,33 @@ function o1OptionalBlockPos_(form) {
     var t = items[i].getTitle();
     if (t === O1_OPTIONAL_SECTION_TITLE || titles.indexOf(t) >= 0) idx.push(i);
   }
-  // ★ 「末尾に連続して在る」＝ 最後の n 個がちょうど任意ブロックであること。
-  var isLast = idx.length > 0;
-  for (var j = 0; j < idx.length; j++) {
-    if (idx[idx.length - 1 - j] !== items.length - 1 - j) {
-      isLast = false;
-      break;
+  return idx;
+}
+
+/**
+ * ⚠️★★★ **「任意」の見出しが、任意でないものを配下に抱えているか。**
+ *
+ * ★ これが**修復すべき状態の定義そのもの**である（★ 2026-09-13・cross-review 指摘 1）。
+ *   ⚠️ 当初は「必須項目を足す前に任意ブロックが末尾だったか」という**経緯**で判定していたが、
+ *   ★ それでは **既に壊れた状態で配備されているフォームを救えない**（＝ 修復が経緯に依存する）。
+ *   → ★ **今の並びだけを見て決める。** ⚠️ 自己修復になり、build の正規配置も守れる:
+ *     - build の並び … 任意の見出しの後ろに**別の見出し**（ご記名 等）が来るので `false`
+ *     - migrate で足した並び … 任意の見出しが**最後の見出し**になり、
+ *       ⚠️ そのあと必須項目が append されると `true`
+ */
+function o1OptionalSectionCapturesOthers_(form) {
+  var titles = o1ConsentOptionalItemTitles_();
+  var items = form.getItems();
+  var inOptionalSection = false;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].getType() === FormApp.ItemType.SECTION_HEADER) {
+      inOptionalSection = items[i].getTitle() === O1_OPTIONAL_SECTION_TITLE;
+      continue;
     }
+    // ⚠️ 任意の見出しの配下に、任意項目でないものが居る ＝ 壊れている。
+    if (inOptionalSection && titles.indexOf(items[i].getTitle()) < 0) return true;
   }
-  return { idx: idx, isLast: isLast };
+  return false;
 }
 
 /**
@@ -892,15 +918,15 @@ function o1OptionalBlockPos_(form) {
  * @return {number} 動かした項目数（★ 0 なら何もしていない）
  */
 function o1MoveOptionalBlockToEnd_(form) {
-  var pos = o1OptionalBlockPos_(form);
-  if (!pos.idx.length || pos.isLast) return 0;
+  var idx = o1OptionalBlockIdx_(form);
+  if (!idx.length) return 0;
   var items = form.getItems();
   var last = items.length - 1;
   // ★ 先頭から順に末尾へ送ると、⚠️ ブロック内の順序（見出し → 項目）が保たれる。
-  for (var k = 0; k < pos.idx.length; k++) {
-    form.moveItem(items[pos.idx[k]], last);
+  for (var k = 0; k < idx.length; k++) {
+    form.moveItem(items[idx[k]], last);
   }
-  return pos.idx.length;
+  return idx.length;
 }
 
 function migrateO1ConsentForm() {
@@ -912,10 +938,6 @@ function migrateO1ConsentForm() {
   form.getItems().forEach(function (it) {
     existing[it.getTitle()] = true;
   });
-
-  // ⚠️★★★ **必須項目を足す「前」に**、任意ブロックが末尾に在るかを見ておく
-  //   （★ 足したあとでは「元から末尾だったのか」が分からない）。
-  var optWasLast = o1OptionalBlockPos_(form).isLast;
 
   var added = 0;
   o1ConsentItemTitles_().forEach(function (title) {
@@ -962,6 +984,18 @@ function migrateO1ConsentForm() {
     var q = it.asCheckboxItem();
     q.setHelpText(o1ConsentSecondaryUseHelp_());
     q.setRequired(false);
+    // ⚠️★★★ **選択肢も直す**（cross-review 指摘 2・2026-09-13）。
+    //   ★ `o1ConsentAnswers_` は「値が空でなければ同意」と読む（⚠️ 文言では判定しない）ので、
+    //     **編集 UI で「同意しません」を足されると、拒否が同意として記録される。**
+    //   ⚠️ **違うときだけ書き直す** —— ★ 回答の在る設問を毎回触らない。
+    var cur = q.getChoices();
+    if (cur.length !== 1 || cur[0].getValue() !== O1_OPTIONAL_CONSENT_CHOICE) {
+      q.setChoices([q.createChoice(O1_OPTIONAL_CONSENT_CHOICE)]);
+      Logger.log(
+        "⚠️★★★ 任意項目の**選択肢を戻しました**（★ 肯定 1 つだけにします）。\n" +
+          "  ⚠️ 否定の選択肢があると、**拒否が同意として記録されます。**"
+      );
+    }
     refreshed++;
   });
   if (refreshed) {
@@ -971,10 +1005,12 @@ function migrateO1ConsentForm() {
     );
   }
 
-  // ⚠️★★★ **末尾に在った任意ブロックの後ろに必須項目を積んでしまったら、送り直す。**
-  //   ★ 条件を絞る理由: ⚠️ 無条件に動かすと、**build が作った並び**
-  //     （任意ブロック → ご記名 → 氏名…）まで毎回引っかき回すことになる。
-  if (added && optWasLast) {
+  // ⚠️★★★ **「任意」の見出しが任意でないものを抱えていたら、送り直す。**
+  //   ★ 経緯ではなく**今の並び**で判定する（cross-review 指摘 1・2026-09-13）——
+  //     ⚠️ 経緯で判定すると、**既に壊れた状態で配備されているフォームを救えない**。
+  //   ★ build が作った並び（任意ブロック → ご記名 → 氏名…）では成立しないので、
+  //     ⚠️ 毎回の migrate でフォームを引っかき回すこともない（★ 陰性対照で固定している）。
+  if (o1OptionalSectionCapturesOthers_(form)) {
     var moved = o1MoveOptionalBlockToEnd_(form);
     if (moved) {
       Logger.log(
@@ -2382,6 +2418,20 @@ function o1ConsentAnswers_(response) {
 }
 
 /**
+ * ★ 登録ログの備考を組み立てる（★ 行番号 / OS ＋ 二次利用の印）。
+ *
+ * ⚠️★ **1 行の呼び出しに保つために切り出した**（★ 2026-09-13）。
+ *   ★ 呼び出しを複数行へ広げたとき、`o1_form_builder_mutation_test.sh` の
+ *     「送信ログを try の内側へ戻す」変異が**当たらなくなった**
+ *     （⚠️ 変異試験が「置換対象が消えた？」と赤にして教えてくれた）。
+ *   → ★ 検査の側を継ぎ当てるより、**呼び出しを 1 行に保つほうが壊れにくい。**
+ */
+function o1RegisterNote_(outcome, a) {
+  var base = outcome && outcome.note ? outcome.note + " / " : "";
+  return base + o1SecondaryUseNote_(a);
+}
+
+/**
  * ★ 登録ログの備考に足す、二次利用同意の印。
  *
  * ⚠️★★★ **これは「正本」ではない。** ★ 正本は O1-C の回答シートである
@@ -2395,6 +2445,71 @@ function o1ConsentAnswers_(response) {
  */
 function o1SecondaryUseNote_(a) {
   return "2nd-use: " + (a && a.secondaryUse ? "yes" : "no");
+}
+
+/**
+ * ★★ **二次利用同意の変更を、研究者が 1 コマンドで記録する。**
+ *
+ * ⚠️★★★ なぜ関数にするか（cross-review 指摘 4・2026-09-13）:
+ *   ★ `docs/o1-deletion-ledger.md` §2b は「登録ログに 1 行足す」と書いているが、
+ *   ⚠️ **手入力だと `kind` / `reason` / 備考の形を 1 文字間違えただけで、
+ *     判定側（§5c）から静かに漏れる**（★ 赤にならない ＝ 誰も気づかない）。
+ *   → ★ **形は機械が作る。** ⚠️ 人が打つのは P-ID と yes/no だけにする。
+ *
+ * ★ 使い方（Apps Script のエディタで実行する）:
+ *     recordO1SecondaryUseChange("P015", false);   // ⚠️ 撤回（「使わないでください」）
+ *     recordO1SecondaryUseChange("P015", true);    // ★ あとから同意をいただいた場合
+ *
+ * ⚠️★★★ **同意の正本（O1-C の回答シート）は書き換えない。**
+ *   ★ 消すと「同意があった事実」まで消える（★ 台帳 §2b-2）。
+ *   ⚠️ ここで足すのは**あとから重なる意思表示**であり、★ §5c は
+ *     「**印を持つ `register` / `consent-update` の最新行**」を読む。
+ *
+ * ⚠️ **`.age` は消えない。** ★ これは*用途からの除外*であって削除要求ではない（★ 台帳 §2b）。
+ *   削除も必要なら、⚠️ **別に §2 の経路を回すこと。**
+ *
+ * @param {string} pid     ★ P-ID（例 "P015"）。⚠️ 形が違えば**何もせず止まる**
+ * @param {boolean} granted ★ true = 同意をいただいた / false = 撤回
+ * @return {boolean} ★ 追記できたか（⚠️ false なら実行ログの理由を読むこと）
+ */
+function recordO1SecondaryUseChange(pid, granted) {
+  var p = String(pid === null || pid === undefined ? "" : pid).trim().toUpperCase();
+  // ⚠️★★★ **形が違うまま書かない。** ★ 引けない行を足すのは、足さないより悪い
+  //   （★ 「記録した」と思い込ませるため）。
+  if (!o1IsValidPid_(p)) {
+    Logger.log(
+      "⛔⚠️ 参加者ID の形が違うので**何も記録していません**（★ 期待する形は P と数字。例: P015）。\n" +
+        "   ★ 正しい形で もう一度実行してください。"
+    );
+    return false;
+  }
+  if (granted !== true && granted !== false) {
+    // ⚠️★★★ **真偽値以外を「同意」に落とさない**（★ 既定は常に「使わない」側）。
+    Logger.log(
+      "⛔⚠️★★★ 2 つめの引数は true / false で渡してください（★ 何も記録していません）。\n" +
+        "   ★ true = 同意をいただいた / false = 撤回（「使わないでください」）"
+    );
+    return false;
+  }
+
+  o1LogMgmt_(
+    "consent-update",
+    p,
+    "ok",
+    granted ? "2nd-use-granted" : "2nd-use-withdrawn",
+    o1SecondaryUseNote_({ secondaryUse: granted })
+  );
+  Logger.log(
+    (granted ? "✅ " : "🛑 ") +
+      p +
+      " の二次利用同意を「" +
+      (granted ? "あり" : "なし") +
+      "」として登録ログに追記しました。\n" +
+      "   ⚠️★★★ **記録そのものは削除していません**（★ これは*用途からの除外*です）。\n" +
+      "   ★ 削除も必要なら docs/o1-deletion-ledger.md §2 の経路を別に回してください。\n" +
+      "   ★ 最後に §6 の実施記録へ 1 行足してコミットしてください。"
+  );
+  return true;
 }
 
 /**
@@ -2813,11 +2928,5 @@ function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
   // ⚠️★★★ **二次利用同意の印をここで残す**（研究者判断 2026-09-13）。
   //   ★ P-ID が確定しているのはこの経路だけなので、⚠️ `blocked` 側には付けない
   //     （★ P-ID が無い行に同意の印を書いても引けない）。
-  o1LogMgmt_(
-    "register",
-    pid,
-    logResult,
-    logReason,
-    (outcome.note ? outcome.note + " / " : "") + o1SecondaryUseNote_(a)
-  );
+  o1LogMgmt_("register", pid, logResult, logReason, o1RegisterNote_(outcome, a));
 }

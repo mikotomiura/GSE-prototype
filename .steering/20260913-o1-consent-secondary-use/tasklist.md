@@ -25,7 +25,7 @@
 ## レビュー
 - [x] code-reviewer + security-checker を**並列**起動
 - [x] HIGH 1 / MEDIUM 5 / LOW 8 に対応（→ review.md）＋ 検証中に自分で 1 件発見して修正
-- [ ] `/cross-review`（⚠️ **パス限定**・⚠️ **被験者 ID を送らない**）
+- [x] `/cross-review`（パス限定・ID 混入 0 件を実測）→ 5 件のうち 4 件に対応（→ review.md）
 
 ## ドキュメント
 - [x] `docs/o1-deletion-ledger.md`: §2b（撤回経路）/ §5c（判定規則・fail-closed）/ A-13 追記
@@ -34,5 +34,5 @@
 ## 完了処理
 - [x] design.md の最終化
 - [x] decisions.md の作成
-- [ ] git commit
+- [x] git commit（2 本）
 - [ ] ⚠️★★★ **文言を研究者の承認へ返す**（★ 被験者向け文書は契約）

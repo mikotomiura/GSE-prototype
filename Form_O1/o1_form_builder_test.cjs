@@ -273,6 +273,8 @@ function makeCtx(opts) {
         PAGE_BREAK: "PAGE_BREAK",
         TEXT: "TEXT",
         CHECKBOX: "CHECKBOX",
+        // ⚠️★ 任意ブロックの修復判定が見出しを見分けるのに使う（★ 2026-09-13）。
+        SECTION_HEADER: "SECTION_HEADER",
       },
       PageNavigationType: { CONTINUE: "CONTINUE" },
       openById: (id) => {
@@ -1532,6 +1534,152 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   push("§6b ⚠️★★★ 任意項目が 0 件なら『任意』見出しを置かない", headers.length === 0, {
     headers: headers.length,
   });
+}
+
+{
+  // --- ⚠️★★★ **既に壊れた状態で配備されたフォームも自己修復する** ---
+  //   （★ cross-review 指摘 1・2026-09-13）
+  //   ⚠️ 当初は「必須項目を足す前に任意ブロックが末尾だったか」という**経緯**で判定していたので、
+  //     ★ **既に壊れて配備されているフォームを救えなかった**。→ ★ 今の並びだけで判定する。
+  const ctx = makeReadyCtx();
+  const form = ctx.__forms[O1_C];
+  ctx.buildO1ConsentForm();
+
+  // ★ 壊れた配備済みフォームを再現する: 任意ブロックを末尾へ動かし、その後ろに必須項目を置く。
+  const optTitles = ctx.o1ConsentOptionalItemTitles_();
+  ctx.o1MoveOptionalBlockToEnd_(form);
+  const ROGUE = "★ 既に「任意」見出しの下に居る必須項目。";
+  const rogue = form.addCheckboxItem();
+  rogue.setTitle(ROGUE);
+  rogue.setRequired(true);
+
+  const sectionOf = (title) => {
+    let sec = "";
+    for (const it of form.__items) {
+      if (it.__type === "SECTION_HEADER") sec = it.__title;
+      if (it.__title === title) return sec;
+    }
+    return null;
+  };
+  // ★ 陽性対照: いま確かに壊れている。
+  push(
+    "§6b ★ 陽性対照: 壊れた配備済みフォームを作れている",
+    sectionOf(ROGUE) === ctx.O1_OPTIONAL_SECTION_TITLE,
+    { section: sectionOf(ROGUE) }
+  );
+
+  // ⚠️★★★ **必須項目を 1 つも足さない migrate** でも直ること（★ 経緯に依存しない）。
+  ctx.migrateO1ConsentForm();
+  push(
+    "§6b ⚠️★★★ 必須項目を足さない migrate でも、壊れた並びを自己修復する",
+    sectionOf(ROGUE) !== ctx.O1_OPTIONAL_SECTION_TITLE,
+    { section: sectionOf(ROGUE) }
+  );
+  push(
+    "§6b ★ 修復後も任意項目は『任意』見出しの配下にある",
+    sectionOf(optTitles[0]) === ctx.O1_OPTIONAL_SECTION_TITLE,
+    { section: sectionOf(optTitles[0]) }
+  );
+  push("§6b ⚠️ 自己修復でも設問は 1 つも消えない", form.__deleted === 0, {
+    deleted: form.__deleted,
+  });
+}
+
+{
+  // --- ⚠️★★★ **編集 UI で否定の選択肢を足されても migrate が戻す** ---
+  //   （★ cross-review 指摘 2・2026-09-13）
+  //   ⚠️ `o1ConsentAnswers_` は「空でなければ同意」と読むので、
+  //     ★ 否定の選択肢が在ると **拒否が同意として記録される**。
+  const ctx = makeReadyCtx();
+  const form = ctx.__forms[O1_C];
+  ctx.buildO1ConsentForm();
+  const optTitles = ctx.o1ConsentOptionalItemTitles_();
+  const item = form.__items.filter((i) => optTitles.indexOf(i.__title) >= 0)[0];
+
+  // ★ 「手で足された」状態を作る。
+  item.setChoices([
+    item.createChoice(ctx.O1_OPTIONAL_CONSENT_CHOICE),
+    item.createChoice("同意しません"),
+  ]);
+  push("§6b ★ 陽性対照: 否定の選択肢を足せている", item.__choices.length === 2, {
+    choices: item.__choices,
+  });
+
+  ctx.migrateO1ConsentForm();
+  push(
+    "§6b ⚠️★★★ migrate が選択肢を肯定 1 つへ戻す（★ 拒否が同意になる経路を塞ぐ）",
+    item.__choices.length === 1 && item.__choices[0] === ctx.O1_OPTIONAL_CONSENT_CHOICE,
+    { choices: item.__choices }
+  );
+  push(
+    "§6b ★ 戻したことはログに残る（⚠️ 黙って書き換えない）",
+    ctx.__logs.some((l) => l.indexOf("選択肢を戻しました") >= 0),
+    { logs: ctx.__logs.filter((l) => l.indexOf("選択肢") >= 0) }
+  );
+  // ⚠️ 既に正しいときは触らない（★ 回答の在る設問を毎回書き換えない）。
+  const logsBefore = ctx.__logs.length;
+  ctx.migrateO1ConsentForm();
+  push(
+    "§6b ★ 既に正しい選択肢なら書き直さない（冪等）",
+    !ctx.__logs.slice(logsBefore).some((l) => l.indexOf("選択肢を戻しました") >= 0),
+    {}
+  );
+}
+
+{
+  // --- ★ `consent-update` は**手入力させない**（★ cross-review 指摘 4・2026-09-13）---
+  //   ⚠️ 手で 1 行足す運用は、`kind` / `reason` / 備考を 1 文字間違えるだけで
+  //     **判定側（台帳 §5c）から静かに漏れる**。→ ★ 形は機械が作る。
+  const rowsOf = (ctx) => ctx.__sheets[MGMT_ID][MGMT_TAB].__grid.slice(2);
+
+  const withdraw = makeReadyCtx();
+  push("§6b ★ 撤回の記録は true を返す", withdraw.recordO1SecondaryUseChange("P015", false) === true, {});
+  const wr = rowsOf(withdraw);
+  push(
+    "§6b ⚠️★★★ 撤回は consent-update / 2nd-use: no の 1 行として残る",
+    wr.length === 1 &&
+      wr[0][1] === "consent-update" &&
+      wr[0][2] === "P015" &&
+      wr[0][3] === "ok" &&
+      wr[0][4] === "2nd-use-withdrawn" &&
+      String(wr[0][5]).indexOf("2nd-use: no") >= 0,
+    { row: wr[0] }
+  );
+  push(
+    "§6b ⚠️★★★ 撤回の記録は「消していない」と明示する（★ 削除要求と混同させない）",
+    withdraw.__logs.some((l) => l.indexOf("記録そのものは削除していません") >= 0),
+    {}
+  );
+
+  const grant = makeReadyCtx();
+  grant.recordO1SecondaryUseChange("P015", true);
+  const gr = rowsOf(grant);
+  push(
+    "§6b ★ あとからの同意は 2nd-use: yes / 2nd-use-granted で残る",
+    gr.length === 1 && gr[0][4] === "2nd-use-granted" && String(gr[0][5]).indexOf("2nd-use: yes") >= 0,
+    { row: gr[0] }
+  );
+
+  // ⚠️★★★ **形が違うなら何も書かない**（★ 引けない行を足すのは、足さないより悪い）。
+  const badPid = makeReadyCtx();
+  push(
+    "§6b ⚠️★★★ P-ID の形が違えば 1 行も書かない",
+    badPid.recordO1SecondaryUseChange("15", false) === false && rowsOf(badPid).length === 0,
+    { rows: rowsOf(badPid).length }
+  );
+  // ⚠️★★★ **真偽値以外を「同意」に落とさない**（★ 既定は常に使わない側）。
+  const badFlag = makeReadyCtx();
+  push(
+    "§6b ⚠️★★★ true / false 以外を渡したら 1 行も書かない（★ 同意に落とさない）",
+    badFlag.recordO1SecondaryUseChange("P015", "yes") === false && rowsOf(badFlag).length === 0,
+    { rows: rowsOf(badFlag).length }
+  );
+  // ⚠️ PII は入らない。
+  push(
+    "§6b ⚠️ consent-update の行にも PII は入らない",
+    rowsOf(withdraw).map((r) => r.join(" ")).join(" ").indexOf("@") < 0,
+    {}
+  );
 }
 
 {
@@ -3046,10 +3194,10 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-//   ★ 2026-09-13: §6b（任意の二次利用同意）を足して 256 件になったので下限を 250 へ。
-if (cases.length < 250) {
+//   ★ 2026-09-13: §6b（任意の二次利用同意）＋ cross-review 対応で 271 件。下限は 265。
+if (cases.length < 265) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（250 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（265 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

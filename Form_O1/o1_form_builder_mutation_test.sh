@@ -287,8 +287,15 @@ mutate "★ 備考の許可リストを拒否リストへ戻す（★ @ を含�
 mutate "★ 却下ログ満杯を消えない側に残さない（★ 黙らされたことが黙って消える）" \
   's/      if \(rejected\) o1NoteRejectLogFull_\(\);/      if (false) o1NoteRejectLogFull_();/'
 
+# ⚠️★★ 2026-09-13: **置換対象を現行の 1 行に合わせ直した。**
+#   ★ 二次利用の印を足したとき、この呼び出しを一度**複数行へ広げた**ので、旧パターンが
+#     ⚠️ **当たらなくなった。**★ `mutate` は「置換対象が消えた？」と赤にして教えてくれた
+#     （★ 変異試験そのものが、変異試験の腐りを捕まえた例）。
+#   ⚠️★ **`$` で行末を綴らないこと** —— ★ 本スクリプトは perl なので `$/` が
+#     **入力レコード区切りの変数**として解釈され、⚠️ 黙って何にも当たらなくなる（★ 実測）。
+#   → ★ 備考の組み立ては `o1RegisterNote_()` に出し、**呼び出しを 1 行に保った**。
 mutate "★ 送信ログを try の内側へ戻す（★ 送信済みなのに mail-failed と記録しうる）" \
-  's/  o1LogMgmt_\("register", pid, logResult, logReason, outcome\.note\);/  \/* moved *\//'
+  's/  o1LogMgmt_\("register", pid, logResult, logReason, o1RegisterNote_\(outcome, a\)\);/  \/* moved *\//'
 
 mutate "★ 空 P-ID 行の採番で例外を捕まえない（★ 中途半端な P-ID が残る）" \
   's/        \} catch \(blankErr\) \{/        } catch (blankErrIgnored) { throw blankErrIgnored; } if (false) { try {} catch (blankErr) {/'
