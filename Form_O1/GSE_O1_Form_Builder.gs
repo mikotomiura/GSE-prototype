@@ -234,6 +234,13 @@ var Q_O1_EMAIL = "メールアドレス";
 var Q_O1_OS = "記録に使うパソコンの種類";
 var Q_O1_SUBJECT_ID = "参加者ID";
 
+// ⚠️★★★ **任意**の二次利用同意（★ 表現研究）。★ 2026-09-13 に追加（研究者判断）。
+//   ⚠️ **`Q_O1_*` の他の設問と違い、これは必須ではない。**
+//   ★ 文言の上流は `consent-draft-o1.md` §3 の「★（任意）この記録を『かたちにして見せる研究』に
+//     使わせていただくことについて」。⚠️ **片方だけ直すと `o1_form_builder_test.cjs` が赤になる。**
+var Q_O1_SECONDARY_USE =
+  "★（任意）この記録から計算した数値を「かたちにして見せる研究」に使わせていただくことに同意します。";
+
 // ★ O1-S の設問タイトルのうち、後段の集計が語で探すもの。
 var Q_O1_S_BURDEN = "記録され続けていることが気になりましたか。";
 var Q_O1_S_PAUSE_USED = "「一時停止」を使いましたか。";
@@ -655,6 +662,90 @@ function o1ConsentItemTitles_() {
   ];
 }
 
+/**
+ * ★ **任意**の同意項目（⚠️ 必須の一括同意とは**別の設問**）。
+ *
+ * ⚠️★★★ **`o1ConsentItemTitles_()` に混ぜてはならない。** 理由は 2 つある:
+ *   1. ★ 呼び出し側は必須群に一律 `setRequired(true)` を当てるので、
+ *      混ぜると**構造的に必須になる**（＝「お断りいただけます」という約束が嘘になる）。
+ *   2. ⚠️ `o1ConsentItemTitles_()` の最後は逐語「**上記すべてに同意し、この記録と研究利用に
+ *      同意します。**」＝ **必須の一括同意**である。★ その**後ろ**に置かないと「上記すべて」に
+ *      飲み込まれる。
+ *
+ * ⚠️★★★ **未回答は `false`（＝ 使わない）に落ちる**（`o1ConsentAnswers_`）。★ fail-closed。
+ *   → ★ だから既存の回答者へ**同意を取り直さなくても約束は破れない**。
+ *
+ * ⚠️ **固有名（作品名・手法名）をここに書かない**（ADR-020 D2）。★ 「絵や動きのかたち」のような
+ *   **説明**にとどめる ——「名前を与えた瞬間に、それは『人が持つ何か』として読まれる」。
+ */
+function o1ConsentOptionalItemTitles_() {
+  return [Q_O1_SECONDARY_USE];
+}
+
+/**
+ * ★ 任意項目の補足（＝ 被験者が実際に読む約束の本体）。
+ * ⚠️ `consent-draft-o1.md` §3 の当該節と**同じ約束**を載せる（★ 1 対 1 を検査が照合する）。
+ */
+function o1ConsentSecondaryUseHelp_() {
+  return (
+    "★ この項目はお断りいただけます。\n" +
+    "⚠️ 断っても、この研究への参加・謝礼・そのほかすべてに影響しません。\n" +
+    "⚠️ 記録する内容も 1 つも変わりません（★ 上の「記録するもの」のとおりです）。\n\n" +
+    "▼ 何に使わせていただきたいか\n" +
+    "★ 私たちは将来、上に書いた記録から計算した数値だけを使って、作業の進み方を\n" +
+    "「絵や動きのかたち」にして見せる研究を、別に行うことを検討しています。\n" +
+    "・★ 使うもの: 記録から計算した数値 ／ 時間の並び（いつ速く進み、いつ止まっていたか）\n" +
+    "・⚠️ 使わないもの: 本文・画面の内容・アプリの名前（★ そもそも記録していません）／氏名・連絡先\n\n" +
+    "▼ ⚠️★★★ まだ決まっていないことも、正直に書きます\n" +
+    "・この研究を実施するかどうかも、どんなかたちにするかも、まだ決まっていません。\n" +
+    "・あなたご本人にそのかたちをお見せするかどうかも決まっていません。\n" +
+    "  ★ お見せする場合は、改めてご説明して、そのときにまたお伺いします。\n" +
+    "・⚠️ あなたの作業を採点したり、性格や能力を言い当てたりするものには使いません。\n\n" +
+    "▼ ★ お約束します\n" +
+    "・できあがったかたちから、元の数値や打った内容を復元できないようにします。\n" +
+    "・数値そのものを添えてあなたにお返しすることはしません。\n" +
+    "・使えるのは保管の上限（" +
+    O1_RETENTION_ENCRYPTED +
+    "）の範囲内です。\n" +
+    "・あとから「使わないでください」とお申し出ください。\n" +
+    "  ★ 宛先は上の連絡先（" +
+    O1_CONTACT_EMAIL +
+    "）です。⚠️ 理由はお聞きしません。"
+  );
+}
+
+/**
+ * ★ 任意の同意項目を 1 問足す。⚠️★★★ **`setRequired(false)` はここ 1 か所にしか無い。**
+ *   ★ `buildO1ConsentForm` と `migrateO1ConsentForm` の**両方**がこれを呼ぶ
+ *     （⚠️ 2 か所で別々に組み立てると、片方だけ必須になる事故が起きる）。
+ */
+function o1AddOptionalConsentItem_(form, title) {
+  var q = form.addCheckboxItem();
+  q.setTitle(title);
+  q.setHelpText(o1ConsentSecondaryUseHelp_());
+  q.setChoices([q.createChoice("同意します（任意）")]);
+  // ⚠️★★★ **ここを true にしてはならない。** ★ 任意であることが約束の本体である。
+  q.setRequired(false);
+  return q;
+}
+
+/**
+ * ★ 任意ブロックの見出しのタイトル。
+ * ⚠️★★★ **定数にしてある理由**: `o1MoveOptionalBlockToEnd_` が**この見出しを名指しで探す**。
+ *   ★ 文字列を 2 か所に持つと、片方を直した日に移動が黙って効かなくなる。
+ */
+var O1_OPTIONAL_SECTION_TITLE = "★（任意）将来の別の研究に使わせていただくことについて";
+
+/** ★ 任意項目のセクション見出し（⚠️ build / migrate で同じ文言を使う）。 */
+function o1AddOptionalConsentSection_(form) {
+  o1AddSectionHeader_(
+    form,
+    O1_OPTIONAL_SECTION_TITLE,
+    "⚠️★★★ ここから下は**任意**です。★ お断りいただけます。\n" +
+      "⚠️ 断っても、参加・謝礼・そのほかすべてに影響しません（★ 上の同意だけで参加できます）。"
+  );
+}
+
 function buildO1ConsentForm() {
   var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
   if (O1_CLEAR_EXISTING) {
@@ -687,6 +778,22 @@ function buildO1ConsentForm() {
     q.setChoices([q.createChoice("同意する / 理解した")]);
     q.setRequired(true);
   });
+
+  // ⚠️★★★ **必須の一括同意（`o1ConsentItemTitles_()` の最終項）より「後」に置く。**
+  //   ★ 前に置くと逐語「上記すべてに同意し…」に飲み込まれ、**任意でなくなる**。
+  // ⚠️★★★ **項目が 0 件なら見出しも置かない。**
+  //   ★ 置いてしまうと、逐語「ここから下は任意です。お断りいただけます」の見出しが
+  //     **中身ゼロで残り**、⚠️ Forms のセクションは次の見出しまでを支配するので
+  //     **その後ろに続く設問（ご記名・氏名…）がその宣言の配下に入る。**
+  //   （★ 2026-09-13 に自分のコードの欠陥として実測で発見した。⚠️ `migrate` 側は元から
+  //     `missingOptional.length` で守られていたが、**build 側だけ無条件だった**。）
+  var optionalTitles = o1ConsentOptionalItemTitles_();
+  if (optionalTitles.length) {
+    o1AddOptionalConsentSection_(form);
+    optionalTitles.forEach(function (title) {
+      o1AddOptionalConsentItem_(form, title);
+    });
+  }
 
   // ⚠️★★★ §6 の「宣言ブロック」「画面録画」は **このフォームでは同意を取らない。**
   //   ★ `consent-draft-o1.md` §6 が逐語「お願いする場合は、必ず個別に説明して同意をいただきます」
@@ -745,6 +852,57 @@ function buildO1ConsentForm() {
  * ⚠️ `setupO1Forms()` は回答があると止まるので、運用開始後の更新はこちらを使う。
  * ★ 説明文とタイトルは上書きする（文面の訂正はこれで届く）。
  */
+/**
+ * ★ 任意ブロック（見出し ＋ 任意項目）の**現在の位置**を返す。
+ * @return {{idx: number[], isLast: boolean}} ⚠️ `idx` が空なら任意ブロックはまだ無い。
+ */
+function o1OptionalBlockPos_(form) {
+  var titles = o1ConsentOptionalItemTitles_();
+  var items = form.getItems();
+  var idx = [];
+  for (var i = 0; i < items.length; i++) {
+    var t = items[i].getTitle();
+    if (t === O1_OPTIONAL_SECTION_TITLE || titles.indexOf(t) >= 0) idx.push(i);
+  }
+  // ★ 「末尾に連続して在る」＝ 最後の n 個がちょうど任意ブロックであること。
+  var isLast = idx.length > 0;
+  for (var j = 0; j < idx.length; j++) {
+    if (idx[idx.length - 1 - j] !== items.length - 1 - j) {
+      isLast = false;
+      break;
+    }
+  }
+  return { idx: idx, isLast: isLast };
+}
+
+/**
+ * ⚠️★★★ 任意ブロックを**フォームの末尾へ送り直す**（★ 2026-09-13・security-checker M-1）。
+ *
+ * ★ なぜ要るか（⚠️ 実測して確認した挙動）:
+ *   1. `migrateO1ConsentForm` は項目を**フォームの末尾へ append** する。
+ *   2. ★ 配備済みフォーム（＝ 任意項目より前に作られたもの）に任意ブロックを足すと、
+ *      **任意の見出しがフォーム最後のセクション見出しになる。**
+ *   3. ⚠️ そのあと `o1ConsentItemTitles_()` に**必須**項目を 1 つ足して再 migrate すると、
+ *      その必須項目は**さらに末尾**へ付く ＝ **「★（任意）…」見出しの配下に着地する。**
+ *   → ⚠️★★★ 被験者は逐語「**ここから下は任意です。★ お断りいただけます。**」を読んだうえで、
+ *     **断れない項目**に同意することになる（★ Forms が必須を強制するので fail-open ではないが、
+ *     **強制される同意を「断れる」と表示した状態**であり `consent-draft-o1.md` の約束と衝突する）。
+ *
+ * ⚠️ **既に末尾に在るなら何もしない**（★ 毎回の migrate でフォームを揺らさない）。
+ * @return {number} 動かした項目数（★ 0 なら何もしていない）
+ */
+function o1MoveOptionalBlockToEnd_(form) {
+  var pos = o1OptionalBlockPos_(form);
+  if (!pos.idx.length || pos.isLast) return 0;
+  var items = form.getItems();
+  var last = items.length - 1;
+  // ★ 先頭から順に末尾へ送ると、⚠️ ブロック内の順序（見出し → 項目）が保たれる。
+  for (var k = 0; k < pos.idx.length; k++) {
+    form.moveItem(items[pos.idx[k]], last);
+  }
+  return pos.idx.length;
+}
+
 function migrateO1ConsentForm() {
   var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
   form.setTitle(o1ConsentFormTitle_());
@@ -754,6 +912,10 @@ function migrateO1ConsentForm() {
   form.getItems().forEach(function (it) {
     existing[it.getTitle()] = true;
   });
+
+  // ⚠️★★★ **必須項目を足す「前」に**、任意ブロックが末尾に在るかを見ておく
+  //   （★ 足したあとでは「元から末尾だったのか」が分からない）。
+  var optWasLast = o1OptionalBlockPos_(form).isLast;
 
   var added = 0;
   o1ConsentItemTitles_().forEach(function (title) {
@@ -766,6 +928,63 @@ function migrateO1ConsentForm() {
     Logger.log("➕ 同意項目を追加: " + title);
   });
 
+  // ⚠️★★★ **任意項目は別に数える。** ★ 必須の追加とは意味がまったく違う（→ 下の警告文）。
+  //   ★ 見出しは**足りない項目があるときだけ**置く（⚠️ さもないと migrate のたびに見出しが増える）。
+  var addedOptional = 0;
+  var missingOptional = o1ConsentOptionalItemTitles_().filter(function (title) {
+    return !existing[title];
+  });
+  if (missingOptional.length) {
+    o1AddOptionalConsentSection_(form);
+    missingOptional.forEach(function (title) {
+      o1AddOptionalConsentItem_(form, title);
+      addedOptional++;
+      Logger.log("➕ ★ **任意の**同意項目を追加: " + title);
+    });
+  }
+
+  // ⚠️★★★ **既に在る任意項目にも、文言と「任意であること」を当て直す**（code-reviewer HIGH・2026-09-13）。
+  //   ★ 理由 1: **約束の本体は設問の補足（help text）の中にある**
+  //     （「お断りいただけます」「採点しません」「復元できないようにします」…）。
+  //     ⚠️ 上の `form.setDescription()` は**フォーム全体の説明**であって設問の補足ではないので、
+  //     ★ ここで当て直さないと **文言を訂正しても配備済みフォーム（＝ 同意の正本）に永久に届かない。**
+  //     ⚠️★★★ かつ検査は毎回まっさらから build するので**緑のまま**、ゲートもソースしか見ないので
+  //     **緑のまま** ——★ つまり **無音で食い違う**（本 repo が最も繰り返している事故の型）。
+  //   ★ 理由 2: ⚠️ **Forms の編集 UI で「必須」トグルを入れられる。**
+  //     ★ コード側に必須化の経路は無いが、**正本側には在る**。→ ★ migrate のたびに `false` を再主張する。
+  //   ⚠️ **件数には数えない**（★ 追加ではなく上書きである。→ 冪等性の判定 `added + addedOptional` を汚さない）。
+  var refreshed = 0;
+  form.getItems().forEach(function (it) {
+    if (it.getType() !== FormApp.ItemType.CHECKBOX) return;
+    var title = it.getTitle();
+    if (o1ConsentOptionalItemTitles_().indexOf(title) < 0) return;
+    if (missingOptional.indexOf(title) >= 0) return; // ★ いま足したものは済んでいる
+    var q = it.asCheckboxItem();
+    q.setHelpText(o1ConsentSecondaryUseHelp_());
+    q.setRequired(false);
+    refreshed++;
+  });
+  if (refreshed) {
+    Logger.log(
+      "♻️ ★ 既存の任意項目 " + refreshed + " 件に、最新の文言と「任意」を当て直しました\n" +
+        "  ⚠️ **必須トグルが入っていた場合はここで外れます**（★ 断れることが約束の本体です）。"
+    );
+  }
+
+  // ⚠️★★★ **末尾に在った任意ブロックの後ろに必須項目を積んでしまったら、送り直す。**
+  //   ★ 条件を絞る理由: ⚠️ 無条件に動かすと、**build が作った並び**
+  //     （任意ブロック → ご記名 → 氏名…）まで毎回引っかき回すことになる。
+  if (added && optWasLast) {
+    var moved = o1MoveOptionalBlockToEnd_(form);
+    if (moved) {
+      Logger.log(
+        "↕️ ★ 任意ブロック " + moved + " 件を末尾へ送り直しました。\n" +
+          "  ⚠️★★★ **そうしないと、いま足した必須項目が『ここから下は任意です』の見出しの\n" +
+          "     配下に着地します**（★ 断れない項目を「断れる」と表示した状態になります）。"
+      );
+    }
+  }
+
   // ⚠️★★ 追加した項目は**末尾**に付く。★ 既に回答した人はその項目に同意していない。
   //   → 黙って進めない。研究者に判断させる。
   if (added) {
@@ -776,10 +995,25 @@ function migrateO1ConsentForm() {
         "  ★ **既に回答した方は、この項目に同意していません。**\n" +
         "  ⚠️ 追加が実質的な内容変更なら、既存の参加者に**あらためて同意を取り直す**こと。"
     );
-  } else {
+  }
+  // ⚠️★★★ **任意項目には上の強い警告を出さない**（★ 過剰警告は不要な再接触を招く）。
+  //   ★ 未回答は `o1ConsentAnswers_` で **`false`（＝ 使わない）** に落ちるので、
+  //     ⚠️ **取り直さなくても約束は破れない**。★ ただし「見ていない」事実は必ず出す。
+  if (addedOptional) {
+    Logger.log(
+      "➕★ " +
+        addedOptional +
+        " 件の**任意**の同意項目を追加しました（★ 必須ではありません）。\n" +
+        "  ★ **既に回答した方はこの項目を見ていません。** ⚠️ その方々は\n" +
+        "     **同意していないものとして扱われます**（★ 既定は使わない = fail-closed）。\n" +
+        "  ★ 使わせていただきたい場合のみ、改めてご説明してお伺いしてください\n" +
+        "     （⚠️ **黙って同意とみなさないこと**）。"
+    );
+  }
+  if (!added && !addedOptional) {
     Logger.log("✅ 追加する同意項目はありません（フォームはコードと一致しています）");
   }
-  return added;
+  return added + addedOptional;
 }
 
 // ============================================================
@@ -1564,6 +1798,7 @@ function o1MgmtSafeCell_(v) {
  *     **正規の登録の記録まで巻き添えで止まる**（= 監査証跡の遠隔抑止）。
  *
  * @param {string} kind   種別（"register" / "assign"。★ 将来 "submit" 等を足せる）
+ *   ⚠️★ `"consent-update"` は**研究者が手で 1 行足す**種別である（★ 二次利用同意の撤回・`docs/o1-deletion-ledger.md` §2b）。
  * @param {string} pid    ★ 分かっているときだけ。⚠️ 不明なら空文字
  * @param {string} result "ok" / "blocked" / "partial"
  * @param {string} reason 理由コード
@@ -2126,7 +2361,10 @@ function removeO1ConsentTriggers() {
  *   提出されても氏名やメールが取れず、★ **黙って発番が止まる**。
  */
 function o1ConsentAnswers_(response) {
-  var out = { name: "", email: "", pid: "", os: "" };
+  // ⚠️★★★ `secondaryUse` の既定は **false（＝ 使わない）**。★ fail-closed である。
+  //   ★ 未チェック / 設問そのものが無い（= migrate 前のフォームからの回答）の**どちらも**
+  //     ここで false に落ちる。⚠️ 「分からない」を「同意」と読まないための既定である。
+  var out = { name: "", email: "", pid: "", os: "", secondaryUse: false };
   var items = response.getItemResponses();
   for (var i = 0; i < items.length; i++) {
     var title = items[i].getItem().getTitle();
@@ -2136,8 +2374,27 @@ function o1ConsentAnswers_(response) {
     else if (title === Q_O1_EMAIL) out.email = s.trim();
     else if (title === Q_O1_PID) out.pid = s.trim().toUpperCase();
     else if (title === Q_O1_OS) out.os = s.trim();
+    // ★ チェックボックスなので、選ばれていれば選択肢の文字列が入る。
+    //   ⚠️ **値の中身では判定しない**（★ 選択肢の文言を変えたら黙って壊れる）。空でなければ同意。
+    else if (title === Q_O1_SECONDARY_USE) out.secondaryUse = s.trim() !== "";
   }
   return out;
+}
+
+/**
+ * ★ 登録ログの備考に足す、二次利用同意の印。
+ *
+ * ⚠️★★★ **これは「正本」ではない。** ★ 正本は O1-C の回答シートである
+ *   （`docs/o1-deletion-ledger.md` §5b 表 2）。★ ここに写すのは、⚠️ 回答シートの
+ *   参加者ID欄が**任意（初参加者は空欄）**で、**P-ID から引けない**ためである
+ *   —— ★ 登録ログは P-ID を持ち、⚠️ 氏名・メールの列を持たない唯一の経路である。
+ * ⚠️ 食い違ったとき / 行が無いときは **「同意なし」として扱う**（★ fail-closed）。
+ *
+ * ★ 形は半角のみ（⚠️ `o1MgmtSafeCell_` の許可リストを通す必要がある。
+ *   日本語で書くと `***` に潰され、⚠️ **同意の有無が読めなくなる**）。
+ */
+function o1SecondaryUseNote_(a) {
+  return "2nd-use: " + (a && a.secondaryUse ? "yes" : "no");
 }
 
 /**
@@ -2553,5 +2810,14 @@ function o1FinishO1Registration_(a, pid, ackUrlSnapshot, outcome) {
     logReason = "mail-failed/" + outcome.reason;
   }
   // ★ 追記は **1 回だけ・try の外**（⚠️ 上のコメント参照）。
-  o1LogMgmt_("register", pid, logResult, logReason, outcome.note);
+  // ⚠️★★★ **二次利用同意の印をここで残す**（研究者判断 2026-09-13）。
+  //   ★ P-ID が確定しているのはこの経路だけなので、⚠️ `blocked` 側には付けない
+  //     （★ P-ID が無い行に同意の印を書いても引けない）。
+  o1LogMgmt_(
+    "register",
+    pid,
+    logResult,
+    logReason,
+    (outcome.note ? outcome.note + " / " : "") + o1SecondaryUseNote_(a)
+  );
 }

@@ -89,6 +89,34 @@ else
   else
     ok "同意文書の状態表に未了が残っていない"
   fi
+
+  # ⚠️★★★ **任意の二次利用同意（★ 表現研究）が同意文書にあること**（★ 2026-09-13 追加）。
+  #   ★ なぜゲートに置くか: ⚠️ **48 時間で自動提出される**ので、★ 配り始めたあとに
+  #     用途を足すには**被験者への再接触が要る**（＝ 取り返しがつかない側の失敗）。
+  #   ⚠️★ **「節が在る」だけでは測れない。** ★ 節が在っても**任意でなければ約束が嘘になる**ので、
+  #     ⚠️ 下の §4 でフォーム側の `setRequired(false)` まで見ている（★ 2 か所で対にしている）。
+  sec_doc=""
+  if ! grep -q '^### ★（任意）この記録を「かたちにして見せる研究」に使わせていただくことについて$' "$CONSENT"; then
+    sec_doc="節が無い"
+  else
+    # ⚠️★ **節の中だけ**を見る（code-reviewer LOW・2026-09-13）。
+    #   ★ ファイル全体を grep すると、⚠️ **約束を別の節へ移しても緑になる**
+    #     （= 「節は在る」と「節に約束が書いてある」を区別できない）。
+    sec_body="$(sed -n '/^### ★（任意）この記録を「かたちにして見せる研究」/,/^## /p' "$CONSENT")"
+    # ★ 断れることと、断っても不利益が無いことが**その節に書いてある**こと。
+    printf '%s\n' "$sec_body" | grep -q 'この項目はお断りいただけます' ||
+      sec_doc="$sec_doc 『お断りいただけます』が節に無い"
+    printf '%s\n' "$sec_body" | grep -q '参加・謝礼' ||
+      sec_doc="$sec_doc 『参加・謝礼…に影響しません』が節に無い"
+    # ⚠️ 撤回できることが書いてあること（★ 台帳 §2b の経路と対になる）。
+    printf '%s\n' "$sec_body" | grep -q '使わないでください' ||
+      sec_doc="$sec_doc 撤回の申し出先が節に無い"
+  fi
+  if [ -z "$sec_doc" ]; then
+    ok "同意文書に**任意**の二次利用同意（表現研究）がある"
+  else
+    ng "★ 同意文書側の任意の二次利用同意が壊れている:$sec_doc"
+  fi
 fi
 
 # --- 2. 削除台帳（ADR-014 D8 制約 3 / 実装 acceptance 3）----------------------
@@ -158,6 +186,87 @@ else
     ng "O1 フォームビルダーのガード検査が赤"
     printf '%s\n' "$out" | grep '^NG' | sed 's/^/       /'   # ★ 原因を画面に出す
   fi
+fi
+
+# ⚠️★★★ **任意の二次利用同意が「任意のまま」であること**（★ 2026-09-13 追加・研究者判断）。
+#
+#   ★ なぜ node の検査（上）と別に置くか: ⚠️ **上の検査は `o1_form_builder_test.cjs` が
+#     その検査を持っている限りでしか効かない**。★ 検査ファイルごと差し替えられたときに
+#     何も言わなくなるので、⚠️ **配布ゲート自身も 1 本だけ独立に持つ**
+#     （★ 本ファイルが「配ってよいか」の単一の真実源であるため）。
+#
+#   ⚠️★★★ **`setRequired(false)` を grep するだけにしない。**
+#     ★ ビルダー全体を grep すると、⚠️ **無関係な場所の 1 行**で緑になりうる。
+#     → ★ **`o1AddOptionalConsentItem_` の関数本体だけ**を awk で切り出して見る。
+opt_missing=""
+if [ ! -f "$FORM_BUILDER" ]; then
+  opt_missing="ビルダーが読めない"
+else
+  grep -q "function o1ConsentOptionalItemTitles_" "$FORM_BUILDER" ||
+    opt_missing="$opt_missing 任意項目の定義（o1ConsentOptionalItemTitles_）が無い"
+  grep -q "function o1AddOptionalConsentItem_" "$FORM_BUILDER" ||
+    opt_missing="$opt_missing 任意項目を足す関数が無い"
+  # ★ 定義 1 ＋ 呼び出し 2（build / migrate）＝ 3 以上。⚠️ 片方だけ配線した状態を弾く。
+  #   ⚠️ 部分一致で数えない（★ `DISABLED_o1AddOptionalConsentItem_` を数えてしまう）。
+  #   ⚠️★★ **コメント行を先に落とす**（security-checker L-2・2026-09-13）——
+  #     ★ さもないと doc コメントに同じ呼び出しを 1 行書くだけで、
+  #       **実配線を消しても件数が保たれて緑になる**（= 件数ガードが盲になる）。
+  opt_calls="$(grep -vE '^[[:space:]]*(//|\*|/\*)' "$FORM_BUILDER" \
+    | grep -cE '(^|[^A-Za-z0-9_])o1AddOptionalConsentItem_\(')"
+  if [ "$opt_calls" -lt 3 ]; then
+    opt_missing="$opt_missing 任意項目が build / migrate の両方に配線されていない"
+  fi
+  # ⚠️★★★ **ここが本検査の眼目**: 任意項目を足す関数の中で **必須にしていない**こと。
+  opt_body="$(awk '/^function o1AddOptionalConsentItem_/{f=1} f{print} f&&/^}$/{exit}' "$FORM_BUILDER")"
+  if [ -z "$opt_body" ]; then
+    opt_missing="$opt_missing 任意項目を足す関数の本体を読めない"
+  elif ! printf '%s\n' "$opt_body" | grep -q 'setRequired(false)'; then
+    opt_missing="$opt_missing ★ 任意項目が必須になっている（setRequired(false) が無い）"
+  elif printf '%s\n' "$opt_body" | grep -q 'setRequired(true)'; then
+    # ⚠️★★★ **「false が在る」だけでは足りない**（security-checker L-1・2026-09-13）。
+    #   ★ `q.setRequired(false); q.setRequired(true);` と **1 行足す**改変は、
+    #     ⚠️ false の grep には当たるので**緑のまま通る**（★ 後勝ちで必須になる）。
+    #   ★ この検査の存在理由は「検査ファイルごと差し替えられても 1 本は残す」ことなので、
+    #     ⚠️ その脅威モデルでは在ることの確認だけでは不十分である。
+    opt_missing="$opt_missing ★ 任意項目を足す関数に setRequired(true) が混ざっている"
+  fi
+  # ⚠️★★★ **必須の一括同意より「後」に置かれていること**（code-reviewer MEDIUM・2026-09-13）。
+  #   ★ 本ファイルは壊れ方を 3 つ挙げている（①必須化 ②飲み込まれる ③.md と食い違う）のに、
+  #     ⚠️ 独立側は①と「必須群への混入」しか持っていなかった。
+  #   ★ ②（必須ループの**前**へ移す）は node 検査だけが捕まえており、⚠️ **検査ファイルごと
+  #     差し替えられたら誰も言わなくなる** —— それがゲートを別に持つ理由（上のコメント）なので、
+  #     ⚠️ **最も重い壊れ方が独立側から漏れていた。**
+  #   ★ 行番号の大小で足りる（⚠️ bash 3.2 可・`head -1` で最初の 1 件に固定）。
+  req_ln="$(grep -n 'o1ConsentItemTitles_().forEach' "$FORM_BUILDER" | head -1 | cut -d: -f1)"
+  opt_ln="$(grep -n 'o1AddOptionalConsentSection_(form);' "$FORM_BUILDER" | head -1 | cut -d: -f1)"
+  if [ -z "$req_ln" ] || [ -z "$opt_ln" ]; then
+    # ⚠️ 判定できないことを緑にしない（★ アンカー喪失を赤にする）。
+    opt_missing="$opt_missing ★ 任意項目の位置を判定できない（アンカーが見つからない）"
+  elif [ "$opt_ln" -lt "$req_ln" ]; then
+    opt_missing="$opt_missing ★ 任意項目が必須の一括同意より **前** にある（＝ 上記すべてに飲み込まれる）"
+  fi
+  # ⚠️★★★ **既存の任意項目へ文言と「任意」を当て直しているか**（code-reviewer HIGH・2026-09-13）。
+  #   ★ 当て直さないと、⚠️ **文言を訂正しても配備済みフォーム（＝ 同意の正本）に届かない**。
+  mig_body="$(awk '/^function migrateO1ConsentForm/{f=1} f{print} f&&/^}$/{exit}' "$FORM_BUILDER")"
+  if [ -z "$mig_body" ]; then
+    opt_missing="$opt_missing migrateO1ConsentForm の本体を読めない"
+  elif ! printf '%s\n' "$mig_body" | grep -q 'setHelpText(o1ConsentSecondaryUseHelp_())'; then
+    opt_missing="$opt_missing ★ migrate が既存の任意項目へ文言を当て直していない（訂正が正本に届かない）"
+  fi
+  # ⚠️ 必須の一括同意に**混ぜていない**こと（★ 混ぜると断れなくなる）。
+  if grep -q 'Q_O1_SECONDARY_USE' "$FORM_BUILDER"; then
+    req_body="$(awk '/^function o1ConsentItemTitles_/{f=1} f{print} f&&/^}$/{exit}' "$FORM_BUILDER")"
+    if printf '%s\n' "$req_body" | grep -q 'Q_O1_SECONDARY_USE'; then
+      opt_missing="$opt_missing ★ 任意項目が必須群（o1ConsentItemTitles_）に混ざっている"
+    fi
+  else
+    opt_missing="$opt_missing 任意項目の設問タイトル定数が無い"
+  fi
+fi
+if [ -z "$opt_missing" ]; then
+  ok "★ 任意の二次利用同意がフォーム側にあり、**任意のまま**配線されている"
+else
+  ng "⚠️★★★ 任意の二次利用同意が壊れている（★ 断れない同意は同意ではない）:$opt_missing"
 fi
 
 # ⚠️★ 限界: **書き込み文**を要求する（コメントに `o1.mode` と書くだけでは緑にしない）。
@@ -735,6 +844,51 @@ selftest () {
   #   ★ 実コードの参照を消してコメントだけ残す = 起票時点の状態を再現する。
   build; sed_i 's/^    mgmtSheetId: String(props.getProperty("O1_MGMT_SHEET_ID").*$/    mgmtSheetId: "",/' "$fix/w/$FORM_BUILDER"
   expect_red "運用管理シートが未実装" "★ コメントだけ残して実コードを消す（起票時点の再現）"
+
+  # ⚠️★★★ **任意の二次利用同意（★ 2026-09-13 追加）—— 3 状態で撃つ。**
+  #   ★ 「在る（緑）／無い（赤）／壊れている（赤）」。⚠️ **「無い」と「壊れている」は別物である**:
+  #     ★ 前者は足し忘れ、⚠️ 後者は **足したのに任意でなくなった**（＝ 約束が嘘になる）。
+  #     ⚠️ 後者を測らないと「項目さえ在れば緑」になり、★ 本検査の目的そのものを外す。
+  #   ⚠️★ 照合語は 2 つの検査で**別々の語**にしてある（★ 同じ語だと相手の ❌ を拾って偽合格）。
+
+  # --- 在る（★ 陽性対照。⚠️ fixture の写し漏れで空回りしていないかも同時に測る）---
+  build; expect_green "二次利用同意（表現研究）" "★ 在る: 同意文書側の任意項目"
+  build; expect_green "任意のまま" "★ 在る: フォーム側が任意のまま配線されている"
+
+  # --- 無い ---
+  build; sed_i 's/^### ★（任意）この記録を「かたちにして見せる研究」.*$/### （節を消した）/' "$cons"
+  expect_red "同意文書側の任意" "⚠️ 無い: 同意文書から節を消す"
+  build; sed_i 's/function o1ConsentOptionalItemTitles_/function DISABLED_o1ConsentOptionalItemTitles_/' "$fix/w/$FORM_BUILDER"
+  expect_red "断れない同意は同意ではない" "⚠️ 無い: 任意項目の定義を消す"
+  build; sed_i 's/o1AddOptionalConsentItem_(form, title);/o1SkipOptional_(form, title);/g' "$fix/w/$FORM_BUILDER"
+  expect_red "断れない同意は同意ではない" "⚠️ 無い: 定義は残して build / migrate の配線だけ消す"
+
+  # --- 壊れている（★ 在るのに約束が嘘になっている）---
+  #   ⚠️★★★ **これが本命である。** ★ 項目は在るのに**断れなくなっている**状態。
+  build; sed_i 's/  q.setRequired(false);/  q.setRequired(true);/' "$fix/w/$FORM_BUILDER"
+  expect_red "断れない同意は同意ではない" "⚠️★★★ 壊れている: 任意項目を必須にする"
+  #   ⚠️★★★ **false を残したまま true を 1 行「足す」**（★ 後勝ちで必須になる・L-1）。
+  build; sed_i 's|^  q.setRequired(false);$|  q.setRequired(false);\n  q.setRequired(true);|' "$fix/w/$FORM_BUILDER"
+  expect_red "setRequired(true) が混ざっている" "⚠️★★★ 壊れている: false の後に true を足す（後勝ち）"
+  #   ⚠️★★ **コメントで件数を水増しして実配線を消す**（★ L-2）。
+  build; sed_i 's|^  o1AddOptionalConsentItem_(form, title);$|  // o1AddOptionalConsentItem_(form, title);|' "$fix/w/$FORM_BUILDER"
+  sed_i 's|^      o1AddOptionalConsentItem_(form, title);$|      // o1AddOptionalConsentItem_(form, title);|' "$fix/w/$FORM_BUILDER"
+  expect_red "配線されていない" "⚠️★★ 壊れている: 呼び出しをコメント化する（件数の水増しに騙されない）"
+  #   ⚠️ 必須群に混ぜる（★ 「上記すべてに同意し…」に飲み込ませる）。
+  #   ⚠️★★★ **必須ループの「前」へ移す**（★ 上記すべてに飲み込ませる）。
+  #     ★ 2026-09-13 まで**独立側はこれを捕まえていなかった**（code-reviewer MEDIUM）。
+  build; sed_i 's/^  o1AddOptionalConsentSection_(form);$//' "$fix/w/$FORM_BUILDER"
+  sed_i 's|^  o1ConsentItemTitles_().forEach(function (title) {$|  o1AddOptionalConsentSection_(form);\n  o1ConsentItemTitles_().forEach(function (title) {|' "$fix/w/$FORM_BUILDER"
+  expect_red "断れない同意は同意ではない" "⚠️★★★ 壊れている: 任意項目を必須の一括同意より前へ移す"
+  #   ⚠️★★★ **文言の当て直しを消す**（★ 訂正が配備済みフォームへ届かなくなる）。
+  build; sed_i 's/    q.setHelpText(o1ConsentSecondaryUseHelp_());$//' "$fix/w/$FORM_BUILDER"
+  expect_red "訂正が正本に届かない" "⚠️★★★ 壊れている: migrate の文言の当て直しを消す"
+  build; sed_i 's/^  return \[Q_O1_SECONDARY_USE\];$/  return [];/' "$fix/w/$FORM_BUILDER"
+  sed_i 's/^    "上記すべてに同意し、この記録と研究利用に同意します。",$/    "上記すべてに同意し、この記録と研究利用に同意します。",\n    Q_O1_SECONDARY_USE,/' "$fix/w/$FORM_BUILDER"
+  expect_red "断れない同意は同意ではない" "⚠️★★★ 壊れている: 任意項目を必須群に混ぜる"
+  #   ⚠️ 同意文書から「断れる」という約束だけを消す（★ 節は在るまま）。
+  build; sed_i 's/^★ \*\*この項目はお断りいただけます。\*\*.*$/★ この項目についてご説明します。/' "$cons"
+  expect_red "同意文書側の任意" "⚠️★★★ 壊れている: 節は残して『お断りいただけます』だけ消す"
   # ⚠️★★ **追跡の検査は fixture では測れない**（$fix/w は git 管理下に無く、常に「未追跡」になる）。
   #   → ★ 代わりに **本物の repo で陽性・陰性の対照**を取る（⚠️ 1 バイトも変更しない）。
   #   ⚠️★★★ 陰性対照は「**存在するのに追跡されていない**」でなければならない

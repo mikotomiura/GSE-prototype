@@ -67,6 +67,9 @@ function makeItem(type) {
       return it;
     },
     asMultipleChoiceItem: () => it,
+    // ⚠️★ `migrateO1ConsentForm` が既存の任意項目へ文言を当て直すのに使う
+    //   （★ 2026-09-13・code-reviewer HIGH）。⚠️ 無いと migrate 経路ごと落ちる。
+    asCheckboxItem: () => it,
     asListItem: () => it,
     asPageBreakItem: () => it,
     setGoToPage: () => it,
@@ -84,6 +87,7 @@ function makeForm(id, opts) {
     __confirmation: "",
     __items: [],
     __deleted: 0,
+    __moved: 0,
     __responses: o.responses === undefined ? 0 : o.responses,
     __responsesThrow: !!o.responsesThrow,
     getId: () => id,
@@ -106,6 +110,17 @@ function makeForm(id, opts) {
       form.__confirmation = t;
     },
     getItems: () => form.__items.slice(),
+    // ⚠️★ `migrateO1ConsentForm` が任意ブロックを末尾へ送り直すのに使う
+    //   （★ 2026-09-13・security-checker M-1）。⚠️ 無いと移動の検査が空回りする。
+    //   ★ GAS の `Form.moveItem(item, toIndex)` と同じ意味にする: 抜いてから差し込む。
+    moveItem: (item, toIndex) => {
+      const from = form.__items.indexOf(item);
+      if (from < 0) throw new Error("stub: moveItem: item not in form");
+      form.__items.splice(from, 1);
+      form.__items.splice(toIndex, 0, item);
+      form.__moved++;
+      return item;
+    },
     deleteItem: (item) => {
       form.__deleted++;
       form.__items = form.__items.filter((x) => x !== item);
@@ -1161,10 +1176,27 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   const form = ctx.__forms[O1_C];
   const checks = form.__items.filter((i) => i.__type === "CHECKBOX");
   push("§6 同意項目が 10 件以上ある", checks.length >= 10, { checks: checks.length });
+  // ⚠️★★★ 2026-09-13: **「すべて必須」では測れなくなった。**
+  //   ★ 任意の二次利用同意（`o1ConsentOptionalItemTitles_()`）を足したため。
+  //   ⚠️ ここで単に条件を緩めると、★ **必須であるべき項目が任意に落ちても緑のまま**になる
+  //     （= 検査の空回り）。→ ★ **必須群と任意群を名指しで分け、両方向に測る。**
+  const optionalTitles = ctx.o1ConsentOptionalItemTitles_();
+  const mustChecks = checks.filter((i) => optionalTitles.indexOf(i.__title) < 0);
+  const optChecks = checks.filter((i) => optionalTitles.indexOf(i.__title) >= 0);
   push(
-    "§6 同意項目はすべて必須である",
-    checks.length > 0 && checks.every((i) => i.__required === true),
-    { required: checks.filter((i) => i.__required).length }
+    "§6 ★ 必須群の同意項目はすべて必須である（⚠️ 任意項目を除く）",
+    mustChecks.length >= 10 && mustChecks.every((i) => i.__required === true),
+    {
+      must: mustChecks.length,
+      notRequired: mustChecks.filter((i) => !i.__required).map((i) => i.__title),
+    }
+  );
+  push(
+    "§6 ★★★ 任意項目は 1 つも必須になっていない",
+    optChecks.length === optionalTitles.length &&
+      optChecks.length > 0 &&
+      optChecks.every((i) => i.__required === false),
+    { opt: optChecks.map((i) => ({ t: i.__title, required: i.__required })) }
   );
   push(
     "§6 氏名・メールが必須である",
@@ -1192,6 +1224,407 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
     "§6 ★★★ 録画・宣言ブロックの同意をこのフォームで取らない（個別同意の約束）",
     overreach.length === 0,
     { overreach: overreach.map((i) => i.__title) }
+  );
+}
+
+// ============================================================
+// §6b ⚠️★★★ **任意**の二次利用同意（★ 2026-09-13 追加・研究者判断）
+// ============================================================
+//   ★ 守るべき約束は 1 つだけ: **「お断りいただけます」が本当であること。**
+//   ⚠️ 壊れ方は 3 つある —— ①必須になる ②必須の一括同意の *前* に置かれて
+//     「上記すべて」に飲み込まれる ③`.md` とフォームが食い違う。★ 3 つとも撃つ。
+{
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const items = ctx.__forms[O1_C].__items;
+  const optTitles = ctx.o1ConsentOptionalItemTitles_();
+
+  push("§6b ★ 任意項目が 1 つ以上定義されている", optTitles.length >= 1, { optTitles });
+
+  // --- ① 必須になっていないか ---
+  const opt = items.filter((i) => optTitles.indexOf(i.__title) >= 0);
+  push(
+    "§6b ★★★ 任意項目がフォームに載り、必須になっていない",
+    opt.length === optTitles.length && opt.every((i) => i.__required === false),
+    { found: opt.map((i) => ({ t: i.__title, required: i.__required })) }
+  );
+
+  // --- ② 必須の一括同意より「後」にあるか ---
+  //   ⚠️★★★ ここが本節の眼目である。★ 一括同意は逐語「**上記すべてに同意し**…」なので、
+  //     **前に置いた瞬間に「上記すべて」の一部になる** ＝ 断れなくなる。
+  const bulkTitle = ctx
+    .o1ConsentItemTitles_()
+    .filter((t) => t.indexOf("上記すべてに同意") >= 0)[0];
+  const bulkIdx = items.findIndex((i) => i.__title === bulkTitle);
+  const optIdx = items.findIndex((i) => optTitles.indexOf(i.__title) >= 0);
+  push(
+    "§6b ⚠️★★★ 任意項目は必須の一括同意より **後** にある（★ 上記すべてに飲み込まれない）",
+    !!bulkTitle && bulkIdx >= 0 && optIdx > bulkIdx,
+    { bulkTitle, bulkIdx, optIdx }
+  );
+
+  // --- 任意であることが画面にも書いてあるか（★ 見出し）---
+  const optSections = items.filter(
+    (i) => i.__type === "SECTION_HEADER" && i.__title.indexOf("任意") >= 0
+  );
+  push(
+    "§6b ★ 「ここから下は任意」と分かる見出しが 1 つだけある",
+    optSections.length === 1 &&
+      (optSections[0].__help || "").indexOf("お断り") >= 0 &&
+      (optSections[0].__help || "").indexOf("影響しません") >= 0,
+    { sections: optSections.map((i) => i.__title) }
+  );
+
+  // --- ③ `.md` とフォームが 1 対 1 か ---
+  //   ⚠️★★★ **「節が在る」では測れない。** ★ 約束の 1 行 1 行が両方にあることを見る
+  //     （＝ 片方だけ約束を削る事故を捕まえる）。
+  const doc = fs.readFileSync(CONSENT_DOC, "utf8");
+  const formText = opt.map((i) => i.__title + "\n" + (i.__help || "")).join("\n");
+  const PROMISES = [
+    "かたちにして見せる研究", // ★ 何に使うか
+    "お断りいただけます", // ★ 断れる
+    "参加・謝礼", // ★ 断っても不利益が無い
+    "記録する内容も 1 つも変わりません", // ★ 収集は変わらない
+    "採点", // ⚠️ 採点しない
+    "言い当てたり", // ⚠️ 性格・能力を断定しない
+    "復元できないように", // ★ 元へ戻せない
+    "数値そのものを添えて", // ★ 本人に数値を返さない（ADR-025）
+    "使わないでください", // ★ あとから撤回できる
+    ctx.O1_RETENTION_ENCRYPTED, // ★ 保管上限の範囲内
+  ];
+  const missingInDoc = PROMISES.filter((t) => doc.indexOf(t) < 0);
+  const missingInForm = PROMISES.filter((t) => formText.indexOf(t) < 0);
+  push("§6b ★★ 約束が consent-draft-o1.md に全部ある", missingInDoc.length === 0, {
+    missingInDoc,
+  });
+  push("§6b ★★ 同じ約束がフォーム側にも全部ある（★ 1 対 1）", missingInForm.length === 0, {
+    missingInForm,
+  });
+
+  // --- ⚠️ 固有名を被験者向け文言に出さない（ADR-020 D2 / glossary 禁止用語）---
+  //   ★ 「名前を与えた瞬間に、それは『人が持つ何か』として読まれる」。
+  const BANNED = [
+    "認知体力",
+    "作業持続プロファイル",
+    "負荷応答プロファイル",
+    "プロファイル",
+    "肖像",
+    "Portrait",
+    "消耗",
+    "補充",
+    "回復",
+  ];
+  const sectionText = optSections.map((i) => i.__title + (i.__help || "")).join("\n");
+  const bannedHits = BANNED.filter(
+    (w) => formText.indexOf(w) >= 0 || sectionText.indexOf(w) >= 0
+  );
+  push("§6b ⚠️★★★ 被験者向け文言に固有名・禁止語が無い", bannedHits.length === 0, {
+    bannedHits,
+  });
+}
+
+{
+  // --- ★ 回答取得の往復（⚠️ 既定は fail-closed）---
+  const ctx = makeReadyCtx();
+  const title = ctx.o1ConsentOptionalItemTitles_()[0];
+  const base = {
+    [ctx.Q_O1_NAME]: "山田",
+    [ctx.Q_O1_EMAIL]: "y@example.com",
+    [ctx.Q_O1_OS]: "Mac",
+  };
+  const yes = ctx.o1ConsentAnswers_(
+    makeResponse(Object.assign({}, base, { [title]: ["同意します（任意）"] })).response
+  );
+  const no = ctx.o1ConsentAnswers_(
+    makeResponse(Object.assign({}, base, { [title]: [] })).response
+  );
+  const absent = ctx.o1ConsentAnswers_(makeResponse(base).response);
+  push("§6b ★ チェックされたら secondaryUse = true", yes.secondaryUse === true, { yes });
+  push(
+    "§6b ⚠️★★★ チェックが無ければ false（★ 未回答を同意と読まない）",
+    no.secondaryUse === false,
+    { no }
+  );
+  push(
+    "§6b ⚠️★★★ 設問そのものが無い回答も false（★ migrate 前の回答・fail-closed）",
+    absent.secondaryUse === false,
+    { absent }
+  );
+  // ★ 既存 4 項目の取得を壊していないこと（⚠️ 陰性対照）。
+  push(
+    "§6b ★ 任意項目を足しても既存 4 項目の取得は壊れない",
+    yes.name === "山田" && yes.email === "y@example.com" && yes.os === "Mac",
+    { yes }
+  );
+}
+
+{
+  // --- ★ migrate: 任意項目も足す / 冪等 / 見出しを二重に作らない ---
+  const ctx = makeReadyCtx({ consentResponses: 5 });
+  const form = ctx.__forms[O1_C];
+  ctx.migrateO1ConsentForm();
+  const optTitles = ctx.o1ConsentOptionalItemTitles_();
+  const opt = form.__items.filter((i) => optTitles.indexOf(i.__title) >= 0);
+  push(
+    "§6b ★ migrate も任意項目を足し、必須にしない",
+    opt.length === optTitles.length && opt.every((i) => i.__required === false),
+    { opt: opt.map((i) => ({ t: i.__title, required: i.__required })) }
+  );
+  // ⚠️★★ 強い警告（取り直し）は**必須項目にだけ**出す。★ 任意に出すと過剰警告になる。
+  push(
+    "§6b ★ 任意の追加は「既定は使わない」と明示してログに出る",
+    ctx.__logs.some(
+      (l) =>
+        l.indexOf("任意") >= 0 &&
+        l.indexOf("fail-closed") >= 0 &&
+        l.indexOf("黙って同意とみなさない") >= 0
+    ),
+    { logs: ctx.__logs.filter((l) => l.indexOf("任意") >= 0) }
+  );
+  const before = form.__items.length;
+  const again = ctx.migrateO1ConsentForm();
+  push(
+    "§6b ★ 2 回目の migrate は任意項目も見出しも増やさない（冪等）",
+    again === 0 && form.__items.length === before,
+    { again, before, after: form.__items.length }
+  );
+  const optSections = form.__items.filter(
+    (i) => i.__type === "SECTION_HEADER" && i.__title.indexOf("任意") >= 0
+  );
+  push("§6b ⚠️ 見出しが 2 つに増えていない", optSections.length === 1, {
+    sections: optSections.length,
+  });
+  push("§6b ⚠️★★★ migrate は既存設問を 1 つも消さない", form.__deleted === 0, {
+    deleted: form.__deleted,
+  });
+}
+
+{
+  // --- ⚠️★★★ **文言の訂正が「配備済みフォーム」へ届くか**（★ code-reviewer HIGH・2026-09-13）---
+  //   ★ 約束の本体は設問の補足（help text）の中にある。⚠️ migrate が既存項目に当て直さないと、
+  //     **文言を直しても同意の正本には永久に届かない**（★ しかも検査は毎回まっさらから build するので
+  //     緑のまま ＝ **無音で食い違う**）。→ ★ **古い補足を持つ既存項目**を作って撃つ。
+  const ctx = makeReadyCtx({ consentResponses: 5 });
+  const form = ctx.__forms[O1_C];
+  const title = ctx.o1ConsentOptionalItemTitles_()[0];
+
+  // ★ 「配備済み」を再現する: 同じタイトルで、⚠️ **古い補足・必須トグル入り**の項目を置く。
+  const stale = form.addCheckboxItem();
+  stale.setTitle(title);
+  stale.setHelpText("★ 古い文言（★ 訂正前）");
+  stale.setRequired(true);
+
+  const added = ctx.migrateO1ConsentForm();
+  push(
+    "§6b ⚠️★★★ 既存の任意項目には **足さない**（★ 重複させない）",
+    form.__items.filter((i) => i.__title === title).length === 1,
+    { count: form.__items.filter((i) => i.__title === title).length, added }
+  );
+  push(
+    "§6b ⚠️★★★ migrate が既存の任意項目の補足を最新に当て直す（★ 訂正が正本へ届く）",
+    stale.__help === ctx.o1ConsentSecondaryUseHelp_() && stale.__help.indexOf("古い文言") < 0,
+    { help: String(stale.__help).slice(0, 40) }
+  );
+  push(
+    "§6b ⚠️★★★ migrate が必須トグルを **任意へ戻す**（★ 編集 UI で必須にされても戻る）",
+    stale.__required === false,
+    { required: stale.__required }
+  );
+  push(
+    "§6b ★ 当て直しはログに残る（⚠️ 黙って書き換えない）",
+    ctx.__logs.some((l) => l.indexOf("当て直しました") >= 0),
+    { logs: ctx.__logs.filter((l) => l.indexOf("当て直し") >= 0) }
+  );
+  // ⚠️ 当て直しは **追加ではない** ので、★ 冪等性（2 回目は 0）を汚さない。
+  push("§6b ★ 当て直しは追加件数に数えない（冪等性を汚さない）", ctx.migrateO1ConsentForm() === 0, {});
+}
+
+{
+  // --- ⚠️★★★ **migrate を跨いでも「任意」見出しの下に必須項目が入らない** ---
+  //   （★ security-checker M-1・2026-09-13。⚠️ **実測して再現した**挙動である）
+  //
+  //   ★ 再現手順（＝ 実運用そのもの）:
+  //     1) **旧コードで配備された**フォーム（任意項目がまだ無い）
+  //     2) migrate で任意ブロックを足す → ⚠️ **任意の見出しが最後のセクション見出しになる**
+  //     3) 将来 `o1ConsentItemTitles_()` に**必須**項目を足して再 migrate
+  //        → ⚠️ その必須項目は**さらに末尾**へ付く ＝ 「★（任意）…」見出しの配下に着地する
+  //   → ⚠️★★★ 被験者は逐語「**ここから下は任意です。お断りいただけます。**」を読んだうえで
+  //     **断れない項目**に同意することになる。
+  const ctx = makeReadyCtx();
+  const form = ctx.__forms[O1_C];
+
+  // 1) 旧コードで配備された状態を作る
+  const realOpt = ctx.o1ConsentOptionalItemTitles_;
+  ctx.o1ConsentOptionalItemTitles_ = function () {
+    return [];
+  };
+  ctx.buildO1ConsentForm();
+  ctx.o1ConsentOptionalItemTitles_ = realOpt;
+
+  // 2) 任意ブロックを足す
+  ctx.migrateO1ConsentForm();
+
+  // 3) 将来「必須」項目が 1 つ増えた世界で再 migrate
+  const origReq = ctx.o1ConsentItemTitles_;
+  const FUTURE = "★ 将来足した必須の同意項目。";
+  ctx.o1ConsentItemTitles_ = function () {
+    return origReq().concat([FUTURE]);
+  };
+  ctx.migrateO1ConsentForm();
+  ctx.o1ConsentItemTitles_ = origReq;
+
+  // ★ 各項目の「直上のセクション見出し」を出す。
+  const sectionOf = (title) => {
+    let sec = "";
+    for (const it of form.__items) {
+      if (it.__type === "SECTION_HEADER") sec = it.__title;
+      if (it.__title === title) return sec;
+    }
+    return null;
+  };
+  push(
+    "§6b ⚠️★★★ migrate を跨いでも、必須項目が『任意』見出しの配下に入らない",
+    sectionOf(FUTURE) !== ctx.O1_OPTIONAL_SECTION_TITLE,
+    { section: sectionOf(FUTURE) }
+  );
+  push(
+    "§6b ★ 任意項目は依然として『任意』見出しの配下にある",
+    sectionOf(ctx.o1ConsentOptionalItemTitles_()[0]) === ctx.O1_OPTIONAL_SECTION_TITLE,
+    { section: sectionOf(ctx.o1ConsentOptionalItemTitles_()[0]) }
+  );
+  push(
+    "§6b ⚠️★★★ 送り直しても設問は 1 つも消えていない",
+    form.__deleted === 0 &&
+      form.__items.filter((i) => i.__title === FUTURE).length === 1 &&
+      form.__items.filter((i) => i.__title === ctx.o1ConsentOptionalItemTitles_()[0]).length === 1,
+    { deleted: form.__deleted, items: form.__items.length }
+  );
+  push(
+    "§6b ★ 送り直しはログに残る（⚠️ 黙って並べ替えない）",
+    ctx.__logs.some((l) => l.indexOf("末尾へ送り直しました") >= 0),
+    { logs: ctx.__logs.filter((l) => l.indexOf("送り直し") >= 0) }
+  );
+  // ⚠️ もう 1 度 migrate しても**動かさない**（★ 毎回フォームを揺らさない）。
+  const movedBefore = form.__moved;
+  ctx.migrateO1ConsentForm();
+  push("§6b ★ 変化が無ければ並べ替えない（冪等）", form.__moved === movedBefore, {
+    before: movedBefore,
+    after: form.__moved,
+  });
+}
+
+{
+  // --- ⚠️★★★ 任意項目が 0 件なら **見出しも置かない** ---
+  //   ★ 2026-09-13 に自分のコードの欠陥として実測で発見した。
+  //   ⚠️ 中身ゼロの見出しを置くと、逐語「**ここから下は任意です。お断りいただけます**」が残り、
+  //     ★ Forms のセクションは次の見出しまでを支配するので
+  //     **その後ろに続く設問がその宣言の配下に入る**（＝ 嘘の表示）。
+  const ctx = makeReadyCtx();
+  const real = ctx.o1ConsentOptionalItemTitles_;
+  ctx.o1ConsentOptionalItemTitles_ = function () {
+    return [];
+  };
+  ctx.buildO1ConsentForm();
+  ctx.o1ConsentOptionalItemTitles_ = real;
+  const headers = ctx.__forms[O1_C].__items.filter(
+    (i) => i.__type === "SECTION_HEADER" && i.__title === ctx.O1_OPTIONAL_SECTION_TITLE
+  );
+  push("§6b ⚠️★★★ 任意項目が 0 件なら『任意』見出しを置かない", headers.length === 0, {
+    headers: headers.length,
+  });
+}
+
+{
+  // --- ★ build が作る並びは migrate に引っかき回されない（⚠️ 陰性対照）---
+  //   ★ build 後の並びでは任意ブロックは末尾ではない（ご記名・氏名…が続く）。
+  //     ⚠️ そこで無条件に「末尾へ送る」と、**被験者が見る順序が毎回変わる**。
+  const ctx = makeReadyCtx();
+  const form = ctx.__forms[O1_C];
+  ctx.buildO1ConsentForm();
+  const before = form.__items.map((i) => i.__title).join("|");
+  ctx.migrateO1ConsentForm();
+  push(
+    "§6b ★ build 直後のフォームは migrate で並べ替えられない（陰性対照）",
+    form.__items.map((i) => i.__title).join("|") === before && form.__moved === 0,
+    { moved: form.__moved }
+  );
+}
+
+{
+  // --- ⚠️★★★ 「空でなければ同意」の**前提**を固定する（★ code-reviewer MEDIUM・2026-09-13）---
+  //   ★ `o1ConsentAnswers_` は「値が空でなければ同意」と読む（⚠️ 選択肢の文言では判定しない）。
+  //   → ⚠️ **選択肢に否定の選択肢を足した瞬間、「同意しません」が `true` になる**（＝ 拒否が同意になる）。
+  //   ★ 値判定の設計は妥当なので、**前提のほうをここで固定する。**
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const optTitles = ctx.o1ConsentOptionalItemTitles_();
+  const opt = ctx.__forms[O1_C].__items.filter((i) => optTitles.indexOf(i.__title) >= 0);
+  const NEGATIVE = ["同意しません", "同意しない", "いいえ", "希望しません", "拒否"];
+  push(
+    "§6b ⚠️★★★ 任意項目の選択肢は 1 つだけ（★ 否定の選択肢を置かない）",
+    opt.length > 0 && opt.every((i) => i.__choices.length === 1),
+    { choices: opt.map((i) => i.__choices) }
+  );
+  push(
+    "§6b ⚠️★★★ その 1 つは肯定である（★ 否定を選ぶと同意として記録される経路を塞ぐ）",
+    opt.every(
+      (i) =>
+        i.__choices.length === 1 &&
+        i.__choices[0].indexOf("同意します") >= 0 &&
+        !NEGATIVE.some((w) => i.__choices[0].indexOf(w) >= 0)
+    ),
+    { choices: opt.map((i) => i.__choices) }
+  );
+}
+
+{
+  // --- ⚠️★★★ 登録ログに同意の印が残る（★ P-ID だけで引ける唯一の PII 無し経路）---
+  //   ★ 研究者判断 2026-09-13: 正本は O1-C の回答シート。⚠️ ただし回答シートの参加者ID欄は
+  //     **任意**（初参加者は空欄）なので、★ **P-ID からは引けない**。
+  //   → ⚠️ ここが潰れる（`***` になる / 付かない）と、利用可否の判定で**毎回 PII 表を開く**ことになる。
+  const optTitle = makeReadyCtx().o1ConsentOptionalItemTitles_()[0];
+  const run = (extra) => {
+    const ctx = makeReadyCtx();
+    ctx.onO1ConsentSubmit(
+      makeResponse(
+        Object.assign(
+          {
+            [ctx.Q_O1_NAME]: "新規",
+            [ctx.Q_O1_EMAIL]: "new@example.com",
+            [ctx.Q_O1_OS]: "Mac",
+          },
+          extra
+        )
+      )
+    );
+    return ctx.__sheets[MGMT_ID][MGMT_TAB].__grid.slice(2);
+  };
+  const yesRows = run({ [optTitle]: ["同意します（任意）"] });
+  const noRows = run({});
+  const noteOf = (rows) => (rows[0] ? String(rows[0][5]) : "");
+  push(
+    "§6b ⚠️★★★ 同意したら登録ログの備考に 2nd-use: yes が残る",
+    noteOf(yesRows).indexOf("2nd-use: yes") >= 0,
+    { note: noteOf(yesRows) }
+  );
+  push(
+    "§6b ⚠️★★★ 同意しなければ 2nd-use: no が残る（★ 空欄にしない）",
+    noteOf(noRows).indexOf("2nd-use: no") >= 0,
+    { note: noteOf(noRows) }
+  );
+  // ⚠️★★★ **許可リストに潰されていないこと**（★ `o1MgmtSafeCell_` は日本語を `***` にする）。
+  //   ★ 半角で書いた理由がこれである。⚠️ 潰れると「同意の有無が読めない行」が静かに増える。
+  push(
+    "§6b ⚠️★★★ 備考が *** に潰れていない（★ 許可リストを通る形である）",
+    noteOf(yesRows).indexOf("***") < 0 && noteOf(noRows).indexOf("***") < 0,
+    { yes: noteOf(yesRows), no: noteOf(noRows) }
+  );
+  // ⚠️ PII は依然として 1 文字も入らない。
+  const flat = yesRows.map((r) => r.join(" ")).join(" ");
+  push(
+    "§6b ⚠️★★★ 印を足しても登録ログに氏名・メールは入らない",
+    flat.indexOf("@") < 0 && flat.indexOf("新規") < 0,
+    { flat }
   );
 }
 
@@ -1303,9 +1736,12 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   push("§8 ★ 回答があっても migrate は設問を消さない", form.__deleted === 0, {
     deleted: form.__deleted,
   });
-  push("§8 migrate が同意項目を追加する", added === ctx.o1ConsentItemTitles_().length, {
-    added,
-  });
+  // ⚠️★ 期待値に **任意項目の件数を焼き込まない**（★ `+ 1` と書くと 2 本目を足した日に静かにずれる）。
+  push(
+    "§8 migrate が同意項目を追加する（★ 必須 ＋ 任意）",
+    added === ctx.o1ConsentItemTitles_().length + ctx.o1ConsentOptionalItemTitles_().length,
+    { added, must: ctx.o1ConsentItemTitles_().length, opt: ctx.o1ConsentOptionalItemTitles_().length }
+  );
   push(
     "§8 ★★ 追加時に「既存の回答者は同意していない」と警告する",
     ctx.__logs.some((l) => l.indexOf("同意していません") >= 0),
@@ -2610,9 +3046,10 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-if (cases.length < 215) {
+//   ★ 2026-09-13: §6b（任意の二次利用同意）を足して 256 件になったので下限を 250 へ。
+if (cases.length < 250) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（215 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（250 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }
