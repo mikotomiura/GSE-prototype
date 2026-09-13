@@ -127,7 +127,7 @@ D4（「絶対秒数で固定しない」）と衝突するため。
 ### ✅★★★ 解決（2026-09-13）—— **(A) が正しい。⚠️ ただし裁定できたのは「片方だけ」である**
 
 ★ **[P359]** Zou & Carl (2026)（★ 全文 24 頁・`IME` の出現 165 回）＋
-★★★ **[P360]** 公開生ログ（`ENJA15/P01_T1.xml`・10.2 MB を**実際に取得して grep**）の**二重確認**:
+★★★ **[P360]** 公開生ログ（`ENJA15/P01_T1.xml`・10.2 MB を**実際に取得して grep**。⚠️ **`P01` は *ENJA15 の被験者 ID*** であって GSE の被験者ではない）の**二重確認**:
 
 - 論文逐語: *"**Translog-II records these five keystrokes as "Type=IME" events and the actual text modification
   as insertion**"* ／ *"The attribute "**IMEtext**" records the sequence of keystrokes that were typed"*

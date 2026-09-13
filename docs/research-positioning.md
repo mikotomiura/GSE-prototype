@@ -758,7 +758,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッション＋3% �
     ★ **[P359]** Zou & Carl (2026) が逐語で
     *"**Translog-II records these five keystrokes as "Type=IME" events and the actual text modification as insertion**"*
     ／ *"The attribute "**IMEtext**" records the sequence of keystrokes that were typed"* と明記し、
-    ★★★ **[P360]** の公開生ログ（`ENJA15/P01_T1.xml`・10.2 MB を実測）に
+    ★★★ **[P360]** の公開生ログ（`ENJA15/P01_T1.xml`・10.2 MB を実測。⚠️ **`P01` は *ENJA15 の被験者 ID*** であって GSE の被験者ではない）に
     `Type="IME"` **1,355** ／ `IMEtext=` **192** ／ ⚠️ **`[Back]` 87（変換中の打ち直し）・`[ProcessKey]` 22（候補選択）・
     `[D0]/[D2]/[D4]`（候補番号）** が実在した ＝ **変換過程そのものが公開されている**
     （★ 論文が「終身刑」の例に引く `SHBackBackD4BAISpaceBackBackSHUUSINKEISpace` が生ログと**完全一致**）。
