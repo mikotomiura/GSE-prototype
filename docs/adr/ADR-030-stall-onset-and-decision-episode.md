@@ -724,8 +724,12 @@ criterion validity の問いが **自壊する**。
 ## Migration
 
 1. ⚠️★★★ **本 ADR は Proposed である。** ★ ADR-009 が Accepted になるまで Accepted にしない。
-2. ★ **次タスク**: `T0` / `T1a` / `T1b` / `T1d` / `Q` を `gse-replay` に実装する
-   （★ 縦切りの issue に分解 ＋ **`T1d` は本 ADR の完了に依存**するので直列化する）。
+2. ★ **次タスク**: **計器を変えずに作れる特徴群**を `gse-replay` に実装する ——
+   `T0` / `T1a` / `T1b` / `T1d` / `Q` ＋ ★★★ **`T1c` のうち `delete run` / `rewrite` / `再削除` /
+   `loop depth` / `局所 recurrence`**（⚠️ `undo` / `redo` 往復**だけ**を外す・D11）。
+   ★ 縦切りの issue に分解する。⚠️ **`T1d` は本 ADR の `stall onset` 定義に依存する**ので直列化する。
+   ⚠️★★★ **初版の「`T0`/`T1a`/`T1b`/`T1d`/`Q` の 5 本」は `T1c` を丸ごと外していた**
+   （★ `code-reviewer` MEDIUM 指摘で割り直した）。→ ★ **issue は 6 本目を足す前提で分解する。**
 3. ⚠️★★★ **実装は「`StuckTrigger` に enum を 1 つ足す」では済まない**（★ `code-reviewer` MEDIUM 指摘・実測）:
    - ⚠️ `segment_stuck_episodes(feats: &[FeatSnapshot], …)`（`metrics.rs:299`）は **`feat` 行を取る**
      —— ★ **D3 が値の使用を禁じた入力**である。
