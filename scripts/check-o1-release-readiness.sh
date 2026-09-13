@@ -98,7 +98,7 @@ else
   #   ⚠️ 承認マーカ `<!-- o1-esm-consent: approved -->` は**研究者が入れる**
   #     （★ dev が案を書いただけでは緑にしない ＝ 承認の代理をさせない）。
   if [ ! -f "$CAPS" ]; then
-    ng "収集仕様の自己記述が無い: $CAPS（★ 計器と同意の連動を判定できない）"
+    ng "収集仕様の自己記述が無い: ${CAPS}（★ 計器と同意の連動を判定できない）"
   elif grep -q '"activity_label"' "$CAPS"; then
     # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
     #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
@@ -744,7 +744,7 @@ selftest () {
   build; sed_i 's/^- 所属: \*\*.*\*\*$/- 所属: **（実施前に記入）**/' "$cons"; expect_red "同意文書に未記入" "同意文書の空欄"
   build; sed_i 's/^- 連絡先: .*/- 連絡先: **（未定）**/' "$cons";             expect_red "連絡先が埋まっていない" "連絡先"
   build; sed_i 's/^- 所属: \*\*.*\*\*$/- 所属: **/' "$cons";                  expect_red "所属が埋まっていない" "所属"
-  build; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
+  build; clear_pending; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
   build; rm -f "$fix/w/docs/o1-deletion-ledger.md";                            expect_red "削除台帳が無い" "削除台帳の欠落"
   build; sed_i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
   build; rm -f "$fix/w/Form_O1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
@@ -927,7 +927,9 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
 ' >> "$cons"
   expect_green "同意の ESM 追補が承認済み" "計器と同意の連動（承認あり）"
   # ★ 逆側: **計器がまだ無い版では追補を要求しない**（⚠️ 常に赤くする検査にしない）。
-  build; sed_i 's/"activity_label",//' "$fix/w/$CAPS"
+  # ⚠️ 1 か所を消すだけでは足りない（★ テスト側のメッセージにも語が出るため）。
+  #   → ★ 語を含む行を**全部**落として「計器がまだ無い版」を作る。
+  build; sed_i '/activity_label/d' "$fix/w/$CAPS"
   expect_green "ESM の計器がまだ無い" "計器と同意の連動（計器なし）"
 
   # ⚠️★★★ **O1 実装を含むタグを作ると緑に変わること**（2026-08-30 追加）。

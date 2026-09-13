@@ -437,6 +437,16 @@ pub enum LogEntryDto {
         category: ActivityCategoryDto,
         answered: bool,
         latency_ms: u64,
+        /// この回答が**指している区間**の開始 (ms)。
+        ///
+        /// ⚠️★★★ **区間指定削除がこの行を拾うために要る** (ADR-031 D6・2026-09-14 追加)。
+        /// `t` は**回答した時刻**であって、被験者が思い出している時間帯ではない。
+        /// → `t` だけで削除判定すると、「14:20-14:45 に会話していた」という申告を
+        /// 14:46 に記録した行が、**14:20-14:45 を削除しても端末に残る**
+        /// (＝ 同意文書の「お答えもいっしょに消えます」が破れる)。
+        recall_window_start_ms: u64,
+        /// この回答が指している区間の終了 (ms)。[`Self::ActivityLabel::recall_window_start_ms`] 参照。
+        recall_window_end_ms: u64,
         t: u64,
     },
 }

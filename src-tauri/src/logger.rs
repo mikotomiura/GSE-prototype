@@ -206,6 +206,10 @@ impl ActivityCategory {
     }
 
     /// ★ 6 択の全列挙（⚠️ **テストと UI がここを単一の出所にする**）。
+    ///
+    /// ⚠️★★★ **variant を足したら `exhaustive_marker` が非網羅で *コンパイルエラー* になる**
+    /// （2026-09-14・security-checker LOW）。★ 旧版は `[Self; 6]` の長さしか言わず、
+    /// **7 個目を足して `ALL` に入れ忘れると検査を素通り**した。
     pub const ALL: [Self; 6] = [
         Self::Deliberating,
         Self::Stuck,
@@ -214,6 +218,22 @@ impl ActivityCategory {
         Self::Away,
         Self::CannotAnswer,
     ];
+
+    /// ⚠️★★★ **`ALL` の網羅性をコンパイラに守らせるためだけの関数**。
+    ///
+    /// ★ variant を足すと本 `match` が非網羅になって**ビルドが落ちる**ので、
+    /// そのとき [`Self::ALL`] も一緒に直さざるを得ない。
+    #[cfg(test)]
+    fn exhaustive_marker(self) -> usize {
+        match self {
+            Self::Deliberating => 0,
+            Self::Stuck => 1,
+            Self::ExternalMaterial => 2,
+            Self::Conversation => 3,
+            Self::Away => 4,
+            Self::CannotAnswer => 5,
+        }
+    }
 }
 
 /// `realtime_label` の出所 (source)。`random_probe` = backend が割当てたランダムプローブ、
@@ -659,12 +679,15 @@ fn format_probe_assignment_line(
 /// `LogEntry::ActivityLabel` の NDJSON 1 行を生成する純粋関数 (ADR-031 D1 / D6)。
 ///
 /// ⚠️★★★ **時刻キーは `"t"`** —— ★ `redaction::line_timestamp` が区間指定削除で拾えるようにする。
+#[allow(clippy::too_many_arguments)]
 fn format_activity_label_line(
     timestamp: u64,
     probe_id: Option<&str>,
     category: ActivityCategory,
     answered: bool,
     latency_ms: u64,
+    recall_window_start_ms: u64,
+    recall_window_end_ms: u64,
 ) -> String {
     // ★ 安全網: 未回答なら「回答不能」でなければならない
     //   (⚠️ コンストラクタを経由しない直接構築を捕まえる)。
@@ -673,12 +696,14 @@ fn format_activity_label_line(
         "answered=false なのに category が cannot_answer ではない"
     );
     format!(
-        r#"{{"type":"activity_label","t":{},"probe_id":{},"category":"{}","answered":{},"latency_ms":{}}}"#,
+        r#"{{"type":"activity_label","t":{},"probe_id":{},"category":"{}","answered":{},"latency_ms":{},"recall_window_start_ms":{},"recall_window_end_ms":{}}}"#,
         timestamp,
         json_opt_str(probe_id),
         category.as_str(),
         answered,
         latency_ms,
+        recall_window_start_ms,
+        recall_window_end_ms,
     )
 }
 
@@ -1044,6 +1069,14 @@ pub enum LogEntry {
         /// (★ コンストラクタ [`LogEntry::activity_label_skipped`] が保証する)。
         answered: bool,
         latency_ms: u64,
+        /// ⚠️★★★ **この回答が *指している* 区間** (ADR-031 D6・2026-09-14 追加)。
+        ///
+        /// ★ `timestamp` は**回答した時刻**である。⚠️ 被験者が思い出しているのは
+        /// **その手前の区間**なので、`timestamp` だけで削除判定すると
+        /// 「14:20-14:45 に会話していた」という申告が **14:20-14:45 を消しても残る**。
+        /// → ★ `redaction::line_interval` がこの 2 つを見て**区間の交差**で落とす。
+        recall_window_start_ms: u64,
+        recall_window_end_ms: u64,
     },
     /// ⚠️★★★ **記録の一時停止 / 再開の遷移マーカー** (O1 / ADR-014 **D7-ii**)。
     ///
@@ -1215,11 +1248,16 @@ impl LogEntry {
     ///
     /// ⚠️★★★ **理由や自由記述の引数を足してはならない** (`data-privacy` ルール 7 条件 ii / iv)。
     /// ★ 削除経路 `delete_time_range` が**引数に理由を持たない**のと同じ作法である。
+    ///
+    /// ⚠️★★★ **`recall_window_*` は必須である** (2026-09-14・security-checker HIGH)。
+    /// ★ 無いと「その時間帯のお答えも消えます」という同意の約束が実装で保証できない。
     pub fn activity_label_answered(
         timestamp: u64,
         probe_id: Option<&str>,
         category: ActivityCategory,
         latency_ms: u64,
+        recall_window_start_ms: u64,
+        recall_window_end_ms: u64,
     ) -> Self {
         LogEntry::ActivityLabel {
             timestamp,
@@ -1227,6 +1265,8 @@ impl LogEntry {
             category,
             answered: true,
             latency_ms,
+            recall_window_start_ms,
+            recall_window_end_ms,
         }
     }
 
@@ -1234,15 +1274,23 @@ impl LogEntry {
     ///
     /// ★ **未回答は `CannotAnswer` で表す** —— ⚠️ 行そのものを書かないと
     /// 「**問いが出たのに答えなかった**」と「**問いが出なかった**」が区別できず、
-    /// ★ `.idea` §16 が O1 で測れと言っている **MNAR / 回答率**が出せなくなる
+    /// ★ `.idea` §16 が O1 で測れと言っている **回答率 / MNAR** が出せない
     /// (ADR-031 D7)。
-    pub fn activity_label_skipped(timestamp: u64, probe_id: Option<&str>, latency_ms: u64) -> Self {
+    pub fn activity_label_skipped(
+        timestamp: u64,
+        probe_id: Option<&str>,
+        latency_ms: u64,
+        recall_window_start_ms: u64,
+        recall_window_end_ms: u64,
+    ) -> Self {
         LogEntry::ActivityLabel {
             timestamp,
             probe_id: probe_id.map(str::to_string),
             category: ActivityCategory::CannotAnswer,
             answered: false,
             latency_ms,
+            recall_window_start_ms,
+            recall_window_end_ms,
         }
     }
 
@@ -2068,6 +2116,8 @@ impl SessionLogger {
                                 category,
                                 answered,
                                 latency_ms,
+                                recall_window_start_ms,
+                                recall_window_end_ms,
                             } => {
                                 let _ = writeln!(
                                     writer,
@@ -2077,7 +2127,9 @@ impl SessionLogger {
                                         probe_id.as_deref(),
                                         category,
                                         answered,
-                                        latency_ms
+                                        latency_ms,
+                                        recall_window_start_ms,
+                                        recall_window_end_ms
                                     ),
                                 );
                                 dirty = true;
@@ -3221,11 +3273,23 @@ mod tests {
             "category",
             "answered",
             "latency_ms",
+            // ⚠️★★★ **この回答が指している区間**（ADR-031 D6・区間指定削除がこれを見る）。
+            //   ★ 数値 2 つだけで、内容は 1 バイトも含まない。
+            "recall_window_start_ms",
+            "recall_window_end_ms",
         ]
         .into_iter()
         .collect();
         for cat in ActivityCategory::ALL {
-            let line = format_activity_label_line(1_700_000_000_000, Some("p-1"), cat, true, 120);
+            let line = format_activity_label_line(
+                1_700_000_000_000,
+                Some("p-1"),
+                cat,
+                true,
+                120,
+                1_699_999_970_000,
+                1_700_000_000_000,
+            );
             let v: serde_json::Value =
                 serde_json::from_str(&line).expect("activity_label は JSON でなければならない");
             let obj = v.as_object().expect("object");
@@ -3241,7 +3305,7 @@ mod tests {
             assert_eq!(obj["t"], serde_json::json!(1_700_000_000_000u64));
         }
         // ⚠️★★★ **自発の記録 (probe_id なし) でもキー集合は変わらない。**
-        let line = format_activity_label_line(1, None, ActivityCategory::Away, true, 0);
+        let line = format_activity_label_line(1, None, ActivityCategory::Away, true, 0, 0, 1);
         let v: serde_json::Value = serde_json::from_str(&line).unwrap();
         let got: BTreeSet<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
         assert_eq!(
@@ -3263,6 +3327,19 @@ mod tests {
         assert_eq!(ActivityCategory::parse(""), None);
         // ⚠️ 6 択であることそのものを固定する (★ 増やすには ADR-031 D3 条件 i の改訂が要る)。
         assert_eq!(ActivityCategory::ALL.len(), 6);
+        // ⚠️★★★ **`ALL` が全 variant を覆っていること** (2026-09-14・security-checker LOW)。
+        //   ★ `exhaustive_marker` は網羅 `match` なので、variant を足すと**コンパイルが落ちる**。
+        //   ★ ここで印が 0..6 を過不足なく埋めることを見て、`ALL` 側の抜けも捕まえる。
+        let mut marks: Vec<usize> = ActivityCategory::ALL
+            .iter()
+            .map(|c| c.exhaustive_marker())
+            .collect();
+        marks.sort_unstable();
+        assert_eq!(
+            marks,
+            (0..6).collect::<Vec<_>>(),
+            "ALL が全 variant を覆っていない"
+        );
 
         for st in [
             ProbeStratum::Random,
@@ -3281,7 +3358,7 @@ mod tests {
     /// 区別できず、`.idea` §16 が O1 で測れと言っている **回答率 / MNAR** が出せない。
     #[test]
     fn activity_label_skipped_is_recorded_as_cannot_answer() {
-        let e = LogEntry::activity_label_skipped(5, None, 0);
+        let e = LogEntry::activity_label_skipped(5, None, 0, 0, 5);
         match &e {
             LogEntry::ActivityLabel {
                 category,
@@ -3431,7 +3508,14 @@ mod tests {
                 paused: true,
             },
             // ⚠️★★★ ADR-031 D4: 新行種 `activity_label`。
-            LogEntry::activity_label_answered(1, Some("p-1"), ActivityCategory::Conversation, 10),
+            LogEntry::activity_label_answered(
+                1,
+                Some("p-1"),
+                ActivityCategory::Conversation,
+                10,
+                0,
+                1,
+            ),
             LogEntry::BlockEnd,
             LogEntry::Rotate {
                 new_path: PathBuf::from("x"),
@@ -4896,6 +4980,8 @@ mod tests {
             Some("p-1"),
             ActivityCategory::Conversation,
             120,
+            4200,
+            4500,
         ))
         .unwrap();
         tx.send(LogEntry::realtime_label_answered(
@@ -4950,7 +5036,7 @@ mod tests {
         ), "vignette_response 行が不正:\n{contents}");
         // ⚠️★★★ ADR-031 D6: **時刻キーは `"t"`**。★ `"ts"` にすると区間指定削除で消えない。
         assert!(contents.contains(
-            r#"{"type":"activity_label","t":4500,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120}"#
+            r#"{"type":"activity_label","t":4500,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120,"recall_window_start_ms":4200,"recall_window_end_ms":4500}"#
         ), "activity_label 行が不正 (★ 時刻キーが t でないと区間指定削除で消えない):
 {contents}");
     }

@@ -183,6 +183,18 @@ pub fn self_marker_allowed(o1_mode: bool) -> bool {
 /// ★ 対象は `user_label` / `realtime_label` / `review_marker` / `vignette_response` ——
 /// ⚠️ **どれも O1 の同意文書が列挙していない行型**である。
 ///
+/// ## ⚠️★★★ `activity_label` はここに**入れない**（2026-09-14・security-checker MEDIUM）
+///
+/// ★ 本関数は「**同意文書が列挙していないから O1 では通さない**」という門である。
+/// ⚠️ ところが `activity_label`（6 択 ESM）は **O1 で取ると研究者が決めた**ものなので、
+/// ★ 同じ門に入れると「通す」側へ倒すことになり、**門の意味が反転する**。
+///
+/// → ★★★ **代わりに [`activity_label_allowed`] を別に置く。**
+/// ⚠️ そちらは `o1_mode` **だけでは通さない** —— ★ **同意の承認**と対にする
+/// （`check-o1-release-readiness.sh` の承認マーカと 1 対 1）。
+/// ★ いまは producer が無いので fail-closed だが、⚠️ **M5 で「O1 だから通す」と
+/// 書かれると、同意承認と結びつかない穴になる。**
+///
 /// ## ⚠️ なぜ 1 つにまとめるのか
 ///
 /// ★ 2026-08-30 に `record_self_marker` **だけ**に門を置いたが、
@@ -210,6 +222,28 @@ pub fn self_marker_allowed(o1_mode: bool) -> bool {
 /// ★ 実際に 2026-08-30 の事故がその形だった（ホットキーは塞いだのにボタンが残った）。
 pub fn label_row_allowed(o1_mode: bool) -> bool {
     !o1_mode
+}
+
+/// ⚠️★★★ **6 択 ESM（`activity_label`）を記録してよいか**（純関数・2026-09-14）。
+///
+/// ★ ADR-031 **D1 / D5 保証 3**。⚠️ `o1_mode` だけでは通さない ——
+/// **同意の ESM 追補が承認されていること**を対にする。
+///
+/// ## ⚠️ なぜ `label_row_allowed` と分けるのか
+///
+/// ★ あちらは「**同意が列挙していないから O1 では通さない**」（`!o1_mode`）。
+/// ⚠️ `activity_label` は **O1 で取ると決めたもの**なので、同じ式に混ぜると
+/// **門の意味が反転する**（★ 通す側へ倒れる）。
+///
+/// ## ⚠️★★★ 呼び出し側へ（★ ADR-031 M5）
+///
+/// ★ `consent_approved` は**ビルド時の定数や `true` 直書きにしない**。
+/// ⚠️ 承認は `consent-draft-o1.md` の `<!-- o1-esm-consent: approved -->` と
+/// `Form_O1` の同意項目の**両方**で成立する運用上の事実であり、
+/// ★ 配布物のゲート（`scripts/check-o1-release-readiness.sh`）が門である。
+/// → ★ **M5 では「O1 だから通す」と書かないこと。**
+pub fn activity_label_allowed(o1_mode: bool, consent_approved: bool) -> bool {
+    o1_mode && consent_approved
 }
 
 /// ⚠️★★★ **いま記録しているか** (純関数)。稼働中インジケータと `liveness` の両方が使う。
@@ -717,6 +751,27 @@ pub fn detect_from_env() -> Option<O1Source> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ⚠️★★★ **6 択 ESM は「O1 だから」では通らない**（ADR-031 D1 / D5 保証 3）。
+    ///
+    /// ★ 4 通りすべてを見る（⚠️ 片側だけ見ると「常に false」でも緑になる）。
+    #[test]
+    fn activity_label_needs_both_o1_and_consent() {
+        assert!(
+            activity_label_allowed(true, true),
+            "★ O1 かつ承認済みなら通る"
+        );
+        assert!(
+            !activity_label_allowed(true, false),
+            "⚠️★★★ 承認前は通さない（★ 被験者向け文書は契約）"
+        );
+        assert!(
+            !activity_label_allowed(false, true),
+            "⚠️ O1 でなければ通さない"
+        );
+        assert!(!activity_label_allowed(false, false));
+    }
+
     use std::path::PathBuf;
 
     // --- A: 引き金 ---------------------------------------------------------

@@ -112,8 +112,8 @@ pub struct RedactionSummary {
 pub fn line_timestamp(line: &str) -> Option<u64> {
     let v: serde_json::Value = serde_json::from_str(line).ok()?;
     let obj = v.as_object()?;
-    // ⚠️★★★ **`meta` 行は消さない**（上記 R-12）。★ 行種で弾くので、将来 `meta` に
-    //   時刻フィールドが増えても**自動的に守られる**。
+    // ⚠️★★★ **`meta` / `session_meta` 行は消さない**（上記 R-12 / ADR-031 D6 決定 3）。
+    //   ★ 行種で弾くので、将来これらに時刻フィールドが増えても**自動的に守られる**。
     let line_type = obj.get("type").and_then(serde_json::Value::as_str);
     if matches!(line_type, Some("meta") | Some("session_meta")) {
         return None;
@@ -125,6 +125,55 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
         _ => "t",
     };
     obj.get(key).and_then(serde_json::Value::as_u64)
+}
+
+/// 行が**占める時間の区間** `[start, end]`（★ 点しか持たない行は `start == end`）。
+///
+/// ## ⚠️★★★ なぜ「点」では足りないのか（2026-09-14・security-checker HIGH）
+///
+/// ★ 自己申告の行は **「答えた時刻」と「答えが指している時間帯」が違う**。
+/// ⚠️ 点（＝ 答えた時刻）だけで削除判定すると、次が起きる:
+///
+/// > ★ 会話が **14:20–14:45**。復帰を引き金にプローブが **14:46** に出て、
+/// > 被験者が「会話」と答える。⚠️ 第三者の求めで被験者が **14:20–14:45 を削除**しても、
+/// > 回答の行（`t` ＝ 14:46）は**残る**。
+/// > → ★★★ **削除した区間に第三者が同席していた事実が端末と提出物に残る。**
+///
+/// ⚠️ これは同意文書の逐語「★ **その時間帯のお答えは消えます**」を破る
+/// （＝ ADR-031 **D5 保証 2** が実体として成立しない）。
+///
+/// ## ★ どの行が区間を持つか
+///
+/// | 行種 | 区間 |
+/// |---|---|
+/// | `activity_label` | `recall_window_start_ms` 〜 `recall_window_end_ms` ∪ `t` |
+/// | `realtime_label` | `analysis_window_start_ms` 〜 `analysis_window_end_ms` ∪ `ts` |
+/// | それ以外 | 点（[`line_timestamp`]） |
+/// | `meta` / `session_meta` | **`None`（常に残す）** |
+///
+/// ⚠️★★★ **区間は「答えた時刻」も含める**（和集合）。★ 回答そのものの時刻を消す
+/// 要求（「さっきの 5 分を消して」）でも落ちるようにするためである。
+///
+/// ⚠️ **`(0, 0)` の窓は「未設定」とみなして無視する** —— ★ skip 応答や旧ログで
+/// 窓が 0 のことがあり、素直に和集合を取ると **epoch から回答時刻までの全区間**になって
+/// **無関係な削除要求でも落ちてしまう**（★ 実測で踏んだ）。
+pub fn line_interval(line: &str) -> Option<(u64, u64)> {
+    let point = line_timestamp(line)?;
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    let obj = v.as_object()?;
+    let num = |k: &str| obj.get(k).and_then(serde_json::Value::as_u64);
+    let window = match obj.get("type").and_then(serde_json::Value::as_str) {
+        Some("activity_label") => num("recall_window_start_ms").zip(num("recall_window_end_ms")),
+        Some("realtime_label") => {
+            num("analysis_window_start_ms").zip(num("analysis_window_end_ms"))
+        }
+        _ => None,
+    };
+    Some(match window {
+        // ⚠️ 壊れた窓（start > end）と未設定の窓（0,0）は**点に倒す**（★ 黙って広げない）。
+        Some((ws, we)) if ws <= we && we > 0 => (point.min(ws), point.max(we)),
+        _ => (point, point),
+    })
 }
 
 /// `[from_ms, to_ms]`（★ **両端を含む**）に入る行を落とし、残す行だけを返す。
@@ -143,8 +192,10 @@ pub fn retain_outside_range<'a>(
     let mut removed = 0usize;
     for line in lines {
         if from_ms <= to_ms {
-            if let Some(t) = line_timestamp(line) {
-                if t >= from_ms && t <= to_ms {
+            // ★ **区間が交差したら落とす**（ADR-031 D6・2026-09-14）。
+            //   ⚠️ 点の行は `start == end` なので、従来どおり「点が範囲内か」になる。
+            if let Some((start, end)) = line_interval(line) {
+                if start <= to_ms && end >= from_ms {
                     removed += 1;
                     continue;
                 }
@@ -581,10 +632,68 @@ mod tests {
         // ★ 新しい監査 criterion は `"t"` を使う (ADR-031 D6 決定 1)。
         assert_eq!(
             line_timestamp(
-                r#"{"type":"activity_label","t":5000,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120}"#
+                r#"{"type":"activity_label","t":5000,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120,"recall_window_start_ms":4700,"recall_window_end_ms":5000}"#
             ),
             Some(5000)
         );
+    }
+
+    /// ⚠️★★★ **「会話の *区間* を消せば、その申告も消える」** (ADR-031 **D5 保証 2**)。
+    ///
+    /// ## ★ これは同意文書の逐語に対応する回帰である
+    ///
+    /// 逐語（`consent-draft-o1.md` §4 追補）: 「★ **お答えも上の 3 番（時間帯を指定して消す）の
+    /// 対象です。★ その時間帯のお答えは消えます。**」
+    ///
+    /// ⚠️★★★ **2026-09-14 まで、これは実装で保証されていなかった**（security-checker HIGH）。
+    /// ★ `activity_label` の `t` は**回答した時刻**なので、会話が 14:20–14:45 で回答が 14:46 だと、
+    /// **14:20–14:45 を削除しても行が残った**。
+    #[test]
+    fn deleting_the_conversation_window_also_removes_the_self_report_about_it() {
+        // ★ 会話は 14:20–14:45、プローブは復帰後の 14:46 に発火して回答された、という配置。
+        const CONV_START: u64 = 1_700_000_000_000; // 14:20 相当
+        const CONV_END: u64 = CONV_START + 25 * 60_000; // 14:45
+        const ANSWERED_AT: u64 = CONV_END + 60_000; // 14:46
+
+        let label = format!(
+            r#"{{"type":"activity_label","t":{ANSWERED_AT},"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":900,"recall_window_start_ms":{CONV_START},"recall_window_end_ms":{CONV_END}}}"#
+        );
+        let unrelated =
+            format!(r#"{{"type":"key","t":{ANSWERED_AT},"category":"alphabetic","press":true}}"#);
+
+        // ★ 被験者は **会話の時間帯だけ**を指定する（⚠️ 回答時刻は範囲の外である）。
+        let (kept, removed) =
+            retain_outside_range([label.as_str(), unrelated.as_str()], CONV_START, CONV_END);
+        assert_eq!(removed, 1, "★ 会話の申告が落ちていない: {kept:?}");
+        assert!(
+            !kept.iter().any(|l| l.contains("conversation")),
+            "⚠️★★★ 第三者の在席を示す申告が端末に残った: {kept:?}"
+        );
+        // ⚠️★★★ **対照**: 同じ範囲でも、範囲外の打鍵行は残る（★ 過剰削除をしていない）。
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert!(kept[0].contains(r#""type":"key""#), "{kept:?}");
+
+        // ★ 逆向き: **回答時刻だけ**を指定しても落ちる（★ 和集合であること）。
+        let (kept2, removed2) =
+            retain_outside_range([label.as_str()], ANSWERED_AT - 1_000, ANSWERED_AT + 1_000);
+        assert_eq!(removed2, 1, "回答時刻を指定しても落ちること: {kept2:?}");
+
+        // ⚠️★★★ **無関係な時間帯では落ちない**（★ 検査が「常に落ちる」空回りでないこと）。
+        let (kept3, removed3) =
+            retain_outside_range([label.as_str()], CONV_START - 600_000, CONV_START - 60_000);
+        assert_eq!(removed3, 0, "無関係な範囲で落ちてはならない: {kept3:?}");
+    }
+
+    /// ★ `realtime_label` も**分析窓**で落ちる（★ 同じ穴が主データ側にもあった）。
+    #[test]
+    fn realtime_label_is_removed_when_its_analysis_window_is_deleted() {
+        let line = r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":500,"analysis_window_start_ms":1700000000000,"analysis_window_end_ms":1700000030000,"ts":1700000090000}"#;
+        // ★ 分析窓だけを指定する（⚠️ `ts` は範囲外）。
+        let (kept, removed) = retain_outside_range([line], 1_700_000_000_000, 1_700_000_030_000);
+        assert_eq!(removed, 1, "分析窓で落ちない: {kept:?}");
+        // ⚠️ 無関係な範囲では落ちないこと（★ 空回り防止）。
+        let (kept2, removed2) = retain_outside_range([line], 1, 2);
+        assert_eq!(removed2, 0, "{kept2:?}");
     }
 
     /// ⚠️★★★ **`session_meta` は消さない** (ADR-031 D6 決定 3)。
@@ -615,7 +724,7 @@ mod tests {
                 r#"{"type":"session_meta","track":"o1","task_kind":"writing","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":1100}"#,
                 r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#,
                 r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":1,"analysis_window_start_ms":0,"analysis_window_end_ms":0,"ts":3000}"#,
-                r#"{"type":"activity_label","t":3100,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120}"#,
+                r#"{"type":"activity_label","t":3100,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120,"recall_window_start_ms":2800,"recall_window_end_ms":3100}"#,
                 r#"{"type":"key","t":8000,"category":"alphabetic","press":true}"#,
                 r#"{"type":"meta","session_end":9000}"#,
             ],
