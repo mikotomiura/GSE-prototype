@@ -212,7 +212,7 @@ ls docs/adr/ | tail -4      # ★ ADR-029 まで在ることを確認する（�
 
 | # | やること | ⚠️ 注意 |
 |---|---|---|
-| **1** | ⚠️★★★ **deny リストを worktree へ入れる経路を作る** | ★ `loop-run.sh`（または `loop-spawn.sh`）が worktree 作成後に `.claude/settings.local.json` を書く形にする。⚠️ **main checkout の `settings.json` には入れない**（★ 対話セッションの `git push` を塞ぐ） |
+| **1** | ⚠️★★★ **deny リストを worktree へ入れる経路を作る**（★ 下記 §8c に実体を置いた） | ★ `loop-run.sh`（または `loop-spawn.sh`）が worktree 作成後に `.claude/settings.local.json` を書く形にする。⚠️ **main checkout の `settings.json` には入れない**（★ 対話セッションの `git push` を塞ぐ） |
 | **2** | `_loop-config.json` を `_template/loop-config.json` から写す | ⚠️★★★ **`loop-config.README.md` を必ず読む**（★ 落とし穴集）。★ `mode: "C"` ／ ⚠️ **`budget.parallel: 1`**（初回）／ `verify` は **GSE の実体へ pin**（`test` = `cargo test --manifest-path src-tauri/Cargo.toml --workspace` 等。⚠️ **テンプレの `pytest -q` をそのまま使わない**）／ `events_path` は **main checkout の絶対パス** |
 | **3** | ⚠️ **`acceptance.sh` を書く**（★ 基準 4 / `loop-run.sh` の acceptance 段） | ⚠️★★★ **`cargo test` が無条件に緑になる issue では AC 未充足のまま `issue_done` になる**（★ `loop-run.sh` のコメント逐語）。→ ★ **新特徴が実際に出力に出ていることを検査する** |
 | **4** | ★ **最も安い issue 1 本を `parallel=1` で回して基盤を検証する** | ★ SSOT 逐語。⚠️ **`--dry-run` では権限・cwd 境界・hook 発火・契約の二重定義が観測できない**（★ 実測で 2 回空振り） |
@@ -232,6 +232,56 @@ ls docs/adr/ | tail -4      # ★ ADR-029 まで在ることを確認する（�
 | Q | capability / missingness reason / logger・IME health / observability mask | ⚠️★★★ **状態特徴にしない**（`survey:194`「**欠測を 0 として入力せず、推論の抑制・abstention に使う**」） |
 
 ⚠️★★★ **T1d は タスク 1（`stall onset` の操作的定義）の完了後でないと AC が書けない** —— ★ `## Dependencies` で直列化する。
+
+## §8c ★★★ 着手順 1 の実体 —— **worktree へ書く deny リスト**（★ 再導出しないこと）
+
+⚠️★★★ **これは研究者判断（2026-09-13）で「新しいセッションで Loop 基盤整備と同時にやる」と決めた作業である。**
+★ 2026-09-13 セッションはコンテキストの都合で**実装せず、材料だけ確定した**。
+
+### ★ 書く内容（★ `loop-config.README.md` の逐語リストに `gh pr merge` を含む 7 件）
+
+★ worktree 作成直後に `<worktree>/.claude/settings.local.json` を**新規作成**する:
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git rebase:*)",
+      "Bash(sudo:*)",
+      "Bash(rm -rf:*)",
+      "Bash(chmod -R:*)"
+    ]
+  }
+}
+```
+
+### ★ なぜ worktree 側なのか（⚠️ main checkout に入れない理由）
+
+| # | 事実（★ 2026-09-13 実測） |
+|---|---|
+| 1 | ★ `.claude/settings.local.json` は **`.gitignore:46` で ignore 済み** → **worktree ごとに別物にできる** |
+| 2 | ★ `.claude/` 自体は **git 追跡（79 ファイル）** → worktree には `settings.json` / agents / commands / skills が**自動で複製される** |
+| 3 | ⚠️★★★ **main checkout の `.claude/settings.json` に入れると、対話セッションでも `git push` が塞がれる** |
+| 4 | ★ `loop-config.README.md` 逐語「★ `.claude/settings.json` の `permissions.deny` を**必ず併用する**（`deny` は allow と frontmatter の**両方に優先**）」 |
+| 5 | ⚠️ **現状の `.claude/settings.json` は `chmod -R` / `sudo` の 2 件だけ**（= 必須 7 件のうち **5 件欠け**） |
+| 6 | ⚠️★★★ **それを worktree へ入れる仕組みが無い**（`loop-spawn.sh` / `loop-run.sh` を grep して `settings` は **0 件**） |
+
+### ⚠️ 実装時の注意
+
+1. ⚠️ **既存の `settings.local.json` を上書きしない** —— worktree は新規作成なので通常は無いが、
+   ★ **在ったら `deny` 配列へ**マージする（⚠️ 他のキーを消さない）。
+2. ⚠️★★★ **検査を一緒に置く**（★ `verify-before-claiming` ルール 6）——
+   ★ worktree 作成後に `deny` が 7 件入っていることを確認する段を入れ、
+   ⚠️ **3 状態（在る / 無い / 壊れている）で試す**（ルール 5b）。
+3. ⚠️ **`.steering/` に独立した作業記録を切る**（★ `/start-task` から。Loop 基盤への変更なので）。
+4. ★ **`allowed_tools` は触らない** —— ⚠️ テンプレートの既定リストは
+   「**最初の 2 回の無人実行がコード 0 行のまま終了した（約 $11）**」を受けて修正済みである。
+   ⚠️★★★ **`null` に戻さない。**
+5. ⚠️ **`deny` は「完全な境界」ではない** —— ★ README 逐語
+   「許可を 1 つ間違えるだけで全体が迂回できる。**実質的な境界は worktree 隔離と人間の merge ゲート**」。
 
 ## §9 ★ 併走している未了事項（⚠️ このセッションでは触らない）
 
