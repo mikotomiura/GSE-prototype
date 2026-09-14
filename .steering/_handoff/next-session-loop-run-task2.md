@@ -1,5 +1,11 @@
 # 次セッション開始プロンプト — **タスク 2 の Loop 実行（モード C の初回）**
 
+> ⚠️★★★ **上書き表示（2026-09-15）**: issue 001 は実行済み（6 attempt すべて acceptance_fail →
+> abandoned・cost $3.53 / 7.79M tokens）。worker は `features.rs` に pause 閾値の named constant が
+> 無いことを理由に Stop Conditions 該当と判断して停止した。★ **後続は
+> `.steering/_handoff/next-session-issue001-pause-const-arbitration.md` を参照する**
+> （本ファイルは §0〜§2 の罠の記録として引き続き有効・§3 以降の実行手順は消化済み）。
+
 > ★ **本ファイルは詳細版（罠・復旧表・宿題）。** セッション冒頭に**そのまま打ち込む短い本文**は
 > `next-session-loop-run-task2-prompt.md` にある（2026-09-14 追加）。
 > ★ 併せて: **2z は実装完了・コミット済み（`56d4e58`）であり、再実施しない。**

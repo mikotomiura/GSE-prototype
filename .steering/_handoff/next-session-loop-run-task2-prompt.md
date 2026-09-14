@@ -1,5 +1,10 @@
 # 新セッション冒頭に**そのまま打ち込む**プロンプト — タスク 2 の Loop 実行（モード C 初回・Sonnet）
 
+> ⚠️★★★ **上書き表示（2026-09-15）**: このプロンプトは**実行済み**。issue 001 は
+> 6 attempt すべて acceptance_fail → abandoned（cost $3.53）で、pause 閾値問題の裁定待ちに
+> なっている。★ **以後は `.steering/_handoff/next-session-issue001-pause-const-arbitration-prompt.md`
+> を参照する**（本ファイルは経緯の記録として残す）。
+
 > 作成: 2026-09-14 / ★ **下のコードブロックの中身をコピーして、新セッションの最初の発話に貼る。**
 > ⚠️ このファイル自体は一次資料ではない。★ 詳細な罠と復旧手順は
 > `.steering/_handoff/next-session-loop-run-task2.md`（150 行）にある。
