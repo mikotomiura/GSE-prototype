@@ -1,5 +1,10 @@
 # 次セッション開始プロンプト — **タスク 2 の Loop 実行（モード C の初回）**
 
+> ★ **本ファイルは詳細版（罠・復旧表・宿題）。** セッション冒頭に**そのまま打ち込む短い本文**は
+> `next-session-loop-run-task2-prompt.md` にある（2026-09-14 追加）。
+> ★ 併せて: **2z は実装完了・コミット済み（`56d4e58`）であり、再実施しない。**
+> ⚠️ 残っているのは実地検証（「注入 ≠ 発効」）で、それは §3-1 の 001 が担う。
+>
 > 作成: 2026-09-14 / ⚠️★★★ **このメモを一次資料にしない。**
 > ★ 一次は `.steering/20260914-mhd-feature-offline-tiers/_issue-plan.md`（**DAG / 交差表 / 実行前の前提**）／
 > `issues/00X.md`（**AC と Stop Conditions の SSOT**）／ `docs/loop-engineering.md`（Loop の単一 SSOT）／
