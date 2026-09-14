@@ -25,6 +25,7 @@
 | **`capability matrix`**（ADR-032 **M7**） | ★ 研究者判断 2026-09-14: 「**実装 issue だけ Loop、matrix は対話で行う**」（→ `decisions.md` 判断 4）。⚠️ 中身は一次資料の読み込みと裁定で、`acceptance.sh` は「行があること」しか検査できない（＝ 客観に見えて無意味な緑）。★ 範囲は `decisions.md` 判断 5 |
 | ⚠️ `undo` / `redo`・`key.mod` の実装（ADR-032 **M5**） | ★ **ADR-032 が Accepted になり、同意 §3 の改訂（M4）が通ってから**。⚠️ 研究者承認待ち |
 | ⚠️ `T2` / `T3` | ★ ADR-032 **D3** で `T2` は解かない / **D4** で `T3` は不採 |
+| ★ **pause 閾値の `pub const` 命名**（`features.rs::PAUSE_THRESHOLD_MS`） | ⚠️★★★ **2026-09-15 追加**。★ `decisions.md` **判断 7** の裁定に伴う 5 行の命名リファクタ。⚠️ **issue にしない** —— 基準 1 逐語「**層別の横切り分割は禁止**」に反し、§8 の自己検査「AC が書けない『リファクタするだけ』の issue を作っていないか」を自分で破るため。★ **裁定セッション（Opus）が直接実装し、pin 済み verify 3 本の緑を実測で確認した**（→ 判断 7 の検証表） |
 
 ## 2. 依存 DAG（★ 循環なし）
 
@@ -69,11 +70,15 @@
 → ★ 001 を**最初に単独で**回し、基盤（権限 / cwd 境界 / hook 発火 / 契約の二重定義）を検証する。
 ⚠️ SSOT 逐語「**`--dry-run` では権限・cwd 境界・hook 発火・契約の二重定義が観測できない**（実測で 2 回空振り）」。
 
-## 5. ベースライン（★ 2026-09-14 実測・⚠️ 予測ではない）
+## 5. ベースライン（★ 2026-09-15 再実測・⚠️ 予測ではない）
+
+> ⚠️★★★ **2026-09-15 に更新した。** ★ `decisions.md` **判断 7**（pause 閾値の SSOT 命名）で
+> `features.rs` に `pub const PAUSE_THRESHOLD_MS` ＋ 回帰テスト 1 本を足したため、
+> **test 本数が 670 → 671 に増えている**（⚠️ ゴールデンは**再生成していない**・`HMM_VERSION` は `0.5.0` のまま）。
 
 | pin 済み verify | exit |
 |---|---|
-| `cargo test --manifest-path src-tauri/Cargo.toml --workspace` | **0**（670 passed / 0 failed） |
+| `cargo test --manifest-path src-tauri/Cargo.toml --workspace` | **0**（**671** passed / 0 failed） |
 | `cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json` | **0**（`OK: 15 snapshots match`） |
 | `cargo check --manifest-path src-tauri/Cargo.toml --workspace --all-targets` | **0** |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings` | **0** |

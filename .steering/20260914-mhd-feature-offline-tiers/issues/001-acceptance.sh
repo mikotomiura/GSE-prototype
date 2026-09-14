@@ -27,12 +27,28 @@ printf '%s' "$out" | jq -e '
 printf '%s' "$out" | jq -e '[.[].activity.keys] | add > 0' >/dev/null 2>&1 \
   || fail "activity.keys の総和が 0（★ 出力が退化している）"
 
-# AC6: ⚠️ 新しい数値定数を導入していないこと
+# AC6: ⚠️ 新しい数値定数を導入していないこと ＋ ★ SSOT を実際に参照していること
 #   ★ ADR-030 D3 逐語「新しい定数を作らず、既存パラメータを対称に再利用する」。
-#   ★ `const NAME: ... = <数値>` の宣言が activity.rs に無いことを見る（★ use による参照は可）。
+#   ⚠️★★★ 2026-09-15 に 3 本へ強化した（`decisions.md` 判断 7）——
+#     初版は `const NAME: ... = <数値>` の**宣言**しか見ておらず、
+#     ★ `>= 2000` と**直書き**されたら緑のまま通る穴があった。
+FEATDIR="src/analysis/feat_offline"
+
+# (1) 否定形: 数値定数の宣言が activity.rs に無いこと（★ 初版どおりの範囲）
 if grep -nE '^[[:space:]]*(pub )?const [A-Z_]+[[:space:]]*:[^=]*=[[:space:]]*[0-9]' \
-     src/analysis/feat_offline/activity.rs >/dev/null 2>&1; then
+     "$FEATDIR/activity.rs" >/dev/null 2>&1; then
   fail "activity.rs に新しい数値定数が宣言されている（★ features.rs の既存定数を use すること）"
+fi
+
+# (2) 肯定形: pause 閾値の SSOT を実際に参照していること
+#   ⚠️ 「新しい定数が無い」だけでは「閾値を直書きした」と区別できない。
+grep -rq 'PAUSE_THRESHOLD_MS' "$FEATDIR" \
+  || fail "$FEATDIR が features.rs::PAUSE_THRESHOLD_MS を参照していない（★ pause 閾値の SSOT）"
+
+# (3) 直書きの禁止: 閾値としての 2000 リテラルが残っていないこと
+#   ★ 比較の形だけを見る（⚠️ テストの合成タイムスタンプ `key_at(2000)` を誤検出しないため）。
+if grep -rnE '(>=|<=|<|>|==|!=)[[:space:]]*2_?000([^0-9]|$)' "$FEATDIR" >/dev/null 2>&1; then
+  fail "$FEATDIR に閾値として直書きされた 2000 がある（★ PAUSE_THRESHOLD_MS を使うこと）"
 fi
 
 # AC8: ★ pause / net の抽出が mod.rs の共有ヘルパとして公開されていること
