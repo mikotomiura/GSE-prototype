@@ -1,5 +1,11 @@
 # 次セッション開始プロンプト — **2z（Loop 基盤整備）＋ タスク 2 の issue 分解**
 
+> ⚠️★★★ **このメモは 2026-09-14 に消化済みである。** ★ 前半（2z）も後半（issue 分解）も完了した。
+> → ★ **次に読むのは `.steering/_handoff/next-session-loop-run-task2.md`**（タスク 2 の Loop 実行）。
+> ★ 成果物: `.steering/20260914-loop-foundation-worktree-deny/` ／
+> `.steering/20260914-mhd-feature-offline-tiers/`。
+> ⚠️ 以下は**当時の指示のまま**残してある（★ 経緯を読むためのもので、指示としては失効している）。
+
 > 作成: 2026-09-14 / ⚠️★★★ **このメモを一次資料にしない。**
 > ★ 一次は `docs/loop-engineering.md`（**用語 / Done・Stop / budget / events 契約 / モデル割当の単一 SSOT**）／
 > `.steering/_template/loop-config.README.md`（★ **落とし穴集。必ず読む**）／
