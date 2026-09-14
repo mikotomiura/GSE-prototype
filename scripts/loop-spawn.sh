@@ -122,12 +122,19 @@ cd "$wtdir"
 #     ★ 作りたてで中身が無いので、撤去して失うものは無い。
 deny_script="${SCRIPT_DIR}/loop-worktree-deny.sh"
 abort_worktree() { # abort_worktree <理由>
+  local left=""
   cd "$repo_root" 2>/dev/null || true
   git worktree remove --force "$wtdir" >/dev/null 2>&1 || true
-  git branch -D "$branch"              >/dev/null 2>&1 || true
-  git worktree prune                   >/dev/null 2>&1 || true
+  # ⚠️★★★ **`-D` を使わない**（★ Codex /cross-review MEDIUM・2026-09-14）。
+  #   ★ ここへ来るのは上の `git show-ref --verify` で「同名ブランチが無い」ことを確かめた直後に
+  #     `git worktree add -b` で**作ったばかりのブランチ**だけなので、base から進んでいない。
+  #   → ★ `-d` なら「未 merge の作業を持つブランチ」は**拒否される** ＝ 想定外の削除が起きない。
+  #     ⚠️ 拒否されたらブランチを残し、そのことを人に伝える（★ 黙って force しない）。
+  git branch -d "$branch" >/dev/null 2>&1 || left="$branch"
+  git worktree prune      >/dev/null 2>&1 || true
   die "$1
-            ★ worktree ($wtdir) と branch ($branch) は撤去しました。原因を直して再実行してください。
+            ★ worktree ($wtdir) は撤去しました。原因を直して再実行してください。
+            ${left:+⚠️ branch $left は未 merge の作業を持つため残しました (手で確認してください)。}
             (既存 worktree を手で点検するなら  bash scripts/loop-worktree-deny.sh --verify <worktree>)"
 }
 [ -f "${deny_script}" ] || abort_worktree "必須 deny の注入スクリプトが見つかりません: ${deny_script}"

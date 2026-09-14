@@ -112,10 +112,29 @@ emit() { # emit <issue> <phase> <event> [k=v ...]
 #     ⚠️ 保証できなければ **起動しない** (fail-closed)。
 #   ⚠️ deny は「完全な境界」ではない (綴り違いの迂回は残る)。
 #     ★ 実質的な境界は worktree 隔離と人間の merge ゲートである (loop-config.README.md 逐語)。
+#
+# ⚠️★★★ **黙って自己修復しない**（★ Codex /cross-review HIGH・2026-09-14）:
+#   ★ 先に `--verify` で**現状を見てから**直す。⚠️ いきなり再注入すると
+#     「安全設定が消されていた」という**無人ループで最も記録に値する事実**が
+#     events に 1 行も残らない。★ 検知（記録）と回復（再注入）を分ける。
 DENY_SH="$MAIN_ROOT/scripts/loop-worktree-deny.sh"
-ensure_deny() { # ensure_deny <worktree>; 0 = 必須 deny が効いている
-  [ -f "$DENY_SH" ] || return 1
-  bash "$DENY_SH" "$1" >/dev/null 2>&1
+ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 deny が効いている
+  local id="$1" phase="$2" attempt="$3" wt="$4"
+  if [ ! -f "$DENY_SH" ]; then
+    emit "$id" "$phase" blocked attempt="$attempt" \
+         detail="必須 deny の注入スクリプトが無い: $DENY_SH"
+    return 1
+  fi
+  bash "$DENY_SH" --verify "$wt" >/dev/null 2>&1 && return 0
+  # ⚠️ 失われていた事実を必ず 1 行残す
+  #   (★ 書式は既存の permission_denials / max_turns と同じ「attempt_start ＋ detail」に揃える。
+  #    ⚠️ events 語彙は 10 種で固定なので新しい event 値を作らない)
+  emit "$id" "$phase" attempt_start attempt="$attempt" \
+       detail="WARN: worktree の必須 permissions.deny が失われていた (削除/改ざん)。再注入を試みる"
+  bash "$DENY_SH" "$wt" >/dev/null 2>&1 && return 0
+  emit "$id" "$phase" blocked attempt="$attempt" \
+       detail="worktree の必須 permissions.deny を保証できない (注入/検査に失敗)。deny 無しでは起動しない"
+  return 1
 }
 
 # ---------- issue のメタ抽出 ----------
@@ -187,11 +206,7 @@ WD_TOOLS="Read,Glob,Grep,Bash(cargo test:*),Bash(cargo clippy:*),Bash(cargo chec
 run_watchdog() { # run_watchdog <id> <worktree> <attempt>; 0=OK, 1=NG
   local id="$1" wt="$2" attempt="$3" wres verdict head try
   # ⚠️ watchdog も worktree 内の完全なセッションなので、起動前に deny を保証する。
-  if ! ensure_deny "$wt"; then
-    emit "$id" verify blocked attempt="$attempt" \
-         detail="watchdog 起動前に worktree の必須 permissions.deny を保証できない。deny 無しでは起動しない"
-    return 1
-  fi
+  ensure_deny "$id" verify "$attempt" "$wt" || return 1
   for try in 1 2; do
     wres="$( (cd "$wt" && claude -p "issue $id の Acceptance Criteria を実際に充足しているか、
 必要なら verify コマンドを自分で実行して確認せよ。
@@ -305,11 +320,7 @@ run_issue() {
     emit "$id" execute attempt_start attempt="$attempt"
 
     # ⚠️★★★ **毎 attempt** 必須 deny を保証する (★ 詳細は ensure_deny の冒頭)。
-    if ! ensure_deny "$wt"; then
-      emit "$id" execute blocked attempt="$attempt" \
-           detail="worktree の必須 permissions.deny を保証できない (注入/検査に失敗)。deny 無しでは起動しない"
-      return 1
-    fi
+    ensure_deny "$id" execute "$attempt" "$wt" || return 1
 
     # --- 完全なセッションを 1 回。hook / スラッシュコマンド / settings が効く ---
     local res subtype denials
@@ -396,12 +407,17 @@ ALL="$(issue_ids)"
 #    ウェーブを分けて**別プロセスで**起動する運用では、`## Dependencies` に issue 番号を書くと
 #    2 波目で deps_met() が永久に false になり、対象 issue が**一度も実行されないまま終わる**。
 #    → 起動時に events から既完了を seed する。
+# ⚠️★★★ `${#DONE_IDS[@]:-0}` は **bash の構文として不正**で `bad substitution` になる
+#   (★ 2026-09-14 に stub 実行で実測。`${#arr[@]}` に `:-` は付けられない)。
+#   ⚠️ `set -e` を付けていないので**エラーを出したまま続行**し、復元ログだけが黙って消えていた。
+#   → ★ カウンタで数える (★ `check-shell-portability.sh` が言うとおり、空配列の参照自体を避ける)。
+DONE_COUNT=0
 if [ -f "$EVENTS" ]; then
   while read -r seeded; do
     [ -n "$seeded" ] || continue
-    DONE_IDS+=("$seeded")
+    DONE_IDS+=("$seeded"); DONE_COUNT=$((DONE_COUNT+1))
   done <<< "$(jq -r -s '[.[] | select(.event=="issue_done") | .issue] | unique | .[]' "$EVENTS" 2>/dev/null || true)"
-  [ "${#DONE_IDS[@]:-0}" -gt 0 ] && log "events から完了済みを復元: ${DONE_IDS[*]}"
+  [ "$DONE_COUNT" -gt 0 ] && log "events から完了済みを復元: ${DONE_IDS[*]}"
 fi
 
 is_done() { printf '%s\n' "${DONE_IDS[@]:-}" | grep -qx "$1"; }

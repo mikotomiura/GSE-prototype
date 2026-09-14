@@ -139,7 +139,7 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
 ⚠ **この 7 件は「多層防御」であって境界ではない** (2 点とも 2026-09-14 時点で未検証):
 - **綴りを網羅できない**。`Bash(git push:*)` は前置一致なので `git -C <dir> push …` は当たらず、
   追跡済み `.claude/settings.json` の `allow: ["Bash(git *)","Bash(gh *)"]` に拾われる。
-  `gh pr merge` を塞いでも `gh api --method PUT …/merges` は残る。
+  `gh pr merge` を塞いでも `gh api --method PUT …/merges` は残り、`git -c alias.x=push x` も通る。
   → **実効的な境界はリモート側** (`main` の branch protection) と **人間の merge ゲート**に置く。
 - **注入されていること ≠ 発効していること**。`headless.permission_mode` を
   `LOOP_ALLOW_FULL_ACCESS=1` で `auto` / `bypassPermissions` へ昇格させたとき deny が

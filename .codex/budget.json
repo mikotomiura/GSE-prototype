@@ -1,14 +1,15 @@
 {
   "schema_version": "1",
   "_comment_budget_2026_09_08": "⚠️★★★ 2026-09-08: daily_token_budget を 200000 → 300000 へ一時的に引き上げた。★ 理由: 同日 4 回の呼び出しで 226059 tokens を使い切った後、研究者が『codex 使ってええで』と明示的に許可したため（★ secrets-filter の引用符バイパス修正を /cross-review にかけるのが目的）。⚠️★★★ today.tokens_used は【改竄していない】—— 記録は残したまま上限だけを上げてある。★ 恒久的にこの上限でよいかは研究者が決めること（★ 戻すなら 200000 に戻す）。 ⚠️★★★ 2026-09-12 に裁定した = 【据え置く】。★ 根拠（history 30 日の実測）: 中央値 97558 / ⚠️ 200000 超が 6 日（20%）/ R-2〜R-5 タスク単独で 170400（7 回）。→ ⚠️ 200000 に戻すと 5 日に 1 日はガードに当たる。★ したがって 300000 は『一時的』ではなく実態に合った値である。⚠️ ただし予算ガード自体は外さない —— 上限があること自体が『cross-review を無自覚に何度も回す』ことへの歯止めになっている。★ 一次記録: .steering/20260912-r2-r5-decisions/decisions.md 判断 52。",
+  "_comment_2026_09_14_lost_accounting": "⚠️★★★ 2026-09-14: /cross-review 1 回分の **実測 token 数を失った**。★ 経緯: run-codex-review.sh が today.tokens_used を更新した直後に、作業ツリーを綺麗にするつもりで `git checkout -- .codex/budget.json` を実行し、**未コミットの記帳を巻き戻した**（★ raw の result.jsonl は script の TMPDIR ごと消えており復元不能）。→ ★ 復旧として **per_invocation_max と同じ 30000 を推定値として加算**した（⚠️ 実測ではない。★ 予算ガードにとっては過大計上のほうが安全側なので、この向きに倒した）。⚠️ invocations は +1（＝ 4）で、これは確実である。★ 教訓: .codex/budget.json は台帳なので、`git checkout --` の対象に含めない。",
   "daily_token_budget": 300000,
   "per_invocation_max": 30000,
   "diff_size_threshold_lines": 500,
   "manual_approval_threshold_lines": 2000,
   "today": {
     "date": "2026-09-14",
-    "tokens_used": 110537,
-    "invocations": 3
+    "tokens_used": 140537,
+    "invocations": 4
   },
   "history": [
     {

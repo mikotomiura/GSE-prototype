@@ -49,6 +49,13 @@ src-tauri/target/
 .claude/memory.md
 
 # Steering runtime artifacts (token logging / locks — generated per session, not versioned)
+# ⚠️★★★ 2026-09-14 追加: Loop の実行時生成物。★ **無視しないとモードC が起動しない。**
+#   実測: `loop-run.sh` は `_loop-events.jsonl` を**作ってから** `loop-spawn.sh` を呼ぶので、
+#   spawn 側の「作業ツリーに未コミット変更があります」判定に**自分で作ったファイルが当たり**、
+#   ⚠️ 1 issue 目から `worktree 生成に失敗` で全部死ぬ（★ stub 実行で再現した）。
+.steering/**/_loop-events.jsonl
+.steering/**/_loop-board.md
+.steering/**/_loop-run-report.md
 .steering/_token_log.md
 .steering/_token_log.last_key
 .steering/_token_log.md.lock

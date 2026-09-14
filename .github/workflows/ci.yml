@@ -624,8 +624,11 @@ jobs:
       #     入っているか未検証**だから (`ci.yml` 上方の probe ループが同じ前提を置いている)。
       #     ★ テストは jq 不在で `exit 2`(＝ 判定しない) になるため、CI では赤に見える。
       #     → ⚠️ **「macOS は検証していない」ことを隠さない。** jq を確認できたら条件を外す。
+      # ⚠️ 条件は **runner 名ではなく OS** で書く（★ Codex /cross-review LOW・2026-09-14）——
+      #   ★ `matrix.runner == 'gse-win-selfhosted'` だと、runner 名を変えた瞬間に
+      #     **静かに未実行**になる（⚠️ 緑のまま検査が消える形）。
       - name: Loop worktree deny gate (Windows・git-bash の jq が CRLF を出すため)
-        if: matrix.runner == 'gse-win-selfhosted'
+        if: runner.os == 'Windows'
         shell: bash
         run: bash scripts/loop-worktree-deny-test.sh
 

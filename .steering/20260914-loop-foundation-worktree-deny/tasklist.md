@@ -19,9 +19,16 @@
 - [x] ベースライン（`cargo test --workspace`）— ★ Rust は 1 行も触っていない。実測 exit 0 / 670 passed / 0 failed
 
 ## レビュー
-- [ ] code-reviewer + security-checker を並列起動
-- [ ] `/cross-review`（2 巡）
-- [ ] HIGH 指摘への対応
+- [x] code-reviewer + security-checker を並列起動（★ 両方 HIGH 2 件で一致）
+- [x] `/cross-review` 1 巡目（Codex・HIGH 1 / MEDIUM 2 / LOW 1 / テスト不足 1）
+- [x] HIGH 指摘への対応（★ verify の fail-open ／ 毎 attempt の保証 ／ 黙って自己修復しない）
+- [x] MEDIUM / LOW も全件対応（★ backlog に punt しない）
+
+## ⚠️ 副産物として見つかった実バグ（★ 2 件・どちらも「モード C を 1 度も回していない」ことの帰結）
+- [x] `loop-run.sh:415` `${#DONE_IDS[@]:-0}` が **bad substitution**（★ 復元ログが黙って消えていた）
+- [x] ⚠️★★★ **モード C が 1 issue 目で必ず死ぬ** —— `loop-run.sh` が `_loop-events.jsonl` を
+      **作ってから** `loop-spawn.sh` を呼ぶため、spawn の dirty-tree 判定に自分で作ったファイルが当たる
+      （★ stub 実行で再現 → `.gitignore` に Loop の実行時生成物 3 件を追加して解消）
 
 ## ドキュメント
 - [x] `loop-config.README.md` に「注入は自動である」旨を追記（★ 契約の所在を 1 か所に）

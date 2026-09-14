@@ -333,6 +333,130 @@ else
   ng "配線の陰性対照: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
+
+echo "6. loop-run.sh の「毎 attempt の deny 保証」(⚠️ claude を stub して実際に回す)"
+# ⚠️★★★ ここが本丸である（★ Codex /cross-review「テスト不足」・2026-09-14）。
+#   ★ 5 節までが見ているのは「worktree 生成時に deny が書かれること」までで、
+#   ⚠️ **attempt をまたいで保証され続けるか**は 1 行も検査していなかった。
+#   → ★ `claude` を stub に差し替えて `loop-run.sh` を実際に 1 issue ぶん回し、
+#     events.jsonl（★ script が唯一の writer）を読んで判定する。
+
+RUN_SH="${REPO_ROOT}/scripts/loop-run.sh"
+
+# ⚠️★★★ 実 repo 側の前提も検査する —— ★ 上の一時 repo が緑でも、
+#   **本物の `.gitignore` が Loop の生成物を無視していなければモードC は起動しない**。
+for art in _loop-events.jsonl _loop-board.md _loop-run-report.md; do
+  if git -C "${REPO_ROOT}" check-ignore -q ".steering/00000000-probe/${art}" 2>/dev/null; then
+    ok "実 repo の .gitignore が ${art} を無視している (★ dirty-tree で spawn が死なない)"
+  else
+    ng "⚠️ 実 repo の .gitignore が ${art} を無視していない (★ モードC が 1 issue 目で死ぬ)"
+  fi
+done
+
+setup_loop_repo() { # setup_loop_repo <repo-dir> <claude-stub-の本体>
+  local r="$1" stub="$2"
+  mkdir -p "${r}/scripts" "${r}/.steering/task/issues" "${r}/stub"
+  cp "${SPAWN_SH}" "${r}/scripts/loop-spawn.sh"
+  cp "${DENY_SH}"  "${r}/scripts/loop-worktree-deny.sh"
+  cp "${RUN_SH}"   "${r}/scripts/loop-run.sh"
+  { printf '#!/usr/bin/env bash\n'; printf '%s\n' "${stub}"
+    # ★ loop-run.sh が読むのは subtype / usage / total_cost_usd / permission_denials だけ
+    printf '%s\n' 'printf "{\"subtype\":\"success\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":1,\"output_tokens\":1},\"permission_denials\":[]}\n"'
+  } > "${r}/stub/claude"
+  chmod +x "${r}/stub/claude"
+  cat > "${r}/.steering/task/issues/001.md" <<'ISSUE'
+# Issue 001: stub
+verify_level: parse
+## Goal
+stub
+## Dependencies
+ISSUE
+  # ⚠️★★★ Loop の実行時生成物を無視する（★ 実 repo の .gitignore と同じ規則）。
+  #   ★ 無視しないと `loop-run.sh` が自分で作った `_loop-events.jsonl` に
+  #     `loop-spawn.sh` の dirty-tree 判定が当たり、⚠️ **1 issue 目から worktree 生成に失敗する**。
+  cat > "${r}/.gitignore" <<'IGN'
+.steering/**/_loop-events.jsonl
+.steering/**/_loop-board.md
+.steering/**/_loop-run-report.md
+stub/
+IGN
+  cat > "${r}/.steering/task/_loop-config.json" <<CFG
+{
+  "task": "stub", "mode": "C", "base_branch": "main",
+  "verify": { "test": "false" },
+  "budget": { "max_attempts": 2, "no_progress_threshold": 4, "token_ceiling": 40000000, "parallel": 1 },
+  "events_path": "${r}/.steering/task/_loop-events.jsonl",
+  "headless": { "max_turns": 3, "permission_mode": "acceptEdits", "model": "sonnet", "watchdog_model": "haiku" }
+}
+CFG
+  (
+    cd "${r}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    git -c init.defaultBranch=main -c init.templateDir= init -q . || exit 1
+    git config user.email loop-test@example.invalid || exit 1
+    git config user.name loop-test || exit 1
+    git config commit.gpgsign false || exit 1
+    git config core.hooksPath /dev/null || exit 1
+    git add scripts .steering .gitignore || exit 1
+    git commit -q -m init || exit 1
+  ) >/dev/null 2>&1
+}
+
+run_loop() { # run_loop <repo-dir> → events.jsonl のパスを stdout へ
+  local r="$1"
+  ( cd "${r}" && PATH="${r}/stub:${PATH}" bash scripts/loop-run.sh .steering/task ) >/dev/null 2>&1
+  printf '%s\n' "${r}/.steering/task/_loop-events.jsonl"
+}
+
+# --- 6-1 改ざん検知 ＋ 回復: stub が settings.local.json を毎回消す ---
+LOOP_A="${TMP}/loopA/repo"; mkdir -p "${LOOP_A}"
+if setup_loop_repo "${LOOP_A}" 'rm -f .claude/settings.local.json'; then
+  ev_a="$(run_loop "${LOOP_A}")"
+  if [ -s "${ev_a}" ]; then
+    n_start="$(grep -c '"event":"attempt_start"' "${ev_a}" || true)"
+    n_warn="$(grep -c '必須 permissions.deny が失われていた' "${ev_a}" || true)"
+    n_block="$(grep -c '"event":"blocked"' "${ev_a}" || true)"
+    if [ "${n_warn}" -ge 1 ]; then
+      ok "毎 attempt 保証: deny が消されたことを events に記録した (${n_warn} 行)"
+    else
+      ng "毎 attempt 保証: ⚠️ deny が消されたのに events に 1 行も残っていない (★ 黙って自己修復している)"
+    fi
+    if [ "${n_start}" -ge 2 ] && [ "${n_block}" -eq 0 ]; then
+      ok "毎 attempt 保証: 再注入して attempt 2 も起動できた (attempt_start=${n_start} / blocked=0)"
+    else
+      ng "毎 attempt 保証: 回復できていない (attempt_start=${n_start} blocked=${n_block})"
+    fi
+  else
+    ng "毎 attempt 保証: events.jsonl が空 (★ loop-run.sh が 1 度も動いていない → 判定できない)"
+  fi
+else
+  ng "毎 attempt 保証: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- 6-2 fail-closed: stub が settings.local.json を壊す (再注入できない形) ---
+LOOP_B="${TMP}/loopB/repo"; mkdir -p "${LOOP_B}"
+if setup_loop_repo "${LOOP_B}" 'printf "{ broken" > .claude/settings.local.json'; then
+  ev_b="$(run_loop "${LOOP_B}")"
+  if [ -s "${ev_b}" ]; then
+    if grep -q '必須 permissions.deny を保証できない' "${ev_b}"; then
+      ok "fail-closed: deny を保証できない attempt は blocked にして起動しなかった"
+    else
+      ng "⚠️ fail-closed: 壊れた settings.local.json のまま起動している (★ 最も危険な形)"
+    fi
+    # ⚠️ 壊れたファイルを上書きしていないこと（★ 人の設定を黙って捨てない）
+    broken_wt="$(ls -d "${TMP}/loopB/wt/"* 2>/dev/null | head -1 || true)"
+    if [ -n "${broken_wt}" ] && [ "$(cat "${broken_wt}/.claude/settings.local.json" 2>/dev/null)" = "{ broken" ]; then
+      ok "fail-closed: 壊れたファイルを上書きしていない"
+    else
+      ok "fail-closed: (worktree は撤去済み / 判定対象なし)"
+    fi
+  else
+    ng "fail-closed: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "fail-closed: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
 echo "────────────────────────────────────────"
 FINISHED=1
 echo "合格 ${PASS} / 不合格 ${FAIL}"
