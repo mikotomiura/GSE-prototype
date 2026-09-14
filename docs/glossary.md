@@ -220,6 +220,9 @@
 | 許可リスト | — | 「これだけを通す」形の判定。⚠️ 拒否リスト（これを止める）と対で、**漏れが fail-open にならない側**を選ぶ。配布では `^block\d{2}\.html$` に一致する物だけを上げる | 陰性対照, fail-closed |
 | drive.file スコープ | — | Google Drive API の**非機微**スコープ。「このアプリが作った・開いたファイルだけ」に限られる。⚠️ 資格情報が漏れても研究者の Drive 全体は読まれない。`drive` フルスコープ（機微）と混同しない | OAuth, spike-1 |
 | allowFileDiscovery | — | Drive の共有設定。`false` = リンクを知っている全員、`true` = **検索可能＝一般公開**。⚠️ API の暗黙既定に任せず**明示指定して読み返す**（fail-open 側の性質を既定に依存させない） | permissions.create, D-7 |
+| 特徴行 | feature row | `gse-replay --features` が出す **1 Hz tick 単位の 1 行**。既存 `FeatSnapshot` と同じ仮想時刻グリッドに載り、Tier ごとのサブ構造体 (`activity` / `boundary` / `dispersion` / `revision` / `restart` / `quality` / `stall_onset`) を持つ。⚠️ **モデルの標本単位ではない** (標本単位は Decision Episode・ADR-010 D4)。★ 中間成果物であり `gse-dataset` へは共有しない | Tier, FeatSnapshot |
+| Tier のブロック名 | activity / boundary / dispersion / revision / restart / evidence quality | `T0`=activity / `T1a`=dispersion / `T1b`=boundary / `T1c`=revision topology / `T1d`=restart / `Q`=evidence quality (`.idea/survey §6.1`)。⚠️★★★ **フィールド名に `T0` を使わない** —— ★ ADR-030 は **`t0` を `stall onset` の時刻**の意味で使っており、衝突する | stall onset, 特徴行 |
+| stall onset | — | ★ **検出時点** `t0 = s + θ_person`（ADR-030 **D2 / D3**）。⚠️★★★ **「停滞が始まった時点」ではない** —— ★ そこに置くと区間 `[t0, t0+θ_person]` で回復が起きないことが定義上保証され、初期の期のハザードが構造的に歪む。★ `θ_person` は個人 × `task_kind` の IKI 分位点で、⚠️ **床も天井も置かない**（D4） | Decision Episode, 特徴行 |
 
 ## 略語
 

@@ -97,6 +97,21 @@ pin し忘れると main から worktree が切られ、実装が存在しない
 `acceptance.sh` が無い issue はこの段を skip する。
 **AC が test で表せない issue には必ず `acceptance.sh` を書く。**
 
+### ⚠ `acceptance_template` は `loop-run.sh` に読まれない (2026-09-14 実測)
+
+モードC の実体は **`$TASK_DIR/issues/<id>-acceptance.sh` のハードコード** (`loop-run.sh:235`)。
+`acceptance_template` の値を書き換えても効かない (= **契約の二重定義**)。
+置き場は必ず `issues/<id>-acceptance.sh` にすること。`--dry-run` の `acceptance=yes/no` 表示で
+実際に拾えているかを確認できる。
+
+### ⚠ Loop の実行時生成物は `.gitignore` に入れる
+
+`loop-run.sh` は `_loop-events.jsonl` を **作ってから** `loop-spawn.sh` を呼ぶので、
+無視されていないと spawn の dirty-tree 判定に**自分で作ったファイルが当たり**、
+1 issue 目から `worktree 生成に失敗` で全部死ぬ (2026-09-14 に stub 実行で再現)。
+本リポジトリでは `.steering/**/_loop-events.jsonl` / `_loop-board.md` / `_loop-run-report.md` を
+`.gitignore` に入れてある。
+
 ## ⚠ verify はベースラインで緑か
 
 pin 済み verify がベースラインで赤い (既存の lint 負債等) と、worktree は互いに独立なので
