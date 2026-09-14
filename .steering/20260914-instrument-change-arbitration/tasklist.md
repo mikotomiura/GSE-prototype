@@ -38,5 +38,5 @@
 ## 完了処理
 - [x] `requirement.md` / `design.md` / `decisions.md` を作る
 - [x] `decisions.md` の最終化（★ 判断 7 〜 10）
-- [ ] `git commit`（⚠️ `git add -A` を使わない・**明示的に staging**）
-- [ ] 次セッションの引き継ぎを `.steering/_handoff/` に作る
+- [x] `git commit`（★ 3 コミット・⚠️ すべて明示 staging）
+- [x] 次セッションの引き継ぎを `.steering/_handoff/next-session-post-adr032-approvals-and-parallel-tracks.md` に作る
