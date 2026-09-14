@@ -31,11 +31,12 @@
 - [x] HIGH を消化（★ **7 か所で裁定を狭めた** —— `decisions.md` 判断 7）
 - [x] ⚠️ レビューの主張 1 件を**一次で確認して訂正**（★ 判断 8 —— 「既に破れている」は**未配布ドラフトの話**だった）
 - [x] ★ **自分の実測発見を起票**（★ 起票 19 / 20）
-- [ ] `/cross-review` を**パス限定**で（⚠️ `docs/mitou_submission/**` を送らない）
-- [ ] 2 巡目（★ 自分が足した規則の境界条件）
+- [x] `/cross-review` を**パス限定**で（★ Codex・HIGH 2 / MEDIUM 2 → 反映済み）
+- [x] 2 巡目（★ 自分が足した規則の境界条件）—— ⚠️★★★ **門が 4 か所で破れていた**（`decisions.md` 判断 10）
+- [x] ★ 起票 21 / 22 / 23 を足す
 
 ## 完了処理
 - [x] `requirement.md` / `design.md` / `decisions.md` を作る
-- [ ] `decisions.md` の最終化（★ レビューで出た判断を追記）
+- [x] `decisions.md` の最終化（★ 判断 7 〜 10）
 - [ ] `git commit`（⚠️ `git add -A` を使わない・**明示的に staging**）
 - [ ] 次セッションの引き継ぎを `.steering/_handoff/` に作る
