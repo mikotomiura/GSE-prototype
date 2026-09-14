@@ -107,7 +107,15 @@ else
   #   ★ ADR-013 D2 の「導出元は *送出元があるか* であって writer ではない」と基準を揃える。
   if [ ! -f "$EMITTER" ]; then
     ng "送出元の判定対象が無い: ${EMITTER}（★ 計器と同意の連動を判定できない）"
-  elif grep -qE 'activity_label_(answered|skipped)\(' "$EMITTER"; then
+  #   ⚠️★★★ **コメント行を除いてから見る**（2026-09-14・`/cross-review` 2 巡目 HIGH-1）。
+  #     ★ 除かないと、本ファイルや `lib.rs` の**説明文にヒットして偽の赤**になる。
+  #   ⚠️ **限界を明示する**: 静的 grep なので、★ **改行を挟んだ呼び出し**は取りこぼす
+  #     （⚠️ ただし `rustfmt` は関数名と `(` を分けないので実害は小さい）。
+  #     ★ 修飾付き（`o1::activity_label_answered(`）は部分一致で拾える。
+  #   ★★★ **最後の砦は型である** —— `LogEntry::activity_label_*` は
+  #     `o1::EsmConsent`（`activity_label_allowed` からしか作れない）を要求するので、
+  #     ⚠️ **門を通さない送出はコンパイルできない**。本検査は二重の網である。
+  elif grep -vE '^[[:space:]]*(//|/\*|\*)' "$EMITTER" | grep -qE 'activity_label_(answered|skipped)\('; then
     # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
     #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
     #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
@@ -119,7 +127,7 @@ else
     # ⚠️★★★ **送出元があるなら、同意の門を通していなければならない**（ADR-031 M5）。
     #   ★ `o1::activity_label_allowed(o1_mode, consent_approved)` を経由せずに記録すると、
     #     **同意承認と実際の記録が結びつかない穴**になる（★ `/cross-review` の「テスト不足」）。
-    if grep -q 'activity_label_allowed(' "$EMITTER"; then
+    if grep -vE '^[[:space:]]*(//|/\*|\*)' "$EMITTER" | grep -q 'activity_label_allowed('; then
       ok "6 択 ESM の記録が同意の門（activity_label_allowed）を通っている"
     else
       ng "6 択 ESM の送出元が同意の門を通っていない（★ o1::activity_label_allowed を経由すること）"

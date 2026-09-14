@@ -301,6 +301,25 @@
 **2 は与える** —— ★ **被験者が「あの時間帯を消して」と言えば、ESM 行ごと端末から消える**。
 → ⚠️★★★ **だからこそ D6 を同じ ADR で閉じなければならない。**
 
+#### ⚠️★★★ 保証 1 を **型で** 守る（★ 2026-09-14 追加・`/cross-review` 2 巡目 HIGH）
+
+★ 初版は「`o1::activity_label_allowed(o1_mode, consent_approved)` を経由すること」を
+**ゲートの grep で見る**形にしていた。⚠️ Codex の逐語指摘:
+
+> 「`grep -q 'activity_label_allowed('` は **『同じファイルに一度でも呼ばれている』ことしか見ません**。
+> 実際の `activity_label_answered/skipped` の各送出経路が必ずその戻り値でガードされている
+> 保証はありません。**無関係な場所に `activity_label_allowed(true, true);` があれば通ります。**」
+
+→ ★★★ **決定**: `activity_label_allowed` は `bool` ではなく **`Option<o1::EsmConsent>`** を返す。
+★ `EsmConsent` は**そこからしか作れない** unit struct で、
+**`LogEntry::activity_label_*` が参照を要求する**。
+→ ⚠️★★★ **門を通さずに 6 択 ESM の行を構築することはコンパイルできない。**
+
+⚠️ **残る抜け道を明示する**: `LogEntry::ActivityLabel { .. }` の**直接構築**は
+Rust の pub variant の性質上塞げない。→ ★ そこは **(i) `format_activity_label_line` の正規化**
+（★ 未回答なのに「会話」は `cannot_answer` へ倒す）と **(ii) ゲートの送出元検査**が受け止める。
+⚠️★★★ **「塞いだ」とは書かない** —— ★ 3 枚重ねただけである。
+
 ### D6. ★★★ **区間指定削除の取りこぼしを塞ぐ**（★ 本 ADR の実測発見）
 
 ★ **決定 1**: **新行種 `activity_label` は時刻キーに `"t"` を使う**（★ 既存のデータ行と揃える）。

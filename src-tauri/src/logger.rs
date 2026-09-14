@@ -698,6 +698,15 @@ fn format_activity_label_line(
     //   ★★★ **第三者の在席を、被験者が選んでいないのに残す**ことになる。
     //   → ★ **assert ではなく正規化する** (★ `realtime_label_skipped` の `skip_reason`
     //   正規化と同じ作法)。⚠️ 握りつぶさず `tracing::warn!` を残す。
+    //
+    // ⚠️★★★ **限界を明示する** (2026-09-14・`/cross-review` 2 巡目 MEDIUM-1):
+    //   ★ Codex は「正規化は呼び出し側バグを隠す。warn が未収集だと見逃す」と指摘した。**正しい。**
+    //   ⚠️ ただし **NDJSON に「正規化した」フラグを足すことはしない** ——
+    //   ★ それは行の意味に『実装のバグ』という被験者と無関係な情報を混ぜることになり、
+    //   `data-privacy` ルール 7 条件 i（固定 6 択のみ）の趣旨から外れる。
+    //   → ★ **代わりに、そもそも不正な組が作れない側で守る**:
+    //   コンストラクタ経由なら型で不可能で、直接構築は本正規化が受け止める。
+    //   ⚠️ **「どれだけ起きたか」は現状 warn ログでしか分からない**（★ 未解決と明記する）。
     let category = if answered || matches!(category, ActivityCategory::CannotAnswer) {
         category
     } else {
@@ -1263,7 +1272,9 @@ impl LogEntry {
     ///
     /// ⚠️★★★ **`recall_window_*` は必須である** (2026-09-14・security-checker HIGH)。
     /// ★ 無いと「その時間帯のお答えも消えます」という同意の約束が実装で保証できない。
+    #[allow(clippy::too_many_arguments)]
     pub fn activity_label_answered(
+        _consent: &crate::o1::EsmConsent,
         timestamp: u64,
         probe_id: Option<&str>,
         category: ActivityCategory,
@@ -1289,6 +1300,7 @@ impl LogEntry {
     /// ★ `.idea` §16 が O1 で測れと言っている **回答率 / MNAR** が出せない
     /// (ADR-031 D7)。
     pub fn activity_label_skipped(
+        _consent: &crate::o1::EsmConsent,
         timestamp: u64,
         probe_id: Option<&str>,
         latency_ms: u64,
@@ -3407,7 +3419,9 @@ mod tests {
     /// 区別できず、`.idea` §16 が O1 で測れと言っている **回答率 / MNAR** が出せない。
     #[test]
     fn activity_label_skipped_is_recorded_as_cannot_answer() {
-        let e = LogEntry::activity_label_skipped(5, None, 0, 0, 5);
+        // ★ 門を通した証拠が無いと**コンパイルできない**（ADR-031 / `/cross-review` HIGH-2）。
+        let consent = crate::o1::activity_label_allowed(true, true).expect("門を通る");
+        let e = LogEntry::activity_label_skipped(&consent, 5, None, 0, 0, 5);
         match &e {
             LogEntry::ActivityLabel {
                 category,
@@ -3558,6 +3572,7 @@ mod tests {
             },
             // ⚠️★★★ ADR-031 D4: 新行種 `activity_label`。
             LogEntry::activity_label_answered(
+                &crate::o1::activity_label_allowed(true, true).expect("門を通る"),
                 1,
                 Some("p-1"),
                 ActivityCategory::Conversation,
@@ -5025,6 +5040,7 @@ mod tests {
         })
         .unwrap();
         tx.send(LogEntry::activity_label_answered(
+            &crate::o1::activity_label_allowed(true, true).expect("門を通る"),
             4500,
             Some("p-1"),
             ActivityCategory::Conversation,

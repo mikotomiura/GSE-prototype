@@ -242,9 +242,32 @@ pub fn label_row_allowed(o1_mode: bool) -> bool {
 /// `Form_O1` の同意項目の**両方**で成立する運用上の事実であり、
 /// ★ 配布物のゲート（`scripts/check-o1-release-readiness.sh`）が門である。
 /// → ★ **M5 では「O1 だから通す」と書かないこと。**
-pub fn activity_label_allowed(o1_mode: bool, consent_approved: bool) -> bool {
-    o1_mode && consent_approved
+pub fn activity_label_allowed(o1_mode: bool, consent_approved: bool) -> Option<EsmConsent> {
+    (o1_mode && consent_approved).then_some(EsmConsent(()))
 }
+
+/// ⚠️★★★ **6 択 ESM を記録してよいことの「証拠」**（★ 2026-09-14・`/cross-review` HIGH-2）。
+///
+/// ## ★ なぜ `bool` ではなく型なのか
+///
+/// ⚠️ `bool` を返すだけだと、**門を通したことを誰も強制できない**。
+/// ★ `/cross-review`（Codex）の逐語指摘:
+///
+/// > 「`grep -q 'activity_label_allowed('` は **『同じファイルに一度でも呼ばれている』ことしか見ません**。
+/// > 実際の `activity_label_answered/skipped` の各送出経路が必ずその戻り値でガードされている
+/// > 保証はありません。**無関係な場所に `activity_label_allowed(true, true);` があれば通ります。**」
+///
+/// → ★★★ **したがって「検査で守る」のをやめ、*型で守る*。**
+/// ★ 本型は [`activity_label_allowed`] からしか作れず（⚠️ フィールドが private な unit struct）、
+/// **`LogEntry::activity_label_*` が参照を要求する**ので、
+/// ★ **門を通さずに 6 択 ESM の行を構築することはコンパイルできない。**
+///
+/// ⚠️ **残る抜け道**: `LogEntry::ActivityLabel { .. }` を直接構築する経路は Rust の
+/// pub variant の性質上塞げない。→ ★ そちらは `capabilities` の
+/// `activity_label_has_no_emitter_until_it_is_wired` と
+/// `check-o1-release-readiness.sh` の送出元検査が二重に見る。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EsmConsent(());
 
 /// ⚠️★★★ **いま記録しているか** (純関数)。稼働中インジケータと `liveness` の両方が使う。
 ///
@@ -758,18 +781,18 @@ mod tests {
     #[test]
     fn activity_label_needs_both_o1_and_consent() {
         assert!(
-            activity_label_allowed(true, true),
+            activity_label_allowed(true, true).is_some(),
             "★ O1 かつ承認済みなら通る"
         );
         assert!(
-            !activity_label_allowed(true, false),
+            activity_label_allowed(true, false).is_none(),
             "⚠️★★★ 承認前は通さない（★ 被験者向け文書は契約）"
         );
         assert!(
-            !activity_label_allowed(false, true),
+            activity_label_allowed(false, true).is_none(),
             "⚠️ O1 でなければ通さない"
         );
-        assert!(!activity_label_allowed(false, false));
+        assert!(activity_label_allowed(false, false).is_none());
     }
 
     use std::path::PathBuf;

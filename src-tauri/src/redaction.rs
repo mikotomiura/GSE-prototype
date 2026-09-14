@@ -600,6 +600,15 @@ mod tests {
         //   (2026-09-14・`/cross-review` MEDIUM「フォーマット文字列走査は脆い」への対処)。
         //   ★ `logger.rs` の書式が複数行化・serde 化して走査が空振りしたら、
         //   **ここで検出される**（★ 見逃しではなく赤になる）。
+        //
+        // ⚠️★★★ **循環していないことの確認**（2026-09-14・`/cross-review` 2 巡目 MEDIUM-2）:
+        //   ★ Codex は「`KNOWN_LINE_TYPES` を基準にすると *logger に足したのに KNOWN を
+        //   更新し忘れた* ケースを検出できない」と指摘した。
+        //   → ★ **それは別のテストが既に見ている** ——
+        //   `capabilities::tests::capabilities_covers_every_line_type` が
+        //   **`logger.rs` のリテラルを走査して KNOWN に在ることを要求する**。
+        //   ⚠️ したがって「logger にあって KNOWN に無い」は**そちらで赤になる**。
+        //   ★ 本テストが見るのは「KNOWN にあって redaction が拾えない」側である。
         let expected: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
             .iter()
             .copied()
