@@ -615,6 +615,19 @@ jobs:
       - name: Clippy (-D warnings, --all-targets)
         run: cargo clippy --all-targets --features package --target ${{ matrix.target }} -- -D warnings
         working-directory: src-tauri
+      # ⚠️★★★ Loop 基盤の deny 注入を **Windows(git-bash) でも走らせる** (2026-09-14)。
+      #   ★ なぜ ubuntu だけでは足りないか: `scripts/loop-worktree-deny.sh` は
+      #     **git-bash の jq が CRLF を出す**という OS 固有の回避を持つ (2026-09-14 に実測)。
+      #     ⚠️ そこが退行しても ubuntu の同じテストは緑のままである
+      #     (`docs/agent-shared.md` 逐語「OS ごとに規則が違うロジックは両 OS に対のテストを置く」)。
+      #   ⚠️★★ macOS 側では走らせていない —— ★ 理由は **self-hosted の gse-mac に jq が
+      #     入っているか未検証**だから (`ci.yml` 上方の probe ループが同じ前提を置いている)。
+      #     ★ テストは jq 不在で `exit 2`(＝ 判定しない) になるため、CI では赤に見える。
+      #     → ⚠️ **「macOS は検証していない」ことを隠さない。** jq を確認できたら条件を外す。
+      - name: Loop worktree deny gate (Windows・git-bash の jq が CRLF を出すため)
+        if: matrix.runner == 'gse-win-selfhosted'
+        shell: bash
+        run: bash scripts/loop-worktree-deny-test.sh
 
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────
   frontend-check:
@@ -678,6 +691,14 @@ jobs:
       #     「検査が空振りしていないこと」まで見る (上の 2 つの --self-test と同じ思想)。
       - name: Shell portability gate (bash 3.2 の変数名パース・対照つき)
         run: bash scripts/check-shell-portability.sh
+      # ⚠️★★★ Loop 基盤の安全装置 (2026-09-14 追加)。
+      #   ★ 無人モードC は worktree の中で `claude -p` を回すので、**承認する人が居ない**。
+      #     → ⚠️ `permissions.deny` が worktree に入っていないと `git push` / `gh pr merge` が通りうる。
+      #   ⚠️ 実測 (2026-09-13) では **deny を worktree へ入れる仕組みが 1 つも無かった** (grep 0 件)。
+      #   ★ このテストは 3 状態 (不在 / 正常 / 壊れている) と**陰性対照**を持ち、
+      #     ⚠️ 「検査が空振りしていないこと」まで見る (★ 実際に一時 git repo で worktree を作る)。
+      - name: Loop worktree deny gate (無人ループの worktree に deny が入るか)
+        run: bash scripts/loop-worktree-deny-test.sh
       # ⚠️★★★ secrets-filter のゲート (2026-09-10 追加)。
       #   ★ `scripts/secrets-filter.sh` は **git diff を外部 LLM (Codex) へ渡す前の最後の関門**で、
       #     `scripts/secrets-filter-test.sh` という対照つきのテストも**既にあった**。

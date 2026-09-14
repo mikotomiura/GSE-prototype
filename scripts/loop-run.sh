@@ -101,6 +101,23 @@ emit() { # emit <issue> <phase> <event> [k=v ...]
   printf '%s\n' "$json" >> "$EVENTS"
 }
 
+# ---------- worktree の必須 permissions.deny を「毎 attempt」保証する ----------
+# ⚠️★★★ 注入は worktree 生成時の 1 回では足りない
+#   (★ 2026-09-14 に code-reviewer / security-checker が **両方 HIGH** で指摘した):
+#   ★ 既定 `permission_mode=acceptEdits` は **Edit/Write を自動承認**し、
+#     必須 deny 7 件に Edit / Write 系は 1 件も無い。
+#   → ⚠️ attempt N で deny に阻まれた worker が `<worktree>/.claude/settings.local.json` を
+#     書き換え・削除すると、**attempt N+1 は新しいセッションなので deny 無しで起動する**。
+#   → ★ `claude -p` を起動する **直前に毎回** 注入 (冪等) ＋ 検査を通し、
+#     ⚠️ 保証できなければ **起動しない** (fail-closed)。
+#   ⚠️ deny は「完全な境界」ではない (綴り違いの迂回は残る)。
+#     ★ 実質的な境界は worktree 隔離と人間の merge ゲートである (loop-config.README.md 逐語)。
+DENY_SH="$MAIN_ROOT/scripts/loop-worktree-deny.sh"
+ensure_deny() { # ensure_deny <worktree>; 0 = 必須 deny が効いている
+  [ -f "$DENY_SH" ] || return 1
+  bash "$DENY_SH" "$1" >/dev/null 2>&1
+}
+
 # ---------- issue のメタ抽出 ----------
 issue_file() { printf '%s/issues/%s.md' "$TASK_DIR" "$1"; }
 issue_ids() {
@@ -169,6 +186,12 @@ WD_TOOLS="Read,Glob,Grep,Bash(cargo test:*),Bash(cargo clippy:*),Bash(cargo chec
 
 run_watchdog() { # run_watchdog <id> <worktree> <attempt>; 0=OK, 1=NG
   local id="$1" wt="$2" attempt="$3" wres verdict head try
+  # ⚠️ watchdog も worktree 内の完全なセッションなので、起動前に deny を保証する。
+  if ! ensure_deny "$wt"; then
+    emit "$id" verify blocked attempt="$attempt" \
+         detail="watchdog 起動前に worktree の必須 permissions.deny を保証できない。deny 無しでは起動しない"
+    return 1
+  fi
   for try in 1 2; do
     wres="$( (cd "$wt" && claude -p "issue $id の Acceptance Criteria を実際に充足しているか、
 必要なら verify コマンドを自分で実行して確認せよ。
@@ -280,6 +303,13 @@ run_issue() {
       emit "$id" execute abandoned attempt="$attempt" detail="token_ceiling 超過"; return 1
     fi
     emit "$id" execute attempt_start attempt="$attempt"
+
+    # ⚠️★★★ **毎 attempt** 必須 deny を保証する (★ 詳細は ensure_deny の冒頭)。
+    if ! ensure_deny "$wt"; then
+      emit "$id" execute blocked attempt="$attempt" \
+           detail="worktree の必須 permissions.deny を保証できない (注入/検査に失敗)。deny 無しでは起動しない"
+      return 1
+    fi
 
     # --- 完全なセッションを 1 回。hook / スラッシュコマンド / settings が効く ---
     local res subtype denials

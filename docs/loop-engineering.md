@@ -129,7 +129,21 @@ C では制御がループの**外**にあり、events も自己申告ではな�
 **C の危険と既定**: 非対話で書き込みを許すので次を守る。
 worktree 隔離を必須 (main checkout で走らせない) / `headless.permission_mode` の既定は
 `acceptEdits` (全許可は worktree 隔離下で明示合意時のみ) / `budget.token_ceiling` を必ず設定し
-script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns` で有界化。
+script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns` で有界化 /
+**worktree には必須 `permissions.deny` 7 件が自動注入される** (`loop-spawn.sh` → `loop-worktree-deny.sh`。
+書いたあと読み直して検査し、失敗したら worktree のパスを返さない = fail-closed。
+`loop-run.sh` は **attempt ごとに再注入・再検査**する — worker は `acceptEdits` で
+`.claude/settings.local.json` を書き換えられるため、作成時 1 回では閉じない)。
+⚠ `ask` は**承認する人が居ない無人実行では前提を満たさない**ので、止めたいものは `deny` に置く。
+
+⚠ **この 7 件は「多層防御」であって境界ではない** (2 点とも 2026-09-14 時点で未検証):
+- **綴りを網羅できない**。`Bash(git push:*)` は前置一致なので `git -C <dir> push …` は当たらず、
+  追跡済み `.claude/settings.json` の `allow: ["Bash(git *)","Bash(gh *)"]` に拾われる。
+  `gh pr merge` を塞いでも `gh api --method PUT …/merges` は残る。
+  → **実効的な境界はリモート側** (`main` の branch protection) と **人間の merge ゲート**に置く。
+- **注入されていること ≠ 発効していること**。`headless.permission_mode` を
+  `LOOP_ALLOW_FULL_ACCESS=1` で `auto` / `bypassPermissions` へ昇格させたとき deny が
+  どう評価されるかは**実測していない**。昇格モードを使うなら、そこは未検証のまま使うことになる。
 
 **`claude -p` は完全なセッション**であり、機能が削られた実行ではない。だからカスタムスラッシュ
 コマンド・hook・settings.json・権限設定がすべて効き、worktree 内で `loop-guard.sh` が発火する。

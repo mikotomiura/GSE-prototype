@@ -11,6 +11,11 @@ BASE_DEFAULT="${LOOP_BASE_BRANCH:-}"   # 未指定なら下で解決
 
 die() { echo "loop-spawn: $*" >&2; exit 1; }
 
+# ⚠️ このスクリプトは後段で repo_root → worktree と 2 回 cd するので、
+#   ★ 兄弟スクリプトの場所は **cd する前に絶対パスで固定**する
+#   (⚠️ `dirname "$0"` を後段で評価すると worktree 側の存在しないパスを指す)。
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || die "git リポジトリ内で実行してください"
 cd "$repo_root"
 repo_name="$(basename "$repo_root")"
@@ -103,6 +108,31 @@ fi
 echo "loop-spawn: base=$base (start=$start) → branch=$branch / worktree=$wtdir"
 git worktree add -b "$branch" "$wtdir" "$start"
 cd "$wtdir"
+
+# --- ⚠️★★★ 必須 `permissions.deny` の注入（★ worktree 作成直後・失敗したら使わせない） ---
+#   ★ モードC (`loop-run.sh:275`) は worktree 生成を **このスクリプトへ委譲している**ので、
+#     ここに 1 か所置けば **モードA（人が spawn）とモードC（無人）の両方**が通る。
+#   ⚠️ 逆に `loop-run.sh` 側に置くと **モードA が素通りする**。
+#   ⚠️★★★ 出力は **stderr** へ流す —— ★ `--no-exec` の
+#     「**stdout の最終行 = worktree の絶対パス**」という契約 (`loop-run.sh:275` の `tail -1`) を壊さないため。
+#   ⚠️ 失敗しても続行する経路は作らない (fail-closed)。理由は loop-worktree-deny.sh 冒頭。
+#   ⚠️★★★ 失敗したら **worktree と branch ごと撤去する**（★ code-reviewer / security-checker
+#     MEDIUM・2026-09-14）。★ 残すと (a) 人が手で `cd` して deny 無しで起動できてしまい、
+#     (b) 同じ id の再実行が「同名 worktree が既に存在」で**恒久的に死ぬ**。
+#     ★ 作りたてで中身が無いので、撤去して失うものは無い。
+deny_script="${SCRIPT_DIR}/loop-worktree-deny.sh"
+abort_worktree() { # abort_worktree <理由>
+  cd "$repo_root" 2>/dev/null || true
+  git worktree remove --force "$wtdir" >/dev/null 2>&1 || true
+  git branch -D "$branch"              >/dev/null 2>&1 || true
+  git worktree prune                   >/dev/null 2>&1 || true
+  die "$1
+            ★ worktree ($wtdir) と branch ($branch) は撤去しました。原因を直して再実行してください。
+            (既存 worktree を手で点検するなら  bash scripts/loop-worktree-deny.sh --verify <worktree>)"
+}
+[ -f "${deny_script}" ] || abort_worktree "必須 deny の注入スクリプトが見つかりません: ${deny_script}"
+bash "${deny_script}" "$(pwd)" >&2 \
+  || abort_worktree "worktree への必須 deny 注入に失敗しました。★ deny 無しの worktree は渡しません。"
 
 echo "loop-spawn: worktree 準備完了。"
 
