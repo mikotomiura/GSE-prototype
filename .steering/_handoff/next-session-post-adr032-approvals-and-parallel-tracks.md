@@ -1,5 +1,10 @@
 # 次セッション開始プロンプト — ⚠️★★★ **ADR-032 の後始末（承認待ち 5 件）と、承認を待たずに走れる 2 本**
 
+> ⚠️★★★ **2026-09-14 追記 —— 次タスクは確定した。**
+> ★ **`next-session-loop-foundation-and-task2-slicing.md`（2z ＋ タスク 2 の分解）が現行である。**
+> ★ 本メモは **承認待ち 2 件の一覧**として引き続き有効（⚠️ §3 の「走れるもの 3 本」のうち
+> **2z ＋ タスク 2 を採ることに決まった**ので、タスク 3 は後回し）。
+
 > 作成: 2026-09-14 / ⚠️★★★ **このメモを一次資料にしない。**
 > ★ 一次は `docs/adr/ADR-032-instrument-change-arbitration.md`（**D1 の適合表 / D2 の 9 条件 / §Migration**）／
 > `.steering/20260914-instrument-change-arbitration/`（**decisions 判断 1〜10 / blockers 起票 19〜23**）／

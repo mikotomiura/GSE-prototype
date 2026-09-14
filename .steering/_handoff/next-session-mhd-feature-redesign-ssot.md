@@ -1,5 +1,12 @@
 # 次セッション開始プロンプト — **Mh-D と特徴量再設計の SSOT 化（T3）／第 1 歩 = `stall onset` の操作的定義**
 
+> ⚠️★★★ **2026-09-14 追記 —— §8b の「縦切りの目安 5 本」は是正された。**
+> ★ 当時は `ADR-030 D11` の **初版が `T1c` を丸ごと「計器変更 要」に送っていた**ため表から落ちていたが、
+> ⚠️ その後 `code-reviewer` の指摘で **`T1c` のうち 5 項目（delete run / rewrite / 再削除 / loop depth / 局所 recurrence）は
+> 計器変更 *不要*** に直っている。★ かつ 2026-09-14 に **`capability matrix`**（ADR-032 M7）が加わった。
+> → ★★★ **目安は 7 本である。現行の指示は `next-session-loop-foundation-and-task2-slicing.md` §3 を見ること。**
+> ★ **§8c（deny リストの実体）はそのまま有効**（⚠️ 再導出しない）。
+
 > 作成: 2026-09-13 / ⚠️★★★ **このメモを一次資料にしない。**
 > ★ 一次は `.idea/20260910-mhd-criterion-practice-trace-and-g-o-validation.md` /
 > `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md` /
