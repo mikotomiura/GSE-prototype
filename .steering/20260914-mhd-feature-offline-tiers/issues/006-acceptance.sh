@@ -38,4 +38,21 @@ if grep -nEi '(recovery|recover|回復)' "$SRC" >/dev/null 2>&1; then
   fail "$SRC に recovery / 回復 がある（★ docs/glossary.md の禁止用語。stable_generation_ms で表す）"
 fi
 
+# ★ pause / net は issue 001 の共有ヘルパを使うこと（⚠️ 局所定義を作らない）
+#   ⚠️ Codex TASK-PRE 指摘 5: 局所定義は issue 005 (stall onset) との破壊的な食い違いを生む。
+SRCF="src/analysis/feat_offline/restart.rs"
+if grep -nE '^[[:space:]]*(pub )?fn [a-z_]*(extract_pauses|compute_net|pause_list)' "$SRCF" >/dev/null 2>&1; then
+  fail "$SRCF が pause / net を独自に定義している（★ mod.rs の共有ヘルパを使うこと）"
+fi
+grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が mod.rs の共有ヘルパを参照していない"
+
+# AC7: ⚠️★★★ restart は retrospective であり、detection 側へ渡らないこと
+MODRS="src/analysis/feat_offline/mod.rs"
+grep -qEi 'restart[^
+]*retrospective|retrospective[^
+]*restart' "$MODRS"   || fail "$MODRS に restart が retrospective である旨の明記が無い"
+if grep -nE '(activity|stall_onset)::[a-z_]+\([^)]*restart' "$MODRS" >/dev/null 2>&1; then
+  fail "$MODRS が restart を detection 側へ渡している（★ 転帰側を検出側に混ぜない）"
+fi
+
 echo "[acceptance 006] OK"

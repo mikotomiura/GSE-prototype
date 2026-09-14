@@ -42,4 +42,12 @@ if grep -nE '^[[:space:]]*(pub )?const [A-Z_]*NET_DIFF[A-Z_]*[[:space:]]*:' "$SR
   fail "$SRC が net_diff_min を新しい定数として宣言している（★ 既存の値を参照すること）"
 fi
 
+# ★ pause / net は issue 001 の共有ヘルパを使うこと（⚠️ 局所定義を作らない）
+#   ⚠️ Codex TASK-PRE 指摘 5: 局所定義は issue 005 (stall onset) との破壊的な食い違いを生む。
+SRCF="src/analysis/feat_offline/stall_onset.rs"
+if grep -nE '^[[:space:]]*(pub )?fn [a-z_]*(extract_pauses|compute_net|pause_list)' "$SRCF" >/dev/null 2>&1; then
+  fail "$SRCF が pause / net を独自に定義している（★ mod.rs の共有ヘルパを使うこと）"
+fi
+grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が mod.rs の共有ヘルパを参照していない"
+
 echo "[acceptance 005] OK"

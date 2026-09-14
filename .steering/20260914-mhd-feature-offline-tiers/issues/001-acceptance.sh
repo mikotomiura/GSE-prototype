@@ -35,4 +35,15 @@ if grep -nE '^[[:space:]]*(pub )?const [A-Z_]+[[:space:]]*:[^=]*=[[:space:]]*[0-
   fail "activity.rs に新しい数値定数が宣言されている（★ features.rs の既存定数を use すること）"
 fi
 
+# AC8: ★ pause / net の抽出が mod.rs の共有ヘルパとして公開されていること
+#   ⚠️ Codex TASK-PRE 指摘 5: 後続 issue が局所的な pause 定義を持つと、
+#     issue 005 (stall onset) が別定義を要求して破壊的変更になる。
+MODRS="src/analysis/feat_offline/mod.rs"
+grep -qE '^[[:space:]]*pub fn [a-z_]*pause' "$MODRS"   || fail "$MODRS に pause 抽出の pub 関数が無い（★ 共有ヘルパとして公開すること）"
+grep -qE '^[[:space:]]*pub fn [a-z_]*net' "$MODRS"   || fail "$MODRS に net 計算の pub 関数が無い（★ 共有ヘルパとして公開すること）"
+
+# AC9: ★ Tier ごとの causal / retrospective の区分が書かれていること
+#   ⚠️ Codex TASK-PRE 指摘 3: 「その時点で既知」と「後から付けたラベル」を tick 行で混ぜない。
+grep -qEi '(causal|retrospective)' "$MODRS"   || fail "$MODRS に Tier ごとの causal / retrospective の区分が書かれていない"
+
 echo "[acceptance 001] OK"

@@ -110,6 +110,19 @@
 6. ★ worktree には必須 `permissions.deny` 7 件が**自動注入され、attempt ごとに再検査される**
    （★ 2026-09-14 に実装）。⚠️ ただし **注入されていること ≠ 発効していること**は未検証である。
 
+## 7b. ⚠️ TASK-PRE（Codex の第二意見）を反映した点
+
+★ `docs/loop-engineering.md` の Codex ゲート **TASK-PRE** を 1 回実行した（→ `_codex-preplan.md` に全文と採否）。
+★ **採用した 4 件**（⚠️ 不採用 2 件・部分採用 1 件は理由つきで preplan に記録した）:
+
+| 反映先 | 内容 |
+|---|---|
+| **001** | ★ `pause` / `net` の抽出を **`mod.rs` の共有ヘルパ**として所有する（AC 8）。⚠️ Codex 指摘 5: 002〜004 が局所的な pause 定義を持つと **005 が別定義を要求して破壊的変更になる** |
+| **001** | ★ **Tier ごとの causal / retrospective の区分**を明記する（AC 9）。⚠️ Codex 指摘 3: 「その時点で既知」と「後から付けたラベル」を tick 行で混ぜない |
+| **001** | ⚠️ **境界入力で落ちない**（空ログ / 単一イベント / 同一 timestamp / 時刻逆行 / tick 境界ちょうど / 閉じない最終 pause）（AC 10）。★ Codex 指摘 4 |
+| **002〜006** | ★ **共有ヘルパを使うこと**を AC ＋ `acceptance.sh` の grep で強制した |
+| **006** | ⚠️★★★ `restart` は **retrospective** と明記し、**detection 側へ渡さない**（AC 7）。★ Codex 指摘 3 |
+
 ## 8. 分解の自己検査（★ `issue-slicing` skill の締め）
 
 - [x] 各 issue を**単体 merge**しても main が壊れないか

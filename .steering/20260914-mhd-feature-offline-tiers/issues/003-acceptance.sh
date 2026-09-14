@@ -34,4 +34,12 @@ if grep -nEi '(band|bucket|short_pause|medium_pause|long_pause|帯域)' \
   fail "dispersion.rs に帯域分割がある（★ [P121] は 4 帯域すべてが成績と負相関と示した）"
 fi
 
+# ★ pause / net は issue 001 の共有ヘルパを使うこと（⚠️ 局所定義を作らない）
+#   ⚠️ Codex TASK-PRE 指摘 5: 局所定義は issue 005 (stall onset) との破壊的な食い違いを生む。
+SRCF="src/analysis/feat_offline/dispersion.rs"
+if grep -nE '^[[:space:]]*(pub )?fn [a-z_]*(extract_pauses|compute_net|pause_list)' "$SRCF" >/dev/null 2>&1; then
+  fail "$SRCF が pause / net を独自に定義している（★ mod.rs の共有ヘルパを使うこと）"
+fi
+grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が mod.rs の共有ヘルパを参照していない"
+
 echo "[acceptance 003] OK"
