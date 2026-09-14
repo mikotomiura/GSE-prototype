@@ -426,6 +426,23 @@ if setup_loop_repo "${LOOP_A}" 'rm -f .claude/settings.local.json'; then
     else
       ng "毎 attempt 保証: 回復できていない (attempt_start=${n_start} blocked=${n_block})"
     fi
+    # ⚠️★★★ events の不変条件（★ Codex /cross-review 2 巡目「テストの盲点」）:
+    #   ★ **`detail` の無い `attempt_start` は attempt ごとにちょうど 1 件**。
+    #   ⚠️ `detail` 付きは「その attempt の中で起きたこと」の記録であって attempt の数ではない
+    #   （★ 既存の max_turns / permission_denials も同じ作法）。ここを崩すと下流の
+    #   attempt 計数がある実装を将来入れたときに静かに壊れる。
+    n_bare="$(grep '"event":"attempt_start"' "${ev_a}" | grep -vc '"detail"' || true)"
+    if [ "${n_bare}" -eq 2 ]; then
+      ok "events 不変条件: detail 無しの attempt_start が attempt ごとに 1 件 (計 ${n_bare} / max_attempts=2)"
+    else
+      ng "events 不変条件: detail 無しの attempt_start が ${n_bare} 件 (★ 2 件のはず)"
+    fi
+    # ⚠️ phase=verify の attempt_start を出していないこと（★ loop-status の折り畳み表に無い組み合わせ）
+    if grep '"event":"attempt_start"' "${ev_a}" | grep -q '"phase":"verify"'; then
+      ng "events 不変条件: phase=verify の attempt_start を出している (★ board が解釈できない)"
+    else
+      ok "events 不変条件: attempt_start は phase=execute だけで出ている"
+    fi
   else
     ng "毎 attempt 保証: events.jsonl が空 (★ loop-run.sh が 1 度も動いていない → 判定できない)"
   fi

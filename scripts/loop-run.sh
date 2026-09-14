@@ -129,7 +129,15 @@ ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 d
   # ⚠️ 失われていた事実を必ず 1 行残す
   #   (★ 書式は既存の permission_denials / max_turns と同じ「attempt_start ＋ detail」に揃える。
   #    ⚠️ events 語彙は 10 種で固定なので新しい event 値を作らない)
-  emit "$id" "$phase" attempt_start attempt="$attempt" \
+  #
+  # ⚠️★★★ **phase は呼び出し元に関わらず `execute` で出す** (★ Codex /cross-review 2 巡目)。
+  #   ★ `loop-status` の折り畳み表は逐語「`attempt_start` → 🔄 running (**phase=execute**)」であり、
+  #     ⚠️ `phase=verify` の `attempt_start` は**表に無い組み合わせ**になって board が解釈できない。
+  #   ★ 不変条件はこう置く: **`detail` の無い `attempt_start` が attempt ごとにちょうど 1 件**。
+  #     ⚠️ `detail` 付きは「その attempt の中で起きたこと」の記録であり、attempt の数ではない
+  #     (★ 既存の max_turns / permission_denials も同じ作法。`loop-status` は件数ではなく
+  #      **最後の event** を見るので、この重複で board は壊れない)。
+  emit "$id" execute attempt_start attempt="$attempt" \
        detail="WARN: worktree の必須 permissions.deny が失われていた (削除/改ざん)。再注入を試みる"
   bash "$DENY_SH" "$wt" >/dev/null 2>&1 && return 0
   emit "$id" "$phase" blocked attempt="$attempt" \

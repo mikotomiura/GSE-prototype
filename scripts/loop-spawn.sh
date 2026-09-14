@@ -106,6 +106,8 @@ if git remote get-url origin >/dev/null 2>&1; then
 fi
 
 echo "loop-spawn: base=$base (start=$start) → branch=$branch / worktree=$wtdir"
+# ★ 撤去判定に使う「作成時の commit」を控えておく (★ abort_worktree の注記を参照)。
+start_sha="$(git rev-parse --verify --quiet "$start" 2>/dev/null || true)"
 git worktree add -b "$branch" "$wtdir" "$start"
 cd "$wtdir"
 
@@ -122,19 +124,27 @@ cd "$wtdir"
 #     ★ 作りたてで中身が無いので、撤去して失うものは無い。
 deny_script="${SCRIPT_DIR}/loop-worktree-deny.sh"
 abort_worktree() { # abort_worktree <理由>
-  local left=""
+  local left_wt="" left_br="" tip=""
   cd "$repo_root" 2>/dev/null || true
-  git worktree remove --force "$wtdir" >/dev/null 2>&1 || true
-  # ⚠️★★★ **`-D` を使わない**（★ Codex /cross-review MEDIUM・2026-09-14）。
-  #   ★ ここへ来るのは上の `git show-ref --verify` で「同名ブランチが無い」ことを確かめた直後に
-  #     `git worktree add -b` で**作ったばかりのブランチ**だけなので、base から進んでいない。
-  #   → ★ `-d` なら「未 merge の作業を持つブランチ」は**拒否される** ＝ 想定外の削除が起きない。
-  #     ⚠️ 拒否されたらブランチを残し、そのことを人に伝える（★ 黙って force しない）。
-  git branch -d "$branch" >/dev/null 2>&1 || left="$branch"
-  git worktree prune      >/dev/null 2>&1 || true
+  # ⚠️ 撤去できたかを**確かめてから**「撤去しました」と書く（★ Codex /cross-review 2 巡目）。
+  git worktree remove --force "$wtdir" >/dev/null 2>&1 || left_wt="$wtdir"
+  # ⚠️★★★ **`-D` を無条件で使わない**（★ Codex /cross-review 1 巡目 MEDIUM）。
+  #   ★ ただし `-d` の merged 判定は **現在の HEAD 依存**なので、作業ブランチに居ると
+  #     ⚠️ 空のブランチでも拒否されて残骸になる（★ Codex 2 巡目）。
+  #   → ★ 判定を HEAD に依存させない: **作成時の commit から 1 mm も動いていないときだけ**消す。
+  tip="$(git rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || true)"
+  if [ -n "$tip" ] && [ "$tip" = "${start_sha:-}" ]; then
+    git branch -D "$branch" >/dev/null 2>&1 || left_br="$branch"
+  elif [ -n "$tip" ]; then
+    # ⚠️ 何かがコミットされている ＝ 作りたてではない。★ 消さずに残して人に渡す。
+    left_br="$branch"
+  fi
+  git worktree prune >/dev/null 2>&1 || true
   die "$1
-            ★ worktree ($wtdir) は撤去しました。原因を直して再実行してください。
-            ${left:+⚠️ branch $left は未 merge の作業を持つため残しました (手で確認してください)。}
+            ${left_wt:+⚠️ worktree ($left_wt) を撤去できませんでした。手で確認してください。}${left_wt:+
+            }${left_wt:-★ worktree ($wtdir) は撤去しました。}
+            ${left_br:+⚠️ branch $left_br は作成時から動いているため残しました (手で確認してください)。}
+            ★ 原因を直してから再実行してください。
             (既存 worktree を手で点検するなら  bash scripts/loop-worktree-deny.sh --verify <worktree>)"
 }
 [ -f "${deny_script}" ] || abort_worktree "必須 deny の注入スクリプトが見つかりません: ${deny_script}"
