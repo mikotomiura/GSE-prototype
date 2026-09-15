@@ -86,3 +86,128 @@
     （⚠️ ただし **events を手で書かせる形にしない** —— モードC の原則を壊す）。
   - ⚠️ あるいは `loop-run.sh` に **issue 間の merge ゲート**を持たせるかを裁定する
     （★ そうすれば DAG が本来の意味で機能する）。
+
+---
+
+## 起票 5: ⚠️★★★ 「`--features` 出力を共有しない」に**機械的な門が無い**
+
+- **起票日**: 2026-09-15（★ issue 003 の `security-checker` 指摘 M1）
+- **規約は在る**: `docs/glossary.md:223` 逐語
+  「★ **中間成果物であり `gse-dataset` へは共有しない**」。
+  ★ 実装も規約どおりで、`bin/replay.rs` の `--features` は **stdout に書くだけ**（ファイルを作らない）、
+  `scripts/build_analysis_db.py` は `.metrics.json` しか読まない。
+  → ★ **issue 003 の diff は規約に違反していない。**
+- ⚠️ **問題は門が無いこと**（★ 実測で確認）:
+  - `.gitignore` は **集計 JSON を意図的に対象外**にしている（逐語「集計 JSON (metrics/calib/cohort.json) は対象外」）。
+  - ★ `git check-ignore` の実測: `feat.json` / `features.json` / `src-tauri/rows.json` /
+    `experiments/x/feat.json` は **4 つとも NOT ignored**。
+  - ⚠️★★★ **NDJSON の保護も名前依存である** —— ★ パターンは `gse_*.ndjson` /
+    `P[0-9]*_*.ndjson` なので、**`out.ndjson` は NOT ignored**（★ 実測。
+    ⚠️ 「NDJSON は守られている」と一般化して読まないこと）。
+- ⚠️ **`T1a` で中身の機微度が上がった**: 002 までは件数・カテゴリ件数だったが、
+  いま同じファイルに **ms 粒度の pause 長 ＋ セッション全体を横断する個人統計（`surprise`）**が載る。
+  ★ かつ `t_ms` は**絶対 epoch のまま**で、**`anonymize.rs` を一度も通らない**。
+- **★ 次に何をするか**:
+  1. ✅ **実施済み（安価な側）**: `--features` の usage に
+     「**手元の解析用中間成果物であり gse-dataset へ共有しない**」
+     「**`t_ms` は絶対 epoch ms で匿名化を通っていない**」を明記した。
+  2. ⚠️ **未実施（本筋）**: `glossary.md:223` の規約を**検査器にする**
+     （★ `gse-dataset` 側に feature row 形の JSON が無いことを CI で見る）。
+     ⚠️ `.gitignore` に慣用ファイル名を足すのは**名前依存なので代替にならない**。
+- ⚠️ **起票 2（由来の封筒）と一緒に裁定するのが自然**（★ どちらも `--features` の出力契約の話）。
+
+---
+
+## 起票 6: ⚠️ 削除区間（redaction）の長さが `pause_max_ms` に現れる
+
+- **起票日**: 2026-09-15（★ issue 003 の `security-checker` 指摘 L4）
+- **中身**: `feat_offline/mod.rs` の共有ヘルパ doc は逐語
+  「**`feat` 行の穴（削除区間・一時停止・計器欠損）を知らない**」
+  「本関数を素通しで使うと**被験者が削除を求めた位置に必ず onset が立つ**」と警告しているが、
+  ★ これは **issue 005 宛て**に書かれていた。
+  ⚠️ ところが `T1a` も同じ `extract_pause_resumptions` を素通しで使うので、
+  **削除後の NDJSON を入力にすると削除区間の前後が 1 本の巨大 pause として接続され、
+  その長さが `pause_max_ms` に出る**。→ ★ **005 だけの課題ではなく、003 で既に顕在化している。**
+- ★ **規約違反ではない**（⚠️ 情報は増えていない）: 削除後の NDJSON を読めば同じギャップが見えるし、
+  **原因ラベルは付いていない**ので `data-privacy` ルール 6「何を消したかは書かない」に抵触しない。
+- **★ 次に何をするか**: ⚠️ **issue 005 が「穴の有無で条件 B の連続を切る」を実装するとき、
+  `T1a` にも同じ扱いが要るかを判断する**（★ 005 の設計が決まってから）。
+  ⚠️ **原因ラベルを作る方向で直さない**（ADR-030 却下リスト 9）。
+
+---
+
+## 起票 7: ⚠️★★★ `T1a` の分位点が**構造的に退化している**（★ 集約窓は事前宣言事項なので裁定を上げる）
+
+- **起票日**: 2026-09-15（★ issue 003 の `code-reviewer` **HIGH-1**）
+- **何が起きているか**（★ 証明 ＋ 実測。⚠️ 推測ではない）:
+  - `features::PAUSE_THRESHOLD_MS` = **2000ms** > `loop_step::ENGINE_TICK_MS` = **1000ms**。
+  - pause は**再開側の press が属する tick** に帰属する（`feat_offline/mod.rs` のモジュール doc）。
+  - ★ 同じ tick に終わる pause が 2 本あると仮定する。再開時刻を `t1 < t2` とすると
+    同一 tick なので `t2 - t1 < 1000`。ところが `t2` で終わる pause の開始は `t1` 以降の press なので
+    `gap(t2) <= t2 - t1 < 1000 < 2000` となり、**`gap(t2) >= PAUSE_THRESHOLD_MS` に矛盾する**。
+  - → ★★★ **1 tick に pause は高々 1 本。** よって
+    **`pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は常に同値**である。
+  - ★ **実測（`tests/fixtures/` の 14 本すべて）**: `activity.pauses > 1` の tick は **0 件**、
+    `p50 != max` の行も **0 件**。
+- **なぜ効くか**:
+  - ⚠️ **3 フィールドのうち 2 つが情報を持たない。**
+  - ⚠️ `issues/003.md` **AC3** の不変式 `p50 <= p90 <= max` は
+    **等号でしか成立せず、検出力がゼロ**である（★ 緑に見えて何も検査していない）。
+  - ★ `ADR-030 D10` の `T1a` ＝「**分布**・個人相対（p50 / p90 / max・CV・個人基準からの逸脱）」が、
+    **`decisions.md` 判断 2（出力単位 = 1 Hz tick）と噛み合っていない**。
+    ⚠️ D10 は「`key` 行が 1 打鍵ごとに `t` を持つので **pause 長の分布を完全復元できる**」を
+    `T1a` の前提に置いているが、★ **行の粒度がその分布を潰している**。
+- ⚠️★★★ **本セッションでは値を決めなかった。理由を明記する**:
+  - ★ 直し方は**集約窓を決める問題**である。⚠️ **窓長は事前宣言 (pre-registration) 事項**であり、
+    `ADR-030 D4` が `W` / `q` / `B` を「**P1 前に事前宣言する**」と定め、
+    `issues/005.md` は逐語で「**`W` / `q` / `B` の値を決めること**」を **Scope Out** にしている。
+    → ★★★ **`T1a` の窓だけ裁定セッションが独断で決めるのは、同じ規律を片側だけ破ることになる。**
+  - ⚠️ かつ `docs/preregistration-v0.3.md` が凍結された合否契約を持つので、
+    ★ **研究者の承認なしに解析窓を足さない。**
+- **★ 選択肢（⚠️ 研究者が選ぶ）**:
+  - **(a) `T1a` だけ集約窓を広げる** —— ★ 例: 末尾 30 秒のローリング窓（`features.rs` の既存の窓と同じ長さ）。
+    ★ 因果的（後ろ向きにしか見ない）で、**1 行 1 tick は保たれる**ので判断 2 も他の issue も壊れない。
+    ⚠️ ただし `features.rs:129` の `30_000` は**名前の無い生リテラル**なので、
+    採るなら**判断 7 と同じ型の命名リファクタ**（`pub const` 化）が先に要る。
+  - **(b) `p50` / `p90` を落とす** —— ★ `T1a` を `pause_max_ms`（= その tick の唯一の pause 長）＋
+    `iki_cv` ＋ `surprise` に絞る。⚠️ **D10 が名指しした項目を削ることになる。**
+  - **(c) 判断 2 を見直す** —— ⚠️ **影響が全 issue に及ぶ**ので最後の手段。
+- **★ いま入れてある暫定の扱い**（⚠️ 放置していない）:
+  - ★ `dispersion.rs` の `Dispersion` の doc に**証明と実測を書き、「分布の要約として読むな」と明記**した。
+  - ★ `003-acceptance.sh` に「**現状 3 値が同値であること**」を固定する検査を入れた。
+    ⚠️ **(a) / (b) の裁定が入ったら、この検査を先に書き換えること。**
+- **⚠️ 併記すべき関連指摘**（★ `code-reviewer` MEDIUM）:
+  - `surprise` は pause を含む行で **`pause_max_ms` のアフィン変換にほぼ一致する**（共線性）。
+    ★ 実測: `resumption_outcomes` の非 null 7 行中 6 行が `keys=1` ＝ tick 内 IKI が 1 件なので、
+    `tick_mean` ≡ pause 長であり `surprise` はその線形写像そのもの。
+    → ⚠️ `ADR-030` の block ablation で「`T1a` 一群」の増分を測ると、
+    **実質 1 本の信号（pause 長）を重複計上する。**★ ablation 設計に明記が要る。
+  - `surprise` は **tick 内 IKI 件数 n に依存して尺度が揃わない**（`keys=1` の行と `keys=20` の行を
+    同じ尺度で読めない）。⚠️ ★ `code-reviewer` 自身が「手元 fixture が小さく**実証はできなかった**」と
+    明記しているので、**断定しない**。★ (a) の裁定と併せて検討する。
+
+---
+
+## 起票 8: ★ pause の「対の突き合わせ」が 2 か所に複製されている → **issue 005 で一本化する**
+
+- **起票日**: 2026-09-15（★ issue 003 の `code-reviewer` MEDIUM）
+- **中身**:
+  - `boundary::pause_boundary_pairs`（002）と `dispersion::pause_durations`（003）が、
+    ★ **同一の 15 行の走査**（sorted press を左から歩き、`extract_pause_resumptions` の
+    出力と値一致で対応づける）を**別々に持っている**。
+  - ⚠️ さらに `feat_offline/mod.rs` は**同じ press 列に対して sort ＋ pause 抽出を 3 回**
+    独立に行っている（`press_intervals` / `pause_boundary_pairs` / `pause_durations`）。
+    → ★ **3 か所が drift しうる。**
+- **⚠️ 今すぐ共通化しない理由**（★ `code-reviewer` の判断に同意した）:
+  ★ **issue 003 の Allowed Files に `boundary.rs` が無い**ので、003 で抽出するのは Allowed Files 違反。
+  → ★ **`boundary.rs` と `dispersion.rs` の両方を Allowed Files に持てる issue 005 で
+  `pause_events()`（`resuming_ts` ＋ `gap_ms` ＋ prev/next カテゴリ）へ一本化する**のが正しい。
+  ⚠️ 005 は `stall onset` で**同じ対の情報を要する**ので、そこが自然な集約点である。
+- **★ 005 への申し送り（⚠️ 忘れると 3 か所目が増える）**:
+  1. ★ **走査の正しさを支える不変式を明文化する** —— 現状どこにも書かれていない:
+     「**`extract_pause_resumptions` が返す resumption は、同値 run の先頭であり、かつ昇順である**」。
+     ⚠️ これが崩れると 3 か所すべてが黙って壊れる。
+  2. ★ 一本化したら **002 / 003 の単体テストがそのまま通ること**を確認する
+     （⚠️ 特に `dispersion::tests::pause_durations_pairs_gap_with_resuming_ts` の
+     同時刻重複ケースと、`boundary::tests::duplicate_timestamps_do_not_misalign_pairs`）。
+  3. ⚠️ **mutation で検出力を確かめてから**一本化する（★ 判断 16 の HIGH-2）。

@@ -600,7 +600,8 @@ struct Args {
     /// --corr-floor: correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (Step 2)。
     /// `--sweep` と同様に複数セッションを受ける。
     corr_floor: bool,
-    /// --features: ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を出力する (issue 001)。
+    /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
+    /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
     features: bool,
     /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
@@ -708,7 +709,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         false
     };
 
-    // --features フラグ (ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を出力。issue 001)
+    // --features フラグ (ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力。issue 001-007)
     let features = if let Some(pos) = args.iter().position(|a| a == "--features") {
         args.remove(pos);
         true
@@ -811,7 +812,9 @@ fn usage() -> String {
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
          --corr-floor        correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (production 不変)\n    \
-         --features          ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を JSON 配列で出力\n    \
+         --features          ADR-030 の Tier 別 1 Hz tick 単位特徴行を JSON 配列で出力\n    \
+         *** 手元の解析用中間成果物であり gse-dataset へ共有しない ***\n    \
+         *** t_ms は絶対 epoch ms で、匿名化 (anonymize.rs) を通っていない ***\n    \
          --json              集計系モード (--metrics/--segments/--intervention/--calibration/--sweep/--nudge-diag/--corr-floor) の出力を JSON へ\n    \
          -h, --help          このヘルプを表示\n",
     )
@@ -1046,7 +1049,7 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    // --features 経路: ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を JSON 配列で出力する
+    // --features 経路: ADR-030 の Tier 別 1 Hz tick 単位特徴行を JSON 配列で出力する
     // (issue 001)。`features.rs` / `engine.rs` を経由しない独立経路 (D1)。
     if args.features {
         let keys = match collect_key_events(&args.session_path) {

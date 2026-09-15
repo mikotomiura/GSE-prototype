@@ -81,10 +81,11 @@ if grep -nE '^[[:space:]]*(pub )?fn [a-z_]*(extract_pauses|compute_net|pause_lis
   fail "$SRCF が pause / net を独自に定義している（★ mod.rs の共有ヘルパを使うこと）"
 fi
 if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \
-     "$SRCF" | grep -vE 'const +TEST_' >/dev/null 2>&1; then
+     "$SRCF" | grep -vE '^[0-9]+:[[:space:]]*//' | grep -vE 'const +TEST_' >/dev/null 2>&1; then
   fail "$SRCF が数値定数を宣言している（★ 既存 SSOT を use する。テスト専用は TEST_ 接頭辞）"
 fi
-if grep -nE '[<>=!]=?[[:space:]]*(2000|2_000|1000|1_000)\b' "$SRCF" >/dev/null 2>&1; then
+if grep -nE '[<>=!]=?[[:space:]]*(2000|2_000|1000|1_000)\b' "$SRCF" \
+     | grep -vE '^[0-9]+:[[:space:]]*//' >/dev/null 2>&1; then
   fail "$SRCF が pause / tick の閾値をリテラルで直書き比較している（★ PAUSE_THRESHOLD_MS / ENGINE_TICK_MS を使う）"
 fi
 grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF" \

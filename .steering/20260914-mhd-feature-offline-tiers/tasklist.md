@@ -21,7 +21,7 @@
 ## 実行（★ 別セッション）
 - [x] 001 `--features` ＋ `T0`（★ commit `061e6fb`）
 - [x] 002 `T1b`（境界）（★ commit `284c754` → merge `a4400b9` ＋ レビュー修正。⚠️ Loop は `abandoned`・原因は検査バグ＝判断 13）
-- [ ] 003 `T1a`（分布）
+- [x] 003 `T1a`（分布）（★ commit `1440524` → merge `46f98ff` ＋ レビュー修正。⚠️ 起票 7 が開いたまま＝分位点が構造的に退化）
 - [ ] 004 `T1c`（revision topology）
 - [ ] 005 `stall onset`（★ 判断 11 で `parse` へ）
 - [ ] 006 `T1d`（restart）
