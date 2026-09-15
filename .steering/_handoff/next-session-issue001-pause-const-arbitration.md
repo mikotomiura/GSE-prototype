@@ -1,5 +1,11 @@
 # 次セッション開始プロンプト — issue 001 の pause 閾値問題を裁定する（詳細版・Opus）
 
+> ✅★★★ **2026-09-15 に完了した。本メモは履歴である。**
+> ★ 裁定は `.steering/20260914-mhd-feature-offline-tiers/decisions.md` **判断 7 / 判断 8**。
+> ★ issue 001 は `done`（commit `061e6fb` で merge 済み）。
+> ⚠️ **本メモの 3 案の前提のうち 3 件は一次資料で成立しなかった**（→ 判断 7 に訂正を記録）。
+> ⚠️ **次にやることは本メモではなく `next-session-loop-issues-002-007.md` を見ること。**
+
 > ★ **本ファイルは詳細版。** セッション冒頭に**そのまま打ち込む短い本文**は
 > `next-session-issue001-pause-const-arbitration-prompt.md` にある（2026-09-15 追加）。
 > ★ 前段（issue 001 実行の記録）は `next-session-loop-run-task2.md` /

@@ -1,5 +1,8 @@
 # 新セッション冒頭に**そのまま打ち込む**プロンプト — issue 001 の pause 閾値裁定（Opus）
 
+> ✅★★★ **2026-09-15 に実行済み。このプロンプトはもう貼らない。**
+> ★ 結果は `decisions.md` 判断 7 / 判断 8 と `issues/001.md` の Execution Result にある。
+
 > 作成: 2026-09-15 / ★ **下のコードブロックの中身をコピーして、新セッションの最初の発話に貼る。**
 > ⚠️ このファイル自体は一次資料ではない。★ 詳細な経緯・3案・裁定後の手順は
 > `.steering/_handoff/next-session-issue001-pause-const-arbitration.md` にある。
