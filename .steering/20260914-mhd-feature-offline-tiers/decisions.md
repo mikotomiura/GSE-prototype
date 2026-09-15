@@ -214,3 +214,62 @@
    `const NAME: ... = <数値>` の**宣言**しか見ておらず、**`>= 2000` と直書き**されたら**緑のまま通る**。
    → ★ 「新しい定数が無い」の否定形に加えて、**`PAUSE_THRESHOLD_MS` を実際に参照している**という
    肯定形と、**`feat_offline/` 配下に `2000` リテラルが無い**ことを足した。
+
+## 判断 8: issue 001 は Loop の外（裁定セッション）で仕上げる ＋ `recheck` の watchdog を当てにしない
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション）
+- **背景**: 判断 7 の後に issue 001 を再実行したところ、⚠️ **attempt 1 / 2 とも `max_turns`（30）到達**で
+  打ち切られつつ実装は積み上がり、`run_verify` は通過した。★ しかし **watchdog が 2 回連続で空応答**を返し、
+  `loop-run.sh:238-241` の fail-closed で `blocked` になった（tokens 9,050,167 / cost **$3.604688**）。
+  ⚠️ `loop-run.sh:243-246` 自身が逐語「**`recheck` の watchdog は現状まだ完全に信頼できる gate ではない。
+  空応答を返すことがある**」「**AC を機械的に検査できるなら `<id>-acceptance.sh` を書くほうが確実**」と明記している。
+- **選択肢**:
+  - A: **裁定セッションが客観再検証し、レビュー指摘を直して仕上げる**（★ Loop の残り attempt を使わない）
+  - B: `max_turns` を上げて 3 回目を回す
+  - C: `verify_level` を `parse` に落として回し直す
+- **採用**: **A**（⚠️ C の「acceptance を厚くする」部分は**併せて採る**）
+- **理由**:
+  - ★★★ **watchdog がやるはずだった「客観再検証」を、より強い検査主体が実際に行える**。
+    ★ 実測で pin 済み verify 4 本 ＋ acceptance ＋ **AC 対応 test を名前指定**で緑を確認した。
+  - ⚠️★★★ **緑は「正しい」を意味しなかった** —— `code-reviewer` / `security-checker` を並列起動したところ、
+    **HIGH 相当が 3 件**出た（下記）。★ B / C で回し直しても、**この 3 件は acceptance が検査していない以上
+    緑のまま通る**（＝ attempt を増やしても見つからない）。→ ★ **検査を足すことが先**である。
+  - ⚠️ B は $3.5/回 を追加で払って `max_turns` の当て推量を試すことになる。
+- **レビューで出た HIGH 3 件（★ すべて一次資料で再確認してから直した）**:
+  1. ⚠️★★★ **AC 6 の実質違反**: `feat_offline/mod.rs` に `pub const TICK_MS: u64 = 1000;`
+     （`loop_step.rs:40 ENGINE_TICK_MS` の再宣言。★ doc 自身が「同じ」と書いていた）。
+     → ★ **私が判断 7 で AC 6 検査を `activity.rs` に絞った**（誤検出を恐れて範囲を狭めた）ことが原因。
+     ⚠️ **範囲を狭めた判断が、まさにその抜け穴を作った。** → 検査を `feat_offline/` 全体へ広げ、
+     `ENGINE_TICK_MS` 参照の**肯定形**も足した。
+  2. ⚠️★★★ **時刻スパンに比例した確保**: tick 数は入力バイト数でなく**時刻スパン**に比例するので
+     `MAX_SESSION_BYTES` では防げない。★ **実測: 251 バイト・2 行の NDJSON（`t=0` と `t=1e8`）で 100,001 行**。
+     ADR-030 **D9**（壁時計の前方跳躍）で現実に発火する。→ `MAX_FEATURE_TICKS` で `Err`。
+     ⚠️ ギャップを `saturating_sub` で潰さない（D9 の危険側に落ちる）。
+  3. ⚠️ **`pastes` が恒常 0**: `collect_paste_events` は `--metrics` 用で文字数欠落行を落とすため、
+     `minimal.ndjson:22` の paste が 1 件も数えられていなかった（★「paste が無い」と「文字数が取れない」の混同）。
+     → `collect_all_paste_timestamps` を追加。
+  ★ 併せて `t_ms` を**絶対 epoch ms** に変更（⚠️ 相対だと判断 2 の「後から join できる」が出力単体で成立しない）。
+- **acceptance の強化（★ 検査自体を実測で試した）**: ① 定数宣言の禁止を `feat_offline/` 全体へ ＋
+  ② `ENGINE_TICK_MS` 参照の肯定形 ＋ ③ **出力キー集合の完全一致**（⚠️ 将来 `window_title` 等が増えたら落ちる）
+  ＋ ④ `pastes` 総和 > 0 ＋ ⑤ **巨大時刻ギャップ入力で exit ≠ 0**。
+  ★ ルール 5b に従い、**旧実装（`TICK_MS` あり）で落ち、現行で通り、余計なフィールド追加を弾く**ことを実際に試した。
+- **トレードオフ**:
+  - ⚠️★★★ **Loop の自律性は今回実証されなかった** —— ★ 2 回とも人が引き取っている。
+    ★ ただし**実装の大枠（363 行）は worker が書いた**もので、人が足したのは修正と検査である。
+  - ⚠️ `events.jsonl` に `issue_done` が**書かれていない**（★ script だけが書く規約を破らない）。
+    → ★ **issue 002 以降の `deps_met` が満たされない**。⚠️ 手で `issue_done` を捏造しない。
+    → ★ 対処は「**002 の `## Dependencies` から 001 を外す**」（★ コード上の依存は **merge 済み**で満たされている）。
+      ⚠️ 外すときは `_issue-plan.md` の DAG も同時に直すこと。
+- **影響範囲**: `issues/001.md`（Status: done ＋ Execution Result）/ `001-acceptance.sh` /
+  `src-tauri/src/analysis/feat_offline/` / `src-tauri/src/bin/replay.rs` / commit `061e6fb`
+- **見直しタイミング**: ★ watchdog の空応答が直ったとき（★ そのとき `recheck` を再び当てにしてよい）
+
+### ⚠️★★★ 次に Loop を回す前に決めること（★ 未決・起票）
+
+1. ⚠️ **`headless.max_turns: 30` が足りているか** —— ★ 002〜007 も同程度の規模なら、
+   毎 attempt が途中で切れる。★ 上げるか、issue をさらに小さく切るかを決める。
+2. ⚠️ **`verify_level: recheck` を 005 / 007 でどうするか** —— ★ watchdog が空応答を返す限り、
+   `recheck` は「必ず最後に blocked になる門」である。★ `parse` ＋ 厚い `acceptance.sh` ＋
+   **人のレビュー**に寄せるのが現実的（★ `loop-run.sh` 自身の推奨と同じ）。
+3. ⚠️ **`permission_denials` の中身は今回も未検証**（★ 前回の引き継ぎ §1b と同じ）。
+   ★ `loop-run.sh:342` の `res` を保存する改修を先に入れないと、何が拒否されたか永久に分からない。
