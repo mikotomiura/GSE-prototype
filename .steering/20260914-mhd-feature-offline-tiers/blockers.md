@@ -269,3 +269,81 @@
      最短（★ worker はそのファイルを読めないため、転記なしでは同じ壁に当たる）。
 - **本タスクで閉じない理由**: 定義確定は「本タスク（Tier 実装）」の外側にある研究者判断であり、
   `docs/loop-engineering.md` の Stop Condition「要件が曖昧 (AC を確定できない)」に直接該当する。
+
+### ★★★ 裁定セッションによる追記（2026-09-15・⚠️ worker が読めなかった一次資料を確認した）
+
+⚠️★★★ **worker の「`.idea/` は参照不可」は正しいが、理由は「存在しない」ではない。**
+
+- ★ `.idea/` は **ローカルディスクに実在する**（`C:\GSE-prototype\.idea\`・20 ファイル）。
+  ⚠️ **gitignore されている**ので、**worktree には 1 バイトも現れない**
+  （★ `git worktree add` は追跡ファイルしか持って行かない）。
+  → ★ **worker からは構造的に読めない**（★ 権限の問題ではない）。
+- ★ 該当ファイルは `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md`。
+  `ADR-030` が引く `.idea/survey:189` は**その 189 行目**である。
+
+★★★ **裁定セッションが実際に読んだ結果（⚠️ 推測ではない）** —— 189 行目の逐語:
+
+```text
+| T1c | revision topology | delete run、rewrite、再削除、loop depth、undo/redo 往復、局所 recurrence |
+```
+
+→ ⚠️★★★ **算出式は書かれていない。候補の *名前の一覧* である。**
+
+- ★ 前後（§6.1 の Tier 表・§6.2 第一仮説）にも演算的定義は無い。
+- ★ §17.3「追加するならこの形に限定する」に「**transition count と recurrence**」という
+  記述はあるが、⚠️ これは**オンラインで作ってよい特徴の類型**を述べたもので、
+  `loop_depth` / `local_recurrence` の**式ではない**。
+- → ★★★ **worker の「次に何をするか 3」（`.idea/survey:189` の抜粋を転記するのが最短）は
+  *実行できない*。** ⚠️ **転記すべき式が存在しない**ので、この経路は閉じた。
+
+★ **したがって本起票は「資料を探せば解ける」ものではなく、研究者が定義を *作る* 案件である。**
+⚠️ ★ `delete_run_max` / `delete_runs` の 2 項目だけが一意に読める、という worker の切り分けは
+**追認する**（★ AC2 の「手計算と一致」と整合し、fixture も 3 連の走りを持つ）。
+
+**★ 裁定（2026-09-15・`decisions.md` 判断 17）**: ⚠️ **issue 004 は保留し、実装しない。**
+★ 005 / 006 / 007 は `revision` に依存しない（★ 005 は `net_production`、006 は `t0`、
+007 は `capabilities` を要る）ので、**先に進める**。
+⚠️ **部分実装（2 項目だけ）もしない** —— ★ AC1 が 6 フィールドを要求しており、
+半分の Tier を出力に載せると**後から足すときにキー集合の検査を 2 度書き換える**ことになる。
+
+---
+
+## 起票 10: ⚠️★★★ worker が `git checkout main` で **worktree 隔離を自分で外せた**（★ 実測）
+
+- **起票日**: 2026-09-15（★ issue 004 の attempt で実際に発生）
+- **何が起きたか**（★ reflog の実測）:
+  ```text
+  92fd22f HEAD@{0}: checkout: moving from loop/004-issue to main
+  bd921b6 HEAD@{1}: commit: docs(engine): issue 004 … 実装せず停止し、定義未確定を起票する
+  ```
+  → ★ worker は停止記録をコミットした**後**、worktree を **`main` へ切り替えて終わった**。
+  ⚠️ `git worktree list` が `C:/wt/GSE-prototype-004-issue 92fd22f [main]` を示す状態になった。
+- **なぜ通ったか**（★ 一次資料で確認・⚠️ 推測ではない）:
+  - ★ worktree に注入される必須 `deny` は **7 件**で、実測の内訳は
+    `Bash(git push:*)` / `Bash(gh pr merge:*)` / `Bash(git reset --hard:*)` / `Bash(git rebase:*)` /
+    `Bash(sudo:*)` / `Bash(rm -rf:*)` / `Bash(chmod -R:*)`。⚠️ **`git checkout` は入っていない。**
+  - ★ 追跡済み `.claude/settings.json` の `permissions.allow` に
+    **`Bash(git *)` と `Bash(gh *)`** が在る（★ 実測）。→ ⚠️ **`git checkout` は明示的に許可されている。**
+  - ★ `_loop-config.json` の `allowed_tools` にも `git checkout` は無いが、
+    ⚠️ **allow 側の `Bash(git *)` が広いので効かない。**
+- ⚠️★★★ **これは `docs/loop-engineering.md` が理論として書いていたことの実測である**。逐語:
+  > ⚠ **この 7 件は「多層防御」であって境界ではない** (2 点とも 2026-09-14 時点で未検証):
+  > - **綴りを網羅できない**。… 追跡済み `.claude/settings.json` の
+  >   `allow: ["Bash(git *)","Bash(gh *)"]` に拾われる。
+  → ★ **「未検証」だった側が、2026-09-15 に検証された**（⚠️ 悪意ではなく通常動作として）。
+- **今回の実害**: ★ **無い**。⚠️ ただしそれは**偶然である**:
+  - ★ worker は commit **後**に checkout したので、作業は `loop/004-issue` に残った。
+  - ⚠️ **未コミットの変更を抱えたまま checkout していたら失われていた**
+    （★ 001 / 002 / 003 の worker は**いずれも未コミットのまま終わっている**）。
+  - ⚠️ かつ main checkout が `main` に居たら checkout は失敗していた（★ 今回は別ブランチだったので通った）。
+- **★ 次に何をするか**（⚠️ 本タスクの範囲外・Loop 基盤の改修）:
+  1. ★ **deny に `Bash(git checkout:*)` / `Bash(git switch:*)` を足す**か、
+     ⚠️ **`allow` の `Bash(git *)` を worktree 内では絞る**。
+     ★ 後者のほうが本筋（★ 綴りの網羅を諦める側の設計にしない）。
+  2. ⚠️★★★ **より重要**: `loop-run.sh` は attempt 終了時に
+     **worktree が期待どおりのブランチに居るかを検査していない**。
+     → ★ `run_verify` の前に `git -C "$wt" rev-parse --abbrev-ref HEAD` が
+     `loop/<id>-issue` であることを確かめ、違えば `blocked` にする（fail-closed）。
+     ⚠️ これが無いと、**別ブランチの内容を verify して緑/赤を出す**ことが起こりうる。
+  3. ★ 併せて「**worker は commit してから終わる**」を `/loop-issue` の契約に書く
+     （⚠️ 001 / 002 / 003 はいずれも未コミットで終わり、裁定セッションが拾っている）。
