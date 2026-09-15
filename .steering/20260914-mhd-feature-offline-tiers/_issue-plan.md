@@ -8,12 +8,21 @@
 | id | 中身 | verify_level | Allowed Files（新規は ★） |
 |---|---|---|---|
 | **001** | `--features` モード ＋ `T0`（activity） | **recheck** | `bin/replay.rs` / `analysis/mod.rs` / ★`feat_offline/mod.rs` / ★`feat_offline/activity.rs` |
-| **002** | `T1b`（boundary） | parse | `feat_offline/mod.rs` / ★`feat_offline/boundary.rs` |
+| **002** | `T1b`（boundary） | parse | `feat_offline/mod.rs` / ★`feat_offline/boundary.rs` / ⚠️`bin/replay.rs` |
 | **003** | `T1a`（dispersion） | parse | `feat_offline/mod.rs` / ★`feat_offline/dispersion.rs` |
 | **004** | `T1c`（revision topology） | parse | `feat_offline/mod.rs` / ★`feat_offline/revision.rs` |
-| **005** | `stall onset`（`t0`）検出器 | **recheck** | `feat_offline/mod.rs` / ★`feat_offline/stall_onset.rs` |
+| **005** | `stall onset`（`t0`）検出器 | parse ※ | `feat_offline/mod.rs` / ★`feat_offline/stall_onset.rs` / ⚠️`bin/replay.rs`（任意） |
 | **006** | `T1d`（restart） | parse | `feat_offline/mod.rs` / ★`feat_offline/restart.rs` |
-| **007** | `Q`（evidence quality） | **recheck** | `feat_offline/mod.rs` / ★`feat_offline/quality.rs` |
+| **007** | `Q`（evidence quality） | parse ※ | `feat_offline/mod.rs` / ★`feat_offline/quality.rs` / ⚠️`bin/replay.rs` |
+
+> ⚠️★★★ **2026-09-15 に 2 点を改訂した**（★ `decisions.md` **判断 11 / 判断 12**）:
+> - **※** 005 / 007 の `recheck` を **`parse` に落とした**（★ watchdog が空応答を返すため。
+>   ⚠️ **独立再検証をやめたのではない** —— 主体が裁定セッション ＋ 厚い `acceptance.sh` へ移った）。
+> - ⚠️ 002 / 005 / 007 の Allowed Files に **`bin/replay.rs` を足した**（★ `ime_shadow` /
+>   `meta.capabilities` / `hook_health` は **replay 側がまだ読んでおらず**、AC が
+>   実在しない前提に乗っていたため）。★ 制約は各 issue の `## Allowed Files` に明記した。
+> - ★ 非退化検査用の新規 fixture **`tests/fixtures/instrument_rich.ndjson`** を裁定セッションが作った
+>   （⚠️ 既存 fixture は 1 本も書き換えていない）。
 
 ★ 順序は **ADR-030 D10 の投資順序**に従う —— 逐語「⚠️★★★ **`T1` の内側では `T1b`（境界）を
 `T1a`（分布）より先に置く。**」→ ★ `001 → 002(T1b) → 003(T1a) → 004 → 005 → 006 → 007`。
@@ -30,10 +39,16 @@
 ## 2. 依存 DAG（★ 循環なし）
 
 ```text
-001 → 002 → 003 → 004 → 005 → 006 → 007
+[001 = done・merge 済み]   002 → 003 → 004 → 005 → 006 → 007
 ```
 
-- **最長 chain: 7 段**（＝ 直列時の総ウェーブ数）。
+> ⚠️★★★ **2026-09-15 に `001 → 002` の辺を外した**（★ `decisions.md` **判断 9**）。
+> ★ コード上の依存（共有ヘルパ）は commit `061e6fb` で **merge 済み**である。
+> ⚠️ ただし 001 は Loop の外で仕上げたため `_loop-events.jsonl` に `issue_done` が無く、
+> 辺を残すと `loop-run.sh:435-448` の `preflight_dag` が die する。
+> ★ **残る chain は 6 段**（002→…→007）。
+
+- **最長 chain: 6 段**（★ 2026-09-15 時点。001 を除いた実行対象のみ）。
 - **循環: なし**（★ 各 issue の `## Dependencies` は自分より小さい id を 1 つだけ持つ）。
 - ★ `budget.parallel: 1`（引き継ぎ §6 の指示。★ 初回の無人実行なので最小で回す）。
 
@@ -90,12 +105,21 @@
 
 | id | level | 理由 |
 |---|---|---|
-| 001 | **recheck** | ★ **公開 CLI（`--features`）を新設**し、⚠️ ゴールデン replay の経路に隣接する |
-| 005 | **recheck** | ★ **AC 直結**（`t0` は本トラック全体の原点。⚠️ 誤ると後続の転帰がすべて歪む） |
-| 007 | **recheck** | ⚠️★★★ **data-privacy に触れる**（★ 欠測理由に被験者由来が混ざると、端末内で完結すると約束した削除の事実が共有物に出る） |
+| 001 | **recheck**（★ 実行済み） | ★ **公開 CLI（`--features`）を新設**し、⚠️ ゴールデン replay の経路に隣接する |
+| 005 | ~~recheck~~ → **parse ＋ 人** | ★ **AC 直結**（`t0` は本トラック全体の原点。⚠️ 誤ると後続の転帰がすべて歪む） |
+| 007 | ~~recheck~~ → **parse ＋ 人** | ⚠️★★★ **data-privacy に触れる**（★ 欠測理由に被験者由来が混ざると、端末内で完結すると約束した削除の事実が共有物に出る） |
 | 002 / 003 / 004 / 006 | parse | ★ 純関数の追加で、AC は `acceptance.sh` と単体テストで機械的に取れる |
 
-⚠️ **全部 parse にしていない**（基準 5 のアンチパターン）。
+⚠️★★★ **2026-09-15 改訂**（★ `decisions.md` **判断 11**）: 005 / 007 の `recheck` を `parse` に落とした。
+★ 実測で watchdog が **2 回連続で空応答**を返し、`loop-run.sh:238-241` の fail-closed で必ず `blocked` になるため
+（★ `loop-run.sh:243-246` 自身が逐語「`recheck` の watchdog は現状まだ完全に信頼できる gate ではない」
+「AC を機械的に検査できるなら `<id>-acceptance.sh` を書くほうが確実」と書いている）。
+
+⚠️ **基準 5 を緩めたのではない。** ★ 基準 5 が要求するのは**独立再検証が在ること**であって
+**watchdog であること**ではない。→ ★ 再検証の主体を
+「動かない Haiku watchdog」から「**裁定セッション（pin 済み verify 4 本 ＋ 厚い `acceptance.sh` ＋
+`code-reviewer` / `security-checker` 並列）**」へ移した。
+⚠️★★★ **005 / 007 は merge 前に必ずレビュー 2 本を通す**（★ 省略したら基準 5 を本当に破ったことになる）。
 
 ## 7. ⚠️ 実行前に効く前提（★ 忘れると空振りする）
 

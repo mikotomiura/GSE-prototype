@@ -50,4 +50,30 @@ if grep -nE '^[[:space:]]*(pub )?fn [a-z_]*(extract_pauses|compute_net|pause_lis
 fi
 grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が mod.rs の共有ヘルパを参照していない"
 
+# ⚠️★★★ 2026-09-15 追加（★ decisions.md 判断 11 —— `recheck` を `parse` に落としたぶん、
+#   機械検査をここで厚くする。★ 型は引き継ぎ §4）。
+printf '%s' "$out" | jq -e '
+  [.[].stall_onset | keys_unsorted[]] | unique
+  == ["is_onset","phase","s_ms","t0_ms","task_kind","theta_person_ms"]' >/dev/null 2>&1 \
+  || fail "stall_onset のキー集合が AC1 の 6 個と完全一致しない（★ 増えても減っても落とす）"
+
+# ⚠️★★★ ADR-030 D3 逐語「新しい定数を作らない」。★ W / q / B の値を決めるのは Scope Out である。
+if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \
+     "$SRC" | grep -vE 'const +TEST_' >/dev/null 2>&1; then
+  fail "$SRC が数値定数を宣言している（★ ADR-030 D3: 新しい定数を作らない。W/q/B は設定で外から与える。テスト専用は TEST_ 接頭辞）"
+fi
+if grep -nE '[<>=!]=?[[:space:]]*(2000|2_000|1000|1_000)\b' "$SRC" >/dev/null 2>&1; then
+  fail "$SRC が pause / tick の閾値をリテラルで直書き比較している（★ PAUSE_THRESHOLD_MS / ENGINE_TICK_MS を使う）"
+fi
+
+# AC8 の肯定形: net は共有ヘルパを**実際に呼んでいる**こと（⚠️ 否定形だけでは 001 で抜けた）
+grep -qE 'net_production' "$SRC" \
+  || fail "$SRC が net_production を呼んでいない（★ 条件 A の net は 001 の共有ヘルパが SSOT）"
+
+# ⚠️★★★ 原因ラベルを作らないこと（★ ADR-030 却下リスト 9 / redaction.rs の約束
+#   「何を消したかは書かない」）。★ 穴の**有無**だけを見るのが正しい。
+if grep -nEi '(recording_pause|redaction|redact|participant|一時停止|区間削除)' "$SRC" >/dev/null 2>&1; then
+  fail "$SRC が欠測の**原因**に言及している（★ 穴の有無だけを見る。ADR-030 却下リスト 9）"
+fi
+
 echo "[acceptance 005] OK"

@@ -273,3 +273,135 @@
    **人のレビュー**に寄せるのが現実的（★ `loop-run.sh` 自身の推奨と同じ）。
 3. ⚠️ **`permission_denials` の中身は今回も未検証**（★ 前回の引き継ぎ §1b と同じ）。
    ★ `loop-run.sh:342` の `res` を保存する改修を先に入れないと、何が拒否されたか永久に分からない。
+
+## 判断 9: issue 002 の `## Dependencies` から `001` を外す
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション・2 回目）
+- **背景**: 判断 8 のとおり issue 001 は Loop の外で仕上げたため、`_loop-events.jsonl` に
+  **`issue_done` 行が 1 行も無い**（★ 実測: event 値の内訳は
+  `abandoned 1 / acceptance_fail 6 / attempt_start 18 / blocked 2 / test_fail 1`。`issue_done` はゼロ）。
+- **一次資料で確かめたこと**（⚠️ 引き継ぎメモを根拠にしていない）:
+  - `scripts/loop-run.sh:435-448` `preflight_dag` は、`## Dependencies` の依存先が
+    **`--issues` で選んだ集合 `$ALL` に無ければ `die` する**（逐語「issue $id の依存 $d が issues/ に存在しません」）。
+  - 同 `:422-431` は events から `issue_done` の issue だけを `DONE_IDS` に seed する。
+    → ★ 001 を `--issues` に含めても `deps_met` は満たされず、**001 が再実行される**。
+  - コード上の依存は満たされている（`src/analysis/feat_offline/mod.rs` は commit `061e6fb` で main 側に在る）。
+- **採用**: **002 の `## Dependencies` を「なし」にする**（★ 003→002 以降の直列は維持する）。
+  ⚠️ `_issue-plan.md §2` の DAG 図も同時に直す（★ 片方だけ直さない）。
+- ⚠️ **却下**: events.jsonl に手で `issue_done` を書く。
+  → ★ モードC の原則（`docs/loop-engineering.md` 逐語「events の writer は … モードC = `scripts/loop-run.sh` **だけ**」）を破る。
+- **影響範囲**: `issues/002.md` / `_issue-plan.md §2`
+
+## 判断 10: `headless.max_turns` を 30 → 60 に上げる
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション・2 回目）
+- **背景**: 判断 8 の未決 1。★ 実測（`_loop-events.jsonl`）: issue 001 は
+  **`max_turns 到達 (attempt 打ち切り)` を 4 回**記録している（1 回目の run で 1 回・2 回目の run で 3 回）。
+  ⚠️ 打ち切られても実装は積み上がるが、次 attempt は**毎回ゼロから文脈を読み直す**ぶんだけ無駄になる。
+- **一次資料で確かめたこと**:
+  - `loop-run.sh:335-341` は `--max-turns "$MAX_TURNS"` と **`--max-budget-usd "$MAX_USD"` を
+    1 attempt ごとに渡している**。→ ★ **真の上限は turn 数ではなく `max_budget_usd: 5.0` / attempt** である。
+  - 実績: run1 = 6 attempt / **$3.528222**（≈ $0.59 / attempt）、run2 = 3 attempt / **$3.604688**（≈ $1.20 / attempt）。
+    → ★ `$5.0 / attempt` の天井には**一度も当たっていない**。turn 数を倍にしても天井は動かない。
+- **採用**: **`max_turns: 60`**（`max_budget_usd: 5.0` は据え置き）。
+- **理由**: ★ 002〜007 の 1 本あたりの作業は「ADR/issue を読む → 1 モジュール ＋ 単体テストを書く →
+  `cargo test` を数回回す」で、**cargo の 1 回が数 turn**を食う。30 では読み込みだけで尽きる実測がある。
+  ⚠️ 費用側は turn ではなく `max_budget_usd` が押さえているので、turn を絞る意味が薄い。
+- **トレードオフ**: ⚠️ 1 attempt の最悪費用が上がる（理論上 $5.0 まで）。
+  ★ ただし `budget.max_attempts: 6` と `no_progress_threshold: 4` は据え置きなので、issue 1 本の上限構造は変わらない。
+- **影響範囲**: `_loop-config.json`
+
+## 判断 11: `verify_level: recheck`（005 / 007）を `parse` に落とし、客観再検証は本セッションが担う
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション・2 回目）
+- **背景**: 判断 8 の未決 2。★ 実測で watchdog は **2 回連続で空応答**を返し、
+  `loop-run.sh:238-241` の fail-closed で `blocked` になった。
+- **一次資料**（⚠️ 引き継ぎメモではなくスクリプト本文）: `loop-run.sh:243-246` 逐語
+  「**`recheck` の watchdog は現状まだ完全に信頼できる gate ではない。空応答を返すことがある**」
+  「**AC を機械的に検査できるなら `<id>-acceptance.sh` を書くほうが確実**」。
+  ★ `:377-381` のとおり `recheck` は **verify が緑になった直後に必ず通る門**なので、
+  空応答が出る限り「最後に必ず `blocked` になる門」である。
+- **採用**: **005 / 007 を `parse` にする ＋ `acceptance.sh` を厚くする ＋ 本セッションが客観再検証する**。
+  ★ 客観再検証の中身は判断 8 の A と同じ: pin 済み verify 4 本 ＋ `<id>-acceptance.sh` ＋
+  `code-reviewer` / `security-checker` の**並列**起動。
+- ⚠️ **これは基準 5 の緩和ではない**。`docs/loop-engineering.md` の基準 5（AC 直結 / security /
+  公開 API に触れるなら `recheck`）が要求しているのは**独立再検証があること**であって、
+  **watchdog であること**ではない。★ 再検証の主体を「動かない Haiku watchdog」から
+  「実際に走る Opus セッション ＋ 機械検査」へ移す。
+  ⚠️★★★ **だから「レビューを省いてよい」とは読まない** —— ★ 005 / 007 は
+  merge 前に**必ず** `code-reviewer` ＋ `security-checker` を通す（★ 007 は data-privacy に触る）。
+- **見直しタイミング**: ★ watchdog の空応答が直ったとき
+- **影響範囲**: `issues/005.md` / `issues/007.md` の `verify_level:` 行 / `_issue-plan.md §6`
+
+## 判断 12: ⚠️★★★ issue 002 / 007 の AC は**実在しない前提**に乗っていた（★ 実行前に潰す）
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション・2 回目）
+- **背景**: 判断 7 の「モードC の運用上の発見 2」が起票したこと —— 逐語
+  「**Stop Conditions が前提にしている事実を `acceptance.sh` で先に機械検査しておけば、
+  1 attempt 目の `acceptance_fail` の中身から気づけた**」—— を、**回す前に**全 issue へ適用した。
+  ★ その結果、issue 001 と**同じ失敗様式が 2 件**見つかった。
+- **実測（⚠️ 予測ではない・すべて一次資料）**:
+
+  | # | issue | AC の前提 | 実体 |
+  |---|---|---|---|
+  | 1 | **002** | AC1/AC5 が `ime_dwell_ms` / `ime_nav` / `ime_abandon` を要求 | ⚠️ `bin/replay.rs:159` の `ImeShadow` は **`serde_json::Value` の読み飛ばし専用**（doc 逐語「replay では読み飛ばす」）。★ `build_feature_rows(keys, paste_ts, max_ticks)` に IME は**入っていない**。⚠️ かつ **`bin/replay.rs` は 002 の Allowed Files に無い** |
+  | 2 | **002** | AC5 が `argumentative_ime_mixed.ndjson` で `ime_dwell_ms` 総和 > 0 を要求 | ⚠️★★★ **`tests/fixtures/` のどの `.ndjson` にも `ime_shadow` 行が 1 本も無い**（実測: 全 fixture を grep して 0 件）。★ 当該 fixture の行種は `key 244 / ime_state 3 / meta 2 / session_start 1 / session_meta 1` |
+  | 3 | **007** | AC1 が `capabilities` / `hook_health` を要求 | ⚠️ `capabilities` は **`meta` 行のフィールド**（`logger.rs:1628`・ADR-013 D1）だが、`ReplayEvent::Meta`（`replay.rs:91-97`）は `session_start` / `session_end` / `hmm_version` **しか持たない**。`HookHealth` も読み飛ばし専用。⚠️ `bin/replay.rs` は 007 の Allowed Files に無い |
+  | 4 | **007** | AC6 が `minimal.ndjson` で `capabilities` 非 null を要求（★ 検査の fail 文言は逐語「minimal.ndjson は meta 行を持つ」） | ⚠️★★★ **`minimal.ndjson` の meta 行は `session_start` / `hmm_version` だけ**で、`capabilities` も `app_version` も**無い**（★ ADR-013 D1 より前の形式）。★ `hook_health` 行も全 fixture にゼロ |
+
+  → ★★★ **どちらも「AC が参照する対象が存在しない」**。issue 001 の AC 6（`features.rs` の
+  pause 閾値の named constant が無い）と**同一の失敗様式**であり、放置すれば
+  **worker が Stop Condition に当たって止まるか、Allowed Files を破る**かのどちらかになる。
+  ⚠️ 前者は 1 issue あたり **$3.5 前後**を捨てる（★ 001 の実績）。
+
+- **選択肢**:
+  - A: **Allowed Files に `bin/replay.rs` を足し**、欠けている fixture を**裁定セッションが作る**
+  - B: AC から IME / `capabilities` / `hook_health` を落として issue を痩せさせる
+  - C: 配線だけの先行 issue を切る
+- **採用**: **A**
+- **理由**:
+  - ★★★ **ADR-030 D11 の「計器変更不要」は成立している** —— ⚠️ D11 が言う「計器」は
+    **`logger.rs` が行を書き出すか**であり、`logger.rs:478` は `ime_shadow` を、`:1986` は `hook_health` を、
+    `:1628` は `capabilities` 入りの `meta` を**実際に書いている**。
+    ★ 欠けているのは**オフライン読み出し側**であって、計器ではない。
+    → ★ 本タスクが作っているのは**まさにそのオフライン読み出し側**なので、配線は各 issue の縦切りの中身である。
+  - ⚠️ B は 007 をほぼ空にする（★ `Q` の中身は `capabilities` / `hook_health` / `dropped` という
+    **計器側の事実**そのものであり、ADR-030 D10 の囲みが名指ししている）。
+  - ⚠️ C は `docs/loop-engineering.md` 基準 1 逐語「**層別の横切り分割は禁止**」に反する（★ 判断 7 と同じ理由）。
+  - ★ **並列度は失われない** —— `_issue-plan.md §3` のとおり **並列可能な組は元々 1 つも無い**
+    （交差の実体は `feat_offline/mod.rs` 1 本）。`bin/replay.rs` を足しても DAG は変わらない。
+- **`bin/replay.rs` に付ける制約**（⚠️ 無制限には開けない）:
+  - ★ 触ってよいのは **`--features` 経路**と **`ReplayEvent` への行型/フィールド追加**、
+    および **新しい `collect_*` 関数の追加**だけ。
+  - ⚠️★★★ **`--snapshot` / `--metrics` / `--calibration` / `--sweep` 経路を変更しない**
+    （★ ゴールデン 15 本は pin 済み verify の `test` に載っており、壊せば必ず赤になる）。
+  - ⚠️ `HMM_VERSION` を bump しない / ゴールデンを再生成しない（★ 引き継ぎ §6 の継続）。
+- **fixture は裁定セッションが作る**（★ 判断 7 と同じ理由 —— 前提の整備は縦切りではない）:
+  - ★ 新規 `src-tauri/tests/fixtures/instrument_rich.ndjson`（**62 行**・合成）。
+    ⚠️ 既存 fixture は **1 本も書き換えていない**（★ ゴールデン 15 本の入力を動かさないため）。
+  - ★ 中身は **`logger.rs` の実際の出力書式に合わせた**（⚠️ 推測で組んでいない）:
+    `meta`（`capabilities` ＋ `app_version` 入り・`capabilities.rs::capabilities_json` の 3 群と同じ形）/
+    `session_meta`（`task_kind=argumentative`）/ `ime_shadow`（`logger.rs:478` 逐語書式・
+    `dwell_ms` 650 と 920・`nav` 2 と 3・`abandon` false と true）/
+    `hook_health`（`logger.rs:1986` 逐語書式・`dropped_delta` 付き）/ `paste` /
+    2 本の pause（**2650 ms** と **7550 ms**）/ backspace 3 連（delete run）/
+    `188`（`,`）と `190`（`.`）= `SentencePunctuation` / `32`（Space）/ `13`（Enter）。
+  - **検証（★ 実行した。⚠️ 予測ではない）**: 既定モード `gse-replay <fixture>` が **exit 0**（14 snapshot 行。
+    ⚠️ `hmm_version 0.2.0 / engine 0.5.0` の WARN は**既存 fixture と同じベースライン**）/
+    `--features` が **exit 0**（15 行・`pauses` が立つ行 2 件・`pastes` 総和 1）。
+  - ⚠️ **ゴールデンの対象にはしない** —— ★ `replay.rs` のゴールデン一覧は
+    `(ndjson, json)` の**明示ペア列**（`:3602-3610`）であり、fixture ディレクトリを走査していないので
+    **新規ファイルを足しても snapshot テストは増減しない**。
+  - ⚠️ ★ `scripts/verify-extraction-parity.sh:170` は fixture ディレクトリを `find` で**全走査する**。
+    ★ 新規 fixture でも既定モードが exit 0 なので FAIL しない（★ 上で実測）。
+    ⚠️ ただし同スクリプト自身が「差分に fixtures が含まれると偽 FAIL になりうる」と警告するので、
+    **base=main と比較する用途では結果を鵜呑みにしない**（★ 同スクリプトは pin 済み verify に載っていない）。
+- **トレードオフ**:
+  - ⚠️ worker が `bin/replay.rs`（約 3600 行）を触れるようになる。★ 壊れれば pin 済み verify の
+    ゴールデン 15 本が赤になるので、**黙って通り抜ける経路は無い**。
+  - ⚠️ `instrument_rich.ndjson` は**合成データ**であり、実測の IME 挙動を代表しない。
+    ★ `ime_shadow` の**行数は「変換回数」の代理にならない**（★ 起票 6・issue 002 の Background）。
+    → ★ 本 fixture は **AC の非退化検査用**であって、分布の根拠には使わない。
+- **影響範囲**: `issues/002.md` / `issues/005.md` / `issues/007.md` の Allowed Files /
+  `002-acceptance.sh` / `007-acceptance.sh` / `_issue-plan.md §1` /
+  ★ 新規 `src-tauri/tests/fixtures/instrument_rich.ndjson`

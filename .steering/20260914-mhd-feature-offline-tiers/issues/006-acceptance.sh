@@ -55,4 +55,19 @@ if grep -nE '(activity|stall_onset)::[a-z_]+\([^)]*restart' "$MODRS" >/dev/null 
   fail "$MODRS が restart を detection 側へ渡している（★ 転帰側を検出側に混ぜない）"
 fi
 
+# ⚠️★★★ 2026-09-15 追加（★ 引き継ぎ §4 の型 / decisions.md 判断 8）
+printf '%s' "$out" | jq -e '
+  [.[].restart | keys_unsorted[]] | unique
+  == ["post_t0_deletes","post_t0_inserts","post_t0_navigations",
+      "restop_ms","stable_generation_ms"]' >/dev/null 2>&1 \
+  || fail "restart のキー集合が AC1 の 5 個と完全一致しない（★ 増えても減っても落とす）"
+
+if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \
+     "$SRC" | grep -vE 'const +TEST_' >/dev/null 2>&1; then
+  fail "$SRC が数値定数を宣言している（★ buffer B は stall_onset 側の設定から引く。テスト専用は TEST_ 接頭辞）"
+fi
+if grep -nE '[<>=!]=?[[:space:]]*(2000|2_000|1000|1_000)\b' "$SRC" >/dev/null 2>&1; then
+  fail "$SRC が pause / tick の閾値をリテラルで直書き比較している（★ PAUSE_THRESHOLD_MS / ENGINE_TICK_MS を使う）"
+fi
+
 echo "[acceptance 006] OK"

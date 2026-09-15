@@ -42,4 +42,22 @@ if grep -nE '^[[:space:]]*(pub )?fn [a-z_]*(extract_pauses|compute_net|pause_lis
 fi
 grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が mod.rs の共有ヘルパを参照していない"
 
+# ⚠️★★★ 2026-09-15 追加（★ 引き継ぎ §4 の型 / decisions.md 判断 8）——
+#   ★ 「否定形だけでは抜ける」ことを issue 001 で実測した（`TICK_MS` の再宣言が緑のまま通った）。
+#   ⚠️ 出力キー集合の**完全一致**。フィールドを足したくなったら AC1 と本検査を先に直すこと。
+printf '%s' "$out" | jq -e '
+  [.[].dispersion | keys_unsorted[]] | unique
+  == ["iki_cv","pause_max_ms","pause_p50_ms","pause_p90_ms","surprise"]' >/dev/null 2>&1 \
+  || fail "dispersion のキー集合が AC1 の 5 個と完全一致しない（★ 増えても減っても落とす）"
+
+# ⚠️ 新しい数値定数を宣言しない（ADR-030 D3 逐語「新しい定数を作らず、既存パラメータを対称に再利用する」）
+if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \
+     "$SRCF" | grep -vE 'const +TEST_' >/dev/null 2>&1; then
+  fail "$SRCF が数値定数を宣言している（★ 既存 SSOT を use する。テスト専用は TEST_ 接頭辞）"
+fi
+# ⚠️ 直書き禁止: pause / tick の閾値をリテラルで比較しない
+if grep -nE '[<>=!]=?[[:space:]]*(2000|2_000|1000|1_000)\b' "$SRCF" >/dev/null 2>&1; then
+  fail "$SRCF が pause / tick の閾値をリテラルで直書き比較している（★ PAUSE_THRESHOLD_MS / ENGINE_TICK_MS を使う）"
+fi
+
 echo "[acceptance 003] OK"

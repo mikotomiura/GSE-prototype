@@ -19,7 +19,7 @@
   "events_path": "/c/GSE-prototype/.steering/20260914-mhd-feature-offline-tiers/_loop-events.jsonl",
   "acceptance_template": "bash {issue_dir}/{issue_id}-acceptance.sh",
   "headless": {
-    "max_turns": 30,
+    "max_turns": 60,
     "max_budget_usd": 5.0,
     "permission_mode": "acceptEdits",
     "model": "sonnet",
