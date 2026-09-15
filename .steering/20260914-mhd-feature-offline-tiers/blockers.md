@@ -211,3 +211,61 @@
      （⚠️ 特に `dispersion::tests::pause_durations_pairs_gap_with_resuming_ts` の
      同時刻重複ケースと、`boundary::tests::duplicate_timestamps_do_not_misalign_pairs`）。
   3. ⚠️ **mutation で検出力を確かめてから**一本化する（★ 判断 16 の HIGH-2）。
+
+---
+
+## 起票 9: ⚠️★★★ issue 004 (`T1c` revision topology) の `rewrite` / `redelete` / `loop_depth` / `local_recurrence` — 演算的定義がリポジトリ内に無い（★ issue 自身の Stop Condition に該当・実装せず停止）
+
+- **起票日**: 2026-09-15（★ `/loop-issue 004` attempt 4、実装前の一次資料確認で発見）
+- **経緯（★ 一次資料で確認）**:
+  - `_loop-events.jsonl` の実測: `issue":"004"` は **attempt 1〜3 がすでに `acceptance_fail`**
+    （fingerprint はそれぞれ別: `4aea54bf…` / `79592cf9…` / `9ddc17b2…`）。★ 原因ログは
+    起票 3 の通り保存されない仕様なので、失敗理由そのものは特定できない。
+  - ⚠️ しかし `issues/004.md` の `## Stop Conditions` は逐語で
+    「**`rewrite` / `loop depth` の定義が本文なしでは一意に決まらないとき → 定義候補を 2〜3 出して止める
+    （推測で 1 つ選ばない）**」と明記しており、attempt 4 の着手前にこの条件を検査したところ
+    **該当することが判明した**。
+- **確認した一次資料（★ 定義が「無い」ことの証拠）**:
+  - `docs/adr/ADR-030-stall-onset-and-decision-episode.md` D11: `T1c` の 5 項目
+    （`delete run` / `rewrite` / `再削除` / `loop depth` / `局所 recurrence`）を**「計器変更不要」と
+    分類するのみ**で、演算的な定義は書かれていない。出典は `.idea/survey:189` とされるが、
+    ★ `.idea/` は本 repo に存在しない（`Glob .idea/**` = 0 件）——研究者の私的資料であり
+    **worker からは参照不可能**。
+  - `requirement.md:18` / `design.md:33-34` も同様に**名前と JSON 形だけ**を示し、算出式を持たない。
+  - `decisions.md` / `_issue-plan.md` / `_codex-preplan.md` の grep も**演算的定義 0 件**
+    （fixture 差し替え（判断 13）は `delete_runs` の非退化検査の話であり、
+    `rewrite` 等の定義そのものには触れていない）。
+  - → ★★★ **`delete_run_max` / `delete_runs` の 2 項目だけは「連続する削除の走り」として
+    一意に読める**（AC2 の「手計算と一致」・fixture コメントの「連続 2 打以上」とも整合）。
+    ⚠️ **残る 4 項目（`rewrite_count` / `redelete_count` / `loop_depth_max` / `local_recurrence`）は
+    一意に決まらない**。
+- **なぜ「本文を参照せずに定義する」制約 (AC3) だけでは絞り込めないか**:
+  AC3 は「引数が `KeyCategory` と時刻だけ」を要求するのみで、その 2 つから**どの集約規則**
+  （burst の切り方・alternation か nesting か・window の取り方）を採るかは規定しない。
+  以下のとおり、同じ入力に対して**異なる出力を返す複数の読みが両立する**
+  （= 「唯一の妥当な読み」に収束しない。実測: 簡単な `D I D I D` 系列で試算すると
+  alternation 数 = 4、push/pop 深さ = 1 と**候補間で値が食い違う**）。
+
+  | 項目 | 候補 A | 候補 B | 候補 C |
+  |---|---|---|---|
+  | `rewrite_count` | **隣接再開**: 削除の走りの直後の 1 press（時間間隔を問わない、系列上の隣）が text-producing なら 1 カウント | **同一 burst 内再開**: `extract_pause_resumptions` が切る burst の中で、削除の走りの後に text-producing press が 1 件以上あれば 1 カウント（pause SSOT を再利用） | **net 回復**: 削除の走り後、次の削除の走り（または burst 終端）までの `net_production` が 0 以上に戻ったら 1 カウント（`net_production` ヘルパを再利用するが「区切り」を新規定義する必要がある） |
+  | `redelete_count` | burst 内で 2 本目以降に現れる削除の走りをすべて計上（候補 B の burst 定義に依存） | 削除の走りの直後に text-producing が**ちょうど 1 件だけ**挟まって再び削除の走りが来た場合のみ計上（A よりきつい） | burst 境界を使わず session 全体で「直前の削除の走り後に net が正に回復しないまま次の削除の走りが来た」場合を計上（burst に依存しないぶん、tick 帰属規則が他 Tier と非対称になる） |
+  | `loop_depth_max` | **alternation 数**: burst を `{D=delete run, I=insert run}` の 2 記号に圧縮した run-length 列の遷移回数 | **alternation 数 ÷ 2 (pair 数)**: 候補 A を D→I の完了ペア数として数え直したもの | **push/pop 深さ**: delete run で +1・text-producing の run で -1（0 未満に沈まない）とする累積カウンタの burst 内最大値。★ 候補 A/B とは**別の概念**であり、同じ入力で異なる数値になる（本文中の試算参照） |
+  | `local_recurrence` | tick 内で KeyCategory bigram が重複する割合（window = 既存 tick grid、新規定数不要） | burst 内（pause SSOT の区切り）で同様の重複割合を出し、resuming tick に帰属 | `redelete_count > 0` を 0.0/1.0 にキャストしただけの縮退値（★ これは `redelete_count` と冗長になるため、3 候補の中では**採用に値しない**候補として明示的に却下する） |
+
+- **なぜここで止めるのが正しいか（★ 推測で 1 つ選ばなかった理由）**:
+  1. issue 自身の `## Stop Conditions` が該当ケースを名指ししている。
+  2. 4 候補軸（burst 切り方 / alternation か nesting か / 隣接か net 回復か / window の単位）は
+     互いに独立で、組み合わせ次第で `rewrite_count` 等の値が変わる——
+     「唯一の自然な読み」に絞り込めない。
+  3. **3 回の推測実装がすでに `acceptance_fail` で終わっている**（budget 6 attempt 中 3 消費済み）。
+     ★ ここでさらに 4 回目の推測を重ねるのは `decisions.md` が記録した
+     「issue 002 で実際に $5.7 を捨てた失敗様式」の再演になる。
+- **★ 次に何をするか（研究者判断が必要）**:
+  1. 上表 4 項目 × 各 2〜3 候補から、研究者が採用案を選ぶ（または別案を示す）。
+  2. 選定結果を `decisions.md` に判断として記録し、`issues/004.md` の Background に
+     算出式を明記してから `/loop-issue 004` を再実行する。
+  3. ⚠️ **`.idea/survey:189` に算出式が実在するなら、その抜粋を issue に転記する**のが
+     最短（★ worker はそのファイルを読めないため、転記なしでは同じ壁に当たる）。
+- **本タスクで閉じない理由**: 定義確定は「本タスク（Tier 実装）」の外側にある研究者判断であり、
+  `docs/loop-engineering.md` の Stop Condition「要件が曖昧 (AC を確定できない)」に直接該当する。
