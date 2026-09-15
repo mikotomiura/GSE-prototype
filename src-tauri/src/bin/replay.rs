@@ -62,6 +62,15 @@ use gse_next_lib::logger::TaskKind;
 /// 10 分セッションの NDJSON は通常 数 MB なので 500 MB は十分広いバッファ。
 const MAX_SESSION_BYTES: u64 = 500 * 1024 * 1024;
 
+/// `--features` が許す tick 数の上限 (= 1 Hz で約 11.5 日ぶん)。
+///
+/// ⚠️★★★ **`MAX_SESSION_BYTES` では防げない**別種の暴走を止めるための上限である。
+/// tick 数は**入力のバイト数ではなく時刻スパンに比例する**ので、
+/// ★ 実測 (2026-09-15): **251 バイト・2 行**の NDJSON に `t=0` と `t=1e8` を並べるだけで
+/// **100,001 行**が出た。epoch 混入・壁時計の前方跳躍 (**ADR-030 D9**)・セッション連結の
+/// いずれでも発火しうる。⚠️ ギャップを黙って潰さず `Err` で止める (D9 の危険側に落とさない)。
+const MAX_FEATURE_TICKS: usize = 1_000_000;
+
 /// `--calibration` で受け付ける 1 被験者あたりのセッションファイル数の上限。
 ///
 /// 各ファイルは `MAX_SESSION_BYTES` で保護されるが、ファイル**数**が無制限だと
@@ -566,12 +575,19 @@ struct Args {
     /// --corr-floor: correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (Step 2)。
     /// `--sweep` と同様に複数セッションを受ける。
     corr_floor: bool,
+    /// --features: ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を出力する (issue 001)。
+    features: bool,
     /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    parse_args_from(std::env::args().skip(1).collect())
+}
+
+/// `parse_args()` の本体。`Vec<String>` を直接受けるため、`std::env::args()`
+/// (プロセス全体で 1 つ) に依存せず単体テストできる (AC4: モード相互排他)。
+fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     if args.is_empty() || args.iter().any(|a| a == "-h" || a == "--help") {
         return Err(usage());
     }
@@ -667,6 +683,14 @@ fn parse_args() -> Result<Args, String> {
         false
     };
 
+    // --features フラグ (ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を出力。issue 001)
+    let features = if let Some(pos) = args.iter().position(|a| a == "--features") {
+        args.remove(pos);
+        true
+    } else {
+        false
+    };
+
     // --json は集計系モード併用時のみ意味を持つ
     if json
         && !metrics
@@ -694,13 +718,14 @@ fn parse_args() -> Result<Args, String> {
         sweep,
         nudge_diag,
         corr_floor,
+        features,
     ]
     .iter()
     .filter(|&&v| v)
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag, --corr-floor are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
                 .to_string(),
         );
     }
@@ -732,6 +757,7 @@ fn parse_args() -> Result<Args, String> {
         sweep,
         nudge_diag,
         corr_floor,
+        features,
         extra_sessions,
     })
 }
@@ -748,7 +774,8 @@ fn usage() -> String {
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
-         gse-replay <s1.ndjson> [s2.ndjson ...] --corr-floor [--json]\n\n\
+         gse-replay <s1.ndjson> [s2.ndjson ...] --corr-floor [--json]\n    \
+         gse-replay <session.ndjson> --features\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
@@ -759,6 +786,7 @@ fn usage() -> String {
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
          --corr-floor        correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (production 不変)\n    \
+         --features          ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を JSON 配列で出力\n    \
          --json              集計系モード (--metrics/--segments/--intervention/--calibration/--sweep/--nudge-diag/--corr-floor) の出力を JSON へ\n    \
          -h, --help          このヘルプを表示\n",
     )
@@ -989,6 +1017,50 @@ fn main() -> ExitCode {
             }
         } else {
             let _ = write!(lock, "{}", format_intervention_pretty(&metrics));
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    // --features 経路: ADR-030 T0 (activity) の 1 Hz tick 単位特徴行を JSON 配列で出力する
+    // (issue 001)。`features.rs` / `engine.rs` を経由しない独立経路 (D1)。
+    if args.features {
+        let keys = match collect_key_events(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect key events: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        // ⚠️ `collect_paste_events` ではなく**全 paste 行の時刻**を使う。
+        // ★ `T0` の `pastes` は件数なので、文字数欠落の行を落とすと 0 に潰れる。
+        let paste_ts = match collect_all_paste_timestamps(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect paste events: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
+            &keys,
+            &paste_ts,
+            MAX_FEATURE_TICKS,
+        ) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to build feature rows: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        match serde_json::to_string_pretty(&rows) {
+            Ok(s) => {
+                let _ = writeln!(lock, "{}", s);
+            }
+            Err(e) => {
+                tracing::error!("failed to serialize feature rows: {}", e);
+                return ExitCode::from(1);
+            }
         }
         return ExitCode::SUCCESS;
     }
@@ -1355,6 +1427,56 @@ fn collect_logged_feats(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, Str
 /// (`.steering/20260623-outcome-metrics/decisions.md` CD-OM3)。中身は一切読まない (数値のみ)。
 /// 戻り値 = (capture 済 paste 列, 文字数欠落で除外した paste 件数)。後者は
 /// `OutcomeMetrics.excluded_paste_count` に載せ、偏りの透明性を確保する。
+/// `--features` 用: NDJSON の `{"type":"paste", ...}` 行の**時刻をすべて**返す。
+///
+/// ⚠️★★★ [`collect_paste_events`] と**用途が違う**ので分けてある。
+/// ★ あちらは `external_paste_chars` を持つ行だけを集める (文字数が要る `--metrics` 用)。
+/// ⚠️ `T0` の `pastes` は **件数**なので、文字数が欠落した行を落とすと
+/// 「paste が無かった」と「paste は在ったが文字数が取れなかった」が `0` に潰れる
+/// (★ 実測: `tests/fixtures/minimal.ndjson:22` は文字数の無い paste 行で、
+///  分けなかった初版では全 tick が `pastes: 0` になっていた。2026-09-15・レビュー MEDIUM)。
+/// ⚠️ 中身は一切読まない (時刻のみ)。
+fn collect_all_paste_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<u64> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Paste { t, .. } = ev {
+            out.push(t);
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_all_paste_timestamps: some lines failed to parse as ReplayEvent"
+        );
+    }
+    out.sort_unstable();
+    Ok(out)
+}
+
 fn collect_paste_events(session_path: &PathBuf) -> Result<(Vec<PasteEvent>, u32), String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
@@ -2270,6 +2392,25 @@ mod tests {
         p.push("snapshots");
         p.push(name);
         p
+    }
+
+    /// AC4: `--features` は他のモードフラグと同時指定できない (exit ≠ 0 相当の `Err`)。
+    #[test]
+    fn features_mode_is_mutually_exclusive() {
+        let args = vec![
+            "session.ndjson".to_string(),
+            "--features".to_string(),
+            "--metrics".to_string(),
+        ];
+        assert!(parse_args_from(args).is_err());
+    }
+
+    /// `--features` 単独では受理される (mutual exclusion の対照)。
+    #[test]
+    fn features_mode_alone_is_accepted() {
+        let args = vec!["session.ndjson".to_string(), "--features".to_string()];
+        let parsed = parse_args_from(args).expect("--features alone should parse");
+        assert!(parsed.features);
     }
 
     /// v0.4 Outcome metrics の Replay-as-Truth 回帰: outcome_metrics.ndjson を

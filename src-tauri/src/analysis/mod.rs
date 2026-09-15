@@ -2,6 +2,9 @@ pub mod anonymize;
 pub mod calibration_eval;
 pub mod cohort;
 pub mod engine;
+// ★ ADR-030 D1: stall onset 検出器の下準備となる T0 (activity) 等の特徴量計算 (オフライン専用)。
+// `gse-replay --features` が呼ぶ。⚠️ `features.rs` / `engine.rs` とは独立 (HMM_VERSION 非依存)。
+pub mod feat_offline;
 pub mod features;
 pub mod heads;
 pub mod intervention;
