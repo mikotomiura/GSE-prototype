@@ -49,18 +49,21 @@
 //! 明示すること (「その時点で既知」と「後から付けたラベル」を tick 行の中で混ぜない)。
 
 pub mod activity;
+pub mod boundary;
 
 pub use activity::T0Activity;
+pub use boundary::{Boundary, ImeShadowEvent};
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{is_backspace, is_text_producing, KeyPress};
 
-/// 1 tick ぶんの特徴行。`activity` は `T0` (Tier 0)。
+/// 1 tick ぶんの特徴行。`activity` は `T0` (Tier 0)、`boundary` は `T1b` (境界)。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FeatureRow {
     /// tick 開始時刻 (**絶対 epoch ms**)。モジュール doc の「tick への帰属規則」参照。
     pub t_ms: u64,
     pub activity: T0Activity,
+    pub boundary: Boundary,
 }
 
 /// 連続する press 間の間隔 1 件。`resuming_ts` はその間隔を終える (2 打目の) press 時刻。
@@ -145,17 +148,28 @@ pub fn net_production(keys: &[KeyPress]) -> i64 {
 pub fn build_feature_rows(
     keys: &[KeyPress],
     paste_ts: &[u64],
+    ime_events: &[ImeShadowEvent],
     max_ticks: usize,
 ) -> Result<Vec<FeatureRow>, String> {
-    if keys.is_empty() && paste_ts.is_empty() {
+    if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());
     }
 
     let key_ts = keys.iter().map(|k| k.timestamp);
     let paste_ts_iter = paste_ts.iter().copied();
+    let ime_ts_iter = ime_events.iter().map(|e| e.t_ms);
     // unwrap: 上の early-return で空入力を排除済みなので、少なくとも1件は必ずある。
-    let grid_origin_ms = key_ts.clone().chain(paste_ts_iter.clone()).min().unwrap();
-    let t_last = key_ts.chain(paste_ts_iter).max().unwrap();
+    let grid_origin_ms = key_ts
+        .clone()
+        .chain(paste_ts_iter.clone())
+        .chain(ime_ts_iter.clone())
+        .min()
+        .unwrap();
+    let t_last = key_ts
+        .chain(paste_ts_iter)
+        .chain(ime_ts_iter)
+        .max()
+        .unwrap();
 
     let tick_of =
         |t: u64| -> usize { (t.saturating_sub(grid_origin_ms) / ENGINE_TICK_MS) as usize };
@@ -190,6 +204,16 @@ pub fn build_feature_rows(
         pause_count_by_tick[tick_of(resuming_ts)] += 1;
     }
 
+    let mut ime_by_tick: Vec<Vec<ImeShadowEvent>> = vec![Vec::new(); tick_count];
+    for ev in ime_events {
+        ime_by_tick[tick_of(ev.t_ms)].push(*ev);
+    }
+    let mut boundary_pairs_by_tick: Vec<Vec<boundary::PauseBoundaryPair>> =
+        vec![Vec::new(); tick_count];
+    for pair in boundary::pause_boundary_pairs(keys) {
+        boundary_pairs_by_tick[tick_of(pair.resuming_ts)].push(pair);
+    }
+
     Ok((0..tick_count)
         .map(|idx| FeatureRow {
             t_ms: grid_origin_ms + idx as u64 * ENGINE_TICK_MS,
@@ -198,6 +222,11 @@ pub fn build_feature_rows(
                 paste_counts[idx],
                 &iki_ms_by_tick[idx],
                 pause_count_by_tick[idx],
+            ),
+            boundary: boundary::compute_boundary(
+                &keys_by_tick[idx],
+                &boundary_pairs_by_tick[idx],
+                &ime_by_tick[idx],
             ),
         })
         .collect())
@@ -218,7 +247,7 @@ mod tests {
     const TEST_MAX_TICKS: usize = 10_000;
 
     fn rows_of(keys: &[KeyPress], paste_ts: &[u64]) -> Vec<FeatureRow> {
-        build_feature_rows(keys, paste_ts, TEST_MAX_TICKS).expect("within tick limit")
+        build_feature_rows(keys, paste_ts, &[], TEST_MAX_TICKS).expect("within tick limit")
     }
 
     /// 境界入力で `build_feature_rows` が panic しないことを確認する (AC10)。
@@ -278,8 +307,8 @@ mod tests {
     fn tick_loop_rejects_time_span_beyond_limit() {
         // 0ms と 1,000,000ms → tick 0..=1000 の 1001 tick が要る
         let huge = vec![key_at(0), key_at(1_000_000)];
-        assert!(build_feature_rows(&huge, &[], 1001).is_ok());
-        let err = build_feature_rows(&huge, &[], 1000).expect_err("上限超過は Err");
+        assert!(build_feature_rows(&huge, &[], &[], 1001).is_ok());
+        let err = build_feature_rows(&huge, &[], &[], 1000).expect_err("上限超過は Err");
         assert!(err.contains("time span too large"), "err = {}", err);
     }
 

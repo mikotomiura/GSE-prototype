@@ -36,6 +36,7 @@ use gse_next_lib::analysis::calibration_eval::{
     VignetteRecord, HOLDOUT_CALIBRATION_SESSIONS,
 };
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
+use gse_next_lib::analysis::feat_offline::ImeShadowEvent;
 use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::heads::TaskDomain;
 use gse_next_lib::analysis::intervention::InterventionThresholds;
@@ -155,9 +156,17 @@ enum ReplayEvent {
         #[allow(dead_code)]
         t: u64,
     },
-    /// Phase 2b IME Shadow Features。replay では読み飛ばす。
+    /// Phase 2b IME Shadow Features。`--snapshot` 等の時刻順ステップからは読み飛ばす
+    /// (`timestamp()` が `None`)。`--features` (`T1b`・issue 002) だけが専用コレクタ
+    /// (`collect_all_ime_shadow_events`) で別途構造化読み出しする。
+    /// フィールド名は `logger.rs::format_ime_shadow_line` の NDJSON 実形式に一致させる。
     #[serde(rename = "ime_shadow")]
-    ImeShadow(#[allow(dead_code)] serde_json::Value),
+    ImeShadow {
+        t: u64,
+        dwell_ms: u64,
+        nav: u32,
+        abandon: bool,
+    },
     /// MVP Opportunity 判定ログ。replay では読み飛ばす。
     #[serde(rename = "intervention_decision")]
     InterventionDecision(#[allow(dead_code)] serde_json::Value),
@@ -302,7 +311,7 @@ impl ReplayEvent {
             // metrics 算出経路で別途抽出する。
             ReplayEvent::UserLabel { .. } => None,
             ReplayEvent::ReviewMarker { .. } => None,
-            ReplayEvent::ImeShadow(_) => None,
+            ReplayEvent::ImeShadow { .. } => None,
             ReplayEvent::InterventionDecision(_) => None,
             ReplayEvent::InterventionResponse(_) => None,
             // 診断行。ゲート進行を動かさないので時刻順ソートから除外する。
@@ -1040,9 +1049,17 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        let ime_events = match collect_all_ime_shadow_events(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect ime_shadow events: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
         let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
+            &ime_events,
             MAX_FEATURE_TICKS,
         ) {
             Ok(v) => v,
@@ -1474,6 +1491,62 @@ fn collect_all_paste_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, Stri
         );
     }
     out.sort_unstable();
+    Ok(out)
+}
+
+/// `--features` (`T1b`・issue 002) 用: NDJSON の `{"type":"ime_shadow", ...}` 行を
+/// [`ImeShadowEvent`] 列として抽出する。中身は `dwell_ms` / `nav` / `abandon` の 3 値のみ
+/// (IME 局面は既存 `ime_shadow` フィールドの範囲に閉じる。`.idea/survey §6.3` の追加候補は
+/// `capability matrix` (ADR-032 M7) が先)。
+fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadowEvent>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<ImeShadowEvent> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::ImeShadow {
+            t,
+            dwell_ms,
+            nav,
+            abandon,
+        } = ev
+        {
+            out.push(ImeShadowEvent {
+                t_ms: t,
+                dwell_ms,
+                nav,
+                abandon,
+            });
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_all_ime_shadow_events: some lines failed to parse as ReplayEvent"
+        );
+    }
+    out.sort_by_key(|e| e.t_ms);
     Ok(out)
 }
 
@@ -1976,7 +2049,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::Paste { .. }
             | ReplayEvent::UserLabel { .. }
             | ReplayEvent::ReviewMarker { .. }
-            | ReplayEvent::ImeShadow(_)
+            | ReplayEvent::ImeShadow { .. }
             | ReplayEvent::InterventionDecision(_)
             | ReplayEvent::InterventionResponse(_)
             | ReplayEvent::HookHealth(_)
@@ -2793,7 +2866,7 @@ mod tests {
             ),
             (
                 "ime_shadow",
-                r#"{"type":"ime_shadow","t":1,"dwell_ms":0,"nav":0,"abandon":0}"#,
+                r#"{"type":"ime_shadow","t":1,"dwell_ms":0,"nav":0,"abandon":false}"#,
             ),
             (
                 "hook_health",
