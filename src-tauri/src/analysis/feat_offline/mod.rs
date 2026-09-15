@@ -59,20 +59,28 @@
 
 pub mod activity;
 pub mod boundary;
+pub mod dispersion;
 
 pub use activity::T0Activity;
 pub use boundary::{Boundary, ImeShadowEvent};
+pub use dispersion::Dispersion;
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{is_backspace, is_text_producing, KeyPress};
 
-/// 1 tick ぶんの特徴行。`activity` は `T0` (Tier 0)、`boundary` は `T1b` (境界)。
+/// 1 tick ぶんの特徴行。`activity` は `T0` (Tier 0)、`boundary` は `T1b` (境界)、
+/// `dispersion` は `T1a` (分布・個人相対)。
+///
+/// ⚠️ `dispersion` はモジュール doc 「Tier ごとの causal / retrospective の区分」が
+/// 予告した retrospective 側の Tier —— `surprise` はセッション全体の IKI baseline を
+/// 要するため、`activity` (causal) と混ぜず別フィールドに置く。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FeatureRow {
     /// tick 開始時刻 (**絶対 epoch ms**)。モジュール doc の「tick への帰属規則」参照。
     pub t_ms: u64,
     pub activity: T0Activity,
     pub boundary: Boundary,
+    pub dispersion: Dispersion,
 }
 
 /// 連続する press 間の間隔 1 件。`resuming_ts` はその間隔を終える (2 打目の) press 時刻。
@@ -223,6 +231,15 @@ pub fn build_feature_rows(
         boundary_pairs_by_tick[tick_of(pair.resuming_ts)].push(pair);
     }
 
+    let mut pause_ms_by_tick: Vec<Vec<u64>> = vec![Vec::new(); tick_count];
+    for pd in dispersion::pause_durations(&all_press_ts) {
+        pause_ms_by_tick[tick_of(pd.resuming_ts)].push(pd.gap_ms);
+    }
+    // ★ baseline はセッション全体の IKI から一度だけ作り、tick ごとに作り直さない
+    // (AC5: surprise はセッション相対)。
+    let all_iki_ms: Vec<u64> = iki_ms_by_tick.iter().flatten().copied().collect();
+    let iki_baseline = dispersion::SessionIkiBaseline::from_session_iki(&all_iki_ms);
+
     Ok((0..tick_count)
         .map(|idx| FeatureRow {
             t_ms: grid_origin_ms + idx as u64 * ENGINE_TICK_MS,
@@ -236,6 +253,11 @@ pub fn build_feature_rows(
                 &keys_by_tick[idx],
                 &boundary_pairs_by_tick[idx],
                 &ime_by_tick[idx],
+            ),
+            dispersion: dispersion::compute_dispersion(
+                &pause_ms_by_tick[idx],
+                &iki_ms_by_tick[idx],
+                iki_baseline.as_ref(),
             ),
         })
         .collect())
