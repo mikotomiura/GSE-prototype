@@ -36,12 +36,18 @@ printf '%s' "$out" | jq -e '
       "prev_cat_counts","sentence_punctuation","space"]' >/dev/null 2>&1 \
   || fail "boundary のキー集合が AC1 の 8 個と完全一致しない（★ 増えても減っても落とす）"
 
-# ⚠️ sentence_punctuation が punctuation に畳まれていないこと
-#   ★ instrument_rich には vk=188 (,) と vk=190 (.) = SentencePunctuation が入っている。
+# AC2: ⚠️ sentence_punctuation が punctuation に畳まれていないこと。
+#   ★ 検査は 2 段にする（⚠️ 2026-09-15 改訂・decisions.md 判断 13）:
+#   (a) **行レベルの計数**が立つこと —— ★ fixture は vk=188 (,) と vk=190 (.) を 1 個ずつ持つ。
+#       ⚠️ ここは pause と無関係に必ず立つので、**畳み込みを最も確実に検出する**。
+printf '%s' "$out" | jq -e '[.[].boundary.sentence_punctuation] | add > 0' >/dev/null 2>&1 \
+  || fail "sentence_punctuation の総和が 0（★ fixture は vk=188 と vk=190 を持つ。punctuation に畳まれている疑い）"
+#   (b) **pause 境界のカテゴリ**にも現れること —— ★ fixture の 2 本目の pause は
+#       直前が vk=190 (.) である（⚠️ この前提が崩れたら本検査は落ちる。fixture 側を直すこと）。
 printf '%s' "$out" | jq -e '
   [.[].boundary.prev_cat_counts | keys[]] + [.[].boundary.next_cat_counts | keys[]] | unique
   | index("sentence_punctuation") != null' >/dev/null 2>&1 \
-  || fail "prev/next_cat_counts に sentence_punctuation が 1 度も現れない（★ punctuation に畳まれている疑い）"
+  || fail "prev/next_cat_counts に sentence_punctuation が 1 度も現れない（★ fixture の 2 本目の pause は直前が vk=190）"
 
 # AC3: prev_cat_counts のキーは KeyCategory の 14 種のうちのものだけ
 printf '%s' "$out" | jq -e --argjson cats '

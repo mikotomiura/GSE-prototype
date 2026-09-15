@@ -12,7 +12,16 @@
 //! - tick 幅は [`ENGINE_TICK_MS`] (= 1000ms・`loop_step` の 1 Hz グリッドの SSOT)。
 //!   tick `k` は区間 `[grid_origin_ms + k*ENGINE_TICK_MS, grid_origin_ms + (k+1)*ENGINE_TICK_MS)`
 //!   を表す (左閉右開)。`grid_origin_ms` はセッション内の最初のイベント時刻
-//!   (press または paste の最小値)。
+//!   (**全チャネル**= press / paste / `ime_shadow` の最小値)。
+//!   ⚠️★★★ **グリッドは「打鍵だけ」ではなく入力チャネル全部を覆う。**
+//!   ★ そうしないと、打鍵より前/後にある `ime_shadow` 行が tick 配列の範囲外になる。
+//!   ⚠️ **副作用を承知して使うこと** (2026-09-15・`code-reviewer` MEDIUM・実測):
+//!   同じ打鍵列でも **`ime_shadow` 行が 1 本あるかどうかで原点が動き、全行の `t_ms` がずれる**
+//!   (実測では 100ms シフトした)。★ `ime_shadow` は `config_gated` (環境によって丸ごと出ない) なので、
+//!   **同じセッションを計器条件の違う環境で解析すると tick 割りが揃わない**。
+//!   → ★ 複数セッション/複数端末の行を突き合わせるときは `t_ms` の絶対値で join し、
+//!   **tick の添字で揃えない**こと。回帰は
+//!   `bin/replay.rs` の `ime_shadow_events_reach_feature_rows_through_the_collector` が張る。
 //!   ⚠️ 本モジュールは **1000 を再宣言しない** —— `loop_step::ENGINE_TICK_MS` を `use` する
 //!   (ADR-030 D3 逐語「新しい定数を作らず、既存パラメータを対称に再利用する」)。
 //! - ★ `t_ms` は **絶対 epoch ms** (`grid_origin_ms + k*ENGINE_TICK_MS`) である。

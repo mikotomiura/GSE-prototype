@@ -13,19 +13,19 @@
 - [x] `--dry-run` で config / DAG / acceptance の検出を確認（★ 7 本とも `acceptance=yes`）
 
 ## ⚠️ 分解セッションはここで終わる
-- [ ] `/clear` する
-- [ ] **新セッション**で `bash scripts/loop-run.sh .steering/20260914-mhd-feature-offline-tiers --issues 001`
+- [x] `/clear` する
+- [x] **新セッション**で `bash scripts/loop-run.sh .steering/20260914-mhd-feature-offline-tiers --issues 001`
       （★ 最も安い 1 本で基盤を検証する）
-- [ ] 001 が緑なら残りを回す
+- [x] 001 が緑なら残りを回す（★ 001 は Loop 外で仕上げた・判断 8）
 
 ## 実行（★ 別セッション）
-- [ ] 001 `--features` ＋ `T0`（recheck）
-- [ ] 002 `T1b`（境界）
+- [x] 001 `--features` ＋ `T0`（★ commit `061e6fb`）
+- [x] 002 `T1b`（境界）（★ commit `284c754` → merge `a4400b9` ＋ レビュー修正。⚠️ Loop は `abandoned`・原因は検査バグ＝判断 13）
 - [ ] 003 `T1a`（分布）
 - [ ] 004 `T1c`（revision topology）
-- [ ] 005 `stall onset`（recheck）
+- [ ] 005 `stall onset`（★ 判断 11 で `parse` へ）
 - [ ] 006 `T1d`（restart）
-- [ ] 007 `Q`（evidence quality・recheck）
+- [ ] 007 `Q`（evidence quality・★ 判断 11 で `parse` へ）
 
 ## Loop 外（★ 対話で行う・研究者判断 2026-09-14）
 - [ ] `capability matrix`（ADR-032 **M7**）—— ⚠️ `OS × ライブ変換設定` で層別。

@@ -10,6 +10,23 @@
 //! `.idea/survey §6.3` の追加候補は `capability matrix` (ADR-032 M7) が先で、本 issue の範囲外。
 //! ⚠️ ライブ変換 ON では `abandon` が偽陽性で立ちうる (起票 6) ため、件数のみを記録し、
 //! 状態の解釈はコード・コメントのどちらにも書かない。
+//!
+//! # ⚠️★★★ `ime_*` の `0` は「使わなかった」と「計器が無い」を区別しない
+//!
+//! `ime_dwell_ms` / `ime_nav` / `ime_abandon` はどちらの場合も **`0`** になる。
+//! ★ `capabilities.rs` は `ime_shadow` を **`config_gated`** と裁定しており (逐語
+//! 「**0 行は依然「判定不能」であって「信号が無かった」ではない**」)、
+//! ⚠️ **`0` を実測値と読むと「測ったふり」になる**。
+//!
+//! → ★ **判別は `Q` (evidence quality・issue 007) が持つ**。本モジュールは数えるだけで、
+//! `Option` にもしない (⚠️ `null` にしても「未使用」と「不在」は依然分けられないため、
+//! 分離の責務を 2 か所に散らさない)。
+//! ⚠️ したがって **`--features` の出力を `Q` 無しで解釈しないこと**。
+//!
+//! ⚠️ さらに Windows と macOS では `dwell_ms` の**由来**も 1 行になる変換の**母数**も違う
+//! (`capabilities.rs` 逐語「**`abandon` 率を OS 間で直接比べてはならない**」)。
+//! ★ ところが `meta` 行に OS を示すフィールドは**存在しない**
+//! (→ `.steering/20260914-mhd-feature-offline-tiers/blockers.md` 起票 1)。
 
 use std::collections::BTreeMap;
 
@@ -241,18 +258,35 @@ mod tests {
 
     /// 同一 timestamp の press が並ぶ境界入力でも、helper の出力順と本関数の走査順が
     /// 一致することを確認する (mod.rs の同種テストと対称)。
+    /// ⚠️★★★ **2026-09-15 に検出力を足した** (`code-reviewer` MEDIUM)。
+    ///
+    /// ★ 旧版は 4 キーとも `0x41`〜`0x44` = すべて `Alphabetic` で、assert は
+    /// `pairs.len()` と `resuming_ts` の 2 つだけだった。
+    /// → ⚠️ **`prev_category` を `sorted[i-2]` に取り違えても緑のまま通る**ので、
+    /// 名前が主張する「ずれ」を**原理的に検出できなかった**。
+    /// → ★ カテゴリが全部異なる VK に替え、`prev_category` / `next_category` まで固定する。
     #[test]
     fn duplicate_timestamps_do_not_misalign_pairs() {
         use crate::analysis::features::PAUSE_THRESHOLD_MS;
+        // ★ 4 キーすべて別カテゴリ: Alphabetic / Backspace / Space / Enter。
         let keys = vec![
-            key(0, 0x41),
-            key(PAUSE_THRESHOLD_MS, 0x42),
-            key(PAUSE_THRESHOLD_MS, 0x43),
-            key(2 * PAUSE_THRESHOLD_MS, 0x44),
+            key(0, 0x41),                      // Alphabetic
+            key(PAUSE_THRESHOLD_MS, 0x08),     // Backspace
+            key(PAUSE_THRESHOLD_MS, 0x20),     // Space (同時刻・2 件目)
+            key(2 * PAUSE_THRESHOLD_MS, 0x0D), // Enter
         ];
         let pairs = pause_boundary_pairs(&keys);
         assert_eq!(pairs.len(), 2);
+
+        // 1 本目の pause: 0 (Alphabetic) → PAUSE_THRESHOLD_MS (Backspace)
         assert_eq!(pairs[0].resuming_ts, PAUSE_THRESHOLD_MS);
+        assert_eq!(pairs[0].prev_category, KeyCategory::Alphabetic);
+        assert_eq!(pairs[0].next_category, KeyCategory::Backspace);
+
+        // 2 本目の pause: 直前は**同時刻 2 件のうち後ろ** (Space) であり、
+        // ⚠️ 1 つ手前 (Backspace) でも 2 つ手前 (Alphabetic) でもない。
         assert_eq!(pairs[1].resuming_ts, 2 * PAUSE_THRESHOLD_MS);
+        assert_eq!(pairs[1].prev_category, KeyCategory::Space);
+        assert_eq!(pairs[1].next_category, KeyCategory::Enter);
     }
 }

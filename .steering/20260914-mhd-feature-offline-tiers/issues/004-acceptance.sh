@@ -5,7 +5,12 @@ fail() { echo "[acceptance 004] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
 cd src-tauri || fail "src-tauri が無い"
 
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/minimal.ndjson --features 2>/dev/null)" \
+# ⚠️★★★ 2026-09-15: fixture を minimal.ndjson → instrument_rich.ndjson へ差し替えた
+#   （★ decisions.md 判断 13）。★ 理由: **minimal.ndjson の backspace press は 1 個しかない**ので、
+#   「delete run は連続 2 打以上」と定義した実装では `delete_runs` が 0 になり、
+#   ⚠️ **欠陥でないのに acceptance が落ちる**（★ issue 002 で実際に $5.7 を捨てた失敗様式）。
+#   ★ instrument_rich は **backspace 3 連**を持つので、どちらの定義でも run が 1 本以上立つ。
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndjson --features 2>/dev/null)" \
   || fail "gse-replay --features が非 0 で終了した"
 [ -n "$out" ] || fail "--features の出力が空"
 
@@ -17,7 +22,10 @@ printf '%s' "$out" | jq -e '
   || fail "全行に revision の必須フィールドが揃っていない"
 
 printf '%s' "$out" | jq -e '[.[].revision.delete_runs] | add > 0' >/dev/null 2>&1 \
-  || fail "delete_runs の総和が 0（★ 出力が退化している）"
+  || fail "delete_runs の総和が 0（★ instrument_rich は backspace 3 連を持つ。出力が退化している）"
+# ★ 3 連の走りが「走り」として見えていること（⚠️ 1 打ずつ数えていたら max は 1 になる）
+printf '%s' "$out" | jq -e '[.[].revision.delete_run_max] | max >= 3' >/dev/null 2>&1 \
+  || fail "delete_run_max が 3 未満（★ fixture は backspace を 3 連続で持つ。走りの長さを数えていない疑い）"
 
 # AC4: ⚠️★★★ undo / redo / key.mod を先取りしていないこと
 #   ★ ADR-032 は Proposed で、§Migration M4（同意 §3 の改訂）は研究者承認待ちである。

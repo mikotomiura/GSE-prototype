@@ -405,3 +405,186 @@
 - **影響範囲**: `issues/002.md` / `issues/005.md` / `issues/007.md` の Allowed Files /
   `002-acceptance.sh` / `007-acceptance.sh` / `_issue-plan.md §1` /
   ★ 新規 `src-tauri/tests/fixtures/instrument_rich.ndjson`
+
+## 判断 13: ⚠️★★★ 検査は「**実 fixture で正常系が通る**」ところまで確かめないと、検証したことにならない
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション・2 回目／★ issue 002 の実行後）
+- **背景**: issue 002 を Loop モードC で回したところ、**6 attempt すべて `acceptance_fail` → `abandoned`**
+  （`_loop-run-report.md`: **$5.706873** / 14,591,909 tokens）。
+- ⚠️★★★ **原因は実装ではなく、私が判断 12 で書いた検査のバグだった。**
+  - ★ 落ちていたのは `002-acceptance.sh` の 1 行:
+    「`prev/next_cat_counts` に `sentence_punctuation` が 1 度も現れない」。
+  - ⚠️ ところが **`instrument_rich.ndjson` の 2 本の pause は、直前/直後が
+    `alphabetic` と `backspace` しか無い**（★ 実測: 出現カテゴリ集合は `["alphabetic","backspace"]`）。
+    → ★★★ **fixture の構造上、この検査は原理的に緑にならなかった。**
+  - ★ **実装は正しかった**（⚠️ 実測で確認・推測ではない）: 行レベルの `sentence_punctuation` は **2**、
+    IME は `dwell 1570`（= 650 + 920）/ `nav 5`（= 2 + 3）/ `abandon 1`、8 フィールドすべて在り、
+    `super::extract_pause_resumptions`（001 の共有ヘルパ）を使い、**単体テスト 6 本が緑**。
+- ⚠️★★★ **3 状態テストを実施したのに防げなかった。** ★ ここが本判断の要点である。
+  - ★ 私は判断 12 で「検査自体を 3 状態（正常 / 壊れている / 誤検出しうる正当な形）で試す」を実行し、
+    **17/17 通した**。
+  - ⚠️ **しかしそれは「手書きの合成 JSON」に対してであって、「fixture が実際に出せる形」に対してではなかった。**
+    ★ 正常系のサンプルを**自分で都合よく作った**ので、`sentence_punctuation` を手で置いてしまった。
+  - → ★★★ **ルールを 1 つ足す（4 つ目の状態）**:
+    **「実 fixture を実際に流して、正常系の前提が成立することを確かめる」**。
+    ⚠️ 実装がまだ無い段階でも、**実装に依存しない前提**（＝ その fixture がその形を作れるか）は
+    必ず確かめられる。★ 今回なら「pause の隣に文末句読点が在るか」を
+    `jq` で 1 回見れば 6 attempt を使わずに分かった。
+- **対処（★ 実行済み・実測で確認）**:
+  1. **fixture を直した**: `1700000105450` / `105530` の `vk` を **73（I）→ 190（`.`）** にした。
+     ★ 「文を書き終えて止まる」という自然な形であり、**2 本目の pause の直前が文末句読点になる**。
+  2. **検査を 2 段にした**:
+     - (a) **行レベルの計数** `sentence_punctuation` の総和 > 0 —— ★ pause と無関係に必ず立つので、
+       **畳み込み（`punctuation` に統合）を最も確実に検出する**。
+     - (b) pause 境界のカテゴリにも現れること —— ★ 14 種の語彙が保たれていることの実地検査。
+  3. ★ **実測で (b) が空振りでないことを確認**: 出現カテゴリ集合が
+     `["alphabetic","backspace","sentence_punctuation"]` になった。
+- **同じ穴を他の issue でも先回りして潰した（★ 判断 13 の適用）**:
+  - ⚠️★★★ **issue 004 の AC5** は `minimal.ndjson` で `delete_runs` 総和 > 0 を要求していたが、
+    ★ 実測で **`minimal.ndjson` の backspace press は 1 個しかない**。
+    → ⚠️ 「delete run は**連続 2 打以上**」と定義した実装では **0 になり、欠陥でないのに落ちる**。
+    → ★ fixture を `instrument_rich.ndjson`（**backspace 3 連**）へ差し替え、
+      **どちらの定義でも run が立つ**ようにした。併せて `delete_run_max >= 3` を足し、
+      「1 打ずつ数えて走りを見ていない」実装を落とせるようにした。
+  - ★ 003（`deep_silence` の 2600ms × 2 ＋ 43440ms）/ 007（`instrument_rich` の `capabilities` ＋
+    `hook_health` 2 行、`minimal` の `capabilities` 不在）は **fixture 側の前提を実測で確認済み**。
+  - ⚠️ 005 / 006 の非退化検査（`onset` が 1 回以上立つ / `restop_ms` が非 null）は
+    **実装の既定パラメータに依存する**ので、実装前には確かめられない。
+    ★ これは「検出器が何も検出しないなら緑に見えて無意味」という **AC 本来の要求**であり、
+    fixture の欠陥ではない。⚠️ ただし落ちたときは **まず実装を疑う前に前提を確かめる**こと。
+- **worker の成果は捨てていない**:
+  - ★ worktree の未コミット作業（`boundary.rs` 258 行 ＋ `mod.rs` ＋ `replay.rs`）を
+    commit **`284c754`** として保存し、**`a4400b9`** で base ブランチへ merge した。
+  - ★ pin 済み verify 4 本は緑（**688 passed**（ベースライン 682 + 6）/ `OK: 15 snapshots match` /
+    `cargo check` exit 0 / `clippy -D warnings` exit 0）。
+  - ★ AC 対応の単体テスト 6 本を**名前指定で実行して緑を確認**した
+    （`prev_cat_keys_are_key_categories` / `boundary_categories_match_hand_computed` /
+    `space_enter_sentence_punctuation_are_counted_per_tick` / `ime_fields_aggregate_dwell_nav_abandon` /
+    `no_pause_yields_empty_boundary_maps` / `duplicate_timestamps_do_not_misalign_pairs`）。
+- **費用の記録（⚠️ 楽観的に丸めない）**: issue 002 = **$5.706873** / 14,591,909 tokens。
+  ★ うち **実装 372 行は得られている**が、⚠️ **$5.7 のうちの大半は私の検査バグに払った**。
+  ★ 001 の $3.53 + $3.60 と合わせ、**本タスクの Loop 費用は累計 $12.84**。
+- **トレードオフ**: ⚠️ 検査を厚くするほど「検査自体のバグで落ちる」確率が上がる。
+  ★ だから**厚くすることと、実 fixture で正常系を通すことは対**であって、片方だけでは害になる。
+- **影響範囲**: `src-tauri/tests/fixtures/instrument_rich.ndjson` /
+  `issues/002-acceptance.sh` / `issues/004-acceptance.sh` / `issues/004.md` の AC5 /
+  ★ 以後の全 issue の acceptance の書き方
+
+## 判断 14: issue 002 のレビュー指摘の裁定（★ `code-reviewer` ∥ `security-checker` を並列起動）
+
+- **判断日時**: 2026-09-15（Opus 裁定セッション・2 回目）
+- **前提**: 判断 11 で 005 / 007 の `recheck` を落とした代わりに
+  「**merge 前に必ずレビュー 2 本を通す**」と決めた。★ 002 は `parse` だが、
+  ⚠️ **`bin/replay.rs` を開けた最初の issue** なので同じ扱いにした。
+- ★★★ **両者が独立に同じ HIGH を挙げた**（⚠️ どちらも**実測で再現**している）。
+
+### HIGH-1: `ReplayEvent::ImeShadow` の型付け化が `--snapshot` の受理集合を狭めた → **採用（修正済み）**
+
+- **指摘**: worker は `ImeShadow(serde_json::Value)`（読み飛ばし専用）を
+  **4 フィールド必須の構造体**に変えた。⚠️ `run_replay` は**既知タグのパース失敗も `Err` にして
+  中断する**ので、崩れた `ime_shadow` 行 1 本で**リプレイが丸ごと落ちる**。
+- ★ 実測された落ち方（⚠️ 推測ではない）:
+  | 入力 | 旧実装の結果 |
+  |---|---|
+  | `"abandon":0`（整数） | 逐語 `invalid type: integer 0, expected a boolean` |
+  | `nav` 欠落 | 逐語 `missing field 'nav'` |
+  | `"dwell_ms":null` | 逐語 `invalid type: null, expected u64` |
+- ⚠️★★★ **これは `issues/002.md` の逐語「`--snapshot` / `--metrics` / `--calibration` / `--sweep`
+  経路を変更しない」に直撃する。** ★ 「行型・フィールドの追加」は許可したが、
+  **既存 variant の厳格化**は許可範囲の外である（★ 私が書いた制約文が曖昧だった）。
+- ⚠️★★★ **私の 1 次案（`Option` ＋ `#[serde(default)]`）では足りなかった** —— ★ 実測で確認:
+  `Option<bool>` は `0` を受け取れないので `"abandon":0` は**依然 exit 1**。
+  → ★ **`code-reviewer` の案を採る**: variant を `Value` に戻し、構造化は
+  `collect_all_ime_shadow_events` 内の専用 DTO（`ImeShadowDto`）が行う。
+  ★ **これは `feat` 行の `LoggedFeatDto` という file 内の既存先例と同じ手法**である。
+- ★ 併せて **`unwrap_or(0)` にしない**: 形の合わない行は**捨てて件数だけ warn** する。
+  ⚠️ 0 に畳むと「変換が 0 だった」と「値が取れなかった」が同じになる
+  （`capabilities.rs` 逐語「0 行は依然『判定不能』であって『信号が無かった』ではない」）。
+- ★ **回帰を張った**: `tests::partial_ime_shadow_line_does_not_break_run_replay` が
+  **上の 3 形すべて**について「`run_replay` が通る ＋ `FeatSnapshot` 列が 1 件も変わらない ＋
+  `--features` 側は採らない」を固定する。
+  ⚠️★★★ **issue 007 が `hook_health` を構造化するときも同じ形にすること**を variant の doc に書いた。
+- ★ これは `hook_health`（2026-08-09）/ `activity_label` / `starve_window`（2026-09-14）と
+  **同一の失敗様式の 4 度目**である。
+
+### HIGH-2: fixture 変更が未コミットだった → **採用（本コミットで解消）**
+
+- ★ `code-reviewer` は `db53b98..HEAD` の diff **だけでは AC2(b) が通らない**ことを実測で示した。
+  ⚠️ working tree の `vk 73→190` が入って初めて緑になる。→ ★ 本コミットに含める。
+- ★ 影響調査済み（`code-reviewer` 実測）: `instrument_rich` を参照する `.rs` / `.json` / golden は **0 件**。
+
+### MEDIUM: 採用したもの
+
+1. ⚠️ **`duplicate_timestamps_do_not_misalign_pairs` が名前どおりの検出力を持っていなかった** ——
+   ★ 4 キーとも `Alphabetic` で、`prev_category` を 1 つ手前に取り違えても緑のまま通った。
+   → ★ VK を `0x41 / 0x08 / 0x20 / 0x0D`（**全部別カテゴリ**）に替え、
+   `prev_category` / `next_category` まで固定した。
+   ⚠️★★★ **これは判断 13 と同じ病である**（★ 検査が検査になっていない）。
+2. ⚠️ **collector → `build_feature_rows` の配線に `cargo test` 上の網が無かった** ——
+   ★ `boundary.rs` の単体テストは `compute_boundary` を直接叩くだけなので、
+   **`ime_events` 引数を落としても緑のまま**だった。
+   → ★ `tests::ime_shadow_events_reach_feature_rows_through_the_collector` を追加し、
+   NDJSON → collector → `build_feature_rows` の合計値と **tick 帰属**を固定した。
+3. ⚠️★★★ **`ime_*` の `0` が「使わなかった」と「計器が無い」を区別しない** ——
+   ★ `boundary.rs` の module doc に明記した（★ 判別は `Q` = issue 007 が持つ）。
+   ⚠️ `Option` にはしない —— **`null` にしても両者は分けられない**ので、責務を 2 か所に散らさない。
+4. ⚠️★★★ **`ime_shadow` の有無でグリッド原点が動く** —— ★ 実測で全行の `t_ms` が 100ms シフトする。
+   `ime_shadow` は `config_gated`（環境によって丸ごと出ない）なので、
+   ⚠️ **同じセッションを計器条件の違う環境で解析すると tick 割りが揃わない**。
+   → ★ `mod.rs` の module doc に副作用と対処（**`t_ms` の絶対値で join し、tick 添字で揃えない**）を書き、
+   回帰テストで原点の張り方を固定した。
+
+### MEDIUM / LOW: 採らなかったもの（★ 理由を残す）
+
+- ⚠️ **`--features` 出力に「由来の封筒」を付ける**（`security-checker` M2 後半）→ **起票 2 に回した**。
+  ★ 出力形状の変更は **002〜007 の全 `acceptance.sh` の前提**（配列である）を壊すので、
+  ⚠️ 走行中に変えると走り終えた issue の検査が全部無効になる。★ 007 の完了後に 1 度だけ裁定する。
+- ⚠️ **`meta` に `os` を足す**（`security-checker` M2 前半）→ **起票 1 に回した**（★ 計器変更・ADR-032 の領域）。
+- ★ `BTreeMap<String, u64>` → `BTreeMap<&'static str, u64>`（LOW・割当削減）→ **見送り**。
+  ★ JSON 出力は同一で、`KeyCategory::as_str()` が `&'static str` を返すので安全だが、
+  ⚠️ **レビュー修正のついでに型を触る利得が小さい**。
+- ★ `KeyCategory::from_vk` の 3 回呼び（LOW）/ セッションファイルの 3 回読み（LOW）→ **見送り**。
+  ⚠️ 後者は **tier が増えるたびに N パスになる**ので、**005 以降で 1 パス収集への集約を検討**する
+  （★ ただし本 issue の範囲ではない）。
+- ★ 戻り値が `Result<_, String>`（`rust-standards` は `anyhow::Result`）→ **見送り**。
+  ★ `replay.rs` の `collect_*` は**全て `String`** であり、**ファイル内の一貫性を優先**する。
+- ⚠️ エラーメッセージがセッションファイルの**絶対パス**を出す（`security-checker` L1）→ **見送り**。
+  ★ 既存 `collect_key_events` と同一パターンで、**利用者自身が渡したパスを返すだけのローカル CLI**。
+  ⚠️ 直すなら全 collector を一括で直す（★ 本 issue で 1 か所だけ直すと不整合になる）。
+- ⚠️ fixture の `capabilities` ブロックが**手写しで無音 drift する**（`security-checker` L2）
+  → **見送り（★ 起票しない）**。⚠️ ★ ただし **drift しても検査が落ちるのは 007 だけ**なので、
+  007 の実装時に「`capabilities.rs` の実リストと突き合わせる」検査を足すか判断する。
+
+### ⚠️★★★ Stop Condition の逸脱を 1 行残す（★ `code-reviewer` LOW の指摘）
+
+- ★ `issues/002.md` の Stop Condition 逐語「**変更が 5 ファイル / 300 行を超えそうなとき**」に対し、
+  実績は **372 insertions / 12 deletions（3 ファイル）**だった。
+  → ★ **ファイル数は満たし、行数は超えた**。⚠️ worker は止まらずに完走した。
+- **裁定**: ★ **例外として認める**。理由: 超過分の実体は
+  ① `boundary.rs` の `#[cfg(test)] mod tests`（6 本）と ② doc コメントであり、
+  ★ **Stop Condition が守ろうとしている「1 issue が大きくなりすぎる」危険とは別物**である。
+  ⚠️ ただし **今後 issue を切るときは「300 行」にテストと doc を含めるのかを明示する**こと
+  （★ 含めない運用にするなら `docs/loop-engineering.md` の基準 2 側を直す）。
+  → ★ **起票はしない**が、次の分解セッションへの申し送りとしてここに残す。
+
+### ★ 両レビューが「問題なし」と**追認**したもの（⚠️ 記録しておく）
+
+- ★ 出力に**生 VK / 文字 / 打鍵順序は 1 バイトも出ていない**（`security-checker` が実測）。
+  `prev/next_cat_counts` は `KeyCategory::as_str()` の 14 語彙 ＋ カウントのみで、
+  **tick 内の順序を失う**ので匿名化 NDJSON より厳密に粗い。
+- ★ 新規 fixture に**実データ混入は無い**（`security-checker` が VK をデコードして確認。
+  `app_version:"0.3.0"` は実値 `0.1.35` と不一致＝実ビルドの指紋ではない）。
+- ★ `abandon` を「迷い」と解釈する語は**コードにもコメントにも無い**（起票 6 を遵守）。
+- ★ テストデータ `"abandon":0` → `false` は**弱体化ではなく訂正**（`logger.rs` の実書式は `bool`）。
+- ★ ⚠️ 私が事前に挙げた懸念「同一 timestamp で pause のペア対応がずれるのでは」は **否認された** ——
+  ★ `extract_pause_resumptions` の resumption 値は `windows(2)` 由来で、
+  同一値 X で終わる窓のうち gap≥閾値になり得るのは **X の最初の出現だけ**（以降は gap=0）。
+  → **resumption 列に同じ値は 2 度現れず、昇順どうしの単調走査で対応は一意**。
+  ⚠️ ただし**テストがそれを示していなかった**ので、テスト側は上記 MEDIUM 1 で直した。
+- ★ 入力検証は `collect_key_events` と**同水準**（`MAX_SESSION_BYTES` → 行ストリーミング → 行単位スキップ）。
+  ★ `vec![Vec::new(); tick_count]` の確保は `MAX_FEATURE_TICKS` チェック**より後**にある。
+- ★ 依存追加はゼロ（`Cargo.toml` / `Cargo.lock` / `package*.json` の diff が空）。
+
+- **影響範囲**: `src-tauri/src/bin/replay.rs` / `src-tauri/src/analysis/feat_offline/boundary.rs` /
+  `src-tauri/src/analysis/feat_offline/mod.rs` / `src-tauri/tests/fixtures/instrument_rich.ndjson` /
+  `blockers.md`（起票 1・2・3）

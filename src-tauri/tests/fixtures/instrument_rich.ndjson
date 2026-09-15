@@ -40,8 +40,8 @@
 {"type":"ime_state","t":1700000105200,"on":true,"active":true}
 {"type":"key","t":1700000105300,"vk":83,"press":true}
 {"type":"key","t":1700000105380,"vk":83,"press":false}
-{"type":"key","t":1700000105450,"vk":73,"press":true}
-{"type":"key","t":1700000105530,"vk":73,"press":false}
+{"type":"key","t":1700000105450,"vk":190,"press":true}
+{"type":"key","t":1700000105530,"vk":190,"press":false}
 {"type":"ime_shadow","t":1700000105600,"dwell_ms":920,"nav":3,"abandon":true}
 {"type":"ime_state","t":1700000105650,"on":false,"active":false}
 {"type":"paste","t":1700000105800}

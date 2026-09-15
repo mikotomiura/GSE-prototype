@@ -156,17 +156,33 @@ enum ReplayEvent {
         #[allow(dead_code)]
         t: u64,
     },
-    /// Phase 2b IME Shadow Features。`--snapshot` 等の時刻順ステップからは読み飛ばす
-    /// (`timestamp()` が `None`)。`--features` (`T1b`・issue 002) だけが専用コレクタ
-    /// (`collect_all_ime_shadow_events`) で別途構造化読み出しする。
-    /// フィールド名は `logger.rs::format_ime_shadow_line` の NDJSON 実形式に一致させる。
+    /// Phase 2b IME Shadow Features。replay では読み飛ばす (`timestamp()` が `None`)。
+    ///
+    /// ⚠️★★★ **この variant を型付き構造体にしてはならない。`serde_json::Value` のまま置く。**
+    ///
+    /// ★ `--features` (`T1b`・issue 002) が中身を要るようになったが、構造化は
+    /// [`collect_all_ime_shadow_events`] の中の専用 DTO ([`ImeShadowDto`]) が行う。
+    /// ★ **同じ手法の先例は `feat` 行の [`LoggedFeatDto`]** である (本 variant の上の
+    /// `ReplayEvent::Feat` の doc を参照)。
+    ///
+    /// ★ 理由 (2026-09-15・`code-reviewer` / `security-checker` が独立に HIGH で指摘し、
+    /// **両者とも実測で再現した**): `run_replay` は**既知タグのパース失敗も `Err` にして
+    /// 中断する**ので、ここを厳格にすると「読み飛ばすはずの行」が**リプレイを丸ごと殺す**。
+    /// ⚠️ 実測した落ち方 (issue 002 の初版):
+    /// - `"abandon":0` (整数) → 逐語 `invalid type: integer 0, expected a boolean`
+    /// - `nav` 欠落 → 逐語 `missing field 'nav'`
+    /// - `"dwell_ms":null` → 逐語 `invalid type: null, expected u64`
+    ///
+    /// ⚠️ **`Option` ＋ `#[serde(default)]` でも足りない** (★ 2026-09-15 に実測):
+    /// `Option<bool>` は `0` を受け取れないので `"abandon":0` は依然 exit 1 になる。
+    /// → ★ **受理集合を 1 バイトも狭めない唯一の形が `Value`** である。
+    ///
+    /// ★ これは `hook_health` (2026-08-09) / `activity_label` / `starve_window` (2026-09-14) で
+    /// 3 度踏んだ失敗様式の 4 度目であり、回帰は
+    /// [`tests::partial_ime_shadow_line_does_not_break_run_replay`] が張る。
+    /// ⚠️ **issue 007 が `hook_health` を構造化するときも同じ形にすること。**
     #[serde(rename = "ime_shadow")]
-    ImeShadow {
-        t: u64,
-        dwell_ms: u64,
-        nav: u32,
-        abandon: bool,
-    },
+    ImeShadow(#[allow(dead_code)] serde_json::Value),
     /// MVP Opportunity 判定ログ。replay では読み飛ばす。
     #[serde(rename = "intervention_decision")]
     InterventionDecision(#[allow(dead_code)] serde_json::Value),
@@ -311,7 +327,7 @@ impl ReplayEvent {
             // metrics 算出経路で別途抽出する。
             ReplayEvent::UserLabel { .. } => None,
             ReplayEvent::ReviewMarker { .. } => None,
-            ReplayEvent::ImeShadow { .. } => None,
+            ReplayEvent::ImeShadow(_) => None,
             ReplayEvent::InterventionDecision(_) => None,
             ReplayEvent::InterventionResponse(_) => None,
             // 診断行。ゲート進行を動かさないので時刻順ソートから除外する。
@@ -1494,10 +1510,30 @@ fn collect_all_paste_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, Stri
     Ok(out)
 }
 
+/// `--features` 専用の `ime_shadow` DTO。
+///
+/// ⚠️★★★ **`ReplayEvent::ImeShadow` は `serde_json::Value` のまま置き、構造化はここで行う。**
+/// ★ `--snapshot` / `--metrics` の受理集合を 1 バイトも狭めないための分離であり、
+/// **`feat` 行の [`LoggedFeatDto`] と同じ手法**である (`ReplayEvent::ImeShadow` の doc を参照)。
+/// ★ フィールド名は `logger.rs::format_ime_shadow_line` の NDJSON 実形式に一致させる。
+#[derive(Debug, serde::Deserialize)]
+struct ImeShadowDto {
+    t: u64,
+    dwell_ms: u64,
+    nav: u32,
+    abandon: bool,
+}
+
 /// `--features` (`T1b`・issue 002) 用: NDJSON の `{"type":"ime_shadow", ...}` 行を
 /// [`ImeShadowEvent`] 列として抽出する。中身は `dwell_ms` / `nav` / `abandon` の 3 値のみ
 /// (IME 局面は既存 `ime_shadow` フィールドの範囲に閉じる。`.idea/survey §6.3` の追加候補は
 /// `capability matrix` (ADR-032 M7) が先)。
+///
+/// ⚠️★★★ **形が合わない `ime_shadow` 行は捨てる (0 に畳まない)。**
+/// ★ ここで `unwrap_or(0)` すると **「変換が 0 だった」と「値が取れなかった」が同じ 0 になる** ——
+/// `capabilities.rs` 逐語「0 行は依然『判定不能』であって『信号が無かった』ではない」に反する。
+/// → ★ 捨てたことは**件数だけ** `warn` に残す (⚠️ 行の中身は出さない)。
+/// ⚠️ 「何行捨てたか」の下流への伝達は **issue 007 (`Q`) の担当**である (本 issue では出力に載せない)。
 fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadowEvent>, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
@@ -1513,6 +1549,7 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
     let reader = BufReader::new(file);
     let mut out: Vec<ImeShadowEvent> = Vec::new();
     let mut parse_failed_lines: u64 = 0;
+    let mut incomplete_lines: u64 = 0;
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
@@ -1525,25 +1562,30 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
                 continue;
             }
         };
-        if let ReplayEvent::ImeShadow {
-            t,
-            dwell_ms,
-            nav,
-            abandon,
-        } = ev
-        {
-            out.push(ImeShadowEvent {
-                t_ms: t,
-                dwell_ms,
-                nav,
-                abandon,
-            });
+        if let ReplayEvent::ImeShadow(v) = ev {
+            // ⚠️ 形が合った行だけを採る。欠け・型違いは 0 に畳まず捨てる (関数 doc 参照)。
+            match serde_json::from_value::<ImeShadowDto>(v) {
+                Ok(dto) => out.push(ImeShadowEvent {
+                    t_ms: dto.t,
+                    dwell_ms: dto.dwell_ms,
+                    nav: dto.nav,
+                    abandon: dto.abandon,
+                }),
+                Err(_) => incomplete_lines += 1,
+            }
         }
     }
     if parse_failed_lines > 0 {
         tracing::warn!(
             failed = parse_failed_lines,
             "collect_all_ime_shadow_events: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if incomplete_lines > 0 {
+        tracing::warn!(
+            skipped = incomplete_lines,
+            "collect_all_ime_shadow_events: ime_shadow lines whose dwell_ms/nav/abandon did not \
+             match the logger format were skipped (not folded into 0)"
         );
     }
     out.sort_by_key(|e| e.t_ms);
@@ -2049,7 +2091,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::Paste { .. }
             | ReplayEvent::UserLabel { .. }
             | ReplayEvent::ReviewMarker { .. }
-            | ReplayEvent::ImeShadow { .. }
+            | ReplayEvent::ImeShadow(_)
             | ReplayEvent::InterventionDecision(_)
             | ReplayEvent::InterventionResponse(_)
             | ReplayEvent::HookHealth(_)
@@ -2788,6 +2830,149 @@ mod tests {
             baseline.len(),
             "hook_health 行は FeatSnapshot 列を 1 件も変えてはならない"
         );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// ⚠️★★★ **形の崩れた `ime_shadow` 行が `run_replay` を落とさない**
+    /// （2026-09-15・`code-reviewer` / `security-checker` が独立に HIGH で指摘した M1 の回帰）。
+    ///
+    /// ★ issue 002 の初版は `ReplayEvent::ImeShadow` を `serde_json::Value` から
+    /// **4 フィールド必須の構造体**へ変えた。⚠️ `run_replay` は**既知タグのパース失敗も
+    /// `Err` にして中断する**ため、崩れた行が 1 本あるだけで**リプレイが丸ごと落ちた**
+    /// （★ `hook_health` / `starve_window` / `activity_label` と同じ失敗様式で 4 度目）。
+    ///
+    /// ⚠️★★★ **`Option` ＋ `#[serde(default)]` でも足りなかった**（★ 2026-09-15 に実測）——
+    /// `Option<bool>` は `0` を受け取れないので `"abandon":0` は依然 exit 1 になる。
+    /// → ★ variant を `Value` に戻し、構造化は `ImeShadowDto` が担う形にした。
+    ///
+    /// ⚠️ **ゴールデンが緑でもこの事故は検出できない**（★ 既存 fixture に崩れた行が無いため）。
+    /// → ★ **行を足して通す**形でなければ回帰にならない。
+    #[test]
+    fn partial_ime_shadow_line_does_not_break_run_replay() {
+        // ★ 3 つとも「issue 002 の初版が実際に落ちた形」である（⚠️ 想像で並べていない）。
+        let broken = [
+            // 欠落 → 旧実装は `missing field 'nav'`
+            r#"{"type":"ime_shadow","t":1700000002500,"dwell_ms":300}"#,
+            // 整数 bool → 旧実装は `invalid type: integer 0, expected a boolean`
+            r#"{"type":"ime_shadow","t":1700000002500,"dwell_ms":300,"nav":1,"abandon":0}"#,
+            // null → 旧実装は `invalid type: null, expected u64`
+            r#"{"type":"ime_shadow","t":1700000002500,"dwell_ms":null,"nav":1,"abandon":true}"#,
+        ];
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+
+        for (i, line) in broken.iter().enumerate() {
+            let ev: ReplayEvent = serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("崩れた ime_shadow 行も受理すること ({line}): {e}"));
+            assert!(
+                matches!(ev, ReplayEvent::ImeShadow(_)),
+                "expected ReplayEvent::ImeShadow, got {ev:?}"
+            );
+            assert_eq!(
+                ev.timestamp(),
+                None,
+                "ime_shadow は時刻順ソートから除外する"
+            );
+
+            let mut ndjson = std::fs::read_to_string(fixture_path("minimal.ndjson"))
+                .expect("read minimal fixture");
+            ndjson.push_str(line);
+            ndjson.push('\n');
+            let tmp = std::env::temp_dir().join(format!(
+                "gse_partial_ime_shadow_replay_{}_{}.ndjson",
+                std::process::id(),
+                i
+            ));
+            std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+            let with_line = run_replay(&tmp).unwrap_or_else(|e| {
+                panic!("run_replay must accept broken ime_shadow ({line}): {e}")
+            });
+            assert_eq!(
+                with_line.len(),
+                baseline.len(),
+                "ime_shadow 行は FeatSnapshot 列を 1 件も変えてはならない ({line})"
+            );
+
+            // ★ `--features` 側は**形の合わない行を捨てる**（⚠️ 0 に畳まない）。
+            let collected = collect_all_ime_shadow_events(&tmp).expect("collect must not fail");
+            assert!(
+                collected.is_empty(),
+                "形が合わない ime_shadow 行は採らない (0 埋めしない): {collected:?} ({line})"
+            );
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
+    /// ★ `collect_all_ime_shadow_events` → `build_feature_rows` の**配線**が生きていること
+    /// （2026-09-15・`code-reviewer` MEDIUM「新しい配線に `cargo test` 上の網が無い」の回帰）。
+    ///
+    /// ⚠️ `boundary.rs` の単体テストは `compute_boundary` を直接叩くだけなので、
+    /// **`ime_events` 引数を落としても緑のまま**だった。★ ここで NDJSON から通して固定する。
+    ///
+    /// ★ 併せて、**IME 行がグリッド原点/終端を動かす**ことも固定する
+    /// （`build_feature_rows` の doc 参照。⚠️ `config_gated` チャネルの有無で tick 割りが変わる）。
+    #[test]
+    fn ime_shadow_events_reach_feature_rows_through_the_collector() {
+        let base = 1_700_000_000_000_u64;
+        // ⚠️ 先頭と末尾を **ime_shadow** にして、グリッドが打鍵より広く張ることを確かめる。
+        let ndjson = format!(
+            concat!(
+                r#"{{"type":"meta","session_start":{0},"hmm_version":"0.2.0"}}"#,
+                "
+",
+                r#"{{"type":"ime_shadow","t":{0},"dwell_ms":400,"nav":2,"abandon":false}}"#,
+                "
+",
+                r#"{{"type":"key","t":{1},"vk":65,"press":true}}"#,
+                "
+",
+                r#"{{"type":"key","t":{2},"vk":65,"press":false}}"#,
+                "
+",
+                r#"{{"type":"ime_shadow","t":{3},"dwell_ms":600,"nav":1,"abandon":true}}"#,
+                "
+",
+            ),
+            base,
+            base + 1_500,
+            base + 1_580,
+            base + 2_500,
+        );
+        let tmp =
+            std::env::temp_dir().join(format!("gse_ime_wiring_{}.ndjson", std::process::id()));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let keys = collect_key_events(&tmp).expect("collect keys");
+        let paste_ts = collect_all_paste_timestamps(&tmp).expect("collect pastes");
+        let ime = collect_all_ime_shadow_events(&tmp).expect("collect ime_shadow");
+        assert_eq!(ime.len(), 2, "ime_shadow 2 行が採れること");
+
+        let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
+            &keys,
+            &paste_ts,
+            &ime,
+            MAX_FEATURE_TICKS,
+        )
+        .expect("build rows");
+
+        // ★ 原点は ime_shadow(base)、終端も ime_shadow(base+2500) なので tick は 0..=2 の 3 本。
+        assert_eq!(
+            rows.len(),
+            3,
+            "グリッドは ime_shadow の時刻まで張る: {rows:?}"
+        );
+        assert_eq!(rows[0].t_ms, base, "原点は最初の ime_shadow 行の時刻");
+
+        let dwell: u64 = rows.iter().map(|r| r.boundary.ime_dwell_ms).sum();
+        let nav: u64 = rows.iter().map(|r| r.boundary.ime_nav).sum();
+        let abandon: u64 = rows.iter().map(|r| r.boundary.ime_abandon).sum();
+        assert_eq!(dwell, 1_000, "400 + 600");
+        assert_eq!(nav, 3, "2 + 1");
+        assert_eq!(abandon, 1, "false + true");
+
+        // ★ tick 帰属も固定する（⚠️ 全部を tick 0 に寄せていないこと）。
+        assert_eq!(rows[0].boundary.ime_dwell_ms, 400);
+        assert_eq!(rows[2].boundary.ime_dwell_ms, 600);
         let _ = std::fs::remove_file(&tmp);
     }
 
