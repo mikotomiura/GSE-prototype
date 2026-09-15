@@ -60,10 +60,12 @@
 pub mod activity;
 pub mod boundary;
 pub mod dispersion;
+pub mod stall_onset;
 
 pub use activity::T0Activity;
 pub use boundary::{Boundary, ImeShadowEvent};
 pub use dispersion::Dispersion;
+pub use stall_onset::{StallOnset, StallOnsetConfig};
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{is_backspace, is_text_producing, KeyPress};
@@ -81,6 +83,9 @@ pub struct FeatureRow {
     pub activity: T0Activity,
     pub boundary: Boundary,
     pub dispersion: Dispersion,
+    /// `stall onset`（`t0`）検出器 (ADR-030 D2-D6)。`activity` と同じく **causal**
+    /// (`stall_onset` モジュール doc 参照)。onset が起きた tick だけ値が埋まる。
+    pub stall_onset: StallOnset,
 }
 
 /// 連続する press 間の間隔 1 件。`resuming_ts` はその間隔を終える (2 打目の) press 時刻。
@@ -240,6 +245,17 @@ pub fn build_feature_rows(
     let all_iki_ms: Vec<u64> = iki_ms_by_tick.iter().flatten().copied().collect();
     let iki_baseline = dispersion::SessionIkiBaseline::from_session_iki(&all_iki_ms);
 
+    // ★ ADR-030 D6: task_kind の実配線 (session_meta 読み出し) は本 issue の任意 Allowed
+    // Files 項目であり、まだ配線していない (未宣言 = None として back-off の経路を通す)。
+    let stall_onset_col = stall_onset::stall_onset_column(
+        keys,
+        tick_count,
+        grid_origin_ms,
+        ENGINE_TICK_MS,
+        &stall_onset::StallOnsetConfig::default(),
+        None,
+    );
+
     Ok((0..tick_count)
         .map(|idx| FeatureRow {
             t_ms: grid_origin_ms + idx as u64 * ENGINE_TICK_MS,
@@ -259,6 +275,7 @@ pub fn build_feature_rows(
                 &iki_ms_by_tick[idx],
                 iki_baseline.as_ref(),
             ),
+            stall_onset: stall_onset_col[idx].clone(),
         })
         .collect())
 }
