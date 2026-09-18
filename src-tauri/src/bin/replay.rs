@@ -1075,11 +1075,31 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        let feat_ts = match collect_all_feat_timestamps(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect feat timestamps: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let task_kind_declarations = match collect_task_kind_declarations(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect task_kind declarations: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &task_kind_declarations,
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
         let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
             &ime_events,
             MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
         ) {
             Ok(v) => v,
             Err(msg) => {
@@ -1592,6 +1612,143 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
         );
     }
     out.sort_by_key(|e| e.t_ms);
+    Ok(out)
+}
+
+/// `--features` (issue 008) 専用の `feat` 行の `t` だけを取り出す DTO。
+///
+/// ⚠️★★★ `ReplayEvent::Feat` は `serde_json::Value` のまま置き、構造化はここで行う
+/// (`ImeShadowDto` / `collect_all_ime_shadow_events` と同じ手法)。★ 形の合わない `feat` 行
+/// (`t` 欠落 / 文字列 / `null`) を捨てても `run_replay` は影響を受けない
+/// (`ReplayEvent::Feat` は既に `Value` なので、行の形に関わらずパース自体は必ず成功し、
+/// `timestamp()` も `None` を返す)。
+#[derive(Debug, serde::Deserialize)]
+struct FeatTimestampDto {
+    t: u64,
+}
+
+/// `--features` (issue 008・ADR-030 D8 (b-2)) 用: NDJSON の `{"type":"feat", ...}` 行の
+/// **時刻だけ**を返す。★ `feat` 行の値 (`keys` / `bs_keys` 等) は 1 バイトも読まない
+/// (D3 逐語「使ってよいのは feat 行の存在だけ」)。観測区間の判定にのみ使う。
+///
+/// ⚠️★★★ **形が合わない `feat` 行は捨てる (0 に畳まない)。** 件数だけ `warn` に残す
+/// (`collect_all_ime_shadow_events` と同じ手法・判断 14 HIGH-1)。
+fn collect_all_feat_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<u64> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut malformed_feat_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Feat(v) = ev {
+            match serde_json::from_value::<FeatTimestampDto>(v) {
+                Ok(dto) => out.push(dto.t),
+                Err(_) => malformed_feat_lines += 1,
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_all_feat_timestamps: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if malformed_feat_lines > 0 {
+        tracing::warn!(
+            skipped = malformed_feat_lines,
+            "collect_all_feat_timestamps: feat lines whose t did not match the logger \
+             format were skipped (not folded into a placeholder)"
+        );
+    }
+    out.sort_unstable();
+    Ok(out)
+}
+
+/// `--features` (issue 008) 用: NDJSON の `{"type":"session_meta", ...}` 行から
+/// `(ts, task_kind)` の宣言列を抽出する。
+///
+/// ⚠️ 既存 `run_replay` の「1 ファイルに相異なる `task_kind` が複数あれば Err」
+/// (`declared_task_kinds` の検査) はここでは**適用しない** —— こちらは `stall_onset`
+/// が `s` 時点で有効な宣言を引くための時系列そのものが要るので、複数の宣言を
+/// そのまま返す (run_replay 側の制約とは別の用途)。
+///
+/// ⚠️★★★ **`task_kind` の検証は `logger::TaskKind::parse` を SSOT として通す**
+/// (`run_replay` の `domain` 解決と同じ経路。新しい許可リストを作らない)。`None` になる
+/// 未知の値は宣言として**採らない** (= その時点は未宣言のまま back-off する。値そのものは
+/// 出力に出さず、捨てた件数だけ `warn` する)。
+fn collect_task_kind_declarations(session_path: &PathBuf) -> Result<Vec<(u64, String)>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<(u64, String)> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut unknown_task_kind_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::SessionMeta { task_kind, ts, .. } = ev {
+            match TaskKind::parse(&task_kind) {
+                Some(kind) => out.push((ts, kind.as_str().to_string())),
+                None => {
+                    unknown_task_kind_lines += 1;
+                }
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_task_kind_declarations: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if unknown_task_kind_lines > 0 {
+        // ⚠️ 値そのものは出さない (件数だけ)。
+        tracing::warn!(
+            skipped = unknown_task_kind_lines,
+            "collect_task_kind_declarations: some session_meta declarations had a task_kind \
+             unrecognized by logger::TaskKind::parse and were dropped (treated as undeclared)"
+        );
+    }
+    out.sort_by_key(|(ts, _)| *ts);
     Ok(out)
 }
 
@@ -2906,6 +3063,59 @@ mod tests {
         }
     }
 
+    /// AC17 (issue 008): 形の合わない `feat` 行 (`t` 欠落 / 文字列 / `null`) があっても
+    /// `run_replay` の `FeatSnapshot` 列は 1 件も変わらず (`ReplayEvent::Feat` が既に
+    /// `serde_json::Value` なので、形に関わらずパース自体は常に成功する)、`--features` 側の
+    /// `collect_all_feat_timestamps` はその行を採らない (0 件のまま)。
+    #[test]
+    fn malformed_feat_line_does_not_break_run_replay() {
+        let broken = [
+            // t 欠落
+            r#"{"type":"feat","keys":3}"#,
+            // 文字列
+            r#"{"type":"feat","t":"not-a-number"}"#,
+            // null
+            r#"{"type":"feat","t":null}"#,
+        ];
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+
+        for (i, line) in broken.iter().enumerate() {
+            let ev: ReplayEvent = serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("崩れた feat 行も受理すること ({line}): {e}"));
+            assert!(
+                matches!(ev, ReplayEvent::Feat(_)),
+                "expected ReplayEvent::Feat, got {ev:?}"
+            );
+            assert_eq!(ev.timestamp(), None, "feat は時刻順ソートから除外する");
+
+            let mut ndjson = std::fs::read_to_string(fixture_path("minimal.ndjson"))
+                .expect("read minimal fixture");
+            ndjson.push_str(line);
+            ndjson.push('\n');
+            let tmp = std::env::temp_dir().join(format!(
+                "gse_malformed_feat_replay_{}_{}.ndjson",
+                std::process::id(),
+                i
+            ));
+            std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+            let with_line = run_replay(&tmp)
+                .unwrap_or_else(|e| panic!("run_replay must accept broken feat ({line}): {e}"));
+            assert_eq!(
+                with_line.len(),
+                baseline.len(),
+                "feat 行は FeatSnapshot 列を 1 件も変えてはならない ({line})"
+            );
+
+            let collected = collect_all_feat_timestamps(&tmp).expect("collect must not fail");
+            assert!(
+                collected.is_empty(),
+                "形が合わない feat 行は採らない: {collected:?} ({line})"
+            );
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
     /// ★ `collect_all_ime_shadow_events` → `build_feature_rows` の**配線**が生きていること
     /// （2026-09-15・`code-reviewer` MEDIUM「新しい配線に `cargo test` 上の網が無い」の回帰）。
     ///
@@ -2950,11 +3160,17 @@ mod tests {
         let ime = collect_all_ime_shadow_events(&tmp).expect("collect ime_shadow");
         assert_eq!(ime.len(), 2, "ime_shadow 2 行が採れること");
 
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &[],
+            task_kind_declarations: &[],
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
             &ime,
             MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
         )
         .expect("build rows");
 
@@ -2976,6 +3192,103 @@ mod tests {
         // ★ tick 帰属も固定する（⚠️ 全部を tick 0 に寄せていないこと）。
         assert_eq!(rows[0].boundary.ime_dwell_ms, 400);
         assert_eq!(rows[2].boundary.ime_dwell_ms, 600);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// MEDIUM-4: `collect_all_feat_timestamps` / `collect_task_kind_declarations` →
+    /// `build_feature_rows` の**配線**を NDJSON から通して固定する (issue 008)。
+    /// `session_meta` の `task_kind` 宣言が onset 行の `task_kind` まで届くこと。
+    #[test]
+    fn task_kind_declaration_reaches_stall_onset_through_the_collectors() {
+        let base = 1_700_000_000_000_u64;
+        let mut ndjson = format!(
+            concat!(
+                "{{\"type\":\"meta\",\"session_start\":{0},\"hmm_version\":\"0.5.0\"}}\n",
+                "{{\"type\":\"session_meta\",\"track\":\"main\",\"task_kind\":\"argumentative\",\
+                 \"intervention_enabled\":false,\"ts\":{0}}}\n",
+                "{{\"type\":\"key\",\"t\":{0},\"vk\":65,\"press\":true}}\n",
+                "{{\"type\":\"key\",\"t\":{1},\"vk\":65,\"press\":true}}\n",
+                "{{\"type\":\"key\",\"t\":{2},\"vk\":65,\"press\":true}}\n",
+            ),
+            base,
+            base + 100,
+            base + 200,
+        );
+        // feat 行: base..=base+31000 を 1000ms 刻み (小さな立ち上がりを観測区間に収める)。
+        let mut t = base;
+        while t <= base + 31_000 {
+            ndjson.push_str(&format!("{{\"type\":\"feat\",\"t\":{t}}}\n"));
+            t += 1_000;
+        }
+
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_task_kind_wiring_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let keys = collect_key_events(&tmp).expect("collect keys");
+        let feat_ts = collect_all_feat_timestamps(&tmp).expect("collect feat timestamps");
+        let task_kind_declarations =
+            collect_task_kind_declarations(&tmp).expect("collect task_kind declarations");
+        assert_eq!(
+            task_kind_declarations,
+            vec![(base, "argumentative".to_string())]
+        );
+
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &task_kind_declarations,
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
+        let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
+            &keys,
+            &[],
+            &[],
+            MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
+        )
+        .expect("build rows");
+
+        let onset_row = rows
+            .iter()
+            .find(|r| r.stall_onset.is_onset)
+            .expect("onset should fire through the wired collectors");
+        assert_eq!(
+            onset_row.stall_onset.task_kind,
+            Some("argumentative".to_string()),
+            "collect_task_kind_declarations → build_feature_rows の配線で \
+             宣言値が onset 行に届くこと"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// LOW-5: 未知の `task_kind` は `logger::TaskKind::parse` の SSOT を通し、`None` になる
+    /// 値は宣言として採らない (= 未宣言扱いで back-off。値は出力しない)。
+    #[test]
+    fn unknown_task_kind_is_not_emitted() {
+        let ndjson = concat!(
+            "{\"type\":\"meta\",\"session_start\":1700000000000,\"hmm_version\":\"0.5.0\"}\n",
+            "{\"type\":\"session_meta\",\"track\":\"main\",\
+             \"task_kind\":\"underwater_basket_weaving\",\"intervention_enabled\":false,\
+             \"ts\":1700000000000}\n",
+            "{\"type\":\"session_meta\",\"track\":\"main\",\"task_kind\":\"vibe_coding\",\
+             \"intervention_enabled\":false,\"ts\":1700000001000}\n",
+        );
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_unknown_task_kind_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, ndjson).expect("write temp fixture");
+
+        let declarations = collect_task_kind_declarations(&tmp)
+            .expect("collect must not fail on unknown task_kind");
+        assert_eq!(
+            declarations,
+            vec![(1_700_000_001_000, "vibe_coding".to_string())],
+            "未知の task_kind (\"underwater_basket_weaving\") は宣言として採らず、\
+             既知の宣言だけが残るはず"
+        );
         let _ = std::fs::remove_file(&tmp);
     }
 
