@@ -209,23 +209,33 @@ pub fn build_feature_rows(
         .min()
         .unwrap();
     // ★ 右端 (終端) は入力チャネルと feat 行の max (issue 008)。
-    let feat_ts_iter = stall_onset_inputs.feat_ts.iter().copied();
-    let t_last = key_ts
+    // ⚠️ どちらが右端を決めたかをエラーで区別できるよう、別々に max を取っておく
+    // (LOW-6: 値の大きさは出してよいが、行の中身は出さない)。
+    let t_last_events = key_ts
         .chain(paste_ts_iter)
         .chain(ime_ts_iter)
-        .chain(feat_ts_iter)
         .max()
         .unwrap();
+    let t_last_feat = stall_onset_inputs.feat_ts.iter().copied().max();
+    let t_last = match t_last_feat {
+        Some(f) => t_last_events.max(f),
+        None => t_last_events,
+    };
 
     let tick_of =
         |t: u64| -> usize { (t.saturating_sub(grid_origin_ms) / ENGINE_TICK_MS) as usize };
     let tick_count = tick_of(t_last) + 1;
     if tick_count > max_ticks {
+        // ⚠️ 行の中身 (feat の値・key の vk 等) は出さない —— 出すのは時刻の大きさだけ。
+        let (t_last_source, t_last_source_ms) = match t_last_feat {
+            Some(f) if f > t_last_events => ("the last feat row", f),
+            _ => ("the last input event", t_last_events),
+        };
         return Err(format!(
             "time span too large: {} ticks exceeds limit {} ticks \
-             (first event {} ms, last event {} ms). \
+             (first input event {} ms, grid ends at {} ms, determined by {} at {} ms). \
              The log likely contains a wall-clock jump or concatenated sessions (ADR-030 D9).",
-            tick_count, max_ticks, grid_origin_ms, t_last
+            tick_count, max_ticks, grid_origin_ms, t_last, t_last_source, t_last_source_ms
         ));
     }
 
@@ -397,6 +407,35 @@ mod tests {
         assert!(build_feature_rows(&huge, &[], &[], 1001, &inputs).is_ok());
         let err = build_feature_rows(&huge, &[], &[], 1000, &inputs).expect_err("上限超過は Err");
         assert!(err.contains("time span too large"), "err = {}", err);
+    }
+
+    /// MEDIUM-3: `feat` 行が最初の入力イベントより前・最後の入力イベントより後に
+    /// またがる入力で、原点は入力イベント (`feat` では動かない) のまま、最後の行は
+    /// 最後の `feat` 行を覆うこと (issue 008・mod.rs doc「tick への帰属規則」)。
+    #[test]
+    fn grid_end_extends_to_feat_but_origin_stays_at_first_input_event() {
+        let epoch = 1_700_000_000_000_u64;
+        let keys = vec![key_at(epoch + 5_000), key_at(epoch + 5_100)];
+        // feat 行は入力イベントより前 (epoch) と後 (epoch+20_000) の両方にまたがる。
+        let feat_ts = vec![epoch, epoch + 20_000];
+        let inputs = StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &[],
+            config: StallOnsetConfig::default(),
+        };
+        let rows = build_feature_rows(&keys, &[], &[], TEST_MAX_TICKS, &inputs)
+            .expect("within tick limit");
+
+        assert_eq!(
+            rows[0].t_ms,
+            epoch + 5_000,
+            "原点は最初の入力イベント時刻のまま (feat 行では動かない)"
+        );
+        let last_row_end = rows.last().unwrap().t_ms + ENGINE_TICK_MS;
+        assert!(
+            last_row_end > epoch + 20_000,
+            "最後の行は最後の feat 行 (epoch+20000) を覆うはず: last_row_end={last_row_end}"
+        );
     }
 
     /// ★ `t_ms` が**絶対 epoch ms** であること (⚠️ セッション相対にしない)。

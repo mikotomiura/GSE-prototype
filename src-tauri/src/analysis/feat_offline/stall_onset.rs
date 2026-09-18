@@ -1,9 +1,16 @@
 //! `stall onset`（`t0`）検出器（ADR-030 D2 / D3 / D4 / D5 / D6 / D8 (b-2)）。
 //!
-//! **causal**（`super` のモジュール doc の区分に従う）: 各時刻の判定は、その時刻までに
-//! 実際に発生した `key` 行だけから決まる。未来の `key` 行を 1 行も参照しない
-//! (`tests::prefix_stable_at_every_cut` が入力を任意の時刻で切っても、切った時刻以前に
-//! 確定する onset の集合が変わらないことを固定する)。
+//! **causal（`key` 行について、`super` のモジュール doc の区分に従う）**: 各時刻の判定は、
+//! その時刻までに実際に発生した `key` 行だけから決まる。未来の `key` 行を 1 行も参照しない
+//! (`tests::no_lookahead_in_net` / `tests::no_lookahead_in_theta` が条件 A の産出 (net) と
+//! θ の標本のそれぞれで個別に固定する。`tests::prefix_stable_at_every_cut` は入力を
+//! 任意の時刻で切っても、切った時刻以前に確定する onset の集合が変わらないことを
+//! 全体として固定する)。
+//!
+//! ⚠️ **`feat` 行は先読みする** —— ただし内容は読まず (D3 逐語「使ってよいのは feat 行の
+//! *存在* だけ」)、観測区間の右端 `b`（`t0 <= b` の確定）を決めるためだけに使う。区間が
+//! そこで終わるか続くかを判定するには、構造上「最大 `hole_gap_ms` 程度先」の `feat` 行の
+//! **存在**を見る必要がある (`observed_intervals` 参照)。
 //!
 //! 条件 A（産出）・条件 B（持続）・`t0 = s + θ_person` の定義は ADR-030 D3 / D4 逐語のまま。
 //! `net`（挿入系 − 削除系）は `super::net_production` / `super::key_net_delta`（issue 001 の
@@ -21,16 +28,18 @@
 //! θ の標本は**同じ観測区間に入る隣接 press 対**だけを使う（穴をまたぐ対は使わない）が、
 //! ⚠️ **`s` が属する区間に限定はしない** —— 規範文の θ 標本節は「同じ観測区間 `[a, b]`」と
 //! 書くだけで「`s` と同じ区間」とは書いておらず、対象は**全観測区間からプール**する
-//! (issue 008 再裁定。「確定」節の「`s` **と同じ**観測区間の右端 `b`」は `t0` の上限にだけ
-//! 使う別の制約であり、混同しない)。
+//! (issue 008 「規範となる定義」の θ 標本節の逐語 ＋ `decisions.md` 判断 18 の正解表で確定。
+//! 「確定」節の「`s` **と同じ**観測区間の右端 `b`」は `t0` の上限にだけ使う別の制約であり、
+//! 混同しない)。
 //!
 //! # 実装が一意に決まらなかった箇所（★ 推測せず、ここに明記する）
 //!
 //! - **`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` の値**: ADR-030 D4 は「決め方」だけを
 //!   凍結し、値は P1 前の事前宣言に委ねている。`w_ms` / `b_ms` は既存
-//!   `OutcomeConfig::merge_gap_ms` から、`hole_gap_ms` は `2 * ENGINE_TICK_MS`（1Hz の予定行が
-//!   少なくとも 1 本欠けたと言える構造的な下限）から借りたプレースホルダであり、
-//!   `warmup_count` は `None`（無効化）のままである —— **いずれも値そのものを決めたわけではない**
+//!   `OutcomeConfig::merge_gap_ms` から借りたプレースホルダ、`warmup_count` は `None`
+//!   （無効化）のままである —— **値そのものを決めたわけではない** (`blockers.md` 起票 14)。
+//!   `hole_gap_ms` は `2 * ENGINE_TICK_MS`（1Hz の予定行が少なくとも 1 本欠けたと言える
+//!   構造的な下限）から借りたプレースホルダであり、同じく値を決めたわけではない
 //!   (`blockers.md` 起票 15)。
 //! - **分位点の推定法**（D4 点 3「nearest-rank か線形補間かを事前宣言する」）: 本モジュールは
 //!   **nearest-rank**（`dispersion.rs::quantile` と同じ規約）を採用した。線形補間との差は
@@ -63,8 +72,11 @@ pub struct StallOnsetConfig {
     /// 条件 A の産出判定閾値。★ 新しい定数ではなく既存 `OutcomeConfig::net_diff_min`
     /// の値をそのまま引く (ADR-030 D3)。
     pub net_diff_min: u64,
-    /// 観測区間を切る閾値 (ms)。隣接する `feat` 行の間隔がこれを超えたら区間を分ける
-    /// (ADR-030 D8 (b-2))。
+    /// 観測区間を切る閾値 (ms、ADR-030 D8 (b-2))。隣接する `feat` 行の間隔が**これを超えたら**
+    /// 区間を分ける（＝ ちょうど `hole_gap_ms` なら同じ区間のまま）。既定は 2 tick。
+    /// ⚠️ 予定行が 1 本だけ欠けた場合 (差がちょうど 2 tick 前後) は、遅延による揺らぎと
+    /// 本当の欠測を区別できない —— 切れるかどうかは揺らぎ次第になる。値そのものは
+    /// 事前宣言事項 (`blockers.md` 起票 15)。
     pub hole_gap_ms: u64,
     /// θ の標本数がこれ未満なら個人分位点を使わない (`None` を返す)。`None` は無効化
     /// (下限を課さない) を表す (ADR-030 D4 点 1)。
@@ -129,6 +141,10 @@ struct OnsetEvent {
 /// **順位のインデックス範囲**を保証するものであり、ADR-030 D4 が禁じる θ_person への
 /// 床/天井とは別物 (対象はインデックスであって θ_person の値ではない)。
 /// `sorted_ascending` は昇順ソート済みを仮定する。要素 0 個なら `None`。
+///
+/// ⚠️ 本番経路 (`ThetaAccumulator::find_kth`) はこの規則を Fenwick 木上で独立に再実装して
+/// いるため、本関数自体は呼ばない (issue 008 HIGH-1)。テストと素朴な参照実装専用。
+#[cfg(test)]
 fn quantile_nearest_rank(sorted_ascending: &[u64], q: f64) -> Option<u64> {
     let n = sorted_ascending.len();
     if n == 0 {
@@ -216,8 +232,13 @@ fn build_global_instants(sorted_keys: &[KeyPress], w_ms: u64) -> Vec<u64> {
 /// `s` **以後**に確定する間隔 (2 打目が `s` より後) は使わない —— そうしないと、後から
 /// 追加された `key` 行が既に確定した `s` の θ_person を変え、因果性を破る。サンプルが
 /// 1 件も無い、または `warmup_count` に届かない場合は `None` (床で埋めず「推定できない」を
-/// 伝える)。呼び出し側が「同じ観測区間に入る対だけ」を候補列として渡す (`pooled_theta_gaps`
-/// / `theta_person_for_interval` のいずれか)。
+/// 伝える)。呼び出し側が「同じ観測区間に入る対だけ」を候補列として渡す (`pooled_theta_gaps`)。
+///
+/// ⚠️ **本番経路 (`detect_stall_onsets`) はこの関数を直接呼ばない** —— 立ち上がりのたびに
+/// プール全体を filter し直すと `O(R・P log P)` になる (issue 008 HIGH-1)。同じ規則
+/// (`rank = ceil(q*n)` を `[1, n]` にクランプ、1-indexed) を [`ThetaAccumulator`] が
+/// 座標圧縮 Fenwick 木で `O(log N)` に再実装している。本関数はテストからのみ使う。
+#[cfg(test)]
 fn theta_person_from_gaps(
     gaps: &[(u64, u64)],
     s: u64,
@@ -243,8 +264,8 @@ fn theta_person_from_gaps(
 
 /// 全観測区間を通して、区間内 (穴をまたがない) の隣接 press 間隔だけを集めたプール
 /// (`resuming_ts` 昇順)。θ の標本は `s` が属する区間に限定せず、**同じ観測区間に入る対で
-/// あれば全区間からプールする** (モジュール doc 冒頭・issue 008 再裁定)。
-/// `sorted_press_ts` は昇順ソート済みを仮定する。
+/// あれば全区間からプールする** (モジュール doc 冒頭。規範定義の θ 標本節の逐語 ＋
+/// `decisions.md` 判断 18 の正解表で確定)。`sorted_press_ts` は昇順ソート済みを仮定する。
 fn pooled_theta_gaps(sorted_press_ts: &[u64], intervals: &[(u64, u64)]) -> Vec<(u64, u64)> {
     let mut pooled = Vec::new();
     for &(a, b) in intervals {
@@ -260,6 +281,119 @@ fn pooled_theta_gaps(sorted_press_ts: &[u64], intervals: &[(u64, u64)]) -> Vec<(
     pooled
 }
 
+/// gap 値の頻度を座標圧縮した Fenwick 木 (Binary Indexed Tree) で管理し、θ_person を
+/// `O(log N)` で求める累積器 (issue 008 HIGH-1)。
+///
+/// ★ **前提**: `s` はこの累積器への呼び出し全体を通して単調非減少である。観測区間は
+/// (`observed_intervals` により) 時刻順・重複無しに並び、各区間内の評価時刻も昇順で
+/// 処理されるため、`detect_stall_onsets` がこの前提を満たす唯一の呼び出し元となる。
+/// この前提のもとでは、`pooled`（`resuming_ts` 昇順）を指すポインタ `pos` を前進させる
+/// だけで「`resuming_ts <= s` の集合」を管理でき、`s` が増えるたびにプール全体を
+/// filter し直す必要が無くなる (旧実装は立ち上がり 1 回ごとに `O(P)` の filter+sort を
+/// 行い、立ち上がり `R` 回で `O(R・P log P)` になっていた)。
+struct ThetaAccumulator {
+    /// (resuming_ts, gap_ms) の全プール。`resuming_ts` 昇順 (`pooled_theta_gaps` の出力)。
+    pooled: Vec<(u64, u64)>,
+    /// `pooled` のうち、まだ Fenwick 木に加えていない先頭の添字。
+    pos: usize,
+    /// 昇順・重複除去した gap 値 (座標圧縮の軸)。`sorted_values[i]` が Fenwick 木の
+    /// 1-indexed 位置 `i + 1` に対応する。
+    sorted_values: Vec<u64>,
+    /// Fenwick 木本体 (1-indexed。`tree[0]` は未使用)。
+    tree: Vec<u64>,
+    /// Fenwick 木上の k 番目探索 (binary lifting) で使う最上位ビット
+    /// (`floor(log2(sorted_values.len()))`)。
+    log_n: u32,
+    /// 累積器に既に加えた件数 (= 現在の `n`。`sorted_values.len()` とは別 — 同じ gap 値が
+    /// 複数回加わりうる)。
+    n_added: usize,
+}
+
+impl ThetaAccumulator {
+    /// `pooled`（`resuming_ts` 昇順）から空の累積器を作る。まだ何も Fenwick 木に加えない
+    /// (`theta_at` が `s` に応じて遅延的に加える)。
+    fn new(pooled: &[(u64, u64)]) -> Self {
+        let mut sorted_values: Vec<u64> = pooled.iter().map(|&(_, gap_ms)| gap_ms).collect();
+        sorted_values.sort_unstable();
+        sorted_values.dedup();
+        let size = sorted_values.len();
+        let log_n = if size == 0 {
+            0
+        } else {
+            usize::BITS - 1 - size.leading_zeros()
+        };
+        Self {
+            pooled: pooled.to_vec(),
+            pos: 0,
+            sorted_values,
+            tree: vec![0u64; size + 1],
+            log_n,
+            n_added: 0,
+        }
+    }
+
+    /// gap 値 1 件を Fenwick 木に加える (`O(log N)`)。
+    fn add(&mut self, gap_ms: u64) {
+        // `gap_ms` は `new` で構築した `sorted_values` から取った値なので必ず見つかる。
+        let idx = self
+            .sorted_values
+            .binary_search(&gap_ms)
+            .expect("gap_ms must be a value seen when building sorted_values");
+        let mut i = idx + 1; // Fenwick 木は 1-indexed
+        let len = self.tree.len();
+        while i < len {
+            self.tree[i] += 1;
+            i += i & i.wrapping_neg(); // 最下位ビットを加える (Fenwick 木の標準更新)
+        }
+        self.n_added += 1;
+    }
+
+    /// Fenwick 木上で `k` 番目 (1-indexed) に小さい値を二分探索 (binary lifting) で求める
+    /// (`O(log N)`)。`k` が総和 (`n_added`) を超えないことは呼び出し側が保証する。
+    fn find_kth(&self, k: u64) -> u64 {
+        let mut pos = 0usize;
+        let mut remaining = k;
+        let mut pw = 1usize << self.log_n;
+        while pw > 0 {
+            let next = pos + pw;
+            if next < self.tree.len() && self.tree[next] < remaining {
+                pos = next;
+                remaining -= self.tree[next];
+            }
+            pw >>= 1;
+        }
+        self.sorted_values[pos]
+    }
+
+    /// `s` 時点で有効な θ_person を返す。`theta_person_from_gaps` と**完全に同じ規則**
+    /// (`rank = ceil(q * n)` を `[1, n]` にクランプ、1-indexed の nearest-rank) を、
+    /// プール全体の filter+sort の代わりに Fenwick 木で計算する。
+    ///
+    /// ⚠️ `s` はこのインスタンスへの呼び出し全体を通して単調非減少でなければならない
+    /// (構造体 doc 参照)。降順で呼ぶと `pos` を巻き戻せずに壊れる —— この前提を破る
+    /// 呼び出し方をした場合の検出は `tests::matches_naive_reference_on_random_inputs`
+    /// (素朴な参照実装との全数比較) に委ねる。
+    fn theta_at(&mut self, s: u64, q: f64, warmup_count: Option<usize>) -> Option<u64> {
+        while self.pos < self.pooled.len() && self.pooled[self.pos].0 <= s {
+            let gap_ms = self.pooled[self.pos].1;
+            self.add(gap_ms);
+            self.pos += 1;
+        }
+        let n = self.n_added;
+        if n == 0 {
+            return None;
+        }
+        if let Some(m) = warmup_count {
+            if n < m {
+                return None;
+            }
+        }
+        let rank = (q * n as f64).ceil() as usize;
+        let rank = rank.clamp(1, n);
+        Some(self.find_kth(rank as u64))
+    }
+}
+
 /// 1 つの観測区間 `[a, b]` の中で `stall onset` を検出する (ADR-030 D8 (b) 「連続を切る」
 /// を区間単位で満たす)。評価時刻は `{key の t} ∪ {key の t + W} ∪ {a + W}` を
 /// `[a + W, b]` に制限したものだけ (D3 逐語 ＋ issue 008 の観測区間の規範)。
@@ -270,7 +404,7 @@ fn detect_stall_onsets_for_interval(
     global_instants: &[u64],
     sorted_keys: &[KeyPress],
     prefix: &[i64],
-    pooled_gaps: &[(u64, u64)],
+    theta_acc: &mut ThetaAccumulator,
     config: &StallOnsetConfig,
 ) -> Vec<OnsetEvent> {
     let w = config.w_ms;
@@ -303,9 +437,7 @@ fn detect_stall_onsets_for_interval(
     for i in 0..instants.len() {
         if cond_a[i] && !prev {
             let s = instants[i];
-            if let Some(theta) =
-                theta_person_from_gaps(pooled_gaps, s, config.q, config.warmup_count)
-            {
+            if let Some(theta) = theta_acc.theta_at(s, config.q, config.warmup_count) {
                 if let Some(t0) = s.checked_add(theta) {
                     // t0 が区間の右端を越える onset は立てない
                     // (D3「セッションが終わった場合は第 3 項を置かない」の issue 008 実装)。
@@ -337,8 +469,14 @@ fn detect_stall_onsets_for_interval(
 
 /// `stall onset` 列を検出する純関数 (ADR-030 D2/D3/D4/D8 (b-2) の中心アルゴリズム)。
 /// `feat_ts` が空なら観測区間が無いので `onset` は 1 つも立たない (AC3)。
-/// 計算量は `O(N log N)` (`N` = `keys.len()`。`net_at_fast` の二分探索 ＋ 各観測区間 1 回の
-/// ソート。issue 008 AC18 —— 旧実装は評価時刻ごとに `O(N)` フィルタする `O(N^2)` だった)。
+///
+/// 計算量は `O(N log N)` (`N` = `keys.len()`)。内訳:
+/// - 観測区間ごとの条件 A は `net_at_fast` (累積和 ＋ 二分探索) で評価時刻あたり `O(log N)`。
+/// - θ_person は [`ThetaAccumulator`] を**全区間を通して 1 つだけ**作り、立ち上がり `s` の
+///   たびにポインタを前進させながら Fenwick 木で引く (`s` は呼び出し全体で単調非減少 —
+///   区間は時刻順、区間内の評価時刻も昇順)。立ち上がり `R` 回でも `O(R log P)` に収まる
+///   (`P` = press 数。issue 008 AC18/AC18b —— 旧実装は立ち上がりのたびにプール全体を
+///   filter+sort し直す `O(R・P log P)` だった)。
 fn detect_stall_onsets(
     keys: &[KeyPress],
     feat_ts: &[u64],
@@ -354,6 +492,7 @@ fn detect_stall_onsets(
     let global_instants = build_global_instants(&sorted_keys, config.w_ms);
     let intervals = observed_intervals(feat_ts, config.hole_gap_ms);
     let pooled_gaps = pooled_theta_gaps(&press_ts, &intervals);
+    let mut theta_acc = ThetaAccumulator::new(&pooled_gaps);
 
     let mut onsets = Vec::new();
     for (a, b) in intervals {
@@ -363,7 +502,7 @@ fn detect_stall_onsets(
             &global_instants,
             &sorted_keys,
             &prefix,
-            &pooled_gaps,
+            &mut theta_acc,
             config,
         ));
     }
@@ -663,6 +802,20 @@ mod tests {
         assert!(column.iter().all(|row| !row.is_onset));
     }
 
+    /// LOW-1: 隣接差が**ちょうど** `hole_gap_ms` なら同じ区間のまま (規範「これを超えたら
+    /// 切る」＝ 以下なら切らない)。境界のどちら側で切れるかを固定する。
+    #[test]
+    fn gap_equal_to_hole_gap_does_not_split() {
+        let config = StallOnsetConfig::default();
+        let feat = vec![0, config.hole_gap_ms];
+        let intervals = observed_intervals(&feat, config.hole_gap_ms);
+        assert_eq!(
+            intervals,
+            vec![(0, config.hole_gap_ms)],
+            "隣接差がちょうど hole_gap_ms なら区間は割れないはず"
+        );
+    }
+
     /// AC4: 観測区間の長さが `W` に届かなければ (`a + W > b`)、その区間は 1 度も評価
     /// されない —— 区間を `a + W` まで伸ばした対照では同じ key 列で onset が立つ。
     #[test]
@@ -678,6 +831,35 @@ mod tests {
 
         let long_feat = feat_ts_range(0, 31_000, 1_000); // b=31000 >= a+W=30000
         assert_eq!(detect_stall_onsets(&keys, &long_feat, &config).len(), 1);
+    }
+
+    /// MEDIUM-1 是正: 上の対照 (short_feat) は区間そのものが評価不能 (a+W > b) になるだけで、
+    /// 「区間開始 (a) からの抑制」を外しても赤にならない (評価時刻が 1 つも生まれないため)。
+    /// ⚠️ 穴の後に長い沈黙が続き、区間開始 `a` から評価すると onset が立ってしまう形にする
+    /// (抑制を外すと `s=50000`〈区間開始〉になり、この test は赤くなる)。
+    #[test]
+    fn no_evaluation_within_w_after_hole_produces_wrong_s_if_suppression_removed() {
+        let config = StallOnsetConfig::default();
+        // 区間1: feat 0..5000。key は 1000/1100 (gap=100、θ の種として使うだけ)。
+        // 穴: 5000..50000 (feat 行なし)。
+        // 区間2: feat 50000..90000。打鍵は 1 つも無い (長い沈黙)。
+        let mut feat = feat_ts_range(0, 5_000, 1_000);
+        feat.extend(feat_ts_range(50_000, 90_000, 1_000));
+        let keys = vec![key(1_000), key(1_100)];
+
+        let onsets = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            onsets.len(),
+            1,
+            "区間2 の長い沈黙で onset が 1 つ立つはず: {onsets:?}"
+        );
+        assert_eq!(
+            onsets[0].s_ms, 80_000,
+            "区間開始 (50000) ではなく区間開始+W (80000) で立ち上がるはず \
+             (a+W の抑制を外すと s=50000 になる): {onsets:?}"
+        );
+        assert_eq!(onsets[0].t0_ms, 80_100);
+        assert_eq!(onsets[0].theta_person_ms, 100);
     }
 
     /// AC5: θ の標本は同じ観測区間に属する隣接 press だけから取り、区間をまたぐ間隔
@@ -706,9 +888,10 @@ mod tests {
         assert_eq!(onsets[0].t0_ms, 71_200);
     }
 
-    /// issue 008 再裁定: θ の標本は `s` が属する観測区間だけに限定せず、**同じ観測区間に
-    /// 入る対であれば他の区間からもプール**する。規範文の θ 標本節は「同じ観測区間」と
-    /// 書くだけで「`s` と同じ区間」に限定していない (「確定」節の t0<=b とは別の制約)。
+    /// θ の標本は `s` が属する観測区間だけに限定せず、**同じ観測区間に入る対であれば
+    /// 他の区間からもプール**する (issue 008「規範となる定義」の θ 標本節の逐語 ＋
+    /// `decisions.md` 判断 18 の正解表)。規範文の θ 標本節は「同じ観測区間」と書くだけで
+    /// 「`s` と同じ区間」に限定していない (「確定」節の t0<=b とは別の制約)。
     #[test]
     fn theta_sample_pools_from_other_intervals_too() {
         let config = StallOnsetConfig::default();
@@ -732,6 +915,44 @@ mod tests {
              区間1 の gap=5000 がプールされていない可能性がある: {onsets:?}"
         );
         assert_eq!(onsets[0].t0_ms, 76_100);
+    }
+
+    /// HIGH-2 是正: 規範定義の 2 項目 —「連続を切る: 直前状態を各観測区間の評価開始時点で
+    /// false に戻す」と「評価時刻に `{a+W}` を含める」— を外しても既存テストが緑のままだった。
+    /// 区間2 に打鍵を 1 つも置かず (a2+W だけが評価時刻になる)、直前区間の cond_a=true を
+    /// 引きずらない/引きずるかで区間2 の onset の有無自体が変わる形にして両方を同時に固定する。
+    #[test]
+    fn onset_after_hole_rises_at_interval_start_plus_w() {
+        let config = StallOnsetConfig::default();
+        let keys = small_onset_keys(); // 0, 100, 200
+        let mut feat = feat_ts_range(0, 40_000, 1_000);
+        feat.extend(feat_ts_range(50_000, 100_000, 1_000));
+
+        let onsets = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            onsets.len(),
+            2,
+            "区間1 (0..40000) と区間2 (50000..100000) それぞれで onset が 1 つずつ立つはず: {onsets:?}"
+        );
+        assert_eq!(
+            onsets[0],
+            OnsetEvent {
+                s_ms: 30_200,
+                t0_ms: 30_300,
+                theta_person_ms: 100,
+            }
+        );
+        assert_eq!(
+            onsets[1],
+            OnsetEvent {
+                s_ms: 80_000,
+                t0_ms: 80_100,
+                theta_person_ms: 100,
+            },
+            "区間2 に打鍵が無いので、a2+W (=80000) の評価時刻自体が無ければ onset 2 は \
+             立たず (評価時刻に {{a+W}} を含める規則)、区間1 の cond_a=true を \
+             引きずれば a2+W での立ち上がりが検出されない (直前状態リセットの規則): {onsets:?}"
+        );
     }
 
     /// AC6 (D3「セッションが終わった場合は第 3 項を置かない」): `t0` が観測区間の右端を
@@ -942,6 +1163,267 @@ mod tests {
         }
     }
 
+    /// HIGH-3 是正: 条件 A (net) の計算が未来の `key` 行を覗いていないこと。s=30200 の
+    /// 確定を汚染しない位置 (t0=30300 の 1ms 後) に文字キーを 1 つ足す。
+    /// (先読みすると net の窓が誤って広がり、s=30200 が立ち上がらなくなる。)
+    #[test]
+    fn no_lookahead_in_net() {
+        let config = StallOnsetConfig::default();
+        let mut keys = small_onset_keys(); // 0, 100, 200
+        keys.push(key(30_301)); // t0 (30300) の 1ms 後
+        let feat = feat_ts_range(0, 60_000, 1_000);
+
+        let onsets = detect_stall_onsets(&keys, &feat, &config);
+        assert!(
+            onsets
+                .iter()
+                .any(|ev| ev.s_ms == 30_200 && ev.t0_ms == 30_300 && ev.theta_person_ms == 100),
+            "net が未来の key (30301) を先読みすると s=30200 の立ち上がりが消えるはず: {onsets:?}"
+        );
+    }
+
+    /// HIGH-3 是正: θ の標本 (press gap) が未来の `key` 行を覗いていないこと。
+    /// `s` (30200) と `t0` (30300) の間に navigation キー (net に寄与しない) を挟むと、
+    /// その resuming_ts (30250) は `s` より後なので θ の標本には入らないはず。
+    /// (先読みすると gap=30050 が混入し θ が 30050 になる。)
+    #[test]
+    fn no_lookahead_in_theta() {
+        let config = StallOnsetConfig::default();
+        let mut keys = small_onset_keys(); // 0, 100, 200
+        keys.push(KeyPress {
+            timestamp: 30_250,
+            vk: 0x25, // navigation, net に寄与しない
+        });
+        let feat = feat_ts_range(0, 60_000, 1_000);
+
+        let onsets = detect_stall_onsets(&keys, &feat, &config);
+        assert!(
+            onsets
+                .iter()
+                .any(|ev| ev.s_ms == 30_200 && ev.t0_ms == 30_300 && ev.theta_person_ms == 100),
+            "θ が未来の press (30250) を先読みすると theta_person が 30050 になるはず: {onsets:?}"
+        );
+    }
+
+    /// 決定論的 xorshift64 PRNG (crate を足さずテスト内だけで完結させる)。
+    struct XorShift64(u64);
+
+    impl XorShift64 {
+        fn new(seed: u64) -> Self {
+            // 0 は不動点 (x^=x<<13 等が 0 のまま) なので回避する。
+            Self(seed | 1)
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+
+        /// `[0, bound)` の一様乱数 (`bound > 0`)。
+        fn next_range(&mut self, bound: u64) -> u64 {
+            self.next_u64() % bound
+        }
+    }
+
+    /// テスト専用: ランダム入力のタイムライン長 (ms)。
+    const TEST_RANDOM_TIMELINE_MS: u64 = 90_000;
+    /// テスト専用: `feat` 行 1 本を欠落させる確率 (パーセント)。
+    const TEST_RANDOM_HOLE_PERCENT: u64 = 20;
+    /// テスト専用: ランダム入力の生成回数。
+    const TEST_RANDOM_CASES: usize = 220;
+
+    /// `matches_naive_reference_on_random_inputs` 用のランダム入力を 1 件作る。
+    /// feat 行の穴・同一時刻の打鍵・BS・navigation を混ぜる。
+    fn random_stall_onset_input(rng: &mut XorShift64) -> (Vec<KeyPress>, Vec<u64>) {
+        let mut feat_ts = Vec::new();
+        let mut t = 0u64;
+        while t <= TEST_RANDOM_TIMELINE_MS {
+            if rng.next_range(100) >= TEST_RANDOM_HOLE_PERCENT {
+                feat_ts.push(t);
+            }
+            t += ENGINE_TICK_MS;
+        }
+
+        let key_count = 5 + rng.next_range(36) as usize;
+        let mut keys = Vec::with_capacity(key_count);
+        let mut last_ts: Option<u64> = None;
+        for _ in 0..key_count {
+            let ts = match last_ts {
+                // 同一時刻の打鍵を時々混ぜる。
+                Some(prev) if rng.next_range(10) == 0 => prev,
+                _ => rng.next_range(TEST_RANDOM_TIMELINE_MS + 1),
+            };
+            let roll = rng.next_range(10);
+            let vk: u32 = if roll < 6 {
+                0x41 // 文字キー (text-producing)
+            } else if roll < 8 {
+                0x08 // backspace
+            } else {
+                0x25 // navigation
+            };
+            keys.push(KeyPress { timestamp: ts, vk });
+            last_ts = Some(ts);
+        }
+        (keys, feat_ts)
+    }
+
+    /// 素朴な参照実装: 規範定義を逐語どおりに書いたもの。評価時刻ごとに全キーを走査し
+    /// (`naive_net_at`)、θ も毎回全 gap から集め直す (`naive_theta_at`)。最適化 (Fenwick 木・
+    /// 累積和二分探索) と実装戦略を完全に分けることで、[`ThetaAccumulator`] / `net_at_fast`
+    /// への信頼を `detect_stall_onsets` の出力そのものと比較して検証する
+    /// (`matches_naive_reference_on_random_inputs`)。
+    ///
+    /// ★ `observed_intervals` / `build_global_instants` は共有する —— これらは今回の
+    /// 二乗バグ (θ の再計算) と無関係であり、既に個別のテストで固定済み。
+    fn naive_net_at(keys: &[KeyPress], t: u64, w_ms: u64) -> i64 {
+        keys.iter()
+            .filter(|k| {
+                k.timestamp <= t
+                    && k.timestamp
+                        .checked_add(w_ms)
+                        .map(|end| end > t)
+                        .unwrap_or(true)
+            })
+            .map(super::super::key_net_delta)
+            .sum()
+    }
+
+    fn naive_theta_at(
+        sorted_press_ts: &[u64],
+        intervals: &[(u64, u64)],
+        s: u64,
+        q: f64,
+        warmup_count: Option<usize>,
+    ) -> Option<u64> {
+        let mut gaps: Vec<u64> = Vec::new();
+        for w in sorted_press_ts.windows(2) {
+            let (k_i, k_ip1) = (w[0], w[1]);
+            if k_ip1 > s {
+                continue; // 因果性: s より後に確定する対は使わない
+            }
+            let same_interval = intervals.iter().any(|&(a, b)| a <= k_i && k_ip1 <= b);
+            if same_interval {
+                gaps.push(k_ip1.saturating_sub(k_i));
+            }
+        }
+        if gaps.is_empty() {
+            return None;
+        }
+        if let Some(m) = warmup_count {
+            if gaps.len() < m {
+                return None;
+            }
+        }
+        gaps.sort_unstable();
+        quantile_nearest_rank(&gaps, q)
+    }
+
+    fn naive_detect_stall_onsets(
+        keys: &[KeyPress],
+        feat_ts: &[u64],
+        config: &StallOnsetConfig,
+    ) -> Vec<OnsetEvent> {
+        if feat_ts.is_empty() {
+            return Vec::new();
+        }
+        let mut sorted_keys: Vec<KeyPress> = keys.to_vec();
+        sorted_keys.sort_by_key(|k| k.timestamp);
+        let sorted_press_ts: Vec<u64> = sorted_keys.iter().map(|k| k.timestamp).collect();
+        let global_instants = build_global_instants(&sorted_keys, config.w_ms);
+        let intervals = observed_intervals(feat_ts, config.hole_gap_ms);
+
+        let mut onsets = Vec::new();
+        for &(a, b) in &intervals {
+            let Some(start) = a.checked_add(config.w_ms) else {
+                continue;
+            };
+            if start > b {
+                continue;
+            }
+            let lo = global_instants.partition_point(|&t| t < start);
+            let hi = global_instants.partition_point(|&t| t <= b);
+            let mut instants: Vec<u64> = Vec::with_capacity(hi - lo + 1);
+            instants.push(start);
+            instants.extend_from_slice(&global_instants[lo..hi]);
+            instants.sort_unstable();
+            instants.dedup();
+
+            // ★ 評価時刻ごとに全キーを走査する (naive・O(N) per instant)。
+            let cond_a: Vec<bool> = instants
+                .iter()
+                .map(|&t| naive_net_at(&sorted_keys, t, config.w_ms) < config.net_diff_min as i64)
+                .collect();
+
+            let mut prev = false;
+            for i in 0..instants.len() {
+                if cond_a[i] && !prev {
+                    let s = instants[i];
+                    // ★ θ も毎回全 gap から集め直す (naive・s ごとに再走査・再ソート)。
+                    if let Some(theta) = naive_theta_at(
+                        &sorted_press_ts,
+                        &intervals,
+                        s,
+                        config.q,
+                        config.warmup_count,
+                    ) {
+                        if let Some(t0) = s.checked_add(theta) {
+                            if t0 <= b {
+                                let mut confirmed = true;
+                                let mut j = i + 1;
+                                while j < instants.len() && instants[j] <= t0 {
+                                    if !cond_a[j] {
+                                        confirmed = false;
+                                        break;
+                                    }
+                                    j += 1;
+                                }
+                                if confirmed {
+                                    onsets.push(OnsetEvent {
+                                        s_ms: s,
+                                        t0_ms: t0,
+                                        theta_person_ms: theta,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                prev = cond_a[i];
+            }
+        }
+        onsets
+    }
+
+    /// HIGH-3 是正: 本番 (`detect_stall_onsets`、Fenwick 木 ＋ 累積和二分探索) と
+    /// 素朴な参照実装 (`naive_detect_stall_onsets`、規範定義を逐語どおりに書いたもの) を、
+    /// シード固定の xorshift64 で作った 220 件のランダム入力 (穴・同一時刻・BS・navigation を
+    /// 混ぜる) について比較し、出力 (`s`/`t0`/`theta_person_ms` の列) が完全一致することを
+    /// 固定する。
+    #[test]
+    fn matches_naive_reference_on_random_inputs() {
+        let mut config = StallOnsetConfig::default();
+        // ★ タイムラインを圧縮した既定より短い W を使い、220 件の中で立ち上がりが
+        //   十分な頻度で起きるようにする (`OutcomeConfig::merge_gap_ms` 由来の既定は
+        //   このタイムラインに対して大きすぎる)。
+        config.w_ms /= 8;
+
+        let mut rng = XorShift64::new(0x9E3779B97F4A7C15);
+        for case in 0..TEST_RANDOM_CASES {
+            let (keys, feat_ts) = random_stall_onset_input(&mut rng);
+            let fast = detect_stall_onsets(&keys, &feat_ts, &config);
+            let naive = naive_detect_stall_onsets(&keys, &feat_ts, &config);
+            assert_eq!(
+                fast, naive,
+                "case {case}: fast (Fenwick 木) と naive (素朴な参照実装) の出力が \
+                 食い違う (keys={keys:?}, feat_ts={feat_ts:?})"
+            );
+        }
+    }
+
     /// AC14: onset はちょうど `t0` を含む tick に載る (`t_ms <= t0 < t_ms + tick`)。
     #[test]
     fn onset_is_attributed_to_the_t0_tick() {
@@ -963,6 +1445,36 @@ mod tests {
         let t0 = column[idx].t0_ms.expect("onset row has t0");
         let t_ms = idx as u64 * ENGINE_TICK_MS; // grid_origin=0
         assert!(t_ms <= t0 && t0 < t_ms + ENGINE_TICK_MS);
+    }
+
+    /// MEDIUM-2 是正: 上のテストは `s` と `t0` (θ=100ms) が偶然同じ tick に乗るため、
+    /// 「onset を `s` の tick に載せる」誤りとの区別が付かない。θ >= 1000ms にして
+    /// `s` と `t0` を別々の tick に置き、tick 帰属が `t0` 基準であることを直接固定する。
+    #[test]
+    fn onset_tick_uses_t0_not_s_when_they_differ() {
+        let config = StallOnsetConfig::default();
+        let keys = vec![key(0), key(20_000)]; // gap 20000 → θ = 20000 (単一標本)
+        let feat = feat_ts_range(0, 71_000, 1_000);
+        let column = stall_onset_column(&keys, &feat, &[], 80, 0, ENGINE_TICK_MS, &config);
+
+        let idx = column
+            .iter()
+            .position(|r| r.is_onset)
+            .expect("onset should fire");
+        let s = column[idx].s_ms.expect("onset row has s");
+        let t0 = column[idx].t0_ms.expect("onset row has t0");
+        assert_ne!(
+            s / ENGINE_TICK_MS,
+            t0 / ENGINE_TICK_MS,
+            "この test の前提: s と t0 が異なる tick に乗ること (s={s}, t0={t0})"
+        );
+
+        let t_ms = idx as u64 * ENGINE_TICK_MS; // grid_origin=0
+        assert!(
+            t_ms <= t0 && t0 < t_ms + ENGINE_TICK_MS,
+            "onset は t0 の tick に載るはず (s の tick に載せると idx が s 側にずれる): \
+             idx={idx} t_ms={t_ms} s={s} t0={t0}"
+        );
     }
 
     /// AC15: 同じ tick に 2 つ目の onset が落ちても上書きせず、先に確定した onset を残す。

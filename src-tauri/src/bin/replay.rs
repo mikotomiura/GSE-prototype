@@ -1692,6 +1692,11 @@ fn collect_all_feat_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, Strin
 /// (`declared_task_kinds` の検査) はここでは**適用しない** —— こちらは `stall_onset`
 /// が `s` 時点で有効な宣言を引くための時系列そのものが要るので、複数の宣言を
 /// そのまま返す (run_replay 側の制約とは別の用途)。
+///
+/// ⚠️★★★ **`task_kind` の検証は `logger::TaskKind::parse` を SSOT として通す**
+/// (`run_replay` の `domain` 解決と同じ経路。新しい許可リストを作らない)。`None` になる
+/// 未知の値は宣言として**採らない** (= その時点は未宣言のまま back-off する。値そのものは
+/// 出力に出さず、捨てた件数だけ `warn` する)。
 fn collect_task_kind_declarations(session_path: &PathBuf) -> Result<Vec<(u64, String)>, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
@@ -1707,6 +1712,7 @@ fn collect_task_kind_declarations(session_path: &PathBuf) -> Result<Vec<(u64, St
     let reader = BufReader::new(file);
     let mut out: Vec<(u64, String)> = Vec::new();
     let mut parse_failed_lines: u64 = 0;
+    let mut unknown_task_kind_lines: u64 = 0;
     for (lineno, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
@@ -1720,13 +1726,26 @@ fn collect_task_kind_declarations(session_path: &PathBuf) -> Result<Vec<(u64, St
             }
         };
         if let ReplayEvent::SessionMeta { task_kind, ts, .. } = ev {
-            out.push((ts, task_kind));
+            match TaskKind::parse(&task_kind) {
+                Some(kind) => out.push((ts, kind.as_str().to_string())),
+                None => {
+                    unknown_task_kind_lines += 1;
+                }
+            }
         }
     }
     if parse_failed_lines > 0 {
         tracing::warn!(
             failed = parse_failed_lines,
             "collect_task_kind_declarations: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if unknown_task_kind_lines > 0 {
+        // ⚠️ 値そのものは出さない (件数だけ)。
+        tracing::warn!(
+            skipped = unknown_task_kind_lines,
+            "collect_task_kind_declarations: some session_meta declarations had a task_kind \
+             unrecognized by logger::TaskKind::parse and were dropped (treated as undeclared)"
         );
     }
     out.sort_by_key(|(ts, _)| *ts);
@@ -3173,6 +3192,103 @@ mod tests {
         // ★ tick 帰属も固定する（⚠️ 全部を tick 0 に寄せていないこと）。
         assert_eq!(rows[0].boundary.ime_dwell_ms, 400);
         assert_eq!(rows[2].boundary.ime_dwell_ms, 600);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// MEDIUM-4: `collect_all_feat_timestamps` / `collect_task_kind_declarations` →
+    /// `build_feature_rows` の**配線**を NDJSON から通して固定する (issue 008)。
+    /// `session_meta` の `task_kind` 宣言が onset 行の `task_kind` まで届くこと。
+    #[test]
+    fn task_kind_declaration_reaches_stall_onset_through_the_collectors() {
+        let base = 1_700_000_000_000_u64;
+        let mut ndjson = format!(
+            concat!(
+                "{{\"type\":\"meta\",\"session_start\":{0},\"hmm_version\":\"0.5.0\"}}\n",
+                "{{\"type\":\"session_meta\",\"track\":\"main\",\"task_kind\":\"argumentative\",\
+                 \"intervention_enabled\":false,\"ts\":{0}}}\n",
+                "{{\"type\":\"key\",\"t\":{0},\"vk\":65,\"press\":true}}\n",
+                "{{\"type\":\"key\",\"t\":{1},\"vk\":65,\"press\":true}}\n",
+                "{{\"type\":\"key\",\"t\":{2},\"vk\":65,\"press\":true}}\n",
+            ),
+            base,
+            base + 100,
+            base + 200,
+        );
+        // feat 行: base..=base+31000 を 1000ms 刻み (小さな立ち上がりを観測区間に収める)。
+        let mut t = base;
+        while t <= base + 31_000 {
+            ndjson.push_str(&format!("{{\"type\":\"feat\",\"t\":{t}}}\n"));
+            t += 1_000;
+        }
+
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_task_kind_wiring_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+        let keys = collect_key_events(&tmp).expect("collect keys");
+        let feat_ts = collect_all_feat_timestamps(&tmp).expect("collect feat timestamps");
+        let task_kind_declarations =
+            collect_task_kind_declarations(&tmp).expect("collect task_kind declarations");
+        assert_eq!(
+            task_kind_declarations,
+            vec![(base, "argumentative".to_string())]
+        );
+
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &task_kind_declarations,
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
+        let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
+            &keys,
+            &[],
+            &[],
+            MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
+        )
+        .expect("build rows");
+
+        let onset_row = rows
+            .iter()
+            .find(|r| r.stall_onset.is_onset)
+            .expect("onset should fire through the wired collectors");
+        assert_eq!(
+            onset_row.stall_onset.task_kind,
+            Some("argumentative".to_string()),
+            "collect_task_kind_declarations → build_feature_rows の配線で \
+             宣言値が onset 行に届くこと"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// LOW-5: 未知の `task_kind` は `logger::TaskKind::parse` の SSOT を通し、`None` になる
+    /// 値は宣言として採らない (= 未宣言扱いで back-off。値は出力しない)。
+    #[test]
+    fn unknown_task_kind_is_not_emitted() {
+        let ndjson = concat!(
+            "{\"type\":\"meta\",\"session_start\":1700000000000,\"hmm_version\":\"0.5.0\"}\n",
+            "{\"type\":\"session_meta\",\"track\":\"main\",\
+             \"task_kind\":\"underwater_basket_weaving\",\"intervention_enabled\":false,\
+             \"ts\":1700000000000}\n",
+            "{\"type\":\"session_meta\",\"track\":\"main\",\"task_kind\":\"vibe_coding\",\
+             \"intervention_enabled\":false,\"ts\":1700000001000}\n",
+        );
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_unknown_task_kind_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, ndjson).expect("write temp fixture");
+
+        let declarations = collect_task_kind_declarations(&tmp)
+            .expect("collect must not fail on unknown task_kind");
+        assert_eq!(
+            declarations,
+            vec![(1_700_000_001_000, "vibe_coding".to_string())],
+            "未知の task_kind (\"underwater_basket_weaving\") は宣言として採らず、\
+             既知の宣言だけが残るはず"
+        );
         let _ = std::fs::remove_file(&tmp);
     }
 
