@@ -65,7 +65,7 @@ printf '%s' "$out" | jq -e '
 meta_cap="$(jq -c 'select(.type=="meta" and has("capabilities")) | .capabilities' "$RICH" | head -1)"
 [ -n "$meta_cap" ] || fail "前提: $RICH の meta に capabilities が無い"
 printf '%s' "$out" | jq -e --argjson cap "$meta_cap" 'all(.[]; .quality.capabilities == $cap)' >/dev/null 2>&1 \
-  || fail "AC6: capabilities が meta の値と完全一致しない行がある（★ 加工・並べ替え・欠落をしない）"
+  || fail "AC6: capabilities が meta の値と JSON 値として等価でない行がある（★ 加工・欠落をしない。⚠️ キー順は辞書順に正規化されうるので jq の == で比べる）"
 
 # AC3: ⚠️★★★ 被験者由来の欠測理由が 1 つも出ていないこと（★ capabilities を除いた出力全体を見る）
 if printf '%s' "$out" | jq -c 'map(.quality |= del(.capabilities))' | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
@@ -121,6 +121,51 @@ if printf '%s' "$red_out" | jq -c 'map(.quality |= del(.capabilities))' | grep -
   fail "AC3: 削除版の出力に被験者由来の語が現れている"
 fi
 
+# ---------- 判断 24 の改訂（AC13 / AC14 / AC15） ----------
+#   ★ 正解値は参照実装（ジョブ一時領域の ref_q_emit.py）と手計算で確定した。
+# AC13: hook の持ち越しを観測区間で切る（★ security-checker MEDIUM）
+{ cat "$OBS"
+  echo "{\"type\":\"hook_health\",\"t\":$((T + 50500)),\"alive\":true,\"starved_ms\":0,\"rehook\":false,\"dropped\":0,\"dropped_delta\":0}"
+  echo "{\"type\":\"hook_health\",\"t\":$((T + 120500)),\"alive\":false,\"starved_ms\":0,\"rehook\":false,\"dropped\":0,\"dropped_delta\":0}"
+} > "$tmpd/obs_hook.ndjson"
+jq -c --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
+  select(((.t // .ts // 0) < $lo) or ((.t // .ts // 0) > $hi))' "$tmpd/obs_hook.ndjson" > "$tmpd/obs_hook_red.ndjson"
+hk_out="$(replay "$tmpd/obs_hook.ndjson" --features 2>/dev/null)" || fail "AC13: hook 入り入力で --features が非 0"
+printf '%s' "$hk_out" | jq -e '
+  ([.[].quality.observability_mask.hook]
+     == ([range(50)] | map(null)) + ([range(70)] | map(true)) + ([range(100)] | map(false)))
+  and ([to_entries[] | select(.value.quality.missing_reasons | index("hook_dead")) | .key] == [range(120; 220)])' >/dev/null 2>&1 \
+  || fail "AC13: 穴の無い入力で hook の持ち越し（null×50 / true×70 / false×100）と hook_dead（tick 120〜219）が正解と一致しない"
+hkr_out="$(replay "$tmpd/obs_hook_red.ndjson" --features 2>/dev/null)" || fail "AC13: hook 入り削除版で --features が非 0"
+printf '%s' "$hkr_out" | jq -e '
+  ([.[].quality.observability_mask.hook]
+     == ([range(50)] | map(null)) + ([range(49)] | map(true)) + ([range(121)] | map(null)))
+  and ([.[] | select(.quality.missing_reasons | index("hook_dead"))] | length == 0)' >/dev/null 2>&1 \
+  || fail "AC13: ⚠️★★★ 穴をまたいで hook の古い状態を持ち越している（★ 期待: null×50 / true×49 / null×121・hook_dead 無し）。実際: $(printf '%s' "$hkr_out" | jq -c '[.[].quality.observability_mask.hook] | reduce .[] as $x ([]; if length>0 and .[-1][0]==$x then .[:-1]+[[.[-1][0], .[-1][1]+1]] else .+[[$x,1]] end)' 2>/dev/null)"
+
+# AC14: dropped_delta の欠けた行を 0 で埋めない（★ code-reviewer M1）
+TR=1700000100000
+{ cat "$RICH"
+  echo "{\"type\":\"hook_health\",\"t\":$((TR + 8000)),\"alive\":true,\"starved_ms\":0,\"rehook\":false,\"dropped\":0}"
+} > "$tmpd/rich_legacy.ndjson"
+lg_out="$(replay "$tmpd/rich_legacy.ndjson" --features 2>/dev/null)" || fail "AC14: 旧形式の hook_health 入りで --features が非 0"
+printf '%s' "$lg_out" | jq -e '
+  (.[7].quality.hook_health == {"alive":true,"starved_ms":0,"rehook":false,"dropped_delta":null})
+  and (.[7].quality.missing_reasons == [])
+  and (.[13].quality.hook_health.dropped_delta == 2)' >/dev/null 2>&1 \
+  || fail "AC14: dropped_delta の欠けた行（tick 7）が null にならない、または理由が立っている（★ 0 で埋めない）。実際: $(printf '%s' "$lg_out" | jq -c '.[7].quality' 2>/dev/null)"
+
+# AC15: capabilities が JSON オブジェクトでない / 4096 バイト超 → Err（★ security-checker LOW-3。null に倒さない）
+jq -c 'if .type == "meta" and has("capabilities") then .capabilities = "x" else . end' "$RICH" > "$tmpd/cap_str.ndjson"
+if replay "$tmpd/cap_str.ndjson" --features >/dev/null 2>&1; then
+  fail "AC15: capabilities が文字列の入力で --features が exit 0（★ 形の合わない宣言を黙って受けない）"
+fi
+jq -c --arg pad "$(head -c 5000 /dev/zero | tr '\0' 'a')" \
+  'if .type == "meta" and has("capabilities") then .capabilities.padding = $pad else . end' "$RICH" > "$tmpd/cap_big.ndjson"
+if replay "$tmpd/cap_big.ndjson" --features >/dev/null 2>&1; then
+  fail "AC15: 4096 バイトを超える capabilities で --features が exit 0（★ 行ごとに複製されるので上限を置く）"
+fi
+
 # ---------- ソース検査（AC5 / AC11 / 計器変更の禁止 / test の実在） ----------
 if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
   # AC5: ⚠️ quality を他 Tier の入力に渡していないこと（★ 状態特徴にしない）
@@ -143,11 +188,16 @@ if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
   # ★ AC の test が実在すること
   for t in missing_reasons_are_instrument_side_only participant_originated_reasons_are_never_emitted \
            missing_is_null_not_zero absent_capabilities_is_null_not_empty \
-           feat_hole_is_masked_without_a_reason hook_state_carries_forward_until_next_row; do
+           feat_hole_is_masked_without_a_reason hook_state_carries_forward_until_next_row \
+           hook_carry_is_cut_at_observed_interval_boundaries missing_dropped_delta_is_null_not_zero \
+           aggregation_of_multiple_rows_in_one_tick in_tick_dead_row_sets_hook_dead_even_if_state_ends_alive \
+           tick_boundary_rows_are_attributed_correctly; do
     grep -qE "fn ${t}\b" "$SRCF" || fail "AC の test \`$t\` が $SRCF に無い"
   done
-  grep -qE 'fn malformed_hook_health_line_does_not_break_run_replay\b' src/bin/replay.rs \
-    || fail "AC12 の test \`malformed_hook_health_line_does_not_break_run_replay\` が bin/replay.rs に無い"
+  for t in malformed_hook_health_line_does_not_break_run_replay non_object_or_oversized_capabilities_is_an_error \
+           quality_inputs_reach_feature_rows_through_the_collectors; do
+    grep -qE "fn ${t}\b" src/bin/replay.rs || fail "AC の test \`$t\` が bin/replay.rs に無い"
+  done
 
   # ★ 計器変更をしていないこと（⚠️ Scope Out）
   #   ⚠️★★★ `git diff HEAD` で見ない —— worker は commit するので、**コミット済みの計器変更を見逃す**。

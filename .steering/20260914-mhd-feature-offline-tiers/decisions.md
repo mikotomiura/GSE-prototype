@@ -1060,3 +1060,43 @@
 - **費用の記録**: 007 の Loop = `_loop-run-report.md` を参照（★ 6 attempt 分。原因は検査のバグ）。
 - ★ 併せて **001 の最上位キー集合に `quality` を足した**（★ 判断 18 で決めた「Tier を足す issue の merge で 1 語足す」の初回）。
 - **影響範囲**: `issues/007-acceptance.sh`（AC11）/ `issues/001-acceptance.sh`（最上位集合）/ worktree `loop/007-issue`（`b71c360`）
+
+## 判断 24: issue 007 のレビュー裁定 —— ⚠️ 規範定義（判断 21）の穴 2 つを改訂し、検出力を足す
+
+- **判断日時**: 2026-09-18（Opus 裁定セッション・3 回目）
+- ★ **客観検証**（`b71c360`・裁定セッションが直接実行）: `cargo test` **737 passed**（695 ＋ 41 ＋ 1）/ ゴールデン 15 本 / check・clippy・fmt **exit 0** /
+  acceptance **001・002・003・005・007・008 すべて OK**。
+- ★★★ **プライバシーは merge を止めない**（`security-checker` 実測）: 削除（`retain_outside_range` の忠実移植）・一時停止・全行欠損の 3 条件で
+  **stdout 全体の sha が一致**（`5f59c8e3e227`）＝ ★ **`--features` の出力上で 3 つは区別できない**。`missing_reasons` は 3 語の外に出ない（fuzz でも）。
+  ★ 判断 21 の整理「原因ラベルが無ければ新しい露出ではない」は `--features` 出力について**成立する**。
+
+### ⚠️ 私の規範定義（判断 21）の穴 —— 改訂した
+
+1. ⚠️★★★ **`mask.hook` が穴をまたいで古い状態を持ち越す**（`security-checker` MEDIUM・実測）。
+   - 削除後は `hook_dead` が 100 tick → **0 tick** になり、`mask.hook = true` が末尾まで続いた（★ **偽の「健全」**）。
+   - ⚠️ **一時停止でも実在する経路**: `recording.rs` の書き出しゲートは停止中の `hook_health` を捨てるが、`lib.rs` は送信成功時点で `prev_health` を進める
+     → **停止中にフックが死に、再開後も死んだままだと `alive=false` が NDJSON に永久に出ない**。
+   - ⚠️ これは `capabilities.rs:105` 逐語「0 行は『信号が無かった』を意味しない」と ADR-030 D8 (a)「検出側では等しく『データが無い』」に反する。
+   - → ★ **改訂**: feat 行を持つファイルでは **`mask.feat == false` の tick で `mask.hook = null`**、**区間に入り直す tick で持ち越しを null に戻す**。
+     ★ feat 行の存在だけに依存する（**原因を区別しない・プライバシー中立**）。★ feat 行の無いファイル（`instrument_rich`）の正解表は変わらない。
+2. ⚠️ **`dropped_delta` の欠けた旧形式の行を 0 で埋めていた**（`code-reviewer` M1・実測）—— ★ 判断 14「`unwrap_or(0)` にしない」に反する。
+   → ★ **改訂**: tick 内に欠けた行が 1 本でもあれば `dropped_delta = null`、`dropped_events` は値を持つ行だけで判定（★ 飽和加算）。
+3. ★ `capabilities` の形と大きさ（`security-checker` LOW-3）: 非オブジェクト / 4096 バイト超は **Err**（★ null に倒すと「宣言が無い」と誤報）。
+   ★ 行ごとの deep clone をやめ `Arc` で共有（`code-reviewer` M4: 疎な 20 万 tick で peak 1,005MB）。⚠️ **出力サイズの増加は「全行に載せる」仕様由来** → 起票 2 で扱う。
+
+### 検出力（`code-reviewer`・mutation 24 本中 **13 本が cargo test と acceptance の両方を生き残った**）
+
+- ⚠️ **1 tick に複数行**・**理由が複数立つ行**のケースが、単体テストにも fixture にも 1 つも無かった → 集約 6 種・sort の削除・tick 内 `hook_dead` 条項が素通り。
+- ⚠️ collector / 配線を壊しても cargo test が緑（★ acceptance だけが捉える＝判断 14 MEDIUM 2 と同じ構図）。
+- → ★ AC 16〜18 のテストを要求し、acceptance の存在チェックに名前を足した。
+
+### ★ acceptance を 3 状態で試した（★ 判断 23 の教訓どおり、今度はソース検査も含めて）
+
+| 状態 | 結果 |
+|---|---|
+| 正しい（参照実装を改訂規則に更新して差し込む） | ★ OK |
+| 壊れている（`b71c360`） | ★ **AC13 NG** —— 削除版で `[[null,50],[true,170]]`（★ 古い `true` が 170 tick 持ち越された実測） |
+
+- ★ 追加の正解表（`stall_onset_observed` ＋ hook_health 2 行）は参照実装で計算し、手計算（tick 50 / 120 の帰属）と一致した。
+- **是正は Sonnet のサブエージェントへ委譲した**（★ 008 と同じ形）。
+- **影響範囲**: `issues/007.md`（改訂・AC 13〜18）/ `issues/007-acceptance.sh`（AC13〜15・test 名）/ worktree `loop/007-issue`
