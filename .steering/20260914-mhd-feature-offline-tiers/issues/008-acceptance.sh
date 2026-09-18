@@ -96,6 +96,29 @@ printf '%s' "$out4" | jq -e '[.[] | select(.stall_onset.is_onset)] | length == 1
   || fail "AC18: 大入力の末尾の沈黙で onset がちょうど 1 つ立たない（★ 検出器が走っていない可能性）"
 echo "[acceptance 008] AC18: ${elapsed}s" >&2
 
+# ---------- 4b. 計算量（AC18b）: 条件 A の立ち上がりが打鍵数に比例する入力 ----------
+#   ⚠️★★★ 2026-09-18 追加（decisions.md 判断 22）: AC18 の入力は立ち上がりが 1 回しか起きないので、
+#     「立ち上がりのたびに θ の標本を集め直す」二乗の経路を捉えなかった（★ 2 レビューが独立に実測）。
+#   ★ 文字 → 1ms 後に BS の対を 70ms ごとに 75,000 対（15 万打鍵）＝ 立ち上がり 75,000 回。
+#   ★ 実測 (debug): e079b21 の実装 = 248 秒（security-checker）。
+awk 'BEGIN{T=1700000000000; n=75000;
+  print "{\"type\":\"meta\",\"session_start\":" T ",\"hmm_version\":\"0.5.0\"}";
+  print "{\"type\":\"session_start\",\"t\":" T "}";
+  for(i=0;i<n;i++){ t=T+1000+i*70;
+    printf "{\"type\":\"key\",\"t\":%d,\"vk\":65,\"press\":true}\n", t;
+    printf "{\"type\":\"key\",\"t\":%d,\"vk\":8,\"press\":true}\n", t+1 };
+  end=T+1000+n*70+60000;
+  for(f=T+1000; f<=end; f+=1000) printf "{\"type\":\"feat\",\"t\":%d}\n", f }' > "$tmpd/churn.ndjson" \
+  || fail "AC18b の入力生成に失敗"
+start=$(date +%s)
+out4b="$(timeout 20 $BIG_CMD "$tmpd/churn.ndjson" --features 2>/dev/null)"
+rc=$?
+elapsed=$(( $(date +%s) - start ))
+[ $rc -eq 124 ] && fail "AC18b: 立ち上がり 75,000 回の入力で --features が 20 秒で終わらない（★ θ の再計算が二乗。e079b21 は実測 248 秒）"
+[ $rc -eq 0 ] || fail "AC18b: 立ち上がりの多い入力で --features が非 0 で終了した (rc=$rc)"
+printf '%s' "$out4b" | jq -e 'length > 0' >/dev/null 2>&1 || fail "AC18b: 出力が空"
+echo "[acceptance 008] AC18b: ${elapsed}s" >&2
+
 # ---------- 5. ソースの検査（AC8 ほか） ----------
 grep -qE 'merge_gap_ms' "$SRC" || fail "AC8: $SRC が W / B の既定を OutcomeConfig::merge_gap_ms から引いていない"
 # ★ 本体（最初の #[cfg(test)] より前）のコード行に 30000 の直書きが無いこと

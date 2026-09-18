@@ -945,3 +945,77 @@
   - ★ 007 は `restart` に依存しない（★ 交差は `mod.rs` だけ）。
 - ★ 候補と論点は **`blockers.md` 起票 17** に上げた（★ 研究者が選ぶ）。
 - **影響範囲**: `issues/006.md`（Status: blocked）/ `blockers.md` 起票 17 / `tasklist.md`
+
+## 判断 21: issue 007（`Q`）の定義を既存 SSOT から確定し、原理的に通らなかった AC3 を直す
+
+- **判断日時**: 2026-09-18（Opus 裁定セッション・3 回目）
+- **背景**: ★ 判断 13 の規律（**実 fixture で正常系の前提が通るかを回す前に確かめる**）を 007 に当てた。
+- ⚠️★★★ **見つけたもの 1: 旧 AC3 は原理的に通らなかった。**
+  - 旧 AC6 は「`instrument_rich` で `capabilities` が非 null」を要求する。
+  - ★ ところが `instrument_rich` の `meta.capabilities.unconditional` には **`"recording_pause"` という行種名**が入っている
+    （★ `capabilities.rs::unconditional` が本物のビルドでも載せる・実測）。
+  - 旧 AC3 は **出力全体**を `recording_pause` で grep して落とす。→ ⚠️ **`capabilities` を素直に出すと必ず NG**（★ 判断 13 と同じ病・3 件目）。
+  - ★ **直し方**: `capabilities` は「このビルドはその行種を書ける」という**宣言**であって欠測理由ではない。
+    → 被験者由来語の grep は **`capabilities` を除いた出力**に掛け、`capabilities` は別途「**meta の値と完全一致**（加工しない）」で見る。
+- ⚠️★★★ **見つけたもの 2: `Q` の 4 項目も一次資料では名前だけ**（`ADR-030 D10`・`.idea/survey:192`）。
+  ★ ただし 004 / 006 と違い、**新しい研究上の定義を作らずに**既存 SSOT の組み合わせで一意に決まる（→ `issues/007.md`「規範となる定義」）:
+  | 項目 | 由来（★ 既存 SSOT） |
+  |---|---|
+  | `capabilities` | ADR-013 D1（meta の宣言そのもの。無ければ null ＝「計器の宣言が無い」） |
+  | `hook_health` | tick 内の行の集約（`logger.rs:1986` の書式）。⚠️ 累積 `dropped` は tick に割れないので載せない |
+  | `observability_mask.hook` | ★ **状態の持ち越し** —— `capabilities.rs` 逐語「`hook_health` は状態変化時にしか出ず」。行が無い間は null（ADR-013 D1「`threshold_gated` の 0 行は判定不能」） |
+  | `observability_mask.feat` | ★ **issue 008 の `observed_intervals` をそのまま使う**（ADR-030 D8 (b-2)。⚠️ 独自の穴判定を作らない） |
+  | `missing_reasons` | ★ **3 語だけ**: `capability_undeclared`（ADR-013 D1）/ `hook_dead` / `dropped_events`（ADR-016 D4・ADR-029 D3 の除外規則） |
+  - ⚠️★★★ **`feat` の穴は `missing_reasons` に入れない** —— 穴の原因は区別できず、区別してはいけない（ADR-030 D8 (b-2)）。★ `mask.feat = false` とだけ書く。
+  - ⚠️ `starved_ms > 0` は理由にしない —— 打鍵が無いことと計器の不調を区別できない。
+- ★ **正解表を実 fixture で書き下し、Python の参照実装（`ref_q_emit.py`・ジョブ一時領域）で一致を確認した**。
+- ★ **`007-acceptance.sh` を 3 状態＋3 変異で試した**:
+  | 状態 | 結果 |
+  |---|---|
+  | 壊れている（未実装） | ★ NG（`quality.rs` が無い） |
+  | 正しい（参照実装を `ACC_REPLAY_CMD` で差し込む） | ★ OK（⚠️ `recording_pause` を含む `capabilities` を**誤検出しない**ことの実地確認を兼ねる） |
+  | 変異: 穴に理由を付ける | ★ NG（AC8） |
+  | 変異: 無い `capabilities` を `{}` で埋める | ★ NG（AC7/AC8） |
+  | 変異: `hook` の持ち越しをやめる | ★ NG（AC8） |
+- ★ **Allowed Files に `stall_onset.rs` を足した** —— ⚠️ **`observed_intervals` の可視性を `pub(super)` に上げる 1 語だけ**（acceptance が diff で検査する）。
+- ★ **`ReplayEvent::HookHealth` を厳格化しない**と明記した（★ 判断 14 HIGH-1 の申し送りが issue 本文に反映されていなかった。旧 Scope は逐語「`ReplayEvent::HookHealth` の構造化」を指示していた）。
+- **影響範囲**: `issues/007.md` / `issues/007-acceptance.sh`
+
+## 判断 22: issue 008 のレビュー裁定 —— ★ 削除区間の onset は解消。⚠️ ただし θ の二乗と検出力の穴を merge 前に直す
+
+- **判断日時**: 2026-09-18（Opus 裁定セッション・3 回目）
+- **前提**: 008 は Loop が attempt 4 で `issue_done`（費用 **$13.80**・39.0M tokens ＝ **token_ceiling 40M の 97.6%**）。
+  ⚠️ worker は sandbox の承認ゲートで `008-acceptance.sh` を直接走らせられず、AC18 を自分では未確認と書いていた。
+  ★ `loop-run.sh` 側の verify は acceptance を含めて緑だった（＝ `issue_done` の根拠）。
+- ★ **客観検証**（test-runner・実測）: `cargo test` **719 passed**（680 ＋ 38 ＋ 1）/ ゴールデン 15 本一致 / check / clippy **exit 0** /
+  acceptance **001 / 002 / 003 / 005 / 008 すべて OK**（AC18 = **8 秒**）。
+
+### ★★★ 解消を確認したもの（`security-checker` 実測）
+
+- ★ **前回 HIGH（削除区間の内側に onset）は、UI から実行できる削除では 0 件になった。** 削除長 20〜120 秒 × 開始位置の掃引を
+  5 種類の入力で計 **2,775 回**行い、`s` または `t0` が削除区間に入る onset は **0 件**（★ 005 の旧版では同じ掃引で **1,389 件**）。
+  ★ 削除後の onset の `s − 削除終端` の最小は **30,660ms** ＝ D8 (b)「区間の終了後 W の間は評価しない」が効いている。
+- ★ **前回 MEDIUM（削除をまたぐ gap が θ に混ざる）も解消**: 旧版で `θ = 50,064` に化けた入力が `θ = 399`（元 400）になった。
+  ★ 全 onset の θ を「同じ観測区間内の gap だけ」から独立計算した値と突き合わせて**不一致 0 件**。
+- ★ `code-reviewer` が**独立に書いた参照実装**と、ランダム入力 300 件（期待 onset 490 件）で**完全一致**。他 Tier は原点・値とも不変（末尾に活動ゼロの行が足されるだけ）。
+
+### ⚠️ 直すもの（★ merge 前・Sonnet のサブエージェントへ委譲）
+
+| 重大度 | 指摘 | 出所 |
+|---|---|---|
+| **HIGH** | ⚠️ **θ の再計算が二乗** —— 立ち上がりのたびにプール全体を filter＋sort。★ 文字と BS を交互に打つ 15 万打鍵で **debug 248 秒**（`security-checker`）、4 万打鍵で 18 秒（`code-reviewer`）。⚠️ **AC18 は立ち上がり 1 回の入力なので捉えなかった**。→ ★ gap 値を座標圧縮した **Fenwick 木**で分位点を O(log N) に。★ **AC18b（立ち上がり 75,000 回）を acceptance に足し、`e079b21` で NG になることを実測した** | 両者（`code-reviewer` HIGH / `security-checker` L2） |
+| **HIGH** | ⚠️ 規範定義の「区間ごとに直前状態を false に戻す」と「評価時刻に `{a+W}` を含める」を外しても**全テストが緑** | `code-reviewer`（mutation） |
+| **HIGH** | ⚠️ **net・θ に 5 秒の先読みを入れても全テストが緑** —— ★ 判断 18 で名指しした mutation と同じものが**是正後も生き残った**。原因は `prefix_stable_at_every_cut` の切断点が key 時刻だけで key 列が疎なこと。→ ★ 直接テスト 2 本 ＋ **素朴な O(N²) 参照実装とのシード固定ランダム突き合わせ**（★ `code-reviewer` の実測ではこれ 1 本で生き残り 5 本がすべて赤） | `code-reviewer` |
+| MEDIUM | AC 名のテスト 2 本（`no_evaluation_within_w_after_hole` / `onset_is_attributed_to_the_t0_tick`）が自分の標的の mutation を検出できない（★ 判断 14 MEDIUM 1 と同型・**4 件目**） | `code-reviewer` |
+| MEDIUM | 原点を守る網・配線の網が `cargo test` に無い（★ acceptance だけが検出） | `code-reviewer` |
+| MEDIUM | 因果性の doc が実装より強い（確定 `t0 <= b` には feat 行を最大 `hole_gap_ms` 先読みする） | `code-reviewer` |
+| LOW | `task_kind` を検証せず出力する（★ 細工した値がそのまま出る）→ **`crate::logger::TaskKind::parse` を通す**（★ 既存 SSOT。新しい許可リストを作らない） | `security-checker` L3 |
+| LOW | 隣接差 == `hole_gap_ms` の境界テストが無い／doc の `hole_gap_ms` の説明が不正確／存在しない関数への doc 参照／「issue 008 再裁定」という実在しない裁定への言及／起票番号の取り違え | 両者 |
+
+### 本 issue で直さないもの
+
+- ⚠️ `security-checker` L1（**2 秒未満の削除は穴にならず、区間内に onset が作られうる**）→ ★ **起票 15 に追記**した。
+  ★ 現行 UI は分単位（`RecordingControls.tsx` が秒を 0 に固定）なので**到達不能**。⚠️ ただし `delete_time_range`（`lib.rs`）は任意の ms を受ける。
+- ★ `code-reviewer` LOW「壁時計が跳んだ feat 行 1 本で `--features` 全体が exit 1」→ ★ D9 の方針（黙って潰さず Err）どおりなので**維持**。エラー文言だけ直す。
+
+- **影響範囲**: `issues/008-acceptance.sh`（AC18b）/ `stall_onset.rs` / `mod.rs` / `bin/replay.rs`（修正はサブエージェント）/ `blockers.md` 起票 15
