@@ -29,6 +29,13 @@
 - [x] ★ Loop 基盤: worker へのプロンプト `/loop-issue` が MSYS のパス変換で壊れていた（★ 003〜008 の全 attempt）→ commit `446fa3b` で修正（判断 19）
 - [x] 007 `Q`（evidence quality・★ 判断 11 で `parse` へ）（★ Loop は acceptance の自己矛盾で `abandoned` → 判断 23 で引き取り `b71c360` → レビュー 2 本 → 規範の改訂と是正 `5b8fb0e`（判断 24）→ merge `08423b2`）
 
+## ⚠️★★★ 2026-09-18 に中断（★ 研究者判断 25）
+- [x] ブロックされていない issue をすべて merge・検証した（★ `08423b2`: cargo test 745 passed・acceptance 001〜008 OK）
+- [x] 残る研究者判断 16 件を仰いだ（★ `decisions.md` 判断 25）
+- ★ 次は **理論の批判的レビュー**（別タスク・`.steering/_handoff/next-session-theory-critical-review.md`）
+- ★ 再開順: 理論レビュー → Loop 基盤の修正（起票 3 / 10）→ 封筒 issue（起票 2 / 5）→ 004 / 006 → `capability matrix` → P1 前の事前宣言文書 ＋ CLI ＋ 両極
+- [ ] ★ 小タスク: 削除 UI の最小幅 > `hole_gap_ms` を redaction 側の制約として明記・テスト固定（起票 15・判断 25 #6）
+
 ## Loop 外（★ 対話で行う・研究者判断 2026-09-14）
 - [ ] `capability matrix`（ADR-032 **M7**）—— ⚠️ `OS × ライブ変換設定` で層別。
       ★ 範囲は `decisions.md` 判断 5（schema 静的分析 ＋ 既存 fixture ＋ 起票 6 の既測結果）
