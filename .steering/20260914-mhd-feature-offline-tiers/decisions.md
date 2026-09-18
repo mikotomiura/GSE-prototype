@@ -1100,3 +1100,13 @@
 - ★ 追加の正解表（`stall_onset_observed` ＋ hook_health 2 行）は参照実装で計算し、手計算（tick 50 / 120 の帰属）と一致した。
 - **是正は Sonnet のサブエージェントへ委譲した**（★ 008 と同じ形）。
 - **影響範囲**: `issues/007.md`（改訂・AC 13〜18）/ `issues/007-acceptance.sh`（AC13〜15・test 名）/ worktree `loop/007-issue`
+
+### ★ 判断 24 の結果（2026-09-18・是正後）
+
+- ★ 是正は Sonnet のサブエージェント（`5b8fb0e`・3 ファイル +695 / −66）。★ mutation 8 種すべてで `cargo test` のどれかが赤
+  （★ 「`dropped_delta` を `unwrap_or(0)` に戻す」は当初 acceptance しか捉えず、collector の単体テストを足して閉じた）。
+  ★ `Arc` 共有・`to_writer_pretty` への変更の前後で `instrument_rich` / `minimal` の出力が**バイト単位で同一**（`cmp`）。
+- ★ **裁定セッションの確認**: `ReplayEvent::Meta` は base から差分なし（★ 受理集合を狭めない）／ 重複した `capabilities` キーの meta 行で既定モード **exit 0**（★ `b71c360` では exit 1 だった）。
+- ★ **merge `08423b2` 後の客観再検証**: `cargo test` **745 passed**（700 ＋ 44 ＋ 1）/ ゴールデン 15 本 / check・clippy・fmt **exit 0** /
+  acceptance **001・002・003・005・007・008 すべて OK**（AC18 = 11 秒・AC18b = 3 秒）。
+- ⚠️ **再レビューは行っていない**（★ 008 と同じく、客観検証 ＋ 裁定セッションの読みで merge した。★ 利用上限の事情もある）。

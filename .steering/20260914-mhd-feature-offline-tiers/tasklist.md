@@ -27,7 +27,7 @@
 - [x] ★ 008 `stall onset` の是正（観測区間 = D8 (b-2)・末尾の沈黙・`task_kind`・O(N log N)・検出力）（★ Loop attempt 4 → レビュー 2 本 → 是正 `9e5d0fa` → merge `2b417c1`。判断 18 / 22）
 - [!] 006 `T1d`（restart）★ **保留**（2026-09-18）—— ⚠️ 算出式が一次資料に無く、「再停止」は ADR-031 の転帰側の語。→ 起票 17 / 判断 20。★ 研究者の定義確定待ち
 - [x] ★ Loop 基盤: worker へのプロンプト `/loop-issue` が MSYS のパス変換で壊れていた（★ 003〜008 の全 attempt）→ commit `446fa3b` で修正（判断 19）
-- [ ] 007 `Q`（evidence quality・★ 判断 11 で `parse` へ）
+- [x] 007 `Q`（evidence quality・★ 判断 11 で `parse` へ）（★ Loop は acceptance の自己矛盾で `abandoned` → 判断 23 で引き取り `b71c360` → レビュー 2 本 → 規範の改訂と是正 `5b8fb0e`（判断 24）→ merge `08423b2`）
 
 ## Loop 外（★ 対話で行う・研究者判断 2026-09-14）
 - [ ] `capability matrix`（ADR-032 **M7**）—— ⚠️ `OS × ライブ変換設定` で層別。
