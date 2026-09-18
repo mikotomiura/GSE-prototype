@@ -6,7 +6,11 @@ command -v jq >/dev/null 2>&1 || fail "jq が無い"
 cd src-tauri || fail "src-tauri が無い"
 SRC="src/analysis/feat_offline/stall_onset.rs"
 
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features 2>/dev/null)" \
+# ⚠️★★★ 2026-09-18 に fixture を deep_silence.ndjson から差し替えた（★ decisions.md 判断 18）。
+#   ★ ADR-030 D8 (b-2) の「feat 列の穴で条件 B の連続を切る」を実装すると、feat 行を 1 本も持たない
+#     deep_silence.ndjson では観測区間が無く onset が立たなくなる（★ それが正しい挙動）。
+#   → ★ 1Hz feat 行を持つ stall_onset_observed.ndjson（裁定セッション作成）で非退化を見る。
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features 2>/dev/null)" \
   || fail "gse-replay --features が非 0 で終了した"
 [ -n "$out" ] || fail "--features の出力が空"
 
@@ -18,10 +22,10 @@ printf '%s' "$out" | jq -e '
          and has("theta_person_ms") and has("task_kind") and has("phase")))' >/dev/null 2>&1 \
   || fail "全行に stall_onset の必須フィールドが揃っていない"
 
-# ⚠️ 退化していないこと: deep_silence は長い沈黙を含むので onset が 1 回以上立つはず。
+# ⚠️ 退化していないこと: stall_onset_observed は長い沈黙を 2 つ含むので onset が 1 回以上立つはず。
 #   ★ 立たないなら「検出器が何も検出しない」= 緑に見えて無意味。
 printf '%s' "$out" | jq -e '[.[].stall_onset.is_onset | select(. == true)] | length > 0' >/dev/null 2>&1 \
-  || fail "deep_silence.ndjson で onset が 1 度も立たない（★ 検出器が何も検出していない）"
+  || fail "stall_onset_observed.ndjson で onset が 1 度も立たない（★ 検出器が何も検出していない）"
 
 # ⚠️ t0 = s + theta （null でない行について）
 printf '%s' "$out" | jq -e '

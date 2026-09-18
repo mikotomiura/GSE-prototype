@@ -14,6 +14,12 @@
 | **005** | `stall onset`（`t0`）検出器 | parse ※ | `feat_offline/mod.rs` / ★`feat_offline/stall_onset.rs` / ⚠️`bin/replay.rs`（任意） |
 | **006** | `T1d`（restart） | parse | `feat_offline/mod.rs` / ★`feat_offline/restart.rs` |
 | **007** | `Q`（evidence quality） | parse ※ | `feat_offline/mod.rs` / ★`feat_offline/quality.rs` / ⚠️`bin/replay.rs` |
+| **008** | ★ `stall onset` の是正（観測区間・末尾の沈黙・`task_kind`・検出力） | parse | `feat_offline/mod.rs` / `feat_offline/stall_onset.rs` / ⚠️`bin/replay.rs` |
+
+> ⚠️★★★ **2026-09-18 に 008 を足した**（★ `decisions.md` **判断 18**）。★ 005 のレビューで
+> **削除区間の内側に onset が立つ**（ADR-030 D8 (b-2) 未実装）ことが実測されたため。
+> ★ **実行順は `005 → 008 → 006 → 007`**（⚠️ 番号順ではない。006 は `t0` を原点にするので 008 の後）。
+> ★ 検証用 fixture **`tests/fixtures/stall_onset_observed.ndjson`**（`key` と 1Hz `feat` を両方持つ唯一の fixture）を裁定セッションが作った。
 
 > ⚠️★★★ **2026-09-15 に 2 点を改訂した**（★ `decisions.md` **判断 11 / 判断 12**）:
 > - **※** 005 / 007 の `recheck` を **`parse` に落とした**（★ watchdog が空応答を返すため。

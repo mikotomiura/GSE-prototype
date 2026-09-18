@@ -36,9 +36,12 @@ printf '%s' "$out" | jq -e '[.[].activity.pastes] | add > 0' >/dev/null 2>&1 \
 
 # AC2b: ⚠️★★★ 出力のキー集合が**完全一致**すること（★ privacy の門を両側にする）
 #   ⚠️ has() の存在確認だけだと、将来 vk / app / window_title を足しても緑のまま通る。
+#   ⚠️★★★ 2026-09-18（decisions.md 判断 18）: 最上位の集合は **002 で boundary が加わった時点から
+#     この行で NG になっていた**（★ 各 issue の裁定が自分の acceptance しか回していなかったので見逃した）。
+#     ★ Tier を足す issue を merge したら、裁定セッションがここへ 1 語足す（★ 最上位の門はここ 1 か所）。
 printf '%s' "$out" | jq -e '
   all(.[];
-    (keys_unsorted | sort) == ["activity","t_ms"]
+    (keys_unsorted | sort) == ["activity","boundary","dispersion","stall_onset","t_ms"]
     and (.activity | keys_unsorted | sort)
         == ["deletes","keys","mean_iki_ms","net_production","pastes","pauses"])' >/dev/null 2>&1 \
   || fail "出力のキー集合が想定と完全一致しない（★ フィールドの増減を検査している）"
@@ -84,7 +87,11 @@ grep -rq 'ENGINE_TICK_MS' "$FEATDIR" \
 
 # (3) 直書きの禁止: 閾値としての 2000 リテラルが残っていないこと
 #   ★ 比較の形だけを見る（⚠️ テストの合成タイムスタンプ `key_at(2000)` を誤検出しないため）。
-if grep -rnE '(>=|<=|<|>|==|!=)[[:space:]]*2_?000([^0-9]|$)' "$FEATDIR" >/dev/null 2>&1; then
+#   ⚠️ 2026-09-18（判断 18）: **コメント行を除外する段**を足した。★ 判断 16 は 002〜006 には入れたが
+#     001 に入れ漏れており、`dispersion.rs` の doc コメント「`< 1000 < 2000`」（判断 16 自身が足した証明）で落ちていた。
+#     ★ `grep -rn` の出力は `path:line:content` なので、除外の形も 002〜006 と違う。
+if grep -rnE '(>=|<=|<|>|==|!=)[[:space:]]*2_?000([^0-9]|$)' "$FEATDIR" \
+     | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' | grep -q .; then
   fail "$FEATDIR に閾値として直書きされた 2000 がある（★ PAUSE_THRESHOLD_MS を使うこと）"
 fi
 
