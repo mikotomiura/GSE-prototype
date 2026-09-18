@@ -904,3 +904,44 @@
 - **影響範囲**: `issues/008.md`（新規）/ `issues/008-acceptance.sh`（新規）/ `issues/005-acceptance.sh`（fixture 差し替え）/
   `issues/001-acceptance.sh`（最上位集合・コメント除外）/ ★ `src-tauri/tests/fixtures/stall_onset_observed.ndjson`（新規）/
   `blockers.md` 起票 11〜16 / `_issue-plan.md` / `tasklist.md`
+
+## 判断 19: ⚠️★★★ Loop の worker は `/loop-issue` の指示を**一度も受け取っていなかった**（★ MSYS のパス変換・修正済み）
+
+- **判断日時**: 2026-09-18（Opus 裁定セッション・3 回目）
+- **何が起きたか**（★ 実測）: issue 008 の 1 回目の run で、attempt 1〜3 が 20 秒前後で終わり、worktree に変更が 1 つも無かった。
+  ★ worker の transcript（`~/.claude/projects/C--wt-GSE-prototype-008-issue/*.jsonl`）を読むと、最初の user メッセージが
+  **`C:/Program Files/Git/loop-issue 008`** であり、worker は逐語「**具体的な指示がまだありません。何を行いますか？**」と返して終わっていた。
+- **原因**: ★ Windows の git-bash（MSYS）は、**ネイティブ実行ファイルへ渡す `/` 始まりの引数を Windows パスへ書き換える**。
+  → `loop-run.sh` の `claude -p "/loop-issue $id"` が壊れ、スラッシュコマンドが展開されなかった。
+  ★ `python -c "import sys;print(sys.argv)" "/loop-issue 008"` で再現した（→ `['C:/Program Files/Git/loop-issue 008']`）。
+- ⚠️★★★ **過去の run も全部そうだった**: 003 / 004 / 005 の worker transcript の最初の user メッセージも**すべて同じ壊れた形**（実測）。
+  → ★ **worker は `/loop-issue` の契約（Allowed Files の再確認・events の書き方・commit して終わる等）を一度も読んでいない。**
+  worktree 名やコミット履歴から推測して動いていた。★ 003 / 005 が通ったのは、推測が当たったからにすぎない。
+  - ⚠️ 起票 10（worker が `git checkout main` した）・「001〜003 の worker が未コミットで終わる」・
+    002 / 004 の空回りの一部は、**この欠陥で説明できる可能性がある**（★ 断定はしない。transcript を個別に読んでいない）。
+- **修正**（commit `446fa3b`）: `MSYS2_ARG_CONV_EXCL="/loop-issue"` を worker 起動の前に置き、**この接頭辞の引数だけ**を変換から外した。
+  ★ 他の引数のパス変換は従来どおり効く（python で実測: `/c/GSE-prototype` は `C:/GSE-prototype` に変換される）。
+  ★ 修正後の run で worker の最初のメッセージが `<command-name>/loop-issue</command-name>` ＋ コマンド本文に変わったことを確認した。
+- ⚠️ **本タスクの範囲外（Loop 基盤）を直した理由**: ★ **全 issue の worker が指示を受け取れない**ので、放置すると本タスクの残り（008 / 006 / 007）が
+  すべて推測実装になる。★ 1 行・副作用なし（除外は接頭辞 1 つ）で、直さない理由が無い。
+- ★ **教訓**: `permission_denials` と同じく、**`claude -p` の生の入出力を見ないと worker が何をしていたか分からない**（起票 3）。
+  ★ transcript は `~/.claude/projects/<worktree を符号化した名前>/*.jsonl` に残る —— **検証の一次資料はそこにある**。
+- **影響範囲**: `scripts/loop-run.sh:342`
+
+## 判断 20: issue 006（`T1d` restart）は**保留**する（★ 004 と同じく算出式が無い）
+
+- **判断日時**: 2026-09-18（Opus 裁定セッション・3 回目）
+- **確認した一次資料**（⚠️ issue の要約ではなく本文）:
+  - `ADR-030 D10` の Tier 表: 「`T1d` | restart（pause 後の生成 / 削除 / 移動・再停止時間・安定生成時間）| 中（記述）」—— **名前の一覧**。
+  - `.idea/…-survey.md:190`: 「`T1d | restart | pause 後の生成/削除/移動、再停止時間、安定生成時間、rhythm 回復`」—— **同じく名前の一覧**。
+  - `issues/006.md`: フィールド名（`post_t0_inserts` / `post_t0_deletes` / `post_t0_navigations` / `restop_ms` / `stable_generation_ms`）だけで、
+    ⚠️ **集計窓の終わり・「再停止」の定義・「安定生成」の定義が無い**。
+- ⚠️★★★ **しかも「再停止」は転帰（criterion）側の語である**:
+  - `ADR-031` 逐語「主 criterion: 未来の安定再開、**再停止までの時間**、外部化、離脱を前向きログから生成する」。
+  - 別トラックの pre-SSOT 草案（`.steering/20260916-gse-theory-operationalization-review/eval-ncc-analysis-contract.md:75`）逐語
+    「再停止 | 再開後に、主課題イベントが連続 30 秒以上途切れる最初の時点。**閾値は課題選定後に固定**」。
+  → ⚠️ 006 が `restop_ms` を独自に定義すると、**転帰の定義をもう 1 つ作る**ことになる（★ SSOT の二重化）。
+- **採用**: ⚠️ **006 を保留し、実装しない。★ 007 へ進む**（★ 判断 17 と同じ規律）。
+  - ★ 007 は `restart` に依存しない（★ 交差は `mod.rs` だけ）。
+- ★ 候補と論点は **`blockers.md` 起票 17** に上げた（★ 研究者が選ぶ）。
+- **影響範囲**: `issues/006.md`（Status: blocked）/ `blockers.md` 起票 17 / `tasklist.md`
