@@ -15,6 +15,11 @@
 //!   (**全チャネル**= press / paste / `ime_shadow` の最小値)。
 //!   ⚠️★★★ **グリッドは「打鍵だけ」ではなく入力チャネル全部を覆う。**
 //!   ★ そうしないと、打鍵より前/後にある `ime_shadow` 行が tick 配列の範囲外になる。
+//!   ⚠️★★★ **グリッドの右端 (終端) は `max(最後の入力イベント, 最後の feat 行)` である**
+//!   (issue 008)。★ そうしないと、末尾の沈黙で `stall_onset` の `t0` が入力イベントより
+//!   後ろに来たとき、その onset の帰属先 tick がグリッドの外に出て黙って捨てられる
+//!   (2026-09-15 実測: `code-reviewer` HIGH)。⚠️ **原点 (最小値) は変えない** —— 入力チャネル
+//!   だけで決める (`feat` 行は原点の計算に加えない)。
 //!   ⚠️ **副作用を承知して使うこと** (2026-09-15・`code-reviewer` MEDIUM・実測):
 //!   同じ打鍵列でも **`ime_shadow` 行が 1 本あるかどうかで原点が動き、全行の `t_ms` がずれる**
 //!   (実測では 100ms シフトした)。★ `ime_shadow` は `config_gated` (環境によって丸ごと出ない) なので、
@@ -69,6 +74,20 @@ pub use stall_onset::{StallOnset, StallOnsetConfig};
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{is_backspace, is_text_producing, KeyPress};
+
+/// `build_feature_rows` の `stall_onset` (issue 008) 用の追加入力をまとめた構造体。
+///
+/// ★ `keys` / `paste_ts` / `ime_events` / `max_ticks` に加えて `feat_ts` /
+/// `task_kind_declarations` / `config` を引数で渡すと `clippy::too_many_arguments`
+/// に抵触するため、`stall_onset` 固有の入力だけを 1 つにまとめた。
+pub struct StallOnsetInputs<'a> {
+    /// 1Hz 特徴列 (`feat` 行) の時刻。値は読まない — 観測区間の判定にだけ使う
+    /// (ADR-030 D8 (b-2))。
+    pub feat_ts: &'a [u64],
+    /// `session_meta.task_kind` の宣言列 (`(ts, task_kind)`。順不同でよい)。
+    pub task_kind_declarations: &'a [(u64, String)],
+    pub config: StallOnsetConfig,
+}
 
 /// 1 tick ぶんの特徴行。`activity` は `T0` (Tier 0)、`boundary` は `T1b` (境界)、
 /// `dispersion` は `T1a` (分布・個人相対)。
@@ -172,6 +191,7 @@ pub fn build_feature_rows(
     paste_ts: &[u64],
     ime_events: &[ImeShadowEvent],
     max_ticks: usize,
+    stall_onset_inputs: &StallOnsetInputs,
 ) -> Result<Vec<FeatureRow>, String> {
     if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());
@@ -180,6 +200,7 @@ pub fn build_feature_rows(
     let key_ts = keys.iter().map(|k| k.timestamp);
     let paste_ts_iter = paste_ts.iter().copied();
     let ime_ts_iter = ime_events.iter().map(|e| e.t_ms);
+    // ⚠️ 原点 (最小値) は入力チャネルだけで決める。feat 行は加えない (mod.rs doc 参照)。
     // unwrap: 上の early-return で空入力を排除済みなので、少なくとも1件は必ずある。
     let grid_origin_ms = key_ts
         .clone()
@@ -187,9 +208,12 @@ pub fn build_feature_rows(
         .chain(ime_ts_iter.clone())
         .min()
         .unwrap();
+    // ★ 右端 (終端) は入力チャネルと feat 行の max (issue 008)。
+    let feat_ts_iter = stall_onset_inputs.feat_ts.iter().copied();
     let t_last = key_ts
         .chain(paste_ts_iter)
         .chain(ime_ts_iter)
+        .chain(feat_ts_iter)
         .max()
         .unwrap();
 
@@ -245,15 +269,14 @@ pub fn build_feature_rows(
     let all_iki_ms: Vec<u64> = iki_ms_by_tick.iter().flatten().copied().collect();
     let iki_baseline = dispersion::SessionIkiBaseline::from_session_iki(&all_iki_ms);
 
-    // ★ ADR-030 D6: task_kind の実配線 (session_meta 読み出し) は本 issue の任意 Allowed
-    // Files 項目であり、まだ配線していない (未宣言 = None として back-off の経路を通す)。
     let stall_onset_col = stall_onset::stall_onset_column(
         keys,
+        stall_onset_inputs.feat_ts,
+        stall_onset_inputs.task_kind_declarations,
         tick_count,
         grid_origin_ms,
         ENGINE_TICK_MS,
-        &stall_onset::StallOnsetConfig::default(),
-        None,
+        &stall_onset_inputs.config,
     );
 
     Ok((0..tick_count)
@@ -294,8 +317,23 @@ mod tests {
     /// テストの既定上限。実運用の値は `bin/replay.rs::MAX_FEATURE_TICKS` が所有する。
     const TEST_MAX_TICKS: usize = 10_000;
 
+    fn test_stall_onset_inputs() -> StallOnsetInputs<'static> {
+        StallOnsetInputs {
+            feat_ts: &[],
+            task_kind_declarations: &[],
+            config: StallOnsetConfig::default(),
+        }
+    }
+
     fn rows_of(keys: &[KeyPress], paste_ts: &[u64]) -> Vec<FeatureRow> {
-        build_feature_rows(keys, paste_ts, &[], TEST_MAX_TICKS).expect("within tick limit")
+        build_feature_rows(
+            keys,
+            paste_ts,
+            &[],
+            TEST_MAX_TICKS,
+            &test_stall_onset_inputs(),
+        )
+        .expect("within tick limit")
     }
 
     /// 境界入力で `build_feature_rows` が panic しないことを確認する (AC10)。
@@ -355,8 +393,9 @@ mod tests {
     fn tick_loop_rejects_time_span_beyond_limit() {
         // 0ms と 1,000,000ms → tick 0..=1000 の 1001 tick が要る
         let huge = vec![key_at(0), key_at(1_000_000)];
-        assert!(build_feature_rows(&huge, &[], &[], 1001).is_ok());
-        let err = build_feature_rows(&huge, &[], &[], 1000).expect_err("上限超過は Err");
+        let inputs = test_stall_onset_inputs();
+        assert!(build_feature_rows(&huge, &[], &[], 1001, &inputs).is_ok());
+        let err = build_feature_rows(&huge, &[], &[], 1000, &inputs).expect_err("上限超過は Err");
         assert!(err.contains("time span too large"), "err = {}", err);
     }
 

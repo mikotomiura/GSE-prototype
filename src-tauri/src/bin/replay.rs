@@ -1075,11 +1075,31 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        let feat_ts = match collect_all_feat_timestamps(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect feat timestamps: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let task_kind_declarations = match collect_task_kind_declarations(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect task_kind declarations: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &task_kind_declarations,
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
         let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
             &ime_events,
             MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
         ) {
             Ok(v) => v,
             Err(msg) => {
@@ -1592,6 +1612,124 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
         );
     }
     out.sort_by_key(|e| e.t_ms);
+    Ok(out)
+}
+
+/// `--features` (issue 008) 専用の `feat` 行の `t` だけを取り出す DTO。
+///
+/// ⚠️★★★ `ReplayEvent::Feat` は `serde_json::Value` のまま置き、構造化はここで行う
+/// (`ImeShadowDto` / `collect_all_ime_shadow_events` と同じ手法)。★ 形の合わない `feat` 行
+/// (`t` 欠落 / 文字列 / `null`) を捨てても `run_replay` は影響を受けない
+/// (`ReplayEvent::Feat` は既に `Value` なので、行の形に関わらずパース自体は必ず成功し、
+/// `timestamp()` も `None` を返す)。
+#[derive(Debug, serde::Deserialize)]
+struct FeatTimestampDto {
+    t: u64,
+}
+
+/// `--features` (issue 008・ADR-030 D8 (b-2)) 用: NDJSON の `{"type":"feat", ...}` 行の
+/// **時刻だけ**を返す。★ `feat` 行の値 (`keys` / `bs_keys` 等) は 1 バイトも読まない
+/// (D3 逐語「使ってよいのは feat 行の存在だけ」)。観測区間の判定にのみ使う。
+///
+/// ⚠️★★★ **形が合わない `feat` 行は捨てる (0 に畳まない)。** 件数だけ `warn` に残す
+/// (`collect_all_ime_shadow_events` と同じ手法・判断 14 HIGH-1)。
+fn collect_all_feat_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<u64> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut malformed_feat_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Feat(v) = ev {
+            match serde_json::from_value::<FeatTimestampDto>(v) {
+                Ok(dto) => out.push(dto.t),
+                Err(_) => malformed_feat_lines += 1,
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_all_feat_timestamps: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if malformed_feat_lines > 0 {
+        tracing::warn!(
+            skipped = malformed_feat_lines,
+            "collect_all_feat_timestamps: feat lines whose t did not match the logger \
+             format were skipped (not folded into a placeholder)"
+        );
+    }
+    out.sort_unstable();
+    Ok(out)
+}
+
+/// `--features` (issue 008) 用: NDJSON の `{"type":"session_meta", ...}` 行から
+/// `(ts, task_kind)` の宣言列を抽出する。
+///
+/// ⚠️ 既存 `run_replay` の「1 ファイルに相異なる `task_kind` が複数あれば Err」
+/// (`declared_task_kinds` の検査) はここでは**適用しない** —— こちらは `stall_onset`
+/// が `s` 時点で有効な宣言を引くための時系列そのものが要るので、複数の宣言を
+/// そのまま返す (run_replay 側の制約とは別の用途)。
+fn collect_task_kind_declarations(session_path: &PathBuf) -> Result<Vec<(u64, String)>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<(u64, String)> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::SessionMeta { task_kind, ts, .. } = ev {
+            out.push((ts, task_kind));
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_task_kind_declarations: some lines failed to parse as ReplayEvent"
+        );
+    }
+    out.sort_by_key(|(ts, _)| *ts);
     Ok(out)
 }
 
@@ -2906,6 +3044,59 @@ mod tests {
         }
     }
 
+    /// AC17 (issue 008): 形の合わない `feat` 行 (`t` 欠落 / 文字列 / `null`) があっても
+    /// `run_replay` の `FeatSnapshot` 列は 1 件も変わらず (`ReplayEvent::Feat` が既に
+    /// `serde_json::Value` なので、形に関わらずパース自体は常に成功する)、`--features` 側の
+    /// `collect_all_feat_timestamps` はその行を採らない (0 件のまま)。
+    #[test]
+    fn malformed_feat_line_does_not_break_run_replay() {
+        let broken = [
+            // t 欠落
+            r#"{"type":"feat","keys":3}"#,
+            // 文字列
+            r#"{"type":"feat","t":"not-a-number"}"#,
+            // null
+            r#"{"type":"feat","t":null}"#,
+        ];
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+
+        for (i, line) in broken.iter().enumerate() {
+            let ev: ReplayEvent = serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("崩れた feat 行も受理すること ({line}): {e}"));
+            assert!(
+                matches!(ev, ReplayEvent::Feat(_)),
+                "expected ReplayEvent::Feat, got {ev:?}"
+            );
+            assert_eq!(ev.timestamp(), None, "feat は時刻順ソートから除外する");
+
+            let mut ndjson = std::fs::read_to_string(fixture_path("minimal.ndjson"))
+                .expect("read minimal fixture");
+            ndjson.push_str(line);
+            ndjson.push('\n');
+            let tmp = std::env::temp_dir().join(format!(
+                "gse_malformed_feat_replay_{}_{}.ndjson",
+                std::process::id(),
+                i
+            ));
+            std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+            let with_line = run_replay(&tmp)
+                .unwrap_or_else(|e| panic!("run_replay must accept broken feat ({line}): {e}"));
+            assert_eq!(
+                with_line.len(),
+                baseline.len(),
+                "feat 行は FeatSnapshot 列を 1 件も変えてはならない ({line})"
+            );
+
+            let collected = collect_all_feat_timestamps(&tmp).expect("collect must not fail");
+            assert!(
+                collected.is_empty(),
+                "形が合わない feat 行は採らない: {collected:?} ({line})"
+            );
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
     /// ★ `collect_all_ime_shadow_events` → `build_feature_rows` の**配線**が生きていること
     /// （2026-09-15・`code-reviewer` MEDIUM「新しい配線に `cargo test` 上の網が無い」の回帰）。
     ///
@@ -2950,11 +3141,17 @@ mod tests {
         let ime = collect_all_ime_shadow_events(&tmp).expect("collect ime_shadow");
         assert_eq!(ime.len(), 2, "ime_shadow 2 行が採れること");
 
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &[],
+            task_kind_declarations: &[],
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
             &ime,
             MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
         )
         .expect("build rows");
 
