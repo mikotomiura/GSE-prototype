@@ -339,7 +339,15 @@ run_issue() {
                      --output-format json )
     [ -n "${MAX_USD:-}" ]     && cargs+=( --max-budget-usd "$MAX_USD" )
     [ -n "${ALLOW_TOOLS:-}" ] && cargs+=( --allowedTools "$ALLOW_TOOLS" )
-    res="$( (cd "$wt" && claude "${cargs[@]}") 2>&1 )"
+    # ⚠️★★★ `MSYS2_ARG_CONV_EXCL` を外さないこと（2026-09-18 に実測で発見）。
+    #   ★ Windows の git-bash (MSYS) は、ネイティブ実行ファイルへ渡す `/` 始まりの引数を
+    #     Windows パスへ書き換える。→ `-p "/loop-issue 008"` は worker に
+    #     **`C:/Program Files/Git/loop-issue 008`** として届き、スラッシュコマンドが展開されない。
+    #   ⚠️ worker の transcript で確認したところ、003 / 004 / 005 / 008 の**全 attempt**がこの形で届いており、
+    #     worker は `/loop-issue` の契約を読まずに worktree 名やコミット履歴から推測して動いていた
+    #     （★ 「具体的な指示がまだありません」と返して何もせず終わる attempt が実在した）。
+    #   ★ 除外するのはこの接頭辞だけ（他の引数のパス変換は従来どおり効かせる）。macOS / Linux では無害。
+    res="$( (cd "$wt" && MSYS2_ARG_CONV_EXCL="/loop-issue" claude "${cargs[@]}") 2>&1 )"
 
     add_usage "$(printf '%s' "$res" | usage_tokens)" \
               "$(printf '%s' "$res" | jq -r '.total_cost_usd // 0' 2>/dev/null || echo 0)"
