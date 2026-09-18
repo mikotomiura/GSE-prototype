@@ -14,12 +14,12 @@
 - [x] 段 1 の成果物をコミット
 
 ## 段 2: サーヴェイ（1 ラウンドごとにコミット）
-- [ ] S7 content-free な修正指標 → `definitions-restop-t1d-t1c.md` §6 を確定案へ・issue 004 へ転記
-- [ ] S8 再開・再停止・burst → `definitions-restop-t1d-t1c.md` §3-§4 の接地・issue 006 へ転記
-- [ ] S1 返権の負荷逆説 vs ironies of automation 等 → `review-B.md` B-23 / B-24 の判定更新
-- [ ] S2 非支配的協調 vs 非支配・関係的自律・nudge 倫理 → `review-D.md` §5 の更新
-- [ ] （補足・必要時のみ）Digital Nature の一次
-- [ ] `check_citations.py` 違反なし
+- [x] S7 content-free な修正指標 → カード・[V151]–[V160]・定義案 §6.2b（`4403763`）。⚠️ issue 004 への転記は判断 2（改名）の後
+- [x] S8 再開・再停止・burst → カード・[V161]–[V169]・定義案 §3.4・補訂案 項目 6（`7860ccb`）。⚠️ issue 006 への転記は判断 2 の後
+- [x] S1 返権の負荷逆説 vs ironies of automation 等 → カード・[P368]–[P379]・`review-B.md` §5（`95abd10`）
+- [x] S2 非支配的協調 vs 非支配・関係的自律・nudge 倫理 → カード・[P380]–[P391]・`review-D.md` §6（`99c0d60`）
+- [x] （補足）Digital Nature の一次 —— ★ J-6（CORE-CS の比較節へ統合）を段 3 で正確に書くため必要と判断し、1 ラウンドに絞って実行（カード・[P392]–[P395]）
+- [x] `check_citations.py` 違反なし（各ラウンド）
 
 ## 完了処理
 - [ ] 段 3（SSOT 昇格）の作業単位を書き出す
