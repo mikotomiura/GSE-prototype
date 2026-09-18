@@ -131,8 +131,14 @@ if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
   # AC11: mask.feat は 008 の observed_intervals を使う（★ 独自の穴判定を作らない）
   grep -qE 'observed_intervals' "$SRCF" "$MODRS" \
     || fail "AC11: quality が stall_onset::observed_intervals を使っていない（★ 独自に穴を判定しない）"
-  if grep -nE 'fn [a-z_]*(hole|gap|interval)[a-z_]*\(' "$SRCF" | grep -vE '^[0-9]+:[[:space:]]*//' | grep -q .; then
-    fail "AC11: $SRCF が穴 / 区間の判定関数を独自に定義している（★ observed_intervals を使う）"
+  # ⚠️★★★ 2026-09-18 修正（判断 23）: 本体（最初の #[cfg(test)] より前）だけを見る。
+  #   ★ 旧版はファイル全体を見ていたので、AC9 が要求する test 名 `feat_hole_is_masked_without_a_reason`
+  #     （★ 裁定セッション自身が命名した）に必ず一致し、**AC9 と AC11 が両立しなかった**（worker が実測で指摘）。
+  first_test_line="$(grep -nE '^#\[cfg\(test\)\]' "$SRCF" | head -1 | cut -d: -f1)"
+  first_test_line="${first_test_line:-999999}"
+  if grep -nE 'fn [a-z_]*(hole|gap|interval)[a-z_]*\(' "$SRCF" | grep -vE '^[0-9]+:[[:space:]]*//' \
+       | awk -F: -v L="$first_test_line" '$1 < L' | grep -q .; then
+    fail "AC11: $SRCF の本体が穴 / 区間の判定関数を独自に定義している（★ observed_intervals を使う）"
   fi
   # ★ AC の test が実在すること
   for t in missing_reasons_are_instrument_side_only participant_originated_reasons_are_never_emitted \

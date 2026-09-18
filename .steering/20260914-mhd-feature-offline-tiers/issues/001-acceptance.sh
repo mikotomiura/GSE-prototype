@@ -41,7 +41,7 @@ printf '%s' "$out" | jq -e '[.[].activity.pastes] | add > 0' >/dev/null 2>&1 \
 #     ★ Tier を足す issue を merge したら、裁定セッションがここへ 1 語足す（★ 最上位の門はここ 1 か所）。
 printf '%s' "$out" | jq -e '
   all(.[];
-    (keys_unsorted | sort) == ["activity","boundary","dispersion","stall_onset","t_ms"]
+    (keys_unsorted | sort) == ["activity","boundary","dispersion","quality","stall_onset","t_ms"]
     and (.activity | keys_unsorted | sort)
         == ["deletes","keys","mean_iki_ms","net_production","pastes","pauses"])' >/dev/null 2>&1 \
   || fail "出力のキー集合が想定と完全一致しない（★ フィールドの増減を検査している）"
