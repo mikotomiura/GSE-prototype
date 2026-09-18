@@ -98,7 +98,11 @@ pub struct StallOnsetInputs<'a> {
 /// (feat 時刻を別に読み直さない・issue 007 Allowed Files 節)。
 pub struct QualityInputs<'a> {
     /// `meta` 行の `capabilities` (無ければ `None`)。加工しない。
-    pub capabilities: Option<serde_json::Value>,
+    ///
+    /// ⚠️★★★ `Arc` で共有する (2026-09-18・判断 24・code-reviewer M4) —— 行ごとに JSON を
+    /// deep clone しないため。呼び出し側 (`bin/replay.rs`) が収集直後に 1 度だけ `Arc::new`
+    /// で包む。
+    pub capabilities: Option<std::sync::Arc<serde_json::Value>>,
     /// `hook_health` 行の列 (順不同でよい)。
     pub hook_health: &'a [quality::HookHealthEvent],
 }
@@ -313,7 +317,7 @@ pub fn build_feature_rows(
         tick_count,
         grid_origin_ms,
         ENGINE_TICK_MS,
-        quality_inputs.capabilities.as_ref(),
+        quality_inputs.capabilities.clone(),
         quality_inputs.hook_health,
         stall_onset_inputs.feat_ts,
         stall_onset_inputs.config.hole_gap_ms,
