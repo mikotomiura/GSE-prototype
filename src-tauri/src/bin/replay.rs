@@ -72,6 +72,15 @@ const MAX_SESSION_BYTES: u64 = 500 * 1024 * 1024;
 /// いずれでも発火しうる。⚠️ ギャップを黙って潰さず `Err` で止める (D9 の危険側に落とさない)。
 const MAX_FEATURE_TICKS: usize = 1_000_000;
 
+/// `--features` (issue 007・`Q`) が許す `meta.capabilities` の直列化後サイズの上限 (バイト)。
+///
+/// ⚠️★★★ 2026-09-18 改訂 (判断 24・security-checker LOW-3): `capabilities` は tick 数ぶん
+/// 全行へ複製される (`Quality.capabilities` は `Arc` 共有なのでメモリは増えないが、出力
+/// JSON のサイズは複製ぶん増える)。JSON オブジェクトでない、またはこの上限を超えるものは
+/// 「宣言が壊れている」とみなし `null` に倒さず `Err` にする (`null` に倒すと
+/// 「宣言が無い」と誤報になる)。
+const MAX_CAPABILITIES_BYTES: usize = 4096;
+
 /// `--calibration` で受け付ける 1 被験者あたりのセッションファイル数の上限。
 ///
 /// 各ファイルは `MAX_SESSION_BYTES` で保護されるが、ファイル**数**が無制限だと
@@ -1089,10 +1098,35 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        // issue 007: `Q` (evidence quality) 用に meta.capabilities / hook_health を読む。
+        // ⚠️ hook_health は「無い / 形が合わない」で --features を落とさない (旧ログ互換・AC12)。
+        // ⚠️★★★ capabilities は「無い」では落とさない (AC7) が、「形が壊れている」
+        // (JSON オブジェクトでない / 4096 バイト超) では落とす (2026-09-18 改訂・判断 24・AC15)。
+        let capabilities = match collect_meta_capabilities(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect meta capabilities: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let hook_health_events = match collect_all_hook_health_events(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect hook_health events: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
         let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
             feat_ts: &feat_ts,
             task_kind_declarations: &task_kind_declarations,
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
+        // ⚠️★★★ `Arc` で 1 度だけ包む (2026-09-18・判断 24・code-reviewer M4)。
+        // `quality::quality_column` は行ごとにこの `Arc` を clone するだけで、JSON を
+        // deep clone しない。
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities: capabilities.map(std::sync::Arc::new),
+            hook_health: &hook_health_events,
         };
         let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
@@ -1100,6 +1134,7 @@ fn main() -> ExitCode {
             &ime_events,
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
+            &quality_inputs,
         ) {
             Ok(v) => v,
             Err(msg) => {
@@ -1107,16 +1142,23 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        // ⚠️★★★ 2026-09-18 改訂 (判断 24・security-checker LOW-3): `to_string_pretty` で
+        // 一旦 `String` に全体を確保してから書き出すのをやめ、`to_writer_pretty` で
+        // `BufWriter` へ直接流す (巨大な出力を 2 重に確保しない)。★ 出力はバイト単位で
+        // 従来と同一 (末尾に改行を 1 つ書く点も同じ)。
         let stdout = std::io::stdout();
-        let mut lock = stdout.lock();
-        match serde_json::to_string_pretty(&rows) {
-            Ok(s) => {
-                let _ = writeln!(lock, "{}", s);
-            }
-            Err(e) => {
-                tracing::error!("failed to serialize feature rows: {}", e);
-                return ExitCode::from(1);
-            }
+        let mut writer = std::io::BufWriter::new(stdout.lock());
+        if let Err(e) = serde_json::to_writer_pretty(&mut writer, &rows) {
+            tracing::error!("failed to serialize feature rows: {}", e);
+            return ExitCode::from(1);
+        }
+        if let Err(e) = writer.write_all(b"\n") {
+            tracing::error!("failed to write feature rows: {}", e);
+            return ExitCode::from(1);
+        }
+        if let Err(e) = writer.flush() {
+            tracing::error!("failed to flush feature rows: {}", e);
+            return ExitCode::from(1);
         }
         return ExitCode::SUCCESS;
     }
@@ -1609,6 +1651,174 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
             skipped = incomplete_lines,
             "collect_all_ime_shadow_events: ime_shadow lines whose dwell_ms/nav/abandon did not \
              match the logger format were skipped (not folded into 0)"
+        );
+    }
+    out.sort_by_key(|e| e.t_ms);
+    Ok(out)
+}
+
+/// `--features` (issue 007・`Q`) 用: NDJSON の `meta` 行から `capabilities` を取り出す。
+///
+/// ⚠️★★★ **`ReplayEvent::Meta` に型付きフィールドとして持たせない**
+/// (2026-09-18 改訂・security-checker LOW-1: 型付きフィールドを足したことで `run_replay`
+/// 側の受理集合が狭まった)。★ 行をまず `serde_json::Value` として読み、`type == "meta"` の
+/// 行から `capabilities` キーを直接取り出す (`ImeShadow` / `HookHealth` と同じ「まず Value
+/// で受け、構造化は専用の関数が担う」手法・`ReplayEvent::ImeShadow` の doc 参照)。
+/// これにより `--snapshot` (`run_replay`) 側の `Meta` 型は元の 3 フィールドのまま変わらない。
+///
+/// 複数の `meta` 行がありうる (`session_start` 形と `session_end` 形)。`capabilities` を
+/// 持つ最初の行を採る。⚠️ 値は加工しない。宣言が無い (キーが無い、または明示的に `null`)
+/// なら `None` (⚠️ 空配列・空オブジェクトへフォールバックしない・AC7)。
+///
+/// ⚠️★★★ **形の検査もここで行う** (2026-09-18・security-checker LOW-3・判断 24)。
+/// `capabilities` が JSON オブジェクトでない、または直列化して [`MAX_CAPABILITIES_BYTES`]
+/// を超えるなら `Err` を返す (`--features` は exit 1)。★ 理由は出すが、値の中身は出さない。
+fn collect_meta_capabilities(session_path: &PathBuf) -> Result<Option<serde_json::Value>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut parse_failed_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let raw: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        let is_meta = raw.get("type").and_then(|t| t.as_str()) == Some("meta");
+        if !is_meta {
+            continue;
+        }
+        let cap = match raw.get("capabilities") {
+            Some(v) if !v.is_null() => v,
+            // キーが無い、または明示的に null: 宣言が無い扱いで次の meta 行を探す。
+            _ => continue,
+        };
+        if !cap.is_object() {
+            return Err(format!(
+                "line {}: meta.capabilities is not a JSON object",
+                lineno + 1
+            ));
+        }
+        let serialized = serde_json::to_string(cap).map_err(|e| {
+            format!(
+                "line {}: failed to serialize capabilities: {}",
+                lineno + 1,
+                e
+            )
+        })?;
+        if serialized.len() > MAX_CAPABILITIES_BYTES {
+            return Err(format!(
+                "line {}: meta.capabilities serializes to {} bytes, exceeds limit {} bytes",
+                lineno + 1,
+                serialized.len(),
+                MAX_CAPABILITIES_BYTES
+            ));
+        }
+        return Ok(Some(cap.clone()));
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_meta_capabilities: some lines failed to parse as JSON"
+        );
+    }
+    Ok(None)
+}
+
+/// `--features` (issue 007・`Q`) 専用の `hook_health` DTO。★ フィールド名は
+/// `schema_dto.rs::LoggedLine::HookHealth` の NDJSON 実形式に一致させる。
+/// `dropped_delta` は 2026-08-19 より前のログに無いので `#[serde(default)]` で欠落を許容する。
+/// ⚠️★★★ 2026-09-18 改訂 (判断 24・code-reviewer M1): 欠落を `0` に正規化**しない**
+/// (旧版はここで `0` に畳んでいたが、「値が無い」と「`0` だった」は区別できる情報であり、
+/// `0` に畳むと情報が失われる)。`Option<u64>` のまま `quality::HookHealthEvent` へ渡し、
+/// tick 単位の欠測判定 (`null` / 飽和加算) は `quality.rs` 側に委ねる。
+#[derive(Debug, serde::Deserialize)]
+struct HookHealthDto {
+    t: u64,
+    alive: bool,
+    starved_ms: u64,
+    rehook: bool,
+    #[serde(default)]
+    dropped_delta: Option<u64>,
+}
+
+/// `--features` (issue 007・`Q`) 用: NDJSON の `{"type":"hook_health", ...}` 行を
+/// [`gse_next_lib::analysis::feat_offline::HookHealthEvent`] 列として抽出する。
+///
+/// ⚠️★★★ **形が合わない `hook_health` 行 (`alive` 欠落 / 型違い) は捨てる (0 に畳まない・AC12)。**
+/// ★ `run_replay` 自体は `ReplayEvent::HookHealth` を `serde_json::Value` のまま読み飛ばすので
+/// 落ちない (`ReplayEvent::HookHealth` の doc 参照)。ここは `--features` 専用の追加パースであり、
+/// 捨てたことは件数だけ `warn` に残す (⚠️ 行の中身は出さない)。
+fn collect_all_hook_health_events(
+    session_path: &PathBuf,
+) -> Result<Vec<gse_next_lib::analysis::feat_offline::HookHealthEvent>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<gse_next_lib::analysis::feat_offline::HookHealthEvent> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut incomplete_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::HookHealth(v) = ev {
+            // ⚠️ 形が合った行だけを採る。欠け・型違いは 0 に畳まず捨てる (関数 doc 参照)。
+            match serde_json::from_value::<HookHealthDto>(v) {
+                Ok(dto) => out.push(gse_next_lib::analysis::feat_offline::HookHealthEvent {
+                    t_ms: dto.t,
+                    alive: dto.alive,
+                    starved_ms: dto.starved_ms,
+                    rehook: dto.rehook,
+                    dropped_delta: dto.dropped_delta,
+                }),
+                Err(_) => incomplete_lines += 1,
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_all_hook_health_events: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if incomplete_lines > 0 {
+        tracing::warn!(
+            skipped = incomplete_lines,
+            "collect_all_hook_health_events: hook_health lines whose shape did not match the \
+             logger format were skipped (not folded into 0)"
         );
     }
     out.sort_by_key(|e| e.t_ms);
@@ -3116,6 +3326,225 @@ mod tests {
         }
     }
 
+    /// AC12 / M3 (issue 007): 形の合わない `hook_health` 行 (`alive` 欠落 / 型違い) があっても
+    /// `run_replay` の `FeatSnapshot` 列は 1 件も (**内容も**) 変わらず (`ReplayEvent::HookHealth`
+    /// は既に `serde_json::Value` なので、形に関わらずパース自体は常に成功する)、`--features`
+    /// 側の `collect_all_hook_health_events` はその行を採らない。
+    ///
+    /// ⚠️★★★ 2026-09-18 改訂 (判断 24・code-reviewer M3): **形の正しい対照行を 1 本混ぜ**、
+    /// collector がちょうどそれだけを採ることを確かめる (★ 旧版は壊れた行だけを足していたので
+    /// 「collector が hook_health を丸ごと読み飛ばす」変異でも `collected.is_empty()` が
+    /// 誤って緑になった)。`FeatSnapshot` 列の比較も `.len()` だけでなく**内容**で行う。
+    #[test]
+    fn malformed_hook_health_line_does_not_break_run_replay() {
+        let broken = [
+            // alive 欠落
+            r#"{"type":"hook_health","t":1700000002500,"starved_ms":0,"rehook":false,"dropped_delta":0}"#,
+            // alive の型違い (整数)
+            r#"{"type":"hook_health","t":1700000002500,"alive":1,"starved_ms":0,"rehook":false,"dropped_delta":0}"#,
+        ];
+        // ★ 形の正しい対照行。壊れた行と混ぜても collector はこれだけをちょうど 1 件採ること。
+        let control = r#"{"type":"hook_health","t":1700000002600,"alive":true,"starved_ms":10,"rehook":false,"dropped_delta":1}"#;
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+
+        for (i, line) in broken.iter().enumerate() {
+            let ev: ReplayEvent = serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("崩れた hook_health 行も受理すること ({line}): {e}"));
+            assert!(
+                matches!(ev, ReplayEvent::HookHealth(_)),
+                "expected ReplayEvent::HookHealth, got {ev:?}"
+            );
+            assert_eq!(
+                ev.timestamp(),
+                None,
+                "hook_health は時刻順ソートから除外する"
+            );
+
+            let mut ndjson = std::fs::read_to_string(fixture_path("minimal.ndjson"))
+                .expect("read minimal fixture");
+            ndjson.push_str(line);
+            ndjson.push('\n');
+            ndjson.push_str(control);
+            ndjson.push('\n');
+            let tmp = std::env::temp_dir().join(format!(
+                "gse_malformed_hook_health_replay_{}_{}.ndjson",
+                std::process::id(),
+                i
+            ));
+            std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+            let with_line = run_replay(&tmp).unwrap_or_else(|e| {
+                panic!("run_replay must accept broken hook_health ({line}): {e}")
+            });
+            assert_eq!(
+                with_line, baseline,
+                "hook_health 行は FeatSnapshot 列を 1 件も (内容も) 変えてはならない ({line})"
+            );
+
+            let collected = collect_all_hook_health_events(&tmp).expect("collect must not fail");
+            assert_eq!(
+                collected.len(),
+                1,
+                "壊れた行は捨て、形の正しい対照行だけをちょうど 1 件採ること: {collected:?} ({line})"
+            );
+            assert!(collected[0].alive, "対照行は alive=true のはず");
+            assert_eq!(collected[0].dropped_delta, Some(1));
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
+    /// 判断 24 (code-reviewer M1) の収集側回帰: 旧形式の `hook_health` 行 (`dropped_delta`
+    /// フィールド自体が無い) を `collect_all_hook_health_events` に通しても `0` に正規化
+    /// しない。★ `quality.rs` 側の単体テスト (`missing_dropped_delta_is_null_not_zero`) は
+    /// 集約ロジックだけを見るので、収集側が `unwrap_or(0)` に戻る回帰はここでしか捕まえられない。
+    #[test]
+    fn collect_all_hook_health_events_preserves_missing_dropped_delta_as_none() {
+        let ndjson = concat!(
+            "{\"type\":\"meta\",\"session_start\":1700000000000,\"hmm_version\":\"0.2.0\"}\n",
+            // dropped_delta フィールドが無い (2026-08-19 より前のログ形式)。
+            "{\"type\":\"hook_health\",\"t\":1700000001000,\"alive\":true,\"starved_ms\":0,\
+             \"rehook\":false}\n",
+        );
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_hook_health_missing_dropped_delta_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, ndjson).expect("write temp fixture");
+
+        let collected = collect_all_hook_health_events(&tmp).expect("collect must not fail");
+        assert_eq!(collected.len(), 1);
+        assert_eq!(
+            collected[0].dropped_delta, None,
+            "dropped_delta が無い行を 0 に正規化してはならない"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    /// AC15 (issue 007・判断 24・security-checker LOW-3): `meta.capabilities` が JSON
+    /// オブジェクトでない、または直列化して 4096 バイトを超えるなら `collect_meta_capabilities`
+    /// は `Err` を返す (`--features` は exit 1)。⚠️ `null` に倒すと「宣言が無い」と誤報になる
+    /// ため、`Ok(None)` にしない。
+    #[test]
+    fn non_object_or_oversized_capabilities_is_an_error() {
+        // 非オブジェクト (文字列)。
+        let non_object = "{\"type\":\"meta\",\"session_start\":1700000000000,\
+             \"hmm_version\":\"0.2.0\",\"capabilities\":\"x\"}\n";
+        let tmp1 = std::env::temp_dir().join(format!(
+            "gse_capabilities_non_object_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp1, non_object).expect("write temp fixture");
+        let err =
+            collect_meta_capabilities(&tmp1).expect_err("非オブジェクトの capabilities は Err");
+        assert!(
+            err.contains("not a JSON object"),
+            "エラー文言が理由を示していない: {err}"
+        );
+        let _ = std::fs::remove_file(&tmp1);
+
+        // 4096 バイトを超えるオブジェクト。
+        let padding = "a".repeat(5000);
+        let oversized = format!(
+            "{{\"type\":\"meta\",\"session_start\":1700000000000,\"hmm_version\":\"0.2.0\",\
+             \"capabilities\":{{\"padding\":\"{padding}\"}}}}\n"
+        );
+        let tmp2 = std::env::temp_dir().join(format!(
+            "gse_capabilities_oversized_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp2, &oversized).expect("write temp fixture");
+        let err =
+            collect_meta_capabilities(&tmp2).expect_err("4096 バイトを超える capabilities は Err");
+        assert!(
+            err.contains("exceeds limit"),
+            "エラー文言が理由を示していない: {err}"
+        );
+        let _ = std::fs::remove_file(&tmp2);
+
+        // 対照: 通常の (規範) capabilities は Ok(Some(_)) のまま。
+        let path = fixture_path("instrument_rich.ndjson");
+        let ok = collect_meta_capabilities(&path).expect("正常な capabilities は Err にならない");
+        assert!(ok.is_some());
+    }
+
+    /// AC18 (issue 007): `collect_meta_capabilities` / `collect_all_hook_health_events` →
+    /// `build_feature_rows` の**配線**を `instrument_rich.ndjson` から通して固定する
+    /// (`ime_shadow_events_reach_feature_rows_through_the_collector` と同型)。
+    #[test]
+    fn quality_inputs_reach_feature_rows_through_the_collectors() {
+        let path = fixture_path("instrument_rich.ndjson");
+
+        let keys = collect_key_events(&path).expect("collect keys");
+        let paste_ts = collect_all_paste_timestamps(&path).expect("collect pastes");
+        let ime_events = collect_all_ime_shadow_events(&path).expect("collect ime_shadow");
+        let feat_ts = collect_all_feat_timestamps(&path).expect("collect feat timestamps");
+        let task_kind_declarations =
+            collect_task_kind_declarations(&path).expect("collect task_kind declarations");
+        let capabilities = collect_meta_capabilities(&path).expect("collect capabilities");
+        assert!(
+            capabilities.is_some(),
+            "instrument_rich の meta は capabilities を持つはず"
+        );
+        let hook_health_events =
+            collect_all_hook_health_events(&path).expect("collect hook_health events");
+
+        let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
+            feat_ts: &feat_ts,
+            task_kind_declarations: &task_kind_declarations,
+            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities: capabilities.clone().map(std::sync::Arc::new),
+            hook_health: &hook_health_events,
+        };
+        let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
+            &keys,
+            &paste_ts,
+            &ime_events,
+            MAX_FEATURE_TICKS,
+            &stall_onset_inputs,
+            &quality_inputs,
+        )
+        .expect("build rows");
+
+        assert_eq!(rows.len(), 15, "instrument_rich は 15 tick のはず");
+
+        let hh_ticks: Vec<usize> = rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.quality.hook_health.is_some())
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(
+            hh_ticks,
+            vec![5, 13],
+            "hook_health が非 null の tick は 5 / 13 だけのはず"
+        );
+
+        assert_eq!(
+            rows[13].quality.missing_reasons,
+            vec!["dropped_events".to_string()],
+            "tick 13 だけ dropped_events が立つこと"
+        );
+        for (i, row) in rows.iter().enumerate() {
+            if i != 13 {
+                assert!(
+                    row.quality.missing_reasons.is_empty(),
+                    "tick {i} に理由が立ってはならない: {:?}",
+                    row.quality.missing_reasons
+                );
+            }
+        }
+
+        for row in &rows {
+            assert_eq!(
+                row.quality.capabilities.as_deref(),
+                capabilities.as_ref(),
+                "capabilities は meta の値と (collector 経由でも) 等しいこと"
+            );
+        }
+    }
+
     /// ★ `collect_all_ime_shadow_events` → `build_feature_rows` の**配線**が生きていること
     /// （2026-09-15・`code-reviewer` MEDIUM「新しい配線に `cargo test` 上の網が無い」の回帰）。
     ///
@@ -3165,12 +3594,17 @@ mod tests {
             task_kind_declarations: &[],
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities: None,
+            hook_health: &[],
+        };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
             &ime,
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
+            &quality_inputs,
         )
         .expect("build rows");
 
@@ -3241,12 +3675,17 @@ mod tests {
             task_kind_declarations: &task_kind_declarations,
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities: None,
+            hook_health: &[],
+        };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &[],
             &[],
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
+            &quality_inputs,
         )
         .expect("build rows");
 

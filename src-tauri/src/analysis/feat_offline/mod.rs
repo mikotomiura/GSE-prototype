@@ -65,11 +65,13 @@
 pub mod activity;
 pub mod boundary;
 pub mod dispersion;
+pub mod quality;
 pub mod stall_onset;
 
 pub use activity::T0Activity;
 pub use boundary::{Boundary, ImeShadowEvent};
 pub use dispersion::Dispersion;
+pub use quality::{HookHealthEvent, Quality};
 pub use stall_onset::{StallOnset, StallOnsetConfig};
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
@@ -89,6 +91,22 @@ pub struct StallOnsetInputs<'a> {
     pub config: StallOnsetConfig,
 }
 
+/// `build_feature_rows` の `quality` (issue 007) 用の追加入力をまとめた構造体。
+/// `stall_onset_inputs` と同じ理由 (`clippy::too_many_arguments` 回避) で 1 つにまとめる。
+/// ⚠️ `observability_mask.feat` の判定には**この構造体の値を使わない** —— 008 の
+/// `stall_onset_inputs.feat_ts` / `stall_onset_inputs.config.hole_gap_ms` をそのまま使う
+/// (feat 時刻を別に読み直さない・issue 007 Allowed Files 節)。
+pub struct QualityInputs<'a> {
+    /// `meta` 行の `capabilities` (無ければ `None`)。加工しない。
+    ///
+    /// ⚠️★★★ `Arc` で共有する (2026-09-18・判断 24・code-reviewer M4) —— 行ごとに JSON を
+    /// deep clone しないため。呼び出し側 (`bin/replay.rs`) が収集直後に 1 度だけ `Arc::new`
+    /// で包む。
+    pub capabilities: Option<std::sync::Arc<serde_json::Value>>,
+    /// `hook_health` 行の列 (順不同でよい)。
+    pub hook_health: &'a [quality::HookHealthEvent],
+}
+
 /// 1 tick ぶんの特徴行。`activity` は `T0` (Tier 0)、`boundary` は `T1b` (境界)、
 /// `dispersion` は `T1a` (分布・個人相対)。
 ///
@@ -105,6 +123,10 @@ pub struct FeatureRow {
     /// `stall onset`（`t0`）検出器 (ADR-030 D2-D6)。`activity` と同じく **causal**
     /// (`stall_onset` モジュール doc 参照)。onset が起きた tick だけ値が埋まる。
     pub stall_onset: StallOnset,
+    /// `Q` (evidence quality・issue 007)。⚠️ 状態特徴ではなく出力にだけ載せる —
+    /// 他 Tier (`activity` / `boundary` / `dispersion` / `stall_onset`) の計算へは渡さない
+    /// (`quality` モジュール doc 参照)。
+    pub quality: Quality,
 }
 
 /// 連続する press 間の間隔 1 件。`resuming_ts` はその間隔を終える (2 打目の) press 時刻。
@@ -192,6 +214,7 @@ pub fn build_feature_rows(
     ime_events: &[ImeShadowEvent],
     max_ticks: usize,
     stall_onset_inputs: &StallOnsetInputs,
+    quality_inputs: &QualityInputs,
 ) -> Result<Vec<FeatureRow>, String> {
     if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());
@@ -288,6 +311,17 @@ pub fn build_feature_rows(
         ENGINE_TICK_MS,
         &stall_onset_inputs.config,
     );
+    // ⚠️ observability_mask.feat は 008 の feat_ts / hole_gap_ms をそのまま使う
+    // (quality_inputs には feat 側の入力を持たせない・issue 007 Allowed Files 節)。
+    let quality_col = quality::quality_column(
+        tick_count,
+        grid_origin_ms,
+        ENGINE_TICK_MS,
+        quality_inputs.capabilities.clone(),
+        quality_inputs.hook_health,
+        stall_onset_inputs.feat_ts,
+        stall_onset_inputs.config.hole_gap_ms,
+    );
 
     Ok((0..tick_count)
         .map(|idx| FeatureRow {
@@ -309,6 +343,7 @@ pub fn build_feature_rows(
                 iki_baseline.as_ref(),
             ),
             stall_onset: stall_onset_col[idx].clone(),
+            quality: quality_col[idx].clone(),
         })
         .collect())
 }
@@ -335,6 +370,13 @@ mod tests {
         }
     }
 
+    fn test_quality_inputs() -> QualityInputs<'static> {
+        QualityInputs {
+            capabilities: None,
+            hook_health: &[],
+        }
+    }
+
     fn rows_of(keys: &[KeyPress], paste_ts: &[u64]) -> Vec<FeatureRow> {
         build_feature_rows(
             keys,
@@ -342,6 +384,7 @@ mod tests {
             &[],
             TEST_MAX_TICKS,
             &test_stall_onset_inputs(),
+            &test_quality_inputs(),
         )
         .expect("within tick limit")
     }
@@ -404,8 +447,10 @@ mod tests {
         // 0ms と 1,000,000ms → tick 0..=1000 の 1001 tick が要る
         let huge = vec![key_at(0), key_at(1_000_000)];
         let inputs = test_stall_onset_inputs();
-        assert!(build_feature_rows(&huge, &[], &[], 1001, &inputs).is_ok());
-        let err = build_feature_rows(&huge, &[], &[], 1000, &inputs).expect_err("上限超過は Err");
+        let q_inputs = test_quality_inputs();
+        assert!(build_feature_rows(&huge, &[], &[], 1001, &inputs, &q_inputs).is_ok());
+        let err = build_feature_rows(&huge, &[], &[], 1000, &inputs, &q_inputs)
+            .expect_err("上限超過は Err");
         assert!(err.contains("time span too large"), "err = {}", err);
     }
 
@@ -423,8 +468,15 @@ mod tests {
             task_kind_declarations: &[],
             config: StallOnsetConfig::default(),
         };
-        let rows = build_feature_rows(&keys, &[], &[], TEST_MAX_TICKS, &inputs)
-            .expect("within tick limit");
+        let rows = build_feature_rows(
+            &keys,
+            &[],
+            &[],
+            TEST_MAX_TICKS,
+            &inputs,
+            &test_quality_inputs(),
+        )
+        .expect("within tick limit");
 
         assert_eq!(
             rows[0].t_ms,
