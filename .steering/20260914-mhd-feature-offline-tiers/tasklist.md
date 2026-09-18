@@ -24,7 +24,7 @@
 - [x] 003 `T1a`（分布）（★ commit `1440524` → merge `46f98ff` ＋ レビュー修正。⚠️ 起票 7 が開いたまま＝分位点が構造的に退化）
 - [!] 004 `T1c`（revision topology）★ **保留** —— ⚠️ rewrite / redelete / loop_depth / local_recurrence の**演算的定義が存在しない**（★ .idea/survey も候補名の一覧だけ）。→ 起票 9 / 判断 17。★ 研究者の定義確定待ち
 - [x] 005 `stall onset`（★ 判断 11 で `parse` へ）（★ commit `134c9e2` → merge `da1b8b2`。⚠️ **レビューを通さずに merge されていた** → 2026-09-18 に客観検証 ＋ レビュー 2 本 → ⚠️★★★ **削除区間に onset が立つ**（HIGH・実測）ほか → 判断 18）
-- [ ] ★ 008 `stall onset` の是正（観測区間 = D8 (b-2)・末尾の沈黙・`task_kind`・O(N log N)・検出力）（★ 判断 18。⚠️ **006 より先に merge する**）
+- [x] ★ 008 `stall onset` の是正（観測区間 = D8 (b-2)・末尾の沈黙・`task_kind`・O(N log N)・検出力）（★ Loop attempt 4 → レビュー 2 本 → 是正 `9e5d0fa` → merge `2b417c1`。判断 18 / 22）
 - [!] 006 `T1d`（restart）★ **保留**（2026-09-18）—— ⚠️ 算出式が一次資料に無く、「再停止」は ADR-031 の転帰側の語。→ 起票 17 / 判断 20。★ 研究者の定義確定待ち
 - [x] ★ Loop 基盤: worker へのプロンプト `/loop-issue` が MSYS のパス変換で壊れていた（★ 003〜008 の全 attempt）→ commit `446fa3b` で修正（判断 19）
 - [ ] 007 `Q`（evidence quality・★ 判断 11 で `parse` へ）

@@ -1019,3 +1019,22 @@
 - ★ `code-reviewer` LOW「壁時計が跳んだ feat 行 1 本で `--features` 全体が exit 1」→ ★ D9 の方針（黙って潰さず Err）どおりなので**維持**。エラー文言だけ直す。
 
 - **影響範囲**: `issues/008-acceptance.sh`（AC18b）/ `stall_onset.rs` / `mod.rs` / `bin/replay.rs`（修正はサブエージェント）/ `blockers.md` 起票 15
+
+### ★ 判断 22 の結果（2026-09-18・是正後）
+
+- ★ 是正は **Sonnet のサブエージェント**に委譲した（`9e5d0fa`・3 ファイル +698 / −31）。
+  - HIGH-1: θ を **`ThetaAccumulator`**（gap 値を座標圧縮した Fenwick 木・`s` の単調非減少を前提にポインタで追加）に置換。
+    ★ **AC18b = 248 秒 → 2 秒**（debug）。旧 `theta_person_from_gaps` / `quantile_nearest_rank` は `#[cfg(test)]` に降格して参照実装に残した。
+  - HIGH-2 / HIGH-3: `onset_after_hole_rises_at_interval_start_plus_w` / `no_lookahead_in_net` / `no_lookahead_in_theta` ＋
+    **素朴な O(N²) 参照実装とのシード固定ランダム突き合わせ 220 件**（`matches_naive_reference_on_random_inputs`）。
+    ★ 修正担当の mutation 表: 「直前状態リセットを外す」「`{a+W}` を外す」「net に 5 秒先読み」「θ に 5 秒先読み」
+    「区間開始 + W の抑制を外す」「onset を `s` の tick に載せる」の **6 種すべてで 1 本以上が赤**。
+  - `task_kind` は `crate::logger::TaskKind::parse` を通し、未知値は件数だけ warn して出力しない。
+- ⚠️ **再レビューは API の利用上限で途中終了した**（Opus の `code-reviewer`・HTTP 429）。→ ★ 裁定セッションが要点を自分で確かめた:
+  - ★ `ThetaAccumulator::find_kth` は「累積 < k の最大位置」の 1 つ先を返す標準の binary lifting で、`rank` のクランプは旧規則と同一。
+  - ★ 素朴な参照実装は、今回書き換えた **net（全キー走査）と θ（毎回全 gap を再収集・再ソート）を本番のヘルパを使わずに書いている**（＝ 独立）。
+    ⚠️ ただし **`build_global_instants` と `observed_intervals` は本番と共有している** —— ★ そこは専用テスト（`gap_equal_to_hole_gap_does_not_split` ほか）と
+    **Python の参照実装（acceptance の正解値）**が別経路で押さえている。
+- ★ **merge `2b417c1` 後の客観再検証（裁定セッションが直接実行）**: `cargo test` **729 passed**（688 ＋ 40 ＋ 1）/ ゴールデン 15 本 /
+  check・clippy **exit 0** / acceptance **001・002・003・005・008 すべて OK**（AC18 = 8 秒・AC18b = 2 秒）。
+- **費用の記録（⚠️ 丸めない）**: 008 の Loop = **$13.80**（うち 1 回目の run は MSYS の不具合で worker が指示を受け取れず空回り）＋ レビュー / 是正のサブエージェント。
