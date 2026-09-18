@@ -95,6 +95,12 @@ enum ReplayEvent {
         #[allow(dead_code)]
         session_end: Option<u64>,
         hmm_version: Option<String>,
+        /// issue 007 (`Q`): ADR-013 D1 で追加された計器宣言。2026-08-19 より前のログには
+        /// 無いので `#[serde(default)]` で欠落を許容する (`None` = 宣言が無い、
+        /// `capability_undeclared` の根拠になる)。★ 加工せず `collect_meta_capabilities`
+        /// がそのまま読み出す。
+        #[serde(default)]
+        capabilities: Option<serde_json::Value>,
     },
     /// `start_session` コマンド発火時刻マーカー。replay では extractor を
     /// リセットして「session 境界」を再現するために使う。
@@ -1089,10 +1095,30 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        // issue 007: `Q` (evidence quality) 用に meta.capabilities / hook_health を読む。
+        // ⚠️ どちらも「無い / 形が合わない」で --features を落とさない (旧ログ互換・AC7/AC12)。
+        let capabilities = match collect_meta_capabilities(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect meta capabilities: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let hook_health_events = match collect_all_hook_health_events(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect hook_health events: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
         let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
             feat_ts: &feat_ts,
             task_kind_declarations: &task_kind_declarations,
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+        };
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities,
+            hook_health: &hook_health_events,
         };
         let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
@@ -1100,6 +1126,7 @@ fn main() -> ExitCode {
             &ime_events,
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
+            &quality_inputs,
         ) {
             Ok(v) => v,
             Err(msg) => {
@@ -1609,6 +1636,136 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
             skipped = incomplete_lines,
             "collect_all_ime_shadow_events: ime_shadow lines whose dwell_ms/nav/abandon did not \
              match the logger format were skipped (not folded into 0)"
+        );
+    }
+    out.sort_by_key(|e| e.t_ms);
+    Ok(out)
+}
+
+/// `--features` (issue 007・`Q`) 用: NDJSON の `meta` 行から `capabilities` を取り出す。
+/// 複数の `meta` 行がありうる (`session_start` 形と `session_end` 形)。`capabilities` を
+/// 持つ最初の行を採る。⚠️ 値は加工しない。宣言が無ければ `None`
+/// (⚠️ 空配列・空オブジェクトへフォールバックしない・AC7)。
+fn collect_meta_capabilities(session_path: &PathBuf) -> Result<Option<serde_json::Value>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut parse_failed_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Meta {
+            capabilities: Some(v),
+            ..
+        } = ev
+        {
+            return Ok(Some(v));
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_meta_capabilities: some lines failed to parse as ReplayEvent"
+        );
+    }
+    Ok(None)
+}
+
+/// `--features` (issue 007・`Q`) 専用の `hook_health` DTO。★ フィールド名は
+/// `schema_dto.rs::LoggedLine::HookHealth` の NDJSON 実形式に一致させる。
+/// `dropped_delta` は 2026-08-19 より前のログに無いので `#[serde(default)]` で欠落を許容する
+/// (収集側で `0` に正規化して `quality::HookHealthEvent` へ渡す。この 1 フィールドに限った
+/// 後方互換であり、`quality.rs` が計算する `missing_reasons` / `null` の規約とは別の話)。
+#[derive(Debug, serde::Deserialize)]
+struct HookHealthDto {
+    t: u64,
+    alive: bool,
+    starved_ms: u64,
+    rehook: bool,
+    #[serde(default)]
+    dropped_delta: Option<u64>,
+}
+
+/// `--features` (issue 007・`Q`) 用: NDJSON の `{"type":"hook_health", ...}` 行を
+/// [`gse_next_lib::analysis::feat_offline::HookHealthEvent`] 列として抽出する。
+///
+/// ⚠️★★★ **形が合わない `hook_health` 行 (`alive` 欠落 / 型違い) は捨てる (0 に畳まない・AC12)。**
+/// ★ `run_replay` 自体は `ReplayEvent::HookHealth` を `serde_json::Value` のまま読み飛ばすので
+/// 落ちない (`ReplayEvent::HookHealth` の doc 参照)。ここは `--features` 専用の追加パースであり、
+/// 捨てたことは件数だけ `warn` に残す (⚠️ 行の中身は出さない)。
+fn collect_all_hook_health_events(
+    session_path: &PathBuf,
+) -> Result<Vec<gse_next_lib::analysis::feat_offline::HookHealthEvent>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    let mut out: Vec<gse_next_lib::analysis::feat_offline::HookHealthEvent> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut incomplete_lines: u64 = 0;
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::HookHealth(v) = ev {
+            // ⚠️ 形が合った行だけを採る。欠け・型違いは 0 に畳まず捨てる (関数 doc 参照)。
+            match serde_json::from_value::<HookHealthDto>(v) {
+                Ok(dto) => out.push(gse_next_lib::analysis::feat_offline::HookHealthEvent {
+                    t_ms: dto.t,
+                    alive: dto.alive,
+                    starved_ms: dto.starved_ms,
+                    rehook: dto.rehook,
+                    dropped_delta: dto.dropped_delta.unwrap_or(0),
+                }),
+                Err(_) => incomplete_lines += 1,
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_all_hook_health_events: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if incomplete_lines > 0 {
+        tracing::warn!(
+            skipped = incomplete_lines,
+            "collect_all_hook_health_events: hook_health lines whose shape did not match the \
+             logger format were skipped (not folded into 0)"
         );
     }
     out.sort_by_key(|e| e.t_ms);
@@ -3116,6 +3273,62 @@ mod tests {
         }
     }
 
+    /// AC12 (issue 007): 形の合わない `hook_health` 行 (`alive` 欠落 / 型違い) があっても
+    /// `run_replay` の `FeatSnapshot` 列は 1 件も変わらず (`ReplayEvent::HookHealth` は
+    /// 既に `serde_json::Value` なので、形に関わらずパース自体は常に成功する)、`--features`
+    /// 側の `collect_all_hook_health_events` はその行を採らない (0 件のまま。0 に畳まない)。
+    #[test]
+    fn malformed_hook_health_line_does_not_break_run_replay() {
+        let broken = [
+            // alive 欠落
+            r#"{"type":"hook_health","t":1700000002500,"starved_ms":0,"rehook":false,"dropped_delta":0}"#,
+            // alive の型違い (整数)
+            r#"{"type":"hook_health","t":1700000002500,"alive":1,"starved_ms":0,"rehook":false,"dropped_delta":0}"#,
+        ];
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+
+        for (i, line) in broken.iter().enumerate() {
+            let ev: ReplayEvent = serde_json::from_str(line)
+                .unwrap_or_else(|e| panic!("崩れた hook_health 行も受理すること ({line}): {e}"));
+            assert!(
+                matches!(ev, ReplayEvent::HookHealth(_)),
+                "expected ReplayEvent::HookHealth, got {ev:?}"
+            );
+            assert_eq!(
+                ev.timestamp(),
+                None,
+                "hook_health は時刻順ソートから除外する"
+            );
+
+            let mut ndjson = std::fs::read_to_string(fixture_path("minimal.ndjson"))
+                .expect("read minimal fixture");
+            ndjson.push_str(line);
+            ndjson.push('\n');
+            let tmp = std::env::temp_dir().join(format!(
+                "gse_malformed_hook_health_replay_{}_{}.ndjson",
+                std::process::id(),
+                i
+            ));
+            std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+
+            let with_line = run_replay(&tmp).unwrap_or_else(|e| {
+                panic!("run_replay must accept broken hook_health ({line}): {e}")
+            });
+            assert_eq!(
+                with_line.len(),
+                baseline.len(),
+                "hook_health 行は FeatSnapshot 列を 1 件も変えてはならない ({line})"
+            );
+
+            let collected = collect_all_hook_health_events(&tmp).expect("collect must not fail");
+            assert!(
+                collected.is_empty(),
+                "形が合わない hook_health 行は採らない (0 埋めしない): {collected:?} ({line})"
+            );
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+
     /// ★ `collect_all_ime_shadow_events` → `build_feature_rows` の**配線**が生きていること
     /// （2026-09-15・`code-reviewer` MEDIUM「新しい配線に `cargo test` 上の網が無い」の回帰）。
     ///
@@ -3165,12 +3378,17 @@ mod tests {
             task_kind_declarations: &[],
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities: None,
+            hook_health: &[],
+        };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &paste_ts,
             &ime,
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
+            &quality_inputs,
         )
         .expect("build rows");
 
@@ -3241,12 +3459,17 @@ mod tests {
             task_kind_declarations: &task_kind_declarations,
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
+        let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
+            capabilities: None,
+            hook_health: &[],
+        };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
             &keys,
             &[],
             &[],
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
+            &quality_inputs,
         )
         .expect("build rows");
 
