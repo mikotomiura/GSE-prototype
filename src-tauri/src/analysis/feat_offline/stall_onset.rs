@@ -12,11 +12,17 @@
 //! # 観測区間（ADR-030 D8 (b-2)）
 //!
 //! `feat` 行（1Hz 特徴列）の**存在**だけを使い、隣接差が [`StallOnsetConfig::hole_gap_ms`]
-//! 以下の極大な連続を 1 つの観測区間とする。条件 A / B の評価・θ の標本は**観測区間の内側だけ**
+//! 以下の極大な連続を 1 つの観測区間とする。条件 A / B の評価は**観測区間の内側だけ**
 //! で行い（区間をまたがない）、各区間の評価開始時点で条件 A の直前状態を `false` に戻す
 //! (D8 (b) 「跨いで足し上げない」)。★ `feat` 行に穴が生じる原因は 1 つも区別しない
 //! (D8 (b-2) 「原因は問わない。原因ラベルを作らない」)。`feat` 行が 1 本も無い入力には
 //! 観測区間が無く、onset は 1 つも立たない。
+//!
+//! θ の標本は**同じ観測区間に入る隣接 press 対**だけを使う（穴をまたぐ対は使わない）が、
+//! ⚠️ **`s` が属する区間に限定はしない** —— 規範文の θ 標本節は「同じ観測区間 `[a, b]`」と
+//! 書くだけで「`s` と同じ区間」とは書いておらず、対象は**全観測区間からプール**する
+//! (issue 008 再裁定。「確定」節の「`s` **と同じ**観測区間の右端 `b`」は `t0` の上限にだけ
+//! 使う別の制約であり、混同しない)。
 //!
 //! # 実装が一意に決まらなかった箇所（★ 推測せず、ここに明記する）
 //!
@@ -206,36 +212,52 @@ fn build_global_instants(sorted_keys: &[KeyPress], w_ms: u64) -> Vec<u64> {
     instants
 }
 
-/// θ_person を、観測区間内の隣接 press 間隔から因果的に推定する (ADR-030 D4)。
-/// `local_press_ts` は**同じ観測区間**に属する press 時刻だけ (呼び出し側が区間の
-/// `[a, b]` で切り出し済み)。`s` **以後**に確定する間隔 (2 打目が `s` より後) は使わない
-/// —— そうしないと、後から追加された `key` 行が既に確定した `s` の θ_person を変え、
-/// 因果性を破る。サンプルが 1 件も無い、または `warmup_count` に届かない場合は `None`
-/// (床で埋めず「推定できない」を伝える)。
-///
-/// ★ `super::press_intervals` (mod.rs の共有ヘルパ) を再利用し、sort + `windows(2)` の
-/// 複製を増やさない。
-fn theta_person_for_interval(
-    local_press_ts: &[u64],
+/// θ_person を、`(resuming_ts, gap_ms)` の候補列から因果的に推定する (ADR-030 D4)。
+/// `s` **以後**に確定する間隔 (2 打目が `s` より後) は使わない —— そうしないと、後から
+/// 追加された `key` 行が既に確定した `s` の θ_person を変え、因果性を破る。サンプルが
+/// 1 件も無い、または `warmup_count` に届かない場合は `None` (床で埋めず「推定できない」を
+/// 伝える)。呼び出し側が「同じ観測区間に入る対だけ」を候補列として渡す (`pooled_theta_gaps`
+/// / `theta_person_for_interval` のいずれか)。
+fn theta_person_from_gaps(
+    gaps: &[(u64, u64)],
     s: u64,
     q: f64,
     warmup_count: Option<usize>,
 ) -> Option<u64> {
-    let mut gaps: Vec<u64> = super::press_intervals(local_press_ts)
-        .into_iter()
-        .filter(|iv| iv.resuming_ts <= s)
-        .map(|iv| iv.gap_ms)
+    let mut values: Vec<u64> = gaps
+        .iter()
+        .filter(|&&(resuming_ts, _)| resuming_ts <= s)
+        .map(|&(_, gap_ms)| gap_ms)
         .collect();
-    if gaps.is_empty() {
+    if values.is_empty() {
         return None;
     }
     if let Some(n) = warmup_count {
-        if gaps.len() < n {
+        if values.len() < n {
             return None;
         }
     }
-    gaps.sort_unstable();
-    quantile_nearest_rank(&gaps, q)
+    values.sort_unstable();
+    quantile_nearest_rank(&values, q)
+}
+
+/// 全観測区間を通して、区間内 (穴をまたがない) の隣接 press 間隔だけを集めたプール
+/// (`resuming_ts` 昇順)。θ の標本は `s` が属する区間に限定せず、**同じ観測区間に入る対で
+/// あれば全区間からプールする** (モジュール doc 冒頭・issue 008 再裁定)。
+/// `sorted_press_ts` は昇順ソート済みを仮定する。
+fn pooled_theta_gaps(sorted_press_ts: &[u64], intervals: &[(u64, u64)]) -> Vec<(u64, u64)> {
+    let mut pooled = Vec::new();
+    for &(a, b) in intervals {
+        let lo = sorted_press_ts.partition_point(|&t| t < a);
+        let hi = sorted_press_ts.partition_point(|&t| t <= b);
+        pooled.extend(
+            super::press_intervals(&sorted_press_ts[lo..hi])
+                .into_iter()
+                .map(|iv| (iv.resuming_ts, iv.gap_ms)),
+        );
+    }
+    pooled.sort_unstable_by_key(|&(resuming_ts, _)| resuming_ts);
+    pooled
 }
 
 /// 1 つの観測区間 `[a, b]` の中で `stall onset` を検出する (ADR-030 D8 (b) 「連続を切る」
@@ -248,7 +270,7 @@ fn detect_stall_onsets_for_interval(
     global_instants: &[u64],
     sorted_keys: &[KeyPress],
     prefix: &[i64],
-    local_press_ts: &[u64],
+    pooled_gaps: &[(u64, u64)],
     config: &StallOnsetConfig,
 ) -> Vec<OnsetEvent> {
     let w = config.w_ms;
@@ -282,7 +304,7 @@ fn detect_stall_onsets_for_interval(
         if cond_a[i] && !prev {
             let s = instants[i];
             if let Some(theta) =
-                theta_person_for_interval(local_press_ts, s, config.q, config.warmup_count)
+                theta_person_from_gaps(pooled_gaps, s, config.q, config.warmup_count)
             {
                 if let Some(t0) = s.checked_add(theta) {
                     // t0 が区間の右端を越える onset は立てない
@@ -331,19 +353,17 @@ fn detect_stall_onsets(
     let prefix = net_prefix(&sorted_keys);
     let global_instants = build_global_instants(&sorted_keys, config.w_ms);
     let intervals = observed_intervals(feat_ts, config.hole_gap_ms);
+    let pooled_gaps = pooled_theta_gaps(&press_ts, &intervals);
 
     let mut onsets = Vec::new();
     for (a, b) in intervals {
-        let lo = press_ts.partition_point(|&t| t < a);
-        let hi = press_ts.partition_point(|&t| t <= b);
-        let local_press_ts = &press_ts[lo..hi];
         onsets.extend(detect_stall_onsets_for_interval(
             a,
             b,
             &global_instants,
             &sorted_keys,
             &prefix,
-            local_press_ts,
+            &pooled_gaps,
             config,
         ));
     }
@@ -464,6 +484,16 @@ mod tests {
         v
     }
 
+    /// 昇順 press 時刻列を `theta_person_from_gaps` が受け取る `(resuming_ts, gap_ms)` 列に
+    /// 変換するテスト専用ヘルパ (単一区間を仮定するテストで `pooled_theta_gaps` を経由せず
+    /// 直接 `theta_person_from_gaps` を検査するため)。
+    fn gaps_from_presses(sorted_press_ts: &[u64]) -> Vec<(u64, u64)> {
+        super::super::press_intervals(sorted_press_ts)
+            .into_iter()
+            .map(|iv| (iv.resuming_ts, iv.gap_ms))
+            .collect()
+    }
+
     /// AC13 の前提にもなる基本テスト: 入力の末尾を切っても、既に確定した (早い時刻の)
     /// onset の判定が変わらないこと。
     #[test]
@@ -513,11 +543,12 @@ mod tests {
     #[test]
     fn theta_has_no_floor_or_ceiling() {
         // 単一サンプル 3ms —— 小さすぎるからと引き上げられない。
-        let tiny = theta_person_for_interval(&[0, 3], 3, 0.99, None);
+        let tiny = theta_person_from_gaps(&gaps_from_presses(&[0, 3]), 3, 0.99, None);
         assert_eq!(tiny, Some(3));
 
         // 単一サンプル 5,000,000ms —— 大きすぎるからと切り下げられない。
-        let huge = theta_person_for_interval(&[0, 5_000_000], 5_000_000, 0.99, None);
+        let huge =
+            theta_person_from_gaps(&gaps_from_presses(&[0, 5_000_000]), 5_000_000, 0.99, None);
         assert_eq!(huge, Some(5_000_000));
     }
 
@@ -675,6 +706,34 @@ mod tests {
         assert_eq!(onsets[0].t0_ms, 71_200);
     }
 
+    /// issue 008 再裁定: θ の標本は `s` が属する観測区間だけに限定せず、**同じ観測区間に
+    /// 入る対であれば他の区間からもプール**する。規範文の θ 標本節は「同じ観測区間」と
+    /// 書くだけで「`s` と同じ区間」に限定していない (「確定」節の t0<=b とは別の制約)。
+    #[test]
+    fn theta_sample_pools_from_other_intervals_too() {
+        let config = StallOnsetConfig::default();
+        // 区間1: feat 0..6000。key は 0, 5000 (gap=5000、区間1 の内側に収まる)。
+        // 穴: 6000..40000 (feat 行なし)。
+        // 区間2: feat 40000..77000 (s はここで立つ)。key は 41000, 41100 (gap=100)。
+        let mut feat = feat_ts_range(0, 6_000, 1_000);
+        feat.extend(feat_ts_range(40_000, 77_000, 1_000));
+        let keys = vec![key(0), key(5_000), key(41_000), key(41_100)];
+
+        let onsets = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            onsets.len(),
+            1,
+            "区間2 だけで onset が 1 つ立つはず: {onsets:?}"
+        );
+        assert_eq!(onsets[0].s_ms, 71_100);
+        assert_eq!(
+            onsets[0].theta_person_ms, 5_000,
+            "θ の標本が s の区間 (区間2、gap=100 だけ) に限定されていて、\
+             区間1 の gap=5000 がプールされていない可能性がある: {onsets:?}"
+        );
+        assert_eq!(onsets[0].t0_ms, 76_100);
+    }
+
     /// AC6 (D3「セッションが終わった場合は第 3 項を置かない」): `t0` が観測区間の右端を
     /// 越える onset は立たない —— 区間を `t0` まで伸ばした対照では同じ `s`/`θ` で確定する。
     #[test]
@@ -821,7 +880,7 @@ mod tests {
         let mut ts: Vec<u64> = (0..=100).collect(); // 100 個の gap=1ms
         ts.push(100_100); // 101 個目の gap = 100000ms (突出した外れ値)
         let s = *ts.last().unwrap();
-        let theta = theta_person_for_interval(&ts, s, 0.99, None);
+        let theta = theta_person_from_gaps(&gaps_from_presses(&ts), s, 0.99, None);
         assert_eq!(
             theta,
             Some(1),
