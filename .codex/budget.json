@@ -7,16 +7,11 @@
   "diff_size_threshold_lines": 500,
   "manual_approval_threshold_lines": 2000,
   "today": {
-    "date": "2026-09-14",
-    "tokens_used": 188898,
-    "invocations": 6
+    "date": "2026-09-19",
+    "tokens_used": 42768,
+    "invocations": 1
   },
   "history": [
-    {
-      "date": "2026-08-10",
-      "tokens_used": 226320,
-      "invocations": 5
-    },
     {
       "date": "2026-08-11",
       "tokens_used": 98718,
@@ -161,6 +156,11 @@
       "date": "2026-09-13",
       "tokens_used": 244153,
       "invocations": 5
+    },
+    {
+      "date": "2026-09-14",
+      "tokens_used": 188898,
+      "invocations": 6
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。",

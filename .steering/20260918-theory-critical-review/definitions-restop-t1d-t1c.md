@@ -1,8 +1,8 @@
 # 定義案: 「再開」「再停止」（EVAL-NCC）→ `T1d`（issue 006）／ `T1c` の算出式（issue 004）
 
-> Status: ⚠️ **案**。研究者判断 25 **#9**（`T1d` を EVAL-NCC の「再停止」と一体で決める・定義を 2 つにしない）と **#10**（`T1c` を理論レビューで扱う）への回答候補。
+> Status: ~~⚠️ **案**~~ → ★ **採用済み（次行）**。起案時点の文言: 研究者判断 25 **#9**（`T1d` を EVAL-NCC の「再停止」と一体で決める・定義を 2 つにしない）と **#10**（`T1c` を理論レビューで扱う）への回答候補。
 > ★★★ **2026-09-19: 採用済み** —— 判断 1 #5 / #6（条件 A の辺・E1 連結）・判断 2 #5〜#8（`T1c` の改名と算出式・純産出の打鍵数・再開の回数と E2 の併報）。issue 004 / 006 へ転記済み（タスク 2 `decisions.md` 判断 26）。⚠️ 実装の細部（`T1c` U1〜U4・`T1d` V1〜V4、★ E1 の集計窓を含む）は**実装フェーズで決める**（判断 3）。
-> ⚠️ **採否は研究者**。採用後に `decisions.md` へ記録し、`issues/006.md` / `issues/004.md` の Background へ算出式を転記する（★ worker は `.idea` を読めない —— 起票 9 の教訓）。
+> ~~⚠️ **採否は研究者**。~~ ★ **2026-09-19 に完了**: 採用を `decisions.md` へ記録し（判断 2）、`issues/006.md` / `issues/004.md` の Background へ算出式を転記する（★ worker は `.idea` を読めない —— 起票 9 の教訓）。
 > 一次資料: ADR-030 D2 / D3 / D7 / D8 / D10（全文通読）・ADR-029 D1 / D2 / D5・ADR-017 D8・ADR-024 §Migration・ADR-016 D1・
 > `src-tauri/src/analysis/feat_offline/stall_onset.rs`（実装）・`blockers.md` 起票 9 / 17・`issues/004.md` / `006.md`・
 > `eval-ncc-analysis-contract.md` §6・`eval-ncc-dag.md` §6。

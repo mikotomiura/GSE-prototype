@@ -28,6 +28,10 @@ printf '%s' "$out" | jq -e '
   || fail "t0 が無い行で restart が 0 埋めされている（★ null にすること）"
 
 # AC6: ⚠️ 退化していないこと
+#   ⚠️★★★ 2026-09-19（decisions.md 判断 26・/cross-review 1 巡目）: **この検査は現状では意図的に落ちる**。
+#   deep_silence.ndjson は issue 008 以後 onset が立たない（blockers.md 起票 17）。
+#   ★ issue 006 の Background V3（fixture を stall_onset_observed.ndjson へ差し替える）を
+#   実装フェーズで裁定するまで、この NG を実装の欠陥と読まないこと。
 printf '%s' "$out" | jq -e '[.[].restart.restop_ms | select(. != null)] | length > 0' >/dev/null 2>&1 \
   || fail "restop_ms が全行 null（★ deep_silence では onset 後の再停止が測れるはず）"
 
