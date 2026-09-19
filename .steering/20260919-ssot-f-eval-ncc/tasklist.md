@@ -4,6 +4,6 @@
 - [x] 分析契約（冒頭・§2・§5・§6）
 - [x] DAG §6・測定辞書 `B_ij`・反証表（GR-H11 / C1）・理論 A（coupling の名）
 - [x] `check_citations.py` 違反なし
-- [ ] `/cross-review` 1 巡目
-- [ ] `/cross-review` 2 巡目
-- [ ] git commit
+- [x] `/cross-review` 1 巡目（Claude 単独 → `decisions.md`）
+- [x] `/cross-review` 2 巡目（Claude 単独・opus → `decisions.md` 判断 3）
+- [x] git commit

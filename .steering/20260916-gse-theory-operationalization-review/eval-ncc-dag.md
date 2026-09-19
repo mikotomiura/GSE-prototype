@@ -20,7 +20,7 @@
 | `M_a` | 割付後 | 応答義務、罪悪感、不利益予期、放置不安 |
 | `Y_q` | 転帰 | 判断品質、誤受容、無検証依存 |
 | `Y_s` | 転帰 | 支援到達可能性、支援 probe 成功 |
-| `Y_w` | 転帰 | 再開、再停止、外部化、離脱 |
+| `Y_w` | 転帰 | 産出の再開 `r_1`、再停止 `s'_1`、`externalized`、`left_observation`（★ 課題終了・観測窓末は打ち切り） |
 | `R` | 観測過程 | 自己報告・ログが観測されること。選択的無応答を含む |
 
 ## 2. 主 DAG
@@ -39,7 +39,7 @@ flowchart LR
     MA["M_a: guilt/obligation/penalty/abandonment"]
     YQ["Y_q: quality/EA/UVR"]
     YS["Y_s: support accessibility"]
-    YW["Y_w: resume/restop/externalize/exit"]
+    YW["Y_w: r_1 / s'_1 / externalized / left_observation"]
     R["R: observed vs missing"]
 
     X --> P
@@ -150,11 +150,15 @@ stateDiagram-v2
     Resumed --> Restopped: s'_1 (condition A rises)
     Resumed --> Externalized
     Resumed --> LeftObservation
+    Resumed --> AdministrativeEnd: task end / interval end (censoring)
+    BranchObserved --> AdministrativeEnd: hole after o (unresolved)
 ```
+
+> ⚠️ **2026-09-19（cross-review 2 巡目）**: `paste` と `r_1` が同じミリ秒に立つときは `Externalized` を先の転帰とする（分析契約 §6 の注記・ADR-024 D4 と同じ保守側）。★ `r_1` / `s'_1` は ADR-030 補訂 1 の観測区間の中だけで評価し、区間の右端で打ち切る。⚠️ 原点 `o` の後の穴を打ち切りにするか両極にするかは未決（分析契約 §14）。
 
 > ★ **2026-09-19（J-10 / J-13）**: 状態名を SSOT の語彙へ対応させる —— `Resumed` = 産出の再開 `r_1`・`Restopped` = 再停止 `s'_1`（ADR-030 補訂 1 項目 7）／ `Externalized` = `externalized`（ADR-029・GSE の実体は `paste`）／ `Exited` は**分解する**: ウィンドウ離脱 = `left_observation`、課題終了・観測窓末 = 打ち切り（ADR-029 D5）。★ 2026-09-19: 図の辺を SSOT の語彙へ改め、旧 `Exited` を `LeftObservation`（focus 事象・⚠️ 競合と打ち切りの混合なので両極で上下界）と `AdministrativeEnd`（課題終了・観測窓末 = 打ち切り）の 2 本に割った。⚠️ 本人の明示終了の扱いは分析契約 §14 の未決。
 
-再開、外部化、離脱は first-event 解析では競合する。AdministrativeEnd は競合転帰ではなく管理打切りである。再開後の再停止は再開を入口とする別 transition であり、再開した者だけの比較を主要効果へ戻さない。
+産出の再開、外部化、離脱は first-event 解析では競合する（⚠️ ただし `left_observation` は競合と打ち切りの両極で上下界を併記する —— 上の注記）。AdministrativeEnd は競合転帰ではなく管理打切りである。再開後の再停止は再開を入口とする別 transition であり、再開した者だけの比較を主要効果へ戻さない。
 
 ## 7. 媒介分析を行う場合の境界
 

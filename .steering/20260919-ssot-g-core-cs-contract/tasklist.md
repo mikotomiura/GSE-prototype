@@ -5,6 +5,6 @@
 - [x] `t0` → `t_stop`
 - [x] 旧 BRIDGE-DN 契約・命題カバレッジ行列に統合の注記
 - [x] `check_citations.py` 違反なし
-- [ ] `/cross-review` 1 巡目
-- [ ] `/cross-review` 2 巡目
-- [ ] git commit
+- [x] `/cross-review` 1 巡目（Claude 単独 → `decisions.md`）
+- [x] `/cross-review` 2 巡目（Claude 単独・opus → `decisions.md` 判断 3）
+- [x] git commit

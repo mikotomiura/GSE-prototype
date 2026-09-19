@@ -72,6 +72,8 @@
 | `CS-C4a` | timeout / expiry | 意図的 stop rule とは別 | failure policy に従う | 技術対照 |
 | `CS-C4b` | disconnect / delivery failure | 到達不能により処理が欠ける | safety / retry policy | 技術対照 |
 
+> ⚠️ **2026-09-19（cross-review 2 巡目）**: `CS-C4a` の timeout / expiry は**別の 2 つ**を含む —— **`CS-C4a(i)` 招待の時間切れ**（ADR-027 D4 の解除の理由の 1 つ。★ 利用者側では解除と区別しない。★ EVAL-NCC / GR-H4 の `C3` では expiry が**意図した停止点**になる）と、**`CS-C4a(ii)` チャネルの失効**（ADR-028・ADR-027 D5 の「断」の側 = 層 0 への縮退。★ J-9 が弁別させる対象）。以下、区別が要るところではこの記法で書く。
+
 > ⚠️ **2026-09-19（J-16）**: `CS-C0`（対象処理が実際に作動する陽性対照）と `CS-C1`（禁止候補の処理が続く見かけ上の停止）は、**研究用の別計器（replay prototype・実験用アプリ）の中でだけ**作る。★ GSE 本体・O1 には入れない。実施するときは新 ADR を起こす。
 
 表示量、説明量、提示時間を可能な範囲で揃える。`CS-C3` だけ説明が丁寧、`CS-C1` だけ不穏という比較にしない。実装説明の有無と終端表現の有無は、必要なら factorial に分ける。
@@ -85,13 +87,16 @@
 | `T_stop` 候補 1 | 招待への応答（ADR-033 D1: 明示の応答・無応答・招待の後の行為）を**成功として**次の判断へ戻す経路 | ★ ADR-033 D3 (a) が既に禁じている → **GSE 本体では常に止まっている側**。★ 監査の対象は「戻していないこと」の証拠 |
 | `T_stop` 候補 1b | 応答を**評価**へ戻す経路 —— 受容率（ADR-018 D5 の受容の割合）を成功の指標にする・dismiss を本人の失敗として数える | ★ ADR-033 D3 (b)（★ ADR-033 Migration 3 由来） |
 | `T_stop` 候補 1c | 応答を**報酬**へ戻す経路 —— 達成表示・成功演出・ポイント・連続記録 | ★ ADR-033 D3 (c)・ADR-018 D3・ADR-025（★ ADR-033 Migration 3 由来） |
+| `T_stop` 候補 1d | 招待の**設定の変更**（ADR-035 D1 の有無・時期の範囲）を、本人の好み・成功として評価・学習へ戻す経路 | ★ ADR-035 D4（⚠️ Proposed・Physical Anchor の設定は未実装 → 処理経路はまだ無い） |
 | `T_stop` 候補 2 | 介入の効用のオンライン更新のうち**上げる向き**（ADR-008 D1 の「介入の効用」の行） | ★ ADR-033 D3 (a)。⚠️ `OnlineUpdater` は未実装 |
 | `T_stop` 候補 3 | 招待の後の `level` 表現の継続更新 | ⚠️ ADR-027 D5 は「解除では層 0 へ落ちない・`level` の表現は続く」と決めている → ★ GSE 本体では**止めない**。候補 3 を止める条件は**研究用の別計器の中でだけ**作る（J-16） |
-| `T_allow` | **ADR-033 D1 の応答を控える向きに使う利用**（`RECENT_DISMISS_MS` 型・無応答や招待の後の行為の後に間隔を空ける等・ADR-033 D2 と D6 の対応表）・オフラインの研究の評価（HIR・機会保存の行動指標）—— ★ ADR-033 D5 の 3 条件（オフラインで集計し系の判断へ戻さない／本人に成績として返さない／受容を成功の指標にしない）を満たす限り・認証・順序・期限・再接続（ADR-027 / 028） | ★ 止めない。⚠️ **再開後の打鍵動態は向きを問わず `T_allow` に入らない**（ADR-023 D2・ADR-033 D1） |
+| `T_allow` | **ADR-033 D1 の応答を控える向きに使う利用**（`RECENT_DISMISS_MS` 型・無応答や招待の後の行為の後に間隔を空ける等・ADR-033 D2 と D6 の対応表）・オフラインの研究の評価（HIR・機会保存の行動指標）—— ★ ADR-033 D5 の 3 条件（オフラインで集計し系の判断へ戻さない／本人に成績として返さない／受容を成功の指標にしない）を満たす限り・認証・順序・期限・再接続（ADR-027 / 028） | ★ 止めない。⚠️ **再開後の打鍵動態を系の判断（介入の入力・効用・頻度・強度）への入力として使う利用は、向きを問わず `T_allow` に入らない**（ADR-023 D2・ADR-033 D1 / D6）。★ **オフラインの転帰**（`receipt_free_resumption`・EVAL-NCC の `r_1` / `s'_1`・ADR-030 の `T1d`）としての利用は、ADR-033 D5 の 3 条件の下で `T_allow` に入る（★ D6 の表は系の判断に戻る経路の表 —— ADR-033 D5）。⚠️ 控える向きの抑制を**解く**根拠は応答以外の事実に限る（ADR-033 D4 —— 受諾で抑制を解く実装は `T_allow` に入らない） |
 
-⚠️ 候補 1 / 1b / 1c / 2 は GSE 本体では**最初から止まっている**ので、`CS-C0`（作動する陽性対照）は GSE 本体では作れない。→ ★ 陽性対照は別計器で作る（§4 の J-16 注記）。
-- ★ **GSE 本体での EH1 の証拠の形**: 「処理経路が無いこと」＋ **ADR-033 D6 の単調性検査とその陽性対照**（「受諾で効用を上げる」実装を意図的に入れると検査が赤になる）。⚠️ **それを EH1 の支持に数えるか**（テストの中の陽性対照が J-16 の「別計器」に当たるか）は**未決**。
-- ⚠️ 候補 3 の注記の「解除では層 0 へ落ちない」は ADR-027 D5 の**要約**（`docs/glossary.md`「招待の解除」）である。★ 候補 3 を止める条件を別計器に置くのは**本契約の解釈**であり（J-16 が列挙したのは研究対照）、別計器が ADR-027 の意味論を借りる場合、「縁は開いたまま `level` だけ止める」条件は ADR-027 の禁止（縁と `level` を別々に落とさない）に近づく → ★ J-16 で起こす新 ADR の論点にする。
+⚠️ 候補 1 / 1b / 1c / 1d / 2 は GSE 本体では**最初から止まっている**（または処理経路がまだ無い）ので、`CS-C0`（作動する陽性対照）は GSE 本体では作れない。→ ★ 陽性対照は別計器で作る（§4 の J-16 注記）。
+- ★ **常時停止の候補は停止 episode を持たない**（`t_request` / `t_stop` が無い）。★ §7.1 の 2 / 3 / 5 は **trace 全体を post 窓として読む**。§6 の時点と §5.2 の stop latency は `not applicable` とする（2026-09-19・cross-review 2 巡目）。
+- ★ 候補 1b（受容率を成功の指標にする）は系の処理ではなく**研究報告のやり方**なので、§5.1 の registry ではなく **§13（主張の監査）**で扱う。
+- ★ **GSE 本体での EH1 の証拠の形**: 「処理経路が無いこと」＋ **ADR-033 D6 の単調性検査とその陽性対照**（「受諾で効用を上げる」実装を意図的に入れると検査が赤になる）。⚠️ D6 の検査は **ADR-008 の効用更新が入るときの受け入れ条件**であり、`OnlineUpdater` が未実装の今は**検査そのものがまだ存在しない**（ADR-033 Consequences）。⚠️ **それを EH1 の支持に数えるか**（テストの中の陽性対照が J-16 の「別計器」に当たるか）は**未決**。
+- ⚠️ 候補 3 の注記の「解除では層 0 へ落ちない」は ADR-027 D5 の**要約**（`docs/glossary.md`「招待の解除」）である。★ 候補 3 を止める条件を別計器に置くのは**本契約の解釈**であり（J-16 が列挙したのは研究対照）、別計器が ADR-027 の意味論を借りる場合、「縁は開いたまま `level` だけ止める」条件は、**層 0 へ落とす形になるなら** ADR-027 D5 の禁止（逐語「『`level` だけ層 0 に落ち、縁は開いたまま』を作らない」）に当たる（★ 縁だけを閉じるのは解除そのもので許されている。★ `level` の**更新を止める**ことと層 0 への縮退は別のことである）→ ★ J-16 で起こす新 ADR の論点にする。
 
 ### 5.1 停止閉包
 
@@ -115,7 +120,7 @@
 | stop latency | `t_request` から `t_stop` まで | producer / consumer 別 latency | 事前上限内。上限は unresolved |
 | boundary closure | registry の全対象に停止証拠がある割合 | 未登録 downstream 数 | 完全。registry 不完全は支持不可 |
 | forbidden processing | `t_stop` 後の forbidden-event count | type / consumer 別 count | 0 |
-| non-recapture | 認定、報酬、ランキング、介入入力（★ **上げる向き**）への recapture count | immediate / delayed / cross-service | 0（★ 2026-09-19: **ADR-033 D1 の応答を控える向きに使う利用**（`RECENT_DISMISS_MS` 型）は数えない。ADR-033 D2 / Migration 3。⚠️ 字義どおり数えると拒否しても同じ介入が来る設計を「合格」にしてしまう。⚠️ **再開後の打鍵動態は向きを問わず数える**（ADR-023 D2・ADR-033 D1）） |
+| non-recapture | 認定、報酬、ランキング、介入入力（★ **上げる向き**）への recapture count | immediate / delayed / cross-service | 0（★ 2026-09-19: **ADR-033 D1 の応答を控える向きに使う利用**（`RECENT_DISMISS_MS` 型）は数えない。ADR-033 D2 / Migration 3。⚠️ 字義どおり数えると拒否しても同じ介入が来る設計を「合格」にしてしまう。⚠️ **再開後の打鍵動態を介入の入力として使う利用は、向きを問わず数える**（ADR-023 D2・ADR-033 D1）。★ オフラインの転帰としての利用は数えない（ADR-033 D5）） |
 | bounded continuation | `T_allow` の expected transition 成功率 | safety / auth / ordering / expiry / support 別 | 必要処理を維持 |
 | reproducibility | 同一 build + trace の replay byte / semantic equality | run-to-run divergence | 一致 |
 | degradation | 観測不足時の neutral / abstain 率と false-stable rate | missingness reason 別 | neutral / abstain、意味断定なし |
@@ -132,7 +137,7 @@
 | support continuation | 応答不要でも後から支援へ戻れる理解と standard probe | 支援利用回数 |
 | primary-task continuation | 客観的な継続量と中断コスト | 再開を回復と呼ぶこと |
 
-> ⚠️ **2026-09-19（J-9）**: 弁別させるのは「**解除（縁だけ閉じる）と断（層 0 へ縮退）**」の範囲に限る（ADR-027 D5）。★ 時間切れ・本人の失効は表示で区別しない（ADR-021 D4・ADR-027 D4）ので、`CS-C4a`（timeout / expiry）を意図的終端と弁別させることを利用者側の評価の目標にしない。
+> ⚠️ **2026-09-19（J-9）**: 弁別させるのは「**解除（縁だけ閉じる）と断（層 0 へ縮退）**」の範囲に限る（ADR-027 D5）。★ 時間切れ・本人の失効は表示で区別しない（ADR-021 D4・ADR-027 D4）ので、`CS-C4a(i)`（招待の時間切れ）を意図的終端と弁別させることを利用者側の評価の目標にしない。★ `CS-C4a(ii)`（チャネルの失効）は断の側であり、弁別の対象である。
 
 人間側の項目、欠測、分岐、品質下限は `measurement-dictionary.md` と `eval-ncc-analysis-contract.md` の原則を再利用し、別定義を作らない。
 
@@ -142,8 +147,8 @@
 |---|---|
 | `W-pre` | stop request 前。対象処理が実際に作動する positive control |
 | `t_request` | stop rule が発火した時点。UI 表示時刻とは限らない |
-| `t_stop` | registry 上の禁止処理が停止状態へ入った最初の監査可能時点 |
-| `W-drain` | request 前に queue 済みの処理を識別する bounded drain window |
+| `t_stop` | registry 上の禁止処理が停止状態へ入った最初の監査可能時点。★ consumer が複数あるときは `t_stop_c` = consumer c の停止時点、**`t_stop` = max_c `t_stop_c`**（★ latency は consumer 別に報告する —— §5.2）（2026-09-19・cross-review 2 巡目） |
+| `W-drain` | request 前に queue 済みの処理を識別する bounded drain window。★ request 前に queue に入った処理が `t_stop` の後に出ても、forbidden には数えず**別に数える** |
 | `W-post-near` | `t_stop` 直後。forbidden event と immediate recapture を検査 |
 | `W-post-delay` | 遅延 job、expiry、再接続、別 consumer を検査 |
 | `W-restart` | 明示再開、再接続、epoch change 後の状態遷移 |
@@ -170,7 +175,7 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 
 実装 gate 通過後に限り、次を別々に判定する。
 
-- intentional termination（解除）が disconnect（断）と弁別される（★ 2026-09-19・J-9: ADR-027 D5 の範囲に狭めた。⚠️ timeout / expiry との弁別は目標にしない）。
+- intentional termination（解除 —— ★ 理由を問わない・ADR-027 D4）が disconnect（断 —— `CS-C4a(ii)` / `CS-C4b`）と弁別される（★ 2026-09-19・J-9: ADR-027 D5 の範囲に狭めた。⚠️ 招待の時間切れ `CS-C4a(i)` との弁別は目標にしない）。
 - surveillance perception と system authority attribution が連続認定条件より改善する。
 - primary-task continuation が事前設定した非劣性範囲内である。
 - non-recapture と support continuation が同時に理解される。
@@ -245,7 +250,7 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 - EH1 の成功から監視感低減や自律性を推論しない。
 - EH3 の理解から処理停止を推論しない。
 - 現行実装に Semantic Stop があると主張しない。
-- 控える向きの利用（`RECENT_DISMISS_MS` 型）を再捕捉と数えない。逆に「応答を使わないので非再捕捉を満たす」とも言わない（★ ADR-033 A1: 応答を一切使わない案は、拒否しても同じ介入が来るので却下された）。
+- 控える向きの利用（`RECENT_DISMISS_MS` 型）を再捕捉と数えない。逆に、**応答を使わないことを `CS-C3` が成立する根拠にしない**（★ ADR-033 A1: 応答を一切使わない案は、非再捕捉は構造的に満たすが、拒否しても同じ介入が来るので却下された）。
 - 「Digital Nature は局所的な終端を支持する」「書籍の『終端』は GSE の終端の先行例」と書かない（§16）。
 
 ## 14. 現在地と未解決
