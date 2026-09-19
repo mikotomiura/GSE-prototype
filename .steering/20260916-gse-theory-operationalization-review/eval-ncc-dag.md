@@ -152,6 +152,8 @@ stateDiagram-v2
     Resumed --> Exited
 ```
 
+> ★ **2026-09-19（J-10 / J-13）**: 状態名を SSOT の語彙へ対応させる —— `Resumed` = 産出の再開 `r_1`・`Restopped` = 再停止 `s'_1`（ADR-030 補訂 1 項目 7）／ `Externalized` = `externalized`（ADR-029・GSE の実体は `paste`）／ `Exited` は**分解する**: ウィンドウ離脱 = `left_observation`、課題終了・観測窓末 = 打ち切り（ADR-029 D5）。★ 図の辺はそのまま使える（辺の定義だけが確定する）。
+
 再開、外部化、離脱は first-event 解析では競合する。AdministrativeEnd は競合転帰ではなく管理打切りである。再開後の再停止は再開を入口とする別 transition であり、再開した者だけの比較を主要効果へ戻さない。
 
 ## 7. 媒介分析を行う場合の境界

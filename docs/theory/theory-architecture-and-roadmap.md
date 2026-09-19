@@ -307,6 +307,7 @@ GSE を越えて、生成芸術、bioadaptive media、AI 創作支援、personal
 - perceived obligation / guilt / anticipated penalty
 - choice symmetry（いずれの分岐も自動的な正誤・達成認定へ結びつかないこと）
 - coupling as primary outcome
+  > ⚠️ **2026-09-19（理論レビュー 判断 1 #7 = J-13）**: この名を**流用しない**。★ ADR-023 の主要アウトカム（「出口への結合」・HIR と機会保存の行動指標）とは中身が違う（負担・品質・依存の gate を持つ）。
 - 予測入力と報告アウトカムの分離
 
 **独立性**:
