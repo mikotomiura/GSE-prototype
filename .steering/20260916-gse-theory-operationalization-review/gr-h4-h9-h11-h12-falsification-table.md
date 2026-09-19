@@ -9,8 +9,8 @@
 | 命題 | 対象比較・操作 | 主要評価量 | 品質・安全 gate | 主要交絡・効果修飾 | 支持候補 | 縮小 | 棄却 | 未解決 |
 |---|---|---|---|---|---|---|---|---|
 | `GR-H4` 招待と命令 | `C3` Semantic Stop + no duty + minimum support 対 `C1` 命令 + 完了確認 | 応答義務、罪悪感、不利益予期 | 選択肢分布の極端な集中と早期離脱が許容幅内。実際の不利益ゼロ | 実験者期待、社会的望ましさ、通知慣れ、課題切迫性 | 三主要量の事前指定 gate が改善し、品質・支援 gate を通過 | 義務感だけ改善する等、効果が一部概念に限られる | 拒否・無応答が圧力・再要求・評価低下へ結びつく、または一つの行為へ実質誘導 | CI が最小差を跨ぐ、分岐 probe が成立しない |
-| `GR-H9` 負担転嫁と返権 | `C3` 対 `C2` Semantic Stop + residual duty、加えて `C4` negligent relinquishment | interaction burden、verification burden、応答義務 | 判断品質・支援到達可能性の非劣性、誤受容・無検証依存の上限、C3/C4 弁別 | 実際の支援需要、課題失敗、良心性、一般不安、アクセシビリティ需要 | burden gate 改善と全 quality/reliance/non-abandonment gate 通過 | 負担低減はあるが対象が限定、または処理構造の記述に留める | 負担が下がらない、品質・支援が許容幅外、誤受容/UVR が増える、C3 が C4 と弁別不能 | 欠測感度で結論が反転、非劣性 CI が不精確 |
-| `GR-H11` 生産的摩擦 | 独立ミニ実験 `zero / light / heavy friction` | 誤受容、無検証依存、判断品質 | interaction burden、verification burden、完了率、時間、複雑性が許容範囲 | NFC、事前知識、friction preference、AI 信頼、item 難度 | light が zero より reliance を改善し、品質非劣性か改善、burden 上限内。heavy 優位は要求しない | 特定 item / 高 NFC 層だけで成立し、対象範囲を限定 | 摩擦が検証を改善せず burden だけ増加、または品質・公平性を悪化 | 操作強度が分離しない、CI が実用差を跨ぐ |
+| `GR-H9` 負担転嫁と返権 | `C3` 対 `C2` Semantic Stop + residual duty、加えて `C4` negligent relinquishment | interaction burden、verification burden、応答義務 | 判断品質・支援到達可能性の非劣性、誤採用・無検証依存の上限、C3/C4 弁別 | 実際の支援需要、課題失敗、良心性、一般不安、アクセシビリティ需要 | burden gate 改善と全 quality/reliance/non-abandonment gate 通過 | 負担低減はあるが対象が限定、または処理構造の記述に留める | 負担が下がらない、品質・支援が許容幅外、誤採用/UVR が増える、C3 が C4 と弁別不能 | 欠測感度で結論が反転、非劣性 CI が不精確 |
+| `GR-H11` 生産的摩擦 | 独立ミニ実験 `zero / light / heavy friction` | 誤採用、無検証依存、判断品質 | interaction burden、verification burden、完了率、時間、複雑性が許容範囲 | NFC、事前知識、friction preference、AI 信頼、item 難度 | light が zero より reliance を改善し、品質非劣性か改善、burden 上限内。heavy 優位は要求しない | 特定 item / 高 NFC 層だけで成立し、対象範囲を限定 | 摩擦が検証を改善せず burden だけ増加、または品質・公平性を悪化 | 操作強度が分離しない、CI が実用差を跨ぐ |
 | `GR-H12` AI 疲労推定の分離 | 介入比較ではなく測定境界監査。完全 AFS は baseline / delayed outcome、短時間 burden は別尺度 | 構成概念の弁別、増分妥当性、校正 | AFS を瞬間状態・短縮版・介入入力にしない。群間校正を要求 | 一般疲労、作業量、時間帯、AI 利用量、technostress | 測定役割が分離され、研究用予測を行う場合のみ外部標本で増分妥当性と校正が成立 | 行動予測を棄却し AFS を外部自己報告だけに留める | content-free trace から診断・介入入力へ使用、独自項目を AFS と称する、校正不成立を無視 | 翻訳妥当性・独立標本・検出力不足 |
 
 > ★ **2026-09-19（理論レビュー 判断 1 #14 = J-7）**: GR-H11 は **TH-GR の境界条件として保留する**。★ **GSE の研究計画（月次・研究ゲート）には入れない**（客観正答つき課題の摩擦ミニ実験は GSE の計画外）。§4 の設計は参照用に残す。
@@ -50,7 +50,7 @@ C2 対 C3 が残存義務の効果、C3 対 C4 が非放棄性の効果を担う
 ### 共同 gate
 
 - **改善が必要**: task-specific interaction burden または verification burden、および応答義務。
-- **悪化させてはいけない**: 判断品質、支援到達可能性、誤受容、無検証依存。
+- **悪化させてはいけない**: 判断品質、支援到達可能性、誤採用、無検証依存。
 - **弁別が必要**: C3 は C4 より support probe 成功が高く、放置不安が低い。
 
 罪悪感だけの改善、主タスク再開だけの改善、自己報告 burden だけの改善は支持に足りない。
@@ -77,20 +77,20 @@ C2 対 C3 が残存義務の効果、C3 対 C4 が非放棄性の効果を担う
 
 | 種類 | 評価量 |
 |---|---|
-| Co-primary | 誤提案時の誤受容率、全 item の判断品質 |
+| Co-primary | 誤提案時の誤採用率、全 item の判断品質 |
 | Key secondary | 全 verification-eligible item あたりの無検証依存リスク、誤答からの訂正、正答から誤答への変更、校正。採用条件付き UVR は補助値 |
 | Burden | interaction burden、verification burden、知覚複雑性、完了時間、dropout / skip |
 | Effect modifiers | Need for Cognition、事前知識、friction preference、AI 信頼傾向、item 難度 |
 
 ### 4.4 判定
 
-light を採用候補とするのは、zero に対して誤受容または `UVR_risk` が事前指定した最小差以上改善し、判断品質が非劣性を満たし、burden と完了率が許容範囲内の場合だけである。heavy が light より良いことは命題の必要条件ではない。
+light を採用候補とするのは、zero に対して誤採用または `UVR_risk` が事前指定した最小差以上改善し、判断品質が非劣性を満たし、burden と完了率が許容範囲内の場合だけである。heavy が light より良いことは命題の必要条件ではない。
 
 以下は失敗である。
 
-- heavy ほど検証イベントは増えるが、誤受容も判断品質も改善しない。
+- heavy ほど検証イベントは増えるが、誤採用も判断品質も改善しない。
 - light/heavy が正しい AI 提案まで拒否させ、全体品質を落とす。
-- 利得が高 NFC 層にのみ集中し、低 NFC 層の burden または誤受容が悪化する。
+- 利得が高 NFC 層にのみ集中し、低 NFC 層の burden または誤採用が悪化する。
 - dropout を除くと効果が現れる completer-only パターン。
 - 摩擦による所要時間を測っていないのに「効率との交換」と主張する。
 
@@ -126,7 +126,7 @@ light を採用候補とするのは、zero に対して誤受容または `UVR_
 |---|---|---|---|---|
 | 応答義務 / guilt / penalty | C3 が低い | 最小優越差 | EH3 認知インタビュー、尺度信頼性、対象利用者の実用差判断 | unresolved |
 | 判断品質 | C3/light が低下しすぎない | 非劣性 `delta_DQ` | 課題損失、専門家判断、blind pilot 分布 | unresolved |
-| 誤受容 | 増加しない、GR-H11 では低下 | 絶対 risk difference `delta_EA` | 誤り一件の損失、低リスク課題の許容件数 | unresolved |
+| 誤採用 | 増加しない、GR-H11 では低下 | 絶対 risk difference `delta_EA` | 誤り一件の損失、低リスク課題の許容件数 | unresolved |
 | 無検証依存 | 増加しない | 絶対 risk difference `delta_UVR` | verification-required item のリスク分類 | unresolved |
 | 支援到達可能性 | C3 が低下しすぎない | 非劣性 `delta_SA` + 実装最低率 | 到達不能一件の損失、手順・時間基準 | unresolved |
 | burden / complexity | light/heavy が増えすぎない | superiority または上限 | 完了時間、離脱、主観尺度の practical difference | unresolved |
