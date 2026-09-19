@@ -14,9 +14,9 @@
 - [x] 禁止用語の規則を新しい行に当てる
 
 ## レビュー
-- [ ] `/cross-review` 1 巡目
-- [ ] `/cross-review` 2 巡目
-- [ ] 指摘の採否を `decisions.md` に記録
+- [x] `/cross-review` 1 巡目（Codex ＋ Claude・Codex の指摘 0 件 → 判断 2）
+- [x] `/cross-review` 2 巡目（Claude 単独・予算の縮退 → 判断 3）
+- [x] 指摘の採否を `decisions.md` に記録
 
 ## 完了処理
-- [ ] git commit
+- [x] git commit（`f1c5314` / `84f636d` / `7e0fb4d` / `49ec239`）

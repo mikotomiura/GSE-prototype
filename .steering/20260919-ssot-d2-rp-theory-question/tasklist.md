@@ -15,9 +15,9 @@
 - [x] `check_citations.py` / `check_doc_lexicon.py` 違反なし
 
 ## レビュー
-- [ ] `/cross-review` 1 巡目
-- [ ] `/cross-review` 2 巡目
-- [ ] 指摘の採否を `decisions.md` に記録
+- [x] `/cross-review` 1 巡目（Codex ＋ Claude → 判断 2）
+- [x] `/cross-review` 2 巡目（Claude 単独・予算の縮退 → 判断 3）
+- [x] 指摘の採否を `decisions.md` に記録
 
 ## 完了処理
-- [ ] git commit
+- [x] git commit（`84f636d` / `7e0fb4d` / `49ec239`）
