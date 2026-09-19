@@ -1,5 +1,7 @@
 # 次セッション — 研究者判断バッチ 6（判断 4）の帰結を SSOT へ反映する
 
+> ✅ **完了**（2026-09-20・`.steering/20260920-decision4-reflection/`）。★ 次は `next-session-g1-o1-inventory.md`（§5 の 2 番目）。★ 反映中に起票した研究者への質問 Q1〜Q4 は `decisions.md` 判断 8。
+
 > 作成: 2026-09-20。前段: `.steering/_handoff/next-session-theory-stage3-followups.md` §2 の 10 件を研究者に聞き、
 > ★ 回答を `.steering/20260919-theory-ssot-promotion/decisions.md` **判断 4** に記録した（★ 10 件とも回答済み・**反映は未着手**）。
 > ★ 本タスクは**反映だけ**を行う。新しい裁定はしない（★ 反映の途中で規定の無い点が出たら止まって研究者に聞く）。

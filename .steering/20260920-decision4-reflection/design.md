@@ -84,8 +84,25 @@ docs/theory/generative-relinquishment-theory.md
 docs/theory/theory-architecture-and-roadmap.md"
 for f in $F; do [ -f "$f" ] || { echo "MISSING: $f"; exit 2; }; done   # ⚠️ 無いと黙って緑になる
 if grep -n "誤受容" $F | grep -v '旧名「誤受容」\|「誤受容」→'; then echo "RESIDUAL"; else echo "OK: 注記以外の残存 0"; fi
+# ★ 置換規則 2 / 3（測定辞書だけ）: 旧い形が 0 件であること（★ 2 巡目 L3 で追加）
+M=.steering/20260916-gse-theory-operationalization-review/measurement-dictionary.md
+[ "$(grep -c '受容率（★ AI の提案' "$M")" = 0 ] && [ "$(grep -c '正しい提案の受容（' "$M")" = 0 ] && echo "OK: 規則 2 / 3 の旧形 0" || echo "RESIDUAL (規則 2 / 3)"
 ```
+
+⚠️ **限界**（2 巡目 L3）: 除外は**行単位**なので、注記の行（旧名への言及を含む 4 行）の中に本物の残存が同居すると見逃す。★ 2026-09-20 時点では該当 4 行とも「誤受容」の出現が 1 回だけであることを実測した。⚠️ `scripts/check_doc_lexicon.py` はこの語を検査していない（対象が pre-SSOT の契約と theory candidate で同スクリプトの範囲外。★ 足すなら HISTORICAL の正規表現に「旧名」「改名」が無いので glossary の 2 行が違反になる点に注意）。
 
 ## ロールバック計画
 
 - 反映単位ごとにコミットを分ける（2-1〜2-5）。問題があれば該当コミットを revert する。
+
+## 結果（★ 最終化・2026-09-20）
+
+- ★ 判断 4 の #1 / #4 / #5 / #6 / #7 / #8 を反映した（コミット: `9a22f5b` 2-1 ／ `510c614` 2-2 ／ `9df1478` 2-3 ／ `9ea0bbe` 2-4 ／ `57c7584` 2-5 ／ `371fc7f` 1 巡目の対応 ／ 2 巡目の対応は最終コミット）。
+- ★ `/cross-review` は 2 巡とも **Claude（Opus）∥ Codex** の両系統で回した（Codex 計 127,233 tokens・予算内。skip なし）。
+- **当初設計からの変更**:
+  1. README は ADR-014 / 034 行に加え、**ADR-016 行（時期の列）と ADR-032 行（D8 の配布ゲート）**も直した（grep で見つけた・decisions 判断 1）。
+  2. 第 19 版で **`analyze.py` / `config.json` の版も 19** にした（版一致検査・判断 3）。`data.md` の状態にも 1 行。
+  3. glossary に「誤採用」の用語行と、旧名の禁止用語行を足した（判断 5。⚠️ 禁止用語に置いたのは本タスクの判断で、研究者は個別には未確認）。
+  4. レビューで、**私が 1 巡目の修正で持ち込んだ誤り 2 件**（第 19 版の「§3.6 はブロックの除外だけ」・CORE-CS の「`CS-C0` は別計器だけ」）を 2 巡目が拾い、直した（判断 8 H1 / M4）。
+- ★ **研究者への質問 4 件（Q1〜Q4）を決めずに残した**（判断 8）。どれも本タスクの反映を止めるものではない（締切はそれぞれ G1 の収集開始前・G1 の次の配布前・`OnlineUpdater` の実装時・R-1 を決めるとき）。
+- ⚠️ **範囲外で見つけたもの**は次の棚卸しへ渡した（`run.sh` の cp932・`config.json` の `status`・律速 4 の確認場所・募集と配布のあいだの約束・schema の drift は既知の保留）。

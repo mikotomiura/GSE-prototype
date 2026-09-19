@@ -32,12 +32,12 @@
 
 ## 受け入れ条件（引き継ぎ §4 のまま）
 
-- [ ] 1. ADR-034 のステータスが Accepted で、README の ADR-014 行と ADR-034 行が整合している。`o1-roster-operations.md` §5 が効いている状態になっている
-- [ ] 2. `grep -rn "収集完了" docs/ .claude/skills/` の各ヒットについて、直したか・直さない理由を `.steering/` に記録した
-- [ ] 3. 事前登録に第 19 版があり、`check_frozen_sections.py` が緑（★ 加えて `analyze.py --selftest` が緑 —— 版一致検査）
-- [ ] 4. §2-3 の対象ファイルで「誤受容」が 0 件（★ 注記の中の旧名の言及を除く —— 除いた行は記録する）。変えない記録ファイルの件数は元のまま
-- [ ] 5. CORE-CS §5.0 の未決が閉じ、Nudge の見直し候補が登録され、`intervention-design` Skill から辿れる
-- [ ] 6. `/cross-review` の 2 巡を通した（または skip の理由を書いた）
+- [x] 1. ADR-034 のステータスが Accepted で、README の ADR-014 行と ADR-034 行が整合している。`o1-roster-operations.md` §5 が効いている状態になっている
+- [x] 2. `grep -rn "収集完了" docs/ .claude/skills/` の各ヒットについて、直したか・直さない理由を `.steering/` に記録した
+- [x] 3. 事前登録に第 19 版があり、`check_frozen_sections.py` が緑（★ 加えて `analyze.py --selftest` が緑 —— 版一致検査）
+- [x] 4. §2-3 の対象ファイルで「誤受容」が 0 件（★ 注記の中の旧名の言及を除く —— 除いた行は記録する）。変えない記録ファイルの件数は元のまま
+- [x] 5. CORE-CS §5.0 の未決が閉じ、Nudge の見直し候補が登録され、`intervention-design` Skill から辿れる
+- [x] 6. `/cross-review` の 2 巡を通した（または skip の理由を書いた）
 
 ## 関連ドキュメント
 

@@ -11,7 +11,9 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| ★★★ **理論の SSOT 昇格（段 3）の後始末 —— 研究者の確認待ち**（新） | `next-session-theory-stage3-followups.md` | ★★★ **現行・次の主タスク**（2026-09-19 作成）。段 3 の全単位はコミット済み。★ 残るのは研究者の確認 10 件（ADR-033 / 034 / 035 の Accepted・ADR-035 の未決・Nudge の時期の統制・G1 の途中離脱の数え方・`誤受容` の改名・EH1 の数え方・理論名・補足の検索）と、実装フェーズへ渡す論点 |
+| ★★★ **G1 / O1 の残タスクの棚卸し**（新） | `next-session-g1-o1-inventory.md` | ★★★ **現行・次の主タスク**（2026-09-20 作成・未着手）。★ `/start-task` の grill で範囲を確定してから。★ 研究者への質問 Q1〜Q4（判断 4 の反映で起票）・G1 の前提条件 1〜7・ADR-034 Migration 3 / 6・律速 4・`run.sh` の cp932・main へのマージの計画 |
+| ~~**判断 4（研究者判断バッチ 6）の反映**~~ | `next-session-decision4-reflection.md` | ✅ **完了**（2026-09-20・`.steering/20260920-decision4-reflection/`）。ADR-034 を Accepted・事前登録 第 19 版（前提条件 7）・「誤受容」→「誤採用」・CORE-CS §5.0・Nudge の見直し候補 R-1。`/cross-review` 2 巡（Claude ∥ Codex） |
+| ~~**理論の SSOT 昇格（段 3）の後始末 —— 研究者の確認待ち**~~ | `next-session-theory-stage3-followups.md` | ✅ **研究者の確認 10 件は回答・反映済み**（2026-09-20・判断 4）。★ **§3（実装フェーズへ渡す論点）は現行**（ADR-030 補訂 1 の保留・EVAL-NCC §14・ADR-035 の UI と未決 3 つ） |
 | ~~**理論レビューの SSOT 昇格（段 3）**~~ | `next-session-theory-ssot-promotion.md` | ✅ **完了**（2026-09-19・`.steering/20260919-theory-ssot-promotion/`・単位 a〜i・SR・d-3 を 2 巡の cross-review（Claude 単独・Codex は予算で skip）を経てコミット。最終 `8560339`）。★ 体系的レビューの結論: C1〜C6 は既出・C7 は部分的に既出・差分は認めず見つからなかった要素 4 つは差分の候補（未検証）（RP §4） |
 | ~~**GSE 理論草案の批判的レビュー（pre-SSOT → SSOT 候補の仕分け）**~~ | `next-session-theory-critical-review.md` | ✅ **完了**（2026-09-18〜19・`.steering/20260918-theory-critical-review/`）。研究者判断は判断 1（18 問）・判断 2（8 問）。E1 と `T1c` の細部は研究者の指示で実装フェーズへ回した（判断 3）。`T1c` / `T1d` の算出式は issue 004 / 006 へ転記済み（判断 4）。→ 後続は上段 |
 | ★ **Mh-D Tier 別オフライン実装（タスク 2）の残り** | `next-session-mhd-tiers-researcher-decisions.md` | ★ **中断中**（2026-09-18）。002 / 003 / 005 / 007 と是正 issue 008 は merge 済み（`08423b2` で cargo test 745 passed・acceptance 全 OK）。★ 研究者判断 16 件は `decisions.md` **判断 25** で裁定済み。★ 2026-09-19: 004 / 006 の算出式は理論レビューで確定し、転記済み（判断 26）。⚠️ U1〜U4 / V1〜V5（★ E1 の集計窓を含む）は実装フェーズで先に裁定する。★ 再開順: 理論レビュー（✅ 完了）→ Loop 基盤の修正 → 封筒 issue → 004 / 006 → `capability matrix` → P1 前の事前宣言文書。⚠️★★★ **main へ switch しない**（ADR-030 / 031 / 032 は `docs/adr-030-stall-onset-definition` にしか無い） |

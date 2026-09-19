@@ -39,12 +39,12 @@
 
 ## レビュー
 - [x] `/cross-review` 1 巡目 Codex（70,586 tokens・CRITICAL/HIGH なし・4 件）
-- [ ] `/cross-review` 1 巡目 Claude（code-reviewer・Opus）
-- [ ] 1 巡目の指摘への対応
-- [ ] `/cross-review` 2 巡目（自分が足した規則の境界条件）
-- [ ] 2 巡目の指摘への対応
+- [x] `/cross-review` 1 巡目 Claude（code-reviewer・Opus・MEDIUM 3 / LOW 7）
+- [x] 1 巡目の指摘への対応（`371fc7f`・decisions 判断 7）
+- [x] `/cross-review` 2 巡目（Claude HIGH 1 / MEDIUM 5 / LOW 3 ∥ Codex 56,647 tokens・HIGH 2 / MEDIUM 2 / LOW 1）
+- [x] 2 巡目の指摘への対応（decisions 判断 8・研究者への質問 Q1〜Q4）
 
 ## 完了処理
-- [ ] design.md の最終化
-- [ ] 次の引き継ぎ（G1 / O1 の残タスクの棚卸し）へ観察を渡す
-- [ ] git commit
+- [x] design.md の最終化（「検査の記録」「結果」）
+- [x] 次の引き継ぎ `_handoff/next-session-g1-o1-inventory.md`・`_handoff/README.md` の索引・memory 2 件
+- [x] git commit
