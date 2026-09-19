@@ -22,6 +22,8 @@
 - [x] `check_citations.py` 違反なし（各ラウンド）
 
 ## 完了処理
-- [ ] 段 3（SSOT 昇格）の作業単位を書き出す
-- [ ] 研究者判断が新たに要る箇所をまとめて聞く
-- [ ] `design.md` の最終化
+- [x] 段 3（SSOT 昇格）の作業単位を書き出す → `.steering/_handoff/next-session-theory-ssot-promotion.md`（単位 a〜i）・RP 還元案 `positioning-reduction-draft.md`
+- [x] 研究者判断が新たに要る箇所をまとめて聞く → バッチ 2（8 問・判断 2）。★ バッチ 3（実装の細部 4 問）は研究者が差し戻した → 実装フェーズへ回す（判断 3）
+- [x] 判断 2 の `T1c` / `T1d` を issue 004 / 006・受け入れスクリプトへ転記（判断 4・タスク 2 判断 26）。⚠️ スクリプトは `bash -n` とダミー行での jq 検算のみ
+- [x] ADR-030 補訂案 項目 6 に「V1 の裁定まで反映しない」を注記
+- [x] `design.md` の最終化
