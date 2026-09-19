@@ -4,6 +4,16 @@
 >
 > 本書は `CORE-CS` を反証可能にする作業契約であり、実装仕様、事前登録、確立尺度、SSOT ではない。現行コードに `invitation` と Semantic Stop の実装は確認できないため、実装済みとは扱わない。
 
+
+> ★★★ **2026-09-19 の改訂（段 3 の単位 g・`.steering/20260919-ssot-g-core-cs-contract/`）** —— 研究者が裁定した事項と機械的な規則だけを当てた。
+> - **J-3**（理論レビュー 判断 1 #2）: `T_stop` を**現行 GSE に実在する処理**から取る → §5.0 に候補を書いた（ADR-033 と対応）。
+> - **J-9**（同 #10）: 表現上で弁別させる終端は「**解除（縁だけ閉じる）と断（層 0 へ縮退）**」の範囲に限る（ADR-027 D5）→ §5.3・§7.2 を狭めた。
+> - **J-6**（同 #16）: BRIDGE-DN を独立の接続命題にせず、**本契約の比較節**（§16）として統合した。
+> - **J-16**（同 #12）: 陽性対照（`CS-C0`）と見かけ上の停止（`CS-C1`）は**研究用の別計器**（ADR-012 型）でだけ作る。GSE 本体・O1 に入れない。
+> - **J-4 / ADR-033**: 非再捕捉の数え方から**控える向きの利用（`RECENT_DISMISS_MS` 型）を除く**（§5.2）。
+> - 機械的な規則: 停止成立の時点の記号 `t0` を **`t_stop`** へ改めた（11 か所。★ ADR-030 の `stall onset` の `t0` と衝突するため）。
+> - ⚠️ §15 の文献の多くは `docs/references.md` に未登録（`.steering/20260918-theory-critical-review/citations-audit.md`）。
+
 ## 1. 命題と理論的親
 
 **命題**: 適応システムでは、いつ主導権を取るかだけでなく、いつ推論、意味認定、達成認定、応答要求を終えるかを、監査可能で非再捕捉的なシステム境界として設計しなければならない。
@@ -19,8 +29,8 @@
 ### 含む
 
 - 停止対象となる event、field、state transition、downstream consumer の閉包
-- stop request から停止成立 `t0` までの遷移と latency
-- `t0` 後の意味推論、達成認定、報酬、ランキング、介入入力への再捕捉
+- stop request から停止成立 `t_stop` までの遷移と latency
+- `t_stop` 後の意味推論、達成認定、報酬、ランキング、介入入力への再捕捉
 - expiry、解除、再接続、再起動、遅延処理、別サービスを跨ぐ状態遷移
 - 通常状態推定、認証、順序、期限、安全、必要な非評価的研究処理の bounded continuation
 - 観測不足時の neutral / abstain への退化
@@ -40,7 +50,7 @@
 | 項目 | 契約 |
 |---|---|
 | 主要観測単位 | `build x fixed replay trace x stop episode x downstream consumer` |
-| 停止 episode | 事前に定義した stop request、成立 `t0`、対象集合 `T_stop`、継続集合 `T_allow`、再接続条件を持つ一件 |
+| 停止 episode | 事前に定義した stop request、成立 `t_stop`、対象集合 `T_stop`、継続集合 `T_allow`、再接続条件を持つ一件 |
 | システム対象 | 同一 build 内の event producer、state machine、queue、log/replay、遅延 job、外部 consumer |
 | 利用者対象 | 対象利用者。実装監査を通過した build だけを EH3 以降へ送る |
 | `EH0` | 概念、target registry、反例、比較条件の定義 |
@@ -61,9 +71,22 @@
 | `CS-C4a` | timeout / expiry | 意図的 stop rule とは別 | failure policy に従う | 技術対照 |
 | `CS-C4b` | disconnect / delivery failure | 到達不能により処理が欠ける | safety / retry policy | 技術対照 |
 
+> ⚠️ **2026-09-19（J-16）**: `CS-C0`（対象処理が実際に作動する陽性対照）と `CS-C1`（禁止候補の処理が続く見かけ上の停止）は、**研究用の別計器（replay prototype・実験用アプリ）の中でだけ**作る。★ GSE 本体・O1 には入れない。実施するときは新 ADR を起こす。
+
 表示量、説明量、提示時間を可能な範囲で揃える。`CS-C3` だけ説明が丁寧、`CS-C1` だけ不穏という比較にしない。実装説明の有無と終端表現の有無は、必要なら factorial に分ける。
 
 ## 5. 構成概念と観測可能量
+
+### 5.0 ★ 停止対象の候補（2026-09-19・J-3 —— 現行 GSE に実在する処理から取る）
+
+| 候補 | 実在する処理 | ★ 既決との関係 |
+|---|---|---|
+| `T_stop` 候補 1 | 招待への応答（受諾・無応答・招待の後の行為）を**成功として**次の判断へ戻す経路 | ★ ADR-033 D3 (a) が既に禁じている → **GSE 本体では常に止まっている側**。★ 監査の対象は「戻していないこと」の証拠 |
+| `T_stop` 候補 2 | 介入の効用のオンライン更新のうち**上げる向き**（ADR-008 D1 の「介入の効用」の行） | ★ ADR-033 D3 (a)。⚠️ `OnlineUpdater` は未実装 |
+| `T_stop` 候補 3 | 招待の後の `level` 表現の継続更新 | ⚠️ ADR-027 D5 は「解除では層 0 へ落ちない・`level` の表現は続く」と決めている → ★ GSE 本体では**止めない**。候補 3 を止める条件は**研究用の別計器の中でだけ**作る（J-16） |
+| `T_allow` | 拒否を尊重して控える利用（`RECENT_DISMISS_MS` 型・ADR-033 D2）・オフラインの研究の評価（HIR・機会保存の行動指標・ADR-033 D5）・認証・順序・期限・再接続（ADR-027 / 028） | ★ 止めない |
+
+⚠️ 候補 1 / 2 は GSE 本体では**最初から止まっている**ので、`CS-C0`（作動する陽性対照）は GSE 本体では作れない。→ ★ 陽性対照は別計器で作る（§4 の J-16 注記）。
 
 ### 5.1 停止閉包
 
@@ -71,8 +94,8 @@
 
 | registry | 内容 |
 |---|---|
-| `T_stop.events` | `t0` 後に新規生成してはいけない event type |
-| `T_stop.fields` | `t0` 後に更新してはいけない意味・認定・報酬 field |
+| `T_stop.events` | `t_stop` 後に新規生成してはいけない event type |
+| `T_stop.fields` | `t_stop` 後に更新してはいけない意味・認定・報酬 field |
 | `T_stop.transitions` | 禁止 state transition |
 | `T_stop.consumers` | downstream で当該行為を評価・報酬・介入入力へ戻してはいけない consumer |
 | `T_allow` | 認証、順序、期限、安全、通常状態推定、独立した非評価的研究処理など継続可能な処理 |
@@ -84,10 +107,10 @@
 
 | 構成概念 | 主要観測量 | 副次観測量 | 望ましい方向 |
 |---|---|---|---|
-| stop latency | `t_request` から `t0` まで | producer / consumer 別 latency | 事前上限内。上限は unresolved |
+| stop latency | `t_request` から `t_stop` まで | producer / consumer 別 latency | 事前上限内。上限は unresolved |
 | boundary closure | registry の全対象に停止証拠がある割合 | 未登録 downstream 数 | 完全。registry 不完全は支持不可 |
-| forbidden processing | `t0` 後の forbidden-event count | type / consumer 別 count | 0 |
-| non-recapture | 認定、報酬、ランキング、介入入力への recapture count | immediate / delayed / cross-service | 0 |
+| forbidden processing | `t_stop` 後の forbidden-event count | type / consumer 別 count | 0 |
+| non-recapture | 認定、報酬、ランキング、介入入力（★ **上げる向き**）への recapture count | immediate / delayed / cross-service | 0（★ 2026-09-19: 控える向きの利用 —— `RECENT_DISMISS_MS` 型 —— は数えない。ADR-033 D2 / Migration 3。⚠️ 字義どおり数えると拒否しても同じ介入が来る設計を「合格」にしてしまう） |
 | bounded continuation | `T_allow` の expected transition 成功率 | safety / auth / ordering / expiry / support 別 | 必要処理を維持 |
 | reproducibility | 同一 build + trace の replay byte / semantic equality | run-to-run divergence | 一致 |
 | degradation | 観測不足時の neutral / abstain 率と false-stable rate | missingness reason 別 | neutral / abstain、意味断定なし |
@@ -98,6 +121,8 @@
 | 構成概念 | 主要評価 | 禁止する代用 |
 |---|---|---|
 | intentional termination / failure discrimination | forced choice + confidence + 理由コード | 説明文を読めたことだけ |
+
+> ⚠️ **2026-09-19（J-9）**: 弁別させるのは「**解除（縁だけ閉じる）と断（層 0 へ縮退）**」の範囲に限る（ADR-027 D5）。★ 時間切れ・本人の失効は表示で区別しない（ADR-021 D4・ADR-027 D4）ので、`CS-C4a`（timeout / expiry）を意図的終端と弁別させることを利用者側の評価の目標にしない。
 | system authority attribution | システムが何を知り続け、認定し続けると感じたか | 実装監査の成功 |
 | surveillance perception | 境界後も行為を評価される感覚 | 表示が消えたこと |
 | non-recapture understanding | 応答しない行為が将来評価・報酬へ戻らない理解 | 低応答率 |
@@ -112,9 +137,9 @@
 |---|---|
 | `W-pre` | stop request 前。対象処理が実際に作動する positive control |
 | `t_request` | stop rule が発火した時点。UI 表示時刻とは限らない |
-| `t0` | registry 上の禁止処理が停止状態へ入った最初の監査可能時点 |
+| `t_stop` | registry 上の禁止処理が停止状態へ入った最初の監査可能時点 |
 | `W-drain` | request 前に queue 済みの処理を識別する bounded drain window |
-| `W-post-near` | `t0` 直後。forbidden event と immediate recapture を検査 |
+| `W-post-near` | `t_stop` 直後。forbidden event と immediate recapture を検査 |
 | `W-post-delay` | 遅延 job、expiry、再接続、別 consumer を検査 |
 | `W-restart` | 明示再開、再接続、epoch change 後の状態遷移 |
 
@@ -140,7 +165,7 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 
 実装 gate 通過後に限り、次を別々に判定する。
 
-- intentional termination が failure / timeout / disconnect と弁別される。
+- intentional termination（解除）が disconnect（断）と弁別される（★ 2026-09-19・J-9: ADR-027 D5 の範囲に狭めた。⚠️ timeout / expiry との弁別は目標にしない）。
 - surveillance perception と system authority attribution が連続認定条件より改善する。
 - primary-task continuation が事前設定した非劣性範囲内である。
 - non-recapture と support continuation が同時に理解される。
@@ -154,7 +179,7 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 
 - `CS-C0` では対象処理が positive control として実際に発生する。
 - `CS-C1` では表示停止後も少なくとも一つの禁止候補処理が継続し、sham stop として機能する。
-- `CS-C2/C3` では同じ処理が `t0` 後に停止する。
+- `CS-C2/C3` では同じ処理が `t_stop` 後に停止する。
 - `CS-C3` では拒否、無応答、見逃し後の確認要求や評価 edge がない。
 - `CS-C4` は authored stop と異なる failure code / transition を持つ。
 
@@ -215,6 +240,8 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 - EH1 の成功から監視感低減や自律性を推論しない。
 - EH3 の理解から処理停止を推論しない。
 - 現行実装に Semantic Stop があると主張しない。
+- 控える向きの利用（`RECENT_DISMISS_MS` 型）を再捕捉と数えない。逆に「応答を使わないので非再捕捉を満たす」とも言わない（ADR-033）。
+- 「Digital Nature は局所的な終端を支持する」「書籍の『終端』は GSE の終端の先行例」と書かない（§16）。
 
 ## 14. 現在地と未解決
 
@@ -223,7 +250,7 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 未解決は次である。
 
 1. stop target registry の実体と ownership。
-2. `t0`、drain、near / delayed window の決め方。
+2. `t_stop`、drain、near / delayed window の決め方。
 3. audit event schema と cross-service consumer の列挙。
 4. allowed continuation と minimum support の実装境界。
 5. latency、主タスク継続、知覚尺度の margin。
@@ -254,3 +281,16 @@ registry に未列挙の consumer が見つかった場合、分母を小さく�
 - NIST の decommissioning は lifecycle と continuity の規範枠であり、局所 Semantic Stop の operational definition ではない。
 
 したがって既存研究から直接借りられるのは、control transfer、interruptibility の反例、lifecycle deactivation、dismiss / correction、non-use の尊重までである。`Semantic Stop + non-recapture + no residual response duty` の結合は、CORE-CS 自身の EH1 と EVAL-NCC で反証可能にしなければならない。
+
+## 16. ★ 比較節: Digital Nature（2026-09-19・J-6 —— 旧 BRIDGE-DN 契約を統合）
+
+> 一次: `docs/literature/20260919-digital-nature-primary-scope.md`（[P392]–[P395]）。旧契約 `bridge-dn-evaluation-contract.md` は参照用に残すが、**独立の接続命題としては数えない**。
+
+| 観点 | Digital Nature | CORE-CS |
+|---|---|---|
+| 対象の粒度 | 環境全体の世界観（2018 年: 計算機と自然が融合した生態系 [P392] ／ 2025 年: 計算と物質が循環する動的な過程・定義はいまだ曖昧と著者自身が認める [P393]） | ★ **個別システム**が推論・意味認定・達成認定・応答要求を**いつ終えるか** |
+| 未完の論点 | 「目的関数は誰が決めるか」を研究室が未完の論点と明記 [P395] | ★ 停止対象・継続対象の registry（§5） |
+| 停止・終端 | ⚠️ 今回読めた一次の範囲では、個別システムの停止を論じた箇所は**見つからなかった**。⚠️ 書籍の「終端」は End to End の「端」であり別物 | ★ 本契約の主題 |
+
+- ★ **書いてよいこと**: CORE-CS は Digital Nature の**内部**で、個別システムの停止という**粒度の違う**問いを扱う。Digital Nature 自身が未完とする「目的関数は誰が決めるか」に、個別システムの側から隣接する。
+- ⚠️ **書いてはいけないこと**: 「Digital Nature は局所的な終端を支持する」／「書籍の『終端』は GSE の終端の先行例」／「計算機生態系は Digital Nature の用語」／ 2025 年の自己批判だけを引いて 2018 年の全体最適化への志向を隠すこと。⚠️ [P392] は `provisional`（紙版の頁が未確定）なので頁を付けて引かない。
