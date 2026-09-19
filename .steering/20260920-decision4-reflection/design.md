@@ -60,6 +60,32 @@
 - `grep` の前後件数（改名）
 - `python scripts/check_citations.py`（引用に触れたら「違反なし」まで）・`python scripts/check_doc_lexicon.py`
 
+## 検査の記録（★ 2026-09-20 に実行した実出力）
+
+| 検査 | 結果 |
+|---|---|
+| `python experiments/20260801-controlled-friction-task/check_frozen_sections.py` | `[OK] 凍結節は第 1 版（6013104）と一致: §3.1(全体), §3.2(全体), §3.4(全体), §3.5(append-only), §3.6(append-only)`（rc=0） |
+| `python experiments/20260801-controlled-friction-task/analyze.py --selftest` | `[OK] analyze.py selftest 緑 (…)`（rc=0・★ 版一致検査 = 文書 第 19 版 / `config.json` 19 / `PREREG_REVISION` 19） |
+| `PYTHONUTF8=1 bash run.sh`（G1 実験ディレクトリ） | `[GREEN] 実施前チェック 全項目通過`（rc=0）。⚠️ `PYTHONUTF8` なしでは `[FAIL] config.json が JSON として壊れている` ほか 2 件 —— ★ HEAD の `config.json` でも同じ（cp932 の既存問題・decisions 観察 1） |
+| `PYTHONUTF8=1 python scripts/check_citations.py` | `=== 違反なし ===` |
+| `PYTHONUTF8=1 python scripts/check_doc_lexicon.py` | `=== 違反なし ===` |
+| 改名の残存検査（下のコマンド） | `OK: 注記以外の残存 0`。★ 陰性対照: 「誤受容」を含む行を注入したファイルでは検出する（rc=0）。⚠️ **ファイルが無いと `grep` が rc=2 でも `grep -v` の後ろで rc=1（＝残存なし）に化ける** → 存在確認を先に置いた |
+| 改名の diff の突き合わせ | `git diff -U0` の 33 行ペアを置換規則 3 つで写して一致（不一致 0） |
+| schema parity check（`/finish-task` Step 3） | ⚠️ drift（`activity_label` が gse-dataset 側に無い）。★ 本タスクは schema に触れていない（`git diff 046f6c2..HEAD -- src-tauri/src/schema_dto.rs src-tauri/schema/current.json` = 0 ファイル）。★ 既知の保留（`.steering/20260913-esm-audit-criterion-gate/decisions.md` 判断 3「同期は本ブランチのマージ後」—— いま同期すると dataset が main より先に進む） |
+
+```bash
+# ★ 改名の残存検査（契約・理論の 7 本で、旧名が注記以外に残っていないか）
+F=".steering/20260916-gse-theory-operationalization-review/measurement-dictionary.md
+.steering/20260916-gse-theory-operationalization-review/eval-ncc-analysis-contract.md
+.steering/20260916-gse-theory-operationalization-review/eval-ncc-dag.md
+.steering/20260916-gse-theory-operationalization-review/gr-h4-h9-h11-h12-falsification-table.md
+.steering/20260916-gse-theory-operationalization-review/core-proposition-coverage-matrix.md
+docs/theory/generative-relinquishment-theory.md
+docs/theory/theory-architecture-and-roadmap.md"
+for f in $F; do [ -f "$f" ] || { echo "MISSING: $f"; exit 2; }; done   # ⚠️ 無いと黙って緑になる
+if grep -n "誤受容" $F | grep -v '旧名「誤受容」\|「誤受容」→'; then echo "RESIDUAL"; else echo "OK: 注記以外の残存 0"; fi
+```
+
 ## ロールバック計画
 
 - 反映単位ごとにコミットを分ける（2-1〜2-5）。問題があれば該当コミットを revert する。
