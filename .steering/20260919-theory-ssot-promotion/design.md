@@ -32,3 +32,13 @@
 ## ロールバック計画
 
 - 単位ごとのコミットを `git revert` する。⚠️ `docs/references.md` は append-only なので、取り消しは tombstone で行う。
+
+## ★ 結果（2026-09-19・最終化）
+
+- ★ 全単位（a・b・c・d-1・d-2・d-3・e・f・g・h・i・SR）を 2 巡の `/cross-review` を経てコミットした（単位ごとのコミットは `.steering/_handoff/next-session-theory-stage3-followups.md` §1）。
+- ⚠️ **Codex の系統はほぼ全単位で skip**（日次予算の残り 47,400 が、段 3 の cross-review 1 回の実測消費 54,000〜56,000 を下回った —— 単位 e 判断 3）。★ Claude のレビュー担当だけで 2 巡を回し、単位ごとの `decisions.md` に skip の理由を書いた。★ 2026-09-19 夜の再開以降、レビュー担当は opus・操作系のサブエージェントは sonnet で起動した（研究者の指示・memory `feedback_subagent_model_split`）。
+- ★ 当初の設計からの変更:
+  - 単位 i は「検討メモ（起票しないこともある）」から **ADR-035（Proposed）の起票**へ（研究者判断 3 #2）。
+  - SR は段 2 を「結論が確定した時点で打ち切る」形へ（逸脱 2・利用上限に 2 回当たったため）。手動の補完（ACM DL・PhilPapers）は研究者の Chrome で行った。
+  - d-3 は RP §4 だけでなく、「体系的レビューの前」と保留していた箇所（RP §1 / §3・用語集・ADR-033・`docs/theory/`）にも日付つきの注記で結果を当てた。
+- ★ 研究者の確認待ち・実装フェーズへ渡すものは引き継ぎ §2 / §3。
