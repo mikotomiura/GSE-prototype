@@ -352,7 +352,7 @@ Stage 2 はロジスティック回帰（昇格は約 50 セッションのデ�
   18 RCT・N=1,164 のメタ分析が computer prompt で
   **歩数 +1,029.99/勤務日（GRADE `high certainty`・publication bias 検出なし）**・
   勤務中座位 −12.46 分/勤務日（`moderate`）を示す [P47]。**GSE 周辺で最も頑健な効果量**であり、
-  H-PA（§5）の feasibility を大きく上げる。
+  H-PA（§5）の feasibility を大きく上げる（★ ここでいう feasibility は「招待で人が動きうる」という実施可能性であって、受容率を成功とする根拠ではない —— §5 H-PA の 2026-09-19 改訂）。
   ⚠️ **ただし 2 段で接地し 1 本に圧縮しない**——[P47] は**健康アウトカム（座位・歩数）**であって
   認知回復を測っていない。GSE の H-PA が測るのは **招待の受容**（★ 記述として・2026-09-19 の §5 H-PA 改訂）と、その後の**機会保存の行動指標**
   （`paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio`）であり
