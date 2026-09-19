@@ -116,5 +116,6 @@
 ## やり残し
 
 - ⚠️ **「認識的権限の任意の返還」「一致したまま移る残務」「解釈・説明要求を含む負担台帳」はいずれも今回の範囲で 0 件** —— 体系的レビュー（検索式・DB・採否基準を固定）の前に「先行が無い」とは書かない
+- ★ **2026-09-19 体系的レビューの後**（`.steering/20260919-ssot-sr-systematic-review/results.md`・RP §4）: 上の 4 点（C1〜C4）はいずれも本プロトコルの範囲で**既出**だった（[P396][P397]・[P398][P399]・[P400]・[P401]）。
 - 未取得: Woods & Cook 2002・Dekker 2002・Inagaki 2003・Davies 2024・Miller & Parasuraman 2007・Solove 2013（privacy self-management）・社会学の responsibilization
 - 脅威になりうる系譜（未検証）: privacy self-management / notice-and-choice（「選択を返す」ことで負担を個人に移す）

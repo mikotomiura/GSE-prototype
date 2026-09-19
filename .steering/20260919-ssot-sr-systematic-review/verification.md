@@ -40,7 +40,7 @@
   - ★ C3 / 返権の負荷逆説にも関わる逐語（§10.1）: "A system that always returns control can create cognitive burden and approval fatigue." → 返すことが負担を生むという指摘（★ C3 の検算で扱う）
 
 ## C3（★ 既出で確定。⚠️ 該当は工学の記述 1 件で、「そろったままでも」を主張として立てた文献ではない）
-- C3-0214 Rødseth & Lien（ほか）"Formal descriptions of MASS Operational Envelope and Operational Design Domain" J. Phys.: Conf. Ser.（OPEN ACCESS・CC BY）—— 本文（★ 段 2 担当が取り出したテキスト `pdfs/c3_0214_iop.txt` でメインが前後を読んだ）。
+- C3-0214 Rødseth, Ø. J. & Wennersberg, L. A. L.（★ 2026-09-19 訂正: 旧「Rødseth & Lien（ほか）」は誤り）"Formal descriptions of MASS Operational Envelope and Operational Design Domain" J. Phys.: Conf. Ser.（OPEN ACCESS・CC BY）—— 本文（★ 段 2 担当が取り出したテキスト `pdfs/c3_0214_iop.txt` でメインが前後を読んだ）。
   - 逐語（§3.2 Table 1）: "The code column contains the abbreviation for the mode and the party that is uniquely responsible for control actions: O – operator; or A – automation."
   - 逐語（§3.3）: "Alerts from the automation system must be raised in time for the operator to reach a control station, to understand the developing situation, and to make the correct actions to maintain safe navigation."
   - 判定: **該当**（制御と「制御の責任を一意に負う者」が一致したまま、系から人へ制御が移り、そのとき制御卓への移動・状況の把握・操作という残務が人に移ることを、応答期限（response deadline）として操作化している）。⚠️ 系が制御を移す契機は系の判断の限界（"unable to determine"）であり、C4 とは重ならない。★ 根は "ironies of automation"（Bainbridge 1983 —— C3-0089 が引用）の系譜。
@@ -85,7 +85,7 @@
 
 ## C6（★ 既出で確定 —— ⚠️ ただし「控える側にだけ使う」非対称は見つからなかった）
 - C6-0113 Williams, M. ほか "On Targeted Manipulation and Deception when Optimizing LLMs for User Feedback" arXiv 2411.02306（2024）—— 本文（arXiv HTML・`pdfs/c6_0113.txt`）。
-  - 逐語（Discussion）: "In no uncertain terms, we do not advocate for the optimization of user feedback – if anything, we hope our work provides evidence against its usage. Indeed, there is ample evidence from the recommender system literature regarding the negative consequences of optimizing for engagement and other shallow user feedback signals"
+  - 逐語（Ethics Statement —— ★ 2026-09-19 訂正: 旧「Discussion」）: "In no uncertain terms, we do not advocate for the optimization of user feedback – if anything, we hope our work provides evidence against its usage. Indeed, there is ample evidence from the recommender system literature regarding the negative consequences of optimizing for engagement and other shallow user feedback signals"
   - 判定: **該当**（★ 段 2 担当は「部分」→ メインが上げた。利用者のフィードバック（受諾・拒否の評価）を成功の報酬として最適化へ戻すことを退けている。⚠️ 応答を**一律に**使わない立場（ADR-033 A1 の形）であり、GSE の「控える側にだけ使う」非対称（ADR-033 D2 / D3）は述べていない）
 - C6-0612 Le & Andrzejak "Rethinking AI code generation: a one-shot correction approach based on user feedback" ASE 2024（Springer OA）—— 逐語 "We proposed a methodology named One-shot Correction to incorporate user feedback into generative AI models without re-training." → **部分**（訂正を再学習へ戻さないが、「成功として」の枠付けは無い）
 - ★ 段 1 の採用は 11 件で、全件の段 2 を行った（逸脱 2 の打ち切りは使っていない）。★ 逆向きの主流（応答を学習・報酬へ戻す）は段 1 で 214 件に `contrary` が付いた。
