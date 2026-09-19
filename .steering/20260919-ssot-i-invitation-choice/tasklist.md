@@ -5,6 +5,6 @@
 - [x] 研究者へ質問 → 段 3 判断 3 #2（A）
 - [x] ADR-035 を起草・README に 1 行
 - [x] `check_citations.py` 違反なし
-- [ ] `/cross-review` 1 巡目
+- [x] `/cross-review` 1 巡目（Claude 単独・H-1 / H-2 / M-1〜M-6 / L-1〜L-8 をすべて反映 → `decisions.md` 判断 2）
 - [ ] `/cross-review` 2 巡目
 - [ ] git commit
