@@ -24,5 +24,5 @@
 ## 関連
 
 - 評価契約群（pre-SSOT）: `.steering/20260916-gse-theory-operationalization-review/`
-- 用語: `docs/glossary.md`（返権・返権の負荷逆説・権限・負担の二重台帳・Semantic Stop・非再捕捉・選択の対称性・関係的自律を支える協調）
+- 用語: `docs/glossary.md`（返権・返権の負荷逆説・権限・負担の二重台帳・Semantic Stop・非再捕捉・選択の対称性・関係的自律を支える協調・計測なき身体回帰）
 - 既決: ADR-033（非再捕捉の射程）・ADR-030 補訂 1（再開・再停止の定義）

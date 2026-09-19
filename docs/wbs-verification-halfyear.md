@@ -151,7 +151,7 @@ Phase 1b 6週・Phase 2 8週・Phase 3 9週はいずれも上限で、最小ラ�
 |---|---|---|---|
 | 3.1 | AB/BA 割付（半数 A→B、半数 B→A） | 割付表 | 順序効果の相殺 |
 | 3.2 | A=介入なし / B=介入あり の交互運用 | 条件別ログ | Physical Anchor は opt-in（⚠️ **2026-09-01: 旧「強Wall/」を削除** — ADR-015 D1）|
-| 3.3 | 主指標：external_paste_count, paste_after_stuck_rate, pflow_exit_without_receipt, 第三者ブラインド品質 | 効果指標 | |
+| 3.3 | 主指標：external_paste_count, paste_after_stuck_rate, pflow_exit_without_receipt, 第三者ブラインド品質 | 効果指標 | ⚠️ 2026-09-19: 本行は ADR-024 D1 より前の記述。行動指標の主要アウトカムは `receipt_free_resumption`、併記義務は ADR-024 D6。H-Y の主の凍結は 0.16 |
 | 3.4 | 副指標：task self-efficacy, NASA-TLX, helpfulness, annoyance | 受容指標 | [10][11r] |
 | 3.5 | Physical Anchor：**招待の受容** / **下流の機会保存指標**（`paste_after_stuck_rate` / `pflow_exit_without_receipt` / `manual_contribution_ratio`）/ 安全 を層別評価（⚠️★★★ **2026-09-01 訂正: 旧「実行/効果」は ADR-018 D5 が評価量から降ろした。系は実行も完了も判定しない**）| Anchor 受容レポート | 夜間Outdoor無効 [8][9] |
 | 3.6 | post_intervention ラベルを別プールで継続収集 | monitoring データ | X1合算しない |
