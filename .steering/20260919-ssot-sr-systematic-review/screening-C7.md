@@ -10,13 +10,13 @@
 | 検索（重複除去の後） | 617 |
 | 段 1 で採った | 6 |
 | 段 1 で逆向きの主流として記録した（`contrary`） | 6 |
-| 段 2 で照合した（版違いは 1 件にまとめた） | 6 |
-| 段 2 の判定（メインの訂正の後） | 該当 0 ／ 部分 2 ／ 非該当 4 |
+| 段 2 で照合した（版違いは 1 件にまとめた） | 7 |
+| 段 2 の判定（メインの訂正の後） | 該当 0 ／ 部分 3 ／ 非該当 4 |
 | 段 2 未実施（★ 逸脱 2: 結論の確定後に打ち切り） | 0 |
 
 ## 結論
 
-★ **部分的に既出** —— ⚠️ **本プロトコル（検索式・検索元・期間・採否基準）の範囲で該当 0 件**。部分: C7-0134 [P406]・C7-0209 [P407]・手動の補完 `JACTRT`
+★ **部分的に既出** —— ⚠️ **本プロトコル（検索式・検索元・期間・採否基準）の範囲で該当 0 件**（⚠️ 網が粗い —— RP §4）。部分: C7-0134 [P406]・C7-0209 [P407]・手動の補完 `JACTRT`・C7-0608（d-3 の cross-review 2 巡目で拾い直した・抄録のみ）
 
 ## 段 2 の判定
 
@@ -24,6 +24,7 @@
 |---|---|---|---|---|---|---|---|
 | C7-0134 | 部分 | 本文 | Work emails stopped being delivered shortly after the working day and resumed before the next shift | §6, p.12 | 要素(b)『系が人へ向ける応答の要求を終了させることを設計の規範的な要件にする』は、Volkswagenのメール配信停止事例で明確に述べられている(配信という技術的な仕組みが『a visible stopping point』を作り、著者は『communication systems can be designed to protect personal time』と規範的に主張)。一方、要素(a… |  | メインが抄録・取り出したテキストと機械照合 |
 | C7-0209 | 部分 | 抄録のみ | a proactive auto-response messaging agent that can reduce perceived obligations and social pressure to respond quickly to incoming messages by providing unavailability-related context | abstract | 抄録で、系(auto-response messaging agent)が『応答すべきという知覚された義務・社会的圧力を軽減する』ことを明示的な設計目的として掲げており、要素(b)『系が人へ向ける応答の要求を(軽減/終了)させることを設計目的にする』に近い。ただし動詞は『reduce(軽減する)』であり『終了させる(end/terminate)』ではなく、規範的要件として明記されているかは本文未確… |  | メインが抄録・取り出したテキストと機械照合 |
+| C7-0608 | 部分 | 抄録のみ | remaining strictly within non-inference, non-diagnostic constraints. By focusing on cognition extraction rather than interpretation | Abstract | 系が意味の認定（推論・診断）をしない制約を設計の要件にする。⚠️ 恒常的な範囲の制限で「終了させる」ではない・応答の要求の要素は無い | 段 1 で除外 → d-3 の cross-review 2 巡目で拾い直した。メインが抄録で判定 | メインが抄録で照合 |
 | C7-0091 | 非該当 | 抄録のみ |  |  | 本文非公開。抄録は『前提研究[1]のresponse obligation estimation(ROE)手法をHALOGENでリアルタイム評価する』という報告であり、ROEは系(対話ロボット)が入力音声に反応すべきかを系自身が推定するタスク。C7が求める『系が人へ向ける応答の要求の終了』『系による意味の認定の終了』のいずれの要素も無く、向きが逆(系が自らの応答要否を判定し続ける枠組み)。 |  |  |
 | C7-0104 | 非該当 | 抄録のみ |  |  | 抄録が『Response obligation is whether a spoken dialogue system should react to an input sound』とROEを明確に定義しており、これは系自身が『自分は応答すべきか』を推定するタスクであって、系が人へ向ける応答の要求を終了させる話ではない。応答しないことを『the system's neglect of its us… |  |  |
 | C7-0477 | 非該当 | 抄録のみ |  |  | 本文は認証プロトコル(SSO/ローミング)の技術論文であり、対話的・適応的な系による意味の認定や、系が人へ向ける応答要求を終了させるという論点は抄録に存在しない。『does not require any end-user interactions while roaming』はローミング中に認証セッションを維持するための技術要件であり、C7が扱う意味認定・応答義務の終了とは対象ドメインが異なる。 |  |  |

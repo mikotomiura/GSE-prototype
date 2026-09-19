@@ -97,3 +97,11 @@
 - C7-0209 "Co-Designing with Users the Explanations for a Proactive Auto-Response Messaging Agent" ACM（2023）—— 抄録のみ（ACM DL は 403）。逐語 "a proactive auto-response messaging agent that can reduce perceived obligations and social pressure to respond quickly to incoming messages by providing unavailability-related context" → **部分**（応答義務を「減らす」。終了ではない）
 - 手動の補完 `JACTRT`（PhilPapers・未刊の原稿）→ **部分**（search-log.md）
 - ★ 段 1 の採用は 6 件で、全件の段 2 を行った。★ 残る要素: **系が**、**意味の認定**と**応答の要求**の両方を**終了させる**ことを、**設計の規範的な要件**にすること。
+
+## 2026-09-19 訂正（単位 d-3 の cross-review 1 巡目 / 2 巡目）
+
+- C5-0452 [P402]: 上の「GSE の『読まない』より弱い」は**誤り**。[P402] は §5 で *"the absence of voice should not be interpreted as tacit acceptance"* と *"silence does not mark the end of a process, but the beginning of systemic responsibility"* を述べ、無応答を**系の責任**として読む（★ ADR-033 D3 の判定の言い方と同じ向き）。⚠️ ただしその責任を §4.2 *"it should assume an active responsibility for notification, follow-up, and the protection of users' rights"* で果たすので、無応答で働きかけを上げない ADR-033 D6 とは**逆向き**になりうる。★ GSE との違いの 1 つは "automatic" の限定の軸である。
+- C6-0113 [P404]: 上の「応答を一律に使わない立場（ADR-033 A1 の形）」は**読み込み**。逐語は最適化（成功の側）だけを退けており、**控える側での利用には触れていない**。節は Ethics Statement。
+- C6 の段 2 の 11 件の内訳: 本文 7・抄録 1・入手できず 3（C6-0200 / 0449 / 0683）。
+- 式ごとの件数: C6-b（控える側を探した式）は OpenAlex の 200 件のうち 198 件を段 1 で落とし、採った 2 件は段 2 で非該当。C7-c（意味の側を探した式）は OpenAlex で 19 件・すべて段 1 で除外。
+- ★ **C7-0608 を拾い直した**（d-3 の cross-review 2 巡目の指摘）: *"Speaking the Intake Form: STOIC as a Framework for Safe, Structured Medical Cognition"*（PhilPapers・刊年不明）。段 1 で「診断推論の範囲制限という別概念」として除外されていたが、抄録の逐語 *"remaining strictly within non-inference, non-diagnostic constraints. By focusing on cognition extraction rather than interpretation"* は、系が意味の認定をしない制約を設計の要件にしている → C7 の**部分**（抄録のみ・⚠️ 恒常的な範囲の制限であって「終了させる」ではない・応答の要求の要素は無い）。★ 無作為 70 件の検算の外で見つかった除外の誤りである。
