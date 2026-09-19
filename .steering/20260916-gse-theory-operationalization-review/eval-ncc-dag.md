@@ -14,7 +14,7 @@
 | `A` | 割付 | C0-C4 の実験条件 |
 | `L` | 割付後 | 配信成功、表示、最低支援経路など実装忠実度 |
 | `P` | 割付後 | 招待の知覚。気づいた／気づかなかった／不明 |
-| `B` | 割付後 | 受容、保留、拒否、見逃し、意図的無応答、判別不能無応答 |
+| `B` | 割付後 | 明示の受諾（★ 2026-09-19: 旧「受容」）、保留、拒否、見逃し、意図的無応答、判別不能無応答 |
 | `M_v` | 割付後 | 検証行動、確信変更、摩擦完遂 |
 | `M_s` | 割付後 | 支援探索・利用 |
 | `M_a` | 割付後 | 応答義務、罪悪感、不利益予期、放置不安 |
@@ -143,16 +143,16 @@ flowchart LR
 stateDiagram-v2
     [*] --> Assigned
     Assigned --> BranchObserved: W0 closes
-    BranchObserved --> Resumed: first primary-task event
-    BranchObserved --> Externalized: predefined externalization event
-    BranchObserved --> Exited: task/window exit
-    BranchObserved --> AdministrativeEnd: W2 ends
-    Resumed --> Restopped: >= pre-registered silence threshold
+    BranchObserved --> Resumed: r_1 (condition A falls)
+    BranchObserved --> Externalized: paste (externalized)
+    BranchObserved --> LeftObservation: focus event (left_observation, bounded)
+    BranchObserved --> AdministrativeEnd: task end / W2 ends (censoring)
+    Resumed --> Restopped: s'_1 (condition A rises)
     Resumed --> Externalized
-    Resumed --> Exited
+    Resumed --> LeftObservation
 ```
 
-> ★ **2026-09-19（J-10 / J-13）**: 状態名を SSOT の語彙へ対応させる —— `Resumed` = 産出の再開 `r_1`・`Restopped` = 再停止 `s'_1`（ADR-030 補訂 1 項目 7）／ `Externalized` = `externalized`（ADR-029・GSE の実体は `paste`）／ `Exited` は**分解する**: ウィンドウ離脱 = `left_observation`、課題終了・観測窓末 = 打ち切り（ADR-029 D5）。★ 図の辺はそのまま使える（辺の定義だけが確定する）。
+> ★ **2026-09-19（J-10 / J-13）**: 状態名を SSOT の語彙へ対応させる —— `Resumed` = 産出の再開 `r_1`・`Restopped` = 再停止 `s'_1`（ADR-030 補訂 1 項目 7）／ `Externalized` = `externalized`（ADR-029・GSE の実体は `paste`）／ `Exited` は**分解する**: ウィンドウ離脱 = `left_observation`、課題終了・観測窓末 = 打ち切り（ADR-029 D5）。★ 2026-09-19: 図の辺を SSOT の語彙へ改め、旧 `Exited` を `LeftObservation`（focus 事象・⚠️ 競合と打ち切りの混合なので両極で上下界）と `AdministrativeEnd`（課題終了・観測窓末 = 打ち切り）の 2 本に割った。⚠️ 本人の明示終了の扱いは分析契約 §14 の未決。
 
 再開、外部化、離脱は first-event 解析では競合する。AdministrativeEnd は競合転帰ではなく管理打切りである。再開後の再停止は再開を入口とする別 transition であり、再開した者だけの比較を主要効果へ戻さない。
 
