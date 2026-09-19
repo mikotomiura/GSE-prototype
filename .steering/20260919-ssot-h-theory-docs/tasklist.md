@@ -16,8 +16,8 @@
 - [x] リンクの存在確認・`check_citations.py` 違反なし・禁止用語の規則
 
 ## レビュー
-- [ ] `/cross-review` 1 巡目
-- [ ] `/cross-review` 2 巡目
+- [x] `/cross-review` 1 巡目（Claude 単独 → `decisions.md`）
+- [x] `/cross-review` 2 巡目（Claude 単独 → `decisions.md` 判断 4）
 
 ## 完了処理
-- [ ] git commit
+- [x] git commit
