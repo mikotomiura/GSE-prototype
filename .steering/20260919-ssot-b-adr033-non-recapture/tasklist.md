@@ -15,9 +15,9 @@
 - [x] 禁止用語の規則を当てる（0 件）
 
 ## レビュー
-- [ ] `/cross-review` 1 巡目
-- [ ] `/cross-review` 2 巡目
-- [ ] 指摘の採否を `decisions.md` に記録
+- [x] `/cross-review` 1 巡目（判断 3）
+- [x] `/cross-review` 2 巡目（判断 4）
+- [x] 指摘の採否を `decisions.md` に記録
 
 ## 完了処理
-- [ ] git commit
+- [x] git commit（`0cc2a82` / `1e69464` / `7e0fb4d`）
