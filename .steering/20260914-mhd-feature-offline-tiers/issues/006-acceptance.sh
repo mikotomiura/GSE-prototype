@@ -33,7 +33,7 @@ printf '%s' "$out" | jq -e '
 #   ★ issue 006 の Background V3（fixture を stall_onset_observed.ndjson へ差し替える）を
 #   実装フェーズで裁定するまで、この NG を実装の欠陥と読まないこと。
 printf '%s' "$out" | jq -e '[.[].restart.restop_ms | select(. != null)] | length > 0' >/dev/null 2>&1 \
-  || fail "restop_ms が全行 null（★ deep_silence では onset 後の再停止が測れるはず）"
+  || fail "restop_ms が全行 null（⚠️ fixture 差し替え（issue 006 Background V3）が未裁定なら意図的に落ちる・判断 26。裁定後は onset 後の再停止が測れるはず）"
 
 # AC4: buffer B を stall_onset 側から引いていること
 grep -qE 'buffer|_b_ms|StallOnsetConfig|stall_onset::' "$SRC" \

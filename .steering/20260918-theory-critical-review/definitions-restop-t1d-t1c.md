@@ -1,7 +1,7 @@
 # 定義案: 「再開」「再停止」（EVAL-NCC）→ `T1d`（issue 006）／ `T1c` の算出式（issue 004）
 
 > Status: ~~⚠️ **案**~~ → ★ **採用済み（次行）**。起案時点の文言: 研究者判断 25 **#9**（`T1d` を EVAL-NCC の「再停止」と一体で決める・定義を 2 つにしない）と **#10**（`T1c` を理論レビューで扱う）への回答候補。
-> ★★★ **2026-09-19: 採用済み** —— 判断 1 #5 / #6（条件 A の辺・E1 連結）・判断 2 #5〜#8（`T1c` の改名と算出式・純産出の打鍵数・再開の回数と E2 の併報）。issue 004 / 006 へ転記済み（タスク 2 `decisions.md` 判断 26）。⚠️ 実装の細部（`T1c` U1〜U4・`T1d` V1〜V4、★ E1 の集計窓を含む）は**実装フェーズで決める**（判断 3）。
+> ★★★ **2026-09-19: 採用済み** —— 判断 1 #5 / #6（条件 A の辺・E1 連結）・判断 2 #5〜#8（`T1c` の改名と算出式・純産出の打鍵数・再開の回数と E2 の併報）。issue 004 / 006 へ転記済み（タスク 2 `decisions.md` 判断 26）。⚠️ 実装の細部（`T1c` U1〜U4・`T1d` V1〜V5、★ E1 の集計窓を含む）は**実装フェーズで決める**（判断 3）。
 > ~~⚠️ **採否は研究者**。~~ ★ **2026-09-19 に完了**: 採用を `decisions.md` へ記録し（判断 2）、`issues/006.md` / `issues/004.md` の Background へ算出式を転記する（★ worker は `.idea` を読めない —— 起票 9 の教訓）。
 > 一次資料: ADR-030 D2 / D3 / D7 / D8 / D10（全文通読）・ADR-029 D1 / D2 / D5・ADR-017 D8・ADR-024 §Migration・ADR-016 D1・
 > `src-tauri/src/analysis/feat_offline/stall_onset.rs`（実装）・`blockers.md` 起票 9 / 17・`issues/004.md` / `006.md`・
@@ -89,7 +89,7 @@ ADR-030 D7 の「`Decision Episode` の終わり」表:
 | `restop_ms` | **`s'_1 − o`**（原点から最初の再停止まで） | 窓内に `r_1` が無い、または `s'_1` が窓内に無い → **`null`**（⚠️ 0 で埋めない・AC3 の精神） |
 | `stable_generation_ms` | **`s'_1 − r_1`**（最初の再開から最初の再停止までの生成区間の長さ） | `r_1` が無い → `null`。`s'_1` が窓外（打ち切り）→ **`null`**（★ 打ち切りを値で埋めない） |
 | （導出） | `r_1 − o = restop_ms − stable_generation_ms`（原点から最初の再開までの遅れ）—— ★ 2 フィールドから復元できるので**フィールドを足さない** | — |
-| `post_t0_inserts` / `post_t0_deletes` / `post_t0_navigations` | 集計窓内の press を ADR-030 D3 の写像で数えた回数（`navigation` は「どちらでもない」側の `navigation` カテゴリだけ） | 窓が空 → `0` ではなく… ★ **窓があって press が 0 件なら `0`**、onset が無い行は `null`（AC3） |
+| `post_t0_inserts` / `post_t0_deletes` / `post_t0_navigations` | 集計窓内の press を ADR-030 D3 の写像で数えた回数（`navigation` は「どちらでもない」側の `navigation` カテゴリだけ） | ★ **窓があって press が 0 件なら `0`**、onset が無い行は `null`（AC3）。⚠️ **窓そのものが無い**場合（`o` が観測区間の右端を越える等）は起案時に書き切っていなかった → issue 006 **V5**（実装フェーズで決める・推奨 `null`）—— 2026-09-19 `/cross-review` 2 巡目 |
 
 - ★ 起票 17 の候補表との対応: `restop_ms` = **候補 A**（条件 A の次の立ち上がり・`W` の再利用・onset と対称）。
   `stable_generation_ms` = 候補 A の欠点（「`restop_ms` とほぼ同じ量」）を、**原点を分ける**ことで解消した（`restop_ms` は `o` 起点、`stable_generation_ms` は `r_1` 起点）。
