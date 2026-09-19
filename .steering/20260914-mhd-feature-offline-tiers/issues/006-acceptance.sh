@@ -14,7 +14,8 @@ printf '%s' "$out" | jq -e '
   all(.[];
     (.restart | type == "object")
     and (.restart | has("post_t0_inserts") and has("post_t0_deletes") and has("post_t0_navigations")
-         and has("restop_ms") and has("stable_generation_ms")))' >/dev/null 2>&1 \
+         and has("restop_ms") and has("stable_generation_ms")
+         and has("stable_generation_net_presses") and has("resumption_count")))' >/dev/null 2>&1 \
   || fail "全行に restart の必須フィールドが揃っていない"
 
 # AC3: ⚠️ onset が立っていない行は null（★ 0 で埋めない）
@@ -22,7 +23,8 @@ printf '%s' "$out" | jq -e '
   all(.[] | select(.stall_onset.t0_ms == null) | .restart;
     (.post_t0_inserts == null and .post_t0_deletes == null
      and .post_t0_navigations == null and .restop_ms == null
-     and .stable_generation_ms == null))' >/dev/null 2>&1 \
+     and .stable_generation_ms == null
+     and .stable_generation_net_presses == null and .resumption_count == null))' >/dev/null 2>&1 \
   || fail "t0 が無い行で restart が 0 埋めされている（★ null にすること）"
 
 # AC6: ⚠️ 退化していないこと
@@ -56,11 +58,13 @@ if grep -nE '(activity|stall_onset)::[a-z_]+\([^)]*restart' "$MODRS" >/dev/null 
 fi
 
 # ⚠️★★★ 2026-09-15 追加（★ 引き継ぎ §4 の型 / decisions.md 判断 8）
+# ⚠️★★★ 2026-09-19 改訂（decisions.md 判断 26 / theory-critical-review 判断 2 #7 / #8）——
+#   ★ stable_generation_net_presses（速度との交絡の手当て）と resumption_count（E1 の過剰結合を見せる）を追加した。
 printf '%s' "$out" | jq -e '
   [.[].restart | keys_unsorted[]] | unique
   == ["post_t0_deletes","post_t0_inserts","post_t0_navigations",
-      "restop_ms","stable_generation_ms"]' >/dev/null 2>&1 \
-  || fail "restart のキー集合が AC1 の 5 個と完全一致しない（★ 増えても減っても落とす）"
+      "restop_ms","resumption_count","stable_generation_ms","stable_generation_net_presses"]' >/dev/null 2>&1 \
+  || fail "restart のキー集合が AC1 の 7 個と完全一致しない（★ 増えても減っても落とす）"
 
 if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \
      "$SRC" | grep -vE '^[0-9]+:[[:space:]]*//' | grep -vE 'const +TEST_' >/dev/null 2>&1; then

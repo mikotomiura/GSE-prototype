@@ -1144,3 +1144,25 @@
   5. `capability matrix`
   6. P1 前: 事前宣言文書 ＋ CLI 注入 ＋ 両極（ポインタ・修飾キー）の出力
 - **影響範囲**: `blockers.md` 起票 2 / 3 / 5 / 7 / 9 / 10 / 11 / 12 / 13 / 14 / 15 / 16 / 17 ／ `tasklist.md` ／ `.steering/_handoff/`
+
+## 判断 26: ★★★ issue 004（`T1c`）/ 006（`T1d`）へ、理論レビューで確定した算出式と名前を転記した（2026-09-19）
+
+- **出典**: `.steering/20260918-theory-critical-review/decisions.md`
+  - **判断 1 #5 / #6**: 再停止 = 条件 A の辺 ／ E1 連結
+  - **判断 2 #5〜#8**: `T1c` の改名・算出式・純産出の打鍵数の併記・再開回数と E2 の併報
+  - **判断 3**: 実装の設計は実装フェーズで決める
+  - 算出式の本体は同じディレクトリの `definitions-restop-t1d-t1c.md` §3 / §6.2 / §6.2b
+- **やったこと**:
+  - issue 004: Background に算出式と改名を書いた（`rewrite_count`→`del_to_ins_transitions` ／ `redelete_count`→`delete_runs_after_first_in_burst` ／ `loop_depth_max`→`di_alternations_max` ／ `local_recurrence`→`category_bigram_repeat_rate`）。AC1 / AC3 / AC6 と `004-acceptance.sh` のキー集合を改訂した。
+  - issue 006: Background に `r` / `s'` の定義と算出式を書いた。AC1 に `stable_generation_net_presses` / `resumption_count` を足し、`006-acceptance.sh` のキー集合と AC3 の null 検査を改訂した。
+  - 両 issue に「**実装フェーズで決める（未裁定）**」節を置いた（004: U1〜U4 ／ 006: V1〜V4）。未裁定のまま着手することを Stop Condition にした。
+- ★ **研究者の指示（2026-09-19・逐語）**: 「**E1の箇所は具体的に設計議論などが実行後での実装フェーズにて実装する形にしましょう**」
+  → ⚠️ **006 V1（E1 の集計窓と実装順）はここで決めない。**
+  → ⚠️ **004 U1〜U4 も実装の設計に属するので同じ扱いにした**（★ 理論レビュー担当の判断。指示が名指ししたのは E1 だけである）。
+- ⚠️★★★ **実装フェーズで最初に扱う発見**（★ 理論レビュー中に一次で確認した）:
+  1. **E1 × `recovery` 未実装**: E1 を検出列に入れると、同じ観測区間では最初の onset しか立たない（→ 006 V1）。
+  2. **条件 A が非公開**: 条件 A は `stall_onset.rs` の非公開関数にある。いまの 006 の Allowed Files では、条件 A を二重に定義するしかない（→ 006 V2）。
+  3. **006 の fixture**: いまの fixture では AC6 が原理的に通らない（起票 17 → 006 V3）。
+- **Status**: 004 / 006 とも **`blocked` のまま**とし、理由を「算出式は確定・実装フェーズの設計議論待ち」へ改めた。
+- ⚠️★★★ **受け入れスクリプトは未検証**: `bash -n` と、キー集合の jq 式を正負のダミー行で検算しただけである（新しいキー集合 = true、旧名 = false）。
+  → ⚠️ **実 fixture ＋実装で通しで回すまで未検証として扱う**（memory「Acceptance self-test」）。

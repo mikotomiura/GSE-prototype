@@ -17,8 +17,9 @@ out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndjs
 printf '%s' "$out" | jq -e '
   all(.[];
     (.revision | type == "object")
-    and (.revision | has("delete_run_max") and has("delete_runs") and has("rewrite_count")
-         and has("redelete_count") and has("loop_depth_max") and has("local_recurrence")))' >/dev/null 2>&1 \
+    and (.revision | has("delete_run_max") and has("delete_runs") and has("del_to_ins_transitions")
+         and has("delete_runs_after_first_in_burst") and has("di_alternations_max")
+         and has("category_bigram_repeat_rate")))' >/dev/null 2>&1 \
   || fail "全行に revision の必須フィールドが揃っていない"
 
 printf '%s' "$out" | jq -e '[.[].revision.delete_runs] | add > 0' >/dev/null 2>&1 \
@@ -47,10 +48,13 @@ grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が 
 
 # ⚠️★★★ 2026-09-15 追加（★ 引き継ぎ §4 の型 / decisions.md 判断 8）——
 #   ★ 「否定形だけでは抜ける」ことを issue 001 で実測した（`TICK_MS` の再宣言が緑のまま通った）。
+# ⚠️★★★ 2026-09-19 改訂（decisions.md 判断 26 / theory-critical-review 判断 2 #5）——
+#   ★ 観測の名前へ改名した。旧名 rewrite_count / redelete_count / loop_depth_max / local_recurrence で
+#   実装すると、このキー集合の完全一致で落ちる。
 printf '%s' "$out" | jq -e '
   [.[].revision | keys_unsorted[]] | unique
-  == ["delete_run_max","delete_runs","local_recurrence","loop_depth_max",
-      "redelete_count","rewrite_count"]' >/dev/null 2>&1 \
+  == ["category_bigram_repeat_rate","del_to_ins_transitions","delete_run_max","delete_runs",
+      "delete_runs_after_first_in_burst","di_alternations_max"]' >/dev/null 2>&1 \
   || fail "revision のキー集合が AC1 の 6 個と完全一致しない（★ 増えても減っても落とす）"
 
 if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \
