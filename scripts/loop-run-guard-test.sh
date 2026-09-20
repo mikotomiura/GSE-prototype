@@ -301,6 +301,41 @@ else
   ng "B5: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
+# --- B6: ⚠️★★★ **陰性対照** —— 正当な `git commit --amend` を blocked にしないこと ---
+#   ★ Codex `/cross-review` HIGH（2026-09-20）。⚠️ アンカーを「attempt 直前の HEAD」にすると、
+#     attempt 2 の worker が attempt 1 のコミットを amend した瞬間に祖先関係が切れて
+#     **正当な作業が落ちる**。→ ★ アンカーを worktree 生成時点に固定したことの対照。
+#
+#   ⚠️★★★ **attempt 2 まで回さないとこの検査は空振りする**（★ 2026-09-20 に実測で踏んだ）:
+#     ★ 誤検知は「attempt 2 の worker が **attempt 1 のコミット**を amend する」ときにだけ起きる。
+#     ⚠️ 1 attempt で終わる stub だと、アンカーがどちらの定義でも worktree 生成時点と同じになり、
+#       **実装を壊しても緑のまま**だった（★ 突然変異 M-g で確認した）。
+#   → ★ verify を `test -f done.marker` にして **attempt 1 を必ず落とし**、
+#     attempt 2 で amend ＋ marker 作成をさせる。
+B6="${TMP}/b6/repo"; mkdir -p "${B6}"
+B6_STUB='if [ -f w.txt ]; then
+  echo w2 >> w.txt && git add w.txt && git commit -q --amend -m amended && touch done.marker
+else
+  echo w > w.txt && git add w.txt && git commit -q -m work
+fi
+true'
+if setup_repo "${B6}" "${B6_STUB}" '[]' 'test -f done.marker'; then
+  ev="$(run_loop "${B6}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '履歴が入れ替わっている' "${ev}"; then
+    ng "B6 陰性対照: ⚠️★ 正当な commit --amend を「履歴の入れ替え」として blocked にした (★ 誤検知)"
+  else
+    ok "B6 陰性対照: 正当な commit --amend を誤検知しない"
+  fi
+  if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+    ok "B6 陰性対照: amend した attempt が issue_done になった"
+  else
+    ng "B6 陰性対照: amend しただけで done にならなかった"
+    [ -s "${ev}" ] && sed -n '1,6p' "${ev}"
+  fi
+else
+  ng "B6: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
 echo "S. Status フィルタ — ⚠️ 判断 26 の申し送り (★ 3 状態)"
 
 S="${TMP}/s/repo"; mkdir -p "${S}"

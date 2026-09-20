@@ -167,15 +167,21 @@ ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 d
 #   （★ `security-checker` MEDIUM・2026-09-20）。★ `git reset --soft|--mixed <other>` /
 #   `git branch -f loop/<id>-issue <other>` は **HEAD の symbolic ref を保ったまま**中身を差し替える
 #   （⚠️ deny に在るのは `git reset --hard:*` だけである）。
-#   → ★ 第 5 引数に「worker を起動する *前* の commit」を渡したときは、
+#   → ★ 第 5 引数に「**worktree を作った時点の commit**」を渡したときは、
 #     **現 HEAD がその子孫であること**も見る。
-#   ⚠️ 通常の commit も `git commit --amend` も**子孫になる**ので誤検出しない
-#     （★ 記録するのは worker のセッションが始まる前の HEAD だから）。
+#
+#   ⚠️★★★ **アンカーは「attempt 開始前の HEAD」にしてはならない**
+#     （★ Codex `/cross-review` HIGH・2026-09-20。⚠️ 最初はそう書いていた）:
+#     ★ attempt 2 の worker が **attempt 1 のコミットを `git commit --amend`** すると、
+#       新しい HEAD は同じ親を持つ別コミットになり、⚠️ **直前の HEAD は祖先でなくなる**。
+#       → ★ 正当な作業が blocked になる（`git commit --amend` は deny に無い）。
+#     ★ **worktree 生成時点**に固定すれば、worker が自分のコミットをどう作り直しても
+#       アンカーは常に祖先のままであり、⚠️ **他ブランチへの差し替えだけが不一致になる**。
 #
 # ⚠️★★★ **それでも見ていないもの**（★ 明示する）: `git restore --source=<other> -- .` /
 #   `git read-tree -u` のような **HEAD を 1 mm も動かさない内容の差し替え**は原理的に拾えない。
 #   ★ ここが「境界」の限界である。⚠️ **deny で塞ぐ方向に戻さない**（★ M3 のとおり閉じない）。
-ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [起動前の-sha]; 0 = 期待どおり
+ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [worktree生成時の-sha]; 0 = 期待どおり
   local id="$1" phase="$2" attempt="$3" wt="$4" base="${5:-}" head
   # ★ detached HEAD は `HEAD` という文字列が返るので、下の case に当たらず不一致になる (正しい)。
   head="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
@@ -191,7 +197,7 @@ ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [起動�
   esac
   if [ -n "$base" ] && ! git -C "$wt" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
     emit "$id" "$phase" blocked attempt="$attempt" \
-         detail="worktree の履歴が入れ替わっている (HEAD=$head が起動前の $base の子孫でない)。★ reset --soft/--mixed や branch -f で中身が差し替わった可能性。★ worktree は残す: $wt"
+         detail="worktree の履歴が入れ替わっている (HEAD=$head が worktree 生成時の $base の子孫でない)。★ reset --soft/--mixed や branch -f で中身が差し替わった可能性。★ worktree は残す: $wt"
     return 1
   fi
   return 0
@@ -417,9 +423,19 @@ cost_used()   { cat "$COST_FILE"; }
 
 # ---------- 1 issue の attempt ループ ----------
 run_issue() {
-  local id="$1" wt attempt=1 same=0 last_fp="" fp
+  local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor
   wt="$(LOOP_NO_EXEC=1 bash "$MAIN_ROOT/scripts/loop-spawn.sh" --no-exec "$id" 2>/dev/null | tail -1)"
   [ -d "${wt:-}" ] || { emit "$id" execute blocked detail="worktree 生成に失敗"; return 1; }
+
+  # ⚠️★★★ **履歴検査のアンカーは「worktree を作った時点」に固定する**
+  #   （★ Codex `/cross-review` HIGH・2026-09-20）。
+  #   ⚠️ attempt ごとの「直前の HEAD」を使うと、attempt 2 の worker が
+  #     **attempt 1 のコミットを `git commit --amend`** した瞬間に祖先関係が切れ、
+  #     ★ 正当な作業が blocked になる（`git commit --amend` は deny に無い）。
+  #   ★ 生成時点なら、worker が自分のコミットをどう作り直してもアンカーは祖先のままで、
+  #     ⚠️ **他ブランチへの差し替えだけが不一致になる**。
+  #   ⚠️ 取れなければ空のまま進む（★ 名前の検査は base 無しでも効く。fail-open にはしない）。
+  wt_anchor="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
 
   while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     if [ "$(tokens_used)" -ge "$TOKEN_CEIL" ]; then
@@ -449,11 +465,7 @@ run_issue() {
     #   → ⚠️ **検出力を持つのは verify 直前と issue_done 直前の 2 つ**であり、ここは
     #     「将来 worktree を再利用する経路が生えたとき」のための保険である。
     #   ⚠️ **「3 か所で検査している」と数えないこと**（★ 検査があるつもりで検査していない型）。
-    ensure_branch "$id" execute "$attempt" "$wt" || return 1
-
-    # ★ worker を起動する *前* の HEAD を控える (★ 履歴入れ替えの検査に使う)。
-    #   ⚠️ 取れなければ空のまま進む —— ★ 名前の検査は base 無しでも効く (fail-open にしない)。
-    local head_before; head_before="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+    ensure_branch "$id" execute "$attempt" "$wt" "$wt_anchor" || return 1
 
     # --- 完全なセッションを 1 回。hook / スラッシュコマンド / settings が効く ---
     local res subtype denials
@@ -550,7 +562,7 @@ run_issue() {
     #   ★ **起票 10 の実測はこの形だった**: worker が session の最後に `git checkout main` を打ち、
     #     ⚠️ `run_verify` が **別ブランチの内容**を検査するところだった。
     #   ★ ここを通さずに verify すると、緑も赤も**何を測ったのか分からない数字**になる。
-    ensure_branch "$id" verify "$attempt" "$wt" "$head_before" || return 1
+    ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
 
     # --- 客観検証: exit code がすべて。LLM の申告は読まない ---
     # ⚠ `$(run_verify ...)` の形で呼ばないこと (サブシェルで VERIFY_* が失われる)。
@@ -569,7 +581,7 @@ run_issue() {
       #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
       #     M3 が `git -C . checkout` で破れることを実測している。
       #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
-      ensure_branch "$id" verify "$attempt" "$wt" "$head_before" || return 1
+      ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
       emit "$id" done issue_done attempt="$attempt"
       log "issue $id: done (attempt $attempt)"
       return 0
