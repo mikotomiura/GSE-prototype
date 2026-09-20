@@ -9,14 +9,18 @@
 
 ## 0. 本タスクで閉じたもの（★ 実測つき）
 
-| # | 何 | 実測 |
-|---|---|---|
-| ✅ M-1 | `run.sh` が Windows 既定（cp932）で**偽の赤 2 件**を出していた | 修正後 `bash run.sh` = **exit 0**（`PYTHONUTF8` なし）。`check_g1_emails.py` 単体も exit 0 |
-| ✅ M-2 | 移植性ゲートが入れ子 worktree で **rc=2（検査できなかった）**。`check-o1-release-readiness.sh` の赤 3 件目 | 修正後 **rc=0**。3 状態（正常 / 壊した入力 / 後始末）を実測 |
-| ✅ M-3 | ⚠️ 上記 rc=2 に隠れていた**本物の違反 1 件**（`$OLD・` = bash 3.2 で落ちる形） | `007-acceptance.sh:94` を `${OLD}` に修正 → ゲート緑 |
-| ✅ M-4 | ⚠️ 違反の**明細が 1 行も出ない**故障（VIOL 行が cp932 で `UnicodeEncodeError`） | 走査器の出力を UTF-8 固定 → 明細（ファイル:行）が出ることを実測 |
-| ✅ M-5 | **D6（案内日の分離）を確かめる場所が無い**（ADR-034 D1 の律速 4） | `check-o1-release-readiness.sh [5]` を新設 ＋ G1 側 README §6.3 に D6 を反映。selftest 4 ケース |
-| ✅ Q1〜Q4 | 研究者への質問 4 件 | `decisions.md` 判断 1〜4 |
+★ 各行に**実装したコミット**を書く（⚠️ 台帳だけを読んで「直っている」と信じないため。
+Codex `/cross-review` 2 巡目 #2）。
+
+| # | 何 | 実測 | コミット |
+|---|---|---|---|
+| ✅ M-1 | `run.sh` が Windows 既定（cp932）で**偽の赤 2 件**を出していた | 修正後 `bash run.sh` = **exit 0**（`PYTHONUTF8` なし）。`check_g1_emails.py` 単体も exit 0 | `936c434` |
+| ✅ M-2 | 移植性ゲートが入れ子 worktree で **rc=2（検査できなかった）**。`check-o1-release-readiness.sh` の赤 3 件目 | 修正後 **rc=0**。3 状態（正常 / 壊した入力 / 後始末）を実測 | `aa54c13` ＋ `d8aaeb5` |
+| ✅ M-3 | ⚠️ 上記 rc=2 に隠れていた**本物の違反 1 件**（`$OLD・` = bash 3.2 で落ちる形） | `007-acceptance.sh:94` を `${OLD}` に修正 → ゲート緑 | `aa54c13` |
+| ✅ M-4 | ⚠️ 違反の**明細が 1 行も出ない**故障（VIOL 行が cp932 で `UnicodeEncodeError`） | 走査器の出力を UTF-8 固定 → 明細（ファイル:行）が出ることを実測 | `aa54c13` |
+| ✅ M-5 | **D6（案内日の分離）を確かめる場所が無い**（ADR-034 D1 の律速 4） | `check-o1-release-readiness.sh [5]` を新設 ＋ G1 側 README §6.3 に D6 を反映。selftest **7 ケース** | `2785cb6` ＋ `d8aaeb5` |
+| ✅ M-6 | ⚠️ selftest の**未定義関数 `clear_pending`**（本タスク以前から）。該当ケースが**空回りで緑**だった | 関数を定義し、出発点を「未了なし」に戻してから変異させる形へ | `d8aaeb5` |
+| ✅ Q1〜Q4 | 研究者への質問 4 件 | `decisions.md` 判断 1〜4（Q3 / Q4 は本文へ反映 = `17fea9f`） | `4ac40e4` / `17fea9f` |
 
 ## 1. G1
 
@@ -43,7 +47,7 @@
 | O1-3 | **[ゲート]** | ADR-034 **Migration 6**: 「G1 のログを入力に取ったら止まる」検査を **O1 の事前登録**に書く | ❌ ⚠️ **O1 の事前登録文書がそもそも存在しない**（`experiments/<日付>-left-observation-decomposition/` が無い）。★ 作る日は「O1 の最初の配布より前」 | O1 の最初の配布の前 |
 | O1-4 | **[ゲート]** | ADR-034 **Migration 4**: ADR-031 **M9** の追補（O1 配布は ADR-032 の Accepted と同じリリース） | ❌ 未（O1-1 / O1-2 と同じ律速） | O1 配布の前 |
 | O1-5 | **[研究者]** | **募集してから配布までの間に、O1 の参加者へ何を約束するか** | ❌ 記述 **0 件**。★ ADR-034 は「被験者向け文書は**変えない**」と明記しているので、⚠️ **変えるなら研究者の裁定が要る**（被験者向け文書は契約） | 募集を始める前 |
-| O1-6 | **[機械]** | D6 の運用が O1 側の手順に入っているか | ✅ `docs/o1-roster-operations.md` §5（`:81-108`）。★ 本タスクで機械検査を付けた | — |
+| O1-6 | **[機械]** | D6 の運用が O1 側の手順に入っているか | ✅ `docs/o1-roster-operations.md` §5（★ アンカー `<!-- gate:d6-recruitment-separation -->` を規則の直前に置いた）。★ 本タスクで機械検査を付けた | — |
 
 ## 3. 共通（マージ・配布・後始末）
 
@@ -85,3 +89,15 @@ G1 の収集  ← G1-1（前提条件 7 の 9 マス）← 研究者
 ★ **最短の道**: 研究者判断（O1-1 / G1-1）と、マージ→タグ（C-1 / C-2 → C-4 / G1-2）は
 **並行して進められる**。⚠️ ただし **G1-2 は「配布に使うタグ」を決める行為**なので、
 C-1 / C-2 が終わってから確定する（★ 古いタグに固定すると判断 2 の理由が崩れる）。
+
+## 6. ★ 本タスク終了時のゲートの実測値（2026-09-20）
+
+| コマンド | 結果 |
+|---|---|
+| `cd experiments/20260801-controlled-friction-task && bash run.sh` | **exit 0**（★ `PYTHONUTF8` なし・Windows 既定環境） |
+| `bash scripts/check-shell-portability.sh` | **exit 0**（★ `.worktrees/` の 1 件を「走査対象外」と表示） |
+| `bash scripts/check-o1-release-readiness.sh` | **exit 1 / 通過 21・未達 2**（⚠️ 残り 2 は**正しい赤**: 同意未承認・タグ陳腐化） |
+| `bash scripts/check-o1-release-readiness.sh --selftest` | **通過 57 件 / 失敗 0 件**（★ 空回りしている検査は無い） |
+| `python scripts/check_schema_parity.py --dataset C:/gse-dataset` | **exit 1 / DRIFT**（`activity_label`。★ マージ計画で扱う） |
+
+⚠️ **手元の緑は CI の代替にならない**（OS 差と `--features package` の有無は残る）。

@@ -147,5 +147,82 @@
   （→ 緑を「衝突が起きない」と読まない、と検査のコメントにも書いた）。
 - **あわせて行った反映**: G1 側の募集手順（`experiments/.../README.md` §6.3）に D6 を追記した。
   ★ これは **Accepted 済みの ADR-034 D6 を手順に写しただけ**で、新しい裁定ではない。
-- **影響範囲**: `scripts/check-o1-release-readiness.sh`（検査 [5] ＋ selftest 4 ケース）・
-  `experiments/20260801-controlled-friction-task/README.md`。
+- **影響範囲**: `scripts/check-o1-release-readiness.sh`（検査 [5] ＋ selftest **7 ケース**
+  —— ★ 当初 4 ケース ＋ 判断 8 #2 で 3 ケース追加）・
+  `experiments/20260801-controlled-friction-task/README.md`・`docs/o1-roster-operations.md`（アンカー）。
+
+## 判断 8: `/cross-review` 1 巡目（Codex）の指摘と対応
+
+- **判断日時**: 2026-09-20
+- **実施**: `scripts/run-codex-review.sh 5b37b3b..HEAD -- <8 パス>`（★ 116 行に限定）。
+  **27,227 tokens**（本日の累計 154,460 / 300,000）。★ 指摘は MEDIUM 2 / LOW〜MED 1 / LOW 1。
+
+| # | 重大度 | 指摘 | 対応 |
+|---|---|---|---|
+| 1 | MEDIUM | `[5]` の検査が **文書全体の grep** なので、語が別節・脚注・否定文・古い記録に残っているだけで緑になる | ✅ 採用。アンカー `<!-- gate:d6-recruitment-separation -->` を両文書に置き、**その直後 20 行**の中に根拠と規則の両方があることを見る形へ（⚠️ `sed -n '/re/,+20p'` は BSD sed で使えないので **awk** で書いた）。★ O1 側はアンカーを §5 の見出しではなく**運用ルールの直前**へ置いた（⚠️ 見出しに置くと規則まで 19 行で、1 行足すだけで偽の赤になる） |
+| 2 | MEDIUM | selftest が **G1 側しか内容を壊していない**（O1 側はファイル削除のみ） | ✅ 採用。O1 側にも「アンカーを消す」「規則を消す」を追加。★ さらに **「アンカーの外に語が残っていても赤」**（＝ 文書全体 grep への退行を捕まえる）を追加 |
+| 3 | LOW〜MED | `f.endswith("/")` の除外が広すぎる（★ 将来別種のディレクトリが同じ形で返ると未走査になる） | ✅ 採用。`os.path.exists(os.path.join(f, ".git"))` を確かめ、**入れ子リポジトリでなければ `SKIPPED`（fail-closed）のまま**にした |
+| 4 | LOW | `PYTHONIOENCODING=utf-8` の副作用 | ❌ 対応なし（★ 一次で確認した）。`run.sh` の判定は **python の終了コード**と**ファイルに対する grep** だけで、⚠️ **python の標準出力を grep して判定している検査は 1 件も無い**（実測: `run.sh` の grep 4 件はすべて `SEED` と `*.rs` を読む）。→ 出力の見た目だけが変わる |
+
+## 判断 9: `/cross-review` 2 巡目（Codex）の指摘と対応
+
+- **判断日時**: 2026-09-20
+- **実施**: 同スクリプトで `.steering/20260920-g1-o1-inventory/` の 3 文書（707 行）に限定。
+- ⚠️★★ **HIGH 2 件はパス限定の副作用**（★ 誤検知）: 「台帳が事実より先行している」「`evidence.md` が
+  差分に無い」は、**実装コミットと `evidence.md` を差分に入れなかった**ために起きた読みである
+  （★ 実装は `936c434` / `aa54c13` / `2785cb6`、`evidence.md` は同じ範囲に存在する）。
+  ⚠️ ただし **パス限定は外さない**（`.codex/budget.json` の予算ガードと、
+  `project_cross_review_cached_gap` の経緯）。
+
+| # | 重大度 | 指摘 | 対応 |
+|---|---|---|---|
+| 1 | HIGH | 台帳が「修正後」「緑」と書くが差分に実装が無い | ❌ 誤検知（上記）。★ ただし**核は採る** → 下記 2 |
+| 2 | MEDIUM | 完了項目に **該当コミット / ファイル変更への直接参照**が要る | ✅ 採用。`inventory.md` §0 の各行に**コミットハッシュ**を書いた |
+| 3 | MEDIUM | テスト追加が差分から確認できない | ❌ 誤検知（selftest は `2785cb6` に入っている）。★ 2 の対応で追跡可能になる |
+| 4 | LOW | セキュリティ上の新規脆弱性は無い。リスクは「運用文書の過信による配布ミス」 | ✅ 同意（★ `merge-plan.md` §5 の注意 1〜5 がその位置） |
+
+## 判断 10: selftest の未定義関数 `clear_pending` を定義する（★ 本タスクで発見）
+
+- **判断日時**: 2026-09-20（Claude）
+- **背景**: selftest 実行中に `scripts/check-o1-release-readiness.sh: line 814: clear_pending:
+  command not found` が出た。⚠️ **本タスク以前から存在する**（★ 最初の selftest でも同じ行が出ている）。
+- **⚠️ 何が起きていたか**: 該当ケースは「状態表に『⚠️ **未了』を 1 行足すと赤になるか」を測る変異試験。
+  ★ ところが**実物の同意文書には既に未了の行がある**（`consent-draft-o1.md:281`）ので、
+  ⚠️ **何を足しても赤**になり、**空回りしたまま緑（＝ 発火していると報告）**を返していた。
+  ★ これは本ゲートが戒めている型そのもの。
+- **採用**: `clear_pending` を定義し（`sed_i '/⚠️ \*\*未了/d'`）、**出発点を「未了なし」に戻してから**
+  1 行足す形にした。→ ★ これで初めて「足すと赤になる」を測れる。
+- **⚠️ 代償**: 本タスクの範囲外のコードに手を入れた。★ ただし **同じファイルの同じ仕組み**であり、
+  「自分が HIGH / MEDIUM と認めた負債を次へ送らない」に従った。
+
+## 判断 11: `security-checker`（opus）の指摘と対応
+
+- **判断日時**: 2026-09-20
+- **結果**: CRITICAL 0 / **HIGH 1** / MEDIUM 1 / LOW 4。★ プライバシー規約（`data-privacy`）は 4 項目とも
+  「新しい行種・新しい観測チャネルの追加なし」で通過。依存マニフェストの変更が無いため
+  `cargo audit` / `npm audit` は該当なし。
+
+| # | 重大度 | 指摘 | 対応 |
+|---|---|---|---|
+| H-1a | HIGH | 入れ子リポジトリの除外が**パス無条件**。配布物に入る場所（`experiments/…` / `scripts/submit/`）に入れ子 git が出来ると、⚠️ **その配下のスクリプトが丸ごと未走査**になる（★ 被験者が叩くスクリプトを含みうる） | ✅ 採用。`NESTED_ALLOWED = (".worktrees/",)` に限定し、それ以外は `SKIPPED`（fail-closed）へ戻した。**実測**: `tmp/_nested_probe/`（`git init` 済み）を置くと **rc=2**、消すと **rc=0** |
+| H-1b | HIGH | O1 配布ゲートが移植性ゲートの**成功枝で出力を捨てて**おり、⚠️ 「走査対象外」が**門の上で 1 行も見えなかった**（★ 判断 6 の「緑のときこそ言う」が門では成立していなかった） | ✅ 採用。緑の枝でも `走査対象外` の行を出す。**実測**: ゲート出力に 1 行出る |
+| M-1 | MEDIUM | HEAD 版の `[5]` は文書全体 grep（★ Codex 1 巡目 #1 と同じ指摘）。⚠️ **未コミット分を HEAD と一緒にコミットしないと、弱い門がマージされる** | ✅ 採用。アンカー方式と selftest 7 ケースを**同じコミット群**（`d8aaeb5`）に入れた |
+| L-1 | LOW | `d6_near` の窓 20 行に対し O1 側の距離が **19 行**で、1〜2 行足すと偽の赤 | ✅ 採用（★ 指摘より前に同じ理由で対処済み）。アンカーを**運用ルールの直前**へ移し、距離を 5 行にした |
+| L-2 | LOW | `PYTHONIOENCODING=utf-8` は既定 `strict` なので、surrogateescape 由来の文字で `UnicodeEncodeError` → ⚠️ **本修正が消そうとしている型に戻る** | ✅ 採用。`utf-8:backslashreplace` にした |
+| L-3 | LOW | `check_g1_emails.py` が node の stderr をそのまま出す。⚠️ `.gs` 直書きの Form / Sheet / Drive ID がログ（CI 含む）へ出うる。★ 本差分が作った経路ではないが `encoding` 修正で**到達しやすくなった** | ✅ 採用。25 文字以上の ID 形を `<id-masked>` に伏せてから出す（★ 行番号と文脈は残す） |
+| L-4 | LOW | selftest の fixture は `RETURN` でしか消えず、⚠️ **Ctrl-C で `/tmp` に残る**（★ 同意文書ドラフト = 研究者の実メール・所属を含む） | ✅ 採用。`trap 'rm -rf "${fix:?}"' RETURN INT TERM` にした |
+
+★ 「問題なし」と確認された主なもの: `rm -f "$fix/w/$RECRUIT_O1"` は `mktemp -d` 配下のみ
+（★ selftest 後に `git status` で repo 無変更も確認）／コマンド注入の余地なし（`shell=True` なし・
+引数はすべてスクリプト内定数）／新しく fixture へ写す 2 文書に秘密は 0 件（grep 実測）／
+`[5]` は既存検査を空回りさせていない（★ 各検査が独立に `PASS`/`FAIL` を加算）。
+
+## ★ 本タスク終了時の実測（★ 断定の根拠）
+
+| コマンド | 結果 |
+|---|---|
+| `bash run.sh`（`PYTHONUTF8` なし） | **exit 0** |
+| `bash scripts/check-shell-portability.sh` | **exit 0**（走査対象外 1 件を表示） |
+| `bash scripts/check-o1-release-readiness.sh` | **exit 1 / 通過 21・未達 2**（⚠️ 正しい赤） |
+| `bash scripts/check-o1-release-readiness.sh --selftest` | **通過 57 / 失敗 0** |
+| ★ 入れ子リポジトリの fail-closed | `tmp/_nested_probe/` で **rc=2** → 後始末で **rc=0** |
