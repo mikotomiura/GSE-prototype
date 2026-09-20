@@ -244,7 +244,13 @@ def run_gas(short_mode: str = "0") -> dict:
             HARNESS.replace("__GAS_SOURCE__", src).replace("__SHORTMODE__", short_mode),
             encoding="utf-8",
         )
-        r = subprocess.run(["node", str(js)], capture_output=True, text=True)
+        # ⚠️★ `encoding="utf-8"` を明示する（2026-09-20 実測）。★ `text=True` だけだと
+        #   **実行環境の既定エンコーディング**でデコードするので、Windows（cp932）では
+        #   node が出す日本語のメール本文で `UnicodeDecodeError` が読み取りスレッド内で起き、
+        #   ⚠️ `r.stdout` が `None` のまま返って `AttributeError` でスクリプトごと落ちる。
+        #   → ★ 上位の `run.sh` には **`[FAIL] 受付メールが §2.12 の開示範囲から外れている`**
+        #     と出る（⚠️ **開示範囲は正しいのに赤くなる**）。
+        r = subprocess.run(["node", str(js)], capture_output=True, encoding="utf-8")
     if r.returncode != 0:
         raise SystemExit(
             "[NG] ★ .gs を評価できない（GAS 実行時にも同じエラーになる）\n"
