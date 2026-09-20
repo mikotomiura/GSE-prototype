@@ -32,6 +32,7 @@
    `.claude/skills/[name]/SKILL.md` を Read で参照してから手を動かす。
    GSE 固有領域には専用 Skill がある (下記)。公式 Skill で済む領域は自前を作らない。
 4. **サブエージェントへの委譲**: 以下はメインではなくサブエージェントで実行する。
+   ⚠️ **渡し方の契約は `subagent-delegation` Skill**（★ model の明示・範囲と禁止事項・締切）。
    - 複数ファイル横断の探索 → `file-finder`、影響範囲調査 → `impact-analyzer`、
      依存関係 → `dependency-checker`
    - レビュー → `code-reviewer` + `security-checker` を **並列**起動
@@ -64,6 +65,7 @@
 | `implementation-workflow` | 実装タスクの共通骨格 (調査→設計→実装→テスト→レビュー) |
 | ★ `verify-before-claiming` | **事実を断定する前**（「不要」「壊れる」「既知」「〜になる」）／削除・簡略化の提案／memory を根拠に使う時 ／ ★★★ **ADR・裁定・仕様を確定する時**（⚠️ **長い一次資料を 1 節だけ読んで代表させない**＝ルール 7 ／ ⚠️ **「核心」「閉じた」と書く前に同じ語で全文 grep**＝ルール 8。★ 2026-09-13 に ADR-030 で 2 回踏み抜いた） |
 | ★ `browser-verification` | **`mcp__claude-in-chrome__*` を使う時**（最初の 1 回で必ず）／GAS・フォーム・シートの配備検証／生成 HTML の表示確認 |
+| ★ `subagent-delegation` | **サブエージェントへ仕事を渡す *前*** （★ 下記 4 の実行時に必ず）／レビュー系の起動／サーヴェイの fan-out ／「投げるか自分でやるか」を迷った時。⚠️ **model の明示・範囲と禁止事項・締切・戻り値の裏取り**の契約 |
 
 ### 研究トラック Skill (docs/ の研究文書・`experiments/` を触る時)
 
