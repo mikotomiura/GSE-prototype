@@ -33,7 +33,7 @@
 
 ## Phase 4: レビュー
 
-- [ ] `code-reviewer` ＋ `security-checker`（並列・opus・範囲/禁止/締切を明記）
-- [ ] `/cross-review` 2 巡（⚠️ 予算ガードの状態を先に確認。止まったら skip 理由を明記）
-- [ ] 指摘の是正と `decisions.md` への記録
+- [x] `code-reviewer` ＋ `security-checker`（並列・opus・範囲/禁止/締切を明記）
+- [x] `/cross-review` 2 巡（⚠️ 予算ガードの状態を先に確認。止まったら skip 理由を明記）
+- [x] 指摘の是正と `decisions.md` への記録
 - [ ] `/finish-task`
