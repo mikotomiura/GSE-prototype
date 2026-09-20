@@ -66,7 +66,7 @@ trap 'gate_cleanup; exit 130' INT
 trap 'gate_cleanup; exit 143' TERM
 trap 'gate_cleanup; exit 129' HUP
 
-gate_mktemp () { local p; p="$(mktemp "$@")" || return 1; GATE_TMPS+=("${p}"); printf '%s' "${p}"; }
+gate_mktemp () { local p; p="$(mktemp "${TMPDIR:-/tmp}/g1gate.XXXXXX")" || return 1; GATE_TMPS+=("${p}"); printf '%s' "${p}"; }
 
 MODE=main
 while [ $# -gt 0 ]; do
@@ -128,6 +128,10 @@ if [ -n "${MUT}" ]; then
       *) echo "知らない変異トークン: ${tok}" >&2; exit 2 ;;
     esac
   done
+  # ⚠️★★ **検証と実処理の区切り文字をそろえる** (Codex /cross-review 1 巡目 #2)。
+  #   ★ 検証は `tr ',' ' '` で空白区切りも通すのに、`mutated` は `,` しか見ていなかった。
+  #     → ⚠️ `t1a t1b` は**検証を通るのに 1 つも変異しない**（黙って何もしないモード）。
+  MUT="$(printf '%s' "${MUT}" | tr ' ' ',' | sed 's/,,*/,/g')"
 fi
 mutated () { case ",${MUT}," in *",$1,"*) return 0 ;; *) return 1 ;; esac ; }
 
@@ -145,7 +149,7 @@ sed_i () {
     eval "args+=(\"\${${i}}\")"
     i=$((i + 1))
   done
-  tmp="$(mktemp)"
+  tmp="$(mktemp "${TMPDIR:-/tmp}/g1gate.XXXXXX")"
   # ⚠️★ 置き換えは成功したときだけ (★ 失敗して空ファイルにすると変異試験が意味を失う)。
   if sed "${args[@]}" "${f}" > "${tmp}"; then
     cat "${tmp}" > "${f}"
@@ -223,10 +227,13 @@ record_ok () {
   #   ★ `protocol.md:1133` 逐語「❌ 成果物にセッション日時・氏名・メール・所属を出す」/
   #     `notes.md:1057` 逐語「★ 実 URL は repo に置かない。」と同じ規約をこの票にも当てる。
   #   ⚠️ 28 文字以上の英数字トークンは Google の file id の形 (★ 通常の日本語記入では出ない)。
+  #   ⚠️★★★ **見ていないもの** (Codex /cross-review 1 巡目 #3): ★ **氏名・所属は機械では弾けない**。
+  #     → 記録票にも「一部しか弾けない」と書いてある。★ 最後は書いた人が責任を持つ。
   bad=""
   printf '%s\n' "${fields}" | grep -qE 'https?://'              && bad="URL"
   printf '%s\n' "${fields}" | grep -q  '@'                      && bad="${bad}${bad:+ / }メールアドレス"
   printf '%s\n' "${fields}" | grep -qE '[A-Za-z0-9_-]{28,}'     && bad="${bad}${bad:+ / }ID らしき長いトークン"
+  printf '%s\n' "${fields}" | grep -qE '[0-9]{1,2}:[0-9]{2}'    && bad="${bad}${bad:+ / }時刻"
   if [ -n "${bad}" ]; then
     ng "記録票 ${label}: 書いてはいけないものが入っている (${bad}) —— ★ 本 repo は一時 public にする"
     return
@@ -454,7 +461,7 @@ if ! command -v python3 > /dev/null 2>&1; then
 elif [ -e "${G1DIR}/blocks/${GATE_SUBJECT}.json" ]; then
   ng "${GATE_SUBJECT} はゲートが使う予約 ID なのに割付ファイルがある (★ 実被験者に使わない)"
 else
-  t5="$(mktemp -d)"; GATE_TMPS+=("${t5}")
+  t5="$(mktemp -d "${TMPDIR:-/tmp}/g1gate.XXXXXX")"; GATE_TMPS+=("${t5}")
   # ★ 「実物の repo を 1 バイトも変えない」を**主張でなく検査**にする (code-reviewer LOW)。
   g1_before="$(git status --porcelain "${G1DIR}" 2>/dev/null)"
   mkdir -p "${t5}/blocks" "${t5}/pages"
@@ -586,7 +593,7 @@ selftest () {
   unset GSE_G1_GATE_MUTATE
   MUT=""
   repo="$(pwd)"
-  fix="$(mktemp -d)"; GATE_TMPS+=("${fix}")
+  fix="$(mktemp -d "${TMPDIR:-/tmp}/g1gate.XXXXXX")"; GATE_TMPS+=("${fix}")
   sp=0; sf=0
 
   # ⚠️★★★ **allow-list で写す** (security-checker M-1)。
@@ -615,9 +622,15 @@ selftest () {
     done
     cp -r "${repo}/${G1DIR}/materials" "${fix}/w/${G1DIR}/materials" \
       || { echo "  ❌ fixture を作れない: materials/"; return 1; }
-    # ★ fixture を git リポジトリにする (⚠️ 記録票の「対象のコミット」検査が
-    #   `git rev-parse` を使うため。非 git だと変異と無関係に赤になる)。
+    # ★ fixture を git リポジトリにし、**コミットを 1 本作る** (Codex /cross-review 1 巡目 #1)。
+    #   ⚠️ `init` だけだと HEAD が無く、記録票の「対象のコミット」検査は
+    #     **「実在しない → 赤」の経路しか試せない**。★ 正しい SHA で緑になる経路が未検証だった。
     git -C "${fix}/w" init -q > /dev/null 2>&1 || true
+    git -C "${fix}/w" -c user.name=gate -c user.email=gate@example.invalid \
+        add -A > /dev/null 2>&1 || true
+    git -C "${fix}/w" -c user.name=gate -c user.email=gate@example.invalid \
+        commit -q -m fixture > /dev/null 2>&1 || true
+    FIX_SHA="$(git -C "${fix}/w" rev-parse --short=7 HEAD 2>/dev/null || true)"
   }
 
   # ★ fixture の実行。⚠️ `env -u` で変異モードの継承を**構造的に**断つ。
@@ -737,6 +750,11 @@ selftest () {
   sed_i 's#^- 突合したフォームの定数名: .*#- 突合したフォームの定数名: **https://docs.google.com/forms/d/e/x/viewform**#' \
         "${fix}/w/${RECORD}"
   expect_red "書いてはいけないものが入っている (URL" "★ 記録票に URL を書く (検査 8)"
+  # ⚠️★★ **時刻を書いたら赤** (Codex /cross-review 1 巡目 #3: `protocol.md:1112` は日付までと決めている)。
+  build; sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
+                "${fix}/w/${RECORD}"
+  sed_i 's/^- 突合の結果: .*/- 突合の結果: **14:30 に一致を確認**/' "${fix}/w/${RECORD}"
+  expect_red "書いてはいけないものが入っている (時刻" "★ 記録票に時刻を書く (検査 8)"
   # ⚠️★★★ **確認日が形になっていないと赤** (code-reviewer M4 相当)。
   build; sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/済/g' "${fix}/w/${RECORD}"
   expect_red "記録票 A (配布済みフォームとの突合): 確認日が YYYY-MM-DD" \
@@ -760,6 +778,14 @@ selftest () {
   sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
         "${fix}/w/${RECORD}"
   expect_green "記録票 A (配布済みフォームとの突合) が埋まっている" "記録票 A を埋める (検査 8)"
+  # ★ **正しい SHA なら緑になる**経路 (Codex /cross-review 1 巡目 #1)。
+  #   ⚠️ 「実在しない → 赤」だけでは、`merge-base` が常に偽でも気づけない。
+  build
+  sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
+        "${fix}/w/${RECORD}"
+  sed_i "s/^- 対象のコミット: .*/- 対象のコミット: **${FIX_SHA}**/" "${fix}/w/${RECORD}"
+  expect_green "記録票 B (両 OS の対のテスト) が埋まっている" \
+               "★ HEAD の祖先である SHA を書く (検査 8)"
   build
   sed_i 's/^| 記録する | 記録しない |$/| 記録する (starve_window \/ app_version) | 記録しない |/' \
         "${fix}/w/${CONSENT}"
