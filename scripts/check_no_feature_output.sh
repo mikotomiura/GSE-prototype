@@ -133,15 +133,23 @@ run_scan() {
     [ -f "$f" ] || continue
     scanned=$((scanned + 1))
     # ⚠️ jq の失敗 (JSON でない) と「true が返った」を区別する。
-    hit="$(jq -e "$JQ_PROG" "$f" 2>/dev/null)"
-    rc=$?
+    #
+    # ⚠️★★★ **`-e` を付けてはいけない**（2026-09-20・Codex /cross-review 1 巡目）。
+    #   ★ `jq -e` の終了コードは **最後の出力だけ**を見る。→ 多文書ファイルが
+    #     `違反JSON` → `安全JSON` の順に並ぶと `"true\nfalse"` を出して **rc=1** になり、
+    #     ⚠️ `[ $rc -eq 0 ]` で弾かれて**素通り**していた（★ 実測で再現）。
+    #   ★ `-e` 無しの `jq` は、**JSON として読めたか**だけを終了コードに返す（値に依らない）。
+    #     → 「読めたか」は rc、「違反があるか」は出力、と役割を分ける。
+    #
     # ⚠️★★★ **1 ファイルに JSON 文書が複数入っていると jq は文書ごとに 1 行出す**
     #   (2026-09-20・code-reviewer / security-checker が独立に指摘・実測で確認)。
-    #   ★ 旧版は `[ "$hit" = "true" ]` だったので、`"true\ntrue"` と一致せず
+    #   ★ 初版は `[ "$hit" = "true" ]` だったので、`"true\ntrue"` と一致せず
     #     ⚠️ **2 文書以上なら必ず緑**になっていた（= 違反が大きいほど通る逆向きの挙動）。
     #   ⚠️ 封筒を入れた動機そのもの（複数セッションの結合）に沿って
     #     `cat feat_a.json feat_b.json > all.json` とされると素通りしていた。
     #   → ★ 「**1 行でも true があるか**」で判定する。
+    hit="$(jq "$JQ_PROG" "$f" 2>/dev/null)"
+    rc=$?
     if [ $rc -eq 0 ] && printf '%s\n' "$hit" | grep -qx true; then
       echo "[gate] NG: $f は gse-replay --features の出力に見える" >&2
       echo "       ★ これは中間成果物であり gse-dataset へ共有しない（docs/glossary.md「特徴行」）。" >&2
@@ -162,7 +170,7 @@ run_scan() {
   return 0
 }
 
-# ---------- --self-test: 陽性対照 3 件 ＋ 陰性対照 2 件 ----------
+# ---------- --self-test: 陽性対照 5 件 ＋ 陰性対照 3 件 ----------
 # ⚠️★★★ **「門がある」と「門が閉まる」は別である。**
 #   ★ 本プロジェクトは「検査があるつもりで検査していない」を 3 回踏んでいる。
 #   ★ 実際、この検査器自身が 2026-09-20 の初版で **陽性対照 P2 を通していた**
@@ -201,7 +209,7 @@ self_test() {
     report "$name" "$want" "$got"
   }
 
-  echo "[gate] --self-test: 陽性 4 / 陰性 3（★ 既定枝の対照を含む）"
+  echo "[gate] --self-test: 陽性 5 / 陰性 3（★ 既定枝の対照を含む）"
   # ★ 陽性対照: 赤 (rc=1) にならなければ検査は空振りしている。
   probe "P1 封筒つき（マーカー）" 1 feat.json \
     "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}"
@@ -213,6 +221,12 @@ self_test() {
   probe "P4 封筒を 2 つ連結した多文書" 1 all.json \
     "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}
 {\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}"
+  # ⚠️★★★ P6: **違反 → 安全**の順に並ぶ多文書（★ Codex /cross-review 1 巡目が見つけた）。
+  #   ★ `jq -e` は**最後の出力**で終了コードを決めるので、この順だと rc=1 になり
+  #     ⚠️ 旧版は `[ $rc -eq 0 ]` で弾いて**素通り**していた。P4 (`true\ntrue`) では踏めない。
+  probe "P6 違反→安全 の順の多文書" 1 mixed.json \
+    "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}
+{\"session_id\":\"P001\",\"f1\":0.83}"
   # ★ 陰性対照: 緑 (rc=0) にならなければ偽陽性で、門はいずれ外される。
   probe "N1 metrics.json 形（共有物）" 0 m.json \
     '{"session_id":"P001","f1":0.83,"median_ms":120}'

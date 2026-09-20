@@ -92,8 +92,12 @@ const MAX_CAPABILITIES_BYTES: usize = 4096;
 /// [`MAX_CAPABILITIES_BYTES`] があるのに、こちらには何も無かった。
 ///
 /// ★ 実際に書かれる値は semver (`"0.5.0"`) / enum (`"g1"`) / レイアウト識別子で、
-/// いずれも数十バイト。256 は十分広い。⚠️ 超過は**切り詰めずに落とす**
-/// (切り詰めると「短い宣言」と区別できなくなる)。
+/// いずれも数十バイト。256 は十分広い。
+///
+/// ⚠️★★★ **超過は `Err`（`--features` は exit 1）。`None` に倒さない。**
+/// ★ 倒すと出力だけを見て「未宣言」と「壊れた長大値」が区別できなくなる
+/// (2026-09-20・Codex `/cross-review`)。`capabilities` と同じ規律である ——
+/// **「無い」は `None` / 「壊れている」は `Err`**。
 const MAX_META_STRING_BYTES: usize = 256;
 
 /// `provenance.source_sha256` に出す 16 進の桁数 (= 8 バイトぶん)。
@@ -1979,20 +1983,28 @@ fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts
         //     `meta` 行の中身は**被験者が編集しうる入力**である。
         //   ⚠️ 旧版は長さも文字種も無制限に封筒へ複写していた —— ★ 同じ `meta` 行から採る
         //     `capabilities` には 4096 バイトの上限があるのに、ここには何も無かった。
-        //   ★ 超過は**切り詰めずに `None`**（=「宣言が無い」へ倒す）。
-        //     ⚠️ 切り詰めると「短い宣言」と区別できなくなる。
-        let str_field = |k: &str| -> Option<String> {
-            let v = raw.get(k).and_then(|v| v.as_str())?;
+        //
+        // ⚠️★★★ **超過は `Err`。`None` に倒さない** (2026-09-20 改訂・Codex /cross-review 1 巡目)。
+        //   ★ 最初は「切り詰めずに `None`」にしたが、⚠️ **出力だけを見ると「未宣言」と
+        //     「壊れた長大値」が区別できない**（tracing の警告はバッチ実行で流れる）。
+        //   ★ `capabilities` と同じ規律に揃える —— **「無い」は `None` / 「壊れている」は `Err`**。
+        //     ⚠️ 正常な値は semver / enum / レイアウト識別子で数十バイトなので、
+        //     256 を超えるのは編集された入力だけである。
+        let str_field = |k: &str| -> Result<Option<String>, String> {
+            let Some(v) = raw.get(k).and_then(|v| v.as_str()) else {
+                return Ok(None);
+            };
             if v.len() > MAX_META_STRING_BYTES {
-                tracing::warn!(
-                    field = k,
-                    bytes = v.len(),
-                    limit = MAX_META_STRING_BYTES,
-                    "meta string field exceeds the limit; dropped from the envelope (not truncated)"
-                );
-                return None;
+                // ★ 理由と大きさは出すが、⚠️ **値の中身は出さない** (`capabilities` と同じ作法)。
+                return Err(format!(
+                    "line {}: meta.{} is {} bytes, exceeds limit {} bytes",
+                    lineno + 1,
+                    k,
+                    v.len(),
+                    MAX_META_STRING_BYTES
+                ));
             }
-            Some(v.to_string())
+            Ok(Some(v.to_string()))
         };
         let capabilities = match raw.get("capabilities") {
             // ★ 在るなら形を検査する。⚠️ 壊れていれば `Err`（`null` に倒さない）。
@@ -2002,11 +2014,11 @@ fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts
         };
         return Ok(MetaSessionFacts {
             session_start: Some(session_start),
-            hmm_version: str_field("hmm_version"),
-            app_version: str_field("app_version"),
-            g1_mode: str_field("g1_mode"),
-            o1_mode: str_field("o1_mode"),
-            keyboard_layout: str_field("keyboard_layout"),
+            hmm_version: str_field("hmm_version")?,
+            app_version: str_field("app_version")?,
+            g1_mode: str_field("g1_mode")?,
+            o1_mode: str_field("o1_mode")?,
+            keyboard_layout: str_field("keyboard_layout")?,
             capabilities,
         });
     }
@@ -4003,40 +4015,55 @@ mod tests {
         let _ = std::fs::remove_dir(&dir);
     }
 
-    /// ⚠️★★★ 回帰 (2026-09-20・security-checker M1): **`meta` の文字列に上限がある。**
+    /// ⚠️★★★ 回帰 (2026-09-20・security-checker M1 / Codex `/cross-review`):
+    /// **`meta` の文字列に上限があり、超過は `Err` になる。**
     ///
     /// ★ 信頼境界: O1 の NDJSON は被験者端末で生成されるので、`meta` 行の中身は
     /// **被験者が編集しうる入力**である。⚠️ 上限が無いと、封筒が
     /// (a) 巨大な文字列の複写経路 (b) 自由文が解析成果物に入る唯一の経路 になる。
-    /// ★ 超過は**切り詰めずに `None`**（「宣言が無い」へ倒す）。
+    ///
+    /// ⚠️ **`None` に倒さない** —— 倒すと出力だけを見て「未宣言」と「壊れた長大値」が
+    /// 区別できない。★ `capabilities` と同じ規律（「無い」は `None` /「壊れている」は `Err`）。
     #[test]
-    fn oversized_meta_strings_are_dropped_not_truncated() {
+    fn oversized_meta_strings_are_an_error_not_silently_dropped() {
         let dir = envelope_tmp_dir("longstr");
-        let path = dir.join("long.ndjson");
         let long = "a".repeat(MAX_META_STRING_BYTES + 1);
         let at_limit = "b".repeat(MAX_META_STRING_BYTES);
+
+        // (1) 超過 → Err（★ 理由は出すが、値の中身は出さない）。
+        let over = dir.join("over.ndjson");
         std::fs::write(
-            &path,
+            &over,
             format!(
                 "{{\"type\":\"meta\",\"session_start\":1700000000000,\
-                 \"hmm_version\":\"{long}\",\"app_version\":\"{at_limit}\"}}\n"
+                 \"hmm_version\":\"{long}\"}}\n"
             ),
         )
         .expect("write");
-
-        let facts = collect_meta_session_facts(&path).expect("collect meta facts");
-        assert_eq!(facts.session_start, Some(1_700_000_000_000));
+        let err = collect_meta_session_facts(&over).expect_err("上限超過は Err のはず");
         assert!(
-            facts.hmm_version.is_none(),
-            "上限超過の文字列が封筒へ入った (⚠️ 切り詰めでもなく落とすのが正)"
+            err.contains("exceeds limit") && err.contains("hmm_version"),
+            "エラー文言が理由とフィールド名を示していない: {err}"
         );
-        assert_eq!(
-            facts.app_version.as_deref(),
-            Some(at_limit.as_str()),
-            "ちょうど上限の文字列は通ること (★ 境界を 1 バイトずらしていないか)"
-        );
+        assert!(!err.contains(&long), "⚠️ エラー文言に値の中身が漏れている");
 
-        let _ = std::fs::remove_file(&path);
+        // (2) ちょうど上限 → 通る（★ 境界を 1 バイトずらしていないか）。
+        let ok_path = dir.join("at_limit.ndjson");
+        std::fs::write(
+            &ok_path,
+            format!(
+                "{{\"type\":\"meta\",\"session_start\":1700000000000,\
+                 \"app_version\":\"{at_limit}\"}}\n"
+            ),
+        )
+        .expect("write");
+        let facts = collect_meta_session_facts(&ok_path).expect("ちょうど上限は Ok のはず");
+        assert_eq!(facts.app_version.as_deref(), Some(at_limit.as_str()));
+        // ★ 宣言が無いフィールドは `None`（⚠️ 「無い」と「壊れている」を分ける）。
+        assert!(facts.hmm_version.is_none());
+
+        let _ = std::fs::remove_file(&over);
+        let _ = std::fs::remove_file(&ok_path);
         let _ = std::fs::remove_dir(&dir);
     }
 
