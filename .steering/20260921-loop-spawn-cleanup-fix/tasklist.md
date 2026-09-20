@@ -14,8 +14,8 @@
 - [x] 対象 0 件は exit 0（冪等）
 
 ## テスト
-- [x] `scripts/loop-spawn-cleanup-test.sh` 新規（**8 群 28 件**・⚠️ 変異テスト付き）
-- [x] 新テストが緑（**28 / 28**）
+- [x] `scripts/loop-spawn-cleanup-test.sh` 新規（**9 群 29 件**・⚠️ 変異テスト付き）
+- [x] 新テストが緑（**29 / 29**）
 - [x] ⚠️★★★ **旧実装に当てて赤になることを実測**（**18 件 NG / exit 1**）＝ 空振りでない
 - [x] `check-shell-portability.sh` 緑（12 / 0）
 - [x] `check-tests-are-wired.sh` 緑（**17 本**すべて配線・self-test も緑）
@@ -32,7 +32,7 @@
 - [x] LOW 対応: テストの `grep -q` / 完全一致経路の追加 / CI の macOS 除外理由 / design の行番号・書式
 - [x] ⚠️ 範囲外と判断したもの: `check` job の `permissions:`（★ 既存条件 → **起票 24**・判断 10）
 - [x] `/cross-review` **1 巡目**（★ 指摘 5 件 → 判断 11 / 12。⚠️ 足したテストが**実害を 1 件検出**）
-- [ ] `/cross-review` **2 巡目**（★ 自分が足した規則の境界条件）
+- [x] `/cross-review` **2 巡目**（★ 有効 2 件を採用。⚠️ HIGH は 2 巡連続で**誤検出**・判断 13）
 
 ## ドキュメント
 - [x] 起票 18 に **✅ 是正済み** を追記（★ 本文は書き換えず追記）
@@ -40,9 +40,9 @@
 - [x] CI 配線（ubuntu ＋ Windows の 2 か所）
 - [x] ⚠️ 派生発見を **起票 23**（`resolve_base` が config を `tail -1` で選ぶ）と
       **起票 24**（`check` job の `permissions:`）として登録
-- [ ] glossary への用語追加（★ 新語なし → 不要）
+- [x] glossary への用語追加（★ 新語なし → 不要）
 
 ## 完了処理
 - [x] design.md の最終化
 - [x] decisions.md の作成
-- [ ] git commit（⚠️ `git add -A` 禁止・明示パスのみ）
+- [x] git commit（⚠️ `git add -A` 禁止・明示パスのみ）

@@ -145,7 +145,13 @@ $2
   # porcelain の worktree 行はプレフィックス除去で取得 (空白入りパスに耐える)
   # ⚠️ 取得に失敗したら黙って進まない (★ `set -o pipefail` 下では無言で exit していた)。
   wts="$(git worktree list --porcelain | awk -v id="${id}" -v rn="${repo_name}" -v home="${wt_home}" '
-    BEGIN { exa_p = rn "-" id; pfx_p = rn "-" id "-"; exa_b = "loop/" id; pfx_b = "loop/" id "-" }
+    BEGIN {
+      exa_p = rn "-" id; pfx_p = rn "-" id "-"; exa_b = "loop/" id; pfx_b = "loop/" id "-"
+      # ⚠️ 表記の正規化は **両側に**かける（★ Codex /cross-review 2 巡目）——
+      #   ★ worktree パス側だけ `\` → `/` にして `home` を素のままにすると、
+      #   ⚠️ 区切りが混ざった環境で path 系統が**空振り**し、直したはずの穴が戻る。
+      gsub(/\\/, "/", home)
+    }
     function flush() {
       if (p != "" && (hitb || hitp)) print p
       p = ""; hitb = 0; hitp = 0
@@ -184,7 +190,15 @@ ${wt}"
       #   ★ branch 側で `-D` を使わないと決めた判断と同じ理屈である。
       #   ⚠️ 逸脱した worktree（起票 10 の形）は **作業が載っている可能性が最も高い**対象であり、
       #     旧実装のように `--force` を無条件で撃つと**復旧不能に失われる**。
-      dirty="$(git -C "${wt}" status --porcelain 2>/dev/null || true)"
+      #   ⚠️★★★ **status が読めないときも撤去しない**（★ Codex /cross-review 2 巡目）——
+      #     旧版は `|| true` で「dirty なし」に倒れ、⚠️ 権限・破損・I/O エラーのときに
+      #     **`--force` まで進んでいた**（★ fail-open）。
+      if ! dirty="$(git -C "${wt}" status --porcelain 2>/dev/null)"; then
+        echo "loop-spawn: ⚠️ 状態を読めないので撤去しません: ${wt}" >&2
+        echo "            ★ 手で確認:  git -C \"${wt}\" status" >&2
+        left=$((left + 1))
+        continue
+      fi
       if [ -n "${dirty}" ]; then
         echo "loop-spawn: ⚠️ 未コミット変更があるので撤去しません: ${wt}" >&2
         echo "            ★ 中身を確認:  git -C \"${wt}\" status" >&2
