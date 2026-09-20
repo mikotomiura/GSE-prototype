@@ -48,7 +48,7 @@
 >
 > - ★ 出力は **`{ provenance, config, rows }`** になった（`bin/replay.rs::FeatureEnvelope`）。
 > - ★ `provenance` が持つもの（★ grill で研究者が裁定・判断 2）:
->   `sharing` / `tool` / `tool_version` / `source_basename` / `source_sha256` /
+>   `sharing` / `tool` / `tool_version` / `source_basename` / `source_sha256_prefix` /
 >   `session_start` / `hmm_version` / `app_version` / `g1_mode` / `o1_mode` /
 >   `keyboard_layout` / `capabilities`。
 > - ⚠️★★★ **`os` は載っていない** —— `logger.rs::write_meta_start` が書いていないため
