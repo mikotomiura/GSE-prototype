@@ -91,7 +91,7 @@ printf '%s' "$out" | jq -e '
 
 # ---------- minimal（AC7 / AC8） ----------
 old_out="$(replay "$OLD" --features 2>/dev/null)" \
-  || fail "AC7: gse-replay --features が非 0 で終了した ($OLD・★ 古い形式で落ちてはならない)"
+  || fail "AC7: gse-replay --features が非 0 で終了した (${OLD}・★ 古い形式で落ちてはならない)"
 [ -n "$old_out" ] || fail "--features の出力が空 ($OLD)"
 printf '%s' "$old_out" | jq -e '
   all(.[]; .quality.capabilities == null and .quality.hook_health == null

@@ -75,6 +75,16 @@ SCAN_PY="$(
   cat << 'PY'
 import re, subprocess, sys
 
+# ⚠️★★ 出力を **UTF-8 に固定**する（2026-09-20 実測）。★ Windows の既定（cp932）だと
+#   VIOL 行に載る多バイトの断片（置換文字 `�` を含む）が encode できず、
+#   `UnicodeEncodeError` で **rc=1 のまま明細を 1 行も出さずに死ぬ**。
+#   ⚠️ これは本スクリプト冒頭が警戒している型そのもの（「違反があると言いながら明細が無い」）。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except Exception:
+        pass
+
 # ★ 走査対象の集め方。
 #   ⚠️ **拡張子だけに頼らない**（★ shebang しか手がかりの無いファイルを取りこぼす）。
 #   ⚠️★★ **未追跡のファイルも見る**（2026-08-29 実測: `git ls-files` だけだと
@@ -120,6 +130,15 @@ def is_shell_by_shebang(first_line):
 #   → ★ NUL 区切りで受け取れば quote されない。⚠️ あわせて OSError を
 #     **「検査できなかった」として数える**（★ 黙って飛ばさない）。
 SKIPPED = []
+# ⚠️★★ **入れ子の worktree / リポジトリ**（`git worktree add .worktrees/...` や
+#   submodule）は、`git ls-files --others` が **末尾 `/` の 1 エントリ**として返す。
+#   ★ これは「開けなかったファイル」ではなく**ディレクトリ**であり、必ず OSError になる。
+#   ⚠️ 2026-09-20 実測: `.worktrees/codex-rescue-20260916-theory-review/` が残っていたために
+#     本ゲートが **rc=2（検査できなかった）** で落ち、`check-o1-release-readiness.sh` の
+#     赤 3 件目になっていた（★ 違反は 1 件も無い）。
+#   → ★ **別枠で数えて note として必ず出す**（⚠️ 黙って消さない）。中のスクリプトは
+#     その worktree 自身の checkout の持ち物であり、この checkout の配布物ではない。
+NESTED = []
 
 
 def targets():
@@ -134,6 +153,11 @@ def targets():
             if not raw:
                 continue
             f = raw.decode("utf-8", "surrogateescape")
+            # ★ 末尾 `/` = 入れ子の worktree / リポジトリ（上記 NESTED の注記）。
+            #   ⚠️ 開こうとすると必ず OSError になるので、SKIPPED（fail-closed）に混ぜない。
+            if f.endswith("/"):
+                NESTED.append(f)
+                continue
             if f.endswith(EXTS):
                 bucket.append(f)
                 continue
@@ -183,6 +207,9 @@ if mode == "repo":
               file=sys.stderr)
         sys.exit(2)
     print("SCANNED %d %d" % (len(tracked), len(untracked)))
+    # ★ 入れ子の worktree は**飛ばしたことを必ず言う**（⚠️ 「走査した」と誤読させない）。
+    if NESTED:
+        print("NESTED %d %s" % (len(NESTED), ", ".join(NESTED[:5])))
     hits = scan(allf)
     # ⚠️★★ 開けなかったファイルがあれば **違反 0 件でも緑にしない**（fail-closed）。
     #   ★ 旧版はここが無かったので、非 ASCII 名の 2 本が消えたまま緑だった。
@@ -238,6 +265,16 @@ case "${scan_rc}" in
     [ -n "${SCAN_ERR}" ] && printf '%s\n' "${SCAN_ERR}" | sed 's/^/       /'
     ;;
 esac
+
+# ⚠️★★ **走査していないものを、緑のときこそ言う**（2026-09-20 追加）。
+#   ★ 入れ子の worktree / リポジトリ（`git worktree add .worktrees/...`）は
+#     `git ls-files --others` が末尾 `/` の 1 エントリで返すので走査できない。
+#   ⚠️ 黙って除くと「87 本走査して違反 0」だけが残り、**中の何本を見ていないかが消える**。
+NESTED_OUT="$(printf '%s\n' "${SCAN_OUT}" | grep '^NESTED ' || true)"
+if [ -n "${NESTED_OUT}" ]; then
+  printf '%s\n' "${NESTED_OUT}" \
+    | sed 's/^NESTED [0-9]* /       ★ 走査対象外（入れ子の worktree・中は別 checkout の持ち物）: /'
+fi
 
 # --- 2. ⚠️★★★ 収集経路の陽性対照 -------------------------------------------------
 #   ★ 上の「0 件」が **走査が空振りしたのではない**ことを、
