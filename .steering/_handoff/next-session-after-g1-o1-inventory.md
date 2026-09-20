@@ -70,11 +70,12 @@ git add -A / git add <dir> は使わない。.codex/budget.json を git checkout
 | cp932 で `run.sh` が偽の赤 2 件 | `run.sh` の inline python ＋ `check_g1_emails.py` の subprocess（`encoding` 明示）／出力は `PYTHONIOENCODING` |
 | 移植性ゲートが入れ子 worktree で rc=2 | `check-shell-portability.sh` の `NESTED` 別枠 ＋ 出力の UTF-8 固定 |
 | 上記に隠れていた**本物の違反 1 件** | `007-acceptance.sh:94` の `($OLD・` → `(${OLD}・` |
-| D6 の確認場所が無い（ADR-034 D1 律速 4） | `check-o1-release-readiness.sh [5]` ＋ G1 README §6.3。selftest 4 ケース |
+| ⚠️ selftest の**未定義関数 `clear_pending`**（本タスク以前から・該当ケースが空回りで緑） | `check-o1-release-readiness.sh` の selftest に定義を追加 |
+| D6 の確認場所が無い（ADR-034 D1 律速 4） | `check-o1-release-readiness.sh [5]` ＋ G1 README §6.3 ＋ 両文書のアンカー。selftest **7 ケース** |
 
 ★ ゲートの現在値（2026-09-20 実測）: `run.sh` = **exit 0** ／
 `check-shell-portability.sh` = **exit 0** ／ `check-o1-release-readiness.sh` = **exit 1・通過 21 / 未達 2**
-（★ 残り 2 は正しい赤: 同意未承認・タグ陳腐化）／ 同 `--selftest` = **通過 54 / 失敗 0**。
+（★ 残り 2 は正しい赤: 同意未承認・タグ陳腐化）／ 同 `--selftest` = **通過 57 / 失敗 0**。
 
 ## §5b ⚠️★★ 受けていないレビューが 1 系統ある（★ 先に片づける）
 
