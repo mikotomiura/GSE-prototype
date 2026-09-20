@@ -151,6 +151,33 @@ cd <repo> && bash scripts/check-g1-collection-readiness.sh --selftest
 - [ ] ⚠️★★★ **G1 の新コホートの収集を始める回のみ**:
       `bash scripts/check-g1-collection-readiness.sh` が exit 0
       (★ 開発の門ではない。⚠️ **今は赤いのが正しい** —— 前提条件 3 / 5 / 7 が未達)
+- [ ] ⚠️★★★ **`gse-dataset` へ何かを push する回のみ**（★ 下記 (i)）:
+      `bash scripts/check_no_feature_output.sh --root <gse-dataset のクローン>` が exit 0
+
+### (i) ⚠️★★★ `gse-dataset` 側の共有の門（★ 手動。CI では走らない）
+
+`gse-replay --features` の出力（**特徴行**）は**中間成果物**であり、`gse-dataset` へ共有しない
+(`docs/glossary.md`「特徴行」の逐語)。⚠️ `t_ms` は**絶対 epoch ms** で **`anonymize.rs` を
+一度も通っておらず**、`T1a` 以後は ms 粒度の pause 長とセッション横断の個人統計が載る ——
+`gse-dataset` へ出してよい唯一の共有物と定めた `metrics.json`（集計値・約 1KB）より
+遥かに粒度が高い。
+
+★ 本リポ側は CI で自動的に見ている（`ci.yml` の `frontend-check`）。
+⚠️★★★ **`gse-dataset` 側は見ていない** —— ★ 向こうには `.github` が無く **CI が存在しない**
+(2026-09-20 実測)。→ **push の前に手で回す**:
+
+```bash
+# ★ 先に門そのものが閉まることを確かめる (⚠️ 陽性対照 3 / 陰性対照 3)
+bash scripts/check_no_feature_output.sh --self-test
+
+# ★ gse-dataset のクローンを走査する (⚠️ 本機は C:\gse-dataset)
+bash scripts/check_no_feature_output.sh --root /c/gse-dataset
+```
+
+- exit 0 = 緑 / exit 1 = 違反あり / ⚠️ **exit 2 = 走査できなかった**（★ 緑として扱わない）
+- ⚠️ **この門が見ていないもの**: リポジトリの外（Slack / メール / USB）／
+  圧縮・暗号化された中身（`.zip` / `.age` / `.gz`）／ CSV・NDJSON へ変換された行。
+  → ★ script 冒頭に同じ一覧がある。
 
 ---
 

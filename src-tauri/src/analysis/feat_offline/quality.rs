@@ -38,8 +38,14 @@
 //! 3. **`capabilities` の形と大きさを検査する** (security-checker LOW-3):
 //!    JSON オブジェクトでない、または直列化して 4096 バイトを超えるものは
 //!    収集側 (`bin/replay.rs::collect_meta_capabilities`) が `Err` を返す。
-
-use std::sync::Arc;
+//!
+//! # 2026-09-20 改訂 (判断 3・封筒)
+//!
+//! ⚠️★★★ **`capabilities` の値は `Quality` から外れ、出力の封筒へ移った**
+//! (`bin/replay.rs::FeatureProvenance::capabilities`)。★ セッション不変の事実を
+//! 行ごとに複製しないため。⚠️ **「宣言が無い」という事実は tick 単位の欠測理由なので
+//! `missing_reasons` に残る** —— 本モジュールは値ではなく
+//! `capabilities_declared: bool` を受け取る。
 
 use super::stall_onset::observed_intervals;
 
@@ -96,47 +102,26 @@ pub struct ObservabilityMask {
     pub hook: Option<bool>,
 }
 
-/// `Option<Arc<serde_json::Value>>` を中身の JSON 値としてそのまま直列化する
-/// (`serde` の `rc` feature が使えないため自前で書く。`Cargo.toml` は触らない)。
-/// `None` は `null`、`Some(v)` は `v` そのものを出力する —— `Option<serde_json::Value>`
-/// だった頃と出力はバイト単位で同一になる。
-fn serialize_capabilities<S>(
-    value: &Option<Arc<serde_json::Value>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match value {
-        Some(v) => serde::Serialize::serialize(v.as_ref(), serializer),
-        None => serializer.serialize_none(),
-    }
-}
-
 /// 1 tick ぶんの `Q`。
 ///
 /// # causal / retrospective の区分
 ///
-/// `capabilities` は **セッション単位の宣言** (`meta` 行 1 回だけを読み、全 tick に複製する)。
 /// `hook_health` / `observability_mask.hook` は、その tick までに観測された `hook_health` 行
 /// だけで決まる **causal** な値。⚠️ 一方 `observability_mask.feat` は **retrospective**
 /// (`ObservabilityMask::feat` の doc 参照) —— 観測区間の右端が確定するまで、その tick の
 /// `feat` 行を最大 `hole_gap_ms` 程度先読みして初めて決まる。
+///
+/// # ⚠️★★★ `capabilities` はここに無い (2026-09-20・判断 3)
+///
+/// `meta` 行の `capabilities` は **セッション不変の事実**であり、行ごとに複製する意味が無い。
+/// `gse-replay --features` の出力では **封筒の `provenance.capabilities`** に 1 回だけ載る
+/// (`bin/replay.rs::FeatureProvenance`)。★ 本構造体が持つのは
+/// **tick ごとに値が変わりうるもの**だけである。
+/// ⚠️ ただし「宣言が無い」という事実は tick 単位の欠測理由として意味を持つので、
+/// `missing_reasons` の `"capability_undeclared"` は**そのまま残る**
+/// (`quality_column` の `capabilities_declared` 引数から立つ)。
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Quality {
-    /// `meta` 行の `capabilities` を加工せずそのまま載せる。宣言が無ければ `None`
-    /// (⚠️ 空配列・空オブジェクトで埋めない)。
-    ///
-    /// ⚠️★★★ 全行で **`Arc` を共有**し、行ごとに JSON を deep clone しない
-    /// (2026-09-18・code-reviewer M4: 疎な 20 万 tick で peak 1,005MB の実測)。
-    /// 出力 JSON は `Option<serde_json::Value>` だった頃と**バイト単位で同一**になる
-    /// (`serialize_capabilities` が中身をそのまま直列化する)。
-    ///
-    /// ★ 「そのまま」は **JSON 値としての等価**を指す —— オブジェクトのキーは
-    /// `serde_json` の既定 (feature `preserve_order` 無し) で辞書順に正規化される
-    /// (元の NDJSON のキー出現順とは限らない。「並べ替えない」ではない)。
-    #[serde(serialize_with = "serialize_capabilities")]
-    pub capabilities: Option<Arc<serde_json::Value>>,
     pub hook_health: Option<QualityHookHealth>,
     pub missing_reasons: Vec<String>,
     pub observability_mask: ObservabilityMask,
@@ -171,15 +156,17 @@ fn feat_mask_column(
 
 /// 1 Hz tick 単位の `Quality` 列を作る。`super::build_feature_rows` から呼ばれる。
 ///
-/// - `capabilities`: `meta` 行の値 (無ければ `None`)。全行に `Arc` を共有して複製する
-///   (deep clone しない)。
+/// - `capabilities_declared`: `meta` 行に `capabilities` の宣言があったか。
+///   ⚠️★★★ **値そのものは受け取らない** (2026-09-20・判断 3) —— 値は封筒
+///   (`bin/replay.rs::FeatureProvenance::capabilities`) が 1 回だけ持つ。ここで要るのは
+///   「宣言があったか」という真偽だけで、それが `"capability_undeclared"` を立てる。
 /// - `hook_health`: `hook_health` 行の列 (時刻昇順でなくてよい)。
 /// - `feat_ts` / `hole_gap_ms`: 008 の観測区間の入力と同じもの (別に読み直さない)。
 pub fn quality_column(
     tick_count: usize,
     grid_origin_ms: u64,
     tick_ms: u64,
-    capabilities: Option<Arc<serde_json::Value>>,
+    capabilities_declared: bool,
     hook_health: &[HookHealthEvent],
     feat_ts: &[u64],
     hole_gap_ms: u64,
@@ -191,7 +178,7 @@ pub fn quality_column(
     // ⚠️★★★ 判断 24: 持ち越しを区間で切るのは「feat 行を 1 本以上持つファイル」だけ
     // (原因は区別しない・feat 行の存在だけに依存する・プライバシー中立)。
     let has_feat_rows = !feat_ts.is_empty();
-    let capability_undeclared = capabilities.is_none();
+    let capability_undeclared = !capabilities_declared;
 
     let mut hh_idx = 0usize;
     let mut carried_alive: Option<bool> = None;
@@ -266,7 +253,6 @@ pub fn quality_column(
         reasons.sort();
 
         rows.push(Quality {
-            capabilities: capabilities.clone(),
             hook_health: hook_health_field,
             missing_reasons: reasons,
             observability_mask: mask,
@@ -281,13 +267,10 @@ pub fn quality_column(
 mod tests {
     use super::*;
 
-    fn caps() -> serde_json::Value {
-        serde_json::json!({
-            "unconditional": ["key"],
-            "threshold_gated": ["hook_health"],
-            "config_gated": []
-        })
-    }
+    // ⚠️ 2026-09-20 (判断 3): `caps()` ヘルパは消した。`quality_column` は
+    // `capabilities` の**値**を受け取らなくなり、テストが渡すのは真偽値だけになったため。
+    // ★ 値が封筒へ正しく載ることは `bin/replay.rs` の
+    // `envelope_carries_meta_facts_and_sharing_marker` が固定する。
 
     fn hh(t_ms: u64, alive: bool, dropped_delta: Option<u64>) -> HookHealthEvent {
         HookHealthEvent {
@@ -303,23 +286,14 @@ mod tests {
     #[test]
     fn missing_reasons_are_instrument_side_only() {
         const ALLOWED: [&str; 3] = ["capability_undeclared", "dropped_events", "hook_dead"];
-        let c = caps();
         let scenarios: Vec<Vec<Quality>> = vec![
-            quality_column(5, 0, 1000, None, &[], &[], 2000),
-            quality_column(
-                5,
-                0,
-                1000,
-                Some(Arc::new(c.clone())),
-                &[hh(500, false, Some(3))],
-                &[],
-                2000,
-            ),
+            quality_column(5, 0, 1000, false, &[], &[], 2000),
+            quality_column(5, 0, 1000, true, &[hh(500, false, Some(3))], &[], 2000),
             quality_column(
                 10,
                 0,
                 1000,
-                Some(Arc::new(c)),
+                true,
                 &[hh(2500, true, Some(0)), hh(7200, false, Some(9))],
                 &[0, 1000, 9000],
                 2000,
@@ -338,17 +312,18 @@ mod tests {
     }
 
     /// AC3: 被験者由来語 (一時停止 / 区間削除) がどんな入力でも出力に現れない。
-    /// ⚠️ `capabilities` はそのまま複製するフィールドなので対象外
-    /// (行種名としての `recording_pause` は許容される・007-acceptance.sh も除外している)。
+    /// ⚠️ 2026-09-20 (判断 3) 以後、`capabilities` は行に無い (封筒が持つ) ので、
+    /// ここで見るのは `missing_reasons` だけでよい。★ 封筒側の `capabilities` は
+    /// 「加工せずそのまま載せる」フィールドなので**この検査の対象外**であり、
+    /// `007-acceptance.sh` も封筒の `capabilities` を除外して走査している。
     #[test]
     fn participant_originated_reasons_are_never_emitted() {
         let forbidden = ["recording_pause", "redaction", "redact", "participant"];
-        let c = serde_json::json!({"unconditional": ["recording_pause"]});
         let rows = quality_column(
             5,
             0,
             1000,
-            Some(Arc::new(c)),
+            true,
             &[hh(500, false, Some(1))],
             &[0, 4500],
             2000,
@@ -368,7 +343,7 @@ mod tests {
     /// AC4: 欠測は `null`。`0` や空配列・空オブジェクトへフォールバックしない。
     #[test]
     fn missing_is_null_not_zero() {
-        let rows = quality_column(3, 0, 1000, None, &[], &[], 2000);
+        let rows = quality_column(3, 0, 1000, false, &[], &[], 2000);
         for row in &rows {
             assert_eq!(row.hook_health, None, "hook_health 行が無ければ null");
             assert_eq!(
@@ -378,12 +353,16 @@ mod tests {
         }
     }
 
-    /// AC7: `capabilities` が無い (宣言が無い) ことは `null` で表す。空配列で埋めない。
+    /// AC7: 宣言が無いことは `missing_reasons` の `capability_undeclared` で表す。
+    ///
+    /// ⚠️★★★ 2026-09-20 改訂 (判断 3): 旧版はここで `row.capabilities == None` も見ていたが、
+    /// `capabilities` は**封筒へ移した**ので行には無い。「宣言が無いことを `null` で表し、
+    /// 空配列・空オブジェクトで埋めない」という規律自体は封筒側へ移り、
+    /// `envelope-acceptance.sh` が `provenance.capabilities == null` を検査する。
     #[test]
-    fn absent_capabilities_is_null_not_empty() {
-        let rows = quality_column(2, 0, 1000, None, &[], &[], 2000);
+    fn absent_capabilities_is_reported_as_missing_reason() {
+        let rows = quality_column(2, 0, 1000, false, &[], &[], 2000);
         for row in &rows {
-            assert_eq!(row.capabilities, None);
             assert_eq!(
                 row.missing_reasons,
                 vec!["capability_undeclared".to_string()]
@@ -391,13 +370,27 @@ mod tests {
         }
     }
 
+    /// ★ 判断 3 の回帰: 宣言の**有無だけ**が行に効き、値そのものは行に現れない。
+    #[test]
+    fn declared_capabilities_do_not_appear_in_rows() {
+        let declared = quality_column(2, 0, 1000, true, &[], &[], 2000);
+        for row in &declared {
+            assert!(row.missing_reasons.is_empty());
+        }
+        // ⚠️ 行を直列化しても `capabilities` というキーは 1 つも出ない (封筒が持つ)。
+        let json = serde_json::to_string(&declared).expect("serialize");
+        assert!(
+            !json.contains("capabilities"),
+            "行に capabilities が漏れている: {json}"
+        );
+    }
+
     /// AC9: `feat` の穴には理由を付けない。`observability_mask.feat = false` とだけ書く。
     #[test]
     fn feat_hole_is_masked_without_a_reason() {
-        let c = caps();
         // 観測区間: [0, 1000] と [5000, 6000] (間の 2000..5000 が穴)。hole_gap_ms=1000。
         let feat_ts = [0, 1000, 5000, 6000];
-        let rows = quality_column(7, 0, 1000, Some(Arc::new(c)), &[], &feat_ts, 1000);
+        let rows = quality_column(7, 0, 1000, true, &[], &feat_ts, 1000);
         // tick 2,3,4 (t_k = 2000,3000,4000) は穴 (直前の区間終端 1000 から 4000 は超えず、
         // 区間 [5000,6000] とも交わらない)。
         for idx in [2usize, 3, 4] {
@@ -416,12 +409,11 @@ mod tests {
     /// `false` のまま (`hook_dead` も立ち続ける)。
     #[test]
     fn hook_state_carries_forward_until_next_row() {
-        let c = caps();
         let rows = quality_column(
             6,
             0,
             1000,
-            Some(Arc::new(c)),
+            true,
             &[hh(500, false, Some(0)), hh(4500, true, Some(0))],
             &[],
             2000,
@@ -439,7 +431,7 @@ mod tests {
     /// 境界: `hook_health` 行が 1 本も無い入力で panic しない。
     #[test]
     fn empty_hook_health_produces_null_mask_for_every_row() {
-        let rows = quality_column(4, 0, 1000, None, &[], &[], 2000);
+        let rows = quality_column(4, 0, 1000, false, &[], &[], 2000);
         assert_eq!(rows.len(), 4);
         for row in rows {
             assert_eq!(row.observability_mask.hook, None);
@@ -458,15 +450,7 @@ mod tests {
             hh(500, true, Some(0)),   // 穴の前: alive=true (tick 0)
             hh(6500, false, Some(0)), // 穴の後: alive=false (tick 6)
         ];
-        let rows = quality_column(
-            8,
-            0,
-            1000,
-            Some(Arc::new(caps())),
-            &hh_events,
-            &feat_ts,
-            1000,
-        );
+        let rows = quality_column(8, 0, 1000, true, &hh_events, &feat_ts, 1000);
         assert_eq!(rows.len(), 8);
 
         let feat_flags: Vec<bool> = rows.iter().map(|r| r.observability_mask.feat).collect();
@@ -511,17 +495,8 @@ mod tests {
     /// 1 本でも欠けていれば集約は `null`。`0` で埋めない。
     #[test]
     fn missing_dropped_delta_is_null_not_zero() {
-        let c = caps();
         // 1 行だけ、かつ欠けている → 集約は null、dropped_events も立たない。
-        let rows_missing = quality_column(
-            1,
-            0,
-            1000,
-            Some(Arc::new(c.clone())),
-            &[hh(100, true, None)],
-            &[],
-            2000,
-        );
+        let rows_missing = quality_column(1, 0, 1000, true, &[hh(100, true, None)], &[], 2000);
         assert_eq!(
             rows_missing[0].hook_health,
             Some(QualityHookHealth {
@@ -543,7 +518,7 @@ mod tests {
             1,
             0,
             1000,
-            Some(Arc::new(c.clone())),
+            true,
             &[hh(100, true, Some(5)), hh(200, true, None)],
             &[],
             2000,
@@ -555,7 +530,7 @@ mod tests {
             1,
             0,
             1000,
-            Some(Arc::new(c)),
+            true,
             &[hh(100, true, Some(5)), hh(200, true, Some(3))],
             &[],
             2000,
@@ -574,7 +549,7 @@ mod tests {
             1,
             0,
             1000,
-            None,
+            false,
             &[
                 HookHealthEvent {
                     t_ms: 100,
@@ -622,7 +597,7 @@ mod tests {
             1,
             0,
             1000,
-            Some(Arc::new(caps())),
+            true,
             &[
                 HookHealthEvent {
                     t_ms: 100,
@@ -683,15 +658,7 @@ mod tests {
                 dropped_delta: Some(0),
             },
         ];
-        let rows = quality_column(
-            4,
-            1000,
-            1000,
-            Some(Arc::new(caps())),
-            &hh_events,
-            &feat_ts,
-            2000,
-        );
+        let rows = quality_column(4, 1000, 1000, true, &hh_events, &feat_ts, 2000);
         assert_eq!(rows.len(), 4);
 
         // 原点より前の行: tick0 の集約 (hook_health) には含まれないが、持ち越しには使う。

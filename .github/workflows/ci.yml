@@ -702,6 +702,22 @@ jobs:
       #     「検査が空振りしていないこと」まで見る (上の 2 つの --self-test と同じ思想)。
       - name: Shell portability gate (bash 3.2 の変数名パース・対照つき)
         run: bash scripts/check-shell-portability.sh
+      # ⚠️★★★ `--features` 出力の共有の門 (2026-09-20 追加・起票 5)。
+      #   ★ 規約は前から在った —— `docs/glossary.md` の「特徴行」に逐語
+      #     「中間成果物であり gse-dataset へは共有しない」。
+      #   ⚠️ しかし **機械的な門が無かった** (2026-09-15 実測): `feat.json` / `features.json` /
+      #     `src-tauri/rows.json` / `experiments/x/feat.json` / `out.ndjson` は **すべて NOT ignored**。
+      #   ⚠️★★★ `.gitignore` にファイル名を足すのは**名前依存なので代替にならない**
+      #     (★ 起票 5 の逐語)。→ 中身で見る (マーカー ＋ 封筒を剥がした行の形の 2 本立て)。
+      #   ⚠️ 実測: 初版の検査器は **陽性対照 P2 (剥がした行の配列) を通していた**
+      #     (jq の `|` が `or` より弱く、2 本目の条件が元の文書を受けていなかった)。
+      #     → ★ `--self-test` を**先に**走らせ、門が閉まることまで見る。
+      #   ⚠️ この門が見ていないもの (リポジトリの外 / 圧縮済み / CSV・NDJSON 変換 /
+      #     **gse-dataset 側のコミット**) は script 冒頭に列挙してある。
+      - name: Feature-output sharing gate self-test (門が実際に閉まるか)
+        run: bash scripts/check_no_feature_output.sh --self-test
+      - name: Feature-output sharing gate (--features 出力をコミットしていないか)
+        run: bash scripts/check_no_feature_output.sh
       # ⚠️★★★ Loop 基盤の安全装置 (2026-09-14 追加)。
       #   ★ 無人モードC は worktree の中で `claude -p` を回すので、**承認する人が居ない**。
       #     → ⚠️ `permissions.deny` が worktree に入っていないと `git push` / `gh pr merge` が通りうる。

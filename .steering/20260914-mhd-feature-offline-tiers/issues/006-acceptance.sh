@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # issue 006 (T1d restart) の AC 検査
+# ⚠️★★★ 2026-09-20（封筒・起票 2）: `--features` の出力は
+#   **`{ provenance, config, rows }` の封筒**になった（判断 25 #14）。
+#   ★ 本検査は取得時に `jq '.rows'` で**行だけを取り出して**おり、
+#     以降の `.[]` / `all(.[]; ...)` は封筒を剥がした後の配列を指す。
+#   ⚠️★★★ **この検査は `provenance` と `config` を 1 つも見ていない。**
+#     ★ 封筒自体の検査は `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
+#   ★ 封筒が無い（配列のままの）出力では `jq '.rows'` が失敗し、
+#     `set -o pipefail` によりその場で赤になる（fail-closed）。
 set -uo pipefail
 fail() { echo "[acceptance 006] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
 cd src-tauri || fail "src-tauri が無い"
 SRC="src/analysis/feat_offline/restart.rs"
 
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features 2>/dev/null)" \
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq '.rows')" \
   || fail "gse-replay --features が非 0 で終了した"
 [ -n "$out" ] || fail "--features の出力が空"
 

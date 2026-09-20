@@ -97,12 +97,15 @@ pub struct StallOnsetInputs<'a> {
 /// `stall_onset_inputs.feat_ts` / `stall_onset_inputs.config.hole_gap_ms` をそのまま使う
 /// (feat 時刻を別に読み直さない・issue 007 Allowed Files 節)。
 pub struct QualityInputs<'a> {
-    /// `meta` 行の `capabilities` (無ければ `None`)。加工しない。
+    /// `meta` 行に `capabilities` の宣言があったか。
     ///
-    /// ⚠️★★★ `Arc` で共有する (2026-09-18・判断 24・code-reviewer M4) —— 行ごとに JSON を
-    /// deep clone しないため。呼び出し側 (`bin/replay.rs`) が収集直後に 1 度だけ `Arc::new`
-    /// で包む。
-    pub capabilities: Option<std::sync::Arc<serde_json::Value>>,
+    /// ⚠️★★★ **値そのものは受け取らない** (2026-09-20・判断 3)。★ `capabilities` は
+    /// セッション不変の事実なので、`gse-replay --features` の出力では**封筒**
+    /// (`bin/replay.rs::FeatureProvenance::capabilities`) が 1 回だけ持つ。
+    /// ここで要るのは「宣言があったか」という真偽だけで、それが tick ごとの
+    /// `missing_reasons` に `"capability_undeclared"` を立てる。
+    /// ★ これにより `Arc` 共有 (2026-09-18・判断 24・code-reviewer M4) も不要になった。
+    pub capabilities_declared: bool,
     /// `hook_health` 行の列 (順不同でよい)。
     pub hook_health: &'a [quality::HookHealthEvent],
 }
@@ -317,7 +320,7 @@ pub fn build_feature_rows(
         tick_count,
         grid_origin_ms,
         ENGINE_TICK_MS,
-        quality_inputs.capabilities.clone(),
+        quality_inputs.capabilities_declared,
         quality_inputs.hook_health,
         stall_onset_inputs.feat_ts,
         stall_onset_inputs.config.hole_gap_ms,
@@ -372,7 +375,7 @@ mod tests {
 
     fn test_quality_inputs() -> QualityInputs<'static> {
         QualityInputs {
-            capabilities: None,
+            capabilities_declared: false,
             hook_health: &[],
         }
     }

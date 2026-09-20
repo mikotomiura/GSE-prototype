@@ -17,6 +17,14 @@
 #
 # ★ ACC_REPLAY_CMD を与えると gse-replay の代わりにそのコマンドを使う（★ 検査自体の 3 状態テスト用）。
 #   ACC_SKIP_SRC=1 でソース検査を省く（同上）。
+# ⚠️★★★ 2026-09-20（封筒・起票 2）: `--features` の出力は
+#   **`{ provenance, config, rows }` の封筒**になった（判断 25 #14）。
+#   ★ 本検査は取得時に `jq '.rows'` で**行だけを取り出して**おり、
+#     以降の `.[]` / `all(.[]; ...)` は封筒を剥がした後の配列を指す。
+#   ⚠️★★★ **この検査は `provenance` と `config` を 1 つも見ていない。**
+#     ★ 封筒自体の検査は `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
+#   ★ 封筒が無い（配列のままの）出力では `jq '.rows'` が失敗し、
+#     `set -o pipefail` によりその場で赤になる（fail-closed）。
 set -uo pipefail
 fail() { echo "[acceptance 007] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
@@ -41,35 +49,55 @@ ALLOWED='["capability_undeclared","dropped_events","hook_dead"]'
 PARTICIPANT_RE='(recording_pause|redaction|redact|participant|subject_|一時停止|区間削除|削除要求)'
 
 # ---------- instrument_rich（AC1 / AC3 / AC6 / AC8） ----------
-out="$(replay "$RICH" --features 2>/dev/null)" || fail "gse-replay --features が非 0 で終了した ($RICH)"
-[ -n "$out" ] || fail "--features の出力が空"
+# ⚠️★★★ 2026-09-20（封筒・判断 3）: `capabilities` は **行から封筒へ移った**ので、
+#   ここだけ封筒ごと (`env_out`) と行だけ (`out`) の両方を持つ。
+env_out="$(replay "$RICH" --features 2>/dev/null)" || fail "gse-replay --features が非 0 で終了した ($RICH)"
+[ -n "$env_out" ] || fail "--features の出力が空"
+out="$(printf '%s' "$env_out" | jq '.rows')" \
+  || fail "出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 
 # AC1
 printf '%s' "$out" | jq -e '
   all(.[];
     (.quality | type == "object")
-    and (.quality | has("capabilities") and has("hook_health")
+    and (.quality | has("hook_health")
          and has("missing_reasons") and has("observability_mask")))' >/dev/null 2>&1 \
   || fail "AC1: 全行に quality の必須フィールドが揃っていない"
 
 # ⚠️★★★ 出力キー集合の**完全一致**（★ privacy の門）。フィールドが 1 つ増えたら**必ず落とす**。
+#   ⚠️ 2026-09-20（判断 3）: `capabilities` を規範の集合から外した。★ 行に戻ってきたら落とす。
 printf '%s' "$out" | jq -e '
   ([.[].quality | keys_unsorted[]] | unique
-     == ["capabilities","hook_health","missing_reasons","observability_mask"])
+     == ["hook_health","missing_reasons","observability_mask"])
   and ([.[].quality.observability_mask | keys_unsorted[]] | unique == ["feat","hook"])
   and ([.[].quality.hook_health | select(. != null) | keys_unsorted[]] | unique
      == ["alive","dropped_delta","rehook","starved_ms"])' >/dev/null 2>&1 \
-  || fail "quality / observability_mask / hook_health のキー集合が規範と完全一致しない（★ 増えても減っても落とす）"
+  || fail "quality / observability_mask / hook_health のキー集合が規範と完全一致しない（★ 増えても減っても落とす。⚠️ capabilities は封筒へ移した）"
 
-# AC6 ＋ capabilities は meta の値を**加工せずそのまま**全行に載せる
+# AC6 ＋ capabilities は meta の値を**加工せずそのまま**封筒に 1 回だけ載せる（判断 3）
 meta_cap="$(jq -c 'select(.type=="meta" and has("capabilities")) | .capabilities' "$RICH" | head -1)"
 [ -n "$meta_cap" ] || fail "前提: $RICH の meta に capabilities が無い"
-printf '%s' "$out" | jq -e --argjson cap "$meta_cap" 'all(.[]; .quality.capabilities == $cap)' >/dev/null 2>&1 \
-  || fail "AC6: capabilities が meta の値と JSON 値として等価でない行がある（★ 加工・欠落をしない。⚠️ キー順は辞書順に正規化されうるので jq の == で比べる）"
+printf '%s' "$env_out" | jq -e --argjson cap "$meta_cap" '.provenance.capabilities == $cap' >/dev/null 2>&1 \
+  || fail "AC6: 封筒の provenance.capabilities が meta の値と JSON 値として等価でない（★ 加工・欠落をしない。⚠️ キー順は辞書順に正規化されうるので jq の == で比べる）"
 
-# AC3: ⚠️★★★ 被験者由来の欠測理由が 1 つも出ていないこと（★ capabilities を除いた出力全体を見る）
-if printf '%s' "$out" | jq -c 'map(.quality |= del(.capabilities))' | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
-  fail "AC3: 出力に被験者由来の欠測理由が現れている（★ ADR-030 D10 / docs/o1-deletion-ledger.md）"
+# AC3: ⚠️★★★ 被験者由来の欠測理由が 1 つも出ていないこと
+#   ⚠️★★★ 2026-09-20（判断 3 / 判断 4）: **走査対象は `rows` だけ**である。
+#   ★ 封筒を除外する理由は 2 つ:
+#     (1) `provenance.capabilities` は「加工せずそのまま載せる」フィールドで、
+#         instrument_rich の宣言には**行種名** `recording_pause` が含まれる（判断 21 と同じ事情）。
+#     (2) `provenance.source_basename` は**入力ファイルの名前**で、実運用では `..._P003.ndjson`
+#         のように参加者 ID を含みうる。★ 研究者の手元のファイル名であり新しい漏洩先を作らない、
+#         と裁定した（判断 4）。→ ⚠️ **この検査は意図して封筒を見ていない。**
+if printf '%s' "$out" | jq -c '.' | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
+  fail "AC3: 行に被験者由来の欠測理由が現れている（★ ADR-030 D10 / docs/o1-deletion-ledger.md）"
+fi
+
+# AC3b: ★ 封筒のうち、**上の 2 つを除いた部分**には被験者由来語が現れないこと。
+#   ⚠️ 封筒を丸ごと検査の外へ出すと「封筒なら何でも書ける」になる。★ 穴を 2 つに限定して塞ぐ。
+if printf '%s' "$env_out" \
+   | jq -c 'del(.provenance.capabilities) | del(.provenance.source_basename) | del(.rows)' \
+   | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
+  fail "AC3b: 封筒（capabilities / source_basename を除く）に被験者由来の語が現れている"
 fi
 
 # AC2: 許可リスト方式
@@ -90,20 +118,26 @@ printf '%s' "$out" | jq -e '
   || fail "AC8: instrument_rich の quality が正解表と一致しない（★ issues/007.md の規範となる定義を参照）。実際: $(printf '%s' "$out" | jq -c '[.[] | .quality | [.hook_health, .missing_reasons, .observability_mask]]' 2>/dev/null | head -c 1500)"
 
 # ---------- minimal（AC7 / AC8） ----------
-old_out="$(replay "$OLD" --features 2>/dev/null)" \
+old_env="$(replay "$OLD" --features 2>/dev/null)" \
   || fail "AC7: gse-replay --features が非 0 で終了した (${OLD}・★ 古い形式で落ちてはならない)"
-[ -n "$old_out" ] || fail "--features の出力が空 ($OLD)"
+[ -n "$old_env" ] || fail "--features の出力が空 ($OLD)"
+old_out="$(printf '%s' "$old_env" | jq '.rows')" \
+  || fail "AC7: 古い形式の出力から封筒の .rows を取り出せない"
+# ⚠️★★★ 2026-09-20（判断 3）: 「宣言が無いことを `null` で表し、空配列・空オブジェクトで
+#   埋めない」という規律は**封筒へ移った**。行に残るのは `capability_undeclared` の理由だけ。
+printf '%s' "$old_env" | jq -e '.provenance.capabilities == null' >/dev/null 2>&1 \
+  || fail "AC7: 宣言の無い入力で封筒の provenance.capabilities が null でない（★ 空配列・空オブジェクトで埋めない）"
 printf '%s' "$old_out" | jq -e '
-  all(.[]; .quality.capabilities == null and .quality.hook_health == null
+  all(.[]; (.quality | has("capabilities") | not) and .quality.hook_health == null
            and .quality.missing_reasons == ["capability_undeclared"]
            and .quality.observability_mask == {"feat":false,"hook":null})' >/dev/null 2>&1 \
-  || fail "AC7/AC8: minimal.ndjson の quality が正解表と一致しない（★ capabilities は null・理由は capability_undeclared だけ）"
+  || fail "AC7/AC8: minimal.ndjson の quality が正解表と一致しない（★ 行に capabilities は無い・理由は capability_undeclared だけ）"
 if printf '%s' "$old_out" | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
   fail "AC3: 古い形式の出力に被験者由来の理由が現れている"
 fi
 
 # ---------- stall_onset_observed とその削除版（AC8 / AC9） ----------
-obs_out="$(replay "$OBS" --features 2>/dev/null)" || fail "gse-replay --features が非 0 で終了した ($OBS)"
+obs_out="$(replay "$OBS" --features 2>/dev/null | jq '.rows')" || fail "gse-replay --features が非 0 で終了した ($OBS)"
 printf '%s' "$obs_out" | jq -e 'length == 220 and all(.[]; .quality.observability_mask.feat == true)' >/dev/null 2>&1 \
   || fail "AC8: stall_onset_observed で mask.feat が全行 true でない（★ feat 行は途切れていない）"
 
@@ -111,14 +145,15 @@ T=1700000000000
 jq -c --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
   select(((.t // .ts // 0) < $lo) or ((.t // .ts // 0) > $hi))' "$OBS" > "$tmpd/redacted.ndjson" \
   || fail "削除版の生成に失敗"
-red_out="$(replay "$tmpd/redacted.ndjson" --features 2>/dev/null)" || fail "削除版で --features が非 0 で終了した"
+red_out="$(replay "$tmpd/redacted.ndjson" --features 2>/dev/null | jq '.rows')" || fail "削除版で --features が非 0 で終了した"
 printf '%s' "$red_out" | jq -e '
   [to_entries[] | select(.value.quality.observability_mask.feat == false) | .key] == [range(99; 140)]' >/dev/null 2>&1 \
   || fail "AC9: 削除版で mask.feat = false が tick 99〜139 だけに立っていない。実際: $(printf '%s' "$red_out" | jq -c '[to_entries[] | select(.value.quality.observability_mask.feat == false) | .key] | [first, last, length]' 2>/dev/null)"
 printf '%s' "$red_out" | jq -e 'all(.[]; .quality.missing_reasons == ["capability_undeclared"])' >/dev/null 2>&1 \
   || fail "AC9: ⚠️★★★ 削除版で穴に理由が付いている（★ 穴は mask.feat=false とだけ書く。理由を付けない）"
-if printf '%s' "$red_out" | jq -c 'map(.quality |= del(.capabilities))' | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
-  fail "AC3: 削除版の出力に被験者由来の語が現れている"
+# ⚠️ 2026-09-20（判断 3）: `capabilities` は行に無いので `del` は要らなくなった。
+if printf '%s' "$red_out" | jq -c '.' | grep -nEi "$PARTICIPANT_RE" >/dev/null 2>&1; then
+  fail "AC3: 削除版の行に被験者由来の語が現れている"
 fi
 
 # ---------- 判断 24 の改訂（AC13 / AC14 / AC15） ----------
@@ -130,13 +165,13 @@ fi
 } > "$tmpd/obs_hook.ndjson"
 jq -c --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
   select(((.t // .ts // 0) < $lo) or ((.t // .ts // 0) > $hi))' "$tmpd/obs_hook.ndjson" > "$tmpd/obs_hook_red.ndjson"
-hk_out="$(replay "$tmpd/obs_hook.ndjson" --features 2>/dev/null)" || fail "AC13: hook 入り入力で --features が非 0"
+hk_out="$(replay "$tmpd/obs_hook.ndjson" --features 2>/dev/null | jq '.rows')" || fail "AC13: hook 入り入力で --features が非 0"
 printf '%s' "$hk_out" | jq -e '
   ([.[].quality.observability_mask.hook]
      == ([range(50)] | map(null)) + ([range(70)] | map(true)) + ([range(100)] | map(false)))
   and ([to_entries[] | select(.value.quality.missing_reasons | index("hook_dead")) | .key] == [range(120; 220)])' >/dev/null 2>&1 \
   || fail "AC13: 穴の無い入力で hook の持ち越し（null×50 / true×70 / false×100）と hook_dead（tick 120〜219）が正解と一致しない"
-hkr_out="$(replay "$tmpd/obs_hook_red.ndjson" --features 2>/dev/null)" || fail "AC13: hook 入り削除版で --features が非 0"
+hkr_out="$(replay "$tmpd/obs_hook_red.ndjson" --features 2>/dev/null | jq '.rows')" || fail "AC13: hook 入り削除版で --features が非 0"
 printf '%s' "$hkr_out" | jq -e '
   ([.[].quality.observability_mask.hook]
      == ([range(50)] | map(null)) + ([range(49)] | map(true)) + ([range(121)] | map(null)))
@@ -148,7 +183,7 @@ TR=1700000100000
 { cat "$RICH"
   echo "{\"type\":\"hook_health\",\"t\":$((TR + 8000)),\"alive\":true,\"starved_ms\":0,\"rehook\":false,\"dropped\":0}"
 } > "$tmpd/rich_legacy.ndjson"
-lg_out="$(replay "$tmpd/rich_legacy.ndjson" --features 2>/dev/null)" || fail "AC14: 旧形式の hook_health 入りで --features が非 0"
+lg_out="$(replay "$tmpd/rich_legacy.ndjson" --features 2>/dev/null | jq '.rows')" || fail "AC14: 旧形式の hook_health 入りで --features が非 0"
 printf '%s' "$lg_out" | jq -e '
   (.[7].quality.hook_health == {"alive":true,"starved_ms":0,"rehook":false,"dropped_delta":null})
   and (.[7].quality.missing_reasons == [])
@@ -186,8 +221,13 @@ if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
     fail "AC11: $SRCF の本体が穴 / 区間の判定関数を独自に定義している（★ observed_intervals を使う）"
   fi
   # ★ AC の test が実在すること
+  # ⚠️ 2026-09-20（判断 3）: `absent_capabilities_is_null_not_empty` は
+  #   `absent_capabilities_is_reported_as_missing_reason` へ改名した（★ 行に `capabilities` が
+  #   無くなり、`null` を見る側が封筒へ移ったため）。★ 値が行へ漏れないことは
+  #   `declared_capabilities_do_not_appear_in_rows` が張る。
   for t in missing_reasons_are_instrument_side_only participant_originated_reasons_are_never_emitted \
-           missing_is_null_not_zero absent_capabilities_is_null_not_empty \
+           missing_is_null_not_zero absent_capabilities_is_reported_as_missing_reason \
+           declared_capabilities_do_not_appear_in_rows \
            feat_hole_is_masked_without_a_reason hook_state_carries_forward_until_next_row \
            hook_carry_is_cut_at_observed_interval_boundaries missing_dropped_delta_is_null_not_zero \
            aggregation_of_multiple_rows_in_one_tick in_tick_dead_row_sets_hook_dead_even_if_state_ends_alive \
@@ -195,7 +235,8 @@ if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
     grep -qE "fn ${t}\b" "$SRCF" || fail "AC の test \`$t\` が $SRCF に無い"
   done
   for t in malformed_hook_health_line_does_not_break_run_replay non_object_or_oversized_capabilities_is_an_error \
-           quality_inputs_reach_feature_rows_through_the_collectors; do
+           quality_inputs_reach_feature_rows_through_the_collectors \
+           envelope_carries_meta_facts_and_sharing_marker; do
     grep -qE "fn ${t}\b" src/bin/replay.rs || fail "AC の test \`$t\` が bin/replay.rs に無い"
   done
 

@@ -81,6 +81,175 @@ const MAX_FEATURE_TICKS: usize = 1_000_000;
 /// 「宣言が無い」と誤報になる)。
 const MAX_CAPABILITIES_BYTES: usize = 4096;
 
+/// `provenance.source_sha256` に出す 16 進の桁数 (= 8 バイトぶん)。
+///
+/// ★ 目的は「同じ入力かどうか」の同定であって暗号学的な衝突耐性ではない。
+/// 64 桁を丸ごと出しても人が読めないので先頭だけを出す。
+const SOURCE_SHA256_HEX_CHARS: usize = 16;
+
+/// `--features` 出力の封筒 (起票 2・判断 25 #14 逐語 `{ provenance, config, rows }`)。
+///
+/// ⚠️★★★ **2026-09-20 以前はトップレベルが `FeatureRow` の配列だった。**
+/// ★ 配列のままだと**複数セッションの出力を結合したとき、どの行がどの計器条件で
+/// 取れたか失われる** (起票 2)。封筒はその 1 点を直す。
+///
+/// ★ 封筒は **`bin/replay.rs` が組み立てる** —— 中身は `meta` 行 / 入力ファイル /
+/// CLI の設定値であり、どれも「セッションの計算」ではなく「実行の由来」だからである
+/// (`analysis/feat_offline/` は OS 非依存の計算層で、ファイルパスも CLI 引数も知らない)。
+#[derive(Debug, serde::Serialize)]
+struct FeatureEnvelope<'a> {
+    provenance: FeatureProvenance,
+    config: FeatureConfigDto,
+    rows: &'a [gse_next_lib::analysis::feat_offline::FeatureRow],
+}
+
+/// 「この出力を共有してはいけない」ことと、**なぜ共有できないか**を出力自身に刻む
+/// (起票 5・判断 5)。
+///
+/// ⚠️★★★ **規約は前から在ったが、機械的な門が無かった** —— `docs/glossary.md` の
+/// 「特徴行」に逐語「中間成果物であり `gse-dataset` へは共有しない」と書いてあり、
+/// `--features` の usage にも書いたが、**検査器が拾える鍵がどこにも無かった**。
+/// ★ `.gitignore` に慣用ファイル名を足すのは**名前依存なので代替にならない**
+/// (起票 5 の逐語)。→ 中身に鍵を置く。
+///
+/// ★ `scripts/check_no_feature_output.sh` がこのマーカーを探す。
+#[derive(Debug, serde::Serialize)]
+struct SharingMarker {
+    /// ★ 固定値 `"prohibited"`。⚠️ **真偽値にしない** —— `false` が書ける形は
+    /// 「共有してよい `--features` 出力がありうる」と読まれる。そういう出力は無い。
+    gse_dataset: &'static str,
+    /// ⚠️ `t_ms` を含む全行が `anonymize.rs` を**一度も通っていない**という事実。
+    anonymized: bool,
+    /// ⚠️ `t_ms` が**絶対 epoch ms** であるという事実 (セッション相対ではない)。
+    absolute_epoch_ms: bool,
+    /// 規約の在処 (逐語ではなく参照。★ 文言の SSOT は `docs/glossary.md` 側)。
+    rule: &'static str,
+}
+
+impl Default for SharingMarker {
+    fn default() -> Self {
+        Self {
+            gse_dataset: "prohibited",
+            anonymized: false,
+            absolute_epoch_ms: true,
+            rule: "docs/glossary.md 特徴行",
+        }
+    }
+}
+
+/// 封筒の `provenance` —— 「どの計器条件で・どの入力から・何が出したか」。
+///
+/// ⚠️★★★ **載せられるのは NDJSON から読めるものだけである。**
+/// ★ 起票 2 は「OS」も挙げていたが、`meta` 行に `os` は**無い** (`logger.rs::write_meta_start`
+/// を 2026-09-20 に実測)。それを足すのは**計器の変更** (起票 1・ADR-032 の領域) であり、
+/// ここで推測して埋めない。
+#[derive(Debug, serde::Serialize)]
+struct FeatureProvenance {
+    sharing: SharingMarker,
+    /// ★ 固定値。どのツールが出したか。
+    tool: &'static str,
+    /// このバイナリの `CARGO_PKG_VERSION`。
+    ///
+    /// ⚠️★★★ **生成時刻 (`generated_at`) は載せない** (判断 7) —— 載せると
+    /// 同じ入力から同じ出力が出なくなり、「出力が変わらないこと」を検査できなくなる
+    /// (`reproducibility-discipline` と衝突する)。いつ生成したかは mtime で足りる。
+    tool_version: &'static str,
+    /// 入力 NDJSON のファイル名 (⚠️ **ディレクトリは含めない**)。
+    ///
+    /// ⚠️ 実セッションでは参加者 ID (`..._P003.ndjson`) を含みうる。★ それを承知で
+    /// 載せる (判断 4) —— 入力は研究者の手元にあるファイルの名前であり、
+    /// **新しい漏洩先を作らない**。一方 `rows` には個人を混ぜないという規律は狭めない。
+    source_basename: String,
+    /// 入力 NDJSON の SHA-256 先頭 [`SOURCE_SHA256_HEX_CHARS`] 桁。
+    /// ★ 名前が変わっても同じ入力を同定するため。
+    source_sha256: String,
+    /// 以下は `meta`(session_start) 行から読む。★ 行が無い / キーが無いなら `null`。
+    /// ⚠️ **欠けていても `--features` は落とさない** (旧ログ互換。`hook_health` と同じ作法)。
+    session_start: Option<u64>,
+    /// ⚠️ **収集時**の `HMM_VERSION`。★ `config.hmm_version` (**解析時** = このバイナリ) とは
+    /// 意味が違う。古いログを新しいバイナリで読むと食い違い、**それが読めること自体が目的**。
+    hmm_version: Option<String>,
+    app_version: Option<String>,
+    g1_mode: Option<String>,
+    o1_mode: Option<String>,
+    keyboard_layout: Option<String>,
+    /// `meta` 行の `capabilities` を加工せずそのまま。宣言が無ければ `null`
+    /// (⚠️ 空配列・空オブジェクトで埋めない)。
+    ///
+    /// ⚠️★★★ **2026-09-20 (判断 3) に `rows[].quality` から移した。**
+    /// ★ セッション不変の事実を行ごとに複製する意味が無いため。
+    /// ⚠️ 「宣言が無い」という事実は tick 単位の欠測理由として意味を持つので、
+    /// `rows[].quality.missing_reasons` の `"capability_undeclared"` は**そのまま残る**。
+    capabilities: Option<serde_json::Value>,
+}
+
+/// 封筒の `config` —— この出力を再現するのに要る設定値。
+///
+/// ★ 判断 25 #13 (`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 /
+/// `T1a` の窓 を P1 前に 1 本の宣言文書で凍結し、**同時に CLI 注入を作る**) の**受け皿**である。
+/// ⚠️ 本タスクは受け皿を作るだけで、値は `StallOnsetConfig::default()` のまま。
+///
+/// ⚠️★★★ **θ_person の分位点はここに入れない** —— θ は**設定ではなく結果**
+/// (ADR-008 D4 の `within_session_adaptive`) であり、行の `stall_onset.theta_person_ms` が持つ。
+/// 設定と結果を同じ箱に入れない。
+#[derive(Debug, serde::Serialize)]
+struct FeatureConfigDto {
+    /// 条件 A の因果窓長 (ms・ADR-030 D4)。
+    w_ms: u64,
+    /// θ_person の分位点 (ADR-030 D4)。
+    q: f64,
+    /// `t0` 直後の buffer (ms・ADR-030 D2)。
+    b_ms: u64,
+    /// 条件 A の産出判定閾値 (ADR-030 D3)。
+    net_diff_min: u64,
+    /// 観測区間を切る閾値 (ms・ADR-030 D8 (b-2))。
+    hole_gap_ms: u64,
+    /// θ の標本数の下限 (`null` = 下限を課さない・ADR-030 D4 点 1)。
+    warmup_count: Option<usize>,
+    /// [`MAX_FEATURE_TICKS`]。★ 出力がこの上限で止められたかを後から判別できる。
+    max_feature_ticks: usize,
+    /// ⚠️ **解析時** (このバイナリ) の `HMM_VERSION`。`provenance.hmm_version` (収集時) と別物。
+    hmm_version: &'static str,
+    /// tick 幅 (`loop_step::ENGINE_TICK_MS`)。
+    engine_tick_ms: u64,
+    /// 「単純 pause」の閾値 (`features::PAUSE_THRESHOLD_MS`)。
+    pause_threshold_ms: u64,
+}
+
+impl FeatureConfigDto {
+    fn from_stall_onset_config(
+        c: &gse_next_lib::analysis::feat_offline::StallOnsetConfig,
+        max_feature_ticks: usize,
+    ) -> Self {
+        Self {
+            w_ms: c.w_ms,
+            q: c.q,
+            b_ms: c.b_ms,
+            net_diff_min: c.net_diff_min,
+            hole_gap_ms: c.hole_gap_ms,
+            warmup_count: c.warmup_count,
+            max_feature_ticks,
+            hmm_version: HMM_VERSION,
+            engine_tick_ms: ENGINE_TICK_MS,
+            pause_threshold_ms: gse_next_lib::analysis::features::PAUSE_THRESHOLD_MS,
+        }
+    }
+}
+
+/// `meta`(session_start) 行から読めるセッション単位の事実 (封筒の `provenance` 用)。
+///
+/// ⚠️ **`os` は含まない** —— `logger.rs::write_meta_start` が書いていないため
+/// (2026-09-20 実測)。★ 足すのは計器の変更 (起票 1・ADR-032) であってここではない。
+#[derive(Debug, Default)]
+struct MetaSessionFacts {
+    session_start: Option<u64>,
+    hmm_version: Option<String>,
+    app_version: Option<String>,
+    g1_mode: Option<String>,
+    o1_mode: Option<String>,
+    keyboard_layout: Option<String>,
+}
+
 /// `--calibration` で受け付ける 1 被験者あたりのセッションファイル数の上限。
 ///
 /// 各ファイルは `MAX_SESSION_BYTES` で保護されるが、ファイル**数**が無制限だと
@@ -821,9 +990,13 @@ fn usage() -> String {
          --sweep             nudge_need を 0.50–0.90 で振り reason 別 HIR / 閾値別指標を複数セッションでプール出力 (production 不変)\n    \
          --nudge-diag        ACT decision を reason×GT で層別し決定時の特徴量分布 (min/med/max) を出力 (FP/TP 分離診断)\n    \
          --corr-floor        correction_after_pause veto floor (f4/f6) の counterfactual 候補比較 (production 不変)\n    \
-         --features          ADR-030 の Tier 別 1 Hz tick 単位特徴行を JSON 配列で出力\n    \
+         --features          ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力\n    \
+         出力は { provenance, config, rows } の封筒形 (2026-09-20・起票 2)\n    \
+         provenance に由来 (meta 由来の事実 / 入力の basename・sha256 / capabilities)\n    \
          *** 手元の解析用中間成果物であり gse-dataset へ共有しない ***\n    \
          *** t_ms は絶対 epoch ms で、匿名化 (anonymize.rs) を通っていない ***\n    \
+         *** provenance.sharing がこの 2 点を出力自身に刻む ***\n    \
+         *** 門: scripts/check_no_feature_output.sh (CI で走る) ***\n    \
          --json              集計系モード (--metrics/--segments/--intervention/--calibration/--sweep/--nudge-diag/--corr-floor) の出力を JSON へ\n    \
          -h, --help          このヘルプを表示\n",
     )
@@ -1116,16 +1289,34 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        // 起票 2 (封筒): `meta` 行のセッション単位の事実と、入力ファイルの同一性を読む。
+        // ⚠️ どちらも「行の計算」ではなく「実行の由来」なので、`feat_offline` ではなく
+        // ここ (CLI) が読む。
+        let meta_facts = match collect_meta_session_facts(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect meta session facts: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let source_sha256 = match sha256_prefix_of_file(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to hash session file: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        let stall_onset_config = gse_next_lib::analysis::feat_offline::StallOnsetConfig::default();
         let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
             feat_ts: &feat_ts,
             task_kind_declarations: &task_kind_declarations,
-            config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
+            config: stall_onset_config,
         };
-        // ⚠️★★★ `Arc` で 1 度だけ包む (2026-09-18・判断 24・code-reviewer M4)。
-        // `quality::quality_column` は行ごとにこの `Arc` を clone するだけで、JSON を
-        // deep clone しない。
+        // ⚠️★★★ 2026-09-20 改訂 (判断 3・封筒): 行には `capabilities` の**値を渡さない**。
+        // 宣言の有無だけが tick ごとの `missing_reasons` に効き、値は封筒が 1 回だけ持つ。
+        // ★ これで 2026-09-18 に入れた `Arc` 共有 (判断 24・code-reviewer M4) も不要になった。
         let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
-            capabilities: capabilities.map(std::sync::Arc::new),
+            capabilities_declared: capabilities.is_some(),
             hook_health: &hook_health_events,
         };
         let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
@@ -1142,22 +1333,44 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        let envelope = FeatureEnvelope {
+            provenance: FeatureProvenance {
+                sharing: SharingMarker::default(),
+                tool: "gse-replay",
+                tool_version: env!("CARGO_PKG_VERSION"),
+                source_basename: source_basename_of(&args.session_path),
+                source_sha256,
+                session_start: meta_facts.session_start,
+                hmm_version: meta_facts.hmm_version,
+                app_version: meta_facts.app_version,
+                g1_mode: meta_facts.g1_mode,
+                o1_mode: meta_facts.o1_mode,
+                keyboard_layout: meta_facts.keyboard_layout,
+                capabilities,
+            },
+            config: FeatureConfigDto::from_stall_onset_config(
+                &stall_onset_config,
+                MAX_FEATURE_TICKS,
+            ),
+            rows: &rows,
+        };
         // ⚠️★★★ 2026-09-18 改訂 (判断 24・security-checker LOW-3): `to_string_pretty` で
         // 一旦 `String` に全体を確保してから書き出すのをやめ、`to_writer_pretty` で
-        // `BufWriter` へ直接流す (巨大な出力を 2 重に確保しない)。★ 出力はバイト単位で
-        // 従来と同一 (末尾に改行を 1 つ書く点も同じ)。
+        // `BufWriter` へ直接流す (巨大な出力を 2 重に確保しない)。
+        // ★ 2026-09-20 (起票 2): 流し込む対象が配列から封筒へ変わったが、
+        //   `rows` を**参照で**持つので行を複製しない点は変わらない。
         let stdout = std::io::stdout();
         let mut writer = std::io::BufWriter::new(stdout.lock());
-        if let Err(e) = serde_json::to_writer_pretty(&mut writer, &rows) {
-            tracing::error!("failed to serialize feature rows: {}", e);
+        if let Err(e) = serde_json::to_writer_pretty(&mut writer, &envelope) {
+            tracing::error!("failed to serialize feature envelope: {}", e);
             return ExitCode::from(1);
         }
         if let Err(e) = writer.write_all(b"\n") {
-            tracing::error!("failed to write feature rows: {}", e);
+            tracing::error!("failed to write feature envelope: {}", e);
             return ExitCode::from(1);
         }
         if let Err(e) = writer.flush() {
-            tracing::error!("failed to flush feature rows: {}", e);
+            tracing::error!("failed to flush feature envelope: {}", e);
             return ExitCode::from(1);
         }
         return ExitCode::SUCCESS;
@@ -1738,6 +1951,103 @@ fn collect_meta_capabilities(session_path: &PathBuf) -> Result<Option<serde_json
         );
     }
     Ok(None)
+}
+
+/// `--features` の封筒用: NDJSON の `meta` 行からセッション単位の事実を取り出す (起票 2)。
+///
+/// `collect_meta_capabilities` と同じ作法で、行をまず `serde_json::Value` として読む
+/// (⚠️ `ReplayEvent::Meta` に型付きフィールドを足さない —— 2026-09-18・security-checker
+/// LOW-1 で「型付きフィールドを足したことで `run_replay` 側の受理集合が狭まった」実害が出た)。
+///
+/// ★ `session_start` を**持つ最初の `meta` 行**を採る。⚠️ ローテートで複数ファイルを
+/// 連結した NDJSON では `meta`(session_start) が複数ありうるが、封筒が表すのは
+/// 「この出力を作った入力」であり、★ 先頭が入力の開始である。
+///
+/// ⚠️★★★ **欠けていても `Err` にしない。** キーが無い / 値の型が違う / `meta` 行そのものが
+/// 無い場合は該当フィールドが `None` になるだけである (旧ログ互換。`hook_health` と同じ作法・
+/// 007 の AC12)。★ `capabilities` だけは形の検査を `collect_meta_capabilities` が担い、
+/// そちらは壊れた宣言を `Err` にする (判断 24・AC15) —— 役割が違うので統合しない。
+fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let reader = BufReader::new(file);
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let raw: serde_json::Value = match serde_json::from_str(&line) {
+            // ⚠️ パース不能な行は黙って読み飛ばす (`collect_meta_capabilities` と同じ)。
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if raw.get("type").and_then(|t| t.as_str()) != Some("meta") {
+            continue;
+        }
+        // ★ `session_end` 形の `meta` 行には `session_start` が無いので、ここで弾かれる。
+        let Some(session_start) = raw.get("session_start").and_then(|v| v.as_u64()) else {
+            continue;
+        };
+        let str_field = |k: &str| -> Option<String> {
+            raw.get(k).and_then(|v| v.as_str()).map(|s| s.to_string())
+        };
+        return Ok(MetaSessionFacts {
+            session_start: Some(session_start),
+            hmm_version: str_field("hmm_version"),
+            app_version: str_field("app_version"),
+            g1_mode: str_field("g1_mode"),
+            o1_mode: str_field("o1_mode"),
+            keyboard_layout: str_field("keyboard_layout"),
+        });
+    }
+    Ok(MetaSessionFacts::default())
+}
+
+/// `--features` の封筒用: 入力ファイルの SHA-256 先頭 [`SOURCE_SHA256_HEX_CHARS`] 桁を返す。
+///
+/// ⚠️ **ファイル全体をメモリに載せない** —— 8 KiB ずつ読んで流し込む
+/// (`MAX_SESSION_BYTES` は 500 MB を許すので、一括読みは OOM 経路になる)。
+///
+/// ★ 目的は「同じ入力かどうか」の同定であって改竄検知ではない。
+fn sha256_prefix_of_file(path: &Path) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    let file = File::open(path).map_err(|e| format!("cannot open {}: {}", path.display(), e))?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = std::io::Read::read(&mut reader, &mut buf)
+            .map_err(|e| format!("read error on {}: {}", path.display(), e))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    let digest = hasher.finalize();
+    let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+    Ok(hex[..SOURCE_SHA256_HEX_CHARS].to_string())
+}
+
+/// `--features` の封筒用: 入力パスからファイル名だけを取り出す。
+///
+/// ⚠️ **ディレクトリを含めない** —— パスには利用者のホームディレクトリ名が含まれうる。
+/// ★ ファイル名が取れない入力 (末尾が `..` 等) では `"<unknown>"` を返す
+/// (⚠️ ここで `Err` にして `--features` を落とさない —— 由来が 1 つ欠けることは
+/// 特徴行が出せない理由にならない)。
+fn source_basename_of(path: &Path) -> String {
+    path.file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("<unknown>")
+        .to_string()
 }
 
 /// `--features` (issue 007・`Q`) 専用の `hook_health` DTO。★ フィールド名は
@@ -3494,7 +3804,7 @@ mod tests {
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
         let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
-            capabilities: capabilities.clone().map(std::sync::Arc::new),
+            capabilities_declared: capabilities.is_some(),
             hook_health: &hook_health_events,
         };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
@@ -3536,13 +3846,109 @@ mod tests {
             }
         }
 
-        for row in &rows {
-            assert_eq!(
-                row.quality.capabilities.as_deref(),
-                capabilities.as_ref(),
-                "capabilities は meta の値と (collector 経由でも) 等しいこと"
-            );
-        }
+        // ⚠️★★★ 2026-09-20 (判断 3・封筒): `capabilities` は行から封筒へ移した。
+        // ★ ここでは「行に漏れていないこと」だけを固定し、値が `meta` と等しいことは
+        //   `envelope_carries_meta_facts_and_sharing_marker` が封筒側で固定する。
+        let rows_json = serde_json::to_string(&rows).expect("serialize rows");
+        assert!(
+            !rows_json.contains("capabilities"),
+            "行に capabilities が残っている (封筒へ移したはず)"
+        );
+    }
+
+    /// 起票 2 / 5 の回帰: `--features` の封筒が `meta` 由来の事実・入力の同一性・
+    /// 「共有しない」のマーカーを持ち、**同じ入力から同じ出力**になること。
+    ///
+    /// ⚠️ ここは配線 (`collect_meta_session_facts` / `sha256_prefix_of_file` /
+    /// `FeatureEnvelope`) の固定であり、封筒の受け入れ検査そのものは
+    /// `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
+    #[test]
+    fn envelope_carries_meta_facts_and_sharing_marker() {
+        let path = fixture_path("instrument_rich.ndjson");
+
+        let facts = collect_meta_session_facts(&path).expect("collect meta facts");
+        assert!(
+            facts.session_start.is_some(),
+            "instrument_rich の meta は session_start を持つはず"
+        );
+        // ⚠️★★★ **収集時と解析時の `hmm_version` は食い違いうる。**
+        // ★ `instrument_rich.ndjson` の `meta.hmm_version` は "0.2.0"、現行バイナリの
+        //   `HMM_VERSION` は "0.5.0" (2026-09-20 実測)。★ 封筒が両方を別フィールドで
+        //   持つ理由がまさにこれで、**食い違いが読めること自体が目的**である
+        //   (`provenance.hmm_version` = 収集時 / `config.hmm_version` = 解析時)。
+        assert_eq!(
+            facts.hmm_version.as_deref(),
+            Some("0.2.0"),
+            "fixture の meta.hmm_version をそのまま読むこと (現行バイナリの値へ寄せない)"
+        );
+        assert_ne!(
+            facts.hmm_version.as_deref(),
+            Some(HMM_VERSION),
+            "★ この fixture では収集時と解析時が食い違う —— 揃ってしまったら、\
+             封筒が 2 つのフィールドを持つ意味を別の fixture で張り直すこと"
+        );
+
+        // ★ sha256 は 16 桁の 16 進で、2 回読んでも同じ。
+        let h1 = sha256_prefix_of_file(&path).expect("hash once");
+        let h2 = sha256_prefix_of_file(&path).expect("hash twice");
+        assert_eq!(h1, h2, "同じファイルのハッシュは変わらない");
+        assert_eq!(h1.len(), SOURCE_SHA256_HEX_CHARS);
+        assert!(
+            h1.chars().all(|c| c.is_ascii_hexdigit()),
+            "16 進以外の文字が出た: {h1}"
+        );
+
+        // ★ basename はディレクトリを含まない。
+        let base = source_basename_of(&path);
+        assert_eq!(base, "instrument_rich.ndjson");
+        assert!(!base.contains('/') && !base.contains('\\'));
+
+        // ★ マーカーは固定値で、真偽値 2 つは「匿名化を通っていない・絶対 epoch」を意味する。
+        let marker = serde_json::to_value(SharingMarker::default()).expect("serialize marker");
+        assert_eq!(marker["gse_dataset"], "prohibited");
+        assert_eq!(marker["anonymized"], false);
+        assert_eq!(marker["absolute_epoch_ms"], true);
+
+        // ★ config は解析時の値で、`StallOnsetConfig::default()` をそのまま映す。
+        let cfg = gse_next_lib::analysis::feat_offline::StallOnsetConfig::default();
+        let dto = serde_json::to_value(FeatureConfigDto::from_stall_onset_config(
+            &cfg,
+            MAX_FEATURE_TICKS,
+        ))
+        .expect("serialize config");
+        assert_eq!(dto["w_ms"], cfg.w_ms);
+        assert_eq!(dto["hole_gap_ms"], cfg.hole_gap_ms);
+        assert_eq!(dto["max_feature_ticks"], MAX_FEATURE_TICKS);
+        assert_eq!(dto["hmm_version"], HMM_VERSION);
+        assert_eq!(dto["engine_tick_ms"], ENGINE_TICK_MS);
+    }
+
+    /// ⚠️ `meta` 行が無い / `session_start` を持たない NDJSON でも封筒は落ちない
+    /// (旧ログ互換・`hook_health` と同じ作法)。★ 由来が読めないことは、
+    /// 特徴行が出せない理由にならない。
+    #[test]
+    fn meta_facts_are_all_none_when_meta_is_absent() {
+        let dir = std::env::temp_dir().join(format!("gse-envelope-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("no_meta.ndjson");
+        std::fs::write(
+            &path,
+            "{\"type\":\"key\",\"t\":1,\"vk\":65,\"press\":true}\n\
+             {\"type\":\"meta\",\"session_end\":9}\n\
+             not json at all\n",
+        )
+        .expect("write");
+
+        let facts = collect_meta_session_facts(&path).expect("collect meta facts");
+        assert!(facts.session_start.is_none());
+        assert!(facts.hmm_version.is_none());
+        assert!(facts.app_version.is_none());
+        assert!(facts.g1_mode.is_none());
+        assert!(facts.o1_mode.is_none());
+        assert!(facts.keyboard_layout.is_none());
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&dir);
     }
 
     /// ★ `collect_all_ime_shadow_events` → `build_feature_rows` の**配線**が生きていること
@@ -3595,7 +4001,7 @@ mod tests {
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
         let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
-            capabilities: None,
+            capabilities_declared: false,
             hook_health: &[],
         };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
@@ -3676,7 +4082,7 @@ mod tests {
             config: gse_next_lib::analysis::feat_offline::StallOnsetConfig::default(),
         };
         let quality_inputs = gse_next_lib::analysis::feat_offline::QualityInputs {
-            capabilities: None,
+            capabilities_declared: false,
             hook_health: &[],
         };
         let rows = gse_next_lib::analysis::feat_offline::build_feature_rows(
