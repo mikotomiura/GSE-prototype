@@ -18,17 +18,32 @@
 - [x] `CLAUDE.md` の Skill 表 ＋ §4 に入口
 - [x] memory 4 件をポインタへ縮小 ＋ `MEMORY.md` の 4 行を更新
 
-## 検証（`empirical-prompt-tuning` Lite）
+## 検証（`empirical-prompt-tuning` Lite・詳細は `verification.md`）
 - [x] **Iteration 0**: description と body の乖離を修正（★ 入れ子 / 渡すかの判断 / brief が
       description に無かった）
-- [ ] **Iteration 1**: 別エージェントに 1 シナリオを渡し、要件 7 項目で採点 ＋ 「詰まった点」を回収
-- [ ] **Iteration 2**: 詰まった点を Skill へ反映 → 再実行して改善を確認
-- [ ] ⚠️ 改行コードが LF であることを確認（`tr -cd '\r' | wc -c` が 0）
+- [x] **Iteration 1**: 要件 **7/7（100%）**だが ⚠️ **詰まりが 5 件**（★ 実行者は推測で埋めて満点を取った）
+- [x] **Iteration 2**: 5 点中 **4 点が「Skill に答えあり」**へ。残る 1 点は
+      ⚠️ **シナリオ側の欠陥**（git 操作を禁じたため Skill と矛盾した）。新たな穴 1 件を一般形で反映
+- [x] ⚠️ 改行コードが LF（★ `SKILL.md` / `literature-review.md` / `verification.md` とも CR=0）
 
 ## レビュー
-- [ ] `code-reviewer`（opus・★ 範囲と禁止事項と締切を明記）
-- [ ] `/cross-review`（⚠️ 予算残と相談。★ 本タスクは文書のみなので 1 巡でも可）
-- [ ] `/finish-task`
+- [x] `code-reviewer`（opus・★ 範囲と禁止事項と締切を明記）
+      → ⚠️ **HIGH 5 / MEDIUM 6 / LOW 3。一次で裏取りして偽陽性 0。全件反映**（`110c41f`）
+- [x] `security-checker` → ⚠️★ **skip。理由: 本タスクは `.md` のみ 8 ファイル**で、
+      rust/ts **0 件**・schema **0 件**。★ 外部入力・認証・データ保存に触れていない
+      （`.claude/agents/security-checker.md` の起動条件に該当しない）
+- [x] `test-runner` → ⚠️★ **skip。理由: 同上（コード変更 0 件）**
+- [x] schema parity check → ⚠️★ **skip。理由: `schema_dto.rs` / `schema/current.json` 未変更**
+- [x] `/cross-review`（Codex） → ⚠️★★★ **skip。理由: 研究者の指示**（2026-09-20・
+      「finish-task へ進めよう」）。★ 予算は残 **78,542 / per_inv 30,000** で通せたが、
+      **本タスクは文書のみ**であり、⚠️ Codex は repo を読めないので
+      （memory「Codex は repo を読めない」）**プロンプトに全文を貼る必要があり割に合わない**と判断
+- [x] `/finish-task`
+
+## ⚠️ マージ時にやること（★ 本ブランチでは触らない）
+- [ ] `.steering/_handoff/README.md` に本タスクの行を足す
+      —— ⚠️ **本ブランチでは編集しない**。★ 同ファイルは `feature/g1-collection-readiness-gate`
+      が既に書き換えており、**両方で触ると衝突する**。→ マージの後に 1 行足す。
 
 ## ⚠️ 起票（★ 本タスクでは直さない）
 1. **`cross-reviewer` の文書と実体の食い違い** —— `/cross-review` Step 5 は
