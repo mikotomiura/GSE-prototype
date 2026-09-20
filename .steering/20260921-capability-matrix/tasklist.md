@@ -38,8 +38,9 @@
       `esc_count` の OS 間比較を凍結
 - [x] MEDIUM 対応: 条件数 10 / `meta` のキー数の限定語 / 同意逐語の裏取り（判断 10）/ 出力先を M4 へ
 - [x] LOW 対応: D5 の表は 2 行である旨 / `feat_offline` は mod.rs 除き 7
-- [ ] `/cross-review` 2 巡
+- [x] `/cross-review` **1 巡目**（★ 5 件すべて採用）
+- [x] `/cross-review` **2 巡目**（★ 5 件すべて採用。⚠️ うち 1 件は**定義そのものの穴**・判断 12）
 
 ## 完了処理
 - [x] decisions.md
-- [ ] git commit
+- [x] git commit
