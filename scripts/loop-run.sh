@@ -508,12 +508,12 @@ run_issue() {
     #
     # ⚠️★★★ **保存する前に必ず伏せる**（★ `security-checker` HIGH・2026-09-20）:
     #   ★ `.tool_input.command` は worker が組み立てた**自由文字列**であり、
-    #     `GH_TOKEN=ghp_… gh api …` / `curl -H "Authorization: Bearer …"` の形で
+    #     `CI_TOKEN=<値> gh api …` / `curl -H "Authorization: Bearer …"` の形で
     #     ⚠️ **資格情報がそのまま入りうる**。★ 保存先は 2 か所（events の detail ＋ 生配列）で、
     #     どちらも**恒久**に残る（`cleanup_tmp` の対象外）。
     #   → ★ `DENY_REDACT` で (a) `KEY=VALUE` の値 (b) 秘密らしいキーの直後の値 を伏せ、
     #     (c) 1 件 200 文字で切る。⚠️ **伏せてから集計キーを作る**
-    #     （★ そうしないと「先頭 2 語」が `GH_TOKEN=ghp_…` を狙い撃ちで拾う）。
+    #     （★ そうしないと「先頭 2 語」が `CI_TOKEN=<値>` を狙い撃ちで拾う）。
     denials="$(printf '%s' "$res" | jq -r '(.permission_denials // []) | length' 2>/dev/null || echo 0)"
     if [ "${denials:-0}" -gt 0 ]; then
       local by_tool art tmp_art
