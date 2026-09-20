@@ -145,6 +145,73 @@ ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 d
   return 1
 }
 
+# ---------- worktree が期待どおりのブランチに居ることを保証する ----------
+# ⚠️★★★ **これが worktree 隔離の「境界」である**（★ 起票 10 の是正・判断 1 / 2・2026-09-20）。
+#   ★ 実測（2026-09-15・issue 004）で worker が `git checkout main` を打ち、
+#     worktree が `main` を掴んだまま attempt が終わった。reflog 逐語:
+#       `92fd22f HEAD@{0}: checkout: moving from loop/004-issue to main`
+#   ⚠️ このとき `run_verify` は **別ブランチの内容を検査して緑/赤を出す**。
+#
+# ⚠️★★★ **`deny` では閉じない**（★ 2026-09-20 に実測 —— `measurements.md` M3）:
+#   ★ 必須 deny に `Bash(git checkout:*)` を足しても、**`git -C . checkout main` は
+#     拒否 0 件で通り、ブランチが動いた**。前置一致は綴りを網羅できない。
+#   → ★ だから**到達した綴りを問わず、結果（HEAD）だけを見る**。
+#
+# ⚠️ **自動で戻さない**（★ 判断 2）。`ensure_deny` は「検知して再注入」する型だが、
+#   ここは違う: ★ 未コミットの変更を抱えたまま `git checkout` で戻すと、
+#   **変更が別ブランチへ持ち越されるか checkout 自体が失敗する**。
+#   ⚠️ 起票 10 の実害が「無かった」のは worker が commit **後**に checkout したからで、
+#   ★ 自動復帰はその偶然に依存する設計になる。→ **記録して止める (fail-closed)**。
+#
+# ⚠️★★★ **ブランチ「名」だけでは、名前を保ったままの履歴入れ替えを見逃す**
+#   （★ `security-checker` MEDIUM・2026-09-20）。★ `git reset --soft|--mixed <other>` /
+#   `git branch -f loop/<id>-issue <other>` は **HEAD の symbolic ref を保ったまま**中身を差し替える
+#   （⚠️ deny に在るのは `git reset --hard:*` だけである）。
+#   → ★ 第 5 引数に「**worktree を作った時点の commit**」を渡したときは、
+#     **現 HEAD がその子孫であること**も見る。
+#
+#   ⚠️★★★ **アンカーは「attempt 開始前の HEAD」にしてはならない**
+#     （★ Codex `/cross-review` HIGH・2026-09-20。⚠️ 最初はそう書いていた）:
+#     ★ attempt 2 の worker が **attempt 1 のコミットを `git commit --amend`** すると、
+#       新しい HEAD は同じ親を持つ別コミットになり、⚠️ **直前の HEAD は祖先でなくなる**。
+#       → ★ 正当な作業が blocked になる（`git commit --amend` は deny に無い）。
+#     ★ **worktree 生成時点**に固定すれば、worker が自分のコミットをどう作り直しても
+#       アンカーは常に祖先のままであり、⚠️ **他ブランチへの差し替えだけが不一致になる**。
+#
+# ⚠️★★★ **それでも見ていないもの**（★ 明示する。⚠️ 2 つある）:
+#   (a) `git restore --source=<other> -- .` / `git read-tree -u` のような
+#       **HEAD を 1 mm も動かさない内容の差し替え**は原理的に拾えない。
+#   (b) **同じブランチ内の巻き戻し** —— `git reset --soft|--mixed <anchor>` は
+#       HEAD がアンカーそのものになるので `--is-ancestor` は **TRUE を返す**
+#       （★ 2026-09-20 に実測。Codex `/cross-review` 2 巡目 HIGH）。
+#       ⚠️ ただし **`--soft` / `--mixed` は作業ツリーを保つ**ので、
+#       ★ `run_verify` が測る内容は worker の成果物のままである（★ これも実測した）。
+#       → ★ 害は「**コミットが捨てられる**」であって「**別の内容を測る**」ではない。
+#       ★ これは判断 5（「未コミットで終わる」を失敗にしない）と**同じ型**として**許容する**。
+#       ⚠️ `git reset --hard` は deny に在るので別（★ そちらは作業ツリーも消す）。
+#   ★ ここが「境界」の限界である。⚠️ **deny で塞ぐ方向に戻さない**（★ M3 のとおり閉じない）。
+ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [worktree生成時の-sha]; 0 = 期待どおり
+  local id="$1" phase="$2" attempt="$3" wt="$4" base="${5:-}" head
+  # ★ detached HEAD は `HEAD` という文字列が返るので、下の case に当たらず不一致になる (正しい)。
+  head="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  case "$head" in
+    # ★ 前方一致にする: `loop-spawn.sh` の branch は `loop/<id>-<short>` で、
+    #   ⚠️ `short` は第 2 引数で可変（モードC は省略して既定 `issue`）。
+    #   ★ 厳密一致にすると将来 short を渡した瞬間に全 attempt が blocked になる。
+    "loop/$id"|"loop/$id-"*) : ;;
+    *)
+      emit "$id" "$phase" blocked attempt="$attempt" \
+           detail="worktree が loop/$id-* から外れている (HEAD=${head:-取得不能})。別ブランチを verify しないため停止する。★ worktree は残す: ${wt} ／ ⚠️ 撤去は「git worktree remove --force ${wt}」を手で (★ loop-spawn.sh --cleanup はブランチ名で引くので逸脱した worktree を撤去できない —— 起票 18)"
+      return 1 ;;
+  esac
+  if [ -n "$base" ] && ! git -C "$wt" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+    emit "$id" "$phase" blocked attempt="$attempt" \
+         detail="worktree の履歴が入れ替わっている (HEAD=$head が worktree 生成時の $base の子孫でない)。★ reset --soft/--mixed や branch -f で中身が差し替わった可能性。★ worktree は残す: $wt"
+    return 1
+  fi
+  return 0
+}
+
 # ---------- issue のメタ抽出 ----------
 issue_file() { printf '%s/issues/%s.md' "$TASK_DIR" "$1"; }
 issue_ids() {
@@ -168,6 +235,25 @@ issue_deps() { # 実行時に使う版。自己依存は落としてデッドロ
   issue_deps_raw "$1" | grep -vx "$1" || true
 }
 issue_verify_level() { grep -m1 -E '^verify_level:' "$(issue_file "$1")" | awk '{print $2}'; }
+
+# ⚠️★★★ `## Status` を読む (★ 判断 26 の申し送り・判断 4・2026-09-20)。
+#   ★ これが無いと `--issues` なしの実行で **`blocked` の issue も走る**。
+#     実績: issue 004 は blocked のまま回されて **attempt 1〜3 を失った**。
+#   ★ 節の**最初の非空行**を見る。⚠️ 実際の値は
+#     `blocked（★ 2026-09-19 更新・判断 26 —— …）` のように注釈が続くので、**前方一致**で判定する。
+issue_status() { # issue_status <id> → ## Status 節の最初の非空行 (無ければ空文字)
+  issue_field "$1" Status 2>/dev/null | grep -m1 -v '^[[:space:]]*$' || true
+}
+# ⚠️★★★ **装飾を剥がしてから判定する**（★ `code-reviewer` MEDIUM・2026-09-20）。
+#   ⚠️ 素の前方一致は、実在する書式で **fail-open する**（★ 2026-09-20 に全 issue を走査して実測）:
+#     `.steering/20260911-outcome-arbitration-and-o1-preflight/issues/008.md` → `✅ **done**（2026-09-12）`
+#     同 `009.md` → `⚠️★★★ **不要（not needed）** ——`
+#   → ★ 同じ書き手が `⚠️ **blocked**（…）` と書いた瞬間に **blocked の issue が既定実行に載る**
+#     （＝ 起票の動機そのものが再発する）。
+#   ★ 先頭の ASCII 英字までを捨ててから小文字化する（⚠️ `${v,,}` は bash 3.2 に無いので `tr`）。
+issue_status_key() { # issue_status_key <id> → 判定用に正規化した文字列
+  issue_status "$1" | sed -e 's/^[^A-Za-z]*//' | tr 'A-Z' 'a-z'
+}
 
 # ---------- fingerprint ----------
 # ⚠ 既定の抽出を `grep -aiE 'fail|error|assert'` だけにしてはならない。
@@ -299,6 +385,35 @@ WORK_TMP="$(mktemp -d)"
 cleanup_tmp() { rm -rf "$WORK_TMP" "$TOKENS_FILE" "$COST_FILE" "$TOKENS_FILE.lock" 2>/dev/null || true; }
 trap cleanup_tmp EXIT
 
+# ⚠️★★★ **run をまたいで残す**置き場 (★ 起票 3・判断 3)。
+#   ★ `WORK_TMP` は上の `cleanup_tmp` で run 終了時に消えるので、**後から読みたいものは置けない**。
+#   ⚠️ `.gitignore` に `.steering/**/_loop-artifacts/` を入れてある
+#     （★ 無いと `loop-spawn.sh` の dirty-tree 判定に当たって次の issue が死ぬ）。
+ARTIFACTS_DIR="$TASK_DIR/_loop-artifacts"
+
+# ⚠️★★★ 保存する前に資格情報を伏せる jq の前置き（★ `security-checker` HIGH・2026-09-20）。
+#   ★ 3 段: (a) 秘密らしいキーの直後の値 (b) `KEY=VALUE` の値 (c) 200 文字で切る。
+#   ⚠️ **完全ではない**（★ 明示する）—— 任意の位置に置かれた裸のトークン
+#     （例: `gh api -f body=<token>` 以外の形、base64 の断片）は伏せられない。
+#     ★ ここは「よくある形を減らす」多層防御であって、**秘密を入れてよい置き場ではない**。
+DENY_REDACT='
+def redact:
+  gsub("(?<a>authorization|token|secret|password|passwd|api[-_]?key|access[-_]?token|bearer)(?<b>[^[:alnum:]]{1,3})(?<c>[^[:space:]]+)"; .a + .b + "***"; "i")
+  | gsub("(?<p>^|[[:space:]])(?<n>[A-Za-z_][A-Za-z0-9_]*)=(?<v>[^[:space:]]+)"; .p + .n + "=***")
+  | if (length > 200) then .[0:200] + "…(切り詰め)" else . end;
+'
+
+# ⚠️ 古い artifacts を掃除する（★ `security-checker` HIGH の「保持期間が無い」）。
+#   ★ `.gitignore` 済みなので `git status` に出ず、**増え続けても誰も気づかない**。
+#   ⚠️ 失敗しても run は止めない（★ 掃除は本務ではない）。
+if [ -d "$ARTIFACTS_DIR" ]; then
+  pruned="$(find "$ARTIFACTS_DIR" -type f -name '*-denials.json*' -mtime +14 -print 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "${pruned:-0}" -gt 0 ]; then
+    find "$ARTIFACTS_DIR" -type f -name '*-denials.json*' -mtime +14 -delete 2>/dev/null || true
+    log "14 日より古い denials 成果物を $pruned 件削除した → $ARTIFACTS_DIR"
+  fi
+fi
+
 usage_tokens() { # stdin = claude の JSON → 合計トークン
   jq -r '(.usage.input_tokens // 0) + (.usage.output_tokens // 0)
        + (.usage.cache_read_input_tokens // 0) + (.usage.cache_creation_input_tokens // 0)' 2>/dev/null || echo 0
@@ -317,9 +432,19 @@ cost_used()   { cat "$COST_FILE"; }
 
 # ---------- 1 issue の attempt ループ ----------
 run_issue() {
-  local id="$1" wt attempt=1 same=0 last_fp="" fp
+  local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor
   wt="$(LOOP_NO_EXEC=1 bash "$MAIN_ROOT/scripts/loop-spawn.sh" --no-exec "$id" 2>/dev/null | tail -1)"
   [ -d "${wt:-}" ] || { emit "$id" execute blocked detail="worktree 生成に失敗"; return 1; }
+
+  # ⚠️★★★ **履歴検査のアンカーは「worktree を作った時点」に固定する**
+  #   （★ Codex `/cross-review` HIGH・2026-09-20）。
+  #   ⚠️ attempt ごとの「直前の HEAD」を使うと、attempt 2 の worker が
+  #     **attempt 1 のコミットを `git commit --amend`** した瞬間に祖先関係が切れ、
+  #     ★ 正当な作業が blocked になる（`git commit --amend` は deny に無い）。
+  #   ★ 生成時点なら、worker が自分のコミットをどう作り直してもアンカーは祖先のままで、
+  #     ⚠️ **他ブランチへの差し替えだけが不一致になる**。
+  #   ⚠️ 取れなければ空のまま進む（★ 名前の検査は base 無しでも効く。fail-open にはしない）。
+  wt_anchor="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
 
   while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     if [ "$(tokens_used)" -ge "$TOKEN_CEIL" ]; then
@@ -327,8 +452,29 @@ run_issue() {
     fi
     emit "$id" execute attempt_start attempt="$attempt"
 
+    # ⚠️★★★ **blocked を承知で回したことを events に残す**（★ `security-checker` MEDIUM・2026-09-20）。
+    #   ★ 除外も迂回も従来は `log`（stdout）と `_loop-run-report.md`（**gitignore 済み**）にしか出ず、
+    #     ⚠️ **後から監査できるのが端末のスクロールバックだけ**になっていた。
+    #   ★ events 語彙は増やさない —— `ensure_deny` と同じ「`attempt_start` ＋ `detail`」の作法。
+    if [ "$attempt" = "1" ]; then
+      case " $BYPASSED_BLOCKED " in
+        *" $id "*) emit "$id" execute attempt_start attempt="$attempt" \
+                        detail="WARN: Status=blocked の issue を --issues で明示指定して実行している ($(issue_status "$id" | head -c 120))" ;;
+      esac
+    fi
+
     # ⚠️★★★ **毎 attempt** 必須 deny を保証する (★ 詳細は ensure_deny の冒頭)。
     ensure_deny "$id" execute "$attempt" "$wt" || return 1
+    # ★ 前の attempt が残した逸脱を次の attempt に持ち越さない (★ 詳細は ensure_branch の冒頭)。
+    #
+    # ⚠️★★★ **この 1 行は、現在のモードC では到達しない**（★ `code-reviewer` HIGH・2026-09-20）。
+    #   ★ 逸脱はセッション中に起きるので、必ず先に verify 側 (下記) が拾って `return 1` する。
+    #     → attempt 2 が始まらないので、ここに逸脱した状態で来ることがない。
+    #   ★ 逸脱後の再実行も `loop-spawn.sh` の「同名 worktree が既に存在」で先に死ぬ。
+    #   → ⚠️ **検出力を持つのは verify 直前と issue_done 直前の 2 つ**であり、ここは
+    #     「将来 worktree を再利用する経路が生えたとき」のための保険である。
+    #   ⚠️ **「3 か所で検査している」と数えないこと**（★ 検査があるつもりで検査していない型）。
+    ensure_branch "$id" execute "$attempt" "$wt" "$wt_anchor" || return 1
 
     # --- 完全なセッションを 1 回。hook / スラッシュコマンド / settings が効く ---
     local res subtype denials
@@ -372,11 +518,60 @@ run_issue() {
     #    append しようとすると**必ず**拒否される。無関係なディレクトリを 1 度覗いただけでも同じ。
     #    「静かな停滞」を防ぐ意図は **1 行必ず残す**ことで満たされる。
     #    **合否は run_verify の exit code だけが決める。** ここで return してはならない。
+    #
+    # ⚠️★★★ **件数だけでは「非致命」と言い切れない**（★ 起票 3・判断 3・2026-09-20）。
+    #   ★ issue 002 の 6 attempt で 1 / 2 / 5 / 10 件が記録されたが、**内訳が分からなかった**。
+    #   → ★ (a) events に **何が拒否されたか**の集計を書き、(b) 生配列をファイルに残す。
+    #   ⚠️ **`WORK_TMP` には置かない** —— `trap cleanup_tmp EXIT` が run 終了時に `rm -rf` する
+    #     （★ 起票 3 が書いていた「`WORK_TMP` に保存」は後から読めない）。
+    #   ★ 集計キーは **`.tool_input.command` の先頭 2 語**にする（★ 2026-09-20 の実測 M1b）:
+    #     拒否はすべて `tool_name == "Bash"` になるので、**`.tool_name` だけ数えても何も分からない**。
+    #
+    # ⚠️★★★ **保存する前に必ず伏せる**（★ `security-checker` HIGH・2026-09-20）:
+    #   ★ `.tool_input.command` は worker が組み立てた**自由文字列**であり、
+    #     `CI_TOKEN=<値> gh api …` / `curl -H "Authorization: Bearer …"` の形で
+    #     ⚠️ **資格情報がそのまま入りうる**。★ 保存先は 2 か所（events の detail ＋ 生配列）で、
+    #     どちらも**恒久**に残る（`cleanup_tmp` の対象外）。
+    #   → ★ `DENY_REDACT` で (a) `KEY=VALUE` の値 (b) 秘密らしいキーの直後の値 を伏せ、
+    #     (c) 1 件 200 文字で切る。⚠️ **伏せてから集計キーを作る**
+    #     （★ そうしないと「先頭 2 語」が `CI_TOKEN=<値>` を狙い撃ちで拾う）。
     denials="$(printf '%s' "$res" | jq -r '(.permission_denials // []) | length' 2>/dev/null || echo 0)"
     if [ "${denials:-0}" -gt 0 ]; then
+      local by_tool art tmp_art
+      by_tool="$(printf '%s' "$res" | jq -r "$DENY_REDACT"'
+          [ (.permission_denials // [])[]
+            | if (.tool_name // "") == "Bash"
+              then "Bash(" + ((.tool_input.command // "?") | redact
+                              | [splits("[[:space:]]+")] | map(select(. != "")) | .[0:2] | join(" ")) + ")"
+              else (.tool_name // "?") end ]
+          | group_by(.) | map("\(.[0])x\(length)") | join(" ")
+        ' 2>/dev/null | tr -d '\r' | tr '\n' ' ' | head -c 300)"
+      art="$ARTIFACTS_DIR/$id-attempt$attempt-denials.json"
+      # ⚠️ 直接リダイレクトすると **jq が失敗しても 0 バイトのファイルが残る**
+      #   （★ 「空 ＝ 拒否内訳が空」と読み違える。`code-reviewer` MEDIUM）。→ 一時ファイル ＋ mv。
+      tmp_art="$art.tmp$$"
+      if mkdir -p "$ARTIFACTS_DIR" 2>/dev/null \
+         && printf '%s' "$res" | jq "$DENY_REDACT"'
+              [ (.permission_denials // [])[]
+                | if (.tool_input.command // null) != null
+                  then .tool_input.command |= redact else . end ]
+            ' > "$tmp_art" 2>/dev/null \
+         && [ -s "$tmp_art" ] && mv "$tmp_art" "$art" 2>/dev/null; then
+        : # ★ 保存できた
+      else
+        # ⚠️ 保存に失敗しても attempt は落とさない (★ 記録の補助であって判定ではない)。
+        rm -f "$tmp_art" 2>/dev/null || true
+        art="(保存できず)"
+      fi
       emit "$id" execute attempt_start attempt="$attempt" \
-           detail="permission_denials=$denials (非致命・verify の exit code で判定する)"
+           detail="permission_denials=$denials [${by_tool:-内訳不明}] (非致命・verify の exit code で判定する) → $art"
     fi
+
+    # --- ⚠️★★★ verify の直前にブランチを確かめる ---
+    #   ★ **起票 10 の実測はこの形だった**: worker が session の最後に `git checkout main` を打ち、
+    #     ⚠️ `run_verify` が **別ブランチの内容**を検査するところだった。
+    #   ★ ここを通さずに verify すると、緑も赤も**何を測ったのか分からない数字**になる。
+    ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
 
     # --- 客観検証: exit code がすべて。LLM の申告は読まない ---
     # ⚠ `$(run_verify ...)` の形で呼ばないこと (サブシェルで VERIFY_* が失われる)。
@@ -386,6 +581,16 @@ run_issue() {
       if [ "$lvl" = "recheck" ]; then
         if ! run_watchdog "$id" "$wt" "$attempt"; then return 1; fi
       fi
+      # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
+      #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
+      #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
+      #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
+      #     **`issue_done` が「別ブランチを見て出した done」**になる。
+      #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
+      #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
+      #     M3 が `git -C . checkout` で破れることを実測している。
+      #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
+      ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
       emit "$id" done issue_done attempt="$attempt"
       log "issue $id: done (attempt $attempt)"
       return 0
@@ -415,9 +620,69 @@ run_issue() {
 
 # ---------- DAG 解決と実行 ----------
 declare -a READY DONE_IDS
-ALL="$(issue_ids)"
-[ -n "$ONLY_ISSUES" ] && ALL="$(printf '%s' "$ONLY_ISSUES" | tr ',' '\n')"
-[ -n "$ALL" ] || die "issues/ に issue がありません"
+# ⚠️★★★ `ALL_FILES` は **フィルタ前の全 id**。★ 下の `preflight_dag` の「依存が存在するか」は
+#   必ずこちらに対して行う (★ フィルタ後の `$ALL` で引くと、`blocked` な issue に依存している
+#   issue が「issues/ に存在しません」で **die する** —— 実際には存在するのに)。
+ALL_FILES="$(issue_ids)"
+# ⚠️★★★ **ファイル名由来の id も検証する**（★ Codex `/cross-review` 2 巡目 MEDIUM・2026-09-20）。
+#   ★ 1 巡目の是正で `--issues` 側だけ検証していたが、⚠️ `issue_ids()` 由来は素通りだった。
+#   ★ 以降のすべてが **`for id in $ALL_FILES` の単語分割**に依存しているので、
+#     空白や glob メタ文字を含む issue ファイルがあると
+#     ⚠️ **id が黙って分割され / パターンとして解釈される**（★ `case " $BYPASSED_BLOCKED "` も同じ）。
+#   → ★ 早い段階で **die** する（⚠️ 黙って壊れた id で走らせない）。
+#   ⚠️★★★ **`for id in $ALL_FILES` で検査してはならない** —— ★ その時点で**既に分割済み**であり、
+#     `0 06.md` は `0` と `06` という**見かけ上は正当な 2 つの id** になってしまう
+#     （★ 2026-09-20 に検査 S9 が実測で捕まえた）。→ ★ **行単位**で、分割される前に見る。
+bad_ids="$(issue_ids | grep -vE '^[A-Za-z0-9._-]+$' || true)"
+bad_ids="$bad_ids$(issue_ids | grep -xE '\.|\.\.' || true)"
+[ -z "$bad_ids" ] || die "issue ファイル名が不正です (英数字 . _ - のみ):
+$(printf '%s\n' "$bad_ids" | sed 's/^/  - /')
+  ⚠️ 空白や glob メタ文字を含む名前は、id の単語分割・パターン解釈を壊します。"
+ALL="$ALL_FILES"
+SKIPPED_BLOCKED=""
+BYPASSED_BLOCKED=""
+if [ -n "$ONLY_ISSUES" ]; then
+  # ★ 明示指定はフィルタしない (⚠️ blocked を承知で回せる余地を残す・判断 4)。
+  ALL="$(printf '%s' "$ONLY_ISSUES" | tr ',' '\n')"
+  # ⚠️★★★ **id を検証する**（★ `security-checker` LOW・2026-09-20）。
+  #   ★ `$id` は下で `_loop-artifacts/$id-attempt…` のパス組み立てに使う。
+  #     `--issues ../../x` を通すと **`.gitignore` の外**へ書けてしまう
+  #     (⚠️ `issue_ids()` 由来の id は `basename f .md` なのでスラッシュを含まず、この経路は運用者入力だけ)。
+  for id in $ALL; do
+    case "$id" in
+      *[!A-Za-z0-9._-]*|""|.|..) die "--issues の id が不正です: '$id' (英数字 . _ - のみ)" ;;
+    esac
+  done
+  for id in $ALL; do
+    case "$(issue_status_key "$id")" in
+      blocked*)
+        BYPASSED_BLOCKED="$BYPASSED_BLOCKED $id"
+        log "⚠️ issue $id は Status=blocked ですが --issues で明示指定されたので実行します" ;;
+    esac
+  done
+else
+  # ⚠️★★★ `blocked` を**既定の選択から外す**（★ 判断 4）。
+  #   ★ `done` は外さない —— 外すと `deps_met()` が永久に false になり、
+  #     ⚠️ その issue に依存する後続が「依存 issue が未完のため未実行」で落ちる。
+  #     ★ 完了の復元は下の「events から seed」が担っている。
+  #   ★ `## Status` が無い issue は**回す**（⚠️ テンプレの Status 節は見出しだけで値が空。
+  #     外すと新規に切った issue が黙って走らなくなる）。
+  kept=""
+  for id in $ALL_FILES; do
+    case "$(issue_status_key "$id")" in
+      blocked*) SKIPPED_BLOCKED="$SKIPPED_BLOCKED $id" ;;
+      *)        kept="$kept $id" ;;
+    esac
+  done
+  ALL="$(printf '%s\n' $kept)"
+  if [ -n "$SKIPPED_BLOCKED" ]; then
+    # ⚠️ events には出さない —— ★ events 語彙は 10 種で固定であり、
+    #   「**実行しなかった**」は状態遷移ではない。★ ログとレポートで人に見せる。
+    log "⚠️ Status=blocked のため既定の選択から外した:$SKIPPED_BLOCKED"
+    log "   ★ 承知で回すなら --issues$(printf '%s' "$SKIPPED_BLOCKED" | tr ' ' ',') を付ける"
+  fi
+fi
+[ -n "$ALL" ] || die "実行対象の issue がありません (⚠️ Status=blocked で全件外れた可能性:${SKIPPED_BLOCKED:- なし})"
 
 # ⚠ DONE_IDS を空で始めてはならない。
 #    ウェーブを分けて**別プロセスで**起動する運用では、`## Dependencies` に issue 番号を書くと
@@ -439,7 +704,11 @@ fi
 is_done() { printf '%s\n' "${DONE_IDS[@]:-}" | grep -qx "$1"; }
 deps_met() { local d; for d in $(issue_deps "$1"); do is_done "$d" || return 1; done; return 0; }
 
-# 自己依存・存在しない依存・循環を起動前に検出して die する (デッドロックで黙って止まらないため)
+# 自己依存・存在しない依存を起動前に検出して die する (デッドロックで黙って止まらないため)
+# ⚠️★★★ **循環は検出していない**（★ `code-reviewer` LOW・2026-09-20 に指摘。旧コメントは
+#   「循環を起動前に検出」と書いていたが**実装していなかった**）。★ ただし黙って止まりはしない ——
+#   循環する issue は `deps_met` が永久に false になり、下の `remaining` ループを抜けて
+#   `blocked`（「依存 issue が未完のため未実行」）が events に残る。⚠️ **原因が循環だとは書かれない。**
 preflight_dag() {
   local id d bad=0
   for id in $ALL; do
@@ -447,7 +716,10 @@ preflight_dag() {
       if [ "$d" = "$id" ]; then
         echo "loop-run: issue $id が自分自身に依存しています。## Dependencies の箇条書きから
          '$id' を削除してください (散文で自分に言及したい場合は箇条書きにしない)" >&2; bad=1
-      elif ! printf '%s\n' $ALL | grep -qx "$d"; then
+      elif ! printf '%s\n' $ALL_FILES | grep -qx "$d"; then
+        # ⚠️★★★ `$ALL` ではなく `$ALL_FILES` (フィルタ前) で引く。
+        #   ★ `$ALL` で引くと、Status=blocked で外れた issue に依存しているだけで
+        #     「存在しません」と誤診して die する (★ 2026-09-20 の Status フィルタ導入で入りうる回帰)。
         echo "loop-run: issue $id の依存 $d が issues/ に存在しません" >&2; bad=1
       fi
     done
@@ -463,6 +735,7 @@ if [ "$DRY_RUN" = "1" ]; then
       "$([ -f "$TASK_DIR/issues/$id-acceptance.sh" ] && echo yes || echo no)"; done
   log "parallel=$PARALLEL max_attempts=$MAX_ATTEMPTS token_ceiling=$TOKEN_CEIL"
   log "既完了 (events から): ${DONE_IDS[*]:-なし}"
+  log "Status=blocked で除外:${SKIPPED_BLOCKED:- なし}"
   log "⚠ --dry-run で検証できるのは config / DAG まで。権限 (allowed_tools) / cwd 境界 / hook /"
   log "  契約の二重定義は --dry-run では観測できない。初回は最も安い issue 1 本を parallel=1 で回すこと。"
   exit 0
@@ -506,6 +779,14 @@ REPORT="$TASK_DIR/_loop-run-report.md"
       "$(printf '%s' "$line" | jq -r '.event // "-"')" \
       "$(printf '%s' "$line" | jq -r '.attempt // "-"')"
   done
+  # ⚠️ 除外した issue を**黙って消さない**（★ ALL から外すとこの表に 1 行も出ないため）。
+  if [ -n "$SKIPPED_BLOCKED" ]; then
+    echo; echo "## ⚠️ Status=blocked のため実行しなかった issue"
+    echo; for id in $SKIPPED_BLOCKED; do
+      printf -- '- %s — `%s`\n' "$id" "$(issue_status "$id" | head -c 120)"
+    done
+    echo; echo "★ 承知で回すなら \`--issues$(printf '%s' "$SKIPPED_BLOCKED" | tr ' ' ',')\` を付ける。"
+  fi
   echo; echo "次: /loop-status で board を確認 → 全緑なら code-reviewer(Opus) と /cross-review"
 } > "$REPORT"
 log "レポート: $REPORT"

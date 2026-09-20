@@ -32,6 +32,22 @@ git rev-parse --show-toplevel            # ../wt/<repo>-<id>-<short> である�
   ("main checkout で直接実行しようとしています。続行しますか?")。ユーザーが No なら
   `scripts/loop-spawn.sh <id>` の実行を案内して停止する。
 
+### ⚠★★★ セッションを終える前に必ず commit する (2026-09-20 追加)
+
+**実装・停止記録・起票のいずれであっても、worktree を離れる前に `git add <path>` + `git commit` する。**
+未コミットのまま終わらない。
+
+- **なぜ**: 2026-09-15 に worker が `git checkout main` を打って worktree 隔離を外した (起票 10)。
+  このとき作業が失われなかったのは **commit の後に checkout したからで、偶然である**。
+  ⚠️ 001 / 002 / 003 の worker は**いずれも未コミットのまま終わっており**、
+  同じことが起きていれば作業は消えていた。
+- ⚠ **`git checkout` / `git switch` は打たない。** worktree のブランチを変えない。
+  `permissions.deny` に入っている (綴りを変えて迂回しようとしないこと) うえ、
+  `loop-run.sh` の `ensure_branch` が逸脱を検出して **その attempt を `blocked` にする**
+  (`docs/loop-engineering.md` §worktree ブランチ検査)。
+- ⚠ これは**文章の契約であって機械強制ではない**。守られなかったことは
+  ブランチ検査が結果として拾うが、「未コミットで終わった」こと自体は記録されない。
+
 ## 入力の読み込み (SSOT)
 1. `docs/loop-engineering.md` — 用語・Done/Stop・budget 方針 (この command の唯一の真実源)。
 2. タスクの `_loop-config.json` — `verify.*` / `ci_command` / `budget.max_attempts` /

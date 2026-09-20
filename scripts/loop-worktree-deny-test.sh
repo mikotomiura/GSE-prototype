@@ -9,7 +9,7 @@
 # ★ 対象:
 #   1. 3 状態 ＋ 冪等性
 #   2. ⚠️ 陰性対照（検査が空振りしていないこと）
-#   3. ⚠️★★★ **契約の二重定義** —— スクリプトの 7 件 ⇄ `loop-config.README.md` の逐語 7 件
+#   3. ⚠️★★★ **契約の二重定義** —— スクリプトの 9 件 ⇄ `loop-config.README.md` の逐語 9 件
 #   4. ★ `loop-spawn.sh` への配線を **実際に worktree を作って** 検査する（一時 git repo 内）
 #      ⚠️ 併せて「**stdout の最終行 = worktree の絶対パス**」という
 #      `loop-run.sh:275` (`tail -1`) の契約が壊れていないことを見る。
@@ -29,6 +29,12 @@ README="${REPO_ROOT}/.steering/_template/loop-config.README.md"
 PASS=0; FAIL=0
 ok() { echo "  OK   $1"; PASS=$((PASS + 1)); }
 ng() { echo "  NG   $1"; FAIL=$((FAIL + 1)); }
+
+# ⚠️★★★ **期待件数はここ 1 か所に書く**。★ `--print` の出力から数えてしまうと、
+#   誰かがリストを縮めても「自分自身と一致する」ので**緑のまま通る**（＝ 検査が空振りする）。
+#   → ★ 人が意図して変えたときだけこの数字を動かす。
+#   ★ 2026-09-14: 7 件 → 2026-09-20: **9 件**（`git checkout` / `git switch` を追加・起票 10）。
+EXPECT_N=9
 
 command -v jq >/dev/null 2>&1 || { echo "jq が無いので検査できない (★ 判定しない)"; exit 2; }
 [ -f "${DENY_SH}" ]  || { echo "loop-worktree-deny.sh が無い"; exit 2; }
@@ -56,10 +62,10 @@ echo "1. --print と 契約の二重定義 (スクリプト ⇄ loop-config.READ
 
 printed="$(bash "${DENY_SH}" --print | sort)"
 n_printed="$(count_of "${printed}")"
-if [ "${n_printed}" -eq 7 ]; then
-  ok "--print が 7 件を返した"
+if [ "${n_printed}" -eq "${EXPECT_N}" ]; then
+  ok "--print が ${EXPECT_N} 件を返した"
 else
-  ng "--print が ${n_printed} 件 (★ 7 件のはず)"
+  ng "--print が ${n_printed} 件 (★ ${EXPECT_N} 件のはず)"
 fi
 
 # ★ README のコードブロックから逐語で抜く。
@@ -67,10 +73,10 @@ fi
 # ⚠️ 抽出は **`deny` 配列だけ**に限る（★ 同じブロックに `allow` / `ask` の例が足されても壊れないため）。
 from_readme="$(awk '/"deny": \[/,/\]/' "${README}" | grep -oE '"Bash\([^"]*\)"' | tr -d '"' | sort -u)"
 n_readme="$(count_of "${from_readme}")"
-if [ "${n_readme}" -lt 7 ]; then
+if [ "${n_readme}" -lt "${EXPECT_N}" ]; then
   ng "README から deny を ${n_readme} 件しか抽出できない (★ 抽出が壊れている → 判定できない)"
 elif [ "${printed}" = "${from_readme}" ]; then
-  ok "契約の二重定義なし: スクリプトの 7 件と README の 7 件が集合一致"
+  ok "契約の二重定義なし: スクリプトの ${EXPECT_N} 件と README の ${n_readme} 件が集合一致"
 else
   ng "スクリプトと README の deny が食い違う (★ 片方だけ増えた)"
   diff <(printf '%s\n' "${printed}") <(printf '%s\n' "${from_readme}") || true
@@ -83,10 +89,10 @@ WT_A="${TMP}/absent"; mkdir -p "${WT_A}"
 if bash "${DENY_SH}" "${WT_A}" >/dev/null 2>&1; then
   f_a="${WT_A}/.claude/settings.local.json"
   got_a="$(deny_of "${f_a}")"
-  if [ "$(count_of "${got_a}")" -eq 7 ] && [ "${got_a}" = "${printed}" ]; then
-    ok "不在: 必須 7 件ちょうどを持つ有効な JSON を新規作成した"
+  if [ "$(count_of "${got_a}")" -eq "${EXPECT_N}" ] && [ "${got_a}" = "${printed}" ]; then
+    ok "不在: 必須 ${EXPECT_N} 件ちょうどを持つ有効な JSON を新規作成した"
   else
-    ng "不在: 生成された deny が必須 7 件と一致しない"
+    ng "不在: 生成された deny が必須 ${EXPECT_N} 件と一致しない"
   fi
 else
   ng "不在: 注入が失敗した"
@@ -125,14 +131,17 @@ if bash "${DENY_SH}" "${WT_B}" >/dev/null 2>&1; then
     ng "正常: 既存のキーが失われた (env=${kept_env} allow=${kept_allow} ask=${kept_ask} curl=${kept_extra})"
   fi
   if [ "${n_missing}" -eq 0 ]; then
-    ok "正常: 必須 7 件がすべてマージされた"
+    ok "正常: 必須 ${EXPECT_N} 件がすべてマージされた"
   else
     ng "正常: 必須 deny が ${n_missing} 件欠けている"
   fi
-  if [ "${n_deny}" = "${n_uniq}" ] && [ "${n_deny}" = "8" ]; then
-    ok "正常: 重複なし (既存 2 ∪ 必須 7 = 8 件。★ sudo が重複していない)"
+  # ★ 既存 2 件 (`sudo` / `curl`) のうち `sudo` は必須にも在るので、和集合は 必須 + 1 件。
+  #   ⚠️ ここを定数で書くと必須件数を増やすたびに黙って壊れる (★ 2026-09-20 に実際に踏んだ)。
+  EXPECT_MERGED=$((EXPECT_N + 1))
+  if [ "${n_deny}" = "${n_uniq}" ] && [ "${n_deny}" = "${EXPECT_MERGED}" ]; then
+    ok "正常: 重複なし (既存 2 ∪ 必須 ${EXPECT_N} = ${EXPECT_MERGED} 件。★ sudo が重複していない)"
   else
-    ng "正常: deny の件数が想定外 (len=${n_deny} uniq=${n_uniq}。★ 8 件のはず)"
+    ng "正常: deny の件数が想定外 (len=${n_deny} uniq=${n_uniq}。★ ${EXPECT_MERGED} 件のはず)"
   fi
 else
   ng "正常: 既存ファイルがあるときの注入が失敗した"
@@ -174,10 +183,10 @@ fi
 echo "3. 冪等性"
 bash "${DENY_SH}" "${WT_B}" >/dev/null 2>&1
 n2="$(jq -r '.permissions.deny | length' "${WT_B}/.claude/settings.local.json")"
-if [ "${n2}" = "8" ]; then
-  ok "冪等: 2 回目でも deny が増えない (8 件のまま)"
+if [ "${n2}" = "${EXPECT_MERGED:-0}" ]; then
+  ok "冪等: 2 回目でも deny が増えない (${EXPECT_MERGED} 件のまま)"
 else
-  ng "冪等: 2 回目で ${n2} 件に増えた"
+  ng "冪等: 2 回目で ${n2} 件に増えた (★ ${EXPECT_MERGED:-?} 件のはず)"
 fi
 
 echo "4. 検査 (--verify) の陽性対照 / 陰性対照"
@@ -294,8 +303,8 @@ if setup_fake_repo "${FAKE}"; then
     ng "契約: stdout の最終行がディレクトリでない → [${last_line}] (⚠️ loop-run.sh が worktree を掴めなくなる)"
   fi
   if [ -n "${last_line}" ] && [ -d "${last_line}" ] \
-     && [ "$(count_of "$(deny_of "${last_line}/.claude/settings.local.json")")" -eq 7 ]; then
-    ok "配線: 作られた worktree に必須 deny 7 件が入っている"
+     && [ "$(count_of "$(deny_of "${last_line}/.claude/settings.local.json")")" -eq "${EXPECT_N}" ]; then
+    ok "配線: 作られた worktree に必須 deny ${EXPECT_N} 件が入っている"
   else
     ng "配線: 作られた worktree に必須 deny が入っていない"
   fi
@@ -345,7 +354,8 @@ RUN_SH="${REPO_ROOT}/scripts/loop-run.sh"
 
 # ⚠️★★★ 実 repo 側の前提も検査する —— ★ 上の一時 repo が緑でも、
 #   **本物の `.gitignore` が Loop の生成物を無視していなければモードC は起動しない**。
-for art in _loop-events.jsonl _loop-board.md _loop-run-report.md; do
+#   ★ 2026-09-20: `_loop-artifacts/` を足した (★ `permission_denials` の生配列・起票 3)。
+for art in _loop-events.jsonl _loop-board.md _loop-run-report.md _loop-artifacts/denials.json; do
   if git -C "${REPO_ROOT}" check-ignore -q ".steering/00000000-probe/${art}" 2>/dev/null; then
     ok "実 repo の .gitignore が ${art} を無視している (★ dirty-tree で spawn が死なない)"
   else
@@ -378,6 +388,7 @@ ISSUE
 .steering/**/_loop-events.jsonl
 .steering/**/_loop-board.md
 .steering/**/_loop-run-report.md
+.steering/**/_loop-artifacts/
 stub/
 IGN
   cat > "${r}/.steering/task/_loop-config.json" <<CFG
