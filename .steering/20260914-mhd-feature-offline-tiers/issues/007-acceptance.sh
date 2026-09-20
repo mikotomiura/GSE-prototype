@@ -289,7 +289,7 @@ if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
                  | grep -cE "$rule_re" || true)"
   now_rule="$(grep -cE "$rule_re" src/analysis/feat_offline/stall_onset.rs || true)"
   if [ "$now_rule" = "0" ] || [ "$base_rule" != "$now_rule" ]; then
-    fail "条件 A の判定式が base から変わっている（base=$base_rule / now=$now_rule。★ 検出の本体は 006 / 007 とも変えない）"
+    fail "条件 A の判定式が base から変わっている（base=${base_rule} / now=${now_rule}。★ 検出の本体は 006 / 007 とも変えない）"
   fi
 fi
 
