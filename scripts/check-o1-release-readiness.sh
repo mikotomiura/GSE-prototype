@@ -49,6 +49,9 @@ FORM_BUILDER="Form_O1/GSE_O1_Form_Builder.gs"
 FORM_BUILDER_TEST="Form_O1/o1_form_builder_test.cjs"
 SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
+# ★ 募集の運用（ADR-034 D6 / D1 の律速 4）を書いてある手順書。★ 両側が要る。
+RECRUIT_O1="docs/o1-roster-operations.md"
+RECRUIT_G1="experiments/20260801-controlled-friction-task/README.md"
 # ★ 収集仕様の自己記述（ADR-013 D1）。★ 6 択 ESM の計器が**この版に在るか**を見る。
 CAPS="src-tauri/src/capabilities.rs"
 # ★ 6 択 ESM の**送出元**（★ 呼ぶ側）。⚠️ writer（`logger.rs`）ではない。
@@ -624,6 +627,28 @@ elif grep -q "from_secs(180)" src-tauri/src/reconcile.rs; then
 else
   ok "送信 timeout が実測にもとづいて見直されている"
 fi
+
+# --- 5. 募集の運用（ADR-034 D6 / D1 の律速 4）---------------------------------
+head_ 5 "募集の運用（★ 案内日の分離が G1 と O1 の両方の手順に入っているか）"
+# ⚠️★★★ **ADR-034 D1 の律速 4**: 「D6 の運用（案内日の分離）が G1 と O1 の**両方**の
+#   募集に入っていること」が O1 配布の律速である。★ 2026-09-20 までこれを確かめる場所が
+#   どこにも無かった（★ 本ゲートに D6 / 案内日の語が 0 件だった）。
+# ⚠️★★ **ここで見るのは「手順書に規則が書いてあるか」だけ**である。
+#   ★ D6 は機械的に強制しない運用ルール（ADR-034 D6・o1-roster-operations §5 の「限界」）なので、
+#     ⚠️ **実際に日を分けたかは見ていない**。→ ★ 緑を「衝突が起きない」と読まないこと。
+for side_doc in "O1:${RECRUIT_O1}" "G1:${RECRUIT_G1}"; do
+  side="${side_doc%%:*}"; doc="${side_doc#*:}"
+  if [ ! -f "${doc}" ]; then
+    ng "${side} の募集手順が読めない: ${doc}（★ 移動/改名したら本検査を直すこと）"
+  elif ! grep -q 'ADR-034 D6' "${doc}"; then
+    ng "${side} の募集手順に ADR-034 D6（案内日の分離）の根拠が無い: ${doc}"
+  elif ! grep -q '日を分ける' "${doc}"; then
+    # ★ 参照だけ書いて中身が無い状態を緑にしない（★ 規則は現場の手順に載って初めて効く）。
+    ng "${side} の募集手順に「日を分ける」という規則そのものが無い: ${doc}"
+  else
+    ok "${side} の募集手順に案内日の分離がある: ${doc}"
+  fi
+done
 }
 
 # ⚠️★★★ **`sed -i` を直接書かない**（security-checker HIGH・2026-08-29 に macOS で実測）:
@@ -703,6 +728,10 @@ selftest () {
     #   ★ 写さないと selftest 中は常に「ゲートが無い」で赤になり、
     #     ⚠️ **新しく足した検査だけ変異試験が無い**状態になる（★ 本ゲートが戒めている型そのもの）。
     cp "$repo/scripts/check-shell-portability.sh" "$fix/w/scripts/" 2>/dev/null
+    # ⚠️★★ **募集手順の 2 本も写す**（ADR-034 D6・2026-09-20 追加）。
+    #   ★ 写さないと「読めない」で常に赤になり、⚠️ 新しく足した検査だけ変異試験が成立しない。
+    cp "$repo/$RECRUIT_O1" "$fix/w/$RECRUIT_O1" 2>/dev/null
+    cp "$repo/$RECRUIT_G1" "$fix/w/$RECRUIT_G1" 2>/dev/null
     # ⚠️★★ **一時ツリーを git リポジトリにする**。
     #   ★ 移植性ゲートは `git ls-files` で対象を集めるので、⚠️ 非 git のままだと
     #     **必ず「検査できなかった」になり、壊しても壊さなくても赤**＝ 変異試験が成立しない。
@@ -987,6 +1016,17 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   git -C "$fix/w" -c user.email=s@e -c user.name=s commit -qm selftest > /dev/null 2>&1
   git -C "$fix/w" tag v9.9.8 > /dev/null 2>&1
   expect_red "リリースタグが 1 つも無い" "★ o1.rs を含まないタグを打っても赤のまま"
+
+  # ★★ [5] 募集の運用（ADR-034 D6）—— ⚠️ 3 つの落ち方を別々に確かめる。
+  #   ★ 「書いてある / 根拠が無い / 規則が無い / 読めない」を 1 本の検査にまとめたので、
+  #     ⚠️ **どれか 1 つでも空回りすると律速 4 の確認が嘘になる**。
+  build; expect_green "G1 の募集手順に案内日の分離がある" "★ 両側の手順に D6 が書いてある"
+  build; sed_i '/ADR-034 D6/d' "$fix/w/$RECRUIT_G1"
+  expect_red "G1 の募集手順に ADR-034 D6" "★ 根拠（ADR-034 D6）を消すと赤"
+  build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
+  expect_red "「日を分ける」という規則そのものが無い" "★ 参照だけ残して規則を消すと赤"
+  build; rm -f "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順が読めない" "★ 手順書ごと消える（移動/改名）と赤"
 
   echo
   echo "────────────────────────────────────────"
