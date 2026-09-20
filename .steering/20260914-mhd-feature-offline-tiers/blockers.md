@@ -618,3 +618,30 @@
 - ★ **緩和済み**: ブランチ検査（起票 10 の是正）が入ったので、⚠️ **逸脱した attempt はそもそも
   `blocked` で止まる**。★ この形に到達する確率は大きく下がったが、**経路は残っている**
   （★ M3 の迂回で逸脱し、その後 `--cleanup` する場合）。
+
+---
+
+## 起票 19: ⚠️ `RUSTSEC-2026-0285`（rustls 0.23.43）—— ★ `cargo update` では上がらない
+
+- **起票日**: 2026-09-20（★ PR #214 の `audit` ジョブが赤になって表面化）
+- **中身**: `cargo-audit` が逐語
+  「**RUSTSEC-2026-0285  rustls 0.23.43  patched: >=0.23.45 /
+  TLS 1.3 handshake messages incorrectly accepted across encryption level boundaries**」。
+- ⚠️★★★ **PR #214 の変更が原因ではない**（★ 2026-09-20 に一次で確認）:
+  - 本ブランチの `Cargo.lock` 差分は **1 行だけ**（`sha2` の辺の追加）。
+  - `rustls 0.23.43` は **main と完全に同一**（`git show main:src-tauri/Cargo.lock` で照合）。
+  - ★ main の最終 `supply-chain.yml` 実行は **2026-09-14 に success**。
+    ⚠️ 助言 DB は **2026-09-19 更新**で、★ **この助言はその後に公開された新着**である。
+- ⚠️ **単純な更新では解けない**: `cargo update -p rustls --dry-run` の実測が
+  逐語「**Locking 0 packages to latest compatible versions**」。
+  ★ `0.23.45` が現在の制約から到達できない理由（どの依存が上限を締めているか）は**未調査**。
+- **★ 次に何をするか**:
+  1. ★ `cargo tree -i rustls` 等で**誰が制約しているか**を特定する
+     （★ 候補: `reqwest`（`--features package` で optional）/ `rustls-platform-verifier` / `tauri` 系）。
+  2. ★ 上げられるなら lock を更新し、⚠️ **MSRV check と `--features package` の clippy を再走**する
+     （★ `docs/verification-runbook.md` §1 の「依存を更新した回のみ」の行）。
+  3. ⚠️ 上げられないなら `.cargo/audit.toml` に **理由 ＋ 依存パス ＋ `# review-by:`** を付けて waive する。
+     ★ ただし **TLS のハンドシェイク検証**に関わる案件なので、**waive の可否は研究者判断**である。
+- **★ 判断（2026-09-20・研究者裁定）**: **別タスクにして PR #214 はマージする。**
+  ★ 根拠: `docs/agent-shared.md` 逐語「`supply-chain.yml` は **branch protection が無いので
+  門ではなく信号**であり、赤でもマージは止まらない」。⚠️ **本 PR が赤くしたのではない。**
