@@ -619,6 +619,62 @@
   `blocked` で止まる**。★ この形に到達する確率は大きく下がったが、**経路は残っている**
   （★ M3 の迂回で逸脱し、その後 `--cleanup` する場合）。
 
+### ✅ 是正済み（2026-09-21・`.steering/20260921-loop-spawn-cleanup-fix/`）
+
+★ **直す前に再現させた**（⚠️ 再現しないまま直して「直った」と書かない）。実測:
+
+```text
+$ LOOP_FORCE=1 bash scripts/loop-spawn.sh --no-exec zzz
+$ (cd ../wt/GSE-prototype-zzz-issue && git switch -c deviated-repro-zzz)
+$ bash scripts/loop-spawn.sh --cleanup zzz
+loop-spawn: worktree 見つからず (既に撤去?)
+Deleted branch loop/zzz-issue (was ca7764f).
+loop-spawn: cleanup 完了 issue zzz     ← ⚠️ 嘘 / exit=0
+$ git worktree list
+C:/wt/GSE-prototype-zzz-issue ca7764f [deviated-repro-zzz]   ← ★ 残っている
+```
+
+★ **やったこと**（`scripts/loop-spawn.sh` の `--cleanup` 分岐）:
+
+1. ★ **パスでも引く**: 一致規則を **branch 系統 ∪ path 系統**にした
+   （branch = `loop/<id>` / `loop/<id>-*`、path = basename が `<repo>-<id>` / `<repo>-<id>-*`）。
+   ⚠️ 併せて**部分一致の穴も塞いだ** —— ★ 旧 `$0 ~ ("loop/" id)` は正規表現の部分一致なので
+   `--cleanup 005` が `loop/0055-t` にも当たっていた（★ 実測で確認）。
+2. ★ **撤去できたことを確かめてから書く**: `remove` の exit code を信じず、
+   worktree は**登録とディレクトリを引き直して**、branch は `show-ref` で確認する。
+   ⚠️ 1 つでも残れば `⚠️ cleanup 未完了` と書いて **非 0 で終了**する。
+3. ★ 付随: **main checkout を撤去しない**明示ガード、**残存ディレクトリの報告**（⚠️ 自動削除はしない）、
+   **対象 0 件は exit 0**（冪等）。
+
+### ⚠️★★★ レビューで **同じ嘘が別経路で生きていた**ことが分かった（★ 同日・同タスクで是正）
+
+★ `code-reviewer` HIGH →★ **メインが独立に再現**した実測:
+
+```text
+$ (cd $T/wt/repo-002-t && bash $T/repo/scripts/loop-spawn.sh --cleanup 002)
+loop-spawn: cleanup 完了 issue 002 (worktree 0 件 / branch 1 件 を撤去)   ← ⚠️ rc=0
+$ git -C $T/repo worktree list
+.../wt/repo-002-t  [deviated]      ← ★ 残っている
+```
+
+⚠️ `git rev-parse --show-toplevel` は **linked worktree の中では worktree 自身**を返すため、
+`repo_name` が化けて ★ **(1) path 系統 (2) main checkout ガード (3) 残存 dir の網 が同時に無効化**されていた。
+→ ★ `git worktree list --porcelain` の**先頭 ＝ main worktree** から `repo_root` を取るよう直した。
+
+★ 併せて `security-checker` MEDIUM 2 件も閉じた:
+**(a)** `git branch --list` は **fnmatch パターン**なので `--cleanup '*'` が `loop/*` に化ける
+→ ★ id を `[A-Za-z0-9._-]` に限定。
+**(b)** `remove --force` を無条件に撃っていた → ★ **未コミット変更があれば撤去せず人へ渡す**
+（⚠️ 逸脱 worktree は作業が載っている可能性が最も高い対象である）。
+
+★ **回帰**: `scripts/loop-spawn-cleanup-test.sh`（新規・**7 群 25 件**・CI の ubuntu / Windows 両方に配線）。
+⚠️ **変異テスト付き**（path 系統を潰すと赤くなる）。
+★ **旧実装に当てると 17 件 NG / exit 1** になることを 2026-09-21 に実測した
+（＝ この検査は空振りしていない）。
+
+⚠️ `scripts/loop-run.sh:204` の `detail`（逐語「`--cleanup` はブランチ名で引くので逸脱した
+worktree を撤去できない」）は**この是正で嘘になった**ので、同時に書き換えた。
+
 ---
 
 ## 起票 19: ⚠️ `RUSTSEC-2026-0285`（rustls 0.23.43）—— ★ `cargo update` では上がらない
@@ -776,3 +832,100 @@
   （★ ADR と同じ流儀: 本文を書き換えず、番号の新しい記述を足す）。
 - (ii) `run-codex-review.sh` の `[-30:]` は**外したまま**（★ 台帳の規約「append-only」に実装を合わせた）。
   ⚠️ 肥大が問題になったら、「切ったことが分かる形」（件数・期間・合計を注記に残す）で入れ直すこと。
+
+---
+
+## 起票 23: ⚠️ `loop-spawn.sh` の `resolve_base` は `.steering/*/_loop-config.json` を **どれか 1 つ**拾う
+
+- **起票日**: 2026-09-21（★ 起票 18 の**再現作業中に偶然観測**した。⚠️ 狙って探したものではない）
+- **何が起きたか**（★ 実測。⚠️ 推測ではない）:
+
+  ```text
+  $ LOOP_FORCE=1 bash scripts/loop-spawn.sh --no-exec zzz
+  loop-spawn: base=docs/adr-030-stall-onset-definition (start=origin/docs/adr-030-stall-onset-definition) …
+  HEAD is now at ca7764f docs(steering): 次タスク（前提条件 1〜6 の確かめ方）の引き継ぎを置く
+  ```
+
+  → ⚠️ **main（`a5c53a0`）ではなく 38 コミット前の枝から worktree が切られた。**
+  （★ `git rev-list --left-right --count main...origin/docs/adr-030-stall-onset-definition` = `38  0`。
+   ★ 当該ブランチは main の祖先なので**分岐はしていない**。⚠️ が、**38 コミットぶん古い**）
+
+- **原因**（★ `scripts/loop-spawn.sh:37` 逐語）:
+
+  ```bash
+  cfg="$(ls -1 .steering/*/_loop-config.json 2>/dev/null | tail -1 || true)"
+  ```
+
+  → ⚠️ **いま回そうとしているタスクとは無関係に**、`.steering/` 配下の
+  `_loop-config.json` を**名前順で最後の 1 つ**拾う。★ 今回拾われたのは
+  `.steering/20260914-mhd-feature-offline-tiers/_loop-config.json`（★ 現存する唯一の config）で、
+  その `base_branch` は **完了済みタスクの作業ブランチ**のまま残っていた。
+
+- **実害（★ 実測ではなく推論。⚠️ まだ踏んでいない）**:
+  1. ⚠️ 新しいタスクで Loop を回すと、**前のタスクの作業ブランチから worktree が切られる**。
+     ★ `loop-spawn.sh:29` の注記は逆向きの事故（pin し忘れ → main から切られる）だけを警告しており、
+     ⚠️ **pin が古いまま残る**形は書かれていない。
+  2. ⚠️ ブランチが**削除済み**だと `git fetch` が失敗し、`ローカル base で続行` に落ちる
+     （★ そこから先の挙動は未検証）。
+- **★ 次に何をするか**（⚠️ 本タスク（起票 18）の範囲外）:
+  1. ★ config を**タスクで選ぶ**（＝ 引数か env でタスクを指定する / `--task` を足す）か、
+     ⚠️ **複数ヒット・不一致なら止める**（fail-closed）。★ `tail -1` で黙って選ばない。
+  2. ★ 併せて「解決した base がいま何であるか」を**人が承認できる形**にする
+     （⚠️ 現在も `base=… (start=…)` は出ているが、★ 無人モードC では誰も読まない）。
+- ⚠️ **本タスクでは直していない**（★ 起票 18 の `--cleanup` と混ぜない）。
+- ★★★ **いつやるか（2026-09-21・研究者判断）**: ⚠️ **⑤'（理論の回: S3 → S4 → J-2 の裁定）の *後* に実施する。**
+  ★★★ **⑥（P1 前: 事前宣言文書 ＋ CLI 注入 ＋ 両極）の実施前には *必ず* 解決させる。**
+  → ★ 再開順は **⑤ ✅ → ⑤' → 本起票 → ⑥** になる（★ `decisions.md` 判断 25 の順に 1 つ挿入）。
+  ⚠️ **理由**: ⑥ は **Loop で回す**ので、★ `resolve_base` が古い枝を選ぶと
+  **worktree が 38 コミット前から切られ、全 issue が誤った base の上で走る**。
+  ★ 判断 25 #4 の先例（逐語「Loop 基盤の穴は**次に Loop を回す前に直す**」）と同型である。
+
+---
+
+## 起票 24: ⚠️ `ci.yml` の `check` job に job レベルの `permissions:` が無い
+
+- **起票日**: 2026-09-21（★ 起票 18 の是正レビューで `security-checker` が LOW として指摘）
+- **状態**: ⚠️ **未解決**（★ 本タスクでは**触っていない** —— `.steering/20260921-loop-spawn-cleanup-fix/decisions.md` 判断 10）
+- **内容**: ★ `frontend-check` は `permissions: contents: read` を**明示している**のに、
+  ⚠️ `check` job（ビルド / テスト / ゴールデン / clippy / Loop 基盤の検査群）には**無い**。
+  → ★ リポジトリ既定の `GITHUB_TOKEN` 権限がそのまま渡る。
+- **なぜ問題か**: ⚠️ 既定が read/write なら、★ **CI から repo へ push できてしまう**。
+  ★ 同じ理由づけは `ci.yml` の `frontend-check` に**逐語で既に書いてある**
+  （「job レベルの permissions が無いと、リポジトリ既定の GITHUB_TOKEN 権限がそのまま渡る」）。
+  → ⚠️ **番人の理屈が 1 つの job にしか適用されていない**。
+- ⚠️★★★ **本コミットが作った穴ではない**（★ 既存条件。2026-09-21 より前から同じ）。
+- **★ 次に何をするか**（⚠️ 独立したタスクで）:
+  1. ★ `check` job が **tag push / release 経路**で何を書くのかを先に確かめる
+     （⚠️ 権限を絞ると別の job が**無言で壊れる**）。
+  2. ★ 必要最小を `permissions:` で明示する。
+  3. ⚠️ **`supply-chain.yml` 側も同じ目で見る**（★ workflow は 2 枚ある）。
+
+### ❌ 成立しない（2026-09-21・★ 同日中に一次で確かめて取り下げ）
+
+⚠️★★★ **本起票は誤りだった。** ★ `security-checker` の LOW 指摘を**裏を取らずに登録した**のが原因である。
+
+★ 一次（2026-09-21 実測）:
+
+```text
+$ grep -n "^permissions:" -A 2 .github/workflows/ci.yml
+59:permissions:
+60-  contents: read
+```
+
+→ ★★★ **`ci.yml` には *workflow 全体に効く* `permissions: contents: read` が在る**（`:59`）。
+★ GitHub Actions では **top-level の `permissions` が全 job の既定になる**ので、
+⚠️ **`check` job にも `contents: read` が効いている**。
+→ ★ 「リポジトリ既定の `GITHUB_TOKEN` 権限がそのまま渡る」という本起票の前提は**成立しない**。
+
+★ さらに **機械の番人が既に在った**: `scripts/check_workflow_invariants.py` の不変条件 1 逐語
+「**Every job has an effective `permissions`** (top-level or job-level)」。
+★ 同スクリプトのコメントも逐語「**With a top-level `permissions:` in place, a presence-only check
+can never fire again**」と、★ **まさにこの形を想定して書かれている**。
+⚠️ 本タスクでも実行して緑だった（逐語「OK: 2 workflow(s) / 7 job(s) satisfy all invariants」）。
+
+★ `frontend-check` / `release` が **job レベルでも書いている**のは
+**さらに絞る**ためであって、⚠️ 「他の job には無い」という意味ではない。
+
+- **解決**: ❌ **取り下げ**（★ 番号は再利用しない）。
+- ⚠️★★★ **教訓**: ★ `verify-before-claiming` ルール 1 —— **subagent の報告は三次資料**である。
+  ★ 起票する前に一次へ降りること（⚠️ 本件は `grep -n "^permissions:"` の**1 回**で分かった）。
