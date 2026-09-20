@@ -182,7 +182,13 @@ fn quantile_nearest_rank(sorted_ascending: &[u64], q: f64) -> Option<u64> {
 /// `feat` 行の時刻 (`t` だけ・値は読まない) から観測区間を作る (ADR-030 D8 (b-2))。
 /// 昇順・重複除去した上で、隣接差が `hole_gap_ms` を超えたところで区間を分ける。
 /// `feat_ts` が空なら観測区間は無い (空 `Vec`)。
-pub(super) fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> {
+///
+/// ★ 2026-09-21 に `pub(super)` → `pub` へ広げた（★ 研究者判断・`blockers.md` 起票 20 (a)）——
+/// `bin/replay.rs` が**封筒の `provenance.observed_intervals`** に載せるためである。
+/// ⚠️ 新しい露出ではない: 穴の位置と長さは `rows[].quality.observability_mask.feat`
+/// が既に tick ごとに出している（issue 007）。★ 封筒の列はその**再表現**であり、
+/// 「どの行が観測区間のどこに居るか」を解析側が引けるようにするだけである。
+pub fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> {
     if feat_ts.is_empty() {
         return Vec::new();
     }
