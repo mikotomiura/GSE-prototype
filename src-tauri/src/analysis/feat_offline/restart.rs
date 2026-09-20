@@ -239,6 +239,11 @@ fn restart_for_onset(
 
     // ---- 集計窓（E2・V1） ----
     // ★ 右端 b は確定扱いなので、窓の排他的な右端は b + 1 とする（V2 と対称）。
+    // ⚠️ 次の onset がある場合、窓は **`[o, 次の s)` の半開**である
+    //   (2026-09-21・`/cross-review` 1 巡目・Codex 指摘 3 —— 仕様どおりだが明示する)。
+    //   ★ `次の s` ちょうどの press は**この窓に入らない**。それは次の onset の
+    //     *検出窓* `[s, t0)` に属する時刻であり、転帰として数えるべきものではない
+    //     （ADR-030 D2「検出窓と転帰窓を重ねない」）。
     let window_end_exclusive = next_onset_s_ms.unwrap_or_else(|| interval.b.saturating_add(1));
     let window = (o < window_end_exclusive).then_some((o, window_end_exclusive));
 
@@ -337,7 +342,11 @@ pub(super) fn restart_column(
                 return Restart::null_row();
             };
             let interval = &timeline[i];
-            if t0_ms > interval.b {
+            // ⚠️ `s` が区間の**穴**に落ちている行を、手前の区間に付けない
+            //   (2026-09-21・`/cross-review` 1 巡目・Codex 指摘 2)。
+            //   ★ `t0 = s + θ` かつ `θ >= 0` なので `s > b` なら `t0 > b` でもあり、
+            //     下の検査だけでも現状は捕まる。⚠️ **その含意に依存させない**ために明示する。
+            if s_ms > interval.b || t0_ms > interval.b {
                 return Restart::null_row();
             }
             // ★ onset は区間内で `s` 昇順なので二分探索で引く（⚠️ 線形 find だと `O(R²)`）。
@@ -743,6 +752,69 @@ mod tests {
         assert!(
             rows.iter().any(|row| row.restop_ms.is_some()),
             "空振りの比較にしない（★ 少なくとも 1 行は値を持つ）"
+        );
+    }
+
+    /// ★ 観測区間の同定と窓の右端の境界（2026-09-21・`/cross-review` 1 巡目・Codex 指摘 2 / 3 / 4）。
+    ///
+    /// ⚠️ 観測区間は**穴で切れている**ので、`s` が穴に落ちた onset を手前の区間に付けてはならない。
+    /// ★ 窓の右端は `次の onset の s` の**半開**であり、同時刻の press はこの窓に入らない。
+    #[test]
+    fn interval_lookup_and_window_edges_are_exact() {
+        let config = StallOnsetConfig {
+            b_ms: 0,
+            ..StallOnsetConfig::default()
+        };
+        // 区間は 2 つ: [0, 10_000] と [50_000, 90_000]（★ 間の 10_000〜50_000 は穴）
+        let first = interval(0, 10_000, vec![(0, true), (5_000, false), (8_000, true)]);
+        let second = interval(
+            50_000,
+            90_000,
+            vec![(50_000, true), (60_000, false), (70_000, true)],
+        );
+        let timeline = vec![first, second];
+
+        // (a) `s` が穴の中 → 手前の区間に付けず null
+        let in_hole = restart_column(&[onset_row(20_000, 20_500)], &timeline, &[], &config);
+        assert_eq!(in_hole[0].restop_ms, None);
+        assert_eq!(in_hole[0].resumption_count, None, "窓も無い（V5）");
+
+        // (b) `s` が区間の左端ちょうど → その区間で評価される
+        let at_a = restart_column(&[onset_row(50_000, 50_000)], &timeline, &[], &config);
+        assert_eq!(at_a[0].restop_ms, Some(70_000 - 50_000));
+
+        // (c) `s` が区間の右端ちょうど → 区間内として扱う（★ `t0 <= b` と対称）
+        let at_b = restart_column(&[onset_row(10_000, 10_000)], &timeline, &[], &config);
+        assert_eq!(
+            at_b[0].restop_ms, None,
+            "右端では再停止が観測できない（打ち切り）"
+        );
+        assert_eq!(at_b[0].resumption_count, Some(0), "窓はある");
+
+        // (d) 窓の右端は次の onset の `s` の半開。同時刻の press は入らない。
+        let mut crowded = interval(
+            0,
+            90_000,
+            vec![(0, true), (5_000, false), (8_000, true), (40_000, false)],
+        );
+        crowded.onsets = vec![
+            crate::analysis::feat_offline::stall_onset::OnsetEvent {
+                s_ms: 1_000,
+                t0_ms: 2_000,
+                theta_person_ms: 1_000,
+            },
+            crate::analysis::feat_offline::stall_onset::OnsetEvent {
+                s_ms: 30_000,
+                t0_ms: 31_000,
+                theta_person_ms: 1_000,
+            },
+        ];
+        let keys = vec![letter(29_999), letter(30_000)];
+        let rows = restart_column(&[onset_row(1_000, 2_000)], &[crowded], &keys, &config);
+        assert_eq!(
+            rows[0].post_t0_inserts,
+            Some(1),
+            "次の onset の s (30_000) ちょうどの press は入らない"
         );
     }
 

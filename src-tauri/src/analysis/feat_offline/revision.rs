@@ -309,7 +309,9 @@ pub(super) fn revision_column(
     sorted.sort_by_key(|p| p.t_ms);
 
     let events = extract_revision_events(&sorted);
-    debug_assert!(tick_ms > 0, "tick_ms は 0 にならない (ENGINE_TICK_MS)");
+    // ⚠️ 0 除算は release でも panic する。★ 割る前に**理由の分かる形で**止める
+    //   (2026-09-21・`/cross-review` 1 巡目・Codex 指摘 1)。
+    assert!(tick_ms > 0, "revision_column: tick_ms は 0 にできない");
     let tick_of = |t: u64| -> Option<usize> {
         if t < grid_origin_ms {
             return None;
