@@ -319,3 +319,44 @@ A  b                                                  ← ★ 成果物は残っ
 | `bash scripts/check-shell-portability.sh` | ★ **12 / 12** |
 | `bash scripts/check-tests-are-wired.sh` | ★ **16 / 16** |
 | 突然変異 | ★ **8 種すべてが該当検査を赤にした**（M-a〜M-h） |
+
+---
+
+## ⚠️★★★ CI で赤になった（★ 手元では 35/35 緑・2026-09-20）
+
+★ **PR #212 の Windows `check` が `Loop run guard gate` だけで落ちた**（合格 34 / 不合格 1）。
+
+```text
+NG   B6 陰性対照: amend しただけで done にならなかった
+{"...","event":"blocked","attempt":1,"detail":"セッション異常終了 subtype=unknown "}
+```
+
+**原因**（★ 一次のログから）:
+
+- ★ `loop-run.sh` は `res="$( (cd "$wt" && … claude …) 2>&1 )"` で
+  **stdout と stderr を混ぜて**受け取り、それを `jq` で読む。
+- ⚠️ B6 の stub は `git commit` を打つ。★ **CI の git は `core.autocrlf` が有効**で、
+  「in the working copy of 'w.txt', LF will be replaced by CRLF」を **stderr に出す**。
+- → ⚠️ **JSON が壊れて `subtype=unknown`** ＝「セッション異常終了」で attempt が blocked になった。
+
+⚠️★★★ **手元では 1 度も再現しない**（★ このマシンの git は autocrlf が無効）。
+★ `docs/agent-shared.md` 逐語「**⚠️★★ 手元の検証は CI の代替にならない**」の実例である。
+⚠️ **同じ自己ホスト機（gse-win = G-GEAR）で走っているのに落ちた** —— ★ runner は
+NetworkService で **HOME と git config が違う**（★ memory「Win runner tool PATH」と同じ根）。
+
+**対策（★ 二重にした）**:
+
+1. ★ stub 本体を `{ … } >/dev/null 2>&1` で包み、**stdout に JSON だけ**を出させる
+   （★ 本物の `claude` の振る舞いに合わせる）。
+2. ★ 一時 repo に `core.autocrlf false` / `core.safecrlf false` を設定して環境非依存にする。
+
+**★ 再発防止（⚠️ 「直した」で終わらせない）**:
+
+★ **B2 の stub が stdout と stderr の両方にわざとノイズを出す**ようにした。
+→ ⚠️ **B2 が緑であること自体が「ノイズは漏れていない」の証明**になる。
+
+| 変異 | 内容 | 結果 |
+|---|---|---|
+| M-i | stub の出力を捨てる包みを外す（＝ CI で起きたバグを再導入） | ★ **B2 が赤**（35 → 34 合格） |
+
+★ これで突然変異は **計 9 種**（M-a〜M-i）。

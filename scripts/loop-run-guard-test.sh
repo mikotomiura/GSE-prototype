@@ -77,7 +77,16 @@ setup_repo() { # setup_repo <repo-dir> <claude-stub-の本体> [denials-json] [v
   cp "${SPAWN_SH}" "${r}/scripts/loop-spawn.sh"
   cp "${DENY_SH}"  "${r}/scripts/loop-worktree-deny.sh"
   cp "${RUN_SH}"   "${r}/scripts/loop-run.sh"
-  { printf '#!/usr/bin/env bash\n'; printf '%s\n' "${stub}"
+  # ⚠️★★★ **stub 本体の出力を全部捨てる**（★ 2026-09-20 に CI で赤くなって分かった）:
+  #   ★ `loop-run.sh` は `res="$( … claude … 2>&1 )"` で **stdout と stderr を混ぜて**受け取り、
+  #     それを `jq` で読む。→ ⚠️ stub の中の `git` が **1 行でも stderr に書くと JSON が壊れ**、
+  #     `subtype=unknown` ＝「セッション異常終了」になって attempt が blocked になる。
+  #   ⚠️ 手元では出ないが **CI の git は `core.autocrlf` の警告を出した**
+  #     （★ 「in the working copy of 'w.txt', LF will be replaced by CRLF」）。
+  #     → ★ `docs/agent-shared.md` 逐語「**手元の検証は CI の代替にならない**」の実例。
+  #   ★ 本物の `claude` は stdout に JSON だけを出すので、stub もそう振る舞わせる。
+  { printf '#!/usr/bin/env bash\n'
+    printf '{\n'; printf '%s\n' "${stub}"; printf '} >/dev/null 2>&1\n'
     printf 'printf "%s\\n"\n' \
       "{\\\"subtype\\\":\\\"success\\\",\\\"total_cost_usd\\\":0,\\\"usage\\\":{\\\"input_tokens\\\":1,\\\"output_tokens\\\":1},\\\"permission_denials\\\":${denials}}"
   } > "${r}/stub/claude"
@@ -157,6 +166,10 @@ CFG
     git config user.name loop-test || exit 1
     git config commit.gpgsign false || exit 1
     git config core.hooksPath /dev/null || exit 1
+    # ⚠️ 一時 repo を環境非依存にする（★ CI の git は autocrlf が有効で警告を出す）。
+    #   ★ 上の「stub の出力を捨てる」と二重の防御にする（⚠️ どちらか片方でも成立するように）。
+    git config core.autocrlf false || exit 1
+    git config core.safecrlf false || exit 1
     git add scripts .steering .gitignore || exit 1
     git commit -q -m init || exit 1
     # ⚠️★★★ **逸脱先の空きブランチ**を用意する（★ 2026-09-20 に踏んだ落とし穴 その 1）。
@@ -196,8 +209,17 @@ echo "B. ブランチ検査 (ensure_branch) — ⚠️ 起票 10 の境界"
 
 # --- B2 (⚠️ 陰性対照を先に回す): 逸脱しない stub は issue_done になること ---
 #   ★ これが赤なら、B1 / B3 の「blocked になった」は何も検査していない緑である。
+#
+#   ⚠️★★★ **stub は stdout / stderr の両方にわざとノイズを出す**（★ 2026-09-20 の CI 赤から）。
+#     ★ `loop-run.sh` は `res="$( … 2>&1 )"` で両方を受けて `jq` で読むので、
+#       ⚠️ ノイズが漏れると JSON が壊れて `subtype=unknown` ＝ blocked になる。
+#     → ★ **B2 が緑であること自体が「ノイズは漏れていない」の証明**になる。
+#     ⚠️ CI の git は `core.autocrlf` の警告を stderr に出し、実際にこれで B6 が赤くなった。
 B2="${TMP}/b2/repo"; mkdir -p "${B2}"
-if setup_repo "${B2}" ':'; then
+B2_STUB='echo "stdout のノイズ (★ 漏れたら JSON が壊れる)"
+echo "stderr のノイズ (★ CI の git autocrlf 警告と同じ位置)" >&2
+true'
+if setup_repo "${B2}" "${B2_STUB}"; then
   ev="$(run_loop "${B2}" --issues 001)"
   if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
     ok "B2 陰性対照: 逸脱しない attempt は issue_done になった (★ 検査が空振りでない)"
