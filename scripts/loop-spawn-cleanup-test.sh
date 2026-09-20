@@ -264,6 +264,43 @@ else
   else
     ng "id 検証: '../../x' を受け付けた"
   fi
+  # ★ `.` / `..` は文字集合だけでは通る（⚠️ Codex /cross-review 1 巡目）。
+  do_cleanup "${R2B}" '..'
+  if [ "${RC}" -ne 0 ]; then
+    ok "id 検証: '..' を拒否した"
+  else
+    ng "id 検証: '..' を受け付けた"
+  fi
+fi
+
+# ── 2d. 同じ basename の別 worktree に誤爆しないか ──────
+echo "2d. ⚠️ 別パスに同じ basename の worktree があっても誤判定しないか"
+
+R2C="${TMP}/r2c/repo"; mkdir -p "${R2C}"
+if ! setup_fake_repo "${R2C}" || ! do_spawn "${R2C}" 013 t; then
+  ng "同 basename: 準備できなかった (★ 判定できない)"
+else
+  # ★ `../wt/repo-013-t` と **同じ basename** の worktree を別の場所にも作る。
+  #   ⚠️ 撤去確認を basename で行うと、対象が消えているのに「撤去失敗」と誤判定する。
+  mkdir -p "${TMP}/r2c/other"
+  ( cd "${R2C}" && git worktree add -b decoy-013 "${TMP}/r2c/other/repo-013-t" main ) >/dev/null 2>&1
+  decoy_ok=0
+  [ -d "${TMP}/r2c/other/repo-013-t" ] && decoy_ok=1
+  if [ "${decoy_ok}" -eq 0 ]; then
+    ng "同 basename: 囮 worktree を作れなかった (★ 判定できない)"
+  else
+    do_cleanup "${R2C}" 013
+    if [ "${RC}" -eq 0 ] && ! has_text "${OUT}" "撤去失敗"; then
+      ok "同 basename: 誤って「撤去失敗」と言わない (★ パスで見ている)"
+    else
+      ng "同 basename: 撤去できたのに失敗と報告した (rc=${RC}) —— ★ basename 照合に戻っている"
+    fi
+    if [ -d "${TMP}/r2c/other/repo-013-t" ]; then
+      ok "同 basename: ⚠️ 別パスの worktree を巻き込んでいない"
+    else
+      ng "同 basename: ⚠️★★★ 別パスの worktree を撤去した"
+    fi
+  fi
 fi
 
 # ── 3. 別 id を巻き込まない ─────────────────────────────
@@ -340,7 +377,7 @@ echo "6. ⚠️★★★ 変異テスト —— path 系統を潰したら赤く
 
 R6="${TMP}/r6/repo"; mkdir -p "${R6}"
 MUT="${TMP}/mutated-loop-spawn.sh"
-sed 's/if (bn == exa_p || index(bn, pfx_p) == 1) hitp = 1/hitp = hitp/' "${SPAWN_SH}" > "${MUT}"
+sed 's/if (index(q, home) == 1 \&\& (bn == exa_p || index(bn, pfx_p) == 1)) hitp = 1/hitp = hitp/' "${SPAWN_SH}" > "${MUT}"
 # ⚠️ ここでも `grep -q` をパイプ終端に置かない (★ 上の `wt_has` と同じ理屈)。
 mut_left="$(grep -c 'index(bn, pfx_p)' "${MUT}" 2>/dev/null)" || mut_left=0
 if [ "${mut_left:-0}" -ne 0 ]; then

@@ -14,9 +14,9 @@
 - [x] 対象 0 件は exit 0（冪等）
 
 ## テスト
-- [x] `scripts/loop-spawn-cleanup-test.sh` 新規（**7 群 25 件**・⚠️ 変異テスト付き）
-- [x] 新テストが緑（**25 / 25**）
-- [x] ⚠️★★★ **旧実装に当てて赤になることを実測**（**17 件 NG / exit 1**）＝ 空振りでない
+- [x] `scripts/loop-spawn-cleanup-test.sh` 新規（**8 群 28 件**・⚠️ 変異テスト付き）
+- [x] 新テストが緑（**28 / 28**）
+- [x] ⚠️★★★ **旧実装に当てて赤になることを実測**（**18 件 NG / exit 1**）＝ 空振りでない
 - [x] `check-shell-portability.sh` 緑（12 / 0）
 - [x] `check-tests-are-wired.sh` 緑（**17 本**すべて配線・self-test も緑）
 - [x] `loop-worktree-deny-test.sh` 緑（34 / 0）
@@ -31,7 +31,8 @@
       `registered_bn` の fail-closed / 除外をパス同定へ / `prune` の裸実行 / 復旧案内に `unlock`
 - [x] LOW 対応: テストの `grep -q` / 完全一致経路の追加 / CI の macOS 除外理由 / design の行番号・書式
 - [x] ⚠️ 範囲外と判断したもの: `check` job の `permissions:`（★ 既存条件 → **起票 24**・判断 10）
-- [ ] `/cross-review` 2 巡（パス限定・出力は scratchpad）
+- [x] `/cross-review` **1 巡目**（★ 指摘 5 件 → 判断 11 / 12。⚠️ 足したテストが**実害を 1 件検出**）
+- [ ] `/cross-review` **2 巡目**（★ 自分が足した規則の境界条件）
 
 ## ドキュメント
 - [x] 起票 18 に **✅ 是正済み** を追記（★ 本文は書き換えず追記）

@@ -99,19 +99,28 @@ if [ "${1:-}" = "--cleanup" ]; then
   case "${id}" in
     -*) die "issue-id が '-' 始まりです: [${id}]" ;;
     *[!A-Za-z0-9._-]*) die "issue-id に使えない文字が入っています (英数字 . _ - のみ): [${id}]" ;;
+    # ★ `.` / `..` / `a..b` は上を通るが、ref としても名前としても紛らわしい (⚠️ Codex /cross-review 1 巡目)。
+    #   ★ パス脱出は起きない (`<repo>-..` は 1 つの名前であって親ディレクトリではない) が、通す意味も無い。
+    .|..|*..*) die "issue-id にドットの連なりは使えません: [${id}]" ;;
   esac
   left=0; n_wt=0; n_br=0; processed_path=""
 
-  # ★ 登録済み worktree の **basename** 集合を返す。⚠️ **取得できなければ非 0 を返す**
-  #   (★ code-reviewer MEDIUM —— 旧版はエラーを握りつぶして空を返し、
-  #    ⚠️ 「取れなかった」を「撤去できた」と読んでいた)。
-  #   ⚠️ フルパスで突き合わせない —— git は `C:/wt/...` を、bash の `pwd` は `/c/wt/...` を返すため
-  #     (2026-09-21 に git-bash で実測)。★ 既存の stale 検出 (下方) も basename で比較している。
-  registered_bn() {
+  # ★ 登録済み worktree の **パス** 集合を返す（★ git の出力そのまま）。
+  #   ⚠️ **取得できなければ非 0 を返す**（★ code-reviewer MEDIUM —— 旧版はエラーを握りつぶして
+  #     空を返し、⚠️ 「取れなかった」を「撤去できた」と読んでいた）。
+  #   ★ **パスで突き合わせてよいのはここだけ** —— ⚠️ 比べる相手 (`${wt}`) も **git の出力**だからである
+  #     (★ bash の `pwd` は `/c/wt/...`、git は `C:/wt/...` を返すので、混ぜると必ずずれる)。
+  registered_paths() {
     local out
     out="$(git worktree list --porcelain 2>/dev/null)" || return 1
+    printf '%s\n' "${out}" | awk '/^worktree /{print substr($0, 10)}'
+  }
+  # ★ 登録済み worktree の **basename** 集合（★ シェル側のパスと突き合わせるときだけ使う）。
+  registered_bn() {
+    local out
+    out="$(registered_paths)" || return 1
     printf '%s\n' "${out}" \
-      | awk '/^worktree /{p=substr($0,10); gsub(/\\/,"/",p); n=split(p,seg,"/"); print seg[n]}'
+      | awk '{p=$0; gsub(/\\/,"/",p); n=split(p,seg,"/"); if (p != "") print seg[n]}'
   }
   # ★ 改行を番兵にした完全一致判定（⚠️ `grep -q` を使わない —— `set -o pipefail` 下では
   #   grep の早期終了が上流に SIGPIPE を投げ、**一致したのに非 0** になりうるため）。
@@ -126,9 +135,16 @@ $2
     return 1
   }
 
+  # ★ path 系統が見てよい置き場（★ `git` の表記で組み立てる —— `repo_root` が git 由来なので揃う）。
+  #   ⚠️★★★ **basename だけで一致させない**（★ 2026-09-21 に新テストが実害を検出）——
+  #     `--cleanup 013` が、**別の場所にある同名 worktree**（`../other/<repo>-013-t`）まで撤去していた。
+  #   ★ 本スクリプトが作る worktree は必ず `../wt/` 直下なので、**そこに限る**。
+  #   ⚠️ 置き場を移されたものは path 系統では拾えない（★ branch 系統が `loop/<id>` なら拾う）。
+  wt_home="$(dirname "${repo_root}")/wt/"
+
   # porcelain の worktree 行はプレフィックス除去で取得 (空白入りパスに耐える)
   # ⚠️ 取得に失敗したら黙って進まない (★ `set -o pipefail` 下では無言で exit していた)。
-  wts="$(git worktree list --porcelain | awk -v id="${id}" -v rn="${repo_name}" '
+  wts="$(git worktree list --porcelain | awk -v id="${id}" -v rn="${repo_name}" -v home="${wt_home}" '
     BEGIN { exa_p = rn "-" id; pfx_p = rn "-" id "-"; exa_b = "loop/" id; pfx_b = "loop/" id "-" }
     function flush() {
       if (p != "" && (hitb || hitp)) print p
@@ -138,7 +154,8 @@ $2
       flush()
       p = substr($0, 10)
       q = p; gsub(/\\/, "/", q); n = split(q, seg, "/"); bn = seg[n]
-      if (bn == exa_p || index(bn, pfx_p) == 1) hitp = 1
+      # ★ 名前が合うだけでは足りない —— **`../wt/` 直下にあること**も要求する。
+      if (index(q, home) == 1 && (bn == exa_p || index(bn, pfx_p) == 1)) hitp = 1
     }
     /^branch /{
       b = substr($0, 8); sub(/^refs\/heads\//, "", b)
@@ -182,10 +199,13 @@ ${wt}"
       fi
       # ★ remove の exit code を信じず、**登録とディレクトリを引き直して**確かめる。
       #   ⚠️ 登録を読めなかったときは「撤去できた」と書かない（fail-closed）。
+      #   ⚠️ **basename ではなくパスで見る**（★ Codex /cross-review 1 巡目）——
+      #     別パスに同じ basename の worktree が登録されていると、
+      #     ★ 対象は消えているのに「撤去失敗」と誤判定していた（⚠️ 安全側だが嘘である）。
       still=1
-      if reg="$(registered_bn)"; then
+      if reg="$(registered_paths)"; then
         still=0
-        if contains_line "${reg}" "${wt_bn}"; then still=1; fi
+        if contains_line "${reg}" "${wt}"; then still=1; fi
         if [ -e "${wt}" ]; then still=1; fi
       else
         echo "loop-spawn: ⚠️ worktree 登録を読めませんでした (撤去できたか確認できません)" >&2
@@ -238,6 +258,9 @@ EOF
   #   ⚠️★★★ **上のループで触ったものだけを除外する**（★ 「登録にあるなら除外」にしない）——
   #     ★ 一致規則が退行して worktree を拾えなくなったとき、**ここが最後の網**になる。
   #     ⚠️ 登録の有無で除外すると、拾えなかった worktree が黙って「完了」に化ける（＝ 起票 18 の再来）。
+  #   ⚠️ **配置 `../wt/` に依存している**（★ Codex /cross-review 1 巡目）——
+  #     ★ 下方の `wtdir="../wt/${repo_name}-${id}-${short}"` と**同じ前提**であり、
+  #     ⚠️ 置き場を変えるときは**この網も一緒に変える**こと（★ 片方だけ動かすと網が空振りする）。
   for d in "../wt/${repo_name}-${id}" "../wt/${repo_name}-${id}-"*; do
     [ -d "${d}" ] || continue
     d_bn="$(basename "${d}")"
