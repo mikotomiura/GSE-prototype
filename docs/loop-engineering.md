@@ -178,8 +178,18 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
 ★ 名前だけでなく **`merge-base --is-ancestor` で履歴の子孫性**も見る。
 ⚠ `git reset --soft|--mixed <other>` / `git branch -f loop/<id>-issue <other>` は
 **HEAD の名前を保ったまま中身を差し替える** (deny に在るのは `git reset --hard:*` だけ)。
-⚠ ただし `git restore --source=<other> -- .` のような **HEAD を動かさない内容の差し替えは拾えない**。
-★ これが境界の限界である (⚠ deny で塞ぐ方向に戻さない)。
+⚠ **境界の限界は 2 つある** (★ どちらも 2026-09-20 に実測した):
+
+1. `git restore --source=<other> -- .` / `git read-tree -u` のような
+   **HEAD を動かさない内容の差し替えは拾えない**。
+2. **同じブランチ内の巻き戻し** (`git reset --soft|--mixed <アンカー>`) は
+   `--is-ancestor` が TRUE を返すので **検出しない**。
+   ★ これは**許容と裁定した仕様**である —— `--soft` / `--mixed` は作業ツリーを保つので、
+   verify が測る内容は worker の成果物のまま。害は「コミットが捨てられる」であって
+   「別の内容を測る」ではなく、**「未コミットで終わる」を失敗にしない**のと同じ型。
+   ⚠ `git reset --hard` は deny に在る (作業ツリーも消すため)。
+
+⚠ deny で塞ぐ方向に戻さないこと。
 
 - **なぜ要るか**: 2026-09-15 に worker が `git checkout main` を打ち、worktree が `main` を
   掴んだまま attempt が終わった (起票 10)。⚠️ このとき `run_verify` は

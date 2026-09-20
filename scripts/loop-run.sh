@@ -178,8 +178,17 @@ ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 d
 #     ★ **worktree 生成時点**に固定すれば、worker が自分のコミットをどう作り直しても
 #       アンカーは常に祖先のままであり、⚠️ **他ブランチへの差し替えだけが不一致になる**。
 #
-# ⚠️★★★ **それでも見ていないもの**（★ 明示する）: `git restore --source=<other> -- .` /
-#   `git read-tree -u` のような **HEAD を 1 mm も動かさない内容の差し替え**は原理的に拾えない。
+# ⚠️★★★ **それでも見ていないもの**（★ 明示する。⚠️ 2 つある）:
+#   (a) `git restore --source=<other> -- .` / `git read-tree -u` のような
+#       **HEAD を 1 mm も動かさない内容の差し替え**は原理的に拾えない。
+#   (b) **同じブランチ内の巻き戻し** —— `git reset --soft|--mixed <anchor>` は
+#       HEAD がアンカーそのものになるので `--is-ancestor` は **TRUE を返す**
+#       （★ 2026-09-20 に実測。Codex `/cross-review` 2 巡目 HIGH）。
+#       ⚠️ ただし **`--soft` / `--mixed` は作業ツリーを保つ**ので、
+#       ★ `run_verify` が測る内容は worker の成果物のままである（★ これも実測した）。
+#       → ★ 害は「**コミットが捨てられる**」であって「**別の内容を測る**」ではない。
+#       ★ これは判断 5（「未コミットで終わる」を失敗にしない）と**同じ型**として**許容する**。
+#       ⚠️ `git reset --hard` は deny に在るので別（★ そちらは作業ツリーも消す）。
 #   ★ ここが「境界」の限界である。⚠️ **deny で塞ぐ方向に戻さない**（★ M3 のとおり閉じない）。
 ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [worktree生成時の-sha]; 0 = 期待どおり
   local id="$1" phase="$2" attempt="$3" wt="$4" base="${5:-}" head
@@ -615,6 +624,20 @@ declare -a READY DONE_IDS
 #   必ずこちらに対して行う (★ フィルタ後の `$ALL` で引くと、`blocked` な issue に依存している
 #   issue が「issues/ に存在しません」で **die する** —— 実際には存在するのに)。
 ALL_FILES="$(issue_ids)"
+# ⚠️★★★ **ファイル名由来の id も検証する**（★ Codex `/cross-review` 2 巡目 MEDIUM・2026-09-20）。
+#   ★ 1 巡目の是正で `--issues` 側だけ検証していたが、⚠️ `issue_ids()` 由来は素通りだった。
+#   ★ 以降のすべてが **`for id in $ALL_FILES` の単語分割**に依存しているので、
+#     空白や glob メタ文字を含む issue ファイルがあると
+#     ⚠️ **id が黙って分割され / パターンとして解釈される**（★ `case " $BYPASSED_BLOCKED "` も同じ）。
+#   → ★ 早い段階で **die** する（⚠️ 黙って壊れた id で走らせない）。
+#   ⚠️★★★ **`for id in $ALL_FILES` で検査してはならない** —— ★ その時点で**既に分割済み**であり、
+#     `0 06.md` は `0` と `06` という**見かけ上は正当な 2 つの id** になってしまう
+#     （★ 2026-09-20 に検査 S9 が実測で捕まえた）。→ ★ **行単位**で、分割される前に見る。
+bad_ids="$(issue_ids | grep -vE '^[A-Za-z0-9._-]+$' || true)"
+bad_ids="$bad_ids$(issue_ids | grep -xE '\.|\.\.' || true)"
+[ -z "$bad_ids" ] || die "issue ファイル名が不正です (英数字 . _ - のみ):
+$(printf '%s\n' "$bad_ids" | sed 's/^/  - /')
+  ⚠️ 空白や glob メタ文字を含む名前は、id の単語分割・パターン解釈を壊します。"
 ALL="$ALL_FILES"
 SKIPPED_BLOCKED=""
 BYPASSED_BLOCKED=""

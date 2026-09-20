@@ -25,9 +25,15 @@
 #   5. ⚠️ **`git restore --source=<other> -- .` のような HEAD を動かさない内容の差し替え**。
 #      ★ `ensure_branch` は原理的に拾えない（★ B5 が見ているのは HEAD が動く形だけ）。
 #   6. ★ `_loop-artifacts/` の 14 日 prune と、`mkdir -p` 失敗時の「(保存できず)」経路。
+#   7. ⚠️ **`issue_status_key` の語彙**（`unblocked` / `not blocked` / 日本語で始まる Status）。
+#      ★ 挙動は確かめてあるが（判断 9）、**裁定していない**ので検査で固定していない。
 #
-# ⚠️★★★ **B1〜B5 / S1〜S8 / D1〜D2 は突然変異で赤くなることを確認済み**（2026-09-20・計 6 種）。
+# ⚠️★★★ **「検出しないこと」を固定している検査が 1 つある**: **B7**（同一ブランチ内の巻き戻し）。
+#   ★ 判断 9 で**許容と裁定した**境界なので、⚠️ **裁定が変わったら検査を反転させる**。
+#
+# ⚠️★★★ **B1〜B7 / S1〜S9 / D1〜D2 は突然変異で赤くなることを確認済み**（2026-09-20・計 8 種）。
 #   ★ 詳細は `.steering/20260920-loop-foundation-fixes/measurements.md`。
+#   ⚠️ **B7 だけは例外**（★ 「検出しない」を固定しているので、変異させる対象が無い）。
 #
 # Usage: bash scripts/loop-run-guard-test.sh
 # Exit:  0 = 全件合格 / 1 = 不合格あり / 2 = ⚠️ 検査できなかった
@@ -336,6 +342,35 @@ else
   ng "B6: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
+# --- B7: ⚠️★★★ **許容する境界を固定する** —— 同じブランチ内の巻き戻し ---
+#   ★ Codex `/cross-review` 2 巡目 HIGH（2026-09-20）。⚠️ `git reset --soft <anchor>` は
+#     HEAD がアンカーそのものになり `--is-ancestor` が TRUE を返すので **検出されない**。
+#   ★ これは**バグではなく裁定した仕様**である（判断 9）:
+#     ⚠️ `--soft` / `--mixed` は作業ツリーを保つので、`run_verify` が測る内容は worker の成果物のまま。
+#     → ★ 害は「コミットが捨てられる」であって「別の内容を測る」ではない
+#       （★ 判断 5 の「未コミットで終わるのを失敗にしない」と同じ型）。
+#   ⚠️ **この検査は「検出できること」ではなく「検出しないこと」を固定している。**
+#     ★ 将来ここを塞ぐ裁定が出たら、この検査を反転させること。
+B7="${TMP}/b7/repo"; mkdir -p "${B7}"
+B7_STUB='echo w > w.txt && git add w.txt && git commit -q -m work && git reset -q --soft HEAD~1 || true
+true'
+if setup_repo "${B7}" "${B7_STUB}"; then
+  ev="$(run_loop "${B7}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '履歴が入れ替わっている' "${ev}"; then
+    ng "B7: 同一ブランチ内の巻き戻しを blocked にした (★ 判断 9 では許容する仕様。裁定が変わったなら本検査を反転させる)"
+  else
+    ok "B7: 同一ブランチ内の巻き戻しは検出しない (★ 判断 9 の許容境界・仕様として固定)"
+  fi
+  # ⚠️ 作業ツリーが残ること = 「別の内容を測っていない」ことの根拠
+  if [ -f "${TMP}/b7/wt/repo-001-issue/w.txt" ] || [ -n "$(find "${TMP}/b7" -name w.txt 2>/dev/null | head -1)" ]; then
+    ok "B7: 巻き戻しても作業ツリーの成果物は残る (★ verify は worker の成果物を測っている)"
+  else
+    ng "B7: ⚠️ 作業ツリーの成果物が消えた (★ 許容の前提が崩れている)"
+  fi
+else
+  ng "B7: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
 echo "S. Status フィルタ — ⚠️ 判断 26 の申し送り (★ 3 状態)"
 
 S="${TMP}/s/repo"; mkdir -p "${S}"
@@ -441,6 +476,23 @@ if setup_repo "${S}" ':'; then
     ok "S8 検証: --issues の不正な id を拒否した (★ _loop-artifacts の外へ書かせない)"
   else
     ng "S8 検証: ⚠️ '../../x' を受理した (★ gitignore の外へ成果物を書ける)"
+  fi
+
+  # --- S9 ⚠️ **ファイル名由来の id** も検証すること（★ Codex 2 巡目 MEDIUM） ---
+  #   ★ 以降すべてが `for id in $ALL_FILES` の単語分割に依存しているので、
+  #     空白入りの issue ファイルがあると id が黙って 2 つに割れる。
+  S9="${TMP}/s9/repo"; mkdir -p "${S9}"
+  if setup_repo "${S9}" ':'; then
+    cp "${S9}/.steering/task/issues/001.md" "${S9}/.steering/task/issues/0 06.md"
+    out9="$(dry_run "${S9}" 2>&1)"
+    if printf '%s' "${out9}" | grep -q 'issue ファイル名が不正です'; then
+      ok "S9 検証: 空白入りの issue ファイル名を拒否した (★ 単語分割で黙って壊れない)"
+    else
+      ng "S9 検証: ⚠️ 空白入りのファイル名を受理した (★ id が '0' と '06' に割れる)"
+      printf '%s\n' "${out9}" | head -8
+    fi
+  else
+    ng "S9: 一時 git repo を用意できなかった (★ 判定できない)"
   fi
 else
   ng "S: 一時 git repo を用意できなかった (★ 判定できない)"
