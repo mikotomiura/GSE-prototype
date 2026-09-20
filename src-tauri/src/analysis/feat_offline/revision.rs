@@ -202,19 +202,27 @@ fn di_alternations(burst: &[CategorizedPress]) -> u64 {
 
 /// burst 1 つぶんの `KeyCategory` bigram の重複率（U2 の裁定: `1 − 種類数 ÷ 総数`）。
 /// bigram が 0 個（press が 1 件以下）なら `None`。
+///
+/// ⚠️★★★ **出力は率という実数 1 つだが、`distinct`（相異なる bigram の *種類数*）は
+/// 逆算できる** —— 分母 `total` は同じ出力の `activity.keys` を burst 区間で足せば得られる
+/// （2026-09-20・`security-checker` L1）。★ ただし**どの型が出たか・順序は 1 ビットも出ない**ので、
+/// 本文の部分復元は構造的に不可能である。⚠️ 「率だから安全」という前提を置かないこと。
 fn category_bigram_repeat_rate(burst: &[CategorizedPress]) -> Option<f64> {
     if burst.len() < 2 {
         return None;
     }
-    let bigrams: Vec<(KeyCategory, KeyCategory)> = burst
+    // ★ 種類数を数えるだけなので、文字列ではなく**判別子**で並べ替える
+    //   （2026-09-20・`code-reviewer` M3: `as_str()` の文字列比較 ＋ clone は
+    //    15 万 press が 1 burst になる入力で効く）。⚠️ 並び順に意味は無い（distinct だけを使う）。
+    let mut bigrams: Vec<(u8, u8)> = burst
         .windows(2)
-        .map(|w| (w[0].category, w[1].category))
+        .map(|w| (w[0].category as u8, w[1].category as u8))
         .collect();
-    let mut distinct: Vec<(KeyCategory, KeyCategory)> = bigrams.clone();
-    distinct.sort_unstable_by_key(|(a, b)| (a.as_str(), b.as_str()));
-    distinct.dedup();
     let total = bigrams.len() as f64;
-    Some(1.0 - (distinct.len() as f64) / total)
+    bigrams.sort_unstable();
+    bigrams.dedup();
+    // ★ `1.0 - distinct/total` ではなく差で書く（⚠️ 1/3 が 0.33333333333333337 にならない）。
+    Some((total - bigrams.len() as f64) / total)
 }
 
 /// press 列（時刻昇順）から、閉じが確定した走りと burst を取り出す純関数。
@@ -279,7 +287,11 @@ fn extract_revision_events(sorted: &[CategorizedPress]) -> RevisionEvents {
 /// ★ ここが `vk` を触る唯一の場所である（`KeyCategory::from_vk` に通して落とす）。
 /// `tick_count` / `grid_origin_ms` / `tick_ms` は呼び出し側の tick グリッドと揃える。
 /// ⚠️ グリッドの外に閉じが落ちた単位は黙って捨てる（モジュール doc の細目 3）。
-pub fn revision_column(
+///
+/// ⚠️ `tick_ms` は 0 でないこと（★ 呼び出し側は `ENGINE_TICK_MS` を渡す）。
+/// ★ 可視性は `restart_column` と揃えて `pub(super)` にしてある
+/// （2026-09-20・`security-checker` L2: `pub` のままだとモジュール外から 0 を渡せた）。
+pub(super) fn revision_column(
     keys: &[KeyPress],
     tick_count: usize,
     grid_origin_ms: u64,
@@ -297,6 +309,7 @@ pub fn revision_column(
     sorted.sort_by_key(|p| p.t_ms);
 
     let events = extract_revision_events(&sorted);
+    debug_assert!(tick_ms > 0, "tick_ms は 0 にならない (ENGINE_TICK_MS)");
     let tick_of = |t: u64| -> Option<usize> {
         if t < grid_origin_ms {
             return None;
@@ -435,6 +448,43 @@ mod tests {
             "1 本目は burst の閉じ (最後の press + PAUSE_THRESHOLD_MS) で確定する"
         );
         assert!(!events.runs[1].after_first_in_burst, "別 burst の 1 本目");
+    }
+
+    /// ⚠️★★★ `burst_ranges` は `extract_pause_resumptions` の出力と**値の一致で同じ順に歩く**。
+    /// ★ その論証が load-bearing なので、**pause 境界のちょうどそこに同時刻打鍵がある**入力で固定する
+    /// (2026-09-20・`code-reviewer` M2)。⚠️ 将来 `extract_pause_resumptions` が dedup や
+    /// 添字返しに変わると、ここが赤くなって気づける。
+    #[test]
+    fn burst_ranges_survive_same_timestamp_presses_at_a_pause_boundary() {
+        let gap = TEST_PAUSE_GAP_MS;
+        // pause を終える press が同時刻に 2 つある
+        let at_boundary = vec![
+            press(0, KeyCategory::Alphabetic),
+            press(gap, KeyCategory::Alphabetic),
+            press(gap, KeyCategory::Alphabetic),
+        ];
+        assert_eq!(
+            burst_ranges(&at_boundary),
+            vec![(0, 1), (1, 3)],
+            "2 つ目の同時刻 press は同じ burst に入る (⚠️ 間隔 0ms は pause ではない)"
+        );
+
+        // pause の両側に同時刻打鍵がある
+        let both_sides = vec![
+            press(0, KeyCategory::Alphabetic),
+            press(0, KeyCategory::Alphabetic),
+            press(gap, KeyCategory::Alphabetic),
+            press(gap, KeyCategory::Alphabetic),
+            press(2 * gap, KeyCategory::Alphabetic),
+        ];
+        assert_eq!(burst_ranges(&both_sides), vec![(0, 2), (2, 4), (4, 5)]);
+
+        // 閾値ちょうどは pause (★ extract_pause_resumptions が `>=` である SSOT と揃う)
+        let exact = vec![
+            press(0, KeyCategory::Alphabetic),
+            press(PAUSE_THRESHOLD_MS, KeyCategory::Alphabetic),
+        ];
+        assert_eq!(burst_ranges(&exact), vec![(0, 1), (1, 2)]);
     }
 
     /// AC6: `category_bigram_repeat_rate` が定義 (U2) と一致すること。

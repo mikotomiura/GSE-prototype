@@ -90,15 +90,6 @@ impl Restart {
     }
 }
 
-/// 条件 A が `false` であり続けた区間（＝ 生成が続いた区間）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct GenerationSpan {
-    /// 開始（★ `o` より前に始まっていれば `o` にクリップ済み・V6）。
-    r_ms: u64,
-    /// 閉じ（条件 A の立ち上がり）。観測区間の右端まで閉じなければ `None`（打ち切り）。
-    s_prime_ms: Option<u64>,
-}
-
 /// press 列を種別ごとの累積和にしたもの（★ 区間の件数を `O(log N)` で引くため）。
 struct PressPrefix {
     sorted_ts: Vec<u64>,
@@ -152,53 +143,85 @@ impl PressPrefix {
     }
 }
 
-/// 条件 A の変化点の列から、`[o, b]` の中の生成区間を取り出す（V6 の裁定）。
+/// 1 つの観測区間の変化点に対する `O(log C)` の索引（`C` = 変化点の数）。
 ///
-/// `changes` は `(時刻, 値)` の変化点だけを持ち、値は必ず交互に変わる
-/// （`stall_onset::ConditionAInterval` の doc 参照）。
-fn generation_spans(changes: &[(u64, bool)], o: u64, b: u64) -> Vec<GenerationSpan> {
-    let idx = changes.partition_point(|&(t, _)| t <= o);
-    if idx == 0 {
-        // ⚠️ `o` 以前に評価時刻が 1 つも無い（＝ 条件 A の値が決まらない）。
-        // ★ `o = t0 + B >= s >= a + W`（区間の最初の評価時刻）なので構造的には起きないが、
-        //   境界入力で落ちないよう「情報が無い」側に倒す。
-        return Vec::new();
+/// ⚠️★★★ **onset 行ごとに変化点を線形に走らないためにある。**
+/// ★ 2026-09-20 のレビューで `code-reviewer`（H1）と `security-checker`（M1）が**独立に**
+/// 「`restart` が `O(R・C)`（`R` = onset の数）になっている」と指摘した。
+/// ⚠️ これは issue 008 が `stall_onset` 側で潰した二乗と**同型**であり、かつ
+/// **AC18 / AC18b はどちらも `R = 1`** なので 20 秒の門がこの経路を検出しない
+/// （★ 起票 21 に記録した）。
+///
+/// ★ `true_prefix` は単調非減少なので、「`from` 以上で最初に `value` を取る添字」も
+/// 「`[from, to)` に `value` が何個あるか」も**二分探索と引き算**で引ける。
+/// ⚠️ **「変化点の値が交互に並ぶ」という前提を使っていない** —— ★ 前提が破れても
+/// 値がおかしくなるだけで、走査量は増えないし panic もしない
+/// （`code-reviewer` L5: 交替が型で守られていないという指摘への手当て）。
+struct ChangeIndex {
+    /// `true_prefix[k]` = `changes[0..k]` に含まれる `true` の個数。
+    true_prefix: Vec<usize>,
+}
+
+impl ChangeIndex {
+    fn new(changes: &[(u64, bool)]) -> Self {
+        let mut true_prefix = Vec::with_capacity(changes.len() + 1);
+        let mut acc = 0usize;
+        true_prefix.push(acc);
+        for &(_, value) in changes {
+            if value {
+                acc += 1;
+            }
+            true_prefix.push(acc);
+        }
+        Self { true_prefix }
     }
 
-    let mut spans: Vec<GenerationSpan> = Vec::new();
-    // ★ V6: `o` の時点で条件 A が false なら、生成区間は既に開いている（左端を `o` にクリップ）。
-    if !changes[idx - 1].1 {
-        spans.push(GenerationSpan {
-            r_ms: o,
-            s_prime_ms: None,
-        });
+    /// 変化点の数。
+    fn len(&self) -> usize {
+        self.true_prefix.len() - 1
     }
-    for &(t, value) in &changes[idx..] {
-        if t > b {
-            break;
-        }
+
+    /// `[from, to)` に含まれる値 `value` の変化点の個数（`O(1)`）。
+    fn count(&self, from: usize, to: usize, value: bool) -> usize {
+        let from = from.min(self.len());
+        let to = to.clamp(from, self.len());
+        let trues = self.true_prefix[to] - self.true_prefix[from];
         if value {
-            // 条件 A が立ち上がった = 生成区間が閉じた。
-            if let Some(open) = spans.last_mut() {
-                if open.s_prime_ms.is_none() {
-                    open.s_prime_ms = Some(t);
-                }
-            }
+            trues
         } else {
-            spans.push(GenerationSpan {
-                r_ms: t,
-                s_prime_ms: None,
-            });
+            (to - from) - trues
         }
     }
-    spans
+
+    /// `from` 以上で最初に値 `value` を取る変化点の添字（`O(log C)`）。
+    fn first_with(&self, from: usize, value: bool) -> Option<usize> {
+        let len = self.len();
+        if from >= len {
+            return None;
+        }
+        // `count(from, k + 1, value) >= 1` は k について単調なので、最小の k を二分探索する。
+        let mut lo = from;
+        let mut hi = len;
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if self.count(from, mid + 1, value) >= 1 {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        (lo < len && self.count(from, lo + 1, value) >= 1).then_some(lo)
+    }
 }
 
 /// 1 つの onset 行ぶんの `restart` を計算する。
+///
+/// ⚠️ 引数に `s` を取らない —— ★ `s` は**呼び出し側が観測区間と次の onset を引く**のに使う。
+/// ここへ渡すと「原点に `s` も効く」という誤読を招く（`code-reviewer` L6 / `security-checker` L3）。
 fn restart_for_onset(
-    s_ms: u64,
     t0_ms: u64,
     interval: &ConditionAInterval,
+    index: &ChangeIndex,
     next_onset_s_ms: Option<u64>,
     config: &StallOnsetConfig,
     presses: &PressPrefix,
@@ -209,7 +232,6 @@ fn restart_for_onset(
     let Some(o) = t0_ms.checked_add(config.b_ms) else {
         return row;
     };
-    let _ = s_ms; // ★ `s` は区間の同定に使う（呼び出し側）。ここでは原点に混ぜない。
     if o > interval.b {
         // ⚠️ 原点が観測区間の右端を越えた = 窓も生成区間も無い（V5）。
         return row;
@@ -220,17 +242,38 @@ fn restart_for_onset(
     let window_end_exclusive = next_onset_s_ms.unwrap_or_else(|| interval.b.saturating_add(1));
     let window = (o < window_end_exclusive).then_some((o, window_end_exclusive));
 
-    // ---- 生成区間（V6） ----
-    let spans = generation_spans(&interval.changes, o, interval.b);
+    let changes = &interval.changes;
+    let after_o = changes.partition_point(|&(t, _)| t <= o);
+    // ⚠️ `o` 以前に評価時刻が 1 つも無い（＝ 条件 A の値が決まらない）。
+    // ★ `o = t0 + B >= s >= a + W`（区間の最初の評価時刻）なので構造的には起きないが、
+    //   境界入力で落ちないよう「情報が無い」側に倒す。
+    let state_known = after_o > 0;
+    // ★ V6: `o` の時点で条件 A が false なら、生成区間は既に `o` で開いている。
+    let generating_at_o = state_known && !changes[after_o - 1].1;
 
-    if let Some(first) = spans.first() {
-        if let Some(s_prime) = first.s_prime_ms {
-            row.restop_ms = Some(s_prime.saturating_sub(o));
-            row.stable_generation_ms = Some(s_prime.saturating_sub(first.r_ms));
-            let (lo, hi) = presses.range(first.r_ms, s_prime);
-            row.stable_generation_net_presses = Some(presses.net[hi] - presses.net[lo]);
+    // ---- 最初の生成区間（V6） ----
+    if state_known {
+        let (r_1, search_from) = if generating_at_o {
+            (Some(o), after_o)
+        } else {
+            match index.first_with(after_o, false) {
+                Some(i) if changes[i].0 <= interval.b => (Some(changes[i].0), i + 1),
+                _ => (None, after_o),
+            }
+        };
+        if let Some(r_1) = r_1 {
+            let s_prime_1 = index
+                .first_with(search_from, true)
+                .map(|i| changes[i].0)
+                .filter(|&t| t <= interval.b);
+            if let Some(s_prime_1) = s_prime_1 {
+                row.restop_ms = Some(s_prime_1.saturating_sub(o));
+                row.stable_generation_ms = Some(s_prime_1.saturating_sub(r_1));
+                let (lo, hi) = presses.range(r_1, s_prime_1);
+                row.stable_generation_net_presses = Some(presses.net[hi] - presses.net[lo]);
+            }
+            // ⚠️ `s'_1` が無い（右端まで閉じなかった）行は打ち切りなので `null` のまま（AC9）。
         }
-        // ⚠️ `s'_1` が無い（右端まで閉じなかった）行は打ち切りなので `null` のまま（AC9）。
     }
 
     // ---- 窓に依存する量（V5: 窓が無ければ null） ----
@@ -239,12 +282,18 @@ fn restart_for_onset(
         row.post_t0_inserts = Some(presses.inserts[end] - presses.inserts[start]);
         row.post_t0_deletes = Some(presses.deletes[end] - presses.deletes[start]);
         row.post_t0_navigations = Some(presses.navigations[end] - presses.navigations[start]);
-        row.resumption_count = Some(
-            spans
-                .iter()
-                .filter(|span| span.r_ms >= lo && span.r_ms < hi_exclusive)
-                .count() as u64,
-        );
+        // ★ 窓の中で始まった生成区間の本数。
+        //   ⚠️★★★ **V6 でクリップされた区間は `o` で始まったものとして 1 に数える**
+        //   （`code-reviewer` M4）—— ★ したがって「`o` より前に再開済みで窓の中では 1 度も
+        //   再開していない」行と「窓の中でちょうど 1 回再開した」行は**同じ 1 になる**。
+        //   ★ 両者は `stable_generation_ms == restop_ms`（前者）で区別できる。
+        let started_in_window = if state_known {
+            let hi_idx = changes.partition_point(|&(t, _)| t < hi_exclusive);
+            index.count(after_o, hi_idx, false) + usize::from(generating_at_o)
+        } else {
+            0
+        };
+        row.resumption_count = Some(started_in_window as u64);
     }
 
     row
@@ -270,6 +319,11 @@ pub(super) fn restart_column(
             .collect();
     }
     let presses = PressPrefix::new(keys);
+    // ★ 変化点の索引は**観測区間ごとに 1 回だけ**作る（⚠️ onset 行ごとに作らない）。
+    let indexes: Vec<ChangeIndex> = timeline
+        .iter()
+        .map(|interval| ChangeIndex::new(&interval.changes))
+        .collect();
 
     stall_onset_col
         .iter()
@@ -279,18 +333,26 @@ pub(super) fn restart_column(
             };
             // `s` を含み `t0` が右端に収まる観測区間を引く（★ 区間は時刻順・互いに素）。
             let idx = timeline.partition_point(|interval| interval.a <= s_ms);
-            let Some(interval) = idx.checked_sub(1).map(|i| &timeline[i]) else {
+            let Some(i) = idx.checked_sub(1) else {
                 return Restart::null_row();
             };
+            let interval = &timeline[i];
             if t0_ms > interval.b {
                 return Restart::null_row();
             }
+            // ★ onset は区間内で `s` 昇順なので二分探索で引く（⚠️ 線形 find だと `O(R²)`）。
             let next_onset_s_ms = interval
                 .onsets
-                .iter()
-                .map(|onset| onset.s_ms)
-                .find(|&next_s| next_s > s_ms);
-            restart_for_onset(s_ms, t0_ms, interval, next_onset_s_ms, config, &presses)
+                .get(interval.onsets.partition_point(|onset| onset.s_ms <= s_ms))
+                .map(|onset| onset.s_ms);
+            restart_for_onset(
+                t0_ms,
+                interval,
+                &indexes[i],
+                next_onset_s_ms,
+                config,
+                &presses,
+            )
         })
         .collect()
 }
@@ -611,6 +673,76 @@ mod tests {
         assert!(
             rows.iter().any(|row| row.stall_onset.is_onset),
             "この入力では onset が立つはず（★ 空振りの比較にしない）"
+        );
+    }
+
+    /// ★ onset が多数立つ入力でも、各行の値が**素朴な走査と一致する**こと。
+    ///
+    /// ⚠️★★★ 2026-09-20 のレビュー（`code-reviewer` H1 / `security-checker` M1）で
+    /// `O(R・C)` を潰して二分探索に置き換えたので、**置き換えの正しさをここで固定する**。
+    /// ★ `AC18` / `AC18b` は `R = 1` なのでこの形を 1 度も通っていない（起票 21）。
+    #[test]
+    fn many_onsets_match_a_naive_scan() {
+        let config = StallOnsetConfig {
+            b_ms: 1_000,
+            ..StallOnsetConfig::default()
+        };
+        // 条件 A が 10_000ms 周期で true / false を繰り返し、onset が 60 本立つ観測区間。
+        let period = 10_000u64;
+        let count = 60u64;
+        let mut changes = Vec::new();
+        let mut onsets = Vec::new();
+        for k in 0..count {
+            let rise = k * period;
+            changes.push((rise, true));
+            changes.push((rise + period / 2, false));
+            onsets.push(crate::analysis::feat_offline::stall_onset::OnsetEvent {
+                s_ms: rise,
+                t0_ms: rise + 100,
+                theta_person_ms: 100,
+            });
+        }
+        let b = count * period;
+        let mut interval = interval(0, b, changes.clone());
+        interval.onsets = onsets.clone();
+        let column: Vec<StallOnset> = onsets
+            .iter()
+            .map(|onset| onset_row(onset.s_ms, onset.t0_ms))
+            .collect();
+        let rows = restart_column(&column, &[interval], &[], &config);
+
+        assert_eq!(rows.len(), count as usize);
+        for (k, row) in rows.iter().enumerate() {
+            let k = k as u64;
+            let o = k * period + 100 + config.b_ms;
+            // 素朴な走査: `o` 以後で最初に false へ落ち、その後で最初に true へ戻る時刻。
+            let naive_r = changes
+                .iter()
+                .find(|&&(t, v)| t > o && !v)
+                .map(|&(t, _)| t)
+                .filter(|&t| t <= b);
+            let naive_s_prime = naive_r.and_then(|r| {
+                changes
+                    .iter()
+                    .find(|&&(t, v)| t > r && v)
+                    .map(|&(t, _)| t)
+                    .filter(|&t| t <= b)
+            });
+            // `o` の時点では条件 A は true（rise の直後）なので、V6 のクリップは起きない。
+            assert_eq!(
+                row.restop_ms,
+                naive_s_prime.map(|s| s - o),
+                "k = {k} の restop_ms が素朴な走査と食い違う"
+            );
+            assert_eq!(
+                row.stable_generation_ms,
+                naive_s_prime.zip(naive_r).map(|(s, r)| s - r),
+                "k = {k} の stable_generation_ms が素朴な走査と食い違う"
+            );
+        }
+        assert!(
+            rows.iter().any(|row| row.restop_ms.is_some()),
+            "空振りの比較にしない（★ 少なくとも 1 行は値を持つ）"
         );
     }
 

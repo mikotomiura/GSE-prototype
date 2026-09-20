@@ -211,3 +211,54 @@ r / s'        : ⚠️ **窓ではなく観測区間 [a, b] の中の条件 A �
 | 最上位の行に `vk` を足す / `restart` を消す（jq で注入） | ★ `001` AC2b の式が**両方とも落ちる**ことを確認 |
 
 - ★ いずれも**戻した後にバイト一致を確認**した（`diff` / `git status`）。
+
+---
+
+## 判断 6: ★ `code-reviewer` ＋ `security-checker`（並列・opus）の指摘を是正した
+
+- **判断日時**: 2026-09-21
+- ★ 範囲・禁止事項・締切を明記して 2 本を並列起動した（`subagent-delegation` ルール 2 の 5 点）。
+  ★ 実測: **5.4 分 / 6.8 分**で完走し、両者とも「読んでいない範囲」を自己申告した（⚠️ ハングしていない）。
+
+### ⚠️★★★ **両者が独立に同じ HIGH / MEDIUM を挙げた** —— ★ これが最大の収穫
+
+| | `code-reviewer` | `security-checker` |
+|---|---|---|
+| 指摘 | **H1**: `restart` が onset 行ごとに変化点を線形に走り `O(R・C)` | **M1**: 同じ経路を「可用性への DoS」として指摘 |
+
+★ **両者が同じ場所を指しているので、これは偽陽性ではない**（⚠️ 片方だけの指摘とは格が違う）。
+⚠️ さらに `code-reviewer` は **AC18 / AC18b がどちらも `R = 1` なので門が効かない**ことまで降ろした
+（★ AC18b は 70ms 周期の churn で θ_person を満たさず、onset は末尾沈黙の 1 本だけ）。
+→ ★ **実装を `O(R log C)` に直し**（`ChangeIndex` = `true` の累積和 ＋ 二分探索）、
+**多 onset の入力で素朴な走査と一致する単体テスト**を足した。門の穴は `blockers.md` **起票 21** で研究者へ。
+
+### 是正した指摘
+
+| # | 指摘 | 対応 |
+|---|---|---|
+| H1 / M1 | `restart` の `O(R・C)`（＋ `next_onset` の線形 find で `O(R²)`） | ★ **直した**。`ChangeIndex` で `O(log C)`、`next_onset` は `partition_point`。索引は**観測区間ごとに 1 回**だけ作る |
+| M2 | `burst_ranges` の値一致突き合わせを守るテストが無い | ★ **直した**（`burst_ranges_survive_same_timestamp_presses_at_a_pause_boundary`: pause 境界の同時刻打鍵・両側・閾値ちょうど） |
+| M3 | bigram の distinct を `as_str()` の文字列比較 ＋ clone で数えている | ★ **直した**。判別子 `as u8` で in-place ソート（⚠️ clone を落とした）。★ 率も `(total − distinct)/total` にして `1/3` の丸めを直した |
+| M4 | `resumption_count` の doc と実装の食い違い（V6 のクリップ分を 1 に数える） | ★ **doc に明記した**（⚠️ 数え方は変えない ＝ V6 と整合）。★ 「`o` 前に再開済み」と「窓内で 1 回再開」は `stable_generation_ms == restop_ms` で区別できることも書いた |
+| L1 | `category_bigram_repeat_rate` から `distinct` が逆算できる | ★ **doc に明記した**（⚠️「率だから安全」という前提を置かせない）。★ どの型が出たか・順序は出ないので本文復元は不可 |
+| L2 | `revision_column` だけ `pub` で `tick_ms = 0` を渡せた | ★ **`pub(super)` に揃え、`debug_assert!` を足した** |
+| L3 / L6 | `restart_for_onset` が使わない `s_ms` を受け取り捨てている | ★ **引数から落とした**（意図は呼び出し側のコメントへ） |
+| L5 | `changes` の交替前提が型で守られておらず、破れると最初の区間が閉じない | ★ **前提を使わない実装に変えた**（累積和 ＋ 二分探索は交替に依存しない） |
+| L8 | `mod.rs` の「欠測の表現」節が 2 Tier の `null` 規約に触れていない | ★ **2 Tier ぶんを足した** |
+| L7 | `007` の置き換えガードはテキスト一致で `net_at_fast` の中身の変更は素通り | ⚠️ **対応しない**（★ 振る舞いの回帰は 008 ＋ ゴールデンが張ると**スクリプトに既に書いた**。★ 二重に見ない） |
+
+### ★ 是正後の客観検証（実測）
+
+- `cargo test --workspace` **773 passed**（724 ＋ 48 ＋ 1。★ 是正で +2）／ `clippy -D warnings`・`fmt --check` **exit 0**
+- acceptance **001〜008 ＋ envelope すべて OK**（★ **008 も OK** —— 計算量の門を通した）
+- ⚠️ **出力が変わっていないこと**を実測: `stall_onset_observed` の onset 2 行の `restart` は
+  是正前と**完全に同じ値**（`restop_ms` 114840 / null、`resumption_count` 1 / 0）。
+  ★ `instrument_rich` の `revision` も手計算と一致（tick 3: 交替 0・率 2/3 ／ tick 4: 走り 3 連・del→ins 1 ／ tick 7: 交替 1・率 2/7）。
+
+### ⚠️ レビューが読んでいない範囲（★ 「指摘なし」ではない）
+
+- 両者とも `.steering/20260920-issues-004-006/` の `design.md` / `requirement.md` / `tasklist.md` と
+  `issues/004.md` / `006.md` の本文改訂を**読んでいない**（★ AC 本文と実装の逐語照合はレビューを経ていない）。
+- `code-reviewer` は `stall_onset.rs` の `#[cfg(test)]` ブロック（約 640 行）と `quality.rs` / `activity.rs` の本体を未読。
+- `security-checker` は 2026-09-18 の「削除／一時停止／欠損で stdout の sha 一致」実験を**再実行していない**
+  （★ 入力依存の静的追跡で「壊れていない」と結論した）。
