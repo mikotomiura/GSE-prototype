@@ -682,6 +682,15 @@
 
 ## 起票 21: ⚠️★★★ `008-acceptance.sh` の AC18 / AC18b は **`R = 1`**（onset が 1 本）なので、転帰側の二乗を検出できない
 
+> ⚠️★★★ **番号の衝突に注意（2026-09-21 に気づいた）。**
+> ★ 本タスクの `decisions.md` **判断 4** と `tasklist.md:42`、および
+> `.steering/_handoff/next-session-loop-run-task2.md` / `next-session-loop-foundation-and-task2-slicing.md`
+> が言う「**起票 21**」は、⚠️ **本ファイルのこの起票ではない** ——
+> ★ **`.steering/20260914-instrument-change-arbitration/blockers.md` の起票 21（単独キー用の門・ADR-032 M11）**である。
+> ★ 本起票は 2026-09-21 に**別タスクで採番された同番号**であり、中身は無関係である。
+> ⚠️ **改番しない**（★ 既に main へ merge 済みで、コミットと PR #215 が本番号を指している）。
+> → ★ 「起票 21」を読んだら**どちらのファイルか**を先に確かめること。
+
 - **起票日**: 2026-09-21（★ issue 004 / 006 のレビューで `code-reviewer` H1 と `security-checker` M1 が**独立に**指摘）
 - **何が問題か**: `T1d`（`restart`）は **onset の立った tick ごと**に計算されるので、
   計算量は **onset 数 `R` × 観測区間の変化点数 `C`** に効く。
