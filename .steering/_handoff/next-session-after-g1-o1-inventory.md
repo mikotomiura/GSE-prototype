@@ -74,21 +74,22 @@ git add -A / git add <dir> は使わない。.codex/budget.json を git checkout
 | D6 の確認場所が無い（ADR-034 D1 律速 4） | `check-o1-release-readiness.sh [5]` ＋ G1 README §6.3 ＋ 両文書のアンカー。selftest **7 ケース** |
 
 ★ ゲートの現在値（2026-09-20 実測）: `run.sh` = **exit 0** ／
-`check-shell-portability.sh` = **exit 0** ／ `check-o1-release-readiness.sh` = **exit 1・通過 21 / 未達 2**
-（★ 残り 2 は正しい赤: 同意未承認・タグ陳腐化）／ 同 `--selftest` = **通過 57 / 失敗 0**。
+`check-shell-portability.sh` = **exit 0（通過 12）** ／ `check-o1-release-readiness.sh` = **exit 1・通過 21 / 未達 2**
+（★ 残り 2 は正しい赤: 同意未承認・タグ陳腐化）／ 同 `--selftest` = **通過 59 / 失敗 0**。
 
-## §5b ⚠️★★ 受けていないレビューが 1 系統ある（★ 先に片づける）
+## §5b ✅ レビューは 3 系統すべて受けた（★ 2026-09-20 に完了）
 
-`code-reviewer`（Claude 側の一般的なコード品質レビュー）は **25 分走った末に Bash で停止し、
-結果を 1 行も返していない**（★ `.steering/20260920-g1-o1-inventory/decisions.md` 判断 12）。
-⚠️ **「指摘なし」ではなく「結果が無い」**。
+`code-reviewer` は 1 回目こそ Bash でハングしたが（判断 12）、**範囲と禁止事項を明記して
+再実行したところ 5 分半で完走**し、**HIGH 1 / MEDIUM 5 / LOW 6** を返した（判断 13）。
+★ HIGH と MEDIUM は**全件反映済み**（`a8a3eab`）。⚠️ 残した LOW は 1 件だけ:
+`.worktrees/` が将来 `.gitignore` に足されると注記が無言で消える（★ 台帳の「未確認」へ起票）。
 
-→ ★ 次セッションの最初に **`/review-changes` を `5b37b3b..HEAD`** に対して回すこと。
-⚠️ そのとき **「コミット済みの範囲だけを見る・作業ツリーを触らない・隔離クローンを作らない」**を
-プロンプトに明記する（★ 今回の長時間化の原因がそれだった）。
+★ 受けた担保: `code-reviewer`（opus）／`security-checker`（opus）／`/cross-review` 2 巡（Codex）／
+ゲートの selftest **59 件**。
 
-★ 受けている担保: `security-checker`（opus・HIGH 2 点反映済み）／`/cross-review` 2 巡（Codex）／
-ゲートの selftest **57 件**。
+★ ⚠️ **レビュー系 subagent を起動するときの型**（★ 今回の教訓）:
+「**コミット済みの範囲だけを見る・作業ツリーを触らない・隔離クローンを作らない・
+長い selftest は回さない・N 分で結論**」をプロンプトに明記する。
 
 ## §6 ⚠️ 守ること
 

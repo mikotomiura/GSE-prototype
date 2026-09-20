@@ -20,6 +20,7 @@ Codex `/cross-review` 2 巡目 #2）。
 | ✅ M-4 | ⚠️ 違反の**明細が 1 行も出ない**故障（VIOL 行が cp932 で `UnicodeEncodeError`） | 走査器の出力を UTF-8 固定 → 明細（ファイル:行）が出ることを実測 | `aa54c13` |
 | ✅ M-5 | **D6（案内日の分離）を確かめる場所が無い**（ADR-034 D1 の律速 4） | `check-o1-release-readiness.sh [5]` を新設 ＋ G1 側 README §6.3 に D6 を反映。selftest **7 ケース** | `2785cb6` ＋ `d8aaeb5` |
 | ✅ M-6 | ⚠️ selftest の**未定義関数 `clear_pending`**（本タスク以前から）。該当ケースが**空回りで緑**だった | 関数を定義し、出発点を「未了なし」に戻してから変異させる形へ | `d8aaeb5` |
+| ✅ M-7 | ⚠️ 新設した **NESTED 分類に対照が無い**（緩めても赤くならない）／ O1 側で**窓が EOF まで**効いていた ほか HIGH 1・MEDIUM 5 | 分類を純関数化して対照 3 本 ／ 窓を「次の見出しまで」に ／ 注記を rc に依らず表示 ほか | `a8a3eab` |
 | ✅ Q1〜Q4 | 研究者への質問 4 件 | `decisions.md` 判断 1〜4（Q3 / Q4 は本文へ反映 = `17fea9f`） | `4ac40e4` / `17fea9f` |
 
 ## 1. G1
@@ -68,6 +69,9 @@ Codex `/cross-review` 2 巡目 #2）。
 - main 側 2 コミットが触った `.steering/20260911-outcome-arbitration-and-o1-preflight/` の
   **記述内容**と本ブランチの整合（★ パスの交差は 0 なので git 上は無衝突）。
 - 3 人目の確証標本の募集状況（G1-10）。
+- ⚠️ `.worktrees/` が将来 `.gitignore` に足されると、`git ls-files --others --exclude-standard` から
+  消えて**「何を走査していないか」の注記が無言で消える**（★ 走査漏れは残る）。
+  ★ いま `.gitignore` に無いことは実測済み（code-reviewer LOW-6・起票のみ）。
 
 ## 5. ★ 依存関係（どれが何を塞いでいるか）
 
@@ -95,9 +99,9 @@ C-1 / C-2 が終わってから確定する（★ 古いタグに固定すると
 | コマンド | 結果 |
 |---|---|
 | `cd experiments/20260801-controlled-friction-task && bash run.sh` | **exit 0**（★ `PYTHONUTF8` なし・Windows 既定環境） |
-| `bash scripts/check-shell-portability.sh` | **exit 0**（★ `.worktrees/` の 1 件を「走査対象外」と表示） |
+| `bash scripts/check-shell-portability.sh` | **exit 0 / 通過 12 件**（★ 入れ子分類の対照 3 本を含む。`.worktrees/` の 1 件を「走査対象外」と表示） |
 | `bash scripts/check-o1-release-readiness.sh` | **exit 1 / 通過 21・未達 2**（⚠️ 残り 2 は**正しい赤**: 同意未承認・タグ陳腐化） |
-| `bash scripts/check-o1-release-readiness.sh --selftest` | **通過 57 件 / 失敗 0 件**（★ 空回りしている検査は無い） |
+| `bash scripts/check-o1-release-readiness.sh --selftest` | **通過 59 件 / 失敗 0 件**（★ `[5]` は 10 ケース全発火。空回りしている検査は無い） |
 | `python scripts/check_schema_parity.py --dataset C:/gse-dataset` | **exit 1 / DRIFT**（`activity_label`。★ マージ計画で扱う） |
 
 ⚠️ **手元の緑は CI の代替にならない**（OS 差と `--features package` の有無は残る）。
