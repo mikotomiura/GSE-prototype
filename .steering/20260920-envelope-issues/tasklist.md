@@ -30,8 +30,8 @@
 - [x] 突然変異 M-0〜M-h を `measurements.md` に記録（⚠️ **赤になることを実測する**）
 
 ## レビュー
-- [ ] `code-reviewer` ＋ `security-checker` を並列（opus・範囲/禁止/締切を明記）
-- [ ] HIGH / MEDIUM 指摘への対応
+- [x] `code-reviewer` ＋ `security-checker` を並列（opus・範囲/禁止/締切を明記）
+- [x] HIGH / MEDIUM 指摘への対応（★ HIGH 1 / MEDIUM 5 / LOW 6 を反映・判断 12〜15）
 - [ ] `/cross-review` 2 巡（パス限定・⚠️ 先に secrets-filter が 0 を返すか確認）
 
 ## ドキュメント

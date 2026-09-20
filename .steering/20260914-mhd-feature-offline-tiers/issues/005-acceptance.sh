@@ -19,7 +19,7 @@ SRC="src/analysis/feat_offline/stall_onset.rs"
 #     deep_silence.ndjson では観測区間が無く onset が立たなくなる（★ それが正しい挙動）。
 #   → ★ 1Hz feat 行を持つ stall_onset_observed.ndjson（裁定セッション作成）で非退化を見る。
 out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features 2>/dev/null | jq '.rows')" \
-  || fail "gse-replay --features が非 0 で終了した"
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 # AC1

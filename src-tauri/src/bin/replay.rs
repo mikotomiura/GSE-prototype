@@ -74,12 +74,27 @@ const MAX_FEATURE_TICKS: usize = 1_000_000;
 
 /// `--features` (issue 007・`Q`) が許す `meta.capabilities` の直列化後サイズの上限 (バイト)。
 ///
-/// ⚠️★★★ 2026-09-18 改訂 (判断 24・security-checker LOW-3): `capabilities` は tick 数ぶん
-/// 全行へ複製される (`Quality.capabilities` は `Arc` 共有なのでメモリは増えないが、出力
-/// JSON のサイズは複製ぶん増える)。JSON オブジェクトでない、またはこの上限を超えるものは
-/// 「宣言が壊れている」とみなし `null` に倒さず `Err` にする (`null` に倒すと
-/// 「宣言が無い」と誤報になる)。
+/// ⚠️★★★ 2026-09-18 (判断 24・security-checker LOW-3): JSON オブジェクトでない、または
+/// この上限を超えるものは「宣言が壊れている」とみなし `null` に倒さず `Err` にする
+/// (`null` に倒すと「宣言が無い」と誤報になる)。
+///
+/// ★ 2026-09-20 (封筒・判断 3): 導入時の理由は「`capabilities` が tick 数ぶん全行へ複製され、
+/// 出力 JSON が複製ぶん膨らむ」ことだった。⚠️ **その理由は封筒への移動で消えた**
+/// (値は 1 回しか出ない)。★ それでも上限は残す —— **被験者が編集しうる入力**
+/// (O1 の NDJSON) を無制限に読み込まないため。
 const MAX_CAPABILITIES_BYTES: usize = 4096;
+
+/// `--features` の封筒が `meta` から複写する**文字列**フィールドの上限 (バイト)。
+///
+/// ⚠️★★★ 2026-09-20 追加 (security-checker M1)。★ 対象は `hmm_version` / `app_version` /
+/// `g1_mode` / `o1_mode` / `keyboard_layout`。
+/// ⚠️ 旧版は長さも文字種も無制限に複写していた —— ★ 同じ `meta` 行の `capabilities` には
+/// [`MAX_CAPABILITIES_BYTES`] があるのに、こちらには何も無かった。
+///
+/// ★ 実際に書かれる値は semver (`"0.5.0"`) / enum (`"g1"`) / レイアウト識別子で、
+/// いずれも数十バイト。256 は十分広い。⚠️ 超過は**切り詰めずに落とす**
+/// (切り詰めると「短い宣言」と区別できなくなる)。
+const MAX_META_STRING_BYTES: usize = 256;
 
 /// `provenance.source_sha256` に出す 16 進の桁数 (= 8 バイトぶん)。
 ///
@@ -206,7 +221,12 @@ struct FeatureConfigDto {
     hole_gap_ms: u64,
     /// θ の標本数の下限 (`null` = 下限を課さない・ADR-030 D4 点 1)。
     warmup_count: Option<usize>,
-    /// [`MAX_FEATURE_TICKS`]。★ 出力がこの上限で止められたかを後から判別できる。
+    /// [`MAX_FEATURE_TICKS`]。★ この実行に効いていた上限値を記録する。
+    ///
+    /// ⚠️ **「上限で止められたか」はこれ単独では判別できない** (2026-09-20・code-reviewer LOW)
+    /// —— 上限に当たった場合は `--features` が `Err` で **exit 1** し、そもそも出力が無い。
+    /// ★ 出力がある以上 `rows.len() <= max_feature_ticks` であり、
+    /// ちょうど `max_feature_ticks` 行のセッションと切り捨てを区別する必要は生じない。
     max_feature_ticks: usize,
     /// ⚠️ **解析時** (このバイナリ) の `HMM_VERSION`。`provenance.hmm_version` (収集時) と別物。
     hmm_version: &'static str,
@@ -248,6 +268,9 @@ struct MetaSessionFacts {
     g1_mode: Option<String>,
     o1_mode: Option<String>,
     keyboard_layout: Option<String>,
+    /// ★ **同じ `meta` 行**から取る (2026-09-20・code-reviewer MEDIUM)。
+    /// ⚠️ 別関数が別条件で拾うと、連結ログで**別セグメントの宣言**が混ざる。
+    capabilities: Option<serde_json::Value>,
 }
 
 /// `--calibration` で受け付ける 1 被験者あたりのセッションファイル数の上限。
@@ -1271,27 +1294,12 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        // issue 007: `Q` (evidence quality) 用に meta.capabilities / hook_health を読む。
-        // ⚠️ hook_health は「無い / 形が合わない」で --features を落とさない (旧ログ互換・AC12)。
-        // ⚠️★★★ capabilities は「無い」では落とさない (AC7) が、「形が壊れている」
-        // (JSON オブジェクトでない / 4096 バイト超) では落とす (2026-09-18 改訂・判断 24・AC15)。
-        let capabilities = match collect_meta_capabilities(&args.session_path) {
-            Ok(v) => v,
-            Err(msg) => {
-                tracing::error!("failed to collect meta capabilities: {}", msg);
-                return ExitCode::from(1);
-            }
-        };
-        let hook_health_events = match collect_all_hook_health_events(&args.session_path) {
-            Ok(v) => v,
-            Err(msg) => {
-                tracing::error!("failed to collect hook_health events: {}", msg);
-                return ExitCode::from(1);
-            }
-        };
-        // 起票 2 (封筒): `meta` 行のセッション単位の事実と、入力ファイルの同一性を読む。
-        // ⚠️ どちらも「行の計算」ではなく「実行の由来」なので、`feat_offline` ではなく
-        // ここ (CLI) が読む。
+        // 起票 2 (封筒) ＋ issue 007 (`Q`): `meta`(session_start) 行から
+        // セッション単位の事実と `capabilities` を **1 パスで**読む。
+        // ⚠️★★★ 2026-09-20: 以前は `capabilities` を別関数が**別の条件**で拾っており、
+        //   連結ログで別セグメントの宣言が混ざった (実測)。→ 同じ行から取る。
+        // ⚠️ capabilities は「無い」では落とさない (AC7) が、「形が壊れている」
+        // (JSON オブジェクトでない / 4096 バイト超) では落とす (判断 24・AC15)。
         let meta_facts = match collect_meta_session_facts(&args.session_path) {
             Ok(v) => v,
             Err(msg) => {
@@ -1299,6 +1307,17 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+        let capabilities = meta_facts.capabilities;
+        // ⚠️ hook_health は「無い / 形が合わない」で --features を落とさない (旧ログ互換・AC12)。
+        let hook_health_events = match collect_all_hook_health_events(&args.session_path) {
+            Ok(v) => v,
+            Err(msg) => {
+                tracing::error!("failed to collect hook_health events: {}", msg);
+                return ExitCode::from(1);
+            }
+        };
+        // 起票 2 (封筒): 入力ファイルの同一性。
+        // ⚠️ 「行の計算」ではなく「実行の由来」なので、`feat_offline` ではなくここ (CLI) が読む。
         let source_sha256 = match sha256_prefix_of_file(&args.session_path) {
             Ok(v) => v,
             Err(msg) => {
@@ -1870,23 +1889,59 @@ fn collect_all_ime_shadow_events(session_path: &PathBuf) -> Result<Vec<ImeShadow
     Ok(out)
 }
 
-/// `--features` (issue 007・`Q`) 用: NDJSON の `meta` 行から `capabilities` を取り出す。
+/// `meta.capabilities` の**形と大きさ**を検査する (2026-09-18・security-checker LOW-3・判断 24)。
+///
+/// JSON オブジェクトでない、または直列化して [`MAX_CAPABILITIES_BYTES`] を超えるなら `Err`
+/// (`--features` は exit 1)。★ 理由は出すが、**値の中身は出さない**。
+/// ⚠️ `null` に倒さない —— 倒すと「宣言が無い」と誤報になる。
+fn validate_meta_capabilities(
+    cap: &serde_json::Value,
+    lineno: usize,
+) -> Result<serde_json::Value, String> {
+    if !cap.is_object() {
+        return Err(format!(
+            "line {}: meta.capabilities is not a JSON object",
+            lineno
+        ));
+    }
+    let serialized = serde_json::to_string(cap)
+        .map_err(|e| format!("line {}: failed to serialize capabilities: {}", lineno, e))?;
+    if serialized.len() > MAX_CAPABILITIES_BYTES {
+        return Err(format!(
+            "line {}: meta.capabilities serializes to {} bytes, exceeds limit {} bytes",
+            lineno,
+            serialized.len(),
+            MAX_CAPABILITIES_BYTES
+        ));
+    }
+    Ok(cap.clone())
+}
+
+/// `--features` の封筒用: NDJSON の `meta` 行からセッション単位の事実を **1 パスで**取り出す
+/// (起票 2・`capabilities` を含む)。
 ///
 /// ⚠️★★★ **`ReplayEvent::Meta` に型付きフィールドとして持たせない**
 /// (2026-09-18 改訂・security-checker LOW-1: 型付きフィールドを足したことで `run_replay`
-/// 側の受理集合が狭まった)。★ 行をまず `serde_json::Value` として読み、`type == "meta"` の
-/// 行から `capabilities` キーを直接取り出す (`ImeShadow` / `HookHealth` と同じ「まず Value
-/// で受け、構造化は専用の関数が担う」手法・`ReplayEvent::ImeShadow` の doc 参照)。
+/// 側の受理集合が狭まった)。★ 行をまず `serde_json::Value` として読む
+/// (`ImeShadow` / `HookHealth` と同じ「まず Value で受け、構造化は専用の関数が担う」手法)。
 /// これにより `--snapshot` (`run_replay`) 側の `Meta` 型は元の 3 フィールドのまま変わらない。
 ///
-/// 複数の `meta` 行がありうる (`session_start` 形と `session_end` 形)。`capabilities` を
-/// 持つ最初の行を採る。⚠️ 値は加工しない。宣言が無い (キーが無い、または明示的に `null`)
-/// なら `None` (⚠️ 空配列・空オブジェクトへフォールバックしない・AC7)。
+/// ★ 採るのは **`session_start` を持つ最初の `meta` 行**で、`capabilities` も**その同じ行**から取る。
 ///
-/// ⚠️★★★ **形の検査もここで行う** (2026-09-18・security-checker LOW-3・判断 24)。
-/// `capabilities` が JSON オブジェクトでない、または直列化して [`MAX_CAPABILITIES_BYTES`]
-/// を超えるなら `Err` を返す (`--features` は exit 1)。★ 理由は出すが、値の中身は出さない。
-fn collect_meta_capabilities(session_path: &PathBuf) -> Result<Option<serde_json::Value>, String> {
+/// ⚠️★★★ **2026-09-20 改訂 (封筒・code-reviewer MEDIUM)**: 旧版は `capabilities` を
+/// 別関数 (`collect_meta_capabilities`) が**別の条件**——「`capabilities` を持つ最初の `meta` 行」
+/// ——で拾っており、★ **同じ行である保証が無かった**。
+/// ⚠️ 実測 (2026-09-20): ローテートで 2 セグメントを連結し、前半の `meta` に `capabilities` が
+/// 無い NDJSON を食わせると、封筒が **前半の `session_start` / `hmm_version` / `app_version` と
+/// 後半の `capabilities`** を並べて提示した。★ 封筒は「どの計器条件で取れた行か」を保証する
+/// ために入れたので、ここが混ざるのは目的を直撃する。→ **1 行・1 パスに統合した。**
+/// ★ 副産物として、`meta` 行が無い入力に対する**全行パースのフルパスが 1 本減った**。
+///
+/// ⚠️★★★ **欠けていても `Err` にしない。** キーが無い / 値の型が違う / `meta` 行そのものが
+/// 無い場合は該当フィールドが `None` になるだけである (旧ログ互換。`hook_health` と同じ作法・
+/// 007 の AC12)。★ ただし `capabilities` が**在るのに壊れている**ときだけは `Err`
+/// ([`validate_meta_capabilities`]・判断 24・AC15) —— 「無い」と「壊れている」は別である。
+fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
     if metadata.len() > MAX_SESSION_BYTES {
@@ -1912,84 +1967,6 @@ fn collect_meta_capabilities(session_path: &PathBuf) -> Result<Option<serde_json
                 continue;
             }
         };
-        let is_meta = raw.get("type").and_then(|t| t.as_str()) == Some("meta");
-        if !is_meta {
-            continue;
-        }
-        let cap = match raw.get("capabilities") {
-            Some(v) if !v.is_null() => v,
-            // キーが無い、または明示的に null: 宣言が無い扱いで次の meta 行を探す。
-            _ => continue,
-        };
-        if !cap.is_object() {
-            return Err(format!(
-                "line {}: meta.capabilities is not a JSON object",
-                lineno + 1
-            ));
-        }
-        let serialized = serde_json::to_string(cap).map_err(|e| {
-            format!(
-                "line {}: failed to serialize capabilities: {}",
-                lineno + 1,
-                e
-            )
-        })?;
-        if serialized.len() > MAX_CAPABILITIES_BYTES {
-            return Err(format!(
-                "line {}: meta.capabilities serializes to {} bytes, exceeds limit {} bytes",
-                lineno + 1,
-                serialized.len(),
-                MAX_CAPABILITIES_BYTES
-            ));
-        }
-        return Ok(Some(cap.clone()));
-    }
-    if parse_failed_lines > 0 {
-        tracing::warn!(
-            failed = parse_failed_lines,
-            "collect_meta_capabilities: some lines failed to parse as JSON"
-        );
-    }
-    Ok(None)
-}
-
-/// `--features` の封筒用: NDJSON の `meta` 行からセッション単位の事実を取り出す (起票 2)。
-///
-/// `collect_meta_capabilities` と同じ作法で、行をまず `serde_json::Value` として読む
-/// (⚠️ `ReplayEvent::Meta` に型付きフィールドを足さない —— 2026-09-18・security-checker
-/// LOW-1 で「型付きフィールドを足したことで `run_replay` 側の受理集合が狭まった」実害が出た)。
-///
-/// ★ `session_start` を**持つ最初の `meta` 行**を採る。⚠️ ローテートで複数ファイルを
-/// 連結した NDJSON では `meta`(session_start) が複数ありうるが、封筒が表すのは
-/// 「この出力を作った入力」であり、★ 先頭が入力の開始である。
-///
-/// ⚠️★★★ **欠けていても `Err` にしない。** キーが無い / 値の型が違う / `meta` 行そのものが
-/// 無い場合は該当フィールドが `None` になるだけである (旧ログ互換。`hook_health` と同じ作法・
-/// 007 の AC12)。★ `capabilities` だけは形の検査を `collect_meta_capabilities` が担い、
-/// そちらは壊れた宣言を `Err` にする (判断 24・AC15) —— 役割が違うので統合しない。
-fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts, String> {
-    let metadata = std::fs::metadata(session_path)
-        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
-    if metadata.len() > MAX_SESSION_BYTES {
-        return Err(format!(
-            "session file too large: {} bytes exceeds limit {} bytes",
-            metadata.len(),
-            MAX_SESSION_BYTES
-        ));
-    }
-    let file = File::open(session_path)
-        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
-    let reader = BufReader::new(file);
-    for (lineno, line) in reader.lines().enumerate() {
-        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let raw: serde_json::Value = match serde_json::from_str(&line) {
-            // ⚠️ パース不能な行は黙って読み飛ばす (`collect_meta_capabilities` と同じ)。
-            Ok(v) => v,
-            Err(_) => continue,
-        };
         if raw.get("type").and_then(|t| t.as_str()) != Some("meta") {
             continue;
         }
@@ -1997,8 +1974,31 @@ fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts
         let Some(session_start) = raw.get("session_start").and_then(|v| v.as_u64()) else {
             continue;
         };
+        // ⚠️★★★ **自由文の上限を課す** (2026-09-20・security-checker M1)。
+        //   ★ 信頼境界: O1 は被験者端末で生成された NDJSON を研究者が復号して食わせるので、
+        //     `meta` 行の中身は**被験者が編集しうる入力**である。
+        //   ⚠️ 旧版は長さも文字種も無制限に封筒へ複写していた —— ★ 同じ `meta` 行から採る
+        //     `capabilities` には 4096 バイトの上限があるのに、ここには何も無かった。
+        //   ★ 超過は**切り詰めずに `None`**（=「宣言が無い」へ倒す）。
+        //     ⚠️ 切り詰めると「短い宣言」と区別できなくなる。
         let str_field = |k: &str| -> Option<String> {
-            raw.get(k).and_then(|v| v.as_str()).map(|s| s.to_string())
+            let v = raw.get(k).and_then(|v| v.as_str())?;
+            if v.len() > MAX_META_STRING_BYTES {
+                tracing::warn!(
+                    field = k,
+                    bytes = v.len(),
+                    limit = MAX_META_STRING_BYTES,
+                    "meta string field exceeds the limit; dropped from the envelope (not truncated)"
+                );
+                return None;
+            }
+            Some(v.to_string())
+        };
+        let capabilities = match raw.get("capabilities") {
+            // ★ 在るなら形を検査する。⚠️ 壊れていれば `Err`（`null` に倒さない）。
+            Some(v) if !v.is_null() => Some(validate_meta_capabilities(v, lineno + 1)?),
+            // キーが無い、または明示的に `null`: 宣言が無い (⚠️ 空配列・空オブジェクトで埋めない)。
+            _ => None,
         };
         return Ok(MetaSessionFacts {
             session_start: Some(session_start),
@@ -2007,7 +2007,14 @@ fn collect_meta_session_facts(session_path: &PathBuf) -> Result<MetaSessionFacts
             g1_mode: str_field("g1_mode"),
             o1_mode: str_field("o1_mode"),
             keyboard_layout: str_field("keyboard_layout"),
+            capabilities,
         });
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_meta_session_facts: some lines failed to parse as JSON"
+        );
     }
     Ok(MetaSessionFacts::default())
 }
@@ -3731,7 +3738,7 @@ mod tests {
     }
 
     /// AC15 (issue 007・判断 24・security-checker LOW-3): `meta.capabilities` が JSON
-    /// オブジェクトでない、または直列化して 4096 バイトを超えるなら `collect_meta_capabilities`
+    /// オブジェクトでない、または直列化して 4096 バイトを超えるなら `collect_meta_session_facts`
     /// は `Err` を返す (`--features` は exit 1)。⚠️ `null` に倒すと「宣言が無い」と誤報になる
     /// ため、`Ok(None)` にしない。
     #[test]
@@ -3745,7 +3752,7 @@ mod tests {
         ));
         std::fs::write(&tmp1, non_object).expect("write temp fixture");
         let err =
-            collect_meta_capabilities(&tmp1).expect_err("非オブジェクトの capabilities は Err");
+            collect_meta_session_facts(&tmp1).expect_err("非オブジェクトの capabilities は Err");
         assert!(
             err.contains("not a JSON object"),
             "エラー文言が理由を示していない: {err}"
@@ -3764,7 +3771,7 @@ mod tests {
         ));
         std::fs::write(&tmp2, &oversized).expect("write temp fixture");
         let err =
-            collect_meta_capabilities(&tmp2).expect_err("4096 バイトを超える capabilities は Err");
+            collect_meta_session_facts(&tmp2).expect_err("4096 バイトを超える capabilities は Err");
         assert!(
             err.contains("exceeds limit"),
             "エラー文言が理由を示していない: {err}"
@@ -3773,11 +3780,11 @@ mod tests {
 
         // 対照: 通常の (規範) capabilities は Ok(Some(_)) のまま。
         let path = fixture_path("instrument_rich.ndjson");
-        let ok = collect_meta_capabilities(&path).expect("正常な capabilities は Err にならない");
-        assert!(ok.is_some());
+        let ok = collect_meta_session_facts(&path).expect("正常な capabilities は Err にならない");
+        assert!(ok.capabilities.is_some());
     }
 
-    /// AC18 (issue 007): `collect_meta_capabilities` / `collect_all_hook_health_events` →
+    /// AC18 (issue 007): `collect_meta_session_facts` / `collect_all_hook_health_events` →
     /// `build_feature_rows` の**配線**を `instrument_rich.ndjson` から通して固定する
     /// (`ime_shadow_events_reach_feature_rows_through_the_collector` と同型)。
     #[test]
@@ -3790,7 +3797,9 @@ mod tests {
         let feat_ts = collect_all_feat_timestamps(&path).expect("collect feat timestamps");
         let task_kind_declarations =
             collect_task_kind_declarations(&path).expect("collect task_kind declarations");
-        let capabilities = collect_meta_capabilities(&path).expect("collect capabilities");
+        let capabilities = collect_meta_session_facts(&path)
+            .expect("collect meta facts")
+            .capabilities;
         assert!(
             capabilities.is_some(),
             "instrument_rich の meta は capabilities を持つはず"
@@ -3928,8 +3937,9 @@ mod tests {
     /// 特徴行が出せない理由にならない。
     #[test]
     fn meta_facts_are_all_none_when_meta_is_absent() {
-        let dir = std::env::temp_dir().join(format!("gse-envelope-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("mkdir");
+        // ⚠️ テストは同一プロセスの複数スレッドで走るので、pid だけだと名前が衝突する
+        // (2026-09-20・code-reviewer LOW)。★ テスト名を接尾に入れて分ける。
+        let dir = envelope_tmp_dir("meta_absent");
         let path = dir.join("no_meta.ndjson");
         std::fs::write(
             &path,
@@ -3946,6 +3956,85 @@ mod tests {
         assert!(facts.g1_mode.is_none());
         assert!(facts.o1_mode.is_none());
         assert!(facts.keyboard_layout.is_none());
+        assert!(facts.capabilities.is_none());
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&dir);
+    }
+
+    /// 封筒用の一時ディレクトリ。★ pid ＋ テスト名で分ける (同一プロセス内の並列実行対策)。
+    fn envelope_tmp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("gse-envelope-{}-{}", std::process::id(), tag));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        dir
+    }
+
+    /// ⚠️★★★ 回帰 (2026-09-20・code-reviewer MEDIUM): **連結ログで `capabilities` が
+    /// 別セグメントから混ざらないこと。**
+    ///
+    /// ★ 旧実装は `capabilities` を「`capabilities` を持つ最初の `meta` 行」から、
+    /// それ以外を「`session_start` を持つ最初の `meta` 行」から取っており、
+    /// ⚠️ **同じ行である保証が無かった**。実測では前半の `session_start` / `hmm_version` と
+    /// 後半の `capabilities` が封筒に並んだ。★ 封筒は「どの計器条件で取れた行か」を
+    /// 保証するために入れたので、これは目的を直撃する。
+    #[test]
+    fn capabilities_never_come_from_a_different_meta_segment() {
+        let dir = envelope_tmp_dir("concat");
+        let path = dir.join("concat.ndjson");
+        std::fs::write(
+            &path,
+            "{\"type\":\"meta\",\"session_start\":1700000000000,\"hmm_version\":\"0.2.0\"}\n\
+             {\"type\":\"key\",\"t\":1700000000100,\"vk\":65,\"press\":true}\n\
+             {\"type\":\"meta\",\"session_end\":1700000001000}\n\
+             {\"type\":\"meta\",\"session_start\":1700000002000,\"hmm_version\":\"0.5.0\",\
+             \"capabilities\":{\"unconditional\":[\"key\"]}}\n",
+        )
+        .expect("write");
+
+        let facts = collect_meta_session_facts(&path).expect("collect meta facts");
+        assert_eq!(facts.session_start, Some(1_700_000_000_000));
+        assert_eq!(facts.hmm_version.as_deref(), Some("0.2.0"));
+        assert!(
+            facts.capabilities.is_none(),
+            "⚠️ 後半セグメントの capabilities が前半の封筒に混ざっている"
+        );
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&dir);
+    }
+
+    /// ⚠️★★★ 回帰 (2026-09-20・security-checker M1): **`meta` の文字列に上限がある。**
+    ///
+    /// ★ 信頼境界: O1 の NDJSON は被験者端末で生成されるので、`meta` 行の中身は
+    /// **被験者が編集しうる入力**である。⚠️ 上限が無いと、封筒が
+    /// (a) 巨大な文字列の複写経路 (b) 自由文が解析成果物に入る唯一の経路 になる。
+    /// ★ 超過は**切り詰めずに `None`**（「宣言が無い」へ倒す）。
+    #[test]
+    fn oversized_meta_strings_are_dropped_not_truncated() {
+        let dir = envelope_tmp_dir("longstr");
+        let path = dir.join("long.ndjson");
+        let long = "a".repeat(MAX_META_STRING_BYTES + 1);
+        let at_limit = "b".repeat(MAX_META_STRING_BYTES);
+        std::fs::write(
+            &path,
+            format!(
+                "{{\"type\":\"meta\",\"session_start\":1700000000000,\
+                 \"hmm_version\":\"{long}\",\"app_version\":\"{at_limit}\"}}\n"
+            ),
+        )
+        .expect("write");
+
+        let facts = collect_meta_session_facts(&path).expect("collect meta facts");
+        assert_eq!(facts.session_start, Some(1_700_000_000_000));
+        assert!(
+            facts.hmm_version.is_none(),
+            "上限超過の文字列が封筒へ入った (⚠️ 切り詰めでもなく落とすのが正)"
+        );
+        assert_eq!(
+            facts.app_version.as_deref(),
+            Some(at_limit.as_str()),
+            "ちょうど上限の文字列は通ること (★ 境界を 1 バイトずらしていないか)"
+        );
 
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_dir(&dir);

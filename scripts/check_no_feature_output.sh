@@ -27,6 +27,11 @@
 #   - **リポジトリの外**（Slack / メール / USB / クラウド共有）。★ ここは門を置けない。
 #   - **圧縮・暗号化された中身**（`.zip` / `.age` / `.gz`）。★ git は中身を見ない。
 #   - **CSV や NDJSON に変換された行**。★ JSON の形だけを見ている。
+#   - ⚠️★★★ **キーを間引いた射影**。★ `is_feature_row` は 5 キー**すべて**を要求するので、
+#     `jq '[.rows[] | {t_ms, dispersion}]'` のような抜き出しは**緑になる**。
+#     ⚠️ `t_ms`（絶対 epoch）と `dispersion`（ms 粒度の pause 長）だけでも機微はそのまま出る。
+#     ★ 5 キーを緩めると偽陽性が増えて門ごと外されるので、**検知は諦めている**
+#     （⚠️ 諦めたことを隠さない・2026-09-20 code-reviewer MEDIUM）。
 #   - **`gse-dataset` 側のコミット**。⚠️ 向こうには `.github` が無く CI が存在しない
 #     （2026-09-20 実測）。★ 本スクリプトは `--root` で向こうのクローンにも向けられるが、
 #     **自動では走らない**。→ 手順は `docs/verification-runbook.md`。
@@ -43,15 +48,25 @@
 set -uo pipefail
 
 ROOT=""
+ROOT_GIVEN=0
 SELF_TEST=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --root) ROOT="${2:-}"; shift 2 || { echo "[gate] --root に値がありません" >&2; exit 2; } ;;
+    --root) ROOT="${2:-}"; ROOT_GIVEN=1; shift 2 || { echo "[gate] --root に値がありません" >&2; exit 2; } ;;
     --self-test) SELF_TEST=1; shift ;;
-    -h|--help) sed -n '1,46p' "$0"; exit 0 ;;
+    -h|--help) sed -n '1,52p' "$0"; exit 0 ;;
     *) echo "[gate] 不明な引数: $1" >&2; exit 2 ;;
   esac
 done
+
+# ⚠️★★★ `--root ""` を黙って「本リポの走査」に落とさない（2026-09-20・security-checker M4）。
+#   ★ 実測: `--root "$DATASET"` で `DATASET` が空文字だと `shift 2` は成功し `ROOT=""` になり、
+#     gse-dataset ではなく GSE-prototype を走査して `[gate] OK`（走査 121 件）を返していた。
+#   ⚠️ gse-dataset 側は CI が無く**この手動手順が唯一の門**なので、そこが fail-open になる。
+if [ "$ROOT_GIVEN" -eq 1 ] && [ -z "$ROOT" ]; then
+  echo "[gate] ⚠️ --root に空の値が渡された（★ 変数が未設定のまま展開されていないか）" >&2
+  exit 2
+fi
 
 command -v jq >/dev/null 2>&1 || { echo "[gate] ⚠️ jq が無いので検査できない" >&2; exit 2; }
 
@@ -59,19 +74,30 @@ command -v jq >/dev/null 2>&1 || { echo "[gate] ⚠️ jq が無いので検査�
 # ★ 既定（--root 無し）は **git の追跡ファイル** —— 「コミットされたら赤」が守りたい線であり、
 #   作業ツリーの一時ファイルまで赤にすると門が鬱陶しくなって外される。
 # ★ `--root` を与えたときは **ツリー内の全ファイル** を見る（⚠️ 向こうが git とは限らない）。
+# ⚠️★★★ **出力は必ず絶対パス・NUL 区切り**にする（2026-09-20・security-checker M3 / LOW）。
+#   ★ 本関数は `< <(list_candidates)` のプロセス置換、つまり**サブシェル**で走るので、
+#     ここでの `cd` は呼び出し元の `$PWD` を変えない（実測）。
+#     ⚠️ 旧版は `git ls-files` の repo ルート相対パスをそのまま返しており、
+#     `run_scan` の `[ -f "$f" ]` は**呼び出し元の cwd** に対して解決していた。
+#     → ★ repo ルート以外から起動すると候補が黙って落ちる（実測: `src-tauri/` から起動で走査 0 件）。
+#   ⚠️ 旧版の `git ls-files -z | tr '\0' '\n'` は `-z` を打ち消していた ——
+#     改行を含むパスは 2 つに割れ、`[ -f ]` で落ちて**黙って消える**。→ NUL のまま渡す。
 list_candidates() {
   if [ -n "$ROOT" ]; then
     [ -d "$ROOT" ] || { echo "[gate] ⚠️ --root のディレクトリが無い: $ROOT" >&2; exit 2; }
     find "$ROOT" -type f \
       \( -name '*.json' -o -name '*.txt' -o -name '*.out' -o -name '*.log' \) \
-      -not -path '*/.git/*' -print
+      -not -path '*/.git/*' -print0
   else
     cd "$(dirname "$0")/.." || { echo "[gate] ⚠️ repo 直下へ移動できない" >&2; exit 2; }
-    git rev-parse --git-dir >/dev/null 2>&1 \
+    local top
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" \
       || { echo "[gate] ⚠️ git リポジトリでないので追跡ファイルを列挙できない" >&2; exit 2; }
+    [ -n "$top" ] || { echo "[gate] ⚠️ repo ルートを特定できない" >&2; exit 2; }
     # ⚠️ 拡張子で**対象を絞る**が、判定そのものは中身で行う（★ 名前で「これは安全」と決めない）。
     #   ★ `.json` 以外も見るのは、`> feat.txt` のようにリダイレクト先を変えただけの持ち出しを拾うため。
-    git ls-files -z -- '*.json' '*.txt' '*.out' '*.log' | tr '\0' '\n'
+    git ls-files -z -- '*.json' '*.txt' '*.out' '*.log' \
+      | while IFS= read -r -d '' f; do printf '%s/%s\0' "$top" "$f"; done
   fi
 }
 
@@ -102,14 +128,21 @@ JQ_PROG='
 
 run_scan() {
   local violations=0 scanned=0 f hit rc
-  while IFS= read -r f; do
+  while IFS= read -r -d '' f; do
     [ -n "$f" ] || continue
     [ -f "$f" ] || continue
     scanned=$((scanned + 1))
     # ⚠️ jq の失敗 (JSON でない) と「true が返った」を区別する。
     hit="$(jq -e "$JQ_PROG" "$f" 2>/dev/null)"
     rc=$?
-    if [ $rc -eq 0 ] && [ "$hit" = "true" ]; then
+    # ⚠️★★★ **1 ファイルに JSON 文書が複数入っていると jq は文書ごとに 1 行出す**
+    #   (2026-09-20・code-reviewer / security-checker が独立に指摘・実測で確認)。
+    #   ★ 旧版は `[ "$hit" = "true" ]` だったので、`"true\ntrue"` と一致せず
+    #     ⚠️ **2 文書以上なら必ず緑**になっていた（= 違反が大きいほど通る逆向きの挙動）。
+    #   ⚠️ 封筒を入れた動機そのもの（複数セッションの結合）に沿って
+    #     `cat feat_a.json feat_b.json > all.json` とされると素通りしていた。
+    #   → ★ 「**1 行でも true があるか**」で判定する。
+    if [ $rc -eq 0 ] && printf '%s\n' "$hit" | grep -qx true; then
       echo "[gate] NG: $f は gse-replay --features の出力に見える" >&2
       echo "       ★ これは中間成果物であり gse-dataset へ共有しない（docs/glossary.md「特徴行」）。" >&2
       echo "       ⚠️ t_ms は絶対 epoch ms で anonymize.rs を通っていない。" >&2
@@ -145,26 +178,41 @@ self_test() {
 
   local row='{"t_ms":1,"activity":{},"boundary":{},"dispersion":{},"stall_onset":{},"quality":{}}'
 
-  probe() { # probe <名前> <期待 rc> <ファイル名> <中身>
-    local name="$1" want="$2" fname="$3" body="$4" got
-    rm -rf "${d:?}/tree"; mkdir -p "$d/tree"
-    printf '%s' "$body" > "$d/tree/$fname"
-    ROOT="$d/tree" run_scan >/dev/null 2>&1
-    got=$?
-    if [ "$got" -eq "$want" ]; then
-      printf '  ✅ %-34s rc=%s\n' "$name" "$got"
+  report() { # report <名前> <期待 rc> <実測 rc>
+    if [ "$3" -eq "$2" ]; then
+      printf '  ✅ %-36s rc=%s\n' "$1" "$3"
     else
-      printf '  ❌ %-34s rc=%s（期待 %s）\n' "$name" "$got" "$want"
+      printf '  ❌ %-36s rc=%s（期待 %s）\n' "$1" "$3" "$2"
       failed=$((failed + 1))
     fi
   }
 
-  echo "[gate] --self-test: 陽性 3 / 陰性 2"
+  probe() { # probe <名前> <期待 rc> <ファイル名> <中身>
+    local name="$1" want="$2" fname="$3" body="$4" got
+    rm -rf "${d:?}/tree"; mkdir -p "$d/tree"
+    printf '%s' "$body" > "$d/tree/$fname"
+    # ⚠️ 関数呼び出しへの前置代入 (`ROOT=x run_scan`) は bash の posix モードで
+    #   呼び出し後も残りうる。★ 代入と呼び出しを分ける（本リポは移植性ゲートを持つほど
+    #   この手の版差を気にする・2026-09-20 code-reviewer LOW）。
+    ROOT="$d/tree"
+    run_scan >/dev/null 2>&1
+    got=$?
+    ROOT=""
+    report "$name" "$want" "$got"
+  }
+
+  echo "[gate] --self-test: 陽性 4 / 陰性 3（★ 既定枝の対照を含む）"
   # ★ 陽性対照: 赤 (rc=1) にならなければ検査は空振りしている。
   probe "P1 封筒つき（マーカー）" 1 feat.json \
     "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}"
   probe "P2 封筒を剥がした行の配列" 1 rows.json "[$row]"
   probe "P3 拡張子だけ変えた持ち出し" 1 notes.txt "[$row]"
+  # ⚠️★★★ P4: **多文書 JSON**（★ 2026-09-20 に 2 レビューが独立に見つけた偽陰性）。
+  #   ★ 封筒を入れた動機そのもの（複数セッションの結合）に沿う形なので、
+  #     ここが緑だと「違反が大きいほど通る」という逆向きの門になる。
+  probe "P4 封筒を 2 つ連結した多文書" 1 all.json \
+    "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}
+{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}"
   # ★ 陰性対照: 緑 (rc=0) にならなければ偽陽性で、門はいずれ外される。
   probe "N1 metrics.json 形（共有物）" 0 m.json \
     '{"session_id":"P001","f1":0.83,"median_ms":120}'
@@ -172,12 +220,35 @@ self_test() {
 
   # ⚠️★ 「走査 0 件」を緑と取り違えないこと（★ exit 2 と 0 を分けている理由）。
   rm -rf "${d:?}/tree"; mkdir -p "$d/tree"
-  ROOT="$d/tree" run_scan >/dev/null 2>&1
+  ROOT="$d/tree"
+  run_scan >/dev/null 2>&1
   rc=$?
-  if [ "$rc" -eq 2 ]; then
-    printf '  ✅ %-34s rc=2\n' "N3 空ツリーは「検査できなかった」"
+  ROOT=""
+  report "N3 空ツリーは「検査できなかった」" 2 "$rc"
+
+  # ⚠️★★★ **既定枝（`git ls-files`）の対照**（2026-09-20・security-checker M3）。
+  #   ★ 上の 7 件はすべて `ROOT` を立てるので `--root` 枝しか通らない ——
+  #     ⚠️ **既定枝は対照で 1 度も検査されていなかった**。
+  #     ★ 本 script 自身が冒頭で警告している「検査があるつもりで検査していない」型そのもの。
+  #   ★ 使い捨ての git repo を作り、検体を追跡させて既定枝を通す。
+  if command -v git >/dev/null 2>&1; then
+    local r="$d/repo"
+    mkdir -p "$r/scripts"
+    cp "$0" "$r/scripts/$(basename "$0")"
+    (
+      cd "$r" || exit 2
+      git init -q . >/dev/null 2>&1 || exit 2
+      git config user.email selftest@example.invalid
+      git config user.name selftest
+      printf '%s' "[$row]" > rows.json
+      git add scripts/"$(basename "$0")" rows.json >/dev/null 2>&1 || exit 2
+      # ★ 別ディレクトリから起動して、cwd 依存でないことも同時に見る。
+      cd / || exit 2
+      bash "$r/scripts/$(basename "$0")" >/dev/null 2>&1
+    )
+    report "P5 既定枝（追跡ファイル・別 cwd）" 1 $?
   else
-    printf '  ❌ %-34s rc=%s（期待 2）\n' "N3 空ツリーは「検査できなかった」" "$rc"
+    printf '  ⚠️ %-36s（git が無いので既定枝を検査できない）\n' "P5 既定枝"
     failed=$((failed + 1))
   fi
 

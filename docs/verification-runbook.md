@@ -167,7 +167,7 @@ cd <repo> && bash scripts/check-g1-collection-readiness.sh --selftest
 (2026-09-20 実測)。→ **push の前に手で回す**:
 
 ```bash
-# ★ 先に門そのものが閉まることを確かめる (⚠️ 陽性対照 3 / 陰性対照 3)
+# ★ 先に門そのものが閉まることを確かめる (⚠️ 陽性 4 / 陰性 3。★ 既定枝の対照を含む)
 bash scripts/check_no_feature_output.sh --self-test
 
 # ★ gse-dataset のクローンを走査する (⚠️ 本機は C:\gse-dataset)

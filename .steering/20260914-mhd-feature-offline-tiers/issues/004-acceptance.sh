@@ -19,7 +19,7 @@ cd src-tauri || fail "src-tauri が無い"
 #   ⚠️ **欠陥でないのに acceptance が落ちる**（★ issue 002 で実際に $5.7 を捨てた失敗様式）。
 #   ★ instrument_rich は **backspace 3 連**を持つので、どちらの定義でも run が 1 本以上立つ。
 out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndjson --features 2>/dev/null | jq '.rows')" \
-  || fail "gse-replay --features が非 0 で終了した"
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 printf '%s' "$out" | jq -e '

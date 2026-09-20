@@ -15,7 +15,7 @@ cd src-tauri || fail "src-tauri が無い"
 SRC="src/analysis/feat_offline/restart.rs"
 
 out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq '.rows')" \
-  || fail "gse-replay --features が非 0 で終了した"
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 printf '%s' "$out" | jq -e '

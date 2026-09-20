@@ -24,7 +24,7 @@ FIXTURE="tests/fixtures/instrument_rich.ndjson"
 [ -f "$SRCF" ]    || fail "$SRCF が無い"
 
 out="$(cargo run --quiet --bin gse-replay -- "$FIXTURE" --features 2>/dev/null | jq '.rows')" \
-  || fail "gse-replay --features が非 0 で終了した"
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 # AC1 / AC2: boundary の必須フィールド（★ sentence_punctuation が分離していること）

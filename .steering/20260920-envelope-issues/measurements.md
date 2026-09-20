@@ -57,6 +57,9 @@ rc=0
 
 ## M-c: 共有の門の `--self-test`（★ 対照を script に内蔵した）
 
+> ⚠️ **これはレビュー前の姿である**（陽性 3 / 陰性 2）。
+> ★ 現行は **陽性 4 / 陰性 3** —— P4（多文書）と P5（既定枝）を後から足した。下記 M-i / M-m を参照。
+
 ```
 $ bash scripts/check_no_feature_output.sh --self-test
   ✅ P1 封筒つき（マーカー）           rc=1
@@ -156,3 +159,103 @@ right: Some("0.5.0")   ← 現行バイナリの HMM_VERSION
 （収集時 ≠ 解析時）。⚠️ 検査を実測に合わせ、さらに
 `envelope-acceptance.sh` AC8 で「**同じ値になったら赤**」にした
 （★ 揃ってしまうと「2 つ持つ意味」を誰も見なくなるため）。
+
+---
+
+# 追補（2026-09-20・レビュー指摘への対応の実測）
+
+> ★ `code-reviewer` と `security-checker` を並列（opus・範囲/禁止/締切を明記）で回した結果。
+> ⚠️ **両者が独立に同じ HIGH を挙げた** —— 一致した指摘は優先度が高い（`subagent-delegation`）。
+
+## M-i: ⚠️★★★ HIGH —— 共有の門が**多文書 JSON を素通り**していた
+
+★ 2 レビューが独立に指摘。**一次で再現した**:
+
+```
+$ printf '{"gse_dataset":"prohibited"}\n{"gse_dataset":"prohibited"}\n' > two.json
+$ jq -e 'type=="object" and (.gse_dataset? == "prohibited")' two.json
+true
+true            ← ⚠️ jq は **文書ごとに 1 行**出す
+$ bash scripts/check_no_feature_output.sh --root <two.json のツリー>
+[gate] OK: --features 出力は見つからなかった（走査 1 件）   ← ⚠️ 緑
+```
+
+★ 原因: `hit="$(jq -e ...)"` を `[ "$hit" = "true" ]` で見ていたので、
+`"true\ntrue"` と一致せず **2 文書以上なら必ず緑**になっていた。
+⚠️★★★ **封筒を入れた動機そのもの**（「複数セッションの出力を結合する」）に沿って
+`cat feat_a.json feat_b.json > all.json` とされると素通りする ——
+★ **違反が大きいほど通る**という逆向きの門だった。
+
+★ 修正: 「**1 行でも true があるか**」で判定する（`printf '%s\n' "$hit" | grep -qx true`）。
+★ **陽性対照 P4 として恒久化**した。⚠️ 突然変異（旧判定に戻した版）で **P4 だけが赤**になることを実測:
+
+```
+  ❌ P4 封筒を 2 つ連結した多文書 rc=0（期待 1）
+[gate] --self-test NG: 1 件
+```
+
+⚠️★ **この検算で 1 度空振りした** —— 最初に作った「壊した版」は置換が当たっておらず
+**元のままの script を回して「OK」を見ていた**。★ `grep` で置換が入ったことを確かめてから回し直した。
+（⚠️ memory「Acceptance self-test」と同じ型。★ *検査を検査するときも、検査が本当に壊れたか確かめる*。）
+
+## M-j: MEDIUM —— `capabilities` が**別セグメントから混ざっていた**
+
+★ `code-reviewer` 指摘。**一次で再現した**（2 セグメントを連結した NDJSON）:
+
+```
+修正前: {"session_start":1700000000000,"hmm_version":"0.2.0","app_version":"0.1.0",
+         "capabilities":{"unconditional":["key"]}}   ← ⚠️ 後半セグメントの宣言
+修正後: {"session_start":1700000000000,"hmm_version":"0.2.0","app_version":"0.1.0",
+         "capabilities":null}                        ← ★ 前半には宣言が無い、が正しい
+```
+
+★ 原因: `capabilities` を「`capabilities` を持つ最初の `meta` 行」から、
+それ以外を「`session_start` を持つ最初の `meta` 行」から取っており、
+⚠️ **同じ行である保証が無かった**。
+→ ★ **1 行・1 パスに統合**した（`collect_meta_session_facts`）。
+★ 副産物: `meta` 行の無い入力に対する**全行パースのフルパスが 1 本減った**
+（⚠️ `008` の AC18 は 20 秒の予算で回っている）。
+★ 回帰: `capabilities_never_come_from_a_different_meta_segment`。
+
+## M-k: MEDIUM —— `meta` の文字列に上限が無かった
+
+★ `security-checker` 指摘。`hmm_version` / `app_version` / `g1_mode` / `o1_mode` /
+`keyboard_layout` を**長さ無制限・文字種無制限**で封筒へ複写していた。
+⚠️ 同じ `meta` 行の `capabilities` には 4096 バイトの上限があるのに、こちらには何も無かった。
+⚠️ 信頼境界: O1 の NDJSON は**被験者端末で生成される**ので、`meta` の中身は被験者が編集しうる。
+
+→ ★ `MAX_META_STRING_BYTES = 256`。**切り詰めずに落とす**（「宣言が無い」へ倒す）。
+★ 回帰: `oversized_meta_strings_are_dropped_not_truncated`（⚠️ **ちょうど上限は通る**ことも固定）。
+
+## M-l: MEDIUM —— `007` は封筒を **1 本しか**走査していなかった
+
+★ `security-checker` M2 (a)。`instrument_rich` の封筒だけを見ており、
+⚠️ `minimal` / `stall_onset_observed` / 削除版 / hook 入り / legacy の封筒は**1 度も見ていなかった**。
+→ ★ 取得を `capture()` に集約し、**7 本すべての封筒**に `scan_envelope`（AC3b）を掛ける。
+
+## M-m: MEDIUM —— 共有の門が cwd 依存 / `--root ""` で fail-open
+
+| 症状 | 修正前の実測 | 修正後 |
+|---|---|---|
+| `src-tauri/` から起動 | `走査 0 件`（rc=2） | **走査 121 件**（絶対パスで出す） |
+| `--root ""`（変数が空） | ⚠️ **本リポを走査して `OK`**（121 件） | **rc=2「空の値が渡された」** |
+| 既定枝（`git ls-files`）の対照 | ⚠️ **1 件も無かった** | **P5** を追加（別 cwd から使い捨て repo を走査） |
+
+★ あわせて `git ls-files -z | tr '\0' '\n'` が `-z` を打ち消していたのも直した
+（⚠️ 改行を含むパスが 2 つに割れて**黙って消える**）。
+
+## M-n: 修正後の全再走（★ 通しで回した）
+
+| 検査 | 結果 |
+|---|---|
+| `cargo fmt --check` | exit 0 |
+| `cargo clippy --all-targets --features package -- -D warnings` | exit 0 |
+| `cargo test --workspace` | **lib 701 / bin 48 / 1**（★ 回帰 2 本を追加） |
+| `001` / `002` / `003` / `005` / `007` / `008` | **すべて OK** |
+| `004` / `006` | ⚠️ NG（★ 理由は**自分の Tier 未実装**。「配列が来ない」ではない） |
+| `envelope-acceptance.sh` | OK（⚠️ 突然変異 6 種すべてで赤を実測） |
+| `check_no_feature_output.sh --self-test` | OK（陽性 4 / 陰性 3） |
+| `check_no_feature_output.sh` | OK（走査 121 件） |
+| `check-shell-portability.sh` | 通過 12 / 未達 0 |
+| `check-tests-are-wired.sh` | 16 本すべて CI から呼ばれている |
+| `check_doc_lexicon.py` | exit 0 |

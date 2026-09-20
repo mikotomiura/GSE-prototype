@@ -14,7 +14,7 @@ command -v jq >/dev/null 2>&1 || fail "jq が無い"
 cd src-tauri || fail "src-tauri が無い"
 
 out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq '.rows')" \
-  || fail "gse-replay --features が非 0 で終了した"
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 # AC1
@@ -43,7 +43,7 @@ printf '%s' "$out" | jq -e '[.[].dispersion.pause_max_ms | select(. != null)] | 
 #     - resumption_outcomes.ndjson: iki_cv が全行 null
 #   ★ これらを「壊れている」と誤診して直しにいかないこと。
 out2="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndjson --features 2>/dev/null | jq '.rows')" \
-  || fail "gse-replay --features が非 0 で終了した (instrument_rich)"
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない (instrument_rich)"
 printf '%s' "$out2" | jq -e '[.[].dispersion.pause_max_ms | select(. != null)] | length > 0' >/dev/null 2>&1 \
   || fail "instrument_rich で pause_max_ms が全行 null（★ 同 fixture は pause を 2 本持つ）"
 

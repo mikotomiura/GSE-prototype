@@ -214,3 +214,82 @@
   ⚠️ **それ以外の封筒フィールドに被験者由来語が入る経路は塞いでおく。**
 - **トレードオフ**: 検査が 1 本増える。
 - **影響範囲**: `007-acceptance.sh`。
+
+---
+
+## 判断 12: `meta` の読み取りを 1 行・1 パスに統合する（★ レビュー指摘）
+
+- **判断日時**: 2026-09-20（★ `code-reviewer` MEDIUM を受けて）
+- **背景**: `capabilities` を「`capabilities` を持つ最初の `meta` 行」、それ以外を
+  「`session_start` を持つ最初の `meta` 行」から取っており、⚠️ **同じ行である保証が無かった**。
+  ★ 実測（`measurements.md` M-j）: 2 セグメントを連結した NDJSON で、封筒が
+  **前半の `session_start` / `hmm_version` と後半の `capabilities`** を並べた。
+- **選択肢**:
+  - A: 1 パスに統合し、`session_start` を持つ最初の `meta` 行から**すべて**取る
+  - B: 両者が採った行番号を返し、食い違ったら `capabilities` を `null` にする
+- **採用**: **A**
+- **理由**: ⚠️ 封筒は「**どの計器条件で取れた行か**」を保証するために入れた。
+  ★ そこが混ざるのは起票 2 の目的を直撃する。B は検出するだけで、正しい値を与えない。
+  ★ A は副産物として、`meta` 行の無い入力に対する**全行パースのフルパスを 1 本減らす**
+  （⚠️ `008` の AC18 は 20 秒の予算で回っている）。
+- **トレードオフ**: ⚠️ 先頭の `meta(session_start)` に宣言が無く、後続にある NDJSON では
+  `capabilities` が `null` になる。★ **それが正しい**（前半セグメントには宣言が無かった）。
+- **影響範囲**: `collect_meta_capabilities` を削除し `collect_meta_session_facts` に統合。
+  形の検査は `validate_meta_capabilities` に切り出した（AC15 は据え置き）。
+- **検算**: `capabilities_never_come_from_a_different_meta_segment`。
+
+---
+
+## 判断 13: `meta` の文字列に上限を課す（★ レビュー指摘）
+
+- **判断日時**: 2026-09-20（★ `security-checker` M1 を受けて）
+- **背景**: `hmm_version` / `app_version` / `g1_mode` / `o1_mode` / `keyboard_layout` を
+  **長さ無制限・文字種無制限**で封筒へ複写していた。⚠️ 同じ `meta` 行の `capabilities` には
+  4096 バイトの上限があるのに、こちらには何も無かった。
+  ⚠️★★★ **信頼境界**: O1 の NDJSON は**被験者端末で生成される**ので、`meta` の中身は
+  被験者が編集しうる入力である。★ 封筒は「自由文が解析成果物に入る」初めての経路になる
+  （⚠️ `rows` は数値と固定 enum しか持たない）。
+- **採用**: `MAX_META_STRING_BYTES = 256`。**超過は切り詰めずに `None`** へ倒す。
+- **理由**: ★ 実際に書かれる値は semver / enum / レイアウト識別子で数十バイト。
+  ⚠️ 切り詰めると「短い宣言」と区別できなくなる ——
+  ★ `dropped_delta` を `0` で埋めない（判断 14）のと同じ規律。
+- **却下案**: 文字種を `[A-Za-z0-9._-]` に制限する —— ⚠️ `keyboard_layout` の値域を
+  一次で確かめていない。★ **推測で狭めない**（長さだけ先に閉じる）。
+- **影響範囲**: `collect_meta_session_facts`。
+- **検算**: `oversized_meta_strings_are_dropped_not_truncated`（★ **ちょうど上限は通る**も固定）。
+
+---
+
+## 判断 14: 共有の門は「1 行でも true があるか」で判定する（★ HIGH・両レビュー一致）
+
+- **判断日時**: 2026-09-20
+- **背景**: ⚠️★★★ `jq` は **1 ファイルに JSON 文書が複数あると文書ごとに 1 行**出す。
+  旧判定 `[ "$hit" = "true" ]` は `"true\ntrue"` と一致せず、★ **2 文書以上なら必ず緑**だった。
+  ⚠️ 封筒を入れた動機そのもの（複数セッションの結合）に沿って
+  `cat feat_a.json feat_b.json > all.json` とされると素通りする ——
+  ★ **違反が大きいほど通る**という逆向きの門だった。
+- **採用**: `printf '%s\n' "$hit" | grep -qx true`。**陽性対照 P4 として恒久化**。
+- **理由**: ★ 判断 9 と同じ ——「直して終わり」にすると、同じ型が次に入ったとき誰も気づかない。
+- **影響範囲**: `scripts/check_no_feature_output.sh`。
+- **検算**: ⚠️ 旧判定に戻した版で **P4 だけが赤**になることを実測。
+  ★ このとき**置換が当たっていない script を回して一度空振りした** ——
+  ⚠️ **検査を検査するときも、検査が本当に壊れたかを確かめる**（memory「Acceptance self-test」）。
+
+---
+
+## 判断 15: 共有の門の既定枝にも対照を置く（★ レビュー指摘）
+
+- **判断日時**: 2026-09-20（★ `security-checker` M3 を受けて）
+- **背景**: `--self-test` の検体はすべて `ROOT` を立てるので、
+  ⚠️ **既定枝（`git ls-files`）は対照で 1 度も検査されていなかった** ——
+  ★ script 自身が冒頭で警告している「検査があるつもりで検査していない」型そのもの。
+  ⚠️ 併せて `list_candidates` は**サブシェル**で走るため、そこでの `cd` が
+  呼び出し元の cwd を変えず、★ repo ルート以外から起動すると候補が黙って落ちていた
+  （実測: `src-tauri/` から起動で走査 0 件）。
+- **採用**:
+  - `git rev-parse --show-toplevel` を取り、**絶対パス・NUL 区切り**で候補を出す
+  - `--self-test` に **P5**（使い捨て git repo を**別 cwd から**走査）を足す
+  - ⚠️ `--root ""` は `exit 2`（★ 旧版は**黙って本リポを走査して緑**を返していた ——
+    `gse-dataset` 側は CI が無く**この手動手順が唯一の門**なので fail-open は許さない）
+- **影響範囲**: `scripts/check_no_feature_output.sh`、`docs/verification-runbook.md`（対照の数）。
+- **検算**: `measurements.md` M-m の表（修正前後の実測）。
