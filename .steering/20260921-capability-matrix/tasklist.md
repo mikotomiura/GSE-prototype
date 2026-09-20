@@ -31,7 +31,13 @@
 - [x] ⚠️ ライブ変換の層識別子 → **起票 24**（`20260914-instrument-change-arbitration`）
 
 ## レビュー
-- [ ] `code-reviewer` ＋ `security-checker`（並列・opus）
+- [x] `code-reviewer` ＋ `security-checker`（並列・opus）
+- [x] ⚠️★★★ **HIGH 対応 5 件**（★ 2 人が**独立に同じ穴**を指摘した 1 件を含む）:
+      門と派生量の切り分け（判断 8）／ `s-i` にポインタ結合禁止を戻す ／
+      `ime_shadow.t` の macOS 記述を訂正（判断 9-1）／ `s-vii` 後半の取りこぼし（判断 9-2）／
+      `esc_count` の OS 間比較を凍結
+- [x] MEDIUM 対応: 条件数 10 / `meta` のキー数の限定語 / 同意逐語の裏取り（判断 10）/ 出力先を M4 へ
+- [x] LOW 対応: D5 の表は 2 行である旨 / `feat_offline` は mod.rs 除き 7
 - [ ] `/cross-review` 2 巡
 
 ## 完了処理
