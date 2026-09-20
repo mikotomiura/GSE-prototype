@@ -32,7 +32,9 @@
 ## レビュー
 - [x] `code-reviewer` ＋ `security-checker` を並列（opus・範囲/禁止/締切を明記）
 - [x] HIGH / MEDIUM 指摘への対応（★ HIGH 1 / MEDIUM 5 / LOW 6 を反映・判断 12〜15）
-- [ ] `/cross-review` 2 巡（パス限定・⚠️ 先に secrets-filter が 0 を返すか確認）
+- [x] `/cross-review` 2 巡（パス限定・secrets-filter rc=0 を確認）
+      ★ ⚠️ 予算ガードで止まっていたため研究者裁定で上限を一時引き上げ → **実施後 300000 に戻した**（判断 16）
+      ★ ⚠️★★★ **Codex が Claude の 2 レビューの見落としを 3 件拾った**（判断 17〜19）
 
 ## ドキュメント
 - [x] `docs/glossary.md` に「封筒」「共有の門」を追加、「特徴行」に封筒の形を追記
@@ -41,4 +43,4 @@
 ## 完了処理
 - [x] `design.md` の最終化
 - [x] `decisions.md` に実装中の判断を追記
-- [ ] git commit（⚠️ `git add -A` / `git add <dir>` 禁止・明示ステージング）
+- [x] git commit（⚠️ `git add -A` / `git add <dir>` 禁止・明示ステージング）

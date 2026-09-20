@@ -26,7 +26,8 @@
 # ⚠️★★★ **この検査が見ていないもの**（★ 隠さずに書く）:
 #   - **リポジトリの外**（Slack / メール / USB / クラウド共有）。★ ここは門を置けない。
 #   - **圧縮・暗号化された中身**（`.zip` / `.age` / `.gz`）。★ git は中身を見ない。
-#   - **CSV や NDJSON に変換された行**。★ JSON の形だけを見ている。
+#   - **CSV に変換された行**。★ JSON として読めないので jq が落ち、違反なしとして扱う。
+#     （⚠️ `.ndjson` は 2026-09-20 から**見ている** —— `> feat.ndjson` は自然な回避経路だった。）
 #   - ⚠️★★★ **キーを間引いた射影**。★ `is_feature_row` は 5 キー**すべて**を要求するので、
 #     `jq '[.rows[] | {t_ms, dispersion}]'` のような抜き出しは**緑になる**。
 #     ⚠️ `t_ms`（絶対 epoch）と `dispersion`（ms 粒度の pause 長）だけでも機微はそのまま出る。
@@ -82,21 +83,33 @@ command -v jq >/dev/null 2>&1 || { echo "[gate] ⚠️ jq が無いので検査�
 #     → ★ repo ルート以外から起動すると候補が黙って落ちる（実測: `src-tauri/` から起動で走査 0 件）。
 #   ⚠️ 旧版の `git ls-files -z | tr '\0' '\n'` は `-z` を打ち消していた ——
 #     改行を含むパスは 2 つに割れ、`[ -f ]` で落ちて**黙って消える**。→ NUL のまま渡す。
+#
+# ⚠️★★★ **失敗は `return`（`exit` ではない）で返す**（2026-09-20・Codex `/cross-review` 2 巡目）。
+#   ★ 旧版は `exit 2` を使っていたが、本関数は**サブシェル**で走るので
+#     ⚠️ 呼び出し元には伝わらない。★ 途中まで候補を出してから `find` が失敗すると、
+#     `scanned > 0` になって **`[gate] OK` が返る（false green）**。
+#   → ★ 呼び出し側 (`run_scan`) が**列挙の終了コードを必ず見る**。
+#
+# ⚠️ 拡張子で**対象を絞る**が、判定そのものは中身で行う（★ 名前で「これは安全」と決めない）。
+#   ★ `.json` 以外も見るのは、`> feat.txt` のようにリダイレクト先を変えただけの持ち出しを拾うため。
+#   ★ `.ndjson` を入れたのは 2026-09-20（Codex 2 巡目）——
+#     ⚠️ `gse-replay --features > feat.ndjson` は**かなり自然な回避経路**で、
+#     `.gitignore` の NDJSON 網（`gse_*.ndjson` / `P[0-9]*_*.ndjson`）にも当たらない。
+#     ★ 実測: 追加前は `feat.ndjson` だけのツリーで「走査対象が 0 件」だった。
+SCAN_GLOBS=('*.json' '*.ndjson' '*.txt' '*.out' '*.log')
 list_candidates() {
   if [ -n "$ROOT" ]; then
-    [ -d "$ROOT" ] || { echo "[gate] ⚠️ --root のディレクトリが無い: $ROOT" >&2; exit 2; }
+    [ -d "$ROOT" ] || { echo "[gate] ⚠️ --root のディレクトリが無い: $ROOT" >&2; return 2; }
     find "$ROOT" -type f \
-      \( -name '*.json' -o -name '*.txt' -o -name '*.out' -o -name '*.log' \) \
+      \( -name '*.json' -o -name '*.ndjson' -o -name '*.txt' -o -name '*.out' -o -name '*.log' \) \
       -not -path '*/.git/*' -print0
   else
-    cd "$(dirname "$0")/.." || { echo "[gate] ⚠️ repo 直下へ移動できない" >&2; exit 2; }
+    cd "$(dirname "$0")/.." || { echo "[gate] ⚠️ repo 直下へ移動できない" >&2; return 2; }
     local top
     top="$(git rev-parse --show-toplevel 2>/dev/null)" \
-      || { echo "[gate] ⚠️ git リポジトリでないので追跡ファイルを列挙できない" >&2; exit 2; }
-    [ -n "$top" ] || { echo "[gate] ⚠️ repo ルートを特定できない" >&2; exit 2; }
-    # ⚠️ 拡張子で**対象を絞る**が、判定そのものは中身で行う（★ 名前で「これは安全」と決めない）。
-    #   ★ `.json` 以外も見るのは、`> feat.txt` のようにリダイレクト先を変えただけの持ち出しを拾うため。
-    git ls-files -z -- '*.json' '*.txt' '*.out' '*.log' \
+      || { echo "[gate] ⚠️ git リポジトリでないので追跡ファイルを列挙できない" >&2; return 2; }
+    [ -n "$top" ] || { echo "[gate] ⚠️ repo ルートを特定できない" >&2; return 2; }
+    git ls-files -z -- "${SCAN_GLOBS[@]}" \
       | while IFS= read -r -d '' f; do printf '%s/%s\0' "$top" "$f"; done
   fi
 }
@@ -127,7 +140,19 @@ JQ_PROG='
 '
 
 run_scan() {
-  local violations=0 scanned=0 f hit rc
+  local violations=0 scanned=0 f hit rc lrc listfile
+  # ⚠️★★★ **候補の列挙を先に確定させる**（2026-09-20・Codex `/cross-review` 2 巡目）。
+  #   ★ `while ... < <(list_candidates)` だと列挙側の失敗が呼び出し元に伝わらず、
+  #     ⚠️ 途中まで候補を出してから `find` が失敗すると **false green** になる。
+  #   → ★ 一旦ファイルへ落とし、**列挙の終了コードを見てから**走査する。
+  listfile="$(mktemp)" || { echo "[gate] ⚠️ 一時ファイルを作れない" >&2; return 2; }
+  list_candidates > "$listfile"
+  lrc=$?
+  if [ "$lrc" -ne 0 ]; then
+    rm -f "$listfile"
+    echo "[gate] ⚠️ 走査候補の列挙に失敗した (rc=$lrc)（★ 「違反なし」ではない）" >&2
+    return 2
+  fi
   while IFS= read -r -d '' f; do
     [ -n "$f" ] || continue
     [ -f "$f" ] || continue
@@ -156,7 +181,8 @@ run_scan() {
       echo "       ⚠️ t_ms は絶対 epoch ms で anonymize.rs を通っていない。" >&2
       violations=$((violations + 1))
     fi
-  done < <(list_candidates)
+  done < "$listfile"
+  rm -f "$listfile"
 
   if [ "$scanned" -eq 0 ]; then
     echo "[gate] ⚠️ 走査対象が 0 件だった（★ 「違反なし」ではなく「検査できなかった」）" >&2
@@ -170,7 +196,7 @@ run_scan() {
   return 0
 }
 
-# ---------- --self-test: 陽性対照 5 件 ＋ 陰性対照 3 件 ----------
+# ---------- --self-test: 陽性対照 6 件 ＋ 陰性対照 5 件 ----------
 # ⚠️★★★ **「門がある」と「門が閉まる」は別である。**
 #   ★ 本プロジェクトは「検査があるつもりで検査していない」を 3 回踏んでいる。
 #   ★ 実際、この検査器自身が 2026-09-20 の初版で **陽性対照 P2 を通していた**
@@ -209,7 +235,7 @@ self_test() {
     report "$name" "$want" "$got"
   }
 
-  echo "[gate] --self-test: 陽性 5 / 陰性 3（★ 既定枝の対照を含む）"
+  echo "[gate] --self-test: 陽性 6 / 陰性 5（★ 既定枝の対照と「見ていない範囲」を含む）"
   # ★ 陽性対照: 赤 (rc=1) にならなければ検査は空振りしている。
   probe "P1 封筒つき（マーカー）" 1 feat.json \
     "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}"
@@ -231,6 +257,19 @@ self_test() {
   probe "N1 metrics.json 形（共有物）" 0 m.json \
     '{"session_id":"P001","f1":0.83,"median_ms":120}'
   probe "N2 t_ms だけを持つ別物" 0 other.json '[{"t_ms":1,"note":"x"},{"t_ms":2,"note":"y"}]'
+  # ⚠️★★★ N4 / N5 は「**守れている**」の対照ではない ——
+  #   ★ **知っていて見ていない範囲**を固定する陰性対照である（2026-09-20・Codex 2 巡目）。
+  #   ⚠️ これが緑であることを「安全」と読まないこと。★ 冒頭の「見ていないもの」と対で読む。
+  # ⚠️ 検体は**走査対象の拡張子**に置く（`.csv` のままだと「走査 0 件」= rc 2 になり、
+  #   ★ 「見ていない」ではなく「検査できなかった」を測ってしまう）。
+  probe "N4 ⚠️ CSV 形式の中身（見ていない）" 0 rows.txt "t_ms,keys
+1,3
+2,5"
+  probe "N5 ⚠️ キーを間引いた射影（見ていない）" 0 proj.json \
+    '[{"t_ms":1,"dispersion":{"pause_max_ms":4000}},{"t_ms":2,"dispersion":{"pause_max_ms":9000}}]'
+  # ★ 逆に `.ndjson` は**見ている**（⚠️ 2026-09-20 まで穴だった）。
+  probe "P7 .ndjson へリダイレクトした封筒" 1 feat.ndjson \
+    "{\"provenance\":{\"sharing\":{\"gse_dataset\":\"prohibited\"}},\"config\":{},\"rows\":[$row]}"
 
   # ⚠️★ 「走査 0 件」を緑と取り違えないこと（★ exit 2 と 0 を分けている理由）。
   rm -rf "${d:?}/tree"; mkdir -p "$d/tree"

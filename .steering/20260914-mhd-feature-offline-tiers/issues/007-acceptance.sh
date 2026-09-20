@@ -68,7 +68,7 @@ capture() {
   ENV_JSON="$(replay "$path" --features 2>/dev/null)" \
     || fail "gse-replay --features が非 0 で終了した（${label}）"
   [ -n "$ENV_JSON" ] || fail "--features の出力が空（${label}）"
-  ROWS_JSON="$(printf '%s' "$ENV_JSON" | jq '.rows')" \
+  ROWS_JSON="$(printf '%s' "$ENV_JSON" | jq -e '.rows | arrays')" \
     || fail "出力から封筒の .rows を取り出せない（${label}・★ { provenance, config, rows } の形か確認）"
   scan_envelope "$label" "$ENV_JSON"
 }

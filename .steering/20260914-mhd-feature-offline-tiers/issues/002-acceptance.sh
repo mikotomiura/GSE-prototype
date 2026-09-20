@@ -23,7 +23,7 @@ FIXTURE="tests/fixtures/instrument_rich.ndjson"
 [ -f "$FIXTURE" ] || fail "$FIXTURE が無い（★ 裁定セッションが用意した fixture。自分で作らない）"
 [ -f "$SRCF" ]    || fail "$SRCF が無い"
 
-out="$(cargo run --quiet --bin gse-replay -- "$FIXTURE" --features 2>/dev/null | jq '.rows')" \
+out="$(cargo run --quiet --bin gse-replay -- "$FIXTURE" --features 2>/dev/null | jq -e '.rows | arrays')" \
   || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 

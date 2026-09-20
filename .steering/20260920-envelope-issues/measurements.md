@@ -58,7 +58,8 @@ rc=0
 ## M-c: 共有の門の `--self-test`（★ 対照を script に内蔵した）
 
 > ⚠️ **これはレビュー前の姿である**（陽性 3 / 陰性 2）。
-> ★ 現行は **陽性 4 / 陰性 3** —— P4（多文書）と P5（既定枝）を後から足した。下記 M-i / M-m を参照。
+> ★ 現行は **陽性 6 / 陰性 5** —— P4（多文書）/ P5（既定枝）/ P6（違反→安全の順）/ P7（`.ndjson`）
+> と N4 / N5（★ 知っていて見ていない範囲）を後から足した。下記 M-i / M-m / M-o〜M-t を参照。
 
 ```
 $ bash scripts/check_no_feature_output.sh --self-test
@@ -224,8 +225,12 @@ $ bash scripts/check_no_feature_output.sh --root <two.json のツリー>
 ⚠️ 同じ `meta` 行の `capabilities` には 4096 バイトの上限があるのに、こちらには何も無かった。
 ⚠️ 信頼境界: O1 の NDJSON は**被験者端末で生成される**ので、`meta` の中身は被験者が編集しうる。
 
-→ ★ `MAX_META_STRING_BYTES = 256`。**切り詰めずに落とす**（「宣言が無い」へ倒す）。
-★ 回帰: `oversized_meta_strings_are_dropped_not_truncated`（⚠️ **ちょうど上限は通る**ことも固定）。
+→ ★ `MAX_META_STRING_BYTES = 256`。
+
+⚠️★★★ **この時点では「切り詰めずに `None` へ倒す」にした。★ その後 M-o の巡で `Err` へ改めた**
+—— 出力だけを見ると「未宣言」と「壊れた長大値」が区別できないため（Codex 1 巡目）。
+★ 現行の回帰は `oversized_meta_strings_are_an_error_not_silently_dropped`
+（⚠️ **ちょうど上限は通る**ことと、**エラー文言に値の中身が出ない**ことも固定）。
 
 ## M-l: MEDIUM —— `007` は封筒を **1 本しか**走査していなかった
 
@@ -259,3 +264,108 @@ $ bash scripts/check_no_feature_output.sh --root <two.json のツリー>
 | `check-shell-portability.sh` | 通過 12 / 未達 0 |
 | `check-tests-are-wired.sh` | 16 本すべて CI から呼ばれている |
 | `check_doc_lexicon.py` | exit 0 |
+
+---
+
+# 追補 2（2026-09-20・`/cross-review` 2 巡・Codex）
+
+> ⚠️★★★ **Codex は Claude の 2 レビューが見落とした穴を 3 件拾った。**
+> ★ 一致した指摘だけでなく、**片方だけが出した指摘にも実在するものがある**。
+
+## M-o: 1 巡目 HIGH —— `jq -e` の終了コードは**最後の出力だけ**を見る
+
+⚠️ 前回足した P4（`true\ntrue`）では踏めない型だった。**一次で再現した**:
+
+```
+$ printf '{"gse_dataset":"prohibited"}\n{"safe":true}\n' > mix.json
+$ jq -e 'type=="object" and (.gse_dataset? == "prohibited")' mix.json
+true
+false
+jq rc=1          ← ⚠️ 最後の出力が false なので 1
+$ bash scripts/check_no_feature_output.sh --root <mix.json のツリー>
+gate rc=0        ← ⚠️ `[ $rc -eq 0 ]` で弾かれて素通り
+```
+
+★ 修正: `-e` を外す（「読めたか」は rc / 「違反があるか」は出力、と役割を分ける）。
+★ **陽性対照 P6（違反 → 安全 の順）として恒久化**。
+
+## M-p: 2 巡目 HIGH —— `.ndjson` を 1 つも見ていなかった
+
+⚠️ `gse-replay --features > feat.ndjson` は**自然な回避経路**で、
+`.gitignore` の NDJSON 網（`gse_*.ndjson` / `P[0-9]*_*.ndjson`）にも当たらない。
+
+```
+（追加前）$ bash scripts/check_no_feature_output.sh --root <feat.ndjson だけのツリー>
+[gate] ⚠️ 走査対象が 0 件だった
+```
+
+★ 修正: 走査 glob に `*.ndjson` を追加。★ **陽性対照 P7** として恒久化。
+★ 本リポの走査件数: **121 → 136 件**（⚠️ 追加された `tests/fixtures/*.ndjson` は
+すべて緑 ＝ **偽陽性が出ない**ことも同時に確かめた）。
+
+## M-q: 2 巡目 HIGH —— 列挙の失敗が呼び出し元に伝わらなかった
+
+⚠️ `while ... < <(list_candidates)` の**プロセス置換はサブシェル**なので、
+`list_candidates` 内の `exit 2` は呼び出し元に届かない。
+★ **途中まで候補を出してから `find` が失敗すると `scanned > 0` になり、`[gate] OK` が返る**。
+
+★ 修正: 失敗は `return` で返し、`run_scan` が**列挙を一旦ファイルへ落として終了コードを見てから**走査する。
+
+## M-r: 2 巡目 MEDIUM —— `jq '.rows'` は壊れた object を通していた
+
+```
+$ echo '{}' | jq '.rows'      →  null      rc=0   ⚠️ 通る
+$ echo '{}' | jq -e '.rows | arrays'  →  (出力なし) rc=4   ★ 落ちる
+```
+
+★ 全 acceptance（001〜008 ＋ 007 の `capture`）を `jq -e '.rows | arrays'` に統一した。
+★ 実測: 封筒を `{provenance: ...}` だけに壊した出力で **007 が rc=1** になる。
+
+## M-s: 2 巡目 MEDIUM —— `source_sha256` という名前が誤解を招く
+
+⚠️ 載っているのは先頭 16 桁だけなのに、名前は完全な SHA-256 を示唆していた。
+★ **`source_sha256_prefix` に改名**した（⚠️ 短縮そのものは研究者の裁定どおり据え置き）。
+
+## M-t: 「見ていない範囲」を陰性対照で固定した（2 巡目 LOW）
+
+★ **N4（CSV 形式の中身）/ N5（キーを間引いた射影）を陰性対照として置いた。**
+⚠️★★★ **これらが緑であることを「安全」と読まないこと** ——
+★ 「**知っていて見ていない**」を機械で固定するための対照である。
+
+⚠️★ N4 は最初 `.csv` に置いて **rc=2（走査 0 件）**になった ——
+★ それは「見ていない」ではなく「**検査できなかった**」の測定である。
+→ ★ 走査対象の拡張子（`.txt`）に中身を置き直して測り直した。
+
+## M-u: 2 巡目までの最終状態
+
+```
+$ bash scripts/check_no_feature_output.sh --self-test
+  ✅ P1 封筒つき（マーカー）           ✅ P5 既定枝（追跡ファイル・別 cwd）
+  ✅ P2 封筒を剥がした行の配列          ✅ P6 違反→安全 の順の多文書
+  ✅ P3 拡張子だけ変えた持ち出し         ✅ P7 .ndjson へリダイレクトした封筒
+  ✅ P4 封筒を 2 つ連結した多文書        ✅ N1 metrics.json 形（共有物）
+  ✅ N2 t_ms だけを持つ別物             ✅ N4 ⚠️ CSV 形式の中身（見ていない）
+  ✅ N5 ⚠️ キーを間引いた射影（見ていない） ✅ N3 空ツリーは「検査できなかった」
+[gate] --self-test OK   （陽性 6 / 陰性 5）
+
+$ bash scripts/check_no_feature_output.sh
+[gate] OK: --features 出力は見つからなかった（走査 136 件）
+```
+
+| 検査 | 結果 |
+|---|---|
+| `cargo fmt --check` / `clippy -D warnings` | exit 0 / 0 件 |
+| `cargo test --workspace` | lib 701 / bin 48 / 1 |
+| `001` `002` `003` `005` `007` `008` | **すべて OK** |
+| `004` / `006` | ⚠️ NG（★ 自分の Tier 未実装。「配列が来ない」ではない） |
+| `envelope-acceptance.sh` | OK（★ 突然変異 5 種で赤を実測） |
+
+## M-v: ⚠️ 誤検知として扱った指摘（★ 理由を残す）
+
+| 指摘 | 判定 | 理由 |
+|---|---|---|
+| `sha2` が diff に無いのでコンパイル不能 | 誤検知 | ★ `Cargo.toml` の追加は commit `cbf57f5` に在る。**パス限定の diff に含めなかった**だけ |
+| `std::path::Path` の import が無い | 誤検知 | ★ `replay.rs:30` に既存（`use std::path::{Path, PathBuf};`） |
+
+★ Codex 自身が「誤検知可能性あり」と明記していた。⚠️ **パス限定の副作用**なので、
+次回は `Cargo.toml` も範囲に含めるか、範囲を明示してプロンプトに書く。

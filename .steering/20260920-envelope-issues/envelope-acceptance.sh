@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # 封筒（起票 2 / 5）の AC 検査。
 #
-# ⚠️★★★ **既存 8 本の `issues/00N-acceptance.sh` は封筒を見ていない** ——
-#   あちらは取得時に `jq '.rows'` で行だけを取り出す。★ 封筒 (`provenance` / `config`) を
-#   見るのは**この 1 本だけ**である。
+# ⚠️★★★ **既存 8 本の `issues/00N-acceptance.sh` は封筒の形を見ていない** ——
+#   あちらは取得時に `jq -e '.rows | arrays'` で行だけを取り出す。★ 封筒の形・`config` の値・
+#   byte-equal 性を見るのは**この 1 本だけ**である（⚠️ 007 だけは封筒の被験者由来語を走査する）。
 #
 # ★ ACC_REPLAY_CMD を与えると gse-replay の代わりにそのコマンドを使う（★ 検査自体の 3 状態テスト用）。
 #
@@ -44,7 +44,7 @@ printf '%s' "$env_out" | jq -e '(.rows | type == "array") and (.rows | length > 
 printf '%s' "$env_out" | jq -e '
   (.provenance | keys_unsorted | sort) == [
     "app_version","capabilities","g1_mode","hmm_version","keyboard_layout",
-    "o1_mode","session_start","sharing","source_basename","source_sha256",
+    "o1_mode","session_start","sharing","source_basename","source_sha256_prefix",
     "tool","tool_version"
   ]' >/dev/null 2>&1 \
   || fail "AC2: provenance のキー集合が規範と完全一致しない。実際: $(printf '%s' "$env_out" | jq -c '.provenance | keys_unsorted | sort' 2>/dev/null)"
@@ -89,13 +89,13 @@ printf '%s' "$env_out" | jq -e '[.rows[] | select(.quality | has("capabilities")
 printf '%s' "$env_out" | jq -e '.provenance.source_basename == "instrument_rich.ndjson"' >/dev/null 2>&1 \
   || fail "AC6: source_basename が入力のファイル名でない"
 printf '%s' "$env_out" | jq -e '
-  (.provenance.source_sha256 | test("^[0-9a-f]{16}$"))' >/dev/null 2>&1 \
-  || fail "AC6: source_sha256 が 16 桁の 16 進でない。実際: $(printf '%s' "$env_out" | jq -c '.provenance.source_sha256' 2>/dev/null)"
+  (.provenance.source_sha256_prefix | test("^[0-9a-f]{16}$"))' >/dev/null 2>&1 \
+  || fail "AC6: source_sha256_prefix が 16 桁の 16 進でない。実際: $(printf '%s' "$env_out" | jq -c '.provenance.source_sha256_prefix' 2>/dev/null)"
 # ★ 違う入力なら違うハッシュになる（★ 定数を返していないことの確認）。
 old_env="$(replay "$OLD" --features 2>/dev/null)" || fail "AC6: $OLD で --features が非 0"
-h1="$(printf '%s' "$env_out" | jq -r '.provenance.source_sha256')"
-h2="$(printf '%s' "$old_env" | jq -r '.provenance.source_sha256')"
-[ "$h1" != "$h2" ] || fail "AC6: 異なる入力で source_sha256 が同じ（★ 定数を返していないか）"
+h1="$(printf '%s' "$env_out" | jq -r '.provenance.source_sha256_prefix')"
+h2="$(printf '%s' "$old_env" | jq -r '.provenance.source_sha256_prefix')"
+[ "$h1" != "$h2" ] || fail "AC6: 異なる入力で source_sha256_prefix が同じ（★ 定数を返していないか）"
 printf '%s' "$old_env" | jq -e '.provenance.source_basename == "minimal.ndjson"' >/dev/null 2>&1 \
   || fail "AC6: minimal の source_basename が違う"
 # ⚠️ 宣言の無い入力では capabilities が null（★ 空配列・空オブジェクトで埋めない）。

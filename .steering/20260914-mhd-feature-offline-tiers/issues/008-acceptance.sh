@@ -35,7 +35,7 @@ T=1700000000000
 tmpd="$(mktemp -d)"; trap 'rm -rf "$tmpd"' EXIT
 
 # ---------- 1. そのままの fixture（AC1 / AC7 / AC14） ----------
-out1="$(replay "$FIX" --features 2>/dev/null | jq '.rows')" || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない ($FIX)"
+out1="$(replay "$FIX" --features 2>/dev/null | jq -e '.rows | arrays')" || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない ($FIX)"
 [ -n "$out1" ] || fail "--features の出力が空 ($FIX)"
 
 printf '%s' "$out1" | jq -e --argjson T "$T" '
@@ -62,7 +62,7 @@ printf '%s' "$out1" | jq -e '
 jq -c --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
   select(((.t // .ts // 0) < $lo) or ((.t // .ts // 0) > $hi))' "$FIX" > "$tmpd/redacted.ndjson" \
   || fail "削除版の生成に失敗"
-out2="$(replay "$tmpd/redacted.ndjson" --features 2>/dev/null | jq '.rows')" || fail "削除版で --features が非 0 で終了した、または封筒の .rows を取り出せない"
+out2="$(replay "$tmpd/redacted.ndjson" --features 2>/dev/null | jq -e '.rows | arrays')" || fail "削除版で --features が非 0 で終了した、または封筒の .rows を取り出せない"
 printf '%s' "$out2" | jq -e --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
   [.[] | select(.stall_onset.is_onset) | .stall_onset
        | select((.s_ms >= $lo and .s_ms <= $hi) or (.t0_ms >= $lo and .t0_ms <= $hi))] | length == 0' >/dev/null 2>&1 \
@@ -72,7 +72,7 @@ printf '%s' "$out2" | jq -e --argjson T "$T" '
   || fail "AC2: 削除版の onset が t0 = [40160, 187600] (T 相対) でない"
 
 # ---------- 3. feat 行 0 本（AC3） ----------
-out3="$(replay tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq '.rows')" \
+out3="$(replay tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
   || fail "AC3: deep_silence.ndjson で --features が非 0 で終了した、または封筒の .rows を取り出せない"
 printf '%s' "$out3" | jq -e 'length > 0 and all(.[]; .stall_onset.is_onset == false)' >/dev/null 2>&1 \
   || fail "AC3: feat 行の無い deep_silence.ndjson で onset が立った（★ 観測区間が無ければ onset は立たない）"
@@ -107,7 +107,7 @@ rc=$?
 elapsed=$(( $(date +%s) - start ))
 [ $rc -eq 124 ] && fail "AC18: 15 万打鍵の --features が 20 秒で終わらない（★ 計算量が二乗のまま。現行実装は実測 56 秒）"
 [ $rc -eq 0 ] || fail "AC18: 大入力で --features が非 0 で終了した (rc=$rc)"
-out4="$(jq '.rows' "$tmpd/big_out.json")" \
+out4="$(jq -e '.rows | arrays' "$tmpd/big_out.json")" \
   || fail "AC18: 出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 printf '%s' "$out4" | jq -e '[.[] | select(.stall_onset.is_onset)] | length == 1' >/dev/null 2>&1 \
   || fail "AC18: 大入力の末尾の沈黙で onset がちょうど 1 つ立たない（★ 検出器が走っていない可能性）"
@@ -134,7 +134,7 @@ rc=$?
 elapsed=$(( $(date +%s) - start ))
 [ $rc -eq 124 ] && fail "AC18b: 立ち上がり 75,000 回の入力で --features が 20 秒で終わらない（★ θ の再計算が二乗。e079b21 は実測 248 秒）"
 [ $rc -eq 0 ] || fail "AC18b: 立ち上がりの多い入力で --features が非 0 で終了した (rc=$rc)"
-out4b="$(jq '.rows' "$tmpd/churn_out.json")" \
+out4b="$(jq -e '.rows | arrays' "$tmpd/churn_out.json")" \
   || fail "AC18b: 出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 printf '%s' "$out4b" | jq -e 'length > 0' >/dev/null 2>&1 || fail "AC18b: 出力が空"
 echo "[acceptance 008] AC18b: ${elapsed}s" >&2

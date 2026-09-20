@@ -100,7 +100,10 @@ const MAX_CAPABILITIES_BYTES: usize = 4096;
 /// **「無い」は `None` / 「壊れている」は `Err`**。
 const MAX_META_STRING_BYTES: usize = 256;
 
-/// `provenance.source_sha256` に出す 16 進の桁数 (= 8 バイトぶん)。
+/// `provenance.source_sha256_prefix` に出す 16 進の桁数 (= 8 バイトぶん)。
+///
+/// ⚠️★★★ **フィールド名に `_prefix` を付けている** (2026-09-20・Codex `/cross-review` 2 巡目) ——
+/// ★ `source_sha256` だと**完全な SHA-256 が載っている**と読まれる。載っているのは先頭だけである。
 ///
 /// ★ 目的は「同じ入力かどうか」の同定であって暗号学的な衝突耐性ではない。
 /// 64 桁を丸ごと出しても人が読めないので先頭だけを出す。
@@ -181,7 +184,7 @@ struct FeatureProvenance {
     source_basename: String,
     /// 入力 NDJSON の SHA-256 先頭 [`SOURCE_SHA256_HEX_CHARS`] 桁。
     /// ★ 名前が変わっても同じ入力を同定するため。
-    source_sha256: String,
+    source_sha256_prefix: String,
     /// 以下は `meta`(session_start) 行から読む。★ 行が無い / キーが無いなら `null`。
     /// ⚠️ **欠けていても `--features` は落とさない** (旧ログ互換。`hook_health` と同じ作法)。
     session_start: Option<u64>,
@@ -1322,7 +1325,7 @@ fn main() -> ExitCode {
         };
         // 起票 2 (封筒): 入力ファイルの同一性。
         // ⚠️ 「行の計算」ではなく「実行の由来」なので、`feat_offline` ではなくここ (CLI) が読む。
-        let source_sha256 = match sha256_prefix_of_file(&args.session_path) {
+        let source_sha256_prefix = match sha256_prefix_of_file(&args.session_path) {
             Ok(v) => v,
             Err(msg) => {
                 tracing::error!("failed to hash session file: {}", msg);
@@ -1362,7 +1365,7 @@ fn main() -> ExitCode {
                 tool: "gse-replay",
                 tool_version: env!("CARGO_PKG_VERSION"),
                 source_basename: source_basename_of(&args.session_path),
-                source_sha256,
+                source_sha256_prefix,
                 session_start: meta_facts.session_start,
                 hmm_version: meta_facts.hmm_version,
                 app_version: meta_facts.app_version,
