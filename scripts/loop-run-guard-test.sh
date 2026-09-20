@@ -462,22 +462,30 @@ fi
 #   ★ `.tool_input.command` は worker が組み立てた自由文字列なので、秘密が混ざりうる。
 #   ⚠️ **events（board から見える）と生配列（恒久保存）の両方**を見る。
 D2="${TMP}/d2/repo"; mkdir -p "${D2}"
-SECRET_DENIALS='[{\"tool_name\":\"Bash\",\"tool_use_id\":\"t1\",\"tool_input\":{\"command\":\"GH_TOKEN=ghp_ZZZTESTSECRET1234 gh api repos/x\"}},{\"tool_name\":\"Bash\",\"tool_use_id\":\"t2\",\"tool_input\":{\"command\":\"curl -H Authorization:Bearer_ZZZTESTSECRET5678 https://x\"}}]'
+# ⚠️★★★ **架空値は `scripts/secrets-filter.sh` に当たらない綴りで書く**（★ 2026-09-20 に実際に踏んだ）。
+#   ★ 最初は `GH_TOKEN=ghp_…` と書いたが、⚠️ フィルタの `gh_token` に直撃して
+#     **`/cross-review` が fail-closed でブロックされた**。
+#   ★ 本 repo の方針は逐語「**正しい解き方はフィクスチャ側を寄せること**」であり、
+#     ⚠️ **フィルタを弱めたり `--ack-filtered` で迂回したりしない**
+#     （★ 迂回する動機を作るのが最悪の結果 —— `secrets-filter.sh` の S5C-D8）。
+#   ★ `CI_TOKEN` / `Authorization:` は **`loop-run.sh` の `DENY_REDACT` には当たり**、
+#     フィルタの列には無い。→ ★ 検出力は落ちていない。
+SECRET_DENIALS='[{\"tool_name\":\"Bash\",\"tool_use_id\":\"t1\",\"tool_input\":{\"command\":\"CI_TOKEN=zzzTESTVALUE1234 gh api repos/x\"}},{\"tool_name\":\"Bash\",\"tool_use_id\":\"t2\",\"tool_input\":{\"command\":\"curl -H Authorization:Bearer_ZZZTESTVALUE5678 https://x\"}}]'
 if setup_repo "${D2}" ':' "${SECRET_DENIALS}"; then
   ev="$(run_loop "${D2}" --issues 001)"
   art2="${D2}/.steering/task/_loop-artifacts/001-attempt1-denials.json"
-  if [ -s "${ev}" ] && ! grep -q 'ZZZTESTSECRET' "${ev}"; then
+  if [ -s "${ev}" ] && ! grep -q 'ZZZTESTVALUE' "${ev}"; then
     ok "D2: events に秘密が出ていない (★ 伏せてから集計している)"
   else
-    ng "D2: ⚠️★★★ events に秘密が平文で残った: $(grep -o 'ZZZTESTSECRET[0-9]*' "${ev}" | head -2 | tr '\n' ' ')"
+    ng "D2: ⚠️★★★ events に秘密が平文で残った: $(grep -o 'ZZZTESTVALUE[0-9]*' "${ev}" | head -2 | tr '\n' ' ')"
   fi
-  if [ -s "${art2}" ] && ! grep -q 'ZZZTESTSECRET' "${art2}"; then
+  if [ -s "${art2}" ] && ! grep -q 'ZZZTESTVALUE' "${art2}"; then
     ok "D2: 生配列にも秘密が残っていない (★ 恒久保存される側)"
   else
     ng "D2: ⚠️★★★ 生配列に秘密が平文で残った → ${art2}"
   fi
   # ⚠️ 伏せても「何が拒否されたか」は読めること（★ 起票 3 の目的を潰していないこと）
-  if [ -s "${ev}" ] && grep -q 'gh api\|GH_TOKEN=\*\*\*' "${ev}"; then
+  if [ -s "${ev}" ] && grep -q 'gh api\|CI_TOKEN=\*\*\*' "${ev}"; then
     ok "D2: 伏せたうえで、何が拒否されたかは読める (★ 起票 3 の目的を潰していない)"
   else
     ng "D2: ⚠️ 伏せた結果、内訳が読めなくなった: $(grep -o 'permission_denials=[^"]*' "${ev}" | head -1)"
