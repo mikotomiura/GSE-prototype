@@ -378,6 +378,7 @@ schema を動かさずに満たす**ことを意味する。
 
 | 文書 | 何が書いてあるか |
 |---|---|
+| ★ **`docs/adr/ADR-036-ime-capability-arbitration-and-single-key-gate.md`** | ★★★ **本表を受けた裁定**（**D1** ④ は schema を足さない ／ **D2** `esc_count` は派生量 ／ **D3** 単独キー用の門 ／ **D5** `F5` は通らない） |
 | `docs/adr/ADR-032-instrument-change-arbitration.md` | **D5**（本表の発注）／ **D6**（`abandon` の凍結）／ **D2**（修飾キー併用の 9 条件）／ **M7 / M11** |
 | `docs/adr/ADR-030-stall-onset-and-decision-episode.md` | **D3**（産出の計算規則）／ **D10**（Tier 枠と投資順序） |
 | `.steering/20260911-outcome-arbitration-and-o1-preflight/blockers.md` | **起票 6**（macOS ライブ変換の実機実測）／ **起票 7**（`dwell_ms` が複数変換を覆う） |

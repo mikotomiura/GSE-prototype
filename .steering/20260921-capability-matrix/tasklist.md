@@ -25,15 +25,15 @@
 - [x] `check_citations.py` / `check_doc_lexicon.py` が緑
 
 ## 裁定（★ 表が閉じたら）
-- [ ] ADR-032 未決 ④（IME content-free 状態機械）
-- [ ] ADR-032 未決 ⑤（`esc_count`）
-- [ ] M11 / 起票 21（単独キー用の門）
-- [ ] ⚠️ ライブ変換の層識別子を記録するかの検討（★ 起票する）
+- [x] ADR-032 未決 ④ → **ADR-036 D1**（schema を足さない）
+- [x] ADR-032 未決 ⑤ → **ADR-036 D2**（派生量として定義・schema 不変）
+- [x] M11 / 起票 21 → **ADR-036 D3 / D4**（門を定義し、1 件目を通してみせた）
+- [x] ⚠️ ライブ変換の層識別子 → **起票 24**（`20260914-instrument-change-arbitration`）
 
 ## レビュー
 - [ ] `code-reviewer` ＋ `security-checker`（並列・opus）
 - [ ] `/cross-review` 2 巡
 
 ## 完了処理
-- [ ] decisions.md
+- [x] decisions.md
 - [ ] git commit
