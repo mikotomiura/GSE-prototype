@@ -137,7 +137,15 @@ mutated () { case ",${MUT}," in *",$1,"*) return 0 ;; *) return 1 ;; esac ; }
 
 # ★ ローカル絶対パスを画面に出さない (security-checker L-1)。
 #   ⚠️ ゲートの出力は PR や cross-review 経由で外へ出うる。
-redact () { sed -e "s#${HOME}#~#g" -e "s#$(pwd)#<repo>#g"; }
+#   ⚠️★★ **パスを sed のパターンとしてエスケープする** (Codex /cross-review 2 巡目 #3)。
+#     ★ 素で埋め込むと、パスに `#` / `\` / `.` / `*` などが入る環境で
+#       **sed 式が壊れる / 意図しない置換になる**。
+redact () {
+  local h p
+  h="$(printf '%s' "${HOME}"  | sed 's/[][\\.*^$#&]/\\&/g')"
+  p="$(printf '%s' "$(pwd)"   | sed 's/[][\\.*^$#&]/\\&/g')"
+  sed -e "s#${h}#~#g" -e "s#${p}#<repo>#g"
+}
 
 # ★ in-place sed の移植版 (BSD と GNU の `-i` の差を避ける)。
 sed_i () {
@@ -155,6 +163,19 @@ sed_i () {
     cat "${tmp}" > "${f}"
   else
     echo "sed に失敗した: ${f}" >&2
+  fi
+  rm -f "${tmp}"
+}
+
+# ★ 完全一致した行の**直後**に 1 行足す (`--selftest` の変異用)。
+#   ⚠️ `sed` の `a\` も replacement 中の `\n` も **BSD と GNU で書き方が違う**ので awk を使う。
+insert_after () {   # $1 = ファイル / $2 = 一致させる行 (完全一致) / $3 = 挿入する行
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/g1gate.XXXXXX")"
+  if awk -v m="$2" -v ins="$3" '{ print; if ($0 == m) print ins }' "$1" > "${tmp}"; then
+    cat "${tmp}" > "$1"
+  else
+    echo "insert_after に失敗した: $1" >&2
   fi
   rm -f "${tmp}"
 }
@@ -207,14 +228,18 @@ record_section () {
 #     LF 固定していないので、`core.autocrlf=true` の環境では `$` アンカーが CR で外れ、
 #     **正しく埋めても永久に赤**になる (★ しかも「まだ実施されていない」と誤った理由が出る)。
 record_ok () {
-  local key="$1" label="$2" sec fields bad sha
+  local key="$1" label="$2" sec fields scan bad sha
   sec="$(record_section "${key}")"
   if [ -z "${sec}" ]; then
     ng "記録票 ${label}: 節が見つからない (★ 記録票の見出しが変わった可能性)"
     return
   fi
-  # ★ 記入欄だけを取り出す (⚠️ 引用の規則文を検査対象にしない)。
+  # ★ 記入欄だけを取り出す (⚠️ 引用の規則文を書式検査の対象にしない)。
   fields="$(printf '%s\n' "${sec}" | grep '^- ' || true)"
+  # ⚠️★★ **秘匿の走査は節全体**から行う (Codex /cross-review 2 巡目 #4)。
+  #   ★ `- ` 行だけだと、**継続行**に URL を書かれたときに見落とす。
+  #   ⚠️ 逐語を引いている引用行 (`>`) だけは除く (★ 規則文そのものを誤検知しない)。
+  scan="$(printf '%s\n' "${sec}" | grep -v '^>' || true)"
   if ! printf '%s\n' "${sec}" | grep -qE '^- 状態: \*\*確認済み\*\*[[:space:]]*$'; then
     ng "記録票 ${label}: まだ実施されていない (★ 状態が「確認済み」でない)"
     return
@@ -230,16 +255,25 @@ record_ok () {
   #   ⚠️★★★ **見ていないもの** (Codex /cross-review 1 巡目 #3): ★ **氏名・所属は機械では弾けない**。
   #     → 記録票にも「一部しか弾けない」と書いてある。★ 最後は書いた人が責任を持つ。
   bad=""
-  printf '%s\n' "${fields}" | grep -qE 'https?://'              && bad="URL"
-  printf '%s\n' "${fields}" | grep -q  '@'                      && bad="${bad}${bad:+ / }メールアドレス"
-  printf '%s\n' "${fields}" | grep -qE '[A-Za-z0-9_-]{28,}'     && bad="${bad}${bad:+ / }ID らしき長いトークン"
-  printf '%s\n' "${fields}" | grep -qE '[0-9]{1,2}:[0-9]{2}'    && bad="${bad}${bad:+ / }時刻"
+  printf '%s\n' "${scan}" | grep -qE 'https?://'              && bad="URL"
+  printf '%s\n' "${scan}" | grep -q  '@'                      && bad="${bad}${bad:+ / }メールアドレス"
+  printf '%s\n' "${scan}" | grep -qE '[A-Za-z0-9_-]{28,}'     && bad="${bad}${bad:+ / }ID らしき長いトークン"
+  printf '%s\n' "${scan}" | grep -qE '[0-9]{1,2}:[0-9]{2}'    && bad="${bad}${bad:+ / }時刻"
   if [ -n "${bad}" ]; then
     ng "記録票 ${label}: 書いてはいけないものが入っている (${bad}) —— ★ 本 repo は一時 public にする"
     return
   fi
   if ! printf '%s\n' "${fields}" | grep -qE '^- 確認日: \*\*20[0-9]{2}-[0-9]{2}-[0-9]{2}\*\*[[:space:]]*$'; then
     ng "記録票 ${label}: 確認日が YYYY-MM-DD の形で入っていない"
+    return
+  fi
+  # ⚠️★★★ **一括置換で埋める抜け道を塞ぐ** (Codex /cross-review 2 巡目 #1)。
+  #   ★ `s/（未記入）/2026-09-20/g` のように**全部を同じ日付で埋める**と、
+  #     日付の形も禁止語も満たしてしまい、⚠️ **中身の無い記録で「人手確認済み」**になる。
+  #   → ★ `確認日` 以外の欄が**日付だけ**なら赤にする。
+  if printf '%s\n' "${fields}" | grep -v '^- 確認日: ' \
+       | grep -qE ': \*\*20[0-9]{2}-[0-9]{2}-[0-9]{2}\*\*[[:space:]]*$'; then
+    ng "記録票 ${label}: 確認日以外の欄が日付のまま (★ 一括置換で埋めていないか)"
     return
   fi
   # ★ B / C だけが持つ「対象のコミット」。⚠️ **HEAD の祖先でなくなったら赤に戻す**
@@ -341,8 +375,28 @@ echo "        ★ 配布済みの電子同意フォームとの突合は検査 [
 #   ⚠️ `participant-guide.md` は表とは限らないので、**箇条書きの項目行**も受ける。
 #   ⚠️ **この検査が見ていないもの**: 列見出しが入れ替わった場合 (★ 1 セル目が「記録しない」に
 #     なっていても通る)。→ 列見出しの並びは検査 [8] の記録票 A で人が見る。
+#   ⚠️★★ **表を特定してから 1 セル目を見る** (Codex /cross-review 2 巡目 #2)。
+#     ★ 旧式は「どこかの表の 1 セル目」で緑になったので、⚠️ **別表への追記でも通った**。
+#     → ★ 「記録する」と「記録しない」を**両方持つヘッダ行**を見つけ、その表の行だけを見る。
+#   ⚠️ **この検査が見ていないもの**: 列見出しの左右が入れ替わった場合 (★ 1 セル目が
+#     「記録しない」側になっていても通る)。→ そこは検査 [8] の記録票 A で人が見る。
 records_term () {   # $1 = ファイル / $2 = 語
-  grep -qE "^\| *[^|]*$2[^|]*\|" "$1" || grep -qE "^ *[-*] .*$2" "$1"
+  awk -v term="$2" '
+    # ★ ヘッダ行を見つけたら表に入る (★ ヘッダ自身は項目行として数えない)。
+    /^\|/ && /記録する/ && /記録しない/ { intable = 1; next }
+    intable && !/^\|/ { intable = 0 }
+    intable && /^\|/ {
+      line = $0
+      sub(/^\|/, "", line)
+      n = split(line, cell, "|")
+      first = cell[1]
+      gsub(/[ \t-]/, "", first)
+      if (first != "" && index(cell[1], term) > 0) { found = 1 }
+    }
+    # ★ 表でない文書 (participant-guide) 向け: 箇条書きの項目行。
+    /^ *[-*] / && index($0, term) > 0 { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$1"
 }
 for pair in "${CONSENT}|同意文書" "${GUIDE}|参加案内"; do
   path="${pair%%|*}"; name="${pair##*|}"
@@ -633,6 +687,22 @@ selftest () {
     FIX_SHA="$(git -C "${fix}/w" rev-parse --short=7 HEAD 2>/dev/null || true)"
   }
 
+  # ★ 記録票を**欄ごとに**現実的な値で埋める。
+  #   ⚠️ 一括置換 (`s/（未記入）/日付/g`) は本体側が赤にするようになったので、
+  #     selftest も**人が埋めるのと同じ形**で埋める (Codex /cross-review 2 巡目 #1)。
+  fill_record () {
+    sed_i \
+      -e 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/' \
+      -e 's/^- 確認日: .*/- 確認日: **2026-09-20**/' \
+      -e 's/^- 確認者のロール: .*/- 確認者のロール: **研究者 A**/' \
+      -e 's/^- 突合したフォームの定数名: .*/- 突合したフォームの定数名: **G1_CONSENT_FORM_C**/' \
+      -e 's/^- 突合の結果: .*/- 突合の結果: **一致していた**/' \
+      -e 's/^- 確認した CI の run 番号.*/- 確認した CI の run 番号: **1234 と 1235**/' \
+      -e 's/^- 差し替えた配布フォルダの通称.*/- 差し替えた配布フォルダの通称: **G1 課題ページ 秋版**/' \
+      -e 's/^- 差し替え後に確認した枚数.*/- 差し替え後に確認した枚数: **10 枚**/' \
+      "${fix}/w/${RECORD}"
+  }
+
   # ★ fixture の実行。⚠️ `env -u` で変異モードの継承を**構造的に**断つ。
   run_fixture () { ( cd "${fix}/w" && env -u GSE_G1_GATE_MUTATE bash scripts/gate.sh 2>&1 ) ; }
 
@@ -718,11 +788,10 @@ selftest () {
   build; printf '\n- starve_window を記録します。\n' >> "${fix}/w/${CONSENT}"
   expect_red "同意文書の記録項目表に app_version が無い" "★ 1 語目だけ足す (検査 3)"
   # ⚠️★★★ **「記録しない」側に入れても緑にしないこと** (code-reviewer M4)。
-  #   ★ 1 語目は「記録する」列へ、2 語目は「記録しない」列へ入れる。
+  #   ★ 表の**データ行**として、1 語目は 1 セル目・2 語目は 2 セル目へ入れる。
   #     → ⚠️ 文書全体 grep なら両方緑になるが、1 セル目限定なら **2 語目で赤**になる
   #       (★ baseline の ❌ は starve_window 側なので、この期待は空回りしない)。
-  build; sed_i 's/^| 記録する | 記録しない |$/| 記録する starve_window | 記録しない app_version |/' \
-                "${fix}/w/${CONSENT}"
+  build; insert_after "${fix}/w/${CONSENT}" '|---|---|' '| starve_window | app_version |'
   expect_red "同意文書の記録項目表に app_version が無い" "★ 2 語目を「記録しない」列に入れる (検査 3)"
   build; rm -f "${fix}/w/${SHEET}"
   expect_red "確証用の記録用紙が無い" "記録用紙の欠落 (検査 6)"
@@ -745,14 +814,12 @@ selftest () {
              "★ 状態だけ確認済みにする (検査 8)"
   # ⚠️★★★ **URL を書いたら赤になること** (security-checker H-1)。
   #   ★ 本 repo は一時 public にする運用があり、フォーム / Drive のリンクは**それ自体が鍵**。
-  build; sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
-                "${fix}/w/${RECORD}"
+  build; fill_record
   sed_i 's#^- 突合したフォームの定数名: .*#- 突合したフォームの定数名: **https://docs.google.com/forms/d/e/x/viewform**#' \
         "${fix}/w/${RECORD}"
   expect_red "書いてはいけないものが入っている (URL" "★ 記録票に URL を書く (検査 8)"
   # ⚠️★★ **時刻を書いたら赤** (Codex /cross-review 1 巡目 #3: `protocol.md:1112` は日付までと決めている)。
-  build; sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
-                "${fix}/w/${RECORD}"
+  build; fill_record
   sed_i 's/^- 突合の結果: .*/- 突合の結果: **14:30 に一致を確認**/' "${fix}/w/${RECORD}"
   expect_red "書いてはいけないものが入っている (時刻" "★ 記録票に時刻を書く (検査 8)"
   # ⚠️★★★ **確認日が形になっていないと赤** (code-reviewer M4 相当)。
@@ -760,10 +827,13 @@ selftest () {
   expect_red "記録票 A (配布済みフォームとの突合): 確認日が YYYY-MM-DD" \
              "★ 確認日を「済」で埋める (検査 8)"
   # ⚠️★★★ **無関係なコミットを書いたら赤** (code-reviewer M7: 一度埋めたら永久に緑、にしない)。
-  build; sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
-                "${fix}/w/${RECORD}"
+  build; fill_record
   sed_i 's/^- 対象のコミット: .*/- 対象のコミット: **0000000**/' "${fix}/w/${RECORD}"
   expect_red "対象のコミット 0000000 がこのリポジトリに無い" "★ 実在しないコミットを書く (検査 8)"
+  # ⚠️★★★ **一括置換で全部埋めても緑にしないこと** (Codex /cross-review 2 巡目 #1)。
+  build; sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
+                "${fix}/w/${RECORD}"
+  expect_red "確認日以外の欄が日付のまま" "★ 全欄を同じ日付で一括置換する (検査 8)"
   build; sed_i 's/改訂履歴 — 第 19 版/改訂履歴 — 第 21 版/' "${fix}/w/${PREREG}"
   expect_red "config.json の revision が事前登録とずれている" "版のずれ (検査 7)"
   # ★ 課題ページ: 生の ** を 1 枚に混ぜる材料を作れないので、**陰性対照側**を壊す。
@@ -775,20 +845,17 @@ selftest () {
   echo
   echo "=== selftest 2: 未達を満たすと緑に変わるか ==="
   build
-  sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
-        "${fix}/w/${RECORD}"
+  fill_record
   expect_green "記録票 A (配布済みフォームとの突合) が埋まっている" "記録票 A を埋める (検査 8)"
   # ★ **正しい SHA なら緑になる**経路 (Codex /cross-review 1 巡目 #1)。
   #   ⚠️ 「実在しない → 赤」だけでは、`merge-base` が常に偽でも気づけない。
   build
-  sed_i 's/^- 状態: \*\*未実施\*\*/- 状態: **確認済み**/; s/（未記入）/2026-09-20/g' \
-        "${fix}/w/${RECORD}"
+  fill_record
   sed_i "s/^- 対象のコミット: .*/- 対象のコミット: **${FIX_SHA}**/" "${fix}/w/${RECORD}"
   expect_green "記録票 B (両 OS の対のテスト) が埋まっている" \
                "★ HEAD の祖先である SHA を書く (検査 8)"
   build
-  sed_i 's/^| 記録する | 記録しない |$/| 記録する (starve_window \/ app_version) | 記録しない |/' \
-        "${fix}/w/${CONSENT}"
+  insert_after "${fix}/w/${CONSENT}" '|---|---|' '| starve_window と app_version | — |'
   expect_green "同意文書に starve_window と app_version" "同意文書への追記 (検査 3)"
   # ★ **2 つの文書が別々に見られている**ことの対照 (★ baseline にこの ✅ は無い)。
   build
