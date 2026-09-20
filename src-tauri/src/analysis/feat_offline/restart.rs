@@ -755,6 +755,63 @@ mod tests {
         );
     }
 
+    /// ⚠️★★★ **`restop_ms` の `null` は、onset のある行では*必ず*右側打ち切りを意味する。**
+    ///
+    /// ★ 判断 2 の **V4**（`censored` フラグを足さない）は、この一意性に**依存している** ——
+    /// 「打ち切りか否か」は `t0_ms != null && restop_ms == null` で復元できる、という復元規則が
+    /// `mod.rs` の `FeatureRow.restart` doc に書いてある。
+    /// ⚠️ 将来 `null` に別の意味（「再開が無い」「窓が無い」等の*区別*）が混ざると、**復元規則が壊れる**
+    /// （2026-09-21・`/cross-review` 2 巡目・Codex 指摘 3）。
+    /// → ★ `null` になる 3 通りの経路をここで**列挙して固定する**。⚠️ 4 つ目が生えたらこのテストを直すこと。
+    #[test]
+    fn restop_null_always_means_right_censoring() {
+        let config = StallOnsetConfig {
+            b_ms: 1_000,
+            ..StallOnsetConfig::default()
+        };
+        let onset = [onset_row(5_000, 10_000)];
+
+        // (1) 窓が無い（原点が観測区間の右端を越える）
+        let no_window = restart_column(
+            &onset,
+            &[interval(0, 10_500, vec![(0, true)])],
+            &[],
+            &config,
+        );
+        assert_eq!(no_window[0].restop_ms, None);
+        assert_eq!(
+            no_window[0].resumption_count, None,
+            "窓が無いので null（V5）"
+        );
+
+        // (2) 窓はあるが `r_1` が観測区間の中に無い（1 度も再開しないまま右端に達した）
+        let never_resumed = restart_column(
+            &onset,
+            &[interval(0, 60_000, vec![(0, true)])],
+            &[],
+            &config,
+        );
+        assert_eq!(never_resumed[0].restop_ms, None);
+        assert_eq!(never_resumed[0].resumption_count, Some(0), "窓はあるので 0");
+
+        // (3) `r_1` はあるが `s'_1` が観測区間の中に無い（生成が続いたまま右端に達した）
+        let censored = restart_column(
+            &onset,
+            &[interval(0, 60_000, vec![(0, true), (20_000, false)])],
+            &[],
+            &config,
+        );
+        assert_eq!(censored[0].restop_ms, None);
+        assert_eq!(censored[0].resumption_count, Some(1));
+
+        // ★ 3 通りとも「観測区間の右端まで再停止を観測できなかった」＝ 右側打ち切りである。
+        //   ⚠️ onset のある行で `restop_ms` が `null` になる経路は、この 3 つしかない。
+        for row in [&no_window[0], &never_resumed[0], &censored[0]] {
+            assert_eq!(row.stable_generation_ms, None);
+            assert_eq!(row.stable_generation_net_presses, None);
+        }
+    }
+
     /// ★ 観測区間の同定と窓の右端の境界（2026-09-21・`/cross-review` 1 巡目・Codex 指摘 2 / 3 / 4）。
     ///
     /// ⚠️ 観測区間は**穴で切れている**ので、`s` が穴に落ちた onset を手前の区間に付けてはならない。

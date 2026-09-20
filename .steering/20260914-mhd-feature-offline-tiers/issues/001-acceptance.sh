@@ -55,6 +55,16 @@ printf '%s' "$out" | jq -e '
         == ["deletes","keys","mean_iki_ms","net_production","pastes","pauses"])' >/dev/null 2>&1 \
   || fail "出力のキー集合が想定と完全一致しない（★ フィールドの増減を検査している）"
 
+# ⚠️★★★ 2026-09-21（`/cross-review` 2 巡目・Codex 指摘 4）: 最上位のキー集合だけだと、
+#   ★ `revision` / `restart` が**空オブジェクトでも緑になる**。
+#   ★ 中身の完全一致は 004 / 006 の acceptance が見るが、**統合側にも最低限の形**を置く
+#   （⚠️ 004 / 006 を回さずに 001 だけ回す場面があるため）。
+printf '%s' "$out" | jq -e '
+  all(.[];
+    (.revision | type == "object") and (.revision | length) > 0
+    and (.restart | type == "object") and (.restart | length) > 0)' >/dev/null 2>&1 \
+  || fail "revision / restart が空オブジェクトになっている（★ 中身の完全一致は 004 / 006 が見る）"
+
 # AC10b: ⚠️★★★ 巨大な時刻ギャップで暴走しないこと（★ 2026-09-15 追加・レビュー HIGH）
 #   ★ 実測: 251 バイト・2 行の入力に t=0 と t=1e8 を並べると 100,001 行出た。
 #   ⚠️ tick 数は**入力サイズではなく時刻スパン**に比例するので MAX_SESSION_BYTES で防げない。
