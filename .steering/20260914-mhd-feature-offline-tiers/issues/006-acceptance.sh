@@ -14,7 +14,12 @@ command -v jq >/dev/null 2>&1 || fail "jq が無い"
 cd src-tauri || fail "src-tauri が無い"
 SRC="src/analysis/feat_offline/restart.rs"
 
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
+# ⚠️★★★ 2026-09-20（`.steering/20260920-issues-004-006/decisions.md` 判断 2・**V3 の裁定**）:
+#   fixture を deep_silence.ndjson → stall_onset_observed.ndjson へ差し替えた。
+#   ★ 理由: deep_silence.ndjson は **feat 行を持たない**ので観測区間が無く、issue 008 以後
+#     onset が 1 つも立たない（blockers.md 起票 17）。→ AC6 が原理的に通らなかった。
+#   ★ stall_onset_observed.ndjson は実測で onset が 2 本立つ（t0 = +40160 / +187600）。
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
   || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
@@ -36,12 +41,12 @@ printf '%s' "$out" | jq -e '
   || fail "t0 が無い行で restart が 0 埋めされている（★ null にすること）"
 
 # AC6: ⚠️ 退化していないこと
-#   ⚠️★★★ 2026-09-19（decisions.md 判断 26・/cross-review 1 巡目）: **この検査は現状では意図的に落ちる**。
-#   deep_silence.ndjson は issue 008 以後 onset が立たない（blockers.md 起票 17）。
-#   ★ issue 006 の Background V3（fixture を stall_onset_observed.ndjson へ差し替える）を
-#   実装フェーズで裁定するまで、この NG を実装の欠陥と読まないこと。
+#   ★ 2026-09-20（判断 2 の V3 / 判断 3 の V6）: fixture の差し替えで**この検査は通るようになった**。
+#   ⚠️★★★ V6（原点 o で条件 A が既に false なら生成区間は o で開いている）を採らないと、
+#     このデータでは 2 本の onset の**どちらも restop_ms が null** になり AC6 は通らない。
+#     → ★ この行は V6 の裁定そのものを守っている（⚠️ 「辺だけ」の読みへ戻すと赤くなる）。
 printf '%s' "$out" | jq -e '[.[].restart.restop_ms | select(. != null)] | length > 0' >/dev/null 2>&1 \
-  || fail "restop_ms が全行 null（⚠️ fixture 差し替え（issue 006 Background V3）が未裁定なら意図的に落ちる・判断 26。裁定後は onset 後の再停止が測れるはず）"
+  || fail "restop_ms が全行 null（★ onset 後の再停止が 1 つも測れていない。⚠️ V6 の裁定＝原点で条件 A が既に false なら r_1 を o にクリップする、を外していないか確認）"
 
 # AC4: buffer B を stall_onset 側から引いていること
 grep -qE 'buffer|_b_ms|StallOnsetConfig|stall_onset::' "$SRC" \
@@ -62,9 +67,14 @@ grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が 
 
 # AC7: ⚠️★★★ restart は retrospective であり、detection 側へ渡らないこと
 MODRS="src/analysis/feat_offline/mod.rs"
-grep -qEi 'restart[^
-]*retrospective|retrospective[^
-]*restart' "$MODRS"   || fail "$MODRS に restart が retrospective である旨の明記が無い"
+# ⚠️★★★ 2026-09-20 修正（判断 5）: 旧版はパターンの中に**リテラル改行**を含んでいた
+#   （`restart[^<改行>]*retrospective|...`）。★ grep は PATTERN 引数を改行で分割して
+#   **複数パターンとして扱う**ので、`restart[^` 等の未閉じブラケットになり
+#   `grep: Invalid regular expression` で**必ず失敗していた**（⚠️ 実測。判断 26 の
+#   「受け入れスクリプトは未検証」がここで顕在化した）。
+#   ★ grep は行単位で走るので `.` で十分である（`.` は改行に一致しない）。
+grep -qEi 'restart.*retrospective|retrospective.*restart' "$MODRS" \
+  || fail "$MODRS に restart が retrospective である旨の明記が無い"
 if grep -nE '(activity|stall_onset)::[a-z_]+\([^)]*restart' "$MODRS" >/dev/null 2>&1; then
   fail "$MODRS が restart を detection 側へ渡している（★ 転帰側を検出側に混ぜない）"
 fi

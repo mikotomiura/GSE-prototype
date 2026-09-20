@@ -41,13 +41,25 @@ printf '%s' "$env_out" | jq -e '(.rows | type == "array") and (.rows | length > 
 # ---------- AC2: provenance のキー集合（★ 完全一致） ----------
 #   ⚠️ `os` は**入っていない** —— `logger.rs::write_meta_start` が書いていないため（起票 1 / ADR-032 の領域）。
 #     ★ ここへ `os` が現れたら、それは計器が変わったということなので、この検査が落ちてよい。
+#   ★ 2026-09-21: `observed_intervals` を足した（研究者判断・`blockers.md` 起票 20 (a)）。
+#     ⚠️ 新しい露出ではない —— 穴の位置と長さは `rows[].quality.observability_mask.feat` が
+#     既に tick ごとに出している（issue 007）。★ 封筒は**セッション不変の再表現**を 1 回だけ持つ。
 printf '%s' "$env_out" | jq -e '
   (.provenance | keys_unsorted | sort) == [
     "app_version","capabilities","g1_mode","hmm_version","keyboard_layout",
-    "o1_mode","session_start","sharing","source_basename","source_sha256_prefix",
-    "tool","tool_version"
+    "o1_mode","observed_intervals","session_start","sharing","source_basename",
+    "source_sha256_prefix","tool","tool_version"
   ]' >/dev/null 2>&1 \
   || fail "AC2: provenance のキー集合が規範と完全一致しない。実際: $(printf '%s' "$env_out" | jq -c '.provenance | keys_unsorted | sort' 2>/dev/null)"
+
+# ---------- AC2b: observed_intervals の形（★ 2026-09-21 追加・起票 20 (a)） ----------
+#   ★ `feat` 行が 1 本も無い入力では**空配列**（⚠️ `null` にしない）。
+#   ★ 各要素は `{a_ms, b_ms}` の 2 キーで、`a_ms <= b_ms`。
+printf '%s' "$env_out" | jq -e '
+  (.provenance.observed_intervals | type == "array")
+  and all(.provenance.observed_intervals[];
+        (keys_unsorted | sort) == ["a_ms","b_ms"] and .a_ms <= .b_ms)' >/dev/null 2>&1 \
+  || fail "AC2b: observed_intervals が配列 / {a_ms, b_ms} / a_ms <= b_ms のいずれかを満たさない"
 
 # ---------- AC3: sharing マーカー（起票 5・判断 5） ----------
 #   ★ 検査器 `scripts/check_no_feature_output.sh` がこの形を鍵に使う。⚠️ 形を変えるなら両方直す。

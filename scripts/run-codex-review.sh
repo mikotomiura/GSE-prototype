@@ -253,7 +253,14 @@ if d['today'].get('date') == today:
     d['today']['invocations'] += 1
 else:
     d.setdefault('history', []).append(d['today'])
-    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
+    # ⚠️★★★ history は **append-only**（消さない）。
+    #   ★ 旧版は `[-30:]` で切り捨てていた。⚠️ これは budget.json 自身の注記
+    #     `_comment_history_2026_09_11`（逐語「★ 実測: history を回転させるコードは
+    #     repo 内に存在しない (手作業の削除だった)」「→ ★ history は append-only とし、消さない」）
+    #     と**真っ向から矛盾する** —— ★ 回転させるコードは**ここに在った**。
+    #   ★ 2026-09-21 に実測: 日付が変わった 1 回目の記帳で **2026-08-12 の 1 件（25290 / 1 回）が
+    #     実際に消えた**（`.steering/20260920-issues-004-006/decisions.md` 判断 8・`blockers.md` 起票 22）。
+    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))
     d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
 # 同ディレクトリの一時ファイル + os.replace で atomic に差し替える。
 # `open(p, 'w')` は開いた瞬間に truncate するため、中断で budget.json が壊れる。

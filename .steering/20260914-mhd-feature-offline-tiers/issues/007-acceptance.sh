@@ -272,10 +272,24 @@ if [ "${ACC_SKIP_SRC:-0}" != "1" ]; then
   if ! git diff --quiet "$BASE_REF" -- src/capabilities.rs src/schema_dto.rs src/logger.rs; then
     fail "capabilities.rs / schema_dto.rs / logger.rs を変更している（★ 計器変更は Scope Out）"
   fi
-  # ★ stall_onset.rs は observed_intervals の可視性 1 語だけ（★ 本体を変えない）
-  sdiff="$(git diff "$BASE_REF" -- src/analysis/feat_offline/stall_onset.rs | grep -E '^[+-][^+-]' || true)"
-  if [ -n "$sdiff" ] && [ "$(printf '%s\n' "$sdiff" | grep -cvE 'fn observed_intervals\(')" != "0" ]; then
-    fail "stall_onset.rs を observed_intervals の可視性以外で変更している（★ 1 語だけ）"
+  # ★ stall_onset.rs: 2026-09-20 まで「base との差分は `observed_intervals` の可視性 1 語だけ」
+  #   という**行差分**で検査していた。
+  #   ⚠️★★★ issue 006 の **V2 の裁定**（`.steering/20260920-issues-004-006/decisions.md` 判断 2 / 5）で
+  #     `stall_onset.rs` が **issue 006 の Allowed Files に入った**ため、この形は構造的に成り立たなくなった
+  #     （★ 006 は条件 A の辺を `pub(super)` で出す）。⚠️ 実測でここが赤くなったのを確認している。
+  #   → ★ 検査の**意図**（issue 007 の `quality` が検出の本体へ手を出していないこと）を、
+  #     行差分ではなく **(a) 参照関係** と **(b) 条件 A の判定式の不変** で見る形へ置き換えた。
+  #   ⚠️ 検出の**振る舞い**の回帰は `008-acceptance.sh` とゴールデン replay が別に張る（★ 二重に見ない）。
+  if grep -nE '(detect_stall_onsets|net_at_fast|ThetaAccumulator|condition_a_timeline|stall_onset_column)' \
+       "$SRCF" >/dev/null 2>&1; then
+    fail "$SRCF が stall_onset の検出本体へ手を伸ばしている（★ quality が使ってよいのは observed_intervals だけ）"
+  fi
+  rule_re='net_at_fast\(sorted_keys, prefix, t, w\) < net_diff_min'
+  base_rule="$(git show "$BASE_REF":src-tauri/src/analysis/feat_offline/stall_onset.rs 2>/dev/null \
+                 | grep -cE "$rule_re" || true)"
+  now_rule="$(grep -cE "$rule_re" src/analysis/feat_offline/stall_onset.rs || true)"
+  if [ "$now_rule" = "0" ] || [ "$base_rule" != "$now_rule" ]; then
+    fail "条件 A の判定式が base から変わっている（base=${base_rule} / now=${now_rule}。★ 検出の本体は 006 / 007 とも変えない）"
   fi
 fi
 

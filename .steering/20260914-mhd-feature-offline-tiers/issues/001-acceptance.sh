@@ -47,12 +47,23 @@ printf '%s' "$out" | jq -e '[.[].activity.pastes] | add > 0' >/dev/null 2>&1 \
 #   ⚠️★★★ 2026-09-18（decisions.md 判断 18）: 最上位の集合は **002 で boundary が加わった時点から
 #     この行で NG になっていた**（★ 各 issue の裁定が自分の acceptance しか回していなかったので見逃した）。
 #     ★ Tier を足す issue を merge したら、裁定セッションがここへ 1 語足す（★ 最上位の門はここ 1 か所）。
+#   ★ 2026-09-20: issue 004（`revision`）/ 006（`restart`）の実装と**同じコミットで** 2 語足した。
 printf '%s' "$out" | jq -e '
   all(.[];
-    (keys_unsorted | sort) == ["activity","boundary","dispersion","quality","stall_onset","t_ms"]
+    (keys_unsorted | sort) == ["activity","boundary","dispersion","quality","restart","revision","stall_onset","t_ms"]
     and (.activity | keys_unsorted | sort)
         == ["deletes","keys","mean_iki_ms","net_production","pastes","pauses"])' >/dev/null 2>&1 \
   || fail "出力のキー集合が想定と完全一致しない（★ フィールドの増減を検査している）"
+
+# ⚠️★★★ 2026-09-21（`/cross-review` 2 巡目・Codex 指摘 4）: 最上位のキー集合だけだと、
+#   ★ `revision` / `restart` が**空オブジェクトでも緑になる**。
+#   ★ 中身の完全一致は 004 / 006 の acceptance が見るが、**統合側にも最低限の形**を置く
+#   （⚠️ 004 / 006 を回さずに 001 だけ回す場面があるため）。
+printf '%s' "$out" | jq -e '
+  all(.[];
+    (.revision | type == "object") and (.revision | length) > 0
+    and (.restart | type == "object") and (.restart | length) > 0)' >/dev/null 2>&1 \
+  || fail "revision / restart が空オブジェクトになっている（★ 中身の完全一致は 004 / 006 が見る）"
 
 # AC10b: ⚠️★★★ 巨大な時刻ギャップで暴走しないこと（★ 2026-09-15 追加・レビュー HIGH）
 #   ★ 実測: 251 バイト・2 行の入力に t=0 と t=1e8 を並べると 100,001 行出た。

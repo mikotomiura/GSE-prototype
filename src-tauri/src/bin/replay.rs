@@ -203,6 +203,31 @@ struct FeatureProvenance {
     /// ⚠️ 「宣言が無い」という事実は tick 単位の欠測理由として意味を持つので、
     /// `rows[].quality.missing_reasons` の `"capability_undeclared"` は**そのまま残る**。
     capabilities: Option<serde_json::Value>,
+    /// 観測区間の列 (ADR-030 D8 (b-2))。`feat` 行の**存在**だけから決まる
+    /// (`stall_onset::observed_intervals`)。`feat` 行が 1 本も無ければ**空配列**
+    /// (⚠️ `null` にしない —— 「観測区間が 1 つも無い」は観測できた事実である)。
+    ///
+    /// ★★★ **なぜ封筒に載せるか** (2026-09-21・研究者判断・`blockers.md` 起票 20 (a)):
+    /// `restart` (`T1d`) の `restop_ms` が `null` の行は**右側打ち切り**だが、
+    /// ⚠️ **打ち切りまでの追跡時間 (`b − o`) が行からは読めない** —— `b` が出力に無いため。
+    /// 生存解析 (`ADR-031:52` 逐語「主 criterion: … **再停止までの時間** …」) は
+    /// `(時間, 事象)` の組を要するので、打ち切り行を捨てるしかなくなっていた。
+    /// ★ 区間はセッション不変なので**封筒が 1 回だけ持つ**のが正しい (⚠️ 行ごとに複製しない ——
+    /// `capabilities` を行から封筒へ移した判断 3 と同じ理屈)。
+    ///
+    /// ⚠️★★★ **新しい露出ではない。** 穴の位置と長さは
+    /// `rows[].quality.observability_mask.feat` が**既に tick ごとに出している** (issue 007)。
+    /// ★ 削除 / 一時停止 / 計器欠損の**原因ラベルは 1 つも無い**まま (ADR-030 D8 (b-2))。
+    observed_intervals: Vec<ObservedIntervalDto>,
+}
+
+/// 観測区間 1 つ (`[a_ms, b_ms]`・**両端を含む**)。
+///
+/// ⚠️ 右端 `b_ms` は**確定扱い**である (`stall_onset` の `t0 <= b` と対称)。
+#[derive(Debug, serde::Serialize)]
+struct ObservedIntervalDto {
+    a_ms: u64,
+    b_ms: u64,
 }
 
 /// 封筒の `config` —— この出力を再現するのに要る設定値。
@@ -1373,6 +1398,16 @@ fn main() -> ExitCode {
                 o1_mode: meta_facts.o1_mode,
                 keyboard_layout: meta_facts.keyboard_layout,
                 capabilities,
+                // ★ 行と同じ SSOT (`stall_onset::observed_intervals`) から作る。
+                //   ⚠️ 区間の定義をここで作り直さない。
+                observed_intervals:
+                    gse_next_lib::analysis::feat_offline::stall_onset::observed_intervals(
+                        &feat_ts,
+                        stall_onset_config.hole_gap_ms,
+                    )
+                    .into_iter()
+                    .map(|(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
+                    .collect(),
             },
             config: FeatureConfigDto::from_stall_onset_config(
                 &stall_onset_config,
