@@ -1,0 +1,637 @@
+//! `T1d` = **再開**（issue 006・ADR-030 D2 / D3 / D8 (b-2)）。
+//!
+//! `stall onset` の `t0` の**後**に何が起きたか —— 生成 / 削除 / 移動、再び止まるまでの時間、
+//! 安定して生成が続いた時間 —— を tick 行に載せる。
+//!
+//! ⚠️★★★ **retrospective（転帰側）である。** `restart` は `t0` より後を見る量なので、
+//! **detection 側（`activity` / `stall_onset`）の入力に 1 つも渡さない**
+//! （ADR-017 D8 / ADR-024 §Migration 逐語「再開後の動態は *アウトカム* であって、決して *入力* にしない」・
+//! issue 006 AC7）。★ 配線は `stall_onset` → `restart` の**一方向だけ**である（判断 4）。
+//!
+//! ⚠️ 禁止用語（`docs/glossary.md`）: 認知リソースの消耗・補充の語彙は使わない。
+//! ★ 「安定して生成が続いた時間」は [`Restart::stable_generation_ms`] で表す。
+//!
+//! # 原点と窓（★ `.steering/20260920-issues-004-006/decisions.md` 判断 2 / 3）
+//!
+//! ```text
+//! 原点 o   = t0 + B          ★ B = StallOnsetConfig::b_ms（⚠️ 本モジュールで値を決めない・AC4）
+//! 集計窓   = [o, min(同じ観測区間の次の onset の s, b + 1))      ★ E2（V1 の裁定）
+//!            ⚠️ 右端 b は確定扱い（`stall_onset` の `t0 <= b` と対称・V2 の裁定）
+//!            ⚠️ 窓が無い（o > b、または次の onset の s <= o）→ post_t0_* / resumption_count は None（V5）
+//!
+//! 生成区間 = 条件 A が false である極大区間を [o, b] で切ったもの   ★ V6 の裁定
+//! r_k      = k 番目の生成区間の開始時刻（★ o より前に始まっていれば o にクリップする）
+//! s'_k     = その生成区間が閉じる時刻（条件 A が true へ立ち上がる時刻）
+//! ```
+//!
+//! ★ **V6 が要る理由（⚠️ 実測）**: `B` は `W` と同じ 30 秒系列から選ぶ（ADR-030 D4）ので、
+//! **`o` に達する前に打鍵が戻っている**ことが構造的に起きる。この場合「`o` 以後の true → false の辺」は
+//! 存在しないため、辺だけで読むと **速やかに再開した人ほど全フィールドが `None`** になり、意味が反転する。
+//! → ★ `o` の時点で条件 A が既に `false` なら、**生成区間は `o` で開いている**と読む（左側を `o` で切る）。
+//! ⚠️ `o` の時点で条件 A が `true` の場合、この定義は「最初の true → false の辺」と完全に一致する。
+//!
+//! # 集計窓に依存する量・しない量
+//!
+//! ★ `restop_ms` / `stable_generation_ms` / `stable_generation_net_presses` は
+//! **束ね方（E1 / E2）に依存しない** —— `r_1` と `s'_1` は**観測区間**の中の条件 A の辺だけで決まる
+//! （issue 006 Background 逐語）。⚠️ 窓に依存するのは `post_t0_*` と `resumption_count` だけである。
+//!
+//! ⚠️★★★ **E2 の既知の代償（★ V1 で E1 を入れるまで残る）**: 次の onset が `o` より前にあると、
+//! 窓が消えて `post_t0_*` / `resumption_count` が `None` になる一方、
+//! `restop_ms` / `stable_generation_ms` は**次の停滞に属する時間帯**を測ることがある。
+//! ★ これは [V146] が警告した過剰分割であり、`blockers.md` 起票 20 に上げてある。
+//!
+//! # 打ち切り（⚠️ `censored` フィールドは持たない・判断 2 の V4）
+//!
+//! onset のある行で `restop_ms` が `None` になる経路は、**観測区間の右端 `b` に達するまで
+//! `s'_1` を観測できなかった右側打ち切りだけ**である。★ したがって打ち切りか否かは
+//! `stall_onset.t0_ms != null && restart.restop_ms == null` で完全に復元でき、
+//! ⚠️ boolean を 1 つ足しても情報は増えない。★ 生存解析に要る**追跡時間**は別途
+//! 研究者判断（`blockers.md` 起票 20）である。
+
+use crate::analysis::anonymize::KeyCategory;
+use crate::analysis::metrics::KeyPress;
+
+use super::stall_onset::{ConditionAInterval, StallOnset, StallOnsetConfig};
+
+/// `T1d` の 1 tick ぶんの値。★ onset が立った tick だけ値が埋まり、
+/// それ以外の tick は全フィールド `null`（⚠️ 0 で埋めない・issue 006 AC3）。
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Restart {
+    /// 集計窓の中の挿入系 press の回数（ADR-030 D3 の写像）。
+    pub post_t0_inserts: Option<u64>,
+    /// 集計窓の中の削除系 press の回数。
+    pub post_t0_deletes: Option<u64>,
+    /// 集計窓の中の `navigation` カテゴリの press の回数（★ 「どちらでもない」側のうち移動だけ）。
+    pub post_t0_navigations: Option<u64>,
+    /// `s'_1 − o`（原点から最初の再停止まで）。打ち切りなら `null`。
+    pub restop_ms: Option<u64>,
+    /// `s'_1 − r_1`（最初の生成区間の長さ）。打ち切りなら `null`。
+    pub stable_generation_ms: Option<u64>,
+    /// `[r_1, s'_1)` の純産出（挿入系 − 削除系。★ `super::net_production` の共有ヘルパ）。
+    /// ⚠️ `stable_generation_ms` は打鍵速度と交絡する（[V164]）ので**必ず対で読む**。
+    pub stable_generation_net_presses: Option<i64>,
+    /// 集計窓の中で始まった生成区間の本数。窓があって 0 本なら `0`。
+    pub resumption_count: Option<u64>,
+}
+
+impl Restart {
+    /// onset が立っていない tick の行（⚠️ **すべて `null`**・AC3）。
+    fn null_row() -> Self {
+        Self {
+            post_t0_inserts: None,
+            post_t0_deletes: None,
+            post_t0_navigations: None,
+            restop_ms: None,
+            stable_generation_ms: None,
+            stable_generation_net_presses: None,
+            resumption_count: None,
+        }
+    }
+}
+
+/// 条件 A が `false` であり続けた区間（＝ 生成が続いた区間）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct GenerationSpan {
+    /// 開始（★ `o` より前に始まっていれば `o` にクリップ済み・V6）。
+    r_ms: u64,
+    /// 閉じ（条件 A の立ち上がり）。観測区間の右端まで閉じなければ `None`（打ち切り）。
+    s_prime_ms: Option<u64>,
+}
+
+/// press 列を種別ごとの累積和にしたもの（★ 区間の件数を `O(log N)` で引くため）。
+struct PressPrefix {
+    sorted_ts: Vec<u64>,
+    inserts: Vec<u64>,
+    deletes: Vec<u64>,
+    navigations: Vec<u64>,
+    net: Vec<i64>,
+}
+
+impl PressPrefix {
+    fn new(keys: &[KeyPress]) -> Self {
+        let mut sorted: Vec<KeyPress> = keys.to_vec();
+        sorted.sort_by_key(|k| k.timestamp);
+
+        let n = sorted.len();
+        let mut sorted_ts = Vec::with_capacity(n);
+        let mut inserts = Vec::with_capacity(n + 1);
+        let mut deletes = Vec::with_capacity(n + 1);
+        let mut navigations = Vec::with_capacity(n + 1);
+        let mut net = Vec::with_capacity(n + 1);
+        inserts.push(0);
+        deletes.push(0);
+        navigations.push(0);
+        net.push(0);
+
+        for k in &sorted {
+            sorted_ts.push(k.timestamp);
+            // ★ 挿入系 / 削除系の写像は ADR-030 D3 の SSOT (`super::key_net_delta`) をそのまま使う。
+            let delta = super::key_net_delta(k);
+            inserts.push(inserts.last().copied().unwrap_or(0) + u64::from(delta == 1));
+            deletes.push(deletes.last().copied().unwrap_or(0) + u64::from(delta == -1));
+            let is_navigation = KeyCategory::from_vk(k.vk) == KeyCategory::Navigation;
+            navigations.push(navigations.last().copied().unwrap_or(0) + u64::from(is_navigation));
+            net.push(net.last().copied().unwrap_or(0) + delta);
+        }
+
+        Self {
+            sorted_ts,
+            inserts,
+            deletes,
+            navigations,
+            net,
+        }
+    }
+
+    /// `[lo, hi)` に入る press の添字範囲。
+    fn range(&self, lo: u64, hi_exclusive: u64) -> (usize, usize) {
+        let start = self.sorted_ts.partition_point(|&t| t < lo);
+        let end = self.sorted_ts.partition_point(|&t| t < hi_exclusive);
+        (start, end.max(start))
+    }
+}
+
+/// 条件 A の変化点の列から、`[o, b]` の中の生成区間を取り出す（V6 の裁定）。
+///
+/// `changes` は `(時刻, 値)` の変化点だけを持ち、値は必ず交互に変わる
+/// （`stall_onset::ConditionAInterval` の doc 参照）。
+fn generation_spans(changes: &[(u64, bool)], o: u64, b: u64) -> Vec<GenerationSpan> {
+    let idx = changes.partition_point(|&(t, _)| t <= o);
+    if idx == 0 {
+        // ⚠️ `o` 以前に評価時刻が 1 つも無い（＝ 条件 A の値が決まらない）。
+        // ★ `o = t0 + B >= s >= a + W`（区間の最初の評価時刻）なので構造的には起きないが、
+        //   境界入力で落ちないよう「情報が無い」側に倒す。
+        return Vec::new();
+    }
+
+    let mut spans: Vec<GenerationSpan> = Vec::new();
+    // ★ V6: `o` の時点で条件 A が false なら、生成区間は既に開いている（左端を `o` にクリップ）。
+    if !changes[idx - 1].1 {
+        spans.push(GenerationSpan {
+            r_ms: o,
+            s_prime_ms: None,
+        });
+    }
+    for &(t, value) in &changes[idx..] {
+        if t > b {
+            break;
+        }
+        if value {
+            // 条件 A が立ち上がった = 生成区間が閉じた。
+            if let Some(open) = spans.last_mut() {
+                if open.s_prime_ms.is_none() {
+                    open.s_prime_ms = Some(t);
+                }
+            }
+        } else {
+            spans.push(GenerationSpan {
+                r_ms: t,
+                s_prime_ms: None,
+            });
+        }
+    }
+    spans
+}
+
+/// 1 つの onset 行ぶんの `restart` を計算する。
+fn restart_for_onset(
+    s_ms: u64,
+    t0_ms: u64,
+    interval: &ConditionAInterval,
+    next_onset_s_ms: Option<u64>,
+    config: &StallOnsetConfig,
+    presses: &PressPrefix,
+) -> Restart {
+    let mut row = Restart::null_row();
+
+    // 原点 o = t0 + B（⚠️ 値は決めない・AC4）。加算が溢れる入力では何も測れない。
+    let Some(o) = t0_ms.checked_add(config.b_ms) else {
+        return row;
+    };
+    let _ = s_ms; // ★ `s` は区間の同定に使う（呼び出し側）。ここでは原点に混ぜない。
+    if o > interval.b {
+        // ⚠️ 原点が観測区間の右端を越えた = 窓も生成区間も無い（V5）。
+        return row;
+    }
+
+    // ---- 集計窓（E2・V1） ----
+    // ★ 右端 b は確定扱いなので、窓の排他的な右端は b + 1 とする（V2 と対称）。
+    let window_end_exclusive = next_onset_s_ms.unwrap_or_else(|| interval.b.saturating_add(1));
+    let window = (o < window_end_exclusive).then_some((o, window_end_exclusive));
+
+    // ---- 生成区間（V6） ----
+    let spans = generation_spans(&interval.changes, o, interval.b);
+
+    if let Some(first) = spans.first() {
+        if let Some(s_prime) = first.s_prime_ms {
+            row.restop_ms = Some(s_prime.saturating_sub(o));
+            row.stable_generation_ms = Some(s_prime.saturating_sub(first.r_ms));
+            let (lo, hi) = presses.range(first.r_ms, s_prime);
+            row.stable_generation_net_presses = Some(presses.net[hi] - presses.net[lo]);
+        }
+        // ⚠️ `s'_1` が無い（右端まで閉じなかった）行は打ち切りなので `null` のまま（AC9）。
+    }
+
+    // ---- 窓に依存する量（V5: 窓が無ければ null） ----
+    if let Some((lo, hi_exclusive)) = window {
+        let (start, end) = presses.range(lo, hi_exclusive);
+        row.post_t0_inserts = Some(presses.inserts[end] - presses.inserts[start]);
+        row.post_t0_deletes = Some(presses.deletes[end] - presses.deletes[start]);
+        row.post_t0_navigations = Some(presses.navigations[end] - presses.navigations[start]);
+        row.resumption_count = Some(
+            spans
+                .iter()
+                .filter(|span| span.r_ms >= lo && span.r_ms < hi_exclusive)
+                .count() as u64,
+        );
+    }
+
+    row
+}
+
+/// 1 Hz tick 単位の `restart` 列を作る。`super::build_feature_rows` から呼ばれる。
+///
+/// ⚠️★★★ **入力は `stall_onset` の *列* である**（判断 4）—— `stall_onset_column` は
+/// グリッド外の `t0` と同じ tick に落ちた 2 つ目の onset を捨てるので、生の onset 列から
+/// 独立に作ると**行が対応しなくなる**（★ AC3「`t0` が立っていない行は全部 `null`」が壊れる）。
+/// ★ 一方、集計窓の右端に使う「次の onset の `s`」は **`timeline` 側の（捨てられた分も含む）
+/// onset 列**から取る —— 窓の右端は「次に onset が立った事実」で決まるからである。
+pub(super) fn restart_column(
+    stall_onset_col: &[StallOnset],
+    timeline: &[ConditionAInterval],
+    keys: &[KeyPress],
+    config: &StallOnsetConfig,
+) -> Vec<Restart> {
+    if stall_onset_col.iter().all(|row| !row.is_onset) {
+        return stall_onset_col
+            .iter()
+            .map(|_| Restart::null_row())
+            .collect();
+    }
+    let presses = PressPrefix::new(keys);
+
+    stall_onset_col
+        .iter()
+        .map(|row| {
+            let (Some(s_ms), Some(t0_ms)) = (row.s_ms, row.t0_ms) else {
+                return Restart::null_row();
+            };
+            // `s` を含み `t0` が右端に収まる観測区間を引く（★ 区間は時刻順・互いに素）。
+            let idx = timeline.partition_point(|interval| interval.a <= s_ms);
+            let Some(interval) = idx.checked_sub(1).map(|i| &timeline[i]) else {
+                return Restart::null_row();
+            };
+            if t0_ms > interval.b {
+                return Restart::null_row();
+            }
+            let next_onset_s_ms = interval
+                .onsets
+                .iter()
+                .map(|onset| onset.s_ms)
+                .find(|&next_s| next_s > s_ms);
+            restart_for_onset(s_ms, t0_ms, interval, next_onset_s_ms, config, &presses)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::loop_step::ENGINE_TICK_MS;
+
+    fn key(t_ms: u64, vk: u32) -> KeyPress {
+        KeyPress {
+            timestamp: t_ms,
+            vk,
+        }
+    }
+
+    /// 文字キー（挿入系）。
+    fn letter(t_ms: u64) -> KeyPress {
+        key(t_ms, 0x41)
+    }
+
+    fn onset_row(s_ms: u64, t0_ms: u64) -> StallOnset {
+        StallOnset {
+            is_onset: true,
+            s_ms: Some(s_ms),
+            t0_ms: Some(t0_ms),
+            theta_person_ms: Some(t0_ms - s_ms),
+            task_kind: None,
+            phase: "unspecified".to_string(),
+        }
+    }
+
+    fn plain_row() -> StallOnset {
+        StallOnset {
+            is_onset: false,
+            s_ms: None,
+            t0_ms: None,
+            theta_person_ms: None,
+            task_kind: None,
+            phase: "unspecified".to_string(),
+        }
+    }
+
+    fn interval(a: u64, b: u64, changes: Vec<(u64, bool)>) -> ConditionAInterval {
+        ConditionAInterval {
+            a,
+            b,
+            changes,
+            onsets: Vec::new(),
+        }
+    }
+
+    /// AC3: onset が立っていない行は**全フィールド `null`**（⚠️ 0 で埋めない）。
+    #[test]
+    fn no_onset_yields_null_not_zero() {
+        let column = vec![plain_row(), plain_row()];
+        let timeline = vec![interval(0, 100_000, vec![(0, false)])];
+        let config = StallOnsetConfig::default();
+        let rows = restart_column(&column, &timeline, &[letter(10)], &config);
+
+        assert_eq!(rows.len(), 2);
+        for row in &rows {
+            let json = serde_json::to_value(row).expect("serialize");
+            for (name, value) in json.as_object().expect("object") {
+                assert!(value.is_null(), "{name} は null のはず: {value}");
+            }
+        }
+    }
+
+    /// AC2: 原点が **`t0`**（＋ buffer `B`）であって、単純 pause ではないこと。
+    ///
+    /// ★ 同じ条件 A の辺の列に対し、`t0` を後ろへずらすと `restop_ms` が**その差だけ縮む**。
+    /// ⚠️ 単純 pause（＝ `s` の側）に原点を置いていたら、`t0` を動かしても値は変わらない。
+    #[test]
+    fn restart_is_anchored_at_t0_not_pause() {
+        let config = StallOnsetConfig {
+            b_ms: 0,
+            ..StallOnsetConfig::default()
+        };
+        // 条件 A: 0 で true（停滞）→ 50_000 で false（生成）→ 80_000 で true（再停止）
+        let changes = vec![(0, true), (50_000, false), (80_000, true)];
+        let timeline = vec![interval(0, 200_000, changes)];
+
+        let early = restart_column(&[onset_row(5_000, 10_000)], &timeline, &[], &config);
+        let late = restart_column(&[onset_row(5_000, 20_000)], &timeline, &[], &config);
+
+        assert_eq!(early[0].restop_ms, Some(80_000 - 10_000));
+        assert_eq!(late[0].restop_ms, Some(80_000 - 20_000));
+        assert_ne!(
+            early[0].restop_ms, late[0].restop_ms,
+            "`s` が同じでも `t0` が違えば値が変わる（★ 原点は t0）"
+        );
+        // `r_1` は辺そのもの（50_000）なので、安定生成の長さは t0 に依らない。
+        assert_eq!(early[0].stable_generation_ms, Some(30_000));
+        assert_eq!(late[0].stable_generation_ms, Some(30_000));
+    }
+
+    /// AC4: buffer `B` を `StallOnsetConfig` から引いていること（★ 値を決めていない）。
+    #[test]
+    fn buffer_b_comes_from_the_stall_onset_config() {
+        let changes = vec![(0, true), (50_000, false), (80_000, true)];
+        let timeline = vec![interval(0, 200_000, changes)];
+        let column = vec![onset_row(5_000, 10_000)];
+
+        let without_buffer = restart_column(
+            &column,
+            &timeline,
+            &[],
+            &StallOnsetConfig {
+                b_ms: 0,
+                ..StallOnsetConfig::default()
+            },
+        );
+        let with_buffer = restart_column(
+            &column,
+            &timeline,
+            &[],
+            &StallOnsetConfig {
+                b_ms: 5_000,
+                ..StallOnsetConfig::default()
+            },
+        );
+        assert_eq!(without_buffer[0].restop_ms, Some(70_000));
+        assert_eq!(
+            with_buffer[0].restop_ms,
+            Some(65_000),
+            "B を足すと原点が後ろへ動く"
+        );
+    }
+
+    /// ★ V6 の裁定: 原点の時点で条件 A が既に `false`（もう生成している）なら、
+    /// 生成区間は `o` で開いていると読む（⚠️ `null` にしない）。
+    #[test]
+    fn generation_already_open_at_origin_clips_r1_to_origin() {
+        let config = StallOnsetConfig {
+            b_ms: 30_000,
+            ..StallOnsetConfig::default()
+        };
+        // 条件 A: 0 で true → 20_000 で false（★ 原点 40_000 より前に再開している）→ 90_000 で true
+        let changes = vec![(0, true), (20_000, false), (90_000, true)];
+        let timeline = vec![interval(0, 200_000, changes)];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &timeline, &[], &config);
+
+        let o = 10_000 + 30_000;
+        assert_eq!(rows[0].restop_ms, Some(90_000 - o));
+        assert_eq!(
+            rows[0].stable_generation_ms,
+            Some(90_000 - o),
+            "r_1 は o にクリップされる（★ buffer の内側へ遡らない）"
+        );
+        assert_eq!(rows[0].resumption_count, Some(1));
+    }
+
+    /// AC9: onset はあるが `s'_1` が観測区間の中に無い（打ち切り）行では `null`（⚠️ 0 で埋めない）。
+    #[test]
+    fn censored_restop_yields_null_not_zero() {
+        let config = StallOnsetConfig {
+            b_ms: 0,
+            ..StallOnsetConfig::default()
+        };
+        // 50_000 で生成が始まるが、観測区間の右端 (60_000) までに立ち上がらない。
+        let changes = vec![(0, true), (50_000, false)];
+        let timeline = vec![interval(0, 60_000, changes)];
+        let rows = restart_column(
+            &[onset_row(5_000, 10_000)],
+            &timeline,
+            &[letter(55_000)],
+            &config,
+        );
+
+        assert_eq!(rows[0].restop_ms, None, "⚠️ 0 で埋めない");
+        assert_eq!(rows[0].stable_generation_ms, None);
+        assert_eq!(rows[0].stable_generation_net_presses, None);
+        // ★ 窓はあるので、窓に依存する量は値を持つ（打ち切りとは別の話）。
+        assert_eq!(rows[0].resumption_count, Some(1));
+        assert_eq!(rows[0].post_t0_inserts, Some(1));
+
+        // ★ 再開が 1 度も無いまま右端に達した行も同じく null（★ ただし resumption_count は 0）。
+        let never = vec![(0, true)];
+        let rows = restart_column(
+            &[onset_row(5_000, 10_000)],
+            &[interval(0, 60_000, never)],
+            &[],
+            &config,
+        );
+        assert_eq!(rows[0].restop_ms, None);
+        assert_eq!(
+            rows[0].resumption_count,
+            Some(0),
+            "窓はあるので 0（null ではない）"
+        );
+    }
+
+    /// V5 の裁定: 集計窓そのものが無い行では `post_t0_*` / `resumption_count` が `null`。
+    #[test]
+    fn missing_window_yields_null_counts() {
+        let config = StallOnsetConfig {
+            b_ms: 30_000,
+            ..StallOnsetConfig::default()
+        };
+        // 原点 o = 10_000 + 30_000 = 40_000 が観測区間の右端 (30_000) を越える。
+        let timeline = vec![interval(0, 30_000, vec![(0, true)])];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &timeline, &[], &config);
+        assert_eq!(rows[0].post_t0_inserts, None, "⚠️ 0 で埋めない");
+        assert_eq!(rows[0].resumption_count, None);
+
+        // E2 で次の onset の `s` が原点以前にある場合も窓が無い。
+        let mut crowded = interval(0, 200_000, vec![(0, true), (20_000, false), (35_000, true)]);
+        crowded.onsets = vec![super::super::stall_onset::OnsetEvent {
+            s_ms: 35_000,
+            t0_ms: 38_000,
+            theta_person_ms: 3_000,
+        }];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &[crowded], &[], &config);
+        assert_eq!(rows[0].post_t0_inserts, None);
+        assert_eq!(rows[0].resumption_count, None);
+    }
+
+    /// 窓があって press が 0 件なら `0`（⚠️ `null` ではない）。
+    #[test]
+    fn empty_window_counts_zero_not_null() {
+        let config = StallOnsetConfig {
+            b_ms: 0,
+            ..StallOnsetConfig::default()
+        };
+        let timeline = vec![interval(0, 60_000, vec![(0, true)])];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &timeline, &[], &config);
+        assert_eq!(rows[0].post_t0_inserts, Some(0));
+        assert_eq!(rows[0].post_t0_deletes, Some(0));
+        assert_eq!(rows[0].post_t0_navigations, Some(0));
+    }
+
+    /// `post_t0_*` が ADR-030 D3 の写像で数えられていること（`navigation` は移動だけ）。
+    #[test]
+    fn post_t0_counts_use_the_adr_030_d3_mapping() {
+        let config = StallOnsetConfig {
+            b_ms: 0,
+            ..StallOnsetConfig::default()
+        };
+        let timeline = vec![interval(0, 60_000, vec![(0, true)])];
+        let keys = vec![
+            letter(11_000),
+            key(12_000, 0x08), // backspace → 削除系
+            key(13_000, 0x25), // ← 矢印 → navigation
+            key(14_000, 0xA0), // 左 Shift → modifier（★ どれにも数えない）
+            letter(9_000),     // ⚠️ 原点より前 → 窓の外
+        ];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &timeline, &keys, &config);
+        assert_eq!(rows[0].post_t0_inserts, Some(1));
+        assert_eq!(rows[0].post_t0_deletes, Some(1));
+        assert_eq!(rows[0].post_t0_navigations, Some(1));
+    }
+
+    /// `stable_generation_net_presses` が `[r_1, s'_1)` の純産出であること。
+    #[test]
+    fn stable_generation_net_presses_counts_the_generation_span() {
+        let config = StallOnsetConfig {
+            b_ms: 0,
+            ..StallOnsetConfig::default()
+        };
+        let changes = vec![(0, true), (20_000, false), (30_000, true)];
+        let timeline = vec![interval(0, 60_000, changes)];
+        let keys = vec![
+            letter(19_000), // ⚠️ r_1 より前
+            letter(21_000),
+            letter(22_000),
+            key(23_000, 0x08), // 削除系 → −1
+            letter(31_000),    // ⚠️ s'_1 以降
+        ];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &timeline, &keys, &config);
+        assert_eq!(rows[0].stable_generation_net_presses, Some(1));
+    }
+
+    /// AC7: `restart` が **detection 側へ渡っていない**こと。
+    ///
+    /// ★ 配線の向きを実測で固定する —— `build_feature_rows` が返す `stall_onset` 列は、
+    /// `restart` を一切知らない `stall_onset_column` の出力と**完全に一致する**。
+    #[test]
+    fn restart_is_not_fed_into_detection() {
+        let epoch = 1_700_000_000_000_u64;
+        let keys: Vec<KeyPress> = (0..5).map(|i| letter(epoch + i * 100)).collect();
+        let feat_ts: Vec<u64> = (0..90).map(|i| epoch + i * ENGINE_TICK_MS).collect();
+        let config = StallOnsetConfig::default();
+
+        let rows = super::super::build_feature_rows(
+            &keys,
+            &[],
+            &[],
+            10_000,
+            &super::super::StallOnsetInputs {
+                feat_ts: &feat_ts,
+                task_kind_declarations: &[],
+                config,
+            },
+            &super::super::QualityInputs {
+                capabilities_declared: false,
+                hook_health: &[],
+            },
+        )
+        .expect("within tick limit");
+
+        let detection_only = super::super::stall_onset::stall_onset_column(
+            &keys,
+            &feat_ts,
+            &[],
+            rows.len(),
+            rows[0].t_ms,
+            ENGINE_TICK_MS,
+            &config,
+        );
+        assert_eq!(detection_only.len(), rows.len());
+        for (row, expected) in rows.iter().zip(detection_only.iter()) {
+            assert_eq!(row.stall_onset.is_onset, expected.is_onset);
+            assert_eq!(row.stall_onset.s_ms, expected.s_ms);
+            assert_eq!(row.stall_onset.t0_ms, expected.t0_ms);
+            assert_eq!(row.stall_onset.theta_person_ms, expected.theta_person_ms);
+        }
+        assert!(
+            rows.iter().any(|row| row.stall_onset.is_onset),
+            "この入力では onset が立つはず（★ 空振りの比較にしない）"
+        );
+    }
+
+    /// 境界入力で panic しないこと（`t0 + B` の溢れ / 観測区間が引けない / 空入力）。
+    #[test]
+    fn restart_column_handles_degenerate_inputs() {
+        let config = StallOnsetConfig::default();
+        assert!(restart_column(&[], &[], &[], &config).is_empty());
+
+        // `t0 + B` が u64 を溢れる
+        let timeline = vec![interval(0, u64::MAX, vec![(0, true)])];
+        let rows = restart_column(&[onset_row(1, u64::MAX)], &timeline, &[], &config);
+        assert_eq!(rows[0].restop_ms, None);
+
+        // onset の `s` を含む観測区間が timeline に無い
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &[], &[], &config);
+        assert_eq!(rows[0].resumption_count, None);
+
+        // 変化点が `o` 以前に 1 つも無い（構造的には起きないが落ちないこと）
+        let late = vec![interval(0, 200_000, vec![(150_000, true)])];
+        let rows = restart_column(&[onset_row(5_000, 10_000)], &late, &[], &config);
+        assert_eq!(rows[0].restop_ms, None);
+    }
+}

@@ -130,10 +130,34 @@ impl StallOnset {
 /// 確定した 1 つの `stall onset`（条件 A が `s` で立ち上がり、`θ_person` 継続して
 /// `t0` で確定したもの）。
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct OnsetEvent {
-    s_ms: u64,
-    t0_ms: u64,
-    theta_person_ms: u64,
+pub(super) struct OnsetEvent {
+    pub s_ms: u64,
+    pub t0_ms: u64,
+    pub theta_person_ms: u64,
+}
+
+/// 観測区間 1 つぶんの条件 A の評価結果。
+///
+/// ⚠️★★★ **issue 006 (`T1d`) のために出している**（★ 判断 2 の **V2**）——
+/// `restart` は「条件 A が `false` へ落ちる / `true` へ立ち上がる」辺を要するが、
+/// 条件 A の評価は本モジュールの非公開関数にある。★ ここで出さないと
+/// **`restart.rs` が条件 A を再実装することになり、定義が二重になる**
+/// （Codex TASK-PRE 指摘 5 と同型）。
+///
+/// ★ `changes` は**変化点だけ**を持つ（先頭はこの区間の最初の評価時刻とその値）。
+/// ⚠️ 条件 A は評価時刻の間で一定である（`net` が変わるのは `key の t` と `key の t + W` だけ）
+/// ので、**この列だけで区間内の任意時刻の値を復元できる**（★ `t` 以下で最後の変化点を引く）。
+#[derive(Debug, Clone)]
+pub(super) struct ConditionAInterval {
+    /// 観測区間の左端（ADR-030 D8 (b-2)）。
+    pub a: u64,
+    /// 観測区間の右端。⚠️ **右端ちょうどは確定扱い**（`t0 <= b` と対称・V2 の裁定）。
+    pub b: u64,
+    /// 条件 A の変化点 `(時刻, 値)`。時刻昇順・重複なし。値は必ず交互に変わる。
+    pub changes: Vec<(u64, bool)>,
+    /// この区間で確定した onset（`s` 昇順）。⚠️ **tick グリッドで捨てられた分も含む**
+    /// （★ 集計窓の右端は「次に onset が立った事実」で決まるのであって、tick 割りの都合ではない）。
+    pub onsets: Vec<OnsetEvent>,
 }
 
 /// nearest-rank 法で分位点を取る (`dispersion.rs::quantile` と同じ規約。線形補間なし。
@@ -398,6 +422,9 @@ impl ThetaAccumulator {
 /// を区間単位で満たす)。評価時刻は `{key の t} ∪ {key の t + W} ∪ {a + W}` を
 /// `[a + W, b]` に制限したものだけ (D3 逐語 ＋ issue 008 の観測区間の規範)。
 /// 区間の直前状態 (立ち上がり判定の `prev`) はここで `false` にリセットする。
+///
+/// ★ 戻り値は onset の列と**条件 A の変化点の列**である（⚠️ 変化点は issue 006 の `restart` が
+/// 使う —— 判断 2 の V2。★ 条件 A を 2 度評価しないよう、検出と同じ 1 回の走査で作る）。
 fn detect_stall_onsets_for_interval(
     a: u64,
     b: u64,
@@ -406,17 +433,17 @@ fn detect_stall_onsets_for_interval(
     prefix: &[i64],
     theta_acc: &mut ThetaAccumulator,
     config: &StallOnsetConfig,
-) -> Vec<OnsetEvent> {
+) -> (Vec<OnsetEvent>, Vec<(u64, bool)>) {
     let w = config.w_ms;
     let net_diff_min = config.net_diff_min as i64;
 
     // 区間が W に届かない (a + W > b) なら、この区間では 1 度も評価されない
     // (ADR-030 D8 (b) 「区間の終了後 W の間も条件 A を評価しない」の裏面)。
     let Some(start) = a.checked_add(w) else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     if start > b {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
 
     let lo = global_instants.partition_point(|&t| t < start);
@@ -433,8 +460,13 @@ fn detect_stall_onsets_for_interval(
         .collect();
 
     let mut onsets = Vec::new();
+    // ★ 条件 A の変化点 (先頭はこの区間の最初の評価時刻とその値)。V2 のために同じ走査で作る。
+    let mut changes: Vec<(u64, bool)> = Vec::new();
     let mut prev = false;
     for i in 0..instants.len() {
+        if i == 0 || cond_a[i] != cond_a[i - 1] {
+            changes.push((instants[i], cond_a[i]));
+        }
         if cond_a[i] && !prev {
             let s = instants[i];
             if let Some(theta) = theta_acc.theta_at(s, config.q, config.warmup_count) {
@@ -464,7 +496,7 @@ fn detect_stall_onsets_for_interval(
         }
         prev = cond_a[i];
     }
-    onsets
+    (onsets, changes)
 }
 
 /// `stall onset` 列を検出する純関数 (ADR-030 D2/D3/D4/D8 (b-2) の中心アルゴリズム)。
@@ -477,11 +509,31 @@ fn detect_stall_onsets_for_interval(
 ///   区間は時刻順、区間内の評価時刻も昇順)。立ち上がり `R` 回でも `O(R log P)` に収まる
 ///   (`P` = press 数。issue 008 AC18/AC18b —— 旧実装は立ち上がりのたびにプール全体を
 ///   filter+sort し直す `O(R・P log P)` だった)。
+///
+/// ★ 2026-09-20 (issue 006 V2): 本関数は [`condition_a_timeline`] の薄い包みになり、
+/// **本番経路からは呼ばれなくなった** (`stall_onset_column_with_timeline` が直接 timeline を使う)。
+/// ⚠️ **検出のアルゴリズムは 1 文字も変えていない** —— 同じ走査が変化点も返すようにしただけである。
+/// ★ 既存のテスト (onset の集合を直接検算するもの) がこの形を使うので残す。
+#[cfg(test)]
 fn detect_stall_onsets(
     keys: &[KeyPress],
     feat_ts: &[u64],
     config: &StallOnsetConfig,
 ) -> Vec<OnsetEvent> {
+    condition_a_timeline(keys, feat_ts, config)
+        .into_iter()
+        .flat_map(|interval| interval.onsets)
+        .collect()
+}
+
+/// 観測区間ごとの条件 A の評価結果（変化点 ＋ 確定した onset）を返す。
+/// ★ [`detect_stall_onsets`] と **同じ 1 回の走査**であり、条件 A を 2 度評価しない
+/// （⚠️ issue 008 AC18 / AC18b の計算量の門があるため、二重走査にしない）。
+pub(super) fn condition_a_timeline(
+    keys: &[KeyPress],
+    feat_ts: &[u64],
+    config: &StallOnsetConfig,
+) -> Vec<ConditionAInterval> {
     if feat_ts.is_empty() {
         return Vec::new();
     }
@@ -494,19 +546,26 @@ fn detect_stall_onsets(
     let pooled_gaps = pooled_theta_gaps(&press_ts, &intervals);
     let mut theta_acc = ThetaAccumulator::new(&pooled_gaps);
 
-    let mut onsets = Vec::new();
-    for (a, b) in intervals {
-        onsets.extend(detect_stall_onsets_for_interval(
-            a,
-            b,
-            &global_instants,
-            &sorted_keys,
-            &prefix,
-            &mut theta_acc,
-            config,
-        ));
-    }
-    onsets
+    intervals
+        .into_iter()
+        .map(|(a, b)| {
+            let (onsets, changes) = detect_stall_onsets_for_interval(
+                a,
+                b,
+                &global_instants,
+                &sorted_keys,
+                &prefix,
+                &mut theta_acc,
+                config,
+            );
+            ConditionAInterval {
+                a,
+                b,
+                changes,
+                onsets,
+            }
+        })
+        .collect()
 }
 
 /// `s` 時点で有効な `task_kind` 宣言 (`ts <= s` の最新) を返す。宣言が無ければ `None`。
@@ -583,14 +642,46 @@ pub fn stall_onset_column(
     tick_ms: u64,
     config: &StallOnsetConfig,
 ) -> Vec<StallOnset> {
-    let onsets = detect_stall_onsets(keys, feat_ts, config);
-    column_from_onsets(
+    stall_onset_column_with_timeline(
+        keys,
+        feat_ts,
+        task_kind_declarations,
+        tick_count,
+        grid_origin_ms,
+        tick_ms,
+        config,
+    )
+    .0
+}
+
+/// [`stall_onset_column`] と**同じ 1 回の走査**で、tick 列と条件 A の時系列の両方を返す。
+///
+/// ⚠️★★★ **2 度走らせないためにある**（★ issue 006 V2 / 008 AC18 の計算量の門）——
+/// `restart` (`T1d`) は条件 A の辺を要するが、`condition_a_timeline` を別に呼ぶと
+/// 大入力で検出が 2 回走る。★ `build_feature_rows` はこちらを使う。
+#[allow(clippy::too_many_arguments)]
+pub(super) fn stall_onset_column_with_timeline(
+    keys: &[KeyPress],
+    feat_ts: &[u64],
+    task_kind_declarations: &[(u64, String)],
+    tick_count: usize,
+    grid_origin_ms: u64,
+    tick_ms: u64,
+    config: &StallOnsetConfig,
+) -> (Vec<StallOnset>, Vec<ConditionAInterval>) {
+    let timeline = condition_a_timeline(keys, feat_ts, config);
+    let onsets: Vec<OnsetEvent> = timeline
+        .iter()
+        .flat_map(|interval| interval.onsets.iter().copied())
+        .collect();
+    let column = column_from_onsets(
         &onsets,
         task_kind_declarations,
         tick_count,
         grid_origin_ms,
         tick_ms,
-    )
+    );
+    (column, timeline)
 }
 
 #[cfg(test)]

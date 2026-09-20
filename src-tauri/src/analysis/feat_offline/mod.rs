@@ -66,12 +66,16 @@ pub mod activity;
 pub mod boundary;
 pub mod dispersion;
 pub mod quality;
+pub mod restart;
+pub mod revision;
 pub mod stall_onset;
 
 pub use activity::T0Activity;
 pub use boundary::{Boundary, ImeShadowEvent};
 pub use dispersion::Dispersion;
 pub use quality::{HookHealthEvent, Quality};
+pub use restart::Restart;
+pub use revision::Revision;
 pub use stall_onset::{StallOnset, StallOnsetConfig};
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
@@ -130,6 +134,20 @@ pub struct FeatureRow {
     /// 他 Tier (`activity` / `boundary` / `dispersion` / `stall_onset`) の計算へは渡さない
     /// (`quality` モジュール doc 参照)。
     pub quality: Quality,
+    /// `T1c` = **削除と挿入の遷移の形** (issue 004)。`activity` と同じく **causal** —
+    /// 各 tick には「その tick までに閉じが確定した単位」しか載らない (`revision` モジュール doc の U3)。
+    /// ⚠️ 「修正 (revision) の位相」とは呼ばない (★ 識別子だけが `revision` である)。
+    pub revision: Revision,
+    /// `T1d` = **再開** (issue 006)。⚠️★★★ **`restart` は retrospective (転帰側) である** ——
+    /// `stall onset` の `t0` より**後**を見る量なので、⚠️ **detection 側 (`activity` / `stall_onset`)
+    /// の入力に渡さない** (ADR-017 D8 / ADR-024 §Migration 逐語「再開後の動態は *アウトカム* であって、
+    /// 決して *入力* にしない」・issue 006 AC7)。★ 配線も `stall_onset` → `restart` の一方向だけである。
+    ///
+    /// ★ **打ち切りの読み方** (⚠️ `censored` フィールドは持たない・判断 2 V4):
+    /// `stall_onset.t0_ms != null` かつ `restart.restop_ms == null` の行は、
+    /// **観測区間の右端まで再停止を観測できなかった (右側打ち切り)** を意味する。
+    /// ⚠️ 追跡時間そのものは載せていない (★ 生存解析に使うなら `blockers.md` 起票 20)。
+    pub restart: Restart,
 }
 
 /// 連続する press 間の間隔 1 件。`resuming_ts` はその間隔を終える (2 打目の) press 時刻。
@@ -305,13 +323,24 @@ pub fn build_feature_rows(
     let all_iki_ms: Vec<u64> = iki_ms_by_tick.iter().flatten().copied().collect();
     let iki_baseline = dispersion::SessionIkiBaseline::from_session_iki(&all_iki_ms);
 
-    let stall_onset_col = stall_onset::stall_onset_column(
+    // ★ 条件 A の時系列は `restart` (T1d・issue 006 V2) が使う。⚠️ 検出を 2 回走らせないよう、
+    //   tick 列と同じ 1 回の走査から受け取る (issue 008 AC18 / AC18b の計算量の門)。
+    let (stall_onset_col, condition_a_timeline) = stall_onset::stall_onset_column_with_timeline(
         keys,
         stall_onset_inputs.feat_ts,
         stall_onset_inputs.task_kind_declarations,
         tick_count,
         grid_origin_ms,
         ENGINE_TICK_MS,
+        &stall_onset_inputs.config,
+    );
+    let revision_col = revision::revision_column(keys, tick_count, grid_origin_ms, ENGINE_TICK_MS);
+    // ⚠️★★★ 向きは `stall_onset` → `restart` の一方向だけ (issue 006 AC7)。
+    //   ★ 転帰側 (`restart`) の値は detection 側 (`activity` / `stall_onset`) の入力に渡さない。
+    let restart_col = restart::restart_column(
+        &stall_onset_col,
+        &condition_a_timeline,
+        keys,
         &stall_onset_inputs.config,
     );
     // ⚠️ observability_mask.feat は 008 の feat_ts / hole_gap_ms をそのまま使う
@@ -347,6 +376,8 @@ pub fn build_feature_rows(
             ),
             stall_onset: stall_onset_col[idx].clone(),
             quality: quality_col[idx].clone(),
+            revision: revision_col[idx].clone(),
+            restart: restart_col[idx].clone(),
         })
         .collect())
 }
