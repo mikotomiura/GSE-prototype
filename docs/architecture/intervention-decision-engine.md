@@ -149,6 +149,25 @@ last_log_key 等 **十数個の可変状態**を持つため、pure `decide()` �
 
 ---
 
+## ⚠️ 見直し候補（未決）
+
+> ★ 本節は**決定ではなく、未決の登録**である。★ 決めるときは ADR で決める（⚠️ 本節を根拠に実装しない）。
+> `intervention-design` Skill の冒頭から参照される。
+
+### R-1. ⚠️ Nudge の時期（と有無）を本人が統制する経路（2026-09-20 登録）
+
+- **登録の一次**: `.steering/20260919-theory-ssot-promotion/decisions.md` **判断 4 #5**（研究者判断「見直し候補に載せる」）。起票は ADR-035 Consequences（「未決として起票する: Nudge の時期を本人が統制する経路」）。
+
+| 項目 | 内容 |
+|---|---|
+| 何が問題か | ★ [P386] §2 の警告 —— 状態に合わせて働きかけること（逐語 *"only at the specific times of day they were thought to be most afflicted"*）は操作として非難されうる —— は、招待より先に**現行の Nudge**（Stuck 推定時に出す）に当たる（`docs/research-positioning.md` §3・S2 の追記）。★ 防御線として挙がっているのは透明性と本人の統制（[P380]・[P385]） |
+| 既決との関係 | ★ **ADR-035（Proposed）は招待（Physical Anchor の PC 面）だけが対象**で、Nudge については何も決めていない（ADR-035「最初に固定する切り分け」・Consequences）。★ 近い既存の仕組みは 2 つあるが、どちらも本項の答えではない: ① ADR-004 の Consent 軸（`support_consent == ObserveOnly → none`）—— **有無**の側の候補だが**未実装**（Epic 3）／ ② セッションが宣言する `intervention_enabled`（`session_meta`・スタート画面の第 1 週 / 第 2 週）—— 研究の条件（`condition` / `labelPool`）と一体で選ぶもので、⚠️ **時期**を本人が選ぶ経路ではない（`src/App.tsx` の `PHASE_WEEKS`） |
+| いつまでに決めるか | ★ **Nudge を被験者に出す研究を設計する前**（`docs/research-positioning.md` §6 の M3 = Phase 2 の Y 価値（AB/BA）・M4 = Phase 3 の X2 介入機会（MRT））。⚠️ 割付（AB/BA・MRT）と本人の統制は衝突しうる —— ★ 招待の側では ADR-035 D1「本人が止めた区間は研究の条件が有効でも出さない」（段 3 判断 4 #3 で例外なしと確認）を決め、解析での数え方を解析計画へ回した。★ Nudge で同じ形を採るかは本項で決める |
+| いまは効いていない理由 | ★ 現在の G1 と O1 では **Nudge を出さない**: G1 は起動モード「第 1 週（blind 較正）」で介入を全部 gate する（`experiments/20260801-controlled-friction-task/protocol.md`・`INTERVENTION_ENABLED=false`）—— ⚠️ **手順と既定値（`src/App.tsx` の既定は第 1 週）で守っており、コードでは強制しない**（G1 モードでも週の選択は出る・バックエンドは G1 モードで介入を止めない）／ O1 は判断 O1-5（`src-tauri/src/lib.rs` が `INTERVENTION_ENABLED` を明示的に `false` にする —— ★ コードで強制）。⚠️ 通常モードのビルドでは第 2 週（Nudge が出る）を選べる。~~研究者本人のパイロット（`EH2`）や開発者の日常利用が「Nudge を被験者に出す研究」に入るかは未決（→ 研究者へ）~~ → ★ **2026-09-20 研究者判断: 入らない**（研究者本人・開発者は「被験者」ではない。`.steering/20260920-g1-o1-inventory/decisions.md` 判断 4）。★ したがって本項の締切は**本人・開発者の利用を止めない**。⚠️ ただし `EH2` の制限（**本人による計器・手順の確認であり、外部知覚の証拠にしない**）はそのまま効く —— ★ 本人で Nudge を出して得た所見を「効いた / 受け入れられた」の証拠にしない。⚠️ **G1 の第 1 週の守り方を緩めるものでもない**（上記のとおりコードでは強制していない） |
+| ⚠️ 書いてはいけないこと | ⚠️ 「Nudge は dismiss できるので本人が統制している」—— ★ RP §3 が「opt-in と dismiss があるから自律性を脅かさない」を否決したのと同じ向き（dismiss は出た後の応答であって、出す時期の統制ではない） |
+
+---
+
 ## 関連文書
 - 上位: `docs/architecture/gse-v2-overview.md`
 - 入力側（Layer 0-3）: `docs/architecture/domain-adapter-boundary.md`

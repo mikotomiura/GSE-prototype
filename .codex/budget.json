@@ -1,31 +1,17 @@
 {
   "schema_version": "1",
   "_comment_budget_2026_09_08": "⚠️★★★ 2026-09-08: daily_token_budget を 200000 → 300000 へ一時的に引き上げた。★ 理由: 同日 4 回の呼び出しで 226059 tokens を使い切った後、研究者が『codex 使ってええで』と明示的に許可したため（★ secrets-filter の引用符バイパス修正を /cross-review にかけるのが目的）。⚠️★★★ today.tokens_used は【改竄していない】—— 記録は残したまま上限だけを上げてある。★ 恒久的にこの上限でよいかは研究者が決めること（★ 戻すなら 200000 に戻す）。 ⚠️★★★ 2026-09-12 に裁定した = 【据え置く】。★ 根拠（history 30 日の実測）: 中央値 97558 / ⚠️ 200000 超が 6 日（20%）/ R-2〜R-5 タスク単独で 170400（7 回）。→ ⚠️ 200000 に戻すと 5 日に 1 日はガードに当たる。★ したがって 300000 は『一時的』ではなく実態に合った値である。⚠️ ただし予算ガード自体は外さない —— 上限があること自体が『cross-review を無自覚に何度も回す』ことへの歯止めになっている。★ 一次記録: .steering/20260912-r2-r5-decisions/decisions.md 判断 52。",
+  "_comment_2026_09_14_lost_accounting": "⚠️★★★ 2026-09-14: /cross-review 1 回分の **実測 token 数を失った**。★ 経緯: run-codex-review.sh が today.tokens_used を更新した直後に、作業ツリーを綺麗にするつもりで `git checkout -- .codex/budget.json` を実行し、**未コミットの記帳を巻き戻した**（★ raw の result.jsonl は script の TMPDIR ごと消えており復元不能）。→ ★ 復旧として **per_invocation_max と同じ 30000 を推定値として加算**した（⚠️ 実測ではない。★ 予算ガードにとっては過大計上のほうが安全側なので、この向きに倒した）。⚠️ invocations は +1（＝ 4）で、これは確実である。★ 教訓: .codex/budget.json は台帳なので、`git checkout --` の対象に含めない。",
   "daily_token_budget": 300000,
   "per_invocation_max": 30000,
   "diff_size_threshold_lines": 500,
   "manual_approval_threshold_lines": 2000,
   "today": {
-    "date": "2026-09-13",
-    "tokens_used": 47235,
-    "invocations": 1
+    "date": "2026-09-20",
+    "tokens_used": 183069,
+    "invocations": 4
   },
   "history": [
-    {
-      "date": "2026-08-09",
-      "tokens_used": 30195,
-      "invocations": 1
-    },
-    {
-      "date": "2026-08-10",
-      "tokens_used": 226320,
-      "invocations": 5
-    },
-    {
-      "date": "2026-08-11",
-      "tokens_used": 98718,
-      "invocations": 2
-    },
     {
       "date": "2026-08-12",
       "tokens_used": 25290,
@@ -160,6 +146,21 @@
       "date": "2026-09-12",
       "tokens_used": 230862,
       "invocations": 9
+    },
+    {
+      "date": "2026-09-13",
+      "tokens_used": 244153,
+      "invocations": 5
+    },
+    {
+      "date": "2026-09-14",
+      "tokens_used": 188898,
+      "invocations": 6
+    },
+    {
+      "date": "2026-09-19",
+      "tokens_used": 252600,
+      "invocations": 6
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。",

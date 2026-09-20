@@ -38,6 +38,18 @@ import subprocess
 import sys
 import tempfile
 
+# ⚠️★★ **自分の出力も UTF-8 に固定する**（code-reviewer MEDIUM・2026-09-20）。
+#   ★ `subprocess(..., encoding="utf-8")` は **node の出力の読み取り**を直しただけで、
+#     ⚠️ 本スクリプト自身の stdout は環境既定（Windows では cp932）のままだった。
+#   → 研究者が `python3 scripts/check_g1_emails.py` を直接叩く／別のハーネスから呼ぶと、
+#     ⚠️ **今回消したのと同じ「理由の読めない赤」が戻る**（★ `run.sh` 経由でしか直っていなかった）。
+#   ★ `check-shell-portability.sh` の埋め込み走査器と同じ自衛にそろえる（★ 環境変数に依存しない）。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except Exception:
+        pass
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
 # ★ 検査対象は通常 repo の .gs である。⚠️ `G1_GAS_PATH` で差し替えられるのは
 #   **この検査自体が空回りしていないか**を試すため（scripts/tests/test_check_g1_emails.py が、
@@ -236,6 +248,16 @@ def gas_constants(*names: str) -> dict[str, str]:
     return out
 
 
+def _mask_ids(text: str) -> str:
+    """⚠️★ node の出力に載りうる Form / Sheet / Drive の ID を伏せる。
+
+    ★ node のスタックトレースは**該当ソース行を丸ごと**載せるので、`.gs` 直書きの ID が
+    `run.sh` のログ（と CI のログ）へ出うる（security-checker LOW・2026-09-20）。
+    ★ 25 文字以上の ID 形だけを伏せる。⚠️ 行番号と文脈は残すので原因の特定には足りる。
+    """
+    return re.sub(r"[A-Za-z0-9_-]{25,}", "<id-masked>", text)
+
+
 def run_gas(short_mode: str = "0") -> dict:
     src = GAS.read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as td:
@@ -244,13 +266,35 @@ def run_gas(short_mode: str = "0") -> dict:
             HARNESS.replace("__GAS_SOURCE__", src).replace("__SHORTMODE__", short_mode),
             encoding="utf-8",
         )
-        r = subprocess.run(["node", str(js)], capture_output=True, text=True)
+        # ⚠️★ `encoding="utf-8"` を明示する（2026-09-20 実測）。★ `text=True` だけだと
+        #   **実行環境の既定エンコーディング**でデコードするので、Windows（cp932）では
+        #   node が出す日本語のメール本文で `UnicodeDecodeError` が読み取りスレッド内で起き、
+        #   ⚠️ `r.stdout` が `None` のまま返って `AttributeError` でスクリプトごと落ちる。
+        #   → ★ 上位の `run.sh` には **`[FAIL] 受付メールが §2.12 の開示範囲から外れている`**
+        #     と出る（⚠️ **開示範囲は正しいのに赤くなる**）。
+        #   ★ `errors="replace"` も付ける（code-reviewer LOW）: node が不正バイトを吐くと
+        #     ⚠️ 今度は `UnicodeDecodeError` で同じ形（理由の読めない赤）に戻るため。
+        r = subprocess.run(
+            ["node", str(js)], capture_output=True, encoding="utf-8", errors="replace"
+        )
     if r.returncode != 0:
+        # ⚠️★ node のスタックトレースは**該当ソース行を丸ごと**載せるので、`.gs` に直書きの
+        #   Form / Sheet / Drive の ID がそのまま `run.sh` のログ（と CI のログ）へ出うる
+        #   （security-checker LOW・2026-09-20）。★ 25 文字以上の ID 形を伏せてから出す。
+        #   ⚠️ 伏せても**行番号と文脈は残る**ので、原因の特定には足りる。
         raise SystemExit(
             "[NG] ★ .gs を評価できない（GAS 実行時にも同じエラーになる）\n"
-            + (r.stderr.strip()[:1500] or "(stderr なし)")
+            + (_mask_ids(r.stderr.strip())[:1500] or "(stderr なし)")
         )
-    return json.loads(r.stdout.strip().splitlines()[-1])
+    # ⚠️★ stdout 側も伏せてから出す（code-reviewer LOW・2026-09-20）。
+    #   ★ ここで例外にすると、その **stdout の生断片**が traceback に載る経路があった。
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError) as e:
+        raise SystemExit(
+            "[NG] ★ .gs の出力を JSON として読めない（%s）\n" % type(e).__name__
+            + (_mask_ids(r.stdout.strip())[-500:] or "(stdout なし)")
+        )
 
 
 def main() -> int:

@@ -49,6 +49,30 @@ worker が実際に打つのは `uv run ruff check . ; echo "EXIT:$?"` のよう
 }
 ```
 
+### この 7 件は worktree へ**自動で注入される** (2026-09-14)
+
+`scripts/loop-spawn.sh` が worktree 作成直後に `scripts/loop-worktree-deny.sh` を呼び、
+`<worktree>/.claude/settings.local.json` へ書いたうえで**読み直して検査する**。
+注入または検査に失敗したら `loop-spawn.sh` は**非 0 で止まり、worktree のパスを返さない** (fail-closed)。
+
+- モードC (`loop-run.sh`) も worktree 生成をこのスクリプトへ委譲しているので、**モードA / C の両方**で効く。
+- ⚠ **main checkout の `.claude/settings.json` には入れない** — 対話セッションでも `git push` が塞がれる。
+  worktree 側の `settings.local.json` は gitignore 済みなので worktree ごとに別物にできる。
+- 既存ファイルがあれば **`deny` 配列へマージする** (他のキーを消さない)。
+  ⚠ **壊れた JSON なら上書きせず停止する** (人の設定を黙って捨てない・deny 無しでも続行しない)。
+- ⚠ 上のリストと `loop-worktree-deny.sh` の 7 件が食い違うと `scripts/loop-worktree-deny-test.sh` が
+  **赤になる** (契約の二重定義を機械で止めている)。**片方だけ増やさないこと。**
+- 既存 worktree を手で確認する: `bash scripts/loop-worktree-deny.sh --verify <worktree>`
+- ⚠ `loop-run.sh` は **attempt ごとに再注入・再検査**する。worker は `acceptEdits` で
+  `.claude/settings.local.json` を書き換え・削除できるので、**作成時 1 回では閉じない**
+  (⚠ 必須 7 件に `Edit` / `Write` 系は 1 件も無い)。保証できない attempt は `blocked` にして起動しない。
+- ⚠ `deny` を入れても**完全な境界ではない**のは上記のとおり。実質的な境界は worktree 隔離と人間の merge ゲート。
+  綴り違い (`git -C <dir> push` / `gh api --method PUT …/merges`) は塞げず、しかも追跡済み
+  `.claude/settings.json` の `allow: ["Bash(git *)","Bash(gh *)"]` に拾われる。
+  **deny の件数を増やす方向で解こうとしないこと** — 実効的な境界はリモート側 (branch protection) に置く。
+- ⚠ **注入されていること ≠ 発効していること**。`permission_mode` を `auto` / `bypassPermissions` へ
+  昇格させたときに deny がどう評価されるかは **2026-09-14 時点で未検証**。
+
 ## ⚠ `token_ceiling` を 2,000,000 にしない
 
 実測で **1 attempt × 3 並列 ≒ 7.09M tokens** (cache 込み)。2M は 1 ラウンドで必ず超過し、
@@ -72,6 +96,21 @@ pin し忘れると main から worktree が切られ、実装が存在しない
 `acceptance_template` で issue ごとの AC 検査コマンドを回す (`{issue_dir}` は issue の置き場に解決)。
 `acceptance.sh` が無い issue はこの段を skip する。
 **AC が test で表せない issue には必ず `acceptance.sh` を書く。**
+
+### ⚠ `acceptance_template` は `loop-run.sh` に読まれない (2026-09-14 実測)
+
+モードC の実体は **`$TASK_DIR/issues/<id>-acceptance.sh` のハードコード** (`loop-run.sh:235`)。
+`acceptance_template` の値を書き換えても効かない (= **契約の二重定義**)。
+置き場は必ず `issues/<id>-acceptance.sh` にすること。`--dry-run` の `acceptance=yes/no` 表示で
+実際に拾えているかを確認できる。
+
+### ⚠ Loop の実行時生成物は `.gitignore` に入れる
+
+`loop-run.sh` は `_loop-events.jsonl` を **作ってから** `loop-spawn.sh` を呼ぶので、
+無視されていないと spawn の dirty-tree 判定に**自分で作ったファイルが当たり**、
+1 issue 目から `worktree 生成に失敗` で全部死ぬ (2026-09-14 に stub 実行で再現)。
+本リポジトリでは `.steering/**/_loop-events.jsonl` / `_loop-board.md` / `_loop-run-report.md` を
+`.gitignore` に入れてある。
 
 ## ⚠ verify はベースラインで緑か
 

@@ -73,7 +73,17 @@ fi
 
 SCAN_PY="$(
   cat << 'PY'
-import re, subprocess, sys
+import os, re, subprocess, sys
+
+# ⚠️★★ 出力を **UTF-8 に固定**する（2026-09-20 実測）。★ Windows の既定（cp932）だと
+#   VIOL 行に載る多バイトの断片（置換文字 `�` を含む）が encode できず、
+#   `UnicodeEncodeError` で **rc=1 のまま明細を 1 行も出さずに死ぬ**。
+#   ⚠️ これは本スクリプト冒頭が警戒している型そのもの（「違反があると言いながら明細が無い」）。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except Exception:
+        pass
 
 # ★ 走査対象の集め方。
 #   ⚠️ **拡張子だけに頼らない**（★ shebang しか手がかりの無いファイルを取りこぼす）。
@@ -120,6 +130,33 @@ def is_shell_by_shebang(first_line):
 #   → ★ NUL 区切りで受け取れば quote されない。⚠️ あわせて OSError を
 #     **「検査できなかった」として数える**（★ 黙って飛ばさない）。
 SKIPPED = []
+# ⚠️★★ **入れ子の worktree / リポジトリ**（`git worktree add .worktrees/...` や
+#   submodule）は、`git ls-files --others` が **末尾 `/` の 1 エントリ**として返す。
+#   ★ これは「開けなかったファイル」ではなく**ディレクトリ**であり、必ず OSError になる。
+#   ⚠️ 2026-09-20 実測: `.worktrees/codex-rescue-20260916-theory-review/` が残っていたために
+#     本ゲートが **rc=2（検査できなかった）** で落ち、`check-o1-release-readiness.sh` の
+#     赤 3 件目になっていた（★ 違反は 1 件も無い）。
+#   → ★ **別枠で数えて note として必ず出す**（⚠️ 黙って消さない）。中のスクリプトは
+#     その worktree 自身の checkout の持ち物であり、この checkout の配布物ではない。
+NESTED = []
+# ★ 対象外にしてよい入れ子リポジトリの置き場（⚠️ ここに無い場所は fail-closed）。
+#   ★ `.worktrees/` は `codex-rescue` / loop 系が作る一時 checkout の置き場である
+#     （`.claude/skills/codex-rescue/SKILL.md` の `WORKTREE_DIR=".worktrees/…"`）。
+NESTED_ALLOWED = (".worktrees/",)
+
+
+def classify_dir_entry(path, has_git):
+    """★ 末尾 `/` のエントリを **走査対象外（NESTED）** と **fail-closed（SKIPPED）** に分ける。
+
+    ⚠️★★★ **ここは「サブツリーを丸ごと走査から外すか」を決める唯一の場所**である
+    （code-reviewer HIGH・2026-09-20）。★ 本ファイル冒頭の規約「型を足すときは必ず
+    陽性対照と陰性対照を一緒に足す」に従い、**純関数に切り出して対照を掛けられる**ようにした。
+    ⚠️ ここを緩めても（置き場の限定を外す・`.git` の確認を外す・`else` を消す）、
+    **実行時には何も赤くならない**ので、対照が無いと静かに壊れる。
+    """
+    if path.startswith(NESTED_ALLOWED) and has_git:
+        return "NESTED"
+    return "SKIPPED"
 
 
 def targets():
@@ -134,6 +171,20 @@ def targets():
             if not raw:
                 continue
             f = raw.decode("utf-8", "surrogateescape")
+            # ★ 末尾 `/` = 入れ子の worktree / リポジトリ（上記 NESTED の注記）。
+            #   ⚠️ 開こうとすると必ず OSError になるので、SKIPPED（fail-closed）に混ぜない。
+            # ⚠️★★ ただし **末尾 `/` だけで信じない**（Codex /cross-review 1 巡目・2026-09-20）。
+            #   ★ 入れ子リポジトリなら `.git`（worktree ではファイル・通常は dir）が必ず在る。
+            # ⚠️★★★ **置き場も限定する**（security-checker HIGH・2026-09-20）:
+            #   ★ 「入れ子 git なら**どこにあっても**素通り」にすると、⚠️ 配布物に入る場所
+            #     （`experiments/…` や `scripts/submit/`）に入れ子リポジトリが出来た瞬間に、
+            #     **その配下のスクリプトが丸ごと未走査**になる（★ 被験者が叩くスクリプトを含みうる）。
+            #   → ★ **宣言した接頭辞（`.worktrees/`）だけ**を対象外にし、それ以外は
+            #     `SKIPPED`（fail-closed）に戻す。⚠️ 置き場を増やすときはここに書き足すこと。
+            if f.endswith("/"):
+                kind = classify_dir_entry(f, os.path.exists(os.path.join(f, ".git")))
+                (NESTED if kind == "NESTED" else SKIPPED).append(f)
+                continue
             if f.endswith(EXTS):
                 bucket.append(f)
                 continue
@@ -183,6 +234,9 @@ if mode == "repo":
               file=sys.stderr)
         sys.exit(2)
     print("SCANNED %d %d" % (len(tracked), len(untracked)))
+    # ★ 入れ子の worktree は**飛ばしたことを必ず言う**（⚠️ 「走査した」と誤読させない）。
+    if NESTED:
+        print("NESTED %d %s" % (len(NESTED), ", ".join(NESTED[:5])))
     hits = scan(allf)
     # ⚠️★★ 開けなかったファイルがあれば **違反 0 件でも緑にしない**（fail-closed）。
     #   ★ 旧版はここが無かったので、非 ASCII 名の 2 本が消えたまま緑だった。
@@ -208,6 +262,14 @@ elif mode == "shebang":
         with open(p, "rb") as fh:
             first = fh.read(256).split(b"\n")[0]
         print("%s %s" % ("YES" if is_shell_by_shebang(first) else "NO", p))
+    sys.exit(0)
+
+elif mode == "classify":
+    # ★ 入れ子ディレクトリの分類だけを単体で試す（★ 副作用なし・実ファイル不要）。
+    #   引数は `<path> <0|1>` の並び（1 = そのディレクトリに `.git` が在る）。
+    args = sys.argv[2:]
+    for i in range(0, len(args), 2):
+        print("%s %s" % (classify_dir_entry(args[i], args[i + 1] == "1"), args[i]))
     sys.exit(0)
 
 else:  # ctl: 対照。引数のファイルだけを見る
@@ -238,6 +300,16 @@ case "${scan_rc}" in
     [ -n "${SCAN_ERR}" ] && printf '%s\n' "${SCAN_ERR}" | sed 's/^/       /'
     ;;
 esac
+
+# ⚠️★★ **走査していないものを、緑のときこそ言う**（2026-09-20 追加）。
+#   ★ 入れ子の worktree / リポジトリ（`git worktree add .worktrees/...`）は
+#     `git ls-files --others` が末尾 `/` の 1 エントリで返すので走査できない。
+#   ⚠️ 黙って除くと「87 本走査して違反 0」だけが残り、**中の何本を見ていないかが消える**。
+NESTED_OUT="$(printf '%s\n' "${SCAN_OUT}" | grep '^NESTED ' || true)"
+if [ -n "${NESTED_OUT}" ]; then
+  printf '%s\n' "${NESTED_OUT}" \
+    | sed 's/^NESTED [0-9]* /       ★ 走査対象外（入れ子の worktree・中は別 checkout の持ち物）: /'
+fi
 
 # --- 2. ⚠️★★★ 収集経路の陽性対照 -------------------------------------------------
 #   ★ 上の「0 件」が **走査が空振りしたのではない**ことを、
@@ -289,6 +361,34 @@ if [ "${sb}" = "YES" ]; then
   ok "★ shebang だけのファイル（#!/usr/bin/env sh）を拾える"
 else
   ng "★ shebang 判定が拾えていない（⚠️ macOS の /bin/sh は bash 3.2 の実体＝同じ罠を踏む）"
+fi
+
+# --- 5b. ⚠️★★★ **入れ子ディレクトリの分類の対照**（code-reviewer HIGH・2026-09-20）-----
+#     ★ 「サブツリーを丸ごと走査から外すか」を決める分岐は、⚠️ **緩めても実行時には
+#       何も赤くならない**（置き場の限定を外す・`.git` の確認を外す・`else` を消す、のどれでも）。
+#     → ★ 純関数 `classify_dir_entry` を `classify` モードで直接叩き、
+#       **陽性 1 本と陰性 2 本**を置く（⚠️ 実ファイルを作らないので副作用ゼロ）。
+cls="$(python3 -c "${SCAN_PY}" classify \
+        ".worktrees/x/" 1 \
+        "experiments/20260801-controlled-friction-task/x/" 1 \
+        ".worktrees/x/" 0 2> /dev/null || true)"
+cls_pos="$(printf '%s\n' "${cls}" | sed -n '1p')"
+cls_neg_place="$(printf '%s\n' "${cls}" | sed -n '2p')"
+cls_neg_git="$(printf '%s\n' "${cls}" | sed -n '3p')"
+if [ "${cls_pos}" = "NESTED .worktrees/x/" ]; then
+  ok "★ 陽性対照: 宣言した置き場の入れ子リポジトリは走査対象外になる"
+else
+  ng "★ 陽性対照が壊れた: 期待 'NESTED .worktrees/x/' / 実際 '${cls_pos}'"
+fi
+if [ "${cls_neg_place}" = "SKIPPED experiments/20260801-controlled-friction-task/x/" ]; then
+  ok "★ 陰性対照: 置き場が違う入れ子リポジトリは fail-closed（★ 配布物に入る場所を素通りさせない）"
+else
+  ng "⚠️★ 陰性対照が壊れた: 置き場を問わず素通りしている（実際 '${cls_neg_place}'）"
+fi
+if [ "${cls_neg_git}" = "SKIPPED .worktrees/x/" ]; then
+  ok "★ 陰性対照: .git の無いディレクトリは fail-closed（★ 正体不明を緑にしない）"
+else
+  ng "⚠️★ 陰性対照が壊れた: .git の確認が効いていない（実際 '${cls_neg_git}'）"
 fi
 
 # --- 6. ⚠️★★★ **この規約が必要な理由そのもの**を実演する --------------------------

@@ -58,7 +58,38 @@ pub struct RedactionSummary {
 
 /// NDJSON 1 行が「いつの記録か」を返す。⚠️ ★ **`meta` 行は常に `None`** である。
 ///
-/// ★ 対象は `t` だけである（`key` / `feat` / `paste` / `pointer_bin` / …）。
+/// ★ 主たる対象は `t` である（`key` / `feat` / `paste` / `pointer_bin` / `activity_label` / …）。
+///
+/// ## ⚠️★★★ 2026-09-14: **自己申告行が 1 行も消えていなかった**（ADR-031 **D6**）
+///
+/// ★ 旧実装は `"t"` **だけ**を読んでいた。⚠️ ところが `logger.rs` は
+/// **`realtime_label` / `vignette_response` に `"ts"`**、**`probe_assignment` に
+/// `"scheduled_ts"`** を書いている。→ ★ 本関数が `None` を返し、
+/// [`retain_outside_range`] が**残していた**。
+///
+/// ⚠️★★★ **画面には「消しました（… 件）」と出るのに、被験者の自己申告は端末に残っていた。**
+/// ★ 削除 UI は O1 以外でも出る（`src/components/RecordingControls.tsx` の `else` 枝）ので、
+/// **通常運用（v0.3 較正）で live な欠陥**だった。
+/// ⚠️ 既存テストは `key` と `pointer_bin`（どちらも `"t"`）しか見ておらず、素通りしていた。
+///
+/// ★ **直し方は「行種ごとの明示列挙」である**（⚠️ **「`t` が無ければ任意の `*_ts` を探す」
+/// 汎用実装は採らない**）。理由は 2 つ:
+/// 1. ⚠️ `session_meta` まで消える（下記）。
+/// 2. ⚠️ **将来の行種が無言で削除対象に入る** —— ★ 明示列挙なら、足し忘れたときに
+///    「**消えない**」側（＝ 安全側ではないが**気づける**側）に倒れ、テストが止める。
+///
+/// ## ⚠️★★★ `session_meta` は `meta` と同じく残す（ADR-031 D6 決定 3）
+///
+/// ⚠️★★★ **2026-09-14 に理由を実測で訂正した**（code-reviewer MEDIUM）。
+/// ★ 初出は「`gse-replay` が 1 セッション 1 本を前提。**0 本の挙動は未検証**」と書いたが、
+/// ⚠️ **実測すると 0 本は `Err` にならない** —— `bin/replay.rs` は
+/// `track = TrackKind::Main` を既定にし、逐語 `"no session_meta found — assuming track=main"` と
+/// **warn するだけ**である。
+/// → ★★★ **実害は「落ちること」ではなく「O1 / exploratory が黙って `main` として読まれること」**である。
+/// ⚠️ `Err` になるのは **2 本目以降で `task_kind` が割れたとき**（同ファイルの `bail!`）。
+/// → ★ 結論（残す）は変わらないが、**根拠はこちらが正しい**。
+/// ★ `session_meta` が持つのは `track` / `task_kind` / `condition` / `head_id` ——
+/// **被験者の行動の中身ではなく、そのセッションの条件**である。
 ///
 /// ## ⚠️★★★ 2026-08-26: **`meta` 行を削除対象から外した**（研究者判断 R-12）
 ///
@@ -81,12 +112,68 @@ pub struct RedactionSummary {
 pub fn line_timestamp(line: &str) -> Option<u64> {
     let v: serde_json::Value = serde_json::from_str(line).ok()?;
     let obj = v.as_object()?;
-    // ⚠️★★★ **`meta` 行は消さない**（上記 R-12）。★ 行種で弾くので、将来 `meta` に
-    //   時刻フィールドが増えても**自動的に守られる**。
-    if obj.get("type").and_then(serde_json::Value::as_str) == Some("meta") {
+    // ⚠️★★★ **`meta` / `session_meta` 行は消さない**（上記 R-12 / ADR-031 D6 決定 3）。
+    //   ★ 行種で弾くので、将来これらに時刻フィールドが増えても**自動的に守られる**。
+    let line_type = obj.get("type").and_then(serde_json::Value::as_str);
+    if matches!(line_type, Some("meta") | Some("session_meta")) {
         return None;
     }
-    obj.get("t").and_then(serde_json::Value::as_u64)
+    // ★ 既定は `"t"`。⚠️ 別名を書く行種だけを**明示列挙**する（ADR-031 D6）。
+    let key = match line_type {
+        Some("realtime_label") | Some("vignette_response") => "ts",
+        Some("probe_assignment") => "scheduled_ts",
+        _ => "t",
+    };
+    obj.get(key).and_then(serde_json::Value::as_u64)
+}
+
+/// 行が**占める時間の区間** `[start, end]`（★ 点しか持たない行は `start == end`）。
+///
+/// ## ⚠️★★★ なぜ「点」では足りないのか（2026-09-14・security-checker HIGH）
+///
+/// ★ 自己申告の行は **「答えた時刻」と「答えが指している時間帯」が違う**。
+/// ⚠️ 点（＝ 答えた時刻）だけで削除判定すると、次が起きる:
+///
+/// > ★ 会話が **14:20–14:45**。復帰を引き金にプローブが **14:46** に出て、
+/// > 被験者が「会話」と答える。⚠️ 第三者の求めで被験者が **14:20–14:45 を削除**しても、
+/// > 回答の行（`t` ＝ 14:46）は**残る**。
+/// > → ★★★ **削除した区間に第三者が同席していた事実が端末と提出物に残る。**
+///
+/// ⚠️ これは同意文書の逐語「★ **その時間帯のお答えは消えます**」を破る
+/// （＝ ADR-031 **D5 保証 2** が実体として成立しない）。
+///
+/// ## ★ どの行が区間を持つか
+///
+/// | 行種 | 区間 |
+/// |---|---|
+/// | `activity_label` | `recall_window_start_ms` 〜 `recall_window_end_ms` ∪ `t` |
+/// | `realtime_label` | `analysis_window_start_ms` 〜 `analysis_window_end_ms` ∪ `ts` |
+/// | それ以外 | 点（[`line_timestamp`]） |
+/// | `meta` / `session_meta` | **`None`（常に残す）** |
+///
+/// ⚠️★★★ **区間は「答えた時刻」も含める**（和集合）。★ 回答そのものの時刻を消す
+/// 要求（「さっきの 5 分を消して」）でも落ちるようにするためである。
+///
+/// ⚠️ **`(0, 0)` の窓は「未設定」とみなして無視する** —— ★ skip 応答や旧ログで
+/// 窓が 0 のことがあり、素直に和集合を取ると **epoch から回答時刻までの全区間**になって
+/// **無関係な削除要求でも落ちてしまう**（★ 実測で踏んだ）。
+pub fn line_interval(line: &str) -> Option<(u64, u64)> {
+    let point = line_timestamp(line)?;
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    let obj = v.as_object()?;
+    let num = |k: &str| obj.get(k).and_then(serde_json::Value::as_u64);
+    let window = match obj.get("type").and_then(serde_json::Value::as_str) {
+        Some("activity_label") => num("recall_window_start_ms").zip(num("recall_window_end_ms")),
+        Some("realtime_label") => {
+            num("analysis_window_start_ms").zip(num("analysis_window_end_ms"))
+        }
+        _ => None,
+    };
+    Some(match window {
+        // ⚠️ 壊れた窓（start > end）と未設定の窓（0,0）は**点に倒す**（★ 黙って広げない）。
+        Some((ws, we)) if ws <= we && we > 0 => (point.min(ws), point.max(we)),
+        _ => (point, point),
+    })
 }
 
 /// `[from_ms, to_ms]`（★ **両端を含む**）に入る行を落とし、残す行だけを返す。
@@ -105,8 +192,10 @@ pub fn retain_outside_range<'a>(
     let mut removed = 0usize;
     for line in lines {
         if from_ms <= to_ms {
-            if let Some(t) = line_timestamp(line) {
-                if t >= from_ms && t <= to_ms {
+            // ★ **区間が交差したら落とす**（ADR-031 D6・2026-09-14）。
+            //   ⚠️ 点の行は `start == end` なので、従来どおり「点が範囲内か」になる。
+            if let Some((start, end)) = line_interval(line) {
+                if start <= to_ms && end >= from_ms {
                     removed += 1;
                     continue;
                 }
@@ -442,6 +531,236 @@ mod tests {
         assert_eq!(kept.len(), 2);
         assert!(kept[0].contains("session_start"), "{kept:?}");
         assert!(kept[1].contains("session_end"), "{kept:?}");
+    }
+
+    /// ⚠️★★★ **`line_timestamp` の行種列挙が `logger.rs` の書式と一致していること**
+    /// (ADR-031 **D6 決定 4** / `verify-before-claiming` ルール 6)。
+    ///
+    /// ## ★ なぜ要るのか
+    ///
+    /// ★ ADR-031 §Alternatives **A8** は「汎用実装は採らず明示列挙にする。
+    /// **足し忘れれば『消えない』側に倒れるが、それは検査で止める**」と書いた。
+    /// ⚠️ **その「検査」が無かった** (2026-09-14・code-reviewer HIGH)。
+    ///
+    /// ## ★ 何を突き合わせるか
+    ///
+    /// `logger.rs` の書式文字列を行単位で走査し、**その行が書く時刻キー**を
+    /// [`line_timestamp`] が実際に拾えることを 1 行通して確かめる。
+    /// ⚠️ 拾えない行種は**区間指定削除で永久に消えない** (= 同意文書 §4-3 の約束が破れる)。
+    #[test]
+    fn every_logger_line_type_uses_the_time_key_that_redaction_looks_for() {
+        const LOGGER: &str = include_str!("logger.rs");
+        const NEEDLE: &str = "{{\"type\":\"";
+        let mut checked: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        let mut problems: Vec<String> = Vec::new();
+
+        for src_line in LOGGER.lines() {
+            let Some(i) = src_line.find(NEEDLE) else {
+                continue;
+            };
+            let rest = &src_line[i + NEEDLE.len()..];
+            let Some(q) = rest.find('"') else { continue };
+            let line_type = &rest[..q];
+
+            // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
+            if matches!(line_type, "meta" | "session_meta") {
+                continue;
+            }
+
+            // ★ この行が実際に書いている時刻キーを拾う (★ 走査は 1 行に閉じる)。
+            let key = if src_line.contains("\"scheduled_ts\":") {
+                "scheduled_ts"
+            } else if src_line.contains("\"t\":") {
+                "t"
+            } else if src_line.contains("\"ts\":") {
+                "ts"
+            } else {
+                continue; // ★ 時刻を持たない行は対象外。
+            };
+
+            checked.insert(line_type);
+            let probe = format!("{{\"type\":\"{line_type}\",\"{key}\":4242}}");
+            if line_timestamp(&probe) != Some(4242) {
+                problems.push(format!(
+                    "{line_type}: logger は {key} を書くのに line_timestamp が拾わない"
+                ));
+            }
+        }
+
+        assert!(
+            problems.is_empty(),
+            "⚠️★★★ 区間指定削除で消えない行種がある (同意文書 §4-3 が破れる):
+{}",
+            problems.join(
+                "
+"
+            )
+        );
+        // ⚠️★★★ **検査が空回りしていないこと** —— ★ 魔法数ではなく**宣言と一致**させる
+        //   (2026-09-14・`/cross-review` MEDIUM「フォーマット文字列走査は脆い」への対処)。
+        //   ★ `logger.rs` の書式が複数行化・serde 化して走査が空振りしたら、
+        //   **ここで検出される**（★ 見逃しではなく赤になる）。
+        //
+        // ⚠️★★★ **循環していないことの確認**（2026-09-14・`/cross-review` 2 巡目 MEDIUM-2）:
+        //   ★ Codex は「`KNOWN_LINE_TYPES` を基準にすると *logger に足したのに KNOWN を
+        //   更新し忘れた* ケースを検出できない」と指摘した。
+        //   → ★ **それは別のテストが既に見ている** ——
+        //   `capabilities::tests::capabilities_covers_every_line_type` が
+        //   **`logger.rs` のリテラルを走査して KNOWN に在ることを要求する**。
+        //   ⚠️ したがって「logger にあって KNOWN に無い」は**そちらで赤になる**。
+        //   ★ 本テストが見るのは「KNOWN にあって redaction が拾えない」側である。
+        let expected: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
+            .iter()
+            .copied()
+            .filter(|t| !matches!(*t, "meta" | "session_meta"))
+            .collect();
+        assert_eq!(
+            checked, expected,
+            "★ 走査できた行種が宣言と一致しない。
+             ⚠️ `logger.rs` の書式文字列の形が変わって走査が空振りしている可能性がある 
+             (★ そのときは *見逃し* ではなく本アサートで止まる)。"
+        );
+    }
+
+    /// ⚠️★★★ **自己申告行も区間指定削除の対象である** (ADR-031 **D6** 決定 2 / 4)。
+    ///
+    /// ★ 2026-09-14 まで、これらは `"t"` を持たないので **1 行も消えていなかった**。
+    /// ⚠️ 画面には「消しました（… 件）」と出るのに端末に残る、という状態だった。
+    #[test]
+    fn self_reported_rows_are_redactable_even_though_they_use_another_time_key() {
+        // ★ `realtime_label` / `vignette_response` は `"ts"`。
+        assert_eq!(
+            line_timestamp(
+                r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":1,"analysis_window_start_ms":0,"analysis_window_end_ms":0,"ts":3000}"#
+            ),
+            Some(3000)
+        );
+        assert_eq!(
+            line_timestamp(
+                r#"{"type":"vignette_response","vignette_id":"v1","expected_quadrant":"flow","q1_friction":3,"q2_progress":4,"elapsed_ms":1,"changes":0,"ts":4000}"#
+            ),
+            Some(4000)
+        );
+        // ⚠️ `probe_assignment` は `"t"` を**持たない**。時刻は `"scheduled_ts"` である。
+        assert_eq!(
+            line_timestamp(
+                r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#
+            ),
+            Some(2000)
+        );
+        // ★ 新しい監査 criterion は `"t"` を使う (ADR-031 D6 決定 1)。
+        assert_eq!(
+            line_timestamp(
+                r#"{"type":"activity_label","t":5000,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120,"recall_window_start_ms":4700,"recall_window_end_ms":5000}"#
+            ),
+            Some(5000)
+        );
+    }
+
+    /// ⚠️★★★ **「会話の *区間* を消せば、その申告も消える」** (ADR-031 **D5 保証 2**)。
+    ///
+    /// ## ★ これは同意文書の逐語に対応する回帰である
+    ///
+    /// 逐語（`consent-draft-o1.md` §4 追補）: 「★ **お答えも上の 3 番（時間帯を指定して消す）の
+    /// 対象です。★ その時間帯のお答えは消えます。**」
+    ///
+    /// ⚠️★★★ **2026-09-14 まで、これは実装で保証されていなかった**（security-checker HIGH）。
+    /// ★ `activity_label` の `t` は**回答した時刻**なので、会話が 14:20–14:45 で回答が 14:46 だと、
+    /// **14:20–14:45 を削除しても行が残った**。
+    #[test]
+    fn deleting_the_conversation_window_also_removes_the_self_report_about_it() {
+        // ★ 会話は 14:20–14:45、プローブは復帰後の 14:46 に発火して回答された、という配置。
+        const CONV_START: u64 = 1_700_000_000_000; // 14:20 相当
+        const CONV_END: u64 = CONV_START + 25 * 60_000; // 14:45
+        const ANSWERED_AT: u64 = CONV_END + 60_000; // 14:46
+
+        let label = format!(
+            r#"{{"type":"activity_label","t":{ANSWERED_AT},"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":900,"recall_window_start_ms":{CONV_START},"recall_window_end_ms":{CONV_END}}}"#
+        );
+        let unrelated =
+            format!(r#"{{"type":"key","t":{ANSWERED_AT},"category":"alphabetic","press":true}}"#);
+
+        // ★ 被験者は **会話の時間帯だけ**を指定する（⚠️ 回答時刻は範囲の外である）。
+        let (kept, removed) =
+            retain_outside_range([label.as_str(), unrelated.as_str()], CONV_START, CONV_END);
+        assert_eq!(removed, 1, "★ 会話の申告が落ちていない: {kept:?}");
+        assert!(
+            !kept.iter().any(|l| l.contains("conversation")),
+            "⚠️★★★ 第三者の在席を示す申告が端末に残った: {kept:?}"
+        );
+        // ⚠️★★★ **対照**: 同じ範囲でも、範囲外の打鍵行は残る（★ 過剰削除をしていない）。
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert!(kept[0].contains(r#""type":"key""#), "{kept:?}");
+
+        // ★ 逆向き: **回答時刻だけ**を指定しても落ちる（★ 和集合であること）。
+        let (kept2, removed2) =
+            retain_outside_range([label.as_str()], ANSWERED_AT - 1_000, ANSWERED_AT + 1_000);
+        assert_eq!(removed2, 1, "回答時刻を指定しても落ちること: {kept2:?}");
+
+        // ⚠️★★★ **無関係な時間帯では落ちない**（★ 検査が「常に落ちる」空回りでないこと）。
+        let (kept3, removed3) =
+            retain_outside_range([label.as_str()], CONV_START - 600_000, CONV_START - 60_000);
+        assert_eq!(removed3, 0, "無関係な範囲で落ちてはならない: {kept3:?}");
+    }
+
+    /// ★ `realtime_label` も**分析窓**で落ちる（★ 同じ穴が主データ側にもあった）。
+    #[test]
+    fn realtime_label_is_removed_when_its_analysis_window_is_deleted() {
+        let line = r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":500,"analysis_window_start_ms":1700000000000,"analysis_window_end_ms":1700000030000,"ts":1700000090000}"#;
+        // ★ 分析窓だけを指定する（⚠️ `ts` は範囲外）。
+        let (kept, removed) = retain_outside_range([line], 1_700_000_000_000, 1_700_000_030_000);
+        assert_eq!(removed, 1, "分析窓で落ちない: {kept:?}");
+        // ⚠️ 無関係な範囲では落ちないこと（★ 空回り防止）。
+        let (kept2, removed2) = retain_outside_range([line], 1, 2);
+        assert_eq!(removed2, 0, "{kept2:?}");
+    }
+
+    /// ⚠️★★★ **`session_meta` は消さない** (ADR-031 D6 決定 3)。
+    ///
+    /// ★ `gse-replay` は 1 セッション 1 本の `session_meta` を前提にしており、
+    /// ⚠️ **0 本になったときの挙動は未検証**である。→ ★ 触らない側に倒す。
+    /// ⚠️ `meta` と対で固定する —— ★ 片方だけ直すと、もう片方が無言で消える。
+    #[test]
+    fn session_meta_is_never_redacted_like_meta() {
+        assert_eq!(
+            line_timestamp(
+                r#"{"type":"session_meta","track":"o1","task_kind":"writing","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":1000}"#
+            ),
+            None
+        );
+        assert_eq!(
+            line_timestamp(r#"{"type":"meta","session_start":500,"hmm_version":"0.5.0"}"#),
+            None
+        );
+    }
+
+    /// ★ 通しの回帰: **自己申告行が実際に落ちて、`session_meta` と `meta` は残る**。
+    #[test]
+    fn a_range_drops_self_reports_and_keeps_both_meta_kinds() {
+        let (kept, removed) = retain_outside_range(
+            [
+                r#"{"type":"meta","session_start":1000,"hmm_version":"0.5.0"}"#,
+                r#"{"type":"session_meta","track":"o1","task_kind":"writing","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":1100}"#,
+                r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#,
+                r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":1,"analysis_window_start_ms":0,"analysis_window_end_ms":0,"ts":3000}"#,
+                r#"{"type":"activity_label","t":3100,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120,"recall_window_start_ms":2800,"recall_window_end_ms":3100}"#,
+                r#"{"type":"key","t":8000,"category":"alphabetic","press":true}"#,
+                r#"{"type":"meta","session_end":9000}"#,
+            ],
+            1500,
+            5000,
+        );
+        assert_eq!(removed, 3, "★ 自己申告 3 行が落ちる: {kept:?}");
+        assert_eq!(kept.len(), 4);
+        assert!(kept[0].contains("session_start"), "{kept:?}");
+        assert!(kept[1].contains("session_meta"), "{kept:?}");
+        assert!(kept[2].contains(r#""t":8000"#), "{kept:?}");
+        assert!(kept[3].contains("session_end"), "{kept:?}");
+        // ⚠️★★★ **会話の申告が端末に残っていないこと** (ADR-031 D5 保証 2)。
+        assert!(
+            !kept.iter().any(|l| l.contains("conversation")),
+            "第三者の在席を示す申告が残っている: {kept:?}"
+        );
     }
 
     /// ⚠️ 時刻の無い行・壊れた行は `None` → **残す**。

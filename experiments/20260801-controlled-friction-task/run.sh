@@ -10,6 +10,22 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# ⚠️★★ 子プロセス（python3）の**出力**を UTF-8 に固定する（2026-09-20 実測）。
+#   ★ Windows の既定（cp932）だと、`validate_materials.py` などが出す日本語が
+#     cp932 バイトで書かれ、git-bash（UTF-8）では**文字化けして読めない**。
+#   ⚠️ 実害は見た目ではなく判断で、**FAIL の理由が読めない**（研究者が何を直すか分からない）。
+#   ★ これは出力の encoding だけを固定するもので、ファイルの読み方（＝検査の意味）は変えない。
+# ⚠️★ ハンドラまで指定する（security-checker LOW・2026-09-20）。★ 既定の `strict` だと、
+#   surrogateescape 由来の文字を子 python が print した瞬間に `UnicodeEncodeError` で落ち、
+#   ⚠️ **本修正が消そうとしている「理由の読めない赤」と同じ形**になる。
+export PYTHONIOENCODING=utf-8:backslashreplace
+# ⚠️★★ **`PYTHONUTF8=1` は足さない**（code-reviewer LOW への回答・2026-09-20）:
+#   ★ 上記は**出力だけ**を直すので、`open()` の既定は環境依存のまま残る。
+#   ⚠️ だが `PYTHONUTF8=1` を足すと**ファイルの読み方まで変わり**、将来の encoding バグを
+#     覆い隠す（★ しかも `run.sh` 経由でしか効かず、`python3 analyze.py` を直接叩く経路は
+#     直らない —— `.steering/20260920-g1-o1-inventory/decisions.md` 判断 5）。
+#   → ★ **ここに inline python を足すときは、`open(..., encoding='utf-8')` を必ず書くこと。**
+
 FAIL=0
 ok()   { printf '  [ OK ] %s\n' "$1"; }
 bad()  { printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); }
@@ -68,7 +84,11 @@ echo "[1] 凍結文書"
 for f in preregistration.md config.json SEED README.md notes.md env.md data.md; do
   if [ -s "$f" ]; then ok "$f"; else bad "$f が無い/空"; fi
 done
-if python3 -c "import json; json.load(open('config.json'))" 2>/dev/null; then
+# ⚠️★ `encoding='utf-8'` を明示する（2026-09-20 実測）。★ 省くと Python は**実行環境の
+#   既定エンコーディング**で開くので、Windows（cp932）では `config.json` が読めず
+#   **`[FAIL] config.json が JSON として壊れている`** と出る —— ⚠️ **壊れていないのに赤くなる**。
+#   ★ ファイルは UTF-8 で凍結されているので、環境に依らず UTF-8 で読むのが正しい。
+if python3 -c "import json; json.load(open('config.json', encoding='utf-8'))" 2>/dev/null; then
   ok "config.json は妥当な JSON"
 else
   bad "config.json が JSON として壊れている"

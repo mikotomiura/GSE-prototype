@@ -49,6 +49,13 @@ FORM_BUILDER="Form_O1/GSE_O1_Form_Builder.gs"
 FORM_BUILDER_TEST="Form_O1/o1_form_builder_test.cjs"
 SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
+# ★ 募集の運用（ADR-034 D6 / D1 の律速 4）を書いてある手順書。★ 両側が要る。
+RECRUIT_O1="docs/o1-roster-operations.md"
+RECRUIT_G1="experiments/20260801-controlled-friction-task/README.md"
+# ★ 収集仕様の自己記述（ADR-013 D1）。★ 6 択 ESM の計器が**この版に在るか**を見る。
+CAPS="src-tauri/src/capabilities.rs"
+# ★ 6 択 ESM の**送出元**（★ 呼ぶ側）。⚠️ writer（`logger.rs`）ではない。
+EMITTER="src-tauri/src/lib.rs"
 
 # ★ 秘密検出の**判定器**。⚠️★★ **トップレベルに置く**（2026-08-29 に実測で判明）:
 #   `run_checks` の中に置くと `--selftest` からは**見えない**（★ selftest は `run_checks` を
@@ -88,6 +95,48 @@ else
     ng "同意文書の状態表に『⚠️ **未了』が残っている（★ 本文と食い違っていないか確かめる）"
   else
     ok "同意文書の状態表に未了が残っていない"
+  fi
+  # ⚠️★★★ **計器と同意を機械で連動させる**（ADR-031 D1 / D5 保証 3・2026-09-14 追加）。
+  #   ★ 6 択 ESM（`activity_label`）は**画面に問いを出す**ので、同意文書 §3 注 C の逐語
+  #     「この記録では画面に何も出しません」を**破る**。
+  #   → ★ **計器がこの版に在るなら、同意の ESM 追補が承認済みでなければ配れない。**
+  #   ⚠️ 承認マーカ `<!-- o1-esm-consent: approved -->` は**研究者が入れる**
+  #     （★ dev が案を書いただけでは緑にしない ＝ 承認の代理をさせない）。
+  #
+  # ⚠️★★★ **引き金は「送出元があるか」である**（2026-09-14 訂正・`/cross-review` HIGH）。
+  #   ★ 初版は `capabilities.rs` に語が在るかを見ていたが、⚠️ **schema と writer が在っても
+  #     呼ぶ側が無ければ 1 行も記録されない** —— ★ それを「計器がある」と読むと、
+  #     **記録できない計器のためにゲートが赤くなる**（＝ 偽の赤）。
+  #   ★ ADR-013 D2 の「導出元は *送出元があるか* であって writer ではない」と基準を揃える。
+  if [ ! -f "$EMITTER" ]; then
+    ng "送出元の判定対象が無い: ${EMITTER}（★ 計器と同意の連動を判定できない）"
+  #   ⚠️★★★ **コメント行を除いてから見る**（2026-09-14・`/cross-review` 2 巡目 HIGH-1）。
+  #     ★ 除かないと、本ファイルや `lib.rs` の**説明文にヒットして偽の赤**になる。
+  #   ⚠️ **限界を明示する**: 静的 grep なので、★ **改行を挟んだ呼び出し**は取りこぼす
+  #     （⚠️ ただし `rustfmt` は関数名と `(` を分けないので実害は小さい）。
+  #     ★ 修飾付き（`o1::activity_label_answered(`）は部分一致で拾える。
+  #   ★★★ **最後の砦は型である** —— `LogEntry::activity_label_*` は
+  #     `o1::EsmConsent`（`activity_label_allowed` からしか作れない）を要求するので、
+  #     ⚠️ **門を通さない送出はコンパイルできない**。本検査は二重の網である。
+  elif grep -vE '^[[:space:]]*(//|/\*|\*)' "$EMITTER" | grep -qE 'activity_label_(answered|skipped)\('; then
+    # ⚠️★★★ **行頭完全一致で見る**（2026-09-14 に実測で踏んだ）。
+    #   ★ 部分一致にすると、**dev メモの「承認したらこのマーカを入れること」という
+    #     *説明文* 自体にヒットして緑になる**（= 承認していないのに配れてしまう）。
+    if grep -qE '^<!-- o1-esm-consent: approved -->[[:space:]]*$' "$CONSENT"; then
+      ok "6 択 ESM の送出元がある版で、同意の ESM 追補が承認済み"
+    else
+      ng "6 択 ESM の送出元があるのに同意の ESM 追補が未承認（★ 注 D ＋ 承認マーカを研究者が入れること）"
+    fi
+    # ⚠️★★★ **送出元があるなら、同意の門を通していなければならない**（ADR-031 M5）。
+    #   ★ `o1::activity_label_allowed(o1_mode, consent_approved)` を経由せずに記録すると、
+    #     **同意承認と実際の記録が結びつかない穴**になる（★ `/cross-review` の「テスト不足」）。
+    if grep -vE '^[[:space:]]*(//|/\*|\*)' "$EMITTER" | grep -q 'activity_label_allowed('; then
+      ok "6 択 ESM の記録が同意の門（activity_label_allowed）を通っている"
+    else
+      ng "6 択 ESM の送出元が同意の門を通っていない（★ o1::activity_label_allowed を経由すること）"
+    fi
+  else
+    ok "6 択 ESM の送出元がまだ無い（★ 同意の ESM 追補は不要）"
   fi
 fi
 
@@ -311,6 +360,14 @@ else
     ng "★ bash 3.2 で壊れる書き方が残っている（★ \${name} と括ること）"
     printf '%s\n' "$sp_out" | grep -E '❌|:[0-9]+:' | sed 's/^/     /'
   fi
+  # ⚠️★★★ **緑でも赤でも「何を走査していないか」を出す**（security-checker HIGH ＋
+  #   code-reviewer MEDIUM・2026-09-20）。★ 移植性ゲート自身は note を出しているのに、
+  #   ⚠️ 成功枝は `sp_out` を捨て、失敗枝は `❌|:[0-9]+:` で絞るため注記が落ちていた
+  #   —— ★ **何を直すか判断するのは赤のとき**なので、要る場面でだけ消える形だった。
+  #   → `if` の外に出して rc に依らず必ず出す。
+  #   ⚠️ 注記行だけに絞る（★ 移植性ゲートの対照の ✅ 行にも「走査対象外になる」が出るので、
+  #     素の `走査対象外` で拾うと**門の一覧に紛れ込む**）。
+  printf '%s\n' "${sp_out}" | grep '走査対象外（' | sed 's/^ */     /' || true
 fi
 
 # ⚠️★★ **配備ごとに変わる値が `.gs` に直書きされていないか**（2026-08-29 追加・起票 T-18）。
@@ -578,6 +635,52 @@ elif grep -q "from_secs(180)" src-tauri/src/reconcile.rs; then
 else
   ok "送信 timeout が実測にもとづいて見直されている"
 fi
+
+# --- 5. 募集の運用（ADR-034 D6 / D1 の律速 4）---------------------------------
+head_ 5 "募集の運用（★ 案内日の分離が G1 と O1 の両方の手順に入っているか）"
+# ⚠️★★★ **ADR-034 D1 の律速 4**: 「D6 の運用（案内日の分離）が G1 と O1 の**両方**の
+#   募集に入っていること」が O1 配布の律速である。★ 2026-09-20 までこれを確かめる場所が
+#   どこにも無かった（★ 本ゲートに D6 / 案内日の語が 0 件だった）。
+# ⚠️★★ **ここで見るのは「手順書に規則が書いてあるか」だけ**である。
+#   ★ D6 は機械的に強制しない運用ルール（ADR-034 D6・o1-roster-operations §5 の「限界」）なので、
+#     ⚠️ **実際に日を分けたかは見ていない**。→ ★ 緑を「衝突が起きない」と読まないこと。
+# ⚠️★★ **文書全体を grep しない**（Codex /cross-review 1 巡目 MEDIUM・2026-09-20）。
+#   ★ 語が別節・脚注・否定文・古い記録に残っているだけで緑になってしまう。
+#   → ★ **アンカー `<!-- gate:d6-recruitment-separation -->` から、次の見出しまで
+#     （最大 20 行）**の中に、根拠（ADR-034 D6）と規則（日を分ける）の**両方**があることを見る。
+#   ⚠️ `sed -n '/re/,+20p'` は **BSD(macOS) sed で使えない**ので awk で書く。
+# ⚠️★★ **行数だけで窓を切らない**（code-reviewer MEDIUM・2026-09-20）:
+#   ★ `docs/o1-roster-operations.md` はアンカーが 95 行目・全 109 行なので、
+#     20 行窓が**ファイル末尾を覆い切っていた** ＝ ⚠️ O1 側では「文書全体 grep をやめた」
+#     という強化が**ほとんど効いていなかった**。→ ★ **次の見出しで窓を閉じる**。
+#   ★ アンカーは**節の見出しの直前**に置く（⚠️ アンカーの次の 1 行が見出しでも閉じない
+#     ＝ それは「そのアンカーが指す見出し」だからである。閉じるのは**その次の見出し**から）。
+# ⚠️ 本検査の限界（★ 隠さずに書く）: 2 つの語を**独立に**見るので、アンカーが複数ある文書では
+#   「語 A が窓 1・語 B が窓 2」でも通る。★ 否定文（「日を分ける必要はない」）も通る。
+d6_near () { # $1 = ファイル / $2 = 探す語
+  awk -v pat="$2" '
+    /<!-- gate:d6-recruitment-separation -->/ { anchor = NR; next }
+    anchor && NR > anchor + 20 { anchor = 0 }
+    anchor && NR > anchor + 1 && /^#+ / { anchor = 0 }
+    anchor && index($0, pat) { found = 1 }
+    END { exit (found ? 0 : 1) }
+  ' "$1"
+}
+for side_doc in "O1:${RECRUIT_O1}" "G1:${RECRUIT_G1}"; do
+  side="${side_doc%%:*}"; doc="${side_doc#*:}"
+  if [ ! -f "${doc}" ]; then
+    ng "${side} の募集手順が読めない: ${doc}（★ 移動/改名したら本検査を直すこと）"
+  elif ! grep -q '<!-- gate:d6-recruitment-separation -->' "${doc}"; then
+    ng "${side} の募集手順に D6 のアンカーが無い: ${doc}（★ 規則の節の直前に置くこと）"
+  elif ! d6_near "${doc}" 'ADR-034 D6'; then
+    ng "${side} の募集手順のアンカー近傍に ADR-034 D6（案内日の分離）の根拠が無い: ${doc}"
+  elif ! d6_near "${doc}" '日を分ける'; then
+    # ★ 参照だけ書いて中身が無い状態を緑にしない（★ 規則は現場の手順に載って初めて効く）。
+    ng "${side} の募集手順に「日を分ける」という規則そのものが無い: ${doc}"
+  else
+    ok "${side} の募集手順に案内日の分離がある: ${doc}"
+  fi
+done
 }
 
 # ⚠️★★★ **`sed -i` を直接書かない**（security-checker HIGH・2026-08-29 に macOS で実測）:
@@ -619,7 +722,17 @@ selftest () {
   local repo fix cons rc out
   repo="$(pwd)"
   fix="$(mktemp -d)"
-  trap 'rm -rf "$fix"' RETURN
+  # ⚠️★★ **Ctrl-C でも消す**（security-checker LOW・2026-09-20）。
+  #   ★ fixture には同意文書ドラフト（**研究者の実メールアドレス・所属**）と
+  #     `Form_G1/GSE_G1_Form_Builder.gs`（実 ID 群）が写る。⚠️ `RETURN` だけだと
+  #     中断時に `mktemp -d` の中身が残る。★ `${fix:?}` で空文字の `rm -rf` を弾く。
+  # ⚠️★★ **INT / TERM は自分で `exit` する**（code-reviewer MEDIUM・2026-09-20）。
+  #   ★ 本スクリプトは `set -uo pipefail`（`-e` 無し）なので、ハンドラが `exit` しないと
+  #     ⚠️ **Ctrl-C の後も selftest が次のケースへ進み、`build` が fixture を作り直す**
+  #     ＝「中断時に残さない」という目的が達成できない。
+  trap 'rm -rf "${fix:?}"' RETURN
+  trap 'rm -rf "${fix:?}"; exit 130' INT
+  trap 'rm -rf "${fix:?}"; exit 143' TERM
 
   build () {
     rm -rf "${fix:?}/w"
@@ -647,12 +760,20 @@ selftest () {
     #   ★ 以前はスタブ 1 行だったので、liveness の検査は「未達を満たすと緑になるか」しか
     #   測れなかった。⚠️ いまは repo 側が緑なので、**壊すと赤になるか**を測る側へ移す。
     cp "$repo/src-tauri/src/lib.rs" "$fix/w/src-tauri/src/lib.rs" 2>/dev/null
+    # ⚠️★★★ **収集仕様の自己記述も写す**（ADR-031・2026-09-14）。
+    #   ★ 写さないと「計器があるか」の判定が常に「ファイルが無い」で赤になり、
+    #     ⚠️ **連動の検査だけ変異試験が成立しない**（★ 本ゲートが戒めている型そのもの）。
+    cp "$repo/$CAPS" "$fix/w/$CAPS" 2>/dev/null
     printf 'x\n.timeout(std::time::Duration::from_secs(180))\n' > "$fix/w/src-tauri/src/reconcile.rs"
     cp "$repo/$MEASURE" "$fix/w/$MEASURE" 2>/dev/null
     # ⚠️★★★ **移植性ゲートも写す**（security-checker 指摘・2026-08-29）。
     #   ★ 写さないと selftest 中は常に「ゲートが無い」で赤になり、
     #     ⚠️ **新しく足した検査だけ変異試験が無い**状態になる（★ 本ゲートが戒めている型そのもの）。
     cp "$repo/scripts/check-shell-portability.sh" "$fix/w/scripts/" 2>/dev/null
+    # ⚠️★★ **募集手順の 2 本も写す**（ADR-034 D6・2026-09-20 追加）。
+    #   ★ 写さないと「読めない」で常に赤になり、⚠️ 新しく足した検査だけ変異試験が成立しない。
+    cp "$repo/$RECRUIT_O1" "$fix/w/$RECRUIT_O1" 2>/dev/null
+    cp "$repo/$RECRUIT_G1" "$fix/w/$RECRUIT_G1" 2>/dev/null
     # ⚠️★★ **一時ツリーを git リポジトリにする**。
     #   ★ 移植性ゲートは `git ls-files` で対象を集めるので、⚠️ 非 git のままだと
     #     **必ず「検査できなかった」になり、壊しても壊さなくても赤**＝ 変異試験が成立しない。
@@ -672,6 +793,29 @@ selftest () {
       -e 's/^- 採用した timeout: \*\*（未記入）\*\*$/- 採用した timeout: **固定 900 秒**/' \
       "$fix/w/$MEASURE"
   }
+  # ⚠️★★★ **記録票を「未実測」へ戻す**（★ 2026-09-14 追加）。
+  #   ★ なぜ要るか: `fill_measure` は「空欄を埋める」変異だったが、⚠️ **実物の記録票は
+  #     2026-09-05 に実測済みで埋まった**。→ ★ 「埋める」変異はもう**状態を何も変えない**ので、
+  #     ⚠️ **selftest 3 の 2 本が「壊しても緑のまま」と報告し続けていた**（★ 空回り）。
+  #   → ★ いまは **逆向き（空に戻す）** が正しい変異である。
+  blank_measure () {
+    sed_i       -e 's/^- 状態: \*\*実測済み\*\*$/- 状態: **未実施**/'       -e 's/^- 実測日: \*\*.*\*\*$/- 実測日: **（未記入）**/'       -e 's/^- 送信バイト数 (base64 後): \*\*.*\*\*$/- 送信バイト数 (base64 後): **（未記入）**/'       -e 's/^- 所要時間 (Drive 保存を含む): \*\*.*\*\*$/- 所要時間 (Drive 保存を含む): **（未記入）**/'       -e 's/^- 実効スループット: \*\*.*\*\*$/- 実効スループット: **（未記入）**/'       -e 's/^- 採用した timeout: \*\*.*\*\*$/- 採用した timeout: **（未記入）**/'       "$fix/w/$MEASURE"
+  }
+  # ★ 「状態」だけ実測済みのまま、値の欄を空に戻す（⚠️ 中身の無い記録で緑にしないことの対照）。
+  blank_measure_fields () {
+    blank_measure
+    sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"
+  }
+
+  # ⚠️★★★ **`clear_pending` は 2026-09-20 まで「定義されていなかった」**（本セッションで発見）。
+  #   ★ 呼び出し側（下の「状態表の未了残置」）は `command not found` を出しながら先へ進み、
+  #     ⚠️ **実物の同意文書には既に「⚠️ **未了」の行がある**ので、何を足しても赤になった
+  #     ＝ **その変異試験は空回りで緑を返していた**（★ 本ゲートが戒めている型そのもの）。
+  #   → ★ 出発点を「未了なし」に戻してから 1 行足す。これで初めて「足すと赤になる」を測れる。
+  clear_pending () {
+    sed_i '/⚠️ \*\*未了/d' "$cons"
+  }
+
   # ★ 送信側を実測にもとづいて直した状態（= 180 秒固定でなくなった）。
   fix_timeout () {
     printf 'x\n.timeout(std::time::Duration::from_secs(900))\n' > "$fix/w/src-tauri/src/reconcile.rs"
@@ -704,7 +848,7 @@ selftest () {
   build; sed_i 's/^- 所属: \*\*.*\*\*$/- 所属: **（実施前に記入）**/' "$cons"; expect_red "同意文書に未記入" "同意文書の空欄"
   build; sed_i 's/^- 連絡先: .*/- 連絡先: **（未定）**/' "$cons";             expect_red "連絡先が埋まっていない" "連絡先"
   build; sed_i 's/^- 所属: \*\*.*\*\*$/- 所属: **/' "$cons";                  expect_red "所属が埋まっていない" "所属"
-  build; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
+  build; clear_pending; printf '\n| x | ⚠️ **未了: なにか** | y |\n' >> "$cons";              expect_red "未了" "状態表の未了残置"
   build; rm -f "$fix/w/docs/o1-deletion-ledger.md";                            expect_red "削除台帳が無い" "削除台帳の欠落"
   build; sed_i 's/^<!-- o1-retention: set -->$//' "$fix/w/docs/o1-deletion-ledger.md"; expect_red "マーカ.*が見つからない" "保管上限マーカの喪失"
   build; rm -f "$fix/w/Form_O1/GSE_O1_Submit.gs";                              expect_red "受け口が無い" "受け口の欠落"
@@ -718,6 +862,9 @@ selftest () {
   build; sed_i 's/liveness::participant_visible_starved/liveness::NOT_WIRED_/g' "$fix/w/src-tauri/src/lib.rs"; expect_red "配線されていない" "liveness の配線の喪失"
   # ★ 実測記録票そのものが消えたら、⚠️「未実測」ではなく**票が無い**と言うこと（★ 原因が違う）。
   build; rm -f "$fix/w/$MEASURE";                                              expect_red "実測記録票が無い" "実測記録票の喪失"
+  # ⚠️★★★ ADR-031: **送出元を足すと、承認が無い限り赤になる**（★ M5 が来た瞬間に門が効く）。
+  build; printf '\nfn wired() { activity_label_answered(); activity_label_allowed(true, true); }\n' >> "$fix/w/$EMITTER"
+  expect_red "同意の ESM 追補が未承認" "計器と同意の連動（送出元あり・未承認）"
   # ⚠️★★★ 運用管理シート（起票 T-25）—— ★ **3 つの壊し方を別々に撃つ**。
   #   ⚠️ 1 つだけだと「どれか 1 つでも欠けたら赤」なのか「たまたま拾えた」のか分からない。
   build; sed_i 's/function buildO1MgmtSheet/function DISABLED_buildO1MgmtSheet/' "$fix/w/$FORM_BUILDER"
@@ -877,7 +1024,16 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   # ⚠️★★★ **実測の記録とコードの修正が「両方そろって」初めて緑にする。**
   #   ★ 旧版は `grep from_secs(180)` ただ 1 本だったので、**数字を書き換えるだけで緑**になった。
   #   ★ liveness の陽性対照は selftest 1（壊すと赤）へ移した（= repo 側が緑になったため）。
-  build; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
+  build; blank_measure; fill_measure; fix_timeout; expect_green "実測にもとづいて見直されている" "送信 timeout（実測 ＋ 修正）"
+
+  # ⚠️★★★ ADR-031: **送出元 ＋ 承認マーカ ＋ 同意の門がそろうと緑**（★ M5 後の正しい姿）。
+  build; printf '\nfn wired() { activity_label_answered(); activity_label_allowed(true, true); }\n' >> "$fix/w/$EMITTER"
+  printf '\n<!-- o1-esm-consent: approved -->\n' >> "$cons"
+  expect_green "同意の ESM 追補が承認済み" "計器と同意の連動（送出元 ＋ 承認）"
+  # ⚠️★★★ **送出元があるのに同意の門を通していないと赤**（★ M5 の穴）。
+  build; printf '\nfn wired() { activity_label_answered(); }\n' >> "$fix/w/$EMITTER"
+  printf '\n<!-- o1-esm-consent: approved -->\n' >> "$cons"
+  expect_red "同意の門を通っていない" "送出元はあるが同意の門を通していない"
 
   # ⚠️★★★ **O1 実装を含むタグを作ると緑に変わること**（2026-08-30 追加）。
   #   ★ 一時ツリーは `git init` しただけでタグが 1 つも無いので、既定では赤い
@@ -899,10 +1055,10 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   build; sed_i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.ps1"; expect_red "sync-session" "ps1 だけ壊しても赤になる"
   build; sed_i 's/gse_o1_/gse_XX_/g' "$fix/w/scripts/sync-session.sh";  expect_red "sync-session" "sh だけ壊しても赤になる"
   # ⚠️★★★ **A-2 の肝**: 片方だけでは緑にしない（★「見えないまま緑」への抜け道を塞ぐ）。
-  build; fix_timeout;   expect_red "未実測"           "コードだけ直しても赤になる（実測が無い）"
-  build; fill_measure;  expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
+  build; blank_measure; fix_timeout; expect_red "未実測" "コードだけ直しても赤になる（実測が無い）"
+  build; blank_measure; fill_measure; expect_red "180 秒固定のまま" "記録だけ埋めても赤になる（コードが古い）"
   # ★「状態」だけ実測済みにして必須欄が空なら赤（⚠️ 中身の無い記録で緑にしない）。
-  build; sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
+  build; blank_measure_fields; fix_timeout; expect_red "必須欄が埋まっていない" "必須欄が空なら赤になる"
   # ⚠️★★★ **タグの新しさで代用していないこと**（2026-08-30 追加・本セッションの事故そのもの）。
   #   ★ `v0.1.29` は「実在する最新タグ」だったが `o1.rs` を含まなかった。
   #   → ★ **o1.rs を含まないタグ**を打っても赤のままであることを確かめる。
@@ -911,6 +1067,40 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   git -C "$fix/w" -c user.email=s@e -c user.name=s commit -qm selftest > /dev/null 2>&1
   git -C "$fix/w" tag v9.9.8 > /dev/null 2>&1
   expect_red "リリースタグが 1 つも無い" "★ o1.rs を含まないタグを打っても赤のまま"
+
+  # ★★ [5] 募集の運用（ADR-034 D6）—— ⚠️ 3 つの落ち方を別々に確かめる。
+  #   ★ 「書いてある / 根拠が無い / 規則が無い / 読めない」を 1 本の検査にまとめたので、
+  #     ⚠️ **どれか 1 つでも空回りすると律速 4 の確認が嘘になる**。
+  build; expect_green "G1 の募集手順に案内日の分離がある" "★ 両側の手順に D6 が書いてある"
+  build; sed_i '/ADR-034 D6/d' "$fix/w/$RECRUIT_G1"
+  expect_red "G1 の募集手順のアンカー近傍に ADR-034 D6" "★ 根拠（ADR-034 D6）を消すと赤"
+  build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
+  expect_red "G1 の募集手順に「日を分ける」" "★ 参照だけ残して規則を消すと赤"
+  build; rm -f "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順が読めない" "★ 手順書ごと消える（移動/改名）と赤"
+  # ⚠️★★ **O1 側も内容の変異を試す**（Codex /cross-review 1 巡目 MEDIUM・2026-09-20）。
+  #   ★ 同じループで回るから同じはず、という推論で済ませない（★ O1 側は文言も構造も違う）。
+  build; sed_i '/gate:d6-recruitment-separation/d' "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順に D6 のアンカーが無い" "★ O1 側のアンカーを消すと赤"
+  build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順に「日を分ける」" "★ O1 側の規則を消すと赤"
+  build; sed_i '/ADR-034 D6/d' "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順のアンカー近傍に ADR-034 D6" "★ O1 側の根拠を消すと赤"
+  # ⚠️★★ **窓が本当に効いているか**（code-reviewer MEDIUM・2026-09-20）:
+  #   ★ 規則を**次の見出しの後ろ**へ移すと赤になるべき。⚠️ 行数だけの窓だと O1 側は
+  #     EOF まで覆ってしまい、この対照が**緑のまま通る**（＝ 強化が効いていないことに気付けない）。
+  build
+  sed_i 's/★ \*\*日を分ける\*\*/★ （窓の外へ移した）/' "$fix/w/$RECRUIT_O1"
+  printf '
+### 窓の外
+
+★ **日を分ける**
+' >> "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順に「日を分ける」" "★ 規則が次の見出しの後ろにあると赤（窓が効いている）"
+  # ★ アンカーから遠い場所に語があっても緑にしない（★ 文書全体 grep への退行を捕まえる）。
+  build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
+  printf '\n★ 参考: 昔は日を分けることになっていた（ADR-034 D6）\n' >> "$fix/w/$RECRUIT_G1"
+  expect_red "G1 の募集手順に「日を分ける」" "★ アンカーの外に語が残っていても赤"
 
   echo
   echo "────────────────────────────────────────"

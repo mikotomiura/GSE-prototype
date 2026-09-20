@@ -1,5 +1,30 @@
 use std::collections::VecDeque;
 
+/// TUNE: ポーズ判定閾値 2000 ms (F5, F6 共通)。
+///
+/// ⚠️★★★ **本定数は「単純 pause」(= 2 秒以上の無入力) の唯一の真実源 (SSOT) である。**
+/// ★ オフライン側 (`analysis::feat_offline` / `gse-replay --features`) の `T0` は
+/// **ここを参照する** (ADR-030 D3 逐語「**新しい定数を作らず、既存パラメータを対称に再利用する**」)。
+/// ⚠️ **別の場所で 2000 を再定義しないこと。**
+/// ★ 先例は `analysis::intervention::AWAY_IDLE_MS` → `OutcomeConfig::away_gap_ms` (ADR-024 D3 / AC-3)。
+///
+/// ★ 命名の経緯: 2026-09-15 に `.steering/20260914-mhd-feature-offline-tiers/decisions.md`
+/// **判断 7** で、値を 1 ビットも変えない命名のみのリファクタとして抽出した
+/// (⚠️ `HMM_VERSION` は bump しない —— `engine.rs:28-37` の bump 対象は
+/// 「`phi` / `make_silence_observation` / `calculate_features` の**数値挙動変更**」であり、
+/// `u64` 比較のリテラルを同値の定数へ置き換える操作はこれに当たらない。★ ゴールデン replay で実測確認)。
+///
+/// ⚠️★★★ **同じ閾値を秒で表した箇所が 1 つ残っている**: `make_silence_observation` の
+/// `silence_secs < 2.0` (doc 逐語「ポーズとして認識しない」)。
+/// ★ そこを本定数から導出しないのは、当該関数が `engine.rs` の bump 対象に**名指しされている**うえ
+/// 浮動小数経路だからである (`engine.rs:19-26` の EWMA α 定数化ポリシーと同じ警戒)。
+/// → ★ **代わりに結合をテストで固定する**: `tests::pause_threshold_matches_silence_gate`。
+///
+/// ⚠️ 値が同じ `2000` でも**別の knob** なので混同しないこと:
+/// F1 Flight Time の外れ値キャップ (`ft < 2000.0`) と、その飽和値
+/// (`make_silence_observation` の `f1 = 2000.0`) は本定数と無関係である。
+pub const PAUSE_THRESHOLD_MS: u64 = 2_000;
+
 #[derive(Debug, Clone, Copy)]
 pub struct InputEvent {
     pub vk_code: u32,
@@ -215,10 +240,10 @@ impl FeatureExtractor {
             .map(|e| e.timestamp)
             .collect();
 
-        // TUNE: ポーズ判定閾値 2000 ms (F5, F6 共通)
+        // TUNE: ポーズ判定閾値は `PAUSE_THRESHOLD_MS` (F5, F6 共通・SSOT)
         let f5 = press_ts
             .windows(2)
-            .filter(|w| w[1].saturating_sub(w[0]) >= 2000)
+            .filter(|w| w[1].saturating_sub(w[0]) >= PAUSE_THRESHOLD_MS)
             .count() as f64;
 
         // --- F6: 削除後停止率 = BS/Del直後に2秒以上停止する割合 ---
@@ -230,7 +255,7 @@ impl FeatureExtractor {
             .zip(press_events.windows(2))
             .filter(|(ts_win, ev_win)| {
                 let is_del = ev_win[0].is_backspace;
-                let long_pause = ts_win[1].saturating_sub(ts_win[0]) >= 2000;
+                let long_pause = ts_win[1].saturating_sub(ts_win[0]) >= PAUSE_THRESHOLD_MS;
                 is_del && long_pause
             })
             .count();
@@ -409,6 +434,26 @@ mod tests {
     fn silence_below_2s_returns_none() {
         assert!(extractor().make_silence_observation(1.9, None).is_none());
         assert!(extractor().make_silence_observation(0.0, None).is_none());
+    }
+
+    /// ★ `PAUSE_THRESHOLD_MS` (SSOT) と `make_silence_observation` の秒単位ゲートが
+    /// **同じ境界**であることを固定する。
+    ///
+    /// ⚠️ 当該ゲート (`silence_secs < 2.0`) は浮動小数経路かつ `engine.rs` の
+    /// `HMM_VERSION` bump 対象に名指しされているため、定数から導出する形にしていない。
+    /// → ★ 代わりに本テストが結合を保証する (`decisions.md` 判断 7)。
+    /// ⚠️ 片方だけを変えると赤になる。
+    #[test]
+    fn pause_threshold_matches_silence_gate() {
+        let threshold_secs = PAUSE_THRESHOLD_MS as f64 / 1000.0;
+        // 閾値ちょうどはポーズとして認識される
+        assert!(extractor()
+            .make_silence_observation(threshold_secs, None)
+            .is_some());
+        // 閾値の直下は認識されない
+        assert!(extractor()
+            .make_silence_observation(threshold_secs - 0.001, None)
+            .is_none());
     }
 
     #[test]

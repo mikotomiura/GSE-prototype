@@ -121,6 +121,121 @@ impl From<TaskKind> for TaskDomain {
     }
 }
 
+/// `probe_assignment` の層化理由 (stratum・ADR-031 **D2**)。
+///
+/// ⚠️★★★ **いずれも「時計と操作の事実」だけで決まる。** ★ 推定器の出力
+/// (`p_stuck` / HMM 状態) は **1 バイトも読まない** —— ★ 読むと監査 criterion が
+/// 主 criterion に依存し、**criterion の二重化が意味を失う**（★ 循環）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbeStratum {
+    /// ★ 既存のランダム枠（⚠️ **残す** —— `.idea:239` 逐語「ランダム枠を残しつつ」）。
+    Random,
+    /// ★ 低操作区間が終わった（打鍵が戻った）時点。
+    LowOperationEnd,
+    /// ★ フォーカスが戻ったあとに打鍵が戻った時点。
+    Resumption,
+}
+
+impl ProbeStratum {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Random => "random",
+            Self::LowOperationEnd => "low_operation_end",
+            Self::Resumption => "resumption",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "random" => Some(Self::Random),
+            "low_operation_end" => Some(Self::LowOperationEnd),
+            "resumption" => Some(Self::Resumption),
+            _ => None,
+        }
+    }
+}
+
+/// `activity_label` の行動カテゴリ (ADR-031 **D3**)。★ **固定 6 択**。
+///
+/// ★ 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
+/// 「**熟考・詰まり・外部資料・会話・離席・回答不能**」に対応する。
+///
+/// ⚠️★★★ **1 つも足さない。** ★ 足すには**別 ADR** が要る（`data-privacy` ルール 7 条件 i）。
+/// ⚠️★★★ `ExternalMaterial` / `Conversation` は、**計器由来なら** ADR-014 D4 が禁じている
+/// 役割カテゴリ（`editor` / `terminal` / `browser`）と**意味的に等価**である。
+/// ★ **自己申告経由に限って**許可されており、条件（自由記述を置かない / 相手・アプリ・URL を
+/// 持たない / 理由を求めない）は `data-privacy` **ルール 7** にある。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActivityCategory {
+    /// 熟考: 手は止まっていたが考えていた。
+    Deliberating,
+    /// 詰まり: 先に進めずにいた。
+    Stuck,
+    /// 外部資料: 本・書類・画面などを読んでいた。
+    ExternalMaterial,
+    /// 会話: 会話・通話・打ち合わせをしていた。
+    Conversation,
+    /// 離席: その場を離れていた。
+    Away,
+    /// 回答不能: 思い出せない・当てはまらない。
+    CannotAnswer,
+}
+
+impl ActivityCategory {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Deliberating => "deliberating",
+            Self::Stuck => "stuck",
+            Self::ExternalMaterial => "external_material",
+            Self::Conversation => "conversation",
+            Self::Away => "away",
+            Self::CannotAnswer => "cannot_answer",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "deliberating" => Some(Self::Deliberating),
+            "stuck" => Some(Self::Stuck),
+            "external_material" => Some(Self::ExternalMaterial),
+            "conversation" => Some(Self::Conversation),
+            "away" => Some(Self::Away),
+            "cannot_answer" => Some(Self::CannotAnswer),
+            _ => None,
+        }
+    }
+
+    /// ★ 6 択の全列挙（⚠️ **テストと UI がここを単一の出所にする**）。
+    ///
+    /// ⚠️★★★ **variant を足したら `exhaustive_marker` が非網羅で *コンパイルエラー* になる**
+    /// （2026-09-14・security-checker LOW）。★ 旧版は `[Self; 6]` の長さしか言わず、
+    /// **7 個目を足して `ALL` に入れ忘れると検査を素通り**した。
+    pub const ALL: [Self; 6] = [
+        Self::Deliberating,
+        Self::Stuck,
+        Self::ExternalMaterial,
+        Self::Conversation,
+        Self::Away,
+        Self::CannotAnswer,
+    ];
+
+    /// ⚠️★★★ **`ALL` の網羅性をコンパイラに守らせるためだけの関数**。
+    ///
+    /// ★ variant を足すと本 `match` が非網羅になって**ビルドが落ちる**ので、
+    /// そのとき [`Self::ALL`] も一緒に直さざるを得ない。
+    #[cfg(test)]
+    fn exhaustive_marker(self) -> usize {
+        match self {
+            Self::Deliberating => 0,
+            Self::Stuck => 1,
+            Self::ExternalMaterial => 2,
+            Self::Conversation => 3,
+            Self::Away => 4,
+            Self::CannotAnswer => 5,
+        }
+    }
+}
+
 /// `realtime_label` の出所 (source)。`random_probe` = backend が割当てたランダムプローブ、
 /// `self_marker` = ユーザー自発の hotkey マーカー (副データ)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -550,12 +665,66 @@ fn format_probe_assignment_line(
     probe_id: &str,
     scheduled_ts: u64,
     session_elapsed_ms: u64,
+    stratum: ProbeStratum,
 ) -> String {
     format!(
-        r#"{{"type":"probe_assignment","probe_id":{},"scheduled_ts":{},"session_elapsed_ms":{}}}"#,
+        r#"{{"type":"probe_assignment","probe_id":{},"scheduled_ts":{},"session_elapsed_ms":{},"stratum":"{}"}}"#,
         json_opt_str(Some(probe_id)),
         scheduled_ts,
         session_elapsed_ms,
+        stratum.as_str(),
+    )
+}
+
+/// `LogEntry::ActivityLabel` の NDJSON 1 行を生成する純粋関数 (ADR-031 D1 / D6)。
+///
+/// ⚠️★★★ **時刻キーは `"t"`** —— ★ `redaction::line_timestamp` が区間指定削除で拾えるようにする。
+#[allow(clippy::too_many_arguments)]
+fn format_activity_label_line(
+    timestamp: u64,
+    probe_id: Option<&str>,
+    category: ActivityCategory,
+    answered: bool,
+    latency_ms: u64,
+    recall_window_start_ms: u64,
+    recall_window_end_ms: u64,
+) -> String {
+    // ⚠️★★★ **release でも不変条件を守る** (2026-09-14・`/cross-review` MEDIUM)。
+    //   ★ 旧版は `debug_assert!` だけだったので、⚠️ **release では
+    //   `answered=false` かつ `category=Conversation` の行が書けた**
+    //   (`LogEntry::ActivityLabel` は pub variant なので直接構築できる)。
+    //   → ★ それは **「答えていないのに会話と申告された」行**であり、
+    //   ⚠️ 回答率 / MNAR の解析 (ADR-031 D7) を壊すだけでなく、
+    //   ★★★ **第三者の在席を、被験者が選んでいないのに残す**ことになる。
+    //   → ★ **assert ではなく正規化する** (★ `realtime_label_skipped` の `skip_reason`
+    //   正規化と同じ作法)。⚠️ 握りつぶさず `tracing::warn!` を残す。
+    //
+    // ⚠️★★★ **限界を明示する** (2026-09-14・`/cross-review` 2 巡目 MEDIUM-1):
+    //   ★ Codex は「正規化は呼び出し側バグを隠す。warn が未収集だと見逃す」と指摘した。**正しい。**
+    //   ⚠️ ただし **NDJSON に「正規化した」フラグを足すことはしない** ——
+    //   ★ それは行の意味に『実装のバグ』という被験者と無関係な情報を混ぜることになり、
+    //   `data-privacy` ルール 7 条件 i（固定 6 択のみ）の趣旨から外れる。
+    //   → ★ **代わりに、そもそも不正な組が作れない側で守る**:
+    //   コンストラクタ経由なら型で不可能で、直接構築は本正規化が受け止める。
+    //   ⚠️ **「どれだけ起きたか」は現状 warn ログでしか分からない**（★ 未解決と明記する）。
+    let category = if answered || matches!(category, ActivityCategory::CannotAnswer) {
+        category
+    } else {
+        tracing::warn!(
+            got = category.as_str(),
+            "activity_label: answered=false なのに category が cannot_answer でない              → cannot_answer に正規化した (呼び出し側バグの可能性)"
+        );
+        ActivityCategory::CannotAnswer
+    };
+    format!(
+        r#"{{"type":"activity_label","t":{},"probe_id":{},"category":"{}","answered":{},"latency_ms":{},"recall_window_start_ms":{},"recall_window_end_ms":{}}}"#,
+        timestamp,
+        json_opt_str(probe_id),
+        category.as_str(),
+        answered,
+        latency_ms,
+        recall_window_start_ms,
+        recall_window_end_ms,
     )
 }
 
@@ -855,6 +1024,10 @@ pub enum LogEntry {
         probe_id: String,
         scheduled_ts: u64,
         session_elapsed_ms: u64,
+        /// ★ **なぜ発火したか** (ADR-031 D2)。
+        /// ⚠️★★★ **`Option` にしない** —— ★ `Random` を含む 3 値を常に書くので、
+        /// **キーの不在がそのまま「本フィールドを持たない古いビルド」を意味する**。
+        stratum: ProbeStratum,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     /// 不変条件は `realtime_label_answered` / `realtime_label_skipped` で保証する:
@@ -888,6 +1061,43 @@ pub enum LogEntry {
         elapsed_ms: u64,
         /// Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。
         changes: u16,
+    },
+    /// ⚠️★★★ **O1 の監査 criterion** (ADR-031 **D1**): 「直前は何をしていたか」の自己申告。
+    ///
+    /// ## ★ なぜ `realtime_label` と別の行種なのか (ADR-031 **D4**)
+    ///
+    /// ⚠️★★★ `capabilities` は **行種粒度でしか能力を宣言しない**
+    /// (`capabilities::KNOWN_LINE_TYPES`)。→ ★ `realtime_label` の nullable フィールドとして
+    /// 足すと、**「計器が無かった (古いビルド)」と「被験者が答えなかった」を機械的に
+    /// 分離できない** (ADR-013 D1 の判定表)。
+    ///
+    /// ## ⚠️★★★ 時刻キーは `"t"` である (ADR-031 **D6**)
+    ///
+    /// ★ `redaction::line_timestamp` は `"t"` を読む。⚠️ `"ts"` にすると
+    /// **区間指定削除で消えない行**になり、同意文書 §4-3 の約束が破れる
+    /// (★ 既存の `realtime_label` / `probe_assignment` が実際にそうなっていた)。
+    ///
+    /// ## ★ content-free の保証 (ADR-031 **D3**)
+    ///
+    /// ⚠️ **自由記述・相手の識別子・アプリ名・URL・理由を 1 バイトも持たない。**
+    /// ★ 持つのは時刻と 6 択のどれかだけである。
+    ActivityLabel {
+        timestamp: u64,
+        /// ★ どのプローブへの回答か。⚠️ 自発の記録なら `None`。
+        probe_id: Option<String>,
+        category: ActivityCategory,
+        /// ★ 答えたか。⚠️ `false` なら `category` は `CannotAnswer` である
+        /// (★ コンストラクタ [`LogEntry::activity_label_skipped`] が保証する)。
+        answered: bool,
+        latency_ms: u64,
+        /// ⚠️★★★ **この回答が *指している* 区間** (ADR-031 D6・2026-09-14 追加)。
+        ///
+        /// ★ `timestamp` は**回答した時刻**である。⚠️ 被験者が思い出しているのは
+        /// **その手前の区間**なので、`timestamp` だけで削除判定すると
+        /// 「14:20-14:45 に会話していた」という申告が **14:20-14:45 を消しても残る**。
+        /// → ★ `redaction::line_interval` がこの 2 つを見て**区間の交差**で落とす。
+        recall_window_start_ms: u64,
+        recall_window_end_ms: u64,
     },
     /// ⚠️★★★ **記録の一時停止 / 再開の遷移マーカー** (O1 / ADR-014 **D7-ii**)。
     ///
@@ -980,6 +1190,7 @@ impl LogEntry {
             LogEntry::ProbeAssignment { .. } => "probe_assignment",
             LogEntry::RealtimeLabel { .. } => "realtime_label",
             LogEntry::VignetteResponse { .. } => "vignette_response",
+            LogEntry::ActivityLabel { .. } => "activity_label",
             LogEntry::InterventionDecision { .. } => "intervention_decision",
             LogEntry::InterventionResponse { .. } => "intervention_response",
             LogEntry::RecordingPause { .. } => "recording_pause",
@@ -1051,6 +1262,59 @@ impl LogEntry {
             latency_ms,
             analysis_window_start_ms,
             analysis_window_end_ms,
+        }
+    }
+
+    /// `ActivityLabel` (回答あり) を構築する (ADR-031 D1)。
+    ///
+    /// ⚠️★★★ **理由や自由記述の引数を足してはならない** (`data-privacy` ルール 7 条件 ii / iv)。
+    /// ★ 削除経路 `delete_time_range` が**引数に理由を持たない**のと同じ作法である。
+    ///
+    /// ⚠️★★★ **`recall_window_*` は必須である** (2026-09-14・security-checker HIGH)。
+    /// ★ 無いと「その時間帯のお答えも消えます」という同意の約束が実装で保証できない。
+    #[allow(clippy::too_many_arguments)]
+    pub fn activity_label_answered(
+        _consent: &crate::o1::EsmConsent,
+        timestamp: u64,
+        probe_id: Option<&str>,
+        category: ActivityCategory,
+        latency_ms: u64,
+        recall_window_start_ms: u64,
+        recall_window_end_ms: u64,
+    ) -> Self {
+        LogEntry::ActivityLabel {
+            timestamp,
+            probe_id: probe_id.map(str::to_string),
+            category,
+            answered: true,
+            latency_ms,
+            recall_window_start_ms,
+            recall_window_end_ms,
+        }
+    }
+
+    /// `ActivityLabel` (未回答) を構築する。
+    ///
+    /// ★ **未回答は `CannotAnswer` で表す** —— ⚠️ 行そのものを書かないと
+    /// 「**問いが出たのに答えなかった**」と「**問いが出なかった**」が区別できず、
+    /// ★ `.idea` §16 が O1 で測れと言っている **回答率 / MNAR** が出せない
+    /// (ADR-031 D7)。
+    pub fn activity_label_skipped(
+        _consent: &crate::o1::EsmConsent,
+        timestamp: u64,
+        probe_id: Option<&str>,
+        latency_ms: u64,
+        recall_window_start_ms: u64,
+        recall_window_end_ms: u64,
+    ) -> Self {
+        LogEntry::ActivityLabel {
+            timestamp,
+            probe_id: probe_id.map(str::to_string),
+            category: ActivityCategory::CannotAnswer,
+            answered: false,
+            latency_ms,
+            recall_window_start_ms,
+            recall_window_end_ms,
         }
     }
 
@@ -1856,6 +2120,7 @@ impl SessionLogger {
                                 probe_id,
                                 scheduled_ts,
                                 session_elapsed_ms,
+                                stratum,
                             } => {
                                 let _ = writeln!(
                                     writer,
@@ -1863,7 +2128,32 @@ impl SessionLogger {
                                     format_probe_assignment_line(
                                         &probe_id,
                                         scheduled_ts,
-                                        session_elapsed_ms
+                                        session_elapsed_ms,
+                                        stratum
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::ActivityLabel {
+                                timestamp,
+                                probe_id,
+                                category,
+                                answered,
+                                latency_ms,
+                                recall_window_start_ms,
+                                recall_window_end_ms,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_activity_label_line(
+                                        timestamp,
+                                        probe_id.as_deref(),
+                                        category,
+                                        answered,
+                                        latency_ms,
+                                        recall_window_start_ms,
+                                        recall_window_end_ms
                                     ),
                                 );
                                 dirty = true;
@@ -2980,6 +3270,187 @@ mod tests {
             "recording_pause が漏れている"
         );
         assert!(seen.contains("key"));
+        // ⚠️★★★ ADR-031 D4: 監査 criterion の行種が宣言から漏れていないこと。
+        assert!(
+            seen.contains("activity_label"),
+            "activity_label が漏れている (★ 漏れると capabilities に現れず、             『計器が無い』と『答えなかった』が分離できない)"
+        );
+    }
+
+    /// ⚠️★★★ **`activity_label` の 1 行に content-free 以外のものが入らない** (ADR-031 D3)。
+    ///
+    /// ## ⚠️★★★ 2026-09-14: **denylist をやめて allowlist にした** (code-reviewer MEDIUM)
+    ///
+    /// ★ 旧版は禁止語 8 個 (`reason` / `note` / `text` / …) を当てていたが、
+    /// ⚠️ `partner` / `detail` / `memo` のような**新しいフィールドは素通り**した。
+    /// ★ プライバシー保証の要 (ADR-031 **D5 保証 1** = 第三者を識別可能にしない) を
+    /// 支える検査としては弱すぎる。
+    /// → ★ **キー集合の完全一致**にする。⚠️ **1 つでも増えたら赤になる。**
+    #[test]
+    fn activity_label_line_is_content_free() {
+        use std::collections::BTreeSet;
+        // ★ 出してよいキーは**これだけ**である。⚠️ 増やすには ADR が要る。
+        let allowed: BTreeSet<&str> = [
+            "type",
+            "t",
+            "probe_id",
+            "category",
+            "answered",
+            "latency_ms",
+            // ⚠️★★★ **この回答が指している区間**（ADR-031 D6・区間指定削除がこれを見る）。
+            //   ★ 数値 2 つだけで、内容は 1 バイトも含まない。
+            "recall_window_start_ms",
+            "recall_window_end_ms",
+        ]
+        .into_iter()
+        .collect();
+        for cat in ActivityCategory::ALL {
+            let line = format_activity_label_line(
+                1_700_000_000_000,
+                Some("p-1"),
+                cat,
+                true,
+                120,
+                1_699_999_970_000,
+                1_700_000_000_000,
+            );
+            let v: serde_json::Value =
+                serde_json::from_str(&line).expect("activity_label は JSON でなければならない");
+            let obj = v.as_object().expect("object");
+            let got: BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+            assert_eq!(
+                got, allowed,
+                "★ activity_label のキー集合が変わった (ADR-031 D3 / data-privacy ルール 7)。
+                 ⚠️ 自由記述・相手の識別子・アプリ名・URL・理由を持たせてはならない。
+                 line = {line}"
+            );
+            // ★ 6 択の値そのものは出てよい (⚠️ それが唯一の意味情報である)。
+            assert_eq!(obj["category"], serde_json::json!(cat.as_str()));
+            assert_eq!(obj["t"], serde_json::json!(1_700_000_000_000u64));
+        }
+        // ⚠️★★★ **自発の記録 (probe_id なし) でもキー集合は変わらない。**
+        let line = format_activity_label_line(1, None, ActivityCategory::Away, true, 0, 0, 1);
+        let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+        let got: BTreeSet<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(
+            got, allowed,
+            "probe_id が null でもキーは落とさない: {line}"
+        );
+    }
+
+    /// ⚠️★★★ **release でも「答えていない会話」を書けないこと**（2026-09-14・`/cross-review` MEDIUM）。
+    ///
+    /// ★ `LogEntry::ActivityLabel` は pub variant なので**直接構築できる**。
+    /// ⚠️ `debug_assert!` は release で無効なので、**正規化で守る**。
+    #[test]
+    fn unanswered_activity_label_is_normalised_even_when_built_directly() {
+        // ★ コンストラクタを通さずに「未回答なのに会話」を作る（＝ 攻撃面そのもの）。
+        let line = format_activity_label_line(
+            10,
+            Some("p-1"),
+            ActivityCategory::Conversation,
+            false, // ⚠️ answered=false
+            0,
+            1,
+            9,
+        );
+        let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            v["category"],
+            serde_json::json!("cannot_answer"),
+            "⚠️★★★ 答えていないのに第三者の在席が残った: {line}"
+        );
+        assert_eq!(v["answered"], serde_json::json!(false));
+        // ⚠️★★★ **対照**: `answered=true` なら正規化しない（★ 常に潰す実装ではないこと）。
+        let ok_line = format_activity_label_line(
+            10,
+            Some("p-1"),
+            ActivityCategory::Conversation,
+            true,
+            0,
+            1,
+            9,
+        );
+        let v2: serde_json::Value = serde_json::from_str(&ok_line).unwrap();
+        assert_eq!(v2["category"], serde_json::json!("conversation"));
+    }
+
+    /// ★ `ProbeStratum` / `ActivityCategory` の `as_str` ⇄ `parse` が往復すること。
+    ///
+    /// ⚠️ 既存 5 enum には往復テストがあるのに、新 enum 2 つだけ無かった
+    /// (2026-09-14・code-reviewer MEDIUM)。★ 綴り誤りを誰も止められない状態だった。
+    #[test]
+    fn probe_stratum_and_activity_category_round_trip() {
+        for c in ActivityCategory::ALL {
+            assert_eq!(ActivityCategory::parse(c.as_str()), Some(c), "{c:?}");
+        }
+        assert_eq!(ActivityCategory::parse("bogus"), None);
+        assert_eq!(ActivityCategory::parse(""), None);
+        // ⚠️ 6 択であることそのものを固定する (★ 増やすには ADR-031 D3 条件 i の改訂が要る)。
+        assert_eq!(ActivityCategory::ALL.len(), 6);
+        // ⚠️★★★ **`ALL` が全 variant を覆っていること** (2026-09-14・security-checker LOW)。
+        //   ★ `exhaustive_marker` は網羅 `match` なので、variant を足すと**コンパイルが落ちる**。
+        //   ★ ここで印が 0..6 を過不足なく埋めることを見て、`ALL` 側の抜けも捕まえる。
+        let mut marks: Vec<usize> = ActivityCategory::ALL
+            .iter()
+            .map(|c| c.exhaustive_marker())
+            .collect();
+        marks.sort_unstable();
+        assert_eq!(
+            marks,
+            (0..6).collect::<Vec<_>>(),
+            "ALL が全 variant を覆っていない"
+        );
+
+        for st in [
+            ProbeStratum::Random,
+            ProbeStratum::LowOperationEnd,
+            ProbeStratum::Resumption,
+        ] {
+            assert_eq!(ProbeStratum::parse(st.as_str()), Some(st), "{st:?}");
+        }
+        assert_eq!(ProbeStratum::parse("p_stuck"), None);
+        assert_eq!(ProbeStratum::parse(""), None);
+    }
+
+    /// ⚠️★★★ **未回答は行を書かないのではなく `cannot_answer` で残す** (ADR-031 D7)。
+    ///
+    /// ★ 書かないと「**問いが出たのに答えなかった**」と「**問いが出なかった**」が
+    /// 区別できず、`.idea` §16 が O1 で測れと言っている **回答率 / MNAR** が出せない。
+    #[test]
+    fn activity_label_skipped_is_recorded_as_cannot_answer() {
+        // ★ 門を通した証拠が無いと**コンパイルできない**（ADR-031 / `/cross-review` HIGH-2）。
+        let consent = crate::o1::activity_label_allowed(true, true).expect("門を通る");
+        let e = LogEntry::activity_label_skipped(&consent, 5, None, 0, 0, 5);
+        match &e {
+            LogEntry::ActivityLabel {
+                category,
+                answered,
+                probe_id,
+                ..
+            } => {
+                assert_eq!(*category, ActivityCategory::CannotAnswer);
+                assert!(!*answered);
+                assert!(probe_id.is_none());
+            }
+            other => panic!("想定外の variant: {other:?}"),
+        }
+        assert_eq!(e.line_type(), Some("activity_label"));
+    }
+
+    /// ★ `probe_assignment` が**層化理由を必ず書く** (ADR-031 D2 / D4)。
+    ///
+    /// ⚠️★★★ `Option` にしていないので、**キーの不在 = 本フィールドを持たない古いビルド**である。
+    #[test]
+    fn probe_assignment_line_always_carries_the_stratum() {
+        for (st, want) in [
+            (ProbeStratum::Random, "random"),
+            (ProbeStratum::LowOperationEnd, "low_operation_end"),
+            (ProbeStratum::Resumption, "resumption"),
+        ] {
+            let line = format_probe_assignment_line("p-1", 2000, 1000, st);
+            assert!(line.contains(&format!(r#""stratum":"{want}""#)), "{line}");
+        }
     }
 
     /// ⚠️★★★ **一時停止中はデータ行が 1 行も書かれない** (ADR-014 D7-ii)。
@@ -3099,6 +3570,16 @@ mod tests {
                 timestamp: 1,
                 paused: true,
             },
+            // ⚠️★★★ ADR-031 D4: 新行種 `activity_label`。
+            LogEntry::activity_label_answered(
+                &crate::o1::activity_label_allowed(true, true).expect("門を通る"),
+                1,
+                Some("p-1"),
+                ActivityCategory::Conversation,
+                10,
+                0,
+                1,
+            ),
             LogEntry::BlockEnd,
             LogEntry::Rotate {
                 new_path: PathBuf::from("x"),
@@ -4272,20 +4753,21 @@ mod tests {
 
     #[test]
     fn probe_assignment_line_basic() {
-        let line = format_probe_assignment_line("p-001", 1_700_000_000_000, 95_000);
+        let line =
+            format_probe_assignment_line("p-001", 1_700_000_000_000, 95_000, ProbeStratum::Random);
         assert_eq!(
             line,
-            r#"{"type":"probe_assignment","probe_id":"p-001","scheduled_ts":1700000000000,"session_elapsed_ms":95000}"#
+            r#"{"type":"probe_assignment","probe_id":"p-001","scheduled_ts":1700000000000,"session_elapsed_ms":95000,"stratum":"random"}"#
         );
     }
 
     #[test]
     fn probe_assignment_line_escapes_probe_id() {
         // probe_id は生成済み不透明 ID の想定だが、escape で JSON injection を防ぐ。
-        let line = format_probe_assignment_line("a\"b", 1, 2);
+        let line = format_probe_assignment_line("a\"b", 1, 2, ProbeStratum::Resumption);
         assert_eq!(
             line,
-            r#"{"type":"probe_assignment","probe_id":"a\"b","scheduled_ts":1,"session_elapsed_ms":2}"#
+            r#"{"type":"probe_assignment","probe_id":"a\"b","scheduled_ts":1,"session_elapsed_ms":2,"stratum":"resumption"}"#
         );
     }
 
@@ -4554,7 +5036,18 @@ mod tests {
             probe_id: "p-1".to_string(),
             scheduled_ts: 2000,
             session_elapsed_ms: 1000,
+            stratum: ProbeStratum::Random,
         })
+        .unwrap();
+        tx.send(LogEntry::activity_label_answered(
+            &crate::o1::activity_label_allowed(true, true).expect("門を通る"),
+            4500,
+            Some("p-1"),
+            ActivityCategory::Conversation,
+            120,
+            4200,
+            4500,
+        ))
         .unwrap();
         tx.send(LogEntry::realtime_label_answered(
             3000,
@@ -4598,7 +5091,7 @@ mod tests {
             "intervention_response (nudge) 行が不正:\n{contents}"
         );
         assert!(contents.contains(
-            r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000}"#
+            r#"{"type":"probe_assignment","probe_id":"p-1","scheduled_ts":2000,"session_elapsed_ms":1000,"stratum":"random"}"#
         ), "probe_assignment 行が不正:\n{contents}");
         assert!(contents.contains(
             r#"{"type":"realtime_label","probe_id":"p-1","source":"random_probe","q1_friction":3,"q2_progress":4,"answered":true,"skip_reason":"none","latency_ms":500,"analysis_window_start_ms":2969,"analysis_window_end_ms":2999,"ts":3000}"#
@@ -4606,6 +5099,11 @@ mod tests {
         assert!(contents.contains(
             r#"{"type":"vignette_response","vignette_id":"v2s1","expected_quadrant":"stuck","q1_friction":5,"q2_progress":1,"elapsed_ms":6500,"changes":5,"ts":4000}"#
         ), "vignette_response 行が不正:\n{contents}");
+        // ⚠️★★★ ADR-031 D6: **時刻キーは `"t"`**。★ `"ts"` にすると区間指定削除で消えない。
+        assert!(contents.contains(
+            r#"{"type":"activity_label","t":4500,"probe_id":"p-1","category":"conversation","answered":true,"latency_ms":120,"recall_window_start_ms":4200,"recall_window_end_ms":4500}"#
+        ), "activity_label 行が不正 (★ 時刻キーが t でないと区間指定削除で消えない):
+{contents}");
     }
 
     /// ペーストイベントが NDJSON に「時刻のみ」で記録され、クリップボードの中身に

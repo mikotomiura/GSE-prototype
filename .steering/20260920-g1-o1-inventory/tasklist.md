@@ -1,0 +1,41 @@
+# タスクリスト — G1 / O1 の残タスクの棚卸し
+
+## 準備
+- [x] `.steering/_handoff/next-session-g1-o1-inventory.md` を読む
+- [x] 前段の一次（`.steering/20260920-decision4-reflection/decisions.md` 判断 8）を読む
+- [x] grill: 範囲を研究者と確定（棚卸し ＋ 機械的修正 ＋ マージ計画 ＋ 検査の追加）
+- [x] 一次確認 4 本（G1 / O1・ADR-034 / マージ・schema / Q3・Q4 の材料）の結果を受け取る
+
+## 棚卸し
+- [x] `inventory.md` を作る（行ごとに 根拠 = ファイル:行 or コマンド＋終了コード）
+- [x] 各行を [研究者] / [機械] / [ゲート] に分類
+- [x] 引き継ぎの「未検証メモ」と実測の食い違いを明示（★ 古い記述は一次へ戻す）
+
+## 研究者の判断
+- [x] Q1（前提条件 7 の範囲）を一次つきで提示 → `decisions.md`
+- [x] Q2（「G1 の最初の配布」＋ Migration 3）→ `decisions.md`
+- [x] Q3（「テストの中の陽性対照」の境界）→ `decisions.md`
+- [x] Q4（R-1 の「被験者」に EH2・開発者利用が入るか）→ `decisions.md`
+
+## 機械的な修正
+- [x] cp932 問題（`run.sh` / `check_g1_emails.py` ほか `open()` の encoding 欠落）を直す
+- [x] 修正後に `PYTHONUTF8` 無しで `run.sh` を実行し終了コード 0 を確認
+- [x] ⚠️ 直した範囲が「研究者判断の要らないもの」に収まっているか確認（事前登録の記録は触らない）
+
+## 検査の追加
+- [x] D6（案内日の分離）の検査の置き場を決める（`decisions.md` に判断として記録）
+- [x] 検査を追加
+- [x] ★ わざと壊した入力で赤・正常な入力で緑の両方を実測（自己検査の 3 状態）
+
+## マージ計画
+- [x] `merge-plan.md`（衝突予測・schema drift `activity_label`・タグとの順序・実行手順）
+- [x] ⚠️ マージの実行はしない
+
+## レビュー
+- [x] `security-checker`（opus）= HIGH 1 / MEDIUM 1 / LOW 4 を反映 ／ ⚠️ `code-reviewer` は Bash でハングし**結果なし**（判断 12）
+- [x] `/cross-review` 2 巡（コミット後・パス限定・出力は scratchpad）
+
+## 完了処理
+- [x] `design.md` の最終化 / `decisions.md` の確定
+- [x] 次セッションの引き継ぎを `.steering/_handoff/` に置く
+- [x] git commit（`Refs: .steering/20260920-g1-o1-inventory/`）

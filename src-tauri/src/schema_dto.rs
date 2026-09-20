@@ -365,6 +365,24 @@ pub enum LogEntryDto {
         probe_id: String,
         scheduled_ts: u64,
         session_elapsed_ms: u64,
+        /// このプローブが**なぜ発火したか** (ADR-031 D2)。
+        ///
+        /// ⚠️★★★ **`Option` にしない。** `random` を含む 3 値を常に書くので、
+        /// **キーの不在がそのまま「本フィールドを持たない古いビルド」を意味する**
+        /// (⚠️ `capabilities` は行種粒度でしか宣言できず、フィールドの有無を宣言しない。
+        /// → `meta` 行の `app_version` と併せて判定する)。
+        ///
+        /// ⚠️★★★ **推定器の出力 (`p_stuck` / HMM 状態) で層化してはならない** ——
+        /// 監査 criterion が主 criterion に依存し、criterion の二重化が意味を失う。
+        ///
+        /// ⚠️★★★ **DTO 側だけ `Option` である** (2026-09-14・code-reviewer HIGH)。
+        /// 旧ログ (本フィールドを持たない `probe_assignment` 行) を `required` で弾くと
+        /// **ADR-005 の additive versioning が成立しない** —— 実測で `gse-dataset` 側の
+        /// 既存ファイルが `validate_schema.py` で落ちた。
+        /// 書き手 (`logger::LogEntry::ProbeAssignment.stratum`) は **非 `Option` のまま**で、
+        /// ADR-031 D4 の「3 値を常に書く / キーの不在 = 古いビルド」は writer 側で保たれる。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stratum: Option<ProbeStratumDto>,
     },
     /// v0.3 較正スモーク: 主データ (リアルタイム/自己マーカー回答)。
     ///
@@ -400,6 +418,36 @@ pub enum LogEntryDto {
         /// Q1/Q2 スライダー合計の値変更回数。即答と熟慮を分ける。
         changes: u16,
         ts: u64,
+    },
+    /// O1 の**監査 criterion** (ADR-031 D1): 「直前は何をしていたか」の自己申告。
+    ///
+    /// **主データ (`realtime_label`) とは別の行種である。**
+    /// 前者は 1..5 の Likert 2 問で、本行は固定 6 択の行動カテゴリを 1 つ持つ。
+    /// 別の行種にしてあるのは、`capabilities` が**行種粒度でしか能力を宣言しない**ためで、
+    /// `realtime_label` のフィールドとして足すと「計器が無かった (古いビルド)」と
+    /// 「被験者が答えなかった」を機械的に分離できなくなる (ADR-013 D1 / ADR-031 D4)。
+    ///
+    /// **content-free の保証 (ADR-031 D3)**: 自由記述・相手の識別子・アプリ名・URL・
+    /// 理由のいずれも持たない。持つのは時刻と 6 択のどれかだけである。
+    ///
+    /// **時刻キーは `t` である** (ADR-031 D6)。`redaction::line_timestamp` が
+    /// 区間指定削除でこの行を拾えるようにするためで、`ts` にすると**消えない行**になる。
+    ActivityLabel {
+        probe_id: Option<String>,
+        category: ActivityCategoryDto,
+        answered: bool,
+        latency_ms: u64,
+        /// この回答が**指している区間**の開始 (ms)。
+        ///
+        /// ⚠️★★★ **区間指定削除がこの行を拾うために要る** (ADR-031 D6・2026-09-14 追加)。
+        /// `t` は**回答した時刻**であって、被験者が思い出している時間帯ではない。
+        /// → `t` だけで削除判定すると、「14:20-14:45 に会話していた」という申告を
+        /// 14:46 に記録した行が、**14:20-14:45 を削除しても端末に残る**
+        /// (＝ 同意文書の「お答えもいっしょに消えます」が破れる)。
+        recall_window_start_ms: u64,
+        /// この回答が指している区間の終了 (ms)。[`Self::ActivityLabel::recall_window_start_ms`] 参照。
+        recall_window_end_ms: u64,
+        t: u64,
     },
 }
 
@@ -481,6 +529,48 @@ pub enum HeadIdDto {
     Writing,
     WritingFallback,
     CodingV0,
+}
+
+/// `probe_assignment` の層化理由 (ADR-031 D2)。
+///
+/// `random` = 既存のランダム枠、`low_operation_end` = 低操作区間が終わった時点、
+/// `resumption` = フォーカスが戻ったあとに打鍵が戻った時点。
+///
+/// ⚠️★★★ **いずれも「時計と操作の事実」だけで決まる。** 推定器の出力は 1 バイトも読まない。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProbeStratumDto {
+    Random,
+    LowOperationEnd,
+    Resumption,
+}
+
+/// `activity_label` の行動カテゴリ (ADR-031 D3)。固定 6 択で、増やすには別 ADR が要る。
+///
+/// 語は `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md:140` の
+/// 「熟考・詰まり・外部資料・会話・離席・回答不能」に対応する。
+///
+/// ⚠️ 同メモ `:236` は「外部参照 / 観測不能」という別語で同じ並びを書いているが、
+/// そちらは**解析側の混同率のカテゴリ**であって被験者に出す選択肢ではない (ADR-031 Context-1)。
+///
+/// ⚠️★★★ `external_material` と `conversation` は、計器由来なら ADR-014 D4 が禁じている
+/// 役割カテゴリ (`editor` / `terminal` / `browser`) と**意味的に等価**である。
+/// 自己申告経由に限って許可されており、条件は `data-privacy` ルール 7 にある。
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityCategoryDto {
+    /// 熟考: 手は止まっていたが考えていた。
+    Deliberating,
+    /// 詰まり: 先に進めずにいた。
+    Stuck,
+    /// 外部資料: 本・書類・画面などを読んでいた。
+    ExternalMaterial,
+    /// 会話: 会話・通話・打ち合わせをしていた。
+    Conversation,
+    /// 離席: その場を離れていた。
+    Away,
+    /// 回答不能: 思い出せない・当てはまらない。
+    CannotAnswer,
 }
 
 /// `realtime_label` の出所。`random_probe` = backend 割当、`self_marker` = 自発 hotkey。

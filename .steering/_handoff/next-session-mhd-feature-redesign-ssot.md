@@ -1,5 +1,12 @@
 # 次セッション開始プロンプト — **Mh-D と特徴量再設計の SSOT 化（T3）／第 1 歩 = `stall onset` の操作的定義**
 
+> ⚠️★★★ **2026-09-14 追記 —— §8b の「縦切りの目安 5 本」は是正された。**
+> ★ 当時は `ADR-030 D11` の **初版が `T1c` を丸ごと「計器変更 要」に送っていた**ため表から落ちていたが、
+> ⚠️ その後 `code-reviewer` の指摘で **`T1c` のうち 5 項目（delete run / rewrite / 再削除 / loop depth / 局所 recurrence）は
+> 計器変更 *不要*** に直っている。★ かつ 2026-09-14 に **`capability matrix`**（ADR-032 M7）が加わった。
+> → ★★★ **目安は 7 本である。現行の指示は `next-session-loop-foundation-and-task2-slicing.md` §3 を見ること。**
+> ★ **§8c（deny リストの実体）はそのまま有効**（⚠️ 再導出しない）。
+
 > 作成: 2026-09-13 / ⚠️★★★ **このメモを一次資料にしない。**
 > ★ 一次は `.idea/20260910-mhd-criterion-practice-trace-and-g-o-validation.md` /
 > `.idea/20260910-mhd-feature-work-behavior-literature-gap-survey.md` /
@@ -170,7 +177,7 @@ ls docs/adr/ | tail -4      # ★ ADR-029 まで在ることを確認する（�
 | **1** | ★★★ **`stall onset` / `Decision Episode` の操作的定義** | 不要 | ⚠️ **本セッション** |
 | **2** | **T0 / T1a / T1b / T1d / Q を `gse-replay` に実装** | 不要 | ★ 1 の後。⚠️ `issue-slicing` で分解（**別セッション**） |
 | **3** | **leakage 防止・split 規律の SSOT 化** | 不要 | ★ 2 と並行可 |
-| **4** | ⚠️ **計器を変える一式**（T1c / T2 / T3 ＋ **起票 11 の ESM**）を **1 本に束ねて裁く** | **要** | ⚠️ `decisions.md` **判断 12** の順序（**idea 議論 → Mh-D 全体の修正 → 再配布**）に乗せる |
+| **4** | ⚠️ **計器を変える一式**（T1c / T2 / T3 ＋ **起票 11 の ESM**）を **1 本に束ねて裁く** | **要** | ⚠️ `decisions.md` **判断 12** の順序（**idea 議論 → Mh-D 全体の修正 → 再配布**）に乗せる。⚠️★★★ **2026-09-13 更新 —— 起票 11 の ESM は「取る」で確定済み**（★ 研究者判断 (a)）なので、**ここで裁くのは *要否* ではなく ⓪〜④ の実施**である。★ かつ **締切を持つのはこれだけ**（「O1 の収集が本格化する前」）→ ⚠️ **本行の他の要素（T1c / T2 / T3）と同じ速度で扱わない** |
 | **5** | **T4（Practice Portrait）** | — | ⚠️ **後**。★ ただし **ADR-020 D3 の 6 条件**との照合が必須 |
 
 ## §8b ★★★ タスク 2 は **Loop Engineering モード C の初回**である（★ 研究者判断 2026-09-13）
@@ -288,7 +295,7 @@ ls docs/adr/ | tail -4      # ★ ADR-029 まで在ることを確認する（�
 | 何 | どこ | 状態 |
 |---|---|---|
 | **ADR-029** | `docs/adr/ADR-029-outcome-role-arbitration.md` | ⚠️★★★ **ブランチ `docs/adr-029-outcome-role-arbitration` に 4 コミット・未 push / 未 PR。AC 1〜3 は研究者承認待ち**（★ `main` に無ければまずこれを確認する） |
-| **起票 11**（ESM 監査 criterion） | `20260911-outcome-arbitration-and-o1-preflight/blockers.md` | ⚠️ 研究者判断待ち（★ 上記 4 で束ねる） |
+| **起票 11**（ESM 監査 criterion） | `20260911-outcome-arbitration-and-o1-preflight/blockers.md` | ⏳★★★ **2026-09-13 更新 —— 研究者判断は出た =「(a) 6 択フルを O1 で取る」。⚠️ 再決定しないこと。**★ ただし**未着手**で、⚠️ **⓪〜④ が丸ごと残っている**（⓪ ESM 行の提出猶予と第三者の扱い → ① `data-privacy` ルール 7 の改訂 → ② 同意文書の改訂 → ③ `capabilities` 粒度の決定 → ④ `schema_dto.rs`）。⚠️★★★ **④ から始めてはならない。**⚠️ 締切は「O1 配布前」ではなく **「O1 の収集が本格化する前」** |
 | **起票 12**（セッション終了の independent 仮定） | 同上 | ⚠️ 未解決 |
 | **起票 13**（2 設計文書に ADR-024 / 029 未反映） | 同上 | ⚠️ 未着手（★ ADR-029 §Migration **N1 / N2**）。⚠️★★★ **`workspace-behavior-observation.md` は O1 の観測設計の SSOT** なので O1 未開始のうちに直すのが安い |
 | **起票 6**（macOS ライブ変換で `abandon` 過大） | 同上 | ⚠️ **意図的に直していない**（★ 判断 12・特徴量設計が動きうるため） |

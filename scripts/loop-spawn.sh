@@ -11,6 +11,11 @@ BASE_DEFAULT="${LOOP_BASE_BRANCH:-}"   # 未指定なら下で解決
 
 die() { echo "loop-spawn: $*" >&2; exit 1; }
 
+# ⚠️ このスクリプトは後段で repo_root → worktree と 2 回 cd するので、
+#   ★ 兄弟スクリプトの場所は **cd する前に絶対パスで固定**する
+#   (⚠️ `dirname "$0"` を後段で評価すると worktree 側の存在しないパスを指す)。
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || die "git リポジトリ内で実行してください"
 cd "$repo_root"
 repo_name="$(basename "$repo_root")"
@@ -101,8 +106,50 @@ if git remote get-url origin >/dev/null 2>&1; then
 fi
 
 echo "loop-spawn: base=$base (start=$start) → branch=$branch / worktree=$wtdir"
+# ★ 撤去判定に使う「作成時の commit」を控えておく (★ abort_worktree の注記を参照)。
+start_sha="$(git rev-parse --verify --quiet "$start" 2>/dev/null || true)"
 git worktree add -b "$branch" "$wtdir" "$start"
 cd "$wtdir"
+
+# --- ⚠️★★★ 必須 `permissions.deny` の注入（★ worktree 作成直後・失敗したら使わせない） ---
+#   ★ モードC (`loop-run.sh:275`) は worktree 生成を **このスクリプトへ委譲している**ので、
+#     ここに 1 か所置けば **モードA（人が spawn）とモードC（無人）の両方**が通る。
+#   ⚠️ 逆に `loop-run.sh` 側に置くと **モードA が素通りする**。
+#   ⚠️★★★ 出力は **stderr** へ流す —— ★ `--no-exec` の
+#     「**stdout の最終行 = worktree の絶対パス**」という契約 (`loop-run.sh:275` の `tail -1`) を壊さないため。
+#   ⚠️ 失敗しても続行する経路は作らない (fail-closed)。理由は loop-worktree-deny.sh 冒頭。
+#   ⚠️★★★ 失敗したら **worktree と branch ごと撤去する**（★ code-reviewer / security-checker
+#     MEDIUM・2026-09-14）。★ 残すと (a) 人が手で `cd` して deny 無しで起動できてしまい、
+#     (b) 同じ id の再実行が「同名 worktree が既に存在」で**恒久的に死ぬ**。
+#     ★ 作りたてで中身が無いので、撤去して失うものは無い。
+deny_script="${SCRIPT_DIR}/loop-worktree-deny.sh"
+abort_worktree() { # abort_worktree <理由>
+  local left_wt="" left_br="" tip=""
+  cd "$repo_root" 2>/dev/null || true
+  # ⚠️ 撤去できたかを**確かめてから**「撤去しました」と書く（★ Codex /cross-review 2 巡目）。
+  git worktree remove --force "$wtdir" >/dev/null 2>&1 || left_wt="$wtdir"
+  # ⚠️★★★ **`-D` を無条件で使わない**（★ Codex /cross-review 1 巡目 MEDIUM）。
+  #   ★ ただし `-d` の merged 判定は **現在の HEAD 依存**なので、作業ブランチに居ると
+  #     ⚠️ 空のブランチでも拒否されて残骸になる（★ Codex 2 巡目）。
+  #   → ★ 判定を HEAD に依存させない: **作成時の commit から 1 mm も動いていないときだけ**消す。
+  tip="$(git rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || true)"
+  if [ -n "$tip" ] && [ "$tip" = "${start_sha:-}" ]; then
+    git branch -D "$branch" >/dev/null 2>&1 || left_br="$branch"
+  elif [ -n "$tip" ]; then
+    # ⚠️ 何かがコミットされている ＝ 作りたてではない。★ 消さずに残して人に渡す。
+    left_br="$branch"
+  fi
+  git worktree prune >/dev/null 2>&1 || true
+  die "$1
+            ${left_wt:+⚠️ worktree ($left_wt) を撤去できませんでした。手で確認してください。}${left_wt:+
+            }${left_wt:-★ worktree ($wtdir) は撤去しました。}
+            ${left_br:+⚠️ branch $left_br は作成時から動いているため残しました (手で確認してください)。}
+            ★ 原因を直してから再実行してください。
+            (既存 worktree を手で点検するなら  bash scripts/loop-worktree-deny.sh --verify <worktree>)"
+}
+[ -f "${deny_script}" ] || abort_worktree "必須 deny の注入スクリプトが見つかりません: ${deny_script}"
+bash "${deny_script}" "$(pwd)" >&2 \
+  || abort_worktree "worktree への必須 deny 注入に失敗しました。★ deny 無しの worktree は渡しません。"
 
 echo "loop-spawn: worktree 準備完了。"
 
