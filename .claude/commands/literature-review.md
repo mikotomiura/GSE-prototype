@@ -5,7 +5,8 @@ description: >
   docs/references.md への append-only 登録 → docs/literature/_index.md 追記 →
   research-positioning.md §3/§4 への還元まで行う。「サーベイする」「先行研究を調べる」
   「この主張の証拠を確かめる」「Epic の go/no-go を文献で判定する」時に実行する。
-allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Bash(date *), Bash(ls *), Bash(grep *)
+allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task,
+  Bash(date *), Bash(ls *), Bash(grep *), Bash(git *), Bash(python3 *)
 ---
 
 # /literature-review
@@ -75,9 +76,11 @@ angle の例: 分野を変える（HCI / 教育心理 / SE） / 測定法を変�
 - ⚠️ **渡し方の契約は `subagent-delegation` Skill**（★ 範囲・禁止事項・締切の 5 点を必ず書く）。
 - ★ 各 subagent には **`citation-ssot` と `literature-card` を先に Read させる**。
   ★ 持ち帰らせるのは **逐語引用 ＋ 完全な書誌情報 ＋ 反証**（⚠️ 要約だけを受け取らない）。
-- ⚠️ **subagent の中でさらに subagent を起動させない**（★ プロンプトに明記する）。
-  ⚠️★★★ 2026-09-19 に入れ子で **月の利用上限に 2 回当たって全停止**した
-  （`.steering/20260919-theory-ssot-promotion/design.md:42`）。★ 並列数はメインが決める。
+- ⚠️ **subagent の中でさらに subagent を起動させない**（★ 汎用 agent に投げるので
+  **必ず書く**側である —— `subagent-delegation` ルール 4 の相手別の表）。
+  ⚠️★★★ 2026-09-19 の実測（`.steering/20260919-ssot-sr-systematic-review/deviations.md:13` 逐語）:
+  「段 2 を全件に回したところ、**並列のサブエージェントが入れ子で 20 本以上に増え、
+  月の利用上限に 2 回当たって全停止した**」。★ **並列数と総本数はメインが決める。**
 - ⚠️★★★ **`references.md` への append は *メインが直列で* 行う。**
   ★ 理由: 採番 (`[Pn]` / `[Vn]`) は append-only の共有資源で、
   **並列に書くと採番が衝突する**（`citation-ssot`）。
@@ -201,8 +204,12 @@ ADR / preregistration に影響する場合は、該当 ADR の「根拠」節�
 - [ ] `docs/literature/_index.md` に 1 行追記された
 - [ ] `docs/research-positioning.md` への還元（または「還元不要」の判断）が明示された
 - [ ] gate 用途なら **go / no-go / de-risk 先行**のいずれかを明言した
+- [ ] ⚠️ `python3 scripts/check_citations.py` が **`=== 違反なし ===`** で終わった（★ 下記 2）
+- [ ] ⚠️ **このラウンドを単独でコミットした**（★ 下記 1）
 
 ## ★ ラウンドを閉じる（⚠️ 次ラウンドを始める前に）
+
+> ★ 上の**完了条件の最後の 2 行の手順**である（⚠️ ここを読み飛ばすと完了条件が満たせない）。
 
 ### 1. ⚠️★★★ **毎ラウンド、その場でコミットする**
 
@@ -217,9 +224,14 @@ ADR / preregistration に影響する場合は、該当 ADR の「根拠」節�
 python3 scripts/check_citations.py
 ```
 
-⚠️★★★ **1 回で全件は出ない**（★ 重複検出は検出した時点で打ち切る作りである）。
-→ ★ **是正 → 再実行**を、**違反 0 になるまで**繰り返す。
-⚠️ 1 回通しただけで「違反なし」と書かない。
+⚠️★★★ **1 回通っただけで「違反なし」と書かない。**
+★ 是正すると**新たな違反が現れうる**（★ 追記・番号の付け替えで、欠番や重複の判定が変わるため）。
+→ ★ **是正 → 再実行**を、**`=== 違反なし ===` が出るまで**繰り返す。
+
+> ⚠️ **機構の断定を書かない**（2026-09-20 に一度書いて誤りだった）。
+> ★ 実装（`scripts/check_citations.py:148-152`）は違反を `violations` に集約し、
+> **`=== VIOLATION N 件 ===` として全件出力する**（★ 早期 `break` / `return` は無い）。
+> → ★ 繰り返すのは **「打ち切られるから」ではなく「是正が新しい違反を生むから」**である。
 
 ## アンチパターン
 
