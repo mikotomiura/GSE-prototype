@@ -631,6 +631,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: bash scripts/loop-worktree-deny-test.sh
+      # ⚠️★★★ Loop 基盤の**境界**の検査 (2026-09-20 追加・起票 10 / 3 / 判断 26 の申し送り)。
+      #   ★ deny は多層防御でしかない (⚠️ `git -C . checkout` が通ることを実測した)。
+      #     **境界は `loop-run.sh` の `ensure_branch`** であり、ここが退行すると
+      #     ⚠️ **別ブランチを verify して緑/赤を出す**事故に戻る。
+      - name: Loop run guard gate (Windows・ブランチ検査 / Status フィルタ / denials 内訳)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: bash scripts/loop-run-guard-test.sh
 
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────
   frontend-check:
@@ -702,6 +710,14 @@ jobs:
       #     ⚠️ 「検査が空振りしていないこと」まで見る (★ 実際に一時 git repo で worktree を作る)。
       - name: Loop worktree deny gate (無人ループの worktree に deny が入るか)
         run: bash scripts/loop-worktree-deny-test.sh
+      # ⚠️★★★ Loop 基盤の**境界** (2026-09-20 追加)。
+      #   ★ 2026-09-15 に worker が `git checkout main` で worktree 隔離を自分で外した (起票 10)。
+      #   ⚠️ deny を増やしても閉じない —— `git -C . checkout main` は **deny 9 件でも通る**
+      #     (★ 2026-09-20 に実測。`.steering/20260920-loop-foundation-fixes/measurements.md` M3)。
+      #   → ★ 境界は `ensure_branch`。この検査は B2 を**陰性対照**に持ち、
+      #     ⚠️ 実装を殺すと実際に赤くなることを確認済み (突然変異 3 種)。
+      - name: Loop run guard gate (ブランチ検査 / Status フィルタ / denials 内訳)
+        run: bash scripts/loop-run-guard-test.sh
       # ⚠️★★★ secrets-filter のゲート (2026-09-10 追加)。
       #   ★ `scripts/secrets-filter.sh` は **git diff を外部 LLM (Codex) へ渡す前の最後の関門**で、
       #     `scripts/secrets-filter-test.sh` という対照つきのテストも**既にあった**。

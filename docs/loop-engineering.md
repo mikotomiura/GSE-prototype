@@ -11,6 +11,10 @@ worktree 隔離のもと安全に回す。人が目視できる監視ファイ�
 - goal        : /goal による 1 セッションの有界自律実行 (executor)。
 - checkpoint  : events.jsonl の 1 状態遷移行 (attempt_start / test_fail / issue_done 等)。
 - retrospective: task 完了時の学習記録 (次ループへの入力)。
+- **worktree 逸脱**: worktree の HEAD が、その issue のために切られた `loop/<id>-*` から
+  外れている状態 (別ブランチ / detached HEAD)。⚠️ このまま verify すると**別ブランチを測る**。
+- **ブランチ検査**: 逸脱を検出して `blocked` にする `loop-run.sh` の検査 (`ensure_branch`)。
+  ★ **worktree 隔離の境界はここに置く** (⚠️ `permissions.deny` は多層防御であって境界ではない)。
 
 ## 原則
 1. **1 issue = 1 worktree = 1 PR 候補**。issue は vertical slice で切る (縦に薄く貫く)。
@@ -130,20 +134,60 @@ C では制御がループの**外**にあり、events も自己申告ではな�
 worktree 隔離を必須 (main checkout で走らせない) / `headless.permission_mode` の既定は
 `acceptEdits` (全許可は worktree 隔離下で明示合意時のみ) / `budget.token_ceiling` を必ず設定し
 script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns` で有界化 /
-**worktree には必須 `permissions.deny` 7 件が自動注入される** (`loop-spawn.sh` → `loop-worktree-deny.sh`。
+**worktree には必須 `permissions.deny` 9 件が自動注入される** (`loop-spawn.sh` → `loop-worktree-deny.sh`。
 書いたあと読み直して検査し、失敗したら worktree のパスを返さない = fail-closed。
 `loop-run.sh` は **attempt ごとに再注入・再検査**する — worker は `acceptEdits` で
 `.claude/settings.local.json` を書き換えられるため、作成時 1 回では閉じない)。
 ⚠ `ask` は**承認する人が居ない無人実行では前提を満たさない**ので、止めたいものは `deny` に置く。
 
-⚠ **この 7 件は「多層防御」であって境界ではない** (2 点とも 2026-09-14 時点で未検証):
-- **綴りを網羅できない**。`Bash(git push:*)` は前置一致なので `git -C <dir> push …` は当たらず、
+⚠ **この 9 件は「多層防御」であって境界ではない**:
+- **綴りを網羅できない**。⚠️★★★ **2026-09-20 に実測した** (`.steering/20260920-loop-foundation-fixes/measurements.md` M3)。
+  `Bash(git checkout:*)` を deny に入れた worktree で **`git -C . checkout main` は拒否 0 件で通り、
+  ブランチが `main` へ動いた**。`Bash(git push:*)` も前置一致なので `git -C <dir> push …` は当たらず、
   追跡済み `.claude/settings.json` の `allow: ["Bash(git *)","Bash(gh *)"]` に拾われる。
   `gh pr merge` を塞いでも `gh api --method PUT …/merges` は残り、`git -c alias.x=push x` も通る。
-  → **実効的な境界はリモート側** (`main` の branch protection) と **人間の merge ゲート**に置く。
+  → **deny の件数を増やす方向で解こうとしないこと。**
+  → **実効的な境界は (a) 下記の worktree ブランチ検査、(b) リモート側** (`main` の branch protection)、
+    **(c) 人間の merge ゲート**に置く。
+- ⚠️★★★ **`allow` は worktree 側で狭められない**。`<worktree>/.claude/settings.local.json` の
+  `allow` は追跡済み `.claude/settings.json` と **union** される (★ 2026-09-20 に一次で確認)。
+  → worktree 限定で効かせられるのは **`deny` 側だけ**。`allow` を絞るには追跡ファイルを変えるしかなく、
+    それは**対話セッションの権限も同時に変える**。
 - **注入されていること ≠ 発効していること**。`headless.permission_mode` を
   `LOOP_ALLOW_FULL_ACCESS=1` で `auto` / `bypassPermissions` へ昇格させたとき deny が
-  どう評価されるかは**実測していない**。昇格モードを使うなら、そこは未検証のまま使うことになる。
+  どう評価されるかは**実測していない** (⚠️ 2026-09-20 の実測は既定 `acceptEdits` だけ)。
+  昇格モードを使うなら、そこは未検証のまま使うことになる。
+
+### ⚠★★★ worktree ブランチ検査 —— **これが隔離の境界である** (2026-09-20)
+
+`loop-run.sh` は **attempt 開始時**と **`run_verify` の直前**の 2 か所で、worktree の
+`git rev-parse --abbrev-ref HEAD` が `loop/<id>-*` であることを確かめる (`ensure_branch`)。
+外れていたら events に `blocked` を 1 行残して **その issue を落とす (fail-closed)**。
+
+- **なぜ要るか**: 2026-09-15 に worker が `git checkout main` を打ち、worktree が `main` を
+  掴んだまま attempt が終わった (起票 10)。⚠️ このとき `run_verify` は
+  **別ブランチの内容を検査して緑/赤を出す** — 何を測ったのか分からない数字になる。
+- **なぜ deny ではなくこれが境界か**: ⚠️ deny は**到達の綴り**を塞ぐが網羅できない (上記 M3)。
+  ブランチ検査は**結果 (HEAD) だけ**を見るので、どの綴りで到達しても同じく拾う。
+- ⚠ **自動で戻さない**。`ensure_deny` は「検知して再注入」する型だが、ブランチは違う:
+  未コミットの変更を抱えたまま `git checkout` で戻すと、変更が別ブランチへ持ち越されるか
+  checkout 自体が失敗する。→ **記録して止める。** worktree は撤去せず人に渡す。
+- ⚠ **worker は commit してから終わること** (`.claude/commands/loop-issue.md` の契約)。
+  未コミットのまま逸脱すると作業が失われうる。
+
+### ⚠ `## Status` が `blocked` の issue は既定の選択から外れる (2026-09-20)
+
+`loop-run.sh` は issue の `## Status` 節の最初の非空行を読み、`blocked` で始まるものを
+**既定の実行対象から外す**。`--issues 004,006` と明示すれば回せる (警告を 1 行出す)。
+
+- **なぜ**: ⚠️ 以前は `issues/*.md` を無条件に列挙していたため、`blocked` の issue も走った。
+  実績として issue 004 は blocked のまま回されて **attempt 1〜3 を失った**。
+- ⚠ **`done` は外さない**。外すと `deps_met()` が永久に false になり、その issue に依存する
+  後続が「依存 issue が未完のため未実行」で落ちる。完了の復元は events からの seed が担う。
+- ⚠ **`## Status` が無い issue は回す**。テンプレの Status 節は見出しだけで値が空なので、
+  外すと新規に切った issue が黙って走らなくなる。
+- 除外は **ログと `_loop-run-report.md`** に出す。⚠ events には出さない
+  (events 語彙は 10 種で固定であり、「実行しなかった」は状態遷移ではない)。
 
 **`claude -p` は完全なセッション**であり、機能が削られた実行ではない。だからカスタムスラッシュ
 コマンド・hook・settings.json・権限設定がすべて効き、worktree 内で `loop-guard.sh` が発火する。

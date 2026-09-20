@@ -45,11 +45,18 @@ worker が実際に打つのは `uv run ruff check . ; echo "EXIT:$?"` のよう
 ```json
 "permissions": {
   "deny": ["Bash(git push:*)", "Bash(gh pr merge:*)", "Bash(git reset --hard:*)",
-           "Bash(git rebase:*)", "Bash(sudo:*)", "Bash(rm -rf:*)", "Bash(chmod -R:*)"]
+           "Bash(git rebase:*)", "Bash(git checkout:*)", "Bash(git switch:*)",
+           "Bash(sudo:*)", "Bash(rm -rf:*)", "Bash(chmod -R:*)"]
 }
 ```
 
-### この 7 件は worktree へ**自動で注入される** (2026-09-14)
+⚠️★★★ **`git checkout` / `git switch` は 2026-09-20 に足した** (★ 起票 10 の是正)。
+worker が `git checkout main` を打って **worktree 隔離を自分で外した**実測があるため
+(`.steering/20260920-loop-foundation-fixes/measurements.md` M1)。
+★ `allow` 側を worktree だけで狭めることは**できない** (`settings.local.json` の `allow` は
+追跡済み `settings.json` と **union** される) ので、worktree 限定で効かせられるのは `deny` だけである。
+
+### この 9 件は worktree へ**自動で注入される** (2026-09-14)
 
 `scripts/loop-spawn.sh` が worktree 作成直後に `scripts/loop-worktree-deny.sh` を呼び、
 `<worktree>/.claude/settings.local.json` へ書いたうえで**読み直して検査する**。
@@ -60,16 +67,20 @@ worker が実際に打つのは `uv run ruff check . ; echo "EXIT:$?"` のよう
   worktree 側の `settings.local.json` は gitignore 済みなので worktree ごとに別物にできる。
 - 既存ファイルがあれば **`deny` 配列へマージする** (他のキーを消さない)。
   ⚠ **壊れた JSON なら上書きせず停止する** (人の設定を黙って捨てない・deny 無しでも続行しない)。
-- ⚠ 上のリストと `loop-worktree-deny.sh` の 7 件が食い違うと `scripts/loop-worktree-deny-test.sh` が
+- ⚠ 上のリストと `loop-worktree-deny.sh` の 9 件が食い違うと `scripts/loop-worktree-deny-test.sh` が
   **赤になる** (契約の二重定義を機械で止めている)。**片方だけ増やさないこと。**
 - 既存 worktree を手で確認する: `bash scripts/loop-worktree-deny.sh --verify <worktree>`
 - ⚠ `loop-run.sh` は **attempt ごとに再注入・再検査**する。worker は `acceptEdits` で
   `.claude/settings.local.json` を書き換え・削除できるので、**作成時 1 回では閉じない**
-  (⚠ 必須 7 件に `Edit` / `Write` 系は 1 件も無い)。保証できない attempt は `blocked` にして起動しない。
-- ⚠ `deny` を入れても**完全な境界ではない**のは上記のとおり。実質的な境界は worktree 隔離と人間の merge ゲート。
-  綴り違い (`git -C <dir> push` / `gh api --method PUT …/merges`) は塞げず、しかも追跡済み
+  (⚠ 必須 9 件に `Edit` / `Write` 系は 1 件も無い)。保証できない attempt は `blocked` にして起動しない。
+- ⚠★★★ `deny` を入れても**完全な境界ではない**。**これは推測ではなく実測である** (2026-09-20):
+  ★ `Bash(git checkout:*)` を deny に入れた状態で **`git -C . checkout main` は拒否 0 件で通り、
+  ブランチが動いた** (`measurements.md` M3)。前置一致は綴りを網羅できず、追跡済み
   `.claude/settings.json` の `allow: ["Bash(git *)","Bash(gh *)"]` に拾われる。
-  **deny の件数を増やす方向で解こうとしないこと** — 実効的な境界はリモート側 (branch protection) に置く。
+  **deny の件数を増やす方向で解こうとしないこと。**
+  → 実効的な境界は **(a) `loop-run.sh` のブランチ検査** (`ensure_branch` — 到達した綴りを問わず
+  HEAD が `loop/<id>-*` から外れた attempt を `blocked` にする)、**(b) リモート側の branch protection**、
+  **(c) 人間の merge ゲート**に置く。
 - ⚠ **注入されていること ≠ 発効していること**。`permission_mode` を `auto` / `bypassPermissions` へ
   昇格させたときに deny がどう評価されるかは **2026-09-14 時点で未検証**。
 

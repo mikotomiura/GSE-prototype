@@ -57,9 +57,24 @@
 
 ---
 
-## 起票 3: ⚠️ `permission_denials` の中身が依然未検証
+## 起票 3: ⚠️ `permission_denials` の中身が依然未検証 —— ★★★ **2026-09-20 に閉じた**
 
 > ★ **研究者判断 2026-09-18（判断 25 #4）**: 次に Loop を回す前に直す。⚠️ worker の transcript は `~/.claude/projects/C--wt-GSE-prototype-<id>-issue/*.jsonl` に残る。
+>
+> ### ★★★ 閉じた（2026-09-20・`.steering/20260920-loop-foundation-fixes/`）
+>
+> - ★ **実スキーマを実測した**（`measurements.md` M1b）:
+>   `{"tool_name":"Bash","tool_use_id":"...","tool_input":{"command":"...","description":"..."}}`
+>   ⚠️★★★ **拒否はすべて `tool_name == "Bash"` になる**ので、
+>   ★ **`.tool_name` だけ集計しても「何が拒否されたか」は分からない**（★ 本起票の核心はここだった）。
+>   → ★ 集計キーを **`.tool_input.command` の先頭 2 語**にした。
+> - ★ `loop-run.sh` が events の `detail` に `[Bash(git checkout)x1 Bash(git push)x1 WebFetch x1]` の形で内訳を書く。
+> - ★ 生の `permission_denials` 配列を `$TASK_DIR/_loop-artifacts/<id>-attempt<N>-denials.json` に残す。
+> - ⚠️★★★ **本起票が書いていた「`WORK_TMP` に保存する」は成立しない** ——
+>   `loop-run.sh` の `trap cleanup_tmp EXIT` が run 終了時に `rm -rf` する（★ 2026-09-20 に一次で確認）。
+> - ★ 検査: `scripts/loop-run-guard-test.sh` の D1（⚠️ 突然変異で赤になることを確認済み）。
+> - ⚠️ **「非致命」の扱いは変えていない** —— ★ `events_path` が worktree の cwd 境界外にあるため
+>   **必ず 1 件は拒否される**という理解は変わらない。★ ただし**今後は内訳で裏が取れる**。
 
 - **起票日**: 2026-09-15（★ `decisions.md` 判断 8 の未決 3 を引き継ぐ）
 - **中身**: Loop モードC は `permission_denials=N` を件数だけ events に残す。
@@ -320,9 +335,44 @@
 
 ---
 
-## 起票 10: ⚠️★★★ worker が `git checkout main` で **worktree 隔離を自分で外せた**（★ 実測）
+## 起票 10: ⚠️★★★ worker が `git checkout main` で **worktree 隔離を自分で外せた**（★ 実測）—— ★★★ **2026-09-20 に閉じた**
 
 > ★ **研究者判断 2026-09-18（判断 25 #4）**: 次に Loop を回す前に直す（ブランチ検査・worktree 内の `git checkout` / `git switch` の遮断）。
+>
+> ### ★★★ 閉じた（2026-09-20・`.steering/20260920-loop-foundation-fixes/`）
+>
+> **★ 境界はブランチ検査に置いた**（★ 研究者が grill で裁定・判断 1 / 2）:
+>
+> - ★ `loop-run.sh` に `ensure_branch` を足し、**attempt 開始時**と **`run_verify` の直前**の
+>   2 か所で HEAD が `loop/<id>-*` であることを確かめる。外れていたら `blocked`（fail-closed）。
+>   ⚠️ **自動で戻さない** —— 未コミットの変更を別ブランチへ持ち越さないため。
+> - ★ 必須 deny を **7 → 9 件**にした（`Bash(git checkout:*)` / `Bash(git switch:*)`）。
+>   ⚠️ ただし**これは多層防御であって境界ではない**（下記）。
+> - ★ `/loop-issue` の契約に「**worker は commit してから終わる**」を明記した（判断 5・文章のみ）。
+>
+> **⚠️★★★ 本起票の「次に何をするか 1」の判断を一部 *訂正* した**:
+>
+> - ★ 本起票は「**`allow` の `Bash(git *)` を worktree 内では絞る**。★ 後者のほうが本筋」と書いていた。
+> - ⚠️ **実行できない。** `<worktree>/.claude/settings.local.json` の `allow` は
+>   追跡済み `.claude/settings.json` と **union** される（★ 2026-09-20 に一次で確認）ので、
+>   **`allow` を worktree 限定で狭める手段が存在しない**。
+>   → ★ 狭めるには追跡ファイルを変えるしかなく、**対話セッションの権限も同時に変わる**。
+>   → ★ 代わりに **worktree 限定で効く `deny`** に置いた（★ 意図は達成している）。
+>
+> **⚠️★★★ 実測（`measurements.md`）**:
+>
+> | | 条件 | 結果 |
+> |---|---|---|
+> | M1 | deny **7** 件で `git checkout main` | ⚠️ **通った**（`main` へ移動・拒否 0 件）＝ 本起票の再現 |
+> | M2 | deny **9** 件で `git checkout main` | ★ **拒否された**（ブランチ不変・`permission_denials` 1 件） |
+> | M3 | deny **9** 件で `git -C . checkout main` | ⚠️★★★ **通った**（拒否 0 件・ブランチが動いた） |
+>
+> → ★ **M3 が「deny は境界ではない」の実測である。**
+>   ⚠️ `docs/loop-engineering.md` が「2026-09-14 時点で**未検証**」と断っていた逐語が、これで検証された。
+>   ★ ブランチ検査は**到達した綴りを問わず結果（HEAD）だけを見る**ので、M3 の形も拾う。
+>
+> ★ 検査: `scripts/loop-run-guard-test.sh` の B1 / B2（**陰性対照**）/ B3（detached HEAD）。
+> ⚠️ 実装を殺すと赤になることを突然変異 3 種で確認済み。
 
 - **起票日**: 2026-09-15（★ issue 004 の attempt で実際に発生）
 - **何が起きたか**（★ reflog の実測）:
@@ -476,3 +526,44 @@
 - ⚠️ `T1d` は **retrospective**（`t0` の後の未来を見る）であり、issue 006 AC7 のとおり **detection 側へ渡さない**。
 - **★ 次に何をするか**: 研究者が 4 点を選ぶ → `issues/006.md` の Background に算出式を書く → `006-acceptance.sh` の fixture を
   `stall_onset_observed.ndjson` へ差し替え（★ `deep_silence` は 008 以後 onset が立たない）、正解値を参照実装で確定してから回す。
+
+---
+
+## 起票 18: ⚠️★★★ 逸脱した worktree は `loop-spawn.sh --cleanup` で撤去できず、**「完了」と嘘の報告をする**
+
+- **起票日**: 2026-09-20（★ `.steering/20260920-loop-foundation-fixes/` の実測 M4 で発見）
+- **何が起きたか**（★ 実測。⚠️ 推測ではない）:
+
+  ```text
+  $ bash scripts/loop-spawn.sh --cleanup zzz
+  loop-spawn: worktree 見つからず (既に撤去?)
+  Deleted branch loop/zzz-issue (was 1bdbb24).
+  loop-spawn: cleanup 完了 issue zzz
+
+  $ git worktree list
+  C:/wt/GSE-prototype-zzz-issue    b7a1cae [main]      ← ★ 残っている
+  ```
+
+- **原因**（★ `scripts/loop-spawn.sh:57` 逐語）:
+
+  ```bash
+  wt="$(git worktree list --porcelain | awk -v id="$id" '/^worktree /{p=substr($0,10)} /^branch /&&$0 ~ ("loop/" id){print p}')"
+  ```
+
+  → ⚠️★★★ **worktree を「ブランチ名」で引いている**ので、
+  ★ **起票 10 の形で `main` へ逸脱した worktree は 1 件もヒットしない**。
+  ⚠️ しかも **branch だけは削除され**、★ **worktree は登録に残る**。
+
+- **実害**:
+  1. ⚠️ **同じ id の再実行が恒久的に死ぬ**（`loop-spawn.sh:90`「同名 worktree が既に存在」）。
+  2. ⚠️ **main checkout が `main` をチェックアウトできなくなる**（git は同一ブランチの二重チェックアウトを拒む）。
+  3. ⚠️★★★ **`--cleanup` が「完了」と報告する**ので、★ **失敗が誰にも見えない**（`verify-before-claiming` の型）。
+- **★ 次に何をするか**（⚠️ 本タスクの範囲外）:
+  1. ★ 引き方を **パス（`../wt/<repo>-<id>-<short>`）でも引く**ように足す。
+     ⚠️ ブランチ名だけに依存させない。
+  2. ★ **撤去できたことを確かめてから「完了」と書く**（★ `loop-spawn.sh` の `abort_worktree` は
+     既にこの作法を持っている —— 逐語「⚠️ 撤去できたかを**確かめてから**「撤去しました」と書く」。
+     ⚠️ `--cleanup` 側だけがこの作法から外れている）。
+- ★ **緩和済み**: ブランチ検査（起票 10 の是正）が入ったので、⚠️ **逸脱した attempt はそもそも
+  `blocked` で止まる**。★ この形に到達する確率は大きく下がったが、**経路は残っている**
+  （★ M3 の迂回で逸脱し、その後 `--cleanup` する場合）。

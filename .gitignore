@@ -56,6 +56,10 @@ src-tauri/target/
 .steering/**/_loop-events.jsonl
 .steering/**/_loop-board.md
 .steering/**/_loop-run-report.md
+# ⚠️★★★ 2026-09-20 追加: `permission_denials` の生配列 (★ 起票 3 の是正・判断 3)。
+#   ★ `loop-run.sh` が attempt ごとに書く。⚠️ 無視しないと上と同じ理由で
+#     **2 issue 目以降の worktree 生成が死ぬ**（★ 1 issue 目が自分で作ってしまう）。
+.steering/**/_loop-artifacts/
 .steering/_token_log.md
 .steering/_token_log.last_key
 .steering/_token_log.md.lock

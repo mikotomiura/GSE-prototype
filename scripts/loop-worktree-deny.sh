@@ -40,7 +40,22 @@ log() { echo "${PREFIX} $*" >&2; }   # ⚠️ stdout は使わない（loop-spaw
 # ⚠️★★★ ここと README の 2 か所に同じリストが存在する（**契約の二重定義**）。
 #   → ★ `loop-worktree-deny-test.sh` が `--print` の出力と README のコードブロックを
 #     突き合わせ、**片方だけ増やす事故**を機械で止める。⚠️ 手で揃える運用にしない。
-DENY_REQUIRED='["Bash(git push:*)","Bash(gh pr merge:*)","Bash(git reset --hard:*)","Bash(git rebase:*)","Bash(sudo:*)","Bash(rm -rf:*)","Bash(chmod -R:*)"]'
+#
+# ⚠️★★★ **2026-09-20 追加: `git checkout` / `git switch`**（★ 起票 10 の是正・判断 1）。
+#   ★ 実測（2026-09-15・issue 004 の attempt）で **worker が `git checkout main` を実行し、
+#     worktree 隔離を自分で外した**。reflog 逐語:
+#       `92fd22f HEAD@{0}: checkout: moving from loop/004-issue to main`
+#   ★ 通った理由は、追跡済み `.claude/settings.json` の `allow` に `Bash(git *)` が在ること。
+#   ⚠️ **`allow` は worktree 側で*狭められない*** —— `settings.local.json` の `allow` は
+#     追跡済み `settings.json` と **union** される（★ 2026-09-20 に一次で確認）。
+#     → ★ worktree 限定で効かせられるのは **`deny` 側だけ**なので、ここに置く。
+#
+# ⚠️★★★ **この 2 件は境界ではない。** ★ `git -C <dir> checkout` / `git -c alias.x=checkout x`
+#   のような綴り違いは前置一致をすり抜ける。★ **境界は `loop-run.sh` のブランチ検査**
+#   （`ensure_branch`: HEAD が `loop/<id>-*` から外れた attempt を `blocked` にする）であり、
+#   ここは**多層防御**である。⚠️ 迂回が見つかっても deny を増やす方向で解こうとしないこと
+#   （★ `loop-config.README.md` 逐語）。
+DENY_REQUIRED='["Bash(git push:*)","Bash(gh pr merge:*)","Bash(git reset --hard:*)","Bash(git rebase:*)","Bash(git checkout:*)","Bash(git switch:*)","Bash(sudo:*)","Bash(rm -rf:*)","Bash(chmod -R:*)"]'
 
 # ---------- 引数 ----------
 MODE="apply"
@@ -73,7 +88,7 @@ SETTINGS="${SETTINGS_DIR}/settings.local.json"
 
 # ---------- 検査（★ 書いた後も必ずここを通す） ----------
 # ⚠️★★★ 「書いたから入っているはず」で終わらせない（`verify-before-claiming` ルール 6）。
-verify_deny() { # verify_deny <settings-file>; 0 = 必須 7 件がすべて在る
+verify_deny() { # verify_deny <settings-file>; 0 = 必須 9 件がすべて在る
   local f="$1" out rc
   [ -f "${f}" ] || { log "検査: ファイルが無い → ${f}"; return 1; }
   jq -e 'type == "object"' "${f}" >/dev/null 2>&1 \
@@ -83,9 +98,9 @@ verify_deny() { # verify_deny <settings-file>; 0 = 必須 7 件がすべて在�
   #   **両方 HIGH で指摘し、実測で再現した**）。
   #   ★ 旧実装は `2>/dev/null || true` だったため、`{"permissions": "nope"}` のように
   #     `.permissions.deny` を評価できない形では **jq が落ちて出力が空 → 「欠けなし」＝ 緑**になった。
-  #     ⚠️ deny が 1 件も無いファイルを「必須 deny 7 件が効いている」と報告していた（＝ **fail-open**）。
+  #     ⚠️ deny が 1 件も無いファイルを「必須 deny が効いている」と報告していた（＝ **fail-open**）。
   #   → ★ 対策は 2 段:
-  #     (1) jq プログラムを **total** にする（型が想定外なら必須 7 件を全部「欠け」として出す）。
+  #     (1) jq プログラムを **total** にする（型が想定外なら必須の全件を「欠け」として出す）。
   #     (2) **sentinel を要求する** —— 出力が `__ALL_PRESENT__` でなければ合格にしない。
   #        ⚠️ これで「jq が落ちて出力が空」は**自動的に不合格**になる（★ 空 = 不合格）。
   out="$(jq -r --argjson req "${DENY_REQUIRED}" '
@@ -110,7 +125,7 @@ verify_deny() { # verify_deny <settings-file>; 0 = 必須 7 件がすべて在�
 
 if [ "${MODE}" = "verify" ]; then
   verify_deny "${SETTINGS}" || die "必須 deny が効いていない: ${SETTINGS}"
-  log "検査 OK: 必須 deny 7 件が効いている → ${SETTINGS}"
+  log "検査 OK: 必須 deny 9 件が効いている → ${SETTINGS}"
   exit 0
 fi
 
@@ -157,4 +172,4 @@ trap - EXIT INT TERM HUP
 verify_deny "${SETTINGS}" || die "注入したのに必須 deny が揃っていない: ${SETTINGS}
   ⚠️★★★ この worktree で無人セッションを回してはならない。"
 
-log "OK: 必須 deny 7 件を注入・確認した → ${SETTINGS}"
+log "OK: 必須 deny 9 件を注入・確認した → ${SETTINGS}"
