@@ -15,7 +15,10 @@ cd "$(dirname "$0")"
 #     cp932 バイトで書かれ、git-bash（UTF-8）では**文字化けして読めない**。
 #   ⚠️ 実害は見た目ではなく判断で、**FAIL の理由が読めない**（研究者が何を直すか分からない）。
 #   ★ これは出力の encoding だけを固定するもので、ファイルの読み方（＝検査の意味）は変えない。
-export PYTHONIOENCODING=utf-8
+# ⚠️★ ハンドラまで指定する（security-checker LOW・2026-09-20）。★ 既定の `strict` だと、
+#   surrogateescape 由来の文字を子 python が print した瞬間に `UnicodeEncodeError` で落ち、
+#   ⚠️ **本修正が消そうとしている「理由の読めない赤」と同じ形**になる。
+export PYTHONIOENCODING=utf-8:backslashreplace
 
 FAIL=0
 ok()   { printf '  [ OK ] %s\n' "$1"; }

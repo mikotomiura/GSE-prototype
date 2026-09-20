@@ -252,9 +252,14 @@ def run_gas(short_mode: str = "0") -> dict:
         #     と出る（⚠️ **開示範囲は正しいのに赤くなる**）。
         r = subprocess.run(["node", str(js)], capture_output=True, encoding="utf-8")
     if r.returncode != 0:
+        # ⚠️★ node のスタックトレースは**該当ソース行を丸ごと**載せるので、`.gs` に直書きの
+        #   Form / Sheet / Drive の ID がそのまま `run.sh` のログ（と CI のログ）へ出うる
+        #   （security-checker LOW・2026-09-20）。★ 25 文字以上の ID 形を伏せてから出す。
+        #   ⚠️ 伏せても**行番号と文脈は残る**ので、原因の特定には足りる。
+        masked = re.sub(r"[A-Za-z0-9_-]{25,}", "<id-masked>", r.stderr.strip())
         raise SystemExit(
             "[NG] ★ .gs を評価できない（GAS 実行時にも同じエラーになる）\n"
-            + (r.stderr.strip()[:1500] or "(stderr なし)")
+            + (masked[:1500] or "(stderr なし)")
         )
     return json.loads(r.stdout.strip().splitlines()[-1])
 

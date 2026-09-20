@@ -73,7 +73,7 @@ fi
 
 SCAN_PY="$(
   cat << 'PY'
-import re, subprocess, sys
+import os, re, subprocess, sys
 
 # ⚠️★★ 出力を **UTF-8 に固定**する（2026-09-20 実測）。★ Windows の既定（cp932）だと
 #   VIOL 行に載る多バイトの断片（置換文字 `�` を含む）が encode できず、
@@ -139,6 +139,10 @@ SKIPPED = []
 #   → ★ **別枠で数えて note として必ず出す**（⚠️ 黙って消さない）。中のスクリプトは
 #     その worktree 自身の checkout の持ち物であり、この checkout の配布物ではない。
 NESTED = []
+# ★ 対象外にしてよい入れ子リポジトリの置き場（⚠️ ここに無い場所は fail-closed）。
+#   ★ `.worktrees/` は `codex-rescue` / loop 系が作る一時 checkout の置き場である
+#     （`.claude/skills/codex-rescue/SKILL.md` の `WORKTREE_DIR=".worktrees/…"`）。
+NESTED_ALLOWED = (".worktrees/",)
 
 
 def targets():
@@ -155,8 +159,19 @@ def targets():
             f = raw.decode("utf-8", "surrogateescape")
             # ★ 末尾 `/` = 入れ子の worktree / リポジトリ（上記 NESTED の注記）。
             #   ⚠️ 開こうとすると必ず OSError になるので、SKIPPED（fail-closed）に混ぜない。
+            # ⚠️★★ ただし **末尾 `/` だけで信じない**（Codex /cross-review 1 巡目・2026-09-20）。
+            #   ★ 入れ子リポジトリなら `.git`（worktree ではファイル・通常は dir）が必ず在る。
+            # ⚠️★★★ **置き場も限定する**（security-checker HIGH・2026-09-20）:
+            #   ★ 「入れ子 git なら**どこにあっても**素通り」にすると、⚠️ 配布物に入る場所
+            #     （`experiments/…` や `scripts/submit/`）に入れ子リポジトリが出来た瞬間に、
+            #     **その配下のスクリプトが丸ごと未走査**になる（★ 被験者が叩くスクリプトを含みうる）。
+            #   → ★ **宣言した接頭辞（`.worktrees/`）だけ**を対象外にし、それ以外は
+            #     `SKIPPED`（fail-closed）に戻す。⚠️ 置き場を増やすときはここに書き足すこと。
             if f.endswith("/"):
-                NESTED.append(f)
+                if f.startswith(NESTED_ALLOWED) and os.path.exists(os.path.join(f, ".git")):
+                    NESTED.append(f)
+                else:
+                    SKIPPED.append(f)
                 continue
             if f.endswith(EXTS):
                 bucket.append(f)

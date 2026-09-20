@@ -356,6 +356,10 @@ else
   #   ★ 「ゲートが黙って飛ぶ」はこのプロジェクトが最も踏んでいる型なので、形のほうを堅くする。
   if sp_out=$(bash scripts/check-shell-portability.sh 2>&1); then
     ok "シェルスクリプトが bash 3.2 で壊れる書き方をしていない（★ 陽性/陰性対照つき）"
+    # ⚠️★★★ **緑のときこそ「何を走査していないか」を出す**（security-checker HIGH・2026-09-20）。
+    #   ★ 移植性ゲート自身は note を出しているのに、⚠️ ここが成功枝で `sp_out` を捨てていたため、
+    #     **配布の可否を決める門の上では 1 行も見えなかった**。
+    printf '%s\n' "${sp_out}" | grep '走査対象外' | sed 's/^ */     /' || true
   else
     ng "★ bash 3.2 で壊れる書き方が残っている（★ \${name} と括ること）"
     printf '%s\n' "$sp_out" | grep -E '❌|:[0-9]+:' | sed 's/^/     /'
@@ -636,13 +640,27 @@ head_ 5 "募集の運用（★ 案内日の分離が G1 と O1 の両方の手�
 # ⚠️★★ **ここで見るのは「手順書に規則が書いてあるか」だけ**である。
 #   ★ D6 は機械的に強制しない運用ルール（ADR-034 D6・o1-roster-operations §5 の「限界」）なので、
 #     ⚠️ **実際に日を分けたかは見ていない**。→ ★ 緑を「衝突が起きない」と読まないこと。
+# ⚠️★★ **文書全体を grep しない**（Codex /cross-review 1 巡目 MEDIUM・2026-09-20）。
+#   ★ 語が別節・脚注・否定文・古い記録に残っているだけで緑になってしまう。
+#   → ★ **アンカー `<!-- gate:d6-recruitment-separation -->` の直後 20 行**の中に
+#     根拠（ADR-034 D6）と規則（日を分ける）の**両方**があることを見る。
+#   ⚠️ `sed -n '/re/,+20p'` は **BSD(macOS) sed で使えない**ので awk で書く。
+d6_near () { # $1 = ファイル / $2 = 探す語
+  awk -v pat="$2" '
+    /<!-- gate:d6-recruitment-separation -->/ { anchor = NR }
+    anchor && NR <= anchor + 20 && index($0, pat) { found = 1 }
+    END { exit (found ? 0 : 1) }
+  ' "$1"
+}
 for side_doc in "O1:${RECRUIT_O1}" "G1:${RECRUIT_G1}"; do
   side="${side_doc%%:*}"; doc="${side_doc#*:}"
   if [ ! -f "${doc}" ]; then
     ng "${side} の募集手順が読めない: ${doc}（★ 移動/改名したら本検査を直すこと）"
-  elif ! grep -q 'ADR-034 D6' "${doc}"; then
-    ng "${side} の募集手順に ADR-034 D6（案内日の分離）の根拠が無い: ${doc}"
-  elif ! grep -q '日を分ける' "${doc}"; then
+  elif ! grep -q '<!-- gate:d6-recruitment-separation -->' "${doc}"; then
+    ng "${side} の募集手順に D6 のアンカーが無い: ${doc}（★ 規則の節の直前に置くこと）"
+  elif ! d6_near "${doc}" 'ADR-034 D6'; then
+    ng "${side} の募集手順のアンカー近傍に ADR-034 D6（案内日の分離）の根拠が無い: ${doc}"
+  elif ! d6_near "${doc}" '日を分ける'; then
     # ★ 参照だけ書いて中身が無い状態を緑にしない（★ 規則は現場の手順に載って初めて効く）。
     ng "${side} の募集手順に「日を分ける」という規則そのものが無い: ${doc}"
   else
@@ -690,7 +708,11 @@ selftest () {
   local repo fix cons rc out
   repo="$(pwd)"
   fix="$(mktemp -d)"
-  trap 'rm -rf "$fix"' RETURN
+  # ⚠️★★ **Ctrl-C でも消す**（security-checker LOW・2026-09-20）。
+  #   ★ fixture には同意文書ドラフト（**研究者の実メールアドレス・所属**）と
+  #     `Form_G1/GSE_G1_Form_Builder.gs`（実 ID 群）が写る。⚠️ `RETURN` だけだと
+  #     中断時に `mktemp -d` の中身が残る。★ `${fix:?}` で空文字の `rm -rf` を弾く。
+  trap 'rm -rf "${fix:?}"' RETURN INT TERM
 
   build () {
     rm -rf "${fix:?}/w"
@@ -763,6 +785,15 @@ selftest () {
   blank_measure_fields () {
     blank_measure
     sed_i 's/^- 状態: \*\*未実施\*\*$/- 状態: **実測済み**/' "$fix/w/$MEASURE"
+  }
+
+  # ⚠️★★★ **`clear_pending` は 2026-09-20 まで「定義されていなかった」**（本セッションで発見）。
+  #   ★ 呼び出し側（下の「状態表の未了残置」）は `command not found` を出しながら先へ進み、
+  #     ⚠️ **実物の同意文書には既に「⚠️ **未了」の行がある**ので、何を足しても赤になった
+  #     ＝ **その変異試験は空回りで緑を返していた**（★ 本ゲートが戒めている型そのもの）。
+  #   → ★ 出発点を「未了なし」に戻してから 1 行足す。これで初めて「足すと赤になる」を測れる。
+  clear_pending () {
+    sed_i '/⚠️ \*\*未了/d' "$cons"
   }
 
   # ★ 送信側を実測にもとづいて直した状態（= 180 秒固定でなくなった）。
@@ -1022,11 +1053,21 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   #     ⚠️ **どれか 1 つでも空回りすると律速 4 の確認が嘘になる**。
   build; expect_green "G1 の募集手順に案内日の分離がある" "★ 両側の手順に D6 が書いてある"
   build; sed_i '/ADR-034 D6/d' "$fix/w/$RECRUIT_G1"
-  expect_red "G1 の募集手順に ADR-034 D6" "★ 根拠（ADR-034 D6）を消すと赤"
+  expect_red "G1 の募集手順のアンカー近傍に ADR-034 D6" "★ 根拠（ADR-034 D6）を消すと赤"
   build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
   expect_red "「日を分ける」という規則そのものが無い" "★ 参照だけ残して規則を消すと赤"
   build; rm -f "$fix/w/$RECRUIT_O1"
   expect_red "O1 の募集手順が読めない" "★ 手順書ごと消える（移動/改名）と赤"
+  # ⚠️★★ **O1 側も内容の変異を試す**（Codex /cross-review 1 巡目 MEDIUM・2026-09-20）。
+  #   ★ 同じループで回るから同じはず、という推論で済ませない（★ O1 側は文言も構造も違う）。
+  build; sed_i '/gate:d6-recruitment-separation/d' "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順に D6 のアンカーが無い" "★ O1 側のアンカーを消すと赤"
+  build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順に「日を分ける」" "★ O1 側の規則を消すと赤"
+  # ★ アンカーから遠い場所に語があっても緑にしない（★ 文書全体 grep への退行を捕まえる）。
+  build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
+  printf '\n★ 参考: 昔は日を分けることになっていた（ADR-034 D6）\n' >> "$fix/w/$RECRUIT_G1"
+  expect_red "「日を分ける」という規則そのものが無い" "★ アンカーの外に語が残っていても赤"
 
   echo
   echo "────────────────────────────────────────"
