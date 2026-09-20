@@ -619,6 +619,41 @@
   `blocked` で止まる**。★ この形に到達する確率は大きく下がったが、**経路は残っている**
   （★ M3 の迂回で逸脱し、その後 `--cleanup` する場合）。
 
+### ✅ 是正済み（2026-09-21・`.steering/20260921-loop-spawn-cleanup-fix/`）
+
+★ **直す前に再現させた**（⚠️ 再現しないまま直して「直った」と書かない）。実測:
+
+```text
+$ LOOP_FORCE=1 bash scripts/loop-spawn.sh --no-exec zzz
+$ (cd ../wt/GSE-prototype-zzz-issue && git switch -c deviated-repro-zzz)
+$ bash scripts/loop-spawn.sh --cleanup zzz
+loop-spawn: worktree 見つからず (既に撤去?)
+Deleted branch loop/zzz-issue (was ca7764f).
+loop-spawn: cleanup 完了 issue zzz     ← ⚠️ 嘘 / exit=0
+$ git worktree list
+C:/wt/GSE-prototype-zzz-issue ca7764f [deviated-repro-zzz]   ← ★ 残っている
+```
+
+★ **やったこと**（`scripts/loop-spawn.sh` の `--cleanup` 分岐）:
+
+1. ★ **パスでも引く**: 一致規則を **branch 系統 ∪ path 系統**にした
+   （branch = `loop/<id>` / `loop/<id>-*`、path = basename が `<repo>-<id>` / `<repo>-<id>-*`）。
+   ⚠️ 併せて**部分一致の穴も塞いだ** —— ★ 旧 `$0 ~ ("loop/" id)` は正規表現の部分一致なので
+   `--cleanup 005` が `loop/0055-t` にも当たっていた（★ 実測で確認）。
+2. ★ **撤去できたことを確かめてから書く**: `remove` の exit code を信じず、
+   worktree は**登録とディレクトリを引き直して**、branch は `show-ref` で確認する。
+   ⚠️ 1 つでも残れば `⚠️ cleanup 未完了` と書いて **非 0 で終了**する。
+3. ★ 付随: **main checkout を撤去しない**明示ガード、**残存ディレクトリの報告**（⚠️ 自動削除はしない）、
+   **対象 0 件は exit 0**（冪等）。
+
+★ **回帰**: `scripts/loop-spawn-cleanup-test.sh`（新規・CI の ubuntu / Windows 両方に配線）。
+⚠️ **変異テスト付き**（path 系統を潰すと赤くなる）。
+★ **旧実装に当てると 10 件 NG / exit 1** になることを 2026-09-21 に実測した
+（＝ この検査は空振りしていない）。
+
+⚠️ `scripts/loop-run.sh:204` の `detail`（逐語「`--cleanup` はブランチ名で引くので逸脱した
+worktree を撤去できない」）は**この是正で嘘になった**ので、同時に書き換えた。
+
 ---
 
 ## 起票 19: ⚠️ `RUSTSEC-2026-0285`（rustls 0.23.43）—— ★ `cargo update` では上がらない
@@ -776,3 +811,44 @@
   （★ ADR と同じ流儀: 本文を書き換えず、番号の新しい記述を足す）。
 - (ii) `run-codex-review.sh` の `[-30:]` は**外したまま**（★ 台帳の規約「append-only」に実装を合わせた）。
   ⚠️ 肥大が問題になったら、「切ったことが分かる形」（件数・期間・合計を注記に残す）で入れ直すこと。
+
+---
+
+## 起票 23: ⚠️ `loop-spawn.sh` の `resolve_base` は `.steering/*/_loop-config.json` を **どれか 1 つ**拾う
+
+- **起票日**: 2026-09-21（★ 起票 18 の**再現作業中に偶然観測**した。⚠️ 狙って探したものではない）
+- **何が起きたか**（★ 実測。⚠️ 推測ではない）:
+
+  ```text
+  $ LOOP_FORCE=1 bash scripts/loop-spawn.sh --no-exec zzz
+  loop-spawn: base=docs/adr-030-stall-onset-definition (start=origin/docs/adr-030-stall-onset-definition) …
+  HEAD is now at ca7764f docs(steering): 次タスク（前提条件 1〜6 の確かめ方）の引き継ぎを置く
+  ```
+
+  → ⚠️ **main（`a5c53a0`）ではなく 38 コミット前の枝から worktree が切られた。**
+  （★ `git rev-list --left-right --count main...origin/docs/adr-030-stall-onset-definition` = `38  0`。
+   ★ 当該ブランチは main の祖先なので**分岐はしていない**。⚠️ が、**38 コミットぶん古い**）
+
+- **原因**（★ `scripts/loop-spawn.sh:37` 逐語）:
+
+  ```bash
+  cfg="$(ls -1 .steering/*/_loop-config.json 2>/dev/null | tail -1 || true)"
+  ```
+
+  → ⚠️ **いま回そうとしているタスクとは無関係に**、`.steering/` 配下の
+  `_loop-config.json` を**名前順で最後の 1 つ**拾う。★ 今回拾われたのは
+  `.steering/20260914-mhd-feature-offline-tiers/_loop-config.json`（★ 現存する唯一の config）で、
+  その `base_branch` は **完了済みタスクの作業ブランチ**のまま残っていた。
+
+- **実害（★ 実測ではなく推論。⚠️ まだ踏んでいない）**:
+  1. ⚠️ 新しいタスクで Loop を回すと、**前のタスクの作業ブランチから worktree が切られる**。
+     ★ `loop-spawn.sh:29` の注記は逆向きの事故（pin し忘れ → main から切られる）だけを警告しており、
+     ⚠️ **pin が古いまま残る**形は書かれていない。
+  2. ⚠️ ブランチが**削除済み**だと `git fetch` が失敗し、`ローカル base で続行` に落ちる
+     （★ そこから先の挙動は未検証）。
+- **★ 次に何をするか**（⚠️ 本タスク（起票 18）の範囲外）:
+  1. ★ config を**タスクで選ぶ**（＝ 引数か env でタスクを指定する / `--task` を足す）か、
+     ⚠️ **複数ヒット・不一致なら止める**（fail-closed）。★ `tail -1` で黙って選ばない。
+  2. ★ 併せて「解決した base がいま何であるか」を**人が承認できる形**にする
+     （⚠️ 現在も `base=… (start=…)` は出ているが、★ 無人モードC では誰も読まない）。
+- ⚠️ **本タスクでは直していない**（★ 起票 18 の `--cleanup` と混ぜない）。

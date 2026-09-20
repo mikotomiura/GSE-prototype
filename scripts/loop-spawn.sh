@@ -51,22 +51,146 @@ resolve_base() {
 }
 
 # --- cleanup モード (merge 後の撤去) ---
+# ⚠️★★★ **撤去できたことを確かめてから「完了」と書く**（★ 起票 18・2026-09-20 の実測で発見）。
+#   ★ 旧実装は worktree を **ブランチ名だけ**で引いていたので、
+#     ⚠️ 起票 10 の形で `loop/<id>-*` から逸脱した worktree が **1 件もヒットせず**、
+#     **branch だけ消して worktree を残したまま `cleanup 完了` / exit 0** を返していた。
+#     ★ 実害: 同じ id の再実行が恒久的に死に (下の `:同名 worktree が既に存在`)、
+#       ⚠️ main checkout が `main` を取れなくなり、**失敗が誰にも見えない**。
+#   → ★ 直し方は 3 つ: **(1) パスでも引く (2) 撤去できたか再確認してから報告する
+#     (3) 1 つでも残ったら非 0 で止まる**。
+#
+# ★ 一致規則は **branch と path の 2 系統**（どちらかに当たれば対象）:
+#     branch: `loop/<id>` 完全一致 / `loop/<id>-` 前方一致
+#     path  : basename が `<repo>-<id>` 完全一致 / `<repo>-<id>-` 前方一致
+#   ⚠️ 前方一致には区切り `-` を要求する —— ★ 旧実装の `$0 ~ ("loop/" id)` は
+#     **正規表現の部分一致**なので `--cleanup zzz` が `loop/zzz2-issue` にも当たった。
+#   ★ `<id>-<short>` を丸ごと渡す運用 (`--cleanup 001-issue`) が実在するので**完全一致も許す**。
 if [ "${1:-}" = "--cleanup" ]; then
   id="${2:?--cleanup には issue-id が必要です}"
+  left=0; n_wt=0; n_br=0; processed_bn=""
+
+  # ★ 登録済み worktree の **basename** 集合を返す。
+  #   ⚠️ フルパスで突き合わせない —— git は `C:/wt/...` を、bash の `pwd` は `/c/wt/...` を返すため
+  #     (2026-09-21 に git-bash で実測)。★ 既存の stale 検出 (下方) も basename で比較している。
+  registered_bn() {
+    git worktree list --porcelain 2>/dev/null \
+      | awk '/^worktree /{p=substr($0,10); gsub(/\\/,"/",p); n=split(p,seg,"/"); print seg[n]}'
+  }
+  # ★ 改行を番兵にした完全一致判定（⚠️ `grep -q` を使わない —— `set -o pipefail` 下では
+  #   grep の早期終了が上流に SIGPIPE を投げ、**一致したのに非 0** になりうるため）。
+  contains_line() { # contains_line <candidates> <needle>
+    case "
+$1
+" in
+      *"
+$2
+"*) return 0 ;;
+    esac
+    return 1
+  }
+
   # porcelain の worktree 行はプレフィックス除去で取得 (空白入りパスに耐える)
-  wt="$(git worktree list --porcelain | awk -v id="$id" '/^worktree /{p=substr($0,10)} /^branch /&&$0 ~ ("loop/" id){print p}')"
-  if [ -n "$wt" ]; then
-    git worktree remove "$wt" 2>/dev/null || git worktree remove --force "$wt" \
-      || echo "loop-spawn: worktree 撤去失敗 (dirty/locked?) — 手動確認を"
-  else
-    echo "loop-spawn: worktree 見つからず (既に撤去?)"
+  wts="$(git worktree list --porcelain | awk -v id="${id}" -v rn="${repo_name}" '
+    BEGIN { exa_p = rn "-" id; pfx_p = rn "-" id "-"; exa_b = "loop/" id; pfx_b = "loop/" id "-" }
+    function flush() {
+      if (p != "" && (hitb || hitp)) print p
+      p = ""; hitb = 0; hitp = 0
+    }
+    /^worktree /{
+      flush()
+      p = substr($0, 10)
+      q = p; gsub(/\\/, "/", q); n = split(q, seg, "/"); bn = seg[n]
+      if (bn == exa_p || index(bn, pfx_p) == 1) hitp = 1
+    }
+    /^branch /{
+      b = substr($0, 8); sub(/^refs\/heads\//, "", b)
+      if (b == exa_b || index(b, pfx_b) == 1) hitb = 1
+    }
+    END { flush() }
+  ')"
+
+  if [ -n "${wts}" ]; then
+    while IFS= read -r wt; do
+      [ -n "${wt}" ] || continue
+      # ⚠️★★★ main checkout は**絶対に**撤去しない（★ 明示ガード。basename 規則上は届かないが置く）。
+      if [ "${wt}" = "${repo_root}" ]; then
+        echo "loop-spawn: ⚠️ main checkout (${wt}) は撤去対象にしません" >&2
+        continue
+      fi
+      wt_bn="$(basename "${wt}")"
+      processed_bn="${processed_bn}
+${wt_bn}"
+      git worktree remove "${wt}" >/dev/null 2>&1 \
+        || git worktree remove --force "${wt}" >/dev/null 2>&1 || true
+      # ★ remove の exit code を信じず、**登録とディレクトリを引き直して**確かめる。
+      if contains_line "$(registered_bn)" "${wt_bn}" || [ -e "${wt}" ]; then
+        echo "loop-spawn: ⚠️ worktree 撤去失敗 (dirty/locked?): ${wt}" >&2
+        echo "            ★ 手で:  git worktree remove --force \"${wt}\"" >&2
+        left=$((left + 1))
+      else
+        echo "loop-spawn: ★ worktree 撤去: ${wt}"
+        n_wt=$((n_wt + 1))
+      fi
+    done <<EOF
+${wts}
+EOF
   fi
+
   # 同一 id の branch を 1 つずつ削除 (複数一致でも壊れない)
-  git branch --list "loop/${id}-*" | sed 's/^[ *]*//' | while read -r b; do
-    [ -n "$b" ] && { git branch -d "$b" 2>/dev/null || echo "loop-spawn: branch $b 未 merge か既に削除"; }
-  done
+  # ⚠️ `-D` は使わない（★ 未 merge の作業を黙って捨てない。★ `abort_worktree` と同じ判断）。
+  # ★ `--format` で取る —— ⚠️ `git branch --list` の素の出力は別 worktree が掴む枝に `+` を付ける。
+  brs="$(git branch --list "loop/${id}" "loop/${id}-*" --format='%(refname:short)')"
+  if [ -n "${brs}" ]; then
+    while IFS= read -r b; do
+      [ -n "${b}" ] || continue
+      git branch -d "${b}" >/dev/null 2>&1 || true
+      # ★ 削除できたかを **show-ref で**確かめてから書く。
+      if git show-ref --verify --quiet "refs/heads/${b}"; then
+        echo "loop-spawn: ⚠️ branch ${b} を削除できませんでした (未 merge か worktree が掴んでいる)" >&2
+        echo "            ★ 内容を確認のうえ:  git branch -D ${b}" >&2
+        left=$((left + 1))
+      else
+        echo "loop-spawn: ★ branch 撤去: ${b}"
+        n_br=$((n_br + 1))
+      fi
+    done <<EOF
+${brs}
+EOF
+  fi
+
   git worktree prune
-  echo "loop-spawn: cleanup 完了 issue ${id}"
+
+  # ★ 撤去しきれずに**ディレクトリが残っている**形（下方の `ディレクトリ … が残存` が die する状態）。
+  #   ⚠️ **自動削除はしない** —— `rm -rf` は破壊的で、中に何が入っているか分からない。
+  #   ★ ただし同じ id の再実行を殺すので、**「完了」とは書かない**（left に数える）。
+  #   ⚠️★★★ **上のループで触ったものだけを除外する**（★ 「登録にあるなら除外」にしない）——
+  #     ★ 一致規則が退行して worktree を拾えなくなったとき、**ここが最後の網**になる。
+  #     ⚠️ 登録の有無で除外すると、拾えなかった worktree が黙って「完了」に化ける（＝ 起票 18 の再来）。
+  for d in "../wt/${repo_name}-${id}" "../wt/${repo_name}-${id}-"*; do
+    [ -d "${d}" ] || continue
+    d_bn="$(basename "${d}")"
+    if contains_line "${processed_bn}" "${d_bn}"; then continue; fi   # ★ 上で報告済み
+    if contains_line "$(registered_bn)" "${d_bn}"; then
+      echo "loop-spawn: ⚠️ worktree 登録に残っているのに id と結び付けられませんでした: ${d}" >&2
+      echo "            ★ 手で:  git worktree remove --force \"${d}\"" >&2
+    else
+      echo "loop-spawn: ⚠️ worktree 登録に無いディレクトリが残存: ${d}" >&2
+      echo "            ★ 中身を確認のうえ手で削除してください (★ 残ると同じ id の再実行が死にます)" >&2
+    fi
+    left=$((left + 1))
+  done
+
+  if [ "${left}" -gt 0 ]; then
+    echo "loop-spawn: ⚠️ cleanup 未完了 issue ${id} — 撤去できなかったものが ${left} 件あります" >&2
+    echo "            (★ 撤去できたのは worktree ${n_wt} 件 / branch ${n_br} 件)" >&2
+    exit 1
+  fi
+  if [ "$((n_wt + n_br))" -eq 0 ]; then
+    echo "loop-spawn: cleanup 対象なし issue ${id} (★ 既に撤去済み)"
+  else
+    echo "loop-spawn: cleanup 完了 issue ${id} (worktree ${n_wt} 件 / branch ${n_br} 件 を撤去)"
+  fi
   exit 0
 fi
 

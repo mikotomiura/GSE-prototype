@@ -201,7 +201,7 @@ ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [worktree
     "loop/$id"|"loop/$id-"*) : ;;
     *)
       emit "$id" "$phase" blocked attempt="$attempt" \
-           detail="worktree が loop/$id-* から外れている (HEAD=${head:-取得不能})。別ブランチを verify しないため停止する。★ worktree は残す: ${wt} ／ ⚠️ 撤去は「git worktree remove --force ${wt}」を手で (★ loop-spawn.sh --cleanup はブランチ名で引くので逸脱した worktree を撤去できない —— 起票 18)"
+           detail="worktree が loop/$id-* から外れている (HEAD=${head:-取得不能})。別ブランチを verify しないため停止する。★ worktree は残す: ${wt} ／ ★ 撤去は「bash scripts/loop-spawn.sh --cleanup ${id}」(★ 2026-09-21 に起票 18 を是正し、逸脱した worktree も**パスで**引いて撤去できるようになった。⚠️ 撤去できなければ非 0 で止まる)"
       return 1 ;;
   esac
   if [ -n "$base" ] && ! git -C "$wt" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then

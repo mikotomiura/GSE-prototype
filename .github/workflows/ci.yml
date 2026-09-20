@@ -639,6 +639,17 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: bash scripts/loop-run-guard-test.sh
+      # ⚠️★★★ Loop 基盤の**後始末**の検査 (2026-09-21 追加・起票 18)。
+      #   ★ `--cleanup` は worktree を **ブランチ名だけ**で引いていたので、逸脱した worktree を
+      #     撤去できないまま **`cleanup 完了` / exit 0** を返していた (★ 2026-09-20 に実測)。
+      #   ⚠️ Windows でも走らせる理由: ★ **`git worktree list` は `C:/...` を、bash の `pwd` は
+      #     `/c/...` を返す** (2026-09-21 に git-bash で実測)。★ 撤去の事後確認をフルパスで
+      #     書き直すと ubuntu では緑のまま Windows だけ壊れる ——
+      #     `docs/agent-shared.md` 逐語「OS ごとに規則が違うロジックは両 OS に対のテストを置く」。
+      - name: Loop spawn cleanup gate (Windows・逸脱 worktree の撤去 / 嘘の完了報告)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: bash scripts/loop-spawn-cleanup-test.sh
 
   # ── ブランチ push / PR: Frontend 型検査 + Vite ビルド ─────────
   frontend-check:
@@ -734,6 +745,13 @@ jobs:
       #     ⚠️ 実装を殺すと実際に赤くなることを確認済み (突然変異 3 種)。
       - name: Loop run guard gate (ブランチ検査 / Status フィルタ / denials 内訳)
         run: bash scripts/loop-run-guard-test.sh
+      # ⚠️★★★ Loop 基盤の**後始末** (2026-09-21 追加・起票 18)。
+      #   ★ 2026-09-20 の実測: `--cleanup zzz` が「完了」と言ったのに worktree が残り、
+      #     ⚠️ **同じ id の再実行が恒久的に死ぬ / main を checkout できなくなる**状態になった。
+      #   ★ この検査は **変異テスト** (一致規則の path 系統を潰す) を持ち、
+      #     ⚠️ 旧実装に当てると 10 件 NG になることを確認済み (2026-09-21)。
+      - name: Loop spawn cleanup gate (逸脱 worktree の撤去 / 嘘の完了報告)
+        run: bash scripts/loop-spawn-cleanup-test.sh
       # ⚠️★★★ secrets-filter のゲート (2026-09-10 追加)。
       #   ★ `scripts/secrets-filter.sh` は **git diff を外部 LLM (Codex) へ渡す前の最後の関門**で、
       #     `scripts/secrets-filter-test.sh` という対照つきのテストも**既にあった**。
