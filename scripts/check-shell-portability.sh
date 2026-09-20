@@ -145,6 +145,20 @@ NESTED = []
 NESTED_ALLOWED = (".worktrees/",)
 
 
+def classify_dir_entry(path, has_git):
+    """★ 末尾 `/` のエントリを **走査対象外（NESTED）** と **fail-closed（SKIPPED）** に分ける。
+
+    ⚠️★★★ **ここは「サブツリーを丸ごと走査から外すか」を決める唯一の場所**である
+    （code-reviewer HIGH・2026-09-20）。★ 本ファイル冒頭の規約「型を足すときは必ず
+    陽性対照と陰性対照を一緒に足す」に従い、**純関数に切り出して対照を掛けられる**ようにした。
+    ⚠️ ここを緩めても（置き場の限定を外す・`.git` の確認を外す・`else` を消す）、
+    **実行時には何も赤くならない**ので、対照が無いと静かに壊れる。
+    """
+    if path.startswith(NESTED_ALLOWED) and has_git:
+        return "NESTED"
+    return "SKIPPED"
+
+
 def targets():
     tracked, untracked = [], []
     for flag, bucket in ((["--cached"], tracked), (["--others", "--exclude-standard"], untracked)):
@@ -168,10 +182,8 @@ def targets():
             #   → ★ **宣言した接頭辞（`.worktrees/`）だけ**を対象外にし、それ以外は
             #     `SKIPPED`（fail-closed）に戻す。⚠️ 置き場を増やすときはここに書き足すこと。
             if f.endswith("/"):
-                if f.startswith(NESTED_ALLOWED) and os.path.exists(os.path.join(f, ".git")):
-                    NESTED.append(f)
-                else:
-                    SKIPPED.append(f)
+                kind = classify_dir_entry(f, os.path.exists(os.path.join(f, ".git")))
+                (NESTED if kind == "NESTED" else SKIPPED).append(f)
                 continue
             if f.endswith(EXTS):
                 bucket.append(f)
@@ -250,6 +262,14 @@ elif mode == "shebang":
         with open(p, "rb") as fh:
             first = fh.read(256).split(b"\n")[0]
         print("%s %s" % ("YES" if is_shell_by_shebang(first) else "NO", p))
+    sys.exit(0)
+
+elif mode == "classify":
+    # ★ 入れ子ディレクトリの分類だけを単体で試す（★ 副作用なし・実ファイル不要）。
+    #   引数は `<path> <0|1>` の並び（1 = そのディレクトリに `.git` が在る）。
+    args = sys.argv[2:]
+    for i in range(0, len(args), 2):
+        print("%s %s" % (classify_dir_entry(args[i], args[i + 1] == "1"), args[i]))
     sys.exit(0)
 
 else:  # ctl: 対照。引数のファイルだけを見る
@@ -341,6 +361,34 @@ if [ "${sb}" = "YES" ]; then
   ok "★ shebang だけのファイル（#!/usr/bin/env sh）を拾える"
 else
   ng "★ shebang 判定が拾えていない（⚠️ macOS の /bin/sh は bash 3.2 の実体＝同じ罠を踏む）"
+fi
+
+# --- 5b. ⚠️★★★ **入れ子ディレクトリの分類の対照**（code-reviewer HIGH・2026-09-20）-----
+#     ★ 「サブツリーを丸ごと走査から外すか」を決める分岐は、⚠️ **緩めても実行時には
+#       何も赤くならない**（置き場の限定を外す・`.git` の確認を外す・`else` を消す、のどれでも）。
+#     → ★ 純関数 `classify_dir_entry` を `classify` モードで直接叩き、
+#       **陽性 1 本と陰性 2 本**を置く（⚠️ 実ファイルを作らないので副作用ゼロ）。
+cls="$(python3 -c "${SCAN_PY}" classify \
+        ".worktrees/x/" 1 \
+        "experiments/20260801-controlled-friction-task/x/" 1 \
+        ".worktrees/x/" 0 2> /dev/null || true)"
+cls_pos="$(printf '%s\n' "${cls}" | sed -n '1p')"
+cls_neg_place="$(printf '%s\n' "${cls}" | sed -n '2p')"
+cls_neg_git="$(printf '%s\n' "${cls}" | sed -n '3p')"
+if [ "${cls_pos}" = "NESTED .worktrees/x/" ]; then
+  ok "★ 陽性対照: 宣言した置き場の入れ子リポジトリは走査対象外になる"
+else
+  ng "★ 陽性対照が壊れた: 期待 'NESTED .worktrees/x/' / 実際 '${cls_pos}'"
+fi
+if [ "${cls_neg_place}" = "SKIPPED experiments/20260801-controlled-friction-task/x/" ]; then
+  ok "★ 陰性対照: 置き場が違う入れ子リポジトリは fail-closed（★ 配布物に入る場所を素通りさせない）"
+else
+  ng "⚠️★ 陰性対照が壊れた: 置き場を問わず素通りしている（実際 '${cls_neg_place}'）"
+fi
+if [ "${cls_neg_git}" = "SKIPPED .worktrees/x/" ]; then
+  ok "★ 陰性対照: .git の無いディレクトリは fail-closed（★ 正体不明を緑にしない）"
+else
+  ng "⚠️★ 陰性対照が壊れた: .git の確認が効いていない（実際 '${cls_neg_git}'）"
 fi
 
 # --- 6. ⚠️★★★ **この規約が必要な理由そのもの**を実演する --------------------------

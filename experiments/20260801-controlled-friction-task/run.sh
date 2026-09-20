@@ -19,6 +19,12 @@ cd "$(dirname "$0")"
 #   surrogateescape 由来の文字を子 python が print した瞬間に `UnicodeEncodeError` で落ち、
 #   ⚠️ **本修正が消そうとしている「理由の読めない赤」と同じ形**になる。
 export PYTHONIOENCODING=utf-8:backslashreplace
+# ⚠️★★ **`PYTHONUTF8=1` は足さない**（code-reviewer LOW への回答・2026-09-20）:
+#   ★ 上記は**出力だけ**を直すので、`open()` の既定は環境依存のまま残る。
+#   ⚠️ だが `PYTHONUTF8=1` を足すと**ファイルの読み方まで変わり**、将来の encoding バグを
+#     覆い隠す（★ しかも `run.sh` 経由でしか効かず、`python3 analyze.py` を直接叩く経路は
+#     直らない —— `.steering/20260920-g1-o1-inventory/decisions.md` 判断 5）。
+#   → ★ **ここに inline python を足すときは、`open(..., encoding='utf-8')` を必ず書くこと。**
 
 FAIL=0
 ok()   { printf '  [ OK ] %s\n' "$1"; }

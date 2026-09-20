@@ -356,14 +356,18 @@ else
   #   ★ 「ゲートが黙って飛ぶ」はこのプロジェクトが最も踏んでいる型なので、形のほうを堅くする。
   if sp_out=$(bash scripts/check-shell-portability.sh 2>&1); then
     ok "シェルスクリプトが bash 3.2 で壊れる書き方をしていない（★ 陽性/陰性対照つき）"
-    # ⚠️★★★ **緑のときこそ「何を走査していないか」を出す**（security-checker HIGH・2026-09-20）。
-    #   ★ 移植性ゲート自身は note を出しているのに、⚠️ ここが成功枝で `sp_out` を捨てていたため、
-    #     **配布の可否を決める門の上では 1 行も見えなかった**。
-    printf '%s\n' "${sp_out}" | grep '走査対象外' | sed 's/^ */     /' || true
   else
     ng "★ bash 3.2 で壊れる書き方が残っている（★ \${name} と括ること）"
     printf '%s\n' "$sp_out" | grep -E '❌|:[0-9]+:' | sed 's/^/     /'
   fi
+  # ⚠️★★★ **緑でも赤でも「何を走査していないか」を出す**（security-checker HIGH ＋
+  #   code-reviewer MEDIUM・2026-09-20）。★ 移植性ゲート自身は note を出しているのに、
+  #   ⚠️ 成功枝は `sp_out` を捨て、失敗枝は `❌|:[0-9]+:` で絞るため注記が落ちていた
+  #   —— ★ **何を直すか判断するのは赤のとき**なので、要る場面でだけ消える形だった。
+  #   → `if` の外に出して rc に依らず必ず出す。
+  #   ⚠️ 注記行だけに絞る（★ 移植性ゲートの対照の ✅ 行にも「走査対象外になる」が出るので、
+  #     素の `走査対象外` で拾うと**門の一覧に紛れ込む**）。
+  printf '%s\n' "${sp_out}" | grep '走査対象外（' | sed 's/^ */     /' || true
 fi
 
 # ⚠️★★ **配備ごとに変わる値が `.gs` に直書きされていないか**（2026-08-29 追加・起票 T-18）。
@@ -642,13 +646,23 @@ head_ 5 "募集の運用（★ 案内日の分離が G1 と O1 の両方の手�
 #     ⚠️ **実際に日を分けたかは見ていない**。→ ★ 緑を「衝突が起きない」と読まないこと。
 # ⚠️★★ **文書全体を grep しない**（Codex /cross-review 1 巡目 MEDIUM・2026-09-20）。
 #   ★ 語が別節・脚注・否定文・古い記録に残っているだけで緑になってしまう。
-#   → ★ **アンカー `<!-- gate:d6-recruitment-separation -->` の直後 20 行**の中に
-#     根拠（ADR-034 D6）と規則（日を分ける）の**両方**があることを見る。
+#   → ★ **アンカー `<!-- gate:d6-recruitment-separation -->` から、次の見出しまで
+#     （最大 20 行）**の中に、根拠（ADR-034 D6）と規則（日を分ける）の**両方**があることを見る。
 #   ⚠️ `sed -n '/re/,+20p'` は **BSD(macOS) sed で使えない**ので awk で書く。
+# ⚠️★★ **行数だけで窓を切らない**（code-reviewer MEDIUM・2026-09-20）:
+#   ★ `docs/o1-roster-operations.md` はアンカーが 95 行目・全 109 行なので、
+#     20 行窓が**ファイル末尾を覆い切っていた** ＝ ⚠️ O1 側では「文書全体 grep をやめた」
+#     という強化が**ほとんど効いていなかった**。→ ★ **次の見出しで窓を閉じる**。
+#   ★ アンカーは**節の見出しの直前**に置く（⚠️ アンカーの次の 1 行が見出しでも閉じない
+#     ＝ それは「そのアンカーが指す見出し」だからである。閉じるのは**その次の見出し**から）。
+# ⚠️ 本検査の限界（★ 隠さずに書く）: 2 つの語を**独立に**見るので、アンカーが複数ある文書では
+#   「語 A が窓 1・語 B が窓 2」でも通る。★ 否定文（「日を分ける必要はない」）も通る。
 d6_near () { # $1 = ファイル / $2 = 探す語
   awk -v pat="$2" '
-    /<!-- gate:d6-recruitment-separation -->/ { anchor = NR }
-    anchor && NR <= anchor + 20 && index($0, pat) { found = 1 }
+    /<!-- gate:d6-recruitment-separation -->/ { anchor = NR; next }
+    anchor && NR > anchor + 20 { anchor = 0 }
+    anchor && NR > anchor + 1 && /^#+ / { anchor = 0 }
+    anchor && index($0, pat) { found = 1 }
     END { exit (found ? 0 : 1) }
   ' "$1"
 }
@@ -712,7 +726,13 @@ selftest () {
   #   ★ fixture には同意文書ドラフト（**研究者の実メールアドレス・所属**）と
   #     `Form_G1/GSE_G1_Form_Builder.gs`（実 ID 群）が写る。⚠️ `RETURN` だけだと
   #     中断時に `mktemp -d` の中身が残る。★ `${fix:?}` で空文字の `rm -rf` を弾く。
-  trap 'rm -rf "${fix:?}"' RETURN INT TERM
+  # ⚠️★★ **INT / TERM は自分で `exit` する**（code-reviewer MEDIUM・2026-09-20）。
+  #   ★ 本スクリプトは `set -uo pipefail`（`-e` 無し）なので、ハンドラが `exit` しないと
+  #     ⚠️ **Ctrl-C の後も selftest が次のケースへ進み、`build` が fixture を作り直す**
+  #     ＝「中断時に残さない」という目的が達成できない。
+  trap 'rm -rf "${fix:?}"' RETURN
+  trap 'rm -rf "${fix:?}"; exit 130' INT
+  trap 'rm -rf "${fix:?}"; exit 143' TERM
 
   build () {
     rm -rf "${fix:?}/w"
@@ -1055,7 +1075,7 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   build; sed_i '/ADR-034 D6/d' "$fix/w/$RECRUIT_G1"
   expect_red "G1 の募集手順のアンカー近傍に ADR-034 D6" "★ 根拠（ADR-034 D6）を消すと赤"
   build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
-  expect_red "「日を分ける」という規則そのものが無い" "★ 参照だけ残して規則を消すと赤"
+  expect_red "G1 の募集手順に「日を分ける」" "★ 参照だけ残して規則を消すと赤"
   build; rm -f "$fix/w/$RECRUIT_O1"
   expect_red "O1 の募集手順が読めない" "★ 手順書ごと消える（移動/改名）と赤"
   # ⚠️★★ **O1 側も内容の変異を試す**（Codex /cross-review 1 巡目 MEDIUM・2026-09-20）。
@@ -1064,10 +1084,23 @@ var FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
   expect_red "O1 の募集手順に D6 のアンカーが無い" "★ O1 側のアンカーを消すと赤"
   build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_O1"
   expect_red "O1 の募集手順に「日を分ける」" "★ O1 側の規則を消すと赤"
+  build; sed_i '/ADR-034 D6/d' "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順のアンカー近傍に ADR-034 D6" "★ O1 側の根拠を消すと赤"
+  # ⚠️★★ **窓が本当に効いているか**（code-reviewer MEDIUM・2026-09-20）:
+  #   ★ 規則を**次の見出しの後ろ**へ移すと赤になるべき。⚠️ 行数だけの窓だと O1 側は
+  #     EOF まで覆ってしまい、この対照が**緑のまま通る**（＝ 強化が効いていないことに気付けない）。
+  build
+  sed_i 's/★ \*\*日を分ける\*\*/★ （窓の外へ移した）/' "$fix/w/$RECRUIT_O1"
+  printf '
+### 窓の外
+
+★ **日を分ける**
+' >> "$fix/w/$RECRUIT_O1"
+  expect_red "O1 の募集手順に「日を分ける」" "★ 規則が次の見出しの後ろにあると赤（窓が効いている）"
   # ★ アンカーから遠い場所に語があっても緑にしない（★ 文書全体 grep への退行を捕まえる）。
   build; sed_i '/日を分ける/d' "$fix/w/$RECRUIT_G1"
   printf '\n★ 参考: 昔は日を分けることになっていた（ADR-034 D6）\n' >> "$fix/w/$RECRUIT_G1"
-  expect_red "「日を分ける」という規則そのものが無い" "★ アンカーの外に語が残っていても赤"
+  expect_red "G1 の募集手順に「日を分ける」" "★ アンカーの外に語が残っていても赤"
 
   echo
   echo "────────────────────────────────────────"
