@@ -226,3 +226,24 @@
 | `bash scripts/check-o1-release-readiness.sh` | **exit 1 / 通過 21・未達 2**（⚠️ 正しい赤） |
 | `bash scripts/check-o1-release-readiness.sh --selftest` | **通過 57 / 失敗 0** |
 | ★ 入れ子リポジトリの fail-closed | `tmp/_nested_probe/` で **rc=2** → 後始末で **rc=0** |
+
+## ⚠️ 判断 12: `code-reviewer`（Claude 側）は完了しなかった —— 代替の担保を明示する
+
+- **事実**: `code-reviewer`（opus）を `security-checker` と並列起動したが、**25 分走った末に
+  Bash 呼び出しで停止**した（★ 最後の活動 2026-09-20T03:39:20Z。`/tmp` に偽の入れ子 worktree を
+  作って `.gitignore` や encoding を実測検証している途中）。★ 12 分以上伸びないため**停止させた**。
+  ⚠️ **レポートは 1 行も受け取っていない**（★ 「指摘なし」ではなく「**結果が無い**」）。
+- **代替として実際に効いた担保**（★ すべて実測を伴う）:
+  1. `security-checker`（opus）—— **HIGH 1 / MEDIUM 1 / LOW 4**。★ HIGH は 2 点とも反映済み（判断 11）。
+     ★ この agent は `check-shell-portability.sh` と `check-o1-release-readiness.sh` の**両方**を
+     実行して確かめており、本タスクで最も重いファイルを覆っている。
+  2. `/cross-review` **2 巡**（Codex）—— 1 巡目で `[5]` の grep 抜け道・selftest の偏り・
+     `endswith("/")` の広さを指摘（判断 8）。
+  3. ゲート自身の **selftest 57 件**（★ 空回り検出）と、手で作った 3 状態の実測。
+- ⚠️ **残っている穴**: 「Claude 側の一般的なコード品質レビュー」（可読性・重複・命名・
+  `set -euo pipefail` 下の細かな失敗経路）は**受けていない**。
+  → ★ 次セッションで `/review-changes` を `5b37b3b..HEAD` に対して回すこと（引き継ぎに記載）。
+- **★ 教訓**: レビュー系 subagent に「作業ツリーが並行更新されうる」状況を渡すと、
+  ⚠️ 検証のために**隔離クローンを作りに行って長時間化する**（★ 停止直前の発話がまさにそれ）。
+  → ★ 次は **コミット済みの範囲を明示し、「作業ツリーは触らない・隔離クローンを作らない」**と
+  プロンプトに書く。

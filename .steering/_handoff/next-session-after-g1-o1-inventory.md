@@ -76,6 +76,19 @@ git add -A / git add <dir> は使わない。.codex/budget.json を git checkout
 `check-shell-portability.sh` = **exit 0** ／ `check-o1-release-readiness.sh` = **exit 1・通過 21 / 未達 2**
 （★ 残り 2 は正しい赤: 同意未承認・タグ陳腐化）／ 同 `--selftest` = **通過 54 / 失敗 0**。
 
+## §5b ⚠️★★ 受けていないレビューが 1 系統ある（★ 先に片づける）
+
+`code-reviewer`（Claude 側の一般的なコード品質レビュー）は **25 分走った末に Bash で停止し、
+結果を 1 行も返していない**（★ `.steering/20260920-g1-o1-inventory/decisions.md` 判断 12）。
+⚠️ **「指摘なし」ではなく「結果が無い」**。
+
+→ ★ 次セッションの最初に **`/review-changes` を `5b37b3b..HEAD`** に対して回すこと。
+⚠️ そのとき **「コミット済みの範囲だけを見る・作業ツリーを触らない・隔離クローンを作らない」**を
+プロンプトに明記する（★ 今回の長時間化の原因がそれだった）。
+
+★ 受けている担保: `security-checker`（opus・HIGH 2 点反映済み）／`/cross-review` 2 巡（Codex）／
+ゲートの selftest **57 件**。
+
 ## §6 ⚠️ 守ること
 
 - ★ `/start-task` から。判断は `decisions.md`。`verify-before-claiming`（状態の断定は一次で）。

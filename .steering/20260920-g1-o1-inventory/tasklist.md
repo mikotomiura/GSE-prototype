@@ -32,10 +32,10 @@
 - [x] ⚠️ マージの実行はしない
 
 ## レビュー
-- [ ] `code-reviewer`（opus）∥ `security-checker`（opus）
-- [ ] `/cross-review` 2 巡（コミット後・パス限定・出力は scratchpad）
+- [x] `security-checker`（opus）= HIGH 1 / MEDIUM 1 / LOW 4 を反映 ／ ⚠️ `code-reviewer` は Bash でハングし**結果なし**（判断 12）
+- [x] `/cross-review` 2 巡（コミット後・パス限定・出力は scratchpad）
 
 ## 完了処理
 - [x] `design.md` の最終化 / `decisions.md` の確定
-- [ ] 次セッションの引き継ぎを `.steering/_handoff/` に置く
-- [ ] git commit（`Refs: .steering/20260920-g1-o1-inventory/`）
+- [x] 次セッションの引き継ぎを `.steering/_handoff/` に置く
+- [x] git commit（`Refs: .steering/20260920-g1-o1-inventory/`）
