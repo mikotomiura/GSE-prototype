@@ -148,6 +148,47 @@ else
   else
     ng "冪等: rc=${RC} / 出力=[${OUT}]"
   fi
+
+  # --- 1d: ⚠️ **完全一致**の経路 (`<id>-<short>` を丸ごと渡す) ---
+  # ★ `--cleanup 001-issue` という渡し方が実在する
+  #   (`.steering/_handoff/next-session-issue001-pause-const-arbitration.md:123` 逐語)。
+  # ⚠️ これが無いと `bn == exa_p` / `b == exa_b` を消しても緑のままになる (★ code-reviewer 指摘)。
+  if do_spawn "${R1}" 003 t; then
+    do_cleanup "${R1}" 003-t
+    if [ "${RC}" -eq 0 ] && ! wt_has "${R1}" "repo-003-t" && ! branch_exists "${R1}" "loop/003-t"; then
+      ok "完全一致: <id>-<short> を丸ごと渡しても撤去できた"
+    else
+      ng "完全一致: rc=${RC} —— ★ 前方一致しか効いていない (⚠️ --cleanup 001-issue の形が死ぬ)"
+    fi
+  else
+    ng "完全一致: worktree を作れなかった (★ 判定できない)"
+  fi
+
+  # --- 1e: ⚠️★★★ **linked worktree の中から叩く** (★ code-reviewer HIGH・2026-09-21 実測) ---
+  # ★ `git rev-parse --show-toplevel` は worktree 自身を返すので、repo_name が
+  #   `repo-00N-t` に化け、⚠️ **path 系統 / main ガード / 残存 dir の網が同時に無効化**されていた。
+  if do_spawn "${R1}" 009 t; then
+    ( cd "${TMP}/r1/wt/repo-009-t" && git switch -c deviated-009 ) >/dev/null 2>&1
+    OUT="$( (cd "${TMP}/r1/wt/repo-009-t" && bash "${R1}/scripts/loop-spawn.sh" --cleanup 009) 2>&1 )"
+    RC=$?
+    if ! wt_has "${R1}" "repo-009-t"; then
+      ok "⚠️★ worktree 内から: main checkout を解決して撤去できた"
+    else
+      ng "⚠️★★★ worktree 内から: 撤去できていない (★ 起票 18 と同じ嘘が戻っている)"
+    fi
+    if wt_has "${R1}" "repo"; then
+      ok "⚠️★ worktree 内から: main checkout は無傷"
+    else
+      ng "⚠️★★★ worktree 内から: main checkout を壊した"
+    fi
+    if [ "${RC}" -eq 0 ] && wt_has "${R1}" "repo-009-t"; then
+      ng "⚠️★★★ worktree 内から: 残っているのに exit 0 を返した"
+    else
+      ok "⚠️★ worktree 内から: 事実と報告が一致している (rc=${RC})"
+    fi
+  else
+    ng "worktree 内から: worktree を作れなかった (★ 判定できない)"
+  fi
 fi
 
 # ── 2. 撤去不能のとき「完了」と書かない ─────────────────
@@ -175,6 +216,54 @@ else
     ng "撤去不能: worktree は消えているのに失敗と報告した (★ 検査の前提が崩れている)"
   fi
   ( cd "${R2}" && git worktree unlock "${TMP}/r2/wt/repo-004-t" ) >/dev/null 2>&1 || true
+
+  # --- 2b: ⚠️★★★ **未コミット変更を黙って捨てない** (★ security-checker MEDIUM) ---
+  # ★ 旧版は `remove --force` を無条件に撃っていた。⚠️ 逸脱 worktree は作業が載っている
+  #   可能性が最も高い対象なので、★ **捨てずに人へ渡す**（branch 側で -D を避けたのと同じ理屈）。
+  if do_spawn "${R2}" 010 t; then
+    echo "work-in-progress" > "${TMP}/r2/wt/repo-010-t/WIP.txt"
+    do_cleanup "${R2}" 010
+    if [ -f "${TMP}/r2/wt/repo-010-t/WIP.txt" ]; then
+      ok "未コミット変更: ⚠️ 黙って捨てていない (★ ファイルが残っている)"
+    else
+      ng "未コミット変更: ⚠️★★★ 作業を復旧不能に捨てた"
+    fi
+    if [ "${RC}" -ne 0 ] && ! has_text "${OUT}" "cleanup 完了"; then
+      ok "未コミット変更: 「完了」と書かず非 0 で止まった"
+    else
+      ng "未コミット変更: rc=${RC} で「完了」と書いた"
+    fi
+  else
+    ng "未コミット変更: worktree を作れなかった (★ 判定できない)"
+  fi
+fi
+
+# ── 2c. id の検証 ───────────────────────────────────────
+echo "2c. ⚠️★★★ id の glob メタ文字で削除対象が広がらないか"
+
+R2B="${TMP}/r2b/repo"; mkdir -p "${R2B}"
+if ! setup_fake_repo "${R2B}" || ! do_spawn "${R2B}" 011 t || ! do_spawn "${R2B}" 012 t; then
+  ng "id 検証: 準備できなかった (★ 判定できない)"
+else
+  # ★ `git branch --list` の引数は **fnmatch パターン**なので、素通しだと
+  #   `--cleanup '*'` が `loop/*` に化け、⚠️ **全 loop ブランチが -d の対象**になる。
+  do_cleanup "${R2B}" '*'
+  if [ "${RC}" -ne 0 ]; then
+    ok "id 検証: '*' を拒否した"
+  else
+    ng "id 検証: '*' を受け付けた (⚠️ branch 側だけ全部消えうる)"
+  fi
+  if branch_exists "${R2B}" "loop/011-t" && branch_exists "${R2B}" "loop/012-t"; then
+    ok "id 検証: ⚠️★★★ 無関係な loop ブランチを 1 本も消していない"
+  else
+    ng "id 検証: ⚠️★★★ 無関係な loop ブランチを消した"
+  fi
+  do_cleanup "${R2B}" '../../x'
+  if [ "${RC}" -ne 0 ]; then
+    ok "id 検証: '../../x' を拒否した (★ ../wt/ の外を指させない)"
+  else
+    ng "id 検証: '../../x' を受け付けた"
+  fi
 fi
 
 # ── 3. 別 id を巻き込まない ─────────────────────────────
@@ -252,7 +341,9 @@ echo "6. ⚠️★★★ 変異テスト —— path 系統を潰したら赤く
 R6="${TMP}/r6/repo"; mkdir -p "${R6}"
 MUT="${TMP}/mutated-loop-spawn.sh"
 sed 's/if (bn == exa_p || index(bn, pfx_p) == 1) hitp = 1/hitp = hitp/' "${SPAWN_SH}" > "${MUT}"
-if grep -c 'index(bn, pfx_p)' "${MUT}" 2>/dev/null | grep -qv '^0$'; then
+# ⚠️ ここでも `grep -q` をパイプ終端に置かない (★ 上の `wt_has` と同じ理屈)。
+mut_left="$(grep -c 'index(bn, pfx_p)' "${MUT}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
   ng "変異テスト: 変異が当たらなかった (★ 一致規則の書き方が変わった → 検査不能)"
 elif ! setup_fake_repo "${R6}" "${MUT}" || ! do_spawn "${R6}" 008 t; then
   ng "変異テスト: 準備できなかった (★ 判定できない)"

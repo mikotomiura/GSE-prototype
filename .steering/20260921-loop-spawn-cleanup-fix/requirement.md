@@ -71,6 +71,15 @@ C:/wt/GSE-prototype-zzz-issue ca7764f [deviated-repro-zzz]   ← ★ 残って�
 - [ ] AC7: `bash scripts/check-shell-portability.sh` が緑
 - [ ] AC8: `bash scripts/check-tests-are-wired.sh` が緑（★ 新テストが CI に配線されている）
 
+### ★ レビューで足りないと分かった受け入れ条件（2026-09-21 追加）
+
+- [ ] AC9: `--cleanup <id>-<short>`（完全一致の渡し方）でも撤去できる
+- [ ] AC10: ⚠️★★★ **linked worktree の中から叩いても**撤去でき、main checkout が無傷で、
+      報告と事実が一致する（★ code-reviewer HIGH。メインが独立に再現して確認した）
+- [ ] AC11: ⚠️★★★ **未コミット変更がある worktree を黙って捨てない**（★ security-checker MEDIUM）
+- [ ] AC12: ⚠️★★★ id に glob メタ文字（`*`）や `..` を渡しても、**無関係な `loop/*` ブランチを
+      1 本も消さない**（★ security-checker MEDIUM）
+
 ## 関連ドキュメント
 
 - `.steering/20260914-mhd-feature-offline-tiers/blockers.md` 起票 18（一次）

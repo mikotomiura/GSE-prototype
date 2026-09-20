@@ -73,3 +73,80 @@
   → ★ 「一致したのに『していない』と読む」＝ **検査が静かに反転する**。
 - **採用**: ★ `grep -c`（全部読む）＋ 件数比較、または改行を番兵にした `case` 完全一致。
 - **影響範囲**: `scripts/loop-spawn.sh` の `contains_line` / `scripts/loop-spawn-cleanup-test.sh` の `wt_has`。
+
+---
+
+## ★ レビュー（`code-reviewer` ＋ `security-checker`・2026-09-21）後に足した判断
+
+## 判断 7: `repo_root` は **main worktree** から解決する（★ `--show-toplevel` を使わない）
+
+- **判断日時**: 2026-09-21（★ `code-reviewer` HIGH → **メインが独立に再現**して確認）
+- **背景**: ⚠️ `git rev-parse --show-toplevel` は **linked worktree の中では worktree 自身**を返す。
+  ★ 実測（使い捨て repo）:
+
+  ```text
+  $ (cd $T/wt/repo-002-t && bash $T/repo/scripts/loop-spawn.sh --cleanup 002)
+  loop-spawn: ★ branch 撤去: loop/002-t
+  loop-spawn: cleanup 完了 issue 002 (worktree 0 件 / branch 1 件 を撤去)   ← ⚠️ rc=0
+  $ git -C $T/repo worktree list
+  .../wt/repo-002-t  [deviated]      ← ★ 残っている
+  ```
+
+  → ⚠️★★★ **本タスクが契約にした「撤去できていないのに完了と書かない」が破れていた。**
+  ★ 原因は 1 つだが**壊れ方が 3 段**である: `repo_name` が `<repo>-<id>-<short>` に化けるため
+  (1) path 系統が永久に当たらない (2) main checkout ガードが**本物の main を守らない**
+  (3) 残存 dir の網が存在しないパスを見る。
+- **選択肢**:
+  - A: **main worktree を解決して、そこで処理する**
+  - B: fail-closed —— `--git-dir` と `--git-common-dir` が違えば「main checkout から実行してください」と `die`
+- **採用**: **A**
+- **理由**: ★ `git worktree list --porcelain` は **main worktree を必ず先頭に出す**ので確実に取れる。
+  ⚠️ B は「worktree に居るまま別 id を片付ける」という正当な操作まで拒否する。
+  ★ A なら `--cleanup` だけでなく **spawn 経路も正しくなる**（⚠️ worktree の中から spawn すると
+  `../wt/<worktree名>-…` という入れ子ができる形も同時に塞がる）。
+- **トレードオフ**: ★ 起動位置によって処理対象が動くので、**移動したことを stderr に明示**する。
+- **影響範囲**: `scripts/loop-spawn.sh` の全経路（★ `--cleanup` / spawn / `--no-exec`）。
+
+## 判断 8: id を **文字集合で検証**する（⚠️ glob を `git branch --list` へ通さない）
+
+- **判断日時**: 2026-09-21（★ `security-checker` MEDIUM）
+- **背景**: ⚠️ `git branch --list` の引数は **fnmatch パターン**である。
+  → `--cleanup '*'` は `loop/*` / `loop/*-*` に化け、★ **merge 済みの `loop/*` が全部 `-d` の対象**になる。
+  ⚠️ 一方 worktree 側は `==` / `index()` の **literal 比較**なので 1 件も当たらない。
+  → ★★★ **両系統の広さが非対称**（branch だけ全部消え、worktree は 1 件も消えない）。
+- **採用**: ★ `[A-Za-z0-9._-]` のみ許可・`-` 始まり禁止。それ以外は `die`。
+- **理由**: ★ 1 行で 3 つ閉じる —— (a) glob の拡大 (b) `..` / `/` で `../wt/` の外を指す形
+  (c) `awk -v` がエスケープ列を解釈して**シェル側の glob と awk 側の一致文字列がずれる**形。
+- **トレードオフ**: ⚠️ 記号を含む id を将来使えない。★ 実在の id（`001` / `zzz` / `001-issue`）はすべて通る。
+
+## 判断 9: **未コミット変更がある worktree は撤去しない**
+
+- **判断日時**: 2026-09-21（★ `security-checker` MEDIUM）
+- **背景**: ⚠️ 旧実装は `git worktree remove` が失敗したら **無条件に `--force`** を撃ち、
+  しかも出力を `/dev/null` に捨てていた。★ 本タスクで一致規則を **path 系統へ広げた**ので、
+  ⚠️ `--force` が届く範囲も広がった。★ 起票 10 の「逸脱した worktree」は
+  **worker が別ブランチで作業した跡**＝未コミット変更が載っている可能性が最も高い対象である。
+- **採用**: ★ `git -C <wt> status --porcelain` が非空なら **撤去せず** `left` に数えて人へ渡す。
+  ⚠️ `--force` へ落ちるときは **stderr に 1 行出す**（★ 黙らない）。
+- **理由**: ★ 判断 2（`-D` を使わない）と**同じ理屈**である。⚠️ branch 側だけ自制して
+  worktree 側が無条件に強制削除するのは筋が通らない。
+- **トレードオフ**: ⚠️ 「撤去できない」が増える。★ ただし**失われるものが無い側**に倒した。
+
+## 判断 10: ⚠️ `check` job の `permissions:` は**本タスクで触らない**
+
+- **判断日時**: 2026-09-21（★ `security-checker` LOW-5）
+- **背景**: ★ `frontend-check` は `permissions: contents: read` を明示しているが、
+  ⚠️ 新 step を足した `check` job には無く、リポジトリ既定の `GITHUB_TOKEN` 権限が渡る。
+- **採用**: ⚠️ **本タスクでは変更しない。★ 起票 24 として登録する。**
+- **理由**: ★ **本コミットが作った穴ではない**（既存条件）。
+  ⚠️ `check` job は release 経路も担うので、権限を絞ると**別の job が無言で壊れうる**。
+  → ★ 影響範囲の確認（release / tag 経路）を伴う**独立したタスク**にする。
+
+## ★ 判断 4 / 判断 5 への補訂（2026-09-21・レビュー後）
+
+⚠️ **判断 4 の「触った basename だけを除外する」は basename → パスへ改めた**（★ `code-reviewer` MEDIUM）。
+★ basename で除外すると、`/elsewhere/<repo>-001-t` を撤去したあとに
+**別物の `../wt/<repo>-001-t`（未登録で残存）が黙って外れる**。
+→ ★ 除外は `git -C <dir> rev-parse --show-toplevel`（＝ **git の表記**）で同定する。
+⚠️ **判断 5 は生きている** —— `pwd` の `/c/…` と git の `C:/…` を突き合わせないという規則はそのままで、
+★ 今回は「**git の出力同士で比べる**」という判断 5 の但し書きの側を使った。

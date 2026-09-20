@@ -646,9 +646,30 @@ C:/wt/GSE-prototype-zzz-issue ca7764f [deviated-repro-zzz]   ← ★ 残って�
 3. ★ 付随: **main checkout を撤去しない**明示ガード、**残存ディレクトリの報告**（⚠️ 自動削除はしない）、
    **対象 0 件は exit 0**（冪等）。
 
-★ **回帰**: `scripts/loop-spawn-cleanup-test.sh`（新規・CI の ubuntu / Windows 両方に配線）。
+### ⚠️★★★ レビューで **同じ嘘が別経路で生きていた**ことが分かった（★ 同日・同タスクで是正）
+
+★ `code-reviewer` HIGH →★ **メインが独立に再現**した実測:
+
+```text
+$ (cd $T/wt/repo-002-t && bash $T/repo/scripts/loop-spawn.sh --cleanup 002)
+loop-spawn: cleanup 完了 issue 002 (worktree 0 件 / branch 1 件 を撤去)   ← ⚠️ rc=0
+$ git -C $T/repo worktree list
+.../wt/repo-002-t  [deviated]      ← ★ 残っている
+```
+
+⚠️ `git rev-parse --show-toplevel` は **linked worktree の中では worktree 自身**を返すため、
+`repo_name` が化けて ★ **(1) path 系統 (2) main checkout ガード (3) 残存 dir の網 が同時に無効化**されていた。
+→ ★ `git worktree list --porcelain` の**先頭 ＝ main worktree** から `repo_root` を取るよう直した。
+
+★ 併せて `security-checker` MEDIUM 2 件も閉じた:
+**(a)** `git branch --list` は **fnmatch パターン**なので `--cleanup '*'` が `loop/*` に化ける
+→ ★ id を `[A-Za-z0-9._-]` に限定。
+**(b)** `remove --force` を無条件に撃っていた → ★ **未コミット変更があれば撤去せず人へ渡す**
+（⚠️ 逸脱 worktree は作業が載っている可能性が最も高い対象である）。
+
+★ **回帰**: `scripts/loop-spawn-cleanup-test.sh`（新規・**7 群 25 件**・CI の ubuntu / Windows 両方に配線）。
 ⚠️ **変異テスト付き**（path 系統を潰すと赤くなる）。
-★ **旧実装に当てると 10 件 NG / exit 1** になることを 2026-09-21 に実測した
+★ **旧実装に当てると 17 件 NG / exit 1** になることを 2026-09-21 に実測した
 （＝ この検査は空振りしていない）。
 
 ⚠️ `scripts/loop-run.sh:204` の `detail`（逐語「`--cleanup` はブランチ名で引くので逸脱した
@@ -852,3 +873,23 @@ worktree を撤去できない」）は**この是正で嘘になった**ので�
   2. ★ 併せて「解決した base がいま何であるか」を**人が承認できる形**にする
      （⚠️ 現在も `base=… (start=…)` は出ているが、★ 無人モードC では誰も読まない）。
 - ⚠️ **本タスクでは直していない**（★ 起票 18 の `--cleanup` と混ぜない）。
+
+---
+
+## 起票 24: ⚠️ `ci.yml` の `check` job に job レベルの `permissions:` が無い
+
+- **起票日**: 2026-09-21（★ 起票 18 の是正レビューで `security-checker` が LOW として指摘）
+- **状態**: ⚠️ **未解決**（★ 本タスクでは**触っていない** —— `.steering/20260921-loop-spawn-cleanup-fix/decisions.md` 判断 10）
+- **内容**: ★ `frontend-check` は `permissions: contents: read` を**明示している**のに、
+  ⚠️ `check` job（ビルド / テスト / ゴールデン / clippy / Loop 基盤の検査群）には**無い**。
+  → ★ リポジトリ既定の `GITHUB_TOKEN` 権限がそのまま渡る。
+- **なぜ問題か**: ⚠️ 既定が read/write なら、★ **CI から repo へ push できてしまう**。
+  ★ 同じ理由づけは `ci.yml` の `frontend-check` に**逐語で既に書いてある**
+  （「job レベルの permissions が無いと、リポジトリ既定の GITHUB_TOKEN 権限がそのまま渡る」）。
+  → ⚠️ **番人の理屈が 1 つの job にしか適用されていない**。
+- ⚠️★★★ **本コミットが作った穴ではない**（★ 既存条件。2026-09-21 より前から同じ）。
+- **★ 次に何をするか**（⚠️ 独立したタスクで）:
+  1. ★ `check` job が **tag push / release 経路**で何を書くのかを先に確かめる
+     （⚠️ 権限を絞ると別の job が**無言で壊れる**）。
+  2. ★ 必要最小を `permissions:` で明示する。
+  3. ⚠️ **`supply-chain.yml` 側も同じ目で見る**（★ workflow は 2 枚ある）。

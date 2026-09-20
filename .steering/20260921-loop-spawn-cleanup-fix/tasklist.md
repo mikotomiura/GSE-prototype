@@ -14,9 +14,9 @@
 - [x] 対象 0 件は exit 0（冪等）
 
 ## テスト
-- [x] `scripts/loop-spawn-cleanup-test.sh` 新規（7 群 16 件・⚠️ 変異テスト付き）
-- [x] 新テストが緑（**16 / 16**）
-- [x] ⚠️★★★ **旧実装に当てて赤になることを実測**（**10 件 NG / exit 1**）＝ 空振りでない
+- [x] `scripts/loop-spawn-cleanup-test.sh` 新規（**7 群 25 件**・⚠️ 変異テスト付き）
+- [x] 新テストが緑（**25 / 25**）
+- [x] ⚠️★★★ **旧実装に当てて赤になることを実測**（**17 件 NG / exit 1**）＝ 空振りでない
 - [x] `check-shell-portability.sh` 緑（12 / 0）
 - [x] `check-tests-are-wired.sh` 緑（**17 本**すべて配線・self-test も緑）
 - [x] `loop-worktree-deny-test.sh` 緑（34 / 0）
@@ -24,15 +24,21 @@
 - [x] `check_workflow_invariants.py` 緑（2 workflow / 7 job）＋ unittest 34 件 OK
 
 ## レビュー
-- [ ] `code-reviewer` ＋ `security-checker`（並列・opus）
-- [ ] HIGH 指摘への対応
+- [x] `code-reviewer` ＋ `security-checker`（並列・opus）
+- [x] ⚠️★★★ **HIGH 対応**: linked worktree の中から叩くと嘘が戻る形
+      （★ メインが独立に再現 → `repo_root` を main worktree から解決・判断 7）
+- [x] MEDIUM 対応: id の検証（判断 8）/ 未コミット変更を捨てない（判断 9）/
+      `registered_bn` の fail-closed / 除外をパス同定へ / `prune` の裸実行 / 復旧案内に `unlock`
+- [x] LOW 対応: テストの `grep -q` / 完全一致経路の追加 / CI の macOS 除外理由 / design の行番号・書式
+- [x] ⚠️ 範囲外と判断したもの: `check` job の `permissions:`（★ 既存条件 → **起票 24**・判断 10）
 - [ ] `/cross-review` 2 巡（パス限定・出力は scratchpad）
 
 ## ドキュメント
 - [x] 起票 18 に **✅ 是正済み** を追記（★ 本文は書き換えず追記）
 - [x] `loop-run.sh:204` の `detail`（★ 是正で**嘘になる**案内文）を更新
 - [x] CI 配線（ubuntu ＋ Windows の 2 か所）
-- [x] ⚠️ 派生発見を **起票 23** として登録（`resolve_base` が config を `tail -1` で選ぶ）
+- [x] ⚠️ 派生発見を **起票 23**（`resolve_base` が config を `tail -1` で選ぶ）と
+      **起票 24**（`check` job の `permissions:`）として登録
 - [ ] glossary への用語追加（★ 新語なし → 不要）
 
 ## 完了処理

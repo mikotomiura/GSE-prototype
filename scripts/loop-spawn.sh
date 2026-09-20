@@ -16,7 +16,28 @@ die() { echo "loop-spawn: $*" >&2; exit 1; }
 #   (⚠️ `dirname "$0"` を後段で評価すると worktree 側の存在しないパスを指す)。
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || die "git リポジトリ内で実行してください"
+# ⚠️★★★ **main checkout (main worktree) を解決する。`--show-toplevel` をそのまま使わない。**
+#   ★ `git rev-parse --show-toplevel` は **linked worktree の中では worktree 自身**を返す。
+#   ⚠️ 2026-09-21 に実測: worktree の中から `--cleanup` を叩くと `repo_name` が
+#     `<repo>-<id>-<short>` になり、★ **3 段が同時に無効化される** ——
+#     (1) path 系統の一致が永久に当たらない (2) main checkout ガードが**本物の main を守らない**
+#     (3) 残存 dir の網が存在しないパスを見る。
+#     → ⚠️ `cleanup 完了` / exit 0 という**起票 18 と同じ嘘**に戻っていた (code-reviewer HIGH)。
+#   ★ `git worktree list --porcelain` は **main worktree を必ず先頭に出す**ので、そこから取る。
+#   ⚠️ awk で `exit` しない —— `set -o pipefail` 下で上流に SIGPIPE が飛ぶため (下記 `contains_line` と同じ理屈)。
+main_worktree() {
+  local out
+  out="$(git worktree list --porcelain 2>/dev/null)" || return 1
+  printf '%s\n' "${out}" | awk '/^worktree /{ if (!got) { print substr($0, 10); got = 1 } }'
+}
+repo_root="$(main_worktree)" || repo_root=""
+if [ -z "${repo_root:-}" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || die "git リポジトリ内で実行してください"
+fi
+here="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "${here:-}" ] && [ "${here}" != "${repo_root}" ]; then
+  echo "loop-spawn: ★ linked worktree (${here}) から起動されたので main checkout (${repo_root}) で処理します" >&2
+fi
 cd "$repo_root"
 repo_name="$(basename "$repo_root")"
 
@@ -68,13 +89,28 @@ resolve_base() {
 #   ★ `<id>-<short>` を丸ごと渡す運用 (`--cleanup 001-issue`) が実在するので**完全一致も許す**。
 if [ "${1:-}" = "--cleanup" ]; then
   id="${2:?--cleanup には issue-id が必要です}"
-  left=0; n_wt=0; n_br=0; processed_bn=""
+  # ⚠️★★★ **id を検証する** (★ security-checker MEDIUM・2026-09-21)。
+  #   ★ `git branch --list` の引数は **fnmatch パターン**なので、`--cleanup '*'` は `loop/*` に化け、
+  #     ⚠️ **merge 済みの `loop/*` ブランチが全部 `-d` の対象になる**。
+  #   ⚠️ 一方 worktree 側の一致は literal 比較 (`==` / `index()`) なので glob を解釈せず、
+  #     ★ **両系統の広さが非対称**になる (branch だけ全部消え、worktree は 1 件も消えない)。
+  #   ★ 併せて閉じるもの: `../wt/` の外を指す `..` / `/` と、`awk -v` がエスケープ列として
+  #     解釈する `\` (⚠️ シェル側の glob と awk 側の一致文字列がずれる)。
+  case "${id}" in
+    -*) die "issue-id が '-' 始まりです: [${id}]" ;;
+    *[!A-Za-z0-9._-]*) die "issue-id に使えない文字が入っています (英数字 . _ - のみ): [${id}]" ;;
+  esac
+  left=0; n_wt=0; n_br=0; processed_path=""
 
-  # ★ 登録済み worktree の **basename** 集合を返す。
+  # ★ 登録済み worktree の **basename** 集合を返す。⚠️ **取得できなければ非 0 を返す**
+  #   (★ code-reviewer MEDIUM —— 旧版はエラーを握りつぶして空を返し、
+  #    ⚠️ 「取れなかった」を「撤去できた」と読んでいた)。
   #   ⚠️ フルパスで突き合わせない —— git は `C:/wt/...` を、bash の `pwd` は `/c/wt/...` を返すため
   #     (2026-09-21 に git-bash で実測)。★ 既存の stale 検出 (下方) も basename で比較している。
   registered_bn() {
-    git worktree list --porcelain 2>/dev/null \
+    local out
+    out="$(git worktree list --porcelain 2>/dev/null)" || return 1
+    printf '%s\n' "${out}" \
       | awk '/^worktree /{p=substr($0,10); gsub(/\\/,"/",p); n=split(p,seg,"/"); print seg[n]}'
   }
   # ★ 改行を番兵にした完全一致判定（⚠️ `grep -q` を使わない —— `set -o pipefail` 下では
@@ -91,6 +127,7 @@ $2
   }
 
   # porcelain の worktree 行はプレフィックス除去で取得 (空白入りパスに耐える)
+  # ⚠️ 取得に失敗したら黙って進まない (★ `set -o pipefail` 下では無言で exit していた)。
   wts="$(git worktree list --porcelain | awk -v id="${id}" -v rn="${repo_name}" '
     BEGIN { exa_p = rn "-" id; pfx_p = rn "-" id "-"; exa_b = "loop/" id; pfx_b = "loop/" id "-" }
     function flush() {
@@ -108,25 +145,55 @@ $2
       if (b == exa_b || index(b, pfx_b) == 1) hitb = 1
     }
     END { flush() }
-  ')"
+  ')" || die "worktree の一覧を取得できませんでした"
 
   if [ -n "${wts}" ]; then
     while IFS= read -r wt; do
       [ -n "${wt}" ] || continue
+      wt_bn="$(basename "${wt}")"
+      # ★ 触ったものを**パスで**記録する (⚠️ basename では別 worktree と衝突する ——
+      #   `/elsewhere/<repo>-001-t` を撤去すると `../wt/<repo>-001-t` が黙って除外された)。
+      #   ★ 値は git の出力そのままなので、後段も git の出力と突き合わせる (表記が揃う)。
+      processed_path="${processed_path}
+${wt}"
       # ⚠️★★★ main checkout は**絶対に**撤去しない（★ 明示ガード。basename 規則上は届かないが置く）。
       if [ "${wt}" = "${repo_root}" ]; then
         echo "loop-spawn: ⚠️ main checkout (${wt}) は撤去対象にしません" >&2
+        echo "            ★ この id を掴んでいるのは main checkout 自身です (branch を切り替えてから再実行)" >&2
+        left=$((left + 1))
         continue
       fi
-      wt_bn="$(basename "${wt}")"
-      processed_bn="${processed_bn}
-${wt_bn}"
-      git worktree remove "${wt}" >/dev/null 2>&1 \
-        || git worktree remove --force "${wt}" >/dev/null 2>&1 || true
+      # ⚠️★★★ **未コミット変更がある worktree を黙って捨てない**（★ security-checker MEDIUM）。
+      #   ★ branch 側で `-D` を使わないと決めた判断と同じ理屈である。
+      #   ⚠️ 逸脱した worktree（起票 10 の形）は **作業が載っている可能性が最も高い**対象であり、
+      #     旧実装のように `--force` を無条件で撃つと**復旧不能に失われる**。
+      dirty="$(git -C "${wt}" status --porcelain 2>/dev/null || true)"
+      if [ -n "${dirty}" ]; then
+        echo "loop-spawn: ⚠️ 未コミット変更があるので撤去しません: ${wt}" >&2
+        echo "            ★ 中身を確認:  git -C \"${wt}\" status" >&2
+        echo "            ★ 捨ててよいなら:  git worktree remove --force \"${wt}\"" >&2
+        left=$((left + 1))
+        continue
+      fi
+      if ! git worktree remove "${wt}" >/dev/null 2>&1; then
+        # ⚠️ `--force` へ落ちたことを**黙らない**（★ 旧実装は無音だった）。
+        echo "loop-spawn: ★ 通常の remove が通らないので --force で再試行します: ${wt}" >&2
+        git worktree remove --force "${wt}" >/dev/null 2>&1 || true
+      fi
       # ★ remove の exit code を信じず、**登録とディレクトリを引き直して**確かめる。
-      if contains_line "$(registered_bn)" "${wt_bn}" || [ -e "${wt}" ]; then
-        echo "loop-spawn: ⚠️ worktree 撤去失敗 (dirty/locked?): ${wt}" >&2
-        echo "            ★ 手で:  git worktree remove --force \"${wt}\"" >&2
+      #   ⚠️ 登録を読めなかったときは「撤去できた」と書かない（fail-closed）。
+      still=1
+      if reg="$(registered_bn)"; then
+        still=0
+        if contains_line "${reg}" "${wt_bn}"; then still=1; fi
+        if [ -e "${wt}" ]; then still=1; fi
+      else
+        echo "loop-spawn: ⚠️ worktree 登録を読めませんでした (撤去できたか確認できません)" >&2
+      fi
+      if [ "${still}" -eq 1 ]; then
+        echo "loop-spawn: ⚠️ worktree 撤去失敗: ${wt}" >&2
+        echo "            ★ lock されているなら:  git worktree unlock \"${wt}\"  →  git worktree remove --force \"${wt}\"" >&2
+        echo "            ★ それでも残るなら中身を確認のうえ手で削除してください" >&2
         left=$((left + 1))
       else
         echo "loop-spawn: ★ worktree 撤去: ${wt}"
@@ -159,7 +226,11 @@ ${brs}
 EOF
   fi
 
-  git worktree prune
+  # ⚠️ 裸で置かない —— ★ ここで落ちると**残存 dir の網も最終報告も出ずに**終わる。
+  git worktree prune || {
+    echo "loop-spawn: ⚠️ git worktree prune に失敗しました" >&2
+    left=$((left + 1))
+  }
 
   # ★ 撤去しきれずに**ディレクトリが残っている**形（下方の `ディレクトリ … が残存` が die する状態）。
   #   ⚠️ **自動削除はしない** —— `rm -rf` は破壊的で、中に何が入っているか分からない。
@@ -170,8 +241,12 @@ EOF
   for d in "../wt/${repo_name}-${id}" "../wt/${repo_name}-${id}-"*; do
     [ -d "${d}" ] || continue
     d_bn="$(basename "${d}")"
-    if contains_line "${processed_bn}" "${d_bn}"; then continue; fi   # ★ 上で報告済み
-    if contains_line "$(registered_bn)" "${d_bn}"; then
+    # ★ 除外は **パス同定**で行う（⚠️ basename だと同名の別 worktree を黙って外す）。
+    #   ★ `git -C … --show-toplevel` は **git の表記**を返すので `processed_path` と揃う
+    #     (⚠️ bash の `pwd` は `/c/...` を返すので使えない)。
+    d_top="$(git -C "${d}" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "${d_top:-}" ] && contains_line "${processed_path}" "${d_top}"; then continue; fi
+    if reg="$(registered_bn)" && contains_line "${reg}" "${d_bn}"; then
       echo "loop-spawn: ⚠️ worktree 登録に残っているのに id と結び付けられませんでした: ${d}" >&2
       echo "            ★ 手で:  git worktree remove --force \"${d}\"" >&2
     else
@@ -208,9 +283,14 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 # --- stale worktree 検出 (basename 一致・空白入りパスに耐える) ---
+# ⚠️★★★ `grep -q` をパイプの終端に置かない（★ 2026-09-21 に `--cleanup` 側で同じ形を直した）——
+#   `set -o pipefail` 下では grep の早期終了が上流へ SIGPIPE を投げ、
+#   ★ **一致したのに非 0** になりうる（＝ stale 検出が静かに反転し、同名 worktree を素通りさせる）。
+#   → ★ `grep -c` で全部読ませ、件数で判定する。
 target_bn="$(basename "$wtdir")"
-if git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' \
-     | while read -r p; do [ "$(basename "$p")" = "$target_bn" ] && echo HIT; done | grep -q HIT; then
+stale_hits="$(git worktree list --porcelain \
+  | awk -v bn="$target_bn" '/^worktree /{p=substr($0,10); gsub(/\\/,"/",p); n=split(p,seg,"/"); if (seg[n] == bn) c++} END{print c+0}')"
+if [ "${stale_hits:-0}" -gt 0 ]; then
   die "同名 worktree が既に存在: $wtdir  (完了済みなら --cleanup $id を先に)"
 fi
 if [ -d "$wtdir" ]; then die "ディレクトリ $wtdir が残存。手動で確認/削除してください"; fi
