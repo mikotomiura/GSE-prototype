@@ -233,6 +233,12 @@ venv/
 #   → ★ セッション固有の一時物は本来 scratchpad へ置くこと。
 .tmp/
 
+# ⚠️ 2026-09-20 追加。★ `tmp/` (ドット無し) も同じ扱い —— サーヴェイ作業の一時置き場
+#   (★ 実測: `check_citations_out.txt` = 検査の出力、`pdfs/` = 取得済み一次資料の PDF)。
+#   ⚠️ 一次資料の PDF は再取得できるが **repo には入れない** (`docs/references.md` が SSOT)。
+#   → ★ ここも本来は scratchpad へ置くこと。
+tmp/
+
 # ⚠️★★★ 稼働コスト実測の**生サンプル**は commit しない (2026-09-03・security-checker LOW)。
 #   ★ `ndjson-size.tsv` はファイル名(=セッション開始時刻)・バイト数・mtime を持ち、
 #   ⚠️ **いつ何時間作業したかの時系列**になる。`samples.tsv` も同様に稼働時間帯が出る。
