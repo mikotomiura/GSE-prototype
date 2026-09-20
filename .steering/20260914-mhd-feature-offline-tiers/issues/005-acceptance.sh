@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # issue 005 (stall onset t0 検出器) の AC 検査
+# ⚠️★★★ 2026-09-20（封筒・起票 2）: `--features` の出力は
+#   **`{ provenance, config, rows }` の封筒**になった（判断 25 #14）。
+#   ★ 本検査は取得時に `jq '.rows'` で**行だけを取り出して**おり、
+#     以降の `.[]` / `all(.[]; ...)` は封筒を剥がした後の配列を指す。
+#   ⚠️★★★ **この検査は `provenance` と `config` を 1 つも見ていない。**
+#     ★ 封筒自体の検査は `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
+#   ★ 封筒が無い（配列のままの）出力では `jq '.rows'` が失敗し、
+#     `set -o pipefail` によりその場で赤になる（fail-closed）。
 set -uo pipefail
 fail() { echo "[acceptance 005] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
@@ -10,8 +18,8 @@ SRC="src/analysis/feat_offline/stall_onset.rs"
 #   ★ ADR-030 D8 (b-2) の「feat 列の穴で条件 B の連続を切る」を実装すると、feat 行を 1 本も持たない
 #     deep_silence.ndjson では観測区間が無く onset が立たなくなる（★ それが正しい挙動）。
 #   → ★ 1Hz feat 行を持つ stall_onset_observed.ndjson（裁定セッション作成）で非退化を見る。
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features 2>/dev/null)" \
-  || fail "gse-replay --features が非 0 で終了した"
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 # AC1

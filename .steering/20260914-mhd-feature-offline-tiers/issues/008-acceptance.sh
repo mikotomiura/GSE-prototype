@@ -7,6 +7,14 @@
 #
 # ★ ACC_REPLAY_CMD を与えると gse-replay の代わりにそのコマンドを使う（★ 検査自体の 3 状態テスト用）。
 #   ACC_SKIP_005=1 で 005-acceptance の再実行を省く（同上）。
+# ⚠️★★★ 2026-09-20（封筒・起票 2）: `--features` の出力は
+#   **`{ provenance, config, rows }` の封筒**になった（判断 25 #14）。
+#   ★ 本検査は取得時に `jq '.rows'` で**行だけを取り出して**おり、
+#     以降の `.[]` / `all(.[]; ...)` は封筒を剥がした後の配列を指す。
+#   ⚠️★★★ **この検査は `provenance` と `config` を 1 つも見ていない。**
+#     ★ 封筒自体の検査は `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
+#   ★ 封筒が無い（配列のままの）出力では `jq '.rows'` が失敗し、
+#     `set -o pipefail` によりその場で赤になる（fail-closed）。
 set -uo pipefail
 fail() { echo "[acceptance 008] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
@@ -27,7 +35,7 @@ T=1700000000000
 tmpd="$(mktemp -d)"; trap 'rm -rf "$tmpd"' EXIT
 
 # ---------- 1. そのままの fixture（AC1 / AC7 / AC14） ----------
-out1="$(replay "$FIX" --features 2>/dev/null)" || fail "gse-replay --features が非 0 で終了した ($FIX)"
+out1="$(replay "$FIX" --features 2>/dev/null | jq -e '.rows | arrays')" || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない ($FIX)"
 [ -n "$out1" ] || fail "--features の出力が空 ($FIX)"
 
 printf '%s' "$out1" | jq -e --argjson T "$T" '
@@ -54,7 +62,7 @@ printf '%s' "$out1" | jq -e '
 jq -c --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
   select(((.t // .ts // 0) < $lo) or ((.t // .ts // 0) > $hi))' "$FIX" > "$tmpd/redacted.ndjson" \
   || fail "削除版の生成に失敗"
-out2="$(replay "$tmpd/redacted.ndjson" --features 2>/dev/null)" || fail "削除版で --features が非 0 で終了した"
+out2="$(replay "$tmpd/redacted.ndjson" --features 2>/dev/null | jq -e '.rows | arrays')" || fail "削除版で --features が非 0 で終了した、または封筒の .rows を取り出せない"
 printf '%s' "$out2" | jq -e --argjson lo "$((T + 100000))" --argjson hi "$((T + 140000))" '
   [.[] | select(.stall_onset.is_onset) | .stall_onset
        | select((.s_ms >= $lo and .s_ms <= $hi) or (.t0_ms >= $lo and .t0_ms <= $hi))] | length == 0' >/dev/null 2>&1 \
@@ -64,8 +72,8 @@ printf '%s' "$out2" | jq -e --argjson T "$T" '
   || fail "AC2: 削除版の onset が t0 = [40160, 187600] (T 相対) でない"
 
 # ---------- 3. feat 行 0 本（AC3） ----------
-out3="$(replay tests/fixtures/deep_silence.ndjson --features 2>/dev/null)" \
-  || fail "AC3: deep_silence.ndjson で --features が非 0 で終了した"
+out3="$(replay tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
+  || fail "AC3: deep_silence.ndjson で --features が非 0 で終了した、または封筒の .rows を取り出せない"
 printf '%s' "$out3" | jq -e 'length > 0 and all(.[]; .stall_onset.is_onset == false)' >/dev/null 2>&1 \
   || fail "AC3: feat 行の無い deep_silence.ndjson で onset が立った（★ 観測区間が無ければ onset は立たない）"
 
@@ -87,11 +95,20 @@ else
   BIG_CMD="./target/debug/gse-replay"
 fi
 start=$(date +%s)
-out4="$(timeout 20 $BIG_CMD "$tmpd/big.ndjson" --features 2>/dev/null)"
+# ⚠️★★★ ここだけ封筒を**別の行で**剥がす（2026-09-20・封筒）。
+#   ★ `timeout ... | jq` にすると、打ち切られた出力で jq が 5 を返した瞬間に
+#     pipefail が「最も右の非 0」= 5 を採り、**rc=124（時間切れ）が消える**。
+#     → ★ 時間切れの診断が「非 0 で終了した」に化ける。生の rc を先に確定させる。
+#   ★ 併せて出力は**ファイルへ落とす**（2026-09-20・code-reviewer MEDIUM）——
+#     15 万打鍵の pretty 出力は数十 MB 規模で、生と剥がし済みを同時にシェル変数へ載せると
+#     ⚠️ ピーク使用量が倍になる。`elapsed` は jq の前に確定するので計時 AC は汚れない。
+timeout 20 $BIG_CMD "$tmpd/big.ndjson" --features > "$tmpd/big_out.json" 2>/dev/null
 rc=$?
 elapsed=$(( $(date +%s) - start ))
 [ $rc -eq 124 ] && fail "AC18: 15 万打鍵の --features が 20 秒で終わらない（★ 計算量が二乗のまま。現行実装は実測 56 秒）"
 [ $rc -eq 0 ] || fail "AC18: 大入力で --features が非 0 で終了した (rc=$rc)"
+out4="$(jq -e '.rows | arrays' "$tmpd/big_out.json")" \
+  || fail "AC18: 出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 printf '%s' "$out4" | jq -e '[.[] | select(.stall_onset.is_onset)] | length == 1' >/dev/null 2>&1 \
   || fail "AC18: 大入力の末尾の沈黙で onset がちょうど 1 つ立たない（★ 検出器が走っていない可能性）"
 echo "[acceptance 008] AC18: ${elapsed}s" >&2
@@ -111,11 +128,14 @@ awk 'BEGIN{T=1700000000000; n=75000;
   for(f=T+1000; f<=end; f+=1000) printf "{\"type\":\"feat\",\"t\":%d}\n", f }' > "$tmpd/churn.ndjson" \
   || fail "AC18b の入力生成に失敗"
 start=$(date +%s)
-out4b="$(timeout 20 $BIG_CMD "$tmpd/churn.ndjson" --features 2>/dev/null)"
+# ⚠️ AC18 と同じ理由で、封筒は別の行で剥がす（rc=124 を jq の 5 で潰さない）。
+timeout 20 $BIG_CMD "$tmpd/churn.ndjson" --features > "$tmpd/churn_out.json" 2>/dev/null
 rc=$?
 elapsed=$(( $(date +%s) - start ))
 [ $rc -eq 124 ] && fail "AC18b: 立ち上がり 75,000 回の入力で --features が 20 秒で終わらない（★ θ の再計算が二乗。e079b21 は実測 248 秒）"
 [ $rc -eq 0 ] || fail "AC18b: 立ち上がりの多い入力で --features が非 0 で終了した (rc=$rc)"
+out4b="$(jq -e '.rows | arrays' "$tmpd/churn_out.json")" \
+  || fail "AC18b: 出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 printf '%s' "$out4b" | jq -e 'length > 0' >/dev/null 2>&1 || fail "AC18b: 出力が空"
 echo "[acceptance 008] AC18b: ${elapsed}s" >&2
 

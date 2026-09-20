@@ -40,9 +40,35 @@
 
 ---
 
-## 起票 2: ⚠️ `--features` の出力に「由来の封筒」が無い
+## 起票 2: ⚠️ `--features` の出力に「由来の封筒」が無い —— ★★★ **2026-09-20 に閉じた**
 
 > ★ **研究者判断 2026-09-18（判断 25 #14）**: 封筒を足す小 issue を切る（`{ provenance, config, rows }`・全 acceptance の前提を 1 度だけ書き換える）。Loop 基盤の修正の後。
+>
+> ### ★★★ 閉じた（2026-09-20・`.steering/20260920-envelope-issues/`）
+>
+> - ★ 出力は **`{ provenance, config, rows }`** になった（`bin/replay.rs::FeatureEnvelope`）。
+> - ★ `provenance` が持つもの（★ grill で研究者が裁定・判断 2）:
+>   `sharing` / `tool` / `tool_version` / `source_basename` / `source_sha256_prefix` /
+>   `session_start` / `hmm_version` / `app_version` / `g1_mode` / `o1_mode` /
+>   `keyboard_layout` / `capabilities`。
+> - ⚠️★★★ **`os` は載っていない** —— `logger.rs::write_meta_start` が書いていないため
+>   （2026-09-20 に一次で確認）。★ 足すのは**計器の変更** = 起票 1・ADR-032 の領域であり、
+>   ⚠️ **推測で埋めなかった**。
+> - ★ **二重化は解いた**（判断 3）: `capabilities` は `rows[].quality` から**外し**、封筒へ移した。
+>   ⚠️ 「宣言が無い」という事実は tick 単位の欠測理由なので
+>   `missing_reasons` の `capability_undeclared` は**そのまま残る**。
+> - ⚠️★★★ **`provenance.hmm_version`（収集時）と `config.hmm_version`（解析時）は別物**である。
+>   ★ `instrument_rich.ndjson` では前者 `0.2.0` / 後者 `0.5.0` で**実際に食い違う**
+>   （2026-09-20 実測）。★ 食い違いが読めること自体が封筒の目的なので、
+>   `envelope-acceptance.sh` AC8 が**同じ値になったら赤**にする。
+> - ⚠️ **生成時刻は載せない**（判断 7）。★ 載せると「同じ入力から同じ出力」を検査できなくなる。
+>   回帰は AC9（2 回実行してバイト単位で一致）。
+> - ★ **acceptance 8 本すべて**を 1 度だけ書き換えた（判断 8・取得時に `jq '.rows'`）。
+>   ★ merge 済み 6 本（001 / 002 / 003 / 005 / 007 / 008）が**実測で緑**。
+>   ⚠️ 004 / 006 は blocked のままだが、**「配列が来ない」ではなく自分の Tier 未実装で赤**である
+>   （2026-09-20 実測）。
+> - ★ 検査: `.steering/20260920-envelope-issues/envelope-acceptance.sh`
+>   （⚠️ 突然変異 6 種で赤になることを実測済み・同 `measurements.md`）。
 
 - **起票日**: 2026-09-15（★ `security-checker` 指摘 M2 の後半）
 - **中身**: `--features` の出力はトップレベルが **`FeatureRow` の配列**であり、
@@ -108,9 +134,34 @@
 
 ---
 
-## 起票 5: ⚠️★★★ 「`--features` 出力を共有しない」に**機械的な門が無い**
+## 起票 5: ⚠️★★★ 「`--features` 出力を共有しない」に**機械的な門が無い** —— ★★★ **2026-09-20 に閉じた**
 
 > ★ **研究者判断 2026-09-18（判断 25 #14）**: 起票 2 の封筒 issue で「共有しない」を封筒に刻む。
+>
+> ### ★★★ 閉じた（2026-09-20・`.steering/20260920-envelope-issues/`）
+>
+> - ★ **封筒に刻んだ**（判断 5）: `provenance.sharing` =
+>   `{ "gse_dataset": "prohibited", "anonymized": false, "absolute_epoch_ms": true, "rule": "docs/glossary.md 特徴行" }`。
+>   ★ 「共有するな」だけでなく、⚠️ **なぜ共有できないか**（匿名化を通っていない・絶対 epoch）を
+>   出力自身が持つ。⚠️ **真偽値 1 つにしなかった** —— `false` が書ける形は
+>   「共有してよい `--features` 出力がありうる」と読まれるため。
+> - ★ **門を置いた**: `scripts/check_no_feature_output.sh`。
+>   判定は **(a) `sharing` マーカー** と **(b) 封筒を剥がした行の形**（`t_ms` ＋ `activity` ＋
+>   `boundary` ＋ `dispersion` ＋ `stall_onset` の 5 キーを持つオブジェクトの配列）の
+>   **2 本立て**で、どちらか 1 つでも当たれば赤（判断 6）。
+>   ⚠️★★★ **ファイル名を 1 つも見ていない**（★ 起票 5 の逐語「名前依存なので代替にならない」）。
+> - ★ CI に載せた: `ci.yml` の `frontend-check` に `--self-test` と本走査の 2 ステップ。
+> - ⚠️★★★ **初版の検査器は陽性対照 P2 を通していた**（2026-09-20 実測）——
+>   `[ .. | select(A) ] | length > 0 or (...)` と書くと jq が `|` を `or` より弱く結び、
+>   ★ **2 本目が元の文書ではなく 1 本目の結果を入力に取っていた**。
+>   → ★ `def` に包んで直し、**その穴を `--self-test` の P2 として恒久化**した
+>   （⚠️ 壊した版を回すと P2 / P3 が赤になることを実測済み）。
+> - ⚠️★★★ **本筋の一部は残っている** —— 起票 5 が書いた「`gse-dataset` 側に feature row 形の
+>   JSON が無いことを **CI で** 見る」は**達成していない**。
+>   ★ 理由（2026-09-20 に一次で確認）: **`gse-dataset` に `.github` が無く CI が存在しない**。
+>   → ★ 同じ script を `--root <gse-dataset のクローン>` で**手で**回せるようにし、
+>   手順を `docs/verification-runbook.md` に置いた。⚠️ **自動では走らない。**
+>   → ★ 向こうに workflow を新設するかは**別リポの作業**として `next-session` に残す。
 
 - **起票日**: 2026-09-15（★ issue 003 の `security-checker` 指摘 M1）
 - **規約は在る**: `docs/glossary.md:223` 逐語
@@ -567,3 +618,30 @@
 - ★ **緩和済み**: ブランチ検査（起票 10 の是正）が入ったので、⚠️ **逸脱した attempt はそもそも
   `blocked` で止まる**。★ この形に到達する確率は大きく下がったが、**経路は残っている**
   （★ M3 の迂回で逸脱し、その後 `--cleanup` する場合）。
+
+---
+
+## 起票 19: ⚠️ `RUSTSEC-2026-0285`（rustls 0.23.43）—— ★ `cargo update` では上がらない
+
+- **起票日**: 2026-09-20（★ PR #214 の `audit` ジョブが赤になって表面化）
+- **中身**: `cargo-audit` が逐語
+  「**RUSTSEC-2026-0285  rustls 0.23.43  patched: >=0.23.45 /
+  TLS 1.3 handshake messages incorrectly accepted across encryption level boundaries**」。
+- ⚠️★★★ **PR #214 の変更が原因ではない**（★ 2026-09-20 に一次で確認）:
+  - 本ブランチの `Cargo.lock` 差分は **1 行だけ**（`sha2` の辺の追加）。
+  - `rustls 0.23.43` は **main と完全に同一**（`git show main:src-tauri/Cargo.lock` で照合）。
+  - ★ main の最終 `supply-chain.yml` 実行は **2026-09-14 に success**。
+    ⚠️ 助言 DB は **2026-09-19 更新**で、★ **この助言はその後に公開された新着**である。
+- ⚠️ **単純な更新では解けない**: `cargo update -p rustls --dry-run` の実測が
+  逐語「**Locking 0 packages to latest compatible versions**」。
+  ★ `0.23.45` が現在の制約から到達できない理由（どの依存が上限を締めているか）は**未調査**。
+- **★ 次に何をするか**:
+  1. ★ `cargo tree -i rustls` 等で**誰が制約しているか**を特定する
+     （★ 候補: `reqwest`（`--features package` で optional）/ `rustls-platform-verifier` / `tauri` 系）。
+  2. ★ 上げられるなら lock を更新し、⚠️ **MSRV check と `--features package` の clippy を再走**する
+     （★ `docs/verification-runbook.md` §1 の「依存を更新した回のみ」の行）。
+  3. ⚠️ 上げられないなら `.cargo/audit.toml` に **理由 ＋ 依存パス ＋ `# review-by:`** を付けて waive する。
+     ★ ただし **TLS のハンドシェイク検証**に関わる案件なので、**waive の可否は研究者判断**である。
+- **★ 判断（2026-09-20・研究者裁定）**: **別タスクにして PR #214 はマージする。**
+  ★ 根拠: `docs/agent-shared.md` 逐語「`supply-chain.yml` は **branch protection が無いので
+  門ではなく信号**であり、赤でもマージは止まらない」。⚠️ **本 PR が赤くしたのではない。**

@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # issue 004 (T1c revision topology) の AC 検査
+# ⚠️★★★ 2026-09-20（封筒・起票 2）: `--features` の出力は
+#   **`{ provenance, config, rows }` の封筒**になった（判断 25 #14）。
+#   ★ 本検査は取得時に `jq '.rows'` で**行だけを取り出して**おり、
+#     以降の `.[]` / `all(.[]; ...)` は封筒を剥がした後の配列を指す。
+#   ⚠️★★★ **この検査は `provenance` と `config` を 1 つも見ていない。**
+#     ★ 封筒自体の検査は `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
+#   ★ 封筒が無い（配列のままの）出力では `jq '.rows'` が失敗し、
+#     `set -o pipefail` によりその場で赤になる（fail-closed）。
 set -uo pipefail
 fail() { echo "[acceptance 004] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
@@ -10,8 +18,8 @@ cd src-tauri || fail "src-tauri が無い"
 #   「delete run は連続 2 打以上」と定義した実装では `delete_runs` が 0 になり、
 #   ⚠️ **欠陥でないのに acceptance が落ちる**（★ issue 002 で実際に $5.7 を捨てた失敗様式）。
 #   ★ instrument_rich は **backspace 3 連**を持つので、どちらの定義でも run が 1 本以上立つ。
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndjson --features 2>/dev/null)" \
-  || fail "gse-replay --features が非 0 で終了した"
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
+  || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 
 printf '%s' "$out" | jq -e '

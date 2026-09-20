@@ -127,6 +127,13 @@ schemars = "0.8"
 # Wall Server: QRコードによるスマートフォン連携Wall解除
 base64 = "0.22"
 
+# envelope-issues (起票 2): `gse-replay --features` の封筒 `provenance.source_sha256`。
+# 「どのセッション NDJSON から出た行か」を、ファイル名が変わっても同定できるようにする。
+# ★ **新規の供給元を増やさない**: `sha2 0.10.9` は既に `wry` (tauri の実行時依存) と
+# `tauri-codegen` (ビルド依存) 経由でビルドツリーに入っている (Cargo.lock 実測)。
+# `reqwest` を足したときと同じ論拠 (rust-standards ルール 7「既存の依存で代替できないか」)。
+sha2 = "0.10"
+
 # Utilities
 crossbeam-channel = "0.5"
 # capture-schema-freeze (CD1): ペースト時にクリップボードの**文字数のみ**を取得するため
