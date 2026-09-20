@@ -17,3 +17,37 @@
 
 ★ 推奨順: **S7 → S8**（issue 004 / 006 の定義確定に直結・タスク 2 の再開順を進める）→ **S1**（理論の新規性の核）→ S2 → S3 / S4 → S5 → S6b。
 ⚠️ S7 / S8 は「定義を借りられるか」を問うラウンドであり、**結果が無くても定義案（新しい定数ゼロ）で進められる**（→ 待たずに暫定確定する選択肢もある）。
+
+---
+
+## ★ 実施状況と残りの予定（2026-09-21 追記・研究者判断）
+
+> ⚠️ 本節は**後から足した進捗の記録**である。★ 上の表（問い・対象の主張）は当時のまま。
+
+### 実施済み（2026-09-19・段 2）
+
+| ID | 成果 | コミット |
+|---|---|---|
+| **S7** | `docs/literature/20260919-content-free-revision-measures.md`・[V151]–[V160]・定義案 §6.2b | `4403763` |
+| **S8** | `docs/literature/20260919-resumption-restop-and-bout-segmentation.md`・[V161]–[V169]・定義案 §3.4 | `7860ccb` |
+| **S1** | `docs/literature/20260919-authority-return-burden-precedents.md`・[P368]–[P379]・`review-B.md` §5 | `95abd10` |
+| **S2** | `docs/literature/20260919-non-domination-and-autonomy-norms.md`・[P380]–[P391]・`review-D.md` §6 | `99c0d60` |
+| （補足） | Digital Nature の一次（`20260919-digital-nature-primary-scope.md`・[P392]–[P395]） | 段 2 |
+
+★ S7 / S8 の結果は **issue 004 / 006 に転記済み**で、⚠️ **2026-09-21 に実装まで完了した**
+（`.steering/20260920-issues-004-006/`・PR #215 merge）。
+
+### ★ 残り 4 本のタイミング（2026-09-21・研究者判断）
+
+| ID | ★ いつ回すか | ⚠️ 根拠（一次） |
+|---|---|---|
+| **S3** | ★ **`capability matrix`（ADR-032 M7）の後、理論の回として** | ⚠️★★★ **J-2（名称ゲート ＝「生成的返権論」の名前を残すか）が S3 待ちで止まっている** —— `questions-batch-1.md:27` 逐語「S1 / S3 の結果（先行と衝突するか）を見てからでないと判断材料が無い」。★ **S1 は済んだので、残る閂は S3 だけ**である |
+| **S4** | ★ **S3 と同じ回に続けて** | 対象主張（A-13 / B-18 / B-25）が S3 と隣接し、出典が重なる |
+| **S5** | ★ **Physical Anchor の PC 面の実装設計タスク**（ADR-035 の未決 3 つと同じ回） | ★ ゲートだった **J-14 は判断 1 #4 で裁定済み**（語を分け、PM-Q7 は別途）。→ ⚠️ 残る論点 **PM-Q7**（復帰後の差分を表現へ結合するか）は PA の実装設計の場にある。★ そこで問わないと S5 の問い自体が揺れる |
+| **S6b** | ★ **EH3 を設計する回**（⚠️ EH3 を走らせる前） | 上の表「中（EH3 前まで）」／ `docs/theory/generative-relinquishment-theory.md:496` 逐語「数値マージンと独自項目の妥当性は未確定であり、**EH3 後かつ EH4 の割付前に凍結する**」。⚠️ EH3 は研究用の**別計器**で、まだ設計されていない |
+
+- ⚠️ **外部の締切要因は無い**（★ `docs/wbs-verification-halfyear.md` のマイルストーンは W1 起点の相対表記で、
+  逐語「絶対日付は着手時に確定」）。
+- ★ 実施は `/literature-review` 1 ラウンド＝ 1 問。⚠️ **ラウンドごとに即コミット**（memory「Commit each survey round」）、
+  探索は subagent・`docs/references.md` への追記はメイン直列（memory「Survey via subagent」）、
+  `check_citations.py` は「違反なし」まで回す。
