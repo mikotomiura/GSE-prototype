@@ -17,9 +17,17 @@
 #      ⚠️ **M3 は deny 9 件でも `git -C . checkout main` が通ることを実測している**。
 #        ★ だから deny は多層防御であり、**境界は本検査 B1〜B3 が見ているブランチ検査**である。
 #   2. ★ `permission_mode` を `auto` / `bypassPermissions` へ昇格させた場合。★ 測っていない。
-#   3. ★ `run_watchdog` 側の `ensure_branch`（⚠️ watchdog は `run_verify` が緑のときだけ走るので、
-#      ★ 本検査の経路では到達しない）。
+#   3. ⚠️ **`verify_level: recheck` の `run_watchdog` セッションそのもの**は 1 度も起動していない
+#      （★ stub の issue はすべて `parse`）。★ B4 が押さえているのは
+#      **`issue_done` 直前の検査**であり、⚠️ watchdog が逸脱する経路は
+#      「verify の最中に逸脱する」形で*代用*している（★ 同じ 1 行が両方を拾う）。
 #   4. ★ 並列実行 (`parallel > 1`) での events の競合。★ 1 本でしか回していない。
+#   5. ⚠️ **`git restore --source=<other> -- .` のような HEAD を動かさない内容の差し替え**。
+#      ★ `ensure_branch` は原理的に拾えない（★ B5 が見ているのは HEAD が動く形だけ）。
+#   6. ★ `_loop-artifacts/` の 14 日 prune と、`mkdir -p` 失敗時の「(保存できず)」経路。
+#
+# ⚠️★★★ **B1〜B5 / S1〜S8 / D1〜D2 は突然変異で赤くなることを確認済み**（2026-09-20・計 6 種）。
+#   ★ 詳細は `.steering/20260920-loop-foundation-fixes/measurements.md`。
 #
 # Usage: bash scripts/loop-run-guard-test.sh
 # Exit:  0 = 全件合格 / 1 = 不合格あり / 2 = ⚠️ 検査できなかった
@@ -57,8 +65,8 @@ trap cleanup EXIT
 #   ⚠️ `claude` を stub に差し替えて `loop-run.sh` を**実際に回し**、events を読んで判定する。
 #   ★ stub は **worktree を cwd として**起動されるので、
 #     `git checkout` をさせれば起票 10 の実測をそのまま再現できる。
-setup_repo() { # setup_repo <repo-dir> <claude-stub-の本体> <denials-json>
-  local r="$1" stub="$2" denials="${3:-[]}"
+setup_repo() { # setup_repo <repo-dir> <claude-stub-の本体> [denials-json] [verify.test のコマンド]
+  local r="$1" stub="$2" denials="${3:-[]}" vtest="${4:-true}"
   mkdir -p "${r}/scripts" "${r}/.steering/task/issues" "${r}/stub"
   cp "${SPAWN_SH}" "${r}/scripts/loop-spawn.sh"
   cp "${DENY_SH}"  "${r}/scripts/loop-worktree-deny.sh"
@@ -106,6 +114,19 @@ stub
 ## Status
 
 I4
+  # ⚠️★★★ 005 = **装飾つきの blocked**（★ `code-reviewer` MEDIUM・2026-09-20）。
+  #   ★ 実在する書式（`✅ **done**（…）` / `⚠️★★★ **不要（not needed）**`）と同じ形で
+  #     `blocked` を書かれると、⚠️ **素の前方一致は fail-open する**。
+  cat > "${r}/.steering/task/issues/005.md" <<'I5'
+# Issue 005: stub (装飾つき blocked)
+verify_level: parse
+## Goal
+stub
+## Dependencies
+## Status
+
+⚠️★★★ **blocked**（★ 装飾つきでも除外されること）
+I5
   cat > "${r}/.gitignore" <<'IGN'
 .steering/**/_loop-events.jsonl
 .steering/**/_loop-board.md
@@ -116,7 +137,7 @@ IGN
   cat > "${r}/.steering/task/_loop-config.json" <<CFG
 {
   "task": "stub", "mode": "C", "base_branch": "main",
-  "verify": { "test": "true" },
+  "verify": { "test": "${vtest}" },
   "budget": { "max_attempts": 2, "no_progress_threshold": 4, "token_ceiling": 40000000, "parallel": 1 },
   "events_path": "${r}/.steering/task/_loop-events.jsonl",
   "headless": { "max_turns": 3, "permission_mode": "acceptEdits", "model": "sonnet", "watchdog_model": "haiku" }
@@ -132,14 +153,24 @@ CFG
     git config core.hooksPath /dev/null || exit 1
     git add scripts .steering .gitignore || exit 1
     git commit -q -m init || exit 1
-    # ⚠️★★★ **逸脱先の空きブランチ**を用意する（★ 2026-09-20 に踏んだ落とし穴）。
+    # ⚠️★★★ **逸脱先の空きブランチ**を用意する（★ 2026-09-20 に踏んだ落とし穴 その 1）。
     #   ★ 最初 B1 の stub は `git checkout main` にしていたが、⚠️ **git 自身が弾いて逸脱できず**、
     #     検査が「逸脱を検出していない」ではなく「逸脱が起きていない」で赤になった。
     #     （★ git は同一ブランチの二重チェックアウトを拒む。一時 repo の本体が `main` に居るため。）
     #   ★ これは起票 10 の逐語「⚠️ かつ main checkout が `main` に居たら checkout は失敗していた
     #     （★ 今回は別ブランチだったので通った）」そのものである。
     #   → ★ **どこにもチェックアウトされていないブランチ**を逸脱先にすれば、実運用の一般形を再現できる。
+    #
+    # ⚠️★★★ **さらに `escape-target` を main から *分岐* させる**（★ 落とし穴 その 2）。
+    #   ★ 同一コミットを指したままだと、B5（履歴の入れ替え）で HEAD が 1 mm も動かず、
+    #     ⚠️ 「検査が見逃した」ではなく **「入れ替えが起きていない」** で赤になる。
+    #   → ★ init(C1) から escape-target に独自コミットを積み、main にも別のコミットを積んで
+    #     **共通祖先が C1 になる本物の分岐**を作る。
     git branch escape-target || exit 1
+    git checkout -q escape-target || exit 1
+    echo decoy > decoy.txt && git add decoy.txt && git commit -q -m decoy || exit 1
+    git checkout -q main || exit 1
+    echo onmain > onmain.txt && git add onmain.txt && git commit -q -m onmain || exit 1
   ) >/dev/null 2>&1
 }
 
@@ -227,6 +258,49 @@ else
   ng "B3: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
+# --- B4: ⚠️ verify が緑になった *後*（watchdog 経路）の逸脱を拾うこと ---
+#   ★ `code-reviewer` / `security-checker` が**両方 HIGH** で指摘した穴（2026-09-20）。
+#   ⚠️ stub は `claude` の代役なので、**verify が緑になる条件**で逸脱させる必要がある。
+#     → ★ verify(`true`) は常に緑なので、stub がセッション末に逸脱すれば
+#       verify 直前の検査に当たる。★ **issue_done 直前の検査を単独で試すには、
+#       verify 自身に逸脱させる**（`verify.test` から checkout する）。
+B4="${TMP}/b4/repo"; mkdir -p "${B4}"
+if setup_repo "${B4}" ':' '[]' 'git checkout -q escape-target 2>/dev/null; true'; then
+  ev="$(run_loop "${B4}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    if grep -q '"event":"issue_done"' "${ev}"; then
+      ng "B4: ⚠️★★★ verify の最中に逸脱したのに issue_done になった (★ 別ブランチを見て出した done)"
+    else
+      ok "B4: verify 後の逸脱でも issue_done を出さなかった"
+    fi
+    if grep -q 'loop/001-\* から外れている' "${ev}"; then
+      ok "B4: issue_done 直前のブランチ検査が発火した"
+    else
+      ng "B4: ⚠️ issue_done 直前に HEAD を見ていない"
+    fi
+  else
+    ng "B4: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "B4: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- B5: ⚠️ ブランチ名を保ったままの履歴入れ替え（reset --soft / branch -f） ---
+#   ★ `security-checker` MEDIUM。⚠️ `git reset --hard` だけが deny に在り、`--soft` は通る。
+B5="${TMP}/b5/repo"; mkdir -p "${B5}"
+if setup_repo "${B5}" 'git reset -q --soft escape-target 2>/dev/null || true'; then
+  ev="$(run_loop "${B5}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '履歴が入れ替わっている' "${ev}" \
+     && ! grep -q '"event":"issue_done"' "${ev}"; then
+    ok "B5: ブランチ名は同じでも履歴が入れ替わったら blocked にした"
+  else
+    ng "B5: ⚠️ reset --soft による中身の差し替えを見逃した (★ 名前しか見ていない)"
+    [ -s "${ev}" ] && sed -n '1,6p' "${ev}"
+  fi
+else
+  ng "B5: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
 echo "S. Status フィルタ — ⚠️ 判断 26 の申し送り (★ 3 状態)"
 
 S="${TMP}/s/repo"; mkdir -p "${S}"
@@ -278,6 +352,61 @@ if setup_repo "${S}" ':'; then
     ng "S4 回帰: 004 が実行計画に出ない (★ 依存 issue を外したことで巻き添えにしている)"
     printf '%s\n' "${out}" | head -20
   fi
+
+  # --- S5 ⚠️ 装飾つき blocked（★ 素の前方一致だと fail-open する） ---
+  if printf '%s' "${out}" | grep -qE '^ +005 '; then
+    ng "S5 装飾: ⚠️★ 「⚠️★★★ **blocked**（…）」が除外されず実行計画に載った (★ fail-open)"
+  else
+    ok "S5 装飾: 装飾つきの blocked も除外した (★ 先頭の記号を剥がして判定している)"
+  fi
+
+  # --- S6 ⚠️ **実際に回す**（★ --dry-run では通らない経路。`code-reviewer` MEDIUM） ---
+  #   ★ S1〜S5 はすべて --dry-run なので、`_loop-run-report.md` の「実行しなかった issue」節と
+  #     Status フィルタの**副作用の本体**（blocked に依存する issue が実際に blocked になること）を
+  #     ⚠️ **1 度も通っていなかった**（★ その 2 ブロックを削除しても緑のままだった）。
+  ev="$(run_loop "${S}")"
+  rep="${S}/.steering/task/_loop-run-report.md"
+  if [ -s "${rep}" ]; then
+    if grep -q '002' "${rep}" && grep -q 'Status=blocked のため実行しなかった' "${rep}"; then
+      ok "S6 レポート: 除外した issue をレポートに残した (★ ALL から外れても消えない)"
+    else
+      ng "S6 レポート: 除外した issue がレポートから消えた (★ 人が気づけない)"
+    fi
+  else
+    ng "S6 レポート: _loop-run-report.md が空 (★ 判定できない)"
+  fi
+  if [ -s "${ev}" ] && grep '"issue":"004"' "${ev}" | grep -q '依存 issue が未完のため未実行'; then
+    ok "S6 副作用: blocked な 002 に依存する 004 は blocked として events に残る (★ 黙って消えない)"
+  else
+    ng "S6 副作用: ⚠️ 004 の扱いが events から分からない (★ Status フィルタの副作用が不可視)"
+    [ -s "${ev}" ] && grep '"issue":"004"' "${ev}" | head -3
+  fi
+  if [ -s "${ev}" ] && grep -q '"issue":"005"' "${ev}"; then
+    ng "S6: ⚠️ 装飾つき blocked の 005 が実際に実行された"
+  else
+    ok "S6: 装飾つき blocked の 005 は実行されなかった"
+  fi
+
+  # --- S7 ⚠️ --issues で blocked を迂回したことが events に残ること ---
+  S7="${TMP}/s7/repo"; mkdir -p "${S7}"
+  if setup_repo "${S7}" ':'; then
+    ev7="$(run_loop "${S7}" --issues 002)"
+    if [ -s "${ev7}" ] && grep -q 'Status=blocked の issue を --issues で明示指定して実行している' "${ev7}"; then
+      ok "S7 迂回: blocked を承知で回したことを events に残した (★ 後から監査できる)"
+    else
+      ng "S7 迂回: ⚠️ 迂回の記録が events に無い (★ 端末のスクロールバックにしか残らない)"
+    fi
+  else
+    ng "S7: 一時 git repo を用意できなかった (★ 判定できない)"
+  fi
+
+  # --- S8 ⚠️ --issues の id 検証（★ パストラバーサル） ---
+  out8="$(dry_run "${S}" --issues '../../x' 2>&1)"
+  if printf '%s' "${out8}" | grep -q 'id が不正です'; then
+    ok "S8 検証: --issues の不正な id を拒否した (★ _loop-artifacts の外へ書かせない)"
+  else
+    ng "S8 検証: ⚠️ '../../x' を受理した (★ gitignore の外へ成果物を書ける)"
+  fi
 else
   ng "S: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
@@ -327,6 +456,34 @@ if setup_repo "${D}" ':' "${DENIALS}"; then
   fi
 else
   ng "D: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- D2 ⚠️★★★ 資格情報を伏せてから保存すること（★ `security-checker` HIGH・2026-09-20） ---
+#   ★ `.tool_input.command` は worker が組み立てた自由文字列なので、秘密が混ざりうる。
+#   ⚠️ **events（board から見える）と生配列（恒久保存）の両方**を見る。
+D2="${TMP}/d2/repo"; mkdir -p "${D2}"
+SECRET_DENIALS='[{\"tool_name\":\"Bash\",\"tool_use_id\":\"t1\",\"tool_input\":{\"command\":\"GH_TOKEN=ghp_ZZZTESTSECRET1234 gh api repos/x\"}},{\"tool_name\":\"Bash\",\"tool_use_id\":\"t2\",\"tool_input\":{\"command\":\"curl -H Authorization:Bearer_ZZZTESTSECRET5678 https://x\"}}]'
+if setup_repo "${D2}" ':' "${SECRET_DENIALS}"; then
+  ev="$(run_loop "${D2}" --issues 001)"
+  art2="${D2}/.steering/task/_loop-artifacts/001-attempt1-denials.json"
+  if [ -s "${ev}" ] && ! grep -q 'ZZZTESTSECRET' "${ev}"; then
+    ok "D2: events に秘密が出ていない (★ 伏せてから集計している)"
+  else
+    ng "D2: ⚠️★★★ events に秘密が平文で残った: $(grep -o 'ZZZTESTSECRET[0-9]*' "${ev}" | head -2 | tr '\n' ' ')"
+  fi
+  if [ -s "${art2}" ] && ! grep -q 'ZZZTESTSECRET' "${art2}"; then
+    ok "D2: 生配列にも秘密が残っていない (★ 恒久保存される側)"
+  else
+    ng "D2: ⚠️★★★ 生配列に秘密が平文で残った → ${art2}"
+  fi
+  # ⚠️ 伏せても「何が拒否されたか」は読めること（★ 起票 3 の目的を潰していないこと）
+  if [ -s "${ev}" ] && grep -q 'gh api\|GH_TOKEN=\*\*\*' "${ev}"; then
+    ok "D2: 伏せたうえで、何が拒否されたかは読める (★ 起票 3 の目的を潰していない)"
+  else
+    ng "D2: ⚠️ 伏せた結果、内訳が読めなくなった: $(grep -o 'permission_denials=[^"]*' "${ev}" | head -1)"
+  fi
+else
+  ng "D2: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
 echo "────────────────────────────────────────"

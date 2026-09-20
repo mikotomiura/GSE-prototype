@@ -160,9 +160,26 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
 
 ### ⚠★★★ worktree ブランチ検査 —— **これが隔離の境界である** (2026-09-20)
 
-`loop-run.sh` は **attempt 開始時**と **`run_verify` の直前**の 2 か所で、worktree の
-`git rev-parse --abbrev-ref HEAD` が `loop/<id>-*` であることを確かめる (`ensure_branch`)。
-外れていたら events に `blocked` を 1 行残して **その issue を落とす (fail-closed)**。
+`loop-run.sh` は worktree の `git rev-parse --abbrev-ref HEAD` が `loop/<id>-*` であることを
+確かめる (`ensure_branch`)。外れていたら events に `blocked` を 1 行残して
+**その issue を落とす (fail-closed)**。**自動では戻さない。**
+
+★ **検出力を持つのは 2 か所**:
+
+1. **`run_verify` の直前** — worker のセッション中の逸脱を拾う (⚠️ 起票 10 の実測はこの形)。
+2. **`issue_done` を出す直前** — `verify_level: recheck` の `run_watchdog` は worktree 内で
+   **もう 1 回フルセッション**を起動するので、ここを見ないと
+   ⚠️ **「別ブランチを見て出した done」**が成立する (★ 2026-09-20 に両レビューが HIGH で指摘)。
+
+⚠ attempt 開始時にも呼んでいるが、**現在のモードC では到達しない**
+(逸脱は必ず先に 1. が拾って issue を落とすため)。将来 worktree を再利用する経路のための保険であり、
+**「3 か所で検査している」と数えないこと。**
+
+★ 名前だけでなく **`merge-base --is-ancestor` で履歴の子孫性**も見る。
+⚠ `git reset --soft|--mixed <other>` / `git branch -f loop/<id>-issue <other>` は
+**HEAD の名前を保ったまま中身を差し替える** (deny に在るのは `git reset --hard:*` だけ)。
+⚠ ただし `git restore --source=<other> -- .` のような **HEAD を動かさない内容の差し替えは拾えない**。
+★ これが境界の限界である (⚠ deny で塞ぐ方向に戻さない)。
 
 - **なぜ要るか**: 2026-09-15 に worker が `git checkout main` を打ち、worktree が `main` を
   掴んだまま attempt が終わった (起票 10)。⚠️ このとき `run_verify` は
@@ -186,8 +203,26 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
   後続が「依存 issue が未完のため未実行」で落ちる。完了の復元は events からの seed が担う。
 - ⚠ **`## Status` が無い issue は回す**。テンプレの Status 節は見出しだけで値が空なので、
   外すと新規に切った issue が黙って走らなくなる。
+- ⚠ 判定の前に **先頭の記号・絵文字・`**` を剥がして小文字化する**。
+  実在する書式 (`✅ **done**（…）` / `⚠️★★★ **不要（not needed）**`) と同じ形で `blocked` を
+  書かれると、素の前方一致は **fail-open する**。
 - 除外は **ログと `_loop-run-report.md`** に出す。⚠ events には出さない
   (events 語彙は 10 種で固定であり、「実行しなかった」は状態遷移ではない)。
+  ★ ただし **`--issues` で `blocked` を承知で回したとき**は、その attempt の
+  `attempt_start` に `detail` を 1 行足す (⚠ 迂回が端末のスクロールバックにしか残らないのを避ける)。
+
+### ⚠ `permission_denials` を残すときは、先に伏せる (2026-09-20)
+
+`loop-run.sh` は拒否の内訳を events の `detail` (集計) と
+`<task>/_loop-artifacts/<id>-attempt<N>-denials.json` (生配列) に残す。
+
+- ⚠ `.tool_input.command` は worker が組み立てた**自由文字列**で、資格情報が混ざりうる。
+  → **`KEY=VALUE` の値・秘密らしいキーの直後の値を伏せ、1 件 200 字で切ってから**保存する。
+  ⚠ 伏せる前に集計キーを作らないこと (★ 「先頭 2 語」は `KEY=secret cmd` を狙い撃ちで拾う)。
+- ⚠ 集計キーは **`tool_name` ではなくコマンドの先頭 2 語**。拒否はほぼすべて `tool_name == "Bash"`
+  になるため、`tool_name` を数えても「何が拒否されたか」は分からない (★ 2026-09-20 に実測)。
+- 成果物は 14 日で prune する。`.gitignore` は **`**/_loop-artifacts/`**
+  (⚠ `.steering/**` に限定すると、外に置いた task-dir で ignore が外れる)。
 
 **`claude -p` は完全なセッション**であり、機能が削られた実行ではない。だからカスタムスラッシュ
 コマンド・hook・settings.json・権限設定がすべて効き、worktree 内で `loop-guard.sh` が発火する。

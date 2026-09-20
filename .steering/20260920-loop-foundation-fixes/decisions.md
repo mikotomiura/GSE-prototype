@@ -145,3 +145,51 @@
 - **理由**: ⚠️ ドメイン用語集に道具の用語を混ぜると、★ **禁止用語の検査（`glossary.md` の役割）**が
   Loop 工学の語まで抱えることになる。
 - **トレードオフ**: ⚠️ `grilling` skill の逐語から外れる。★ 本判断に理由を残して整合させる。
+
+---
+
+## 判断 7: レビュー裁定（★ `code-reviewer` ∥ `security-checker` を並列起動・2026-09-20）
+
+- **判断日時**: 2026-09-20（★ 本セッション。⚠️ 研究者の裁定ではない）
+- ★ 両者とも **`ensure_branch` が `issue_done` の直前に無い**ことを **HIGH** で挙げた（★ 独立に一致）。
+  ⚠️ **一致した指摘は最優先**（`cross-reviewer` の作法）。
+
+### ★★★ 採用した（★ すべて一次で裏取りしてから）
+
+| # | 出所 | 指摘 | 対応 |
+|---|---|---|---|
+| H1 | **両者** | ⚠️ `run_watchdog` → `issue_done` の経路にブランチ検査が無い。★ watchdog は worktree 内で**もう 1 回フルセッション**を起動する | ★ `emit issue_done` の**直前**に `ensure_branch` を追加。検査 **B4** |
+| H2 | code-reviewer | ⚠️ attempt 開始側の `ensure_branch` は **18 件のどれも通らない**（消しても緑） | ★ **到達しない理由をコメントに明記**し、「2 か所で検査」という含意を docs から落とした（⚠️ 検出力を持つのは verify 直前と `issue_done` 直前） |
+| H3 | security-checker | ⚠️ 拒否コマンドに混ざる**資格情報が 2 か所に恒久保存**される。★ 「先頭 2 語」は `KEY=secret cmd` を狙い撃ちで拾う | ★ `DENY_REDACT`（`KEY=VALUE` / 秘密キーの直後 / 200 字切り）を**集計の前**に通す。14 日で prune。検査 **D2** |
+| M1 | code-reviewer | ⚠️ `blocked*` の前方一致が装飾つき Status で **fail-open**（★ `✅ **done**（…）` が実在） | ★ `issue_status_key` で先頭の非 ASCII 英字を剥がして小文字化。検査 **S5** |
+| M2 | security-checker | ⚠️ ブランチ **名**だけでは `reset --soft` / `branch -f` の**履歴入れ替え**を見逃す | ★ 起動前 HEAD を控え、`merge-base --is-ancestor` で子孫性も見る。検査 **B5** |
+| M3 | security-checker | ⚠️ `.gitignore` が `.steering/**` 限定で、外の task-dir だと**追跡対象になる**（★ `git check-ignore` で実測） | ★ `**/_loop-artifacts/` に変更 |
+| M4 | security-checker | ⚠️ `--issues` による blocked 迂回が **events に残らない** | ★ `attempt_start` ＋ `detail` で 1 行残す（★ 語彙は増やさない）。検査 **S7** |
+| M5 | code-reviewer | ⚠️ レポートと die の経路が **`--dry-run` しか通っておらず未検査** | ★ 実際に `loop-run.sh` を回す **S6** を追加 |
+| M6 | 両者 | ⚠️ `jq` 失敗時に **0 バイトの成果物が残る**のに「(保存できず)」と書かれる | ★ 一時ファイル ＋ `mv`、失敗時は `rm -f` |
+| M7 | 両者 | ⚠️ 逸脱 worktree を `--cleanup` が撤去できない | ★ `detail` に復旧コマンドを明記（⚠️ 本体の是正は**起票 18**） |
+| L1 | security-checker | ⚠️ `--issues ../../x` で `_loop-artifacts` の外へ書ける | ★ id を検証して `die`。検査 **S8** |
+| L2 | code-reviewer | ⚠️ `detail` の長さが無制限 | ★ `head -c 300` で切る |
+| L3 | code-reviewer | ⚠️ `split(" ")` が連続空白で空トークンを作る | ★ `splits("[[:space:]]+")` ＋ 空要素を落とす |
+| L4 | code-reviewer | ⚠️ `preflight_dag` のコメントが「循環を検出」と書くが**実装していない** | ★ コメントを実態に直した（★ 本コミットの変更点ではないが隣接行） |
+
+### ⚠️ 採らなかったもの（★ 理由を残す）
+
+- **`不要（not needed）` を既定の除外に足す**（code-reviewer MEDIUM の後半）。
+  → ⚠️ **判断 4 の選択肢に無かった**。★ 研究者は「`blocked` だけ外す」を選んでおり、
+  `abandoned` すら足さないと決めている。→ ★ **勝手に増やさない。**
+  ⚠️ ただし `.steering/20260911-outcome-arbitration-and-o1-preflight/issues/009.md` が
+  `⚠️★★★ **不要（not needed）** ——` で、**現状そのまま回る**。★ **未決として研究者に上げる。**
+- **検査の判定を日本語 `detail` 文言の完全一致でなく構造で見る**（code-reviewer LOW）。
+  → ★ 文言を変えると赤くなるのは**偽陽性方向（安全側）**であり、
+  ⚠️ 構造判定に変えると「`blocked` が出た理由」まで見なくなる。★ 現状維持。
+- **`--cleanup` の引き方をパス一致に直す**（両者 MEDIUM の本体）。
+  → ⚠️ `loop-spawn.sh` の変更は本タスクの範囲外。★ **起票 18** で追跡する。
+
+### ⚠️ 両レビューが読んでいない範囲（★ 「問題なし」ではない）
+
+- `security-checker`: ★ `scripts/loop-run-guard-test.sh` を **1 行も読んでいない**。
+  `ci.yml` / `loop-issue.md` / `blockers.md` の差分も未読。
+- `code-reviewer`: ★ `measurements.md` 本文・`requirement.md` / `design.md` / `tasklist.md` 未読。
+  ⚠️ HIGH 2 件の「消しても緑のまま」は**読解による推論**で、突然変異は走らせていない
+  （→ ★ **メインが走らせて確かめた**。M-d / M-e / M-f がすべて赤になった）。

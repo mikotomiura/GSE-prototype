@@ -197,5 +197,39 @@ wt="$(git worktree list --porcelain | awk -v id="$id" '/^worktree /{p=substr($0,
 | M-a | `ensure_branch` を常に `return 0` にする | ★ **B1（3 件）と B3 が赤**（18 → 14 合格） |
 | M-b | Status フィルタを `ALL="$ALL_FILES"` に戻す | ★ **S1 の 1 件目が赤**（18 → 17 合格） |
 | M-c | `detail` から `by_tool` を落とす | ★ **D1 の 2 件が赤**（18 → 16 合格） |
+| M-d | `issue_done` 直前の `ensure_branch` を殺す | ★ **B4 の 2 件が赤**（30 → 28 合格） |
+| M-e | `merge-base --is-ancestor` の検査を殺す | ★ **B5 が赤**（30 → 29 合格） |
+| M-f | 生配列への `redact` を外す | ★ **D2 の「生配列に秘密が残った」が赤**（30 → 29 合格） |
 
-→ ★ **どの変異も検出された。** ⚠️ 復元後の `md5sum` は元と一致（`062fe6c5…`）。
+→ ★ **どの変異も検出された。** ⚠️ 復元後の `md5sum` は毎回元と一致。
+
+---
+
+## ★ レビュー後の追試（2026-09-20・`code-reviewer` ∥ `security-checker` の反映後）
+
+| 検査 | 結果 |
+|---|---|
+| `bash scripts/loop-run-guard-test.sh` | ★ **30 / 30**（B1〜B5・S1〜S8・D1〜D2） |
+| `bash scripts/loop-worktree-deny-test.sh` | ★ **34 / 34** |
+| `bash scripts/check-shell-portability.sh` | ★ **12 / 12** |
+| `bash scripts/check-tests-are-wired.sh` | ★ **16 / 16**（★ `loop-run-guard-test.sh` を CI に配線済み） |
+| CRLF（`tr -cd '\r' \| wc -c`） | ★ 変更した 5 ファイルすべて **0** |
+
+⚠️★★★ **`check-shell-portability.sh` は一度赤になった**（★ 記録に残す）:
+`ensure_branch` の `detail` に書いた `$wt」` が **`$name` に多バイト文字を直付けした形**で、
+★ bash 3.2 は変数名を誤って長く読む。→ `${wt}」` に直して緑になった。
+⚠️ **この規約は macOS 既定の bash 3.2 のために在り、手元の bash 5.2 では再現しない。**
+
+---
+
+## ⚠️ 追試で分かった、検査の *前提* が壊れていた 2 例（★ 記録に値する）
+
+★ どちらも「検査が見逃した」ではなく **「そもそも壊すことに失敗していた」**形である。
+⚠️ 気づかなければ **「検出できた」という偽の緑**になっていた。
+
+1. **B1 の逸脱先を `main` にしていた** → ⚠️ git が二重チェックアウトを拒んで**逸脱が起きなかった**。
+   ★ 起票 10 の逐語「main checkout が `main` に居たら checkout は失敗していた」そのもの。
+   → ★ どこにもチェックアウトされていない `escape-target` を逸脱先にした。
+2. **`escape-target` が `main` と同一コミットだった** → ⚠️ B5（履歴の入れ替え）で
+   **HEAD が 1 mm も動かず**、ancestry 検査が正しく「子孫である」と判定した。
+   → ★ `escape-target` に独自コミットを積み、`main` にも別コミットを積んで**本物の分岐**を作った。
