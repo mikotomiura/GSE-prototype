@@ -5,7 +5,8 @@ description: >
   docs/references.md への append-only 登録 → docs/literature/_index.md 追記 →
   research-positioning.md §3/§4 への還元まで行う。「サーベイする」「先行研究を調べる」
   「この主張の証拠を確かめる」「Epic の go/no-go を文献で判定する」時に実行する。
-allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Bash(date *), Bash(ls *), Bash(grep *)
+allowed-tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Task,
+  Bash(date *), Bash(ls *), Bash(grep *), Bash(git *), Bash(python3 *)
 ---
 
 # /literature-review
@@ -64,6 +65,41 @@ angle の例: 分野を変える（HCI / 教育心理 / SE） / 測定法を変�
 
 > **禁止**: NDJSON セッションログ・キーストローク内容を検索クエリや外部送信に含めない
 > (`data-privacy` Skill)。
+
+### ★ 回し方（⚠️ メインで抱え込まない）
+
+⚠️★★★ **angle ごとの探索をメインで直列に回さない。** ★ WebSearch の出力は長く、
+メインの文脈を食い潰すわりに、**必要なのは抽出結果だけ**である。
+
+- ★ **angle ごとに subagent へ分ける**（`model: sonnet`・`docs/loop-engineering.md:71` の
+  「survey（探索・影響調査） = Sonnet」に従う）。★ 独立なので **1 メッセージで並列**に投げる。
+- ⚠️ **渡し方の契約は `subagent-delegation` Skill**（★ 範囲・禁止事項・締切の 5 点を必ず書く）。
+- ★ 各 subagent には **`citation-ssot` と `literature-card` を先に Read させる**。
+  ★ 持ち帰らせるのは **逐語引用 ＋ 完全な書誌情報 ＋ 反証**（⚠️ 要約だけを受け取らない）。
+- ⚠️ **subagent の中でさらに subagent を起動させない**（★ 汎用 agent に投げるので
+  **必ず書く**側である —— `subagent-delegation` ルール 4 の相手別の表）。
+  ⚠️★★★ 2026-09-19 の実測（`.steering/20260919-ssot-sr-systematic-review/deviations.md:13` 逐語）:
+  「段 2 を全件に回したところ、**並列のサブエージェントが入れ子で 20 本以上に増え、
+  月の利用上限に 2 回当たって全停止した**」。★ **並列数と総本数はメインが決める。**
+- ⚠️★★★ **`references.md` への append は *メインが直列で* 行う。**
+  ★ 理由: 採番 (`[Pn]` / `[Vn]`) は append-only の共有資源で、
+  **並列に書くと採番が衝突する**（`citation-ssot`）。
+- ⚠️ **一次資料の読解を subagent に代行させない**（★ 断定の根拠にするものはメインが開く。
+  `verify-before-claiming` ルール 1 / 7）。
+
+### ⚠️ PDF の読み方（★ WebFetch では読めない）
+
+★ `WebFetch` は PDF を**読めない**が、**原本をローカルへ保存はする**。
+→ ★ そのパスを **`pypdf`** で開けば一次全文が取れる。
+⚠️ `Read` の PDF 経路は `pdftoppm` 不在のため**この環境では使えない**。
+
+```python
+from pypdf import PdfReader
+print("\n".join(p.extract_text() or "" for p in PdfReader(path).pages))
+```
+
+⚠️ 要旨・二次記述だけで採番したなら、`references.md` の備考に
+**「一次全文未取得」と明記する**（★ 黙って一次扱いにしない）。
 
 ---
 
@@ -168,10 +204,42 @@ ADR / preregistration に影響する場合は、該当 ADR の「根拠」節�
 - [ ] `docs/literature/_index.md` に 1 行追記された
 - [ ] `docs/research-positioning.md` への還元（または「還元不要」の判断）が明示された
 - [ ] gate 用途なら **go / no-go / de-risk 先行**のいずれかを明言した
+- [ ] ⚠️ `python3 scripts/check_citations.py` が **`=== 違反なし ===`** で終わった（★ 下記 2）
+- [ ] ⚠️ **このラウンドを単独でコミットした**（★ 下記 1）
+
+## ★ ラウンドを閉じる（⚠️ 次ラウンドを始める前に）
+
+> ★ 上の**完了条件の最後の 2 行の手順**である（⚠️ ここを読み飛ばすと完了条件が満たせない）。
+
+### 1. ⚠️★★★ **毎ラウンド、その場でコミットする**
+
+★ `references.md` / `_index.md` / `research-positioning.md` は**ラウンドをまたいで同じ行を触る**。
+⚠️ 2 ラウンドぶんが未コミットで同居すると、**`git add -p` で分離できなくなる**
+（★ 採番が連続しているので hunk が混ざる）。
+→ ★ **1 ラウンド = 1 コミット**。次の angle を投げる前に閉じる。
+
+### 2. ⚠️ `check_citations.py` は「違反なし」まで**繰り返す**
+
+```bash
+python3 scripts/check_citations.py
+```
+
+⚠️★★★ **1 回通っただけで「違反なし」と書かない。**
+★ 是正すると**新たな違反が現れうる**（★ 追記・番号の付け替えで、欠番や重複の判定が変わるため）。
+→ ★ **是正 → 再実行**を、**`=== 違反なし ===` が出るまで**繰り返す。
+
+> ⚠️ **機構の断定を書かない**（2026-09-20 に一度書いて誤りだった）。
+> ★ 実装（`scripts/check_citations.py:148-152`）は違反を `violations` に集約し、
+> **`=== VIOLATION N 件 ===` として全件出力する**（★ 早期 `break` / `return` は無い）。
+> → ★ 繰り返すのは **「打ち切られるから」ではなく「是正が新しい違反を生むから」**である。
 
 ## アンチパターン
 
 - ❌ RQ を分解せず 1 問のまま検索する（温度が平均化されて gate 判定を誤る）
+- ❌ **探索をメインで直列に回す**（文脈を食い潰す。angle ごとに subagent へ並列）
+- ❌ **`references.md` への append を subagent にさせる**（採番が衝突する）
+- ❌ **ラウンドを複数ためてからコミットする**（`git add -p` で分離できなくなる）
+- ❌ **`check_citations.py` を 1 回だけ回して「違反なし」と書く**
 - ❌ 反証 angle を省く / 有利な主張だけ甘く通す（対称性が壊れ、出力が gate に使えなくなる）
 - ❌ 「該当研究ゼロ」を「弱い支持」と書く
 - ❌ 否決した主張を記録せず捨てる（次ラウンドで同じ主張が無検証で再浮上する）
