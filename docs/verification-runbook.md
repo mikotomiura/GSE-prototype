@@ -120,6 +120,19 @@ cd <repo> && python3 scripts/check_workflow_invariants.py
 #          ★ `workflow_dispatch` を**ブランチ指定**で発火し `build-windows` を実機確認する
 #            (⚠️ tag を選ぶと Release ができる)。
 #   ⚠️ `actions/*` は**意図的にタグのまま**である (★ 理由は `.github/workflows/ci.yml` の注記)。
+
+# (i) ⚠️★★★ G1 の**新コホートの収集を始める前**だけ回すゲート (2026-09-20 追加)
+#   ★ 事前登録の逐語「⚠️ 1〜7 が終わるまで新コホートの収集を始めない」(`preregistration.md:69`)
+#     を機械が持つ。⚠️ **今は赤いのが正しい** (前提条件 3 / 5 / 7 が未達)。
+cd <repo> && bash scripts/check-g1-collection-readiness.sh
+#   ★ ゲート自身が空回りしていないかを測る (⚠️ 数分かかる。実物の repo は 1 バイトも変えない):
+cd <repo> && bash scripts/check-g1-collection-readiness.sh --selftest
+#   ⚠️★★★ **(a)〜(h) が全部緑でも、このゲートが緑になるまで収集を始めてはならない。**
+#     ★ 逆に、このゲートは**開発の門ではない** (★ 収集を始めるときだけ通す)。
+#   ⚠️ **ゲートが見ていないもの**: 配布したバイナリの実行時挙動 / 外部サービスの状態
+#     (配布済み同意フォーム・Drive の実物・CI の両 OS の run)。
+#     → ★ 後者は `experiments/.../collection-readiness-record.md` の**人手の記録票**が受ける。
+#       ⚠️ 検査 [8] が見ているのは「**人が確かめたと書いたこと**」だけである。
 ```
 
 
@@ -135,6 +148,9 @@ cd <repo> && python3 scripts/check_workflow_invariants.py
 - [ ] ★ **workflow / composite action を触った回のみ**:
       `python3 scripts/check_workflow_invariants.py` が exit 0
       (⚠️ **exit 2 = 走査 0 件**＝検査が動いていない。★ 緑として扱わない)
+- [ ] ⚠️★★★ **G1 の新コホートの収集を始める回のみ**:
+      `bash scripts/check-g1-collection-readiness.sh` が exit 0
+      (★ 開発の門ではない。⚠️ **今は赤いのが正しい** —— 前提条件 3 / 5 / 7 が未達)
 
 ---
 
