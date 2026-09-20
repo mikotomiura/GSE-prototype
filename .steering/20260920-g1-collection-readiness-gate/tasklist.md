@@ -30,7 +30,27 @@
 - [x] `bash run.sh`: **exit 0**（★ 既存の緑を壊していない）
 - [x] ゴールデン 6 本の再生: 全本 rc=0（★ ゲート全体で 5.4 秒に収まる）
 
-## レビュー
-- [ ] `code-reviewer`（opus）＋ `security-checker`（opus）を並列（★ 範囲と禁止事項を明記）
-- [ ] `/cross-review` 2 巡（パス限定）
-- [ ] `/finish-task`
+## レビュー（完了・詳細は `review-response.md`）
+- [x] `code-reviewer`（opus）＋ `security-checker`（opus）を**並列**（範囲・禁止事項・締切を明記）
+      → HIGH 4 / MEDIUM 9 / LOW 11。★ **全件を一次で裏付けてから**反映（コミット `e4147f7`）
+- [x] `/cross-review` **2 巡**（パス限定・`main..HEAD`）
+      → 1 巡目 5 件（`f2fb8d5`）/ 2 巡目 6 件（`367a546`）
+- [x] `/finish-task`
+
+## 最終検証（2026-09-20）
+- [x] ゲート本体: **exit 1** / 通過 14・未達 6（★ 今は赤いのが正しい）
+- [x] `--selftest`: **exit 0 / 33 ケース全通過**
+- [x] `cargo test --workspace`: **745 passed / 0 failed**（★ Rust は 1 行も触っていない）
+- [x] schema parity: OK（★ `schema_dto.rs` / `schema/current.json` は未変更）
+- [x] `check-shell-portability.sh`: exit 0 ／ `run.sh`: exit 0
+- [x] 改行コード LF ／ `/tmp` 残骸 0 件 ／ repo への副作用なし
+- [x] `.codex/budget.json` の記帳を 2 回ともコミット（`3649e57` / `b27d96f`）
+
+## ⚠️ 研究者へ返すもの（★ 本タスクでは触らない）
+1. **前提条件 3 は未達** — `consent.md` / `participant-guide.md` に `starve_window` /
+   `app_version` が無い。⚠️ **被験者向け文書は契約**なので、追記は研究者判断。
+2. **前提条件 5・3 の人手側** — 記録票 A / C（Drive 差し替え・配布済みフォーム突合）。
+3. **前提条件 7** — やめた人の数え方（★ 第 20 版以降に記録する）。
+4. **前提条件 4 の両 OS の対** — 記録票 B（CI の run 番号）。
+5. ★ **起票: ゲートを CI で回す導線**（Codex 2 巡目 #6）。⚠️ 門を増やす判断 ＋
+   hosted では parity が常に赤になるため、**self-hosted 前提の設計**が要る。
