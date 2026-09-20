@@ -11,7 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| ★★★ **G1 / O1 の残タスクの棚卸し**（新） | `next-session-g1-o1-inventory.md` | ★★★ **現行・次の主タスク**（2026-09-20 作成・未着手）。★ `/start-task` の grill で範囲を確定してから。★ 研究者への質問 Q1〜Q4（判断 4 の反映で起票）・G1 の前提条件 1〜7・ADR-034 Migration 3 / 6・律速 4・`run.sh` の cp932・main へのマージの計画 |
+| ★★★ **棚卸しの後（研究者判断 2 件 ＋ マージ → タグ ＋ 前提条件 1〜6）**（新） | `next-session-after-g1-o1-inventory.md` | ★★★ **現行・次の主タスク**（2026-09-20 作成）。★ 次の実施は **B = 前提条件 1〜6 の確かめ方を決める**（研究者を待たずに走れる）。⚠️ 研究者にしか決められない 2 件（G1-1 = 前提条件 7 の 9 マス ／ O1-1 = ADR-031 / 032 の承認）は別建て |
+| ~~**G1 / O1 の残タスクの棚卸し**~~ | `next-session-g1-o1-inventory.md` | ✅ **完了**（2026-09-20・`.steering/20260920-g1-o1-inventory/`）。★ 研究者判断 Q1〜Q4 を裁定（判断 1〜4）／一次確認で引き継ぎの 4 点を訂正（ADR-031/032 は Proposed・O1 事前登録は不在・schema drift は本ブランチ由来・衝突は 1 件）／cp932 の偽の赤 2 件・移植性ゲートの rc=2・隠れていた実違反 1 件・selftest の空回り 1 件を修正／ADR-034 D6 の検査（律速 4）を新設。レビュー 3 系統（code-reviewer / security-checker / Codex 2 巡）。→ 後続は下段 |
 | ~~**判断 4（研究者判断バッチ 6）の反映**~~ | `next-session-decision4-reflection.md` | ✅ **完了**（2026-09-20・`.steering/20260920-decision4-reflection/`）。ADR-034 を Accepted・事前登録 第 19 版（前提条件 7）・「誤受容」→「誤採用」・CORE-CS §5.0・Nudge の見直し候補 R-1。`/cross-review` 2 巡（Claude ∥ Codex） |
 | ~~**理論の SSOT 昇格（段 3）の後始末 —— 研究者の確認待ち**~~ | `next-session-theory-stage3-followups.md` | ✅ **研究者の確認 10 件は回答・反映済み**（2026-09-20・判断 4）。★ **§3（実装フェーズへ渡す論点）は現行**（ADR-030 補訂 1 の保留・EVAL-NCC §14・ADR-035 の UI と未決 3 つ） |
 | ~~**理論レビューの SSOT 昇格（段 3）**~~ | `next-session-theory-ssot-promotion.md` | ✅ **完了**（2026-09-19・`.steering/20260919-theory-ssot-promotion/`・単位 a〜i・SR・d-3 を 2 巡の cross-review（Claude 単独・Codex は予算で skip）を経てコミット。最終 `8560339`）。★ 体系的レビューの結論: C1〜C6 は既出・C7 は部分的に既出・差分は認めず見つからなかった要素 4 つは差分の候補（未検証）（RP §4） |
