@@ -141,6 +141,15 @@
 - **理由**: ★ **本コミットが作った穴ではない**（既存条件）。
   ⚠️ `check` job は release 経路も担うので、権限を絞ると**別の job が無言で壊れうる**。
   → ★ 影響範囲の確認（release / tag 経路）を伴う**独立したタスク**にする。
+- ⚠️★★★ **訂正（2026-09-21・同日）**: ★ **そもそも穴が無かった。**
+  `ci.yml:59` に **workflow 全体に効く `permissions: contents: read`** が在り、
+  ★ top-level の宣言は**全 job の既定**になるので `check` job にも効いている。
+  ⚠️ かつ `scripts/check_workflow_invariants.py` の不変条件 1 が逐語
+  「**Every job has an effective `permissions`** (top-level or job-level)」として**既に見張っている**
+  （★ 本タスクでも緑だった）。→ ★ **起票 24 は取り下げた**（`20260914-mhd-feature-offline-tiers/blockers.md`）。
+- ⚠️ **教訓**: ★ `security-checker` の LOW 指摘を**裏を取らずに起票した**のが誤りである。
+  ★ `verify-before-claiming` ルール 1 —— **subagent の報告は三次資料**であり、
+  ⚠️ **起票も「断定」である**（★ 1 回の `grep` で分かった）。
 
 ## ★ 判断 4 / 判断 5 への補訂（2026-09-21・レビュー後）
 

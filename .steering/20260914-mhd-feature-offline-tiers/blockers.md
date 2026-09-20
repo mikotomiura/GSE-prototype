@@ -893,3 +893,33 @@ worktree を撤去できない」）は**この是正で嘘になった**ので�
      （⚠️ 権限を絞ると別の job が**無言で壊れる**）。
   2. ★ 必要最小を `permissions:` で明示する。
   3. ⚠️ **`supply-chain.yml` 側も同じ目で見る**（★ workflow は 2 枚ある）。
+
+### ❌ 成立しない（2026-09-21・★ 同日中に一次で確かめて取り下げ）
+
+⚠️★★★ **本起票は誤りだった。** ★ `security-checker` の LOW 指摘を**裏を取らずに登録した**のが原因である。
+
+★ 一次（2026-09-21 実測）:
+
+```text
+$ grep -n "^permissions:" -A 2 .github/workflows/ci.yml
+59:permissions:
+60-  contents: read
+```
+
+→ ★★★ **`ci.yml` には *workflow 全体に効く* `permissions: contents: read` が在る**（`:59`）。
+★ GitHub Actions では **top-level の `permissions` が全 job の既定になる**ので、
+⚠️ **`check` job にも `contents: read` が効いている**。
+→ ★ 「リポジトリ既定の `GITHUB_TOKEN` 権限がそのまま渡る」という本起票の前提は**成立しない**。
+
+★ さらに **機械の番人が既に在った**: `scripts/check_workflow_invariants.py` の不変条件 1 逐語
+「**Every job has an effective `permissions`** (top-level or job-level)」。
+★ 同スクリプトのコメントも逐語「**With a top-level `permissions:` in place, a presence-only check
+can never fire again**」と、★ **まさにこの形を想定して書かれている**。
+⚠️ 本タスクでも実行して緑だった（逐語「OK: 2 workflow(s) / 7 job(s) satisfy all invariants」）。
+
+★ `frontend-check` / `release` が **job レベルでも書いている**のは
+**さらに絞る**ためであって、⚠️ 「他の job には無い」という意味ではない。
+
+- **解決**: ❌ **取り下げ**（★ 番号は再利用しない）。
+- ⚠️★★★ **教訓**: ★ `verify-before-claiming` ルール 1 —— **subagent の報告は三次資料**である。
+  ★ 起票する前に一次へ降りること（⚠️ 本件は `grep -n "^permissions:"` の**1 回**で分かった）。
