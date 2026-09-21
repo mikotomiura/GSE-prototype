@@ -31,6 +31,15 @@
 > - **本書内の `M0` / `M1` は 26 週 WBS のマイルストーン** (`docs/wbs-verification-halfyear.md` §2) であって、
 >   モデル成熟の段ではない。ADR-021 は両者の記号衝突を避けるため、モデル成熟側から `M` 記号を外した。
 
+> **別の事前宣言文書がある (2026-09-21・追記 / 合否基準は不変)**: **P1**（自然作業の episode 化・★ G1 の後）の
+> **episode 定義パラメータ**は `docs/preregistration-p1-episode.md` が凍結する
+> (`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 / `T1a` の窓)。
+> - ⚠️ **対象フェーズも判定量も本書とは別である** —— 本書は**較正スモーク** (n=3〜5) の**合否契約**
+>   (PreReg-1〜8 / GATE1–3)、向こうは **P1 の解析パラメータ**であって**合否を判定しない**。
+> - この追記は **PreReg-1〜8 の合否基準を一切変更しない** (forking paths 排除)。足すのは参照だけである。
+> - 根拠: 研究者判断 25 #13 (`.steering/20260914-mhd-feature-offline-tiers/decisions.md`) ／
+>   裁定の記録は `.steering/20260921-p1-prereg-cli-poles/decisions.md` 判断 1〜2。
+
 ---
 
 ## 0. このスモークで主張すること / しないこと
