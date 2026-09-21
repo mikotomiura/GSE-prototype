@@ -2,9 +2,9 @@
 
 > ⚠️★★★ **2026-09-19 に `.idea/` から移した（段 3 判断 1 #4）。** 元のファイルは `.idea/20260915-generative-relinquishment-theory.md`（2026-09-15）。移した理由は、改訂を版管理し `/cross-review` を通すためである。作業記録は `.steering/20260919-ssot-h-theory-docs/`。
 > - ★ **位置づけ**: **theory candidate**（証拠階梯 `EH0` = 概念監査まで）。⚠️ **SSOT の主張ではない**。`docs/research-positioning.md` §1 は理論を**問い**として参照するだけで、確証核は L0 のまま、headline も変えない（理論レビュー 判断 1 #1 = J-1）。
-> - ⚠️ 理論名「生成的返権論」は**作業名**である（生成芸術論側のサーヴェイ S3 の後に確定・段 3 判断 1 #3）。語「返権」は確定（`docs/glossary.md`）。
+> - ★★★ **理論名「生成的返権論 / Generative Relinquishment Theory」は 2026-09-21 に *確定* した**（`J-2`・研究者判断・S3 の後）。⚠️ **作業名ではなくなった。** ★ ただし **§11.4 の層の使い分けは規約**であり、⚠️ **名前には 2 つの注記が必ず伴う**（**返すのは `control` ではない** ／ **英語名は仏教の英訳語 [P417] と衝突する**）。語「返権」は 2026-09-19 に確定済み（`docs/glossary.md`・段 3 判断 1 #3）。
 > - ★ **本文へ反映したのは、研究者が裁定した事項と、昇格時に一括で直す機械的な規則だけ**である（→ 下の「2026-09-19 の改訂」）。
-> - ⚠️★★★ **批判的レビューの判定（保持・統合・縮小・棄却・要サーヴェイ）は提案であり、研究者の採否は未了である。本文には当てていない。** 読むときは併読すること: `.steering/20260918-theory-critical-review/review-B.md`・`ssot-collision-findings.md`・`citations-audit.md`（★ 著者・年で引いた文献の多くは `docs/references.md` に未登録）。
+> - ⚠️★★★ **批判的レビューの判定（保持・統合・縮小・棄却・要サーヴェイ）のうち、*まだ裁定されていないもの* は提案であり、本文には当てていない。** ★★★ **ただし 2026-09-21 に、サーヴェイ S3 / S4 の一次から出た訂正 6 件は `J-2` の裁定とあわせて本文へ当てた**（★ §2 / §6 衝突表 4 行 / §11.4 / §16 ／ 実践肖像の 5 要件 —— `.steering/20260918-theory-critical-review/decisions.md` 判断 5-3）。→ ⚠️ **「未了」と「反映済み」の境目は `decisions.md` 判断 5-3 の表で確かめること。** 読むときは併読すること: `.steering/20260918-theory-critical-review/review-B.md`・`ssot-collision-findings.md`・`citations-audit.md`（★ 著者・年で引いた文献の多くは `docs/references.md` に未登録）。
 >
 > **2026-09-19 の改訂（★ 本文に当てたもの）** ／ ★ 加えて、体系的レビュー（段 3 単位 SR）の結論を指す注記を差分の候補の箇所に足した（単位 d-3 —— 裁定でも機械的な規則でもなく、SSOT 側の結論を指すだけ）
 > - 「非支配的協調」→ **「関係的自律を支える協調」**（段 3 判断 1 #1・S2）
@@ -15,6 +15,12 @@
 >
 > **2026-09-20 の改訂（★ 本文に当てたもの）**
 > - 「誤受容」→ **「誤採用」**（本文 6 か所・`.steering/20260919-theory-ssot-promotion/decisions.md` 判断 4 #7）。★ AI の誤った提案を採ることを指す語であり、SSOT の「受容」（ADR-018 D5・招待の提示の後に離席が起きたか）・「受容性」（Receptivity）とは**別の構成概念**である。⚠️ 応答分岐の「受容、保留、拒否…」（本文の J-13 の注記で「明示の受諾」と呼び分けたもの）は本改訂の対象ではない
+
+> **2026-09-21 の改訂（★ 本文に当てたもの・研究者判断で採否が下りた）** —— ★ サーヴェイ **S3 / S4** の一次からの訂正 7 件（`.steering/20260918-theory-critical-review/survey-S3-raw.md` §5 ／ `survey-S4-raw.md` §5）
+> - **§2**: Galanter が委譲するのは `control` であることを一次で接地 [P409]。⚠️ McCormack et al. [P416] は**メイン未照合**なので保留と明記
+> - **§6 衝突表 4 行**: 「Eco / open work」（★ 意味の所有は作者に残る [P410]）／「Ambient / calm media」（⚠️ slow technology は**時間を要求する** [P104]）／「Data portrait / self-tracking」（★ 経路依存を追加・⚠️ 系譜は**正確性**を志向 [P418]–[P423]）／「Autographic visualization」（⚠️★★★ **差分を 3 点へ縮小** [P424]）
+> - **§11.4**: `J-2` の裁定を反映し、層の使い分けを**規約**へ上げた
+> - ⚠️ **ADR-025 の根拠（起票 S4-4）は当てていない** —— ★ ADR 本文は書き換えない規約なので、**次の改訂時**に回す
 
 ## Generative Relinquishment Theory の理論構築メモ
 
@@ -113,6 +119,10 @@ Philip Galanter の生成芸術論では、芸術家が規則や自律的シス�
 > システムは、何を主体へ返すのか。生成を続けられるにもかかわらず、どこで知ること、評価すること、導くことを終えるのか。
 
 この違いは、単なる「停止ボタン」の追加ではない。古典的な生成芸術における作者からシステムへの**形式的制御の委譲**に対し、生成的返権論が扱うのは、システムから主体への**意味的・規範的権限の返還**である。ただし、この「反転」は Galanter が意味権限の問題を欠落させたという史的主張ではなく、本稿が導入する分析上の比喩である。
+
+> ★ **2026-09-21 追記（S3・一次に接地した）**: この自己限定は **Galanter (2003) の一次全文の範囲で正確**である —— ★ 定義の直後の逐語は *"The key element in generative art is then the system to which the artist **cedes** partial or total subsequent control."* [P409] であり、**委譲されるのは `control`** である。★ 全文実測でも `semantic` **0 件** / `finish` **0 件**（＝「系がいつ終えるか」という論点が本文に無い）。
+> ⚠️★★★ **ただし Galanter だけを名指しするのは網が狭い。** ★ McCormack et al. (2014) は *"Generative art **redistributes** traditional notions of authorship and intention"* と踏み込んでいるとされる [P416]。⚠️ **この逐語はサブエージェント報告でメイン未照合**（★ 3 経路で取得に失敗した）なので、**一次を取ってから本文に織り込む**。
+> ⚠️ **Galanter (2016) と Boden & Edmonds (2009) も未読**であり、「Galanter は意味権限を扱っていない」を**著作全体について**言わない。
 
 短く言えば、Galanter が「何が形式を生成するか」を問うなら、GSE から導く理論は「システムはどこで知ることと導くことを止めるか」を問う。
 
@@ -239,13 +249,13 @@ GSE は生成的返権論そのものではなく、その候補例である。�
 |---|---|---|---|
 | Galanter / Boden & Edmonds の生成芸術 | 規則、自律系、作者からシステムへの制御委譲 | 「システムに生成を任せる」 | 委譲後に意味権限を主体へ返す終端構造 |
 | LeWitt / rule-based art | 規則や概念が作品を実行する | 「規則が作品を作る」 | 規則が自らの適用限界も生成すること |
-| Eco / open work | 作品の意味が受け手に開かれる | 「解釈を観客に委ねる」 | センサーと推論を持つ系が認定権を明示的に止めること |
+| Eco / open work | 作品の意味が受け手に開かれる | 「解釈を観客に委ねる」 | センサーと推論を持つ系が認定権を明示的に止めること（★ **S3 で一次に接地した** —— ⚠️ Eco が開くのは**実現の経路**であって、**意味の枠組みと所有は最後まで作者に残る**: 逐語 *"always remains the world intended by the author"* / *"once completed the work in question will still be his own"* [P410]。→ ⚠️★★★ **Eco を「意味権限を手放した先行」として引いてはならない**） |
 | Participatory / relational / interactive art | 観客の行為が作品を成立させる | 「観客に能動性がある」 | 行為を参加実績や正解として回収しないこと |
-| Data portrait / self-tracking | 個人データを肖像や省察へ変換する | 「行動データを抽象表現にする」 | 肖像が人格を代表せず、意味推論の終端を含むこと |
-| Autographic visualization | 物質的痕跡や生成過程を可視化する | 「痕跡そのものを表現にする」 | 痕跡から身体を認定しない境界を設けること |
+| Data portrait / self-tracking | 個人データを肖像や省察へ変換する | 「行動データを抽象表現にする」 | 肖像が人格を代表せず、意味推論の終端を含むこと。★ **2026-09-21 追記（S4・一次）**: 差分に **経路依存（非代替性）** を加える —— ⚠️ 系譜は**経路依存を主張していない** [P418]。⚠️★★★ **かつ「推定を開いたままにする」系譜ではない** —— より正確な推定を将来目標に掲げ（*"more accurately determine the significance of a relationship"* [P420]）、満足が**確認**と結びつく（*"The more Themail confirmed their expectations … the more they enjoyed using the tool"* [P419]）。★ personal / lived informatics 側は**終端の規範を持たず長期蓄積が前提**（*"they are iterative"* / *"Long-term reflection is valuable"* [P421]、*"ego-centric"* [P423]）→ ⚠️ 差分は「**空白**」ではなく「**向きが逆**」と書く |
+| Autographic visualization | 物質的痕跡や生成過程を可視化する | 「痕跡そのものを表現にする」 | ⚠️★★★ **2026-09-21 縮小（S4・メインが原典を全文照合）**: 旧記述「痕跡から身体を認定しない境界を設けること」は**弱い** —— ★ [P424] は **`indexicality` を中心概念に置き**、**解釈の非閉鎖まで既に述べ**（*"autographic visualizations are **not stable artifacts** whose correct interpretation is just a matter of visual literacy"*・Barad の intra-action）、⚠️ **「computer keyboard の摩耗」を直接の例に挙げている**（*"the uneven traces of wear on a staircase or a computer keyboard"*）。→ ★ **残る差分は「非代替性の明示要件化 × 肖像（人格表象）の文脈 × セッション局所」の 3 点に縮小する**（★ 全文実測で `portrait` **0 件** / `trajectory` **0 件**、かつ keyboard の例は **`accidental`（偶発的）**の側）。⚠️ **それも「今回の範囲で見つからなかった」まで**（★ *Autographic Design*（MIT Press, 2023）は**未読**） |
 | Physiological / bioadaptive computing | センシング、分析、適応、フィードバックのループ。解釈責任を利用者側に残す構成も含む | 「状態に応じて表現が変わる」「意味を開いておく」 | 特定の推論処理を時間境界で停止し、その停止を作品上も知覚可能にすること |
 | Reflective design / ambiguity | 技術を最終権威にせず、多義性を省察資源にする | 「曖昧に表示する」「判断をユーザーへ委ねる」 | 推論可能でも認定を停止する監査可能な終端 |
-| Ambient / calm media | 周辺的・非要求的な情報提示 | 「静かな抽象表示」 | 静けさではなく権限の停止が中心であること |
+| Ambient / calm media | 周辺的・非要求的な情報提示 | 「静かな抽象表示」 | 静けさではなく権限の停止が中心であること。⚠️★★★ **2026-09-21 訂正（S3・一次全文）**: この要約は **slow technology には当たらない** —— ★ slow technology は静けさですらなく **時間を要求する**設計である（逐語 *"It is technology that **claims time**."* / *"Slow technology is **not** about making technology invisible, but about **exposing** technology…"* [P104]。★ 全文実測で `terminat` / `withdraw` / `authority` はいずれも 0 件）。→ ★ `SUB-SWM`（媒体が自らの媒介・注意要求・意味認定を終える）は、この系譜と**逆向き**に位置する |
 | Non-use / abandonment | 不使用、離脱、放棄も設計対象になる | 「使わない自由」「終了できること」 | 使用中の生成系が自ら意味権限を返すこと |
 | Data refusal | データ化される側が収集・統治へ抵抗する | 「データを取らないこと」 | 収集側の系が作品構造として自己制限すること。ただし refusal の政治性を代替しない |
 | Cage / Lozano などの沈黙・撤退 | 不在、沈黙、撤退が作品になりうる | 「停止や不在を作品にする」 | 観測・推論可能な計算系の権限停止として定式化すること |
@@ -525,12 +535,24 @@ AI Fatigue Scale の傾向得点と、短時間の content-free な行動痕跡�
 
 現段階は theory ではなく theory candidate である。必要条件、十分条件、反例、隣接領域との差、経験的予測が反復的に支持されて初めて、理論という呼称が妥当になる。
 
-推奨する使い分けは次の通り。
+⚠️★★★ **2026-09-21 裁定（`J-2`・研究者判断）: 理論名「生成的返権論 / Generative Relinquishment Theory」は *残す*。** ★ あわせて、下の使い分けは**推奨ではなく規約**とする（★ 根拠は `docs/literature/20260921-generative-art-process-ending-and-withdrawal.md` カード 6 / 7）。
 
-- 思想的な傘: **生成的返権論**
-- 論文の狭い構成概念: **Epistemic Relinquishment**
-- 実装・監査語彙: **Semantic Stop Boundary**
-- GSE の作品形式: **Practice-Generated Portrait / Immanent Aperture**
+**規約（★ 層を混ぜない）**
+
+| 層 | 用いる名 |
+|---|---|
+| 思想的な傘 | **生成的返権論 / Generative Relinquishment Theory** |
+| 論文の狭い構成概念 | **Epistemic Relinquishment** |
+| 実装・監査語彙 | **Semantic Stop Boundary** |
+| GSE の作品形式 | **Practice-Generated Portrait / Immanent Aperture** |
+
+⚠️★★★ **名前に必ず伴わせる注記（2 つ）**:
+
+1. **返すのは `control` ではない。** ★ 生成芸術の正典が委譲するのは **`control`** であり（*"the system to which the artist **cedes** … control"* [P409]）、⚠️ **GSE が返すのは認識的権限（意味の認定・評価・報酬化）である**。→ ★ 「返権」を *Galanter が譲った制御を返すこと* と読ませない。
+2. **英語名は仏教の英訳語と衝突する。** ★ `relinquishment` は上座部仏教の第三聖諦の英訳で用いられる確立した語である（⚠️ 確認は **Thanissaro Bhikkhu 訳の 2 ページのみ**で、**別訳は未照合** —— ★ 「定訳」とは書かない。*"the remainderless fading & cessation, renunciation, **relinquishment**, release, & letting go of that very craving"* [P417]）。⚠️ GSE は省察系（slow technology [P104] ほか）と隣接するため、**無害な連想ではない**。→ ★ 英語で傘の名を出すときは、**狭い構成概念（Epistemic Relinquishment）を併記する**。
+
+> ★ **語「返権」そのものは 2026-09-19 に確定済み**（`docs/glossary.md`・段 3 判断 1 #3）。⚠️ `J-2` が問うていたのは**理論名だけ**であった。
+> ⚠️ **判断材料にしなかったもの**: 「`relinquish control` は生成芸術の常套句」（★ **1-2 で否決** —— 根拠が二次のみ）／ 養子縁組法の「親権放棄」・`epistemic relinquishment` が術語でないこと（★ **判定不能** —— 一次未到達）。
 
 ---
 
@@ -691,7 +713,7 @@ AI を日常的に使う対象集団では、完全な 15 項目 AI Fatigue Scal
 
 ## 16. 次の判断ゲート
 
-1. **名称ゲート**: 「生成的返権論」を傘概念として維持し、論文上は `Epistemic Relinquishment` に絞るか。
+1. ~~**名称ゲート**: 「生成的返権論」を傘概念として維持し、論文上は `Epistemic Relinquishment` に絞るか。~~ → ★★★ **2026-09-21 に `J-2` で通過した**（★ 傘の名は**維持**し、層の使い分けを **§11.4 の規約**へ上げた。⚠️ 「論文上は絞る」ではなく「**層で使い分ける**」が裁定である）。★ 一次: `.steering/20260918-theory-critical-review/decisions.md` 判断 5-2。→ ⚠️ **以下の残ゲートは 6 件**である。
 2. **差分ゲート**: 体系的レビュー後も「経路依存的生成 × 意味停止 × 非回収的終端 × 監査可能性」の結合が残るか。
 > ⚠️ **2026-09-19 体系的レビューの後**（RP §4）: 体系的レビューは候補ごとに検索し、**結合（組み合わせ）は検索していない**。★ 構成要素のうち「返還後の行為を報酬・最適化へ回収しない」については、[P404] が利用者のフィードバック（信号）の最適化を退けている。⚠️ 返還後の**行為**そのものを扱ったかは確かめていない。
 3. **実装ゲート**: Semantic Stop Boundary を既存の責務分離を壊さず実装可能か。
