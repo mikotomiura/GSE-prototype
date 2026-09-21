@@ -443,10 +443,16 @@ run_issue() {
   #     「解決した base は何で、既定からどれだけ離れているか」を**丸ごと消していた**
   #     (＝ **無人モードC では誰も読まない** ＝ 起票 23 の 2 つ目の論点)。
   #   → ★ run ログへ流す。⚠️ stdout 側の契約 (最終行 = worktree の絶対パス) は変えない。
-  local spawn_err
+  local spawn_err _l
   spawn_err="$(mktemp)" || { emit "$id" execute blocked detail="mktemp に失敗 (worktree 生成前)"; return 1; }
   wt="$(LOOP_NO_EXEC=1 bash "$MAIN_ROOT/scripts/loop-spawn.sh" --no-exec --task "$TASK_DIR" "$id" 2>"$spawn_err" | tail -1)"
-  while IFS= read -r _l; do [ -n "$_l" ] && log "$_l"; done < "$spawn_err"
+  # ⚠️ `[ -n "$_l" ] && log "$_l"` と書かない —— ★ 最終行が空なら
+  #   ループ本体の戻り値が非 0 になる。⚠️ 今は `set -e` を使っていないので無害だが、
+  #   ★ 将来 `set -e` を足すと **空行 1 本で run_issue が落ちる** (`code-reviewer` LOW・2026-09-21)。
+  while IFS= read -r _l; do
+    [ -n "$_l" ] || continue
+    log "$_l"
+  done < "$spawn_err"
   rm -f "$spawn_err"
   [ -d "${wt:-}" ] || { emit "$id" execute blocked detail="worktree 生成に失敗"; return 1; }
 

@@ -22,7 +22,13 @@
 #   7. ★★★ **base の解決** (★ 起票 23・2026-09-21 追加) —— config を task で選ぶ /
 #      ⚠️ 特定できなければ **1 件でも止まる** / ⚠️ 読めない値で **黙って main へ落ちない** /
 #      ★ provenance と乖離を stderr へ出す / ★ stdout の最終行の契約を壊さない
-#   8. ⚠️★★★ 変異テスト (★ **群 7 が** 空振りしていないこと) —— fail-closed と抽出器を潰す
+#   8. ⚠️★★★ 変異テスト (★ **群 7 が** 空振りしていないこと)
+#      8a fail-closed を潰す / 8b 抽出器の**深さ 1 だけ**規則を潰す / 8c `valid_refname` を潰す
+#
+# ⚠️★★★ **7k には変異対照が無い** (★ 2026-09-21 の書き直し後) ——
+#   ★ 抽出器を文字ステートマシンへ書き直した結果、**行の位置に依存しなくなった**ので、
+#   「1 行同居を取り逸す」形を sed で作れない。★ 7k は **行ベースへ戻したときに
+#   捕まえるための構造的な回帰テスト**として残してある（⚠️ 「対照がある」とは書かない）。
 #
 # Usage: bash scripts/loop-spawn-cleanup-test.sh
 # Exit:  0 = 全件合格 / 1 = 不合格あり / 2 = ⚠️ 検査できなかった
@@ -576,19 +582,32 @@ else
 
   # --- 7s / 7t: provenance と乖離 (stderr) / stdout 契約 ---
   SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec --task 20260101-zzz-task 7s t
+  # ⚠️★★★ **「コミット後ろ」だけで見ない** (★ `code-reviewer` MEDIUM・2026-09-21) ——
+  #   ★ その語は「0 コミット後ろ」にも一致するので、**警告経路を検査できない**。
+  #   ⚠️ fake repo の構成を少し変えると乖離が 0 になり、★★★ **起票 23 の 2 つ目の視点が
+  #   黙って無検査になる**。→ ★ 警告の印まで固定し、乖離 0 の陰性対照を置く。
   if [ "${SRC}" -eq 0 ] \
      && has_text "${SERR}" "provenance" \
+     && has_text "${SERR}" "⚠️★★★ 乖離" \
      && has_text "${SERR}" "コミット後ろ" \
      && has_text "${SERR}" "20260101-zzz-task"; then
-    ok "7s: 解決した base の provenance と既定からの乖離を stderr に出した"
+    ok "7s: provenance と ★★★付きの乖離警告を stderr に出した"
   else
-    ng "7s: rc=${SRC} / provenance/乖離 が stderr に出ていない"
+    ng "7s: rc=${SRC} / provenance または ★★★付きの乖離警告が stderr に出ていない"
   fi
-  s_last="$(printf '%s\n' "${SOUT}" | tail -1)"
-  if [ -n "${s_last}" ] && [ -d "${s_last}" ]; then
+  s_last_7s="$(printf '%s\n' "${SOUT}" | tail -1)"
+  # ★ 陰性対照: 乖離が無いときは ★★★警告を出さない
+  #   (⚠️ 常に出ていたら上の 7s は何も見ていない)
+  SPAWN_ENV="LOOP_BASE_BRANCH=main"; do_spawn_x "${R7}" --no-exec 7s2 t
+  if [ "${SRC}" -eq 0 ] && ! has_text "${SERR}" "⚠️★★★ 乖離"; then
+    ok "7s の陰性対照: 乖離が無いときは ★★★警告を出さない"
+  else
+    ng "7s の陰性対照: rc=${SRC} —— ⚠️ 乖離が無いのに警告が出た (★ 上の 7s が何も見ていない)"
+  fi
+  if [ -n "${s_last_7s}" ] && [ -d "${s_last_7s}" ]; then
     ok "7t: ★ stdout の最終行が worktree の絶対パスのまま (--no-exec の契約)"
   else
-    ng "7t: ⚠️★★★ stdout 契約が壊れた (最終行=[${s_last}]) —— loop-run.sh が worktree を掴めない"
+    ng "7t: ⚠️★★★ stdout 契約が壊れた (最終行=[${s_last_7s}]) —— loop-run.sh が worktree を掴めない"
   fi
 fi
 
@@ -656,40 +675,130 @@ else
   fi
 fi
 
-# --- 7n..7r: ⚠️ 読めない / 不正な値 / 存在しない枝 → 止まる (★ 黙って main へ落ちない) ---
-echo "7n-7r. ⚠️★★★ 読めない値・不正な値・存在しない枝で **黙って main へ落ちない**か"
+# --- 7n..7ab: ⚠️ 読めない / 不正な値 / 危険な参照 → 止まる (★ 黙って main へ落ちない) ---
+# ⚠️★★★ **期待する stderr の語まで見る。**
+#   ★ `code-reviewer` MEDIUM・2026-09-21: 旧 7p / 7q は「非 0 なら緑」だったので、
+#     `valid_refname` を外しても **後段の `git fetch` / `worktree add` が落ちて緑のまま通った**
+#     (＝ 依頼文が警告した「偶然一致で緑」型)。→ ★ **どの関門で止まったか**を語で固定する。
+echo "7n-7ab. ⚠️★★★ 読めない値・不正な値・危険な参照で **黙って main へ落ちない**か"
 i=0
 for spec in \
-  '7n|123|数値' \
-  '7o|DUPKEY|base_branch が 2 回' \
-  '7p|"-foo"|先頭が - (オプション混入)' \
-  '7q|"a b"|空白入り' \
-  '7r|"no-such-branch"|存在しないブランチ'
+  '7n|VAL:123|数値|値を読めません' \
+  '7o|RAW_NESTED_BOTH|深さ 1 と入れ子の両方|深さ 1 (トップレベル) 以外' \
+  '7p|VAL:"-foo"|先頭が - (オプション混入)|ブランチ名として妥当ではありません' \
+  '7q|VAL:"a b"|空白入り|ブランチ名として妥当ではありません' \
+  '7r|VAL:"no-such-branch"|存在しないブランチ|' \
+  '7u|RAW_NESTED_ONLY|⚠️★★★ 入れ子のみ (両系統 HIGH)|深さ 1 (トップレベル) 以外' \
+  '7v|RAW_BROKEN|壊れた JSON (書き込み途中)|JSON が壊れています' \
+  '7w|VAL:""|空文字列 (= 打ち間違い)|空文字列です' \
+  '7x|RAW_DUP_TOP|深さ 1 に 2 回|2 回出てきます' \
+  '7z|VAL:"FETCH_HEAD"|予約名 FETCH_HEAD|ブランチ名として妥当ではありません' \
+  '7aa|VAL:"0123456789012345678901234567890123456789"|40 桁 hex (= commit sha)|ブランチ名として妥当ではありません' \
+  '7ab|VAL:"refs/heads/main"|refs/ 始まり|ブランチ名として妥当ではありません'
 do
   i=$((i + 1))
-  cid="${spec%%|*}"; rest="${spec#*|}"; val="${rest%%|*}"; label="${rest#*|}"
+  cid="${spec%%|*}"; rest="${spec#*|}"; val="${rest%%|*}"
+  rest="${rest#*|}"; label="${rest%%|*}"; want="${rest#*|}"
   RX="${TMP}/rx${i}/repo"; mkdir -p "${RX}"
   if ! setup_fake_repo "${RX}"; then
     ng "${cid}: 準備できなかった (★ 判定できない)"
     continue
   fi
-  if [ "${val}" = "DUPKEY" ]; then
-    add_cfg_raw "${RX}" 20260101-bad '{
+  case "${val}" in
+    RAW_NESTED_BOTH)
+      add_cfg_raw "${RX}" 20260101-bad '{
   "task": "bad",
   "base_branch": "main",
   "headless": { "base_branch": "other" }
-}'
-  else
-    add_cfg "${RX}" 20260101-bad "${val}"
-  fi
+}' ;;
+    RAW_NESTED_ONLY)
+      # ⚠️★★★ 両系統が HIGH で挙げた形 —— ★ template に `headless` が実在するので、
+      #   base_branch をその中に書き間違えるだけで踏める。
+      add_cfg_raw "${RX}" 20260101-bad '{
+  "task": "bad",
+  "headless": { "base_branch": "sneaky" }
+}' ;;
+    RAW_BROKEN)  mkdir -p "${RX}/.steering/20260101-bad"
+                 printf '%s' '{"task": "bad", "base_bra' > "${RX}/.steering/20260101-bad/_loop-config.json" ;;
+    RAW_DUP_TOP) add_cfg_raw "${RX}" 20260101-bad '{
+  "task": "bad",
+  "base_branch": "main",
+  "base_branch": "other"
+}' ;;
+    VAL:*)       add_cfg "${RX}" 20260101-bad "${val#VAL:}" ;;
+  esac
   commit_cfgs "${RX}"
   SPAWN_ENV=""; do_spawn_x "${RX}" --no-exec --task 20260101-bad "${cid}" t
-  if [ "${SRC}" -ne 0 ] && ! wt_has "${RX}" "repo-${cid}-t"; then
-    ok "${cid}: ${label} → 非 0 で止まり worktree を作らなかった"
-  else
+  if [ "${SRC}" -eq 0 ] || wt_has "${RX}" "repo-${cid}-t"; then
     ng "${cid}: ${label} → rc=${SRC} / worktree 残=$(wt_has "${RX}" "repo-${cid}-t" && echo yes || echo no) (⚠️ 黙って進んだ)"
+  elif [ -n "${want}" ] && ! has_text "${SERR}" "${want}"; then
+    # ⚠️ 非 0 ではあるが **別の理由**で落ちている (★ 意図した関門を通っていない)
+    ng "${cid}: ${label} → 非 0 だが期待した語が出ていない (欲しい語=[${want}])"
+  else
+    ok "${cid}: ${label} → 非 0 で止まり worktree を作らなかった${want:+ (★ 関門を語で確認)}"
   fi
 done
+
+# --- 7y: ⚠️ config でない既存ファイルを --task に渡す (★ security-checker MEDIUM) ---
+R7Y="${TMP}/r7y/repo"; mkdir -p "${R7Y}"
+if ! setup_fake_repo "${R7Y}"; then
+  ng "7y: 準備できなかった (★ 判定できない)"
+else
+  add_cfg "${R7Y}" 20260101-ok 'null'
+  printf 'not a config\n' > "${R7Y}/.steering/20260101-ok/requirement.md"
+  commit_cfgs "${R7Y}"
+  SPAWN_ENV=""; do_spawn_x "${R7Y}" --no-exec --task .steering/20260101-ok/requirement.md 7y t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "_loop-config.json を指定してください" \
+     && ! wt_has "${R7Y}" "repo-7y-t"; then
+    ok "7y: config でないファイルを --task に渡すと止まる (⚠️ キー 0 件で黙って main へ落ちない)"
+  else
+    ng "7y: rc=${SRC} —— ⚠️ 任意のファイルを config として受けている"
+  fi
+fi
+
+# --- 7ac: ⚠️★★★ config の制御バイトが provenance を汚さない (★ security-checker MEDIUM) ---
+# ⚠️ 生で出すと `\x1b[8m` (conceal) や `\r` で **この後に続く乖離の警告行を隠せる**。
+R7AC="${TMP}/r7ac/repo"; mkdir -p "${R7AC}"
+if ! setup_fake_repo "${R7AC}" || ! make_branch "${R7AC}" pinned-a; then
+  ng "7ac: 準備できなかった (★ 判定できない)"
+else
+  mkdir -p "${R7AC}/.steering/20260101-esc"
+  printf '{\n  "task": "t\033[8m EVIL",\n  "base_branch": "pinned-a"\n}\n' \
+    > "${R7AC}/.steering/20260101-esc/_loop-config.json"
+  commit_cfgs "${R7AC}"
+  SPAWN_ENV=""; do_spawn_x "${R7AC}" --no-exec --task 20260101-esc 7ac t
+  esc_left="$(printf '%s' "${SERR}" | LC_ALL=C tr -dc '\033' | wc -c)"
+  esc_left="${esc_left//[[:space:]]/}"
+  if [ "${SRC}" -eq 0 ] && [ "${esc_left:-1}" -eq 0 ] && has_text "${SERR}" "EVIL"; then
+    ok "7ac: ★★★ config の ESC バイトを落として出した (⚠️ 乖離の警告行を隠せない)"
+  else
+    ng "7ac: rc=${SRC} / 残った ESC=${esc_left} —— ⚠️★★★ 端末エスケープで警告を隠せる"
+  fi
+fi
+
+# --- 7x2: ⚠️ 素名の日付接頭辞が「数字 8 桁」に限られているか (★ code-reviewer MEDIUM) ---
+# ⚠️ 旧実装の `${bn#????????-}` は **任意の 8 文字**を剥がしたので、
+#   `fix-loop-spawn` が `--task spawn` に当たった (★ 誤った base に pin)。
+R7X="${TMP}/r7x/repo"; mkdir -p "${R7X}"
+if ! setup_fake_repo "${R7X}"; then
+  ng "7x2: 準備できなかった (★ 判定できない)"
+else
+  add_cfg "${R7X}" fix-loop-spawn 'null'
+  commit_cfgs "${R7X}"
+  SPAWN_ENV=""; do_spawn_x "${R7X}" --no-exec --task spawn 7x2 t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${R7X}" "repo-7x2-t"; then
+    ok "7x2: 日付でない 8 文字＋- を素名として剥がさない (⚠️ fix-loop-spawn が spawn に当たらない)"
+  else
+    ng "7x2: rc=${SRC} —— ⚠️ 任意の 8 文字を日付として剥がしている"
+  fi
+  # ★ 陽性対照: 同じ dir 名は basename でちゃんと引ける
+  SPAWN_ENV=""; do_spawn_x "${R7X}" --no-exec --task fix-loop-spawn 7x3 t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7X}" "${TMP}/r7x/wt" 7x3 t main; then
+    ok "7x2 の陽性対照: basename 完全一致なら日付が無くても引ける"
+  else
+    ng "7x2 の陽性対照: rc=${SRC} —— ⚠️ 日付の無い task dir を引けなくなった"
+  fi
+fi
 
 # ── 8. 変異テスト (★ 群 7 が空振りしていないこと) ────────
 echo "8. ⚠️★★★ 変異テスト —— fail-closed / 抽出器を潰したら赤くなるか"
@@ -729,35 +838,66 @@ else
   fi
 fi
 
-# --- 8b: 抽出器を行頭アンカーへ退行させる ---
-# ⚠️★★★ **これが最も重要である** —— ★ 7k だけでは「fake repo の既定が偶然 main」で
-#   緑のまま通る恐れがある。★ 8b が赤くならなければ 7k は何も見ていない。
+# --- 8b: 抽出器の「深さ 1 だけ」規則を殺す ---
+# ⚠️★★★ **両系統 (code-reviewer / security-checker) が HIGH で挙げた穴の対照である。**
+#   ★ 殺すと入れ子の同名キーを深さ 1 として数えるので、
+#   `{"headless":{"base_branch":"sneaky"}}` が **正当な pin として採られる**。
+#   ⚠️ template には `headless` が実在するので、書き間違えるだけで踏める形である。
 MUT8B="${TMP}/mut8b-loop-spawn.sh"
-sed 's/anchor = ""/anchor = "^"/' "${SPAWN_SH}" > "${MUT8B}"
-# ⚠️ 変異後の形を数えない —— ★ `loop-spawn.sh` の**注記に逐語で** `anchor = "^"` が入っているので
-#   2 件数えてしまう。★ 群 6 と同じく「**元の形が消えたか**」で判定する。
-mut8b_src="$(grep -c 'anchor = ""' "${SPAWN_SH}" 2>/dev/null)" || mut8b_src=0
-mut8b_left="$(grep -c 'anchor = ""' "${MUT8B}" 2>/dev/null)" || mut8b_left=0
+sed 's/if (depth != 1) { i = k + 1; continue }/if (0) { i = k + 1; continue }/' "${SPAWN_SH}" > "${MUT8B}"
+mut8b_src="$(grep -c 'if (depth != 1) { i = k + 1; continue }' "${SPAWN_SH}" 2>/dev/null)" || mut8b_src=0
+mut8b_left="$(grep -c 'if (depth != 1) { i = k + 1; continue }' "${MUT8B}" 2>/dev/null)" || mut8b_left=0
 if [ "${mut8b_src:-0}" -ne 1 ] || [ "${mut8b_left:-0}" -ne 0 ]; then
-  # ⚠️ メッセージにバッククォートを入れない —— ★ 二重引用符の中では **コマンド置換**として
-  #   実行される (2026-09-21 に実測: `anchor: command not found` を出し、語が消えた)。
-  ng "8b: 変異を当てられない (src=${mut8b_src} / mut=${mut8b_left}) —— ★ 抽出器の注入点 [anchor = \"\"] が変わった → ⚠️ **検査不能**。sed を直せ"
+  ng "8b: 変異を当てられない (src=${mut8b_src} / mut=${mut8b_left}) —— ★ 深さ規則の書き方が変わった → ⚠️ **検査不能**。sed を直せ"
 else
   R8B="${TMP}/r8b/repo"; mkdir -p "${R8B}"
-  if ! setup_fake_repo "${R8B}" "${MUT8B}" || ! make_branch "${R8B}" pinned-a; then
+  if ! setup_fake_repo "${R8B}" "${MUT8B}" || ! make_branch "${R8B}" sneaky; then
     ng "8b: 準備できなかった (★ 判定できない)"
   else
-    add_cfg_raw "${R8B}" 20260101-oneline '{
-  "task": "oneline", "mode": "C", "base_branch": "pinned-a",
-  "budget": { "max_attempts": 2 }
+    add_cfg_raw "${R8B}" 20260101-nested '{
+  "task": "nested",
+  "headless": { "base_branch": "sneaky" }
 }'
     commit_cfgs "${R8B}"
-    SPAWN_ENV=""; do_spawn_x "${R8B}" --no-exec --task 20260101-oneline 8b t
-    if cut_from "${R8B}" "${TMP}/r8b/wt" 8b t main; then
-      ok "8b: ★★★ 行頭アンカーへ退行させると pin を取り逃がし main へ落ちた (★ 7k は空振りしていない)"
+    SPAWN_ENV=""; do_spawn_x "${R8B}" --no-exec --task 20260101-nested 8b t
+    if [ "${SRC}" -eq 0 ] && cut_from "${R8B}" "${TMP}/r8b/wt" 8b t sneaky; then
+      ok "8b: ★★★ 深さ規則を潰すと入れ子の base_branch が採られた (★ 7u は空振りしていない)"
     else
-      ng "8b: 退行させても pinned-a から切れた (⚠️★★★ 7k は行頭アンカーの穴を見ていない)"
+      ng "8b: 潰しても入れ子が採られなかった (⚠️★★★ 7u は深さの穴を見ていない可能性)"
     fi
+  fi
+fi
+
+# --- 8c: valid_refname を殺す ---
+# ⚠️★★★ **7p / 7q / 7z / 7aa / 7ab の対照である。**
+#   ★ `code-reviewer` MEDIUM・2026-09-21: これらは `valid_refname` を外しても
+#   **後段の `git fetch` / `worktree add` が落ちて非 0 になる**ので、
+#   ⚠️ 「非 0 なら緑」の判定では **関門を 1 つも検査できていなかった**。
+#   → ★ 7 群側は期待する語まで固定したので、ここで「語が出なくなる」ことを確認する。
+MUT8C="${TMP}/mut8c-loop-spawn.sh"
+sed 's/^valid_refname() {/valid_refname() { return 0;/' "${SPAWN_SH}" > "${MUT8C}"
+mut8c_src="$(grep -c '^valid_refname() {$' "${SPAWN_SH}" 2>/dev/null)" || mut8c_src=0
+mut8c_left="$(grep -c '^valid_refname() {$' "${MUT8C}" 2>/dev/null)" || mut8c_left=0
+if [ "${mut8c_src:-0}" -ne 1 ] || [ "${mut8c_left:-0}" -ne 0 ]; then
+  ng "8c: 変異を当てられない (src=${mut8c_src} / mut=${mut8c_left}) —— ★ valid_refname の宣言が変わった → ⚠️ **検査不能**"
+else
+  R8C="${TMP}/r8c/repo"; mkdir -p "${R8C}"
+  if ! setup_fake_repo "${R8C}" "${MUT8C}"; then
+    ng "8c: 準備できなかった (★ 判定できない)"
+  else
+    add_cfg "${R8C}" 20260101-bad '"FETCH_HEAD"'
+    commit_cfgs "${R8C}"
+    SPAWN_ENV=""; do_spawn_x "${R8C}" --no-exec --task 20260101-bad 8c t
+    if ! has_text "${SERR}" "ブランチ名として妥当ではありません"; then
+      ok "8c: ★★★ valid_refname を潰すと関門の語が出なくなった (★ 7p/7q/7z/7aa/7ab は語で見ている)"
+    else
+      ng "8c: 潰しても関門の語が出た (⚠️★★★ 変異が効いていない → 検査不能)"
+    fi
+    # ⚠️★★★ **ここで rc を見ない。**
+    #   ★ 潰しても `git worktree add ... FETCH_HEAD` が別の理由で落ちるので、
+    #   「rc が 0 でも非 0 でも ok」と書くと **常に真 = それ自体が空振り**になる
+    #   (★ 2026-09-21 に実際にそう書いてしまい、rc=128 で緑になっていた)。
+    #   → ★ **対照は「関門の語が消えること」だけ**で成立する。
   fi
 fi
 
