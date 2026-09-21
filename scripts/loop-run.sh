@@ -433,7 +433,32 @@ cost_used()   { cat "$COST_FILE"; }
 # ---------- 1 issue の attempt ループ ----------
 run_issue() {
   local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor
-  wt="$(LOOP_NO_EXEC=1 bash "$MAIN_ROOT/scripts/loop-spawn.sh" --no-exec "$id" 2>/dev/null | tail -1)"
+  # ⚠️★★★ **`--task` を渡す** (★ 起票 23)。
+  #   ★ 旧実装は `--no-exec "$id"` だけを渡しており、⚠️ **loop-run.sh は `$TASK_DIR` を
+  #     持っているのに伝えていなかった**ので、`loop-spawn.sh` が `.steering/*/_loop-config.json` を
+  #     `tail -1` で**再導出**していた。→ ★ 2026-09-21 に **38 コミット前の枝**から worktree が
+  #     切られる事故が実測された。
+  # ⚠️★★★ **stderr を捨てない。**
+  #   ★ 旧実装の `2>/dev/null` は、`loop-spawn.sh` が出す
+  #     「解決した base は何で、既定からどれだけ離れているか」を**丸ごと消していた**
+  #     (＝ **無人モードC では誰も読まない** ＝ 起票 23 の 2 つ目の論点)。
+  #   → ★ run ログへ流す。⚠️ stdout 側の契約 (最終行 = worktree の絶対パス) は変えない。
+  local spawn_err _l
+  spawn_err="$(mktemp)" || { emit "$id" execute blocked detail="mktemp に失敗 (worktree 生成前)"; return 1; }
+  # ⚠️ 早期 return でも必ず掃除する (★ Codex `/cross-review` 1 巡目・2026-09-21)。
+  #   ★ 現在は下の `rm -f` に到達するので leak は無いが、
+  #   ⚠️ 将来 `set -e` を足すか途中で return を増やすと残る。
+  #   ★ bash では関数内の RETURN trap がその関数の戻りで発火する (2026-09-21 に実測)。
+  trap 'rm -f "$spawn_err"' RETURN
+  wt="$(LOOP_NO_EXEC=1 bash "$MAIN_ROOT/scripts/loop-spawn.sh" --no-exec --task "$TASK_DIR" "$id" 2>"$spawn_err" | tail -1)"
+  # ⚠️ `[ -n "$_l" ] && log "$_l"` と書かない —— ★ 最終行が空なら
+  #   ループ本体の戻り値が非 0 になる。⚠️ 今は `set -e` を使っていないので無害だが、
+  #   ★ 将来 `set -e` を足すと **空行 1 本で run_issue が落ちる** (`code-reviewer` LOW・2026-09-21)。
+  while IFS= read -r _l; do
+    [ -n "$_l" ] || continue
+    log "$_l"
+  done < "$spawn_err"
+  rm -f "$spawn_err"
   [ -d "${wt:-}" ] || { emit "$id" execute blocked detail="worktree 生成に失敗"; return 1; }
 
   # ⚠️★★★ **履歴検査のアンカーは「worktree を作った時点」に固定する**

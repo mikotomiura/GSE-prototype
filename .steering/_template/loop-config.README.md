@@ -99,6 +99,31 @@ attempt 2 の開始時点で全 issue が `abandoned` になる。`token_ceiling
 `null` なら `origin/HEAD` → `main` → `master` の順に解決する。
 pin し忘れると main から worktree が切られ、実装が存在しないため**全 issue が即死する**。
 
+### ⚠★★★ 逆向きの事故もある —— `--task` で **どの config か**を必ず名指しする (2026-09-21・起票 23)
+
+★ 2026-09-21 に**実測**した: `loop-spawn.sh` が `.steering/*/_loop-config.json` を
+`tail -1` で**タスクと無関係に 1 つ拾い**、⚠️ **完了済みタスクの枝**から worktree を切って
+**main より 38 コミット前**の状態になった。→ ★ 是正後は次の規則である。
+
+| 状況 | 挙動 |
+|---|---|
+| `LOOP_BASE_BRANCH` が設定されている | ★ **最優先**。config を読まない |
+| `--task <t>` / `LOOP_TASK=<t>` がある | ★ **そのタスクの config だけ**を読む (⚠️ 0 件 / 複数件に一致したら**止まる**) |
+| どちらも無く、config が **1 件以上**ある | ⚠️★★★ **止まる (fail-closed)**。★ 候補一覧と書き方を出す。**1 件でも黙って選ばない** |
+| どちらも無く、config が **0 件** | ★ 従来どおり `origin/HEAD` → `main` → `master` |
+
+★ `--task` の指定は 3 形とも通る: **ディレクトリ** (`.steering/20260914-foo`) /
+**basename** (`20260914-foo`) / **日付接頭辞を落とした素名** (`foo`)。
+
+⚠️ **`base_branch` の値は検証される** —— 先頭が `-` / 空白や引用符を含む / `..` を含む /
+`git check-ref-format` が通らない値は**エラーで止まる**（★ 値が `git fetch` と
+`git worktree add` に引数として流れるため）。★ 値の形は **`null` か単純な文字列だけ**を受ける
+（⚠️ 数値・配列・同名キーの重複は**止まる**。**黙って `main` へ落ちない**）。
+
+★ 解決結果は **stderr に provenance つきで出る**（`base` / `provenance` / `config.task` /
+`start` / ⚠️ **既定ブランチからの乖離コミット数**）。★ 無人モードC では
+`loop-run.sh` が run ログへ記録する。⚠️ **乖離が 0 でないときは意図した pin か確かめること。**
+
 ## ⚠ `acceptance_template` — AC が gate に載っていない issue は素通りする
 
 `verify` の `test` / `typecheck` / `lint` は、docs 同期・設定変更のみの issue では

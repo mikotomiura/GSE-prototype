@@ -146,7 +146,8 @@ Hook は 3 層で動作し、全層の出力がユーザーに明示される (W
   新セッションで実行を始める。設計文脈を実行に持ち込まない。
   *issue ファイルだけを読んで実行が成立しないなら、分解が失敗している。*
 - **実行**: C(無人)=`bash scripts/loop-run.sh <task>` / B=新セッションで `/model sonnet` → `/loop-orchestrate` /
-  A=端末ごとに `scripts/loop-spawn.sh <id>` → `/loop-issue <id>` (GSE は A+B+C を採用・L5 で実体化)。
+  A=端末ごとに `scripts/loop-spawn.sh --task <task> <id>` → `/loop-issue <id>`
+  (⚠️★★★ **`--task` を落とすと fail-closed で止まる** —— 2026-09-21・起票 23) (GSE は A+B+C を採用・L5 で実体化)。
 - **監視**: `/loop-status` が board の単一書き手。worker は events に append のみ。
 - **done を自己申告で信じない**: `issue_done` は必ず `loop-watchdog` の客観再検証を通す。
 <!-- loop:end -->

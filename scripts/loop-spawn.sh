@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # loop-spawn.sh — 1 issue 用の worktree を切り、その中で Claude セッションを起動する人間用ヘルパ。
-#   使い方:  bash scripts/loop-spawn.sh <issue-id> [short-slug]
+#   使い方:  bash scripts/loop-spawn.sh --task <task> <issue-id> [short-slug]
 #            bash scripts/loop-spawn.sh --cleanup <issue-id>
-#            bash scripts/loop-spawn.sh --no-exec <issue-id> [short-slug]   # worktree 生成のみ (モードC 用)
+#            bash scripts/loop-spawn.sh --no-exec --task <task> <issue-id> [short-slug]   # worktree 生成のみ (モードC 用)
+#
+#   --task : ★ base の pin 元にする task。**ディレクトリ / basename / 日付接頭辞を落とした素名** の 3 形。
+#            ★ env `LOOP_TASK` でも指定できる (⚠️ `--task` が優先)。
+#            ⚠️★★★ `.steering/*/_loop-config.json` が **1 件以上**あるのに
+#            `--task` / `LOOP_TASK` / `LOOP_BASE_BRANCH` のいずれも無ければ **止まる** (起票 23)。
+#            ★ `--cleanup` は `--task` を使わない (撤去は base の解決に到達しない)。
 # worktree は main checkout の隣 (../wt/) に作る。events は main checkout の絶対パスに集約されるため
 # 各 worker が同じ _loop-events.jsonl に append できる。
 set -euo pipefail
@@ -41,34 +47,467 @@ fi
 cd "$repo_root"
 repo_name="$(basename "$repo_root")"
 
-# --no-exec: worktree 生成のみで Claude を起動しない (先頭で処理し、以降の分岐に影響させる)
-if [ "${1:-}" = "--no-exec" ]; then LOOP_NO_EXEC=1; shift; fi
+# --- 先頭オプションの解析 ---
+#   --no-exec: worktree 生成のみで Claude を起動しない (モードC 用)
+#   --task   : ★ base の pin 元となる task を指定する (⚠️ 起票 23)
+# ⚠️★★★ **このループは `--cleanup` の判定より *前* に置く。**
+#   ★ `--cleanup` は `$1` で引く形を維持しており、`--task` を使わない
+#     (★ 撤去は `resolve_base` に到達しないため)。
+#   ⚠️ したがって `--cleanup` は先頭に来た時点でこのループを素通りする。
+TASK_SEL="${LOOP_TASK:-}"   # ★ env は既定値。--task が来たら上書きする (--task が勝つ)
+# ⚠️ die メッセージで「同じことをやり直す書き方」を出すために元の引数を控える
+#   (★ 関数内の `$*` は **関数の引数**を指すので使えない)。
+# ⚠️ **quoting は失われる** ので、空白入り slug ではそのままコプペしても再現しない
+#   (★ die メッセージでは「参考」として示す。`code-reviewer` LOW・2026-09-21)。
+SPAWN_ARGS="$*"
+while true; do
+  case "${1:-}" in
+    --no-exec) LOOP_NO_EXEC=1; shift ;;
+    --task)
+      shift
+      [ "$#" -gt 0 ] && [ -n "${1:-}" ] || die "--task にはタスク (ディレクトリ名 / パス / 素名) を指定してください"
+      TASK_SEL="$1"; shift ;;
+    --task=*)
+      TASK_SEL="${1#--task=}"
+      [ -n "$TASK_SEL" ] || die "--task= の値が空です"
+      shift ;;
+    *) break ;;
+  esac
+done
 
 # --- base branch の解決 (pin) ---
-# 優先順: LOOP_BASE_BRANCH → _loop-config.json の base_branch → origin/HEAD → main → master
+# 優先順: LOOP_BASE_BRANCH → --task / LOOP_TASK で選んだ config の base_branch
+#         → origin/HEAD → main → master → 現 HEAD
 #
 # ⚠ 未 merge の作業ブランチで作業している場合は必ず pin すること。
 #    pin し忘れると main から worktree が切られ、実装がそこに存在しないため
 #    **全 issue が即死する**。
+#
+# ⚠️★★★ **逆向きの事故もある (起票 23・2026-09-21 に実測)。**
+#   ★ 旧実装は逐語 `cfg="$(ls -1 .steering/*/_loop-config.json ... | tail -1 || true)"` で、
+#     ⚠️ **いま回そうとしている task と無関係に**、名前順で最後の config を **黙って 1 つ**拾っていた。
+#   ★ 実害の実測: `LOOP_FORCE=1 bash scripts/loop-spawn.sh --no-exec zzz` が
+#     **完了済みタスクの枝 (`docs/adr-030-stall-onset-definition`) から worktree を切り**、
+#     ⚠️ **main より 38 コミット前**の状態になった (`git rev-list --left-right --count` = `38 0`)。
+#   → ★ **task で選ぶ**。⚠️ **特定できなければ止める (fail-closed)** ——
+#     ★★★ **config が 1 件でも止める** (⚠️ 研究者裁定 2026-09-21。
+#     **上の事故は config が 1 件の状態で起きた**ので、「複数ヒットだけ止める」では直らない)。
+#
+# ⚠️★★★ **`jq` は使わない。**
+#   ★ 旧実装は逐語 `b="$(jq -r '.base_branch // empty' "$cfg" 2>/dev/null || true)"` で、
+#     ⚠️ **jq 不在 / 壊れた JSON / 不正な値のどれでも `b` が空になり、黙って main へ落ちた**
+#     (＝ **config を書いたのに pin が無言で消える**)。
+#   ★ jq を捨てる理由は 3 つ: (1) `ci.yml:651` 逐語「本テストは **jq を要らない**」を壊さない
+#     (2) ⚠️ **macOS の self-hosted runner に jq があるか未検証**である (同じく ci.yml が明記)
+#     (3) 読む値は **git のブランチ名 1 つ**で、config は repo が template から生成する機械可読ファイルである。
+
+# json_top_value <file> <key>
+#   ★ config から **深さ 1 (トップレベル) の** `"<key>": null` / `"<key>": "文字列"` を取り出す。
+#
+# ⚠️★★★ **行や正規表現で引いてはならない (2 つの理由で壊れる)。**
+#   (a) ★ 既存テストが書く fake config は逐語 `  "task": "stub", "mode": "C", "base_branch": "main",`
+#       で、**1 行に 3 キーが同居**している (`loop-worktree-deny-test.sh` / `loop-run-guard-test.sh`)。
+#       ⚠️ かつ fake repo の default ブランチは `main` なので、取り逃がして fallback に落ちても
+#       **結果が偶然一致し、テストは緑のまま穴が生きる** (→ 群 7k が守る)。
+#   (b) ⚠️★★★ **深さを見ないと入れ子の同名キーを拾う。** ★ 2026-09-21 の `code-reviewer` HIGH を
+#       一次で実測: `{"task":"a","headless":{"base_branch":"sneaky"}}` を正規表現版に食わせると
+#       **`sneaky` を採って pin した**。⚠️ template には `headless` オブジェクトが実在するので、
+#       `base_branch` をその中に書き間違えると **起票 23 と同クラスの事故**になる
+#       (★ しかも `jq '.base_branch'` は null を返すので **人の検算と食い違う**)。
+#
+# ★ したがって **JSON を文字単位で歩く**。⚠️ 文字列の中の `{` `}` とエスケープを除外できるのは
+#   この形だけである。★ config は数 KB なので費用は問題にならない。
+#
+# ★ 出力は 6 行:
+#   1) nkey   深さ 1 で `"<key>":` が出た回数
+#   2) nany   **深さを問わず**出た回数 (⚠️ `nany != nkey` なら入れ子に在る ＝ 呼び出し側が die する)
+#   3) nval   値として `null` か単純な文字列を読めた回数
+#   4) isnull 値が `null` だったか (★ **空文字列 `""` と区別するため** —— ⚠️ `""` は
+#             「未指定」ではなく**打ち間違い**なので呼び出し側が die する)
+#   5) bad    ⚠️ JSON が壊れている (未終端文字列 / 括弧の収支が合わない) —— ★ **黙って fallback しない**
+#   6) val    値そのまま (⚠️ エスケープは展開しない。★ `\` が残れば `valid_refname` が弾く)
+#
+# ⚠️ awk で `exit` しない (★ `set -o pipefail` 下で上流に SIGPIPE が飛ぶ。main_worktree と同じ理屈)。
+# ⚠️ 入力の `\r` を落とす (★ CRLF の config で `null` が行末に来ると値の判定が OS で割れる)。
+json_top_value() {
+  awk -v key="$2" '
+    { sub(/\r$/, ""); buf = buf $0 "\n" }
+    END {
+      nkey = 0; nany = 0; nval = 0; isnull = 0; bad = 0; val = ""
+      depth = 0; i = 1; n = length(buf)
+      while (i <= n) {
+        c = substr(buf, i, 1)
+        if (c == "\"") {
+          # 文字列を読み切る (★ エスケープを考慮)
+          j = i + 1; content = ""; closed = 0
+          while (j <= n) {
+            d = substr(buf, j, 1)
+            if (d == "\\") { content = content d substr(buf, j + 1, 1); j += 2; continue }
+            if (d == "\"") { closed = 1; break }
+            content = content d; j++
+          }
+          if (!closed) { bad = 1; break }
+          i = j + 1
+          if (content == key) {
+            k = i
+            while (k <= n && substr(buf, k, 1) ~ /[ \t\n]/) k++
+            if (substr(buf, k, 1) == ":") {
+              nany++
+              # ⚠️★★★ **群 8b の変異当て先。** ★ この行を殺すと入れ子の同名キーを深さ 1 として
+              #   数えるようになり、`{"h":{"base_branch":"sneaky"}}` で `sneaky` に pin される。
+              #   ⚠️ 書き方を変えるときは 8b の sed も直す (★ 当たらなくなったら 8b が NG を出す)。
+              if (depth != 1) { i = k + 1; continue }
+              nkey++
+              k++
+              while (k <= n && substr(buf, k, 1) ~ /[ \t\n]/) k++
+              if (substr(buf, k, 4) == "null" && substr(buf, k + 4, 1) ~ /[ \t\n,}]|^$/) {
+                nval++; isnull = 1; val = ""
+              } else if (substr(buf, k, 1) == "\"") {
+                m = k + 1; sv = ""; sclosed = 0
+                while (m <= n) {
+                  d = substr(buf, m, 1)
+                  if (d == "\\") { sv = sv d substr(buf, m + 1, 1); m += 2; continue }
+                  if (d == "\"") { sclosed = 1; break }
+                  sv = sv d; m++
+                }
+                if (!sclosed) { bad = 1; break }
+                nval++; isnull = 0; val = sv
+              }
+            }
+          }
+          continue
+        }
+        if (c == "{" || c == "[") { depth++; i++; continue }
+        if (c == "}" || c == "]") { depth--; i++; continue }
+        i++
+      }
+      if (depth != 0) bad = 1
+      print nkey; print nany; print nval; print isnull; print bad; print val
+    }
+  ' "$1"
+}
+
+# sanitize_disp <値> → ⚠️ 表示・ログに出す前に通す
+#   ⚠️★★★ **config の値を生で echo してはならない** (★ `security-checker` MEDIUM・2026-09-21)。
+#   ★ 実測: `"task": "t<ESC>[8m EVIL"` の ESC バイトは抽出器を素通りし、
+#     `config.task=` 行に残る。→ ⚠️ 端末で `\x1b[8m` (conceal) や `\r` を使うと、
+#     ★★★ **その *後* に出る `start` 行と「⚠️ 乖離 = 既定より N コミット後ろ」行を
+#     不可視・上書きにできる** ＝ **本スクリプトが足した唯一の検知手段を、記録を残したまま無力化できる**。
+#   ⚠️ worktree の worker は `acceptEdits` で走り、deny は Bash の 9 パターンだけなので
+#     **main checkout の `_loop-config.json` を Write で書き換える経路が開いている**。
+#   → ★ 制御文字を落とし、長さも切る (⚠️ `loop-run.sh` の `log` に redaction は無いので **出す側で消す**)。
+sanitize_disp() {
+  # ⚠️ **削除ではなく `?` へ置換する** (★ Codex `/cross-review` 2 巡目・2026-09-21)。
+  #   ★ 削除すると `ab<CR>cd` が `abcd` に見え、⚠️ **何かがあったこと自体が消える**。
+  #   ★ 目的は「表示を崩さないこと」であって「痕跡を消すこと」ではないので、
+  #     **位置と個数を残す**方が事故調査に強い。
+  printf '%s' "$1" | LC_ALL=C tr '\000-\037\177' '?' | cut -c1-200
+}
+
+# valid_refname <value>
+#   ⚠️★★★ **解決した base は `git fetch origin "$base"` と `git worktree add ... "$start"` に
+#     引数として流れる** ので、★ 先頭が `-` の値は **オプションとして読まれうる**。
+#   ★★★ これは机上ではない —— `security-checker` が使い捨て repo で実測 (2026-09-21):
+#     `git fetch origin --bogus-opt` は **位置引数の後でもオプションとして解釈され**、
+#     ⚠️ `git fetch origin --upload-pack=echo` は **警告のみで受理される**。
+#     → ★ 旧実装 (`jq -r` の結果を無検証で渡す) では、config に
+#       `"base_branch": "--upload-pack=<cmd>"` を書くだけで **コマンド実行に到達しえた**。
+#     ★ `:` `+` `^` `~` `@{` `*` も文字集合で落ちるので、**`X:Y` 形の refspec で
+#       fetch にローカル ref を上書きさせる経路**も閉じている。
+#
+# ⚠️★★★ **`git check-ref-format --branch` は「ブランチ名として妥当か」しか見ない。**
+#   ★ 実測 (2026-09-21): `HEAD` と `main.lock` は落ちるが、
+#     ⚠️ **`FETCH_HEAD` / `ORIG_HEAD` / 40 桁 hex / `refs/heads/main` / `origin/main` は通る**。
+#   ⚠️ うち **`FETCH_HEAD` と 40 桁 hex は `git worktree add` が *成功する*** ——
+#     ★ 「直前に誰かが fetch した何か」や **どのブランチにも乗っていない commit** から
+#     worktree が切られる。→ ★ **予約名 / `refs/` / hex を明示的に拒否する。**
+valid_refname() {
+  local v="$1" first
+  case "$v" in
+    ''|-*) return 1 ;;
+    */) return 1 ;;
+    *..*) return 1 ;;
+    *[!A-Za-z0-9._/-]*) return 1 ;;
+    refs/*) return 1 ;;                       # ⚠️ 完全修飾は受けない (★ origin/refs/... に化ける)
+  esac
+  # ⚠️ git の pseudo-ref を拒否する。
+  #   ⚠️★★★ **「先頭コンポーネントが全部大文字なら拒否」にしてはならない**
+  #     (★ Codex `/cross-review` 1 巡目・2026-09-21)。★ 実測で `RELEASE/2026-09` /
+  #     `FEATURE/foo` / `HOTFIX/x` まで**誤って拒否していた** ——
+  #     ⚠️ 運用ブランチを大文字で切る repo では徒に止まる。
+  #   ★ 実在する pseudo-ref はすべて `HEAD` か `*_HEAD` か `AUTO_MERGE` である
+  #     (HEAD / FETCH_HEAD / ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD /
+  #      REVERT_HEAD / BISECT_HEAD / REBASE_HEAD / AUTO_MERGE)。→ ★ **そこだけを拒む**。
+  case "$v" in
+    HEAD|*_HEAD|AUTO_MERGE) return 1 ;;
+  esac
+  # ⚠️ commit sha を枝と誤認しない (★ 40 桁 = SHA-1 / 64 桁 = SHA-256)
+  case "$v" in
+    *[!0-9a-fA-F]*) : ;;
+    *) [ "${#v}" -ne 40 ] && [ "${#v}" -ne 64 ] || return 1 ;;
+  esac
+  git check-ref-format --branch "$v" >/dev/null 2>&1
+}
+
+# list_configs → .steering/*/_loop-config.json を 1 行 1 件で出す (★ 0 件なら何も出さない)
+#   ⚠️ `ls -1` に依存しない (★ Codex `/cross-review` 1 巡目・2026-09-21) ——
+#     ★ glob を直接回すので `ls` の出力整形に左右されない。
+#   ⚠️ ただし **ディレクトリ名に改行が入ると行単位の出力は壊れる**
+#     (★ 本 repo の task dir は kebab-case 規約であり、改行入りなら
+#      `.steering/` の他の仕組みも先に壊れるので、ここでは抱えない)。
+list_configs() {
+  local c
+  for c in .steering/*/_loop-config.json; do
+    [ -f "$c" ] && printf '%s
+' "$c"
+  done
+  return 0
+}
+
+# find_task_config <selector> → ★ 一致した config のパスを **FOUND_CFG に入れる** (⚠️ 0 件 / 複数件なら die)
+#   ⚠️★★★ **stdout で返してはならない。**
+#     ★ `cfg="$(find_task_config ...)"` の形にすると、**die (exit) が
+#       コマンド置換のサブシェルしか抜けず**、⚠️ 呼び出し元は `cfg` が空のまま**続行する**
+#       (＝ **fail-closed のつもりで fail-open になる**)。→ ★ グローバルで返す。
+#   ★ selector の 3 形を受ける:
+#     (a) ディレクトリ (絶対でも相対でも) —— ★ モードC が `$TASK_DIR` を渡す形
+#     (b) task ディレクトリの basename そのまま (`20260914-mhd-feature-offline-tiers`)
+#     (c) 日付接頭辞を落とした素名 (`mhd-feature-offline-tiers`)
+#
+# ⚠️★★★ **解決先は必ず `<repo>/.steering/<task>/_loop-config.json` の形に閉じる**
+#   (★ `security-checker` MEDIUM・2026-09-21)。★ 閉じない場合の実害:
+#   ⚠️ `--task .steering/20260914-foo/requirement.md` (★ タブ補完で 1 つ深く押した) が
+#     `[ -f "$sel" ]` に当たり、**config でないファイルを config として受ける** →
+#     キー 0 件 → **die せず fallback** ＝ ★ **起票 23 の事故が別経路で復活する**。
+#   ⚠️ かつ `--task /abs/any/dir` / `--task ../../other/x.json` で **repo 外**も読めた。
+FOUND_CFG=""
+# cfg_rel <path> → ★ repo 相対の `.steering/<task>/_loop-config.json` を CFG_REL に入れる (⚠️ 形が違えば非 0)
+#   ⚠️★★★ **`$repo_root` の前方一致で相対化してはならない。**
+#     ★ Windows では `git worktree list --porcelain` が `C:/GSE-prototype` を返し、
+#       一方モードC が渡す `$TASK_DIR` は `/c/GSE-prototype/...` になりうる (★ bash の `pwd` 由来)。
+#     ⚠️ 前方一致で剥がすと**一致せず、モードC が Windows だけで死ぬ**。
+#   → ★ **`/.steering/` の位置から相対形を組み立て、repo 相対で存在を確かめる。**
+#     ⚠️ これにより **読む対象は必ず main checkout 直下の `.steering/*/_loop-config.json` に閉じる**
+#       (★ 絶対パスで repo 外を指されても、repo 外は 1 バイトも読まない)。
+#     ★ 実際に読んだパスは provenance 行に出るので、人が食い違いに気づける。
+CFG_REL=""
+cfg_rel() {
+  local p="$1"
+  CFG_REL=""
+  case "$p" in *..*) return 1 ;; esac         # ⚠️ .steering/../.. を弾く
+  case "$p" in
+    .steering/*/_loop-config.json)   CFG_REL="$p" ;;
+    */.steering/*/_loop-config.json) CFG_REL=".steering/${p#*/.steering/}" ;;
+    *) return 1 ;;
+  esac
+  # ★ 入れ子が深すぎる形 (.steering/a/b/_loop-config.json) を弾く
+  case "${CFG_REL#.steering/}" in */*/*) return 1 ;; esac
+  [ -f "$CFG_REL" ]
+}
+find_task_config() {
+  local sel="$1" hits="" n=0 c bn cand
+  FOUND_CFG=""
+  # (a) ディレクトリとして解釈できるか (★ モードC が渡す形)
+  if [ -d "$sel" ] && [ -f "$sel/_loop-config.json" ]; then
+    cand="$sel/_loop-config.json"
+    cfg_rel "$cand" \
+      || die "--task が repo の .steering/<task>/ の形になっていません: [$(sanitize_disp "$cand")]"
+    FOUND_CFG="$CFG_REL"; return 0
+  fi
+  # ⚠️ **任意の既存ファイルを受けない** —— ★ basename と位置の両方を要求する
+  if [ -f "$sel" ]; then
+    cfg_rel "$sel" \
+      || die "--task にはタスクのディレクトリか _loop-config.json を指定してください: [$(sanitize_disp "$sel")]
+            ⚠️ 指定されたのは repo の .steering/<task>/_loop-config.json ではありません。
+            ★ config でないファイルを config として受けると、キーが 0 件になって
+              **黙って既定ブランチへ落ちます** ＝ 起票 23 の事故が別経路で復活します。"
+    FOUND_CFG="$CFG_REL"; return 0
+  fi
+  # (b) / (c) 名前で引く
+  # ⚠️ `????????-` は **任意の 8 文字**に当たる (★ `code-reviewer` MEDIUM・2026-09-21 実測:
+  #   `fix-loop-spawn` → `spawn` / `loop_run-x` → `x`)。→ ★ **数字 8 桁に限る。**
+  while IFS= read -r c; do
+    [ -n "$c" ] || continue
+    bn="$(basename "$(dirname "$c")")"
+    if [ "$bn" = "$sel" ] || [ "${bn#[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-}" = "$sel" ]; then
+      hits="${hits}${c}
+"
+      n=$((n + 1))
+    fi
+  done <<EOF
+$(list_configs)
+EOF
+  if [ "$n" -eq 0 ]; then
+    {
+      echo "loop-spawn: ⚠️ --task で指定したタスクの _loop-config.json が見つかりません: [${sel}]"
+      echo "            ★ 現存する候補:"
+      list_configs | sed 's/^/              - /'
+      echo "            ★ 指定できる形: ディレクトリ (.steering/20260914-foo) / basename (20260914-foo) / 素名 (foo)"
+    } >&2
+    exit 1
+  fi
+  if [ "$n" -gt 1 ]; then
+    {
+      echo "loop-spawn: ⚠️★★★ --task [${sel}] が ${n} 件に一致しました。★ 一意に指定してください。"
+      printf '%s' "$hits" | sed 's/^/              - /'
+    } >&2
+    exit 1
+  fi
+  # ★ 1 件だけ残っているので、末尾の改行を落として返す
+  #   ⚠️ bash 限定の入れ子パターン展開は使わない
+  #   (★ macOS 既定の bash 3.2 を踏む必要がない。`code-reviewer` LOW・2026-09-21)。
+  FOUND_CFG="$(printf '%s' "$hits" | sed -n '1p')"
+}
+
+# resolve_base → ★ 結果を RESOLVED_BASE / RESOLVED_FROM に入れる
+#   ⚠️ stdout で返さない —— ★ provenance を 2 値目として返す必要があり、
+#     stdout を 2 行にすると呼び出し側 (`base="$(resolve_base)"`) が壊れるため。
+RESOLVED_BASE=""
+RESOLVED_FROM=""
 resolve_base() {
-  if [ -n "$BASE_DEFAULT" ]; then echo "$BASE_DEFAULT"; return; fi
-  local b=""
-  # _loop-config.json の base_branch を見る (config が見つかる場合のみ)
-  local cfg
-  cfg="$(ls -1 .steering/*/_loop-config.json 2>/dev/null | tail -1 || true)"
-  if [ -n "${cfg:-}" ] && [ -f "$cfg" ]; then
-    b="$(jq -r '.base_branch // empty' "$cfg" 2>/dev/null || true)"
+  if [ -n "$BASE_DEFAULT" ]; then
+    RESOLVED_BASE="$BASE_DEFAULT"; RESOLVED_FROM="env:LOOP_BASE_BRANCH"
+    valid_refname "$RESOLVED_BASE" \
+      || die "LOOP_BASE_BRANCH の値がブランチ名として妥当ではありません: [${RESOLVED_BASE}]"
+    return
   fi
-  if [ -z "${b:-}" ]; then
-    # origin/HEAD が指す既定ブランチ → 無ければ main → master の順
-    b="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')" || true
+
+  local b="" cfg="" n_cfg=0
+  # ⚠️★★★ **`|| true` で飲まない** (★ `security-checker` LOW・2026-09-21) ——
+  #   ★ 旧形 `n_cfg="$(list_configs | grep -c . || true)"` は、grep 不在なら `n_cfg` が **空**になり、
+  #     `${n_cfg:-0}` で 0 に化けて ⚠️ **下の fail-closed ブロックを飛ばして黙って fallback** する。
+  #   → ★ **起票 23 で潰したのと同じ形の生き残り**だったので、数えたうえで**数値であることを要求する**。
+  n_cfg="$(list_configs | wc -l)" || die "config の候補を数えられませんでした (★ 判定せず止まります)"
+  n_cfg="${n_cfg//[[:space:]]/}"
+  case "${n_cfg}" in
+    ''|*[!0-9]*) die "config の件数が数値として読めません: [${n_cfg}] (★ 判定せず止まります)" ;;
+  esac
+
+  if [ -n "${TASK_SEL:-}" ]; then
+    # ⚠️ コマンド置換にしない (★ die が抜けなくなる。find_task_config 冒頭の注記)
+    find_task_config "$TASK_SEL"
+    cfg="$FOUND_CFG"
+  elif [ "${n_cfg:-0}" -gt 0 ]; then
+    # ⚠️★★★ **ここが起票 23 の本丸。黙って 1 つ選ばない。**
+    {
+      echo "loop-spawn: ⚠️★★★ base の pin 元を特定できません (★ 起票 23 の fail-closed)。"
+      echo "            .steering/ に _loop-config.json が ${n_cfg} 件あります:"
+      while IFS= read -r c; do
+        [ -n "$c" ] || continue
+        local bb
+        bb="$(json_top_value "$c" base_branch | sed -n '6p')"
+        echo "              - $(dirname "$c")  (base_branch=$(sanitize_disp "${bb:-null}"))"
+      done <<EOF2
+$(list_configs)
+EOF2
+      echo "            ★ どちらかを指定してください (⚠️ 引数の quoting は失われているので **参考**):"
+      echo "              bash scripts/loop-spawn.sh --task <task> ${SPAWN_ARGS}"
+      echo "              LOOP_BASE_BRANCH=main bash scripts/loop-spawn.sh ${SPAWN_ARGS}"
+      echo "            ⚠️ 黙って 1 つ選ぶことはしません (★ 2026-09-21 に 38 コミット前の枝から"
+      echo "               worktree が切られた実測がある)。"
+    } >&2
+    exit 1
   fi
-  if [ -z "${b:-}" ]; then
-    if git show-ref --verify --quiet refs/heads/main; then b=main
-    elif git show-ref --verify --quiet refs/heads/master; then b=master
-    else b="$(git rev-parse --abbrev-ref HEAD)"; fi
+
+  if [ -n "${cfg:-}" ]; then
+    [ -f "$cfg" ] || die "config が読めません: [$(sanitize_disp "$cfg")]"
+    # ★ 判定表 (⚠️ **想定外は必ず die**。黙って fallback する経路を作らない):
+    #   | bad=1                          | ⚠️ JSON が壊れている            → die |
+    #   | nany != nkey                   | ⚠️ 深さ 1 以外に base_branch    → die |
+    #   | nkey > 1                       | ⚠️ 深さ 1 に複数                → die |
+    #   | nkey=1 かつ nval != 1          | ⚠️ 値が null / 文字列でない     → die |
+    #   | nkey=1, nval=1, isnull=1       | ★ 未指定として fallback (正当)        |
+    #   | nkey=1, nval=1, isnull=0, 空   | ⚠️ 明示的な空文字列 = 打ち間違い → die |
+    #   | nkey=1, nval=1, isnull=0, 有値 | ★ 検証して採用                        |
+    #   | nkey=0 かつ nany=0             | ★ キー無し → fallback (正当)          |
+    local out n_key n_any n_val is_null is_bad
+    out="$(json_top_value "$cfg" base_branch)" \
+      || die "config の読み取りに失敗しました: [$(sanitize_disp "$cfg")]"
+    n_key="$(printf '%s\n' "$out" | sed -n '1p')"
+    n_any="$(printf '%s\n' "$out" | sed -n '2p')"
+    n_val="$(printf '%s\n' "$out" | sed -n '3p')"
+    is_null="$(printf '%s\n' "$out" | sed -n '4p')"
+    is_bad="$(printf '%s\n' "$out" | sed -n '5p')"
+    b="$(printf '%s\n' "$out" | sed -n '6p')"
+    if [ "${is_bad:-0}" -ne 0 ]; then
+      die "config の JSON が壊れています (★ 未終端の文字列か括弧の収支が合いません): [$(sanitize_disp "$cfg")]
+            ⚠️ 黙って既定ブランチへ落ちることはしません (★ 起票 23)。"
+    fi
+    if [ "${n_any:-0}" -ne "${n_key:-0}" ]; then
+      die "config の base_branch が **深さ 1 (トップレベル) 以外**にあります: [$(sanitize_disp "$cfg")]
+            ★ 深さ 1 に ${n_key} 件 / 全体に ${n_any} 件。
+            ⚠️★★★ 入れ子 (例: \"headless\": { \"base_branch\": … }) に書いた pin は効きません。
+            ★ jq '.base_branch' も null を返すので、**人の検算と食い違います**。
+            → ★ base_branch はトップレベルに 1 つだけ置いてください。"
+    fi
+    if [ "${n_key:-0}" -gt 1 ]; then
+      die "config の深さ 1 に base_branch が ${n_key} 回出てきます (⚠️ 推測で 1 つ選びません): [$(sanitize_disp "$cfg")]"
+    fi
+    if [ "${n_key:-0}" -eq 1 ] && [ "${n_val:-0}" -ne 1 ]; then
+      die "config の base_branch の値を読めません (★ null か単純な文字列だけを受けます): [$(sanitize_disp "$cfg")]"
+    fi
+    if [ "${n_key:-0}" -eq 1 ] && [ "${is_null:-0}" -eq 0 ] && [ -z "${b:-}" ]; then
+      # ⚠️★★★ `""` は「未指定」ではない —— ★ pin を書こうとした打ち間違いである。
+      #   → ★ null と同じ扱いにすると「**pin を書いたのに無言で main へ落ちる**」が復活する。
+      die "config の base_branch が空文字列です: [$(sanitize_disp "$cfg")]
+            ★ pin しないなら null を書いてください (⚠️ \"\" は打ち間違いとして扱います)。"
+    fi
+    # ★ config の `task` は **表示のためだけ**に読む (⚠️ 一致を強制する門にはしない ——
+    #   ★ 「ディレクトリ名と config.task の正規化規則」を新しく発明することになり、
+    #     ⚠️ その規則自体が黙って間違うクラスを増やす。→ **人が見て気づける形**に留める)。
+    cfg_task_name="$(json_top_value "$cfg" task | sed -n '6p')" || cfg_task_name=""
+    if [ -n "${b:-}" ]; then
+      valid_refname "$b" \
+        || die "config の base_branch がブランチ名として妥当ではありません: [$(sanitize_disp "$b")]  ($(sanitize_disp "$cfg"))
+            ⚠️ 受けないもの: 先頭が '-' / 空白や引用符を含む / '..' / 'refs/' 始まり /
+               予約名 (HEAD・FETCH_HEAD・ORIG_HEAD …) / 40 桁・64 桁の hex (＝ commit sha)。"
+      RESOLVED_BASE="$b"; RESOLVED_FROM="config:${cfg}"
+      return
+    fi
+    # ★ キーが無い / null → 未指定として fallback (⚠️ die しない)
+    #   ⚠️ 「null」と言い切らない —— ★ ここへ来る理由は **キー無し** と **null** の 2 つある
+    #     (★ `code-reviewer` MEDIUM・2026-09-21: 旧文言は 4 状態を「null」と言い切っていた)。
+    RESOLVED_FROM="fallback (config:${cfg} の base_branch は未指定 = キー無し または null)"
+  else
+    RESOLVED_FROM="fallback (config なし)"
   fi
-  echo "$b"
+
+  # origin/HEAD が指す既定ブランチ → 無ければ main → master の順
+  b="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')" || true
+  if [ -n "${b:-}" ]; then
+    RESOLVED_BASE="$b"; RESOLVED_FROM="${RESOLVED_FROM} → origin/HEAD"; return
+  fi
+  if git show-ref --verify --quiet refs/heads/main; then
+    RESOLVED_BASE=main; RESOLVED_FROM="${RESOLVED_FROM} → refs/heads/main"; return
+  fi
+  if git show-ref --verify --quiet refs/heads/master; then
+    RESOLVED_BASE=master; RESOLVED_FROM="${RESOLVED_FROM} → refs/heads/master"; return
+  fi
+  RESOLVED_BASE="$(git rev-parse --abbrev-ref HEAD)"
+  RESOLVED_FROM="${RESOLVED_FROM} → 現 HEAD"
+}
+
+# default_branch → ★ 乖離の基準に使う既定ブランチ
+# ⚠️★★★ **remote-tracking を優先する。**
+#   ★ `start` は fetch 成功時に `origin/$base` になる（下の `--- base を remote と同期 ---`）。
+#   ⚠️ 基準側を**ローカル**の `main` にすると **片側だけ remote** という非対称になり、
+#     ★ **ローカル main が古い環境では `behind` が過小に出て、古い pin を見逃す**
+#     （＝ 起票 23 が起きうる状況そのもの。`code-reviewer` MEDIUM / `security-checker` LOW・2026-09-21）。
+#   → ★ `refs/remotes/origin/<d>` が在ればそれを使い、無ければローカルへ縮退する。
+default_branch() {
+  local d
+  d="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')" || true
+  if [ -z "${d:-}" ]; then
+    if git show-ref --verify --quiet refs/heads/main; then d=main
+    elif git show-ref --verify --quiet refs/heads/master; then d=master
+    fi
+  fi
+  [ -n "${d:-}" ] || return 0
+  if git show-ref --verify --quiet "refs/remotes/origin/${d}"; then
+    printf '%s' "origin/${d}"
+  else
+    printf '%s' "$d"
+  fi
 }
 
 # --- cleanup モード (merge 後の撤去) ---
@@ -308,7 +747,8 @@ fi
 
 id="${1:?issue-id を指定してください}"
 short="${2:-issue}"
-base="$(resolve_base)"
+resolve_base                # ⚠️ コマンド置換にしない (★ die が抜けず、provenance も取れない)
+base="$RESOLVED_BASE"
 branch="loop/${id}-${short}"
 wtdir="../wt/${repo_name}-${id}-${short}"
 
@@ -346,6 +786,48 @@ if git remote get-url origin >/dev/null 2>&1; then
   fi
 fi
 
+# --- ⚠️★★★ 解決した base を「人が承認できる形」で出す (起票 23 の 2 つ目) ---
+#   ★ 旧実装も `base=… (start=…)` を 1 行出していたが、⚠️ **stdout** に出していたため
+#     `loop-run.sh:436` の `... 2>/dev/null | tail -1` が **パイプに吸わせて捨てていた**
+#     (＝ **無人モードC では誰も読まない**)。
+#   → ★ **stderr へ出す** (⚠️ `--no-exec` の「stdout の最終行 = worktree の絶対パス」を
+#      構造的に壊さないため。`loop-worktree-deny.sh:37` と同じ作法)。
+#   ★ あわせて **既定ブランチからの乖離**を出す —— ⚠️ 起票 23 の事故は
+#     「pin 自体は表示されていたのに、それが 38 コミット前だと気づけなかった」形である。
+{
+  echo "loop-spawn: ── base の解決 ──────────────────────────────"
+  # ⚠️★★★ **config 由来の値は `sanitize_disp` を通して出す。**
+  #   ★ 生で出すと `\x1b[8m` (conceal) や `\r` で **この後に続く乖離の警告行を隠せる**
+  #     (★ `security-checker` MEDIUM・2026-09-21 に実測)。→ ★ 詳細は sanitize_disp の注記。
+  echo "loop-spawn:   base       = $(sanitize_disp "${base}")"
+  echo "loop-spawn:   provenance = $(sanitize_disp "${RESOLVED_FROM}")"
+  if [ -n "${cfg_task_name:-}" ]; then
+    echo "loop-spawn:   config.task= $(sanitize_disp "${cfg_task_name}")"
+  fi
+  echo "loop-spawn:   start      = $(sanitize_disp "${start}")"
+  _def="$(default_branch)"
+  if [ -z "${_def:-}" ]; then
+    echo "loop-spawn:   ⚠️ 既定ブランチを特定できないため乖離を出せません"
+  elif [ "${_def#origin/}" = "${base}" ]; then
+    # ⚠️ `origin/` を剥がして比べる (★ default_branch は remote-tracking を優先して返す)
+    echo "loop-spawn:   乖離       = なし (★ base は既定ブランチ ${_def} そのもの)"
+  else
+    _cnt="$(git rev-list --left-right --count "${_def}...${start}" 2>/dev/null || true)"
+    if [ -z "${_cnt:-}" ]; then
+      echo "loop-spawn:   ⚠️ 既定 (${_def}) との乖離を数えられませんでした"
+    else
+      _behind="$(printf '%s' "${_cnt}" | awk '{print $1+0}')"
+      _ahead="$(printf '%s' "${_cnt}" | awk '{print $2+0}')"
+      if [ "${_behind}" -gt 0 ]; then
+        echo "loop-spawn:   ⚠️★★★ 乖離  = 既定 (${_def}) より ${_behind} コミット後ろ / ${_ahead} コミット先"
+        echo "loop-spawn:          ★ 意図した pin か確かめてください (⚠️ 起票 23: 古い pin が残っていた事故がある)"
+      else
+        echo "loop-spawn:   乖離       = 既定 (${_def}) より 0 コミット後ろ / ${_ahead} コミット先"
+      fi
+    fi
+  fi
+  echo "loop-spawn: ─────────────────────────────────────────────"
+} >&2
 echo "loop-spawn: base=$base (start=$start) → branch=$branch / worktree=$wtdir"
 # ★ 撤去判定に使う「作成時の commit」を控えておく (★ abort_worktree の注記を参照)。
 start_sha="$(git rev-parse --verify --quiet "$start" 2>/dev/null || true)"

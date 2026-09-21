@@ -191,6 +191,10 @@ main へのマージ前チェック:
 - **remote 同期**: spawn 前に `git fetch origin <base>`。長命な worktree は定期的に base へ rebase。
 - **命名**: branch `loop/[id]-[short]` / worktree `../wt/[repo]-[id]-[short]`。
 - **stale cleanup**: merge 後は `scripts/loop-spawn.sh --cleanup [id]` で worktree remove + branch -d + prune。
+- ⚠️★★★ **worktree を切るときは `--task <task>` を名指す** (`scripts/loop-spawn.sh --task <task> <id>`)。★ `.steering/` に `_loop-config.json` が
+  1 件以上あるときに落とすと **fail-closed で止まる** (⚠️ 旧実装は `tail -1` で黙って 1 つ拾い、
+  **完了済みタスクの枝から worktree を切っていた** —— 2026-09-21・起票 23)。
+  ★ `--cleanup` は `--task` を使わない（撤去は base の解決に到達しない）。
 - **並行 resource 隔離** (`_loop-config.json.resource_isolation`):
   - `per-worktree` → DB 名 / port を worktree ごとに分離 (例 `PORT=$((5432+id))`、schema/db 名に id 付与)。
     GSE では Wall Server の待受ポート等が該当。
