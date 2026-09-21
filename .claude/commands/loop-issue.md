@@ -30,7 +30,11 @@ git rev-parse --show-toplevel            # ../wt/<repo>-<id>-<short> である�
 ```
 - **現在ブランチが `loop/*` でない、または worktree 内でない場合は警告し確認を求める**
   ("main checkout で直接実行しようとしています。続行しますか?")。ユーザーが No なら
-  `scripts/loop-spawn.sh <id>` の実行を案内して停止する。
+  `scripts/loop-spawn.sh --task <task> <id>` の実行を案内して停止する。
+  ⚠️★★★ **`--task` を落とさない** (2026-09-21・起票 23) —— ★ `.steering/` に
+  `_loop-config.json` が 1 件以上あるとき、`--task` が無いと `loop-spawn.sh` は
+  **fail-closed で止まる** (⚠️ 旧実装は `tail -1` で黙って 1 つ拾い、
+  **完了済みタスクの枝から worktree を切っていた**)。
 
 ### ⚠★★★ セッションを終える前に必ず commit する (2026-09-20 追加)
 

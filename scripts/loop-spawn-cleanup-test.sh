@@ -18,15 +18,20 @@
 #   3. ⚠️ 別 id を巻き込まないか (★ 旧実装は正規表現の部分一致で `loop/zzz2-*` を巻き込んだ)
 #   4. ⚠️★★★ **main checkout を撤去しない**か
 #   5. ⚠️ 残存ディレクトリを **消さずに**報告し、非 0 で止まるか
-#   6. ⚠️★★★ 変異テスト (★ この検査が空振りしていないこと)
+#   6. ⚠️★★★ 変異テスト (★ --cleanup の検査が空振りしていないこと)
+#   7. ★★★ **base の解決** (★ 起票 23・2026-09-21 追加) —— config を task で選ぶ /
+#      ⚠️ 特定できなければ **1 件でも止まる** / ⚠️ 読めない値で **黙って main へ落ちない** /
+#      ★ provenance と乖離を stderr へ出す / ★ stdout の最終行の契約を壊さない
+#   8. ⚠️★★★ 変異テスト (★ **群 7 が** 空振りしていないこと) —— fail-closed と抽出器を潰す
 #
 # Usage: bash scripts/loop-spawn-cleanup-test.sh
 # Exit:  0 = 全件合格 / 1 = 不合格あり / 2 = ⚠️ 検査できなかった
 #
 # ⚠️ **実 repo には 1 バイトも触れない** (★ すべて mktemp 配下の使い捨て git repo で行う)。
 #
-# 関連: .steering/20260921-loop-spawn-cleanup-fix/ ／
-#       .steering/20260914-mhd-feature-offline-tiers/blockers.md 起票 18
+# 関連: .steering/20260921-loop-spawn-cleanup-fix/ (起票 18) ／
+#       .steering/20260921-loop-spawn-resolve-base/ (★ 起票 23・群 7 / 8) ／
+#       .steering/20260914-mhd-feature-offline-tiers/blockers.md 起票 18 / 23
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
@@ -419,6 +424,340 @@ else
     ok "変異テスト: 一致規則が退行しても「完了」とは書かなかった (★ 残存 dir の網が効いた)"
   else
     ng "変異テスト: 退行しているのに「完了」と書いた (⚠️★ 起票 18 と同じ嘘に戻る)"
+  fi
+fi
+
+# ── 7. base の解決 (★ 起票 23 の回帰) ───────────────────
+# ⚠️★★★ **何を止めるためにあるのか** (2026-09-21 の実測・起票 23):
+#   ★ 旧 `resolve_base` は逐語 `cfg="$(ls -1 .steering/*/_loop-config.json ... | tail -1 || true)"` で、
+#     ⚠️ **いま回そうとしている task と無関係に** config を **黙って 1 つ**拾っていた。
+#   ★ 実害の実測: `LOOP_FORCE=1 bash scripts/loop-spawn.sh --no-exec zzz` が
+#     **完了済みタスクの枝**から worktree を切り、⚠️ **main より 38 コミット前**になった。
+#   ⚠️ 併せて `jq -r ... 2>/dev/null || true` が **jq 不在 / 壊れた JSON / 不正な値**を
+#     すべて「空」に潰し、★ **pin が無言で消える**形もあった。
+#
+# ⚠️★★★ **判定は「どの枝から切られたか」を *中身* で見る。**
+#   ★ 各ブランチに `marker-<branch>` を 1 つ置き、worktree の HEAD sha と突き合わせる。
+#   ⚠️ 「base=main と表示されたか」で見てはならない —— ★ 使い捨て repo の既定は `main` なので、
+#     **取り逃がして fallback に落ちても偶然一致し、緑のまま穴が生きる**。
+echo "7. ⚠️★★★ base の解決 —— task で選ぶ / 特定できなければ止まる (★ 起票 23)"
+
+make_branch() { # make_branch <repo-dir> <branch>   ★ マーカー付きの実在ブランチを足す
+  ( cd "$1" && git switch -q -c "$2" \
+    && printf 'x\n' > "marker-$2" && git add "marker-$2" \
+    && git commit -q -m "on $2" && git switch -q main ) >/dev/null 2>&1
+}
+
+add_cfg_raw() { # add_cfg_raw <repo-dir> <task-dir> <JSON 本文>
+  local r="$1" t="$2"
+  mkdir -p "${r}/.steering/${t}" || return 1
+  printf '%s\n' "$3" > "${r}/.steering/${t}/_loop-config.json"
+}
+
+add_cfg() { # add_cfg <repo-dir> <task-dir> <base_branch の JSON 値そのまま>
+  add_cfg_raw "$1" "$2" "{
+  \"task\": \"$2\",
+  \"mode\": \"C\",
+  \"base_branch\": $3,
+  \"budget\": { \"max_attempts\": 2 }
+}"
+}
+
+# ⚠️ config を足したら commit する —— ★ さもないと `loop-spawn.sh` の dirty-tree 判定に当たる。
+#   ★ pathspec を `.steering` に限っているので、repo 全体を無条件に stage しているのではない。
+commit_cfgs() { ( cd "$1" && git add -A -- .steering && git commit -q -m cfg ) >/dev/null 2>&1; }
+reset_cfgs()  { ( cd "$1" && rm -rf .steering && git add -A -- .steering && git commit -q -m nocfg ) >/dev/null 2>&1; }
+
+SOUT=""; SERR=""; SRC=0; SPAWN_ENV=""
+do_spawn_x() { # do_spawn_x <repo-dir> <args...>   ★ 環境は SPAWN_ENV="K=V ..." で渡す
+  local r="$1"; shift
+  # ⚠️ `$SPAWN_ENV` は意図して非引用 (★ 語分割させて env に渡す)。本検査の値に空白は無い。
+  # shellcheck disable=SC2086
+  SOUT="$( (cd "$r" && env ${SPAWN_ENV} bash scripts/loop-spawn.sh "$@") 2>"${TMP}/serr.txt" )"
+  SRC=$?
+  SERR="$(cat "${TMP}/serr.txt" 2>/dev/null || true)"
+}
+
+tip_of()  { ( cd "$1" && git rev-parse --verify --quiet "refs/heads/$2" ) 2>/dev/null; }
+wt_head() { ( cd "$1" && git rev-parse HEAD ) 2>/dev/null; }
+
+# ★ 「id <id> の worktree が branch <b> の先端から切られたか」
+cut_from() { # cut_from <repo-dir> <wt-root> <id> <short> <branch>
+  local r="$1" wtroot="$2" id="$3" short="$4" b="$5" wt
+  wt="${wtroot}/repo-${id}-${short}"
+  [ -d "$wt" ] || return 1
+  [ "$(wt_head "$wt")" = "$(tip_of "$r" "$b")" ]
+}
+
+R7="${TMP}/r7/repo"; mkdir -p "${R7}"
+if ! setup_fake_repo "${R7}" || ! make_branch "${R7}" pinned-a || ! make_branch "${R7}" pinned-b; then
+  ng "群 7: 一時 git repo を用意できなかった (★ 判定できない)"
+else
+  MAIN_TIP="$(tip_of "${R7}" main)"
+
+  # --- 7a: config 0 件 + --task なし → 従来どおり main ---
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec 7a t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7}" "${TMP}/r7/wt" 7a t main; then
+    ok "7a: config 0 件なら従来どおり既定 (main) から切る"
+  else
+    ng "7a: rc=${SRC} / worktree が main から切られていない"
+  fi
+
+  # --- 7b: config 1 件 + --task なし → ⚠️★★★ 止まる (本丸) ---
+  add_cfg "${R7}" 20260101-zzz-task '"pinned-a"' && commit_cfgs "${R7}"
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec 7b t
+  if [ "${SRC}" -ne 0 ] \
+     && has_text "${SERR}" "20260101-zzz-task" \
+     && has_text "${SERR}" "--task" \
+     && has_text "${SERR}" "LOOP_BASE_BRANCH" \
+     && ! wt_has "${R7}" "repo-7b-t"; then
+    ok "7b: ★★★ config 1 件でも --task 無しなら止まり、候補と逃がし口を出した"
+  else
+    ng "7b: rc=${SRC} / 候補=$(has_text "${SERR}" "20260101-zzz-task" && echo yes || echo no) / worktree 残=$(wt_has "${R7}" "repo-7b-t" && echo yes || echo no)"
+  fi
+
+  # --- 7c: config 2 件 + --task なし → 止まり、両方を挙げる ---
+  add_cfg "${R7}" 20260101-aaa-task '"pinned-b"' && commit_cfgs "${R7}"
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec 7c t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "20260101-zzz-task" && has_text "${SERR}" "20260101-aaa-task"; then
+    ok "7c: config 2 件なら止まり、候補を 2 件とも挙げた"
+  else
+    ng "7c: rc=${SRC} / 候補の列挙が不足"
+  fi
+
+  # --- 7d: --task で「tail -1 が選ぶ方ではない」方を選べる ---
+  # ⚠️ zzz が名前順で最後 (= 旧実装が拾う方) で pinned-a。aaa を指定して pinned-b を取る。
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec --task 20260101-aaa-task 7d t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7}" "${TMP}/r7/wt" 7d t pinned-b; then
+    ok "7d: ★ --task が tail -1 とは別の config を選び、その base から切った"
+  else
+    ng "7d: rc=${SRC} / pinned-b から切られていない (⚠️ tail -1 に退行?)"
+  fi
+
+  # --- 7e: LOOP_TASK (env) でも選べる ---
+  SPAWN_ENV="LOOP_TASK=20260101-aaa-task"; do_spawn_x "${R7}" --no-exec 7e t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7}" "${TMP}/r7/wt" 7e t pinned-b; then
+    ok "7e: LOOP_TASK (env) でも task を選べる"
+  else
+    ng "7e: rc=${SRC} / pinned-b から切られていない"
+  fi
+
+  # --- 7f: --task が LOOP_TASK に勝つ ---
+  SPAWN_ENV="LOOP_TASK=20260101-zzz-task"; do_spawn_x "${R7}" --no-exec --task 20260101-aaa-task 7f t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7}" "${TMP}/r7/wt" 7f t pinned-b; then
+    ok "7f: --task が LOOP_TASK より優先される"
+  else
+    ng "7f: rc=${SRC} / --task が勝っていない"
+  fi
+
+  # --- 7g: 日付接頭辞を落とした素名でも当たる ---
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec --task aaa-task 7g t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7}" "${TMP}/r7/wt" 7g t pinned-b; then
+    ok "7g: 素名 (日付接頭辞なし) でも task を引ける"
+  else
+    ng "7g: rc=${SRC} / 素名で引けていない"
+  fi
+
+  # --- 7h: 存在しない task → 止まる ---
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec --task no-such-task 7h t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${R7}" "repo-7h-t"; then
+    ok "7h: 存在しない --task で止まった"
+  else
+    ng "7h: rc=${SRC} / 存在しない task で進んだ"
+  fi
+
+  # --- 7j: LOOP_BASE_BRANCH は config を読まずに勝つ ---
+  SPAWN_ENV="LOOP_BASE_BRANCH=pinned-a"; do_spawn_x "${R7}" --no-exec 7j t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7}" "${TMP}/r7/wt" 7j t pinned-a; then
+    ok "7j: LOOP_BASE_BRANCH が config を読まずに最優先で効く"
+  else
+    ng "7j: rc=${SRC} / pinned-a から切られていない"
+  fi
+
+  # --- 7s / 7t: provenance と乖離 (stderr) / stdout 契約 ---
+  SPAWN_ENV=""; do_spawn_x "${R7}" --no-exec --task 20260101-zzz-task 7s t
+  if [ "${SRC}" -eq 0 ] \
+     && has_text "${SERR}" "provenance" \
+     && has_text "${SERR}" "コミット後ろ" \
+     && has_text "${SERR}" "20260101-zzz-task"; then
+    ok "7s: 解決した base の provenance と既定からの乖離を stderr に出した"
+  else
+    ng "7s: rc=${SRC} / provenance/乖離 が stderr に出ていない"
+  fi
+  s_last="$(printf '%s\n' "${SOUT}" | tail -1)"
+  if [ -n "${s_last}" ] && [ -d "${s_last}" ]; then
+    ok "7t: ★ stdout の最終行が worktree の絶対パスのまま (--no-exec の契約)"
+  else
+    ng "7t: ⚠️★★★ stdout 契約が壊れた (最終行=[${s_last}]) —— loop-run.sh が worktree を掴めない"
+  fi
+fi
+
+# --- 7i: --task が 2 つの dir に一致 → 止まる ---
+R7I="${TMP}/r7i/repo"; mkdir -p "${R7I}"
+if ! setup_fake_repo "${R7I}"; then
+  ng "7i: 準備できなかった (★ 判定できない)"
+else
+  add_cfg "${R7I}" 20260101-dup 'null'
+  add_cfg "${R7I}" 20260202-dup 'null'
+  commit_cfgs "${R7I}"
+  SPAWN_ENV=""; do_spawn_x "${R7I}" --no-exec --task dup 7i t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "20260101-dup" && has_text "${SERR}" "20260202-dup"; then
+    ok "7i: 素名が 2 件に一致したら止まり、両方を挙げた"
+  else
+    ng "7i: rc=${SRC} / 曖昧な --task で進んだ or 候補が出ない"
+  fi
+fi
+
+# --- 7k: ⚠️★★★ 1 行に 3 キーが同居した config (★ 既存テストと同じ形) ---
+# ⚠️ **pinned-a に pin する** —— ★ main 以外にしないと、行頭アンカーへ退行しても
+#   fallback の main と偶然一致し、**この検査が何も見ないことになる** (→ 群 8b が対照)。
+R7K="${TMP}/r7k/repo"; mkdir -p "${R7K}"
+if ! setup_fake_repo "${R7K}" || ! make_branch "${R7K}" pinned-a; then
+  ng "7k: 準備できなかった (★ 判定できない)"
+else
+  add_cfg_raw "${R7K}" 20260101-oneline '{
+  "task": "oneline", "mode": "C", "base_branch": "pinned-a",
+  "budget": { "max_attempts": 2 }
+}'
+  commit_cfgs "${R7K}"
+  SPAWN_ENV=""; do_spawn_x "${R7K}" --no-exec --task 20260101-oneline 7k t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7K}" "${TMP}/r7k/wt" 7k t pinned-a; then
+    ok "7k: ★★★ 1 行に複数キーが同居した config でも base_branch が効く (行頭アンカー禁止)"
+  else
+    ng "7k: rc=${SRC} / pinned-a から切られていない (⚠️ 行頭アンカーに退行?)"
+  fi
+fi
+
+# --- 7l / 7m: null / キー無し → die せず fallback ---
+R7L="${TMP}/r7l/repo"; mkdir -p "${R7L}"
+if ! setup_fake_repo "${R7L}"; then
+  ng "7l/7m: 準備できなかった (★ 判定できない)"
+else
+  add_cfg "${R7L}" 20260101-nullbase 'null' && commit_cfgs "${R7L}"
+  SPAWN_ENV=""; do_spawn_x "${R7L}" --no-exec --task 20260101-nullbase 7l t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7L}" "${TMP}/r7l/wt" 7l t main; then
+    ok "7l: base_branch が null なら fallback (main) へ落ちる"
+  else
+    ng "7l: rc=${SRC} / null で main へ落ちていない"
+  fi
+
+  reset_cfgs "${R7L}"
+  add_cfg_raw "${R7L}" 20260101-nokey '{
+  "task": "nokey",
+  "mode": "C",
+  "budget": { "max_attempts": 2 }
+}'
+  commit_cfgs "${R7L}"
+  SPAWN_ENV=""; do_spawn_x "${R7L}" --no-exec --task 20260101-nokey 7m t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7L}" "${TMP}/r7l/wt" 7m t main; then
+    ok "7m: base_branch キーが無ければ fallback (⚠️ die しない)"
+  else
+    ng "7m: rc=${SRC} / キー無しで止まった or main へ落ちていない"
+  fi
+fi
+
+# --- 7n..7r: ⚠️ 読めない / 不正な値 / 存在しない枝 → 止まる (★ 黙って main へ落ちない) ---
+echo "7n-7r. ⚠️★★★ 読めない値・不正な値・存在しない枝で **黙って main へ落ちない**か"
+i=0
+for spec in \
+  '7n|123|数値' \
+  '7o|DUPKEY|base_branch が 2 回' \
+  '7p|"-foo"|先頭が - (オプション混入)' \
+  '7q|"a b"|空白入り' \
+  '7r|"no-such-branch"|存在しないブランチ'
+do
+  i=$((i + 1))
+  cid="${spec%%|*}"; rest="${spec#*|}"; val="${rest%%|*}"; label="${rest#*|}"
+  RX="${TMP}/rx${i}/repo"; mkdir -p "${RX}"
+  if ! setup_fake_repo "${RX}"; then
+    ng "${cid}: 準備できなかった (★ 判定できない)"
+    continue
+  fi
+  if [ "${val}" = "DUPKEY" ]; then
+    add_cfg_raw "${RX}" 20260101-bad '{
+  "task": "bad",
+  "base_branch": "main",
+  "headless": { "base_branch": "other" }
+}'
+  else
+    add_cfg "${RX}" 20260101-bad "${val}"
+  fi
+  commit_cfgs "${RX}"
+  SPAWN_ENV=""; do_spawn_x "${RX}" --no-exec --task 20260101-bad "${cid}" t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${RX}" "repo-${cid}-t"; then
+    ok "${cid}: ${label} → 非 0 で止まり worktree を作らなかった"
+  else
+    ng "${cid}: ${label} → rc=${SRC} / worktree 残=$(wt_has "${RX}" "repo-${cid}-t" && echo yes || echo no) (⚠️ 黙って進んだ)"
+  fi
+done
+
+# ── 8. 変異テスト (★ 群 7 が空振りしていないこと) ────────
+echo "8. ⚠️★★★ 変異テスト —— fail-closed / 抽出器を潰したら赤くなるか"
+
+# --- 8a: fail-closed を殺す (--task 無しの die を素通りさせる) ---
+MUT8A="${TMP}/mut8a-loop-spawn.sh"
+sed 's/elif \[ "\${n_cfg:-0}" -gt 0 \]; then/elif false; then/' "${SPAWN_SH}" > "${MUT8A}"
+# ⚠️★★★ **`|| echo 0` を使わない。**
+#   ★ `grep -c` は **0 件でも "0" を出力しつつ exit 1** するので、`|| echo 0` を付けると
+#     **"0" が 2 行**出る。⚠️ すると `[` が integer expression エラーを出し、
+#     ★★★ **`if` が偽になってガードが素通りする** (＝ 変異が当たっていなくても
+#     「検査不能」と報告せずに本体へ進む ＝ **検査が空振りしていることに気づけない**)。
+#   ★ 群 6 の `mut_left` と同じ形 (`... 2>/dev/null)" || var=0`) に揃える。
+#   ⚠️ 2026-09-21 に実測で踏んだ: 当て先の書き方を変える実験をしたら
+#     `[: missing ']'` を出して **NG の理由を間違えた**。
+#   ★★★ **両側で数える** —— ⚠️★★★ 「元の形が消えた」だけでは
+#     **「sed が置換した」と「そもそも存在しなかった」を区別できない**。
+#     ★ 2026-09-21 に実測: 当て先の書き方を変えたところ、ガードは「成功」と見なして
+#     本体へ進み、⚠️ **NG の理由を間違えた**（「潰しても止まった」と報告した）。
+#   → ★ 元は **SPAWN_SH に 1 件あり**、**MUT で 0 件になっている**ことを両方確かめる。
+mut8a_src="$(grep -c 'elif \[ "\${n_cfg:-0}" -gt 0 \]; then' "${SPAWN_SH}" 2>/dev/null)" || mut8a_src=0
+mut8a_left="$(grep -c 'elif \[ "\${n_cfg:-0}" -gt 0 \]; then' "${MUT8A}" 2>/dev/null)" || mut8a_left=0
+if [ "${mut8a_src:-0}" -ne 1 ] || [ "${mut8a_left:-0}" -ne 0 ]; then
+  ng "8a: 変異を当てられない (src=${mut8a_src} / mut=${mut8a_left}) —— ★ fail-closed の書き方が変わった → ⚠️ **検査不能**。sed を直せ"
+else
+  R8A="${TMP}/r8a/repo"; mkdir -p "${R8A}"
+  if ! setup_fake_repo "${R8A}" "${MUT8A}"; then
+    ng "8a: 準備できなかった (★ 判定できない)"
+  else
+    add_cfg "${R8A}" 20260101-zzz-task '"main"' && commit_cfgs "${R8A}"
+    SPAWN_ENV=""; do_spawn_x "${R8A}" --no-exec 8a t
+    if [ "${SRC}" -eq 0 ]; then
+      ok "8a: fail-closed を潰すと --task 無しで通ってしまった (★ 7b は空振りしていない)"
+    else
+      ng "8a: 潰しても止まった (⚠️★★★ 7b は fail-closed を見ていない可能性)"
+    fi
+  fi
+fi
+
+# --- 8b: 抽出器を行頭アンカーへ退行させる ---
+# ⚠️★★★ **これが最も重要である** —— ★ 7k だけでは「fake repo の既定が偶然 main」で
+#   緑のまま通る恐れがある。★ 8b が赤くならなければ 7k は何も見ていない。
+MUT8B="${TMP}/mut8b-loop-spawn.sh"
+sed 's/anchor = ""/anchor = "^"/' "${SPAWN_SH}" > "${MUT8B}"
+# ⚠️ 変異後の形を数えない —— ★ `loop-spawn.sh` の**注記に逐語で** `anchor = "^"` が入っているので
+#   2 件数えてしまう。★ 群 6 と同じく「**元の形が消えたか**」で判定する。
+mut8b_src="$(grep -c 'anchor = ""' "${SPAWN_SH}" 2>/dev/null)" || mut8b_src=0
+mut8b_left="$(grep -c 'anchor = ""' "${MUT8B}" 2>/dev/null)" || mut8b_left=0
+if [ "${mut8b_src:-0}" -ne 1 ] || [ "${mut8b_left:-0}" -ne 0 ]; then
+  # ⚠️ メッセージにバッククォートを入れない —— ★ 二重引用符の中では **コマンド置換**として
+  #   実行される (2026-09-21 に実測: `anchor: command not found` を出し、語が消えた)。
+  ng "8b: 変異を当てられない (src=${mut8b_src} / mut=${mut8b_left}) —— ★ 抽出器の注入点 [anchor = \"\"] が変わった → ⚠️ **検査不能**。sed を直せ"
+else
+  R8B="${TMP}/r8b/repo"; mkdir -p "${R8B}"
+  if ! setup_fake_repo "${R8B}" "${MUT8B}" || ! make_branch "${R8B}" pinned-a; then
+    ng "8b: 準備できなかった (★ 判定できない)"
+  else
+    add_cfg_raw "${R8B}" 20260101-oneline '{
+  "task": "oneline", "mode": "C", "base_branch": "pinned-a",
+  "budget": { "max_attempts": 2 }
+}'
+    commit_cfgs "${R8B}"
+    SPAWN_ENV=""; do_spawn_x "${R8B}" --no-exec --task 20260101-oneline 8b t
+    if cut_from "${R8B}" "${TMP}/r8b/wt" 8b t main; then
+      ok "8b: ★★★ 行頭アンカーへ退行させると pin を取り逃がし main へ落ちた (★ 7k は空振りしていない)"
+    else
+      ng "8b: 退行させても pinned-a から切れた (⚠️★★★ 7k は行頭アンカーの穴を見ていない)"
+    fi
   fi
 fi
 

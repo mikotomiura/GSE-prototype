@@ -110,7 +110,17 @@ recheck を基準 5 で選別したか (全部 parse にしていないか) /
 
 | | A: 手動 worktree 並列 | B: orchestrator ＋ subagent | C: script ＋ headless (無人) |
 |---|---|---|---|
-| 起動 | `loop-spawn.sh` → `/loop-issue` | `/loop-orchestrate` (新セッション) | `bash scripts/loop-run.sh <task>` |
+| 起動 | `loop-spawn.sh --task <task> <id>` → `/loop-issue` | `/loop-orchestrate` (新セッション) | `bash scripts/loop-run.sh <task>` |
+
+⚠️★★★ **モードA は `--task` を名指しする** (2026-09-21・起票 23)。
+★ `loop-spawn.sh` は旧実装で `.steering/*/_loop-config.json` を `tail -1` で
+**タスクと無関係に 1 つ拾っていた** ため、⚠️ **完了済みタスクの枝から worktree が切られ、
+main より 38 コミット前になる**事故が実測された。
+→ ★ **config が 1 件以上あるのに `--task` / `LOOP_TASK` / `LOOP_BASE_BRANCH` のいずれもなければ
+  `loop-spawn.sh` は止まる** (fail-closed)。⚠️ **1 件だけでも黙って選ばない。**
+★ モードC (`loop-run.sh`) は `$TASK_DIR` を自動で渡すので、人が書く必要はない。
+★ 解決した base は **provenance と「既定ブランチからの乖離コミット数」とともに stderr へ出る**
+  (★ モードC では run ログに残る)。→ 詳細は `.steering/_template/loop-config.README.md`。
 | 制御の主体 | 人 | LLM (Sonnet) | **script (決定論)** |
 | 隔離 | worktree で完全隔離 | 親と同一チェックアウト | worktree で完全隔離 |
 | 並列度 | `budget.parallel` (既定 3) | 既定 1 (直列) | `budget.parallel` (semaphore) |
