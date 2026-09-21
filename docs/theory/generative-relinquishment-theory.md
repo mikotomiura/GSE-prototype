@@ -2,7 +2,7 @@
 
 > ⚠️★★★ **2026-09-19 に `.idea/` から移した（段 3 判断 1 #4）。** 元のファイルは `.idea/20260915-generative-relinquishment-theory.md`（2026-09-15）。移した理由は、改訂を版管理し `/cross-review` を通すためである。作業記録は `.steering/20260919-ssot-h-theory-docs/`。
 > - ★ **位置づけ**: **theory candidate**（証拠階梯 `EH0` = 概念監査まで）。⚠️ **SSOT の主張ではない**。`docs/research-positioning.md` §1 は理論を**問い**として参照するだけで、確証核は L0 のまま、headline も変えない（理論レビュー 判断 1 #1 = J-1）。
-> - ★★★ **理論名「生成的返権論 / Generative Relinquishment Theory」は 2026-09-21 に *確定* した**（`J-2`・研究者判断・S3 の後）。⚠️ **作業名ではなくなった。** ★ ただし **§11.4 の層の使い分けは規約**であり、⚠️ **名前には 2 つの注記が必ず伴う**（**返すのは `control` ではない** ／ **英語名は仏教の定訳 [P417] と衝突する**）。語「返権」は 2026-09-19 に確定済み（`docs/glossary.md`・段 3 判断 1 #3）。
+> - ★★★ **理論名「生成的返権論 / Generative Relinquishment Theory」は 2026-09-21 に *確定* した**（`J-2`・研究者判断・S3 の後）。⚠️ **作業名ではなくなった。** ★ ただし **§11.4 の層の使い分けは規約**であり、⚠️ **名前には 2 つの注記が必ず伴う**（**返すのは `control` ではない** ／ **英語名は仏教の英訳語 [P417] と衝突する**）。語「返権」は 2026-09-19 に確定済み（`docs/glossary.md`・段 3 判断 1 #3）。
 > - ★ **本文へ反映したのは、研究者が裁定した事項と、昇格時に一括で直す機械的な規則だけ**である（→ 下の「2026-09-19 の改訂」）。
 > - ⚠️★★★ **批判的レビューの判定（保持・統合・縮小・棄却・要サーヴェイ）は提案であり、研究者の採否は未了である。本文には当てていない。** 読むときは併読すること: `.steering/20260918-theory-critical-review/review-B.md`・`ssot-collision-findings.md`・`citations-audit.md`（★ 著者・年で引いた文献の多くは `docs/references.md` に未登録）。
 >
@@ -549,7 +549,7 @@ AI Fatigue Scale の傾向得点と、短時間の content-free な行動痕跡�
 ⚠️★★★ **名前に必ず伴わせる注記（2 つ）**:
 
 1. **返すのは `control` ではない。** ★ 生成芸術の正典が委譲するのは **`control`** であり（*"the system to which the artist **cedes** … control"* [P409]）、⚠️ **GSE が返すのは認識的権限（意味の認定・評価・報酬化）である**。→ ★ 「返権」を *Galanter が譲った制御を返すこと* と読ませない。
-2. **英語名は仏教の定訳と衝突する。** ★ `relinquishment` は上座部仏教の第三聖諦の定訳として定着した英語術語である（*"the remainderless fading & cessation, renunciation, **relinquishment**, release, & letting go of that very craving"* [P417]）。⚠️ GSE は省察系（slow technology [P104] ほか）と隣接するため、**無害な連想ではない**。→ ★ 英語で傘の名を出すときは、**狭い構成概念（Epistemic Relinquishment）を併記する**。
+2. **英語名は仏教の英訳語と衝突する。** ★ `relinquishment` は上座部仏教の第三聖諦の英訳で用いられる確立した語である（⚠️ 確認は **Thanissaro Bhikkhu 訳の 2 ページのみ**で、**別訳は未照合** —— ★ 「定訳」とは書かない。*"the remainderless fading & cessation, renunciation, **relinquishment**, release, & letting go of that very craving"* [P417]）。⚠️ GSE は省察系（slow technology [P104] ほか）と隣接するため、**無害な連想ではない**。→ ★ 英語で傘の名を出すときは、**狭い構成概念（Epistemic Relinquishment）を併記する**。
 
 > ★ **語「返権」そのものは 2026-09-19 に確定済み**（`docs/glossary.md`・段 3 判断 1 #3）。⚠️ `J-2` が問うていたのは**理論名だけ**であった。
 > ⚠️ **判断材料にしなかったもの**: 「`relinquish control` は生成芸術の常套句」（★ **1-2 で否決** —— 根拠が二次のみ）／ 養子縁組法の「親権放棄」・`epistemic relinquishment` が術語でないこと（★ **判定不能** —— 一次未到達）。
