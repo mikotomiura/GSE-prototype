@@ -99,12 +99,12 @@
 4. **どう有効と検証した?** 理論論文。★★★ **メインが arXiv から原典 PDF を取得して全文照合**した。
 5. **議論はあるか?** ⚠️★★★ **「コンピュータのキーボードの摩耗」を直接の例に挙げている** —— 逐語: *"Autographic visualizations can be **accidental**, such as the desire paths across grass areas in the city or the **uneven traces of wear on a staircase or a computer keyboard**."*
    ★ **ただし限定が 2 つある（★ メインの全文実測）**: (i) この例は **`accidental`（偶発的）**として挙げられている。(ii) 本文に **`portrait` は 0 件**であり、**人格表象としての「肖像」の文脈には置かれていない**。★ また **`trajectory` 0 件 / `path` 3 件**（いずれも desire path の意）で、**経路依存＝非代替性の理論化は見当たらない**。
-6. **次に読むべき** Offenhuber, D. *Autographic Design*（MIT Press, 2023）／ 本論文が引く Ginzburg の evidential paradigm（★ **どちらも未読**）。
+6. **次に読むべき** Offenhuber, D. *Autographic Design*（MIT Press, **2024**）／ 本論文が引く Ginzburg の evidential paradigm（★ **どちらも未読**）。
 
 > ⚠️★★★ **GSE への含意（本ラウンド最大の帰結）**: **`SUB-PGP` の「5 要件の結合が新しい」とは書けない。**
 > ★ **指標性**と**解釈の余地**は [P424] に既出で、**過程性**も「データ生成過程の露出」という形で既出である。
 > → ★ 残る差分の候補は **非代替性の明示要件化 × 肖像（人格表象）の文脈 × セッション局所**の 3 点に**縮小する**。
-> ⚠️ **それも「今回の範囲で見つからなかった」までである**（★ *Autographic Design*（2023）が未読）。
+> ⚠️ **それも「今回の範囲で見つからなかった」までである**（★ *Autographic Design*（**2024**）が未読）。
 
 ## カード 7: 「データを作品にする＝数値を隠す」ではない **[検証済 2-1]** [P425] [P427] [P428]
 
@@ -132,7 +132,7 @@
 
 ## やり残し（★ 次ラウンドの入口）
 
-1. ⚠️★★★ **Offenhuber, D. *Autographic Design*（MIT Press, 2023）** —— ★ [P424] は 2019 年の論文であり、**書籍版で「肖像」「経路依存」に踏み込んでいれば、`SUB-PGP` に残った 3 点の差分も消える**。★ **最優先**。
+1. ⚠️★★★ **Offenhuber, D. *Autographic Design*（MIT Press, **2024**）** —— ★ [P424] は 2019 年の論文であり、**書籍版で「肖像」「経路依存」に踏み込んでいれば、`SUB-PGP` に残った 3 点の差分も消える**。★ **最優先**。
 2. **Donath (2014) *The Social Machine* の "Data Portraits" 章** —— ★ MIT Press Gateway が 403。カード 1 の留保を閉じる。
 3. **[P429] の一次全文**（★ 逐語がメイン未照合のまま）／ Lupton (2016) の一次。
 4. **[P425] *Dear Data* の書籍本文** と **[P426] の 13 原則の全文**（★ どちらも抜粋止まり）。
