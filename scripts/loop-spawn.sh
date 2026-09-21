@@ -197,7 +197,11 @@ json_top_value() {
 #     **main checkout の `_loop-config.json` を Write で書き換える経路が開いている**。
 #   → ★ 制御文字を落とし、長さも切る (⚠️ `loop-run.sh` の `log` に redaction は無いので **出す側で消す**)。
 sanitize_disp() {
-  printf '%s' "$1" | LC_ALL=C tr -d '\000-\037\177' | cut -c1-200
+  # ⚠️ **削除ではなく `?` へ置換する** (★ Codex `/cross-review` 2 巡目・2026-09-21)。
+  #   ★ 削除すると `ab<CR>cd` が `abcd` に見え、⚠️ **何かがあったこと自体が消える**。
+  #   ★ 目的は「表示を崩さないこと」であって「痕跡を消すこと」ではないので、
+  #     **位置と個数を残す**方が事故調査に強い。
+  printf '%s' "$1" | LC_ALL=C tr '\000-\037\177' '?' | cut -c1-200
 }
 
 # valid_refname <value>

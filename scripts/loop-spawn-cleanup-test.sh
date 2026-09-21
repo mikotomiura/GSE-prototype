@@ -816,10 +816,15 @@ else
   # --- 7ad: LOOP_BASE_BRANCH の不正値も検証されるか ---
   # ⚠️ env 経路は config を読まずに即 return するので、**検証が別経路**になっている。
   SPAWN_ENV="LOOP_BASE_BRANCH=--upload-pack=echo"; do_spawn_x "${R7Z}" --no-exec 7ad t
-  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "LOOP_BASE_BRANCH" && ! wt_has "${R7Z}" "repo-7ad-t"; then
-    ok "7ad: LOOP_BASE_BRANCH の不正値も止まる (⚠️ env 経路は config を読まないので別の関門が要る)"
+  # ⚠️★★★ **「LOOP_BASE_BRANCH」の語で見てはならない** —— ★ 2026-09-21 に実測:
+  #   provenance 行が `provenance = env:LOOP_BASE_BRANCH` を出すので、
+  #   ⚠️ **検証を外しても語が一致し、`git worktree add` が落ちて非 0 になり、
+  #   ★★★ 緑のまま通っていた** (★ 本タスクで狩ってきた「偶然一致で緑」型そのもの)。
+  #   → ★ **関門の die メッセージで固定する。**
+  if [ "${SRC}" -ne 0 ]      && has_text "${SERR}" "LOOP_BASE_BRANCH の値がブランチ名として妥当ではありません"      && ! wt_has "${R7Z}" "repo-7ad-t"; then
+    ok "7ad: LOOP_BASE_BRANCH の不正値を **env 経路の関門**で止めた (★ 語で確認)"
   else
-    ng "7ad: rc=${SRC} —— ⚠️ env 経路が無検証 (★ --upload-pack= は git fetch が受理する)"
+    ng "7ad: rc=${SRC} —— ⚠️ env 経路の関門を通っていない (★ --upload-pack= は git fetch が受理する)"
   fi
 
   # --- 7ae: ⚠️★★★ 大文字ブランチを **過剰に拒否していない**か (★ 過剰拒否の陰性対照) ---
@@ -844,39 +849,18 @@ else
   fi
 fi
 
-# --- 7ag: ⚠️ loop-run.sh 経由で spawn が失敗したときログに残るか (★ 統合) ---
-# ⚠️ Codex `/cross-review` 1 巡目の「loop-run.sh の spawn 失敗時ログ/cleanup が薄い」への対照。
-#   ★ loop-run.sh を fake repo に置き、**config を壊して** spawn を失敗させ、
-#     ⚠️ (a) run が止まる (b) **一時ファイルが残らない** ことを見る。
-R7AG="${TMP}/r7ag/repo"; mkdir -p "${R7AG}"
-if [ ! -f "${REPO_ROOT}/scripts/loop-run.sh" ]; then
-  ng "7ag: loop-run.sh が無い (★ 判定できない)"
-elif ! setup_fake_repo "${R7AG}"; then
-  ng "7ag: 準備できなかった (★ 判定できない)"
-else
-  cp "${REPO_ROOT}/scripts/loop-run.sh" "${R7AG}/scripts/loop-run.sh"
-  mkdir -p "${R7AG}/.steering/task/issues"
-  printf '# 001\n' > "${R7AG}/.steering/task/issues/001.md"
-  # ⚠️ base_branch を **入れ子だけ**に置く = 本タスクが塞いだ形 → spawn が die する
-  printf '%s\n' '{
-  "task": "task", "mode": "C",
-  "verify": { "test": "true" },
-  "budget": { "max_attempts": 1, "no_progress_threshold": 1, "token_ceiling": 1000, "parallel": 1 },
-  "headless": { "model": "sonnet", "base_branch": "sneaky" }
-}' > "${R7AG}/.steering/task/_loop-config.json"
-  ( cd "${R7AG}" && git add -A -- .steering scripts && git commit -q -m cfg ) >/dev/null 2>&1
-  tmp_before="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'tmp.*' -type f 2>/dev/null | wc -l)"
-  ( cd "${R7AG}" && bash scripts/loop-run.sh .steering/task --dry-run ) >"${TMP}/r7ag.out" 2>&1
-  ag_rc=$?
-  tmp_after="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'tmp.*' -type f 2>/dev/null | wc -l)"
-  tmp_before="${tmp_before//[[:space:]]/}"; tmp_after="${tmp_after//[[:space:]]/}"
-  if [ "${tmp_after:-0}" -le "${tmp_before:-0}" ]; then
-    ok "7ag: loop-run.sh 経由でも一時ファイルが増えていない (★ trap RETURN が効いている)"
-  else
-    ng "7ag: 一時ファイルが ${tmp_before} → ${tmp_after} に増えた (⚠️ spawn 失敗時に残る)"
-  fi
-fi
-
+# --- 7ag: ✖ **削除した** (2026-09-21・Codex `/cross-review` 2 巡目) ---
+# ⚠️★★★ **完全な空振りだったので消した。「緑だが何も見ていないテスト」は残さない。**
+#   ★ 理由: `loop-run.sh:756` は `--dry-run` のとき **`run_issue` に到達しない**ので、
+#     一時ファイルを数えても **spawn の経路を 1 行も通っていなかった**。
+#   ⚠️ かつコメントには「(a) run が止まる (b) 一時ファイルが残らない」と書いていたが、
+#     **(a) は一切検査していなかった**（`ag_rc` も `r7ag.out` も未使用）。
+#   ★ 代わりに何が守っているか:
+#     - モードC の配線（`--task` を渡すこと）は **`loop-worktree-deny-test.sh` と
+#       `loop-run-guard-test.sh` が stub 付きで本番の `loop-run.sh` を回して守っている**。
+#       ★ 実測の陰性対照: `--task` を外すと **34/0 → 30/4** と **35/0 → 19/16** になる。
+#     - `trap ... RETURN` が bash で発火することは **別途 2026-09-21 に直接実測**している。
+#   ⚠️ ここで stub ハーネスを組み直すのは `loop-run-guard-test.sh` の重複になるのでしない。
 
 # ── 8. 変異テスト (★ 群 7 が空振りしていないこと) ────────
 echo "8. ⚠️★★★ 変異テスト —— fail-closed / 抽出器を潰したら赤くなるか"
