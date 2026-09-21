@@ -1,7 +1,11 @@
 # S5 生データ（*Autographic Design* 書籍 ＋ 生成芸術の正典 —— S3 / S4 のやり残し）
 
 > 実施: 2026-09-21 ／ カード: `docs/literature/20260921-autographic-book-and-generative-art-primaries.md`
-> 採番: 新規 **[P430]–[P431]** ＋ 既存 **[P416]（`active` へ昇格）/ [P424]（掲載誌を確定）**
+> 採番: 新規 **[P430]–[P432]** ＋ 既存 **[P416]（`active` へ昇格）/ [P424]（掲載誌を著者ページに基づき記録・⚠️ 巻号/頁は未確認）**
+>
+> ⚠️★★★ **2026-09-21 追記（`/cross-review` の指摘で是正）**: 本ファイルは当初 **[P432] を 1 度も書いていなかった**。
+> ★ 実害: **最も出所の格が低い 1 件**（YouTube の**自動生成字幕**）だけが**監査記録の外**にあり、
+> `docs/references.md:467` とカード 5 が根拠にしている語彙実測を**ここで追検証できなかった**。→ ★ §2 / §3 に追記した。
 
 ## 1. ⚠️★★★ このラウンドが回った経緯（★ 記録しておく価値がある）
 
@@ -29,6 +33,20 @@
 
 ★ **全 3 本に「抽出テキストを scratchpad に保存してパスを報告」を課した** → ⚠️ **メインが全件を再照合できた**（S4 で導入した対策が継続して効いている）。
 
+### ★ [P432]（著者インタビュー）の取得経路 —— ⚠️ 出所の格が最も低い 1 件
+
+| 項目 | 中身 |
+|---|---|
+| 対象 | *PolicyViz* podcast（聞き手 Schwabish, J.）<https://www.youtube.com/watch?v=vxxl5EwKPE4> |
+| 取得 | ★ **メインが `yt-dlp` 2026.08.19 を本ラウンドで導入して取得**（`python -m pip install yt-dlp`） |
+| コマンド | `python -m yt_dlp --skip-download --write-auto-subs --sub-langs "en.*" --sub-format vtt -o "yt-%(id)s.%(ext)s" <URL>` |
+| ⚠️ **出所の格** | ★★★ **YouTube の *自動生成字幕* である**（⚠️ 公式の書き起こしではない）。**逐語の正確性は保証されない** —— ★ 実際に**人名が崩れている箇所がある**。→ ★ `references.md` では **`provisional`** で登録し、「**論文で引くなら公式の書き起こしか原典に当たり直す**」と明記した |
+| ⚠️ 未確認 | **収録日**（★ 告知ページに記載なし） |
+| 保存 | ★ 字幕全文を scratchpad に保存し、メインが**全文照合**した（⚠️ セッション終了で消えるため、逐語は `references.md:467` とカード 5 に写してある） |
+
+⚠️★★★ **この 1 件だけは「取得できたこと」自体が `verify-before-claiming` の対象だった** —— ★ カード `:107` / `decisions.md` / 本ファイル §7 が
+**「`yt-dlp` 等がこの環境に未インストールで取れなかった」と書いたまま残っていた**（⚠️ 同じラウンドで取得済みなのに）。→ ★ 3 か所とも是正した。
+
 ## 3. ★ メインの一次実測（⚠️ 断定の根拠はここだけ）
 
 | 対象 | 実測 |
@@ -36,6 +54,11 @@
 | **[P430] 序章**（60,942 字） | `trace` 52 / `material` 43 / `forensic` 9 ／ ⚠️ **`portrait` 0 / `path depend` 0 / `trajectory` 0 / `indexical` 0** / `person` 3 / `identif` 2 / `accountab` 0 / `provenance` 0 |
 | **[P416] 掲載版**（40,317 字） | ⚠️ **`relinquish` 0** / **`cede` 0**（★ 1 件は **"concede" の部分一致＝偽陽性**）/ `redistribut` 1 / `authorship` 2 / `autonom` 10 / `agency` 4 / **`terminat` 0** |
 | **[P424] arXiv**（74,684 字） | `individualiz` 1 / `fingerprint` 2 / `forensic` 10 ／ ⚠️ **`biometric` 0 / `Bertillon` 0 / `facial` 0 / `surveillance` 0 / `portrait` 0** |
+| ⚠️ **[P432] 自動生成字幕**（★ **出所の格が低い** —— 下記の留保つき） | `autographic` 90 / `trace` 93 / `indexical` 3 / `forensic` 3 ／ ⚠️ **`portrait` 0 / `biometric` 0 / `Bertillon` 0 / `facial` 0 / `path depend` 0** |
+
+⚠️★★★ **[P432] の行だけは他の 3 行と格が違う** —— ★ 上 3 行は**原典 PDF の抽出テキスト**だが、[P432] は **YouTube の自動生成字幕**である。
+★ したがって **0 件群を「本人が触れていない」の根拠に使うのは可**（★ 語の不在は誤字に強い）だが、⚠️ **逐語の引用には使えない**（★ 人名が崩れている）。
+→ ★ カード 5 と `references.md:467` の両方に、この格の違いを明記してある。
 
 ★ **[P424] の 0 件群が意味すること**: ⚠️ **biometric / Bertillon / facial / surveillance は書籍側で足された** —— ★ だからこそ**書籍の当該ページを読まないと (ii) は決まらない**。
 
@@ -66,6 +89,8 @@ Identifiers: LCCN 2023007789 (print) | ISBN 9780262547024 (paperback)
 
 ## 7. 残り
 
-1. ⚠️★★★ **書籍 pp.33 / 62 / 80 / 186–187**（★ **図書館 / 書評本文 / 講演の字幕**。⚠️ `yt-dlp` 等は**この環境に未インストール**）
+1. ⚠️★★★ **書籍 pp.33 / 62 / 80 / 186–187**（★ 残る経路は **図書館（ILL / 所蔵館）／[P431] の書評本文／Google Books 本文内検索の再試行**。
+   ⚠️★★★ **講演の字幕は候補から外した** —— ★ **本ラウンドで取得済み**である（[P432]・`yt-dlp` 2026.08.19 を導入）。
+   ⚠️ ただし代わりにはならない: 字幕実測で `portrait` / `biometric` / `Bertillon` / `facial` / `path depend` いずれも **0 件**）
 2. **Galanter (2016) / Boden & Edmonds (2009)**（★ S3 カード 1 の留保）
 3. ⚠️ **Google Books の本文内検索はメイン未再現**（★ レート制限）
