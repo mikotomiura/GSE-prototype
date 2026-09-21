@@ -226,11 +226,16 @@ valid_refname() {
     *[!A-Za-z0-9._/-]*) return 1 ;;
     refs/*) return 1 ;;                       # ⚠️ 完全修飾は受けない (★ origin/refs/... に化ける)
   esac
-  # ⚠️ 予約名 (`HEAD` / `*_HEAD` 系) —— ★ 先頭コンポーネントが英大文字と _ だけなら拒否
-  first="${v%%/*}"
-  case "$first" in
-    *[!A-Z_]*) : ;;                           # ★ 小文字や数字を含む = 予約名ではない
-    *) return 1 ;;                            # ⚠️ HEAD / FETCH_HEAD / ORIG_HEAD / MERGE_HEAD …
+  # ⚠️ git の pseudo-ref を拒否する。
+  #   ⚠️★★★ **「先頭コンポーネントが全部大文字なら拒否」にしてはならない**
+  #     (★ Codex `/cross-review` 1 巡目・2026-09-21)。★ 実測で `RELEASE/2026-09` /
+  #     `FEATURE/foo` / `HOTFIX/x` まで**誤って拒否していた** ——
+  #     ⚠️ 運用ブランチを大文字で切る repo では徒に止まる。
+  #   ★ 実在する pseudo-ref はすべて `HEAD` か `*_HEAD` か `AUTO_MERGE` である
+  #     (HEAD / FETCH_HEAD / ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD /
+  #      REVERT_HEAD / BISECT_HEAD / REBASE_HEAD / AUTO_MERGE)。→ ★ **そこだけを拒む**。
+  case "$v" in
+    HEAD|*_HEAD|AUTO_MERGE) return 1 ;;
   esac
   # ⚠️ commit sha を枝と誤認しない (★ 40 桁 = SHA-1 / 64 桁 = SHA-256)
   case "$v" in
@@ -241,8 +246,18 @@ valid_refname() {
 }
 
 # list_configs → .steering/*/_loop-config.json を 1 行 1 件で出す (★ 0 件なら何も出さない)
+#   ⚠️ `ls -1` に依存しない (★ Codex `/cross-review` 1 巡目・2026-09-21) ——
+#     ★ glob を直接回すので `ls` の出力整形に左右されない。
+#   ⚠️ ただし **ディレクトリ名に改行が入ると行単位の出力は壊れる**
+#     (★ 本 repo の task dir は kebab-case 規約であり、改行入りなら
+#      `.steering/` の他の仕組みも先に壊れるので、ここでは抱えない)。
 list_configs() {
-  ls -1 .steering/*/_loop-config.json 2>/dev/null || true
+  local c
+  for c in .steering/*/_loop-config.json; do
+    [ -f "$c" ] && printf '%s
+' "$c"
+  done
+  return 0
 }
 
 # find_task_config <selector> → ★ 一致した config のパスを **FOUND_CFG に入れる** (⚠️ 0 件 / 複数件なら die)

@@ -449,8 +449,15 @@ fi
 echo "7. ⚠️★★★ base の解決 —— task で選ぶ / 特定できなければ止まる (★ 起票 23)"
 
 make_branch() { # make_branch <repo-dir> <branch>   ★ マーカー付きの実在ブランチを足す
+  # ⚠️ ブランチ名に `/` が入る形 (`RELEASE/2026-09`) を渡されるので、
+  #   ★ マーカーのファイル名は平坦化する。
+  #   ⚠️ さもなければ存在しないディレクトリへの書き込みになり、
+  #   **「準備できなかった」で群がまるごと飛ぶ** (2026-09-21 に実測)。
+  local mk
+  mk="marker-$(printf '%s' "$2" | tr '/' '_')"
   ( cd "$1" && git switch -q -c "$2" \
-    && printf 'x\n' > "marker-$2" && git add "marker-$2" \
+    && printf 'x
+' > "${mk}" && git add "${mk}" \
     && git commit -q -m "on $2" && git switch -q main ) >/dev/null 2>&1
 }
 
@@ -799,6 +806,77 @@ else
     ng "7x2 の陽性対照: rc=${SRC} —— ⚠️ 日付の無い task dir を引けなくなった"
   fi
 fi
+# --- 7ad-7af: ⚠️ Codex `/cross-review` 1 巡目が「薄い」と指摘した経路 ---
+echo "7ad-7af. ⚠️ LOOP_BASE_BRANCH の不正値 / 大文字ブランチの過剰拒否 / 制御文字入り selector"
+
+R7Z="${TMP}/r7z/repo"; mkdir -p "${R7Z}"
+if ! setup_fake_repo "${R7Z}" || ! make_branch "${R7Z}" RELEASE/2026-09; then
+  ng "7ad-7af: 準備できなかった (★ 判定できない)"
+else
+  # --- 7ad: LOOP_BASE_BRANCH の不正値も検証されるか ---
+  # ⚠️ env 経路は config を読まずに即 return するので、**検証が別経路**になっている。
+  SPAWN_ENV="LOOP_BASE_BRANCH=--upload-pack=echo"; do_spawn_x "${R7Z}" --no-exec 7ad t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "LOOP_BASE_BRANCH" && ! wt_has "${R7Z}" "repo-7ad-t"; then
+    ok "7ad: LOOP_BASE_BRANCH の不正値も止まる (⚠️ env 経路は config を読まないので別の関門が要る)"
+  else
+    ng "7ad: rc=${SRC} —— ⚠️ env 経路が無検証 (★ --upload-pack= は git fetch が受理する)"
+  fi
+
+  # --- 7ae: ⚠️★★★ 大文字ブランチを **過剰に拒否していない**か (★ 過剰拒否の陰性対照) ---
+  # ⚠️ 2026-09-21 の実測: 「先頭コンポーネントが全部大文字なら拒否」にしていたため
+  #   `RELEASE/2026-09` / `FEATURE/foo` / `HOTFIX/x` まで**誤って拒否**していた。
+  #   → ★ pseudo-ref は `HEAD` / `*_HEAD` / `AUTO_MERGE` だけなので、そこだけ拒む。
+  add_cfg "${R7Z}" 20260101-upper '"RELEASE/2026-09"'
+  commit_cfgs "${R7Z}"
+  SPAWN_ENV=""; do_spawn_x "${R7Z}" --no-exec --task 20260101-upper 7ae t
+  if [ "${SRC}" -eq 0 ] && cut_from "${R7Z}" "${TMP}/r7z/wt" 7ae t "RELEASE/2026-09"; then
+    ok "7ae: ★★★ 大文字の運用ブランチ (RELEASE/2026-09) を過剰に拒否していない"
+  else
+    ng "7ae: rc=${SRC} —— ⚠️★★★ 正当な大文字ブランチを拒否している (★ 予約名の規則が広すぎる)"
+  fi
+
+  # --- 7af: 制御文字・CRLF 入りの --task を渡す ---
+  SPAWN_ENV=""; do_spawn_x "${R7Z}" --no-exec --task "$(printf '20260101-upper\r')" 7af t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${R7Z}" "repo-7af-t"; then
+    ok "7af: 制御文字入りの --task は一致せず止まる"
+  else
+    ng "7af: rc=${SRC} —— ⚠️ CR 付きの selector が通った"
+  fi
+fi
+
+# --- 7ag: ⚠️ loop-run.sh 経由で spawn が失敗したときログに残るか (★ 統合) ---
+# ⚠️ Codex `/cross-review` 1 巡目の「loop-run.sh の spawn 失敗時ログ/cleanup が薄い」への対照。
+#   ★ loop-run.sh を fake repo に置き、**config を壊して** spawn を失敗させ、
+#     ⚠️ (a) run が止まる (b) **一時ファイルが残らない** ことを見る。
+R7AG="${TMP}/r7ag/repo"; mkdir -p "${R7AG}"
+if [ ! -f "${REPO_ROOT}/scripts/loop-run.sh" ]; then
+  ng "7ag: loop-run.sh が無い (★ 判定できない)"
+elif ! setup_fake_repo "${R7AG}"; then
+  ng "7ag: 準備できなかった (★ 判定できない)"
+else
+  cp "${REPO_ROOT}/scripts/loop-run.sh" "${R7AG}/scripts/loop-run.sh"
+  mkdir -p "${R7AG}/.steering/task/issues"
+  printf '# 001\n' > "${R7AG}/.steering/task/issues/001.md"
+  # ⚠️ base_branch を **入れ子だけ**に置く = 本タスクが塞いだ形 → spawn が die する
+  printf '%s\n' '{
+  "task": "task", "mode": "C",
+  "verify": { "test": "true" },
+  "budget": { "max_attempts": 1, "no_progress_threshold": 1, "token_ceiling": 1000, "parallel": 1 },
+  "headless": { "model": "sonnet", "base_branch": "sneaky" }
+}' > "${R7AG}/.steering/task/_loop-config.json"
+  ( cd "${R7AG}" && git add -A -- .steering scripts && git commit -q -m cfg ) >/dev/null 2>&1
+  tmp_before="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'tmp.*' -type f 2>/dev/null | wc -l)"
+  ( cd "${R7AG}" && bash scripts/loop-run.sh .steering/task --dry-run ) >"${TMP}/r7ag.out" 2>&1
+  ag_rc=$?
+  tmp_after="$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'tmp.*' -type f 2>/dev/null | wc -l)"
+  tmp_before="${tmp_before//[[:space:]]/}"; tmp_after="${tmp_after//[[:space:]]/}"
+  if [ "${tmp_after:-0}" -le "${tmp_before:-0}" ]; then
+    ok "7ag: loop-run.sh 経由でも一時ファイルが増えていない (★ trap RETURN が効いている)"
+  else
+    ng "7ag: 一時ファイルが ${tmp_before} → ${tmp_after} に増えた (⚠️ spawn 失敗時に残る)"
+  fi
+fi
+
 
 # ── 8. 変異テスト (★ 群 7 が空振りしていないこと) ────────
 echo "8. ⚠️★★★ 変異テスト —— fail-closed / 抽出器を潰したら赤くなるか"

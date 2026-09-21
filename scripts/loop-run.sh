@@ -445,6 +445,11 @@ run_issue() {
   #   → ★ run ログへ流す。⚠️ stdout 側の契約 (最終行 = worktree の絶対パス) は変えない。
   local spawn_err _l
   spawn_err="$(mktemp)" || { emit "$id" execute blocked detail="mktemp に失敗 (worktree 生成前)"; return 1; }
+  # ⚠️ 早期 return でも必ず掃除する (★ Codex `/cross-review` 1 巡目・2026-09-21)。
+  #   ★ 現在は下の `rm -f` に到達するので leak は無いが、
+  #   ⚠️ 将来 `set -e` を足すか途中で return を増やすと残る。
+  #   ★ bash では関数内の RETURN trap がその関数の戻りで発火する (2026-09-21 に実測)。
+  trap 'rm -f "$spawn_err"' RETURN
   wt="$(LOOP_NO_EXEC=1 bash "$MAIN_ROOT/scripts/loop-spawn.sh" --no-exec --task "$TASK_DIR" "$id" 2>"$spawn_err" | tail -1)"
   # ⚠️ `[ -n "$_l" ] && log "$_l"` と書かない —— ★ 最終行が空なら
   #   ループ本体の戻り値が非 0 になる。⚠️ 今は `set -e` を使っていないので無害だが、
