@@ -525,3 +525,15 @@
 - **背景**: 打ち切り・孤立 release は `tracing::warn` にしか出ず、区間が壊れても出力は `pole_applicable=true` のまま平然と見える。
 - **採用**: 封筒 `config` に件数を足す（★ 極 M+ 以外は `null`）。判断 13 の `pole_modifier_rows`（修飾キー行数）と同じ扱い。
   → `envelope-acceptance.sh` AC7 のキー集合を追随させる。
+
+## ⚠️ 2026-09-25 起票 P1-I / P1-J（Loop 基盤・未是正）
+
+- **P1-I**: `issue_done` は**コミットが 1 つも無くても出る**。issue 005 は worker が `max_turns` で打ち切られ、
+  実装が**未コミットの作業ツリー**のまま verify 緑 → `issue_done`。⚠️ そのまま merge すると**空の merge** になる。
+  ★ メインが worker の作業ツリーをコミットして救った（`49d867b`）。→ 是正案: `issue_done` の前に「base からのコミットが 1 以上・作業ツリーがクリーン」を検査する。
+- **P1-J**: `loop-spawn.sh` の `resolve_base` は、upstream がある作業ブランチでは **`origin/<branch>` を切り元に選ぶ**。
+  ⚠️ PR #222 のために push した後、ローカルで 005 を merge したが push していなかったので、006 の worktree は
+  **005 を含まない古い `origin` から切られた**（worker が気づいて実装前に `blocked` にした）。provenance には
+  「⚠️ 意図した pin か確かめてください（1 コミット後ろ / 0 コミット先）」が出ていたが、無人のため読まれなかった。
+  ★ 対処: ローカルを push して `origin` を揃えてから再実行。→ 是正案: ローカルが upstream より先にあるときは**ローカルを採る**か、**fail-closed で止める**。
+  ★ 運用: 本タスクでは **merge のたびに push する**。
