@@ -86,6 +86,60 @@ if ( cd "$REPO_ROOT" && bash "$ALLPOLES" "src-tauri/tests/fixtures/__does_not_ex
   fail "AC5: 存在しない入力でも exit 0 になった（fail-closed でない）"
 fi
 
+# ── AC5(b) / AC4(b): 極ごとの失敗の枝・ラベル食い違いの枝を、偽の gse-replay で実際に踏む ──
+#   ⚠️★★★ 上の AC5 は存在しない入力を渡すので、スクリプトの**入口の検査**で止まる。
+#     ★ 「1 極が失敗したら止まる」枝（極ごとの失敗処理）はそこでは 1 度も踏まれていない。
+#   ★ 本物の gse-replay の代わりに、`FAKE_MODE` で振る舞いを変える偽コマンドを `GSE_REPLAY_BIN` で差す。
+#   ⚠️ ok の枝も**同じ偽コマンド**で踏む（★ 偽コマンドが常に壊れていて、ng の枝が空振りのまま緑になるのを防ぐ）。
+fake="$(mktemp)" || fail "AC5: 偽 gse-replay の一時ファイルを作れない"
+CLEANUP+=("$fake")
+cat > "$fake" <<'FAKE_EOF'
+#!/usr/bin/env bash
+# 偽 gse-replay: `--pole <名前>` の名前を読み、FAKE_MODE に応じて振る舞う。
+pole=""
+prev=""
+for a in "$@"; do
+  if [ "$prev" = "--pole" ]; then pole="$a"; fi
+  prev="$a"
+done
+case "${FAKE_MODE:-ok}" in
+  fail_pointer_b) if [ "$pole" = "pointer_b" ]; then exit 1; fi ;;
+  mislabel) pole="baseline" ;;
+esac
+printf '{"config":{"pole":"%s","pole_applicable":true},"rows":[]}\n' "$pole"
+FAKE_EOF
+chmod +x "$fake" || fail "AC5: 偽 gse-replay に実行権を付けられない"
+
+run_fake() { # run_fake <FAKE_MODE> <outdir> → all-poles の exit code をそのまま返す
+  ( cd "$REPO_ROOT" && FAKE_MODE="$1" GSE_REPLAY_BIN="$fake" bash "$ALLPOLES" "src-tauri/$FIX" "$2" ) >/dev/null 2>&1
+}
+
+# ok の枝（陽性対照）: 全極が成功する偽コマンドなら exit 0 で 3 ファイル出る。
+outdir_ok="$(mktemp -d)" || fail "AC5: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_ok")
+run_fake ok "$outdir_ok" \
+  || fail "AC5(陽性対照): 全極が成功する偽コマンドなのに all-poles が非 0（★ 偽コマンドか本スクリプトが壊れている）"
+[ "$(ls -1 "$outdir_ok"/*.json 2>/dev/null | wc -l)" -eq 3 ] \
+  || fail "AC5(陽性対照): 偽コマンドで 3 ファイル出ていない"
+
+# ng の枝 1: 1 極（pointer_b）だけが失敗 → 全体が非 0・outdir は空（staging も残さない）。
+outdir_ng="$(mktemp -d)" || fail "AC5: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_ng")
+if run_fake fail_pointer_b "$outdir_ng"; then
+  fail "AC5: 1 極 (pointer_b) だけが失敗したのに全体が exit 0 になった（fail-closed でない）"
+fi
+[ -z "$(ls -A "$outdir_ng" 2>/dev/null)" ] \
+  || fail "AC5: 1 極が失敗したのに outdir にファイルが残っている（★ 3 ファイルが揃わない outdir を作らない）"
+
+# ng の枝 2: 出力の config.pole がファイル名と食い違う → 全体が非 0・outdir は空。
+outdir_ml="$(mktemp -d)" || fail "AC4: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_ml")
+if run_fake mislabel "$outdir_ml"; then
+  fail "AC4: config.pole がファイル名と食い違う出力でも exit 0 になった（★ 中身の極とファイル名が違うと読み手が誤る）"
+fi
+[ -z "$(ls -A "$outdir_ml" 2>/dev/null)" ] \
+  || fail "AC4: 食い違う出力を outdir に置いている（★ 3 極が正しく揃うまで何も置かない）"
+
 # ── AC7: runbook に手順と Cartesian 禁止が書かれている ──────────────────
 grep -qE 'run-features-all-poles' "$RUNBOOK" \
   || fail "AC7: runbook に 3 極を回す手順が無い"
