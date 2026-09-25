@@ -107,13 +107,26 @@ pub struct StallOnsetInputs<'a> {
 ///
 /// ⚠️ [`StallOnsetInputs`] に足さない —— あちらは `..` 無しで全フィールドを列挙するリテラルが
 /// 既存テストに多数あり (`dispersion.rs` / `restart.rs` ほか)、フィールドを足すたびに壊れる。
-/// ★ 極の入力は `Default` を持つこの構造体に置く (極 B の `pointer_active_ts` も同じ場所へ足せる)。
+/// ★ 極の入力は `Default` を持つこの構造体に置く (極 B の `pointer_active_ts` もここ)。
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PoleInputs<'a> {
     /// 極 M+ の**修飾キーの押下区間** ([`stall_onset::modifier_press_intervals`] の戻り値・両端を含む)。
     /// ⚠️ `None` は「渡されていない」であり「区間が 0 本」(`Some(&[])`) とは別 —— 極 M+ で `None` なら
     /// `Err` にする (★ 入力を渡し忘れて baseline の値を極 M+ の名前で返さない)。
     pub modifier_intervals: Option<&'a [(u64, u64)]>,
+    /// 極 B の**ポインタ活動の行の時刻** (`pointer_bin` 行の `t`・**ビンの終端時刻**・順不同でよい)。
+    /// ★ 行の**存在だけ**を使う (値は読まない)。抑制区間は [`stall_onset::pointer_suppression_intervals`] が作る。
+    /// ⚠️ `None` は「渡されていない」であり「活動が 0 行」(`Some(&[])`) とは別 —— 極 B で `None` なら
+    /// `Err` にする (★ 入力を渡し忘れて baseline の値を極 B の名前で返さない)。
+    /// ★ `capabilities` に `pointer_bin` の宣言が無い入力の扱い (= 適用不可) は**呼び出し側**が決める
+    /// (`analysis/` に `capabilities` の意味を持ち込まない)。適用不可なら `Some(&[])` を渡すと baseline と恒等になる。
+    ///
+    /// ⚠️ **抑制区間→評価区間の構築は 1 か所に畳まれていない** (`bin/replay.rs` が封筒
+    /// `provenance.observed_intervals` 用にもう一度計算する) が、**両者は同じ 2 関数
+    /// (`stall_onset::pointer_suppression_intervals` / `stall_onset::evaluation_intervals`) と
+    /// 同じ定数 (`ENGINE_TICK_MS`) を呼ぶ**ので、値が独立に乖離することはない
+    /// (`replay.rs` 側の呼び出し箇所のコメント参照。code-reviewer LOW・issue 006)。
+    pub pointer_active_ts: Option<&'a [u64]>,
 }
 
 /// `build_feature_rows` の `quality` (issue 007) 用の追加入力をまとめた構造体。
@@ -320,7 +333,23 @@ pub fn build_feature_rows_with_pole_inputs(
         },
         // ★ ワイルドカードなしの網羅列挙 (極を足すと、ここで判定を決めるまでコンパイルが
         //   通らない。`pole_applicability` (`bin/replay.rs`) と同じ規律)。
+        //   極 B は `key` 列を変えない (変えるのは評価区間の側)。
         Pole::Baseline | Pole::PointerB => std::borrow::Cow::Borrowed(keys),
+    };
+    // ⚠️ 極 B の**抑制区間**。極 B 以外は空 (= 観測区間そのまま)。入力が空でも先に検査する (上と同じ理由)。
+    let pointer_suppression: Vec<(u64, u64)> = match pole {
+        Pole::PointerB => match pole_inputs.pointer_active_ts {
+            // ★ `pointer_bin` の 1 ビン幅は 1 秒 (= `ENGINE_TICK_MS`)。写しであってリンクではない (`pointer_suppression_intervals` の doc)。
+            Some(ts) => stall_onset::pointer_suppression_intervals(ts, ENGINE_TICK_MS),
+            None => {
+                return Err(format!(
+                    "pole `{}` needs its pointer activity (PoleInputs::pointer_active_ts is None; \
+                     refusing to return baseline values under this pole's name)",
+                    pole.as_str()
+                ))
+            }
+        },
+        Pole::Baseline | Pole::ModifierMPlus => Vec::new(),
     };
     if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());
@@ -427,6 +456,7 @@ pub fn build_feature_rows_with_pole_inputs(
     let (stall_onset_col, condition_a_timeline) = stall_onset::stall_onset_column_with_timeline(
         &detection_keys,
         stall_onset_inputs.feat_ts,
+        &pointer_suppression,
         stall_onset_inputs.task_kind_declarations,
         tick_count,
         grid_origin_ms,
@@ -522,7 +552,66 @@ mod tests {
         .expect("within tick limit")
     }
 
-    /// issue 004: 未実装の極は**入力が空でも** `Err` (黙って baseline の値を返さない)。
+    /// issue 006: 極 B は `pointer_active_ts` を渡さなければ `Err` (★ baseline の値を極 B の名前で返さない)。
+    /// 活動が 0 行 (`Some(&[])`) なら baseline と**恒等**で、長い沈黙の途中に活動があると評価区間が割れる。
+    #[test]
+    fn pole_b_needs_pointer_activity_and_idle_pointer_equals_baseline() {
+        let keys = [key_at(1_000), key_at(1_100)];
+        let feat: Vec<u64> = (0..=90).map(|i| i * 1_000).collect();
+        let inputs = |pole: Pole| StallOnsetInputs {
+            feat_ts: &feat,
+            task_kind_declarations: &[],
+            config: StallOnsetConfig {
+                pole,
+                ..StallOnsetConfig::default()
+            },
+        };
+        let run = |pole: Pole, active: Option<&[u64]>| {
+            build_feature_rows_with_pole_inputs(
+                &keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &inputs(pole),
+                &test_quality_inputs(),
+                &PoleInputs {
+                    pointer_active_ts: active,
+                    ..PoleInputs::default()
+                },
+            )
+        };
+        let onset_rows =
+            |rows: &[FeatureRow]| rows.iter().filter(|r| r.stall_onset.is_onset).count();
+
+        let err = run(Pole::PointerB, None).expect_err("活動の入力を渡さない極 B は Err");
+        assert!(err.contains("pointer_b"), "極の名前が出る: {err}");
+
+        let baseline = run(Pole::Baseline, None).expect("baseline は入力が要らない");
+        let idle = run(Pole::PointerB, Some(&[])).expect("活動 0 行の極 B");
+        assert_eq!(
+            serde_json::to_value(&baseline).expect("serialize"),
+            serde_json::to_value(&idle).expect("serialize"),
+            "活動が 0 行なら極 B は baseline と恒等（★ 値で埋めない）"
+        );
+
+        // 沈黙 (1100 → 90000) の途中 (49000, 50000] に活動 → 片が 2 つになり onset が 1 → 2 本。
+        let active = run(Pole::PointerB, Some(&[50_000])).expect("活動ありの極 B");
+        assert_eq!(onset_rows(&baseline), 1);
+        assert_eq!(onset_rows(&active), 2, "抑制が検出へ配線されていない");
+        // ⚠️ 極 B が変えるのは検出 (`stall_onset`) と条件 A に依る `restart` だけ。他の Tier は極に依らない。
+        for (b, a) in baseline.iter().zip(&active) {
+            assert_eq!(
+                serde_json::to_value(b.activity).expect("serialize"),
+                serde_json::to_value(a.activity).expect("serialize")
+            );
+            assert_eq!(
+                serde_json::to_value(&b.dispersion).expect("serialize"),
+                serde_json::to_value(&a.dispersion).expect("serialize")
+            );
+        }
+    }
+
+    /// issue 004: 入力の無い極は**入力が空でも** `Err` (黙って baseline の値を返さない)。
     /// ⚠️ 陰性対照 (`baseline`) が通ることも同じテストで固定する —— 常に `Err` を返す実装を通さない。
     #[test]
     fn unimplemented_pole_is_refused_even_on_empty_input() {
@@ -545,9 +634,10 @@ mod tests {
             )
         };
 
-        // ★ 未実装なのは極 B だけ (極 M+ は issue 005 で開通した)。
+        // ★ 未実装の極はもう無い (極 M+ は issue 005・極 B は issue 006 で開通した)。ここでは
+        //   「入力を渡さない (`build_feature_rows` は `PoleInputs::default()`) 極 B は Err」を見る。
         for keys in [&[][..], &[key_at(0)][..]] {
-            let err = run(Pole::PointerB, keys).expect_err("未実装の極は Err");
+            let err = run(Pole::PointerB, keys).expect_err("入力を渡さない極 B は Err");
             assert!(err.contains("pointer_b"), "極の名前が出る: {err}");
         }
         assert!(run(Pole::Baseline, &[])
@@ -593,6 +683,7 @@ mod tests {
         }
         let empty = PoleInputs {
             modifier_intervals: Some(&[]),
+            ..PoleInputs::default()
         };
         let rows = build_feature_rows_with_pole_inputs(
             &[key_at(0)],
@@ -641,6 +732,7 @@ mod tests {
                 &test_quality_inputs(),
                 &PoleInputs {
                     modifier_intervals: Some(intervals),
+                    ..PoleInputs::default()
                 },
             )
             .expect("within tick limit")

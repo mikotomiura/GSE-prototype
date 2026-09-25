@@ -226,6 +226,16 @@ struct FeatureProvenance {
     /// ⚠️★★★ **新しい露出ではない。** 穴の位置と長さは
     /// `rows[].quality.observability_mask.feat` が**既に tick ごとに出している** (issue 007)。
     /// ★ 削除 / 一時停止 / 計器欠損の**原因ラベルは 1 つも無い**まま (ADR-030 D8 (b-2))。
+    ///
+    /// ⚠️★★★ **極 B ではこの列自体の意味が変わる** (security-checker LOW・issue 006)。
+    /// baseline (極 A) では「`feat` 行の穴」だけを表すが、極 B では
+    /// **「観測区間 − ポインタ活動区間」= 評価区間**を表す。★ そのため、極 B の
+    /// `observed_intervals` から baseline の `observed_intervals` を差し引くと、
+    /// **ポインタ活動があった秒の時系列** (1 秒ビン単位・活動の**存在のみ**、
+    /// `moved` / `buttons` / `wheel` の値は含まない) を読み取れる —— ゼロ抑制された
+    /// `pointer_bin` 行そのものは封筒に出していないが、極 B と baseline の区間差分という
+    /// **間接的な形**で活動の有無と大まかなタイミングが漏れる。★ 欄は分けない (issue 006
+    /// の裁定): `pole == "pointer_b"` の出力を baseline と突き合わせて読む側の責任とする。
     observed_intervals: Vec<ObservedIntervalDto>,
 }
 
@@ -280,12 +290,20 @@ struct FeatureConfigDto {
     /// 押下区間が 1 つも無く、極 M+ は構造的に極 M− と同じ値になる。★ 値で埋めない (別の値を出さない)。
     pole_applicable: bool,
     /// `pole_applicable == false` の理由コード。★ 適用可のとき `null`。⚠️ 極ごとに判定の根拠が違うので、
-    /// 理由の語も別にする (`no_pointer_capability` = issue 006 / `no_modifier_rows` = 極 M+)。
+    /// 理由の語も別にする (`no_pointer_capability` / `no_pointer_rows` = 極 B・issue 006・
+    /// `decisions.md` 判断 26 / `no_modifier_rows` = 極 M+)。
     ///
     /// ⚠️★★★ `no_modifier_rows` は「**計器が無かった**」(2026-08-23 より前のログ・macOS) と
     /// 「**押さなかった**」を**区別しない** (`meta` に `os` が無く、`capabilities` に修飾キーの計器を表す項目も無い)。
     /// ★ 過剰拒否だが**情報は失わない** (行が 0 本なら極 M+ = 極 M− で、上下界の幅への寄与がゼロ)。
-    /// ⚠️ `not_implemented` は**防御の値**であり、実際には出ない (未実装の極は出力の前に止まる)。
+    /// ⚠️★★★ `no_pointer_rows` も同型 —— `capabilities.rs:244-245` 逐語「0 行は判定不能」のとおり、
+    /// 宣言はコンパイル時の `POINTER_AVAILABLE` でしかなく、実行時の `observe::start` は
+    /// 設置に失敗しうる。「活動が無かった」と「設置に失敗した」を区別できないので、
+    /// 0 行を所見として `true` にはしない (`decisions.md` 判断 26・極 M+ の判断 13 と揃えた)。
+    /// ⚠️ `pointer_evidence_not_supplied`（極 B）／`modifier_evidence_not_supplied`（極 M+）は
+    /// **防御の値**であり、実際には出ない (未実装の極は出力の前に止まる。呼び出し側が証拠を
+    /// 渡し忘れたときだけ出る。★ 旧称 `not_implemented` は「未実装」と誤読されるため改名した
+    /// — code-reviewer LOW)。
     pole_not_applicable_reason: Option<&'static str>,
     /// 極 M+ の判定に使った入力ファイルの**修飾キーの `key` 行数** (`decisions.md` 判断 13 逐語
     /// 「封筒に理由コード (`no_modifier_rows`) と `modifier` 行数を刻み」)。★ 極 M+ 以外では数えないので `null`。
@@ -302,6 +320,15 @@ struct FeatureConfigDto {
     /// (`decisions.md` 判断 24・`stall_onset::ModifierIntervals::orphan_releases`)。
     /// ★ 極 M+ 以外では数えないので `null`。
     pole_modifier_orphan_releases: Option<u64>,
+    /// 極 B の判定に使った入力ファイルの **`pointer_bin` 行数**。★ 極 B 以外では数えないので `null`。
+    /// ⚠️★★★ **宣言があっても行が 0 本なら `pole_applicable == false`／理由 `no_pointer_rows`**
+    /// (`decisions.md` 判断 26・2026-09-25 是正) —— `capabilities.rs:244-245` 逐語「0 行は判定不能」の
+    /// とおり、宣言はコンパイル時の `POINTER_AVAILABLE` でしかなく、実行時の `observe::start` は
+    /// 設置に失敗しうる。「活動が無かった」と「設置に失敗した」を**区別できない**ので、0 行を
+    /// 所見として `true` にはしない (★ 極 M+ の判断 13 と揃えた)。
+    /// ★ 宣言が無い入力 (`no_pointer_capability`) で 0 より大きければ、宣言と行が食い違う壊れたログである
+    /// (⚠️ その場合も抑制は**しない** —— 適用不可の出力は baseline と恒等)。
+    pole_pointer_rows: Option<u64>,
     /// 採用した事前宣言の `id` / `version` / 内容の SHA-256 先頭桁 (★ 何を読んだかの同定)。
     prereg_id: String,
     prereg_version: String,
@@ -548,21 +575,69 @@ fn resolve_pole(features: bool, raw: Option<&str>) -> Result<Pole, String> {
 /// ★ 網羅 `match` (ワイルドカード無し) —— 極を足すと、ここで判定を決めるまでコンパイルが通らない。
 /// `modifier_rows` は入力ファイルの**修飾キーの `key` 行数** ([`ModifierScan::rows`])。★ 極 M+ だけが読む。
 /// `None` は「数えていない」 (⚠️ 「0 本」とは別) —— 極 M+ では**防御の値**で止める。
-/// ⚠️ 極 B の判定 (`capabilities` の `pointer_bin`) は issue 006 が入力を足して実装する
-/// (このシグネチャは後続で変わる)。
+/// ⚠️ 極 B の判定 (`capabilities` の `pointer_bin`) は**この関数では確定しない** —— 入力 (`capabilities`) が
+/// 要るので [`FeatureConfigDto::with_pointer_evidence`] が [`pointer_applicability`] で確定する。
 fn pole_applicability(pole: Pole, modifier_rows: Option<u64>) -> (bool, Option<&'static str>) {
     match pole {
         // 極 A / 極 M− はどの入力でも計算できる (現行の計算そのもの)。
         Pole::Baseline => (true, None),
-        // ⚠️ 中身が無い極。`resolve_pole` が出力の前に止めるので実際には来ない (防御)。
-        Pole::PointerB => (false, Some("not_implemented")),
+        // ⚠️ 極 B は入力 (`capabilities`) を見るまで**適用可と名乗らない** (防御の値。
+        //   `with_pointer_evidence` が確定させる。呼び忘れても嘘の `true` を出さない)。
+        //   ★ 旧称 `not_implemented` は「未実装」と誤読される (開通済みのため) —— 実態に
+        //   合わせて改名した (code-reviewer LOW)。
+        Pole::PointerB => (false, Some("pointer_evidence_not_supplied")),
         // ★ 判定単位は**入力ファイル (セッション)**・判定式は「修飾キーの行が 0 本」(判断 13)。
         Pole::ModifierMPlus => match modifier_rows {
             Some(0) => (false, Some("no_modifier_rows")),
             Some(_) => (true, None),
             // 数えずに極 M+ を名乗らせない (防御。実際には main が必ず数える)。
-            None => (false, Some("not_implemented")),
+            // ★ 同じ理由で `not_implemented` → `modifier_evidence_not_supplied` に改名した。
+            None => (false, Some("modifier_evidence_not_supplied")),
         },
+    }
+}
+
+/// 封筒 `provenance.capabilities` に `pointer_bin` の**宣言があるか** (極 B の適用可否の根拠・issue 006)。
+///
+/// ★ `capabilities` は行種の名前の配列を群 (`unconditional` / `threshold_gated` / `config_gated`) ごとに持つ
+/// オブジェクトである。**どの群に載っていても**宣言ありとする (⚠️ 群の名前を再宣言しない)。
+/// ⚠️ 宣言が無いのは「**計器が無かった**」であって「活動が無かった」ではない
+/// (`schema/current.json` の `pointer_bin`: 「行が無い＝活動が無かった」は宣言がある場合に限る)。
+/// `None` (`capabilities` 自体が無い旧ログ) も宣言なし。
+fn declares_pointer_bin(capabilities: Option<&serde_json::Value>) -> bool {
+    capabilities
+        .and_then(serde_json::Value::as_object)
+        .is_some_and(|groups| {
+            groups
+                .values()
+                .filter_map(serde_json::Value::as_array)
+                .flatten()
+                .any(|name| name.as_str() == Some("pointer_bin"))
+        })
+}
+
+/// 極 B の適用可否 (`(適用可否, 理由コード)`)。★ 判定式は 3 状態 (`decisions.md` 判断 26・2026-09-25 是正):
+///
+/// 1. `capabilities` に `pointer_bin` の宣言が**無い** → 適用不可・`no_pointer_capability`
+///    (「**計器が無かった**」)。
+/// 2. 宣言は**ある**が行が **0 本** → 適用不可・`no_pointer_rows` (「**判定不能**」——
+///    `capabilities.rs:244-245` 逐語「0 行は判定不能」のとおり、宣言はコンパイル時の
+///    `POINTER_AVAILABLE` でしかなく、実行時の `observe::start` は設置に失敗しうる。
+///    「活動が無かった」と「設置に失敗した」を区別できないので、0 行を所見として
+///    `true` にはしない。★ 極 M+ の判断 13 (0 行は `not_applicable`) と揃えた)。
+/// 3. 宣言があり行が **1 本以上** → 適用可・`null`。
+///
+/// ⚠️ 極 M+ (`no_modifier_rows`) とは**根拠が違う**ので理由の語も別にする。
+/// `rows` が `None` (証拠を渡し忘れ) は防御の値 (★ 実際には呼び出し側が pole==PointerB のとき
+/// 必ず数える。[`pole_applicability`] の `PointerB` 既定値と同じ語にする)。
+fn pointer_applicability(declared: bool, rows: Option<u64>) -> (bool, Option<&'static str>) {
+    if !declared {
+        return (false, Some("no_pointer_capability"));
+    }
+    match rows {
+        Some(0) => (false, Some("no_pointer_rows")),
+        Some(_) => (true, None),
+        None => (false, Some("pointer_evidence_not_supplied")),
     }
 }
 
@@ -699,6 +774,8 @@ impl FeatureConfigDto {
                 Pole::ModifierMPlus => modifier_orphan_releases,
                 Pole::Baseline | Pole::PointerB => None,
             },
+            // ★ 極 B の証拠 (行数・適用可否) は入力が要るので [`Self::with_pointer_evidence`] が足す。
+            pole_pointer_rows: None,
             prereg_id: resolved.prereg_id.clone(),
             prereg_version: resolved.prereg_version.clone(),
             prereg_sha256_prefix: resolved.prereg_sha256_prefix.clone(),
@@ -709,6 +786,24 @@ impl FeatureConfigDto {
             engine_tick_ms: ENGINE_TICK_MS,
             pause_threshold_ms: gse_next_lib::analysis::features::PAUSE_THRESHOLD_MS,
         }
+    }
+
+    /// 極 B の**適用可否と `pointer_bin` 行数**を確定する (issue 006)。★ 極 B 以外では何もしない
+    /// (`pole_pointer_rows` は `null` のまま・渡された値を漏らさない)。
+    ///
+    /// `declared` は [`declares_pointer_bin`] (封筒 `provenance.capabilities` の宣言)、`rows` は入力の
+    /// `pointer_bin` 行数。⚠️ 極 B で呼ばなければ `pole_applicable == false` /
+    /// `pointer_evidence_not_supplied` の防御の値のまま (嘘の `true` を出さない)。
+    /// ★ `rows` は [`pointer_applicability`] (判断 26 の 3 状態判定) にも渡す —— 宣言があっても
+    /// 0 行なら `pole_applicable == false` になる (「判定不能」)。
+    fn with_pointer_evidence(mut self, declared: bool, rows: Option<u64>) -> Self {
+        if self.pole == Pole::PointerB.as_str() {
+            let (applicable, reason) = pointer_applicability(declared, rows);
+            self.pole_applicable = applicable;
+            self.pole_not_applicable_reason = reason;
+            self.pole_pointer_rows = rows;
+        }
+        self
     }
 }
 
@@ -883,9 +978,11 @@ enum ReplayEvent {
     /// ⚠️ 読み飛ばし専用（上記 `RecordingPause` の doc を参照）。
     #[serde(rename = "focus_transition")]
     FocusTransition(#[allow(dead_code)] serde_json::Value),
-    /// ⚠️ 読み飛ばし専用（同上）。
+    /// ⚠️ 読み飛ばし専用（同上）。★ 例外は **`--features --pole pointer_b` の
+    /// [`collect_pointer_bin_timestamps`] だけ**（issue 006）—— 行の**時刻 `t` だけ**を読み、値は読まない。
+    /// ⚠️ `timestamp()` は `None` のままなので HMM 経路（`--snapshot` / `--metrics`）へは 1 バイトも流れない。
     #[serde(rename = "pointer_bin")]
-    PointerBin(#[allow(dead_code)] serde_json::Value),
+    PointerBin(serde_json::Value),
     /// ⚠️ 読み飛ばし専用（同上）。
     #[serde(rename = "secure_input")]
     SecureInput(#[allow(dead_code)] serde_json::Value),
@@ -1879,8 +1976,45 @@ fn main() -> ExitCode {
         } else {
             None
         };
+        // ⚠️★★★ `pointer_bin` の行を要るのは**極 B だけ**。他の極では走査しない (baseline の実行経路を変えない)。
+        let pointer_rows: Option<Vec<u64>> = if pole == Pole::PointerB {
+            match collect_pointer_bin_timestamps(&args.session_path) {
+                Ok(v) => Some(v),
+                Err(msg) => {
+                    tracing::error!("failed to collect pointer_bin timestamps: {}", msg);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            None
+        };
+        // ★ 極 B の適用可否は `capabilities` の宣言で決める (⚠️ `analysis/` へは意味を持ち込まない)。
+        //   宣言が無い入力は「計器が無かった」= 適用不可 → **抑制しない** (空を渡す = baseline と恒等)。
+        let pointer_declared = declares_pointer_bin(capabilities.as_ref());
+        let no_pointer_rows: Vec<u64> = Vec::new();
+        let pointer_active_ts: Option<&[u64]> = match &pointer_rows {
+            Some(rows) if pointer_declared => Some(rows.as_slice()),
+            Some(_) => Some(no_pointer_rows.as_slice()),
+            None => None,
+        };
         let pole_inputs = PoleInputs {
             modifier_intervals: modifier_scan.as_ref().map(|s| s.intervals.as_slice()),
+            pointer_active_ts,
+        };
+        // ★ 封筒の `provenance.observed_intervals` は「実際に評価した区間」。極 B では抑制区間を除いた区間で、
+        //   ⚠️ 検出と**同じ 2 つの関数** (`pointer_suppression_intervals` / `evaluation_intervals`) から作る
+        //   (区間の定義をここで作り直さない)。極 B 以外は観測区間そのまま。
+        let evaluated_intervals: Vec<(u64, u64)> = match pointer_active_ts {
+            Some(ts) => {
+                use gse_next_lib::analysis::feat_offline::stall_onset::{
+                    evaluation_intervals, pointer_suppression_intervals,
+                };
+                evaluation_intervals(
+                    &observed,
+                    &pointer_suppression_intervals(ts, ENGINE_TICK_MS),
+                )
+            }
+            None => observed.clone(),
         };
         let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
             feat_ts: &feat_ts,
@@ -1923,9 +2057,10 @@ fn main() -> ExitCode {
                 o1_mode: meta_facts.o1_mode,
                 keyboard_layout: meta_facts.keyboard_layout,
                 capabilities,
-                // ★ 行と同じ SSOT (`stall_onset::observed_intervals`) から作った `observed`。
+                // ★ 行と同じ SSOT (`stall_onset::observed_intervals`) から作った `observed`
+                //   (極 B では抑制区間を除いた評価区間・上の `evaluated_intervals`)。
                 //   ⚠️ 区間の定義をここで作り直さない。
-                observed_intervals: observed
+                observed_intervals: evaluated_intervals
                     .iter()
                     .map(|&(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
                     .collect(),
@@ -1936,6 +2071,10 @@ fn main() -> ExitCode {
                 modifier_scan.as_ref().map(|s| s.rows),
                 modifier_scan.as_ref().map(|s| s.truncated_at_right_edge),
                 modifier_scan.as_ref().map(|s| s.orphan_releases),
+            )
+            .with_pointer_evidence(
+                pointer_declared,
+                pointer_rows.as_ref().map(|rows| rows.len() as u64),
             ),
             rows: &rows,
         };
@@ -2780,6 +2919,75 @@ fn collect_all_feat_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, Strin
             skipped = malformed_feat_lines,
             "collect_all_feat_timestamps: feat lines whose t did not match the logger \
              format were skipped (not folded into a placeholder)"
+        );
+    }
+    out.sort_unstable();
+    Ok(out)
+}
+
+/// `--features --pole pointer_b` (issue 006) 用の `pointer_bin` 行の `t` だけを取り出す DTO。
+///
+/// ⚠️★★★ **`t` の 1 フィールドだけ**を持つ —— 移動量・ボタン・ホイールの値は**読まない**
+/// (ゼロ抑制されているので**行の存在＝その秒に活動があった**であり、値は要らない・粗い量子化スカラでも触らない)。
+/// ★ `Serialize` はテスト専用 (`cfg_attr`) —— `tests::pointer_bin_timestamp_dto_has_only_the_t_field`
+/// が serde 出力キーが `["t"]` だけであることを固定する (フィールドが増える回帰を検出する門・LOW 是正)。
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(test, derive(serde::Serialize))]
+struct PointerBinTimestampDto {
+    /// **ビンの終端時刻** (`analysis/pointer_bin.rs`)。1 行が覆うのは `(t − 1000, t]`。
+    t: u64,
+}
+
+/// `--features --pole pointer_b` (issue 006) 用: NDJSON の `{"type":"pointer_bin", ...}` 行の**時刻だけ**を返す
+/// (昇順)。★ `collect_all_feat_timestamps` と同じ形・**`--features` 経路からだけ呼ぶ**
+/// (`--snapshot` / `--metrics` / `--calibration` へは配線しない)。
+///
+/// ⚠️★★★ **形が合わない行は捨てる (0 に畳まない)。** 件数だけ `warn` に残す。
+fn collect_pointer_bin_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let mut out: Vec<u64> = Vec::new();
+    let mut parse_failed_lines: u64 = 0;
+    let mut malformed_lines: u64 = 0;
+    for (lineno, line) in BufReader::new(file).lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::PointerBin(v) = ev {
+            match serde_json::from_value::<PointerBinTimestampDto>(v) {
+                Ok(dto) => out.push(dto.t),
+                Err(_) => malformed_lines += 1,
+            }
+        }
+    }
+    if parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = parse_failed_lines,
+            "collect_pointer_bin_timestamps: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if malformed_lines > 0 {
+        tracing::warn!(
+            skipped = malformed_lines,
+            "collect_pointer_bin_timestamps: pointer_bin lines whose t did not match the \
+             logger format were skipped (not folded into a placeholder)"
         );
     }
     out.sort_unstable();
@@ -4852,9 +5060,13 @@ mod tests {
             assert!(err.contains("--features"), "理由が出る: {err}");
         }
 
-        // AC3: 未実装の極は止める (⚠️ baseline の値を返さない)。★ 未実装なのは極 B だけ (極 M+ は issue 005 で開通)。
-        let err = resolve_pole(true, Some("pointer_b")).expect_err("未実装の極は Err");
-        assert!(err.contains("pointer_b"), "極の名前が出る: {err}");
+        // AC3: 未実装の極は止める (⚠️ baseline の値を返さない)。★ 未実装の極はもう無い
+        //   (極 M+ は issue 005・極 B は issue 006 で開通)。→ 全部通る。門の中身は `Pole::is_implemented` の単体テストが固定する。
+        assert_eq!(
+            resolve_pole(true, Some("pointer_b")),
+            Ok(Pole::PointerB),
+            "issue 006: 極 B は通る (⚠️ ただし `--features` 以外では上の AC5 が止める)"
+        );
         // issue 005: 極 M+ は通る (⚠️ ただし `--features` 以外では上の AC5 が止める)。
         assert_eq!(
             resolve_pole(true, Some("modifier_m_plus")),
@@ -4914,11 +5126,16 @@ mod tests {
 
     /// ⚠️ 防御の値: 未実装の極を (何かの間違いで) 封筒へ写しても `applicable == true` とは言わない。
     /// 実際には `resolve_pole` が出力の前に止める。
+    /// ⚠️ 理由コードは根拠が違うので**極ごとに別の語** (code-reviewer LOW・旧称 `not_implemented` から改名):
+    /// 極 B = `pointer_evidence_not_supplied` / 極 M+ = `modifier_evidence_not_supplied`。
     #[test]
     fn unimplemented_pole_never_claims_to_be_applicable() {
         let base = resolve_feature_config(None, &[]).expect("frozen resolves");
-        // ★ 極 B だけが未実装。極 M+ は数えていない (`None`) ときに同じ防御の値を出す。
-        for (pole, modifier_rows) in [(Pole::PointerB, None), (Pole::ModifierMPlus, None)] {
+        // ★ 極 B は入力 (`with_pointer_evidence`)・極 M+ は修飾キー行数 (`None`) を渡されていないとき、防御の値を出す。
+        for (pole, modifier_rows, expected_reason) in [
+            (Pole::PointerB, None, "pointer_evidence_not_supplied"),
+            (Pole::ModifierMPlus, None, "modifier_evidence_not_supplied"),
+        ] {
             let resolved = base.clone().with_pole(pole);
             let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
                 &resolved,
@@ -4930,7 +5147,7 @@ mod tests {
             .expect("serialize config");
             assert_eq!(dto["pole"], pole.as_str());
             assert_eq!(dto["pole_applicable"], false);
-            assert_eq!(dto["pole_not_applicable_reason"], "not_implemented");
+            assert_eq!(dto["pole_not_applicable_reason"], expected_reason);
         }
     }
 
@@ -4953,7 +5170,7 @@ mod tests {
         );
         assert_eq!(
             pole_applicability(Pole::ModifierMPlus, None),
-            (false, Some("not_implemented")),
+            (false, Some("modifier_evidence_not_supplied")),
             "数えていない極 M+ は適用可と名乗らない"
         );
         for rows in [None, Some(0), Some(5)] {
@@ -5005,6 +5222,186 @@ mod tests {
         assert!(baseline["pole_modifier_rows"].is_null());
         assert!(baseline["pole_modifier_truncated"].is_null());
         assert!(baseline["pole_modifier_orphan_releases"].is_null());
+    }
+
+    /// issue 006 AC7 ＋ `decisions.md` 判断 26: 極 B の適用可否は 3 状態
+    /// (宣言なし / 宣言ありだが 0 行 / 宣言ありで 1 行以上) で決まる。
+    /// ★ 理由コードは極 M+ (`no_modifier_rows`) と別の語。⚠️★★★ 2026-09-25 是正: 宣言があっても
+    /// 行が 0 本なら**判定不能** (`no_pointer_rows`) —— 「宣言があれば 0 行でも適用可 (所見)」だった
+    /// 旧仕様は、宣言はコンパイル時の可否でしかなく実行時の設置失敗と区別できないため裁定で覆った。
+    #[test]
+    fn pointer_b_applicability_follows_the_capability_declaration() {
+        let declared = serde_json::json!({
+            "unconditional": ["key"],
+            "config_gated": ["focus_transition", "pointer_bin"],
+        });
+        let other_group = serde_json::json!({ "threshold_gated": ["pointer_bin"] });
+        let undeclared = serde_json::json!({
+            "unconditional": ["key", "feat"],
+            "config_gated": ["focus_transition", "secure_input"],
+        });
+        assert!(declares_pointer_bin(Some(&declared)));
+        assert!(
+            declares_pointer_bin(Some(&other_group)),
+            "どの群でも宣言は宣言"
+        );
+        assert!(!declares_pointer_bin(Some(&undeclared)));
+        assert!(
+            !declares_pointer_bin(None),
+            "capabilities が無い旧ログは宣言なし"
+        );
+        for not_an_object in [
+            serde_json::json!("pointer_bin"),
+            serde_json::json!(["pointer_bin"]),
+        ] {
+            assert!(
+                !declares_pointer_bin(Some(&not_an_object)),
+                "オブジェクトでない capabilities は宣言と読まない"
+            );
+        }
+        // 判断 26: 3 状態 (宣言なし / 宣言ありだが 0 行 / 宣言ありで 1 行以上)。
+        assert_eq!(
+            pointer_applicability(false, Some(0)),
+            (false, Some("no_pointer_capability")),
+            "宣言が無ければ行数に関わらず計器が無かった扱い"
+        );
+        assert_eq!(
+            pointer_applicability(false, Some(5)),
+            (false, Some("no_pointer_capability")),
+            "宣言と行が食い違っていても (壊れたログ) 抑制はしない"
+        );
+        assert_eq!(
+            pointer_applicability(true, Some(0)),
+            (false, Some("no_pointer_rows")),
+            "判断26: 宣言があっても 0 行は判定不能 (所見として true にはしない)"
+        );
+        assert_eq!(pointer_applicability(true, Some(1)), (true, None));
+        assert_eq!(pointer_applicability(true, Some(240)), (true, None));
+        assert_eq!(
+            pointer_applicability(true, None),
+            (false, Some("pointer_evidence_not_supplied")),
+            "証拠 (行数) を渡し忘れても適用可と名乗らない (防御の値)"
+        );
+
+        // ★ 封筒の JSON: 宣言あり・0 行 → 判定不能 / 宣言あり・1 行以上 → 適用可 / 宣言なし → 適用不可。
+        //   極 B 以外は行数が `null`。
+        let base = resolve_feature_config(None, &[]).expect("frozen resolves");
+        let dto = |pole: Pole, declared: bool, rows: Option<u64>| {
+            serde_json::to_value(
+                FeatureConfigDto::from_resolved(&base.clone().with_pole(pole), 1, None, None, None)
+                    .with_pointer_evidence(declared, rows),
+            )
+            .expect("serialize config")
+        };
+        let idle = dto(Pole::PointerB, true, Some(0));
+        assert_eq!(idle["pole"], "pointer_b");
+        assert_eq!(
+            idle["pole_applicable"], false,
+            "判断26: 宣言あり・0 行は判定不能"
+        );
+        assert_eq!(idle["pole_not_applicable_reason"], "no_pointer_rows");
+        assert_eq!(idle["pole_pointer_rows"], 0, "0 行でも null にしない");
+        let active = dto(Pole::PointerB, true, Some(2));
+        assert_eq!(
+            active["pole_applicable"], true,
+            "宣言あり・1 行以上は適用可"
+        );
+        assert!(active["pole_not_applicable_reason"].is_null());
+        assert_eq!(active["pole_pointer_rows"], 2);
+        let none = dto(Pole::PointerB, false, Some(3));
+        assert_eq!(none["pole_applicable"], false);
+        assert_eq!(none["pole_not_applicable_reason"], "no_pointer_capability");
+        assert_ne!(none["pole_not_applicable_reason"], "no_modifier_rows");
+        assert_ne!(none["pole_not_applicable_reason"], "no_pointer_rows");
+        assert_eq!(none["pole_pointer_rows"], 3);
+        // 極 B 以外では何も足さない (渡された値を漏らさない)。
+        for pole in [Pole::Baseline, Pole::ModifierMPlus] {
+            let other = dto(pole, false, Some(9));
+            assert!(other["pole_pointer_rows"].is_null());
+            assert_ne!(other["pole_not_applicable_reason"], "no_pointer_capability");
+        }
+        // 極 B で証拠を渡し忘れても、適用可とは名乗らない (防御の値)。
+        let unset = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &base.clone().with_pole(Pole::PointerB),
+            1,
+            None,
+            None,
+            None,
+        ))
+        .expect("serialize config");
+        assert_eq!(unset["pole_applicable"], false);
+        assert_eq!(
+            unset["pole_not_applicable_reason"],
+            "pointer_evidence_not_supplied"
+        );
+        assert!(unset["pole_pointer_rows"].is_null());
+    }
+
+    /// 判断 26 の付随確認: `pole_applicable == false` (宣言あり・0 行の判定不能を含む) のとき、
+    /// `stall_onset` 列が baseline と恒等であること。★ 値では埋めない (既存の not_applicable の作法)。
+    /// ⚠️ これは `pointer_active_ts` の合成側 (main の分岐: 宣言なし/宣言あり0行のどちらも空の
+    /// `pointer_ts` を渡す) で保証されている構造的な事実であり、`pointer_suppression_intervals(&[], _)`
+    /// が空を返すことから導かれる (回帰させないための固定)。
+    #[test]
+    fn pointer_b_not_applicable_zero_rows_suppresses_nothing() {
+        use gse_next_lib::analysis::feat_offline::stall_onset::{
+            evaluation_intervals, pointer_suppression_intervals,
+        };
+        // 判定不能 (宣言あり・0 行) のとき、main は空の pointer_ts を渡す
+        // (`replay.rs` の `pointer_active_ts` 合成: `Some(rows) if pointer_declared` の rows が
+        // 空ベクタであっても、抑制区間は必ず空になる)。
+        let empty_rows: Vec<u64> = Vec::new();
+        let suppressed = pointer_suppression_intervals(&empty_rows, ENGINE_TICK_MS);
+        assert!(
+            suppressed.is_empty(),
+            "0 行からは抑制区間が 1 つも作られない"
+        );
+        let observed = vec![(0u64, 100_000u64)];
+        assert_eq!(
+            evaluation_intervals(&observed, &suppressed),
+            observed,
+            "抑制が空なら評価区間は観測区間そのまま (= baseline と恒等)"
+        );
+    }
+
+    /// issue 006: `pointer_bin` の collector は**時刻 `t` だけ**を読み、形の合わない行は捨てる (0 に畳まない)。
+    /// ★ 他の行種は拾わない・順不同の入力は昇順で返す。
+    #[test]
+    fn pointer_bin_collector_reads_only_the_timestamp() {
+        let path = std::env::temp_dir().join(format!(
+            "gse-replay-pointer-bin-collector-{}.ndjson",
+            std::process::id()
+        ));
+        let ndjson = "\
+{\"type\":\"pointer_bin\",\"t\":6000,\"moved\":3,\"buttons\":1,\"wheel\":0}\n\
+{\"type\":\"pointer_bin\",\"t\":5000}\n\
+{\"type\":\"pointer_bin\",\"t\":\"oops\"}\n\
+{\"type\":\"pointer_bin\",\"moved\":1}\n\
+{\"type\":\"feat\",\"t\":7000}\n\
+not json\n";
+        std::fs::write(&path, ndjson).expect("write temp session");
+        let got = collect_pointer_bin_timestamps(&path);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(got, Ok(vec![5_000, 6_000]));
+    }
+
+    /// LOW 是正 (code-reviewer): [`PointerBinTimestampDto`] のフィールドが **`t` だけ**であることを
+    /// 構造そのもので固定する (将来フィールドが増える回帰を検出する門)。
+    /// ★ 余分なフィールドを持つ JSON をデシリアライズしても `t` 以外は保持されず、
+    /// 逆シリアライズした serde 出力のキー集合も `["t"]` だけであることを見る。
+    #[test]
+    fn pointer_bin_timestamp_dto_has_only_the_t_field() {
+        let with_extra: PointerBinTimestampDto =
+            serde_json::from_str(r#"{"t":6000,"moved":3,"buttons":1,"wheel":0}"#)
+                .expect("extra fields are ignored, not an error");
+        assert_eq!(with_extra.t, 6_000);
+        let value = serde_json::to_value(&with_extra).expect("serialize back");
+        let obj = value.as_object().expect("dto serializes as a JSON object");
+        assert_eq!(
+            obj.keys().collect::<Vec<_>>(),
+            vec!["t"],
+            "PointerBinTimestampDto は t 以外のキーを持たないはず: {obj:?}"
+        );
     }
 
     /// issue 005: 修飾キーの edge は press と release の**両方**を、旧ログ (`vk`) と匿名化ログ (`category`) の

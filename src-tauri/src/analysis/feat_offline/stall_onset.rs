@@ -51,7 +51,36 @@
 //! - **IME 変換中の抑制**（D3 抑制表 2 行目）: 区間の定義と「抑制」の意味が未確定。
 //!   研究者判断待ち (`blockers.md` 起票 12)。
 //! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形は**別モード (`--pole`・1 実行 1 極)** に
-//!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B の中身は未実装 (issue 006)。
+//!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B は**観測区間と同じ構造で切る**と裁定済みで
+//!   (判断 7)、実装は [`pointer_suppression_intervals`] / [`evaluation_intervals`] (issue 006)。
+//!
+//! # 極 B の入れ方（issue 006）
+//!
+//! ★ 検出の**中には極の分岐を持たない**。極 B は検出へ渡す**評価区間の側**で表す: `pointer_bin` 行が覆う
+//! 秒の極大連続を**抑制区間**とし、観測区間から抑制区間を除いた各片を 1 つの観測区間として検出へ渡す
+//! ([`evaluation_intervals`])。→ 各片で (1) 条件 A の直前状態が `false` に戻り (2) 頭の `W` を評価せず
+//! (3) θ の標本も**片の内側の隣接 press 対だけ**になる —— **新しい機構は 1 つも無い**
+//! (観測区間と同じ規則をそのまま再利用する)。
+//!
+//! ⚠️★★★ **「極 B は onset 少なめ」は保証されない**（`decisions.md` 判断 25）。ADR-030 D3 の囲みは
+//! 「極 B (ポインタ活動区間を抑制する ＝ onset 少なめ)」と書くが、それは**典型形の記述であって
+//! 不変式ではない**。包含が崩れる経路は 2 つある:
+//!
+//! 1. **θ 経路**: θ_person は**全観測区間からプールした因果累積**である (モジュール doc 冒頭
+//!    「θ の標本は… 全観測区間からプールする」＋ [`pooled_theta_gaps`])。抑制をまたぐ標本を
+//!    プールから外すと、**抑制区間から遠い onset の θ・ひいては `t0` まで動く** —— baseline で
+//!    立った onset が極 B では別の時刻へ動いたり消えたりし、baseline に無い時刻で新しく
+//!    立つこともある (`tests::theta_sample_excludes_pairs_across_pointer_suppression` が固定:
+//!    同じ入力で baseline の onset は `s=71100, t0=91500` の 1 本だけだが、極 B では同じ
+//!    `s=71100` が `t0=71200` に移動し、baseline の `t0` 集合との交わりがゼロになる —— **極 B の
+//!    onset 集合は baseline の部分集合ですらない**)。
+//! 2. **分割経路**: 長い沈黙の途中にポインタ活動が入ると、片が 2 つに割れて後ろの片で `a + W` 後に
+//!    条件 A が改めて立つ (`feat` 行の穴と同じ扱い。`tests::pointer_suppression_skips_the_leading_w`
+//!    が固定: baseline 1 本 → 極 B 2 本。**onset が増える**)。
+//!
+//! → ★ 極 B が baseline の部分集合になるとは**限らない**（活動が停滞の途中で止めさせる典型形では
+//! 減るが、一般には保証されない）。★ したがって **G2 の上下界は「極 A が上・極 B が下」のような
+//! 2 極の順序を前提にせず、両極それぞれで求めた G2 の min / max で取る**（判断 25）。
 //!
 //! # 極 M+ の入れ方（issue 005）
 //!
@@ -77,7 +106,7 @@ use crate::analysis::metrics::{KeyPress, OutcomeConfig};
 /// | 名前 | ポインタ | 修飾キー | 実装 |
 /// |---|---|---|---|
 /// | `baseline` | 極 A (抑制しない) | 極 M− (規則なし) | ★ 現行の計算そのもの |
-/// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | issue 006 |
+/// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | ★ 実装済み (issue 006) |
 /// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | ★ 実装済み (issue 005) |
 ///
 /// ⚠️ 極は `--set` で変える 8 値 (`StallOnsetConfig` の他のフィールド) とは**別の軸**であり、
@@ -112,12 +141,12 @@ impl Pole {
     ///
     /// ⚠️★★★ **`false` の極を黙って `baseline` の値で返してはならない** —— 出力が嘘をつき、
     /// 極の比較が無意味になる。呼び出し側 (`build_feature_rows` / CLI) は `false` なら**止める**
-    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させる
-    /// (★ 極 M+ は issue 005 で開通済み。極 B は issue 006)。
+    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させた
+    /// (★ 極 M+ は issue 005・極 B は issue 006)。今は全部 `true` だが、極を足したときの
+    /// 門としてこの関数と網羅 `match` を残す。
     pub const fn is_implemented(self) -> bool {
         match self {
-            Pole::Baseline | Pole::ModifierMPlus => true,
-            Pole::PointerB => false,
+            Pole::Baseline | Pole::PointerB | Pole::ModifierMPlus => true,
         }
     }
 }
@@ -294,6 +323,79 @@ pub fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> 
     }
     intervals.push((start, prev));
     intervals
+}
+
+/// 極 B: `pointer_bin` 行の時刻から**抑制区間**を作る (ADR-030 D3・`decisions.md` 判断 7)。
+///
+/// ★ 1 行 `t` が覆うのは `(t − bin_ms, t]` である (`analysis/pointer_bin.rs`: `timestamp` は**ビンの終端時刻**)。
+/// ★ `bin_ms` は呼び出し側が **`ENGINE_TICK_MS`** を渡す —— 値は `input/observe_*.rs` の `BIN_MS` (= 1000・各 OS のテストが固定)
+/// の**写しであってリンクではない**ので、`BIN_MS` が変わったら呼び出し側 (`feat_offline/mod.rs` / `bin/replay.rs`) を追随させる
+/// (`decisions.md` 判断 7 の見直しタイミング)。⚠️ 数値定数を**宣言しない** (ADR-030 D3「新しい定数を作らない」・`005-acceptance.sh` が検査する)。
+/// ⚠️ ゼロ抑制なので**行が在る＝その秒に活動があった**。★ 行の**値は読まない** (存在だけを使う)。
+/// 覆う区間の**極大連続**を 1 本に畳む: ちょうど `bin_ms` 離れた 2 行 `(t−bin, t]` と `(t, t+bin]` は接して 1 本になり、
+/// それより離れた行は別の区間になる (整数 ms で 1 ms でも空けば別)。
+///
+/// 戻り値は `(下端を含まない, 上端を含む)` の組 (開始昇順・互いに素)。`pointer_ts` は順不同・重複ありでよい。
+/// `bin_ms == 0` は覆う秒が無いので空 (⚠️ 空の区間で観測区間を割らない)。
+///
+/// ⚠️ **`t == 0`（★ `bin_ms` に飽和で吸収される先頭）の行は `(0, 0]` という空区間を作る**
+/// （★ LOW 是正・code-reviewer 指摘）。`(0, 0]` は `lo == t` で「0 より大きく 0 以下」＝
+/// 実際には**どの整数 ms も覆わない**ので、抑制区間として push すると
+/// [`evaluation_intervals`] が観測区間を無意味に (何も除かずに) 2 片へ割ってしまう
+/// (`tests::pointer_suppression_at_t_zero_produces_no_interval` が固定)。→ **空区間は作らない**。
+pub fn pointer_suppression_intervals(pointer_ts: &[u64], bin_ms: u64) -> Vec<(u64, u64)> {
+    if bin_ms == 0 {
+        return Vec::new();
+    }
+    let mut sorted = pointer_ts.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+
+    let mut out: Vec<(u64, u64)> = Vec::new();
+    for t in sorted {
+        let lo = t.saturating_sub(bin_ms);
+        if lo == t {
+            // `(lo, t]` が空区間 (t == 0 のときだけ起こる)。何も覆わないので捨てる。
+            continue;
+        }
+        match out.last_mut() {
+            // 前の区間の上端 (含む) に、この行の下端 (含まない) が届いていれば接している。
+            Some(last) if lo <= last.1 => last.1 = t,
+            _ => out.push((lo, t)),
+        }
+    }
+    out
+}
+
+/// 観測区間から抑制区間を除いた**評価区間**を返す (両端を含む・開始昇順・互いに素)。
+///
+/// ★ 極 B が検出へ渡す区間である。**極 A (baseline) は抑制が空なので観測区間そのまま**が返る。
+/// 観測区間 `[a, b]` から `(lo, hi]` を除くと `[.., lo]` と `[hi + 1, ..]` に割れる (整数 ms)。
+/// ⚠️ 抑制が観測区間の外にあれば何も変わらない。⚠️ 抑制が区間全体を覆えば、その区間は消える。
+/// `observed` / `suppressed` はどちらも開始昇順・互いに素 ([`observed_intervals`] /
+/// [`pointer_suppression_intervals`] の戻り値) を仮定する。計算量は `O((I + S) + I log S)`。
+pub fn evaluation_intervals(observed: &[(u64, u64)], suppressed: &[(u64, u64)]) -> Vec<(u64, u64)> {
+    let mut out: Vec<(u64, u64)> = Vec::with_capacity(observed.len());
+    for &(a, b) in observed {
+        // この観測区間に届きうる最初の抑制 (上端が `a` 以上のもの)。
+        let mut i = suppressed.partition_point(|&(_, hi)| hi < a);
+        let mut cursor = a;
+        while let Some(&(lo, hi)) = suppressed.get(i) {
+            // 抑制は (lo, hi] = [lo + 1, hi]。`b` より後ろから始まるなら、以降は全部区間の外。
+            if lo >= b {
+                break;
+            }
+            if cursor <= lo {
+                out.push((cursor, lo));
+            }
+            cursor = cursor.max(hi.saturating_add(1));
+            i += 1;
+        }
+        if cursor <= b {
+            out.push((cursor, b));
+        }
+    }
+    out
 }
 
 /// [`modifier_press_intervals`] の結果。押下区間と、区間を作れなかった行の件数。
@@ -768,12 +870,33 @@ fn detect_stall_onsets(
 /// 観測区間ごとの条件 A の評価結果（変化点 ＋ 確定した onset）を返す。
 /// ★ [`detect_stall_onsets`] と **同じ 1 回の走査**であり、条件 A を 2 度評価しない
 /// （⚠️ issue 008 AC18 / AC18b の計算量の門があるため、二重走査にしない）。
+///
+/// ★ 本番経路は評価区間を自分で合成する [`stall_onset_column_with_timeline`] を使うので、**テスト専用**
+/// (`detect_stall_onsets` の入口)。⚠️ 観測区間そのまま (= 抑制なし) の検出である。
+#[cfg(test)]
 pub(super) fn condition_a_timeline(
     keys: &[KeyPress],
     feat_ts: &[u64],
     config: &StallOnsetConfig,
 ) -> Vec<ConditionAInterval> {
-    if feat_ts.is_empty() {
+    condition_a_timeline_over(
+        keys,
+        observed_intervals(feat_ts, config.hole_gap_ms),
+        config,
+    )
+}
+
+/// [`condition_a_timeline`] の本体。**評価する区間を呼び出し側が渡す** (開始昇順・互いに素・両端を含む)。
+///
+/// ★ 極 B は観測区間から抑制区間を除いた区間 ([`evaluation_intervals`]) をここへ渡す。⚠️ 検出の中身
+/// (条件 A・θ の標本・`t0 <= b`) は**区間の由来を知らない** —— 観測区間と同じ規則が抑制の各片にそのまま効く。
+/// 区間が 1 本も無ければ (`feat` 行が 1 本も無い入力・全部が抑制) onset は 1 つも立たない。
+fn condition_a_timeline_over(
+    keys: &[KeyPress],
+    intervals: Vec<(u64, u64)>,
+    config: &StallOnsetConfig,
+) -> Vec<ConditionAInterval> {
+    if intervals.is_empty() {
         return Vec::new();
     }
     let mut sorted_keys: Vec<KeyPress> = keys.to_vec();
@@ -781,7 +904,6 @@ pub(super) fn condition_a_timeline(
     let press_ts: Vec<u64> = sorted_keys.iter().map(|k| k.timestamp).collect();
     let prefix = net_prefix(&sorted_keys);
     let global_instants = build_global_instants(&sorted_keys, config.w_ms);
-    let intervals = observed_intervals(feat_ts, config.hole_gap_ms);
     let pooled_gaps = pooled_theta_gaps(&press_ts, &intervals);
     let mut theta_acc = ThetaAccumulator::new(&pooled_gaps);
 
@@ -885,6 +1007,7 @@ pub fn stall_onset_column(
     stall_onset_column_with_timeline(
         keys,
         feat_ts,
+        &[],
         task_kind_declarations,
         tick_count,
         grid_origin_ms,
@@ -899,17 +1022,23 @@ pub fn stall_onset_column(
 /// ⚠️★★★ **2 度走らせないためにある**（★ issue 006 V2 / 008 AC18 の計算量の門）——
 /// `restart` (`T1d`) は条件 A の辺を要するが、`condition_a_timeline` を別に呼ぶと
 /// 大入力で検出が 2 回走る。★ `build_feature_rows` はこちらを使う。
+///
+/// `suppressed` は極 B の**抑制区間** ([`pointer_suppression_intervals`])。★ 空なら観測区間そのまま
+/// (極 A / 極 M+ / [`stall_onset_column`] が渡す値)。空でなければ観測区間から除いた評価区間で検出する。
 #[allow(clippy::too_many_arguments)]
 pub(super) fn stall_onset_column_with_timeline(
     keys: &[KeyPress],
     feat_ts: &[u64],
+    suppressed: &[(u64, u64)],
     task_kind_declarations: &[(u64, String)],
     tick_count: usize,
     grid_origin_ms: u64,
     tick_ms: u64,
     config: &StallOnsetConfig,
 ) -> (Vec<StallOnset>, Vec<ConditionAInterval>) {
-    let timeline = condition_a_timeline(keys, feat_ts, config);
+    let observed = observed_intervals(feat_ts, config.hole_gap_ms);
+    let timeline =
+        condition_a_timeline_over(keys, evaluation_intervals(&observed, suppressed), config);
     let onsets: Vec<OnsetEvent> = timeline
         .iter()
         .flat_map(|interval| interval.onsets.iter().copied())
@@ -1964,7 +2093,9 @@ mod tests {
     fn baseline_and_modifier_m_plus_are_implemented() {
         assert!(Pole::Baseline.is_implemented());
         assert!(Pole::ModifierMPlus.is_implemented());
-        assert!(!Pole::PointerB.is_implemented());
+        // ★ 極 B は issue 006 で開通した (未実装の極が 1 つも無くなった)。
+        assert!(Pole::PointerB.is_implemented());
+        assert!(Pole::ALL.into_iter().all(Pole::is_implemented));
     }
 
     // ── 極 M+（issue 005）────────────────────────────────────────────────
@@ -2207,5 +2338,215 @@ mod tests {
             );
         }
         assert!(m_plus.len() > baseline.len());
+    }
+
+    // ── 極 B（issue 006）────────────────────────────────────────────────
+
+    /// 抑制区間つきで検出する (テスト専用)。★ 本番 (`stall_onset_column_with_timeline`) と同じ合成。
+    fn detect_with_suppression(
+        keys: &[KeyPress],
+        feat_ts: &[u64],
+        suppressed: &[(u64, u64)],
+        config: &StallOnsetConfig,
+    ) -> Vec<OnsetEvent> {
+        let observed = observed_intervals(feat_ts, config.hole_gap_ms);
+        condition_a_timeline_over(keys, evaluation_intervals(&observed, suppressed), config)
+            .into_iter()
+            .flat_map(|interval| interval.onsets)
+            .collect()
+    }
+
+    /// AC4: 抑制区間は `pointer_bin` 行の `(t − 1000, t]` の**極大連続**である。
+    /// ★ 隣接する 2 行は 1 本に畳まれ、1 ms でも空けば別の区間になる。
+    #[test]
+    fn pointer_bins_merge_into_maximal_intervals() {
+        assert_eq!(
+            ENGINE_TICK_MS, 1_000,
+            "呼び出し側が bin_ms に渡す ENGINE_TICK_MS は observe_*.rs の BIN_MS と同じ 1 秒 (変わったら追随を見直す)"
+        );
+        // 隣接 2 行 (5000, 6000) は (4000, 5000] と (5000, 6000] が接して 1 本になる。
+        assert_eq!(
+            pointer_suppression_intervals(&[5_000, 6_000], ENGINE_TICK_MS),
+            vec![(4_000, 6_000)]
+        );
+        // 3 行の連鎖も 1 本。
+        assert_eq!(
+            pointer_suppression_intervals(&[5_000, 6_000, 7_000], 1_000),
+            vec![(4_000, 7_000)]
+        );
+        // 順不同・重複は吸収され、離れた行は別の区間になる。
+        assert_eq!(
+            pointer_suppression_intervals(&[9_000, 5_000, 6_000, 5_000], 1_000),
+            vec![(4_000, 6_000), (8_000, 9_000)]
+        );
+        // ⚠️ 境界: ちょうど 1 ビン離れは接する (上で確認)／1 ms 空けば別 ((5000, 5001] が未被覆)。
+        assert_eq!(
+            pointer_suppression_intervals(&[5_000, 6_001], 1_000),
+            vec![(4_000, 5_000), (5_001, 6_001)]
+        );
+        // 空・ビン幅 0 (覆う秒が無い) は空。先頭がビン幅より小さければ下端は 0 に飽和する。
+        assert!(pointer_suppression_intervals(&[], 1_000).is_empty());
+        assert!(pointer_suppression_intervals(&[5_000], 0).is_empty());
+        assert_eq!(pointer_suppression_intervals(&[300], 1_000), vec![(0, 300)]);
+    }
+
+    /// LOW 是正 (code-reviewer): `t = 0` の行は `(0, 0]` という**空区間**を作る
+    /// (`0.saturating_sub(bin_ms) == 0 == t`)。push すると [`evaluation_intervals`] が
+    /// 観測区間を「何も除いていないのに」2 片へ無意味に割ってしまう。
+    #[test]
+    fn pointer_suppression_at_t_zero_produces_no_interval() {
+        assert!(
+            pointer_suppression_intervals(&[0], 1_000).is_empty(),
+            "t=0 だけの入力は空区間しか作らないので抑制区間は 0 本のはず"
+        );
+        // t=0 は無視され、t=5000 由来の区間だけが残る (空区間が他の区間の計算を乱さない)。
+        assert_eq!(
+            pointer_suppression_intervals(&[0, 5_000], 1_000),
+            vec![(4_000, 5_000)]
+        );
+        // observed 側でも「t=0 だけの入力」は評価区間を割らない (baseline と恒等)。
+        let observed = vec![(0, 100)];
+        assert_eq!(
+            evaluation_intervals(&observed, &pointer_suppression_intervals(&[0], 1_000)),
+            observed
+        );
+    }
+
+    /// 観測区間から抑制区間を除く合成の境界 (`(lo, hi]` は整数 ms で `[lo + 1, hi]`)。
+    #[test]
+    fn evaluation_intervals_cut_observed_by_suppression() {
+        let observed = vec![(0, 100_000)];
+        // 抑制が空なら観測区間そのまま (★ 極 A / 極 M+ が baseline と恒等になる根拠)。
+        assert_eq!(evaluation_intervals(&observed, &[]), observed);
+        // 途中を抜くと 2 片に割れ、抑制の上端の**次の ms**から次の片が始まる。
+        assert_eq!(
+            evaluation_intervals(&observed, &[(55_000, 57_000)]),
+            vec![(0, 55_000), (57_001, 100_000)]
+        );
+        // 1 つの観測区間に複数の抑制。
+        assert_eq!(
+            evaluation_intervals(&[(0, 100)], &[(10, 20), (30, 40)]),
+            vec![(0, 10), (21, 30), (41, 100)]
+        );
+        // 抑制が区間の境界をまたぐ／区間全体を覆う。
+        assert_eq!(
+            evaluation_intervals(&[(10, 20), (30, 40)], &[(15, 35)]),
+            vec![(10, 15), (36, 40)]
+        );
+        assert!(evaluation_intervals(&[(20, 30)], &[(10, 40)]).is_empty());
+        // 抑制が区間の外なら変わらない: 終端ちょうどから始まる (`b + 1` 以降を覆う) / 始端の直前で終わる。
+        assert_eq!(evaluation_intervals(&[(0, 10)], &[(10, 20)]), vec![(0, 10)]);
+        assert_eq!(
+            evaluation_intervals(&[(11, 20)], &[(0, 10)]),
+            vec![(11, 20)]
+        );
+        // 始端ちょうどを覆う抑制は、その ms を除く。
+        assert_eq!(
+            evaluation_intervals(&[(10, 20)], &[(0, 10)]),
+            vec![(11, 20)]
+        );
+    }
+
+    /// AC5: θ の標本は**抑制区間をまたがない** (ADR-030 D4 の標本規則: 抑制・除外区間をまたぐ gap は入れない)。
+    /// ★ 抑制区間の**内側**の press を含む対も入らない。baseline との対照で θ が変わることを見る。
+    ///
+    /// ⚠️★★★ **判断 25**: 同じ入力で、極 B の onset の `t0` 集合が baseline の**部分集合ですらない**
+    /// ことも明示的に固定する（θ 経路で包含が崩れる例。モジュール doc 「極 B の入れ方」参照）。
+    /// 「極 B は onset 少なめ」は不変式ではなく、この fixture では baseline 側の `t0` (91500) が
+    /// 消え、baseline に無い `t0` (71200) が新しく立つ。
+    #[test]
+    fn theta_sample_excludes_pairs_across_pointer_suppression() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 115_000, 1_000);
+        // 1000/1100/1200 (gap 100 ×2) → 20500/20600 (抑制区間 (20000, 21000] の内側) → 41000/41100。
+        let keys = vec![
+            key(1_000),
+            key(1_100),
+            key(1_200),
+            key(20_500),
+            key(20_600),
+            key(41_000),
+            key(41_100),
+        ];
+
+        // baseline: 標本は 6 対 (100, 100, 19300, 100, 20400, 100)。p99 = 最大 = 20400。
+        let baseline = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            baseline.len(),
+            1,
+            "baseline は s=71100 の 1 本だけ: {baseline:?}"
+        );
+        assert_eq!(baseline[0].s_ms, 71_100);
+        assert_eq!(baseline[0].theta_person_ms, 20_400);
+        assert_eq!(baseline[0].theta_sample_n, 6);
+
+        // 極 B: 抑制の内側の press (20500/20600) と、抑制をまたぐ対 (1200→41000 / 1200→20500) は標本に入らない。
+        // 残るのは同じ片の内側の 3 対 (100 ×3) だけ → θ = 100。
+        let suppressed = pointer_suppression_intervals(&[21_000], ENGINE_TICK_MS);
+        assert_eq!(suppressed, vec![(20_000, 21_000)]);
+        let pole_b = detect_with_suppression(&keys, &feat, &suppressed, &config);
+        assert_eq!(
+            pole_b,
+            vec![OnsetEvent {
+                s_ms: 71_100,
+                t0_ms: 71_200,
+                theta_person_ms: 100,
+                theta_sample_n: 3,
+            }],
+            "抑制をまたぐ gap が標本に混ざると θ が 20400 に跳ね上がる (θ_person が過大になり episode yield が落ちる)"
+        );
+
+        // 判断 25: 極 B の t0 集合は baseline の部分集合ではない (θ 経路で包含が崩れる例を固定する)。
+        let baseline_t0: std::collections::BTreeSet<u64> =
+            baseline.iter().map(|o| o.t0_ms).collect();
+        let pole_b_t0: std::collections::BTreeSet<u64> = pole_b.iter().map(|o| o.t0_ms).collect();
+        assert!(
+            !pole_b_t0.is_subset(&baseline_t0),
+            "判断25: 極 B の t0 集合 {pole_b_t0:?} が baseline の t0 集合 {baseline_t0:?} の部分集合になっている \
+             (θ 経路で包含が崩れることを示すはずの例が、たまたま包含してしまっている)"
+        );
+    }
+
+    /// AC6: 抑制区間の直後の片も、観測区間と同じく**頭の `W` を評価しない**
+    /// (補訂 1 項目 1-3)。片の開始 (50001) ではなく `開始 + W` (80001) で条件 A が立ち上がる。
+    /// ★ 同時に、直前状態が `false` に戻ること・長い沈黙の途中の抑制で onset が**増える**ことも固定する。
+    #[test]
+    fn pointer_suppression_skips_the_leading_w() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 90_000, 1_000);
+        let keys = vec![key(1_000), key(1_100)];
+
+        let baseline = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            baseline.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![31_100],
+            "baseline は 1 本の沈黙で onset 1 つ"
+        );
+
+        // 沈黙の途中 (49000, 50000] に活動。→ 片は [0, 49000] と [50001, 90000]。
+        let suppressed = pointer_suppression_intervals(&[50_000], ENGINE_TICK_MS);
+        let pole_b = detect_with_suppression(&keys, &feat, &suppressed, &config);
+        assert_eq!(
+            pole_b.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![31_100, 80_001],
+            "後ろの片は開始 50001 ではなく開始+W=80001 で立つはず \
+             (W の抑制を外すと 50001 になる): {pole_b:?}"
+        );
+        assert_eq!(pole_b[1].t0_ms, 80_101);
+        // 前の片の onset は baseline と同じ (θ の標本も同じ 1 対)。
+        assert_eq!(pole_b[0], baseline[0]);
+
+        // ⚠️ 片が W に届かなければ、その片は 1 度も評価されない (直後の片が短い場合)。
+        let short_tail = detect_with_suppression(
+            &keys,
+            &feat_ts_range(0, 70_000, 1_000),
+            &suppressed,
+            &config,
+        );
+        assert_eq!(
+            short_tail.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![31_100],
+            "後ろの片 [50001, 70000] は W=30000 に届かず評価されない"
+        );
     }
 }
