@@ -59,9 +59,20 @@ done
 
 # ── AC2 / AC6: 削除行が 0 であること ────────────────────────────────────
 #   ⚠️★★★ 「本文を書き換えていない」は **削除行の不在** でしか確かめられない。
-#     ★ base は _loop-config.json の base_branch。取れなければ origin/main へ退く。
-BASE="$(sed -nE 's/.*"base_branch" *: *"([^"]+)".*/\1/p' \
-        .steering/20260921-p1-prereg-cli-poles/_loop-config.json 2>/dev/null | head -1)"
+#     ★ base は「補訂 2 の見出しを初めて足したコミットの**親**」（★ 2026-09-25 メイン修正）。
+#     ⚠️ 旧式は `_loop-config.json` の base_branch（＝ 作業ブランチ自身）を使っていたので、009 を merge した後は
+#       BASE == HEAD となり「追記が 1 バイトも無い」で**必ず赤**になった（★ main へ入った後も同じ）。
+#     ★ 見出しで引けない場合（worktree で未コミット等）だけ、従来どおり base_branch → origin/main へ退く。
+#     ★ `ACC_009_BASE` で明示指定できる（検査の検査用）。
+BASE="${ACC_009_BASE:-}"
+if [ -z "$BASE" ]; then
+  intro="$(git log --format=%H -S'## 補訂 2（2026-09-25）' -- "$ADR" 2>/dev/null | tail -1)"
+  [ -n "$intro" ] && BASE="${intro}^"
+fi
+if [ -z "$BASE" ]; then
+  BASE="$(sed -nE 's/.*"base_branch" *: *"([^"]+)".*/\1/p' \
+          .steering/20260921-p1-prereg-cli-poles/_loop-config.json 2>/dev/null | head -1)"
+fi
 [ -n "${BASE:-}" ] || BASE="origin/main"
 git rev-parse --verify "$BASE" >/dev/null 2>&1 || BASE="origin/main"
 git rev-parse --verify "$BASE" >/dev/null 2>&1 \
