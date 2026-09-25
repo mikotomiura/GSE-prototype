@@ -421,25 +421,96 @@ run_verify() { # run_verify <worktree> <issue-id> <out-file>; 失敗種別は $V
 #   `max_turns` で切れて何もコミットしなくても緑になりうる (★ design.md P1-I・判断 5)。
 #   → ★ 「ちゃんとコミットされているか」を別に見る。
 # ⚠️★★★ **呼び出し順序はレビュー指摘 C-M3/C-M4（2026-09-26）で verify の前に是正した。**
-#   ★ 旧実装（verify 緑の**後**に呼ぶ）は、verify/acceptance が gitignore されていない生成物を
-#     作業ツリーに残す issue では、worker が正しくコミットしても check_committed が見る porcelain が
-#     **毎回 dirty** になり、同一 fingerprint → `no_progress_stop` の誤検知になっていた (C-M3)。
-#     かつ `verify_level: recheck` では `run_watchdog`（フルセッション 1 回分）が
-#     check_committed より前に走り、未コミットの attempt でも予算を浪費していた (C-M4)。
-#   ★ 呼び出し側 (run_issue の verify 直前) が `check_committed && run_verify` の短絡評価で
-#     この順序を強制する。詳細はそちらのコメントを参照。
-check_committed() { # check_committed <worktree> <anchor> <out-file>; 0 = コミット済み
-  local wt="$1" anchor="$2" out_file="$3" porcelain n_commits rc
+#   ★ 呼び出し側 (run_issue の verify 直前) がこの順序を強制する。詳細はそちらのコメントを参照。
+#
+# ⚠️★★★ **2026-09-26 の 2 回目の是正 (/cross-review + security-checker・判断 10)**:
+#   ★ 「check_committed を verify の前に置く」だけでは 3 つの穴が残っていた:
+#     (a) code-reviewer MEDIUM: 赤の verify が gitignore 外の生成物を作業ツリーに残すと、
+#         worker が正しくコミットしても porcelain には生成物が**未追跡のまま**残り続け、
+#         次の attempt の check_committed が**恒久的に dirty**になる (worker は rm を持たない)。
+#     (b) Codex P2-3: 逆に `status.showUntrackedFiles=no` の設定下では、生の `git status --porcelain`
+#         は未追跡ファイルを一切表示しない。→ コミットしていない新規ファイルを使って
+#         見かけ上クリーンになり、緑になりうる。
+#     (c) Codex P2-2 / security LOW 1: check_committed が見ているのは「呼ばれた時点のスナップショット」
+#         でしかない。verify が追跡ファイルを書き換えた場合や、skip-worktree / assume-unchanged の
+#         印が付いたファイルがある場合、**コミットの内容そのものは検証されていない**。
+#   ★ 是正: (a)(b) は check_committed 内で対処し、(c) は run_issue 側で verify 前後の不変性を見る。
+#
+# ⚠️★★★ **限界（境界ではなく明示する）**:
+#   worker が verify の生成物と同じパスを後で意図的に編集しても、未追跡のままなら
+#   引き続き除外される。gitignore 対象のパスは見ない (そもそも porcelain に出ない)。
+#   これは検査の穴ではなく、**最終判定は merge 前にメインが clean な checkout で回す acceptance**
+#   に委ねる設計 (前タスク判断 21 / 22 の運用・判断 8 と同じ型)。
+untracked_paths() { # untracked_paths <worktree> → 未追跡パス一覧 (1 行 1 パス。"?? " 接頭辞は剥がす)
+  #   ⚠️★★★ `--untracked-files=all` を明示する ((b) の対策そのもの)。指定しないと
+  #     `status.showUntrackedFiles=no` の設定を継承してしまい、未追跡ファイルを一切拾えない。
+  git -C "$1" status --porcelain --untracked-files=all 2>/dev/null | grep '^?? ' | sed 's/^?? //'
+}
+
+record_verify_generated() { # record_verify_generated <worktree> <u0-file> <gen-file>
+  #   verify (run_verify / watchdog) が実行される**前後**の未追跡集合の差分 (U1 - U0) を
+  #   <gen-file> に積む。次回以降の check_committed がこの集合に含まれる未追跡パスを
+  #   dirty 判定から除外する ((a) の対策)。緑でも赤でも呼ぶこと (どちらも生成物を残しうる)。
+  local wt="$1" u0="$2" gen="$3" u1
+  u1="$(mktemp)" || return 0
+  untracked_paths "$wt" > "$u1"
+  if [ -s "$u0" ]; then
+    grep -Fxvf "$u0" "$u1" 2>/dev/null >> "$gen" || true
+  else
+    cat "$u1" >> "$gen" 2>/dev/null || true
+  fi
+  rm -f "$u1"
+}
+
+check_committed() { # check_committed <worktree> <anchor> <out-file> <gen-file>; 0 = コミット済み
+  local wt="$1" anchor="$2" out_file="$3" gen_file="$4"
+  local n_commits rc
   : > "$out_file"
-  porcelain="$(git -C "$wt" status --porcelain 2>&1)"
-  {
-    echo "# check_committed: git status --porcelain"
-    if [ -n "$porcelain" ]; then printf '%s\n' "$porcelain"; else echo "(クリーン)"; fi
-  } >> "$out_file"
+  [ -f "$gen_file" ] || : > "$gen_file"
+
+  # --- (1) 未追跡ファイルは設定非依存で全件見る。verify が作った生成物だけを除外する ---
+  local porcelain line path dirty_lines="" excluded_lines=""
+  porcelain="$(git -C "$wt" status --porcelain --untracked-files=all 2>&1)"
   if [ -n "$porcelain" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      case "$line" in
+        "?? "*)
+          path="${line#"?? "}"
+          if grep -Fxq "$path" "$gen_file" 2>/dev/null; then
+            excluded_lines="${excluded_lines}${line}"$'\n'
+          else
+            dirty_lines="${dirty_lines}${line}"$'\n'
+          fi ;;
+        *) dirty_lines="${dirty_lines}${line}"$'\n' ;;
+      esac
+    done <<< "$porcelain"
+  fi
+  {
+    echo "# check_committed: git status --porcelain --untracked-files=all"
+    if [ -n "$porcelain" ]; then printf '%s\n' "$porcelain"; else echo "(クリーン)"; fi
+    if [ -n "$excluded_lines" ]; then
+      echo "# → 除外した生成物 (verify が作った未追跡パスなので dirty 判定から外した):"
+      printf '%s' "$excluded_lines"
+    fi
+  } >> "$out_file"
+  if [ -n "$dirty_lines" ]; then
     echo "# → 未コミットの変更がある (dirty)" >> "$out_file"
     return 1
   fi
+
+  # --- (2) skip-worktree / assume-unchanged の印はコミットの内容を保証しない ---
+  local flagged
+  flagged="$(git -C "$wt" ls-files -v 2>/dev/null | grep -E '^(S |[a-z] )' || true)"
+  if [ -n "$flagged" ]; then
+    {
+      echo "# check_committed: git ls-files -v に skip-worktree(S) / assume-unchanged(小文字) の印がある"
+      printf '%s\n' "$flagged"
+      echo "# → コミット済みの内容が保証できないため fail-closed"
+    } >> "$out_file"
+    return 1
+  fi
+
   # ⚠️ anchor が空・rev-list が失敗 → 数えられない ＝ fail-closed (done にしない側)。
   if [ -z "$anchor" ]; then
     echo "# → anchor (worktree 生成時の HEAD) を取得できていない。コミット数を数えられないため fail-closed" >> "$out_file"
@@ -544,6 +615,11 @@ check_wt_became_blocked() { # check_wt_became_blocked <id> <wt> <attempt> <was-b
 # ---------- 1 issue の attempt ループ ----------
 run_issue() {
   local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor wt_blocked_at_start=0
+  # ⚠️★★★ verify が生成した未追跡パスの集合 (判断 10)。attempt をまたいで蓄積する
+  #   (前 attempt が残した生成物は次の attempt でも未追跡のまま残るため)。issue ごとに 1 本、
+  #   run_issue の開始で空にする (WORK_TMP は run 全体で 1 つなので id 違いと混線しない)。
+  local gen_file="$WORK_TMP/verify-generated-$id.txt"
+  : > "$gen_file"
   # ⚠️★★★ **`--task` を渡す** (★ 起票 23)。
   #   ★ 旧実装は `--no-exec "$id"` だけを渡しており、⚠️ **loop-run.sh は `$TASK_DIR` を
   #     持っているのに伝えていなかった**ので、`loop-spawn.sh` が `.steering/*/_loop-config.json` を
@@ -742,41 +818,60 @@ run_issue() {
     local vout="$WORK_TMP/verify-$id.out"
     # ⚠️★★★ P1-I（design.md 判断 5・レビュー指摘 C-M3/C-M4 で 2026-09-26 是正）:
     #   `check_committed` は **`run_verify` より前**に見る。
-    #   ⚠️ 旧実装は verify 緑の**後**に check_committed していたため:
-    #     (a) verify / acceptance が gitignore されていない生成物を作業ツリーに残す issue では、
-    #         worker が正しくコミットしても check_committed が見る porcelain は**毎回 dirty**になり、
-    #         同一 fingerprint → `no_progress_stop` の誤検知になっていた (C-M3)。
-    #     (b) `verify_level: recheck` では `run_watchdog`（フルセッション 1 回分）が
-    #         check_committed より前に走り、未コミットの attempt でも予算を浪費していた (C-M4)。
-    #   ★ `&&` の短絡評価で順序を強制する: `check_committed` が非 0 なら `run_verify` は
-    #     実行されない（verify も watchdog も回さず、check_committed が書いた $vout をそのまま
-    #     既存の失敗経路 (fingerprint → check_wt_became_blocked → no_progress → 次 attempt) に渡す）。
-    #   → これで「verify が測った内容 ＝ コミット済みの内容」になる
-    #     (check_committed を通過した時点で作業ツリーはクリーンなので)。
+    #   ⚠️★★★ **さらに 2026-09-26 の 2 回目の是正 (/cross-review + security-checker・判断 10)**:
+    #   ★ 分岐を明示にする —— `if ! check_committed …; then VERIFY_KIND=uncommitted;
+    #     elif run_verify …; then …（緑の経路）…; fi` の形にし、`[ -n "$VERIFY_KIND" ] ||
+    #     VERIFY_KIND=uncommitted` という**暗黙の推論**はやめる。
+    #   ★ check_committed 自身の生成物除外・未追跡設定非依存・skip-worktree 検査は
+    #     check_committed のコメントを参照。★ ここで足すのは verify 前後の不変性検査:
+    #     run_verify (と recheck の watchdog) の**前後**で「未追跡集合 U0/U1」を取り、
+    #     U1 − U0 を生成集合に足す (次回以降の check_committed が除外できるようにする)。
+    #     さらに issue_done の直前で「HEAD が動いていない」かつ「追跡ファイルに差分がない」
+    #     ことを確かめ、崩れていれば uncommitted 扱いにして done にしない
+    #     (Codex P2-2 / security LOW 1 —— verify が追跡ファイルを書き換えても
+    #     check_committed 単体では気づけない)。
     VERIFY_KIND=""
-    if check_committed "$wt" "$wt_anchor" "$vout" && run_verify "$wt" "$id" "$vout"; then
-      local lvl; lvl="$(issue_verify_level "$id")"
-      if [ "$lvl" = "recheck" ]; then
-        if ! run_watchdog "$id" "$wt" "$attempt"; then return 1; fi
+    if ! check_committed "$wt" "$wt_anchor" "$vout" "$gen_file"; then
+      VERIFY_KIND=uncommitted
+    else
+      local u0_file head_before head_after
+      u0_file="$WORK_TMP/verify-u0-$id.txt"
+      untracked_paths "$wt" > "$u0_file"
+      head_before="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+      if run_verify "$wt" "$id" "$vout"; then
+        # ★ 緑になった直後にも U1 を取って生成集合を更新する (verify 自体が生成物を作りうる)。
+        record_verify_generated "$wt" "$u0_file" "$gen_file"
+        local lvl; lvl="$(issue_verify_level "$id")"
+        if [ "$lvl" = "recheck" ] && ! run_watchdog "$id" "$wt" "$attempt"; then
+          return 1
+        fi
+        # ⚠️★★★ **`issue_done` を出す直前に「HEAD 不変」かつ「追跡ファイルに差分なし」を確かめる**
+        #   （★ Codex P2-2 / security LOW 1・2026-09-26。★ `code-reviewer` / `security-checker` の
+        #     旧 HIGH 指摘・2026-09-20 の「HEAD だけ見る」検査をさらに強める）。
+        #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
+        #     (`verify_level: recheck` の issue)。そこや `run_verify` の最中に
+        #     追跡ファイルが書き換えられていても、check_committed 通過時点のスナップショットだけでは
+        #     見えない。→ ★ ここで H0 との一致と `git diff --quiet HEAD --` を見る。
+        head_after="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+        if [ "$head_after" = "$head_before" ] && git -C "$wt" diff --quiet HEAD -- 2>/dev/null; then
+          # ⚠️ ブランチ名 / 履歴入れ替えの検査は従来どおり残す (HEAD 不変チェックとは別の観点:
+          #   `ensure_branch` はブランチ名と anchor からの祖先関係を見る)。
+          ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
+          emit "$id" done issue_done attempt="$attempt"
+          log "issue $id: done (attempt $attempt)"
+          return 0
+        fi
+        {
+          echo "# → verify（または watchdog）が追跡ファイル / HEAD を変更した"
+          echo "#   HEAD: 前=$head_before 後=$head_after"
+        } >> "$vout"
+        VERIFY_KIND=uncommitted
+      else
+        # run_verify が失敗した場合も生成物を残しうる (test_fail 等)。
+        # VERIFY_KIND は run_verify 自身が設定済みなので、ここでは上書きしない。
+        record_verify_generated "$wt" "$u0_file" "$gen_file"
       fi
-      # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
-      #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
-      #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
-      #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
-      #     **`issue_done` が「別ブランチを見て出した done」**になる。
-      #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
-      #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
-      #     M3 が `git -C . checkout` で破れることを実測している。
-      #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
-      ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
-      emit "$id" done issue_done attempt="$attempt"
-      log "issue $id: done (attempt $attempt)"
-      return 0
     fi
-    # ⚠️ `check_committed` が落ちた場合は `&&` の短絡評価で `run_verify` が呼ばれず、
-    #   `VERIFY_KIND` は直前でリセットした "" のまま残る。`run_verify` が呼ばれて失敗した場合は
-    #   `run_verify` 自身が失敗種別 (test_fail 等) を設定済みなので、ここでは上書きしない。
-    [ -n "$VERIFY_KIND" ] || VERIFY_KIND=uncommitted
 
     # 一時ファイルから fingerprint を作る (サブシェル経由だと必ず sha1("") になる)
     fp="$(fingerprint < "$vout")"

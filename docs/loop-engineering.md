@@ -55,9 +55,16 @@ worktree 隔離のもと安全に回す。人が目視できる監視ファイ�
 `no_progress_stop` | `scope_violation` | `blocked` | `issue_done` | `abandoned`
 
 - `acceptance_fail`: `<id>-acceptance.sh` が非 0。⚠️ `loop-run.sh` は以前から出していたが、この表に載っていなかった (2026-09-26 に追記)。
-- `uncommitted` (2026-09-26・起票 P1-I): worker の attempt の後、**verify を回す前**に見て、worktree に**未コミットの変更がある**か、
-  **worktree 生成時点からのコミットが 0 件**。⚠️ verify も watchdog も回さず `issue_done` にしない (未コミットの緑をそのまま merge すると空の merge になる)。
-  ★ verify より前に見るので「verify が測った内容 ＝ コミット済みの内容」になり、verify が作る生成物で誤検知しない。
+- `uncommitted` (2026-09-26・起票 P1-I。★ 2026-09-26 に /cross-review + security-checker の指摘で 2 回目の是正): worker の attempt の後、**verify を回す前**に見て、worktree に**未コミットの変更がある**か、
+  **worktree 生成時点からのコミットが 0 件**か、**追跡ファイルに skip-worktree / assume-unchanged の印が付いている**場合。
+  ⚠️ 未コミット判定は `git status --porcelain --untracked-files=all` で設定 (`status.showUntrackedFiles`) に依存せず全未追跡ファイルを見る。
+  ただし verify (と `verify_level: recheck` の watchdog) が実行の前後で新たに作った未追跡パスは、issue ごとの「生成集合」に記録して次回以降の判定から除外する
+  (赤の verify が gitignore 外の生成物を残しても、worker が正しくコミットすれば次の attempt で `issue_done` に届く)。
+  ★ verify を回す前に見るので、check_committed を通過した時点の作業ツリーはクリーンな状態から始まる。
+  さらに、verify (と watchdog) の**後**にも「HEAD が動いていないか」「追跡ファイルに差分が無いか」(`git diff --quiet HEAD --`) を確かめ、
+  崩れていれば verify が緑でも `uncommitted` にして `issue_done` にしない (verify 自身が追跡ファイルを書き換える・checkout する等でコミットの内容が保証できなくなるため)。
+  ⚠️★ **限界**: worker が生成物と同じパスを後で意図的に編集しても未追跡のままなら除外対象のままである。gitignore 対象のパスはそもそも porcelain に出ないので見ない。
+  これは境界の欠陥ではなく、**最終判定は merge 前にメインが clean な checkout で回す acceptance** に委ねる設計である。
   ★ `test_fail` と同じく**失敗 attempt**として次の attempt へ進む (max_turns で切れた worker が次の attempt でコミットできる)。
   同じ未コミット状態が続けば同じ fingerprint になり `no_progress_stop` で止まる。モードC では `loop-run.sh` が機械検査する。
 

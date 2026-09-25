@@ -1364,7 +1364,14 @@ run_fakerm_scenario() { # run_fakerm_scenario <repo-dir> <spawn-src> <id> <out-p
     cd "${r}" || exit 1
     rm() { return 1; }
     export -f rm
-    env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "${id}" t
+    # ⚠️★★★ 起票 (2026-09-26 の裁定・項目 7): **exec を明示する。**
+    #   ★ exec 最適化の保証が無い bash (macOS 3.2) では、`(...)` サブシェルの最後のコマンドが
+    #     単純な `env ... bash ...` でも新たな子プロセスへ fork されうる。
+    #   ⚠️ すると `$!` (＝ gpid) はサブシェル自身の pid のままで、実際に走る
+    #     `bash scripts/loop-spawn.sh` はその**孫プロセス**になる。下の `kill -9 "${gpid}"` は
+    #     孫まで届かないため、ハング検出後も loop-spawn.sh が孤児として残りうる。
+    #   → ★ `exec` でサブシェル自身を置き換え、`gpid` が実プロセスの pid と一致するようにする。
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "${id}" t
   ) >"${TMP}/${pfx}.out" 2>"${TMP}/${pfx}.err" &
   gpid=$!
   waited=0
@@ -1449,7 +1456,9 @@ run_fakecat_scenario() { # run_fakecat_scenario <repo-dir> <spawn-src> <id> <out
       command cat "$@"
     }
     export -f cat
-    env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "${id}" t
+    # ⚠️★★★ 起票 (2026-09-26 の裁定・項目 7): `run_fakerm_scenario` と同じ理由で exec を明示する
+    #   (★ サブシェルの pid ($!) と実プロセスをずらさない。詳細はそちらのコメント参照)。
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "${id}" t
   ) >"${TMP}/${pfx}.out" 2>"${TMP}/${pfx}.err" &
   ipid=$!
   waited=0
@@ -1615,6 +1624,377 @@ fi
 #     (rc 128 は shallow clone の追加配線が要り、既存ハーネス (bare origin + full push) の
 #     延長では作れない)。★ die メッセージはコードレビューで固定した文言を実装した
 #     (このファイル群にある「分岐とは別の異常です」「rc=128・shallow clone 等の可能性」)。
+
+# ── 13. ⚠️★★★ 2026-09-26 Codex /cross-review (P1・LOW 群) の個別対応 ──────
+# ⚠️★★★ **何を止めるためにあるのか** (decisions.md 判断 9/10):
+#   ★ Codex P1: `git worktree add` 失敗経路が「ロック解放 → abort_worktree」の順だったため、
+#     解放直後に**並行する別 spawn**が同じ id/short の worktree/branch を作ると、
+#     abort_worktree の後始末がその**他人の worktree/branch**を消しうる。
+#   ★ ref の修飾: `start="origin/$base"`（equal/local-behind/no-local）と
+#     fetch 失敗・origin 無しの `start="$base"` が無修飾のままだった
+#     (⚠️ 後者は同名 tag があると `fatal: ambiguous object name` で実際に落ちる。下の 13a-fetchfail で実測)。
+#   ★ CDPATH: LOCK の絶対化 `cd "$d" && pwd` が CDPATH の影響を受ける (下の 13b で実測)。
+#   ★ release: 自分のロックか確かめずに `rm -rf` していた (13c)。
+#   ★ 巨大な TIMEOUT: awk の `max_i` が数値比較を壊す桁数でも通っていた (13d)。
+echo "════════════════════════════════════════"
+echo "13. ⚠️★★★ Codex /cross-review 由来の個別対応 (ロック保持順序 / ref 修飾 / CDPATH / release pid 一致 / 巨大 TIMEOUT)"
+
+# --- 13a: ref の修飾 —— base 名と同名の tag があっても各経路が worktree を作れる ---
+echo "13a. ⚠️★★★ base 名と同名の tag があっても equal/local-behind/no-local/fetch-失敗 が worktree を作れる"
+
+R13="${TMP}/r13/repo"; O13="${TMP}/r13/origin.git"
+if ! setup_origin_repo "${R13}" "${O13}"; then
+  ng "13a: origin 付き一時 repo を用意できなかった (★ 判定できない)"
+else
+  # 13a-eq: 一致 + 同名 tag
+  make_pushed_branch "${R13}" tag-eq
+  ( cd "${R13}" && git tag tag-eq main ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=tag-eq"; do_spawn_x "${R13}" --no-exec 13aeq t
+  if [ "${SRC}" -eq 0 ] && [ "$(wt_head "${TMP}/r13/wt/repo-13aeq-t")" = "$(origin_tip "${R13}" tag-eq)" ]; then
+    ok "13a-eq: 一致 + 同名 tag でも worktree を作れた (HEAD が origin/base と一致)"
+  else
+    ng "13a-eq: rc=${SRC} —— 同名 tag があると一致状態で worktree を作れない"
+  fi
+
+  # 13a-behind: ローカル遅れ + 同名 tag
+  make_pushed_branch "${R13}" tag-behind
+  add_origin_commit "${O13}" tag-behind
+  ( cd "${R13}" && git tag tag-behind main ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=tag-behind"; do_spawn_x "${R13}" --no-exec 13abehind t
+  if [ "${SRC}" -eq 0 ] && [ "$(wt_head "${TMP}/r13/wt/repo-13abehind-t")" = "$(origin_tip "${R13}" tag-behind)" ]; then
+    ok "13a-behind: ローカル遅れ + 同名 tag でも worktree を作れた"
+  else
+    ng "13a-behind: rc=${SRC} —— 同名 tag があるとローカル遅れで worktree を作れない"
+  fi
+
+  # 13a-nolocal: ローカルに無い (origin 限定ブランチ) + ローカルにある同名 tag
+  ( cd "${R13}" && git tag tag-nolocal main ) >/dev/null 2>&1
+  create_origin_only_branch "${O13}" tag-nolocal
+  SPAWN_ENV="LOOP_BASE_BRANCH=tag-nolocal"; do_spawn_x "${R13}" --no-exec 13anolocal t
+  if [ "${SRC}" -eq 0 ] && [ "$(wt_head "${TMP}/r13/wt/repo-13anolocal-t")" = "$(origin_tip "${R13}" tag-nolocal)" ]; then
+    ok "13a-nolocal: ローカルに同名 tag があっても origin 限定ブランチから worktree を作れた"
+  else
+    ng "13a-nolocal: rc=${SRC} —— 同名 tag があるとローカル無しで worktree を作れない"
+  fi
+fi
+
+# 13a-fetchfail: ⚠️★★★ fetch 失敗 (無修飾 $base) + 同名 tag —— ★ これは実際に ambiguous で落ちる経路
+R13F="${TMP}/r13f/repo"; O13F="${TMP}/r13f/origin.git"
+if ! setup_origin_repo "${R13F}" "${O13F}" || ! make_pushed_branch "${R13F}" tag-ff; then
+  ng "13a-fetchfail: 準備できなかった (★ 判定できない)"
+else
+  ( cd "${R13F}" && git tag tag-ff main ) >/dev/null 2>&1
+  ( cd "${R13F}" && git remote set-url origin "${TMP}/r13f/no-such-origin.git" ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=tag-ff"; do_spawn_x "${R13F}" --no-exec 13aff t
+  if [ "${SRC}" -eq 0 ] && [ "$(wt_head "${TMP}/r13f/wt/repo-13aff-t")" = "$(tip_of "${R13F}" tag-ff)" ]; then
+    ok "13a-fetchfail: ★★★ fetch 失敗 + 同名 tag でもローカル base から worktree を作れた (旧実装は ambiguous で落ちる)"
+  else
+    ng "13a-fetchfail: rc=${SRC} —— ⚠️★★★ 同名 tag があると fetch 失敗時に worktree を作れない (無修飾 \$base の危険)"
+  fi
+fi
+
+# --- 13b: ⚠️★★★ CDPATH が一致しうる値でも spawn が正常に完了するか ---
+# ⚠️★★★ **なぜ「ロックの待ち」ではなく「正常完了」で見るか** (2026-09-26 に一次実測で発見):
+#   ★ CDPATH の一致で `cd` が使われると、bash は **解決したパスを cd 自身が stdout にも書く**
+#     (`cd -` と同じ副作用)。→ `$(cd "$dir" && pwd)` は **同じ行が 2 回**入った値になり、
+#     ⚠️ 素朴に「待ち切って die したか」で見ると、**この 2 行入り (改行混入) の不正な値のせいで
+#     `mkdir` が常に失敗し続けてタイムアウト待ちに落ちる**(原因は CDPATH だが症状は同じ「die」)。
+#     ★ 実測: `mkdir "<decoy>/.git\n<decoy>/.git/loop-spawn.lock"` は
+#     `mkdir: cannot create directory … No such file or directory` で rc=1。
+#   → ★ **正常完了 (rc=0・worktree 作成) するかどうか**で見る: 旧実装は改行混入で `mkdir` が
+#     恒久的に失敗し続け待ち切って die する。★ 修正後は `CDPATH=` で無効化しているので
+#     普通に (競合なしで) 一発で `mkdir` が成功し、正常完了する。
+echo "13b. ⚠️★★★ CDPATH が一致しうる値でも spawn が正常に完了するか (改行混入で mkdir が壊れて die しないか)"
+
+R13B="${TMP}/r13b/repo"; mkdir -p "${R13B}"
+DECOY13B="${TMP}/r13b-decoy"; mkdir -p "${DECOY13B}/.git"
+if ! setup_fake_repo "${R13B}"; then
+  ng "13b: 準備できなかった (★ 判定できない)"
+else
+  # ⚠️★★★ CDPATH には **デコイ自身** を列挙する (★ bash は "CDPATH エントリ + / + 引数" で探すため、
+  #   `cd .git` は `${DECOY13B}/.git` と一致しうる)。
+  SPAWN_ENV="CDPATH=${DECOY13B} LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2"
+  do_spawn_x "${R13B}" --no-exec cdp t
+  if [ "${SRC}" -eq 0 ] && wt_has "${R13B}" "repo-cdp-t"; then
+    ok "13b: ★★★ CDPATH があっても spawn が正常に完了した (★ CDPATH= での無効化が効いている)"
+  else
+    ng "13b: rc=${SRC} / worktree=$(wt_has "${R13B}" "repo-cdp-t" && echo yes || echo no) —— ⚠️★★★ CDPATH で LOCK の絶対化が壊れている疑い"
+  fi
+fi
+
+# --- 13c: ⚠️★★★ release_spawn_lock は pid が自分と一致しないロックを消さない ---
+echo "13c. ⚠️★★★ release_spawn_lock は pid が自分と一致しないロックを消さないか"
+
+R13C="${TMP}/r13c/repo"; mkdir -p "${R13C}"
+if ! setup_fake_repo "${R13C}"; then
+  ng "13c: 準備できなかった (★ 判定できない)"
+else
+  (
+    cd "${R13C}" || exit 1
+    # ⚠️ `${LOCK}/pid` の読み取りだけを偽装する —— 実ファイルには自分の $$ が書かれているが、
+    #   release 時の確認読み取りだけ **別の pid** を返させ、「一致しない」状況を決定論的に作る。
+    cat() {
+      case "$1" in
+        */loop-spawn.lock/pid) printf '424242'; return 0 ;;
+      esac
+      command cat "$@"
+    }
+    export -f cat
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=5 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13c t
+  ) >"${TMP}/13c.out" 2>"${TMP}/13c.err"
+  RC13C=$?
+  ERR13C="$(cat "${TMP}/13c.err" 2>/dev/null || true)"
+  if [ "${RC13C}" -eq 0 ] && has_text "${ERR13C}" "解放しません" && [ -d "${R13C}/.git/loop-spawn.lock" ]; then
+    ok "13c: ★★★ pid 不一致のロックを release が消さず、警告を出した (ロックは残存)"
+  else
+    ng "13c: rc=${RC13C} / lock 残=$([ -d "${R13C}/.git/loop-spawn.lock" ] && echo yes || echo no) / stderr=[${ERR13C}]"
+  fi
+  rm -rf "${R13C}/.git/loop-spawn.lock" 2>/dev/null || true
+fi
+
+# --- 13d: ⚠️★★★ 巨大な LOOP_SPAWN_LOCK_TIMEOUT は die する (無限待ちに落ちない) ---
+# ⚠️★★★ **なぜ競合 (先に置いたロック) を用意するか**: `[ -gt ]` の数値比較が壊れて無効化される
+#   バグは `acquire_spawn_lock` の **while ループの中**にしか無い。★ 競合が無いと 1 回目の
+#   `mkdir` がそのまま成功してループ本体が 1 度も実行されず、TIMEOUT の値に関係なく
+#   一瞬で正常終了してしまう (＝ 検査が何も見ない)。→ ★ 11d と同じ「生きている pid」の
+#   ロックを先に置き、実際にループへ入らせてから検証する。
+echo "13d. ⚠️★★★ ロックが競合している状況で LOOP_SPAWN_LOCK_TIMEOUT=20 桁でも die するか (待ちが無効化されないか)"
+
+R13D="${TMP}/r13d/repo"; mkdir -p "${R13D}"
+if ! setup_fake_repo "${R13D}"; then
+  ng "13d: 準備できなかった (★ 判定できない)"
+else
+  sleep 60 & D13_LIVE_PID=$!
+  mkdir -p "${R13D}/.git/loop-spawn.lock" && printf '%s' "${D13_LIVE_PID}" > "${R13D}/.git/loop-spawn.lock/pid"
+  # ⚠️★★★ **壁時計タイムアウトで包む** (★ 11g/11h と同じ理由) —— 検査対象そのものが
+  #   「無限待ちに落ちる」バグなので、素の呼び出しだと**この検査自身がハングしうる**。
+  (
+    cd "${R13D}" || exit 1
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=12345678901234567890 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13d t
+  ) >"${TMP}/13d.out" 2>"${TMP}/13d.err" &
+  d13pid=$!
+  waited=0
+  while kill -0 "${d13pid}" 2>/dev/null && [ "${waited}" -lt 10 ]; do
+    sleep 1; waited=$((waited + 1))
+  done
+  if kill -0 "${d13pid}" 2>/dev/null; then
+    kill -9 "${d13pid}" 2>/dev/null || true
+    wait "${d13pid}" 2>/dev/null || true
+    ng "13d: ⚠️★★★ ${waited} 秒待ってもプロセスが終わらなかった (★ 巨大な TIMEOUT で無限待ちに落ちている疑い)"
+  else
+    wait "${d13pid}"; d13rc=$?
+    d13err="$(cat "${TMP}/13d.err" 2>/dev/null || true)"
+    if [ "${d13rc}" -ne 0 ] && has_text "${d13err}" "待ち回数" && [ "${waited}" -le 3 ] && ! wt_has "${R13D}" "repo-13d-t"; then
+      ok "13d: ★★★ 競合下でも 20 桁の LOCK_TIMEOUT は (待たずに) 即 die した (${waited} 秒で終了)"
+    else
+      ng "13d: rc=${d13rc} / ${waited} 秒で終了 —— 期待した die メッセージが無い、または待ってしまっている"
+    fi
+  fi
+  kill "${D13_LIVE_PID}" 2>/dev/null || true
+fi
+
+# --- 13e: ⚠️★★★ Codex P1: worktree add 失敗の後始末中もロックを保持しているか ---
+echo "13e. ⚠️★★★ Codex P1: worktree add 失敗の後始末 (abort_worktree) 中もロックを保持しているか"
+
+R13E="${TMP}/r13e/repo"; mkdir -p "${R13E}"
+if ! setup_fake_repo "${R13E}"; then
+  ng "13e: 準備できなかった (★ 判定できない)"
+else
+  mkdir -p "${TMP}/r13e/wt"
+  echo "blocker" > "${TMP}/r13e/wt/repo-fy-t"   # ★ worktree の作成先を実ファイルで塞ぎ git worktree add を失敗させる (11b と同じ作法)
+  (
+    cd "${R13E}" || exit 1
+    OBS="${TMP}/13e-observed.txt"
+    export OBS
+    # ⚠️ `git worktree remove --force <wtdir>` (＝ abort_worktree の最初の一手) だけを横取りし、
+    #   その時点での LOCK の状態を観測してから、実際の git へ渡す。
+    git() {
+      if [ "$1" = "worktree" ] && [ "$2" = "remove" ] && [ "$3" = "--force" ]; then
+        local gcd gcd_abs lockdir pidval
+        gcd="$(command git rev-parse --git-common-dir 2>/dev/null)"
+        gcd_abs="$(CDPATH= cd -P -- "${gcd}" 2>/dev/null && pwd -P)"
+        lockdir="${gcd_abs}/loop-spawn.lock"
+        if [ -d "${lockdir}" ]; then
+          pidval="$(command cat "${lockdir}/pid" 2>/dev/null || true)"
+          if [ "${pidval}" = "$$" ]; then
+            printf 'held-self' > "${OBS}"
+          else
+            printf 'held-other:%s' "${pidval}" > "${OBS}"
+          fi
+        else
+          printf 'absent' > "${OBS}"
+        fi
+      fi
+      command git "$@"
+    }
+    export -f git
+    exec env bash scripts/loop-spawn.sh --no-exec fy t
+  ) >"${TMP}/13e.out" 2>"${TMP}/13e.err"
+  RC13E=$?
+  OBS13E="$(cat "${TMP}/13e-observed.txt" 2>/dev/null || echo "(観測なし)")"
+  if [ "${RC13E}" -ne 0 ] && [ "${OBS13E}" = "held-self" ]; then
+    ok "13e: ★★★ abort_worktree の最初の一手の時点でロックは自分保持のまま (観測=${OBS13E})"
+  else
+    ng "13e: rc=${RC13E} / 観測=[${OBS13E}] —— ⚠️★★★ 後始末の前にロックが解放されている疑い (Codex P1 の再発)"
+  fi
+fi
+
+# --- 13f: ⚠️ reap 用ロックの残骸 (mkdir(.reap) と rmdir(.reap) の間の中断) を EXIT trap が片づけるか ---
+echo "13f. ⚠️ reap 用ロックの残骸を EXIT trap が片づけるか (中断を SIGTERM の自己送信で模す)"
+
+R13G="${TMP}/r13g/repo"; mkdir -p "${R13G}"
+if ! setup_fake_repo "${R13G}"; then
+  ng "13f: 準備できなかった (★ 判定できない)"
+else
+  true & dpid13f=$!; wait "${dpid13f}" 2>/dev/null || true   # ★ 確実に死んでいる pid (11e と同じ作法)
+  mkdir -p "${R13G}/.git/loop-spawn.lock" && printf '%s' "${dpid13f}" > "${R13G}/.git/loop-spawn.lock/pid"
+  (
+    cd "${R13G}" || exit 1
+    export FAKECAT13F_N="${TMP}/13f-n"
+    printf '0' > "${FAKECAT13F_N}"
+    # ⚠️ `${LOCK}/pid` の 2 回目の読み取り (＝ reap 内の `reap_pid=...`。mkdir(.reap) は既に成功済みで
+    #   rmdir(.reap) 前) のタイミングで自分自身へ SIGTERM を送り「中断」を模す。
+    #   ⚠️ **本当の 2 プロセス競合ではない** (★ 隠さない。11i/11j と同じ限界)。
+    cat() {
+      case "$1" in
+        */loop-spawn.lock/pid)
+          local n
+          n="$(command cat "${FAKECAT13F_N}" 2>/dev/null || echo 0)"
+          n=$((n + 1))
+          printf '%s' "${n}" > "${FAKECAT13F_N}"
+          if [ "${n}" -eq 2 ]; then
+            kill -TERM $$
+          fi
+          command cat "$@"
+          return 0 ;;
+      esac
+      command cat "$@"
+    }
+    export -f cat
+    exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13f t
+  ) >"${TMP}/13f.out" 2>"${TMP}/13f.err"
+  if [ ! -d "${R13G}/.git/loop-spawn.lock.reap" ]; then
+    ok "13f: ★★★ mkdir(.reap)/rmdir(.reap) 間で中断されても .reap の残骸が残らなかった (EXIT trap の後始末)"
+  else
+    ng "13f: ⚠️★★★ .reap の残骸が残った (EXIT trap が REAP_HELD を片づけていない可能性)"
+  fi
+fi
+# ⚠️ **やっていないこと** (★ 隠さない): 13f は **本当の 2 プロセス競合による中断を再現していない**
+#   (★ SIGTERM の自己送信という決定論的な代替。11i/11j の限界と同じ)。
+
+# --- 13g-13i: ⚠️★★★ 変異テスト —— 13e/13c/13d の心臓部を潰したら赤くなるか ---
+echo "13g-13i. ⚠️★★★ 変異テスト —— ロック保持順序 / release pid 一致 / max_i 桁数上限を潰したら赤くなるか"
+
+# 13g: item 1 の心臓部 (worktree add 失敗時に abort_worktree の前で明示解放しない) を潰す
+#   → 旧実装のとおり abort_worktree の直前に release_spawn_lock を戻すと、13e が観測する時点で
+#   ロックは既に解放されているはず (観測=absent になる)。
+MUT13G="${TMP}/mut13g-loop-spawn.sh"
+sed 's/  abort_worktree "git worktree add に失敗しました: branch=\$branch \/ worktree=\$wtdir \/ start=\$start"/  release_spawn_lock\n  abort_worktree "git worktree add に失敗しました: branch=$branch \/ worktree=$wtdir \/ start=$start"/' \
+  "${SPAWN_SH}" > "${MUT13G}"
+mut13g_src="$(grep -cF 'abort_worktree "git worktree add に失敗しました: branch=$branch / worktree=$wtdir / start=$start"' "${SPAWN_SH}" 2>/dev/null)" || mut13g_src=0
+mut13g_mutlines="$(grep -c 'release_spawn_lock' "${MUT13G}" 2>/dev/null)" || mut13g_mutlines=0
+mut13g_srclines="$(grep -c 'release_spawn_lock' "${SPAWN_SH}" 2>/dev/null)" || mut13g_srclines=0
+if [ "${mut13g_src:-0}" -ne 1 ] || [ "${mut13g_mutlines}" -le "${mut13g_srclines}" ]; then
+  ng "13g: 変異を当てられない (src 一致=${mut13g_src} / release_spawn_lock 行数 src=${mut13g_srclines} mut=${mut13g_mutlines}) —— ★ 書き方が変わった → ⚠️ 検査不能"
+else
+  R13H="${TMP}/r13h/repo"; mkdir -p "${R13H}"
+  if ! setup_fake_repo "${R13H}" "${MUT13G}"; then
+    ng "13g: 準備できなかった (★ 判定できない)"
+  else
+    mkdir -p "${TMP}/r13h/wt"
+    echo "blocker" > "${TMP}/r13h/wt/repo-fz-t"
+    (
+      cd "${R13H}" || exit 1
+      OBS="${TMP}/13g-observed.txt"; export OBS
+      git() {
+        if [ "$1" = "worktree" ] && [ "$2" = "remove" ] && [ "$3" = "--force" ]; then
+          local gcd gcd_abs lockdir
+          gcd="$(command git rev-parse --git-common-dir 2>/dev/null)"
+          gcd_abs="$(CDPATH= cd -P -- "${gcd}" 2>/dev/null && pwd -P)"
+          lockdir="${gcd_abs}/loop-spawn.lock"
+          if [ -d "${lockdir}" ]; then printf 'held' > "${OBS}"; else printf 'absent' > "${OBS}"; fi
+        fi
+        command git "$@"
+      }
+      export -f git
+      exec env bash scripts/loop-spawn.sh --no-exec fz t
+    ) >"${TMP}/13g.out" 2>"${TMP}/13g.err"
+    OBS13G="$(cat "${TMP}/13g-observed.txt" 2>/dev/null || echo "(観測なし)")"
+    if [ "${OBS13G}" = "absent" ]; then
+      ok "13g: ★★★ 明示解放を戻すと後始末の時点でロックが既に無かった (★ 13e は空振りしていない)"
+    else
+      ng "13g: 観測=[${OBS13G}] —— ⚠️★★★ 変異を当てても held のままだった (13e が見ている経路と違う可能性)"
+    fi
+  fi
+fi
+
+# 13h: item 4 の心臓部 (release 時の pid 一致確認) を潰す —— 常に消す形に戻す
+MUT13H="${TMP}/mut13h-loop-spawn.sh"
+sed 's/if \[ "\${held_pid:-}" = "\$\$" \]; then/if true; then/' "${SPAWN_SH}" > "${MUT13H}"
+mut13h_src="$(grep -cF 'if [ "${held_pid:-}" = "$$" ]; then' "${SPAWN_SH}" 2>/dev/null)" || mut13h_src=0
+mut13h_left="$(grep -cF 'if [ "${held_pid:-}" = "$$" ]; then' "${MUT13H}" 2>/dev/null)" || mut13h_left=0
+if [ "${mut13h_src:-0}" -ne 1 ] || [ "${mut13h_left:-0}" -ne 0 ]; then
+  ng "13h: 変異を当てられない (src=${mut13h_src} / mut=${mut13h_left}) —— ★ pid 一致確認の書き方が変わった → ⚠️ 検査不能"
+else
+  R13I="${TMP}/r13i/repo"; mkdir -p "${R13I}"
+  if ! setup_fake_repo "${R13I}" "${MUT13H}"; then
+    ng "13h: 準備できなかった (★ 判定できない)"
+  else
+    (
+      cd "${R13I}" || exit 1
+      cat() {
+        case "$1" in
+          */loop-spawn.lock/pid) printf '424242'; return 0 ;;
+        esac
+        command cat "$@"
+      }
+      export -f cat
+      exec env LOOP_SPAWN_LOCK_TIMEOUT=5 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13h t
+    ) >"${TMP}/13h.out" 2>"${TMP}/13h.err"
+    if [ ! -d "${R13I}/.git/loop-spawn.lock" ]; then
+      ok "13h: ★★★ pid 一致確認を潰すと、pid 不一致でもロックを消してしまった (★ 13c は空振りしていない)"
+    else
+      ng "13h: 潰してもロックが残った (⚠️★★★ 13c が pid 一致確認以外の理由で残っている可能性)"
+    fi
+  fi
+fi
+
+# 13i: item 6 の心臓部 (max_i の桁数上限) を潰す —— 20 桁でも die しなくなるはず
+MUT13I="${TMP}/mut13i-loop-spawn.sh"
+sed 's/if \[ "\${#max_i}" -gt 9 \]; then/if false; then/' "${SPAWN_SH}" > "${MUT13I}"
+mut13i_src="$(grep -cF 'if [ "${#max_i}" -gt 9 ]; then' "${SPAWN_SH}" 2>/dev/null)" || mut13i_src=0
+mut13i_left="$(grep -cF 'if [ "${#max_i}" -gt 9 ]; then' "${MUT13I}" 2>/dev/null)" || mut13i_left=0
+if [ "${mut13i_src:-0}" -ne 1 ] || [ "${mut13i_left:-0}" -ne 0 ]; then
+  ng "13i: 変異を当てられない (src=${mut13i_src} / mut=${mut13i_left}) —— ★ 桁数上限の書き方が変わった → ⚠️ 検査不能"
+else
+  R13J="${TMP}/r13j/repo"; mkdir -p "${R13J}"
+  if ! setup_fake_repo "${R13J}" "${MUT13I}"; then
+    ng "13i: 準備できなかった (★ 判定できない)"
+  else
+    # ⚠️★★★ 13d と同じ理由で **競合 (先に置いたロック) が無いとループ本体に入らず、
+    #   潰した行を一度も通らないまま一瞬で正常終了する** (＝ 検査が何も見ない)。
+    sleep 60 & I13_LIVE_PID=$!
+    mkdir -p "${R13J}/.git/loop-spawn.lock" && printf '%s' "${I13_LIVE_PID}" > "${R13J}/.git/loop-spawn.lock/pid"
+    (
+      cd "${R13J}" || exit 1
+      exec env LOOP_SPAWN_LOCK_TIMEOUT=12345678901234567890 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13i t
+    ) >"${TMP}/13i.out" 2>"${TMP}/13i.err" &
+    i13pid=$!
+    waited=0
+    while kill -0 "${i13pid}" 2>/dev/null && [ "${waited}" -lt 8 ]; do
+      sleep 1; waited=$((waited + 1))
+    done
+    if kill -0 "${i13pid}" 2>/dev/null; then
+      kill -9 "${i13pid}" 2>/dev/null || true
+      wait "${i13pid}" 2>/dev/null || true
+      ok "13i: ★★★ 桁数上限を潰すと 20 桁の TIMEOUT + 競合下で ${waited} 秒待ってもプロセスが終わらなかった (★ 13d は空振りしていない)"
+    else
+      wait "${i13pid}"; i13rc=$?
+      ng "13i: 潰しても ${waited} 秒で終了した (rc=${i13rc}) (⚠️★★★ 13d が桁数上限以外の理由で die している可能性)"
+    fi
+    kill "${I13_LIVE_PID}" 2>/dev/null || true
+  fi
+fi
 
 echo "════════════════════════════════════════"
 echo "PASS=${PASS}  FAIL=${FAIL}"

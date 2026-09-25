@@ -779,10 +779,14 @@ wtdir="../wt/${repo_name}-${id}-${short}"
 #   ★ 相対のままだと、後段で `cd` を跨いだ時にロックが指す先がずれかねない。
 #   → ★ `cd … && pwd` で絶対化する (⚠️ この時点では既に repo_root に cd 済み)。
 _git_common_dir="$(git rev-parse --git-common-dir)" || die "git-common-dir を解決できませんでした"
-_git_common_dir_abs="$(cd "${_git_common_dir}" && pwd)" \
+# ⚠️★★★ LOW (Codex /cross-review): `cd "$dir" && pwd` は CDPATH の影響を受ける
+#   (★ CDPATH に相対パスの一致先があると、意図しないディレクトリへ `cd` しうる)。
+#   → ★ `CDPATH=` で無効化し、`cd -P` / `pwd -P` でシンボリックリンクも解決した物理パスに揃える。
+_git_common_dir_abs="$(CDPATH= cd -P -- "${_git_common_dir}" && pwd -P)" \
   || die "git-common-dir (${_git_common_dir}) を絶対パスにできませんでした"
 LOCK="${_git_common_dir_abs}/loop-spawn.lock"
 LOCK_HELD=0
+REAP_HELD=0   # ★ 判断 9 (C-M1/C-M2 の後始末): stale 除去用ロック (${LOCK}.reap) を自分が保持しているか
 # ⚠️ テストでは待ち間隔・上限を短縮できるよう env で上書き可能にする (★ 既定は本番相当)。
 LOCK_POLL="${LOOP_SPAWN_LOCK_POLL:-0.5}"
 LOCK_TIMEOUT="${LOOP_SPAWN_LOCK_TIMEOUT:-120}"
@@ -801,8 +805,25 @@ awk -v t="${LOCK_TIMEOUT}" 'BEGIN{ exit !(t+0 > 0) }' \
   || die "LOOP_SPAWN_LOCK_TIMEOUT は 0 より大きい数値にしてください: [$(sanitize_disp "${LOCK_TIMEOUT}")]"
 
 release_spawn_lock() {
+  # ⚠️★★★ 判断 9 (C-M1/C-M2 の後始末): reap 用ロックが自分の手に残っていれば先に片づける
+  #   (★ mkdir "${LOCK}.reap" と rmdir "${LOCK}.reap" の間で中断されると残骸になる —— ここが最後の網)。
+  if [ "${REAP_HELD}" -eq 1 ]; then
+    rmdir "${LOCK}.reap" 2>/dev/null || true
+    REAP_HELD=0
+  fi
   if [ "${LOCK_HELD}" -eq 1 ]; then
-    rm -rf "${LOCK}" 2>/dev/null || true
+    # ⚠️★★★ レビュー指摘: 解放前に「いま ${LOCK} を掴んでいるのは自分か」を確かめる。
+    #   ★ 確かめずに rm -rf すると、何らかの理由で自分のロックが既に消え、別プロセスが
+    #     同じパスへ新しいロックを作っていた場合に **他人のロックを消してしまう**
+    #     (＝ 直列化そのものが壊れる)。★ pid が読めない/一致しないときは **消さずに** WARN する。
+    local held_pid
+    held_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
+    if [ "${held_pid:-}" = "$$" ]; then
+      rm -rf "${LOCK}" 2>/dev/null || true
+    else
+      echo "loop-spawn: ⚠️ ロック (${LOCK}) の pid ([$(sanitize_disp "${held_pid:-空}")]) が自分 ($$) と一致しないため解放しません" >&2
+      echo "            ★ 手で確認:  cat \"${LOCK}/pid\"" >&2
+    fi
     LOCK_HELD=0
   fi
 }
@@ -810,6 +831,9 @@ release_spawn_lock() {
 #   ★ ただし **正常系では `git worktree add` の直後に明示解放する** (下記) —— ⚠️ `exec claude` は
 #     プロセスを置き換えるだけで「シェルの終了」ではないため、EXIT trap が exec 前に
 #     必ず走るとは限らない。だから **明示解放が本筋、trap は異常系の保険**。
+#   ⚠️★★★ 判断 9 (Codex P1): `git worktree add` 失敗時は **この trap まで解放しない**
+#     (★ 下の `abort_worktree` 呼び出し部を参照。失敗直後の明示解放をやめ、後始末が
+#     終わって `die` が exit するまでロックを保持する)。
 trap release_spawn_lock EXIT
 
 # acquire_spawn_lock → ★ mkdir で排他を取る。stale (pid が死んでいる) なら別ロックで直列化して除去し取り直す。
@@ -819,6 +843,20 @@ acquire_spawn_lock() {
   # ⚠️ bash 3.2 に浮動小数演算は無いので、待ち回数は awk で整数化する (sleep 自体は小数を受ける)。
   max_i="$(awk -v t="${LOCK_TIMEOUT}" -v p="${LOCK_POLL}" \
     'BEGIN{n=t/p; i=int(n); if (n>i) i++; if (i<1) i=1; print i}')"
+  # ⚠️★★★ レビュー指摘 (巨大な TIMEOUT): `max_i` が `1e+20` のような指数表記や桁あふれになると、
+  #   下の `[ "${i}" -gt "${max_i}" ]` が非数値比較エラーを起こして **常に偽** になり、
+  #   ⚠️ タイムアウトが無効化されて無限に待ち続ける (die しない)。
+  #   → ★ `max_i` が数字だけ・9 桁以下であることを要求する (⚠️ 黙って進まない)。
+  case "${max_i}" in
+    ''|*[!0-9]*)
+      die "待ち回数を計算できませんでした (max_i=[$(sanitize_disp "${max_i}")])。
+            LOOP_SPAWN_LOCK_TIMEOUT / LOOP_SPAWN_LOCK_POLL の値を確認してください。" ;;
+  esac
+  if [ "${#max_i}" -gt 9 ]; then
+    die "LOOP_SPAWN_LOCK_TIMEOUT (${LOCK_TIMEOUT}) / LOOP_SPAWN_LOCK_POLL (${LOCK_POLL}) から計算した
+          待ち回数が大きすぎます (max_i=${max_i})。
+          ⚠️ このまま進めると数値比較が壊れてタイムアウトが効かなくなるため、判定せず止まります。"
+  fi
   while ! mkdir "${LOCK}" 2>/dev/null; do
     if [ -f "${LOCK}/pid" ]; then
       lock_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
@@ -835,14 +873,19 @@ acquire_spawn_lock() {
             #     同じで、なお kill -0 が失敗するときに限り rm -rf する。
             #   ⚠️ reap を取れなければここでは何もしない (★ 下の i 加算 / sleep で普通に待つ)。
             if mkdir "${LOCK}.reap" 2>/dev/null; then
+              # ⚠️★★★ 判断 9 (C-M1/C-M2 の後始末): ここから rmdir までの間に中断されると
+              #   `${LOCK}.reap` が残骸になる。★ フラグを立てておき、EXIT trap
+              #   (`release_spawn_lock`) にも同じ後始末をさせる (＝ 中断されても最後の網が効く)。
+              REAP_HELD=1
               reap_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
               if [ "${reap_pid:-}" = "${lock_pid}" ] && ! kill -0 "${lock_pid}" 2>/dev/null; then
                 rm -rf "${LOCK}" 2>/dev/null || true
               fi
               # ⚠️★★★ reap は必ず解放する。★ 取った側がこの中で死ぬと reap の残骸が残り、
               #   以後の stale 除去ができなくなる (許容する —— 待ち切れば die し、
-              #   die メッセージで reap ディレクトリの手動削除を案内する)。
-              rmdir "${LOCK}.reap" 2>/dev/null || true
+              #   die メッセージで reap ディレクトリの手動削除を案内する。
+              #   ⚠️ ★ ここで中断されても EXIT trap が REAP_HELD を見て後始末する)。
+              rmdir "${LOCK}.reap" 2>/dev/null && REAP_HELD=0
             fi
           fi
           ;;
@@ -923,22 +966,40 @@ if git show-ref --verify --quiet "refs/heads/$branch"; then
 fi
 git worktree prune   # 消えたパスの登録を掃除
 
+# local_ref_or_raw <base> → ★ ローカルに <base> というブランチがあれば `refs/heads/<base>`、
+#   無ければ <base> のまま (⚠️ 従来どおりの無修飾値。ローカルに無い形まで書き換えない)。
+#   ⚠️★★★ 判断 9/10 (Codex /cross-review LOW): 無修飾の `$base` は同名の tag があると
+#     `git worktree add` が `fatal: ambiguous object name` で落ちる (12g で local-ahead 側は実測済み)。
+#     fetch 失敗・origin 無しの経路も同じ危険を持つので、ここに括り出して両方から呼ぶ。
+local_ref_or_raw() {
+  if git show-ref --verify --quiet "refs/heads/$1"; then
+    printf 'refs/heads/%s' "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+
 # --- ⚠️★★★ P1-J: base を remote と同期し、祖先関係で start を決める (判断 3) ---
 #   ★ 旧実装は fetch 成功なら**無条件で** `origin/$base` を採用しており、ローカル $base が
 #     先行していても無視していた (design.md P1-J の根本原因)。
 #   ★ 判定表 (decisions.md 判断 3):
-#     一致       → origin/$base
-#     ローカル先行 (origin が ローカルの祖先) → $base (ローカル) ＋ 未 push 件数の WARN
-#     ローカル遅れ (ローカルが origin の祖先) → origin/$base (現行どおり)
+#     一致       → refs/remotes/origin/$base
+#     ローカル先行 (origin が ローカルの祖先) → refs/heads/$base (ローカル) ＋ 未 push 件数の WARN
+#     ローカル遅れ (ローカルが origin の祖先) → refs/remotes/origin/$base (現行どおり)
 #     分岐 (どちらでもない)                  → **die** (worktree も branch も作る前に)
-#     ローカルに $base が無い                 → origin/$base (現行どおり)
-start="$base"
+#     ローカルに $base が無い                 → refs/remotes/origin/$base (現行どおり)
+#   ⚠️★★★ 判断 9/10 (Codex /cross-review LOW): 旧実装は上記のうち **local-ahead だけ**
+#     `refs/heads/$base` で修飾しており、他 (equal / local-behind / no-local) は
+#     短縮形 `origin/$base` のまま、fetch 失敗・origin 無しは無修飾 `$base` のままだった。
+#     → ★ remote 側は `refs/remotes/origin/$base`、ローカル側は `refs/heads/$base`
+#       (ローカルに無いときは `local_ref_or_raw` が従来どおりの値を返す) に揃える。
+start="$(local_ref_or_raw "$base")"
 start_choice=""      # ★ 値は equal|local-ahead|local-behind|no-local|fetch-failed のいずれか
 start_ahead_n=""
 if git remote get-url origin >/dev/null 2>&1; then
   if git fetch --quiet origin "$base"; then
     if ! git show-ref --verify --quiet "refs/heads/$base"; then
-      start="origin/$base"; start_choice="no-local"
+      start="refs/remotes/origin/$base"; start_choice="no-local"
     else
       local_sha="$(git rev-parse --verify --quiet "refs/heads/$base" 2>/dev/null || true)"
       origin_sha="$(git rev-parse --verify --quiet "refs/remotes/origin/$base" 2>/dev/null || true)"
@@ -950,7 +1011,7 @@ if git remote get-url origin >/dev/null 2>&1; then
               ★ 手で確認:  git -C ${repo_root} rev-parse refs/remotes/origin/${base}"
       fi
       if [ -n "${local_sha:-}" ] && [ "${local_sha}" = "${origin_sha}" ]; then
-        start="origin/$base"; start_choice="equal"
+        start="refs/remotes/origin/$base"; start_choice="equal"
       else
         # ⚠️★★★ LOW (レビュー): `git merge-base --is-ancestor` の rc は 0=祖先 / 1=祖先でない /
         #   128=異常終了 (shallow clone 等で判定不能) の 3 通り。「分岐」(＝両方 1) と
@@ -974,7 +1035,7 @@ if git remote get-url origin >/dev/null 2>&1; then
           git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null || behind_rc=$?
           if [ "${behind_rc}" -eq 0 ]; then
             # ★ ローカルが origin の祖先 ＝ ローカルが遅れている (stale local base)。
-            start="origin/$base"; start_choice="local-behind"
+            start="refs/remotes/origin/$base"; start_choice="local-behind"
           elif [ "${behind_rc}" -eq 128 ]; then
             die "merge-base --is-ancestor が異常終了しました (rc=128・shallow clone 等の可能性): refs/heads/${base} → refs/remotes/origin/${base}
                   ⚠️ 「祖先でない」(rc 1・分岐の可能性) とは区別します。fail-closed のため worktree も branch も作らずに止まります。
@@ -990,7 +1051,7 @@ if git remote get-url origin >/dev/null 2>&1; then
       fi
     fi
   else
-    start="$base"
+    start="$(local_ref_or_raw "$base")"
     start_choice="fetch-failed"
     # ⚠️ 他の診断行と同じく stderr へ (★ 旧実装は stdout に出ており、`--no-exec` の
     #   「stdout の最終行 = worktree の絶対パス」契約は壊さないが、診断の置き場が不揃いだった)。
@@ -1054,10 +1115,16 @@ start_sha="$(git rev-parse --verify --quiet "$start" 2>/dev/null || true)"
 # ⚠️★★★ P1-K: `set -e` に落とし込んで die しない —— ★ ここで `set -e` に死なせると
 #   `abort_worktree` を経由せずブランチだけが残るケース (根本原因) を直せない。
 if ! git worktree add -b "$branch" "$wtdir" "$start"; then
-  release_spawn_lock   # ★ 失敗時も worktree add 直後に必ず解放する
+  # ⚠️★★★ 判断 9 (Codex P1): **ここで明示解放しない。**
+  #   ★ 旧実装はここで release_spawn_lock してから abort_worktree していたため、
+  #     ロックを放した直後に**並行する別 spawn**が同じ id/short の worktree を作ってしまい、
+  #     abort_worktree の `remove --force` / `branch -D` がその**他人の worktree/branch**を
+  #     消しうる (＝ 直列化の意味が失われる)。
+  #   → ★ 後始末 (abort_worktree) が終わって die が exit するまでロックを保持し続け、
+  #     EXIT trap (`release_spawn_lock`) に解放させる。
   abort_worktree "git worktree add に失敗しました: branch=$branch / worktree=$wtdir / start=$start"
 fi
-# ★ 成功時も worktree add の直後に必ず解放する (⚠️ `exec claude` の前に必ず解放済みにする契約)。
+# ★ 成功時のみ、ここで明示的に解放する (⚠️ `exec claude` の前に必ず解放済みにする契約)。
 release_spawn_lock
 cd "$wtdir"
 

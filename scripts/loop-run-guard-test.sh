@@ -1179,6 +1179,144 @@ else
   ng "C-skip: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
+echo "N. check_committed の生成物除外・未追跡設定非依存・skip-worktree・HEAD/追跡ファイル不変 — /cross-review・design.md 判断 10"
+
+# ⚠️★★★ 背景（decisions.md 判断 10）:
+#   - code-reviewer MEDIUM: 赤の verify が残した gitignore 外の生成物で、次の attempt の
+#     未コミット判定が dirty に固定される（worker は rm / git clean を持たない）→ 誤った no_progress_stop。
+#   - Codex P2-3: 逆に未追跡を見落とす (status.showUntrackedFiles=no) と、コミットしていない
+#     新規ファイルを使って緑になりうる。
+#   - Codex P2-2 / security LOW 1: verify が追跡ファイルを書き換えた場合・skip-worktree /
+#     assume-unchanged の印がある場合、コミットの内容は検証されていない。
+#
+# ⚠️★★★ N1 は HEAD (是正前) の実装では赤になるはずのテストである
+#   (★ TDD: 先に回帰テストを足し、現状の実装で失敗することを確認してから直す)。
+
+# --- N1: 赤の verify が gitignore 外の生成物を作っても、次の attempt でコミットすれば issue_done になる ---
+#   ★ 是正前の実装では check_committed が verify の生成物を毎回 dirty と見て、
+#     コミットしても uncommitted に固定される (★ これが今回の是正対象そのもの)。
+#   ★ attempt1: worker がコミット (check_committed 通過) → verify.test が junk.out を作って失敗 (test_fail)。
+#     attempt2: worker が別のコミットを積む → verify.test は junk.out が既にあるので成功。
+#     ⚠️ worker のマーカー (.worker-marker) は毎回コミットする — untracked のまま残すと
+#     判定対象が check_committed の別の観点 (worker 自身の未追跡) と混線するため。
+N1="${TMP}/n1/repo"; mkdir -p "${N1}"
+N1_STUB='if [ ! -f .worker-marker ]; then
+  echo one > .worker-marker
+  git add .worker-marker
+  git commit -q -m attempt1
+else
+  echo two >> .worker-marker
+  git add .worker-marker
+  git commit -q -m attempt2
+fi
+true'
+N1_VERIFY='[ -f junk.out ] && exit 0 || { touch junk.out; exit 1; }'
+if setup_repo "${N1}" "${N1_STUB}" '[]' "${N1_VERIFY}"; then
+  ev="$(run_loop "${N1}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+    ok "N1: 赤の verify が残した生成物があっても、次の attempt でコミットすれば issue_done になる"
+  else
+    ng "N1: ⚠️★ verify の生成物のせいで uncommitted に固定され issue_done にならない (★ 是正対象そのもの)"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N1: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N2 陰性対照: worker が作った未追跡ファイル（コミットしない）は生成物として除外されない ---
+#   ★ N1 の除外ロジックが「verify が作ったものだけ」に閉じていること (worker 自身の
+#     未追跡ファイルまで巻き込まないこと) を確かめる陰性対照。
+N2="${TMP}/n2/repo"; mkdir -p "${N2}"
+N2_STUB='if [ ! -f tracked.txt ]; then
+  echo tracked > tracked.txt && git add tracked.txt && git commit -q -m tracked
+fi
+echo stray > stray.txt
+true'
+if setup_repo "${N2}" "${N2_STUB}" '[]' 'true'; then
+  ev="$(run_loop "${N2}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}" && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N2 陰性対照: worker 自身が残した未追跡ファイルは除外されず uncommitted のまま"
+  else
+    ng "N2 陰性対照: ⚠️★ worker の未追跡ファイルが生成物として除外され issue_done になった (★ 誤検出)"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N2: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N3: status.showUntrackedFiles=no の設定下でも未追跡の新規ファイルで uncommitted になる ---
+#   ⚠️ Codex P2-3。★ worktree は一時 repo の .git を共有するので、メイン側の config が効く。
+N3="${TMP}/n3/repo"; mkdir -p "${N3}"
+N3_STUB='echo tracked > t3.txt && git add t3.txt && git commit -q -m t3
+echo stray > stray3.txt
+true'
+if setup_repo "${N3}" "${N3_STUB}" '[]' 'true'; then
+  ( cd "${N3}" && git config status.showUntrackedFiles no ) >/dev/null 2>&1
+  ev="$(run_loop "${N3}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}" && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N3: status.showUntrackedFiles=no でも未追跡ファイルを検出して uncommitted にした"
+  else
+    ng "N3: ⚠️★ showUntrackedFiles=no で未追跡ファイルを見落とし、コミットしていない内容のまま issue_done になった"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N3: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N4: skip-worktree の印を付けた追跡ファイルは uncommitted にする ---
+#   ⚠️ security LOW 1。★ worktree は独自インデックスを持つので、stub (worker) 自身が
+#     セッション内で update-index --skip-worktree を実行させる。
+N4="${TMP}/n4/repo"; mkdir -p "${N4}"
+N4_STUB='echo w > w4.txt && git add w4.txt && git commit -q -m work
+git update-index --skip-worktree w4.txt
+true'
+if setup_repo "${N4}" "${N4_STUB}" '[]' 'true'; then
+  ev="$(run_loop "${N4}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}" && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N4: skip-worktree の印があるファイルを検出して uncommitted にした"
+  else
+    ng "N4: ⚠️★ skip-worktree の印を見落とし、コミットの内容が保証できないまま issue_done になった"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N4: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N5: verify が追跡ファイルを書き換えたら issue_done にしない ---
+#   ⚠️ Codex P2-2。★ verify.test 自身が追跡ファイルに追記する (HEAD は動かさない)。
+N5="${TMP}/n5/repo"; mkdir -p "${N5}"
+N5_STUB='echo w > w5.txt && git add w5.txt && git commit -q -m work
+true'
+if setup_repo "${N5}" "${N5_STUB}" '[]' 'echo x >> w5.txt; true'; then
+  ev="$(run_loop "${N5}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}"; then
+    ok "N5: verify が追跡ファイルを書き換えたら issue_done にしなかった"
+  else
+    ng "N5: ⚠️★ verify が追跡ファイルを書き換えたのに issue_done になった (★ 検証していない内容を merge しうる)"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N5: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N6: パスに空白を含む未追跡ファイルでも壊れずに検出できる ---
+#   ★ 制約「パスに空白があっても壊れないこと」の直接検査。
+N6="${TMP}/n6/repo"; mkdir -p "${N6}"
+N6_STUB='echo tracked > t6.txt && git add t6.txt && git commit -q -m t6
+echo stray > "stray file with spaces.txt"
+true'
+if setup_repo "${N6}" "${N6_STUB}" '[]' 'true'; then
+  ev="$(run_loop "${N6}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}" && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N6: パスに空白を含む未追跡ファイルでも uncommitted として検出した (★ porcelain の引用に壊れない)"
+  else
+    ng "N6: ⚠️★ パスに空白を含むファイルの扱いが壊れている"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N6: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
 echo "M. 変異テスト —— 新しい判定の心臓部を潰したら赤くなるか (2026-09-26 レビュー是正分)"
 
 # ⚠️★★★ 「正常なら緑」だけでは、この検査が何も見ていない可能性を排除できない
@@ -1187,31 +1325,126 @@ echo "M. 変異テスト —— 新しい判定の心臓部を潰したら赤く
 #   同じシナリオを回して**赤になる**ことを確かめる (★ 既存の変異テストと同じ作法。
 #   loop-spawn-cleanup-test.sh の「6. 変異テスト」を参照)。
 
-# --- M-cm3: check_committed を run_verify の**後**へ戻す (★ C-M3/C-M4 是正の要) ---
+# --- M-cm3: check_committed の判定結果を無視する (常に通す) ---
+#   ⚠️★★★ 2026-09-26 の 2 回目の是正で `check_committed && run_verify` の短絡評価から
+#   `if ! check_committed …; then … else … fi` の明示分岐に変わったため、旧 sed パターン
+#   (`check_committed "$wt" "$wt_anchor" "$vout" && run_verify …`) はもう本文に存在しない。
+#   → ★ 「check_committed の判定を無視する」変異に更新し、N2 (worker 自身が残した未追跡
+#   ファイル) が本来 uncommitted のはずなのに issue_done になってしまうことで検出する。
 MUT_CM3="${TMP}/mutated-loop-run-cm3.sh"
-sed 's/check_committed "$wt" "$wt_anchor" "$vout" && run_verify "$wt" "$id" "$vout"/run_verify "$wt" "$id" "$vout" \&\& check_committed "$wt" "$wt_anchor" "$vout"/' \
+sed 's#if ! check_committed "\$wt" "\$wt_anchor" "\$vout" "\$gen_file"; then#if false; then#' \
   "${RUN_SH}" > "${MUT_CM3}"
-mut_left="$(grep -c 'check_committed "\$wt" "\$wt_anchor" "\$vout" && run_verify' "${MUT_CM3}" 2>/dev/null)" || mut_left=0
+mut_left="$(grep -c 'if ! check_committed "\$wt" "\$wt_anchor" "\$vout" "\$gen_file"; then' "${MUT_CM3}" 2>/dev/null)" || mut_left=0
 if [ "${mut_left:-0}" -ne 0 ]; then
   ng "M-cm3 変異テスト: 変異が当たらなかった (★ 呼び出し規約の書き方が変わった → 検査不能)"
 else
   MCM3="${TMP}/mcm3/repo"; mkdir -p "${MCM3}"
-  if setup_repo "${MCM3}" "${CM3_STUB}" '[]' 'touch verify-junk.out && true'; then
+  if setup_repo "${MCM3}" "${N2_STUB}" '[]' 'true'; then
     cp "${MUT_CM3}" "${MCM3}/scripts/loop-run.sh"
     (
       cd "${MCM3}" || exit 1
       export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
       git add scripts/loop-run.sh || exit 1
-      git commit -q -m "test: mutate loop-run.sh (check_committed after verify)" || exit 1
+      git commit -q -m "test: mutate loop-run.sh (disable check_committed)" || exit 1
     ) >/dev/null 2>&1
     ev="$(run_loop "${MCM3}" --issues 001)"
     if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
-      ng "M-cm3 変異テスト: check_committed を verify の後へ戻しても issue_done になった (⚠️★★★ この検査は何も見ていない)"
+      ok "M-cm3 変異テスト: check_committed を無効化すると N2 が赤くなった (★ 検査は空振りしていない)"
     else
-      ok "M-cm3 変異テスト: check_committed を verify の後へ戻すと C-M3 が赤くなった (★ 検査は空振りしていない)"
+      ng "M-cm3 変異テスト: check_committed を無効化しても issue_done にならなかった (⚠️★★★ この検査は何も見ていない)"
     fi
   else
     ng "M-cm3 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-gen: 生成集合による除外を無効化する (★ 判断 10・N1 の心臓部) ---
+MUT_GEN="${TMP}/mutated-loop-run-gen.sh"
+sed 's#if grep -Fxq "\$path" "\$gen_file" 2>/dev/null; then#if false; then#' \
+  "${RUN_SH}" > "${MUT_GEN}"
+mut_left="$(grep -c 'if grep -Fxq "\$path" "\$gen_file" 2>/dev/null; then' "${MUT_GEN}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
+  ng "M-gen 変異テスト: 変異が当たらなかった (★ 除外判定の書き方が変わった → 検査不能)"
+else
+  MGEN="${TMP}/mgen/repo"; mkdir -p "${MGEN}"
+  if setup_repo "${MGEN}" "${N1_STUB}" '[]' "${N1_VERIFY}"; then
+    cp "${MUT_GEN}" "${MGEN}/scripts/loop-run.sh"
+    (
+      cd "${MGEN}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (disable generated-set exclusion)" || exit 1
+    ) >/dev/null 2>&1
+    ev="$(run_loop "${MGEN}" --issues 001)"
+    if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+      ng "M-gen 変異テスト: 生成集合の除外を無効化しても issue_done になった (⚠️★★★ この検査は何も見ていない)"
+    else
+      ok "M-gen 変異テスト: 生成集合の除外を無効化すると N1 が赤くなった (★ 検査は空振りしていない)"
+    fi
+  else
+    ng "M-gen 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-utf: check_committed の `--untracked-files=all` を外す (★ Codex P2-3・N3 の心臓部) ---
+MUT_UTF="${TMP}/mutated-loop-run-utf.sh"
+sed 's#porcelain="\$(git -C "\$wt" status --porcelain --untracked-files=all 2>&1)"#porcelain="$(git -C "$wt" status --porcelain 2>\&1)"#' \
+  "${RUN_SH}" > "${MUT_UTF}"
+mut_left="$(grep -c 'porcelain="\$(git -C "\$wt" status --porcelain --untracked-files=all 2>&1)"' "${MUT_UTF}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
+  ng "M-utf 変異テスト: 変異が当たらなかった (★ check_committed の porcelain 取得の書き方が変わった → 検査不能)"
+else
+  MUTF="${TMP}/mutf/repo"; mkdir -p "${MUTF}"
+  MUTF_STUB='echo tracked > t3.txt && git add t3.txt && git commit -q -m t3
+echo stray > stray3.txt
+true'
+  if setup_repo "${MUTF}" "${MUTF_STUB}" '[]' 'true'; then
+    ( cd "${MUTF}" && git config status.showUntrackedFiles no ) >/dev/null 2>&1
+    cp "${MUT_UTF}" "${MUTF}/scripts/loop-run.sh"
+    (
+      cd "${MUTF}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (drop --untracked-files=all)" || exit 1
+    ) >/dev/null 2>&1
+    ev="$(run_loop "${MUTF}" --issues 001)"
+    if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+      ok "M-utf 変異テスト: --untracked-files=all を外すと N3 が赤くなった (★ 検査は空振りしていない)"
+    else
+      ng "M-utf 変異テスト: --untracked-files=all を外しても issue_done にならなかった (⚠️★★★ この検査は何も見ていない)"
+    fi
+  else
+    ng "M-utf 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-inv: verify 後の HEAD/追跡ファイル不変確認を消す (★ Codex P2-2・N5 の心臓部) ---
+MUT_INV="${TMP}/mutated-loop-run-inv.sh"
+sed 's#if \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null; then#if true; then#' \
+  "${RUN_SH}" > "${MUT_INV}"
+mut_left="$(grep -c 'if \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null; then' "${MUT_INV}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
+  ng "M-inv 変異テスト: 変異が当たらなかった (★ 不変確認の書き方が変わった → 検査不能)"
+else
+  MINV="${TMP}/minv/repo"; mkdir -p "${MINV}"
+  MINV_STUB='echo w > w5.txt && git add w5.txt && git commit -q -m work
+true'
+  if setup_repo "${MINV}" "${MINV_STUB}" '[]' 'echo x >> w5.txt; true'; then
+    cp "${MUT_INV}" "${MINV}/scripts/loop-run.sh"
+    (
+      cd "${MINV}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (disable HEAD/tracked-file invariance check)" || exit 1
+    ) >/dev/null 2>&1
+    ev="$(run_loop "${MINV}" --issues 001)"
+    if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+      ok "M-inv 変異テスト: 不変確認を消すと N5 が赤くなった (★ 検査は空振りしていない)"
+    else
+      ng "M-inv 変異テスト: 不変確認を消しても issue_done にならなかった (⚠️★★★ この検査は何も見ていない)"
+    fi
+  else
+    ng "M-inv 変異テスト: 準備できなかった (★ 判定できない)"
   fi
 fi
 

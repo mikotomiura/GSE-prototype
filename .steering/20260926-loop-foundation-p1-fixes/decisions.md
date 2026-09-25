@@ -104,3 +104,16 @@
   ★ これで `uncommitted` の意味が「verify 緑だが未コミット」から「verify 前の時点で未コミット」に変わった → 語彙表・loop-status / loop-issue / loop-worker の文言を追随。
   LOW → `start-choice` の完全一致・rev-list を `refs/` で書く・LOCK の絶対パス化・LOCK_POLL / TIMEOUT の数値検証・`validate_name` の表示を `sanitize_disp` に通す・origin_sha 空や merge-base rc 128 の専用メッセージ・テスト判定の絞り込みと変異テストの追加。
 - **やらない LOW**: 11b 状況での `abort_worktree` の文言（「撤去できませんでした」が事象とずれる）—— 実害なし・記録のみ。
+
+## 判断 10: /cross-review（Codex gpt-6-astra ∥ code-reviewer）＋ security-checker の指摘への対応
+
+- **判断日時**: 2026-09-26（研究者裁定）
+- **背景**（メインが一次で照合済み）:
+  - code-reviewer MEDIUM: 赤の verify が残した gitignore 外の生成物で、次の attempt の未コミット判定が dirty に固定される（worker は `rm` / `git clean` を持たない）→ 誤った `no_progress_stop`。P1-B で worker 自身が acceptance を回すので attempt 1 でも起きうる
+  - Codex P2-3: 逆に未追跡を見落とす（`status.showUntrackedFiles=no`）と、コミットしていない新規ファイルを使って緑になりうる
+  - Codex P2-2 / security LOW 1: verify が追跡ファイルを書き換えた場合・skip-worktree / assume-unchanged の印がある場合、コミットの内容は検証されていない（文書の「測った内容＝コミット済み」は言い過ぎ）
+  - Codex P1: `worktree add` 失敗経路がロックを解放してから `abort_worktree` する → 並行する同じ id の worktree を消しうる
+  - LOW 群: ref の修飾が local-ahead だけ ／ LOCK 絶対化の `cd` が CDPATH の影響を受ける ／ 解放時に自分のロックか確かめない ／ reap の残骸が中断で残る ／ 巨大な TIMEOUT で待ちが無効 ／ `uncommitted` の決まり方が暗黙 ／ テストの孫プロセス
+- **選択肢（未追跡の扱い）**: A: verify が新しく作った未追跡ファイルだけを以後の判定から除外（＋ `--untracked-files=all`・verify 後の HEAD と追跡ファイル不変・skip-worktree 等の印の検出）／ B: 未追跡を判定から外す（Codex P2-3 の穴が開く）／ C: 起票して文書だけ狭める
+- **採用**: A。LOW 群は全部直す。
+- **却下**: Codex P2-4（fingerprint に差分内容を含める）—— 判断 5 の意図は「commit しないまま続けば、内容が動いていても止める」。未コミットの継続そのものを前進なしとみなす。
