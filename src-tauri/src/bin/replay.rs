@@ -407,6 +407,14 @@ impl P1Operational {
         if self.t1a_window_ms == 0 {
             return Err("t1a_window_ms は 1 以上でなければならない".to_string());
         }
+        // ⚠️ `dispersion::pause_ms_by_window` は窓内の pause を tick ごとに具体化する
+        // (`Vec<Vec<u64>>`) ので、窓を無制限に広げるとメモリが窓幅に比例して膨らむ
+        // (自己 DoS 防止・security-checker LOW-1・2026-09-25)。事前宣言 (`p1-episode.json`
+        // `search_space.t1a_window_ms`) の探索空間の最大は 60000ms なので、それに十分な
+        // 安全マージンを取った 1 時間 (3_600_000ms) を運用上の上限に置く。
+        if self.t1a_window_ms > 3_600_000 {
+            return Err("t1a_window_ms は 3600000 (1 時間) 以下でなければならない".to_string());
+        }
         // ⚠️ `stall_onset.rs` は `net_diff_min as i64` で比べる。`i64::MAX` を超える値は負へ丸まり、
         //   `net < net_diff_min` が常に偽になって **onset が黙って 0 本**になる (security-checker LOW・2026-09-25)。
         if self.net_diff_min == 0 || i64::try_from(self.net_diff_min).is_err() {
@@ -4361,6 +4369,8 @@ mod tests {
     #[test]
     fn set_is_fail_closed_on_unknown_key_bad_type_and_out_of_range() {
         assert!(resolve_feature_config(None, &["hole_gap_ms=3000".to_string()]).is_ok());
+        // 陰性対照 (security LOW-1): 上限ちょうど (3600000 = 1 時間) は Ok。
+        assert!(resolve_feature_config(None, &["t1a_window_ms=3600000".to_string()]).is_ok());
         for bad in [
             "bogus=1",                          // 未知キー
             "q=abc",                            // 型の不一致
@@ -4373,6 +4383,7 @@ mod tests {
             "warmup_count=0",                   // 範囲外
             "net_diff_min=0",                   // 範囲外
             "net_diff_min=9223372036854775808", // 範囲外 (i64::MAX + 1 ・ `as i64` で負に丸まる)
+            "t1a_window_ms=3600001",            // 範囲外 (security LOW-1・1 時間超)
             "theta_estimator=linear",           // 未実装の推定法
             "q",                                // `=` が無い
         ] {

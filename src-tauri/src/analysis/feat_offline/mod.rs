@@ -128,6 +128,9 @@ pub struct QualityInputs<'a> {
 /// ⚠️ `dispersion` はモジュール doc 「Tier ごとの causal / retrospective の区分」が
 /// 予告した retrospective 側の Tier —— `surprise` はセッション全体の IKI baseline を
 /// 要するため、`activity` (causal) と混ぜず別フィールドに置く。
+/// ★ `dispersion.pause_*` は `t1a_window_ms` の**因果窓**で集約した値である (issue 003・
+/// `dispersion::pause_ms_by_window`)。⚠️ tick 帰属ではなく窓なので、上の「tick への帰属規則」の
+/// `pauses` (件数・tick 帰属) とは集計単位が違う。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FeatureRow {
     /// tick 開始時刻 (**絶対 epoch ms**)。モジュール doc の「tick への帰属規則」参照。
@@ -322,10 +325,23 @@ pub fn build_feature_rows(
         boundary_pairs_by_tick[tick_of(pair.resuming_ts)].push(pair);
     }
 
-    let mut pause_ms_by_tick: Vec<Vec<u64>> = vec![Vec::new(); tick_count];
-    for pd in dispersion::pause_durations(&all_press_ts) {
-        pause_ms_by_tick[tick_of(pd.resuming_ts)].push(pd.gap_ms);
-    }
+    // ★ `T1a` の pause 分位点は tick ではなく `t1a_window_ms` の因果窓で集約する (issue 003・判断 4)。
+    //   ⚠️ 窓は観測区間 (`feat` 行の穴) をまたがない (起票 6) —— 観測区間は **dispersion 用に**
+    //   ここで 1 度だけ作って渡す (`dispersion` から `feat` 行を読み直さない。⚠️ `quality_column`
+    //   は別の呼び出しで自分の観測区間を作り直しており、これはそちらへは渡っていない)。
+    //   `iki_cv` / `surprise` には窓を掛けない。
+    let observed = stall_onset::observed_intervals(
+        stall_onset_inputs.feat_ts,
+        stall_onset_inputs.config.hole_gap_ms,
+    );
+    let pause_ms_by_tick = dispersion::pause_ms_by_window(
+        &dispersion::pause_durations(&all_press_ts),
+        tick_count,
+        grid_origin_ms,
+        ENGINE_TICK_MS,
+        stall_onset_inputs.config.t1a_window_ms,
+        &observed,
+    );
     // ★ baseline はセッション全体の IKI から一度だけ作り、tick ごとに作り直さない
     // (AC5: surprise はセッション相対)。
     let all_iki_ms: Vec<u64> = iki_ms_by_tick.iter().flatten().copied().collect();
