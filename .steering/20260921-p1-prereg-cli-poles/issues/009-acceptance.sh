@@ -81,7 +81,7 @@ for f in "$ADR" "$BLK"; do
     del=0
   fi
   case "$del" in
-    ''|*[!0-9]*) fail "AC2/AC6: $f の削除行数を読めない（numstat: $stat）" ;;
+    ''|*[!0-9]*) fail "AC2/AC6: $f の削除行数を読めない（numstat: ${stat}）" ;;
   esac
   [ "$del" -eq 0 ] \
     || fail "AC2/AC6: $f に削除行が $del 行ある（★ 本文・起票本文は追記のみの規約）"
@@ -91,17 +91,21 @@ done
 #   ⚠️ 削除行が 0 でも、本文の**途中に**行を挿入する変更は通ってしまう（AC2 は「追加行が補訂 2 より後だけ」）。
 #     ★ base の blob と、作業ツリーの先頭から同じバイト数を切ったものが一致することで確かめる。
 base_size="$(git cat-file -s "$BASE:$ADR")" \
-  || fail "AC2: base の ADR のサイズを取れない（$BASE:$ADR）"
-base_sha="$(git show "$BASE:$ADR" | sha1sum | cut -d' ' -f1)"
+  || fail "AC2: base の ADR のサイズを取れない（${BASE}:${ADR}）"
+# ⚠️ `git show` が失敗すると空入力の sha1 が入り `-n` を通ってしまう（security-checker LOW）→ 先に blob を取り出して失敗を拾う。
+base_blob="$(mktemp)" || fail "AC2: 一時ファイルを作れない"
+git show "$BASE:$ADR" > "$base_blob" || { rm -f "$base_blob"; fail "AC2: base の ADR を取り出せない（${BASE}:${ADR}）"; }
+base_sha="$(sha1sum < "$base_blob" | cut -d' ' -f1)"
+rm -f "$base_blob"
 work_sha="$(head -c "$base_size" "$ADR" | sha1sum | cut -d' ' -f1)"
 [ -n "$base_sha" ] && [ "$base_sha" = "$work_sha" ] \
-  || fail "AC2: ADR-030 の既存の本文が（追記以外で）変わっている（base=$base_sha work=$work_sha・先頭 $base_size バイト）"
+  || fail "AC2: ADR-030 の既存の本文が（追記以外で）変わっている（base=${base_sha} work=${work_sha}・先頭 ${base_size} バイト）"
 [ "$(wc -c < "$ADR")" -gt "$base_size" ] \
   || fail "AC2: ADR-030 に追記が 1 バイトも無い（補訂 2 が入っていない）"
 
 # ── AC5 (補): 起票 12 を「閉じた」と書いていない（★ 数える計器だけ・抑制は未決）─────────
 awk '
-  $0 ~ "^## 起票 12[:：]" { inblk=1; next }
+  $0 ~ "^## 起票 12(:|：)" { inblk=1; next }
   inblk && /^## 起票 /    { exit ok ? 0 : 1 }
   inblk && /閉じていない/ { ok=1 }
   END { exit (inblk && ok) ? 0 : 1 }

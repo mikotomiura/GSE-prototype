@@ -563,7 +563,7 @@
 
 - ★ **1（`warmup_count` の値）**: 事前宣言文書（`docs/preregistration-p1-episode.md` §1）と凍結 JSON が持つ。値は `q` の従属変数 `⌈1/(1−q)⌉`（nearest-rank で分位点が最大値に退化しない最小の標本数・`decisions.md` 判断 5）。下回る間は個人分位点を使わず onset を立てない。
 - ★ **退化の判定を出力側で可能にした**: onset 行に `theta_sample_n`（θ を決めた標本数）を出す。上の実測「`n <= 99` なら θ は常に最大値」は、この列で解析側から読める。
-- ⚠️ **2（`cold_start`）は閉じていない**: 集団 prior は**作らない**と裁定した（判断 5 —— P1 前に集団データが無く、prior の中身を推測で埋めることになる）。→ `cold_start` は**未実装のまま**。
+- ⚠️ **2（`cold_start`）は閉じていない**: 集団 prior は **P1 では使わない**と裁定した（判断 5 —— P1 前に集団データが無く、prior の中身を推測で埋めることになる。★ 見直しは「集団 prior が作れるようになったとき（WP2 以降）」）。→ `cold_start` は**未実装のまま**。
 - ⚠️ **3（版と時点の刻印）**: 本タスクで足した封筒の `prereg_id` / `prereg_version` / `prereg_sha256_prefix` は事前宣言の版を刻むが、D4 表 #4 の `feature_schema_version` / `profile_cutoff_time` / `coverage` の有無は**本タスクでは確かめていない**。
 - → ADR-030 補訂 2 項目 1 / 7。
 

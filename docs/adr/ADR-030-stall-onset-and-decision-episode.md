@@ -1184,7 +1184,7 @@ criterion validity の問いが **自壊する**。
 
 ---
 
-## 補訂 2（2026-09-25）—— 実装が先に決めた規則を規範へ上げ、補訂 1 の「補訂しないもの」を閉じる（D9 を除く）
+## 補訂 2（2026-09-25）—— 実装が先に決めた規則を規範へ上げ、補訂 1 の「補訂しないもの」を閉じる（D9 と項目 6〔E1〕を除く）
 
 > ★ **本節は D1〜D11 と補訂 1 の本文を書き換えない。** 食い違う箇所は「補訂 2 項目 n が上書きする」と読む（★ 先例: 補訂 1・ADR-014「判断 4 の追補」・ADR-031「M9 の追補」）。
 > ★ 出所: `.steering/20260921-p1-prereg-cli-poles/`（`decisions.md` 判断 1〜12・16 は研究者の直接裁定、13〜15 は裁定の帰結として一意に決まったもの、23〜26 は実装フェーズの研究者裁定）。実装は issue 001〜008 の merge（`f5163a6` / `01d90f2` / `dde07ee` / `5c6cc4b` / `ac812fa` / `f1305f0` / `822fd2a` / `ddc3172`）。
@@ -1199,7 +1199,7 @@ criterion validity の問いが **自壊する**。
 | 4 | 極 B の抑制は観測区間と同じ構造で切る。「onset 少なめ」は保証されない | D3 の囲み・抑制表 3 行目・補訂 1 項目 8 | ★ 上書き |
 | 5 | 極 M+ の押下区間の閉じ方と `not_applicable` の判定（ファイル単位・`modifier` 行が 0 本） | 補訂 1 項目 3 | ★ 規範にする |
 | 6 | `T1a` は 30 秒窓で集約し、観測区間をまたがない | D10 Tier 表の `T1a` 行・補訂 1「補訂しないもの」の `T1a` の窓 | ★ 規範にする |
-| 7 | θ の標本数 `theta_sample_n` と、`warmup_count` を下回る間の扱い | D4 点 1 | ★ 規範にする |
+| 7 | θ の標本数 `theta_sample_n` と、`warmup_count` を下回る間の扱い | D4 表 #1・**#2** | ★ **上書き**（#2 の fallback `cold_start` を P1 では使わない・判断 5） |
 | 8 | 削除幅の制約の固定（(a) 定数比較 ＋ (b) 入口で広げて消す） | 補訂 1 項目 5 | ★ 規範にする |
 | 9 | 出力列 `ime_overlap`（数えるだけ・下限として読む） | 補訂 1 項目 4 | ★ 規範にする（⚠️ 抑制は決めない） |
 | 10 | 壁時計の非単調性 | D9 | ⚠️★★★ **補訂しない（未決のまま）** |
@@ -1213,7 +1213,7 @@ criterion validity の問いが **自壊する**。
 - ⚠️ 事前宣言は**運用値と探索手続きの 2 層**である（判断 1）。P1 のデータで値を選ぶことはできない（まだ無い）。探索の結果は WP2 の freeze と感度分析にだけ使う。⚠️ 凍結の時点は issue 001 の merge であり、変更が必要なら**書き換えず新版を切る**（★ `preregistration-v0.3.md` の規約と同じ）。
 - ⚠️ **ライブラリ側の `StallOnsetConfig::default()` は事前宣言の値ではない**（例: `warmup_count` は `None`）。P1 の出力を作る経路は CLI であり、CLI は凍結 JSON を読む（項目 2）。→ **テストやライブラリ呼び出しの既定値を、P1 の運用値として引かない**。
 
-### 項目 2. CLI 注入の形 —— 凍結 JSON を既定 ＋ 上書きの記録
+### 項目 2. CLI 注入の形 —— 凍結 JSON を既定 ＋ 上書きの記録（★ `decisions.md` 判断 6）
 
 - `gse-replay <入力> --features` は凍結 JSON を**既定**として読む。上書きは `--feature-config <path>`（凍結 JSON と同じ schema の外部ファイル）と `--set <key>=<value>`（繰り返し可）。重ねる順は「凍結値 → ファイル → `--set`」。`--feature-config` / `--set` は `--features` 専用である。
 - ★ **fail-closed**: 未知のキー・型の不一致・範囲外の値・`=` の無い引数・未実装の `theta_estimator` は**すべてエラー**（exit 1・stdout 空）。⚠️ 黙って無視しない。設定は入力を読む前に解決する。
@@ -1222,7 +1222,7 @@ criterion validity の問いが **自壊する**。
 - ⚠️ `--set q=…` は従属変数の `warmup_count` を**連動させない**（探索の実行者が両方を指定する）。連動させるかは探索プロトコルの実装時に裁定する（`.steering/20260921-p1-prereg-cli-poles/decisions.md` の起票 P1-F）。
 - ⚠️ `t1a_window_ms` の値は `--set` で変えられるが、`pole` は変えられない（別の軸・項目 3）。
 
-### 項目 3. 極は 1 実行 1 極 —— Cartesian を作らない
+### 項目 3. 極は 1 実行 1 極 —— Cartesian を作らない（★ `decisions.md` 判断 3）
 
 - 補訂 1 項目 3 / 8 が実施時期を「P1 の解析設計」へ回した極を、次の形で実装した。**別モード `--pole <name>`・1 実行 1 極**で、出す組は次の 3 つだけである。
 
@@ -1284,10 +1284,13 @@ criterion validity の問いが **自壊する**。
 - ★ 窓を 1 tick へ戻す（`--set t1a_window_ms=<ENGINE_TICK_MS>`）と上の退化が再現する。→ これが検査の**陽性対照**である。
 - ⚠️ `surprise` と `pause_max_ms` の共線性（起票 7 の併記）は本補訂でも直さない。窓が広がると弱まるはずだが**実測していない**ので断定しない。D10 の block ablation で「`T1a` 一群」の増分を測るときは、実質 1 本の信号を重複計上しうる。
 
-### 項目 7. θ の標本数 `theta_sample_n` と、`warmup_count` を下回る間の扱い
+### 項目 7. θ の標本数 `theta_sample_n` と、`warmup_count` を下回る間の扱い（★ D4 表 #2 を上書き）
+
+★ 根拠: `.steering/20260921-p1-prereg-cli-poles/decisions.md` **判断 5**（研究者裁定）—— 選択肢 C「100 を課し、下回る間は `cold_start`（集団 prior）へ退く」を**却下**して A を採った。
+⚠️ D4 表 #2 の逐語「`cold_start`（集団 prior）へ退く」は **P1 では効かない**。★ 見直し時期は判断 5 のとおり「集団 prior が作れるようになったとき（WP2 以降）」。
 
 - ★ onset 行に **`theta_sample_n`（θ を決めた標本数）**を出す。θ が決まる行にだけ値が入る。⚠️ 設定ではなく**結果**なので、封筒 `config` ではなく**行**が持つ。→ `warmup_count` を将来変えたとき、**過去の出力を読み直して分位点の退化を判定できる**。
-- ★ 標本数が `warmup_count` を**下回る間は、個人分位点を使わず onset を立てない**。⚠️ D4 点 2 の `cold_start`（集団 prior）へは**退かない** —— P1 前に集団データが無く、prior の中身を推測で埋めることになるので、`cold_start` は未実装のままである。
+- ★ 標本数が `warmup_count` を**下回る間は、個人分位点を使わず onset を立てない**。⚠️ D4 表 #2 の `cold_start`（集団 prior）へは**退かない** —— P1 前に集団データが無く、prior の中身を推測で埋めることになるので、`cold_start` は未実装のままである。
 - ★ `warmup_count` は `q` の**従属変数**である（nearest-rank で分位点が最大値に退化しない最小の標本数 `⌈1/(1−q)⌉`）。分位点の推定法は nearest-rank に事前宣言した（D4 点 3）。
 - ⚠️ 代償: 短いセッションでは onset が 0 件になり、episode yield が落ちる。→ **P1 で実測する**（WP1 の完了条件「一人あたり episode 数」に直接効く）。
 
@@ -1318,15 +1321,16 @@ criterion validity の問いが **自壊する**。
 | `W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 / `T1a` の窓の**値** | ★ **閉じた** —— 事前宣言文書と凍結 JSON が持つ（項目 1・6・7） |
 | CLI からの値の注入 | ★ **閉じた**（項目 2） |
 | 壁時計の非単調性（D9） | ⚠️★★★ **未決のまま**。D9 が「P1 の実データで跳躍の頻度と大きさを見てから決める」としており、今決めるとその判断を覆す（判断 11・研究者裁定）。P1 の実データの後に、別の補訂で扱う |
-| 項目 6 の実装の形（E1） | ⚠️★★★ **保留のまま**。`recovery` が未実装の状態で E1 を検出列へ入れると、検出列の挙動が変わる。**検出列は再立ち上がりごとに onset を立てる現行のまま**であり、補訂 1 項目 6 の読み方（検出列の onset を数えた値は「E2（分割）」と名乗る・独立標本の数として数えない）が引き続き有効である |
+| 項目 6 の実装の形（E1） | ⚠️★★★ **保留のまま**。`recovery` が未実装の状態で E1 を検出列へ入れると、検出列の挙動が変わる。**検出列は再立ち上がりごとに onset を立てる現行のまま**であり、補訂 1 項目 6 の読み方（検出列の onset を数えた値は「E2（分割）」と名乗る・独立標本の数として数えない）が引き続き有効である。★ なお補訂 1 が「issue 006 の V1 で決める」とした点は、**2026-09-20 に研究者が裁定済み**（`.steering/20260920-issues-004-006/decisions.md` 判断 2 逐語「検出列（`stall_onset`）は変えない。E1 は `recovery` と同時に別層で入れる」）。⚠️ 補訂 1 項目 6 を書き下すのは **`recovery` を実装する回**である |
 
 ⚠️ 本補訂は次も**決めていない**: `key.mod`（ADR-032 D9）の実装・`meta` 行への `os` の追加・匿名化の写像の変更・`cold_start`（集団 prior）・`--features` 出力の gse-dataset への共有（★ いずれも計器または同意文書の領域）。
+⚠️ ただし最後の 1 つは「**まだ誰も禁じていない**」ではない —— ★ **現行の規約では共有しない**（共有物は `metrics.json` のみ・`docs/agent-shared.md`「データ repo 連携」・`data-privacy` Skill・封筒の `sharing: prohibited`）。変えるなら同意文書と別の ADR で扱う。
 
 ### 補訂 2 で足す fixture（★ 補訂 1 fixture 表の宿題の決着）
 
 | # | 何を固定するか | 状態 |
 |---|---|---|
-| (xvi) | 修飾キーの行が無いログで、極 M+ が `not_applicable` になり、出力が baseline と一致する（項目 5） | ✅ 実装済み（`stall_onset_observed.ndjson` ＋ `bin/replay.rs` の封筒の判定テスト） |
+| (xvi) | 修飾キーの行が無いログで、極 M+ が `not_applicable` になり、出力が baseline と一致する（項目 5） | ✅ 実装済み（`bin/replay.rs` の `modifier_m_plus_applicability_follows_the_modifier_row_count` ＋ `stall_onset_observed.ndjson` を使う `.steering/20260921-p1-prereg-cli-poles/issues/005-acceptance.sh` AC6） |
 | (xvii) | 削除 UI の最小幅 > `hole_gap_ms` の検査が、違反する値で赤になる陽性対照を持つ（項目 8） | ✅ 実装済み（`redaction::tests::min_redaction_width_check_rejects_a_violating_pair` / `min_redaction_width_exceeds_hole_gap`） |
 | (xviii) | 再開 `r` と再停止 `s'` が観測区間をまたがず、右端で打ち切られる（補訂 1 項目 7） | ✅ 実装済み（`restart.rs` の `restop_null_always_means_right_censoring` / `censored_restop_yields_null_not_zero` / `interval_lookup_and_window_edges_are_exact`） |
 | (xix) | 極 B が抑制をまたぐ θ の標本を除く／頭の `W` を評価しない／onset が増える経路を持つ（項目 4） | ✅ 実装済み（`theta_sample_excludes_pairs_across_pointer_suppression` / `pointer_suppression_skips_the_leading_w` / `pointer_bins_merge_into_maximal_intervals`） |
