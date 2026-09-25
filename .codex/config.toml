@@ -4,7 +4,7 @@
 # 設定値の矛盾時は AGENTS.md が優先。
 
 # モデル設定 (真実源: ここ。AGENTS.md はコメントで参照のみ)
-model = "gpt-5.5"
+model = "gpt-6-sol"   # ★ 2026-09-25: gpt-5.5 は CLI 上で Legacy。既定と rescue は workhorse の sol、review / consult は scripts 側で gpt-6-astra を明示
 model_reasoning_effort = "medium"
 
 # サンドボックス既定 — read-only。書き込みが必要な時だけ Skill 側で workspace-write を明示

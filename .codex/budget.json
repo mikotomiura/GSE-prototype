@@ -10,10 +10,11 @@
   "per_invocation_max": 30000,
   "diff_size_threshold_lines": 500,
   "manual_approval_threshold_lines": 2000,
+  "_comment_diag_2026_09_25": "⚠️ 2026-09-25: モデルを gpt-5.5（Legacy）→ gpt-6-astra / gpt-6-sol へ切り替えた際（chore(codex) d3b6da2）、gpt-6-astra がこのアカウントで応答するかを wrapper を経由せず codex exec 直接呼び出しで 1 回確認した（scratchpad・プロンプト「Reply with exactly: OK」・effort low）。★ 実測 5747 tokens。→ 本記帳で +5747 / invocations +1 を自己申告として加算した（★ 2026-09-12 の診断コールと同じ作法）。直後の /cross-review 3 回（P1 前タスク・パス限定）は wrapper 経由で自動計上済み（0 → 146699）。",
   "today": {
-    "date": "2026-09-21",
-    "tokens_used": 432937,
-    "invocations": 11
+    "date": "2026-09-25",
+    "tokens_used": 152446,
+    "invocations": 4
   },
   "history": [
     {
@@ -170,6 +171,11 @@
       "date": "2026-09-20",
       "tokens_used": 420545,
       "invocations": 10
+    },
+    {
+      "date": "2026-09-21",
+      "tokens_used": 432937,
+      "invocations": 11
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。 ★★★ 2026-09-21 訂正（研究者判断・blockers.md 起票 22）: ⚠️ **上の『実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)』は誤りである。** ★ 回転させるコードは scripts/run-codex-review.sh の `d['history'] = sorted(...)[-30:]` に在った。★ 2026-09-21 に実測: 日付が 09-20 → 09-21 へ変わった最初の記帳で、歴代最古の 2026-08-12 (25290 / 1 回) が実際に消えた。→ ★ 切り捨てを外し、消えた 1 件を実測値で戻した。★ history の件数上限は【置かない】と裁定した（研究者判断 2026-09-21）。⚠️ 本文は当時の記録として残してあるので、この訂正と併せて読むこと。",

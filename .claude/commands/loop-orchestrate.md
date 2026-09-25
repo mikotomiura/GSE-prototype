@@ -82,7 +82,7 @@ board を人が眺めたい場合は**別端末**で `/loop 30s /loop-status` �
 ```
 Task(subagent_type="code-reviewer")            [Opus]  統合 diff のレビュー
 Task(subagent_type="security-checker")         [Opus]  security 面 (該当時)
-/cross-review                                  [gpt-5.5] Codex 第二意見 (L6 enabled 時・人が起動)
+/cross-review                                  [gpt-6-astra] Codex 第二意見 (L6 enabled 時・人が起動)
 統合フル CI (_loop-config.json.ci_command。GSE 既定は cargo test --workspace / gse-replay --snapshot / emit_schema diff)
 retrospective.md を .steering/_template/loop-retrospective.md から作成
 ```

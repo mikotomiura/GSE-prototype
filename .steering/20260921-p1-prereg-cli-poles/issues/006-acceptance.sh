@@ -29,17 +29,24 @@ printf '%s' "$pb" | jq -e '
 
 base="$(run "$PFIX" --pole baseline)" || fail "AC2: --pole baseline が非 0"
 
-# ── AC2: 極 B の onset が baseline の真の部分集合 ───────────────────────
+# ── AC2: 極 B の onset が baseline と異なる ─────────────────────────────
+# ⚠️★★★ 2026-09-25 `decisions.md` 判断 25 で「真の部分集合」から「異なる (≠)」へ言い直した。
+#   ADR-030 D3 の囲みが言う「極 B (ポインタ活動区間を抑制する) = onset 少なめ」は**典型形の
+#   記述であって不変式ではない**。判断 7 の実装 (抑制区間を観測区間と同じ構造で切る) では
+#   次の 2 経路で包含が崩れうる (★ `stall_onset.rs` モジュール doc「極 B の入れ方」・
+#   単体テスト `theta_sample_excludes_pairs_across_pointer_suppression` /
+#   `pointer_suppression_skips_the_leading_w` が固定):
+#   1. θ 経路: θ_person は全観測区間からプールした因果累積なので、抑制をまたぐ標本を外すと
+#      抑制区間から遠い onset の θ・t0 まで動く (baseline にしかない t0 が消え、baseline に
+#      無い t0 が新しく立ちうる)。
+#   2. 分割経路: 長い沈黙の途中の抑制で観測区間が 2 片に割れ、onset が増えることがある。
+#   → 「真の部分集合」はこの fixture (pointer_pole.ndjson) だけで成り立つ観測であり、
+#   一般には保証されない。★ 「異なる」の検査は残す — baseline と完全一致なら抑制が
+#   効いていないことの陰性対照として意味がある。
 o_base="$(onsets "$base")" || fail "AC2: baseline の onset を取り出せない"
 o_pb="$(onsets "$pb")"     || fail "AC2: pointer_b の onset を取り出せない"
 [ "$o_base" != "$o_pb" ] \
   || fail "AC2: pointer_b と baseline の onset が同一（★ 抑制が効いていない）。onset=$o_base"
-
-subset="$(jq -n --argjson a "$o_base" --argjson b "$o_pb" \
-  '($b - ($b - $a)) == $b and (($b | length) < ($a | length))')" \
-  || fail "AC2: 包含関係を判定できない"
-[ "$subset" = "true" ] \
-  || fail "AC2: pointer_b の onset が baseline の真の部分集合でない（baseline=$o_base pointer_b=${o_pb}）。★ 逆向きなら抑制が反転している"
 
 # ── AC3: observed_intervals が極 B で狭くなる ───────────────────────────
 iv_base="$(printf '%s' "$base" | jq -c '.provenance.observed_intervals')" || fail "AC3: observed_intervals が無い"

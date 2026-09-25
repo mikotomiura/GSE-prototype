@@ -103,6 +103,32 @@ pub struct StallOnsetInputs<'a> {
     pub config: StallOnsetConfig,
 }
 
+/// **極ごとの追加入力** (ADR-030 D3・[`Pole`])。[`build_feature_rows_with_pole_inputs`] だけが受ける。
+///
+/// ⚠️ [`StallOnsetInputs`] に足さない —— あちらは `..` 無しで全フィールドを列挙するリテラルが
+/// 既存テストに多数あり (`dispersion.rs` / `restart.rs` ほか)、フィールドを足すたびに壊れる。
+/// ★ 極の入力は `Default` を持つこの構造体に置く (極 B の `pointer_active_ts` もここ)。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PoleInputs<'a> {
+    /// 極 M+ の**修飾キーの押下区間** ([`stall_onset::modifier_press_intervals`] の戻り値・両端を含む)。
+    /// ⚠️ `None` は「渡されていない」であり「区間が 0 本」(`Some(&[])`) とは別 —— 極 M+ で `None` なら
+    /// `Err` にする (★ 入力を渡し忘れて baseline の値を極 M+ の名前で返さない)。
+    pub modifier_intervals: Option<&'a [(u64, u64)]>,
+    /// 極 B の**ポインタ活動の行の時刻** (`pointer_bin` 行の `t`・**ビンの終端時刻**・順不同でよい)。
+    /// ★ 行の**存在だけ**を使う (値は読まない)。抑制区間は [`stall_onset::pointer_suppression_intervals`] が作る。
+    /// ⚠️ `None` は「渡されていない」であり「活動が 0 行」(`Some(&[])`) とは別 —— 極 B で `None` なら
+    /// `Err` にする (★ 入力を渡し忘れて baseline の値を極 B の名前で返さない)。
+    /// ★ `capabilities` に `pointer_bin` の宣言が無い入力の扱い (= 適用不可) は**呼び出し側**が決める
+    /// (`analysis/` に `capabilities` の意味を持ち込まない)。適用不可なら `Some(&[])` を渡すと baseline と恒等になる。
+    ///
+    /// ⚠️ **抑制区間→評価区間の構築は 1 か所に畳まれていない** (`bin/replay.rs` が封筒
+    /// `provenance.observed_intervals` 用にもう一度計算する) が、**両者は同じ 2 関数
+    /// (`stall_onset::pointer_suppression_intervals` / `stall_onset::evaluation_intervals`) と
+    /// 同じ定数 (`ENGINE_TICK_MS`) を呼ぶ**ので、値が独立に乖離することはない
+    /// (`replay.rs` 側の呼び出し箇所のコメント参照。code-reviewer LOW・issue 006)。
+    pub pointer_active_ts: Option<&'a [u64]>,
+}
+
 /// `build_feature_rows` の `quality` (issue 007) 用の追加入力をまとめた構造体。
 /// `stall_onset_inputs` と同じ理由 (`clippy::too_many_arguments` 回避) で 1 つにまとめる。
 /// ⚠️ `observability_mask.feat` の判定には**この構造体の値を使わない** —— 008 の
@@ -140,6 +166,7 @@ pub struct FeatureRow {
     pub dispersion: Dispersion,
     /// `stall onset`（`t0`）検出器 (ADR-030 D2-D6)。`activity` と同じく **causal**
     /// (`stall_onset` モジュール doc 参照)。onset が起きた tick だけ値が埋まる。
+    /// ⚠️ **ただし `ime_overlap` だけは retrospective** (`t0` より後に書かれる `ime_shadow` 行に依存しうる・issue 007)。
     pub stall_onset: StallOnset,
     /// `Q` (evidence quality・issue 007)。⚠️ 状態特徴ではなく出力にだけ載せる —
     /// 他 Tier (`activity` / `boundary` / `dispersion` / `stall_onset`) の計算へは渡さない
@@ -245,6 +272,9 @@ pub fn net_production(keys: &[KeyPress]) -> i64 {
 /// ★ 極の中身が無いのに `baseline` の値を返すと、出力が `pole = pointer_b` と名乗ったまま
 /// 別の計算の結果を載せる (**出力が嘘をつく**)。⚠️ **入力が空でも先に検査する** ——
 /// 空の `Vec` を返すと「その極で計算した結果が 0 行だった」と読まれる。
+///
+/// ⚠️ 本関数は**極の入力を持たない** ([`PoleInputs::default`])。★ 極 M+ は押下区間が要るので
+/// `Err` になる —— [`build_feature_rows_with_pole_inputs`] を使うこと。
 pub fn build_feature_rows(
     keys: &[KeyPress],
     paste_ts: &[u64],
@@ -253,6 +283,34 @@ pub fn build_feature_rows(
     stall_onset_inputs: &StallOnsetInputs,
     quality_inputs: &QualityInputs,
 ) -> Result<Vec<FeatureRow>, String> {
+    build_feature_rows_with_pole_inputs(
+        keys,
+        paste_ts,
+        ime_events,
+        max_ticks,
+        stall_onset_inputs,
+        quality_inputs,
+        &PoleInputs::default(),
+    )
+}
+
+/// [`build_feature_rows`] に**極ごとの入力** ([`PoleInputs`]) を足した版。
+///
+/// ★ 極が変えるのは**検出 (`stall_onset`) と、その条件 A の辺・挿入系の写像を使う `restart` だけ**である。
+/// ⚠️ `T0` / `T1a` / `T1b` / `T1c` / `Q` は極に依らない (baseline と同じ `keys` を見る)。
+/// ★ 極 M+ は検出へ渡す `key` 列の側で表す ([`stall_onset::apply_modifier_m_plus`]) —— press の時刻は
+/// 1 本も変わらないので θ の標本は極に依らず、変わるのは挿入系 (`+1`) の数え方だけ。
+///
+/// ⚠️★★★ 極 M+ で `pole_inputs.modifier_intervals` が `None` なら `Err` (入力が空でも先に検査する)。
+pub fn build_feature_rows_with_pole_inputs(
+    keys: &[KeyPress],
+    paste_ts: &[u64],
+    ime_events: &[ImeShadowEvent],
+    max_ticks: usize,
+    stall_onset_inputs: &StallOnsetInputs,
+    quality_inputs: &QualityInputs,
+    pole_inputs: &PoleInputs,
+) -> Result<Vec<FeatureRow>, String> {
     let pole = stall_onset_inputs.config.pole;
     if !pole.is_implemented() {
         return Err(format!(
@@ -260,6 +318,40 @@ pub fn build_feature_rows(
             pole.as_str()
         ));
     }
+    // ⚠️ 検出へ渡す `key` 列。極 M+ だけが作り直す (baseline は借りるだけ・1 バイトも複製しない)。
+    let detection_keys: std::borrow::Cow<[KeyPress]> = match pole {
+        Pole::ModifierMPlus => match pole_inputs.modifier_intervals {
+            Some(intervals) => {
+                std::borrow::Cow::Owned(stall_onset::apply_modifier_m_plus(keys, intervals))
+            }
+            None => {
+                return Err(format!(
+                "pole `{}` needs its modifier intervals (PoleInputs::modifier_intervals is None; \
+                     refusing to return baseline values under this pole's name)",
+                pole.as_str()
+            ))
+            }
+        },
+        // ★ ワイルドカードなしの網羅列挙 (極を足すと、ここで判定を決めるまでコンパイルが
+        //   通らない。`pole_applicability` (`bin/replay.rs`) と同じ規律)。
+        //   極 B は `key` 列を変えない (変えるのは評価区間の側)。
+        Pole::Baseline | Pole::PointerB => std::borrow::Cow::Borrowed(keys),
+    };
+    // ⚠️ 極 B の**抑制区間**。極 B 以外は空 (= 観測区間そのまま)。入力が空でも先に検査する (上と同じ理由)。
+    let pointer_suppression: Vec<(u64, u64)> = match pole {
+        Pole::PointerB => match pole_inputs.pointer_active_ts {
+            // ★ `pointer_bin` の 1 ビン幅は 1 秒 (= `ENGINE_TICK_MS`)。写しであってリンクではない (`pointer_suppression_intervals` の doc)。
+            Some(ts) => stall_onset::pointer_suppression_intervals(ts, ENGINE_TICK_MS),
+            None => {
+                return Err(format!(
+                    "pole `{}` needs its pointer activity (PoleInputs::pointer_active_ts is None; \
+                     refusing to return baseline values under this pole's name)",
+                    pole.as_str()
+                ))
+            }
+        },
+        Pole::Baseline | Pole::ModifierMPlus => Vec::new(),
+    };
     if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());
     }
@@ -361,9 +453,15 @@ pub fn build_feature_rows(
 
     // ★ 条件 A の時系列は `restart` (T1d・issue 006 V2) が使う。⚠️ 検出を 2 回走らせないよう、
     //   tick 列と同じ 1 回の走査から受け取る (issue 008 AC18 / AC18b の計算量の門)。
+    //   ★ 検出と `restart` だけが `detection_keys` (極 M+ では挿入系を置き換えた列) を見る。
     let (stall_onset_col, condition_a_timeline) = stall_onset::stall_onset_column_with_timeline(
-        keys,
+        &detection_keys,
         stall_onset_inputs.feat_ts,
+        &pointer_suppression,
+        // ★ `ime_shadow` 行は onset の `ime_overlap` を埋めるためだけに渡す (issue 007)。
+        //   ⚠️ 検出は読まない —— 検出値 (s / t0 / θ / n) を変えない (数えるだけで抑制しない)。
+        //   ★ ただし `ime_events` は上の grid_origin_ms / t_last には既に入っている (issue 002 から・本 issue は変えない)。
+        ime_events,
         stall_onset_inputs.task_kind_declarations,
         tick_count,
         grid_origin_ms,
@@ -376,7 +474,7 @@ pub fn build_feature_rows(
     let restart_col = restart::restart_column(
         &stall_onset_col,
         &condition_a_timeline,
-        keys,
+        &detection_keys,
         &stall_onset_inputs.config,
     );
     // ⚠️ observability_mask.feat は 008 の feat_ts / hole_gap_ms をそのまま使う
@@ -459,7 +557,66 @@ mod tests {
         .expect("within tick limit")
     }
 
-    /// issue 004: 未実装の極は**入力が空でも** `Err` (黙って baseline の値を返さない)。
+    /// issue 006: 極 B は `pointer_active_ts` を渡さなければ `Err` (★ baseline の値を極 B の名前で返さない)。
+    /// 活動が 0 行 (`Some(&[])`) なら baseline と**恒等**で、長い沈黙の途中に活動があると評価区間が割れる。
+    #[test]
+    fn pole_b_needs_pointer_activity_and_idle_pointer_equals_baseline() {
+        let keys = [key_at(1_000), key_at(1_100)];
+        let feat: Vec<u64> = (0..=90).map(|i| i * 1_000).collect();
+        let inputs = |pole: Pole| StallOnsetInputs {
+            feat_ts: &feat,
+            task_kind_declarations: &[],
+            config: StallOnsetConfig {
+                pole,
+                ..StallOnsetConfig::default()
+            },
+        };
+        let run = |pole: Pole, active: Option<&[u64]>| {
+            build_feature_rows_with_pole_inputs(
+                &keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &inputs(pole),
+                &test_quality_inputs(),
+                &PoleInputs {
+                    pointer_active_ts: active,
+                    ..PoleInputs::default()
+                },
+            )
+        };
+        let onset_rows =
+            |rows: &[FeatureRow]| rows.iter().filter(|r| r.stall_onset.is_onset).count();
+
+        let err = run(Pole::PointerB, None).expect_err("活動の入力を渡さない極 B は Err");
+        assert!(err.contains("pointer_b"), "極の名前が出る: {err}");
+
+        let baseline = run(Pole::Baseline, None).expect("baseline は入力が要らない");
+        let idle = run(Pole::PointerB, Some(&[])).expect("活動 0 行の極 B");
+        assert_eq!(
+            serde_json::to_value(&baseline).expect("serialize"),
+            serde_json::to_value(&idle).expect("serialize"),
+            "活動が 0 行なら極 B は baseline と恒等（★ 値で埋めない）"
+        );
+
+        // 沈黙 (1100 → 90000) の途中 (49000, 50000] に活動 → 片が 2 つになり onset が 1 → 2 本。
+        let active = run(Pole::PointerB, Some(&[50_000])).expect("活動ありの極 B");
+        assert_eq!(onset_rows(&baseline), 1);
+        assert_eq!(onset_rows(&active), 2, "抑制が検出へ配線されていない");
+        // ⚠️ 極 B が変えるのは検出 (`stall_onset`) と条件 A に依る `restart` だけ。他の Tier は極に依らない。
+        for (b, a) in baseline.iter().zip(&active) {
+            assert_eq!(
+                serde_json::to_value(b.activity).expect("serialize"),
+                serde_json::to_value(a.activity).expect("serialize")
+            );
+            assert_eq!(
+                serde_json::to_value(&b.dispersion).expect("serialize"),
+                serde_json::to_value(&a.dispersion).expect("serialize")
+            );
+        }
+    }
+
+    /// issue 004: 入力の無い極は**入力が空でも** `Err` (黙って baseline の値を返さない)。
     /// ⚠️ 陰性対照 (`baseline`) が通ることも同じテストで固定する —— 常に `Err` を返す実装を通さない。
     #[test]
     fn unimplemented_pole_is_refused_even_on_empty_input() {
@@ -482,11 +639,11 @@ mod tests {
             )
         };
 
-        for pole in [Pole::PointerB, Pole::ModifierMPlus] {
-            for keys in [&[][..], &[key_at(0)][..]] {
-                let err = run(pole, keys).expect_err("未実装の極は Err");
-                assert!(err.contains(pole.as_str()), "極の名前が出る: {err}");
-            }
+        // ★ 未実装の極はもう無い (極 M+ は issue 005・極 B は issue 006 で開通した)。ここでは
+        //   「入力を渡さない (`build_feature_rows` は `PoleInputs::default()`) 極 B は Err」を見る。
+        for keys in [&[][..], &[key_at(0)][..]] {
+            let err = run(Pole::PointerB, keys).expect_err("入力を渡さない極 B は Err");
+            assert!(err.contains("pointer_b"), "極の名前が出る: {err}");
         }
         assert!(run(Pole::Baseline, &[])
             .expect("baseline は通る")
@@ -496,6 +653,197 @@ mod tests {
                 .expect("baseline は通る")
                 .len(),
             1
+        );
+    }
+
+    /// issue 005: 極 M+ は**押下区間が渡されなければ** `Err` (入力が空でも)。
+    /// ★ `build_feature_rows` (極の入力を持たない) も同じく `Err` —— 渡し忘れて baseline の値を
+    /// 極 M+ の名前で返さない。⚠️ 陰性対照: 区間を渡せば (空でも) 通る。
+    #[test]
+    fn modifier_m_plus_requires_its_intervals() {
+        let inputs = StallOnsetInputs {
+            feat_ts: &[],
+            task_kind_declarations: &[],
+            config: StallOnsetConfig {
+                pole: Pole::ModifierMPlus,
+                ..StallOnsetConfig::default()
+            },
+        };
+        let quality = test_quality_inputs();
+        for keys in [&[][..], &[key_at(0)][..]] {
+            let err = build_feature_rows(keys, &[], &[], TEST_MAX_TICKS, &inputs, &quality)
+                .expect_err("区間の無い極 M+ は Err");
+            assert!(err.contains("modifier_m_plus"), "極の名前が出る: {err}");
+            let err = build_feature_rows_with_pole_inputs(
+                keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &inputs,
+                &quality,
+                &PoleInputs::default(),
+            )
+            .expect_err("modifier_intervals が None なら Err");
+            assert!(err.contains("modifier"), "{err}");
+        }
+        let empty = PoleInputs {
+            modifier_intervals: Some(&[]),
+            ..PoleInputs::default()
+        };
+        let rows = build_feature_rows_with_pole_inputs(
+            &[key_at(0)],
+            &[],
+            &[],
+            TEST_MAX_TICKS,
+            &inputs,
+            &quality,
+            &empty,
+        )
+        .expect("区間 0 本は有効な入力");
+        assert_eq!(rows.len(), 1);
+    }
+
+    /// issue 005: 極 M+ が動かすのは**検出 (`stall_onset` / `restart`) だけ**。`T0` / `T1a` / `T1b` / `T1c` / `Q` は
+    /// baseline と一致する (⚠️ 極が Tier をまたいで漏れない)。★ 押下区間が空なら検出も恒等。
+    #[test]
+    fn modifier_m_plus_leaves_the_other_tiers_alone() {
+        let ctrl = KeyPress {
+            timestamp: 300,
+            vk: 0xA2,
+        };
+        let keys = vec![
+            key_at(0),
+            key_at(100),
+            key_at(200),
+            ctrl,
+            key_at(400),
+            key_at(500),
+        ];
+        let feat_ts: Vec<u64> = (0..=60).map(|i| i * 1000).collect();
+        let run = |pole: Pole, intervals: &[(u64, u64)]| {
+            build_feature_rows_with_pole_inputs(
+                &keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &StallOnsetInputs {
+                    feat_ts: &feat_ts,
+                    task_kind_declarations: &[],
+                    config: StallOnsetConfig {
+                        pole,
+                        ..StallOnsetConfig::default()
+                    },
+                },
+                &test_quality_inputs(),
+                &PoleInputs {
+                    modifier_intervals: Some(intervals),
+                    ..PoleInputs::default()
+                },
+            )
+            .expect("within tick limit")
+        };
+        let baseline = run(Pole::Baseline, &[]);
+        // ★ 区間 [300, 600] は 400 / 500 の文字キーを挿入系から外す。
+        let m_plus = run(Pole::ModifierMPlus, &[(300, 600)]);
+        assert_eq!(baseline.len(), m_plus.len());
+        fn json<T: serde::Serialize>(v: &T) -> serde_json::Value {
+            serde_json::to_value(v).expect("serialize")
+        }
+        for (b, m) in baseline.iter().zip(&m_plus) {
+            assert_eq!(b.t_ms, m.t_ms);
+            assert_eq!(json(&b.activity), json(&m.activity), "T0 は極に依らない");
+            assert_eq!(json(&b.boundary), json(&m.boundary), "T1b は極に依らない");
+            assert_eq!(
+                json(&b.dispersion),
+                json(&m.dispersion),
+                "T1a は極に依らない"
+            );
+            assert_eq!(json(&b.revision), json(&m.revision), "T1c は極に依らない");
+            assert_eq!(json(&b.quality), json(&m.quality), "Q は極に依らない");
+        }
+        // ★ 陰性対照: 区間が空の極 M+ は検出も baseline と恒等（`not_applicable` の根拠）。
+        let m_plus_empty = run(Pole::ModifierMPlus, &[]);
+        for (b, m) in baseline.iter().zip(&m_plus_empty) {
+            assert_eq!(json(&b.stall_onset), json(&m.stall_onset));
+            assert_eq!(json(&b.restart), json(&m.restart));
+        }
+    }
+
+    /// Codex r1a-3: 極 M+ が `detection_keys`（挿入系を置き換えた列）を検出へ**実際に配線している**
+    /// ことを固定する（★ 押下区間を渡しても検出結果が baseline と変わらないなら、
+    /// `build_feature_rows_with_pole_inputs` が `detection_keys` を検出へ渡していない疑いがある）。
+    ///
+    /// 手計算（`modifier_m_plus_leaves_the_other_tiers_alone` と同じ fixture・`W`=30 秒・
+    /// `q`=0.99・`net_diff_min`=1・warmup 無し）:
+    /// - 打鍵は 100ms 間隔で `0/100/200/300(Ctrl)/400/500`（Ctrl 以外の 5 本が挿入系 +1）。
+    /// - baseline: 5 本すべてが窓に寄与するので、最後の `500` が窓から抜ける `30_500` で
+    ///   条件 A が立つ → onset s=30_500。
+    /// - M+ (区間 `[300,600]` が `400`/`500` を覆う): 寄与するのは `0/100/200` の 3 本だけになり、
+    ///   最後の `200` が窓から抜ける `30_200` で条件 A が立つ → onset s=30_200。
+    /// - ★ `detection_keys` が本番経路に配線されていなければ（常に baseline の `keys` を検出へ
+    ///   渡していれば）、M+ も `s=30_500` になり baseline と一致してしまう。
+    #[test]
+    fn modifier_m_plus_intervals_actually_change_detection() {
+        let ctrl = KeyPress {
+            timestamp: 300,
+            vk: 0xA2,
+        };
+        let keys = vec![
+            key_at(0),
+            key_at(100),
+            key_at(200),
+            ctrl,
+            key_at(400),
+            key_at(500),
+        ];
+        let feat_ts: Vec<u64> = (0..=60).map(|i| i * 1000).collect();
+        let run = |pole: Pole, intervals: &[(u64, u64)]| {
+            build_feature_rows_with_pole_inputs(
+                &keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &StallOnsetInputs {
+                    feat_ts: &feat_ts,
+                    task_kind_declarations: &[],
+                    config: StallOnsetConfig {
+                        pole,
+                        ..StallOnsetConfig::default()
+                    },
+                },
+                &test_quality_inputs(),
+                &PoleInputs {
+                    modifier_intervals: Some(intervals),
+                    ..PoleInputs::default()
+                },
+            )
+            .expect("within tick limit")
+        };
+        let onset_s = |rows: &[FeatureRow]| -> Vec<u64> {
+            rows.iter()
+                .filter(|r| r.stall_onset.is_onset)
+                .filter_map(|r| r.stall_onset.s_ms)
+                .collect()
+        };
+
+        let baseline = run(Pole::Baseline, &[]);
+        let m_plus = run(Pole::ModifierMPlus, &[(300, 600)]);
+
+        assert_eq!(
+            onset_s(&baseline),
+            vec![30_500],
+            "baseline は 500 まで届いて抜ける 30_500 で立つ"
+        );
+        assert_eq!(
+            onset_s(&m_plus),
+            vec![30_200],
+            "M+ は 400/500 を数えないので 200 が抜ける 30_200 で立つ \
+             （★ detection_keys が配線されていない場合は 30_500 になる）"
+        );
+        assert_ne!(
+            onset_s(&baseline),
+            onset_s(&m_plus),
+            "極 M+ の押下区間を渡しても検出結果が変わっていない（detection_keys の配線漏れの疑い）"
         );
     }
 
@@ -653,5 +1001,68 @@ mod tests {
         assert_eq!(net_production(&[letter, letter, backspace]), 1);
         assert_eq!(net_production(&[backspace, backspace]), -2);
         assert_eq!(net_production(&[arrow]), 0);
+    }
+
+    /// issue 007: `build_feature_rows` が渡された `ime_events` を `stall_onset.ime_overlap` へ配線する。
+    /// ★ 引数を落としても onset の集合は変わらない (数えるだけで抑制しない) ので、**値そのもの**を固定する。
+    #[test]
+    fn ime_events_reach_stall_onset_overlap_without_changing_onsets() {
+        // onset は s = 30_200, t0 = 30_300 (`stall_onset` の小さい合成入力と同じ)。
+        let keys = [key_at(0), key_at(100), key_at(200)];
+        let feat: Vec<u64> = (0..=41).map(|i| i * 1_000).collect();
+        let inputs = StallOnsetInputs {
+            feat_ts: &feat,
+            task_kind_declarations: &[],
+            config: StallOnsetConfig::default(),
+        };
+        let run = |ime_events: &[ImeShadowEvent]| {
+            build_feature_rows(
+                &keys,
+                &[],
+                ime_events,
+                TEST_MAX_TICKS,
+                &inputs,
+                &test_quality_inputs(),
+            )
+            .expect("within tick limit")
+        };
+        let overlapping = ImeShadowEvent {
+            t_ms: 30_250,
+            dwell_ms: 100,
+            nav: 0,
+            abandon: false,
+        };
+        let with = run(&[overlapping]);
+        let without = run(&[]);
+
+        let onset_of = |rows: &[FeatureRow]| {
+            rows.iter()
+                .map(|r| {
+                    (
+                        r.stall_onset.is_onset,
+                        r.stall_onset.s_ms,
+                        r.stall_onset.t0_ms,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        // ★ 行は打鍵の範囲の内側にあり、tick グリッドの原点・終端を動かさない (動かす入力は本テストの対象外)。
+        assert_eq!(
+            onset_of(&with),
+            onset_of(&without),
+            "ime_shadow 行の有無で onset の集合が変わった (抑制してしまっている)"
+        );
+        let idx = with
+            .iter()
+            .position(|r| r.stall_onset.is_onset)
+            .expect("onset が立つ");
+        assert_eq!(with[idx].stall_onset.ime_overlap, Some(true));
+        assert_eq!(without[idx].stall_onset.ime_overlap, Some(false));
+        assert!(
+            with.iter()
+                .filter(|r| !r.stall_onset.is_onset)
+                .all(|r| r.stall_onset.ime_overlap.is_none()),
+            "onset でない行は null"
+        );
     }
 }

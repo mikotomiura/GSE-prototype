@@ -86,10 +86,158 @@ if ( cd "$REPO_ROOT" && bash "$ALLPOLES" "src-tauri/tests/fixtures/__does_not_ex
   fail "AC5: 存在しない入力でも exit 0 になった（fail-closed でない）"
 fi
 
+# ── AC5(b) / AC4(b): 極ごとの失敗の枝・ラベル食い違いの枝を、偽の gse-replay で実際に踏む ──
+#   ⚠️★★★ 上の AC5 は存在しない入力を渡すので、スクリプトの**入口の検査**で止まる。
+#     ★ 「1 極が失敗したら止まる」枝（極ごとの失敗処理）はそこでは 1 度も踏まれていない。
+#   ★ 本物の gse-replay の代わりに、`FAKE_MODE` で振る舞いを変える偽コマンドを `GSE_REPLAY_BIN` で差す。
+#   ⚠️ ok の枝も**同じ偽コマンド**で踏む（★ 偽コマンドが常に壊れていて、ng の枝が空振りのまま緑になるのを防ぐ）。
+fake="$(mktemp)" || fail "AC5: 偽 gse-replay の一時ファイルを作れない"
+CLEANUP+=("$fake")
+cat > "$fake" <<'FAKE_EOF'
+#!/usr/bin/env bash
+# 偽 gse-replay: 最初の位置引数 (ndjson パス) と `--pole <名前>` を読み、FAKE_MODE に応じて振る舞う。
+# ★ ndjson_path は AC12 (入力の固定コピー) が「gse-replay に渡ったパスが staging 内か」を
+#   検査するために出す (run-features-all-poles.sh は常に ndjson パスを最初の引数で渡す)。
+ndjson_path="${1:-}"
+pole=""
+prev=""
+for a in "$@"; do
+  if [ "$prev" = "--pole" ]; then pole="$a"; fi
+  prev="$a"
+done
+case "${FAKE_MODE:-ok}" in
+  fail_pointer_b) if [ "$pole" = "pointer_b" ]; then exit 1; fi ;;
+  mislabel) pole="baseline" ;;
+esac
+printf '{"config":{"pole":"%s","pole_applicable":true},"rows":[],"fake_input_path":"%s"}\n' "$pole" "$ndjson_path"
+FAKE_EOF
+chmod +x "$fake" || fail "AC5: 偽 gse-replay に実行権を付けられない"
+
+run_fake() { # run_fake <FAKE_MODE> <outdir> → all-poles の exit code をそのまま返す
+  ( cd "$REPO_ROOT" && FAKE_MODE="$1" GSE_REPLAY_BIN="$fake" bash "$ALLPOLES" "src-tauri/$FIX" "$2" ) >/dev/null 2>&1
+}
+
+# ok の枝（陽性対照）: 全極が成功する偽コマンドなら exit 0 で 3 ファイル出る。
+outdir_ok="$(mktemp -d)" || fail "AC5: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_ok")
+run_fake ok "$outdir_ok" \
+  || fail "AC5(陽性対照): 全極が成功する偽コマンドなのに all-poles が非 0（★ 偽コマンドか本スクリプトが壊れている）"
+[ "$(ls -1 "$outdir_ok"/*.json 2>/dev/null | wc -l)" -eq 3 ] \
+  || fail "AC5(陽性対照): 偽コマンドで 3 ファイル出ていない"
+
+# ── AC9: 陽性対照の outdir はファイル名がちょうど 3 極で、staging (.all-poles.*) が残らない ──
+for pole in baseline pointer_b modifier_m_plus; do
+  [ -f "$outdir_ok/$pole.json" ] || fail "AC9: $outdir_ok/$pole.json が無い"
+done
+count_ok="$(ls -1 "$outdir_ok" | wc -l | tr -d ' ')"
+[ "${count_ok:-0}" -eq 3 ] \
+  || fail "AC9: outdir のファイル数がちょうど 3 でない ($count_ok 個・余計なファイルがある可能性)"
+hidden_ok="$(ls -A "$outdir_ok" | grep -c '^\.all-poles\.' || true)"
+[ "${hidden_ok:-0}" -eq 0 ] \
+  || fail "AC9: staging ディレクトリ (.all-poles.*) が outdir に残っている"
+
+# ── AC10: 既に 3 ファイルがある outdir に ok を流すと exit 2 で拒否され、既存ファイルは変わらない ──
+outdir_reuse="$(mktemp -d)" || fail "AC10: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_reuse")
+run_fake ok "$outdir_reuse" \
+  || fail "AC10: 1 回目（空 outdir への ok）が非 0 になった（★ 前提が壊れている）"
+before_reuse="$(cat "$outdir_reuse/baseline.json" "$outdir_reuse/pointer_b.json" "$outdir_reuse/modifier_m_plus.json")"
+run_fake ok "$outdir_reuse"
+rc10=$?
+[ "$rc10" -eq 2 ] \
+  || fail "AC10: 既に 3 ファイルがある outdir への再実行が exit 2 にならない (rc=$rc10)。★ 使い回しの拒否が効いていない"
+after_reuse="$(cat "$outdir_reuse/baseline.json" "$outdir_reuse/pointer_b.json" "$outdir_reuse/modifier_m_plus.json")"
+[ "$before_reuse" = "$after_reuse" ] \
+  || fail "AC10: 拒否されたはずなのに既存ファイルの中身が変わった（★ fail-closed が破れている）"
+
+# ── AC11: git 管理下の outdir を渡すと exit 2 で拒否される ────────────────
+outdir_git="$(mktemp -d)" || fail "AC11: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_git")
+( cd "$outdir_git" && git init -q . ) >/dev/null 2>&1 \
+  || fail "AC11: テスト前提の git init に失敗した"
+run_fake ok "$outdir_git"
+rc11=$?
+[ "$rc11" -eq 2 ] \
+  || fail "AC11: git 管理下の outdir を渡しても exit 2 にならない (rc=$rc11)。★ 共有禁止の特徴行を repo 内に書きうる"
+
+# ng の枝 1: 1 極（pointer_b）だけが失敗 → 全体が非 0・outdir は空（staging も残さない）。
+outdir_ng="$(mktemp -d)" || fail "AC5: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_ng")
+if run_fake fail_pointer_b "$outdir_ng"; then
+  fail "AC5: 1 極 (pointer_b) だけが失敗したのに全体が exit 0 になった（fail-closed でない）"
+fi
+[ -z "$(ls -A "$outdir_ng" 2>/dev/null)" ] \
+  || fail "AC5: 1 極が失敗したのに outdir にファイルが残っている（★ 3 ファイルが揃わない outdir を作らない）"
+
+# ng の枝 2: 出力の config.pole がファイル名と食い違う → 全体が非 0・outdir は空。
+outdir_ml="$(mktemp -d)" || fail "AC4: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_ml")
+if run_fake mislabel "$outdir_ml"; then
+  fail "AC4: config.pole がファイル名と食い違う出力でも exit 0 になった（★ 中身の極とファイル名が違うと読み手が誤る）"
+fi
+[ -z "$(ls -A "$outdir_ml" 2>/dev/null)" ] \
+  || fail "AC4: 食い違う出力を outdir に置いている（★ 3 極が正しく揃うまで何も置かない）"
+
 # ── AC7: runbook に手順と Cartesian 禁止が書かれている ──────────────────
 grep -qE 'run-features-all-poles' "$RUNBOOK" \
   || fail "AC7: runbook に 3 極を回す手順が無い"
 grep -qE '(Cartesian|直積|組まない)' "$RUNBOOK" \
   || fail "AC7: runbook に「極を Cartesian に組まない」旨が無い"
+grep -qE 'SIGKILL' "$RUNBOOK" \
+  || fail "AC7: runbook に SIGKILL 時の部分出力の限界が書かれていない（判断 6(e)）"
+
+# ── AC12: 入力は最初に staging へコピーされ、3 極とも同じ staged パスを見る（判断 6(c)） ──
+outdir_stage="$(mktemp -d)" || fail "AC12: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_stage")
+run_fake ok "$outdir_stage" \
+  || fail "AC12: 前提の ok 実行が非 0 になった"
+p_base="$(jq -r '.fake_input_path' "$outdir_stage/baseline.json")" || fail "AC12: fake_input_path を読めない (baseline)"
+p_ptr="$(jq -r '.fake_input_path' "$outdir_stage/pointer_b.json")" || fail "AC12: fake_input_path を読めない (pointer_b)"
+p_mod="$(jq -r '.fake_input_path' "$outdir_stage/modifier_m_plus.json")" || fail "AC12: fake_input_path を読めない (modifier_m_plus)"
+[ "$p_base" = "$p_ptr" ] && [ "$p_base" = "$p_mod" ] \
+  || fail "AC12: 3 極が同じ staged パスを見ていない（base=$p_base ptr=$p_ptr mod=${p_mod}）"
+case "$p_base" in
+  *".all-poles."*) : ;;
+  *) fail "AC12: gse-replay に渡ったパスが staging 内でない（元の入力パスをそのまま渡している疑い）: $p_base" ;;
+esac
+[ "$p_base" != "$REPO_ROOT/src-tauri/$FIX" ] \
+  || fail "AC12: gse-replay に渡ったパスが元の入力とそのまま同じ（コピーしていない）"
+
+# ── AC13: ロックが残っている出力先は exit 2 で拒否される（判断 6(a)・二重起動対策） ──
+outdir_lock="$(mktemp -d)" || fail "AC13: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_lock")
+mkdir "$outdir_lock/.all-poles.lock" || fail "AC13: 前提のロック作成に失敗した"
+run_fake ok "$outdir_lock"
+rc13=$?
+[ "$rc13" -eq 2 ] \
+  || fail "AC13: ロックが残っている出力先への実行が exit 2 にならない (rc=$rc13)"
+[ -d "$outdir_lock/.all-poles.lock" ] \
+  || fail "AC13: 拒否された実行が他プロセスのロックを消してしまった（★ 二重起動時に正常なプロセスのロックを壊す）"
+leftover="$(ls -A "$outdir_lock" 2>/dev/null | grep -v '^\.all-poles\.lock$' || true)"
+[ -z "$leftover" ] \
+  || fail "AC13: ロック拒否なのに outdir に出力ファイルが残っている: $leftover"
+
+# ── AC14: git 判定が「not a git repository」以外のエラーを出したら exit 2 で拒否（fail-closed） ──
+fakegit_dir="$(mktemp -d)" || fail "AC14: 一時ディレクトリを作れない"
+CLEANUP+=("$fakegit_dir")
+cat > "$fakegit_dir/git" <<'GIT_EOF'
+#!/usr/bin/env bash
+# 偽 git: `-C <path> rev-parse --is-inside-work-tree` だけを横取りし、
+# 「not a git repository」を含まない別のエラー（所有権チェック失敗を模す）を返す。
+if [ "$1" = "-C" ] && [ "$3" = "rev-parse" ] && [ "$4" = "--is-inside-work-tree" ]; then
+  echo "fatal: detected dubious ownership in repository at '$2'" >&2
+  exit 128
+fi
+exit 127
+GIT_EOF
+chmod +x "$fakegit_dir/git" || fail "AC14: 偽 git に実行権を付けられない"
+outdir_direrr="$(mktemp -d)" || fail "AC14: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_direrr")
+( cd "$REPO_ROOT" && PATH="$fakegit_dir:$PATH" FAKE_MODE=ok GSE_REPLAY_BIN="$fake" bash "$ALLPOLES" "src-tauri/$FIX" "$outdir_direrr" ) >/dev/null 2>&1
+rc14=$?
+[ "$rc14" -eq 2 ] \
+  || fail "AC14: 'not a git repository' 以外の git エラーで exit 2 にならない (rc=$rc14)。★ 所有権チェック等の失敗を『管理外』として素通りさせていないか確認"
+[ -z "$(ls -A "$outdir_direrr" 2>/dev/null)" ] \
+  || fail "AC14: 拒否されたのに outdir にファイルが残っている"
 
 echo "[acceptance 008g] OK"

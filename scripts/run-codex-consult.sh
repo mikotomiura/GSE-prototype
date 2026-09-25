@@ -119,7 +119,7 @@ fi
 
 # Codex 呼び出し (固定パラメータ)
 if ! codex exec --json --sandbox read-only --skip-git-repo-check \
-  -m gpt-5.5 -c model_reasoning_effort=medium \
+  -m gpt-6-astra -c model_reasoning_effort=medium \
   - <<< "$PROMPT" > "$TMPDIR_WORK/result.jsonl"; then
   echo "[run-codex-consult] FAILED: codex exec error" >&2
   exit 1

@@ -45,17 +45,107 @@
 //!   **nearest-rank**（`dispersion.rs::quantile` と同じ規約）を採用した。線形補間との差は
 //!   小標本で顕在化しうるので、P1 の事前宣言で確定させること。
 //! - **修飾キー押下中の文字キー除外**（D3）: `KeyCategory::Modifier` は Shift を含むため、
-//!   逐語どおり実装すると大文字・記号の入力まで産出から外れる。研究者判断待ち
-//!   (`blockers.md` 起票 11)。
-//! - **IME 変換中の抑制**（D3 抑制表 2 行目）: 区間の定義と「抑制」の意味が未確定。
-//!   研究者判断待ち (`blockers.md` 起票 12)。
+//!   逐語どおり実装すると大文字・記号の入力まで産出から外れる。★ **それが極 M+ の定義である**
+//!   (ADR-030 補訂 1 項目 3)。極 M− (baseline) は除外しない。実装は [`Pole::ModifierMPlus`] /
+//!   [`modifier_press_intervals`] / [`apply_modifier_m_plus`] (issue 005)。
+//! - **IME 変換中の抑制**（D3 抑制表 2 行目）: ★ **補訂 1 項目 4 が「いまは抑制しない」と決着した**
+//!   (研究者判断 25 #7)。本モジュールは**数えるだけ**である (issue 007・下の
+//!   「IME 変換中の onset を数える」節)。
 //! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形は**別モード (`--pole`・1 実行 1 極)** に
-//!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B の中身は未実装 (issue 006)。
+//!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B は**観測区間と同じ構造で切る**と裁定済みで
+//!   (判断 7)、実装は [`pointer_suppression_intervals`] / [`evaluation_intervals`] (issue 006)。
+//!
+//! # 極 B の入れ方（issue 006）
+//!
+//! ★ 検出の**中には極の分岐を持たない**。極 B は検出へ渡す**評価区間の側**で表す: `pointer_bin` 行が覆う
+//! 秒の極大連続を**抑制区間**とし、観測区間から抑制区間を除いた各片を 1 つの観測区間として検出へ渡す
+//! ([`evaluation_intervals`])。→ 各片で (1) 条件 A の直前状態が `false` に戻り (2) 頭の `W` を評価せず
+//! (3) θ の標本も**片の内側の隣接 press 対だけ**になる —— **新しい機構は 1 つも無い**
+//! (観測区間と同じ規則をそのまま再利用する)。
+//!
+//! ⚠️★★★ **「極 B は onset 少なめ」は保証されない**（`decisions.md` 判断 25）。ADR-030 D3 の囲みは
+//! 「極 B (ポインタ活動区間を抑制する ＝ onset 少なめ)」と書くが、それは**典型形の記述であって
+//! 不変式ではない**。包含が崩れる経路は 2 つある:
+//!
+//! 1. **θ 経路**: θ_person は**全観測区間からプールした因果累積**である (モジュール doc 冒頭
+//!    「θ の標本は… 全観測区間からプールする」＋ [`pooled_theta_gaps`])。抑制をまたぐ標本を
+//!    プールから外すと、**抑制区間から遠い onset の θ・ひいては `t0` まで動く** —— baseline で
+//!    立った onset が極 B では別の時刻へ動いたり消えたりし、baseline に無い時刻で新しく
+//!    立つこともある (`tests::theta_sample_excludes_pairs_across_pointer_suppression` が固定:
+//!    同じ入力で baseline の onset は `s=71100, t0=91500` の 1 本だけだが、極 B では同じ
+//!    `s=71100` が `t0=71200` に移動し、baseline の `t0` 集合との交わりがゼロになる —— **極 B の
+//!    onset 集合は baseline の部分集合ですらない**)。
+//! 2. **分割経路**: 長い沈黙の途中にポインタ活動が入ると、片が 2 つに割れて後ろの片で `a + W` 後に
+//!    条件 A が改めて立つ (`feat` 行の穴と同じ扱い。`tests::pointer_suppression_skips_the_leading_w`
+//!    が固定: baseline 1 本 → 極 B 2 本。**onset が増える**)。
+//!
+//! → ★ 極 B が baseline の部分集合になるとは**限らない**（活動が停滞の途中で止めさせる典型形では
+//! 減るが、一般には保証されない）。★ したがって **G2 の上下界は「極 A が上・極 B が下」のような
+//! 2 極の順序を前提にせず、両極それぞれで求めた G2 の min / max で取る**（判断 25）。
+//!
+//! # IME 変換中の onset を数える（issue 007・ADR-030 補訂 1 項目 4）
+//!
+//! ⚠️★★★ **数えるだけで、抑制はしない。** 検出 (条件 A / B・θ・観測区間) は `ime_shadow` 行を**読まない**ので、
+//! `ime_shadow` 行の有無で検出値 (`s` / `t0` / θ / n の組) は 1 本も変わらない (`tests::ime_rows_never_change_the_onset_set`)。
+//! 変わるのは onset 行に載る [`StallOnset::ime_overlap`] だけである。
+//! ⚠️ ただし `ime_shadow` 行は **tick グリッドの原点・終端の決定には入る** (`mod.rs` の `grid_origin_ms` / `t_last`・
+//! issue 002 からの既存の挙動)。最初の打鍵より前・最後の入力より後に行があると、onset が載る **tick の添字**は動きうる
+//! (★ 検出値は同じ。本 issue はこの挙動を変えていない)。
+//!
+//! - **重なりの定義** (補訂 1 項目 4 の**暫定の数え方**・抑制の定義ではない): onset の `[s, t0]` と
+//!   `ime_shadow` 行の `[t − dwell_ms, t]` の**閉区間どうしの交わり**。端点で接するだけでも重なる。
+//!   `t < dwell_ms` (区間が原点より前へ延びる) は下端を 0 に飽和させる。
+//! - ⚠️ `ime_shadow` 行が 1 本も無い入力では**全 onset が `false`** (`null` にしない)。「重なりを数えたが 0 件だった」は
+//!   観測できた事実である。★ ただし**その 0 が「使わなかった」のか「計器が無かった」のかは区別しない**
+//!   (`boundary` モジュール doc の `ime_*` と同じ。判別は `Q` が持つ)。
+//! - ⚠️ **既知の偏り** (補訂 1 項目 4・そのまま持ち込む。★ 判断 29 で結論を書き直した):
+//!   1. macOS の `dwell_ms` は「1 変換分とは限らない」(`schema_dto.rs` の `ime_shadow` の doc) → 区間が長めに出ることがある
+//!      (**過大**の側)。
+//!   2. 20 秒を超えた変換は行が出ない (両 OS 共通・同じ doc) → 偽の onset を作りうる長い変換ほど数えられない
+//!      (**過小**の側)。
+//!   3. 同じ tick に onset が 2 つ落ちると `column_from_onsets` は後ろを捨てる (既存の挙動・件数は warn のみ)
+//!      → 捨てた onset の `ime_overlap` も数えない (2026-09-25 code-reviewer LOW。**過小**の側)。
+//!   4. → ⚠️★★★ **判断 29**: 1 は過大、2 と 3 は過小に働くので、**「下限」という単一方向の結論は
+//!      前提（1 の存在）と矛盾していた**（補訂 1 の原文は「下限」と書いていたが、それは 1 を
+//!      無視した結論である）。★ 正しくは **過小と過大の両方向の誤差がある観測値**として読む。
+//!      ⚠️ **Windows では 1 の要因（macOS 固有の `dwell_ms` の性質）が無い**ので、Windows のログに
+//!      限れば 2・3 だけが効き、**下限として読める**（★ OS を区別できない場合の既定は「両方向」）。
+//! - ⚠️ **`ime_overlap` は retrospective である**: `t` は変換の**終端**なので、`[s, t0]` に掛かる行の `t` は `t0` より
+//!   後でありうる (`t0` の時点ではまだ書かれていない)。→ onset の**集合**は causal のまま、行に載る `ime_overlap`
+//!   だけが `t0` より後の行に依存する。★ 上の因果性テスト群の対象は検出であり、`ime_shadow` 行を渡さない。
+//! - ★ 検出の**中には分岐を持たない**。onset を 1 tick 列へ写す `column_from_onsets` が、確定した onset ごとに
+//!   [`ImeIntervalIndex`] を引いて `ime_overlap` を埋めるだけ (極に依らず同じ計算・極の数を増やさない)。
+//!
+//! # 極 M+ の入れ方（issue 005）
+//!
+//! ★ 検出 (条件 A / B・θ) の**中には極の分岐を持たない**。極 M+ は**検出へ渡す `key` 列の側**で
+//! 「修飾キーの押下区間の中の挿入系 press」を修飾キーの VK へ置き換えて表す ([`apply_modifier_m_plus`])。
+//! ⚠️ press の**時刻は 1 本も変えない** —— θ の標本 (隣接 press の間隔) は極に依らず、
+//! 変わるのは条件 A の産出 (`net`) の**挿入系の側だけ**である (`−1` の削除系は外さない)。
 //! - **`phase`**: 構造化セッションの block id は未実装。自然セッション (O1) では常に
 //!   `"unspecified"` に collapse する (ADR-030 D5)。
+//!
+//! ⚠️★★★ **「極 M+ は baseline の onset を全部保つ（真の上位集合）」は保証されない**
+//! (`decisions.md` 判断 28・判断 25 と同じ扱い)。★ 挿入系の press を除くと、条件 A が
+//! **`false` を経由せず true のまま続く**区間が生まれうる —— 除いた挿入 press が本来
+//! 条件 A を一時的に `false` へ戻していた（＝正味産出を回復させていた）場合、その `false`
+//! 区間が消えて前後の `true` 区間が**つながる**。onset は `cond_a[i] && !prev`（**立ち上がり**）
+//! でしか生まれないので、成立期間がつながると baseline にあった**後ろの立ち上がりが消える**
+//! (`tests::m_plus_can_drop_a_baseline_onset_by_merging_condition_a` が固定: baseline は 2 本
+//! [`30_200`, `70_000`] だが、M+ では 2 本目の立ち上がりを作っていた `40_000` の挿入 press が
+//! 消えるため条件 A が `30_200` から一度も落ちず、onset は `30_200` の 1 本だけになる ——
+//! **baseline は M+ の部分集合ですらない**)。
+//!
+//! → ★ 極 M+ が baseline の上位集合になるとは**限らない**（挿入系を除くことで onset が増える
+//! 典型形では上位集合になりやすいが、一般には保証されない）。★ したがって **G2 の上下界は
+//! 「極 M+ が上」のような順序を前提にせず、両極それぞれで求めた G2 の min / max で取る**
+//! (判断 25 と同じ規則)。
 
+use crate::analysis::anonymize::KeyCategory;
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{KeyPress, OutcomeConfig};
+
+use super::ImeShadowEvent;
 
 /// ADR-030 D3 の「極」—— 抑制規則の置き方を名前で区別する。
 ///
@@ -68,8 +158,8 @@ use crate::analysis::metrics::{KeyPress, OutcomeConfig};
 /// | 名前 | ポインタ | 修飾キー | 実装 |
 /// |---|---|---|---|
 /// | `baseline` | 極 A (抑制しない) | 極 M− (規則なし) | ★ 現行の計算そのもの |
-/// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | issue 006 |
-/// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | issue 005 |
+/// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | ★ 実装済み (issue 006) |
+/// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | ★ 実装済み (issue 005) |
 ///
 /// ⚠️ 極は `--set` で変える 8 値 (`StallOnsetConfig` の他のフィールド) とは**別の軸**であり、
 /// `--set` の対象にしない (CLI は `--pole` だけが持つ)。
@@ -103,11 +193,12 @@ impl Pole {
     ///
     /// ⚠️★★★ **`false` の極を黙って `baseline` の値で返してはならない** —— 出力が嘘をつき、
     /// 極の比較が無意味になる。呼び出し側 (`build_feature_rows` / CLI) は `false` なら**止める**
-    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させる。
+    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させた
+    /// (★ 極 M+ は issue 005・極 B は issue 006)。今は全部 `true` だが、極を足したときの
+    /// 門としてこの関数と網羅 `match` を残す。
     pub const fn is_implemented(self) -> bool {
         match self {
-            Pole::Baseline => true,
-            Pole::PointerB | Pole::ModifierMPlus => false,
+            Pole::Baseline | Pole::PointerB | Pole::ModifierMPlus => true,
         }
     }
 }
@@ -142,7 +233,8 @@ pub struct StallOnsetConfig {
     pub t1a_window_ms: u64,
     /// 極 (ADR-030 D3・[`Pole`])。既定は [`Pole::Baseline`] (現行の計算)。
     /// ⚠️ 他の 8 値と違い `--set` では変えられない (`bin/replay.rs` の `--pole` だけが持つ)。
-    /// ★ 本モジュールの検出そのものはまだ極を読まない —— 非 `baseline` の極は
+    /// ★ 本モジュールの検出そのものは極を読まない —— 極 M+ は検出へ渡す `key` 列の側で表す
+    /// ([`apply_modifier_m_plus`]・モジュール doc 「極 M+ の入れ方」)。未実装の極は
     /// `build_feature_rows` が入口で `Err` にするので、ここへは届かない ([`Pole::is_implemented`])。
     pub pole: Pole,
 }
@@ -164,8 +256,9 @@ impl Default for StallOnsetConfig {
 }
 
 /// `stall onset` の 1 tick ぶんの値。onset が起きた tick だけ `is_onset = true` で
-/// 他 5 フィールドが埋まる。他の tick は `is_onset = false` で `s_ms` / `t0_ms` /
-/// `theta_person_ms` / `task_kind` は `null`（欠測を 0 で埋めない）。
+/// 他のフィールドが埋まる (`task_kind` だけは宣言が無ければ `null`)。他の tick は `is_onset = false` で
+/// `s_ms` / `t0_ms` / `theta_person_ms` / `theta_sample_n` / `task_kind` / `ime_overlap` は
+/// `null`（欠測を 0 で埋めない）。
 /// `phase` は自然セッションでは常に `"unspecified"` (ADR-030 D5)。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct StallOnset {
@@ -184,6 +277,14 @@ pub struct StallOnset {
     pub task_kind: Option<String>,
     /// ADR-030 D5: 自然セッション (O1) では常に `"unspecified"` に collapse する。
     pub phase: String,
+    /// onset の `[s, t0]` が `ime_shadow` 行の `[t − dwell_ms, t]` と**重なるか** (閉区間の交わり・issue 007)。
+    /// ⚠️★★★ **数えるだけで抑制ではない** (ADR-030 補訂 1 項目 4・モジュール doc「IME 変換中の onset を数える」)。
+    /// onset 行では常に `Some` —— ⚠️ `ime_shadow` 行が 1 本も無ければ `Some(false)` (`None` にしない)。
+    /// onset でない行は `None` (他のフィールドと揃える)。
+    /// ⚠️ **retrospective**: `t0` より後に書かれる行に依存しうる。★ P1 の頻度は**両方向の誤差がある
+    /// 観測値**として読む (過小: 20 秒超の変換・tick 衝突／過大: macOS の長めの `dwell_ms`。
+    /// Windows では過大の要因が無いので下限として読める。判断 29・モジュール doc「既知の偏り」参照)。
+    pub ime_overlap: Option<bool>,
 }
 
 impl StallOnset {
@@ -196,6 +297,7 @@ impl StallOnset {
             theta_sample_n: None,
             task_kind: None,
             phase: "unspecified".to_string(),
+            ime_overlap: None,
         }
     }
 }
@@ -283,6 +385,236 @@ pub fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> 
     }
     intervals.push((start, prev));
     intervals
+}
+
+/// 極 B: `pointer_bin` 行の時刻から**抑制区間**を作る (ADR-030 D3・`decisions.md` 判断 7)。
+///
+/// ★ 1 行 `t` が覆うのは `(t − bin_ms, t]` である (`analysis/pointer_bin.rs`: `timestamp` は**ビンの終端時刻**)。
+/// ★ `bin_ms` は呼び出し側が **`ENGINE_TICK_MS`** を渡す —— 値は `input/observe_*.rs` の `BIN_MS` (= 1000・各 OS のテストが固定)
+/// の**写しであってリンクではない**ので、`BIN_MS` が変わったら呼び出し側 (`feat_offline/mod.rs` / `bin/replay.rs`) を追随させる
+/// (`decisions.md` 判断 7 の見直しタイミング)。⚠️ 数値定数を**宣言しない** (ADR-030 D3「新しい定数を作らない」・`005-acceptance.sh` が検査する)。
+/// ⚠️ ゼロ抑制なので**行が在る＝その秒に活動があった**。★ 行の**値は読まない** (存在だけを使う)。
+/// 覆う区間の**極大連続**を 1 本に畳む: ちょうど `bin_ms` 離れた 2 行 `(t−bin, t]` と `(t, t+bin]` は接して 1 本になり、
+/// それより離れた行は別の区間になる (整数 ms で 1 ms でも空けば別)。
+///
+/// 戻り値は `(下端を含まない, 上端を含む)` の組 (開始昇順・互いに素)。`pointer_ts` は順不同・重複ありでよい。
+/// `bin_ms == 0` は覆う秒が無いので空 (⚠️ 空の区間で観測区間を割らない)。
+///
+/// ⚠️ **`t == 0`（★ `bin_ms` に飽和で吸収される先頭）の行は `(0, 0]` という空区間を作る**
+/// （★ LOW 是正・code-reviewer 指摘）。`(0, 0]` は `lo == t` で「0 より大きく 0 以下」＝
+/// 実際には**どの整数 ms も覆わない**ので、抑制区間として push すると
+/// [`evaluation_intervals`] が観測区間を無意味に (何も除かずに) 2 片へ割ってしまう
+/// (`tests::pointer_suppression_at_t_zero_produces_no_interval` が固定)。→ **空区間は作らない**。
+pub fn pointer_suppression_intervals(pointer_ts: &[u64], bin_ms: u64) -> Vec<(u64, u64)> {
+    if bin_ms == 0 {
+        return Vec::new();
+    }
+    let mut sorted = pointer_ts.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+
+    let mut out: Vec<(u64, u64)> = Vec::new();
+    for t in sorted {
+        let lo = t.saturating_sub(bin_ms);
+        if lo == t {
+            // `(lo, t]` が空区間 (t == 0 のときだけ起こる)。何も覆わないので捨てる。
+            continue;
+        }
+        match out.last_mut() {
+            // 前の区間の上端 (含む) に、この行の下端 (含まない) が届いていれば接している。
+            Some(last) if lo <= last.1 => last.1 = t,
+            _ => out.push((lo, t)),
+        }
+    }
+    out
+}
+
+/// 観測区間から抑制区間を除いた**評価区間**を返す (両端を含む・開始昇順・互いに素)。
+///
+/// ★ 極 B が検出へ渡す区間である。**極 A (baseline) は抑制が空なので観測区間そのまま**が返る。
+/// 観測区間 `[a, b]` から `(lo, hi]` を除くと `[.., lo]` と `[hi + 1, ..]` に割れる (整数 ms)。
+/// ⚠️ 抑制が観測区間の外にあれば何も変わらない。⚠️ 抑制が区間全体を覆えば、その区間は消える。
+/// `observed` / `suppressed` はどちらも開始昇順・互いに素 ([`observed_intervals`] /
+/// [`pointer_suppression_intervals`] の戻り値) を仮定する。計算量は `O((I + S) + I log S)`。
+///
+/// ⚠️★★★ **`hi == u64::MAX` の抑制を `hi + 1` で進めない** (Codex r1a-4 / r2-4)。
+/// 旧実装は `cursor = cursor.max(hi.saturating_add(1))` を使っており、`hi == u64::MAX` では
+/// `saturating_add` が `u64::MAX` に張り付いたまま止まる。抑制がこの観測区間の右端 `b`
+/// (または `u64::MAX`) まで覆っていれば、その区間の残余は無いのだから `cursor` を進める意味は
+/// 無い —— **`hi >= b` の時点で「この観測区間はここで打ち切り、残余は無し」として抜ける**
+/// (`hi + 1` を計算しない。`hi < b` が保証された経路でしか `hi + 1` を計算しないので、
+/// `hi` が `u64::MAX` 付近でもオーバーフローしない)。
+pub fn evaluation_intervals(observed: &[(u64, u64)], suppressed: &[(u64, u64)]) -> Vec<(u64, u64)> {
+    let mut out: Vec<(u64, u64)> = Vec::with_capacity(observed.len());
+    for &(a, b) in observed {
+        // この観測区間に届きうる最初の抑制 (上端が `a` 以上のもの)。
+        let mut i = suppressed.partition_point(|&(_, hi)| hi < a);
+        let mut cursor = a;
+        // ★ 抑制がこの観測区間を `b`（または `u64::MAX`）まで覆いきったら `true`。
+        //   その場合はこの観測区間に残余が無いので、末尾の `[cursor, b]` を push しない。
+        let mut exhausted = false;
+        while let Some(&(lo, hi)) = suppressed.get(i) {
+            // 抑制は (lo, hi] = [lo + 1, hi]。`b` より後ろから始まるなら、以降は全部区間の外。
+            if lo >= b {
+                break;
+            }
+            if cursor <= lo {
+                out.push((cursor, lo));
+            }
+            if hi >= b {
+                // この抑制だけで観測区間の右端まで覆いきった。`hi + 1` は計算しない
+                // (`hi == u64::MAX` でもオーバーフローしない・[MAX, MAX] という幽霊区間を作らない)。
+                exhausted = true;
+                break;
+            }
+            cursor = cursor.max(hi + 1);
+            i += 1;
+        }
+        if !exhausted && cursor <= b {
+            out.push((cursor, b));
+        }
+    }
+    out
+}
+
+/// [`modifier_press_intervals`] の結果。押下区間と、区間を作れなかった行の件数。
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ModifierIntervals {
+    /// 修飾キーの押下区間 `[開始, 終了]`（**両端を含む**）。開始昇順・互いに素。
+    pub intervals: Vec<(u64, u64)>,
+    /// 先行する press が無い release の件数（★ 区間を作らなかったもの）。
+    pub orphan_releases: u64,
+    /// 観測区間の右端まで**「release の並びの最後」に達せず開いたまま**終わり、
+    /// **右端で閉じた**区間の本数（打ち切り）。
+    pub truncated_at_right_edge: u64,
+}
+
+/// 修飾キーの edge 列（`(時刻, press なら true / release なら false)`・順不同でよい）から
+/// **押下区間**を作る（ADR-030 補訂 1 項目 3・極 M+）。
+///
+/// ⚠️★★★ **開いている区間は、どの release でも閉じる**（`decisions.md` 判断 27。
+/// 2026-09-25 に判断 23 の「連続する release の並びの最後で閉じる」規則から是正した —
+/// ⚠️ 判断 23 自体が旧カウント方式 [press で `depth+=1`・release で `depth-=1`] からの
+/// 是正だったが、判断 23 には 2 つの欠陥があった（`/cross-review`〔Codex〕r1a-1 / r2-2 が発見）:
+/// 1. **look-ahead**: 「並びの最後か」は`window.get(i + 1)` —— **次の edge**を見て決めていた。
+///    ある時点の文字キーを除外するかどうかが**その時点より後の行**で決まる。ADR-030 D3 が
+///    `progress_proxy` を禁じたのと同じ型（評価時刻より後の情報を使う）。
+/// 2. **「誤る向きは常に baseline 側」が崩れる**: `P(100) R(200) R(900)` で 2 本目の R (900) が
+///    孤立していると、判断 23 は区間を `[100, 900]` まで延ばしてしまい、実際には離していた
+///    200〜900 の文字まで誤って除外する（M+ 側への誤り＝除外しすぎ）。
+///
+/// - **開く**: 開いていないときの press で開く（★ 開いている間に来る 2 本目以降の press は
+///   無視する —— リピート・持ち替えの重ね押しを区間の継続として扱う）。
+/// - **閉じる**: 開いている状態で release が来たら、**その release でそこを閉じる**
+///   （次の edge を見ない・先読みしない）。
+///   例: `P P R R` → 1 つ目の R (最初の release) で閉じ、2 つ目の R は孤立 release になる。
+///   `P R P R` → 1 つ目の R で閉じ、次の P で開き直す（2 区間）。
+/// - ⚠️ 観測区間の右端に達しても release が来ず**開いたまま**なら**そこで閉じる**
+///   （打ち切り。`t0 <= b` と対称）。
+/// - ⚠️ 開いていないときに来た release は区間を作らない（件数だけ返す・孤立 release）。
+///
+/// ★ **観測区間ごとに開閉の状態を最初から数え直す**（D8 (b)「跨いで足し上げない」と同じ規律）。
+/// ⚠️ したがって観測区間の**外**の edge は読まず、区間の左端より前に押された修飾キーの release は
+/// 孤立 release になる（★ 押下区間を作らない側＝挿入系を**外さない**側に倒れる）。
+/// ⚠️ 同時刻は既存どおり press を先に処理する（Ctrl → Shift の持ち替えで、同時刻に来た
+/// Shift の press が無駄に新しい区間を開く前に、Ctrl の release が確定した区間を閉じる）。
+///
+/// ⚠️★★★ **誤る向きは常に baseline 側（除外しない側）に倒れる**（判断 27。因果的でかつ
+/// look-ahead が無いので、判断 23 の欠陥 2 は起きない）: `Ctrl` を押したまま `Shift` を離す、
+/// のような操作は「開いている区間の途中の release」として扱われ、**そこで区間が切れる**
+/// （代償）。★ その場合も切れた分だけ**除外しない**側（挿入系をそのまま数える側）に倒れる
+/// —— 旧カウント方式が持っていた「区間が右端まで閉じず onset を水増しする」向きの誤りも、
+/// 判断 23 が持っていた「先読みで区間を延ばしすぎる」向きの誤りも、どちらも起きない。
+///
+/// `observed` は [`observed_intervals`] の戻り値（開始昇順・互いに素）を仮定する。
+pub fn modifier_press_intervals(
+    edges: &[(u64, bool)],
+    observed: &[(u64, u64)],
+) -> ModifierIntervals {
+    let mut sorted: Vec<(u64, bool)> = edges.to_vec();
+    sorted.sort_by_key(|&(t, press)| (t, !press));
+
+    let mut out = ModifierIntervals::default();
+    for &(a, b) in observed {
+        let lo = sorted.partition_point(|&(t, _)| t < a);
+        let hi = sorted.partition_point(|&(t, _)| t <= b);
+        let window = &sorted[lo..hi];
+        let mut open = false;
+        let mut start = a;
+        for &(t, press) in window {
+            if press {
+                if !open {
+                    open = true;
+                    start = t;
+                }
+                // 既に開いている区間中の 2 本目以降の press は無視する
+                // (リピート・持ち替えの重ね押しを区間の継続として扱う。判断 27)。
+            } else if !open {
+                out.orphan_releases += 1;
+            } else {
+                // ⚠️★★★ 次の edge を見ない（look-ahead をしない・判断 27）。
+                // 開いている区間は、どの release でも即座にそこで閉じる。
+                out.intervals.push((start, t));
+                open = false;
+            }
+        }
+        if open {
+            out.intervals.push((start, b));
+            out.truncated_at_right_edge += 1;
+        }
+    }
+    out
+}
+
+/// 極 M+ が「挿入系に数えない」press の置き換え先の VK（★ `KeyCategory::Modifier` に属する最初の VK）。
+///
+/// ⚠️ 数値を**ここに再宣言しない** —— 匿名化の写像（`KeyCategory::from_vk`・SSOT）から引く。
+/// ★ 置き換え先は `key_net_delta == 0`（挿入系にも削除系にも数えない）で、
+/// `restart` の 3 件数（挿入 / 削除 / 移動）のどれにも入らない。
+fn modifier_neutral_vk() -> u32 {
+    (0..=u32::from(u8::MAX))
+        .find(|&vk| KeyCategory::from_vk(vk) == KeyCategory::Modifier)
+        .expect("KeyCategory::from_vk maps at least one VK to Modifier")
+}
+
+/// 極 M+（ADR-030 補訂 1 項目 3）: `modifier_intervals` の中の**挿入系（`+1`）の press** を
+/// 検出が挿入系に数えないもの（修飾キーの VK）へ置き換えた `key` 列を返す。
+///
+/// ⚠️★★★ **削除系（`−1`）は外さない。** ADR-030 D3 の逐語は「修飾キーが押されている間の
+/// *文字キー* は挿入系に数えない」で、削除系には触れていない。`Ctrl+Backspace`（単語削除）まで
+/// 外すと `net` が上振れし、**逆向きの系統誤差**が入る。外すのは `key_net_delta` の `+1` の側だけ。
+/// ⚠️ press の**時刻・件数・順序は変えない**（★ θ の標本は極に依らない）。
+/// ★ `modifier_intervals` は両端を含む。順不同・重なりがあってもよい（内部で併合する）。
+pub fn apply_modifier_m_plus(
+    keys: &[KeyPress],
+    modifier_intervals: &[(u64, u64)],
+) -> Vec<KeyPress> {
+    let mut merged: Vec<(u64, u64)> = Vec::with_capacity(modifier_intervals.len());
+    let mut sorted = modifier_intervals.to_vec();
+    sorted.sort_unstable();
+    for (s, e) in sorted {
+        match merged.last_mut() {
+            Some(last) if s <= last.1 => last.1 = last.1.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+    let covered = |t: u64| {
+        let idx = merged.partition_point(|&(s, _)| s <= t);
+        idx > 0 && t <= merged[idx - 1].1
+    };
+    let neutral_vk = modifier_neutral_vk();
+    keys.iter()
+        .map(|k| {
+            if super::key_net_delta(k) == 1 && covered(k.timestamp) {
+                KeyPress {
+                    timestamp: k.timestamp,
+                    vk: neutral_vk,
+                }
+            } else {
+                *k
+            }
+        })
+        .collect()
 }
 
 /// `sorted_keys` (timestamp 昇順) の net production 累積和。`prefix[i]` は
@@ -615,12 +947,33 @@ fn detect_stall_onsets(
 /// 観測区間ごとの条件 A の評価結果（変化点 ＋ 確定した onset）を返す。
 /// ★ [`detect_stall_onsets`] と **同じ 1 回の走査**であり、条件 A を 2 度評価しない
 /// （⚠️ issue 008 AC18 / AC18b の計算量の門があるため、二重走査にしない）。
+///
+/// ★ 本番経路は評価区間を自分で合成する [`stall_onset_column_with_timeline`] を使うので、**テスト専用**
+/// (`detect_stall_onsets` の入口)。⚠️ 観測区間そのまま (= 抑制なし) の検出である。
+#[cfg(test)]
 pub(super) fn condition_a_timeline(
     keys: &[KeyPress],
     feat_ts: &[u64],
     config: &StallOnsetConfig,
 ) -> Vec<ConditionAInterval> {
-    if feat_ts.is_empty() {
+    condition_a_timeline_over(
+        keys,
+        observed_intervals(feat_ts, config.hole_gap_ms),
+        config,
+    )
+}
+
+/// [`condition_a_timeline`] の本体。**評価する区間を呼び出し側が渡す** (開始昇順・互いに素・両端を含む)。
+///
+/// ★ 極 B は観測区間から抑制区間を除いた区間 ([`evaluation_intervals`]) をここへ渡す。⚠️ 検出の中身
+/// (条件 A・θ の標本・`t0 <= b`) は**区間の由来を知らない** —— 観測区間と同じ規則が抑制の各片にそのまま効く。
+/// 区間が 1 本も無ければ (`feat` 行が 1 本も無い入力・全部が抑制) onset は 1 つも立たない。
+fn condition_a_timeline_over(
+    keys: &[KeyPress],
+    intervals: Vec<(u64, u64)>,
+    config: &StallOnsetConfig,
+) -> Vec<ConditionAInterval> {
+    if intervals.is_empty() {
         return Vec::new();
     }
     let mut sorted_keys: Vec<KeyPress> = keys.to_vec();
@@ -628,7 +981,6 @@ pub(super) fn condition_a_timeline(
     let press_ts: Vec<u64> = sorted_keys.iter().map(|k| k.timestamp).collect();
     let prefix = net_prefix(&sorted_keys);
     let global_instants = build_global_instants(&sorted_keys, config.w_ms);
-    let intervals = observed_intervals(feat_ts, config.hole_gap_ms);
     let pooled_gaps = pooled_theta_gaps(&press_ts, &intervals);
     let mut theta_acc = ThetaAccumulator::new(&pooled_gaps);
 
@@ -665,18 +1017,60 @@ fn declaration_in_effect(sorted_declarations: &[(u64, String)], s: u64) -> Optio
     }
 }
 
+/// `ime_shadow` 行の区間 `[t − dwell_ms, t]` (閉区間) の索引 (issue 007)。
+///
+/// ⚠️★★★ **区間を作って引くだけで、検出へは渡さない** —— onset の集合を変えない (数えるだけで抑制しない)。
+/// `dwell_ms` が取れなかった行はここへ届く前に**捨てられている** (`bin/replay.rs::collect_all_ime_shadow_events`
+/// が 0 に畳まず捨てる)。→ 区間を作らない・0 に畳まない、の両方が構造的に満たされる。
+struct ImeIntervalIndex {
+    /// `(lo, hi)` を `lo` 昇順に並べたもの (`lo = t − dwell_ms`・下端は 0 に飽和・`hi = t`)。
+    by_lo: Vec<(u64, u64)>,
+    /// `max_hi[i]` = `by_lo[..=i]` の `hi` の最大。
+    max_hi: Vec<u64>,
+}
+
+impl ImeIntervalIndex {
+    fn new(ime_events: &[ImeShadowEvent]) -> Self {
+        let mut by_lo: Vec<(u64, u64)> = ime_events
+            .iter()
+            .map(|e| (e.t_ms.saturating_sub(e.dwell_ms), e.t_ms))
+            .collect();
+        by_lo.sort_unstable();
+        let mut max_hi = Vec::with_capacity(by_lo.len());
+        let mut running = 0u64;
+        for &(_, hi) in &by_lo {
+            running = running.max(hi);
+            max_hi.push(running);
+        }
+        Self { by_lo, max_hi }
+    }
+
+    /// `[s, t0]` (閉区間) と重なる区間が 1 本でもあるか。`O(log n)`。
+    ///
+    /// 交わる ⇔ `lo <= t0` かつ `hi >= s`。`lo <= t0` を満たす区間は `by_lo` の**先頭からの連続**なので、
+    /// その範囲の `hi` の最大が `s` 以上かを見ればよい (⚠️ 直近 1 本だけを見ると、長い区間の後ろに
+    /// 下端の大きい短い区間が並ぶ入力で取りこぼす)。区間が 0 本なら `false`。
+    fn overlaps(&self, s: u64, t0: u64) -> bool {
+        let n = self.by_lo.partition_point(|&(lo, _)| lo <= t0);
+        n > 0 && self.max_hi[n - 1] >= s
+    }
+}
+
 /// 確定した onset 列を 1 Hz tick グリッドへ写像する。検出アルゴリズムから分離してあるのは
 /// テスト容易性のため (`tests::same_tick_collision_keeps_the_first` が合成した `OnsetEvent`
 /// だけでタイル衝突を検査できる)。
 ///
 /// 同じ tick に 2 つ目の onset が落ちても**上書きしない** —— 先に確定した (時刻順で早い)
 /// onset を残し、件数だけ `tracing::warn!` で報告する。
+///
+/// ★ `ime` は各 onset の `ime_overlap` を埋めるためだけに引く (issue 007)。⚠️ onset の採否・時刻には**触れない**。
 fn column_from_onsets(
     onsets: &[OnsetEvent],
     task_kind_declarations: &[(u64, String)],
     tick_count: usize,
     grid_origin_ms: u64,
     tick_ms: u64,
+    ime: &ImeIntervalIndex,
 ) -> Vec<StallOnset> {
     let mut column: Vec<StallOnset> = (0..tick_count).map(|_| StallOnset::none_row()).collect();
     let mut sorted_decls: Vec<(u64, String)> = task_kind_declarations.to_vec();
@@ -703,6 +1097,7 @@ fn column_from_onsets(
             theta_sample_n: Some(ev.theta_sample_n),
             task_kind: declaration_in_effect(&sorted_decls, ev.s_ms),
             phase: "unspecified".to_string(),
+            ime_overlap: Some(ime.overlaps(ev.s_ms, ev.t0_ms)),
         };
     }
     if collisions > 0 {
@@ -720,6 +1115,9 @@ fn column_from_onsets(
 /// `tick_count` / `grid_origin_ms` / `tick_ms` は呼び出し側の tick グリッドと揃える
 /// (帰属先を `t0_ms` から逆算する)。範囲外 (グリッド外) に落ちる `t0` は帰属先が無いため
 /// 黙って捨てる (境界入力で panic しない)。
+///
+/// ⚠️ **`ime_shadow` 行を渡さない版**である (全 onset の `ime_overlap` は `Some(false)`)。
+/// IME の重なりを数えるなら [`stall_onset_column_with_timeline`] に `ime_events` を渡す。
 pub fn stall_onset_column(
     keys: &[KeyPress],
     feat_ts: &[u64],
@@ -732,6 +1130,8 @@ pub fn stall_onset_column(
     stall_onset_column_with_timeline(
         keys,
         feat_ts,
+        &[],
+        &[],
         task_kind_declarations,
         tick_count,
         grid_origin_ms,
@@ -746,17 +1146,27 @@ pub fn stall_onset_column(
 /// ⚠️★★★ **2 度走らせないためにある**（★ issue 006 V2 / 008 AC18 の計算量の門）——
 /// `restart` (`T1d`) は条件 A の辺を要するが、`condition_a_timeline` を別に呼ぶと
 /// 大入力で検出が 2 回走る。★ `build_feature_rows` はこちらを使う。
+///
+/// `suppressed` は極 B の**抑制区間** ([`pointer_suppression_intervals`])。★ 空なら観測区間そのまま
+/// (極 A / 極 M+ / [`stall_onset_column`] が渡す値)。空でなければ観測区間から除いた評価区間で検出する。
+///
+/// `ime_events` は `ime_shadow` 行 (issue 007)。⚠️★★★ **各 onset の `ime_overlap` を埋めるためだけに使い、検出には渡さない**
+/// (`suppressed` と違い、onset の集合を変えない ＝ **数えるだけで抑制しない**)。★ 空なら全 onset が `Some(false)`。
 #[allow(clippy::too_many_arguments)]
 pub(super) fn stall_onset_column_with_timeline(
     keys: &[KeyPress],
     feat_ts: &[u64],
+    suppressed: &[(u64, u64)],
+    ime_events: &[ImeShadowEvent],
     task_kind_declarations: &[(u64, String)],
     tick_count: usize,
     grid_origin_ms: u64,
     tick_ms: u64,
     config: &StallOnsetConfig,
 ) -> (Vec<StallOnset>, Vec<ConditionAInterval>) {
-    let timeline = condition_a_timeline(keys, feat_ts, config);
+    let observed = observed_intervals(feat_ts, config.hole_gap_ms);
+    let timeline =
+        condition_a_timeline_over(keys, evaluation_intervals(&observed, suppressed), config);
     let onsets: Vec<OnsetEvent> = timeline
         .iter()
         .flat_map(|interval| interval.onsets.iter().copied())
@@ -767,6 +1177,7 @@ pub(super) fn stall_onset_column_with_timeline(
         tick_count,
         grid_origin_ms,
         tick_ms,
+        &ImeIntervalIndex::new(ime_events),
     );
     (column, timeline)
 }
@@ -1680,7 +2091,14 @@ mod tests {
             theta_person_ms: 3_800,
             theta_sample_n: 9,
         };
-        let column = column_from_onsets(&[earlier, later], &[], 10, 0, 1000);
+        let column = column_from_onsets(
+            &[earlier, later],
+            &[],
+            10,
+            0,
+            1000,
+            &ImeIntervalIndex::new(&[]),
+        );
         assert!(column[5].is_onset);
         assert_eq!(column[5].t0_ms, Some(5_500), "先に確定した onset を残す");
         assert_eq!(column[5].s_ms, Some(1_000));
@@ -1805,12 +2223,749 @@ mod tests {
         }
     }
 
-    /// 現時点で中身があるのは `baseline` だけ。⚠️ issue 006 / 005 が 1 極ずつ `true` にする
-    /// (そのとき本テストの期待を変える —— 開通したことを意図して書き換えさせるための固定)。
+    /// 中身があるのは `baseline` と `modifier_m_plus`（issue 005 で開通）。⚠️ issue 006 が極 B を
+    /// `true` にする（そのとき本テストの期待を変える —— 開通したことを意図して書き換えさせるための固定）。
     #[test]
-    fn only_baseline_pole_is_implemented() {
+    fn baseline_and_modifier_m_plus_are_implemented() {
         assert!(Pole::Baseline.is_implemented());
-        assert!(!Pole::PointerB.is_implemented());
-        assert!(!Pole::ModifierMPlus.is_implemented());
+        assert!(Pole::ModifierMPlus.is_implemented());
+        // ★ 極 B は issue 006 で開通した (未実装の極が 1 つも無くなった)。
+        assert!(Pole::PointerB.is_implemented());
+        assert!(Pole::ALL.into_iter().all(Pole::is_implemented));
+    }
+
+    // ── 極 M+（issue 005）────────────────────────────────────────────────
+
+    /// 修飾キーの VK（左 Ctrl）。★ `KeyCategory::Modifier` に入る。
+    const TEST_CTRL_VK: u32 = 0xA2;
+    const TEST_BACKSPACE_VK: u32 = 0x08;
+
+    fn key_vk(t: u64, vk: u32) -> KeyPress {
+        KeyPress { timestamp: t, vk }
+    }
+
+    /// `KeyPress` は `PartialEq` を持たない（`metrics.rs` は本 issue の対象外）ので `(時刻, VK)` で比べる。
+    fn pairs(keys: &[KeyPress]) -> Vec<(u64, u32)> {
+        keys.iter().map(|k| (k.timestamp, k.vk)).collect()
+    }
+
+    /// AC3: ⚠️★★★ **削除系（`−1`）を外さない。** `Ctrl+Backspace`（修飾キー押下中の backspace）は
+    /// 極 M+ でも `−1` のまま数えられる。外すのは挿入系（`+1`）だけである。
+    #[test]
+    fn m_plus_does_not_drop_deletions() {
+        let keys = vec![
+            key_vk(1000, TEST_CTRL_VK),      // 押下区間の開始（どれにも数えない）
+            key_vk(1100, TEST_BACKSPACE_VK), // Ctrl+Backspace ★ −1 のまま
+            key_vk(1200, 0x41),              // Ctrl+A ★ 区間内の +1 → 数えない
+            key_vk(1300, 0x41),              // 同上
+            key_vk(5000, 0x41),              // 区間の外 ★ +1 のまま
+            key_vk(6000, TEST_BACKSPACE_VK), // 区間の外 ★ −1 のまま
+        ];
+        let observed = [(0_u64, 10_000_u64)];
+        let intervals = modifier_press_intervals(&[(1000, true), (1400, false)], &observed);
+        assert_eq!(intervals.intervals, vec![(1000, 1400)]);
+
+        let mapped = apply_modifier_m_plus(&keys, &intervals.intervals);
+
+        // 陰性対照（baseline の写像）: −1 +1 +1 +1 −1 = +1。
+        assert_eq!(super::super::net_production(&keys), 1);
+        // 極 M+: 区間内の +1 が 2 本消えるだけ → −1 +0 +0 +1 −1 = −1。
+        assert_eq!(super::super::net_production(&mapped), -1);
+
+        // ★ 削除系は 1 本も外れていない（VK も 1 文字も変わらない）。
+        assert_eq!(pairs(&mapped[1..2]), pairs(&keys[1..2]));
+        assert_eq!(super::super::key_net_delta(&mapped[1]), -1);
+        assert_eq!(pairs(&mapped[5..]), pairs(&keys[5..]));
+        assert_eq!(super::super::key_net_delta(&mapped[2]), 0);
+        assert_eq!(super::super::key_net_delta(&mapped[3]), 0);
+        assert_eq!(super::super::key_net_delta(&mapped[4]), 1);
+
+        // ★ press の時刻・件数・順序は変えない（θ の標本は極に依らない）。
+        assert_eq!(
+            mapped.iter().map(|k| k.timestamp).collect::<Vec<_>>(),
+            keys.iter().map(|k| k.timestamp).collect::<Vec<_>>()
+        );
+    }
+
+    /// ⚠️★★★ **名前は変えない**（005-acceptance.sh AC3〜5 が `cargo test` で直接この名前を
+    /// 参照するため）。★ 中身は判断 27（是正後の規則）に合わせて書き直した —— 「入れ子・
+    /// 持ち替えのどちらも 1 本に merge される」という**旧規則（判断 23）の主張はもう成り立たない**。
+    /// 新規則は「開いている区間は、どの release でも即座に閉じる」ので、Ctrl 押下中に Shift を
+    /// 離す（＝先に来る release）とそこで閉じ、後続の release は孤立になる
+    /// （★ 判断 27 が明記する代償「Ctrl を押したまま Shift を離すと区間が切れる」そのもの）。
+    #[test]
+    fn modifier_depth_merges_nested_presses() {
+        let observed = [(0_u64, 10_000_u64)];
+        let run = |edges: &[(u64, bool)]| modifier_press_intervals(edges, &observed);
+
+        // Ctrl 押下 → Shift 押下 → Shift 離上 → Ctrl 離上（入れ子。P P R R）。
+        // ★ 新規則: 先読みしないので最初の release (300) で閉じる。2 つ目の release (400) は
+        // 孤立になる（旧規則は「並びの最後」まで待っていたが、それは look-ahead だった）。
+        // ⚠️ `category:"modifier"` は Ctrl/Shift を区別しないため、「離す順が逆」
+        // （Ctrl を先に離す/Shift を先に離す）は edge 列として区別できない —— どちらも
+        // 同じ `(t, press)` 列になる。
+        let nested = run(&[(100, true), (200, true), (300, false), (400, false)]);
+        assert_eq!(nested.intervals, vec![(100, 300)]);
+        assert_eq!(nested.orphan_releases, 1);
+
+        // 持ち替え（Ctrl 離上と Shift 押下が同時刻）。★ 同時刻は press を先に処理するので、
+        // 300 の press（既に開いているので無視）の直後に 300 の release が閉じる。
+        // 500 の release は（何も開いていないので）孤立になる —— ★ これが判断 27 の代償
+        // （Ctrl を押したまま Shift を離すと区間が切れる）の具体例である。
+        let handoff = run(&[(100, true), (300, false), (300, true), (500, false)]);
+        assert_eq!(handoff.intervals, vec![(100, 300)]);
+        assert_eq!(handoff.orphan_releases, 1);
+
+        // 重ならない 2 回の押下は 2 本のまま（陰性対照。新旧で変わらない）。
+        let separate = run(&[(100, true), (150, false), (400, true), (450, false)]);
+        assert_eq!(separate.intervals, vec![(100, 150), (400, 450)]);
+        assert_eq!(separate.orphan_releases, 0);
+
+        // 順不同で渡しても同じ（内部で時刻順に直す）。edge の並びは `nested` と同じなので
+        // 結果も同じ。
+        let shuffled = run(&[(400, false), (200, true), (100, true), (300, false)]);
+        assert_eq!(shuffled.intervals, vec![(100, 300)]);
+        assert_eq!(shuffled.orphan_releases, 1);
+
+        for r in [&nested, &handoff, &separate, &shuffled] {
+            assert_eq!(r.truncated_at_right_edge, 0);
+        }
+    }
+
+    /// 判断 27: Windows の自動リピートで press が多数連続しても、区間は
+    /// **最初の release**（本テストでは release 1 本）で閉じる —— 旧カウント方式
+    /// （press で `depth+=1`）だと `depth` が `N-1` 残り、観測区間の右端まで閉じず
+    /// `truncated_at_right_edge` が立ってしまう（系統誤差・水増し）。
+    #[test]
+    fn modifier_repeat_presses_close_on_release_not_right_edge() {
+        let observed = [(0_u64, 100_000_u64)];
+        // 150ms 間隔で press を 20 本（リピート）→ 最後に release 1 本。
+        let mut edges: Vec<(u64, bool)> = (0..20).map(|i| (100 + i * 150, true)).collect();
+        let release_t = 100 + 19 * 150 + 150;
+        edges.push((release_t, false));
+
+        let result = modifier_press_intervals(&edges, &observed);
+
+        assert_eq!(
+            result.intervals,
+            vec![(100, release_t)],
+            "release で閉じる（観測区間の右端 100_000 までは伸びない）"
+        );
+        assert_eq!(
+            result.truncated_at_right_edge, 0,
+            "リピートを depth として数えていたら、この release では閉じず右端で打ち切られる"
+        );
+        assert_eq!(result.orphan_releases, 0);
+    }
+
+    /// 判断 27: `P R P R` は 1 つ目の R で閉じ、次の P で開き直すので **2 区間**になる
+    /// （★ 旧カウント方式なら `depth` が 1→0→1→0 と動き、たまたま同じ 2 区間になるので、
+    /// 本テストは新規則固有の検証ではない —— 新旧の違いは look-ahead を伴う入力
+    /// [`modifier_second_release_without_reopen_is_orphan`] や
+    /// [`modifier_press_intervals_no_lookahead`] で検出する）。
+    #[test]
+    fn modifier_alternating_press_release_makes_two_intervals() {
+        let observed = [(0_u64, 10_000_u64)];
+        let alternating = modifier_press_intervals(
+            &[(100, true), (200, false), (300, true), (400, false)],
+            &observed,
+        );
+        assert_eq!(alternating.intervals, vec![(100, 200), (300, 400)]);
+        assert_eq!(alternating.orphan_releases, 0);
+        assert_eq!(alternating.truncated_at_right_edge, 0);
+    }
+
+    /// AC5: ⚠️ 孤立した release（先行する press が無い）は区間を作らず、閉じない押下は
+    /// **観測区間の右端で打ち切る**（判断 27）。
+    #[test]
+    fn unmatched_modifier_release_and_open_press() {
+        // 孤立 release: 区間ができない（件数だけ数える）。
+        let orphan = modifier_press_intervals(&[(50, false)], &[(0, 1000)]);
+        assert!(orphan.intervals.is_empty());
+        assert_eq!(orphan.orphan_releases, 1);
+        assert_eq!(orphan.truncated_at_right_edge, 0);
+
+        // 孤立 release の後の press/release は普通に 1 本になる（開いていない状態が
+        // 孤立 release をまたいでも壊れない）。
+        let recovered =
+            modifier_press_intervals(&[(100, false), (200, true), (300, false)], &[(0, 1000)]);
+        assert_eq!(recovered.intervals, vec![(200, 300)]);
+        assert_eq!(recovered.orphan_releases, 1);
+
+        // 閉じない押下: 観測区間の右端 `b` で閉じる（★ 右端ちょうどは確定扱い）。
+        let open = modifier_press_intervals(&[(900, true)], &[(0, 1000)]);
+        assert_eq!(open.intervals, vec![(900, 1000)]);
+        assert_eq!(open.truncated_at_right_edge, 1);
+
+        // ⚠️ 打ち切りは穴を越えない・開閉の状態は区間ごとに最初から数え直す:
+        // 1 つ目の区間で開いた押下は 1000 で閉じ、2 つ目の区間の release は孤立になる。
+        let across =
+            modifier_press_intervals(&[(800, true), (5500, false)], &[(0, 1000), (5000, 6000)]);
+        assert_eq!(across.intervals, vec![(800, 1000)]);
+        assert_eq!(across.orphan_releases, 1);
+        assert_eq!(across.truncated_at_right_edge, 1);
+
+        // 観測区間の外の edge は読まない（区間が無ければ何も作らない）。
+        let outside = modifier_press_intervals(&[(100, true), (200, false)], &[(1000, 2000)]);
+        assert!(outside.intervals.is_empty());
+        assert_eq!(outside.orphan_releases, 0);
+        assert!(modifier_press_intervals(&[(100, true)], &[])
+            .intervals
+            .is_empty());
+    }
+
+    /// Codex r1a-1 の反例（判断 27 の背景）: `P(100) R(200) R(900)` は最初の release (200) で
+    /// 閉じ、2 つ目の release (900) は孤立になる。★ 旧規則 A（判断 23・`window.get(i + 1)` で
+    /// 「次の edge が press か」を見る look-ahead）だと、次の edge が無い最後の release (900)
+    /// まで「並びの最後」判定が遅れて区間が `[100, 900]` になり、実際には離れていた
+    /// 200〜900 の文字キーまで誤って挿入系から除外していた（M+ 側への誤り＝除外しすぎ）。
+    #[test]
+    fn modifier_second_release_without_reopen_is_orphan() {
+        let observed = [(0_u64, 10_000_u64)];
+        let result =
+            modifier_press_intervals(&[(100, true), (200, false), (900, false)], &observed);
+        assert_eq!(result.intervals, vec![(100, 200)]);
+        assert_eq!(result.orphan_releases, 1);
+        assert_eq!(result.truncated_at_right_edge, 0);
+    }
+
+    /// 因果性（判断 27）: edge 列の**末尾**に release を足しても、それより**前**に確定した
+    /// 区間は変わらない。★ 旧規則 A は次の edge を見る look-ahead だったので、末尾に release を
+    /// 足すと直前の区間の閉じ方まで遡って変わりえた（[`modifier_second_release_without_reopen_is_orphan`]
+    /// と対になる固定: あちらは「延びない」ことを onset の集合の言葉で、こちらは「末尾追加で
+    /// 過去が変わらない」ことを直接固定する）。
+    #[test]
+    fn modifier_press_intervals_no_lookahead() {
+        let observed = [(0_u64, 10_000_u64)];
+        let short = modifier_press_intervals(&[(100, true), (200, false)], &observed);
+        assert_eq!(short.intervals, vec![(100, 200)]);
+
+        // 末尾に「無関係な」新しい押下区間 (5000-5100) と、さらに孤立 release (9000) を足す。
+        let mut long_edges = vec![(100, true), (200, false)];
+        long_edges.extend([(5_000, true), (5_100, false), (9_000, false)]);
+        let long = modifier_press_intervals(&long_edges, &observed);
+
+        assert_eq!(
+            long.intervals[0], short.intervals[0],
+            "末尾に edge を足しても、既に閉じた最初の区間 (100, 200) は変わらない"
+        );
+        assert_eq!(
+            long.intervals,
+            vec![(100, 200), (5_000, 5_100)],
+            "末尾の孤立 release (9000) は新しい区間を作らない"
+        );
+        assert_eq!(long.orphan_releases, 1);
+    }
+
+    /// 区間の端は**含む**・区間の外は触らない・空の区間は恒等・重なる/順不同の区間は併合する。
+    #[test]
+    fn m_plus_mapping_boundaries_and_identity() {
+        let keys = vec![key(99), key(100), key(150), key(200), key(201), key(300)];
+        let mapped = apply_modifier_m_plus(&keys, &[(100, 200)]);
+        let deltas: Vec<i64> = mapped.iter().map(super::super::key_net_delta).collect();
+        // 99 と 201 は区間の外（+1 のまま）、100 / 150 / 200 は区間内（両端を含む）。
+        assert_eq!(deltas, vec![1, 0, 0, 0, 1, 1]);
+
+        // 空の区間: 恒等（★ 修飾キーの行が 0 本の入力で baseline と一致する根拠）。
+        assert_eq!(pairs(&apply_modifier_m_plus(&keys, &[])), pairs(&keys));
+
+        // 重なる・順不同の区間は併合して同じ結果になる。
+        let merged = apply_modifier_m_plus(&keys, &[(150, 200), (100, 160)]);
+        assert_eq!(pairs(&merged), pairs(&mapped));
+    }
+
+    /// 置き換え先の VK は `KeyCategory::Modifier` で、挿入系にも削除系にも数えない。
+    #[test]
+    fn m_plus_neutral_vk_counts_nowhere() {
+        let vk = modifier_neutral_vk();
+        assert_eq!(KeyCategory::from_vk(vk), KeyCategory::Modifier);
+        let k = key_vk(0, vk);
+        assert_eq!(super::super::key_net_delta(&k), 0);
+        assert!(!crate::analysis::metrics::is_backspace(vk));
+    }
+
+    /// ★ この fixture では極 M+ は onset を**広げる**（baseline の onset を 1 本も失わず、
+    /// M+ にしか立たない onset がある）。⚠️★★★ ただし**これはこの fixture 固有の結果であって、
+    /// 一般に「M+ は baseline の上位集合になる」ことは保証されない**（判断 28・反例は
+    /// [`m_plus_can_drop_a_baseline_onset_by_merging_condition_a`] が固定する）。
+    ///
+    /// 手計算（`W` = 30 秒・`q` = 0.99・`net_diff_min` = 1・warmup 無し）:
+    /// - 打鍵: 平文 200ms 刻み ×130（〜26_000）→ Ctrl+文字 5 本（40_100〜40_900）→ 平文 1 本（65_000）。
+    /// - baseline: Ctrl+文字が +5 で窓に居続け、平文 65_000 が抜ける 95_000 まで条件 A は立たない → onset 1 本。
+    /// - M+: 40_100〜40_900 を数えないので最後の平文 26_000 が窓を抜ける **56_000** で条件 A が立ち、
+    ///   65_000 の平文で一度落ち、95_000 でもう一度立つ → onset 2 本（95_000 は baseline と共通）。
+    ///
+    /// ★ 両極の θ は同じ press 時刻から作るので、共通の onset は θ も一致する。
+    #[test]
+    fn m_plus_widens_onsets_in_this_fixture_but_superset_is_not_guaranteed() {
+        let mut keys: Vec<KeyPress> = (1..=130).map(|i| key(i * 200)).collect();
+        keys.push(key_vk(40_000, TEST_CTRL_VK));
+        keys.extend((0..5).map(|i| key(40_100 + i * 200)));
+        keys.push(key(65_000));
+        let feat_ts = feat_ts_range(1000, 115_000, 1000);
+        let config = StallOnsetConfig {
+            warmup_count: None,
+            ..StallOnsetConfig::default()
+        };
+
+        let baseline = detect_stall_onsets(&keys, &feat_ts, &config);
+
+        let observed = observed_intervals(&feat_ts, config.hole_gap_ms);
+        let modifier = modifier_press_intervals(&[(40_000, true), (41_000, false)], &observed);
+        let mapped = apply_modifier_m_plus(&keys, &modifier.intervals);
+        let m_plus = detect_stall_onsets(&mapped, &feat_ts, &config);
+
+        assert_eq!(
+            baseline.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![95_000],
+            "baseline は 95_000 の 1 本だけ"
+        );
+        assert_eq!(
+            m_plus.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![56_000, 95_000],
+            "M+ は 56_000 が増える（★ 逆向きなら写像が逆）"
+        );
+        for onset in &baseline {
+            assert!(
+                m_plus.contains(onset),
+                "baseline の onset {onset:?} が M+ に無い（★ θ も含めて一致するはず）"
+            );
+        }
+        assert!(m_plus.len() > baseline.len());
+    }
+
+    /// ⚠️★★★ 判断 28 の反例: 極 M+ は「baseline の onset を全部保つ（上位集合）」を**保証しない**。
+    ///
+    /// 手計算（`W` = 30 秒・`q` = 0.99・`net_diff_min` = 1・warmup 無し）:
+    /// - 打鍵: `0/100/200`（gap 100 ×2）→ 沈黙 → `40_000`（1 文字、Ctrl 押下区間 `[39_900,40_100]` の
+    ///   内側）→ 沈黙。
+    /// - baseline: `0/100/200` が窓から抜ける `30_200` で条件 A が立つ（onset1: s=30_200, θ=100,
+    ///   t0=30_300）。`40_000` の +1 が窓に入っている間 (`40_000` 時点) は条件 A が一旦落ち、
+    ///   `40_000` が窓から抜ける `70_000` でもう一度立つ（onset2: s=70_000。θ は
+    ///   `[100,100,39_800]` の p99（nearest-rank）= 39_800 → t0=109_800）。
+    ///   → baseline は **2 本**（`30_200` と `70_000`）。
+    /// - M+: `40_000` の +1 を数えないので、条件 A は `30_200` で立った後**一度も落ちない**
+    ///   （`40_000` 時点の窓内 net が 0 のまま）。→ 2 本目の「立ち上がり」が発生せず、
+    ///   onset は **1 本**（`30_200` だけ）。★ baseline にあった `s=70_000` の onset が M+ では
+    ///   消える —— baseline は M+ の**部分集合でさえない**（「M+ は baseline の上位集合」の反例）。
+    #[test]
+    fn m_plus_can_drop_a_baseline_onset_by_merging_condition_a() {
+        let keys = vec![key(0), key(100), key(200), key(40_000)];
+        let feat_ts = feat_ts_range(0, 115_000, 1_000);
+        let config = StallOnsetConfig {
+            warmup_count: None,
+            ..StallOnsetConfig::default()
+        };
+
+        let baseline = detect_stall_onsets(&keys, &feat_ts, &config);
+        assert_eq!(
+            baseline.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![30_200, 70_000],
+            "baseline は 2 本（★ 40_000 の +1 が条件 A を一旦落とすので、立ち上がりが 2 回起きる）"
+        );
+
+        let observed = observed_intervals(&feat_ts, config.hole_gap_ms);
+        let modifier = modifier_press_intervals(&[(39_900, true), (40_100, false)], &observed);
+        let mapped = apply_modifier_m_plus(&keys, &modifier.intervals);
+        let m_plus = detect_stall_onsets(&mapped, &feat_ts, &config);
+
+        assert_eq!(
+            m_plus.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![30_200],
+            "M+ は 1 本だけ（★ 40_000 の +1 を数えないので条件 A が落ちず、70_000 の立ち上がりが消える）"
+        );
+        assert!(
+            !m_plus.iter().any(|o| o.s_ms == 70_000),
+            "baseline の s=70_000 が M+ に無い（★ baseline は M+ の部分集合でさえない。判断 28）"
+        );
+    }
+
+    // ── 極 B（issue 006）────────────────────────────────────────────────
+
+    /// 抑制区間つきで検出する (テスト専用)。★ 本番 (`stall_onset_column_with_timeline`) と同じ合成。
+    fn detect_with_suppression(
+        keys: &[KeyPress],
+        feat_ts: &[u64],
+        suppressed: &[(u64, u64)],
+        config: &StallOnsetConfig,
+    ) -> Vec<OnsetEvent> {
+        let observed = observed_intervals(feat_ts, config.hole_gap_ms);
+        condition_a_timeline_over(keys, evaluation_intervals(&observed, suppressed), config)
+            .into_iter()
+            .flat_map(|interval| interval.onsets)
+            .collect()
+    }
+
+    /// AC4: 抑制区間は `pointer_bin` 行の `(t − 1000, t]` の**極大連続**である。
+    /// ★ 隣接する 2 行は 1 本に畳まれ、1 ms でも空けば別の区間になる。
+    #[test]
+    fn pointer_bins_merge_into_maximal_intervals() {
+        assert_eq!(
+            ENGINE_TICK_MS, 1_000,
+            "呼び出し側が bin_ms に渡す ENGINE_TICK_MS は observe_*.rs の BIN_MS と同じ 1 秒 (変わったら追随を見直す)"
+        );
+        // 隣接 2 行 (5000, 6000) は (4000, 5000] と (5000, 6000] が接して 1 本になる。
+        assert_eq!(
+            pointer_suppression_intervals(&[5_000, 6_000], ENGINE_TICK_MS),
+            vec![(4_000, 6_000)]
+        );
+        // 3 行の連鎖も 1 本。
+        assert_eq!(
+            pointer_suppression_intervals(&[5_000, 6_000, 7_000], 1_000),
+            vec![(4_000, 7_000)]
+        );
+        // 順不同・重複は吸収され、離れた行は別の区間になる。
+        assert_eq!(
+            pointer_suppression_intervals(&[9_000, 5_000, 6_000, 5_000], 1_000),
+            vec![(4_000, 6_000), (8_000, 9_000)]
+        );
+        // ⚠️ 境界: ちょうど 1 ビン離れは接する (上で確認)／1 ms 空けば別 ((5000, 5001] が未被覆)。
+        assert_eq!(
+            pointer_suppression_intervals(&[5_000, 6_001], 1_000),
+            vec![(4_000, 5_000), (5_001, 6_001)]
+        );
+        // 空・ビン幅 0 (覆う秒が無い) は空。先頭がビン幅より小さければ下端は 0 に飽和する。
+        assert!(pointer_suppression_intervals(&[], 1_000).is_empty());
+        assert!(pointer_suppression_intervals(&[5_000], 0).is_empty());
+        assert_eq!(pointer_suppression_intervals(&[300], 1_000), vec![(0, 300)]);
+    }
+
+    /// LOW 是正 (code-reviewer): `t = 0` の行は `(0, 0]` という**空区間**を作る
+    /// (`0.saturating_sub(bin_ms) == 0 == t`)。push すると [`evaluation_intervals`] が
+    /// 観測区間を「何も除いていないのに」2 片へ無意味に割ってしまう。
+    #[test]
+    fn pointer_suppression_at_t_zero_produces_no_interval() {
+        assert!(
+            pointer_suppression_intervals(&[0], 1_000).is_empty(),
+            "t=0 だけの入力は空区間しか作らないので抑制区間は 0 本のはず"
+        );
+        // t=0 は無視され、t=5000 由来の区間だけが残る (空区間が他の区間の計算を乱さない)。
+        assert_eq!(
+            pointer_suppression_intervals(&[0, 5_000], 1_000),
+            vec![(4_000, 5_000)]
+        );
+        // observed 側でも「t=0 だけの入力」は評価区間を割らない (baseline と恒等)。
+        let observed = vec![(0, 100)];
+        assert_eq!(
+            evaluation_intervals(&observed, &pointer_suppression_intervals(&[0], 1_000)),
+            observed
+        );
+    }
+
+    /// 観測区間から抑制区間を除く合成の境界 (`(lo, hi]` は整数 ms で `[lo + 1, hi]`)。
+    #[test]
+    fn evaluation_intervals_cut_observed_by_suppression() {
+        let observed = vec![(0, 100_000)];
+        // 抑制が空なら観測区間そのまま (★ 極 A / 極 M+ が baseline と恒等になる根拠)。
+        assert_eq!(evaluation_intervals(&observed, &[]), observed);
+        // 途中を抜くと 2 片に割れ、抑制の上端の**次の ms**から次の片が始まる。
+        assert_eq!(
+            evaluation_intervals(&observed, &[(55_000, 57_000)]),
+            vec![(0, 55_000), (57_001, 100_000)]
+        );
+        // 1 つの観測区間に複数の抑制。
+        assert_eq!(
+            evaluation_intervals(&[(0, 100)], &[(10, 20), (30, 40)]),
+            vec![(0, 10), (21, 30), (41, 100)]
+        );
+        // 抑制が区間の境界をまたぐ／区間全体を覆う。
+        assert_eq!(
+            evaluation_intervals(&[(10, 20), (30, 40)], &[(15, 35)]),
+            vec![(10, 15), (36, 40)]
+        );
+        assert!(evaluation_intervals(&[(20, 30)], &[(10, 40)]).is_empty());
+        // 抑制が区間の外なら変わらない: 終端ちょうどから始まる (`b + 1` 以降を覆う) / 始端の直前で終わる。
+        assert_eq!(evaluation_intervals(&[(0, 10)], &[(10, 20)]), vec![(0, 10)]);
+        assert_eq!(
+            evaluation_intervals(&[(11, 20)], &[(0, 10)]),
+            vec![(11, 20)]
+        );
+        // 始端ちょうどを覆う抑制は、その ms を除く。
+        assert_eq!(
+            evaluation_intervals(&[(10, 20)], &[(0, 10)]),
+            vec![(11, 20)]
+        );
+    }
+
+    /// Codex r1a-4 / r2-4: 抑制の上端が `u64::MAX` (または観測区間の右端) のとき、
+    /// `hi.saturating_add(1)` が `u64::MAX` に張り付いて `[u64::MAX, u64::MAX]` という
+    /// 幽霊区間が残らないこと。★ 観測区間の右端に近い 3 パターンで固定する
+    /// (`u64::MAX-2` / `u64::MAX-1` / `u64::MAX` を左端に取る観測区間・抑制は常に全域 `(0, u64::MAX]`)。
+    #[test]
+    fn evaluation_intervals_does_not_leave_a_ghost_interval_at_u64_max() {
+        let suppressed = [(0_u64, u64::MAX)];
+        for observed in [
+            (1_u64, u64::MAX),
+            (u64::MAX - 1, u64::MAX),
+            (u64::MAX - 2, u64::MAX),
+        ] {
+            assert!(
+                evaluation_intervals(&[observed], &suppressed).is_empty(),
+                "抑制が u64::MAX まで覆っているのに観測区間 {observed:?} の残余が出た \
+                 (★ 旧実装なら saturating_add が u64::MAX に張り付いて [MAX, MAX] が残るはず)"
+            );
+        }
+    }
+
+    /// AC5: θ の標本は**抑制区間をまたがない** (ADR-030 D4 の標本規則: 抑制・除外区間をまたぐ gap は入れない)。
+    /// ★ 抑制区間の**内側**の press を含む対も入らない。baseline との対照で θ が変わることを見る。
+    ///
+    /// ⚠️★★★ **判断 25**: 同じ入力で、極 B の onset の `t0` 集合が baseline の**部分集合ですらない**
+    /// ことも明示的に固定する（θ 経路で包含が崩れる例。モジュール doc 「極 B の入れ方」参照）。
+    /// 「極 B は onset 少なめ」は不変式ではなく、この fixture では baseline 側の `t0` (91500) が
+    /// 消え、baseline に無い `t0` (71200) が新しく立つ。
+    #[test]
+    fn theta_sample_excludes_pairs_across_pointer_suppression() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 115_000, 1_000);
+        // 1000/1100/1200 (gap 100 ×2) → 20500/20600 (抑制区間 (20000, 21000] の内側) → 41000/41100。
+        let keys = vec![
+            key(1_000),
+            key(1_100),
+            key(1_200),
+            key(20_500),
+            key(20_600),
+            key(41_000),
+            key(41_100),
+        ];
+
+        // baseline: 標本は 6 対 (100, 100, 19300, 100, 20400, 100)。p99 = 最大 = 20400。
+        let baseline = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            baseline.len(),
+            1,
+            "baseline は s=71100 の 1 本だけ: {baseline:?}"
+        );
+        assert_eq!(baseline[0].s_ms, 71_100);
+        assert_eq!(baseline[0].theta_person_ms, 20_400);
+        assert_eq!(baseline[0].theta_sample_n, 6);
+
+        // 極 B: 抑制の内側の press (20500/20600) と、抑制をまたぐ対 (1200→41000 / 1200→20500) は標本に入らない。
+        // 残るのは同じ片の内側の 3 対 (100 ×3) だけ → θ = 100。
+        let suppressed = pointer_suppression_intervals(&[21_000], ENGINE_TICK_MS);
+        assert_eq!(suppressed, vec![(20_000, 21_000)]);
+        let pole_b = detect_with_suppression(&keys, &feat, &suppressed, &config);
+        assert_eq!(
+            pole_b,
+            vec![OnsetEvent {
+                s_ms: 71_100,
+                t0_ms: 71_200,
+                theta_person_ms: 100,
+                theta_sample_n: 3,
+            }],
+            "抑制をまたぐ gap が標本に混ざると θ が 20400 に跳ね上がる (θ_person が過大になり episode yield が落ちる)"
+        );
+
+        // 判断 25: 極 B の t0 集合は baseline の部分集合ではない (θ 経路で包含が崩れる例を固定する)。
+        let baseline_t0: std::collections::BTreeSet<u64> =
+            baseline.iter().map(|o| o.t0_ms).collect();
+        let pole_b_t0: std::collections::BTreeSet<u64> = pole_b.iter().map(|o| o.t0_ms).collect();
+        assert!(
+            !pole_b_t0.is_subset(&baseline_t0),
+            "判断25: 極 B の t0 集合 {pole_b_t0:?} が baseline の t0 集合 {baseline_t0:?} の部分集合になっている \
+             (θ 経路で包含が崩れることを示すはずの例が、たまたま包含してしまっている)"
+        );
+    }
+
+    /// AC6: 抑制区間の直後の片も、観測区間と同じく**頭の `W` を評価しない**
+    /// (補訂 1 項目 1-3)。片の開始 (50001) ではなく `開始 + W` (80001) で条件 A が立ち上がる。
+    /// ★ 同時に、直前状態が `false` に戻ること・長い沈黙の途中の抑制で onset が**増える**ことも固定する。
+    #[test]
+    fn pointer_suppression_skips_the_leading_w() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 90_000, 1_000);
+        let keys = vec![key(1_000), key(1_100)];
+
+        let baseline = detect_stall_onsets(&keys, &feat, &config);
+        assert_eq!(
+            baseline.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![31_100],
+            "baseline は 1 本の沈黙で onset 1 つ"
+        );
+
+        // 沈黙の途中 (49000, 50000] に活動。→ 片は [0, 49000] と [50001, 90000]。
+        let suppressed = pointer_suppression_intervals(&[50_000], ENGINE_TICK_MS);
+        let pole_b = detect_with_suppression(&keys, &feat, &suppressed, &config);
+        assert_eq!(
+            pole_b.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![31_100, 80_001],
+            "後ろの片は開始 50001 ではなく開始+W=80001 で立つはず \
+             (W の抑制を外すと 50001 になる): {pole_b:?}"
+        );
+        assert_eq!(pole_b[1].t0_ms, 80_101);
+        // 前の片の onset は baseline と同じ (θ の標本も同じ 1 対)。
+        assert_eq!(pole_b[0], baseline[0]);
+
+        // ⚠️ 片が W に届かなければ、その片は 1 度も評価されない (直後の片が短い場合)。
+        let short_tail = detect_with_suppression(
+            &keys,
+            &feat_ts_range(0, 70_000, 1_000),
+            &suppressed,
+            &config,
+        );
+        assert_eq!(
+            short_tail.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![31_100],
+            "後ろの片 [50001, 70000] は W=30000 に届かず評価されない"
+        );
+    }
+
+    fn ime(t_ms: u64, dwell_ms: u64) -> ImeShadowEvent {
+        ImeShadowEvent {
+            t_ms,
+            dwell_ms,
+            nav: 0,
+            abandon: false,
+        }
+    }
+
+    /// issue 007 AC4: 重なりは onset の `[s, t0]` と `ime_shadow` 行の `[t − dwell_ms, t]` の**閉区間の交わり**。
+    /// ★ 端点で接するだけでも重なる。1ms 外れたら重ならない。
+    #[test]
+    fn ime_overlap_is_closed_interval_intersection() {
+        // onset は [50_000, 50_400]。
+        let overlaps =
+            |events: &[ImeShadowEvent]| ImeIntervalIndex::new(events).overlaps(50_000, 50_400);
+
+        // 右端で接する: 区間 [50_400, 50_700] の下端が t0 ちょうど。
+        assert!(overlaps(&[ime(50_700, 300)]), "下端が t0 なら重なる");
+        assert!(
+            !overlaps(&[ime(50_701, 300)]),
+            "下端が t0 + 1 なら重ならない"
+        );
+        // 左端で接する: 区間 [49_800, 50_000] の上端が s ちょうど。
+        assert!(overlaps(&[ime(50_000, 200)]), "上端が s なら重なる");
+        assert!(
+            !overlaps(&[ime(49_999, 200)]),
+            "上端が s - 1 なら重ならない"
+        );
+        // 内包 / 被包含。
+        assert!(overlaps(&[ime(50_300, 100)]), "onset に内包される区間");
+        assert!(overlaps(&[ime(53_000, 5_000)]), "onset を包む区間");
+        // 原点より前へ延びる区間 (t < dwell_ms) は下端を 0 に飽和させ、panic しない。
+        assert!(ImeIntervalIndex::new(&[ime(100, 500)]).overlaps(50, 80));
+        // 行が 0 本なら重ならない。
+        assert!(!overlaps(&[]));
+    }
+
+    /// 索引は素朴な全数比較と一致する。⚠️ 「`lo` 昇順の直近 1 本だけを見る」実装は、長い区間の後ろに
+    /// 下端の大きい短い区間が並ぶ入力で取りこぼす (`hi` の累積最大を持つ理由)。
+    #[test]
+    fn ime_interval_index_matches_naive_scan() {
+        // A = [10, 60_000] の後ろに B = [20_000, 20_100] が並ぶ。onset [50_000, 50_400] に重なるのは A だけ。
+        assert!(
+            ImeIntervalIndex::new(&[ime(60_000, 59_990), ime(20_100, 100)])
+                .overlaps(50_000, 50_400),
+            "長い区間 A が重なる (B だけを見ると取りこぼす)"
+        );
+
+        // 決定論的な擬似乱数 (LCG) で全数比較する。
+        let mut state: u64 = 0x2545_F491_4F6C_DD1D;
+        let mut next = |modulus: u64| -> u64 {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) % modulus
+        };
+        for _ in 0..300 {
+            let count = next(8);
+            let events: Vec<ImeShadowEvent> =
+                (0..count).map(|_| ime(next(10_000), next(3_000))).collect();
+            let s = next(10_000);
+            let t0 = s + next(500);
+            let naive = events
+                .iter()
+                .any(|e| e.t_ms.saturating_sub(e.dwell_ms) <= t0 && e.t_ms >= s);
+            assert_eq!(
+                ImeIntervalIndex::new(&events).overlaps(s, t0),
+                naive,
+                "events={events:?} onset=[{s}, {t0}]"
+            );
+        }
+    }
+
+    /// issue 007 AC5: `ime_shadow` 行が 1 本も無い入力では**すべての onset が `false`** で、`null` ではない
+    /// (「重なりを数えたが 0 件だった」は観測できた事実)。onset でない行は `null`。
+    #[test]
+    fn no_ime_rows_means_overlap_false_not_null() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 41_000, 1_000);
+        let column = stall_onset_column(
+            &small_onset_keys(),
+            &feat,
+            &[],
+            42,
+            0,
+            ENGINE_TICK_MS,
+            &config,
+        );
+
+        let onset_rows: Vec<&StallOnset> = column.iter().filter(|r| r.is_onset).collect();
+        assert_eq!(
+            onset_rows.len(),
+            1,
+            "小さい合成入力は onset をちょうど 1 つ立てる"
+        );
+        assert_eq!(
+            onset_rows[0].ime_overlap,
+            Some(false),
+            "行が 0 本でも null にしない"
+        );
+        assert!(
+            column
+                .iter()
+                .filter(|r| !r.is_onset)
+                .all(|r| r.ime_overlap.is_none()),
+            "onset でない行は null"
+        );
+    }
+
+    /// issue 007 AC6 (単体側): **数えるだけで抑制しない**。`ime_shadow` 行の有無で onset の集合
+    /// (s / t0 / θ / n) は 1 本も変わらず、変わるのは `ime_overlap` だけ。
+    #[test]
+    fn ime_rows_never_change_the_onset_set() {
+        let config = StallOnsetConfig::default();
+        let keys = small_onset_keys();
+        let feat = feat_ts_range(0, 41_000, 1_000);
+        let run = |ime_rows: &[ImeShadowEvent]| {
+            stall_onset_column_with_timeline(
+                &keys,
+                &feat,
+                &[],
+                ime_rows,
+                &[],
+                42,
+                0,
+                ENGINE_TICK_MS,
+                &config,
+            )
+            .0
+        };
+        // onset は s = 30_200, t0 = 30_300。IME 区間 [30_150, 30_250] はそれと重なる。
+        let with = run(&[ime(30_250, 100)]);
+        let without = run(&[]);
+
+        let detection = |column: &[StallOnset]| {
+            column
+                .iter()
+                .map(|r| {
+                    (
+                        r.is_onset,
+                        r.s_ms,
+                        r.t0_ms,
+                        r.theta_person_ms,
+                        r.theta_sample_n,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            detection(&with),
+            detection(&without),
+            "ime_shadow 行の有無で onset の集合が変わった (抑制してしまっている)"
+        );
+        let idx = with.iter().position(|r| r.is_onset).expect("onset が立つ");
+        assert_eq!(with[idx].ime_overlap, Some(true));
+        assert_eq!(without[idx].ime_overlap, Some(false));
     }
 }

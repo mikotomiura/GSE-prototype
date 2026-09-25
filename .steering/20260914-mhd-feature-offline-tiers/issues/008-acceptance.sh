@@ -17,6 +17,12 @@
 #     ★ 封筒自体の検査は `.steering/20260920-envelope-issues/envelope-acceptance.sh` が持つ。
 #   ★ 封筒が無い（配列のままの）出力では `jq '.rows'` が失敗し、
 #     `set -o pipefail` によりその場で赤になる（fail-closed）。
+# ★ 2026-09-25 (P1 前 issue 008・起票 21): 計算量の門 (AC18 / AC18b) を**多 onset の入力**で張り直した。
+#   ⚠️ 旧入力は onset が 1 本しか立たず、onset 数 `R` に比例する経路 (`T1d`) が門を素通りしていた。
+#   ★ 門は「**1 極あたり** 20 秒」（時間を計る実行は極を 1 つだけ渡す。3 極の合計を測らない）。
+#   ★ 各門は `AC18: onsets=<n>` / `AC18b: onsets=<n>` を 1 行ずつ出す（onset が ONSET_MIN 本未満なら赤）。
+#     issue 008 の acceptance (`.steering/20260921-p1-prereg-cli-poles/issues/008-acceptance.sh`) が
+#     この 2 行を拾って本数を数え直す。⚠️ 行の書式を変えるときは向こうも同時に直すこと。
 set -uo pipefail
 fail() { echo "[acceptance 008] NG: $*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq が無い"
@@ -97,16 +103,38 @@ out3="$(replay tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq -e
 printf '%s' "$out3" | jq -e 'length > 0 and all(.[]; .stall_onset.is_onset == false)' >/dev/null 2>&1 \
   || fail "AC3: feat 行の無い deep_silence.ndjson で onset が立った（★ 観測区間が無ければ onset は立たない）"
 
-# ---------- 4. 計算量（AC18）: 15 万打鍵 ＋ 末尾 60 秒の沈黙 ----------
+# ---------- 4. 計算量（AC18）: 15 万打鍵 ＋ 35 秒の沈黙を 100 回（末尾は 60 秒） ----------
 #   ★ 実測 (2026-09-18・debug): 現行 O(N²) 実装 = 56 秒 / 検出器以外の処理 = 2 秒。
-#   ★ 末尾の沈黙で onset がちょうど 1 つ立つこと＝ 検出器が実際に走ったことも確かめる。
-awk 'BEGIN{T=1700000000000; n=150000;
+#   ⚠️★★★ 2026-09-25 (P1 前 issue 008・起票 21): 旧入力は「15 万打鍵 ＋ 末尾の沈黙」で **onset がちょうど 1 本**しか
+#     立たなかった。`T1d` (`restart`) は onset の立った tick ごとに計算されるので、計算量は打鍵数 `N` だけでなく
+#     onset 数 `R` にも効く。⚠️ ところが **`R` に比例する経路はこの門を素通りしていた**。
+#     → 15 万打鍵を `ONSET_SEGMENTS` 個の束に割り、束の間に 35 秒の沈黙（= W 30 秒 ＋ θ 250ms を超える）を置く。
+#     ★ 沈黙 1 つにつき onset が 1 本立つので `R = ONSET_SEGMENTS`（末尾の沈黙を含む）。θ は動かない
+#     （★ 沈黙の間隔は 1500 打鍵に 1 回 = p99 に届かないので、θ は束の中の 250ms のまま）。
+#   ⚠️ 門は **1 極あたり** 20 秒である（★ 判断 3 で極ごとに回すが、3 極の合計を門に織り込まない）。
+#     → 時間を計る実行は極を 1 つだけ渡す（★ 極の名前は下の実行行を見る。ここに書くと AC3 の検査が数え違える）。
+#   ⚠️★★★ 「20 秒以内に終わった」だけでは足りない。**onset が ONSET_MIN 本以上立ったこと**を出力から数え、
+#     `AC18: onsets=<n>` の 1 行を出す（★ issue 008 の acceptance がこの行を拾う。本数が少なければ、
+#     門は依然 `R` 経路を踏んでいない）。
+#   ⚠️ 打鍵数を減らして `R` を稼がない・`--set warmup_count` で下限を緩めない（★ 本番と違う経路を測ることになる。
+#     最初の沈黙は 1500 打鍵の後 = θ の標本 1499 対で、`warmup_count` 100 を超えている）。
+#   ⚠️★★★ この門が保証する範囲（2026-09-25・code-reviewer MEDIUM）: `R`（onset 数）に比例する経路を
+#     実際に踏むことと、`N`・立ち上がり数に対する**二乗**への退行の検出まで。★ `R=100`（`ONSET_SEGMENTS`）
+#     では `O(R·C)` や `O(R²)` への退行は 20 秒に届かず検出できない。`R` 経路そのものの正しさ（愚直走査との
+#     一致）は `restart::tests::many_onsets_match_a_naive_scan` が持つ（★ `ONSET_SEGMENTS` の値は変えない）。
+ONSET_SEGMENTS=100   # ★ 沈黙の数 = onset の本数 R（末尾を含む）。ONSET_MIN の 2 倍
+ONSET_MIN=50         # ★ R に比例する経路を踏むのに要る onset の下限（issue 008 AC1 / AC2）
+awk -v R="$ONSET_SEGMENTS" 'BEGIN{T=1700000000000; n=150000; sil=35000; per=int(n/R);
   print "{\"type\":\"meta\",\"session_start\":" T ",\"hmm_version\":\"0.5.0\"}";
   print "{\"type\":\"session_start\",\"t\":" T "}";
-  for(i=0;i<n;i++) printf "{\"type\":\"key\",\"t\":%d,\"vk\":%d,\"press\":true}\n", T+1000+i*250, 65+(i%26);
-  end=T+1000+n*250+60000;
+  for(i=0;i<n;i++){ s=int(i/per);
+    printf "{\"type\":\"key\",\"t\":%d,\"vk\":%d,\"press\":true}\n", T+1000+i*250+s*(sil-250), 65+(i%26) };
+  end=T+1000+(n-1)*250+(R-1)*(sil-250)+60000;
   for(f=T+1000; f<=end; f+=1000) printf "{\"type\":\"feat\",\"t\":%d}\n", f }' > "$tmpd/big.ndjson" \
   || fail "大入力の生成に失敗"
+# ⚠️ 生成部を書き換えて打鍵数が減っても気づけるよう、key 行の数を固定する（★ 打鍵を削って `R` や時間を稼がない）。
+keys18="$(grep -c '"type":"key"' "$tmpd/big.ndjson")"
+[ "${keys18:-0}" -eq 150000 ] || fail "AC18: 大入力の key 行が ${keys18:-?} 本（★ 15 万本でなければ門の入力が変わっている）"
 if [ -n "${ACC_REPLAY_CMD:-}" ]; then
   BIG_CMD="$ACC_REPLAY_CMD"
 else
@@ -122,15 +150,19 @@ start=$(date +%s)
 #   ★ 併せて出力は**ファイルへ落とす**（2026-09-20・code-reviewer MEDIUM）——
 #     15 万打鍵の pretty 出力は数十 MB 規模で、生と剥がし済みを同時にシェル変数へ載せると
 #     ⚠️ ピーク使用量が倍になる。`elapsed` は jq の前に確定するので計時 AC は汚れない。
-timeout 20 $BIG_CMD "$tmpd/big.ndjson" --features > "$tmpd/big_out.json" 2>/dev/null
+timeout 20 $BIG_CMD "$tmpd/big.ndjson" --features --pole baseline > "$tmpd/big_out.json" 2>/dev/null
 rc=$?
 elapsed=$(( $(date +%s) - start ))
-[ $rc -eq 124 ] && fail "AC18: 15 万打鍵の --features が 20 秒で終わらない（★ 計算量が二乗のまま。現行実装は実測 56 秒）"
+[ $rc -eq 124 ] && fail "AC18: 15 万打鍵・onset $ONSET_SEGMENTS 本の --features が 20 秒で終わらない（★ 計算量が N か R に対して悪化している。二乗のときの旧実装は実測 56 秒）"
 [ $rc -eq 0 ] || fail "AC18: 大入力で --features が非 0 で終了した (rc=$rc)"
-out4="$(jq -e '.rows | arrays' "$tmpd/big_out.json")" \
+jq -e '.rows | arrays' "$tmpd/big_out.json" >/dev/null 2>&1 \
   || fail "AC18: 出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
-printf '%s' "$out4" | jq -e '[.[] | select(.stall_onset.is_onset)] | length == 1' >/dev/null 2>&1 \
-  || fail "AC18: 大入力の末尾の沈黙で onset がちょうど 1 つ立たない（★ 検出器が走っていない可能性）"
+# ⚠️ 本数は**変数へ取ってから**判定する（`$( )` の中の fail はサブシェルしか抜けない）。
+onsets18="$(jq '[.rows[] | select(.stall_onset.is_onset)] | length' "$tmpd/big_out.json" 2>/dev/null)"
+[[ "${onsets18:-}" =~ ^[0-9]+$ ]] || fail "AC18: 出力から onset の本数を数えられない"
+[ "$onsets18" -ge "$ONSET_MIN" ] \
+  || fail "AC18: 大入力で onset が ${onsets18} 本しか立たない（★ ${ONSET_MIN} 本以上でないと R に比例する経路を踏めない。検出器が走っていない可能性）"
+echo "[acceptance 008] AC18: onsets=${onsets18}" >&2
 echo "[acceptance 008] AC18: ${elapsed}s" >&2
 
 # ---------- 4b. 計算量（AC18b）: 条件 A の立ち上がりが打鍵数に比例する入力 ----------
@@ -138,25 +170,41 @@ echo "[acceptance 008] AC18: ${elapsed}s" >&2
 #     「立ち上がりのたびに θ の標本を集め直す」二乗の経路を捉えなかった（★ 2 レビューが独立に実測）。
 #   ★ 文字 → 1ms 後に BS の対を 70ms ごとに 75,000 対（15 万打鍵）＝ 立ち上がり 75,000 回。
 #   ★ 実測 (debug): e079b21 の実装 = 248 秒（security-checker）。
-awk 'BEGIN{T=1700000000000; n=75000;
+#   ⚠️★★★ 2026-09-25 (P1 前 issue 008・起票 21): 旧入力は 70ms 周期の churn なので **θ_person（= 69ms）を満たさず**、
+#     確定する onset は**末尾の沈黙の 1 本だけ**だった（★ 条件 A の変化点 `C ≈ 15 万` なのに onset 数 `R = 1`）。
+#     `T1d` は `O(R log C)` なので、⚠️ `C` が大きく `R` も大きい入力でしか、その経路は測れない。
+#     → 75,000 対を `ONSET_SEGMENTS` 個の束（= 750 対）に割り、束の間に 35 秒の沈黙を置く。
+#     ★ `C` は 15 万のまま、`R = ONSET_SEGMENTS`（末尾の沈黙を含む）になる。
+#     ★ 束の最後の BS で条件 A が立ち上がり（s = その 1ms 後）、θ = 69ms を経て t0 = s + 69ms で確定する
+#       （⚠️ 沈黙が 70ms 以上なら確定する。35 秒は余裕）。沈黙の間隔は 750 対に 1 回 = p99 に届かないので θ は 69ms のまま。
+#   ⚠️ 門は AC18 と同じく **1 極あたり** 20 秒（極は実行行で 1 つだけ渡す）。onset 本数の数え方も AC18 と同じ。
+awk -v R="$ONSET_SEGMENTS" 'BEGIN{T=1700000000000; n=75000; sil=35000; per=int(n/R); extra=sil-69;
   print "{\"type\":\"meta\",\"session_start\":" T ",\"hmm_version\":\"0.5.0\"}";
   print "{\"type\":\"session_start\",\"t\":" T "}";
-  for(i=0;i<n;i++){ t=T+1000+i*70;
+  for(i=0;i<n;i++){ s=int(i/per); t=T+1000+i*70+s*extra;
     printf "{\"type\":\"key\",\"t\":%d,\"vk\":65,\"press\":true}\n", t;
     printf "{\"type\":\"key\",\"t\":%d,\"vk\":8,\"press\":true}\n", t+1 };
-  end=T+1000+n*70+60000;
+  end=T+1000+(n-1)*70+(R-1)*extra+1+60000;
   for(f=T+1000; f<=end; f+=1000) printf "{\"type\":\"feat\",\"t\":%d}\n", f }' > "$tmpd/churn.ndjson" \
   || fail "AC18b の入力生成に失敗"
+# ⚠️ 立ち上がりの数（= key 行 15 万本）を固定する。★ 減らして時間や `R` を稼がない。
+keys18b="$(grep -c '"type":"key"' "$tmpd/churn.ndjson")"
+[ "${keys18b:-0}" -eq 150000 ] || fail "AC18b: churn 入力の key 行が ${keys18b:-?} 本（★ 15 万本でなければ門の入力が変わっている）"
 start=$(date +%s)
 # ⚠️ AC18 と同じ理由で、封筒は別の行で剥がす（rc=124 を jq の 5 で潰さない）。
-timeout 20 $BIG_CMD "$tmpd/churn.ndjson" --features > "$tmpd/churn_out.json" 2>/dev/null
+timeout 20 $BIG_CMD "$tmpd/churn.ndjson" --features --pole baseline > "$tmpd/churn_out.json" 2>/dev/null
 rc=$?
 elapsed=$(( $(date +%s) - start ))
-[ $rc -eq 124 ] && fail "AC18b: 立ち上がり 75,000 回の入力で --features が 20 秒で終わらない（★ θ の再計算が二乗。e079b21 は実測 248 秒）"
+[ $rc -eq 124 ] && fail "AC18b: 立ち上がり 75,000 回・onset $ONSET_SEGMENTS 本の入力で --features が 20 秒で終わらない（★ θ の再計算が二乗、または R の経路が悪化。e079b21 は実測 248 秒）"
 [ $rc -eq 0 ] || fail "AC18b: 立ち上がりの多い入力で --features が非 0 で終了した (rc=$rc)"
-out4b="$(jq -e '.rows | arrays' "$tmpd/churn_out.json")" \
+jq -e '.rows | arrays' "$tmpd/churn_out.json" >/dev/null 2>&1 \
   || fail "AC18b: 出力から封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
-printf '%s' "$out4b" | jq -e 'length > 0' >/dev/null 2>&1 || fail "AC18b: 出力が空"
+jq -e '.rows | length > 0' "$tmpd/churn_out.json" >/dev/null 2>&1 || fail "AC18b: 出力が空"
+onsets18b="$(jq '[.rows[] | select(.stall_onset.is_onset)] | length' "$tmpd/churn_out.json" 2>/dev/null)"
+[[ "${onsets18b:-}" =~ ^[0-9]+$ ]] || fail "AC18b: 出力から onset の本数を数えられない"
+[ "$onsets18b" -ge "$ONSET_MIN" ] \
+  || fail "AC18b: churn 入力で onset が ${onsets18b} 本しか立たない（★ ${ONSET_MIN} 本以上でないと C が大きいまま R も大きい入力にならない）"
+echo "[acceptance 008] AC18b: onsets=${onsets18b}" >&2
 echo "[acceptance 008] AC18b: ${elapsed}s" >&2
 
 # ---------- 5. ソースの検査（AC8 ほか） ----------

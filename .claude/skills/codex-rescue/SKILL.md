@@ -72,7 +72,7 @@ git worktree add "$WORKTREE_DIR" HEAD
 cd "$WORKTREE_DIR"
 codex exec --sandbox workspace-write --ask-for-approval \
   --skip-git-repo-check \
-  -m gpt-5.5 -c model_reasoning_effort=high \
+  -m gpt-6-sol -c model_reasoning_effort=high \
   - < /tmp/codex-rescue-task-filtered.txt
 ```
 

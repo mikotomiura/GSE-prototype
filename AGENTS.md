@@ -29,7 +29,8 @@
 
 ## モデル設定
 
-- 既定モデル: `gpt-5.5`、reasoning effort 既定: `medium`
+- 既定モデル: `gpt-6-sol`、reasoning effort 既定: `medium`（★ 2026-09-25 に `gpt-5.5`〔CLI 上で Legacy〕から更新）
+- ★ 役割ごとの割当: **レビュー（`/cross-review`）・設計相談（`codex-consult`）= `gpt-6-astra`**（見逃しコスト・やり直しの効かない判断）／ **rescue（実装）= `gpt-6-sol`**。値の実体は `.codex/config.toml`・`scripts/run-codex-review.sh`・`scripts/run-codex-consult.sh`・`codex-rescue` Skill
 - レビュー特化タスクでは `-c model_reasoning_effort=xhigh` を Skill から指定可。
 
 ## 出力形式
