@@ -537,3 +537,26 @@
   「⚠️ 意図した pin か確かめてください（1 コミット後ろ / 0 コミット先）」が出ていたが、無人のため読まれなかった。
   ★ 対処: ローカルを push して `origin` を揃えてから再実行。→ 是正案: ローカルが upstream より先にあるときは**ローカルを採る**か、**fail-closed で止める**。
   ★ 運用: 本タスクでは **merge のたびに push する**。
+
+## 判断 25: 極 B が「onset 少なめ」であることは**保証されない** —— 実装（判断 7）は保ち、記述と AC を直す
+
+- **日付**: 2026-09-25（★ 研究者裁定・issue 006 の `code-reviewer` HIGH）
+- **背景**: ADR-030 D3 の囲み逐語「**極 A（抑制しない ＝ onset 多め）** と **極 B（ポインタ活動区間を抑制する ＝ onset 少なめ）**」。
+  ⚠️ ところが判断 7（抑制区間を観測区間と同じ構造で切る）の実装では、次の 2 経路で包含が崩れる（★ メインが一次で確認）:
+  1. **θ 経路**: θ_person は全評価区間からプールした因果累積なので、抑制をまたぐ標本を外すと**ポインタ活動から遠い onset の θ・t0 も動く**
+     （★ 同梱テスト `theta_sample_excludes_pairs_across_pointer_suppression`: baseline t0 = 91500 → 極 B t0 = 71200）。
+  2. **分割経路**: 長い沈黙の途中の抑制で区間が割れ、**onset が増える**（★ `pointer_suppression_skips_the_leading_w` が固定）。
+  → `006-acceptance.sh` AC2「真の部分集合」は**この fixture でだけ**成り立っていた。
+- **採用**: **実装は保つ**。「少なめ」は保証されないことを **ADR-030 補訂 2（issue 009）に明記**し、
+  上下界は **2 極の順序を前提にせず、両極の G2 の min / max で取る**と書く。AC2 は「fixture で baseline と異なる」に言い直し、
+  θ 経路で包含が崩れる例を単体テストで明示的に固定する。
+- ⚠️ ADR-030 本文は書き換えない（補訂で扱う）。
+
+## 判断 26: `capabilities` に `pointer_bin` の宣言があり行が 0 本の入力は、極 B で **判定不能（`not_applicable`）** とする
+
+- **日付**: 2026-09-25（★ 研究者裁定・issue 006 の `code-reviewer` MEDIUM）
+- **背景**: `capabilities.rs:244-245` は `pointer_bin` の 0 行を「**判定不能**」と書く（宣言はコンパイル時の `POINTER_AVAILABLE`、
+  実行時の `observe::start` は設置に失敗しうる）。issue 006 の実装は「活動なし」と読み `pole_applicable=true` にしていたので、
+  設置に失敗した端末で極 B が baseline と恒等になり、**上下界の幅が黙って 0 に潰れる**。
+- **採用**: 宣言あり・0 行 → `pole_applicable=false`・理由 `no_pointer_rows`（宣言なし → 既存の `no_pointer_capability`）。
+  ★ 極 M+ の判断 13（0 行は `not_applicable`）と揃う。
