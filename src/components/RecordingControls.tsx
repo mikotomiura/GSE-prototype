@@ -448,6 +448,13 @@ const RecordingControls: React.FC = () => {
         <p style={{ fontSize: "0.9em", opacity: 0.85, marginTop: "0.4rem" }}>
           消したい時間帯を入れて「消す」を押してください。理由を聞くことはありません。
         </p>
+        {/* ⚠️★★★ 最小幅の告知（issue 002・判断 8）。★ 被験者向けの文言は契約である。
+            「1 分」は backend の `redaction::MIN_REDACTION_WIDTH_MS`（60,000 ms）と揃える
+            （⚠️ 値を frontend に持たない＝ 文言だけ。値を変えたらここも直す）。
+            ★ 広げる向きは**終了側**（開始は動かさない）。⚠️ 拒否はしない（消えないのは約束違反）。 */}
+        <p style={{ fontSize: "0.85em", opacity: 0.85, marginTop: "0.4rem" }}>
+          ⚠️ 開始から終了までが 1 分より短いときは、開始時刻から 1 分（最小幅）まで広げて消えます。
+        </p>
         <div
           style={{
             display: "flex",
