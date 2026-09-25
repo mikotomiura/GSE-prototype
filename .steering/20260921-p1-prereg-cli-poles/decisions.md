@@ -428,3 +428,47 @@
 - **影響範囲**: `scripts/loop-run.sh` / `scripts/loop-run-guard-test.sh` / `docs/loop-engineering.md`（★ Sonnet に実装を委譲・メインがレビュー）。
 - **付随の発見（⚠️ 未是正・起票）**: `issue_deps_raw` は `- **001**` の太字を依存として拾わず、**警告も出さない**
   （★ 本タスクの dry-run で 9 本とも `deps=[]` になった）。本タスクでは issue 側の書式を直して回避した。
+
+## 判断 19: issue 001 が `006-acceptance.sh` の**呼び出し**に `--set warmup_count=1` を足した変更を追認する
+
+- **日付**: 2026-09-25（★ 研究者裁定）
+- **背景**: 001 の Allowed Files は旧タスク `005/006/008-acceptance.sh` について「onset の本数・`[s,t0,θ]` の期待値と理由コメントだけ」を許していた。
+  worker は `006` の AC6（`restop_ms` が 1 つでも非 null）が凍結既定（`warmup_count=100`）では**原理的に成立しない**
+  （残る onset が観測区間の右端で右側打ち切り）ので、呼び出しに `--set warmup_count=1` を足して旧前提を明示的に再現した。
+  ★ `code-reviewer` M2: **文言の外だが実質は妥当**（検査式 AC3 / AC6 は不変。別案は AC6 を「0 件可」に緩めることになる。fixture 追加は禁止）。
+- **採用**: 追認する。
+- **⚠️ 副作用（起票 P1-A）**: restart の非退化検査は、**凍結既定 config では走らない**。
+  → ★ 既定 config で restop が測れる fixture が要るかを後続で判断する。
+
+## 判断 20: 凍結文書冒頭の古い一文を、凍結（merge）前の同じ変更単位で過去形へ直す
+
+- **日付**: 2026-09-25（★ 研究者裁定）
+- **背景**: `docs/preregistration-p1-episode.md:9`「CLI 注入が入るまで**まだ真ではない**」がステータス行（frozen）と矛盾していた（`code-reviewer` M4）。
+- **採用**: merge 前に「真ではなかった（2026-09-25 に満たした）」へ 1 文だけ直した（`ed6d89f`）。§1 / §2 の値は不変（`check_prereg_parity.py` OK）。
+  ★ 凍結の時点は **`f5163a6`（issue 001 の merge）**とする。
+
+## 判断 21: 002〜006 の `verify_level` を `recheck` → `parse` に落とし、003 から `001` への依存を外す
+
+- **日付**: 2026-09-25（★ 研究者裁定）
+- **背景**: 001 の再試走で verify は attempt 1 で全部緑だったが、`recheck` の watchdog が **2 回とも空応答** → fail-closed で `blocked`。
+  ★ 前タスク（`20260914-mhd-feature-offline-tiers` 判断 8 / 11）と同じ症状であり、`loop-run.sh` 自身も
+  「`recheck` の watchdog は現状まだ完全に信頼できる gate ではない」と書いている。
+  ⚠️ `issue_done` が出ないので、依存する後続が**永久に始まらない**。
+- **採用**: 002〜006 を `parse` に落とす。★ 代わりに **メインが毎 issue で**
+  (1) pin 済み verify ＋ ゴールデン 6 本 ＋ 新旧 acceptance 全部（★ `envelope-acceptance.sh` を含む）を自分で回し、
+  (2) `code-reviewer` ＋ `security-checker` を並列で掛けてから merge する。
+  003 の `## Dependencies` から `001` を外した（⚠️ `issue_done` を手で捏造しない）。
+- **⚠️ 運用上の注意**: 001 の Status は `done` だが、`loop-run.sh` の既定選択は `blocked` しか除外しない。
+  → ★ **以後は必ず `--issues` で対象を指定する**（無指定だと 001 が再実行される）。
+
+## ⚠️ 2026-09-25 実行セッションの起票（★ 本タスクでは未是正）
+
+| # | 何 | 根拠 |
+|---|---|---|
+| P1-A | 凍結既定 config では restart の非退化検査（`006-acceptance.sh` AC6）が走らない | 判断 19 |
+| P1-B | ⚠️ **worker は `bash <script>` / `python <script>` を実行できない**（`allowed_tools` に無く承認待ちで止まる）→ acceptance を自己検証できず、読解と `jq` の直当てで代用していた | 001 attempt 1 の `permission_denials=16`・001.md「未解決 2」 |
+| P1-C | 001 は Stop Condition「5 ファイル / 300 行」を超えた（9 ファイル・+697 行）。★ Allowed Files 自体が 9 本を列挙しており、分解時点で基準 2 を満たしていなかった | `code-reviewer` M3 |
+| P1-D | `loop-run.sh` `issue_deps_raw` が `- **001**` の太字を黙って落とす（★ 警告も出ない） | 判断 18 付随 |
+| P1-E | ⚠️ **分解時の見落としがもう 1 件**: 001 は `envelope-acceptance.sh` AC7（封筒 config のキー集合の完全一致）を赤にするのに、Allowed Files に無かった（★ メインが merge 前に `9ce5df9` で是正） | `security-checker` 補足 / `code-reviewer` H1 |
+| P1-F | `--set q=…` が従属変数 `warmup_count` を連動させない（探索プロトコル実装時に裁定） | 001.md「未解決 4」 |
+| P1-G | security LOW: `--feature-config` の `id` / `version` を検証せず封筒へ写す（★ `config_source` / sha / `overrides` で区別は可能） | `security-checker` LOW-2 |

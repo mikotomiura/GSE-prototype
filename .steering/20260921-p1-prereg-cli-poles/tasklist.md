@@ -29,7 +29,7 @@
 - [x] `docs/preregistration-v0.3.md` にリンク 1 行 ／ `docs/agent-shared.md` のリンクハブに 1 行
 - [x] `docs/glossary.md` に確定用語 5 件
 - [x] コミット（⚠️ `git add -A` / `git add <dir>` は**使わない** —— ファイル名を明示） ★ `1cd25ce`
-- [ ] ⚠️★★★ **`status` は `draft` のまま**（★ 判断 16）—— 【2】が end-to-end で通った時点で `frozen` に上げる。
+- [x] ⚠️★★★ **`status` は `draft` のまま**（★ 2026-09-25 `f5163a6` で frozen）（★ 判断 16）—— 【2】が end-to-end で通った時点で `frozen` に上げる。
       ★ **それは【2】の issue の最後の AC である**
 
 ## 分解（★ 本セッション・Opus）
@@ -56,7 +56,7 @@
 
 ## 実行（★ 別セッション・Sonnet）
 
-- [ ] 【2】CLI 注入（凍結 JSON を既定 ＋ `--feature-config` ＋ `--set`・封筒 `config` の拡張）
+- [x] 【2】CLI 注入（凍結 JSON を既定 ＋ `--feature-config` ＋ `--set`・封筒 `config` の拡張）
 - [ ] 【3a】`T1a` の 30 秒窓（★ `features.rs` の `pub const` 化が**先**・⚠️ 振る舞いを変えない）
       ＋ `003-acceptance.sh` の「3 値が同値」検査の**置き換え** ＋ 起票 11 を閉じる
 - [ ] 【3b】極の器（`--pole` ＋ `Pole` enum ＋ `pole_applicable` ＋ `theta_sample_n`）
