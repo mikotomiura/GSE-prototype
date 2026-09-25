@@ -235,7 +235,7 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
   実在する書式 (`✅ **done**（…）` / `⚠️★★★ **不要（not needed）**`) と同じ形で `blocked` を
   書かれると、素の前方一致は **fail-open する**。
 - 除外は **ログと `_loop-run-report.md`** に出す。⚠ events には出さない
-  (events 語彙は 10 種で固定であり、「実行しなかった」は状態遷移ではない)。
+  (events 語彙は上の語彙表の種類で固定であり、「実行しなかった」は状態遷移ではない)。
   ★ ただし **`--issues` で `blocked` を承知で回したとき**は、その attempt の
   `attempt_start` に `detail` を 1 行足す (⚠ 迂回が端末のスクロールバックにしか残らないのを避ける)。
 

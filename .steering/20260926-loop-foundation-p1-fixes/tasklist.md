@@ -24,6 +24,6 @@
 - [x] メインが diff を一次でレビュー（`* 001` 箇条書きの回帰を発見・是正 P1-D-c ／ ロックの決定論的検査 11d-11f を追加）
 - [x] code-reviewer ＋ security-checker 並列・HIGH 対応（HIGH 0。MEDIUM 5 件＋安い LOW は研究者裁定で全対応 → 下）
 - [x] レビュー対応: S-M1 文書訂正 ／ C-M1+M2 stale 除去の直列化 ／ C-M3+M4 check_committed を verify・watchdog の前へ ／ LOW 群（＋ メインが local-ahead の start を refs/heads で修飾・12g）
-- [ ] empirical-prompt-tuning（Lite・2 シナリオ: /loop-status の uncommitted 畳み込み ／ loop-issue・loop-worker の未コミット時の振る舞い）— 研究者依頼 2026-09-26
+- [x] empirical-prompt-tuning（Lite・2 シナリオ: /loop-status の uncommitted 畳み込み ／ loop-issue・loop-worker の未コミット時の振る舞い）— 研究者依頼 2026-09-26
 - [ ] /finish-task（/cross-review 必須・Codex gpt-6-astra）
 - [ ] git コミット（明示ステージング・`Refs:`）

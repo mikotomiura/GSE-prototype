@@ -44,6 +44,7 @@ gh pr list --state all 2>/dev/null || echo "GH_ABSENT"   # gh が無ければ PR
   - `abandoned` → abandoned
   - event 無し → ⏳ queued
 - `try` = その issue の `attempt` 最大値。`verify` 列は test✓/✗・tc・lint を要約。
+  ★ `acceptance_fail` は `acc✗`、`uncommitted` は `未コミット` と書く (★ 後者は verify を回していないので ✓/✗ を付けない)。
 - **fingerprint は数えない** (loop-guard.sh の責務)。失敗回数の括弧表示のみ。
 
 ### 5. 進捗サマリ行と heartbeat を計算

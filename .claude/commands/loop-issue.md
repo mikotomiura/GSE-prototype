@@ -78,6 +78,10 @@ AC 直結の絞り込みは `scope_test_template` (例 `cargo test --workspace {
 `/goal` の各 attempt (実装→自己テスト) の**直後に**、この command が客観検証を挿入する:
 
 1. `attempt_start` を events に append。
+1.5. ★ **verify の前に**未コミット／コミット 0 件を確かめ、該当すれば**まず自分で commit する**
+     (`git add <具体的なパス>` + `git commit`。★ event の記録より先。残りターンが少ないときほど commit を最優先)。
+     commit できたらそのまま 2 へ進む (`uncommitted` は書かない)。
+     ⚠ **commit できないまま attempt を終えるときだけ** `uncommitted` を append する (2〜4 は回さない)。
 2. `Task(subagent_type="test-runner")` (Haiku) に pin 済み verify を実行させ、exit code を回収。
 3. `Task(subagent_type="loop-watchdog")` (Haiku) を呼ぶ。watchdog は:
    - test-runner の結果を parse し fingerprint 化 (README 2.4)。
@@ -87,7 +91,6 @@ AC 直結の絞り込みは `scope_test_template` (例 `cargo test --workspace {
 4. verdict で分岐:
    - 緑かつ watchdog が AC 充足を確認 → `issue_done` を append し `/goal` を終了。
    - 赤 → `test_fail`/`typecheck_fail`/`lint_fail` を append し次 attempt へ。
-   - 未コミット／コミット 0 件 (★ verify より前に確かめる) → `uncommitted` を append し、commit してから次 attempt へ。
    - Stop 条件 (下記) → 対応イベントを append し停止。
 
 > **重要**: `/goal` 自身の「done」宣言は信用しない。`issue_done` は必ず watchdog の客観再検証
