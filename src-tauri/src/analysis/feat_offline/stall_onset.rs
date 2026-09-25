@@ -49,13 +49,67 @@
 //!   (`blockers.md` 起票 11)。
 //! - **IME 変換中の抑制**（D3 抑制表 2 行目）: 区間の定義と「抑制」の意味が未確定。
 //!   研究者判断待ち (`blockers.md` 起票 12)。
-//! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形が未確定。研究者判断待ち
-//!   (`blockers.md` 起票 13)。
+//! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形は**別モード (`--pole`・1 実行 1 極)** に
+//!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B の中身は未実装 (issue 006)。
 //! - **`phase`**: 構造化セッションの block id は未実装。自然セッション (O1) では常に
 //!   `"unspecified"` に collapse する (ADR-030 D5)。
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{KeyPress, OutcomeConfig};
+
+/// ADR-030 D3 の「極」—— 抑制規則の置き方を名前で区別する。
+///
+/// ⚠️★★★ **enum である**ことが、極を掛け合わせた直積を**構造的に作れなくする**
+/// (ADR-030 D3 の囲み逐語「他の極と組まない。独立に報告する」。理由: 掛け算で組むと
+/// 極の数が増えて幅が解釈不能になる)。→ **1 実行 1 極**で、出す組は次の 3 つだけ
+/// (`decisions.md` 判断 3):
+///
+/// | 名前 | ポインタ | 修飾キー | 実装 |
+/// |---|---|---|---|
+/// | `baseline` | 極 A (抑制しない) | 極 M− (規則なし) | ★ 現行の計算そのもの |
+/// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | issue 006 |
+/// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | issue 005 |
+///
+/// ⚠️ 極は `--set` で変える 8 値 (`StallOnsetConfig` の他のフィールド) とは**別の軸**であり、
+/// `--set` の対象にしない (CLI は `--pole` だけが持つ)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Pole {
+    #[default]
+    Baseline,
+    PointerB,
+    ModifierMPlus,
+}
+
+impl Pole {
+    /// 全ての極 (定義順)。
+    pub const ALL: [Pole; 3] = [Pole::Baseline, Pole::PointerB, Pole::ModifierMPlus];
+
+    /// CLI (`--pole`) と封筒 `config.pole` に出す名前。
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Pole::Baseline => "baseline",
+            Pole::PointerB => "pointer_b",
+            Pole::ModifierMPlus => "modifier_m_plus",
+        }
+    }
+
+    /// [`Self::as_str`] の逆。⚠️ 未知の名前は `None` (近い名前へ丸めない)。
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.as_str() == name)
+    }
+
+    /// 中身が実装済みの極か。
+    ///
+    /// ⚠️★★★ **`false` の極を黙って `baseline` の値で返してはならない** —— 出力が嘘をつき、
+    /// 極の比較が無意味になる。呼び出し側 (`build_feature_rows` / CLI) は `false` なら**止める**
+    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させる。
+    pub const fn is_implemented(self) -> bool {
+        match self {
+            Pole::Baseline => true,
+            Pole::PointerB | Pole::ModifierMPlus => false,
+        }
+    }
+}
 
 /// `stall onset` 検出のパラメータ。★ `W` / `q` / `B` / `hole_gap_ms` / `warmup_count` は
 /// 値をコードに焼かず、ここで受け取る (ADR-030 D4)。既定値は P1 前の事前宣言が確定するまでの
@@ -85,6 +139,11 @@ pub struct StallOnsetConfig {
     /// ★ 本モジュールは `T1a` の窓を実装していない (issue 003) ため未使用。`b_ms` と同じく
     /// **設定の器だけ**を持ち、封筒 `config` に載せて値を再現可能にする。
     pub t1a_window_ms: u64,
+    /// 極 (ADR-030 D3・[`Pole`])。既定は [`Pole::Baseline`] (現行の計算)。
+    /// ⚠️ 他の 8 値と違い `--set` では変えられない (`bin/replay.rs` の `--pole` だけが持つ)。
+    /// ★ 本モジュールの検出そのものはまだ極を読まない —— 非 `baseline` の極は
+    /// `build_feature_rows` が入口で `Err` にするので、ここへは届かない ([`Pole::is_implemented`])。
+    pub pole: Pole,
 }
 
 impl Default for StallOnsetConfig {
@@ -98,6 +157,7 @@ impl Default for StallOnsetConfig {
             hole_gap_ms: 2 * ENGINE_TICK_MS,
             warmup_count: None,
             t1a_window_ms: outcome.merge_gap_ms,
+            pole: Pole::Baseline,
         }
     }
 }
@@ -1711,5 +1771,45 @@ mod tests {
         let onsets = detect_stall_onsets(&keys, &feat, &config);
         assert!(onsets.is_empty());
         let _ = stall_onset_column(&keys, &feat, &[], 5, near_max, 1000, &config);
+    }
+
+    /// 極の既定は `Baseline` (現行の計算)。`StallOnsetConfig` の既定にも及ぶ。
+    #[test]
+    fn pole_defaults_to_baseline() {
+        assert_eq!(Pole::default(), Pole::Baseline);
+        assert_eq!(StallOnsetConfig::default().pole, Pole::Baseline);
+    }
+
+    /// 名前の往復と、未知の名前の拒否。★ 大文字小文字・前後の空白・近い綴りを丸めない。
+    #[test]
+    fn pole_names_round_trip_and_unknown_is_none() {
+        for pole in Pole::ALL {
+            assert_eq!(Pole::from_name(pole.as_str()), Some(pole));
+        }
+        assert_eq!(
+            Pole::ALL.map(Pole::as_str),
+            ["baseline", "pointer_b", "modifier_m_plus"]
+        );
+        for bad in [
+            "",
+            "bogus",
+            "Baseline",
+            " baseline",
+            "baseline ",
+            "pointer",
+            "modifier",
+            "pointer_b+modifier_m_plus",
+        ] {
+            assert_eq!(Pole::from_name(bad), None, "`{bad}` は未知の極");
+        }
+    }
+
+    /// 現時点で中身があるのは `baseline` だけ。⚠️ issue 006 / 005 が 1 極ずつ `true` にする
+    /// (そのとき本テストの期待を変える —— 開通したことを意図して書き換えさせるための固定)。
+    #[test]
+    fn only_baseline_pole_is_implemented() {
+        assert!(Pole::Baseline.is_implemented());
+        assert!(!Pole::PointerB.is_implemented());
+        assert!(!Pole::ModifierMPlus.is_implemented());
     }
 }

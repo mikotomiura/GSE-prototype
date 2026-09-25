@@ -36,7 +36,7 @@ use gse_next_lib::analysis::calibration_eval::{
     VignetteRecord, HOLDOUT_CALIBRATION_SESSIONS,
 };
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
-use gse_next_lib::analysis::feat_offline::ImeShadowEvent;
+use gse_next_lib::analysis::feat_offline::{ImeShadowEvent, Pole};
 use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::heads::TaskDomain;
 use gse_next_lib::analysis::intervention::InterventionThresholds;
@@ -207,6 +207,13 @@ struct FeatureProvenance {
     /// (`stall_onset::observed_intervals`)。`feat` 行が 1 本も無ければ**空配列**
     /// (⚠️ `null` にしない —— 「観測区間が 1 つも無い」は観測できた事実である)。
     ///
+    /// ⚠️★★★ **極によって変わる** (ADR-030 D3・`config.pole`)。
+    /// ★ 上の定義は `baseline` (極 A ＝ 何も抑制しない) のもの。極 B (ポインタ活動区間を抑制) では
+    /// 抑制区間を除いた **実際に評価した区間**を載せる (`decisions.md` 判断 7・issue 006) —— 起票 20 (a) の
+    /// 目的 (打ち切りまでの追跡時間 `b − o`) から見ても、評価していない区間は追跡時間に数えられない。
+    /// ⚠️ フィールド名は変えない。**どの極の区間か**は封筒の `config.pole` から読む
+    /// (⚠️ 別の極の出力と区間を突き合わせるときは、先に `config.pole` が一致することを確かめる)。
+    ///
     /// ★★★ **なぜ封筒に載せるか** (2026-09-21・研究者判断・`blockers.md` 起票 20 (a)):
     /// `restart` (`T1d`) の `restop_ms` が `null` の行は**右側打ち切り**だが、
     /// ⚠️ **打ち切りまでの追跡時間 (`b − o`) が行からは読めない** —— `b` が出力に無いため。
@@ -259,6 +266,17 @@ struct FeatureConfigDto {
     theta_estimator: String,
     /// `T1a` の窓長 (ms・P1 事前宣言 §1)。★ 窓の実装は issue 003。ここは値の記録だけ。
     t1a_window_ms: u64,
+    /// この出力の**極** (ADR-030 D3・[`Pole::as_str`])。★ 1 実行 1 極で、極を持つのは**封筒だけ**
+    /// (行には載せない・判断 3)。⚠️ 上の設定 8 値とは別の軸で、`--set` では変えられない (`--pole` だけ)。
+    pole: &'static str,
+    /// この入力で、上の極が**計算できたか**。★ 常に出る (`baseline` は常に `true`)。
+    /// ⚠️ 極 B / 極 M+ の判定は**入力に依存する** (`capabilities` の宣言 / 修飾キー行の有無) ので、
+    /// 判定は issue 006 / 005 が入力を受ける形で実装する。★ それまで両極は `--pole` が exit 1 で止める。
+    pole_applicable: bool,
+    /// `pole_applicable == false` の理由コード。★ 適用可のとき `null`。⚠️ 極ごとに判定の根拠が違うので、
+    /// 理由の語も別にする (`no_pointer_capability` = issue 006 / `no_modifier_rows` = issue 005)。
+    /// ⚠️ `not_implemented` は**防御の値**であり、実際には出ない (未実装の極は出力の前に止まる)。
+    pole_not_applicable_reason: Option<&'static str>,
     /// 採用した事前宣言の `id` / `version` / 内容の SHA-256 先頭桁 (★ 何を読んだかの同定)。
     prereg_id: String,
     prereg_version: String,
@@ -440,9 +458,19 @@ struct ResolvedFeatureConfig {
     prereg_sha256_prefix: String,
     config_source: &'static str,
     overrides: Vec<ConfigOverride>,
+    /// ★ 極 (ADR-030 D3)。⚠️ `operational` の 8 値とは**別の軸**で、`--set` / `--feature-config` では
+    /// 変えられない (凍結 JSON に極は無い)。`resolve_feature_config` は常に `Baseline` で返し、
+    /// `--pole` の値は [`Self::with_pole`] で足す。
+    pole: Pole,
 }
 
 impl ResolvedFeatureConfig {
+    /// 極を差し替える。⚠️ 呼ぶ前に [`resolve_pole`] を通すこと (未実装の極を持ち込まない)。
+    fn with_pole(mut self, pole: Pole) -> Self {
+        self.pole = pole;
+        self
+    }
+
     /// 検出器へ渡す設定へ写す。⚠️ 呼ぶ前に `validate` 済みであること (`resolve_feature_config` が保証)。
     fn stall_onset_config(&self) -> gse_next_lib::analysis::feat_offline::StallOnsetConfig {
         let o = &self.operational;
@@ -455,7 +483,50 @@ impl ResolvedFeatureConfig {
             // `validate` が usize に収まることを確かめている。
             warmup_count: usize::try_from(o.warmup_count).ok(),
             t1a_window_ms: o.t1a_window_ms,
+            pole: self.pole,
         }
+    }
+}
+
+/// `--pole` の値を極へ解決する。★ 出力を 1 バイトも書く前に呼ぶこと (fail-closed)。
+///
+/// ⚠️★★★ **止める 3 つ** (いずれも `Err` = 呼び出し側は exit 1・stdout は空):
+/// 1. `--features` 以外での指定 —— 他のモードは極を読まない。★ 指定を黙って無視すると
+///    「極 B で計算した」つもりの出力が baseline になる。
+/// 2. 未知の名前 —— ⚠️ 近い名前へ丸めない。
+/// 3. 未実装の極 ([`Pole::is_implemented`]) —— ⚠️ **黙って baseline の値を返さない**
+///    (出力が嘘をつき、極の比較が無意味になる)。
+///
+/// 未指定は `Baseline` (現行の計算そのもの・行の値は `--pole` 導入前と一致する)。
+fn resolve_pole(features: bool, raw: Option<&str>) -> Result<Pole, String> {
+    let Some(name) = raw else {
+        return Ok(Pole::Baseline);
+    };
+    if !features {
+        return Err("--pole requires --features".to_string());
+    }
+    let pole = Pole::from_name(name).ok_or_else(|| {
+        let allowed: Vec<&str> = Pole::ALL.iter().map(|p| p.as_str()).collect();
+        format!("--pole: 未知の極 `{name}` (許可: {})", allowed.join(", "))
+    })?;
+    if !pole.is_implemented() {
+        return Err(format!(
+            "--pole {name}: この極はまだ実装されていない (baseline の値を別の極の名前で返さないため止める)"
+        ));
+    }
+    Ok(pole)
+}
+
+/// 封筒 `config.pole_applicable` / `pole_not_applicable_reason` の値 (`(適用可否, 理由コード)`)。
+///
+/// ★ 網羅 `match` (ワイルドカード無し) —— 極を足すと、ここで判定を決めるまでコンパイルが通らない。
+fn pole_applicability(pole: Pole) -> (bool, Option<&'static str>) {
+    match pole {
+        // 極 A / 極 M− はどの入力でも計算できる (現行の計算そのもの)。
+        Pole::Baseline => (true, None),
+        // ⚠️ 中身が無い極。`resolve_pole` が出力の前に止めるので実際には来ない (防御)。
+        // 判定は入力に依存する (`capabilities` / 修飾キー行) ので、issue 006 / 005 が入力を受ける形に直す。
+        Pole::PointerB | Pole::ModifierMPlus => (false, Some("not_implemented")),
     }
 }
 
@@ -550,12 +621,14 @@ fn resolve_feature_config(
         prereg_sha256_prefix: sha,
         config_source: source,
         overrides,
+        pole: Pole::Baseline,
     })
 }
 
 impl FeatureConfigDto {
     fn from_resolved(resolved: &ResolvedFeatureConfig, max_feature_ticks: usize) -> Self {
         let c = resolved.stall_onset_config();
+        let (pole_applicable, pole_not_applicable_reason) = pole_applicability(c.pole);
         Self {
             w_ms: c.w_ms,
             q: c.q,
@@ -565,6 +638,9 @@ impl FeatureConfigDto {
             warmup_count: c.warmup_count,
             theta_estimator: resolved.operational.theta_estimator.clone(),
             t1a_window_ms: c.t1a_window_ms,
+            pole: c.pole.as_str(),
+            pole_applicable,
+            pole_not_applicable_reason,
             prereg_id: resolved.prereg_id.clone(),
             prereg_version: resolved.prereg_version.clone(),
             prereg_sha256_prefix: resolved.prereg_sha256_prefix.clone(),
@@ -1131,6 +1207,10 @@ struct Args {
     /// --set <key>=<value> (繰り返し可): `--features` の設定を 1 キーずつ上書きする。
     /// ⚠️ 生の文字列のまま持つ。検証 (未知キー / 型 / 範囲) は `resolve_feature_config` が行う。
     feature_sets: Vec<String>,
+    /// --pole <baseline|pointer_b|modifier_m_plus>: `--features` の極 (ADR-030 D3・1 実行 1 極)。
+    /// ⚠️ 生の文字列のまま持つ。検証 (`--features` 専用 / 未知の名前 / 未実装) は `resolve_pole` が行う
+    /// (★ `--set` と同じ作法。未知の名前は exit 1)。
+    pole: Option<String>,
     /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
 }
@@ -1268,6 +1348,18 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         return Err("--feature-config and --set require --features".to_string());
     }
 
+    // --pole <name>: `--features` の極。⚠️ 名前の検証は `resolve_pole` (main が出力の前に呼ぶ)。
+    let pole = if let Some(pos) = args.iter().position(|a| a == "--pole") {
+        if pos + 1 >= args.len() {
+            return Err("--pole requires a <name> argument".to_string());
+        }
+        let name = args.remove(pos + 1);
+        args.remove(pos);
+        Some(name)
+    } else {
+        None
+    };
+
     // --json は集計系モード併用時のみ意味を持つ
     if json
         && !metrics
@@ -1337,6 +1429,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         features,
         feature_config_path,
         feature_sets,
+        pole,
         extra_sessions,
     })
 }
@@ -1354,7 +1447,7 @@ fn usage() -> String {
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --corr-floor [--json]\n    \
-         gse-replay <session.ndjson> --features [--feature-config <cfg.json>] [--set <key>=<value> ...]\n\n\
+         gse-replay <session.ndjson> --features [--pole <name>] [--feature-config <cfg.json>] [--set <key>=<value> ...]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
@@ -1375,6 +1468,8 @@ fn usage() -> String {
          設定の既定は埋め込みの凍結 JSON (src-tauri/prereg/p1-episode.json)。config.overrides に外れた値だけが残る\n    \
          --feature-config <path>  凍結 JSON と同じ形の外部ファイルから設定を読む (config.config_source = \"file\")\n    \
          --set <key>=<value>      設定を 1 キー上書きする (繰り返し可)。未知キー / 型の不一致 / 範囲外は exit 1 で出力なし\n    \
+         --pole <name>            極 (ADR-030 D3): baseline (既定) / pointer_b / modifier_m_plus。1 実行 1 極で、封筒 config.pole に刻む。\n    \
+         --features 以外との併用 / 未知の名前 / 未実装の極 (現状 baseline 以外はすべて) は exit 1 で出力なし\n    \
          --json              集計系モード (--metrics/--segments/--intervention/--calibration/--sweep/--nudge-diag/--corr-floor) の出力を JSON へ\n    \
          -h, --help          このヘルプを表示\n",
     )
@@ -1439,6 +1534,17 @@ fn main() -> ExitCode {
         Err(msg) => {
             let _ = writeln!(std::io::stderr(), "{}", msg);
             return ExitCode::from(2);
+        }
+    };
+
+    // ⚠️★★★ `--pole` は**どのモードの出力よりも前**に解決する (fail-closed)。
+    // `--features` 以外での指定 / 未知の名前 / 未実装の極は exit 1 で、stdout には 1 バイトも出さない。
+    // ★ 未指定なら `Baseline` (他のモードは極を読まないので何も変わらない)。
+    let pole = match resolve_pole(args.features, args.pole.as_deref()) {
+        Ok(v) => v,
+        Err(msg) => {
+            tracing::error!("invalid --pole: {}", msg);
+            return ExitCode::from(1);
         }
     };
 
@@ -1616,7 +1722,7 @@ fn main() -> ExitCode {
         // 未知キー / 型の不一致 / 範囲外は exit 1 で、stdout には 1 バイトも出さない。
         let resolved_config =
             match resolve_feature_config(args.feature_config_path.as_deref(), &args.feature_sets) {
-                Ok(v) => v,
+                Ok(v) => v.with_pole(pole),
                 Err(msg) => {
                     tracing::error!("invalid --features configuration: {}", msg);
                     return ExitCode::from(1);
@@ -4459,6 +4565,128 @@ mod tests {
             "--set".to_string(),
         ];
         assert!(parse_args_from(dangling).is_err());
+    }
+
+    /// issue 004: `--pole <name>` は生の文字列のまま `Args` に載る (検証は `resolve_pole`)。
+    /// ★ 値の無い `--pole` は `Err`。⚠️ 指定が無ければ `None` (= baseline)。
+    #[test]
+    fn pole_flag_is_carried_as_a_raw_string() {
+        let with_pole = vec![
+            "s.ndjson".to_string(),
+            "--features".to_string(),
+            "--pole".to_string(),
+            "pointer_b".to_string(),
+        ];
+        let parsed = parse_args_from(with_pole).expect("--pole parses");
+        assert_eq!(parsed.pole.as_deref(), Some("pointer_b"));
+        // ★ 値は位置引数に混ざらない (session_path は `s.ndjson` のまま)。
+        assert_eq!(parsed.session_path, PathBuf::from("s.ndjson"));
+
+        // ★ 未知の名前もここでは弾かない (raw のまま持つ・exit 1 は `resolve_pole`)。
+        let bogus = vec![
+            "s.ndjson".to_string(),
+            "--features".to_string(),
+            "--pole".to_string(),
+            "bogus".to_string(),
+        ];
+        assert_eq!(
+            parse_args_from(bogus).expect("raw").pole.as_deref(),
+            Some("bogus")
+        );
+
+        let none = vec!["s.ndjson".to_string(), "--features".to_string()];
+        assert_eq!(parse_args_from(none).expect("parses").pole, None);
+
+        let dangling = vec![
+            "s.ndjson".to_string(),
+            "--features".to_string(),
+            "--pole".to_string(),
+        ];
+        assert!(parse_args_from(dangling).is_err());
+    }
+
+    /// issue 004 AC1〜5: `resolve_pole` は fail-closed。★ 陰性対照 (通るもの) を先に置く。
+    #[test]
+    fn resolve_pole_is_fail_closed() {
+        // 通る: 未指定 (どのモードでも baseline) / `--features` での `baseline`。
+        assert_eq!(resolve_pole(true, None), Ok(Pole::Baseline));
+        assert_eq!(resolve_pole(false, None), Ok(Pole::Baseline));
+        assert_eq!(resolve_pole(true, Some("baseline")), Ok(Pole::Baseline));
+
+        // AC5: `--features` 以外での指定は、名前が正しくても止める。
+        for name in ["baseline", "pointer_b", "modifier_m_plus", "bogus"] {
+            let err = resolve_pole(false, Some(name)).expect_err("--features 以外は Err");
+            assert!(err.contains("--features"), "理由が出る: {err}");
+        }
+
+        // AC3: 未実装の極は止める (⚠️ baseline の値を返さない)。
+        for name in ["pointer_b", "modifier_m_plus"] {
+            let err = resolve_pole(true, Some(name)).expect_err("未実装の極は Err");
+            assert!(err.contains(name), "極の名前が出る: {err}");
+        }
+
+        // AC4: 未知の名前 (丸めない)。
+        for name in ["bogus", "", "Baseline", "baseline ", "pointer"] {
+            let err = resolve_pole(true, Some(name)).expect_err("未知の名前は Err");
+            assert!(err.contains("未知"), "未知と分かる: {err}");
+        }
+    }
+
+    /// issue 004 AC1 / AC6: 封筒 `config` に極の 3 キーが**常に**出て、`baseline` は
+    /// `pole_applicable == true` / `pole_not_applicable_reason == null` になる。
+    #[test]
+    fn envelope_config_always_carries_the_pole_keys() {
+        let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
+        assert_eq!(resolved.stall_onset_config().pole, Pole::Baseline);
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1))
+            .expect("serialize config");
+        for key in ["pole", "pole_applicable", "pole_not_applicable_reason"] {
+            assert!(dto.get(key).is_some(), "config.{key} は常に出る");
+        }
+        assert_eq!(dto["pole"], "baseline");
+        assert_eq!(dto["pole_applicable"], true);
+        // ★ `null` である (キーが無いのでも空文字でもない)。
+        assert!(dto["pole_not_applicable_reason"].is_null());
+    }
+
+    /// issue 004: 極は `--set` の 8 値とは別の軸で、`--set` / `--feature-config` から変えられない。
+    #[test]
+    fn pole_is_not_settable_through_set() {
+        assert!(!P1_OPERATIONAL_KEYS.contains(&"pole"));
+        for entry in ["pole=pointer_b", "pole=baseline", "pole_applicable=false"] {
+            assert!(
+                resolve_feature_config(None, &[entry.to_string()]).is_err(),
+                "`--set {entry}` は未知のキー"
+            );
+        }
+        // ★ 凍結 JSON へ `pole` を書いても `deny_unknown_fields` が拒む。
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "gse-replay-pole-in-config-{}.json",
+            std::process::id()
+        ));
+        let mut v: serde_json::Value =
+            serde_json::from_str(FROZEN_P1_EPISODE_JSON).expect("frozen JSON parses");
+        v["operational"]["pole"] = serde_json::json!("pointer_b");
+        std::fs::write(&path, v.to_string()).expect("write temp config");
+        let result = resolve_feature_config(Some(&path), &[]);
+        let _ = std::fs::remove_file(&path);
+        assert!(result.is_err(), "operational.pole は未知のキー");
+    }
+
+    /// ⚠️ 防御の値: 未実装の極を (何かの間違いで) 封筒へ写しても `applicable == true` とは言わない。
+    /// 実際には `resolve_pole` が出力の前に止める。
+    #[test]
+    fn unimplemented_pole_never_claims_to_be_applicable() {
+        let base = resolve_feature_config(None, &[]).expect("frozen resolves");
+        for pole in [Pole::PointerB, Pole::ModifierMPlus] {
+            let resolved = base.clone().with_pole(pole);
+            let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1))
+                .expect("serialize config");
+            assert_eq!(dto["pole"], pole.as_str());
+            assert_eq!(dto["pole_applicable"], false);
+            assert_eq!(dto["pole_not_applicable_reason"], "not_implemented");
+        }
     }
 
     /// ⚠️ `meta` 行が無い / `session_start` を持たない NDJSON でも封筒は落ちない
