@@ -17,6 +17,9 @@ REPO_ROOT="$(pwd)"
 # ── AC1〜6: 対応する test が実在し、名前指定で緑であること ───────────────
 #   ⚠️★★★ `cargo test <name>` は **0 件マッチでも exit 0** である。
 #     → 「マッチ件数」を必ず見る (検査の検査 ルール 4: 判定式が常に真にならないように)。
+#   ⚠️★★★ `--exact` は**モジュール込みのフルパス**（`redaction::tests::<name>`）に一致させる。
+#     ★ 裸の名前を渡すと **0 件**にマッチし、必ず「1 件も走っていない」で赤になる
+#     （2026-09-25 に実測: `min_redaction_width_matches_the_ui_granularity` は lib で `0 tests`）。
 cd "$REPO_ROOT/src-tauri" || fail "src-tauri が無い"
 
 for t in \
@@ -27,10 +30,12 @@ for t in \
   wide_enough_range_is_not_widened \
   reversed_range_is_still_rejected
 do
-  out="$(cargo test --workspace "$t" -- --exact --nocapture 2>&1)" || fail "test $t が赤"
-  # ⚠️ 「1 件走った」ことを確かめる。0 件だと cargo は緑で返す。
-  printf '%s' "$out" | grep -qE '1 passed' \
-    || fail "test $t が 1 件も走っていない（★ 名前が違う / 未実装のまま緑に見えている）"
+  full="redaction::tests::$t"
+  out="$(cargo test --workspace "$full" -- --exact --nocapture 2>&1)" || fail "test $full が赤"
+  # ⚠️ 「ちょうど 1 件走って緑」を確かめる。0 件だと cargo は緑で返す。
+  #   ★ 行頭側も縛る（`21 passed` を `1 passed` と読まない）。
+  printf '%s' "$out" | grep -qE 'test result: ok\. 1 passed' \
+    || fail "test $full が 1 件も走っていない（★ 名前が違う / 未実装のまま緑に見えている）"
 done
 
 # ── AC7: UI 文言と削除台帳の両方に「広げて消す」旨がある ────────────────

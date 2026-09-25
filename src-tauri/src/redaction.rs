@@ -19,6 +19,7 @@
 //! | 2 | ★ **原本を壊さない** | ★ 一時ファイルへ書いて `rename`（途中で落ちても原本が残る） |
 //! | 3 | ⚠️ **消した「事実」は残す** | ★ 台帳へ 1 行 append。⚠️ **何を消したかは書かない** |
 //! | 4 | ⚠️ **書きかけのファイルを壊さない** | ★ 呼び出し側が現行セッションを `skip` に渡す |
+//! | 5 | ⚠️★★★ **削除した位置に「元に無い onset」を立てない** | ★ 入口で最小幅まで**終端側へ広げる**（[`widen_to_minimum_width`]） |
 //!
 //! ## ⚠️ OS API を呼ばない
 //!
@@ -54,6 +55,46 @@ pub struct RedactionSummary {
     pub lines_removed: usize,
     /// ⚠️ 走査したが**書きかけなので飛ばした**ファイル数（★ 現行セッション）。
     pub files_skipped: usize,
+}
+
+/// ⚠️★★★ 区間指定削除の**最小幅**（ミリ秒）。★ これ未満の要求は [`widen_to_minimum_width`] が広げる。
+///
+/// ## なぜ要るのか（ADR-030 **D8 (b-2)** ／ 補訂 1 項目 5 ／ `blockers.md` **起票 15**）
+///
+/// 1Hz の `feat` 列に穴がある区間では、`stall onset` の条件 B の連続を切る。
+/// ⚠️★★★ **ところが穴は `隣接差 > hole_gap_ms` で判定する**（`hole_gap_ms` の既定は 2 tick = 2,000 ms）。
+/// → ★ **`feat` 行が 1 本だけ欠ける幅の削除は穴にならず**、
+/// 1 秒おきの `feat` の中で `[30,900, 31,500]` を消すと**元に無い onset が削除区間の内側に立つ**
+/// （★ 実測）。⚠️ 被験者が消すよう求めた位置に onset が出ては、削除の約束が裏から破れる。
+///
+/// ## ★ なぜ 60,000 か
+///
+/// 現行 UI の削除入力は `datetime-local`（**秒なし**）なので、UI が作りうる区間の幅は
+/// 0 か **60,000 以上**になる。★ その最小の非 0 幅に揃える（＝ 現行 UI の被験者から見た挙動は
+/// 「同じ分を両端に入れたときに 1 分消える」だけが変わる）。
+///
+/// ⚠️★★★ **`hole_gap_ms` より大きいことを保つ**（★ 大小の検査は `tests` にある）。
+/// `hole_gap_ms` の値を変えるときは**この値も同時に見直す**（補訂 1 項目 5）。
+pub const MIN_REDACTION_WIDTH_MS: u64 = 60_000;
+
+/// 削除要求の区間 `[from_ms, to_ms]` を、[`MIN_REDACTION_WIDTH_MS`] を満たす形へ直す。
+///
+/// - ★ **広げる向きは終端側**（`to_ms = from_ms + MIN_REDACTION_WIDTH_MS`）。
+///   `from_ms` は被験者が「**ここから**消したい」と言った点なので**動かさない**
+///   （⚠️ 対称に広げると**指定していない過去**が消える）。
+/// - ★ 幅が既に最小幅以上なら **1 ms も広げない**（過剰に消さない）。
+/// - ⚠️★★★ **拒否しない。** 被験者が「消してくれ」と言ったのに消えないのは約束違反である
+///   （補訂 1 項目 5 逐語「**削除は広げる側に倒す。被験者への約束は『その時間帯が消える』ことである**」）。
+/// - ⚠️ `from_ms > to_ms` は**従来どおりエラー**（★ 空区間として黙って全消し／無視にしない）。
+///
+/// ★ 純関数。ファイル I/O を持たないので境界条件をテストで固定できる。
+pub fn widen_to_minimum_width(from_ms: u64, to_ms: u64) -> Result<(u64, u64)> {
+    if from_ms > to_ms {
+        return Err("開始時刻が終了時刻より後になっています。".to_string());
+    }
+    // ⚠️ `saturating_add`: `from_ms` が `u64::MAX` 近傍でも桁あふれで**狭まらない**ようにする。
+    let min_to_ms = from_ms.saturating_add(MIN_REDACTION_WIDTH_MS);
+    Ok((from_ms, to_ms.max(min_to_ms)))
 }
 
 /// NDJSON 1 行が「いつの記録か」を返す。⚠️ ★ **`meta` 行は常に `None`** である。
@@ -1107,5 +1148,153 @@ mod tests {
         append_ledger(&d, 1, 0, 1, &s).unwrap();
         let p = append_ledger(&d, 2, 0, 1, &s).unwrap();
         assert_eq!(fs::read_to_string(&p).unwrap().lines().count(), 2);
+    }
+
+    // ── 削除の最小幅（ADR-030 D8 (b-2) ／ 補訂 1 項目 5 ／ issue 002）──────────────
+
+    /// 最小幅が穴の閾値を**超える**か（★ 定数を直接比べず、**引数を取る**判定にしてある）。
+    ///
+    /// ⚠️★★★ 引数化の理由: 定数どうしを直接 `assert!(A > B)` で比べると、
+    /// 「**今たまたま大小を満たしている**」ことしか言えず、判定が働いていること
+    /// （＝ 崩れたら赤になること）は示せない。★ 真になる組と偽になる組の両方を踏めるようにする。
+    fn min_width_exceeds_hole_gap(min_width_ms: u64, hole_gap_ms: u64) -> bool {
+        min_width_ms > hole_gap_ms
+    }
+
+    /// AC1: 60,000 = 現行 UI（`datetime-local`・秒なし）が作りうる**最小の非 0 幅**。
+    #[test]
+    fn min_redaction_width_matches_the_ui_granularity() {
+        assert_eq!(
+            MIN_REDACTION_WIDTH_MS, 60_000,
+            "★ `RecordingControls.tsx` の削除入力は分単位。値を変えるなら UI の文言（「1 分」）も同時に直す"
+        );
+    }
+
+    /// AC2: ⚠️★★★ 最小幅 > `hole_gap_ms`（凍結済みの既定）。
+    ///
+    /// ★ この test が赤になる場面は 2 つ: `hole_gap_ms` の既定が最小幅以上へ上がったとき、
+    /// 最小幅が `hole_gap_ms` 以下へ下がったとき。⚠️ どちらも**削除区間の内側に onset が立つ穴**が開く
+    /// （補訂 1 項目 5 が「値を変えるときは最小幅も同時に見直す」と書いた理由）。
+    ///
+    /// ⚠️ `analysis/` への参照は**この test だけ**（★ 非 test の `redaction.rs` は `analysis/` を
+    /// 1 行も import しない。`analysis/` 側も `redaction` を参照しない → 循環しない）。
+    #[test]
+    fn min_redaction_width_exceeds_hole_gap() {
+        let hole_gap_ms = crate::analysis::feat_offline::StallOnsetConfig::default().hole_gap_ms;
+        assert!(
+            min_width_exceeds_hole_gap(MIN_REDACTION_WIDTH_MS, hole_gap_ms),
+            "⚠️★★★ 最小幅 {MIN_REDACTION_WIDTH_MS} ms が hole_gap_ms {hole_gap_ms} ms を超えていない \
+             → 削除区間の内側に元に無い onset が立つ穴が開く"
+        );
+    }
+
+    /// AC3: ⚠️★★★ **陽性対照** —— 上の判定は**違反した組で `false` を返す**。
+    ///
+    /// ★ これが無いと、判定が常に真でも AC2 は緑のままである（検査の検査）。
+    #[test]
+    fn min_redaction_width_check_rejects_a_violating_pair() {
+        let hole_gap_ms = crate::analysis::feat_offline::StallOnsetConfig::default().hole_gap_ms;
+        // 真になる組（現行値）。
+        assert!(min_width_exceeds_hole_gap(
+            MIN_REDACTION_WIDTH_MS,
+            hole_gap_ms
+        ));
+        // ⚠️ 現行値を**逆転**させた組は偽。
+        assert!(
+            !min_width_exceeds_hole_gap(hole_gap_ms, MIN_REDACTION_WIDTH_MS),
+            "逆転させた組で判定が真を返している（判定が働いていない）"
+        );
+        // ⚠️ 境界: **等しい**組も偽（★ 厳密な不等式であること）。
+        assert!(!min_width_exceeds_hole_gap(2_000, 2_000));
+        assert!(!min_width_exceeds_hole_gap(1_999, 2_000));
+        assert!(min_width_exceeds_hole_gap(2_001, 2_000));
+    }
+
+    /// AC4: 最小幅未満は **終端側へ**最小幅まで広げる（★ `from` は動かさない）。
+    #[test]
+    fn narrow_range_is_widened_to_the_minimum() {
+        let from = 1_700_000_000_000_u64;
+        // ★ 幅 0 も含める: `datetime-local` は秒が無いので、同じ分を両端に入れると幅 0 になる。
+        for width in [0, 1, 600, 30_000, MIN_REDACTION_WIDTH_MS - 1] {
+            let (f, t) = widen_to_minimum_width(from, from + width).unwrap();
+            assert_eq!(f, from, "⚠️ from は動かさない（幅 {width}）");
+            assert_eq!(
+                t,
+                from + MIN_REDACTION_WIDTH_MS,
+                "幅 {width} は from + 最小幅まで広がるはず"
+            );
+        }
+        // ⚠️ 桁あふれで**狭まらない**（`u64::MAX` 近傍）。
+        let (f, t) = widen_to_minimum_width(u64::MAX - 5, u64::MAX - 1).unwrap();
+        assert_eq!((f, t), (u64::MAX - 5, u64::MAX));
+        assert!(t >= u64::MAX - 1, "広げる操作が要求より狭めてはならない");
+    }
+
+    /// AC5: ⚠️ **陰性対照** —— 幅が既に最小幅以上なら **1 ms も広げない**（過剰に消さない）。
+    #[test]
+    fn wide_enough_range_is_not_widened() {
+        let from = 1_700_000_000_000_u64;
+        for width in [
+            MIN_REDACTION_WIDTH_MS, // ★ 境界（ちょうど最小幅）
+            MIN_REDACTION_WIDTH_MS + 1,
+            3_600_000,
+            86_400_000,
+        ] {
+            assert_eq!(
+                widen_to_minimum_width(from, from + width).unwrap(),
+                (from, from + width),
+                "幅 {width} は最小幅以上なので変えてはならない"
+            );
+        }
+        // 全期間（参加の取りやめ）も変えない。
+        assert_eq!(widen_to_minimum_width(0, u64::MAX).unwrap(), (0, u64::MAX));
+    }
+
+    /// AC6: ⚠️ `from_ms > to_ms` は**従来どおりエラー**（★ 最小幅で救わない・文言も変えない）。
+    #[test]
+    fn reversed_range_is_still_rejected() {
+        let err = widen_to_minimum_width(2_000, 1_000).unwrap_err();
+        assert_eq!(
+            err, "開始時刻が終了時刻より後になっています。",
+            "★ UI がそのまま被験者に見せる文言。変えると従来の振る舞いを壊す"
+        );
+        // ⚠️ 1 ms だけ逆でも拒否する（★ 「ほぼ同じ」を広げて通さない）。
+        assert!(widen_to_minimum_width(1_001, 1_000).is_err());
+    }
+
+    /// ⚠️★★★ 起票 15 の欠陥を**再現してから**直ったことを通しで固める（★ AC1〜6 は部品の検査）。
+    ///
+    /// 1 秒おきの `feat` 行の中で `[30,900, 31,500]` を消すと**消えるのは 1 本だけ**で、
+    /// 隣接差がちょうど 2,000 ms（＝ `hole_gap_ms`。**超えない**）なので区間が切れず、
+    /// 元に無い onset が削除区間の内側に立った。→ 広げたあとは穴が区間を切ること。
+    #[test]
+    fn widening_makes_a_narrow_deletion_split_the_observed_intervals() {
+        use crate::analysis::feat_offline::stall_onset::observed_intervals;
+        let hole_gap_ms = crate::analysis::feat_offline::StallOnsetConfig::default().hole_gap_ms;
+        let rows: Vec<String> = (0..=120_u64)
+            .map(|k| format!(r#"{{"type":"feat","t":{}}}"#, k * 1000))
+            .collect();
+        let feat_ts_after = |from: u64, to: u64| -> Vec<u64> {
+            let (kept, _) = retain_outside_range(rows.iter().map(String::as_str), from, to);
+            kept.iter().filter_map(|l| line_timestamp(l)).collect()
+        };
+
+        // ★ 陽性対照（欠陥の再現）: 広げないと 1 本だけ消え、区間は切れない。
+        let unwidened = feat_ts_after(30_900, 31_500);
+        assert_eq!(unwidened.len(), rows.len() - 1, "消えるのは feat 1 本だけ");
+        assert_eq!(
+            observed_intervals(&unwidened, hole_gap_ms).len(),
+            1,
+            "⚠️ 欠陥の再現に失敗した（前提が変わった: 広げなくても穴が切れるなら本 test を見直す）"
+        );
+
+        // ★ 直った: 最小幅まで広げると、消えた区間が穴として観測区間を 2 つに割る。
+        let (from, to) = widen_to_minimum_width(30_900, 31_500).unwrap();
+        let widened = feat_ts_after(from, to);
+        assert_eq!(
+            observed_intervals(&widened, hole_gap_ms),
+            vec![(0, 30_000), (91_000, 120_000)],
+            "広げた区間 [{from}, {to}] が穴として区間を切っていない"
+        );
     }
 }
