@@ -318,7 +318,9 @@ pub fn build_feature_rows_with_pole_inputs(
             ))
             }
         },
-        _ => std::borrow::Cow::Borrowed(keys),
+        // ★ ワイルドカードなしの網羅列挙 (極を足すと、ここで判定を決めるまでコンパイルが
+        //   通らない。`pole_applicability` (`bin/replay.rs`) と同じ規律)。
+        Pole::Baseline | Pole::PointerB => std::borrow::Cow::Borrowed(keys),
     };
     if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());

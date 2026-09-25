@@ -291,6 +291,17 @@ struct FeatureConfigDto {
     /// 「封筒に理由コード (`no_modifier_rows`) と `modifier` 行数を刻み」)。★ 極 M+ 以外では数えないので `null`。
     /// ⚠️ 0 のとき「計器が無かった」と「押さなかった」は区別できない (上の理由コードの doc)。
     pole_modifier_rows: Option<u64>,
+    /// 極 M+ の区間の健全性: 観測区間の右端で**打ち切られた**押下区間の本数
+    /// (`decisions.md` 判断 24・`stall_onset::ModifierIntervals::truncated_at_right_edge`)。
+    /// ★ 極 M+ 以外では数えないので `null`。⚠️ 値の出所は既存の件数 (`collect_modifier_intervals`
+    /// が `tracing::warn!` へ出しているのと同じもの) —— warn はそのまま残す。
+    /// ⚠️ 0 より大きいと、その本数ぶん区間が本来より短く（＝除外が少なく）数えられている
+    /// (`pole_applicable=true` のまま出力は見た目正常だが、内部で打ち切りが起きている)。
+    pole_modifier_truncated: Option<u64>,
+    /// 極 M+ の区間の健全性: 先行する press が無い release（孤立）の件数
+    /// (`decisions.md` 判断 24・`stall_onset::ModifierIntervals::orphan_releases`)。
+    /// ★ 極 M+ 以外では数えないので `null`。
+    pole_modifier_orphan_releases: Option<u64>,
     /// 採用した事前宣言の `id` / `version` / 内容の SHA-256 先頭桁 (★ 何を読んだかの同定)。
     prereg_id: String,
     prereg_version: String,
@@ -652,10 +663,14 @@ fn resolve_feature_config(
 
 impl FeatureConfigDto {
     /// `modifier_rows` は入力ファイルの修飾キーの `key` 行数 (極 M+ の適用可否・[`pole_applicability`])。
+    /// `modifier_truncated` / `modifier_orphan_releases` は極 M+ の区間の健全性カウンタ
+    /// (`decisions.md` 判断 24・[`ModifierScan`])。
     fn from_resolved(
         resolved: &ResolvedFeatureConfig,
         max_feature_ticks: usize,
         modifier_rows: Option<u64>,
+        modifier_truncated: Option<u64>,
+        modifier_orphan_releases: Option<u64>,
     ) -> Self {
         let c = resolved.stall_onset_config();
         let (pole_applicable, pole_not_applicable_reason) =
@@ -674,6 +689,14 @@ impl FeatureConfigDto {
             pole_not_applicable_reason,
             pole_modifier_rows: match c.pole {
                 Pole::ModifierMPlus => modifier_rows,
+                Pole::Baseline | Pole::PointerB => None,
+            },
+            pole_modifier_truncated: match c.pole {
+                Pole::ModifierMPlus => modifier_truncated,
+                Pole::Baseline | Pole::PointerB => None,
+            },
+            pole_modifier_orphan_releases: match c.pole {
+                Pole::ModifierMPlus => modifier_orphan_releases,
                 Pole::Baseline | Pole::PointerB => None,
             },
             prereg_id: resolved.prereg_id.clone(),
@@ -1911,6 +1934,8 @@ fn main() -> ExitCode {
                 &resolved_config,
                 MAX_FEATURE_TICKS,
                 modifier_scan.as_ref().map(|s| s.rows),
+                modifier_scan.as_ref().map(|s| s.truncated_at_right_edge),
+                modifier_scan.as_ref().map(|s| s.orphan_releases),
             ),
             rows: &rows,
         };
@@ -2816,6 +2841,12 @@ struct ModifierScan {
     rows: u64,
     /// 押下区間 (`stall_onset::modifier_press_intervals`・両端を含む)。
     intervals: Vec<(u64, u64)>,
+    /// 先行する press が無い release の件数 (`decisions.md` 判断 24 の健全性カウンタ・
+    /// `stall_onset::ModifierIntervals::orphan_releases` の写し)。
+    orphan_releases: u64,
+    /// 観測区間の右端で打ち切られた押下区間の本数 (`decisions.md` 判断 24 の健全性カウンタ・
+    /// `stall_onset::ModifierIntervals::truncated_at_right_edge` の写し)。
+    truncated_at_right_edge: u64,
 }
 
 /// `--features --pole modifier_m_plus` (issue 005) 用: 修飾キーの**押下区間**を 1 パスで作る。
@@ -2875,6 +2906,8 @@ fn collect_modifier_intervals(
     Ok(ModifierScan {
         rows: scanned.edges.len() as u64,
         intervals: built.intervals,
+        orphan_releases: built.orphan_releases,
+        truncated_at_right_edge: built.truncated_at_right_edge,
     })
 }
 
@@ -4591,6 +4624,8 @@ mod tests {
             &resolved,
             MAX_FEATURE_TICKS,
             None,
+            None,
+            None,
         ))
         .expect("serialize config");
         assert_eq!(dto["w_ms"], cfg.w_ms);
@@ -4612,8 +4647,10 @@ mod tests {
     #[test]
     fn resolve_without_flags_reproduces_the_frozen_values() {
         let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
-        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1, None))
-            .expect("serialize config");
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved, 1, None, None, None,
+        ))
+        .expect("serialize config");
         let want = frozen_operational_value();
         for key in P1_OPERATIONAL_KEYS {
             assert_eq!(dto[key], want[key], "config.{key} は凍結値と一致する");
@@ -4837,8 +4874,10 @@ mod tests {
     fn envelope_config_always_carries_the_pole_keys() {
         let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
         assert_eq!(resolved.stall_onset_config().pole, Pole::Baseline);
-        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1, None))
-            .expect("serialize config");
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved, 1, None, None, None,
+        ))
+        .expect("serialize config");
         for key in ["pole", "pole_applicable", "pole_not_applicable_reason"] {
             assert!(dto.get(key).is_some(), "config.{key} は常に出る");
         }
@@ -4881,9 +4920,14 @@ mod tests {
         // ★ 極 B だけが未実装。極 M+ は数えていない (`None`) ときに同じ防御の値を出す。
         for (pole, modifier_rows) in [(Pole::PointerB, None), (Pole::ModifierMPlus, None)] {
             let resolved = base.clone().with_pole(pole);
-            let dto =
-                serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1, modifier_rows))
-                    .expect("serialize config");
+            let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+                &resolved,
+                1,
+                modifier_rows,
+                None,
+                None,
+            ))
+            .expect("serialize config");
             assert_eq!(dto["pole"], pole.as_str());
             assert_eq!(dto["pole_applicable"], false);
             assert_eq!(dto["pole_not_applicable_reason"], "not_implemented");
@@ -4918,25 +4962,49 @@ mod tests {
         // ★ 封筒の JSON にも出る (`null` は欠落でも空文字でもない)。
         let base = resolve_feature_config(None, &[]).expect("frozen resolves");
         let resolved = base.with_pole(Pole::ModifierMPlus);
-        let no_rows = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1, Some(0)))
-            .expect("serialize config");
+        let no_rows = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved,
+            1,
+            Some(0),
+            Some(2),
+            Some(3),
+        ))
+        .expect("serialize config");
         assert_eq!(no_rows["pole"], "modifier_m_plus");
         assert_eq!(no_rows["pole_applicable"], false);
         assert_eq!(no_rows["pole_not_applicable_reason"], "no_modifier_rows");
-        let some_rows =
-            serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1, Some(4)))
-                .expect("serialize config");
+        let some_rows = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved,
+            1,
+            Some(4),
+            Some(5),
+            Some(6),
+        ))
+        .expect("serialize config");
         assert_eq!(some_rows["pole_applicable"], true);
         assert!(some_rows["pole_not_applicable_reason"].is_null());
         // ★ 判断 13: 修飾キーの行数も封筒に刻む (0 でも `null` にしない)。
         assert_eq!(no_rows["pole_modifier_rows"], 0);
         assert_eq!(some_rows["pole_modifier_rows"], 4);
+        // ★ 判断 24: 区間の健全性カウンタ（右端打ち切り本数・孤立 release 件数）も封筒に刻む
+        // (0 でも `null` にしない・極 M+ で値が入る)。
+        assert_eq!(no_rows["pole_modifier_truncated"], 2);
+        assert_eq!(no_rows["pole_modifier_orphan_releases"], 3);
+        assert_eq!(some_rows["pole_modifier_truncated"], 5);
+        assert_eq!(some_rows["pole_modifier_orphan_releases"], 6);
         // ★ 極 M+ 以外では数えないので `null` (★ 渡された値を漏らさない)。
         let base_again = resolve_feature_config(None, &[]).expect("frozen resolves");
-        let baseline =
-            serde_json::to_value(FeatureConfigDto::from_resolved(&base_again, 1, Some(7)))
-                .expect("serialize config");
+        let baseline = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &base_again,
+            1,
+            Some(7),
+            Some(8),
+            Some(9),
+        ))
+        .expect("serialize config");
         assert!(baseline["pole_modifier_rows"].is_null());
+        assert!(baseline["pole_modifier_truncated"].is_null());
+        assert!(baseline["pole_modifier_orphan_releases"].is_null());
     }
 
     /// issue 005: 修飾キーの edge は press と release の**両方**を、旧ログ (`vk`) と匿名化ログ (`category`) の

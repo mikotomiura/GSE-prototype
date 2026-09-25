@@ -119,13 +119,16 @@ printf '%s' "$env_out" | jq -e '
   (.config | keys_unsorted | sort) == [
     "b_ms","config_source","engine_tick_ms","hmm_version","hole_gap_ms",
     "max_feature_ticks","net_diff_min","overrides","pause_threshold_ms",
-    "pole","pole_applicable","pole_modifier_rows","pole_not_applicable_reason",
+    "pole","pole_applicable","pole_modifier_orphan_releases","pole_modifier_rows",
+    "pole_modifier_truncated","pole_not_applicable_reason",
     "prereg_id","prereg_sha256_prefix","prereg_version","q","t1a_window_ms",
     "theta_estimator","w_ms","warmup_count"
   ]' >/dev/null 2>&1 \
   || fail "AC7: config のキー集合が規範と完全一致しない。実際: $(printf '%s' "$env_out" | jq -c '.config | keys_unsorted | sort' 2>/dev/null)"
 # ★ 既定値（事前宣言事項・判断 25 #13 が P1 前に凍結する対象）。
 #   ⚠️ 値を変えたら**この行を先に書き換える**こと（★ 黙って変わらせない）。
+# ★ 2026-09-25 (P1 前タスク issue 005・判断 24): `pole_modifier_truncated` / `pole_modifier_orphan_releases`
+#   （区間の健全性カウンタ）を足した（★ 極 M+ 以外では null）。
 # ★ 2026-09-25 (P1 前タスク issue 005): `pole_modifier_rows` を足した（判断 13。★ 極 M+ 以外では null）。
 # ★ 2026-09-25 (P1 前タスク issue 004): 封筒 config に極の 3 キー (`pole` / `pole_applicable` / `pole_not_applicable_reason`) が増えた。
 #   既定 (`--pole` 無指定) は baseline・適用可・理由 null。⚠️ issue 004 の Allowed Files に本ファイルが無く、Loop の verify は
@@ -143,6 +146,7 @@ printf '%s' "$env_out" | jq -e '
   and (.config.overrides == [])
   and (.config.pole == "baseline") and (.config.pole_applicable == true)
   and (.config.pole_not_applicable_reason == null) and (.config.pole_modifier_rows == null)
+  and (.config.pole_modifier_truncated == null) and (.config.pole_modifier_orphan_releases == null)
   and (.config.prereg_sha256_prefix | test("^[0-9a-f]{16}$"))
   and (.config.max_feature_ticks == 1000000)
   and (.config.engine_tick_ms == 1000) and (.config.pause_threshold_ms == 2000)' >/dev/null 2>&1 \
