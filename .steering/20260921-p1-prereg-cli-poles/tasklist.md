@@ -28,24 +28,25 @@
       （従属マーカーの部分一致 ／ 子プロセス stderr の cp932 デコード失敗）→ `decisions.md` 末尾に記録
 - [x] `docs/preregistration-v0.3.md` にリンク 1 行 ／ `docs/agent-shared.md` のリンクハブに 1 行
 - [x] `docs/glossary.md` に確定用語 5 件
-- [ ] コミット（⚠️ `git add -A` / `git add <dir>` は**使わない** —— ファイル名を明示）
+- [x] コミット（⚠️ `git add -A` / `git add <dir>` は**使わない** —— ファイル名を明示） ★ `1cd25ce`
 - [ ] ⚠️★★★ **`status` は `draft` のまま**（★ 判断 16）—— 【2】が end-to-end で通った時点で `frozen` に上げる。
       ★ **それは【2】の issue の最後の AC である**
 
 ## 分解（★ 本セッション・Opus）
 
-- [ ] `to-issues`（`issue-slicing` Skill）で【2】〜【7】を縦切り issue に分解
+- [x] `to-issues`（`issue-slicing` Skill）で【2】〜【7】を縦切り issue に分解
       → `issues/00X.md`（テンプレ `.steering/_template/loop-issue.md`）
-- [ ] `_issue-plan.md`（★ DAG / Allowed Files 交差表 / 自己検査）
-- [ ] `_loop-config.json`（⚠️ **`base_branch` を本タスクの作業ブランチに pin** ——
+- [x] `_issue-plan.md`（★ DAG / Allowed Files 交差表 / 自己検査）
+- [x] `_loop-config.json`（⚠️ **`base_branch` を本タスクの作業ブランチに pin** ——
       ★ 規則は `.steering/_template/loop-config.README.md`）
-- [ ] ⚠️ **`--dry-run` で config / DAG / acceptance の検出を確認**
+- [x] ⚠️ **`--dry-run` で config / DAG / acceptance の検出を確認**
+      ⚠️★★★ **2026-09-25 実行セッションで発見**: 初回の dry-run は **全 issue が `deps=[]`** だった —— ★ `- **001**（…）` の太字が `loop-run.sh` `issue_deps_raw` の正規表現（行頭 `- 001`）に当たらず、**依存が黙って全部落ちていた**（⚠️ `parallel: 2` なら 003 が 001 と同時に走る）。→ ★ 003〜009 の箇条書きを `- 001 （…）` に直し、DAG が §2 と一致することを再 dry-run で確かめた
 - [ ] ⚠️★★★ **issue ファイルだけを読んで実行が成立するか**を自分で確かめる（★ 成立しないなら分解が失敗）
 
 ## ⚠️ 分解セッションはここで終わる
 
-- [ ] `/clear` する
-- [ ] **新セッション**で Loop を始める
+- [x] `/clear` する
+- [x] **新セッション**で Loop を始める
       （★ C: `bash scripts/loop-run.sh .steering/20260921-p1-prereg-cli-poles` ／
        B: `/model sonnet` → `/loop-orchestrate` ／
        A: `bash scripts/loop-spawn.sh --task <task> <id> [short]`

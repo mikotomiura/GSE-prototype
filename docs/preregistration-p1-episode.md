@@ -68,7 +68,7 @@
 | `hole_gap_ms` | `2000` | 観測区間を切る閾値 | ADR-030 **補訂 1 項目 5**（逐語「仮の値は **`2 × ENGINE_TICK_MS`**（「1Hz の予定行が少なくとも 1 本欠けた」と言える**構造上の下限**）」）＋ 研究者判断 25 #6（逐語「**仮の値（2 tick）のまま**」）。★ `ENGINE_TICK_MS = 1000`（`loop_step.rs:40`） |
 | `warmup_count` | `100` | θ の標本数の下限 | ⚠️★★★ **`q` の従属変数**である。★ 実装の nearest-rank は `rank = ceil(q·n)` を `[1, n]` にクランプするので、`ceil(0.99n) < n ⟺ n ≥ 100`。→ **`100 = ⌈1/(1−q)⌉` は「分位点が max に退化しない最小の標本数」**であり、任意の数値ではない |
 | `theta_estimator` | `nearest_rank` | 分位点の推定法 | ADR-030 **D4** 点 3（逐語「`nearest-rank` か線形補間かを**事前宣言する**」）。★ 実装は既に nearest-rank（`stall_onset.rs:172` `quantile_nearest_rank`・module doc `:44` で宣言済み） |
-| `t1a_window_ms` | `30000` | `T1a`（分布）の集約窓 | ★ 研究者裁定（`decisions.md` 判断 4）。⚠️ **現行は 1 tick で構造的に退化している** —— `PAUSE_THRESHOLD_MS`(2000) > `ENGINE_TICK_MS`(1000) なので **1 tick に pause は高々 1 本**であり、`pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は**常に同値**（★ `tests/fixtures/` 14 本すべてで `p50 != max` の行が 0 件）。★ `W` / `B` と同じ 30 秒系列に揃える |
+| `t1a_window_ms` | `30000` | `T1a` の **pause 分位点**（`pause_p50_ms` / `pause_p90_ms` / `pause_max_ms`）の集約窓。⚠️ **`iki_cv` / `surprise` には掛からない**（★ 前者は tick ローカル、後者はセッション相対であり、起票 7 が指摘した退化はこの 3 値にしか起きない） | ★ 研究者裁定（`decisions.md` 判断 4）。⚠️ **現行は 1 tick で構造的に退化している** —— `PAUSE_THRESHOLD_MS`(2000) > `ENGINE_TICK_MS`(1000) なので **1 tick に pause は高々 1 本**であり、`pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は**常に同値**（★ `tests/fixtures/` 14 本すべてで `p50 != max` の行が 0 件）。★ `W` / `B` と同じ 30 秒系列に揃える |
 | `net_diff_min` | `1` | 条件 A の産出判定閾値 | ⚠️ **本書が新たに凍結する値ではない** —— ★ 既存 `OutcomeConfig::net_diff_min`（`metrics.rs:169`）の引き写しである（ADR-030 **D3** 逐語「新しい定数を作らず、既存パラメータを**対称に再利用する**」）。★ JSON が `StallOnsetConfig` を完全に決めるために載せる |
 
 ### ⚠️ `warmup_count` を下回ったとき
