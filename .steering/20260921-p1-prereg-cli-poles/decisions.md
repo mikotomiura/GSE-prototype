@@ -472,3 +472,18 @@
 | P1-E | ⚠️ **分解時の見落としがもう 1 件**: 001 は `envelope-acceptance.sh` AC7（封筒 config のキー集合の完全一致）を赤にするのに、Allowed Files に無かった（★ メインが merge 前に `9ce5df9` で是正） | `security-checker` 補足 / `code-reviewer` H1 |
 | P1-F | `--set q=…` が従属変数 `warmup_count` を連動させない（探索プロトコル実装時に裁定） | 001.md「未解決 4」 |
 | P1-G | security LOW: `--feature-config` の `id` / `version` を検証せず封筒へ写す（★ `config_source` / sha / `overrides` で区別は可能） | `security-checker` LOW-2 |
+
+## ⚠️ 2026-09-25 ウェーブ 2（002 ‖ 003）の記録
+
+- ★ **acceptance の `cargo test <裸の名前> -- --exact` は必ず 0 件マッチ**（`--exact` は完全パスにしか一致しない）→ 実装が正しくても必ず赤。
+  002 / 003 の worker が実測で発見し、自分の acceptance を直して `blocked` を宣言した（★ `cc4d4fe` の遷移検知で attempt 2 で打ち切り）。
+  ★ verify が main 側の acceptance を走らせるのは「worker に門を触らせない」正しい守りなので、**メインがレビューして merge で取り込む**。
+  ★ 未実装の 005〜007 は `b2a2fd9` でモジュール非依存の形（`test <任意のパス>::<name> ... ok` がちょうど 1 行）へ先に直した。
+- ⚠️★★★ **メインの検証スクリプトの欠陥**: `echo "$(…)=$?"` の形で acceptance の終了コードを表示しており、
+  `$(…)` が `$?` を上書きして**常に 0** と出ていた（★ 001 修正後の再検証・002 / 003 の独立検証の acceptance 欄が無効）。
+  ★ 実行直後に `rc=$?` へ退避する形に直し、**わざと落ちるスクリプトで非 0 を拾う**ことを確かめてから全部回し直した →
+  赤は「merge 前の枝に特有」の想定どおり 2 件のみ。merge 済み 001 / 002 の判断は結果として正しかった。
+  ★ 教訓（`feedback_acceptance_self_test` と同型）: **検証スクリプト自体も 3 状態で試してから使う**。
+- ★ 003 MEDIUM-1（区間終端 tick で pause が消える）は方針 (a)＝ `feat_mask_column` の規則に揃えて是正（研究判断ではなく既存定義への整合）。
+- ★ 002 の台帳 `to` の文言は「削除を適用した範囲の上限」へ正した（★ worker が新たに書いた文であり、同意文書本体は不変）。
+- ★ merge 後の main（`dde07ee`）: test 795 / clippy 0 / golden 6 / acceptance 12 本 / prereg parity すべて緑（★ 正しい終了コードで確認）。
