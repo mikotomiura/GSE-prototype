@@ -92,9 +92,13 @@ printf '%s' "$file_out" | jq -e '
   || fail "AC5: --feature-config の値 / config_source が反映されていない"
 
 # ── AC6: theta_sample_n が theta_person_ms と同時にだけ立つ ──────────────
+#   ⚠️ 旧式は `all(.stall_onset; …)` で、入力が配列 `.rows` のため
+#     `Cannot index array with string ("stall_onset")` (jq rc=5) で**実装に関係なく常に落ちた**
+#     (2026-09-25・合成データで実測)。★ 正しくは `all(.[].stall_onset; …)`。
+#     陰性 (片方だけ null) が false・陽性 (両方 null / 両方非 null) が true になることも実測済み。
 printf '%s' "$env_out" | jq -e '
   (.rows | arrays)
-  and (.rows | all(.stall_onset;
+  and (.rows | all(.[].stall_onset;
         (.theta_person_ms == null) == (.theta_sample_n == null)))' >/dev/null 2>&1 \
   || fail "AC6: theta_sample_n が theta_person_ms と同時に立っていない行がある"
 

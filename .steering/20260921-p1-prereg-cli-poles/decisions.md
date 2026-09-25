@@ -387,3 +387,44 @@
 ★ **教訓**: ⚠️ 1 は「**研究者に出す前に一次へ降ろし直す**」で止まった。
 ⚠️ 2 と 3 は「**検査を実ファイルで通しで回す**」（`feedback_acceptance_self_test`）でしか出なかった ——
 ★ **検査を書いただけでは未検証**である。
+
+---
+
+## 判断 17: issue 001 / 004 / 005 / 006 / 007 の Allowed Files に `restart.rs`（テストのリテラル行だけ）を足す
+
+- **日付**: 2026-09-25（★ 実行セッション・研究者裁定）
+- **背景**: issue 001 を Loop（モード C・`--issues 001 --parallel 1`）で試走したところ、worker が attempt 1 で
+  「`StallOnset` に `theta_sample_n` を足すと `restart.rs` の `#[cfg(test)]` 内の構造体リテラル
+  （`..` 無しの全フィールド列挙）がコンパイルできなくなる。`restart.rs` は Allowed Files に無い」として
+  **Stop Condition どおり止まった**（★ worker の判断は正しい）。⚠️ **分解時の見落とし**である。
+  ★ メインが一次で確かめた: `StallOnset` 2 箇所（`:387` `:398`）／ `OnsetEvent` 4 箇所（`:573` `:708` `:858` `:863`）／
+  `StallOnsetInputs` 1 箇所（`:654`）。⚠️ `StallOnsetConfig` は全箇所 `..StallOnsetConfig::default()` なので壊れない。
+  → ★ 同じ穴は **004（極の配線）/ 005（`modifier_intervals`）/ 006（`pointer_active_ts`）/ 007（`ime_overlap` ・`ime_events`）**にもある。
+- **選択肢**:
+  - A: `restart.rs` の **`#[cfg(test)]` 内のリテラルにフィールドを書き足す行だけ**を許可する（5 本に同文）
+  - A': 001 だけ許可し、後続は止まるたびに裁定する
+  - B: `StallOnset` を変えず `serde(flatten)` のラッパで添える（★ 本番コードの形が歪み、検出が 2 度走査になる）
+- **採用**: **A**
+- **理由**: ★ 変更は機械的（フィールドの書き足し）で、⚠️ 非 test の実装と期待値を固定すれば挙動に影響しない。
+  A' は 5 回止まることが**分かっている**のに止めることになる。B は Allowed Files を守るためだけに本番の形を歪める。
+- **影響範囲**: `issues/001.md` / `004.md` / `005.md` / `006.md` / `007.md` の `## Allowed Files` ／ `_issue-plan.md` §3。
+  ⚠️ **並列性は変わらない** —— 5 本はもともと `mod.rs` / `stall_onset.rs` で直列化されており、
+  並列相手の 002 / 008 は `restart.rs` を触らない。
+- **付随**: worker が attempt 1 で見つけた **`001-acceptance.sh` AC6 の jq 欠陥**（`all(.stall_onset; …)` は
+  配列入力で rc=5 ＝ **実装に関係なく常に赤**）を main 側へ取り込んだ。★ メインが旧式 / 新式 × 陽性 / 陰性で
+  実測（旧式 5/5・新式 0/1）。
+
+## 判断 18: `loop-run.sh` が worker の `blocked` を見落として空回りする欠陥を **本タスク内で直す**
+
+- **日付**: 2026-09-25（★ 研究者裁定）
+- **背景**: 上記の試走で worker は attempt 1 で Status を `blocked` にしたが、loop-run は **attempt 6 まで**
+  同じ worker を再起動した（★ 5 attempt の空回り）。原因は 2 つ:
+  (1) attempt ループが verify 失敗後に Status を読み直さない ／
+  (2) `issue_status` は **main checkout 側**を読むが、worker が書くのは **worktree 側**のコピー。
+- **選択肢**: A: 起票だけ残す ／ B: 本タスク内で直す
+- **採用**: **B**
+- **理由**: ★ 残り 8 本の issue でも同じ形の停止は起こりうる（Stop Condition は全 issue にある）。
+  1 回ごとに最大 5 attempt と worker のセッション代を失う。
+- **影響範囲**: `scripts/loop-run.sh` / `scripts/loop-run-guard-test.sh` / `docs/loop-engineering.md`（★ Sonnet に実装を委譲・メインがレビュー）。
+- **付随の発見（⚠️ 未是正・起票）**: `issue_deps_raw` は `- **001**` の太字を依存として拾わず、**警告も出さない**
+  （★ 本タスクの dry-run で 9 本とも `deps=[]` になった）。本タスクでは issue 側の書式を直して回避した。

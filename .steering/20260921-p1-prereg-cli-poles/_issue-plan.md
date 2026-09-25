@@ -57,15 +57,17 @@
 
 | id | Allowed Files |
 |---|---|
-| 001 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `prereg/p1-episode.json`, `docs/preregistration-p1-episode.md`, **前タスク** `005/006/008-acceptance.sh` |
+| 001 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `feat_offline/restart.rs`（★ テストのリテラルのみ・判断 17）, `prereg/p1-episode.json`, `docs/preregistration-p1-episode.md`, **前タスク** `005/006/008-acceptance.sh` |
 | 002 | `lib.rs`, `redaction.rs`, `src/components/RecordingControls.tsx`, `docs/o1-deletion-ledger.md` |
 | 003 | `analysis/features.rs`, `feat_offline/dispersion.rs`, `feat_offline/mod.rs`, `tests/fixtures/t1a_window.ndjson`, **前タスク** `003-acceptance.sh` |
-| 004 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs` |
-| 005 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `tests/fixtures/modifier_pole.ndjson` |
-| 006 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `tests/fixtures/pointer_pole.ndjson` |
-| 007 | `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `tests/fixtures/ime_overlap.ndjson` |
+| 004 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `feat_offline/restart.rs`（★ テストのリテラルのみ・判断 17） |
+| 005 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `feat_offline/restart.rs`（★ テストのリテラルのみ・判断 17）, `tests/fixtures/modifier_pole.ndjson` |
+| 006 | `bin/replay.rs`, `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `feat_offline/restart.rs`（★ テストのリテラルのみ・判断 17）, `tests/fixtures/pointer_pole.ndjson` |
+| 007 | `feat_offline/stall_onset.rs`, `feat_offline/mod.rs`, `feat_offline/restart.rs`（★ テストのリテラルのみ・判断 17）, `tests/fixtures/ime_overlap.ndjson` |
 | 008 | **前タスク** `008-acceptance.sh`, `scripts/run-features-all-poles.sh`, `docs/verification-runbook.md` |
 | 009 | `docs/adr/ADR-030-….md`, **前タスク** `blockers.md`, **前タスク** `tasklist.md` |
+
+⚠️★★★ **2026-09-25 追記（判断 17）**: 001 / 004 / 005 / 006 / 007 に `restart.rs`（`#[cfg(test)]` 内のリテラルのみ）を足した。★ 5 本は元から直列で、並列相手の 002 / 008 は `restart.rs` を触らないので、下表の並列可否は変わらない。
 
 ### 3.2 交差（★ `∅` = 並列可能）
 
