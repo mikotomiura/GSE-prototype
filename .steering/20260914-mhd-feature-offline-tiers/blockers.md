@@ -260,6 +260,14 @@
     同じ尺度で読めない）。⚠️ ★ `code-reviewer` 自身が「手元 fixture が小さく**実証はできなかった**」と
     明記しているので、**断定しない**。★ (a) の裁定と併せて検討する。
 
+### ✅ 是正済み（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 003）
+
+- ★ **裁定**: 選択肢 **(a)** を採った（`decisions.md` 判断 4・研究者裁定）。`pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は **30 秒系列のローリング窓**（値は `docs/preregistration-p1-episode.md` の `t1a_window_ms`）で集約する。因果的で **1 行 1 tick は保たれる**（判断 2・他の issue は壊れない）。`features.rs` の生リテラル `30_000` は `pub const FEATURE_WINDOW_MS` へ命名した（振る舞いは変えていない・ゴールデン byte-equal）。
+- ★ **暫定の検査を置き換えた**: 上の「現状 3 値が同値であること」の検査は、「**窓を 1 tick に戻す（`--set t1a_window_ms=<ENGINE_TICK_MS>`）と 3 値が同値に戻る**」という陽性対照へ書き換えた。新 fixture `tests/fixtures/t1a_window.ndjson` では、`pause_*` が非 null の 25 行中 19 行で `p50 != max`（実測）。
+- ★ 窓は**観測区間をまたがない**（→ 起票 6 の是正も同じ変更で入った）。
+- ⚠️ **残ること**: (1) `surprise` と `pause_max_ms` の共線性・`surprise` の `n` 依存は**直していない**（窓が広がると弱まるはずだが実測していない → 断定しない。ablation 設計に明記が要る）。(2) `feat` 行が疎なセッションでは `pause_*` の多くが `null` になる → P1 で欠損率を数える。(3) `feat` 行が 1 本も無い入力では窓を切らない（onset の扱いとは向きが違う・未裁定）。
+- → ADR-030 補訂 2 項目 6。
+
 ---
 
 ## 起票 8: ★ pause の「対の突き合わせ」が 2 か所に複製されている → **issue 005 で一本化する**
@@ -486,6 +494,14 @@
   - (c) 逐語どおり（Shift 込み）で実装し、偽 onset の増分を **P1 で実測**してから決める
 - **本タスクでの扱い**: ⚠️ **実装しない**（issue 008 の Scope Out）。★ `stall_onset.rs` の module doc に未実装と明記する。
 
+### ✅ 是正済み（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 005）
+
+- ★ 研究者判断 25 #5 の**両極**を実装した: `gse-replay --features --pole modifier_m_plus`（極 M+）と `--pole baseline`（極 M−）。両極は独立に報告し、他の極と Cartesian に組まない（`--pole` は enum・1 実行 1 極）。⚠️ **匿名化の写像は変えていない**（選択肢 (b) は採らない）。
+- ★ 極 M+ は Shift を含む側（onset が多めに出る側）である。押下区間は「連続する release の並びの最後」で閉じる（`decisions.md` 判断 23 —— Windows の自動リピートで `P×N → R` になるため）。削除系（−1）は外さない。
+- ★ **計算できないログ**: `modifier` 行が 0 本のセッションは `pole_applicable=false`・`no_modifier_rows`（判断 13・ファイル単位。OS では判定できない —— `meta` 行に `os` が無い）。2026-08-23 より前のログと macOS のログは、どちらもこれに当たる。
+- ⚠️ **残ること**: `key.mod`（ADR-032 D9）は未実装なので、Shift を含まない M+ は計算できない。M+`modifier` と M+`mod` のどちらを報告するかは未決。
+- → ADR-030 補訂 2 項目 5。
+
 ## 起票 12: ⚠️ ADR-030 D3 の「IME の変換中」の抑制は、区間の定義と「抑制」の意味が決まっていない
 
 > ★ **研究者判断 2026-09-18（判断 25 #7）**: **P1 で頻度を見てから決める**（IME 変換中に立つ onset を数える）。それまで抑制しない。
@@ -501,6 +517,13 @@
      → ★ `ime_shadow` による抑制は**最も効いてほしい場面を覆えない**可能性がある（★ 推論。⚠️ 実データで未確認）。
 - **本タスクでの扱い**: ⚠️ **実装しない**（issue 008 の Scope Out）。
 
+### ✅ 是正済み（⚠️ **数える計器だけ**・★ **抑制は閉じていない**）（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 007）
+
+- ★ 研究者判断 25 #7 の「P1 で頻度を見てから決める」を、**P1 で実行できるようにした**: onset 行に `ime_overlap`（bool・onset でない行は `null`）を足した。定義は「onset の `[s, t0]` と `ime_shadow` 行の `[t − dwell_ms, t]` の閉区間どうしの交わり」。
+- ⚠️★★★ **抑制はしていない。** 検出は `ime_shadow` 行を読まず、`ime_shadow` の有無で `s` / `t0` / θ / `n` の組は 1 本も変わらない（テスト `ime_rows_never_change_the_onset_set`）。
+- ⚠️ **上の「決まっていないこと」1〜3 はどれも閉じていない**: 1（区間の形）は**数え方として**暫定に置いただけで、抑制の定義ではない。2（「抑制」の意味）は未決。3（実効性）は**実データで未確認**のまま —— 20 秒を超えた変換は行が出ないので、`ime_overlap` の頻度は**下限**として読む。
+- → 抑制の要否と形は **P1 の頻度を見てから**、別の補訂で決める。ADR-030 補訂 2 項目 9。
+
 ## 起票 13: ⚠️ ADR-030 D3 のポインタ活動の「両極」は出力の形が決まっていない
 
 > ★ **研究者判断 2026-09-18（判断 25 #8）**: **P1 まで極 A のみ**。極 B と `pointer_bin` の collector は P1 の解析設計と一緒に。
@@ -511,6 +534,14 @@
   **列を 2 本にする**か **別モードにする**かを決める必要がある（★ どちらも出力形状の変更 ＝ 全 acceptance の前提に触る）。
   ⚠️ かつ `pointer_bin` は `--features` の collector にまだ無い。
 - **本タスクでの扱い**: ⚠️ **実装しない**。★ 現行の onset は**極 A（抑制しない）に相当する**と module doc に書く。
+
+### ✅ 是正済み（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 004 / 006）
+
+- ★ **出力の形を決めた**（`decisions.md` 判断 3・研究者裁定）: **別モード `--pole <baseline|pointer_b|modifier_m_plus>`・1 実行 1 極**。`--features` は 1 tick 1 行・`stall_onset` は 1 列のまま（形は不変）で、極は封筒 `config`（`pole` / `pole_applicable` / `pole_not_applicable_reason` ほか）だけが持つ。→ 「列を 2 本にする」は採らなかった。
+- ★ `pointer_bin` の collector（`collect_pointer_bin_timestamps`・時刻だけを読む）と極 B（抑制区間を観測区間と同じ構造で切る・判断 7）を実装した。
+- ⚠️ 実装で分かったこと: 極 B は「onset 少なめ」と**限らない**（θ 経路・分割経路。判断 25）。→ G2 の上下界は 2 極の順序を前提にせず、両極の min / max で取る。
+- ⚠️ 3 回実行が要る → `scripts/run-features-all-poles.sh`（issue 008）が 3 極を all-or-nothing で回す。
+- → ADR-030 補訂 2 項目 3 / 4。
 
 ## 起票 14: ⚠️ ADR-030 D4 の小標本対策（`warmup_count` の値・`cold_start` の集団 prior・版と時点の刻印）
 
@@ -528,6 +559,14 @@
      ⚠️ `.idea/survey §17.3:509` は `warmup_count` を「各時点の特徴値に**付ける**」値として書き、ADR-030 D4 は**閾値**として書いている（★ 語の役割が食い違う）。
 - ★ 併記: 同じ理由で **θ は ADR-008 D4 の `within_session_adaptive`（探索的結果としてのみ報告）に当たる**。⚠️ 出力に出所が載っていない（→ 起票 2）。
 
+### ✅ 是正済み（★ 1 のみ。⚠️ 2 は閉じておらず、3 は確かめていない）（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 001）
+
+- ★ **1（`warmup_count` の値）**: 事前宣言文書（`docs/preregistration-p1-episode.md` §1）と凍結 JSON が持つ。値は `q` の従属変数 `⌈1/(1−q)⌉`（nearest-rank で分位点が最大値に退化しない最小の標本数・`decisions.md` 判断 5）。下回る間は個人分位点を使わず onset を立てない。
+- ★ **退化の判定を出力側で可能にした**: onset 行に `theta_sample_n`（θ を決めた標本数）を出す。上の実測「`n <= 99` なら θ は常に最大値」は、この列で解析側から読める。
+- ⚠️ **2（`cold_start`）は閉じていない**: 集団 prior は**作らない**と裁定した（判断 5 —— P1 前に集団データが無く、prior の中身を推測で埋めることになる）。→ `cold_start` は**未実装のまま**。
+- ⚠️ **3（版と時点の刻印）**: 本タスクで足した封筒の `prereg_id` / `prereg_version` / `prereg_sha256_prefix` は事前宣言の版を刻むが、D4 表 #4 の `feature_schema_version` / `profile_cutoff_time` / `coverage` の有無は**本タスクでは確かめていない**。
+- → ADR-030 補訂 2 項目 1 / 7。
+
 ## 起票 15: ⚠️ `hole_gap_ms`（`feat` 列の穴とみなす間隔）の値
 
 > ★ **研究者判断 2026-09-18（判断 25 #6）**: **仮の値（2 tick）のまま、削除 UI の最小幅 > `hole_gap_ms` を redaction 側の制約として明記・テスト固定する**。値は事前宣言文書で。
@@ -544,6 +583,13 @@
   - ⚠️ ただし **`delete_time_range`（`lib.rs`）は任意の ms を受ける** —— ★ **秒単位の削除 UI を足した時点で実際に起きる**。
   - → ★ 値を事前宣言するときは「**削除 UI の最小幅 > `hole_gap_ms`**」を redaction 側の制約として同時に固定すること（★ 片側だけ決めない）。
 
+### ✅ 是正済み（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 002 ＋ 事前宣言文書）
+
+- ★ **値**: `hole_gap_ms` は**仮の値（2 tick）のまま**事前宣言文書と凍結 JSON に置いた（研究者判断 25 #6・`decisions.md` 判断 14）。⚠️ 上の「P1 の実データで隣接差の分布を見てから事前宣言する」は採らなかった —— P1 のデータは**まだ無い**ので、運用値は今凍結し、探索空間（`hole_gap_ms` を振る）は P1 discovery の内側で回す（判断 1・両建て）。⚠️ `feat` 行の隣接差の分布は**依然として未測定**である。
+- ★ **削除幅の制約**（上の 2026-09-18 追記）: (b) `delete_time_range` は最小幅（`redaction.rs` の `MIN_REDACTION_WIDTH_MS`）未満の区間を**終端側へ広げて**消し、(a) 最小幅 > `hole_gap_ms` を単体テストで固定した（判断 8）。上の `[30,900, 31,500]` は、広げると観測区間が 2 つに割れることを通しで固定している（`widening_makes_a_narrow_deletion_split_the_observed_intervals`）。被験者向けの文言（`RecordingControls.tsx`）と `docs/o1-deletion-ledger.md` に「広げて消える」旨を書いた。
+- ⚠️ **残ること**: 未来側へ広げた終端が実行時刻を超えると、実際にできる穴の幅は `now − from` 程度になり、`now − from` が `hole_gap_ms` 未満（分の頭の直後の削除）では内側に onset の余地が残りうる（issue 002 の既知の制約・未是正）。
+- → ADR-030 補訂 2 項目 1 / 8。
+
 ## 起票 16: ⚠️ 事前宣言した値を `--features` へ外から渡す経路が無い
 
 > ★ **研究者判断 2026-09-18（判断 25 #13）**: 事前宣言文書を作るときに CLI 注入を作る（★ 値より先に作らない）。
@@ -553,6 +599,14 @@
   → ★ P1 前に `W` / `q` / `B` / `hole_gap_ms` / `warmup_count` を宣言しても、**CLI から注入できない**。
 - **★ 次に何をするか**: ★ 値の事前宣言（起票 14 / 15）が決まった時点で、CLI フラグか設定ファイルを足す（★ `bin/replay.rs` の `--features` 経路・小さな issue）。
   ⚠️ **値が決まる前に経路だけ作らない**（★ 使われない CLI は drift する）。
+
+### ✅ 是正済み（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 001）
+
+- ★ 値の事前宣言（起票 14 / 15）が決まったので経路を足した（「値より先に作らない」の順序を守った）: `--features` は**凍結 JSON を既定**として読み（`include_str!` で埋め込み）、`--feature-config <path>` と `--set <key>=<value>` で上書きできる。
+- ★ **未知のキー・型の不一致・範囲外・未実装の `theta_estimator` は fail-closed**（exit 1・stdout 空）。
+- ★ 封筒 `config` に `prereg_id` / `prereg_version` / `prereg_sha256_prefix` / `config_source` / `overrides`（凍結値から**外れたキーだけ**）を刻むので、事前登録から外れた出力は自己申告する。
+- ⚠️ **残ること**: `--set q=…` は従属変数 `warmup_count` を連動させない（`decisions.md` の起票 P1-F・探索プロトコルの実装時に裁定）。`--feature-config` の `id` / `version` は検証せず封筒へ写す（`security-checker` LOW・`config_source` / sha / `overrides` で区別はできる）。
+- → ADR-030 補訂 2 項目 1 / 2。
 
 ## 起票 17: ⚠️★★★ issue 006（`T1d` restart）の算出式が無い（★ しかも「再停止」は転帰側の語）
 
@@ -764,6 +818,13 @@ worktree を撤去できない」）は**この是正で嘘になった**ので�
   2. 足さず、単体テスト（上記）だけで守る。⚠️ **配線を通した実測にはならない**。
   3. `--features` に経過時間を出させ、`008` の既存 AC の中で見る（★ 新しい出力が要る）。
 - ★ **推奨は 1**。⚠️ ただし `docs/verification-runbook.md` の所要時間が伸びるので、採否は研究者が決める。
+
+### ✅ 是正済み（2026-09-25・`.steering/20260921-p1-prereg-cli-poles/` issue 008）
+
+- ★ **採ったのは「AC18c を足す」ではなく、既存の門を張り直す形**: 前タスク `008-acceptance.sh` の AC18 / AC18b を**多 onset の入力**にした（AC18: 15 万打鍵を 100 束に割り、束の間に 35 秒の沈黙を置く → onset 100 本。AC18b: 75,000 対を 100 束に割り、束の間に 35 秒の沈黙 → 立ち上がり 75,000 回のまま onset 100 本）。→ 「onset がちょうど 1 つ」を要求していた旧 AC18 の**逆**になり、`R` に比例する経路が 20 秒の門を通る。
+- ★ **`R` が実際に増えていることを検査自身が確かめる**: onset が 50 本未満なら赤。変異（沈黙を 20 秒に縮めた入力 → onset 1 本）で赤になることを実測した。
+- ★ 門は **1 極あたり**（`--pole baseline` の 1 実行だけを測る）。3 極の実行漏れは `scripts/run-features-all-poles.sh` と `docs/verification-runbook.md` §1 (j) が塞ぐ。
+- ⚠️ **残ること**: 門が測るのは `--pole baseline` だけである。極 B / 極 M+ の経路の計算量は**門では測っていない**（極 B は二分探索で `O((N + I) log N)` とコードで読んで確認しただけ）。
 
 ---
 
