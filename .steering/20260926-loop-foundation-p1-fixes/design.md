@@ -93,3 +93,14 @@
 - 全体: `loop-run-guard-test.sh` / `loop-spawn-cleanup-test.sh` / `loop-worktree-deny-test.sh` / `check-shell-portability.sh`（bash 3.2）/ `check-tests-are-wired.sh` を緑。終了コードは実行直後に `rc=$?`。
 - Rust / gse-replay は触らないので対象外。
 - 手動: 実 Loop 実行（モード C）は本タスクでは行わない（判断 1）。
+
+## 実装中に変わった点・判明した事実（/finish-task Step 2）
+
+- **P1-I の位置**: 当初は「verify 緑の**後**に `check_committed`」だったが、レビュー C-M3 / C-M4 で **verify の前**へ移した（`check_committed && run_verify`）。
+  → `uncommitted` の意味は「verify 前の時点で未コミット／コミット 0 件（verify も watchdog も回さない）」。判断 9。
+- **P1-D**: 装飾剥がし `s/[*_`]//g` だけでは `* 001` の箇条書きが拾えなくなる回帰をメインのレビューで発見 → 箇条書きの `*` を先に `-` へ正規化（`deps_section_plain`・テスト P1-D-c）。
+- **P1-K**: 同時実行の競合はこの環境で 12 並列まで再現しなかった → ロックは「先に置いたロック」で決定論的に検査（11d〜11f）。stale 除去は別ロック `.reap` で直列化（C-M2）・除去を試みた周も待ち回数を進める（C-M1）。
+- **P1-J**: local-ahead の `start` を無修飾の `$base` にすると同名 tag で `worktree add` が曖昧で落ちる → `refs/heads/$base` で修飾（12g）。merge-base の rc 128 と origin_sha 空は「分岐」と別メッセージで止まる（テストでは再現できず・コードのみ）。
+- **P1-B**: 実測で効いた綴りは `Bash(bash .steering/**/*-acceptance.sh)` だけ。境界ではない（判断 8）。文書の「main 側の acceptance を回すので合否は動かない」は誤りとして訂正（S-M1）。
+- **指示文**: empirical-prompt-tuning（`prompt-tuning.md`）で loop-issue / loop-worker の未コミット時の手順を「まず自分で commit」に直した。
+- **最終テスト**: guard / spawn-cleanup 100 / worktree-deny / portability / wired すべて rc=0。
