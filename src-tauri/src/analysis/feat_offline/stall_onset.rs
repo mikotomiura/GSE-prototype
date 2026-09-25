@@ -49,13 +49,68 @@
 //!   (`blockers.md` 起票 11)。
 //! - **IME 変換中の抑制**（D3 抑制表 2 行目）: 区間の定義と「抑制」の意味が未確定。
 //!   研究者判断待ち (`blockers.md` 起票 12)。
-//! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形が未確定。研究者判断待ち
-//!   (`blockers.md` 起票 13)。
+//! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形は**別モード (`--pole`・1 実行 1 極)** に
+//!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B の中身は未実装 (issue 006)。
 //! - **`phase`**: 構造化セッションの block id は未実装。自然セッション (O1) では常に
 //!   `"unspecified"` に collapse する (ADR-030 D5)。
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{KeyPress, OutcomeConfig};
+
+/// ADR-030 D3 の「極」—— 抑制規則の置き方を名前で区別する。
+///
+/// ⚠️★★★ **enum である**ことが、極を掛け合わせた直積を**構造的に作れなくする**
+/// (ADR-030 D3 の囲みの要約: 極は他の極と直積に組まず、独立に報告する ——
+/// ⚠️ 原文は ADR-030 D3 を参照。ここに逐語で写さない (code-reviewer MEDIUM・2026-09-25)。理由: 掛け算で組むと
+/// 極の数が増えて幅が解釈不能になる)。→ **1 実行 1 極**で、出す組は次の 3 つだけ
+/// (`decisions.md` 判断 3):
+///
+/// | 名前 | ポインタ | 修飾キー | 実装 |
+/// |---|---|---|---|
+/// | `baseline` | 極 A (抑制しない) | 極 M− (規則なし) | ★ 現行の計算そのもの |
+/// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | issue 006 |
+/// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | issue 005 |
+///
+/// ⚠️ 極は `--set` で変える 8 値 (`StallOnsetConfig` の他のフィールド) とは**別の軸**であり、
+/// `--set` の対象にしない (CLI は `--pole` だけが持つ)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Pole {
+    #[default]
+    Baseline,
+    PointerB,
+    ModifierMPlus,
+}
+
+impl Pole {
+    /// 全ての極 (定義順)。
+    pub const ALL: [Pole; 3] = [Pole::Baseline, Pole::PointerB, Pole::ModifierMPlus];
+
+    /// CLI (`--pole`) と封筒 `config.pole` に出す名前。
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Pole::Baseline => "baseline",
+            Pole::PointerB => "pointer_b",
+            Pole::ModifierMPlus => "modifier_m_plus",
+        }
+    }
+
+    /// [`Self::as_str`] の逆。⚠️ 未知の名前は `None` (近い名前へ丸めない)。
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.as_str() == name)
+    }
+
+    /// 中身が実装済みの極か。
+    ///
+    /// ⚠️★★★ **`false` の極を黙って `baseline` の値で返してはならない** —— 出力が嘘をつき、
+    /// 極の比較が無意味になる。呼び出し側 (`build_feature_rows` / CLI) は `false` なら**止める**
+    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させる。
+    pub const fn is_implemented(self) -> bool {
+        match self {
+            Pole::Baseline => true,
+            Pole::PointerB | Pole::ModifierMPlus => false,
+        }
+    }
+}
 
 /// `stall onset` 検出のパラメータ。★ `W` / `q` / `B` / `hole_gap_ms` / `warmup_count` は
 /// 値をコードに焼かず、ここで受け取る (ADR-030 D4)。既定値は P1 前の事前宣言が確定するまでの
@@ -81,6 +136,15 @@ pub struct StallOnsetConfig {
     /// θ の標本数がこれ未満なら個人分位点を使わない (`None` を返す)。`None` は無効化
     /// (下限を課さない) を表す (ADR-030 D4 点 1)。
     pub warmup_count: Option<usize>,
+    /// `T1a` の窓長 (ms・P1 事前宣言 §1 の `t1a_window_ms`)。
+    /// ★ 本モジュールは `T1a` の窓を実装していない (issue 003) ため未使用。`b_ms` と同じく
+    /// **設定の器だけ**を持ち、封筒 `config` に載せて値を再現可能にする。
+    pub t1a_window_ms: u64,
+    /// 極 (ADR-030 D3・[`Pole`])。既定は [`Pole::Baseline`] (現行の計算)。
+    /// ⚠️ 他の 8 値と違い `--set` では変えられない (`bin/replay.rs` の `--pole` だけが持つ)。
+    /// ★ 本モジュールの検出そのものはまだ極を読まない —— 非 `baseline` の極は
+    /// `build_feature_rows` が入口で `Err` にするので、ここへは届かない ([`Pole::is_implemented`])。
+    pub pole: Pole,
 }
 
 impl Default for StallOnsetConfig {
@@ -93,6 +157,8 @@ impl Default for StallOnsetConfig {
             net_diff_min: outcome.net_diff_min,
             hole_gap_ms: 2 * ENGINE_TICK_MS,
             warmup_count: None,
+            t1a_window_ms: outcome.merge_gap_ms,
+            pole: Pole::Baseline,
         }
     }
 }
@@ -107,6 +173,12 @@ pub struct StallOnset {
     pub s_ms: Option<u64>,
     pub t0_ms: Option<u64>,
     pub theta_person_ms: Option<u64>,
+    /// `theta_person_ms` を算出した時点の標本数 `n` (`resuming_ts <= s` の隣接 press 対の数)。
+    /// ★ `warmup_count` は `q` の従属変数 `ceil(1 / (1 - q))` なので、将来 `warmup_count` を
+    /// 変えても**過去の出力を読み直せる**ようにするために行が持つ。
+    /// ⚠️ `theta_person_ms` と同じく**設定ではなく結果** (ADR-030 D4) —— 封筒 `config` には入れない。
+    /// `theta_person_ms` が非 `None` の行では必ず非 `None`、それ以外は `None`。
+    pub theta_sample_n: Option<u64>,
     /// onset 行には `s` 時点で有効な宣言 (`ts <= s` の最新) を記録する。宣言が無ければ
     /// `None`。onset でない行は常に `None` (他の 4 フィールドと揃える)。
     pub task_kind: Option<String>,
@@ -121,6 +193,7 @@ impl StallOnset {
             s_ms: None,
             t0_ms: None,
             theta_person_ms: None,
+            theta_sample_n: None,
             task_kind: None,
             phase: "unspecified".to_string(),
         }
@@ -134,6 +207,8 @@ pub(super) struct OnsetEvent {
     pub s_ms: u64,
     pub t0_ms: u64,
     pub theta_person_ms: u64,
+    /// `theta_person_ms` を算出した時点の標本数 (`StallOnset::theta_sample_n` の元)。
+    pub theta_sample_n: u64,
 }
 
 /// 観測区間 1 つぶんの条件 A の評価結果。
@@ -395,15 +470,17 @@ impl ThetaAccumulator {
         self.sorted_values[pos]
     }
 
-    /// `s` 時点で有効な θ_person を返す。`theta_person_from_gaps` と**完全に同じ規則**
+    /// `s` 時点で有効な θ_person を、**その標本数 `n` とともに** `(θ, n)` で返す。
+    /// `theta_person_from_gaps` と**完全に同じ規則**
     /// (`rank = ceil(q * n)` を `[1, n]` にクランプ、1-indexed の nearest-rank) を、
     /// プール全体の filter+sort の代わりに Fenwick 木で計算する。
+    /// ★ `n` は `warmup_count` の判定に使った件数と同じもの (`n_added`) である。
     ///
     /// ⚠️ `s` はこのインスタンスへの呼び出し全体を通して単調非減少でなければならない
     /// (構造体 doc 参照)。降順で呼ぶと `pos` を巻き戻せずに壊れる —— この前提を破る
     /// 呼び出し方をした場合の検出は `tests::matches_naive_reference_on_random_inputs`
     /// (素朴な参照実装との全数比較) に委ねる。
-    fn theta_at(&mut self, s: u64, q: f64, warmup_count: Option<usize>) -> Option<u64> {
+    fn theta_at(&mut self, s: u64, q: f64, warmup_count: Option<usize>) -> Option<(u64, u64)> {
         while self.pos < self.pooled.len() && self.pooled[self.pos].0 <= s {
             let gap_ms = self.pooled[self.pos].1;
             self.add(gap_ms);
@@ -420,7 +497,7 @@ impl ThetaAccumulator {
         }
         let rank = (q * n as f64).ceil() as usize;
         let rank = rank.clamp(1, n);
-        Some(self.find_kth(rank as u64))
+        Some((self.find_kth(rank as u64), n as u64))
     }
 }
 
@@ -475,7 +552,9 @@ fn detect_stall_onsets_for_interval(
         }
         if cond_a[i] && !prev {
             let s = instants[i];
-            if let Some(theta) = theta_acc.theta_at(s, config.q, config.warmup_count) {
+            if let Some((theta, theta_sample_n)) =
+                theta_acc.theta_at(s, config.q, config.warmup_count)
+            {
                 if let Some(t0) = s.checked_add(theta) {
                     // t0 が区間の右端を越える onset は立てない
                     // (D3「セッションが終わった場合は第 3 項を置かない」の issue 008 実装)。
@@ -494,6 +573,7 @@ fn detect_stall_onsets_for_interval(
                                 s_ms: s,
                                 t0_ms: t0,
                                 theta_person_ms: theta,
+                                theta_sample_n,
                             });
                         }
                     }
@@ -620,6 +700,7 @@ fn column_from_onsets(
             s_ms: Some(ev.s_ms),
             t0_ms: Some(ev.t0_ms),
             theta_person_ms: Some(ev.theta_person_ms),
+            theta_sample_n: Some(ev.theta_sample_n),
             task_kind: declaration_in_effect(&sorted_decls, ev.s_ms),
             phase: "unspecified".to_string(),
         };
@@ -745,6 +826,7 @@ mod tests {
                 s_ms: 30_200,
                 t0_ms: 30_300,
                 theta_person_ms: 100,
+                theta_sample_n: 2,
             }
         );
 
@@ -1037,6 +1119,7 @@ mod tests {
                 s_ms: 30_200,
                 t0_ms: 30_300,
                 theta_person_ms: 100,
+                theta_sample_n: 2,
             }
         );
         assert_eq!(
@@ -1045,6 +1128,7 @@ mod tests {
                 s_ms: 80_000,
                 t0_ms: 80_100,
                 theta_person_ms: 100,
+                theta_sample_n: 2,
             },
             "区間2 に打鍵が無いので、a2+W (=80000) の評価時刻自体が無ければ onset 2 は \
              立たず (評価時刻に {{a+W}} を含める規則)、区間1 の cond_a=true を \
@@ -1113,6 +1197,7 @@ mod tests {
         assert_eq!(config.hole_gap_ms, 2 * ENGINE_TICK_MS);
         assert_eq!(config.warmup_count, None);
         assert_eq!(config.net_diff_min, outcome.net_diff_min);
+        assert_eq!(config.t1a_window_ms, outcome.merge_gap_ms);
     }
 
     /// AC9: `warmup_count` が `Some(n)` で標本数が `n` 未満なら onset を立てない。
@@ -1395,7 +1480,7 @@ mod tests {
         s: u64,
         q: f64,
         warmup_count: Option<usize>,
-    ) -> Option<u64> {
+    ) -> Option<(u64, u64)> {
         let mut gaps: Vec<u64> = Vec::new();
         for w in sorted_press_ts.windows(2) {
             let (k_i, k_ip1) = (w[0], w[1]);
@@ -1416,7 +1501,9 @@ mod tests {
             }
         }
         gaps.sort_unstable();
-        quantile_nearest_rank(&gaps, q)
+        // ★ 標本数 `n` は素朴な参照側でも独立に数える (Fenwick 木の `n_added` を信用しない)。
+        let n = gaps.len() as u64;
+        quantile_nearest_rank(&gaps, q).map(|theta| (theta, n))
     }
 
     fn naive_detect_stall_onsets(
@@ -1460,7 +1547,7 @@ mod tests {
                 if cond_a[i] && !prev {
                     let s = instants[i];
                     // ★ θ も毎回全 gap から集め直す (naive・s ごとに再走査・再ソート)。
-                    if let Some(theta) = naive_theta_at(
+                    if let Some((theta, theta_sample_n)) = naive_theta_at(
                         &sorted_press_ts,
                         &intervals,
                         s,
@@ -1483,6 +1570,7 @@ mod tests {
                                         s_ms: s,
                                         t0_ms: t0,
                                         theta_person_ms: theta,
+                                        theta_sample_n,
                                     });
                                 }
                             }
@@ -1584,16 +1672,91 @@ mod tests {
             s_ms: 1_000,
             t0_ms: 5_500,
             theta_person_ms: 4_500,
+            theta_sample_n: 7,
         };
         let later = OnsetEvent {
             s_ms: 2_000,
             t0_ms: 5_800, // earlier と同じ tick (5000..6000)
             theta_person_ms: 3_800,
+            theta_sample_n: 9,
         };
         let column = column_from_onsets(&[earlier, later], &[], 10, 0, 1000);
         assert!(column[5].is_onset);
         assert_eq!(column[5].t0_ms, Some(5_500), "先に確定した onset を残す");
         assert_eq!(column[5].s_ms, Some(1_000));
+        assert_eq!(
+            column[5].theta_sample_n,
+            Some(7),
+            "θ と標本数は同じ onset のものが残る (後の onset の 9 が混ざらない)"
+        );
+    }
+
+    /// 等間隔 `step_ms` の press を `count` 個 (`t = 0, step, 2*step, ...`) 並べる。
+    /// 隣接対は `count - 1` 個 (どれも gap = `step_ms`)。
+    fn evenly_spaced_keys(step_ms: u64, count: u64) -> Vec<KeyPress> {
+        (0..count).map(|i| key(i * step_ms)).collect()
+    }
+
+    /// AC6: `theta_sample_n` は `theta_person_ms` と**同時にだけ**立つ。onset 行では標本数
+    /// (`resuming_ts <= s` の隣接対の数) と一致し、onset でない行は `null`。
+    #[test]
+    fn theta_sample_n_is_present_exactly_when_theta_is() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 31_000, 1_000);
+        let column = stall_onset_column(&small_onset_keys(), &feat, &[], 40, 0, 1_000, &config);
+
+        assert!(
+            column.iter().any(|r| r.is_onset),
+            "対照: onset が 1 つは立つ"
+        );
+        for row in &column {
+            assert_eq!(
+                row.theta_person_ms.is_some(),
+                row.theta_sample_n.is_some(),
+                "θ と標本数は同時に立つ: {row:?}"
+            );
+        }
+        let onset_row = column.iter().find(|r| r.is_onset).expect("onset row");
+        // 0→100 / 100→200 の 2 対 (手計算・モジュール doc 参照)。
+        assert_eq!(onset_row.theta_sample_n, Some(2));
+        assert!(column
+            .iter()
+            .filter(|r| !r.is_onset)
+            .all(|r| r.theta_sample_n.is_none()));
+    }
+
+    /// AC7: `warmup_count` は標本数 `n` が下限に**届くまで** θ を出さず、届いた onset は
+    /// `theta_sample_n >= warmup_count` を満たす (`n == warmup_count` ちょうどでも出る)。
+    /// ★ 対照 (`Some(n)` → onset あり / `Some(n + 1)` → onset なし) で、
+    /// 「そもそも onset が立たない入力だった」と区別する。
+    #[test]
+    fn warmup_count_blocks_theta_below_the_floor() {
+        // 101 press = 100 対 (gap 100ms)。最後の press (t=10_000) が窓から抜ける
+        // s = 40_000 で条件 A が立ち、θ = 100 → t0 = 40_100。
+        let keys = evenly_spaced_keys(100, 101);
+        let feat = feat_ts_range(0, 41_000, 1_000);
+
+        let floor_met = StallOnsetConfig {
+            warmup_count: Some(100),
+            ..StallOnsetConfig::default()
+        };
+        let onsets = detect_stall_onsets(&keys, &feat, &floor_met);
+        assert_eq!(
+            onsets.len(),
+            1,
+            "n = warmup_count ちょうどなら出る: {onsets:?}"
+        );
+        assert_eq!(onsets[0].theta_sample_n, 100);
+        assert!(onsets[0].theta_sample_n >= 100);
+
+        let floor_missed = StallOnsetConfig {
+            warmup_count: Some(101),
+            ..StallOnsetConfig::default()
+        };
+        assert!(
+            detect_stall_onsets(&keys, &feat, &floor_missed).is_empty(),
+            "n = 100 < warmup_count = 101 なら θ を出さず、onset も立たない"
+        );
     }
 
     /// AC16: `u64` 上限付近の時刻で panic しない (加算オーバーフローを `checked_add` で防ぐ)。
@@ -1609,5 +1772,45 @@ mod tests {
         let onsets = detect_stall_onsets(&keys, &feat, &config);
         assert!(onsets.is_empty());
         let _ = stall_onset_column(&keys, &feat, &[], 5, near_max, 1000, &config);
+    }
+
+    /// 極の既定は `Baseline` (現行の計算)。`StallOnsetConfig` の既定にも及ぶ。
+    #[test]
+    fn pole_defaults_to_baseline() {
+        assert_eq!(Pole::default(), Pole::Baseline);
+        assert_eq!(StallOnsetConfig::default().pole, Pole::Baseline);
+    }
+
+    /// 名前の往復と、未知の名前の拒否。★ 大文字小文字・前後の空白・近い綴りを丸めない。
+    #[test]
+    fn pole_names_round_trip_and_unknown_is_none() {
+        for pole in Pole::ALL {
+            assert_eq!(Pole::from_name(pole.as_str()), Some(pole));
+        }
+        assert_eq!(
+            Pole::ALL.map(Pole::as_str),
+            ["baseline", "pointer_b", "modifier_m_plus"]
+        );
+        for bad in [
+            "",
+            "bogus",
+            "Baseline",
+            " baseline",
+            "baseline ",
+            "pointer",
+            "modifier",
+            "pointer_b+modifier_m_plus",
+        ] {
+            assert_eq!(Pole::from_name(bad), None, "`{bad}` は未知の極");
+        }
+    }
+
+    /// 現時点で中身があるのは `baseline` だけ。⚠️ issue 006 / 005 が 1 極ずつ `true` にする
+    /// (そのとき本テストの期待を変える —— 開通したことを意図して書き換えさせるための固定)。
+    #[test]
+    fn only_baseline_pole_is_implemented() {
+        assert!(Pole::Baseline.is_implemented());
+        assert!(!Pole::PointerB.is_implemented());
+        assert!(!Pole::ModifierMPlus.is_implemented());
     }
 }

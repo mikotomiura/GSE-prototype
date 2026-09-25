@@ -1422,6 +1422,12 @@ struct RedactionOutcomeDto {
 ///   `BufWriter` がすでに開いている fd へ書き続け、**削除したはずの行が復活する**。
 ///   → ★ UI は「先に一時停止してください」と促し、`files_skipped>0` をそのまま表示する。
 /// - ★ 台帳へ「消した事実」を 1 行残す（⚠️ **何を消したかは書かない**）。
+/// - ⚠️★★★ **最小幅（`MIN_REDACTION_WIDTH_MS`）未満の区間は、終端側へ広げてから消す**
+///   （ADR-030 D8 (b-2) ／ 補訂 1 項目 5 ／ 判断 8）。★ `feat` 行が 1 本だけ欠ける幅の削除は
+///   穴として区間を切らず、削除区間の内側に**元に無い onset** が立つため。
+///   ⚠️ **拒否はしない**（「その時間帯が消える」が被験者への約束）。★ 台帳の `to` は
+///   **広げたあとの値**（＝ 削除を適用した範囲の上限）である。⚠️ 実行時刻より未来の部分や、
+///   `skip` した書きかけのファイルの行は消えない（★ `docs/o1-deletion-ledger.md`）。
 #[tauri::command]
 fn delete_time_range(
     from_ms: u64,
@@ -1430,9 +1436,9 @@ fn delete_time_range(
     engine: State<'_, CognitiveStateEngine>,
     reset_signal: State<'_, ResetSignal>,
 ) -> Result<RedactionOutcomeDto, String> {
-    if from_ms > to_ms {
-        return Err("開始時刻が終了時刻より後になっています。".to_string());
-    }
+    // ⚠️ `from_ms > to_ms` の拒否もここ（従来どおり `Err`）。★ 以降は**広げたあとの値**で処理する
+    //   （ローテート後の削除・台帳の追記も同じ範囲になる）。
+    let (from_ms, to_ms) = crate::redaction::widen_to_minimum_width(from_ms, to_ms)?;
 
     // ⚠️★★★ **O1 では先に現行ファイルを閉じる** (code-reviewer / security-checker が一致して指摘)。
     //

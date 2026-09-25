@@ -25,6 +25,21 @@ use std::collections::VecDeque;
 /// (`make_silence_observation` の `f1 = 2000.0`) は本定数と無関係である。
 pub const PAUSE_THRESHOLD_MS: u64 = 2_000;
 
+/// TUNE: 特徴量計算ウィンドウ = 30 秒 (30,000 ms)。`FeatureExtractor::calculate_features` の
+/// 「直近 N ms」の N。
+///
+/// ★ 命名の経緯: 2026-09-25 に `.steering/20260921-p1-prereg-cli-poles/` の issue 003 で、
+/// **値を 1 ビットも変えない命名のみのリファクタ**として、名前の無い生リテラル `30_000` から
+/// 抽出した (`PAUSE_THRESHOLD_MS` の抽出と同じ型)。
+/// ⚠️ `HMM_VERSION` は bump しない —— `engine.rs` の bump 対象は数値挙動の変更であり、
+/// `u64` の引き算のリテラルを同値の定数へ置き換える操作はこれに当たらない
+/// (★ ゴールデン replay の byte-equal で確認する)。
+///
+/// ⚠️ **オフライン側の `T1a` の窓 (`StallOnsetConfig::t1a_window_ms`) はこの定数を参照しない。**
+/// ★ 値が同じ 30 秒系列というだけで**別の knob** である (`T1a` の窓の SSOT は
+/// `src-tauri/prereg/p1-episode.json`)。ここを変えても `T1a` の窓は動かず、逆も同じ。
+pub const FEATURE_WINDOW_MS: u64 = 30_000;
+
 #[derive(Debug, Clone, Copy)]
 pub struct InputEvent {
     pub vk_code: u32,
@@ -125,8 +140,8 @@ impl FeatureExtractor {
         }
 
         let last_ts = self.buffer.back().unwrap().timestamp;
-        // TUNE: 特徴量計算ウィンドウ = 30 秒 (30,000 ms)
-        let cutoff = last_ts.saturating_sub(30_000);
+        // TUNE: 特徴量計算ウィンドウ = FEATURE_WINDOW_MS (30 秒)
+        let cutoff = last_ts.saturating_sub(FEATURE_WINDOW_MS);
 
         // 直近30秒のイベントを収集
         let events: Vec<&InputEvent> = self

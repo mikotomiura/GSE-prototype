@@ -32,6 +32,9 @@ printf '%s' "$out" | jq -e '
 
 # ⚠️ 退化していないこと: stall_onset_observed は長い沈黙を 2 つ含むので onset が 1 回以上立つはず。
 #   ★ 立たないなら「検出器が何も検出しない」= 緑に見えて無意味。
+#   ★ 2026-09-25 (P1 前 issue 001): 既定が凍結 JSON (warmup_count = 100) になり、第 1 onset
+#     (θ の標本が 11 対 < 100) は消えて **onset は 2 本 → 1 本**になった。⚠️ 本検査は「1 本以上」
+#     なので通る (検査は緩めていない)。本数の厳密な pin は 008-acceptance.sh AC1 が持つ。
 printf '%s' "$out" | jq -e '[.[].stall_onset.is_onset | select(. == true)] | length > 0' >/dev/null 2>&1 \
   || fail "stall_onset_observed.ndjson で onset が 1 度も立たない（★ 検出器が何も検出していない）"
 
@@ -64,10 +67,12 @@ grep -qE 'super::|crate::analysis::feat_offline::' "$SRCF"   || fail "$SRCF が 
 
 # ⚠️★★★ 2026-09-15 追加（★ decisions.md 判断 11 —— `recheck` を `parse` に落としたぶん、
 #   機械検査をここで厚くする。★ 型は引き継ぎ §4）。
+#   ★ 2026-09-25 (P1 前 issue 001): θ の標本数 `theta_sample_n` を足したので **6 個 → 7 個**。
+#     ⚠️ 完全一致は保ったまま期待値だけを更新した (増えても減っても落とす)。
 printf '%s' "$out" | jq -e '
   [.[].stall_onset | keys_unsorted[]] | unique
-  == ["is_onset","phase","s_ms","t0_ms","task_kind","theta_person_ms"]' >/dev/null 2>&1 \
-  || fail "stall_onset のキー集合が AC1 の 6 個と完全一致しない（★ 増えても減っても落とす）"
+  == ["is_onset","phase","s_ms","t0_ms","task_kind","theta_person_ms","theta_sample_n"]' >/dev/null 2>&1 \
+  || fail "stall_onset のキー集合が AC1 の 7 個 (6 個 + theta_sample_n) と完全一致しない（★ 増えても減っても落とす）"
 
 # ⚠️★★★ ADR-030 D3 逐語「新しい定数を作らない」。★ W / q / B の値を決めるのは Scope Out である。
 if grep -nE '^[[:space:]]*(pub )?const +[A-Z_]+ *: *(u8|u16|u32|u64|usize|i8|i16|i32|i64|isize|f32|f64) *=' \

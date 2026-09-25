@@ -40,6 +40,15 @@ cd "$MAIN_ROOT"
 case "$TASK_DIR" in /*) : ;; *) TASK_DIR="$MAIN_ROOT/$TASK_DIR" ;; esac
 [ -d "$TASK_DIR" ] || die "task ディレクトリが見つかりません: $TASK_DIR"
 
+# ⚠️★★★ TASK_DIR の repo 相対パス (worktree 側の issue ファイルを引く土台・2026-09-25 追加)。
+#   ★ MAIN_ROOT は `C:/...`、TASK_DIR は `/c/...` のように git-bash で表記が揺れうるので、
+#     文字列の前方一致 (`${TASK_DIR#$MAIN_ROOT}`) では剥がせない (実測: 揺れると一致しない)。
+#   → git 自身に相対パスを聞く。worktree はリポジトリ全体をミラーするので、
+#     この相対パスは worktree ルート以下でもそのまま通用する。
+TASK_DIR_RELPATH="$(git -C "$TASK_DIR" rev-parse --show-prefix 2>/dev/null)"
+TASK_DIR_RELPATH="${TASK_DIR_RELPATH%/}"
+[ -n "$TASK_DIR_RELPATH" ] || die "TASK_DIR の repo 相対パスを解決できません: $TASK_DIR"
+
 CFG="$TASK_DIR/_loop-config.json"
 [ -f "$CFG" ] || die "_loop-config.json がありません: $CFG"
 
@@ -255,6 +264,21 @@ issue_status_key() { # issue_status_key <id> → 判定用に正規化した文�
   issue_status "$1" | sed -e 's/^[^A-Za-z]*//' | tr 'A-Z' 'a-z'
 }
 
+# ⚠️★★★ 上の issue_status* は $TASK_DIR (main checkout 側) を読む。既存の呼び出し元
+#   (dry-run の実行計画 / ALL の決定) はそれで正しいので**変えない**。
+#   ★ ここで足すのは **worktree 側のコピー**を読む版 (2026-09-25 実測の是正):
+#     worker が Allowed Files 外の変更が必要と判断して `## Status` を blocked に書き換えるのは
+#     worktree 側のファイルであり、main checkout 側は動かない。正規化は issue_status_key と揃える。
+wt_issue_file() { printf '%s/%s/issues/%s.md' "$1" "$TASK_DIR_RELPATH" "$2"; } # wt_issue_file <wt> <id>
+wt_issue_status() { # wt_issue_status <wt> <id> → worktree 側 ## Status 節の最初の非空行 (無ければ空文字)
+  local f; f="$(wt_issue_file "$1" "$2")"
+  [ -f "$f" ] || { printf ''; return; }
+  awk '$0=="## Status"{f=1;next} /^## /{f=0} f' "$f" | grep -m1 -v '^[[:space:]]*$' || true
+}
+wt_issue_status_key() { # wt_issue_status_key <wt> <id> → 判定用に正規化した文字列
+  wt_issue_status "$1" "$2" | sed -e 's/^[^A-Za-z]*//' | tr 'A-Z' 'a-z'
+}
+
 # ---------- fingerprint ----------
 # ⚠ 既定の抽出を `grep -aiE 'fail|error|assert'` だけにしてはならない。
 #    lint / typecheck の出力には "fail" も "error" も "assert" も現れないことが多く、
@@ -430,9 +454,29 @@ add_usage() { # add_usage <tokens> <cost_usd>  並列からも安全に加算 (f
 tokens_used() { cat "$TOKENS_FILE"; }
 cost_used()   { cat "$COST_FILE"; }
 
+# ---------- worker が worktree 側で Status を blocked にしたか (2026-09-25 追加) ----------
+# ⚠️★★★ 実測 (issue 001・2026-09-25): worker が「Allowed Files の外の変更が必要」と判断し、
+#   worktree 側の issue ファイルの `## Status` を `blocked（…）` に書き換えて attempt を止めたのに、
+#   loop-run.sh は気づかず acceptance_fail として **同じ worker を max_attempts まで再起動**した
+#   (issue 001 で 5 attempt の空回り)。
+#   ★ 検知するのは「開始時は blocked でなかったのに今 blocked」という*遷移*だけにする ——
+#     `--issues` で最初から blocked な issue を明示実行する既存経路 (BYPASSED_BLOCKED) は
+#     遷移が起きないのでこの関数を素通りする (壊さない)。
+check_wt_became_blocked() { # check_wt_became_blocked <id> <wt> <attempt> <was-blocked-at-start:0|1>; 0=遷移を検知 1=検知せず
+  local id="$1" wt="$2" attempt="$3" was_blocked="$4"
+  [ "$was_blocked" = "0" ] || return 1
+  case "$(wt_issue_status_key "$wt" "$id")" in
+    blocked*)
+      emit "$id" verify blocked attempt="$attempt" \
+           detail="worker が Status を blocked にした ($(wt_issue_status "$wt" "$id" | head -c 120))。★ worktree は残す: $wt"
+      return 0 ;;
+  esac
+  return 1
+}
+
 # ---------- 1 issue の attempt ループ ----------
 run_issue() {
-  local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor
+  local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor wt_blocked_at_start=0
   # ⚠️★★★ **`--task` を渡す** (★ 起票 23)。
   #   ★ 旧実装は `--no-exec "$id"` だけを渡しており、⚠️ **loop-run.sh は `$TASK_DIR` を
   #     持っているのに伝えていなかった**ので、`loop-spawn.sh` が `.steering/*/_loop-config.json` を
@@ -470,6 +514,14 @@ run_issue() {
   #     ⚠️ **他ブランチへの差し替えだけが不一致になる**。
   #   ⚠️ 取れなければ空のまま進む（★ 名前の検査は base 無しでも効く。fail-open にはしない）。
   wt_anchor="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+
+  # ⚠️★★★ worktree 生成直後の Status を記録する (2026-09-25 追加)。
+  #   ★ `--issues` で最初から blocked な issue を明示実行する経路 (BYPASSED_BLOCKED) では
+  #     ここが 1 になり、`check_wt_became_blocked` は「遷移していない」として素通りする。
+  case "$(wt_issue_status_key "$wt" "$id")" in
+    blocked*) wt_blocked_at_start=1 ;;
+    *)        wt_blocked_at_start=0 ;;
+  esac
 
   while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     if [ "$(tokens_used)" -ge "$TOKEN_CEIL" ]; then
@@ -627,10 +679,14 @@ run_issue() {
     if [ ! -s "$vout" ]; then
       emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp" \
            detail="WARN: verify 出力が空。fingerprint は無効として no-progress 判定に使わない"
+      # ★ no_progress 判定より前に見る (2026-09-25 追加。詳細は check_wt_became_blocked の冒頭)。
+      check_wt_became_blocked "$id" "$wt" "$attempt" "$wt_blocked_at_start" && return 1
       last_fp=""; same=0
       attempt=$((attempt+1)); continue
     fi
     emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp"
+    # ★ no_progress 判定より前に見る (2026-09-25 追加。詳細は check_wt_became_blocked の冒頭)。
+    check_wt_became_blocked "$id" "$wt" "$attempt" "$wt_blocked_at_start" && return 1
     if [ "$fp" = "$last_fp" ]; then same=$((same+1)); else same=1; last_fp="$fp"; fi
     if [ "$same" -ge "$NO_PROGRESS" ]; then
       emit "$id" verify no_progress_stop attempt="$attempt" fingerprint="$fp" \

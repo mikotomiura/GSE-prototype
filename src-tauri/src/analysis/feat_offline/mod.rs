@@ -84,7 +84,7 @@ pub use dispersion::Dispersion;
 pub use quality::{HookHealthEvent, Quality};
 pub use restart::Restart;
 pub use revision::Revision;
-pub use stall_onset::{StallOnset, StallOnsetConfig};
+pub use stall_onset::{Pole, StallOnset, StallOnsetConfig};
 
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{is_backspace, is_text_producing, KeyPress};
@@ -128,6 +128,9 @@ pub struct QualityInputs<'a> {
 /// ⚠️ `dispersion` はモジュール doc 「Tier ごとの causal / retrospective の区分」が
 /// 予告した retrospective 側の Tier —— `surprise` はセッション全体の IKI baseline を
 /// 要するため、`activity` (causal) と混ぜず別フィールドに置く。
+/// ★ `dispersion.pause_*` は `t1a_window_ms` の**因果窓**で集約した値である (issue 003・
+/// `dispersion::pause_ms_by_window`)。⚠️ tick 帰属ではなく窓なので、上の「tick への帰属規則」の
+/// `pauses` (件数・tick 帰属) とは集計単位が違う。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FeatureRow {
     /// tick 開始時刻 (**絶対 epoch ms**)。モジュール doc の「tick への帰属規則」参照。
@@ -237,6 +240,11 @@ pub fn net_production(keys: &[KeyPress]) -> i64 {
 /// 巨大ギャップは**黙って潰さず** `Err` で止める (⚠️ `saturating_sub` で吸収すると
 /// D9 の危険側に落ちる)。★ 上限値そのものは `bin/replay.rs` が所有する
 /// (⚠️ 本モジュールに新しい数値定数を置かないため・AC 6)。
+///
+/// ⚠️★★★ **`stall_onset_inputs.config.pole` が未実装の極なら `Err`** ([`Pole::is_implemented`])。
+/// ★ 極の中身が無いのに `baseline` の値を返すと、出力が `pole = pointer_b` と名乗ったまま
+/// 別の計算の結果を載せる (**出力が嘘をつく**)。⚠️ **入力が空でも先に検査する** ——
+/// 空の `Vec` を返すと「その極で計算した結果が 0 行だった」と読まれる。
 pub fn build_feature_rows(
     keys: &[KeyPress],
     paste_ts: &[u64],
@@ -245,6 +253,13 @@ pub fn build_feature_rows(
     stall_onset_inputs: &StallOnsetInputs,
     quality_inputs: &QualityInputs,
 ) -> Result<Vec<FeatureRow>, String> {
+    let pole = stall_onset_inputs.config.pole;
+    if !pole.is_implemented() {
+        return Err(format!(
+            "pole `{}` is not implemented yet (refusing to return baseline values under another pole's name)",
+            pole.as_str()
+        ));
+    }
     if keys.is_empty() && paste_ts.is_empty() && ime_events.is_empty() {
         return Ok(Vec::new());
     }
@@ -322,10 +337,23 @@ pub fn build_feature_rows(
         boundary_pairs_by_tick[tick_of(pair.resuming_ts)].push(pair);
     }
 
-    let mut pause_ms_by_tick: Vec<Vec<u64>> = vec![Vec::new(); tick_count];
-    for pd in dispersion::pause_durations(&all_press_ts) {
-        pause_ms_by_tick[tick_of(pd.resuming_ts)].push(pd.gap_ms);
-    }
+    // ★ `T1a` の pause 分位点は tick ではなく `t1a_window_ms` の因果窓で集約する (issue 003・判断 4)。
+    //   ⚠️ 窓は観測区間 (`feat` 行の穴) をまたがない (起票 6) —— 観測区間は **dispersion 用に**
+    //   ここで 1 度だけ作って渡す (`dispersion` から `feat` 行を読み直さない。⚠️ `quality_column`
+    //   は別の呼び出しで自分の観測区間を作り直しており、これはそちらへは渡っていない)。
+    //   `iki_cv` / `surprise` には窓を掛けない。
+    let observed = stall_onset::observed_intervals(
+        stall_onset_inputs.feat_ts,
+        stall_onset_inputs.config.hole_gap_ms,
+    );
+    let pause_ms_by_tick = dispersion::pause_ms_by_window(
+        &dispersion::pause_durations(&all_press_ts),
+        tick_count,
+        grid_origin_ms,
+        ENGINE_TICK_MS,
+        stall_onset_inputs.config.t1a_window_ms,
+        &observed,
+    );
     // ★ baseline はセッション全体の IKI から一度だけ作り、tick ごとに作り直さない
     // (AC5: surprise はセッション相対)。
     let all_iki_ms: Vec<u64> = iki_ms_by_tick.iter().flatten().copied().collect();
@@ -429,6 +457,46 @@ mod tests {
             &test_quality_inputs(),
         )
         .expect("within tick limit")
+    }
+
+    /// issue 004: 未実装の極は**入力が空でも** `Err` (黙って baseline の値を返さない)。
+    /// ⚠️ 陰性対照 (`baseline`) が通ることも同じテストで固定する —— 常に `Err` を返す実装を通さない。
+    #[test]
+    fn unimplemented_pole_is_refused_even_on_empty_input() {
+        let with_pole = |pole: Pole| StallOnsetInputs {
+            feat_ts: &[],
+            task_kind_declarations: &[],
+            config: StallOnsetConfig {
+                pole,
+                ..StallOnsetConfig::default()
+            },
+        };
+        let run = |pole: Pole, keys: &[KeyPress]| {
+            build_feature_rows(
+                keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &with_pole(pole),
+                &test_quality_inputs(),
+            )
+        };
+
+        for pole in [Pole::PointerB, Pole::ModifierMPlus] {
+            for keys in [&[][..], &[key_at(0)][..]] {
+                let err = run(pole, keys).expect_err("未実装の極は Err");
+                assert!(err.contains(pole.as_str()), "極の名前が出る: {err}");
+            }
+        }
+        assert!(run(Pole::Baseline, &[])
+            .expect("baseline は通る")
+            .is_empty());
+        assert_eq!(
+            run(Pole::Baseline, &[key_at(0)])
+                .expect("baseline は通る")
+                .len(),
+            1
+        );
     }
 
     /// 境界入力で `build_feature_rows` が panic しないことを確認する (AC10)。

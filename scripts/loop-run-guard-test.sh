@@ -5,6 +5,9 @@
 #   B. **ブランチ検査** (`ensure_branch`) —— ⚠️ 起票 10 の是正。worktree 隔離の**境界**。
 #   S. **Status フィルタ** (`issue_status` / `ALL` の決定) —— ⚠️ 判断 26 の申し送り。
 #   D. **`permission_denials` の内訳** —— ⚠️ 起票 3。
+#   W. **worktree 側 Status の遷移検知** (`check_wt_became_blocked` / `wt_issue_status_key`)
+#      —— ★ 2026-09-25 追加。issue 001 の実測 (worker が worktree 側 Status を blocked に
+#      書き換えたのに同じ worker を max_attempts まで再起動していた) の是正。
 #
 # ⚠️★★★ **「正常なら緑」だけ試さない**（★ `verify-before-claiming` ルール 5b / 6）。
 #   ★ B2 が **陰性対照**である: ⚠️ 逸脱しない stub でも blocked になるなら、
@@ -601,6 +604,120 @@ if setup_repo "${D2}" ':' "${SECRET_DENIALS}"; then
   fi
 else
   ng "D2: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+echo "W. worktree 側 Status の遷移検知 (check_wt_became_blocked) — ★ 2026-09-25 追加"
+
+# ⚠️★★★ 実測 (issue 001・2026-09-25): worker が worktree 側の issue ファイルの
+#   `## Status` を blocked に書き換えて attempt を止めたのに、loop-run.sh は気づかず
+#   同じ worker を max_attempts まで再起動していた (5 attempt の空回り)。
+#   ★ verify を毎回失敗させる ('echo FAIL-marker; exit 1') ことで、既存の no_progress /
+#     max_attempts 系の停止条件と混同しないことを確かめる (★ W1/W4 は attempt 1 の
+#     verify 失敗**だけ**で止まる必要がある。no_progress_threshold=4・max_attempts=2 の
+#     どちらにも attempt 1 だけでは届かない)。
+
+# --- W1 陽性: stub が worktree 側の Status を blocked に書き換え、verify は失敗 ---
+#   期待: attempt_start はちょうど 1 回、blocked event が出る、abandoned は出ない。
+W1="${TMP}/w1/repo"; mkdir -p "${W1}"
+W1_STUB='printf "%s\n" "blocked（stub がテスト用に worktree 側で書き換えた）" >> .steering/task/issues/001.md
+true'
+if setup_repo "${W1}" "${W1_STUB}" '[]' 'echo FAIL-marker; exit 1'; then
+  ev="$(run_loop "${W1}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    n_start="$(grep -c '"event":"attempt_start"' "${ev}" || true)"
+    if [ "${n_start:-0}" = "1" ]; then
+      ok "W1: attempt_start はちょうど 1 回 (★ 同じ worker を再起動していない)"
+    else
+      ng "W1: ⚠️★ attempt_start が ${n_start:-0} 回 (★ 1 回で打ち切れていない)"
+    fi
+    if grep -q '"event":"blocked"' "${ev}" && grep -q 'worker が Status を blocked にした' "${ev}"; then
+      ok "W1: worker が blocked にした attempt を blocked event として記録した"
+    else
+      ng "W1: ⚠️★ 遷移を検知していない (★ 起票そのものの再現)"
+      sed -n '1,8p' "${ev}"
+    fi
+    if grep -q '"event":"abandoned"' "${ev}"; then
+      ng "W1: ⚠️★★★ abandoned まで回してしまった (★ 空回りが起きている)"
+    else
+      ok "W1: abandoned までは回していない"
+    fi
+  else
+    ng "W1: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "W1: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- W2 陰性対照: Status を書き換えず verify 失敗 → blocked で止まらないこと ---
+#   ★ これが赤なら、W1 の「blocked になった」は何も検査していない緑である。
+W2="${TMP}/w2/repo"; mkdir -p "${W2}"
+if setup_repo "${W2}" ':' '[]' 'echo FAIL-marker; exit 1'; then
+  ev="$(run_loop "${W2}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    n_start="$(grep -c '"event":"attempt_start"' "${ev}" || true)"
+    if [ "${n_start:-0}" -ge 2 ]; then
+      ok "W2 陰性対照: Status を書き換えなければ attempt 2 以上に進む (${n_start} 回)"
+    else
+      ng "W2 陰性対照: ⚠️★ attempt 1 で止まった (★ W1 が何も検査していない緑になる)"
+    fi
+    if grep -q 'worker が Status を blocked にした' "${ev}"; then
+      ng "W2 陰性対照: ⚠️ 書き換えていないのに遷移を検知した (★ 誤検出)"
+    else
+      ok "W2 陰性対照: 誤検出していない"
+    fi
+  else
+    ng "W2: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "W2: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- W3: 開始時から Status=blocked の issue を --issues で明示実行 → 遷移でないため止まらない ---
+#   ★ 002 は setup_repo が最初から `blocked（…）` で作る issue。
+W3="${TMP}/w3/repo"; mkdir -p "${W3}"
+if setup_repo "${W3}" ':' '[]' 'echo FAIL-marker; exit 1'; then
+  ev="$(run_loop "${W3}" --issues 002)"
+  if [ -s "${ev}" ]; then
+    n_start="$(grep -c '"event":"attempt_start"' "${ev}" || true)"
+    if [ "${n_start:-0}" -ge 2 ]; then
+      ok "W3: 開始時から blocked な issue は attempt 1 の後で止まらない (${n_start} 回)"
+    else
+      ng "W3: ⚠️★ 開始時から blocked なだけで打ち切られた (★ 遷移ではないのに誤検出)"
+    fi
+    if grep -q 'worker が Status を blocked にした' "${ev}"; then
+      ng "W3: ⚠️ 遷移していないのに検知文言が出た (★ was_blocked_at_start が効いていない)"
+    else
+      ok "W3: 遷移の検知文言は出ていない (★ 開始時から blocked は対象外)"
+    fi
+  else
+    ng "W3: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "W3: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- W4: 装飾つき blocked (⚠️ **blocked**（…）) でも W1 と同じく打ち切ること ---
+#   ★ `wt_issue_status_key` は issue_status_key と同じ正規化 (先頭の非 ASCII 英字を剥がす)
+#     を使っているはずなので、装飾つきでも fail-open しないことを確かめる。
+W4="${TMP}/w4/repo"; mkdir -p "${W4}"
+W4_STUB='printf "%s\n" "⚠️ **blocked**（stub がテスト用に worktree 側で書き換えた）" >> .steering/task/issues/001.md
+true'
+if setup_repo "${W4}" "${W4_STUB}" '[]' 'echo FAIL-marker; exit 1'; then
+  ev="$(run_loop "${W4}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    n_start="$(grep -c '"event":"attempt_start"' "${ev}" || true)"
+    if [ "${n_start:-0}" = "1" ] && grep -q 'worker が Status を blocked にした' "${ev}" \
+       && ! grep -q '"event":"abandoned"' "${ev}"; then
+      ok "W4 装飾: 装飾つき blocked でも W1 と同じく打ち切った"
+    else
+      ng "W4 装飾: ⚠️★ 装飾つきだと検知できていない (★ fail-open)"
+      sed -n '1,8p' "${ev}"
+    fi
+  else
+    ng "W4: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "W4: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
 echo "────────────────────────────────────────"
