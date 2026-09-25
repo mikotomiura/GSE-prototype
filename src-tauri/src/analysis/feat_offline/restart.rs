@@ -389,6 +389,7 @@ mod tests {
             s_ms: Some(s_ms),
             t0_ms: Some(t0_ms),
             theta_person_ms: Some(t0_ms - s_ms),
+            theta_sample_n: Some(1),
             task_kind: None,
             phase: "unspecified".to_string(),
         }
@@ -400,6 +401,7 @@ mod tests {
             s_ms: None,
             t0_ms: None,
             theta_person_ms: None,
+            theta_sample_n: None,
             task_kind: None,
             phase: "unspecified".to_string(),
         }
@@ -574,6 +576,7 @@ mod tests {
             s_ms: 35_000,
             t0_ms: 38_000,
             theta_person_ms: 3_000,
+            theta_sample_n: 1,
         }];
         let rows = restart_column(&[onset_row(5_000, 10_000)], &[crowded], &[], &config);
         assert_eq!(rows[0].post_t0_inserts, None);
@@ -709,6 +712,7 @@ mod tests {
                 s_ms: rise,
                 t0_ms: rise + 100,
                 theta_person_ms: 100,
+                theta_sample_n: 1,
             });
         }
         let b = count * period;
@@ -859,11 +863,13 @@ mod tests {
                 s_ms: 1_000,
                 t0_ms: 2_000,
                 theta_person_ms: 1_000,
+                theta_sample_n: 1,
             },
             crate::analysis::feat_offline::stall_onset::OnsetEvent {
                 s_ms: 30_000,
                 t0_ms: 31_000,
                 theta_person_ms: 1_000,
+                theta_sample_n: 1,
             },
         ];
         let keys = vec![letter(29_999), letter(30_000)];

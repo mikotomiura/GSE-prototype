@@ -19,7 +19,15 @@ SRC="src/analysis/feat_offline/restart.rs"
 #   ★ 理由: deep_silence.ndjson は **feat 行を持たない**ので観測区間が無く、issue 008 以後
 #     onset が 1 つも立たない（blockers.md 起票 17）。→ AC6 が原理的に通らなかった。
 #   ★ stall_onset_observed.ndjson は実測で onset が 2 本立つ（t0 = +40160 / +187600）。
-out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
+# ⚠️★★★ 2026-09-25 (P1 前 issue 001): 既定が凍結 JSON (warmup_count = 100) になり、既定のままだと
+#   第 1 onset (θ の標本が 11 対 < 100) が消えて **onset は +187600 の 1 本だけ**になる。
+#   ★ その onset は観測区間の右端に近く再停止が観測できない (右側打ち切り) ので、AC6 の
+#     「restop_ms が 1 つでも非 null」が**成立しない** (2026-09-25 実測: 非 null 0 件)。
+#   ★ 本検査が守るのは restart の挙動 (V6 の裁定) であって、warmup の下限ではない。
+#     → 旧前提 (onset が 2 本) を **`--set warmup_count=1` で明示的に再現**する。
+#     ⚠️ 検査は 1 つも外していない (AC3 / AC6 とも同じ式のまま)。下限の効き方は
+#       008-acceptance.sh AC1 と 001-acceptance.sh AC7 が持つ。
+out="$(cargo run --quiet --bin gse-replay -- tests/fixtures/stall_onset_observed.ndjson --features --set warmup_count=1 2>/dev/null | jq -e '.rows | arrays')" \
   || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない（★ { provenance, config, rows } の形か確認）"
 [ -n "$out" ] || fail "--features の出力が空"
 

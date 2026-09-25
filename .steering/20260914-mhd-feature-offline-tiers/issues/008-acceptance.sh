@@ -4,6 +4,8 @@
 # ★ 正解値は裁定セッションが「参照実装 (Python) ＋ 手計算」で確定させた（decisions.md 判断 18）。
 #   既定値 W=30000 / q=0.99 / hole_gap_ms=2000 のときの値である。
 #   ⚠️ 既定値（事前宣言事項）を変えたら、この表を先に書き換えること。
+#   ★ 2026-09-25 (P1 前 issue 001): 既定は凍結 JSON (`warmup_count = 100`) になった。AC1 / AC2 の
+#     onset は 2 本 → 1 本に減り、旧期待値は `--set warmup_count=1` の陽性対照として残した。
 #
 # ★ ACC_REPLAY_CMD を与えると gse-replay の代わりにそのコマンドを使う（★ 検査自体の 3 状態テスト用）。
 #   ACC_SKIP_005=1 で 005-acceptance の再実行を省く（同上）。
@@ -38,10 +40,21 @@ tmpd="$(mktemp -d)"; trap 'rm -rf "$tmpd"' EXIT
 out1="$(replay "$FIX" --features 2>/dev/null | jq -e '.rows | arrays')" || fail "gse-replay --features が非 0 で終了した、または封筒の .rows を取り出せない ($FIX)"
 [ -n "$out1" ] || fail "--features の出力が空 ($FIX)"
 
+# ⚠️★★★ 2026-09-25 (P1 前 issue 001): 既定が凍結 JSON (warmup_count = 100) になった。
+#   ★ 第 1 onset (s = T+37,560) の時点で θ の標本は 11 対しかなく 100 を下回るので**消える**
+#     (⚠️ バグではなく warmup_count の目的そのもの —— ADR-030 D4「高分位点は小標本では実質 max」)。
+#     第 1 onset の θ = 2600 は 11 件中の max であり、退化した推定だった。
+#   ★ 旧期待値 [[37560,40160,2600],[185000,187600,2600]] は消さず、`--set warmup_count=1`
+#     (= 下限なし) の**陽性対照**として残す (「そもそも 1 本しか立たない入力だった」と区別する)。
 printf '%s' "$out1" | jq -e --argjson T "$T" '
   [.[] | select(.stall_onset.is_onset) | .stall_onset | [(.s_ms - $T), (.t0_ms - $T), .theta_person_ms]]
+  == [[185000, 187600, 2600]]' >/dev/null 2>&1 \
+  || fail "AC1: onset が [s,t0,θ] = [185000,187600,2600] (T 相対) の 1 本でない（★ 第 1 onset は標本 11 < warmup_count 100 で消える。2 本のままなら warmup_count が配線されていない）。実際: $(printf '%s' "$out1" | jq -c --argjson T "$T" '[.[] | select(.stall_onset.is_onset) | .stall_onset | [(.s_ms - $T), (.t0_ms - $T), .theta_person_ms]]' 2>/dev/null)"
+out1w="$(replay "$FIX" --features --set warmup_count=1 2>/dev/null | jq -e '.rows | arrays')" || fail "AC1(陽性対照): --set warmup_count=1 で --features が非 0 で終了した"
+printf '%s' "$out1w" | jq -e --argjson T "$T" '
+  [.[] | select(.stall_onset.is_onset) | .stall_onset | [(.s_ms - $T), (.t0_ms - $T), .theta_person_ms]]
   == [[37560, 40160, 2600], [185000, 187600, 2600]]' >/dev/null 2>&1 \
-  || fail "AC1: onset が [s,t0,θ] = [37560,40160,2600] と [185000,187600,2600] (T 相対) の 2 つでない（★ 末尾の沈黙の onset が出力に出ているか）。実際: $(printf '%s' "$out1" | jq -c --argjson T "$T" '[.[] | select(.stall_onset.is_onset) | .stall_onset | [(.s_ms - $T), (.t0_ms - $T), .theta_person_ms]]' 2>/dev/null)"
+  || fail "AC1(陽性対照): warmup_count=1 で onset が旧期待値 [37560,40160,2600] と [185000,187600,2600] に戻らない"
 
 # AC14: onset は t0 を含む tick に載る（★ tick 幅は隣接行の t_ms 差から取る。リテラルを置かない）
 printf '%s' "$out1" | jq -e '
@@ -67,9 +80,16 @@ printf '%s' "$out2" | jq -e --argjson lo "$((T + 100000))" --argjson hi "$((T + 
   [.[] | select(.stall_onset.is_onset) | .stall_onset
        | select((.s_ms >= $lo and .s_ms <= $hi) or (.t0_ms >= $lo and .t0_ms <= $hi))] | length == 0' >/dev/null 2>&1 \
   || fail "AC2: ⚠️★★★ 削除区間の内側に onset が立っている（ADR-030 D8 (b-2)）。実際: $(printf '%s' "$out2" | jq -c --argjson T "$T" '[.[] | select(.stall_onset.is_onset) | .stall_onset | [(.s_ms - $T), (.t0_ms - $T)]]' 2>/dev/null)"
+# ⚠️ 2026-09-25 (P1 前 issue 001): AC1 と同じ理由 (warmup_count = 100) で、削除版でも第 1 onset は消える。
+#   ★ 第 2 onset の θ の標本は削除で減るが 240 対 (実測) 残り、100 を下回らないので立つ。
+#   ★ 旧期待値 [40160, 187600] は `--set warmup_count=1` の陽性対照として残す。
 printf '%s' "$out2" | jq -e --argjson T "$T" '
+  [.[] | select(.stall_onset.is_onset) | .stall_onset.t0_ms - $T] == [187600]' >/dev/null 2>&1 \
+  || fail "AC2: 削除版の onset が t0 = [187600] (T 相対) の 1 本でない（★ 第 1 onset は warmup_count 100 で消える）"
+out2w="$(replay "$tmpd/redacted.ndjson" --features --set warmup_count=1 2>/dev/null | jq -e '.rows | arrays')" || fail "AC2(陽性対照): --set warmup_count=1 で削除版の --features が非 0 で終了した"
+printf '%s' "$out2w" | jq -e --argjson T "$T" '
   [.[] | select(.stall_onset.is_onset) | .stall_onset.t0_ms - $T] == [40160, 187600]' >/dev/null 2>&1 \
-  || fail "AC2: 削除版の onset が t0 = [40160, 187600] (T 相対) でない"
+  || fail "AC2(陽性対照): warmup_count=1 で削除版の onset が t0 = [40160, 187600] (T 相対) に戻らない"
 
 # ---------- 3. feat 行 0 本（AC3） ----------
 out3="$(replay tests/fixtures/deep_silence.ndjson --features 2>/dev/null | jq -e '.rows | arrays')" \
