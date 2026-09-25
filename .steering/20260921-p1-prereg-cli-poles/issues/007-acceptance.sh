@@ -66,9 +66,13 @@ for t in \
   ime_overlap_is_closed_interval_intersection \
   no_ime_rows_means_overlap_false_not_null
 do
-  o="$(cargo test --workspace "$t" -- --exact --nocapture 2>&1)" || fail "test $t が赤"
-  printf '%s' "$o" | grep -qE '1 passed' \
-    || fail "test $t が 1 件も走っていない（★ cargo test は 0 件マッチでも exit 0 になる）"
+  # ⚠️★★★ `--exact` は**完全パス**（`mod::tests::<name>`）にしか一致せず、裸の名前では 0 件＝**実装が正しくても必ず赤**
+  #   （2026-09-25 実測・issue 002 / 003 の worker が発見）。→ 部分一致で走らせ、
+  #   `test <任意のパス>::<name> ... ok` の行が**ちょうど 1 行**あることを数える（★ 部分名・0 件・同名 2 件をすべて落とす）。
+  o="$(cargo test --workspace "$t" -- --nocapture 2>&1)" || fail "test $t が赤"
+  n_ok="$(printf '%s\n' "$o" | tr -d '\r' | grep -cE "^test ([A-Za-z0-9_]+::)*${t} \.\.\. ok$")"
+  [ "${n_ok}" -eq 1 ] \
+    || fail "test $t がちょうど 1 件緑で走っていない（${n_ok} 件）（★ cargo test は 0 件マッチでも exit 0 になる）"
 done
 
 # ── AC7: abandon を「迷い」と解釈する語が無い ───────────────────────────
