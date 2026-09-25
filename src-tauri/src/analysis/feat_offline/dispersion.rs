@@ -29,8 +29,11 @@
 ///
 /// tick `k` の `pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は、[`pause_ms_by_window`] が作る窓
 /// `[tick_end − t1a_window_ms, tick_end)` に**再開する** pause の長さの分位点である。
-/// ⚠️ 窓の右端は tick の**終端**で、未来は見ない (因果的)。★ 窓長が `ENGINE_TICK_MS` なら旧来の
-/// 「その tick に帰属する pause だけ」と一致する。
+/// ⚠️ 窓の右端は tick の**終端**。**値そのものは因果的**（未来を見ない）だが、**穴による切断は
+/// retrospective** である —— `observed_intervals` が決める区間の右端は、その tick より後にある
+/// `feat` 行を最大 `hole_gap_ms` 程度先読みしてから確定する (`super` モジュール doc の
+/// 「causal / retrospective の区分」と同じ)。★ 窓長が `ENGINE_TICK_MS` なら旧来の
+/// 「その tick に帰属する pause だけ」と一致する（穴が無い限り）。
 ///
 /// ⚠️★★★ **窓が 1 tick だと 3 値は常に同値になる** (2026-09-15・`code-reviewer` HIGH-1・
 /// **構造的な帰結であってバグではない**。旧実装はこの状態で出荷されていた):
@@ -205,22 +208,39 @@ pub fn pause_durations(press_ts: &[u64]) -> Vec<PauseDuration> {
 
 /// tick ごとの `T1a` の pause 長の集合を、**因果的なローリング窓**で作る (issue 003・判断 4)。
 ///
-/// tick `k` (終端 `tick_end = grid_origin_ms + (k + 1) * tick_ms`) の窓は
+/// tick `k` (開始 `t_k = grid_origin_ms + k * tick_ms`・終端 `tick_end = t_k + tick_ms`) の窓は
 /// `[tick_end − window_ms, tick_end)` で、再開時刻 (`resuming_ts`) がここに入る pause を集める。
 /// ★ 右端は tick の終端で**未来を見ない**。★ tick の帰属規則 (左閉右開・再開側の tick) と同じ向きなので、
-/// `window_ms == tick_ms` なら旧来の「その tick に帰属する pause だけ」と一致する。
+/// `window_ms == tick_ms` なら旧来の「その tick に帰属する pause だけ」と一致する（穴が無い限り）。
 /// ⚠️ `window_ms` が `tick_ms` 未満なら tick の後半だけを見る (`0` は空の窓 = 全 tick が空)。
 ///
 /// ⚠️★★★ **窓は観測区間 (`feat` 行の穴) をまたがない** (★ 起票 6 の `T1a` 側):
 /// `observed` は `stall_onset::observed_intervals` の返り値 (昇順・互いに素) で、
-/// 隣り合う区間の間 `(end_j, start_{j+1})` が**穴**である。窓は tick の終端より前にある**最後の穴の
-/// 直後**より前へは伸びず、⚠️ **穴と重なる pause (開始が穴より前・再開が穴より後) も入れない**
+/// 隣り合う区間の間 `(end_j, start_{j+1})` が**穴**である。
+///
+/// # tick が区間と交わるかの判定は `quality::feat_mask_column` と揃える (2026-09-25・MEDIUM-1)
+///
+/// ⚠️ **tick の終端 (`tick_end`) を基準に「もう穴に落ちたか」を判定してはならない。**
+/// `quality::feat_mask_column` は tick の**開始** `t_k` を基準に交わりを判定する
+/// (`t_k <= b && tick_end > a`)。この基準がずれると、grid の起点 (`grid_origin_ms`) が
+/// `feat` 行自身の格子とずれたとき (例: `grid_origin_ms = 200`)、区間の右端 `b` を内部に含む tick
+/// (例: tick `[19200, 20200)`・`b = 20000`) が「もう次の区間へ進んだ」と誤判定され、
+/// **区間の内側で再開した pause が窓から丸ごと消えていた** —— `feat_mask_column` はこの tick を
+/// 「観測済み」(`feat = true`) と判定するのに、本関数だけ空の窓を返す食い違いがあった
+/// (レビュー指摘・回帰は
+/// [`tests::window_survives_offset_grid_origin_when_interval_end_falls_inside_a_tick`])。
+/// → 本関数も `t_k` を基準に「次の区間へ進んだか」を判定し、tick が区間と交わるなら
+/// **窓の右端もその区間の右端 `b` で切る** (`min(tick_end, b + 1)`。`+1` は区間が閉区間 `[a, b]` で
+/// `b` 自身の瞬間を含むため)。
+///
+/// ⚠️ **穴と重なる pause (開始が穴より前・再開が穴より後) も入れない**
 /// —— そうしないと削除後の NDJSON で穴の前後が 1 本の巨大 pause として接続され、
-/// その長さが `pause_max_ms` に出る。★ tick の終端そのものが穴の中にある tick は**空の窓**になる
-/// (0 で埋めず `null` に落ちる)。
+/// その長さが `pause_max_ms` に出る。★ tick が**どの区間とも交わらない**
+/// (開始・終端ともに隣り合う区間の間の穴に収まる) tick は**空の窓**になる (0 で埋めず `null` に落ちる)。
 /// ⚠️ 穴として扱うのは**隣り合う区間の間だけ**である —— 最初の区間より前・最後の区間より後は
-/// 「区間が無い」だけで穴ではない。★ `observed` が空 (`feat` 行が 1 本も無い) なら穴の情報が無いので、
-/// **窓を切らない**。⚠️ 原因ラベルは作らない (ADR-030 却下リスト 9): 使うのは `feat` 行の**存在**だけ。
+/// 「区間が無い」だけで穴ではない (この 2 つは窓を切らない)。★ `observed` が空
+/// (`feat` 行が 1 本も無い) なら穴の情報が無いので、**窓を切らない**。
+/// ⚠️ 原因ラベルは作らない (ADR-030 却下リスト 9): 使うのは `feat` 行の**存在**だけ。
 ///
 /// 戻り値は tick ごとの pause 長 (ms・**順不同**) で、`compute_dispersion` へそのまま渡す。
 /// 計算量は `O(tick_count + pauses + Σ 窓内の pause 数)` (2 本のポインタが単調に進む)。
@@ -236,24 +256,37 @@ pub fn pause_ms_by_window(
     sorted.sort_unstable_by_key(|p| p.resuming_ts);
 
     let mut out: Vec<Vec<u64>> = Vec::with_capacity(tick_count);
-    // left: 窓に入る最初の pause / right: tick の終端以降の最初の pause (= 窓の外の未来)。
+    // left: 窓に入る最初の pause / right: 窓の右端以降の最初の pause (= 窓の外の未来)。
     let (mut left, mut right) = (0_usize, 0_usize);
-    // 終端より前で終わっている穴の数。次の区間の先頭 `observed[holes_passed].0` が窓の下限になる。
-    let mut holes_passed = 0_usize;
+    // `quality::feat_mask_column` と同じ advance 規則: tick の**開始** `t_k` より前に
+    // 閉じている区間だけを読み飛ばす (⚠️ 旧実装は tick の終端を基準にしていたため、区間の
+    // 右端 `b` を内部に含む tick を「もう次の区間へ進んだ」と誤判定していた・MEDIUM-1)。
+    let mut iv_idx = 0_usize;
     for k in 0..tick_count {
-        let tick_end = grid_origin_ms + (k as u64 + 1) * tick_ms;
-        let last_instant = tick_end.saturating_sub(1);
-        while holes_passed + 1 < observed.len() && observed[holes_passed].1 < last_instant {
-            holes_passed += 1;
-        }
-        let hole_floor = if holes_passed == 0 {
-            0
-        } else {
-            observed[holes_passed].0
-        };
-        let window_start = tick_end.saturating_sub(window_ms).max(hole_floor);
+        // security LOW-2: 飽和演算で桁あふれを避ける (`grid_origin_ms` / `tick_ms` は
+        // CLI の `--set` 由来なので、極端な値でも panic / wrap しない)。
+        let t_k = grid_origin_ms.saturating_add((k as u64).saturating_mul(tick_ms));
+        let tick_end = t_k.saturating_add(tick_ms);
 
-        while right < sorted.len() && sorted[right].resuming_ts < tick_end {
+        while iv_idx + 1 < observed.len() && observed[iv_idx].1 < t_k {
+            iv_idx += 1;
+        }
+        // `iv_idx == 0` は「最初の区間より前・またはその中」= 左側に穴が無いので下限は 0
+        // (最初の区間より前は穴として扱わない・上の doc)。
+        let hole_floor = if iv_idx == 0 { 0 } else { observed[iv_idx].0 };
+
+        // tick が現在の区間と交わるか (`t_k <= b` 側だけ確認すればよい —— `iv_idx` の advance
+        // 条件が既に `observed[iv_idx].1 >= t_k` を保証している)。交わるなら窓の右端を
+        // その区間の右端 `b` で切る。交わらない (= 区間が既に閉じていて、次の区間が無いため
+        // これ以上進めない = 最後の区間を過ぎた) 場合は「区間が無いだけで穴ではない」ので
+        // `tick_end` をそのまま使う (上の doc)。
+        let right_edge = match observed.get(iv_idx) {
+            Some(&(_, b)) if t_k <= b => tick_end.min(b.saturating_add(1)),
+            _ => tick_end,
+        };
+        let window_start = right_edge.saturating_sub(window_ms).max(hole_floor);
+
+        while right < sorted.len() && sorted[right].resuming_ts < right_edge {
             right += 1;
         }
         while left < right && sorted[left].resuming_ts < window_start {
@@ -599,6 +632,52 @@ mod tests {
             no_info[29],
             vec![3000],
             "陽性対照: 穴の情報が無ければ見える"
+        );
+    }
+
+    /// MEDIUM-1 (issue 003 レビュー・2026-09-25): grid の起点 (`grid_origin_ms`) が `feat` 行
+    /// 自身の格子とずれていても、観測区間の右端 `b` を内部に含む tick で「区間の内側で再開した
+    /// pause」が窓から消えない。
+    ///
+    /// ⚠️ 旧実装は「もう次の区間へ進んだか」を tick の**終端** (`tick_end - 1`) を基準に判定して
+    /// いたため、tick `[19200, 20200)` (`b = 20000` を内部に含む) で `20000 < 20199` が成立し、
+    /// 区間の内側で再開した pause がまだ存在するにもかかわらず窓が丸ごと空になっていた。
+    /// ★ この修正 (`t_k` 基準に変更 + 右端クリップ) を戻すと本テストは赤になる
+    /// (2026-09-25・変異テストで確認済み)。
+    #[test]
+    fn window_survives_offset_grid_origin_when_interval_end_falls_inside_a_tick() {
+        use crate::analysis::loop_step::ENGINE_TICK_MS;
+        // grid_origin_ms を格子からずらす (レビュー指摘の実例と同じ 200ms オフセット)。
+        let grid_origin_ms = 200_u64;
+        // 観測区間: [1000, 20000] と [40000, 60000] (間の (20000, 40000) が穴)。
+        let observed = [(1000_u64, 20000_u64), (40000_u64, 60000_u64)];
+        // tick 19 = [19200, 20200): 区間の右端 b=20000 をこの tick の内部に含む
+        // (`quality::feat_mask_column` はこの tick を `feat = true` と判定する)。
+        let inside_before_b = pd(19_700, 500); // 区間 1 の内側 (19200..20000) で再開
+                                               // 穴をまたぐ pause: 開始 (19900) は区間 1 の内側、再開 (40500) は区間 2 の内側。
+                                               // どの tick の窓にも入ってはならない。
+        let straddler = pd(40_500, 20_600);
+        let all = [inside_before_b, straddler];
+        let ticks = 45;
+        let window = 60 * ENGINE_TICK_MS; // 広い窓 (窓長だけでは両方とも入りうる)
+        let out = pause_ms_by_window(
+            &all,
+            ticks,
+            grid_origin_ms,
+            ENGINE_TICK_MS,
+            window,
+            &observed,
+        );
+
+        assert_eq!(
+            out[19],
+            vec![500],
+            "区間の内側で再開した pause が、b を内部に含む tick の窓から消えている: {:?}",
+            out[19]
+        );
+        assert!(
+            !out.iter().flatten().any(|&g| g == 20_600),
+            "穴をまたぐ pause が窓に入った"
         );
     }
 

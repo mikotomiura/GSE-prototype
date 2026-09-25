@@ -326,8 +326,10 @@ pub fn build_feature_rows(
     }
 
     // ★ `T1a` の pause 分位点は tick ではなく `t1a_window_ms` の因果窓で集約する (issue 003・判断 4)。
-    //   ⚠️ 窓は観測区間 (`feat` 行の穴) をまたがない (起票 6) —— 観測区間はここで 1 度だけ作って渡す
-    //   (`dispersion` から `feat` 行を読み直さない)。`iki_cv` / `surprise` には窓を掛けない。
+    //   ⚠️ 窓は観測区間 (`feat` 行の穴) をまたがない (起票 6) —— 観測区間は **dispersion 用に**
+    //   ここで 1 度だけ作って渡す (`dispersion` から `feat` 行を読み直さない。⚠️ `quality_column`
+    //   は別の呼び出しで自分の観測区間を作り直しており、これはそちらへは渡っていない)。
+    //   `iki_cv` / `surprise` には窓を掛けない。
     let observed = stall_onset::observed_intervals(
         stall_onset_inputs.feat_ts,
         stall_onset_inputs.config.hole_gap_ms,
