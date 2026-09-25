@@ -40,9 +40,9 @@ LEDGER="$REPO_ROOT/docs/o1-deletion-ledger.md"
 [ -f "$LEDGER" ] || fail "AC7: $LEDGER が無い"
 
 grep -qE '(広げ|最小.*1 ?分|最小幅)' "$UI" \
-  || fail "AC7: UI 文言に「広げて消す」旨が無い（$UI）"
+  || fail "AC7: UI 文言に「広げて消す」旨が無い（${UI}）"
 grep -qE '(広げ|最小幅)' "$LEDGER" \
-  || fail "AC7: 削除台帳に「広げて消す」旨が無い（$LEDGER）"
+  || fail "AC7: 削除台帳に「広げて消す」旨が無い（${LEDGER}）"
 
 # ⚠️ 片側だけ直して緑になるのを防ぐ: 両方に `MIN_REDACTION_WIDTH_MS` か 60,000 の
 #   具体値が現れることまで見る (★ 語が別の理由で出る可能性を潰す・検査の検査 ルール 5)。

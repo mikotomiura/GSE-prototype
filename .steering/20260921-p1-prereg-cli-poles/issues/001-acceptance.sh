@@ -113,7 +113,7 @@ onsets="$(printf '%s' "$env_out" | jq -c --argjson T "$T" \
   '[.rows[] | select(.stall_onset.is_onset) | (.stall_onset.t0_ms - $T)]')" \
   || fail "AC7: onset を取り出せない"
 [ "$onsets" = "[187600]" ] \
-  || fail "AC7: onset が [187600] (T 相対) の 1 本でない。実測: $onsets（★ 2 本のままなら warmup_count が配線されていない＝ AC が空振り）"
+  || fail "AC7: onset が [187600] (T 相対) の 1 本でない。実測: ${onsets}（★ 2 本のままなら warmup_count が配線されていない＝ AC が空振り）"
 
 printf '%s' "$env_out" | jq -e '
   [.rows[] | select(.stall_onset.is_onset) | .stall_onset.theta_sample_n]

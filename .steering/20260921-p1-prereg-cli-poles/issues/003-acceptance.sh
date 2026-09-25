@@ -24,7 +24,7 @@ FIX="tests/fixtures/t1a_window.ndjson"
 grep -qE 'pub const FEATURE_WINDOW_MS: *u64 *= *30_000;' "$FEATURES_RS" \
   || fail "AC1: pub const FEATURE_WINDOW_MS が $FEATURES_RS に無い"
 if grep -nE 'saturating_sub\( *30_000 *\)' "$FEATURES_RS" >/dev/null 2>&1; then
-  fail "AC1: 窓の計算に生リテラル 30_000 が残っている（$FEATURES_RS）"
+  fail "AC1: 窓の計算に生リテラル 30_000 が残っている（${FEATURES_RS}）"
 fi
 grep -qE 'saturating_sub\( *FEATURE_WINDOW_MS *\)' "$FEATURES_RS" \
   || fail "AC1: 窓の計算が FEATURE_WINDOW_MS を使っていない（★ 別の綴りに置き換わった疑い）"

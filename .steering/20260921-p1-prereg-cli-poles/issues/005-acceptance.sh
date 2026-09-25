@@ -41,7 +41,7 @@ superset="$(jq -n --argjson a "$o_base" --argjson b "$o_plus" \
   '($a - ($a - $b)) == $a and (($b | length) > ($a | length))')" \
   || fail "AC2: 包含関係を判定できない"
 [ "$superset" = "true" ] \
-  || fail "AC2: M+ の onset が baseline の真の上位集合でない（baseline=$o_base M+=$o_plus）。★ 逆向きなら写像が逆である"
+  || fail "AC2: M+ の onset が baseline の真の上位集合でない（baseline=$o_base M+=${o_plus}）。★ 逆向きなら写像が逆である"
 
 # ── AC6: 修飾キー行が 0 本の入力で not_applicable かつ baseline と恒等 ──
 nm_plus="$(run "$NOMOD" --pole modifier_m_plus)" || fail "AC6: --pole modifier_m_plus が非 0（修飾キー無し fixture）"

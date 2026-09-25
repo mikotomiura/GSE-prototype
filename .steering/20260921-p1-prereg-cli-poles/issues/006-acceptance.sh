@@ -39,7 +39,7 @@ subset="$(jq -n --argjson a "$o_base" --argjson b "$o_pb" \
   '($b - ($b - $a)) == $b and (($b | length) < ($a | length))')" \
   || fail "AC2: 包含関係を判定できない"
 [ "$subset" = "true" ] \
-  || fail "AC2: pointer_b の onset が baseline の真の部分集合でない（baseline=$o_base pointer_b=$o_pb）。★ 逆向きなら抑制が反転している"
+  || fail "AC2: pointer_b の onset が baseline の真の部分集合でない（baseline=$o_base pointer_b=${o_pb}）。★ 逆向きなら抑制が反転している"
 
 # ── AC3: observed_intervals が極 B で狭くなる ───────────────────────────
 iv_base="$(printf '%s' "$base" | jq -c '.provenance.observed_intervals')" || fail "AC3: observed_intervals が無い"

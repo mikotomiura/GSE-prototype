@@ -64,7 +64,7 @@ BASE="$(sed -nE 's/.*"base_branch" *: *"([^"]+)".*/\1/p' \
 [ -n "${BASE:-}" ] || BASE="origin/main"
 git rev-parse --verify "$BASE" >/dev/null 2>&1 || BASE="origin/main"
 git rev-parse --verify "$BASE" >/dev/null 2>&1 \
-  || fail "AC2/AC6: 比較対象のブランチを解決できない（$BASE）"
+  || fail "AC2/AC6: 比較対象のブランチを解決できない（${BASE}）"
 
 for f in "$ADR" "$BLK"; do
   del="$(git diff "$BASE" -- "$f" | grep -cE '^-[^-]' || true)"
