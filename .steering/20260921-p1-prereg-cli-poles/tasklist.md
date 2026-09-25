@@ -57,42 +57,42 @@
 ## 実行（★ 別セッション・Sonnet）
 
 - [x] 【2】CLI 注入（凍結 JSON を既定 ＋ `--feature-config` ＋ `--set`・封筒 `config` の拡張）
-- [ ] 【3a】`T1a` の 30 秒窓（★ `features.rs` の `pub const` 化が**先**・⚠️ 振る舞いを変えない）
+- [x] 【3a】`T1a` の 30 秒窓（★ `features.rs` の `pub const` 化が**先**・⚠️ 振る舞いを変えない）
       ＋ `003-acceptance.sh` の「3 値が同値」検査の**置き換え** ＋ 起票 11 を閉じる
-- [ ] 【3b】極の器（`--pole` ＋ `Pole` enum ＋ `pole_applicable` ＋ `theta_sample_n`）
-- [ ] 【3c】極 B（`collect_pointer_bin_timestamps` ＋ 抑制区間 ＋ 評価区間の合成）
-- [ ] 【3d】極 M+（`collect_modifier_intervals` ＋ カウント方式 ＋ 挿入系の写像
+- [x] 【3b】極の器（`--pole` ＋ `Pole` enum ＋ `pole_applicable` ＋ `theta_sample_n`）
+- [x] 【3c】極 B（`collect_pointer_bin_timestamps` ＋ 抑制区間 ＋ 評価区間の合成）
+- [x] 【3d】極 M+（`collect_modifier_intervals` ＋ カウント方式 ＋ 挿入系の写像
       ⚠️ **`−1` は外さない** —— `Ctrl+Backspace` の陰性対照）
-- [ ] 【4】削除幅の制約（`MIN_REDACTION_WIDTH_MS` ＋ 広げて消す ＋ **陽性対照** ＋ UI 文言 ＋ 削除台帳）
-- [ ] 【5】IME 変換中の onset 頻度カウンタ（★ 抑制はしない。数えるだけ）
-- [ ] 【6】起票 21（多 onset の計算量の門・⚠️ 1 極あたりで置く）
-- [ ] `scripts/run-features-all-poles.sh`（★ 3 極の実行漏れを防ぐ）
+- [x] 【4】削除幅の制約（`MIN_REDACTION_WIDTH_MS` ＋ 広げて消す ＋ **陽性対照** ＋ UI 文言 ＋ 削除台帳）
+- [x] 【5】IME 変換中の onset 頻度カウンタ（★ 抑制はしない。数えるだけ）
+- [x] 【6】起票 21（多 onset の計算量の門・⚠️ 1 極あたりで置く）
+- [x] `scripts/run-features-all-poles.sh`（★ 3 極の実行漏れを防ぐ）
 
 ## テスト
 
-- [ ] 各 issue の AC に 1 対 1 の test（★ `cargo test --workspace` は **`src-tauri/` から**）
-- [ ] ⚠️ ゴールデン 15 本が **byte-equal**（★ `--snapshot`。動いたらリファクタが失敗している）
-- [ ] `check` / `clippy` / `fmt` / schema parity が exit 0
-- [ ] ⚠️★★★ **「検査の検査」5 点**（★ `design.md` §テスト戦略。⚠️ 省略しない）
+- [x] 各 issue の AC に 1 対 1 の test（★ `cargo test --workspace` は **`src-tauri/` から**）
+- [x] ⚠️ ゴールデン（★ snapshot ファイル 6 本・`minimal.json` 内 15 snapshot）が **byte-equal**（★ `--snapshot`。動いたらリファクタが失敗している）
+- [x] `check` / `clippy` / `fmt` / schema parity が exit 0
+- [x] ⚠️★★★ **「検査の検査」5 点**（★ `design.md` §テスト戦略。⚠️ 省略しない）
 
 ## ドキュメント
 
-- [ ] 【7】`docs/adr/ADR-030-...md` に **補訂 2**（⚠️ **本文は 1 文字も書き換えない**）
-- [ ] `docs/verification-runbook.md` に 3 極を回す手順
-- [ ] `.steering/20260914-mhd-feature-offline-tiers/blockers.md` の
+- [x] 【7】`docs/adr/ADR-030-...md` に **補訂 2**（⚠️ **本文は 1 文字も書き換えない**）
+- [x] `docs/verification-runbook.md` に 3 極を回す手順
+- [x] `.steering/20260914-mhd-feature-offline-tiers/blockers.md` の
       起票 7 / 11 / 12 / 13 / 14 / 15 / 16 / 21 に **✅ 是正済み**を追記（⚠️ 起票本文は書き換えない）
-- [ ] 同 `tasklist.md` の `[!] 004` / `[!] 006` の**更新漏れ**を直す（★ 2026-09-21 に merge 済み）
+- [x] 同 `tasklist.md` の `[!] 004` / `[!] 006` の**更新漏れ**を直す（★ 2026-09-21 に merge 済み）
 
 ## レビュー
 
-- [ ] `code-reviewer` ＋ `security-checker` を**並列**（⚠️ `model` を毎回明示・入れ子禁止・範囲と禁止事項・締切）
-- [ ] HIGH / MEDIUM への対応
-- [ ] ⚠️★★★ **`/cross-review`（Codex）を 2 巡**
+- [x] `code-reviewer` ＋ `security-checker` を**並列**（⚠️ `model` を毎回明示・入れ子禁止・範囲と禁止事項・締切）
+- [x] HIGH / MEDIUM への対応
+- [x] ⚠️★★★ **`/cross-review`（Codex）を 2 巡**（★ 2026-09-25 実施・gpt-6-astra・パス限定 3 回〔1 巡目 A/B・2 巡目〕・146699 tokens。指摘 12 件 → 研究者裁定 3 件〔判断 27〜29〕・是正 6 件・偽陽性 1 件）
       （1 巡目 = 自文書・他文書の矛盾 ／ 2 巡目 = 自分が足した規則の境界条件）
       ⚠️ **「規則」と「その実装」を同じ diff 範囲に入れる**（★ 2026-09-21 の偽陽性の原因）
       ⚠️ **Codex 予算**: `.codex/budget.json` の上限は **300000**。`today.tokens_used` が 432937 のままなので
       **日付が変わるまで予算ガードで止まる**（★ それが意図どおり）。⚠️ **上限を勝手に引き上げない**
-- [ ] ⚠️ ブロックされた場合は **skip 理由を完了報告に明記**する
+- [x] ⚠️ ブロックされた場合は **skip 理由を完了報告に明記**する
 
 ## 完了処理
 

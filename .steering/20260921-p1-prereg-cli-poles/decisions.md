@@ -590,3 +590,12 @@
   「**下限として読む**」と結論していた。⚠️ 前者は**過大の側**に働くので、結論が前提と矛盾していた（★ 補訂 2 と 007 のコード doc がそれを写していた）。
 - **採用**: **過小（20 秒超の変換・tick 衝突）と過大（macOS の長めの `dwell_ms`）の両方向の誤差がある観測値**とする。
   ★ Windows では過大の要因が無いので下限として読める。補訂 1 の文は書き換えず、**補訂 2 で上書き**として明記する。
+
+## ⚠️ 2026-09-25 起票 P1-K（Loop 基盤・未是正）
+
+- **P1-K**: `loop-run.sh --parallel 2` で 2 本の worktree を**同時に**作ると、`git worktree add` の upstream 設定が
+  `.git/config` のロックで競合し（実測 `error: could not lock config file .git/config: File exists`）、片方（008）が
+  **ブランチだけ作られて worktree が無い**まま `blocked`（worktree 生成に失敗）になった。→ 残ったブランチを消して単独で回し直した。
+  ★ 是正案: spawn を直列化する（ロックファイル）か、失敗したら短い間隔でリトライする。
+- ★ 併せて: 001 の jq 欠陥（`all(.stall_onset; …)`）を見つけた時点で**全 acceptance を同じパターンで洗わなかった**のはメインの手落ちで、
+  007 で同じ欠陥により 5 attempt を失った（★ `_loop-retrospective.md` §2）。
