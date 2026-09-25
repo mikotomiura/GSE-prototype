@@ -963,6 +963,391 @@ else
   fi
 fi
 
+# ── 9. ⚠️★★★ 起票 A: spawn 経路 (id / short) の検証 ──────
+# ⚠️★★★ **何を止めるためにあるのか** (2026-09-26 の実測・design.md 起票 A):
+#   ★ 旧実装は `--cleanup` 経路にしか id 検証が無く、spawn 経路 (`id="${1:?…}"` /
+#     `short="${2:-issue}"`) は無検証のまま `branch=` / `wtdir=` へ直接埋め込んでいた。
+#   ⚠️ 実測: id に `-x` (leading dash) や `a/b` (スラッシュ) を渡しても
+#     `git worktree add -b "loop/-x-t" ...` / `git worktree add -b "loop/a/b-t" "../wt/repo-a/b-t" ...`
+#     は **成功する** (git 自身は拒まない)。★ すると `--cleanup` 側は同じ id を validate_name で
+#     弾くため、**spawn では作れるのに --cleanup では永久に撤去できない worktree** が生まれる。
+echo "════════════════════════════════════════"
+echo "9. ⚠️★★★ 起票 A: spawn 経路 (id / short) の検証 (--cleanup 専用だった検証を通す)"
+
+R9="${TMP}/r9/repo"; mkdir -p "${R9}"
+if ! setup_fake_repo "${R9}"; then
+  ng "起票 A: 準備できなかった (★ 判定できない)"
+else
+  wt_count() { ( cd "$1" && git worktree list --porcelain 2>/dev/null | grep -c '^worktree ' ) || true; }
+  br_count() { ( cd "$1" && git branch --list 'loop/*' 2>/dev/null | wc -l | tr -d '[:space:]' ); }
+
+  base_wt="$(wt_count "${R9}")"; base_br="$(br_count "${R9}")"
+
+  # --- 9a: id が不正なら非 0 で die し、worktree/branch を 1 件も増やさない ---
+  for bad in '-x' 'a/b' 'a..b'; do
+    SPAWN_ENV=""; do_spawn_x "${R9}" --no-exec "${bad}" t
+    now_wt="$(wt_count "${R9}")"; now_br="$(br_count "${R9}")"
+    if [ "${SRC}" -ne 0 ] && [ "${now_wt}" = "${base_wt}" ] && [ "${now_br}" = "${base_br}" ]; then
+      ok "9a: id=[${bad}] は非 0 で die し worktree/branch を作らなかった"
+    else
+      ng "9a: id=[${bad}] rc=${SRC} / worktree ${base_wt}→${now_wt} / branch ${base_br}→${now_br}"
+    fi
+  done
+
+  # --- 9b: short が不正でも同様 (id は有効値 900 を使う) ---
+  for bad in '-x' 'a/b' 'a..b'; do
+    SPAWN_ENV=""; do_spawn_x "${R9}" --no-exec 900 "${bad}"
+    now_wt="$(wt_count "${R9}")"; now_br="$(br_count "${R9}")"
+    if [ "${SRC}" -ne 0 ] && [ "${now_wt}" = "${base_wt}" ] && [ "${now_br}" = "${base_br}" ]; then
+      ok "9b: short=[${bad}] は非 0 で die し worktree/branch を作らなかった"
+    else
+      ng "9b: short=[${bad}] rc=${SRC} / worktree ${base_wt}→${now_wt} / branch ${base_br}→${now_br}"
+    fi
+  done
+
+  # --- 9m: ⚠️★★★ 変異テスト —— validate_name を no-op にすると spawn 経路が素通りするか ---
+  MUT9="${TMP}/mut9-loop-spawn.sh"
+  sed 's/^validate_name() {/validate_name() { return 0;/' "${SPAWN_SH}" > "${MUT9}"
+  mut9_src="$(grep -c '^validate_name() {$' "${SPAWN_SH}" 2>/dev/null)" || mut9_src=0
+  mut9_left="$(grep -c '^validate_name() {$' "${MUT9}" 2>/dev/null)" || mut9_left=0
+  if [ "${mut9_src:-0}" -ne 1 ] || [ "${mut9_left:-0}" -ne 0 ]; then
+    ng "9m: 変異を当てられない (src=${mut9_src} / mut=${mut9_left}) —— ★ validate_name の宣言が変わった → ⚠️ 検査不能"
+  else
+    R9M="${TMP}/r9m/repo"; mkdir -p "${R9M}"
+    if ! setup_fake_repo "${R9M}" "${MUT9}"; then
+      ng "9m: 準備できなかった (★ 判定できない)"
+    else
+      # ★ id=-x は git 自身が拒まない (実測済み) ので、潰せば通ってしまうはず。
+      SPAWN_ENV=""; do_spawn_x "${R9M}" --no-exec '-x' t
+      if [ "${SRC}" -eq 0 ] && wt_has "${R9M}" "repo--x-t"; then
+        ok "9m: ★★★ validate_name を潰すと id=[-x] が通ってしまった (★ 9a/9b は空振りしていない)"
+      else
+        ng "9m: 潰しても rc=${SRC} で止まった (⚠️★★★ 9a/9b が検証したい経路を通っていない可能性)"
+      fi
+    fi
+  fi
+fi
+
+# ── 10. ⚠️★★★ P1-J: base の祖先関係で start を決める (判断 3) ────
+# ⚠️★★★ **何を止めるためにあるのか** (design.md P1-J・decisions.md 判断 3):
+#   ★ 旧実装は `git fetch origin "$base"` が成功すると**無条件で** `origin/$base` を採用し、
+#     ローカル `$base` が先行していても無視していた。→ push 前にローカルで merge した pin が
+#     古い origin から切られる事故になる。
+echo "10. ⚠️★★★ P1-J: base の祖先関係で start を決める (equal/ahead/behind/diverge/no-local/fetch 失敗)"
+
+setup_origin_repo() { # setup_origin_repo <repo-dir> <bare-dir> [spawn-script-src]
+  local r="$1" bare="$2" src="${3:-${SPAWN_SH}}"
+  # ⚠️★★★ `setup_fake_repo` へ `src` を転送し忘れると、群 10g/10h の変異版
+  #   (`${MUT10G}` / `${MUT10H}`) が使われず **常に無傷の loop-spawn.sh を検査してしまう**
+  #   (＝ 変異テストが空振りする)。★ 2026-09-26 に実測で踏んだ。
+  setup_fake_repo "${r}" "${src}" || return 1
+  git init --bare -q "${bare}" >/dev/null 2>&1 || return 1
+  ( cd "${r}" && git remote add origin "${bare}" && git push -q origin main ) >/dev/null 2>&1
+}
+make_pushed_branch() { # make_pushed_branch <repo-dir> <branch> → ★ local と origin を同じ sha に揃える
+  local r="$1" b="$2"
+  ( cd "${r}" && git switch -q -c "${b}" \
+      && printf 'x\n' > "m-$(printf '%s' "${b}" | tr '/' '_')" \
+      && git add -A -- . && git commit -q -m "on ${b}" \
+      && git push -q origin "${b}" && git switch -q main ) >/dev/null 2>&1
+}
+add_local_commit() { # add_local_commit <repo-dir> <branch> → ★ ローカルだけ 1 コミット進める (未 push)
+  local r="$1" b="$2"
+  ( cd "${r}" && git switch -q "${b}" \
+      && printf 'y\n' > "l-$(printf '%s' "${b}" | tr '/' '_')" \
+      && git add -A -- . && git commit -q -m "local extra on ${b}" && git switch -q main ) >/dev/null 2>&1
+}
+add_origin_commit() { # add_origin_commit <bare-dir> <branch> → ★ origin だけ (別クローン経由で) 1 コミット進める
+  local bare="$1" b="$2" tmp rc
+  tmp="$(mktemp -d)" || return 1
+  ( cd "${tmp}" && git clone -q "${bare}" c \
+      && cd c && git -c user.email=x@x.invalid -c user.name=x checkout -q "${b}" \
+      && printf 'z\n' > "o-$(printf '%s' "${b}" | tr '/' '_')" && git add -A -- . \
+      && git -c user.email=x@x.invalid -c user.name=x commit -q -m "origin extra on ${b}" \
+      && git push -q origin "${b}" ) >/dev/null 2>&1
+  rc=$?
+  rm -rf "${tmp}"
+  return ${rc}
+}
+create_origin_only_branch() { # create_origin_only_branch <bare-dir> <branch> → ★ ローカルには一切存在しない
+  local bare="$1" b="$2" tmp rc
+  tmp="$(mktemp -d)" || return 1
+  ( cd "${tmp}" && git clone -q "${bare}" c \
+      && cd c && git -c user.email=x@x.invalid -c user.name=x switch -q -c "${b}" \
+      && printf 'n\n' > "n-$(printf '%s' "${b}" | tr '/' '_')" && git add -A -- . \
+      && git -c user.email=x@x.invalid -c user.name=x commit -q -m "on ${b}" \
+      && git push -q origin "${b}" ) >/dev/null 2>&1
+  rc=$?
+  rm -rf "${tmp}"
+  return ${rc}
+}
+origin_tip() { ( cd "$1" && git rev-parse --verify --quiet "refs/remotes/origin/$2" ) 2>/dev/null; }
+# ★ `tip_of` / `wt_head` は群 7 で定義済み (このファイル内で以後も使い回せる)。
+
+R10="${TMP}/r10/repo"; O10="${TMP}/r10/origin.git"
+if ! setup_origin_repo "${R10}" "${O10}"; then
+  ng "P1-J: origin 付き一時 repo を用意できなかった (★ 判定できない)"
+else
+  # --- 10a: 一致 → origin/$base ---
+  make_pushed_branch "${R10}" feat-eq
+  SPAWN_ENV="LOOP_BASE_BRANCH=feat-eq"; do_spawn_x "${R10}" --no-exec 10a t
+  if [ "${SRC}" -eq 0 ] && has_text "${SERR}" "start-choice = equal" \
+     && [ "$(wt_head "${TMP}/r10/wt/repo-10a-t")" = "$(origin_tip "${R10}" feat-eq)" ]; then
+    ok "10a: 一致 → origin/base から切り、start-choice=equal を出した"
+  else
+    ng "10a: rc=${SRC} —— 一致状態で期待どおりに切れていない"
+  fi
+
+  # --- 10b: ローカル先行 → ローカルから切り、未 push 件数の WARN を出す ---
+  make_pushed_branch "${R10}" feat-ahead
+  add_local_commit "${R10}" feat-ahead
+  SPAWN_ENV="LOOP_BASE_BRANCH=feat-ahead"; do_spawn_x "${R10}" --no-exec 10b t
+  if [ "${SRC}" -eq 0 ] && has_text "${SERR}" "start-choice = local-ahead" && has_text "${SERR}" "未 push" \
+     && [ "$(wt_head "${TMP}/r10/wt/repo-10b-t")" = "$(tip_of "${R10}" feat-ahead)" ]; then
+    ok "10b: ★★★ ローカル先行 → ローカルから切り、未 push の WARN を出した (旧実装は origin から切っていた)"
+  else
+    ng "10b: rc=${SRC} —— ローカル先行なのに期待どおりに切れていない"
+  fi
+
+  # --- 10c: ローカル遅れ → origin/$base (現行どおり) ---
+  make_pushed_branch "${R10}" feat-behind
+  add_origin_commit "${O10}" feat-behind
+  SPAWN_ENV="LOOP_BASE_BRANCH=feat-behind"; do_spawn_x "${R10}" --no-exec 10c t
+  if [ "${SRC}" -eq 0 ] && has_text "${SERR}" "start-choice = local-behind" \
+     && [ "$(wt_head "${TMP}/r10/wt/repo-10c-t")" = "$(origin_tip "${R10}" feat-behind)" ]; then
+    ok "10c: ローカル遅れ → origin/base から切った"
+  else
+    ng "10c: rc=${SRC} —— ローカル遅れなのに期待どおりに切れていない"
+  fi
+
+  # --- 10d: 分岐 → die (worktree も branch も作らない) ---
+  make_pushed_branch "${R10}" feat-div
+  add_local_commit "${R10}" feat-div
+  add_origin_commit "${O10}" feat-div
+  SPAWN_ENV="LOOP_BASE_BRANCH=feat-div"; do_spawn_x "${R10}" --no-exec 10d t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${R10}" "repo-10d-t" && ! branch_exists "${R10}" "loop/10d-t"; then
+    ok "10d: ★★★ 分岐は die し、worktree も branch も作らなかった (fail-closed)"
+  else
+    ng "10d: rc=${SRC} —— 分岐なのに進んだ、または残骸がある"
+  fi
+
+  # --- 10e: ローカルに base が無い → origin/$base (現行どおり) ---
+  create_origin_only_branch "${O10}" feat-nolocal
+  SPAWN_ENV="LOOP_BASE_BRANCH=feat-nolocal"; do_spawn_x "${R10}" --no-exec 10e t
+  if [ "${SRC}" -eq 0 ] && has_text "${SERR}" "start-choice = no-local" \
+     && [ "$(wt_head "${TMP}/r10/wt/repo-10e-t")" = "$(origin_tip "${R10}" feat-nolocal)" ]; then
+    ok "10e: ローカル無し → origin/base から切った"
+  else
+    ng "10e: rc=${SRC} —— ローカル無しなのに期待どおりに切れていない"
+  fi
+fi
+
+# --- 10f: fetch 失敗 → ローカル base で続行 (★ 別 repo。origin URL を壊すため使い捨てる) ---
+R10F="${TMP}/r10f/repo"; O10F="${TMP}/r10f/origin.git"
+if ! setup_origin_repo "${R10F}" "${O10F}" || ! make_pushed_branch "${R10F}" feat-eq; then
+  ng "10f: 準備できなかった (★ 判定できない)"
+else
+  ( cd "${R10F}" && git remote set-url origin "${TMP}/r10f/no-such-origin.git" ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=feat-eq"; do_spawn_x "${R10F}" --no-exec 10f t
+  if [ "${SRC}" -eq 0 ] && has_text "${SERR}" "start-choice = fetch-failed" && has_text "${SERR}" "fetch 失敗" \
+     && [ "$(wt_head "${TMP}/r10f/wt/repo-10f-t")" = "$(tip_of "${R10F}" feat-eq)" ]; then
+    ok "10f: fetch 失敗 → ローカル base で続行し、start-choice=fetch-failed を出した"
+  else
+    ng "10f: rc=${SRC} —— fetch 失敗時の挙動が期待と違う"
+  fi
+fi
+
+# --- 10g/10h: ⚠️★★★ 変異テスト (★ 群 10 が空振りしていないこと) ---
+echo "10g-10h. ⚠️★★★ 変異テスト —— 祖先関係の分岐を潰したら赤くなるか"
+
+# 10g: local-ahead の判定を潰す (常に false) → 10b は分岐 (die) に落ちるはず
+MUT10G="${TMP}/mut10g-loop-spawn.sh"
+sed 's|elif git merge-base --is-ancestor "refs/remotes/origin/\$base" "refs/heads/\$base" 2>/dev/null; then|elif false; then|' \
+  "${SPAWN_SH}" > "${MUT10G}"
+mut10g_src="$(grep -cF 'elif git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null; then' "${SPAWN_SH}" 2>/dev/null)" || mut10g_src=0
+mut10g_left="$(grep -cF 'elif git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null; then' "${MUT10G}" 2>/dev/null)" || mut10g_left=0
+if [ "${mut10g_src:-0}" -ne 1 ] || [ "${mut10g_left:-0}" -ne 0 ]; then
+  ng "10g: 変異を当てられない (src=${mut10g_src} / mut=${mut10g_left}) —— ★ 判定式の書き方が変わった → ⚠️ 検査不能"
+else
+  R10G="${TMP}/r10g/repo"; O10G="${TMP}/r10g/origin.git"
+  if ! setup_origin_repo "${R10G}" "${O10G}" "${MUT10G}"; then
+    ng "10g: 準備できなかった (★ 判定できない)"
+  else
+    make_pushed_branch "${R10G}" feat-ahead
+    add_local_commit "${R10G}" feat-ahead
+    SPAWN_ENV="LOOP_BASE_BRANCH=feat-ahead"; do_spawn_x "${R10G}" --no-exec 10g t
+    if [ "${SRC}" -ne 0 ]; then
+      ok "10g: ★★★ local-ahead 判定を潰すと分岐扱いで die した (★ 10b は空振りしていない)"
+    else
+      ng "10g: 潰しても rc=0 で進んだ (⚠️★★★ 10b が判定式を見ていない可能性)"
+    fi
+  fi
+fi
+
+# 10h: local-behind の判定を潰す (常に true) → 10d (分岐) が die せず進んでしまうはず
+MUT10H="${TMP}/mut10h-loop-spawn.sh"
+sed 's|elif git merge-base --is-ancestor "refs/heads/\$base" "refs/remotes/origin/\$base" 2>/dev/null; then|elif true; then|' \
+  "${SPAWN_SH}" > "${MUT10H}"
+mut10h_src="$(grep -cF 'elif git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null; then' "${SPAWN_SH}" 2>/dev/null)" || mut10h_src=0
+mut10h_left="$(grep -cF 'elif git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null; then' "${MUT10H}" 2>/dev/null)" || mut10h_left=0
+if [ "${mut10h_src:-0}" -ne 1 ] || [ "${mut10h_left:-0}" -ne 0 ]; then
+  ng "10h: 変異を当てられない (src=${mut10h_src} / mut=${mut10h_left}) —— ★ 判定式の書き方が変わった → ⚠️ 検査不能"
+else
+  R10H="${TMP}/r10h/repo"; O10H="${TMP}/r10h/origin.git"
+  if ! setup_origin_repo "${R10H}" "${O10H}" "${MUT10H}"; then
+    ng "10h: 準備できなかった (★ 判定できない)"
+  else
+    make_pushed_branch "${R10H}" feat-div
+    add_local_commit "${R10H}" feat-div
+    add_origin_commit "${O10H}" feat-div
+    SPAWN_ENV="LOOP_BASE_BRANCH=feat-div"; do_spawn_x "${R10H}" --no-exec 10h t
+    if [ "${SRC}" -eq 0 ] && wt_has "${R10H}" "repo-10h-t"; then
+      ok "10h: ★★★ local-behind 判定を潰すと分岐なのに死なず進んでしまった (★ 10d は空振りしていない)"
+    else
+      ng "10h: 潰しても rc=${SRC} で止まった (⚠️★★★ 10d が判定式を見ていない可能性)"
+    fi
+  fi
+fi
+
+# ── 11. ⚠️★★★ P1-K: spawn の直列化ロックと失敗時の残骸片づけ ────
+# ⚠️★★★ **何を止めるためにあるのか** (design.md P1-K・decisions.md 判断 6):
+#   ★ `git worktree add -b` は upstream 設定で `.git/config` を書くため、2 本同時だと
+#     git 自身のロックで片方が落ち、旧実装は `set -e` で **ブランチだけ作られた状態で die**
+#     し、片づけないまま終わっていた。
+echo "11. ⚠️★★★ P1-K: spawn の同時実行と、worktree add 失敗時の残骸片づけ"
+
+# --- 11a: 同じ repo で別 id の spawn を 2 本 & で同時に起動し、両方 exit 0 / 両方 worktree あり ---
+R11="${TMP}/r11/repo"; mkdir -p "${R11}"
+if ! setup_fake_repo "${R11}"; then
+  ng "11a: 準備できなかった (★ 判定できない)"
+else
+  round=1
+  all_ok=1
+  while [ "${round}" -le 3 ]; do
+    ida="c${round}a"; idb="c${round}b"
+    ( cd "${R11}" && bash scripts/loop-spawn.sh --no-exec "${ida}" t ) >"${TMP}/r11-${round}a.log" 2>&1 &
+    pa=$!
+    ( cd "${R11}" && bash scripts/loop-spawn.sh --no-exec "${idb}" t ) >"${TMP}/r11-${round}b.log" 2>&1 &
+    pb=$!
+    wait "${pa}"; rca=$?
+    wait "${pb}"; rcb=$?
+    if [ "${rca}" -ne 0 ] || [ "${rcb}" -ne 0 ] \
+       || ! wt_has "${R11}" "repo-${ida}-t" || ! wt_has "${R11}" "repo-${idb}-t"; then
+      all_ok=0
+      ng "11a: round ${round} 失敗 (rca=${rca} rcb=${rcb})"
+    fi
+    round=$((round + 1))
+  done
+  if [ "${all_ok}" -eq 1 ]; then
+    ok "11a: 別 id の同時 spawn を 3 ラウンド、毎回両方 exit 0・両方 worktree あり"
+  fi
+fi
+
+# --- 11b: ⚠️★★★ git worktree add を失敗させたとき、branch が残らないこと ---
+#   ★ 失敗のさせ方: 作成先パスに **同名の実ファイル**を事前に置く (★ Windows もファイル名で
+#     衝突させられるので両 OS で同じ fixture を作れる。パーミッションでの再現は移植性が無い)。
+R11B="${TMP}/r11b/repo"; mkdir -p "${R11B}"
+if ! setup_fake_repo "${R11B}"; then
+  ng "11b: 準備できなかった (★ 判定できない)"
+else
+  mkdir -p "${TMP}/r11b/wt"
+  echo "blocker" > "${TMP}/r11b/wt/repo-fx-t"   # ★ worktree の作成先を実ファイルで塞ぐ
+  SPAWN_ENV=""; do_spawn_x "${R11B}" --no-exec fx t
+  if [ "${SRC}" -ne 0 ] && ! branch_exists "${R11B}" "loop/fx-t"; then
+    ok "11b: ★★★ git worktree add 失敗時に branch loop/fx-t を残さなかった (旧実装は残していた)"
+  else
+    ng "11b: rc=${SRC} / branch 残=$(branch_exists "${R11B}" "loop/fx-t" && echo yes || echo no)"
+  fi
+fi
+
+# --- 11c: ⚠️★★★ 変異テスト —— abort_worktree の cleanup 条件を潰すと branch が残るか ---
+MUT11C="${TMP}/mut11c-loop-spawn.sh"
+sed 's/if \[ -n "\$tip" \] && \[ "\$tip" = "\${start_sha:-}" \]; then/if false; then/' "${SPAWN_SH}" > "${MUT11C}"
+mut11c_src="$(grep -cF 'if [ -n "$tip" ] && [ "$tip" = "${start_sha:-}" ]; then' "${SPAWN_SH}" 2>/dev/null)" || mut11c_src=0
+mut11c_left="$(grep -cF 'if [ -n "$tip" ] && [ "$tip" = "${start_sha:-}" ]; then' "${MUT11C}" 2>/dev/null)" || mut11c_left=0
+if [ "${mut11c_src:-0}" -ne 1 ] || [ "${mut11c_left:-0}" -ne 0 ]; then
+  ng "11c: 変異を当てられない (src=${mut11c_src} / mut=${mut11c_left}) —— ★ abort_worktree の書き方が変わった → ⚠️ 検査不能"
+else
+  R11C="${TMP}/r11c/repo"; mkdir -p "${R11C}"
+  if ! setup_fake_repo "${R11C}" "${MUT11C}"; then
+    ng "11c: 準備できなかった (★ 判定できない)"
+  else
+    mkdir -p "${TMP}/r11c/wt"
+    echo "blocker" > "${TMP}/r11c/wt/repo-fx-t"
+    SPAWN_ENV=""; do_spawn_x "${R11C}" --no-exec fx t
+    if [ "${SRC}" -ne 0 ] && branch_exists "${R11C}" "loop/fx-t"; then
+      ok "11c: ★★★ cleanup 条件を潰すと branch が残った (★ 11b は空振りしていない)"
+    else
+      ng "11c: 潰しても branch が残らなかった (⚠️★★★ 11b が cleanup 条件を見ていない可能性)"
+    fi
+  fi
+fi
+
+# --- 11d-11f: ⚠️★★★ ロックそのものを決定論的に検査する (★ 2026-09-26 メインのレビューで追加) ---
+#   ★ 同時実行の競合は再現できなかった (下の注記) ので、**ロックを先に置いて**振る舞いを見る:
+#     11d: 生きている pid のロック → 待ち切って非 0・branch も worktree も作らない
+#     11e: 死んだ pid のロック     → stale として除去し、spawn が通る
+#     11f: 変異 —— `acquire_spawn_lock` の呼び出しを消すと 11d の状況で spawn が通ってしまう (★ 11d が空振りしていない)
+echo "11d-11f. ⚠️★★★ P1-K: ロックを先に置いたときの待ち・stale 除去・変異"
+LOCK_ENV="LOOP_SPAWN_LOCK_TIMEOUT=2 LOOP_SPAWN_LOCK_POLL=0.2"
+sleep 60 &
+LIVE_PID=$!
+R11D="${TMP}/r11d/repo"; mkdir -p "${R11D}"
+if ! setup_fake_repo "${R11D}"; then
+  ng "11d: 準備できなかった (★ 判定できない)"
+else
+  mkdir -p "${R11D}/.git/loop-spawn.lock" && printf '%s' "${LIVE_PID}" > "${R11D}/.git/loop-spawn.lock/pid"
+  SPAWN_ENV="${LOCK_ENV}"; do_spawn_x "${R11D}" --no-exec lk t
+  if [ "${SRC}" -ne 0 ] && ! branch_exists "${R11D}" "loop/lk-t" && ! wt_has "${R11D}" "repo-lk-t" \
+     && [ -d "${R11D}/.git/loop-spawn.lock" ]; then
+    ok "11d: 生きている pid のロックでは待ち切って非 0・branch/worktree を作らず・他人のロックを消さない"
+  else
+    ng "11d: rc=${SRC} / branch 残=$(branch_exists "${R11D}" "loop/lk-t" && echo yes || echo no) / lock 残=$([ -d "${R11D}/.git/loop-spawn.lock" ] && echo yes || echo no)"
+  fi
+fi
+R11E="${TMP}/r11e/repo"; mkdir -p "${R11E}"
+if ! setup_fake_repo "${R11E}"; then
+  ng "11e: 準備できなかった (★ 判定できない)"
+else
+  true & DEAD_PID=$!; wait "${DEAD_PID}" 2>/dev/null || true
+  mkdir -p "${R11E}/.git/loop-spawn.lock" && printf '%s' "${DEAD_PID}" > "${R11E}/.git/loop-spawn.lock/pid"
+  SPAWN_ENV="${LOCK_ENV}"; do_spawn_x "${R11E}" --no-exec st t
+  if [ "${SRC}" -eq 0 ] && wt_has "${R11E}" "repo-st-t" && [ ! -d "${R11E}/.git/loop-spawn.lock" ]; then
+    ok "11e: 死んだ pid のロックは stale として除去し、spawn が通り、終了時にロックを残さない"
+  else
+    ng "11e: rc=${SRC} / wt=$(wt_has "${R11E}" "repo-st-t" && echo yes || echo no) / lock 残=$([ -d "${R11E}/.git/loop-spawn.lock" ] && echo yes || echo no)"
+  fi
+fi
+MUT11F="${TMP}/mut11f-loop-spawn.sh"
+sed '/^acquire_spawn_lock$/d' "${SPAWN_SH}" > "${MUT11F}"
+mut11f_src="$(grep -c '^acquire_spawn_lock$' "${SPAWN_SH}" 2>/dev/null)" || mut11f_src=0
+mut11f_left="$(grep -c '^acquire_spawn_lock$' "${MUT11F}" 2>/dev/null)" || mut11f_left=0
+if [ "${mut11f_src:-0}" -ne 1 ] || [ "${mut11f_left:-0}" -ne 0 ]; then
+  ng "11f: 変異を当てられない (src=${mut11f_src} / mut=${mut11f_left}) —— ★ ロック取得の書き方が変わった → ⚠️ 検査不能"
+else
+  R11F="${TMP}/r11f/repo"; mkdir -p "${R11F}"
+  if ! setup_fake_repo "${R11F}" "${MUT11F}"; then
+    ng "11f: 準備できなかった (★ 判定できない)"
+  else
+    mkdir -p "${R11F}/.git/loop-spawn.lock" && printf '%s' "${LIVE_PID}" > "${R11F}/.git/loop-spawn.lock/pid"
+    SPAWN_ENV="${LOCK_ENV}"; do_spawn_x "${R11F}" --no-exec lk t
+    if [ "${SRC}" -eq 0 ]; then
+      ok "11f: ★★★ ロック取得を消すと、生きているロックを無視して spawn が通った (★ 11d は空振りしていない)"
+    else
+      ng "11f: 取得を消しても止まった (⚠️★★★ 11d がロック以外の理由で止まっている可能性) rc=${SRC}"
+    fi
+  fi
+fi
+kill "${LIVE_PID}" 2>/dev/null || true
+
+# ⚠️ **やっていないこと** (★ 隠さない):
+#   - P1-K のロック自体を外す変異による「同時実行で本当に失敗する」直接の再現は
+#     この環境 (Windows/git-bash・ローカル NTFS) では **12 並列まで手で確認しても再現しなかった**
+#     (★ git 自身の内部ロックが十分速いため、この規模の同時実行では衝突しなかったと見られる)。
+#     → 上の 11b/11c は「同時実行で起きた事故と *同じ形* (worktree add 失敗時にブランチが
+#     残る)」を **決定論的なファイル衝突**で再現し、その修正 (`abort_worktree` 経由の片づけ)
+#     が効いていることを検査する。ロック自体は 11d-11f (先に置いたロックでの待ち・stale 除去・変異) が守る。
+
 echo "════════════════════════════════════════"
 echo "PASS=${PASS}  FAIL=${FAIL}"
 FINISHED=1

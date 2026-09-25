@@ -249,6 +249,22 @@ valid_refname() {
   git check-ref-format --branch "$v" >/dev/null 2>&1
 }
 
+# validate_name <label> <value>
+#   ⚠️★★★ 起票 A: 旧実装は `--cleanup` 経路にしか id 検証が無く、spawn 経路 (id / short) は
+#     無検証で `branch=` / `wtdir=` へ直接埋め込んでいた。→ ★ 検証本体をここに括り出し、
+#     cleanup の id・spawn の id・spawn の short の **3 か所**から呼ぶ (振る舞いは元の
+#     --cleanup の case と同一。`label` だけ呼び出し元で変える)。
+validate_name() {
+  local label="$1" v="$2"
+  case "${v}" in
+    -*) die "${label} が '-' 始まりです: [${v}]" ;;
+    *[!A-Za-z0-9._-]*) die "${label} に使えない文字が入っています (英数字 . _ - のみ): [${v}]" ;;
+    # ★ `.` / `..` / `a..b` は上を通るが、ref としても名前としても紛らわしい (⚠️ Codex /cross-review 1 巡目)。
+    #   ★ パス脱出は起きない (`<repo>-..` は 1 つの名前であって親ディレクトリではない) が、通す意味も無い。
+    .|..|*..*) die "${label} にドットの連なりは使えません: [${v}]" ;;
+  esac
+}
+
 # list_configs → .steering/*/_loop-config.json を 1 行 1 件で出す (★ 0 件なら何も出さない)
 #   ⚠️ `ls -1` に依存しない (★ Codex `/cross-review` 1 巡目・2026-09-21) ——
 #     ★ glob を直接回すので `ls` の出力整形に左右されない。
@@ -535,13 +551,8 @@ if [ "${1:-}" = "--cleanup" ]; then
   #     ★ **両系統の広さが非対称**になる (branch だけ全部消え、worktree は 1 件も消えない)。
   #   ★ 併せて閉じるもの: `../wt/` の外を指す `..` / `/` と、`awk -v` がエスケープ列として
   #     解釈する `\` (⚠️ シェル側の glob と awk 側の一致文字列がずれる)。
-  case "${id}" in
-    -*) die "issue-id が '-' 始まりです: [${id}]" ;;
-    *[!A-Za-z0-9._-]*) die "issue-id に使えない文字が入っています (英数字 . _ - のみ): [${id}]" ;;
-    # ★ `.` / `..` / `a..b` は上を通るが、ref としても名前としても紛らわしい (⚠️ Codex /cross-review 1 巡目)。
-    #   ★ パス脱出は起きない (`<repo>-..` は 1 つの名前であって親ディレクトリではない) が、通す意味も無い。
-    .|..|*..*) die "issue-id にドットの連なりは使えません: [${id}]" ;;
-  esac
+  # ★ 起票 A: 検証本体は共通関数 validate_name に括り出した (spawn 経路の id / short もここを通る)。
+  validate_name "issue-id" "${id}"
   left=0; n_wt=0; n_br=0; processed_path=""
 
   # ★ 登録済み worktree の **パス** 集合を返す（★ git の出力そのまま）。
@@ -747,10 +758,103 @@ fi
 
 id="${1:?issue-id を指定してください}"
 short="${2:-issue}"
+# ★ 起票 A: --cleanup 経路にしか無かった検証を spawn 経路 (id / short) にも適用する。
+validate_name "issue-id" "${id}"
+validate_name "short-slug" "${short}"
 resolve_base                # ⚠️ コマンド置換にしない (★ die が抜けず、provenance も取れない)
 base="$RESOLVED_BASE"
 branch="loop/${id}-${short}"
 wtdir="../wt/${repo_name}-${id}-${short}"
+
+# --- ⚠️★★★ P1-K: spawn を直列化する mkdir ロック (git-bash に flock が無い前提) ---
+#   ★ 根本原因 (design.md P1-K 表): `git worktree add -b` は upstream 設定で `.git/config` を
+#     書くため、2 本同時だと git 自身の内部ロックで片方が落ち、`set -e` で
+#     **ブランチだけ作られた状態で die** し、片づけないまま終わっていた。
+#     → ★ 原因 (同時実行) そのものを mkdir ロックで消す。
+#   ★ `git rev-parse --git-common-dir` は全 worktree が共有する 1 か所を指す
+#     (⚠️ worktree ごとに別内容を持つ `.git` ファイルの場所ではない)。
+LOCK="$(git rev-parse --git-common-dir)/loop-spawn.lock"
+LOCK_HELD=0
+# ⚠️ テストでは待ち間隔・上限を短縮できるよう env で上書き可能にする (★ 既定は本番相当)。
+LOCK_POLL="${LOOP_SPAWN_LOCK_POLL:-0.5}"
+LOCK_TIMEOUT="${LOOP_SPAWN_LOCK_TIMEOUT:-120}"
+
+release_spawn_lock() {
+  if [ "${LOCK_HELD}" -eq 1 ]; then
+    rm -rf "${LOCK}" 2>/dev/null || true
+    LOCK_HELD=0
+  fi
+}
+# ⚠️★★★ 異常終了 (set -e による die を含む) でも解放する保険。
+#   ★ ただし **正常系では `git worktree add` の直後に明示解放する** (下記) —— ⚠️ `exec claude` は
+#     プロセスを置き換えるだけで「シェルの終了」ではないため、EXIT trap が exec 前に
+#     必ず走るとは限らない。だから **明示解放が本筋、trap は異常系の保険**。
+trap release_spawn_lock EXIT
+
+# acquire_spawn_lock → ★ mkdir で排他を取る。stale (pid が死んでいる) なら 1 回だけ除去して取り直す。
+#   ⚠️ pid ファイルが無い/読めない (作成直後の競合) ときは stale と見なさない (待つ側に倒す)。
+acquire_spawn_lock() {
+  local i=0 max_i lock_pid
+  # ⚠️ bash 3.2 に浮動小数演算は無いので、待ち回数は awk で整数化する (sleep 自体は小数を受ける)。
+  max_i="$(awk -v t="${LOCK_TIMEOUT}" -v p="${LOCK_POLL}" \
+    'BEGIN{n=t/p; i=int(n); if (n>i) i++; if (i<1) i=1; print i}')"
+  while ! mkdir "${LOCK}" 2>/dev/null; do
+    if [ -f "${LOCK}/pid" ]; then
+      lock_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
+      case "${lock_pid:-}" in
+        '') : ;;              # ⚠️ 読めない (作成直後の競合) → stale と見なさない
+        *[!0-9]*) : ;;        # ⚠️ 壊れた pid → stale と見なさない
+        *)
+          if ! kill -0 "${lock_pid}" 2>/dev/null; then
+            # ★ stale: 死んだ pid のロックを 1 回だけ除去して即座に取り直す。
+            rm -rf "${LOCK}" 2>/dev/null || true
+            continue
+          fi
+          ;;
+      esac
+    fi
+    i=$((i + 1))
+    if [ "${i}" -gt "${max_i}" ]; then
+      die "loop-spawn.lock を ${LOCK_TIMEOUT} 秒待っても取得できませんでした: ${LOCK}
+            ⚠️ 他の loop-spawn.sh が動いていないか確認してください。
+            ★ 完全に止まっているなら手で削除:  rmdir \"${LOCK}\""
+    fi
+    sleep "${LOCK_POLL}"
+  done
+  printf '%s' "$$" > "${LOCK}/pid" 2>/dev/null || true
+  LOCK_HELD=1
+}
+
+# --- abort_worktree はここで定義する (★ P1-K で `git worktree add` 失敗時にも使うため) ---
+#   ★ 元は下段の deny 注入失敗時だけの後始末だったが、`git worktree add` 自体の失敗
+#     (根本原因: 同時実行によるブランチだけ残る事故) にも同じ規則を適用する。
+#   ⚠️ 関数本体は呼び出し時まで評価されないので、`$branch` / `$wtdir` / `$start_sha` が
+#     まだ代入されていないこの位置で定義してよい。
+#   ⚠️★★★ 撤去できたことを確かめてから「完了」と書く（★ 起票 18・2026-09-20 の実測で発見）。
+abort_worktree() { # abort_worktree <理由>
+  local left_wt="" left_br="" tip=""
+  cd "$repo_root" 2>/dev/null || true
+  # ⚠️ 撤去できたかを**確かめてから**「撤去しました」と書く（★ Codex /cross-review 2 巡目）。
+  git worktree remove --force "$wtdir" >/dev/null 2>&1 || left_wt="$wtdir"
+  # ⚠️★★★ **`-D` を無条件で使わない**（★ Codex /cross-review 1 巡目 MEDIUM）。
+  #   ★ ただし `-d` の merged 判定は **現在の HEAD 依存**なので、作業ブランチに居ると
+  #     ⚠️ 空のブランチでも拒否されて残骸になる（★ Codex 2 巡目）。
+  #   → ★ 判定を HEAD に依存させない: **作成時の commit から 1 mm も動いていないときだけ**消す。
+  tip="$(git rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || true)"
+  if [ -n "$tip" ] && [ "$tip" = "${start_sha:-}" ]; then
+    git branch -D "$branch" >/dev/null 2>&1 || left_br="$branch"
+  elif [ -n "$tip" ]; then
+    # ⚠️ 何かがコミットされている ＝ 作りたてではない。★ 消さずに残して人に渡す。
+    left_br="$branch"
+  fi
+  git worktree prune >/dev/null 2>&1 || true
+  die "$1
+            ${left_wt:+⚠️ worktree ($left_wt) を撤去できませんでした。手で確認してください。}${left_wt:+
+            }${left_wt:-★ worktree ($wtdir) は撤去しました。}
+            ${left_br:+⚠️ branch $left_br は作成時から動いているため残しました (手で確認してください)。}
+            ★ 原因を直してから再実行してください。
+            (既存 worktree を手で点検するなら  bash scripts/loop-worktree-deny.sh --verify <worktree>)"
+}
 
 # --- dirty tree ハンドリング ---
 if [ -n "$(git status --porcelain)" ]; then
@@ -758,6 +862,10 @@ if [ -n "$(git status --porcelain)" ]; then
   echo "            が、混乱を避けるため commit / stash を推奨します。続行するには LOOP_FORCE=1。" >&2
   [ "${LOOP_FORCE:-0}" = "1" ] || die "中断 (LOOP_FORCE=1 で強行可)"
 fi
+
+# --- ⚠️★★★ P1-K: ここから `git worktree add` 完了までロックで直列化する ---
+#   ★ stale 検出 (ロックの pid が死んでいないか) 〜 `git worktree add` までを囲む。
+acquire_spawn_lock
 
 # --- stale worktree 検出 (basename 一致・空白入りパスに耐える) ---
 # ⚠️★★★ `grep -q` をパイプの終端に置かない（★ 2026-09-21 に `--cleanup` 側で同じ形を直した）——
@@ -776,13 +884,48 @@ if git show-ref --verify --quiet "refs/heads/$branch"; then
 fi
 git worktree prune   # 消えたパスの登録を掃除
 
-# --- base を remote と同期し、可能なら remote-tracking から分岐 (stale local base を避ける) ---
+# --- ⚠️★★★ P1-J: base を remote と同期し、祖先関係で start を決める (判断 3) ---
+#   ★ 旧実装は fetch 成功なら**無条件で** `origin/$base` を採用しており、ローカル $base が
+#     先行していても無視していた (design.md P1-J の根本原因)。
+#   ★ 判定表 (decisions.md 判断 3):
+#     一致       → origin/$base
+#     ローカル先行 (origin が ローカルの祖先) → $base (ローカル) ＋ 未 push 件数の WARN
+#     ローカル遅れ (ローカルが origin の祖先) → origin/$base (現行どおり)
+#     分岐 (どちらでもない)                  → **die** (worktree も branch も作る前に)
+#     ローカルに $base が無い                 → origin/$base (現行どおり)
 start="$base"
+start_choice=""      # ★ 値は equal|local-ahead|local-behind|no-local|fetch-failed のいずれか
+start_ahead_n=""
 if git remote get-url origin >/dev/null 2>&1; then
   if git fetch --quiet origin "$base"; then
-    start="origin/$base"          # fetch 成功時は最新の remote から分岐
+    if ! git show-ref --verify --quiet "refs/heads/$base"; then
+      start="origin/$base"; start_choice="no-local"
+    else
+      local_sha="$(git rev-parse --verify --quiet "refs/heads/$base" 2>/dev/null || true)"
+      origin_sha="$(git rev-parse --verify --quiet "refs/remotes/origin/$base" 2>/dev/null || true)"
+      if [ -n "${local_sha:-}" ] && [ "${local_sha}" = "${origin_sha:-}" ]; then
+        start="origin/$base"; start_choice="equal"
+      elif git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null; then
+        # ★ origin が ローカルの祖先 ＝ ローカルが先行している。
+        start="$base"; start_choice="local-ahead"
+        start_ahead_n="$(git rev-list --count "origin/${base}..${base}" 2>/dev/null || true)"
+      elif git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null; then
+        # ★ ローカルが origin の祖先 ＝ ローカルが遅れている (stale local base)。
+        start="origin/$base"; start_choice="local-behind"
+      else
+        # ⚠️★★★ 分岐: どちらが正しいか自動で決められない → fail-closed。
+        #   ★ worktree も branch もまだ何も作っていない時点で止める。
+        die "base '$base' はローカルと origin で分岐しています (ローカル=${local_sha:-?} / origin=${origin_sha:-?})
+              ⚠️ どちらが正しいか自動で決められないため、worktree も branch も作らずに止まります (判断 3・fail-closed)。
+              ★ 手で解決してから再実行してください (例:  git -C ${repo_root} pull --ff-only origin ${base})。"
+      fi
+    fi
   else
-    echo "loop-spawn: fetch 失敗 (オフライン?) ローカル base で続行"
+    start="$base"
+    start_choice="fetch-failed"
+    # ⚠️ 他の診断行と同じく stderr へ (★ 旧実装は stdout に出ており、`--no-exec` の
+    #   「stdout の最終行 = worktree の絶対パス」契約は壊さないが、診断の置き場が不揃いだった)。
+    echo "loop-spawn: fetch 失敗 (オフライン?) ローカル base で続行" >&2
   fi
 fi
 
@@ -805,6 +948,14 @@ fi
     echo "loop-spawn:   config.task= $(sanitize_disp "${cfg_task_name}")"
   fi
   echo "loop-spawn:   start      = $(sanitize_disp "${start}")"
+  # ⚠️★★★ P1-J: 別 subagent (loop-run.sh 側) がこの行を `start-choice = local-ahead` で
+  #   grep するので、綴りを変えない (契約は decisions.md 判断 3 / design.md P1-J)。
+  if [ -n "${start_choice:-}" ]; then
+    echo "loop-spawn:   start-choice = ${start_choice}"
+    if [ "${start_choice}" = "local-ahead" ]; then
+      echo "loop-spawn:     ⚠️ 未 push の ${start_ahead_n:-?} コミットを含む worktree になります"
+    fi
+  fi
   _def="$(default_branch)"
   if [ -z "${_def:-}" ]; then
     echo "loop-spawn:   ⚠️ 既定ブランチを特定できないため乖離を出せません"
@@ -831,7 +982,14 @@ fi
 echo "loop-spawn: base=$base (start=$start) → branch=$branch / worktree=$wtdir"
 # ★ 撤去判定に使う「作成時の commit」を控えておく (★ abort_worktree の注記を参照)。
 start_sha="$(git rev-parse --verify --quiet "$start" 2>/dev/null || true)"
-git worktree add -b "$branch" "$wtdir" "$start"
+# ⚠️★★★ P1-K: `set -e` に落とし込んで die しない —— ★ ここで `set -e` に死なせると
+#   `abort_worktree` を経由せずブランチだけが残るケース (根本原因) を直せない。
+if ! git worktree add -b "$branch" "$wtdir" "$start"; then
+  release_spawn_lock   # ★ 失敗時も worktree add 直後に必ず解放する
+  abort_worktree "git worktree add に失敗しました: branch=$branch / worktree=$wtdir / start=$start"
+fi
+# ★ 成功時も worktree add の直後に必ず解放する (⚠️ `exec claude` の前に必ず解放済みにする契約)。
+release_spawn_lock
 cd "$wtdir"
 
 # --- ⚠️★★★ 必須 `permissions.deny` の注入（★ worktree 作成直後・失敗したら使わせない） ---
@@ -845,31 +1003,9 @@ cd "$wtdir"
 #     MEDIUM・2026-09-14）。★ 残すと (a) 人が手で `cd` して deny 無しで起動できてしまい、
 #     (b) 同じ id の再実行が「同名 worktree が既に存在」で**恒久的に死ぬ**。
 #     ★ 作りたてで中身が無いので、撤去して失うものは無い。
+#   ⚠️ `abort_worktree` はここでは定義しない —— P1-K で `git worktree add` 失敗時にも使うため、
+#     より前方 (id/short/base/branch/wtdir の直後) で定義している。
 deny_script="${SCRIPT_DIR}/loop-worktree-deny.sh"
-abort_worktree() { # abort_worktree <理由>
-  local left_wt="" left_br="" tip=""
-  cd "$repo_root" 2>/dev/null || true
-  # ⚠️ 撤去できたかを**確かめてから**「撤去しました」と書く（★ Codex /cross-review 2 巡目）。
-  git worktree remove --force "$wtdir" >/dev/null 2>&1 || left_wt="$wtdir"
-  # ⚠️★★★ **`-D` を無条件で使わない**（★ Codex /cross-review 1 巡目 MEDIUM）。
-  #   ★ ただし `-d` の merged 判定は **現在の HEAD 依存**なので、作業ブランチに居ると
-  #     ⚠️ 空のブランチでも拒否されて残骸になる（★ Codex 2 巡目）。
-  #   → ★ 判定を HEAD に依存させない: **作成時の commit から 1 mm も動いていないときだけ**消す。
-  tip="$(git rev-parse --verify --quiet "refs/heads/$branch" 2>/dev/null || true)"
-  if [ -n "$tip" ] && [ "$tip" = "${start_sha:-}" ]; then
-    git branch -D "$branch" >/dev/null 2>&1 || left_br="$branch"
-  elif [ -n "$tip" ]; then
-    # ⚠️ 何かがコミットされている ＝ 作りたてではない。★ 消さずに残して人に渡す。
-    left_br="$branch"
-  fi
-  git worktree prune >/dev/null 2>&1 || true
-  die "$1
-            ${left_wt:+⚠️ worktree ($left_wt) を撤去できませんでした。手で確認してください。}${left_wt:+
-            }${left_wt:-★ worktree ($wtdir) は撤去しました。}
-            ${left_br:+⚠️ branch $left_br は作成時から動いているため残しました (手で確認してください)。}
-            ★ 原因を直してから再実行してください。
-            (既存 worktree を手で点検するなら  bash scripts/loop-worktree-deny.sh --verify <worktree>)"
-}
 [ -f "${deny_script}" ] || abort_worktree "必須 deny の注入スクリプトが見つかりません: ${deny_script}"
 bash "${deny_script}" "$(pwd)" >&2 \
   || abort_worktree "worktree への必須 deny 注入に失敗しました。★ deny 無しの worktree は渡しません。"

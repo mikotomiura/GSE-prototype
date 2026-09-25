@@ -47,6 +47,7 @@ while attempt <= budget.max_attempts:
         watchdog が独立に verify を再実行して客観確認する
     verdict が緑かつ AC 充足 → issue_done を append して終了
     verdict が赤            → test_fail/typecheck_fail/lint_fail を append し attempt += 1
+    緑だが未コミット/コミット 0 件 → uncommitted を append し attempt += 1 (★ 先に commit する)
     Stop 条件に該当         → 対応イベントを append して終了
 ```
 

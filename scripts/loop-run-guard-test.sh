@@ -207,6 +207,54 @@ dry_run() { # dry_run <repo-dir> [引数...] → stdout(+stderr) をそのまま
   ( cd "${r}" && PATH="${r}/stub:${PATH}" bash scripts/loop-run.sh .steering/task --dry-run "$@" ) 2>&1
 }
 
+# ⚠️ P1-I-c（no_progress_stop で止まること）用: budget を小さく上書きする。
+#   ★ setup_repo の既定 (max_attempts=2 / no_progress_threshold=4) だと no_progress_threshold に
+#     届く前に max_attempts で打ち切られ、「no_progress_stop で止まった」ことを検査できない。
+set_budget() { # set_budget <repo-dir> <max_attempts> <no_progress_threshold>
+  local r="$1" ma="$2" np="$3" cfg tmp
+  cfg="${r}/.steering/task/_loop-config.json"
+  tmp="$(mktemp)" || return 1
+  jq --argjson ma "${ma}" --argjson np "${np}" \
+     '.budget.max_attempts=$ma | .budget.no_progress_threshold=$np' "${cfg}" > "${tmp}" \
+     && mv "${tmp}" "${cfg}" || return 1
+  # ⚠️★★★ main checkout を dirty のまま残すと loop-spawn.sh の dirty-tree ガードに引っかかり
+  #   LOOP_FORCE=1 を要求されて worktree 生成が失敗する (★ 実測で踏んだ)。→ commit する。
+  (
+    cd "${r}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    git add .steering/task/_loop-config.json || exit 1
+    git commit -q -m "test: set_budget" || exit 1
+  ) >/dev/null 2>&1
+}
+
+# ⚠️★★★ P1-J-events 用ラッパー: `loop-spawn.sh` 本体は別 subagent が並行して改修中で、
+#   まだ `start-choice = local-ahead` を出さないかもしれない。
+#   → ★ 本体は差し替えず (setup_repo がコピーした実物を `loop-spawn-real.sh` に退避し)、
+#   テスト用 repo 側だけに「本体を呼ぶ前に stderr へ 1 行足すラッパー」を置く。
+#   これで検査するのは **loop-run.sh 側の検出・events 反映**だけであり、
+#   loop-spawn.sh がこの行をいつ出すようになるかには依存しない。
+wrap_spawn_local_ahead() { # wrap_spawn_local_ahead <repo-dir>
+  local r="$1"
+  mv "${r}/scripts/loop-spawn.sh" "${r}/scripts/loop-spawn-real.sh" || return 1
+  cat > "${r}/scripts/loop-spawn.sh" <<'WRAP'
+#!/usr/bin/env bash
+# テスト用ラッパー (loop-run-guard-test.sh が生成)。本物の loop-spawn.sh を呼ぶ前に
+# start-choice=local-ahead の provenance 行を stderr に 1 本足すだけで、他の挙動は素通しする。
+DIR="$(cd "$(dirname "$0")" && pwd)"
+echo "loop-spawn:   start-choice = local-ahead" >&2
+exec bash "${DIR}/loop-spawn-real.sh" "$@"
+WRAP
+  chmod +x "${r}/scripts/loop-spawn.sh" 2>/dev/null || true
+  # ⚠️ main checkout を dirty のまま残すと、本物の loop-spawn.sh 冒頭の dirty-tree ガードに
+  #   引っかかって LOOP_FORCE=1 が要求される (★ このラッパー自身が原因の dirty)。→ commit する。
+  (
+    cd "${r}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    git add scripts/loop-spawn.sh scripts/loop-spawn-real.sh || exit 1
+    git commit -q -m "test: wrap loop-spawn for start-choice" || exit 1
+  ) >/dev/null 2>&1
+}
+
 echo "════════════════════════════════════════"
 echo "B. ブランチ検査 (ensure_branch) — ⚠️ 起票 10 の境界"
 
@@ -219,8 +267,12 @@ echo "B. ブランチ検査 (ensure_branch) — ⚠️ 起票 10 の境界"
 #     → ★ **B2 が緑であること自体が「ノイズは漏れていない」の証明**になる。
 #     ⚠️ CI の git は `core.autocrlf` の警告を stderr に出し、実際にこれで B6 が赤くなった。
 B2="${TMP}/b2/repo"; mkdir -p "${B2}"
+# ⚠️★★★ P1-I（design.md 判断 5）導入後は「verify 緑」だけでは issue_done にならない
+#   （check_committed も緑である必要がある）。★ B2 はブランチ検査の陰性対照であり、
+#   P1-I とは別の不変条件を見ているので、コミットさせて orthogonal に保つ。
 B2_STUB='echo "stdout のノイズ (★ 漏れたら JSON が壊れる)"
 echo "stderr のノイズ (★ CI の git autocrlf 警告と同じ位置)" >&2
+echo w > w.txt && git add w.txt && git commit -q -m work
 true'
 if setup_repo "${B2}" "${B2_STUB}"; then
   ev="$(run_loop "${B2}" --issues 001)"
@@ -343,9 +395,13 @@ fi
 #       **実装を壊しても緑のまま**だった（★ 突然変異 M-g で確認した）。
 #   → ★ verify を `test -f done.marker` にして **attempt 1 を必ず落とし**、
 #     attempt 2 で amend ＋ marker 作成をさせる。
+#   ⚠️★★★ P1-I（design.md 判断 5）導入後は `done.marker` も**コミットする**こと。
+#     ★ `touch` だけだと untracked のまま残り、check_committed が dirty と見て
+#     uncommitted 扱いになる (★ これは B6 の検査対象＝ブランチ/履歴検査とは orthogonal な
+#     不変条件なので、ここで混線させない)。
 B6="${TMP}/b6/repo"; mkdir -p "${B6}"
 B6_STUB='if [ -f w.txt ]; then
-  echo w2 >> w.txt && git add w.txt && git commit -q --amend -m amended && touch done.marker
+  echo w2 >> w.txt && git add w.txt && git commit -q --amend -m amended && touch done.marker && git add done.marker && git commit -q -m marker
 else
   echo w > w.txt && git add w.txt && git commit -q -m work
 fi
@@ -530,7 +586,9 @@ echo "D. permission_denials の内訳 — ⚠️ 起票 3"
 #   ⚠️ 拒否はすべて tool_name=="Bash" になるので、**tool_name だけ数えても何も分からない**。
 D="${TMP}/d/repo"; mkdir -p "${D}"
 DENIALS='[{\"tool_name\":\"Bash\",\"tool_use_id\":\"t1\",\"tool_input\":{\"command\":\"git checkout main\",\"description\":\"x\"}},{\"tool_name\":\"Bash\",\"tool_use_id\":\"t2\",\"tool_input\":{\"command\":\"git push origin\",\"description\":\"y\"}},{\"tool_name\":\"WebFetch\",\"tool_use_id\":\"t3\",\"tool_input\":{\"url\":\"http://x\"}}]'
-if setup_repo "${D}" ':' "${DENIALS}"; then
+# ⚠️★★★ P1-I 導入後は commit させないと issue_done に届かない (D1 の非致命チェックが
+#   check_committed の判定と混線しないよう orthogonal にする)。
+if setup_repo "${D}" 'echo w > w.txt && git add w.txt && git commit -q -m work' "${DENIALS}"; then
   ev="$(run_loop "${D}" --issues 001)"
   if [ -s "${ev}" ]; then
     line="$(grep 'permission_denials=' "${ev}" | head -1)"
@@ -718,6 +776,263 @@ if setup_repo "${W4}" "${W4_STUB}" '[]' 'echo FAIL-marker; exit 1'; then
   fi
 else
   ng "W4: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+echo "I. check_committed (verify 緑でも未コミット／コミット 0 件は done にしない) — design.md P1-I ／ 判断 5"
+
+# ⚠️★★★ 実例（005 / 008）: worker が max_turns で切れただけで中身は正しかったが、
+#   コミットしていなくても verify (worktree の作業ツリーを測る) は緑になっていた。
+#   → ★ check_committed を新設し、verify 緑の後に「ちゃんとコミットされているか」を別に見る。
+#   ⚠️ すべて verify.test を無条件 'true' にする — check_committed の判定だけを orthogonal に見るため。
+
+# --- P1-I-a: ファイルを書くだけでコミットしない ---
+I_A="${TMP}/i-a/repo"; mkdir -p "${I_A}"
+IA_STUB='echo w > w.txt
+true'
+if setup_repo "${I_A}" "${IA_STUB}" '[]' 'true'; then
+  ev="$(run_loop "${I_A}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    if grep -q '"event":"uncommitted"' "${ev}"; then
+      ok "P1-I-a: 未コミットのファイルを残しただけの attempt を uncommitted として記録した"
+    else
+      ng "P1-I-a: ⚠️★ 未コミットの verify 緑を uncommitted として検出していない"
+      sed -n '1,8p' "${ev}"
+    fi
+    if grep -q '"event":"issue_done"' "${ev}"; then
+      ng "P1-I-a: ⚠️★★★ 未コミットなのに issue_done になった (★ 起票そのものの再現)"
+    else
+      ok "P1-I-a: 未コミットのまま done にしていない"
+    fi
+    n_start="$(grep -c '"event":"attempt_start"' "${ev}" || true)"
+    if [ "${n_start:-0}" -ge 2 ]; then
+      ok "P1-I-a: ブロックせず次 attempt に進んだ (attempt_start ${n_start} 回)"
+    else
+      ng "P1-I-a: ⚠️ 次 attempt に進んでいない (max_attempts=2 のはず。attempt_start ${n_start} 回)"
+    fi
+  else
+    ng "P1-I-a: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "P1-I-a: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-I-b: 何もしない (dirty でもない・コミット 0) ---
+I_B="${TMP}/i-b/repo"; mkdir -p "${I_B}"
+if setup_repo "${I_B}" ':' '[]' 'true'; then
+  ev="$(run_loop "${I_B}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '"event":"uncommitted"' "${ev}" \
+     && ! grep -q '"event":"issue_done"' "${ev}"; then
+    ok "P1-I-b: 何もしない attempt (dirty でもコミットでもない) も done にせず uncommitted にした"
+  else
+    ng "P1-I-b: ⚠️★ 何もしない attempt が done 扱いになった、または uncommitted を検出していない"
+    [ -s "${ev}" ] && sed -n '1,8p' "${ev}"
+  fi
+else
+  ng "P1-I-b: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-I-c: 同じ未コミット状態が続くと no_progress_stop で止まる (無限に回らない) ---
+#   ★ max_attempts / no_progress_threshold を小さくする (既定の no_progress_threshold=4 だと
+#     max_attempts=2 で先に abandoned になり、no_progress_stop を検査できない)。
+I_C="${TMP}/i-c/repo"; mkdir -p "${I_C}"
+if setup_repo "${I_C}" ':' '[]' 'true'; then
+  set_budget "${I_C}" 6 2
+  ev="$(run_loop "${I_C}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    if grep -q '"event":"no_progress_stop"' "${ev}"; then
+      ok "P1-I-c: 同じ未コミット状態が続くと no_progress_stop で止まった"
+    else
+      ng "P1-I-c: ⚠️★ no_progress_stop で止まらなかった (★ 無限に回るおそれ)"
+      sed -n '1,20p' "${ev}"
+    fi
+    n_start="$(grep -c '"event":"attempt_start"' "${ev}" || true)"
+    if [ "${n_start:-0}" -le 3 ]; then
+      ok "P1-I-c: no_progress_threshold(2) 前後で早期に止まった (attempt_start ${n_start} 回。max_attempts=6 まで浪費していない)"
+    else
+      ng "P1-I-c: ⚠️ no_progress_threshold を超えて回り続けた (attempt_start ${n_start} 回)"
+    fi
+    if grep -q '"event":"abandoned"' "${ev}"; then
+      ng "P1-I-c: ⚠️★ max_attempts まで空回りしてから abandoned になった (no_progress で止まっていない)"
+    else
+      ok "P1-I-c: max_attempts まで空回りしていない"
+    fi
+  else
+    ng "P1-I-c: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "P1-I-c: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-I-d 陰性対照: コミットする attempt は従来どおり issue_done になる ---
+I_D="${TMP}/i-d/repo"; mkdir -p "${I_D}"
+ID_STUB='echo w > w.txt && git add w.txt && git commit -q -m work
+true'
+if setup_repo "${I_D}" "${ID_STUB}" '[]' 'true'; then
+  ev="$(run_loop "${I_D}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+    ok "P1-I-d 陰性対照: コミットする attempt は従来どおり issue_done になる"
+  else
+    ng "P1-I-d 陰性対照: ⚠️★ コミットしても issue_done にならない (★ P1-I が正常系まで壊した)"
+    [ -s "${ev}" ] && sed -n '1,8p' "${ev}"
+  fi
+  if [ -s "${ev}" ] && grep -q '"event":"uncommitted"' "${ev}"; then
+    ng "P1-I-d 陰性対照: ⚠️ コミットしているのに uncommitted と誤判定した"
+  else
+    ok "P1-I-d 陰性対照: 誤検出していない"
+  fi
+else
+  ng "P1-I-d: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+echo "P1-D. 依存の装飾剥がし・拾えない 3 桁数字の WARN — design.md P1-D ／ 判断 7"
+
+# --- P1-D-a: 装飾つき依存 (- **001**（説明）) を deps として拾うこと ---
+D_DEP_A="${TMP}/d-dep-a/repo"; mkdir -p "${D_DEP_A}"
+if setup_repo "${D_DEP_A}" ':'; then
+  cat > "${D_DEP_A}/.steering/task/issues/004.md" <<'DEPA'
+# Issue 004: stub (decorated dependency)
+verify_level: parse
+## Goal
+stub
+## Dependencies
+- **001**（説明）
+## Status
+
+DEPA
+  out_da="$(dry_run "${D_DEP_A}")"
+  if printf '%s' "${out_da}" | grep -E '^ +004 ' | grep -q 'deps=\[001'; then
+    ok "P1-D-a: 装飾つき依存 (- **001**（説明）) を deps として拾った"
+  else
+    ng "P1-D-a: ⚠️★ 装飾を剥がせておらず deps を拾えていない"
+    printf '%s\n' "${out_da}" | head -20
+  fi
+else
+  ng "P1-D-a: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-D-b: 散文中の 3 桁数字 (「issue 004 の merge 後に…」) は WARN するが die しない ---
+D_DEP_B="${TMP}/d-dep-b/repo"; mkdir -p "${D_DEP_B}"
+if setup_repo "${D_DEP_B}" ':'; then
+  cat > "${D_DEP_B}/.steering/task/issues/001.md" <<'DEPB'
+# Issue 001: stub (散文中の 3 桁数字)
+verify_level: parse
+## Goal
+stub
+## Dependencies
+- 002
+issue 004 の merge 後に反映してください
+## Status
+
+DEPB
+  out_db="$(dry_run "${D_DEP_B}")"; rc_db=$?
+  if printf '%s' "${out_db}" | grep -q 'WARN.*004'; then
+    ok "P1-D-b: 散文中の 3 桁数字 (issue 004 の merge 後に…) を WARN した"
+  else
+    ng "P1-D-b: ⚠️★ 散文中の 3 桁数字を WARN していない"
+    printf '%s\n' "${out_db}" | head -20
+  fi
+  if [ "${rc_db}" -eq 0 ]; then
+    ok "P1-D-b: WARN でも die しない (exit 0)"
+  else
+    ng "P1-D-b: ⚠️★ WARN のはずが die してしまった (exit ${rc_db})"
+  fi
+else
+  ng "P1-D-b: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-D-b 陰性対照: 普通の "- 001" だけなら WARN が出ない ---
+D_DEP_B2="${TMP}/d-dep-b2/repo"; mkdir -p "${D_DEP_B2}"
+if setup_repo "${D_DEP_B2}" ':'; then
+  cat > "${D_DEP_B2}/.steering/task/issues/004.md" <<'DEPB2'
+# Issue 004: stub (undecorated single dependency)
+verify_level: parse
+## Goal
+stub
+## Dependencies
+- 001
+## Status
+
+DEPB2
+  out_db2="$(dry_run "${D_DEP_B2}")"
+  if printf '%s' "${out_db2}" | grep -q 'WARN'; then
+    ng "P1-D-b 陰性対照: ⚠️★ 普通の依存 (- 001) だけなのに WARN が出た (誤検出)"
+    printf '%s\n' "${out_db2}" | head -20
+  else
+    ok "P1-D-b 陰性対照: 普通の依存だけなら WARN が出ない"
+  fi
+else
+  ng "P1-D-b 陰性対照: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-D-c: `*` の箇条書き (`* 001` / `* **002**`) も従来どおり拾い、WARN しない ---
+#   ⚠️★★★ 装飾剥がしを `s/[*_`]//g` だけにすると、**箇条書きの `*` まで剥がれて**
+#     従来の正規表現 `[-*]` が受けていた `* 001` が拾えなくなる (2026-09-26 メインのレビューで発見)。
+D_DEP_C="${TMP}/d-dep-c/repo"; mkdir -p "${D_DEP_C}"
+if setup_repo "${D_DEP_C}" ':'; then
+  cat > "${D_DEP_C}/.steering/task/issues/004.md" <<'DEPC'
+# Issue 004: stub (asterisk bullets)
+verify_level: parse
+## Goal
+stub
+## Dependencies
+* 001
+* **002**（説明）
+## Status
+
+DEPC
+  out_dc="$(dry_run "${D_DEP_C}")"
+  line_dc="$(printf '%s\n' "${out_dc}" | grep -E '^ +004 ' || true)"
+  if printf '%s' "${line_dc}" | grep -q '001' && printf '%s' "${line_dc}" | grep -q '002'; then
+    ok "P1-D-c: \`* 001\` / \`* **002**\` の箇条書きを deps として拾った"
+  else
+    ng "P1-D-c: ⚠️★ \`*\` の箇条書きが拾えていない (装飾剥がしが箇条書きの \`*\` まで消している)"
+    printf '%s\n' "${out_dc}" | head -20
+  fi
+  if printf '%s' "${out_dc}" | grep -q 'WARN.*004 の Dependencies'; then
+    ng "P1-D-c: ⚠️★ \`*\` の箇条書きなのに WARN が出た"
+  else
+    ok "P1-D-c: \`*\` の箇条書きでは WARN が出ない"
+  fi
+else
+  ng "P1-D-c: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+echo "P1-J-events. spawn の start-choice=local-ahead を events の WARN に反映 — design.md P1-J"
+
+# ⚠️★★★ loop-spawn.sh 本体は別 subagent が並行して改修中で、まだ start-choice=local-ahead を
+#   出さないかもしれない。→ ★ 本体は差し替えず、wrap_spawn_local_ahead でテスト用 repo 側だけ
+#   ラップし、loop-run.sh 側の検出・events 反映だけを検査する。
+JW="${TMP}/jw/repo"; mkdir -p "${JW}"
+if setup_repo "${JW}" ':'; then
+  wrap_spawn_local_ahead "${JW}"
+  ev="$(run_loop "${JW}" --issues 001)"
+  if [ -s "${ev}" ]; then
+    line="$(grep '"event":"attempt_start"' "${ev}" | grep '"attempt":1' | grep 'ローカル先行' | head -1)"
+    if [ -n "${line}" ]; then
+      ok "P1-J-events: start-choice=local-ahead を attempt 1 の attempt_start WARN として events に残した"
+    else
+      ng "P1-J-events: ⚠️★ WARN が events に反映されていない"
+      sed -n '1,8p' "${ev}"
+    fi
+  else
+    ng "P1-J-events: events.jsonl が空 (★ 判定できない)"
+  fi
+else
+  ng "P1-J-events: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- 陰性対照: ラップしていなければ (= start-choice 行が無ければ) WARN も出ない ---
+JW2="${TMP}/jw2/repo"; mkdir -p "${JW2}"
+if setup_repo "${JW2}" ':'; then
+  ev2="$(run_loop "${JW2}" --issues 001)"
+  if [ -s "${ev2}" ] && ! grep -q 'ローカル先行' "${ev2}"; then
+    ok "P1-J-events 陰性対照: start-choice の行が無ければ WARN も出ない"
+  else
+    ng "P1-J-events 陰性対照: ⚠️ ラップしていないのに WARN が出た (誤検出)"
+    [ -s "${ev2}" ] && sed -n '1,8p' "${ev2}"
+  fi
+else
+  ng "P1-J-events 陰性対照: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
 echo "────────────────────────────────────────"

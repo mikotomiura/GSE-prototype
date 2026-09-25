@@ -39,7 +39,7 @@ gh pr list --state all 2>/dev/null || echo "GH_ABSENT"   # gh が無ければ PR
 - event → 状態 emoji の対応:
   - `attempt_start` → 🔄 running (phase=execute)
   - `test_pass` → verifying/✅ 方向、`issue_done` → ✅ done (PR 反映)
-  - `test_fail / typecheck_fail / lint_fail` → 🔄 running (verify で ✗、失敗回数を括弧表示)
+  - `test_fail / typecheck_fail / lint_fail / acceptance_fail / uncommitted` → 🔄 running (verify で ✗、失敗回数を括弧表示。`uncommitted` = 緑だが未コミット／コミット 0 件)
   - `no_progress_stop / blocked / scope_violation` → ⛔ blocked (note に理由)
   - `abandoned` → abandoned
   - event 無し → ⏳ queued

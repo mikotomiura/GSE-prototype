@@ -234,14 +234,34 @@ issue_field() { # issue_field <id> <見出し> → 該当セクションの本�
 #    → 箇条書き行の先頭にある id だけを拾い、自己依存は落とす。
 #      推奨する書式:  - 003
 #                     - 004  (loader の変更が前提)
-issue_deps_raw() { # 自己依存も含めてそのまま返す (preflight が検出するため)
+# ⚠️★★★ P1-D（design.md 判断 7）: `- **001**（説明）` のように強調で囲まれると、
+#   装飾を剥がす前の正規表現は一致しない。→ ★ 行ごとに `*` `_` `` ` `` を剥がしてから拾う
+#   (issue_status_key が装飾を剥がすのと同じ発想)。
+# ⚠️★★★ ただし箇条書きの `*` は**先に `-` へ正規化してから**剥がす (2026-09-26 メインのレビュー)。
+#   ★ `s/[*_`]//g` だけだと `* 001` の箇条書き記号まで消え、従来の `[-*]` が受けていた書式が拾えなくなる。
+deps_section_plain() { # deps_section_plain <id> → 装飾を剥がした Dependencies 節
   issue_field "$1" Dependencies \
+    | sed -e 's/^\([[:space:]]*\)[*]\([[:space:]]\)/\1-\2/' -e 's/[*_`]//g'
+}
+issue_deps_raw() { # 自己依存も含めてそのまま返す (preflight が検出するため)
+  deps_section_plain "$1" \
     | grep -oE '^[[:space:]]*[-*][[:space:]]*(#|issue[[:space:]]*)?[0-9]{3}\b' \
     | grep -oE '[0-9]{3}' \
     | sort -u
 }
 issue_deps() { # 実行時に使う版。自己依存は落としてデッドロックを避ける
   issue_deps_raw "$1" | grep -vx "$1" || true
+}
+# ⚠️★★★ P1-D（design.md 判断 7）: 散文中の言及 (「issue 004 の merge 後に…」) は正当にありうる。
+#   die はせず WARN するための材料をここで作る —— Dependencies 節 (装飾を剥がした後) にある
+#   単語境界の 3 桁数字のうち、箇条書き行の先頭として拾えなかったもの。
+issue_deps_unparsed() { # issue_deps_unparsed <id> → 拾えなかった 3 桁数字 (1 行 1 件、無ければ空)
+  local all_nums parsed n
+  all_nums="$(deps_section_plain "$1" | grep -oE '\b[0-9]{3}\b' | sort -u)"
+  parsed="$(issue_deps_raw "$1")"
+  for n in $all_nums; do
+    printf '%s\n' "$parsed" | grep -qx "$n" || printf '%s\n' "$n"
+  done
 }
 issue_verify_level() { grep -m1 -E '^verify_level:' "$(issue_file "$1")" | awk '{print $2}'; }
 
@@ -396,6 +416,45 @@ run_verify() { # run_verify <worktree> <issue-id> <out-file>; 失敗種別は $V
   return 0
 }
 
+# ---------- P1-I: 「未コミット／コミット 0 件」の verify 緑を done にしない ----------
+# ⚠️★★★ 実例（005 / 008）: verify はworktree の**作業ツリー**を測るので、worker が
+#   `max_turns` で切れて何もコミットしなくても緑になりうる (★ design.md P1-I・判断 5)。
+#   → ★ verify 緑の**後**に「ちゃんとコミットされているか」を別に見る。
+check_committed() { # check_committed <worktree> <anchor> <out-file>; 0 = コミット済み
+  local wt="$1" anchor="$2" out_file="$3" porcelain n_commits rc
+  : > "$out_file"
+  porcelain="$(git -C "$wt" status --porcelain 2>&1)"
+  {
+    echo "# check_committed: git status --porcelain"
+    if [ -n "$porcelain" ]; then printf '%s\n' "$porcelain"; else echo "(クリーン)"; fi
+  } >> "$out_file"
+  if [ -n "$porcelain" ]; then
+    echo "# → 未コミットの変更がある (dirty)" >> "$out_file"
+    return 1
+  fi
+  # ⚠️ anchor が空・rev-list が失敗 → 数えられない ＝ fail-closed (done にしない側)。
+  if [ -z "$anchor" ]; then
+    echo "# → anchor (worktree 生成時の HEAD) を取得できていない。コミット数を数えられないため fail-closed" >> "$out_file"
+    return 1
+  fi
+  n_commits="$(git -C "$wt" rev-list --count "$anchor..HEAD" 2>&1)"; rc=$?
+  echo "# check_committed: git rev-list --count $anchor..HEAD = $n_commits (rc=$rc)" >> "$out_file"
+  if [ $rc -ne 0 ]; then
+    echo "# → rev-list に失敗した。数えられないため fail-closed" >> "$out_file"
+    return 1
+  fi
+  case "$n_commits" in
+    ''|*[!0-9]*)
+      echo "# → rev-list の出力が数値でない。fail-closed" >> "$out_file"
+      return 1 ;;
+  esac
+  if [ "$n_commits" -eq 0 ]; then
+    echo "# → anchor からコミットが 0 件" >> "$out_file"
+    return 1
+  fi
+  return 0
+}
+
 # ---------- 予算の積算 (claude -p --output-format json の usage / total_cost_usd) ----------
 # 注意 (実測): usage.input_tokens は **キャッシュ分を含まない**。
 #   input+output だけ足すと 3 桁規模で過小計上し token_ceiling が永久に発火しない。
@@ -487,7 +546,7 @@ run_issue() {
   #     「解決した base は何で、既定からどれだけ離れているか」を**丸ごと消していた**
   #     (＝ **無人モードC では誰も読まない** ＝ 起票 23 の 2 つ目の論点)。
   #   → ★ run ログへ流す。⚠️ stdout 側の契約 (最終行 = worktree の絶対パス) は変えない。
-  local spawn_err _l
+  local spawn_err _l spawn_local_ahead=0
   spawn_err="$(mktemp)" || { emit "$id" execute blocked detail="mktemp に失敗 (worktree 生成前)"; return 1; }
   # ⚠️ 早期 return でも必ず掃除する (★ Codex `/cross-review` 1 巡目・2026-09-21)。
   #   ★ 現在は下の `rm -f` に到達するので leak は無いが、
@@ -501,6 +560,13 @@ run_issue() {
   while IFS= read -r _l; do
     [ -n "$_l" ] || continue
     log "$_l"
+    # ⚠️★★★ P1-J（design.md 判断 3）: spawn が「ローカルが origin/<base> より先行している」と
+    #   判定して**ローカル base**から切ったこと (未 push のコミットを含みうる) を検出する。
+    #   ★ ここでは検出だけし、emit は下の attempt=1 の attempt_start に合流させる
+    #   (★ events 語彙は増やさない。ensure_deny / BYPASSED_BLOCKED と同じ「attempt_start + detail」の作法)。
+    case "$_l" in
+      *start-choice*local-ahead*) spawn_local_ahead=1 ;;
+    esac
   done < "$spawn_err"
   rm -f "$spawn_err"
   [ -d "${wt:-}" ] || { emit "$id" execute blocked detail="worktree 生成に失敗"; return 1; }
@@ -538,6 +604,11 @@ run_issue() {
         *" $id "*) emit "$id" execute attempt_start attempt="$attempt" \
                         detail="WARN: Status=blocked の issue を --issues で明示指定して実行している ($(issue_status "$id" | head -c 120))" ;;
       esac
+      # ⚠️★★★ P1-J（design.md 判断 3）: 両方該当したら 2 行 emit でよい (既存 WARN と同じ作法)。
+      if [ "$spawn_local_ahead" = "1" ]; then
+        emit "$id" execute attempt_start attempt="$attempt" \
+             detail="WARN: base をローカル先行（未 push を含む）から切った: loop-spawn の provenance (start-choice) を確認してください"
+      fi
     fi
 
     # ⚠️★★★ **毎 attempt** 必須 deny を保証する (★ 詳細は ensure_deny の冒頭)。
@@ -658,19 +729,28 @@ run_issue() {
       if [ "$lvl" = "recheck" ]; then
         if ! run_watchdog "$id" "$wt" "$attempt"; then return 1; fi
       fi
-      # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
-      #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
-      #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
-      #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
-      #     **`issue_done` が「別ブランチを見て出した done」**になる。
-      #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
-      #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
-      #     M3 が `git -C . checkout` で破れることを実測している。
-      #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
-      ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
-      emit "$id" done issue_done attempt="$attempt"
-      log "issue $id: done (attempt $attempt)"
-      return 0
+      # ⚠️★★★ P1-I（design.md 判断 5）: verify 緑でも「未コミット／コミット 0 件」なら
+      #   done にしない。★ check_committed が非 0 を返したら、run_verify 失敗時と**同じ**
+      #   失敗経路 (fingerprint → check_wt_became_blocked → no_progress) に合流させる
+      #   ($vout を check_committed の出力で上書きし、VERIFY_KIND=uncommitted にして
+      #   この if ブロックの外へ抜ける。⚠️ ここで return 1 してはならない —— 次 attempt に
+      #   進めるための「失敗 attempt」であって致命ではない)。
+      if check_committed "$wt" "$wt_anchor" "$vout"; then
+        # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
+        #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
+        #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
+        #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
+        #     **`issue_done` が「別ブランチを見て出した done」**になる。
+        #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
+        #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
+        #     M3 が `git -C . checkout` で破れることを実測している。
+        #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
+        ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
+        emit "$id" done issue_done attempt="$attempt"
+        log "issue $id: done (attempt $attempt)"
+        return 0
+      fi
+      VERIFY_KIND=uncommitted
     fi
 
     # 一時ファイルから fingerprint を作る (サブシェル経由だと必ず sha1("") になる)
@@ -791,7 +871,7 @@ deps_met() { local d; for d in $(issue_deps "$1"); do is_done "$d" || return 1; 
 #   循環する issue は `deps_met` が永久に false になり、下の `remaining` ループを抜けて
 #   `blocked`（「依存 issue が未完のため未実行」）が events に残る。⚠️ **原因が循環だとは書かれない。**
 preflight_dag() {
-  local id d bad=0
+  local id d bad=0 unparsed
   for id in $ALL; do
     for d in $(issue_deps_raw "$id"); do
       if [ "$d" = "$id" ]; then
@@ -804,6 +884,14 @@ preflight_dag() {
         echo "loop-run: issue $id の依存 $d が issues/ に存在しません" >&2; bad=1
       fi
     done
+    # ⚠️★★★ P1-D（design.md 判断 7）: 箇条書きの先頭で拾えなかった 3 桁数字は WARN するが
+    #   die しない。散文中の言及 (「issue 004 の merge 後に…」) は正当にありうるので、
+    #   黙らないことが要点であって止めることではない。★ --dry-run でも見える (preflight は
+    #   DRY_RUN の判定より前に走る)。
+    unparsed="$(issue_deps_unparsed "$id")"
+    if [ -n "$unparsed" ]; then
+      log "WARN: issue $id の Dependencies に依存として拾わなかった 3 桁数字: $(printf '%s' "$unparsed" | tr '\n' ' ')（箇条書き行の先頭にない）"
+    fi
   done
   [ "$bad" = "0" ] || die "DAG の前提が壊れています (上記を修正してください)"
 }
