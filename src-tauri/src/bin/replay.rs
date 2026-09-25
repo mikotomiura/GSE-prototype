@@ -507,11 +507,12 @@ fn resolve_pole(features: bool, raw: Option<&str>) -> Result<Pole, String> {
     }
     let pole = Pole::from_name(name).ok_or_else(|| {
         let allowed: Vec<&str> = Pole::ALL.iter().map(|p| p.as_str()).collect();
-        format!("--pole: 未知の極 `{name}` (許可: {})", allowed.join(", "))
+        // ★ `{:?}` でエスケープする (制御文字・ANSI エスケープで端末表示を乱さない・security-checker LOW)。
+        format!("--pole: 未知の極 {name:?} (許可: {})", allowed.join(", "))
     })?;
     if !pole.is_implemented() {
         return Err(format!(
-            "--pole {name}: この極はまだ実装されていない (baseline の値を別の極の名前で返さないため止める)"
+            "--pole {name:?}: この極はまだ実装されていない (baseline の値を別の極の名前で返さないため止める)"
         ));
     }
     Ok(pole)
@@ -520,6 +521,8 @@ fn resolve_pole(features: bool, raw: Option<&str>) -> Result<Pole, String> {
 /// 封筒 `config.pole_applicable` / `pole_not_applicable_reason` の値 (`(適用可否, 理由コード)`)。
 ///
 /// ★ 網羅 `match` (ワイルドカード無し) —— 極を足すと、ここで判定を決めるまでコンパイルが通らない。
+/// ⚠️ 現状は極だけで決まる。★ issue 005 / 006 で「入力で計算できるか」(修飾キー行・`pointer_bin` の有無) を
+/// 判定するため、**引数に入力の情報を足す**こと (このシグネチャは後続で必ず変わる)。
 fn pole_applicability(pole: Pole) -> (bool, Option<&'static str>) {
     match pole {
         // 極 A / 極 M− はどの入力でも計算できる (現行の計算そのもの)。
@@ -1355,6 +1358,11 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         }
         let name = args.remove(pos + 1);
         args.remove(pos);
+        // ⚠️ 2 回目の `--pole` を位置引数として残すと「positional が 3 個」という理由の分からない
+        //   エラーになる (security-checker LOW・2026-09-25)。→ 重複は名指しで止める。
+        if args.iter().any(|a| a == "--pole") {
+            return Err("--pole may be specified only once (1 実行 1 極)".to_string());
+        }
         Some(name)
     } else {
         None
@@ -4593,6 +4601,21 @@ mod tests {
             parse_args_from(bogus).expect("raw").pole.as_deref(),
             Some("bogus")
         );
+
+        // ★ 重複指定は名指しで `Err` (位置引数に紛れて「positional が 3 個」にならない)。
+        let twice = vec![
+            "s.ndjson".to_string(),
+            "--features".to_string(),
+            "--pole".to_string(),
+            "baseline".to_string(),
+            "--pole".to_string(),
+            "pointer_b".to_string(),
+        ];
+        let err = match parse_args_from(twice) {
+            Ok(_) => panic!("--pole の重複は Err でなければならない"),
+            Err(e) => e,
+        };
+        assert!(err.contains("only once"), "重複を名指しする: {err}");
 
         let none = vec!["s.ndjson".to_string(), "--features".to_string()];
         assert_eq!(parse_args_from(none).expect("parses").pole, None);
