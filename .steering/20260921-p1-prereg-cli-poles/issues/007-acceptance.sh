@@ -21,9 +21,12 @@ run() { cargo run --quiet --bin gse-replay -- "$1" --features 2>/dev/null; }
 out="$(run "$FIX")" || fail "AC1: --features が非 0"
 
 # ── AC1: onset 行だけが ime_overlap を持つ ──────────────────────────────
+#   ⚠️ 旧式は `all(.stall_onset; …)` で、入力が配列 `.rows` のため
+#     `Cannot index array with string ("stall_onset")` (jq rc=5) で**実装に関係なく常に落ちた**
+#     (★ 001-acceptance.sh AC6 と同じ欠陥。2026-09-25・合成データで実測)。★ 正しくは `all(.[].stall_onset; …)`。
 printf '%s' "$out" | jq -e '
   (.rows | arrays)
-  and (.rows | all(.stall_onset;
+  and (.rows | all(.[].stall_onset;
         if .is_onset then (.ime_overlap | type == "boolean")
         else (.ime_overlap == null) end))' >/dev/null 2>&1 \
   || fail "AC1: ime_overlap が onset 行だけに bool で載っていない"
@@ -57,8 +60,10 @@ o_none="$(printf '%s' "$out_no_ime" | jq -c '[.rows[] | select(.stall_onset.is_o
   || fail "AC6: ime_shadow の有無で onset 集合が変わった（★ 抑制してしまっている）。with=$o_with none=$o_none"
 
 # ⚠️ かつ ime 無し版では overlap が全部 false であること (AC5 の CLI 側の裏取り)
+#   ★ 上の onset 集合の一致で「onset が 1 件以上ある」ことは担保済み (with 版は AC2 / AC3 で true・false が各 1 件以上)。
+#     → `all` が空集合で真になる (vacuous) ことはない。⚠️ 旧式 `.rows | all(.stall_onset | …)` は AC1 と同じ理由で rc=5。
 printf '%s' "$out_no_ime" | jq -e '
-  .rows | all(.stall_onset | select(.is_onset); .ime_overlap == false)' >/dev/null 2>&1 \
+  .rows | all(.[].stall_onset | select(.is_onset); .ime_overlap == false)' >/dev/null 2>&1 \
   || fail "AC5: ime_shadow が無い入力で ime_overlap が false になっていない（★ null で埋めていないか）"
 
 # ── AC4 / AC5: 対応する単体テストが 1 件ずつ走って緑 ─────────────────────
