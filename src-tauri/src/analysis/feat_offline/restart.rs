@@ -392,6 +392,7 @@ mod tests {
             theta_sample_n: Some(1),
             task_kind: None,
             phase: "unspecified".to_string(),
+            ime_overlap: Some(false),
         }
     }
 
@@ -404,6 +405,7 @@ mod tests {
             theta_sample_n: None,
             task_kind: None,
             phase: "unspecified".to_string(),
+            ime_overlap: None,
         }
     }
 
