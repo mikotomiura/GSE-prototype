@@ -234,7 +234,8 @@ struct ObservedIntervalDto {
 ///
 /// ★ 判断 25 #13 (`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 /
 /// `T1a` の窓 を P1 前に 1 本の宣言文書で凍結し、**同時に CLI 注入を作る**) の**受け皿**である。
-/// ⚠️ 本タスクは受け皿を作るだけで、値は `StallOnsetConfig::default()` のまま。
+/// ★ 値は既定で**凍結 JSON (`prereg/p1-episode.json`)** から来る。`--feature-config` /
+/// `--set` で外れた値は `overrides` に**明示的に**残る ([`ResolvedFeatureConfig`])。
 ///
 /// ⚠️★★★ **θ_person の分位点はここに入れない** —— θ は**設定ではなく結果**
 /// (ADR-008 D4 の `within_session_adaptive`) であり、行の `stall_onset.theta_person_ms` が持つ。
@@ -251,8 +252,21 @@ struct FeatureConfigDto {
     net_diff_min: u64,
     /// 観測区間を切る閾値 (ms・ADR-030 D8 (b-2))。
     hole_gap_ms: u64,
-    /// θ の標本数の下限 (`null` = 下限を課さない・ADR-030 D4 点 1)。
+    /// θ の標本数の下限 (ADR-030 D4 点 1)。
+    /// ★ 凍結 JSON 経路では常に数値 (`validate` が 0 を拒否する)。`null` は旧出力 (下限なし) との互換のため型に残す。
     warmup_count: Option<usize>,
+    /// θ_person の分位点の推定法 (P1 事前宣言 §1・現状 `"nearest_rank"` だけが実装されている)。
+    theta_estimator: String,
+    /// `T1a` の窓長 (ms・P1 事前宣言 §1)。★ 窓の実装は issue 003。ここは値の記録だけ。
+    t1a_window_ms: u64,
+    /// 採用した事前宣言の `id` / `version` / 内容の SHA-256 先頭桁 (★ 何を読んだかの同定)。
+    prereg_id: String,
+    prereg_version: String,
+    prereg_sha256_prefix: String,
+    /// `"frozen"` (埋め込みの凍結 JSON) / `"file"` (`--feature-config`)。
+    config_source: &'static str,
+    /// 凍結値から**外れた**キーだけ (無指定なら空配列)。⚠️ 外れていない `--set` は載せない。
+    overrides: Vec<ConfigOverride>,
     /// [`MAX_FEATURE_TICKS`]。★ この実行に効いていた上限値を記録する。
     ///
     /// ⚠️ **「上限で止められたか」はこれ単独では判別できない** (2026-09-20・code-reviewer LOW)
@@ -268,11 +282,272 @@ struct FeatureConfigDto {
     pause_threshold_ms: u64,
 }
 
+/// P1 事前宣言の凍結 JSON (`src-tauri/prereg/p1-episode.json`)。**実行ファイルへ埋め込む。**
+///
+/// ⚠️★★★ 埋め込みが正である (実行時にファイルを探しに行かない)。★ 理由: 出力の
+/// `provenance.tool_version` と凍結値が 1 対 1 になる —— 実行時に読むと、同じバイナリが
+/// 置かれた場所次第で違う値を使いうる。別の値を使いたいときは `--feature-config` で
+/// **明示的に**指す (`config_source == "file"` が出力に刻まれる)。
+const FROZEN_P1_EPISODE_JSON: &str = include_str!("../../prereg/p1-episode.json");
+
+/// `--feature-config` で読む外部ファイルの上限 (バイト)。凍結 JSON は 2 KiB 程度。
+const MAX_FEATURE_CONFIG_BYTES: u64 = 64 * 1024;
+
+/// `--set` が受け取れるキー (= 凍結 JSON の `operational` の 8 キー)。
+const P1_OPERATIONAL_KEYS: [&str; 8] = [
+    "w_ms",
+    "q",
+    "b_ms",
+    "hole_gap_ms",
+    "warmup_count",
+    "theta_estimator",
+    "t1a_window_ms",
+    "net_diff_min",
+];
+
+/// 凍結 JSON の `operational` (P1 事前宣言 §1 の 8 値)。
+///
+/// ⚠️ `deny_unknown_fields` —— 未知のキーを黙って捨てると、綴りを間違えた設定が
+/// 「効いたつもり」で走る (fail-closed)。
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct P1Operational {
+    w_ms: u64,
+    q: f64,
+    b_ms: u64,
+    hole_gap_ms: u64,
+    warmup_count: u64,
+    theta_estimator: String,
+    t1a_window_ms: u64,
+    net_diff_min: u64,
+}
+
+/// 凍結 JSON のうち本ツールが読む部分 (`status` / `search_*` などは読まない)。
+#[derive(Debug, serde::Deserialize)]
+struct P1PreregFile {
+    id: String,
+    version: String,
+    operational: P1Operational,
+}
+
+/// 凍結値から外れたキー 1 つ (`--feature-config` / `--set` の結果)。
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+struct ConfigOverride {
+    key: &'static str,
+    /// 凍結 JSON の値。
+    frozen: serde_json::Value,
+    /// この実行で使った値。
+    value: serde_json::Value,
+}
+
+impl P1Operational {
+    /// `(キー, JSON 値)` の列 (`P1_OPERATIONAL_KEYS` と同じ順)。overrides の比較に使う。
+    fn as_pairs(&self) -> [(&'static str, serde_json::Value); 8] {
+        [
+            ("w_ms", self.w_ms.into()),
+            ("q", self.q.into()),
+            ("b_ms", self.b_ms.into()),
+            ("hole_gap_ms", self.hole_gap_ms.into()),
+            ("warmup_count", self.warmup_count.into()),
+            ("theta_estimator", self.theta_estimator.clone().into()),
+            ("t1a_window_ms", self.t1a_window_ms.into()),
+            ("net_diff_min", self.net_diff_min.into()),
+        ]
+    }
+
+    /// `--set <key>=<value>` を 1 件適用する。⚠️ 型が合わない値・未知のキーは `Err`
+    /// (黙って無視しない)。範囲の検査は全件を適用した後の [`Self::validate`] が行う。
+    fn apply_set(&mut self, key: &str, value: &str) -> Result<(), String> {
+        let as_u64 = |v: &str| {
+            v.parse::<u64>()
+                .map_err(|_| format!("--set {key}: `{v}` は非負の整数ではない"))
+        };
+        match key {
+            "w_ms" => self.w_ms = as_u64(value)?,
+            "q" => {
+                self.q = value
+                    .parse::<f64>()
+                    .map_err(|_| format!("--set q: `{value}` は数値ではない"))?
+            }
+            "b_ms" => self.b_ms = as_u64(value)?,
+            "hole_gap_ms" => self.hole_gap_ms = as_u64(value)?,
+            "warmup_count" => self.warmup_count = as_u64(value)?,
+            "theta_estimator" => self.theta_estimator = value.to_string(),
+            "t1a_window_ms" => self.t1a_window_ms = as_u64(value)?,
+            "net_diff_min" => self.net_diff_min = as_u64(value)?,
+            _ => {
+                return Err(format!(
+                    "--set: 未知のキー `{key}` (許可: {})",
+                    P1_OPERATIONAL_KEYS.join(", ")
+                ))
+            }
+        }
+        Ok(())
+    }
+
+    /// 物理的な範囲の検査。★ 通らない値を封筒に刻んだ出力は、下流が「計算できた」と誤読する。
+    fn validate(&self) -> Result<(), String> {
+        if self.w_ms == 0 {
+            return Err("w_ms は 1 以上でなければならない".to_string());
+        }
+        if !(self.q.is_finite() && self.q > 0.0 && self.q < 1.0) {
+            return Err(format!(
+                "q は 0 より大きく 1 より小さくなければならない (実際: {})",
+                self.q
+            ));
+        }
+        if self.hole_gap_ms == 0 {
+            return Err("hole_gap_ms は 1 以上でなければならない".to_string());
+        }
+        if self.warmup_count == 0 || usize::try_from(self.warmup_count).is_err() {
+            return Err(
+                "warmup_count は 1 以上で、この環境の usize に収まらなければならない".to_string(),
+            );
+        }
+        if self.t1a_window_ms == 0 {
+            return Err("t1a_window_ms は 1 以上でなければならない".to_string());
+        }
+        // ⚠️ `stall_onset.rs` は `net_diff_min as i64` で比べる。`i64::MAX` を超える値は負へ丸まり、
+        //   `net < net_diff_min` が常に偽になって **onset が黙って 0 本**になる (security-checker LOW・2026-09-25)。
+        if self.net_diff_min == 0 || i64::try_from(self.net_diff_min).is_err() {
+            return Err("net_diff_min は 1 以上で、i64 に収まらなければならない".to_string());
+        }
+        // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
+        if self.theta_estimator != "nearest_rank" {
+            return Err(format!(
+                "theta_estimator は \"nearest_rank\" だけが実装されている (実際: \"{}\")",
+                self.theta_estimator
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// 解決済みの `--features` 設定 (凍結値 → `--feature-config` → `--set` の順に重ねた結果)。
+#[derive(Debug, Clone)]
+struct ResolvedFeatureConfig {
+    operational: P1Operational,
+    prereg_id: String,
+    prereg_version: String,
+    prereg_sha256_prefix: String,
+    config_source: &'static str,
+    overrides: Vec<ConfigOverride>,
+}
+
+impl ResolvedFeatureConfig {
+    /// 検出器へ渡す設定へ写す。⚠️ 呼ぶ前に `validate` 済みであること (`resolve_feature_config` が保証)。
+    fn stall_onset_config(&self) -> gse_next_lib::analysis::feat_offline::StallOnsetConfig {
+        let o = &self.operational;
+        gse_next_lib::analysis::feat_offline::StallOnsetConfig {
+            w_ms: o.w_ms,
+            q: o.q,
+            b_ms: o.b_ms,
+            net_diff_min: o.net_diff_min,
+            hole_gap_ms: o.hole_gap_ms,
+            // `validate` が usize に収まることを確かめている。
+            warmup_count: usize::try_from(o.warmup_count).ok(),
+            t1a_window_ms: o.t1a_window_ms,
+        }
+    }
+}
+
+/// 事前宣言 JSON の本文を読む (`id` / `version` / `operational`)。
+fn parse_prereg_text(text: &str) -> Result<P1PreregFile, String> {
+    serde_json::from_str::<P1PreregFile>(text).map_err(|e| format!("事前宣言 JSON を読めない: {e}"))
+}
+
+/// バイト列の SHA-256 先頭 [`SOURCE_SHA256_HEX_CHARS`] 桁 (`sha256_prefix_of_file` のバイト列版)。
+fn sha256_prefix_of_bytes(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(bytes);
+    let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+    hex[..SOURCE_SHA256_HEX_CHARS].to_string()
+}
+
+/// `--features` の設定を解決する。★ 出力を 1 バイトも書く前に呼ぶこと (fail-closed)。
+///
+/// 1. 既定は**埋め込みの凍結 JSON** (`config_source = "frozen"`)。
+/// 2. `feature_config_path` があればその `operational` に置き換える (`"file"`)。
+/// 3. `sets` (`key=value`) を順に上書きする。
+/// 4. 物理的な範囲を検査し、凍結値から**外れたキー**を `overrides` に残す。
+///
+/// ⚠️ 未知のキー・型の不一致・範囲外は**すべて `Err`** (呼び出し側は exit 1)。
+fn resolve_feature_config(
+    feature_config_path: Option<&Path>,
+    sets: &[String],
+) -> Result<ResolvedFeatureConfig, String> {
+    let frozen = parse_prereg_text(FROZEN_P1_EPISODE_JSON)
+        .map_err(|e| format!("埋め込みの凍結 JSON が壊れている (ビルドの不具合): {e}"))?;
+    frozen
+        .operational
+        .validate()
+        .map_err(|e| format!("埋め込みの凍結 JSON が範囲外 (ビルドの不具合): {e}"))?;
+
+    let (base, source, sha) = match feature_config_path {
+        None => (
+            parse_prereg_text(FROZEN_P1_EPISODE_JSON)?,
+            "frozen",
+            sha256_prefix_of_bytes(FROZEN_P1_EPISODE_JSON.as_bytes()),
+        ),
+        Some(path) => {
+            let file = File::open(path)
+                .map_err(|e| format!("--feature-config を開けない ({}): {e}", path.display()))?;
+            let mut bytes = Vec::new();
+            std::io::Read::read_to_end(
+                &mut std::io::Read::take(file, MAX_FEATURE_CONFIG_BYTES + 1),
+                &mut bytes,
+            )
+            .map_err(|e| format!("--feature-config を読めない ({}): {e}", path.display()))?;
+            if bytes.len() as u64 > MAX_FEATURE_CONFIG_BYTES {
+                return Err(format!(
+                    "--feature-config が大きすぎる (上限 {MAX_FEATURE_CONFIG_BYTES} バイト)"
+                ));
+            }
+            let text = std::str::from_utf8(&bytes)
+                .map_err(|_| "--feature-config が UTF-8 ではない".to_string())?;
+            (
+                parse_prereg_text(text)?,
+                "file",
+                sha256_prefix_of_bytes(&bytes),
+            )
+        }
+    };
+
+    let mut operational = base.operational;
+    for entry in sets {
+        let (key, value) = entry.split_once('=').ok_or_else(|| {
+            format!("--set は <key>=<value> の形でなければならない (実際: `{entry}`)")
+        })?;
+        operational.apply_set(key, value)?;
+    }
+    operational.validate()?;
+
+    let overrides = frozen
+        .operational
+        .as_pairs()
+        .into_iter()
+        .zip(operational.as_pairs())
+        .filter(|((_, frozen_value), (_, value))| frozen_value != value)
+        .map(|((key, frozen_value), (_, value))| ConfigOverride {
+            key,
+            frozen: frozen_value,
+            value,
+        })
+        .collect();
+
+    Ok(ResolvedFeatureConfig {
+        operational,
+        prereg_id: base.id,
+        prereg_version: base.version,
+        prereg_sha256_prefix: sha,
+        config_source: source,
+        overrides,
+    })
+}
+
 impl FeatureConfigDto {
-    fn from_stall_onset_config(
-        c: &gse_next_lib::analysis::feat_offline::StallOnsetConfig,
-        max_feature_ticks: usize,
-    ) -> Self {
+    fn from_resolved(resolved: &ResolvedFeatureConfig, max_feature_ticks: usize) -> Self {
+        let c = resolved.stall_onset_config();
         Self {
             w_ms: c.w_ms,
             q: c.q,
@@ -280,6 +555,13 @@ impl FeatureConfigDto {
             net_diff_min: c.net_diff_min,
             hole_gap_ms: c.hole_gap_ms,
             warmup_count: c.warmup_count,
+            theta_estimator: resolved.operational.theta_estimator.clone(),
+            t1a_window_ms: c.t1a_window_ms,
+            prereg_id: resolved.prereg_id.clone(),
+            prereg_version: resolved.prereg_version.clone(),
+            prereg_sha256_prefix: resolved.prereg_sha256_prefix.clone(),
+            config_source: resolved.config_source,
+            overrides: resolved.overrides.clone(),
             max_feature_ticks,
             hmm_version: HMM_VERSION,
             engine_tick_ms: ENGINE_TICK_MS,
@@ -836,6 +1118,11 @@ struct Args {
     /// --features: ADR-030 の Tier 別 1 Hz tick 単位特徴行を出力する (issue 001-007)。
     /// ⚠️ 手元の解析用中間成果物であり `gse-dataset` へ共有しない (`docs/glossary.md` 逐語)。
     features: bool,
+    /// --feature-config <path>: `--features` の設定を外部 JSON (凍結 JSON と同じ形) から読む。
+    feature_config_path: Option<PathBuf>,
+    /// --set <key>=<value> (繰り返し可): `--features` の設定を 1 キーずつ上書きする。
+    /// ⚠️ 生の文字列のまま持つ。検証 (未知キー / 型 / 範囲) は `resolve_feature_config` が行う。
+    feature_sets: Vec<String>,
     /// `--calibration` / `--sweep` / `--nudge-diag` / `--corr-floor` の 2 個目以降の positional。
     extra_sessions: Vec<PathBuf>,
 }
@@ -950,6 +1237,29 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         false
     };
 
+    // --feature-config <path> / --set <key>=<value> (繰り返し可): --features 専用の設定注入。
+    let feature_config_path = if let Some(pos) = args.iter().position(|a| a == "--feature-config") {
+        if pos + 1 >= args.len() {
+            return Err("--feature-config requires a path argument".to_string());
+        }
+        let path = args.remove(pos + 1);
+        args.remove(pos);
+        Some(PathBuf::from(path))
+    } else {
+        None
+    };
+    let mut feature_sets: Vec<String> = Vec::new();
+    while let Some(pos) = args.iter().position(|a| a == "--set") {
+        if pos + 1 >= args.len() {
+            return Err("--set requires a <key>=<value> argument".to_string());
+        }
+        feature_sets.push(args.remove(pos + 1));
+        args.remove(pos);
+    }
+    if !features && (feature_config_path.is_some() || !feature_sets.is_empty()) {
+        return Err("--feature-config and --set require --features".to_string());
+    }
+
     // --json は集計系モード併用時のみ意味を持つ
     if json
         && !metrics
@@ -1017,6 +1327,8 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         nudge_diag,
         corr_floor,
         features,
+        feature_config_path,
+        feature_sets,
         extra_sessions,
     })
 }
@@ -1034,7 +1346,7 @@ fn usage() -> String {
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --corr-floor [--json]\n    \
-         gse-replay <session.ndjson> --features\n\n\
+         gse-replay <session.ndjson> --features [--feature-config <cfg.json>] [--set <key>=<value> ...]\n\n\
          OPTIONS:\n    \
          --snapshot <path>   既存 JSON スナップショットと完全一致比較\n    \
          --metrics           UserLabel との混同行列・F1・中央値を算出\n    \
@@ -1052,6 +1364,9 @@ fn usage() -> String {
          *** t_ms は絶対 epoch ms で、匿名化 (anonymize.rs) を通っていない ***\n    \
          *** provenance.sharing がこの 2 点を出力自身に刻む ***\n    \
          *** 門: scripts/check_no_feature_output.sh (CI で走る) ***\n    \
+         設定の既定は埋め込みの凍結 JSON (src-tauri/prereg/p1-episode.json)。config.overrides に外れた値だけが残る\n    \
+         --feature-config <path>  凍結 JSON と同じ形の外部ファイルから設定を読む (config.config_source = \"file\")\n    \
+         --set <key>=<value>      設定を 1 キー上書きする (繰り返し可)。未知キー / 型の不一致 / 範囲外は exit 1 で出力なし\n    \
          --json              集計系モード (--metrics/--segments/--intervention/--calibration/--sweep/--nudge-diag/--corr-floor) の出力を JSON へ\n    \
          -h, --help          このヘルプを表示\n",
     )
@@ -1289,6 +1604,16 @@ fn main() -> ExitCode {
     // --features 経路: ADR-030 の Tier 別 1 Hz tick 単位特徴行を JSON 配列で出力する
     // (issue 001)。`features.rs` / `engine.rs` を経由しない独立経路 (D1)。
     if args.features {
+        // ⚠️★★★ 設定は**何かを読む・書く前に**解決する (fail-closed)。
+        // 未知キー / 型の不一致 / 範囲外は exit 1 で、stdout には 1 バイトも出さない。
+        let resolved_config =
+            match resolve_feature_config(args.feature_config_path.as_deref(), &args.feature_sets) {
+                Ok(v) => v,
+                Err(msg) => {
+                    tracing::error!("invalid --features configuration: {}", msg);
+                    return ExitCode::from(1);
+                }
+            };
         let keys = match collect_key_events(&args.session_path) {
             Ok(v) => v,
             Err(msg) => {
@@ -1357,7 +1682,7 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        let stall_onset_config = gse_next_lib::analysis::feat_offline::StallOnsetConfig::default();
+        let stall_onset_config = resolved_config.stall_onset_config();
         let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
             feat_ts: &feat_ts,
             task_kind_declarations: &task_kind_declarations,
@@ -1409,10 +1734,7 @@ fn main() -> ExitCode {
                     .map(|(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
                     .collect(),
             },
-            config: FeatureConfigDto::from_stall_onset_config(
-                &stall_onset_config,
-                MAX_FEATURE_TICKS,
-            ),
+            config: FeatureConfigDto::from_resolved(&resolved_config, MAX_FEATURE_TICKS),
             rows: &rows,
         };
         // ⚠️★★★ 2026-09-18 改訂 (判断 24・security-checker LOW-3): `to_string_pretty` で
@@ -3968,10 +4290,11 @@ mod tests {
         assert_eq!(marker["anonymized"], false);
         assert_eq!(marker["absolute_epoch_ms"], true);
 
-        // ★ config は解析時の値で、`StallOnsetConfig::default()` をそのまま映す。
-        let cfg = gse_next_lib::analysis::feat_offline::StallOnsetConfig::default();
-        let dto = serde_json::to_value(FeatureConfigDto::from_stall_onset_config(
-            &cfg,
+        // ★ config は解析時の値で、埋め込みの凍結 JSON をそのまま映す。
+        let resolved = resolve_feature_config(None, &[]).expect("frozen config resolves");
+        let cfg = resolved.stall_onset_config();
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved,
             MAX_FEATURE_TICKS,
         ))
         .expect("serialize config");
@@ -3980,6 +4303,151 @@ mod tests {
         assert_eq!(dto["max_feature_ticks"], MAX_FEATURE_TICKS);
         assert_eq!(dto["hmm_version"], HMM_VERSION);
         assert_eq!(dto["engine_tick_ms"], ENGINE_TICK_MS);
+    }
+
+    /// 凍結 JSON の `operational` (テストの期待値の元)。★ 実装が読むのと同じ埋め込みを、
+    /// 別経路 (`serde_json::Value`) で引き直す —— `P1Operational` の写しを信用しない。
+    fn frozen_operational_value() -> serde_json::Value {
+        let v: serde_json::Value =
+            serde_json::from_str(FROZEN_P1_EPISODE_JSON).expect("frozen JSON parses");
+        v["operational"].clone()
+    }
+
+    /// AC1 / AC2: 無指定なら凍結値の 8 つがそのまま出て、`overrides` は空・由来は `frozen`。
+    #[test]
+    fn resolve_without_flags_reproduces_the_frozen_values() {
+        let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1))
+            .expect("serialize config");
+        let want = frozen_operational_value();
+        for key in P1_OPERATIONAL_KEYS {
+            assert_eq!(dto[key], want[key], "config.{key} は凍結値と一致する");
+        }
+        assert_eq!(dto["config_source"], "frozen");
+        assert_eq!(dto["overrides"], serde_json::json!([]));
+        assert_eq!(dto["prereg_id"], "p1-episode");
+        assert_eq!(dto["prereg_version"], "1.0.0");
+        let sha = dto["prereg_sha256_prefix"]
+            .as_str()
+            .expect("sha is a string");
+        assert_eq!(sha.len(), SOURCE_SHA256_HEX_CHARS);
+        // ★ warmup_count は凍結値どおり 100 (既定の `None` ではない) —— issue 001 の要点。
+        assert_eq!(dto["warmup_count"], 100);
+    }
+
+    /// AC3: `--set` は凍結値から**外れた**キーだけを `overrides` に残す。
+    /// ⚠️ 凍結値と同じ値の `--set` は外れていないので載せない (対照)。
+    #[test]
+    fn set_records_only_deviations_from_the_frozen_values() {
+        let sets = vec!["q=0.995".to_string()];
+        let resolved = resolve_feature_config(None, &sets).expect("q=0.995 resolves");
+        assert_eq!(resolved.operational.q, 0.995);
+        assert_eq!(resolved.config_source, "frozen", "--set は由来を変えない");
+        assert_eq!(resolved.overrides.len(), 1);
+        assert_eq!(resolved.overrides[0].key, "q");
+        assert_eq!(resolved.overrides[0].frozen, serde_json::json!(0.99));
+        assert_eq!(resolved.overrides[0].value, serde_json::json!(0.995));
+
+        let same = vec!["q=0.99".to_string(), "warmup_count=100".to_string()];
+        let resolved = resolve_feature_config(None, &same).expect("same values resolve");
+        assert!(
+            resolved.overrides.is_empty(),
+            "外れていない --set は載らない"
+        );
+    }
+
+    /// AC4: 未知キー / 型の不一致 / 範囲外 / 形式違いは**すべて `Err`** (fail-closed)。
+    /// ★ 正常な `--set` が通る陰性対照を先に置く (`Err` を返すだけの実装を通さない)。
+    #[test]
+    fn set_is_fail_closed_on_unknown_key_bad_type_and_out_of_range() {
+        assert!(resolve_feature_config(None, &["hole_gap_ms=3000".to_string()]).is_ok());
+        for bad in [
+            "bogus=1",                          // 未知キー
+            "q=abc",                            // 型の不一致
+            "w_ms=-1",                          // 型の不一致 (負)
+            "w_ms=1.5",                         // 型の不一致 (小数)
+            "w_ms=0",                           // 範囲外
+            "q=0",                              // 範囲外
+            "q=1",                              // 範囲外 (⌈1/(1−q)⌉ が発散する)
+            "q=NaN",                            // 範囲外 (非有限)
+            "warmup_count=0",                   // 範囲外
+            "net_diff_min=0",                   // 範囲外
+            "net_diff_min=9223372036854775808", // 範囲外 (i64::MAX + 1 ・ `as i64` で負に丸まる)
+            "theta_estimator=linear",           // 未実装の推定法
+            "q",                                // `=` が無い
+        ] {
+            assert!(
+                resolve_feature_config(None, &[bad.to_string()]).is_err(),
+                "`--set {bad}` は Err でなければならない"
+            );
+        }
+    }
+
+    /// AC5: `--feature-config` は外部ファイルの値を採り、由来を `file` にする。
+    /// ⚠️ 未知キー・欠けたキーを持つファイルは `Err` (黙って凍結値で埋めない)。
+    #[test]
+    fn feature_config_file_is_read_and_labelled_file() {
+        let dir = envelope_tmp_dir("feature_config");
+        let mut value: serde_json::Value =
+            serde_json::from_str(FROZEN_P1_EPISODE_JSON).expect("frozen JSON parses");
+        value["operational"]["hole_gap_ms"] = serde_json::json!(5000);
+        let path = dir.join("cfg.json");
+        std::fs::write(&path, serde_json::to_vec(&value).expect("serialize")).expect("write");
+
+        let resolved = resolve_feature_config(Some(&path), &[]).expect("file resolves");
+        assert_eq!(resolved.config_source, "file");
+        assert_eq!(resolved.operational.hole_gap_ms, 5000);
+        assert_eq!(resolved.overrides.len(), 1);
+        assert_eq!(resolved.overrides[0].key, "hole_gap_ms");
+        // `--set` はファイルの上に重なる。
+        let both = resolve_feature_config(Some(&path), &["q=0.995".to_string()]).expect("resolves");
+        assert_eq!(both.config_source, "file");
+        assert_eq!(both.overrides.len(), 2);
+
+        value["operational"]["bogus"] = serde_json::json!(1);
+        let unknown = dir.join("unknown.json");
+        std::fs::write(&unknown, serde_json::to_vec(&value).expect("serialize")).expect("write");
+        assert!(resolve_feature_config(Some(&unknown), &[]).is_err());
+
+        value["operational"] = serde_json::json!({ "w_ms": 30000 });
+        let partial = dir.join("partial.json");
+        std::fs::write(&partial, serde_json::to_vec(&value).expect("serialize")).expect("write");
+        assert!(resolve_feature_config(Some(&partial), &[]).is_err());
+
+        assert!(resolve_feature_config(Some(&dir.join("missing.json")), &[]).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `--set` / `--feature-config` は `--features` 専用: 単独では `Err`、併用なら受理される。
+    #[test]
+    fn feature_flags_require_features_mode() {
+        let alone = vec![
+            "s.ndjson".to_string(),
+            "--set".to_string(),
+            "q=0.995".to_string(),
+        ];
+        assert!(parse_args_from(alone).is_err());
+
+        let with_features = vec![
+            "s.ndjson".to_string(),
+            "--features".to_string(),
+            "--set".to_string(),
+            "q=0.995".to_string(),
+            "--set".to_string(),
+            "w_ms=15000".to_string(),
+            "--feature-config".to_string(),
+            "cfg.json".to_string(),
+        ];
+        let parsed = parse_args_from(with_features).expect("--features with flags parses");
+        assert_eq!(parsed.feature_sets, vec!["q=0.995", "w_ms=15000"]);
+        assert_eq!(parsed.feature_config_path, Some(PathBuf::from("cfg.json")));
+
+        let dangling = vec![
+            "s.ndjson".to_string(),
+            "--features".to_string(),
+            "--set".to_string(),
+        ];
+        assert!(parse_args_from(dangling).is_err());
     }
 
     /// ⚠️ `meta` 行が無い / `session_start` を持たない NDJSON でも封筒は落ちない
