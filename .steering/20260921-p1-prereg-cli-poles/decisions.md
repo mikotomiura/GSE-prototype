@@ -487,3 +487,16 @@
 - ★ 003 MEDIUM-1（区間終端 tick で pause が消える）は方針 (a)＝ `feat_mask_column` の規則に揃えて是正（研究判断ではなく既存定義への整合）。
 - ★ 002 の台帳 `to` の文言は「削除を適用した範囲の上限」へ正した（★ worker が新たに書いた文であり、同意文書本体は不変）。
 - ★ merge 後の main（`dde07ee`）: test 795 / clippy 0 / golden 6 / acceptance 12 本 / prereg parity すべて緑（★ 正しい終了コードで確認）。
+
+## 判断 22: 他の issue の門（完全一致検査）を壊す変更を、分解の側で先回りして Allowed Files に入れる
+
+- **日付**: 2026-09-25（★ メイン判断・判断 17 と同じ型の分解の是正）
+- **背景**: ⚠️ Loop の verify は**その issue の acceptance しか回さない**。→ 001 と 004 はどちらも
+  `envelope-acceptance.sh` AC7（封筒 `config` のキー集合の完全一致）を赤にしたまま `issue_done` / verify 緑になり、
+  **メインの独立検証でだけ**見つかった（`9ce5df9` / `3aa6078` で是正）。
+- **対応**: 残り issue のうち、出力キーを増やすのは **007**（`StallOnset.ime_overlap`）だけ ——
+  旧タスク `005-acceptance.sh` の `stall_onset` キー集合（7 キー）が赤になる。→ **007 の Allowed Files に
+  そのキー集合の期待値の行だけ**を足した。005 / 006 は封筒の値・行の値を変えるがキーは増やさない。
+- ★ **メインの独立検証は、全 acceptance（新旧＋envelope）を正しい終了コードで回すことを続ける**（★ これが唯一の網）。
+- **起票 P1-H（未是正）**: Loop の verify に「全 acceptance の回帰」を入れる設計（★ ただし worker が他 issue の門を直せない
+  場合は `blocked` になる —— 分解で Allowed Files に入れる運用と組で考える）。
