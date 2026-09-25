@@ -48,8 +48,9 @@
 //!   逐語どおり実装すると大文字・記号の入力まで産出から外れる。★ **それが極 M+ の定義である**
 //!   (ADR-030 補訂 1 項目 3)。極 M− (baseline) は除外しない。実装は [`Pole::ModifierMPlus`] /
 //!   [`modifier_press_intervals`] / [`apply_modifier_m_plus`] (issue 005)。
-//! - **IME 変換中の抑制**（D3 抑制表 2 行目）: 区間の定義と「抑制」の意味が未確定。
-//!   研究者判断待ち (`blockers.md` 起票 12)。
+//! - **IME 変換中の抑制**（D3 抑制表 2 行目）: ★ **補訂 1 項目 4 が「いまは抑制しない」と決着した**
+//!   (研究者判断 25 #7)。本モジュールは**数えるだけ**である (issue 007・下の
+//!   「IME 変換中の onset を数える」節)。
 //! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形は**別モード (`--pole`・1 実行 1 極)** に
 //!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B は**観測区間と同じ構造で切る**と裁定済みで
 //!   (判断 7)、実装は [`pointer_suppression_intervals`] / [`evaluation_intervals`] (issue 006)。
@@ -82,6 +83,33 @@
 //! 減るが、一般には保証されない）。★ したがって **G2 の上下界は「極 A が上・極 B が下」のような
 //! 2 極の順序を前提にせず、両極それぞれで求めた G2 の min / max で取る**（判断 25）。
 //!
+//! # IME 変換中の onset を数える（issue 007・ADR-030 補訂 1 項目 4）
+//!
+//! ⚠️★★★ **数えるだけで、抑制はしない。** 検出 (条件 A / B・θ・観測区間) は `ime_shadow` 行を**読まない**ので、
+//! `ime_shadow` 行の有無で検出値 (`s` / `t0` / θ / n の組) は 1 本も変わらない (`tests::ime_rows_never_change_the_onset_set`)。
+//! 変わるのは onset 行に載る [`StallOnset::ime_overlap`] だけである。
+//! ⚠️ ただし `ime_shadow` 行は **tick グリッドの原点・終端の決定には入る** (`mod.rs` の `grid_origin_ms` / `t_last`・
+//! issue 002 からの既存の挙動)。最初の打鍵より前・最後の入力より後に行があると、onset が載る **tick の添字**は動きうる
+//! (★ 検出値は同じ。本 issue はこの挙動を変えていない)。
+//!
+//! - **重なりの定義** (補訂 1 項目 4 の**暫定の数え方**・抑制の定義ではない): onset の `[s, t0]` と
+//!   `ime_shadow` 行の `[t − dwell_ms, t]` の**閉区間どうしの交わり**。端点で接するだけでも重なる。
+//!   `t < dwell_ms` (区間が原点より前へ延びる) は下端を 0 に飽和させる。
+//! - ⚠️ `ime_shadow` 行が 1 本も無い入力では**全 onset が `false`** (`null` にしない)。「重なりを数えたが 0 件だった」は
+//!   観測できた事実である。★ ただし**その 0 が「使わなかった」のか「計器が無かった」のかは区別しない**
+//!   (`boundary` モジュール doc の `ime_*` と同じ。判別は `Q` が持つ)。
+//! - ⚠️ **既知の偏り** (補訂 1 項目 4・そのまま持ち込む):
+//!   1. macOS の `dwell_ms` は「1 変換分とは限らない」(`schema_dto.rs` の `ime_shadow` の doc) → 区間が長めに出ることがある。
+//!   2. 20 秒を超えた変換は行が出ない (両 OS 共通・同じ doc) → 偽の onset を作りうる長い変換ほど数えられない。
+//!   3. 同じ tick に onset が 2 つ落ちると `column_from_onsets` は後ろを捨てる (既存の挙動・件数は warn のみ)
+//!      → 捨てた onset の `ime_overlap` も数えない (2026-09-25 code-reviewer LOW)。
+//!   4. → ★★★ **P1 の頻度は「下限」として読む。**
+//! - ⚠️ **`ime_overlap` は retrospective である**: `t` は変換の**終端**なので、`[s, t0]` に掛かる行の `t` は `t0` より
+//!   後でありうる (`t0` の時点ではまだ書かれていない)。→ onset の**集合**は causal のまま、行に載る `ime_overlap`
+//!   だけが `t0` より後の行に依存する。★ 上の因果性テスト群の対象は検出であり、`ime_shadow` 行を渡さない。
+//! - ★ 検出の**中には分岐を持たない**。onset を 1 tick 列へ写す `column_from_onsets` が、確定した onset ごとに
+//!   [`ImeIntervalIndex`] を引いて `ime_overlap` を埋めるだけ (極に依らず同じ計算・極の数を増やさない)。
+//!
 //! # 極 M+ の入れ方（issue 005）
 //!
 //! ★ 検出 (条件 A / B・θ) の**中には極の分岐を持たない**。極 M+ は**検出へ渡す `key` 列の側**で
@@ -94,6 +122,8 @@
 use crate::analysis::anonymize::KeyCategory;
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{KeyPress, OutcomeConfig};
+
+use super::ImeShadowEvent;
 
 /// ADR-030 D3 の「極」—— 抑制規則の置き方を名前で区別する。
 ///
@@ -204,8 +234,9 @@ impl Default for StallOnsetConfig {
 }
 
 /// `stall onset` の 1 tick ぶんの値。onset が起きた tick だけ `is_onset = true` で
-/// 他 5 フィールドが埋まる。他の tick は `is_onset = false` で `s_ms` / `t0_ms` /
-/// `theta_person_ms` / `task_kind` は `null`（欠測を 0 で埋めない）。
+/// 他のフィールドが埋まる (`task_kind` だけは宣言が無ければ `null`)。他の tick は `is_onset = false` で
+/// `s_ms` / `t0_ms` / `theta_person_ms` / `theta_sample_n` / `task_kind` / `ime_overlap` は
+/// `null`（欠測を 0 で埋めない）。
 /// `phase` は自然セッションでは常に `"unspecified"` (ADR-030 D5)。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct StallOnset {
@@ -224,6 +255,12 @@ pub struct StallOnset {
     pub task_kind: Option<String>,
     /// ADR-030 D5: 自然セッション (O1) では常に `"unspecified"` に collapse する。
     pub phase: String,
+    /// onset の `[s, t0]` が `ime_shadow` 行の `[t − dwell_ms, t]` と**重なるか** (閉区間の交わり・issue 007)。
+    /// ⚠️★★★ **数えるだけで抑制ではない** (ADR-030 補訂 1 項目 4・モジュール doc「IME 変換中の onset を数える」)。
+    /// onset 行では常に `Some` —— ⚠️ `ime_shadow` 行が 1 本も無ければ `Some(false)` (`None` にしない)。
+    /// onset でない行は `None` (他のフィールドと揃える)。
+    /// ⚠️ **retrospective**: `t0` より後に書かれる行に依存しうる。★ P1 の頻度は**下限**として読む (既知の偏り)。
+    pub ime_overlap: Option<bool>,
 }
 
 impl StallOnset {
@@ -236,6 +273,7 @@ impl StallOnset {
             theta_sample_n: None,
             task_kind: None,
             phase: "unspecified".to_string(),
+            ime_overlap: None,
         }
     }
 }
@@ -940,18 +978,60 @@ fn declaration_in_effect(sorted_declarations: &[(u64, String)], s: u64) -> Optio
     }
 }
 
+/// `ime_shadow` 行の区間 `[t − dwell_ms, t]` (閉区間) の索引 (issue 007)。
+///
+/// ⚠️★★★ **区間を作って引くだけで、検出へは渡さない** —— onset の集合を変えない (数えるだけで抑制しない)。
+/// `dwell_ms` が取れなかった行はここへ届く前に**捨てられている** (`bin/replay.rs::collect_all_ime_shadow_events`
+/// が 0 に畳まず捨てる)。→ 区間を作らない・0 に畳まない、の両方が構造的に満たされる。
+struct ImeIntervalIndex {
+    /// `(lo, hi)` を `lo` 昇順に並べたもの (`lo = t − dwell_ms`・下端は 0 に飽和・`hi = t`)。
+    by_lo: Vec<(u64, u64)>,
+    /// `max_hi[i]` = `by_lo[..=i]` の `hi` の最大。
+    max_hi: Vec<u64>,
+}
+
+impl ImeIntervalIndex {
+    fn new(ime_events: &[ImeShadowEvent]) -> Self {
+        let mut by_lo: Vec<(u64, u64)> = ime_events
+            .iter()
+            .map(|e| (e.t_ms.saturating_sub(e.dwell_ms), e.t_ms))
+            .collect();
+        by_lo.sort_unstable();
+        let mut max_hi = Vec::with_capacity(by_lo.len());
+        let mut running = 0u64;
+        for &(_, hi) in &by_lo {
+            running = running.max(hi);
+            max_hi.push(running);
+        }
+        Self { by_lo, max_hi }
+    }
+
+    /// `[s, t0]` (閉区間) と重なる区間が 1 本でもあるか。`O(log n)`。
+    ///
+    /// 交わる ⇔ `lo <= t0` かつ `hi >= s`。`lo <= t0` を満たす区間は `by_lo` の**先頭からの連続**なので、
+    /// その範囲の `hi` の最大が `s` 以上かを見ればよい (⚠️ 直近 1 本だけを見ると、長い区間の後ろに
+    /// 下端の大きい短い区間が並ぶ入力で取りこぼす)。区間が 0 本なら `false`。
+    fn overlaps(&self, s: u64, t0: u64) -> bool {
+        let n = self.by_lo.partition_point(|&(lo, _)| lo <= t0);
+        n > 0 && self.max_hi[n - 1] >= s
+    }
+}
+
 /// 確定した onset 列を 1 Hz tick グリッドへ写像する。検出アルゴリズムから分離してあるのは
 /// テスト容易性のため (`tests::same_tick_collision_keeps_the_first` が合成した `OnsetEvent`
 /// だけでタイル衝突を検査できる)。
 ///
 /// 同じ tick に 2 つ目の onset が落ちても**上書きしない** —— 先に確定した (時刻順で早い)
 /// onset を残し、件数だけ `tracing::warn!` で報告する。
+///
+/// ★ `ime` は各 onset の `ime_overlap` を埋めるためだけに引く (issue 007)。⚠️ onset の採否・時刻には**触れない**。
 fn column_from_onsets(
     onsets: &[OnsetEvent],
     task_kind_declarations: &[(u64, String)],
     tick_count: usize,
     grid_origin_ms: u64,
     tick_ms: u64,
+    ime: &ImeIntervalIndex,
 ) -> Vec<StallOnset> {
     let mut column: Vec<StallOnset> = (0..tick_count).map(|_| StallOnset::none_row()).collect();
     let mut sorted_decls: Vec<(u64, String)> = task_kind_declarations.to_vec();
@@ -978,6 +1058,7 @@ fn column_from_onsets(
             theta_sample_n: Some(ev.theta_sample_n),
             task_kind: declaration_in_effect(&sorted_decls, ev.s_ms),
             phase: "unspecified".to_string(),
+            ime_overlap: Some(ime.overlaps(ev.s_ms, ev.t0_ms)),
         };
     }
     if collisions > 0 {
@@ -995,6 +1076,9 @@ fn column_from_onsets(
 /// `tick_count` / `grid_origin_ms` / `tick_ms` は呼び出し側の tick グリッドと揃える
 /// (帰属先を `t0_ms` から逆算する)。範囲外 (グリッド外) に落ちる `t0` は帰属先が無いため
 /// 黙って捨てる (境界入力で panic しない)。
+///
+/// ⚠️ **`ime_shadow` 行を渡さない版**である (全 onset の `ime_overlap` は `Some(false)`)。
+/// IME の重なりを数えるなら [`stall_onset_column_with_timeline`] に `ime_events` を渡す。
 pub fn stall_onset_column(
     keys: &[KeyPress],
     feat_ts: &[u64],
@@ -1007,6 +1091,7 @@ pub fn stall_onset_column(
     stall_onset_column_with_timeline(
         keys,
         feat_ts,
+        &[],
         &[],
         task_kind_declarations,
         tick_count,
@@ -1025,11 +1110,15 @@ pub fn stall_onset_column(
 ///
 /// `suppressed` は極 B の**抑制区間** ([`pointer_suppression_intervals`])。★ 空なら観測区間そのまま
 /// (極 A / 極 M+ / [`stall_onset_column`] が渡す値)。空でなければ観測区間から除いた評価区間で検出する。
+///
+/// `ime_events` は `ime_shadow` 行 (issue 007)。⚠️★★★ **各 onset の `ime_overlap` を埋めるためだけに使い、検出には渡さない**
+/// (`suppressed` と違い、onset の集合を変えない ＝ **数えるだけで抑制しない**)。★ 空なら全 onset が `Some(false)`。
 #[allow(clippy::too_many_arguments)]
 pub(super) fn stall_onset_column_with_timeline(
     keys: &[KeyPress],
     feat_ts: &[u64],
     suppressed: &[(u64, u64)],
+    ime_events: &[ImeShadowEvent],
     task_kind_declarations: &[(u64, String)],
     tick_count: usize,
     grid_origin_ms: u64,
@@ -1049,6 +1138,7 @@ pub(super) fn stall_onset_column_with_timeline(
         tick_count,
         grid_origin_ms,
         tick_ms,
+        &ImeIntervalIndex::new(ime_events),
     );
     (column, timeline)
 }
@@ -1962,7 +2052,14 @@ mod tests {
             theta_person_ms: 3_800,
             theta_sample_n: 9,
         };
-        let column = column_from_onsets(&[earlier, later], &[], 10, 0, 1000);
+        let column = column_from_onsets(
+            &[earlier, later],
+            &[],
+            10,
+            0,
+            1000,
+            &ImeIntervalIndex::new(&[]),
+        );
         assert!(column[5].is_onset);
         assert_eq!(column[5].t0_ms, Some(5_500), "先に確定した onset を残す");
         assert_eq!(column[5].s_ms, Some(1_000));
@@ -2548,5 +2645,164 @@ mod tests {
             vec![31_100],
             "後ろの片 [50001, 70000] は W=30000 に届かず評価されない"
         );
+    }
+
+    fn ime(t_ms: u64, dwell_ms: u64) -> ImeShadowEvent {
+        ImeShadowEvent {
+            t_ms,
+            dwell_ms,
+            nav: 0,
+            abandon: false,
+        }
+    }
+
+    /// issue 007 AC4: 重なりは onset の `[s, t0]` と `ime_shadow` 行の `[t − dwell_ms, t]` の**閉区間の交わり**。
+    /// ★ 端点で接するだけでも重なる。1ms 外れたら重ならない。
+    #[test]
+    fn ime_overlap_is_closed_interval_intersection() {
+        // onset は [50_000, 50_400]。
+        let overlaps =
+            |events: &[ImeShadowEvent]| ImeIntervalIndex::new(events).overlaps(50_000, 50_400);
+
+        // 右端で接する: 区間 [50_400, 50_700] の下端が t0 ちょうど。
+        assert!(overlaps(&[ime(50_700, 300)]), "下端が t0 なら重なる");
+        assert!(
+            !overlaps(&[ime(50_701, 300)]),
+            "下端が t0 + 1 なら重ならない"
+        );
+        // 左端で接する: 区間 [49_800, 50_000] の上端が s ちょうど。
+        assert!(overlaps(&[ime(50_000, 200)]), "上端が s なら重なる");
+        assert!(
+            !overlaps(&[ime(49_999, 200)]),
+            "上端が s - 1 なら重ならない"
+        );
+        // 内包 / 被包含。
+        assert!(overlaps(&[ime(50_300, 100)]), "onset に内包される区間");
+        assert!(overlaps(&[ime(53_000, 5_000)]), "onset を包む区間");
+        // 原点より前へ延びる区間 (t < dwell_ms) は下端を 0 に飽和させ、panic しない。
+        assert!(ImeIntervalIndex::new(&[ime(100, 500)]).overlaps(50, 80));
+        // 行が 0 本なら重ならない。
+        assert!(!overlaps(&[]));
+    }
+
+    /// 索引は素朴な全数比較と一致する。⚠️ 「`lo` 昇順の直近 1 本だけを見る」実装は、長い区間の後ろに
+    /// 下端の大きい短い区間が並ぶ入力で取りこぼす (`hi` の累積最大を持つ理由)。
+    #[test]
+    fn ime_interval_index_matches_naive_scan() {
+        // A = [10, 60_000] の後ろに B = [20_000, 20_100] が並ぶ。onset [50_000, 50_400] に重なるのは A だけ。
+        assert!(
+            ImeIntervalIndex::new(&[ime(60_000, 59_990), ime(20_100, 100)])
+                .overlaps(50_000, 50_400),
+            "長い区間 A が重なる (B だけを見ると取りこぼす)"
+        );
+
+        // 決定論的な擬似乱数 (LCG) で全数比較する。
+        let mut state: u64 = 0x2545_F491_4F6C_DD1D;
+        let mut next = |modulus: u64| -> u64 {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) % modulus
+        };
+        for _ in 0..300 {
+            let count = next(8);
+            let events: Vec<ImeShadowEvent> =
+                (0..count).map(|_| ime(next(10_000), next(3_000))).collect();
+            let s = next(10_000);
+            let t0 = s + next(500);
+            let naive = events
+                .iter()
+                .any(|e| e.t_ms.saturating_sub(e.dwell_ms) <= t0 && e.t_ms >= s);
+            assert_eq!(
+                ImeIntervalIndex::new(&events).overlaps(s, t0),
+                naive,
+                "events={events:?} onset=[{s}, {t0}]"
+            );
+        }
+    }
+
+    /// issue 007 AC5: `ime_shadow` 行が 1 本も無い入力では**すべての onset が `false`** で、`null` ではない
+    /// (「重なりを数えたが 0 件だった」は観測できた事実)。onset でない行は `null`。
+    #[test]
+    fn no_ime_rows_means_overlap_false_not_null() {
+        let config = StallOnsetConfig::default();
+        let feat = feat_ts_range(0, 41_000, 1_000);
+        let column = stall_onset_column(
+            &small_onset_keys(),
+            &feat,
+            &[],
+            42,
+            0,
+            ENGINE_TICK_MS,
+            &config,
+        );
+
+        let onset_rows: Vec<&StallOnset> = column.iter().filter(|r| r.is_onset).collect();
+        assert_eq!(
+            onset_rows.len(),
+            1,
+            "小さい合成入力は onset をちょうど 1 つ立てる"
+        );
+        assert_eq!(
+            onset_rows[0].ime_overlap,
+            Some(false),
+            "行が 0 本でも null にしない"
+        );
+        assert!(
+            column
+                .iter()
+                .filter(|r| !r.is_onset)
+                .all(|r| r.ime_overlap.is_none()),
+            "onset でない行は null"
+        );
+    }
+
+    /// issue 007 AC6 (単体側): **数えるだけで抑制しない**。`ime_shadow` 行の有無で onset の集合
+    /// (s / t0 / θ / n) は 1 本も変わらず、変わるのは `ime_overlap` だけ。
+    #[test]
+    fn ime_rows_never_change_the_onset_set() {
+        let config = StallOnsetConfig::default();
+        let keys = small_onset_keys();
+        let feat = feat_ts_range(0, 41_000, 1_000);
+        let run = |ime_rows: &[ImeShadowEvent]| {
+            stall_onset_column_with_timeline(
+                &keys,
+                &feat,
+                &[],
+                ime_rows,
+                &[],
+                42,
+                0,
+                ENGINE_TICK_MS,
+                &config,
+            )
+            .0
+        };
+        // onset は s = 30_200, t0 = 30_300。IME 区間 [30_150, 30_250] はそれと重なる。
+        let with = run(&[ime(30_250, 100)]);
+        let without = run(&[]);
+
+        let detection = |column: &[StallOnset]| {
+            column
+                .iter()
+                .map(|r| {
+                    (
+                        r.is_onset,
+                        r.s_ms,
+                        r.t0_ms,
+                        r.theta_person_ms,
+                        r.theta_sample_n,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            detection(&with),
+            detection(&without),
+            "ime_shadow 行の有無で onset の集合が変わった (抑制してしまっている)"
+        );
+        let idx = with.iter().position(|r| r.is_onset).expect("onset が立つ");
+        assert_eq!(with[idx].ime_overlap, Some(true));
+        assert_eq!(without[idx].ime_overlap, Some(false));
     }
 }

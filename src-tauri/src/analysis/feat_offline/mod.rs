@@ -166,6 +166,7 @@ pub struct FeatureRow {
     pub dispersion: Dispersion,
     /// `stall onset`（`t0`）検出器 (ADR-030 D2-D6)。`activity` と同じく **causal**
     /// (`stall_onset` モジュール doc 参照)。onset が起きた tick だけ値が埋まる。
+    /// ⚠️ **ただし `ime_overlap` だけは retrospective** (`t0` より後に書かれる `ime_shadow` 行に依存しうる・issue 007)。
     pub stall_onset: StallOnset,
     /// `Q` (evidence quality・issue 007)。⚠️ 状態特徴ではなく出力にだけ載せる —
     /// 他 Tier (`activity` / `boundary` / `dispersion` / `stall_onset`) の計算へは渡さない
@@ -457,6 +458,10 @@ pub fn build_feature_rows_with_pole_inputs(
         &detection_keys,
         stall_onset_inputs.feat_ts,
         &pointer_suppression,
+        // ★ `ime_shadow` 行は onset の `ime_overlap` を埋めるためだけに渡す (issue 007)。
+        //   ⚠️ 検出は読まない —— 検出値 (s / t0 / θ / n) を変えない (数えるだけで抑制しない)。
+        //   ★ ただし `ime_events` は上の grid_origin_ms / t_last には既に入っている (issue 002 から・本 issue は変えない)。
+        ime_events,
         stall_onset_inputs.task_kind_declarations,
         tick_count,
         grid_origin_ms,
@@ -918,5 +923,68 @@ mod tests {
         assert_eq!(net_production(&[letter, letter, backspace]), 1);
         assert_eq!(net_production(&[backspace, backspace]), -2);
         assert_eq!(net_production(&[arrow]), 0);
+    }
+
+    /// issue 007: `build_feature_rows` が渡された `ime_events` を `stall_onset.ime_overlap` へ配線する。
+    /// ★ 引数を落としても onset の集合は変わらない (数えるだけで抑制しない) ので、**値そのもの**を固定する。
+    #[test]
+    fn ime_events_reach_stall_onset_overlap_without_changing_onsets() {
+        // onset は s = 30_200, t0 = 30_300 (`stall_onset` の小さい合成入力と同じ)。
+        let keys = [key_at(0), key_at(100), key_at(200)];
+        let feat: Vec<u64> = (0..=41).map(|i| i * 1_000).collect();
+        let inputs = StallOnsetInputs {
+            feat_ts: &feat,
+            task_kind_declarations: &[],
+            config: StallOnsetConfig::default(),
+        };
+        let run = |ime_events: &[ImeShadowEvent]| {
+            build_feature_rows(
+                &keys,
+                &[],
+                ime_events,
+                TEST_MAX_TICKS,
+                &inputs,
+                &test_quality_inputs(),
+            )
+            .expect("within tick limit")
+        };
+        let overlapping = ImeShadowEvent {
+            t_ms: 30_250,
+            dwell_ms: 100,
+            nav: 0,
+            abandon: false,
+        };
+        let with = run(&[overlapping]);
+        let without = run(&[]);
+
+        let onset_of = |rows: &[FeatureRow]| {
+            rows.iter()
+                .map(|r| {
+                    (
+                        r.stall_onset.is_onset,
+                        r.stall_onset.s_ms,
+                        r.stall_onset.t0_ms,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        // ★ 行は打鍵の範囲の内側にあり、tick グリッドの原点・終端を動かさない (動かす入力は本テストの対象外)。
+        assert_eq!(
+            onset_of(&with),
+            onset_of(&without),
+            "ime_shadow 行の有無で onset の集合が変わった (抑制してしまっている)"
+        );
+        let idx = with
+            .iter()
+            .position(|r| r.stall_onset.is_onset)
+            .expect("onset が立つ");
+        assert_eq!(with[idx].stall_onset.ime_overlap, Some(true));
+        assert_eq!(without[idx].stall_onset.ime_overlap, Some(false));
+        assert!(
+            with.iter()
+                .filter(|r| !r.stall_onset.is_onset)
+                .all(|r| r.stall_onset.ime_overlap.is_none()),
+            "onset でない行は null"
+        );
     }
 }
