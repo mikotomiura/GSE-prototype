@@ -78,7 +78,7 @@ board は events を issue ごとに畳んだ (最終 event 優先) 表示。単
 | 監視 (loop-watchdog) | Haiku | parse ＋ 条件付き再実行 |
 | ガード (loop-guard.sh) | script | 無料・機械的 |
 | 統合レビュー (code-reviewer / security-checker) | Opus | 見逃しコストが高い |
-| 第二意見 (codex-consult / cross-review) | gpt-5.5 | 別 LLM の独立性が価値 |
+| 第二意見 (codex-consult / cross-review) | gpt-6-astra（★ 2026-09-25 に gpt-5.5〔Legacy〕から更新） | 別 LLM の独立性が価値・見逃しコストが高い |
 
 この表は `.claude/agents/*.md` の frontmatter `model:` と一致させる (L7 が drift を検出する)。
 
@@ -274,8 +274,8 @@ Codex はタスク境界の 2 点にだけ配置する。issue ループの内�
 | 高度 | 担当 | model | 頻度 | 権限 |
 |---|---|---|---|---|
 | issue ループ内 (毎 attempt) | `loop-guard.sh` / `loop-watchdog` | script / Haiku | 高頻度・安価 | 監視・停止のみ |
-| **タスク境界 (前)** | `codex-consult` | gpt-5.5 | task 毎 1 回 | read-only |
-| **タスク境界 (後)** | `/cross-review` (codex-review ∥ code-reviewer) | gpt-5.5 ∥ Opus | task 毎 1 回 | read-only |
+| **タスク境界 (前)** | `codex-consult` | gpt-6-astra | task 毎 1 回 | read-only |
+| **タスク境界 (後)** | `/cross-review` (codex-review ∥ code-reviewer) | gpt-6-astra ∥ Opus | task 毎 1 回 | read-only |
 
 ### TASK-PRE: issue 独立性の第二意見 (codex-consult, read-only)
 grill → /start-task → /to-prd → /to-issues で issue が確定した**直後**、

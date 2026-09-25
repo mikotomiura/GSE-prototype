@@ -185,7 +185,7 @@ $(cat "$TMPDIR_WORK/input.diff")"
 #   入力側を絞るこの措置が、現状ゆいいつの実効的な歯止めである。
 if ! codex exec --json --sandbox read-only --skip-git-repo-check \
   -C "$TMPDIR_WORK" \
-  -m gpt-5.5 -c model_reasoning_effort=medium \
+  -m gpt-6-astra -c model_reasoning_effort=medium \
   - <<< "$PROMPT" > "$TMPDIR_WORK/result.jsonl"; then
   echo "[run-codex-review] FAILED: codex exec error" >&2
   exit 1

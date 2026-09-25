@@ -132,7 +132,7 @@ AC 直結の絞り込みは `scope_test_template` (例 `cargo test --workspace {
 
 1. 統合ブランチで**フル CI** (`ci_command`) が緑であることを先に確認する。
 2. 既存 `/cross-review` を**統合 diff** に対して起動する
-   (= code-reviewer(Opus) ∥ codex-review(gpt-5.5) の並行レビュー)。
+   (= code-reviewer(Opus) ∥ codex-review(gpt-6-astra) の並行レビュー)。
    - Codex には `scripts/secrets-filter.sh` を通した**フィルタ済み diff のみ**が渡り、
      `.codex/budget.json` の予算ガードを尊重する (超過時は codex-review 側が中止)。read-only。
    - `/cross-review` が無い環境では `codex-review` skill を直呼びし、code-reviewer の
