@@ -22,10 +22,10 @@
 - [x] 001 `--features` ＋ `T0`（★ commit `061e6fb`）
 - [x] 002 `T1b`（境界）（★ commit `284c754` → merge `a4400b9` ＋ レビュー修正。⚠️ Loop は `abandoned`・原因は検査バグ＝判断 13）
 - [x] 003 `T1a`（分布）（★ commit `1440524` → merge `46f98ff` ＋ レビュー修正。⚠️ 起票 7 が開いたまま＝分位点が構造的に退化）
-- [!] 004 `T1c`（revision topology）★ **保留** —— ⚠️ rewrite / redelete / loop_depth / local_recurrence の**演算的定義が存在しない**（★ .idea/survey も候補名の一覧だけ）。→ 起票 9 / 判断 17。★ 研究者の定義確定待ち
+- [x] 004 `T1c`（削除と挿入の遷移の形）（★ 2026-09-18 に**保留**〔rewrite / redelete / loop_depth / local_recurrence の演算的定義が存在しない → 起票 9 / 判断 17〕→ 定義は理論レビューの研究者判断 1〜3（2026-09-18/19・`.steering/20260918-theory-critical-review/decisions.md`）で確定し、2026-09-20 に実装〔実装細目 U1〜U4 は `.steering/20260920-issues-004-006/decisions.md` 判断 1〕。commit `6f5bb9f` → PR #215 の merge `4fa0d15`〔2026-09-21〕。⚠️ 名前は観測の名前へ改めた〔ADR-030 補訂 1 項目 9〕。`T1c` の証拠の格は「未検証」と読む）
 - [x] 005 `stall onset`（★ 判断 11 で `parse` へ）（★ commit `134c9e2` → merge `da1b8b2`。⚠️ **レビューを通さずに merge されていた** → 2026-09-18 に客観検証 ＋ レビュー 2 本 → ⚠️★★★ **削除区間に onset が立つ**（HIGH・実測）ほか → 判断 18）
 - [x] ★ 008 `stall onset` の是正（観測区間 = D8 (b-2)・末尾の沈黙・`task_kind`・O(N log N)・検出力）（★ Loop attempt 4 → レビュー 2 本 → 是正 `9e5d0fa` → merge `2b417c1`。判断 18 / 22）
-- [!] 006 `T1d`（restart）★ **保留**（2026-09-18）—— ⚠️ 算出式が一次資料に無く、「再停止」は ADR-031 の転帰側の語。→ 起票 17 / 判断 20。★ 研究者の定義確定待ち
+- [x] 006 `T1d`（restart）（★ 2026-09-18 に**保留**〔算出式が一次資料に無く、「再停止」は ADR-031 の転帰側の語 → 起票 17 / 判断 20〕→ 定義は理論レビューの研究者判断 1〜3 で確定し、2026-09-20 に実装〔ADR-030 補訂 1 項目 7〕。commit `6f5bb9f`（004 と同じ）＋ `/cross-review` 2 巡目の是正 `9eb539d` → PR #215 の merge `4fa0d15`〔2026-09-21〕。⚠️ `T1d` は転帰側の retrospective な量であり、同じエピソードの予測にもオンラインの入力にも使わない）
 - [x] ★ Loop 基盤: worker へのプロンプト `/loop-issue` が MSYS のパス変換で壊れていた（★ 003〜008 の全 attempt）→ commit `446fa3b` で修正（判断 19）
 - [x] 007 `Q`（evidence quality・★ 判断 11 で `parse` へ）（★ Loop は acceptance の自己矛盾で `abandoned` → 判断 23 で引き取り `b71c360` → レビュー 2 本 → 規範の改訂と是正 `5b8fb0e`（判断 24）→ merge `08423b2`）
 
@@ -34,7 +34,7 @@
 - [x] 残る研究者判断 16 件を仰いだ（★ `decisions.md` 判断 25）
 - ★ 次は **理論の批判的レビュー**（別タスク・`.steering/_handoff/next-session-theory-critical-review.md`）
 - ★ 再開順: 理論レビュー → Loop 基盤の修正（起票 3 / 10）→ 封筒 issue（起票 2 / 5）→ 004 / 006 → `capability matrix` → P1 前の事前宣言文書 ＋ CLI ＋ 両極
-- [ ] ★ 小タスク: 削除 UI の最小幅 > `hole_gap_ms` を redaction 側の制約として明記・テスト固定（起票 15・判断 25 #6）
+- [x] ★ 小タスク: 削除 UI の最小幅 > `hole_gap_ms` を redaction 側の制約として明記・テスト固定（起票 15・判断 25 #6）（★ 2026-09-25 に `.steering/20260921-p1-prereg-cli-poles/` issue 002 で実装 → merge `01d90f2`。(b) 入口で広げて消す ＋ (a) 定数比較の検査の両方・ADR-030 補訂 2 項目 8）
 
 ## Loop 外（★ 対話で行う・研究者判断 2026-09-14）
 - [ ] `capability matrix`（ADR-032 **M7**）—— ⚠️ `OS × ライブ変換設定` で層別。

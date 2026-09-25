@@ -40,10 +40,11 @@ check_in_amend2 '(30 秒|t1a_window_ms|30,000)'    'T1a の 30 秒窓'
 
 # ── AC4: D9 を裁いていない ──────────────────────────────────────────────
 #   ⚠️ 「壁時計」が出るのは構わないが、「未決のまま」であることが書かれていること。
-if printf '%s' "$amend2_body" | grep -qE '壁時計'; then
-  printf '%s' "$amend2_body" | grep -E '壁時計' | grep -qE '(未決|決めない|範囲外|P1 の実データ)' \
-    || fail "AC4: 補訂 2 が壁時計 (D9) を裁いている疑い（★ 研究者判断は「P1 の実データの後」）"
-fi
+#   ⚠️ 「どれか 1 行が合えば通る」では、別の行で D9 を裁いていても素通りする。
+#     ★ 壁時計を含む行は **1 行残らず** 未決の語を持つことを要求する（語の無い行を列挙して赤にする）。
+bad_d9="$(printf '%s\n' "$amend2_body" | grep -E '壁時計' | grep -vE '(未決|決めない|範囲外|P1 の実データ)' || true)"
+[ -z "$bad_d9" ] \
+  || fail "AC4: 補訂 2 の次の行が壁時計 (D9) を「未決」と言わずに書いている（★ 研究者判断は「P1 の実データの後」）: $bad_d9"
 
 # ── AC5: 起票 8 件に「✅ 是正済み」がある ───────────────────────────────
 for n in 7 11 12 13 14 15 16 21; do
@@ -66,11 +67,49 @@ git rev-parse --verify "$BASE" >/dev/null 2>&1 || BASE="origin/main"
 git rev-parse --verify "$BASE" >/dev/null 2>&1 \
   || fail "AC2/AC6: 比較対象のブランチを解決できない（${BASE}）"
 
+#   ⚠️★★★ 検査の検査（2026-09-25）: 旧式の `git diff | grep -cE '^-[^-]'` は **箇条書きの削除を数え落とす**。
+#     markdown の `- foo` を消すと diff では `-- foo`（先頭が `--`）になり、`^-[^-]` に当たらない。
+#     ★ 空行の削除（diff では `-` だけの行）も同じく当たらない。→ この 2 本の文書は箇条書きだらけなので、
+#       旧式は「本文を書き換えていない」ことを実質的に何も確かめていなかった。
+#     ★ `git diff --numstat` の削除行数（2 列目）は行頭の文字に依らないので、これで数える。
 for f in "$ADR" "$BLK"; do
-  del="$(git diff "$BASE" -- "$f" | grep -cE '^-[^-]' || true)"
-  [ "${del:-0}" -eq 0 ] \
+  stat="$(git diff --numstat "$BASE" -- "$f")" \
+    || fail "AC2/AC6: git diff --numstat が失敗した: $f"
+  if [ -n "$stat" ]; then
+    del="$(printf '%s\n' "$stat" | awk -F'\t' 'NR == 1 { print $2 }')"
+  else
+    del=0
+  fi
+  case "$del" in
+    ''|*[!0-9]*) fail "AC2/AC6: $f の削除行数を読めない（numstat: ${stat}）" ;;
+  esac
+  [ "$del" -eq 0 ] \
     || fail "AC2/AC6: $f に削除行が $del 行ある（★ 本文・起票本文は追記のみの規約）"
 done
+
+# ── AC2 (強): ADR は「元の全バイトが接頭辞として残っている」＝ 末尾への追記だけ ─────
+#   ⚠️ 削除行が 0 でも、本文の**途中に**行を挿入する変更は通ってしまう（AC2 は「追加行が補訂 2 より後だけ」）。
+#     ★ base の blob と、作業ツリーの先頭から同じバイト数を切ったものが一致することで確かめる。
+base_size="$(git cat-file -s "$BASE:$ADR")" \
+  || fail "AC2: base の ADR のサイズを取れない（${BASE}:${ADR}）"
+# ⚠️ `git show` が失敗すると空入力の sha1 が入り `-n` を通ってしまう（security-checker LOW）→ 先に blob を取り出して失敗を拾う。
+base_blob="$(mktemp)" || fail "AC2: 一時ファイルを作れない"
+git show "$BASE:$ADR" > "$base_blob" || { rm -f "$base_blob"; fail "AC2: base の ADR を取り出せない（${BASE}:${ADR}）"; }
+base_sha="$(sha1sum < "$base_blob" | cut -d' ' -f1)"
+rm -f "$base_blob"
+work_sha="$(head -c "$base_size" "$ADR" | sha1sum | cut -d' ' -f1)"
+[ -n "$base_sha" ] && [ "$base_sha" = "$work_sha" ] \
+  || fail "AC2: ADR-030 の既存の本文が（追記以外で）変わっている（base=${base_sha} work=${work_sha}・先頭 ${base_size} バイト）"
+[ "$(wc -c < "$ADR")" -gt "$base_size" ] \
+  || fail "AC2: ADR-030 に追記が 1 バイトも無い（補訂 2 が入っていない）"
+
+# ── AC5 (補): 起票 12 を「閉じた」と書いていない（★ 数える計器だけ・抑制は未決）─────────
+awk '
+  $0 ~ "^## 起票 12(:|：)" { inblk=1; next }
+  inblk && /^## 起票 /    { exit ok ? 0 : 1 }
+  inblk && /閉じていない/ { ok=1 }
+  END { exit (inblk && ok) ? 0 : 1 }
+' "$BLK" || fail "AC5: 起票 12 の是正記録に「閉じていない」が無い（★ 抑制は P1 の頻度を見てから）"
 
 # ── AC7: tasklist の 004 / 006 が [x] になっている ──────────────────────
 grep -qE '^- \[x\] *004' "$TL" || fail "AC7: tasklist の 004 が [x] になっていない"
