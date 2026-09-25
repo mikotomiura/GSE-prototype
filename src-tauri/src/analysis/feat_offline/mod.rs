@@ -459,7 +459,8 @@ pub fn build_feature_rows_with_pole_inputs(
         stall_onset_inputs.feat_ts,
         &pointer_suppression,
         // ★ `ime_shadow` 行は onset の `ime_overlap` を埋めるためだけに渡す (issue 007)。
-        //   ⚠️ 検出は読まない —— onset の集合を変えない (数えるだけで抑制しない)。
+        //   ⚠️ 検出は読まない —— 検出値 (s / t0 / θ / n) を変えない (数えるだけで抑制しない)。
+        //   ★ ただし `ime_events` は上の grid_origin_ms / t_last には既に入っている (issue 002 から・本 issue は変えない)。
         ime_events,
         stall_onset_inputs.task_kind_declarations,
         tick_count,
@@ -958,9 +959,16 @@ mod tests {
 
         let onset_of = |rows: &[FeatureRow]| {
             rows.iter()
-                .map(|r| (r.stall_onset.is_onset, r.stall_onset.t0_ms))
+                .map(|r| {
+                    (
+                        r.stall_onset.is_onset,
+                        r.stall_onset.s_ms,
+                        r.stall_onset.t0_ms,
+                    )
+                })
                 .collect::<Vec<_>>()
         };
+        // ★ 行は打鍵の範囲の内側にあり、tick グリッドの原点・終端を動かさない (動かす入力は本テストの対象外)。
         assert_eq!(
             onset_of(&with),
             onset_of(&without),

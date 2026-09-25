@@ -86,8 +86,11 @@
 //! # IME 変換中の onset を数える（issue 007・ADR-030 補訂 1 項目 4）
 //!
 //! ⚠️★★★ **数えるだけで、抑制はしない。** 検出 (条件 A / B・θ・観測区間) は `ime_shadow` 行を**読まない**ので、
-//! `ime_shadow` 行の有無で onset の集合は 1 本も変わらない (`tests::ime_rows_never_change_the_onset_set`)。
+//! `ime_shadow` 行の有無で検出値 (`s` / `t0` / θ / n の組) は 1 本も変わらない (`tests::ime_rows_never_change_the_onset_set`)。
 //! 変わるのは onset 行に載る [`StallOnset::ime_overlap`] だけである。
+//! ⚠️ ただし `ime_shadow` 行は **tick グリッドの原点・終端の決定には入る** (`mod.rs` の `grid_origin_ms` / `t_last`・
+//! issue 002 からの既存の挙動)。最初の打鍵より前・最後の入力より後に行があると、onset が載る **tick の添字**は動きうる
+//! (★ 検出値は同じ。本 issue はこの挙動を変えていない)。
 //!
 //! - **重なりの定義** (補訂 1 項目 4 の**暫定の数え方**・抑制の定義ではない): onset の `[s, t0]` と
 //!   `ime_shadow` 行の `[t − dwell_ms, t]` の**閉区間どうしの交わり**。端点で接するだけでも重なる。
