@@ -61,9 +61,26 @@
 //! ([`evaluation_intervals`])。→ 各片で (1) 条件 A の直前状態が `false` に戻り (2) 頭の `W` を評価せず
 //! (3) θ の標本も**片の内側の隣接 press 対だけ**になる —— **新しい機構は 1 つも無い**
 //! (観測区間と同じ規則をそのまま再利用する)。
-//! ⚠️ **onset が増えることもある**: 長い沈黙の途中にポインタ活動が入ると、片が 2 つに割れて
-//! 後ろの片で `a + W` 後に条件 A が改めて立つ (`feat` 行の穴と同じ扱い)。極 B が baseline の
-//! 部分集合になるとは**限らない** (活動が停滞の途中で止めさせる典型形では減る)。
+//!
+//! ⚠️★★★ **「極 B は onset 少なめ」は保証されない**（`decisions.md` 判断 25）。ADR-030 D3 の囲みは
+//! 「極 B (ポインタ活動区間を抑制する ＝ onset 少なめ)」と書くが、それは**典型形の記述であって
+//! 不変式ではない**。包含が崩れる経路は 2 つある:
+//!
+//! 1. **θ 経路**: θ_person は**全観測区間からプールした因果累積**である (モジュール doc 冒頭
+//!    「θ の標本は… 全観測区間からプールする」＋ [`pooled_theta_gaps`])。抑制をまたぐ標本を
+//!    プールから外すと、**抑制区間から遠い onset の θ・ひいては `t0` まで動く** —— baseline で
+//!    立った onset が極 B では別の時刻へ動いたり消えたりし、baseline に無い時刻で新しく
+//!    立つこともある (`tests::theta_sample_excludes_pairs_across_pointer_suppression` が固定:
+//!    同じ入力で baseline の onset は `s=71100, t0=91500` の 1 本だけだが、極 B では同じ
+//!    `s=71100` が `t0=71200` に移動し、baseline の `t0` 集合との交わりがゼロになる —— **極 B の
+//!    onset 集合は baseline の部分集合ですらない**)。
+//! 2. **分割経路**: 長い沈黙の途中にポインタ活動が入ると、片が 2 つに割れて後ろの片で `a + W` 後に
+//!    条件 A が改めて立つ (`feat` 行の穴と同じ扱い。`tests::pointer_suppression_skips_the_leading_w`
+//!    が固定: baseline 1 本 → 極 B 2 本。**onset が増える**)。
+//!
+//! → ★ 極 B が baseline の部分集合になるとは**限らない**（活動が停滞の途中で止めさせる典型形では
+//! 減るが、一般には保証されない）。★ したがって **G2 の上下界は「極 A が上・極 B が下」のような
+//! 2 極の順序を前提にせず、両極それぞれで求めた G2 の min / max で取る**（判断 25）。
 //!
 //! # 極 M+ の入れ方（issue 005）
 //!
@@ -320,6 +337,12 @@ pub fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> 
 ///
 /// 戻り値は `(下端を含まない, 上端を含む)` の組 (開始昇順・互いに素)。`pointer_ts` は順不同・重複ありでよい。
 /// `bin_ms == 0` は覆う秒が無いので空 (⚠️ 空の区間で観測区間を割らない)。
+///
+/// ⚠️ **`t == 0`（★ `bin_ms` に飽和で吸収される先頭）の行は `(0, 0]` という空区間を作る**
+/// （★ LOW 是正・code-reviewer 指摘）。`(0, 0]` は `lo == t` で「0 より大きく 0 以下」＝
+/// 実際には**どの整数 ms も覆わない**ので、抑制区間として push すると
+/// [`evaluation_intervals`] が観測区間を無意味に (何も除かずに) 2 片へ割ってしまう
+/// (`tests::pointer_suppression_at_t_zero_produces_no_interval` が固定)。→ **空区間は作らない**。
 pub fn pointer_suppression_intervals(pointer_ts: &[u64], bin_ms: u64) -> Vec<(u64, u64)> {
     if bin_ms == 0 {
         return Vec::new();
@@ -331,6 +354,10 @@ pub fn pointer_suppression_intervals(pointer_ts: &[u64], bin_ms: u64) -> Vec<(u6
     let mut out: Vec<(u64, u64)> = Vec::new();
     for t in sorted {
         let lo = t.saturating_sub(bin_ms);
+        if lo == t {
+            // `(lo, t]` が空区間 (t == 0 のときだけ起こる)。何も覆わないので捨てる。
+            continue;
+        }
         match out.last_mut() {
             // 前の区間の上端 (含む) に、この行の下端 (含まない) が届いていれば接している。
             Some(last) if lo <= last.1 => last.1 = t,
@@ -2363,6 +2390,28 @@ mod tests {
         assert_eq!(pointer_suppression_intervals(&[300], 1_000), vec![(0, 300)]);
     }
 
+    /// LOW 是正 (code-reviewer): `t = 0` の行は `(0, 0]` という**空区間**を作る
+    /// (`0.saturating_sub(bin_ms) == 0 == t`)。push すると [`evaluation_intervals`] が
+    /// 観測区間を「何も除いていないのに」2 片へ無意味に割ってしまう。
+    #[test]
+    fn pointer_suppression_at_t_zero_produces_no_interval() {
+        assert!(
+            pointer_suppression_intervals(&[0], 1_000).is_empty(),
+            "t=0 だけの入力は空区間しか作らないので抑制区間は 0 本のはず"
+        );
+        // t=0 は無視され、t=5000 由来の区間だけが残る (空区間が他の区間の計算を乱さない)。
+        assert_eq!(
+            pointer_suppression_intervals(&[0, 5_000], 1_000),
+            vec![(4_000, 5_000)]
+        );
+        // observed 側でも「t=0 だけの入力」は評価区間を割らない (baseline と恒等)。
+        let observed = vec![(0, 100)];
+        assert_eq!(
+            evaluation_intervals(&observed, &pointer_suppression_intervals(&[0], 1_000)),
+            observed
+        );
+    }
+
     /// 観測区間から抑制区間を除く合成の境界 (`(lo, hi]` は整数 ms で `[lo + 1, hi]`)。
     #[test]
     fn evaluation_intervals_cut_observed_by_suppression() {
@@ -2400,6 +2449,11 @@ mod tests {
 
     /// AC5: θ の標本は**抑制区間をまたがない** (ADR-030 D4 の標本規則: 抑制・除外区間をまたぐ gap は入れない)。
     /// ★ 抑制区間の**内側**の press を含む対も入らない。baseline との対照で θ が変わることを見る。
+    ///
+    /// ⚠️★★★ **判断 25**: 同じ入力で、極 B の onset の `t0` 集合が baseline の**部分集合ですらない**
+    /// ことも明示的に固定する（θ 経路で包含が崩れる例。モジュール doc 「極 B の入れ方」参照）。
+    /// 「極 B は onset 少なめ」は不変式ではなく、この fixture では baseline 側の `t0` (91500) が
+    /// 消え、baseline に無い `t0` (71200) が新しく立つ。
     #[test]
     fn theta_sample_excludes_pairs_across_pointer_suppression() {
         let config = StallOnsetConfig::default();
@@ -2440,6 +2494,16 @@ mod tests {
                 theta_sample_n: 3,
             }],
             "抑制をまたぐ gap が標本に混ざると θ が 20400 に跳ね上がる (θ_person が過大になり episode yield が落ちる)"
+        );
+
+        // 判断 25: 極 B の t0 集合は baseline の部分集合ではない (θ 経路で包含が崩れる例を固定する)。
+        let baseline_t0: std::collections::BTreeSet<u64> =
+            baseline.iter().map(|o| o.t0_ms).collect();
+        let pole_b_t0: std::collections::BTreeSet<u64> = pole_b.iter().map(|o| o.t0_ms).collect();
+        assert!(
+            !pole_b_t0.is_subset(&baseline_t0),
+            "判断25: 極 B の t0 集合 {pole_b_t0:?} が baseline の t0 集合 {baseline_t0:?} の部分集合になっている \
+             (θ 経路で包含が崩れることを示すはずの例が、たまたま包含してしまっている)"
         );
     }
 

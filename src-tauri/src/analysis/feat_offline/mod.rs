@@ -120,6 +120,12 @@ pub struct PoleInputs<'a> {
     /// `Err` にする (★ 入力を渡し忘れて baseline の値を極 B の名前で返さない)。
     /// ★ `capabilities` に `pointer_bin` の宣言が無い入力の扱い (= 適用不可) は**呼び出し側**が決める
     /// (`analysis/` に `capabilities` の意味を持ち込まない)。適用不可なら `Some(&[])` を渡すと baseline と恒等になる。
+    ///
+    /// ⚠️ **抑制区間→評価区間の構築は 1 か所に畳まれていない** (`bin/replay.rs` が封筒
+    /// `provenance.observed_intervals` 用にもう一度計算する) が、**両者は同じ 2 関数
+    /// (`stall_onset::pointer_suppression_intervals` / `stall_onset::evaluation_intervals`) と
+    /// 同じ定数 (`ENGINE_TICK_MS`) を呼ぶ**ので、値が独立に乖離することはない
+    /// (`replay.rs` 側の呼び出し箇所のコメント参照。code-reviewer LOW・issue 006)。
     pub pointer_active_ts: Option<&'a [u64]>,
 }
 
