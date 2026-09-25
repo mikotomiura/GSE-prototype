@@ -48,7 +48,9 @@ worker が自分の issue の acceptance を回して、acceptance 自体の欠�
 - ⚠️★★★ **これは境界ではない。** worker は `Write` で任意の `*-acceptance.sh` を作って実行でき、
   `bash .steering/../x-acceptance.sh` も通る (実測)。★ 権限上は `Bash(bash:*)` と同等であり、
   `cargo run` / `cargo test` が build.rs 経由で任意コードを実行できるのと同じ扱い。
-  → ★ 合否は **main checkout 側**の acceptance を `loop-run.sh` が回して決めるので、worker が書き換えても動かない。
+  ⚠️★★★ **Loop の verify の合否も worker の影響を受けうる** —— verify は main checkout 側の acceptance を回すが、
+  任意コードを実行できる worker はそれも書き換えうる。→ ★ 合否を最終的に決めるのは **merge 前にメインが clean な checkout で回す acceptance**
+  (★ 2026-09-26 に旧文「worker が書き換えても動かない」を訂正 —— `security-checker` MEDIUM)。
 
 ### allowlist は「完全な境界」ではない
 

@@ -1160,12 +1160,15 @@ fi
 # --- 10g/10h: ⚠️★★★ 変異テスト (★ 群 10 が空振りしていないこと) ---
 echo "10g-10h. ⚠️★★★ 変異テスト —— 祖先関係の分岐を潰したら赤くなるか"
 
-# 10g: local-ahead の判定を潰す (常に false) → 10b は分岐 (die) に落ちるはず
+# 10g: local-ahead の判定を潰す (常に false = rc 1 扱い) → 10b は分岐 (die) に落ちるはず
+#   ⚠️★★★ P1-K のロック直列化に伴い判定を `elif git merge-base …; then` から
+#   `git merge-base … || ahead_rc=$?` (★ `set -e` 下で bare command の rc を直接読むため) へ
+#   書き換えた。sed の当て先もこの形に追随させる (★ 2026-09-26 レビュー対応時に実測で踏んだ)。
 MUT10G="${TMP}/mut10g-loop-spawn.sh"
-sed 's|elif git merge-base --is-ancestor "refs/remotes/origin/\$base" "refs/heads/\$base" 2>/dev/null; then|elif false; then|' \
+sed 's#git merge-base --is-ancestor "refs/remotes/origin/\$base" "refs/heads/\$base" 2>/dev/null || ahead_rc=\$?#ahead_rc=1#' \
   "${SPAWN_SH}" > "${MUT10G}"
-mut10g_src="$(grep -cF 'elif git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null; then' "${SPAWN_SH}" 2>/dev/null)" || mut10g_src=0
-mut10g_left="$(grep -cF 'elif git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null; then' "${MUT10G}" 2>/dev/null)" || mut10g_left=0
+mut10g_src="$(grep -cF 'git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null || ahead_rc=$?' "${SPAWN_SH}" 2>/dev/null)" || mut10g_src=0
+mut10g_left="$(grep -cF 'git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null || ahead_rc=$?' "${MUT10G}" 2>/dev/null)" || mut10g_left=0
 if [ "${mut10g_src:-0}" -ne 1 ] || [ "${mut10g_left:-0}" -ne 0 ]; then
   ng "10g: 変異を当てられない (src=${mut10g_src} / mut=${mut10g_left}) —— ★ 判定式の書き方が変わった → ⚠️ 検査不能"
 else
@@ -1184,12 +1187,13 @@ else
   fi
 fi
 
-# 10h: local-behind の判定を潰す (常に true) → 10d (分岐) が die せず進んでしまうはず
+# 10h: local-behind の判定を潰す (常に true = rc 0 扱い) → 10d (分岐) が die せず進んでしまうはず
+#   ⚠️★★★ 10g と同じ理由で sed の当て先を `behind_rc=$?` の形へ追随させる。
 MUT10H="${TMP}/mut10h-loop-spawn.sh"
-sed 's|elif git merge-base --is-ancestor "refs/heads/\$base" "refs/remotes/origin/\$base" 2>/dev/null; then|elif true; then|' \
+sed 's#git merge-base --is-ancestor "refs/heads/\$base" "refs/remotes/origin/\$base" 2>/dev/null || behind_rc=\$?#behind_rc=0#' \
   "${SPAWN_SH}" > "${MUT10H}"
-mut10h_src="$(grep -cF 'elif git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null; then' "${SPAWN_SH}" 2>/dev/null)" || mut10h_src=0
-mut10h_left="$(grep -cF 'elif git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null; then' "${MUT10H}" 2>/dev/null)" || mut10h_left=0
+mut10h_src="$(grep -cF 'git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null || behind_rc=$?' "${SPAWN_SH}" 2>/dev/null)" || mut10h_src=0
+mut10h_left="$(grep -cF 'git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null || behind_rc=$?' "${MUT10H}" 2>/dev/null)" || mut10h_left=0
 if [ "${mut10h_src:-0}" -ne 1 ] || [ "${mut10h_left:-0}" -ne 0 ]; then
   ng "10h: 変異を当てられない (src=${mut10h_src} / mut=${mut10h_left}) —— ★ 判定式の書き方が変わった → ⚠️ 検査不能"
 else
@@ -1340,6 +1344,165 @@ else
 fi
 kill "${LIVE_PID}" 2>/dev/null || true
 
+# --- 11g/11h: ⚠️★★★ C-M1 (レビュー): rm -rf が失敗し続けてもタイムアウトが必ず効くか ────
+#   ⚠️★★★ 何を止めるためにあるのか (2026-09-26 のレビュー・C-M1):
+#     ★ 旧実装の stale 分岐は `rm -rf … || true; continue` で、i の加算も sleep も飛ばしていた。
+#     rm が失敗し続けると (★ Windows のハンドル保持など) タイムアウトが一切効かないまま
+#     CPU を回し続ける。
+#   ★ `rm` を bash 関数で shadow し `export -f` で子プロセス (`bash scripts/loop-spawn.sh`) に
+#     引き継がせ、「rm が常に失敗する」状況を **決定論的に**作る (★ 実ファイルは一切消えない)。
+#   ⚠️ 旧実装だとこの状況で無限ループになるため、**外側の壁時計タイムアウト**で検出する
+#     (バックグラウンド起動＋経過秒数のポーリング。`timeout` コマンドの有無に依存しない)。
+echo "11g-11h. ⚠️★★★ C-M1: rm -rf が失敗し続けても LOCK_TIMEOUT 内に非 0 で止まるか (スピンしない)"
+
+run_fakerm_scenario() { # run_fakerm_scenario <repo-dir> <spawn-src> <id> <out-prefix>
+  local r="$1" src="$2" id="$3" pfx="$4" gpid waited grc
+  setup_fake_repo "${r}" "${src}" || return 2
+  true & DPID=$!; wait "${DPID}" 2>/dev/null || true   # ★ 確実に死んでいる pid (11e と同じ作法)
+  mkdir -p "${r}/.git/loop-spawn.lock" && printf '%s' "${DPID}" > "${r}/.git/loop-spawn.lock/pid"
+  (
+    cd "${r}" || exit 1
+    rm() { return 1; }
+    export -f rm
+    env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "${id}" t
+  ) >"${TMP}/${pfx}.out" 2>"${TMP}/${pfx}.err" &
+  gpid=$!
+  waited=0
+  while kill -0 "${gpid}" 2>/dev/null && [ "${waited}" -lt 15 ]; do
+    sleep 1; waited=$((waited + 1))
+  done
+  if kill -0 "${gpid}" 2>/dev/null; then
+    kill -9 "${gpid}" 2>/dev/null || true
+    wait "${gpid}" 2>/dev/null || true
+    FAKERM_HUNG=1; FAKERM_RC=""; FAKERM_WAITED="${waited}"
+  else
+    wait "${gpid}"; grc=$?
+    FAKERM_HUNG=0; FAKERM_RC="${grc}"; FAKERM_WAITED="${waited}"
+  fi
+  FAKERM_ERR="$(cat "${TMP}/${pfx}.err" 2>/dev/null || true)"
+}
+
+R11G="${TMP}/r11g/repo"; mkdir -p "${R11G}"
+if ! run_fakerm_scenario "${R11G}" "${SPAWN_SH}" gg 11g; then
+  ng "11g: 準備できなかった (★ 判定できない)"
+else
+  if [ "${FAKERM_HUNG}" -eq 1 ]; then
+    ng "11g: ⚠️★★★ ${FAKERM_WAITED} 秒待ってもプロセスが終わらなかった (★ C-M1 のスピンが再発している)"
+  elif [ "${FAKERM_RC}" -ne 0 ] && has_text "${FAKERM_ERR}" "loop-spawn.lock を"; then
+    ok "11g: ★★★ rm が失敗し続けても LOCK_TIMEOUT (3秒) 内に非 0 で止まった (${FAKERM_WAITED} 秒で終了)"
+  else
+    ng "11g: rc=${FAKERM_RC} / ${FAKERM_WAITED} 秒で終了したが期待した die メッセージが無い"
+  fi
+fi
+
+# --- 11h: ⚠️★★★ 変異テスト —— i の加算を潰すと 11g の状況でハングするか ---
+MUT11H="${TMP}/mut11h-loop-spawn.sh"
+sed 's/i=\$((i + 1))/i=\$((i + 0))/' "${SPAWN_SH}" > "${MUT11H}"
+mut11h_src="$(grep -cF 'i=$((i + 1))' "${SPAWN_SH}" 2>/dev/null)" || mut11h_src=0
+mut11h_left="$(grep -cF 'i=$((i + 1))' "${MUT11H}" 2>/dev/null)" || mut11h_left=0
+if [ "${mut11h_src:-0}" -ne 1 ] || [ "${mut11h_left:-0}" -ne 0 ]; then
+  ng "11h: 変異を当てられない (src=${mut11h_src} / mut=${mut11h_left}) —— ★ i の加算の書き方が変わった → ⚠️ 検査不能"
+else
+  R11H="${TMP}/r11h/repo"; mkdir -p "${R11H}"
+  if ! run_fakerm_scenario "${R11H}" "${MUT11H}" hh 11h; then
+    ng "11h: 準備できなかった (★ 判定できない)"
+  else
+    if [ "${FAKERM_HUNG}" -eq 1 ]; then
+      ok "11h: ★★★ i の加算を潰すと rm 失敗が続く状況でハングした (★ 11g は空振りしていない)"
+    else
+      ng "11h: 潰しても ${FAKERM_WAITED} 秒で終了した (rc=${FAKERM_RC}) (⚠️★★★ 11g が i の加算を見ていない可能性)"
+    fi
+  fi
+fi
+
+# --- 11i/11j: ⚠️★★★ C-M2 (レビュー): stale 除去の TOCTOU —— 読み直しが効いているか ────
+#   ⚠️★★★ 何を止めるためにあるのか (2026-09-26 のレビュー・C-M2):
+#     ★ 待ち手 A と B が同じ死んだ pid を読み、A が除去して取り直した直後に B が
+#     **古い判断のまま** A の新しいロックを消すと、2 本が同時にクリティカルセクションへ入る。
+#   ⚠️ 実際の 2 プロセス競合はタイミング依存で確定再現できないため、`cat` を bash 関数で
+#     shadow して「1 回目の読み取りは死んだ pid・2 回目以降は生きている pid」を**決定論的に**
+#     作る (★ reap 直後の読み直しが「観測した死んだ pid と同じ場合に限り消す」を検査する)。
+echo "11i-11j. ⚠️★★★ C-M2: stale 除去の TOCTOU —— reap 内の pid 読み直しが効いているか"
+
+run_fakecat_scenario() { # run_fakecat_scenario <repo-dir> <spawn-src> <id> <out-prefix>
+  local r="$1" src="$2" id="$3" pfx="$4" dpid apid ipid waited irc
+  setup_fake_repo "${r}" "${src}" || return 2
+  true & dpid=$!; wait "${dpid}" 2>/dev/null || true   # ★ 1 回目の読み取りに使う「死んだ pid」
+  sleep 20 & apid=$!                                    # ★ 2 回目以降の読み取りに使う「生きている pid」
+  mkdir -p "${r}/.git/loop-spawn.lock" && printf '%s' "${dpid}" > "${r}/.git/loop-spawn.lock/pid"
+  (
+    cd "${r}" || exit 1
+    export FAKECAT_COUNT="${TMP}/${pfx}-count"
+    export FAKECAT_DEAD="${dpid}"
+    export FAKECAT_ALIVE="${apid}"
+    printf '0' > "${FAKECAT_COUNT}"
+    cat() {
+      case "$1" in
+        */loop-spawn.lock/pid)
+          local n
+          n="$(command cat "${FAKECAT_COUNT}" 2>/dev/null || echo 0)"
+          n=$((n + 1))
+          printf '%s' "${n}" > "${FAKECAT_COUNT}"
+          if [ "${n}" -eq 1 ]; then printf '%s' "${FAKECAT_DEAD}"; else printf '%s' "${FAKECAT_ALIVE}"; fi
+          return 0 ;;
+      esac
+      command cat "$@"
+    }
+    export -f cat
+    env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec "${id}" t
+  ) >"${TMP}/${pfx}.out" 2>"${TMP}/${pfx}.err" &
+  ipid=$!
+  waited=0
+  while kill -0 "${ipid}" 2>/dev/null && [ "${waited}" -lt 15 ]; do
+    sleep 1; waited=$((waited + 1))
+  done
+  if kill -0 "${ipid}" 2>/dev/null; then
+    kill -9 "${ipid}" 2>/dev/null || true
+    wait "${ipid}" 2>/dev/null || true
+    FAKECAT_HUNG=1; FAKECAT_RC=""
+  else
+    wait "${ipid}"; irc=$?
+    FAKECAT_HUNG=0; FAKECAT_RC="${irc}"
+  fi
+  FAKECAT_WAITED="${waited}"
+  kill "${apid}" 2>/dev/null || true
+}
+
+R11I="${TMP}/r11i/repo"; mkdir -p "${R11I}"
+if ! run_fakecat_scenario "${R11I}" "${SPAWN_SH}" ii 11i; then
+  ng "11i: 準備できなかった (★ 判定できない)"
+else
+  if [ "${FAKECAT_HUNG}" -eq 1 ]; then
+    ng "11i: ⚠️ ${FAKECAT_WAITED} 秒待ってもプロセスが終わらなかった (★ 判定できない)"
+  elif [ "${FAKECAT_RC}" -ne 0 ] && ! wt_has "${R11I}" "repo-ii-t"; then
+    ok "11i: ★★★ 読み直した pid が生きていたので他人のロックを消さず、待ち切って非 0 で止まった"
+  else
+    ng "11i: rc=${FAKECAT_RC} / worktree 作成=$(wt_has "${R11I}" "repo-ii-t" && echo yes || echo no) (⚠️ 読み直しが効いていない?)"
+  fi
+fi
+
+# --- 11j: ⚠️★★★ 変異テスト —— reap 内の再検査 (読み直し一致 + kill -0) を潰すと
+#   11i と同じ状況で「生きているロック」を消して通ってしまうか ---
+MUT11J="${TMP}/mut11j-loop-spawn.sh"
+sed 's/if \[ "\${reap_pid:-}" = "\${lock_pid}" \] \&\& ! kill -0 "\${lock_pid}" 2>\/dev\/null; then/if true; then/' \
+  "${SPAWN_SH}" > "${MUT11J}"
+mut11j_src="$(grep -cF 'if [ "${reap_pid:-}" = "${lock_pid}" ] && ! kill -0 "${lock_pid}" 2>/dev/null; then' "${SPAWN_SH}" 2>/dev/null)" || mut11j_src=0
+mut11j_left="$(grep -cF 'if [ "${reap_pid:-}" = "${lock_pid}" ] && ! kill -0 "${lock_pid}" 2>/dev/null; then' "${MUT11J}" 2>/dev/null)" || mut11j_left=0
+if [ "${mut11j_src:-0}" -ne 1 ] || [ "${mut11j_left:-0}" -ne 0 ]; then
+  ng "11j: 変異を当てられない (src=${mut11j_src} / mut=${mut11j_left}) —— ★ reap の再検査の書き方が変わった → ⚠️ 検査不能"
+else
+  R11J="${TMP}/r11j/repo"; mkdir -p "${R11J}"
+  if ! run_fakecat_scenario "${R11J}" "${MUT11J}" jj 11j; then
+    ng "11j: 準備できなかった (★ 判定できない)"
+  else
+    if [ "${FAKECAT_HUNG}" -eq 0 ] && [ "${FAKECAT_RC}" -eq 0 ] && wt_has "${R11J}" "repo-jj-t"; then
+      ok "11j: ★★★ 再検査を潰すと『生きているロック』を消して通ってしまった (★ 11i は空振りしていない)"
+    else
+      ng "11j: 潰しても hung=${FAKECAT_HUNG} / rc=${FAKECAT_RC} で止まった (⚠️★★★ 11i が再検査を見ていない可能性)"
+    fi
+  fi
+fi
+
 # ⚠️ **やっていないこと** (★ 隠さない):
 #   - P1-K のロック自体を外す変異による「同時実行で本当に失敗する」直接の再現は
 #     この環境 (Windows/git-bash・ローカル NTFS) では **12 並列まで手で確認しても再現しなかった**
@@ -1347,6 +1510,111 @@ kill "${LIVE_PID}" 2>/dev/null || true
 #     → 上の 11b/11c は「同時実行で起きた事故と *同じ形* (worktree add 失敗時にブランチが
 #     残る)」を **決定論的なファイル衝突**で再現し、その修正 (`abort_worktree` 経由の片づけ)
 #     が効いていることを検査する。ロック自体は 11d-11f (先に置いたロックでの待ち・stale 除去・変異) が守る。
+#   - ⚠️★★★ C-M1 (11g/11h) は `rm` を、C-M2 (11i/11j) は `cat` を bash 関数で shadow して
+#     決定論的に再現した。★ 2 プロセスの実競合そのもの (真の TOCTOU タイミング) は
+#     この環境でも直接には再現していない —— 11i/11j は「reap 内の読み直しという **コードの経路**」
+#     を検査しているのであって、「2 プロセスが同時に mkdir を試みる」瞬間そのものではない
+#     (★ 隠さない。できなかったことはできなかったと書く)。
+
+# ── 12. ⚠️★★★ 起票 A の LOW 項目 (レビュー) ──────────────
+echo "════════════════════════════════════════"
+echo "12. ⚠️ LOW: LOCK_POLL/TIMEOUT の検証・validate_name の sanitize・rev-list の refs 明示化"
+
+R12="${TMP}/r12/repo"; mkdir -p "${R12}"
+if ! setup_fake_repo "${R12}"; then
+  ng "12: 準備できなかった (★ 判定できない)"
+else
+  # --- 12a/12b: LOOP_SPAWN_LOCK_POLL が 0 / 非数値なら die (メッセージつき) ---
+  SPAWN_ENV="LOOP_SPAWN_LOCK_POLL=0"; do_spawn_x "${R12}" --no-exec p0 t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "LOOP_SPAWN_LOCK_POLL" && ! wt_has "${R12}" "repo-p0-t"; then
+    ok "12a: LOOP_SPAWN_LOCK_POLL=0 は die した (★ 0 除算での無言終了ではない)"
+  else
+    ng "12a: rc=${SRC} —— ⚠️ POLL=0 が素通りした (0 除算で無言終了している可能性)"
+  fi
+  SPAWN_ENV="LOOP_SPAWN_LOCK_POLL=abc"; do_spawn_x "${R12}" --no-exec pn t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "LOOP_SPAWN_LOCK_POLL" && ! wt_has "${R12}" "repo-pn-t"; then
+    ok "12b: LOOP_SPAWN_LOCK_POLL=abc (非数値) は die した"
+  else
+    ng "12b: rc=${SRC} —— ⚠️ 非数値の POLL が素通りした"
+  fi
+
+  # --- 12c/12d: LOOP_SPAWN_LOCK_TIMEOUT も同様 ---
+  SPAWN_ENV="LOOP_SPAWN_LOCK_TIMEOUT=0"; do_spawn_x "${R12}" --no-exec t0 t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "LOOP_SPAWN_LOCK_TIMEOUT" && ! wt_has "${R12}" "repo-t0-t"; then
+    ok "12c: LOOP_SPAWN_LOCK_TIMEOUT=0 は die した"
+  else
+    ng "12c: rc=${SRC} —— ⚠️ TIMEOUT=0 が素通りした"
+  fi
+  SPAWN_ENV="LOOP_SPAWN_LOCK_TIMEOUT=-1"; do_spawn_x "${R12}" --no-exec tn t
+  if [ "${SRC}" -ne 0 ] && has_text "${SERR}" "LOOP_SPAWN_LOCK_TIMEOUT" && ! wt_has "${R12}" "repo-tn-t"; then
+    ok "12d: LOOP_SPAWN_LOCK_TIMEOUT=-1 (負値) は die した"
+  else
+    ng "12d: rc=${SRC} —— ⚠️ 負値の TIMEOUT が素通りした"
+  fi
+
+  # ★ 陽性対照: 正常な値では変わらず動く (⚠️ 検証を厳しくしすぎて通常系まで壊していないか)
+  SPAWN_ENV="LOOP_SPAWN_LOCK_POLL=0.1 LOOP_SPAWN_LOCK_TIMEOUT=5"; do_spawn_x "${R12}" --no-exec pok t
+  if [ "${SRC}" -eq 0 ] && wt_has "${R12}" "repo-pok-t"; then
+    ok "12e: 正常な POLL/TIMEOUT では従来どおり動く (★ 過剰拒否の陰性対照)"
+  else
+    ng "12e: rc=${SRC} —— ⚠️ 正常値まで拒否している"
+  fi
+fi
+
+# --- 12f: ⚠️★★★ validate_name の die メッセージが制御文字を生で出さないか ---
+#   ★ 7ac と同じ作法 (ESC バイトが残らないこと)。id に ESC を混ぜても英数字以外を弾く
+#   `*[!A-Za-z0-9._-]*` の分岐で die するので、そのメッセージが sanitize_disp を通っているか見る。
+R12B="${TMP}/r12b/repo"; mkdir -p "${R12B}"
+if ! setup_fake_repo "${R12B}"; then
+  ng "12f: 準備できなかった (★ 判定できない)"
+else
+  SPAWN_ENV=""; do_spawn_x "${R12B}" --no-exec "$(printf 'x\033[8mEVIL')" t
+  esc_left="$(printf '%s' "${SERR}" | LC_ALL=C tr -dc '\033' | wc -c)"
+  esc_left="${esc_left//[[:space:]]/}"
+  if [ "${SRC}" -ne 0 ] && [ "${esc_left:-1}" -eq 0 ] && has_text "${SERR}" "EVIL"; then
+    ok "12f: ★★★ validate_name の die メッセージから ESC バイトを落とした (sanitize_disp 適用済み)"
+  else
+    ng "12f: rc=${SRC} / 残った ESC=${esc_left} —— ⚠️ id の値を生で出している"
+  fi
+fi
+
+# --- 12g: ⚠️★★★ rev-list の refs 明示化 (同名 tag との曖昧さ回避) ---
+#   ★ 旧実装は `git rev-list --count "origin/${base}..${base}"` で、同名 tag があると
+#   `origin/<base>` 側 (tag と衝突しうる短縮形) の解決が曖昧になり、**未 push 件数を誤って数える**
+#   (★ 一次実測: 本来 1 コミットのところ、旧形は warning を出しつつ "0 コミット" と報告した)。
+#   ⚠️★★★ 同じシナリオで、local-ahead の `start` を無修飾の `$base` にしていると
+#   `git worktree add ... "$start"` が `fatal: ambiguous object name` で落ちた (★ 一次実測)。
+#   ★ この経路は P1-J で新設したものなので本タスクで直した (`start="refs/heads/$base"`)。
+#   → ★ 件数の診断に加えて、**worktree が作られ HEAD がローカルの sha であること**も見る。
+R12C="${TMP}/r12c/repo"; O12C="${TMP}/r12c/origin.git"
+if ! setup_origin_repo "${R12C}" "${O12C}"; then
+  ng "12g: 準備できなかった (★ 判定できない)"
+else
+  make_pushed_branch "${R12C}" amb
+  add_local_commit "${R12C}" amb
+  # ★ ブランチと同名の tag を作る (★ `origin/amb` という短縮参照の解決を曖昧にしうる形)。
+  ( cd "${R12C}" && git tag amb main ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=amb"; do_spawn_x "${R12C}" --no-exec 12g t
+  if has_text "${SERR}" "start-choice = local-ahead" && has_text "${SERR}" "未 push の 1 コミット"; then
+    ok "12g: ★★★ 同名 tag があっても未 push の件数を正しく (1件) 数えた (refs/heads・refs/remotes 明示の効果)"
+  else
+    ng "12g: ⚠️ 未 push の件数表示が正しくない (同名 tag で曖昧解決している可能性) / stderr=[${SERR}]"
+  fi
+  loc12g="$(git -C "${R12C}" rev-parse refs/heads/amb 2>/dev/null || true)"
+  head12g="$(git -C "${TMP}/r12c/wt/repo-12g-t" rev-parse HEAD 2>/dev/null || true)"
+  if [ "${SRC}" -eq 0 ] && [ -n "${loc12g}" ] && [ "${head12g}" = "${loc12g}" ]; then
+    ok "12g: ★★★ 同名 tag があっても local-ahead の worktree を作れ、HEAD がローカルの sha (start を refs/heads で修飾した効果)"
+  else
+    ng "12g: ⚠️ 同名 tag で worktree を作れない / HEAD がずれている (rc=${SRC} head=${head12g:-なし} local=${loc12g:-なし})"
+  fi
+fi
+
+# ⚠️ **やっていないこと (LOW・★ 隠さない)**:
+#   - origin_sha が「fetch 成功なのに空」になる状態、および `merge-base --is-ancestor` が
+#     rc 128 (shallow clone 等) を返す状態は、この一時 repo ハーネスでは**再現できなかった**
+#     (rc 128 は shallow clone の追加配線が要り、既存ハーネス (bare origin + full push) の
+#     延長では作れない)。★ die メッセージはコードレビューで固定した文言を実装した
+#     (このファイル群にある「分岐とは別の異常です」「rc=128・shallow clone 等の可能性」)。
 
 echo "════════════════════════════════════════"
 echo "PASS=${PASS}  FAIL=${FAIL}"

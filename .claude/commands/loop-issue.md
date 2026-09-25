@@ -51,8 +51,8 @@ git rev-parse --show-toplevel            # ../wt/<repo>-<id>-<short> である�
   (`docs/loop-engineering.md` §worktree ブランチ検査)。
 - ⚠ モードA/B では、これは**文章の契約であって機械強制ではない**。守られなかったことは
   ブランチ検査が結果として拾うが、「未コミットで終わった」こと自体は記録されない。
-- ★ モードC (`loop-run.sh`) では 2026-09-26 から**機械検査がある** (起票 P1-I): verify が緑でも、
-  worktree が dirty か worktree 生成時点からのコミットが 0 件なら `issue_done` にせず `uncommitted` を記録して次の attempt へ進む。
+- ★ モードC (`loop-run.sh`) では 2026-09-26 から**機械検査がある** (起票 P1-I): verify の前に、
+  worktree が dirty か worktree 生成時点からのコミットが 0 件なら、verify を回さず `uncommitted` を記録して次の attempt へ進む (`issue_done` にならない)。
 
 ## 入力の読み込み (SSOT)
 1. `docs/loop-engineering.md` — 用語・Done/Stop・budget 方針 (この command の唯一の真実源)。
@@ -87,7 +87,7 @@ AC 直結の絞り込みは `scope_test_template` (例 `cargo test --workspace {
 4. verdict で分岐:
    - 緑かつ watchdog が AC 充足を確認 → `issue_done` を append し `/goal` を終了。
    - 赤 → `test_fail`/`typecheck_fail`/`lint_fail` を append し次 attempt へ。
-   - 緑だが未コミット／コミット 0 件 → `uncommitted` を append し、commit してから次 attempt へ。
+   - 未コミット／コミット 0 件 (★ verify より前に確かめる) → `uncommitted` を append し、commit してから次 attempt へ。
    - Stop 条件 (下記) → 対応イベントを append し停止。
 
 > **重要**: `/goal` 自身の「done」宣言は信用しない。`issue_done` は必ず watchdog の客観再検証

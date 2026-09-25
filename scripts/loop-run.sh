@@ -416,10 +416,18 @@ run_verify() { # run_verify <worktree> <issue-id> <out-file>; 失敗種別は $V
   return 0
 }
 
-# ---------- P1-I: 「未コミット／コミット 0 件」の verify 緑を done にしない ----------
+# ---------- P1-I: 「未コミット／コミット 0 件」の attempt を verify すら回さず失敗にする ----------
 # ⚠️★★★ 実例（005 / 008）: verify はworktree の**作業ツリー**を測るので、worker が
 #   `max_turns` で切れて何もコミットしなくても緑になりうる (★ design.md P1-I・判断 5)。
-#   → ★ verify 緑の**後**に「ちゃんとコミットされているか」を別に見る。
+#   → ★ 「ちゃんとコミットされているか」を別に見る。
+# ⚠️★★★ **呼び出し順序はレビュー指摘 C-M3/C-M4（2026-09-26）で verify の前に是正した。**
+#   ★ 旧実装（verify 緑の**後**に呼ぶ）は、verify/acceptance が gitignore されていない生成物を
+#     作業ツリーに残す issue では、worker が正しくコミットしても check_committed が見る porcelain が
+#     **毎回 dirty** になり、同一 fingerprint → `no_progress_stop` の誤検知になっていた (C-M3)。
+#     かつ `verify_level: recheck` では `run_watchdog`（フルセッション 1 回分）が
+#     check_committed より前に走り、未コミットの attempt でも予算を浪費していた (C-M4)。
+#   ★ 呼び出し側 (run_issue の verify 直前) が `check_committed && run_verify` の短絡評価で
+#     この順序を強制する。詳細はそちらのコメントを参照。
 check_committed() { # check_committed <worktree> <anchor> <out-file>; 0 = コミット済み
   local wt="$1" anchor="$2" out_file="$3" porcelain n_commits rc
   : > "$out_file"
@@ -564,8 +572,16 @@ run_issue() {
     #   判定して**ローカル base**から切ったこと (未 push のコミットを含みうる) を検出する。
     #   ★ ここでは検出だけし、emit は下の attempt=1 の attempt_start に合流させる
     #   (★ events 語彙は増やさない。ensure_deny / BYPASSED_BLOCKED と同じ「attempt_start + detail」の作法)。
-    case "$_l" in
-      *start-choice*local-ahead*) spawn_local_ahead=1 ;;
+    # ⚠️★★★ レビュー指摘 (2026-09-26): 緩い部分一致 `*start-choice*local-ahead*` は、
+    #   config 由来の base 名が偶然 "start-choice-local-ahead" になった場合の
+    #   `loop-spawn:   start      = start-choice-local-ahead` という無関係な行にも一致してしまう
+    #   (★ その行は「解決した base 名」であって「ローカル先行の判定」ではない)。
+    #   → ★ loop-spawn.sh が出す契約の行 (loop-spawn.sh 側の該当コメントで綴りを固定) である
+    #     `loop-spawn:   start-choice = local-ahead` の**完全一致**にする
+    #     (行頭から行末まで。末尾の空白だけは許す)。
+    local _l_trimmed; _l_trimmed="$(printf '%s' "$_l" | sed -e 's/[[:space:]]*$//')"
+    case "$_l_trimmed" in
+      "loop-spawn:   start-choice = local-ahead") spawn_local_ahead=1 ;;
     esac
   done < "$spawn_err"
   rm -f "$spawn_err"
@@ -724,34 +740,43 @@ run_issue() {
     # --- 客観検証: exit code がすべて。LLM の申告は読まない ---
     # ⚠ `$(run_verify ...)` の形で呼ばないこと (サブシェルで VERIFY_* が失われる)。
     local vout="$WORK_TMP/verify-$id.out"
-    if run_verify "$wt" "$id" "$vout"; then
+    # ⚠️★★★ P1-I（design.md 判断 5・レビュー指摘 C-M3/C-M4 で 2026-09-26 是正）:
+    #   `check_committed` は **`run_verify` より前**に見る。
+    #   ⚠️ 旧実装は verify 緑の**後**に check_committed していたため:
+    #     (a) verify / acceptance が gitignore されていない生成物を作業ツリーに残す issue では、
+    #         worker が正しくコミットしても check_committed が見る porcelain は**毎回 dirty**になり、
+    #         同一 fingerprint → `no_progress_stop` の誤検知になっていた (C-M3)。
+    #     (b) `verify_level: recheck` では `run_watchdog`（フルセッション 1 回分）が
+    #         check_committed より前に走り、未コミットの attempt でも予算を浪費していた (C-M4)。
+    #   ★ `&&` の短絡評価で順序を強制する: `check_committed` が非 0 なら `run_verify` は
+    #     実行されない（verify も watchdog も回さず、check_committed が書いた $vout をそのまま
+    #     既存の失敗経路 (fingerprint → check_wt_became_blocked → no_progress → 次 attempt) に渡す）。
+    #   → これで「verify が測った内容 ＝ コミット済みの内容」になる
+    #     (check_committed を通過した時点で作業ツリーはクリーンなので)。
+    VERIFY_KIND=""
+    if check_committed "$wt" "$wt_anchor" "$vout" && run_verify "$wt" "$id" "$vout"; then
       local lvl; lvl="$(issue_verify_level "$id")"
       if [ "$lvl" = "recheck" ]; then
         if ! run_watchdog "$id" "$wt" "$attempt"; then return 1; fi
       fi
-      # ⚠️★★★ P1-I（design.md 判断 5）: verify 緑でも「未コミット／コミット 0 件」なら
-      #   done にしない。★ check_committed が非 0 を返したら、run_verify 失敗時と**同じ**
-      #   失敗経路 (fingerprint → check_wt_became_blocked → no_progress) に合流させる
-      #   ($vout を check_committed の出力で上書きし、VERIFY_KIND=uncommitted にして
-      #   この if ブロックの外へ抜ける。⚠️ ここで return 1 してはならない —— 次 attempt に
-      #   進めるための「失敗 attempt」であって致命ではない)。
-      if check_committed "$wt" "$wt_anchor" "$vout"; then
-        # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
-        #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
-        #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
-        #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
-        #     **`issue_done` が「別ブランチを見て出した done」**になる。
-        #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
-        #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
-        #     M3 が `git -C . checkout` で破れることを実測している。
-        #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
-        ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
-        emit "$id" done issue_done attempt="$attempt"
-        log "issue $id: done (attempt $attempt)"
-        return 0
-      fi
-      VERIFY_KIND=uncommitted
+      # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
+      #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
+      #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
+      #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
+      #     **`issue_done` が「別ブランチを見て出した done」**になる。
+      #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
+      #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
+      #     M3 が `git -C . checkout` で破れることを実測している。
+      #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
+      ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
+      emit "$id" done issue_done attempt="$attempt"
+      log "issue $id: done (attempt $attempt)"
+      return 0
     fi
+    # ⚠️ `check_committed` が落ちた場合は `&&` の短絡評価で `run_verify` が呼ばれず、
+    #   `VERIFY_KIND` は直前でリセットした "" のまま残る。`run_verify` が呼ばれて失敗した場合は
+    #   `run_verify` 自身が失敗種別 (test_fail 等) を設定済みなので、ここでは上書きしない。
+    [ -n "$VERIFY_KIND" ] || VERIFY_KIND=uncommitted
 
     # 一時ファイルから fingerprint を作る (サブシェル経由だと必ず sha1("") になる)
     fp="$(fingerprint < "$vout")"

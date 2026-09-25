@@ -256,12 +256,14 @@ valid_refname() {
 #     --cleanup の case と同一。`label` だけ呼び出し元で変える)。
 validate_name() {
   local label="$1" v="$2"
+  # ⚠️★★★ LOW (レビュー): die メッセージの値は `sanitize_disp` を通す。
+  #   ★ 生で出すと端末への制御シーケンス注入 (`sanitize_disp` の注記と同じ経路) を許す。
   case "${v}" in
-    -*) die "${label} が '-' 始まりです: [${v}]" ;;
-    *[!A-Za-z0-9._-]*) die "${label} に使えない文字が入っています (英数字 . _ - のみ): [${v}]" ;;
+    -*) die "${label} が '-' 始まりです: [$(sanitize_disp "${v}")]" ;;
+    *[!A-Za-z0-9._-]*) die "${label} に使えない文字が入っています (英数字 . _ - のみ): [$(sanitize_disp "${v}")]" ;;
     # ★ `.` / `..` / `a..b` は上を通るが、ref としても名前としても紛らわしい (⚠️ Codex /cross-review 1 巡目)。
     #   ★ パス脱出は起きない (`<repo>-..` は 1 つの名前であって親ディレクトリではない) が、通す意味も無い。
-    .|..|*..*) die "${label} にドットの連なりは使えません: [${v}]" ;;
+    .|..|*..*) die "${label} にドットの連なりは使えません: [$(sanitize_disp "${v}")]" ;;
   esac
 }
 
@@ -773,11 +775,30 @@ wtdir="../wt/${repo_name}-${id}-${short}"
 #     → ★ 原因 (同時実行) そのものを mkdir ロックで消す。
 #   ★ `git rev-parse --git-common-dir` は全 worktree が共有する 1 か所を指す
 #     (⚠️ worktree ごとに別内容を持つ `.git` ファイルの場所ではない)。
-LOCK="$(git rev-parse --git-common-dir)/loop-spawn.lock"
+# ⚠️★★★ LOW (レビュー): `git rev-parse --git-common-dir` は cwd 相対 (例: `.git`) を返しうる。
+#   ★ 相対のままだと、後段で `cd` を跨いだ時にロックが指す先がずれかねない。
+#   → ★ `cd … && pwd` で絶対化する (⚠️ この時点では既に repo_root に cd 済み)。
+_git_common_dir="$(git rev-parse --git-common-dir)" || die "git-common-dir を解決できませんでした"
+_git_common_dir_abs="$(cd "${_git_common_dir}" && pwd)" \
+  || die "git-common-dir (${_git_common_dir}) を絶対パスにできませんでした"
+LOCK="${_git_common_dir_abs}/loop-spawn.lock"
 LOCK_HELD=0
 # ⚠️ テストでは待ち間隔・上限を短縮できるよう env で上書き可能にする (★ 既定は本番相当)。
 LOCK_POLL="${LOOP_SPAWN_LOCK_POLL:-0.5}"
 LOCK_TIMEOUT="${LOOP_SPAWN_LOCK_TIMEOUT:-120}"
+# ⚠️★★★ LOW (レビュー): POLL=0 だと下の `acquire_spawn_lock` 内の `awk` (`n=t/p`) が
+#   0 除算になり、`set -e` 下でコマンド置換の失敗が **メッセージ無しにスクリプトを終わらせる**。
+#   → ★ 正の数値であることを case (文字種) + awk (符号) の 2 段で検証してから使う。
+case "${LOCK_POLL}" in
+  ''|.|*[!0-9.]*|*.*.*) die "LOOP_SPAWN_LOCK_POLL が数値ではありません: [$(sanitize_disp "${LOCK_POLL}")]" ;;
+esac
+awk -v p="${LOCK_POLL}" 'BEGIN{ exit !(p+0 > 0) }' \
+  || die "LOOP_SPAWN_LOCK_POLL は 0 より大きい数値にしてください: [$(sanitize_disp "${LOCK_POLL}")]"
+case "${LOCK_TIMEOUT}" in
+  ''|.|*[!0-9.]*|*.*.*) die "LOOP_SPAWN_LOCK_TIMEOUT が数値ではありません: [$(sanitize_disp "${LOCK_TIMEOUT}")]" ;;
+esac
+awk -v t="${LOCK_TIMEOUT}" 'BEGIN{ exit !(t+0 > 0) }' \
+  || die "LOOP_SPAWN_LOCK_TIMEOUT は 0 より大きい数値にしてください: [$(sanitize_disp "${LOCK_TIMEOUT}")]"
 
 release_spawn_lock() {
   if [ "${LOCK_HELD}" -eq 1 ]; then
@@ -791,10 +812,10 @@ release_spawn_lock() {
 #     必ず走るとは限らない。だから **明示解放が本筋、trap は異常系の保険**。
 trap release_spawn_lock EXIT
 
-# acquire_spawn_lock → ★ mkdir で排他を取る。stale (pid が死んでいる) なら 1 回だけ除去して取り直す。
+# acquire_spawn_lock → ★ mkdir で排他を取る。stale (pid が死んでいる) なら別ロックで直列化して除去し取り直す。
 #   ⚠️ pid ファイルが無い/読めない (作成直後の競合) ときは stale と見なさない (待つ側に倒す)。
 acquire_spawn_lock() {
-  local i=0 max_i lock_pid
+  local i=0 max_i lock_pid reap_pid
   # ⚠️ bash 3.2 に浮動小数演算は無いので、待ち回数は awk で整数化する (sleep 自体は小数を受ける)。
   max_i="$(awk -v t="${LOCK_TIMEOUT}" -v p="${LOCK_POLL}" \
     'BEGIN{n=t/p; i=int(n); if (n>i) i++; if (i<1) i=1; print i}')"
@@ -806,18 +827,36 @@ acquire_spawn_lock() {
         *[!0-9]*) : ;;        # ⚠️ 壊れた pid → stale と見なさない
         *)
           if ! kill -0 "${lock_pid}" 2>/dev/null; then
-            # ★ stale: 死んだ pid のロックを 1 回だけ除去して即座に取り直す。
-            rm -rf "${LOCK}" 2>/dev/null || true
-            continue
+            # ⚠️★★★ C-M2 (レビュー): stale 除去に TOCTOU がある —— 待ち手 A と B が同じ死んだ pid を
+            #   読み、A が除去して取り直した直後に B が **古い判断のまま** A の新しいロックを消しうる
+            #   (＝ 2 本が同時にクリティカルセクションへ入る)。
+            #   → ★ 除去そのものを別ロック "${LOCK}.reap" (mkdir) で直列化する。reap を取れた者だけが、
+            #     その中で pid を **読み直し**、読み直した pid が「死んでいると判断した pid」と
+            #     同じで、なお kill -0 が失敗するときに限り rm -rf する。
+            #   ⚠️ reap を取れなければここでは何もしない (★ 下の i 加算 / sleep で普通に待つ)。
+            if mkdir "${LOCK}.reap" 2>/dev/null; then
+              reap_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
+              if [ "${reap_pid:-}" = "${lock_pid}" ] && ! kill -0 "${lock_pid}" 2>/dev/null; then
+                rm -rf "${LOCK}" 2>/dev/null || true
+              fi
+              # ⚠️★★★ reap は必ず解放する。★ 取った側がこの中で死ぬと reap の残骸が残り、
+              #   以後の stale 除去ができなくなる (許容する —— 待ち切れば die し、
+              #   die メッセージで reap ディレクトリの手動削除を案内する)。
+              rmdir "${LOCK}.reap" 2>/dev/null || true
+            fi
           fi
           ;;
       esac
     fi
+    # ⚠️★★★ C-M1 (レビュー): 除去を試みた周も **必ず** ここまで来て i を進め sleep する。
+    #   ★ 旧実装は stale 分岐で `continue` しており、rm が失敗し続けると (Windows のハンドル保持等)
+    #   タイムアウトが一切効かないまま CPU を回し続けた。
     i=$((i + 1))
     if [ "${i}" -gt "${max_i}" ]; then
       die "loop-spawn.lock を ${LOCK_TIMEOUT} 秒待っても取得できませんでした: ${LOCK}
             ⚠️ 他の loop-spawn.sh が動いていないか確認してください。
-            ★ 完全に止まっているなら手で削除:  rmdir \"${LOCK}\""
+            ★ 完全に止まっているなら手で削除:  rmdir \"${LOCK}\"
+            ⚠️ stale 除去用ロック ${LOCK}.reap が残っている場合は、そちらも手で削除してください:  rmdir \"${LOCK}.reap\""
     fi
     sleep "${LOCK_POLL}"
   done
@@ -903,21 +942,51 @@ if git remote get-url origin >/dev/null 2>&1; then
     else
       local_sha="$(git rev-parse --verify --quiet "refs/heads/$base" 2>/dev/null || true)"
       origin_sha="$(git rev-parse --verify --quiet "refs/remotes/origin/$base" 2>/dev/null || true)"
-      if [ -n "${local_sha:-}" ] && [ "${local_sha}" = "${origin_sha:-}" ]; then
+      # ⚠️★★★ LOW (レビュー): fetch は成功したのに origin_sha が読めないのは **分岐とは別の異常**
+      #   (参照の破損など)。「分岐」の die に混ぜると誤診断を招くので専用メッセージで止める。
+      if [ -z "${origin_sha:-}" ]; then
+        die "fetch は成功したのに refs/remotes/origin/$base の sha を解決できませんでした
+              ⚠️ 分岐とは別の異常です。fail-closed のため worktree も branch も作らずに止まります。
+              ★ 手で確認:  git -C ${repo_root} rev-parse refs/remotes/origin/${base}"
+      fi
+      if [ -n "${local_sha:-}" ] && [ "${local_sha}" = "${origin_sha}" ]; then
         start="origin/$base"; start_choice="equal"
-      elif git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null; then
-        # ★ origin が ローカルの祖先 ＝ ローカルが先行している。
-        start="$base"; start_choice="local-ahead"
-        start_ahead_n="$(git rev-list --count "origin/${base}..${base}" 2>/dev/null || true)"
-      elif git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null; then
-        # ★ ローカルが origin の祖先 ＝ ローカルが遅れている (stale local base)。
-        start="origin/$base"; start_choice="local-behind"
       else
-        # ⚠️★★★ 分岐: どちらが正しいか自動で決められない → fail-closed。
-        #   ★ worktree も branch もまだ何も作っていない時点で止める。
-        die "base '$base' はローカルと origin で分岐しています (ローカル=${local_sha:-?} / origin=${origin_sha:-?})
-              ⚠️ どちらが正しいか自動で決められないため、worktree も branch も作らずに止まります (判断 3・fail-closed)。
-              ★ 手で解決してから再実行してください (例:  git -C ${repo_root} pull --ff-only origin ${base})。"
+        # ⚠️★★★ LOW (レビュー): `git merge-base --is-ancestor` の rc は 0=祖先 / 1=祖先でない /
+        #   128=異常終了 (shallow clone 等で判定不能) の 3 通り。「分岐」(＝両方 1) と
+        #   rc 128 (＝判定できていない) を同じ die にしない (⚠️ `set -e` 下で直接 rc を読むため
+        #   `cmd || rc=$?` の形にする —— bare command を書くと非 0 でスクリプトごと落ちる)。
+        ahead_rc=0
+        git merge-base --is-ancestor "refs/remotes/origin/$base" "refs/heads/$base" 2>/dev/null || ahead_rc=$?
+        if [ "${ahead_rc}" -eq 0 ]; then
+          # ★ origin が ローカルの祖先 ＝ ローカルが先行している。
+          # ⚠️★★★ `refs/heads/` で修飾する (★ 2026-09-26 メインのレビュー)。
+          #   ★ 無修飾の `$base` は、同名の tag があると `git worktree add` が
+          #     `fatal: ambiguous object name` で落ちる (12g で実測)。この経路は P1-J で新設したもの。
+          start="refs/heads/$base"; start_choice="local-ahead"
+          start_ahead_n="$(git rev-list --count "refs/remotes/origin/${base}..refs/heads/${base}" 2>/dev/null || true)"
+        elif [ "${ahead_rc}" -eq 128 ]; then
+          die "merge-base --is-ancestor が異常終了しました (rc=128・shallow clone 等の可能性): refs/remotes/origin/${base} → refs/heads/${base}
+                ⚠️ 「祖先でない」(rc 1・分岐の可能性) とは区別します。fail-closed のため worktree も branch も作らずに止まります。
+                ★ 手で確認:  git -C ${repo_root} merge-base --is-ancestor refs/remotes/origin/${base} refs/heads/${base}; echo \$?"
+        else
+          behind_rc=0
+          git merge-base --is-ancestor "refs/heads/$base" "refs/remotes/origin/$base" 2>/dev/null || behind_rc=$?
+          if [ "${behind_rc}" -eq 0 ]; then
+            # ★ ローカルが origin の祖先 ＝ ローカルが遅れている (stale local base)。
+            start="origin/$base"; start_choice="local-behind"
+          elif [ "${behind_rc}" -eq 128 ]; then
+            die "merge-base --is-ancestor が異常終了しました (rc=128・shallow clone 等の可能性): refs/heads/${base} → refs/remotes/origin/${base}
+                  ⚠️ 「祖先でない」(rc 1・分岐の可能性) とは区別します。fail-closed のため worktree も branch も作らずに止まります。
+                  ★ 手で確認:  git -C ${repo_root} merge-base --is-ancestor refs/heads/${base} refs/remotes/origin/${base}; echo \$?"
+          else
+            # ⚠️★★★ 分岐: どちらが正しいか自動で決められない → fail-closed。
+            #   ★ worktree も branch もまだ何も作っていない時点で止める。
+            die "base '$base' はローカルと origin で分岐しています (ローカル=${local_sha:-?} / origin=${origin_sha})
+                  ⚠️ どちらが正しいか自動で決められないため、worktree も branch も作らずに止まります (判断 3・fail-closed)。
+                  ★ 手で解決してから再実行してください (例:  git -C ${repo_root} pull --ff-only origin ${base})。"
+          fi
+        fi
       fi
     fi
   else

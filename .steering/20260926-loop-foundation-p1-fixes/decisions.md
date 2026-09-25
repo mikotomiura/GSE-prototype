@@ -80,6 +80,27 @@
 - **採用**: A
 - **理由**: 境界は元から `ensure_branch`・必須 deny・人の merge ゲートであり、`cargo run` / `cargo test` が build.rs 経由で任意コードを実行できる状況は変わらない。
   得るもの（worker が acceptance の欠陥を自分で見つけられる）が大きい（前タスクで `--exact`・jq 欠陥により 5 attempt を失った）。
-- **トレードオフ**: worker が acceptance を書き換えて自分で緑にすることはできる → ★ ただし Loop の verify は **main 側**の acceptance を走らせるので合否には効かない（既存の守り）。
+- **トレードオフ**: worker が acceptance を書き換えて自分で緑にすることはできる。
+  ⚠️ ~~Loop の verify は main 側の acceptance を走らせるので合否には効かない~~ —— **誤り**（2026-09-26 `security-checker` MEDIUM で訂正）。
+  任意コードを実行できる worker は main 側のファイルも書き換えうる（★ `cargo run` の build.rs 経由でも元から可能）。
+  → ★ 合否を最終的に決めるのは **merge 前にメインが clean な checkout で回す acceptance**（前タスク判断 21 / 22 の運用）。
 - **影響範囲**: `.steering/_template/loop-config.json` の `allowed_tools`、`loop-config.README.md`、`docs/loop-engineering.md`。
 - **見直しタイミング**: Claude Code の permission rule の照合規則が変わったとき（★ 実測をやり直す）。
+
+## 判断 9: レビュー（code-reviewer / security-checker・37bedf76）の MEDIUM 5 件と安い LOW を全部直す
+
+- **判断日時**: 2026-09-26（研究者裁定）
+- **背景**: HIGH は 0。MEDIUM は 5 件で、メインがすべて一次で実在を確認した:
+  - S-M1: 文書が「main 側の acceptance を回すので worker が書き換えても合否は動かない」と書いていた → **誤り**（任意コード実行で main 側も書き換えうる）
+  - C-M1: stale 除去の `continue` が `i` も `sleep` も飛ばし、`rm` が失敗し続けると無限ループ
+  - C-M2: stale 除去の TOCTOU（死んだ pid を 2 者が同時に見ると、一方の新しいロックを他方が消す）
+  - C-M3: `check_committed` が verify の**後**にあり、verify の生成物（gitignore 外）で毎回 dirty → 誤った `no_progress_stop`
+  - C-M4: recheck の watchdog が `check_committed` より前に走り、未コミットの attempt でも予算を使う
+- **選択肢**: A: 5 件と安い LOW を直す ／ B: MEDIUM だけ ／ C: 文書だけ
+- **採用**: A
+- **対応**: S-M1 → 文書 3 か所を「合否を最終的に決めるのは merge 前にメインが clean な checkout で回す acceptance」に訂正。
+  C-M1 / M2 → stale 除去を別ロック `loop-spawn.lock.reap` で直列化し、pid を読み直して一致・なお死んでいるときだけ消す。除去を試みた周も待ち回数を進める。
+  C-M3 / M4 → `check_committed && run_verify` の短絡評価で **verify の前**に置く（未コミットなら verify も watchdog も回さない）。
+  ★ これで `uncommitted` の意味が「verify 緑だが未コミット」から「verify 前の時点で未コミット」に変わった → 語彙表・loop-status / loop-issue / loop-worker の文言を追随。
+  LOW → `start-choice` の完全一致・rev-list を `refs/` で書く・LOCK の絶対パス化・LOCK_POLL / TIMEOUT の数値検証・`validate_name` の表示を `sanitize_disp` に通す・origin_sha 空や merge-base rc 128 の専用メッセージ・テスト判定の絞り込みと変異テストの追加。
+- **やらない LOW**: 11b 状況での `abort_worktree` の文言（「撤去できませんでした」が事象とずれる）—— 実害なし・記録のみ。

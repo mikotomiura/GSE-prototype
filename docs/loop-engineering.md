@@ -55,8 +55,9 @@ worktree 隔離のもと安全に回す。人が目視できる監視ファイ�
 `no_progress_stop` | `scope_violation` | `blocked` | `issue_done` | `abandoned`
 
 - `acceptance_fail`: `<id>-acceptance.sh` が非 0。⚠️ `loop-run.sh` は以前から出していたが、この表に載っていなかった (2026-09-26 に追記)。
-- `uncommitted` (2026-09-26・起票 P1-I): verify は緑だが、worktree に**未コミットの変更がある**か、
-  **worktree 生成時点からのコミットが 0 件**。⚠️ `issue_done` にしない (そのまま merge すると空の merge になる)。
+- `uncommitted` (2026-09-26・起票 P1-I): worker の attempt の後、**verify を回す前**に見て、worktree に**未コミットの変更がある**か、
+  **worktree 生成時点からのコミットが 0 件**。⚠️ verify も watchdog も回さず `issue_done` にしない (未コミットの緑をそのまま merge すると空の merge になる)。
+  ★ verify より前に見るので「verify が測った内容 ＝ コミット済みの内容」になり、verify が作る生成物で誤検知しない。
   ★ `test_fail` と同じく**失敗 attempt**として次の attempt へ進む (max_turns で切れた worker が次の attempt でコミットできる)。
   同じ未コミット状態が続けば同じ fingerprint になり `no_progress_stop` で止まる。モードC では `loop-run.sh` が機械検査する。
 
@@ -273,7 +274,7 @@ C は「script が外から数える」「hook が内から止める」の**二�
 
 ### ⚠ 2026-09-26 の是正 (P1 前タスクの起票 P1-I / J / K / B / D ・ `.steering/20260926-loop-foundation-p1-fixes/`)
 
-- **P1-I — 未コミットの緑は done にしない。** 上の語彙表 `uncommitted` を参照。
+- **P1-I — 未コミットの attempt は verify を回さず失敗にする (done にしない)。** 上の語彙表 `uncommitted` を参照。
 - **P1-J — 切り元はローカルと `origin/<base>` の祖先関係で決まる。**
   `loop-spawn.sh` は fetch 後に比べ、一致 → origin ／ **ローカル先行 → ローカル** (⚠️ 未 push のコミットを含む) ／
   ローカル遅れ → origin ／ **分岐 → fail-closed で止まる** (worktree も branch も作らない)。
@@ -288,8 +289,11 @@ C は「script が外から数える」「hook が内から止める」の**二�
 - **P1-B — worker は acceptance を自分で回せる。** テンプレの `allowed_tools` に `Bash(bash .steering/**/*-acceptance.sh)` を入れた。
   ⚠️★★★ **これは境界ではない** —— worker は `Write` で任意の `*-acceptance.sh` を作れ、`.steering/../` でも外へ出られる
   (★ 2026-09-26 に `claude 2.1.282` で実測。権限上は `Bash(bash:*)` と同等)。境界は従来どおり
-  worktree ブランチ検査・必須 deny・人の merge ゲートであり、★ Loop の verify は **main checkout 側**の acceptance を走らせるので
-  worker が acceptance を書き換えても合否は動かない。
+  worktree ブランチ検査・必須 deny・人の merge ゲートである。
+  ⚠️★★★ **Loop の verify の合否は worker の影響を受けうる。** verify は main checkout 側の acceptance を走らせるが、
+  任意のコードを実行できる worker はそのファイルも書き換えうる (★ `cargo run` / `cargo test` の build.rs 経由でも元から可能。
+  test / typecheck / lint も worktree の中で走る)。→ ★ **合否を最終的に決めるのは、merge 前にメインが clean な checkout で回す acceptance**
+  (★ 前タスク判断 21 / 22 の運用。`security-checker` MEDIUM・2026-09-26 で旧文「書き換えても合否は動かない」を訂正)。
   ⚠️ 途中に `*` を置く形 (`Bash(bash .steering/*/issues/*-acceptance.sh:*)` / `… *)`) と前方一致 `Bash(bash .steering/:*)` は**効かなかった** (同実測)。
 - ⚠️ **P1-H (verify が他の issue の門を回さない) は未是正**。メインが merge 前に全 acceptance を正しい終了コードで回す運用で補う。
 
