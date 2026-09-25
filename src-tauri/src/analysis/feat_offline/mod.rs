@@ -333,7 +333,8 @@ pub fn build_feature_rows_with_pole_inputs(
     // ⚠️ 極 B の**抑制区間**。極 B 以外は空 (= 観測区間そのまま)。入力が空でも先に検査する (上と同じ理由)。
     let pointer_suppression: Vec<(u64, u64)> = match pole {
         Pole::PointerB => match pole_inputs.pointer_active_ts {
-            Some(ts) => stall_onset::pointer_suppression_intervals(ts, stall_onset::POINTER_BIN_MS),
+            // ★ `pointer_bin` の 1 ビン幅は 1 秒 (= `ENGINE_TICK_MS`)。写しであってリンクではない (`pointer_suppression_intervals` の doc)。
+            Some(ts) => stall_onset::pointer_suppression_intervals(ts, ENGINE_TICK_MS),
             None => {
                 return Err(format!(
                     "pole `{}` needs its pointer activity (PoleInputs::pointer_active_ts is None; \

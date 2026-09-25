@@ -308,15 +308,12 @@ pub fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> 
     intervals
 }
 
-/// `pointer_bin` の 1 ビンの幅 (ms)。★ 値は `input/observe_*.rs` の `BIN_MS` (= 1000・各 OS のテストが固定)。
-///
-/// ⚠️ `ENGINE_TICK_MS` (1 Hz の tick) と**同じ値だが別の事実**である —— 数値を再宣言しないために
-/// ここへ束ねているだけで、`BIN_MS` が変わったらこの定数を**追随させる** (`decisions.md` 判断 7 の見直しタイミング)。
-pub const POINTER_BIN_MS: u64 = ENGINE_TICK_MS;
-
 /// 極 B: `pointer_bin` 行の時刻から**抑制区間**を作る (ADR-030 D3・`decisions.md` 判断 7)。
 ///
 /// ★ 1 行 `t` が覆うのは `(t − bin_ms, t]` である (`analysis/pointer_bin.rs`: `timestamp` は**ビンの終端時刻**)。
+/// ★ `bin_ms` は呼び出し側が **`ENGINE_TICK_MS`** を渡す —— 値は `input/observe_*.rs` の `BIN_MS` (= 1000・各 OS のテストが固定)
+/// の**写しであってリンクではない**ので、`BIN_MS` が変わったら呼び出し側 (`feat_offline/mod.rs` / `bin/replay.rs`) を追随させる
+/// (`decisions.md` 判断 7 の見直しタイミング)。⚠️ 数値定数を**宣言しない** (ADR-030 D3「新しい定数を作らない」・`005-acceptance.sh` が検査する)。
 /// ⚠️ ゼロ抑制なので**行が在る＝その秒に活動があった**。★ 行の**値は読まない** (存在だけを使う)。
 /// 覆う区間の**極大連続**を 1 本に畳む: ちょうど `bin_ms` 離れた 2 行 `(t−bin, t]` と `(t, t+bin]` は接して 1 本になり、
 /// それより離れた行は別の区間になる (整数 ms で 1 ms でも空けば別)。
@@ -2337,12 +2334,12 @@ mod tests {
     #[test]
     fn pointer_bins_merge_into_maximal_intervals() {
         assert_eq!(
-            POINTER_BIN_MS, 1_000,
-            "ビン幅は observe_*.rs の BIN_MS と同じ 1 秒"
+            ENGINE_TICK_MS, 1_000,
+            "呼び出し側が bin_ms に渡す ENGINE_TICK_MS は observe_*.rs の BIN_MS と同じ 1 秒 (変わったら追随を見直す)"
         );
         // 隣接 2 行 (5000, 6000) は (4000, 5000] と (5000, 6000] が接して 1 本になる。
         assert_eq!(
-            pointer_suppression_intervals(&[5_000, 6_000], POINTER_BIN_MS),
+            pointer_suppression_intervals(&[5_000, 6_000], ENGINE_TICK_MS),
             vec![(4_000, 6_000)]
         );
         // 3 行の連鎖も 1 本。
@@ -2431,7 +2428,7 @@ mod tests {
 
         // 極 B: 抑制の内側の press (20500/20600) と、抑制をまたぐ対 (1200→41000 / 1200→20500) は標本に入らない。
         // 残るのは同じ片の内側の 3 対 (100 ×3) だけ → θ = 100。
-        let suppressed = pointer_suppression_intervals(&[21_000], POINTER_BIN_MS);
+        let suppressed = pointer_suppression_intervals(&[21_000], ENGINE_TICK_MS);
         assert_eq!(suppressed, vec![(20_000, 21_000)]);
         let pole_b = detect_with_suppression(&keys, &feat, &suppressed, &config);
         assert_eq!(
@@ -2463,7 +2460,7 @@ mod tests {
         );
 
         // 沈黙の途中 (49000, 50000] に活動。→ 片は [0, 49000] と [50001, 90000]。
-        let suppressed = pointer_suppression_intervals(&[50_000], POINTER_BIN_MS);
+        let suppressed = pointer_suppression_intervals(&[50_000], ENGINE_TICK_MS);
         let pole_b = detect_with_suppression(&keys, &feat, &suppressed, &config);
         assert_eq!(
             pole_b.iter().map(|o| o.s_ms).collect::<Vec<_>>(),

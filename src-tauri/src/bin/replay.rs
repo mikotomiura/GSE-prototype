@@ -1968,11 +1968,11 @@ fn main() -> ExitCode {
         let evaluated_intervals: Vec<(u64, u64)> = match pointer_active_ts {
             Some(ts) => {
                 use gse_next_lib::analysis::feat_offline::stall_onset::{
-                    evaluation_intervals, pointer_suppression_intervals, POINTER_BIN_MS,
+                    evaluation_intervals, pointer_suppression_intervals,
                 };
                 evaluation_intervals(
                     &observed,
-                    &pointer_suppression_intervals(ts, POINTER_BIN_MS),
+                    &pointer_suppression_intervals(ts, ENGINE_TICK_MS),
                 )
             }
             None => observed.clone(),
