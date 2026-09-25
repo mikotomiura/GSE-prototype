@@ -3,6 +3,9 @@
 # 常時 FAIL する (CI drift check が flaky になる) ため、該当ファイルを明示的に
 # LF 固定する。
 src-tauri/schema/current.json text eol=lf
+# ★ P1 事前宣言の凍結 JSON は `include_str!` で埋め込まれ、封筒の `prereg_sha256_prefix` の元になる。
+#   CRLF で checkout されると OS ごとに sha が食い違う（code-reviewer M1・2026-09-25）。
+src-tauri/prereg/*.json text eol=lf
 tests/snapshots/*.json text eol=lf
 tests/fixtures/*.ndjson text eol=lf
 

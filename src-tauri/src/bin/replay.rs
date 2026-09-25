@@ -252,7 +252,8 @@ struct FeatureConfigDto {
     net_diff_min: u64,
     /// 観測区間を切る閾値 (ms・ADR-030 D8 (b-2))。
     hole_gap_ms: u64,
-    /// θ の標本数の下限 (`null` = 下限を課さない・ADR-030 D4 点 1)。
+    /// θ の標本数の下限 (ADR-030 D4 点 1)。
+    /// ★ 凍結 JSON 経路では常に数値 (`validate` が 0 を拒否する)。`null` は旧出力 (下限なし) との互換のため型に残す。
     warmup_count: Option<usize>,
     /// θ_person の分位点の推定法 (P1 事前宣言 §1・現状 `"nearest_rank"` だけが実装されている)。
     theta_estimator: String,
@@ -406,8 +407,10 @@ impl P1Operational {
         if self.t1a_window_ms == 0 {
             return Err("t1a_window_ms は 1 以上でなければならない".to_string());
         }
-        if self.net_diff_min == 0 {
-            return Err("net_diff_min は 1 以上でなければならない".to_string());
+        // ⚠️ `stall_onset.rs` は `net_diff_min as i64` で比べる。`i64::MAX` を超える値は負へ丸まり、
+        //   `net < net_diff_min` が常に偽になって **onset が黙って 0 本**になる (security-checker LOW・2026-09-25)。
+        if self.net_diff_min == 0 || i64::try_from(self.net_diff_min).is_err() {
+            return Err("net_diff_min は 1 以上で、i64 に収まらなければならない".to_string());
         }
         // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
         if self.theta_estimator != "nearest_rank" {
@@ -4359,17 +4362,19 @@ mod tests {
     fn set_is_fail_closed_on_unknown_key_bad_type_and_out_of_range() {
         assert!(resolve_feature_config(None, &["hole_gap_ms=3000".to_string()]).is_ok());
         for bad in [
-            "bogus=1",                // 未知キー
-            "q=abc",                  // 型の不一致
-            "w_ms=-1",                // 型の不一致 (負)
-            "w_ms=1.5",               // 型の不一致 (小数)
-            "w_ms=0",                 // 範囲外
-            "q=0",                    // 範囲外
-            "q=1",                    // 範囲外 (⌈1/(1−q)⌉ が発散する)
-            "q=NaN",                  // 範囲外 (非有限)
-            "warmup_count=0",         // 範囲外
-            "theta_estimator=linear", // 未実装の推定法
-            "q",                      // `=` が無い
+            "bogus=1",                          // 未知キー
+            "q=abc",                            // 型の不一致
+            "w_ms=-1",                          // 型の不一致 (負)
+            "w_ms=1.5",                         // 型の不一致 (小数)
+            "w_ms=0",                           // 範囲外
+            "q=0",                              // 範囲外
+            "q=1",                              // 範囲外 (⌈1/(1−q)⌉ が発散する)
+            "q=NaN",                            // 範囲外 (非有限)
+            "warmup_count=0",                   // 範囲外
+            "net_diff_min=0",                   // 範囲外
+            "net_diff_min=9223372036854775808", // 範囲外 (i64::MAX + 1 ・ `as i64` で負に丸まる)
+            "theta_estimator=linear",           // 未実装の推定法
+            "q",                                // `=` が無い
         ] {
             assert!(
                 resolve_feature_config(None, &[bad.to_string()]).is_err(),
