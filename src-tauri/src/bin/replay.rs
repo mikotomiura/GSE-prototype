@@ -30,13 +30,14 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use gse_next_lib::analysis::anonymize::KeyCategory;
 use gse_next_lib::analysis::calibration_eval::{
     compute_calibration_metrics, format_calibration_pretty, is_valid_opaque_id, AggSpec,
     ProbeRecord, ProbeSourceKind, QuadrantKind, SessionData, SkipReasonKind, TrackKind,
     VignetteRecord, HOLDOUT_CALIBRATION_SESSIONS,
 };
 use gse_next_lib::analysis::engine::{CognitiveStateEngine, HMM_VERSION};
-use gse_next_lib::analysis::feat_offline::{ImeShadowEvent, Pole};
+use gse_next_lib::analysis::feat_offline::{ImeShadowEvent, Pole, PoleInputs};
 use gse_next_lib::analysis::features::InputEvent;
 use gse_next_lib::analysis::heads::TaskDomain;
 use gse_next_lib::analysis::intervention::InterventionThresholds;
@@ -270,13 +271,37 @@ struct FeatureConfigDto {
     /// (行には載せない・判断 3)。⚠️ 上の設定 8 値とは別の軸で、`--set` では変えられない (`--pole` だけ)。
     pole: &'static str,
     /// この入力で、上の極が**計算できたか**。★ 常に出る (`baseline` は常に `true`)。
-    /// ⚠️ 極 B / 極 M+ の判定は**入力に依存する** (`capabilities` の宣言 / 修飾キー行の有無) ので、
-    /// 判定は issue 006 / 005 が入力を受ける形で実装する。★ それまで両極は `--pole` が exit 1 で止める。
+    /// ⚠️ 極 B / 極 M+ の判定は**入力に依存する** (`capabilities` の宣言 / 修飾キー行の有無)。
+    /// ★ 極 M+ は**入力ファイル (セッション) 単位**で、解決後の `KeyCategory` が `Modifier` の `key` 行が
+    /// 1 本も無ければ `false` (`decisions.md` 判断 13)。極 B の判定は issue 006 が実装する
+    /// (★ それまで極 B は `--pole` が exit 1 で止める)。
+    ///
+    /// ⚠️★★★ **`false` のとき、行の `stall_onset` / `restart` は baseline と恒等である** —— 修飾キーの行が 0 本なら
+    /// 押下区間が 1 つも無く、極 M+ は構造的に極 M− と同じ値になる。★ 値で埋めない (別の値を出さない)。
     pole_applicable: bool,
     /// `pole_applicable == false` の理由コード。★ 適用可のとき `null`。⚠️ 極ごとに判定の根拠が違うので、
-    /// 理由の語も別にする (`no_pointer_capability` = issue 006 / `no_modifier_rows` = issue 005)。
+    /// 理由の語も別にする (`no_pointer_capability` = issue 006 / `no_modifier_rows` = 極 M+)。
+    ///
+    /// ⚠️★★★ `no_modifier_rows` は「**計器が無かった**」(2026-08-23 より前のログ・macOS) と
+    /// 「**押さなかった**」を**区別しない** (`meta` に `os` が無く、`capabilities` に修飾キーの計器を表す項目も無い)。
+    /// ★ 過剰拒否だが**情報は失わない** (行が 0 本なら極 M+ = 極 M− で、上下界の幅への寄与がゼロ)。
     /// ⚠️ `not_implemented` は**防御の値**であり、実際には出ない (未実装の極は出力の前に止まる)。
     pole_not_applicable_reason: Option<&'static str>,
+    /// 極 M+ の判定に使った入力ファイルの**修飾キーの `key` 行数** (`decisions.md` 判断 13 逐語
+    /// 「封筒に理由コード (`no_modifier_rows`) と `modifier` 行数を刻み」)。★ 極 M+ 以外では数えないので `null`。
+    /// ⚠️ 0 のとき「計器が無かった」と「押さなかった」は区別できない (上の理由コードの doc)。
+    pole_modifier_rows: Option<u64>,
+    /// 極 M+ の区間の健全性: 観測区間の右端で**打ち切られた**押下区間の本数
+    /// (`decisions.md` 判断 24・`stall_onset::ModifierIntervals::truncated_at_right_edge`)。
+    /// ★ 極 M+ 以外では数えないので `null`。⚠️ 値の出所は既存の件数 (`collect_modifier_intervals`
+    /// が `tracing::warn!` へ出しているのと同じもの) —— warn はそのまま残す。
+    /// ⚠️ 0 より大きいと、その本数ぶん区間が本来より短く（＝除外が少なく）数えられている
+    /// (`pole_applicable=true` のまま出力は見た目正常だが、内部で打ち切りが起きている)。
+    pole_modifier_truncated: Option<u64>,
+    /// 極 M+ の区間の健全性: 先行する press が無い release（孤立）の件数
+    /// (`decisions.md` 判断 24・`stall_onset::ModifierIntervals::orphan_releases`)。
+    /// ★ 極 M+ 以外では数えないので `null`。
+    pole_modifier_orphan_releases: Option<u64>,
     /// 採用した事前宣言の `id` / `version` / 内容の SHA-256 先頭桁 (★ 何を読んだかの同定)。
     prereg_id: String,
     prereg_version: String,
@@ -521,15 +546,23 @@ fn resolve_pole(features: bool, raw: Option<&str>) -> Result<Pole, String> {
 /// 封筒 `config.pole_applicable` / `pole_not_applicable_reason` の値 (`(適用可否, 理由コード)`)。
 ///
 /// ★ 網羅 `match` (ワイルドカード無し) —— 極を足すと、ここで判定を決めるまでコンパイルが通らない。
-/// ⚠️ 現状は極だけで決まる。★ issue 005 / 006 で「入力で計算できるか」(修飾キー行・`pointer_bin` の有無) を
-/// 判定するため、**引数に入力の情報を足す**こと (このシグネチャは後続で必ず変わる)。
-fn pole_applicability(pole: Pole) -> (bool, Option<&'static str>) {
+/// `modifier_rows` は入力ファイルの**修飾キーの `key` 行数** ([`ModifierScan::rows`])。★ 極 M+ だけが読む。
+/// `None` は「数えていない」 (⚠️ 「0 本」とは別) —— 極 M+ では**防御の値**で止める。
+/// ⚠️ 極 B の判定 (`capabilities` の `pointer_bin`) は issue 006 が入力を足して実装する
+/// (このシグネチャは後続で変わる)。
+fn pole_applicability(pole: Pole, modifier_rows: Option<u64>) -> (bool, Option<&'static str>) {
     match pole {
         // 極 A / 極 M− はどの入力でも計算できる (現行の計算そのもの)。
         Pole::Baseline => (true, None),
         // ⚠️ 中身が無い極。`resolve_pole` が出力の前に止めるので実際には来ない (防御)。
-        // 判定は入力に依存する (`capabilities` / 修飾キー行) ので、issue 006 / 005 が入力を受ける形に直す。
-        Pole::PointerB | Pole::ModifierMPlus => (false, Some("not_implemented")),
+        Pole::PointerB => (false, Some("not_implemented")),
+        // ★ 判定単位は**入力ファイル (セッション)**・判定式は「修飾キーの行が 0 本」(判断 13)。
+        Pole::ModifierMPlus => match modifier_rows {
+            Some(0) => (false, Some("no_modifier_rows")),
+            Some(_) => (true, None),
+            // 数えずに極 M+ を名乗らせない (防御。実際には main が必ず数える)。
+            None => (false, Some("not_implemented")),
+        },
     }
 }
 
@@ -629,9 +662,19 @@ fn resolve_feature_config(
 }
 
 impl FeatureConfigDto {
-    fn from_resolved(resolved: &ResolvedFeatureConfig, max_feature_ticks: usize) -> Self {
+    /// `modifier_rows` は入力ファイルの修飾キーの `key` 行数 (極 M+ の適用可否・[`pole_applicability`])。
+    /// `modifier_truncated` / `modifier_orphan_releases` は極 M+ の区間の健全性カウンタ
+    /// (`decisions.md` 判断 24・[`ModifierScan`])。
+    fn from_resolved(
+        resolved: &ResolvedFeatureConfig,
+        max_feature_ticks: usize,
+        modifier_rows: Option<u64>,
+        modifier_truncated: Option<u64>,
+        modifier_orphan_releases: Option<u64>,
+    ) -> Self {
         let c = resolved.stall_onset_config();
-        let (pole_applicable, pole_not_applicable_reason) = pole_applicability(c.pole);
+        let (pole_applicable, pole_not_applicable_reason) =
+            pole_applicability(c.pole, modifier_rows);
         Self {
             w_ms: c.w_ms,
             q: c.q,
@@ -644,6 +687,18 @@ impl FeatureConfigDto {
             pole: c.pole.as_str(),
             pole_applicable,
             pole_not_applicable_reason,
+            pole_modifier_rows: match c.pole {
+                Pole::ModifierMPlus => modifier_rows,
+                Pole::Baseline | Pole::PointerB => None,
+            },
+            pole_modifier_truncated: match c.pole {
+                Pole::ModifierMPlus => modifier_truncated,
+                Pole::Baseline | Pole::PointerB => None,
+            },
+            pole_modifier_orphan_releases: match c.pole {
+                Pole::ModifierMPlus => modifier_orphan_releases,
+                Pole::Baseline | Pole::PointerB => None,
+            },
             prereg_id: resolved.prereg_id.clone(),
             prereg_version: resolved.prereg_version.clone(),
             prereg_sha256_prefix: resolved.prereg_sha256_prefix.clone(),
@@ -1805,6 +1860,28 @@ fn main() -> ExitCode {
             }
         };
         let stall_onset_config = resolved_config.stall_onset_config();
+        // ★ 観測区間は 1 度だけ作り、極 M+ の打ち切りと封筒 `provenance` の両方へ渡す
+        //   (⚠️ 区間の定義をここで作り直さない)。
+        let observed = gse_next_lib::analysis::feat_offline::stall_onset::observed_intervals(
+            &feat_ts,
+            stall_onset_config.hole_gap_ms,
+        );
+        // ⚠️★★★ 修飾キーの押下区間を要るのは**極 M+ だけ**。他の極では走査しない
+        //   (★ baseline の出力・実行経路を 1 バイトも変えない・`--snapshot` / `--metrics` へも配線しない)。
+        let modifier_scan = if pole == Pole::ModifierMPlus {
+            match collect_modifier_intervals(&args.session_path, &observed) {
+                Ok(v) => Some(v),
+                Err(msg) => {
+                    tracing::error!("failed to collect modifier intervals: {}", msg);
+                    return ExitCode::from(1);
+                }
+            }
+        } else {
+            None
+        };
+        let pole_inputs = PoleInputs {
+            modifier_intervals: modifier_scan.as_ref().map(|s| s.intervals.as_slice()),
+        };
         let stall_onset_inputs = gse_next_lib::analysis::feat_offline::StallOnsetInputs {
             feat_ts: &feat_ts,
             task_kind_declarations: &task_kind_declarations,
@@ -1817,13 +1894,14 @@ fn main() -> ExitCode {
             capabilities_declared: capabilities.is_some(),
             hook_health: &hook_health_events,
         };
-        let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows(
+        let rows = match gse_next_lib::analysis::feat_offline::build_feature_rows_with_pole_inputs(
             &keys,
             &paste_ts,
             &ime_events,
             MAX_FEATURE_TICKS,
             &stall_onset_inputs,
             &quality_inputs,
+            &pole_inputs,
         ) {
             Ok(v) => v,
             Err(msg) => {
@@ -1845,18 +1923,20 @@ fn main() -> ExitCode {
                 o1_mode: meta_facts.o1_mode,
                 keyboard_layout: meta_facts.keyboard_layout,
                 capabilities,
-                // ★ 行と同じ SSOT (`stall_onset::observed_intervals`) から作る。
+                // ★ 行と同じ SSOT (`stall_onset::observed_intervals`) から作った `observed`。
                 //   ⚠️ 区間の定義をここで作り直さない。
-                observed_intervals:
-                    gse_next_lib::analysis::feat_offline::stall_onset::observed_intervals(
-                        &feat_ts,
-                        stall_onset_config.hole_gap_ms,
-                    )
-                    .into_iter()
-                    .map(|(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
+                observed_intervals: observed
+                    .iter()
+                    .map(|&(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
                     .collect(),
             },
-            config: FeatureConfigDto::from_resolved(&resolved_config, MAX_FEATURE_TICKS),
+            config: FeatureConfigDto::from_resolved(
+                &resolved_config,
+                MAX_FEATURE_TICKS,
+                modifier_scan.as_ref().map(|s| s.rows),
+                modifier_scan.as_ref().map(|s| s.truncated_at_right_edge),
+                modifier_scan.as_ref().map(|s| s.orphan_releases),
+            ),
             rows: &rows,
         };
         // ⚠️★★★ 2026-09-18 改訂 (判断 24・security-checker LOW-3): `to_string_pretty` で
@@ -2704,6 +2784,131 @@ fn collect_all_feat_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, Strin
     }
     out.sort_unstable();
     Ok(out)
+}
+
+/// 修飾キーの `key` 行から読んだ edge (`(時刻, press なら true)`) と、読み飛ばした行の件数。
+#[derive(Debug, Default)]
+struct ModifierEdges {
+    /// **解決後の `KeyCategory` が `Modifier`** の `key` 行 (press と release の**両方**)。
+    edges: Vec<(u64, bool)>,
+    parse_failed_lines: u64,
+    /// `vk` も既知の `category` も無く、種別を解決できなかった `key` 行。
+    unresolved_keys: u64,
+}
+
+/// NDJSON から修飾キーの edge を 1 パスで集める ([`collect_modifier_intervals`] の読み取り部)。
+///
+/// ★ 旧ログ (`vk`) も匿名化ログ (`category`) も [`resolve_key_vk`] を通して同じ規則で判定する
+/// (`collect_key_events` と同じ解決)。⚠️ **release の行も読む** —— `collect_key_events` は press しか
+/// 残さないので、押下区間はそちらからは復元できない (ADR-030 D3「`key` 行は press と release の両方が出る」)。
+fn read_modifier_edges(reader: impl BufRead) -> Result<ModifierEdges, String> {
+    let mut out = ModifierEdges::default();
+    for (lineno, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let ev: ReplayEvent = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => {
+                out.parse_failed_lines += 1;
+                continue;
+            }
+        };
+        if let ReplayEvent::Key {
+            t,
+            vk,
+            category,
+            press,
+        } = ev
+        {
+            match resolve_key_vk(vk, category.as_deref()) {
+                Some(resolved) if KeyCategory::from_vk(resolved) == KeyCategory::Modifier => {
+                    out.edges.push((t, press));
+                }
+                Some(_) => {}
+                None => out.unresolved_keys += 1,
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// 修飾キーの走査結果 (`--pole modifier_m_plus` 用)。
+#[derive(Debug)]
+struct ModifierScan {
+    /// 修飾キーの `key` 行数 (press と release の合計)。★ 極 M+ の適用可否の判定式 (判断 13)。
+    rows: u64,
+    /// 押下区間 (`stall_onset::modifier_press_intervals`・両端を含む)。
+    intervals: Vec<(u64, u64)>,
+    /// 先行する press が無い release の件数 (`decisions.md` 判断 24 の健全性カウンタ・
+    /// `stall_onset::ModifierIntervals::orphan_releases` の写し)。
+    orphan_releases: u64,
+    /// 観測区間の右端で打ち切られた押下区間の本数 (`decisions.md` 判断 24 の健全性カウンタ・
+    /// `stall_onset::ModifierIntervals::truncated_at_right_edge` の写し)。
+    truncated_at_right_edge: u64,
+}
+
+/// `--features --pole modifier_m_plus` (issue 005) 用: 修飾キーの**押下区間**を 1 パスで作る。
+///
+/// ⚠️★★★ `KeyPress` (`metrics.rs`・HMM 経路と共有) は release を持たないので、押下区間は
+/// `collect_key_events` からは作れない。★ `KeyPress` を変えず、専用の走査を足す
+/// (`--snapshot` / `--metrics` / `--calibration` へ波及させない)。**`--features` 経路からだけ呼ぶ。**
+/// ⚠️ 区間の作り方 (カウント方式・観測区間の右端で打ち切り) は
+/// `stall_onset::modifier_press_intervals` が SSOT。`observed` はその打ち切りに使う観測区間。
+///
+/// ⚠️ 形の合わない行は捨てて**件数だけ `warn`** する (0 に畳まない・`collect_all_feat_timestamps` と同じ手法)。
+fn collect_modifier_intervals(
+    session_path: &PathBuf,
+    observed: &[(u64, u64)],
+) -> Result<ModifierScan, String> {
+    let metadata = std::fs::metadata(session_path)
+        .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "session file too large: {} bytes exceeds limit {} bytes",
+            metadata.len(),
+            MAX_SESSION_BYTES
+        ));
+    }
+    let file = File::open(session_path)
+        .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
+    let scanned = read_modifier_edges(BufReader::new(file))?;
+    if scanned.parse_failed_lines > 0 {
+        tracing::warn!(
+            failed = scanned.parse_failed_lines,
+            "modifier scan: some lines failed to parse as ReplayEvent"
+        );
+    }
+    if scanned.unresolved_keys > 0 {
+        tracing::warn!(
+            skipped = scanned.unresolved_keys,
+            "modifier scan: key entries with neither vk nor a known category were skipped"
+        );
+    }
+    let built = gse_next_lib::analysis::feat_offline::stall_onset::modifier_press_intervals(
+        &scanned.edges,
+        observed,
+    );
+    if built.orphan_releases > 0 {
+        // ⚠️ 孤立 release (先行する press が無い) は区間を作らない。件数だけ残す。
+        tracing::warn!(
+            orphan_releases = built.orphan_releases,
+            "modifier scan: modifier release rows with no preceding press made no interval"
+        );
+    }
+    if built.truncated_at_right_edge > 0 {
+        tracing::warn!(
+            truncated = built.truncated_at_right_edge,
+            "modifier scan: modifier presses still held at an observed interval's right edge were closed there"
+        );
+    }
+    Ok(ModifierScan {
+        rows: scanned.edges.len() as u64,
+        intervals: built.intervals,
+        orphan_releases: built.orphan_releases,
+        truncated_at_right_edge: built.truncated_at_right_edge,
+    })
 }
 
 /// `--features` (issue 008) 用: NDJSON の `{"type":"session_meta", ...}` 行から
@@ -4418,6 +4623,9 @@ mod tests {
         let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
             &resolved,
             MAX_FEATURE_TICKS,
+            None,
+            None,
+            None,
         ))
         .expect("serialize config");
         assert_eq!(dto["w_ms"], cfg.w_ms);
@@ -4439,8 +4647,10 @@ mod tests {
     #[test]
     fn resolve_without_flags_reproduces_the_frozen_values() {
         let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
-        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1))
-            .expect("serialize config");
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved, 1, None, None, None,
+        ))
+        .expect("serialize config");
         let want = frozen_operational_value();
         for key in P1_OPERATIONAL_KEYS {
             assert_eq!(dto[key], want[key], "config.{key} は凍結値と一致する");
@@ -4642,11 +4852,14 @@ mod tests {
             assert!(err.contains("--features"), "理由が出る: {err}");
         }
 
-        // AC3: 未実装の極は止める (⚠️ baseline の値を返さない)。
-        for name in ["pointer_b", "modifier_m_plus"] {
-            let err = resolve_pole(true, Some(name)).expect_err("未実装の極は Err");
-            assert!(err.contains(name), "極の名前が出る: {err}");
-        }
+        // AC3: 未実装の極は止める (⚠️ baseline の値を返さない)。★ 未実装なのは極 B だけ (極 M+ は issue 005 で開通)。
+        let err = resolve_pole(true, Some("pointer_b")).expect_err("未実装の極は Err");
+        assert!(err.contains("pointer_b"), "極の名前が出る: {err}");
+        // issue 005: 極 M+ は通る (⚠️ ただし `--features` 以外では上の AC5 が止める)。
+        assert_eq!(
+            resolve_pole(true, Some("modifier_m_plus")),
+            Ok(Pole::ModifierMPlus)
+        );
 
         // AC4: 未知の名前 (丸めない)。
         for name in ["bogus", "", "Baseline", "baseline ", "pointer"] {
@@ -4661,8 +4874,10 @@ mod tests {
     fn envelope_config_always_carries_the_pole_keys() {
         let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
         assert_eq!(resolved.stall_onset_config().pole, Pole::Baseline);
-        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1))
-            .expect("serialize config");
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved, 1, None, None, None,
+        ))
+        .expect("serialize config");
         for key in ["pole", "pole_applicable", "pole_not_applicable_reason"] {
             assert!(dto.get(key).is_some(), "config.{key} は常に出る");
         }
@@ -4702,14 +4917,134 @@ mod tests {
     #[test]
     fn unimplemented_pole_never_claims_to_be_applicable() {
         let base = resolve_feature_config(None, &[]).expect("frozen resolves");
-        for pole in [Pole::PointerB, Pole::ModifierMPlus] {
+        // ★ 極 B だけが未実装。極 M+ は数えていない (`None`) ときに同じ防御の値を出す。
+        for (pole, modifier_rows) in [(Pole::PointerB, None), (Pole::ModifierMPlus, None)] {
             let resolved = base.clone().with_pole(pole);
-            let dto = serde_json::to_value(FeatureConfigDto::from_resolved(&resolved, 1))
-                .expect("serialize config");
+            let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+                &resolved,
+                1,
+                modifier_rows,
+                None,
+                None,
+            ))
+            .expect("serialize config");
             assert_eq!(dto["pole"], pole.as_str());
             assert_eq!(dto["pole_applicable"], false);
             assert_eq!(dto["pole_not_applicable_reason"], "not_implemented");
         }
+    }
+
+    /// issue 005 AC6: 極 M+ の適用可否は**修飾キーの `key` 行数**で決まる (入力ファイル単位・判断 13)。
+    /// ★ 0 本なら `false` ＋ 理由 `no_modifier_rows`、1 本でもあれば `true` ＋ `null`。
+    /// ⚠️ 陰性対照: baseline は行数に依らず常に `true`。
+    #[test]
+    fn modifier_m_plus_applicability_follows_the_modifier_row_count() {
+        assert_eq!(
+            pole_applicability(Pole::ModifierMPlus, Some(0)),
+            (false, Some("no_modifier_rows"))
+        );
+        assert_eq!(
+            pole_applicability(Pole::ModifierMPlus, Some(1)),
+            (true, None)
+        );
+        assert_eq!(
+            pole_applicability(Pole::ModifierMPlus, Some(240)),
+            (true, None)
+        );
+        assert_eq!(
+            pole_applicability(Pole::ModifierMPlus, None),
+            (false, Some("not_implemented")),
+            "数えていない極 M+ は適用可と名乗らない"
+        );
+        for rows in [None, Some(0), Some(5)] {
+            assert_eq!(pole_applicability(Pole::Baseline, rows), (true, None));
+        }
+        // ★ 封筒の JSON にも出る (`null` は欠落でも空文字でもない)。
+        let base = resolve_feature_config(None, &[]).expect("frozen resolves");
+        let resolved = base.with_pole(Pole::ModifierMPlus);
+        let no_rows = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved,
+            1,
+            Some(0),
+            Some(2),
+            Some(3),
+        ))
+        .expect("serialize config");
+        assert_eq!(no_rows["pole"], "modifier_m_plus");
+        assert_eq!(no_rows["pole_applicable"], false);
+        assert_eq!(no_rows["pole_not_applicable_reason"], "no_modifier_rows");
+        let some_rows = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved,
+            1,
+            Some(4),
+            Some(5),
+            Some(6),
+        ))
+        .expect("serialize config");
+        assert_eq!(some_rows["pole_applicable"], true);
+        assert!(some_rows["pole_not_applicable_reason"].is_null());
+        // ★ 判断 13: 修飾キーの行数も封筒に刻む (0 でも `null` にしない)。
+        assert_eq!(no_rows["pole_modifier_rows"], 0);
+        assert_eq!(some_rows["pole_modifier_rows"], 4);
+        // ★ 判断 24: 区間の健全性カウンタ（右端打ち切り本数・孤立 release 件数）も封筒に刻む
+        // (0 でも `null` にしない・極 M+ で値が入る)。
+        assert_eq!(no_rows["pole_modifier_truncated"], 2);
+        assert_eq!(no_rows["pole_modifier_orphan_releases"], 3);
+        assert_eq!(some_rows["pole_modifier_truncated"], 5);
+        assert_eq!(some_rows["pole_modifier_orphan_releases"], 6);
+        // ★ 極 M+ 以外では数えないので `null` (★ 渡された値を漏らさない)。
+        let base_again = resolve_feature_config(None, &[]).expect("frozen resolves");
+        let baseline = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &base_again,
+            1,
+            Some(7),
+            Some(8),
+            Some(9),
+        ))
+        .expect("serialize config");
+        assert!(baseline["pole_modifier_rows"].is_null());
+        assert!(baseline["pole_modifier_truncated"].is_null());
+        assert!(baseline["pole_modifier_orphan_releases"].is_null());
+    }
+
+    /// issue 005: 修飾キーの edge は press と release の**両方**を、旧ログ (`vk`) と匿名化ログ (`category`) の
+    /// **両方の形**から同じ規則で集める。⚠️ 修飾キー以外の行・解決できない行・壊れた行は edge にしない。
+    #[test]
+    fn modifier_edges_read_both_press_and_release_in_both_log_formats() {
+        let ndjson = "\
+{\"type\":\"key\",\"t\":100,\"vk\":162,\"press\":true}\n\
+{\"type\":\"key\",\"t\":150,\"category\":\"alphabetic\",\"press\":true}\n\
+{\"type\":\"key\",\"t\":200,\"vk\":162,\"press\":false}\n\
+{\"type\":\"key\",\"t\":300,\"category\":\"modifier\",\"press\":true}\n\
+{\"type\":\"key\",\"t\":350,\"category\":\"modifier\",\"press\":false}\n\
+{\"type\":\"key\",\"t\":400,\"press\":true}\n\
+{\"type\":\"key\",\"t\":410,\"vk\":16,\"press\":true}\n\
+not json\n";
+        let scanned = read_modifier_edges(ndjson.as_bytes()).expect("reads");
+        assert_eq!(
+            scanned.edges,
+            vec![
+                (100, true),
+                (200, false),
+                (300, true),
+                (350, false),
+                (410, true)
+            ],
+            "vk=162 (左 Ctrl)・category=modifier・vk=16 (Shift) が edge。文字キーは edge にしない"
+        );
+        assert_eq!(
+            scanned.unresolved_keys, 1,
+            "vk も category も無い行は数えて捨てる"
+        );
+        assert_eq!(scanned.parse_failed_lines, 1);
+
+        // 修飾キーの行が 0 本の入力（旧形式の文字キーだけ）。
+        let plain = "{\"type\":\"key\",\"t\":1,\"vk\":65,\"press\":true}\n\
+                     {\"type\":\"key\",\"t\":2,\"vk\":65,\"press\":false}\n";
+        assert!(read_modifier_edges(plain.as_bytes())
+            .expect("reads")
+            .edges
+            .is_empty());
     }
 
     /// ⚠️ `meta` 行が無い / `session_start` を持たない NDJSON でも封筒は落ちない

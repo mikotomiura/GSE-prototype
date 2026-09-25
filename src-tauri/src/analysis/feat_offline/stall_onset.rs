@@ -45,15 +45,24 @@
 //!   **nearest-rank**（`dispersion.rs::quantile` と同じ規約）を採用した。線形補間との差は
 //!   小標本で顕在化しうるので、P1 の事前宣言で確定させること。
 //! - **修飾キー押下中の文字キー除外**（D3）: `KeyCategory::Modifier` は Shift を含むため、
-//!   逐語どおり実装すると大文字・記号の入力まで産出から外れる。研究者判断待ち
-//!   (`blockers.md` 起票 11)。
+//!   逐語どおり実装すると大文字・記号の入力まで産出から外れる。★ **それが極 M+ の定義である**
+//!   (ADR-030 補訂 1 項目 3)。極 M− (baseline) は除外しない。実装は [`Pole::ModifierMPlus`] /
+//!   [`modifier_press_intervals`] / [`apply_modifier_m_plus`] (issue 005)。
 //! - **IME 変換中の抑制**（D3 抑制表 2 行目）: 区間の定義と「抑制」の意味が未確定。
 //!   研究者判断待ち (`blockers.md` 起票 12)。
 //! - **ポインタ活動の両極**（D3 抑制表 3 行目）: 出力の形は**別モード (`--pole`・1 実行 1 極)** に
 //!   裁定済み (`decisions.md` 判断 3・[`Pole`])。極 B の中身は未実装 (issue 006)。
+//!
+//! # 極 M+ の入れ方（issue 005）
+//!
+//! ★ 検出 (条件 A / B・θ) の**中には極の分岐を持たない**。極 M+ は**検出へ渡す `key` 列の側**で
+//! 「修飾キーの押下区間の中の挿入系 press」を修飾キーの VK へ置き換えて表す ([`apply_modifier_m_plus`])。
+//! ⚠️ press の**時刻は 1 本も変えない** —— θ の標本 (隣接 press の間隔) は極に依らず、
+//! 変わるのは条件 A の産出 (`net`) の**挿入系の側だけ**である (`−1` の削除系は外さない)。
 //! - **`phase`**: 構造化セッションの block id は未実装。自然セッション (O1) では常に
 //!   `"unspecified"` に collapse する (ADR-030 D5)。
 
+use crate::analysis::anonymize::KeyCategory;
 use crate::analysis::loop_step::ENGINE_TICK_MS;
 use crate::analysis::metrics::{KeyPress, OutcomeConfig};
 
@@ -69,7 +78,7 @@ use crate::analysis::metrics::{KeyPress, OutcomeConfig};
 /// |---|---|---|---|
 /// | `baseline` | 極 A (抑制しない) | 極 M− (規則なし) | ★ 現行の計算そのもの |
 /// | `pointer_b` | 極 B (ポインタ活動区間を抑制) | 極 M− | issue 006 |
-/// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | issue 005 |
+/// | `modifier_m_plus` | 極 A | 極 M+ (押下区間中の文字キーを挿入系に数えない) | ★ 実装済み (issue 005) |
 ///
 /// ⚠️ 極は `--set` で変える 8 値 (`StallOnsetConfig` の他のフィールド) とは**別の軸**であり、
 /// `--set` の対象にしない (CLI は `--pole` だけが持つ)。
@@ -103,11 +112,12 @@ impl Pole {
     ///
     /// ⚠️★★★ **`false` の極を黙って `baseline` の値で返してはならない** —— 出力が嘘をつき、
     /// 極の比較が無意味になる。呼び出し側 (`build_feature_rows` / CLI) は `false` なら**止める**
-    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させる。
+    /// (fail-closed)。★ issue 005 / 006 がそれぞれ 1 極ずつここを `true` にして開通させる
+    /// (★ 極 M+ は issue 005 で開通済み。極 B は issue 006)。
     pub const fn is_implemented(self) -> bool {
         match self {
-            Pole::Baseline => true,
-            Pole::PointerB | Pole::ModifierMPlus => false,
+            Pole::Baseline | Pole::ModifierMPlus => true,
+            Pole::PointerB => false,
         }
     }
 }
@@ -142,7 +152,8 @@ pub struct StallOnsetConfig {
     pub t1a_window_ms: u64,
     /// 極 (ADR-030 D3・[`Pole`])。既定は [`Pole::Baseline`] (現行の計算)。
     /// ⚠️ 他の 8 値と違い `--set` では変えられない (`bin/replay.rs` の `--pole` だけが持つ)。
-    /// ★ 本モジュールの検出そのものはまだ極を読まない —— 非 `baseline` の極は
+    /// ★ 本モジュールの検出そのものは極を読まない —— 極 M+ は検出へ渡す `key` 列の側で表す
+    /// ([`apply_modifier_m_plus`]・モジュール doc 「極 M+ の入れ方」)。未実装の極は
     /// `build_feature_rows` が入口で `Err` にするので、ここへは届かない ([`Pole::is_implemented`])。
     pub pole: Pole,
 }
@@ -283,6 +294,148 @@ pub fn observed_intervals(feat_ts: &[u64], hole_gap_ms: u64) -> Vec<(u64, u64)> 
     }
     intervals.push((start, prev));
     intervals
+}
+
+/// [`modifier_press_intervals`] の結果。押下区間と、区間を作れなかった行の件数。
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ModifierIntervals {
+    /// 修飾キーの押下区間 `[開始, 終了]`（**両端を含む**）。開始昇順・互いに素。
+    pub intervals: Vec<(u64, u64)>,
+    /// 先行する press が無い release の件数（★ 区間を作らなかったもの）。
+    pub orphan_releases: u64,
+    /// 観測区間の右端まで**「release の並びの最後」に達せず開いたまま**終わり、
+    /// **右端で閉じた**区間の本数（打ち切り）。
+    pub truncated_at_right_edge: u64,
+}
+
+/// 修飾キーの edge 列（`(時刻, press なら true / release なら false)`・順不同でよい）から
+/// **押下区間**を作る（ADR-030 補訂 1 項目 3・極 M+）。
+///
+/// ⚠️★★★ **「連続する release の並びの最後」で閉じる**（`decisions.md` 判断 23。
+/// 2026-09-25 に旧カウント方式 [press で `depth+=1`・release で `depth-=1`] から是正した）。
+/// `category:"modifier"` は `Ctrl` / `Shift` / `Win` を区別しないので、`Ctrl+Shift+X` の
+/// ような入れ子では**どの release がどの press に対応するかが原理的に読めない**。加えて
+/// Windows では修飾キーの押しっぱなしの自動リピートも `press:true` 行としてログに残る
+/// (`hook_windows.rs` は `is_repeat: false` 固定で送り、`loop_step.rs` のリピート判定は
+/// ログに書く `KeyRecord` の生成には関係しない)。旧カウント方式では `P×N → R` で `depth` が
+/// `N-1` 残ってしまい、区間が**観測区間の右端まで閉じず** onset を水増しする（系統誤差）。
+///
+/// - **開く**: 開いていないときの press で開く（★ 開いている間に来る 2 本目以降の press は
+///   無視する —— リピート・持ち替えの重ね押しを区間の継続として扱う）。
+/// - **閉じる**: 開いている状態で release が来たとき、その release が
+///   **「release の連続する並びの最後」**（＝次の edge が press、または次の edge が無い）
+///   なら**そこで閉じる**。次の edge も release なら（並びの途中なので）閉じずに開いたまま
+///   並びの次の release を待つ。
+///   例: `P P R R` → 2 つ目の R で閉じる／`P R P R` → 1 つ目の R で閉じ、次の P で開き直す。
+/// - ⚠️ 観測区間の右端に達しても、release の並びの最後に届かず**開いたまま**なら
+///   **そこで閉じる**（打ち切り。`t0 <= b` と対称）。一方、release の並びがちょうど
+///   観測区間の終わりで終わった場合はそれ自体が「次の edge が無い」なので**通常どおり
+///   閉じる**（打ち切りではない）。
+/// - ⚠️ 開いていないときに来た release は区間を作らない（件数だけ返す・孤立 release）。
+///
+/// ★ **観測区間ごとに開閉の状態を最初から数え直す**（D8 (b)「跨いで足し上げない」と同じ規律）。
+/// ⚠️ したがって観測区間の**外**の edge は読まず、区間の左端より前に押された修飾キーの release は
+/// 孤立 release になる（★ 押下区間を作らない側＝挿入系を**外さない**側に倒れる）。
+/// ⚠️ 同時刻は press を先に処理する（Ctrl → Shift の持ち替えで孤立 release を作らない）。
+///
+/// ⚠️★★★ **誤る向きは常に baseline 側（除外しない側）に倒れる**（判断 23）: `Ctrl` を押した
+/// まま `Shift` を離して押し直す、のような操作で edge の並びが実際の押しっぱなしと違う形
+/// （release の並びの途中に次の press が来ない形）に見えると、区間が本来より早く割れることが
+/// ある。★ その場合も割れた分だけ**除外しない**側（挿入系をそのまま数える側）に倒れるので、
+/// 旧カウント方式が持っていた「区間が右端まで閉じず onset を水増しする」向きの誤りは起きない。
+///
+/// `observed` は [`observed_intervals`] の戻り値（開始昇順・互いに素）を仮定する。
+pub fn modifier_press_intervals(
+    edges: &[(u64, bool)],
+    observed: &[(u64, u64)],
+) -> ModifierIntervals {
+    let mut sorted: Vec<(u64, bool)> = edges.to_vec();
+    sorted.sort_by_key(|&(t, press)| (t, !press));
+
+    let mut out = ModifierIntervals::default();
+    for &(a, b) in observed {
+        let lo = sorted.partition_point(|&(t, _)| t < a);
+        let hi = sorted.partition_point(|&(t, _)| t <= b);
+        let window = &sorted[lo..hi];
+        let mut open = false;
+        let mut start = a;
+        for (i, &(t, press)) in window.iter().enumerate() {
+            if press {
+                if !open {
+                    open = true;
+                    start = t;
+                }
+                // 既に開いている区間中の 2 本目以降の press は無視する
+                // (リピート・持ち替えの重ね押しを区間の継続として扱う。判断 23)。
+            } else if !open {
+                out.orphan_releases += 1;
+            } else {
+                // release の連続する並びの最後か = 次の edge が press、または次が無い。
+                let is_last_of_run = window.get(i + 1).map(|&(_, p)| p).unwrap_or(true);
+                if is_last_of_run {
+                    out.intervals.push((start, t));
+                    open = false;
+                }
+                // 最後でなければ何もしない（開いたまま並びの次の release を待つ）。
+            }
+        }
+        if open {
+            out.intervals.push((start, b));
+            out.truncated_at_right_edge += 1;
+        }
+    }
+    out
+}
+
+/// 極 M+ が「挿入系に数えない」press の置き換え先の VK（★ `KeyCategory::Modifier` に属する最初の VK）。
+///
+/// ⚠️ 数値を**ここに再宣言しない** —— 匿名化の写像（`KeyCategory::from_vk`・SSOT）から引く。
+/// ★ 置き換え先は `key_net_delta == 0`（挿入系にも削除系にも数えない）で、
+/// `restart` の 3 件数（挿入 / 削除 / 移動）のどれにも入らない。
+fn modifier_neutral_vk() -> u32 {
+    (0..=u32::from(u8::MAX))
+        .find(|&vk| KeyCategory::from_vk(vk) == KeyCategory::Modifier)
+        .expect("KeyCategory::from_vk maps at least one VK to Modifier")
+}
+
+/// 極 M+（ADR-030 補訂 1 項目 3）: `modifier_intervals` の中の**挿入系（`+1`）の press** を
+/// 検出が挿入系に数えないもの（修飾キーの VK）へ置き換えた `key` 列を返す。
+///
+/// ⚠️★★★ **削除系（`−1`）は外さない。** ADR-030 D3 の逐語は「修飾キーが押されている間の
+/// *文字キー* は挿入系に数えない」で、削除系には触れていない。`Ctrl+Backspace`（単語削除）まで
+/// 外すと `net` が上振れし、**逆向きの系統誤差**が入る。外すのは `key_net_delta` の `+1` の側だけ。
+/// ⚠️ press の**時刻・件数・順序は変えない**（★ θ の標本は極に依らない）。
+/// ★ `modifier_intervals` は両端を含む。順不同・重なりがあってもよい（内部で併合する）。
+pub fn apply_modifier_m_plus(
+    keys: &[KeyPress],
+    modifier_intervals: &[(u64, u64)],
+) -> Vec<KeyPress> {
+    let mut merged: Vec<(u64, u64)> = Vec::with_capacity(modifier_intervals.len());
+    let mut sorted = modifier_intervals.to_vec();
+    sorted.sort_unstable();
+    for (s, e) in sorted {
+        match merged.last_mut() {
+            Some(last) if s <= last.1 => last.1 = last.1.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+    let covered = |t: u64| {
+        let idx = merged.partition_point(|&(s, _)| s <= t);
+        idx > 0 && t <= merged[idx - 1].1
+    };
+    let neutral_vk = modifier_neutral_vk();
+    keys.iter()
+        .map(|k| {
+            if super::key_net_delta(k) == 1 && covered(k.timestamp) {
+                KeyPress {
+                    timestamp: k.timestamp,
+                    vk: neutral_vk,
+                }
+            } else {
+                *k
+            }
+        })
+        .collect()
 }
 
 /// `sorted_keys` (timestamp 昇順) の net production 累積和。`prefix[i]` は
@@ -1805,12 +1958,254 @@ mod tests {
         }
     }
 
-    /// 現時点で中身があるのは `baseline` だけ。⚠️ issue 006 / 005 が 1 極ずつ `true` にする
-    /// (そのとき本テストの期待を変える —— 開通したことを意図して書き換えさせるための固定)。
+    /// 中身があるのは `baseline` と `modifier_m_plus`（issue 005 で開通）。⚠️ issue 006 が極 B を
+    /// `true` にする（そのとき本テストの期待を変える —— 開通したことを意図して書き換えさせるための固定）。
     #[test]
-    fn only_baseline_pole_is_implemented() {
+    fn baseline_and_modifier_m_plus_are_implemented() {
         assert!(Pole::Baseline.is_implemented());
+        assert!(Pole::ModifierMPlus.is_implemented());
         assert!(!Pole::PointerB.is_implemented());
-        assert!(!Pole::ModifierMPlus.is_implemented());
+    }
+
+    // ── 極 M+（issue 005）────────────────────────────────────────────────
+
+    /// 修飾キーの VK（左 Ctrl）。★ `KeyCategory::Modifier` に入る。
+    const TEST_CTRL_VK: u32 = 0xA2;
+    const TEST_BACKSPACE_VK: u32 = 0x08;
+
+    fn key_vk(t: u64, vk: u32) -> KeyPress {
+        KeyPress { timestamp: t, vk }
+    }
+
+    /// `KeyPress` は `PartialEq` を持たない（`metrics.rs` は本 issue の対象外）ので `(時刻, VK)` で比べる。
+    fn pairs(keys: &[KeyPress]) -> Vec<(u64, u32)> {
+        keys.iter().map(|k| (k.timestamp, k.vk)).collect()
+    }
+
+    /// AC3: ⚠️★★★ **削除系（`−1`）を外さない。** `Ctrl+Backspace`（修飾キー押下中の backspace）は
+    /// 極 M+ でも `−1` のまま数えられる。外すのは挿入系（`+1`）だけである。
+    #[test]
+    fn m_plus_does_not_drop_deletions() {
+        let keys = vec![
+            key_vk(1000, TEST_CTRL_VK),      // 押下区間の開始（どれにも数えない）
+            key_vk(1100, TEST_BACKSPACE_VK), // Ctrl+Backspace ★ −1 のまま
+            key_vk(1200, 0x41),              // Ctrl+A ★ 区間内の +1 → 数えない
+            key_vk(1300, 0x41),              // 同上
+            key_vk(5000, 0x41),              // 区間の外 ★ +1 のまま
+            key_vk(6000, TEST_BACKSPACE_VK), // 区間の外 ★ −1 のまま
+        ];
+        let observed = [(0_u64, 10_000_u64)];
+        let intervals = modifier_press_intervals(&[(1000, true), (1400, false)], &observed);
+        assert_eq!(intervals.intervals, vec![(1000, 1400)]);
+
+        let mapped = apply_modifier_m_plus(&keys, &intervals.intervals);
+
+        // 陰性対照（baseline の写像）: −1 +1 +1 +1 −1 = +1。
+        assert_eq!(super::super::net_production(&keys), 1);
+        // 極 M+: 区間内の +1 が 2 本消えるだけ → −1 +0 +0 +1 −1 = −1。
+        assert_eq!(super::super::net_production(&mapped), -1);
+
+        // ★ 削除系は 1 本も外れていない（VK も 1 文字も変わらない）。
+        assert_eq!(pairs(&mapped[1..2]), pairs(&keys[1..2]));
+        assert_eq!(super::super::key_net_delta(&mapped[1]), -1);
+        assert_eq!(pairs(&mapped[5..]), pairs(&keys[5..]));
+        assert_eq!(super::super::key_net_delta(&mapped[2]), 0);
+        assert_eq!(super::super::key_net_delta(&mapped[3]), 0);
+        assert_eq!(super::super::key_net_delta(&mapped[4]), 1);
+
+        // ★ press の時刻・件数・順序は変えない（θ の標本は極に依らない）。
+        assert_eq!(
+            mapped.iter().map(|k| k.timestamp).collect::<Vec<_>>(),
+            keys.iter().map(|k| k.timestamp).collect::<Vec<_>>()
+        );
+    }
+
+    /// AC4 (判断 23 是正後): 入れ子（`Ctrl` 押下中に `Shift` 押下/離上）・持ち替えのいずれでも
+    /// **区間は 1 本**になる（＝ release の並びの最後まで開いたまま繋がる）。
+    #[test]
+    fn modifier_depth_merges_nested_presses() {
+        let observed = [(0_u64, 10_000_u64)];
+        let run = |edges: &[(u64, bool)]| modifier_press_intervals(edges, &observed);
+
+        // Ctrl 押下 → Shift 押下 → Shift 離上 → Ctrl 離上（入れ子。P P R R）。
+        // ★ 2 つ目の release (400) が「release の並びの最後」なのでそこで閉じる。
+        // ⚠️ `category:"modifier"` は Ctrl/Shift を区別しないため、「離す順が逆」
+        // （Ctrl を先に離す/Shift を先に離す）は edge 列として区別できない —— どちらも
+        // 同じ `(t, press)` 列になる（★ 旧テストの `crossed` は `nested` と同一の入力で
+        // 何も別に検証していなかったため削除した）。
+        let nested = run(&[(100, true), (200, true), (300, false), (400, false)]);
+        assert_eq!(nested.intervals, vec![(100, 400)]);
+
+        // 持ち替え（Ctrl 離上と Shift 押下が同時刻）。★ 同時刻は press を先に処理するので途切れない。
+        let handoff = run(&[(100, true), (300, false), (300, true), (500, false)]);
+        assert_eq!(handoff.intervals, vec![(100, 500)]);
+        assert_eq!(handoff.orphan_releases, 0);
+
+        // 重ならない 2 回の押下は 2 本のまま（陰性対照）。
+        let separate = run(&[(100, true), (150, false), (400, true), (450, false)]);
+        assert_eq!(separate.intervals, vec![(100, 150), (400, 450)]);
+
+        // 順不同で渡しても同じ（内部で時刻順に直す）。
+        let shuffled = run(&[(400, false), (200, true), (100, true), (300, false)]);
+        assert_eq!(shuffled.intervals, vec![(100, 400)]);
+        for r in [&nested, &separate, &shuffled] {
+            assert_eq!(r.orphan_releases, 0);
+            assert_eq!(r.truncated_at_right_edge, 0);
+        }
+    }
+
+    /// 判断 23 (a): Windows の自動リピートで press が多数連続しても、区間は
+    /// **release の並びの最後**（本テストでは release 1 本）で閉じる —— 旧カウント方式
+    /// （press で `depth+=1`）だと `depth` が `N-1` 残り、観測区間の右端まで閉じず
+    /// `truncated_at_right_edge` が立ってしまう（系統誤差・水増し）。
+    #[test]
+    fn modifier_repeat_presses_close_on_release_not_right_edge() {
+        let observed = [(0_u64, 100_000_u64)];
+        // 150ms 間隔で press を 20 本（リピート）→ 最後に release 1 本。
+        let mut edges: Vec<(u64, bool)> = (0..20).map(|i| (100 + i * 150, true)).collect();
+        let release_t = 100 + 19 * 150 + 150;
+        edges.push((release_t, false));
+
+        let result = modifier_press_intervals(&edges, &observed);
+
+        assert_eq!(
+            result.intervals,
+            vec![(100, release_t)],
+            "release で閉じる（観測区間の右端 100_000 までは伸びない）"
+        );
+        assert_eq!(
+            result.truncated_at_right_edge, 0,
+            "リピートを depth として数えていたら、この release では閉じず右端で打ち切られる"
+        );
+        assert_eq!(result.orphan_releases, 0);
+    }
+
+    /// 判断 23 (c): `P R P R` は 1 つ目の R で閉じ、次の P で開き直すので **2 区間**になる
+    /// （★ 旧カウント方式なら `depth` が 1→0→1→0 と動き、たまたま同じ 2 区間になるので、
+    /// 本テストは新規則そのものではなく「開いたまま release の並びを待つ」ことの陰性対照
+    /// —— 判断 23 (a) の変異テストが新旧の違いを検出する）。
+    #[test]
+    fn modifier_alternating_press_release_makes_two_intervals() {
+        let observed = [(0_u64, 10_000_u64)];
+        let alternating = modifier_press_intervals(
+            &[(100, true), (200, false), (300, true), (400, false)],
+            &observed,
+        );
+        assert_eq!(alternating.intervals, vec![(100, 200), (300, 400)]);
+        assert_eq!(alternating.orphan_releases, 0);
+        assert_eq!(alternating.truncated_at_right_edge, 0);
+    }
+
+    /// AC5: ⚠️ 孤立した release（先行する press が無い）は区間を作らず、閉じない押下は
+    /// **観測区間の右端で打ち切る**（判断 23 (d)(e)）。
+    #[test]
+    fn unmatched_modifier_release_and_open_press() {
+        // 孤立 release: 区間ができない（件数だけ数える）。
+        let orphan = modifier_press_intervals(&[(50, false)], &[(0, 1000)]);
+        assert!(orphan.intervals.is_empty());
+        assert_eq!(orphan.orphan_releases, 1);
+        assert_eq!(orphan.truncated_at_right_edge, 0);
+
+        // 孤立 release の後の press/release は普通に 1 本になる（開いていない状態が
+        // 孤立 release をまたいでも壊れない）。
+        let recovered =
+            modifier_press_intervals(&[(100, false), (200, true), (300, false)], &[(0, 1000)]);
+        assert_eq!(recovered.intervals, vec![(200, 300)]);
+        assert_eq!(recovered.orphan_releases, 1);
+
+        // 閉じない押下: 観測区間の右端 `b` で閉じる（★ 右端ちょうどは確定扱い）。
+        let open = modifier_press_intervals(&[(900, true)], &[(0, 1000)]);
+        assert_eq!(open.intervals, vec![(900, 1000)]);
+        assert_eq!(open.truncated_at_right_edge, 1);
+
+        // ⚠️ 打ち切りは穴を越えない・開閉の状態は区間ごとに最初から数え直す:
+        // 1 つ目の区間で開いた押下は 1000 で閉じ、2 つ目の区間の release は孤立になる。
+        let across =
+            modifier_press_intervals(&[(800, true), (5500, false)], &[(0, 1000), (5000, 6000)]);
+        assert_eq!(across.intervals, vec![(800, 1000)]);
+        assert_eq!(across.orphan_releases, 1);
+        assert_eq!(across.truncated_at_right_edge, 1);
+
+        // 観測区間の外の edge は読まない（区間が無ければ何も作らない）。
+        let outside = modifier_press_intervals(&[(100, true), (200, false)], &[(1000, 2000)]);
+        assert!(outside.intervals.is_empty());
+        assert_eq!(outside.orphan_releases, 0);
+        assert!(modifier_press_intervals(&[(100, true)], &[])
+            .intervals
+            .is_empty());
+    }
+
+    /// 区間の端は**含む**・区間の外は触らない・空の区間は恒等・重なる/順不同の区間は併合する。
+    #[test]
+    fn m_plus_mapping_boundaries_and_identity() {
+        let keys = vec![key(99), key(100), key(150), key(200), key(201), key(300)];
+        let mapped = apply_modifier_m_plus(&keys, &[(100, 200)]);
+        let deltas: Vec<i64> = mapped.iter().map(super::super::key_net_delta).collect();
+        // 99 と 201 は区間の外（+1 のまま）、100 / 150 / 200 は区間内（両端を含む）。
+        assert_eq!(deltas, vec![1, 0, 0, 0, 1, 1]);
+
+        // 空の区間: 恒等（★ 修飾キーの行が 0 本の入力で baseline と一致する根拠）。
+        assert_eq!(pairs(&apply_modifier_m_plus(&keys, &[])), pairs(&keys));
+
+        // 重なる・順不同の区間は併合して同じ結果になる。
+        let merged = apply_modifier_m_plus(&keys, &[(150, 200), (100, 160)]);
+        assert_eq!(pairs(&merged), pairs(&mapped));
+    }
+
+    /// 置き換え先の VK は `KeyCategory::Modifier` で、挿入系にも削除系にも数えない。
+    #[test]
+    fn m_plus_neutral_vk_counts_nowhere() {
+        let vk = modifier_neutral_vk();
+        assert_eq!(KeyCategory::from_vk(vk), KeyCategory::Modifier);
+        let k = key_vk(0, vk);
+        assert_eq!(super::super::key_net_delta(&k), 0);
+        assert!(!crate::analysis::metrics::is_backspace(vk));
+    }
+
+    /// ⚠️★★★ 極 M+ は onset を**広げる**（baseline の onset を 1 本も失わず、M+ にしか立たない onset がある）。
+    ///
+    /// 手計算（`W` = 30 秒・`q` = 0.99・`net_diff_min` = 1・warmup 無し）:
+    /// - 打鍵: 平文 200ms 刻み ×130（〜26_000）→ Ctrl+文字 5 本（40_100〜40_900）→ 平文 1 本（65_000）。
+    /// - baseline: Ctrl+文字が +5 で窓に居続け、平文 65_000 が抜ける 95_000 まで条件 A は立たない → onset 1 本。
+    /// - M+: 40_100〜40_900 を数えないので最後の平文 26_000 が窓を抜ける **56_000** で条件 A が立ち、
+    ///   65_000 の平文で一度落ち、95_000 でもう一度立つ → onset 2 本（95_000 は baseline と共通）。
+    ///
+    /// ★ 両極の θ は同じ press 時刻から作るので、共通の onset は θ も一致する。
+    #[test]
+    fn m_plus_widens_onsets_and_keeps_every_baseline_onset() {
+        let mut keys: Vec<KeyPress> = (1..=130).map(|i| key(i * 200)).collect();
+        keys.push(key_vk(40_000, TEST_CTRL_VK));
+        keys.extend((0..5).map(|i| key(40_100 + i * 200)));
+        keys.push(key(65_000));
+        let feat_ts = feat_ts_range(1000, 115_000, 1000);
+        let config = StallOnsetConfig {
+            warmup_count: None,
+            ..StallOnsetConfig::default()
+        };
+
+        let baseline = detect_stall_onsets(&keys, &feat_ts, &config);
+
+        let observed = observed_intervals(&feat_ts, config.hole_gap_ms);
+        let modifier = modifier_press_intervals(&[(40_000, true), (41_000, false)], &observed);
+        let mapped = apply_modifier_m_plus(&keys, &modifier.intervals);
+        let m_plus = detect_stall_onsets(&mapped, &feat_ts, &config);
+
+        assert_eq!(
+            baseline.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![95_000],
+            "baseline は 95_000 の 1 本だけ"
+        );
+        assert_eq!(
+            m_plus.iter().map(|o| o.s_ms).collect::<Vec<_>>(),
+            vec![56_000, 95_000],
+            "M+ は 56_000 が増える（★ 逆向きなら写像が逆）"
+        );
+        for onset in &baseline {
+            assert!(
+                m_plus.contains(onset),
+                "baseline の onset {onset:?} が M+ に無い（★ θ も含めて一致するはず）"
+            );
+        }
+        assert!(m_plus.len() > baseline.len());
     }
 }
