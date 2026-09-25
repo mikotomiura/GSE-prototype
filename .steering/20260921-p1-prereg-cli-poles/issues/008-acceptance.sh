@@ -95,7 +95,10 @@ fake="$(mktemp)" || fail "AC5: 偽 gse-replay の一時ファイルを作れな�
 CLEANUP+=("$fake")
 cat > "$fake" <<'FAKE_EOF'
 #!/usr/bin/env bash
-# 偽 gse-replay: `--pole <名前>` の名前を読み、FAKE_MODE に応じて振る舞う。
+# 偽 gse-replay: 最初の位置引数 (ndjson パス) と `--pole <名前>` を読み、FAKE_MODE に応じて振る舞う。
+# ★ ndjson_path は AC12 (入力の固定コピー) が「gse-replay に渡ったパスが staging 内か」を
+#   検査するために出す (run-features-all-poles.sh は常に ndjson パスを最初の引数で渡す)。
+ndjson_path="${1:-}"
 pole=""
 prev=""
 for a in "$@"; do
@@ -106,7 +109,7 @@ case "${FAKE_MODE:-ok}" in
   fail_pointer_b) if [ "$pole" = "pointer_b" ]; then exit 1; fi ;;
   mislabel) pole="baseline" ;;
 esac
-printf '{"config":{"pole":"%s","pole_applicable":true},"rows":[]}\n' "$pole"
+printf '{"config":{"pole":"%s","pole_applicable":true},"rows":[],"fake_input_path":"%s"}\n' "$pole" "$ndjson_path"
 FAKE_EOF
 chmod +x "$fake" || fail "AC5: 偽 gse-replay に実行権を付けられない"
 
@@ -180,5 +183,61 @@ grep -qE 'run-features-all-poles' "$RUNBOOK" \
   || fail "AC7: runbook に 3 極を回す手順が無い"
 grep -qE '(Cartesian|直積|組まない)' "$RUNBOOK" \
   || fail "AC7: runbook に「極を Cartesian に組まない」旨が無い"
+grep -qE 'SIGKILL' "$RUNBOOK" \
+  || fail "AC7: runbook に SIGKILL 時の部分出力の限界が書かれていない（判断 6(e)）"
+
+# ── AC12: 入力は最初に staging へコピーされ、3 極とも同じ staged パスを見る（判断 6(c)） ──
+outdir_stage="$(mktemp -d)" || fail "AC12: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_stage")
+run_fake ok "$outdir_stage" \
+  || fail "AC12: 前提の ok 実行が非 0 になった"
+p_base="$(jq -r '.fake_input_path' "$outdir_stage/baseline.json")" || fail "AC12: fake_input_path を読めない (baseline)"
+p_ptr="$(jq -r '.fake_input_path' "$outdir_stage/pointer_b.json")" || fail "AC12: fake_input_path を読めない (pointer_b)"
+p_mod="$(jq -r '.fake_input_path' "$outdir_stage/modifier_m_plus.json")" || fail "AC12: fake_input_path を読めない (modifier_m_plus)"
+[ "$p_base" = "$p_ptr" ] && [ "$p_base" = "$p_mod" ] \
+  || fail "AC12: 3 極が同じ staged パスを見ていない（base=$p_base ptr=$p_ptr mod=${p_mod}）"
+case "$p_base" in
+  *".all-poles."*) : ;;
+  *) fail "AC12: gse-replay に渡ったパスが staging 内でない（元の入力パスをそのまま渡している疑い）: $p_base" ;;
+esac
+[ "$p_base" != "$REPO_ROOT/src-tauri/$FIX" ] \
+  || fail "AC12: gse-replay に渡ったパスが元の入力とそのまま同じ（コピーしていない）"
+
+# ── AC13: ロックが残っている出力先は exit 2 で拒否される（判断 6(a)・二重起動対策） ──
+outdir_lock="$(mktemp -d)" || fail "AC13: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_lock")
+mkdir "$outdir_lock/.all-poles.lock" || fail "AC13: 前提のロック作成に失敗した"
+run_fake ok "$outdir_lock"
+rc13=$?
+[ "$rc13" -eq 2 ] \
+  || fail "AC13: ロックが残っている出力先への実行が exit 2 にならない (rc=$rc13)"
+[ -d "$outdir_lock/.all-poles.lock" ] \
+  || fail "AC13: 拒否された実行が他プロセスのロックを消してしまった（★ 二重起動時に正常なプロセスのロックを壊す）"
+leftover="$(ls -A "$outdir_lock" 2>/dev/null | grep -v '^\.all-poles\.lock$' || true)"
+[ -z "$leftover" ] \
+  || fail "AC13: ロック拒否なのに outdir に出力ファイルが残っている: $leftover"
+
+# ── AC14: git 判定が「not a git repository」以外のエラーを出したら exit 2 で拒否（fail-closed） ──
+fakegit_dir="$(mktemp -d)" || fail "AC14: 一時ディレクトリを作れない"
+CLEANUP+=("$fakegit_dir")
+cat > "$fakegit_dir/git" <<'GIT_EOF'
+#!/usr/bin/env bash
+# 偽 git: `-C <path> rev-parse --is-inside-work-tree` だけを横取りし、
+# 「not a git repository」を含まない別のエラー（所有権チェック失敗を模す）を返す。
+if [ "$1" = "-C" ] && [ "$3" = "rev-parse" ] && [ "$4" = "--is-inside-work-tree" ]; then
+  echo "fatal: detected dubious ownership in repository at '$2'" >&2
+  exit 128
+fi
+exit 127
+GIT_EOF
+chmod +x "$fakegit_dir/git" || fail "AC14: 偽 git に実行権を付けられない"
+outdir_direrr="$(mktemp -d)" || fail "AC14: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_direrr")
+( cd "$REPO_ROOT" && PATH="$fakegit_dir:$PATH" FAKE_MODE=ok GSE_REPLAY_BIN="$fake" bash "$ALLPOLES" "src-tauri/$FIX" "$outdir_direrr" ) >/dev/null 2>&1
+rc14=$?
+[ "$rc14" -eq 2 ] \
+  || fail "AC14: 'not a git repository' 以外の git エラーで exit 2 にならない (rc=$rc14)。★ 所有権チェック等の失敗を『管理外』として素通りさせていないか確認"
+[ -z "$(ls -A "$outdir_direrr" 2>/dev/null)" ] \
+  || fail "AC14: 拒否されたのに outdir にファイルが残っている"
 
 echo "[acceptance 008g] OK"

@@ -27,6 +27,22 @@
 #   - ⚠️★★★ **outdir が git 管理下でも拒否する**（security LOW・2026-09-25）: 共有禁止の特徴行
 #     （封筒 `sharing: prohibited`）を repo 内に書くと誤って stage されうる。GSE repo の中・
 #     gse-dataset のクローンの中の両方を弾く（`git -C <outdir> rev-parse --is-inside-work-tree`）。
+#     ⚠️★★★ **git 判定そのものがエラーで失敗したら fail-closed**（Codex `/cross-review` 指摘・
+#     2026-09-25）: エラーメッセージに `not a git repository` が無ければ（★ 所有権チェック失敗等
+#     の別のエラー）「管理外」として素通りさせず exit 2 で拒否する。
+#   - ⚠️★★★ **二重起動を排他する**（2026-09-25 追加）: 出力先に `.all-poles.lock` を
+#     `mkdir`（atomic）で作り、取れなければ exit 2。他プロセスの実行中に同じ outdir へ
+#     書き込みに行かない。
+#   - ⚠️★★★ **入力は最初に staging へ固定コピーし、3 極すべてをそのコピーに対して回す**
+#     （2026-09-25 追加）: 3 回の `gse-replay` 呼び出しの間に元の入力ファイルが変わっても、
+#     3 極の間で入力が食い違わない。
+#   - ⚠️★★★ **rollback（部分的な mv 失敗時の巻き戻し）自体が失敗したら黙らない**
+#     （2026-09-25 追加）: 巻き戻しの `rm -f` が失敗したら、その旨を stderr に出した上で非 0 で終わる。
+#   - ⚠️★★★ **既知の限界**（構成を変えずに受け入れる・2026-09-25）: 3 極は `baseline.json` /
+#     `pointer_b.json` / `modifier_m_plus.json` の **3 ファイル構成**なので、`mv` の**最中**に
+#     プロセスが SIGKILL 等で強制終了された場合の部分出力（1〜2 ファイルだけが outdir に
+#     揃ってしまう状態）は原理的に防げない（★ ディレクトリ単一 rename への構成変更はしない。
+#     詳細は `docs/verification-runbook.md` (j)）。
 #
 # Usage:
 #   bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>
@@ -37,12 +53,13 @@
 # Exit: 0 = 3 ファイルとも出した / 1 = ⚠️ 失敗（★ 何も出していない） /
 #       2 = 引数が違う、または outdir がガード条件に違反
 #         （★ baseline.json / pointer_b.json / modifier_m_plus.json のいずれかが既にある ＝ 使い回し拒否・
-#            outdir が git 管理下 ＝ 共有禁止の特徴行を誤って stage するのを防ぐため拒否）
+#            outdir が git 管理下、または git 判定自体がエラー ＝ 拒否・
+#            outdir が他プロセスにロックされている ＝ 二重起動拒否）
 #
 # ⚠️ 出力（特徴行・封筒）は**中間成果物**であり `gse-dataset` へ共有しない
 #   （★ `scripts/check_no_feature_output.sh`・`docs/glossary.md`「特徴行」）。outdir は repo の外に置く。
 #
-# 関連: docs/verification-runbook.md ／ .steering/20260921-p1-prereg-cli-poles/decisions.md 判断 3
+# 関連: docs/verification-runbook.md ／ .steering/20260921-p1-prereg-cli-poles/decisions.md 判断 3 / 6
 set -uo pipefail
 
 POLES=(baseline pointer_b modifier_m_plus)
@@ -82,21 +99,48 @@ mkdir -p "$OUT" || die "outdir を作れない: $OUT"
 
 # ⚠️★★★ outdir が git 管理下なら拒否する（★ 共有禁止の特徴行を repo 内に書いて誤って stage するのを防ぐ）。
 #   ⚠️ 判定は outdir を作った**後**。拒否するときは自分が作った空ディレクトリだけ消す（既存ディレクトリは消さない）。
-if git -C "$OUT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+#   ⚠️★★★ fail-closed（2026-09-25 追加）: rev-parse が非 0 で終わった理由が「そもそも git 管理下でない」
+#   (`not a git repository`) 以外なら、「管理外」として素通りさせず拒否する
+#   （★ 所有権チェック失敗 (`detected dubious ownership`) 等、git が判定できていないだけの状態を
+#   「安全」と誤読しない）。
+GIT_CHECK_ERR="$(git -C "$OUT" rev-parse --is-inside-work-tree 2>&1 1>/dev/null)"
+GIT_CHECK_RC=$?
+if [ "$GIT_CHECK_RC" -eq 0 ]; then
   [ "$OUT_PRE_EXISTED" -eq 0 ] && rmdir "$OUT" 2>/dev/null
   reject "outdir が git 管理下: ${OUT}（★ 特徴行は共有禁止 (sharing: prohibited)。outdir は repo の外に置く）"
+elif ! printf '%s' "$GIT_CHECK_ERR" | grep -qi 'not a git repository'; then
+  [ "$OUT_PRE_EXISTED" -eq 0 ] && rmdir "$OUT" 2>/dev/null
+  reject "outdir の git 判定がエラー（'not a git repository' 以外・★ 所有権チェック等の失敗を『管理外』として素通りさせない）: ${GIT_CHECK_ERR}"
+fi
+
+# ⚠️★★★ 二重起動の排他（2026-09-25 追加）: `mkdir` は atomic なので、同じ outdir へ同時に
+#   2 プロセスが来ても片方だけがロックを取れる。取れなければ「他の実行が進行中」として拒否する
+#   （★ 他プロセスのロックなので、ここでは絶対に消さない）。
+LOCK_DIR="$OUT/.all-poles.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  reject "出力先 $OUT は他の実行がロック中（$LOCK_DIR が既にある）。★ 二重起動を防ぐため拒否する（自分が作ったのでなければ消さない）"
 fi
 
 # ⚠️ 3 極が全部成功するまで outdir に 1 ファイルも置かない（staging）。
 #   ★ 途中で止まったとき、1〜2 ファイルだけが残ると「3 極を回した」と読まれうる。
-STAGE="$(mktemp -d "$OUT/.all-poles.XXXXXX")" || die "staging ディレクトリを作れない: $OUT"
-trap 'rm -rf "$STAGE"' EXIT
+STAGE="$(mktemp -d "$OUT/.all-poles.XXXXXX")" || { rm -rf "$LOCK_DIR"; die "staging ディレクトリを作れない: $OUT"; }
+cleanup() {
+  [ -n "${STAGE:-}" ] && rm -rf "$STAGE"
+  rm -rf "$LOCK_DIR"
+}
+trap cleanup EXIT
+
+# ⚠️★★★ 入力の固定コピー（2026-09-25 追加）: 3 極を回す**前**に入力を staging へコピーし、
+#   3 回の gse-replay 呼び出しは全部このコピーに対して行う。3 回の間に元の入力ファイルが
+#   変わっても（削除・追記等）、3 極の間で入力が食い違うことがない。
+IN_STAGED="$STAGE/$(basename "$IN_ABS")"
+cp "$IN_ABS" "$IN_STAGED" || die "入力を staging へコピーできない: $IN_ABS"
 
 run_replay() { # run_replay <極> <出力ファイル>
   if [ -n "${GSE_REPLAY_BIN:-}" ]; then
-    "$GSE_REPLAY_BIN" "$IN" --features --pole "$1" > "$2"
+    "$GSE_REPLAY_BIN" "$IN_STAGED" --features --pole "$1" > "$2"
   else
-    ( cd "$REPO_ROOT/src-tauri" && cargo run --quiet --bin gse-replay -- "$IN_ABS" --features --pole "$1" ) > "$2"
+    ( cd "$REPO_ROOT/src-tauri" && cargo run --quiet --bin gse-replay -- "$IN_STAGED" --features --pole "$1" ) > "$2"
   fi
 }
 
@@ -122,12 +166,22 @@ done
 # ★ ここまで来たら 3 極とも揃っている。まとめて outdir へ移す。
 # ⚠️ 部分的な mv の失敗（LOW）: 2 本目以降が失敗したら、既に移した分を rm -f してから die する
 #   （all-or-nothing。★ 1〜2 ファイルだけが outdir に残って「3 極そろった」と誤読されるのを防ぐ）。
+#   ⚠️★★★ rollback 自体の失敗も黙らない（2026-09-25 追加）: 巻き戻しの rm -f が失敗したら、
+#   その旨を stderr に明示した上で非 0 で終わる（★ outdir に不整合なファイルが残っている可能性を
+#   隠さない）。
 MOVED=()
 for pole in "${POLES[@]}"; do
   if ! mv -f "$STAGE/$pole.json" "$OUT/$pole.json"; then
+    ROLLBACK_FAILED=0
     for done_pole in "${MOVED[@]}"; do
-      rm -f "$OUT/$done_pole.json"
+      if ! rm -f "$OUT/$done_pole.json"; then
+        ROLLBACK_FAILED=1
+        echo "[all-poles] NG: rollback (rm -f $OUT/$done_pole.json) に失敗した（★ outdir に不整合なファイルが残っている可能性）" >&2
+      fi
     done
+    if [ "$ROLLBACK_FAILED" -eq 1 ]; then
+      die "極 $pole の出力を outdir へ移せず、かつ巻き戻しにも失敗した（⚠️ outdir を手で確認すること）: $OUT"
+    fi
     die "極 $pole の出力を outdir へ移せない（⚠️ 3 ファイルが揃っていない可能性）: $OUT"
   fi
   MOVED+=("$pole")

@@ -769,6 +769,84 @@ mod tests {
         }
     }
 
+    /// Codex r1a-3: 極 M+ が `detection_keys`（挿入系を置き換えた列）を検出へ**実際に配線している**
+    /// ことを固定する（★ 押下区間を渡しても検出結果が baseline と変わらないなら、
+    /// `build_feature_rows_with_pole_inputs` が `detection_keys` を検出へ渡していない疑いがある）。
+    ///
+    /// 手計算（`modifier_m_plus_leaves_the_other_tiers_alone` と同じ fixture・`W`=30 秒・
+    /// `q`=0.99・`net_diff_min`=1・warmup 無し）:
+    /// - 打鍵は 100ms 間隔で `0/100/200/300(Ctrl)/400/500`（Ctrl 以外の 5 本が挿入系 +1）。
+    /// - baseline: 5 本すべてが窓に寄与するので、最後の `500` が窓から抜ける `30_500` で
+    ///   条件 A が立つ → onset s=30_500。
+    /// - M+ (区間 `[300,600]` が `400`/`500` を覆う): 寄与するのは `0/100/200` の 3 本だけになり、
+    ///   最後の `200` が窓から抜ける `30_200` で条件 A が立つ → onset s=30_200。
+    /// - ★ `detection_keys` が本番経路に配線されていなければ（常に baseline の `keys` を検出へ
+    ///   渡していれば）、M+ も `s=30_500` になり baseline と一致してしまう。
+    #[test]
+    fn modifier_m_plus_intervals_actually_change_detection() {
+        let ctrl = KeyPress {
+            timestamp: 300,
+            vk: 0xA2,
+        };
+        let keys = vec![
+            key_at(0),
+            key_at(100),
+            key_at(200),
+            ctrl,
+            key_at(400),
+            key_at(500),
+        ];
+        let feat_ts: Vec<u64> = (0..=60).map(|i| i * 1000).collect();
+        let run = |pole: Pole, intervals: &[(u64, u64)]| {
+            build_feature_rows_with_pole_inputs(
+                &keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &StallOnsetInputs {
+                    feat_ts: &feat_ts,
+                    task_kind_declarations: &[],
+                    config: StallOnsetConfig {
+                        pole,
+                        ..StallOnsetConfig::default()
+                    },
+                },
+                &test_quality_inputs(),
+                &PoleInputs {
+                    modifier_intervals: Some(intervals),
+                    ..PoleInputs::default()
+                },
+            )
+            .expect("within tick limit")
+        };
+        let onset_s = |rows: &[FeatureRow]| -> Vec<u64> {
+            rows.iter()
+                .filter(|r| r.stall_onset.is_onset)
+                .filter_map(|r| r.stall_onset.s_ms)
+                .collect()
+        };
+
+        let baseline = run(Pole::Baseline, &[]);
+        let m_plus = run(Pole::ModifierMPlus, &[(300, 600)]);
+
+        assert_eq!(
+            onset_s(&baseline),
+            vec![30_500],
+            "baseline は 500 まで届いて抜ける 30_500 で立つ"
+        );
+        assert_eq!(
+            onset_s(&m_plus),
+            vec![30_200],
+            "M+ は 400/500 を数えないので 200 が抜ける 30_200 で立つ \
+             （★ detection_keys が配線されていない場合は 30_500 になる）"
+        );
+        assert_ne!(
+            onset_s(&baseline),
+            onset_s(&m_plus),
+            "極 M+ の押下区間を渡しても検出結果が変わっていない（detection_keys の配線漏れの疑い）"
+        );
+    }
+
     /// 境界入力で `build_feature_rows` が panic しないことを確認する (AC10)。
     #[test]
     fn tick_loop_handles_degenerate_inputs() {

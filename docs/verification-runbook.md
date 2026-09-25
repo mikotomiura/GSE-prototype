@@ -212,7 +212,18 @@ bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>
 - ⚠️★★★ **`<outdir>` は git 管理下に置かない**（2026-09-25 追加）: `git -C <outdir> rev-parse
   --is-inside-work-tree` が成功すると **exit 2 で拒否**される。GSE repo の中・`gse-dataset` の
   クローンの中の両方を弾く（★ 出力（特徴行）は共有禁止 (`sharing: prohibited`) で、repo 内に書くと
-  誤って `git add` で stage されうるため）。
+  誤って `git add` で stage されうるため）。⚠️ この判定自体が「`not a git repository`」以外の
+  エラー（所有権チェック失敗等）で失敗した場合も、**「管理外」として素通りさせず exit 2 で拒否**
+  される（fail-closed）。
+- ⚠️★★★ **二重起動は排他される**（2026-09-25 追加）: `<outdir>/.all-poles.lock` を `mkdir`
+  （atomic）で取り、取れなければ **exit 2**（★ 同じ `<outdir>` への同時実行を防ぐ）。
+- ⚠️★★★ **入力は最初に staging へ固定コピーされる**（2026-09-25 追加）: 3 極すべてがそのコピーに
+  対して回るので、3 回の実行の間に元の入力ファイルが変わっても極間で入力が食い違わない。
+- ⚠️★★★ **既知の限界（構成は変えない）**: 3 極は `baseline.json` / `pointer_b.json` /
+  `modifier_m_plus.json` の **3 ファイル構成**なので、`mv` で outdir へ移す**最中**に SIGKILL 等で
+  プロセスが強制終了されると、1〜2 ファイルだけが outdir に揃ってしまう部分出力は**原理的に防げない**
+  （★ ディレクトリ単一 rename への構成変更はしない。通常の失敗・fail-closed の経路は上記のとおり
+  outdir を空に保つ）。
 - ⚠️ 出力は**中間成果物**で `gse-dataset` へ共有しない（上の (i) の門が見る）。`<outdir>` は repo の外に置く。
 - ★ 計算量の門は **1 極あたり 20 秒**（`.steering/20260914-mhd-feature-offline-tiers/issues/008-acceptance.sh` の
   AC18 / AC18b。★ 門の入力は onset が 100 本立つ）。⚠️ 3 極を回すと時間は**約 3 倍**になるが、門は 3 倍を織り込まない
