@@ -47,7 +47,9 @@ assert_exit1_and_silent() {
   [ -z "$out" ]   || fail "$label: 非 0 で終了したが stdout に出力がある（★ 黙って baseline を返している疑い）"
 }
 assert_exit1_and_silent "AC3(pointer_b)"       "$FIX" --features --pole pointer_b
-assert_exit1_and_silent "AC3(modifier_m_plus)" "$FIX" --features --pole modifier_m_plus
+# ⚠️ 2026-09-25 (issue 005): 極 M+ を開通させたので「未実装の極は exit 1」の対象から外した。
+#   ★ 開通後の振る舞い (exit 0・封筒 `pole == "modifier_m_plus"`) は `005-acceptance.sh` AC1 が持つ。
+#   ⚠️ issue 006 で極 B を開通させたら、上の `pointer_b` の行も同じ形で外すこと（★ 未実装の極が無くなれば AC3 は空になる）。
 assert_exit1_and_silent "AC4(未知の極名)"       "$FIX" --features --pole bogus
 assert_exit1_and_silent "AC5(--features 以外)"  "$FIX" --metrics  --pole baseline
 

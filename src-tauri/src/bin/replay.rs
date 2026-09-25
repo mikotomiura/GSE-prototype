@@ -287,6 +287,10 @@ struct FeatureConfigDto {
     /// ★ 過剰拒否だが**情報は失わない** (行が 0 本なら極 M+ = 極 M− で、上下界の幅への寄与がゼロ)。
     /// ⚠️ `not_implemented` は**防御の値**であり、実際には出ない (未実装の極は出力の前に止まる)。
     pole_not_applicable_reason: Option<&'static str>,
+    /// 極 M+ の判定に使った入力ファイルの**修飾キーの `key` 行数** (`decisions.md` 判断 13 逐語
+    /// 「封筒に理由コード (`no_modifier_rows`) と `modifier` 行数を刻み」)。★ 極 M+ 以外では数えないので `null`。
+    /// ⚠️ 0 のとき「計器が無かった」と「押さなかった」は区別できない (上の理由コードの doc)。
+    pole_modifier_rows: Option<u64>,
     /// 採用した事前宣言の `id` / `version` / 内容の SHA-256 先頭桁 (★ 何を読んだかの同定)。
     prereg_id: String,
     prereg_version: String,
@@ -668,6 +672,10 @@ impl FeatureConfigDto {
             pole: c.pole.as_str(),
             pole_applicable,
             pole_not_applicable_reason,
+            pole_modifier_rows: match c.pole {
+                Pole::ModifierMPlus => modifier_rows,
+                Pole::Baseline | Pole::PointerB => None,
+            },
             prereg_id: resolved.prereg_id.clone(),
             prereg_version: resolved.prereg_version.clone(),
             prereg_sha256_prefix: resolved.prereg_sha256_prefix.clone(),
@@ -4920,6 +4928,15 @@ mod tests {
                 .expect("serialize config");
         assert_eq!(some_rows["pole_applicable"], true);
         assert!(some_rows["pole_not_applicable_reason"].is_null());
+        // ★ 判断 13: 修飾キーの行数も封筒に刻む (0 でも `null` にしない)。
+        assert_eq!(no_rows["pole_modifier_rows"], 0);
+        assert_eq!(some_rows["pole_modifier_rows"], 4);
+        // ★ 極 M+ 以外では数えないので `null` (★ 渡された値を漏らさない)。
+        let base_again = resolve_feature_config(None, &[]).expect("frozen resolves");
+        let baseline =
+            serde_json::to_value(FeatureConfigDto::from_resolved(&base_again, 1, Some(7)))
+                .expect("serialize config");
+        assert!(baseline["pole_modifier_rows"].is_null());
     }
 
     /// issue 005: 修飾キーの edge は press と release の**両方**を、旧ログ (`vk`) と匿名化ログ (`category`) の
