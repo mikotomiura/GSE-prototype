@@ -409,6 +409,9 @@ pub fn secure_existing_files(_dir: &Path) -> usize {
 ///
 /// ★ 対象は `gse_*.ndjson` の通常ファイルのみ。⚠️ `.anon.ndjson` などの派生と、
 /// 台帳 (`redaction_ledger.jsonl`) は**対象外**である。
+///
+/// ⚠️★★★ 本関数は**最小幅を保証しない**。★ 呼ぶ前に必ず [`widen_to_minimum_width`] を通すこと
+/// （★ 本番の呼び出しは `lib.rs` の `delete_time_range` だけで、そこが通している・2026-09-25 code-reviewer LOW）。
 pub fn redact_dir(
     dir: &Path,
     from_ms: u64,
@@ -1186,6 +1189,25 @@ mod tests {
             "⚠️★★★ 最小幅 {MIN_REDACTION_WIDTH_MS} ms が hole_gap_ms {hole_gap_ms} ms を超えていない \
              → 削除区間の内側に元に無い onset が立つ穴が開く"
         );
+    }
+
+    /// ⚠️ 既定値だけでなく、**P1 事前宣言の探索空間にある `hole_gap_ms` のすべて**でも最小幅が上回ること
+    /// （★ `gse-replay --set hole_gap_ms=…` で探索範囲を振ったときに穴が再び開かないため・2026-09-25 security-checker LOW）。
+    #[test]
+    fn min_redaction_width_exceeds_every_declared_hole_gap() {
+        let prereg: serde_json::Value =
+            serde_json::from_str(include_str!("../prereg/p1-episode.json")).expect("prereg JSON");
+        let declared = prereg["search_space"]["hole_gap_ms"]
+            .as_array()
+            .expect("search_space.hole_gap_ms は配列");
+        assert!(!declared.is_empty(), "探索空間が空だと検査が空振りする");
+        for v in declared {
+            let hole_gap_ms = v.as_u64().expect("hole_gap_ms は整数");
+            assert!(
+                min_width_exceeds_hole_gap(MIN_REDACTION_WIDTH_MS, hole_gap_ms),
+                "最小幅 {MIN_REDACTION_WIDTH_MS} ms が宣言済みの hole_gap_ms {hole_gap_ms} ms を超えていない"
+            );
+        }
     }
 
     /// AC3: ⚠️★★★ **陽性対照** —— 上の判定は**違反した組で `false` を返す**。
