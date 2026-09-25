@@ -500,3 +500,28 @@
 - ★ **メインの独立検証は、全 acceptance（新旧＋envelope）を正しい終了コードで回すことを続ける**（★ これが唯一の網）。
 - **起票 P1-H（未是正）**: Loop の verify に「全 acceptance の回帰」を入れる設計（★ ただし worker が他 issue の門を直せない
   場合は `blocked` になる —— 分解で Allowed Files に入れる運用と組で考える）。
+
+## 判断 23: 極 M+ の押下区間は「**連続する release の並びの最後**」で閉じる（カウント方式の是正）
+
+- **日付**: 2026-09-25（★ 研究者裁定）
+- **背景**: issue 005 の `code-reviewer` HIGH。★ メインが一次で確認した経路:
+  `hook_windows.rs` は全イベントを `is_repeat: false` 固定で送る → `loop_step.rs:238-246` はリピートを判定するが、
+  ログに書く `KeyRecord`（`:248`・`is_repeat` を持たない）はリピートに関係なく作られる →
+  ⚠️ **Windows では修飾キーの押しっぱなしの自動リピートも `press:true` 行としてログに残る**。
+  category 形式には VK が無いので「リピート」と「2 つ目の修飾キー（Ctrl+Shift）」を**区別できない**。
+  → カウント方式（depth）は `P×N → R` で depth が N−1 残り、区間が**観測区間の右端まで閉じず**、極 M+ の onset を
+  大きく水増しする（系統誤差）。⚠️ 実機ログではなくコード経路での確認。
+- **選択肢**: A: 連続 release の並びの最後で閉じる ／ B: どの release でも閉じる ／ C: カウント方式のまま起票
+- **採用**: **A**
+- **理由**: `P×N → R` は R で閉じ、入れ子 `P P R R` は 2 つ目の R で閉じる。誤る向き（Ctrl を押したまま Shift を
+  離して押し直す等で一瞬区間が割れる）は**常に baseline 側（除外しない側）**で、極 M+ を水増ししない。
+- **影響範囲**: `stall_onset.rs::modifier_press_intervals` とその単体テスト ／ fixture にリピート列（P×20 → R）／
+  ⚠️ **計器（`loop_step.rs` / `logger.rs`）は変えない**（計器変更は別裁定）。
+- **見直しタイミング**: ログにリピートの有無または VK 相当の識別子が入ったとき（ADR-032 D9 `key.mod`）。
+
+## 判断 24: 極 M+ の区間の健全性（右端打ち切り本数・孤立 release 件数）を**封筒に載せる**
+
+- **日付**: 2026-09-25（★ 研究者裁定・`code-reviewer` MEDIUM）
+- **背景**: 打ち切り・孤立 release は `tracing::warn` にしか出ず、区間が壊れても出力は `pole_applicable=true` のまま平然と見える。
+- **採用**: 封筒 `config` に件数を足す（★ 極 M+ 以外は `null`）。判断 13 の `pole_modifier_rows`（修飾キー行数）と同じ扱い。
+  → `envelope-acceptance.sh` AC7 のキー集合を追随させる。
