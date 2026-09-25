@@ -96,6 +96,6 @@
 
 ## 完了処理
 
-- [ ] `_loop-retrospective.md`
-- [ ] `design.md` / `decisions.md` の最終化（`/finish-task`）
+- [x] `_loop-retrospective.md`（★ 2026-09-25）
+- [x] `design.md` / `decisions.md` の最終化（★ decisions は判断 1〜29 ＋ 起票 P1-A〜K。design.md は計画時の記録として残し、実装で変わった点は decisions 判断 17〜29 が持つ）
 - [ ] ⚠️ **main へのマージは研究者判断**
