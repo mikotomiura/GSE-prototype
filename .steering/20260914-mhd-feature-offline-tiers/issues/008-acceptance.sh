@@ -118,6 +118,10 @@ printf '%s' "$out3" | jq -e 'length > 0 and all(.[]; .stall_onset.is_onset == fa
 #     門は依然 `R` 経路を踏んでいない）。
 #   ⚠️ 打鍵数を減らして `R` を稼がない・`--set warmup_count` で下限を緩めない（★ 本番と違う経路を測ることになる。
 #     最初の沈黙は 1500 打鍵の後 = θ の標本 1499 対で、`warmup_count` 100 を超えている）。
+#   ⚠️★★★ この門が保証する範囲（2026-09-25・code-reviewer MEDIUM）: `R`（onset 数）に比例する経路を
+#     実際に踏むことと、`N`・立ち上がり数に対する**二乗**への退行の検出まで。★ `R=100`（`ONSET_SEGMENTS`）
+#     では `O(R·C)` や `O(R²)` への退行は 20 秒に届かず検出できない。`R` 経路そのものの正しさ（愚直走査との
+#     一致）は `restart::tests::many_onsets_match_a_naive_scan` が持つ（★ `ONSET_SEGMENTS` の値は変えない）。
 ONSET_SEGMENTS=100   # ★ 沈黙の数 = onset の本数 R（末尾を含む）。ONSET_MIN の 2 倍
 ONSET_MIN=50         # ★ R に比例する経路を踏むのに要る onset の下限（issue 008 AC1 / AC2）
 awk -v R="$ONSET_SEGMENTS" 'BEGIN{T=1700000000000; n=150000; sil=35000; per=int(n/R);

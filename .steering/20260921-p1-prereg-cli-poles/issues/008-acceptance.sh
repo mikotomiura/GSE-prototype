@@ -122,6 +122,41 @@ run_fake ok "$outdir_ok" \
 [ "$(ls -1 "$outdir_ok"/*.json 2>/dev/null | wc -l)" -eq 3 ] \
   || fail "AC5(陽性対照): 偽コマンドで 3 ファイル出ていない"
 
+# ── AC9: 陽性対照の outdir はファイル名がちょうど 3 極で、staging (.all-poles.*) が残らない ──
+for pole in baseline pointer_b modifier_m_plus; do
+  [ -f "$outdir_ok/$pole.json" ] || fail "AC9: $outdir_ok/$pole.json が無い"
+done
+count_ok="$(ls -1 "$outdir_ok" | wc -l | tr -d ' ')"
+[ "${count_ok:-0}" -eq 3 ] \
+  || fail "AC9: outdir のファイル数がちょうど 3 でない ($count_ok 個・余計なファイルがある可能性)"
+hidden_ok="$(ls -A "$outdir_ok" | grep -c '^\.all-poles\.' || true)"
+[ "${hidden_ok:-0}" -eq 0 ] \
+  || fail "AC9: staging ディレクトリ (.all-poles.*) が outdir に残っている"
+
+# ── AC10: 既に 3 ファイルがある outdir に ok を流すと exit 2 で拒否され、既存ファイルは変わらない ──
+outdir_reuse="$(mktemp -d)" || fail "AC10: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_reuse")
+run_fake ok "$outdir_reuse" \
+  || fail "AC10: 1 回目（空 outdir への ok）が非 0 になった（★ 前提が壊れている）"
+before_reuse="$(cat "$outdir_reuse/baseline.json" "$outdir_reuse/pointer_b.json" "$outdir_reuse/modifier_m_plus.json")"
+run_fake ok "$outdir_reuse"
+rc10=$?
+[ "$rc10" -eq 2 ] \
+  || fail "AC10: 既に 3 ファイルがある outdir への再実行が exit 2 にならない (rc=$rc10)。★ 使い回しの拒否が効いていない"
+after_reuse="$(cat "$outdir_reuse/baseline.json" "$outdir_reuse/pointer_b.json" "$outdir_reuse/modifier_m_plus.json")"
+[ "$before_reuse" = "$after_reuse" ] \
+  || fail "AC10: 拒否されたはずなのに既存ファイルの中身が変わった（★ fail-closed が破れている）"
+
+# ── AC11: git 管理下の outdir を渡すと exit 2 で拒否される ────────────────
+outdir_git="$(mktemp -d)" || fail "AC11: 一時ディレクトリを作れない"
+CLEANUP+=("$outdir_git")
+( cd "$outdir_git" && git init -q . ) >/dev/null 2>&1 \
+  || fail "AC11: テスト前提の git init に失敗した"
+run_fake ok "$outdir_git"
+rc11=$?
+[ "$rc11" -eq 2 ] \
+  || fail "AC11: git 管理下の outdir を渡しても exit 2 にならない (rc=$rc11)。★ 共有禁止の特徴行を repo 内に書きうる"
+
 # ng の枝 1: 1 極（pointer_b）だけが失敗 → 全体が非 0・outdir は空（staging も残さない）。
 outdir_ng="$(mktemp -d)" || fail "AC5: 一時ディレクトリを作れない"
 CLEANUP+=("$outdir_ng")

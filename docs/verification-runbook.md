@@ -204,10 +204,22 @@ bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>
   修飾キー行の無い入力の `modifier_m_plus`、ポインタの宣言も行も無い入力の `pointer_b` がそうで、
   **exit 0 のまま 3 ファイル出る**。★ 読む側は `config.pole_applicable` を**必ず見る**
   （⚠️ `false` の極の行は baseline と恒等なので、「その極でも onset が同じだった」と読まない）。
+- ⚠️★★★ **`<outdir>` は使い回さない**（2026-09-25 追加）: `baseline.json` / `pointer_b.json` /
+  `modifier_m_plus.json` の**いずれかが既にあれば exit 2 で拒否**される（★ fail-closed が
+  「古い 3 ファイルが残った outdir」では破れるため。前回の失敗の跡が残っていても、今回の失敗時に
+  古い 3 ファイルが「3 極そろった」と誤読される／成功時は黙って上書きされる、の両方を防ぐ）。
+  上書きしたいときは**空の `<outdir>` を新しく指定する**。
+- ⚠️★★★ **`<outdir>` は git 管理下に置かない**（2026-09-25 追加）: `git -C <outdir> rev-parse
+  --is-inside-work-tree` が成功すると **exit 2 で拒否**される。GSE repo の中・`gse-dataset` の
+  クローンの中の両方を弾く（★ 出力（特徴行）は共有禁止 (`sharing: prohibited`) で、repo 内に書くと
+  誤って `git add` で stage されうるため）。
 - ⚠️ 出力は**中間成果物**で `gse-dataset` へ共有しない（上の (i) の門が見る）。`<outdir>` は repo の外に置く。
 - ★ 計算量の門は **1 極あたり 20 秒**（`.steering/20260914-mhd-feature-offline-tiers/issues/008-acceptance.sh` の
   AC18 / AC18b。★ 門の入力は onset が 100 本立つ）。⚠️ 3 極を回すと時間は**約 3 倍**になるが、門は 3 倍を織り込まない
   （★ 1 極が遅いのか 3 回回しているのかを混ぜない）。
+  ⚠️★★★ **この門が保証する範囲**: `R`（onset 数）に比例する経路を実際に踏むことと、`N`・立ち上がり数に
+  対する **二乗**への退行の検出まで。★ `R=100` では `O(R·C)` や `O(R²)` への退行は 20 秒に届かず検出できない。
+  `R` 経路そのものの正しさ（愚直走査との一致）は `restart::tests::many_onsets_match_a_naive_scan` が持つ。
 
 ---
 
