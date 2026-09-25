@@ -16,12 +16,24 @@
 //! `decisions.md` 判断 3 のとおり、baseline は**このセッション内の IKI 分布**から作る。
 //! ⚠️ `ADR-030 D4` の `θ_person` (個人 × `task_kind` の分位点) とは別物 — D4 は
 //! `t0` 検出器の閾値の話であって、`T1a` の baseline の話ではない。混同しないこと。
+//!
+//! # `pause_*` の集約窓 (issue 003・判断 4)
+//!
+//! `pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は tick ではなく **`t1a_window_ms` の因果窓**で
+//! 集約する ([`pause_ms_by_window`])。⚠️ **`iki_cv` / `surprise` には窓を掛けない** (前者は tick
+//! ローカル・後者はセッション相対のまま)。★ 窓は**観測区間 (`feat` 行の穴) をまたがない**。
 
 /// 1 tick ぶんの `T1a` (分布・個人相対) 値。
 ///
-/// # ⚠️★★★ **`pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は現状つねに同値である**
+/// # `pause_*` は **`t1a_window_ms` の因果窓**で集約した値である (issue 003・判断 4)
 ///
-/// ★ 2026-09-15 の `code-reviewer` HIGH-1。**構造的な帰結であって、バグではない**:
+/// tick `k` の `pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は、[`pause_ms_by_window`] が作る窓
+/// `[tick_end − t1a_window_ms, tick_end)` に**再開する** pause の長さの分位点である。
+/// ⚠️ 窓の右端は tick の**終端**で、未来は見ない (因果的)。★ 窓長が `ENGINE_TICK_MS` なら旧来の
+/// 「その tick に帰属する pause だけ」と一致する。
+///
+/// ⚠️★★★ **窓が 1 tick だと 3 値は常に同値になる** (2026-09-15・`code-reviewer` HIGH-1・
+/// **構造的な帰結であってバグではない**。旧実装はこの状態で出荷されていた):
 ///
 /// - `features::PAUSE_THRESHOLD_MS` (= 2000ms) > `loop_step::ENGINE_TICK_MS` (= 1000ms)。
 /// - pause は**再開側の press が属する tick** に帰属する (`super` のモジュール doc)。
@@ -31,23 +43,23 @@
 /// - → ★★★ **1 tick に pause は高々 1 本。要素数が 1 なので 3 分位はすべて同じ値になる。**
 ///
 /// ★ 実測 (2026-09-15・`tests/fixtures/` の **14 本すべて**): `activity.pauses > 1` の tick は
-/// **0 件**、`p50 != max` の行も **0 件**。
+/// **0 件**、`p50 != max` の行も **0 件**だった。
 ///
-/// ⚠️★★★ **だから `p50` / `p90` を「分布の要約」として読んではならない。**
-/// ★ 現状この 3 つは**同じ 1 本の pause 長**であり、`003.md` AC3 の不変式
-/// `p50 <= p90 <= max` は**等号でしか成立せず、検出力を持たない**。
+/// → ★ **窓を広げて解いた**。窓長は事前宣言 (pre-registration) 事項なので値は
+/// `src-tauri/prereg/p1-episode.json` の `t1a_window_ms` が SSOT である
+/// (★ 判断 4・起票 7 の選択肢 (a))。⚠️ **`--set t1a_window_ms=<ENGINE_TICK_MS>` で窓を 1 tick に
+/// 戻すとこの退化が再現する** —— これが `003-acceptance.sh` AC4 の陽性対照である。
 ///
-/// ★ 直し方は **集約窓を決める問題**であり、⚠️ **窓長は事前宣言 (pre-registration) 事項**なので
-/// ここで勝手に決めない (★ ADR-030 D4 が `W` / `q` / `B` を P1 前の事前宣言としたのと同型)。
-/// → ★ `.steering/20260914-mhd-feature-offline-tiers/blockers.md` **起票 7** で人にエスカレートしている。
+/// ⚠️★★★ **窓は観測区間 (`feat` 行の穴) をまたがない** (★ 起票 6): 削除区間・一時停止・計器欠損の
+/// 前後にある pause は同じ窓に入らず、**穴をまたぐ 1 本の巨大 pause も窓に入らない**。
+/// ⚠️ 原因ラベルは作らない (ADR-030 却下リスト 9) —— 使うのは `feat` 行の**存在**だけである。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Dispersion {
-    /// この tick に帰属する pause 長 (ms) の中央値相当 (nearest-rank 法)。要素 0 個なら `null`。
-    /// ⚠️ 上の struct doc のとおり**現状は `pause_max_ms` と必ず同値**である。
+    /// 窓に再開する pause 長 (ms) の中央値相当 (nearest-rank 法)。窓に pause が 0 本なら `null`。
     pub pause_p50_ms: Option<f64>,
-    /// 同じく 90 パーセンタイル相当。⚠️ **現状は `pause_max_ms` と必ず同値**。
+    /// 同じく 90 パーセンタイル相当。
     pub pause_p90_ms: Option<f64>,
-    /// 同じく最大値。★ 現状はこの tick に帰属する**唯一の pause の長さ**そのものである。
+    /// 同じく最大値。⚠️ 窓が 1 tick だと 3 値は必ず同値になる (上の struct doc)。
     pub pause_max_ms: Option<f64>,
     /// この tick に帰属する IKI (打鍵間隔) の変動係数 (std / mean)。要素 2 個未満、
     /// または mean が 0 (同時刻打鍵のみ) なら `null`。
@@ -158,6 +170,13 @@ pub struct PauseDuration {
     pub gap_ms: u64,
 }
 
+impl PauseDuration {
+    /// この pause の開始 (= 再開する press の直前の press) の時刻。
+    fn start_ts(&self) -> u64 {
+        self.resuming_ts.saturating_sub(self.gap_ms)
+    }
+}
+
 /// press 時刻列から pause (長さ付き) の列を作る。pause の判定は `super::extract_pause_resumptions`
 /// (共有ヘルパ) にそのまま委ね、本関数は対になる直前 press との差分から長さを添えるだけ
 /// (`boundary::pause_boundary_pairs` と対称の手法。判定を再実装しない)。
@@ -184,9 +203,77 @@ pub fn pause_durations(press_ts: &[u64]) -> Vec<PauseDuration> {
     out
 }
 
-/// tick ごとの `Dispersion` を作る純関数。`pause_ms_in_tick` / `iki_ms_in_tick` は
-/// 呼び出し側 (`super::build_feature_rows`) が既に tick へ帰属済みの値を渡す
-/// (`activity::compute_t0_activity` / `boundary::compute_boundary` と対称)。
+/// tick ごとの `T1a` の pause 長の集合を、**因果的なローリング窓**で作る (issue 003・判断 4)。
+///
+/// tick `k` (終端 `tick_end = grid_origin_ms + (k + 1) * tick_ms`) の窓は
+/// `[tick_end − window_ms, tick_end)` で、再開時刻 (`resuming_ts`) がここに入る pause を集める。
+/// ★ 右端は tick の終端で**未来を見ない**。★ tick の帰属規則 (左閉右開・再開側の tick) と同じ向きなので、
+/// `window_ms == tick_ms` なら旧来の「その tick に帰属する pause だけ」と一致する。
+/// ⚠️ `window_ms` が `tick_ms` 未満なら tick の後半だけを見る (`0` は空の窓 = 全 tick が空)。
+///
+/// ⚠️★★★ **窓は観測区間 (`feat` 行の穴) をまたがない** (★ 起票 6 の `T1a` 側):
+/// `observed` は `stall_onset::observed_intervals` の返り値 (昇順・互いに素) で、
+/// 隣り合う区間の間 `(end_j, start_{j+1})` が**穴**である。窓は tick の終端より前にある**最後の穴の
+/// 直後**より前へは伸びず、⚠️ **穴と重なる pause (開始が穴より前・再開が穴より後) も入れない**
+/// —— そうしないと削除後の NDJSON で穴の前後が 1 本の巨大 pause として接続され、
+/// その長さが `pause_max_ms` に出る。★ tick の終端そのものが穴の中にある tick は**空の窓**になる
+/// (0 で埋めず `null` に落ちる)。
+/// ⚠️ 穴として扱うのは**隣り合う区間の間だけ**である —— 最初の区間より前・最後の区間より後は
+/// 「区間が無い」だけで穴ではない。★ `observed` が空 (`feat` 行が 1 本も無い) なら穴の情報が無いので、
+/// **窓を切らない**。⚠️ 原因ラベルは作らない (ADR-030 却下リスト 9): 使うのは `feat` 行の**存在**だけ。
+///
+/// 戻り値は tick ごとの pause 長 (ms・**順不同**) で、`compute_dispersion` へそのまま渡す。
+/// 計算量は `O(tick_count + pauses + Σ 窓内の pause 数)` (2 本のポインタが単調に進む)。
+pub fn pause_ms_by_window(
+    pauses: &[PauseDuration],
+    tick_count: usize,
+    grid_origin_ms: u64,
+    tick_ms: u64,
+    window_ms: u64,
+    observed: &[(u64, u64)],
+) -> Vec<Vec<u64>> {
+    let mut sorted: Vec<PauseDuration> = pauses.to_vec();
+    sorted.sort_unstable_by_key(|p| p.resuming_ts);
+
+    let mut out: Vec<Vec<u64>> = Vec::with_capacity(tick_count);
+    // left: 窓に入る最初の pause / right: tick の終端以降の最初の pause (= 窓の外の未来)。
+    let (mut left, mut right) = (0_usize, 0_usize);
+    // 終端より前で終わっている穴の数。次の区間の先頭 `observed[holes_passed].0` が窓の下限になる。
+    let mut holes_passed = 0_usize;
+    for k in 0..tick_count {
+        let tick_end = grid_origin_ms + (k as u64 + 1) * tick_ms;
+        let last_instant = tick_end.saturating_sub(1);
+        while holes_passed + 1 < observed.len() && observed[holes_passed].1 < last_instant {
+            holes_passed += 1;
+        }
+        let hole_floor = if holes_passed == 0 {
+            0
+        } else {
+            observed[holes_passed].0
+        };
+        let window_start = tick_end.saturating_sub(window_ms).max(hole_floor);
+
+        while right < sorted.len() && sorted[right].resuming_ts < tick_end {
+            right += 1;
+        }
+        while left < right && sorted[left].resuming_ts < window_start {
+            left += 1;
+        }
+        out.push(
+            sorted[left..right]
+                .iter()
+                .filter(|p| p.start_ts() >= hole_floor)
+                .map(|p| p.gap_ms)
+                .collect(),
+        );
+    }
+    out
+}
+
+/// tick ごとの `Dispersion` を作る純関数。`pause_ms_in_window` は [`pause_ms_by_window`] が作った
+/// **その tick の窓**の pause 長、`iki_ms_in_tick` は呼び出し側 (`super::build_feature_rows`) が既に
+/// tick へ帰属済みの値を渡す (`activity::compute_t0_activity` / `boundary::compute_boundary` と対称)。
+/// ⚠️ `iki_ms_in_tick` に窓は掛からない (`iki_cv` は tick ローカル)。
 /// `baseline` はセッション全体から一度だけ作ったものを渡す (tick ごとに作り直さない)。
 ///
 /// ⚠️★★★ **非有限値 (NaN / Inf) を出してはならない。**
@@ -198,11 +285,11 @@ pub fn pause_durations(press_ts: &[u64]) -> Vec<PauseDuration> {
 /// [`coefficient_of_variation`] の `m == 0.0`)、**将来の改修で壊れても無音である**。
 /// → ★ 回帰は [`tests::emitted_values_are_always_finite`] が張る。
 pub fn compute_dispersion(
-    pause_ms_in_tick: &[u64],
+    pause_ms_in_window: &[u64],
     iki_ms_in_tick: &[u64],
     baseline: Option<&SessionIkiBaseline>,
 ) -> Dispersion {
-    let mut sorted_pause: Vec<u64> = pause_ms_in_tick.to_vec();
+    let mut sorted_pause: Vec<u64> = pause_ms_in_window.to_vec();
     sorted_pause.sort_unstable();
 
     let surprise = match (mean(iki_ms_in_tick), baseline) {
@@ -409,6 +496,178 @@ mod tests {
         assert!(
             !json.contains("null"),
             "値が揃っている入力で null が出た (非有限値が null に化けた疑い): {json}"
+        );
+    }
+
+    fn pd(resuming_ts: u64, gap_ms: u64) -> PauseDuration {
+        PauseDuration {
+            resuming_ts,
+            gap_ms,
+        }
+    }
+
+    /// AC5 (issue 003): 窓は**因果的**である —— tick の値は `[tick_end − window, tick_end)` に
+    /// 再開する pause だけから作り、未来を見ない。
+    #[test]
+    fn window_is_causal_and_never_looks_ahead() {
+        use crate::analysis::loop_step::ENGINE_TICK_MS;
+        let t = |n: u64| n * ENGINE_TICK_MS;
+        // 再開が tick 3 / 6 / 9 / 12 の先頭。gap は全部別の値 (★ どの pause が窓に入ったか見分ける)。
+        let all = vec![
+            pd(t(3), 2500),
+            pd(t(6), 2600),
+            pd(t(9), 2700),
+            pd(t(12), 2800),
+        ];
+        let ticks = 15;
+        let window = 3 * ENGINE_TICK_MS;
+        let run =
+            |ps: &[PauseDuration]| pause_ms_by_window(ps, ticks, 0, ENGINE_TICK_MS, window, &[]);
+        let full = run(&all);
+
+        // tick 2 = [t(2), t(3)): 再開 t(3) は tick 3 に属する。★ **未来なのでまだ見えない**。
+        assert!(full[2].is_empty(), "{:?}", full[2]);
+        // tick 3: 自 tick に再開した pause が見える。
+        assert_eq!(full[3], vec![2500]);
+        // tick 5 (終端 t(6)・窓 [t(3), t(6))): 下限 t(3) は含み、上限 t(6) は含まない (tick 6 の pause)。
+        assert_eq!(full[5], vec![2500]);
+        // tick 6 (終端 t(7)・窓 [t(4), t(7))): t(3) は窓の外へ出て、t(6) が入る。
+        assert_eq!(full[6], vec![2600]);
+
+        // ★ 未来の pause を 1 本足しても、その pause の tick より前の行は 1 つも変わらない。
+        for cut in 0..all.len() {
+            let partial = run(&all[..cut]);
+            let cut_tick = (all[cut].resuming_ts / ENGINE_TICK_MS) as usize;
+            for k in 0..cut_tick {
+                assert_eq!(
+                    full[k], partial[k],
+                    "tick {k} が未来の pause (cut={cut}) に依存している"
+                );
+            }
+            // ★ 陽性対照: pause 自身の tick では差が出る (= 窓が pause を実際に見ている)。
+            assert_ne!(
+                full[cut_tick], partial[cut_tick],
+                "cut={cut} の pause が窓に入っていない"
+            );
+        }
+    }
+
+    /// 窓長 `0` は空の窓であり、panic せず全 tick が空になる (★ CLI は `t1a_window_ms >= 1` に限る)。
+    #[test]
+    fn zero_window_is_empty_and_does_not_panic() {
+        use crate::analysis::loop_step::ENGINE_TICK_MS;
+        let all = vec![pd(3 * ENGINE_TICK_MS, 2500)];
+        let out = pause_ms_by_window(&all, 6, 0, ENGINE_TICK_MS, 0, &[]);
+        assert_eq!(out.len(), 6);
+        assert!(out.iter().all(|v| v.is_empty()), "{out:?}");
+    }
+
+    /// AC6 (issue 003・起票 6): 窓は**観測区間 (`feat` 行の穴) をまたがない**。
+    /// ⚠️ 穴を挟んだ pause は同じ窓に入らず、**穴と重なる 1 本の巨大 pause も入らない**。
+    #[test]
+    fn window_does_not_span_a_feat_hole() {
+        use crate::analysis::loop_step::ENGINE_TICK_MS;
+        let t = |n: u64| n * ENGINE_TICK_MS;
+        // 観測区間は [t(1), t(20)] と [t(40), t(56)]。間の (t(20), t(40)) が穴。
+        let observed = [(t(1), t(20)), (t(40), t(56))];
+        let before_hole = pd(t(10), 3000); // 区間 0 の中
+        let straddler = pd(t(44), t(25)); // 開始 t(19) は区間 0・再開 t(44) は区間 1 → 穴と重なる
+        let after_hole = pd(t(52), 3300); // 区間 1 の中 (開始 t(52) − 3300 は t(40) 以降)
+        let all = [before_hole, straddler, after_hole];
+        let ticks = 60;
+        // ★ 全体を覆う広い窓 (窓長だけでは 3 本とも入る)。
+        let window = t(60);
+        let with_holes = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &observed);
+        let no_info = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &[]);
+
+        // ★ 陽性対照: 穴の情報が無ければ 3 本とも同じ窓に入り、巨大 pause が最大値になる。
+        assert_eq!(no_info[59], vec![3000, t(25), 3300]);
+        // 穴の後の窓には**穴より後で閉じた pause だけ**が入る (前の区間の pause も巨大 pause も入らない)。
+        assert_eq!(with_holes[59], vec![3300]);
+        // どの tick にも巨大 pause は現れない。
+        assert!(
+            !with_holes.iter().flatten().any(|&g| g == t(25)),
+            "穴をまたぐ pause が窓に入った"
+        );
+
+        // 穴より前の tick は切られない (区間 0 の中の pause はそのまま見える)。
+        assert_eq!(with_holes[19], vec![3000]);
+        // ★ 終端が穴の中にある tick は空の窓 (0 で埋めず null に落ちる)。
+        assert!(with_holes[29].is_empty(), "{:?}", with_holes[29]);
+        assert!(with_holes[41].is_empty(), "{:?}", with_holes[41]);
+        assert_eq!(
+            no_info[29],
+            vec![3000],
+            "陽性対照: 穴の情報が無ければ見える"
+        );
+    }
+
+    /// AC7 (issue 003): 窓は **`iki_cv` / `surprise` を変えない** (⚠️ pause 分位点だけに掛かる)。
+    /// ★ 窓を 1 tick と広い窓で `build_feature_rows` を通し、他の列が 1 つも動かないことを固定する。
+    #[test]
+    fn window_does_not_change_iki_cv_or_surprise() {
+        use crate::analysis::feat_offline::{
+            build_feature_rows, QualityInputs, StallOnsetConfig, StallOnsetInputs,
+        };
+        use crate::analysis::loop_step::ENGINE_TICK_MS;
+        use crate::analysis::metrics::KeyPress;
+
+        // 間隔がまちまちで pause を何本も含む打鍵列 (0x41 = 'A' は文字生成キー)。
+        let ts = [
+            0_u64, 150, 300, 3000, 3200, 3400, 6500, 6600, 6900, 10_000, 10_100, 13_500,
+        ];
+        let keys: Vec<KeyPress> = ts
+            .iter()
+            .map(|&timestamp| KeyPress {
+                timestamp,
+                vk: 0x41,
+            })
+            .collect();
+        let run = |window_ms: u64| {
+            let inputs = StallOnsetInputs {
+                feat_ts: &[],
+                task_kind_declarations: &[],
+                config: StallOnsetConfig {
+                    t1a_window_ms: window_ms,
+                    ..StallOnsetConfig::default()
+                },
+            };
+            let q = QualityInputs {
+                capabilities_declared: false,
+                hook_health: &[],
+            };
+            build_feature_rows(&keys, &[], &[], 10_000, &inputs, &q).expect("within tick limit")
+        };
+        let narrow = run(ENGINE_TICK_MS);
+        let wide = run(StallOnsetConfig::default().t1a_window_ms);
+        assert_eq!(narrow.len(), wide.len());
+
+        let mut pause_columns_moved = false;
+        for (i, (n, w)) in narrow.iter().zip(&wide).enumerate() {
+            assert_eq!(
+                n.dispersion.iki_cv, w.dispersion.iki_cv,
+                "tick {i}: iki_cv が窓で動いた"
+            );
+            assert_eq!(
+                n.dispersion.surprise, w.dispersion.surprise,
+                "tick {i}: surprise が窓で動いた"
+            );
+            // dispersion 以外の列も 1 つも動かない。
+            let mut nv = serde_json::to_value(n).expect("serialize");
+            let mut wv = serde_json::to_value(w).expect("serialize");
+            nv.as_object_mut().expect("object").remove("dispersion");
+            wv.as_object_mut().expect("object").remove("dispersion");
+            assert_eq!(nv, wv, "tick {i}: dispersion 以外の列が窓で動いた");
+            if n.dispersion.pause_p50_ms != w.dispersion.pause_p50_ms
+                || n.dispersion.pause_max_ms != w.dispersion.pause_max_ms
+            {
+                pause_columns_moved = true;
+            }
+        }
+        // ★ 陽性対照: 窓を広げると pause 列は動く (= この入力で窓が効いている)。
+        assert!(
+            pause_columns_moved,
+            "窓を広げても pause 列が動かない (入力が窓を試せていない)"
         );
     }
 }

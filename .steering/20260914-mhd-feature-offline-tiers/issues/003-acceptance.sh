@@ -47,14 +47,21 @@ out2="$(cargo run --quiet --bin gse-replay -- tests/fixtures/instrument_rich.ndj
 printf '%s' "$out2" | jq -e '[.[].dispersion.pause_max_ms | select(. != null)] | length > 0' >/dev/null 2>&1 \
   || fail "instrument_rich で pause_max_ms が全行 null（★ 同 fixture は pause を 2 本持つ）"
 
-# ⚠️★★★ 現状 p50 == p90 == max である（★ code-reviewer HIGH-1・構造的帰結）。
-#   ★ PAUSE_THRESHOLD_MS(2000) > ENGINE_TICK_MS(1000) なので 1 tick に pause は高々 1 本。
-#   → ★ **この検査は「いま 3 値が同値であること」を固定する**。⚠️ 集約窓を広げる裁定
-#     （blockers.md 起票 7）が通ったら、**本検査を先に書き換えること**。
-printf '%s' "$out" | jq -e '
+# ⚠️★★★ 2026-09-25 置き換え（issue 003・`.steering/20260921-p1-prereg-cli-poles/` 判断 4・起票 7 の裁定）:
+#   旧: 「いま p50 == p90 == max であること」を固定していた（★ code-reviewer HIGH-1・構造的帰結:
+#       PAUSE_THRESHOLD_MS(2000) > ENGINE_TICK_MS(1000) なので 1 tick に pause は高々 1 本）。
+#   → 集約窓を 30 秒ローリング窓（既定 t1a_window_ms）に広げて退化は**解けた**ので、その固定は撤去した。
+#   ★ 代わりに **窓を 1 tick に戻すと退化が再現する**（= 構造的帰結の証明が今も成り立つ）ことを固定する。
+#   ⚠️ 窓が実際に効いていること（p50 != max の行が出る）は、新タスクの 003-acceptance.sh AC3 / AC4 が持つ。
+narrow="$(cargo run --quiet --bin gse-replay -- tests/fixtures/deep_silence.ndjson --features --set t1a_window_ms=1000 2>/dev/null | jq -e '.rows | arrays')" \
+  || fail "gse-replay --features --set t1a_window_ms=1000 が非 0 で終了した、または封筒の .rows を取り出せない"
+printf '%s' "$narrow" | jq -e '
+  [.[] | .dispersion | select(.pause_p50_ms != null)] | length > 0' >/dev/null 2>&1 \
+  || fail "窓を 1 tick にしても pause 分位点が全行 null（★ 比較の母集団が空だと下の検査が空振りする）"
+printf '%s' "$narrow" | jq -e '
   all(.[] | .dispersion | select(.pause_p50_ms != null);
     .pause_p50_ms == .pause_p90_ms and .pause_p90_ms == .pause_max_ms)' >/dev/null 2>&1 \
-  || fail "p50/p90/max が同値でない（★ 起票 7 の裁定が入ったなら本検査を更新すること）"
+  || fail "窓を 1 tick に戻しても p50/p90/max が同値にならない（★ 構造的退化の証明が崩れたか、窓の実装が 1 tick と一致していない）"
 
 # AC6: ⚠️ 帯域分割を入れていないこと（★ [P121] が否定した形）
 if grep -nEi '(band|bucket|short_pause|medium_pause|long_pause|帯域)' \
