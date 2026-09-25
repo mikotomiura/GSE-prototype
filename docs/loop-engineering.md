@@ -231,6 +231,15 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
   ★ ただし **`--issues` で `blocked` を承知で回したとき**は、その attempt の
   `attempt_start` に `detail` を 1 行足す (⚠ 迂回が端末のスクロールバックにしか残らないのを避ける)。
 
+**追補 (2026-09-25): attempt 中に worker が worktree 側で `blocked` にしたら、その attempt の
+verify 失敗で打ち切る。** 上の除外判定は main checkout 側の `## Status` を**起動前**に 1 回読むだけ
+なので、worker が「Allowed Files の外の変更が必要」と判断して**worktree 側**のコピーの
+`## Status` を `blocked` に書き換えて止まっても、`loop-run.sh` は気づかず同じ worker を
+`max_attempts` まで再起動していた (issue 001 の実測で 5 attempt の空回り)。
+→ worktree 生成直後の `## Status` を記録しておき、verify 失敗のたびに worktree 側を読み直して
+「開始時は `blocked` でなかったのに今 `blocked`」という**遷移**だけを検知したら、その場で打ち切る
+(`--issues` で最初から `blocked` な issue を明示実行する経路は遷移が起きないため対象外のまま)。
+
 ### ⚠ `permission_denials` を残すときは、先に伏せる (2026-09-20)
 
 `loop-run.sh` は拒否の内訳を events の `detail` (集計) と
