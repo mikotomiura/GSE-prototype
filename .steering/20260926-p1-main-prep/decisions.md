@@ -154,3 +154,13 @@
 - **決定**: 判断 19 のまま。別の宣言ファイルは作らない。
 - **理由**: 事前宣言 §2.3 の表「どこに書くか」= **本書の新バージョン**。値の SSOT は凍結 JSON（parity 検査の対象）。「変更禁止」は D の範囲での話で、v1.2 は研究者が新版として切る。
 - **採った部分**: 値の型と範囲の検証（int・bool でない・1 以上）を 004 / 005 に足した。
+
+## 判断 23: `verify_level: recheck` の 7 本を `parse` に落とす（実行セッション・watchdog の故障）
+
+- **決定**: 001〜005・007・008 の `verify_level` を `recheck` → `parse` にする。006・009・010 は元から `parse`。
+- **理由**: `recheck` の効果は watchdog（Haiku）の起動だけで、その watchdog が `WD_TOOLS` の不備で acceptance を回せず、
+  20 ターンを使い切って空応答になり `blocked` になる（詳細と実測は `blockers.md` B-1）。**AC 未充足の指摘ではなく、gate の故障**。
+- **担保**: acceptance は (1) `loop-run.sh` の verify 内（worktree で `00X-acceptance.sh`）と (2) merge 前のメインによる clean な検証用 worktree での再実行、の 2 段で残る。
+  ★ `issue-slicing` 基準 5 の選別（研究の契約をコードで固定する issue は再検証する）の**趣旨**は (2) が担う。
+- **却下案**: `loop-run.sh` の `WD_TOOLS` とプロンプトをこの task の中で直す（共有基盤の変更・範囲外）。→ 起票候補 P1-L。
+- **見直し**: P1-L を直したら、次の task の issue-slicing で `recheck` を再び選別する。
