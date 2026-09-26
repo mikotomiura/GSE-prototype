@@ -245,6 +245,7 @@ echo stray > "${BAD}/P01/notes.txt"
 run bash "${TARGET}" "${BAD}" "${TMP}/w4b"
 expect_rc "<ndjson-root> のレイアウト違反（契約に無いエントリ）" 2
 check "⚠️ レイアウト違反では <workdir> を作らない" test ! -e "${TMP}/w4b"
+SNAP_ND_BEFORE="$(cd "${ND}" && find . | sort)"
 run bash "${TARGET}" "${ND}" "${ND}/out"
 expect_rc "<workdir> が <ndjson-root> の中" 2
 check "⚠️ 入力のディレクトリに何も作らない" test ! -e "${ND}/out"
@@ -259,6 +260,8 @@ check "⚠️ 利用者の既存の空ディレクトリを消さない（rmdir 
 run bash "${TARGET}" "${ND}" "${TMP}/w4d/new/../w4e"
 expect_rc "まだ無い <workdir> が '..' を含む" 2
 check "⚠️ '..' を含む未作成の <workdir> では何も作らない" test ! -e "${TMP}/w4d"
+# ★ 個々の名前ではなく、拒否の前後で入力ディレクトリの構成が**同一**であること（想定外の場所に作られた階層も拾う）
+check "⚠️ 入力ディレクトリの構成が拒否の前後で同一" test "$(cd "${ND}" && find . | sort)" = "${SNAP_ND_BEFORE}"
 mkdir -p "${TMP}/empty-root"
 run bash "${TARGET}" "${TMP}/empty-root" "${TMP}/w4c"
 expect_rc "セッションが 1 つも無い <ndjson-root>" 2
