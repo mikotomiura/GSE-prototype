@@ -49,12 +49,19 @@
 #   GSE_REPLAY_BIN=src-tauri/target/release/gse-replay bash scripts/run-features-all-poles.sh <in> <outdir>
 #     ★ `GSE_REPLAY_BIN` を与えると `cargo run`（debug）の代わりにそのバイナリを使う（長いセッションを release で回す用）。
 #     ⚠️ 相対パスは**呼び出し元の cwd** から解決する。
+#   bash scripts/run-features-all-poles.sh <session.ndjson> <outdir> -- --set <key>=<value> [--set <key>=<value> ...]
+#     ★ `--` の後ろの `--set` の組を、3 極すべての `gse-replay --features` へそのまま渡す（issue 004・探索格子の実行器が使う）。
+#     ⚠️ 許すのは `--set <key>=<value>` の組**だけ**: key は w_ms / q / b_ms / hole_gap_ms / warmup_count / t1a_window_ms、
+#        value は ^[0-9]+(\.[0-9]+)?$。`--pole` / `--features` / `--feature-config`・知らない key・形の違う value・
+#        **同じ key の 2 回指定**・`--` の後ろが空、はすべて exit 2（★ 極は本スクリプトだけが決める・後勝ちで黙って通さない）。
+#     ⚠️ `--` が無い呼び出しの挙動は変えない。
 #
 # Exit: 0 = 3 ファイルとも出した / 1 = ⚠️ 失敗（★ 何も出していない） /
 #       2 = 引数が違う、または outdir がガード条件に違反
 #         （★ baseline.json / pointer_b.json / modifier_m_plus.json のいずれかが既にある ＝ 使い回し拒否・
 #            outdir が git 管理下、または git 判定自体がエラー ＝ 拒否・
-#            outdir が他プロセスにロックされている ＝ 二重起動拒否）
+#            outdir が他プロセスにロックされている ＝ 二重起動拒否・
+#            `--` の後ろが `--set <key>=<value>` の組の白リストに合わない ＝ 拒否）
 #
 # ⚠️ 出力（特徴行・封筒）は**中間成果物**であり `gse-dataset` へ共有しない
 #   （★ `scripts/check_no_feature_output.sh`・`docs/glossary.md`「特徴行」）。outdir は repo の外に置く。
@@ -68,12 +75,53 @@ die() { echo "[all-poles] NG: $*" >&2; exit 1; }
 # ★ 引数不正 / outdir ガード違反は exit 1 (die) ではなく exit 2 で区別する（ヘッダの Exit 契約参照）。
 reject() { echo "[all-poles] NG: $*" >&2; exit 2; }
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>" >&2
+USAGE="usage: bash scripts/run-features-all-poles.sh <session.ndjson> <outdir> [-- --set <key>=<value> ...]"
+if [ "$#" -lt 2 ]; then
+  echo "$USAGE" >&2
   exit 2
 fi
 IN="$1"
 OUT="$2"
+shift 2
+
+# ⚠️★★★ `--` の後ろ（issue 004）: `--set <key>=<value>` の組だけを gse-replay へ渡す。
+#   ★ 副作用（mkdir / staging / ロック）より前に検査する。⚠️ 白リストに合わないものは 1 つも通さない:
+#     `--pole` を通すと 3 極の網羅が崩れ、`--feature-config` を通すと凍結既定から外れた出力が凍結の顔で出る。
+#   ⚠️ 同じ key の 2 回指定は exit 2（gse-replay は後勝ちで黙って通してしまう・Codex TASK-PRE 指摘 5）。
+#   ⚠️ 値の形は bash の正規表現で見る（★ `grep` は行単位なので、改行を含む値の 1 行目だけで通ってしまう）。
+SET_ARGS=()
+SEEN_KEYS=" "
+if [ "$#" -gt 0 ]; then
+  if [ "$1" != "--" ]; then
+    echo "$USAGE" >&2
+    exit 2
+  fi
+  shift
+  [ "$#" -gt 0 ] || reject "'--' の後ろが空（★ 変数が未設定のまま展開されていないか。渡すものが無いなら '--' ごと省く）"
+  SET_VALUE_RE='^[0-9]+(\.[0-9]+)?$'
+  while [ "$#" -gt 0 ]; do
+    [ "$1" = "--set" ] || reject "'--' の後ろで許すのは '--set <key>=<value>' の組だけ（実際: '${1}'）"
+    [ "$#" -ge 2 ] || reject "'--set' に <key>=<value> が続いていない"
+    KV="$2"
+    case "$KV" in
+      *=*) ;;
+      *) reject "'--set ${KV}' は <key>=<value> の形ではない" ;;
+    esac
+    KEY="${KV%%=*}"
+    VALUE="${KV#*=}"
+    case "$KEY" in
+      w_ms|q|b_ms|hole_gap_ms|warmup_count|t1a_window_ms) ;;
+      *) reject "'--set' の key '${KEY}' は許可されていない（許可: w_ms q b_ms hole_gap_ms warmup_count t1a_window_ms）" ;;
+    esac
+    [[ "$VALUE" =~ $SET_VALUE_RE ]] || reject "'--set ${KEY}' の値 '${VALUE}' が ^[0-9]+(\\.[0-9]+)?\$ の形ではない"
+    case "$SEEN_KEYS" in
+      *" ${KEY} "*) reject "'--set ${KEY}' が 2 回指定されている（★ 後勝ちで黙って通さない）" ;;
+    esac
+    SEEN_KEYS="${SEEN_KEYS}${KEY} "
+    SET_ARGS+=(--set "$KV")
+    shift 2
+  done
+fi
 [ -n "$IN" ] || { echo "[all-poles] ⚠️ 入力が空文字（★ 変数が未設定のまま展開されていないか）" >&2; exit 2; }
 [ -n "$OUT" ] || { echo "[all-poles] ⚠️ outdir が空文字（★ 変数が未設定のまま展開されていないか）" >&2; exit 2; }
 
@@ -136,11 +184,13 @@ trap cleanup EXIT
 IN_STAGED="$STAGE/$(basename "$IN_ABS")"
 cp "$IN_ABS" "$IN_STAGED" || die "入力を staging へコピーできない: $IN_ABS"
 
+# ★ `${SET_ARGS[@]+"${SET_ARGS[@]}"}`: macOS 既定の bash 3.2 は `set -u` 下で空配列の展開が unbound variable になる
+#   （`--` なしの呼び出しでは SET_ARGS が空）。⚠️ この形なら空でも落ちず、要素の境界も保たれる。
 run_replay() { # run_replay <極> <出力ファイル>
   if [ -n "${GSE_REPLAY_BIN:-}" ]; then
-    "$GSE_REPLAY_BIN" "$IN_STAGED" --features --pole "$1" > "$2"
+    "$GSE_REPLAY_BIN" "$IN_STAGED" --features --pole "$1" ${SET_ARGS[@]+"${SET_ARGS[@]}"} > "$2"
   else
-    ( cd "$REPO_ROOT/src-tauri" && cargo run --quiet --bin gse-replay -- "$IN_STAGED" --features --pole "$1" ) > "$2"
+    ( cd "$REPO_ROOT/src-tauri" && cargo run --quiet --bin gse-replay -- "$IN_STAGED" --features --pole "$1" ${SET_ARGS[@]+"${SET_ARGS[@]}"} ) > "$2"
   fi
 }
 

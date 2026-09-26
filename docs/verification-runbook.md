@@ -192,6 +192,8 @@ bash scripts/check_no_feature_output.sh --root /c/gse-dataset
 bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>
 #   ★ 長いセッションは release で（⚠️ 相対パスは呼び出し元の cwd から解決する）:
 #     GSE_REPLAY_BIN=src-tauri/target/release/gse-replay bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>
+#   ★ 設定を振る（探索格子 `scripts/p1_run_grid.py` が使う）: `--` の後ろの `--set <key>=<value>` を 3 極すべてへ渡す（⚠️ `q` は `warmup_count` と対で・同じ key の 2 回指定は exit 2）:
+#     bash scripts/run-features-all-poles.sh <session.ndjson> <outdir> -- --set q=0.995 --set warmup_count=200
 ```
 
 - ★ 出るのは `<outdir>/baseline.json` / `pointer_b.json` / `modifier_m_plus.json` の 3 つ。
