@@ -26,3 +26,15 @@
 ### 証拠
 - W1 で `blocked` になった枝の先端（クリーンアップで撤去した）: `loop/001-issue` = `aa4892c1` / `loop/007-issue` = `4ef99cae`（reflog に残る）。
 - 再現の生出力: 007 の watchdog 呼び出し → `error_max_turns`・21 ターン・`result` 空（本セッションの scratchpad `wd-007.json`）。
+
+## B-2: `004-acceptance.sh` の「Rust 不変」が `main` との差分で、007/008 を merge した base では常に赤（2026-09-26・実行セッション・★ 分解の欠陥）
+
+- **症状**: 004 の worker は実装とテストを終えてコミットしたが、`004-acceptance.sh` の 12 行目（`git diff --quiet main -- src-tauri/src/`）が rc=1 になり、
+  worker は「gate であり Allowed Files の外」として書き換えずに Status を `blocked` にして止まった（`blocked`・events）。
+- **原因**: base（`feat/p1-main-prep`）は W1/W2 で merge した 007/008 の Rust の変更（`dispersion.rs` / `mod.rs` / `replay.rs`）を既に含み、`main` にはまだ無い。
+  → `main` との差分で「004 が Rust を変えていない」を見ると、**004 が何を書いても赤**になる。分解時に「Rust の issue は別の chain だから交差しない」と考え、acceptance の**基準ブランチ**を見落とした。
+  （★ worker の診断は正しい。ただし変更の出所は「issue 001」ではなく 007/008。）
+- **他の acceptance への波及**: 全 acceptance の `git diff … main` を grep して確かめた。他は凍結 JSON・schema・fixture・`Cargo.toml`・007/008 が触らない Rust ファイル（009 の `restart.rs` / `stall_onset.rs`）・`scripts/build_analysis_db.py` の比較で、影響しない。006 / 010 は最初から base（`feat/p1-main-prep`）を基準にしている。
+- **対処（判断 25）**: 004 の 12 行目の基準を `feat/p1-main-prep`（無ければ `main`）へ変える。★ 強さは変えていない（004 の変更が Rust に及べば赤）。
+  修正版を **clean な検証用 worktree で worker のコミットに対して**回し、rc=0（13 テスト OK・AC5 の実 CLI・AC7 の白リスト・配線検査を含む）を確認した。
+- ⚠️ **教訓（issue-slicing への還元）**: acceptance の「変えていない」検査は、**base が他の issue の merge で進むこと**を前提に、`main` ではなく base を基準にする。

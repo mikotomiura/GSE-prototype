@@ -171,3 +171,10 @@
 - **数え方**: JSON として `type == "feat"` の行を数える（`jq -c 'select(.type=="feat")' <file> | wc -l`）。⚠️ 文字列 grep `"type":"feat"` だと 8 本になる —— `resumption_outcomes.ndjson` だけ JSON の区切りに空白が入っており（`"type": "feat"`）数え落とす。
 - **影響**: なし（判断 9 の決定そのものは数に依らない・onset 側へ揃える）。訂正したのは ADR-030 補訂 3 項目 1・issue 008 の Execution Result・issue 010 の記録・過去 acceptance（mhd 003）のコメント。
 - ⚠️ 判断 9 の本文と 008.md の Background は**当時の記録として書き換えない**（この判断が訂正の SSOT）。
+
+## 判断 25: 004-acceptance.sh の基準ブランチを `main` から base へ（実行セッション・分解の欠陥の是正）
+
+- **決定**: `004-acceptance.sh` の「Rust 不変」検査の基準を `feat/p1-main-prep`（無ければ `main`）にする。検査の強さ（004 の変更が `src-tauri/src/` に及べば赤）は変えない。
+- **理由**: `blockers.md` B-2。base は 007/008 の Rust の変更を含むので、`main` との差分は 004 と無関係に赤になる。worker が gate を書き換えずに止まったのは正しい判断だった。
+- **担保**: 修正版を clean な検証用 worktree で worker のコミットに対して回し rc=0。他の acceptance を全数 grep して同型の欠陥が無いことを確かめた。
+- **却下案**: 12 行目を削除する／特定ファイルだけに絞る（検査が弱くなる）。

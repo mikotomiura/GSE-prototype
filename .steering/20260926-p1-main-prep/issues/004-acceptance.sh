@@ -9,7 +9,11 @@ export PYTHONUTF8=1
 
 for f in scripts/p1_run_grid.py scripts/tests/test_p1_run_grid.py; do [ -f "$f" ] || fail "$f が無い"; done
 git diff --quiet main -- src-tauri/prereg/ docs/preregistration-p1-episode.md || fail "凍結文書か凍結 JSON が変わっている"
-git diff --quiet main -- src-tauri/src/ || fail "Rust が変わっている（判断 7: CLI は変えない）"
+# ★ Rust を本 issue が変えていない: タスクの base ブランチとの差分で見る。
+#   ⚠️ base（feat/p1-main-prep）は 007 / 008 の Rust の変更を既に含むので、`main` との差分で見ると何を書いても赤になる
+#   （2026-09-26・blockers.md B-2）。006 / 010 と同じ基準の取り方。★ 強さは変えていない（004 の変更が Rust に及べば赤）。
+B="$(git rev-parse --verify -q feat/p1-main-prep || echo main)"
+git diff --quiet "$B" -- src-tauri/src/ || fail "Rust が変わっている（判断 7: CLI は変えない）"
 
 log="$("$PY" -m unittest scripts.tests.test_p1_run_grid -v 2>&1)"; rc=$?
 printf '%s\n' "$log" | tail -5
