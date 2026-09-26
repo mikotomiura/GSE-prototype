@@ -56,3 +56,13 @@ G-1 の実装 / G-2 の実装 / G-5(2) の実装 / T3 の GAS 変更。
 - テスト 2 本: 直接（対照つき: 更新なしは奪われる / refresh すれば奪われない）＋配線（3 本の O1 送信で毎回ロックが新しいことを uploader が確認）。**変異検査**: ループ内の refresh を消すと配線テストが赤・refresh を no-op にすると 2 本とも赤（緑から壊して赤を確認済み）。
 - 検証: `cargo test --workspace --features package` 813 passed / fmt / clippy `-D warnings` すべて緑（Mac）。⚠️ **Windows は CI 待ち**（`File::set_modified` は std だが実機未確認）。
 - ⚠️ 既知の残り: 奪われた側の `Drop` が後続のロックを消す挙動は直していない（heartbeat で奪取自体がほぼ起きなくなるため・YAGNI）。死んだ収束器のロックは 3600s 後に奪える。
+
+### レビュー対応（code-reviewer / security-checker・2026-09-27・すべて一次で確かめてから反映）
+| 指摘 | 判定 | 対応 |
+|---|---|---|
+| code-reviewer **HIGH**: 梱包側の `refresh` を消してもテストが緑 | **本物**（梱包側だけ消す変異で 29/29 緑を実測）。⚠️ 私の最初の変異は両方を同時に消していたので**送信側しか証明できていなかった** | スレッドローカルの呼び出し回数カウンタ（`cfg(test)`）＋テスト `refresh_is_called_once_per_package_and_once_per_upload`（梱包 N＋送信 M ＝ N+M 回）。**梱包側だけ／送信側だけ消す変異が個別に赤**になることを確認 |
+| code-reviewer MEDIUM: `LOCK_STALE_AFTER` の旧因果（600 秒で壊れる）が heartbeat 後は不成立・`HttpUploader` 側が未改訂 | 本物 | 2 箇所を「必要条件は 1 本ぶんの所要が閾値より十分に短いこと」へ改訂 |
+| code-reviewer MEDIUM: 「12 本 × 300 = 3600」は `>` を満たさない | 本物（算術） | 「13 本以上」へ訂正 |
+| code-reviewer/security-checker: `refresh` がパスで開き直す（奪われた後は他人のロックを延命）・所有者識別なし・symlink 追随（LOW） | 指摘は正しい | **今回は直さない**: fd 保持は Windows の「開いたまま `remove_file`」の挙動を手元で確かめられず（CI の Windows でしか検査できない）、heartbeat で奪取自体がほぼ起きなくなるため効果が小さい。所有者識別（pid＋nonce）は別スコープ。→ 残課題として記録。`NotFound` の警告だけ区別して出す（切り分け用） |
+| LOW: `backdate_lock` の unwrap / `mem::forget` / impl ブロックの分割 | 任意 | `expect` に変更。他は現状維持 |
+| security-checker: プライバシー規約違反なし（URL・メール・ID・氏名・時刻 0 件・`tracing` のパスは提出物に載らない） | — | 対応不要 |

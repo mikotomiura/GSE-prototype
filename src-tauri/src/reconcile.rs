@@ -168,12 +168,20 @@ impl ReconcileLock {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    /// テスト専用: このスレッドで `ReconcileLock::refresh` が呼ばれた回数。
+    /// ⚠️ スレッドローカルなので、並列に走る他のテストの呼び出しは混ざらない。
+    static REFRESH_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 impl ReconcileLock {
     /// ★ **走っている間、ロックの mtime を「いま」へ進める** (heartbeat)。
     ///
     /// ⚠️★★★ 更新が無いと、`acquire` の stale 判定は「**取った時刻からの経過**」になり、
     /// 1 回の収束が `LOCK_STALE_AFTER` を超えて走ったとき**走っている最中のロックを奪われる**。
-    /// O1 は 1 日 1 本なので、回線断が約 12 日続く (= 未送信 12 本 × 送信 timeout 300 秒 > 3600 秒) と
+    /// O1 は 1 日 1 本なので、回線断が約 13 日続く (= 未送信 13 本 × 送信 timeout 300 秒 = 3900 秒 > 3600 秒。
+    /// ⚠️ 12 本ちょうどは 3600 秒で `acquire` の `>` に当たらない。梱包の時間を足せばもっと早い) と
     /// 現に起きる (2026-09-27 に `impact-analyzer` が指摘・`reconcile.rs` 自身を読んで確認)。
     /// 奪われると 2 つの収束器が同じ番号を採り、先に終わった側の `Drop` が**後続のロックを消す**。
     ///
@@ -182,15 +190,24 @@ impl ReconcileLock {
     /// ⚠️ 更新に失敗しても収束は止めない (ロックは補助・失敗しても番号衝突が起きる窓が開くだけ)。
     /// ただし黙らない。
     pub fn refresh(&self) {
+        #[cfg(test)]
+        REFRESH_CALLS.with(|c| c.set(c.get() + 1));
         let result = std::fs::OpenOptions::new()
             .write(true)
             .open(&self.path)
             .and_then(|f| f.set_modified(std::time::SystemTime::now()));
-        if let Err(e) = result {
-            tracing::warn!(
+        match result {
+            Ok(()) => {}
+            // ⚠️ ロックが消えている = **奪われた (または手で消された)** 可能性。
+            //   ★ 作り直さない (他の収束器のロックを壊さない)。走り続けるが、原因の切り分けのため区別して出す。
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => tracing::warn!(
+                "reconcile: the lock file is gone (taken over?) at {:?}",
+                self.path
+            ),
+            Err(e) => tracing::warn!(
                 "reconcile: could not refresh the lock heartbeat at {:?}: {e}",
                 self.path
-            );
+            ),
         }
     }
 }
@@ -203,15 +220,16 @@ impl Drop for ReconcileLock {
 
 /// ロックが残骸とみなされるまでの時間。
 ///
-/// ★ 送信のタイムアウト (300 秒・2026-09-05 に実測して決定) × 10 を超える値にする。
-/// ⚠️ タイムアウトを 600 秒にすると 6000 s > 3600 s で**壊れる**。
+/// ★ 送信のタイムアウト (300 秒・2026-09-05 に実測して決定) を**十分に**上回る値にする
+/// (余裕は × 10 = 3000 秒。テスト `the_stale_threshold_is_longer_than_a_worst_case_run`)。
 /// ⚠️ 短すぎると、正常に走っている収束器のロックを奪って上の衝突を再現してしまう。
 ///
 /// ★ **2026-09-27 の改訂**: 旧文は「× 想定される未送信の最大本数 (10 ブロック)」で、**取った時刻からの
-/// 経過**で判定していた。G1 の 10 ブロックには足りたが、O1 の日単位の滞留 (12 本以上) には足りない。
+/// 経過**で判定していた。G1 の 10 ブロックには足りたが、O1 の日単位の滞留 (13 本以上) には足りない。
 /// → 収束器が `ReconcileLock::refresh` で 1 本ごとに mtime を進めるようにしたので、この値は
-/// 「**1 本ぶん (300 秒) を大きく超えて更新が無い = 死んだ**」の閾値になり、本数に依存しない。
-/// (× 10 の余裕は据え置き。テスト `the_stale_threshold_is_longer_than_a_worst_case_run`)。
+/// 「**1 本ぶんの所要を大きく超えて更新が無い = 死んだ**」の閾値になり、**本数に依存しない**。
+/// 必要条件は「**1 本ぶんの最大所要 (送信 timeout) が本値より十分に短いこと**」だけである
+/// (⚠️ 送信 timeout を延ばすときは 1 本ぶんの所要が本値に近づかないことだけを見ればよい)。
 pub const LOCK_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
 /// ★ **G1 で書かれ、かつ閉じ終わった**セッション NDJSON を、名前昇順 (= 時刻順) で列挙する。
@@ -746,7 +764,9 @@ impl HttpUploader {
             //      ⚠️ これ以上長くしても、37 MB 超は timeout ではなく **400 で落ちる**ので
             //      何も買えない (★ 長い timeout が助けるのは「遅い回線」だけ)。
             //   2. ⚠️ `LOCK_STALE_AFTER >= timeout * 10` の不変条件 (下のテスト) がある。
-            //      ★ 600 秒にすると 6000 s > 3600 s で**壊れる**。300 s なら 3000 s ≤ 3600 s。
+            //      ★ 2026-09-27 以降は heartbeat (`ReconcileLock::refresh`) があるので**未送信の本数には
+            //      依存しない**が、1 本ぶんの所要が `LOCK_STALE_AFTER` に近づかない余裕は要る
+            //      (300 s なら 3000 s ≤ 3600 s。⚠️ 600 秒にするとテストが赤になる = 余裕の見直しを促す)。
             .timeout(std::time::Duration::from_secs(300))
             .build()
             .map_err(|e| format!("HTTP クライアントを初期化できません: {e}"))?;
@@ -1307,8 +1327,9 @@ mod tests {
         let f = std::fs::OpenOptions::new()
             .write(true)
             .open(dir.join("reconcile.lock"))
-            .unwrap();
-        f.set_modified(std::time::SystemTime::now() - age).unwrap();
+            .expect("backdate_lock: reconcile.lock を開けない");
+        f.set_modified(std::time::SystemTime::now() - age)
+            .expect("backdate_lock: mtime を動かせない");
     }
 
     /// ⚠️★★★ **長く走っている収束器のロックを奪わせない** (heartbeat)。
@@ -1401,6 +1422,33 @@ mod tests {
             *up.seen_fresh.lock().unwrap(),
             vec![true, true, true],
             "★ 2 本目以降の送信の前にもロックが更新されていること"
+        );
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ★ **梱包側と送信側の両方**で 1 本ごとに `refresh` が呼ばれる (N 本包む + M 本送る = N + M 回)。
+    ///
+    /// ⚠️ 上の `LockProbeUploader` は**送信側だけ**しか観測できない (梱包は uploader が最初に
+    /// backdate する前に全部終わる)。→ 梱包側の呼び出しを消しても緑のままだった
+    /// (code-reviewer HIGH・2026-09-27・変異で実測)。呼び出し回数で両方を固定する。
+    #[test]
+    fn refresh_is_called_once_per_package_and_once_per_upload() {
+        let d = tmpdir("hb_count");
+        let o = tmpdir("hb_count_out");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_090909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_100909.ndjson", end);
+        let r = test_recipient();
+
+        REFRESH_CALLS.with(|c| c.set(0));
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let rep = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+        assert_eq!((rep.packaged, rep.sent), (2, 2), "{:?}", rep.errors);
+        assert_eq!(
+            REFRESH_CALLS.with(|c| c.get()),
+            4,
+            "★ 梱包 2 回 + 送信 2 回 = 4 回 (梱包側か送信側のどちらかを消すと減る)"
         );
         let _ = std::fs::remove_dir_all(&d);
         let _ = std::fs::remove_dir_all(&o);
