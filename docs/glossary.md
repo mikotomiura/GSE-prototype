@@ -240,6 +240,11 @@
 | 極の適用可否 | pole applicability | 極が**計算できない**入力を `not_applicable` として報告し、⚠️ **値で埋めない**規律（ADR-030 補訂 1 項目 3）。★ 極 M+ の判定単位は**入力ファイル（セッション）単位**、判定式は **`category:"modifier"` の `key` 行が 0 本**（`.steering/20260921-p1-prereg-cli-poles/decisions.md` 判断 13）。⚠️★★★ **OS 単位では判定できない** —— `meta` 行に `os` が無い（実測）。⚠️ 「計器が無い」と「たまたま押さなかった」は**区別しない**（★ どちらでも極 M+ は極 M− と恒等なので、上下界の幅は変わらない） | 極, 封筒 |
 | 事前宣言文書 | pre-registration document | ★ **P1 前に解析パラメータを凍結する文書**（`docs/preregistration-p1-episode.md`）。⚠️ `docs/preregistration-v0.3.md`（**較正スモークの合否契約**・PreReg-1〜8 / GATE1–3）とは**対象フェーズも判定量も別**である。★ **運用値**（P1 で実際に使う値）と**探索空間・選択手続き**（WP2 の freeze が動ける範囲）を**両建て**で持つ（判断 1）。★ 値の SSOT は**凍結 JSON** であり、文書と JSON の一致は検査で固定する | 凍結 JSON, 2段ゲート |
 | 凍結 JSON | frozen config | 事前宣言文書が凍結した値の **SSOT**（repo にコミットされた JSON）。★ `gse-replay --features` が**既定として読む**ので、⚠️ **文書とコードが drift しない**。★ `--feature-config <path>` / `--set <key>=<value>` で上書きでき、⚠️ **既定から外れた値は封筒に明示的に刻まれる**（＝ 事前登録から外れた出力が自己申告する） | 事前宣言文書, 封筒 |
+| 上下界の軸 | bounds axis | ★ **G2 などの上下界を min / max で取る 2 極の組**。**ポインタ軸** = `baseline`（極 A）と `pointer_b`（極 B）／ **修飾キー軸** = `baseline`（極 M−）と `modifier_m_plus`（極 M+）（事前宣言 v1.1 冒頭 (3)）。⚠️ **軸をまたいで 3 実行の min / max を取らない** | 「ポインタ軸の上下界は算出不可、修飾キー軸は not_applicable」 |
+| 算出不可 | not computable | ★ **ポインタ軸で `pointer_b` が `pole_applicable=false` のときの上下界の状態**。⚠️ **幅 0 と報告しない** —— 非適用の極 B は baseline と恒等な出力を出すので、入れると測っていない幅が 0 に見える（v1.1 (3)）。⚠️ 修飾キー軸の `not_applicable`（幅への寄与 0 が構造で保証される）とは**扱いが違う** | 極の適用可否, 上下界の軸 |
+| PG-1 分布集計 | PG-1 distribution | ★ **宣言ゲート PG-1 に渡す唯一の集計**: 参加者 × 極ごとの episode（onset）数の分布（事前宣言 §2.3「見てよいのは参加者ごとの episode 数の分布だけ」）。⚠️ **転帰・予測成績・`restart`・`ime_overlap`・`T1a` を読まない**ことを構造で保証する（`scripts/p1_pg1_distribution.py`・2026-09-26 タスク D） | 「PG-1 分布集計の出力だけを見て下限を宣言する」 |
+| episode 表 | episode table | ★ `--features` の 3 極出力から作る、**極ごとの onset 1 行 = 1 episode** の表（DuckDB・repo の外・共有しない）。⚠️ `ime_overlap` は retrospective なので **`t0` 時点の特徴量のビューに入れない**（v1.1 (1)）。⚠️ 件数は **E2（分割）で数えた値**（§4 #8） | PG-1 分布集計, 特徴行 |
+| 探索格子 | search grid | ★ 事前宣言 §2.1 の **選択 27 通り**（`q` × `hole_gap_ms` × `t1a_window_ms`）＋ **感度 OFAT 4 実行**（`w_ms` / `b_ms`）。★ `q` と `warmup_count` は対応表（`0.99→100`／`0.995→200`／`0.999→1000`）で**対にして**渡し、`config.warmup_count` が表と合わない実行は結果に使わない（v1.1 (5)）。⚠️ **WP1 の内側・PG-1 の後でだけ回す** | 事前宣言文書, 凍結 JSON |
 
 ## 略語
 
