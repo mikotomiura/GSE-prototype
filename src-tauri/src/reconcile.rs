@@ -110,6 +110,13 @@ pub struct ReconcileReport {
 /// (★ 収束型なので、やらなかった仕事は次の機会に必ず拾われる)。
 pub struct ReconcileLock {
     path: PathBuf,
+    /// ★ このロックの**所有印** (取得時にファイルへ書く)。`refresh` / `Drop` は、ファイルの中身が
+    /// これと一致するときだけ触る = **奪われた後に他人のロックを延命も削除もしない**
+    /// (2026-09-27・code-reviewer / security-checker / Codex の 3 系統が一致して指摘)。
+    token: String,
+    /// ★ 所有を失ったと分かった (ロックが消えた / 別の収束器のものに替わった)。
+    /// `reconcile()` は次の 1 本に進まず**中断する** (採番の衝突を広げない)。
+    lost: std::sync::atomic::AtomicBool,
 }
 
 /// ロックを取ろうとした結果。
@@ -138,7 +145,30 @@ impl ReconcileLock {
                 .create_new(true)
                 .open(&path)
             {
-                Ok(_) => return LockOutcome::Acquired(Self { path }),
+                Ok(mut f) => {
+                    let token = new_lock_token();
+                    // ⚠️ 所有印を書けないロックは `refresh` / `Drop` が自分のものと確認できない。
+                    //   → 取れなかったものとして片付け、**失敗として出す** (Busy に倒さない)。
+                    if let Err(e) = std::io::Write::write_all(&mut f, token.as_bytes()) {
+                        drop(f);
+                        if let Err(rm) = std::fs::remove_file(&path) {
+                            // 誰も持たない空のロックが残り、1 時間は Busy になる (stale で自己回復する)。
+                            tracing::warn!(
+                                "reconcile: could not remove the half-written lock at {:?}: {rm}",
+                                path
+                            );
+                        }
+                        return LockOutcome::Unavailable(format!(
+                            "ロックファイルに書き込めません ({}): {e}",
+                            path.display()
+                        ));
+                    }
+                    return LockOutcome::Acquired(Self {
+                        path,
+                        token,
+                        lost: std::sync::atomic::AtomicBool::new(false),
+                    });
+                }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                     if attempt > 0 {
                         return LockOutcome::Busy;
@@ -168,17 +198,127 @@ impl ReconcileLock {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    /// テスト専用: このスレッドで `ReconcileLock::refresh` が呼ばれた回数。
+    /// ⚠️ スレッドローカルなので、並列に走る他のテストの呼び出しは混ざらない。
+    static REFRESH_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+impl ReconcileLock {
+    /// ★ **走っている間、ロックの mtime を「いま」へ進める** (heartbeat)。
+    ///
+    /// ⚠️★★★ 更新が無いと、`acquire` の stale 判定は「**取った時刻からの経過**」になり、
+    /// 1 回の収束が `LOCK_STALE_AFTER` を超えて走ったとき**走っている最中のロックを奪われる**。
+    /// O1 は 1 日 1 本なので、回線断が約 13 日続く (= 未送信 13 本 × 送信 timeout 300 秒 = 3900 秒 > 3600 秒。
+    /// ⚠️ 12 本ちょうどは 3600 秒で `acquire` の `>` に当たらない。梱包の時間を足せばもっと早い) と
+    /// 現に起きる (2026-09-27 に `impact-analyzer` が指摘・`reconcile.rs` 自身を読んで確認)。
+    /// 奪われると 2 つの収束器が同じ番号を採る。
+    ///
+    /// ★ 1 本ごと (梱包 1 回・送信 1 回) の直前に呼ぶ。→ stale 判定は「**更新と更新の間 (1 本ぶん)** を
+    /// 超えて更新が無い」だけになり、未送信の本数に依存しない。
+    /// ⚠️★ **更新する前にファイルの中身が自分の所有印か確認する。** 奪われて別の収束器のロックに
+    /// 替わっていたら、それを延命せず (`lost` を立てて) 呼び出し側に**中断させる**。
+    /// 進められなかっただけ (I/O エラー) なら、黙らないが止めない (ロックは補助)。
+    pub fn refresh(&self) {
+        #[cfg(test)]
+        REFRESH_CALLS.with(|c| c.set(c.get() + 1));
+        match self.owned() {
+            // ★ 自分のロックのときだけ進める。
+            Some(true) => {
+                let result = std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(&self.path)
+                    .and_then(|f| f.set_modified(std::time::SystemTime::now()));
+                if let Err(e) = result {
+                    // 進められなかっただけ (所有は失っていない)。黙らないが止めない。
+                    tracing::warn!(
+                        "reconcile: could not refresh the lock heartbeat at {:?}: {e}",
+                        self.path
+                    );
+                }
+            }
+            // ⚠️ 消えた / 別の収束器のものに替わった = **奪われた**。作り直さず・触らず、印を立てる。
+            Some(false) => {
+                self.lost.store(true, std::sync::atomic::Ordering::SeqCst);
+                tracing::warn!(
+                    "reconcile: the lock was taken over or removed at {:?}; stopping this run",
+                    self.path
+                );
+            }
+            // 読めなかった (一時的な I/O エラー等)。所有は断定できないので中断はしない。
+            None => tracing::warn!(
+                "reconcile: could not read the lock to verify ownership at {:?}",
+                self.path
+            ),
+        }
+    }
+
+    /// ★ 所有を失ったか (`refresh` が奪取・消失を検知した)。呼び出し側は次の 1 本へ進まない。
+    pub fn is_lost(&self) -> bool {
+        self.lost.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// ファイルの中身が自分の所有印か。`Some(true)`=自分 / `Some(false)`=無い・別物 / `None`=読めない。
+    ///
+    /// ⚠️★ **これは OS の排他ロックではない**。確認と操作 (`refresh` の更新・`Drop` の削除) の間には
+    /// 競合窓が残る。⚠️ 窓の長さに上限は無い (確認の直後にスケジューラやスリープで止まりうる)。
+    /// → 「奪われたら他人のロックを延命・削除し続ける」から「確認直後に止まった場合だけ」へ縮むだけで、
+    /// 排他を**保証**するものではない。また処理の途中 (1 本の梱包・送信) で奪われても、その 1 本は
+    /// 完了する (次の `refresh` で初めて検知する)。
+    ///
+    /// ★ 保証を失ったときの**最後の砦**は 2 つ: (1) 出力名が既にあれば包まない
+    /// (`out_path.exists()`・「1 本も失わない」)、(2) 受け口が同名を**別名で足す**
+    /// (`GSE_O1_Submit.gs` `saveWithoutOverwriting_`)。→ 最悪でも**重複・番号のずれ**であって、
+    /// データの喪失ではない。
+    fn owned(&self) -> Option<bool> {
+        match std::fs::read_to_string(&self.path) {
+            Ok(body) => Some(body == self.token),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(false),
+            Err(_) => None,
+        }
+    }
+}
+
+/// ロックの所有印を作る (プロセス ID ＋ 時刻 ＋ プロセス内の連番)。秘密ではない・推測されても害は無い。
+fn new_lock_token() -> String {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "{}-{nanos}-{}",
+        std::process::id(),
+        SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    )
+}
+
 impl Drop for ReconcileLock {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        // ★ **自分のロックだけ**消す。奪われた後に、後続の収束器のロックを消して
+        //   3 つ目を通さない (旧実装は無条件に消していた)。読めないときは消さない
+        //   (残しても 1 時間で stale として奪える・他人のを消すより害が小さい)。
+        if self.owned() == Some(true) {
+            let _ = std::fs::remove_file(&self.path);
+        }
     }
 }
 
 /// ロックが残骸とみなされるまでの時間。
 ///
-/// ★ 送信のタイムアウト (300 秒・2026-09-05 に実測して決定) × 想定される未送信の最大本数
-/// (10 ブロック) を超える値にする。⚠️ タイムアウトを 600 秒にすると 6000 s > 3600 s で**壊れる**。
+/// ★ 送信のタイムアウト (300 秒・2026-09-05 に実測して決定) を**十分に**上回る値にする
+/// (余裕は × 10 = 3000 秒。テスト `the_stale_threshold_is_longer_than_a_worst_case_run`)。
 /// ⚠️ 短すぎると、正常に走っている収束器のロックを奪って上の衝突を再現してしまう。
+///
+/// ★ **2026-09-27 の改訂**: 旧文は「× 想定される未送信の最大本数 (10 ブロック)」で、**取った時刻からの
+/// 経過**で判定していた。G1 の 10 ブロックには足りたが、O1 の日単位の滞留 (13 本以上) には足りない。
+/// → 収束器が `ReconcileLock::refresh` で 1 本ごとに mtime を進めるようにしたので、この値は
+/// 「**1 本ぶんの所要を大きく超えて更新が無い = 死んだ**」の閾値になり、**本数に依存しない**。
+/// 前提は「**更新と更新の間 (= 1 本の梱包、または 1 本の送信) が本値より十分に短いこと**」である。
+/// ⚠️ 送信は timeout (300 秒) で抑えられるが、**梱包と読み込みは timeout で抑えられていない**。
+/// 更新の間隔が本値を超えれば従来と同じ奪取が起きる — ただしその場合も、奪われた側は `refresh` で
+/// 所有を確認して**中断し**、他人のロックを延命も削除もしない (`ReconcileLock::token`)。
 pub const LOCK_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
 /// ★ **G1 で書かれ、かつ閉じ終わった**セッション NDJSON を、名前昇順 (= 時刻順) で列挙する。
@@ -508,7 +648,7 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
 
     // ★ 同時に 2 つ走らせない (ブロック番号の衝突を防ぐ・`ReconcileLock` のコメント参照)。
     //   ⚠️ 取れなかったのは **失敗ではない**。何もせずに帰る。
-    let _lock = match ReconcileLock::acquire(&opts.submission_dir, LOCK_STALE_AFTER) {
+    let lock = match ReconcileLock::acquire(&opts.submission_dir, LOCK_STALE_AFTER) {
         LockOutcome::Acquired(l) => l,
         LockOutcome::Busy => {
             report.skipped_busy = true;
@@ -533,10 +673,18 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
             closed_o1_sessions(&opts.session_dir, opts.now_ms, crate::o1::SUBMIT_GRACE_MS)
         }
     };
+    // ★ ロックを奪われたと分かったら、次の 1 本へ進まず**中断する** (採番の衝突を広げない)。
+    let mut lost = false;
     for input in candidates {
         let stem = session_stem(&input);
         if age_for_stem(&opts.submission_dir, &stem).is_some() {
             continue; // 既に包んである (手動提出で作った旧形式も含む)
+        }
+        // ★ 1 本ごとに heartbeat (`ReconcileLock::refresh` のコメント参照)。
+        lock.refresh();
+        if lock.is_lost() {
+            lost = true;
+            break;
         }
         // ⚠️★★★ **O1 は G1 と別の名前空間で採番する** (研究者判断 R-13)。
         //   ★ 共有すると番号を食い合い、⚠️ 研究者から見て「何ブロック目か」が意味を失う。
@@ -599,6 +747,8 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
     //   ★ `.age.ok` が担っていた「同意手続きを経ていない人が起動する経路を塞ぐ」役割は、
     //   O1 では **配布フォルダのマーカー (`o1.mode`)** が担う (G1 の `g1.mode` と同じ形)。
     //   ⚠️ G1 は `approved_unsent_age_files` のまま —— 1 バイトも変えない。
+    // ⚠️ `upload_disabled` は冒頭 (`uploader.is_none()`) で確定済み。奪われたときだけ送信を飛ばす。
+    let uploader = if lost { None } else { uploader };
     if let Some(up) = uploader {
         let to_send = match opts.mode {
             CollectionMode::G1 => crate::submission::approved_unsent_age_files(
@@ -626,6 +776,12 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                     continue;
                 }
             };
+            // ★ 1 本ごとに heartbeat (最大 300 秒の送信の**前**に進める)。
+            lock.refresh();
+            if lock.is_lost() {
+                lost = true;
+                break;
+            }
             match up.upload(&name, &bytes) {
                 Ok(()) => {
                     // ★ 送れたときだけ印を置く。⚠️ `.age` には触らない。
@@ -643,6 +799,18 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                 Err(e) => report.errors.push(format!("{name} を送信できません: {e}")),
             }
         }
+    }
+
+    if lost {
+        // ⚠️ 黙らない。やらなかった仕事は次の機会に収束する (収束型)。
+        // ★ `Busy` (= 他が走っている・正常な取り合い) と違い、**走行中にロックが消えた・替わった**のは
+        //   異常なので、失敗 (errors) として出す。データは失われないが、原因 (AV の掃除・同期フォルダ・
+        //   スリープ跨ぎ) を研究者が追えるようにする。(code-reviewer 2 巡目は「Busy と同じ扱い」を提案。
+        //   2026-09-27 に検討し、正常と異常を分けるほうを採った。O1 の画面には出ない・G1 では稀。)
+        report.errors.push(
+            "収束の途中でロックを失いました (別の収束器に奪われた可能性)。残りは次の機会に収束します。"
+                .to_string(),
+        );
     }
 
     // ⚠️★ **数える対象と送る対象を同じ規則にする** (`submission.rs` の drift 防止の趣旨)。
@@ -709,7 +877,9 @@ impl HttpUploader {
             //      ⚠️ これ以上長くしても、37 MB 超は timeout ではなく **400 で落ちる**ので
             //      何も買えない (★ 長い timeout が助けるのは「遅い回線」だけ)。
             //   2. ⚠️ `LOCK_STALE_AFTER >= timeout * 10` の不変条件 (下のテスト) がある。
-            //      ★ 600 秒にすると 6000 s > 3600 s で**壊れる**。300 s なら 3000 s ≤ 3600 s。
+            //      ★ 2026-09-27 以降は heartbeat (`ReconcileLock::refresh`) があるので**未送信の本数には
+            //      依存しない**が、1 本ぶんの所要が `LOCK_STALE_AFTER` に近づかない余裕は要る
+            //      (300 s なら 3000 s ≤ 3600 s。⚠️ 600 秒にするとテストが赤になる = 余裕の見直しを促す)。
             .timeout(std::time::Duration::from_secs(300))
             .build()
             .map_err(|e| format!("HTTP クライアントを初期化できません: {e}"))?;
@@ -1262,6 +1432,270 @@ mod tests {
             ReconcileLock::acquire(&o, LOCK_STALE_AFTER),
             LockOutcome::Acquired(_)
         ));
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ロックファイルの mtime を `age` だけ過去へ動かす (テスト用)。
+    fn backdate_lock(dir: &Path, age: std::time::Duration) {
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(dir.join("reconcile.lock"))
+            .expect("backdate_lock: reconcile.lock を開けない");
+        f.set_modified(std::time::SystemTime::now() - age)
+            .expect("backdate_lock: mtime を動かせない");
+    }
+
+    /// ⚠️★★★ **長く走っている収束器のロックを奪わせない** (heartbeat)。
+    ///
+    /// O1 で未送信が 12 本以上溜まると 1 回の収束が 3600 秒を超える。更新が無いと、
+    /// 走っている最中のロックが「古い」と判定されて奪われ、番号衝突と二重送信が起きる。
+    #[test]
+    fn a_refreshed_lock_is_not_taken_over_but_an_unrefreshed_one_is() {
+        let two_hours = std::time::Duration::from_secs(2 * 60 * 60);
+
+        // 対照: 更新が無いまま 2 時間経ったロックは奪われる (= 旧実装の壊れ方)。
+        let a = tmpdir("hb_control");
+        let held_a = match ReconcileLock::acquire(&a, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("first lock must be acquired"),
+        };
+        backdate_lock(&a, two_hours);
+        let stolen = ReconcileLock::acquire(&a, LOCK_STALE_AFTER);
+        assert!(
+            matches!(stolen, LockOutcome::Acquired(_)),
+            "対照: 更新の無い古いロックは奪われる (このテストの前提)"
+        );
+        // ★ 奪われた側の Drop は後続のロックを消さない (所有印)。旧実装は無条件に消していた。
+        drop(held_a);
+        assert!(
+            a.join("reconcile.lock").is_file(),
+            "★ 奪われた側の Drop が、奪った側のロックを消してはならない"
+        );
+        drop(stolen);
+        let _ = std::fs::remove_dir_all(&a);
+
+        // 本体: 走りながら refresh していれば、同じ 2 時間の遅れでも奪われない。
+        let b = tmpdir("hb_refreshed");
+        let held_b = match ReconcileLock::acquire(&b, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("first lock must be acquired"),
+        };
+        backdate_lock(&b, two_hours);
+        held_b.refresh();
+        assert!(
+            matches!(
+                ReconcileLock::acquire(&b, LOCK_STALE_AFTER),
+                LockOutcome::Busy
+            ),
+            "★ refresh したロックは奪われない"
+        );
+        drop(held_b);
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// 送信のたびにロックの mtime を確かめ、確かめたあと 2 時間前へ戻す送信層。
+    /// ⚠️ `reconcile()` が 1 本ごとに `refresh` を呼んでいなければ、**2 本目**で赤くなる。
+    struct LockProbeUploader {
+        submission_dir: PathBuf,
+        seen_fresh: Mutex<Vec<bool>>,
+    }
+    impl Uploader for LockProbeUploader {
+        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), String> {
+            let lock = self.submission_dir.join("reconcile.lock");
+            let age = std::fs::metadata(&lock)
+                .and_then(|m| m.modified())
+                .map(|t| t.elapsed().unwrap_or_default())
+                .unwrap_or(std::time::Duration::MAX);
+            self.seen_fresh
+                .lock()
+                .unwrap()
+                .push(age < std::time::Duration::from_secs(60));
+            backdate_lock(
+                &self.submission_dir,
+                std::time::Duration::from_secs(2 * 60 * 60),
+            );
+            Ok(())
+        }
+    }
+
+    /// ★ 未送信が複数あるとき、`reconcile()` が**送信の直前ごとに**ロックを更新している。
+    #[test]
+    fn reconcile_refreshes_the_lock_before_every_upload() {
+        let d = tmpdir("hb_wire");
+        let o = tmpdir("hb_wire_out");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_090909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_100909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_110909.ndjson", end);
+        let r = test_recipient();
+
+        let up = LockProbeUploader {
+            submission_dir: o.clone(),
+            seen_fresh: Mutex::new(Vec::new()),
+        };
+        let rep = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+        assert_eq!(rep.sent, 3, "{:?}", rep.errors);
+        assert_eq!(
+            *up.seen_fresh.lock().unwrap(),
+            vec![true, true, true],
+            "★ 2 本目以降の送信の前にもロックが更新されていること"
+        );
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ★ **梱包側と送信側の両方**で 1 本ごとに `refresh` が呼ばれる (N 本包む + M 本送る = N + M 回)。
+    ///
+    /// ⚠️ 上の `LockProbeUploader` は**送信側だけ**しか観測できない (梱包は uploader が最初に
+    /// backdate する前に全部終わる)。→ 梱包側の呼び出しを消しても緑のままだった
+    /// (code-reviewer HIGH・2026-09-27・変異で実測)。呼び出し回数で両方を固定する。
+    #[test]
+    fn refresh_is_called_once_per_package_and_once_per_upload() {
+        let d = tmpdir("hb_count");
+        let o = tmpdir("hb_count_out");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_090909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_100909.ndjson", end);
+        let r = test_recipient();
+
+        REFRESH_CALLS.with(|c| c.set(0));
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let rep = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+        assert_eq!((rep.packaged, rep.sent), (2, 2), "{:?}", rep.errors);
+        assert_eq!(
+            REFRESH_CALLS.with(|c| c.get()),
+            4,
+            "★ 梱包 2 回 + 送信 2 回 = 4 回 (梱包側か送信側のどちらかを消すと減る)"
+        );
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ **奪われた側は、他人のロックを延命も削除もせず、中断する** (所有印)。
+    ///
+    /// A が走行中に更新が途切れて stale と判定され、B が奪った、という状況を作る。
+    /// 旧実装は A の `refresh` が B のロックを延命し、A の `Drop` が B のロックを消した
+    /// (code-reviewer / security-checker / Codex の 3 系統が一致して指摘)。
+    #[test]
+    fn a_run_that_lost_its_lock_neither_extends_nor_deletes_the_new_owners_lock() {
+        let o = tmpdir("own");
+        let a = match ReconcileLock::acquire(&o, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("first lock must be acquired"),
+        };
+        // A の更新が途切れて 2 時間経った → B が奪う。
+        backdate_lock(&o, std::time::Duration::from_secs(2 * 60 * 60));
+        let b = match ReconcileLock::acquire(&o, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("stale lock must be taken over by B"),
+        };
+        let b_body = std::fs::read_to_string(o.join("reconcile.lock")).unwrap();
+        assert_ne!(b_body, a.token, "★ 所有印が A と B で別であること (前提)");
+        // B のロックを 2 時間前へ戻しておく = A が延命したら分かる。
+        backdate_lock(&o, std::time::Duration::from_secs(2 * 60 * 60));
+
+        a.refresh();
+        assert!(a.is_lost(), "★ 奪われたことを検知する");
+        assert!(!b.is_lost());
+        let mtime_age = std::fs::metadata(o.join("reconcile.lock"))
+            .and_then(|m| m.modified())
+            .unwrap()
+            .elapsed()
+            .unwrap();
+        assert!(
+            mtime_age > std::time::Duration::from_secs(60 * 60),
+            "★ A の refresh が B のロックを延命してはならない"
+        );
+
+        drop(a);
+        assert!(
+            o.join("reconcile.lock").is_file(),
+            "★ A の Drop が B のロックを消してはならない"
+        );
+        assert_eq!(
+            std::fs::read_to_string(o.join("reconcile.lock")).unwrap(),
+            b_body
+        );
+        drop(b);
+        assert!(
+            !o.join("reconcile.lock").exists(),
+            "自分のロックは Drop で消える"
+        );
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ロックファイルが**消えた**場合も、所有を失ったと検知する (`owned()` の NotFound 経路)。
+    #[test]
+    fn a_vanished_lock_file_is_detected_as_lost_and_not_recreated() {
+        let o = tmpdir("vanished");
+        let a = match ReconcileLock::acquire(&o, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("first lock must be acquired"),
+        };
+        std::fs::remove_file(o.join("reconcile.lock")).unwrap();
+        a.refresh();
+        assert!(a.is_lost(), "★ 消えたロックも所有を失ったとみなす");
+        assert!(
+            !o.join("reconcile.lock").exists(),
+            "★ 作り直さない (他の収束器のロックを壊さない)"
+        );
+        drop(a);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// 送信中にロックを奪われた (と分かった) 収束は、次の 1 本に進まず中断し、失敗として出す。
+    struct StealLockUploader {
+        submission_dir: PathBuf,
+        calls: Mutex<usize>,
+    }
+    impl Uploader for StealLockUploader {
+        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), String> {
+            let mut n = self.calls.lock().unwrap();
+            *n += 1;
+            if *n == 1 {
+                // 1 本目の送信中に、別の収束器がロックを奪った状況を再現する。
+                // ⚠️ 削除→作成にしない (Windows は他ハンドルがあると削除が遅延・拒否されうる)。
+                //   中身が別物になれば `owned()` は `Some(false)` を返す = 奪取の再現として足りる。
+                let lock = self.submission_dir.join("reconcile.lock");
+                std::fs::write(&lock, "someone-else").unwrap();
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn reconcile_stops_when_it_loses_the_lock_and_leaves_the_new_owners_lock() {
+        let d = tmpdir("lost_run");
+        let o = tmpdir("lost_run_out");
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_090909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_100909.ndjson", end);
+        write_closed_o1(&d, "gse_o1_00000000_110909.ndjson", end);
+        let r = test_recipient();
+
+        let up = StealLockUploader {
+            submission_dir: o.clone(),
+            calls: Mutex::new(0),
+        };
+        let rep = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+        assert_eq!(
+            *up.calls.lock().unwrap(),
+            1,
+            "★ 奪われたら次の 1 本へ進まない"
+        );
+        assert_eq!(rep.sent, 1, "{:?}", rep.errors);
+        assert_eq!(rep.unsent, 2, "★ 残りは次の機会に収束する (失われない)");
+        assert!(
+            rep.errors.iter().any(|e| e.contains("ロックを失いました")),
+            "★ 黙って止めない: {:?}",
+            rep.errors
+        );
+        assert_eq!(
+            std::fs::read_to_string(o.join("reconcile.lock")).unwrap(),
+            "someone-else",
+            "★ 他の収束器のロックを消さない"
+        );
+        let _ = std::fs::remove_dir_all(&d);
         let _ = std::fs::remove_dir_all(&o);
     }
 
