@@ -26,7 +26,7 @@
 | 何 | 値 | 測り方 |
 |---|---|---|
 | main | `9558510`（PR #231 = 前段の merge・main の CI **success**） | `git log` / `gh run view 36249820419` |
-| PR #232 | **v0.1.36 へのバージョン更新**（4 ファイル: `Cargo.toml` / `Cargo.lock` / `tauri.conf.json` / `package.json`）＋ O1 耐障害性の点検記録。作成時点で CI 実行中 → ⚠️ **着手時に状態を確認**（merge 済みでなければ CI 緑を待って merge） | `gh pr view 232` |
+| PR #232 | **v0.1.36 へのバージョン更新**（4 ファイル: `Cargo.toml` / `Cargo.lock` / `tauri.conf.json` / `package.json`）＋ O1 耐障害性の点検記録 ＋ ⚠️ **`rustls` 0.23.45 への更新**（RUSTSEC-2026-0285・提出の TLS クライアント。`aws-lc-sys` 0.45 を含む 4 クレート。`decisions.md` 判断 12。⚠️ **Windows のビルドは CI で確認**）。作成時点で CI 実行中 → ⚠️ **着手時に状態を確認**（merge 済みでなければ CI 緑を待って merge） | `gh pr view 232` |
 | 最新のリリースタグ | **`v0.1.35`**（2026-09-11）。⚠️ **区間指定削除の欠陥を含む**（自己申告行が消えない・修正は 9/14）。`v0.1.36` は**まだ打っていない** | `git tag` |
 | G1 ゲート | 通過 17 / 未達 3（記録票 A / B / C のみ＝研究者の人手確認）。selftest 34/0 | `bash scripts/check-g1-collection-readiness.sh` |
 | O1 ゲート | 通過 21 / 未達 2（同意文書の状態表に「⚠️ 未了」・リリースタグ陳腐化）。selftest 59/0 | `bash scripts/check-o1-release-readiness.sh` |
