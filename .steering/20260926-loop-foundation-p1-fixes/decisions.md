@@ -128,3 +128,11 @@
   - code-reviewer LOW: HEAD 取得が前後とも失敗すると不変確認が素通り ／ 無修飾の `$base` で同名 tag が黙って切り元になる経路 ／ sparse-checkout の限界の記載 ／ 引用パスの除外・assume-unchanged・N5 の判定のテスト補強
 - **選択肢**: A: 全部直して終える（cross-review は 2 巡で打ち切り・メインが diff を一次で確認し全検査を緑に）／ B: 全部直して 3 巡目 ／ C: 一致と MEDIUM だけ
 - **採用**: A
+
+## 判断 12: タスク完了時の出荷フロー（commit → push → PR → CI 緑なら merge）を既定にする
+
+- **判断日時**: 2026-09-26（研究者の指示「push、PR、CI 緑なら merge。今後この Git 関連の指示はこの形で動きたい」）
+- **採用**: `git-workflow` Skill にルール 6（手順と「止まる条件」の SSOT）を足し、`/finish-task` に Step 4.5 を足してそこから呼ぶ。都度の承認は求めない。
+- **止まる条件**: CI 赤・未対応の HIGH・non-fast-forward・conflict・`--admin` が要る・main 上・機密混入・研究者の明示の別指示。`--force` / `--admin` は使わない。
+- **経緯**: `/finish-task` の制約行「ユーザー承認なしで commit しない」の書き換えは auto mode の安全判定で 2 回拒否された（研究者の許可後も）→ 研究者が手で書き換えた。
+- **初回の実地**: PR #224 は最初の CI が赤（テストの環境依存・C ロケール）→ 止まる条件どおり merge せず、原因を直して緑を確認してから merge（`1fdd9137`・main の run 発火を確認）。

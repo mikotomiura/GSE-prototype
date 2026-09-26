@@ -8,8 +8,9 @@ description: >
   - バージョン番号 (vX.XX) を付与するとき
   - .steering/ への作業記録を残すとき（Refs: の書き方）
   - main ブランチへのマージ前チェックリストを確認するとき
+  - ★ タスク完了時に push → PR → CI 緑なら merge を行うとき（ルール 6・研究者の既定指示で自動実行）
   - git/Bash などターミナル系のツールを呼ぶとき（ツール呼び出し書式 antml:invoke の確認・冒頭§参照）
-allowed-tools: Bash(git *), Read, Glob
+allowed-tools: Bash(git *), Bash(gh pr *), Bash(gh run *), Bash(gh api *), Read, Glob
 ---
 
 # Git ワークフロー規約
@@ -164,6 +165,35 @@ main へのマージ前チェック:
 
 ---
 
+### ルール 6: ★★★ タスク完了時の出荷フロー（**commit → push → PR → CI 緑なら merge** を自動で行う）
+
+★ **研究者の既定指示（2026-09-26）**: 「push、PR、CI 緑なら merge。今後 Git 関連はこの形で動く」。
+→ ★ `/finish-task` の Step 3（`/cross-review` ＋ security-checker ＋ テスト）が通ったら、**都度の承認を求めずに**以下を最後まで実行する。
+⚠️ 下の「止まる条件」に 1 つでも当たったら**その場で止まって報告する**（★ 自動化は「緑のときだけ進む」であって「何としても通す」ではない）。
+
+1. **commit**: 明示ステージング（`git add <具体的なパス>`。⚠️ `git add -A` / `git add <dir>` は使わない —— 作業ツリーに別トラックの未追跡物がある）。
+   ★ `.codex/budget.json` の記帳は台帳なので**含めてコミットする**（⚠️ `git checkout --` で戻さない）。
+2. **push**: `git push -u origin <作業ブランチ>`（⚠️ `--force` / `--force-with-lease` は使わない）。
+3. **PR**: `gh pr create --base main --head <作業ブランチ>`。本文は `.steering/<task>/` から要約（背景・変更点・検証方法・レビュー結果・残課題）し、末尾に attribution を付ける。
+   ★ 同じブランチに open の PR が既にあれば新規作成せず、それに push したものとして扱う。
+4. **CI 待ち**: `gh pr checks <番号> --watch`（★ self-hosted が offline なら 30 秒で hosted へ fallback する設計 —— memory `project_ci_exhausted`）。
+   ★ チェックが 1 件も作られないまま数分経つなら、`gh run list --branch <作業ブランチ>` で確かめてから判断する。
+5. **merge**: 全チェックが緑なら `gh pr merge <番号> --merge`（★ 既存の PR と同じマージコミット方式。⚠️ `--admin` / `--squash` / `--rebase` は使わない）。
+6. **main の CI 発火確認**: `/finish-task` Step 5 を必ず実行する（★ run = 0 のまま「CI は緑」と書かない）。
+7. **後片づけ**: `git switch main && git pull --ff-only`（★ 作業ブランチは消さない —— 研究者が消すまで残す）。完了報告に PR 番号・merge コミット・main の run を書く。
+
+#### ⚠️ 止まる条件（★ 1 つでも当たれば merge しない・報告して判断を仰ぐ）
+
+- CI のチェックが**赤**・キャンセル・タイムアウト（⚠️ 再実行で緑になるまで回す、はしない。1 回だけ原因を見て報告する）
+- `/cross-review`・code-reviewer・security-checker の **CRITICAL / HIGH が未対応**、またはテストが赤
+- push が non-fast-forward で拒否された（⚠️ force しない）／ merge が conflict・`mergeable: false`
+- merge に `--admin` 等の保護の迂回が要る
+- 現在のブランチが `main` そのもの（★ 先に作業ブランチを切る）
+- ステージ対象に機密（`.env` / `*.pem` / `*.key` / credentials）や NDJSON 生ログが混ざる
+- 研究者が「merge しないで」「PR まで」などと明示した（★ その指示が常に優先）
+
+---
+
 ## チェックリスト
 
 - [ ] type が feat/fix/refactor/docs/chore/test のいずれかか
@@ -172,6 +202,7 @@ main へのマージ前チェック:
 - [ ] ブランチ名が `[type]/[task-name]` 形式か
 - [ ] .steering/ 記録があれば Refs: に記載したか
 - [ ] main へのマージ前ビルドチェックを通過したか
+- [ ] ★ タスク完了時は**ルール 6 の出荷フロー**（push → PR → CI 緑なら merge → main の CI 確認）を最後まで回したか。止まる条件に当たったら報告したか
 
 ---
 
