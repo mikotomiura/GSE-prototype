@@ -383,7 +383,7 @@ echo "        ★ 配布済みの電子同意フォームとの突合は検査 [
 records_term () {   # $1 = ファイル / $2 = 語
   awk -v term="$2" '
     # ★ ヘッダ行を見つけたら表に入る (★ ヘッダ自身は項目行として数えない)。
-    /^\|/ && /記録する/ && /記録しない/ { intable = 1; next }
+    /^\|/ && /記録(する|します)/ && /記録(しない|しません)/ { intable = 1; next }
     intable && !/^\|/ { intable = 0 }
     intable && /^\|/ {
       line = $0
@@ -393,21 +393,28 @@ records_term () {   # $1 = ファイル / $2 = 語
       gsub(/[ \t-]/, "", first)
       if (first != "" && index(cell[1], term) > 0) { found = 1 }
     }
-    # ★ 表でない文書 (participant-guide) 向け: 箇条書きの項目行。
-    /^ *[-*] / && index($0, term) > 0 { found = 1 }
     END { exit found ? 0 : 1 }
   ' "$1"
 }
+#   ⚠️★★★ **見る語は識別子ではなく、被験者が読む語**（2026-09-26・研究者判断＝推奨 A）。
+#     ★ ADR-013 追補 2b（2026-08-20 実施・公開フォームと突合済み）は、`starve_window` を
+#       「1 分ごとの短い中断の回数と合計」、`app_version` を「アプリの版」という**平易な言葉**で
+#       表へ追記した。識別子の文字列を要求していた旧版は、内容が在るのに ❌ を出していた。
+#     ★ 被験者向け文書に技術識別子を出す利益は無い（変えると電子同意フォームとの突合もやり直し）。
+#   ⚠️ 語は「1 セル目」で見るので、**本文の箇条書きに同じ語が在っても緑にならない**
+#     （旧版の箇条書き救済は、平易な語になると表の行を消しても通ってしまうので廃止した）。
+TERM_STARVE='短い中断'      # ← `starve_window`
+TERM_VERSION='アプリの版'   # ← `app_version`
 for pair in "${CONSENT}|同意文書" "${GUIDE}|参加案内"; do
   path="${pair%%|*}"; name="${pair##*|}"
   if [ ! -f "${path}" ]; then
     ng "${name}が無い: ${path}"
-  elif ! records_term "${path}" 'starve_window'; then
-    ng "${name}の記録項目表に starve_window が無い"
-  elif ! records_term "${path}" 'app_version'; then
-    ng "${name}の記録項目表に app_version が無い"
+  elif ! records_term "${path}" "${TERM_STARVE}"; then
+    ng "${name}の記録項目表に「${TERM_STARVE}」（starve_window）の行が無い"
+  elif ! records_term "${path}" "${TERM_VERSION}"; then
+    ng "${name}の記録項目表に「${TERM_VERSION}」（app_version）の行が無い"
   else
-    ok "${name}に starve_window と app_version が書いてある"
+    ok "${name}の記録項目表に「${TERM_STARVE}」と「${TERM_VERSION}」が書いてある"
   fi
 done
 
@@ -766,6 +773,22 @@ selftest () {
     fi
   }
 
+  # ★ **摂動を加えても緑のまま**であること（⚠️ baseline が緑でも空回りではない）。
+  #   ★ `expect_green` は「baseline に無い ✅ が変異で出る」ことを見るので、実 repo が満たした後は
+  #     使えない（2026-09-26 に前提条件 7 が満たされ、検査 7 の 2 件が空回りに転落した）。
+  #   ★ こちらは**変異が入っていること**（呼び出し側が実在の摂動を入れる）を前提に、
+  #     $1 の ✅ が残り、$2 の ❌ が**出ない**ことを見る。摂動が効く設計（旧実装なら $2 が出る）にすること。
+  expect_stays_green () {
+    local pat_ok="$1" pat_ng="$2" label="$3"
+    out="$(run_fixture)"
+    if printf '%s\n' "${out}" | grep -E '^  ✅' | grep -q -- "${pat_ok}" \
+       && ! printf '%s\n' "${out}" | grep -E '^  ❌' | grep -q -- "${pat_ng}"; then
+      echo "  ✅ 摂動しても緑のまま: ${label}"; sp=$((sp+1))
+    else
+      echo "  ❌ 摂動で緑が崩れた: ${label}"; sf=$((sf+1))
+    fi
+  }
+
   echo "=== selftest 0: 変異前の出力を取る (★ 以後の照合語をこれと突き合わせる) ==="
   if ! capture_base; then
     echo "  ❌ baseline を取れなかった"; return 1
@@ -784,21 +807,31 @@ selftest () {
   #   ★ 旧版は「参加案内だけ未追記」を期待していたが、⚠️ **変異しなくても同じ ❌ が出る**
   #     (参加案内は元から未追記) ので、**空回りで緑を返していた**。
   #   → ★ 1 語目だけ足し、**2 語目で赤になる**ことを見る (baseline に無い ❌)。
-  # ★ 1 語目だけを**項目行として**足す (⚠️ 素の 1 行では記録項目と認めない)。
-  build; printf '\n- starve_window を記録します。\n' >> "${fix}/w/${CONSENT}"
-  expect_red "同意文書の記録項目表に app_version が無い" "★ 1 語目だけ足す (検査 3)"
-  # ⚠️★★★ **「記録しない」側に入れても緑にしないこと** (code-reviewer M4)。
-  #   ★ 表の**データ行**として、1 語目は 1 セル目・2 語目は 2 セル目へ入れる。
-  #     → ⚠️ 文書全体 grep なら両方緑になるが、1 セル目限定なら **2 語目で赤**になる
-  #       (★ baseline の ❌ は starve_window 側なので、この期待は空回りしない)。
-  build; insert_after "${fix}/w/${CONSENT}" '|---|---|' '| starve_window | app_version |'
-  expect_red "同意文書の記録項目表に app_version が無い" "★ 2 語目を「記録しない」列に入れる (検査 3)"
+  # ⚠️★★★ 検査 3 は 2026-09-26 に「識別子の有無」から「被験者が読む語の行の有無」へ変えた。
+  #   ★ 実 repo は緑（内容は 2026-08-20 から表に在る）なので、**壊して赤になること**だけを見る。
+  #   ★ 各変異は baseline に無い ❌ を出す（空回りしない）。
+  # (1) 表の行を消す。⚠️ 本文の箇条書き（「短い中断」について）は残る → 散文で通らないこと。
+  build; sed_i -E '/^\|.*短い中断/d' "${fix}/w/${CONSENT}"
+  expect_red "同意文書の記録項目表に「短い中断」" "★ 表から消して散文だけ残す: 短い中断 (検査 3)"
+  build; sed_i -E '/^\|.*アプリの版/d' "${fix}/w/${CONSENT}"
+  expect_red "同意文書の記録項目表に「アプリの版」" "★ 表から消す: アプリの版 (検査 3)"
+  # (2) ⚠️★★★ **「記録しない」側（2 セル目）に入れても緑にしないこと**（code-reviewer M4）。
+  build; sed_i -E '/^\|.*短い中断/d' "${fix}/w/${CONSENT}"
+  insert_after "${fix}/w/${CONSENT}" '|---|---|' '| — | 短い中断 |'
+  expect_red "同意文書の記録項目表に「短い中断」" "★ 記録しない列へ入れる (検査 3)"
+  # (3) 参加案内。★ 表のヘッダは「記録します / 記録しません」（同意文書と語尾が違う）。
+  build; sed_i -E '/^\|.*短い中断/d' "${fix}/w/${GUIDE}"
+  expect_red "参加案内の記録項目表に「短い中断」" "参加案内: 表から消す (検査 3・ヘッダ語尾の対照)"
+  build; sed_i -E '/^\|.*アプリの版/d' "${fix}/w/${GUIDE}"
+  expect_red "参加案内の記録項目表に「アプリの版」" "参加案内: 表から消す (検査 3)"
   build; rm -f "${fix}/w/${SHEET}"
   expect_red "確証用の記録用紙が無い" "記録用紙の欠落 (検査 6)"
   build; sed_i 's/文字数/字数欄なし/g' "${fix}/w/${SHEET}"
   expect_red "記録用紙の表に文字数欄が見つからない" "記録用紙の文字数欄の喪失 (検査 6)"
   # ⚠️★★★ **散文の言及だけでは緑にしないこと** (code-reviewer M5: ERE 交替の壊れを封じる)。
-  build; sed_i '/^ *#\? *|/ s/文字数/字数欄なし/g' "${fix}/w/${SHEET}"
+  #   ⚠️ `\?` は BSD sed の BRE では何にもマッチせず変異が**無音で空振り**する (macOS 実測・2026-09-26)。
+  #      → ERE (`-E`) で書く。空振りすると「壊しても緑のまま」と出る。
+  build; sed_i -E '/^ *#? *\|/ s/文字数/字数欄なし/g' "${fix}/w/${SHEET}"
   expect_red "記録用紙の表に文字数欄が見つからない" "★ 表から消して散文だけ残す (検査 6)"
   # ⚠️★★★ **前提条件の数が変わったら赤になること** (code-reviewer H3)。
   build; sed_i 's/\*\*1〜7 が終わるまで新コホートの収集を始めない。\*\*/**1〜8 が終わるまで新コホートの収集を始めない。**/' \
@@ -854,34 +887,26 @@ selftest () {
   sed_i "s/^- 対象のコミット: .*/- 対象のコミット: **${FIX_SHA}**/" "${fix}/w/${RECORD}"
   expect_green "記録票 B (両 OS の対のテスト) が埋まっている" \
                "★ HEAD の祖先である SHA を書く (検査 8)"
-  build
-  insert_after "${fix}/w/${CONSENT}" '|---|---|' '| starve_window と app_version | — |'
-  expect_green "同意文書に starve_window と app_version" "同意文書への追記 (検査 3)"
-  # ★ **2 つの文書が別々に見られている**ことの対照 (★ baseline にこの ✅ は無い)。
-  build
-  printf '\n- `starve_window` と `app_version` を記録します。\n' >> "${fix}/w/${GUIDE}"
-  expect_green "参加案内に starve_window と app_version" "参加案内への追記 (検査 3)"
   # ⚠️★★★ **版を上げただけでは緑にならず、3 点に触れて初めて緑になること** (code-reviewer H2-b)。
+  #   ⚠️ 2026-09-26 に実 repo が第 20 版で前提条件 7 を満たした。→ ★ 以後は**緑から壊す**:
+  #     第 20 版の見出しを第 19 版へ戻す（＝第 20 版の記録が無い）と「未決」で赤になること。
   build
-  sed_i 's/^## ★ 改訂履歴 — 第 19 版/## ★ 改訂履歴 — 第 20 版/' "${fix}/w/${PREREG}"
-  sed_i 's/"version": 19/"version": 20/' "${fix}/w/${CONFIG}"
-  expect_green "第 20 版に (a)(b)(c) への言及がある" "前提条件 7 を決めて記録する (検査 7)"
+  sed_i 's/^## ★ 改訂履歴 — 第 20 版/## ★ 改訂履歴 — 第 19 版/' "${fix}/w/${PREREG}"
+  expect_red "やめた人の数え方が未決" "★ 第 20 版の記録が無い＝未決 (検査 7)"
   # ⚠️★★★ **本文中の前方参照では版が上がらないこと** (code-reviewer H2-a)。
   #   ★ 旧版は文書**全体**を grep していたので、本文の 1 行で `rev` が上がった
   #     (2026-09-20 実測: 全体 24 件ヒットに対し見出しは 18 件)。
   #   ★ 見出しを 20 に上げたうえで**本文に第 25 版の言及**を混ぜる。
   #     → ⚠️ 全体 grep なら `rev=25` になって「config とずれている」で赤。
   #       ★ 見出し限定なら `rev=20` のままで**緑**になる (= この ✅ が出れば限定が効いている)。
+  #   ★ 実 repo は既に第 20 版・config 20 で揃っている。→ 本文に第 25 版の言及を混ぜても
+  #     「config とずれている」で**赤にならない**（全体 grep の旧実装なら rev=25 で赤）。
   build
-  sed_i 's/^## ★ 改訂履歴 — 第 19 版/## ★ 改訂履歴 — 第 20 版/' "${fix}/w/${PREREG}"
-  sed_i 's/"version": 19/"version": 20/' "${fix}/w/${CONFIG}"
   printf '\n★ これは本文中の言及である: 改訂履歴 — 第 25 版 で扱う。\n' >> "${fix}/w/${PREREG}"
-  expect_green "config.json の revision が事前登録と同じ版 (20)" \
-               "★ 本文に第 25 版の言及を混ぜても見出しだけを見る (検査 7)"
+  expect_stays_green "config.json の revision が事前登録と同じ版 (20)" "revision が事前登録とずれている" \
+                     "★ 本文に第 25 版の言及を混ぜても見出しだけを見る (検査 7)"
   build
-  # ★ 版だけ 20 にし、⚠️ **第 19 版の節の本文は第 18 版側へ退避**して 3 点の語を消す。
-  sed_i 's/^## ★ 改訂履歴 — 第 19 版/## ★ 改訂履歴 — 第 20 版/' "${fix}/w/${PREREG}"
-  sed_i 's/"version": 19/"version": 20/' "${fix}/w/${CONFIG}"
+  # ★ 版は 20 のまま、⚠️ 3 点の語（「n に数え」「補充」）だけを消す（＝版だけ上げて中身が無い）。
   sed_i 's/n に数え/nに数え/g; s/補充/ほじゅう/g' "${fix}/w/${PREREG}"
   expect_red "やめた人の数え方の記録が無い" "★ 版だけ上げて中身が無い (検査 7)"
 
