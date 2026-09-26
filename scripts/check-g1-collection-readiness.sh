@@ -589,7 +589,7 @@ fi
 head_ 7 "途中でやめた人の記録の数え方 (前提条件 7)"
 echo "     ⚠️ 見ているのは**版が上がり、そこで 3 点に触れているか**だけ。"
 echo "        ★ 答えの中身が妥当かは研究者判断であり、ゲートは判定しない。"
-echo "     ⚠️★★★ 緑でも**計器は未対応**: 第 20 版は validate_blocks.py / analyze.py の挙動を変えていない"
+echo "     ⚠️★★★ 緑でも**計器は未対応**（第 20 版時点）: 第 20 版は validate_blocks.py / analyze.py の挙動を変えていない"
 echo "        （未完了・削除の人を処理できない。analyze.py は名簿が n 未満だと NG）。G1 の人単位の記録破棄手順も未確認。"
 echo "        → ★ 収集開始の前提にするかは研究者判断（.steering/20260926-g1-o1-mac-collection-prep/decisions.md 判断 5）。"
 rev="$(latest_prereg_rev)"
@@ -605,9 +605,14 @@ else
     #   ⚠️ **この検査が見ていないもの**: 答えの中身。★ 3 点に**触れている**ことしか見ない。
     sec7="$(prereg_section_for_rev "${PREREG_REV_FOR_7}")"
     miss=""
-    printf '%s\n' "${sec7}" | grep -q '前提条件 7\|途中でやめた' || miss="${miss} 前提条件7への言及"
-    printf '%s\n' "${sec7}" | grep -q 'n に数え'                || miss="${miss} (b)nに数えるか"
-    printf '%s\n' "${sec7}" | grep -q '補充'                    || miss="${miss} (c)補充するか"
+    # ⚠️ `printf | grep -q` は使わない（2026-09-26）: `set -o pipefail` 下では、grep が最初の一致で
+    #   閉じたあとの printf が SIGPIPE で落ち、**一致しているのに「触れていない」と赤**になりうる
+    #   （節が大きいほど起きやすい・並列実行中に 1 回だけ selftest が赤くなったが再現できなかった）。
+    #   → パイプを使わない `has_text`（case）で見る。
+    has_text () { case "$1" in *"$2"*) return 0 ;; esac; return 1; }
+    { has_text "${sec7}" '前提条件 7' || has_text "${sec7}" '途中でやめた'; } || miss="${miss} 前提条件7への言及"
+    has_text "${sec7}" 'n に数え' || miss="${miss} (b)nに数えるか"
+    has_text "${sec7}" '補充'     || miss="${miss} (c)補充するか"
     if [ -n "${miss}" ]; then
       ng "第 ${rev} 版にやめた人の数え方の記録が無い (触れていない:${miss})"
     else
@@ -790,7 +795,7 @@ selftest () {
     local pat_ok="$1" pat_ng="$2" label="$3" marker_file="$4" marker="$5"
     # ⚠️★★★ **摂動が着弾したこと**を先に肯定形で確かめる（これが無いと、摂動が入らなくても
     #   baseline で必ず通る＝空回り。code-reviewer M2 / security-checker）。
-    if ! grep -qF -- "${marker}" "${marker_file}" 2>/dev/null; then
+    if [ -z "${marker}" ] || [ -z "${marker_file}" ] || ! grep -qF -- "${marker}" "${marker_file}" 2>/dev/null; then
       echo "  ❌ ⚠️ 摂動が入っていない (この検査は何も測っていない): ${label}"; sf=$((sf+1)); return
     fi
     out="$(run_fixture)"
