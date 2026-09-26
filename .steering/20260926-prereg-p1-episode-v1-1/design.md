@@ -30,3 +30,11 @@
 | JSON・コード不変 | `git diff main --stat -- src-tauri/` | 空 |
 | 本文を書き換えていない | `git diff main --numstat -- docs/preregistration-p1-episode.md` | 削除行 0 |
 | 独立レビュー | `/cross-review`（パス限定） | 指摘を是正 or 記録 |
+
+## ⚠️ 検査が届かないもの（→ タスク D へ引き継ぐ）
+
+`check_prereg_parity.py` は §1・§2.1 の**値**しか見ないので、v1.1 の読み方の規則は検査できない（`/cross-review` Codex P2-3）。
+D で解析を実装するときに、次をテストで固定する:
+- 上下界: 両極が適用可能／極 B だけ非適用（→ 算出不可・幅 0 にしない）／極 M+ だけ `not_applicable`（→ `not_applicable` と報告・幅への寄与 0）／軸をまたいで min / max を取らない
+- 探索の実行: `config.warmup_count ≠ ⌈1/(1−config.q)⌉` の実行を除外する
+- `ime_overlap` を `t0` の時点の特徴量に使わない
