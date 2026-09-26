@@ -9,6 +9,7 @@
 
 DB は**使い捨て**で、repo の外に置き、共有しない (`decisions.md` 判断 10)。既存のファイルは上書きしない。
 結合するのは episode 表と `sessions.csv` (参加者・OS・phase) だけで、metrics・probe・survey・転帰とは結合しない。
+⚠️ `t0_ms` / `s_ms` は**絶対 epoch ms** で、時刻は個人を同定しうる (`p1_features_io.py` の冒頭の表)。だから DB は repo の外に置き、共有しない。
 
 ## ⚠️★★★ `t0` の時点で使える量と、使えない量を「スキーマで」分ける
 
@@ -30,6 +31,10 @@ ADR-030 補訂 1 項目 7 は `restart` (`T1d`) を**転帰側の量**として�
   ★ さらに、許可したブロックの**中**に上の 3 つのキーが現れたら、黙って落とさず・黙って載せず **exit 3** にする
   (封筒の形が変わっており、`t0` の側に退行量が紛れ込みうるため)。
 - ⚠️ 極は `pole` 列で分けるだけ。**極をまたいだ結合・集計のビューは作らない** (事前宣言 §3 規律 4)。
+- ⚠️★ **未裁定 (issue 003 の Execution Result に記録)**: 規則 (e)・補訂 1 項目 7 が `t0` の側から外すと名指ししているのは `ime_overlap` / `restart` だけで、
+  issue の指示どおり `dispersion` は `episodes_t0` に載せている。ただし `dispersion.surprise` は**セッション全体の IKI baseline** に対する逸脱で
+  (`feat_offline/dispersion.rs` の `Dispersion::surprise`)、`pause_*` も穴による切断が retrospective (同ファイルの struct doc) —
+  → `t0` の時点で使える量かは、このスキーマの分離では保証していない。使う側 (004 以降) が裁定を待つこと。
 
 ## ⚠️ 非適用の極 (`pole_applicable = false`)
 
