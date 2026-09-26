@@ -4,5 +4,5 @@
 - [x] grill（判断 1〜4 を研究者が裁定）・requirement / design / decisions
 - [x] v1.1 改訂宣言ブロックを挿入する
 - [x] 検証 4 本（parity / self-test / src-tauri 不変 / 削除行 0）
-- [ ] `/cross-review`（Codex gpt-6-astra・パス限定）と是正
+- [x] `/cross-review`（Codex gpt-6-astra・パス限定）と是正
 - [ ] `/finish-task` → 出荷フロー（push → PR → CI 緑なら merge → main の CI）
