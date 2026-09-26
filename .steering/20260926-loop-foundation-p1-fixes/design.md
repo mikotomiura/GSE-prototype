@@ -108,3 +108,10 @@
   spawn は「後始末が終わるまでロック保持」「pid を読み戻して確かめる」「自分の pid のときだけ解放」「reap の残骸を EXIT で片づける」「全経路の start を修飾し、ローカルに無い base は die」。
   ⚠️ `start="$(local_ref_or_raw …)"` の die は `set -e` によって全体を止める（コマンド置換の中の die はサブシェルしか抜けない）—— `set -e` を外すと fail-open になる点に注意。
 - **最終テスト**: guard 88（3 回連続で緑）/ spawn-cleanup 118 / worktree-deny 34 / portability / wired すべて rc=0。
+- **PR #224 の CI 赤（2026-09-26）で判明した 2 件**（★ どちらも「手元で緑・CI で赤」）:
+  1. guard テストの一時 repo が利用者の**グローバル除外**（`~/.config/git/ignore` の `**/.claude/settings.local.json`）に依存していた。
+     `GIT_CONFIG_GLOBAL=/dev/null` では既定の除外ファイルは止まらない → 一時 repo の `.gitignore` に `.claude/settings.local.json` を入れ、`core.excludesFile ""` で切り離した。
+     ⚠️ `/dev/null` は Git for Windows で `fatal: cannot use nul as an exclude file` になり porcelain を汚すので**空文字**。手元で `GIT_CONFIG_GLOBAL=/dev/null XDG_CONFIG_HOME=<空>` により CI の 74/14 を再現してから直した。
+  2. `\b` が **C ロケール**（self-hosted Windows runner は NetworkService）でマルチバイトを単語文字とみなし、`- **001**（説明）` の依存を落とした（P1-D の再発）
+     → `deps_section_plain` で非 ASCII を空白に置換。P1-D-d（`LC_ALL=C`）を追加し、置換を外す変異で赤を確認。
+  → guard 89 を CI 相当・通常・CI 相当＋`LC_ALL=C` の 3 条件で緑。spawn-cleanup 118 / deny 34 / portability / wired も CI 相当＋`LC_ALL=C` で緑。

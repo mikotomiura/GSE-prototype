@@ -241,7 +241,13 @@ issue_field() { # issue_field <id> <見出し> → 該当セクションの本�
 #   ★ `s/[*_`]//g` だけだと `* 001` の箇条書き記号まで消え、従来の `[-*]` が受けていた書式が拾えなくなる。
 deps_section_plain() { # deps_section_plain <id> → 装飾を剥がした Dependencies 節
   issue_field "$1" Dependencies \
-    | sed -e 's/^\([[:space:]]*\)[*]\([[:space:]]\)/\1-\2/' -e 's/[*_`]//g'
+    | sed -e 's/^\([[:space:]]*\)[*]\([[:space:]]\)/\1-\2/' -e 's/[*_`]//g' \
+    | LC_ALL=C tr -c '\11\12\40-\176' ' '
+  # ⚠️★★★ 非 ASCII のバイトを空白に置き換える (★ 2026-09-26 PR #224 の Windows CI で実測)。
+  #   ★ 下流の `\b` は、ロケールが C の環境 (self-hosted runner は NetworkService で動く) では
+  #     マルチバイト文字のバイトを単語の一部とみなし、`- 001（説明）` の `001` と `（` の間に境界を作らない
+  #     → **依存を黙って落とす** (P1-D の再発)。手元の UTF-8 ロケールでは再現しない。
+  #   → ★ 依存の判定に要るのは ASCII だけなので、非 ASCII を空白にしてからロケール非依存で拾う。
 }
 issue_deps_raw() { # 自己依存も含めてそのまま返す (preflight が検出するため)
   deps_section_plain "$1" \

@@ -151,6 +151,7 @@ I5
 .steering/**/_loop-run-report.md
 .steering/**/_loop-artifacts/
 stub/
+.claude/settings.local.json
 IGN
   cat > "${r}/.steering/task/_loop-config.json" <<CFG
 {
@@ -169,6 +170,15 @@ CFG
     git config user.name loop-test || exit 1
     git config commit.gpgsign false || exit 1
     git config core.hooksPath /dev/null || exit 1
+    # ⚠️★★★ 利用者のグローバル除外（`~/.config/git/ignore` 等）を読ませない（★ 2026-09-26 PR #224 の CI 赤）。
+    #   ★ `GIT_CONFIG_GLOBAL=/dev/null` は**この subshell の中だけ**で、run_loop の git は利用者の設定を読む。
+    #     ⚠️ 既定の除外ファイル `$XDG_CONFIG_HOME/git/ignore` は GIT_CONFIG_GLOBAL と無関係に読まれるので、
+    #     手元でだけ `.claude/settings.local.json`（deny が worktree に書く）が隠れ、未コミット判定のテストが
+    #     **手元で緑・CI で赤**になった。→ ★ repo の設定で空にし、必要な除外は上の .gitignore に書く（本物の repo と同じ）。
+    #   ⚠️ `/dev/null` は使えない —— Git for Windows は `fatal: cannot use nul as an exclude file` を出し、
+    #     それが check_committed の porcelain に混ざって常に dirty になる（★ 2026-09-26 実測）。
+    #     ★ **空文字**なら既定の除外ファイルも止まり、エラーも出ない（★ 同日に XDG の ignore で確認）。
+    git config core.excludesFile "" || exit 1
     # ⚠️ 一時 repo を環境非依存にする（★ CI の git は autocrlf が有効で警告を出す）。
     #   ★ 上の「stub の出力を捨てる」と二重の防御にする（⚠️ どちらか片方でも成立するように）。
     git config core.autocrlf false || exit 1
@@ -1000,6 +1010,35 @@ DEPB2
   fi
 else
   ng "P1-D-b 陰性対照: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P1-D-d: ロケールが C でも、全角文字が直後に続く依存 (`- **001**（説明）`) を拾う ---
+#   ⚠️★★★ 2026-09-26 PR #224 の Windows CI（self-hosted・NetworkService）で P1-D-a / P1-D-c が赤になった。
+#     ★ `\b` が C ロケールではマルチバイトのバイトを単語文字とみなし、`001（` に境界が無いと判定する。
+#     ⚠️ 手元の UTF-8 ロケールでは再現しない → **ここで LC_ALL=C を明示して**同じ条件を作る。
+D_DEP_D="${TMP}/d-dep-d/repo"; mkdir -p "${D_DEP_D}"
+if setup_repo "${D_DEP_D}" ':'; then
+  cat > "${D_DEP_D}/.steering/task/issues/004.md" <<'DEPD'
+# Issue 004: stub (C locale + fullwidth paren)
+verify_level: parse
+## Goal
+stub
+## Dependencies
+- **001**（説明）
+* **002**（説明）
+## Status
+
+DEPD
+  out_dd="$(LC_ALL=C dry_run "${D_DEP_D}")"
+  line_dd="$(printf '%s\n' "${out_dd}" | grep -E '^ +004 ' || true)"
+  if printf '%s' "${line_dd}" | grep -q '001' && printf '%s' "${line_dd}" | grep -q '002'; then
+    ok "P1-D-d: LC_ALL=C でも全角括弧が続く依存 (001 / 002) を拾った"
+  else
+    ng "P1-D-d: ⚠️★ LC_ALL=C で全角括弧が続く依存を落とした (\\b がマルチバイトを単語文字とみなす)"
+    printf '%s\n' "${out_dd}" | head -20
+  fi
+else
+  ng "P1-D-d: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
 # --- P1-D-c: `*` の箇条書き (`* 001` / `* **002**`) も従来どおり拾い、WARN しない ---
