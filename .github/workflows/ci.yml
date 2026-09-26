@@ -868,6 +868,7 @@ jobs:
       - name: P1 analysis tests (⚠️ skip=0 で走ること)
         run: |
           python3 -m unittest scripts.tests.test_p1_bounds
+          python3 -m unittest scripts.tests.test_p1_pg1_distribution
         env:
           PYTHONUTF8: "1"
       # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
