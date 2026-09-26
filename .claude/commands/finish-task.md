@@ -1,12 +1,13 @@
 ---
 description: >
-  タスクの完了処理を行う。steering 最終化・テスト実行・コミット提案までを実行する。
+  タスクの完了処理を行う。steering 最終化・テスト実行・コミット・★ 出荷フロー
+  （push → PR → CI 緑なら merge。git-workflow ルール 6）までを実行する。
   Step 5 で main へマージした場合の CI 発火確認を行う (2026-08-27 の取りこぼし事象への対処)。
   Step 3 で schema parity check (tier-3 workflow guard) が走り、
   src-tauri/src/schema_dto.rs または src-tauri/schema/current.json に変更がある場合は
   gse-dataset 側との JSON 意味同値を検証する。drift 検出時は Step 4 に進まず停止する。
   /add-feature, /fix-bug, /refactor の完了後に必ず実行する。
-allowed-tools: Read, Write, Edit, Bash(git *), Bash(gh api*), Bash(gh run*), Bash(python scripts/check_schema_parity.py*), Bash(python3 scripts/check_schema_parity.py*), Task
+allowed-tools: Read, Write, Edit, Bash(git *), Bash(gh api*), Bash(gh run*), Bash(gh pr *), Bash(python scripts/check_schema_parity.py*), Bash(python3 scripts/check_schema_parity.py*), Task
 ---
 
 # /finish-task
@@ -122,7 +123,17 @@ Refs: .steering/[YYYYMMDD]-[task-name]/
 
 type: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
 
-ユーザー承認後に `git commit` を実行する。
+★ **2026-09-26 から都度の承認は求めない**（研究者の既定指示「push、PR、CI 緑なら merge。今後 Git 関連はこの形で動く」）。
+Step 3 が全部通ったら、そのまま `git commit` し、**Step 4.5 へ進む**。
+⚠️ 研究者が「コミットしないで」「PR まで」などと明示したときは、その指示が優先する。
+
+---
+
+## Step 4.5: ★★★ 出荷フロー（push → PR → CI 緑なら merge）
+
+★ **`git-workflow` Skill のルール 6 を Read して、その手順どおりに最後まで実行する**（手順と「止まる条件」の SSOT はそちら。ここに写さない）。
+⚠️ 止まる条件（CI 赤・未対応の HIGH・force や `--admin` が要る・機密の混入など）に当たったら merge せずに報告する。
+★ merge したら、そのまま Step 5（main の CI 発火確認）へ進む。
 
 ---
 
@@ -178,5 +189,8 @@ git rev-parse origin/main^{tree} <PR ブランチ head>^{tree}
 - **Step 3 の schema parity check が失敗した状態で Step 4 に進まない**
 - ⚠️★★★ **main へマージしたなら Step 5 の CI 発火確認を省略しない**。★ run = 0 のまま「CI は緑」と報告しない
   (helper の出力に従って修復 → 再度 /finish-task を実走する)
-- ユーザー承認なしで commit しない
+- ★ commit / push / PR / merge は `git-workflow` ルール 6 に従って自動で行う（2026-09-26 研究者の既定指示）。
+    ⚠️ ただし**止まる条件**に当たったら merge しない。⚠️ `--force` / `--admin`
+  を使わない。研究者の明示の指示が常に優先
+  - ⚠️ CI が赤のまま merge しない
 - steering の記録を省略しない
