@@ -151,7 +151,13 @@ impl ReconcileLock {
                     //   → 取れなかったものとして片付け、**失敗として出す** (Busy に倒さない)。
                     if let Err(e) = std::io::Write::write_all(&mut f, token.as_bytes()) {
                         drop(f);
-                        let _ = std::fs::remove_file(&path);
+                        if let Err(rm) = std::fs::remove_file(&path) {
+                            // 誰も持たない空のロックが残り、1 時間は Busy になる (stale で自己回復する)。
+                            tracing::warn!(
+                                "reconcile: could not remove the half-written lock at {:?}: {rm}",
+                                path
+                            );
+                        }
                         return LockOutcome::Unavailable(format!(
                             "ロックファイルに書き込めません ({}): {e}",
                             path.display()
@@ -741,7 +747,9 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
     //   ★ `.age.ok` が担っていた「同意手続きを経ていない人が起動する経路を塞ぐ」役割は、
     //   O1 では **配布フォルダのマーカー (`o1.mode`)** が担う (G1 の `g1.mode` と同じ形)。
     //   ⚠️ G1 は `approved_unsent_age_files` のまま —— 1 バイトも変えない。
-    if let Some(up) = uploader.filter(|_| !lost) {
+    // ⚠️ `upload_disabled` は冒頭 (`uploader.is_none()`) で確定済み。奪われたときだけ送信を飛ばす。
+    let uploader = if lost { None } else { uploader };
+    if let Some(up) = uploader {
         let to_send = match opts.mode {
             CollectionMode::G1 => crate::submission::approved_unsent_age_files(
                 &opts.submission_dir,
@@ -795,6 +803,10 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
 
     if lost {
         // ⚠️ 黙らない。やらなかった仕事は次の機会に収束する (収束型)。
+        // ★ `Busy` (= 他が走っている・正常な取り合い) と違い、**走行中にロックが消えた・替わった**のは
+        //   異常なので、失敗 (errors) として出す。データは失われないが、原因 (AV の掃除・同期フォルダ・
+        //   スリープ跨ぎ) を研究者が追えるようにする。(code-reviewer 2 巡目は「Busy と同じ扱い」を提案。
+        //   2026-09-27 に検討し、正常と異常を分けるほうを採った。O1 の画面には出ない・G1 では稀。)
         report.errors.push(
             "収束の途中でロックを失いました (別の収束器に奪われた可能性)。残りは次の機会に収束します。"
                 .to_string(),
@@ -1453,8 +1465,12 @@ mod tests {
             matches!(stolen, LockOutcome::Acquired(_)),
             "対照: 更新の無い古いロックは奪われる (このテストの前提)"
         );
-        // ⚠️ 奪われた側の Drop が後続のロックを消す = 実害の再現 (ここでは片付けのため forget)。
-        std::mem::forget(held_a);
+        // ★ 奪われた側の Drop は後続のロックを消さない (所有印)。旧実装は無条件に消していた。
+        drop(held_a);
+        assert!(
+            a.join("reconcile.lock").is_file(),
+            "★ 奪われた側の Drop が、奪った側のロックを消してはならない"
+        );
         drop(stolen);
         let _ = std::fs::remove_dir_all(&a);
 
@@ -1608,6 +1624,25 @@ mod tests {
         let _ = std::fs::remove_dir_all(&o);
     }
 
+    /// ロックファイルが**消えた**場合も、所有を失ったと検知する (`owned()` の NotFound 経路)。
+    #[test]
+    fn a_vanished_lock_file_is_detected_as_lost_and_not_recreated() {
+        let o = tmpdir("vanished");
+        let a = match ReconcileLock::acquire(&o, LOCK_STALE_AFTER) {
+            LockOutcome::Acquired(l) => l,
+            _ => panic!("first lock must be acquired"),
+        };
+        std::fs::remove_file(o.join("reconcile.lock")).unwrap();
+        a.refresh();
+        assert!(a.is_lost(), "★ 消えたロックも所有を失ったとみなす");
+        assert!(
+            !o.join("reconcile.lock").exists(),
+            "★ 作り直さない (他の収束器のロックを壊さない)"
+        );
+        drop(a);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
     /// 送信中にロックを奪われた (と分かった) 収束は、次の 1 本に進まず中断し、失敗として出す。
     struct StealLockUploader {
         submission_dir: PathBuf,
@@ -1619,8 +1654,9 @@ mod tests {
             *n += 1;
             if *n == 1 {
                 // 1 本目の送信中に、別の収束器がロックを奪った状況を再現する。
+                // ⚠️ 削除→作成にしない (Windows は他ハンドルがあると削除が遅延・拒否されうる)。
+                //   中身が別物になれば `owned()` は `Some(false)` を返す = 奪取の再現として足りる。
                 let lock = self.submission_dir.join("reconcile.lock");
-                std::fs::remove_file(&lock).unwrap();
                 std::fs::write(&lock, "someone-else").unwrap();
             }
             Ok(())
