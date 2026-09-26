@@ -5,4 +5,9 @@
 - [x] v1.1 改訂宣言ブロックを挿入する
 - [x] 検証 4 本（parity / self-test / src-tauri 不変 / 削除行 0）
 - [x] `/cross-review`（Codex gpt-6-astra・パス限定）と是正
-- [ ] `/finish-task` → 出荷フロー（push → PR → CI 緑なら merge → main の CI）
+- [x] `/finish-task` → 出荷フロー（push → PR → CI 緑なら merge → main の CI）
+
+## 完了時の記録
+- `/cross-review` 2 巡（1 巡目: Codex ＋ code-reviewer・2 巡目: Codex で是正コミットだけ）。HIGH／両系統一致の指摘は是正済み（decisions 判断 6・7）
+- security-checker・test-runner は起動しなかった: 変更はドキュメントと `.steering/` だけで、コード・外部入力・データ保存に触れない（`git diff main -- src-tauri/` は空）
+- schema parity check: skip（schema を触っていない）／ `check_prereg_parity.py` と `--self-test` は exit 0
