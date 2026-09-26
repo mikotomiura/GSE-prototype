@@ -20,11 +20,12 @@ rm -f /tmp/p1-008-list.$$
 ( cd src-tauri && cargo build --quiet --bin gse-replay ) || fail "build できない"
 BIN="$REPO_ROOT/src-tauri/target/debug/gse-replay"; [ -x "$BIN" ] || BIN="$BIN.exe"
 
-# ★ main の gse-replay を別 worktree で作り、出力を比べる
+# ★ 比較先は動く main ではなく、タスクの分岐点（merge-base）に固定する（Codex TASK-PRE 指摘 6）
+CMP="$(git merge-base HEAD main)" || fail "merge-base を取れない"
 tmpd="$(mktemp -d)" || fail "一時ディレクトリを作れない"
 cleanup() { git worktree remove --force "$tmpd/main" >/dev/null 2>&1; rm -rf "$tmpd"; }
 trap cleanup EXIT
-git worktree add --detach "$tmpd/main" main >/dev/null 2>&1 || fail "main の worktree を作れない"
+git worktree add --detach "$tmpd/main" "$CMP" >/dev/null 2>&1 || fail "main の worktree を作れない"
 ( cd "$tmpd/main/src-tauri" && CARGO_TARGET_DIR="$REPO_ROOT/src-tauri/target/p1-008-main" cargo build --quiet --bin gse-replay ) || fail "main を build できない"
 MBIN="$REPO_ROOT/src-tauri/target/p1-008-main/debug/gse-replay"; [ -x "$MBIN" ] || MBIN="$MBIN.exe"
 

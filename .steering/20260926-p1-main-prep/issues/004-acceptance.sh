@@ -16,7 +16,7 @@ printf '%s\n' "$log" | tail -5
 [ "$rc" -eq 0 ] || fail "unittest が非 0 (rc=$rc)"
 printf '%s' "$log" | grep -q "skipped" && fail "skip がある"
 for t in test_grid_has_31_configs test_warmup_paired_with_q test_rule_d_table test_rule_d_excludes_mismatched_runs \
-         test_refuses_without_pg1 test_guards test_all_poles_passthrough_whitelist; do
+         test_refuses_without_pg1 test_manifest_complete_only_on_success test_guards test_all_poles_passthrough_whitelist; do
   printf '%s' "$log" | grep -Eq "^${t} .*\.\.\. ok$" || fail "テスト $t が ok で走っていない"
 done
 
@@ -36,6 +36,8 @@ bash scripts/run-features-all-poles.sh src-tauri/tests/fixtures/minimal.ndjson "
 [ "$rc" -eq 2 ] || fail "AC7: 知らないキーが exit 2 にならない (rc=$rc)"
 bash scripts/run-features-all-poles.sh src-tauri/tests/fixtures/minimal.ndjson "$out7" -- --set 'q=0.99;rm' >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 2 ] || fail "AC7: 形の違う値が exit 2 にならない (rc=$rc)"
+bash scripts/run-features-all-poles.sh src-tauri/tests/fixtures/minimal.ndjson "$out7" -- --set q=0.99 --set q=0.999 >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ] || fail "AC7: 同じキーの 2 回指定が exit 2 にならない (rc=$rc)"
 # ★ 陽性対照: 正しい組は通り、封筒 config に反映される
 ( cd src-tauri && cargo build --quiet --bin gse-replay ) || fail "AC7: build できない"
 BIN="$REPO_ROOT/src-tauri/target/debug/gse-replay"; [ -x "$BIN" ] || BIN="$BIN.exe"

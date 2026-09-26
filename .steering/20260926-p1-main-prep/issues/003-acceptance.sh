@@ -16,7 +16,7 @@ log="$("$PY" -m unittest scripts.tests.test_p1_episode_db -v 2>&1)"; rc=$?
 printf '%s\n' "$log" | tail -5
 [ "$rc" -eq 0 ] || fail "unittest が非 0 (rc=$rc)"
 printf '%s' "$log" | grep -q "skipped" && fail "skip がある"
-for t in test_tables_and_counts test_t0_table_excludes_retrospective test_manifest_join \
+for t in test_tables_and_counts test_t0_table_excludes_retrospective test_t0_json_has_no_retrospective_keys test_manifest_join \
          test_not_applicable_sessions_recorded test_guards; do
   printf '%s' "$log" | grep -Eq "^${t} .*\.\.\. ok$" || fail "テスト $t が ok で走っていない"
 done

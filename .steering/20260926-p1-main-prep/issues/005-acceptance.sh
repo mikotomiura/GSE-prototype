@@ -15,7 +15,7 @@ printf '%s\n' "$log" | tail -5
 [ "$rc" -eq 0 ] || fail "unittest が非 0 (rc=$rc)"
 printf '%s' "$log" | grep -q "skipped" && fail "skip がある"
 for t in test_folds_structure test_folds_deterministic test_seed_from_prereg test_metrics_values test_no_selection_output \
-         test_exclusions_and_label_mismatch test_guards test_poles_independent; do
+         test_exclusions_and_label_mismatch test_guards test_folds_shared_and_zero_episode_included test_poles_independent; do
   printf '%s' "$log" | grep -Eq "^${t} .*\.\.\. ok$" || fail "テスト $t が ok で走っていない"
 done
 

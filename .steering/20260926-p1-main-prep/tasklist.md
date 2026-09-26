@@ -11,7 +11,7 @@
 - [x] `_issue-plan.md`（DAG・ウェーブ・交差表・自己検査）
 - [x] `_loop-config.json`（モード C・base `feat/p1-main-prep`・parallel 2）
 - [x] 前提の実測（2026-09-26）: 004 / 008 が呼ぶ過去 acceptance 3 本（p1-prereg-cli-poles 003・008 ／ mhd-feature-offline-tiers 003）は **rc=0**・`check-tests-are-wired.sh` rc=0
-- [ ] （任意）TASK-PRE: `codex-consult` で issue 独立性の第二意見 → `_codex-preplan.md`
+- [x] TASK-PRE: `codex-consult` で issue 独立性の第二意見 → `_codex-preplan.md`（8 件中 7 件を採用・一部採用、1 件は誤検知で却下。判断 21・22）
 
 ## 実行（★ 別セッション・`/clear` の後・Sonnet）
 - [ ] `bash scripts/loop-run.sh .steering/20260926-p1-main-prep`（初回は安い issue 1 本を parallel=1 で回して基盤を確かめる）

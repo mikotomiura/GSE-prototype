@@ -18,7 +18,7 @@ printf '%s\n' "$log" | tail -5
 [ "$rc" -eq 0 ] || fail "unittest が非 0 (rc=$rc)"
 printf '%s' "$log" | grep -q "skipped" && fail "skip がある"
 for t in test_counts_and_summary test_output_invariant_to_non_onset_fields test_output_keys_whitelist \
-         test_not_applicable_counted_separately test_fail_closed_layout test_rejects_non_frozen test_out_inside_git_rejected; do
+         test_not_applicable_counted_separately test_zero_episode_participant_included test_fail_closed_layout test_rejects_non_frozen test_out_inside_git_rejected; do
   printf '%s' "$log" | grep -Eq "^${t} .*\.\.\. ok$" || fail "テスト $t が ok で走っていない"
 done
 
