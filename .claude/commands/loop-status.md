@@ -39,11 +39,12 @@ gh pr list --state all 2>/dev/null || echo "GH_ABSENT"   # gh が無ければ PR
 - event → 状態 emoji の対応:
   - `attempt_start` → 🔄 running (phase=execute)
   - `test_pass` → verifying/✅ 方向、`issue_done` → ✅ done (PR 反映)
-  - `test_fail / typecheck_fail / lint_fail` → 🔄 running (verify で ✗、失敗回数を括弧表示)
+  - `test_fail / typecheck_fail / lint_fail / acceptance_fail / uncommitted` → 🔄 running (verify で ✗、失敗回数を括弧表示。`uncommitted` = verify 前の時点で未コミット／コミット 0 件。verify は回っていない)
   - `no_progress_stop / blocked / scope_violation` → ⛔ blocked (note に理由)
   - `abandoned` → abandoned
   - event 無し → ⏳ queued
 - `try` = その issue の `attempt` 最大値。`verify` 列は test✓/✗・tc・lint を要約。
+  ★ `acceptance_fail` は `acc✗`、`uncommitted` は `未コミット` と書く (★ 後者は verify を回していないので ✓/✗ を付けない)。
 - **fingerprint は数えない** (loop-guard.sh の責務)。失敗回数の括弧表示のみ。
 
 ### 5. 進捗サマリ行と heartbeat を計算

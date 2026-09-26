@@ -37,6 +37,21 @@ worker が実際に打つのは `uv run ruff check . ; echo "EXIT:$?"` のよう
 | `git push` / `git reset --hard` / `git rebase` | 無人ループからリモートを壊せる。git は読み取り系 + `add` / `commit` に限定 |
 | `cat` の無制限許可 | `.env` を読める。テンプレでは含めているが、機密を置くリポジトリでは外す |
 
+### ★ `Bash(bash .steering/**/*-acceptance.sh)` を入れている (2026-09-26・起票 P1-B)
+
+worker が自分の issue の acceptance を回して、acceptance 自体の欠陥 (`cargo test <名前> -- --exact` が 0 件マッチ等) に
+**Loop の verify より先に**気づけるようにするため (★ 前タスクではこれが無く 5 attempt を失った)。
+
+- ⚠️ **綴りが効くのはこの `**` 形式だけ** (★ `claude 2.1.282` で実測)。途中に `*` を置く
+  `Bash(bash .steering/*/issues/*-acceptance.sh:*)` / `Bash(bash .steering/*/issues/*-acceptance.sh *)` と、
+  前方一致 `Bash(bash .steering/:*)` は**拒否された**。引数付き (`… --x`) と `&&` の後半は拒否される。
+- ⚠️★★★ **これは境界ではない。** worker は `Write` で任意の `*-acceptance.sh` を作って実行でき、
+  `bash .steering/../x-acceptance.sh` も通る (実測)。★ 権限上は `Bash(bash:*)` と同等であり、
+  `cargo run` / `cargo test` が build.rs 経由で任意コードを実行できるのと同じ扱い。
+  ⚠️★★★ **Loop の verify の合否も worker の影響を受けうる** —— verify は main checkout 側の acceptance を回すが、
+  任意コードを実行できる worker はそれも書き換えうる。→ ★ 合否を最終的に決めるのは **merge 前にメインが clean な checkout で回す acceptance**
+  (★ 2026-09-26 に旧文「worker が書き換えても動かない」を訂正 —— `security-checker` MEDIUM)。
+
 ### allowlist は「完全な境界」ではない
 
 許可を 1 つ間違えるだけで全体が迂回できる。**実質的な境界は worktree 隔離と人間の merge ゲート**。

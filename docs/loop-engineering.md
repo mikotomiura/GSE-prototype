@@ -49,9 +49,25 @@ worktree 隔離のもと安全に回す。人が目視できる監視ファイ�
 - **no-progress fingerprint**: `sha1(失敗test id + error種別 + file:line)`。
   同一 fingerprint が連続すると loop-guard.sh が数え、budget 内でも停止する。
 
-## Events 語彙 (events.jsonl の event 値・全 10 種)
+## Events 語彙 (events.jsonl の event 値・全 12 種)
 `attempt_start` | `test_pass` | `test_fail` | `typecheck_fail` | `lint_fail` |
+`acceptance_fail` | `uncommitted` |
 `no_progress_stop` | `scope_violation` | `blocked` | `issue_done` | `abandoned`
+
+- `acceptance_fail`: `<id>-acceptance.sh` が非 0。⚠️ `loop-run.sh` は以前から出していたが、この表に載っていなかった (2026-09-26 に追記)。
+- `uncommitted` (2026-09-26・起票 P1-I。★ 2026-09-26 に /cross-review + security-checker の指摘で 2 回目の是正): worker の attempt の後、**verify を回す前**に見て、worktree に**未コミットの変更がある**か、
+  **worktree 生成時点からのコミットが 0 件**か、**追跡ファイルに skip-worktree / assume-unchanged の印が付いている**場合。
+  ⚠️ 未コミット判定は `git status --porcelain --untracked-files=all` で設定 (`status.showUntrackedFiles`) に依存せず全未追跡ファイルを見る。
+  ただし verify (と `verify_level: recheck` の watchdog) が実行の前後で新たに作った未追跡パスは、issue ごとの「生成集合」に記録して次回以降の判定から除外する
+  (赤の verify が gitignore 外の生成物を残しても、worker が正しくコミットすれば次の attempt で `issue_done` に届く)。
+  ★ verify を回す前に見るので、check_committed を通過した時点の作業ツリーはクリーンな状態から始まる。
+  さらに、verify (と watchdog) の**後**にも「HEAD が動いていないか」「追跡ファイルに差分が無いか」(`git diff --quiet HEAD --`) を確かめ、
+  崩れていれば verify が緑でも `uncommitted` にして `issue_done` にしない (verify 自身が追跡ファイルを書き換える・checkout する等でコミットの内容が保証できなくなるため)。
+  ⚠️★ **限界**: worker が生成物と同じパスを後で意図的に編集しても未追跡のままなら除外対象のままである。gitignore 対象のパスはそもそも porcelain に出ないので見ない。
+  これは境界の欠陥ではなく、**最終判定は merge 前にメインが clean な checkout で回す acceptance** に委ねる設計である。
+  ⚠️★ もう 1 つの限界 (2026-09-26・/cross-review 2 巡目): sparse-checkout を有効にした worktree では対象外パスに正当な `S` (skip-worktree) 印が付くため、常に `uncommitted` になる (本 repo は現状 sparse-checkout ではない)。
+  ★ `test_fail` と同じく**失敗 attempt**として次の attempt へ進む (max_turns で切れた worker が次の attempt でコミットできる)。
+  同じ未コミット状態が続けば同じ fingerprint になり `no_progress_stop` で止まる。モードC では `loop-run.sh` が機械検査する。
 
 1 状態遷移 = 1 行 append (main checkout の絶対パスへ)。board は書かない。
 **writer はモードで変わる**: モードA/B = 各 worker セッション (LLM の申告) /
@@ -227,7 +243,7 @@ script が usage を積算して超過停止 / 各 `claude -p` は `--max-turns`
   実在する書式 (`✅ **done**（…）` / `⚠️★★★ **不要（not needed）**`) と同じ形で `blocked` を
   書かれると、素の前方一致は **fail-open する**。
 - 除外は **ログと `_loop-run-report.md`** に出す。⚠ events には出さない
-  (events 語彙は 10 種で固定であり、「実行しなかった」は状態遷移ではない)。
+  (events 語彙は上の語彙表の種類で固定であり、「実行しなかった」は状態遷移ではない)。
   ★ ただし **`--issues` で `blocked` を承知で回したとき**は、その attempt の
   `attempt_start` に `detail` を 1 行足す (⚠ 迂回が端末のスクロールバックにしか残らないのを避ける)。
 
@@ -263,6 +279,31 @@ C は「script が外から数える」「hook が内から止める」の**二�
 
 `_loop-config.json.mode` に `"A"` / `"B"` / `"C"` を pin する。
 **全モードで events / board / watchdog gate / Stop 条件の契約は同一**。変わるのは制御の主体だけ。
+
+### ⚠ 2026-09-26 の是正 (P1 前タスクの起票 P1-I / J / K / B / D ・ `.steering/20260926-loop-foundation-p1-fixes/`)
+
+- **P1-I — 未コミットの attempt は verify を回さず失敗にする (done にしない)。** 上の語彙表 `uncommitted` を参照。
+- **P1-J — 切り元はローカルと `origin/<base>` の祖先関係で決まる。**
+  `loop-spawn.sh` は fetch 後に比べ、一致 → origin ／ **ローカル先行 → ローカル** (⚠️ 未 push のコミットを含む) ／
+  ローカル遅れ → origin ／ **分岐 → fail-closed で止まる** (worktree も branch も作らない)。
+  選んだ理由は provenance ブロックの `start-choice = <equal|local-ahead|local-behind|no-local|fetch-failed>` 行に出る。
+  ★ モードC ではローカル先行を attempt 1 の `attempt_start` の `detail` (WARN) にも残す。
+  ⚠️ 旧実装は fetch に成功すると**無条件に origin から切った** (push 前にローカルで merge した 005 を含まない枝から 006 が切られた)。
+- **P1-K — spawn は直列化される。** `git worktree add` は upstream 設定で `.git/config` を書くので、
+  同時に 2 本走ると片方がロックで落ちていた。`loop-spawn.sh` は `<git-common-dir>/loop-spawn.lock` (mkdir ロック) を取って
+  worktree を作る。⚠️ `worktree add` が失敗して**ブランチだけ残った**ときは、作成時から動いていなければ消してから止まる。
+- **P1-D — `## Dependencies` の装飾は剥がしてから拾う。** `- **001**` も依存として拾う。
+  箇条書きの先頭にない 3 桁数字 (散文中の「issue 004 の merge 後に」など) は依存にしないが、**WARN を出す** (黙って落とさない・止めもしない)。
+- **P1-B — worker は acceptance を自分で回せる。** テンプレの `allowed_tools` に `Bash(bash .steering/**/*-acceptance.sh)` を入れた。
+  ⚠️★★★ **これは境界ではない** —— worker は `Write` で任意の `*-acceptance.sh` を作れ、`.steering/../` でも外へ出られる
+  (★ 2026-09-26 に `claude 2.1.282` で実測。権限上は `Bash(bash:*)` と同等)。境界は従来どおり
+  worktree ブランチ検査・必須 deny・人の merge ゲートである。
+  ⚠️★★★ **Loop の verify の合否は worker の影響を受けうる。** verify は main checkout 側の acceptance を走らせるが、
+  任意のコードを実行できる worker はそのファイルも書き換えうる (★ `cargo run` / `cargo test` の build.rs 経由でも元から可能。
+  test / typecheck / lint も worktree の中で走る)。→ ★ **合否を最終的に決めるのは、merge 前にメインが clean な checkout で回す acceptance**
+  (★ 前タスク判断 21 / 22 の運用。`security-checker` MEDIUM・2026-09-26 で旧文「書き換えても合否は動かない」を訂正)。
+  ⚠️ 途中に `*` を置く形 (`Bash(bash .steering/*/issues/*-acceptance.sh:*)` / `… *)`) と前方一致 `Bash(bash .steering/:*)` は**効かなかった** (同実測)。
+- ⚠️ **P1-H (verify が他の issue の門を回さない) は未是正**。メインが merge 前に全 acceptance を正しい終了コードで回す運用で補う。
 
 <!-- loop:codex:begin -->
 ## Codex ゲート (任意・タスク境界のみ)

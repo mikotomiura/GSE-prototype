@@ -234,14 +234,40 @@ issue_field() { # issue_field <id> <見出し> → 該当セクションの本�
 #    → 箇条書き行の先頭にある id だけを拾い、自己依存は落とす。
 #      推奨する書式:  - 003
 #                     - 004  (loader の変更が前提)
-issue_deps_raw() { # 自己依存も含めてそのまま返す (preflight が検出するため)
+# ⚠️★★★ P1-D（design.md 判断 7）: `- **001**（説明）` のように強調で囲まれると、
+#   装飾を剥がす前の正規表現は一致しない。→ ★ 行ごとに `*` `_` `` ` `` を剥がしてから拾う
+#   (issue_status_key が装飾を剥がすのと同じ発想)。
+# ⚠️★★★ ただし箇条書きの `*` は**先に `-` へ正規化してから**剥がす (2026-09-26 メインのレビュー)。
+#   ★ `s/[*_`]//g` だけだと `* 001` の箇条書き記号まで消え、従来の `[-*]` が受けていた書式が拾えなくなる。
+deps_section_plain() { # deps_section_plain <id> → 装飾を剥がした Dependencies 節
   issue_field "$1" Dependencies \
+    | sed -e 's/^\([[:space:]]*\)[*]\([[:space:]]\)/\1-\2/' -e 's/[*_`]//g' \
+    | LC_ALL=C tr -c '\11\12\40-\176' ' '
+  # ⚠️★★★ 非 ASCII のバイトを空白に置き換える (★ 2026-09-26 PR #224 の Windows CI で実測)。
+  #   ★ 下流の `\b` は、ロケールが C の環境 (self-hosted runner は NetworkService で動く) では
+  #     マルチバイト文字のバイトを単語の一部とみなし、`- 001（説明）` の `001` と `（` の間に境界を作らない
+  #     → **依存を黙って落とす** (P1-D の再発)。手元の UTF-8 ロケールでは再現しない。
+  #   → ★ 依存の判定に要るのは ASCII だけなので、非 ASCII を空白にしてからロケール非依存で拾う。
+}
+issue_deps_raw() { # 自己依存も含めてそのまま返す (preflight が検出するため)
+  deps_section_plain "$1" \
     | grep -oE '^[[:space:]]*[-*][[:space:]]*(#|issue[[:space:]]*)?[0-9]{3}\b' \
     | grep -oE '[0-9]{3}' \
     | sort -u
 }
 issue_deps() { # 実行時に使う版。自己依存は落としてデッドロックを避ける
   issue_deps_raw "$1" | grep -vx "$1" || true
+}
+# ⚠️★★★ P1-D（design.md 判断 7）: 散文中の言及 (「issue 004 の merge 後に…」) は正当にありうる。
+#   die はせず WARN するための材料をここで作る —— Dependencies 節 (装飾を剥がした後) にある
+#   単語境界の 3 桁数字のうち、箇条書き行の先頭として拾えなかったもの。
+issue_deps_unparsed() { # issue_deps_unparsed <id> → 拾えなかった 3 桁数字 (1 行 1 件、無ければ空)
+  local all_nums parsed n
+  all_nums="$(deps_section_plain "$1" | grep -oE '\b[0-9]{3}\b' | sort -u)"
+  parsed="$(issue_deps_raw "$1")"
+  for n in $all_nums; do
+    printf '%s\n' "$parsed" | grep -qx "$n" || printf '%s\n' "$n"
+  done
 }
 issue_verify_level() { grep -m1 -E '^verify_level:' "$(issue_file "$1")" | awk '{print $2}'; }
 
@@ -396,6 +422,136 @@ run_verify() { # run_verify <worktree> <issue-id> <out-file>; 失敗種別は $V
   return 0
 }
 
+# ---------- P1-I: 「未コミット／コミット 0 件」の attempt を verify すら回さず失敗にする ----------
+# ⚠️★★★ 実例（005 / 008）: verify はworktree の**作業ツリー**を測るので、worker が
+#   `max_turns` で切れて何もコミットしなくても緑になりうる (★ design.md P1-I・判断 5)。
+#   → ★ 「ちゃんとコミットされているか」を別に見る。
+# ⚠️★★★ **呼び出し順序はレビュー指摘 C-M3/C-M4（2026-09-26）で verify の前に是正した。**
+#   ★ 呼び出し側 (run_issue の verify 直前) がこの順序を強制する。詳細はそちらのコメントを参照。
+#
+# ⚠️★★★ **2026-09-26 の 2 回目の是正 (/cross-review + security-checker・判断 10)**:
+#   ★ 「check_committed を verify の前に置く」だけでは 3 つの穴が残っていた:
+#     (a) code-reviewer MEDIUM: 赤の verify が gitignore 外の生成物を作業ツリーに残すと、
+#         worker が正しくコミットしても porcelain には生成物が**未追跡のまま**残り続け、
+#         次の attempt の check_committed が**恒久的に dirty**になる (worker は rm を持たない)。
+#     (b) Codex P2-3: 逆に `status.showUntrackedFiles=no` の設定下では、生の `git status --porcelain`
+#         は未追跡ファイルを一切表示しない。→ コミットしていない新規ファイルを使って
+#         見かけ上クリーンになり、緑になりうる。
+#     (c) Codex P2-2 / security LOW 1: check_committed が見ているのは「呼ばれた時点のスナップショット」
+#         でしかない。verify が追跡ファイルを書き換えた場合や、skip-worktree / assume-unchanged の
+#         印が付いたファイルがある場合、**コミットの内容そのものは検証されていない**。
+#   ★ 是正: (a)(b) は check_committed 内で対処し、(c) は run_issue 側で verify 前後の不変性を見る。
+#
+# ⚠️★★★ **限界（境界ではなく明示する）**:
+#   worker が verify の生成物と同じパスを後で意図的に編集しても、未追跡のままなら
+#   引き続き除外される。gitignore 対象のパスは見ない (そもそも porcelain に出ない)。
+#   これは検査の穴ではなく、**最終判定は merge 前にメインが clean な checkout で回す acceptance**
+#   に委ねる設計 (前タスク判断 21 / 22 の運用・判断 8 と同じ型)。
+untracked_paths() { # untracked_paths <worktree> → 未追跡パス一覧 (1 行 1 パス。"?? " 接頭辞は剥がす)
+  #   ⚠️★★★ `--untracked-files=all` を明示する ((b) の対策そのもの)。指定しないと
+  #     `status.showUntrackedFiles=no` の設定を継承してしまい、未追跡ファイルを一切拾えない。
+  git -C "$1" status --porcelain --untracked-files=all 2>/dev/null | grep '^?? ' | sed 's/^?? //'
+}
+
+record_verify_generated() { # record_verify_generated <worktree> <u0-file> <gen-file>
+  #   verify (run_verify / watchdog) が実行される**前後**の未追跡集合の差分 (U1 - U0) を
+  #   <gen-file> に積む。次回以降の check_committed がこの集合に含まれる未追跡パスを
+  #   dirty 判定から除外する ((a) の対策)。緑でも赤でも呼ぶこと (どちらも生成物を残しうる)。
+  local wt="$1" u0="$2" gen="$3" u1
+  u1="$(mktemp)" || return 0
+  untracked_paths "$wt" > "$u1"
+  if [ -s "$u0" ]; then
+    grep -Fxvf "$u0" "$u1" 2>/dev/null >> "$gen" || true
+  else
+    cat "$u1" >> "$gen" 2>/dev/null || true
+  fi
+  rm -f "$u1"
+}
+
+# ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目・2026-09-26): skip-worktree / assume-unchanged の印は
+#   `check_committed` だけでなく、verify・watchdog **後**の不変確認 (run_issue) からも見る必要がある。
+#   ★ `git diff --quiet HEAD --` は印が付いたパスの変更を見ないため、verify.test 自身が
+#     追跡ファイルを書き換えたうえで印を付けると、不変確認は「クリーン」と誤診して素通りしてしまう。
+#   → ★ 判定を関数に括り出し、check_committed と run_issue の不変確認の両方から呼ぶ。
+flagged_tracked_files() { # flagged_tracked_files <worktree> → skip-worktree(S)/assume-unchanged(小文字) の印が付いた行 (空なら印なし)
+  git -C "$1" ls-files -v 2>/dev/null | grep -E '^(S |[a-z] )' || true
+}
+
+check_committed() { # check_committed <worktree> <anchor> <out-file> <gen-file>; 0 = コミット済み
+  local wt="$1" anchor="$2" out_file="$3" gen_file="$4"
+  local n_commits rc
+  : > "$out_file"
+  [ -f "$gen_file" ] || : > "$gen_file"
+
+  # --- (1) 未追跡ファイルは設定非依存で全件見る。verify が作った生成物だけを除外する ---
+  local porcelain line path dirty_lines="" excluded_lines=""
+  porcelain="$(git -C "$wt" status --porcelain --untracked-files=all 2>&1)"
+  if [ -n "$porcelain" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      case "$line" in
+        "?? "*)
+          path="${line#"?? "}"
+          # ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `$path` が `-` で始まると
+          #   (例: `-report.txt`) grep がオプションと誤解釈し、毎回 dirty 扱いになっていた。
+          #   → `-e` でパターンだと明示し、`--` で以降を非オプション引数に固定する。
+          if grep -Fxq -e "$path" -- "$gen_file" 2>/dev/null; then
+            excluded_lines="${excluded_lines}${line}"$'\n'
+          else
+            dirty_lines="${dirty_lines}${line}"$'\n'
+          fi ;;
+        *) dirty_lines="${dirty_lines}${line}"$'\n' ;;
+      esac
+    done <<< "$porcelain"
+  fi
+  {
+    echo "# check_committed: git status --porcelain --untracked-files=all"
+    if [ -n "$porcelain" ]; then printf '%s\n' "$porcelain"; else echo "(クリーン)"; fi
+    if [ -n "$excluded_lines" ]; then
+      echo "# → 除外した生成物 (verify が作った未追跡パスなので dirty 判定から外した):"
+      printf '%s' "$excluded_lines"
+    fi
+  } >> "$out_file"
+  if [ -n "$dirty_lines" ]; then
+    echo "# → 未コミットの変更がある (dirty)" >> "$out_file"
+    return 1
+  fi
+
+  # --- (2) skip-worktree / assume-unchanged の印はコミットの内容を保証しない ---
+  local flagged
+  flagged="$(flagged_tracked_files "$wt")"
+  if [ -n "$flagged" ]; then
+    {
+      echo "# check_committed: git ls-files -v に skip-worktree(S) / assume-unchanged(小文字) の印がある"
+      printf '%s\n' "$flagged"
+      echo "# → コミット済みの内容が保証できないため fail-closed"
+    } >> "$out_file"
+    return 1
+  fi
+
+  # ⚠️ anchor が空・rev-list が失敗 → 数えられない ＝ fail-closed (done にしない側)。
+  if [ -z "$anchor" ]; then
+    echo "# → anchor (worktree 生成時の HEAD) を取得できていない。コミット数を数えられないため fail-closed" >> "$out_file"
+    return 1
+  fi
+  n_commits="$(git -C "$wt" rev-list --count "$anchor..HEAD" 2>&1)"; rc=$?
+  echo "# check_committed: git rev-list --count $anchor..HEAD = $n_commits (rc=$rc)" >> "$out_file"
+  if [ $rc -ne 0 ]; then
+    echo "# → rev-list に失敗した。数えられないため fail-closed" >> "$out_file"
+    return 1
+  fi
+  case "$n_commits" in
+    ''|*[!0-9]*)
+      echo "# → rev-list の出力が数値でない。fail-closed" >> "$out_file"
+      return 1 ;;
+  esac
+  if [ "$n_commits" -eq 0 ]; then
+    echo "# → anchor からコミットが 0 件" >> "$out_file"
+    return 1
+  fi
+  return 0
+}
+
 # ---------- 予算の積算 (claude -p --output-format json の usage / total_cost_usd) ----------
 # 注意 (実測): usage.input_tokens は **キャッシュ分を含まない**。
 #   input+output だけ足すと 3 桁規模で過小計上し token_ceiling が永久に発火しない。
@@ -477,6 +633,11 @@ check_wt_became_blocked() { # check_wt_became_blocked <id> <wt> <attempt> <was-b
 # ---------- 1 issue の attempt ループ ----------
 run_issue() {
   local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor wt_blocked_at_start=0
+  # ⚠️★★★ verify が生成した未追跡パスの集合 (判断 10)。attempt をまたいで蓄積する
+  #   (前 attempt が残した生成物は次の attempt でも未追跡のまま残るため)。issue ごとに 1 本、
+  #   run_issue の開始で空にする (WORK_TMP は run 全体で 1 つなので id 違いと混線しない)。
+  local gen_file="$WORK_TMP/verify-generated-$id.txt"
+  : > "$gen_file"
   # ⚠️★★★ **`--task` を渡す** (★ 起票 23)。
   #   ★ 旧実装は `--no-exec "$id"` だけを渡しており、⚠️ **loop-run.sh は `$TASK_DIR` を
   #     持っているのに伝えていなかった**ので、`loop-spawn.sh` が `.steering/*/_loop-config.json` を
@@ -487,7 +648,7 @@ run_issue() {
   #     「解決した base は何で、既定からどれだけ離れているか」を**丸ごと消していた**
   #     (＝ **無人モードC では誰も読まない** ＝ 起票 23 の 2 つ目の論点)。
   #   → ★ run ログへ流す。⚠️ stdout 側の契約 (最終行 = worktree の絶対パス) は変えない。
-  local spawn_err _l
+  local spawn_err _l spawn_local_ahead=0
   spawn_err="$(mktemp)" || { emit "$id" execute blocked detail="mktemp に失敗 (worktree 生成前)"; return 1; }
   # ⚠️ 早期 return でも必ず掃除する (★ Codex `/cross-review` 1 巡目・2026-09-21)。
   #   ★ 現在は下の `rm -f` に到達するので leak は無いが、
@@ -501,6 +662,21 @@ run_issue() {
   while IFS= read -r _l; do
     [ -n "$_l" ] || continue
     log "$_l"
+    # ⚠️★★★ P1-J（design.md 判断 3）: spawn が「ローカルが origin/<base> より先行している」と
+    #   判定して**ローカル base**から切ったこと (未 push のコミットを含みうる) を検出する。
+    #   ★ ここでは検出だけし、emit は下の attempt=1 の attempt_start に合流させる
+    #   (★ events 語彙は増やさない。ensure_deny / BYPASSED_BLOCKED と同じ「attempt_start + detail」の作法)。
+    # ⚠️★★★ レビュー指摘 (2026-09-26): 緩い部分一致 `*start-choice*local-ahead*` は、
+    #   config 由来の base 名が偶然 "start-choice-local-ahead" になった場合の
+    #   `loop-spawn:   start      = start-choice-local-ahead` という無関係な行にも一致してしまう
+    #   (★ その行は「解決した base 名」であって「ローカル先行の判定」ではない)。
+    #   → ★ loop-spawn.sh が出す契約の行 (loop-spawn.sh 側の該当コメントで綴りを固定) である
+    #     `loop-spawn:   start-choice = local-ahead` の**完全一致**にする
+    #     (行頭から行末まで。末尾の空白だけは許す)。
+    local _l_trimmed; _l_trimmed="$(printf '%s' "$_l" | sed -e 's/[[:space:]]*$//')"
+    case "$_l_trimmed" in
+      "loop-spawn:   start-choice = local-ahead") spawn_local_ahead=1 ;;
+    esac
   done < "$spawn_err"
   rm -f "$spawn_err"
   [ -d "${wt:-}" ] || { emit "$id" execute blocked detail="worktree 生成に失敗"; return 1; }
@@ -538,6 +714,11 @@ run_issue() {
         *" $id "*) emit "$id" execute attempt_start attempt="$attempt" \
                         detail="WARN: Status=blocked の issue を --issues で明示指定して実行している ($(issue_status "$id" | head -c 120))" ;;
       esac
+      # ⚠️★★★ P1-J（design.md 判断 3）: 両方該当したら 2 行 emit でよい (既存 WARN と同じ作法)。
+      if [ "$spawn_local_ahead" = "1" ]; then
+        emit "$id" execute attempt_start attempt="$attempt" \
+             detail="WARN: base をローカル先行（未 push を含む）から切った: loop-spawn の provenance (start-choice) を確認してください"
+      fi
     fi
 
     # ⚠️★★★ **毎 attempt** 必須 deny を保証する (★ 詳細は ensure_deny の冒頭)。
@@ -653,24 +834,87 @@ run_issue() {
     # --- 客観検証: exit code がすべて。LLM の申告は読まない ---
     # ⚠ `$(run_verify ...)` の形で呼ばないこと (サブシェルで VERIFY_* が失われる)。
     local vout="$WORK_TMP/verify-$id.out"
-    if run_verify "$wt" "$id" "$vout"; then
-      local lvl; lvl="$(issue_verify_level "$id")"
-      if [ "$lvl" = "recheck" ]; then
-        if ! run_watchdog "$id" "$wt" "$attempt"; then return 1; fi
+    # ⚠️★★★ P1-I（design.md 判断 5・レビュー指摘 C-M3/C-M4 で 2026-09-26 是正）:
+    #   `check_committed` は **`run_verify` より前**に見る。
+    #   ⚠️★★★ **さらに 2026-09-26 の 2 回目の是正 (/cross-review + security-checker・判断 10)**:
+    #   ★ 分岐を明示にする —— `if ! check_committed …; then VERIFY_KIND=uncommitted;
+    #     elif run_verify …; then …（緑の経路）…; fi` の形にし、`[ -n "$VERIFY_KIND" ] ||
+    #     VERIFY_KIND=uncommitted` という**暗黙の推論**はやめる。
+    #   ★ check_committed 自身の生成物除外・未追跡設定非依存・skip-worktree 検査は
+    #     check_committed のコメントを参照。★ ここで足すのは verify 前後の不変性検査:
+    #     run_verify (と recheck の watchdog) の**前後**で「未追跡集合 U0/U1」を取り、
+    #     U1 − U0 を生成集合に足す (次回以降の check_committed が除外できるようにする)。
+    #     さらに issue_done の直前で「HEAD が動いていない」かつ「追跡ファイルに差分がない」
+    #     ことを確かめ、崩れていれば uncommitted 扱いにして done にしない
+    #     (Codex P2-2 / security LOW 1 —— verify が追跡ファイルを書き換えても
+    #     check_committed 単体では気づけない)。
+    VERIFY_KIND=""
+    local uncommitted_detail=""
+    if ! check_committed "$wt" "$wt_anchor" "$vout" "$gen_file"; then
+      VERIFY_KIND=uncommitted
+    else
+      local u0_file head_before head_after flagged_after
+      u0_file="$WORK_TMP/verify-u0-$id.txt"
+      untracked_paths "$wt" > "$u0_file"
+      head_before="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+      if run_verify "$wt" "$id" "$vout"; then
+        # ★ 緑になった直後にも U1 を取って生成集合を更新する (verify 自体が生成物を作りうる)。
+        record_verify_generated "$wt" "$u0_file" "$gen_file"
+        local lvl; lvl="$(issue_verify_level "$id")"
+        if [ "$lvl" = "recheck" ]; then
+          if ! run_watchdog "$id" "$wt" "$attempt"; then
+            return 1
+          fi
+          # ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `run_watchdog` もフルセッション 1 回分であり
+          #   gitignore 外の生成物を残しうる。上の記録は verify 直後の 1 回だけだったので、
+          #   watchdog が作った未追跡ファイルは次の attempt の check_committed でも dirty のままに
+          #   固定されていた。★ 冒頭コメント (P1-I) の「run_verify (と recheck の watchdog) の
+          #   前後で…」という記述はこれで実装と一致する。
+          #   ★ U0 は run_verify の前に取った `$u0_file` を再利用する
+          #     (watchdog 用に取り直す必要はない。gen_file は行の集合として追記するだけなので
+          #     verify 分と watchdog 分が重複して積まれても害はない)。
+          record_verify_generated "$wt" "$u0_file" "$gen_file" # WATCHDOG-POST-RECORD (3 回目の是正)
+        fi
+        # ⚠️★★★ **`issue_done` を出す直前に「HEAD 不変」かつ「追跡ファイルに差分なし」かつ
+        #   「skip-worktree/assume-unchanged の印が付いていない」ことを確かめる**
+        #   （★ Codex P2-2 / security LOW 1・2026-09-26。★ `code-reviewer` / `security-checker` の
+        #     旧 HIGH 指摘・2026-09-20 の「HEAD だけ見る」検査をさらに強める）。
+        #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
+        #     (`verify_level: recheck` の issue)。そこや `run_verify` の最中に
+        #     追跡ファイルが書き換えられていても、check_committed 通過時点のスナップショットだけでは
+        #     見えない。→ ★ ここで H0 との一致と `git diff --quiet HEAD --` を見る。
+        #   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `git diff --quiet HEAD --` は
+        #     skip-worktree/assume-unchanged の印が付いたパスの変更を**見ない**。
+        #     verify.test 自身が追跡ファイルを書き換えたうえで印を付けると、上の 2 条件だけでは
+        #     「クリーン」に見えてしまう (check_committed 通過時点では印は無かったはずなので、
+        #     ここで見つかる印は verify/watchdog の最中に付いたものである)。
+        #     → `flagged_tracked_files` (check_committed と共通の判定) をここでも通す。
+        #   ⚠️ `head_before` / `head_after` が両方とも rev-parse 失敗で空文字列だと
+        #     `"" = ""` が成立して fail-open するため、`head_before` が空でないことも確かめる。
+        head_after="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+        flagged_after="$(flagged_tracked_files "$wt")"
+        if [ -n "$head_before" ] && [ "$head_after" = "$head_before" ] && git -C "$wt" diff --quiet HEAD -- 2>/dev/null && [ -z "$flagged_after" ]; then
+          # ⚠️ ブランチ名 / 履歴入れ替えの検査は従来どおり残す (HEAD 不変チェックとは別の観点:
+          #   `ensure_branch` はブランチ名と anchor からの祖先関係を見る)。
+          ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
+          emit "$id" done issue_done attempt="$attempt"
+          log "issue $id: done (attempt $attempt)"
+          return 0
+        fi
+        {
+          echo "# → verify（または watchdog）が追跡ファイル / HEAD を変更したか、skip-worktree/assume-unchanged の印を残した"
+          echo "#   HEAD: 前=$head_before 後=$head_after"
+          if [ -n "$flagged_after" ]; then
+            echo "#   flagged (skip-worktree/assume-unchanged):"; printf '%s\n' "$flagged_after"
+          fi
+        } >> "$vout"
+        VERIFY_KIND=uncommitted
+        uncommitted_detail="verify/watchdog の前後で追跡ファイル差分・HEAD 移動・flagged ファイルのいずれかを検出した (HEAD 前=$head_before 後=$head_after)"
+      else
+        # run_verify が失敗した場合も生成物を残しうる (test_fail 等)。
+        # VERIFY_KIND は run_verify 自身が設定済みなので、ここでは上書きしない。
+        record_verify_generated "$wt" "$u0_file" "$gen_file"
       fi
-      # ⚠️★★★ **`issue_done` を出す直前にもう一度 HEAD を見る**
-      #   （★ `code-reviewer` / `security-checker` が **両方 HIGH** で指摘・2026-09-20）。
-      #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
-      #     (`verify_level: recheck` の issue)。⚠️ そこで逸脱されると、
-      #     **`issue_done` が「別ブランチを見て出した done」**になる。
-      #   ⚠️ watchdog の `WD_TOOLS` に `git checkout` が無いことを根拠にしない ——
-      #     ★ それは **本スクリプトが worker について明確に否定した「綴りで防ぐ」論法**と同じであり、
-      #     M3 が `git -C . checkout` で破れることを実測している。
-      #   ★ `run_verify` の最中（テストが checkout する等）の移動もここで拾える。
-      ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
-      emit "$id" done issue_done attempt="$attempt"
-      log "issue $id: done (attempt $attempt)"
-      return 0
     fi
 
     # 一時ファイルから fingerprint を作る (サブシェル経由だと必ず sha1("") になる)
@@ -684,7 +928,11 @@ run_issue() {
       last_fp=""; same=0
       attempt=$((attempt+1)); continue
     fi
-    emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp"
+    if [ -n "$uncommitted_detail" ]; then
+      emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp" detail="$uncommitted_detail"
+    else
+      emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp"
+    fi
     # ★ no_progress 判定より前に見る (2026-09-25 追加。詳細は check_wt_became_blocked の冒頭)。
     check_wt_became_blocked "$id" "$wt" "$attempt" "$wt_blocked_at_start" && return 1
     if [ "$fp" = "$last_fp" ]; then same=$((same+1)); else same=1; last_fp="$fp"; fi
@@ -791,7 +1039,7 @@ deps_met() { local d; for d in $(issue_deps "$1"); do is_done "$d" || return 1; 
 #   循環する issue は `deps_met` が永久に false になり、下の `remaining` ループを抜けて
 #   `blocked`（「依存 issue が未完のため未実行」）が events に残る。⚠️ **原因が循環だとは書かれない。**
 preflight_dag() {
-  local id d bad=0
+  local id d bad=0 unparsed
   for id in $ALL; do
     for d in $(issue_deps_raw "$id"); do
       if [ "$d" = "$id" ]; then
@@ -804,6 +1052,14 @@ preflight_dag() {
         echo "loop-run: issue $id の依存 $d が issues/ に存在しません" >&2; bad=1
       fi
     done
+    # ⚠️★★★ P1-D（design.md 判断 7）: 箇条書きの先頭で拾えなかった 3 桁数字は WARN するが
+    #   die しない。散文中の言及 (「issue 004 の merge 後に…」) は正当にありうるので、
+    #   黙らないことが要点であって止めることではない。★ --dry-run でも見える (preflight は
+    #   DRY_RUN の判定より前に走る)。
+    unparsed="$(issue_deps_unparsed "$id")"
+    if [ -n "$unparsed" ]; then
+      log "WARN: issue $id の Dependencies に依存として拾わなかった 3 桁数字: $(printf '%s' "$unparsed" | tr '\n' ' ')（箇条書き行の先頭にない）"
+    fi
   done
   [ "$bad" = "0" ] || die "DAG の前提が壊れています (上記を修正してください)"
 }

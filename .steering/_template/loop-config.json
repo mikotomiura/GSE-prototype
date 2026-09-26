@@ -15,7 +15,7 @@
     "permission_mode": "acceptEdits",
     "model": "sonnet",
     "watchdog_model": "haiku",
-    "allowed_tools": "Read,Write,Edit,MultiEdit,Glob,Grep,Task,TodoWrite,Bash(uv run pytest:*),Bash(uv run ruff:*),Bash(uv run mypy:*),Bash(pytest:*),Bash(ruff:*),Bash(mypy:*),Bash(npm test:*),Bash(npm run:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),Bash(git add:*),Bash(git commit:*),Bash(echo:*),Bash(printf:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(jq:*),Bash(test:*),Bash(mkdir:*),Bash(touch:*),Bash(diff:*),Bash(basename:*),Bash(dirname:*),Bash(pwd:*),Bash(date:*),Bash(true:*),Bash(cd:*)",
+    "allowed_tools": "Read,Write,Edit,MultiEdit,Glob,Grep,Task,TodoWrite,Bash(uv run pytest:*),Bash(uv run ruff:*),Bash(uv run mypy:*),Bash(pytest:*),Bash(ruff:*),Bash(mypy:*),Bash(npm test:*),Bash(npm run:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),Bash(git add:*),Bash(git commit:*),Bash(bash .steering/**/*-acceptance.sh),Bash(echo:*),Bash(printf:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(jq:*),Bash(test:*),Bash(mkdir:*),Bash(touch:*),Bash(diff:*),Bash(basename:*),Bash(dirname:*),Bash(pwd:*),Bash(date:*),Bash(true:*),Bash(cd:*)",
     "fingerprint_cmd": null
   }
 }

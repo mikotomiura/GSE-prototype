@@ -49,8 +49,10 @@ git rev-parse --show-toplevel            # ../wt/<repo>-<id>-<short> である�
   `permissions.deny` に入っている (綴りを変えて迂回しようとしないこと) うえ、
   `loop-run.sh` の `ensure_branch` が逸脱を検出して **その attempt を `blocked` にする**
   (`docs/loop-engineering.md` §worktree ブランチ検査)。
-- ⚠ これは**文章の契約であって機械強制ではない**。守られなかったことは
+- ⚠ モードA/B では、これは**文章の契約であって機械強制ではない**。守られなかったことは
   ブランチ検査が結果として拾うが、「未コミットで終わった」こと自体は記録されない。
+- ★ モードC (`loop-run.sh`) では 2026-09-26 から**機械検査がある** (起票 P1-I): verify の前に、
+  worktree が dirty か worktree 生成時点からのコミットが 0 件なら、verify を回さず `uncommitted` を記録して次の attempt へ進む (`issue_done` にならない)。
 
 ## 入力の読み込み (SSOT)
 1. `docs/loop-engineering.md` — 用語・Done/Stop・budget 方針 (この command の唯一の真実源)。
@@ -76,6 +78,10 @@ AC 直結の絞り込みは `scope_test_template` (例 `cargo test --workspace {
 `/goal` の各 attempt (実装→自己テスト) の**直後に**、この command が客観検証を挿入する:
 
 1. `attempt_start` を events に append。
+1.5. ★ **verify の前に**未コミット／コミット 0 件を確かめ、該当すれば**まず自分で commit する**
+     (`git add <具体的なパス>` + `git commit`。★ event の記録より先。残りターンが少ないときほど commit を最優先)。
+     commit できたらそのまま 2 へ進む (`uncommitted` は書かない)。
+     ⚠ **commit できないまま attempt を終えるときだけ** `uncommitted` を append する (2〜4 は回さない)。
 2. `Task(subagent_type="test-runner")` (Haiku) に pin 済み verify を実行させ、exit code を回収。
 3. `Task(subagent_type="loop-watchdog")` (Haiku) を呼ぶ。watchdog は:
    - test-runner の結果を parse し fingerprint 化 (README 2.4)。
