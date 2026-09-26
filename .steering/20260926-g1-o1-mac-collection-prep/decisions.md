@@ -79,3 +79,16 @@ Claude（code-reviewer）: HIGH なし・1 巡目の指摘は一次で解消を�
 - **事象**: 2 巡目の修正後、並列実行中の selftest が 1 回だけ「★ 版だけ上げて中身が無い (検査 7)」を「変異前から赤い」と報告した（fixture の baseline に ❌ が 1 行多かった）。**その後 直列 3 回・並列 2 回・デバッグ用コピー 1 回はすべて 34/0** で、**再現しなかった。原因は特定できていない。**
 - **仮説（未実証）**: 検査 7 の `printf '%s\n' "${sec7}" | grep -q …` は `set -o pipefail` 下で SIGPIPE により「一致しているのに赤」になりうる型（memory `silent-failure-in-guard-scripts` の「`cmd | head -N` の SIGPIPE」と同型）。節は 13.7KB で、200KB の対照デモは再現しなかった → **原因と断定しない**。
 - **対応**: パイプを使わない `has_text`（bash の `case`）へ置き換えた。⚠️ 効果の検証は「再現しなくなった」ことでは示せない（もともと再現しない）ので、**予防であって修正ではない**。同型の不安定な赤が再び出たら、この仮説を捨てて調べ直す。
+
+## 判断 11: タグ前に O1 の耐障害性を点検 → 運用で受け、今のコードで v0.1.36 へ（2026-09-27・研究者）
+- 点検の記録: `o1-resilience-findings.md`（自動起動が無い・再送の契機が粗い・スリープ跨ぎ未検証・粒度の注意）。
+- **決定**: コードは変えない。O1 の改善は O1 用の別タグ（ADR-034 D3）で、配布前に再判断する。
+- ⚠️ **発見**: `Cargo.toml` / `tauri.conf.json` / `package.json` / `Cargo.lock` が 0.1.35 のままだった。`capabilities.rs:309` が `CARGO_PKG_VERSION` を `meta.app_version` に使うので、上げずにタグだけ打つと**新バイナリのログが削除欠陥のある旧 v0.1.35 と同じ版を名乗り**、ADR-034 D3 の「G1 の解析は G1 のタグの `app_version` を持つファイルだけ」が成立しない。→ 前例（`2db46c0`）どおり 4 ファイルを 0.1.36 へ上げる。
+- タグの push は共有状態の変更なので、本 PR の merge 後に**具体名で承認を取る**。
+
+## 判断 12: PR #232 の `audit`（Supply chain audit）が赤 → rustls を 0.23.45 へ上げてからリリースする（2026-09-27）
+- **事象**: PR #232 は 4 ファイルのバージョン文字列しか変えていないのに、`Cargo.lock` が変わる PR で発火する `supply-chain.yml` の `audit` が赤になった。**原因は本 PR の変更ではない**: 脆弱性 DB（2026-09-25 更新）に **RUSTSEC-2026-0285**（`rustls 0.23.43` の TLS 1.3 ハンドシェイクが暗号レベルの境界をまたいで誤って受理される・修正は 0.23.45 以上）が入った。
+- **なぜタグの前に直すか**: `rustls` は `reqwest 0.13.2`（`package` feature）経由で、**配布アプリの提出（Google の受け口への TLS）が使うクライアント**である（`cargo tree -i rustls --features package`）。リリースのバイナリに載る。
+- **対応**: `cargo update -p rustls --precise 0.23.45`。`Cargo.lock` の差分は **4 クレート**（`rustls` 0.23.43→0.23.45／`rustls-webpki` 0.103.13→0.103.15／`aws-lc-rs` 1.17.3→1.18.1／`aws-lc-sys` 0.43.0→0.45.0）。⚠️ **`aws-lc-sys` はネイティブの暗号ライブラリ**で、ビルドの前提（C コンパイラ・Windows の追加ツール）に影響しうる。→ Mac では `cargo check --features package` が通ることを確認（1 分 15 秒）。**Windows は CI の `check` で確認する**（手元の検査は CI の代替にならない）。
+- ⚠️ 手元に `cargo-audit` が無く、`scripts/check_dependency_audit.py` は実行していない。監査が緑になったかは PR の `audit` チェックで確認する。
+- ⚠️ 本来 `supply-chain.yml` は「門ではなく信号」（`docs/agent-shared.md` の CI 節）だが、`git-workflow` ルール 6 の止まる条件（CI 赤）に従い、赤のまま merge しなかった。
