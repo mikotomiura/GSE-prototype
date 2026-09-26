@@ -874,6 +874,11 @@ jobs:
           python3 -m unittest scripts.tests.test_p1_select
         env:
           PYTHONUTF8: "1"
+      # ★ P1 の再現 (1 コマンド・issue 006) のテスト。偽の gse-replay と合成の入力で、既定が PG-1 の手前で止まること・
+      #   `--stage search` が PG-1 未宣言で exit 6 を返すこと・ガードを見る。
+      #   ⚠️★★★ **`Install duckdb` の後**に置く（★ episode DB を作る段を通すため。無いとテスト自身が exit 2 で赤くなる）。
+      - name: P1 repro script test (偽 gse-replay・duckdb 必須)
+        run: bash scripts/p1-repro-test.sh
       # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
       #   ⚠️ 実害の実測: `--compact` を落とすと詳細資料が **10 → 15 ページ**になるが、
       #     **本文は 1 文字も変わらない**ので diff を見ても気づけない。

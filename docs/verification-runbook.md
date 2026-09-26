@@ -156,6 +156,9 @@ cd <repo> && bash scripts/check-g1-collection-readiness.sh --selftest
 - [ ] ⚠️★★★ **`gse-replay --features` の出力を作る回のみ**（★ 下記 (j)）:
       `bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>` が exit 0 で 3 ファイルを出す
       （⚠️ **極を 1 つずつ手で叩かない**。`pole_applicable == false` は失敗ではない）
+- [ ] ⚠️★★★ **P1 の再現を回す回のみ**（★ 下記 (k)）:
+      `bash scripts/p1-repro.sh <ndjson-root> <workdir>` が exit 0 で `provenance.json` を出す
+      （⚠️ **既定は PG-1 の手前で止まる**。`--stage search` は PG-1 を宣言してから）
 
 ### (i) ⚠️★★★ `gse-dataset` 側の共有の門（★ 手動。CI では走らない）
 
@@ -233,6 +236,39 @@ bash scripts/run-features-all-poles.sh <session.ndjson> <outdir>
   ⚠️★★★ **この門が保証する範囲**: `R`（onset 数）に比例する経路を実際に踏むことと、`N`・立ち上がり数に
   対する **二乗**への退行の検出まで。★ `R=100` では `O(R·C)` や `O(R²)` への退行は 20 秒に届かず検出できない。
   `R` 経路そのものの正しさ（愚直走査との一致）は `restart::tests::many_onsets_match_a_naive_scan` が持つ。
+
+### (k) ⚠️★★★ P1 の再現を回す回のみ: **既定は PG-1 の手前で止まる**（★ 手動・2026-09-26 追加）
+
+P1 の実データが届いた日に、**1 コマンドで「3 極 → PG-1 に渡す分布 → episode DB」まで**を回し、刻印を残す
+（`reproducibility-discipline` ルール 4）。事前登録の雛形は `scripts/templates/p1-experiment/README.md`
+（★ `experiments/<その日の日付>-p1-<名前>/` に写して埋める。実体は本タスクでは作らない）。
+
+```bash
+# ★ repo 直下から。<workdir> は repo の外・空か未作成。既定の --stage pg1 は PG-1 の手前で止まる
+GSE_DATASET=<gse-dataset のクローン> GSE_REPLAY_BIN=src-tauri/target/release/gse-replay \
+  bash scripts/p1-repro.sh <ndjson-root> <workdir>
+
+# ★ PG-1 を宣言（凍結 JSON の新版）して gse-replay を作り直したあとにだけ（<workdir> は新しい空のディレクトリ）:
+bash scripts/p1-repro.sh <ndjson-root> <workdir-search> --stage search --labels <labels.csv>
+```
+
+- ★ `<ndjson-root>` は `<P-ID>/<session>.ndjson`（`scripts/p1_run_grid.py` と同じレイアウト・同じ検査）。
+- ⚠️★★★ **既定では格子（`p1_run_grid.py`）も選択（`p1_select.py`）も呼ばない**。事前宣言 §2.3: PG-1 は探索を
+  1 度も回す前に宣言するゲートで、見てよいのは**参加者ごとの episode 数の分布だけ**（`pg1_distribution.json`）。
+  PG-1 が宣言されていない凍結 JSON では `--stage search` は **exit 6** で止まる（★ 握りつぶさない）。
+- ⚠️★★★ **成果物を repo に置かない**: `<workdir>` が git 管理下なら **exit 2**（`features/` は特徴行で共有禁止・
+  `episodes.duckdb` の時刻は絶対 epoch ms で個人を同定しうる）。`<workdir>` が空でない・`<ndjson-root>` の中でも exit 2。
+- ★ 出るのは `features/`・`pg1_distribution.json`・`episodes.duckdb`・`provenance.json`（`--stage search` は
+  `grid/`・`select_table.json` も）。**`provenance.json` は成功した実行にだけ付く**（★ 無い `<workdir>` は
+  完了していない残骸。結果として読まない・使い回さない）。
+- ★ 刻印: repo の commit と作業ツリーが clean か／入力の commit（`GSE_DATASET` の `git rev-parse HEAD` の hash だけ。
+  中身は開かない。無ければ `null` と理由）／`Cargo.lock` の sha256／凍結 JSON の sha256 先頭 16 桁／
+  封筒から取った `hmm_version` と `prereg_version`／seed／実行した stage／開始・終了時刻（UTC・秒）。
+- ⚠️ **封筒の identity が 1 通りでなければ exit 3**: 全セッション・全極で `hmm_version` / `prereg_version` が同じで、
+  かつ封筒に埋め込まれた凍結 JSON の hash が**いま repo にある凍結 JSON と一致**すること
+  （★ PG-1 を宣言して凍結 JSON を新版にしたのに `gse-replay` を作り直していないと、ここで止まる）。
+- ⚠️ どの段でも失敗したら**その段の終了コードで止まる**（次の段へ進まない）。テスト:
+  `bash scripts/p1-repro-test.sh`（★ 偽 `gse-replay`・合成入力・duckdb 必須。CI `frontend-check` で走る）。
 
 ---
 
