@@ -14,6 +14,6 @@
 - [x] TASK-PRE: `codex-consult` で issue 独立性の第二意見 → `_codex-preplan.md`（8 件中 7 件を採用・一部採用、1 件は誤検知で却下。判断 21・22）
 
 ## 実行（★ 別セッション・`/clear` の後・Sonnet）
-- [ ] `bash scripts/loop-run.sh .steering/20260926-p1-main-prep`（初回は安い issue 1 本を parallel=1 で回して基盤を確かめる）
-- [ ] 全 issue done → メインが clean な checkout で acceptance 10 本 ＋ 過去 acceptance 3 本
+- [x] `bash scripts/loop-run.sh .steering/20260926-p1-main-prep`（初回は 009 を parallel=1 で確認 → W1〜。全 10 本 `issue_done`。★ 途中の是正: watchdog の故障で 7 本を parse に落とした〔判断 23・blockers B-1〕／004 の acceptance の基準を base へ〔判断 25・B-2〕／fixture 数の訂正〔判断 24〕）
+- [x] 全 issue done → メインが clean な検証用 worktree（`/c/wt/GSE-prototype-verify`）で、統合先端 `4617bbe1` に対し acceptance 10 本 ＋ 過去 acceptance 3 本 ＋ pin 済み verify 一式（cargo test / ゴールデン / python 56 件 / check / clippy / fmt / schema drift）がすべて rc=0
 - [ ] `/finish-task`（code-reviewer ＋ security-checker 並列・`/cross-review` 2 巡・push → PR → CI 緑 → merge → main CI 確認）
