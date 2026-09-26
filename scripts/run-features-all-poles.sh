@@ -151,7 +151,8 @@ mkdir -p "$OUT" || die "outdir を作れない: $OUT"
 #   (`not a git repository`) 以外なら、「管理外」として素通りさせず拒否する
 #   （★ 所有権チェック失敗 (`detected dubious ownership`) 等、git が判定できていないだけの状態を
 #   「安全」と誤読しない）。
-GIT_CHECK_ERR="$(git -C "$OUT" rev-parse --is-inside-work-tree 2>&1 1>/dev/null)"
+GIT_CHECK_ERR="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_CEILING_DIRECTORIES LC_ALL=C LANGUAGE=C \
+  git -C "$OUT" rev-parse --is-inside-work-tree 2>&1 1>/dev/null)"
 GIT_CHECK_RC=$?
 if [ "$GIT_CHECK_RC" -eq 0 ]; then
   [ "$OUT_PRE_EXISTED" -eq 0 ] && rmdir "$OUT" 2>/dev/null

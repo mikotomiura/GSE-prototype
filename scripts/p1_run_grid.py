@@ -515,6 +515,14 @@ def run_grid(configs, sessions, out_path, prereg_source, prereg_sha256_prefix, b
         for participant, session, ndjson in sessions:
             run_poles(bash, ndjson, out_path / config["id"] / participant / session, config["params"])
     outputs, excluded, identity = collect(configs, sessions, out_path)
+    # ⚠️ 格子と PG-1 を読んだ凍結 JSON と、実行した gse-replay に埋め込まれた凍結 JSON は同じバイト列でなければならない
+    #   （★ 凍結 JSON に PG-1 を足した後で gse-replay を作り直さないと、古い値の刻印の封筒で新しい格子を回してしまう）。
+    #   `--prereg` で差し替えた実行（テスト用）は封筒の hash と食い違って当然なので、manifest に両方の hash を残すだけにする。
+    if prereg_source == "frozen" and identity["prereg_sha256_prefix"] != prereg_sha256_prefix:
+        raise RunError(
+            f"封筒の prereg_sha256_prefix ({identity['prereg_sha256_prefix']}) が格子を組んだ凍結 JSON の hash "
+            f"({prereg_sha256_prefix}) と食い違う (★ 古い gse-replay で回した。作り直してから回し直す)"
+        )
     manifest = {
         "tool": TOOL,
         "complete": True,

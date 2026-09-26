@@ -249,7 +249,9 @@ GSE_DATASET=<gse-dataset のクローン> GSE_REPLAY_BIN=src-tauri/target/releas
   bash scripts/p1-repro.sh <ndjson-root> <workdir>
 
 # ★ PG-1 を宣言（凍結 JSON の新版）して gse-replay を作り直したあとにだけ（<workdir> は新しい空のディレクトリ）:
-bash scripts/p1-repro.sh <ndjson-root> <workdir-search> --stage search --labels <labels.csv>
+#   ⚠️ 格子は 31 一式 × 全セッション × 3 極を回すので、GSE_REPLAY_BIN を付ける（無いと debug の `cargo run` で毎回起動して遅い）
+GSE_DATASET=<gse-dataset のクローン> GSE_REPLAY_BIN=src-tauri/target/release/gse-replay \
+  bash scripts/p1-repro.sh <ndjson-root> <workdir-search> --stage search --labels <labels.csv>
 ```
 
 - ★ `<ndjson-root>` は `<P-ID>/<session>.ndjson`（`scripts/p1_run_grid.py` と同じレイアウト・同じ検査）。

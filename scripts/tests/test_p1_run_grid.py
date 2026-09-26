@@ -175,13 +175,14 @@ class GridCase(unittest.TestCase):
         prereg, _ = grid.load_prereg(prereg_path)
         return [config for config in grid.build_grid(prereg) if predicate(config)]
 
-    def run_subset(self, configs, root, out, prereg_path, **fake_env):
+    def run_subset(self, configs, root, out, prereg_path, source="file", sha=None, **fake_env):
         """格子の一部だけを `run_grid` で回す (★ CLI の全 31 一式を回すと遅い)。`(manifest or None, RunError or None)`。"""
-        _, sha = grid.load_prereg(prereg_path)
+        if sha is None:
+            _, sha = grid.load_prereg(prereg_path)
         sessions = grid.list_sessions(root)
         with mock.patch.dict(os.environ, self.env(**fake_env)), contextlib.redirect_stdout(io.StringIO()):
             try:
-                return grid.run_grid(configs, sessions, Path(out), "file", sha, grid.find_bash()), None
+                return grid.run_grid(configs, sessions, Path(out), source, sha, grid.find_bash()), None
             except grid.RunError as e:
                 return None, e
 
@@ -566,6 +567,31 @@ class GridRunTest(GridCase):
         self.assertIsNone(manifest3)
         self.assertIn("封筒", str(error3))
         self.assertFalse((out3 / grid.MANIFEST_NAME).exists())
+
+    def test_frozen_source_requires_envelope_hash_match(self):
+        # ⚠️★★★ 凍結 JSON 由来（source=frozen）の格子は、実行した gse-replay の封筒の prereg hash と一致しなければならない
+        #   （★ 凍結 JSON に PG-1 を足した後で gse-replay を作り直さないと、古い刻印の封筒で新しい格子を回してしまう）
+        prereg = write_prereg(self.tmp)
+        root = make_root(self.tmp)
+        configs = self.subset(prereg, lambda c: c["id"] == "ofat__w_ms=15000")
+        fake_sha = "0123456789abcdef"  # 偽の replay が封筒に刻む hash
+        # ★ 対照: 一致すれば frozen でも通る（下の拒否が別の理由でないことの裏づけ）
+        manifest, error = self.run_subset(configs, root, self.new_out(), prereg, source="frozen", sha=fake_sha)
+        self.assertIsNone(error, error)
+        self.assertIs(manifest["complete"], True)
+        # ⚠️ 食い違い → 拒否・manifest を残さない
+        out = self.new_out()
+        manifest, error = self.run_subset(configs, root, out, prereg, source="frozen", sha="fedcba9876543210")
+        self.assertIsNone(manifest)
+        self.assertIn("食い違う", str(error))
+        self.assertFalse((out / grid.MANIFEST_NAME).exists())
+        # ★ `--prereg` で差し替えた実行（file）は食い違って当然なので通し、manifest に両方の hash を残す
+        manifest, error = self.run_subset(configs, root, self.new_out(), prereg, source="file", sha="fedcba9876543210")
+        self.assertIsNone(error, error)
+        self.assertEqual(
+            (manifest["prereg_sha256_prefix"], manifest["envelope_identity"]["prereg_sha256_prefix"]),
+            ("fedcba9876543210", fake_sha),
+        )
 
     def test_refuses_without_pg1(self):
         root = make_root(self.tmp)

@@ -54,6 +54,8 @@ episode = **適用可 (`pole_applicable`) かつ規則 (d) で除外されてい
 
 参加者の集合 S (fold の一辺) に対し、**その (一式, 極) で使えるセッション (適用可・除外されていない) を 1 本以上持つ参加者**だけを
 数える。持たない参加者は `n_participants_without_applicable_sessions` に数え、metric に入れない。
+⚠️ そのうち **規則 (d) で除外されたセッションを持つ**参加者（＝適用不可だけが理由ではない）は `n_participants_lost_to_rule_d` にも数える
+（★ 見えるようにするだけ。除外で 0 本になった参加者を最小値から外すか・0 として数えるかは**研究者の裁定待ち**〔decisions.md 判断 26〕）。
 
 | 列 | 意味 |
 |---|---|
@@ -347,6 +349,15 @@ def load_manifest(grid_dir):
         manifest.get("complete") is True,
         "manifest が complete: true でない (★ 実行が終わっていない・途中で失敗した格子は読まない)",
     )
+    _require(
+        manifest.get("prereg_source") in ("frozen", "file"),
+        f"manifest.prereg_source が frozen / file でない: {manifest.get('prereg_source')!r}",
+    )
+    _require(
+        isinstance(manifest.get("prereg_sha256_prefix"), str)
+        and re.fullmatch(r"[0-9a-f]{16}", manifest["prereg_sha256_prefix"]) is not None,
+        f"manifest.prereg_sha256_prefix が 16 桁の 16 進でない: {manifest.get('prereg_sha256_prefix')!r}",
+    )
     sessions, participants = _load_sessions(manifest)
     configs = _load_configs(manifest)
     return {
@@ -524,6 +535,11 @@ def metrics_for(per_participant, participants, min_episodes):
     return {
         "n_participants": len(participants),
         "n_participants_without_applicable_sessions": len(participants) - len(counted),
+        "n_participants_lost_to_rule_d": sum(
+            1
+            for participant in participants
+            if per_participant[participant]["usable_sessions"] == 0 and per_participant[participant]["excluded_sessions"] > 0
+        ),
         "n_not_applicable_sessions": sum(per_participant[participant]["not_applicable_sessions"] for participant in participants),
         "n_excluded_sessions": sum(per_participant[participant]["excluded_sessions"] for participant in participants),
         "min_episodes": min(counts) if counts else None,
@@ -601,6 +617,13 @@ def main(argv=None):
         min_episodes = grid.declared_pg1_min(prereg)
         seed = declared_seed(prereg)
         manifest = load_manifest(grid_dir)
+        # ⚠️ 格子を repo の凍結 JSON で回したなら、選択も同じバイト列の宣言（L・seed）で評価しなければならない。
+        #   `file`（`--prereg` で差し替えた実行・テスト用）は食い違って当然なので、下で note を出して両方の hash を残すだけにする。
+        if manifest["prereg_source"] == "frozen" and manifest["prereg_sha256_prefix"] != prereg_sha256_prefix:
+            raise InputError(
+                f"格子を回した凍結 JSON の sha256 ({manifest['prereg_sha256_prefix']}) と、いま読んだ事前宣言の sha256 "
+                f"({prereg_sha256_prefix}) が食い違う (★ 別の L・seed で表を作らない。格子を回し直すか、事前宣言を戻す)"
+            )
         folds = make_folds(manifest["participants"], seed)  # ★ 1 回だけ作る (N < 3 はここで拒否)
         labels = load_labels(labels_path)
         units, excluded, label_mismatch = load_units(grid_dir, manifest, labels)

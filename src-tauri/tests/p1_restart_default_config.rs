@@ -260,6 +260,24 @@ fn restop_absent_without_second_silence() {
         "onset 行が 1 本も無い（0 本の理由が onset の欠如になってしまい、対照にならない）"
     );
 
+    // ⚠️ 「明示的な null」と「キーが無い」を区別する。serde_json の添字は欠落キーを `Null` として返すので、
+    //   `row["restart"]["restop_ms"].is_null()` だけでは、出力からキー自体が消える退行を「正常な null」として受理してしまう。
+    // ★ あわせて、θ の標本数が凍結既定の下限を満たしていること（0 本の理由が「θ が育っていない」ではないこと）。
+    for row in &onsets {
+        let restop = row
+            .get("restart")
+            .and_then(|restart| restart.get("restop_ms"));
+        assert_eq!(
+            restop,
+            Some(&Value::Null),
+            "onset 行の restart.restop_ms が明示的な null でない（キーの欠落かもしれない）: {row}"
+        );
+        let n = row["stall_onset"]["theta_sample_n"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("onset 行に theta_sample_n が無い: {row}"));
+        assert!(n >= 100, "theta_sample_n = {n} < warmup_count 100: {row}");
+    }
+
     let measured: Vec<&&Value> = onsets
         .iter()
         .filter(|row| !row["restart"]["restop_ms"].is_null())

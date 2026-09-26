@@ -492,9 +492,10 @@ impl P1Operational {
         }
         // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
         if self.theta_estimator != "nearest_rank" {
+            // ⚠️ 外部ファイル由来の文字列は端末へそのまま出さない（`echo_untrusted`: 80 字で切り詰め・`{:?}` でエスケープ）。
             return Err(format!(
-                "theta_estimator は \"nearest_rank\" だけが実装されている (実際: \"{}\")",
-                self.theta_estimator
+                "theta_estimator は \"nearest_rank\" だけが実装されている (実際: {})",
+                echo_untrusted(&self.theta_estimator)
             ));
         }
         Ok(())

@@ -178,3 +178,27 @@
 - **理由**: `blockers.md` B-2。base は 007/008 の Rust の変更を含むので、`main` との差分は 004 と無関係に赤になる。worker が gate を書き換えずに止まったのは正しい判断だった。
 - **担保**: 修正版を clean な検証用 worktree で worker のコミットに対して回し rc=0。他の acceptance を全数 grep して同型の欠陥が無いことを確かめた。
 - **却下案**: 12 行目を削除する／特定ファイルだけに絞る（検査が弱くなる）。
+
+## 判断 26: 完了レビュー（code-reviewer 2 本・security-checker・Codex 1 巡目）の仕分け（実行セッション）
+
+- **結果**: CRITICAL / HIGH は 0 件。MEDIUM 4 件・LOW 多数。すべて一次（コード）で裏取りしてから反映した（偽陽性は無かった）。
+- **直したもの**（本 task 内・`tech debt now`）:
+  - `p1_run_grid.py`: 凍結 JSON 由来（`prereg_source: frozen`）の格子は、封筒の `prereg_sha256_prefix` と一致しなければ `RunError`（古い gse-replay の刻印で新しい格子を回さない）。`--prereg` 差し替え（`file`）は両方の hash を manifest に残すだけ。テスト `test_frozen_source_requires_envelope_hash_match`。
+  - `p1_select.py`: `frozen` の格子を別 hash の事前宣言で評価するのは、**出力を書く前に** exit 3。manifest の `prereg_source` / `prereg_sha256_prefix` の形も検査（テスト追加）。
+  - `p1-repro.sh`: `<workdir>` が `<ndjson-root>` の中かの判定を **`mkdir` の前**へ（2 段以上下のときに入力ディレクトリへ階層を残す欠陥。★ 旧コードで実測: 変異〔旧 `p1-repro.sh`〕で新テストが赤になる）。⚠️ 同時に指摘された「利用者の既存の空ディレクトリを `rmdir` する」は、旧コードでは入力ルートのレイアウト検査（『セッションが 1 つも無い』）が先に止めるため**その形では到達しなかった**（実測）。`rmdir` は防御として廃止し、既存の空ディレクトリを消さないテストは退行止めとして残した（旧コードでも緑＝判別力は無い）。未作成の `..` 入りは拒否。identity の Python は `KeyError` / `TypeError` も exit 3 に揃え、終了コードの契約（1〜3 は各段と重なる）を書いた。テスト 3 件追加。
+  - `run-features-all-poles.sh`: git 判定から `GIT_DIR` / `GIT_WORK_TREE` / `GIT_CEILING_DIRECTORIES` を外した（他の 2 か所と同じ）。
+  - `replay.rs`: `theta_estimator` の検証エラーも `echo_untrusted` を通す（端末へ ANSI が流れない）。
+  - `p1_bounds.py`: 軸の値が dict でない単位も `ValueError`（docstring の契約）。
+  - 009 の陰性対照: 「明示的な null」と「キーの欠落」を区別し、`theta_sample_n >= 100` も確認（Codex 指摘 2・reviewer LOW）。
+  - ADR-030 補訂 3: 「(a)(b) は 0 本にならない」を**否定できない**へ訂正（Codex 指摘 1）／ 0 本と 1 本の不連続を明記（Codex 指摘 3・reviewer LOW）／ 「`p1_run_grid.py` は存在しない」を実装済みへ／ 「`gse-replay` に手を入れない」を連動に限定。`dispersion.rs` の doc・runbook (k) の `GSE_REPLAY_BIN`。
+- ⚠️ **研究者の裁定待ち（M3・実装は変えていない）**: `p1_select.py` の `metrics_for` は、**規則 (d) の除外で使えるセッションを 0 本にした参加者**を、適用不可だけの参加者と同じく最小値から外している（issue 005 の文言は「適用可のセッションが 1 本も無い参加者」で、実装判断〔005 Execution Result 146 行〕は「適用可かつ除外されていない」）。
+  除外で 0 本になった参加者を**外す**か・**0 本として数える**か（後者なら主 metric の下限が悲観側に倒れる）は研究の意味に関わるので、実装者が決めない。→ 見えるように `n_participants_lost_to_rule_d` 列を**足しただけ**（最小値の計算は不変）。到達するのは参加者に固有の除外が起きたときだけ（格子は q と warmup を対で渡すので、通常は全参加者に同時に起きる）。v1.2 で宣言する（判断 18 と同じ扱い）。
+- **記録だけにしたもの（LOW・直さない）**:
+  - `build_p1_episode_db.py`: ガード後の TOCTOU（別プロセスが同じ `--out` を作ると `_remove_partial` が他人のファイルを消しうる）・失敗時に `mkdir` した親ディレクトリが残る。手元で 1 人が使う前提で確率は低い。
+  - `p1_pg1_distribution.py` / `p1_select.py` の出力: 書きかけのファイルが残ると次の実行が「`--out` が既にある」で止まる（一時名 → rename にする案）。
+  - `p1_run_grid.py` / `p1_select.py` が別モジュールの非公開名（`_inside_git_work_tree` / `_emit` / `_sha256_file`）を import している（worker が自己申告済み・共通モジュールへの切り出し案）。
+  - `p1_select.py`: `param_mismatch` を自分で判定し直さず manifest の `excluded_rule_d` に頼る（規則 (d) 自体は独立に判定し直している）。
+  - CI の P1 step は unittest の skip=0 を強制していない（acceptance 側にだけある・判断 17）。
+  - `p1_run_grid.py`: Windows で `shutil.which("bash")` がカレントディレクトリを先に探す（cwd に置ける攻撃者が前提）。
+  - `replay.rs`: `is_wellformed_prereg_version` は先頭ゼロを許す（`01.0.0` と `1.0.0` が別物として通る）。判断 16 の正規表現どおりなので仕様どおり。
+- **却下**: なし（偽陽性 0 件）。

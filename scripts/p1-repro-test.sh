@@ -248,6 +248,17 @@ check "⚠️ レイアウト違反では <workdir> を作らない" test ! -e "
 run bash "${TARGET}" "${ND}" "${ND}/out"
 expect_rc "<workdir> が <ndjson-root> の中" 2
 check "⚠️ 入力のディレクトリに何も作らない" test ! -e "${ND}/out"
+run bash "${TARGET}" "${ND}" "${ND}/deep/er/out"
+expect_rc "<workdir> が <ndjson-root> の 2 段以上下（まだ無い）" 2
+check "⚠️ 2 段以上下でも入力のディレクトリに中間の階層を残さない" test ! -e "${ND}/deep"
+make_input "${TMP}/nd4d" P01/s1
+mkdir "${TMP}/nd4d/P02"
+run bash "${TARGET}" "${TMP}/nd4d" "${TMP}/nd4d/P02"
+expect_rc "<workdir> が <ndjson-root> の中の既存の空ディレクトリ（P-ID の形）" 2
+check "⚠️ 利用者の既存の空ディレクトリを消さない（rmdir しない）" test -d "${TMP}/nd4d/P02"
+run bash "${TARGET}" "${ND}" "${TMP}/w4d/new/../w4e"
+expect_rc "まだ無い <workdir> が '..' を含む" 2
+check "⚠️ '..' を含む未作成の <workdir> では何も作らない" test ! -e "${TMP}/w4d"
 mkdir -p "${TMP}/empty-root"
 run bash "${TARGET}" "${TMP}/empty-root" "${TMP}/w4c"
 expect_rc "セッションが 1 つも無い <ndjson-root>" 2

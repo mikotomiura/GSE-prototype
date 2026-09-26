@@ -173,6 +173,11 @@ class SummarizeTest(unittest.TestCase):
         # ★ 知らない状態・軸の欠けた単位は数えずに止める
         with self.assertRaises(ValueError):
             pb.summarize([{"pointer": {"status": "wide"}, "modifier": {"status": "ok"}}])
+        # ⚠️ 軸の値が dict でない単位も、AttributeError ではなく契約どおり ValueError
+        for bad in (None, "ok", 1, ["ok"]):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    pb.summarize([{"pointer": bad, "modifier": {"status": "ok"}}])
         with self.assertRaises(ValueError):
             pb.summarize([{"pointer": {"status": "ok"}}])
 

@@ -54,7 +54,8 @@ CONFIGS = [
 LABEL_HEADER = "config_id,participant_id,session_id,pole,t0_ms,outcome"
 ROW_KEYS = {
     "outer_fold", "inner_fold", "side", "config_id", "role", "pole",
-    "n_participants", "n_participants_without_applicable_sessions", "n_not_applicable_sessions", "n_excluded_sessions",
+    "n_participants", "n_participants_without_applicable_sessions", "n_participants_lost_to_rule_d",
+    "n_not_applicable_sessions", "n_excluded_sessions",
     "min_episodes", "meets_min_episodes", "n_episodes", "n_episodes_unlabeled",
     "outcome_counts", "n_outcome_categories", "episodes_cv",
 }  # fmt: skip
@@ -314,6 +315,13 @@ class MetricsTest(unittest.TestCase):
         # 除外されたセッションも数える (episode には入らない)
         per["P05"] = unit([], usable=0, excluded=1)
         self.assertEqual(sel.metrics_for(per, ["P05"], 3)["n_excluded_sessions"], 1)
+        # ⚠️ 規則 (d) の除外で使えるセッションを失った参加者は、適用不可だけの参加者と別に数える（★ 最小値からは外れたまま・裁定待ち）
+        m5 = sel.metrics_for(per, ["P01", "P04", "P05"], 3)
+        self.assertEqual(
+            (m5["n_participants_without_applicable_sessions"], m5["n_participants_lost_to_rule_d"], m5["min_episodes"]),
+            (2, 1, 4),
+        )
+        self.assertEqual(m["n_participants_lost_to_rule_d"], 0)
 
         # ★ 参加者 1 人: 変動係数は None (0 で埋めない)。最小値はその人の数
         one = sel.metrics_for(per, ["P01"], 3)
@@ -701,6 +709,17 @@ class GuardTest(SelectCase):
         self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m["outputs"].pop()), "列挙が欠けている")
         self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m["outputs"].append({"path": "x/y.json", "sha256": "0" * 64})), "余分な列挙")
         self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m.update(n_participants=4)), "n_participants が合わない")
+        # ⚠️ manifest の事前宣言の欄は形を検査する（frozen / file・16 桁の 16 進）
+        self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m.update(prereg_source="other")), "prereg_source が知らない値")
+        self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m.update(prereg_sha256_prefix=None)), "prereg_sha256_prefix が null")
+        self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m.update(prereg_sha256_prefix="XYZ")), "prereg_sha256_prefix の形が違う")
+        # ⚠️★★★ 格子を repo の凍結 JSON で回した（frozen）のに、別の hash の事前宣言で評価するのは拒否する（出力は書かれない）
+        self.refused(3, self.make_grid(layout, manifest_edit=lambda m: m.update(prereg_source="frozen")), "frozen の格子を別の事前宣言で評価")
+        # ★ 対照: 同じバイト列の事前宣言（run_select が既定で書くもの）なら frozen でも通る（上の拒否が別の理由でないことの裏づけ）
+        same_sha = sel.grid.load_prereg(write_prereg(self.tmp, "same-sha.json", 3))[1]
+        frozen_ok = self.make_grid(layout, manifest_edit=lambda m: m.update(prereg_source="frozen", prereg_sha256_prefix=same_sha))
+        result = self.ok(frozen_ok)
+        self.assertEqual(result["provenance"]["grid_prereg_source"], "frozen")
         self.refused(
             3,
             self.make_grid(layout, excluded=[("no-such-config", "P01", "s1", "baseline", ["rule_d"])]),

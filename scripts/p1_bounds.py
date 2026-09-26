@@ -105,7 +105,10 @@ def summarize(units):
         for axis in AXES:
             if axis not in unit:
                 raise ValueError(f"単位に軸 {axis!r} が無い: {unit!r}")
-            status = unit[axis].get("status")
+            cell = unit[axis]
+            if not isinstance(cell, dict):
+                raise ValueError(f"軸 {axis!r} の値が dict でない: {cell!r}")
+            status = cell.get("status")
             if status not in STATUSES:
                 raise ValueError(f"知らない状態: {status!r} (軸 {axis!r})")
             counts[axis][status] += 1

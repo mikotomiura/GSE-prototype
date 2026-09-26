@@ -44,6 +44,8 @@
 #       2 = 引数・入力・出力先のガード（<workdir> が git の作業ツリーの中・空でない・<ndjson-root> の中・
 #           <ndjson-root> のレイアウト違反・--labels の不備）/
 #       それ以外（4 / 5 / 6 …）= 各段の終了コードそのまま（★ 6 = PG-1 未宣言）
+#   ⚠️ 1〜3 は各段（run-features-all-poles.sh / p1_run_grid.py の 1 = 実行失敗・2 = ガード・3 = 格子の不備）の終了コードとも重なる。
+#      ★ どの段で落ちたかは終了コードだけでは決まらない —— stderr の `[p1-repro] NG` 行（と各段の `[grid]` / `[all-poles]` 行）で判別する。
 #
 # 関連: docs/verification-runbook.md ／ scripts/templates/p1-experiment/README.md ／ .steering/20260926-p1-main-prep/
 set -uo pipefail
@@ -143,6 +145,22 @@ while [ ! -d "${PROBE}" ]; do
   PROBE="${PARENT}"
 done
 [ -d "${PROBE}" ] || reject "<workdir> の祖先にディレクトリが無い: ${WORKDIR}"
+# ⚠️ <workdir> が <ndjson-root> の中だと、入力のディレクトリに成果物を撒く（search 段は入力のレイアウト違反で落ちる）。
+#   ★ **mkdir の前に**判定する（後だと、拒否しても途中の階層が入力のディレクトリに残り、以後 list_sessions がレイアウト違反で落ちる）。
+#   ★ まだ無い <workdir> は、実在する最も近い祖先（PROBE）が入力ルートの中（または同じ）かで見る。
+#   ⚠️ 未作成の部分に `..` を含むと mkdir -p は祖先の外へ出うる（`a/new/../../b`）ので、その形は拒否する。
+if [ ! -d "${WORKDIR}" ]; then
+  case "/${WORKDIR}/" in
+    *"/../"*) reject "<workdir> がまだ無いのに '..' を含む: ${WORKDIR}（★ 作られる場所が文字列から決まらない。'..' を含まない絶対パスにする）" ;;
+  esac
+fi
+NDJSON_PRE="$(cd "${NDJSON_ROOT}" 2>/dev/null && pwd -P)"
+if [ -n "${NDJSON_PRE}" ]; then
+  PROBE_ABS="$(cd "${PROBE}" && pwd -P)"
+  case "${PROBE_ABS}/" in
+    "${NDJSON_PRE}/"*) reject "<workdir> が <ndjson-root> の中: ${WORKDIR}（★ 入力のディレクトリに成果物を置かない）" ;;
+  esac
+fi
 GIT_CHECK_ERR="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_CEILING_DIRECTORIES LC_ALL=C LANGUAGE=C \
   git -C "${PROBE}" rev-parse --is-inside-work-tree 2>&1 1>/dev/null)"
 GIT_CHECK_RC=$?
@@ -199,7 +217,7 @@ WORK_ABS="$(cd "${WORKDIR}" && pwd -P)"
 # ⚠️ <workdir> が <ndjson-root> の中だと、入力のディレクトリに成果物を撒く（search 段は入力のレイアウト違反で落ちる）
 case "${WORK_ABS}/" in
   "${NDJSON_ABS}/"*)
-    rmdir "${WORK_ABS}" 2>/dev/null
+    # ★ 保険（上の mkdir 前の判定をすり抜けた場合）。⚠️ rmdir はしない（利用者の既存のディレクトリを消しうる）
     reject "<workdir> が <ndjson-root> の中: ${WORK_ABS}（★ 入力のディレクトリに成果物を置かない）" ;;
 esac
 START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -241,8 +259,8 @@ try:
         for envelope in fio.load_session(paths).values():
             config = envelope["config"]
             identities.add((config["hmm_version"], config["prereg_version"], config["prereg_sha256_prefix"]))
-except fio.FeaturesIOError as e:
-    sys.stderr.write("[p1-repro] NG (envelope): %s\n" % e)
+except (fio.FeaturesIOError, KeyError, TypeError) as e:
+    sys.stderr.write("[p1-repro] NG (envelope): %s: %s\n" % (type(e).__name__, e))
     sys.exit(3)
 for identity in sorted(identities):
     sys.stdout.write("\t".join(identity) + "\n")
