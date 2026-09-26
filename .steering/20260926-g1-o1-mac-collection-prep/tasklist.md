@@ -47,3 +47,7 @@
 - [x] 前提条件 3 → ゲート [3] の検査語を実体へ（`decisions.md` 判断 4）
 - [x] 前提条件 7 → 事前登録 第 20 版・config revision 20・analyze PREREG_REVISION 20（判断 5）
 - [x] O1-5 → `docs/o1-roster-operations.md` §5 に 1 行（判断 6）
+
+## 完了時レビュー後の繰り越し
+- [ ] 計器の対応（未完了マーカ・n 未達ゲート・登録/解析 n の報告）と G1 の人単位破棄手順 ⏭ 研究者が前提条件 8 として足すか裁定
+- [ ] 取り消し規則を `protocol.md` へ ⏭ 研究者判断
