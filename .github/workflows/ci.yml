@@ -862,6 +862,14 @@ jobs:
         run: python3 -m unittest scripts.tests.test_build_analysis_db
         env:
           PYTHONUTF8: "1"
+      # ★ P1 の解析コード (事前宣言 v1.1) のテスト。⚠️ **モジュール名を 1 行ずつ足していく**（複数行の `run: |`）。
+      #   ⚠️★★★ duckdb を要するテストが後続で入るので、**必ず `Install duckdb` の後**に置く
+      #     （前に置くと全件 skip の緑になる）。
+      - name: P1 analysis tests (⚠️ skip=0 で走ること)
+        run: |
+          python3 -m unittest scripts.tests.test_p1_bounds
+        env:
+          PYTHONUTF8: "1"
       # ⚠️★★★ 提出文書ゲート (2026-09-03 追加)。★ 3 つとも**手動実行だけに依存していた**。
       #   ⚠️ 実害の実測: `--compact` を落とすと詳細資料が **10 → 15 ページ**になるが、
       #     **本文は 1 文字も変わらない**ので diff を見ても気づけない。
