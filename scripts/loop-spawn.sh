@@ -839,7 +839,7 @@ trap release_spawn_lock EXIT
 # acquire_spawn_lock → ★ mkdir で排他を取る。stale (pid が死んでいる) なら別ロックで直列化して除去し取り直す。
 #   ⚠️ pid ファイルが無い/読めない (作成直後の競合) ときは stale と見なさない (待つ側に倒す)。
 acquire_spawn_lock() {
-  local i=0 max_i lock_pid reap_pid
+  local i=0 max_i lock_pid reap_pid written_pid
   # ⚠️ bash 3.2 に浮動小数演算は無いので、待ち回数は awk で整数化する (sleep 自体は小数を受ける)。
   max_i="$(awk -v t="${LOCK_TIMEOUT}" -v p="${LOCK_POLL}" \
     'BEGIN{n=t/p; i=int(n); if (n>i) i++; if (i<1) i=1; print i}')"
@@ -904,6 +904,22 @@ acquire_spawn_lock() {
     sleep "${LOCK_POLL}"
   done
   printf '%s' "$$" > "${LOCK}/pid" 2>/dev/null || true
+  # ⚠️★★★ CR MEDIUM (2026-09-26 2巡目): 書き込めたかを確かめずに LOCK_HELD=1 にすると、
+  #   pid の書き込みに失敗した (権限・I/O エラー・書き込み先が塞がっている等。空ファイルのまま
+  #   残る場合を含む) ときに、release_spawn_lock は「pid が自分と一致しない」と見て**解放しない**
+  #   (★ 上の注記のとおり、それ自体は正しい安全策)。結果としてロックが永久に残り、
+  #   以後の spawn が全部タイムアウトで die し続ける。
+  #   → ★ 書いた直後に読み戻して $$ と一致するか確かめ、違えば **ここで** (release_spawn_lock を
+  #     待たずに) 自分で作ったディレクトリを rm -rf してから die する (fail-closed)。
+  #     ⚠️ LOCK_HELD はまだ立てていないので、EXIT trap の release_spawn_lock は何もしない
+  #     (二重に rm -rf しようとして事故ることはない)。
+  written_pid="$(cat "${LOCK}/pid" 2>/dev/null || true)"
+  if [ "${written_pid:-}" != "$$" ]; then
+    rm -rf "${LOCK}" 2>/dev/null || true
+    die "loop-spawn.lock (${LOCK}) に pid を書き込めませんでした (読み戻し=[$(sanitize_disp "${written_pid:-空}")])。
+          ⚠️ pid が書けないと release 時の pid 一致確認も stale 判定もできず、ロックが永久に残ります。
+          ★ fail-closed のため、作成したロックディレクトリを削除して止まります。"
+  fi
   LOCK_HELD=1
 }
 
@@ -966,17 +982,33 @@ if git show-ref --verify --quiet "refs/heads/$branch"; then
 fi
 git worktree prune   # 消えたパスの登録を掃除
 
-# local_ref_or_raw <base> → ★ ローカルに <base> というブランチがあれば `refs/heads/<base>`、
-#   無ければ <base> のまま (⚠️ 従来どおりの無修飾値。ローカルに無い形まで書き換えない)。
-#   ⚠️★★★ 判断 9/10 (Codex /cross-review LOW): 無修飾の `$base` は同名の tag があると
+# local_ref_or_raw <base> → ★ ローカルに <base> というブランチがあれば `refs/heads/<base>` を返す。
+#   ⚠️★★★ 判断 9/10 (Codex /cross-review 1巡目 LOW): 無修飾の `$base` は同名の tag があると
 #     `git worktree add` が `fatal: ambiguous object name` で落ちる (12g で local-ahead 側は実測済み)。
 #     fetch 失敗・origin 無しの経路も同じ危険を持つので、ここに括り出して両方から呼ぶ。
+#   ⚠️★★★ CR LOW (2026-09-26 2巡目): ローカルに <base> が無いときは **die する**
+#     (旧実装は無修飾の <base> をそのまま返していた)。
+#     ★ ここに来る (=branch が実在しない) 状況で無修飾値を渡すと、同名の tag があっても
+#     branch との衝突が起きないため `git worktree add` は **ambiguous エラーにすらならず**、
+#     tag から**黙って** worktree を切る (start を誤認しても気づけない)。
+#     → ★ fetch 失敗・origin 無しのどちらの経路も、ローカルに <base> が無ければ
+#       start を決められないので fail-closed で止める。
 local_ref_or_raw() {
   if git show-ref --verify --quiet "refs/heads/$1"; then
     printf 'refs/heads/%s' "$1"
   else
-    printf '%s' "$1"
+    local_ref_or_raw_die "$1"
   fi
+}
+# local_ref_or_raw_die <base> → ★ die 本体を分離する (⚠️ 変異テストで 1 行 sed で潰せるようにするため。
+#   die メッセージは複数行なので local_ref_or_raw 本体に直書きすると変異の当て先が単純な
+#   1 行パターンで表せない)。
+local_ref_or_raw_die() {
+  die "base '$1' はローカルに branch として存在せず、remote からも取得できません。
+        ⚠️★★★ 無修飾の '$1' を使うと、同名の tag があれば git worktree add がそちらを
+        **黙って** start にします (branch が存在しないため ambiguous エラーにもなりません)。
+        ★ start を決められないため、fail-closed のため worktree も branch も作らずに止まります。
+        手で解決してから再実行してください (例: ローカルに '$1' という branch を作る / fetch できる状態にする)。"
 }
 
 # --- ⚠️★★★ P1-J: base を remote と同期し、祖先関係で start を決める (判断 3) ---
@@ -992,8 +1024,8 @@ local_ref_or_raw() {
 #     `refs/heads/$base` で修飾しており、他 (equal / local-behind / no-local) は
 #     短縮形 `origin/$base` のまま、fetch 失敗・origin 無しは無修飾 `$base` のままだった。
 #     → ★ remote 側は `refs/remotes/origin/$base`、ローカル側は `refs/heads/$base`
-#       (ローカルに無いときは `local_ref_or_raw` が従来どおりの値を返す) に揃える。
-start="$(local_ref_or_raw "$base")"
+#       (⚠️★★★ CR LOW 2巡目: ローカルに無いときは `local_ref_or_raw` が die する) に揃える。
+start=""              # ★ 各分岐 (fetch 成功 / fetch 失敗 / origin 無し) が必ず代入するか die する
 start_choice=""      # ★ 値は equal|local-ahead|local-behind|no-local|fetch-failed のいずれか
 start_ahead_n=""
 if git remote get-url origin >/dev/null 2>&1; then
@@ -1051,12 +1083,16 @@ if git remote get-url origin >/dev/null 2>&1; then
       fi
     fi
   else
-    start="$(local_ref_or_raw "$base")"
+    start="$(local_ref_or_raw "$base")"   # ⚠️ ローカルに $base が無ければここで die する
     start_choice="fetch-failed"
     # ⚠️ 他の診断行と同じく stderr へ (★ 旧実装は stdout に出ており、`--no-exec` の
     #   「stdout の最終行 = worktree の絶対パス」契約は壊さないが、診断の置き場が不揃いだった)。
     echo "loop-spawn: fetch 失敗 (オフライン?) ローカル base で続行" >&2
   fi
+else
+  # ⚠️★★★ CR LOW (2026-09-26 2巡目): origin 自体が無い経路も fetch 失敗と同じ危険を持つ
+  #   (ローカルに $base が無ければ無修飾値が同名 tag に黙って化ける)。★ 同じ関数・同じ規則を適用する。
+  start="$(local_ref_or_raw "$base")"     # ⚠️ ローカルに $base が無ければここで die する
 fi
 
 # --- ⚠️★★★ 解決した base を「人が承認できる形」で出す (起票 23 の 2 つ目) ---

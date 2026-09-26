@@ -1446,6 +1446,17 @@ run_fakecat_scenario() { # run_fakecat_scenario <repo-dir> <spawn-src> <id> <out
     cat() {
       case "$1" in
         */loop-spawn.lock/pid)
+          local real
+          real="$(command cat "$1" 2>/dev/null || true)"
+          if [ "${real}" = "$$" ]; then
+            # ⚠️★★★ CR MEDIUM (2026-09-26 2巡目) の副作用: acquire_spawn_lock 自身が pid を
+            #   書いた直後に読み戻して確認するようになった。★ 実ファイルの中身が既に自分の
+            #   $$ (＝ 自分がこの直前に書いた値) なら、それは TOCTOU シナリオの対象
+            #   (他プロセスの死んだ/生きたロック) ではないので偽装せず素通しする
+            #   (⚠️ さもないと acquire 自身が自分の pid を読み戻せず誤って die する)。
+            command cat "$1"
+            return 0
+          fi
           local n
           n="$(command cat "${FAKECAT_COUNT}" 2>/dev/null || echo 0)"
           n=$((n + 1))
@@ -1733,9 +1744,28 @@ else
     cd "${R13C}" || exit 1
     # ⚠️ `${LOCK}/pid` の読み取りだけを偽装する —— 実ファイルには自分の $$ が書かれているが、
     #   release 時の確認読み取りだけ **別の pid** を返させ、「一致しない」状況を決定論的に作る。
+    # ⚠️★★★ CR MEDIUM (2026-09-26 2巡目) の副作用: acquire_spawn_lock 自身が pid を書いた直後に
+    #   読み戻して確認するようになったため、成功系路での「${LOCK}/pid」読み取りは
+    #   1 回 (release 時) から 2 回 (acquire 直後の自己確認 + release 時) に増えた。
+    #   ⚠️ 無条件に偽装すると **acquire 自身の自己確認**まで偽の値を受け取り、
+    #   「自分が書いた pid を読み戻せない」と誤って die してしまう (13c が試したい release 側の
+    #   分岐に到達できなくなる)。→ ★ 1 回目 (acquire 直後) は本物を素通しし、
+    #   2 回目以降 (release) だけ偽装する。
+    export FAKECAT13C_N="${TMP}/13c-n"
+    printf '0' > "${FAKECAT13C_N}"
     cat() {
       case "$1" in
-        */loop-spawn.lock/pid) printf '424242'; return 0 ;;
+        */loop-spawn.lock/pid)
+          local n
+          n="$(command cat "${FAKECAT13C_N}" 2>/dev/null || echo 0)"
+          n=$((n + 1))
+          printf '%s' "${n}" > "${FAKECAT13C_N}"
+          if [ "${n}" -eq 1 ]; then
+            command cat "$1"
+          else
+            printf '424242'
+          fi
+          return 0 ;;
       esac
       command cat "$@"
     }
@@ -1873,14 +1903,70 @@ else
     export -f cat
     exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13f t
   ) >"${TMP}/13f.out" 2>"${TMP}/13f.err"
-  if [ ! -d "${R13G}/.git/loop-spawn.lock.reap" ]; then
-    ok "13f: ★★★ mkdir(.reap)/rmdir(.reap) 間で中断されても .reap の残骸が残らなかった (EXIT trap の後始末)"
+  RC13F=$?
+  # ⚠️★★★ CR MEDIUM (2026-09-26 2巡目): 「.reap が残っていない」だけでは、SIGTERM が
+  #   mkdir(.reap)/rmdir(.reap) の間に間に合わず、**ただ正常終了しただけ**の場合も同じ結果になり
+  #   空振りしうる (★ 正常終了でも通常の `rmdir "${LOCK}.reap" 2>/dev/null && REAP_HELD=0` が
+  #   .reap を消すため、「残っていない」は中断の証拠にならない)。
+  #   → ★ 「本当に中断されたこと」も見る: 中断されたなら非 0 (SIGTERM なら 143 等) で終了し、
+  #     worktree もまだ作られていないはず (mkdir(.reap) の時点では git worktree add に未到達)。
+  if [ "${RC13F}" -ne 0 ] && ! wt_has "${R13G}" "repo-13f-t" \
+     && [ ! -d "${R13G}/.git/loop-spawn.lock.reap" ]; then
+    ok "13f: ★★★ 中断 (rc=${RC13F}・worktree 未作成) の状況で .reap の残骸も残らなかった"
   else
-    ng "13f: ⚠️★★★ .reap の残骸が残った (EXIT trap が REAP_HELD を片づけていない可能性)"
+    ng "13f: rc=${RC13F} / worktree=$(wt_has "${R13G}" "repo-13f-t" && echo yes || echo no) / .reap 残=$([ -d "${R13G}/.git/loop-spawn.lock.reap" ] && echo yes || echo no) —— ⚠️ 中断が実際に起きた証拠が無い (空振りの疑い)"
   fi
 fi
 # ⚠️ **やっていないこと** (★ 隠さない): 13f は **本当の 2 プロセス競合による中断を再現していない**
 #   (★ SIGTERM の自己送信という決定論的な代替。11i/11j の限界と同じ)。
+
+# --- 13f2: ⚠️★★★ 変異テスト —— release_spawn_lock の REAP_HELD 片づけを潰すと 13f が赤くなるか ---
+#   ★ 13f と同じ中断シナリオを再生し、EXIT trap 側の後始末 (`if [ "${REAP_HELD}" -eq 1 ]; then rmdir …`)
+#   を no-op にする。★ 中断が実際に起きているなら、この変異で .reap の残骸が残るはず。
+echo "13f2. ⚠️★★★ 変異テスト —— release_spawn_lock の REAP_HELD 片づけを潰すと 13f の状況で .reap が残るか"
+
+MUT13F2="${TMP}/mut13f2-loop-spawn.sh"
+sed 's/if \[ "\${REAP_HELD}" -eq 1 \]; then/if false; then/' "${SPAWN_SH}" > "${MUT13F2}"
+mut13f2_src="$(grep -cF 'if [ "${REAP_HELD}" -eq 1 ]; then' "${SPAWN_SH}" 2>/dev/null)" || mut13f2_src=0
+mut13f2_left="$(grep -cF 'if [ "${REAP_HELD}" -eq 1 ]; then' "${MUT13F2}" 2>/dev/null)" || mut13f2_left=0
+if [ "${mut13f2_src:-0}" -ne 1 ] || [ "${mut13f2_left:-0}" -ne 0 ]; then
+  ng "13f2: 変異を当てられない (src=${mut13f2_src} / mut=${mut13f2_left}) —— ★ REAP_HELD 片づけの書き方が変わった → ⚠️ 検査不能"
+else
+  R13G2="${TMP}/r13g2/repo"; mkdir -p "${R13G2}"
+  if ! setup_fake_repo "${R13G2}" "${MUT13F2}"; then
+    ng "13f2: 準備できなかった (★ 判定できない)"
+  else
+    true & dpid13f2=$!; wait "${dpid13f2}" 2>/dev/null || true
+    mkdir -p "${R13G2}/.git/loop-spawn.lock" && printf '%s' "${dpid13f2}" > "${R13G2}/.git/loop-spawn.lock/pid"
+    (
+      cd "${R13G2}" || exit 1
+      export FAKECAT13F2_N="${TMP}/13f2-n"
+      printf '0' > "${FAKECAT13F2_N}"
+      cat() {
+        case "$1" in
+          */loop-spawn.lock/pid)
+            local n
+            n="$(command cat "${FAKECAT13F2_N}" 2>/dev/null || echo 0)"
+            n=$((n + 1))
+            printf '%s' "${n}" > "${FAKECAT13F2_N}"
+            if [ "${n}" -eq 2 ]; then
+              kill -TERM $$
+            fi
+            command cat "$@"
+            return 0 ;;
+        esac
+        command cat "$@"
+      }
+      export -f cat
+      exec env LOOP_SPAWN_LOCK_TIMEOUT=3 LOOP_SPAWN_LOCK_POLL=0.2 bash scripts/loop-spawn.sh --no-exec 13f2 t
+    ) >"${TMP}/13f2.out" 2>"${TMP}/13f2.err"
+    if [ -d "${R13G2}/.git/loop-spawn.lock.reap" ]; then
+      ok "13f2: ★★★ REAP_HELD の片づけを潰すと .reap の残骸が残った (★ 13f は空振りしていない)"
+    else
+      ng "13f2: 潰しても .reap の残骸が残らなかった (⚠️★★★ 13f が REAP_HELD 片づけ以外の理由で緑になっている可能性、または中断自体が起きていない可能性)"
+    fi
+  fi
+fi
 
 # --- 13g-13i: ⚠️★★★ 変異テスト —— 13e/13c/13d の心臓部を潰したら赤くなるか ---
 echo "13g-13i. ⚠️★★★ 変異テスト —— ロック保持順序 / release pid 一致 / max_i 桁数上限を潰したら赤くなるか"
@@ -1942,9 +2028,23 @@ else
   else
     (
       cd "${R13I}" || exit 1
+      # ⚠️★★★ CR MEDIUM (2026-09-26 2巡目) の副作用: 13c と同じ理由で、acquire 直後の
+      #   自己確認 (1 回目) は本物を素通しし、release 時 (2 回目以降) だけ偽装する。
+      export FAKECAT13H_N="${TMP}/13h-n"
+      printf '0' > "${FAKECAT13H_N}"
       cat() {
         case "$1" in
-          */loop-spawn.lock/pid) printf '424242'; return 0 ;;
+          */loop-spawn.lock/pid)
+            local n
+            n="$(command cat "${FAKECAT13H_N}" 2>/dev/null || echo 0)"
+            n=$((n + 1))
+            printf '%s' "${n}" > "${FAKECAT13H_N}"
+            if [ "${n}" -eq 1 ]; then
+              command cat "$1"
+            else
+              printf '424242'
+            fi
+            return 0 ;;
         esac
         command cat "$@"
       }
@@ -1993,6 +2093,146 @@ else
       ng "13i: 潰しても ${waited} 秒で終了した (rc=${i13rc}) (⚠️★★★ 13d が桁数上限以外の理由で die している可能性)"
     fi
     kill "${I13_LIVE_PID}" 2>/dev/null || true
+  fi
+fi
+
+# ── 14. ⚠️★★★ 2026-09-26 Codex /cross-review (2巡目) の個別対応 ──────
+# ⚠️★★★ **何を止めるためにあるのか**:
+#   ★ CR MEDIUM: acquire_spawn_lock が pid の書き込み失敗を確かめずに LOCK_HELD=1 にしていた。
+#     release_spawn_lock は「pid が自分と一致するときだけ解放する」ので、書き込みに失敗すると
+#     ロックが永久に残り、以後の spawn が全部タイムアウトで死ぬ。
+#   ★ CR LOW: `local_ref_or_raw` は、ローカルに base が無いとき無修飾の値をそのまま返していた。
+#     fetch 失敗・origin 無しの経路でこれが使われると、同名の tag があれば worktree add が
+#     **黙って** tag を start にする (branch が無いので ambiguous エラーにもならない)。
+echo "════════════════════════════════════════"
+echo "14. ⚠️★★★ Codex /cross-review 2巡目: pid 書き込み確認 / 無修飾 base の die"
+
+# --- 14a: pid の書き込みに失敗すると die し、ロックディレクトリが残らない ---
+echo "14a. ⚠️★★★ CR MEDIUM: pid を書き込めない状況では die し、ロックディレクトリを残さないか"
+
+R14A="${TMP}/r14a/repo"; mkdir -p "${R14A}"
+if ! setup_fake_repo "${R14A}"; then
+  ng "14a: 準備できなかった (★ 判定できない)"
+else
+  (
+    cd "${R14A}" || exit 1
+    # ⚠️ mkdir を shadow し、loop-spawn.lock の mkdir が成功した直後に
+    #   pid の位置へ **ディレクトリ**を先回りして置く (★ 以後の `> .../pid` は
+    #   EISDIR で必ず失敗する)。
+    #   ⚠️ 実測: Windows/git-bash では umask/chmod によるパーミッション遮断が
+    #   所有者に対して効かない (umask 0200 で mkdir しても drwxr-xr-x のままだった) ので、
+    #   パーミッションではなくこの形で決定論的に再現する。
+    mkdir() {
+      case "$1" in
+        */loop-spawn.lock)
+          command mkdir "$1" || return $?
+          command mkdir "$1/pid"
+          return 0
+          ;;
+      esac
+      command mkdir "$@"
+    }
+    export -f mkdir
+    exec env bash scripts/loop-spawn.sh --no-exec 14a t
+  ) >"${TMP}/14a.out" 2>"${TMP}/14a.err"
+  RC14A=$?
+  ERR14A="$(cat "${TMP}/14a.err" 2>/dev/null || true)"
+  if [ "${RC14A}" -ne 0 ] && ! wt_has "${R14A}" "repo-14a-t" \
+     && [ ! -d "${R14A}/.git/loop-spawn.lock" ] && has_text "${ERR14A}" "pid を書き込めませんでした"; then
+    ok "14a: ★★★ pid を書き込めない状況で die し、ロックディレクトリを残さなかった"
+  else
+    ng "14a: rc=${RC14A} / worktree 残=$(wt_has "${R14A}" "repo-14a-t" && echo yes || echo no) / lock 残=$([ -d "${R14A}/.git/loop-spawn.lock" ] && echo yes || echo no) / stderr=[${ERR14A}]"
+  fi
+fi
+
+# --- 14b: ⚠️★★★ 変異テスト —— 読み戻し確認を消すと 14a の状況でロックが残ってしまうか ---
+MUT14B="${TMP}/mut14b-loop-spawn.sh"
+sed 's/if \[ "\${written_pid:-}" != "\$\$" \]; then/if false; then/' "${SPAWN_SH}" > "${MUT14B}"
+mut14b_src="$(grep -cF 'if [ "${written_pid:-}" != "$$" ]; then' "${SPAWN_SH}" 2>/dev/null)" || mut14b_src=0
+mut14b_left="$(grep -cF 'if [ "${written_pid:-}" != "$$" ]; then' "${MUT14B}" 2>/dev/null)" || mut14b_left=0
+if [ "${mut14b_src:-0}" -ne 1 ] || [ "${mut14b_left:-0}" -ne 0 ]; then
+  ng "14b: 変異を当てられない (src=${mut14b_src} / mut=${mut14b_left}) —— ★ 読み戻し確認の書き方が変わった → ⚠️ 検査不能"
+else
+  R14B="${TMP}/r14b/repo"; mkdir -p "${R14B}"
+  if ! setup_fake_repo "${R14B}" "${MUT14B}"; then
+    ng "14b: 準備できなかった (★ 判定できない)"
+  else
+    (
+      cd "${R14B}" || exit 1
+      mkdir() {
+        case "$1" in
+          */loop-spawn.lock)
+            command mkdir "$1" || return $?
+            command mkdir "$1/pid"
+            return 0
+            ;;
+        esac
+        command mkdir "$@"
+      }
+      export -f mkdir
+      exec env bash scripts/loop-spawn.sh --no-exec 14b t
+    ) >"${TMP}/14b.out" 2>"${TMP}/14b.err"
+    if [ -d "${R14B}/.git/loop-spawn.lock" ]; then
+      ok "14b: ★★★ 読み戻し確認を消すと pid を書けなくてもロックが残った (★ 14a は空振りしていない)"
+    else
+      ng "14b: 潰してもロックが残らなかった (⚠️★★★ 14a が読み戻し確認以外の理由で残っている可能性)"
+    fi
+  fi
+fi
+
+# --- 14c: ⚠️★★★ CR LOW: origin 無し + base と同名の tag だけ → die し worktree/branch を作らない ---
+echo "14c-14d. ⚠️★★★ CR LOW: ローカルに base が無く origin も無い/fetch 失敗 + 同名 tag → die するか"
+
+R14C="${TMP}/r14c/repo"; mkdir -p "${R14C}"
+if ! setup_fake_repo "${R14C}"; then
+  ng "14c: 準備できなかった (★ 判定できない)"
+else
+  # ★ base と同名の tag だけを作る (★ branch は作らない —— これが起票の危険な経路)。
+  ( cd "${R14C}" && git tag only-tag main ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=only-tag"; do_spawn_x "${R14C}" --no-exec 14c t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${R14C}" "repo-14c-t" && ! branch_exists "${R14C}" "loop/14c-t" \
+     && has_text "${SERR}" "remote からも取得できません"; then
+    ok "14c: ★★★ origin 無し + 同名 tag のみで die し、worktree も branch も作らなかった"
+  else
+    ng "14c: rc=${SRC} / worktree=$(wt_has "${R14C}" "repo-14c-t" && echo yes || echo no) —— ⚠️★★★ 同名 tag から黙って worktree を切った疑い"
+  fi
+fi
+
+# --- 14d: fetch 失敗 + 同名 tag (origin はあるが取得できない) → die ---
+R14D="${TMP}/r14d/repo"; O14D="${TMP}/r14d/origin.git"
+if ! setup_origin_repo "${R14D}" "${O14D}"; then
+  ng "14d: 準備できなかった (★ 判定できない)"
+else
+  ( cd "${R14D}" && git tag only-tag-2 main ) >/dev/null 2>&1
+  ( cd "${R14D}" && git remote set-url origin "${TMP}/r14d/no-such-origin.git" ) >/dev/null 2>&1
+  SPAWN_ENV="LOOP_BASE_BRANCH=only-tag-2"; do_spawn_x "${R14D}" --no-exec 14d t
+  if [ "${SRC}" -ne 0 ] && ! wt_has "${R14D}" "repo-14d-t" && ! branch_exists "${R14D}" "loop/14d-t" \
+     && has_text "${SERR}" "remote からも取得できません"; then
+    ok "14d: ★★★ fetch 失敗 + 同名 tag のみで die し、worktree も branch も作らなかった"
+  else
+    ng "14d: rc=${SRC} / worktree=$(wt_has "${R14D}" "repo-14d-t" && echo yes || echo no) —— ⚠️★★★ 同名 tag から黙って worktree を切った疑い"
+  fi
+fi
+
+# --- 14e: ⚠️★★★ 変異テスト —— local_ref_or_raw_die を無修飾値に戻すと 14c/14d が危険な成功をするか ---
+MUT14E="${TMP}/mut14e-loop-spawn.sh"
+sed 's/local_ref_or_raw_die "\$1"/printf '"'"'%s'"'"' "$1"/' "${SPAWN_SH}" > "${MUT14E}"
+mut14e_src="$(grep -cF 'local_ref_or_raw_die "$1"' "${SPAWN_SH}" 2>/dev/null)" || mut14e_src=0
+mut14e_left="$(grep -cF 'local_ref_or_raw_die "$1"' "${MUT14E}" 2>/dev/null)" || mut14e_left=0
+if [ "${mut14e_src:-0}" -ne 1 ] || [ "${mut14e_left:-0}" -ne 0 ]; then
+  ng "14e: 変異を当てられない (src=${mut14e_src} / mut=${mut14e_left}) —— ★ die 呼び出しの書き方が変わった → ⚠️ 検査不能"
+else
+  R14E="${TMP}/r14e/repo"; mkdir -p "${R14E}"
+  if ! setup_fake_repo "${R14E}" "${MUT14E}"; then
+    ng "14e: 準備できなかった (★ 判定できない)"
+  else
+    ( cd "${R14E}" && git tag only-tag main ) >/dev/null 2>&1
+    SPAWN_ENV="LOOP_BASE_BRANCH=only-tag"; do_spawn_x "${R14E}" --no-exec 14e t
+    if [ "${SRC}" -eq 0 ] && wt_has "${R14E}" "repo-14e-t"; then
+      ok "14e: ★★★ die を無修飾値に戻すと、同名 tag から黙って worktree を切ってしまった (★ 14c/14d は空振りしていない)"
+    else
+      ng "14e: 潰しても rc=${SRC} で止まった (⚠️★★★ 14c/14d が die 呼び出し以外の理由で止まっている可能性)"
+    fi
   fi
 fi
 

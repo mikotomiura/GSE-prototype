@@ -65,6 +65,7 @@ worktree 隔離のもと安全に回す。人が目視できる監視ファイ�
   崩れていれば verify が緑でも `uncommitted` にして `issue_done` にしない (verify 自身が追跡ファイルを書き換える・checkout する等でコミットの内容が保証できなくなるため)。
   ⚠️★ **限界**: worker が生成物と同じパスを後で意図的に編集しても未追跡のままなら除外対象のままである。gitignore 対象のパスはそもそも porcelain に出ないので見ない。
   これは境界の欠陥ではなく、**最終判定は merge 前にメインが clean な checkout で回す acceptance** に委ねる設計である。
+  ⚠️★ もう 1 つの限界 (2026-09-26・/cross-review 2 巡目): sparse-checkout を有効にした worktree では対象外パスに正当な `S` (skip-worktree) 印が付くため、常に `uncommitted` になる (本 repo は現状 sparse-checkout ではない)。
   ★ `test_fail` と同じく**失敗 attempt**として次の attempt へ進む (max_turns で切れた worker が次の attempt でコミットできる)。
   同じ未コミット状態が続けば同じ fingerprint になり `no_progress_stop` で止まる。モードC では `loop-run.sh` が機械検査する。
 

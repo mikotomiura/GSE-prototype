@@ -104,3 +104,7 @@
 - **P1-B**: 実測で効いた綴りは `Bash(bash .steering/**/*-acceptance.sh)` だけ。境界ではない（判断 8）。文書の「main 側の acceptance を回すので合否は動かない」は誤りとして訂正（S-M1）。
 - **指示文**: empirical-prompt-tuning（`prompt-tuning.md`）で loop-issue / loop-worker の未コミット時の手順を「まず自分で commit」に直した。
 - **最終テスト**: guard / spawn-cleanup 100 / worktree-deny / portability / wired すべて rc=0。
+- **/cross-review の後（判断 10・11）**: 未コミット判定は「verify（と watchdog）が新しく作った未追跡だけを生成集合で除外」「`--untracked-files=all`」「skip-worktree / assume-unchanged の印を verify の前後で検出」「verify 後に HEAD と追跡ファイルの不変を確認」。
+  spawn は「後始末が終わるまでロック保持」「pid を読み戻して確かめる」「自分の pid のときだけ解放」「reap の残骸を EXIT で片づける」「全経路の start を修飾し、ローカルに無い base は die」。
+  ⚠️ `start="$(local_ref_or_raw …)"` の die は `set -e` によって全体を止める（コマンド置換の中の die はサブシェルしか抜けない）—— `set -e` を外すと fail-open になる点に注意。
+- **最終テスト**: guard 88（3 回連続で緑）/ spawn-cleanup 118 / worktree-deny 34 / portability / wired すべて rc=0。

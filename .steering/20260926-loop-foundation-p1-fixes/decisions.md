@@ -117,3 +117,14 @@
 - **選択肢（未追跡の扱い）**: A: verify が新しく作った未追跡ファイルだけを以後の判定から除外（＋ `--untracked-files=all`・verify 後の HEAD と追跡ファイル不変・skip-worktree 等の印の検出）／ B: 未追跡を判定から外す（Codex P2-3 の穴が開く）／ C: 起票して文書だけ狭める
 - **採用**: A。LOW 群は全部直す。
 - **却下**: Codex P2-4（fingerprint に差分内容を含める）—— 判断 5 の意図は「commit しないまま続けば、内容が動いていても止める」。未コミットの継続そのものを前進なしとみなす。
+
+## 判断 11: /cross-review 2 巡目（Codex ∥ code-reviewer・7cef46bd）の指摘を全部直して終える
+
+- **判断日時**: 2026-09-26（研究者裁定）
+- **背景**（メインが一次で照合済み・HIGH なし）:
+  - 両者一致: watchdog の後に生成集合を記録していない（文書・コメントと食い違う）／ `grep -Fxq "$path"` に `--` が無く `-` 始まりの生成物名で毎回 dirty
+  - Codex P1: verify・watchdog の後の不変確認で skip-worktree / assume-unchanged の印を見ていない
+  - code-reviewer MEDIUM: pid の書き込み失敗で「自分の pid のときだけ解放」がロックを永久に残す（判断 10 で入った経路）／ テスト 13f が空振りしうる
+  - code-reviewer LOW: HEAD 取得が前後とも失敗すると不変確認が素通り ／ 無修飾の `$base` で同名 tag が黙って切り元になる経路 ／ sparse-checkout の限界の記載 ／ 引用パスの除外・assume-unchanged・N5 の判定のテスト補強
+- **選択肢**: A: 全部直して終える（cross-review は 2 巡で打ち切り・メインが diff を一次で確認し全検査を緑に）／ B: 全部直して 3 巡目 ／ C: 一致と MEDIUM だけ
+- **採用**: A

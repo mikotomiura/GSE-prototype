@@ -1295,6 +1295,19 @@ if setup_repo "${N5}" "${N5_STUB}" '[]' 'echo x >> w5.txt; true'; then
     ng "N5: ⚠️★ verify が追跡ファイルを書き換えたのに issue_done になった (★ 検証していない内容を merge しうる)"
     [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
   fi
+  # ⚠️★★★ 補強 (CR LOW・2026-09-26 2 巡目): 種別が `uncommitted` であること自体と、
+  #   その理由 (events の detail。取れなければここで判定不能とせず素通しする「取れる方」の作法) も見る。
+  if [ -s "${ev}" ] && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N5 補強: 種別が uncommitted として記録された"
+  else
+    ng "N5 補強: ⚠️★ uncommitted として記録されていない"
+  fi
+  if [ -s "${ev}" ] && grep '"event":"uncommitted"' "${ev}" | grep -q '"detail":"verify/watchdog'; then
+    ok "N5 補強: events の detail に「verify/watchdog が…」の理由が残っている"
+  else
+    ng "N5 補強: ⚠️★ uncommitted の理由 (detail) が events から分からない"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
 else
   ng "N5: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
@@ -1315,6 +1328,177 @@ if setup_repo "${N6}" "${N6_STUB}" '[]' 'true'; then
   fi
 else
   ng "N6: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+echo "N7〜N11. /cross-review 2 巡目 (2026-09-26) —— watchdog 後の記録・'-' 始まりの生成物・verify 中の skip-worktree・補強"
+
+# ⚠️★★★ N7〜N9 は HEAD (2 巡目是正前) の実装では赤になるはずのテストである
+#   (★ TDD: 先に回帰テストを足し、現状の実装で失敗することを確認してから直す)。
+
+# --- N7: verify_level recheck で watchdog が残した未追跡の生成物も、次の attempt で除外される ---
+#   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `run_watchdog` もフルセッション 1 回分であり
+#   gitignore 外の生成物を残しうる。是正前は verify 直後の 1 回だけ記録しており、
+#   watchdog の生成物は次の attempt でも dirty のまま固定されていた。
+#   ★ N1 と同じ 2 attempt 構成: attempt1 は「別理由」(watchdog が追跡ファイルを書き換える) で
+#   uncommitted になり、attempt2 で worker がその書き換えごとコミットすれば issue_done に届くこと。
+#   ⚠️ watchdog の verdict (`.result` に 1 行目 "OK") は setup_repo の固定 JSON テンプレートでは
+#   出せないため、この stub は setup_repo のテンプレートに頼らず直接書く。
+N7="${TMP}/n7/repo"; mkdir -p "${N7}"
+export N7_WD_MARKER="${TMP}/n7-watchdog-called.marker"
+rm -f "${N7_WD_MARKER}"
+if setup_repo "${N7}" ':' '[]' 'true'; then
+  cat > "${N7}/.steering/task/issues/001.md" <<'N7I'
+# Issue 001: stub (verify_level recheck)
+verify_level: recheck
+## Goal
+stub
+## Dependencies
+## Status
+
+N7I
+  cat > "${N7}/stub/claude" <<'N7STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"Acceptance Criteria"*)
+    {
+      touch wd-junk.out
+      if [ ! -f "${N7_WD_MARKER}" ]; then
+        echo called >> "${N7_WD_MARKER}"
+        echo rewritten >> w7.txt
+      fi
+    } >/dev/null 2>&1
+    printf '%s\n' '{"subtype":"success","total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[],"result":"OK\nwatchdog ok"}'
+    ;;
+  *)
+    {
+      if [ ! -f .worker-marker ]; then
+        echo w7base > w7.txt
+        echo one > .worker-marker
+        git add .worker-marker w7.txt
+        git commit -q -m attempt1
+      else
+        echo two >> .worker-marker
+        git add .worker-marker w7.txt
+        git commit -q -m attempt2
+      fi
+    } >/dev/null 2>&1
+    printf '%s\n' '{"subtype":"success","total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}'
+    ;;
+esac
+N7STUB
+  chmod +x "${N7}/stub/claude"
+  (
+    cd "${N7}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    git add .steering/task/issues/001.md || exit 1
+    git commit -q -m "test: verify_level recheck (N7)" || exit 1
+  ) >/dev/null 2>&1
+  ev="$(run_loop "${N7}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+    ok "N7: watchdog が残した未追跡の生成物があっても、次の attempt でコミットすれば issue_done になる"
+  else
+    ng "N7: ⚠️★ watchdog の生成物が記録されず uncommitted に固定され issue_done にならない (★ 是正対象そのもの)"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N7: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N8: verify が作る未追跡ファイル名が "-" で始まっても、次の attempt で正しく除外される ---
+#   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): check_committed の除外判定
+#   (`grep -Fxq "$path" "$gen_file"`) は `$path` が "-" で始まると grep がオプションと誤解釈し、
+#   常に非除外 (dirty) 扱いになる。★ N1 と同じ 2 attempt 構成で、ファイル名だけ "-report.txt" にする。
+N8="${TMP}/n8/repo"; mkdir -p "${N8}"
+N8_STUB='if [ ! -f .worker-marker ]; then
+  echo one > .worker-marker
+  git add .worker-marker
+  git commit -q -m attempt1
+else
+  echo two >> .worker-marker
+  git add .worker-marker
+  git commit -q -m attempt2
+fi
+true'
+#   ⚠️ setup_repo の _loop-config.json 生成は verify.test を **JSON エスケープせず**
+#     ヒアドキュメントへ直接埋め込む (既存の作法)。二重引用符を含めると JSON が壊れるため、
+#     ここでは二重引用符を使わない書き方にする (パスに空白が無いので引用不要)。
+N8_VERIFY='test -f ./-report.txt && exit 0 || { touch -- -report.txt; exit 1; }'
+if setup_repo "${N8}" "${N8_STUB}" '[]' "${N8_VERIFY}"; then
+  ev="$(run_loop "${N8}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+    ok "N8: '-' で始まる生成物 (-report.txt) があっても、次の attempt でコミットすれば issue_done になる"
+  else
+    ng "N8: ⚠️★ '-' で始まる生成物名で除外判定が壊れ、uncommitted に固定され issue_done にならない (★ 是正対象そのもの)"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N8: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N9: verify.test が追跡ファイルを書き換えたうえで skip-worktree を付けると issue_done にならない ---
+#   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目・security LOW 1): `git diff --quiet HEAD --` は
+#   skip-worktree の印が付いたパスの変更を見ない。★ N5 (verify が追跡ファイルを書き換える) の
+#   さらに一段強い形: 書き換えたうえで印を付け、`git diff` からも隠す。
+N9="${TMP}/n9/repo"; mkdir -p "${N9}"
+N9_STUB='echo w > w9.txt && git add w9.txt && git commit -q -m work
+true'
+N9_VERIFY='echo x >> w9.txt && git update-index --skip-worktree w9.txt; true'
+if setup_repo "${N9}" "${N9_STUB}" '[]' "${N9_VERIFY}"; then
+  ev="$(run_loop "${N9}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}" && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N9: verify が skip-worktree で隠して追跡ファイルを書き換えても issue_done にしなかった"
+  else
+    ng "N9: ⚠️★ verify が skip-worktree で隠した書き換えを見逃し issue_done になった (★ 検証していない内容を merge しうる。是正対象そのもの)"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N9: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N10: 生成物のパスが非 ASCII (日本語ファイル名) でも同様に除外される (CR LOW 補強) ---
+#   ★ N1 の非 ASCII 版。除外判定がバイト単位の完全一致であることの確認。
+#   ⚠️ `core.quotepath` の既定 (true) だと porcelain が非 ASCII をエスケープ表示するため明示的に外す。
+N10="${TMP}/n10/repo"; mkdir -p "${N10}"
+N10_STUB='if [ ! -f .worker-marker ]; then
+  echo one > .worker-marker
+  git add .worker-marker
+  git commit -q -m attempt1
+else
+  echo two >> .worker-marker
+  git add .worker-marker
+  git commit -q -m attempt2
+fi
+true'
+#   ⚠️ 同上の理由で二重引用符を使わない (パスに空白が無いので引用不要)。
+N10_VERIFY='test -f 生成.out && exit 0 || { touch 生成.out; exit 1; }'
+if setup_repo "${N10}" "${N10_STUB}" '[]' "${N10_VERIFY}"; then
+  ( cd "${N10}" && git config core.quotepath false ) >/dev/null 2>&1
+  ev="$(run_loop "${N10}" --issues 001)"
+  if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+    ok "N10: 非 ASCII (日本語) の生成物名でも、次の attempt でコミットすれば issue_done になる"
+  else
+    ng "N10: ⚠️★ 非 ASCII の生成物名で除外判定が壊れ issue_done にならない"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N10: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- N11: assume-unchanged の印を付けた追跡ファイルも uncommitted にする (N4 の小文字版・CR LOW 補強) ---
+N11="${TMP}/n11/repo"; mkdir -p "${N11}"
+N11_STUB='echo w > w11.txt && git add w11.txt && git commit -q -m work
+git update-index --assume-unchanged w11.txt
+true'
+if setup_repo "${N11}" "${N11_STUB}" '[]' 'true'; then
+  ev="$(run_loop "${N11}" --issues 001)"
+  if [ -s "${ev}" ] && ! grep -q '"event":"issue_done"' "${ev}" && grep -q '"event":"uncommitted"' "${ev}"; then
+    ok "N11: assume-unchanged の印があるファイルを検出して uncommitted にした"
+  else
+    ng "N11: ⚠️★ assume-unchanged の印を見落とし、コミットの内容が保証できないまま issue_done になった"
+    [ -s "${ev}" ] && sed -n '1,20p' "${ev}"
+  fi
+else
+  ng "N11: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
 echo "M. 変異テスト —— 新しい判定の心臓部を潰したら赤くなるか (2026-09-26 レビュー是正分)"
@@ -1359,10 +1543,12 @@ else
 fi
 
 # --- M-gen: 生成集合による除外を無効化する (★ 判断 10・N1 の心臓部) ---
+#   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目) で該当行に `-e`/`--` が付いたため、
+#   sed パターンをその新しい書き方に更新した (★ 是正 2 と紐づく。挙動そのものは従来どおり全無効化)。
 MUT_GEN="${TMP}/mutated-loop-run-gen.sh"
-sed 's#if grep -Fxq "\$path" "\$gen_file" 2>/dev/null; then#if false; then#' \
+sed 's#if grep -Fxq -e "\$path" -- "\$gen_file" 2>/dev/null; then#if false; then#' \
   "${RUN_SH}" > "${MUT_GEN}"
-mut_left="$(grep -c 'if grep -Fxq "\$path" "\$gen_file" 2>/dev/null; then' "${MUT_GEN}" 2>/dev/null)" || mut_left=0
+mut_left="$(grep -c 'if grep -Fxq -e "\$path" -- "\$gen_file" 2>/dev/null; then' "${MUT_GEN}" 2>/dev/null)" || mut_left=0
 if [ "${mut_left:-0}" -ne 0 ]; then
   ng "M-gen 変異テスト: 変異が当たらなかった (★ 除外判定の書き方が変わった → 検査不能)"
 else
@@ -1383,6 +1569,34 @@ else
     fi
   else
     ng "M-gen 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-dashsafe: `-e`/`--` だけを外し "-" 始まりの生成物名の除外を壊す (★ 3 回目の是正・N8 の心臓部) ---
+MUT_DASH="${TMP}/mutated-loop-run-dash.sh"
+sed 's#if grep -Fxq -e "\$path" -- "\$gen_file" 2>/dev/null; then#if grep -Fxq "\$path" "\$gen_file" 2>/dev/null; then#' \
+  "${RUN_SH}" > "${MUT_DASH}"
+mut_left="$(grep -c 'if grep -Fxq -e "\$path" -- "\$gen_file" 2>/dev/null; then' "${MUT_DASH}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
+  ng "M-dashsafe 変異テスト: 変異が当たらなかった (★ 除外判定の書き方が変わった → 検査不能)"
+else
+  MDASH="${TMP}/mdash/repo"; mkdir -p "${MDASH}"
+  if setup_repo "${MDASH}" "${N8_STUB}" '[]' "${N8_VERIFY}"; then
+    cp "${MUT_DASH}" "${MDASH}/scripts/loop-run.sh"
+    (
+      cd "${MDASH}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (drop -e/-- from generated-set grep)" || exit 1
+    ) >/dev/null 2>&1
+    ev="$(run_loop "${MDASH}" --issues 001)"
+    if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+      ng "M-dashsafe 変異テスト: -e/-- を外しても issue_done になった (⚠️★★★ この検査は何も見ていない)"
+    else
+      ok "M-dashsafe 変異テスト: -e/-- を外すと N8 が赤くなった (★ 検査は空振りしていない)"
+    fi
+  else
+    ng "M-dashsafe 変異テスト: 準備できなかった (★ 判定できない)"
   fi
 fi
 
@@ -1419,10 +1633,13 @@ true'
 fi
 
 # --- M-inv: verify 後の HEAD/追跡ファイル不変確認を消す (★ Codex P2-2・N5 の心臓部) ---
+#   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目) で判定に `head_before` 非空・flagged_after の 2 条件が
+#   増え 1 行にまとまったため、sed パターンをその新しい書き方に更新した
+#   (★ 挙動は従来どおり: `if true; then` で 4 条件すべてを無効化する)。
 MUT_INV="${TMP}/mutated-loop-run-inv.sh"
-sed 's#if \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null; then#if true; then#' \
+sed 's#if \[ -n "\$head_before" \] && \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null && \[ -z "\$flagged_after" \]; then#if true; then#' \
   "${RUN_SH}" > "${MUT_INV}"
-mut_left="$(grep -c 'if \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null; then' "${MUT_INV}" 2>/dev/null)" || mut_left=0
+mut_left="$(grep -c 'if \[ -n "\$head_before" \] && \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null && \[ -z "\$flagged_after" \]; then' "${MUT_INV}" 2>/dev/null)" || mut_left=0
 if [ "${mut_left:-0}" -ne 0 ]; then
   ng "M-inv 変異テスト: 変異が当たらなかった (★ 不変確認の書き方が変わった → 検査不能)"
 else
@@ -1445,6 +1662,110 @@ true'
     fi
   else
     ng "M-inv 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-flag: 不変確認から flagged_after の検査だけを外す (★ 3 回目の是正・N9 の心臓部) ---
+#   ⚠️★★★ HEAD/diff の 2 条件は残したまま flagged_after だけを落とす、より狙いを絞った変異。
+#   M-inv (全無効化) とは別に、「skip-worktree の印だけを見落とす」ことをピンポイントで再現する。
+MUT_FLAG="${TMP}/mutated-loop-run-flag.sh"
+sed 's#if \[ -n "\$head_before" \] && \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null && \[ -z "\$flagged_after" \]; then#if [ -n "$head_before" ] \&\& [ "$head_after" = "$head_before" ] \&\& git -C "$wt" diff --quiet HEAD -- 2>/dev/null; then#' \
+  "${RUN_SH}" > "${MUT_FLAG}"
+mut_left="$(grep -c 'if \[ -n "\$head_before" \] && \[ "\$head_after" = "\$head_before" \] && git -C "\$wt" diff --quiet HEAD -- 2>/dev/null && \[ -z "\$flagged_after" \]; then' "${MUT_FLAG}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
+  ng "M-flag 変異テスト: 変異が当たらなかった (★ 不変確認の書き方が変わった → 検査不能)"
+else
+  MFLAG="${TMP}/mflag/repo"; mkdir -p "${MFLAG}"
+  if setup_repo "${MFLAG}" "${N9_STUB}" '[]' "${N9_VERIFY}"; then
+    cp "${MUT_FLAG}" "${MFLAG}/scripts/loop-run.sh"
+    (
+      cd "${MFLAG}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (drop flagged_after check from invariance)" || exit 1
+    ) >/dev/null 2>&1
+    ev="$(run_loop "${MFLAG}" --issues 001)"
+    # ⚠️ M-flag は M-cm3/M-inv と同じ「ガード除去」型の変異である (M-gen/M-dashsafe/M-wd の
+    #   「有効化する側の是正を消す」型とは極性が逆): flagged_after のガードを外すと、
+    #   N9 (本来 issue_done にならないはず) が誤って issue_done になることを期待する。
+    if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+      ok "M-flag 変異テスト: flagged_after の検査を外すと N9 が誤って issue_done になった (★ 検査は空振りしていない)"
+    else
+      ng "M-flag 変異テスト: flagged_after の検査を外しても issue_done にならなかった (⚠️★★★ この検査は何も見ていない)"
+    fi
+  else
+    ng "M-flag 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-wd: watchdog 後の record_verify_generated 呼び出しを消す (★ 3 回目の是正・N7 の心臓部) ---
+MUT_WD="${TMP}/mutated-loop-run-wd.sh"
+# ⚠️ 区切り文字にパターン中の `#` を使うと壊れるため `@` を使う。
+sed 's@record_verify_generated "\$wt" "\$u0_file" "\$gen_file" # WATCHDOG-POST-RECORD.*@: # WATCHDOG-POST-RECORD disabled by mutation@' \
+  "${RUN_SH}" > "${MUT_WD}"
+mut_left="$(grep -c 'record_verify_generated "\$wt" "\$u0_file" "\$gen_file" # WATCHDOG-POST-RECORD' "${MUT_WD}" 2>/dev/null)" || mut_left=0
+if [ "${mut_left:-0}" -ne 0 ]; then
+  ng "M-wd 変異テスト: 変異が当たらなかった (★ watchdog 後の記録呼び出しの書き方が変わった → 検査不能)"
+else
+  MWD="${TMP}/mwd/repo"; mkdir -p "${MWD}"
+  export N7_WD_MARKER="${TMP}/mwd-watchdog-called.marker"
+  rm -f "${N7_WD_MARKER}"
+  if setup_repo "${MWD}" ':' '[]' 'true'; then
+    cp "${MUT_WD}" "${MWD}/scripts/loop-run.sh"
+    cat > "${MWD}/.steering/task/issues/001.md" <<'MWDI'
+# Issue 001: stub (verify_level recheck)
+verify_level: recheck
+## Goal
+stub
+## Dependencies
+## Status
+
+MWDI
+    cp "${N7}/stub/claude" "${MWD}/stub/claude" 2>/dev/null || cat > "${MWD}/stub/claude" <<'MWDSTUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"Acceptance Criteria"*)
+    {
+      touch wd-junk.out
+      if [ ! -f "${N7_WD_MARKER}" ]; then
+        echo called >> "${N7_WD_MARKER}"
+        echo rewritten >> w7.txt
+      fi
+    } >/dev/null 2>&1
+    printf '%s\n' '{"subtype":"success","total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[],"result":"OK\nwatchdog ok"}'
+    ;;
+  *)
+    {
+      if [ ! -f .worker-marker ]; then
+        echo w7base > w7.txt
+        echo one > .worker-marker
+        git add .worker-marker w7.txt
+        git commit -q -m attempt1
+      else
+        echo two >> .worker-marker
+        git add .worker-marker w7.txt
+        git commit -q -m attempt2
+      fi
+    } >/dev/null 2>&1
+    printf '%s\n' '{"subtype":"success","total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}'
+    ;;
+esac
+MWDSTUB
+    chmod +x "${MWD}/stub/claude"
+    (
+      cd "${MWD}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh .steering/task/issues/001.md || exit 1
+      git commit -q -m "test: mutate loop-run.sh (disable watchdog-post record)" || exit 1
+    ) >/dev/null 2>&1
+    ev="$(run_loop "${MWD}" --issues 001)"
+    if [ -s "${ev}" ] && grep -q '"event":"issue_done"' "${ev}"; then
+      ng "M-wd 変異テスト: watchdog 後の記録を消しても issue_done になった (⚠️★★★ この検査は何も見ていない)"
+    else
+      ok "M-wd 変異テスト: watchdog 後の記録を消すと N7 が赤くなった (★ 検査は空振りしていない)"
+    fi
+  else
+    ng "M-wd 変異テスト: 準備できなかった (★ 判定できない)"
   fi
 fi
 

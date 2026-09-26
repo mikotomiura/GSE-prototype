@@ -462,6 +462,15 @@ record_verify_generated() { # record_verify_generated <worktree> <u0-file> <gen-
   rm -f "$u1"
 }
 
+# ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目・2026-09-26): skip-worktree / assume-unchanged の印は
+#   `check_committed` だけでなく、verify・watchdog **後**の不変確認 (run_issue) からも見る必要がある。
+#   ★ `git diff --quiet HEAD --` は印が付いたパスの変更を見ないため、verify.test 自身が
+#     追跡ファイルを書き換えたうえで印を付けると、不変確認は「クリーン」と誤診して素通りしてしまう。
+#   → ★ 判定を関数に括り出し、check_committed と run_issue の不変確認の両方から呼ぶ。
+flagged_tracked_files() { # flagged_tracked_files <worktree> → skip-worktree(S)/assume-unchanged(小文字) の印が付いた行 (空なら印なし)
+  git -C "$1" ls-files -v 2>/dev/null | grep -E '^(S |[a-z] )' || true
+}
+
 check_committed() { # check_committed <worktree> <anchor> <out-file> <gen-file>; 0 = コミット済み
   local wt="$1" anchor="$2" out_file="$3" gen_file="$4"
   local n_commits rc
@@ -477,7 +486,10 @@ check_committed() { # check_committed <worktree> <anchor> <out-file> <gen-file>;
       case "$line" in
         "?? "*)
           path="${line#"?? "}"
-          if grep -Fxq "$path" "$gen_file" 2>/dev/null; then
+          # ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `$path` が `-` で始まると
+          #   (例: `-report.txt`) grep がオプションと誤解釈し、毎回 dirty 扱いになっていた。
+          #   → `-e` でパターンだと明示し、`--` で以降を非オプション引数に固定する。
+          if grep -Fxq -e "$path" -- "$gen_file" 2>/dev/null; then
             excluded_lines="${excluded_lines}${line}"$'\n'
           else
             dirty_lines="${dirty_lines}${line}"$'\n'
@@ -501,7 +513,7 @@ check_committed() { # check_committed <worktree> <anchor> <out-file> <gen-file>;
 
   # --- (2) skip-worktree / assume-unchanged の印はコミットの内容を保証しない ---
   local flagged
-  flagged="$(git -C "$wt" ls-files -v 2>/dev/null | grep -E '^(S |[a-z] )' || true)"
+  flagged="$(flagged_tracked_files "$wt")"
   if [ -n "$flagged" ]; then
     {
       echo "# check_committed: git ls-files -v に skip-worktree(S) / assume-unchanged(小文字) の印がある"
@@ -831,10 +843,11 @@ run_issue() {
     #     (Codex P2-2 / security LOW 1 —— verify が追跡ファイルを書き換えても
     #     check_committed 単体では気づけない)。
     VERIFY_KIND=""
+    local uncommitted_detail=""
     if ! check_committed "$wt" "$wt_anchor" "$vout" "$gen_file"; then
       VERIFY_KIND=uncommitted
     else
-      local u0_file head_before head_after
+      local u0_file head_before head_after flagged_after
       u0_file="$WORK_TMP/verify-u0-$id.txt"
       untracked_paths "$wt" > "$u0_file"
       head_before="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
@@ -842,18 +855,39 @@ run_issue() {
         # ★ 緑になった直後にも U1 を取って生成集合を更新する (verify 自体が生成物を作りうる)。
         record_verify_generated "$wt" "$u0_file" "$gen_file"
         local lvl; lvl="$(issue_verify_level "$id")"
-        if [ "$lvl" = "recheck" ] && ! run_watchdog "$id" "$wt" "$attempt"; then
-          return 1
+        if [ "$lvl" = "recheck" ]; then
+          if ! run_watchdog "$id" "$wt" "$attempt"; then
+            return 1
+          fi
+          # ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `run_watchdog` もフルセッション 1 回分であり
+          #   gitignore 外の生成物を残しうる。上の記録は verify 直後の 1 回だけだったので、
+          #   watchdog が作った未追跡ファイルは次の attempt の check_committed でも dirty のままに
+          #   固定されていた。★ 冒頭コメント (P1-I) の「run_verify (と recheck の watchdog) の
+          #   前後で…」という記述はこれで実装と一致する。
+          #   ★ U0 は run_verify の前に取った `$u0_file` を再利用する
+          #     (watchdog 用に取り直す必要はない。gen_file は行の集合として追記するだけなので
+          #     verify 分と watchdog 分が重複して積まれても害はない)。
+          record_verify_generated "$wt" "$u0_file" "$gen_file" # WATCHDOG-POST-RECORD (3 回目の是正)
         fi
-        # ⚠️★★★ **`issue_done` を出す直前に「HEAD 不変」かつ「追跡ファイルに差分なし」を確かめる**
+        # ⚠️★★★ **`issue_done` を出す直前に「HEAD 不変」かつ「追跡ファイルに差分なし」かつ
+        #   「skip-worktree/assume-unchanged の印が付いていない」ことを確かめる**
         #   （★ Codex P2-2 / security LOW 1・2026-09-26。★ `code-reviewer` / `security-checker` の
         #     旧 HIGH 指摘・2026-09-20 の「HEAD だけ見る」検査をさらに強める）。
         #   ★ `run_watchdog` は worktree 内で **もう 1 回フルセッション**を起動する
         #     (`verify_level: recheck` の issue)。そこや `run_verify` の最中に
         #     追跡ファイルが書き換えられていても、check_committed 通過時点のスナップショットだけでは
         #     見えない。→ ★ ここで H0 との一致と `git diff --quiet HEAD --` を見る。
+        #   ⚠️★★★ 3 回目の是正 (/cross-review 2 巡目): `git diff --quiet HEAD --` は
+        #     skip-worktree/assume-unchanged の印が付いたパスの変更を**見ない**。
+        #     verify.test 自身が追跡ファイルを書き換えたうえで印を付けると、上の 2 条件だけでは
+        #     「クリーン」に見えてしまう (check_committed 通過時点では印は無かったはずなので、
+        #     ここで見つかる印は verify/watchdog の最中に付いたものである)。
+        #     → `flagged_tracked_files` (check_committed と共通の判定) をここでも通す。
+        #   ⚠️ `head_before` / `head_after` が両方とも rev-parse 失敗で空文字列だと
+        #     `"" = ""` が成立して fail-open するため、`head_before` が空でないことも確かめる。
         head_after="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
-        if [ "$head_after" = "$head_before" ] && git -C "$wt" diff --quiet HEAD -- 2>/dev/null; then
+        flagged_after="$(flagged_tracked_files "$wt")"
+        if [ -n "$head_before" ] && [ "$head_after" = "$head_before" ] && git -C "$wt" diff --quiet HEAD -- 2>/dev/null && [ -z "$flagged_after" ]; then
           # ⚠️ ブランチ名 / 履歴入れ替えの検査は従来どおり残す (HEAD 不変チェックとは別の観点:
           #   `ensure_branch` はブランチ名と anchor からの祖先関係を見る)。
           ensure_branch "$id" verify "$attempt" "$wt" "$wt_anchor" || return 1
@@ -862,10 +896,14 @@ run_issue() {
           return 0
         fi
         {
-          echo "# → verify（または watchdog）が追跡ファイル / HEAD を変更した"
+          echo "# → verify（または watchdog）が追跡ファイル / HEAD を変更したか、skip-worktree/assume-unchanged の印を残した"
           echo "#   HEAD: 前=$head_before 後=$head_after"
+          if [ -n "$flagged_after" ]; then
+            echo "#   flagged (skip-worktree/assume-unchanged):"; printf '%s\n' "$flagged_after"
+          fi
         } >> "$vout"
         VERIFY_KIND=uncommitted
+        uncommitted_detail="verify/watchdog の前後で追跡ファイル差分・HEAD 移動・flagged ファイルのいずれかを検出した (HEAD 前=$head_before 後=$head_after)"
       else
         # run_verify が失敗した場合も生成物を残しうる (test_fail 等)。
         # VERIFY_KIND は run_verify 自身が設定済みなので、ここでは上書きしない。
@@ -884,7 +922,11 @@ run_issue() {
       last_fp=""; same=0
       attempt=$((attempt+1)); continue
     fi
-    emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp"
+    if [ -n "$uncommitted_detail" ]; then
+      emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp" detail="$uncommitted_detail"
+    else
+      emit "$id" verify "$VERIFY_KIND" attempt="$attempt" exit=1 fingerprint="$fp"
+    fi
     # ★ no_progress 判定より前に見る (2026-09-25 追加。詳細は check_wt_became_blocked の冒頭)。
     check_wt_became_blocked "$id" "$wt" "$attempt" "$wt_blocked_at_start" && return 1
     if [ "$fp" = "$last_fp" ]; then same=$((same+1)); else same=1; last_fp="$fp"; fi
