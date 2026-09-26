@@ -42,3 +42,15 @@ Rust 側は独立に 3 本: 007（P1-G）・008（#8・`T1a` の非対称）・0
 ## 検証（完了時）
 
 `requirement.md` の受け入れ条件どおり。
+
+## 実装結果（2026-09-26・実行セッション）
+
+- **モード C・全 10 本 `issue_done`**（W1: 001 ‖ 007 → W2: 002 ‖ 008 → 003 ‖ 010 → 004 → 005 → 006。009 は基盤確認で先行）。
+  ⚠️ 計画（`_issue-plan.md` §2）と違い 010 を 003 と並列にした（依存は 008 だけ・Allowed Files も交差しない）。
+- **設計どおり**: 変更対象・変更しないもの（凍結 JSON・schema・fixture・ゴールデン・`Cargo.toml`）は計画のまま。凍結物・schema・fixture・snapshot・`Cargo.*` の `git diff main` は空。
+- **実行時に変えたもの**（`decisions.md` 判断 23〜25・`blockers.md` B-1 / B-2）:
+  - `verify_level: recheck` の 7 本を `parse` に落とした（watchdog が acceptance を回せず verdict を出せない基盤の故障・起票候補 P1-L）。acceptance は「loop-run の verify」と「メインの clean な検証用 worktree での再実行」の 2 段で残した。
+  - `004-acceptance.sh` の「Rust 不変」検査の基準を `main` → base に直した（分解の欠陥・強さは不変）。
+  - 「`feat` 行 0 本の fixture」は 11 本ではなく **7 本**（JSON で数えた値）に訂正した。
+- **統合先端 `4617bbe1` の検証**（clean な検証用 worktree・全 rc=0）: acceptance 10 本 ＋ 過去 3 本 ＋ `check-tests-are-wired.sh` ／ `cargo test --workspace` ／ ゴールデン再生 ／ python `test_p1_*` 56 件 ／ `cargo check --all-targets` ／ clippy `-D warnings` ／ `cargo fmt --check` ／ schema drift ／ shell-portability ／ no-feature-output。
+- **008 の AC6**（O1 の実ログが `feat` 行を持つか）はコードの経路で確認した（`issues/008.md` の Execution Result）。実データは開いていない。
