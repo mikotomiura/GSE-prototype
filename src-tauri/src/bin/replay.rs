@@ -492,9 +492,10 @@ impl P1Operational {
         }
         // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
         if self.theta_estimator != "nearest_rank" {
+            // ⚠️ 外部ファイル由来の文字列は端末へそのまま出さない（`echo_untrusted`: 80 字で切り詰め・`{:?}` でエスケープ）。
             return Err(format!(
-                "theta_estimator は \"nearest_rank\" だけが実装されている (実際: \"{}\")",
-                self.theta_estimator
+                "theta_estimator は \"nearest_rank\" だけが実装されている (実際: {})",
+                echo_untrusted(&self.theta_estimator)
             ));
         }
         Ok(())
@@ -641,9 +642,80 @@ fn pointer_applicability(declared: bool, rows: Option<u64>) -> (bool, Option<&'s
     }
 }
 
+/// 事前宣言 JSON の `id` の最大文字数 (`^[a-z0-9][a-z0-9-]{0,63}$` = 先頭 1 + 残り 63)。
+const PREREG_ID_MAX_LEN: usize = 64;
+
+/// 事前宣言 JSON の `version` (`major.minor.patch`) の各部の最大桁数。
+const PREREG_VERSION_PART_MAX_DIGITS: usize = 9;
+
+/// 形式検査に落ちた外部の値をエラー文へ出すときの最大文字数。
+/// ⚠️ 値は外部ファイル由来で、長さも中身も信用できない (端末へ制御文字を流させない・巨大な行を出さない)。
+const PREREG_ECHO_MAX_CHARS: usize = 80;
+
+/// `id` の形式: `^[a-z0-9][a-z0-9-]{0,63}$` (issue 007・`decisions.md` 判断 16)。
+///
+/// ⚠️ `regex` crate は足さない (新規依存は Stop)。バイトで走査するので、非 ASCII・空白・制御文字・
+/// **末尾の改行** (`$` が改行の手前で止まる正規表現実装の抜け穴) は文字クラスに入らず落ちる。
+fn is_wellformed_prereg_id(id: &str) -> bool {
+    let bytes = id.as_bytes();
+    let Some((&first, rest)) = bytes.split_first() else {
+        return false;
+    };
+    bytes.len() <= PREREG_ID_MAX_LEN
+        && (first.is_ascii_lowercase() || first.is_ascii_digit())
+        && rest
+            .iter()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
+}
+
+/// `version` の形式: `^[0-9]+\.[0-9]+\.[0-9]+$` (各部は 1〜[`PREREG_VERSION_PART_MAX_DIGITS`] 桁)。
+///
+/// ⚠️ 桁は ASCII の `0-9` だけ (全角数字・符号・空白・末尾の改行は落ちる)。
+fn is_wellformed_prereg_version(version: &str) -> bool {
+    let parts: Vec<&str> = version.split('.').collect();
+    parts.len() == 3
+        && parts.iter().all(|part| {
+            (1..=PREREG_VERSION_PART_MAX_DIGITS).contains(&part.len())
+                && part.bytes().all(|b| b.is_ascii_digit())
+        })
+}
+
+/// エラー文へ出す外部の値: 切り詰めて `{:?}` でエスケープし、元の文字数を添える。
+fn echo_untrusted(value: &str) -> String {
+    let shown: String = value.chars().take(PREREG_ECHO_MAX_CHARS).collect();
+    format!("{shown:?} ({} 文字)", value.chars().count())
+}
+
+/// `id` / `version` の**形式だけ**を検査する (issue 007・起票 P1-G)。
+///
+/// ★ 凍結 JSON との**一致は求めない** (別の config を使うこと自体は正当。区別は `config_source` /
+/// `prereg_sha256_prefix` / `overrides` が担う・`decisions.md` 判断 16)。
+/// 封筒 `config.prereg_id` / `config.prereg_version` へ外部の文字列をそのまま写さないための門。
+fn validate_prereg_identity(file: &P1PreregFile) -> Result<(), String> {
+    if !is_wellformed_prereg_id(&file.id) {
+        return Err(format!(
+            "事前宣言 JSON の `id` が形式に合わない (`^[a-z0-9][a-z0-9-]{{0,63}}$`): {}",
+            echo_untrusted(&file.id)
+        ));
+    }
+    if !is_wellformed_prereg_version(&file.version) {
+        return Err(format!(
+            "事前宣言 JSON の `version` が形式に合わない (`<数字>.<数字>.<数字>`・各部 1〜{PREREG_VERSION_PART_MAX_DIGITS} 桁): {}",
+            echo_untrusted(&file.version)
+        ));
+    }
+    Ok(())
+}
+
 /// 事前宣言 JSON の本文を読む (`id` / `version` / `operational`)。
+///
+/// ★ `id` / `version` の形式もここで検査する (issue 007)。埋め込みの凍結 JSON も外部ファイルも
+/// **同じ 1 か所**を通るので、片方だけ検査が抜けることがない。
 fn parse_prereg_text(text: &str) -> Result<P1PreregFile, String> {
-    serde_json::from_str::<P1PreregFile>(text).map_err(|e| format!("事前宣言 JSON を読めない: {e}"))
+    let file = serde_json::from_str::<P1PreregFile>(text)
+        .map_err(|e| format!("事前宣言 JSON を読めない: {e}"))?;
+    validate_prereg_identity(&file)?;
+    Ok(file)
 }
 
 /// バイト列の SHA-256 先頭 [`SOURCE_SHA256_HEX_CHARS`] 桁 (`sha256_prefix_of_file` のバイト列版)。
@@ -661,7 +733,8 @@ fn sha256_prefix_of_bytes(bytes: &[u8]) -> String {
 /// 3. `sets` (`key=value`) を順に上書きする。
 /// 4. 物理的な範囲を検査し、凍結値から**外れたキー**を `overrides` に残す。
 ///
-/// ⚠️ 未知のキー・型の不一致・範囲外は**すべて `Err`** (呼び出し側は exit 1)。
+/// ⚠️ 未知のキー・型の不一致・範囲外・`id` / `version` の形式違い ([`validate_prereg_identity`]) は
+/// **すべて `Err`** (呼び出し側は exit 1)。
 fn resolve_feature_config(
     feature_config_path: Option<&Path>,
     sets: &[String],
@@ -4959,6 +5032,138 @@ mod tests {
 
         assert!(resolve_feature_config(Some(&dir.join("missing.json")), &[]).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 凍結 JSON の `id` / `version` だけを差し替えた `--feature-config` 用ファイルを書く (issue 007)。
+    /// ★ 値は `serde_json` に渡すので、制御文字・改行・引用符も JSON として正しくエスケープされる。
+    fn write_feature_config_with_identity(
+        dir: &Path,
+        name: &str,
+        id: &str,
+        version: &str,
+    ) -> PathBuf {
+        let mut value: serde_json::Value =
+            serde_json::from_str(FROZEN_P1_EPISODE_JSON).expect("frozen JSON parses");
+        value["id"] = serde_json::json!(id);
+        value["version"] = serde_json::json!(version);
+        let path = dir.join(name);
+        std::fs::write(&path, serde_json::to_vec(&value).expect("serialize")).expect("write");
+        path
+    }
+
+    /// issue 007 AC1: 形式に合わない `id` の `--feature-config` は `Err` (fail-closed・P1-G)。
+    /// ★ 陽性対照 (境界ちょうどの 64 文字・先頭が数字) を先に置く —— `Err` を返すだけの実装を通さない。
+    #[test]
+    fn feature_config_rejects_malformed_id() {
+        let dir = envelope_tmp_dir("feature_config_bad_id");
+        let max_len = "a".repeat(64);
+        for ok in ["p1-episode", "0", "9x-", max_len.as_str(), "p1-episode-alt"] {
+            let path = write_feature_config_with_identity(&dir, "ok.json", ok, "1.0.0");
+            assert!(
+                resolve_feature_config(Some(&path), &[]).is_ok(),
+                "id `{ok}` は形式に合うので受理される"
+            );
+        }
+        let too_long = "a".repeat(65);
+        for bad in [
+            "",                // 空
+            "P1-episode",      // 大文字
+            "p1 episode",      // 空白
+            "p1/episode",      // `/`
+            "../x",            // 経路っぽい値
+            "p1\u{7}x",        // 制御文字
+            "p1-episode\n",    // 末尾の改行 (`$` が改行の手前で止まる実装を通さない)
+            "-p1",             // 先頭が `-`
+            "p1_episode",      // `_`
+            "p1-épisode",      // 非 ASCII
+            too_long.as_str(), // 65 文字
+        ] {
+            let path = write_feature_config_with_identity(&dir, "bad.json", bad, "1.0.0");
+            let err = resolve_feature_config(Some(&path), &[])
+                .expect_err(&format!("id {bad:?} は Err でなければならない"));
+            assert!(err.contains("`id`"), "エラーが id を名指しする: {err}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// issue 007 AC2: 形式に合わない `version` の `--feature-config` は `Err` (fail-closed・P1-G)。
+    #[test]
+    fn feature_config_rejects_malformed_version() {
+        let dir = envelope_tmp_dir("feature_config_bad_version");
+        for ok in ["1.0.0", "0.0.0", "2.3.4", "999999999.999999999.999999999"] {
+            let path = write_feature_config_with_identity(&dir, "ok.json", "p1-episode", ok);
+            assert!(
+                resolve_feature_config(Some(&path), &[]).is_ok(),
+                "version `{ok}` は形式に合うので受理される"
+            );
+        }
+        for bad in [
+            "",               // 空
+            "1.0",            // 2 部
+            "1.0.0.0",        // 4 部
+            "v1.0.0",         // 接頭辞
+            "1.0.0-rc",       // 接尾辞
+            "1..0",           // 空の部
+            "1.0.",           // 末尾が空
+            ".1.0",           // 先頭が空
+            "1.0.0\n",        // 末尾の改行
+            "1.0.0 ",         // 末尾の空白
+            "1.0.-1",         // 符号
+            "1.0.\u{FF10}",   // 全角数字 (`char::is_numeric` 系の実装を通さない)
+            "1234567890.0.0", // 10 桁 (各部は 1〜9 桁)
+        ] {
+            let path = write_feature_config_with_identity(&dir, "bad.json", "p1-episode", bad);
+            let err = resolve_feature_config(Some(&path), &[])
+                .expect_err(&format!("version {bad:?} は Err でなければならない"));
+            assert!(
+                err.contains("`version`"),
+                "エラーが version を名指しする: {err}"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// issue 007 AC3: 形式に合う**別の** `id` / `version` は受理され、封筒へそのまま写り、由来は `file`。
+    /// ★ 検証は形式だけで、凍結 JSON との一致は求めない (`decisions.md` 判断 16)。
+    #[test]
+    fn feature_config_accepts_wellformed_other_id() {
+        let dir = envelope_tmp_dir("feature_config_other_id");
+        let path = write_feature_config_with_identity(&dir, "alt.json", "p1-episode-alt", "2.3.4");
+        let resolved = resolve_feature_config(Some(&path), &[]).expect("well-formed other id");
+        assert_eq!(resolved.config_source, "file");
+        assert_eq!(resolved.prereg_id, "p1-episode-alt");
+        assert_eq!(resolved.prereg_version, "2.3.4");
+        let dto = serde_json::to_value(FeatureConfigDto::from_resolved(
+            &resolved, 1, None, None, None,
+        ))
+        .expect("serialize config");
+        assert_eq!(dto["prereg_id"], "p1-episode-alt");
+        assert_eq!(dto["prereg_version"], "2.3.4");
+        assert_eq!(dto["config_source"], "file");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// issue 007 AC4: 埋め込みの凍結 JSON の `id` / `version` は形式の検査を通る (既定の実行が変わらない)。
+    /// ⚠️ 通らなければ `resolve_feature_config` の全経路が「ビルドの不具合」で落ちる —— その先回りの検知。
+    #[test]
+    fn frozen_json_id_version_are_wellformed() {
+        // ★ 実装が読むのと同じ埋め込みを別経路 (`serde_json::Value`) で引き直す。
+        let value: serde_json::Value =
+            serde_json::from_str(FROZEN_P1_EPISODE_JSON).expect("frozen JSON parses");
+        let id = value["id"].as_str().expect("frozen id is a string");
+        let version = value["version"]
+            .as_str()
+            .expect("frozen version is a string");
+        assert!(is_wellformed_prereg_id(id), "凍結 JSON の id {id:?}");
+        assert!(
+            is_wellformed_prereg_version(version),
+            "凍結 JSON の version {version:?}"
+        );
+
+        let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
+        assert_eq!(resolved.config_source, "frozen");
+        assert_eq!(resolved.prereg_id, id);
+        assert_eq!(resolved.prereg_version, version);
     }
 
     /// `--set` / `--feature-config` は `--features` 専用: 単独では `Err`、併用なら受理される。

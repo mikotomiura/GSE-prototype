@@ -66,6 +66,11 @@ printf '%s' "$wide" | jq -e '[.[] | .dispersion.pause_max_ms | select(. != null)
   || fail "AC6: 穴をまたぐ巨大 pause (25000ms) が pause_max_ms に出ている、または pause_max_ms が全行 null"
 #   ⚠️★★★ 陽性対照: 穴の情報を外す (hole_gap_ms を穴より大きくして区間を 1 つにする) と巨大 pause が出る。
 #     ★ これが無いと「fixture が巨大 pause を持っていない」でも AC6 が緑になる (検査の検査 ルール 4)。
+#   ★ 2026-09-26 (P1-main-prep issue 008・判断 9): 「穴なし版」は **feat 行を残したまま区間を 1 つにする**形である
+#     (`--set hole_gap_ms=30000`・fixture `t1a_window.ndjson` は feat 行を 37 本持つ)。
+#     → ⚠️ **`feat` 行が 1 本も無い入力では `pause_*` が全行 null** になった変更 (`feat` 行 0 本 → 値を返さない) の影響を受けない。
+#     ★ 「`feat` 行を消した版」を穴なし版に使ってはならない (全行 null になり、`max == 25000` を検査できない)。
+#     ⚠️ `feat` 行 0 本 → 全行 null の検査は前タスクの 003-acceptance.sh (deep_silence / instrument_rich) が持つ。
 nohole="$(rows_of --set hole_gap_ms=30000)" \
   || fail "AC6: --set hole_gap_ms=30000 が非 0（★ issue 001 の --set が未実装か、キーが未登録）"
 printf '%s' "$nohole" | jq -e '[.[] | .dispersion.pause_max_ms | select(. != null)] | max == 25000' >/dev/null 2>&1 \

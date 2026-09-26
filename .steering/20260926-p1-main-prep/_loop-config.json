@@ -1,0 +1,30 @@
+{
+  "task": "p1-main-prep",
+  "mode": "C",
+  "verify": {
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml --workspace && (cd src-tauri && cargo run --bin gse-replay -- tests/fixtures/minimal.ndjson --snapshot tests/snapshots/minimal.json) && PYTHONUTF8=1 python -m unittest discover -s scripts/tests -t . -p \"test_p1_*.py\"",
+    "typecheck": "cargo check --manifest-path src-tauri/Cargo.toml --workspace --all-targets && python -m compileall -q scripts",
+    "lint": "cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings"
+  },
+  "ci_command": "cargo test --manifest-path src-tauri/Cargo.toml --workspace",
+  "scope_test_template": "cargo test --manifest-path src-tauri/Cargo.toml --workspace",
+  "resource_isolation": "per-worktree",
+  "base_branch": "feat/p1-main-prep",
+  "budget": {
+    "max_attempts": 6,
+    "no_progress_threshold": 4,
+    "token_ceiling": 40000000,
+    "parallel": 2
+  },
+  "events_path": "/c/GSE-prototype/.steering/20260926-p1-main-prep/_loop-events.jsonl",
+  "acceptance_template": "bash {issue_dir}/{issue_id}-acceptance.sh",
+  "headless": {
+    "max_turns": 60,
+    "max_budget_usd": 5.0,
+    "permission_mode": "acceptEdits",
+    "model": "sonnet",
+    "watchdog_model": "haiku",
+    "allowed_tools": "Read,Write,Edit,MultiEdit,Glob,Grep,Task,TodoWrite,Bash(cargo test:*),Bash(cargo check:*),Bash(cargo clippy:*),Bash(cargo run:*),Bash(cargo fmt:*),Bash(cargo build:*),Bash(python -m unittest:*),Bash(python -m compileall:*),Bash(python scripts/*),Bash(python3 -m unittest:*),Bash(bash scripts/*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),Bash(git add:*),Bash(git commit:*),Bash(bash .steering/**/*-acceptance.sh),Bash(echo:*),Bash(printf:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(jq:*),Bash(test:*),Bash(mkdir:*),Bash(touch:*),Bash(diff:*),Bash(basename:*),Bash(dirname:*),Bash(pwd:*),Bash(date:*),Bash(true:*),Bash(cd:*)",
+    "fingerprint_cmd": null
+  }
+}
