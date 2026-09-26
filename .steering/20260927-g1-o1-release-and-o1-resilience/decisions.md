@@ -49,3 +49,10 @@ Claude Code が `caffeinate` を握るため私からは `pmset sleepnow` を実
 
 ## 未着手・保留（研究者の承認待ち）
 G-1 の実装 / G-2 の実装 / G-5(2) の実装 / T3 の GAS 変更。
+
+## 実装した修正（2026-09-27・研究者の選択: ロックの stale 判定のみ）
+- 研究者確認: G-1 / G-2 / G-5 は **O1 だけの問題**（G1 は 70 分・1 回きり）。今回実装するのは、共有コードだが G1 の挙動を変えないロックの heartbeat のみ。G-1 / G-2 / G-5 は実装しない（保留・O1 配布前に再度決める）。
+- 変更: `reconcile.rs` に `ReconcileLock::refresh()`（mtime を now へ）を足し、梱包・送信の**1 本ごとの直前**に呼ぶ。stale 判定は「1 本ぶんを大きく超えて更新が無い」だけになり、未送信の本数に依存しない。`LOCK_STALE_AFTER` は据え置き（3600s・× 10 の余裕・既存テスト維持）。
+- テスト 2 本: 直接（対照つき: 更新なしは奪われる / refresh すれば奪われない）＋配線（3 本の O1 送信で毎回ロックが新しいことを uploader が確認）。**変異検査**: ループ内の refresh を消すと配線テストが赤・refresh を no-op にすると 2 本とも赤（緑から壊して赤を確認済み）。
+- 検証: `cargo test --workspace --features package` 813 passed / fmt / clippy `-D warnings` すべて緑（Mac）。⚠️ **Windows は CI 待ち**（`File::set_modified` は std だが実機未確認）。
+- ⚠️ 既知の残り: 奪われた側の `Drop` が後続のロックを消す挙動は直していない（heartbeat で奪取自体がほぼ起きなくなるため・YAGNI）。死んだ収束器のロックは 3600s 後に奪える。
