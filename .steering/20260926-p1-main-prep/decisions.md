@@ -164,3 +164,10 @@
   ★ `issue-slicing` 基準 5 の選別（研究の契約をコードで固定する issue は再検証する）の**趣旨**は (2) が担う。
 - **却下案**: `loop-run.sh` の `WD_TOOLS` とプロンプトをこの task の中で直す（共有基盤の変更・範囲外）。→ 起票候補 P1-L。
 - **見直し**: P1-L を直したら、次の task の issue-slicing で `recheck` を再び選別する。
+
+## 判断 24: 「`feat` 行 0 本の fixture」の数の訂正（実行セッション・メイン）
+
+- **決定**: 19 本中 **7 本**が正（`argumentative_ime_mixed` / `category_coverage` / `deep_silence` / `instrument_rich` / `minimal` / `minimal.anon` / `vibe_coding_ime_mixed`）。判断 9 の再確認・`issues/008.md` の Background・`_handoff/next-session-p1-main-prep-loop-run.md` §2 の「11 本」は**誤り**（分解時の数え方は記録に無く、再現できない）。
+- **数え方**: JSON として `type == "feat"` の行を数える（`jq -c 'select(.type=="feat")' <file> | wc -l`）。⚠️ 文字列 grep `"type":"feat"` だと 8 本になる —— `resumption_outcomes.ndjson` だけ JSON の区切りに空白が入っており（`"type": "feat"`）数え落とす。
+- **影響**: なし（判断 9 の決定そのものは数に依らない・onset 側へ揃える）。訂正したのは ADR-030 補訂 3 項目 1・issue 008 の Execution Result・issue 010 の記録・過去 acceptance（mhd 003）のコメント。
+- ⚠️ 判断 9 の本文と 008.md の Background は**当時の記録として書き換えない**（この判断が訂正の SSOT）。

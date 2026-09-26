@@ -90,7 +90,7 @@ printf '%s' "$out" | jq -e '[.[].dispersion.pause_max_ms | select(. != null)] | 
 #   ⚠️ **全行 null が「正しい」fixture が実在する**ので、それを既知として書いておく:
 #     - outcome_metrics.ndjson   : セッション IKI が {1000, 1000} のみ → 分散 0 → baseline なし
 #     - resumption_outcomes.ndjson: iki_cv が全行 null
-#     - ★ `feat` 行を持たない fixture（19 本中 11 本・2026-09-26 実測）: `pause_*` が全行 null（判断 9）
+#     - ★ `feat` 行を持たない fixture（19 本中 7 本・2026-09-26 に JSON として数えた値）: `pause_*` が全行 null（判断 9）
 #   ★ これらを「壊れている」と誤診して直しにいかないこと。
 #   ★ instrument_rich も上のとおり `feat` 行つきの一時コピーで見る（fixture 本体は全行 null）。
 out2="$(cargo run --quiet --bin gse-replay -- "$tmpd/instrument_rich.ndjson" --features 2>/dev/null | jq -e '.rows | arrays')" \
