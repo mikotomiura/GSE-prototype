@@ -434,6 +434,8 @@ pub fn build_feature_rows_with_pole_inputs(
     //   ここで 1 度だけ作って渡す (`dispersion` から `feat` 行を読み直さない。⚠️ `quality_column`
     //   は別の呼び出しで自分の観測区間を作り直しており、これはそちらへは渡っていない)。
     //   `iki_cv` / `surprise` には窓を掛けない。
+    //   ⚠️ `feat` 行が 1 本も無ければ `observed` は空で、`pause_*` は全行 `null` になる
+    //   (観測できないものを値で埋めない・issue 008・判断 9。onset と同じ向き)。
     let observed = stall_onset::observed_intervals(
         stall_onset_inputs.feat_ts,
         stall_onset_inputs.config.hole_gap_ms,
@@ -555,6 +557,63 @@ mod tests {
             &test_quality_inputs(),
         )
         .expect("within tick limit")
+    }
+
+    /// issue 008 AC2 (判断 9): **`feat` 行が 1 本も無い入力では `T1a` の `pause_*` が全行 `null`** —— 観測区間が
+    /// 確定しないので値で埋めない (onset と同じ向き)。⚠️ `iki_cv` / `surprise` は窓を掛けない列なので、
+    /// `feat` 行の有無に依らず**同じ値**になる。★ 陽性対照: 同じ打鍵列に `feat` 行を足すと `pause_*` が出る。
+    #[test]
+    fn t1a_is_null_without_feat_rows() {
+        // pause は 2 本 (0.1 s → 3.0 s の 2.9 s・3.1 s → 6.5 s の 3.4 s)。
+        let keys: Vec<KeyPress> = [0, 100, 3_000, 3_100, 6_500, 6_600]
+            .iter()
+            .map(|&ms| key_at(ms))
+            .collect();
+        let feat_ts: Vec<u64> = (0..=7).map(|i| i * 1_000).collect();
+        let run = |feat: &[u64]| {
+            let inputs = StallOnsetInputs {
+                feat_ts: feat,
+                task_kind_declarations: &[],
+                config: StallOnsetConfig::default(),
+            };
+            build_feature_rows(
+                &keys,
+                &[],
+                &[],
+                TEST_MAX_TICKS,
+                &inputs,
+                &test_quality_inputs(),
+            )
+            .expect("within tick limit")
+        };
+        let without = run(&[]);
+        let with = run(&feat_ts);
+
+        assert!(!without.is_empty());
+        for (i, r) in without.iter().enumerate() {
+            let d = &r.dispersion;
+            assert_eq!(
+                (d.pause_p50_ms, d.pause_p90_ms, d.pause_max_ms),
+                (None, None, None),
+                "tick {i}: feat 行 0 本なのに pause_* に値がある"
+            );
+        }
+        // ★ 陽性対照: feat 行があれば pause_* は出る (= 上の null は入力が pause を持たないからではない)。
+        assert!(
+            with.iter().any(|r| r.dispersion.pause_max_ms.is_some()),
+            "feat 行を足しても pause_max_ms が全行 null (入力が pause を試せていない)"
+        );
+        // ⚠️ 窓を掛けない列は feat 行の有無で動かない (行数は feat 行が右端を延ばしうるので共通部分だけ比べる)。
+        for (i, (a, b)) in without.iter().zip(&with).enumerate() {
+            assert_eq!(
+                a.dispersion.iki_cv, b.dispersion.iki_cv,
+                "tick {i}: iki_cv が feat 行の有無で動いた"
+            );
+            assert_eq!(
+                a.dispersion.surprise, b.dispersion.surprise,
+                "tick {i}: surprise が feat 行の有無で動いた"
+            );
+        }
     }
 
     /// issue 006: 極 B は `pointer_active_ts` を渡さなければ `Err` (★ baseline の値を極 B の名前で返さない)。

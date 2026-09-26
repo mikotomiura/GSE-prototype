@@ -22,6 +22,7 @@
 //! `pause_p50_ms` / `pause_p90_ms` / `pause_max_ms` は tick ではなく **`t1a_window_ms` の因果窓**で
 //! 集約する ([`pause_ms_by_window`])。⚠️ **`iki_cv` / `surprise` には窓を掛けない** (前者は tick
 //! ローカル・後者はセッション相対のまま)。★ 窓は**観測区間 (`feat` 行の穴) をまたがない**。
+//! ⚠️ **`feat` 行が 1 本も無い入力では `pause_*` は全行 `null`** である (観測区間が確定しないので値で埋めない)。
 
 /// 1 tick ぶんの `T1a` (分布・個人相対) 値。
 ///
@@ -59,6 +60,7 @@
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Dispersion {
     /// 窓に再開する pause 長 (ms) の中央値相当 (nearest-rank 法)。窓に pause が 0 本なら `null`。
+    /// ⚠️ `feat` 行が 1 本も無い入力では**全行 `null`** (観測区間が確定しない・[`pause_ms_by_window`])。
     pub pause_p50_ms: Option<f64>,
     /// 同じく 90 パーセンタイル相当。
     pub pause_p90_ms: Option<f64>,
@@ -238,8 +240,14 @@ pub fn pause_durations(press_ts: &[u64]) -> Vec<PauseDuration> {
 /// その長さが `pause_max_ms` に出る。★ tick が**どの区間とも交わらない**
 /// (開始・終端ともに隣り合う区間の間の穴に収まる) tick は**空の窓**になる (0 で埋めず `null` に落ちる)。
 /// ⚠️ 穴として扱うのは**隣り合う区間の間だけ**である —— 最初の区間より前・最後の区間より後は
-/// 「区間が無い」だけで穴ではない (この 2 つは窓を切らない)。★ `observed` が空
-/// (`feat` 行が 1 本も無い) なら穴の情報が無いので、**窓を切らない**。
+/// 「区間が無い」だけで穴ではない (この 2 つは窓を切らない)。
+/// ⚠️★★★ **`observed` が空 (`feat` 行が 1 本も無い) なら、全 tick の窓を空にする** (→ `null`・
+/// 2026-09-26 に**「窓を切らずに値を返す」から改めた**)。★ 穴を検出する手段が無い入力では、
+/// pause が観測区間の内側かどうかを確かめられない。観測できないものを値で埋めない —— 補訂 1 項目 2 の
+/// onset (`feat` 行が無ければ**立てない側**に倒す) と同じ向きに揃えた
+/// (研究者裁定・`.steering/20260926-p1-main-prep/decisions.md` 判断 9。ADR-030 補訂 3 として記録する・issue 010)。
+/// ⚠️ 帰結: **`feat` 行を持たない入力 (古いログ・一部の合成 fixture) は `pause_*` を全行失う**。
+/// ★ `iki_cv` / `surprise` は窓を掛けない列なので、この規則の影響を受けない。
 /// ⚠️ 原因ラベルは作らない (ADR-030 却下リスト 9): 使うのは `feat` 行の**存在**だけ。
 ///
 /// 戻り値は tick ごとの pause 長 (ms・**順不同**) で、`compute_dispersion` へそのまま渡す。
@@ -252,6 +260,12 @@ pub fn pause_ms_by_window(
     window_ms: u64,
     observed: &[(u64, u64)],
 ) -> Vec<Vec<u64>> {
+    // ★ `observed` が空 (`feat` 行が 1 本も無い) なら、どの pause も観測区間の内側だと確かめられない。
+    //   観測できないものは値で埋めず、全 tick の窓を空にする (→ `compute_dispersion` で `null`)。
+    if observed.is_empty() {
+        return vec![Vec::new(); tick_count];
+    }
+
     let mut sorted: Vec<PauseDuration> = pauses.to_vec();
     sorted.sort_unstable_by_key(|p| p.resuming_ts);
 
@@ -554,8 +568,10 @@ mod tests {
         ];
         let ticks = 15;
         let window = 3 * ENGINE_TICK_MS;
+        // ★ 全体を覆う 1 本の観測区間 (穴なし)。⚠️ `&[]` (= `feat` 行が 1 本も無い) だと全 tick が空になる。
+        let whole = [(0, t(ticks as u64))];
         let run =
-            |ps: &[PauseDuration]| pause_ms_by_window(ps, ticks, 0, ENGINE_TICK_MS, window, &[]);
+            |ps: &[PauseDuration]| pause_ms_by_window(ps, ticks, 0, ENGINE_TICK_MS, window, &whole);
         let full = run(&all);
 
         // tick 2 = [t(2), t(3)): 再開 t(3) は tick 3 に属する。★ **未来なのでまだ見えない**。
@@ -590,9 +606,44 @@ mod tests {
     fn zero_window_is_empty_and_does_not_panic() {
         use crate::analysis::loop_step::ENGINE_TICK_MS;
         let all = vec![pd(3 * ENGINE_TICK_MS, 2500)];
-        let out = pause_ms_by_window(&all, 6, 0, ENGINE_TICK_MS, 0, &[]);
+        // ⚠️ 観測区間を渡す (`&[]` だと窓長に関係なく全 tick が空で、この検査が空振りする)。
+        let whole = [(0, 6 * ENGINE_TICK_MS)];
+        let out = pause_ms_by_window(&all, 6, 0, ENGINE_TICK_MS, 0, &whole);
         assert_eq!(out.len(), 6);
         assert!(out.iter().all(|v| v.is_empty()), "{out:?}");
+        // ★ 陽性対照: 窓長だけを 1 tick に戻すと同じ入力で pause が見える (= 空の原因は窓長 0)。
+        let one_tick = pause_ms_by_window(&all, 6, 0, ENGINE_TICK_MS, ENGINE_TICK_MS, &whole);
+        assert_eq!(one_tick[3], vec![2500], "{one_tick:?}");
+    }
+
+    /// AC1 (issue 008・判断 9): **`feat` 行が 1 本も無い (`observed` が空) 入力では、pause が在っても
+    /// 全 tick の窓が空になる** —— 観測できないものを値で埋めない (onset と同じ向き)。
+    /// ★ 陽性対照: 同じ pause でも観測区間が 1 本あれば窓に入る (= 空の原因は `observed` が空なこと)。
+    #[test]
+    fn no_observed_interval_yields_empty_windows() {
+        use crate::analysis::loop_step::ENGINE_TICK_MS;
+        let t = |n: u64| n * ENGINE_TICK_MS;
+        let all = [pd(t(3), 2500), pd(t(6), 2600), pd(t(9), 2700)];
+        let ticks = 12;
+        // 窓は全体を覆う広さ (窓長が原因で空になっていないことを保つ)。
+        let window = t(ticks as u64);
+
+        let none = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &[]);
+        assert_eq!(none.len(), ticks, "tick 数は保たれる (1 行 1 tick)");
+        assert!(none.iter().all(|w| w.is_empty()), "{none:?}");
+
+        let whole = [(0, t(ticks as u64))];
+        let observed = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &whole);
+        assert_eq!(observed[11], vec![2500, 2600, 2700], "{observed:?}");
+
+        // ★ 空の窓は `compute_dispersion` で `null` になる (0 で埋めない)。
+        let d = compute_dispersion(&none[11], &[], None);
+        assert_eq!(
+            (d.pause_p50_ms, d.pause_p90_ms, d.pause_max_ms),
+            (None, None, None)
+        );
+        // 境界: tick が 0 本でも panic しない。
+        assert!(pause_ms_by_window(&all, 0, 0, ENGINE_TICK_MS, window, &[]).is_empty());
     }
 
     /// AC6 (issue 003・起票 6): 窓は**観測区間 (`feat` 行の穴) をまたがない**。
@@ -611,9 +662,11 @@ mod tests {
         // ★ 全体を覆う広い窓 (窓長だけでは 3 本とも入る)。
         let window = t(60);
         let with_holes = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &observed);
-        let no_info = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &[]);
+        // ★ 穴の無い版: 同じ範囲を 1 本の観測区間で覆う。⚠️ `&[]` (`feat` 行 0 本) は「穴なし」ではなく
+        //   「観測区間が確定しない」なので全 tick が空になる (`no_observed_interval_yields_empty_windows`)。
+        let no_info = pause_ms_by_window(&all, ticks, 0, ENGINE_TICK_MS, window, &[(0, t(60))]);
 
-        // ★ 陽性対照: 穴の情報が無ければ 3 本とも同じ窓に入り、巨大 pause が最大値になる。
+        // ★ 陽性対照: 穴が無ければ 3 本とも同じ窓に入り、巨大 pause が最大値になる。
         assert_eq!(no_info[59], vec![3000, t(25), 3300]);
         // 穴の後の窓には**穴より後で閉じた pause だけ**が入る (前の区間の pause も巨大 pause も入らない)。
         assert_eq!(with_holes[59], vec![3300]);
@@ -628,11 +681,7 @@ mod tests {
         // ★ 終端が穴の中にある tick は空の窓 (0 で埋めず null に落ちる)。
         assert!(with_holes[29].is_empty(), "{:?}", with_holes[29]);
         assert!(with_holes[41].is_empty(), "{:?}", with_holes[41]);
-        assert_eq!(
-            no_info[29],
-            vec![3000],
-            "陽性対照: 穴の情報が無ければ見える"
-        );
+        assert_eq!(no_info[29], vec![3000], "陽性対照: 穴が無ければ見える");
     }
 
     /// MEDIUM-1 (issue 003 レビュー・2026-09-25): grid の起点 (`grid_origin_ms`) が `feat` 行
@@ -702,9 +751,12 @@ mod tests {
                 vk: 0x41,
             })
             .collect();
+        // ★ 1Hz の `feat` 行で全体を覆う (穴なし)。⚠️ `feat` 行が 0 本だと `pause_*` は全行 `null` になり、
+        //   下の陽性対照 (窓を広げると pause 列が動く) が空振りする。
+        let feat_ts: Vec<u64> = (0..=14).map(|i| i * 1000).collect();
         let run = |window_ms: u64| {
             let inputs = StallOnsetInputs {
-                feat_ts: &[],
+                feat_ts: &feat_ts,
                 task_kind_declarations: &[],
                 config: StallOnsetConfig {
                     t1a_window_ms: window_ms,
