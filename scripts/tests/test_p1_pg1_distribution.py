@@ -266,20 +266,24 @@ class Pg1DistributionTest(LayoutCase):
             row.clear()
             row["stall_onset"] = {"is_onset": False}
 
-        def rewrite_values(row):
-            # AC の変異: 値を書き換える (⚠️ config / provenance のメタデータには触れない・数値は有限)
-            row["t_ms"] += 987_654_321
-            row["restart"] = {"restop_ms": 1, "restop_kind": "none"}
-            row["dispersion"] = [1, 2, 3]
-            row["activity"] = "garbage"
-            row["boundary"] = None
-            row["revision"] = 12345.5
-            row["quality"] = {"missing_reasons": ["capability_undeclared"], "observability_mask": {"feat": False}}
-            so = row["stall_onset"]
-            so["s_ms"], so["t0_ms"] = 1, 2
-            so["theta_person_ms"], so["theta_sample_n"] = 999_999, 1
-            so["task_kind"], so["phase"] = "coding", "x"
-            so["ime_overlap"] = not bool(so["ime_overlap"])
+        def rewrite_values(magnitude):
+            # AC の変異: 値を書き換える (⚠️ config / provenance のメタデータには触れない・数値は有限)。
+            # ★ 極小 (0) と極大 (10^12) の 2 通りで回す: 「閾値を超えたら数える」型の依存は片方でしか崩れない
+            def rewrite(row):
+                row["t_ms"] = magnitude
+                row["restart"] = {"restop_ms": magnitude, "restop_kind": "none"}
+                row["dispersion"] = [magnitude, 2, 3]
+                row["activity"] = "garbage"
+                row["boundary"] = None
+                row["revision"] = magnitude + 0.5
+                row["quality"] = {"missing_reasons": ["capability_undeclared"], "observability_mask": {"feat": False}}
+                so = row["stall_onset"]
+                so["s_ms"], so["t0_ms"] = magnitude, magnitude
+                so["theta_person_ms"], so["theta_sample_n"] = magnitude, magnitude
+                so["task_kind"], so["phase"] = "coding", "x"
+                so["ime_overlap"] = not bool(so["ime_overlap"])
+
+            return rewrite
 
         def mutate_all(source, fn):
             dest = self.new_dir() / "root"
@@ -296,7 +300,13 @@ class Pg1DistributionTest(LayoutCase):
                 path.write_text(json.dumps(envelope), encoding="utf-8")
             return dest
 
-        for name, fn in (("strip_named", strip_named), ("strip_all", strip_all), ("rewrite_values", rewrite_values)):
+        variants = (
+            ("strip_named", strip_named),
+            ("strip_all", strip_all),
+            ("rewrite_low", rewrite_values(0)),
+            ("rewrite_high", rewrite_values(10**12)),
+        )
+        for name, fn in variants:
             with self.subTest(mutation=name):
                 mutated = mutate_all(root, fn)
                 # ★ 変異が空振りでないこと: 元と違うファイルになっている
