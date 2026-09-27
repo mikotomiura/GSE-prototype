@@ -305,6 +305,45 @@ C は「script が外から数える」「hook が内から止める」の**二�
   ⚠️ 途中に `*` を置く形 (`Bash(bash .steering/*/issues/*-acceptance.sh:*)` / `… *)`) と前方一致 `Bash(bash .steering/:*)` は**効かなかった** (同実測)。
 - ⚠️ **P1-H (verify が他の issue の門を回さない) は未是正**。メインが merge 前に全 acceptance を正しい終了コードで回す運用で補う。
 
+### ⚠ 2026-09-27 の是正 (`.steering/20260927-loop-run-progress-flag-fix/`)
+
+- **無関係な issue が失敗しても、依存を満たした issue は同じ run で必ず 1 回試される。**
+  ⚠️ 旧実装の DAG ループは「そのバッチで `issue_done` が 1 件でも出たか」でも止まっていた。
+  このため `parallel=1` のとき、無関係な issue 1 本が失敗しただけでループを抜けていた。
+  依存の無い issue も一度も試されないまま「依存 issue が未完のため未実行」の `blocked` にされた
+  (★ 実測: `.steering/20260927-precondition8-t3-and-consent/blockers.md` §1)。
+  → 継続条件は「`deps_met` が真の issue がまだ残っているか」だけにした。
+  ★ バッチの issue は成否に関わらず残りから外れるので、**同じ issue を同じ run で再スケジュールしない**
+  (issue の中の attempt 1→2 は従来どおり)。1 周ごとに残りが必ず減るので**必ず停止する**。
+  失敗した issue に依存する issue は従来どおり `blocked` になる。
+  ★ `scripts/loop-run-guard-test.sh` の P1 / P2 / M-prog が固定している。
+  ⚠️ この保証は **1 プロセスの中**だけ。`--issues` なしで同じ task を再実行すると、`done` は既定の選択から外れないので
+  **`issue_done` 済みの issue も再び spawn される** (既存の挙動)。→ 2 波目以降は `--issues` で未完の id だけを渡す。
+- **run 全体を止めるのは 2 つだけ: 境界侵害と token_ceiling 超過。** 通常の失敗 (verify 赤・`max_attempts`・`no_progress_stop`) では止めない。
+  - **境界侵害** = `ensure_branch` (worktree が `loop/<id>-*` から外れた・履歴が差し替わった) または
+    `ensure_deny` (必須 deny を保証できない) の `blocked`。⚠️ 旧実装では parallel=1 の「どれか 1 本の失敗で抜ける」が
+    **偶然** fail-closed として効いていた。逸脱した worker が base に何か残していると、次の spawn がそれを含む base から切りうる。
+    → バッチの後に run を中止し、残りを「境界侵害 (issue <id>) のため run を中止し未実行」の `blocked` にする。
+    `_loop-run-report.md` に「run を中止した理由」節を出し、**終了コード 3** で終わる (P3 / P3b / M-bnd)。
+    ★ 最終 attempt の verify / watchdog の最中に HEAD が動いた場合も拾う。`run_issue` が失敗で抜けるときに、
+    もう一度ブランチを見るため (P3c)。
+    ⚠️ `parallel > 1` では検査がバッチの後なので、**同じバッチのほかの issue は完走して `issue_done` になりうる**。
+  - **token_ceiling** はバッチを組む**前**にも見る。超過後に worktree / branch を作らない (P4)。
+    予定された予算の停止なので、終了コードは 0 のまま (report と events には残る)。
+- issue id は**固定文字列**で比べる (`grep -F`)。`issue_ids` の検証は `.` を許すので、`1.2` が `1x2` を巻き添えにしていた (P5)。
+- ⚠️★★★ **依存の DAG は「実行の順序」だけを決める。依存先の成果物は base に入らない。**
+  `deps_met()` は events の `issue_done` だけを見る。各 issue は **base から切った別の worktree** で動くので、
+  依存先が `issue_done` になっても、その成果物は後続の worktree に**含まれない**。
+  → **依存先の成果物の実体を要する issue** (ファイルは交差しないが、依存先が作ったものを参照する issue) は、
+  **依存先の `loop/<id>-*` を base へ merge してから** spawn する。
+  ★ 手順: 依存先までを 1 波目として回す → 人が base へ merge する → 後続を `--issues` で 2 波目として別プロセスで回す
+  (★ 2 波目の `deps_met` は events からの seed で満たされる)。
+  ⚠️ この中間の merge も**通常の merge ゲートと同じ**である。watchdog の再検証・clean な checkout での全 acceptance
+  (上の P1-H の補い)・レビューを通してから行う。機械的な作業として飛ばさない。
+  ⚠️ push していないローカルの merge は、2 波目の spawn が `start-choice = local-ahead` として拾う (WARN が出る・P1-J)。
+  ⚠️ `loop-run.sh` は自動で merge しない (★ 無人で base を書き換えないため・人の merge ゲートを保つ)。
+  → issue-slicing では、この種の依存を `## Dependencies` に書くだけでなく、**波の切れ目として issue-plan に明記する**。
+
 <!-- loop:codex:begin -->
 ## Codex ゲート (任意・タスク境界のみ)
 
