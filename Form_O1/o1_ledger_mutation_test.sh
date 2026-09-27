@@ -24,6 +24,27 @@ PASS=0
 FAIL=0
 SEEN_HASHES=""
 
+# ⚠️★★★ **`node "$TEST" "$f"` にはタイムアウトを掛ける**（2026-09-27 3 回目レビュー指摘の教訓）。
+#   ★ 「無限ループを再導入する変異」を検知したいテスト自体が、変異を当てた瞬間に**本当に無限ループする**
+#   （= 本ハーネスが固まる）。★ `timeout`/`gtimeout` は macOS 標準に無い（memory
+#   `macos-default-tools-break-gates`）ので、bash 標準機能だけで書く。
+run_with_timeout_ () { # $1 = 秒 / $2.. = コマンド
+  local secs="$1"; shift
+  "$@" & local pid=$!
+  local i=0
+  local limit=$((secs * 20))
+  while kill -0 "$pid" 2> /dev/null; do
+    sleep 0.05
+    i=$((i + 1))
+    if [ "$i" -ge "$limit" ]; then
+      kill -9 "$pid" 2> /dev/null
+      wait "$pid" 2> /dev/null
+      return 124
+    fi
+  done
+  wait "$pid"
+}
+
 # ★ 先に「壊していない本物」で緑になることを確かめる（⚠️ 最初から赤なら、以下の赤は全部無意味）。
 if ! node "$TEST" "$SRC" > /dev/null 2>&1; then
   echo "❌ 壊していない本物のソースで、すでにテストが赤い。変異テストの前提が崩れている。"
@@ -60,7 +81,16 @@ mutate () {
     FAIL=$((FAIL+1))
     return
   fi
-  if node "$TEST" "$f" > /dev/null 2>&1; then
+  local rc
+  run_with_timeout_ 10 node "$TEST" "$f" > /dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq 124 ]; then
+    echo "  ⚠️★★★ 変異がハングした（10 秒でも終わらない・無限ループの疑い）: $name"
+    echo "     ★ ハングも「壊れた」の一種として扱う（検知できているので緑）。"
+    PASS=$((PASS+1))
+    return
+  fi
+  if [ "$rc" -eq 0 ]; then
     echo "  ❌ 壊しても緑のまま（★ 検査の穴）: $name"
     FAIL=$((FAIL+1))
   else
@@ -223,7 +253,7 @@ mutate "同期: Drive ファイル ID にも無害化を掛ける（冪等性が
 mutate "途絶タブ: 日番号の空セルを弾かない（day 0 に化ける）" \
   's/!\/\^\\d\+\$\/\.test\(dayRaw\)/false/'
 mutate "登録ログ: 見出しの中身を見ない（列を挿入されても気づけない）" \
-  's/if \(reg\.getLastRow\(\) >= 2\) \{\n    var regHead/if (false) {\n    var regHead/'
+  's/if \(String\(regHead\[hc\]\)\.trim\(\) !== O1_LEDGER_REG_HEAD\[hc\]\) \{/if (false) {/'
 mutate "登録ログ: 列数の下限を見ない" \
   's/if \(reg\.getMaxColumns\(\) < O1_LEDGER_REG_HEAD\.length\) \{/if (false) {/'
 mutate "通知: 打ち切りが続いても再通知しない（沈黙が続く）" \
@@ -234,6 +264,14 @@ mutate "途絶タブ: 書き込み前の無害化を外す" \
   's/return o1LedgerSafeCell_\(String\(c\)\);/return String(c);/'
 mutate "失敗通知: 宛先未設定でもログを出さない" \
   's/console\.log\("⚠️ " \+ O1_LEDGER_PROP_EMAIL \+ " が未設定なので実行失敗の通知を送っていません。"\);//'
+
+mutate "登録ログ: 空タブ（見出し無し）でも見出し検査をスキップする（3 回目レビューで見つかった後退）" \
+  's/if \(reg\.getLastRow\(\) < 2\) \{/if (false) {/'
+mutate "登録ログ: registered を素のオブジェクトに戻す（辞書キー安全化の後退）" \
+  's/var registered = Object\.create\(null\);/var registered = {};/'
+
+mutate "途絶タブ: 桁あふれの日番号（Infinity）を弾かない（無限ループの回帰）" \
+  's/!Number\.isSafeInteger\(day\)/false/'
 
 echo
 echo "壊すと赤: $PASS / 穴: $FAIL"

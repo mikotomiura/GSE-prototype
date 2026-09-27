@@ -185,7 +185,10 @@ function o1LedgerParseName_(name) {
  * ⚠️ 読むのは P-ID と日時だけ。氏名・メールの列は**そもそも無い**。
  */
 function o1LedgerRegisteredFromLog_(values) {
-  var registered = {};
+  // ★ pid はファイル名由来ではなく登録ログの P-ID 欄（`/^P\d+$/` で絞っている）だが、
+  //   `o1LedgerJudge_` からは `o1LedgerParseName_` 由来（英数字のみ）の pid でも引かれるため、
+  //   `Object.create(null)` で `constructor` 等の辞書キー汚染を閉じる（3 回目レビュー指摘 LOW）。
+  var registered = Object.create(null);
   var skipped = 0;
   for (var i = 0; i < (values || []).length; i++) {
     var row = values[i];
@@ -646,11 +649,18 @@ function o1LedgerDashboard_(cfg, ss, scan) {
       var ms = Number(v[O1_LEDGER_COL.ms]);
       var bytes = Number(v[O1_LEDGER_COL.bytes]);
       var pid = String(v[O1_LEDGER_COL.pid] || "");
-      if (!pid || !isFinite(ms) || !/^\d+$/.test(dayRaw) || !isFinite(bytes)) {
+      var day = Number(dayRaw);
+      // ⚠️★★★ **`Number.isSafeInteger` を戻す**（2026-09-27 3 回目レビュー指摘 HIGH・Codex 発見）。
+      //   ★ 判断 17（`Number("")===0` の穴を塞ぐ）で `!isFinite(day)` を落としたため、
+      //   ⚠️ 桁あふれの数字文字列（例: 400 桁）が `Number()` で `Infinity` になっても
+      //   `/^\d+$/` は**素通りしてしまい**、`maxDay = Infinity` が判定ループ
+      //   （`for (var d = maxDay; d >= 1; d--)`）を**実質無限**にしていた（GAS のタイムアウトまで
+      //   ハングし、その回の途絶判定・通知が丸ごと欠落する）。★ `/^\d+$/` の形検査に加え、
+      //   `Number.isSafeInteger` で有限・整数であることも見る（2 つを併置する・判断 16 と同じ流儀）。
+      if (!pid || !isFinite(ms) || !/^\d+$/.test(dayRaw) || !Number.isSafeInteger(day) || !isFinite(bytes)) {
         badRows++;
         return;
       }
-      var day = Number(dayRaw);
       files.push({ pid: pid, day: day, receivedMs: ms, bytes: bytes, dup: String(v[O1_LEDGER_COL.dup]) === "dup" });
     });
   }
@@ -672,15 +682,25 @@ function o1LedgerDashboard_(cfg, ss, scan) {
         reg.getMaxColumns() + " 列）。"
     );
   }
-  if (reg.getLastRow() >= 2) {
-    var regHead = reg.getRange(2, 1, 1, O1_LEDGER_REG_HEAD.length).getValues()[0];
-    for (var hc = 0; hc < O1_LEDGER_REG_HEAD.length; hc++) {
-      if (String(regHead[hc]).trim() !== O1_LEDGER_REG_HEAD[hc]) {
-        throw new Error(
-          "❌ 「" + O1_LEDGER_REG_TAB + "」の見出しの " + (hc + 1) + " 列目が「" + String(regHead[hc]).slice(0, 20) +
-            "」です（★「" + O1_LEDGER_REG_HEAD[hc] + "」のはず・ビルダーの O1_MGMT_HEAD と食い違っています）。"
-        );
-      }
+  // ⚠️★★★ **見出し行が無ければ止める**（2026-09-27 3 回目レビュー指摘 MEDIUM・自己後退の修正）。
+  //   ★ 直前まで「`reg.getLastRow() >= 2` のときだけ見出しを見る」だったため、
+  //   **タブはあるが空**（研究者が手で作った・`clearContents` した等）だと見出し検査ごと**スキップ**され、
+  //   ⚠️ `regValues` も空のまま完走し、**「未受領」の判定が全員ぶん無音で失われる**（実測で再現・確定）。
+  //   ★ ビルダーが作った正常なタブは必ず `lastRow >= 2`（バナー行＋見出し行）なので、
+  //   `< 2` を「見出しが無い」として弾く（黙って未受領の判定を落とさない、という本関数冒頭の約束と同じ）。
+  if (reg.getLastRow() < 2) {
+    throw new Error(
+      "❌ 「" + O1_LEDGER_REG_TAB + "」タブに見出し行がありません（★ 行数 " + reg.getLastRow() +
+        "）。★ buildO1MgmtSheet() を実行済みか確かめてください。"
+    );
+  }
+  var regHead = reg.getRange(2, 1, 1, O1_LEDGER_REG_HEAD.length).getValues()[0];
+  for (var hc = 0; hc < O1_LEDGER_REG_HEAD.length; hc++) {
+    if (String(regHead[hc]).trim() !== O1_LEDGER_REG_HEAD[hc]) {
+      throw new Error(
+        "❌ 「" + O1_LEDGER_REG_TAB + "」の見出しの " + (hc + 1) + " 列目が「" + String(regHead[hc]).slice(0, 20) +
+          "」です（★「" + O1_LEDGER_REG_HEAD[hc] + "」のはず・ビルダーの O1_MGMT_HEAD と食い違っています）。"
+      );
     }
   }
   var regLast = reg.getLastRow();

@@ -1087,6 +1087,61 @@ const sharedProps = (extra) =>
   check("§9 日番号セルが非数値でも不読行として扱う", /読めない行 1/.test(bad.banner), true);
 }
 
+// 9-7 登録ログのタブはあるが空（見出しが無い）なら、未受領の判定を無音で落とさず止める（3 回目レビュー指摘・自己後退の修正）
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]); // タブは作られるが append は一切しない＝空
+  const env = makeEnv({ spreadsheet: ss, files: [], props: { O1_LEDGER_NOTIFY_EMAIL: null } });
+  let msg = "";
+  try {
+    call(env, "o1LedgerRun");
+  } catch (e) {
+    msg = String(e.message);
+  }
+  check("§9★ 登録ログのタブが空（見出し行が無い）なら理由を言って止まる（未受領判定を無音で失わない）", /見出し行がありません/.test(msg), true);
+}
+
+// 9-8 registered のキーが「constructor」でも例外にならず・値が正しく引ける（辞書キー安全化の同型 2 件目）
+{
+  const reg = E.ctx.o1LedgerRegisteredFromLog_([["2026-09-01 09:00:00", "register", "constructor", "ok", "", ""]]);
+  check("§9 registered のキーが「constructor」でも取り出せる（形は P\\d+ 限定なのでここには来ないが、辞書として安全）", plain(reg.registered), {});
+}
+
+// 9-9 実運用の経路（登録ログ→o1LedgerRun）で、P-ID「constructor」の受領があっても
+//   「登録からの日数」が NaN にならない（registered の辞書キー汚染が実際に効く唯一の経路）
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []); // ★ 登録ログは空（"constructor" は P\d+ の形でないので、正規の経路では絶対に登録されない）
+  const env = makeEnv({ spreadsheet: ss, files: [makeFile("ctor1", goodName("constructor", 1, stamp(20)), 100, ago(1))] });
+  call(env, "o1LedgerRun");
+  const row = ss.sheets[DASH].rows.find((r) => r[0] === "constructor");
+  check("§9★ P-ID が「constructor」でも「登録からの日数」が NaN にならない（registered の辞書キー安全化）", row[8], "");
+}
+
+// 9-10 日番号セルが桁あふれ（Number() が Infinity）でも、判定ループがハングしない
+//   （2026-09-27 3 回目レビュー指摘 HIGH・Codex 発見。判断17 が isFinite チェックを落とした副作用）
+{
+  const bigDigits = "1".repeat(400); // Number(...) === Infinity
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const led = ss.insertSheet(LEDGER);
+  led.appendRow(["banner"]);
+  led.appendRow(LEDGER_HEAD());
+  led.appendRow(["h1", "P120_o1dayXXX_gse_o1_20260920_101112.age", "P120", bigDigits, "", "2026-09-20 10:11:12", ago(1), 5, "", "O1"]);
+  const env = makeEnv({ spreadsheet: ss, files: [] });
+  const t0 = Date.now();
+  let threw = false;
+  let msg = "";
+  try {
+    call(env, "o1LedgerRun");
+  } catch (e) {
+    threw = true;
+    msg = String(e.message);
+  }
+  const elapsedMs = Date.now() - t0;
+  check("§9★ 桁あふれの日番号（Number が Infinity）でもハングしない（1 秒未満で返る）", elapsedMs < 1000, true);
+  check("§9★ 桁あふれの日番号は不読行として扱う（欠番ループへ Infinity を渡さない）", /読めない行 1/.test(ss.sheets[DASH].rows[0][0]), true);
+}
+
 // ---------------------------------------------------------------------------
 // §7 ソースの性質（★ 歯止め）
 // ---------------------------------------------------------------------------

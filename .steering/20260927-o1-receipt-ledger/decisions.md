@@ -140,3 +140,25 @@
 
 ### 最終状態
 - テスト 184 ケース／変異 71 件（すべて 1 箇所ずつ・すべて赤・穴 0）。ゲート 22 通過（未達 2 件は本タスク範囲外）。selftest 63/0。
+
+## 2026-09-27 レビュー（3 回目・完了確認）— code-reviewer / security-checker / cross-reviewer(Codex) を最終差分に対して実行
+
+> security-checker: 新規/未解消の懸念なし・見送りは妥当・進めてよい、と結論。
+> code-reviewer と cross-reviewer(Codex) は**独立に**、2 回目の反映（判断 14〜22）自体が持ち込んだ後退を発見した。3 系統中 2 系統が別の観点から見つけた点で、レビューの反復が効いた例。
+
+### 判断 23: 登録ログの見出し検査が「空タブ」を素通りしていた（MEDIUM・code-reviewer 発見・自己後退）
+- **事実**: 判断 16 で `getMaxColumns()` ＋ 見出し内容の検査を足したが、内容検査を `if (reg.getLastRow() >= 2)` の条件つきにしたため、**タブはあるが空**（研究者が手で作った・`clearContents` 等）だと検査ごとスキップされ、`registered={}` のまま完走 → **「未受領」の判定が全員ぶん無音で失われる**（実測で再現・確定）。台帳の存在理由（G-1/G-2 の代替統制）そのものを失う型なので必須の修正とした。
+- **決定**: `getLastRow() < 2` を「見出しが無い」として明示的に throw する（条件つきをやめる）。ビルダーが作った正常なタブは必ず `lastRow >= 2`。
+
+### 判断 24: 桁あふれの日番号セルが `Infinity` になり判定ループが実質無限になっていた（HIGH・cross-review(Codex) 発見・自己後退）
+- **事実**: 判断 17（`Number("")===0` の穴を塞ぐ）で `!isFinite(day)` の検査を落とし、形検査 `/^\d+$/` だけにした。★ この形検査は**桁数を制限しない**ので、400 桁の数字文字列は正規表現を通り `Number()` で `Infinity` になる。`o1LedgerJudge_` の `for (var d = maxDay; d >= 1; d--)`（`maxDay=Infinity`）が**文字通り終わらない**（`Infinity - 1 === Infinity`）。既存の「未実測の長時間ループ」見送り（cross-review #4）とは**質が違う**（有限の遅さではなく真の無限ループ）ので区別して直した。
+- **決定**: `day = Number(dayRaw)` の直後に `!Number.isSafeInteger(day)` を戻す（形検査と数値検査を併置。判断 16 と同じ「2 つの規則を併置する」流儀）。
+- **副産物**: この修正の回帰テスト（400 桁の日番号）を実行すると、直っていなければ**テスト自体がハングする**。★ `Form_O1/o1_ledger_mutation_test.sh` の `node "$TEST" "$f"` 呼び出しに**タイムアウト（10 秒・bash 標準機能のみで実装。`timeout`/`gtimeout` は macOS 標準に無い）**を足した。ハングも「壊れた」として緑に数える。
+
+### 判断 25: `registered` の辞書キー安全化（LOW・code-reviewer 発見）
+- **事実**: `o1LedgerRegisteredFromLog_` が返す `registered` は素のオブジェクト。書き込み側のキーは `/^P\d+$/` に限られ安全だが、**読み取り側**（`o1LedgerJudge_` の `registered[pid]`）は `o1LedgerParseName_` 由来の pid（英数字のみ）で引かれるため、P-ID が `constructor` だと `Object.prototype.constructor` を掴み `NaN`（登録からの日数）が出る。実運用の唯一の経路（登録ログは空のまま・受領ファイルの P-ID が `constructor`）を通しテストで固定。
+- **決定**: `registered` を `Object.create(null)` にする。
+
+### 最終状態
+- テスト 189 ケース／変異 74 件（1 箇所ずつ・すべて赤・穴 0・タイムアウト検知つき）。ゲート 22 通過。selftest 63/0。
+- 3 回にわたるレビュー（のべ 9 回の subagent 起動）で見つかった指摘はすべて一次で確認したうえで反映または理由つきで見送った。次に配備を検討するときは `.steering/_handoff/` を新規に作り、本タスクの完了状態と研究者待ちの一覧を引き継ぐこと。
