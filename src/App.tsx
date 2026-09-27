@@ -49,7 +49,10 @@ interface SubmissionStatus {
    * `.age` が実在するのに「送信を待っている記録はありません」と言う (fail-open)。
    */
   counted: boolean;
-  /** いま走っている収束器のきっかけ (0=無し / 1=起動時 / 2=ブロック終了後 / 3=承認後)。 */
+  /**
+   * いま走っている収束器のきっかけ (0=無し / 1=起動時 / 2=ブロック終了後 / 3=承認後 /
+   * 4=O1 日次ローテート / 5=O1 定期再送)。★ 4・5 は O1 だけで、この画面 (G1 の内側) には出ない。
+   */
   sending_reason: number;
   /** 収束器が走り始めた時刻 (epoch ms)。null = 走っていない。 */
   sending_since_ms: number | null;

@@ -86,6 +86,10 @@
 ⚠️ ★ **参加の取りやめ**も同じ経路で扱う（同意文書 §4 逐語「やめた時点で、
 それまでの記録をすべて削除するよう求めることもできます」）。★ その場合は時間帯＝全期間とする。
 
+⚠️★★ **取りやめのときは、削除の求めが無くても §3 B-8（自動起動の登録）を外してもらう**（2026-09-28・G-1）。
+★ 外さないと、配布フォルダを残した端末では**次のログインでアプリが立ち上がり、記録と 48 時間後の自動送信が再開する**
+（security-checker HIGH・2026-09-28）。★ 手順は配布フォルダの README【4】末尾（「アプリを使うのをやめるとき」）。
+
 ---
 
 ## §3 ★★ 削除チェックリスト（⚠️ **1 つでも飛ばすと約束が破れる**）
@@ -119,9 +123,11 @@
 | B-2 | ⚠️ 書けなかった時の退避先 | `%TEMP%\GSE-sessions\<pid>_gse_o1_*.ndjson` | `logger.rs:1178-1187` |
 | B-3 | ⚠️★★ **クラウド同期の複製** | OneDrive / iCloud / Dropbox / Google Drive / Box 配下。★ アプリは**警告するだけで阻止しない** | `logger.rs:2390-2409` |
 | B-4 | 提出物 | `%USERPROFILE%\Documents\GSE-submissions\<pid>_o1day<NN>_gse_o1_*.age` | `submission.rs:115-118, 267-269` |
+| **B-4b** | ⚠️★ **送信見送り（32 MB 超）の提出物** | 同フォルダの **`oversize\<pid>_o1day<NN>_gse_o1_*.age`**。★ 受け口の上限を超えて送らなかったもの（2026-09-28・G-5）。⚠️ **研究者に届いていない**ので A 側（Drive）には無い＝**端末にしか無い**。⚠️ 研究者が手で回収したなら、その**回収したコピーは A-9**。★ 受け口の不具合などで**誤って**隔離されたと分かったら、`oversize/` から提出物フォルダ直下へ戻せば次の収束で送られる（`.sent` は作られていない） | `reconcile.rs` `OVERSIZE_DIR_NAME` / `quarantine_oversize` |
 | B-5 | 提出メタ | 同フォルダの `*.age.sent` / `manifest.jsonl` | `submission.rs:327-333, 57` |
 | B-6 | 診断ログ | セッション置き場の `gse-app.log` / `gse-app.log.1` | `logger.rs:2304`, `applog.rs:283` |
 | **B-7** | ⚠️★★ **ごみ箱・バックアップ・版履歴** | ★ B-1..B-6 を消してもここに残る。⚠️ **B-3 のクラウド同期先は「版履歴」も持つ**（削除しても過去版が復元できる） | code-reviewer 指摘 2026-08-28 |
+| **B-8** | ⚠️★★ **自動起動の登録**（記録そのものではないが、**残すと記録が再開する**） | macOS: システム設定 → 一般 → ログイン項目と機能拡張 で gse-next をオフ（★ 実体は `~/Library/LaunchAgents/com.johnd.gse-next.o1.plist`・消してもよい）／Windows: タスクマネージャー → スタートアップ アプリ で無効（★ 実体は `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` の値 `GSE-O1`）。★ 配布フォルダの印 `o1.autostart` はフォルダと一緒に消えてよい。★ `~/.gse/o1_autostart_registered`（「一度登録した」記録・中身は固定文字列）は、残っていると**新しいフォルダで登録を作り直さない**（消した選択を守る）ので、取りやめでは消さなくてよい。⚠️ `~/.gse/o1_consent_ack`（同意確認の時刻）と `~/.gse/` の O1 参加者 ID も端末に残る（中身は時刻と ID だけ）。削除の求めがあれば一緒に消す。⚠️ **取りやめ（§2 末尾）では削除の求めが無くても外してもらう** | `src-tauri/src/autostart.rs`（G-1・2026-09-28） |
 
 ⚠️ ★ **`redaction_ledger.jsonl`（端末側の「消した事実」台帳）は消さない。**
 ★ 中身は 5 つの数だけで（`{"requested_at","from","to","files_touched","lines_removed"}`）、
