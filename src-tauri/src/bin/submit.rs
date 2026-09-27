@@ -425,6 +425,8 @@ fn main() -> ExitCode {
                     "upload_disabled": r.upload_disabled,
                     "skipped_busy": r.skipped_busy,
                     "awaiting_approval": r.awaiting_approval,
+                    // ★ G-5: 受け口の上限を超えて送らずに `oversize/` へ移した本数（O1 のみ）。
+                    "quarantined": r.quarantined,
                     "errors": r.errors.len(),
                 })
             );

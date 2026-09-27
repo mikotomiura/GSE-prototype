@@ -30,7 +30,89 @@ use crate::submission::{
 /// テストは実エンドポイントに投げずに「失敗 → ローカル保持 → 再送」を実測できる。
 pub trait Uploader {
     /// 1 本送る。`Ok(())` を返したときだけ `.sent` が置かれる。
-    fn upload(&self, file_name: &str, bytes: &[u8]) -> Result<(), String>;
+    fn upload(&self, file_name: &str, bytes: &[u8]) -> Result<(), UploadError>;
+}
+
+/// 送信層の失敗の種類。
+///
+/// ★ **「大きすぎる」だけを別にする**（G-5・2026-09-28）。⚠️ 文字列のまま返すと、
+/// 収束器は「回線断（次に送れば届く）」と「大きすぎる（何度送っても届かない）」を区別できず、
+/// ★ **同じファイルを起動とローテートのたびに再送し続ける**。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UploadError {
+    /// 受け口が `{"ok":false,"error":"too large"}` と答えた（`Form_O1/GSE_O1_Submit.gs:218-219`）。
+    TooLarge,
+    /// それ以外（通信・HTTP・受領を確認できない）。
+    Other(String),
+}
+
+impl std::fmt::Display for UploadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UploadError::TooLarge => write!(f, "送信先が「大きすぎる」と答えました (too large)"),
+            UploadError::Other(s) => f.write_str(s),
+        }
+    }
+}
+
+/// ⚠️★★★ **O1 の受け口が受け取る `.age` の上限**（バイト）。★ これを**超える**ものは送らない（G-5）。
+///
+/// ★ 出所は受け口の定数 `Form_O1/GSE_O1_Submit.gs` の `MAX_BYTES = 32 * 1024 * 1024` で、
+/// 判定は `decodedLength_(b64) > MAX_BYTES`（= `.age` のバイト数が**超えたら**拒否・等号は通る）。
+/// ⚠️ **受け口を変えたらここも変える**（送信後の `too large` 応答でも隔離するので、
+/// 受け口だけが下がっても再送は止まる。こちらは「送る前に止める」ための鏡）。
+pub const O1_MAX_UPLOAD_BYTES: u64 = 32 * 1024 * 1024;
+
+/// ★ 送らなかった `.age` を移す、提出物フォルダ直下のサブフォルダ名（G-5）。
+///
+/// ★ `list_age_files` は**非再帰**なので、ここへ移したものは再送・未送信の数から構造的に外れる。
+/// ⚠️ **消さない**（研究者が被験者の PC から手で回収する・`docs/o1-deletion-ledger.md` B-4）。
+pub const OVERSIZE_DIR_NAME: &str = "oversize";
+
+/// O1 の `.age` が受け口の上限を超えているか（純関数）。★ 等号は送る（受け口と同じ境界）。
+pub fn o1_exceeds_upload_limit(len: u64) -> bool {
+    len > O1_MAX_UPLOAD_BYTES
+}
+
+/// `.age` を `oversize/` へ移す。⚠️ **上書きしない**（同名があれば失敗にして元の場所に残す）。
+fn move_to_oversize(age: &Path, submission_dir: &Path) -> std::io::Result<PathBuf> {
+    let dir = submission_dir.join(OVERSIZE_DIR_NAME);
+    std::fs::create_dir_all(&dir)?;
+    let name = age
+        .file_name()
+        .ok_or_else(|| std::io::Error::other("file name is missing"))?;
+    let dest = dir.join(name);
+    if dest.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "the same name already exists in oversize/",
+        ));
+    }
+    std::fs::rename(age, &dest)?;
+    Ok(dest)
+}
+
+/// 送らないと決めた `.age` を隔離し、結果を `report` に積む（G-5）。
+///
+/// ★ 成功しても `errors` に 1 行積む —— ⚠️ **研究者に届かないファイルが生まれた**ことは異常であり、
+/// applog に `error` で残す（1 ファイルにつき 1 回きり。移したあとは対象外になる）。
+fn quarantine_oversize(report: &mut ReconcileReport, age: &Path, submission_dir: &Path, why: &str) {
+    let name = age
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("(unknown)");
+    match move_to_oversize(age, submission_dir) {
+        Ok(_) => {
+            report.quarantined += 1;
+            report.errors.push(format!(
+                "{name} を送らずに {OVERSIZE_DIR_NAME}/ へ移しました ({why})。\
+                 ★ データは残っています（研究者が手で回収します）"
+            ));
+        }
+        Err(e) => report.errors.push(format!(
+            "{name} は送れない大きさですが、{OVERSIZE_DIR_NAME}/ へ移せませんでした ({why}): {e}"
+        )),
+    }
 }
 
 /// ⚠️★★★ **どの収集の提出物を収束させるか** (2026-08-27 / ADR-014 D8 の上書き)。
@@ -89,6 +171,8 @@ pub struct ReconcileReport {
     /// ★ **被験者の確認待ち**の本数 (`.age` は在るが「送信する」がまだ押されていない)。
     /// ⚠️ これは失敗ではないが、★ **放置すると届かない**ので画面に出す。
     pub awaiting_approval: usize,
+    /// ⚠️★ 受け口の上限を超えたので **送らずに `oversize/` へ移した**本数（O1 のみ・G-5）。
+    pub quarantined: usize,
     /// ⚠️ 起きた問題。★ **握り潰さない**。呼び出し側が画面へ出す。
     pub errors: Vec<String>,
 }
@@ -680,6 +764,14 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
         if age_for_stem(&opts.submission_dir, &stem).is_some() {
             continue; // 既に包んである (手動提出で作った旧形式も含む)
         }
+        // ⚠️★★★ O1: **`oversize/` へ移したものも「包み済み」** (G-5)。
+        //   ★ ここを見ないと、隔離した翌回に同じ NDJSON を**新しい日番号で包み直し**、
+        //   また隔離する —— を収束のたびに繰り返す (2026-09-28 にテストで実際に踏んだ)。
+        if opts.mode == CollectionMode::O1
+            && age_for_stem(&opts.submission_dir.join(OVERSIZE_DIR_NAME), &stem).is_some()
+        {
+            continue;
+        }
         // ★ 1 本ごとに heartbeat (`ReconcileLock::refresh` のコメント参照)。
         lock.refresh();
         if lock.is_lost() {
@@ -769,6 +861,18 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                 Some(n) => n.to_string(),
                 None => continue,
             };
+            // ⚠️★★★ **O1 だけ**: 受け口の上限を超えるものは送らない（G-5）。
+            //   ★ 読む前に大きさだけを見る（32 MB を base64 にして送り、拒否されるのを毎回繰り返さない）。
+            //   ⚠️ G1 は凍結（`v0.1.36`・ADR-034 D3）なので**この分岐に入れない**。
+            if opts.mode == CollectionMode::O1 {
+                if let Ok(meta) = std::fs::metadata(&age) {
+                    if o1_exceeds_upload_limit(meta.len()) {
+                        let why = format!("{} バイト > 上限 {O1_MAX_UPLOAD_BYTES}", meta.len());
+                        quarantine_oversize(&mut report, &age, &opts.submission_dir, &why);
+                        continue;
+                    }
+                }
+            }
             let bytes = match std::fs::read(&age) {
                 Ok(b) => b,
                 Err(e) => {
@@ -795,6 +899,12 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                                 .push(format!("{name} の送信済みマークを保存できません: {e}"));
                         }
                     }
+                }
+                // ⚠️★ O1 だけ: 受け口が「大きすぎる」と答えたら、何度送っても届かないので隔離する。
+                //   ★ 受け口の上限が将来こちらの定数より下がっても、再送はここで止まる。
+                Err(UploadError::TooLarge) if opts.mode == CollectionMode::O1 => {
+                    let why = format!("送信先が too large と答えました・{} バイト", bytes.len());
+                    quarantine_oversize(&mut report, &age, &opts.submission_dir, &why);
                 }
                 Err(e) => report.errors.push(format!("{name} を送信できません: {e}")),
             }
@@ -893,7 +1003,7 @@ impl HttpUploader {
 
 #[cfg(feature = "package")]
 impl Uploader for HttpUploader {
-    fn upload(&self, file_name: &str, bytes: &[u8]) -> Result<(), String> {
+    fn upload(&self, file_name: &str, bytes: &[u8]) -> Result<(), UploadError> {
         use base64::Engine as _;
         let body = serde_json::json!({
             "secret": self.secret,
@@ -908,21 +1018,27 @@ impl Uploader for HttpUploader {
             .header("Content-Type", "application/json")
             .body(body)
             .send()
-            .map_err(|e| format!("送信に失敗しました (通信): {e}"))?;
+            .map_err(|e| UploadError::Other(format!("送信に失敗しました (通信): {e}")))?;
 
         let status = resp.status();
         let text = resp.text().unwrap_or_default();
         if !status.is_success() {
-            return Err(format!("送信に失敗しました (HTTP {})", status.as_u16()));
+            return Err(UploadError::Other(format!(
+                "送信に失敗しました (HTTP {})",
+                status.as_u16()
+            )));
         }
         // ⚠️★ **HTTP 200 を成功と読まない。** GAS は例外時も 200 で本文にエラーを返す。
         //   ★ アプリ層の応答 (`"ok":true`) を要求する。さもないと「送ったつもり」が
         //   `.sent` になって回収不能になる (送信先から成否を追えない・M-5)。
         if !response_is_ok(&text) {
-            return Err(format!(
+            if response_is_too_large(&text) {
+                return Err(UploadError::TooLarge);
+            }
+            return Err(UploadError::Other(format!(
                 "送信先が受領を確認しませんでした: {}",
                 truncate_for_display(&text)
-            ));
+            )));
         }
         Ok(())
     }
@@ -938,6 +1054,20 @@ pub fn response_is_ok(body: &str) -> bool {
     serde_json::from_str::<serde_json::Value>(body)
         .ok()
         .and_then(|v| v.get("ok").and_then(|x| x.as_bool()))
+        .unwrap_or(false)
+}
+
+/// 送信先の応答が「大きすぎる」と言っているか (純関数・G-5)。
+///
+/// ★ `response_is_ok` と同じく**構造として読む**: `ok == false` かつ `error == "too large"`。
+/// ⚠️ 部分一致にしない（別の文脈の本文に `too large` が混じっても隔離しない）。
+pub fn response_is_too_large(body: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .map(|v| {
+            v.get("ok").and_then(|x| x.as_bool()) == Some(false)
+                && v.get("error").and_then(|x| x.as_str()) == Some("too large")
+        })
         .unwrap_or(false)
 }
 
@@ -1020,7 +1150,7 @@ mod tests {
     /// 常に成功する送信層。送ったファイル名を記録する。
     struct OkUploader(Mutex<Vec<String>>);
     impl Uploader for OkUploader {
-        fn upload(&self, file_name: &str, _bytes: &[u8]) -> Result<(), String> {
+        fn upload(&self, file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
             self.0.lock().unwrap().push(file_name.to_string());
             Ok(())
         }
@@ -1029,8 +1159,8 @@ mod tests {
     /// 常に失敗する送信層 (★ 実エンドポイントに投げずに「落ちている」を作る)。
     struct FailUploader;
     impl Uploader for FailUploader {
-        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), String> {
-            Err("connection refused (test)".to_string())
+        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
+            Err(UploadError::Other("connection refused (test)".to_string()))
         }
     }
 
@@ -1500,7 +1630,7 @@ mod tests {
         seen_fresh: Mutex<Vec<bool>>,
     }
     impl Uploader for LockProbeUploader {
-        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), String> {
+        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
             let lock = self.submission_dir.join("reconcile.lock");
             let age = std::fs::metadata(&lock)
                 .and_then(|m| m.modified())
@@ -1649,7 +1779,7 @@ mod tests {
         calls: Mutex<usize>,
     }
     impl Uploader for StealLockUploader {
-        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), String> {
+        fn upload(&self, _file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
             let mut n = self.calls.lock().unwrap();
             *n += 1;
             if *n == 1 {
@@ -2074,5 +2204,206 @@ mod tests {
         );
         assert_eq!(std::fs::read_to_string(&p).unwrap(), body);
         assert!(!has_any_data_row(&p), "★ 収束器側も「中身なし」と見ること");
+    }
+
+    // --- G-5: 受け口の上限を超える O1 の `.age` を送らずに隔離する (2026-09-28) -----------
+
+    /// 受け口が「大きすぎる」と答える送信層。送ろうとしたファイル名を記録する。
+    struct TooLargeUploader(Mutex<Vec<String>>);
+    impl Uploader for TooLargeUploader {
+        fn upload(&self, file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
+            self.0.lock().unwrap().push(file_name.to_string());
+            Err(UploadError::TooLarge)
+        }
+    }
+
+    /// `len` バイトの (中身のない) `.age` を置く。⚠️ 暗号文である必要は無い (送信層は偽物)。
+    fn write_sized(dir: &Path, name: &str, len: u64) -> PathBuf {
+        let p = dir.join(name);
+        let f = std::fs::File::create(&p).unwrap();
+        f.set_len(len).unwrap();
+        p
+    }
+
+    /// ★ 構造として読む: `ok == false` かつ `error == "too large"` のときだけ真。
+    #[test]
+    fn response_is_too_large_reads_the_structure() {
+        assert!(response_is_too_large(r#"{"ok":false,"error":"too large"}"#));
+        assert!(!response_is_too_large(r#"{"ok":true}"#));
+        assert!(!response_is_too_large(
+            r#"{"ok":false,"error":"bad secret"}"#
+        ));
+        // ⚠️ `ok` が偽でないものは隔離の理由にしない
+        assert!(!response_is_too_large(r#"{"ok":true,"error":"too large"}"#));
+        assert!(!response_is_too_large(r#"{"echo":"too large"}"#));
+        assert!(!response_is_too_large("too large"));
+        assert!(!response_is_too_large("<html>too large</html>"));
+    }
+
+    /// ★ 境界は受け口 (`> MAX_BYTES`) と同じ: ちょうど 32 MiB は送り、1 バイト超えたら送らない。
+    #[test]
+    fn o1_upload_limit_matches_the_receiver_boundary() {
+        assert_eq!(O1_MAX_UPLOAD_BYTES, 32 * 1024 * 1024);
+        assert!(!o1_exceeds_upload_limit(O1_MAX_UPLOAD_BYTES));
+        assert!(o1_exceeds_upload_limit(O1_MAX_UPLOAD_BYTES + 1));
+        assert!(!o1_exceeds_upload_limit(0));
+    }
+
+    /// ⚠️★★★ 上限を超える O1 の `.age` は **送らずに** `oversize/` へ移し、次の回からは数えも送りもしない。
+    /// ★ ちょうど上限のものは送る (対照)。⚠️ ファイルは消さない。
+    #[test]
+    fn o1_oversize_age_is_quarantined_before_upload_and_never_retried() {
+        let d = tmpdir("g5pre");
+        let o = tmpdir("g5pre_out");
+        let r = test_recipient();
+        let big = "P012_o1day01_gse_o1_20260928_010101.age";
+        let edge = "P012_o1day02_gse_o1_20260929_010101.age";
+        write_sized(&o, big, O1_MAX_UPLOAD_BYTES + 1);
+        write_sized(&o, edge, O1_MAX_UPLOAD_BYTES);
+
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&o1_opts(&d, &o, &r, 1), Some(&up));
+        assert_eq!(
+            *up.0.lock().unwrap(),
+            vec![edge.to_string()],
+            "★ 上限ちょうどは送り、超えたものは送らない"
+        );
+        assert_eq!(report.sent, 1);
+        assert_eq!(report.quarantined, 1);
+        assert_eq!(report.unsent, 0, "★ 隔離したものは未送信に数えない");
+        assert_eq!(
+            report.errors.len(),
+            1,
+            "⚠️ 研究者に届かないことは黙らない: {:?}",
+            report.errors
+        );
+        assert!(report.errors[0].contains(OVERSIZE_DIR_NAME));
+        assert!(!o.join(big).exists());
+        let moved = o.join(OVERSIZE_DIR_NAME).join(big);
+        assert_eq!(
+            std::fs::metadata(&moved).unwrap().len(),
+            O1_MAX_UPLOAD_BYTES + 1,
+            "⚠️ 消さない・中身も変えない"
+        );
+        assert!(!crate::submission::sent_marker_path(&moved).exists());
+
+        // ★ 2 回目: 何もしない (再送しない・二度数えない・黙って正常)
+        let up2 = OkUploader(Mutex::new(Vec::new()));
+        let again = reconcile(&o1_opts(&d, &o, &r, 1), Some(&up2));
+        assert!(up2.0.lock().unwrap().is_empty());
+        assert_eq!((again.sent, again.quarantined, again.unsent), (0, 0, 0));
+        assert!(again.errors.is_empty(), "{:?}", again.errors);
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ **G1 は隔離しない** (凍結・ADR-034 D3)。★ 同じ大きさでも従来どおり送信層に渡す。
+    #[test]
+    fn g1_oversize_age_is_not_quarantined() {
+        let d = tmpdir("g5g1");
+        let o = tmpdir("g5g1_out");
+        let r = test_recipient();
+        let name = crate::submission::age_file_name("P012", 1, "gse_20260928_010101");
+        write_sized(&o, &name, O1_MAX_UPLOAD_BYTES + 1);
+        approve(&o);
+
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&opts(&d, &o, &r), Some(&up));
+        assert_eq!(
+            *up.0.lock().unwrap(),
+            vec![name.clone()],
+            "★ G1 は大きさで止めない"
+        );
+        assert_eq!(report.quarantined, 0);
+        assert!(!o.join(OVERSIZE_DIR_NAME).exists());
+
+        // ★ G1 で受け口が too large と答えても、従来どおりエラーとして残すだけ (動かさない)
+        let name2 = crate::submission::age_file_name("P012", 2, "gse_20260928_020202");
+        write_sized(&o, &name2, 10);
+        approve(&o);
+        let tl = TooLargeUploader(Mutex::new(Vec::new()));
+        let report2 = reconcile(&opts(&d, &o, &r), Some(&tl));
+        assert_eq!(report2.quarantined, 0);
+        assert_eq!(report2.unsent, 1, "★ G1 は未送信のまま残る (従来の挙動)");
+        assert!(o.join(&name2).exists());
+        assert!(!o.join(OVERSIZE_DIR_NAME).exists());
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★★★ O1 で受け口が too large と答えたら隔離する。★ **日番号は再利用されない**
+    /// (台帳 `manifest.jsonl` の最大値も見るため・受領台帳の欠番検知が研究者に知らせる)。
+    #[test]
+    fn o1_too_large_response_quarantines_and_keeps_the_day_number() {
+        let d = tmpdir("g5resp");
+        let o = tmpdir("g5resp_out");
+        let r = test_recipient();
+        let end = 1_000_000_000_000_u64;
+        write_closed_o1(&d, "gse_o1_00000000_101010.ndjson", end);
+
+        let tl = TooLargeUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&tl));
+        assert_eq!(report.packaged, 1, "{:?}", report.errors);
+        assert_eq!(
+            (report.sent, report.quarantined, report.unsent),
+            (0, 1, 0),
+            "{:?}",
+            report.errors
+        );
+        let first = tl.0.lock().unwrap()[0].clone();
+        assert!(first.starts_with("P012_o1day01_"), "{first}");
+        assert!(o.join(OVERSIZE_DIR_NAME).join(&first).exists());
+
+        // ★ 2 回目: 隔離したものは送り直さない
+        let tl2 = TooLargeUploader(Mutex::new(Vec::new()));
+        let again = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&tl2));
+        assert!(
+            tl2.0.lock().unwrap().is_empty(),
+            "⚠️ 何度送っても届かないものを再送しない"
+        );
+        assert_eq!(
+            again.packaged, 0,
+            "⚠️ 隔離しても同じ NDJSON を包み直さない: {:?}",
+            again.errors
+        );
+
+        // ★ 次の日: 番号は 02 (⚠️ 01 を再利用すると受け口で別の日と取り違える)
+        write_closed_o1(&d, "gse_o1_00000000_111111.ndjson", end);
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let next = reconcile(&o1_opts(&d, &o, &r, end + GRACE), Some(&up));
+        assert_eq!(next.sent, 1, "{:?}", next.errors);
+        let sent = up.0.lock().unwrap()[0].clone();
+        assert!(sent.starts_with("P012_o1day02_"), "{sent}");
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️ 移し先に同名があれば上書きしない (元の場所に残し、失敗として出す)。
+    #[test]
+    fn quarantine_does_not_overwrite_an_existing_file() {
+        let d = tmpdir("g5dup");
+        let o = tmpdir("g5dup_out");
+        let r = test_recipient();
+        let big = "P012_o1day01_gse_o1_20260928_010101.age";
+        write_sized(&o, big, O1_MAX_UPLOAD_BYTES + 1);
+        std::fs::create_dir_all(o.join(OVERSIZE_DIR_NAME)).unwrap();
+        std::fs::write(o.join(OVERSIZE_DIR_NAME).join(big), b"earlier").unwrap();
+
+        let up = OkUploader(Mutex::new(Vec::new()));
+        let report = reconcile(&o1_opts(&d, &o, &r, 1), Some(&up));
+        assert!(up.0.lock().unwrap().is_empty(), "⚠️ 移せなくても送らない");
+        assert_eq!(report.quarantined, 0);
+        assert_eq!(report.errors.len(), 1, "{:?}", report.errors);
+        assert!(o.join(big).exists(), "★ 元の場所に残る");
+        assert_eq!(
+            std::fs::read(o.join(OVERSIZE_DIR_NAME).join(big)).unwrap(),
+            b"earlier"
+        );
+
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
     }
 }

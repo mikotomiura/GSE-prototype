@@ -2,6 +2,8 @@ pub mod analysis;
 // アプリ本体の診断ログ (tracing) をファイルに残す writer。
 // ⚠️ stdout だけだと Finder 起動の .app では**どこにも残らない** (2026-08-08 実測)。
 pub mod applog;
+// ⚠️★ O1 自動起動（G-1・2026-09-28）。OS 依存は `#[cfg]` でこのファイルに閉じる。
+pub mod autostart;
 // ★ **このビルドが何を記録できるか**の単一情報源 (ADR-013 D1/D2)。OS API 非依存の宣言表。
 // ⚠️ 送出元ベースで決め `#[cfg]` を反映する (writer から導出すると macOS で ime_shadow を過大申告する)。
 pub mod capabilities;
@@ -1791,6 +1793,9 @@ enum ReconcileReason {
     /// ⚠️ それでも回すのは、**前々日ぶんが猶予を抜けている**からである
     /// (`design.md` §1「起動のきっかけはヒント」と同じ収束型の考え方)。
     O1DailyRotation = 4,
+    /// ⚠️★ O1 (G-2・2026-09-28): **6 時間ごとの定期再送**（`o1::PERIODIC_RECONCILE_MS`）。
+    /// ★ 回線断で失敗した `.age` を、次の起動・ローテートまで待たせない。
+    O1Periodic = 5,
 }
 
 impl ReconcileReason {
@@ -1801,6 +1806,7 @@ impl ReconcileReason {
             ReconcileReason::BlockEnd => "after block",
             ReconcileReason::Approval => "after approval",
             ReconcileReason::O1DailyRotation => "after daily rotation",
+            ReconcileReason::O1Periodic => "periodic (O1)",
         }
     }
 }
@@ -3866,6 +3872,11 @@ pub fn run() {
             // consumer スレッドは走り続ける (従来 `run()` 末尾での drop と同じ挙動)。
             drop(session_logger);
 
+            // ── ⚠️★★★ O1 自動起動 (G-1・2026-09-28) ──────────────────────────────
+            // ★ single-instance を通った**1 個目**だけがここに来る（2 個目は登録しない）。
+            // ⚠️ 配布形 (目印ファイル由来) の O1 の**初回だけ**。判定は `autostart::decide`。
+            crate::autostart::register_if_needed(crate::o1::mode(), g1_mode().is_some());
+
             // ── ⚠️★★★ O1 (R3-a): 日次ローテート (判断 O1-2 の実施条件 1) ──────────
             //
             // ★ **閉じないファイルは提出候補にならない。** `write_meta_end`(`session_end`) は
@@ -3883,6 +3894,8 @@ pub fn run() {
                 let o1_app = app.handle().clone();
                 thread::spawn(move || {
                     tracing::info!("O1 daily-rotate thread started");
+                    // ★ G-2: 直近に収束器を回した時刻。起点は起動時（起動時の収束は別に走る）。
+                    let mut last_reconcile_ms = epoch_ms();
                     loop {
                         // ★ 60 秒粒度で足りる (24 時間に対して 0.07%)。⚠️ スリープからの復帰でも
                         //   epoch ms の差で判定するので、寝ていたぶんも経過に入る。
@@ -3890,6 +3903,14 @@ pub fn run() {
                         if is_shutting_down() {
                             tracing::info!("O1 daily-rotate thread stopping (shutdown)");
                             return;
+                        }
+                        // ⚠️★ G-2: **定期再送はローテートの判定より前に置く**（下の `continue` に
+                        //   飲まれないように）。★ 一時停止中も回す —— 止めているのは記録であって送信ではなく、
+                        //   送るのは猶予 (48 時間) を過ぎて既に包んだものだけである。
+                        let now = epoch_ms();
+                        if crate::o1::periodic_reconcile_due(last_reconcile_ms, now) {
+                            last_reconcile_ms = now;
+                            spawn_reconcile(o1_app.clone(), ReconcileReason::O1Periodic);
                         }
                         let opened = O1_LOG_OPENED_MS.load(Ordering::Acquire);
                         if opened == 0 {
@@ -3928,6 +3949,8 @@ pub fn run() {
                         // ★ 1 本閉じたので収束器を回す。⚠️ いま閉じたファイルは猶予の中なので
                         //   **まだ包まれない** —— 拾われるのは **48 時間前に閉じた分**である。
                         spawn_reconcile(o1_app.clone(), ReconcileReason::O1DailyRotation);
+                        // ★ 直後に定期再送を重ねない（べき等なので害は無いが、無駄な子プロセスを減らす）。
+                        last_reconcile_ms = epoch_ms();
                     }
                 });
             }

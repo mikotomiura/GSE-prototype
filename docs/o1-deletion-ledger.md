@@ -119,6 +119,7 @@
 | B-2 | ⚠️ 書けなかった時の退避先 | `%TEMP%\GSE-sessions\<pid>_gse_o1_*.ndjson` | `logger.rs:1178-1187` |
 | B-3 | ⚠️★★ **クラウド同期の複製** | OneDrive / iCloud / Dropbox / Google Drive / Box 配下。★ アプリは**警告するだけで阻止しない** | `logger.rs:2390-2409` |
 | B-4 | 提出物 | `%USERPROFILE%\Documents\GSE-submissions\<pid>_o1day<NN>_gse_o1_*.age` | `submission.rs:115-118, 267-269` |
+| **B-4b** | ⚠️★ **送信見送り（32 MB 超）の提出物** | 同フォルダの **`oversize\<pid>_o1day<NN>_gse_o1_*.age`**。★ 受け口の上限を超えて送らなかったもの（2026-09-28・G-5）。⚠️ **研究者に届いていない**ので A 側（Drive）には無い＝**端末にしか無い**。⚠️ 研究者が手で回収したなら、その**回収したコピーは A-9** | `reconcile.rs` `OVERSIZE_DIR_NAME` / `quarantine_oversize` |
 | B-5 | 提出メタ | 同フォルダの `*.age.sent` / `manifest.jsonl` | `submission.rs:327-333, 57` |
 | B-6 | 診断ログ | セッション置き場の `gse-app.log` / `gse-app.log.1` | `logger.rs:2304`, `applog.rs:283` |
 | **B-7** | ⚠️★★ **ごみ箱・バックアップ・版履歴** | ★ B-1..B-6 を消してもここに残る。⚠️ **B-3 のクラウド同期先は「版履歴」も持つ**（削除しても過去版が復元できる） | code-reviewer 指摘 2026-08-28 |
