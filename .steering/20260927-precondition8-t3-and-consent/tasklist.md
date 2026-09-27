@@ -51,8 +51,12 @@
         既存 `docs/o1-deletion-ledger.md` が同じパターンを既に採用（security-checker が
         独立に「受容済みリスク」と裏付け）
 - [x] `bash scripts/check-g1-collection-readiness.sh --selftest` を main（base）チェックアウトで
-      複数回実施（マージ直後・レビュー修正後の 2 回とも green・42/42）
-- [ ] `/finish-task`（★ retrospective ＋ push → PR → CI 緑なら merge）
+      複数回実施（マージ直後・レビュー1巡目修正後・レビュー2巡目修正後の 3 回とも green・42/42）
+- [x] `/finish-task` Step 3: 2 巡目レビュー（修正コミット自体の再レビュー・code-reviewer + Codex +
+      test-runner）を実施。**HIGH 1 件（A-8 の引用の逆転）＋ MEDIUM 6 件 ＋ LOW 1 件**を確認・修正
+      （詳細はコミット `ea74751`）。cargo test --workspace 849 tests pass（本タスクは
+      src-tauri/src・src 非touch のため回帰なし）。schema parity check は該当ファイル非touchで skip。
+- [x] `/finish-task`（★ retrospective ＋ push → PR → CI 緑なら merge）
 
 ## 研究者に渡すもの（★ Loop では完了しない）
 
