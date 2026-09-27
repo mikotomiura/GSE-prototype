@@ -13,7 +13,9 @@
 - [x] `docs/glossary.md` に確定用語 5 件を追記
 - [x] `requirement.md` / `design.md` / `decisions.md`
 - [x] issue 5 本 ＋ acceptance 5 本 ＋ `_issue-plan.md` ＋ `_loop-config.json`
-- [ ] コミットして push・PR（分解成果物）
+- [x] コミット `d03b517` ＋ push（★ **PR はまだ出さない** —— この枝が loop の `base_branch` であり、
+      各 issue はここへ merge される。main への PR は `/finish-task` で出す）
+- [ ] （任意）TASK-PRE: `codex-consult` で issue の独立性に第二意見（`docs/loop-engineering.md` Codex ゲート）
 - [ ] ⚠️★★★ **`/clear` して新セッションで実行を始める**
 
 ## 実行セッション（★ 新セッションで行う）
