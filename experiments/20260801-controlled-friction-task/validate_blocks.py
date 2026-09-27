@@ -68,6 +68,9 @@ FORBIDDEN_LINE_TYPES = ("probe_assignment", "probe_triggered", "realtime_label")
 # ★ 第 10 版 §5.4-5: G1 モードを立てた引き金。logger の meta 行に刻まれる
 #   （Rust 側の単一情報源は src-tauri/src/g1.rs の G1Source::as_str）。
 G1_MODE_VALUES = ("marker", "env")
+# ★ 前提条件 8 / A-1: 未完了・未実施を「記入漏れ FAIL」と区別するための語彙。
+#   ⚠️ 除外・判定には使わない（analyze.py はこの値を読まない・§3.6 不触。protocol.md §2.4）。
+PARTICIPATION_STATUS_VALUES = ("not_started", "started_incomplete", "completed")
 
 
 class Report:
@@ -226,6 +229,17 @@ def check_files(spec: dict, seen: dict[str, str], r: Report) -> None:
     subject = spec.get("subject", "?")
     local: dict[str, int] = {}
 
+    # ★ 前提条件 8 / A-1: participation_status が書かれていれば、記入漏れ FAIL の代わりに
+    #   NOTE で報告する（実験者の実施記録で確認済みという意味・protocol.md §2.4）。
+    #   ⚠️ 除外・判定はしない（未知の値だけ FAIL にして黙って通さない）。
+    status = spec.get("participation_status")
+    if status is not None and status not in PARTICIPATION_STATUS_VALUES:
+        r.fail(f"{subject}: participation_status が {status!r}。"
+               f"{' / '.join(PARTICIPATION_STATUS_VALUES)} のいずれかにする (protocol.md §2.4)")
+        return
+    recorded_at = spec.get("status_recorded_at")
+    recorded_suffix = f"（記録日: {recorded_at}）" if recorded_at else ""
+
     # ★ 実施前（前日に割付を置いた状態）と、記入漏れを区別する。
     #   `protocol.md §6` は「前日まで: assign.py --json > blocks/P0xx.json を作り、
     #   validate_blocks.py が緑」を要求している。実施前は NDJSON がまだ存在しないので
@@ -233,16 +247,25 @@ def check_files(spec: dict, seen: dict[str, str], r: Report) -> None:
     #   ⚠️ ★ **一部だけ未記入は記入漏れ**として fail のままにする（そこが本当の事故である）。
     n_with_file = sum(1 for b in spec["blocks"] if b.get("file"))
     if n_with_file == 0:
-        r.note(f"{subject}: NDJSON 名が 1 つも未記入 = **まだ実施していない**"
-               f"（実施したらブロックごとに file を書き足すこと・protocol.md §2.2）")
+        if status == "not_started":
+            r.note(f"{subject}: NDJSON 名が 1 つも未記入。participation_status=not_started "
+                   f"= 実験者の実施記録で未実施と確認済み{recorded_suffix}")
+        else:
+            r.note(f"{subject}: NDJSON 名が 1 つも未記入 = **まだ実施していない**"
+                   f"（実施したらブロックごとに file を書き足すこと・protocol.md §2.2）")
         return
 
     for b in spec["blocks"]:
         n = b.get("block")
         f = b.get("file")
         if not f:
-            r.fail(f"{subject}: ブロック {n} に file が無い。記録用紙の NDJSON 名を書き足すこと "
-                   f"(protocol.md §2.2)")
+            if status == "started_incomplete":
+                r.note(f"{subject}: ブロック {n} に file が無い。"
+                       f"participation_status=started_incomplete "
+                       f"= 実験者の実施記録で途中終了と確認済み{recorded_suffix}")
+            else:
+                r.fail(f"{subject}: ブロック {n} に file が無い。記録用紙の NDJSON 名を書き足すこと "
+                       f"(protocol.md §2.2)")
             continue
         if not isinstance(f, str) or not f.endswith(".ndjson"):
             r.fail(f"{subject}: ブロック {n} の file が NDJSON 名の形をしていない")
@@ -680,6 +703,26 @@ def selftest() -> int:
          lambda s: [b.pop("file", None) for b in s["blocks"]], expect_fail=False)
     case("★ 一部だけ記入は記入漏れとして赤",
          lambda s: [b.pop("file", None) for b in s["blocks"][1:]], expect_fail=True)
+
+    # ★★ 前提条件 8 / A-1: participation_status による記入漏れ FAIL の切り替え。
+    def _partial_with_status(s: dict) -> None:
+        s["participation_status"] = "started_incomplete"
+        for b in s["blocks"][1:]:
+            b.pop("file", None)
+
+    case("★ 未完了は participation_status があれば NOTE (記入漏れの赤にならない)",
+         _partial_with_status, expect_fail=False)
+    case("★ 未知の participation_status は赤",
+         lambda s: s.update(participation_status="ときどき"), expect_fail=True)
+
+    def _not_started_no_files(s: dict) -> None:
+        s["participation_status"] = "not_started"
+        for b in s["blocks"]:
+            b.pop("file", None)
+
+    case("★ 未実施は NOTE (participation_status=not_started)",
+         _not_started_no_files, expect_fail=False)
+
     case("強制比較が 6 件", lambda s: s["manipulation_check_answers"].pop(), expect_fail=True)
     case("強制比較が二択の外",
          lambda s: s["manipulation_check_answers"][0].update(harder=1), expect_fail=True)
