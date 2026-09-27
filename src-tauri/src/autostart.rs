@@ -49,13 +49,30 @@ pub enum AutostartAction {
 
 /// ⚠️★★★ 登録してよいか（純関数）。
 ///
-/// ★ **目印ファイル由来の O1** かつ **G1 でない** かつ **印が無い** ときだけ登録する。
+/// ★ **目印ファイル由来の O1** かつ **G1 でない** かつ **O1 の同意確認が済んでいる** かつ
+/// **印が無い** ときだけ登録する。
+/// ⚠️ 同意確認（`submission::o1_consent_acknowledged`・R-7）を条件に入れるのは、
+/// **同意の画面を押さずに閉じた人の端末で、ログインのたびに起動させない**ため
+/// （code-reviewer HIGH・2026-09-28）。★ 同意した直後にも呼ぶので、初回に同意した人も取りこぼさない。
 /// ⚠️ G1 は `o1::resolve` が既に O1 を落としているが、ここでも見る（二重の防御）。
-pub fn decide(o1: Option<O1Source>, g1_active: bool, marker_exists: bool) -> AutostartAction {
-    match (o1, g1_active, marker_exists) {
-        (Some(O1Source::Marker), false, false) => AutostartAction::Register,
+pub fn decide(
+    o1: Option<O1Source>,
+    g1_active: bool,
+    consent_acknowledged: bool,
+    marker_exists: bool,
+) -> AutostartAction {
+    match (o1, g1_active, consent_acknowledged, marker_exists) {
+        (Some(O1Source::Marker), false, true, false) => AutostartAction::Register,
         _ => AutostartAction::Skip,
     }
+}
+
+/// 登録してよいパスか（純関数）。⚠️ 制御文字を含むパスは拒む。
+///
+/// ★ XML 1.0 は大半の制御文字を許さないので、plist が壊れて**黙って起動しなくなる**
+/// （security-checker MEDIUM・2026-09-28）。Windows の Run 値でも意味が無い。
+pub fn path_is_registrable(exe: &str) -> bool {
+    !exe.is_empty() && !exe.chars().any(char::is_control)
 }
 
 /// `exe` に対応する印ファイルのパス（純関数）。★ 階層は `o1.mode` と同じ関数で決める。
@@ -113,10 +130,13 @@ pub fn run_value(exe: &str) -> String {
     format!("\"{exe}\"")
 }
 
-/// ★ 起動時に 1 回呼ぶ（IO あり）。⚠️ 失敗しても起動は止めない（ログに残し、次の起動で再試行する）。
-pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool) {
-    // ⚠️ 判定の前に絞る: O1 の配布形でなければ exe も印も見ない（通常運用で IO を増やさない）。
-    if decide(o1, g1_active, false) == AutostartAction::Skip {
+/// ★ 起動時と、O1 の同意確認を記録した直後に呼ぶ（IO あり）。
+///
+/// ⚠️ 失敗しても起動は止めない（ログに残す）。
+/// ⚠️ ログにパスを出さない（ホームのパスにはユーザー名＝実名が入りうる・security-checker MEDIUM）。
+pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool, consent_acknowledged: bool) {
+    // ⚠️ 判定の前に絞る: 対象でなければ exe も印も見ない（通常運用で IO を増やさない）。
+    if decide(o1, g1_active, consent_acknowledged, false) == AutostartAction::Skip {
         return;
     }
     let exe = match std::env::current_exe() {
@@ -133,27 +153,30 @@ pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool) {
             return;
         }
     };
-    if decide(o1, g1_active, marker.is_file()) == AutostartAction::Skip {
+    if decide(o1, g1_active, consent_acknowledged, marker.is_file()) == AutostartAction::Skip {
         tracing::info!(
             "O1 autostart: already registered once for this folder (marker present); \
              not touching the OS setting (the participant may have turned it off)"
         );
         return;
     }
+    // ⚠️★ **印を先に書く。** 書けない場所（読み取り専用の置き場）で登録だけ成功すると、
+    //   起動のたびに登録し直し、被験者が OS の設定で切っても戻してしまう（code-reviewer LOW）。
+    //   → ★ 印が書けないなら登録しない。
+    if let Err(e) = std::fs::write(&marker, b"registered\n") {
+        tracing::error!(
+            "O1 autostart: cannot write the marker {MARKER_FILE_NAME} in the distribution folder \
+             ({e}); NOT registering (it would be re-registered on every launch)"
+        );
+        return;
+    }
     match platform::register(&exe) {
-        Ok(where_) => {
-            tracing::warn!("O1 autostart: registered to start at login ({where_})");
-            if let Err(e) = std::fs::write(&marker, b"registered\n") {
-                // ⚠️ 印が置けないと次の起動でもう一度登録する（被験者が切っていたら戻してしまう）。
-                //   ★ 黙らない。
-                tracing::error!(
-                    "O1 autostart: registered, but could not write the marker {}: {e} \
-                     (the next launch will register again)",
-                    MARKER_FILE_NAME
-                );
-            }
+        Ok(where_) => tracing::warn!("O1 autostart: registered to start at login ({where_})"),
+        Err(e) => {
+            // ★ 印を戻して次の起動で再試行する。
+            let _ = std::fs::remove_file(&marker);
+            tracing::warn!("O1 autostart: registration failed (will retry next launch): {e}");
         }
-        Err(e) => tracing::warn!("O1 autostart: registration failed (will retry next launch): {e}"),
     }
 }
 
@@ -161,21 +184,25 @@ pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool) {
 mod platform {
     use std::path::Path;
 
-    /// LaunchAgent の plist を書く。戻り値はログ用の場所の説明。
+    /// LaunchAgent の plist を書く。戻り値はログ用の場所の説明（⚠️ パスを含めない）。
     pub fn register(exe: &Path) -> Result<String, String> {
         // ★ 実体パスにする（シンボリックリンク越しの起動でも同じ `.app` を指す）。
         let exe = exe
             .canonicalize()
-            .map_err(|e| format!("canonicalize failed: {e}"))?;
+            .map_err(|e| format!("canonicalize the executable: {e}"))?;
         let exe = exe
             .to_str()
             .ok_or_else(|| "the executable path is not valid UTF-8".to_string())?;
+        if !super::path_is_registrable(exe) {
+            return Err("the executable path contains control characters".to_string());
+        }
         let home = std::env::var_os("HOME").ok_or_else(|| "HOME is not set".to_string())?;
         let dir = Path::new(&home).join("Library").join("LaunchAgents");
-        std::fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        // ⚠️ エラー文にパスを入れない（ホームにはユーザー名＝実名が入りうる）。
+        std::fs::create_dir_all(&dir).map_err(|e| format!("create ~/Library/LaunchAgents: {e}"))?;
         let path = dir.join(format!("{}.plist", super::LAUNCH_AGENT_LABEL));
         std::fs::write(&path, super::launch_agent_plist(exe))
-            .map_err(|e| format!("write {}: {e}", path.display()))?;
+            .map_err(|e| format!("write the plist: {e}"))?;
         Ok(format!("LaunchAgent {}", super::LAUNCH_AGENT_LABEL))
     }
 }
@@ -201,6 +228,9 @@ mod platform {
         let exe = exe
             .to_str()
             .ok_or_else(|| "the executable path is not valid UTF-8".to_string())?;
+        if !super::path_is_registrable(exe) {
+            return Err("the executable path contains control characters".to_string());
+        }
         let subkey = wide(RUN_SUBKEY);
         let name = wide(super::RUN_VALUE_NAME);
         let data = wide(&super::run_value(exe));
@@ -236,25 +266,39 @@ mod platform {
 mod tests {
     use super::*;
 
-    /// ⚠️★★★ 登録するのは「目印由来の O1・G1 でない・印が無い」の 1 通りだけ（全 12 通りを見る）。
+    /// ⚠️★★★ 登録するのは「目印由来の O1・G1 でない・同意確認済み・印が無い」の 1 通りだけ（全 24 通りを見る）。
     #[test]
-    fn registers_only_for_a_first_launch_of_the_o1_distribution() {
+    fn registers_only_for_a_consented_first_launch_of_the_o1_distribution() {
         for o1 in [None, Some(O1Source::Env), Some(O1Source::Marker)] {
             for g1 in [false, true] {
-                for marker in [false, true] {
-                    let want = if o1 == Some(O1Source::Marker) && !g1 && !marker {
-                        AutostartAction::Register
-                    } else {
-                        AutostartAction::Skip
-                    };
-                    assert_eq!(
-                        decide(o1, g1, marker),
-                        want,
-                        "o1={o1:?} g1={g1} marker={marker}"
-                    );
+                for consent in [false, true] {
+                    for marker in [false, true] {
+                        let want = if o1 == Some(O1Source::Marker) && !g1 && consent && !marker {
+                            AutostartAction::Register
+                        } else {
+                            AutostartAction::Skip
+                        };
+                        assert_eq!(
+                            decide(o1, g1, consent, marker),
+                            want,
+                            "o1={o1:?} g1={g1} consent={consent} marker={marker}"
+                        );
+                    }
                 }
             }
         }
+    }
+
+    /// ⚠️ 制御文字を含むパスは登録しない（plist が壊れて黙って起動しなくなる）。
+    #[test]
+    fn paths_with_control_characters_are_not_registrable() {
+        assert!(path_is_registrable(
+            "/Users/p/O1_実施用_macOS/gse-next.app/Contents/MacOS/gse-next"
+        ));
+        assert!(path_is_registrable(r"C:\Users\Taro Yamada\O1\gse-next.exe"));
+        assert!(!path_is_registrable("/Users/p/a\u{1}b/gse-next"));
+        assert!(!path_is_registrable("/Users/p/a\nb/gse-next"));
+        assert!(!path_is_registrable(""));
     }
 
     /// ★ 印は `o1.mode` と同じフォルダに置く（両 OS の配布形）。

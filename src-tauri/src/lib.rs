@@ -1203,6 +1203,13 @@ fn acknowledge_o1_enrollment(participant_id: String) -> Result<(), String> {
     crate::submission::write_o1_participant_id(&participant_id)?;
     crate::submission::write_o1_consent_ack(epoch_ms())?;
     tracing::info!("O1: enrollment acknowledged (participant id registered)");
+    // ★ G-1: 同意確認が済んだので、ここで初めて自動起動を登録してよい（初回に同意した人を取りこぼさない）。
+    //   ⚠️ 失敗しても同意の記録は取り消さない（登録は次の起動でも試される）。
+    crate::autostart::register_if_needed(
+        crate::o1::mode(),
+        g1_mode().is_some(),
+        crate::submission::o1_consent_acknowledged(),
+    );
     Ok(())
 }
 
@@ -2151,7 +2158,13 @@ fn run_reconcile_blocking(app: &tauri::AppHandle) -> Result<Option<String>, Stri
     } else {
         stdout.trim()
     };
-    tracing::error!("G1 auto-submit detail: {}", redact_home_path(raw));
+    // ★ 接頭辞は G1 のまま（G1 のログは変えない）。O1 だけ "O1" にする（security-checker LOW）。
+    let detail_label = if crate::o1::is_o1() { "O1" } else { "G1" };
+    tracing::error!(
+        "{} auto-submit detail: {}",
+        detail_label,
+        redact_home_path(raw)
+    );
     Err(format!(
         "記録の自動送信に失敗しました (未送信 {} 件)。実施はそのまま続けてください。",
         summary
@@ -3875,7 +3888,12 @@ pub fn run() {
             // ── ⚠️★★★ O1 自動起動 (G-1・2026-09-28) ──────────────────────────────
             // ★ single-instance を通った**1 個目**だけがここに来る（2 個目は登録しない）。
             // ⚠️ 配布形 (目印ファイル由来) の O1 の**初回だけ**。判定は `autostart::decide`。
-            crate::autostart::register_if_needed(crate::o1::mode(), g1_mode().is_some());
+            // ⚠️ **O1 の同意確認が済んでいるときだけ**（未確認なら `acknowledge_o1_enrollment` の直後に登録する）。
+            crate::autostart::register_if_needed(
+                crate::o1::mode(),
+                g1_mode().is_some(),
+                crate::submission::o1_consent_acknowledged(),
+            );
 
             // ── ⚠️★★★ O1 (R3-a): 日次ローテート (判断 O1-2 の実施条件 1) ──────────
             //

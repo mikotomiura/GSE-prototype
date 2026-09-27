@@ -41,7 +41,8 @@ pub trait Uploader {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UploadError {
     /// 受け口が `{"ok":false,"error":"too large"}` と答えた（`Form_O1/GSE_O1_Submit.gs:218-219`）。
-    TooLarge,
+    /// ★ 中身は応答の本文。⚠️ 表示は従来の文言のまま（G1 のログを 1 バイトも変えない・code-reviewer MEDIUM）。
+    TooLarge(String),
     /// それ以外（通信・HTTP・受領を確認できない）。
     Other(String),
 }
@@ -49,7 +50,12 @@ pub enum UploadError {
 impl std::fmt::Display for UploadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UploadError::TooLarge => write!(f, "送信先が「大きすぎる」と答えました (too large)"),
+            // ⚠️ G1 でも同じ応答が来る（`Form_G1/GSE_G1_Submit.gs:146-147`）ので、**変更前の文言**を保つ。
+            UploadError::TooLarge(body) => write!(
+                f,
+                "送信先が受領を確認しませんでした: {}",
+                truncate_for_display(body)
+            ),
             UploadError::Other(s) => f.write_str(s),
         }
     }
@@ -635,7 +641,13 @@ pub fn next_block_number(submission_dir: &Path, participant: &str) -> u32 {
 ///
 /// ★ `.age` の名前と台帳の**両方の最大値 + 1** を採る (⚠️ 片方が欠けても番号が戻らない)。
 pub fn next_o1_day_number(submission_dir: &Path, participant: &str) -> u32 {
-    let from_files = crate::submission::list_age_files(submission_dir)
+    // ⚠️★ `oversize/` へ移したものも数える（G-5）。★ さもないと隔離した日の番号を覚えているのが
+    //   台帳だけになり、台帳が欠けたときに番号が戻る（code-reviewer MEDIUM・2026-09-28）。
+    let mut files = crate::submission::list_age_files(submission_dir);
+    files.extend(crate::submission::list_age_files(
+        &submission_dir.join(OVERSIZE_DIR_NAME),
+    ));
+    let from_files = files
         .iter()
         .filter_map(|p| p.file_name().and_then(|s| s.to_str()))
         .filter_map(|n| crate::submission::parse_o1_day_number(n, participant))
@@ -902,7 +914,7 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
                 }
                 // ⚠️★ O1 だけ: 受け口が「大きすぎる」と答えたら、何度送っても届かないので隔離する。
                 //   ★ 受け口の上限が将来こちらの定数より下がっても、再送はここで止まる。
-                Err(UploadError::TooLarge) if opts.mode == CollectionMode::O1 => {
+                Err(UploadError::TooLarge(_)) if opts.mode == CollectionMode::O1 => {
                     let why = format!("送信先が too large と答えました・{} バイト", bytes.len());
                     quarantine_oversize(&mut report, &age, &opts.submission_dir, &why);
                 }
@@ -1033,7 +1045,7 @@ impl Uploader for HttpUploader {
         //   `.sent` になって回収不能になる (送信先から成否を追えない・M-5)。
         if !response_is_ok(&text) {
             if response_is_too_large(&text) {
-                return Err(UploadError::TooLarge);
+                return Err(UploadError::TooLarge(text));
             }
             return Err(UploadError::Other(format!(
                 "送信先が受領を確認しませんでした: {}",
@@ -2213,7 +2225,9 @@ mod tests {
     impl Uploader for TooLargeUploader {
         fn upload(&self, file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
             self.0.lock().unwrap().push(file_name.to_string());
-            Err(UploadError::TooLarge)
+            Err(UploadError::TooLarge(
+                r#"{"ok":false,"error":"too large"}"#.to_string(),
+            ))
         }
     }
 
@@ -2326,6 +2340,13 @@ mod tests {
         let report2 = reconcile(&opts(&d, &o, &r), Some(&tl));
         assert_eq!(report2.quarantined, 0);
         assert_eq!(report2.unsent, 1, "★ G1 は未送信のまま残る (従来の挙動)");
+        // ⚠️ G1 のエラー文言は変更前と同じ（applog に残る文字列を変えない）
+        assert_eq!(
+            report2.errors,
+            vec![format!(
+                "{name2} を送信できません: 送信先が受領を確認しませんでした: {{\"ok\":false,\"error\":\"too large\"}}"
+            )]
+        );
         assert!(o.join(&name2).exists());
         assert!(!o.join(OVERSIZE_DIR_NAME).exists());
 
@@ -2404,6 +2425,21 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ⚠️★ 台帳 `manifest.jsonl` が欠けても、隔離した日の番号は再利用しない（`oversize/` も数える）。
+    #[test]
+    fn o1_day_number_counts_quarantined_files_even_without_the_manifest() {
+        let o = tmpdir("g5num_out");
+        std::fs::create_dir_all(o.join(OVERSIZE_DIR_NAME)).unwrap();
+        write_sized(
+            &o.join(OVERSIZE_DIR_NAME),
+            "P012_o1day03_gse_o1_20260928_010101.age",
+            1,
+        );
+        assert!(!o.join(MANIFEST_FILE_NAME).exists());
+        assert_eq!(next_o1_day_number(&o, "P012"), 4);
         let _ = std::fs::remove_dir_all(&o);
     }
 }

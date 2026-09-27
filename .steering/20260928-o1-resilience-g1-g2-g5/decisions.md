@@ -47,3 +47,31 @@
 - **grill 判断 1 との関係**: 研究者が選んだのは「OS のログイン時起動を既定 ON で自動登録する」という到達点で、手段の変更は承認済み。
 
 ## 判断 10: 小実験の段階 A は Claude が実行する（研究者許可・2026-09-28）
+- 段階 A を実施した（結果は `g1-mac-autostart-experiment.md`）。
+
+## 判断 11: README・同意文書の文面（研究者承認 2026-09-28「1-3 ok」）
+- README【3】の手動登録手順を削り、自動設定と切り方に差し替え／【4】にやめるときの段落／持ち物に `o1.autostart`。同意文書 §3 に 1 文追加（上流 `consent-draft-o1.md` → `Form_O1/GSE_O1_Form_Builder.gs` の順）。
+- ⚠️ 承認後に 1 か所だけ文言を変えた: 「最初に開いたとき」→「**最初に開いて参加の確認を済ませると**」（判断 12 で登録を同意確認の後にしたため、事実に合わせた）。研究者に報告する。
+- ⚠️ フォームの文面変更は、研究者が O1 同意フォームを配備し直すまで被験者に届かない。
+
+## 判断 12: レビュー対応（code-reviewer / security-checker・2026-09-28・一次で確かめてから反映）
+| 指摘 | 対応 |
+|---|---|
+| CR HIGH: 同意確認（R-7）より前に自動起動を登録する | ✅ `decide` に `consent_acknowledged` を追加。起動時と `acknowledge_o1_enrollment` の直後の 2 か所で呼ぶ。24 通りのテスト＋変異 |
+| SC HIGH / CR MEDIUM: やめても登録が残り、ログインで記録が再開する | ✅ 削除台帳 B-8 と §2 末尾（取りやめでは削除の求めが無くても外してもらう）。README【4】に手順。⚠️ 「`o1.mode` が無いとき自分で外す」は採らない（フォルダを残した人には効かないため） |
+| CR MEDIUM: G1 のエラー文言が変わる | ✅ `TooLarge(String)` にして Display は従来の文言。G1 のテストで文字列一致を確認＋変異 |
+| CR MEDIUM: G1 の要約行に `quarantined:0` が増える | ✅ 1 以上のときだけキーを足す（G1 は常に 0 → 行は不変） |
+| CR MEDIUM: 台帳が欠けると隔離した日の番号が戻る | ✅ `next_o1_day_number` が `oversize/` も数える。台帳なしのテスト＋変異 |
+| SC MEDIUM: 失敗時のログにホームのパス（実名） | ✅ エラー文からパスを外した |
+| SC MEDIUM: 制御文字で plist が壊れて黙って起動しない | ✅ `path_is_registrable` で拒否（両 OS）＋テスト＋変異 |
+| CR LOW: 印を置けない場所で毎回再登録 | ✅ 印を先に書き、書けなければ登録しない。登録に失敗したら印を戻す |
+| CR LOW: `anyhow::Result` に揃える | ❌ 採らない: **`anyhow` はこの crate の依存に無い**（`Cargo.toml` に 0 件・実測）。既存の `reconcile.rs` と同じ `Result<String, String>` |
+| SC LOW: 誤って隔離されたときの戻し方 | ✅ 台帳 B-4b に 1 行 |
+| SC LOW: O1 でもログ接頭辞が「G1 auto-submit detail」 | ✅ O1 のときだけ "O1"（G1 は不変） |
+| CR LOW: 置き場の一覧に autostart.rs | ✅ agent-shared 制約 11・repository-structure |
+| CR LOW: スリープ復帰で定期とローテートが同じ周回に重なる | 見送り（後着はロックで Busy になるだけ・取りこぼし無し） |
+| CR LOW: 端末側に隔離中の状態表示が無い | 見送り（研究者の検知は受領台帳の欠番に頼る設計どおり） |
+| SC LOW: 新しい版のフォルダで macOS のオフ状態が残るか | ⏳ 段階 B で確かめる |
+
+検証: `cargo test --workspace --features package` 830 passed／fmt／clippy `-D warnings`（package あり・なし）rc=0／Windows 用コードは最小クレートで clippy rc=0（壊すと E0308 で赤になる陽性対照つき）／フォーム 221 ケース・変異 64/64／`make-common-app-zip.sh --selftest` 19/19。
+⚠️ 単体テストで確かめていないもの: ローテートスレッドへの配線（60 秒ループ）・`register_if_needed` の IO（印の先書き）・submit.rs の要約行の条件。→ 実機（段階 B）と CI で見る。

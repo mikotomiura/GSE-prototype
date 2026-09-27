@@ -415,21 +415,22 @@ fn main() -> ExitCode {
             let mut o = io::stdout().lock();
             // ★ 呼び出し元 (アプリ) が読む 1 行。⚠️ ファイル名も参加者 ID も出さない
             //   (画面・ログに載るため・data-privacy)。**件数だけ**を出す。
-            let _ = writeln!(
-                o,
-                "GSE_RECONCILE {}",
-                serde_json::json!({
-                    "packaged": r.packaged,
-                    "sent": r.sent,
-                    "unsent": r.unsent,
-                    "upload_disabled": r.upload_disabled,
-                    "skipped_busy": r.skipped_busy,
-                    "awaiting_approval": r.awaiting_approval,
-                    // ★ G-5: 受け口の上限を超えて送らずに `oversize/` へ移した本数（O1 のみ）。
-                    "quarantined": r.quarantined,
-                    "errors": r.errors.len(),
-                })
-            );
+            let mut summary = serde_json::json!({
+                "packaged": r.packaged,
+                "sent": r.sent,
+                "unsent": r.unsent,
+                "upload_disabled": r.upload_disabled,
+                "skipped_busy": r.skipped_busy,
+                "awaiting_approval": r.awaiting_approval,
+                "errors": r.errors.len(),
+            });
+            // ★ G-5: 受け口の上限を超えて送らずに `oversize/` へ移した本数（O1 のみ）。
+            //   ⚠️ **1 以上のときだけ**キーを足す —— G1 は常に 0 なので、G1 の要約行は変わらない
+            //   （凍結・code-reviewer MEDIUM）。読む側はキーを名前で引く（`lib.rs` `summary_count`）。
+            if r.quarantined > 0 {
+                summary["quarantined"] = serde_json::json!(r.quarantined);
+            }
+            let _ = writeln!(o, "GSE_RECONCILE {summary}");
             for e in &r.errors {
                 let _ = writeln!(io::stderr(), "gse-submit: {e}");
             }
