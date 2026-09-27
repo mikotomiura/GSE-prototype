@@ -10,6 +10,7 @@
 #   `--max-turns` のような非掲載フラグは実行結果 (subtype/num_turns) で裏取りしている。
 #
 #   使い方: bash scripts/loop-run.sh <task-dir> [--parallel N] [--issues 001,002] [--dry-run]
+#   終了コード: 0 = 完走 (失敗した issue があっても・token_ceiling で中止しても) / 3 = 境界侵害で run を中止 / 1 = 起動前エラー
 set -uo pipefail
 
 PREFIX="[loop-run]"
@@ -127,11 +128,22 @@ emit() { # emit <issue> <phase> <event> [k=v ...]
 #     「安全設定が消されていた」という**無人ループで最も記録に値する事実**が
 #     events に 1 行も残らない。★ 検知（記録）と回復（再注入）を分ける。
 DENY_SH="$MAIN_ROOT/scripts/loop-worktree-deny.sh"
+# ⚠️★★★ **境界侵害の印**（★ 2026-09-27・`security-checker` MEDIUM）。
+#   ★ ensure_deny / ensure_branch が blocked を返すのは「worker を隔離できていない」ときであり、
+#     ⚠️ 同じ run で次の issue を spawn すると、逸脱した worker が base に残したものから切りうる。
+#   ★ run_issue はバックグラウンドのサブシェルで動き変数を親へ返せないので、**ファイル**で伝える。
+#     親の DAG ループがバッチの後にこれを見て run を中止する。
+#   ⚠️ 書けなかったら黙らない（★ `code-reviewer` LOW: 印が消えると run が続く = fail-open）。
+mark_boundary_breach() {
+  printf '%s\n' "$1" >> "$WORK_TMP/boundary-breach" 2>/dev/null \
+    || log "⚠️★★★ 境界侵害の印を書けなかった (issue $1)。run は止まらない可能性がある —— events の blocked を確認すること"
+}
 ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 deny が効いている
   local id="$1" phase="$2" attempt="$3" wt="$4"
   if [ ! -f "$DENY_SH" ]; then
     emit "$id" "$phase" blocked attempt="$attempt" \
          detail="必須 deny の注入スクリプトが無い: $DENY_SH"
+    mark_boundary_breach "$id"
     return 1
   fi
   bash "$DENY_SH" --verify "$wt" >/dev/null 2>&1 && return 0
@@ -151,6 +163,7 @@ ensure_deny() { # ensure_deny <issue> <phase> <attempt> <worktree>; 0 = 必須 d
   bash "$DENY_SH" "$wt" >/dev/null 2>&1 && return 0
   emit "$id" "$phase" blocked attempt="$attempt" \
        detail="worktree の必須 permissions.deny を保証できない (注入/検査に失敗)。deny 無しでは起動しない"
+  mark_boundary_breach "$id"
   return 1
 }
 
@@ -211,11 +224,13 @@ ensure_branch() { # ensure_branch <issue> <phase> <attempt> <worktree> [worktree
     *)
       emit "$id" "$phase" blocked attempt="$attempt" \
            detail="worktree が loop/$id-* から外れている (HEAD=${head:-取得不能})。別ブランチを verify しないため停止する。★ worktree は残す: ${wt} ／ ★ 撤去は「bash scripts/loop-spawn.sh --cleanup ${id}」(★ 2026-09-21 に起票 18 を是正し、逸脱した worktree も**パスで**引いて撤去できるようになった。⚠️ 撤去できなければ非 0 で止まる)"
+      mark_boundary_breach "$id"
       return 1 ;;
   esac
   if [ -n "$base" ] && ! git -C "$wt" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
     emit "$id" "$phase" blocked attempt="$attempt" \
          detail="worktree の履歴が入れ替わっている (HEAD=$head が worktree 生成時の $base の子孫でない)。★ reset --soft/--mixed や branch -f で中身が差し替わった可能性。★ worktree は残す: $wt"
+    mark_boundary_breach "$id"
     return 1
   fi
   return 0
@@ -631,7 +646,28 @@ check_wt_became_blocked() { # check_wt_became_blocked <id> <wt> <attempt> <was-b
 }
 
 # ---------- 1 issue の attempt ループ ----------
+# ⚠️★★★ **失敗で抜けたら、最後にもう一度ブランチを見る**（★ 2026-09-27・`code-reviewer` MEDIUM）。
+#   ★ `ensure_branch` は attempt 冒頭・verify 直前・issue_done 直前でしか呼ばれない。
+#     ⚠️ **最終 attempt の verify / watchdog の最中**に HEAD が動くと（verify.test は worker が書いたテストを走らせる）、
+#     abandoned / no_progress_stop / watchdog NG / verify 赤のどの出口でも `ensure_branch` を通らずに抜け、
+#     境界侵害の印が付かず、同じ run の次のバッチが spawn されていた。
+#   → ★ 本体 (`run_issue_body`) の出口を 1 つずつ塞がず、**出口の外側で 1 回だけ**見る。
+#     ★ 本体は worktree とアンカーを `$WORK_TMP/wt-<id>` に残す（★ サブシェルなので変数では渡らない）。
+#     ⚠️ すでに印が付いた issue は見直さない（★ 同じ blocked を 2 回 emit しない）。
 run_issue() {
+  local id="$1" rc=0 wt anchor last
+  run_issue_body "$id" || rc=$?
+  [ "$rc" -ne 0 ] || return 0
+  [ -f "$WORK_TMP/wt-$id" ] || return "$rc"
+  grep -qxF -e "$id" "$WORK_TMP/boundary-breach" 2>/dev/null && return "$rc"
+  wt="$(sed -n 1p "$WORK_TMP/wt-$id")"; anchor="$(sed -n 2p "$WORK_TMP/wt-$id")"
+  [ -d "$wt" ] || return "$rc"
+  last="$(jq -s --arg i "$id" '[.[] | select(.issue==$i and (.attempt|type)=="number") | .attempt] | max // 0' "$EVENTS" 2>/dev/null || echo 0)"
+  ensure_branch "$id" verify "${last:-0}" "$wt" "$anchor" || true
+  return "$rc"
+}
+
+run_issue_body() {
   local id="$1" wt attempt=1 same=0 last_fp="" fp wt_anchor wt_blocked_at_start=0
   # ⚠️★★★ verify が生成した未追跡パスの集合 (判断 10)。attempt をまたいで蓄積する
   #   (前 attempt が残した生成物は次の attempt でも未追跡のまま残るため)。issue ごとに 1 本、
@@ -690,6 +726,7 @@ run_issue() {
   #     ⚠️ **他ブランチへの差し替えだけが不一致になる**。
   #   ⚠️ 取れなければ空のまま進む（★ 名前の検査は base 無しでも効く。fail-open にはしない）。
   wt_anchor="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+  printf '%s\n%s\n' "$wt" "$wt_anchor" > "$WORK_TMP/wt-$id" 2>/dev/null || true
 
   # ⚠️★★★ worktree 生成直後の Status を記録する (2026-09-25 追加)。
   #   ★ `--issues` で最初から blocked な issue を明示実行する経路 (BYPASSED_BLOCKED) では
@@ -1030,7 +1067,8 @@ if [ -f "$EVENTS" ]; then
   [ "$DONE_COUNT" -gt 0 ] && log "events から完了済みを復元: ${DONE_IDS[*]}"
 fi
 
-is_done() { printf '%s\n' "${DONE_IDS[@]:-}" | grep -qx "$1"; }
+# ★ `-F`: id は `.` を含みうる（`issue_ids` の検証が許す）ので、正規表現として比べない。
+is_done() { printf '%s\n' "${DONE_IDS[@]:-}" | grep -qxF -e "$1"; }
 deps_met() { local d; for d in $(issue_deps "$1"); do is_done "$d" || return 1; done; return 0; }
 
 # 自己依存・存在しない依存を起動前に検出して die する (デッドロックで黙って止まらないため)
@@ -1079,9 +1117,28 @@ if [ "$DRY_RUN" = "1" ]; then
 fi
 
 log "開始: task=$(jq -r .task "$CFG") parallel=$PARALLEL mode=C"
-remaining="$ALL"; progressed=1
-while [ -n "$remaining" ] && [ "$progressed" = "1" ]; do
-  progressed=0; batch=""
+# ⚠️★★★ 継続条件は「`deps_met` が真の issue がまだ `remaining` にあるか」だけ（★ 2026-09-27 是正）。
+#   ⚠️ 旧実装は `progressed`（そのバッチで issue_done が 1 件でも出たか）でも止めていたため、
+#     parallel=1 で**無関係な issue 1 本が失敗しただけで**ループを抜け、依存を満たしているのに
+#     まだ試していない issue まで末尾で「依存 issue が未完のため未実行」の blocked にしていた
+#     （★ 実測: `.steering/20260927-precondition8-t3-and-consent/blockers.md` §1）。
+#   ★ 「試せる issue が無い」の判定は下の `[ -n "$batch" ] || break` が持つ。
+#   ★ **停止と非再試行の保証**: バッチの issue は成否に関わらず `remaining` から外れるので、
+#     1 周ごとに `remaining` は必ず 1 件以上減る（＝ 同じ issue を同じ run で再試行しない・
+#     周回は高々 issue 数）。⚠️ この「成否に関わらず外す」を崩すなら、再試行ガードを別に要る。
+#   ⚠️ ただし保証は**この 1 プロセスの中**だけ。`--issues` なしで同じ task を再実行すると、
+#     `issue_done` 済みの issue も再び spawn される（★ 既存の挙動・done は ALL から外さない）。
+# ⚠️★★★ run 全体を止める条件は 2 つだけ（★ 2026-09-27・`security-checker` MEDIUM / LOW）:
+#   (a) 境界侵害 (`mark_boundary_breach`) —— 旧実装では parallel=1 の「どれか 1 本の失敗で抜ける」が
+#       **偶然** fail-closed として効いていた。⚠️ それを消したので、意図した停止として入れ直す。
+#   (b) token_ceiling 超過 —— バッチを組む前に見る（★ 超過後に worktree / branch を作らない）。
+#   ★ 通常の失敗 (verify 赤・max_attempts・no_progress) では止めない（★ それが今回の是正）。
+remaining="$ALL"; stop_reason=""; stop_kind=""
+while [ -n "$remaining" ]; do
+  if [ "$(tokens_used)" -ge "$TOKEN_CEIL" ]; then
+    stop_kind="token_ceiling"; stop_reason="token_ceiling 超過のため run を中止し未実行"; break
+  fi
+  batch=""
   for id in $remaining; do
     deps_met "$id" || continue
     batch="$batch $id"
@@ -1094,14 +1151,21 @@ while [ -n "$remaining" ] && [ "$progressed" = "1" ]; do
   for id in $batch; do
     # キー順に依存しないよう jq で判定する (grep の順序前提は静かに壊れる)
     if jq -e -s --arg i "$id" 'any(.[]; .issue==$i and .event=="issue_done")' "$EVENTS" >/dev/null; then
-      DONE_IDS+=("$id"); progressed=1
+      DONE_IDS+=("$id")
     fi
-    remaining="$(printf '%s\n' $remaining | grep -vx "$id" || true)"
+    remaining="$(printf '%s\n' $remaining | grep -vxF -e "$id" || true)"
   done
+  if [ -s "$WORK_TMP/boundary-breach" ]; then
+    stop_kind="boundary"
+    stop_reason="境界侵害 (issue $(sort -u "$WORK_TMP/boundary-breach" | tr '\n' ' ' | sed 's/ $//')) のため run を中止し未実行"
+    break
+  fi
 done
 
-# 依存先が落ちて起動できなかった issue を明示的に blocked にする (握りつぶさない)
-for id in $remaining; do emit "$id" execute blocked detail="依存 issue が未完のため未実行"; done
+# 起動できなかった issue を明示的に blocked にする (握りつぶさない)。
+#   ★ 既定の理由は「依存先が落ちた」。run を中止したときはその理由を書く。
+[ -n "$stop_reason" ] && log "⚠️ $stop_reason"
+for id in $remaining; do emit "$id" execute blocked detail="${stop_reason:-依存 issue が未完のため未実行}"; done
 
 # ---------- レポート ----------
 REPORT="$TASK_DIR/_loop-run-report.md"
@@ -1124,6 +1188,18 @@ REPORT="$TASK_DIR/_loop-run-report.md"
     done
     echo; echo "★ 承知で回すなら \`--issues$(printf '%s' "$SKIPPED_BLOCKED" | tr ' ' ',')\` を付ける。"
   fi
+  # ⚠️ run を中止したことを report にも残す（★ `code-reviewer` MEDIUM: log と各 issue の detail にしか出ていなかった）。
+  if [ -n "$stop_reason" ]; then
+    echo; echo "## ⚠️ run を中止した理由"
+    echo; echo "- $stop_reason"
+    [ "$stop_kind" = "boundary" ] && echo "- ★ worktree は残してある。原因を確かめてから \`bash scripts/loop-spawn.sh --cleanup <id>\` で撤去する。"
+  fi
   echo; echo "次: /loop-status で board を確認 → 全緑なら code-reviewer(Opus) と /cross-review"
 } > "$REPORT"
 log "レポート: $REPORT"
+
+# ⚠️★★★ 境界侵害で中止したら **非 0 で終わる**（★ 2026-09-27 判断 6）。
+#   ★ 無人の呼び出し元（nohup / cron）が「通常終了」と区別できるように。
+#   ★ token_ceiling は予定された予算の停止なので 0 のまま（report と events には残る）。
+[ "$stop_kind" = "boundary" ] && exit 3
+exit 0
