@@ -195,6 +195,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |
 | `docs/o1-deletion-ledger.md` | ⚠️★★★ **進行中の O1 の削除保証台帳**。被験者からの削除要求に対応する時（★ 同意文書が逐語で約束している「記録に残します」の実体） |
+| `docs/o1-distribution-tag.md` | ★ **O1 の配布物を作る / 配る時**。`--mode o1` に使ってよいリリースタグ（最新節）・zip の SHA-256・実体検証の記録。⚠️ G1 の配布タグ（`experiments/20260801-controlled-friction-task/distribution-tag.md`）とは別 |
 | `docs/g1-deletion-ledger.md` | ⚠️★★★ **G1 の削除保証台帳**。G1 の被験者からの削除要求に対応する時（★ O1 版と対になる文書・前提条件 8） |
 | `docs/person-lifecycle-ledger-template.md` | 人単位のライフサイクル台帳（G1/O1 それぞれの進み具合・「やめた」「削除の求め」の記録）を構築・参照する時 |
 | `docs/architecture/intervention-decision-engine.md` | 介入決定エンジン (Layer 5-7) の設計を確認する時 |

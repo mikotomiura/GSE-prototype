@@ -17,3 +17,12 @@
 
 ## D5 package-lock.json は触らない（一次確認）
 - `package-lock.json` の版は `0.1.21` のまま（v0.1.36 の T1 も「4 ファイル」で揃えており、前例どおり）。配布バイナリの版は tauri.conf.json / Cargo.toml が決める。
+
+## D6 修正の目印は gse-submit で見る（実測 2026-09-27）
+- reconcile は `gse-submit` に入り、`gse-next` には入らない（`gse-next` / `gse-next.exe` では v0.1.36・v0.1.37 とも `reconcile.lock` すら 0 件）。
+- `gse-submit` で新 warn メッセージ `lock heartbeat` / `taken over or removed` が v0.1.37=1・v0.1.36=0、旧来の `taking over a stale lock` が両方 1（陽性対照）。記録は `docs/o1-distribution-tag.md`。
+
+## D7 並行セッションとのチェックアウト共有事故（2026-09-27）
+- 同じ作業ツリーで並行セッション（loop-run.sh 修正）が `git checkout -b fix/loop-run-progress-flag` した直後に私がコミットし、版上げコミット `7798874` がそちらのブランチに載った。
+- 対処: 私のブランチ ref を `7798874` に付け替え、以後は `../GSE-o1-tag` の worktree で作業。並行セッション側ブランチの `reset --keep` は権限で拒否されたため研究者へ委ねた。
+- 教訓: 並行実行可能な引き継ぎでも、**チェックアウトを共有するなら並行ではない**。最初から worktree を切る。
