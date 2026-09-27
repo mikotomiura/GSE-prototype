@@ -717,6 +717,13 @@
   },
   "sample_roster": {
     "_note": "誰が確証標本かの単一の正。analyze.py はここだけを見る (blocks/*.json は gitignore 対象でこの端末にしか無いため参照しない)。preregistration.md 2.4 / 2.8。★ 第 18 版 (2026-09-03): 資材の欠陥 (HI 教示文の強調が壊れて表示された) により P007/P014/P016 をパイロットへ降格し、確証標本を 0/3 名へ戻した。⚠️ 3 人目は未募集であり、その人が走る前にここへ追記する (design.n_subjects は 3 のまま)。★ P010 は第 17 版でパイロットへ降格済み。",
+    "registered_k": 2,
+    "recruitment_closed": {
+      "_note": "★ 募集を締めたかどうか。⚠️ analyze.py:196-200 の門の唯一の鍵。preregistration.md 第 20 版 (i)(ii) の規則を実行するために 2026-09-27 に追加した（事前登録の改訂ではない）。外した人の内訳はここに書かない（公表物の書き方）。",
+      "closed": false,
+      "date": null,
+      "decided_before_seeing_results": null
+    },
     "confirmatory": [
       "P017",
       "P018"

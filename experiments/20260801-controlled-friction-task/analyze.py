@@ -125,11 +125,12 @@ def check_subject_matches_filename(stem: str, spec: dict) -> str | None:
 
 
 def resolve_sample(roster: dict | None, n_subjects, subjects_present: list[str]
-                   ) -> tuple[list[str], list[dict], list[str]]:
+                   ) -> tuple[list[str], list[dict], list[str], list[str]]:
     """★ **誰を確証標本として解析するか**を決める（`§2.4` / `§2.8`）。
 
-    戻り値 `(解析する被験者, 外した被験者と理由, エラー文言)`。
-    エラーが 1 件でもあれば呼び出し側は**止める**。
+    戻り値 `(解析する被験者, 外した被験者と理由, エラー文言, NOTE文言)`。
+    エラーが 1 件でもあれば呼び出し側は**止める**。NOTE は止めない
+    （前提条件 8 / A-2・2026-09-27: `recruitment_closed.closed=true` で n 未達の NG を緩めた時に出す）。
 
     ⚠️★★ **なぜ要るか（2026-08-10 に実測）**: それまで `analyze.py` は割付ファイルの
     `confirmatory` フラグを**一度も見ていなかった**うえ、glob `P*.json` は
@@ -148,13 +149,14 @@ def resolve_sample(roster: dict | None, n_subjects, subjects_present: list[str]
     """
     errors: list[str] = []
     excluded: list[dict] = []
+    notes: list[str] = []
 
     # ⚠️★ 境界 1: キーが無い。「古い config なら全員」と読むと**保護が黙って消える**。
     if not isinstance(roster, dict):
         return [], [], [
             "[NG] config.json に sample_roster が無い。★ 誰が確証標本かを決められないので解析しない"
             "（preregistration.md §2.4 / §2.8）。"
-            'sample_roster: {"confirmatory": [...], "pilot": [...], "shakedown": [...]} を書く']
+            'sample_roster: {"confirmatory": [...], "pilot": [...], "shakedown": [...]} を書く'], []
 
     lists: dict[str, list[str]] = {}
     for kind in ROSTER_KINDS:
@@ -183,6 +185,19 @@ def resolve_sample(roster: dict | None, n_subjects, subjects_present: list[str]
     if not conf:
         errors.append("[NG] sample_roster.confirmatory が空。★ 確証標本が 0 名では解析できない")
 
+    # ⚠️★ 境界 7（前提条件 8 / A-2・2026-09-27）: registered_k の矛盾は NG。
+    #   ★ registered_k（名簿に載せた人数・台帳の値）が confirmatory の人数より小さいと、
+    #     台帳と config がずれている ＝ **黙認しない**（台帳は issue 004 の仕様書が持つ）。
+    registered_k = roster.get("registered_k")
+    if registered_k is not None:
+        if not isinstance(registered_k, int) or isinstance(registered_k, bool):
+            errors.append(f"[NG] sample_roster.registered_k が整数でない: {registered_k!r}")
+        elif registered_k < len(conf):
+            errors.append(
+                f"[NG] sample_roster.registered_k の矛盾: registered_k={registered_k} が "
+                f"confirmatory の人数 {len(conf)} より小さい。★ 台帳（募集した人数）と "
+                f"config のずれを黙認しない")
+
     present = set(subjects_present)
     # ⚠️★ 境界 3: roster に居るのに割付ファイルが無い ＝ **欠員**。黙って n-1 で解析しない。
     missing = [s for s in conf if s not in present]
@@ -193,11 +208,22 @@ def resolve_sample(roster: dict | None, n_subjects, subjects_present: list[str]
     # ⚠️★★ 境界 5: 収集済みが n に達していない。**§2.4-4（optional stopping の禁止）の機械化**。
     #   ★ これまで「凍結した n 分が揃うまで見ない」は努力目標だった
     #     （`§5.3` の封印が `§3.4` を機械化したのと同じ形をここにも入れる）。
+    #   ★ 前提条件 8 / A-2（2026-09-27）: `recruitment_closed.closed=true`（募集を締めた）
+    #     ときに限り、この NG を [NOTE] に緩める。⚠️ 既定（キー無し・false）は 1 ビットも変えない
+    #     （preregistration.md 第 20 版 (i)(ii) の規則を実行する。事前登録の改訂ではない）。
+    rc = roster.get("recruitment_closed")
+    recruitment_closed = bool(rc.get("closed")) if isinstance(rc, dict) else False
     if isinstance(n_subjects, int) and not isinstance(n_subjects, bool):
         if len(conf) < n_subjects:
-            errors.append(
-                f"[NG] 確証標本が {len(conf)} 名で、凍結した n={n_subjects} に達していない。"
-                f"★ 揃うまで解析結果を見ない（§2.4-4 optional stopping の禁止）")
+            if recruitment_closed:
+                notes.append(
+                    f"[NOTE] 確証標本が {len(conf)} 名で、凍結した n={n_subjects} に達していないが、"
+                    f"募集を締めた（sample_roster.recruitment_closed.closed=true）ため"
+                    f"収集完了として続行する（preregistration.md 第 20 版 (i)(ii)）。")
+            else:
+                errors.append(
+                    f"[NG] 確証標本が {len(conf)} 名で、凍結した n={n_subjects} に達していない。"
+                    f"★ 揃うまで解析結果を見ない（§2.4-4 optional stopping の禁止）")
     else:
         errors.append(f"[NG] config.json の design.n_subjects が数値で凍結されていない "
                       f"(実際: {n_subjects!r})。★ 確証データより前に凍結する（§2.4-2）")
@@ -212,7 +238,21 @@ def resolve_sample(roster: dict | None, n_subjects, subjects_present: list[str]
             excluded.append({"subject": s, "reason": kind})
 
     analysed = [s for s in conf if s in present]
-    return analysed, excluded, errors
+    return analysed, excluded, errors, notes
+
+
+def check_zero_analysed(analysed_m: int) -> str | None:
+    """★ 完了者が 0 名になったら確証解析は行えない（preregistration.md 第 20 版 (ii)(c)）。
+
+    `analysed_m` は `cohort_verdict()` が出す `n_subjects_analysed`（主判定が skip でない被験者数）。
+    ⚠️ `resolve_sample` の n 未達ゲート（境界 5）とは別の問い: `recruitment_closed` で
+    その NG を緩めても、**主判定が 1 件も出せる被験者がいなければ解析にならない**。
+    ★ 純関数（NG 文言または None を返すだけ）。
+    """
+    if analysed_m == 0:
+        return ("[NG] 確証解析の対象（解析 m = n_subjects_analysed）が 0 名。"
+                "★ 完了者が 0 名になったら確証解析は行えない（preregistration.md 第 20 版 (ii)(c)）。")
+    return None
 
 
 def session_starts(path: pathlib.Path) -> tuple[int, list[int]]:
@@ -1070,8 +1110,9 @@ def main() -> int:
             print(msg)
             return 1
         specs_loaded.append((p, spec_))
-    analysed, excluded, roster_errors = resolve_sample(
-        cfg_all.get("sample_roster"),
+    roster_cfg = cfg_all.get("sample_roster")
+    analysed, excluded, roster_errors, roster_notes = resolve_sample(
+        roster_cfg,
         cfg_all.get("design", {}).get("n_subjects"),
         [p.stem for p in specs])
     if roster_errors:
@@ -1079,6 +1120,13 @@ def main() -> int:
             print(m)
         print("     ★ 単一の正は config.json の sample_roster（blocks/*.json ではない）。")
         return 1
+    # ★ 前提条件 8 / A-2（2026-09-27）: 募集を締めた（recruitment_closed.closed=true）ため
+    #   n 未達の NG を続行に緩めたことを **[NOTE] で必ず可視化する**（黙って緩めない）。
+    for note in roster_notes:
+        print(note)
+    _rc_cfg = roster_cfg.get("recruitment_closed") if isinstance(roster_cfg, dict) else None
+    recruitment_closed = bool(_rc_cfg.get("closed")) if isinstance(_rc_cfg, dict) else False
+    registered_k = roster_cfg.get("registered_k") if isinstance(roster_cfg, dict) else None
     # ⚠️ 外した被験者は**黙って消さない**（decisions D-5）。理由つきで出し、結果にも刻む。
     for e in excluded:
         print(f"[warn] {e['subject']} を確証解析から外した（sample_roster: {e['reason']}）")
@@ -1116,6 +1164,14 @@ def main() -> int:
     pcs = [s["positive_control"] for s in per_subject if not s["positive_control"].get("skipped")]
     status, interp, why = interpretability(mchecks, pcs)
 
+    verdict = cohort_verdict(per_subject, interp, why)
+    # ★ 解析 m = n_subjects_analysed（feature set 間で同じ値。§20 版 (ii)(c) のゲート）。
+    analysed_m = next(iter(verdict.values()))["n_subjects_analysed"] if verdict else 0
+    m_gate = check_zero_analysed(analysed_m)
+    if m_gate:
+        print(m_gate)
+        return 1
+
     result = {
         "experiment": "20260801-controlled-friction-task",
         "gate": "G1",
@@ -1147,10 +1203,18 @@ def main() -> int:
             "analysed": analysed,
             "excluded": excluded,
         },
+        # ⚠️★★ 前提条件 8 / A-2（2026-09-27）: 登録 k / 解析 m を締めの宣言と一緒に必ず刻む。
+        #   ★ 内訳（未完了・やめた・削除の求め）は書かない（preregistration.md 第 20 版「公表物の書き方」）。
+        "sample_counts": {
+            "registered_k": registered_k,
+            "analysed_m": analysed_m,
+            "recruitment_closed": recruitment_closed,
+            "note": "内訳（未完了・やめた・削除の求め）は書かない（preregistration.md 第 20 版「公表物の書き方」）",
+        },
         "reading_order_3_4": ["1_manipulation_check", "2_positive_control", "3_feature_sets"],
         "1_manipulation_check": mchecks or {"supplied": False},
         "2_positive_control": {s["subject"]: s["positive_control"] for s in per_subject},
-        "3_verdict": cohort_verdict(per_subject, interp, why),
+        "3_verdict": verdict,
         "per_subject": per_subject,
         "subjects_with_invalid_assignment_files": errored,
         "constants": {"lambda": LAMBDA, "silence_ms": SILENCE_MS,
@@ -1557,7 +1621,7 @@ def selftest() -> int:
     PRESENT = ["P010", "P011", "P012", "P013", "PILOT-mac", "PILOT-win"]
 
     # ★ 正常系: confirmatory の 3 名だけが解析に入る
-    got, exc, errs = resolve_sample(ROSTER, 3, PRESENT)
+    got, exc, errs, _notes = resolve_sample(ROSTER, 3, PRESENT)
     if errs:
         fails.append(f"★ 正常な roster でエラーになった: {errs[0]}")
     if got != ["P011", "P012", "P013"]:
@@ -1579,7 +1643,7 @@ def selftest() -> int:
     if not resolve_sample(ROSTER, 3, ["P011", "P012", "PILOT-mac"])[2]:
         fails.append("★ 確証標本に欠員があるのに通してはならない")
     # ⚠️★ 境界 4: roster のどこにも無い割付ファイル → **報告して除外**（止めはしない）
-    got4, exc4, errs4 = resolve_sample(ROSTER, 3, PRESENT + ["P099"])
+    got4, exc4, errs4, _notes4 = resolve_sample(ROSTER, 3, PRESENT + ["P099"])
     if errs4:
         fails.append(f"★ 未登録の割付ファイルで止めてはならない（報告して外す）: {errs4[0]}")
     if {e["subject"]: e["reason"] for e in exc4}.get("P099") != "not_in_roster":
@@ -1587,6 +1651,40 @@ def selftest() -> int:
     # ⚠️★ 境界 5: 収集済みが n に達していない → 止まる（§2.4-4 optional stopping の禁止）
     if not resolve_sample(dict(ROSTER, confirmatory=["P011", "P012"]), 3, PRESENT)[2]:
         fails.append("★★ n 未達で解析を通してはならない（§2.4-4 の機械化）")
+
+    # ⚠️★★ 境界 5 の拡張（前提条件 8 / A-2・2026-09-27）: 募集を締めたか否かで
+    #   n 未達の扱いが分岐する（preregistration.md 第 20 版 (i)(ii) の規則の機械化）。
+    # ★ negative control: 締めていなければ n 未達は NG のまま（既定を緩めない）
+    _, _, errs_open, notes_open = resolve_sample(
+        dict(ROSTER, confirmatory=["P011", "P012"], recruitment_closed={"closed": False}),
+        3, PRESENT)
+    if not errs_open:
+        fails.append("★★ 締めていなければ n 未達は NG のまま、のはずが通してしまった"
+                     "（closed=false で保護が緩んだ）")
+    if notes_open:
+        fails.append("★ 締めていないのに NOTE を出している（NG のときに NOTE は要らない）")
+    # ★ 締めた後は n=1 でも解析する（NG を出さず、NOTE を出して続行する）
+    _, _, errs_closed, notes_closed = resolve_sample(
+        dict(ROSTER, confirmatory=["P011"], recruitment_closed={"closed": True}),
+        3, PRESENT)
+    if errs_closed:
+        fails.append(f"★ 締めた後は n 未達を NG にしてはならない: {errs_closed}")
+    if not notes_closed:
+        fails.append("★ 締めた後に n 未達で続行するときは NOTE を出すこと（黙って緩めない）")
+    # ⚠️★ registered_k の矛盾は NG（台帳と config のずれを黙認しない）
+    if not resolve_sample(dict(ROSTER, registered_k=2), 3, PRESENT)[2]:
+        fails.append("★ registered_k(2) < confirmatory 人数(3) の矛盾を NG にしていない")
+    if resolve_sample(dict(ROSTER, registered_k=3), 3, PRESENT)[2]:
+        fails.append("★ registered_k(3) == confirmatory 人数(3) は矛盾でないのに NG にしている")
+    if not resolve_sample(dict(ROSTER, registered_k="2"), 3, PRESENT)[2]:
+        fails.append("★ registered_k が文字列なのに NG にしていない（数値である契約）")
+
+    # ⚠️★★ 完了者 0 名なら確証解析は行えない（preregistration.md 第 20 版 (ii)(c)・m=0 ゲート）
+    if check_zero_analysed(0) is None:
+        fails.append("★★ 解析 m=0 なのに NG にしていない（第 20 版 (ii)(c)）")
+    if check_zero_analysed(1) is not None:
+        fails.append("★ 解析 m>=1 なのに NG にしている（過剰検査）")
+
     # ⚠️★ 境界 6: 同じ被験者が 2 つのリストに居る → 止まる（分類が曖昧なまま進まない）
     if not resolve_sample(dict(ROSTER, shakedown=["P010", "P011"]), 3, PRESENT)[2]:
         fails.append("★ 被験者が 2 つのリストに重複しているのに通してはならない")
