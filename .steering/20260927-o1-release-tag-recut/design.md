@@ -7,3 +7,7 @@ v0.1.36 の手順（`.steering/20260927-g1-o1-release-and-o1-resilience/tasklist
 - ⚠️ タグは merge 後の main コミットに打つ（版上げ PR の head ではなく）。ゲートは `origin/main` と比べるので、タグ以降に docs 以外のコード変更が無いこと。
 - ⚠️ `docs/o1-distribution-tag.md` の追加は tag 後の別コミットになるが、ゲートが見るパスは `src-tauri/src` / `src-tauri/Cargo.toml` / `src` のみなので鮮度判定は赤くならない。
 - テスト: O1 ゲート再実行（Done 条件）・Release 資産の byte レベル検証（`LC_ALL=C grep -a`・v0.1.36 を対照）・zip 展開後の独立再検算。
+
+## 実施後に判明したこと（2026-09-27）
+- 修正の目印は `gse-next` ではなく `gse-submit` に出る（D6）。v0.1.36 の記録（distribution-tag.md）が「修正そのものを示す文字列をバイナリの grep で特定できていない」と書いた限界は、見るバイナリを `gse-submit` にすれば越えられる。
+- 版上げ PR（#239）の merge コミット `7b2846f` にタグを打った。記録（docs/o1-distribution-tag.md）はタグ後の別 PR だが、ゲートが見るパス（`src-tauri/src` / `src-tauri/Cargo.toml` / `src`）には触れないので鮮度判定は緑のまま。
