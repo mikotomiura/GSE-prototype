@@ -111,7 +111,7 @@ mutate "重複を数えない（dupCount が常に 0）" \
 mutate "通知: 続いているだけでも毎回通知する" \
   's/if \(was\[e\.flag\] === undefined\) return true;/return true;/'
 mutate "通知: 次の状態を保存しない（毎回通知になる）" \
-  's/\.join\(","\);\n    var was = \{\};/.join(",") && "";\n    var was = {};/'
+  's/next\[key\] = entries/next[key] = "" \&\& entries/'
 mutate "通知: 対象外の名前を通知しない" \
   's/consider\("\*", foreignCount > 0 \? \[\{ flag: O1_LEDGER_FLAG_FOREIGN, detail: String\(foreignCount\) \}\] : \[\]\);/consider("*", []);/'
 mutate "通知: 対象外の名前の件数の増加を見ない（旗だけ）" \
@@ -183,17 +183,15 @@ mutate "途絶タブ: 登録ログが無くても黙って続ける" \
 mutate "途絶タブ: 判定を常に「正常」と表示する" \
   's/r\.flags\.length \? r\.flags\.join\("・"\) : "正常"/"正常"/'
 mutate "同期: 名前列の無害化を外す（先頭の = + - @ を通す）" \
-  's/\]\.map\(o1LedgerSafeCell_\)/]/'
+  's/for \(var ci = 1; ci < row\.length; ci\+\+\) row\[ci\] = o1LedgerSafeCell_\(row\[ci\]\);//'
 mutate "無害化: 先頭の = + - @ を前置しない" \
   's/return \/\^\[=\+\\-\@\\t\\r\]\/\.test\(v\) \? "⚠" \+ v : v;/return v;/'
 mutate "途絶タブ: 削除済み（tombstone）を不読行にする" \
   's/if \(String\(v\[O1_LEDGER_COL\.kind\]\) === O1_LEDGER_KIND_ERASED\) return;[^\n]*\n//'
 mutate "途絶タブ: 日番号 0 を不読行にする" \
-  's/!isFinite\(day\) \|\| day < 0/!isFinite(day) || day < 1/'
+  's/var dayRaw = String\(v\[O1_LEDGER_COL\.day\] === undefined \|\| v\[O1_LEDGER_COL\.day\] === null \? "" : v\[O1_LEDGER_COL\.day\]\)\.trim\(\);/var dayRaw = String(v[O1_LEDGER_COL.day] === undefined || v[O1_LEDGER_COL.day] === null || v[O1_LEDGER_COL.day] === "" ? "1" : v[O1_LEDGER_COL.day]).trim();/'
 mutate "判定: 日番号 0 を番号の集合に入れる" \
   's/if \(f\.day >= 1\) \{/if (true) {/'
-mutate "途絶タブ: 登録ログの列数を見ない" \
-  's/if \(reg\.getLastColumn\(\) < 6\) \{/if (false) {/'
 mutate "点検: o1LedgerCheck に時間予算を持たせない" \
   's/> O1_LEDGER_TIME_BUDGET_MS\) \{\n      truncated = true;\n      break;\n    \}\n    var f = it\.next\(\);\n    var name/> 1e15) {\n      truncated = true;\n      break;\n    }\n    var f = it.next();\n    var name/'
 mutate "点検: タイムゾーンを出さない" \
@@ -214,6 +212,28 @@ mutate "ソース: Drive に書く（ごみ箱へ送る）" \
   's/\z/\nfunction wipe_(f) { f.setTrashed(true); }\n/'
 mutate "ソース: 未受領の日数をあとから 9 に上書きする（定数の直書き換え）" \
   's/var O1_LEDGER_NEVER_DAYS = 7;/var O1_LEDGER_NEVER_DAYS = 7;\nvar O1_LEDGER_STALE_DAYS_X = 5;\nO1_LEDGER_NEVER_DAYS = 9;/'
+
+# --- §9 2026-09-27 2 回目レビュー指摘の反映 ------------------------------------
+mutate "辞書キー: byPid を素のオブジェクトに戻す（constructor で例外）" \
+  's/var byPid = Object\.create\(null\);/var byPid = {};/'
+mutate "辞書キー: seen を素のオブジェクトに戻す" \
+  's/var seen = Object\.create\(null\);/var seen = {};/'
+mutate "同期: Drive ファイル ID にも無害化を掛ける（冪等性が壊れる）" \
+  's/for \(var ci = 1; ci < row\.length; ci\+\+\)/for (var ci = 0; ci < row.length; ci++)/'
+mutate "途絶タブ: 日番号の空セルを弾かない（day 0 に化ける）" \
+  's/!\/\^\\d\+\$\/\.test\(dayRaw\)/false/'
+mutate "登録ログ: 見出しの中身を見ない（列を挿入されても気づけない）" \
+  's/if \(reg\.getLastRow\(\) >= 2\) \{\n    var regHead/if (false) {\n    var regHead/'
+mutate "登録ログ: 列数の下限を見ない" \
+  's/if \(reg\.getMaxColumns\(\) < O1_LEDGER_REG_HEAD\.length\) \{/if (false) {/'
+mutate "通知: 打ち切りが続いても再通知しない（沈黙が続く）" \
+  's/var opsDue = opsPlan\.added\.length === 0 && opsStillActive && nowForOps - lastOpsMs >= O1_LEDGER_OPS_RENOTIFY_MS;/var opsDue = false;/'
+mutate "通知: 打ち切りの再通知間隔をゼロにする（毎回送ってしまう）" \
+  's/var O1_LEDGER_OPS_RENOTIFY_MS = 7 \* 24 \* 60 \* 60 \* 1000;/var O1_LEDGER_OPS_RENOTIFY_MS = 0;/'
+mutate "途絶タブ: 書き込み前の無害化を外す" \
+  's/return o1LedgerSafeCell_\(String\(c\)\);/return String(c);/'
+mutate "失敗通知: 宛先未設定でもログを出さない" \
+  's/console\.log\("⚠️ " \+ O1_LEDGER_PROP_EMAIL \+ " が未設定なので実行失敗の通知を送っていません。"\);//'
 
 echo
 echo "壊すと赤: $PASS / 穴: $FAIL"

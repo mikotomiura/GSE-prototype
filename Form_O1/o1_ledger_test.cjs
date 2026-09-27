@@ -75,6 +75,11 @@ function makeSheet(name, opts) {
       s.rows.forEach((r) => r && (m = Math.max(m, r.length)));
       return m;
     },
+    getMaxColumns() {
+      // ★ 実 Sheets の新規シートは既定で多くの空列を持つ（★ 内容幅とは無関係）。
+      //   列削除で初めて `getMaxColumns()` が小さくなる。既定は `opts.maxColumns` が無ければ 26。
+      return o.maxColumns || Math.max(this.getLastColumn(), 26);
+    },
     insertRowsAfter(after, n) {
       if (after !== s.maxRows) throw new Error("insertRowsAfter は最終行の後ろだけを想定");
       s.maxRows += n;
@@ -746,6 +751,40 @@ const sharedProps = (extra) =>
   check("§8 数値の列（日番号・epoch・バイト数）はテキスト形式にしない", [4, 7, 8].map(fm), [undefined, undefined, undefined]);
 }
 
+// 9-5 途絶タブの書き込みにも無害化がかかる
+//   ★ 台帳の P-ID 列は同期時にファイル名の正規表現で絞られるが、**研究者が台帳の行を手で編集**すると
+//   任意の文字列になりうる（欠番の tombstone 作業中の誤入力などを含む）。その値が「途絶」タブへ
+//   そのまま転記されないことを、実際の書き込み経路（`o1LedgerRun` → setValues）で確かめる。
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const led = ss.insertSheet(LEDGER);
+  led.appendRow(["banner"]);
+  led.appendRow(LEDGER_HEAD());
+  led.appendRow(["x9", "whatever.age", "=EVIL()", 1, "", "2026-09-20 10:11:12", ago(1), 5, "", "O1"]);
+  const env = makeEnv({ spreadsheet: ss, files: [] });
+  call(env, "o1LedgerRun");
+  check(
+    "§9★ 台帳の P-ID を手編集で「=EVIL()」にしても、途絶タブへ数式の形のまま転記されない",
+    /^[=+\-@\t\r]/.test(ss.sheets[DASH].rows[2][0]),
+    false
+  );
+}
+
+// 9-6 運用アラートだけの回は、件名・見出しで「P-ID の異常ではない」と分かる（code-reviewer L-3 指摘）
+{
+  const ss2 = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss2, []);
+  const files2 = Array.from({ length: 6 }, (_, i) => makeFile("o" + i, goodName("P110", i + 1, stamp(20 + i)), 100, ago(1)));
+  const env2 = makeEnv({ spreadsheet: ss2, files: files2, tickPerFile: 100000 });
+  call(env2, "o1LedgerRun");
+  check(
+    "§9★ 運用アラートだけの通知は件名が「運用アラート」・本文が「P-ID の異常ではありません」",
+    [env2.mails[0].subject, /P-ID の異常ではありません/.test(env2.mails[0].body)],
+    ["[GSE O1] 受領台帳: 運用アラート 1 件", true]
+  );
+}
+
 // 8-3 欠番の列挙の丸め（純関数）
 {
   const list = (g) => E.ctx.o1LedgerListGaps_(g);
@@ -901,16 +940,19 @@ const sharedProps = (extra) =>
     call(env2, "o1LedgerRun");
   } catch (e) {}
   check("§8 宛先が未設定なら失敗の通知は送らない", env2.mails.length, 0);
+  check("§8★ 宛先未設定時も理由をログに残す（沈黙させない）", env2.logs.some((l) => /未設定なので実行失敗の通知を送っていません/.test(l)), true);
   const env3 = makeEnv({ spreadsheet: ss, lockOk: false });
   call(env3, "o1LedgerRun");
   check("§8 ロックが取れなかった回は「失敗」として通知しない", env3.mails.length, 0);
 }
 
-// 8-10 登録ログの列が足りなければ、範囲外の例外でなく理由を言って止まる
+// 8-10 登録ログの列が足りない・見出しの中身が違う場合、理由を言って止まる（範囲外の例外にしない）
 {
+  // (a) 列そのものが削除された表（★ 実 Sheets は既定で 26 列あるので、これは「列削除」を模す）
   const ss = makeSpreadsheet(["O1 登録ログ"]);
+  ss.sheets["O1 登録ログ"] = makeSheet("O1 登録ログ", { maxColumns: 5 });
   ss.sheets["O1 登録ログ"].appendRow(["b", "", "", "", ""]);
-  ss.sheets["O1 登録ログ"].appendRow(["記録日時", "種別", "P-ID", "結果", "理由"]); // 5 列
+  ss.sheets["O1 登録ログ"].appendRow(["記録日時", "種別", "P-ID", "結果", "理由"]);
   const env = makeEnv({ spreadsheet: ss, props: { O1_LEDGER_NOTIFY_EMAIL: null } });
   let msg = "";
   try {
@@ -918,7 +960,22 @@ const sharedProps = (extra) =>
   } catch (e) {
     msg = String(e.message);
   }
-  check("§8 登録ログが 6 列未満なら理由を言って止まる", /6 列に足りません/.test(msg), true);
+  check("§8 登録ログの列そのものが 6 列未満なら理由を言って止まる", /6 列に足りません/.test(msg), true);
+}
+{
+  // (b) 列数は足りる（既定 26 列）が、内容が挿入されて 3 列目が「P-ID」でなくなっている
+  //   （2026-09-27 レビュー指摘 MEDIUM: 列数だけの検査は、列を挿入されて中身がずれても気づけない）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  ss.sheets["O1 登録ログ"].appendRow(["banner"]);
+  ss.sheets["O1 登録ログ"].appendRow(["記録日時", "種別", "担当", "P-ID", "結果", "理由"]);
+  const env = makeEnv({ spreadsheet: ss, props: { O1_LEDGER_NOTIFY_EMAIL: null } });
+  let msg = "";
+  try {
+    call(env, "o1LedgerRun");
+  } catch (e) {
+    msg = String(e.message);
+  }
+  check("§8★ 見出しの中身が違えば、列数が足りていても理由を言って止まる", /見出しの 3 列目が「担当」です/.test(msg), true);
 }
 
 // 8-11 o1LedgerCheck: 時間予算・タイムゾーン・実行ログの注意
@@ -933,6 +990,101 @@ const sharedProps = (extra) =>
   check("§8 o1LedgerCheck はタイムゾーンを出す", /タイムゾーン: Asia\/Tokyo/.test(log), true);
   check("§8 o1LedgerCheck は実行ログに P-ID が残りうる注意を出す", /A-10/.test(log), true);
   NOW = startNow;
+}
+
+// ---------------------------------------------------------------------------
+// §9 2026-09-27 2 回目レビュー指摘の反映（辞書キーの安全化・Drive ID の無害化除外・打切りの再通知）
+// ---------------------------------------------------------------------------
+
+// 9-1 P-ID が Object.prototype のプロパティ名と同じでも例外にならない（Codex 実測で確定した穴）
+{
+  check("§9★ P-ID が「constructor」でも判定が例外にならない", (() => {
+    try {
+      return { rows: judge([F("constructor", 1, 1)]).length, ok: true };
+    } catch (e) {
+      return { ok: false, msg: String(e.message) };
+    }
+  })(), { rows: 1, ok: true });
+  ["toString", "__proto__", "hasOwnProperty", "valueOf"].forEach((pid) => {
+    check(`§9 P-ID が「${pid}」でも判定が例外にならない`, (() => {
+      try {
+        judge([F(pid, 1, 1)]);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    })(), true);
+  });
+  check("§9 「constructor」と他 P-ID を混ぜても互いに混線しない", (() => {
+    const rows = judge([F("constructor", 1, 9), F("P001", 1, 1)]);
+    return [flagsOf(rows, "constructor"), flagsOf(rows, "P001")];
+  })(), [["途絶"], []]);
+  check("§9★ 受領 0 件・登録ログにだけ「constructor」がいても行が作られる（seen の辞書キー汚染）", judge([], { constructor: ago(30) }).map((r) => r.pid), ["constructor"]);
+  // 通知の差分・登録ログの突合でも同じキーが安全か
+  check("§9 通知の差分で P-ID が「constructor」でも例外にならない", (() => {
+    try {
+      alerts(null, [row("constructor", ["途絶"])]);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })(), true);
+  check("§9 登録ログで P-ID 相当が「constructor」でも例外にならない（形は P\d+ なので実際は弾かれる）", (() => {
+    const r = E.ctx.o1LedgerRegisteredFromLog_([["2026-09-01 09:00:00", "register", "constructor", "ok", "", ""]]);
+    return Object.keys(plain(r.registered));
+  })(), []);
+}
+
+// 9-2 Drive ファイル ID が「-」で始まっても、無害化されず冪等性が保たれる（H-1）
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const files = [makeFile("-Ab3xY_dash-leading-id", goodName("P095", 1, stamp(20)), 100, ago(1))];
+  const env = makeEnv({ spreadsheet: ss, files });
+  call(env, "o1LedgerRun");
+  const led = ss.sheets[LEDGER];
+  check("§9★ 先頭が「-」の Drive ファイル ID がそのまま（無害化されず）書かれる", led.rows[2][0], "-Ab3xY_dash-leading-id");
+  call(env, "o1LedgerRun"); // 2 回目
+  check("§9★ 先頭が「-」の ID でも 2 回目で増殖しない（冪等性）", led.getLastRow(), 3);
+}
+
+// 9-3 走査打ち切りが続く間、運用アラートを沈黙させない（M-4・cross-review #1 一致）
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const P = sharedProps();
+  const manyFiles = Array.from({ length: 5 }, (_, i) => makeFile("m" + i, goodName("P100", i + 1, stamp(20 + i)), 100, ago(1)));
+  const startNow = NOW;
+  const env1 = makeEnv({ spreadsheet: ss, files: manyFiles, propsObj: P, tickPerFile: 100000 });
+  call(env1, "o1LedgerRun");
+  check("§9 初回の打ち切りで運用アラートが 1 通", env1.mails.length, 1);
+  const env2 = makeEnv({ spreadsheet: ss, files: manyFiles, propsObj: P, tickPerFile: 100000 });
+  call(env2, "o1LedgerRun");
+  check("§9 直後の 2 回目は再通知しない（同じ理由が続いているだけ）", env2.mails.length, 0);
+  NOW += 8 * DAY; // 再通知の間隔（7 日）を超える
+  const env3 = makeEnv({ spreadsheet: ss, files: manyFiles, propsObj: P, tickPerFile: 100000 });
+  call(env3, "o1LedgerRun");
+  check("§9★ 打ち切りが続いたまま 7 日たつと、沈黙させず再通知する", env3.mails.length, 1);
+  NOW = startNow;
+}
+
+// 9-4 台帳の日番号セルが空・非数値なら不読行にする（day 0 への取り違えを防ぐ）
+{
+  const mk = (dayCell) => {
+    const ss = makeSpreadsheet(["O1 登録ログ"]);
+    regTab(ss, []);
+    const led = ss.insertSheet(LEDGER);
+    led.appendRow(["banner"]);
+    led.appendRow(LEDGER_HEAD());
+    led.appendRow(["x1", "P099_o1day01_gse_o1_20260920_101112.age", "P099", dayCell, "", "2026-09-20 10:11:12", ago(1), 5, "", "O1"]);
+    const env = makeEnv({ spreadsheet: ss, files: [] });
+    call(env, "o1LedgerRun");
+    return { mails: env.mails, banner: ss.sheets[DASH].rows[0][0], dashRows: ss.sheets[DASH].rows.slice(2) };
+  };
+  const empty = mk("");
+  check("§9★ 日番号セルが空なら「受領 0 件」（day 0 に化けず不読行として数える・行も作らない）", [empty.dashRows.length, /読めない行 1/.test(empty.banner), /読めない行/.test((empty.mails[0] || {}).body || "")], [0, true, true]);
+  const bad = mk("abc");
+  check("§9 日番号セルが非数値でも不読行として扱う", /読めない行 1/.test(bad.banner), true);
 }
 
 // ---------------------------------------------------------------------------

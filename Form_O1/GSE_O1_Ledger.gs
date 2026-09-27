@@ -71,6 +71,8 @@ var O1_LEDGER_TAB = "O1 受領台帳";
 var O1_LEDGER_DASH_TAB = "O1 途絶";
 /** ★ ビルダーが書く登録ログのタブ名（⚠️ `GSE_O1_Form_Builder.gs` の `O1_MGMT_TAB` と**同じ文字列**）。 */
 var O1_LEDGER_REG_TAB = "O1 登録ログ";
+/** ビルダーの `O1_MGMT_HEAD`（`GSE_O1_Form_Builder.gs`）と**同じ 6 語**。見出しの一致を確かめるのに使う。 */
+var O1_LEDGER_REG_HEAD = ["記録日時", "種別", "P-ID", "結果", "理由", "備考"];
 
 var O1_LEDGER_DAY_MS = 24 * 60 * 60 * 1000;
 /** ★ 途絶 = 最終受領からこの日数（前段の裁定 2026-09-27）。猶予 48 時間 ＋ 1 日ローテート ＋ 余裕 2 日。 */
@@ -138,7 +140,10 @@ var O1_LEDGER_PROP_SHEET = "O1_MGMT_SHEET_ID";
 var O1_LEDGER_PROP_EMAIL = "O1_LEDGER_NOTIFY_EMAIL";
 var O1_LEDGER_PROP_STATE = "O1_LEDGER_STATE";
 var O1_LEDGER_PROP_OPS = "O1_LEDGER_OPS";
+var O1_LEDGER_PROP_OPS_LAST = "O1_LEDGER_OPS_LAST_MS";
 var O1_LEDGER_PROP_FAIL = "O1_LEDGER_FAIL";
+/** ★ 走査打ち切りが続く間、運用アラートを**沈黙させない**再通知の間隔（2026-09-27 レビュー指摘・判断 14）。 */
+var O1_LEDGER_OPS_RENOTIFY_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ============================================================
 // 純関数（★ ローカルの guard test が同じ関数を呼ぶ）
@@ -237,13 +242,16 @@ function o1LedgerParseLogTime_(v) {
  *   （★ 何かが届いた = 端末は生きている）。
  */
 function o1LedgerJudge_(files, registered, nowMs) {
-  var byPid = {};
+  // ⚠️★★★ **P-ID を素のオブジェクトのキーにしない**（2026-09-27 レビュー指摘・Codex 実測で確定）。
+  //   ★ 受け口の正規表現は英数字なら何でも通す（`constructor` 等の Object.prototype のプロパティ名も含む）ので、
+  //   ⚠️ `byPid[f.pid]` が継承された関数を返し `.push` で例外になる。★ `Object.create(null)` で継承を断つ。
+  var byPid = Object.create(null);
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     if (!byPid[f.pid]) byPid[f.pid] = [];
     byPid[f.pid].push(f);
   }
-  var seen = {};
+  var seen = Object.create(null);
   var pids = [];
   Object.keys(byPid).forEach(function (p) {
     seen[p] = true;
@@ -259,7 +267,7 @@ function o1LedgerJudge_(files, registered, nowMs) {
     var last = null;
     var totalBytes = 0;
     var dupCount = 0;
-    var earliestByDay = {};
+    var earliestByDay = {}; // ★ キーは日番号（数値）。P-ID 由来の文字列キーが来ないので素のオブジェクトで安全
     var maxDay = 0;
     fs.forEach(function (f) {
       if (last === null || f.receivedMs > last) last = f.receivedMs;
@@ -336,7 +344,7 @@ function o1LedgerJudge_(files, registered, nowMs) {
  */
 function o1LedgerAlerts_(prev, rows, foreignCount) {
   var before = prev || {};
-  var next = {};
+  var next = {}; // ★ 書き込み専用（読み取りが無い）。P-ID が Object.prototype 名でも代入は安全
   var alerts = [];
   var consider = function (key, entries) {
     next[key] = entries
@@ -344,7 +352,7 @@ function o1LedgerAlerts_(prev, rows, foreignCount) {
         return e.flag + (e.detail ? ":" + e.detail : "");
       })
       .join(",");
-    var was = {};
+    var was = {}; // ★ キーは固定の旗名（途絶/欠番/未受領/対象外の名前）で P-ID 由来ではない
     (before[key] ? String(before[key]).split(",") : []).forEach(function (tok) {
       var i = tok.indexOf(":");
       was[i < 0 ? tok : tok.slice(0, i)] = i < 0 ? "" : tok.slice(i + 1);
@@ -385,7 +393,7 @@ function o1LedgerAlerts_(prev, rows, foreignCount) {
  */
 function o1LedgerOpsAlerts_(prevOps, ops) {
   var before = prevOps || {};
-  var active = {};
+  var active = {}; // ★ キーは固定の運用アラート名で P-ID 由来ではない
   if (ops.truncated) active[O1_LEDGER_OPS_TRUNCATED] = true;
   if (ops.regSkipped > 0) active[O1_LEDGER_OPS_REGSKIP] = true;
   if (ops.badRows > 0) active[O1_LEDGER_OPS_BADROWS] = true;
@@ -415,7 +423,7 @@ function o1LedgerSafeCell_(v) {
  * 通知メールの本文。⚠️ **P-ID・判定・日数だけ**（★ シートの URL・Drive の ID・ファイル名は載せない）。
  * ⚠️ 「やめた」とは書かない（★ 判定は届いたかの話・ADR-034 D4 2b）。
  */
-function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded) {
+function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded, opsOnly) {
   var byPid = {};
   rows.forEach(function (r) {
     byPid[r.pid] = r;
@@ -444,8 +452,11 @@ function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded) {
   (opsAdded || []).forEach(function (k) {
     lines.push("- （運用）" + (opsText[k] || k));
   });
+  var heading = opsOnly
+    ? "O1 受領台帳: 台帳の運用に要確認があります（★ P-ID の異常ではありません）。"
+    : "O1 受領台帳: 新しく要確認になったものがあります。";
   return (
-    "O1 受領台帳: 新しく要確認になったものがあります。\n\n" +
+    heading + "\n\n" +
     lines.join("\n") +
     "\n\n※ 分かるのは「届いたか」だけです（アプリ未起動・回線断・32 MB 超は区別できません）。" +
     "\n※ 「途絶」「未受領」は「やめた」ではありません。本人へ連絡して確かめてください。" +
@@ -576,20 +587,24 @@ function o1LedgerSync_(cfg, ss) {
     var name = f.getName();
     var parsed = o1LedgerParseName_(name);
     var created = f.getDateCreated().getTime();
-    rows.push(
-      [
-        id,
-        name,
-        parsed ? parsed.pid : "",
-        parsed ? parsed.day : "",
-        parsed ? parsed.start : "",
-        o1LedgerFmt_(created),
-        created,
-        f.getSize(),
-        parsed && parsed.dup ? "dup" : "",
-        parsed ? O1_LEDGER_KIND_OK : O1_LEDGER_KIND_FOREIGN
-      ].map(o1LedgerSafeCell_) // ⚠️ 表示形式に頼らず、先頭の `=` `+` `-` `@` を無害化する（二重の防御）
-    );
+    // ⚠️★★★ **Drive ファイル ID には無害化を掛けない**（2026-09-27 レビュー指摘 HIGH）。
+    //   ★ ID は Drive 由来で被験者端末由来ではなく、先頭に `-` が来ると `⚠-` が前置され、
+    //   ⚠️ 次回の走査が生の ID で `known[id]` を引くため**一致せず、同じファイルが毎回別行として増殖する**
+    //   （＝冪等性が壊れる）。★ 無害化が要るのはファイル名など被験者端末由来の列だけ。
+    var row = [
+      id,
+      name,
+      parsed ? parsed.pid : "",
+      parsed ? parsed.day : "",
+      parsed ? parsed.start : "",
+      o1LedgerFmt_(created),
+      created,
+      f.getSize(),
+      parsed && parsed.dup ? "dup" : "",
+      parsed ? O1_LEDGER_KIND_OK : O1_LEDGER_KIND_FOREIGN
+    ];
+    for (var ci = 1; ci < row.length; ci++) row[ci] = o1LedgerSafeCell_(row[ci]); // 0 列目（ID）は除く
+    rows.push(row);
   }
 
   if (rows.length > 0) {
@@ -625,14 +640,17 @@ function o1LedgerDashboard_(cfg, ss, scan) {
         foreignCount++;
         return;
       }
+      // ⚠️★★★ **`Number("")` は `0` になる**ので、空セルの日番号が「day 0 の受領」に化けていた
+      //   （2026-09-27 レビュー指摘 MEDIUM）。★ 形を先に見る（空・小数・負号を弾く）。
+      var dayRaw = String(v[O1_LEDGER_COL.day] === undefined || v[O1_LEDGER_COL.day] === null ? "" : v[O1_LEDGER_COL.day]).trim();
       var ms = Number(v[O1_LEDGER_COL.ms]);
-      var day = Number(v[O1_LEDGER_COL.day]);
       var bytes = Number(v[O1_LEDGER_COL.bytes]);
       var pid = String(v[O1_LEDGER_COL.pid] || "");
-      if (!pid || !isFinite(ms) || !isFinite(day) || day < 0 || !isFinite(bytes)) {
+      if (!pid || !isFinite(ms) || !/^\d+$/.test(dayRaw) || !isFinite(bytes)) {
         badRows++;
         return;
       }
+      var day = Number(dayRaw);
       files.push({ pid: pid, day: day, receivedMs: ms, bytes: bytes, dup: String(v[O1_LEDGER_COL.dup]) === "dup" });
     });
   }
@@ -645,9 +663,25 @@ function o1LedgerDashboard_(cfg, ss, scan) {
         "（ビルダー側で buildO1MgmtSheet() を実行済みか確かめてください）。"
     );
   }
-  // ⚠️ 列数を先に見る（ビルダーの `O1_MGMT_HEAD` は 6 列）。足りなければ範囲外の例外でなく、理由を言って止める。
-  if (reg.getLastColumn() < 6) {
-    throw new Error("❌ 「" + O1_LEDGER_REG_TAB + "」タブの列が 6 列に足りません（★ ビルダーの O1_MGMT_HEAD と食い違っています）。");
+  // ⚠️★★★ 列数だけでなく**見出しの中身**を見る（2026-09-27 レビュー指摘 MEDIUM）。
+  //   ★ 列数だけの検査は「列を 1 本挿入されて中身がずれた」を見逃す
+  //   （P-ID 列が「種別」になり、登録の突合が**黙って**全員 0 件になる）。★ ビルダー側と同じ流儀。
+  if (reg.getMaxColumns() < O1_LEDGER_REG_HEAD.length) {
+    throw new Error(
+      "❌ 「" + O1_LEDGER_REG_TAB + "」タブの列が " + O1_LEDGER_REG_HEAD.length + " 列に足りません（★ 現在 " +
+        reg.getMaxColumns() + " 列）。"
+    );
+  }
+  if (reg.getLastRow() >= 2) {
+    var regHead = reg.getRange(2, 1, 1, O1_LEDGER_REG_HEAD.length).getValues()[0];
+    for (var hc = 0; hc < O1_LEDGER_REG_HEAD.length; hc++) {
+      if (String(regHead[hc]).trim() !== O1_LEDGER_REG_HEAD[hc]) {
+        throw new Error(
+          "❌ 「" + O1_LEDGER_REG_TAB + "」の見出しの " + (hc + 1) + " 列目が「" + String(regHead[hc]).slice(0, 20) +
+            "」です（★「" + O1_LEDGER_REG_HEAD[hc] + "」のはず・ビルダーの O1_MGMT_HEAD と食い違っています）。"
+        );
+      }
+    }
   }
   var regLast = reg.getLastRow();
   var regValues = regLast >= 3 ? reg.getRange(3, 1, regLast - 2, 6).getValues() : [];
@@ -684,7 +718,10 @@ function o1LedgerDashboard_(cfg, ss, scan) {
     var padded = r.slice();
     while (padded.length < width) padded.push("");
     return padded.map(function (c) {
-      return String(c);
+      // ⚠️★ **台帳と同じ無害化を通す**（security-checker L-1 指摘・2026-09-27）。
+      //   ★ ここは `pid` / 数値の整形結果が主だが、研究者の手編集（tombstone 作業中の半端な値等）で
+      //   先頭が `=` 等になりうる。テキスト形式（下の `setNumberFormat("@")`）だけに頼らない。
+      return o1LedgerSafeCell_(String(c));
     });
   });
   o1LedgerEnsureRows_(dash, out.length);
@@ -726,27 +763,44 @@ function o1LedgerNotify_(cfg, result) {
   var alerts = reliable ? plan.alerts : [];
   var opsPlan = o1LedgerOpsAlerts_(prevOps, result.ops);
 
+  // ⚠️★★★ **打ち切りが続く間、運用アラートを沈黙させない**（2026-09-27 レビュー指摘・両系統一致）。
+  //   ★ `o1LedgerOpsAlerts_` は「前回無かったものだけ」返すので、原因が変わらない限り 2 回目以降は
+  //   `added` が空になる。⚠️ そのままだと、フォルダが育って打ち切りが恒常化したとき**最初の 1 通で
+  //   通知が永久に止まる**（＝台帳が「代替統制」の役目を果たさなくなる）。
+  //   → ★ アクティブなアラートが 1 つでも残っている間、`O1_LEDGER_OPS_RENOTIFY_MS` ごとに**全件**を
+  //   まとめて再送する（新規分だけでなく、続いているものも含める＝研究者は最新の全体像を見られる）。
+  var nowForOps = new Date().getTime();
+  var opsStillActive = Object.keys(opsPlan.next).length > 0;
+  var lastOpsMs = Number(props.getProperty(O1_LEDGER_PROP_OPS_LAST) || 0);
+  var opsDue = opsPlan.added.length === 0 && opsStillActive && nowForOps - lastOpsMs >= O1_LEDGER_OPS_RENOTIFY_MS;
+  var opsToSend = opsDue ? Object.keys(opsPlan.next) : opsPlan.added;
+
   var persist = function () {
     if (reliable) props.setProperty(O1_LEDGER_PROP_STATE, JSON.stringify(plan.next));
     props.setProperty(O1_LEDGER_PROP_OPS, JSON.stringify(opsPlan.next));
+    if (opsToSend.length > 0) props.setProperty(O1_LEDGER_PROP_OPS_LAST, String(nowForOps));
   };
-  if (alerts.length === 0 && opsPlan.added.length === 0) {
+  if (alerts.length === 0 && opsToSend.length === 0) {
     persist();
     return;
   }
-  var body = o1LedgerMailText_(alerts, result.rows, result.foreignCount, opsPlan.added);
+  var body = o1LedgerMailText_(alerts, result.rows, result.foreignCount, opsToSend, alerts.length === 0);
   if (!cfg.email) {
     console.log("⚠️ " + O1_LEDGER_PROP_EMAIL + " が未設定なので通知を送っていません（★ 設定後の次回に 1 通届きます）:\n" + body);
     return;
   }
   try {
-    MailApp.sendEmail(cfg.email, "[GSE O1] 受領台帳: 要確認 " + (alerts.length + opsPlan.added.length) + " 件", body);
+    MailApp.sendEmail(
+      cfg.email,
+      "[GSE O1] 受領台帳: " + (alerts.length === 0 ? "運用アラート " + opsToSend.length : "要確認 " + (alerts.length + opsToSend.length)) + " 件",
+      body
+    );
   } catch (err) {
     console.log("⚠️ 通知メールの送信に失敗しました（★ 通知済みにしていません・次回に再送）: " + err);
     return;
   }
   persist();
-  console.log("✉️ 研究者宛てに通知しました（" + (alerts.length + opsPlan.added.length) + " 件）。");
+  console.log("✉️ 研究者宛てに通知しました（" + (alerts.length + opsToSend.length) + " 件）。");
 }
 
 /**
@@ -760,7 +814,11 @@ function o1LedgerNotifyFailure_(err) {
   try {
     var props = PropertiesService.getScriptProperties();
     var email = String(props.getProperty(O1_LEDGER_PROP_EMAIL) || "").trim();
-    if (!email) return;
+    if (!email) {
+      // ⚠️★ 宛先未設定の分岐だけログが無かった（security-checker L-3 指摘）。★ 本文・原因文字列は出さない。
+      console.log("⚠️ " + O1_LEDGER_PROP_EMAIL + " が未設定なので実行失敗の通知を送っていません。");
+      return;
+    }
     var msg = String(err && err.message ? err.message : err)
       .replace(/https?:\/\/\S+/g, "<URL>")
       .replace(/[0-9A-Za-z_-]{25,}/g, "<ID>")

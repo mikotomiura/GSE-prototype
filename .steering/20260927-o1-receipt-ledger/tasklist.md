@@ -23,7 +23,7 @@
 
 ## レビュー（作業ツリーを変えない）
 - [x] 1 回目: code-reviewer ＋ security-checker ＋ cross-reviewer（並列）→ 指摘を一次で確かめて反映（decisions 判断 8〜13）
-- [ ] 2 回目（反映後の差分）: code-reviewer ＋ security-checker ＋ cross-reviewer（Codex はフィルタに当たるテストを外して）
+- [x] 2 回目: code-reviewer ＋ security-checker ＋ cross-reviewer（Codex 実行成功・テストファイルは除外）→ 判断 14〜22 で反映・見送りは理由つきで decisions.md へ
 
 ## 完了処理
 - [ ] `/finish-task`（テスト・コミット・push → PR → CI 緑なら merge）
