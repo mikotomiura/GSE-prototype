@@ -119,6 +119,9 @@ Form_O1/*
 !Form_O1/o1_submit_guard_test.cjs
 !Form_O1/o1_form_builder_test.cjs
 !Form_O1/o1_form_builder_mutation_test.sh
+!Form_O1/GSE_O1_Ledger.gs
+!Form_O1/o1_ledger_test.cjs
+!Form_O1/o1_ledger_mutation_test.sh
 !Form_O1/README.md
 
 # age secret keys (gse-unpack --keygen, pilot-runbook §2) — never commit private keys.

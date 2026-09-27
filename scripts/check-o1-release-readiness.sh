@@ -47,6 +47,9 @@ RECEIVER="Form_O1/GSE_O1_Submit.gs"
 RECEIVER_TEST="Form_O1/o1_submit_guard_test.cjs"
 FORM_BUILDER="Form_O1/GSE_O1_Form_Builder.gs"
 FORM_BUILDER_TEST="Form_O1/o1_form_builder_test.cjs"
+# ★ 受領台帳＋途絶検知（G-1/G-2 の代替統制・第 3 の Apps Script プロジェクトに貼る・.steering/20260927-o1-receipt-ledger）。
+LEDGER_GS="Form_O1/GSE_O1_Ledger.gs"
+LEDGER_GS_TEST="Form_O1/o1_ledger_test.cjs"
 SYNC_GUARD_TEST="scripts/sync_session_o1_guard_test.sh"
 MEASURE="experiments/20260801-controlled-friction-task/o1-upload-timeout-measurement.md"
 # ★ 募集の運用（ADR-034 D6 / D1 の律速 4）を書いてある手順書。★ 両側が要る。
@@ -205,6 +208,26 @@ else
     ok "O1 のフォームビルダーがあり、ガード検査が緑（${n:-件数不明} ケース）"
   else
     ng "O1 フォームビルダーのガード検査が赤"
+    printf '%s\n' "$out" | grep '^NG' | sed 's/^/       /'   # ★ 原因を画面に出す
+  fi
+fi
+
+# ★ 受領台帳（G-1 自動起動・G-2 定期再送が無いことの**代替統制**）。
+#   ⚠️ 存在だけでなく**テストの実行**を見る（空ファイルでも緑になる検査にしない）。
+#   ⚠️ 変異試験（`Form_O1/o1_ledger_mutation_test.sh`）は**ここでは走らせない**（★ 手で回す・所要 十数秒）。
+if [ ! -s "$LEDGER_GS" ]; then
+  ng "O1 の受領台帳が無い: ${LEDGER_GS}（★ 自動起動・定期再送が無い O1 の代替統制）"
+elif [ ! -f "$LEDGER_GS_TEST" ]; then
+  ng "O1 の受領台帳のガード検査が無い: $LEDGER_GS_TEST"
+elif ! command -v node > /dev/null 2>&1; then
+  ng "node が無いので O1 の受領台帳のガード検査を実行できない"   # ⚠️ 飛ばさず赤にする
+else
+  out=$(node "$LEDGER_GS_TEST" "$LEDGER_GS" 2>&1); rc=$?
+  n=$(printf '%s\n' "$out" | sed -n 's/^全 \([0-9]*\) ケース期待どおり$/\1/p' | tail -1)
+  if [ "$rc" -eq 0 ]; then
+    ok "O1 の受領台帳があり、ガード検査が緑（${n:-件数不明} ケース）"
+  else
+    ng "O1 の受領台帳のガード検査が赤"
     printf '%s\n' "$out" | grep '^NG' | sed 's/^/       /'   # ★ 原因を画面に出す
   fi
 fi
@@ -406,12 +429,12 @@ scan_ () { # $1 = ファイル / $2 = 正規表現 / $3 = ラベル
   [ -z "$hits" ] && return 0
   hardcoded="$hardcoded $1:$(printf '%s' "$hits" | cut -d: -f1 | tr '\n' ',')($3)"
 }
-for f in "$RECEIVER" "$FORM_BUILDER"; do
+for f in "$RECEIVER" "$FORM_BUILDER" "$LEDGER_GS"; do
   [ -f "$f" ] || continue
   # (a) ★ `.gs` に「設定の代入」があってはならない（⚠️ 空文字の代入は対象外）。
-  scan_ "$f" "(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|O1_MGMT_SHEET_ID|ROSTER_ID|FORM_ID_O1_(CONSENT|SURVEY))[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" "設定の直書き"
+  scan_ "$f" "(SHARED_SECRET|FOLDER_ID|O1_APP_DOWNLOAD_URL|PHASE1_MGMT_SHEET_ID|O1_MGMT_SHEET_ID|O1_RECEIVE_FOLDER_ID|O1_LEDGER_NOTIFY_EMAIL|ROSTER_ID|FORM_ID_O1_(CONSENT|SURVEY))[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]" "設定の直書き"
 done
-for f in "$RECEIVER" "$FORM_BUILDER" Form_O1/*.cjs Form_O1/*.sh; do
+for f in "$RECEIVER" "$FORM_BUILDER" "$LEDGER_GS" Form_O1/*.cjs Form_O1/*.sh; do
   [ -f "$f" ] || continue
   # (b) ★ Google の ID の形（25 文字以上の `[A-Za-z0-9_-]`）
   scan_ "$f" "['\"][A-Za-z0-9_-]{25,}['\"]" "ID 形"
@@ -748,6 +771,8 @@ selftest () {
     #   ⚠️ ただし検査は **G1 のビルダー**（拒否リストの突き合わせ・`Form_G1/` に残る）と
     #   同意文書（連絡先の突き合わせ）も読むので、**3 つとも**写す。
     cp "$repo/$FORM_BUILDER" "$repo/$FORM_BUILDER_TEST" "$fix/w/Form_O1/" 2>/dev/null
+    # ★ 受領台帳とその検査も写す（⚠️ 写さないと「無い」で常に赤になり、新しく足した検査だけ変異試験が成立しない）。
+    cp "$repo/$LEDGER_GS" "$repo/$LEDGER_GS_TEST" "$fix/w/Form_O1/" 2>/dev/null
     cp "$repo/Form_G1/GSE_G1_Form_Builder.gs" "$fix/w/Form_G1/" 2>/dev/null
     cp "$repo/$SYNC_GUARD_TEST" "$fix/w/scripts/" 2>/dev/null
     cp "$repo/$CONSENT" "$fix/w/$CONSENT" 2>/dev/null
@@ -937,6 +962,14 @@ selftest () {
   build; rm -f "$fix/w/Form_O1/o1_form_builder_test.cjs";                      expect_red "ガード検査が無い" "フォームビルダーの検査の欠落"
   # ⚠️★★★ **中身を壊しても赤になること。** ★ 存在するだけで緑になっていた旧版の再発防止。
   build; sed_i 's/^var G1_FORM_IDS_DO_NOT_TOUCH = {$/var G1_FORM_IDS_DO_NOT_TOUCH = {}; var UNUSED_ = {/' "$fix/w/Form_O1/GSE_O1_Form_Builder.gs"; expect_red "フォームビルダーのガード検査が赤" "フォームビルダーの G1 拒否リスト"
+  # ⚠️★★★ **受領台帳（2026-09-27）** — ★ 新しく足した検査は**壊して赤になること**を撃つ（本ゲートの流儀）。
+  build; rm -f "$fix/w/$LEDGER_GS";                                             expect_red "受領台帳が無い" "受領台帳の欠落"
+  build; rm -f "$fix/w/$LEDGER_GS_TEST";                                        expect_red "受領台帳のガード検査が無い" "受領台帳の検査の欠落"
+  # ⚠️ 中身を壊しても赤になること（★ 存在だけで緑になる旧版の型を作らない）。
+  build; sed_i 's/^var O1_LEDGER_STALE_DAYS = 5;$/var O1_LEDGER_STALE_DAYS = 6;/' "$fix/w/$LEDGER_GS"; expect_red "受領台帳のガード検査が赤" "受領台帳の判定を壊す"
+  build; printf %s "
+var O1_RECEIVE_FOLDER_ID = \"FAKE_FOLDER_ID_FOR_SELFTEST_0000\";
+" >> "$fix/w/$LEDGER_GS"; expect_red "ID / URL が直書き" "受領台帳への受け取りフォルダ ID の直書き"
   # ⚠️★★ **ビルダーへの直書きが戻ったら赤になること**（2026-08-29・起票 T-18）。
   build; printf %s "
 var O1_APP_DOWNLOAD_URL = \"https://drive.google.com/drive/folders/EXAMPLE\";
