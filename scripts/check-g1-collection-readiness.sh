@@ -94,6 +94,9 @@ CONFIG="${G1DIR}/config.json"
 SNAPDIR="src-tauri/tests/snapshots"
 FIXDIR="src-tauri/tests/fixtures"
 SCHEMA="src-tauri/schema/current.json"
+LEDGER="docs/g1-deletion-ledger.md"
+VALIDATE_PY="${G1DIR}/validate_blocks.py"
+ANALYZE_PY="${G1DIR}/analyze.py"
 
 # ★ 事前登録の逐語「ゴールデン **6 本** byte-equal」(`preregistration.md:359`)。
 #   ⚠️ CI は `minimal.ndjson` **1 本**しか再生していない (`ci.yml:581-582`・2026-09-20 実測)。
@@ -589,8 +592,7 @@ fi
 head_ 7 "途中でやめた人の記録の数え方 (前提条件 7)"
 echo "     ⚠️ 見ているのは**版が上がり、そこで 3 点に触れているか**だけ。"
 echo "        ★ 答えの中身が妥当かは研究者判断であり、ゲートは判定しない。"
-echo "     ⚠️★★★ 緑でも**計器は未対応**（第 20 版時点）: 第 20 版は validate_blocks.py / analyze.py の挙動を変えていない"
-echo "        （未完了・削除の人を処理できない。analyze.py は名簿が n 未満だと NG）。G1 の人単位の記録破棄手順も未確認。"
+echo "     ⚠️ 計器の対応・G1 の人単位の記録破棄手順は検査 [9] (前提条件 8) で見る。"
 echo "        → ★ 収集開始の前提にするかは研究者判断（.steering/20260926-g1-o1-mac-collection-prep/decisions.md 判断 5）。"
 rev="$(latest_prereg_rev)"
 if [ -z "${rev}" ]; then
@@ -641,6 +643,62 @@ else
   record_ok "## C." "C (Drive の差し替え)"
 fi
 
+# --- 9. G1 の削除保証台帳 (前提条件 8) ---------------------------------------
+head_ 9 "G1 の削除保証台帳とゲート組み込み (前提条件 8)"
+echo "     ⚠️ 見ているのは台帳の存在・必須節・保管上限マーカ・validate_blocks.py/analyze.py の"
+echo "        挙動対応・両 --selftest が緑であることだけ。台帳の中身の妥当性は研究者判断。"
+if [ ! -f "${LEDGER}" ]; then
+  ng "G1 削除保証台帳が無い: ${LEDGER}"
+else
+  miss9=""
+  for sec9 in '「送る前」と「送ったあと」' '削除要求の経路' '削除チェックリスト' '保管上限' '実施記録' 'この台帳自身の検査'; do
+    grep -qF -- "${sec9}" "${LEDGER}" || miss9="${miss9} [${sec9}]"
+  done
+  if [ -n "${miss9}" ]; then
+    ng "G1 削除保証台帳に必須節が無い (欠落:${miss9})"
+  else
+    ok "G1 削除保証台帳に §1〜§6 の必須節がある"
+  fi
+  # ⚠️ unset でも緑 (保管上限が未定でも通す)。★ 行ごと消えたら赤 (アンカーの喪失を緑にしない)。
+  if grep -qF 'g1-retention:' "${LEDGER}"; then
+    ok "保管上限の機械可読マーカがある (⚠️ unset でも緑)"
+  else
+    ng "保管上限の機械可読マーカ (g1-retention:) が無い"
+  fi
+fi
+
+if [ ! -f "${VALIDATE_PY}" ]; then
+  ng "validate_blocks.py が無い: ${VALIDATE_PY}"
+elif grep -q 'participation_status' "${VALIDATE_PY}"; then
+  ok "validate_blocks.py が participation_status を読む (前提条件 8 / A-1)"
+else
+  ng "validate_blocks.py が participation_status を読んでいない"
+fi
+
+if [ ! -f "${ANALYZE_PY}" ]; then
+  ng "analyze.py が無い: ${ANALYZE_PY}"
+elif grep -q 'recruitment_closed' "${ANALYZE_PY}"; then
+  ok "analyze.py が recruitment_closed を読む (前提条件 8 / A-2)"
+else
+  ng "analyze.py が recruitment_closed を読んでいない"
+fi
+
+if [ ! -f "${VALIDATE_PY}" ]; then
+  ng "validate_blocks.py --selftest を実行できない (ファイルが無い)"
+elif python3 "${VALIDATE_PY}" --selftest > /dev/null 2>&1; then
+  ok "validate_blocks.py --selftest が exit 0"
+else
+  ng "validate_blocks.py --selftest が赤"
+fi
+
+if [ ! -f "${ANALYZE_PY}" ]; then
+  ng "analyze.py --selftest を実行できない (ファイルが無い)"
+elif python3 "${ANALYZE_PY}" --selftest > /dev/null 2>&1; then
+  ok "analyze.py --selftest が exit 0"
+else
+  ng "analyze.py --selftest が赤"
+fi
+
 # ⚠️★★★ 変異モードでは**必ず 1 件落とす**。★ どう壊しても緑にはならない。
 if [ -n "${MUT}" ]; then
   echo
@@ -679,17 +737,19 @@ selftest () {
   #   ⚠️ 写す先は `mktemp -d` で、正常・中断のどちらでも `gate_cleanup` が消す。
   FIXTURE_FILES="consent.md participant-guide.md record-sheet-confirmatory.md \
                  collection-readiness-record.md preregistration.md config.json SEED \
-                 assign.py build_task_pages.py writing-pad.html"
+                 assign.py build_task_pages.py writing-pad.html validate_blocks.py analyze.py"
   build () {
     local f
     rm -rf "${fix:?}/w"
-    mkdir -p "${fix}/w/scripts" "${fix}/w/${G1DIR}"
+    mkdir -p "${fix}/w/scripts" "${fix}/w/${G1DIR}" "${fix}/w/docs"
     # ⚠️★★ **`cp` の失敗を握りつぶさない** (code-reviewer M8): 部分的に失敗した fixture は
     #   「欠落」系の `expect_red` を**変異と無関係に**通してしまう (= 偽陽性)。
     cp "${SCRIPT_PATH}" "${fix}/w/scripts/gate.sh" \
       || { echo "  ❌ fixture を作れない: gate.sh"; return 1; }
     cp "${repo}/scripts/check_schema_parity.py" "${fix}/w/scripts/" \
       || { echo "  ❌ fixture を作れない: check_schema_parity.py"; return 1; }
+    cp "${repo}/${LEDGER}" "${fix}/w/${LEDGER}" \
+      || { echo "  ❌ fixture を作れない: ${LEDGER}"; return 1; }
     for f in ${FIXTURE_FILES}; do
       cp "${repo}/${G1DIR}/${f}" "${fix}/w/${G1DIR}/${f}" \
         || { echo "  ❌ fixture を作れない: ${f}"; return 1; }
@@ -892,6 +952,36 @@ selftest () {
   expect_red "陰性対照が成立しない" "陰性対照の喪失 (検査 5)"
   build; rm -f "${fix}/w/${G1DIR}/build_task_pages.py"
   expect_red "課題ページを生成できない" "生成器の欠落 (検査 5)"
+
+  # ⚠️★★★ 検査 [9] (前提条件 8 / G1 削除保証台帳)。
+  build; rm -f "${fix}/w/${LEDGER}"
+  expect_red "G1 削除保証台帳が無い" "台帳の欠落 (検査 9)"
+  build; sed_i '/削除チェックリスト/d' "${fix}/w/${LEDGER}"
+  expect_red "G1 削除保証台帳に必須節が無い" "★ 必須節を 1 つ消す (検査 9)"
+  build; sed_i '/g1-retention:/d' "${fix}/w/${LEDGER}"
+  expect_red "保管上限の機械可読マーカ (g1-retention:) が無い" "★ マーカ行を消す (検査 9)"
+  # ⚠️★ 前後を x で包むだけだと元の部分文字列が残り grep が引っかかったままになる
+  #   (2026-09-27 に selftest 実測で発覚: 壊しても緑のまま)。★ 部分文字列ごと別語に置換する。
+  build; sed_i 's/participation_status/removed_field_marker/g' "${fix}/w/${G1DIR}/validate_blocks.py"
+  expect_red "validate_blocks.py が participation_status を読んでいない" \
+             "★ participation_status の記述を壊す (検査 9 / A-1)"
+  build; sed_i 's/recruitment_closed/removed_field_marker/g' "${fix}/w/${G1DIR}/analyze.py"
+  expect_red "analyze.py が recruitment_closed を読んでいない" \
+             "★ recruitment_closed の記述を壊す (検査 9 / A-2)"
+  build
+  insert_after "${fix}/w/${G1DIR}/validate_blocks.py" '#!/usr/bin/env python3' \
+               'raise RuntimeError("selftest mutation: validate_blocks.py を壊す")'
+  expect_red "validate_blocks.py --selftest が赤" "★ validate_blocks.py を実行時に落とす (検査 9)"
+  build
+  insert_after "${fix}/w/${G1DIR}/analyze.py" '#!/usr/bin/env python3' \
+               'raise RuntimeError("selftest mutation: analyze.py を壊す")'
+  expect_red "analyze.py --selftest が赤" "★ analyze.py を実行時に落とす (検査 9)"
+  # ★ マーカ周辺の文言を変えても検出は変わらないこと (摂動を加えても緑のまま)。
+  build
+  sed_i 's/<!-- g1-retention: unset -->/<!-- g1-retention: unset （メモ変更テスト） -->/' "${fix}/w/${LEDGER}"
+  expect_stays_green "保管上限の機械可読マーカがある" "保管上限の機械可読マーカ (g1-retention:) が無い" \
+                     "★ マーカ周辺の文言を変えても検出は変わらない (検査 9)" \
+                     "${fix}/w/${LEDGER}" "（メモ変更テスト）"
 
   echo
   echo "=== selftest 2: 未達を満たすと緑に変わるか ==="
