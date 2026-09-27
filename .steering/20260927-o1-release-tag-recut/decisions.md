@@ -31,3 +31,9 @@
 - CRITICAL/HIGH なし。Claude 側は 3 観点（版の整合・記録の事実性・機密混入）すべて裏取り済み（dmg の SHA-256 は Release API の digest と一致。reconcile は `#[cfg(feature = "package")]` で gse-submit 専用＝D6 をソースで確認）。
 - Codex MEDIUM ① heartbeat の実動作は未検証 → 記録（docs/o1-distribution-tag.md「限界」）に既に明記。実機通し確認は別タスクへ申し送り。
 - Codex MEDIUM ② 鮮度ゲートの監視パスが `src-tauri/src` / `src-tauri/Cargo.toml` / `src` だけで、`Cargo.lock` / `tauri.conf.json` / フロント依存 / 梱包スクリプトの変更は「古い」と判定されない（`scripts/check-o1-release-readiness.sh:286` で確認）。既存の盲点で本タスクの差分ではない。★ 今回のタグ `v0.1.37` は main の先頭なので該当しない。→ ゲート改修の候補として申し送り。
+
+## D9 Drive の照合と記録票 C（2026-09-28）
+- 研究者が G1 / O1 の zip 4 点を Drive に配置。コネクタで 4 点のバイト数が手元と一致（O1: 10423191 / 5981440、G1: 10414729 / 5974147）。
+- 課題ページ: Drive の「G1課題文_P001〜P020」200 枚がブロックごとのバイト数で手元と全件一致。1 枚（P007 block02）をダウンロードして内容の区間一致を確認。`origin/main`（389427d）の生成器で作り直した 208 枚が手元と `diff -r` 一致。→ 記録票 C を記入（G1 ゲート 24 / 2）。
+- ⚠️ コネクタの search_files はページ送り（nextPageToken）で同じ結果を返した → フォルダ（parentId）単位の検索に切り替えた。
+- 研究者の指示で G-1 / G-2 / G-5 の実装を次セッションへ（`.steering/_handoff/next-session-o1-resilience-g1-g2-g5.md`）。
