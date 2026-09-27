@@ -415,19 +415,22 @@ fn main() -> ExitCode {
             let mut o = io::stdout().lock();
             // ★ 呼び出し元 (アプリ) が読む 1 行。⚠️ ファイル名も参加者 ID も出さない
             //   (画面・ログに載るため・data-privacy)。**件数だけ**を出す。
-            let _ = writeln!(
-                o,
-                "GSE_RECONCILE {}",
-                serde_json::json!({
-                    "packaged": r.packaged,
-                    "sent": r.sent,
-                    "unsent": r.unsent,
-                    "upload_disabled": r.upload_disabled,
-                    "skipped_busy": r.skipped_busy,
-                    "awaiting_approval": r.awaiting_approval,
-                    "errors": r.errors.len(),
-                })
-            );
+            let mut summary = serde_json::json!({
+                "packaged": r.packaged,
+                "sent": r.sent,
+                "unsent": r.unsent,
+                "upload_disabled": r.upload_disabled,
+                "skipped_busy": r.skipped_busy,
+                "awaiting_approval": r.awaiting_approval,
+                "errors": r.errors.len(),
+            });
+            // ★ G-5（O1）: `oversize/` に残っている本数。★ 成功した回の要約は applog に残るので、
+            //   研究者が回収するまで**毎回**見える（Codex P2・2026-09-28）。
+            //   ⚠️ 1 以上のときだけキーを足す —— G1 は常に 0 なので、G1 の要約行は変わらない。
+            if r.oversize_pending > 0 {
+                summary["oversize_pending"] = serde_json::json!(r.oversize_pending);
+            }
+            let _ = writeln!(o, "GSE_RECONCILE {summary}");
             for e in &r.errors {
                 let _ = writeln!(io::stderr(), "gse-submit: {e}");
             }

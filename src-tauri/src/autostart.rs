@@ -11,8 +11,9 @@
 //! - ★ 新しい版のフォルダを配り直したときは、**OS に登録が残っているときだけ**新しい exe へ
 //!   **付け替える**（古いフォルダの exe を指したまま死なないように）。⚠️ 消されていたら作り直さない
 //!   （security-checker MEDIUM-1・2026-09-28）。
-//! - ★ 配布フォルダ（`o1.mode` の隣）の印 [`MARKER_FILE_NAME`] は「このフォルダでは処理済み」の印
-//!   （起動のたびに OS の登録を読み書きしない）。
+//! - ★ 配布フォルダ（`o1.mode` の隣）の印 [`MARKER_FILE_NAME`] は「このフォルダでは処理済み」の印で、
+//!   **中身は登録した exe のパス**（フォルダを移動・コピーしたら一致しなくなり、付け替えが起きる）。
+//! - ★ 印と記録は **OS への登録が成功してから**書く（途中で落ちたら次の起動で再試行する）。
 //! - ⚠️ Windows の自動起動は `GSE_起動.bat` を通らないので、`.bat` が付ける `GSE_DISABLE_PROBES=1`
 //!   （多重防御）は**乗らない**。★ O1 でプローブが出ないのは `start_session` を拒む構造のガード
 //!   （`lib.rs` の `start_session` 冒頭）によるもので、自動起動でも同じく効く（cross-review・2026-09-28）。
@@ -191,15 +192,43 @@ pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool, consent_acknowl
         tracing::warn!("O1 autostart: cannot resolve the home folder; NOT registering");
         return;
     };
-    let folder_marker = marker.is_file();
+    handle(&exe, &marker, &record, &OsRegistrar);
+}
+
+/// OS のログイン時起動への登録（テストで差し替えるための境目）。
+pub trait Registrar {
+    /// OS に登録が残っているか。
+    fn entry_exists(&self) -> bool;
+    /// `exe` を登録する（既にあれば上書き）。戻り値はログ用の場所の説明（⚠️ パスを含めない）。
+    fn register(&self, exe: &Path) -> Result<String, String>;
+}
+
+/// 本物の OS に登録する。
+struct OsRegistrar;
+
+impl Registrar for OsRegistrar {
+    fn entry_exists(&self) -> bool {
+        platform::entry_exists()
+    }
+    fn register(&self, exe: &Path) -> Result<String, String> {
+        platform::register(exe)
+    }
+}
+
+/// ★ 判定して登録し、印と記録を書く（IO あり・OS への登録は `reg` に任せる）。戻り値はとった行動。
+pub fn handle(exe: &Path, marker: &Path, record: &Path, reg: &dyn Registrar) -> AutostartAction {
+    let here = exe.to_string_lossy().into_owned();
+    // ★ 印の中身は「このフォルダで登録した exe のパス」。⚠️ フォルダを移動・コピーすると印も一緒に
+    //   移るので、**いまの exe と一致するときだけ**処理済みとみなす（Codex P2・2026-09-28）。
+    let folder_marker = marker_matches(std::fs::read_to_string(marker).ok().as_deref(), &here);
     if folder_marker {
         tracing::info!("O1 autostart: already handled for this folder (marker present)");
-        return;
+        return AutostartAction::Skip;
     }
     let st = AutostartState {
         folder_marker,
         ever_registered: record.is_file(),
-        entry_exists: platform::entry_exists(),
+        entry_exists: reg.entry_exists(),
     };
     let action = decide(true, st);
     if action == AutostartAction::Skip {
@@ -208,67 +237,64 @@ pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool, consent_acknowl
             "O1 autostart: the login entry was removed after registration; \
              respecting it (NOT re-creating)"
         );
-        write_marker_or_log(&marker);
-        return;
+        write_or_log(marker, &here, MARKER_FILE_NAME);
+        return AutostartAction::Skip;
     }
-    // ⚠️★ **印と記録を先に書く。** 書けない場所で登録だけ成功すると、起動のたびに登録し直し、
-    //   被験者が OS の設定で切っても戻してしまう（code-reviewer LOW）。→ ★ 書けないなら登録しない。
-    if let Err(e) = std::fs::write(&marker, b"registered\n") {
+    // ⚠️★ 登録の**前に**、印が書ける場所かだけを確かめる。★ 書けない場所で登録だけ成功すると、
+    //   起動のたびに登録し直し、被験者が OS の設定で切っても戻してしまう（code-reviewer LOW）。
+    //   ⚠️ 印そのものは**登録が成功してから**書く —— 先に書くと、書いた直後に落ちたとき
+    //   二度と再試行しない（Codex P2・2026-09-28）。
+    if let Err(e) = probe_writable(marker) {
         tracing::error!(
-            "O1 autostart: cannot write the marker {MARKER_FILE_NAME} in the distribution folder \
-             ({e}); NOT registering (it would be re-registered on every launch)"
+            "O1 autostart: the distribution folder is not writable ({e}); \
+             NOT registering (it would be re-registered on every launch)"
         );
-        return;
+        return AutostartAction::Skip;
     }
-    let record_was_new = !st.ever_registered;
-    if record_was_new {
-        let written = record
-            .parent()
-            .map(std::fs::create_dir_all)
-            .unwrap_or(Ok(()))
-            .and_then(|()| std::fs::write(&record, b"registered\n"));
-        if let Err(e) = written {
-            tracing::error!(
-                "O1 autostart: cannot write {HOME_RECORD_FILE_NAME} under ~/.gse ({e}); NOT registering"
+    match reg.register(exe) {
+        Ok(where_) => {
+            tracing::warn!(
+                "O1 autostart: {} the login entry ({where_})",
+                if action == AutostartAction::Repoint {
+                    "re-pointed"
+                } else {
+                    "registered"
+                }
             );
-            remove_or_log(&marker, MARKER_FILE_NAME);
-            return;
-        }
-    }
-    match platform::register(&exe) {
-        Ok(where_) => tracing::warn!(
-            "O1 autostart: {} the login entry ({where_})",
-            if action == AutostartAction::Repoint {
-                "re-pointed"
-            } else {
-                "registered"
+            // ★ 成功してから記録と印を書く。⚠️ ここで落ちても、次の起動は Register / Repoint を
+            //   同じ exe でやり直すだけ（上書きなので登録は増えない）。
+            if !st.ever_registered {
+                if let Some(dir) = record.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                write_or_log(record, "registered", HOME_RECORD_FILE_NAME);
             }
-        ),
+            write_or_log(marker, &here, MARKER_FILE_NAME);
+            action
+        }
         Err(e) => {
-            // ★ 印（と、今回作った記録）を戻して次の起動で再試行する。
-            //   ⚠️ 記録を残すと、次の起動で「登録したのに OS に無い＝被験者が消した」と誤読して二度と試さない。
-            remove_or_log(&marker, MARKER_FILE_NAME);
-            if record_was_new {
-                remove_or_log(&record, HOME_RECORD_FILE_NAME);
-            }
             tracing::warn!("O1 autostart: registration failed (will retry next launch): {e}");
+            AutostartAction::Skip
         }
     }
 }
 
-fn write_marker_or_log(marker: &Path) {
-    if let Err(e) = std::fs::write(marker, b"registered\n") {
-        tracing::warn!("O1 autostart: cannot write the marker {MARKER_FILE_NAME} ({e})");
-    }
+/// 印の中身が「いまの exe」を指しているか（純関数）。
+pub fn marker_matches(content: Option<&str>, exe: &str) -> bool {
+    content.map(|c| c.trim_end_matches(['\r', '\n'])) == Some(exe)
 }
 
-/// ⚠️ 戻しに失敗したら黙らない（「次の起動で再試行する」がうそになる・security-checker LOW-2）。
-fn remove_or_log(path: &Path, what: &str) {
-    if let Err(e) = std::fs::remove_file(path) {
-        tracing::error!(
-            "O1 autostart: could not remove {what} after a failure ({e}); \
-             the next launch may not retry — remove it by hand"
-        );
+/// 印と同じフォルダに書き込めるかを試す（試しに作って消す）。
+fn probe_writable(marker: &Path) -> std::io::Result<()> {
+    let probe = marker.with_file_name(format!(".{MARKER_FILE_NAME}.probe"));
+    std::fs::write(&probe, b"")?;
+    std::fs::remove_file(&probe)
+}
+
+/// ⚠️ 書けなかったら黙らない（パスは出さない）。
+fn write_or_log(path: &Path, content: &str, what: &str) {
+    if let Err(e) = std::fs::write(path, format!("{content}\n")) {
+        tracing::error!("O1 autostart: cannot write {what} ({e})");
     }
 }
 
@@ -516,5 +542,170 @@ mod tests {
             run_value(r"C:\Users\Taro Yamada\Downloads\O1_実施用_Windows\gse-next.exe"),
             r#""C:\Users\Taro Yamada\Downloads\O1_実施用_Windows\gse-next.exe""#
         );
+    }
+
+    /// ★ 印は「いまの exe」を指しているときだけ処理済み（移動・コピーに追随する）。
+    #[test]
+    fn marker_must_point_at_the_current_executable() {
+        let here = "/Users/p/O1/gse-next.app/Contents/MacOS/gse-next";
+        assert!(marker_matches(Some(&format!("{here}\n")), here));
+        assert!(marker_matches(Some(&format!("{here}\r\n")), here));
+        assert!(
+            !marker_matches(
+                Some("/Users/p/OLD/gse-next.app/Contents/MacOS/gse-next\n"),
+                here
+            ),
+            "⚠️ 移動・コピーされた印"
+        );
+        assert!(!marker_matches(Some("registered\n"), here));
+        assert!(!marker_matches(Some(""), here));
+        assert!(!marker_matches(None, here));
+    }
+
+    // --- 流れ全体（偽の登録先・一時フォルダ）---------------------------------------------
+
+    use std::cell::{Cell, RefCell};
+
+    /// 偽の登録先。`register` の呼ばれ方を記録し、失敗させることもできる。
+    struct FakeReg {
+        entry: Cell<bool>,
+        fail: Cell<bool>,
+        calls: RefCell<Vec<PathBuf>>,
+    }
+    impl FakeReg {
+        fn new() -> Self {
+            FakeReg {
+                entry: Cell::new(false),
+                fail: Cell::new(false),
+                calls: RefCell::new(Vec::new()),
+            }
+        }
+    }
+    impl Registrar for FakeReg {
+        fn entry_exists(&self) -> bool {
+            self.entry.get()
+        }
+        fn register(&self, exe: &Path) -> Result<String, String> {
+            self.calls.borrow_mut().push(exe.to_path_buf());
+            if self.fail.get() {
+                return Err("boom (test)".to_string());
+            }
+            self.entry.set(true);
+            Ok("fake".to_string())
+        }
+    }
+
+    fn tmp(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "gse_autostart_{tag}_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// 配布フォルダ 1 つ分（exe と印の場所）を作る。
+    fn folder(root: &Path, name: &str) -> (PathBuf, PathBuf) {
+        let f = root.join(name);
+        std::fs::create_dir_all(&f).unwrap();
+        (f.join("gse-next.exe"), f.join(MARKER_FILE_NAME))
+    }
+
+    /// ★ 初回は登録し、同じフォルダの 2 回目は OS に触らない。
+    #[test]
+    fn first_launch_registers_once_then_leaves_the_os_alone() {
+        let root = tmp("once");
+        let (exe, marker) = folder(&root, "O1");
+        let record = root.join("home").join(".gse").join(HOME_RECORD_FILE_NAME);
+        let reg = FakeReg::new();
+        assert_eq!(
+            handle(&exe, &marker, &record, &reg),
+            AutostartAction::Register
+        );
+        assert!(record.is_file() && marker.is_file());
+        assert_eq!(handle(&exe, &marker, &record, &reg), AutostartAction::Skip);
+        assert_eq!(reg.calls.borrow().len(), 1, "★ 2 回目は登録を呼ばない");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// ⚠️★★★ 被験者が登録を消したら、同じフォルダでも新しいフォルダでも作り直さない。
+    #[test]
+    fn a_removed_entry_is_never_recreated() {
+        let root = tmp("removed");
+        let (exe, marker) = folder(&root, "O1");
+        let record = root.join(HOME_RECORD_FILE_NAME);
+        let reg = FakeReg::new();
+        handle(&exe, &marker, &record, &reg);
+        reg.entry.set(false); // 被験者が消した
+        let (exe2, marker2) = folder(&root, "O1_new");
+        assert_eq!(
+            handle(&exe2, &marker2, &record, &reg),
+            AutostartAction::Skip
+        );
+        assert_eq!(reg.calls.borrow().len(), 1, "⚠️ 作り直さない");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// ★ 新しい版のフォルダ・移動したフォルダでは、登録が残っていれば付け替える（印が移ってきても）。
+    #[test]
+    fn a_new_or_moved_folder_repoints_a_live_entry() {
+        let root = tmp("moved");
+        let (exe, marker) = folder(&root, "O1");
+        let record = root.join(HOME_RECORD_FILE_NAME);
+        let reg = FakeReg::new();
+        handle(&exe, &marker, &record, &reg);
+        // フォルダごと移動した = 印の中身は古い exe のまま
+        let (exe2, marker2) = folder(&root, "O1_moved");
+        std::fs::copy(&marker, &marker2).unwrap();
+        assert_eq!(
+            handle(&exe2, &marker2, &record, &reg),
+            AutostartAction::Repoint
+        );
+        assert_eq!(reg.calls.borrow().last().unwrap(), &exe2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// ⚠️★ 登録に失敗したら印も記録も残さない → 次の起動で再試行する（「消した」と誤読しない）。
+    #[test]
+    fn a_failed_registration_is_retried_next_launch() {
+        let root = tmp("fail");
+        let (exe, marker) = folder(&root, "O1");
+        let record = root.join(HOME_RECORD_FILE_NAME);
+        let reg = FakeReg::new();
+        reg.fail.set(true);
+        assert_eq!(handle(&exe, &marker, &record, &reg), AutostartAction::Skip);
+        assert!(!marker.exists() && !record.exists());
+        reg.fail.set(false);
+        assert_eq!(
+            handle(&exe, &marker, &record, &reg),
+            AutostartAction::Register
+        );
+        assert_eq!(reg.calls.borrow().len(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// ⚠️ 印を書けない配布フォルダでは登録しない（起動のたびに登録し直さないため）。
+    #[cfg(unix)]
+    #[test]
+    fn an_unwritable_folder_is_not_registered() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tmp("ro");
+        let (exe, marker) = folder(&root, "O1");
+        let dir = marker.parent().unwrap().to_path_buf();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let record = root.join(HOME_RECORD_FILE_NAME);
+        let reg = FakeReg::new();
+        let got = handle(&exe, &marker, &record, &reg);
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(got, AutostartAction::Skip);
+        assert!(
+            reg.calls.borrow().is_empty(),
+            "⚠️ 書けない場所では登録しない"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

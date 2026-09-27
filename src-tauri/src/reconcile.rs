@@ -41,7 +41,8 @@ pub trait Uploader {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UploadError {
     /// 受け口が `{"ok":false,"error":"too large"}` と答えた（`Form_O1/GSE_O1_Submit.gs:218-219`）。
-    /// ★ 中身は応答の本文。⚠️ 表示は従来の文言のまま（G1 のログを 1 バイトも変えない・code-reviewer MEDIUM）。
+    /// ★ HTTP 413 も含む（Codex P2・2026-09-28: 受け口や中継層が 413 を返す構成でも再送を止める）。
+    /// ★ 中身は**従来どおりの表示文言**（G1 のログを 1 バイトも変えない・code-reviewer MEDIUM）。
     TooLarge(String),
     /// それ以外（通信・HTTP・受領を確認できない）。
     Other(String),
@@ -51,11 +52,7 @@ impl std::fmt::Display for UploadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             // ⚠️ G1 でも同じ応答が来る（`Form_G1/GSE_G1_Submit.gs:146-147`）ので、**変更前の文言**を保つ。
-            UploadError::TooLarge(body) => write!(
-                f,
-                "送信先が受領を確認しませんでした: {}",
-                truncate_for_display(body)
-            ),
+            UploadError::TooLarge(msg) => f.write_str(msg),
             UploadError::Other(s) => f.write_str(s),
         }
     }
@@ -88,14 +85,30 @@ fn move_to_oversize(age: &Path, submission_dir: &Path) -> std::io::Result<PathBu
         .file_name()
         .ok_or_else(|| std::io::Error::other("file name is missing"))?;
     let dest = dir.join(name);
-    if dest.exists() {
-        return Err(std::io::Error::new(
+    // ⚠️★ **上書きしないことを原子的に守る**（Codex P1・2026-09-28）。`exists()` → `rename()` だと、
+    //   間に同名が作られたとき `rename` が黙って上書きする（Unix も Windows の std 実装も上書きする）。
+    //   ★ ハードリンクは移し先が既にあれば OS が拒む → 作れたら元を消す（= 移動）。
+    match std::fs::hard_link(age, &dest) {
+        Ok(()) => {
+            std::fs::remove_file(age)?;
+            Ok(dest)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
             "the same name already exists in oversize/",
-        ));
+        )),
+        // ⚠️ ハードリンクを持たないファイルシステム（FAT 等）: 従来の確認つき rename に戻る。
+        Err(_) => {
+            if dest.exists() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    "the same name already exists in oversize/",
+                ));
+            }
+            std::fs::rename(age, &dest)?;
+            Ok(dest)
+        }
     }
-    std::fs::rename(age, &dest)?;
-    Ok(dest)
 }
 
 /// 送らないと決めた `.age` を隔離し、結果を `report` に積む（G-5）。
@@ -177,8 +190,12 @@ pub struct ReconcileReport {
     /// ★ **被験者の確認待ち**の本数 (`.age` は在るが「送信する」がまだ押されていない)。
     /// ⚠️ これは失敗ではないが、★ **放置すると届かない**ので画面に出す。
     pub awaiting_approval: usize,
-    /// ⚠️★ 受け口の上限を超えたので **送らずに `oversize/` へ移した**本数（O1 のみ・G-5）。
+    /// ⚠️★ 受け口の上限を超えたので **この回に** 送らずに `oversize/` へ移した本数（O1 のみ・G-5）。
     pub quarantined: usize,
+    /// ⚠️★ `oversize/` に**いま残っている**この参加者の `.age` の本数（O1 のみ・G-5）。
+    /// ★ 隔離した回だけでなく毎回数える —— さもないと 2 回目以降は「正常」に見え、
+    /// 研究者に届いていないデータがあることが消える（Codex P2・2026-09-28）。
+    pub oversize_pending: usize,
     /// ⚠️ 起きた問題。★ **握り潰さない**。呼び出し側が画面へ出す。
     pub errors: Vec<String>,
 }
@@ -943,6 +960,15 @@ pub fn reconcile(opts: &ReconcileOptions, uploader: Option<&dyn Uploader>) -> Re
             crate::submission::unsent_o1_age_files(&opts.submission_dir, &opts.participant).len()
         }
     };
+    // ⚠️★ O1: `oversize/` に残っている本数を毎回数える（G-5）。★ 研究者が回収して空にすれば 0 に戻る。
+    report.oversize_pending = match opts.mode {
+        CollectionMode::G1 => 0,
+        CollectionMode::O1 => crate::submission::owned_o1_age_files(
+            &opts.submission_dir.join(OVERSIZE_DIR_NAME),
+            &opts.participant,
+        )
+        .len(),
+    };
     // ⚠️★ **O1 に「確認待ち」は無い** (承認ゲートを通らないので、数えると画面に嘘が出る)。
     report.awaiting_approval = match opts.mode {
         CollectionMode::G1 => {
@@ -1032,28 +1058,41 @@ impl Uploader for HttpUploader {
             .send()
             .map_err(|e| UploadError::Other(format!("送信に失敗しました (通信): {e}")))?;
 
-        let status = resp.status();
+        let status = resp.status().as_u16();
         let text = resp.text().unwrap_or_default();
-        if !status.is_success() {
-            return Err(UploadError::Other(format!(
-                "送信に失敗しました (HTTP {})",
-                status.as_u16()
-            )));
-        }
-        // ⚠️★ **HTTP 200 を成功と読まない。** GAS は例外時も 200 で本文にエラーを返す。
-        //   ★ アプリ層の応答 (`"ok":true`) を要求する。さもないと「送ったつもり」が
-        //   `.sent` になって回収不能になる (送信先から成否を追えない・M-5)。
-        if !response_is_ok(&text) {
-            if response_is_too_large(&text) {
-                return Err(UploadError::TooLarge(text));
-            }
-            return Err(UploadError::Other(format!(
-                "送信先が受領を確認しませんでした: {}",
-                truncate_for_display(&text)
-            )));
-        }
-        Ok(())
+        classify_response(status, &text)
     }
+}
+
+/// 送信先の応答を分類する (純関数・G-5)。★ HTTP 層と隔離の判定をつなぐ所なので、テストで直接見る。
+///
+/// ⚠️ 表示文言は変更前と同じにする（G1 のログを変えない）。
+pub fn classify_response(status: u16, body: &str) -> Result<(), UploadError> {
+    if !(200..300).contains(&status) {
+        let msg = format!("送信に失敗しました (HTTP {status})");
+        // ★ 413 (Payload Too Large) は「何度送っても届かない」。⚠️ 400 は理由が分からないので含めない
+        //   （Google は本文上限の超過を 400 で返すが、400 はほかの理由でも返る）。
+        return Err(if status == 413 {
+            UploadError::TooLarge(msg)
+        } else {
+            UploadError::Other(msg)
+        });
+    }
+    // ⚠️★ **HTTP 200 を成功と読まない。** GAS は例外時も 200 で本文にエラーを返す。
+    //   ★ アプリ層の応答 (`"ok":true`) を要求する。さもないと「送ったつもり」が
+    //   `.sent` になって回収不能になる (送信先から成否を追えない・M-5)。
+    if response_is_ok(body) {
+        return Ok(());
+    }
+    let msg = format!(
+        "送信先が受領を確認しませんでした: {}",
+        truncate_for_display(body)
+    );
+    Err(if response_is_too_large(body) {
+        UploadError::TooLarge(msg)
+    } else {
+        UploadError::Other(msg)
+    })
 }
 
 /// 送信先の応答が「受領した」と言っているか (純関数)。
@@ -2225,9 +2264,7 @@ mod tests {
     impl Uploader for TooLargeUploader {
         fn upload(&self, file_name: &str, _bytes: &[u8]) -> Result<(), UploadError> {
             self.0.lock().unwrap().push(file_name.to_string());
-            Err(UploadError::TooLarge(
-                r#"{"ok":false,"error":"too large"}"#.to_string(),
-            ))
+            classify_response(200, r#"{"ok":false,"error":"too large"}"#)
         }
     }
 
@@ -2301,12 +2338,23 @@ mod tests {
         );
         assert!(!crate::submission::sent_marker_path(&moved).exists());
 
-        // ★ 2 回目: 何もしない (再送しない・二度数えない・黙って正常)
+        assert_eq!(report.oversize_pending, 1);
+
+        // ★ 2 回目: 再送しない・二度数えない。⚠️ ただし **残っていることは毎回見える**
         let up2 = OkUploader(Mutex::new(Vec::new()));
         let again = reconcile(&o1_opts(&d, &o, &r, 1), Some(&up2));
         assert!(up2.0.lock().unwrap().is_empty());
         assert_eq!((again.sent, again.quarantined, again.unsent), (0, 0, 0));
         assert!(again.errors.is_empty(), "{:?}", again.errors);
+        assert_eq!(
+            again.oversize_pending, 1,
+            "⚠️ 研究者に届いていないデータがあることを消さない"
+        );
+
+        // ★ 研究者が回収して空にすれば 0 に戻る
+        std::fs::remove_file(&moved).unwrap();
+        let after = reconcile(&o1_opts(&d, &o, &r, 1), Some(&up2));
+        assert_eq!(after.oversize_pending, 0);
 
         let _ = std::fs::remove_dir_all(&d);
         let _ = std::fs::remove_dir_all(&o);
@@ -2440,6 +2488,65 @@ mod tests {
         );
         assert!(!o.join(MANIFEST_FILE_NAME).exists());
         assert_eq!(next_o1_day_number(&o, "P012"), 4);
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ★ HTTP 層の分類: 413 と `200 + too large` は TooLarge、それ以外は Other、`ok:true` だけが成功。
+    /// ⚠️ 表示文言は変更前と同じ（G1 のログを変えない）。
+    #[test]
+    fn classify_response_maps_http_to_upload_errors() {
+        assert_eq!(classify_response(200, r#"{"ok":true}"#), Ok(()));
+        match classify_response(200, r#"{"ok":false,"error":"too large"}"#) {
+            Err(UploadError::TooLarge(m)) => assert_eq!(
+                m,
+                r#"送信先が受領を確認しませんでした: {"ok":false,"error":"too large"}"#
+            ),
+            other => panic!("{other:?}"),
+        }
+        match classify_response(413, "") {
+            Err(UploadError::TooLarge(m)) => assert_eq!(m, "送信に失敗しました (HTTP 413)"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(
+            classify_response(400, "x"),
+            Err(UploadError::Other(
+                "送信に失敗しました (HTTP 400)".to_string()
+            )),
+            "⚠️ 400 は理由が分からないので隔離しない"
+        );
+        assert_eq!(
+            classify_response(500, ""),
+            Err(UploadError::Other(
+                "送信に失敗しました (HTTP 500)".to_string()
+            ))
+        );
+        assert!(matches!(
+            classify_response(200, "<html>"),
+            Err(UploadError::Other(_))
+        ));
+        assert!(matches!(
+            classify_response(200, r#"{"ok":false,"error":"bad secret"}"#),
+            Err(UploadError::Other(_))
+        ));
+    }
+
+    /// ⚠️ 隔離の移動は、移し先に同名があれば上書きしない（ハードリンクの経路）。
+    #[test]
+    fn move_to_oversize_never_overwrites() {
+        let o = tmpdir("g5mv");
+        let a = o.join("P012_o1day01_gse_o1_20260928_010101.age");
+        std::fs::write(&a, b"new").unwrap();
+        std::fs::create_dir_all(o.join(OVERSIZE_DIR_NAME)).unwrap();
+        let dest = o.join(OVERSIZE_DIR_NAME).join(a.file_name().unwrap());
+        std::fs::write(&dest, b"old").unwrap();
+        let err = move_to_oversize(&a, &o).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read(&dest).unwrap(), b"old");
+        assert_eq!(std::fs::read(&a).unwrap(), b"new", "★ 元は残る");
+        std::fs::remove_file(&dest).unwrap();
+        let moved = move_to_oversize(&a, &o).unwrap();
+        assert_eq!(std::fs::read(&moved).unwrap(), b"new");
+        assert!(!a.exists(), "★ 移動である（コピーを残さない）");
         let _ = std::fs::remove_dir_all(&o);
     }
 }

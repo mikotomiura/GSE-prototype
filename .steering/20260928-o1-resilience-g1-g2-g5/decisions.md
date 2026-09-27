@@ -88,3 +88,20 @@
 | CR LOW-MEDIUM: Windows の自動起動は `.bat` の `GSE_DISABLE_PROBES=1` を通らない | ✅ `autostart.rs` の冒頭に明記（プローブは `start_session` 拒否の構造ガードで止まる・lib.rs:2794 を 2026-09-28 に一次で確認済み） |
 | CR LOW: 台帳の B-8 が B-7 の前 | ✅ 並べ替え |
 | Codex | ⚠️ 1 回目は **secrets-filter が `reconcile.rs` の未変更の文脈行 `"secret": self.secret,` で fail-closed**（既知の型・memory `cross-review-codex-self-block`）。→ 下の再実行を参照 |
+
+### Codex の再実行（2026-09-28）
+- 13 ファイル（`reconcile.rs` と `.steering/` を除く）: secrets-filter rc=0 で通常実行。
+- `reconcile.rs`: secrets-filter の検出 2 行 ——（1）未変更の文脈行 `"secret": self.secret,`（`HttpUploader` のフィールド参照・値ではない）／（2）テストの応答文字列 `{"ok":false,"error":"bad secret"}`。★ **研究者が 2 行を目で確認し `--ack-filtered` を承認した**（2026-09-28 AskUserQuestion「送ってよい」）。
+
+### Codex の結果と対応（2026-09-28）
+| 指摘 | 対応 |
+|---|---|
+| (13 ファイル) P1: G-5 の実装が diff に無い | 却下（誤検知）: `reconcile.rs` を別に回したため |
+| (13 ファイル) P2: 配布フォルダを移動・コピーすると印も移り、付け替えが起きない | ✅ 印の中身を「登録した exe のパス」にし、いまの exe と一致するときだけ処理済み（`marker_matches`） |
+| (13 ファイル) P2: 印を先に書くと、直後に落ちたとき二度と再試行しない／記録まで残ると「消した」と誤読 | ✅ 登録の**前**は書き込めるかを試すだけ（`probe_writable`）、印と記録は**登録成功の後**に書く。⚠️ 判断 12 の「印を先に書く」を置き換えた |
+| (13 ファイル) 所感: IO をまたぐ遷移が未検証 | ✅ `Registrar` trait で登録先を差し替え、一時フォルダで流れ全体をテスト（初回 1 回・消した登録を作り直さない・移動で付け替え・失敗で再試行・書けない場所では登録しない）。変異 4 種すべて赤 |
+| (reconcile.rs) P1 条件付き: `exists`→`rename` が原子的でない | ✅ ハードリンク → 元を削除（移し先があれば OS が拒む）。ハードリンク不可の FS は従来の確認つき rename |
+| (reconcile.rs) P2: 隔離後は次の回から見えない | ✅ `ReconcileReport.oversize_pending`（`oversize/` に残る本数を毎回数える）。1 以上のとき要約行に `oversize_pending`（成功した回の要約は applog に残る）。G1 は常に 0 で要約行は不変 |
+| (reconcile.rs) P2: HTTP 層→隔離の接続が未検証・413 が Other | ✅ `classify_response(status, body)` に切り出してテスト。413 を TooLarge に（400 は理由が分からないので含めない）。表示文言は従来のまま |
+
+検証: 839 passed／clippy `-D warnings` 2 構成 rc=0。
