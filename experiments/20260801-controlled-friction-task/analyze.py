@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import itertools
 import json
 import math
@@ -149,9 +150,16 @@ def evaluate_recruitment_closed(roster: dict | None) -> tuple[bool, str | None]:
         return False, (f"[NG] sample_roster.recruitment_closed.closed が真偽値でない: {closed!r}。"
                         f"★ 文字列/数値では締めたと解釈しない（fail-closed）")
     date = rc.get("date")
-    if not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
-        return False, (f"[NG] recruitment_closed.closed=true だが date が YYYY-MM-DD で"
-                        f"記入されていない: {date!r}")
+    # ⚠️★★★ 2026-09-27 修正（Codex / code-reviewer 2 巡目・両方指摘）: 正規表現
+    # `\d{4}-\d{2}-\d{2}` は書式だけを見るので `"2026-99-99"` のような実在しない日付も通る。
+    # `date.fromisoformat()` は書式と実在の両方を検証する（うるう年等も正しく扱う）。
+    if not isinstance(date, str):
+        return False, (f"[NG] recruitment_closed.closed=true だが date が文字列でない: {date!r}")
+    try:
+        datetime.date.fromisoformat(date)
+    except ValueError:
+        return False, (f"[NG] recruitment_closed.closed=true だが date が実在する YYYY-MM-DD "
+                        f"日付になっていない: {date!r}")
     if rc.get("decided_before_seeing_results") is not True:
         return False, ("[NG] recruitment_closed.closed=true だが "
                         "decided_before_seeing_results が true でない（結果を見る前に締めたと"
@@ -1214,9 +1222,17 @@ def main() -> int:
     #   ★ FEATURE_SETS の先頭キー（"FS_A"）を名指しで引く（feature set 間で同値という
     #   `cohort_verdict` の前提はコメントのとおり）。
     analysed_m = verdict[next(iter(FEATURE_SETS))]["n_subjects_analysed"] if verdict else 0
-    # ★ 前提（feature set 間で同値）が壊れたら気づけるようにする（code-reviewer 指摘）。
-    assert all(v["n_subjects_analysed"] == analysed_m for k, v in verdict.items() if k in FEATURE_SETS), \
-        f"解析 m が feature set 間で不一致: {[(k, v['n_subjects_analysed']) for k, v in verdict.items() if k in FEATURE_SETS]}"
+    # ⚠️★★★ 2026-09-27 修正（code-reviewer 2 巡目 Medium）: `assert` は (a) `python3 -O` で消える、
+    #   (b) 発火時に本ファイルの他の門と違う例外形（AssertionError）になり [NG]/return 1 の
+    #   規約から外れる、という理由で他の検査と揃えて print+return に書き換える。
+    #   ⚠️ 現状の `cohort_verdict()` では `n = len(usable)` が feature set 間で共通の式なので
+    #   この分岐は実際には発火しない（死んだ検査）。それでも将来 `cohort_verdict()` が
+    #   feature set ごとに異なる母集団を使うよう変わったときの回帰検知として残す。
+    _m_mismatch = [(k, v["n_subjects_analysed"]) for k, v in verdict.items()
+                   if k in FEATURE_SETS and v["n_subjects_analysed"] != analysed_m]
+    if _m_mismatch:
+        print(f"[NG] 解析 m が feature set 間で不一致（前提が壊れている）: {_m_mismatch}")
+        return 1
     m_gate = check_zero_analysed(analysed_m)
     if m_gate:
         print(m_gate)
@@ -1734,6 +1750,8 @@ def selftest() -> int:
         ("date が欠落", {"closed": True, "decided_before_seeing_results": True}),
         ("date が不正な形式", {"closed": True, "date": "2026/09/27",
                               "decided_before_seeing_results": True}),
+        ("date が実在しない日付（書式は正しい）", {"closed": True, "date": "2026-99-99",
+                                          "decided_before_seeing_results": True}),
         ("decided_before_seeing_results が欠落", {"closed": True, "date": "2026-09-27"}),
         ("decided_before_seeing_results が false",
          {"closed": True, "date": "2026-09-27", "decided_before_seeing_results": False}),

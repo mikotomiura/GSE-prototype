@@ -34,6 +34,14 @@ if len(conf) < n_subjects and not closed:      → [NG]（従来どおり・§2.
 if len(conf) < n_subjects and closed:          → 続行（★ 注記を errors ではなく notes へ）
 ```
 
+⚠️★★★ **実装の逸脱と是正（2026-09-27・TASK-POST レビューで発覚）**: issue 002 の実装（worker）は
+本設計が指定した `is True`（厳密判定）ではなく `bool(rc.get("closed"))`（素の型変換）を実装した。
+これは `"closed": "false"`（文字列）等で fail-open する（Codex / security-checker / code-reviewer の
+3 系統が独立に指摘・一次で再現確認）。★ TASK-POST の修正コミットで `evaluate_recruitment_closed()`
+ヘルパに一本化し、本設計どおり `closed is True` の厳密判定に戻した。加えて設計時点には無かった
+`date` / `decided_before_seeing_results` の必須化（closed=true のとき）も追加した
+（security-checker 指摘: optional stopping の自己申告フィールドが未検証のまま通っていた）。
+
 - 出力 JSON のトップレベルに `sample_counts` を足す:
   `{"registered_k": <config の registered_k>, "analysed_m": <n_subjects_analysed と同値>,
     "recruitment_closed": <bool>, "note": "内訳（未完了・やめた・削除の求め）は書かない（第 20 版）"}`

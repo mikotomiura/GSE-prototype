@@ -744,6 +744,15 @@ def selftest() -> int:
     case("★★ started_incomplete でも「途中の穴」（末尾からの連続でない欠落）は赤",
          _hole_in_middle_with_status, expect_fail=True)
 
+    # ★ 反対側の境界（code-reviewer Low・2026-09-27）: 先頭ブロックだけ欠落・以降は全部 file が
+    #   ある。これも「末尾からの連続」ではない（＝ 途中の穴側の境界）ので赤のまま。
+    def _hole_at_start_with_status(s: dict) -> None:
+        s["participation_status"] = "started_incomplete"
+        s["blocks"][0].pop("file", None)
+
+    case("★★ started_incomplete でも「先頭ブロックだけ欠落」（末尾からの連続でない）は赤",
+         _hole_at_start_with_status, expect_fail=True)
+
     def _not_started_no_files(s: dict) -> None:
         s["participation_status"] = "not_started"
         for b in s["blocks"]:

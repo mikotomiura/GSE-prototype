@@ -23,14 +23,24 @@ UNTOUCHED="${G1DIR}/consent.md ${G1DIR}/protocol.md Form_G1/README.md Form_G1/GS
 BASE="feature/precondition8-t3-and-consent"
 git rev-parse --verify --quiet "$BASE" >/dev/null || BASE=""
 if [ -n "$BASE" ]; then
-  # ⚠️★★★ 2026-09-27 修正（Codex P2・実測で確認）: 旧版は `git diff --quiet -- $UNTOUCHED`
-  #   （引数無し＝作業ツリー対 index）で「作業ツリーの未コミット変更」しか見ておらず、
-  #   禁止ファイルを編集して `git add`（staged だがコミットしていない）した場合は
-  #   index も作業ツリーも一致するため**すり抜けた**。
-  #   ★ `git diff --quiet HEAD -- ...`（作業ツリー対 HEAD）は staged/unstaged 両方を捉える。
+  # ⚠️★★★ 2026-09-27 修正 1 回目（Codex P2 1 巡目・実測で確認）: 旧版は
+  #   `git diff --quiet -- $UNTOUCHED`（引数無し＝作業ツリー対 index）で「作業ツリーの
+  #   未コミット変更」しか見ておらず、禁止ファイルを編集して `git add`（staged だが
+  #   コミットしていない）した場合は index も作業ツリーも一致するため**すり抜けた**。
+  #   → `git diff --quiet HEAD -- ...`（作業ツリー対 HEAD）に変更。
+  # ⚠️★★★ 2026-09-27 修正 2 回目（Codex / code-reviewer 2 巡目・実測で再現確認）:
+  #   `git diff <ref>`（`--cached` 無し）は **index を経由せず** HEAD のツリーと**作業ツリーの
+  #   ディスク内容**を直接比べる。禁止ファイルを編集して `git add`（staged）した後、
+  #   **作業ツリーだけ元の内容に手で戻す**と、index には禁止変更が残ったまま
+  #   `git diff HEAD -- ...` は「差分無し」を返す（実機で再現済み）。その状態で
+  #   `git commit`（`git add` し直さない）すると index の禁止変更がそのまま commit される。
+  #   → `git diff --quiet --cached -- ...`（index 対 HEAD）を**併せて**検査し、
+  #   index 側の差分も取りこぼさない。
   # shellcheck disable=SC2086
-  if git diff --quiet "$BASE" HEAD -- $UNTOUCHED && git diff --quiet HEAD -- $UNTOUCHED; then
-    ok "AC2 被験者向け文書とフォームのコードに差分が無い（対 ${BASE} ＋ HEAD 対 作業ツリー/staged）"
+  if git diff --quiet "$BASE" HEAD -- $UNTOUCHED \
+     && git diff --quiet HEAD -- $UNTOUCHED \
+     && git diff --quiet --cached -- $UNTOUCHED; then
+    ok "AC2 被験者向け文書とフォームのコードに差分が無い（対 ${BASE} ＋ HEAD 対 作業ツリー ＋ HEAD 対 index）"
   else
     ng "AC2 ⚠️★★★ 被験者向け文書またはフォームのコードが変更されている（本 issue は提案のみ）"
   fi
