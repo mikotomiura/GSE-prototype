@@ -8,6 +8,9 @@
 #   W. **worktree 側 Status の遷移検知** (`check_wt_became_blocked` / `wt_issue_status_key`)
 #      —— ★ 2026-09-25 追加。issue 001 の実測 (worker が worktree 側 Status を blocked に
 #      書き換えたのに同じ worker を max_attempts まで再起動していた) の是正。
+#   P. **DAG ループの継続条件** —— ★ 2026-09-27 追加。無関係な issue の失敗で、依存を満たした
+#      未試行の issue まで blocked にしていた実測の是正 (`.steering/20260927-loop-run-progress-flag-fix/`)。
+#      ★ P2 が陰性対照、M-prog が変異テスト。P3 = 境界侵害では run を中止する (★ M-bnd が変異テスト)。
 #
 # ⚠️★★★ **「正常なら緑」だけ試さない**（★ `verify-before-claiming` ルール 5b / 6）。
 #   ★ B2 が **陰性対照**である: ⚠️ 逸脱しない stub でも blocked になるなら、
@@ -210,6 +213,12 @@ run_loop() { # run_loop <repo-dir> [引数...] → events.jsonl のパスを std
   local r="$1"; shift
   ( cd "${r}" && PATH="${r}/stub:${PATH}" bash scripts/loop-run.sh .steering/task "$@" ) >/dev/null 2>&1
   printf '%s\n' "${r}/.steering/task/_loop-events.jsonl"
+}
+
+run_loop_rc() { # run_loop_rc <repo-dir> [引数...] → loop-run.sh の終了コードを stdout へ
+  local r="$1"; shift
+  ( cd "${r}" && PATH="${r}/stub:${PATH}" bash scripts/loop-run.sh .steering/task "$@" ) >/dev/null 2>&1
+  printf '%s\n' "$?"
 }
 
 dry_run() { # dry_run <repo-dir> [引数...] → stdout(+stderr) をそのまま返す
@@ -1540,6 +1549,230 @@ else
   ng "N11: 一時 git repo を用意できなかった (★ 判定できない)"
 fi
 
+echo "P. DAG ループの継続条件 —— 無関係な issue の失敗で、試していない issue を blocked にしない"
+
+# ⚠️★★★ 2026-09-27 の実測の再現（★ `.steering/20260927-precondition8-t3-and-consent/blockers.md` §1・
+#   是正は `.steering/20260927-loop-run-progress-flag-fix/`）。
+#   ★ 旧実装は `while` の継続を「バッチで issue_done が 1 件でも出たか」(`progressed`) だけで決めていた。
+#     parallel=1 でバッチが 001 だけになり、001 が失敗すると `progressed=0` でループを抜け、
+#     ⚠️ **依存の無い 002 が一度も試されずに** 末尾で「依存 issue が未完のため未実行」の blocked にされた。
+#   ★ 並べ方: 001 = 必ず失敗 / 002 = 独立 / 003 = 001 に依存 (★ 正しく blocked のまま) /
+#     004 = 002 に依存 (★ 2 波目以降も前に進むこと)。
+#   ★ stub はブランチ名で振る舞いを変える: `loop/001*` ではコミットしない (→ uncommitted → abandoned)。
+P_STUB='b="$(git rev-parse --abbrev-ref HEAD)"
+case "$b" in
+  loop/001|loop/001-*) : ;;
+  *) echo w > w.txt && git add w.txt && git commit -q -m work ;;
+esac
+true'
+setup_progress_issues() { # setup_progress_issues <repo-dir>
+  local r="$1"
+  rm -f "${r}/.steering/task/issues/"*.md
+  printf '# Issue 001: stub (必ず失敗する)\nverify_level: parse\n## Goal\nstub\n## Dependencies\n## Status\n\n' \
+    > "${r}/.steering/task/issues/001.md"
+  printf '# Issue 002: stub (独立)\nverify_level: parse\n## Goal\nstub\n## Dependencies\n## Status\n\n' \
+    > "${r}/.steering/task/issues/002.md"
+  printf '# Issue 003: stub (失敗する 001 に依存)\nverify_level: parse\n## Goal\nstub\n## Dependencies\n- 001\n## Status\n\n' \
+    > "${r}/.steering/task/issues/003.md"
+  printf '# Issue 004: stub (成功する 002 に依存)\nverify_level: parse\n## Goal\nstub\n## Dependencies\n- 002\n## Status\n\n' \
+    > "${r}/.steering/task/issues/004.md"
+  (
+    cd "${r}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    git add -A .steering/task/issues || exit 1
+    git commit -q -m "test: progress issues" || exit 1
+  ) >/dev/null 2>&1
+}
+# ev_count <events> <issue> <event> → 件数
+ev_count() { jq -s --arg i "$2" --arg e "$3" '[.[] | select(.issue==$i and .event==$e)] | length' "$1" 2>/dev/null || echo -1; }
+check_progress() { # check_progress <ラベル> <events>  → 0 = 全項目合格
+  local lbl="$1" ev="$2" bad=0 n
+  [ "$(ev_count "${ev}" 002 issue_done)" = "1" ] || { echo "    ${lbl}: 002 が issue_done になっていない"; bad=1; }
+  [ "$(ev_count "${ev}" 004 issue_done)" = "1" ] || { echo "    ${lbl}: 004 (002 に依存) が issue_done になっていない"; bad=1; }
+  [ "$(ev_count "${ev}" 001 issue_done)" = "0" ] || { echo "    ${lbl}: 失敗するはずの 001 が issue_done になった"; bad=1; }
+  jq -e -s 'any(.[]; .issue=="003" and .event=="blocked" and ((.detail // "") | test("依存 issue が未完")))' "${ev}" >/dev/null 2>&1 \
+    || { echo "    ${lbl}: 003 (001 に依存) が「依存 issue が未完」の blocked になっていない"; bad=1; }
+  [ "$(ev_count "${ev}" 003 attempt_start)" = "0" ] || { echo "    ${lbl}: 依存未了の 003 が試行された"; bad=1; }
+  # ★ 同じ run の中で再スケジュールしない: 001 は run_issue 1 回ぶん (= max_attempts=2 の attempt 1・2) だけ。
+  #   ⚠️ 件数だけでなく attempt 番号の列で見る（★ Codex MEDIUM: 「二重にスケジュールされ各回 1 attempt」を
+  #     件数 2 と区別できないため）。
+  n="$(jq -r -s '[.[] | select(.issue=="001" and .event=="attempt_start" and (.detail // "") == "") | .attempt] | map(tostring) | join(",")' "${ev}" 2>/dev/null)"
+  [ "${n}" = "1,2" ] || { echo "    ${lbl}: 001 の attempt_start の attempt 列が '${n}' ('1,2' のはず)"; bad=1; }
+  [ "$(ev_count "${ev}" 002 attempt_start)" = "1" ] || { echo "    ${lbl}: 002 の attempt_start が 1 回ではない"; bad=1; }
+  [ "$(ev_count "${ev}" 004 attempt_start)" = "1" ] || { echo "    ${lbl}: 004 の attempt_start が 1 回ではない"; bad=1; }
+  return "${bad}"
+}
+
+# --- P1: 001 の失敗で止まらず、002 / 004 を試し、003 だけを blocked にする ---
+PR1="${TMP}/p1/repo"; mkdir -p "${PR1}"
+if setup_repo "${PR1}" "${P_STUB}"; then
+  setup_progress_issues "${PR1}"
+  p1_rc="$(run_loop_rc "${PR1}")"; ev="${PR1}/.steering/task/_loop-events.jsonl"
+  [ "${p1_rc}" = "0" ] || echo "    P1: 通常の失敗なのに終了コードが ${p1_rc} (0 のはず)"
+  if [ "${p1_rc}" = "0" ] && [ -s "${ev}" ] && check_progress P1 "${ev}"; then
+    ok "P1: 001 が失敗しても 002 / 004 は issue_done、003 だけが依存未了で blocked (★ 再試行なし)"
+  else
+    ng "P1: ⚠️★ 無関係な issue の失敗で、依存を満たした issue が試されなかった / 再試行された"
+    [ -s "${ev}" ] && jq -c '{issue,event,attempt,detail}' "${ev}" 2>/dev/null | head -20
+  fi
+else
+  ng "P1: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P2 陰性対照: 全部成功する stub なら 4 本とも issue_done・blocked は 0 件 ---
+#   ★ これが赤なら、P1 の「002 / 004 が issue_done」は stub の都合であって継続条件を見ていない。
+PR2="${TMP}/p2/repo"; mkdir -p "${PR2}"
+if setup_repo "${PR2}" 'echo w > w.txt && git add w.txt && git commit -q -m work
+true'; then
+  setup_progress_issues "${PR2}"
+  ev="$(run_loop "${PR2}")"
+  n_done="$(jq -s '[.[] | select(.event=="issue_done") | .issue] | unique | length' "${ev}" 2>/dev/null || echo -1)"
+  if [ "${n_done}" = "4" ] && [ "$(jq -s '[.[] | select(.event=="blocked")] | length' "${ev}" 2>/dev/null)" = "0" ]; then
+    ok "P2 陰性対照: 全部成功する stub では 4 本とも issue_done・blocked 0 件"
+  else
+    ng "P2 陰性対照: issue_done=${n_done} (4 のはず) または blocked が出た"
+    [ -s "${ev}" ] && jq -c '{issue,event,attempt,detail}' "${ev}" 2>/dev/null | head -20
+  fi
+else
+  ng "P2: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P3: ⚠️★★★ 境界侵害 (ブランチ逸脱) の後は run を中止し、独立な 002 も spawn しない ---
+#   ★ 2026-09-27 `security-checker` MEDIUM。旧実装では parallel=1 の「どれか 1 本の失敗で抜ける」が
+#     **偶然** fail-closed として効いていた。是正で消えたので、意図した停止として入れ直した。
+#   ★ P1 が陰性対照を兼ねる（★ 通常の失敗では止まらない）。
+P3_STUB='b="$(git rev-parse --abbrev-ref HEAD)"
+case "$b" in
+  loop/001|loop/001-*) git checkout -q escape-target ;;
+  *) echo w > w.txt && git add w.txt && git commit -q -m work ;;
+esac
+true'
+# check_boundary_stop <ラベル> <repo-dir> <001 の侵害を示す detail の正規表現>  → 0 = 全項目合格
+#   ★ 001 の侵害が events にあり、002 / 004 は spawn されず「境界侵害 (issue 001)」の blocked、
+#     終了コード 3、report に「run を中止した理由」節。
+check_boundary_stop() {
+  local lbl="$1" r="$2" pat="$3" ev rc bad=0 i
+  rc="$(run_loop_rc "${r}")"; ev="${r}/.steering/task/_loop-events.jsonl"
+  grep -qE "${pat}" "${ev}" 2>/dev/null \
+    || { echo "    ${lbl}: ⚠️ 001 の侵害が起きていない / 検出されていない (★ 前提が壊れている)"; bad=1; }
+  for i in 002 004; do
+    [ "$(ev_count "${ev}" "${i}" attempt_start)" = "0" ] || { echo "    ${lbl}: 境界侵害の後に ${i} が spawn された"; bad=1; }
+    jq -e -s --arg i "${i}" 'any(.[]; .issue==$i and .event=="blocked" and ((.detail // "") | test("境界侵害 \\(issue 001\\)")))' "${ev}" >/dev/null 2>&1 \
+      || { echo "    ${lbl}: ${i} が「境界侵害 (issue 001)」の blocked になっていない"; bad=1; }
+  done
+  [ "${rc}" = "3" ] || { echo "    ${lbl}: 終了コードが ${rc} (3 のはず)"; bad=1; }
+  grep -q '^## ⚠️ run を中止した理由' "${r}/.steering/task/_loop-run-report.md" 2>/dev/null \
+    || { echo "    ${lbl}: report に「run を中止した理由」節が無い"; bad=1; }
+  [ "${bad}" = "0" ] || { [ -s "${ev}" ] && jq -c '{issue,event,attempt,detail}' "${ev}" 2>/dev/null | head -20; }
+  return "${bad}"
+}
+
+PR3="${TMP}/p3/repo"; mkdir -p "${PR3}"
+if setup_repo "${PR3}" "${P3_STUB}"; then
+  setup_progress_issues "${PR3}"
+  if check_boundary_stop P3 "${PR3}" 'loop/001-\* から外れている'; then
+    ok "P3: ブランチ逸脱の後は run を中止し、002 / 004 を spawn せず理由つきで blocked・exit 3・report に節"
+  else
+    ng "P3: ⚠️★★★ 境界侵害の後も run が続いた / 理由・終了コードが残っていない"
+  fi
+else
+  ng "P3: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P3b: 名前を保ったままの履歴入れ替え (reset --soft・B5 と同じ形) でも run を中止する ---
+#   ★ `code-reviewer` LOW: P3 は 4 か所の印のうち「名前の不一致」しか通っていなかった。
+PR3B="${TMP}/p3b/repo"; mkdir -p "${PR3B}"
+if setup_repo "${PR3B}" 'b="$(git rev-parse --abbrev-ref HEAD)"
+case "$b" in
+  loop/001|loop/001-*) git reset -q --soft escape-target ;;
+  *) echo w > w.txt && git add w.txt && git commit -q -m work ;;
+esac
+true'; then
+  setup_progress_issues "${PR3B}"
+  if check_boundary_stop P3b "${PR3B}" '履歴が入れ替わっている'; then
+    ok "P3b: reset --soft による履歴の入れ替えでも run を中止した"
+  else
+    ng "P3b: ⚠️★★★ 履歴の入れ替えの後も run が続いた"
+  fi
+else
+  ng "P3b: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P3c: ⚠️★★★ 最終 attempt の verify の最中に逸脱しても run を中止する ---
+#   ★ `code-reviewer` MEDIUM。verify.test は worker が書いたテストを走らせるので、そこで HEAD が動きうる。
+#     ⚠️ 最終 attempt で verify が赤なら、本体は ensure_branch を通らずに abandoned で抜けていた。
+#   ★ max_attempts=1 にし、verify.test が 001 の worktree でだけ逸脱して赤を返す。
+P3C_VT="${TMP}/p3c-verify.sh"
+cat > "${P3C_VT}" <<'VT'
+b="$(git rev-parse --abbrev-ref HEAD)"
+case "$b" in loop/001|loop/001-*) git checkout -q escape-target >/dev/null 2>&1; exit 1 ;; esac
+exit 0
+VT
+PR3C="${TMP}/p3c/repo"; mkdir -p "${PR3C}"
+if setup_repo "${PR3C}" 'echo w > w.txt && git add w.txt && git commit -q -m work
+true' '[]' "bash ${P3C_VT}"; then
+  set_budget "${PR3C}" 1 4
+  setup_progress_issues "${PR3C}"
+  if check_boundary_stop P3c "${PR3C}" 'loop/001-\* から外れている'; then
+    ok "P3c: 最終 attempt の verify 中の逸脱でも印が付き、run を中止した"
+  else
+    ng "P3c: ⚠️★★★ 最終 attempt の verify 中の逸脱をすり抜けた"
+  fi
+else
+  ng "P3c: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P4: token_ceiling を超えていたら、バッチを組む前に止め worktree を 1 本も作らない ---
+#   ★ 2026-09-27 `security-checker` LOW（★ 旧来は run_issue の中＝spawn の後でしか見ていなかった）。
+PR4="${TMP}/p4/repo"; mkdir -p "${PR4}"
+if setup_repo "${PR4}" "${P_STUB}"; then
+  setup_progress_issues "${PR4}"
+  (
+    cd "${PR4}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    tmp="$(mktemp)" && jq '.budget.token_ceiling=0' .steering/task/_loop-config.json > "${tmp}" \
+      && mv "${tmp}" .steering/task/_loop-config.json || exit 1
+    git add .steering/task/_loop-config.json && git commit -q -m "test: token_ceiling=0" || exit 1
+  ) >/dev/null 2>&1
+  ev="$(run_loop "${PR4}")"
+  n_start="$(jq -s '[.[] | select(.event=="attempt_start")] | length' "${ev}" 2>/dev/null || echo -1)"
+  n_blk="$(jq -s '[.[] | select(.event=="blocked" and ((.detail // "") | test("token_ceiling 超過")))] | length' "${ev}" 2>/dev/null || echo -1)"
+  n_br="$(git -C "${PR4}" branch --list 'loop/*' | wc -l | tr -d ' ')"
+  if [ "${n_start}" = "0" ] && [ "${n_blk}" = "4" ] && [ "${n_br}" = "0" ]; then
+    ok "P4: token_ceiling 超過ではバッチ前に止め、4 本とも理由つき blocked・loop/* ブランチ 0 本"
+  else
+    ng "P4: attempt_start=${n_start} (0) / token_ceiling の blocked=${n_blk} (4) / loop/* ブランチ=${n_br} (0)"
+  fi
+else
+  ng "P4: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
+# --- P5: id を正規表現として比べない (`.` を含む id が別の id を巻き添えにしない) ---
+#   ★ `grep -vx "1.2"` は `1x2` にも一致し、1.2 のバッチ後に 1x2 が一度も試されず消えていた
+#     (★ 消える方向なので blocked の記録にも残らない)。`issue_ids` の検証は `.` を許す。
+PR5="${TMP}/p5/repo"; mkdir -p "${PR5}"
+if setup_repo "${PR5}" 'echo w > w.txt && git add w.txt && git commit -q -m work
+true'; then
+  rm -f "${PR5}/.steering/task/issues/"*.md
+  for i in 1.2 1x2; do
+    printf '# Issue %s: stub\nverify_level: parse\n## Goal\nstub\n## Dependencies\n## Status\n\n' "${i}" \
+      > "${PR5}/.steering/task/issues/${i}.md"
+  done
+  (
+    cd "${PR5}" || exit 1
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    git add -A .steering/task/issues && git commit -q -m "test: dotted ids" || exit 1
+  ) >/dev/null 2>&1
+  ev="$(run_loop "${PR5}")"
+  if [ "$(ev_count "${ev}" 1.2 issue_done)" = "1" ] && [ "$(ev_count "${ev}" 1x2 issue_done)" = "1" ]; then
+    ok "P5: 1.2 と 1x2 の両方が実行された (★ id を固定文字列で比べている)"
+  else
+    ng "P5: ⚠️ '.' を含む id が別の id を巻き添えにした (1.2 done=$(ev_count "${ev}" 1.2 issue_done) / 1x2 done=$(ev_count "${ev}" 1x2 issue_done))"
+  fi
+else
+  ng "P5: 一時 git repo を用意できなかった (★ 判定できない)"
+fi
+
 echo "M. 変異テスト —— 新しい判定の心臓部を潰したら赤くなるか (2026-09-26 レビュー是正分)"
 
 # ⚠️★★★ 「正常なら緑」だけでは、この検査が何も見ていない可能性を排除できない
@@ -1871,6 +2104,72 @@ else
     fi
   else
     ng "M-p1j 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-prog: DAG ループの継続条件に `progressed` を戻す (★ 2026-09-27 是正・P1 の心臓部) ---
+#   ★ 2 か所の sed で**旧実装そのもの**を再導入する（issue_done が出なかったバッチでループを抜ける）。
+MUT_PROG="${TMP}/mutated-loop-run-prog.sh"
+sed -e 's/^while \[ -n "\$remaining" \]; do$/progressed=1; while [ -n "$remaining" ] \&\& [ "$progressed" = "1" ]; do progressed=0/' \
+    -e 's/^      DONE_IDS+=("\$id")$/      DONE_IDS+=("$id"); progressed=1/' \
+  "${RUN_SH}" > "${MUT_PROG}"
+mut_hit="$(grep -c 'progressed=1' "${MUT_PROG}" 2>/dev/null)" || mut_hit=0
+if [ "${mut_hit:-0}" -ne 2 ]; then
+  ng "M-prog 変異テスト: 変異が当たらなかった (★ while / DONE_IDS の書き方が変わった → 検査不能)"
+else
+  MPROG="${TMP}/mprog/repo"; mkdir -p "${MPROG}"
+  if setup_repo "${MPROG}" "${P_STUB}"; then
+    cp "${MUT_PROG}" "${MPROG}/scripts/loop-run.sh"
+    (
+      cd "${MPROG}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (restore progressed gate)" || exit 1
+    ) >/dev/null 2>&1
+    setup_progress_issues "${MPROG}"
+    ev="$(run_loop "${MPROG}")"
+    # ⚠️ 「check_progress が落ちた」だけでは準備不備やクラッシュでも合格しうる（★ Codex MEDIUM）。
+    #   → ★ 旧不具合に**固有の結果**を見る: 001 は試行され、独立な 002 は 1 度も spawn されず
+    #     「依存 issue が未完」の blocked にされる。
+    if [ -s "${ev}" ] && ! check_progress M-prog "${ev}" >/dev/null \
+       && [ "$(ev_count "${ev}" 001 attempt_start)" != "0" ] \
+       && [ "$(ev_count "${ev}" 002 attempt_start)" = "0" ] \
+       && jq -e -s 'any(.[]; .issue=="002" and .event=="blocked" and ((.detail // "") | test("依存 issue が未完")))' "${ev}" >/dev/null 2>&1; then
+      ok "M-prog 変異テスト: progressed の継続条件を戻すと P1 が赤くなった (★ 検査は空振りしていない)"
+    else
+      ng "M-prog 変異テスト: 旧実装に戻しても P1 の判定が緑のまま (⚠️★★★ この検査は何も見ていない)"
+    fi
+  else
+    ng "M-prog 変異テスト: 準備できなかった (★ 判定できない)"
+  fi
+fi
+
+# --- M-bnd: 境界侵害の印を無効化する (★ 2026-09-27・P3 の心臓部) ---
+MUT_BND="${TMP}/mutated-loop-run-bnd.sh"
+#   ★ 関数の先頭で `return 0` させる（★ 本文が複数行でも 1 行の sed で当たる）。
+sed 's/^mark_boundary_breach() {$/mark_boundary_breach() { return 0/' "${RUN_SH}" > "${MUT_BND}"
+if grep -q '^mark_boundary_breach() {$' "${MUT_BND}" || ! grep -q '^mark_boundary_breach() { return 0$' "${MUT_BND}"; then
+  ng "M-bnd 変異テスト: 変異が当たらなかった (★ mark_boundary_breach の書き方が変わった → 検査不能)"
+else
+  MBND="${TMP}/mbnd/repo"; mkdir -p "${MBND}"
+  if setup_repo "${MBND}" "${P3_STUB}"; then
+    cp "${MUT_BND}" "${MBND}/scripts/loop-run.sh"
+    (
+      cd "${MBND}" || exit 1
+      export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+      git add scripts/loop-run.sh || exit 1
+      git commit -q -m "test: mutate loop-run.sh (disable boundary breach mark)" || exit 1
+    ) >/dev/null 2>&1
+    setup_progress_issues "${MBND}"
+    ev="$(run_loop "${MBND}")"
+    if [ -s "${ev}" ] && grep -q 'loop/001-\* から外れている' "${ev}" \
+       && [ "$(ev_count "${ev}" 002 attempt_start)" != "0" ]; then
+      ok "M-bnd 変異テスト: 印を無効化すると境界侵害の後も 002 が spawn された = P3 が赤くなる (★ 空振りしていない)"
+    else
+      ng "M-bnd 変異テスト: 印を無効化しても 002 が spawn されない (⚠️★★★ P3 は印を見ていない)"
+    fi
+  else
+    ng "M-bnd 変異テスト: 準備できなかった (★ 判定できない)"
   fi
 fi
 
