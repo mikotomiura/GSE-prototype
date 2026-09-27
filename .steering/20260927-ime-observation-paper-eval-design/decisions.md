@@ -163,3 +163,86 @@ Apple の `NSTextInputClient` 文書（JSON 経由で取得）／BRM の投稿�
 - **トレードオフ**: ⚠️ 新規性は薄い（R₀ 自体は既報）。★ 主張を「指標の形の問題」と「交絡・版の揺れ」に絞る。⚠️ 正式版 [P433] の replication package が未入手（bot 対策）→ ブラウザで取得して v1 との差を突き合わせるのが次の最初の作業。
 - **影響範囲**: `paper-suggest.md` の候補表と投稿計画、`docs/references.md`（[P321] 訂正・[P433]・[P434] 追加）、`experiments/20260906-p321-resumption-baseline/notes.md` §9、handoff `next-session-p321-reanalysis-paper.md`（新規）。
 - ⚠️ **やらないこと**: [P321] / [P434] の値を GSE の期待値として使う（`notes.md` §4）。IME 論文と同じ論文に混ぜる（判断 6）。
+
+---
+
+★ 以下 2026-09-28（issue 分解セッション: `.steering/_handoff/next-session-ime-paper-issues.md`）。
+⚠️ 分解の前に研究者へ 4 問を尋ね、次の 4 つの判断を確定した。
+
+## 判断 17: E1 で評価する「観測」は、公開する単体ロガーにする（2026-09-28）
+
+- **背景**: design.md §1.1 の図は「GSE の IME 観測部 → ImeShadow 行」と書くが、**何を動かして評価するか**（GSE アプリか、公開する単体ロガーか）は決まっていなかった。preregistration が「何を評価したか」を書く以上、凍結前に決める必要がある。
+- **選択肢**: A: 単体ロガー（公開物） / B: GSE アプリ（配布ビルド）＋ 単体ロガーとは manifest で核の同一性だけを保証 / C: 両方を同時に走らせる
+- **採用**: A
+- **理由**: 題（判断 15）が *a cross-platform logger* であり、読者が使うのは公開物である。E3（判断 12）も同じ単体ロガーを測るので、E1 と E3 の対象が一致する。
+- **トレードオフ**: ⚠️ 単体ロガーの OS ドライバが**本計測の前提**になり、クリティカルパスが 1 段伸びる。⚠️ ドライバは GSE の `hook_*.rs` の逐語コピーではない（新規の最小コード）ので、「GSE の値」ではなく「**公開ロガーの値**」として書く。
+- **影響範囲**: issue 分解（ロガーのドライバ issue が本計測のマイルストーンの依存に入る）。★ 較正パイロットの手順 3（合成入力がフックに届くか）も単体ロガーの **`key` 行だけ**で見る（判断 11 の境界）。
+
+## 判断 18: Windows 専用の issue は、この Windows 機（G-GEAR）でループを回す（2026-09-28）
+
+- **背景**: 判断 4 と handoff は「Windows 側は研究者の Windows 機で収集だけを依頼する」運用を引いていたが、⚠️ その根拠の memory（`windows-agent-collection-only`）は G-GEAR の memory には**無い**。★ 一方、G-GEAR ではモード C のループを**過去 3 タスク**で回している（`.steering/20260914-mhd-feature-offline-tiers/` / `20260921-p1-prereg-cli-poles/` / `20260926-p1-main-prep/` の `_loop-config.json` の `events_path` が `/c/GSE-prototype/...`）。
+- **選択肢**: A: G-GEAR でループを回す / B: Mac で実装し、Windows は `cargo check --target` と CI、収集だけを G-GEAR で行う
+- **採用**: A
+- **理由**: B では Windows のアプリが実機で初めて動くのが 11 月の Windows パイロットになり、不具合の発見が遅れる。律速は Windows（判断 7）。
+- **影響範囲**: 各 issue に **`runs_on`**（`macos` / `windows` / `any`）を付け、`_issue-plan.md` に機械ごとの `--issues` を書く。★ 判断 4 のトレードオフの記述（「収集だけを依頼する」）は、**実測（本計測）の運用**としては残す。
+
+## 判断 19: 読みの付与は SudachiPy を前処理だけに pin する（2026-09-28）
+
+- **背景**: design.md §1.5 は「青空文庫の文から句を抽出する」とだけ書くが、⚠️ 漢字かな交じり文をローマ字で打つには**読み**が要る。一次の設計に手段が無かった。
+- **選択肢**: A: `sudachipy` ＋ `sudachidict_core`（どちらも Apache-2.0）を前処理だけに pin / B: かな書きの句だけを抽出 / C: 少数の句に人手で読みを付ける
+- **採用**: A
+- **理由**: ライセンスがコード Apache-2.0（判断 15）と両立する。前処理を 1 回走らせて「句 ＋ 読み」のデータを確定し、その SHA-256 を `data.md` に記録すれば、以降の実行は辞書に依存しない。B は句が機能語に偏り、E2 の言語モデルとも文体がずれる。C は E2 の閉集合（K = 1000）に足りない。
+- **トレードオフ**: ⚠️ 形態素解析の読みは誤りうる（例: 固有名詞）。★ ただし E1 は変換事象を測るので、読みが原文と違っても**打鍵列として妥当なかな**であれば足りる。E2 の正解は**打った読み**（原文ではない）と定義する。
+- **影響範囲**: コーパス準備の issue（新規依存 2 件を Scope In に明記し、ループの停止条件「新規依存の追加」に当たらないようにする）。
+
+## 判断 20: 評価一式は GSE で開発し、公開時に新しい repo へ書き出す（2026-09-28）
+
+- **背景**: 研究者から「論文用に新しいリポジトリを作ったほうがよいか」と問われた。判断 5 は「評価一式だけを別 repo で先に公開する」とだけ書いており、**開発の場所**は決まっていなかった。
+- **選択肢**: A: GSE の `experiments/20260928-ime-observation-accuracy/kit/` で開発し、公開時に新 repo へ書き出す / B: 今すぐ新 repo を作り、そこで開発する / C: 開発は GSE・private の空 repo だけ先に作る
+- **採用**: A
+- **理由**:
+  1. ⚠️ **GSE の履歴は公開できない**（`.github/workflows/ci.yml:169` 逐語「public 化は**履歴全体を公開**するため experiments/ の被験者水準データが露出する」）→ 公開 repo は**どのみち新しい履歴**で始まる。
+  2. ★ **ループ基盤が GSE の worktree 前提**（`loop-run.sh` / `loop-spawn.sh`・hook・CLAUDE.md の制約）。B では使えない。
+  3. ★ **逐語コピーの manifest 照合は、コピー元が見える側でしか意味を持たない**。GSE は private なので、公開 repo の CI にできるのは「manifest と自分自身の一致」までである。GSE とのずれの検出は GSE 側に置く。
+  4. Zenodo の DOI（design.md §4）は公開時点の repo のリリースに付ければ足りる。
+- **トレードオフ**: 公開 repo の履歴は書き出し時点から始まる（★ BRM が求めるのは信頼できるリポジトリへの寄託であり、開発履歴ではない）。⚠️ GSE の `.gitignore` は `experiments/**/*.jsonl` / `*.ndjson` を無視する → ★ 評価の生ログは git に入れず、**Zenodo に寄託**して SHA-256 を `data.md` に記録する（既存の規約と同じ形）。テストの fixture はテストの中で生成する。
+- **影響範囲**: すべての issue の Allowed Files（`experiments/20260928-ime-observation-accuracy/kit/` 配下）、書き出しの issue、公開のマイルストーン。★ 新 repo の作成は**外部への操作**なので、公開のマイルストーンで研究者が行う（または承認を得て行う）。
+
+## 判断 21: 論文用の作成物は `papers/ime-observation/` に全部まとめる（2026-09-28）
+
+- **背景**: 研究者から「論文用のコードや作成物は別ディレクトリを作ってその直下に置くか。GSE に影響が無いように（例: GSE-papers）」と問われた。
+- **選択肢**: A: `papers/ime-observation/` にコード・原稿・事前登録・結果をすべて置く / B: コードと原稿は `papers/`、事前登録と結果は既存規約どおり `experiments/20260928-ime-observation-accuracy/`
+- **採用**: A（研究者が選択）
+- **構成**:
+  ```
+  papers/
+  ├── README.md            ← 境界の規則（GSE 本体から参照しない等）
+  └── ime-observation/     ← 書き出しの単位 ＝ 公開 repo の中身
+      ├── kit/             ← 参照入力欄・実行器・単体ロガー・解析
+      ├── experiment/      ← preregistration.md / SEED / config.json / data.md / env.md / run.sh / notes.md / results/
+      ├── manuscript/      ← BRM 原稿・図
+      └── LICENSE-CODE / LICENSE-DATA / CITATION.cff
+  ```
+- **理由**: 公開は 1 ディレクトリの書き出しで済む。★ GSE 本体（`src-tauri/`・`src/`）からは参照させず、GSE のビルドと CI の対象にも入れない。⚠️ ただし repo 全体を見る門（`scripts/check-shell-portability.sh` 等）には引き続きかかる。
+- **トレードオフ**: ⚠️ `docs/experiment-tracking.md` の「実験は `experiments/<date>-<name>/`」から外れる → ★ 規約（SEED / env.md / data.md / run.sh / notes.md）は `experiment/` の中で守り、その旨を同文書に 1 行足す（issue 001）。⚠️ `.gitignore` の `experiments/**/*.jsonl` / `*.ndjson` は `papers/` に効かない → ★ `papers/ime-observation/.gitignore` で生ログを無視する（issue 001）。
+- **影響範囲**: design.md / requirement.md が書く `experiments/<date>-ime-observation-accuracy/preregistration.md` は **`papers/ime-observation/experiment/preregistration.md`** に読み替える（★ 両文書の冒頭に追記した。本文は書き換えない）。
+
+## 判断 22: issue 分解で決めた実装の型（2026-09-28・slicer の裁定・研究者が覆せる）
+
+★ ループの issue は Allowed Files・verify・新規依存を**分解の時点で**固定しないと成立しない（`docs/loop-engineering.md` の停止条件「新規依存の追加が必要」）。以下はそのための裁定である。
+
+| 部品 | 言語・手段 | 理由 |
+|---|---|---|
+| 生成器・実行器・段取り・解析・パイロットの道具・E2・E3・書き出し | **Python 3 の標準ライブラリだけ** | 依存ゼロで再現しやすい。既存の `experiments/*/analyze.py` と同じ型。⚠️ コーパス前処理だけ SudachiPy（判断 19） |
+| 実行器の OS 送出 | Python `ctypes`（macOS = CoreGraphics の `CGEventPost`、Windows = `user32!SendInput` の scan code） | 計画 → 送出 → oracle を 1 言語で閉じる。⚠️ `docs/agent-shared.md` 制約 1（`windows` crate のみ）は **GSE の Rust** の規約であり、GSE の外にある評価一式には掛からない —— ★ ただし「送出は明示フラグが無ければ行わない（既定 dry-run）」を AC にする |
+| 参照入力欄 macOS | Swift 1 ファイル（`swiftc`・パッケージ依存なし） | `NSTextInputClient` は AppKit のプロトコルで、Rust から実装するより素直 |
+| 参照入力欄 Windows | Rust（`windows = "0.58"`・src-tauri と同じ版） | GSE の規約と揃う。⚠️ TSF はこのアプリ**自身のスレッド**に対してだけ使う（判断 2・`architecture-rules` ルール 5 が禁じるのは他プロセスの観測） |
+| 単体ロガー | Rust（依存は src-tauri と**同じ crate・同じ版**に限る: `windows 0.58` / `core-graphics 0.24` / `core-foundation 0.10` / `serde` / `serde_json` / `crossbeam-channel`） | 逐語コピーした `ime_compose.rs` / `ime_cloak.rs` / `ime_mode.rs` がそのままコンパイルでき、**それらの単体テストも単体ロガーの中で走る** |
+
+- **逐語コピーの範囲**（2026-09-28 に一次で確認）:
+  - ★ **ファイルごと**: `ime_compose.rs`（外部参照は `super::hook::VK_KANJI` ＋ Atomic 8 個 ＋ `super::ime_cloak::MAX_SESSION_MS`・`ime_compose.rs:71,90,360-363`）／`ime_cloak.rs`（外部参照ゼロ・`use std::collections::BTreeSet;` のみ・`:34`）／`ime_mode.rs`（`super::hook::{VK_DBE_* 5 個, VK_KANJI}` の定数だけ・`:31-34`）。→ ★ `hook` は**定数と Atomic だけのシム**で足りる。
+  - ★ **抜粋（アンカーで範囲を決める）**: `anonymize.rs` の `/// VK コードをプライバシーセーフなキー種別カテゴリに変換する` 〜 `/// NDJSON 1 行を匿名化する。` の直前（`KeyCategory` の doc・derive・enum・impl・`anonymize.rs:12-127`。⚠️ ファイルごとはテストが `crate::schema_dto::LogEntryDto` に依存するので不可・`anonymize.rs:325`）／`hook_macos.rs` の **`is_observed_key`（`:248`）と `macos_vk_to_vk`（`:279`）の 2 関数**を doc comment ごと、関数ごとの抜粋として（⚠️ `macos_vk_to_vk` と `handle_event`（`:480`）の間には別の関数があるので「〜 `handle_event` の直前」では取らない）。
+  - ⚠️ **新規に書く**: OS ドライバ（CGEventTap / 低水準キーボードフック / WinEvent・DWM cloak）と行の書き出し。★ `hook_macos.rs`（1529 行）・`ime_windows.rs`（673 行）・`lib.rs` の IME Monitor（`:3552-3664`）は `logger::LogEntry` や G1 の分岐に絡むため（impact-analyzer 報告を一次で裏取り）。
+  - ★ manifest は「ファイル / 抜粋 / 新規」の 3 種を区別して持つ → 論文で「GSE と共有するのはどこまでか」を正確に書ける。
+- **ImeShadow の `t`**: `lib.rs:3216-3243` のとおり **drain した時刻**（IME Monitor のポーリング）であって変換の終端ではない。→ ★ 観測区間は `[t − dwell_ms, t]` を既定とし、⚠️ 終端の遅れ（0〜100 ms）を注入してもパラメータを回復できることを照合器の AC にする（issue 017）。
+- **生ログの置き場**: git に入れない（Zenodo に寄託・SHA-256 を `data.md`）。テストの fixture はテストの中で生成する。

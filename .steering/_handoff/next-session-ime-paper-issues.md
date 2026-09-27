@@ -1,5 +1,7 @@
 # 次セッション — IME 論文: 評価設計（確定版）を issue に分解する
 
+> ✅ **2026-09-28 に実施済み**（27 本に分解・`_issue-plan.md`）。次は `next-session-ime-paper-loop.md`（ループの実行）。
+
 > 作成: 2026-09-28（`next-session-ime-paper-discussion.md` を実施し、design.md をハイブリッドで確定した直後）。
 > ⚠️ **このメモを一次資料にしない。** 状態は着手時に測り直す。
 > ★ 2 本目（`next-session-p321-reanalysis-paper.md`）とは触るファイルが別なので**並行可能**。
