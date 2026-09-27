@@ -9,11 +9,12 @@
   - [P321] Alaboudi & LaToza の figshare パッケージ（arXiv v1 側のコーディング・解析済み:
     `experiments/20260906-p321-resumption-baseline/`）
   - [P433]（[P321] の正式版・*Empirical Software Engineering* 28:117）の replication package
-    （`https://figshare.com/s/0e9eac98b8ddd54c384c`・**未入手**）
+    （`https://figshare.com/s/0e9eac98b8ddd54c384c`・着手時は未入手 → ★ 2026-09-28 に取得。v1 と同じコーディングだった＝判断 7）
   - [P434] Li & Coblenz（FSE 2026）の論文の Table 4（`Resolved`）と Table 5（手法 × task）
 - 論文の芯（案）: **解決と中止を同じ終端に束ねた episode 定義のもとで、成果を要求しない自己解決指標
   （R₀ 型）がどれだけずれるか**（分子の効果 R₀ − R₀′ ＝ 未解決かつ参照なしで終わった割合）を、
   2 つの独立な公開データで示す。あわせて交絡（defect の起点）と、コーディングの版による揺れ（参照 21% → 33%）を指摘する。
+  ⚠️ 後者は判断 7 で「同じ公開コーディングに対し 2 つの版が違う報告値を出し、後者は検討した 4 定義のいずれでも再現できない」に改めた。
 
 ## ゴール
 
@@ -22,13 +23,13 @@ Empirical Software Engineering の研究論文（判断 9。★ 当初の EASE 2
 ## スコープ
 
 ### 含むもの
-- 投稿先の確定と、投稿先の匿名性規程（プレプリントの可否）の一次確認
+- 投稿先の確定と、投稿先の匿名性規程（プレプリントの可否）の一次確認（⚠️ EASE 分は確認済み。EMSE 分は次タスクへ＝`outline.md` 未決）
 - [P433] の replication package の取得（実ブラウザ・ダウンロード前に研究者の承認）と、v1 との差分の特定
 - 解析一式（★ 判断 6 で論文用の別リポジトリ `mikotomiura/self-resolution-measure`・`C:/self-resolution-measure` に置く）:
   [P321] / [P433] の公開コーディング（★ 判断 7: 両パッケージの `rowData.json` は同一）／ [P434] の表の転記 CSV を入力に、R₀ / R₁ / R₀′・分子と分母の効果・
   起点での層別・開発者単位のクラスタ・ブートストラップ区間を出す
 - 位置づけのサーヴェイ 1 ラウンド（`/literature-review`）
-- 6 頁の外枠（主張 ↔ 根拠の対応表）
+- 外枠（主張 ↔ 根拠の対応表・EMSE 研究論文の構成）
 
 ### 含まないもの
 - 原稿の執筆（別タスク）

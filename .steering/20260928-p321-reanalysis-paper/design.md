@@ -20,7 +20,7 @@
 | self-resolution-measure | `analysis/{analyze,d1,d2,stats}.py` / `run.sh` | 解析本体（標準ライブラリのみ） |
 | self-resolution-measure | `data/p434/transcription_{a,b}.csv` / `text_external.csv` | [P434] の転記（A = メイン、B = 独立 subagent） |
 | GSE-prototype | `docs/glossary.md` | 「成果を要求しない自己解決指標」「分子の効果 / 分母の効果」 |
-| GSE-prototype | `docs/references.md` | [P433] の gloss に「パッケージは v1 と同一」を追記（予定） |
+| GSE-prototype | `docs/references.md` | [P433] の gloss に「パッケージは v1 と同一」を追記 |
 
 ## テスト戦略
 
@@ -43,3 +43,4 @@
 - ★ **投稿先を EASE 2027 Short から EMSE 研究論文に変えた**（判断 8・9：研究者の条件「登壇なし・費用ゼロ」）→ 6 頁の制約が消え、外枠は EMSE の研究論文の構成に改めた。プレプリントは投稿と同時（判断 10）、ライセンスは Apache-2.0 ＋ CC BY 4.0（判断 11）。
 - ★ **サーヴェイの判定は go（主張範囲を縮めて）**（`docs/literature/20260928-self-resolution-measure-positioning.md`）→ 「参照なし ≠ 自力解決」[P436] と「成果で条件づける」[P435] は新規性として主張しない。
 - 論文用リポジトリのコミット: `416a0fc`（定義の凍結）→ `834f16a`（解析と結果）→ `4aab7f0`（ライセンス）。`bash run.sh` exit 0・自己検査 12 項目緑・2 回実行でバイト同一。
+- ★ /cross-review（判断 12）後: R₀ − R₁ を分子の効果と分母だけの効果に分解した（条件づけの効果）。検査を強め、転記が LLM によることを明記した（論文用リポジトリ `ae39be6`）。
