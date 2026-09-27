@@ -13,8 +13,8 @@
   "_comment_diag_2026_09_25": "⚠️ 2026-09-25: モデルを gpt-5.5（Legacy）→ gpt-6-astra / gpt-6-sol へ切り替えた際（chore(codex) d3b6da2）、gpt-6-astra がこのアカウントで応答するかを wrapper を経由せず codex exec 直接呼び出しで 1 回確認した（scratchpad・プロンプト「Reply with exactly: OK」・effort low）。★ 実測 5747 tokens。→ 本記帳で +5747 / invocations +1 を自己申告として加算した（★ 2026-09-12 の診断コールと同じ作法）。直後の /cross-review 3 回（P1 前タスク・パス限定）は wrapper 経由で自動計上済み（0 → 146699）。",
   "today": {
     "date": "2026-09-27",
-    "tokens_used": 137395,
-    "invocations": 4
+    "tokens_used": 224770,
+    "invocations": 5
   },
   "history": [
     {
