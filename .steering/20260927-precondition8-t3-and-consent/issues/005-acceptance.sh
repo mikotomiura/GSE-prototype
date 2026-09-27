@@ -23,9 +23,14 @@ UNTOUCHED="${G1DIR}/consent.md ${G1DIR}/protocol.md Form_G1/README.md Form_G1/GS
 BASE="feature/precondition8-t3-and-consent"
 git rev-parse --verify --quiet "$BASE" >/dev/null || BASE=""
 if [ -n "$BASE" ]; then
+  # ⚠️★★★ 2026-09-27 修正（Codex P2・実測で確認）: 旧版は `git diff --quiet -- $UNTOUCHED`
+  #   （引数無し＝作業ツリー対 index）で「作業ツリーの未コミット変更」しか見ておらず、
+  #   禁止ファイルを編集して `git add`（staged だがコミットしていない）した場合は
+  #   index も作業ツリーも一致するため**すり抜けた**。
+  #   ★ `git diff --quiet HEAD -- ...`（作業ツリー対 HEAD）は staged/unstaged 両方を捉える。
   # shellcheck disable=SC2086
-  if git diff --quiet "$BASE" HEAD -- $UNTOUCHED && git diff --quiet -- $UNTOUCHED; then
-    ok "AC2 被験者向け文書とフォームのコードに差分が無い（対 ${BASE} ＋ 作業ツリー）"
+  if git diff --quiet "$BASE" HEAD -- $UNTOUCHED && git diff --quiet HEAD -- $UNTOUCHED; then
+    ok "AC2 被験者向け文書とフォームのコードに差分が無い（対 ${BASE} ＋ HEAD 対 作業ツリー/staged）"
   else
     ng "AC2 ⚠️★★★ 被験者向け文書またはフォームのコードが変更されている（本 issue は提案のみ）"
   fi

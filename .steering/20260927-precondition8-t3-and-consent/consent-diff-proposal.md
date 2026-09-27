@@ -144,26 +144,32 @@
 
 ### 案（逐語）
 
+⚠️★★★ 3 箇所とも「確認済み・実行不要」に加えて、**parity が赤だったときの経路を残す**
+（2026-09-27 追記・security-checker 指摘: 旧案は 3 箇所とも `migrateConsentForm()` への言及ごと
+削除しており、実施当日に再度ズレていた場合の唯一の是正手段が 3 文書のどこにも残らなくなっていた）。
+
 1. `consent.md:178` の表の行を次に置換する:
    ```
-   | ⚠️★★ 配布済み G1-C の **8 項目目の文言更新**（自動送信 → 毎回の送信確認・D-14） | ★ **確認済み・実行不要**。2026-09-27 に `checkConsentFormParity()` で一致を確認した（`✅ G1-C はコードと一致している（同意項目 8 件・既存回答 11 件）`）。⚠️ `setupG1Forms()` は実行しない |
+   | ⚠️★★ 配布済み G1-C の **8 項目目の文言更新**（自動送信 → 毎回の送信確認・D-14） | ★ **確認済み・通常は実行不要**。2026-09-27 に `checkConsentFormParity()` で一致を確認した（`✅ G1-C はコードと一致している（同意項目 8 件・既存回答 11 件）`）。⚠️ **実施直前に再確認し、赤なら `migrateConsentForm()` を実行する（`setupG1Forms()` は実行しない）** |
    ```
 2. `protocol.md:618-621` を次に置換する:
    ```
    ⚠️★★ **`.gs` を直しただけでは実フォームは変わらない。** ★ 2026-08-08 に **8 項目目の文言を変えた**が、
    ★ **2026-09-27 に `checkConsentFormParity()` を実行し、配布済み G1-C がコードと一致していることを
    確認済みである**（`✅ G1-C はコードと一致している（同意項目 8 件・既存回答 11 件）`）。
-   → **`migrateConsentForm()` の再実行は不要**。⚠️ 念のため実施直前にもう一度
-   `checkConsentFormParity()` で確認する（★ `setupG1Forms()` は実行しない）。
+   → **通常は `migrateConsentForm()` の再実行は不要**。⚠️★★★ 実施直前にもう一度
+   `checkConsentFormParity()` で確認し、**赤なら `migrateConsentForm()`（回答を消さない・idempotent）を
+   実行してから実施する**（★ `setupG1Forms()` は実行しない）。
    ```
 3. `Form_G1/README.md:125-129` を次に置換する:
    ```
    ★ **配布済みの G1-C はコードと一致していることを確認済みである**
    （2026-09-27・`checkConsentFormParity()` の実行結果: `✅ G1-C はコードと一致している
-   （同意項目 8 件・既存回答 11 件）`）。→ **`migrateConsentForm()` の実行は不要**。
+   （同意項目 8 件・既存回答 11 件）`）。→ **通常は `migrateConsentForm()` の実行は不要**。
    ⚠️ **`setupG1Forms()` を実行しない**（`clearForm()` を呼び、同意記録を壊す。
    `.steering/20260806-g1-auto-submit-on-block-end/incident-20260807-g1c-rebuild.md`）。
-   実施前にもう一度 `checkConsentFormParity()` で確認すること。
+   ⚠️★★★ 実施前にもう一度 `checkConsentFormParity()` で確認し、**赤なら
+   `migrateConsentForm()` を実行してから実施すること**。
    ```
 
 ### 理由
@@ -195,9 +201,14 @@
    逆ではない。
 3. C-3 の 3 箇所（`consent.md:178` / `protocol.md:618-621` / `Form_G1/README.md:125-129`）を
    「確認済み・実行不要」に更新する。
-4. ⚠️★★★ **`migrateConsentForm()` / `setupG1Forms()` は実行しない**（実フォームは既に一致しているため
-   不要。特に `setupG1Forms()` は `clearForm()` を呼び同意記録を破壊する既知の事故要因）。
+4. ⚠️★★★ **通常は `migrateConsentForm()` / `setupG1Forms()` を実行しない**（実フォームは既に一致して
+   いるため不要。特に `setupG1Forms()` は `clearForm()` を呼び同意記録を破壊する既知の事故要因・
+   ⚠️ こちらは**常に**実行しない）。
 5. 反映後、`checkConsentFormParity()` を**再実行**して一致を再確認する
    （★ md の記述変更が実フォームの状態と食い違っていないことの最終確認）。
+   ⚠️★★★ **赤なら `migrateConsentForm()`（`setupG1Forms()` ではない）を実行してから再度
+   `checkConsentFormParity()` で確認する**（2026-09-27 追記・security-checker 指摘:
+   「通常は実行不要」が「絶対に実行しない」に読み違えられると、実施当日に再度ズレていた場合の
+   是正手段が失われる）。
 6. `participant-guide.md` に同種の食い違いが無いか確認する（★ 本 issue の Scope 外。
    見つかった場合は別途研究者へ報告する。今回の調査では `participant-guide.md` 内は未確認）。
