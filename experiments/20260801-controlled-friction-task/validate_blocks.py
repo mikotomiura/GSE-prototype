@@ -255,14 +255,34 @@ def check_files(spec: dict, seen: dict[str, str], r: Report) -> None:
                    f"（実施したらブロックごとに file を書き足すこと・protocol.md §2.2）")
         return
 
+    # ⚠️★★★ 2026-09-27 修正（code-reviewer MEDIUM・実測で確認）: `started_incomplete` を
+    #   欠落ブロックへ無条件に適用すると、「末尾が連続して未記入（＝ 途中でやめた）」と
+    #   「途中の 1 ブロックだけ穴（＝ 記入漏れ・本当の事故）」を区別できなくなっていた。
+    #   ★ 「途中でやめた」は**末尾から連続**するはずなので、欠落が spec["blocks"] の並び順で
+    #   **末尾の連続区間（suffix）でない**場合は、status に関わらず記入漏れとして FAIL に戻す。
+    missing_ns = [b.get("block") for b in spec["blocks"] if not b.get("file")]
+    present_after_missing = False
+    seen_missing = False
+    for b in spec["blocks"]:
+        if not b.get("file"):
+            seen_missing = True
+        elif seen_missing:
+            present_after_missing = True
+            break
     for b in spec["blocks"]:
         n = b.get("block")
         f = b.get("file")
         if not f:
-            if status == "started_incomplete":
+            if status == "started_incomplete" and not present_after_missing:
                 r.note(f"{subject}: ブロック {n} に file が無い。"
                        f"participation_status=started_incomplete "
                        f"= 実験者の実施記録で途中終了と確認済み{recorded_suffix}")
+            elif status == "started_incomplete" and present_after_missing:
+                r.fail(f"{subject}: ブロック {n} に file が無いが、後続のブロックには file がある"
+                       f"（末尾からの連続した未記入ではない＝**途中の穴**）。"
+                       f"participation_status=started_incomplete は「末尾から連続して未実施」の"
+                       f"ときだけ有効（記入漏れ: {missing_ns}）。記録用紙の NDJSON 名を書き足すこと "
+                       f"(protocol.md §2.2)")
             else:
                 r.fail(f"{subject}: ブロック {n} に file が無い。記録用紙の NDJSON 名を書き足すこと "
                        f"(protocol.md §2.2)")
@@ -714,6 +734,15 @@ def selftest() -> int:
          _partial_with_status, expect_fail=False)
     case("★ 未知の participation_status は赤",
          lambda s: s.update(participation_status="ときどき"), expect_fail=True)
+
+    # ⚠️★★★ 2026-09-27 追加（code-reviewer MEDIUM・fail-open の再発防止）:
+    #   started_incomplete でも「途中の穴」（末尾からの連続ではない欠落）は赤のまま。
+    def _hole_in_middle_with_status(s: dict) -> None:
+        s["participation_status"] = "started_incomplete"
+        s["blocks"][1].pop("file", None)  # ブロック 2 だけ欠落・3 以降は file が残る
+
+    case("★★ started_incomplete でも「途中の穴」（末尾からの連続でない欠落）は赤",
+         _hole_in_middle_with_status, expect_fail=True)
 
     def _not_started_no_files(s: dict) -> None:
         s["participation_status"] = "not_started"
