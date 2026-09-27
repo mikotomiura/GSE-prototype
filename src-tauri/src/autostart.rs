@@ -244,12 +244,29 @@ pub fn handle(exe: &Path, marker: &Path, record: &Path, reg: &dyn Registrar) -> 
     //   起動のたびに登録し直し、被験者が OS の設定で切っても戻してしまう（code-reviewer LOW）。
     //   ⚠️ 印そのものは**登録が成功してから**書く —— 先に書くと、書いた直後に落ちたとき
     //   二度と再試行しない（Codex P2・2026-09-28）。
-    if let Err(e) = probe_writable(marker) {
+    let Some(folder) = marker.parent() else {
+        return AutostartAction::Skip;
+    };
+    if let Err(e) = probe_writable(folder) {
         tracing::error!(
             "O1 autostart: the distribution folder is not writable ({e}); \
              NOT registering (it would be re-registered on every launch)"
         );
         return AutostartAction::Skip;
+    }
+    // ⚠️★ ホーム側の記録も、登録の**前に**書ける場所かを確かめる（Codex P1・2026-09-28）。
+    //   ★ 書けないまま登録すると、被験者が消したあと新しいフォルダで「初めて」と誤読して作り直す。
+    if !st.ever_registered {
+        let ready = match record.parent() {
+            Some(d) => std::fs::create_dir_all(d).and_then(|()| probe_writable(d)),
+            None => Err(std::io::Error::other("no parent")),
+        };
+        if let Err(e) = ready {
+            tracing::error!(
+                "O1 autostart: cannot write {HOME_RECORD_FILE_NAME} under ~/.gse ({e}); NOT registering"
+            );
+            return AutostartAction::Skip;
+        }
     }
     match reg.register(exe) {
         Ok(where_) => {
@@ -264,9 +281,6 @@ pub fn handle(exe: &Path, marker: &Path, record: &Path, reg: &dyn Registrar) -> 
             // ★ 成功してから記録と印を書く。⚠️ ここで落ちても、次の起動は Register / Repoint を
             //   同じ exe でやり直すだけ（上書きなので登録は増えない）。
             if !st.ever_registered {
-                if let Some(dir) = record.parent() {
-                    let _ = std::fs::create_dir_all(dir);
-                }
                 write_or_log(record, "registered", HOME_RECORD_FILE_NAME);
             }
             write_or_log(marker, &here, MARKER_FILE_NAME);
@@ -285,9 +299,20 @@ pub fn marker_matches(content: Option<&str>, exe: &str) -> bool {
 }
 
 /// 印と同じフォルダに書き込めるかを試す（試しに作って消す）。
-fn probe_writable(marker: &Path) -> std::io::Result<()> {
-    let probe = marker.with_file_name(format!(".{MARKER_FILE_NAME}.probe"));
-    std::fs::write(&probe, b"")?;
+///
+/// ⚠️ 名前は毎回一意にし、**新規作成のみ**（`create_new`）で開く —— 固定名で `fs::write` すると、
+/// 同名の既存ファイルを切り詰め、シンボリックリンクなら**リンク先を壊す**（Codex P2・2026-09-28）。
+/// `create_new` は既存（リンクを含む）なら失敗し、辿らない。
+fn probe_writable(dir: &Path) -> std::io::Result<()> {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let probe = dir.join(format!(".gse-probe-{}-{nanos}", std::process::id()));
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)?;
     std::fs::remove_file(&probe)
 }
 
@@ -706,6 +731,45 @@ mod tests {
             reg.calls.borrow().is_empty(),
             "⚠️ 書けない場所では登録しない"
         );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// ⚠️ ホーム側（`~/.gse`）に書けないなら登録しない（消した人に作り直さない、を守れないため）。
+    #[cfg(unix)]
+    #[test]
+    fn an_unwritable_home_is_not_registered() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tmp("rohome");
+        let (exe, marker) = folder(&root, "O1");
+        let gse = root.join("home").join(".gse");
+        std::fs::create_dir_all(&gse).unwrap();
+        std::fs::set_permissions(&gse, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let reg = FakeReg::new();
+        let got = handle(&exe, &marker, &gse.join(HOME_RECORD_FILE_NAME), &reg);
+        std::fs::set_permissions(&gse, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(got, AutostartAction::Skip);
+        assert!(reg.calls.borrow().is_empty());
+        assert!(!marker.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// ⚠️ 書き込みの試しは、既存のファイルやリンクを辿って壊さない。
+    #[cfg(unix)]
+    #[test]
+    fn the_writability_probe_never_touches_existing_files() {
+        let root = tmp("probe");
+        let victim = root.join("victim.txt");
+        std::fs::write(&victim, b"keep").unwrap();
+        // 旧実装の固定名と、それらしい名前のリンクを置いても
+        std::os::unix::fs::symlink(&victim, root.join(".o1.autostart.probe")).unwrap();
+        probe_writable(&root).unwrap();
+        assert_eq!(std::fs::read(&victim).unwrap(), b"keep");
+        let left: Vec<_> = std::fs::read_dir(&root)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".gse-probe-"))
+            .collect();
+        assert!(left.is_empty(), "★ 試しのファイルは残さない");
         let _ = std::fs::remove_dir_all(&root);
     }
 }

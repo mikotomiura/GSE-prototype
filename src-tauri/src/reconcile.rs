@@ -93,22 +93,32 @@ fn move_to_oversize(age: &Path, submission_dir: &Path) -> std::io::Result<PathBu
             std::fs::remove_file(age)?;
             Ok(dest)
         }
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(std::io::Error::new(
-            std::io::ErrorKind::AlreadyExists,
-            "the same name already exists in oversize/",
-        )),
-        // ⚠️ ハードリンクを持たないファイルシステム（FAT 等）: 従来の確認つき rename に戻る。
-        Err(_) => {
-            if dest.exists() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::AlreadyExists,
-                    "the same name already exists in oversize/",
-                ));
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // ★ 前回、リンクを作った直後に止まった（元を消す前）なら、移し先は**同じ中身**である
+            //   → 元を消して移動を完了させる（Codex P2・2026-09-28）。⚠️ 中身が違えば触らない。
+            if same_contents(age, &dest)? {
+                std::fs::remove_file(age)?;
+                return Ok(dest);
             }
-            std::fs::rename(age, &dest)?;
-            Ok(dest)
+            Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "the same name already exists in oversize/",
+            ))
         }
+        // ⚠️★ ハードリンクを持たないファイルシステム（FAT 等）でも **rename に戻らない**。
+        //   `exists()` → `rename()` は原子的でなく上書きしうる（Codex P1・2026-09-28）。
+        //   → ★ その場に残して失敗として出す（送らないことは変わらない・データは失われない）。
+        Err(e) => Err(e),
     }
+}
+
+/// 2 つのファイルの中身が同じか（隔離の途中で止まったかの判定・まれな経路）。
+fn same_contents(a: &Path, b: &Path) -> std::io::Result<bool> {
+    let (ma, mb) = (std::fs::metadata(a)?, std::fs::metadata(b)?);
+    if ma.len() != mb.len() {
+        return Ok(false);
+    }
+    Ok(std::fs::read(a)? == std::fs::read(b)?)
 }
 
 /// 送らないと決めた `.age` を隔離し、結果を `report` に積む（G-5）。
@@ -2547,6 +2557,22 @@ mod tests {
         let moved = move_to_oversize(&a, &o).unwrap();
         assert_eq!(std::fs::read(&moved).unwrap(), b"new");
         assert!(!a.exists(), "★ 移動である（コピーを残さない）");
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    /// ★ 前回リンクの直後に止まって両方が残っていても、次の回で移動を完了させる。
+    #[test]
+    fn an_interrupted_quarantine_is_completed_next_time() {
+        let o = tmpdir("g5half");
+        let a = o.join("P012_o1day01_gse_o1_20260928_010101.age");
+        std::fs::write(&a, b"payload").unwrap();
+        std::fs::create_dir_all(o.join(OVERSIZE_DIR_NAME)).unwrap();
+        let dest = o.join(OVERSIZE_DIR_NAME).join(a.file_name().unwrap());
+        std::fs::hard_link(&a, &dest).unwrap(); // リンクだけ作って止まった状態
+        let moved = move_to_oversize(&a, &o).unwrap();
+        assert_eq!(moved, dest);
+        assert!(!a.exists());
+        assert_eq!(std::fs::read(&dest).unwrap(), b"payload");
         let _ = std::fs::remove_dir_all(&o);
     }
 }
