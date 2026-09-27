@@ -162,6 +162,8 @@
 
 | 用語 | 英語表記 | 定義 | 関連用語 |
 |---|---|---|---|
+| 参照入力欄 | reference input field | IME 観測の精度評価で**正解の源**にする自作の入力欄アプリ。自分のプロセス内で IME の composition イベント（macOS = `NSTextInputClient` の `setMarkedText`/`insertText`/`unmarkText`、Windows = 自窓の `WM_IME_*`・IMN 通知）を記録する。⚠️ 自プロセス内の観測なので制約 7（他プロセスの TSF 観測不可・グローバルフック禁止）に触れない。⚠️ GSE 本体の機能ではなく評価専用（2026-09-27・`.steering/20260927-ime-observation-paper-eval-design/`） | ImeShadow, 合成入力 |
+| 合成入力 | synthetic input | 評価用にスクリプトが OS へ送るキー / マウス入力（macOS = `CGEventPost`、Windows = `SendInput`）。⚠️ 人の打鍵ではない —— 自然な打鍵での精度は主張できない | 参照入力欄 |
 | HMM | Hidden Markov Model | 3 隠れ状態 × 26 観測ビンの確率モデル。Forward Algorithm で状態確率を逐次更新 | Emission Matrix, Transition Matrix |
 | 遷移行列 | Transition Matrix | 3×3 の状態遷移確率行列。現在の認知状態から次の状態への遷移確率を定義 | HMM |
 | 発射行列 | Emission Matrix | 3×26 の観測確率行列。各認知状態から各観測ビンが生成される確率を定義 | HMM, 観測ビン |
