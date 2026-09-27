@@ -1,0 +1,30 @@
+{
+  "task": "precondition8-t3-and-consent",
+  "mode": "C",
+  "verify": {
+    "test": "python3 experiments/20260801-controlled-friction-task/validate_blocks.py --selftest && python3 experiments/20260801-controlled-friction-task/analyze.py --selftest",
+    "typecheck": "python3 -m py_compile experiments/20260801-controlled-friction-task/validate_blocks.py experiments/20260801-controlled-friction-task/analyze.py",
+    "lint": "bash -n scripts/check-g1-collection-readiness.sh"
+  },
+  "ci_command": "python3 experiments/20260801-controlled-friction-task/validate_blocks.py --selftest && python3 experiments/20260801-controlled-friction-task/analyze.py --selftest && bash scripts/check-g1-collection-readiness.sh --selftest",
+  "scope_test_template": "python3 experiments/20260801-controlled-friction-task/analyze.py --selftest",
+  "resource_isolation": "per-worktree",
+  "base_branch": "feature/precondition8-t3-and-consent",
+  "budget": {
+    "max_attempts": 6,
+    "no_progress_threshold": 4,
+    "token_ceiling": 40000000,
+    "parallel": 1
+  },
+  "events_path": "/Users/johnd/GSE-prototype/.steering/20260927-precondition8-t3-and-consent/_loop-events.jsonl",
+  "acceptance_template": "bash {issue_dir}/{issue_id}-acceptance.sh",
+  "headless": {
+    "max_turns": 60,
+    "max_budget_usd": 5.0,
+    "permission_mode": "acceptEdits",
+    "model": "sonnet",
+    "watchdog_model": "haiku",
+    "allowed_tools": "Read,Write,Edit,MultiEdit,Glob,Grep,Task,TodoWrite,Bash(python3:*),Bash(bash scripts/check-g1-collection-readiness.sh:*),Bash(bash .steering/**/*-acceptance.sh),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),Bash(git add:*),Bash(git commit:*),Bash(echo:*),Bash(printf:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(sed:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(jq:*),Bash(test:*),Bash(mkdir:*),Bash(touch:*),Bash(diff:*),Bash(basename:*),Bash(dirname:*),Bash(pwd:*),Bash(date:*),Bash(mktemp:*),Bash(true:*),Bash(cd:*)",
+    "fingerprint_cmd": null
+  }
+}
