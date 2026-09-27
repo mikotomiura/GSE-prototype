@@ -266,6 +266,7 @@ ADR-014 D8 制約 3 は逐語「削除要求経路と**保管上限**を台帳�
 
 ## 関連
 
+- `docs/g1-deletion-ledger.md`（★ G1 版。書式は本文書を流用しているが、G1 にはこの 48 時間の猶予が無い）
 - `docs/adr/ADR-014-continuous-natural-work-collection.md` D8（保管・48 時間の猶予）
 - `docs/adr/ADR-012-nonkeystroke-observation-formative-track.md` D12-b（破棄規約の原型）
 - `.claude/skills/data-privacy/SKILL.md`（★ 削除要求経路は本 Skill の拡張対象と ADR-012 が明記）
