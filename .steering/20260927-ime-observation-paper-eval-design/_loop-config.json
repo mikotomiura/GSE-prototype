@@ -1,0 +1,30 @@
+{
+  "task": "ime-observation-paper-eval-kit",
+  "mode": "C",
+  "verify": {
+    "test": "bash papers/ime-observation/kit/check.sh",
+    "typecheck": "bash papers/ime-observation/kit/check.sh --compile",
+    "lint": "bash scripts/check-shell-portability.sh"
+  },
+  "ci_command": "bash papers/ime-observation/kit/check.sh && bash papers/ime-observation/kit/check.sh --self-test",
+  "scope_test_template": "bash papers/ime-observation/kit/check.sh",
+  "resource_isolation": "per-worktree",
+  "base_branch": "feature/ime-eval-kit",
+  "budget": {
+    "max_attempts": 6,
+    "no_progress_threshold": 4,
+    "token_ceiling": 40000000,
+    "parallel": 1
+  },
+  "events_path": "/c/GSE-prototype/.steering/20260927-ime-observation-paper-eval-design/_loop-events.jsonl",
+  "acceptance_template": "bash {issue_dir}/{issue_id}-acceptance.sh",
+  "headless": {
+    "max_turns": 60,
+    "max_budget_usd": 5.0,
+    "permission_mode": "acceptEdits",
+    "model": "sonnet",
+    "watchdog_model": "haiku",
+    "allowed_tools": "Read,Write,Edit,MultiEdit,Glob,Grep,Task,TodoWrite,Bash(python3:*),Bash(python:*),Bash(cargo test:*),Bash(cargo check:*),Bash(cargo clippy:*),Bash(cargo build:*),Bash(cargo fmt:*),Bash(cargo generate-lockfile:*),Bash(swiftc:*),Bash(bash papers/**),Bash(papers/**),Bash(./papers/**),Bash(bash scripts/check-shell-portability.sh:*),Bash(bash .steering/**/*-acceptance.sh),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),Bash(git check-ignore:*),Bash(git add:*),Bash(git commit:*),Bash(echo:*),Bash(printf:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(sed:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(jq:*),Bash(test:*),Bash(mkdir:*),Bash(touch:*),Bash(cp:*),Bash(cmp:*),Bash(diff:*),Bash(find:*),Bash(basename:*),Bash(dirname:*),Bash(pwd:*),Bash(date:*),Bash(mktemp:*),Bash(uname:*),Bash(true:*),Bash(cd:*)",
+    "fingerprint_cmd": null
+  }
+}

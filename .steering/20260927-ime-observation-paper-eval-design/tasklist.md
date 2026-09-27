@@ -10,7 +10,8 @@
 - [x] タイトル T1・ライセンス Apache-2.0 / CC BY 4.0（判断 15）
 - [x] BRM の規程（非アーカイブ発表・code availability）を確認（判断 13・design.md §4 / §5）
 - [x] [P321] 2 本目の再検討（サーヴェイ 4 本 ＋ 一次の裏取り → 判断 16: 並行で進める）→ 別トラックの handoff `next-session-p321-reanalysis-paper.md`
-- [ ] 後続 issue を `issues/` に分解（design.md §8 の案。⚠️ 分解は Opus・ループ実行とは別セッション —— `docs/loop-engineering.md`）→ handoff `next-session-ime-paper-issues.md`
-- [ ] 較正パイロット（macOS）の結果を根拠に `experiments/<date>-ime-observation-accuracy/preregistration.md` を凍結（macOS 版 → Windows 版は追補）
-- [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `experiments/.../paper-outline.md` に置く
+- [x] 後続 issue を `issues/` に分解（2026-09-28・Opus・`issue-slicing`）: **27 本**（うち任意 3 本は blocked）＋ `_acceptance-lib.sh` ＋ 各 `NNN-acceptance.sh` ＋ `_issue-plan.md`（DAG・交差表・機械の割り当て・マイルストーン M0〜M13）＋ `_loop-config.json`（モード C・G-GEAR のパス）。分解の前に研究者が判断 17–21 を確定、slicer の裁定は判断 22
+- [ ] ⚠️ **ループの実行は別セッション**（`/clear` → `.steering/_handoff/next-session-ime-paper-loop.md`）。W1（001）→ merge → W2 … の順（`_issue-plan.md` §4）
+- [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
+- [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task

@@ -4,6 +4,8 @@
 土台 = 初版 v1（`design-v1.md`・判断 10 の訂正入り）、取り込み = 再生成案 v2（`design-v2.md`）の 8 点。
 ★ v2 由来の箇所には **〔v2〕** と付けた。比較は `design-comparison.md`。
 
+> ⚠️★ **2026-09-28 追記（issue 分解セッション）**: 本文の `experiments/<date>-ime-observation-accuracy/` は **`papers/ime-observation/experiment/`** に読み替える（decisions.md 判断 21）。E1 で評価する観測は**公開する単体ロガー**（判断 17）。§8 の 12 本は `_issue-plan.md` の 27 本 ＋ マイルストーン M0〜M13 に切り直した。★ 本文は書き換えない。
+
 ⚠️ 本書は評価プロトコルの**設計**である。確定版を
 `experiments/<date>-ime-observation-accuracy/preregistration.md` として**実測前に凍結**する
 （★ 凍結は §1.1a の較正パイロットの結果を根拠として書いてから。★ OS ごとに段階凍結する —— §6）。
