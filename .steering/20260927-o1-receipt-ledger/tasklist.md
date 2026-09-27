@@ -7,24 +7,23 @@
 
 ## T1 実装
 - [x] `Form_O1/GSE_O1_Ledger.gs`
-- [x] `Form_O1/o1_ledger_test.cjs`（116 ケース緑）
-- [x] `Form_O1/o1_ledger_mutation_test.sh`（42 変異すべて赤・`VERBOSE=1` で赤の理由も確認）
+- [x] `Form_O1/o1_ledger_test.cjs`（164 ケース緑）
+- [x] `Form_O1/o1_ledger_mutation_test.sh`（62 変異すべて赤・`VERBOSE=1` で赤の理由も確認）
 - [x] ゲートへ配線（テスト実行・直書き走査・selftest fixture）／`.gitignore` ホワイトリスト
 - [x] glossary
-- [ ] ゲートの selftest が壊れていないか確認（`--selftest` 相当）
+- [x] ゲートの selftest（63/0）
 
 ## T3 設計
 - [x] `t3-person-ledger-design.md`
 
 ## T2 記録票 A の実測（★ 研究者の承認が先）
-- [ ] 研究者の承認（Chrome で G1 の Apps Script の読み取り専用関数を 1 本実行）
-- [ ] `browser-verification` を読み、`checkConsentFormParity` を実行 → ✅/❌ を記録票 A の下書きに
-- [ ] `consent.md` ⇔ `consentItemTitles_()` の突合（別に）
+- [x] 研究者の承認（AskUserQuestion）・Chrome 前面化・セレクタは研究者が選択（私は押す前に DOM と画面で確認）
+- [x] `checkConsentFormParity` を実行 → ✅ 一致（8 件）→ `t2-record-a-draft.md`（記録票への記入は研究者）
+- [x] `consent.md` ⇔ コードの突合（語は両側に実在・言い回しと第 8 項目は逐語一致でない → 研究者判断）
 
 ## レビュー（作業ツリーを変えない）
-- [ ] code-reviewer ＋ security-checker（並列・model 明示・範囲/禁止/締切つき）
-- [ ] HIGH 指摘への対応（一次で確かめてから）
-- [ ] `/cross-review`（Codex・縮退したら理由を明記）
+- [x] 1 回目: code-reviewer ＋ security-checker ＋ cross-reviewer（並列）→ 指摘を一次で確かめて反映（decisions 判断 8〜13）
+- [ ] 2 回目（反映後の差分）: code-reviewer ＋ security-checker ＋ cross-reviewer（Codex はフィルタに当たるテストを外して）
 
 ## 完了処理
 - [ ] `/finish-task`（テスト・コミット・push → PR → CI 緑なら merge）

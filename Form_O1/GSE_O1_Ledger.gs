@@ -47,6 +47,11 @@
  *        - **`.age` 以外が置かれていないか**・受領日時（`getDateCreated`）と名前の日時が
  *          常識的にずれているか（判断 6 の未確認 2 点）
  *        - 走査の所要時間（判断 5 の未実測）
+ *      ⚠️ **プロジェクトの設定のタイムゾーンを、ビルダーのプロジェクトと同じにする**（登録ログの日時を読むため）。
+ *   3b. ⚠️★★★ **トリガーの「エラー通知設定」を「今すぐ通知」にしておく**（Apps Script の「トリガー」画面。
+ *      画面の表記は要確認）。本ファイルは失敗時に研究者宛てに 1 通送るが、★ **トリガー自体が消えた・認可が切れた**
+ *      ときは本ファイルは走らないので、これだけが最後の砦である。併せて、**途絶タブのバナーの「更新」時刻を
+ *      ときどき見る**（★ 「通知が来ない = 異常なし」ではない）。
  *   4. `o1LedgerRun()` を 1 回手で実行する（★ 台帳と途絶のタブが**足される**・初回は現在の異常を 1 通で通知）。
  *   5. `installO1LedgerTrigger()` を実行する（6 時間ごと・★ 冪等）。
  *   6. ⚠️★★★ **関数セレクタは表示を信用しない**（押す直前に読み直す）。このプロジェクトには
@@ -114,12 +119,26 @@ var O1_LEDGER_DASH_HEAD = [
 
 var O1_LEDGER_KIND_OK = "O1";
 var O1_LEDGER_KIND_FOREIGN = "対象外";
+/**
+ * ★ 削除の求めに応じた行の印（tombstone）。⚠️ **行は消さず**、P-ID・ファイル名・日番号・セッション開始の列を空にして
+ *   「形式」を本値にする（`docs/o1-deletion-ledger.md` A-14）。★ Drive ファイル ID は残す（さもないと、
+ *   ごみ箱に入れ損ねたファイルが次の走査で**別の行として復活**する）。集計・通知の対象外。
+ */
+var O1_LEDGER_KIND_ERASED = "削除済";
+/** 判定の中身ではなく「台帳そのものが信用できない」ことを知らせる運用アラート（★ 判定とは別枠）。 */
+var O1_LEDGER_OPS_TRUNCATED = "走査打切り";
+var O1_LEDGER_OPS_REGSKIP = "登録ログの日時が読めない";
+var O1_LEDGER_OPS_BADROWS = "台帳の読めない行";
+/** 欠番を本文に並べる上限（★ 壊れた行で 998 件並ぶのを防ぐ）。 */
+var O1_LEDGER_GAP_LIST_MAX = 10;
 
 /** スクリプト プロパティのキー（★ 受け口の `FOLDER_ID` とは**別名**にしてある）。 */
 var O1_LEDGER_PROP_FOLDER = "O1_RECEIVE_FOLDER_ID";
 var O1_LEDGER_PROP_SHEET = "O1_MGMT_SHEET_ID";
 var O1_LEDGER_PROP_EMAIL = "O1_LEDGER_NOTIFY_EMAIL";
 var O1_LEDGER_PROP_STATE = "O1_LEDGER_STATE";
+var O1_LEDGER_PROP_OPS = "O1_LEDGER_OPS";
+var O1_LEDGER_PROP_FAIL = "O1_LEDGER_FAIL";
 
 // ============================================================
 // 純関数（★ ローカルの guard test が同じ関数を呼ぶ）
@@ -246,10 +265,14 @@ function o1LedgerJudge_(files, registered, nowMs) {
       if (last === null || f.receivedMs > last) last = f.receivedMs;
       totalBytes += f.bytes;
       if (f.dup) dupCount++;
-      if (earliestByDay[f.day] === undefined || f.receivedMs < earliestByDay[f.day]) {
-        earliestByDay[f.day] = f.receivedMs;
+      // ⚠️ 日番号 0（`_o1day00_`・受け口は通すが端末は作らない）は「受領」には数えるが、番号の集合には入れない
+      //   （★ さもないと「届いているのに未受領」になる）。
+      if (f.day >= 1) {
+        if (earliestByDay[f.day] === undefined || f.receivedMs < earliestByDay[f.day]) {
+          earliestByDay[f.day] = f.receivedMs;
+        }
+        if (f.day > maxDay) maxDay = f.day;
       }
-      if (f.day > maxDay) maxDay = f.day;
     });
 
     // ★ 欠番: 大きい番号から小さい番号へ、「それより後ろの番号の最古の受領」を持ち回る。
@@ -300,7 +323,13 @@ function o1LedgerJudge_(files, registered, nowMs) {
  *   ⚠️ 復帰（異常 → 正常）では送らない（★ ただし次の状態には反映する → 再び異常になれば送る）。
  *   ⚠️ 異常が**続いている**だけでは送らない（毎回送ると読まれなくなる）。
  *
- * @param {Object<string,string>|null} prev  前回の状態（P-ID → 判定の `,` 区切り）。null = 初回。
+ * ⚠️★★★ **「同じ判定のまま中身が悪化した」も悪化に数える**（2026-09-27 レビュー指摘 3 本が独立に一致）:
+ *   - **欠番**: 新しい欠番の番号が**増えた**とき（旗が既に立っていても）。減った・入れ替わらずに縮んだだけなら送らない。
+ *   - **対象外の名前**: 件数が**増えた**とき。★ 台帳は追記のみで件数は減らないので、旗だけを見ると
+ *     **最初の 1 回しか通知されず、以後の G1 の混入を検知できない**。
+ *
+ * @param {Object<string,string>|null} prev  前回の状態（P-ID → `旗[:詳細]` の `,` 区切り）。null = 初回。
+ *   詳細 = 欠番なら番号の `|` 区切り／対象外の名前なら件数。
  * @param {Array<Object>} rows  `o1LedgerJudge_` の戻り
  * @param {number} foreignCount  O1 の形でないファイルの数（★ P-ID に属さない・キーは `*`）
  * @return {{alerts: Array<{key:string, added:string[]}>, next: Object<string,string>}}
@@ -309,26 +338,84 @@ function o1LedgerAlerts_(prev, rows, foreignCount) {
   var before = prev || {};
   var next = {};
   var alerts = [];
-  var consider = function (key, flags) {
-    next[key] = flags.join(",");
-    var was = before[key] ? String(before[key]).split(",") : [];
-    var added = flags.filter(function (f) {
-      return was.indexOf(f) < 0;
+  var consider = function (key, entries) {
+    next[key] = entries
+      .map(function (e) {
+        return e.flag + (e.detail ? ":" + e.detail : "");
+      })
+      .join(",");
+    var was = {};
+    (before[key] ? String(before[key]).split(",") : []).forEach(function (tok) {
+      var i = tok.indexOf(":");
+      was[i < 0 ? tok : tok.slice(0, i)] = i < 0 ? "" : tok.slice(i + 1);
     });
+    var added = entries
+      .filter(function (e) {
+        if (was[e.flag] === undefined) return true;
+        if (e.flag === O1_LEDGER_FLAG_GAP) {
+          var old = was[e.flag] ? was[e.flag].split("|") : [];
+          return e.detail.split("|").some(function (n) {
+            return old.indexOf(n) < 0;
+          });
+        }
+        if (e.flag === O1_LEDGER_FLAG_FOREIGN) return Number(e.detail) > Number(was[e.flag] || 0);
+        return false;
+      })
+      .map(function (e) {
+        return e.flag;
+      });
     if (added.length > 0) alerts.push({ key: key, added: added });
   };
   rows.forEach(function (r) {
-    consider(r.pid, r.flags);
+    consider(
+      r.pid,
+      r.flags.map(function (f) {
+        return { flag: f, detail: f === O1_LEDGER_FLAG_GAP ? (r.gaps || []).join("|") : "" };
+      })
+    );
   });
-  consider("*", foreignCount > 0 ? [O1_LEDGER_FLAG_FOREIGN] : []);
+  consider("*", foreignCount > 0 ? [{ flag: O1_LEDGER_FLAG_FOREIGN, detail: String(foreignCount) }] : []);
   return { alerts: alerts, next: next };
+}
+
+/**
+ * 運用アラート（台帳そのものが信用できない）の要否。★ 純関数。
+ *   `ops` = { truncated: boolean, regSkipped: number, badRows: number }
+ * ★ 有効になった（前回は無かった）ものだけ返す。解消したら次の状態から消える（再発すれば再通知）。
+ */
+function o1LedgerOpsAlerts_(prevOps, ops) {
+  var before = prevOps || {};
+  var active = {};
+  if (ops.truncated) active[O1_LEDGER_OPS_TRUNCATED] = true;
+  if (ops.regSkipped > 0) active[O1_LEDGER_OPS_REGSKIP] = true;
+  if (ops.badRows > 0) active[O1_LEDGER_OPS_BADROWS] = true;
+  var added = Object.keys(active).filter(function (k) {
+    return !before[k];
+  });
+  return { added: added, next: active };
+}
+
+/** 欠番の番号を本文に並べる。★ 上限を超えたら「他 N 件」に丸める。 */
+function o1LedgerListGaps_(gaps) {
+  var shown = gaps.slice(0, O1_LEDGER_GAP_LIST_MAX).join(", ");
+  return gaps.length > O1_LEDGER_GAP_LIST_MAX ? shown + " …他 " + (gaps.length - O1_LEDGER_GAP_LIST_MAX) + " 件" : shown;
+}
+
+/**
+ * 文字列セルに書く前の無害化。★ 先頭が `=` `+` `-` `@` `\t` `\r` なら見えるマークを前置する。
+ * ⚠️ **表示形式（`@`）に頼らない**（`Range.setValues` が形式で数式解釈を必ず止めるかは、公式に保証されていない）。
+ *   ★ ファイル名は被験者の端末由来で、フォルダには研究者も置ける = 信用しない。二重に守る（形式＋本関数）。
+ */
+function o1LedgerSafeCell_(v) {
+  if (typeof v !== "string") return v;
+  return /^[=+\-@\t\r]/.test(v) ? "⚠" + v : v;
 }
 
 /**
  * 通知メールの本文。⚠️ **P-ID・判定・日数だけ**（★ シートの URL・Drive の ID・ファイル名は載せない）。
  * ⚠️ 「やめた」とは書かない（★ 判定は届いたかの話・ADR-034 D4 2b）。
  */
-function o1LedgerMailText_(alerts, rows, foreignCount) {
+function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded) {
   var byPid = {};
   rows.forEach(function (r) {
     byPid[r.pid] = r;
@@ -344,11 +431,18 @@ function o1LedgerMailText_(alerts, rows, foreignCount) {
     var r = byPid[a.key];
     var parts = a.added.map(function (flag) {
       if (flag === O1_LEDGER_FLAG_STALE) return "途絶（最終受領から " + r.elapsedDays + " 日）";
-      if (flag === O1_LEDGER_FLAG_GAP) return "欠番（日番号 " + r.gaps.join(", ") + "）";
+      if (flag === O1_LEDGER_FLAG_GAP) return "欠番（日番号 " + o1LedgerListGaps_(r.gaps) + "）";
       if (flag === O1_LEDGER_FLAG_NEVER) return "未受領（登録から " + r.sinceRegDays + " 日・受領 0 件）";
       return flag;
     });
     lines.push("- " + a.key + ": " + parts.join(" / "));
+  });
+  var opsText = {};
+  opsText[O1_LEDGER_OPS_TRUNCATED] = "走査が時間予算で打ち切られました（★ 判定の通知は保留し、次回に持ち越します）。";
+  opsText[O1_LEDGER_OPS_REGSKIP] = "登録ログに日時を読めない行があります（★ その人の「未受領」を判定できません）。";
+  opsText[O1_LEDGER_OPS_BADROWS] = "台帳に読めない行があります。";
+  (opsAdded || []).forEach(function (k) {
+    lines.push("- （運用）" + (opsText[k] || k));
   });
   return (
     "O1 受領台帳: 新しく要確認になったものがあります。\n\n" +
@@ -442,6 +536,10 @@ function o1LedgerRun() {
     var scan = o1LedgerSync_(cfg, ss);
     var result = o1LedgerDashboard_(cfg, ss, scan);
     o1LedgerNotify_(cfg, result);
+    PropertiesService.getScriptProperties().deleteProperty(O1_LEDGER_PROP_FAIL); // 成功した = 失敗の解消
+  } catch (e) {
+    o1LedgerNotifyFailure_(e); // ⚠️ 検知器の沈黙を外へ出す。例外は握りつぶさず再送出する。
+    throw e;
   } finally {
     lock.releaseLock();
   }
@@ -478,18 +576,20 @@ function o1LedgerSync_(cfg, ss) {
     var name = f.getName();
     var parsed = o1LedgerParseName_(name);
     var created = f.getDateCreated().getTime();
-    rows.push([
-      id,
-      name,
-      parsed ? parsed.pid : "",
-      parsed ? parsed.day : "",
-      parsed ? parsed.start : "",
-      o1LedgerFmt_(created),
-      created,
-      f.getSize(),
-      parsed && parsed.dup ? "dup" : "",
-      parsed ? O1_LEDGER_KIND_OK : O1_LEDGER_KIND_FOREIGN
-    ]);
+    rows.push(
+      [
+        id,
+        name,
+        parsed ? parsed.pid : "",
+        parsed ? parsed.day : "",
+        parsed ? parsed.start : "",
+        o1LedgerFmt_(created),
+        created,
+        f.getSize(),
+        parsed && parsed.dup ? "dup" : "",
+        parsed ? O1_LEDGER_KIND_OK : O1_LEDGER_KIND_FOREIGN
+      ].map(o1LedgerSafeCell_) // ⚠️ 表示形式に頼らず、先頭の `=` `+` `-` `@` を無害化する（二重の防御）
+    );
   }
 
   if (rows.length > 0) {
@@ -520,6 +620,7 @@ function o1LedgerDashboard_(cfg, ss, scan) {
   if (last >= 3) {
     var values = ledger.getRange(3, 1, last - 2, O1_LEDGER_HEAD.length).getValues();
     values.forEach(function (v) {
+      if (String(v[O1_LEDGER_COL.kind]) === O1_LEDGER_KIND_ERASED) return; // ★ 削除済み（tombstone）は数えない
       if (String(v[O1_LEDGER_COL.kind]) === O1_LEDGER_KIND_FOREIGN) {
         foreignCount++;
         return;
@@ -528,7 +629,7 @@ function o1LedgerDashboard_(cfg, ss, scan) {
       var day = Number(v[O1_LEDGER_COL.day]);
       var bytes = Number(v[O1_LEDGER_COL.bytes]);
       var pid = String(v[O1_LEDGER_COL.pid] || "");
-      if (!pid || !isFinite(ms) || !isFinite(day) || day < 1 || !isFinite(bytes)) {
+      if (!pid || !isFinite(ms) || !isFinite(day) || day < 0 || !isFinite(bytes)) {
         badRows++;
         return;
       }
@@ -543,6 +644,10 @@ function o1LedgerDashboard_(cfg, ss, scan) {
       "❌ 「" + O1_LEDGER_REG_TAB + "」タブがありません。★ 登録ログが無いと「未受領」を判定できません" +
         "（ビルダー側で buildO1MgmtSheet() を実行済みか確かめてください）。"
     );
+  }
+  // ⚠️ 列数を先に見る（ビルダーの `O1_MGMT_HEAD` は 6 列）。足りなければ範囲外の例外でなく、理由を言って止める。
+  if (reg.getLastColumn() < 6) {
+    throw new Error("❌ 「" + O1_LEDGER_REG_TAB + "」タブの列が 6 列に足りません（★ ビルダーの O1_MGMT_HEAD と食い違っています）。");
   }
   var regLast = reg.getLastRow();
   var regValues = regLast >= 3 ? reg.getRange(3, 1, regLast - 2, 6).getValues() : [];
@@ -559,7 +664,7 @@ function o1LedgerDashboard_(cfg, ss, scan) {
     " ／ 対象外の名前 " + foreignCount + " 件" +
     (badRows ? " ／ ⚠️台帳の読めない行 " + badRows : "") +
     (regInfo.skipped ? " ／ ⚠️登録ログの日時が読めない行 " + regInfo.skipped : "") +
-    " ／ ★ 言えるのは「届いたか」だけ・「やめた」ではない";
+    " ／ ★ 言えるのは「届いたか」だけ・「やめた」ではない ／ 表示専用（全て文字列）";
   var out = [[banner], O1_LEDGER_DASH_HEAD.slice()];
   var width = O1_LEDGER_DASH_HEAD.length;
   rows.forEach(function (r) {
@@ -587,40 +692,90 @@ function o1LedgerDashboard_(cfg, ss, scan) {
   range.setNumberFormat("@"); // ★ 表示専用。すべて文字列で書く（数式注入を避ける）。
   range.setValues(out);
   console.log("途絶: " + rows.length + " 人・判定あり " + rows.filter(function (r) { return r.flags.length; }).length + " 人");
-  return { rows: rows, foreignCount: foreignCount };
+  return {
+    rows: rows,
+    foreignCount: foreignCount,
+    ops: { truncated: !!(scan && scan.truncated), regSkipped: regInfo.skipped, badRows: badRows }
+  };
+}
+
+/** スクリプト プロパティの JSON を読む。壊れていたら null（= 初回扱い・現在の異常を 1 回通知し直す）。 */
+function o1LedgerReadJson_(props, key) {
+  try {
+    var raw = props.getProperty(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
  * 悪化方向に変わったときだけ、研究者宛てに 1 通送る。
  * ⚠️★ **宛先が未設定・送信に失敗したときは「通知済み」にしない**（★ 設定後 / 次回に 1 通届く）。
+ * ⚠️★★★ **走査が打ち切られた回は、判定の通知を保留する**（状態も更新しない）。
+ *   ★ 台帳が部分的なまま判定すると、届いている人を「途絶」「未受領」と誤報し、
+ *     しかも**復帰では通知しない**ので、誤報が訂正されない（2026-09-27 レビュー指摘）。
+ *   → 代わりに「走査が打ち切られた」という**運用アラート**を 1 回だけ出す（★ 沈黙させない）。
  */
 function o1LedgerNotify_(cfg, result) {
   var props = PropertiesService.getScriptProperties();
-  var prev = null;
-  try {
-    var raw = props.getProperty(O1_LEDGER_PROP_STATE);
-    prev = raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    prev = null; // ★ 壊れていたら初回扱い（= 現在の異常を 1 回通知し直す）
-  }
+  var prev = o1LedgerReadJson_(props, O1_LEDGER_PROP_STATE);
+  var prevOps = o1LedgerReadJson_(props, O1_LEDGER_PROP_OPS);
+  var reliable = !result.ops.truncated;
   var plan = o1LedgerAlerts_(prev, result.rows, result.foreignCount);
-  if (plan.alerts.length === 0) {
-    props.setProperty(O1_LEDGER_PROP_STATE, JSON.stringify(plan.next));
+  var alerts = reliable ? plan.alerts : [];
+  var opsPlan = o1LedgerOpsAlerts_(prevOps, result.ops);
+
+  var persist = function () {
+    if (reliable) props.setProperty(O1_LEDGER_PROP_STATE, JSON.stringify(plan.next));
+    props.setProperty(O1_LEDGER_PROP_OPS, JSON.stringify(opsPlan.next));
+  };
+  if (alerts.length === 0 && opsPlan.added.length === 0) {
+    persist();
     return;
   }
-  var body = o1LedgerMailText_(plan.alerts, result.rows, result.foreignCount);
+  var body = o1LedgerMailText_(alerts, result.rows, result.foreignCount, opsPlan.added);
   if (!cfg.email) {
     console.log("⚠️ " + O1_LEDGER_PROP_EMAIL + " が未設定なので通知を送っていません（★ 設定後の次回に 1 通届きます）:\n" + body);
     return;
   }
   try {
-    MailApp.sendEmail(cfg.email, "[GSE O1] 受領台帳: 要確認 " + plan.alerts.length + " 件", body);
+    MailApp.sendEmail(cfg.email, "[GSE O1] 受領台帳: 要確認 " + (alerts.length + opsPlan.added.length) + " 件", body);
   } catch (err) {
     console.log("⚠️ 通知メールの送信に失敗しました（★ 通知済みにしていません・次回に再送）: " + err);
     return;
   }
-  props.setProperty(O1_LEDGER_PROP_STATE, JSON.stringify(plan.next));
-  console.log("✉️ 研究者宛てに通知しました（" + plan.alerts.length + " 件）。");
+  persist();
+  console.log("✉️ 研究者宛てに通知しました（" + (alerts.length + opsPlan.added.length) + " 件）。");
+}
+
+/**
+ * 実行そのものが失敗したとき、研究者宛てに 1 通送る（★ 同じ原因では 1 回だけ・成功すると解消）。
+ * ⚠️★★★ **検知器が黙って死ぬと「通知が来ない = 異常なし」と読まれる**（2026-09-27 レビュー指摘）。
+ *   ★ 登録ログのタブ名変更・シート ID の失効・ロスターのタブ混入・設定欠落などで `o1LedgerRun` が例外になると、
+ *     途絶タブの更新も通知も止まる。→ 失敗を**外へ出す**。⚠️ 本文に ID・URL を載せない（長い英数字は伏せる）。
+ * ⚠️ 例外は握りつぶさず、呼び側が再送出する（★ Apps Script の実行ログにも失敗が残る）。
+ */
+function o1LedgerNotifyFailure_(err) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var email = String(props.getProperty(O1_LEDGER_PROP_EMAIL) || "").trim();
+    if (!email) return;
+    var msg = String(err && err.message ? err.message : err)
+      .replace(/https?:\/\/\S+/g, "<URL>")
+      .replace(/[0-9A-Za-z_-]{25,}/g, "<ID>")
+      .slice(0, 300);
+    if (props.getProperty(O1_LEDGER_PROP_FAIL) === msg) return; // 同じ原因では再送しない
+    MailApp.sendEmail(
+      email,
+      "[GSE O1] 受領台帳: 実行が失敗しました",
+      "O1 受領台帳の実行が失敗しました。★ このあいだ、途絶の判定と通知は止まっています。\n\n原因: " + msg +
+        "\n\n※ 原因が直るまで、同じ原因では再送しません。直ると自動で解消します。\n"
+    );
+    props.setProperty(O1_LEDGER_PROP_FAIL, msg);
+  } catch (e2) {
+    console.log("⚠️ 失敗の通知も送れませんでした: " + e2);
+  }
 }
 
 // ============================================================
@@ -651,13 +806,23 @@ function o1LedgerCheck() {
   var folder = DriveApp.getFolderById(cfg.folderId);
   console.log("受け取りフォルダ: " + folder.getName() + "  ★ O1 のものか確かめること（G1 のフォルダを指していないか）");
   console.log(cfg.email ? "通知先: 設定あり" : "⚠️ 通知先が未設定（送らずログに出します）");
+  // ⚠️ 登録ログの日時は「ビルダーのプロジェクトのタイムゾーン」で書かれ、本プロジェクトの設定で読む。
+  //   ★ ずれると「未受領」の 7 日が数時間ずれる。→ ビルダーと**同じ**（Asia/Tokyo 等）にすること。
+  console.log("このプロジェクトのタイムゾーン: " + Session.getScriptTimeZone() + "（★ ビルダーのプロジェクトと同じか確かめること）");
 
   var t0 = new Date().getTime();
   var it = folder.getFiles();
   var ok = 0;
+  var foreignCount = 0;
   var foreign = [];
   var samples = [];
+  var truncated = false;
   while (it.hasNext()) {
+    // ⚠️ 本関数も時間予算を持つ（★ 走査時間を測る関数が 6 分制限で死ぬと「測れなかった」しか分からない）。
+    if (new Date().getTime() - t0 > O1_LEDGER_TIME_BUDGET_MS) {
+      truncated = true;
+      break;
+    }
     var f = it.next();
     var name = f.getName();
     var parsed = o1LedgerParseName_(name);
@@ -666,20 +831,23 @@ function o1LedgerCheck() {
       if (samples.length < 5) {
         samples.push(name + " → 名前の開始 " + parsed.start + " / 受領(作成) " + o1LedgerFmt_(f.getDateCreated().getTime()));
       }
-    } else if (foreign.length < 20) {
-      foreign.push(name + " (" + f.getSize() + " B)");
     } else {
-      foreign.push(null);
+      foreignCount++;
+      if (foreign.length < 20) foreign.push(name + " (" + f.getSize() + " B)");
     }
   }
   var elapsed = new Date().getTime() - t0;
-  console.log("O1 の形: " + ok + " 件 ／ 対象外: " + foreign.length + " 件（表示は 20 まで）");
+  console.log(
+    "O1 の形: " + ok + " 件 ／ 対象外: " + foreignCount + " 件（表示は 20 まで）" +
+      (truncated ? " ／ ⚠️ 時間予算で打ち切り（★ ここまでの件数と経過であり、フォルダ全体ではない）" : "")
+  );
   foreign.forEach(function (n) {
-    if (n) console.log("  対象外: " + n);
+    console.log("  対象外: " + n);
   });
   samples.forEach(function (s) {
     console.log("  例: " + s);
   });
   console.log("走査の所要: " + elapsed + " ms（★ 時間予算 " + O1_LEDGER_TIME_BUDGET_MS + " ms・判断 5 の実測値として記録すること）");
   console.log("⚠️ 受領(作成)が名前の開始日時より**前**なら、getDateCreated を受領時刻とみなせない（判断 6）。");
+  console.log("⚠️ 上の「対象外」の名前には P-ID が含まれうる（★ 実行ログは削除の保証台帳 A-10 の保管対象）。");
 }

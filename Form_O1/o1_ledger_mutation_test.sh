@@ -109,11 +109,37 @@ mutate "重複を数えない（dupCount が常に 0）" \
 
 # --- §3 通知の差分 --------------------------------------------------------------
 mutate "通知: 続いているだけでも毎回通知する" \
-  's/return was\.indexOf\(f\) < 0;/return true;/'
+  's/if \(was\[e\.flag\] === undefined\) return true;/return true;/'
 mutate "通知: 次の状態を保存しない（毎回通知になる）" \
-  's/next\[key\] = flags\.join\(","\);/next[key] = "";/'
+  's/\.join\(","\);\n    var was = \{\};/.join(",") && "";\n    var was = {};/'
 mutate "通知: 対象外の名前を通知しない" \
-  's/consider\("\*", foreignCount > 0 \? \[O1_LEDGER_FLAG_FOREIGN\] : \[\]\);/consider("*", []);/'
+  's/consider\("\*", foreignCount > 0 \? \[\{ flag: O1_LEDGER_FLAG_FOREIGN, detail: String\(foreignCount\) \}\] : \[\]\);/consider("*", []);/'
+mutate "通知: 対象外の名前の件数の増加を見ない（旗だけ）" \
+  's/return Number\(e\.detail\) > Number\(was\[e\.flag\] \|\| 0\);/return false;/'
+mutate "通知: 欠番の番号の増加を見ない（旗だけ）" \
+  's/if \(e\.flag === O1_LEDGER_FLAG_GAP\) \{\n          var old/if (false) {\n          var old/'
+mutate "通知: 打ち切りの回でも判定を通知する" \
+  's/var reliable = !result\.ops\.truncated;/var reliable = true;/'
+mutate "運用: 打ち切りを運用アラートにしない" \
+  's/if \(ops\.truncated\) active\[O1_LEDGER_OPS_TRUNCATED\] = true;//'
+mutate "運用: 登録ログの日時不読を運用アラートにしない" \
+  's/if \(ops\.regSkipped > 0\) active\[O1_LEDGER_OPS_REGSKIP\] = true;//'
+mutate "運用: 台帳の不読行を運用アラートにしない" \
+  's/if \(ops\.badRows > 0\) active\[O1_LEDGER_OPS_BADROWS\] = true;//'
+mutate "運用: 欠番の列挙を丸めない" \
+  's/gaps\.slice\(0, O1_LEDGER_GAP_LIST_MAX\)/gaps.slice(0)/'
+
+# --- 実行の失敗（検知器の沈黙）
+mutate "失敗: 同じ原因でも毎回送る（重複排除を外す）" \
+  's/if \(props\.getProperty\(O1_LEDGER_PROP_FAIL\) === msg\) return;[^\n]*\n//'
+mutate "失敗: 成功しても失敗の状態を解消しない" \
+  's/PropertiesService\.getScriptProperties\(\)\.deleteProperty\(O1_LEDGER_PROP_FAIL\);//'
+mutate "失敗: 通知はするが例外を握りつぶす（再送出しない）" \
+  's/(o1LedgerNotifyFailure_\(e\);[^\n]*)\n    throw e;/$1/'
+mutate "失敗: 通知に長い英数字（ID の形）を伏せない" \
+  's/\.replace\(\/\[0-9A-Za-z_-\]\{25,\}\/g, "<ID>"\)//'
+mutate "失敗: 失敗を通知しない（呼び出しを外す）" \
+  's/    o1LedgerNotifyFailure_\(e\);[^\n]*\n//'
 mutate "通知: 宛先が未設定でも通知済みにする" \
   's/  if \(!cfg\.email\) \{/  props.setProperty(O1_LEDGER_PROP_STATE, JSON.stringify(plan.next));\n  if (!cfg.email) {/'
 mutate "通知: 送信失敗でも通知済みにする" \
@@ -156,6 +182,22 @@ mutate "途絶タブ: 登録ログが無くても黙って続ける" \
   's/if \(!reg\) \{\n    throw new Error\(/if (!reg) {\n    return { rows: [], foreignCount: 0 };\n    throw new Error(/'
 mutate "途絶タブ: 判定を常に「正常」と表示する" \
   's/r\.flags\.length \? r\.flags\.join\("・"\) : "正常"/"正常"/'
+mutate "同期: 名前列の無害化を外す（先頭の = + - @ を通す）" \
+  's/\]\.map\(o1LedgerSafeCell_\)/]/'
+mutate "無害化: 先頭の = + - @ を前置しない" \
+  's/return \/\^\[=\+\\-\@\\t\\r\]\/\.test\(v\) \? "⚠" \+ v : v;/return v;/'
+mutate "途絶タブ: 削除済み（tombstone）を不読行にする" \
+  's/if \(String\(v\[O1_LEDGER_COL\.kind\]\) === O1_LEDGER_KIND_ERASED\) return;[^\n]*\n//'
+mutate "途絶タブ: 日番号 0 を不読行にする" \
+  's/!isFinite\(day\) \|\| day < 0/!isFinite(day) || day < 1/'
+mutate "判定: 日番号 0 を番号の集合に入れる" \
+  's/if \(f\.day >= 1\) \{/if (true) {/'
+mutate "途絶タブ: 登録ログの列数を見ない" \
+  's/if \(reg\.getLastColumn\(\) < 6\) \{/if (false) {/'
+mutate "点検: o1LedgerCheck に時間予算を持たせない" \
+  's/> O1_LEDGER_TIME_BUDGET_MS\) \{\n      truncated = true;\n      break;\n    \}\n    var f = it\.next\(\);\n    var name/> 1e15) {\n      truncated = true;\n      break;\n    }\n    var f = it.next();\n    var name/'
+mutate "点検: タイムゾーンを出さない" \
+  's/  console\.log\("このプロジェクトのタイムゾーン: "[^\n]*\n//'
 mutate "トリガー: 既存の同名トリガーを消さない（増える）" \
   's/ScriptApp\.deleteTrigger\(triggers\[i\]\)/void 0/'
 mutate "トリガー: 他のトリガーまで消す" \
