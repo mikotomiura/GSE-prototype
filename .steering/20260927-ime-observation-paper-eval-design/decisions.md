@@ -80,3 +80,86 @@
   - Phase1 の否定的結果は倫理審査の問題で**出せない**。
 - **採用**: 2 本目は書かない。IME 論文（BRM）＋ CHI 2027 Posters（同じ結果の短縮・非アーカイブ）に集中する。
 - **見直しタイミング**: [P321] と同じ定義を適用できる**別の公開データ**（debugging episode 等の人手コーディング済みデータ）が見つかった場合 → 新データへの適用として ICPC 2027 RENE（12-18 締切）を再検討する。
+
+---
+
+★ 以下 2026-09-28（次セッション: `.steering/_handoff/next-session-ime-paper-discussion.md`）。
+前提の一次確認: CPU 値の出所（`experiments/20260903-o1-runtime-cost/notes.md`）／MS の TSF・IMM 文書／
+Apple の `NSTextInputClient` 文書（JSON 経由で取得）／BRM の投稿規程と Springer 共通方針（ブラウザで取得）。
+
+## 判断 10: design.md 初版を、一次確認による訂正 4 点を入れて承認する（2026-09-28）
+
+- **背景**: 初版は一次文書を見ずに書いた箇所があった。
+- **訂正**:
+  1. ⚠️ `unmarkText` は**取消ではなく確定側**。Apple 逐語 "The text view should accept the marked text as if it had been inserted normally."（`https://developer.apple.com/documentation/appkit/nstextinputclient/unmarktext()` ）。★ 呼び出し順は Apple の文書に**書かれていない**。
+  2. Windows の正解は **(a) IMM 互換メッセージ / (b) TSF 直受け（`ITfContextOwnerCompositionSink`）の 2 経路**を試して選ぶ。MS 逐語 "all non-TSF-enabled applications, except 16-bit and console window applications, are empowered by the TSF-based text services through a compatibility layer"（`https://learn.microsoft.com/en-us/previous-versions/windows/desktop/dnacc/input-method-editor-and-text-services-framework-accessibility` ）—— ⚠️ **どのメッセージが届くかは書かれていない**。
+  3. `nav` の正解 = 正解側のセッション区間 × シナリオ実行器が送った矢印キー（区間を IME 自身から取るので循環しない）。
+  4. ⚠️ CPU 平均 0.98% は**無効な値**（旧計器 `top -l 2` の過小報告。`notes.md:616-653`）。
+- **採用**: 訂正を入れた初版を承認し、`/reimagine` へ進む。
+- **影響範囲**: design.md §0 / §1.1 / §1.3 / §3 / §4 / §5 / §6、requirement.md の背景。
+
+## 判断 11: 凍結前に「参照入力欄の較正パイロット」を行う（2026-09-28）
+
+- **背景**: 判断 10 の 1・2 のとおり、正解の定義（確定・取消・候補窓）の根拠が**一次文書に無い**。
+- **選択肢**: A: 参照入力欄だけを動かして呼び出し列を記録し、正解の定義を決めてから凍結 / B: 文書だけで凍結し、食い違いは逸脱として記録
+- **採用**: A
+- **理由**: 正解の定義を推測で凍結すると、凍結後に逸脱が出るのがほぼ確実。
+- ⚠️ **境界**: GSE の IME 観測部を**走らせない**・ImeShadow と**突き合わせない**。→ ★ 精度の実測ではないので、handoff §4「プロトコル凍結前に実測を始めない」に当たらない。パイロットの範囲は preregistration に明記し、生ログも公開物に含める。
+- **影響範囲**: design.md §1.1a・§6。
+
+## 判断 12: E3 は「公開する IME 観測部だけ」を両 OS で測り直す。バッテリーは外す（2026-09-28）
+
+- **背景**: 既存の値（macOS 2.19% / 1.62%・Windows 2.06%）は **GSE アプリ全体**の値で、論文で公開する観測部だけの値ではない（`notes.md:868-1000`）。
+- **選択肢**: A: 観測部だけを測り直す（GSE 全体の値は参考として併記） / B: GSE 全体の既存値を引いて限界に書く / C: A ＋ macOS だけバッテリー
+- **採用**: A
+- **理由**: 読者が使うのは公開された観測部なので、その値を示すべき。活動量で値が動く（`notes.md:1000`）ので作業中 / 無操作の 2 条件で測る。
+- **却下（バッテリー）**: 指標として 2026-09-04 に取り下げ済み・Windows 機に物理的にバッテリーが無い・macOS のエネルギー影響は無次元（`notes.md:176-193, 446`）。→ 限界に書く。
+- **影響範囲**: design.md §3、paper-suggest.md C5。
+
+## 判断 13: CHI 2027 Posters への併願は、BRM 投稿時のカバーレターで開示する（2026-09-28）
+
+- **背景**: 判断 8 の未確認事項。★ BRM の投稿規程（`https://link.springer.com/journal/13428/submission-guidelines` ・2026-09-28 にブラウザで取得）にも、Springer 共通の方針（`https://link.springer.com/brands/springer/journal-policies` ）にも、**非アーカイブのポスター発表の扱いは書かれていない**。
+  - Springer 共通の方針（逐語）: "The manuscript should not be submitted to more than one publication for simultaneous consideration. The submitted work should be original and should not have been published elsewhere in any form or language (partially or in full), unless the new work concerns an expansion of previous work."
+  - プレプリントについては逐語 "Posting of preprints is not considered prior publication and will not jeopardize consideration at Springer Nature journals."
+  - CHI 2027 Posters 側は逐語 "All Poster submissions are non-archival. Authors may re-use and re-submit the content to other peer-reviewed and archival venues."（判断 8）
+- **選択肢**: A: 投稿時のカバーレターで開示 / B: 編集者に事前に問い合わせる / C: CHI は出さない
+- **採用**: A
+- **理由**: 規程に禁止の記述が無く、非アーカイブ発表なので、開示して判断を編集者に委ねるのが透明。
+- **見直しタイミング**: BRM の編集者から指摘があった場合は CHI への投稿を取り下げる（CHI の締切 2027-01-21 は BRM 投稿より後）。
+
+## 判断 14: /reimagine の結果、ハイブリッド（v1 ＋ v2 の 8 点）を採用する（2026-09-28）
+
+- **背景**: `/reimagine` 1 回目で `requirement.md` だけから v2 を再生成し、`design-comparison.md` で比べた。
+- **選択肢**: A: ハイブリッド / B: v2 を全部 / C: v1（訂正版）/ D: もう一度 /reimagine
+- **採用**: A
+- **理由**: v1 は判断 1–13 と整合するが、⚠️ **凍結後には直せない妥当性の穴が 2 つ**ある:
+  (1) **L2（書字研究者が計算する集計量の一致）が無い** —— BRM の読者が使うのは集計量。
+  (2) **IME の学習で試行が独立でなくなる**のを扱っていない。
+  → v2 から取り込む 8 点: L2 を主評価に／IME の学習・予測・辞書のリセットと固定／打鍵の速さ 3 水準の要因／oracle による正解の検証と content-free な正解ログ／パラメータ回復テストと陰性対照／E2 のシミュレーション攻撃と特徴の除去実験／逐語コピーの manifest／論文の「Validation framework」「Recommendations for researchers」節。
+- **却下（必須化しない）**: 実アプリへの転移確認・現代文コーパス → **任意**（縮退順の先頭）。理由: 判断 7（2026 年内の投稿）に対して工数が重い。
+- **トレードオフ**: 初版より工数は増える（L2 解析・IME のリセットの自動化・除去実験）。
+- **影響範囲**: design.md 全体（v2 由来の箇所に〔v2〕印）。★ 縮退順 = 転移確認 → Google 日本語入力 → 現代文コーパス → S9 → E2 の開集合。★ プロトコルは OS ごとに段階凍結する（Windows 版は Windows 本計測前の追補）。
+- **見直しタイミング**: 較正パイロットで 1 試行の実時間が 8 s を大きく超えた場合は、標本数（n = 75 / セル × シナリオ × 速さ）を凍結前に見直す。
+
+## 判断 15: 題は T1、ライセンスはコード Apache-2.0 ／ データ・文書 CC BY 4.0（2026-09-28）
+
+- **題**: *Observing Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation*（paper-suggest.md T1）。★ E2 の結果が強ければ T4 へ変えてよい（研究者了承済み）。
+- **ライセンス**: コード = **Apache-2.0**（特許条項あり）、データ・シナリオ・文書 = **CC BY 4.0**。
+- **理由**: BRM の Type 4 方針（非商用の自由利用を最低限とする）を満たし、特許条項で利用者を守れる。
+- ⚠️ **未確認**: 現代文コーパス（任意）を使う場合は、その元ライセンスが CC BY 4.0 での再配布と両立するかを選定時に確かめる（例: CC BY-SA は継承が要る）。
+
+## 判断 16: [P321] 再解析を 2 本目として並行で進める（判断 9 を改める・2026-09-28）
+
+- **背景**: handoff §3 のサーヴェイを subagent 4 本（観察データ / 計装ログ / 投稿先 / 新規性）で回し、判断を動かす点はメインが一次で裏取りした。研究者の指示: 「機関に関係なく使えるもの（論文などで公開されたもの）で、機が熟しているなら並行して進める」。
+- **一次で確かめたこと**:
+  1. ★ **新しいデータがある**: [P434] Li & Coblenz（FSE 2026・doi:10.1145/3797077）の論文は逐語 "licensed under a Creative Commons Attribution 4.0 International License"。★ Table 4（task ごとの `Resolved` Y 13 / N 4）と Table 5（手法 × task・外部資源 6 task）だけで [P321] の定義を当てはめられる。配信者の episode の終端も逐語 "either the streamer's announcement that they gave up or had to continue another time, or the issue … fixed" で**同じ束ね方**。→ ★ R₀ = 11/17・R₀′ = 9/17・**分子の効果 +11.8pt**（[P321] は +11.2pt）。⚠️ n = 17・単位は task。⚠️ GitHub の補足データは LICENSE 無し → 論文の表だけを使う。
+  2. ★ [P321] のデータも **CC BY 4.0**（`experiments/20260906-p321-resumption-baseline/data.md:13`）。→ ★ **両方とも機関に属さずに使える**。
+  3. ⚠️ **R₀ は原著が補集合で報告済み**（arXiv v1 "occurring in only 21% of debugging episodes"、正式版 [P433] は "33%"）。→ repo の「論文は未報告」は誤りだった（`references.md` [P321] と `notes.md` §9.1 で訂正）。
+  4. ⚠️ **「未 fix ほど参照が多い」は defect の起点で交絡**（層別で向きが揃わない。`notes.md` §9.2）。
+  5. ★ **再解析・指標の再評価を受ける場がある**: EASE 2027 Short Papers and Emerging Results（逐語 "Re-evaluations, critiques, or empirical assessments of established theories, methods, measures, benchmarks, datasets, and research practices" ／ "Replication, reproduction, and confirmation studies, including studies that confirm previously established findings in new populations, technologies, organizations, or contexts"・**6 頁・abstract 2027-02-22 / paper 2027-03-01 AoE**・double-anonymous。https://conf.researchr.org/track/ease-2027/ease-2027-short-papers-and-emerging-results ）。ICPC 2027 ERA（逐語 "research in progress and do not require a solid evaluation"・4+1 頁・2026-11-26。https://conf.researchr.org/track/icpc-2027/icpc-2027-early-research-achievements--era- ）。
+- **採用**: **2 本目を並行で進める**。主張の芯は R₀ ではなく、⚠️ **「解決と中止を同じ終端に束ねた episode 定義のもとで、成果を要求しない自己解決指標がどれだけずれるか」**（分子の効果 ＝ 未解決かつ参照なしで終わった割合）を **2 つの独立な公開データ**で示すこと、および交絡（起点）と版によるコーディングの揺れ（21% → 33%）の指摘。
+- **暫定の投稿先**: ★ **EASE 2027 Short Papers（2027-03-01）**。理由: 募集文が「指標の再評価」「新しい文脈での確認」を名指ししている／BRM 投稿（12 月）と CHI Posters（2027-01-21）の**後**なので IME 論文と締切が衝突しない。⚠️ ICPC 2027 RENE（12-18・新データ必須）も [P434] で条件を満たしうるが、BRM と同月で、逐語 "lack of statistical power (small samples) is not a good submission" に n = 17 が当たりうるので次点。★ 投稿先の最終確定は研究者（次セッションで確認）。
+- **却下**: 判断 9 の「今は書かない」—— 見直し条件（別の公開データが見つかる）が満たされたため。
+- **トレードオフ**: ⚠️ 新規性は薄い（R₀ 自体は既報）。★ 主張を「指標の形の問題」と「交絡・版の揺れ」に絞る。⚠️ 正式版 [P433] の replication package が未入手（bot 対策）→ ブラウザで取得して v1 との差を突き合わせるのが次の最初の作業。
+- **影響範囲**: `paper-suggest.md` の候補表と投稿計画、`docs/references.md`（[P321] 訂正・[P433]・[P434] 追加）、`experiments/20260906-p321-resumption-baseline/notes.md` §9、handoff `next-session-p321-reanalysis-paper.md`（新規）。
+- ⚠️ **やらないこと**: [P321] / [P434] の値を GSE の期待値として使う（`notes.md` §4）。IME 論文と同じ論文に混ぜる（判断 6）。
