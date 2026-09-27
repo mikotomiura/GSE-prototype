@@ -26,3 +26,8 @@
 - 同じ作業ツリーで並行セッション（loop-run.sh 修正）が `git checkout -b fix/loop-run-progress-flag` した直後に私がコミットし、版上げコミット `7798874` がそちらのブランチに載った。
 - 対処: 私のブランチ ref を `7798874` に付け替え、以後は `../GSE-o1-tag` の worktree で作業。並行セッション側ブランチの `reset --keep` は権限で拒否されたため研究者へ委ねた。
 - 教訓: 並行実行可能な引き継ぎでも、**チェックアウトを共有するなら並行ではない**。最初から worktree を切る。
+
+## D8 /cross-review の結果（2026-09-27・Claude ∥ Codex・縮退なし）
+- CRITICAL/HIGH なし。Claude 側は 3 観点（版の整合・記録の事実性・機密混入）すべて裏取り済み（dmg の SHA-256 は Release API の digest と一致。reconcile は `#[cfg(feature = "package")]` で gse-submit 専用＝D6 をソースで確認）。
+- Codex MEDIUM ① heartbeat の実動作は未検証 → 記録（docs/o1-distribution-tag.md「限界」）に既に明記。実機通し確認は別タスクへ申し送り。
+- Codex MEDIUM ② 鮮度ゲートの監視パスが `src-tauri/src` / `src-tauri/Cargo.toml` / `src` だけで、`Cargo.lock` / `tauri.conf.json` / フロント依存 / 梱包スクリプトの変更は「古い」と判定されない（`scripts/check-o1-release-readiness.sh:286` で確認）。既存の盲点で本タスクの差分ではない。★ 今回のタグ `v0.1.37` は main の先頭なので該当しない。→ ゲート改修の候補として申し送り。

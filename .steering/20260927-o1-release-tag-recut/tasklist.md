@@ -8,4 +8,4 @@
 - [x] O1 zip（--mode o1 --tag v0.1.37 --config Form_O1/o1_submit.json）・独立再検算
 - [x] docs/o1-distribution-tag.md 新設
 - [x] O1 ゲート再実行で「古い」が消えたことを確認
-- [ ] /finish-task
+- [x] /finish-task（cross-review: HIGH なし・MEDIUM 2 件は申し送り）
