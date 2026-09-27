@@ -5,10 +5,17 @@
 //! → ★ O1 の配布形で**初めて起動したときに 1 回だけ**、OS のログイン時起動に登録する。
 //!
 //! ## ★ 決めたこと（decisions.md 判断 1 / 2 / 9）
-//! - ⚠️ **1 回だけ**。配布フォルダ（`o1.mode` の隣）に印 [`MARKER_FILE_NAME`] を置き、印があれば何もしない。
-//!   ★ 被験者が OS の設定で切ったら**上書きしない**（やめる権利）。
-//!   ★ 印を配布フォルダに置くのは、新しい版のフォルダを配り直したときに
-//!   **古いフォルダの exe を指したまま**にならないようにするため。
+//! - ⚠️ **新しく作るのは 1 回だけ**。ホーム側（`~/.gse/`）に「一度登録した」記録
+//!   [`HOME_RECORD_FILE_NAME`] を残し、以後は**新しく作らない**。★ 被験者が OS の設定で切ったり
+//!   登録を消したりしたら**上書きしない**（やめる権利）。
+//! - ★ 新しい版のフォルダを配り直したときは、**OS に登録が残っているときだけ**新しい exe へ
+//!   **付け替える**（古いフォルダの exe を指したまま死なないように）。⚠️ 消されていたら作り直さない
+//!   （security-checker MEDIUM-1・2026-09-28）。
+//! - ★ 配布フォルダ（`o1.mode` の隣）の印 [`MARKER_FILE_NAME`] は「このフォルダでは処理済み」の印
+//!   （起動のたびに OS の登録を読み書きしない）。
+//! - ⚠️ Windows の自動起動は `GSE_起動.bat` を通らないので、`.bat` が付ける `GSE_DISABLE_PROBES=1`
+//!   （多重防御）は**乗らない**。★ O1 でプローブが出ないのは `start_session` を拒む構造のガード
+//!   （`lib.rs` の `start_session` 冒頭）によるもので、自動起動でも同じく効く（cross-review・2026-09-28）。
 //! - ⚠️ **配布形（目印ファイル由来）の O1 だけ**。環境変数 `GSE_O1_MODE=1`（開発・検証）では登録しない
 //!   —— さもないと**開発用バイナリがログイン項目に入る**。G1 / 通常運用でも登録しない。
 //! - ★ `tauri-plugin-autostart` は使わない（tauri の版上げ・Windows の引用符なしパス・
@@ -29,8 +36,11 @@ use std::path::{Path, PathBuf};
 
 use crate::o1::O1Source;
 
-/// ★ 「登録を済ませた」印のファイル名（配布フォルダ・`o1.mode` の隣）。
+/// ★ 「このフォルダでは処理済み」の印のファイル名（配布フォルダ・`o1.mode` の隣）。
 pub const MARKER_FILE_NAME: &str = "o1.autostart";
+
+/// ★ 「この利用者の端末で一度登録した」記録のファイル名（`~/.gse/`・同意の記録と同じ場所）。
+pub const HOME_RECORD_FILE_NAME: &str = "o1_autostart_registered";
 
 /// macOS の LaunchAgent の Label（= plist のファイル名）。
 pub const LAUNCH_AGENT_LABEL: &str = "com.johnd.gse-next.o1";
@@ -41,29 +51,53 @@ pub const RUN_VALUE_NAME: &str = "GSE-O1";
 /// 自動起動をどうするか。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutostartAction {
-    /// ログイン時起動に登録する（初回）。
+    /// ログイン時起動を新しく作る（この端末で初めて）。
     Register,
+    /// ★ 既に OS に残っている登録を、いまの exe へ付け替える（新しい版のフォルダ）。
+    Repoint,
     /// 何もしない。
     Skip,
 }
 
-/// ⚠️★★★ 登録してよいか（純関数）。
+/// 判定に使う端末の状態（IO は呼び出し側が行う）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AutostartState {
+    /// このフォルダの印 [`MARKER_FILE_NAME`] がある。
+    pub folder_marker: bool,
+    /// ホーム側の記録 [`HOME_RECORD_FILE_NAME`] がある（= この端末で一度登録した）。
+    pub ever_registered: bool,
+    /// OS に登録が残っている（macOS: plist がある／Windows: Run の値がある）。
+    pub entry_exists: bool,
+}
+
+/// ⚠️★★★ 対象になるか（純関数）: **目印ファイル由来の O1** かつ **G1 でない** かつ **O1 の同意確認済み**。
 ///
-/// ★ **目印ファイル由来の O1** かつ **G1 でない** かつ **O1 の同意確認が済んでいる** かつ
-/// **印が無い** ときだけ登録する。
 /// ⚠️ 同意確認（`submission::o1_consent_acknowledged`・R-7）を条件に入れるのは、
 /// **同意の画面を押さずに閉じた人の端末で、ログインのたびに起動させない**ため
 /// （code-reviewer HIGH・2026-09-28）。★ 同意した直後にも呼ぶので、初回に同意した人も取りこぼさない。
 /// ⚠️ G1 は `o1::resolve` が既に O1 を落としているが、ここでも見る（二重の防御）。
-pub fn decide(
-    o1: Option<O1Source>,
-    g1_active: bool,
-    consent_acknowledged: bool,
-    marker_exists: bool,
-) -> AutostartAction {
-    match (o1, g1_active, consent_acknowledged, marker_exists) {
-        (Some(O1Source::Marker), false, true, false) => AutostartAction::Register,
-        _ => AutostartAction::Skip,
+pub fn eligible(o1: Option<O1Source>, g1_active: bool, consent_acknowledged: bool) -> bool {
+    o1 == Some(O1Source::Marker) && !g1_active && consent_acknowledged
+}
+
+/// ⚠️★★★ どうするか（純関数）。
+///
+/// | 対象 | フォルダの印 | 一度登録した | OS に登録 | → |
+/// |---|---|---|---|---|
+/// | ✗ | * | * | * | Skip |
+/// | ✓ | あり | * | * | Skip（このフォルダでは処理済み） |
+/// | ✓ | なし | なし | * | **Register** |
+/// | ✓ | なし | あり | あり | **Repoint**（新しいフォルダ・被験者は消していない） |
+/// | ✓ | なし | あり | なし | Skip（⚠️ **被験者が消した**ので作り直さない） |
+pub fn decide(eligible: bool, st: AutostartState) -> AutostartAction {
+    if !eligible || st.folder_marker {
+        AutostartAction::Skip
+    } else if !st.ever_registered {
+        AutostartAction::Register
+    } else if st.entry_exists {
+        AutostartAction::Repoint
+    } else {
+        AutostartAction::Skip
     }
 }
 
@@ -135,8 +169,8 @@ pub fn run_value(exe: &str) -> String {
 /// ⚠️ 失敗しても起動は止めない（ログに残す）。
 /// ⚠️ ログにパスを出さない（ホームのパスにはユーザー名＝実名が入りうる・security-checker MEDIUM）。
 pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool, consent_acknowledged: bool) {
-    // ⚠️ 判定の前に絞る: 対象でなければ exe も印も見ない（通常運用で IO を増やさない）。
-    if decide(o1, g1_active, consent_acknowledged, false) == AutostartAction::Skip {
+    // ⚠️ 対象でなければ exe も印も見ない（通常運用で IO を増やさない）。
+    if !eligible(o1, g1_active, consent_acknowledged) {
         return;
     }
     let exe = match std::env::current_exe() {
@@ -146,23 +180,39 @@ pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool, consent_acknowl
             return;
         }
     };
-    let marker = match marker_path_for(&exe, crate::g1::exe_to_folder_levels()) {
-        Some(p) => p,
-        None => {
-            tracing::warn!("O1 autostart: cannot resolve the distribution folder");
-            return;
-        }
+    let Some(marker) = marker_path_for(&exe, crate::g1::exe_to_folder_levels()) else {
+        tracing::warn!("O1 autostart: cannot resolve the distribution folder");
+        return;
     };
-    if decide(o1, g1_active, consent_acknowledged, marker.is_file()) == AutostartAction::Skip {
-        tracing::info!(
-            "O1 autostart: already registered once for this folder (marker present); \
-             not touching the OS setting (the participant may have turned it off)"
-        );
+    let Some(record) =
+        crate::submission::home_dir().map(|h| h.join(".gse").join(HOME_RECORD_FILE_NAME))
+    else {
+        // ⚠️ 記録を残せないと「消した人に作り直さない」を守れない → 登録しない。
+        tracing::warn!("O1 autostart: cannot resolve the home folder; NOT registering");
+        return;
+    };
+    let folder_marker = marker.is_file();
+    if folder_marker {
+        tracing::info!("O1 autostart: already handled for this folder (marker present)");
         return;
     }
-    // ⚠️★ **印を先に書く。** 書けない場所（読み取り専用の置き場）で登録だけ成功すると、
-    //   起動のたびに登録し直し、被験者が OS の設定で切っても戻してしまう（code-reviewer LOW）。
-    //   → ★ 印が書けないなら登録しない。
+    let st = AutostartState {
+        folder_marker,
+        ever_registered: record.is_file(),
+        entry_exists: platform::entry_exists(),
+    };
+    let action = decide(true, st);
+    if action == AutostartAction::Skip {
+        // ★ 一度登録したのに OS に無い = 被験者が消した。⚠️ 作り直さない。印だけ置いて次から見ない。
+        tracing::info!(
+            "O1 autostart: the login entry was removed after registration; \
+             respecting it (NOT re-creating)"
+        );
+        write_marker_or_log(&marker);
+        return;
+    }
+    // ⚠️★ **印と記録を先に書く。** 書けない場所で登録だけ成功すると、起動のたびに登録し直し、
+    //   被験者が OS の設定で切っても戻してしまう（code-reviewer LOW）。→ ★ 書けないなら登録しない。
     if let Err(e) = std::fs::write(&marker, b"registered\n") {
         tracing::error!(
             "O1 autostart: cannot write the marker {MARKER_FILE_NAME} in the distribution folder \
@@ -170,13 +220,55 @@ pub fn register_if_needed(o1: Option<O1Source>, g1_active: bool, consent_acknowl
         );
         return;
     }
+    let record_was_new = !st.ever_registered;
+    if record_was_new {
+        let written = record
+            .parent()
+            .map(std::fs::create_dir_all)
+            .unwrap_or(Ok(()))
+            .and_then(|()| std::fs::write(&record, b"registered\n"));
+        if let Err(e) = written {
+            tracing::error!(
+                "O1 autostart: cannot write {HOME_RECORD_FILE_NAME} under ~/.gse ({e}); NOT registering"
+            );
+            remove_or_log(&marker, MARKER_FILE_NAME);
+            return;
+        }
+    }
     match platform::register(&exe) {
-        Ok(where_) => tracing::warn!("O1 autostart: registered to start at login ({where_})"),
+        Ok(where_) => tracing::warn!(
+            "O1 autostart: {} the login entry ({where_})",
+            if action == AutostartAction::Repoint {
+                "re-pointed"
+            } else {
+                "registered"
+            }
+        ),
         Err(e) => {
-            // ★ 印を戻して次の起動で再試行する。
-            let _ = std::fs::remove_file(&marker);
+            // ★ 印（と、今回作った記録）を戻して次の起動で再試行する。
+            //   ⚠️ 記録を残すと、次の起動で「登録したのに OS に無い＝被験者が消した」と誤読して二度と試さない。
+            remove_or_log(&marker, MARKER_FILE_NAME);
+            if record_was_new {
+                remove_or_log(&record, HOME_RECORD_FILE_NAME);
+            }
             tracing::warn!("O1 autostart: registration failed (will retry next launch): {e}");
         }
+    }
+}
+
+fn write_marker_or_log(marker: &Path) {
+    if let Err(e) = std::fs::write(marker, b"registered\n") {
+        tracing::warn!("O1 autostart: cannot write the marker {MARKER_FILE_NAME} ({e})");
+    }
+}
+
+/// ⚠️ 戻しに失敗したら黙らない（「次の起動で再試行する」がうそになる・security-checker LOW-2）。
+fn remove_or_log(path: &Path, what: &str) {
+    if let Err(e) = std::fs::remove_file(path) {
+        tracing::error!(
+            "O1 autostart: could not remove {what} after a failure ({e}); \
+             the next launch may not retry — remove it by hand"
+        );
     }
 }
 
@@ -205,6 +297,19 @@ mod platform {
             .map_err(|e| format!("write the plist: {e}"))?;
         Ok(format!("LaunchAgent {}", super::LAUNCH_AGENT_LABEL))
     }
+
+    /// OS に登録（plist）が残っているか。⚠️ 読めないときは「無い」に倒す（作り直さない側）。
+    pub fn entry_exists() -> bool {
+        std::env::var_os("HOME")
+            .map(|h| {
+                Path::new(&h)
+                    .join("Library")
+                    .join("LaunchAgents")
+                    .join(format!("{}.plist", super::LAUNCH_AGENT_LABEL))
+                    .is_file()
+            })
+            .unwrap_or(false)
+    }
 }
 
 #[cfg(windows)]
@@ -213,7 +318,9 @@ mod platform {
 
     use windows::core::PCWSTR;
     use windows::Win32::Foundation::ERROR_SUCCESS;
-    use windows::Win32::System::Registry::{RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ};
+    use windows::Win32::System::Registry::{
+        RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ,
+    };
 
     const RUN_SUBKEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
@@ -253,6 +360,26 @@ mod platform {
         }
         Ok(format!(r"HKCU\{RUN_SUBKEY}\{}", super::RUN_VALUE_NAME))
     }
+
+    /// OS に登録（Run の値）が残っているか。⚠️ 読めないときは「無い」に倒す（作り直さない側）。
+    pub fn entry_exists() -> bool {
+        let subkey = wide(RUN_SUBKEY);
+        let name = wide(super::RUN_VALUE_NAME);
+        // SAFETY: 2 つの UTF-16 バッファは NUL 終端で、この呼び出しの間生きている。
+        //   データを受け取らない（`pvdata` / `pcbdata` / `pdwtype` は None）＝値の有無だけを問う。
+        let rc = unsafe {
+            RegGetValueW(
+                HKEY_CURRENT_USER,
+                PCWSTR(subkey.as_ptr()),
+                PCWSTR(name.as_ptr()),
+                RRF_RT_REG_SZ,
+                None,
+                None,
+                None,
+            )
+        };
+        rc == ERROR_SUCCESS
+    }
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
@@ -260,33 +387,78 @@ mod platform {
     pub fn register(_exe: &std::path::Path) -> Result<String, String> {
         Err("autostart is not supported on this OS".to_string())
     }
+
+    pub fn entry_exists() -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// ⚠️★★★ 登録するのは「目印由来の O1・G1 でない・同意確認済み・印が無い」の 1 通りだけ（全 24 通りを見る）。
+    /// ⚠️★★★ 対象は「目印由来の O1・G1 でない・同意確認済み」の 1 通りだけ（全 12 通りを見る）。
     #[test]
-    fn registers_only_for_a_consented_first_launch_of_the_o1_distribution() {
+    fn eligible_only_for_a_consented_o1_distribution() {
         for o1 in [None, Some(O1Source::Env), Some(O1Source::Marker)] {
             for g1 in [false, true] {
                 for consent in [false, true] {
-                    for marker in [false, true] {
-                        let want = if o1 == Some(O1Source::Marker) && !g1 && consent && !marker {
-                            AutostartAction::Register
-                        } else {
-                            AutostartAction::Skip
+                    let want = o1 == Some(O1Source::Marker) && !g1 && consent;
+                    assert_eq!(
+                        eligible(o1, g1, consent),
+                        want,
+                        "o1={o1:?} g1={g1} consent={consent}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// ⚠️★★★ 表のとおり（全 16 通り）。★ 被験者が消した登録は作り直さない・新しいフォルダでは付け替える。
+    #[test]
+    fn decide_follows_the_table() {
+        use AutostartAction::*;
+        for el in [false, true] {
+            for folder_marker in [false, true] {
+                for ever_registered in [false, true] {
+                    for entry_exists in [false, true] {
+                        let st = AutostartState {
+                            folder_marker,
+                            ever_registered,
+                            entry_exists,
                         };
-                        assert_eq!(
-                            decide(o1, g1, consent, marker),
-                            want,
-                            "o1={o1:?} g1={g1} consent={consent} marker={marker}"
-                        );
+                        let want = match (el, folder_marker, ever_registered, entry_exists) {
+                            (false, ..) | (true, true, ..) => Skip,
+                            (true, false, false, _) => Register,
+                            (true, false, true, true) => Repoint,
+                            (true, false, true, false) => Skip,
+                        };
+                        assert_eq!(decide(el, st), want, "{el} {st:?}");
                     }
                 }
             }
         }
+        // ★ 名指しで 2 つ（表の読み違いを防ぐ）
+        let removed = AutostartState {
+            folder_marker: false,
+            ever_registered: true,
+            entry_exists: false,
+        };
+        assert_eq!(
+            decide(true, removed),
+            Skip,
+            "⚠️ 被験者が消した登録を作り直さない"
+        );
+        let moved = AutostartState {
+            folder_marker: false,
+            ever_registered: true,
+            entry_exists: true,
+        };
+        assert_eq!(
+            decide(true, moved),
+            Repoint,
+            "★ 新しい版のフォルダへ付け替える"
+        );
     }
 
     /// ⚠️ 制御文字を含むパスは登録しない（plist が壊れて黙って起動しなくなる）。

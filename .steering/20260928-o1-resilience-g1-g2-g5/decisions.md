@@ -75,3 +75,16 @@
 
 検証: `cargo test --workspace --features package` 830 passed／fmt／clippy `-D warnings`（package あり・なし）rc=0／Windows 用コードは最小クレートで clippy rc=0（壊すと E0308 で赤になる陽性対照つき）／フォーム 221 ケース・変異 64/64／`make-common-app-zip.sh --selftest` 19/19。
 ⚠️ 単体テストで確かめていないもの: ローテートスレッドへの配線（60 秒ループ）・`register_if_needed` の IO（印の先書き）・submit.rs の要約行の条件。→ 実機（段階 B）と CI で見る。
+
+## 判断 13: 2 巡目レビュー対応（security-checker 再確認・/cross-review・2026-09-28）
+| 指摘 | 対応 |
+|---|---|
+| SC MEDIUM-1: 印が配布フォルダ側なので、新しい版のフォルダで**切った・消した自動起動を作り直す** | ✅ ホーム側に `~/.gse/o1_autostart_registered` を追加。判定は `decide(eligible, AutostartState)` → Register / **Repoint**（OS に登録が残っているときだけ新しい exe へ付け替え）/ Skip（消されていたら作り直さない）。16 通り＋名指し 2 通りのテスト・変異 4 種。Windows は `RegGetValueW` で値の有無を見る（最小クレートで clippy rc=0）。⚠️ macOS で「バックグラウンドでの実行を許可」をオフにした状態が plist の書き換え後も残るかは**段階 B で確かめる** |
+| SC LOW-2: 印の削除失敗を捨てていた | ✅ `remove_or_log`（error で出す） |
+| SC LOW-1: 登録失敗が被験者に見えない | 見送り（README【3】【6】の「印が出ないときは研究者に連絡」で足りる。画面に出すのは UI の変更で盲検・介入規制に触れる） |
+| SC LOW-3: 一覧に出る名前（gse-next）が未確認 | ⏳ 段階 B |
+| SC LOW-4: `~/.gse` の同意記録が台帳に無い | ✅ B-8 に明記 |
+| CR（cross-review Claude）MEDIUM: 要約行の `quarantined` は隔離の回（exit 1）にログへ出ない＝死んだ出力 | ✅ `submit.rs` を元に戻した（G1 の要約行は元から不変）。design.md を訂正 |
+| CR LOW-MEDIUM: Windows の自動起動は `.bat` の `GSE_DISABLE_PROBES=1` を通らない | ✅ `autostart.rs` の冒頭に明記（プローブは `start_session` 拒否の構造ガードで止まる・lib.rs:2794 を 2026-09-28 に一次で確認済み） |
+| CR LOW: 台帳の B-8 が B-7 の前 | ✅ 並べ替え |
+| Codex | ⚠️ 1 回目は **secrets-filter が `reconcile.rs` の未変更の文脈行 `"secret": self.secret,` で fail-closed**（既知の型・memory `cross-review-codex-self-block`）。→ 下の再実行を参照 |

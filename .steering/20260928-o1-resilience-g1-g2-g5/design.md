@@ -14,8 +14,8 @@
 - 隔離の中身は `submission_dir/oversize/` への `rename`（同じボリューム内の移動）。`list_age_files` は非再帰（`submission.rs:308-325`）なので、移したファイルは以後の再送対象からも未送信の件数からも自然に外れる。**ファイルは消さない**。
 - 採番は台帳 `manifest.jsonl` の最大値も見る（`reconcile.rs:553-565`。`append_manifest` は梱包の直後 `:722-732`）。したがって**隔離しても日番号は再利用されない**。研究者には、受け口の欠番検知（`GSE_O1_Ledger.gs`）が 5 日後に知らせる。
 - 研究者向けの記録:
-  - `ReconcileReport` に `quarantined` を足し、`GSE_RECONCILE` の要約 JSON に件数を出す（親プロセスが applog に残す: `lib.rs:2048`）。
-  - 隔離 1 件ごとに `errors` にも 1 行積む。その回は exit 1 になり、`lib.rs` 側で `error!` が出る。**1 ファイルにつき 1 回きり**で、次の回は対象外なので繰り返さない。
+  - 隔離 1 件ごとに `errors` に 1 行積む。その回は exit 1 になり、`lib.rs` 側で `error!`（`O1 auto-submit detail: …`）が applog に出る。**1 ファイルにつき 1 回きり**で、次の回は対象外なので繰り返さない。
+  - ⚠️ 2026-09-28 訂正（cross-review MEDIUM）: 当初は要約 JSON（`GSE_RECONCILE`）にも `quarantined` を出す設計だったが、**隔離が起きた回は必ず exit 1 で、要約行はログに出ない**（`lib.rs` は成功時だけ要約を `info!` する）。→ 死んだ出力なので `submit.rs` は変更しないことにした。`ReconcileReport.quarantined` はテストが使う。
   - ⚠️ ファイル名・P-ID は要約行に出さない（`submit.rs:416` の方針どおり）。
 - 削除台帳: `docs/o1-deletion-ledger.md` の端末側（B-4）に `GSE-submissions/oversize/` を足す（削除保証の範囲が広がるため）。
 

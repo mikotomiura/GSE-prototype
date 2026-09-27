@@ -425,7 +425,8 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 - ⚠️★ **O1 の稼働継続（2026-09-28・`.steering/20260928-o1-resilience-g1-g2-g5/`）**:
   - **自動起動（G-1）**: O1 の配布形（`o1.mode` 由来）で**初めて起動したときに 1 回だけ**、ログイン時起動に登録する
     （macOS = `~/Library/LaunchAgents/com.johnd.gse-next.o1.plist`・Windows = HKCU `Run` の `GSE-O1`（引用符つき））。
-    印 `o1.autostart` を配布フォルダに置き、**2 回目以降は OS の設定に触らない**（被験者が切ったら尊重する）。
+    ★ **O1 の同意確認の後**だけ。新しく作るのは端末で 1 回だけ（`~/.gse/o1_autostart_registered`）で、新しい版のフォルダでは
+    **OS に登録が残っているときだけ**付け替える（被験者が切った・消したら作り直さない）。配布フォルダの印 `o1.autostart` は処理済みの印。
     ⚠️ 環境変数 `GSE_O1_MODE=1`・G1・通常運用では登録しない（`autostart.rs`）
   - **定期再送（G-2）**: O1 では起動時・日次ローテート時に加えて **6 時間ごと**に収束器を回す
     （`ReconcileReason::O1Periodic`・`o1::PERIODIC_RECONCILE_MS`）。排他は既存のロックに任せる
