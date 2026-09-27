@@ -10,22 +10,24 @@
 - [x] figshare を実ブラウザで開き、ファイル名・サイズを示して承認を得てダウンロード
 - [x] v1 との差分を特定（`rowData.json`・コードブックはバイト同一／`interviews .pdf` のみ追加）
 - [x] [P433] の Consult の報告値を定義ごとに当て、単一規則では再現できないことを確認（判断 7）
-- [ ] `docs/references.md` [P433] の gloss に追記
+- [x] `docs/references.md` [P433] の gloss に追記
 
 ## 3. 解析（新リポジトリ）
 - [x] 別リポジトリ作成（判断 6）
 - [x] 定義を `config.json` に凍結してコミット（判断 5）
 - [x] 転記 A と本文ベースの追加分
-- [ ] 転記 B（独立 subagent）を受け取り、A と照合
+- [x] 転記 B（独立 subagent）を受け取り、A と照合（バイト同一）
 - [x] 解析コード・`run.sh`（自己検査は B 以外すべて緑）
-- [ ] `bash run.sh` exit 0・結果の確認・コミット
-- [ ] 旧実験（2026-09-06）の値との一致確認（strict / DF1）
+- [x] `bash run.sh` exit 0・結果の確認・コミット（新リポジトリ `834f16a`・push 済み）
+- [x] 旧実験（2026-09-06）の値との一致確認（strict / DF1: 70/89・60/73・60/89）
 
 ## 4. 位置づけのサーヴェイ
-- [ ] `/literature-review` 1 ラウンド（help-seeking・debugging の観察研究・outcome の定義と中止の混入）
+- [x] `/literature-review` 1 ラウンド（Q1 慣行 / Q2 既存の批判 / Q3 方法論 / Q4 SE の測定）—— 判定 go（主張範囲を縮めて）・`7925339f`
+- [x] EASE 2027 と SIGSOFT Open Science Policy の規程を一次で確認（判断 4 追記）
 
 ## 5. 外枠
-- [ ] `outline.md`（主張 ↔ 根拠の対応表・6 頁の節構成）
+- [x] `outline.md`（主張 ↔ 根拠の対応表・関連研究の配置・EMSE 研究論文の構成）
+- [x] 投稿先を「登壇なし・費用ゼロ」で選び直す（判断 8・9）・プレプリント（判断 10）・ライセンス（判断 11）
 
 ## 6. 完了
 - [ ] `/finish-task`（レビュー・`/cross-review`・コミット・PR）

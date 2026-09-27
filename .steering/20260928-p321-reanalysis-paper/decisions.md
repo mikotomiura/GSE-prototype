@@ -111,3 +111,70 @@
 - ⚠️ **開示（判断 5 との関係）**: ＋OT2 の R₀ / R₀′ は、[P433] の数え方を**特定する途中で見てしまった**（凍結前）。★ 主系列（strict）は 2026-09-06 に Table 4/5 の独立 3 統計で対応づけを固定済みで、**今回の値を見て選び直していない**。→ 凍結する `config` にこの経緯を書き、感度の軸は 4 定義すべてを報告する（都合の良いものだけを選ばない）。
 - **影響範囲**: handoff §3 の「書いてよいこと」の 2 項目目（「コーディングの版で参照率が 21% → 33% と動く」）は**そのままでは書けない** →「同じ公開データに対し、正式版の報告値は単一の規則で再現できない。issue tracker を参照に含めるかで参照率は 21% → 30% 動き、分子の効果は 11.2pt → 9.0pt 動く」に改める。`docs/references.md` [P433] の gloss（「数え直されており値が違う」）に、パッケージが同一だったことを追記する。
 - **見直しタイミング**: 著者から再コーディング版のデータが公開された場合（→ 主系列を差し替えるかを再判断）。
+
+## 判断 4 の追記: 規程を一次で確認した（2026-09-28・ブラウザで取得）
+
+- ★ **EASE 2027 Short Papers and Emerging Results**（`https://conf.researchr.org/track/ease-2027/ease-2027-short-papers-and-emerging-results` ）:
+  - 逐語 "Submissions must not exceed 6 pages, including all figures, tables, references, and appendices." → ⚠️★★★ **参考文献・付録込みで 6 頁**（本文だけで 6 頁ではない）。
+  - 逐語 "Authors must comply with the SIGSOFT Open Science Policy."
+  - 逐語 "EASE 2027 will employ a double-anonymous review process. Authors should not include names or affiliations in their submissions, and references to their own prior work should be written in the third person. Online supplements, replication packages, and other materials referred to in the submission should also be anonymized."
+  - 日程（AoE）: abstract **2027-02-22** ／ full paper **2027-03-01** ／ 通知 2027-04-05 ／ camera-ready 2027-04-19（判断 16 の値と一致）。
+  - ⚠️ 逐語 "If a submission is accepted, at least one author of the paper is required to register for the conference and present the paper."（**2027-06-15〜18・Hanoi**）。⚠️ ACM ICPS の open access で、資格によって **APC** がかかりうる。→ ★ 研究者に要確認（参加と費用）。
+  - ⚠️ **プレプリントについての記載はこのページに無い。**
+- ★ **SIGSOFT Open Science Policy**（`https://github.com/acmsigsoft/open-science-policies/blob/master/sigsoft-open-science-policies.md` ・DOI 10.5281/zenodo.10532792）:
+  - 逐語 "We encourage [VENUE_NAME] authors to self-archive their pre- and post-prints in open and preserved repositories."
+  - 査読者向け逐語 "We ask you not to actively hunt the identity of authors, especially in case they self-archived a preprint of their submission."
+  - → ★ **double-anonymous とプレプリントは両立する**（規程が自己アーカイブを推奨している）。
+  - 逐語 "We ask authors to provide a supporting statement on the data availability (or lack thereof) in their submitted papers in a section named Data Availability after the Conclusion section." → ★ **結論の後に Data Availability 節が要る**（6 頁に含まれる）。
+  - 逐語 "GitHub, GitLab, and similar services for version control systems do not offer properly archived and preserved data." → ⚠️ **再現一式は GitHub だけでは足りない**。Zenodo / figshare / OSF 等に保存する。査読中は匿名の閲覧リンク、採択後に公開（逐語で案内される手順: `https://github.com/dgraziotin/disclose-data-dbr-first-then-opendata` ）。
+- **暫定の結論**: プレプリントは規程上可能。⚠️ **いつ出すか（投稿と同時 / 投稿後 / 採択後）は研究者が決める**（判断 4 の見直しとして次の確認で聞く）。
+- **影響範囲**: 判断 6（再現一式の置き場所）—— 査読用には GitHub の private リポジトリとは別に、**匿名で閲覧できるアーカイブ**（例: figshare の private link・OSF の anonymous view-only link）を用意する。外枠の頁配分は参考文献込みの 6 頁で組む。
+
+## 判断 8: 条件「登壇なし・費用ゼロ」→ 判断 1（EASE 2027 Short）を見直す（2026-09-28）
+
+- **背景**: 研究者の指示（逐語）「できれば登壇なし, お金かからず一切0で行きたい.」
+- **EASE 2027 が条件に合わない理由**（判断 4 追記の一次）:
+  - 逐語 "If a submission is accepted, at least one author of the paper is required to register for the conference and present the paper."（登壇が必須・参加登録費がかかる・会場は Hanoi）
+  - 逐語 "Depending on the authors' institutional and geographic eligibility, publication may require payment of an ACM Article Processing Charge (APC)."（APC がかかりうる）
+- **方針**: ★ **購読型（非 OA）で出せば APC が無料の学術誌**を候補にする（誌には登壇が無い）。プレプリント（arXiv）は無料なので併用してよい。
+- ⚠️ **候補は各誌の規程を一次で確かめてから研究者に示す**（APC の有無・非 OA での掲載料／超過頁料・短い論文の区分・再解析 / 再現論文の受付・匿名査読の方式）。
+- **影響範囲**: 判断 1（投稿先）・判断 4（プレプリント）・外枠（頁数・形式）・判断 6（再現一式の匿名化の要否）。
+- ⚠️ **他タスクへの波及（本タスクでは変更しない）**: IME 論文の判断 8（CHI 2027 Posters を「余裕があれば」併願）は、通常は参加登録と会場での発表を前提とする → 同じ条件に当たりうる。`.steering/20260927-ime-observation-paper-eval-design/` に戻るときに見直す。
+
+### 判断 8 の追記: 費用ゼロ・登壇なしの候補を一次で確認した（2026-09-28・実ブラウザ）
+
+- 調査は subagent（Sonnet・15 分）が先に回したが、出版社のページは curl / WebFetch では 403 で、大半が検索スニペット頼みだった → ★ **上位候補だけメインが実ブラウザで一次確認した**。
+- ★ **Empirical Software Engineering（Springer・Hybrid）**:
+  - 逐語 "Article Charges: The journal does not charge a submission fee or publication fee. If your article is accepted for publication, it will be published without incurring any cost to the authors. However, authors are offered the option to publish your accepted article as Open Access. … Selecting the Open Access option will require an Article Processing Fee … Please note color art is free of charge for the online publication."（`https://link.springer.com/journal/10664/submission-guidelines` ）
+  - 逐語 "Both original and replicated studies can be reported, varying from controlled experiments to field studies, from data intensive to qualitative. Preference is given to studies that can be replicated or expanded upon."（`https://link.springer.com/journal/10664/aims-and-scope` ）
+  - 逐語 "In most cases, the decision is made in less than three months."
+  - ★ [P433] 自体が EMSE の論文。⚠️ 短い論文の区分は見当たらない（通常の研究論文として出す）。⚠️ 査読方式（single / double）は未確認。
+- ★ **Information and Software Technology（Elsevier）**:
+  - 逐語 "Research Papers, Short Communications and Review Articles." ／ "A research paper's maximum length is 15,000 words … For short communication, the maximum length is 2,500 words. Please note that References and appendixes are part of the submission and count against the total number of words and that figures and tables count 200 words each."（guide for authors）
+  - 逐語 "Short Communications is a new section dedicated to short papers addressing new ideas, controversial opinions, 'Negative' results and much more."（⚠️ 原文の二重引用符を一重に置き換えた）
+  - open access options のページ: Subscription = 逐語 "No open access publication fee." ／ OA の APC = **USD 3820**
+  - 逐語（投稿の宣言）"The work described has not been published previously except in the form of a preprint, an abstract, a published lecture, academic thesis or registered report." → ★ プレプリントは可
+- **除外**（subagent の報告・未再確認）: ACM TOSEM（2026 年から全面 OA で購読経路が無い）・PeerJ Computer Science（APC 必須）。
+- ⚠️ 未確認のまま: JSS・IEEE TSE（超過頁料）・JSEP。
+- → ★ 候補を研究者に示して選んでもらう（本追記の直後）。
+
+## 判断 9: 投稿先 = Empirical Software Engineering の研究論文（判断 1 を改める・2026-09-28）
+
+- **背景**: 判断 8（登壇なし・費用ゼロ）。候補は判断 8 追記で一次確認した。
+- **選択肢**: A: EMSE 研究論文 ／ B: IST Short Communications（参考文献込み 2,500 語） ／ C: IST 研究論文
+- **採用**: A（研究者が選んだ）
+- **理由**: 逐語で費用ゼロ（"does not charge a submission fee or publication fee"）・登壇なし・"Both original and replicated studies can be reported"。★ [P433] 自体が EMSE の論文なので、その報告値の再現性を扱う場として自然。短報の語数制限が無いので、感度分析（参照の定義 4 通り・本文ベースの追加）と EMSE の再現表を全部載せられる。
+- **トレードオフ**: ⚠️ 短い論文の区分が無い → 通常の研究論文として「分量が足りない」と見られるリスク。★ 見直し: desk reject されたら B（IST 短報に圧縮）へ。
+- **影響範囲**: `outline.md`（6 頁の配分 → EMSE の研究論文の構成へ）、判断 6（査読方式が double-anonymous かは未確認 → 匿名化の要否は投稿前に確認）。⚠️ **判断 1 の EASE は取り下げ**（締切 2027-03-01 の制約も消える）。
+
+## 判断 10: arXiv へのプレプリントは投稿と同時に出す（判断 4 を閉じる・2026-09-28）
+
+- **採用**: 投稿と同時（研究者が選んだ）。
+- **根拠**: Springer Nature の方針（逐語 "Posting of preprints is not considered prior publication and will not jeopardize consideration at Springer Nature journals." —— `.steering/20260927-ime-observation-paper-eval-design/decisions.md` 判断 13 で一次確認済み）。
+- ⚠️ EMSE の査読方式が double-anonymous なら、その規程とプレプリントの扱いを投稿前に一次で確認する。
+
+## 判断 11: 論文用リポジトリのライセンス = コード Apache-2.0 ／ データ・文書 CC BY 4.0（2026-09-28）
+
+- **採用**: IME 論文の判断 15 と同じ（研究者が選んだ）。
+- **理由**: 元データ（[P321] / [P433] のパッケージ・[P434] の論文）がどちらも CC BY 4.0 なので、転記データを CC BY 4.0 で出すと整合する。⚠️ CC BY は**出典の表示と変更の明示**を求める → 転記 CSV に出典と「値は変えずに転記した」ことを書く。
+- **影響範囲**: `self-resolution-measure` に `LICENSE`（Apache-2.0 の原文）と `LICENSE-DATA`（CC BY 4.0 の legalcode）を置き、README に対象範囲を書く。公開は投稿時（今は private のまま）。
