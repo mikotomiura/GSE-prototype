@@ -1,0 +1,37 @@
+{
+  "_note": "★ 既定の規則は仮説である。IME の呼び出し順序は OS 側の文書に無く、取消の呼び出し列も文書に無い（macOS の unmarkText は確定側）。較正パイロットの実機の呼び出し列で直す。規則の形: start = 開く事象 / commit・cancel = 閉じる事象の配列 / candidate = 候補窓が出たとみなす事象（macOS は取れないので null）/ clock_jump_ms = 時計の跳びの閾値。",
+  "mac_nstic": {
+    "start": {"ev": "set_marked", "len_gt": 0},
+    "commit": [
+      {"ev": "insert_text", "len_gt": 0},
+      {"ev": "unmark"}
+    ],
+    "cancel": [
+      {"ev": "set_marked", "len_eq": 0, "not_followed_by": {"ev": "insert_text", "len_gt": 0}, "within_ms": 50}
+    ],
+    "candidate": null,
+    "clock_jump_ms": 1000
+  },
+  "win_imm": {
+    "start": {"ev": "start_comp"},
+    "commit": [
+      {"ev": "end_comp", "after_result": true}
+    ],
+    "cancel": [
+      {"ev": "end_comp", "after_result": false}
+    ],
+    "candidate": {"ev": "notify", "imn": 5},
+    "clock_jump_ms": 1000
+  },
+  "win_tsf": {
+    "start": {"ev": "tsf_start"},
+    "commit": [
+      {"ev": "tsf_end", "after_result": true}
+    ],
+    "cancel": [
+      {"ev": "tsf_end", "after_result": false}
+    ],
+    "candidate": {"ev": "ui_begin", "ui_kind": "candidate"},
+    "clock_jump_ms": 1000
+  }
+}
