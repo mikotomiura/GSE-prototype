@@ -29,7 +29,9 @@
  *     理由: 受け口は稼働中の Web App、ビルダーは同意フォームのトリガーを持つ。
  *     ★ 本ファイルは Drive / Sheets / Mail / Trigger の 4 つのスコープを要するので、
  *       どちらに足しても**稼働中のものへスコープが増える**。
- *   ★ 受け口の `doPost` は**変えない**（本ファイルは Drive を**読むだけ**）。
+ *   ★ 本ファイルは Drive を**読むだけ**。
+ *   ⚠️ 2026-09-28: 受け口が `<受け取りフォルダ>/<P-ID>/` に保存する版になった（`GSE_O1_Submit.gs` V-3）。
+ *     ★ 本ファイルは直下 ＋ サブフォルダ 1 段を読む（`o1LedgerAllFiles_`）。**受け口と同時に差し替える。**
  *
  * ============================================================================
  * 配備手順（研究者が手で行う。⚠️ ★ 自動操作しない・承認が要る）
@@ -560,6 +562,50 @@ function o1LedgerRun() {
 }
 
 /**
+ * 受領フォルダの **直下 ＋ 直下のサブフォルダ（1 段）** のファイルを順に返すイテレータ。
+ *
+ * ★ 受け口は `<受け取りフォルダ>/<P-ID>/` に保存する（2026-09-28・`GSE_O1_Submit.gs` V-3）。
+ *   ⚠️★★★ **直下だけを読むと、受け口の変更後に全員が「未受領・途絶」と誤報される。**
+ * ★ 直下も読む（旧形式・手で置かれたもの＝「対象外」の検知を保つ）。
+ * ⚠️ ごみ箱のサブフォルダは飛ばす（削除要求で捨てたフォルダの中身を受領に数えない）。
+ *   ファイル単位のごみ箱判定は呼び側が従来どおり行う。
+ * ★ 再帰しない（受け口が作るのは 1 段だけ・decisions D4）。
+ */
+function o1LedgerAllFiles_(root, deadlineMs) {
+  // ⚠️★★ **サブフォルダの列挙も時間予算の中で遅延に行う**（2026-09-28 security-checker MEDIUM）。
+  //   ★ フォルダはシークレット保持者なら P-ID を変えて**いくらでも作れる**。列挙を先にまとめて行うと、
+  //   ⚠️ 数千フォルダで 6 分の実行上限に当たり**台帳の実行ごと落ちる**（＝全員の途絶通知が止まる）。
+  //   → ★ 期限を過ぎたら `timedOut()` を立てて止まる（呼び側は「打ち切り」として扱う）。
+  var sub = null;
+  var cur = root.getFiles();
+  var timedOut = false;
+  function advance() {
+    while (!cur.hasNext()) {
+      if (new Date().getTime() > deadlineMs) {
+        timedOut = true;
+        return false;
+      }
+      if (!sub) sub = root.getFolders();
+      if (!sub.hasNext()) return false;
+      var d = sub.next();
+      if (d.isTrashed()) continue;
+      cur = d.getFiles();
+    }
+    return true;
+  }
+  return {
+    hasNext: advance,
+    next: function () {
+      if (!advance()) throw new Error("no more files");
+      return cur.next();
+    },
+    timedOut: function () {
+      return timedOut;
+    }
+  };
+}
+
+/**
  * Drive の受領フォルダを走査し、**新しいファイルだけ**台帳へ追記する。
  * ★ Drive ファイル ID で冪等（何度回しても行が増えない）。⚠️ 行は消さない。
  * ★ ⚠️ 走査は**全走査**（Drive の ID は時刻順である保証がない・判断 5）。時間予算で打ち切る。
@@ -574,8 +620,8 @@ function o1LedgerSync_(cfg, ss) {
   }
 
   var folder = DriveApp.getFolderById(cfg.folderId);
-  var it = folder.getFiles();
   var t0 = new Date().getTime();
+  var it = o1LedgerAllFiles_(folder, t0 + O1_LEDGER_TIME_BUDGET_MS);
   var truncated = false;
   var rows = [];
   while (it.hasNext()) {
@@ -609,6 +655,7 @@ function o1LedgerSync_(cfg, ss) {
     for (var ci = 1; ci < row.length; ci++) row[ci] = o1LedgerSafeCell_(row[ci]); // 0 列目（ID）は除く
     rows.push(row);
   }
+  if (it.timedOut()) truncated = true; // ★ 空のサブフォルダを辿る途中で期限を過ぎた
 
   if (rows.length > 0) {
     var start = sheet.getLastRow() + 1;
@@ -889,7 +936,7 @@ function o1LedgerCheck() {
   console.log("このプロジェクトのタイムゾーン: " + Session.getScriptTimeZone() + "（★ ビルダーのプロジェクトと同じか確かめること）");
 
   var t0 = new Date().getTime();
-  var it = folder.getFiles();
+  var it = o1LedgerAllFiles_(folder, t0 + O1_LEDGER_TIME_BUDGET_MS);
   var ok = 0;
   var foreignCount = 0;
   var foreign = [];
@@ -914,6 +961,7 @@ function o1LedgerCheck() {
       if (foreign.length < 20) foreign.push(name + " (" + f.getSize() + " B)");
     }
   }
+  if (it.timedOut()) truncated = true; // ★ 空のサブフォルダを辿る途中で期限を過ぎた
   var elapsed = new Date().getTime() - t0;
   console.log(
     "O1 の形: " + ok + " 件 ／ 対象外: " + foreignCount + " 件（表示は 20 まで）" +

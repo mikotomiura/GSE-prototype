@@ -38,6 +38,12 @@
  *   V-2  `MAX_BYTES` が大きい。⚠️ **O1 の単位はブロック (5 分) ではなく日 (24 時間)** である。
  *        ★ 実測に基づく（下の定数コメント）。G1 の 8 MB では毎日弾かれる。
  *
+ *   V-3  ★ **P-ID ごとのサブフォルダに保存する**（`<FOLDER_ID>/<P-ID>/`・無ければ作る）。
+ *        ★ 研究者判断 2026-09-28（`.steering/20260928-o1-receive-pid-folders/`）。
+ *        ⚠️★★ **受領台帳 `GSE_O1_Ledger.gs` もサブフォルダを読む版に同時に差し替える**
+ *          （旧版の台帳は直下しか読まないので、全員を「未受領・途絶」と誤報する）。
+ *        ★ 直下に残る旧形式のファイルは移さない（台帳は直下も読む）。
+ *
  * ============================================================================
  * ★ G1 から引き継いだ実測前提（⚠️ 推測で書き換えない・出所は GSE_G1_Submit.gs）
  * ============================================================================
@@ -231,7 +237,15 @@ function doPost(e) {
       return json_({ ok: false, error: 'empty payload' });
     }
 
-    var folder = DriveApp.getFolderById(cfg.folderId);
+    // ★ 保存先は `<受け取りフォルダ>/<P-ID>/`（研究者判断 2026-09-28・
+    //   `.steering/20260928-o1-receive-pid-folders/decisions.md` D1〜D3）。
+    //   ⚠️ P-ID は **`sanitizeName_` を通った名前から**取る（英数字 1〜16 のみ＝パスを作れない）。
+    var root = DriveApp.getFolderById(cfg.folderId);
+    var folder = pidFolder_(root, pidOfName_(name));
+    if (!folder) {
+      // ⚠️ 保存しない。★ 端末は `ok` を見ないと `.sent` を書かないので、次の再送で届く（D2）。
+      return json_({ ok: false, error: 'busy' });
+    }
     var saved = saveWithoutOverwriting_(folder, name, bytes);
     return json_({
       ok: true,
@@ -345,6 +359,45 @@ function saveWithoutOverwriting_(folder, name, bytes) {
   }
   folder.createFile(Utilities.newBlob(bytes, 'application/octet-stream', finalName));
   return { name: finalName, duplicate: duplicateName };
+}
+
+/**
+ * `sanitizeName_` を通った名前から P-ID（先頭の英数字）を取り出す。
+ * ⚠️ **通っていない名前に使わない**（呼び側が先に検証する）。
+ */
+function pidOfName_(name) {
+  return name.split('_')[0];
+}
+
+/** P-ID フォルダの作成を直列化するロックの待ち時間（ms）。 */
+var PID_FOLDER_LOCK_MS = 30000;
+
+/**
+ * `<root>/<pid>/` を返す。★ **無ければ作る。** ロックを取れなければ null（★ 保存しない）。
+ *
+ * ⚠️★★ **作成はロックで直列化する**: 同じ P-ID の提出が同時に 2 本届くと、
+ *   「無い → 作る」が並走して **同名フォルダが 2 つ**できうる（Drive は名前の一意性を持たない）。
+ * ★ それでも同名が複数あれば（ロック導入前・手作業）**最古**を使う（D3）。
+ *   台帳は全サブフォルダを読むので、どれに入っても取りこぼさない。
+ * ⚠️ ごみ箱にあるフォルダには保存しない（削除要求で捨てたフォルダへ新しい提出を入れない）。
+ */
+function pidFolder_(root, pid) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(PID_FOLDER_LOCK_MS)) return null;
+  try {
+    var it = root.getFoldersByName(pid);
+    var oldest = null;
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.isTrashed()) continue;
+      // ⚠️ 名前の検索が大文字小文字を区別するかは未確認 → **完全一致だけ**を採る（`p012` を `P012/` に混ぜない）。
+      if (f.getName() !== pid) continue;
+      if (!oldest || f.getDateCreated().getTime() < oldest.getDateCreated().getTime()) oldest = f;
+    }
+    return oldest || root.createFolder(pid);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function json_(obj) {
