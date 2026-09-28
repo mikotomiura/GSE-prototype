@@ -1,175 +1,221 @@
-# ログ形式の契約（`gt/1` / `obs/1` / `plan/1` / `oracle/1` / `corpus/1`）
+# Log format contracts (`gt/1` / `obs/1` / `plan/1` / `oracle/1` / `corpus/1`)
 
-キットの部品はすべてこの契約の上で動く。形式を足す・変えるときは、生産側と検査側を同時に直す。
+Every component of the kit operates on top of this contract. When adding or changing a format,
+update the producing side and the validating side together.
 
-## 共通
+## Common
 
-- JSON Lines・UTF-8・1 行 1 オブジェクト。**1 行目はヘッダ**。行末は LF（CRLF は許す）。
-- 時刻は整数（`t_wall_ms` = Unix ms・`t_mono_ns` = 単調時計 ns）。
-- **区切りに空白を入れない**（`{"a":1,"b":2}` の形）。Python は
-  `json.dumps(obj, ensure_ascii=False, separators=(",", ":"))`。
-  後続の検査は `"kind":"sent"` のような空白なしの文字列で行を探すので、空白を入れると検査が
-  素通り・誤って赤になる。`validate_logs.py` は `gt` / `obs` の行に、文字列の外の空白（`": "` / `", "` を含む）が
-  あれば拒否する。
-- **エスケープを使わない**。`validate_logs.py` は `gt` / `obs` の行に `\` があれば拒否する（許される文字列値は
-  どれも `\` を含まないので、正しい出力は必ず通る）。`"gt\/1"` や、`\u` と 16 進 4 桁で 1 文字を綴った列挙値は
-デコードすると列挙に合うが、
-  生の文字列で行を探す検査が素通りする。Swift の `JSONEncoder` は既定で `/` を `\/` と書くので、
-  `outputFormatting` に `.withoutEscapingSlashes` を付ける。Python は上の `json.dumps` のままでよい。
-- **BOM を付けない**（UTF-8 の BOM は JSON として読めず拒否される。.NET の `Encoding.UTF8`・PowerShell 5 の
-  `utf8` は既定で BOM を付けるので注意）。
-- 整数は JSON の整数だけ（小数・指数表記・`NaN`・`Infinity` は拒否）。範囲は、`obs` は GSE の型に合わせて
-  `t` / `dwell_ms` が 0〜2^64−1・`nav` が 0〜2^32−1、`gt` の付随フィールドと時刻は −2^63〜2^64−1。
-  範囲を置くのは、1 つの欄に詰められる量を 8 バイトまでに抑えるため（⚠️ 範囲の中の値の意味は検査しない ——
-  下の「保証の範囲」）。
-- 同じキーを 1 行に 2 回書かない（検査器ごとに採る値が違い、本文を隠せるため）。
+- JSON Lines, UTF-8, one object per line. **The first line is the header.** Line endings are LF
+  (CRLF is allowed).
+- Timestamps are integers (`t_wall_ms` = Unix time in milliseconds; `t_mono_ns` = monotonic clock
+  in nanoseconds).
+- **No whitespace in separators** (the form `{"a":1,"b":2}`). In Python:
+  `json.dumps(obj, ensure_ascii=False, separators=(",", ":"))`.
+  The downstream validator locates rows by matching whitespace-free strings such as `"kind":"sent"`,
+  so adding whitespace lets a violation slip through undetected or produces a false positive.
+  `validate_logs.py` rejects any `gt` / `obs` line that has whitespace outside of string values
+  (including `": "` or `", "`).
+- **No escaping.** `validate_logs.py` rejects any `gt` / `obs` line containing a `\` (every allowed
+  string value is `\`-free, so correctly produced output always passes). A value such as `"gt\/1"`,
+  or an enumeration value spelled out with a backslash followed by the letter u and four hexadecimal
+  digits per character, decodes to a value that matches the enumeration, but a validator that
+  searches the raw string for a row lets it slip through. Swift's `JSONEncoder` escapes `/` as `\/`
+  by default, so set `outputFormatting` to `.withoutEscapingSlashes`. The Python `json.dumps` call
+  above already produces valid output as is.
+- **No BOM** (a UTF-8 BOM is not valid JSON and is rejected; .NET's `Encoding.UTF8` and
+  PowerShell 5's `utf8` encoding add a BOM by default, so this needs attention).
+- Only JSON integers are allowed (decimals, exponential notation, `NaN`, and `Infinity` are
+  rejected). Ranges: in `obs`, `t` and `dwell_ms` range over 0 to 2^64−1 (an unsigned 64-bit
+  integer) and `nav` ranges over 0 to 2^32−1 (an unsigned 32-bit integer); in `gt`, the accompanying
+  fields and the timestamps range over −2^63 to 2^64−1. These ranges exist to cap how much payload
+  can be packed into a single field, at most 8 bytes (the meaning of a value within its range is not
+  checked — see "Scope of guarantee" below).
+- The same key does not appear twice on one line (different validators can pick different values
+  for a duplicate key, which could be used to hide payload).
 
-## `gt/1` — 参照入力欄が出す正解の生ログ
+## `gt/1` — the raw ground-truth log emitted by the reference input field
 
-- ヘッダ: `{"kind":"header","format":"gt/1","src":<"mac_nstic"|"win_imm"|"win_tsf">,"app_version":<str>,"os":<"macos"|"windows">}`
-- イベント: `{"kind":"ev","t_wall_ms":int,"t_mono_ns":int,"ev":<enum>, ...}`
-- `ev` と付随フィールド（**付随フィールドは整数か真偽値だけ**。`cmd` / `ui_kind` のみ列挙型の文字列。
-  現行の表のフィールドはすべて整数で、真偽値の位置は無い）:
+- Header: `{"kind":"header","format":"gt/1","src":<"mac_nstic"|"win_imm"|"win_tsf">,"app_version":<str>,"os":<"macos"|"windows">}`
+- Event: `{"kind":"ev","t_wall_ms":int,"t_mono_ns":int,"ev":<enum>, ...}`
+- `ev` and its accompanying fields (**accompanying fields are integers or booleans only**, except
+  that `cmd` and `ui_kind` are the only string-enum fields; every field in the table below is
+  currently an integer, and no boolean position exists yet):
 
-| src | ev | 付随フィールド |
+| src | ev | accompanying fields |
 |---|---|---|
-| 共通 | `key_down` | `vk`（OS のキーコード） |
-| 共通 | `focus_in` / `focus_out` | なし |
+| common | `key_down` | `vk` (the OS key code) |
+| common | `focus_in` / `focus_out` | none |
 | `mac_nstic` | `set_marked` | `len`, `sel_loc`, `sel_len`, `rep_loc`?, `rep_len`? |
 | `mac_nstic` | `insert_text` | `len`, `rep_loc`?, `rep_len`? |
-| `mac_nstic` | `unmark` / `first_rect` | なし |
+| `mac_nstic` | `unmark` / `first_rect` | none |
 | `mac_nstic` | `do_command` | `cmd` ∈ {`insertNewline:`, `cancelOperation:`, `deleteBackward:`, `deleteForward:`, `moveLeft:`, `moveRight:`, `moveUp:`, `moveDown:`, `insertTab:`, `insertBacktab:`, `noop:`, `other`} |
-| `win_imm` | `start_comp` / `end_comp` | なし |
-| `win_imm` | `comp` | `flags`（GCS_* のビット）, `comp_len`, `result_len` |
-| `win_imm` | `notify` | `imn`（IMN_* の値） |
-| `win_tsf` | `tsf_start` / `tsf_end` | `tsf_end` のみ `result_len`? |
+| `win_imm` | `start_comp` / `end_comp` | none |
+| `win_imm` | `comp` | `flags` (the GCS_* bits), `comp_len`, `result_len` |
+| `win_imm` | `notify` | `imn` (the IMN_* value) |
+| `win_tsf` | `tsf_start` / `tsf_end` | `tsf_end` only: `result_len`? |
 | `win_tsf` | `tsf_update` | `len` |
 | `win_tsf` | `ui_begin` / `ui_update` / `ui_end` | `ui_kind` ∈ {`candidate`, `reading`, `other`} |
 
-長さはすべて **UTF-16 のコード単位数**。`?` は省略可。「共通」の `ev` はどの `src` でも出せる。
-上の表にない `ev` は、その `src` では出ない `ev` として拒否する。
+All lengths are counted in **UTF-16 code units**. `?` marks an optional field. A common `ev` can be
+emitted under any `src`.
 
-**content-free の規則**: 文字列を値に持てるのは `kind` / `format` / `src` / `app_version` / `os` / `ev` / `cmd` / `ui_kind`
-だけ。`app_version` は正規表現 `^[0-9A-Za-z.+-]{1,32}$`、他は上の列挙のどれか。**未知のキーは拒否**、
-整数の位置に文字列・配列・オブジェクトが来たら拒否（真偽値・`null` も整数ではないので拒否する）。
+An `ev` not listed in the table above is rejected as an `ev` that does not occur for that `src`.
 
-## `obs/1` — 単体ロガーの出力
+**Content-free rule**: the only keys that may hold a string value are
+`kind` / `format` / `src` / `app_version` / `os` / `ev` / `cmd` / `ui_kind`. `app_version` follows
+the regular expression `^[0-9A-Za-z.+-]{1,32}$`; every other string field must be one of the
+enumerated values above. **Unknown keys are rejected**, and a string, array, or object in an
+integer position is rejected (booleans and `null` are rejected too, since neither is an integer).
 
-GSE の NDJSON 行と**同じ名前・同じ形**（GSE 側の一次は `schema_dto.rs` の `LogEntryDto` と
-`capabilities.rs` の `capabilities_json()`）。
+## `obs/1` — the standalone logger's output
 
-- ヘッダ: `{"type":"meta","format":"obs/1","os":<"macos"|"windows">,"logger_version":<str>,"manifest_sha256":<64 hex>,"capabilities":<object>}`
-  - `logger_version` は `app_version` と同じ規則（`^[0-9A-Za-z.+-]{1,32}$`）。`manifest_sha256` は 16 進 64 桁。
-  - `capabilities` は GSE の `meta.capabilities` と**同じ形** =
-    `{"unconditional":[<名前>…],"threshold_gated":[<名前>…],"config_gated":[<名前>…]}`。
-    **3 つのキーはすべて必須**で、値は**文字列の配列**（空でよい）。名前は行の種類の名前で、
-    **`key` / `ime_shadow` の列挙**（単体ロガーが出す行の種類はこの 2 つだけ）。3 つの配列を通して
-    **各名前は高々 1 回**（重複は拒否・合計 2 個まで）。⚠️ 名前を正規表現で開いておくと、ローマ字の単語列を
-    何個でも入れられる（本文の抜け道になる）ので閉じた列挙にしている。
-- `{"type":"key","t":int,"category":<14 種>,"press":bool}` — `category` は `alphabetic` / `numeric` /
-  `punctuation` / `sentence_punctuation` / `tab` / `backspace` / `delete` / `space` / `enter` /
-  `navigation` / `modifier` / `function` / `escape` / `other`
+This is the observation log format produced by the standalone logger.
+
+- Header: `{"type":"meta","format":"obs/1","os":<"macos"|"windows">,"logger_version":<str>,"manifest_sha256":<64 hex>,"capabilities":<object>}`
+  - `logger_version` follows the same pattern as `app_version` (`^[0-9A-Za-z.+-]{1,32}$`).
+    `manifest_sha256` is 64 lowercase hexadecimal digits.
+  - `capabilities` has the following shape:
+    `{"unconditional":[<name>…],"threshold_gated":[<name>…],"config_gated":[<name>…]}`.
+    **All three keys are required**, and each value is an **array of strings** (which may be
+    empty). Each name identifies a row type, drawn from the closed enumeration
+    **`key` / `ime_shadow`** (the standalone logger emits only these two row types). Across the
+    three arrays, **each name occurs at most once** (a duplicate is rejected; two names in total at
+    most). Leaving the name open to a regular expression would let an arbitrary sequence of
+    romanized words be packed in (an escape hatch for payload), so it is a closed enumeration
+    instead.
+- `{"type":"key","t":int,"category":<14 kinds>,"press":bool}` — `category` is one of `alphabetic` /
+  `numeric` / `punctuation` / `sentence_punctuation` / `tab` / `backspace` / `delete` / `space` /
+  `enter` / `navigation` / `modifier` / `function` / `escape` / `other`
 - `{"type":"ime_shadow","t":int,"dwell_ms":int,"nav":int,"abandon":bool}`
-- 上以外の `type`（2 行目以降の `meta` を含む）・未知のキー・列挙外の文字列は拒否。
+- Any `type` other than the above (including a second `meta` line), an unknown key, or a string
+  outside its enumeration is rejected.
 
-## `plan/1` — 生成器の出力
+## `plan/1` — the generator's output
 
-- ヘッダ: `{"kind":"header","format":"plan/1","os":…,"seed":int,"generator_version":str,"config_sha256":<64 hex>,"recipes_sha256":<64 hex>,"corpus_sha256":<64 hex>}`
-- ブロック: `{"kind":"block","block_id":int,"speed":"slow"|"mid"|"fast","reset_ime":bool,"marker":[<keyname>…],"marker_gap_ms":int}`
-- 試行: `{"kind":"trial","trial_id":str,"block_id":int,"scenario":"S1"…"S15","speed":"slow"|"mid"|"fast","gap_before_ms":int,"think_ms":int,"phrase_id":str,"reading_len":int,"steps":[{"key":<keyname>,"at_ms":int,"down":bool}…],"intent":{…}}`
-- `gap_before_ms` = 前の試行の終わりからこの試行の先頭までの待ち、`marker_gap_ms` = マーカーのキーの間隔。
-  実行器はこの 2 つの値だけで待つ（自分で決めない）。
-- **ブロックは速さで揃える**（1 ブロック = 1 つの速さ。ブロック行の `speed` と、その中の試行の `speed` は一致する）。
-- `intent` のキーは `commit`（`enter` / `digit` / `mouse` / `none`）・`cand_index`・`nav_count`・`abandon`・
-  `predictive`・`ime_toggle_mid`・`focus_switch_mid`・`expect_session`。
-- 計画は刺激（公有の文の読み）なので content-free の対象ではない。
+- Header: `{"kind":"header","format":"plan/1","os":…,"seed":int,"generator_version":str,"config_sha256":<64 hex>,"recipes_sha256":<64 hex>,"corpus_sha256":<64 hex>}`
+- Block: `{"kind":"block","block_id":int,"speed":"slow"|"mid"|"fast","reset_ime":bool,"marker":[<keyname>…],"marker_gap_ms":int}`
+- Trial: `{"kind":"trial","trial_id":str,"block_id":int,"scenario":"S1"…"S15","speed":"slow"|"mid"|"fast","gap_before_ms":int,"think_ms":int,"phrase_id":str,"reading_len":int,"steps":[{"key":<keyname>,"at_ms":int,"down":bool}…],"intent":{…}}`
+- `gap_before_ms` is the wait from the end of the previous trial to the start of this one;
+  `marker_gap_ms` is the interval between marker keys. The emitter waits only by these two values
+  (it does not decide the wait itself).
+- **Blocks are uniform in speed** (one block has one speed; the block row's `speed` matches the
+  `speed` of every trial within it).
+- `intent`'s keys are `commit` (`enter` / `digit` / `mouse` / `none`), `cand_index`, `nav_count`,
+  `abandon`, `predictive`, `ime_toggle_mid`, `focus_switch_mid`, and `expect_session`.
+- A plan is a stimulus (a public-domain phrase's reading), so it is not subject to the content-free
+  rule.
 
-### `plan/1` の型
+### `plan/1` types
 
-- ヘッダ: `os` ∈ {`macos`, `windows`} ／ `seed` は 0〜2^63−1 の整数 ／ `generator_version` は `^[0-9A-Za-z.+-]{1,32}$` ／
-  `config_sha256` / `recipes_sha256` / `corpus_sha256` はそれぞれ設定・recipes・コーパスのファイルの**バイト列**の
-  SHA-256（小文字の 16 進 64 桁）。★ 計画ごとに、どの版の手順と刺激で作ったかを束ねる（パイロットの後に recipes を
-  直す前提のため）。
-- ブロック: `block_id` は 0 から始まる連番（ファイル中の出現順）／ `reset_ime` は真偽値 ／ `marker` は `keyname` の配列
-  （空でよい＝マーカーを送らない）／ `marker_gap_ms` は 0 以上の整数。
-- 試行: `trial_id` は `^t[0-9]{5,}$`（ファイル全体で 1 から始まる連番を 0 埋め。例 `t00001`）／ `block_id` は**直前の
-  ブロック行**の `block_id`（試行はそのブロック行の後に続き、次のブロック行までがそのブロックの試行）／ `gap_before_ms`・`think_ms` は 0 以上の整数 ／ `phrase_id` は `corpus/1` の書式 ／
-  `reading_len` は**句の**読みの文字数（1 以上。ひらがなは BMP なので UTF-16 のコード単位数と同じ）。⚠️ 実際に打つ
-  読みとは限らない（S10 は前半だけ打つ・S12 は合成かな列）→ 打った読みは生成器の `typed_reading(...)` で取る。
-- `steps` の要素: `key` は `keyname` ／ `at_ms` は**試行の先頭からの相対**の 0 以上の整数で、配列の順に単調非減少 ／
-  `down` は真偽値（押下 = `true`・離し = `false`。同じキーの押下と離しは対になる）。
-- `intent` は次の 8 キーを**すべて持つ**オブジェクト（未知のキーは持たない）。シナリオごとの値は `kit/gen/recipes.json` が決める。
+- Header: `os` ∈ {`macos`, `windows`}; `seed` is an integer from 0 to 2^63−1; `generator_version`
+  follows `^[0-9A-Za-z.+-]{1,32}$`; `config_sha256` / `recipes_sha256` / `corpus_sha256` are the
+  SHA-256 (64 lowercase hexadecimal digits) of the **byte content** of the configuration, recipes,
+  and corpus files, respectively. This ties each plan to the exact version of the procedure and
+  stimuli it was built from, on the assumption that the recipes are revised after the pilot.
+- Block: `block_id` is a 0-based sequence number (in file order); `reset_ime` is a boolean; `marker`
+  is an array of `keyname` (may be empty, meaning no marker is sent); `marker_gap_ms` is a
+  non-negative integer.
+- Trial: `trial_id` matches `^t[0-9]{5,}$` (a file-wide, 1-based, zero-padded sequence number, e.g.
+  `t00001`); `block_id` is the `block_id` of the **immediately preceding block row** (a trial
+  follows that block row, and every trial up to the next block row belongs to that block);
+  `gap_before_ms` and `think_ms` are non-negative integers; `phrase_id` follows the `corpus/1`
+  format; `reading_len` is the character count of the **phrase's** reading (at least 1; hiragana
+  falls within the BMP, so this equals the UTF-16 code unit count). This is not necessarily the
+  reading actually typed (S10 types only the first half, and S12 uses a synthesized kana string) —
+  the reading actually typed is obtained from the generator's `typed_reading(...)`.
+- `steps` elements: `key` is a `keyname`; `at_ms` is a non-negative integer relative to the start of
+  the trial, non-decreasing in array order; `down` is a boolean (press = `true`, release = `false`;
+  the press and release of the same key are paired).
+- `intent` is an object holding **all eight** of the following keys, and no unknown key. The value
+  for each scenario is determined by `kit/gen/recipes.json`.
 
-  | キー | 型 | 意味 |
+  | key | type | meaning |
   |---|---|---|
-  | `commit` | `enter` / `digit` / `mouse` / `none` | 変換を確定する手段。確定しない試行（取消・全消去など）は `none` |
-  | `cand_index` | 0 以上の整数 または `null` | 確定する候補の 0 始まりの番号。候補を選ばずに確定する・確定しない試行は `null`。予測候補を選ぶ試行（`predictive` が真）も `null`（予測候補の番号は数えない） |
-  | `nav_count` | 0 以上の整数 | 変換中に送る矢印キーの数（使わない試行は 0） |
-  | `abandon` | 真偽値 | 確定せずに変換を捨てる意図 |
-  | `predictive` | 真偽値 | 予測候補を使う意図 |
-  | `ime_toggle_mid` | 真偽値 | 変換中に IME を OFF / ON する意図 |
-  | `focus_switch_mid` | 真偽値 | 変換中に前面のアプリを切り替える意図 |
-  | `expect_session` | 真偽値 | 正解側に変換セッションが開く見込み（全 composition の定義で。OS ごとの定義ではない） |
+  | `commit` | `enter` / `digit` / `mouse` / `none` | The means of committing the conversion. A trial that does not commit (cancellation, clearing everything, etc.) uses `none` |
+  | `cand_index` | non-negative integer or `null` | The 0-based index of the committed candidate. `null` for a trial that commits without selecting a candidate, and for a trial that does not commit. Also `null` for a trial that selects a predictive candidate (`predictive` is true) — predictive-candidate indices are not counted |
+  | `nav_count` | non-negative integer | The number of arrow-key presses sent during conversion (0 for a trial that sends none) |
+  | `abandon` | boolean | Intent to discard the conversion without committing |
+  | `predictive` | boolean | Intent to use a predictive candidate |
+  | `ime_toggle_mid` | boolean | Intent to turn the IME off and back on mid-conversion |
+  | `focus_switch_mid` | boolean | Intent to switch the foreground application mid-conversion |
+  | `expect_session` | boolean | Whether the ground-truth side is expected to open a conversion session, under the cross-platform composition definition rather than any OS-specific one |
 
-## `oracle/1` — 実行器の出力
+## `oracle/1` — the emitter's output
 
-- ヘッダ: `{"kind":"header","format":"oracle/1","plan_sha256":…,"os":…,"emitter_version":…,"backend":<"dryrun"|"macos"|"windows">}`
+- Header: `{"kind":"header","format":"oracle/1","plan_sha256":…,"os":…,"emitter_version":…,"backend":<"dryrun"|"macos"|"windows">}`
 - `{"kind":"sent","trial_id":…,"step":int,"key":<keyname>,"down":bool,"t_wall_ms":int,"t_mono_ns":int}`
-- `trial_begin` / `trial_end` / `block_begin` / `block_end`（`trial_id` または `block_id` ＋ 2 つの時刻）
-- `{"kind":"marker","block_id":int,"seq":int,…時刻}`
-- `{"kind":"reset","block_id":int,"exit_code":int,…時刻}`
+- `trial_begin` / `trial_end` / `block_begin` / `block_end` (a `trial_id` or `block_id`, plus the
+  two timestamps)
+- `{"kind":"marker","block_id":int,"seq":int,…the two timestamps}`
+- `{"kind":"reset","block_id":int,"exit_code":int,…the two timestamps}`
 
-### `oracle/1` の型
+### `oracle/1` types
 
-- ヘッダ: `plan_sha256` は計画ファイルの**バイト列**の SHA-256（小文字の 16 進 64 桁）／ `os` ∈ {`macos`, `windows`} ／
-  `emitter_version` は `^[0-9A-Za-z.+-]{1,32}$`。
-- 「2 つの時刻」は `t_wall_ms`（Unix ms）と `t_mono_ns`（単調時計 ns）の整数。**ヘッダ以外のすべての行が両方を持つ。**
-- 行の形（キーはこれだけ）:
-  - `{"kind":"block_begin","block_id":int,"t_wall_ms":int,"t_mono_ns":int}` ／ `block_end` も同じ形
-  - `{"kind":"trial_begin","trial_id":str,"t_wall_ms":int,"t_mono_ns":int}` ／ `trial_end` も同じ形
-  - `{"kind":"sent","trial_id":str,"step":int,"key":<keyname>,"down":bool,"t_wall_ms":int,"t_mono_ns":int}` ——
-    `step` は計画の `steps` の 0 始まりの添字
-  - `{"kind":"marker","block_id":int,"seq":int,"t_wall_ms":int,"t_mono_ns":int}` —— マーカーのキー 1 つの**押下**ごとに 1 行。
-    `seq` はそのブロックの `marker` 配列の 0 始まりの添字（離しは送るが行にしない）
+- Header: `plan_sha256` is the SHA-256 (64 lowercase hexadecimal digits) of the plan file's **byte
+  content**; `os` ∈ {`macos`, `windows`}; `emitter_version` follows `^[0-9A-Za-z.+-]{1,32}$`.
+- The "two timestamps" are the integers `t_wall_ms` (Unix time in ms) and `t_mono_ns` (monotonic
+  clock in ns). **Every row other than the header carries both.**
+- Row shapes (these are the only keys):
+  - `{"kind":"block_begin","block_id":int,"t_wall_ms":int,"t_mono_ns":int}` — `block_end` has the
+    same shape
+  - `{"kind":"trial_begin","trial_id":str,"t_wall_ms":int,"t_mono_ns":int}` — `trial_end` has the
+    same shape
+  - `{"kind":"sent","trial_id":str,"step":int,"key":<keyname>,"down":bool,"t_wall_ms":int,"t_mono_ns":int}`
+    — `step` is the 0-based index into the plan's `steps`
+  - `{"kind":"marker","block_id":int,"seq":int,"t_wall_ms":int,"t_mono_ns":int}` — one row per
+    **press** of a marker key. `seq` is the 0-based index into that block's `marker` array (the
+    release is sent but is not turned into a row)
   - `{"kind":"reset","block_id":int,"exit_code":int,"t_wall_ms":int,"t_mono_ns":int}`
-- 時刻を取る点: `sent` と `marker` は**送出の直前** ／ `trial_begin` は `gap_before_ms` の待ちの**後**・最初の送出の直前
-  （＝試行の区間に試行間の待ちを含めない）／ `trial_end` は最後の送出の後 ／ `block_begin` はマーカーを送る前・
-  `block_end` は最後の試行の後 ／ `reset` はリセットのコマンドが終わった後。
-- 行の順序: ヘッダ → ブロックごとに（`reset`（`reset_ime` が真のとき）→ `block_begin` → `marker`… →
-  試行ごとに（`trial_begin` → `sent`… → `trial_end`）→ `block_end`）。
-- `trial_id` / `block_id` は計画と同じ値。
+- **Timing points**: `sent` and `marker` are taken **immediately before dispatch**; `trial_begin` is
+  taken **after** the `gap_before_ms` wait, immediately before the first dispatch (i.e., the
+  inter-trial wait is not included in the trial's own interval); `trial_end` is taken after the
+  last dispatch; `block_begin` is taken before sending any marker, and `block_end` after the last
+  trial; `reset` is taken after the reset command finishes.
+- **Row order**: header → for each block: (`reset`, when `reset_ime` is true) → `block_begin` →
+  `marker`… → for each trial: (`trial_begin` → `sent`… → `trial_end`) → `block_end`.
+- `trial_id` / `block_id` carry the same values as in the plan.
 
-## `corpus/1` — 句と読み
+## `corpus/1` — phrases and readings
 
-- ヘッダ: `{"kind":"header","format":"corpus/1","source":"aozora","tokenizer":str,"dict":str}`
+- Header: `{"kind":"header","format":"corpus/1","source":"aozora","tokenizer":str,"dict":str}`
 - `{"kind":"phrase","phrase_id":str,"work_id":str,"text":str,"reading":str,"reading_len":int}`
-- `reading` は**ひらがなだけ**（`^[ぁ-ゖー]+$`）。
+- `reading` is **hiragana only** (`^[ぁ-ゖー]+$`).
 
-### `corpus/1` の型
+### `corpus/1` types
 
-- ヘッダ: `tokenizer` と `dict` は名前と版を 1 つの文字列にしたもの（`^[0-9A-Za-z._+-]{1,64}$`。例 `sudachipy-0.6.8`）。
-- `work_id` は `^[a-z0-9][a-z0-9_]{0,31}$`（**小文字で始める**。作品のファイル名から決定的に作る）。
-- `phrase_id` は `<work_id>-<文番号>-<句番号>`（番号は 1 から始まる 10 進）＝ `^[a-z0-9][a-z0-9_]{0,31}-[0-9]+-[0-9]+$`。
-  合成かな列（生成器が埋める）は `^kana-[0-9]+$`。⚠️ どちらも**小文字で始める** —— 公開時の書き出しの検査は
-  被験者 ID の形（大文字の `P` ＋ 3 桁）を拒否するので、それに当たらない形にしている。
-- `reading_len` は `reading` の文字数（1 以上）。`text` は公有の文（content-free の対象ではない）。
+- Header: `tokenizer` and `dict` each combine a name and a version into one string
+  (`^[0-9A-Za-z._+-]{1,64}$`; e.g. `sudachipy-0.6.8`).
+- `work_id` matches `^[a-z0-9][a-z0-9_]{0,31}$` (**starts with a lowercase character**; derived
+  deterministically from the source work's file name).
+- `phrase_id` is `<work_id>-<sentence number>-<phrase number>` (numbers are 1-based decimal) =
+  `^[a-z0-9][a-z0-9_]{0,31}-[0-9]+-[0-9]+$`. A synthesized kana string (filled in by the generator)
+  matches `^kana-[0-9]+$`. Both forms **start with a lowercase character** — the export-time check
+  rejects the shape of a participant identifier (an uppercase `P` followed by three digits), so
+  this format is chosen to avoid matching it.
+- `reading_len` is the character count of `reading` (at least 1). `text` is the public-domain
+  sentence (not subject to the content-free rule).
 
-## `keyname` の列挙
+## The `keyname` enumeration
 
-`a`–`z`, `0`–`9`, `space`, `enter`, `esc`, `backspace`, `tab`, `left`, `right`, `up`, `down`, `minus`, `comma`,
-`period`, `ime_on`, `ime_off`, `f13`–`f19`, `shift`, `mouse_click`, `focus_away`, `focus_back`
-（最後の 2 つは実キーではなく、実行器のバックエンドが OS の手段で前面のアプリを切り替える擬似キー・S15 用）。
+`a`–`z`, `0`–`9`, `space`, `enter`, `esc`, `backspace`, `tab`, `left`, `right`, `up`, `down`,
+`minus`, `comma`, `period`, `ime_on`, `ime_off`, `f13`–`f19`, `shift`, `mouse_click`, `focus_away`,
+`focus_back` (the last two are not real keys; they are pseudo-keys that the emitter backend uses to
+switch the foreground application by OS-specific means, for S15).
 
-## 検査
+## Validation
 
-- `kit/formats/validate_logs.py --kind gt|obs FILE...` — 違反を行番号つきで出して exit 1、違反なしなら exit 0
-  （exit 2 は検査できなかった。★ 0 以外はすべて不合格。違反があれば、開けないファイルが混ざっていても exit 1）。
-  **違反の説明に値は出さない**（本文が混じっていても出力から漏れない）。キー名も、この文書に載っている名前の
-  ときだけ出す。
-- **保証の範囲**: 検査器が機械で保証するのは行の**形**である —— 文字列の値は列挙か正規表現に収まり、未知の
-  キー・エスケープ・重複キーは無く、整数の位置には範囲内の整数しか無い。⚠️ **値の意味は保証しない**:
-  整数の欄（`vk`・長さ・時刻）・版の文字列（`app_version` / `logger_version`）・`manifest_sha256` に符号化して
-  詰めた本文は検出できない。content-free は**生産側の設計**（種別・長さ・時刻しか書かない）が担い、検査器は
-  その形を確かめる。
-- 機械検査するのは `gt` と `obs` だけ（content-free が要るもの）。`plan` / `oracle` / `corpus` の検査は、
-  生産側の部品が自分の selftest で持つ。
+- `kit/formats/validate_logs.py --kind gt|obs FILE...` — prints violations with line numbers and
+  exits 1; exits 0 if there are none (exit 2 means validation could not run at all. **Any exit code
+  other than 0 counts as failing.** If there is at least one violation, the exit code is 1 even when
+  an unreadable file is also present). **A violation's description never includes a value** (so
+  payload content never leaks through the output, even if present). A key name is shown only when
+  it is one of the names listed in this document.
+- **Scope of guarantee**: what the validator mechanically guarantees is a row's **shape** — string
+  values fit an enumeration or a regular expression, there are no unknown keys, no escaping, and no
+  duplicate keys, and only an in-range integer occupies an integer position. **The meaning of a
+  value is not guaranteed**: payload encoded into an integer field (`vk`, a length, a timestamp), a
+  version string (`app_version` / `logger_version`), or `manifest_sha256` cannot be detected this
+  way. Keeping the log content-free is the producing side's design responsibility (writing only
+  kind, length, and time); the validator only confirms that this shape holds.
+- Only `gt` and `obs` are mechanically validated (the formats that require content-freedom).
+  Validation of `plan` / `oracle` / `corpus` lives in the producing component's own selftest.
