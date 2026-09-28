@@ -1,5 +1,5 @@
 {
-  "gse_repo_commit": "5deaba1cab4304acc467434d7779d5efee6882df",
+  "gse_repo_commit": "f1be36162fe00f396f4ced9492a762310a83544a",
   "entries": [
     {
       "kind": "excerpt",
@@ -38,7 +38,7 @@
       "start_anchor": "unsafe extern \"system\" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {",
       "end_anchor": "// Tests",
       "symbol": "hook_callback",
-      "sha256": "2ffa43ad0e1fde79bd0944e0a2c9089baaa9189dea0445d1bede169b644c604b",
+      "sha256": "77c927d55f93fb9eabcaa126220e91178155927376c8c1b8d2dae0f8227ae73f",
       "gse_range_sha256": "b16063ff8e7cdbec771f45487811246c411b5308c7b64f49dc84ed3ffdc0dec3",
       "check_decls": null,
       "reason": "Low-level keyboard hook of the Windows driver: the callback, its installation and the two excerpted pure functions. The callback is newly written (it sends to the core channel and omits the reference implementation's statistics and mode tracking); the anchored range pins the reference callback so that a change of its judgment is detected."
@@ -66,7 +66,7 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "5fd12e9b48ad699dbbfeb6ec73b95e1c63cd27bec2d9e103699468aae9eaad4d",
+      "sha256": "b0f4794f4db7d9cbbec297a928c3dfc07dcb30a09475786c17f98e945df9d58f",
       "gse_range_sha256": null,
       "check_decls": null,
       "reason": "Entry point of the Windows driver: synchronous start-up, the hook thread and its message pump. Newly written; the hooks it installs live in the two submodules."

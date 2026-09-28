@@ -1,15 +1,16 @@
 // hook-callback: keyboard_hook_callback
 //! Low-level keyboard hook (`WH_KEYBOARD_LL`) of the Windows driver.
 //!
-//! The callback forwards every observed key transition to the core as `(t, vk, press)` and, while a
-//! conversion session is open, counts candidate navigation and records abandonment for the session
-//! summary. Two rules bind the callback: it performs atomic operations and a channel send only (no
-//! locking, allocation-heavy work or logging), and it always passes the event on to the next hook.
-//! Injected input is deliberately not discarded, so that keys produced by a scripted input source are
-//! observed like physical ones.
+//! The callback places every observed key transition as `(t, vk, press)` on a bounded queue that a
+//! separate thread drains toward the core, and, while a conversion session is open, counts candidate
+//! navigation and records abandonment for the session summary. Two rules bind the callback: it performs
+//! atomic operations and a non-blocking channel send only (no locking, allocation-heavy work or
+//! logging), and it always passes the event on to the next hook. A full queue is not waited on; the
+//! event is dropped and counted instead. Injected input is deliberately not discarded, so that keys
+//! produced by a scripted input source are observed like physical ones.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::Sender;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::mpsc::SyncSender;
 use std::sync::OnceLock;
 
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
@@ -21,11 +22,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::driver_api::KeyEvent;
 use crate::input::hook::{IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_SHADOW_ABANDON};
 
-/// Channel to the core. A hook callback is a bare function and cannot capture state, so the sender is
-/// published once, before the hook is installed. The sender is never dropped: the core detects a
-/// terminated driver thread through the thread handle rather than through channel disconnection. The
-/// channel is unbounded, so the callback never blocks on a slow consumer.
-static KEY_TX: OnceLock<Sender<KeyEvent>> = OnceLock::new();
+/// Bounded channel to the forwarding thread that relays events on to the core. A hook callback is a
+/// bare function and cannot capture state, so the sender is published once, before the hook is
+/// installed. The sender is never dropped: the core detects a terminated driver thread through the
+/// thread handle rather than through channel disconnection. The channel has a fixed capacity, so a full
+/// channel makes the callback drop the event instead of blocking; `DROPPED_KEY_EVENTS` counts how many
+/// events were dropped this way.
+static KEY_TX: OnceLock<SyncSender<KeyEvent>> = OnceLock::new();
+
+/// Number of key events dropped because the channel above was full when the callback tried to send.
+/// The callback only adds to it; the driver reads it once, when it stops, to report a single summary
+/// line (a count, never the events themselves).
+static DROPPED_KEY_EVENTS: AtomicU64 = AtomicU64::new(0);
 
 // @excerpt-begin is_observed_key
 fn is_observed_key(vk_code: u32) -> bool {
@@ -103,11 +111,25 @@ fn record_ime_nav(
     }
 }
 
+/// Sends one key event over the bounded channel, counting a drop instead of blocking when the channel
+/// is full or its receiving end is gone. Kept separate from the callback so that the drop-counting
+/// behavior can be exercised without touching the process-wide sender above.
+fn send_or_count_drop(tx: &SyncSender<KeyEvent>, event: KeyEvent, dropped: &AtomicU64) {
+    if tx.try_send(event).is_err() {
+        dropped.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
 /// Publishes the channel to the core. Fails if a sender was already published in this process.
-pub(super) fn set_sender(tx: Sender<KeyEvent>) -> Result<(), String> {
+pub(super) fn set_sender(tx: SyncSender<KeyEvent>) -> Result<(), String> {
     KEY_TX
         .set(tx)
         .map_err(|_| "the keyboard hook can be started only once per process".to_string())
+}
+
+/// Number of key events dropped so far because the bounded channel was full.
+pub(super) fn dropped_count() -> u64 {
+    DROPPED_KEY_EVENTS.load(Ordering::Relaxed)
 }
 
 /// Installs the low-level keyboard hook on the calling thread, which must pump its message queue.
@@ -133,6 +155,8 @@ unsafe extern "system" fn keyboard_hook_callback(
 ) -> LRESULT {
     if code >= 0 {
         if let Some(press) = key_transition(wparam.0 as u32) {
+            // SAFETY: `code >= 0` together with a WM_KEY*/WM_SYSKEY* message means the operating
+            // system passes a valid pointer to a `KBDLLHOOKSTRUCT` for the duration of this call.
             let vk_code = (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode;
             let t = super::wall_ms();
             record_ime_nav(
@@ -144,11 +168,15 @@ unsafe extern "system" fn keyboard_hook_callback(
             );
             if is_observed_key(vk_code) {
                 if let Some(tx) = KEY_TX.get() {
-                    let _ = tx.send(KeyEvent {
-                        t,
-                        vk: vk_code,
-                        press,
-                    });
+                    send_or_count_drop(
+                        tx,
+                        KeyEvent {
+                            t,
+                            vk: vk_code,
+                            press,
+                        },
+                        &DROPPED_KEY_EVENTS,
+                    );
                 }
             }
         }
@@ -257,5 +285,57 @@ mod tests {
         }
         assert_eq!(nav.load(Ordering::Relaxed), 0);
         assert!(!abandon.load(Ordering::Relaxed));
+    }
+
+    /// `send_or_count_drop` is exercised on a local channel, never on the process-wide `KEY_TX`, so
+    /// this test does not interfere with any other test that might publish a sender.
+    #[test]
+    fn a_key_event_is_relayed_while_the_channel_has_room() {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<KeyEvent>(1);
+        let dropped = AtomicU64::new(0);
+        send_or_count_drop(
+            &tx,
+            KeyEvent {
+                t: 1,
+                vk: 0x41,
+                press: true,
+            },
+            &dropped,
+        );
+        assert_eq!(dropped.load(Ordering::Relaxed), 0);
+        assert_eq!(rx.try_recv().expect("event was relayed").vk, 0x41);
+    }
+
+    #[test]
+    fn a_key_event_is_dropped_and_counted_once_the_channel_is_full() {
+        let (tx, _rx) = std::sync::mpsc::sync_channel::<KeyEvent>(1);
+        let dropped = AtomicU64::new(0);
+        // Fill the one slot; nothing drains it, so the next event has nowhere to go.
+        tx.try_send(KeyEvent {
+            t: 1,
+            vk: 0x41,
+            press: true,
+        })
+        .expect("the first event fits in the one-slot channel");
+        send_or_count_drop(
+            &tx,
+            KeyEvent {
+                t: 2,
+                vk: 0x42,
+                press: true,
+            },
+            &dropped,
+        );
+        assert_eq!(dropped.load(Ordering::Relaxed), 1);
+        send_or_count_drop(
+            &tx,
+            KeyEvent {
+                t: 3,
+                vk: 0x43,
+                press: true,
+            },
+            &dropped,
+        );
+        assert_eq!(dropped.load(Ordering::Relaxed), 2);
     }
 }
