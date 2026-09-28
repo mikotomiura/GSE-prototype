@@ -32,7 +32,7 @@ for f in "${T}" "${B}"; do
 done
 
 # AC6
-if grep -qE 'TSF の道: 道 [12]' "${D}/README.md"; then ok "AC6 README に採った道がある"; else ng "AC6 README に「TSF の道: 道 1|2」の行が無い"; fi
+if grep -qE 'TSF capture strategy: path [12]' "${D}/README.md"; then ok "AC6 README に採った道がある"; else ng "AC6 README に「TSF capture strategy: path 1|2」の行が無い"; fi
 
 # 008 の bin を壊していない
 run_ok "GUARD refinput_imm の selftest が緑のまま" "${D}/target/release/refinput_imm" --selftest --out "${TMP}/gt_imm.jsonl"

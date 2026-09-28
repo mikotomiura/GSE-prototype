@@ -1,134 +1,164 @@
-# kit/gen — シナリオ生成器
+# kit/gen — scenario generator
 
-`corpus/1`（句と読み）と OS ごとの**キーの手順**（`recipes.json`）から、1 セル分の試行計画 `plan/1`
-（形式は [`../formats/FORMATS.md`](../formats/FORMATS.md)）を出す。実行器はこの計画だけを見て送出する。
+Produces a trial plan `plan/1` (schema in [`../formats/FORMATS.md`](../formats/FORMATS.md)) for one cell,
+from `corpus/1` (phrases and readings) and the OS-specific **key procedures** (`recipes.json`). The
+executor reads only this plan when sending input.
 
-| ファイル | 中身 |
+| File | Content |
 |---|---|
-| `generate_plan.py` | 生成・検査（`--validate`）・所要時間の見積もり（`--estimate`）・selftest |
-| `romaji.py` | ひらがな → ローマ字のキー列（決定的な 1 つの表）。`--keys 'がっこう'` で確かめられる |
-| `recipes.json` | **手順のデータ**（OS × シナリオ）と、S12 のかな配列 |
+| `generate_plan.py` | Generation, validation (`--validate`), duration estimation (`--estimate`), and the selftest |
+| `romaji.py` | Hiragana-to-key-sequence conversion (one deterministic table). Try it with `--keys 'がっこう'` |
+| `recipes.json` | The procedure data (OS x scenario) and the kana layout used by one scenario |
 
-Python 標準ライブラリだけで動く。どの検査も `python3 <file> --selftest`（速い既定・数秒以内）。
+Python standard library only. Every check runs as `python3 <file> --selftest` (fast default, a few
+seconds at most).
 
-## 使い方
+## Usage
 
 ```sh
-# 計画を作る（同じ入力・同じ seed で、同じ機械・同じ Python ならバイト一致）
+# Build a plan (byte-identical for the same input, seed, machine, and Python version).
 python3 generate_plan.py --corpus corpus.jsonl --recipes recipes.json --config config.json \
     --os macos --seed 20260928 --out plan.jsonl
 
-# 計画を検査する（違反は行番号つきで stderr に出て exit 1。値は出さない）
+# Validate a plan (violations are printed to standard error with line numbers; exit 1).
 python3 generate_plan.py --validate plan.jsonl
 
-# 1 セルの所要時間（秒）。最後の行が数 1 つだけ。--corpus が無ければ読みの長さを仮定する
+# Duration (seconds) for one cell. The final line is a single number.
+# If --corpus is omitted, an assumed reading length is used instead.
 python3 generate_plan.py --estimate --config config.json --recipes recipes.json --os macos [--corpus corpus.jsonl]
 ```
 
-Exit: 0 = 成功 ／ 1 = `--validate` が違反を見つけた ／ 2 = 使い方の誤り・入力（設定・コーパス・recipes）が読めない。
+Exit codes: 0 = success / 1 = `--validate` found a violation / 2 = usage error, or an input (config,
+corpus, or recipes) could not be read.
 
-## 設定のキー
+## Configuration keys
 
-`config.json` は 1 セル分の設定。本番の値は決めていない（速さ・思考の間・n は実験の凍結で出典つきで入れる）。
-ここでは**読むだけ**で、名前はこのとおり。`_` で始まるキーはメモとして無視する。
+`config.json` describes one cell. Production values are not yet fixed (speed, think time, and n will be
+added with a citation when the protocol is frozen). This tool only reads the file; the key names below are
+authoritative. A key starting with `_` is treated as a note and ignored.
 
-| キー | 型 | 既定 | 意味 |
+| Key | Type | Default | Meaning |
 |---|---|---|---|
-| `n_per_cell_scenario_speed` | 整数 ≥ 1 | 75 | シナリオ × 速さごとの試行数 |
-| `block_size` | 整数 ≥ 1 | 25 | 1 ブロックの試行数（最後のブロックは端数） |
-| `scenarios` | 配列 | recipes の既定で有効なもの | 有効なシナリオ（`S1`〜`S15`）。OS に手順が無いもの（例: windows の `S11`）は飛ばす。★ `S11` はライブ変換 ON の前提の手順なので、**ライブ変換 OFF のセルでは `scenarios` から `S11` を明示的に外す**（既定の `scenarios`（未指定）は macOS で `S11` を含めてしまう） |
-| `speeds` | オブジェクト | 必須 | `slow` / `mid` / `fast` それぞれ `iki_median_ms`（> 0）と `iki_sigma`（≥ 0）。キー間隔は対数正規 |
-| `key_hold_ms` | 整数 ≥ 1 | 必須 | 押してから離すまで |
-| `think_ms` | `{min, max}` | 必須 | 思考の間（対数一様）。手順の `pause: think` に使う |
-| `cand_index_max` / `nav_count_max` | 整数 ≥ 0 | 必須 | 候補番号・矢印の回数の上限 |
-| `inter_trial_ms` | 整数 ≥ 0 | 必須 | 試行行の `gap_before_ms` に書く |
-| `marker` / `marker_gap_ms` | keyname の配列 / 整数 | 必須 | ブロック行にそのまま書く |
-| `reset_ime_every_block` | 真偽値 | 必須 | ブロック行の `reset_ime` |
-| `assumed_reading_len` | 整数 ≥ 2 | 12 | `--estimate` で `--corpus` が無いときの読みの長さ |
-| `kana_len_min` / `kana_len_max` | 整数 | 4 / 8 | S12 の合成かな列の長さ |
+| `n_per_cell_scenario_speed` | integer >= 1 | 75 | Trials per scenario-speed cell |
+| `block_size` | integer >= 1 | 25 | Trials per block (the last block may hold fewer) |
+| `scenarios` | array | every scenario enabled by default in recipes | Enabled scenarios (`S1`-`S15`). A scenario with no procedure for the OS (e.g. `S11` on windows) is skipped. `S11` assumes live conversion is on, so it must be explicitly excluded from `scenarios` in a cell where live conversion is off (the implicit default, when `scenarios` is omitted, includes `S11` on macOS) |
+| `speeds` | object | required | `slow` / `mid` / `fast`, each with `iki_median_ms` (> 0) and `iki_sigma` (>= 0). Key interval is log-normal |
+| `key_hold_ms` | integer >= 1 | required | Time from key-down to key-up |
+| `think_ms` | `{min, max}` | required | Think time (log-uniform). Used wherever the procedure has `pause: think` |
+| `cand_index_max` / `nav_count_max` | integer >= 0 | required | Upper bound on the candidate index / arrow-key count |
+| `inter_trial_ms` | integer >= 0 | required | Written to the trial row's `gap_before_ms` |
+| `marker` / `marker_gap_ms` | array of keynames / integer | required | Written directly to the block row |
+| `reset_ime_every_block` | boolean | required | Written to the block row's `reset_ime` |
+| `assumed_reading_len` | integer >= 2 | 12 | Reading length assumed by `--estimate` when `--corpus` is omitted |
+| `kana_len_min` / `kana_len_max` | integer | 4 / 8 | Length range for the synthetic kana strings used by one scenario |
 
-`plan/1` のヘッダの `config_sha256` / `recipes_sha256` / `corpus_sha256` は、それぞれ設定・`--recipes`・`--corpus`
-ファイルの**バイト列**の SHA-256（CLI が計算する）。計画ごとに、どの版の手順と刺激で作ったかを束ねるためのもの
-（パイロットの後に recipes を直す前提のため）。
+The `config_sha256` / `recipes_sha256` / `corpus_sha256` fields in the `plan/1` header are the SHA-256 of
+the **byte contents** of the config, `--recipes`, and `--corpus` files (computed by the CLI). They tie each
+plan to the exact version of the procedures and stimuli it was built from, since the recipes may be revised
+after a calibration pilot.
 
-## 生成の規則
+## Generation rules
 
-- **ブロックは速さで揃える**（1 ブロック = 1 つの速さ）。速さごとに試行を seed で並べ替えて `block_size` ずつに区切り、
-  ブロックの並びも seed で並べ替える。ブロックの中の試行順（シナリオの並び）も seed で決まる。
-  - ブロック数は「速さごとの `ceil(シナリオ数 × n / block_size)` の合計」。シナリオ数 × n が `block_size` の倍数なら
-    `ceil(件数 / block_size)` と一致する。倍数でないと速さごとに端数のブロックができ、その分だけ増える。
-- **時刻**: `at_ms` は試行の先頭からの相対で、最初のキーが 0。各キーは押下（`down: true`）と離し（`down: false`・
-  `key_hold_ms` 後）の 2 ステップで、直列に並べる（次の押下は前の離しより後）。
-  キー間隔は「押下から次の押下まで」で、`key_hold_ms + 1` を下限にする。
-- **思考の間・固定の間**: 手順の `pause` は、その前のキーの押下から次のキーの押下までの間を**置き換える**（足さない）。
-  試行の最初と最後にある間は無視する。`think_ms` は試行行に、使った値（使わない手順は 0）を書く。
-- **句の選び方**: シナリオごとに句を並べ替えて順に使い、尽きたら並べ直す。S12 は、かな配列だけで読みが書ける句を優先して
-  使い、足りなければ seed 固定の**合成かな列**（`phrase_id` が `kana-` で始まる）で埋める。合成かな列の読みは
-  `kana_layout` の逆引きで `steps` から復元できる（`typed_reading` を使う）。
-  ⚠️ **`kana-N` の番号はその計画ファイルの中だけで通し番号**（`plan_rows` の呼び出しごとに 1 から数え直す）。
-  別の計画（別の seed・別の corpus）の `kana-3` と同じ句とは限らないので、**計画をまたいで `phrase_id` で突き合わせない**。
-  実際に打った読みは常に `typed_reading(trial, recipes)` でその試行から取り直す。
-  ⚠️ `--corpus` の入力（`corpus/1`）自体に `kana-` で始まる `phrase_id` を書くことはできない
-  （`load_corpus` が拒否する。生成器が作る合成かな列の ID と衝突させないため）。
-- **`reading_len` と実際に打った読みは別**: 試行行の `reading_len` は**句の読みの長さ**（`corpus/1` の `reading` の
-  文字数）で、実際にキーで打った長さではない（S10 は前半だけ・S12 は合成かな列）。打った読み（ひらがな）を
-  取りたいときは `typed_reading(trial, recipes)` を使う。
-- **`GENERATOR_VERSION` を上げる規則**: `romaji.py` の表（綴りの意味）や `recipes.json` の意味（手順・`intent` の
-  既定値・`kana_layout` の対応）を変えたら、`generate_plan.py` の `GENERATOR_VERSION` を上げる。ヘッダの
-  `generator_version` はその計画がどの版の生成器の解釈で作られたかを示す（recipes / corpus 自体の版は
-  `recipes_sha256` / `corpus_sha256` が別途束ねる）。
-- **乱数**: `random.Random` の `random()` だけを使う（版で変わりうる `shuffle` / `choice` は使わない）。
-  試行ごとの乱数は `(seed, trial_id)` から決まる（`trial_rng`）。だから `build_trial` に同じ句・同じ `trial_rng` を渡すと、
-  CLI が書いた計画の該当行と一致する。
-  ⚠️ 浮動小数点の演算は OS の数学ライブラリに依るので、バイト一致を保証するのは同じ機械・同じ Python での再生成まで。
-  別の OS で計画を作り直さず、作った計画のファイルを配る。
+- **Blocks are homogeneous in speed** (one block = one speed). Trials for each speed are ordered by the
+  seed and cut into chunks of `block_size`; the order of blocks is also permuted by the seed. The order of
+  trials (the scenario sequence) within a block is likewise seed-determined.
+  - The number of blocks is the sum, over each speed, of `ceil(number of scenarios x n / block_size)`. When
+    the scenario count times n is a multiple of `block_size`, this equals `ceil(trial count / block_size)`;
+    otherwise each speed contributes a partial block, increasing the total.
+- **Timing**: `at_ms` is relative to the start of the trial, with the first key at 0. Each key is two
+  steps, a press (`down: true`) and a release (`down: false`, after `key_hold_ms`), placed strictly in
+  sequence (the next press follows the previous release). The key interval, measured from one press to the
+  next, is floored at `key_hold_ms + 1`.
+- **Think time and fixed pauses**: a `pause` step in the procedure **replaces** (does not add to) the
+  interval from the previous key's press to the next key's press. A pause at the very start or end of a
+  trial is ignored. `think_ms` is written to the trial row with the value actually used (0 for a procedure
+  that never pauses).
+- **Phrase selection**: phrases are drawn per scenario, cycling through a shuffled order and reshuffling
+  once exhausted. One scenario draws only from phrases that can be typed on the kana layout, falling back,
+  once those run out, to a seed-determined **synthetic kana string** (`phrase_id` starting with `kana-`).
+  The reading of a synthetic kana string can be recovered from its `steps` through the inverse of
+  `kana_layout` (see `typed_reading`).
+  The `kana-N` numbering is a running count **local to that plan file** (restarting at 1 on every call to
+  `plan_rows`): `kana-3` in one plan and `kana-3` in another (a different seed or corpus) need not be the
+  same phrase, so **do not match on `phrase_id` across plans**. The reading actually typed should always be
+  recovered from the trial itself, via `typed_reading(trial, recipes)`.
+  A `corpus/1` input passed via `--corpus` may not itself contain a `phrase_id` starting with `kana-`
+  (`load_corpus` rejects it, so it cannot collide with a generator-produced synthetic kana string's id).
+- **`reading_len` is not the same as what was actually typed**: the trial row's `reading_len` is the
+  **length of the phrase's reading** (the character count of `reading` in `corpus/1`), not the length of
+  what was typed with the keys (one scenario types only the first half; another types a synthetic kana
+  string). To recover the reading (in hiragana) that was actually typed, use
+  `typed_reading(trial, recipes)`.
+- **When to bump `GENERATOR_VERSION`**: bump it whenever the meaning of `romaji.py`'s table (spelling) or
+  of `recipes.json` (the procedures, the default `intent` values, or the `kana_layout` mapping) changes.
+  The header's `generator_version` records which version of the generator's interpretation a plan was built
+  under (the recipes' and corpus's own versions are tracked separately, through `recipes_sha256` and
+  `corpus_sha256`).
+- **Randomness**: only `random.Random`'s `random()` is used (never `shuffle` / `choice`, whose behavior can
+  change across Python versions). Each trial's random state is derived from `(seed, trial_id)`
+  (`trial_rng`), so calling `build_trial` with the same phrase and the same `trial_rng` reproduces the
+  matching row of a plan the CLI wrote.
+  Floating-point arithmetic depends on the platform's math library, so byte-identical output is only
+  guaranteed when regenerating on the same machine and the same Python version. A plan built on one OS is
+  distributed as a file rather than rebuilt on another.
 
-## 公開している関数（他の部品が import する）
+## Public functions (importable by other components)
 
 ```python
-build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id, block_id) -> dict   # plan/1 の試行行 1 つ
+build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id, block_id) -> dict   # one plan/1 trial row
 load_recipes(path) -> dict
-typed_reading(trial, recipes) -> str   # その試行行で実際に打った読み（ひらがな）
+typed_reading(trial, recipes) -> str   # the reading (in hiragana) actually typed for this trial row
 ```
 
-`typed_reading` は `plan/1` の試行行 1 つ（`build_trial` の戻り値、または計画ファイルから読んだ行）と `load_recipes`
-の戻り値を受け取り、`steps` の `down: true` のキーだけを見て、読みを打った部分を逆に写す（ローマ字入力は
-`romaji.from_keys`、S12（かな入力）は `recipes.kana_layout` の逆引き）。読みの打鍵は、そのシナリオで最初に
-「読みの打鍵に使わないキー」が来た所で終わる。通常のシナリオは句の読み全体、S10 は前半だけ、S12 は合成かな列を
-そのまま返す。`reading_len`（句の読みの長さ）とは別物なので混同しない。
+`typed_reading` takes one `plan/1` trial row (the return value of `build_trial`, or a row read back from a
+plan file) and the return value of `load_recipes`, and reconstructs what was typed by reading only the
+`down: true` keys in `steps` (romaji input through `romaji.from_keys`; the kana-input scenario through the
+inverse of `recipes.kana_layout`). The typed reading ends at the first key that scenario does not use for
+typing the reading. An ordinary scenario returns the full phrase reading, one scenario returns only the
+first half, and another returns the synthetic kana string as-is. This is distinct from `reading_len` (the
+phrase's reading length); the two should not be confused.
 
-ほかに `trial_rng(seed, trial_id)`・`load_corpus(path)`・`normalize_config(config)`・`plan_rows(...)`・
-`render_plan(rows)`・`validate_plan(data)` がある。`phrase` は `corpus/1` の句の行（`phrase_id`・`reading` が要る）。
+Also exported: `trial_rng(seed, trial_id)`, `load_corpus(path)`, `normalize_config(config)`,
+`plan_rows(...)`, `render_plan(rows)`, `validate_plan(data)`. `phrase` is one phrase row from `corpus/1`
+(needs `phrase_id` and `reading`).
 
-## recipes.json の書き方
+## Writing recipes.json
 
-`os.<macos|windows>.<S1〜S15>` に `steps`（手順）と `intent`（意図の既定値）を書く。**パイロットの後に直すのは
-このデータだけ**で、コードは触らない。直したら `--selftest` と `--validate` を回す（書式の誤りは読み込みで止まる）。
+`os.<macos|windows>.<S1-S15>` holds `steps` (the procedure) and `intent` (the default interpretation).
+**Only this data should be edited after a calibration pilot**; the code should not need to change. After
+editing, run `--selftest` and `--validate` (a malformed entry stops at load time).
 
-`steps` の要素:
+Elements of `steps`:
 
-| 要素 | 意味 |
+| Element | Meaning |
 |---|---|
-| `{"type_reading": true}` | 読みを打つ。`"part": "first_half"` で前半だけ（S10）、`"input": "kana"` でかな配列（S12） |
-| `{"key": "space"}` | キーを 1 回。`keyname` は FORMATS.md の列挙 |
-| `{"repeat": "space", "times": "cand_index+1"}` | キーを繰り返す。`times` は整数か `cand_index+1` / `nav_count` / `reading_len` |
-| `{"digit": "cand_index+1"}` | 数字キー（1〜9 番の候補を選ぶ） |
-| `{"pause": "think"}` | 思考の間 |
-| `{"pause_ms": 21000}` | 固定の間（ms） |
+| `{"type_reading": true}` | Type the reading. `"part": "first_half"` types only the first half; `"input": "kana"` types via the kana layout |
+| `{"key": "space"}` | One key press. `keyname` follows the enumeration in FORMATS.md |
+| `{"repeat": "space", "times": "cand_index+1"}` | Repeat a key. `times` is an integer or one of `cand_index+1` / `nav_count` / `reading_len` |
+| `{"digit": "cand_index+1"}` | A digit key (selecting candidate 1-9) |
+| `{"pause": "think"}` | A think pause |
+| `{"pause_ms": 21000}` | A fixed pause (ms) |
 
-そのほかの項目:
+Other entries:
 
-- `params`: 試行ごとに抽選する値。`{"cand_index": {"min": 1, "max": "cand_index_max", "cap": 8}}` のように書く
-  （`max` は整数か設定のキー名、`cap` は上限の頭打ち）。`intent` から `{"$param": "cand_index"}` で参照する。
-- `intent`: `plan/1` の 8 キーをすべて書く（値は `FORMATS.md` の表）。
-- `default_enabled`: `false` だと `scenarios` を省略したときに出ない（S9 は手順が未定義で、明示しても止まる）。
-- `reading_len`: `{"min": 2}` のように、そのシナリオで使う読みの長さの範囲。
-- `kana_layout`: S12 用。`keyname` → 打てるかな（JIS かな配列で `keyname` だけで打てるもの）。
+- `params`: values drawn per trial, e.g. `{"cand_index": {"min": 1, "max": "cand_index_max", "cap": 8}}`
+  (`max` is an integer or a config key name; `cap` is an upper clamp). Referenced from `intent` via
+  `{"$param": "cand_index"}`.
+- `intent`: must set all 8 `plan/1` keys (values follow the table in `FORMATS.md`).
+- `default_enabled`: when `false`, the scenario is left out unless `scenarios` names it explicitly (one
+  scenario has no defined procedure, so naming it explicitly still stops the run).
+- `reading_len`: the reading-length range this scenario draws from, e.g. `{"min": 2}`.
+- `kana_layout`: for the kana-input scenario. Maps `keyname` to the kana it types (restricted to keys that
+  type a kana directly on the JIS kana layout).
 
-## 限界と未確定
+## Limitations and open questions
 
-- ⚠️ 既定の手順（ESC の回数・予測候補のキー・IME の ON / OFF のキーなど）は**仮説**。OS・IME で違い、較正パイロットで直る見込み。
-- ⚠️ `romaji.py` の綴り（`ん` = `nn`、促音は子音を重ねる、拗音の綴りなど）も、実際の IME がどう解釈するかは実機で確かめる。
-  表を直すと、逆写像の一意性の selftest がすぐ赤で知らせる。
-- 本番の速さ・思考の間・n は未確定。`--estimate` は設定と recipes の**通り**に試算するだけで、
-  IME のリセットや前面化の時間は含まない。
+- The default procedures (number of Escape presses, the predictive-candidate key, the IME on/off keys, and
+  similar details) are **hypotheses** that are expected to vary by OS and IME and to be revised after a
+  calibration pilot.
+- Whether `romaji.py`'s spelling conventions (`ん` as `nn`, a doubled consonant for the small `っ`, the
+  spelling of contracted sounds, and so on) match how a real IME interprets them can only be confirmed on
+  real hardware. Editing the table immediately shows up as a failure in the reverse-mapping uniqueness
+  check of the selftest.
+- Production speed, think time, and n are not yet fixed. `--estimate` computes a duration strictly from the
+  config and recipes as written; it does not include IME reset time or window-activation time.

@@ -1,15 +1,18 @@
-//! ime-observation-logger — IME 観測の単体ロガー（核）。
+//! ime-observation-logger — the core of the standalone input-method observation logger.
 //!
-//! GSE の変換セッション状態機械（`input/ime_compose.rs` / `ime_cloak.rs` / `ime_mode.rs`）を**逐語コピー**で
-//! 使い、Atomic を読んで `ime_shadow` 行を、ドライバが送る打鍵から `key` 行を、`obs/1` で書き出す。
-//! ⚠️ content-free: `key` は 14 種の category だけ・`ime_shadow` は数（`dwell_ms` / `nav` / `abandon`）だけ。
+//! Reuses a reference conversion-session state machine (`input/ime_compose.rs`, `ime_cloak.rs`,
+//! `ime_mode.rs`), copied verbatim, to read the atomics it exposes and write `ime_shadow` lines, and
+//! writes `key` lines from the key transitions a driver sends. Output follows format `obs/1`. The
+//! observation is content-free: a `key` line carries only one of fourteen categories, and an
+//! `ime_shadow` line carries only counts (`dwell_ms`, `nav`, `abandon`).
 //!
-//! 使い方: `ime-observation-logger --out <path> [--duration-s <n>]` / `ime-observation-logger --selftest [--out <path>]`
-//! OS ドライバ（打鍵の取得）は `driver_macos.rs` / `driver_windows.rs`（後続の issue）。
+//! Usage: `ime-observation-logger --out <path> [--duration-s <n>]` or
+//! `ime-observation-logger --selftest [--out <path>]`. The operating-system driver that captures key
+//! events lives in `driver_macos.rs` / `driver_windows.rs`.
 
-// ★ GSE の Windows の `is_observed_key`（`hook_windows.rs`）は本体の先頭で `crate::analysis::key_gate` を呼ぶ。
-//   `key_gate.rs` を**ファイルごとの逐語コピー**で置き、ドライバ（issue 013 / 014）がそれを逐語の抜粋から呼べるようにする
-//   （011 の追補）。macOS のドライバは使わないので `dead_code` を許す。
+// The Windows driver's low-level keyboard hook calls into the feature-key classifier at the top of its
+// callback. `key_gate.rs` is carried as a whole-file verbatim copy so that the driver can call it from
+// its own verbatim excerpt. It is unused on macOS, so dead code is allowed here.
 #[allow(dead_code)]
 mod analysis;
 mod driver_api;
@@ -41,8 +44,8 @@ use input::ime_compose::{self, Chord};
 use key_category::KeyCategory;
 
 const LOGGER_VERSION: &str = env!("CARGO_PKG_VERSION");
-/// `obs/1` の `os` は macos / windows の 2 値。この 2 つ以外では核は動かない（`start_driver` が
-/// エラーで止まる）。⚠️ Linux 等で誤って "windows" を名乗らない（issue 011 merge ゲートレビュー item 9）。
+/// The `os` field of `obs/1` takes only `macos` or `windows`; the core does not run on any other
+/// platform (`start_driver` returns an error there instead of silently claiming "windows").
 const OS_NAME: &str = if cfg!(target_os = "macos") {
     "macos"
 } else if cfg!(windows) {
@@ -50,13 +53,14 @@ const OS_NAME: &str = if cfg!(target_os = "macos") {
 } else {
     "unsupported"
 };
-/// `meta` 行の `manifest_sha256` の元。核の manifest（ドライバの manifest は含まない）。
+/// Source of the `manifest_sha256` field of the `meta` line. Covers only the core manifest, not a
+/// driver's own manifest.
 const MANIFEST: &[u8] = include_bytes!("../manifest.json");
-/// GSE の IME Monitor スレッドのポーリング間隔（`lib.rs` の `thread::sleep(100ms)`）。
+/// Polling interval of the monitoring loop, matching the reference implementation's polling thread.
 const POLL_MS: u64 = 100;
 
 // ---------------------------------------------------------------------------
-// 行の書き出し（obs/1）。区切りに空白を入れない・エスケープを使わない（FORMATS.md）。
+// Line writers (format obs/1). No spaces around separators, no escaping (see FORMATS.md).
 // ---------------------------------------------------------------------------
 
 fn meta_line() -> String {
@@ -64,7 +68,8 @@ fn meta_line() -> String {
     for b in Sha256::digest(MANIFEST) {
         hex.push_str(&format!("{b:02x}"));
     }
-    // ⚠️ capabilities は GSE の `capabilities.rs` の宣言と同じ群: `key` = unconditional / `ime_shadow` = config_gated。
+    // The capability groups mirror the reference implementation's declaration: `key` is unconditional
+    // and `ime_shadow` is config-gated.
     format!(
         r#"{{"type":"meta","format":"obs/1","os":"{OS_NAME}","logger_version":"{LOGGER_VERSION}","manifest_sha256":"{hex}","capabilities":{{"unconditional":["key"],"threshold_gated":[],"config_gated":["ime_shadow"]}}}}"#
     )
@@ -83,11 +88,11 @@ fn shadow_line(t: u64, dwell_ms: u64, nav: u32, abandon: bool) -> String {
     )
 }
 
-/// 1 行 = 1 回の書き込み＋flush（強制終了されても書いた行は残る）。
+/// One write plus one flush per line, so a line already written survives an abrupt termination.
 fn write_line<W: Write>(out: &mut W, line: &str) -> Result<(), String> {
     writeln!(out, "{line}")
         .and_then(|()| out.flush())
-        .map_err(|e| format!("書き出しに失敗: {e}"))
+        .map_err(|e| format!("failed to write a line: {e}"))
 }
 
 fn wall_ms() -> u64 {
@@ -98,16 +103,18 @@ fn wall_ms() -> u64 {
 }
 
 // ---------------------------------------------------------------------------
-// 監視ループが読み書きする Atomic（issue 011 merge ゲートレビュー item 7）。
+// Atomics read and written by the monitoring loop.
 //
-// 生産では実体はシム `input::hook` の Atomic そのもの（[`ShadowAtomics::real`]）。テストでは
-// `Box::leak` で作った独立の Atomic（[`ShadowAtomics::fresh_for_test`]）を使い、コピーした
-// 状態機械の単体テスト（同じ実 Atomic を並列に読み書きする）と競合しない。
+// In production these refer to the shim's own statics ([`ShadowAtomics::real`]). Tests instead use
+// independent atomics allocated with `Box::leak` ([`ShadowAtomics::fresh_for_test`]), so that they do
+// not race with the copied state machine's own unit tests, which read and write the real statics in
+// parallel.
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy)]
 struct ShadowAtomics {
-    /// 候補窓（変換セッション）の生死。safety valve が下ろす対象は**これ**（GSE と同じ `IME_ACTIVE`）。
+    /// Whether a candidate window (conversion session) is currently open. This is the flag the safety
+    /// valve clears.
     active: &'static AtomicBool,
     ready: &'static AtomicBool,
     dwell_ms: &'static AtomicU64,
@@ -117,7 +124,7 @@ struct ShadowAtomics {
 }
 
 impl ShadowAtomics {
-    /// 生産で使う実体（シム `input::hook` の Atomic そのもの）。
+    /// The production instance, referring to the shim's own statics.
     fn real() -> Self {
         Self {
             active: &IME_ACTIVE,
@@ -129,8 +136,9 @@ impl ShadowAtomics {
         }
     }
 
-    /// テスト用: 実 static とは無関係な Atomic（`Box::leak` するだけで `'static` になる・
-    /// シムの `IME_ACTIVE` 等とは別のメモリ）。並列に走る他のテストと値を共有しない。
+    /// Test instance: atomics unrelated to the real statics (`Box::leak` alone makes them `'static`,
+    /// and they occupy separate memory from the shim's own statics). Does not share state with other
+    /// tests that run in parallel.
     #[cfg(test)]
     fn fresh_for_test() -> Self {
         Self {
@@ -145,20 +153,24 @@ impl ShadowAtomics {
 }
 
 fn default_candidate_observer() -> Box<dyn FnMut() -> bool + Send> {
-    // ⚠️ 既定 = `IME_ACTIVE` を直接読む（旧実装と同じ）。ドライバが観測関数を返さない場合や、
-    // selftest（ドライバを使わない）はこれを使う。Windows ドライバ（013 / 014）は
-    // `ImeMonitor::is_candidate_window_open()` 相当（WinEvent・EnumWindows・UIA の OR ＋
-    // stale リセット）をここに差し込める（`driver_api.rs` の契約）。
+    // Default: read `IME_ACTIVE` directly. Used when a driver returns no observation closure, and by
+    // `--selftest`, which runs without a driver. A driver may instead plug in a stronger observer (for
+    // example, one combining several window-visibility signals with a staleness reset) through the
+    // contract documented in `driver_api.rs`.
     Box::new(|| IME_ACTIVE.load(Ordering::Acquire))
 }
 
 // ---------------------------------------------------------------------------
-// 監視ループ（ime_shadow 行）。
-// 一次: GSE `src-tauri/src/lib.rs` の `emit_ime_shadow` と IME Monitor スレッド（`should_drain_ready` を使う判断の順序）の
-// **G1（`g1_mode()`）を除いた写し**。⚠️ `t` は drain した時刻。⚠️ Stale 経路 / active→false 遷移経路は Windows 限定。
-// 差分: 「候補窓が開いているか」の判定は既定で `IME_ACTIVE` を直接読むが、ドライバは
-// `DriverHandle.candidate_window_observer` でより強い判定（GSE の `is_candidate_window_open()` 相当）を
-// 差し込める（issue 011 merge ゲートレビュー item 1・`driver_api.rs` の契約）。
+// Monitoring loop (`ime_shadow` lines).
+//
+// A transcription, omitting an unrelated experiment-mode branch, of the reference implementation's
+// summary emission and its monitoring thread (including the ordering of the drain condition it uses).
+// `t` is the time the summary was drained. The stale path and the active-to-false transition path are
+// Windows-only.
+//
+// One difference from the reference implementation: whether a candidate window is open is judged by
+// reading `IME_ACTIVE` directly by default, but a driver may plug in a stronger judgment through
+// `DriverHandle.candidate_window_observer` (see the contract in `driver_api.rs`).
 // ---------------------------------------------------------------------------
 
 fn emit_ime_shadow<W: Write>(
@@ -168,13 +180,13 @@ fn emit_ime_shadow<W: Write>(
     is_windows: bool,
 ) -> Result<(), String> {
     if atomics.ready.swap(false, Ordering::AcqRel) {
-        // 正常経路: 要約は書き込み側が計算済み。
+        // Normal path: the summary was already computed by the writer side.
         let dwell_ms = atomics.dwell_ms.swap(0, Ordering::Relaxed);
         let nav = atomics.nav.swap(0, Ordering::Relaxed);
         let abandon = atomics.abandon.swap(false, Ordering::Relaxed);
         return write_line(out, &shadow_line(t, dwell_ms, nav, abandon));
     }
-    // ⚠️ Stale 経路は Windows 限定（macOS では途中の偽の行が出てセッションが壊れる）。
+    // The stale path is Windows-only: on macOS it would emit a spurious line partway through a session.
     if is_windows {
         let start = atomics.composition_start_ms.swap(0, Ordering::Relaxed);
         if start > 0 {
@@ -192,7 +204,8 @@ struct Monitor {
     last_active: Option<bool>,
     active_since: Option<Instant>,
     next_poll: Instant,
-    /// 「候補窓が開いているか」の観測関数（既定 = `IME_ACTIVE` の読み取り。`driver_api.rs` 参照）。
+    /// Observation closure for whether a candidate window is open (default: read `IME_ACTIVE`; see
+    /// `driver_api.rs`).
     observe_candidate: Box<dyn FnMut() -> bool + Send>,
     atomics: ShadowAtomics,
 }
@@ -213,7 +226,7 @@ impl Monitor {
         }
     }
 
-    /// テスト用: Atomic も注入する（実 static と競合しない・issue 011 merge ゲートレビュー item 7）。
+    /// Test constructor that also injects the atomics, so it does not race with the real statics.
     #[cfg(test)]
     fn new_for_test(
         now: Instant,
@@ -231,8 +244,9 @@ impl Monitor {
         }
     }
 
-    /// GSE の IME Monitor スレッドの 1 周（同じ判断・同じ順序）。`POLL_MS` に 1 回だけ動く。
-    /// `now` は経過の測定用・`ts_ms` は drain の壁時計（`ime_shadow` の `t`）。
+    /// One cycle of the monitoring loop, following the same judgment and ordering as the reference
+    /// implementation's polling thread. Runs at most once per `POLL_MS`. `now` measures elapsed time;
+    /// `ts_ms` is the wall-clock time of the drain, used as the `t` of an `ime_shadow` line.
     fn poll<W: Write>(&mut self, now: Instant, ts_ms: u64, out: &mut W) -> Result<(), String> {
         if now < self.next_poll {
             return Ok(());
@@ -241,8 +255,8 @@ impl Monitor {
         self.run_cycle(now, ts_ms, out)
     }
 
-    /// スケジュールを無視して 1 周だけ強制的に回す。★ ループの終了直前に呼び、直近の `poll` 以降に
-    /// 届いた `IME_SHADOW_READY` の取りこぼしを防ぐ（issue 011 merge ゲートレビュー item 4）。
+    /// Forces exactly one cycle regardless of the schedule. Called just before the run loop ends, so
+    /// that a summary that became ready after the last scheduled `poll` is not lost.
     fn force_poll<W: Write>(
         &mut self,
         now: Instant,
@@ -255,7 +269,8 @@ impl Monitor {
     fn run_cycle<W: Write>(&mut self, now: Instant, ts_ms: u64, out: &mut W) -> Result<(), String> {
         let active = (self.observe_candidate)();
 
-        // Safety valve: 窓の閉じを取りこぼして候補窓が開きっぱなしなら stale とみなして下ろす。
+        // Safety valve: if a missed close notification leaves the candidate window open indefinitely,
+        // treat it as stale and clear it.
         if active {
             let since = *self.active_since.get_or_insert(now);
             if now.duration_since(since) > Duration::from_millis(MONITOR_SAFETY_VALVE_MS) {
@@ -275,7 +290,7 @@ impl Monitor {
             self.active_since = None;
         }
 
-        // active → false の遷移（Windows 限定）。
+        // Active-to-false transition (Windows-only).
         if self.last_active.is_none_or(|prev| prev != active) {
             let was_active = self.last_active.unwrap_or(false);
             self.last_active = Some(active);
@@ -284,7 +299,8 @@ impl Monitor {
             }
         }
 
-        // `IME_SHADOW_READY` の直接ポーリング（macOS で ime_shadow が出るのはこの経路だけ）。
+        // Direct polling of `IME_SHADOW_READY` (on macOS this is the only path an `ime_shadow` line
+        // comes from).
         let ready = self.atomics.ready.load(Ordering::Acquire);
         if ime_compose::should_drain_ready(ready, active, self.is_windows) {
             emit_ime_shadow(&self.atomics, out, ts_ms, self.is_windows)?;
@@ -294,7 +310,7 @@ impl Monitor {
 }
 
 // ---------------------------------------------------------------------------
-// ドライバの差し込み（各 OS の中身は後続の issue）。
+// Driver selection.
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "macos")]
@@ -307,7 +323,10 @@ fn start_driver(ctx: DriverCtx) -> Result<driver_api::DriverHandle, String> {
 }
 #[cfg(not(any(target_os = "macos", windows)))]
 fn start_driver(_ctx: DriverCtx) -> Result<driver_api::DriverHandle, String> {
-    Err("この OS にはドライバが無い（macOS / Windows のみ）".to_string())
+    Err(
+        "no driver exists for this operating system (only macOS and Windows are supported)"
+            .to_string(),
+    )
 }
 
 fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
@@ -317,10 +336,10 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
         keys: tx,
         stop: Arc::clone(&stop),
     })
-    .map_err(|e| format!("ドライバを起動できない: {e}"))?;
+    .map_err(|e| format!("cannot start the driver: {e}"))?;
 
-    // ⚠️★ 出力は「ドライバの起動が成功した後」に、既存のファイルを上書きしない形で開く
-    //   （issue 011 merge ゲートレビュー item 3）。開けなければドライバを止めて終わる。
+    // The output file is opened only after the driver has started, and never overwrites an existing
+    // observation log. If it cannot be opened, the driver is stopped and the run ends.
     let mut out = match OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -331,7 +350,7 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
             stop.store(true, Ordering::Release);
             let _ = handle.thread.join();
             return Err(format!(
-                "出力先を開けない（既存の観測ログは上書きしない）: {e}"
+                "cannot open the output path (an existing observation log is never overwritten): {e}"
             ));
         }
     };
@@ -345,15 +364,16 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
     tracing::info!(out = %out_path.display(), "logging started");
     let mut result = Ok(());
     while duration.is_none_or(|d| started.elapsed() < d) {
-        // ⚠️★ ドライバのスレッドが想定外に終わっていたらエラーで終わる
-        //   （issue 011 merge ゲートレビュー item 4・`driver_api.rs` の停止の契約）。
+        // An unexpected exit of the driver's thread ends the run with an error, per the stop contract
+        // in `driver_api.rs`.
         if handle.thread.is_finished() {
-            result = Err("ドライバのスレッドが終了している（想定外の終了）".to_string());
+            result = Err("the driver's thread has ended unexpectedly".to_string());
             break;
         }
         match rx.recv_timeout(Duration::from_millis(POLL_MS)) {
             Ok(k) => {
-                // ⚠️ VK は種別（14 種）に畳んでから書く。VK そのものは書かない。
+                // The virtual-key code is folded into one of fourteen categories before it is written;
+                // the code itself is never written.
                 result = write_line(
                     &mut out,
                     &key_line(k.t, KeyCategory::from_vk(k.vk), k.press),
@@ -361,7 +381,7 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => {
-                result = Err("ドライバが終了した（打鍵の送信側が閉じた）".to_string());
+                result = Err("the driver has ended (its key sender was closed)".to_string());
             }
         }
         if result.is_ok() {
@@ -371,8 +391,8 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
             break;
         }
     }
-    // ⚠️★ 終了直前にもう一度だけスケジュール抜きで回し、直近の poll 以降に届いた READY の
-    //   取りこぼしを防ぐ（issue 011 merge ゲートレビュー item 4）。
+    // One final, unscheduled cycle just before ending, so that a summary that became ready after the
+    // last scheduled poll is not lost.
     if result.is_ok() {
         result = monitor.force_poll(Instant::now(), wall_ms(), &mut out);
     }
@@ -382,12 +402,14 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
-// --selftest（OS 非依存）: ドライバを使わず、状態機械に打鍵列を直接入れて監視ループを回し、読み戻して確かめる。
+// --selftest (platform-independent): drives the state machine directly with a fixed key sequence,
+// without a driver, runs the monitoring loop, and checks the log it wrote back.
 // ---------------------------------------------------------------------------
 
 fn selftest(path: &Path) -> Result<(), String> {
     const T0: u64 = 1_700_000_000_000;
-    // (T0 からの ms, VK): `k a` → Space → Enter（確定・1500ms）／ `k` → Esc（放棄・200ms）。
+    // (milliseconds since T0, virtual-key code): `k a` -> Space -> Enter (committed, 1500ms) / `k` ->
+    // Esc (abandoned, 200ms).
     let sessions: [&[(u64, u32)]; 2] = [
         &[(0, 0x4B), (120, 0x41), (400, 0x20), (1500, 0x0D)],
         &[(3000, 0x4B), (3200, 0x1B)],
@@ -399,7 +421,7 @@ fn selftest(path: &Path) -> Result<(), String> {
         .create(true)
         .truncate(true)
         .open(path)
-        .map_err(|e| format!("selftest の出力先を開けない: {e}"))?;
+        .map_err(|e| format!("cannot open the selftest output path: {e}"))?;
     write_line(&mut out, &meta_line())?;
     let base = Instant::now();
     let mut monitor = Monitor::new(base, cfg!(windows), default_candidate_observer());
@@ -412,30 +434,31 @@ fn selftest(path: &Path) -> Result<(), String> {
         monitor.poll(now, drained_at[i], &mut out)?;
     }
 
-    // ⚠️★★★ Windows 限定の safety valve 経路（issue 011 merge ゲートレビュー item 7）。
-    // `K` → `Space` で候補窓を開いた状態（`active == true`）にし、Enter も Esc も Escape も
-    // 送らず候補窓が開いたまま `MONITOR_SAFETY_VALVE_MS` を超えたことにする（`K` だけでは
-    // `step()` の遷移表どおり `active` は立たない —— 立つのは Space で候補が表示されてから）。
-    // cfg!(windows) が false（macOS ビルド）では `Monitor.is_windows` が false になり、
-    // リセットだけ起きて行は出ない（GSE と同じ: valve のリセット自体は両 OS 共通・
-    // shadow の emit は Windows 限定 —— `lib.rs` の safety valve 節と `emit_ime_shadow` の doc を参照）。
+    // Windows-only safety-valve path. `K` then `Space` opens the candidate window (`active == true`);
+    // neither Enter nor Escape is then sent, so the candidate window stays open past
+    // `MONITOR_SAFETY_VALVE_MS`. `K` alone does not raise `active`, since the state machine's
+    // transition table only raises it once a candidate is displayed (after `Space`). When
+    // `cfg!(windows)` is false (a macOS build), `Monitor.is_windows` is false, so only the reset
+    // happens and no line is emitted: the valve's reset is shared by both platforms, but emitting a
+    // shadow line from it is Windows-only (see the doc comment of `emit_ime_shadow`).
     let k3_at = T0 + 4000;
     write_line(&mut out, &key_line(k3_at, KeyCategory::from_vk(0x4B), true))?;
-    ime_compose::drive(0x4B, true, Chord::Plain, k3_at); // セッション開始（まだ active ではない）
+    ime_compose::drive(0x4B, true, Chord::Plain, k3_at); // Starts the session (not yet active).
     write_line(
         &mut out,
         &key_line(k3_at + 50, KeyCategory::from_vk(0x20), true),
     )?;
-    ime_compose::drive(0x20, true, Chord::Plain, k3_at + 50); // Space → 候補表示（active = true）
+    ime_compose::drive(0x20, true, Chord::Plain, k3_at + 50); // Space -> candidate shown (active = true).
     let compose_poll = base + Duration::from_millis(POLL_MS * 6);
-    monitor.poll(compose_poll, k3_at + 50, &mut out)?; // active_since を刻むだけ（valve 未発火）
+    monitor.poll(compose_poll, k3_at + 50, &mut out)?; // Only stamps active_since; valve not yet tripped.
     let valve_ts = k3_at + MONITOR_SAFETY_VALVE_MS + 1_000;
     let valve_poll = compose_poll + Duration::from_millis(MONITOR_SAFETY_VALVE_MS + 1_000);
-    monitor.poll(valve_poll, valve_ts, &mut out)?; // ★ ここで valve が発火する（Windows のみ 1 行）
+    monitor.poll(valve_poll, valve_ts, &mut out)?; // The valve trips here (one line, Windows only).
 
     drop(out);
 
-    let text = std::fs::read_to_string(path).map_err(|e| format!("読み戻せない: {e}"))?;
+    let text =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read the log back: {e}"))?;
     let lines: Vec<&str> = text.lines().collect();
     let count = |needle: &str| lines.iter().filter(|l| l.contains(needle)).count();
     let expect_shadow_lines: usize = if cfg!(windows) { 3 } else { 2 };
@@ -445,27 +468,27 @@ fn selftest(path: &Path) -> Result<(), String> {
         (
             lines.len() == 1 + expect_key_lines + expect_shadow_lines,
             format!(
-                "行数が {}（meta 1 + key {expect_key_lines} + ime_shadow {expect_shadow_lines}）でない",
+                "line count is not {} (meta 1 + key {expect_key_lines} + ime_shadow {expect_shadow_lines})",
                 1 + expect_key_lines + expect_shadow_lines
             ),
         ),
         (
             lines.first().is_some_and(|l| l.starts_with(r#"{"type":"meta","format":"obs/1""#)),
-            "1 行目が obs/1 の meta でない".to_string(),
+            "the first line is not an obs/1 meta line".to_string(),
         ),
-        (count(r#""type":"key""#) == expect_key_lines, format!("key 行が {expect_key_lines} 行でない")),
+        (count(r#""type":"key""#) == expect_key_lines, format!("key lines are not {expect_key_lines}")),
         (
             count(r#""category":"alphabetic""#) == expect_alphabetic,
-            format!("alphabetic の key 行が {expect_alphabetic} 行でない"),
+            format!("alphabetic key lines are not {expect_alphabetic}"),
         ),
-        (lines.contains(&shadow_line(drained_at[0], 1500, 0, false).as_str()), "確定の ime_shadow 行が無い".to_string()),
-        (lines.contains(&shadow_line(drained_at[1], 200, 0, true).as_str()), "放棄の ime_shadow 行が無い".to_string()),
+        (lines.contains(&shadow_line(drained_at[0], 1500, 0, false).as_str()), "the ime_shadow line for the committed session is missing".to_string()),
+        (lines.contains(&shadow_line(drained_at[1], 200, 0, true).as_str()), "the ime_shadow line for the abandoned session is missing".to_string()),
         (
             !cfg!(windows) || lines.contains(&shadow_line(valve_ts, MONITOR_SAFETY_VALVE_MS + 1_000, 0, false).as_str()),
-            "safety valve の stale ime_shadow 行が無い（Windows 限定）".to_string(),
+            "the stale ime_shadow line from the safety valve is missing (Windows only)".to_string(),
         ),
-        (lines.iter().all(|l| !l.contains(' ') && !l.contains('\\')), "行に空白かエスケープがある".to_string()),
-        (!IME_SHADOW_READY.load(Ordering::Acquire), "IME_SHADOW_READY が残っている".to_string()),
+        (lines.iter().all(|l| !l.contains(' ') && !l.contains('\\')), "a line contains a space or an escape".to_string()),
+        (!IME_SHADOW_READY.load(Ordering::Acquire), "IME_SHADOW_READY is still set".to_string()),
     ];
     let failed: Vec<&str> = expect
         .iter()
@@ -476,12 +499,12 @@ fn selftest(path: &Path) -> Result<(), String> {
         tracing::info!(lines = lines.len(), "selftest ok");
         Ok(())
     } else {
-        Err(format!("selftest 失敗: {}", failed.join(" / ")))
+        Err(format!("selftest failed: {}", failed.join(" / ")))
     }
 }
 
 // ---------------------------------------------------------------------------
-// 引数
+// Command-line arguments.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, PartialEq)]
@@ -502,25 +525,30 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         match a.as_str() {
             "--selftest" => parsed.selftest = true,
             "--out" => {
-                // ⚠️ 2 回渡したら使い方の誤り（issue 011 merge ゲートレビュー item 9）。
+                // Passing --out twice is a usage error.
                 if parsed.out.is_some() {
-                    return Err("--out は 2 回渡せない".to_string());
+                    return Err("--out cannot be given twice".to_string());
                 }
-                parsed.out = Some(PathBuf::from(it.next().ok_or("--out にはパスが要る")?));
+                parsed.out = Some(PathBuf::from(it.next().ok_or("--out requires a path")?));
             }
             "--duration-s" => {
-                let n = it.next().ok_or("--duration-s には秒数が要る")?;
-                parsed.duration_s = Some(n.parse().map_err(|_| "--duration-s は 0 以上の整数")?);
+                let n = it
+                    .next()
+                    .ok_or("--duration-s requires a number of seconds")?;
+                parsed.duration_s = Some(
+                    n.parse()
+                        .map_err(|_| "--duration-s must be a non-negative integer")?,
+                );
             }
             other => {
                 return Err(format!(
-                    "未知の引数: {other}（--out <path> / --duration-s <n> / --selftest）"
+                    "unknown argument: {other} (--out <path> / --duration-s <n> / --selftest)"
                 ))
             }
         }
     }
     if !parsed.selftest && parsed.out.is_none() {
-        return Err("--out <path> が要る".to_string());
+        return Err("--out <path> is required".to_string());
     }
     Ok(parsed)
 }
@@ -538,8 +566,7 @@ fn main() {
         }
     };
     let result = if parsed.selftest {
-        // ⚠️ 既定の出力先（`--out` を渡さなかった場合）は実行後に消す
-        //   （issue 011 merge ゲートレビュー item 9）。
+        // The default output path (used when --out is not given) is removed after the run.
         let used_default = parsed.out.is_none();
         let path = parsed
             .out
@@ -559,9 +586,10 @@ fn main() {
     }
 }
 
-// ⚠️ ここのテストは実 Atomic（`input::hook` の static）に触れない（コピーした状態機械のテストが
-//    同じ Atomic を並列で使うため）。`Monitor` を使うテストは `ShadowAtomics::fresh_for_test()`
-//    （`Box::leak` した独立の Atomic）を使う。状態機械を通す検査は `--selftest`（別プロセス）が持つ。
+// The tests below never touch the real atomics (the shim's statics), because the copied state
+// machine's own unit tests use the same statics in parallel. Tests that use `Monitor` instead use
+// `ShadowAtomics::fresh_for_test()` (independent atomics allocated with `Box::leak`). Exercising the
+// state machine itself is left to `--selftest`, run as a separate process.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -619,21 +647,20 @@ mod tests {
 
     #[test]
     fn args_reject_out_given_twice() {
-        // issue 011 merge ゲートレビュー item 9。
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         let e = parse_args(&s(&["--out", "a", "--out", "b"])).unwrap_err();
-        assert!(e.contains("2 回"), "{e}");
+        assert!(e.contains("twice"), "{e}");
     }
 
     // -----------------------------------------------------------------
-    // `Monitor`: 独立の Atomic（`ShadowAtomics::fresh_for_test`）を使い、コピーした状態機械の
-    // 単体テストが並列に読み書きする実 Atomic とは競合しない。
+    // `Monitor`: uses independent atomics (`ShadowAtomics::fresh_for_test`), so it does not race with
+    // the real atomics that other unit tests read and write in parallel.
     // -----------------------------------------------------------------
 
     #[test]
     fn poll_uses_injected_candidate_observer_not_the_real_ime_active_atomic() {
-        // issue 011 merge ゲートレビュー item 1: 観測関数を注入すれば poll はそれに従う
-        // （実 IME_ACTIVE の値には一切触れない・依存しない）。
+        // With an injected observation closure, poll follows its return value and never touches or
+        // depends on the real IME_ACTIVE atomic.
         let atomics = ShadowAtomics::fresh_for_test();
         let now = Instant::now();
         let mut monitor = Monitor::new_for_test(now, false, Box::new(|| true), atomics);
@@ -642,7 +669,7 @@ mod tests {
         assert_eq!(
             monitor.last_active,
             Some(true),
-            "poll は注入した観測関数の戻り値に従うべき"
+            "poll should follow the injected observer's return value"
         );
     }
 
@@ -654,7 +681,7 @@ mod tests {
         let mut out: Vec<u8> = Vec::new();
         monitor.poll(now, 1, &mut out).unwrap();
         assert_eq!(monitor.last_active, Some(false));
-        // POLL_MS 未満なら次の poll は素通り（last_active は変わらない）。
+        // Below POLL_MS, the next poll is a no-op and last_active does not change.
         monitor
             .poll(now + Duration::from_millis(1), 2, &mut out)
             .unwrap();
@@ -663,7 +690,7 @@ mod tests {
 
     #[test]
     fn windows_active_to_false_transition_emits_ime_shadow_from_ready() {
-        // issue 011 merge ゲートレビュー item 7 の経路 2: active→false 遷移（READY あり）。
+        // Exercises the active-to-false transition path with READY already set.
         let atomics = ShadowAtomics::fresh_for_test();
         atomics.ready.store(true, Ordering::Release);
         atomics.dwell_ms.store(777, Ordering::Relaxed);
@@ -691,7 +718,7 @@ mod tests {
 
     #[test]
     fn windows_stale_path_uses_composition_start_ms_when_ready_is_absent() {
-        // issue 011 merge ゲートレビュー item 7 の経路 3: stale（READY 無し・START_MS から dwell）。
+        // Exercises the stale path: no READY, dwell computed from composition_start_ms.
         let atomics = ShadowAtomics::fresh_for_test();
         atomics.composition_start_ms.store(1_000, Ordering::Relaxed);
         let now = Instant::now();
@@ -716,20 +743,23 @@ mod tests {
 
     #[test]
     fn windows_safety_valve_resets_active_and_emits_stale_line() {
-        // issue 011 merge ゲートレビュー item 7 の経路 1: safety valve。
+        // Exercises the safety-valve path.
         let atomics = ShadowAtomics::fresh_for_test();
         atomics.active.store(true, Ordering::Release);
         atomics.composition_start_ms.store(2_000, Ordering::Relaxed);
         let now = Instant::now();
         let mut monitor = Monitor::new_for_test(now, true, Box::new(|| true), atomics);
         let mut out: Vec<u8> = Vec::new();
-        monitor.poll(now, 100, &mut out).unwrap(); // active_since を刻む（valve 未発火）
-        assert!(out.is_empty(), "valve が発火する前に行が出た");
+        monitor.poll(now, 100, &mut out).unwrap(); // Stamps active_since; the valve has not tripped yet.
+        assert!(
+            out.is_empty(),
+            "a line was emitted before the valve tripped"
+        );
         let after = now + Duration::from_millis(MONITOR_SAFETY_VALVE_MS + 1_000);
-        monitor.poll(after, 30_100, &mut out).unwrap(); // valve 発火
+        monitor.poll(after, 30_100, &mut out).unwrap(); // The valve trips.
         assert!(
             !atomics.active.load(Ordering::Acquire),
-            "valve は候補窓の Atomic を下ろすべき"
+            "the valve should clear the candidate-window atomic"
         );
         let text = String::from_utf8(out).unwrap();
         assert_eq!(
@@ -740,9 +770,9 @@ mod tests {
 
     #[test]
     fn mac_ready_drains_regardless_of_active_transition() {
-        // macOS では active→false 遷移経路そのものが無い（GSE と同じ）。ime_shadow が出るのは
-        // READY の直接ポーリングだけで、`active` の値とは無関係に drain される
-        // （`ime_compose::should_drain_ready` は mac 側で `ready` だけを見る）。
+        // On macOS there is no active-to-false transition path at all. An ime_shadow line comes only
+        // from directly polling READY, drained independently of the value of `active` (the state
+        // machine's own drain condition looks only at `ready` on that platform).
         let atomics = ShadowAtomics::fresh_for_test();
         atomics.ready.store(true, Ordering::Release);
         atomics.dwell_ms.store(50, Ordering::Relaxed);
@@ -755,9 +785,9 @@ mod tests {
             atomics,
         );
         let mut out: Vec<u8> = Vec::new();
-        // 1 回目（active=true）で即 drain される。
+        // The first poll (active=true) drains immediately.
         monitor.poll(now, 100, &mut out).unwrap();
-        // 2 回目（active=false）は READY が既に消費済みなので何も出ない。
+        // The second poll (active=false) emits nothing, since READY was already consumed.
         monitor
             .poll(now + Duration::from_millis(200), 200, &mut out)
             .unwrap();
@@ -770,15 +800,16 @@ mod tests {
 
     #[test]
     fn force_poll_ignores_the_poll_schedule() {
-        // issue 011 merge ゲートレビュー item 4: 終了直前の force_poll は next_poll を待たない。
+        // A force_poll just before the run ends does not wait for next_poll.
         let atomics = ShadowAtomics::fresh_for_test();
         atomics.ready.store(true, Ordering::Release);
         atomics.dwell_ms.store(9, Ordering::Relaxed);
         let now = Instant::now();
         let mut monitor = Monitor::new_for_test(now, false, Box::new(|| false), atomics);
         let mut out: Vec<u8> = Vec::new();
-        // 通常の poll は next_poll（= now）未満では動かないが、ここでは同時刻を渡す force_poll が
-        // 確実に 1 周してくれることを確かめる（duration ゼロの実行でも最後の 1 周が保証される）。
+        // An ordinary poll does nothing before next_poll (= now), but force_poll, given the same
+        // timestamp, is expected to run exactly one cycle: this guarantees a final cycle even for a
+        // run of zero duration.
         monitor.force_poll(now, 100, &mut out).unwrap();
         let text = String::from_utf8(out).unwrap();
         assert_eq!(

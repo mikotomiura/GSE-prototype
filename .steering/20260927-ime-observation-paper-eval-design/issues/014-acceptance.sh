@@ -14,14 +14,14 @@ need_grep "${SUB}/candidate.rs" "is_stale_winevent_active" "AC8 candidate.rs が
 run_ok "AC1 cargo test が緑（Windows）" cargo test --manifest-path "${M}"
 run_ok "AC2 cargo build --release が緑" cargo build --release --manifest-path "${M}"
 run_ok "AC3 check_manifest.py --self が緑" "${PY}" "${C}" --self
-run_ok "AC3 check_manifest.py --against-gse が緑" "${PY}" "${C}" --against-gse
+run_ok "AC3 check_manifest.py --against-upstream が緑" "${PY}" "${C}" --against-upstream
 
 cat > "${TMP}/m4.py" <<'EOF'
 import json, sys
 m = json.load(open(sys.argv[1], encoding="utf-8"))
 ex = [e for e in m.get("entries", []) if e.get("kind") == "excerpt"]
-win = [e for e in ex if str(e.get("gse_path", "")).endswith("ime_windows.rs")]
-hw = set(str(e.get("symbol")) for e in ex if str(e.get("gse_path", "")).endswith("hook_windows.rs"))
+win = [e for e in ex if str(e.get("upstream_path", "")).endswith("ime_windows.rs")]
+hw = set(str(e.get("symbol")) for e in ex if str(e.get("upstream_path", "")).endswith("hook_windows.rs"))
 print("ime_windows:", len(win), "hook_windows symbols:", sorted(hw))
 sys.exit(0 if (len(win) >= 1 and all(e.get("symbol") for e in win) and {"is_observed_key", "classify_ime_nav_key"} <= hw) else 1)
 EOF

@@ -1,56 +1,63 @@
 # Observing Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation
 
-日本語 IME の変換を、本文を記録せずに観測する。観測の限界・クロスプラットフォームの単体ロガー・
-合成入力による検証を 1 本の論文にまとめるための作成物の置き場。境界の規則（GSE 本体から参照しない・
-生ログを git に入れない・公開時に書き出せない語を書かない）は [`../README.md`](../README.md) にある。
+The staging area for the artifacts of a single paper on observing Japanese IME conversion without
+recording its text: the limits of observability, a cross-platform standalone logger, and a
+synthetic-input validation. The boundary rules (no reference to the surrounding project's
+implementation, raw logs are not committed to git, and terms that cannot be exported publicly are
+not written) are documented in [`../README.md`](../README.md).
 
-## 構成
+## Layout
 
-| ディレクトリ | 役割 |
+| Directory | Role |
 |---|---|
-| `kit/` | 再現できる道具一式（ログ形式・生成器・実行器・参照入力欄・単体ロガー・解析・書き出し）。 |
-| `experiment/` | 実験の記録（SEED / env.md / data.md / run.sh / notes.md）。生ログは置かず（`experiment/raw/` は無視される）、寄託先と SHA-256 を `data.md` に書く。 |
-| `manuscript/` | 原稿。 |
+| `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis, export). |
+| `experiment/` | Experiment records (SEED / env.md / data.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md`. |
+| `manuscript/` | The manuscript. |
 
-## ライセンス
+## License
 
-種類で分ける（ディレクトリでは分けない）。
+Split by kind, not by directory.
 
-- コード（`.py` / `.sh` / `.swift` / `.rs` などのソース）: Apache-2.0
-- データ（`kit/corpus/data/` の句と読みを含む）・文書（`*.md`・`experiment/` の記録・`manuscript/`）: CC BY 4.0
+- Code (source in `.py` / `.sh` / `.swift` / `.rs`, etc.): Apache-2.0
+- Data (including the phrases and readings in `kit/corpus/data/`) and documents (`*.md`, the
+  records under `experiment/`, `manuscript/`): CC BY 4.0
 
-## 部品の置き場
+## Component staging areas
 
-後続の部品はこの場所に作る。
+Subsequent components are built at the following locations.
 
-| ディレクトリ | 中身 | issue |
-|---|---|---|
-| `kit/formats/` | ログ形式の契約と検査器 | 001 |
-| `kit/corpus/` | 青空文庫の句と読み | 002 / 027 |
-| `kit/gen/` | シナリオ生成器 | 003 |
-| `kit/emit/` | 実行器（合成キーの送出と oracle） | 004 / 005 |
-| `kit/run/` | 1 セルの段取り | 006 |
-| `kit/refinput-macos/` / `kit/refinput-windows/` | 参照入力欄 | 007 / 008 / 009 |
-| `kit/logger/` | 単体ロガー | 011–014 |
-| `kit/pilot/` | 較正パイロットの道具 | 015 |
-| `kit/analysis/` | 正解の組み立て・照合・L1・L2・パイプライン | 010 / 016–020 |
-| `kit/e2/` / `kit/e3/` | 漏洩の評価 / 実行コスト | 021 / 022 / 023 |
-| `kit/export/` | 公開 repo への書き出し | 024 |
+| Directory | Contents |
+|---|---|
+| `kit/formats/` | Log-format contracts and their validators |
+| `kit/corpus/` | Aozora Bunko phrases and their readings |
+| `kit/gen/` | Scenario generator |
+| `kit/emit/` | Emitter (synthetic key dispatch and the oracle) |
+| `kit/run/` | Single-cell orchestration |
+| `kit/refinput-macos/` / `kit/refinput-windows/` | Reference input field |
+| `kit/logger/` | Standalone logger |
+| `kit/pilot/` | Calibration pilot tooling |
+| `kit/analysis/` | Ground-truth assembly, matching, L1, L2, pipeline |
+| `kit/e2/` / `kit/e3/` | Leakage evaluation / execution cost |
+| `kit/export/` | Export to the public repository |
 
-## 検証
+## Verification
 
 ```bash
-bash papers/ime-observation/kit/check.sh              # kit/ の selftest を全部回す（空振りは赤）
-bash papers/ime-observation/kit/check.sh --compile    # kit/ の全 .py を py_compile
-bash papers/ime-observation/kit/check.sh --self-test  # この入口自身の陰性対照
+bash papers/ime-observation/kit/check.sh              # run every selftest under kit/ (a no-op counts as red)
+bash papers/ime-observation/kit/check.sh --compile    # py_compile every .py under kit/
+bash papers/ime-observation/kit/check.sh --self-test  # this entry point's own negative controls
 ```
 
-- `kit/` 配下で、`# kit: selftest` という目印のコメントを持つ `.py` だけが `--selftest` で回される
-  （目印の無い補助モジュールは compile だけ）。
-- 入口は verify で毎回・各 acceptance でも回るので、**selftest は速い既定で書く**（1 本 30 秒以内。超えると
-  警告が出る）。重い検査は `--selftest --full` などに分け、既定では回さない。
-- ログ形式の契約は [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md)。`gt` と `obs` の行の**形**（文字列の値が
-  列挙か正規表現に収まり、未知のキー・エスケープが無いこと）は `kit/formats/validate_logs.py` が機械で確かめる。
-  ⚠️ 整数・版の文字列・`manifest_sha256` の値の意味は範囲外で、content-free は生産側の設計（種別・長さ・時刻
-  しか書かない）が担う（FORMATS.md の「保証の範囲」）。
-- 目印は**行全体が `# kit: selftest`** のコメントとして書く（文字列の中の目印は拾わない）。
+- Only the `.py` files under `kit/` that carry the `# kit: selftest` marker comment are run with
+  `--selftest` (unmarked helper modules are only compiled).
+- The entry point runs on every verify and on every acceptance check, so **selftests are written to
+  be fast by default** (under 30 seconds each; exceeding that triggers a warning). Heavy checks are
+  split into something like `--selftest --full` and are not run by default.
+- The log-format contract is [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md). The **shape** of
+  `gt` and `obs` rows (string values fit an enumeration or regular expression, and there are no
+  unknown keys or escapes) is verified mechanically by `kit/formats/validate_logs.py`. The meaning
+  of integer values, version strings, and `manifest_sha256` is out of scope; keeping the log
+  content-free is the producing side's responsibility (writing only kind, length, and time), as
+  described in FORMATS.md's "Scope of guarantee".
+- The marker is written as a comment where **the entire line reads `# kit: selftest`** (a marker
+  inside a string literal is not picked up).

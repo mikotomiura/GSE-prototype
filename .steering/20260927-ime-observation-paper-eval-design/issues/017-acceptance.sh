@@ -8,9 +8,9 @@ A="${K}/analysis"
 echo "[017] 照合器と検出の指標"
 selftest_ok "${A}/match.py"
 selftest_ok "${A}/inject.py"
-need_grep "${A}/inject.py" "パラメータ回復" "AC2 selftest ケース: パラメータ回復"
-need_grep "${A}/match.py" "陽性対照" "AC3 selftest ケース: 陽性対照"
-need_grep "${A}/match.py" "陰性対照" "AC3 selftest ケース: 陰性対照"
+need_grep "${A}/inject.py" "parameter recovery" "AC2 selftest ケース: パラメータ回復"
+need_grep "${A}/match.py" "positive control" "AC3 selftest ケース: 陽性対照"
+need_grep "${A}/match.py" "negative control" "AC3 selftest ケース: 陰性対照"
 
 # AC4: 同じ入力で 2 回走らせてバイト一致（入力はここで inject.py から作る）
 cat > "${TMP}/twice.py" <<'EOF'
