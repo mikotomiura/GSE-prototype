@@ -42,3 +42,47 @@
 - `dist/_common/` の `⚠️配るのはこの 2 つです_v0.1.34.txt`（2026-09-11 作成）は**古い**。本タグの内容ではない。
 - `dist/_common/G1_実施用_*.zip` は `v0.1.36` のまま（本作業で上書きしていない。作成時刻 2026-09-27 01:23）。
 - Drive への差し替え・被験者への送付は研究者が行う（未実施）。
+
+## v0.1.38（2026-09-28）
+
+| 項目 | 値 |
+|---|---|
+| タグ | `v0.1.38` |
+| コミット | `afe6b0d7`（PR #247 の merge。版を 0.1.37 → 0.1.38 に上げただけ） |
+| タグ作成日 | 2026-09-28（研究者承認のうえ push） |
+| 切り直した理由 | PR #246（`b955cf05`）の O1 耐障害性 3 点を配布バイナリに入れるため: **G-1 自動起動**（O1 の同意確認の後に 1 回だけログイン時起動に登録）／**G-2 定期再送**（6 時間ごと）／**G-5 32 MiB 超の送信見送り**（`oversize/` へ隔離・消さない）。記録: `.steering/20260928-o1-resilience-g1-g2-g5/` |
+| 版を分けた理由 | G1 は `meta.app_version = 0.1.36` で G1 のファイルを見分ける契約。同じ番号の別バイナリを作らない |
+| CI | run `36367017514`: `build-macos` / `build-windows` / `release` すべて success |
+| 使う配布物 | `dist/_common/O1_実施用_macOS.zip` ／ `dist/_common/O1_実施用_Windows.zip`（★ Drive に置くのはこの 2 つだけ） |
+| O1_実施用_macOS.zip の SHA-256 | `f5ad9a904368c726fbaf760eeffd5bb46319ffb2f2c3d38f87025d8af72d1028`（10,434,926 B） |
+| O1_実施用_Windows.zip の SHA-256 | `e8c69975cb60df96dd4074d6c027d3a14af97daac31ef6a77b8907da8fc5c8b8`（5,983,577 B） |
+| Release の dmg の SHA-256 | `3fae59180285718f793b8672848f5ac12b43d53408a8ef8e3ebdcb141be20f87`（`gse-next_0.1.38_aarch64.dmg`） |
+| ログでの見分け方 | `meta` 行の `app_version = 0.1.38` ＋ `o1_mode` |
+| 作ったコマンド | `bash make-common-app-zip.sh --mode o1 --tag v0.1.38 --config "$REPO/Form_O1/o1_submit.json"` |
+
+### 実体で確かめたこと（2026-09-28・Mac）
+- ★ 修正の目印を `LC_ALL=C grep -a -c -F` で数えた（`v0.1.37` を対照に）:
+
+  | バイナリ | 目印 | v0.1.38 | v0.1.37（対照） |
+  |---|---|---|---|
+  | `gse-next`（mac）／`gse-next.exe` | `O1 autostart:` | 2 ／ 1 | 0 ／ 0 |
+  | `gse-next`（mac） | `com.johnd.gse-next.o1`（LaunchAgent の Label） | 1 | 0 |
+  | `gse-next.exe` | `GSE-O1`（Run の値名） | 1 | 0 |
+  | `gse-next`（mac）／`gse-next.exe` | `periodic (O1)`（G-2） | 1 ／ 1 | 0 ／ 0 |
+  | `gse-submit`（mac）／`gse-submit.exe` | `oversize_pending` / `the same name already exists in oversize/`（G-5） | 1 ／ 1 | 0 ／ 0 |
+  | `gse-submit`（mac）／`gse-submit.exe` | `taking over a stale lock`（**陽性対照**・既存） | 1 ／ 1 | 1 ／ 1 |
+
+- dmg 内 `gse-next.app`: `CFBundleShortVersionString = 0.1.38`・`codesign --verify --strict` OK。
+- スクリプトの自己検査（初回セットアップ・署名・実行ビット・README 文言・余計なもの無し）はすべて ✅。
+- 生成した zip を別の場所へ展開して、スクリプトとは別に再検算した:
+  - macOS: 署名 OK・`0.1.38`・`Contents/MacOS/` の 7 ファイルすべて実行ビットあり・`gse-next` は Release の dmg 内のものと byte 一致。
+  - Windows: `gse-next.exe` / `gse-submit.exe` が Release の資産と byte 一致（`cmp`）。
+  - 両 OS: `o1.mode` あり・`g1.mode` なし・`o1.autostart` なし（★ 印は被験者の端末で同意確認の後にできる）。同梱の `g1-submit.json` は `Form_O1/o1_submit.json` と JSON として一致し、G1 の配布物のものとは不一致（endpoint も別）。
+  - README（両 OS）: 新しい【3】（「参加の確認を済ませると…自動的に立ち上がる」）・【4】の「アプリを使うのをやめるとき」・持ち物の `o1.autostart` があり、旧版の手動登録手順（「おすすめ」）は無い。
+- G1 の zip（`G1_実施用_*.zip`）は作成時刻 2026-09-27 01:23 のまま（本作業で上書きしていない）。
+
+### 注意
+- ⚠️ **同意フォームの文面を変えた**（自動起動の 1 文・PR #246）。被験者に届くのは、研究者が `Form_O1/GSE_O1_Form_Builder.gs` を O1 の Apps Script に貼り直し `migrateO1ConsentForm()` を実行してから（回答は保たれる）。
+- ⚠️ 未確認（段階 B）: ログイン時の実起動・一覧での表示名（README は「gse-next」と書いた）・macOS の「バックグラウンドでの実行を許可」をオフにした状態が付け替え後も残るか。`.steering/20260928-o1-resilience-g1-g2-g5/g1-mac-autostart-experiment.md`。
+- ⚠️ O1 ゲートの「同意文書の状態表の『未了』」（6 択 ESM 追補の採否）は研究者判断待ちのまま（本タグとは無関係）。
+- Drive への差し替え・被験者への送付は研究者が行う（未実施）。

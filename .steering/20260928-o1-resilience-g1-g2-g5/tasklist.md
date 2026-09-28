@@ -12,9 +12,12 @@
 - [x] README 文面案 → 研究者承認
 - [x] code-reviewer + security-checker（並列）
 - [x] /finish-task（/cross-review 必須）→ PR → CI 緑 → merge
-- [ ] 版上げ v0.1.38（PR: chore/o1-release-v0.1.38・4 ファイル） → 研究者承認でタグ → Release 検証 → zip → o1-distribution-tag.md → Drive 照合
+- [x] 版上げ v0.1.38（PR #247・`afe6b0d7`）→ タグ push（研究者承認）→ Release 検証 → zip → `docs/o1-distribution-tag.md` v0.1.38 節
+- [ ] Drive の zip 差し替え（研究者）→ コネクタでバイト数照合
+- [ ] O1 同意フォームの再配備（研究者: `migrateO1ConsentForm()`）
 - [ ] 段階 B（新ビルドで本当のログイン・研究者）
 
 ## 記録
 - PR #246 merged（`b955cf05`・2026-09-28）。PR の CI 全緑（Windows / macOS の check・frontend・audit）。main の run 発火を確認。
 - 版上げ後の O1 ゲート: 通過 22 / 未達 2（タグが古い＝`v0.1.38` で解消予定／同意文書の「未了」＝研究者判断待ち・範囲外）。
+- タグ `v0.1.38`（`afe6b0d7`）・Release run `36367017514` success。O1 zip: macOS `f5ad9a90…`（10,434,926 B）／Windows `e8c69975…`（5,983,577 B）。O1 ゲート 23 / 1（残りは同意文書の「未了」）。
