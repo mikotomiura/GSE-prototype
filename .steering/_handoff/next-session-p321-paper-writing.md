@@ -33,7 +33,7 @@ Skill: verify-before-claiming・citation-ssot・reproducibility-discipline（論
 
 ## §2 次にやること（順番）
 
-0. ★ **研究者の照合結果を確認する**（判断 16）: `.steering/20260928-p321-reanalysis-paper/p434-human-check.md` の末尾が記入済みなら、論文用リポジトリの `data/li-coblenz-2026/README.md` に「著者が PDF と照合した」と追記する。未記入なら研究者に照合を依頼する。
+0. ✅ **研究者の照合は済んだ**（判断 16・2026-09-28・不一致なし・本文 3 文の読みに同意）。論文用リポジトリ `9c73181` に記録済み。★ 原稿の Methods に「転記は LLM の独立な 2 インスタンスで行い、著者が PDF と照合した」と書く（EMSE の LLM 方針・判断 17）。
 1. ★ **EMSE の書式は判断 17 で確認済み**（single-blind＝匿名化不要・要旨 150–250 語・キーワード 4–6・著者名と年の引用・Statements and Declarations と Data availability 必須・LLM の使用は Methods に書く・頁数の上限は見当たらない）。→ **テンプレートを選ぶ**（規程ページの LaTeX マクロ zip〔2021 年版・190 kB〕か Springer Nature の LaTeX テンプレートか。Word も可）。⚠️ zip のダウンロードは研究者の承認を取ってから。⚠️ LaTeX はサブフォルダを使わない（図・bib も同じ階層）
 2. **[V178] の本文**（OA）を読む → 妥当性の節の書き方（7 つのガイドライン）。
 3. 原稿の骨組み（`outline.md` の構成）→ Results（表 1: R0 / R1 / R0′ / 差 / 区間）から書く。
