@@ -347,6 +347,22 @@ pub fn should_rotate_daily(opened_at_ms: u64, now_ms: u64, rotate_after_ms: u64)
     now_ms.saturating_sub(opened_at_ms) >= rotate_after_ms
 }
 
+/// ⚠️★ **O1 定期再送の周期**（G-2・2026-09-28・研究者判断）: 6 時間。
+///
+/// ★ 送信は起動時と日次ローテート時にしか走らなかったので、回線断で失敗した `.age` が
+/// 次のきっかけ（最長 24 時間）まで残っていた。⚠️ 1 時間にしなかったのは、送るものが無くても
+/// 毎回 子プロセスの起動・NDJSON の読み込み・ロックの書き込みが走るため。
+pub const PERIODIC_RECONCILE_MS: u64 = 6 * 60 * 60 * 1000;
+
+/// 定期再送を回す時刻か (純関数・G-2)。
+///
+/// ★ `last_ms` は直近に収束器を回した時刻（起動時・ローテート時・定期のどれでも）。
+/// ⚠️ **時計が巻き戻ったら（`now_ms < last_ms`）真を返す** —— 偽にすると、巻き戻った幅だけ
+/// 再送が止まる。★ 収束器はべき等なので、余分に 1 回回っても害は無い（呼び出し側が基準を引き直す）。
+pub fn periodic_reconcile_due(last_ms: u64, now_ms: u64) -> bool {
+    now_ms < last_ms || now_ms - last_ms >= PERIODIC_RECONCILE_MS
+}
+
 /// 閉じたファイルを提出候補にしてよいか (純関数)。
 ///
 /// ⚠️★★★ **`session_end` からの経過で測る** (ファイルの mtime ではない)。
@@ -1657,5 +1673,26 @@ mod tests {
         assert!(!CLOCK_HWM_FILE_NAME.starts_with("gse_"));
         assert!(!is_o1_session_file_name(CLOCK_HWM_FILE_NAME));
         assert!(!is_o1_age_file_name(CLOCK_HWM_FILE_NAME));
+    }
+
+    /// ★ G-2: 6 時間ちょうどで回し、1 ms 手前では回さない。⚠️ 巻き戻りでは止めない。
+    #[test]
+    fn periodic_reconcile_is_due_every_six_hours() {
+        assert_eq!(PERIODIC_RECONCILE_MS, 6 * 60 * 60 * 1000);
+        let last = 1_790_000_000_000_u64;
+        assert!(!periodic_reconcile_due(last, last));
+        assert!(!periodic_reconcile_due(
+            last,
+            last + PERIODIC_RECONCILE_MS - 1
+        ));
+        assert!(periodic_reconcile_due(last, last + PERIODIC_RECONCILE_MS));
+        assert!(
+            periodic_reconcile_due(last, last + 3 * PERIODIC_RECONCILE_MS),
+            "★ 寝ていたぶんも経過に入る"
+        );
+        assert!(
+            periodic_reconcile_due(last, last - 1),
+            "⚠️ 時計が巻き戻ったら基準を引き直させる"
+        );
     }
 }

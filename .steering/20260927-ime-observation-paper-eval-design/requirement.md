@@ -41,6 +41,8 @@
 
 ## 受け入れ条件
 
+> ⚠️ 2026-09-28 追記: 下の `experiments/<date>-ime-observation-accuracy/` は **`papers/ime-observation/experiment/`** に読み替える（decisions.md 判断 21）。
+
 - [ ] `experiments/<date>-ime-observation-accuracy/` に評価プロトコル（シナリオ目録・正解の定義・指標・OS × IME 行列・解析計画）が書かれ、**実測前に凍結**されている
 - [ ] 本文再構成不能性の評価設計（攻撃者モデル・コーパス・指標）が同プロトコルに含まれている
 - [ ] 論文の外枠（節構成・貢献の主張・各主張 ↔ 根拠資料の対応表）が書かれている

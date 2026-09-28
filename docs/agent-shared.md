@@ -94,7 +94,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
 9. **エラーハンドリング**: `anyhow::Result` を使用
 10. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
-11. **レイヤー分離**: `analysis/` 内で OS API を直接呼ばない (OS 依存は `input/` + `sensors*.rs` + `overlay_panel.rs` + `lib.rs` の `#[cfg]` ブロックに限る（★ **不変なのは「`analysis/` に置かない」**）)
+11. **レイヤー分離**: `analysis/` 内で OS API を直接呼ばない (OS 依存は `input/` + `sensors*.rs` + `overlay_panel.rs` + `autostart.rs`（O1 自動起動・2026-09-28） + `lib.rs` の `#[cfg]` ブロックに限る（★ **不変なのは「`analysis/` に置かない」**）)
 
 ## コーディング規約サマリ
 
