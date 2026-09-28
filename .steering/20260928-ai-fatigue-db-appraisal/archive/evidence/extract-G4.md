@@ -156,7 +156,7 @@
   - "the study is based on a review of literature from only 14 databases"（★内部不整合。下記参照）
   - "The second limitation is that the study is primarily focused on higher education. It does not consider the cognitive developmental differences across various age groups"
 - 倫理承認・同意（逐語）:
-  - "Ethics approval and consent to participate: The author intends to submit a comprehensive application for ethical clearance concerning both the research instrument and the data collection process to the CQUniversity Human Research Ethics Committee (CQUHREC). Given that this project constitutes a systematic review, it does not require an ethics approval number."
+  - "Ethics approval and consent to participate: The author intends to submit a comprehensive application for ethical clearance concerning both the research instrument and the data collection process to the CQUniversity Human Research Ethics Committee (CQUHREC). Given that this …"
   - "Consent for publication: The author(s) hereby grant the publisher the irrevocable, perpetual, and unrestricted right to publish..."
 - 事前登録・データ/材料公開・資金・利益相反:
   - 事前登録: 記載なし（PROSPERO等の言及なし）
@@ -199,7 +199,7 @@
 - 疲労（または中心構成概念）の操作化: 構成概念名は "exhaustion"（燃え尽き/消耗）。JD-Rモデルにおいて engagement と並ぶ媒介変数(mediator)として位置づけられている。抄録の逐語: "with engagement and exhaustion as mediating factors" および "AI technostress increases exhaustion, exacerbates work–family conflict, and lowers job satisfaction"。★疲労(exhaustion)は明確に「AI technostress」に帰属する形で測定されている（抄録レベルで確認）。使用尺度名・項目数・出典・項目例は未確認（全文未取得のため）
 - その他の主要変数: AI demands = AI technostress／AI resources = AI efficacy, generative AI／アウトカム = productivity, job satisfaction, work–family conflict／媒介変数 = engagement, exhaustion
 - 解析手法: Bayesian SEM（構造方程式モデリング）
-- 主要結果（逐語、抄録より）: "Bayesian SEM results indicate that both AI efficacy and generative AI positively impact productivity, with AI efficacy also enhancing engagement and job satisfaction. In contrast, AI technostress increases exhaustion, exacerbates work–family conflict, and lowers job satisfaction, even though it may still contribute to productivity."／"generative AI mitigates the negative effects of technostress, a benefit not observed for AI efficacy as measured in this study."（係数・CI・p値等の数値は抄録に含まれず、未確認）
+- 主要結果（逐語、抄録より）: "Bayesian SEM results indicate that both AI efficacy and generative AI positively impact productivity, with AI efficacy also enhancing engagement and job satisfaction. In contrast, AI technostress increases exhaustion, exacerbates work–family conflict, and lowers job satisfaction, even …"／"generative AI mitigates the negative effects of technostress, a benefit not observed for AI efficacy as measured in this study."（係数・CI・p値等の数値は抄録に含まれず、未確認）
 - 著者自身が述べる限界: 未確認（全文未取得）
 - 倫理承認・同意: 未確認
 - 事前登録・データ/材料公開・資金・利益相反: 未確認
@@ -238,7 +238,7 @@
 - 疲労/負担に関する測定があるかどうか: **単項目の "Mental demand"（"I found this task difficult." 5件法リッカート、単一項目・各ブロック後に測定）が唯一の負担関連測定**。これは検証済みの疲労・workload尺度（NASA-TLX等）ではなく、単一項目の主観評価。fatigue/exhaustion/burnout という語、NASA-TLX、standardized workload scaleへの言及は本文に一切なし（grep で0件、全文読了済み＝「記載なし」）
 - 著者自身が述べる限界（逐語）:
   - "A key limitation of our work is that it was conducted in the context of a single non-critical decision-making task. Additional work is needed to examine if the effects we observe generalize across domains and settings."
-  - "Another limitation is that cognitive forcing functions improved the performance of the human+AI teams at the cost of reducing the perceived usability. Consequently, systems that employ cognitive forcing functions may find less adoption than those that use simple explainable AI techniques because users will resist using them."
+  - "Another limitation is that cognitive forcing functions improved the performance of the human+AI teams at the cost of reducing the perceived usability. Consequently, systems that employ cognitive forcing functions may find less adoption than those that use …"
 - 倫理承認・同意: 本文3.4節に "Participants were first presented with a consent form and instructions." と記載（インフォームドコンセントの実施に言及）。ただし IRB/倫理審査委員会名や承認番号の明記は本文中に見当たらず（grep で "IRB" "institutional review" 該当なし＝記載なし。ACM出版版では別途Ethics節がある可能性があるが本PDFでは未確認）
 - 事前登録・データ/材料公開・資金・利益相反: 本PDF中に Funding/Acknowledgments 節はあるが謝辞のみで資金情報の記載なし（逐語: "We thank Isaac Lage, Andrzej Romanowski, Ofra Amir, Zilin Ma, and Vineet Pandey for helpful suggestions and discussions."）。grant/NSF/funding等の語は grep で本文中に該当なし＝記載なし。事前登録(OSF等)・データ材料公開への言及も本文中に見当たらず（記載なし）
 - 設計別チェック（C. ランダム化比較試験、条件へのランダム割付を伴う実験のため準用）:

@@ -16,7 +16,7 @@
 
 - 訂正・撤回・懸念表明: **あり（Corrigendum）**。主論文の前付に逐語: "This article has been corrected. See Ann Neurosci. 2026 Sep 14:09727531261489932." Crossref: `update-to` = `{DOI: 10.1177/09727531251359872, type: correction, label: Correction, updated: 2026-09-14}`。
   訂正記事（DOI `10.1177/09727531261489932`, 2026-09-14 online, PMC13578129）の全文逐語:
-  「In the above-mentioned article, three references (43, 44, and 45) were inadvertently included in the reference list due to the transposition of author and journal details during manuscript preparation, as the cited works had similar author names and titles. Upon review, the authors identified these references as redundant. Accordingly, references 43, 44, and 45 given below have been removed from the article, and the subsequent references and their corresponding in-text citations have been renumbered throughout the manuscript.」
+  「… three references (43, 44, and 45) were inadvertently included in the reference list due to the transposition of author and journal details during manuscript preparation … references 43, 44, and 45 given below have been removed …」
   削除された文献3件の逐語（原文ママ）:
   「43. Hadar LL, Sood S and Fox CR. Information overload in decision making: Effects of decision context and individual differences. J Behav Decis Mak 2021; 34(2): 151–165. DOI: 10.1002/bdm.2203」
   「44. Shariff AF, Greene JD and Uhlmann EL. The rise of moral machines: Integrating ethics and AI. Nat Mach Intell 2020; 2:13–15. DOI: 10.1038/s42256-019-0130-5」
@@ -58,7 +58,7 @@
   - しかし直後のFigure 1のキャプション: "Depicts the Relationship...**Across Six Survey Items**" → 6個の「調査項目」間の相関であることを示唆し、Table 3の"N=500"と整合しない。
   - Table 4・5・6は列見出しが個々の質問項目名（例: "Automating decisions", "Mental exhaustion", "LTI"）であり、いずれもタイトル・脚注にNの記載が無い。r=0.985（Table4, confidence×productivity）やr=0.996（Table6, LTI×RI）のような極端に1に近い値は、N=500人の個人データでの相関としては非常に稀であり、少数の項目（例えば6〜7項目の平均得点）間の相関である可能性を示唆するが、本文はこの点を明示的に説明していない。事実の並記のみ、判定はしない。
 
-- 著者自身が述べる限界: 本文に明示的な「Limitations」節はない。Discussionに以下の逐語あり: "The marginal significance suggests that more research with larger and more diverse samples may be necessary to fully confirm and clarify the strength of this relationship, as individual differences in digital literacy, exposure to AI technologies, and resource availability may also have an impact on the results." Future Suggestions節: "Future investigations should adopt a longitudinal methodology..."（横断デザインである点を暗に認める記述のみ）。
+- 著者自身が述べる限界: 本文に明示的な「Limitations」節はない。Discussionに以下の逐語あり: "The marginal significance suggests that more research with larger and more diverse samples may be necessary to fully confirm and clarify the strength of this relationship, as individual differences in digital literacy, exposure to AI technologies, and resource …" Future Suggestions節: "Future investigations should adopt a longitudinal methodology..."（横断デザインである点を暗に認める記述のみ）。
 
 - 倫理承認・同意（方法節と末尾宣言、別々に逐語）:
   方法節（"Data Collection"）: "The participants were well informed about the goal of the study and were assured that their answers would remain anonymous and confidential. Informed consent was obtained from all respondents prior to participation."
@@ -103,7 +103,7 @@
 - 研究デザイン: 定量・横断（構造方程式モデリング, SEM-PLS）。逐語: "Cognitive constructs... were examined using Structural Equation Modeling–Partial Least Squares (SEM-PLS)."
 
 - 対象・国・募集方法・収集時期:
-  逐語: "The study received data from 998 academic researchers, including PhD students and faculty members from a variety of fields, all of whom were actively involved in research. The responses are taken from the global top 500 ranking universities across diversified fields. Data was collected from personal contacts using social media and a structured communication channel (Refer Appendix E). Data was filtered for master's or above courses. Using a stratified random sample approach, people were put into groups depending on how often they said they used Generative AI tools like ChatGPT, Elicit, or Scite. Anonymous internet questionnaires were used to collect the data over the course of three months, making sure that everyone who took part did so willingly."
+  逐語: "Data was collected from personal contacts using social media and a structured communication channel … Using a stratified random sample approach, people were put into groups depending on how often they said they used Generative AI tools …"
   国: 明記なし（"global top 500 ranking universities"とのみ、著者所属はサウジアラビア）。収集期間: 「3か月間」とのみ、具体的な暦月・年の記載なし。標本抽出法: 「stratified random sample approach（GenAI利用頻度で層化）」＋募集経路は「personal contacts using social media and a structured communication channel」＝実質的に便宜的・スノーボール的経路（無作為抽出枠の記載はなし）。
 
 - N（募集・除外・解析の各段。単位＝人）: N=998人（researchers）。募集数・除外数の内訳記載なし（"filtered for master's or above courses"という絞り込みはあるが、絞り込み前後の人数は記載なし）。
@@ -135,7 +135,7 @@
   IPMA個別項目（逐語, 効果量|スコア）: GenAI1 "I regularly use tools like ChatGPT or Elicit for literature review and writing support" 効果−0.236, スコア39.156／GenAI2 効果−0.229, スコア38.294／GenAI3 効果−0.238, スコア38.838／GenAI4 効果−0.232, スコア38.385／CL1 "I often feel mentally overloaded…" 効果−0.009, スコア38.339／CL2 効果−0.009, スコア38.566／CL3 効果−0.009, スコア38.203／TFME3 "Even small research tasks feel overwhelming when I am tired." スコア52.753, 直接効果−0.002。
   分析単位: 個人(N=998人)。表タイトル・本文とも単位の食い違いは確認されなかった。
 
-- 著者自身が述べる限界: 節「Limitations of the Study」逐語: "The research employed Self-reported online survey data may have introduced social desirability and self-selection biases to the study. Several controls were applied to reduce risks. Voluntary and anonymous participation reduced societal pressure to respond positively... Although these measures reduce bias, the authors recognize that self-reported perceptions may differ from actual behavior. Mixed-method or longitudinal study using behavioral and observational data to supplement survey responses could improve validity."
+- 著者自身が述べる限界: 節「Limitations of the Study」逐語: "The research employed Self-reported online survey data may have introduced social desirability and self-selection biases to the study. Several controls were applied to reduce risks. Voluntary and anonymous participation reduced societal pressure to respond positively... Although these measures …"
 
 - 倫理承認・同意（方法節 と 末尾宣言、別々に逐語）:
   ★方法節（3.4. Sample and Data Collection, 末尾）: 「The study had ethical approval from the institutional review board, which protected the rights and privacy of all the people who took part.」
@@ -192,7 +192,7 @@
 
 - 主要結果: 該当なし（数量的結果なし、概念的知見の整理）。
 
-- 著者自身が述べる限界: 方法節末尾に逐語: 「As a secondary research study, the analysis is contingent on the quality, availability, and scope of existing literature. Given the novelty of the topic, much of the evidence is conceptual or based on small-scale studies, with potential publication bias towards negative impacts of AI. These limitations reinforce the need for future empirical, longitudinal, and cross-cultural research to validate and extend these findings.」
+- 著者自身が述べる限界: 方法節末尾に逐語: 「As a secondary research study, the analysis is contingent on the quality, availability, and scope of existing literature. Given the novelty of the topic, much of the evidence is conceptual or based on small-scale studies, with potential publication …」
 
 - 倫理承認・同意: 方法節・末尾とも記載なし（人を対象とした一次データ収集がないため、IRB/インフォームドコンセントの節自体が存在しない。全文を確認したが該当節なし）。
 
@@ -245,7 +245,7 @@
 
 - AIの種類・利用文脈: AI全般（生成AI含む）。医療（臨床文書作成支援等）・技術職・製造業・事務職での利用。
 
-- 疲労（AI fatigue）の操作化: 個別尺度の使用なし（レビューのため）。概念定義（Abstract逐語）: 「AI fatigue... workers feel stressed by the technology, overwhelmed by too much information, anxious about AI capabilities, and tired from constantly having to adapt to new systems.」レビュー対象文献が用いた尺度の言及（逐語）: 「Studies used validated measurement tools, including burnout scales (e.g., Maslach Burnout Inventory components), technology stress perception scales, AI anxiety inventories, and patient safety attitude questionnaires... Several studies also developed new measures specifically designed for AI-related stressors, such as AI-induced workload scales and AI transparency [scales]」（末尾一部OCR欠落の可能性あり、原文ママ）。
+- 疲労（AI fatigue）の操作化: 個別尺度の使用なし（レビューのため）。概念定義（Abstract逐語）: 「AI fatigue... workers feel stressed by the technology, overwhelmed by too much information, anxious about AI capabilities, and tired from constantly having to adapt to new systems.」レビュー対象文献が用いた尺度の言及（逐語）: 「Studies used validated measurement tools, including burnout scales (e.g., Maslach Burnout Inventory components), technology stress perception scales, AI anxiety inventories, and patient safety attitude questionnaires... Several studies also developed new measures specifically designed for AI-related stressors, such …」（末尾一部OCR欠落の可能性あり、原文ママ）。
 
 - その他の主要変数: burnout、technostress、cognitive overload、workplace stress、clinician burnout、human-computer interaction（Keywordsより）。
 
@@ -274,7 +274,7 @@
   「Funding Statement — The article did not receive any funding.」
   「Conflict Of Interest — The authors declare no conflict of interest.」
   「Acknowledgements — This research has not received any administrative or technical support.」
-  ★特記: 「Declaration of the use of generative AI and AI-assisted technologies in the writing process」節が存在し逐語: 「During the preparation of this work, the author used generative AI to assist with grammar and stylistic editing to ensure appropriate academic language and for translation into English. After using this tool, the author reviewed and edited the content as needed and takes full responsibility for the final content of the manuscript.」（AI疲労を論じる論文自身が執筆にAIを使用したことを開示している。事実の記録のみ）。
+  ★特記: 「Declaration of the use of generative AI and AI-assisted technologies in the writing process」節が存在し逐語: 「During the preparation of this work, the author used generative AI to assist with grammar and stylistic editing to ensure appropriate academic language and for translation into English. After using this tool, the author reviewed and edited the …」（AI疲労を論じる論文自身が執筆にAIを使用したことを開示している。事実の記録のみ）。
 
 - 事前登録・データ/材料公開・資金・利益相反: 上記の宣言欄と同一（事前登録の言及なし、データ公開「Not Applicable」、資金なし、COIなし）。
 

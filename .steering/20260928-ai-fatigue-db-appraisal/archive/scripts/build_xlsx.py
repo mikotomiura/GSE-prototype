@@ -39,6 +39,19 @@ def snapshot(wb):
     return out
 
 
+def structure(wb, titles=None):
+    """元シートの入力規則・条件付き書式・結合セル・定義名の構成（openpyxl の再保存で失われうるもの）。"""
+    titles = titles or [ws.title for ws in wb.worksheets]
+    out = {}
+    for t in titles:
+        ws = wb[t]
+        out[t] = (sorted((str(dv.sqref), dv.type, dv.formula1) for dv in ws.data_validations.dataValidation),
+                  sorted(str(r.sqref) for r in ws.conditional_formatting),
+                  sorted(str(m) for m in ws.merged_cells.ranges))
+    out["__defined_names__"] = sorted(wb.defined_names.keys()) if hasattr(wb.defined_names, "keys") else len(wb.defined_names)
+    return out
+
+
 def add_sheet(wb, spec, table_idx):
     ws = wb.create_sheet(spec["name"])
     ws.sheet_properties.tabColor = TAB
@@ -67,6 +80,9 @@ def add_sheet(wb, spec, table_idx):
             raise ValueError(f"{spec['name']} row {i}: {len(row)} cols != {ncol}")
         for j, v in enumerate(row, 1):
             c = ws.cell(i, j, v)
+            # 数式は formula_ok のシートだけに許す（外部 API の題名などが '=' で始まっても文字列として保存する）
+            if isinstance(v, str) and v.startswith("=") and not spec.get("formula_ok"):
+                c.data_type = "s"
             c.font = Font(name=FONT, size=11, color=TEXT)
             c.alignment = WRAP_TOP
     for j, w in enumerate(spec["widths"], 1):
@@ -85,10 +101,13 @@ def main():
     spec_path = sys.argv[1] if len(sys.argv) > 1 else f"{SP}/claude_eval.json"
     if len(sys.argv) > 2:
         DST = sys.argv[2]
+    if os.path.abspath(DST) == os.path.abspath(SRC):
+        sys.exit("出力先が入力 xlsx と同じパスです（入力のスナップショットを上書きしない）")
     sheets = json.load(open(spec_path, encoding="utf-8"))
     wb = openpyxl.load_workbook(SRC)
     before = snapshot(wb)
     n_tables_before = sum(len(ws.tables) for ws in wb.worksheets)
+    struct_before = structure(wb)
     orig_titles = [ws.title for ws in wb.worksheets]
     for k, spec in enumerate(sheets, 1):
         add_sheet(wb, spec, k)
@@ -102,6 +121,7 @@ def main():
     scr = wb2["スクリーニング"]
     undecided = all(scr.cell(r, c).value == "未判定" for r in range(5, 39) for c in (4, 5, 6))
     n_tables_after = sum(len(wb2[t].tables) for t in orig_titles)
+    struct_after = structure(wb2, orig_titles)
     print(json.dumps({
         "saved": DST,
         "orig_sheets": len(orig_titles),
@@ -110,8 +130,9 @@ def main():
         "diff_sample": [list(d) for d in diff[:5]],
         "screening_D5_F38_all_undecided": undecided,
         "orig_tables_before_after": [n_tables_before, n_tables_after],
+        "orig_structure_same": struct_before == struct_after,
     }, ensure_ascii=False, indent=1))
-    if diff or not undecided or n_tables_before != n_tables_after:
+    if diff or not undecided or n_tables_before != n_tables_after or struct_before != struct_after:
         sys.exit(1)
 
 

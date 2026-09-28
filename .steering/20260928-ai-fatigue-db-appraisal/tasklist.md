@@ -34,6 +34,10 @@
 
 ## 完了処理
 - [x] アーカイブ（`archive/`・SHA-256 つき README）
-- [ ] worktree でコミット → /cross-review（パス限定）＋ code-reviewer ＋ security-checker
+- [x] worktree でコミット（4e3119a9）
+- [x] security-checker（CRITICAL・HIGH 0。MEDIUM 1・LOW 2 を反映＝判断 10）
+- [x] code-reviewer（CRITICAL 0・HIGH 2・MEDIUM 9 を反映＝判断 11）
+- [x] /cross-review の Codex 系統 1 回目は予算ガードで skip（判断 9）
+- [ ] 研究者の許可（「codexは必要であれば予算を一時的に引き上げてよいよ」）で上限を一時引き上げ、Codex レビューを回す → 上限を戻す
 - [ ] 出荷フロー（push → PR → CI → merge）
 - [ ] 研究者へ報告（限界を含む）
