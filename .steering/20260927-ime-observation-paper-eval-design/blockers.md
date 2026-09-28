@@ -1,0 +1,32 @@
+# blockers — IME 論文の評価一式（ループの実行）
+
+## B1（2026-09-28・W1）spawn が main checkout の未追跡ディレクトリで止まった
+
+- 事象: `bash scripts/loop-run.sh <task> --issues 001` の 1 回目が `loop-spawn: 作業ツリーに未コミット変更があります … 中断 (LOOP_FORCE=1 で強行可)` で止まり、events に `blocked`（`worktree 生成に失敗`）が 1 行残った。
+- 原因: main checkout に**別トラックの未追跡ディレクトリ** `.steering/20260921-media-expression-theory-audit/` がある（`loop-spawn.sh:958` の `git status --porcelain` が未追跡も数える）。
+- 対応: そのディレクトリには触れず（別セッションの作業の可能性がある）、`LOOP_FORCE=1` を付けて再実行した。
+  ★ `LOOP_FORCE` が外すのは dirty 検査（`loop-spawn.sh:958-962`）だけで、base の解決（`--task` 指定・provenance の出力）は別経路であることを一次で確認した。再実行の provenance は `base = feature/ime-eval-kit` / `start-choice = equal` / 乖離 0。
+- ★ 次の波も同じ状態なら `LOOP_FORCE=1` を付ける。
+
+## B2（2026-09-28・W1）`loop-run.sh` の RETURN trap が呼び出し元に漏れる（既存の欠陥・未修正）
+
+- 事象: 1 回目の run の stderr に `scripts/loop-run.sh: line 661: spawn_err: unbound variable`。
+- 原因: `run_issue_body` の中の `trap 'rm -f "$spawn_err"' RETURN`（`loop-run.sh:693`）が関数の戻りで解除されず、呼び出し元 `run_issue` の `return`（`:661`）でも発火する。そこでは `local spawn_err` が既に無いので `set -u`（`:14`）で落ちる。
+- 影響: `run_issue` は `&` のサブシェルで走り、戻り値は `wait "$p" || true`（`:1150`）で捨てられ、合否は events で決まる。→ ★ **判定には影響しない**（stderr の雑音とサブシェルの非 0 終了だけ）。
+- 直し方の候補: trap の中で自分を外す（`trap 'rm -f "$spawn_err"; trap - RETURN' RETURN`）。
+- ⚠️ 本タスクでは直さない（`scripts/` は本タスクの範囲外・全 issue の acceptance が `forbid_gse_changes` で `scripts/` の差分を禁じている）。Loop 基盤の別タスクで扱う。
+
+## B3（2026-09-28・W1）`recheck` の watchdog は、このタスクでは何も再実行できない（読んで判断しているだけ）
+
+- 事象: 001 の watchdog は try 1 で「ユーザーに確認してから実行します。acceptance script を走ら…」と返して解釈不能になり、try 2 で `OK` を返して `issue_done` になった。
+- 原因: watchdog の許可ツール `WD_TOOLS`（`loop-run.sh:363`）は cargo / npm / git diff / cat 等だけで、**`python` も `bash` も入っていない**。本タスクの verify と acceptance はすべて `bash` / `python` なので、watchdog は **verify も acceptance も再実行できない**。→ `OK` は**読んだうえでの判断**であって、独立の再実行ではない。
+- 影響: ★ `verify_level: recheck`（19 / 27 本）の「独立の再検証」は、このタスクでは実質的に効いていない。
+- 対応: ★ merge ゲートの合否は、**メインが clean な checkout で回す acceptance** で決める（`docs/loop-engineering.md` P1-B の「合否を最終的に決めるのは merge 前にメインが clean な checkout で回す acceptance」のとおり）。W1 では clean な checkout（`loop/001-issue` を detached で）で `001-acceptance.sh` 失敗 0 件・verify 3 本と `check.sh --self-test` が exit 0・変異（未知キーの拒否を殺す）で selftest / `check.sh` / acceptance がすべて赤になることを確認した。
+- 直し方の候補（Loop 基盤の別タスク）: `_loop-config.json` から watchdog の許可ツールを足せるようにする（例 `headless.watchdog_allowed_tools`）。⚠️ 本タスクでは `scripts/` を変えない。
+
+## B4（2026-09-28・W2 の前）予算の積算は run ごと・G-GEAR には flock が無い
+
+- `token_ceiling` は**1 回の `loop-run.sh` ごと**の上限（`loop-run.sh:574` で run のたびに `mktemp` で 0 から数え直す）。タスク累計ではない。
+- W1 の実測: issue 001 の 1 attempt（worker ＋ watchdog 2 回）で **6,172,416 トークン**（キャッシュ込み）・**$2.68**。→ W2（G-GEAR 7 本）を 1 run に入れると、1 attempt ずつでも約 4,300 万 ＞ 4,000 万で**途中で止まりうる**。
+- G-GEAR に `flock` が無い（`command -v flock` が空）。`add_usage`（`loop-run.sh:617-624`）は flock が無いとロックなしで読み書きするので、`parallel` ≥ 2 では積算が**競合で少なく数えられ**、`token_ceiling` の停止が遅れうる（判定の合否には影響しない）。
+- 対応案: W2 を 2〜3 回の run に分ける（同じ波の issue どうしは独立なので分けてよい）・`parallel` は 1 のまま、または積算の不正確さを承知で上げる。

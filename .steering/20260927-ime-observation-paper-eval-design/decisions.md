@@ -246,3 +246,18 @@ Apple の `NSTextInputClient` 文書（JSON 経由で取得）／BRM の投稿�
   - ★ manifest は「ファイル / 抜粋 / 新規」の 3 種を区別して持つ → 論文で「GSE と共有するのはどこまでか」を正確に書ける。
 - **ImeShadow の `t`**: `lib.rs:3216-3243` のとおり **drain した時刻**（IME Monitor のポーリング）であって変換の終端ではない。→ ★ 観測区間は `[t − dwell_ms, t]` を既定とし、⚠️ 終端の遅れ（0〜100 ms）を注入してもパラメータを回復できることを照合器の AC にする（issue 017）。
 - **生ログの置き場**: git に入れない（Zenodo に寄託・SHA-256 を `data.md`）。テストの fixture はテストの中で生成する。
+
+## 判断 23〜26: issue 001 の merge ゲートのレビューを受けた契約の変更（2026-09-28・研究者の回答）
+
+★ W1（issue 001）の merge 前に code-reviewer と security-checker を並列で回した（どちらも CRITICAL / HIGH なし）。
+契約（`FORMATS.md` / `validate_logs.py` の規則）を変える指摘だけを研究者に問い、4 問とも推奨案で確定した。
+
+| # | 論点（出どころ） | 採用 | 理由 |
+|---|---|---|---|
+| 23 | `obs/1` の `capabilities` に、名前の正規表現に合うローマ字の単語列を何個でも入れられる（security-checker MEDIUM） | ★ **capabilities だけ閉じる**: 名前は `{key, ime_shadow}` の列挙・3 つの配列を通して重複を拒否（＝合計 2 個まで）。整数の欄・版の文字列・`manifest_sha256` は絞らず、README と FORMATS に「**値の意味は保証の範囲外**」と明記する | 単体ロガーで現れる名前は 2 つだけと契約自身が書いている。整数・版の範囲を絞ると後続の worker が詰まりうる。content-free は生産側の設計（長さ・種別・時刻しか書かない）で担保し、検査器はその**構造**を機械で確かめる、と書き分ける |
+| 24 | JSON のエスケープ（`"gt\/1"` や、`\u` ＋ 16 進 4 桁で 1 文字を綴った `ev`）がデコード後の列挙に合って通る（code-reviewer MEDIUM・再現済み） | ★ **`gt` / `obs` の行に `\` があれば拒否**。FORMATS に「エスケープしない（Swift は `.withoutEscapingSlashes`）」と書く | 許される文字列値はどれも `\` を含まないので、正しい出力は必ず通る。後続の検査が生の文字列で行を探す前提（空白の禁止と同じ型）を守る |
+| 25 | `plan/1` / `oracle/1` の型（`intent` の各キーの型・ヘッダの `os`・時刻のキー名・`trial_id` / `phrase_id` の書式）が未確定（code-reviewer MEDIUM） | ★ **W2 の前にメインが FORMATS.md に型を 1 行ずつ足す**（ID は `P`＋3 桁に当たらない書式）。差分を研究者に見せてから base に入れる | W2 で生産側（003 / 004）と消費側が並列に動くので、食い違いを統合（020）まで持ち越さない |
+| 26 | 圧縮した生ログ（`*.jsonl.gz` / `*.zip` / `*.tar.gz`）と `papers/` の他の場所の `*.jsonl` が追跡されうる（security-checker LOW） | ★ **圧縮物を足し、`papers/.gitignore` にも `*.jsonl` / `*.ndjson` を置く**。例外 `!kit/corpus/data/*.jsonl` は残す | 027（現代文コーパス）も `kit/corpus/data/` に置くので例外は狭めない |
+
+- ★ 仕様の範囲内の直し（研究者に問わずメインが直した）: M1 FORMATS の「整数か真偽値」の文言を issue に戻す ／ M2 ライセンスを種類で書く（コード Apache-2.0 / データ・文書 CC BY 4.0）／ 違反と開けないファイルが重なったら exit 1 を優先 ／ 違反メッセージに出すキー名は既知のものだけ ／ `check.sh` の目印は行全体の一致だけ拾う（⚠️ 行末の空白・CR は許す —— `grep -x` だけだと CRLF のファイルで目印が黙って外れ selftest が回らなくなる）・`--root` の存在確認・`.venv` / `venv` を探索から外す ／ UTF-8 の BOM が拒否されることを FORMATS に明記（既存の挙動の記述） ／ selftest の CLI の件数を実数に。
+- ★ 研究者に問わず記録だけしたもの（LOW・後続の issue やマイルストーンで扱う）: ヘッダが壊れていると 2 行目以降を検査しない ／ `manifest_sha256` の大文字 ／ `gt` の `vk` は合成入力でのみ生成する旨 ／ `NSNotFound` の扱い（007）／ `check.sh` の除外パターンが ROOT を含む絶対パスに効く（checkout が `target/` 等の下にあると 0 本の赤になる・赤に倒れる向き）。
