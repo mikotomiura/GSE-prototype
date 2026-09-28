@@ -1,4 +1,4 @@
-# 次セッション — O1 v0.1.38 の段階 B（本当のログイン）と残り
+# 次セッション — O1 v0.1.38 の段階 B（本当のログイン）・受け取りフォルダの P-ID 分け・残り
 
 > 作成: 2026-09-28（`.steering/20260928-o1-resilience-g1-g2-g5/` 完了直後・O1 の配布タグ = `v0.1.38`）。
 > ⚠️ **このメモを一次資料にしない。** 状態は着手時に測り直す。
@@ -6,7 +6,7 @@
 ## §0 打ち込む用
 
 ```
-.steering/_handoff/next-session-o1-autostart-stage-b.md を読んで、O1 v0.1.38 の段階 B（本当のログインでの自動起動の確認）を進めてください。
+.steering/_handoff/next-session-o1-autostart-stage-b.md を読んで、O1 v0.1.38 の段階 B（本当のログインでの自動起動の確認）と、受け取りフォルダを P-ID ごとに分ける変更（§2-3）を進めてください。
 ⚠️ まず git pull --ff-only。並行セッションがあれば worktree を切る。
 Skill: verify-before-claiming・data-privacy。応答は日本語。
 ```
@@ -30,7 +30,14 @@ Skill: verify-before-claiming・data-privacy。応答は日本語。
    - 片付け: plist・`~/.gse/o1_autostart_registered`・`~/.gse/o1_consent_ack`・O1 参加者 ID・実験で増えた NDJSON／`.age`・システム設定の項目。
    - 結果が README と食い違えば、README（両 OS）を直して**版を上げずに**配布物だけ作り直せるか（README は zip にだけ入る）を確かめる。
 2. **Windows 実機**（研究者または Windows 側の Claude Code・収集専任: memory `windows-agent-collection-only`）: 同意確認のあと `HKCU\…\Run` に `GSE-O1`（引用符つき）ができるか・サインインで起動するか・タスクマネージャーでの表示名・無効にしたあと別フォルダで起動しても無効のままか。
-3. 任意: G-3（スリープをまたいだ確認）は研究者の手順（memory `claude-code-caffeinate-blocks-sleep-tests`）。
+3. ★ **受け取りフォルダを P-ID ごとに分ける**（研究者判断 2026-09-28「フォルダに分けた方がいい」）。⚠️ **O1 を配る前に入れる**（配った後だと既存の受領分と置き場が混ざる）。
+   - 現状（一次・2026-09-28）: 受け口 `Form_O1/GSE_O1_Submit.gs:234-235` は `FOLDER_ID` の**1 つのフォルダ**に保存し、重複判定は `saveWithoutOverwriting_`（`:339`）がそのフォルダ内の同名で行う。名前の先頭が P-ID（`<pid>_o1day<NN>_…`）。
+   - ⚠️★★ **受領台帳は直下しか読まない**: `Form_O1/GSE_O1_Ledger.gs:577` と `:892` の `folder.getFiles()`。→ 受け口だけ変えると**全員が「未受領・途絶」と誤報**される。**受け口と台帳を同じ変更で直す**（台帳は P-ID サブフォルダを辿る）。
+   - 受け口: 名前の検査（既存の正規表現）を通った後に P-ID を取り出し、`<受け取りフォルダ>/<P-ID>/` を**無ければ作る**。⚠️ 同時に 2 本届くと同名フォルダが 2 つできうる → `LockService` で作成を直列化し、作成後に同名フォルダが複数あれば最古を使う。重複判定は P-ID フォルダ内で行う。
+   - ⚠️ 「受け口の `doPost` は変えない」方針（今回のタスク）を**研究者判断で覆す**変更。受け口の再配備（研究者）・`o1_submit_guard_test.cjs` / `o1_ledger_test.cjs` / 変異検査の更新が要る。
+   - 削除台帳 `docs/o1-deletion-ledger.md` A-1（Drive の受け取りフォルダ）を「`<P-ID>/` フォルダ（＋直下に残る旧形式）」に書き換える。★ P-ID 単位の削除はフォルダごとで済むようになる（tombstone の規則は変えない）。
+   - 検証: 受け口・台帳のテスト（Node）＋実配備後に合成ファイルを 1 本送り、P-ID フォルダに入ること・台帳が数えることを確かめる（⚠️ 実験用の P-ID・送ったら消す）。
+4. 任意: G-3（スリープをまたいだ確認）は研究者の手順（memory `claude-code-caffeinate-blocks-sleep-tests`）。
 
 ## §3 やらないこと
 - G1 の配布物（`v0.1.36` 凍結）。GAS の `doPost` の変更。同意文書の「未了」の採否。
