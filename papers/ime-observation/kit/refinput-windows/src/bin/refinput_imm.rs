@@ -1,14 +1,21 @@
-//! 参照入力欄 Windows (a) IMM 互換: 自窓の IME メッセージを content-free な `gt/1`（`src: "win_imm"`）で記録する。
+//! Reference input field for Windows, (a) IMM compatibility layer: records this window's own
+//! IME messages as content-free `gt/1` lines (`src: "win_imm"`).
 //!
-//! 使い方（結果は終了コードだけで知らせる。コンソールには何も出さない）:
-//!   refinput_imm --out <path>              窓を 1 つ作り、閉じるまで記録する（既にある <path> は上書きしない）
-//!   refinput_imm --selftest [--out <path>] 窓を作らず、核を通した代表的な列を書いて読み戻して検査する
+//! Usage (the result is reported only through the exit code; nothing is written to the
+//! console):
+//!   refinput_imm --out <path>              Creates one window and records until it is closed
+//!                                           (an existing <path> is never overwritten).
+//!   refinput_imm --selftest [--out <path>] Creates no window; writes a representative sequence
+//!                                           through the core and reads it back for validation.
 //!
-//! Exit: 0 = 正常 / 1 = 実行時の失敗（窓・書き込み・selftest の不一致）/ 2 = 使い方の誤り・Windows 以外
+//! Exit code: 0 success / 1 a runtime failure (window, write, or self-test mismatch) / 2 usage
+//! error, or not running on Windows.
 //!
-//! ⚠️★★★ 文字列を一切取得しない。長さは `ImmGetCompositionStringW` にバッファ NULL・長さ 0 を渡して
-//! **バイト数だけ**を得る。文字を運ぶメッセージ（`WM_IME_CHAR` など）は記録しない。
-//! ⚠️ 解釈しない: 届いたメッセージを届いた順に書く（どのメッセージが届くかは M5 のパイロットで確かめる）。
+//! No text is ever captured. A length is obtained by calling `ImmGetCompositionStringW` with a
+//! null buffer and a length of 0, which yields only a byte count. A message that carries text
+//! (such as `WM_IME_CHAR`) is not recorded. Messages are recorded as received, in the order
+//! received, with no interpretation; which messages actually arrive is confirmed separately, in
+//! a calibration pilot using a real input method engine.
 
 use std::process::ExitCode;
 
@@ -19,7 +26,8 @@ fn main() -> ExitCode {
 
 #[cfg(not(windows))]
 fn main() -> ExitCode {
-    // 参照入力欄の窓は Windows でしか動かない（`cargo test` が他の OS でも通るように、bin は空の入口を持つ）。
+    // The reference input field's window runs only on Windows; this binary keeps an empty
+    // entry point on other platforms so that `cargo test` still passes there.
     ExitCode::from(2)
 }
 
@@ -55,13 +63,14 @@ mod imp {
 
     const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-    /// 書き込みの失敗（窓プロシージャは戻り値で返せないので旗で持ち、終了コードにする）。
+    /// A write failure. The window procedure cannot return a value, so this is held as a flag
+    /// and turned into the exit code instead.
     static WRITE_FAILED: AtomicBool = AtomicBool::new(false);
     static RECORDER: OnceLock<Mutex<Recorder>> = OnceLock::new();
 
-    // ---- 記録（時計・出力）---------------------------------------------------------------------
+    // ---- recording (clock and output) ------------------------------------------------------
 
-    /// 出力ファイルと単調時計の周波数。
+    /// The output file and the monotonic clock's frequency.
     struct Recorder {
         file: File,
         qpc_freq: i64,
@@ -69,24 +78,24 @@ mod imp {
 
     fn qpc_freq() -> i64 {
         let mut f = 0i64;
-        // SAFETY: 出力先は有効な i64 へのポインタ。
+        // SAFETY: the output pointer is a valid i64 location.
         match unsafe { QueryPerformanceFrequency(&mut f) } {
             Ok(()) => f,
             Err(_) => 0,
         }
     }
 
-    /// 単調時計（QueryPerformanceCounter）を ns にしたもの。
+    /// The monotonic clock (`QueryPerformanceCounter`), converted to nanoseconds.
     fn mono_ns(freq: i64) -> u64 {
         let mut t = 0i64;
-        // SAFETY: 出力先は有効な i64 へのポインタ。
+        // SAFETY: the output pointer is a valid i64 location.
         match unsafe { QueryPerformanceCounter(&mut t) } {
             Ok(()) => ticks_to_ns(t, freq),
             Err(_) => 0,
         }
     }
 
-    /// 壁時計（Unix ms）。
+    /// The wall clock, in Unix milliseconds.
     fn wall_ms() -> u64 {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(d) => u64::try_from(d.as_millis()).unwrap_or(u64::MAX),
@@ -95,14 +104,16 @@ mod imp {
     }
 
     fn append(file: &mut File, text: &str) -> std::io::Result<()> {
-        // ★ 1 行ずつ LF で書く（BOM なし・CRLF なし）。書いた時点で OS に渡す（プロセスが落ちても残す）。
+        // Each line is written with a trailing LF, with no byte-order mark and no CR, and is
+        // handed to the operating system as soon as it is written, so that it survives even if
+        // the process is later terminated.
         let mut buf = String::with_capacity(text.len() + 1);
         buf.push_str(text);
         buf.push('\n');
         file.write_all(buf.as_bytes())
     }
 
-    /// 事象 1 件を、届いた時刻つきで書く。
+    /// Records one event, together with the time at which it arrived.
     fn record(ev: Ev) {
         let Some(cell) = RECORDER.get() else { return };
         let mut rec = match cell.lock() {
@@ -112,14 +123,15 @@ mod imp {
         let text = line(ev, wall_ms(), mono_ns(rec.qpc_freq));
         if append(&mut rec.file, &text).is_err() {
             WRITE_FAILED.store(true, Ordering::SeqCst);
-            // SAFETY: 引数なしの単純な呼び出し（この窓のスレッドで、窓プロシージャの中から呼ぶ）。
+            // SAFETY: a simple call with no arguments, made from within the window procedure on
+            // this window's own thread.
             unsafe { PostQuitMessage(1) };
         }
     }
 
-    // ---- IMM の呼び出し（unsafe はここに閉じる）-------------------------------------------------
+    // ---- IMM calls (unsafe is confined to this section) -------------------------------------
 
-    /// 窓の入力コンテキスト（取得と解放を対にする）。
+    /// The window's input context (pairs acquisition with release).
     struct ImeContext {
         hwnd: HWND,
         himc: windows::Win32::UI::Input::Ime::HIMC,
@@ -127,7 +139,7 @@ mod imp {
 
     impl ImeContext {
         fn of(hwnd: HWND) -> Option<ImeContext> {
-            // SAFETY: hwnd はこの窓プロシージャに渡された自分の窓。
+            // SAFETY: `hwnd` is this window's own handle, as passed to its window procedure.
             let himc = unsafe { ImmGetContext(hwnd) };
             if himc.is_invalid() {
                 None
@@ -136,23 +148,25 @@ mod imp {
             }
         }
 
-        /// 指定した種類の文字列の**長さだけ**（UTF-16 のコード単位数）。
-        /// ⚠️★★★ バッファは NULL・長さ 0 なので、文字列そのものは取得されない。
+        /// Only the length of the string of the given kind, as a count of UTF-16 code units.
+        /// The buffer is null and the length is 0, so the string itself is never obtained.
         fn len_of(&self, kind: IME_COMPOSITION_STRING) -> u32 {
-            // SAFETY: himc は取得済みで、解放前。バッファ NULL・長さ 0 ではバイト数だけが返る。
+            // SAFETY: `himc` has been acquired and not yet released. With a null buffer and a
+            // length of 0, only a byte count is returned.
             units_from_bytes(unsafe { ImmGetCompositionStringW(self.himc, kind, None, 0) })
         }
     }
 
     impl Drop for ImeContext {
         fn drop(&mut self) {
-            // SAFETY: `of` で取得した組を、同じ窓に返す。
+            // SAFETY: returns the pair obtained in `of` to the same window.
             let _ = unsafe { ImmReleaseContext(self.hwnd, self.himc) };
         }
     }
 
-    /// `WM_IME_COMPOSITION` の記録。`lParam` のフラグを書き、立っている種類の長さだけを得る。
-    /// ⚠️ `wParam` はこのメッセージでは直近の 1 文字（DBCS）を運ぶので、**読まない**。
+    /// Records `WM_IME_COMPOSITION`: writes the `lParam` flags, and obtains only the lengths for
+    /// the kinds whose bit is set. `wParam` carries the most recent character (DBCS) for this
+    /// message and is never read.
     fn record_composition(hwnd: HWND, lparam: LPARAM) {
         let flags = lparam.0 as u32;
         let ctx = ImeContext::of(hwnd);
@@ -169,10 +183,11 @@ mod imp {
         });
     }
 
-    // ---- 窓 ------------------------------------------------------------------------------------
+    // ---- window --------------------------------------------------------------------------------
 
-    /// 記録したうえで **`DefWindowProcW` に渡す**（IME の既定の表示を壊さない）。
-    /// ⚠️ 文字を運ぶメッセージ（`WM_IME_CHAR` など）は扱わない（既定の処理に任せる）。
+    /// Records a message and then passes it on to `DefWindowProcW`, so the input method's
+    /// default display is not disturbed. A message that carries text (such as `WM_IME_CHAR`) is
+    /// left to the default processing and is never handled here.
     unsafe extern "system" fn wnd_proc(
         hwnd: HWND,
         msg: u32,
@@ -192,22 +207,23 @@ mod imp {
             WM_SETFOCUS => record(Ev::FocusIn),
             WM_KILLFOCUS => record(Ev::FocusOut),
             WM_DESTROY => {
-                // SAFETY: 引数なしの単純な呼び出し。
+                // SAFETY: a simple call with no arguments.
                 unsafe { PostQuitMessage(0) };
                 return LRESULT(0);
             }
             _ => {}
         }
-        // SAFETY: 受け取った引数をそのまま既定の処理へ渡す。
+        // SAFETY: passes the received arguments through, unchanged, to the default handler.
         unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 
-    /// 窓を 1 つ作って、閉じられるまでメッセージを回す。
+    /// Creates one window and pumps messages until it is closed.
     fn run_window() -> windows::core::Result<i32> {
-        // SAFETY: Win32 の窓の作成とメッセージループ。この関数の中（1 スレッド）で完結する。
+        // SAFETY: Win32 window creation and the message loop, entirely self-contained within
+        // this function (and this thread).
         unsafe {
             let hinstance: HINSTANCE = GetModuleHandleW(PCWSTR::null())?.into();
-            let class_name = w!("GseRefInputImm");
+            let class_name = w!("RefInputImm");
             let class = WNDCLASSEXW {
                 cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
                 style: CS_HREDRAW | CS_VREDRAW,
@@ -243,28 +259,30 @@ mod imp {
             loop {
                 let got = GetMessageW(&mut msg, None, 0, 0);
                 if got.0 <= 0 {
-                    // 0 = WM_QUIT / −1 = エラー
+                    // 0 = WM_QUIT, -1 = an error
                     return if got.0 == 0 {
                         Ok(msg.wParam.0 as i32)
                     } else {
                         Err(windows::core::Error::from_win32())
                     };
                 }
-                // ★ IME は TranslateMessage 経由でキーを受ける（文字の記録には使わない）。
+                // The input method receives keys through `TranslateMessage`; this call is not
+                // used to record any character.
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
         }
     }
 
-    // ---- 引数・selftest ------------------------------------------------------------------------
+    // ---- arguments and self-test -------------------------------------------------------------
 
     struct Args {
         selftest: bool,
         out: Option<PathBuf>,
     }
 
-    /// `--out <path>` / `--selftest`。未知の引数・値の欠け・重複は使い方の誤り。
+    /// Parses `--out <path>` / `--selftest`. An unknown argument, a missing value, or a
+    /// duplicate flag is a usage error.
     fn parse_args<I: Iterator<Item = OsString>>(mut it: I) -> Result<Args, ()> {
         let mut args = Args {
             selftest: false,
@@ -283,7 +301,8 @@ mod imp {
         Ok(args)
     }
 
-    /// selftest が書く代表的な列（窓を作らず、核だけを通す）。時刻は決め打ち。
+    /// The representative sequence the self-test writes (no window is created; only the core is
+    /// exercised). Timestamps are fixed values.
     fn selftest_events() -> Vec<Ev> {
         vec![
             Ev::FocusIn,
@@ -312,7 +331,9 @@ mod imp {
         ]
     }
 
-    /// 核を通して書き、読み戻して検査する。⚠️ 通ったこと ≠ 実 IME で届くこと（M5 で確かめる）。
+    /// Writes the sequence through the core and reads it back for validation. Passing this
+    /// check does not by itself establish that a real input method engine would deliver the
+    /// same messages; that is confirmed separately, in a calibration pilot.
     fn selftest(path: &Path) -> bool {
         let mut lines = vec![header(Src::WinImm, APP_VERSION)];
         for (i, ev) in selftest_events().into_iter().enumerate() {
@@ -339,13 +360,14 @@ mod imp {
         {
             return false;
         }
-        // 書いたとおりに読み戻せる（BOM・CRLF・欠けが無い）
+        // Reads back exactly as written: no byte-order mark, no CR, nothing missing.
         let mut expected = lines.join("\n");
         expected.push('\n');
         if text != expected {
             return false;
         }
-        // 全行が content-free な gt/1 の形（ヘッダは 1 行目だけ・2 行目以降は ev）
+        // Every line has the content-free gt/1 shape (a header on the first line only; an
+        // event on every line after it).
         let mut it = text.lines();
         let head_ok = it
             .next()
@@ -358,7 +380,7 @@ mod imp {
             return ExitCode::from(2);
         };
         if args.selftest {
-            // --out が無ければ一時ファイルに書いて消す
+            // With no `--out`, write to a temporary file and remove it afterward.
             let (path, temp) = match args.out {
                 Some(p) => (p, false),
                 None => (
@@ -382,7 +404,7 @@ mod imp {
         let Some(path) = args.out else {
             return ExitCode::from(2);
         };
-        // ★ 生ログを上書きしない（既にあれば失敗）
+        // A raw log is never overwritten: fail if the path already exists.
         let Ok(mut file) = OpenOptions::new().write(true).create_new(true).open(&path) else {
             return ExitCode::from(1);
         };
