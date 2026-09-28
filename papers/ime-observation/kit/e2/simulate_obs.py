@@ -235,7 +235,7 @@ def selftest():
     s8 = trial("S8")
     check("S8: the candidate digit key is numeric", simulate(s8, KEYCAT)[-1][1] == "numeric")
 
-    # runs="count" groups by delimiter (a row of a different category), not by a 1-second window (judgment 39/2):
+    # runs="count" groups by delimiter (a row of a different category), not by a 1-second window:
     # a run of alphabetic rows that spans a window boundary is kept as one token.
     ev2 = [(0, "alphabetic"), (100, "alphabetic"), (900, "alphabetic"), (1100, "alphabetic"), (1500, "space"),
            (1700, "alphabetic"), (2500, "enter")]
@@ -258,7 +258,7 @@ def selftest():
     check("negative: two runs separated by a delimiter inside the same nominal window are not merged into one",
           apply_features(ev3, "exact", "count") == ev3)
 
-    # positive: phase moves which bin a time near a boundary falls into (judgment 39/2, used by the attack to
+    # positive: phase moves which bin a time near a boundary falls into (used by the attack to
     # search the candidate log's grid alignment against the observed log)
     near = [(950, "alphabetic"), (1050, "alphabetic")]
     check("positive: with phase=0 a pair of times either side of a bin edge fall in different bins",

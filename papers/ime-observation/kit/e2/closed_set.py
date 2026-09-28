@@ -273,7 +273,7 @@ def _scenario_pool(recipes, os_name, scenario, pool):
     """Phrases of pool that the plan generator could actually have chosen as this trial's phrase or as a decoy for
     it: within the scenario's reading-length range and, for a kana-input scenario, typable in the kana layout.
     Mirrors the eligibility rule plan_rows (gen/generate_plan.py) applies when it builds a plan; recipes is data the
-    attacker already has (judgment 29), so this reads the recipe entry directly rather than calling a private
+    attacker already has, so this reads the recipe entry directly rather than calling a private
     function of the generator."""
     entry = recipes["os"].get(os_name, {}).get(scenario)
     if entry is None:
@@ -306,7 +306,7 @@ def _typed_map(recipes, config, os_name, scenario, phrases):
 def _make_candidates(rng, pool, true, K, typed_of, true_typed):
     """The typed phrase plus K-1 phrases from pool whose typed reading (see _typed_reading) differs from the typed
     reading of true, in random order. typed_of maps the phrase_id of every phrase of pool to its typed reading under
-    the trial's scenario and OS (judgment 39/4: a scenario that only types part of the reading, such as S10, or a
+    the trial's scenario and OS (a scenario that only types part of the reading, such as S10, or a
     synthetic reading, such as S12, can make two phrases indistinguishable even though their full readings differ;
     such a phrase would be an unfair decoy and is excluded here rather than left for the distance to fail to tell
     apart). Returns (candidates, index of the typed phrase)."""
@@ -348,7 +348,7 @@ def evaluate(trials, corpus, K, features_list, seed, recipes, config):
       "by_scenario": {scenario: {"acc", "n"}} (raw, per scenario)}}.
     Correctness is judged on the typed reading (see _typed_reading), not on phrase identity, so that a scenario
     which only types part of the reading (S10) or a synthetic reading (S12) is judged the way the attacker's
-    evidence actually constrains it (judgment 39/4). Trials whose phrase is not in the corpus (synthetic kana
+    evidence actually constrains it. Trials whose phrase is not in the corpus (synthetic kana
     strings) are not counted (n_skipped).
     """
     if not isinstance(K, int) or K < 2:
@@ -685,7 +685,7 @@ def selftest():
         p4 = (("alphabetic", 1, 0), ("space", 1, 0), ("enter", 1, 400))
         check("distance: differences among intervals shorter than PAUSE_MS are ignored", _distance(p3, p4, "exact") == 0.0)
 
-        # _gap's bin1s discount (judgment 39/2): a single bin edge is not, by itself, evidence of a pause
+        # _gap's bin1s discount: a single bin edge is not, by itself, evidence of a pause
         q1 = (("alphabetic", 1, 0), ("space", 1, 0), ("enter", 1, 1000))
         q0 = (("alphabetic", 1, 0), ("space", 1, 0), ("enter", 1, 0))
         check("positive: for timing=bin1s an interval of exactly one window is not penalised as a pause",
@@ -708,14 +708,14 @@ def selftest():
                   + " ".join("%s=%.3f" % (f, out[f]["acc"]) for f in feats))
             print("K=%-3d chance %.3f | raw      " % (K, 1.0 / K)
                   + " ".join("%s=%.3f" % (f, out[f]["acc_raw"]) for f in feats))
-            check("全特徴で偶然を超える (all features exceed chance; K=%d, Wilson lower bound above 1/K)" % K,
+            check("all features exceed chance (K=%d, Wilson lower bound above 1/K)" % K,
                   r["acc_ci"][0] > 1.0 / K, "acc %.3f CI %r" % (r["acc"], r["acc_ci"]))
             if K == 10:
-                check("全特徴で偶然を超える (all features reach an accuracy of at least 0.5 at K=10)", r["acc"] >= 0.5,
+                check("all features exceed chance (reach an accuracy of at least 0.5 at K=10)", r["acc"] >= 0.5,
                       "acc %.3f" % r["acc"])
         # The raw values of the removal experiment are printed as measured (they need not decrease with more
         # detail); only the shape of acc/acc_raw is checked, and separately that the reported value (acc) is never
-        # lower than a coarser feature set's (judgment 39/1).
+        # lower than a coarser feature set's.
         out10 = evaluate(trials, corpus, 10, feats, 7, recipes, cfg)
         check("removal experiment: every feature set has acc and acc_raw in [0, 1], each inside its own CI",
               all(0.0 <= out10[f]["acc"] <= 1.0 and out10[f]["acc_ci"][0] <= out10[f]["acc"] <= out10[f]["acc_ci"][1]
@@ -733,7 +733,7 @@ def selftest():
               all(out10[f]["acc_source"] in feats and abs(out10[f]["acc"] - out10[out10[f]["acc_source"]]["acc_raw"]) < 1e-9
                   for f in feats))
         check("removal experiment: by_scenario accounts for every counted trial, and covers every scenario used "
-              "(including S12, judgment 39/3)",
+              "(including S12)",
               all(sum(v["n"] for v in out10[f]["by_scenario"].values()) == out10[f]["n"] for f in feats)
               and set(out10["all"]["by_scenario"]) == set(scen_used))
 
@@ -747,9 +747,9 @@ def selftest():
             for f in ("all", "no_time"):
                 x = int(round(oc[f]["acc_raw"] * oc[f]["n"]))
                 lo, hi = stats.wilson(x, oc[f]["n"], conf=0.99)
-                check("情報の無い観測で偶然水準 (uninformative observation stays at chance; K=%d, %s, 1/K inside the "
+                check("uninformative observation stays at chance level (K=%d, %s, 1/K inside the "
                       "99%% Wilson interval on the raw accuracy; trials include S12, whose decoys are drawn from "
-                      "the kana-typable pool, judgment 39/3)" % (K, f),
+                      "the kana-typable pool)" % (K, f),
                       lo <= 1.0 / K <= hi and "S12" in oc[f]["by_scenario"],
                       "acc_raw %.3f interval (%.3f, %.3f) 1/K %.3f scenarios %r"
                       % (oc[f]["acc_raw"], lo, hi, 1.0 / K, sorted(oc[f]["by_scenario"])))
@@ -758,7 +758,7 @@ def selftest():
         orr = evaluate(rot, corpus, 10, ["all"], 7, recipes, cfg)["all"]
         xr = int(round(orr["acc_raw"] * orr["n"]))
         lo, hi = stats.wilson(xr, orr["n"], conf=0.99)
-        check("情報の無い観測で偶然水準 (observations swapped between trials stay at chance; K=10, 99%% Wilson interval)",
+        check("uninformative observation stays at chance level (observations swapped between trials; K=10, 99%% Wilson interval)",
               lo <= 0.1 <= hi, "acc_raw %.3f interval (%.3f, %.3f)" % (orr["acc_raw"], lo, hi))
 
         # determinism
@@ -791,7 +791,7 @@ def selftest():
                 same = False
         check("passing true_index changes neither chosen nor ranking (only rank_of_true is added)", same)
 
-        # S10 decoy dedup by typed reading, not full reading (judgment 39/4): two phrases whose first half (S10
+        # S10 decoy dedup by typed reading, not full reading: two phrases whose first half (S10
         # types only the first half) coincides must not appear together as the true phrase and a decoy.
         p_a = {"phrase_id": "w2-1-1", "work_id": "w2", "text": "x", "reading": "あいうえ", "reading_len": 4}
         p_b = {"phrase_id": "w2-2-1", "work_id": "w2", "text": "x", "reading": "あいかき", "reading_len": 4}
@@ -810,10 +810,10 @@ def selftest():
               "the colliding decoy p_b",
               ok_cands[ok_ti]["phrase_id"] == "w2-1-1" and all(c["phrase_id"] != "w2-2-1" for c in ok_cands))
 
-        # _scenario_pool (judgment 39/3): a decoy is drawn only from phrases the scenario could actually produce.
+        # _scenario_pool: a decoy is drawn only from phrases the scenario could actually produce.
         mixed = [
             {"phrase_id": "w3-1-1", "work_id": "w3", "text": "x", "reading": "あいう", "reading_len": 3},
-            # not kana-typable: け is outside recipes.json's kana_layout
+            # not kana-typable: `け` is outside recipes.json's kana_layout
             {"phrase_id": "w3-2-1", "work_id": "w3", "text": "x", "reading": "けんこう", "reading_len": 4},
             # kana-typable but shorter than S10's reading_len minimum (2)
             {"phrase_id": "w3-3-1", "work_id": "w3", "text": "x", "reading": "あ", "reading_len": 1},
@@ -830,7 +830,7 @@ def selftest():
               any(p["phrase_id"] == "w3-1-1" for p in s10_pool))
 
         # integration: evaluate() must never let a decoy pool include a phrase the scenario could not have produced
-        # (judgment 39/3) -- if it did, S12 would try to type a character outside the kana layout and raise.
+        # -- if it did, S12 would try to type a character outside the kana layout and raise.
         mixed_corpus = mixed + list(corpus[:30])
         s12_row = generate_plan.build_trial(mixed[0], "S12", "mid", "macos", recipes, cfg,
                                             generate_plan.trial_rng(1, "s12t"), "s12t", 0)
@@ -842,7 +842,7 @@ def selftest():
         except ValueError:
             no_crash = False
         check("positive: evaluate() does not crash on an S12 trial when the corpus also holds a phrase that is not "
-              "kana-typable (that phrase must never be chosen as a decoy; judgment 39/3)", no_crash)
+              "kana-typable (that phrase must never be chosen as a decoy)", no_crash)
 
         dup = [corpus[0]] * 6
         picks = set(attack(const, dup, "S1", "macos", recipes, cfg, "all", 5, tie_seed=s)["chosen"] for s in range(40))
@@ -974,7 +974,7 @@ def selftest():
               "IME toggle key (this plan's scenarios are S1/S2/S3)",
               main(["--obs", obs_p] + base + ["--out", new_out(), "--ime-toggle-in-obs"]) == 0)
 
-        # --out is create-only (judgment 39/7): an existing path is refused, and left untouched, instead of being
+        # --out is create-only: an existing path is refused, and left untouched, instead of being
         # silently overwritten
         pre = new_out()
         with open(pre, "wb") as f:
@@ -984,13 +984,13 @@ def selftest():
         with open(pre, "rb") as f:
             check("positive: the pre-existing --out file was left untouched", f.read() == b"{}")
 
-        # the observation's header os must match the plan's os (judgment 39/7)
+        # the observation's header os must match the plan's os
         mismatched = obs_file([good[0].replace('"os":"macos"', '"os":"windows"')] + good[1:], "os_mismatch.ndjson")
         ev_m, sh_m, os_m = read_obs(mismatched)
         raises("negative: segment_by_plan rejects an observation whose header os differs from the plan's os",
                lambda: segment_by_plan(ev_m, read_plan(plan_path), os_m))
 
-        # --ime-toggle-in-obs / expected_categories / segment_by_plan (judgment 39/6): the default (no switch) is
+        # --ime-toggle-in-obs / expected_categories / segment_by_plan: the default (no switch) is
         # that neither the block-start markers nor the IME toggle keys produce an observed row.
         s14row = generate_plan.build_trial(corpus[0], "S14", "mid", "macos", recipes, cfg,
                                            generate_plan.trial_rng(1, "s14row"), "t00001", 0)

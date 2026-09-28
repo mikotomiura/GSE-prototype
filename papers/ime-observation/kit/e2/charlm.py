@@ -207,12 +207,12 @@ def selftest():
     v = len(VOCAB)
     p = lambda lm, ctx, ch: math.exp(lm.logp(ctx, ch))
 
-    # closed forms, Witten-Bell. Unigram on "ああ": counts あ:2, EOS:1 (N = 3, T = 2, uniform base 1/V).
+    # closed forms, Witten-Bell. Unigram on `ああ`: counts `あ`:2, EOS:1 (N = 3, T = 2, uniform base 1/V).
     lm = CharLM(1, "wb").fit(["ああ"])
     near("WB unigram, seen symbol", p(lm, "", "あ"), (2 + 2.0 / v) / 5.0)
     near("WB unigram, end symbol", p(lm, "", EOS), (1 + 2.0 / v) / 5.0)
     near("WB unigram, unseen symbol", p(lm, "", "い"), (2.0 / v) / 5.0)
-    # Bigram on "あい": unigram counts あ, い, EOS (N = 3, T = 3); context あ -> {い: 1}.
+    # Bigram on `あい`: unigram counts `あ`, `い`, EOS (N = 3, T = 3); context `あ` -> {`い`: 1}.
     lm = CharLM(2, "wb").fit(["あい"])
     p0 = (1 + 3.0 / v) / 6.0
     near("WB bigram, seen continuation", p(lm, "あ", "い"), (1 + 1 * p0) / 2.0)

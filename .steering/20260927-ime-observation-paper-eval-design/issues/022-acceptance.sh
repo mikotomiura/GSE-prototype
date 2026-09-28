@@ -8,7 +8,7 @@ E="${K}/e2"
 echo "[022] E2 開集合"
 selftest_ok "${E}/charlm.py"
 selftest_ok "${E}/open_set.py"
-for c in "復号がベースラインより良い" "入れ替えると差が消える" "学習と評価が重ならない"; do
+for c in "decoding beats the baseline" "shuffling removes the difference" "training and evaluation do not overlap"; do
   need_grep "${E}/open_set.py" "${c}" "selftest ケース: ${c}"
 done
 forbid_grep "${E}/open_set.py" '^def romaji' "AC5 ローマ字の表を再実装していない"
