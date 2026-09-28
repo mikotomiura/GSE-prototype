@@ -192,9 +192,29 @@ function makeWideSheet(rows) {
   const data = (rows || []).map((r) => r.slice());
   const sheet = {
     __grid: data,
+    // ★ 見た目（2026-09-28）。値とは別に記録する（⚠️ 値の配列 `data` には触れない）。
+    __style: {},
+    __frozen: 0,
+    __widths: {},
+    __tab: null,
+    __rules: [],
+    getFrozenRows: () => sheet.__frozen,
+    setFrozenRows: (n) => {
+      sheet.__frozen = n;
+    },
+    setColumnWidth: (c, w) => {
+      sheet.__widths[c] = w;
+    },
+    setTabColor: (c) => {
+      sheet.__tab = c;
+    },
+    setConditionalFormatRules: (rs) => {
+      sheet.__rules = rs.slice();
+    },
     getLastRow: () => data.length,
     getMaxColumns: () => 26,
     getRange: (row, col, numRows, numCols) => {
+      if (typeof row === "string") return { __a1: row }; // 条件付き書式の範囲だけに使う
       if (numRows === undefined) {
         return {
           getValue: () => (data[row - 1] ? data[row - 1][col - 1] : ""),
@@ -203,7 +223,19 @@ function makeWideSheet(rows) {
           },
         };
       }
-      return {
+      const paint = (k) => (v) => {
+        for (let r = row; r < row + numRows; r++)
+          for (let c = col; c < col + (numCols || 1); c++) {
+            const key = r + "," + c;
+            sheet.__style[key] = Object.assign({}, sheet.__style[key], { [k]: v });
+          }
+        return rng;
+      };
+      const rng = {
+        setBackground: paint("bg"),
+        setFontColor: paint("fg"),
+        setFontWeight: paint("weight"),
+        setHorizontalAlignment: paint("halign"),
         getValues: () => {
           const out = [];
           for (let r = row - 1; r < row - 1 + numRows; r++) {
@@ -215,6 +247,7 @@ function makeWideSheet(rows) {
           return out;
         },
       };
+      return rng;
     },
     appendRow: (r) => {
       data.push(r.slice());
@@ -284,6 +317,17 @@ function makeCtx(opts) {
       }),
     },
     SpreadsheetApp: {
+      newConditionalFormatRule() {
+        const rule = {};
+        const b = {
+          whenFormulaSatisfied: (f) => ((rule.formula = f), b),
+          setBackground: (v) => ((rule.bg = v), b),
+          setFontColor: (v) => ((rule.fg = v), b),
+          setRanges: (rs) => ((rule.ranges = rs.map((x) => x.__a1 || "?")), b),
+          build: () => rule,
+        };
+        return b;
+      },
       openById: (id) => {
         if (!ctx.__sheets[id]) throw new Error("stub: no such spreadsheet " + id);
         return {
@@ -2597,6 +2641,59 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
     logRows(ctx, MGMT_REJECT_TAB).some((x) => x[4] === "settle-exception"),
     { rows: logRows(ctx, MGMT_REJECT_TAB) }
   );
+}
+
+// ============================================================
+// §17 見た目（2026-09-28・`.steering/20260928-o1-mgmt-sheet-design/`）
+//   ★ 値には触れず、見出し帯・固定行・条件付き書式だけを付ける。
+// ============================================================
+{
+  const UI = JSON.parse(JSON.stringify(makeReadyCtx().O1_MGMT_UI));
+  // 新規: タブが無い表で buildO1MgmtSheet → 2 枚とも作られ、見た目が付く
+  const ctx = makeReadyCtx({ noMgmtSheet: true });
+  ctx.__sheets[MGMT_ID] = {};
+  const r = attempt(() => ctx.buildO1MgmtSheet());
+  const reg = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  const rej = ctx.__sheets[MGMT_ID][MGMT_REJECT_TAB];
+  push("§17 新規: 2 枚とも作られ 2 行を固定", !r.threw && reg.__frozen === 2 && rej.__frozen === 2, { threw: r.threw, reg: reg && reg.__frozen, rej: rej && rej.__frozen });
+  push("§17 見出しは紺帯・白字", reg.__style["2,1"].bg === UI.navy && reg.__style["2,1"].fg === UI.white, { style: reg.__style["2,1"] });
+  push("§17 却下ログはバナーとタブが赤（登録ログと見分けがつく）", rej.__style["1,1"].bg === UI.dangerBg && rej.__tab === UI.dangerFg && reg.__tab === UI.navy, { rej: rej.__style["1,1"], tabs: [reg.__tab, rej.__tab] });
+  const rules = JSON.parse(JSON.stringify(reg.__rules)).map((x) => [x.formula, x.ranges[0], x.bg]);
+  push(
+    "§17★ 条件付き書式: 結果の色（ok=緑 / partial=黄 / error・blocked=赤）を**先に**、system の行=灰を最後に・列だけで開いた範囲",
+    JSON.stringify(rules) === JSON.stringify([
+      ['=$D3="ok"', "D3:D", UI.okBg],
+      ['=$D3="partial"', "D3:D", UI.warnBg],
+      ['=OR($D3="error",$D3="blocked")', "D3:D", UI.dangerBg],
+      ['=$B3="system"', "A3:F", UI.grayBg],
+    ]),
+    { rules }
+  );
+}
+{
+  // ⚠️ 書式が例外でも buildO1MgmtSheet は落ちず、値も変わらない
+  const rows = [["2026-09-20 10:00:00", "register", "P001", "ok", "new-pid", ""]];
+  const ctx = makeReadyCtx({ mgmtRows: rows });
+  const log = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  log.setConditionalFormatRules = () => {
+    throw new Error("rules quota");
+  };
+  const before = JSON.stringify(log.__grid);
+  const r = attempt(() => ctx.buildO1MgmtSheet());
+  push("§17★ 書式が例外でも落ちず・値は不変・理由をログに出す", !r.threw && JSON.stringify(log.__grid) === before && ctx.__logs.some((l) => /見た目を整えられませんでした/.test(l)), { threw: r.threw });
+}
+{
+  // 既存: 行のあるタブ → 値は 1 つも変えずに見た目だけ付く・2 回目は付け直さない
+  const rows = [["2026-09-20 10:00:00", "register", "P001", "ok", "new-pid", "OS: Mac"]];
+  const ctx = makeReadyCtx({ mgmtRows: rows });
+  const log = ctx.__sheets[MGMT_ID][MGMT_TAB];
+  const before = JSON.stringify(log.__grid);
+  ctx.buildO1MgmtSheet();
+  push("§17★ 既存: 値は 1 つも変わらない", JSON.stringify(log.__grid) === before, { before, after: JSON.stringify(log.__grid) });
+  push("§17 既存: 見た目が付く（固定 2・ログに「見た目を整えました」）", log.__frozen === 2 && ctx.__logs.some((l) => /見た目を整えました/.test(l)), { frozen: log.__frozen });
+  log.__widths[5] = 999; // 研究者が列幅を変えた
+  ctx.buildO1MgmtSheet();
+  push("§17★ 2 回目は付け直さない（研究者の列幅を戻さない）", log.__widths[5] === 999, { w: log.__widths[5] });
 }
 
 let ng = 0;
