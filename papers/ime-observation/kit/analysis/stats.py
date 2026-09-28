@@ -172,7 +172,10 @@ def icc(matrix, kind="2,1"):
       "3,1"  ICC(3,1)  二元混合・単一評定者・**整合性**（評定者ごとの一定の偏りは不一致に数えない）
 
     Shrout & Fleiss (1979) の式: BMS = 対象の平均平方・JMS = 評定者の平均平方・EMS = 残差・WMS = 対象内。
-    ⚠️ 分母が 0（全員が全部同じ値）は None。n >= 2 行・k >= 2 列が要る。
+    ⚠️ 分母が 0（全員が全部同じ値）は None。n >= 2 行・k >= 2 列が要る（満たさなければ ValueError ——
+       「求められない値」の None とは別。呼び出し側は形の誤りとして扱う）。
+    ★ 先に全体を 1 つの値だけ平行移動してから計算する（ICC は平行移動で不変）。0.1 のような値が全員で揃うと、
+       総平均の丸めで分母が 0 にならず、でたらめな値が出るため（全員同じなら偏差がちょうど 0 になる）。
     """
     if kind not in ("1,1", "2,1", "3,1"):
         raise ValueError('kind は "1,1" / "2,1" / "3,1"')
@@ -183,6 +186,8 @@ def icc(matrix, kind="2,1"):
         raise ValueError("matrix は n >= 2 行・k >= 2 列の長方形")
     if any(not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) for r in m for v in r):
         raise ValueError("matrix の値は有限な数")
+    base = m[0][0]
+    m = [[v - base for v in r] for r in m]
     grand = sum(sum(r) for r in m) / (n * k)
     row_mean = [sum(r) / k for r in m]
     col_mean = [sum(m[i][j] for i in range(n)) / n for j in range(k)]
@@ -201,7 +206,8 @@ def icc(matrix, kind="2,1"):
         num, den = bms - ems, bms + (k - 1) * ems + k * (jms - ems) / n
     else:
         num, den = bms - ems, bms + (k - 1) * ems
-    if den == 0:
+    # 分母は数学的に 0 以上（n >= 2, k >= 2）。丸めで負や 0 になったら求められないとみなす
+    if den <= 0:
         return None
     return num / den
 
@@ -264,6 +270,12 @@ def selftest():
     near("ICC は評定者（列）の並べ替えで不変", icc([list(reversed(r)) for r in SF_MATRIX], kind="2,1"),
          icc(SF_MATRIX, kind="2,1"), 1e-12)
     check("ICC 全員が同じ値なら None", icc([[3, 3], [3, 3], [3, 3]]) is None)
+    for kd in ("1,1", "2,1", "3,1"):
+        # ★ 総平均の丸めで分母が 0 にならない値（0.1）でも None になること
+        check("ICC(%s) 全員が 0.1 なら None" % kd, icc([[0.1, 0.1]] * 3, kind=kd) is None,
+              repr(icc([[0.1, 0.1]] * 3, kind=kd)))
+        check("ICC(%s) 3 列とも 0.1 なら None" % kd, icc([[0.1] * 3] * 3, kind=kd) is None,
+              repr(icc([[0.1] * 3] * 3, kind=kd)))
     raises("ICC 未知の kind", lambda: icc(SF_MATRIX, kind="2,k"))
     raises("ICC 長方形でない", lambda: icc([[1, 2], [3]]))
     raises("ICC 1 行だけ", lambda: icc([[1, 2]]))
@@ -422,6 +434,11 @@ def selftest():
 
 
 def main(argv):
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser(description="E1 / E2 の統計の部品（ライブラリ。単体で動かすのは --selftest だけ）")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
