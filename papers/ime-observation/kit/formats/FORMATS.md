@@ -84,6 +84,30 @@ GSE の NDJSON 行と**同じ名前・同じ形**（GSE 側の一次は `schema_
   `predictive`・`ime_toggle_mid`・`focus_switch_mid`・`expect_session`。
 - 計画は刺激（公有の文の読み）なので content-free の対象ではない。
 
+### `plan/1` の型
+
+- ヘッダ: `os` ∈ {`macos`, `windows`} ／ `seed` は 0〜2^63−1 の整数 ／ `generator_version` は `^[0-9A-Za-z.+-]{1,32}$` ／
+  `config_sha256` は設定ファイルの**バイト列**の SHA-256（小文字の 16 進 64 桁）。
+- ブロック: `block_id` は 0 から始まる連番（ファイル中の出現順）／ `reset_ime` は真偽値 ／ `marker` は `keyname` の配列
+  （空でよい＝マーカーを送らない）／ `marker_gap_ms` は 0 以上の整数。
+- 試行: `trial_id` は `^t[0-9]{5,}$`（ファイル全体で 1 から始まる連番を 0 埋め。例 `t00001`）／ `block_id` はそれより前に
+  出たブロック行の `block_id` ／ `gap_before_ms`・`think_ms` は 0 以上の整数 ／ `phrase_id` は `corpus/1` の書式 ／
+  `reading_len` は読みの文字数（1 以上。ひらがなは BMP なので UTF-16 のコード単位数と同じ）。
+- `steps` の要素: `key` は `keyname` ／ `at_ms` は**試行の先頭からの相対**の 0 以上の整数で、配列の順に単調非減少 ／
+  `down` は真偽値（押下 = `true`・離し = `false`。同じキーの押下と離しは対になる）。
+- `intent` は次の 8 キーを**すべて持つ**オブジェクト（未知のキーは持たない）。シナリオごとの値は `kit/gen/recipes.json` が決める。
+
+  | キー | 型 | 意味 |
+  |---|---|---|
+  | `commit` | `enter` / `digit` / `mouse` / `none` | 変換を確定する手段。確定しない試行（取消・全消去など）は `none` |
+  | `cand_index` | 0 以上の整数 または `null` | 確定する候補の 0 始まりの番号。候補を選ばずに確定する・確定しない試行は `null` |
+  | `nav_count` | 0 以上の整数 | 変換中に送る矢印キーの数（使わない試行は 0） |
+  | `abandon` | 真偽値 | 確定せずに変換を捨てる意図 |
+  | `predictive` | 真偽値 | 予測候補を使う意図 |
+  | `ime_toggle_mid` | 真偽値 | 変換中に IME を OFF / ON する意図 |
+  | `focus_switch_mid` | 真偽値 | 変換中に前面のアプリを切り替える意図 |
+  | `expect_session` | 真偽値 | 正解側に変換セッションが開く見込み（全 composition の定義で。OS ごとの定義ではない） |
+
 ## `oracle/1` — 実行器の出力
 
 - ヘッダ: `{"kind":"header","format":"oracle/1","plan_sha256":…,"os":…,"emitter_version":…,"backend":<"dryrun"|"macos"|"windows">}`
@@ -92,11 +116,40 @@ GSE の NDJSON 行と**同じ名前・同じ形**（GSE 側の一次は `schema_
 - `{"kind":"marker","block_id":int,"seq":int,…時刻}`
 - `{"kind":"reset","block_id":int,"exit_code":int,…時刻}`
 
+### `oracle/1` の型
+
+- ヘッダ: `plan_sha256` は計画ファイルの**バイト列**の SHA-256（小文字の 16 進 64 桁）／ `os` ∈ {`macos`, `windows`} ／
+  `emitter_version` は `^[0-9A-Za-z.+-]{1,32}$`。
+- 「2 つの時刻」は `t_wall_ms`（Unix ms）と `t_mono_ns`（単調時計 ns）の整数。**ヘッダ以外のすべての行が両方を持つ。**
+- 行の形（キーはこれだけ）:
+  - `{"kind":"block_begin","block_id":int,"t_wall_ms":int,"t_mono_ns":int}` ／ `block_end` も同じ形
+  - `{"kind":"trial_begin","trial_id":str,"t_wall_ms":int,"t_mono_ns":int}` ／ `trial_end` も同じ形
+  - `{"kind":"sent","trial_id":str,"step":int,"key":<keyname>,"down":bool,"t_wall_ms":int,"t_mono_ns":int}` ——
+    `step` は計画の `steps` の 0 始まりの添字
+  - `{"kind":"marker","block_id":int,"seq":int,"t_wall_ms":int,"t_mono_ns":int}` —— マーカーのキー 1 つの**押下**ごとに 1 行。
+    `seq` はそのブロックの `marker` 配列の 0 始まりの添字（離しは送るが行にしない）
+  - `{"kind":"reset","block_id":int,"exit_code":int,"t_wall_ms":int,"t_mono_ns":int}`
+- 時刻を取る点: `sent` と `marker` は**送出の直前** ／ `trial_begin` は `gap_before_ms` の待ちの**後**・最初の送出の直前
+  （＝試行の区間に試行間の待ちを含めない）／ `trial_end` は最後の送出の後 ／ `block_begin` はマーカーを送る前・
+  `block_end` は最後の試行の後 ／ `reset` はリセットのコマンドが終わった後。
+- 行の順序: ヘッダ → ブロックごとに（`reset`（`reset_ime` が真のとき）→ `block_begin` → `marker`… →
+  試行ごとに（`trial_begin` → `sent`… → `trial_end`）→ `block_end`）。
+- `trial_id` / `block_id` は計画と同じ値。
+
 ## `corpus/1` — 句と読み
 
 - ヘッダ: `{"kind":"header","format":"corpus/1","source":"aozora","tokenizer":str,"dict":str}`
 - `{"kind":"phrase","phrase_id":str,"work_id":str,"text":str,"reading":str,"reading_len":int}`
 - `reading` は**ひらがなだけ**（`^[ぁ-ゖー]+$`）。
+
+### `corpus/1` の型
+
+- ヘッダ: `tokenizer` と `dict` は名前と版を 1 つの文字列にしたもの（`^[0-9A-Za-z._+-]{1,64}$`。例 `sudachipy-0.6.8`）。
+- `work_id` は `^[a-z0-9][a-z0-9_]{0,31}$`（**小文字で始める**。作品のファイル名から決定的に作る）。
+- `phrase_id` は `<work_id>-<文番号>-<句番号>`（番号は 1 から始まる 10 進）＝ `^[a-z0-9][a-z0-9_]{0,31}-[0-9]+-[0-9]+$`。
+  合成かな列（生成器が埋める）は `^kana-[0-9]+$`。⚠️ どちらも**小文字で始める** —— 公開時の書き出しの検査は
+  被験者 ID の形（大文字の `P` ＋ 3 桁）を拒否するので、それに当たらない形にしている。
+- `reading_len` は `reading` の文字数（1 以上）。`text` は公有の文（content-free の対象ではない）。
 
 ## `keyname` の列挙
 
