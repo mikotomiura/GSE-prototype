@@ -30,4 +30,5 @@
 - [x] 投稿先を「登壇なし・費用ゼロ」で選び直す（判断 8・9）・プレプリント（判断 10）・ライセンス（判断 11）
 
 ## 6. 完了
-- [ ] `/finish-task`（レビュー・`/cross-review`・コミット・PR）
+- [x] `/cross-review` 2 巡（Codex ＋ Claude code-reviewer ×2 ＋ security-checker・判断 12 / 13）→ 指摘はすべて対応（論文用リポジトリ `ae39be6` / `098b01a`）
+- [ ] `/finish-task` の出荷フロー（push → PR → CI 緑なら merge → main の CI 確認）
