@@ -1,10 +1,12 @@
-//! シム: GSE の `src-tauri/src/input/hook.rs` のうち、逐語コピーした 3 ファイル
-//! （`ime_compose.rs` / `ime_cloak.rs` / `ime_mode.rs`）が参照する**定数と Atomic だけ**。
+//! Shim exposing only the constants and atomics that the three verbatim-copied state-machine modules
+//! (`ime_compose.rs`, `ime_cloak.rs`, `ime_mode.rs`) reference.
 //!
-//! ⚠️ 値と型は GSE の `hook.rs` と同じでなければならない（`check_manifest.py --against-gse` が照合する）。
-//! ⚠️ フックのコールバック・チャネル・OS API はここに無い（ドライバは `driver_*.rs`）。
+//! The type and value of each item here must match the reference implementation
+//! (`check_manifest.py --against-upstream` verifies this). Hook callbacks, channels and other
+//! operating-system interfaces are not part of this shim; they live in the `driver_*.rs` modules.
 //!
-//! 変換セッションの状態は、GSE と同じくここの Atomic で監視ループ（`main.rs`）へ渡す。
+//! The conversion-session state is carried from the driver to the monitoring loop (`main.rs`) through
+//! the atomics declared here.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64};
 
