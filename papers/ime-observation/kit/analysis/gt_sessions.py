@@ -11,7 +11,8 @@ Python 標準ライブラリだけ。
 実機の呼び出し列で決める前提なので、規則を差し替えるだけで組み立てが変わる。
 
 規則ファイル（src ごと。`_` で始まるキーは注釈で、読まれない）:
-  {"mac_nstic": {"start": 条件, "commit": [条件…], "cancel": [条件…], "candidate": 条件|null, "clock_jump_ms": 整数},
+  {"mac_nstic": {"start": 条件, "commit": [条件…], "cancel": [条件…], "candidate": 条件|null,
+                 "candidate_end": 条件|null, "clock_jump_ms": 整数},
    "win_imm": {…}, "win_tsf": {…}}
   条件 = 事象の述語: {"ev": 名前, <欄>: 値, <欄>_gt|ge|lt|le|eq|ne: 整数, …}
     ・欄は gt/1 の表にある付随フィールド（その ev が持つもの）。欄だけを書くと等しいことを表す。
@@ -19,34 +20,60 @@ Python 標準ライブラリだけ。
         "after_result": true|false   セッションの中でここまでに結果文字列（result_len > 0）が出た / 出ていない
         "not_followed_by": 条件, "within_ms": 整数   この事象の後 within_ms（単調時計）以内に、その条件に合う事象が来ない
       not_followed_by を書くときは within_ms が要る（逆も同じ）。ログの終わりまでに来なければ「来ない」と数える。
+    ・abandon が偽で commit が none の試行は、oracle_agreement では組み立てたセッションの実際の outcome を
+      問わず一致に数える（意図が「確定も取消も期待しない」ため。_classify 参照）。
   事象は 1 本ずつ順に見る。セッションが無いとき start に合えば開く。開いている間は commit → cancel の順に
-  調べ、最初に合った方で閉じる（閉じる事象の時刻が終了）。start に合う事象が開いている間に来ても何もしない。
+  調べ、最初に合った方で閉じる（閉じる事象の時刻が終了）。start に合う事象が開いている間に来ても何もしない
+  （★ 件数は診断用の n_start_while_open に出る）。
   candidate に合う事象がセッションの区間（両端を含む）にあれば候補窓が出たセッションになる。null なら候補窓は
   取れないので candidate_shown は null で、windows_def も作れない（null）。
+  ★ candidate_end（判断 27）: 候補窓が閉じたとみなす条件。candidate と同じ形（単一の条件・null 可）。
+    candidate が開いている間に candidate_end に合う事象が来ればそこで閉じる（次に candidate が来ればまた開く。
+    1 セッションに複数回あってよい）。閉じないまま閉じる規則（commit/cancel）に達したときはセッションの終わり
+    （open_at_end はログの最後）で閉じたものとして数える。candidate が null なら candidate_end も null。
   clock_jump_ms: 隣り合う 2 事象の壁時計の差と単調時計の差のずれがこれを超えたら「時計の跳び」（除外）。
 
 出力（SESSIONS・JSON）:
   {"src", "rules_sha256", "definitions": {"all", "macos_def", "windows_def"}, "oracle_agreement", "excluded"}
   ・セッション = {"trial_id", "start_wall_ms", "end_wall_ms", "start_mono_ns", "end_mono_ns", "outcome",
-    "candidate_shown", "nav_true"}。outcome = commit / cancel / open_at_end（閉じないままログが終わった。
-    このとき end_* は null）。trial_id は oracle の trial_begin〜trial_end との重なり（壁時計・最大の重なり・同点は
-    先の試行）で決め、重ならなければ null。nav_true = セッションの区間（両端を含む・壁時計）の中で実行器が送った
-    矢印キー（left/right/up/down の押下）の数。区間は IME 自身が出した事象から取るので、数と区間が循環しない。
-    open_at_end の区間は最後の事象までとして数える。
+    "candidate_shown", "nav_true", "nav_true_cand", "excluded_by", "n_start_while_open"}。outcome = commit /
+    cancel / open_at_end（閉じないままログが終わった。このとき end_* は null）。trial_id は oracle の
+    trial_begin〜trial_end との重なり（壁時計・最大の重なり・同点は先の試行）で決め、重ならなければ null。
+    nav_true = セッションの区間（両端を含む・壁時計）の中で実行器が送った矢印キー（left/right/up/down の押下）
+    の数。区間は IME 自身が出した事象から取るので、数と区間が循環しない。open_at_end の区間は最後の事象までと
+    して数える。★ nav_true と nav_true_cand が数える矢印は、trial_id が付いたセッションでは、その trial_id の
+    送出（oracle の sent の trial_id）に限る（確定が遅れて次の試行の矢印を拾わないため・判断 27）。trial_id が
+    null のセッションだけは区間内の全 sent を数える。
+    ★ nav_true_cand（判断 27）: candidate が null でない src で、セッションの中の「候補窓が開いていた区間」
+    （candidate_end で複数回開閉すれば全部）に入る矢印の数（数え方は nav_true と同じ）。candidate が null の
+    src（mac_nstic）では null。Windows の `nav` の正解は design.md の定義どおり候補窓が開いていた区間の矢印数
+    なので、後続 issue はこちらを使う。
+    ★ excluded_by（判断 28）: このセッションが除外の対象になった理由の配列（"clock_jump" / "log_truncated"。
+    空なら対象外）。判定は下の excluded の trial_ids にこのセッションの trial_id が入っているか、または
+    セッションの区間が時計の跳びを直接またいでいるか。
+    ★ n_start_while_open（判断 28・診断用）: このセッションが開いている間に来た start 事象の数（整数）。
   ・all = 全 composition。macos_def = かな入力の一区切りすべて（参照側では all と同じ。定義の違いは観測側の
     数え方にある）。windows_def = 候補窓が出たセッションだけ（candidate が null なら null）。
   ・oracle_agreement: --plan（plan/1）があるとき、試行ごとに計画の意図（expect_session / abandon / commit）と
     組み立てたセッション（all）を比べる。意図は oracle に無いので plan が要る。plan の SHA-256 が oracle の
     ヘッダと違えば拒否する。不一致は捨てず型ごとに数える（no_session / unexpected_session / multiple_sessions /
     expected_cancel_got_commit / expected_commit_got_cancel / open_at_end / unknown_trial）。
-    --plan が無いときは {"plan_available": false, "n_trials": N} だけ。
+    --plan が無いときは {"plan_available": false, "n_trials": N} だけで、CLI は stderr に一致率が出ない旨を
+    1 行警告する（終了コードは 0 のまま）。
   ・excluded: 時計の跳び（clock_jump・gt と oracle の両方）と、最後のセッションが閉じないままログが終わった区間
     （log_truncated）。時刻はどちらも隣り合う 2 事象の時刻（時計が戻ったときは end が start より前になりうるので、
-    そのときは mono で見る）。
+    そのときは mono で見る）。★ 各要素に trial_ids（判断 28・影響する試行の trial_id の配列）が付く。oracle の
+    跳びは「跳びの直前の事象を含む試行（試行の間なら次の試行）から同じブロックの最後の試行まで」。gt の跳びは
+    同じ考え方だが位置は跳びの直前の gt 事象の壁時計を oracle の試行の区間に当てて決め、加えて跳びを区間の中に
+    含むセッションの trial_id も足す。log_truncated は閉じなかったセッションの trial_id（null なら空）。
 
 ⚠️ 読むのは正解側（gt / oracle / plan）だけで、観測側のログは読まない。
 ⚠️ gt / oracle の行の形の検査は kit/formats/validate_logs.py の仕事（ここでは必要な欄だけ読む）。
    出力は種別・整数・列挙だけで、本文は載らない。
+⚠️ 入力の頑健性: 規則・gt・oracle・plan の JSON はすべて、同じキーが 1 行に 2 回あれば拒否する（object_pairs_hook）。
+   深すぎる入れ子（RecursionError）も入力エラーとして拒否する。oracle / plan の trial_id は出力にそのまま出る
+   唯一の自由な文字列なので `^[A-Za-z0-9_-]{1,64}$` に絞る。--out が --gt/--oracle/--rules/--plan のどれかと
+   同じファイル（os.path.samefile）なら拒否する（出力は同じディレクトリの一時ファイル経由の os.replace）。
 
 exit: 0 = 出力した / 2 = 入力が読めない・規則が壊れている・使い方の誤り。
 """
@@ -54,6 +81,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -66,7 +94,9 @@ MISMATCH_TYPES = (
     "expected_cancel_got_commit", "expected_commit_got_cancel", "open_at_end", "unknown_trial",
 )
 _OPS = ("gt", "ge", "lt", "le", "eq", "ne")
-_BLOCK_KEYS = ("start", "commit", "cancel", "candidate", "clock_jump_ms")
+_BLOCK_KEYS = ("start", "commit", "cancel", "candidate", "candidate_end", "clock_jump_ms")
+# ★ oracle / plan の trial_id は出力にそのまま出る唯一の自由な文字列（判断 28 のレビュー・security LOW）。
+TRIAL_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 class InputError(ValueError):
@@ -106,10 +136,24 @@ def _lines(data, what):
     return out
 
 
+def _no_dup_pairs(pairs, where):
+    seen = set()
+    out = {}
+    for k, v in pairs:
+        if k in seen:
+            raise InputError("%s: 同じキーが 1 行に 2 回ある" % where)
+        seen.add(k)
+        out[k] = v
+    return out
+
+
 def _loads(raw, where):
     try:
-        return json.loads(raw, parse_float=_no_float, parse_constant=_no_constant)
-    except ValueError:
+        return json.loads(raw, parse_float=_no_float, parse_constant=_no_constant,
+                          object_pairs_hook=lambda pairs: _no_dup_pairs(pairs, where))
+    except InputError:
+        raise
+    except (ValueError, RecursionError):
         raise InputError("%s: JSON として読めない" % where)
 
 
@@ -121,6 +165,11 @@ def _read_times(row, where):
     for k in ("t_wall_ms", "t_mono_ns"):
         if not _is_int(row.get(k)):
             raise InputError("%s: %s が整数でない" % (where, k))
+
+
+def _check_trial_id(v, where):
+    if not isinstance(v, str) or not TRIAL_ID_RE.fullmatch(v):
+        raise InputError("%s: trial_id の形が違う（^[A-Za-z0-9_-]{1,64}$ でない）" % where)
 
 
 def parse_gt(data):
@@ -151,7 +200,9 @@ def parse_gt(data):
 
 
 def parse_oracle(data):
-    """oracle/1 → {"plan_sha256", "rows"（ヘッダ以外）, "trials"（試行の窓）, "arrows"（矢印の押下の壁時計）}。"""
+    """oracle/1 → {"plan_sha256", "rows"（ヘッダ以外）, "trials"（試行の窓）,
+    "arrows"（矢印の押下の壁時計と trial_id）, "block_of_trial", "trials_by_block"（判断 28 の除外の位置決め用）}。
+    """
     lines = _lines(data, "oracle")
     if not lines:
         raise InputError("oracle: 空のファイル")
@@ -162,6 +213,8 @@ def parse_oracle(data):
     open_trial = None
     seen = set()
     prev_mono = None
+    block_of_trial, trials_by_block = {}, {}
+    cur_block = None
     for n, raw in lines[1:]:
         where = "oracle:%d" % n
         row = _loads(raw, where)
@@ -173,14 +226,23 @@ def parse_oracle(data):
         prev_mono = row["t_mono_ns"]
         rows.append(row)
         kind = row["kind"]
-        if kind == "trial_begin":
+        if kind == "block_begin":
+            cur_block = row.get("block_id")
+            trials_by_block.setdefault(cur_block, [])
+        elif kind == "block_end":
+            cur_block = None
+        elif kind == "trial_begin":
             tid = row.get("trial_id")
             if open_trial is not None:
                 raise InputError("%s: 試行が入れ子になっている" % where)
-            if not isinstance(tid, str) or tid in seen:
-                raise InputError("%s: trial_id が文字列でない・重複している" % where)
+            _check_trial_id(tid, where)
+            if tid in seen:
+                raise InputError("%s: trial_id が重複している" % where)
             seen.add(tid)
             open_trial = {"trial_id": tid, "begin_wall_ms": row["t_wall_ms"]}
+            if cur_block is not None:
+                block_of_trial[tid] = cur_block
+                trials_by_block.setdefault(cur_block, []).append(tid)
         elif kind == "trial_end":
             if open_trial is None or row.get("trial_id") != open_trial["trial_id"]:
                 raise InputError("%s: trial_end が対応する trial_begin と合わない" % where)
@@ -188,11 +250,14 @@ def parse_oracle(data):
             trials.append(open_trial)
             open_trial = None
         elif kind == "sent":
+            tid = row.get("trial_id")
+            _check_trial_id(tid, where)
             if row.get("key") in ARROW_KEYS and row.get("down") is True:
-                arrows.append(row["t_wall_ms"])
+                arrows.append((row["t_wall_ms"], tid))
     if open_trial is not None:
         raise InputError("oracle: trial_end が無いまま終わった試行がある")
-    return {"plan_sha256": hdr.get("plan_sha256"), "rows": rows, "trials": trials, "arrows": arrows}
+    return {"plan_sha256": hdr.get("plan_sha256"), "rows": rows, "trials": trials, "arrows": arrows,
+            "block_of_trial": block_of_trial, "trials_by_block": trials_by_block}
 
 
 def parse_plan(data):
@@ -210,8 +275,9 @@ def parse_plan(data):
         if not isinstance(row, dict) or row.get("kind") != "trial":
             continue
         tid, it = row.get("trial_id"), row.get("intent")
-        if not isinstance(tid, str) or tid in out:
-            raise InputError("%s: trial_id が文字列でない・重複している" % where)
+        _check_trial_id(tid, where)
+        if tid in out:
+            raise InputError("%s: trial_id が重複している" % where)
         if (not isinstance(it, dict) or type(it.get("expect_session")) is not bool
                 or type(it.get("abandon")) is not bool or it.get("commit") not in COMMIT_KINDS):
             raise InputError("%s: intent の形が違う（expect_session / abandon / commit）" % where)
@@ -229,7 +295,7 @@ class _Cond(object):
 
 
 class _Block(object):
-    __slots__ = ("start", "commit", "cancel", "candidate", "clock_jump_ms")
+    __slots__ = ("start", "commit", "cancel", "candidate", "candidate_end", "clock_jump_ms")
 
 
 def _compile_pred(key, val, ev_fields, enum_fields, where):
@@ -290,7 +356,7 @@ def _compile_block(src, obj):
             raise InputError("%s: 未知のキー '%s'" % (where, key))
     for key in _BLOCK_KEYS:
         if key not in obj:
-            raise InputError("%s: '%s' が無い（candidate は null でよい）" % (where, key))
+            raise InputError("%s: '%s' が無い（candidate / candidate_end は null でよい）" % (where, key))
     b = _Block()
     b.start = _compile_cond(obj["start"], where + ".start", src, "start")
     for role in ("commit", "cancel"):
@@ -301,6 +367,8 @@ def _compile_block(src, obj):
                                for i, c in enumerate(lst)))
     b.candidate = (None if obj["candidate"] is None
                    else _compile_cond(obj["candidate"], where + ".candidate", src, "candidate"))
+    b.candidate_end = (None if obj["candidate_end"] is None
+                        else _compile_cond(obj["candidate_end"], where + ".candidate_end", src, "candidate_end"))
     if not _is_int(obj["clock_jump_ms"]) or obj["clock_jump_ms"] < 0:
         raise InputError("%s: clock_jump_ms は 0 以上の整数" % where)
     b.clock_jump_ms = obj["clock_jump_ms"]
@@ -385,14 +453,24 @@ def _run_machine(b, events):
     for i, e in enumerate(events):
         if cur is None:
             if _ev_match(b.start, e):
+                cand_open = e["t_wall_ms"] if (b.candidate is not None and _ev_match(b.candidate, e)) else None
                 cur = {"start_wall_ms": e["t_wall_ms"], "start_mono_ns": e["t_mono_ns"],
                        "result_seen": _has_result(e),
-                       "candidate_shown": None if b.candidate is None else _ev_match(b.candidate, e)}
+                       "candidate_shown": None if b.candidate is None else (cand_open is not None),
+                       "n_start_while_open": 0, "cand_open": cand_open, "cand_windows": []}
             continue
+        if _ev_match(b.start, e):
+            cur["n_start_while_open"] += 1
         if _has_result(e):
             cur["result_seen"] = True
-        if b.candidate is not None and not cur["candidate_shown"] and _ev_match(b.candidate, e):
-            cur["candidate_shown"] = True
+        if b.candidate is not None:
+            if cur["cand_open"] is None:
+                if _ev_match(b.candidate, e):
+                    cur["cand_open"] = e["t_wall_ms"]
+                    cur["candidate_shown"] = True
+            elif b.candidate_end is not None and _ev_match(b.candidate_end, e):
+                cur["cand_windows"].append((cur["cand_open"], e["t_wall_ms"]))
+                cur["cand_open"] = None
         outcome = None
         for c in b.commit:
             if _close_match(c, events, i, cur["result_seen"]):
@@ -441,6 +519,46 @@ def _assign_trial(lo_wall, hi_wall, trials):
         if (ov > best_ov) or (best is None and point):
             best, best_ov = tr, max(ov, 0)
     return None if best is None else best["trial_id"]
+
+
+def _count_arrows(arrows, lo, hi, trial_id):
+    """arrows = [(t_wall_ms, trial_id)…]。区間 [lo, hi]（両端を含む）の中で、trial_id が付いていれば
+    その試行の送出だけを数える（判断 27: 確定が遅れて次の試行の矢印を拾わないため）。null なら区間内の全部。"""
+    n = 0
+    for t, tid in arrows:
+        if lo <= t <= hi and (trial_id is None or tid == trial_id):
+            n += 1
+    return n
+
+
+def _locate_trial(t_wall_ms, trials):
+    """壁時計 t を oracle の試行の並びに当てる: 含む試行があればそれ、無ければ次に始まる試行、
+    どちらも無ければ None（判断 28: 除外の trial_ids の位置決め）。trials は出現順（時系列）と仮定する。"""
+    for tr in trials:
+        if tr["begin_wall_ms"] <= t_wall_ms <= tr["end_wall_ms"]:
+            return tr["trial_id"]
+    for tr in trials:
+        if tr["begin_wall_ms"] > t_wall_ms:
+            return tr["trial_id"]
+    return None
+
+
+def _block_range_trial_ids(trial_id, block_of_trial, trials_by_block):
+    """位置決めした試行から、同じブロックの最後の試行までの trial_id の列（判断 28）。"""
+    if trial_id is None:
+        return []
+    block_id = block_of_trial.get(trial_id)
+    if block_id is None:
+        return [trial_id]
+    ids = trials_by_block.get(block_id, [])
+    if trial_id not in ids:
+        return [trial_id]
+    return list(ids[ids.index(trial_id):])
+
+
+def _jump_trial_ids(prev_wall_ms, oracle):
+    pos = _locate_trial(prev_wall_ms, oracle["trials"])
+    return _block_range_trial_ids(pos, oracle["block_of_trial"], oracle["trials_by_block"])
 
 
 def _classify(intent, sess):
@@ -506,19 +624,53 @@ def assemble(gt_bytes, oracle_bytes, rules_bytes, plan_bytes=None):
     last_wall = events[-1]["t_wall_ms"] if events else None
     for s in sessions:
         hi = last_wall if s["end_wall_ms"] is None else s["end_wall_ms"]
+        s["_hi"] = hi
         s["trial_id"] = _assign_trial(s["start_wall_ms"], hi, oracle["trials"])
-        s["nav_true"] = sum(1 for t in oracle["arrows"] if s["start_wall_ms"] <= t <= hi)
+        s["nav_true"] = _count_arrows(oracle["arrows"], s["start_wall_ms"], hi, s["trial_id"])
+        if b.candidate is None:
+            s["nav_true_cand"] = None
+        else:
+            windows = list(s["cand_windows"])
+            if s["cand_open"] is not None:
+                windows.append((s["cand_open"], hi))
+            s["nav_true_cand"] = sum(_count_arrows(oracle["arrows"], lo_c, hi_c, s["trial_id"])
+                                     for lo_c, hi_c in windows)
 
-    excluded = _clock_jumps(events, "gt", b.clock_jump_ms) + _clock_jumps(oracle["rows"], "oracle", b.clock_jump_ms)
+    # ---- 除外（判断 28: excluded の trial_ids と、セッションの excluded_by / n_start_while_open）
+    gt_jumps = _clock_jumps(events, "gt", b.clock_jump_ms)
+    for j in gt_jumps:
+        j["trial_ids"] = _jump_trial_ids(j["start_wall_ms"], oracle)
+        lo_j, hi_j = sorted((j["start_wall_ms"], j["end_wall_ms"]))
+        for s in sessions:
+            if (s["trial_id"] is not None and s["trial_id"] not in j["trial_ids"]
+                    and s["start_wall_ms"] <= lo_j and s["_hi"] >= hi_j):
+                j["trial_ids"].append(s["trial_id"])
+    oc_jumps = _clock_jumps(oracle["rows"], "oracle", b.clock_jump_ms)
+    for j in oc_jumps:
+        j["trial_ids"] = _jump_trial_ids(j["start_wall_ms"], oracle)
+    excluded = gt_jumps + oc_jumps
     if sessions and sessions[-1]["outcome"] == "open_at_end":
         s = sessions[-1]
         excluded.append({"type": "log_truncated", "log": "gt",
                          "start_wall_ms": s["start_wall_ms"], "end_wall_ms": last_wall,
-                         "start_mono_ns": s["start_mono_ns"], "end_mono_ns": events[-1]["t_mono_ns"]})
+                         "start_mono_ns": s["start_mono_ns"], "end_mono_ns": events[-1]["t_mono_ns"],
+                         "trial_ids": [] if s["trial_id"] is None else [s["trial_id"]]})
+
+    for s in sessions:
+        reasons = set()
+        for e in excluded:
+            if s["trial_id"] is not None and s["trial_id"] in e.get("trial_ids", ()):
+                reasons.add(e["type"])
+            if e["type"] == "clock_jump":
+                lo_j, hi_j = sorted((e["start_wall_ms"], e["end_wall_ms"]))
+                if s["start_wall_ms"] <= lo_j and s["_hi"] >= hi_j:
+                    reasons.add("clock_jump")
+        s["excluded_by"] = sorted(reasons)
 
     pub = [{"trial_id": s["trial_id"], "start_wall_ms": s["start_wall_ms"], "end_wall_ms": s["end_wall_ms"],
             "start_mono_ns": s["start_mono_ns"], "end_mono_ns": s["end_mono_ns"], "outcome": s["outcome"],
-            "candidate_shown": s["candidate_shown"], "nav_true": s["nav_true"]} for s in sessions]
+            "candidate_shown": s["candidate_shown"], "nav_true": s["nav_true"], "nav_true_cand": s["nav_true_cand"],
+            "excluded_by": s["excluded_by"], "n_start_while_open": s["n_start_while_open"]} for s in sessions]
     return {
         "src": src,
         "rules_sha256": hashlib.sha256(rules_bytes).hexdigest(),
@@ -543,6 +695,14 @@ def _read(path, what):
             return f.read()
     except OSError as e:
         raise InputError("%s: 開けない（%s）" % (what, type(e).__name__))
+
+
+def _same_file(a, b):
+    """--out が既存の入力ファイルと同じか（security LOW）。どちらか無ければ違うファイル扱い。"""
+    try:
+        return os.path.exists(a) and os.path.exists(b) and os.path.samefile(a, b)
+    except OSError:
+        return False
 
 
 def build_sessions(gt_path, oracle_path, rules_path, plan_path=None):
@@ -725,6 +885,84 @@ def _case_nav_interval():
     return f
 
 
+def _case_nav_true_cand():
+    """nav_true_cand: 候補窓が開いていた区間（判断 27・design.md:100）だけの矢印数。mac_nstic は null。"""
+    f = []
+    comp = lambda t, cl, rl: (t, "comp", {"flags": 8, "comp_len": cl, "result_len": rl})
+    evs = [
+        (100, "start_comp", {}), (150, "notify", {"imn": 5}),                  # 候補窓 1 回目開く
+        comp(200, 2, 0),
+        (300, "notify", {"imn": 4}),                                          # 1 回目閉じる
+        (350, "notify", {"imn": 5}),                                          # 2 回目開く
+        comp(400, 0, 2), (420, "notify", {"imn": 4}),                        # 2 回目閉じる（結果あり）
+        (500, "end_comp", {}),                                                # commit（after_result=true）
+    ]
+    trials = [("t00001", 0, 900)]
+    sents = [(120, "left", True),    # 候補窓の前（cand には数えない・nav_true には数える）
+             (180, "right", True),   # 窓 1（cand に数える）
+             (320, "up", True),      # 窓の間（cand には数えない）
+             (380, "down", True),    # 窓 2（cand に数える）
+             (600, "left", True)]    # セッションの後（どちらにも数えない）
+    r = assemble(_gt_bytes("win_imm", evs), _oracle_bytes(trials, sents), _example_rules())
+    s = r["definitions"]["all"][0]
+    if s["nav_true"] != 4:
+        f.append("nav_true が 4 でない（区間全体・120/180/320/380）: %r" % (s["nav_true"],))
+    if s["nav_true_cand"] != 2:
+        f.append("nav_true_cand が候補窓の区間だけの 2 でない（180/380）: %r" % (s["nav_true_cand"],))
+
+    # mac_nstic は candidate が null なので nav_true_cand も null
+    r2 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(500, 2)]),
+                  _oracle_bytes([("t00001", 0, 900)], [(200, "left", True)]), _example_rules())
+    if r2["definitions"]["all"][0]["nav_true_cand"] is not None:
+        f.append("mac_nstic の nav_true_cand が null でない")
+
+    # 規則を変えると変わる（陰性対照）: candidate_end を null にすると窓が session の終わりまで閉じない
+    r3 = assemble(_gt_bytes("win_imm", evs), _oracle_bytes(trials, sents),
+                 _rules_with(lambda o: o["win_imm"].__setitem__("candidate_end", None)))
+    if r3["definitions"]["all"][0]["nav_true_cand"] != 3:  # 180・320・380（150 以降ずっと開いたまま）
+        f.append("candidate_end を null にしても nav_true_cand が変わらない: %r" %
+                 (r3["definitions"]["all"][0]["nav_true_cand"],))
+    return f
+
+
+def _case_nav_trial_scope():
+    """nav_true / nav_true_cand は、セッションが帰属した試行の sent だけを数える
+    （確定が遅れて次の試行の矢印を拾わない・判断 27）。trial_id が null のセッションは区間内の全 sent を数える。"""
+    f = []
+    # セッション A: mac_nstic・開始 100・確定が 950 まで遅れる（試行 t00001=[0,900] に帰属するが、
+    # 区間は隣の試行 t00002=[920,1900] にわずかに食い込む）。
+    # セッション B: 3000〜3200・どちらの試行にも重ならない（trial_id は null）。
+    evs = [_sm(100, 1), _ins(950, 2), _sm(3000, 1), _ins(3200, 2)]
+    rows = [{"kind": "header", "format": "oracle/1", "plan_sha256": "0" * 64, "os": "macos",
+             "emitter_version": "0", "backend": "dryrun"}]
+
+    def row(kind, t, **kw):
+        r = dict(kw, kind=kind, t_wall_ms=WALL0 + t, t_mono_ns=(MONO0 + t) * 1000000)
+        return r
+
+    rows += [
+        row("trial_begin", 0, trial_id="t00001"),
+        row("sent", 200, trial_id="t00001", step=0, key="left", down=True),
+        row("trial_end", 900, trial_id="t00001"),
+        row("trial_begin", 920, trial_id="t00002"),
+        row("sent", 940, trial_id="t00002", step=0, key="right", down=True),   # 隣の試行の矢印（数えない）
+        row("sent", 1300, trial_id="t00002", step=1, key="up", down=True),
+        row("trial_end", 1900, trial_id="t00002"),
+        row("sent", 3100, trial_id="t00002", step=2, key="down", down=True),   # trial_id null のセッション（数える）
+    ]
+    r = assemble(_gt_bytes("mac_nstic", evs), _jl(*rows), _example_rules())
+    sessA, sessB = r["definitions"]["all"]
+    if sessA["trial_id"] != "t00001":
+        f.append("セッション A の trial_id が t00001 でない: %r" % (sessA["trial_id"],))
+    if sessA["nav_true"] != 1:
+        f.append("セッション A の nav_true が 1 でない（隣の試行の矢印 940 を拾っている）: %r" % (sessA["nav_true"],))
+    if sessB["trial_id"] is not None:
+        f.append("セッション B の trial_id が null でない: %r" % (sessB["trial_id"],))
+    if sessB["nav_true"] != 1:
+        f.append("セッション B（trial_id null）の nav_true が区間内の全 sent（1）でない: %r" % (sessB["nav_true"],))
+    return f
+
+
 def _case_clock_jump():
     """時計の跳び（壁時計だけが進む）を excluded に出す。閾値以下は出さない。gt と oracle の両方。"""
     f = []
@@ -744,6 +982,59 @@ def _case_clock_jump():
     r = assemble(_gt_bytes("mac_nstic", evs), _oracle_bytes(trials), _example_rules())
     if r["excluded"]:
         f.append("跳びが無いのに excluded が空でない")
+    return f
+
+
+def _case_excluded_by():
+    """excluded の trial_ids と、セッションの excluded_by / n_start_while_open（判断 28）。"""
+    f = []
+    # --- シナリオ 1: oracle の時計の跳び。ブロック中央の試行から位置決めし、そこから最後の試行まで。
+    #     先頭の試行（t00001）は範囲に入らず、区間も跳びをまたがないので excluded_by は空（陰性対照）。
+    trials = [("t00001", 0, 900), ("t00002", 1000, 1900), ("t00003", 2000, 2900)]
+    evs = [_sm(100, 1), _ins(500, 2),                                  # セッション 1（t00001）
+           _sm(1100, 1), _sm(1150, 1), _ins(1500, 2),                  # セッション 2（t00002・開いている間に start 1 回）
+           _sm(2100, 1), _ins(2500, 2)]                                # セッション 3（t00003）
+    # wall_shift の添字は _oracle_bytes の items（block_begin, t1begin, t1end, t2begin, t2end, t3begin, t3end, block_end）の並び。
+    r = assemble(_gt_bytes("mac_nstic", evs), _oracle_bytes(trials, wall_shift={4: 5000}), _example_rules())
+    jumps = [x for x in r["excluded"] if x["type"] == "clock_jump"]
+    if len(r["excluded"]) != 1 or len(jumps) != 1 or jumps[0]["log"] != "oracle":
+        f.append("シナリオ1: oracle の時計の跳びがちょうど 1 件でない: %r" % (r["excluded"],))
+    elif set(jumps[0]["trial_ids"]) != {"t00002", "t00003"}:
+        f.append("シナリオ1: trial_ids がブロック中央から最後までの {t00002,t00003} でない: %r" % (jumps[0]["trial_ids"],))
+    s1, s2, s3 = r["definitions"]["all"]
+    if s1["excluded_by"] != []:
+        f.append("シナリオ1: 範囲外・区間も跳ばないセッション 1 の excluded_by が空でない: %r" % (s1["excluded_by"],))
+    if s2["excluded_by"] != ["clock_jump"] or s3["excluded_by"] != ["clock_jump"]:
+        f.append("シナリオ1: セッション 2/3 の excluded_by に clock_jump が無い: %r / %r" %
+                 (s2["excluded_by"], s3["excluded_by"]))
+    if (s1["n_start_while_open"], s2["n_start_while_open"], s3["n_start_while_open"]) != (0, 1, 0):
+        f.append("シナリオ1: n_start_while_open が (0,1,0) でない: %r" %
+                 ((s1["n_start_while_open"], s2["n_start_while_open"], s3["n_start_while_open"]),))
+
+    # --- シナリオ 2: gt の時計の跳び。位置決めした試行（t00002）だけでは基準の範囲に入らない
+    #     セッション（trial_id=t00001）が、区間の中に跳びを含むので trial_ids に足される（判断 28「加えて」）。
+    trials2 = [("t00001", 0, 900), ("t00002", 3000, 5000)]
+    evs2 = [_sm(100, 1), (1005, "focus_out", {}), (1010, "focus_in", {}), _ins(1050, 2)]
+    r2 = assemble(_gt_bytes("mac_nstic", evs2, wall_shift={2: 1001}), _oracle_bytes(trials2), _example_rules())
+    jumps2 = [x for x in r2["excluded"] if x["type"] == "clock_jump"]
+    if len(jumps2) != 1 or jumps2[0]["log"] != "gt":
+        f.append("シナリオ2: gt の時計の跳びがちょうど 1 件でない: %r" % (r2["excluded"],))
+    elif set(jumps2[0]["trial_ids"]) != {"t00001", "t00002"}:
+        f.append("シナリオ2: trial_ids に位置決めした t00002 と、区間が跳びを含む t00001 の両方が無い: %r" %
+                 (jumps2[0]["trial_ids"],))
+    if r2["definitions"]["all"][0]["trial_id"] != "t00001":
+        f.append("シナリオ2: セッションの trial_id が t00001 でない: %r" % (r2["definitions"]["all"][0]["trial_id"],))
+
+    # --- シナリオ 3: log_truncated の trial_ids（閉じなかったセッションの trial_id）。
+    trials3 = [("t00001", 0, 900)]
+    r3 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), (300, "focus_out", {})]), _oracle_bytes(trials3),
+                 _example_rules())
+    trunc = [x for x in r3["excluded"] if x["type"] == "log_truncated"]
+    if len(trunc) != 1 or trunc[0]["trial_ids"] != ["t00001"]:
+        f.append("シナリオ3: log_truncated の trial_ids が [t00001] でない: %r" % (trunc,))
+    if r3["definitions"]["all"][0]["excluded_by"] != ["log_truncated"]:
+        f.append("シナリオ3: 閉じなかったセッションの excluded_by が [log_truncated] でない: %r" %
+                 (r3["definitions"]["all"][0]["excluded_by"],))
     return f
 
 
@@ -890,6 +1181,7 @@ def _case_rules_validation():
         ("src のブロックの未知のキー", lambda o: o["mac_nstic"].__setitem__("comit", [])),
         ("clock_jump_ms が無い", lambda o: o["mac_nstic"].pop("clock_jump_ms")),
         ("candidate が無い（null と書くこと）", lambda o: o["win_imm"].pop("candidate")),
+        ("candidate_end が無い（null と書くこと）", lambda o: o["win_imm"].pop("candidate_end")),
         ("commit が空", lambda o: o["mac_nstic"].__setitem__("commit", [])),
         ("not_followed_by だけで within_ms が無い", lambda o: o["mac_nstic"]["cancel"][0].pop("within_ms")),
         ("within_ms だけで not_followed_by が無い", lambda o: o["mac_nstic"]["commit"][0].__setitem__("within_ms", 5)),
@@ -930,6 +1222,44 @@ def _case_rules_validation():
             f.append("壊れた入力（%s）を拒否しない" % name)
         except InputError:
             pass
+    return f
+
+
+def _case_input_hardening():
+    """入力の頑健性（security LOW）: 重複キーの JSON・深すぎる入れ子・oracle / plan の trial_id の形。"""
+    f = []
+    try:
+        _loads('{"a":1,"a":2}', "dup-test")
+        f.append("同じキーが 1 行に 2 回ある JSON を拒否しない")
+    except InputError:
+        pass
+    deep = ("[" * 3000) + ("]" * 3000)
+    try:
+        _loads(deep, "deep-test")
+        f.append("深すぎる入れ子の JSON（RecursionError）を拒否しない")
+    except InputError:
+        pass
+    try:
+        assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(500, 2)]), _oracle_bytes([("bad id!", 0, 900)]),
+                 _example_rules())
+        f.append("oracle の trial_id（記号入り）を拒否しない")
+    except InputError:
+        pass
+    try:
+        assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(500, 2)]), _oracle_bytes([("t" * 65, 0, 900)]),
+                 _example_rules())
+        f.append("oracle の trial_id（65 文字）を拒否しない")
+    except InputError:
+        pass
+    try:
+        parse_plan(_plan_bytes([("bad id!", (True, False, "enter"))]))
+        f.append("plan の trial_id（記号入り）を拒否しない")
+    except InputError:
+        pass
+    try:
+        parse_plan(_plan_bytes([("t00001", (True, False, "enter"))]))  # 陽性対照: 普通の trial_id は通る
+    except InputError as e:
+        f.append("普通の trial_id を拒否した: %s" % e)
     return f
 
 
@@ -988,6 +1318,26 @@ def _case_cli_bytes_identical():
             f.append("CLI の出力の中身が期待と違う")
         if outs[0] != render(assemble(files["gt.jsonl"], files["oracle.jsonl"], files["rules.json"], plan)):
             f.append("CLI の出力が assemble の結果と違う")
+
+        # --plan が無いときは一致率が出ない旨の警告（項目3 MEDIUM）。exit code は 0 のまま。
+        o_noplan = os.path.join(tmp, "noplan.json")
+        rc, text = run(*(base + ["--out", o_noplan]))
+        if rc != 0:
+            f.append("--plan なしの CLI が exit 0 でない（%d）" % rc)
+        elif "一致率が出ない" not in text:
+            f.append("--plan が無いときに警告が出ない: %s" % text.strip()[-200:])
+        rc, text = run(*(base + ["--plan", paths["plan.jsonl"], "--out", os.path.join(tmp, "withplan.json")]))
+        if rc == 0 and "一致率が出ない" in text:
+            f.append("--plan があるのに一致率が出ない旨の警告が出ている")
+
+        # --out が既存の入力ファイルと同じなら exit 2（security LOW）。入力ファイルも壊れないこと。
+        rc, text = run(*(base + ["--plan", paths["plan.jsonl"], "--out", paths["gt.jsonl"]]))
+        if rc != 2 or "Traceback" in text:
+            f.append("--out が --gt と同じファイルなのに exit 2 でない（%d）: %s" % (rc, text.strip()[-160:]))
+        with open(paths["gt.jsonl"], "rb") as fh:
+            if fh.read() != files["gt.jsonl"]:
+                f.append("--out が入力と同じ判定のはずが入力ファイルが書き換わった")
+
         o = os.path.join(tmp, "x.json")
         for name, args in (
                 ("gt が無い", ["--gt", os.path.join(tmp, "none.jsonl")] + base[2:] + ["--out", o]),
@@ -1013,10 +1363,14 @@ def _case_cli_bytes_identical():
 CASES = (
     ("5 型（開始 → 確定・取消・候補窓あり / なし・1 試行に 2 セッション・閉じないまま終わる）× 3 つの src", _case_five_types),
     ("nav_true は区間内の矢印だけを数える（区間外の矢印を数えない）", _case_nav_interval),
+    ("nav_true_cand は候補窓が開いていた区間だけを数える（判断 27）", _case_nav_true_cand),
+    ("nav_true / nav_true_cand は帰属した試行の sent だけを数える（試行の限定・判断 27）", _case_nav_trial_scope),
     ("時計の跳び（壁時計だけが進む）を excluded に出す", _case_clock_jump),
+    ("excluded の trial_ids とセッションの excluded_by / n_start_while_open（判断 28）", _case_excluded_by),
     ("規則を変えると結果が変わる（陰性対照）", _case_rules_change_result),
     ("oracle ↔ 正解の一致率と不一致の型", _case_agreement),
     ("壊れた規則・入力を拒否する", _case_rules_validation),
+    ("入力の頑健性（重複キー・深い入れ子・trial_id の形）", _case_input_hardening),
     ("例の規則で最小の入力が動く", _case_example_rules_minimal),
     ("CLI: バイト一致・exit code", _case_cli_bytes_identical),
 )
@@ -1063,19 +1417,34 @@ def main(argv):
         return selftest()
     if not (args.gt and args.oracle and args.rules and args.out):
         ap.error("--gt / --oracle / --rules / --out が要る（--plan は任意）")
+    for inp in (args.gt, args.oracle, args.rules, args.plan):
+        if inp and _same_file(inp, args.out):
+            print("gt_sessions: --out が入力ファイルと同じ（%s）" % inp, file=sys.stderr)
+            return 2
     try:
         result = build_sessions(args.gt, args.oracle, args.rules, args.plan)
         data = render(result)
-        d = os.path.dirname(os.path.abspath(args.out))
+        d = os.path.dirname(os.path.abspath(args.out)) or "."
         os.makedirs(d, exist_ok=True)
-        with open(args.out, "wb") as f:
-            f.write(data)
+        fd, tmp_path = tempfile.mkstemp(dir=d, prefix=".gt_sessions_tmp_")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            os.replace(tmp_path, args.out)
+        except Exception:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
     except InputError as e:
         print("gt_sessions: %s" % e, file=sys.stderr)
         return 2
     except OSError as e:
         print("gt_sessions: 出力できない（%s）" % type(e).__name__, file=sys.stderr)
         return 2
+    if not args.plan:
+        print("gt_sessions: --plan が無いので oracle_agreement の一致率が出ない", file=sys.stderr)
     allx = result["definitions"]["all"]
     print("gt_sessions: src=%s sessions=%d (commit=%d cancel=%d open_at_end=%d) excluded=%d" % (
         result["src"], len(allx), sum(1 for s in allx if s["outcome"] == "commit"),

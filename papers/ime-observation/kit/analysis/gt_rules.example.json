@@ -1,5 +1,5 @@
 {
-  "_note": "★ 既定の規則は仮説である。IME の呼び出し順序は OS 側の文書に無く、取消の呼び出し列も文書に無い（macOS の unmarkText は確定側）。較正パイロットの実機の呼び出し列で直す。規則の形: start = 開く事象 / commit・cancel = 閉じる事象の配列 / candidate = 候補窓が出たとみなす事象（macOS は取れないので null）/ clock_jump_ms = 時計の跳びの閾値。",
+  "_note": "★ 既定の規則は仮説である。IME の呼び出し順序は OS 側の文書に無く、取消の呼び出し列も文書に無い（macOS の unmarkText は確定側）。較正パイロットの実機の呼び出し列で直す。規則の形: start = 開く事象 / commit・cancel = 閉じる事象の配列 / candidate = 候補窓が出たとみなす事象（macOS は取れないので null）/ candidate_end = 候補窓が閉じたとみなす事象（candidate と同じ形・判断 27。macOS は null）/ clock_jump_ms = 時計の跳びの閾値。★ win_tsf の tsf_end は result_len を省略できる（?）。省略すると after_result が偽になり取消（cancel）に数えられる —— 参照入力欄の実装（TSF の OnEndComposition が結果の長さを返さない経路）で確かめること。",
   "mac_nstic": {
     "start": {"ev": "set_marked", "len_gt": 0},
     "commit": [
@@ -10,6 +10,7 @@
       {"ev": "set_marked", "len_eq": 0, "not_followed_by": {"ev": "insert_text", "len_gt": 0}, "within_ms": 50}
     ],
     "candidate": null,
+    "candidate_end": null,
     "clock_jump_ms": 1000
   },
   "win_imm": {
@@ -21,6 +22,7 @@
       {"ev": "end_comp", "after_result": false}
     ],
     "candidate": {"ev": "notify", "imn": 5},
+    "candidate_end": {"ev": "notify", "imn": 4},
     "clock_jump_ms": 1000
   },
   "win_tsf": {
@@ -32,6 +34,7 @@
       {"ev": "tsf_end", "after_result": false}
     ],
     "candidate": {"ev": "ui_begin", "ui_kind": "candidate"},
+    "candidate_end": {"ev": "ui_end", "ui_kind": "candidate"},
     "clock_jump_ms": 1000
   }
 }
