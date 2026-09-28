@@ -121,6 +121,11 @@ IMM 互換層を**経ずに**、自分のスレッドの TSF の composition の
 | `ITfThreadMgrEventSink::OnSetFocus`（フォーカス中のドキュメントが有る / 無い） | `focus_in` / `focus_out` | なし |
 | メッセージループで見た `WM_KEYDOWN` | `key_down` | `vk`（(a) と同じ。合成入力だけを送ること） |
 
+- On this composition path, a key that the input method engine consumes does not necessarily
+  reach `WM_KEYDOWN` at all, and the virtual-key code observed here can differ from what an
+  IMM-based capture would report for the same keystroke, because the two mechanisms intercept
+  input at different points. Since `vk` records the literal key that was pressed, this input
+  field must only ever receive synthetic (scripted) input, never a person's own keystrokes.
 - `ui_kind`: 要素が `ITfCandidateListUIElement` を問い合わせて得られれば `candidate`、`ITfReadingInformationUIElement` なら
   `reading`、それ以外は `other`。`ui_update` / `ui_end` は `ui_begin` で決めた種類を使う（終わった要素を問い合わせられるとは
   限らないため。`ui_begin` を見ていない ID は、`ui_update` では問い合わせ、`ui_end` では `other`）。
@@ -130,8 +135,15 @@ IMM 互換層を**経ずに**、自分のスレッドの TSF の composition の
   ⚠️ issue 010 の `after_result` は `result_len > 0` で確定と取消を分けるので、**省略すると取消に数えられる**。
   文書末の位置が得られなかったときだけ省略する。⚠️ 確定のとき IME が最後に文字を置き換える場合は、最後に観測した長さと
   ずれうる（文書末の差から求めるので、残った長さは正しい）。**実 IME での確認は M5**。
-- フォーカスが動いたとき、開いていた composition は**終わりを書かずに忘れる**（終わったか分からないものを終わったと書かない。
-  後段は閉じないセッションとして扱う）。
+- When focus moves away from a context whose composition is still open, the registration that
+  watches that context is kept alive and its composition tracker keeps running; only once the
+  input method itself reports that composition's own end is `tsf_end` written and the
+  registration released. A newly focused context is tracked in parallel, independently. If a
+  single edit notification reports a commit immediately followed by a new composition (detected
+  as a change in the start offset or the number of composition ranges while already active),
+  that is written as a `tsf_end` (with `result_len` omitted, since the document end in between
+  is unknown) followed immediately by `tsf_start`, so a commit and the composition that follows
+  it are never merged into one update.
 - 候補窓は**隠さない**: `BeginUIElement` で `*pbShow = TRUE` を返し、IME 自身の窓を出したままにする。
 
 ## 文字列を取得しないこと（TSF 版）
@@ -174,3 +186,7 @@ target/release/refinput_tsf.exe --out gt_win_tsf.jsonl           # 窓を開い�
 - TSF の UI-less 指定（`ITfThreadMgrEx::ActivateEx` の `TF_TMAE_UIELEMENTENABLEDONLY`）は**使わない**: 使うと UI 要素に対応しない
   text service を止めてしまうため。通常の `Activate` で、UI 要素に対応する text service の通知だけを受ける。
 - 合成入力を送るのは oracle の側の責務（この部品は受けて書くだけ）。窓にフォーカスが無いと `focus_in` が来ず、通知も届かない。
+- Whether the input method genuinely reports a composition's own end after focus has already
+  moved away from its context is unconfirmed; the M5 pilot should check this specifically. If
+  that end notification never arrives in that situation, a rule that closes the composition when
+  focus leaves must be added on the analysis side instead.

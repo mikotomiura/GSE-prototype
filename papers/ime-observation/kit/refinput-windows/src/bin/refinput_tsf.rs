@@ -41,16 +41,18 @@ mod imp {
     use windows::core::{w, PCWSTR};
     use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::Graphics::Gdi::{GetSysColorBrush, UpdateWindow, COLOR_WINDOW};
-    use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
+    use windows::Win32::System::LibraryLoader::{
+        GetModuleHandleW, LoadLibraryExW, LOAD_LIBRARY_SEARCH_SYSTEM32,
+    };
     use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
     use windows::Win32::UI::Controls::RichEdit::{EM_SETEDITSTYLE, MSFTEDIT_CLASS, SES_USECTF};
     use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindow, LoadCursorW,
-        PostQuitMessage, RegisterClassExW, SendMessageW, ShowWindow, TranslateMessage, CS_HREDRAW,
-        CS_VREDRAW, CW_USEDEFAULT, ES_AUTOVSCROLL, ES_MULTILINE, GW_CHILD, IDC_ARROW, MSG, SW_SHOW,
-        WINDOW_STYLE, WM_DESTROY, WM_KEYDOWN, WM_SETFOCUS, WNDCLASSEXW, WS_CAPTION, WS_CHILD,
-        WS_EX_CLIENTEDGE, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
+        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, GetWindow,
+        LoadCursorW, PostQuitMessage, RegisterClassExW, SendMessageW, ShowWindow, TranslateMessage,
+        CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOVSCROLL, ES_MULTILINE, GW_CHILD, IDC_ARROW,
+        MSG, SW_SHOW, WINDOW_STYLE, WM_DESTROY, WM_KEYDOWN, WM_SETFOCUS, WNDCLASSEXW, WS_CAPTION,
+        WS_CHILD, WS_EX_CLIENTEDGE, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
     };
 
     use super::tsf::{self, CompTracker};
@@ -109,6 +111,11 @@ mod imp {
         });
         Rc::new(move |ev: Ev| {
             let Ok(mut o) = out.try_borrow_mut() else {
+                // A reentrant call while an event is already being written would otherwise be
+                // silently dropped; treat it as a recording failure instead of losing the event.
+                failed.set(true);
+                // SAFETY: 引数なしの単純な呼び出し（この窓のスレッドで呼ぶ）。
+                unsafe { PostQuitMessage(1) };
                 return;
             };
             let text = line(ev, wall_ms(), mono_ns(o.qpc_freq));
@@ -156,7 +163,10 @@ mod imp {
         let result = unsafe {
             (|| -> windows::core::Result<i32> {
                 let hinstance: HINSTANCE = GetModuleHandleW(PCWSTR::null())?.into();
-                LoadLibraryW(w!("Msftedit.dll"))?;
+                // Load only from the system directory, not the working directory or the
+                // executable's own folder, so a same-named file placed there cannot be loaded
+                // instead of the intended system library.
+                LoadLibraryExW(w!("Msftedit.dll"), None, LOAD_LIBRARY_SEARCH_SYSTEM32)?;
                 let class_name = w!("GseRefInputTsf");
                 let class = WNDCLASSEXW {
                     cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
@@ -186,7 +196,7 @@ mod imp {
                     None,
                 )?;
                 // ★ 道 1: TSF 対応のコントロール（RichEdit）を載せる。TSF の文書はこのコントロールが持つ。
-                let edit = CreateWindowExW(
+                let edit = match CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     MSFTEDIT_CLASS,
                     PCWSTR::null(),
@@ -202,7 +212,16 @@ mod imp {
                     None,
                     hinstance,
                     None,
-                )?;
+                ) {
+                    Ok(edit) => edit,
+                    Err(err) => {
+                        // Clean up the parent window created above instead of leaking it.
+                        // SAFETY: `hwnd` was just created by this function and is not used
+                        // again on this path.
+                        let _ = DestroyWindow(hwnd);
+                        return Err(err);
+                    }
+                };
                 // TSF を使う指定（既定でも使うが、はっきりさせる）
                 SendMessageW(
                     edit,
@@ -272,16 +291,16 @@ mod imp {
         let cand = UiKind::Candidate;
         let mut t = CompTracker::default();
         let mut evs = vec![Ev::FocusIn, Ev::KeyDown { vk: 0xE5 }];
-        evs.extend(t.observe(Some(1), Some(1)));
-        evs.extend(t.observe(Some(2), Some(2)));
+        evs.extend(t.observe(Some((1, 0, 1)), Some(1)));
+        evs.extend(t.observe(Some((2, 0, 1)), Some(2)));
         evs.push(Ev::UiBegin { kind: cand });
         evs.push(Ev::UiUpdate { kind: cand });
-        evs.extend(t.observe(Some(2), Some(2)));
+        evs.extend(t.observe(Some((2, 0, 1)), Some(2)));
         evs.push(Ev::UiEnd { kind: cand });
         // 確定: composition が消え、文字は文書に残る（文書末は 2 のまま）
         evs.extend(t.observe(None, Some(2)));
         evs.push(Ev::KeyDown { vk: 0xE5 });
-        evs.extend(t.observe(Some(3), Some(5)));
+        evs.extend(t.observe(Some((3, 2, 1)), Some(5)));
         // 取消: composition の文字も文書から消える（5 → 2）
         evs.extend(t.observe(None, Some(2)));
         evs.push(Ev::UiBegin {
@@ -323,12 +342,17 @@ mod imp {
                 1_000_000_000 + i * 10_000_000,
             ));
         }
-        let written = File::create(path).and_then(|mut f| {
-            for l in &lines {
-                append(&mut f, l)?;
-            }
-            f.flush()
-        });
+        // ★ 生ログと同じく、selftest も既にある出力先を上書きしない。
+        let written = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .and_then(|mut f| {
+                for l in &lines {
+                    append(&mut f, l)?;
+                }
+                f.flush()
+            });
         if written.is_err() {
             return false;
         }

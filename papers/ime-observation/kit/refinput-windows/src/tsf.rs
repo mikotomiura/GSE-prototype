@@ -8,14 +8,14 @@
 //! `ITfContextComposition::EnumCompositions` を見て開始・更新・終了を判定する）。
 //! 候補窓などは `ITfUIElementSink`。
 //!
-//! 構成: 純粋な状態遷移（`CompTracker` / `UiKinds`・COM を使わないので単体テストできる）と、COM のシンク・
-//! 登録（`Tsf`）。⚠️ 通ったこと ≠ 実 IME で通知が届くこと（M5 で確かめる）。
+//! 構成: 純粋な状態遷移（`CompTracker` / `FocusTrackers` / `UiKinds`・COM を使わないので単体テストできる）と、
+//! COM のシンク・登録（`Tsf`）。⚠️ 通ったこと ≠ 実 IME で通知が届くこと（M5 で確かめる）。
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use refinput_windows::{Ev, UiKind};
-use windows::core::{implement, Interface, Result};
+use windows::core::{implement, IUnknown, Interface, Result};
 use windows::Win32::Foundation::BOOL;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
@@ -33,17 +33,31 @@ pub type Recorder = Rc<dyn Fn(Ev)>;
 
 // ---- 純粋な状態遷移 ----------------------------------------------------------------------------
 
-/// composition の観測（長さ・文書末）から `tsf_start` / `tsf_update` / `tsf_end` を導く。
+/// A single composition observation: (total length across all ranges, start offset of the
+/// first range, number of ranges). Offsets are opaque integers, never text.
+pub type CompObs = (u32, i64, usize);
+
+/// Derives `tsf_start` / `tsf_update` / `tsf_end` from a stream of composition observations.
 ///
-/// ⚠️ 解釈しない: 編集が終わるたびに composition があれば `tsf_update` を書く（長さが同じでも書く）。
-/// `tsf_end` の `result_len` は、composition の文字が文書に**残った**長さ
-/// （= 終了後の文書末 − 直前まで composition を除いた文書の長さ）。確定なら composition の長さ、
-/// 取消なら 0。⚠️ 文書末の位置が得られなかったときは `None`（省略）。
+/// An edit is reported as an update for as long as a composition is present, even when its
+/// length is unchanged. `result_len` on `tsf_end` is the length that remains committed to the
+/// document (document end after the composition closed, minus the document end that excludes
+/// the composition, both derived from the last known document end). A commit reports the
+/// composition length, a cancellation reports zero; when either document end is unavailable,
+/// `result_len` is omitted.
+///
+/// If the start offset or the range count changes while a composition is already active, the
+/// new observation is treated as a different composition: a commit followed immediately by a
+/// new composition can otherwise be collapsed into a single update by an edit notification that
+/// only reports the current state, silently losing the boundary between the two.
 #[derive(Debug, Default)]
 pub struct CompTracker {
     active: bool,
     last_len: u32,
-    /// 直前の観測での文書末の位置（composition の文字を含む）
+    /// Start offset and range count last observed while active.
+    start: Option<i64>,
+    count: usize,
+    /// Document end at the last observation (includes any composition text).
     doc_end: Option<i64>,
 }
 
@@ -52,17 +66,28 @@ impl CompTracker {
         self.active
     }
 
-    /// `comp_len`: 今の composition の長さの合計（無ければ `None`）。`doc_end`: 文書末の位置（分からなければ `None`）。
-    pub fn observe(&mut self, comp_len: Option<u32>, doc_end: Option<i64>) -> Vec<Ev> {
-        match (self.active, comp_len) {
+    /// `comp`: the current composition observation, or `None` if no composition is present.
+    /// `doc_end`: the current document end offset, or `None` if it could not be read.
+    pub fn observe(&mut self, comp: Option<CompObs>, doc_end: Option<i64>) -> Vec<Ev> {
+        match (self.active, comp) {
             (false, None) => Vec::new(),
-            (was_active, Some(len)) => {
-                let mut out = Vec::with_capacity(2);
-                if !was_active {
+            (was_active, Some((len, start, count))) => {
+                let mut out = Vec::with_capacity(3);
+                let replaced = was_active && (self.start != Some(start) || self.count != count);
+                if replaced {
+                    // The start offset or range count changed while a composition was open:
+                    // this observation belongs to a different composition than the one that was
+                    // active before. The document end in between the two is unknown, so
+                    // `result_len` is omitted on this synthetic end.
+                    out.push(Ev::TsfEnd { result_len: None });
+                    out.push(Ev::TsfStart);
+                } else if !was_active {
                     out.push(Ev::TsfStart);
                 }
                 self.active = true;
                 self.last_len = len;
+                self.start = Some(start);
+                self.count = count;
                 self.doc_end = doc_end;
                 out.push(Ev::TsfUpdate { len });
                 out
@@ -81,10 +106,81 @@ impl CompTracker {
         }
     }
 
-    /// フォーカスが動いた・登録を外したときに、開いていた composition を**書かずに**忘れる
-    /// （終わったかどうかが分からないものを、終わったと書かない）。
+    /// Forgets an open composition without writing an end event. Used only when its outcome is
+    /// genuinely unknown (for example, when the whole registration is torn down at exit).
     pub fn reset(&mut self) {
         *self = CompTracker::default();
+    }
+}
+
+/// Tracks composition state for several contexts concurrently, keyed by an opaque identifier
+/// supplied by the caller. This lets an observer keep watching a context that just lost focus
+/// until its own composition genuinely ends, instead of discarding it the moment focus moves
+/// away, which would otherwise merge a real end-of-composition into the next context or drop it
+/// entirely. Holds no platform-specific types, so it can be unit tested directly.
+#[derive(Debug, Default)]
+pub struct FocusTrackers<Id> {
+    // (identifier, composition state machine, whether this entry already lost focus)
+    entries: Vec<(Id, CompTracker, bool)>,
+}
+
+impl<Id: Copy + Eq> FocusTrackers<Id> {
+    /// Records a focus change to `new` (`None` if nothing is focused now). Every existing entry
+    /// is first marked as having lost focus; an entry with no open composition is then removed
+    /// and its identifier returned, so the caller can release whatever registration backs it.
+    /// An entry that still has an open composition is kept so its eventual end is still
+    /// observed and reported. If `new` names an identifier that is still tracked, its
+    /// lost-focus flag is cleared instead of creating a duplicate entry.
+    pub fn focus_changed(&mut self, new: Option<Id>) -> Vec<Id> {
+        for entry in self.entries.iter_mut() {
+            entry.2 = true;
+        }
+        let mut removed = Vec::new();
+        self.entries.retain(|(id, tracker, lost_focus)| {
+            let drop_it = *lost_focus && !tracker.is_active();
+            if drop_it {
+                removed.push(*id);
+            }
+            !drop_it
+        });
+        if let Some(id) = new {
+            match self.entries.iter_mut().find(|(i, _, _)| *i == id) {
+                Some(entry) => entry.2 = false,
+                None => self.entries.push((id, CompTracker::default(), false)),
+            }
+        }
+        removed
+    }
+
+    /// Feeds an observation to the entry for `id`. Returns the events produced and whether the
+    /// entry may now be released (it has lost focus and its composition just closed). Does
+    /// nothing if `id` is not tracked.
+    pub fn observe(
+        &mut self,
+        id: Id,
+        comp: Option<CompObs>,
+        doc_end: Option<i64>,
+    ) -> (Vec<Ev>, bool) {
+        let Some(entry) = self.entries.iter_mut().find(|(i, _, _)| *i == id) else {
+            return (Vec::new(), false);
+        };
+        let events = entry.1.observe(comp, doc_end);
+        let may_remove = entry.2 && !entry.1.is_active();
+        (events, may_remove)
+    }
+
+    pub fn is_active(&self, id: Id) -> bool {
+        self.entries
+            .iter()
+            .any(|(i, t, _)| *i == id && t.is_active())
+    }
+
+    pub fn remove(&mut self, id: Id) {
+        self.entries.retain(|(i, _, _)| *i != id);
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
     }
 }
 
@@ -117,26 +213,36 @@ impl UiKinds {
 
 // ---- TSF の呼び出し（unsafe はここに閉じる）----------------------------------------------------
 
-/// 範囲の長さ（`cch`）だけ。⚠️ 本文は読まない。読めなければ 0。
-fn cch_of(range: &ITfRange) -> u32 {
+/// A stable identity for a context, derived from `IUnknown` per COM identity rules (querying
+/// the same object for `IUnknown` always yields the same pointer). Used to route callbacks to
+/// the right tracked entry without relying on an interface-specific pointer, which COM does not
+/// guarantee to be stable across queries.
+fn ctx_id(ctx: &ITfContext) -> Option<usize> {
+    ctx.cast::<IUnknown>().ok().map(|u| u.as_raw() as usize)
+}
+
+/// Start offset and length (`cch`) of a range. Never reads its text; returns `(0, 0)` on
+/// failure.
+fn extent_of(range: &ITfRange) -> (i64, u32) {
     let Ok(acp) = range.cast::<ITfRangeACP>() else {
-        return 0;
+        return (0, 0);
     };
     let (mut start, mut cch) = (0i32, 0i32);
     // SAFETY: 出力先は有効な i32 へのポインタ。
     match unsafe { acp.GetExtent(&mut start, &mut cch) } {
-        Ok(()) => u32::try_from(cch).unwrap_or(0),
-        Err(_) => 0,
+        Ok(()) => (i64::from(start), u32::try_from(cch).unwrap_or(0)),
+        Err(_) => (0, 0),
     }
 }
 
-/// コンテキストにある composition の長さの合計。composition が 1 つも無ければ `None`。
-fn composition_len(ctx: &ITfContext) -> Option<u32> {
+/// The composition observation for a context: total length across all ranges, the start offset
+/// of the first range, and the number of ranges. `None` if no composition is present.
+fn composition_info(ctx: &ITfContext) -> Option<CompObs> {
     let comps = ctx.cast::<ITfContextComposition>().ok()?;
     // SAFETY: 引数なしの列挙の取得。
     let views = unsafe { comps.EnumCompositions() }.ok()?;
-    let (mut total, mut any) = (0u32, false);
-    // ★ 列挙器が壊れていても止まるように、回数に上限を置く。
+    let (mut total, mut count, mut first_start) = (0u32, 0usize, None::<i64>);
+    // Bound the loop in case the enumerator misbehaves.
     for _ in 0..16 {
         let mut view = [None];
         let mut got = 0u32;
@@ -144,12 +250,16 @@ fn composition_len(ctx: &ITfContext) -> Option<u32> {
         if unsafe { views.Next(&mut view, &mut got) }.is_err() || got == 0 {
             break;
         }
-        any = true;
         if let Some(Ok(range)) = view[0].take().map(|v| unsafe { v.GetRange() }) {
-            total = total.saturating_add(cch_of(&range));
+            let (start, cch) = extent_of(&range);
+            if first_start.is_none() {
+                first_start = Some(start);
+            }
+            total = total.saturating_add(cch);
+            count += 1;
         }
     }
-    any.then_some(total)
+    (count > 0).then(|| (total, first_start.unwrap_or(0), count))
 }
 
 /// 文書末の位置（末尾で潰れた範囲の開始位置）。`ec` は `OnEndEdit` が渡す読み取り専用の cookie。
@@ -180,30 +290,95 @@ fn ui_kind_of(mgr: &ITfUIElementMgr, id: u32) -> UiKind {
 
 // ---- シンク ------------------------------------------------------------------------------------
 
-/// 3 つのシンクで共有する状態。
+/// State shared by the sinks: the recording sink, the per-context composition trackers keyed by
+/// `ctx_id`, and the registrations backing them. A registration is kept alive until the
+/// `FocusTrackers` entry for the same identifier says it may be released (see `on_focus_change`
+/// and `on_end_edit`), not simply whenever focus moves away.
 struct Shared {
     rec: Recorder,
-    tracker: RefCell<CompTracker>,
-    /// `OnEndEdit` を受けている最中のコンテキスト（`ITfSource` と cookie）。
-    attached: RefCell<Option<(ITfSource, u32)>>,
+    trackers: RefCell<FocusTrackers<usize>>,
+    /// identifier -> registered `ITfSource` and cookie, released by `unadvise`.
+    sources: RefCell<Vec<(usize, ITfSource, u32)>>,
 }
 
 impl Shared {
-    fn detach(&self) {
-        if let Some((source, cookie)) = self.attached.borrow_mut().take() {
-            // SAFETY: `attach` が受け取った cookie を、同じ `ITfSource` に返す。
-            let _ = unsafe { source.UnadviseSink(cookie) };
+    fn new(rec: Recorder) -> Self {
+        Shared {
+            rec,
+            trackers: RefCell::new(FocusTrackers::default()),
+            sources: RefCell::new(Vec::new()),
         }
-        self.tracker.borrow_mut().reset();
     }
 
+    /// Registers an edit sink on `ctx` and records its cookie for later release.
     fn attach(&self, ctx: &ITfContext, edit: &ITfTextEditSink) {
+        let Some(id) = ctx_id(ctx) else { return };
         let Ok(source) = ctx.cast::<ITfSource>() else {
             return;
         };
-        // SAFETY: `edit` は生きているシンク。cookie は `detach` で返す。
+        // SAFETY: `edit` は生きているシンク。cookie は `unadvise` で同じ `source` に返す。
         if let Ok(cookie) = unsafe { source.AdviseSink(&ITfTextEditSink::IID, edit) } {
-            *self.attached.borrow_mut() = Some((source, cookie));
+            self.sources.borrow_mut().push((id, source, cookie));
+        }
+    }
+
+    fn unadvise(&self, id: usize) {
+        let entry = {
+            let mut sources = self.sources.borrow_mut();
+            sources
+                .iter()
+                .position(|(i, _, _)| *i == id)
+                .map(|pos| sources.remove(pos))
+        };
+        if let Some((_, source, cookie)) = entry {
+            // SAFETY: `attach` が受け取った cookie を同じ `ITfSource` に返す。
+            let _ = unsafe { source.UnadviseSink(cookie) };
+        }
+    }
+
+    /// Releases every registration and forgets all tracked compositions without reporting them,
+    /// because no further notification will ever arrive to say how they ended.
+    fn detach_all(&self) {
+        let ids: Vec<usize> = self.sources.borrow().iter().map(|(i, _, _)| *i).collect();
+        for id in ids {
+            self.unadvise(id);
+        }
+        self.trackers.borrow_mut().clear();
+    }
+
+    /// Handles a focus change: a context that lost focus and has no open composition is
+    /// released immediately; one that still has an open composition stays registered until it
+    /// is observed to end on its own. The newly focused context, if any, is registered.
+    fn on_focus_change(&self, new_ctx: Option<&ITfContext>, edit: &ITfTextEditSink) {
+        let new_id = new_ctx.and_then(ctx_id);
+        let removed = self.trackers.borrow_mut().focus_changed(new_id);
+        for id in removed {
+            self.unadvise(id);
+        }
+        if let Some(ctx) = new_ctx {
+            self.attach(ctx, edit);
+        }
+    }
+
+    /// Handles `OnEndEdit` for `ctx`: derives the composition observation, feeds it to that
+    /// context's tracker, records the resulting events, and releases the context once it has
+    /// both lost focus and closed its composition.
+    fn on_end_edit(&self, ctx: &ITfContext, ec: u32) {
+        let Some(id) = ctx_id(ctx) else { return };
+        let comp = composition_info(ctx);
+        let was_active = self.trackers.borrow().is_active(id);
+        let end = if comp.is_some() || was_active {
+            doc_end(ctx, ec)
+        } else {
+            None
+        };
+        let (events, may_remove) = self.trackers.borrow_mut().observe(id, comp, end);
+        for ev in events {
+            (self.rec)(ev);
+        }
+        if may_remove {
+            self.trackers.borrow_mut().remove(id);
+            self.unadvise(id);
         }
     }
 }
@@ -221,16 +396,8 @@ impl ITfTextEditSink_Impl for EditSink_Impl {
         ecreadonly: u32,
         _peditrecord: Option<&ITfEditRecord>,
     ) -> Result<()> {
-        let Some(ctx) = pic else { return Ok(()) };
-        let comp = composition_len(ctx);
-        let end = if comp.is_some() || self.sh.tracker.borrow().is_active() {
-            doc_end(ctx, ecreadonly)
-        } else {
-            None
-        };
-        let events = self.sh.tracker.borrow_mut().observe(comp, end);
-        for ev in events {
-            (self.sh.rec)(ev);
+        if let Some(ctx) = pic {
+            self.sh.on_end_edit(ctx, ecreadonly);
         }
         Ok(())
     }
@@ -255,17 +422,17 @@ impl ITfThreadMgrEventSink_Impl for ThreadSink_Impl {
         pdimfocus: Option<&ITfDocumentMgr>,
         _pdimprevfocus: Option<&ITfDocumentMgr>,
     ) -> Result<()> {
-        self.sh.detach();
-        match pdimfocus {
-            Some(dim) => {
-                // SAFETY: フォーカスを得たドキュメントの最上位のコンテキストを取る。
-                if let Ok(ctx) = unsafe { dim.GetTop() } {
-                    self.sh.attach(&ctx, &self.edit);
-                }
-                (self.sh.rec)(Ev::FocusIn);
-            }
-            None => (self.sh.rec)(Ev::FocusOut),
-        }
+        let ctx = match pdimfocus {
+            // SAFETY: フォーカスを得たドキュメントの最上位のコンテキストを取る。
+            Some(dim) => unsafe { dim.GetTop() }.ok(),
+            None => None,
+        };
+        self.sh.on_focus_change(ctx.as_ref(), &self.edit);
+        (self.sh.rec)(if pdimfocus.is_some() {
+            Ev::FocusIn
+        } else {
+            Ev::FocusOut
+        });
         Ok(())
     }
     fn OnPushContext(&self, _pic: Option<&ITfContext>) -> Result<()> {
@@ -336,11 +503,7 @@ impl Tsf {
             let source: ITfSource = mgr.cast()?;
             let ui_mgr: ITfUIElementMgr = mgr.cast()?;
 
-            let sh = Rc::new(Shared {
-                rec: rec.clone(),
-                tracker: RefCell::new(CompTracker::default()),
-                attached: RefCell::new(None),
-            });
+            let sh = Rc::new(Shared::new(rec.clone()));
             let edit: ITfTextEditSink = EditSink { sh: sh.clone() }.into();
             let thread_sink: ITfThreadMgrEventSink = ThreadSink {
                 sh: sh.clone(),
@@ -354,7 +517,14 @@ impl Tsf {
             }
             .into();
             let thread_cookie = source.AdviseSink(&ITfThreadMgrEventSink::IID, &thread_sink)?;
-            let ui_cookie = source.AdviseSink(&ITfUIElementSink::IID, &ui_sink)?;
+            let ui_cookie = match source.AdviseSink(&ITfUIElementSink::IID, &ui_sink) {
+                Ok(cookie) => cookie,
+                Err(err) => {
+                    // Undo the first registration rather than leaking it if the second fails.
+                    let _ = source.UnadviseSink(thread_cookie);
+                    return Err(err);
+                }
+            };
             Ok(Tsf {
                 mgr,
                 source,
@@ -367,7 +537,7 @@ impl Tsf {
 
     /// シンクを外し、TSF を止め、COM を閉じる（窓を壊した後に呼ぶ）。
     pub fn stop(self) {
-        self.sh.detach();
+        self.sh.detach_all();
         // SAFETY: `start` で得た cookie を同じ `ITfSource` に返し、`Activate` と対に `Deactivate` する。
         unsafe {
             let _ = self.source.UnadviseSink(self.ui_cookie);
@@ -385,17 +555,22 @@ impl Tsf {
 mod tests {
     use super::*;
 
+    // ---- CompTracker ----------------------------------------------------------------------------
+
     #[test]
     fn a_commit_keeps_the_composition_length_as_the_result() {
         let mut t = CompTracker::default();
-        // 既に 2 文字ある文書に、composition 1 文字 → 3 文字
+        // The document already has 2 characters; a 1-character composition starts at offset 2.
         assert_eq!(
-            t.observe(Some(1), Some(3)),
+            t.observe(Some((1, 2, 1)), Some(3)),
             vec![Ev::TsfStart, Ev::TsfUpdate { len: 1 }]
         );
         assert!(t.is_active());
-        assert_eq!(t.observe(Some(3), Some(5)), vec![Ev::TsfUpdate { len: 3 }]);
-        // 確定: composition が消え、文字は文書に残る（文書末は 5 のまま）
+        assert_eq!(
+            t.observe(Some((3, 2, 1)), Some(5)),
+            vec![Ev::TsfUpdate { len: 3 }]
+        );
+        // Commit: the composition disappears, its text stays in the document (end still 5).
         assert_eq!(
             t.observe(None, Some(5)),
             vec![Ev::TsfEnd {
@@ -408,8 +583,8 @@ mod tests {
     #[test]
     fn a_cancel_leaves_nothing_in_the_document() {
         let mut t = CompTracker::default();
-        t.observe(Some(3), Some(5));
-        // 取消: composition の文字も文書から消える（5 → 2）
+        t.observe(Some((3, 2, 1)), Some(5));
+        // Cancel: the composition's text also disappears from the document (5 -> 2).
         assert_eq!(
             t.observe(None, Some(2)),
             vec![Ev::TsfEnd {
@@ -420,9 +595,9 @@ mod tests {
 
     #[test]
     fn a_commit_that_shrinks_the_text_reports_the_remaining_length() {
-        // かな 3 文字 → 変換して 2 文字で確定（文書末 5 → 4）
+        // 3 characters converted and committed as 2 (document end 5 -> 4).
         let mut t = CompTracker::default();
-        t.observe(Some(3), Some(5));
+        t.observe(Some((3, 2, 1)), Some(5));
         assert_eq!(
             t.observe(None, Some(4)),
             vec![Ev::TsfEnd {
@@ -434,13 +609,13 @@ mod tests {
     #[test]
     fn an_unknown_document_end_omits_the_result_length() {
         let mut t = CompTracker::default();
-        t.observe(Some(3), None);
+        t.observe(Some((3, 0, 1)), None);
         assert_eq!(
             t.observe(None, Some(5)),
             vec![Ev::TsfEnd { result_len: None }]
         );
         let mut t = CompTracker::default();
-        t.observe(Some(3), Some(5));
+        t.observe(Some((3, 0, 1)), Some(5));
         assert_eq!(t.observe(None, None), vec![Ev::TsfEnd { result_len: None }]);
     }
 
@@ -455,15 +630,18 @@ mod tests {
     #[test]
     fn every_edit_during_a_composition_is_an_update_even_if_the_length_is_the_same() {
         let mut t = CompTracker::default();
-        t.observe(Some(2), Some(2));
-        assert_eq!(t.observe(Some(2), Some(2)), vec![Ev::TsfUpdate { len: 2 }]);
+        t.observe(Some((2, 0, 1)), Some(2));
+        assert_eq!(
+            t.observe(Some((2, 0, 1)), Some(2)),
+            vec![Ev::TsfUpdate { len: 2 }]
+        );
     }
 
     #[test]
     fn a_result_never_underflows_or_overflows() {
         let mut t = CompTracker::default();
-        t.observe(Some(3), Some(3));
-        // 文書が composition より小さくなっても負にならない
+        t.observe(Some((3, 0, 1)), Some(3));
+        // The document shrinking past zero must not go negative.
         assert_eq!(
             t.observe(None, Some(-5)),
             vec![Ev::TsfEnd {
@@ -471,7 +649,7 @@ mod tests {
             }]
         );
         let mut t = CompTracker::default();
-        t.observe(Some(0), Some(0));
+        t.observe(Some((0, 0, 1)), Some(0));
         assert_eq!(
             t.observe(None, Some(i64::MAX)),
             vec![Ev::TsfEnd {
@@ -483,17 +661,146 @@ mod tests {
     #[test]
     fn reset_forgets_an_open_composition_without_writing_an_end() {
         let mut t = CompTracker::default();
-        t.observe(Some(2), Some(2));
+        t.observe(Some((2, 0, 1)), Some(2));
         t.reset();
         assert!(!t.is_active());
-        // 忘れた後に composition が無くても `tsf_end` は出ない
+        // Nothing is written for a composition that was forgotten, even once it disappears.
         assert!(t.observe(None, Some(2)).is_empty());
-        // 次の composition は新しく始まる
+        // The next composition starts fresh.
         assert_eq!(
-            t.observe(Some(1), Some(3)),
+            t.observe(Some((1, 2, 1)), Some(3)),
             vec![Ev::TsfStart, Ev::TsfUpdate { len: 1 }]
         );
     }
+
+    #[test]
+    fn a_commit_immediately_followed_by_a_new_composition_at_a_different_offset_splits_into_end_and_start(
+    ) {
+        let mut t = CompTracker::default();
+        assert_eq!(
+            t.observe(Some((2, 0, 1)), Some(2)),
+            vec![Ev::TsfStart, Ev::TsfUpdate { len: 2 }]
+        );
+        // Within a single edit notification: the first composition committed, and a second one
+        // started at a different offset. The changed start offset signals a new composition.
+        assert_eq!(
+            t.observe(Some((1, 5, 1)), Some(6)),
+            vec![
+                Ev::TsfEnd { result_len: None },
+                Ev::TsfStart,
+                Ev::TsfUpdate { len: 1 }
+            ]
+        );
+        assert!(t.is_active());
+    }
+
+    #[test]
+    fn a_change_in_the_range_count_also_splits_into_end_and_start() {
+        let mut t = CompTracker::default();
+        t.observe(Some((2, 0, 1)), Some(2));
+        // Same offset, but the range count changed from 1 to 2: still treated as a new
+        // composition rather than a continuation of the same one.
+        assert_eq!(
+            t.observe(Some((3, 0, 2)), Some(3)),
+            vec![
+                Ev::TsfEnd { result_len: None },
+                Ev::TsfStart,
+                Ev::TsfUpdate { len: 3 }
+            ]
+        );
+    }
+
+    #[test]
+    fn continuing_at_the_same_offset_and_range_count_is_a_plain_update() {
+        let mut t = CompTracker::default();
+        t.observe(Some((1, 0, 1)), Some(1));
+        assert_eq!(
+            t.observe(Some((4, 0, 1)), Some(4)),
+            vec![Ev::TsfUpdate { len: 4 }]
+        );
+    }
+
+    // ---- FocusTrackers --------------------------------------------------------------------------
+
+    #[test]
+    fn a_composition_that_outlives_a_focus_change_still_reports_exactly_one_end() {
+        let mut ft: FocusTrackers<i32> = FocusTrackers::default();
+        assert!(ft.focus_changed(Some(1)).is_empty());
+        let (evs, may_remove) = ft.observe(1, Some((2, 0, 1)), Some(2));
+        assert_eq!(evs, vec![Ev::TsfStart, Ev::TsfUpdate { len: 2 }]);
+        assert!(!may_remove);
+
+        // Focus moves to a different context while 1's composition is still open: it must not
+        // be dropped or forced closed.
+        assert!(ft.focus_changed(Some(2)).is_empty());
+        assert!(ft.is_active(1));
+
+        // The old context's own composition now ends.
+        let (evs, may_remove) = ft.observe(1, None, Some(2));
+        assert_eq!(
+            evs,
+            vec![Ev::TsfEnd {
+                result_len: Some(2)
+            }]
+        );
+        assert!(may_remove);
+        ft.remove(1);
+        assert!(!ft.is_active(1));
+    }
+
+    #[test]
+    fn a_new_composition_starting_before_the_old_one_ends_keeps_them_separate() {
+        let mut ft: FocusTrackers<i32> = FocusTrackers::default();
+        ft.focus_changed(Some(1));
+        ft.observe(1, Some((1, 0, 1)), Some(1));
+        ft.focus_changed(Some(2));
+
+        // A composition starts in the newly focused context; it is a separate state machine
+        // from context 1's still-open composition.
+        let (evs, _) = ft.observe(2, Some((3, 0, 1)), Some(3));
+        assert_eq!(evs, vec![Ev::TsfStart, Ev::TsfUpdate { len: 3 }]);
+
+        // Context 1's composition finally ends on its own, unaffected by context 2.
+        let (evs, may_remove) = ft.observe(1, None, Some(1));
+        assert_eq!(
+            evs,
+            vec![Ev::TsfEnd {
+                result_len: Some(1)
+            }]
+        );
+        assert!(may_remove);
+    }
+
+    #[test]
+    fn an_entry_with_no_open_composition_is_removed_as_soon_as_focus_leaves() {
+        let mut ft: FocusTrackers<i32> = FocusTrackers::default();
+        ft.focus_changed(Some(1));
+        // No composition was ever observed for 1, so moving focus away removes it immediately.
+        let removed = ft.focus_changed(Some(2));
+        assert_eq!(removed, vec![1]);
+    }
+
+    #[test]
+    fn focus_returning_to_a_still_open_context_clears_its_lost_focus_flag() {
+        let mut ft: FocusTrackers<i32> = FocusTrackers::default();
+        ft.focus_changed(Some(1));
+        ft.observe(1, Some((1, 0, 1)), Some(1));
+        ft.focus_changed(Some(2));
+        // Focus returns to 1 while its composition is still open. Context 2 never had a
+        // composition, so it is released now that it has lost focus in turn.
+        assert_eq!(ft.focus_changed(Some(1)), vec![2]);
+        // Now that 1 is focused again, its own end must not be treated as removable.
+        let (evs, may_remove) = ft.observe(1, None, Some(1));
+        assert_eq!(
+            evs,
+            vec![Ev::TsfEnd {
+                result_len: Some(1)
+            }]
+        );
+        assert!(!may_remove);
+    }
+
+    // ---- UiKinds --------------------------------------------------------------------------------
 
     #[test]
     fn ui_kinds_are_remembered_from_begin_to_end() {
