@@ -39,6 +39,8 @@ FORBIDDEN = [
     # 内部の番号（判断・issue・マイルストーン）は公開の読者に意味が無い
     ("internal-ref", re.compile(r"(?<![A-Za-z0-9])(decision|issue|judge?ment)s?\s+#?\d{1,3}(?![0-9])", re.IGNORECASE)),
     ("internal-ref", re.compile(r"(?<![A-Za-z0-9_])M(1[0-3]|[0-9])(?![A-Za-z0-9_])")),
+    # 判断 43: 写した元（別の実装）との関係の説明も公開物に書かない
+    ("relation", re.compile(r"reference (implementation|source)|upstream|verbatim cop(y|ies)", re.IGNORECASE)),
 ]
 CJK = re.compile("[　-〿぀-ヿ㐀-䶿一-鿿！-｠]")
 BACKTICK = re.compile(r"`[^`\n]*`")
@@ -311,7 +313,7 @@ def iter_files(root, paths):
             if ("/" + reld + "/").find("/kit/corpus/data/") >= 0:
                 continue
             for f in sorted(files):
-                if f.endswith(SKIP_SUFFIX) or f.endswith(".internal.md"):
+                if f.endswith(SKIP_SUFFIX) or ".internal." in f:
                     continue
                 if not (f.endswith(TEXT_SUFFIX) or f == ".gitignore"):
                     continue
@@ -357,6 +359,9 @@ def selftest():
     expect("py 内部の判断の番号は赤", "a.py", "# see decision 38\n", ["forbidden:internal-ref"])
     expect("py 内部の issue の番号は赤", "a.py", "# imported by issue 021\n", ["forbidden:internal-ref"])
     expect("py judgment の番号も赤", "a.py", "# see judgment 39/2\n", ["forbidden:internal-ref"])
+    expect("rs 参照実装への言及は赤", "a.rs", "// matching the reference implementation's thread\n", ["forbidden:relation"])
+    expect("py upstream は赤", "a.py", "def against_upstream(): pass\n", ["forbidden:relation"])
+    expect("md verbatim copy は赤", "a.md", "This file is a verbatim copy.\n", ["forbidden:relation"])
     expect("py マイルストーンの番号は赤", "a.py", "# confirmed in the M5 pilot\n", ["forbidden:internal-ref"])
     expect("py M を含む普通の語は通る", "a.py", "# MAP decoding and M-estimators\nx_M1a = 1\n", [])
     expect("rs 日本語のコメントは赤", "a.rs", "// " + J + "\nfn f() {}\n", ["japanese-prose"])

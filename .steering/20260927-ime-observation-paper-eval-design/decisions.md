@@ -332,3 +332,11 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - **acceptance の関数 `style_ok`**（`_acceptance-lib.sh`）: その issue が変えた `papers/ime-observation` の中のファイルだけを検査する。まだ回していない 14 本の acceptance に入れ、日本語のケース名（006 / 018 / 019 / 023 / 024 / 025）を英語にした。024 の acceptance に判断 36 の検査（書き出した全体の検査・出どころの欄が無い・`*.internal.md` が無い）を足した。
 - **識別子の改名**: `check_manifest.py --against-gse` → `--against-upstream`、manifest の `gse_*` の欄 → `upstream_*`。判断 36 の「出どころは manifest の `gse_*` の欄」は、改名後の `upstream_*` の欄を指す。公開の書き出し（024）は `upstream_*` と `start_anchor` / `end_anchor` / `check_decls` を落とす。
 - **整理の進め方**: issue 028。ループではなく、メインが 6 つの束（形式と入口／刺激／解析／パイロットと E2／ロガー／参照入力欄）に分けて作業用エージェントに並列で渡し、統合して `028-acceptance.sh` と merge 済みの全 acceptance で確かめる。merge 済みの issue の acceptance が名指す日本語のケース名は、028.md の表の英語の名前に同時に直す。
+
+## 判断 43: 公開物から「参照実装・写した元」との関係の説明も除く（2026-09-28・研究者の回答）
+
+- 論点: issue 028 の整理の後も、公開物（主にロガー）に「reference implementation（参照実装）」「upstream（写した元）」「verbatim copy」の言い回しが残っていた（GSE と名指さないが、別の実装を写した関係を説明している。公開 repo では写した元が見えず、写した元との照合も使えない）。論文ディレクトリの README にも、公開しない境界の規則（`../README.md`）へのリンクがあった（メインが `53fa7b87` で除いた）。
+- 採用: ★ **公開物からも除く**。
+  - 公開する説明文には関係を書かず、中身だけを書く（例「the monitoring loop polls every 100 ms」）。
+  - 写した元との照合（`--against-upstream`）と manifest の書き直し（`--update`）は、書き出さない内部の道具 `kit/logger/check_manifest_upstream.internal.py` に移す。公開する `check_manifest.py` は自己照合（`--self`）と selftest だけにする。
+  - 書き出し（024）は `*.internal.*` をすべて書き出さない。検査器は `*.internal.*` を対象外にし、公開物の中の「reference implementation / reference source / upstream / verbatim copy」を拾う（2026-09-28 の base で 110 件・すべてロガー）。

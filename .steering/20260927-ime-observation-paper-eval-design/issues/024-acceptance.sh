@@ -32,7 +32,7 @@ if [ -d "${TMP}/e1" ] && "${PY}" "$(dirname "$0")/_style_check.py" --root "${TMP
   ok "AC 判断 36: 書き出した全体が公開物の書き方に合う"
 else ng "AC 判断 36: 書き出した側に違反がある（$(tail -n 1 "${TMP}/style-e1.out" 2>/dev/null)）"; fi
 if [ -d "${TMP}/e1" ] && ! grep -rqE '"(gse_|upstream_)' "${TMP}/e1/kit/logger/" 2>/dev/null; then ok "AC 判断 36: 公開側の manifest に出どころの欄が無い"; else ng "AC 判断 36: 公開側の manifest に出どころの欄が残っている"; fi
-if [ -d "${TMP}/e1" ] && [ -z "$(find "${TMP}/e1" -name '*.internal.md' -print)" ]; then ok "AC 判断 36: *.internal.md が無い"; else ng "AC 判断 36: *.internal.md が書き出されている"; fi
+if [ -d "${TMP}/e1" ] && [ -z "$(find "${TMP}/e1" -name '*.internal.*' -print)" ]; then ok "AC 判断 36 / 43: *.internal.* が無い"; else ng "AC 判断 36 / 43: *.internal.* が書き出されている"; fi
 list () { (cd "$1" && find . -type f | LC_ALL=C sort | while IFS= read -r f; do "${PY}" -c "import hashlib,sys; print(sys.argv[1], hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "${f}"; done); }
 L1="$( [ -d "${TMP}/e1" ] && list "${TMP}/e1" )"
 if [ -n "${L1}" ] && [ "${L1}" = "$( [ -d "${TMP}/e2" ] && list "${TMP}/e2" )" ]; then ok "AC5 2 回の書き出しがバイト一致"; else ng "AC5 書き出しが無い、または 2 回が一致しない"; fi
