@@ -1,5 +1,5 @@
 {
-  "gse_repo_commit": "dcb90a1c83d7886ba920ed19286d2bdf8c0cece1",
+  "gse_repo_commit": "791645ed911421bae1d76b22583051c929a303cf",
   "entries": [
     {
       "kind": "file",
@@ -84,10 +84,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "8b3e08b2c57113d1cffc4766e21086aafa85c920fb1cd3fdcbd34bfe2f8850d3",
+      "sha256": "44166764359ff6aac0eee5185c2d166c59590b4170dd959e1a1d3dc8248482d6",
       "gse_range_sha256": null,
       "check_decls": null,
-      "reason": "lib.rs の emit_ime_shadow と IME Monitor スレッドの、G1（g1_mode）を除いた写し（t は drain した時刻・stale 経路と active→false 遷移経路は Windows 限定）＋ meta 行・key 行の書き出し（obs/1）・selftest（新規）。候補窓が開いているかの観測は既定で IME_ACTIVE を直接読むが、ドライバは driver_api.rs の契約に従って is_candidate_window_open() 相当の観測関数を差し込める（issue 011 merge ゲートレビュー item 1）。GSE 側の判断そのものの照合は main_emit_ime_shadow_judgment / main_ime_monitor_loop_judgment（判断 33）が持つ"
+      "reason": "lib.rs の emit_ime_shadow と IME Monitor スレッドの、G1（g1_mode）を除いた写し（t は drain した時刻・stale 経路と active→false 遷移経路は Windows 限定）＋ meta 行・key 行の書き出し（obs/1）・selftest（新規）。候補窓が開いているかの観測は既定で IME_ACTIVE を直接読むが、ドライバは driver_api.rs の契約に従って is_candidate_window_open() 相当の観測関数を差し込める（issue 011 merge ゲートレビュー item 1）。GSE 側の判断そのものの照合は main_emit_ime_shadow_judgment / main_ime_monitor_loop_judgment（判断 33）が持つ。mod analysis（逐語コピーの key_gate）を宣言する（011 の追補・判断 35）"
     },
     {
       "kind": "new",
@@ -126,7 +126,7 @@
       "start_anchor": "fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {",
       "end_anchor": "// アプリ起動",
       "symbol": "emit_ime_shadow",
-      "sha256": "8b3e08b2c57113d1cffc4766e21086aafa85c920fb1cd3fdcbd34bfe2f8850d3",
+      "sha256": "44166764359ff6aac0eee5185c2d166c59590b4170dd959e1a1d3dc8248482d6",
       "gse_range_sha256": "bbd0fcf76c30845444753c1323afa8998d1d928b53bf16dece1f1493e866308b",
       "check_decls": null,
       "reason": "判断 33: emit_ime_shadow が GSE 側で変わっていないかを --against-gse で検出する（写し自体は main.rs の emit_ime_shadow・逐語ではなく Atomic の受け渡しを ShadowAtomics に差し替えた同じ判断の移植）"
@@ -140,10 +140,38 @@
       "start_anchor": "    // IME モニタースレッド",
       "end_anchor": "    // キーボードフック・IME ポーリングの Sender を setup() に渡すために保持。",
       "symbol": null,
-      "sha256": "8b3e08b2c57113d1cffc4766e21086aafa85c920fb1cd3fdcbd34bfe2f8850d3",
+      "sha256": "44166764359ff6aac0eee5185c2d166c59590b4170dd959e1a1d3dc8248482d6",
       "gse_range_sha256": "c806eabc302eeb38dadb6b1dd3e45d4691cdadcc643781c4a8012e444d4564f4",
       "check_decls": null,
       "reason": "判断 33: IME Monitor スレッドの 1 周（safety valve → active→false 遷移 → READY 直接ポーリングの順序）が GSE 側で変わっていないかを --against-gse で検出する（写しは main.rs の Monitor::run_cycle・G1 を除く）"
+    },
+    {
+      "kind": "file",
+      "id": "key_gate",
+      "path": "src/analysis/key_gate.rs",
+      "gse_path": "src-tauri/src/analysis/key_gate.rs",
+      "gse_last_commit": "9eb1384c37d2cb2f2c54f029a9053398ac2ea31e",
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "80f1aa57c96aefeff47daa86bb8901ccbbda1cde7eb29b2fd4657a74f1b20557",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": "011 の追補（判断 35）: GSE の Windows の is_observed_key（hook_windows.rs）が本体の先頭で crate::analysis::key_gate::is_feature_key を呼ぶため、外部参照の無い key_gate.rs をファイルごと逐語コピーする（テストも一緒に走る）"
+    },
+    {
+      "kind": "new",
+      "id": "analysis_mod",
+      "path": "src/analysis/mod.rs",
+      "gse_path": null,
+      "gse_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "2d1b7c2a1d4c114facdc81ba25b93b1f7d58e90fb84e6a35442019a87de64740",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": "GSE の analysis/mod.rs の代わり: 逐語コピーした key_gate.rs だけを宣言する（011 の追補・判断 35）"
     }
   ]
 }

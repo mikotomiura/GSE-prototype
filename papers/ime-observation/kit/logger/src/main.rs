@@ -7,6 +7,11 @@
 //! 使い方: `ime-observation-logger --out <path> [--duration-s <n>]` / `ime-observation-logger --selftest [--out <path>]`
 //! OS ドライバ（打鍵の取得）は `driver_macos.rs` / `driver_windows.rs`（後続の issue）。
 
+// ★ GSE の Windows の `is_observed_key`（`hook_windows.rs`）は本体の先頭で `crate::analysis::key_gate` を呼ぶ。
+//   `key_gate.rs` を**ファイルごとの逐語コピー**で置き、ドライバ（issue 013 / 014）がそれを逐語の抜粋から呼べるようにする
+//   （011 の追補）。macOS のドライバは使わないので `dead_code` を許す。
+#[allow(dead_code)]
+mod analysis;
 mod driver_api;
 #[cfg(target_os = "macos")]
 mod driver_macos;

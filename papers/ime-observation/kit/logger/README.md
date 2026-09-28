@@ -13,10 +13,11 @@ GSE（Generative Struggle Engine）の**変換セッション状態機械**を�
 | **ファイル**（逐語コピー） | `src/input/ime_compose.rs` | `src-tauri/src/input/ime_compose.rs` | 1 バイトも変えない。テストも一緒に走る |
 | **ファイル**（逐語コピー） | `src/input/ime_cloak.rs` | `src-tauri/src/input/ime_cloak.rs` | 同上 |
 | **ファイル**（逐語コピー） | `src/input/ime_mode.rs` | `src-tauri/src/input/ime_mode.rs` | 同上 |
+| **ファイル**（逐語コピー） | `src/analysis/key_gate.rs` | `src-tauri/src/analysis/key_gate.rs` | 同上。Windows の `is_observed_key`（ドライバの逐語の抜粋）が本体の先頭で `crate::analysis::key_gate::is_feature_key` を呼ぶため（011 の追補） |
 | **抜粋**（逐語コピー） | `src/key_category.rs` | `src-tauri/src/analysis/anonymize.rs` の `KeyCategory` ほか | 範囲は `manifest.json` のアンカー。`// @excerpt-begin/end key_category` の間 |
 | **新規**（シム） | `src/input/hook.rs` | `src-tauri/src/input/hook.rs` の定数と Atomic だけ | 値と型は `check_decls: true` を持つ manifest エントリに限り `--against-gse` が GSE と照合する |
 | **新規** | `src/main.rs` | `lib.rs` の `emit_ime_shadow` と IME Monitor スレッドの、G1 を除いた写し | ＋ `meta` / `key` 行の書き出し・`--selftest`。GSE 側の判断そのものの照合は `main_emit_ime_shadow_judgment` / `main_ime_monitor_loop_judgment`（下記） |
-| **新規** | `src/driver_api.rs` / `src/input/mod.rs` / `Cargo.toml` | — | ドライバと核の境界の型・候補窓の観測の差し込み口・停止の契約 |
+| **新規** | `src/driver_api.rs` / `src/input/mod.rs` / `src/analysis/mod.rs` / `Cargo.toml` | — | ドライバと核の境界の型・候補窓の観測の差し込み口・停止の契約 |
 | 差し込み口（**manifest に載せない**） | `src/driver_macos.rs` / `src/driver_windows.rs` | — | 空。中身は後続の issue（macOS = 012 / Windows = 013・014） |
 
 一覧の正本は `manifest.json`（種別・`gse_path`・`gse_last_commit`・SHA-256・理由）。ドライバの manifest
