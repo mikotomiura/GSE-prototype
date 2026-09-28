@@ -247,7 +247,7 @@
   - テンプレート: "LaTeX macro package (Download zip, 190 kB)"（`https://media.springer.com/full/springer-instructions-for-authors-assets/zip/468198_LaTeX_DL_468198_01072021.zip` ・⚠️ ファイル名の日付は 2021）と、"Springer Nature's LaTeX template"（`https://www.springernature.com/gp/authors/campaigns/latex-author-support` ）の 2 系統。⚠️ 同じページの Text Formatting には "Manuscripts should be submitted in Word." ともある（Word / LaTeX のどちらも受け付ける）。逐語 "Please do not use subfolders for your LaTeX submission, e.g. for figures or bibliographic files."
   - 要旨: "Please provide an abstract of 150 to 250 words." ／ キーワード: "Please provide 4 to 6 keywords"
   - 引用: "Cite references in the text by name and year in parentheses."（著者名・年）・文献リストは第一著者の姓のアルファベット順
-  - 必須の節: "The following statements should be included under the heading \"Statements and Declarations\" … submissions that do not include relevant declarations will be returned as incomplete."（Competing Interests など）／ "All original research must include a data availability statement."
+  - 必須の節: "The following statements should be included under the heading 'Statements and Declarations' …（原文の二重引用符を一重に置き換えた） submissions that do not include relevant declarations will be returned as incomplete."（Competing Interests など）／ "All original research must include a data availability statement."
   - LLM: "Large Language Models (LLMs), such as ChatGPT, do not currently satisfy our authorship criteria. … Use of an LLM should be properly documented in the Methods section" ／ "AI assisted copy editing" は申告不要。→ ★ **[P434] の転記と解析・執筆の支援に LLM を使ったことを Methods に書く**（判断 12-4・16）。
   - 所属: "For authors that are (temporarily) unaffiliated we will only capture their city and country of residence" → 個人研究者でも投稿できる。
   - 分量: ⚠️ **このページに頁数・語数の上限は見当たらなかった**（要旨の 150–250 語だけ）。
