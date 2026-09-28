@@ -776,7 +776,7 @@ def selftest():
     train, held, dropped = split_phrases(corpus, 11, 0.25)
     train_readings = set(p["reading"] for p in train)
     held_readings = set(p["reading"] for p in held)
-    check("学習と評価が重ならない", not (set(p["phrase_id"] for p in train) & set(p["phrase_id"] for p in held))
+    check("training and evaluation do not overlap", not (set(p["phrase_id"] for p in train) & set(p["phrase_id"] for p in held))
           and not (train_readings & held_readings) and len(held) == 23, "ids or readings overlap")
     check("work-level split: no evaluation phrase's work contributes a training phrase (K1)",
           not (set(p["work_id"] for p in train) & set(p["work_id"] for p in held)), "works overlap")
@@ -820,7 +820,7 @@ def selftest():
           for i, p in enumerate(held)]   # the held-out phrases, each with its own observation
     res = evaluate(ev, lm0, lm1, beam=6, B=400, seed=5)
     g1, g0 = res["gain"]["K1"], res["gain"]["K0"]
-    check("復号がベースラインより良い", g1["gain"] > 0.25 and g1["gain_ci"][0] is not None and g1["gain_ci"][0] > 0.0
+    check("decoding beats the baseline", g1["gain"] > 0.25 and g1["gain_ci"][0] is not None and g1["gain_ci"][0] > 0.0
           and res["K1"]["cer"] < res["baseline"]["K1"]["cer"], "K1 gain %r CER %r baseline %r" % (
               g1, res["K1"]["cer"], res["baseline"]["K1"]["cer"]))
     check("K0 also gains from the log (the key count)", g0["gain"] > 0.0 and res["K0"]["cer"] < res["baseline"]["K0"]["cer"],
@@ -834,7 +834,7 @@ def selftest():
     check("every decoded reading has the observed key pattern", okpat)
     # negative control: the same trials with the observations exchanged between trials
     sh1 = res["shuffled"]["K1"]
-    check("入れ替えると差が消える", sh1["gain"] < 0.35 * g1["gain"] and abs(sh1["gain"]) < 0.15
+    check("shuffling removes the difference", sh1["gain"] < 0.35 * g1["gain"] and abs(sh1["gain"]) < 0.15
           and sh1["gain_ci"][0] is not None and sh1["gain_ci"][0] <= 0.0
           and sh1["cer"] > res["K1"]["cer"] + 0.25, "shuffled %r real gain %r" % (sh1, g1["gain"]))
     # gain_vs_shuffled (paired against the shuffled decode, not the prior baseline) isolates the trial's own

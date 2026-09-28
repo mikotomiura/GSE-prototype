@@ -8,8 +8,8 @@ P="${K}/pilot"
 echo "[015] 較正パイロットの道具"
 for f in call_types clock_sync reach seal_obs; do selftest_ok "${P}/${f}.py"; done
 need_file "${P}/README.md"
-need_grep "${P}/clock_sync.py" "既知のずれとドリフトを回復" "AC4 selftest ケース: 既知のずれとドリフトを回復"
-need_grep "${P}/reach.py" "key 行を半分消すと 50%" "AC5 selftest ケース: key 行を半分消すと 50%（陽性対照）"
+need_grep "${P}/clock_sync.py" "recovers a known offset and drift" "AC4 selftest ケース: recovers a known offset and drift"
+need_grep "${P}/reach.py" "removing half of the key rows yields 50%" "AC5 selftest ケース: removing half of the key rows yields 50%（陽性対照）"
 
 # AC2: ⚠️ ImeShadow を読まない
 for f in call_types clock_sync reach; do forbid_grep "${P}/${f}.py" 'ime_shadow|dwell_ms' "AC2 ${f}.py が ImeShadow に触れない"; done

@@ -1,150 +1,177 @@
-# kit/pilot — 較正パイロットの道具
+# kit/pilot — calibration pilot instrumentation
 
-較正パイロットは、**実測の前に**計器そのもの（正解・入力・時計）が正しいことを確かめ、正解の定義（変換の開始・確定・
-取消・候補窓）を実機の呼び出し列で決めるための予行である。Apple も Microsoft も、入力メソッドがテキスト入力欄を
-呼ぶ順序を文書にしていないので、順序は実機で見て決める。ここの 4 本の道具は、その材料を出す。
+The calibration pilot verifies, **before any accuracy measurement**, that the instrumentation itself (ground truth,
+input, and clocks) is correct, and fixes the operational definition of ground truth (composition start, commit,
+cancel, and candidate window) against an on-device sequence of API calls. Neither Apple nor Microsoft documents the
+order in which an input method calls a text input field, so the order is determined empirically. The four tools in
+this directory produce that material.
 
-| 道具 | 何を出すか | 入力 |
+| Tool | Output | Input |
 |---|---|---|
-| `call_types.py` | 試行ごとの**呼び出し列の型**（例 `set_marked+ → insert_text`）の、シナリオ × src ごとの件数と、1 試行の実時間（中央値・95 パーセンタイル） | gt・oracle・plan |
-| `clock_sync.py` | ブロックごとの**同期マーカー**から、oracle・gt・観測の**時刻差の分布とドリフト** | oracle・（gt）・（keys-only の観測）・マーカーの仕様 |
-| `reach.py` | 合成入力が**観測部のフックに届くか**（試行ごとの「送った押下」と「届いた key 行」の比較） | oracle・keys-only の観測 |
-| `seal_obs.py` | 単体ロガーの出力から `meta` 行と `key` 行だけを取り出し、元のファイルを**封印**する（`--unseal` は凍結後の解析パイプライン専用） | 単体ロガーの出力 |
+| `call_types.py` | Per-trial **call-sequence types** (for example `set_marked+ → insert_text`), counted by scenario x source, and each trial's wall-clock duration (median, 95th percentile) | gt, oracle, plan |
+| `clock_sync.py` | Per-block **synchronisation markers**: the distribution and drift of the time differences among oracle, gt, and the observation | oracle, (gt), (keys-only observation), marker specification |
+| `reach.py` | Whether synthetic input **reaches the observation-side hook** (per trial, comparing presses sent against key rows received) | oracle, keys-only observation |
+| `seal_obs.py` | Extracts only the `meta` and `key` rows from a standalone-logger output and **seals** the original file (`--unseal` is for the post-freeze analysis pipeline only) | standalone-logger output |
 
-Python 標準ライブラリだけ。各ファイルに `--selftest`（目印 `# kit: selftest`）があり、`bash kit/check.sh` が回す。
+Python standard library only. Each file has a `--selftest` (marked with `# kit: selftest`), run by `bash kit/check.sh`.
 
-## ⚠️ 境界: パイロットは ImeShadow を見ない
+## Boundary: the pilot does not read ImeShadow
 
-パイロットは精度の実測ではない。プロトコルを凍結する前に、観測部の ImeShadow の値を見て、それに合わせて
-正解の定義やシナリオを直すと、後の精度の評価が循環する（見てから決めた定義で測ることになる）。だから:
+The pilot is not an accuracy measurement. Adjusting the operational definition of ground truth, or the scenario set,
+after looking at the observation side's ImeShadow values, before the protocol is frozen, would make the later
+accuracy evaluation circular (measuring against a definition chosen after seeing the data). Therefore:
 
-- パイロットの解析は ImeShadow の行を**見ない・数えない・突き合わせない**。使うのは観測側の `key` 行（category と
-  press と時刻）だけである。
-- 単体ロガーの出力は、**解析より前に**、まず `seal_obs.py` に通す。以後の解析は keys-out だけを読む。
-- `call_types.py` / `clock_sync.py` / `reach.py` は、ImeShadow の行を読む記述を**持たない**。観測側の入力に
-  `meta` と `key` 以外の行が 1 行でもあれば、内容に触れず拒否する（封印していないファイルを渡した事故を止める）。
-- `seal_obs.py` は**許可リスト**で書かれている（残す種類だけを名指し、捨てる種類を名指さない）。許可リストは
-  行の種類だけでなく、行の中のフィールドにも効く（meta 行・key 行はどちらも仕様の欄から作り直して書く。
-  それ以外の欄が 1 つでもある行は拒否する）。捨てた行の行数・値・行番号・種類を、標準出力・`seal.json`・
-  エラーメッセージのどこにも出さない。
-- ⚠️★★★ **元のバイト数・行数は、標準出力にも `seal.json` にも出さない（判断 31）**。バイト数と封印先の大きさ
-  から ImeShadow の行数（＝検出したセッション数）が高い精度で推せてしまい、プロトコルを凍結する前に
-  「精度に近い量」が読めてしまうため。完全性は SHA-256 だけで確かめる（元のバイト数を知らなくても、
-  開封して SHA-256 が一致すれば元のファイルが無傷で戻ったと分かる）。
-- 封印先のファイルは **1 MiB（1048576 バイト）の倍数の大きさに詰める**（0 で埋める）。元の長さは詰め物の
-  後ろの固定長の欄に置き、開封のときだけ取り除く。★ この設計だと、封印先の大きさからは「1 MiB 単位でしか」
-  元の大きさが分からない（判断 31 が許す粗さ）。
-- ⚠️ 封印したファイルの**中身を読む・解釈する**道具は作らない。`seal_obs.py --unseal SEALED --out FILE` は
-  元のバイト列にそのまま戻すだけ（詰め物を取り除き、SHA-256 を `seal.json` と照合する）で、中身の JSON を
-  解析しない。使ってよいのは、プロトコルを凍結した後の解析パイプラインだけ。
+- The pilot's analysis **never reads, counts, or matches** ImeShadow rows. It uses only the observation side's `key`
+  rows (category, press, and timestamp).
+- A standalone-logger output is passed through `seal_obs.py` **before any analysis**. All subsequent analysis reads
+  only the keys-out file.
+- `call_types.py`, `clock_sync.py`, and `reach.py` contain **no code that reads ImeShadow rows**. If the observation
+  input contains any row other than `meta` or `key`, they refuse it without inspecting its content (this stops the
+  accident of passing an unsealed file downstream).
+- `seal_obs.py` is written as an **allow list** (it names the kinds of row to keep, never the kinds to discard). The
+  allow list applies not only to the kind of row but also to the fields inside a row: both the `meta` and `key` rows
+  are rebuilt from the specification's fields, and a row with any other field is refused. The count, value, line
+  number, or kind of a discarded row is never written to standard output, `seal.json`, or an error message.
+- **Neither the original byte count nor the original line count is ever written to standard output or `seal.json`.**
+  The byte count, together with the size of the sealed file, would let the number of ImeShadow rows (that is, the
+  number of detected sessions) be estimated with high precision, revealing something close to the accuracy before
+  the protocol is frozen. Integrity is verified with SHA-256 alone: opening the sealed file and matching its
+  SHA-256 confirms the original file was restored intact, without ever needing the original byte count.
+- The sealed file is **padded to a multiple of 1 MiB (1,048,576 bytes)** (padded with zero bytes). The original
+  length is stored in a fixed-length field after the padding and is removed only when unsealing. Under this design
+  the sealed file's size reveals the original size only to the nearest 1 MiB, which is the coarseness the
+  byte-count-suppression requirement allows.
+- No tool is built to **read or interpret the contents** of a sealed file. `seal_obs.py --unseal SEALED --out FILE`
+  only restores the original byte sequence (removing the padding and checking the SHA-256 against `seal.json`); it
+  never parses the JSON content. It is to be used only by the analysis pipeline after the protocol is frozen.
 
-## 手順（macOS と Windows の較正パイロットで、この順に使う）
+## Procedure (used in this order for the macOS and Windows calibration pilot)
 
-1. **参照入力欄だけ**を動かして S1〜S15 を各数回流し、gt（呼び出し列）と oracle（送った押下）を記録する。
-   Windows は IMM 互換と TSF の両経路を記録する。
-   同時に単体ロガーも走らせ、obs を出させる（ImeShadow を含んでよい。人は開かない）。
-2. **単体ロガーを止めてから、すぐに封印する**（★ ロガーが書き込み中のファイルは、大きさ・mtime が安定しないと
-   判断して拒否する）:
+1. Run S1 through S15 several times each **using the reference input field only**, recording gt (the call sequence)
+   and oracle (the presses sent). On Windows, record both the IMM-compatible and the TSF paths. At the same time,
+   run the standalone logger and let it write obs (it may include ImeShadow rows; no one reads them).
+2. **Stop the standalone logger, then seal its output immediately** (a file the logger is still writing to is
+   refused, because its size and mtime are judged unstable):
    ```bash
    python3 kit/pilot/seal_obs.py --obs obs.jsonl --keys-out obs.keys.jsonl --sealed-dir sealed/
    ```
-   `obs.jsonl` は `sealed/` へ移り（元の場所からは消える）、1 MiB 単位に詰められる。`sealed/seal.json` に
-   元の SHA-256・封印時刻が残る（★ バイト数は記録しない・判断 31）。
-   `obs.keys.jsonl` は `obs/1` の検査器（`kit/formats/validate_logs.py --kind obs`）を通る。
-   keys-out が既にある・封印先に同名のファイルか `seal.json` が既にあるときは、何も動かさずに止まる。
-3. **呼び出し列の型**を数える:
+   `obs.jsonl` moves into `sealed/` (and is removed from its original location) and is padded to a multiple of
+   1 MiB. `sealed/seal.json` records the original SHA-256 and the sealing time (the byte count is not recorded).
+   `obs.keys.jsonl` passes the `obs/1` validator (`kit/formats/validate_logs.py --kind obs`). If keys-out already
+   exists, or a file of the same name or `seal.json` already exists at the seal destination, nothing is touched and
+   the tool stops.
+3. Count the **call-sequence types**:
    ```bash
    python3 kit/pilot/call_types.py --gt gt.jsonl --oracle oracle.jsonl --plan plan.jsonl --out call_types.json
    ```
-   Windows は経路ごとの gt で 2 回回し、出力の `types` を並べて、両経路が同じ区間を返すかを見る（食い違えばそれ自体を報告する）。
-4. **フックへの到達**を確かめる（観測側は keys-only）:
+   On Windows, run it twice, once per path, with the corresponding gt, and compare the `types` output of the two
+   runs to see whether both paths return the same segments (a mismatch is itself worth reporting).
+4. Check **reach to the hook** (observation side is keys-only):
    ```bash
    python3 kit/pilot/reach.py --oracle oracle.jsonl --obs-keys obs.keys.jsonl --out reach.json
    ```
-5. **時計の対応**を出す:
+5. Produce the **clock correspondence**:
    ```bash
    python3 kit/pilot/clock_sync.py --oracle oracle.jsonl --gt gt.jsonl --obs-keys obs.keys.jsonl \
        --marker marker.json --out clock_sync.json
    ```
 
-出力の JSON は実験の記録に置いてよい。生ログ（gt・oracle・plan・obs・封印したファイル）は git に入れない。
+The output JSON files may be kept with the experiment record. Raw logs (gt, oracle, plan, obs, and sealed files) are
+not committed to git.
 
-## 出力の読み方
+## Reading the output
 
 ### `call_types.py`
 
-- `by_scenario.<S>.types` = 型の文字列 → 件数（多い順）。型は呼び出しの名前を「 → 」でつなぎ、同じものが 2 回以上
-  続くと「+」に畳む。`do_command` は `cmd`、`notify` は `imn`、`ui_*` は `ui_kind` を「[…]」で添える。
-- 同じシナリオで型が**割れる**なら、正解の定義はその割れ方を受け止められる形にする（取消と確定の区別・候補窓の
-  有無など）。1 つの型に揃うなら、その型が定義の根拠になる。
-- `duration_ms` = 1 試行の実時間（oracle の `trial_begin` から `trial_end`）。⚠️ **試行間の待ち
-  （`gap_before_ms`）・マーカー・リセットは含まない**（区間はそれらの手前で切れる）。実測全体の所要時間と
-  n の見直しに使う。`session_wall_ms` はそれとは別に、**セッション全体の壁時計の長さ**（最初の `reset` /
-  `block_begin` から最後の `block_end` まで。待ち・マーカー・リセットも含む）。
-- `unassigned_events` / `unassigned_events_by_ev` が多いなら、時計が合っていない（`--clock` を変える・
-  `--pre-ms` / `--tail-ms` を広げる）か、試行の間・次のブロックの頭（`reset` / `block_begin` / `marker`）に
-  呼び出しが来ている（区間は次の oracle 行でも切れるので、そちら側に出る）。`planned_not_run` は、計画にあって
-  oracle に一度も出てこなかった試行の数（★ `trial_begin` だけで終わった未完結の試行は `trials_incomplete`
-  側に数え、二重には数えない）。
-- `per_trial` = 試行ごとの最初と最後の呼び出しの相対時刻（`trial_begin` からの ms。呼び出しが無ければ
-  `null`）。Windows の IMM と TSF の 2 経路の区間が一致するかを M5 で突き合わせるのに使う。
+- `by_scenario.<S>.types` maps a type string to a count (most frequent first). A type joins call names with " → ",
+  folding a name repeated two or more times in a row into a single entry with a trailing "+". `do_command` appends
+  `cmd`, `notify` appends `imn`, and `ui_*` appends `ui_kind`, each in brackets.
+- If a scenario's types **split** into more than one form, the operational definition of ground truth must be able
+  to absorb that split (for example, the distinction between cancel and commit, or the presence of a candidate
+  window). If they converge to a single form, that form is the basis for the definition.
+- `duration_ms` is a trial's wall-clock duration (oracle's `trial_begin` to `trial_end`). **It excludes the
+  inter-trial wait (`gap_before_ms`), markers, and resets** (the interval ends before them). It is used to review
+  the total measurement time and the trial count `n`. `session_wall_ms` is separate: it is the **wall-clock
+  duration of the whole session** (from the first `reset` / `block_begin` to the last `block_end`, including waits,
+  markers, and resets).
+- A large `unassigned_events` / `unassigned_events_by_ev` indicates either that the clocks are not aligned (try a
+  different `--clock`, or widen `--pre-ms` / `--tail-ms`) or that calls are arriving between trials or at the start
+  of the next block (`reset` / `block_begin` / `marker`); the interval also ends at the next oracle row, so such
+  calls appear there. `planned_not_run` counts trials that were in the plan but never appeared in oracle at all
+  (trials that ended with only a `trial_begin`, incomplete, are counted separately in `trials_incomplete`, not
+  double-counted).
+- `per_trial` gives, for each trial, the relative time of its first and last call (in ms from `trial_begin`; `null`
+  if there was no call). It is used to check whether the intervals of the Windows IMM and TSF paths agree during
+  the calibration pilot.
 
 ### `reach.py`
 
-- `reach_rate` = Σ min(送った, 届いた) / Σ 送った。`diff_distribution` は試行ごとの（届いた − 送った）の分布で、
-  0 ばかりなら全部届いている。負の値の試行が並ぶなら、その数だけ取りこぼしている（`per_trial` で試行を探せる）。
-- 擬似キー（`mouse_click` / `focus_away` / `focus_back`）は実キーではなく `key` 行を作らないので数えない（`--ignore-keys` で変えられる）。
-  ⚠️ 観測部が観測しないキー（GSE の macOS は観測対象の外のキーを `key` 行に出さない）を送ると、
-  「届かなかった」に見える。それも到達率の結果である（どのキーが届かないかは、試行の型から読む）。
-- `outside_trials_rows` = どの試行の区間にも入らない `key` 行（ブロック頭のマーカーのキーがここに入る。⚠️ 区間は
-  次の oracle 行（`reset` / `block_begin` / `marker` / 次の `trial_begin`）でも切るので、次のブロックの
-  マーカーの押下が前のブロックの最後の試行に紛れ込まない）。
-- `per_trial` に、試行ごとに送った keyname の並び（`sent_keys`）と届いた category の並び（`obs_categories`。
-  どちらも列挙値）が出る。M1 でマーカーのキーを選ぶときに使う。
+- `reach_rate` = sum(min(sent, received)) / sum(sent). `diff_distribution` is the per-trial distribution of
+  (received − sent); values clustered at 0 mean everything arrived, while trials with negative values are missing
+  that many presses (look them up with `per_trial`).
+- Pseudo-keys (`mouse_click` / `focus_away` / `focus_back`) are not real keys and produce no `key` row, so they are
+  not counted (change this with `--ignore-keys`). Sending a key the observation side does not observe makes it
+  look like it "did not arrive"; that too is a genuine result of the reach measurement (which keys do not arrive is
+  read from the trial's type).
+- `outside_trials_rows` counts `key` rows that fall inside no trial's interval (the presses of a block-start marker
+  land here). The interval also ends at the next oracle row (`reset` / `block_begin` / `marker` / the next
+  `trial_begin`), so a marker press at the start of the next block is not folded into the last trial of the
+  previous block.
+- `per_trial` gives, per trial, the sequence of key names sent (`sent_keys`) and the sequence of categories
+  received (`obs_categories`), both enumerated values. This is used to choose the marker key.
 
 ### `clock_sync.py`
 
-マーカーの仕様（JSON）:
+Marker specification (JSON):
 
 ```json
 {"oracle_keys": ["f13", "f14", "f15"], "gt_vks": [105, 107, 113], "obs_categories": ["function", "function", "function"], "max_gap_ms": 150}
 ```
 
-- マーカーのキーは**観測側の `key` 行に出る**こと・**IME の状態を変えない**ことが要る（観測部が観測しないキーは
-  `key` 行に出ないので、マーカーにならない）。3 つの並びの先頭は、同じ押下に対応させる。
-- 観測側の `key` 行は category（14 種）だけなので、マーカーは「category の並び ＋ 間隔」で見つける。並びが
-  途切れずに続き、隣り合う間隔が `max_gap_ms` 以下の箇所だけを拾う（間隔は gt が単調時計・観測が壁時計）。
-- ブロックへの対応づけは、oracle の先頭のキーの時刻の前後 `--window-ms`（既定 3000）以内で最も近い出現を、
-  一対一で割り当てる。**見つからなかったブロックは `missing` に出る**（黙って捨てない）。どのブロックにも
-  対応しない出現は `unmatched_occurrences`。時計のずれが窓を超えると全部見つからないので、窓を広げる。
-- 差 = 各側の先頭のキーの時刻 − oracle の先頭のキーの時刻（ms）。⚠️ **遅延（送出から記録までの時間）と時計の
-  ずれは分けられない**（差にはその和が出る）。ブロックをまたいで変わらないなら遅延＋一定のずれ、ブロック番号
-  （時間）とともに動くならドリフト。
-- 各差に、中央値・最小・最大・`offset_at_start_ms`（最初のブロックの時刻での当てはめ値）・`drift_ms_per_hour`
-  （oracle のマーカーの時刻に対する最小二乗の傾き）・`residual_max_ms`（当てはめ直線からの最大のずれ）・ブロックごとの値がある。
-  ブロックが 2 つ未満なら `drift_ms_per_hour` は `null`。
-- `gt_minus_oracle_mono` は単調時計の差。観測側は壁時計（Unix ms）だけを持つので、観測の差は壁時計だけ。
-  壁時計と単調時計のどちらが gt と oracle で揃っているかは、この 2 つの差を見て決める。
+- A marker key must **appear in the observation's `key` rows** and must **not change IME state** (a key the
+  observation side does not observe never produces a `key` row and therefore cannot serve as a marker). The first
+  entries of the three lists correspond to the same press.
+- The observation's `key` rows carry only a category (14 kinds), so a marker is found as a sequence of categories
+  with intervals between them. Only a run that is unbroken, with every adjacent gap at or below `max_gap_ms`, is
+  taken (the gap is measured on gt's monotonic clock and on the observation's wall clock).
+- A block is matched to the nearest occurrence within `--window-ms` (default 3000) before or after the wall-clock
+  time of the oracle's first marker key, assigned one to one. **A block that is not found appears in `missing`**
+  (it is never silently dropped). An occurrence matched to no block appears in `unmatched_occurrences`. If the
+  clock offset exceeds the window, nothing is found, so the window should be widened.
+- The difference = each side's first key's time − oracle's first key's time (ms). **Latency (the time from sending
+  to recording) and clock offset cannot be separated** (the difference reports their sum). A difference that stays
+  constant across blocks is latency plus a fixed offset; one that moves with the block index (time) is drift.
+- For each difference: median, minimum, maximum, `offset_at_start_ms` (the fitted value at the first block's
+  time), `drift_ms_per_hour` (the least-squares slope against the oracle marker times), `residual_max_ms` (the
+  largest deviation from the fitted line), and the per-block values. `drift_ms_per_hour` is `null` when fewer than
+  two blocks are matched.
+- `gt_minus_oracle_mono` is the difference on the monotonic clock. The observation side has only a wall clock
+  (Unix ms), so its difference is wall-clock only. Which clock, wall or monotonic, agrees between gt and oracle is
+  determined by comparing these two differences.
 
 ### `seal_obs.py`
 
-- 標準出力: 封印した名前・元の SHA-256・残した key 行の数・keys-out と `seal.json` の場所。★ バイト数・行数は
-  出さない（判断 31）。
-- keys-out の `meta` 行・`key` 行は、どちらも仕様の欄から**作り直して**書く（ImeShadow の名前が meta にも
-  残らない。`key` 行に仕様の 4 つの欄以外があれば行ごと拒否する）。
-- 読めない行（JSON として不正・同じキーが 2 回ある・仕様の欄と違う）・1 行目が `meta` でない・`meta` が
-  2 つ以上ある・書き込み中（大きさ / mtime が安定しない）ファイルは、何も動かさずに拒否する（exit 1）。
-- `--unseal SEALED --out FILE` は封印先を元のバイト列に戻すだけ（詰め物を取り除き、`seal.json` の SHA-256 と
-  照合する）。使ってよいのは、プロトコルを凍結した後の解析パイプラインだけ。
+- Standard output: the sealed file's name, its original SHA-256, the number of `key` rows kept, and the location of
+  keys-out and `seal.json`. Neither the byte count nor the line count is printed.
+- Both the `meta` and `key` rows of keys-out are **rebuilt** from the specification's fields (so no name from
+  ImeShadow survives even in `meta`; a `key` row with any field beyond the specification's four is refused
+  wholesale).
+- An unreadable row (malformed JSON, a duplicate key, or a field that does not match the specification), a first
+  row that is not `meta`, more than one `meta` row, or a file still being written to (size or mtime not yet stable)
+  are all refused without touching anything (exit 1).
+- `--unseal SEALED --out FILE` only restores the sealed file to the original byte sequence (removing the padding
+  and checking the SHA-256 against `seal.json`). It is to be used only by the analysis pipeline after the protocol
+  is frozen.
 
-## 終了コード
+## Exit codes
 
-| 道具 | 0 | 1 | 2 |
+| Tool | 0 | 1 | 2 |
 |---|---|---|---|
-| `call_types.py` | 出した | 完結した試行が 1 つも無い | 入力が読めない・使い方の誤り |
-| `clock_sync.py` | 出した | oracle にマーカーの揃ったブロックが無い・指定した側で 1 ブロックも見つからない | 同上 |
-| `reach.py` | 集計した | 集計できる送信が 1 つも無い | 同上 |
-| `seal_obs.py` | 封印した（`--unseal` は開封した） | 拒否（元のファイルは動かさない）・開封後の照合が崩れた | 使い方の誤り |
+| `call_types.py` | produced output | no completed trial at all | input unreadable, or usage error |
+| `clock_sync.py` | produced output | oracle has no block with a complete marker, or the requested side matched no block at all | same as above |
+| `reach.py` | tallied | nothing to tally (no send at all) | same as above |
+| `seal_obs.py` | sealed (or, for `--unseal`, unsealed) | refused (the original file is left untouched), or post-unseal verification failed | usage error |
 
-空振りを緑にしない（測るものが 1 つも無いときは 1 を返す）。一部のブロック・試行が欠けているだけなら 0 で、
-欠けた分は出力の `missing` / `trials_incomplete` などに出る。
+An empty run is never reported as success (exit 1 when there is nothing to measure). Missing some, but not all,
+blocks or trials is reported as success (exit 0), with the missing pieces reported in fields such as `missing` /
+`trials_incomplete`.
