@@ -6,7 +6,10 @@ require_os windows
 L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; DW="${L}/src/driver_windows.rs"; SUB="${L}/src/driver_windows"
 
 echo "[014] 単体ロガーの Windows ドライバ (2)"
-for f in "${SUB}/cloak.rs" "${SUB}/ime_open.rs" "${L}/manifest.windows.json"; do need_file "${f}"; done
+for f in "${SUB}/cloak.rs" "${SUB}/candidate.rs" "${L}/manifest.windows.json"; do need_file "${f}"; done
+# AC8（判断 41・2026-09-28）: 候補窓の観測関数を核に渡す
+need_grep "${L}/src/driver_windows.rs" "candidate_window_observer" "AC8 driver_windows.rs が候補窓の観測関数を核に渡す"
+need_grep "${SUB}/candidate.rs" "is_stale_winevent_active" "AC8 candidate.rs が stale のリセットを行う"
 
 run_ok "AC1 cargo test が緑（Windows）" cargo test --manifest-path "${M}"
 run_ok "AC2 cargo build --release が緑" cargo build --release --manifest-path "${M}"
@@ -64,5 +67,5 @@ run_ok "AC7 logger --selftest が緑" "${BIN}" --selftest --out "${TMP}/obs.json
 run_ok "AC7 selftest の出力が obs/1 の検査を通る" "${PY}" "${K}/formats/validate_logs.py" --kind obs "${TMP}/obs.jsonl"
 check_entry_green
 forbid_gse_changes
-only_allowed '^papers/ime-observation/kit/logger/(manifest\.windows\.json|src/driver_windows\.rs|src/driver_windows/(cloak|ime_open)\.rs)$'
+only_allowed '^papers/ime-observation/kit/logger/(manifest\.windows\.json|src/driver_windows\.rs|src/driver_windows/(cloak|candidate)\.rs)$'
 finish
