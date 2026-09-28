@@ -121,6 +121,8 @@ GSE-prototype/
 ├── .agents/                      # 共有エージェント定義 (skills/)
 ├── scripts/                      # 同期・検証スクリプト (sync-session.*, sync-all.*, check_schema_parity.py 等)
 │
+├── papers/                       # ★ 論文ごとの作成物 (kit/ experiment/ manuscript/)。GSE 本体からは参照しない。境界は papers/README.md
+│
 ├── .steering/                    # 作業記録
 │   ├── _setup-progress.md        #   環境構築進捗
 │   └── _template/                #   タスク用 5 ファイルテンプレート
@@ -250,6 +252,13 @@ GSE-prototype/
 
 - **目的**: タスク単位の作業記録
 - **構造**: `[YYYYMMDD]-[task-name]/` 形式でタスクごとにディレクトリ作成
+
+### `papers/`
+
+- **目的**: 論文ごとの作成物（キット・実験・原稿）の置き場。1 論文 = 1 ディレクトリ（`papers/<paper>/`）
+- **置くべきもの**: `kit/`（再現できる道具）・`experiment/`（実験の記録）・`manuscript/`（原稿）
+- **置くべきでないもの**: GSE 本体（`src-tauri/` / `src/` / `scripts/`）からの参照、生ログ（`*.jsonl` / `*.ndjson`。Zenodo へ寄託）、人の打鍵データ・被験者データ
+- **境界の規則**（GSE から参照しない・写しは出典を記録する・公開時に書き出せない語を書かない）は `papers/README.md` が持つ。GSE のビルド・CI の対象ではないが、repo 全体を見る門（`scripts/check-shell-portability.sh` 等）にはかかる
 
 ## 3. ファイル命名規則
 
