@@ -40,6 +40,8 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 
 ## §3 気をつけること
 
+- ★★★ **公開物の書き方（判断 36・2026-09-28）**: `papers/ime-observation/` に書くコメント・docstring・README・CLI のヘルプは**学術的な英語**、GSE への言及（名前・パス・用語・「GSE と同じ」）と ★ ⚠️ などの記号は書かない。出どころは manifest の `gse_*` の欄と `*.internal.md` だけ。規則の全文は `papers/README.md`。レビューでもこれを見る。
+
 - ⚠️ **worker に合成キーを送らせない**。004 の実バックエンドは `--i-understand-this-sends-keys` が無ければ送らない（AC）。acceptance も送らない。
 - ⚠️ `check.sh` は G-GEAR（Windows）でも回る → `backend_macos.py` などに selftest の目印を付けるなら、macOS 以外では「対象外」で exit 0（004 の Scope）。
 - ⚠️ `papers/` の文書に `.steering/` のパス・被験者 ID・`gse-dataset`・絶対パスを書かない。GSE 本体（`src-tauri/` ほか）を変えない。

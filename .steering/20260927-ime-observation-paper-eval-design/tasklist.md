@@ -22,6 +22,12 @@
     - [x] 判断 34: 未実行の recheck 14 本を parse に・009 / 020 の依存から 008 / 010 を外す（`1ab259b2`）
     - [x] 011 / 015 の直し（HIGH あり・判断 31〜33）→ メインが独立に検証（015: 封印の大きさが行数によらず 1 MiB・開封で元の SHA-256 ／ 011: 逐語コピーが GSE と一致・lock の共通 53 crate の版の差 0）→ merge。012 / 013 / 023 / 024 の依存から 011 を外した。merge 後の base（`7ed5e6c0`）で 8 本の acceptance・selftest 11 本・compile・lint・`--against-gse` が緑 → push（2026-09-28）
     - [ ] Mac: 004 / 007（`.steering/_handoff/next-session-ime-paper-loop-w2-mac.md`）
+  - [ ] W3（G-GEAR: 009 013 017 021 022 ／ Mac: 012・005 / 006 は 004 の後）
+    - [x] 009: `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16）
+    - [x] 013: attempt 1 で worker が Stop（`is_observed_key` の抜粋が `crate::analysis::key_gate` を呼ぶ）→ 判断 35 でメインが 011 の追補（`key_gate.rs` の逐語コピー）を base に入れた（`dd58dd9d`）
+    - [ ] 013 を回し直す（`loop-spawn.sh --cleanup 013` の後）
+    - [ ] 017 / 021 / 022（W3b・実行中）
+  - [ ] ★ **判断 36 の整理の issue**（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task

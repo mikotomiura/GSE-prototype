@@ -294,3 +294,18 @@ Apple の `NSTextInputClient` 文書（JSON 経由で取得）／BRM の投稿�
 - 選択肢: A = 011 の追補で `key_gate.rs` を逐語コピー（逐語の主張を保つ）／ E = AC4 を緩めて「移植＋変化検出」（主張が弱まる）
 - **採用: A**。メインが base に入れた: `src/analysis/key_gate.rs`（`cmp` で GSE と一致）・`src/analysis/mod.rs`・`main.rs` の `#[allow(dead_code)] mod analysis;`・`manifest.json` の `key_gate`（file）と `analysis_mod`（new）・`main.rs` の SHA-256 を持つ 3 エントリの更新（`check_manifest.py --update`・`--self` と `--against-gse` は一致）。README の共有範囲の表と 013 / 014 の Background に追記。
 - 影響: `meta` の `manifest_sha256` の値が変わる（まだ何も凍結していない）。013 は範囲を変えずに回し直す。
+
+## 判断 36: 公開物の書き方 —— 学術的な英語・GSE への言及なし（2026-09-28・研究者の指示と回答）
+
+- 研究者の指示（逐語の要旨）: 「コメントの箇所などで GSE と関連するような記述は、公開する際には一切ないようにする。コメントの口調や表現もアカデミックに」。
+- 研究者の回答（4 問とも推奨案）:
+
+| 論点 | 採用 |
+|---|---|
+| 言語 | ★ **公開物（`papers/ime-observation/` のコメント・docstring・README・FORMATS・selftest の説明）は学術的な英語**。内部の記録（`.steering/`・`papers/README.md`）は日本語のまま |
+| 逐語コピー（GSE から 1 バイトも変えずに写したファイル・抜粋）のコメント | ★ **リポジトリの中では逐語のまま**（GSE との照合は公開しない側で続ける）。**公開の書き出し（024）でコメントを機械的に除き**、各ファイルの冒頭に学術的な英語の説明を 1 つ付ける。公開側の manifest は書き出した後のファイルのハッシュを持つ |
+| 直す時期 | ★ ① 今から書くもの: まだ回していない issue と作業用エージェントへの指示に規則を入れる ② 024 の書き出しの検査に `GSE` / `src-tauri` / `★` / `⚠` などを足して機械で止める ③ 既に merge したもの（W1〜W3）は **W3 の後に整理の issue を 1 本切って**書き直す |
+| 出どころの記録 | ★ **公開しない欄・ファイルに寄せる**: manifest の `gse_*` の欄と、書き出しの対象外の `*.internal.md` だけに書く。公開するコメント・README には書かない。書き出し（024）がそれらを落とす |
+
+- ⚠️ 整理の issue で一緒に直すこと: acceptance が日本語の文字列（selftest のケース名など）を名指している箇所（例 `010-acceptance.sh` の「5 型」）は、コードを英語にすると赤になる → acceptance の側も同時に直す。GSE を指す識別子（例 `check_manifest.py --against-gse`）も中立の語に改める。
+- ⚠️ 今走っている W3 の 017 / 021 / 022 は旧い書き方のまま出てくる → 整理の issue の対象に入れる。
