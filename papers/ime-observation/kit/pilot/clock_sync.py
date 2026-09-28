@@ -151,7 +151,8 @@ def oracle_found(blocks, markers, n_keys):
         if set(per) == set(range(n_keys)):
             found[b] = per[0]
         else:
-            missing.append({"block_id": b, "reason": "marker 行が無い" if not per else "marker 行が揃わない（seq が足りない・余る）"})
+            missing.append({"block_id": b, "reason": "no marker rows" if not per else
+                            "incomplete marker rows (missing or surplus seq values)"})
     return found, missing
 
 

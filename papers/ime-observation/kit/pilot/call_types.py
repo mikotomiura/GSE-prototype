@@ -189,7 +189,7 @@ def fold(tokens):
             j += 1
         out.append(tokens[i] + ("+" if j > i else ""))
         i = j + 1
-    return " → ".join(out) if out else "(なし)"
+    return " → ".join(out) if out else "(none)"
 
 
 def stats(values):
@@ -334,7 +334,7 @@ def _selftest():
         check(s1 == {"set_marked+ → insert_text": 2, "set_marked → insert_text": 1}, "a known sequence gives the expected type, and repeats fold into + (S1: %s)" % s1)
         check(s2 == {"set_marked → do_command[cancelOperation:] → unmark": 1, "set_marked → do_command[insertNewline:] → insert_text": 1},
               "do_command appends cmd (S2: %s)" % list(s2))
-        check(r["by_scenario"]["S3"]["types"] == {"(なし)": 1}, "a trial with no row at all is reported as the empty-type placeholder")
+        check(r["by_scenario"]["S3"]["types"] == {"(none)": 1}, "a trial with no row at all is reported as the empty-type placeholder")
         check([k for k in r["by_scenario"]] == ["S1", "S2", "S3", "S4"] and r["by_scenario"]["S1"]["trials"] == 3 and r["by_scenario"]["S4"]["trials"] == 20,
               "per-scenario trial counts (%s)" % {k: v["trials"] for k, v in r["by_scenario"].items()})
         check("key_down" not in json.dumps(r, ensure_ascii=False), "key_down is excluded from the type by default")
