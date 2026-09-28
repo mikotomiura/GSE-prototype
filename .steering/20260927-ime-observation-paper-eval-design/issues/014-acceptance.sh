@@ -68,4 +68,5 @@ run_ok "AC7 selftest の出力が obs/1 の検査を通る" "${PY}" "${K}/format
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/logger/(manifest\.windows\.json|src/driver_windows\.rs|src/driver_windows/(cloak|candidate)\.rs)$'
+style_ok
 finish

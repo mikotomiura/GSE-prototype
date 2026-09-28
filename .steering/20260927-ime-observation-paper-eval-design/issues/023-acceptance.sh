@@ -8,7 +8,7 @@ E="${K}/e3"; SRC="experiments/20260903-o1-runtime-cost/scripts"
 echo "[023] E3 の器"
 for f in sample-macos.sh sample-windows.sh calibrate-cpu.sh run_e3.sh summarize_e3.py README.md; do need_file "${E}/${f}"; done
 selftest_ok "${E}/summarize_e3.py"
-need_grep "${E}/summarize_e3.py" "全部 0 は測れていない" "AC3 selftest ケース: 全部 0 は測れていない（陰性対照）"
+need_grep "${E}/summarize_e3.py" "all zeros means not measured" "AC3 selftest ケース: 全部 0 は測れていない（陰性対照）"
 
 # AC2: 写しの差はプロセス名の行だけ
 cat > "${TMP}/diff.py" <<'EOF'
@@ -32,4 +32,5 @@ run_ok "AC6 check-shell-portability が緑" bash scripts/check-shell-portability
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/e3/(sample-macos\.sh|sample-windows\.sh|calibrate-cpu\.sh|run_e3\.sh|summarize_e3\.py|README\.md)$'
+style_ok
 finish

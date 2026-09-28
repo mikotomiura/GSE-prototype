@@ -76,4 +76,5 @@ run_ok "AC7 selftest の出力が obs/1 の検査を通る" "${PY}" "${K}/format
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/logger/(manifest\.macos\.json|src/driver_macos\.rs|src/driver_macos/(keymap|ime_source|tests)\.rs)$'
+style_ok
 finish

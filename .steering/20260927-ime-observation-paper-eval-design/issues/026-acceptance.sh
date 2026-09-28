@@ -16,4 +16,5 @@ run_ok "AC4 emit.py --selftest が緑" "${PY}" "${K}/emit/emit.py" --selftest
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/(refinput-macos/RefInput\.swift|emit/backend_macos\.py|gen/recipes\.json)$'
+style_ok
 finish

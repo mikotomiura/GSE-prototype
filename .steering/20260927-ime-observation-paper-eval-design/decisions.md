@@ -325,3 +325,10 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 | 41 | 013 のレビュー: 候補窓の観測関数（GSE の `is_candidate_window_open` 相当）を核に渡しておらず、013 の引き継ぎにも 014 の仕様にも書かれていない。014 は IME の開閉を追う仕様だが、開閉の書き手は GSE ではキーボードフックの中にあり、014 は 013 の `keyboard.rs` を変えられない | ★ **IME の開閉の追跡を 014 から外す**（公開するログ `obs/1` は開閉を書かない）。014 は**候補窓の観測関数**（DWM cloak・EnumWindows・UIA・stale のリセット）を `candidate_window_observer` として核に渡すことを仕様と AC に明記する。論文では「単体ロガーは IME の開閉を記録しない」と書く | 使わない経路を作らない。候補窓の判定は `dwell_ms` / `nav` に直接効くので、GSE と同じ判断を担う場所をはっきりさせる |
 
 - ★ 仕様の範囲の直し（研究者に問わずメインが段取りする）: 013 のフックからの送信を上限つきのチャネルの `try_send` にし、取りこぼしを数える（hook-constraints）／009 の `Msftedit.dll` をシステムフォルダからだけ読み込む（DLL の植え付け）・始点の位置で「確定 → 次の開始」を分ける・M5 の確認項目を README に足す／017 の F1 の区間をクラスタ・ブートストラップに・`t_raw` を常に付ける・`n_start_while_open` を出力に出す／021・022 の深い入れ子・重複キーの拒否・出力を上書きしない・obs のヘッダの検査・マーカーと IME の切替が行になるかの前提を 2 本で揃える（既定は「行が出ない」＝ Windows の `is_observed_key` の外）。
+
+## 判断 42: 判断 36 の実装 —— 機械の門・識別子の改名・内部の番号・整理の進め方（2026-09-28・メインの実装上の選択）
+
+- **機械の門**: `issues/_style_check.py`（内部の道具・公開しない）。禁止語（語としての GSE・`src-tauri`・`.steering`・★・⚠・内部の番号〔decision / issue の番号・M0〜M13〕）と、地の文（コメント・docstring・Markdown の地の文・manifest の `reason`・規則の `_note`）の日本語を拾う。逐語コピー（manifest の `file` / `excerpt` の範囲）・`kit/corpus/data/`・`*.internal.md`・生成物は除く。バッククォートの中の日本語（読みの例など）は許す。2026-09-28 の base で違反 2,404 件。
+- **acceptance の関数 `style_ok`**（`_acceptance-lib.sh`）: その issue が変えた `papers/ime-observation` の中のファイルだけを検査する。まだ回していない 14 本の acceptance に入れ、日本語のケース名（006 / 018 / 019 / 023 / 024 / 025）を英語にした。024 の acceptance に判断 36 の検査（書き出した全体の検査・出どころの欄が無い・`*.internal.md` が無い）を足した。
+- **識別子の改名**: `check_manifest.py --against-gse` → `--against-upstream`、manifest の `gse_*` の欄 → `upstream_*`。判断 36 の「出どころは manifest の `gse_*` の欄」は、改名後の `upstream_*` の欄を指す。公開の書き出し（024）は `upstream_*` と `start_anchor` / `end_anchor` / `check_decls` を落とす。
+- **整理の進め方**: issue 028。ループではなく、メインが 6 つの束（形式と入口／刺激／解析／パイロットと E2／ロガー／参照入力欄）に分けて作業用エージェントに並列で渡し、統合して `028-acceptance.sh` と merge 済みの全 acceptance で確かめる。merge 済みの issue の acceptance が名指す日本語のケース名は、028.md の表の英語の名前に同時に直す。

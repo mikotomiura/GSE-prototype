@@ -27,6 +27,10 @@
   論文の方法節のような平叙文（主語と述語をはっきり・断定の強さを根拠に合わせる）。★ ⚠️ などの記号・口語・感嘆は使わない。
 - **GSE への言及を一切書かない**: `GSE` という名前、`src-tauri/` などの GSE のパス、GSE のファイル名・関数名・用語
   （Phase1 / G1 / O1 / Nudge など）、「GSE と同じ判断」のような関係の説明。識別子（関数名・CLI のフラグ）も同じ。
+- **内部の番号を書かない**: 判断の番号・issue の番号・マイルストーン（M0〜M13）・波（W1〜）。公開の読者には意味が無い。
+  必要なら内容そのもの（例「the calibration pilot」）で書く。
+- **機械の門**: `.steering/20260927-ime-observation-paper-eval-design/issues/_style_check.py`（公開しない道具）。
+  各 issue の acceptance は `style_ok` でその issue が変えたファイルを検査する。
 - **出どころは公開しない所にだけ書く**: `kit/logger/manifest*.json` の `gse_*` の欄と、書き出しの対象外の
   `*.internal.md`（例 `kit/logger/PROVENANCE.internal.md`）。公開の書き出しがそれらを落とす。
 - **逐語コピーは変えない**。コメントは公開の書き出しで機械的に除き、学術的な英語の説明を冒頭に 1 つ付ける。
