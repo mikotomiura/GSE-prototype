@@ -1,0 +1,75 @@
+{
+  "gse_repo_commit": "f1be36162fe00f396f4ced9492a762310a83544a",
+  "entries": [
+    {
+      "kind": "excerpt",
+      "id": "is_observed_key",
+      "path": "src/driver_windows/keyboard.rs",
+      "gse_path": "src-tauri/src/input/hook_windows.rs",
+      "gse_last_commit": "106e10c1dbcd122b1788f52fd95d2f4315457abb",
+      "start_anchor": "fn is_observed_key(vk_code: u32) -> bool {",
+      "end_anchor": "/// IME 変換候補のナビゲーション/放棄キー分類 (Phase 2b shadow metrics 用)。",
+      "symbol": "is_observed_key",
+      "sha256": "7043a27b34bd7af801993c5f1b5a853cf045b1102ae722cc8c499c26f9481276",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": null
+    },
+    {
+      "kind": "excerpt",
+      "id": "classify_ime_nav_key",
+      "path": "src/driver_windows/keyboard.rs",
+      "gse_path": "src-tauri/src/input/hook_windows.rs",
+      "gse_last_commit": "106e10c1dbcd122b1788f52fd95d2f4315457abb",
+      "start_anchor": "/// IME 変換候補のナビゲーション/放棄キー分類 (Phase 2b shadow metrics 用)。",
+      "end_anchor": "// IME WinEvent constants: `windows` crate の生成バインディングを使う。",
+      "symbol": "classify_ime_nav_key",
+      "sha256": "ea3cf759a84d38a8c3df2097984c530c8ca5526f13b1a16e4a6be2cd42dbf460",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": null
+    },
+    {
+      "kind": "new",
+      "id": "keyboard_hook",
+      "path": "src/driver_windows/keyboard.rs",
+      "gse_path": "src-tauri/src/input/hook_windows.rs",
+      "gse_last_commit": "106e10c1dbcd122b1788f52fd95d2f4315457abb",
+      "start_anchor": "unsafe extern \"system\" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {",
+      "end_anchor": "// Tests",
+      "symbol": "hook_callback",
+      "sha256": "77c927d55f93fb9eabcaa126220e91178155927376c8c1b8d2dae0f8227ae73f",
+      "gse_range_sha256": "b16063ff8e7cdbec771f45487811246c411b5308c7b64f49dc84ed3ffdc0dec3",
+      "check_decls": null,
+      "reason": "Low-level keyboard hook of the Windows driver: the callback, its installation and the two excerpted pure functions. The callback is newly written (it sends to the core channel and omits the reference implementation's statistics and mode tracking); the anchored range pins the reference callback so that a change of its judgment is detected."
+    },
+    {
+      "kind": "new",
+      "id": "ime_winevent",
+      "path": "src/driver_windows/ime_winevent.rs",
+      "gse_path": "src-tauri/src/input/hook_windows.rs",
+      "gse_last_commit": "106e10c1dbcd122b1788f52fd95d2f4315457abb",
+      "start_anchor": "/// WinEvent callback for cross-process IME composition detection.",
+      "end_anchor": "/// ⚠️★★★ **cloak/uncloak 用の 2 本目の WinEvent コールバック。**",
+      "symbol": "win_event_callback",
+      "sha256": "003b17ccf13b28f576be88f9f9862bd0d51228f9050f5932f85d34c567cac863",
+      "gse_range_sha256": "5916aff63ec59728fe46c98e81174c273b5991741b63afb85f7990261ede02bf",
+      "check_decls": null,
+      "reason": "Out-of-context WinEvent hook for the input-method window events. The event handling is a re-implementation over injectable cells; the anchored range pins the reference callback so that a change of its judgment is detected."
+    },
+    {
+      "kind": "new",
+      "id": "driver_windows",
+      "path": "src/driver_windows.rs",
+      "gse_path": null,
+      "gse_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "b0f4794f4db7d9cbbec297a928c3dfc07dcb30a09475786c17f98e945df9d58f",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": "Entry point of the Windows driver: synchronous start-up, the hook thread and its message pump. Newly written; the hooks it installs live in the two submodules."
+    }
+  ]
+}
