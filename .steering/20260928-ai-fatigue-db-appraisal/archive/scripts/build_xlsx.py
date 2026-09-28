@@ -5,6 +5,7 @@
 """
 import json
 import sys
+import tempfile
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -39,6 +40,13 @@ def snapshot(wb):
     return out
 
 
+# 比較する属性（Codex 2 巡目: stopIfTrue・カラースケール等・入力規則のエラー表示も含める）
+DV_ATTRS = ("sqref", "type", "operator", "formula1", "formula2", "allow_blank", "showErrorMessage", "showInputMessage",
+            "errorStyle", "error", "errorTitle", "prompt", "promptTitle", "showDropDown", "imeMode")
+CF_ATTRS = ("type", "operator", "formula", "priority", "stopIfTrue", "text", "timePeriod", "rank", "percent", "bottom",
+            "aboveAverage", "equalAverage", "stdDev", "colorScale", "dataBar", "iconSet")
+
+
 def dxf_content(wb, dxf_id):
     """条件付き書式が指す差分書式の中身。★ openpyxl は保存時に差分書式の一覧を詰め直すので、dxfId の番号ではなく中身で比べる。"""
     if dxf_id is None:
@@ -54,8 +62,8 @@ def structure(wb, titles=None):
     out = {}
     for t in titles:
         ws = wb[t]
-        dv = sorted((str(d.sqref), d.type, d.operator, d.formula1, d.formula2, d.allow_blank) for d in ws.data_validations.dataValidation)
-        cf = sorted((str(rng.sqref), tuple(sorted((r.type, r.operator, tuple(r.formula or ()), r.priority, dxf_content(wb, r.dxfId), r.text) for r in rules)))
+        dv = sorted(tuple(str(getattr(d, a)) for a in DV_ATTRS) for d in ws.data_validations.dataValidation)
+        cf = sorted((str(rng.sqref), tuple(sorted(tuple(str(getattr(r, a)) for a in CF_ATTRS) + (str(dxf_content(wb, r.dxfId)),) for r in rules)))
                     for rng, rules in ws.conditional_formatting._cf_rules.items())
         merged = sorted(str(m) for m in ws.merged_cells.ranges)
         tables = sorted((tb.name, tb.ref, tb.tableStyleInfo.name if tb.tableStyleInfo else None) for tb in ws.tables.values())
@@ -131,8 +139,22 @@ def main():
     for k, spec in enumerate(sheets, 1):
         add_sheet(wb, spec, k)
     wb.calculation = CalcProperties(fullCalcOnLoad=True)
-    # 一時ファイルに保存して検算し、通ったときだけ出力先を置き換える（失敗時に既存の正常版を失わない）
-    tmp = os.path.join(os.path.dirname(os.path.abspath(DST)), ".tmp-" + os.path.basename(DST))  # openpyxl は拡張子 .xlsx を要求する
+    # 一時ファイルに保存して検算し、通ったときだけ出力先を置き換える（失敗時に既存の正常版を失わない）。
+    # ★ mkstemp で排他的に一意に作る（既存のリンクや並行実行の一時ファイルを踏まない）。openpyxl は拡張子 .xlsx を要求する
+    fd, tmp = tempfile.mkstemp(prefix=".tmp-", suffix=".xlsx", dir=os.path.dirname(os.path.abspath(DST)))
+    os.close(fd)
+    try:
+        ok = save_and_verify(wb, tmp, before, struct_before, orig_titles, sheets)
+        if not ok:
+            sys.exit("検算に失敗したので出力先を置き換えなかった")
+        os.replace(tmp, DST)
+        print("saved:", DST)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def save_and_verify(wb, tmp, before, struct_before, orig_titles, sheets):
     wb.save(tmp)
 
     # 検算: 元シートの値が 1 つも変わっていない・判定欄が未判定のまま・構成が内容レベルで同じ
@@ -152,11 +174,7 @@ def main():
         "orig_structure_same": struct_before == struct_after,
     }, ensure_ascii=False, indent=1))
     wb2.close()
-    if diff or not undecided or struct_before != struct_after:
-        os.remove(tmp)
-        sys.exit("検算に失敗したので出力先を置き換えなかった")
-    os.replace(tmp, DST)
-    print("saved:", DST)
+    return not diff and undecided and struct_before == struct_after
 
 
 if __name__ == "__main__":

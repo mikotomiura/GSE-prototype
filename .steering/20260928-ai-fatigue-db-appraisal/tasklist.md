@@ -39,6 +39,6 @@
 - [x] code-reviewer（CRITICAL 0・HIGH 2・MEDIUM 9 を反映＝判断 11）
 - [x] /cross-review の Codex 系統 1 回目は予算ガードで skip（判断 9）
 - [x] Codex レビュー 1 巡目（日付が変わり当日分が 0 に戻ったため上限の引き上げは不要だった・81,940 tokens・P1 1・P2 5 を反映＝判断 12）
-- [ ] Codex レビュー 2 巡目（今回足した規則の境界条件）
+- [x] Codex レビュー 2 巡目（今回足した規則の境界条件・27,991 tokens・P1 1・P2 3 を反映＝判断 13）
 - [ ] 出荷フロー（push → PR → CI → merge）
 - [ ] 研究者へ報告（限界を含む）
