@@ -17,7 +17,10 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 ## §1 状態（2026-09-29 の切り替え時点）
 
 - base `feature/ime-eval-kit` = **`c1da5b8a`**（push 済み）。merge 済み: 001 002 003 008 009 010 011 013 015 016 017 021 022 ＋ 整理（issue 028）。merge 後の base で 13 本の acceptance・028・`_style_check.py`（違反 0 件）がすべて緑。
-- ★ **W4 のループを前セッションから起動したまま切り替えた**: `bash scripts/loop-run.sh <task> --issues 014,018,019`（`LOOP_FORCE=1`・parallel=1）。切り替え時点では **014 の attempt 1 が実行中**（worktree `C:/wt/GSE-prototype-014-issue`・ブランチ `loop/014-issue`）。★ 前セッションを閉じるとこのプロセスも止まった可能性がある。
+- ★ **W4 は研究者の指示で止めた**（2026-09-29）。`loop-run.sh --issues 014,018,019` を起動した後、014 の attempt 1 の途中で loop-run と worker（`claude -p "/loop-issue 014"`）を止めた。残ったプロセスは無い。
+  - 014 の worktree `C:/wt/GSE-prototype-014-issue`（ブランチ `loop/014-issue`）は残っているが、**変更もコミットも無い**。events の最後は 014 の `attempt_start`（`issue_done` も `blocked` も無い）。
+  - 018 / 019 は始まっていない。
+  - → ★ 次のセッションでは、まず `bash scripts/loop-spawn.sh --cleanup 014` で worktree とブランチを片付けてから、W4 を最初から回す: `LOOP_FORCE=1 bash scripts/loop-run.sh .steering/20260927-ime-observation-paper-eval-design --issues 014,018,019`（バックグラウンド）。
 - 判断の要点（詳細は decisions.md）:
   - 判断 34: 未実行の issue はすべて `verify_level: parse`（watchdog は bash / python を実行できず空応答で止まるため）。合否は**メインが clean な checkout で回す acceptance** とレビューで決める。
   - 判断 36 / 42 / 43: **公開物の書き方** —— `papers/ime-observation/` は学術的な英語・GSE への言及なし・内部の番号（decision / issue / judgment・M0〜M13）なし・写した元との関係の語（reference implementation / upstream / verbatim copy）なし・★ ⚠ なし。出どころは `*.internal.*` と manifest の `upstream_*` の欄だけ。機械の門は `issues/_style_check.py`、各 acceptance の最後の `style_ok`。規則の全文は `papers/README.md`。
