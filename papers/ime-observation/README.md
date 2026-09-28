@@ -1,10 +1,9 @@
 # Observing Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation
 
-The staging area for the artifacts of a single paper on observing Japanese IME conversion without
+This directory holds the artifacts of a single paper on observing Japanese IME conversion without
 recording its text: the limits of observability, a cross-platform standalone logger, and a
-synthetic-input validation. The boundary rules (no reference to the surrounding project's
-implementation, raw logs are not committed to git, and terms that cannot be exported publicly are
-not written) are documented in [`../README.md`](../README.md).
+synthetic-input validation. Raw logs are not committed to the repository; they are deposited
+separately, and their locations and SHA-256 digests are recorded in `experiment/data.md`.
 
 ## Layout
 
