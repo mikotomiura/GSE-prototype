@@ -286,3 +286,11 @@ Apple の `NSTextInputClient` 文書（JSON 経由で取得）／BRM の投稿�
 | 32 | 011: `manifest_sha256` の元の `manifest.json` が autocrlf で CRLF になると OS ごとに値が変わる。ドライバの manifest はハッシュに入らない | ★ **`.gitattributes` に `papers/ime-observation/kit/logger/manifest*.json text eol=lf` を足すだけ**（メインが base に入れた）。ハッシュの対象は `manifest.json` のまま | ドライバの版は各 manifest と照合器で辿れる。012〜014 が後から manifest を足してもコンパイルが壊れない |
 | 33 | 011: manifest の `new`（GSE と同じ判断を同じ順で新しく書いたコード）は、GSE 側が後で直されても照合器が緑のまま | ★ **検出できるようにする**: `new` のエントリに写した元の GSE の範囲（アンカー）とその SHA-256 を持たせ、`--against-gse` で照合する（012〜014 も同じ形を使う） | 論文は「ロガー = GSE の判断」と主張する。要の部分だけずれを検出できない状態を避ける |
 | 34 | watchdog: W2 の `recheck` 5 本のうち 3 本（010 / 008 / 011）が空応答で `blocked`。watchdog はこのタスクでは bash / python を実行できず読むだけ（B3）。`blocked` だと `issue_done` が出ず後続が起動しない | ★ **まだ回していない `recheck` の 14 本（004 005 007 009 012 013 014 017 018 019 020 021 024 026）を `parse` に落とす**。合否はこれまでどおりメインが clean な checkout の acceptance とレビューで決める。`blocked` のまま base に merge した issue は、後続の `## Dependencies` から外す（`issue_done` は手で書かない）: 009 から 008・020 から 010（2026-09-28）。011 は merge の後に 012 / 013 / 023 / 024 から外す | 独立の再検証になっていない watchdog が、止めるだけで判定の材料を増やさない。依存の DAG は実行の順序だけを決め、成果物は base にある（`docs/loop-engineering.md` 2026-09-27） |
+
+## 判断 35: 013 の Stop（`is_observed_key` の抜粋が `crate::analysis::key_gate` を呼ぶ）を 011 の追補で解く（2026-09-28・研究者の回答）
+
+- 事象: W3 の 013（単体ロガーの Windows ドライバ (1)）の worker が attempt 1 で Stop した。GSE の `is_observed_key`（`hook_windows.rs:118-133`）は本体の先頭（`:120`）で `crate::analysis::key_gate::is_feature_key` を呼ぶが、単体ロガーのクレートに `analysis` が無く（`main.rs:10-17`）、`mod analysis;` を足せるのは 013 の Allowed Files の外の `main.rs` だけ。→ AC3 / AC4（逐語の抜粋）を Allowed Files の中で満たせない。★ `_issue-plan.md` §7b の「残るリスク」がそのまま起きた形。
+- 一次で確認: `key_gate.rs` の外部参照は doc コメントのリンク 1 件（`:46`）とテストの `use super::*`（`:65`）だけ → ファイルごとの逐語コピーにできる。
+- 選択肢: A = 011 の追補で `key_gate.rs` を逐語コピー（逐語の主張を保つ）／ E = AC4 を緩めて「移植＋変化検出」（主張が弱まる）
+- **採用: A**。メインが base に入れた: `src/analysis/key_gate.rs`（`cmp` で GSE と一致）・`src/analysis/mod.rs`・`main.rs` の `#[allow(dead_code)] mod analysis;`・`manifest.json` の `key_gate`（file）と `analysis_mod`（new）・`main.rs` の SHA-256 を持つ 3 エントリの更新（`check_manifest.py --update`・`--self` と `--against-gse` は一致）。README の共有範囲の表と 013 / 014 の Background に追記。
+- 影響: `meta` の `manifest_sha256` の値が変わる（まだ何も凍結していない）。013 は範囲を変えずに回し直す。
