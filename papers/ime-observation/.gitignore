@@ -6,7 +6,7 @@
 runs/
 sealed/
 experiment/raw/
-# 圧縮・アーカイブした生ログ（Zenodo への寄託物は作業ツリーに置かれやすい）
+# Compressed or archived raw logs (Zenodo deposits tend to end up in the working tree)
 *.jsonl.*
 *.ndjson.*
 *.zip
