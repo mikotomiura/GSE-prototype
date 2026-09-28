@@ -985,7 +985,7 @@ def selftest():
             ("intent の真偽値が整数", first_trial(lambda r: r["intent"].__setitem__("abandon", 0)), "intent_type"),
             ("試行に未知のキー", first_trial(lambda r: r.__setitem__("zz", 1)), "extra_key"),
             ("試行のキーが足りない", first_trial(lambda r: r.pop("think_ms")), "missing_key"),
-            ("phrase_id の書式（大文字）", first_trial(lambda r: r.__setitem__("phrase_id", "P001")), "phrase_id"),
+            ("phrase_id の書式（大文字）", first_trial(lambda r: r.__setitem__("phrase_id", "Xray1")), "phrase_id"),
             ("reading_len が 0", first_trial(lambda r: r.__setitem__("reading_len", 0)), "type"),
             ("at_ms が真偽値", first_trial(lambda r: r["steps"][0].__setitem__("at_ms", True)), "step_shape"),
             ("ブロックの marker に未知のキー", mutate("block", lambda r, rs: (r["marker"].append("hyper"), True)[1]), "keyname"),
@@ -998,7 +998,7 @@ def selftest():
         text = bytes1.decode("utf-8")
         muts += [
             ("区切りに空白", text.replace('"kind":"block"', '"kind": "block"', 1).encode("utf-8"), "format"),
-            ("エスケープ", text.replace('"kind":"block"', '"kind":"bl\\u006fck"', 1).encode("utf-8"), "format"),
+            ("エスケープ", text.replace('"kind":"block"', '"kind":"bl' + chr(92) + 'u006fck"', 1).encode("utf-8"), "format"),
             ("BOM", b"\xef\xbb\xbf" + bytes1, "bom"),
             ("空行", text.replace("\n", "\n\n", 1).encode("utf-8"), "blank"),
             ("小数", text.replace('"at_ms":0,', '"at_ms":0.0,', 1).encode("utf-8"), "float"),
