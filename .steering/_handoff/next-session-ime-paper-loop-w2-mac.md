@@ -40,6 +40,7 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 
 ## §3 気をつけること
 
+- ★★★ **2026-09-29 追記（整理の後）**: base の `papers/ime-observation/` は学術的な英語になった（issue 028・`FORMATS.md` も英語。規則の意味は同じ）。各 acceptance の最後に `style_ok`（`_style_check.py`）があり、**その issue が変えたファイルに GSE・`src-tauri`・`.steering`・★ ⚠・内部の番号（decision / issue / judgment の番号・M0〜M13）・写した元との関係の語（reference implementation / upstream / verbatim copy）・地の文の日本語があると赤**になる。写した元との照合と manifest の書き直しは `kit/logger/check_manifest_upstream.internal.py`（`--against-upstream` / `--update`）、公開用の `check_manifest.py` は `--self` だけ。012 はこれを使う。
 - ★★★ **公開物の書き方（判断 36・2026-09-28）**: `papers/ime-observation/` に書くコメント・docstring・README・CLI のヘルプは**学術的な英語**、GSE への言及（名前・パス・用語・「GSE と同じ」）と ★ ⚠️ などの記号は書かない。出どころは manifest の `gse_*` の欄と `*.internal.md` だけ。規則の全文は `papers/README.md`。レビューでもこれを見る。
 
 - ⚠️ **worker に合成キーを送らせない**。004 の実バックエンドは `--i-understand-this-sends-keys` が無ければ送らない（AC）。acceptance も送らない。
