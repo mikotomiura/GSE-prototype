@@ -17,14 +17,25 @@ path = "src/core.rs"
 name = "refinput_imm"
 path = "src/bin/refinput_imm.rs"
 
-# ⚠️ 依存は `windows` だけ（src-tauri と同じ 0.58 系）。JSON は手書きなので serde は要らない。
+[[bin]]
+name = "refinput_tsf"
+path = "src/bin/refinput_tsf.rs"
+
+# ⚠️ 依存は `windows` 系列だけ（src-tauri と同じ 0.58 系）。JSON は手書きなので serde は要らない。
+# `windows-core` は TSF のシンクを書く `#[implement]` の展開結果が `::windows_core::…` を名指しするために要る
+# （`windows` の依存として Cargo.lock に元からある同じ 0.58 系。新しい crate は増えない）。
 [target.'cfg(windows)'.dependencies]
+windows-core = "0.58"
 windows = { version = "0.58", features = [
+    "implement",
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_Ime",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_TextServices",
+    "Win32_UI_Controls_RichEdit",
     "Win32_Graphics_Gdi",
+    "Win32_System_Com",
     "Win32_System_LibraryLoader",
     "Win32_System_Performance",
 ] }
