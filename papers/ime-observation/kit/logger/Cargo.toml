@@ -2,15 +2,16 @@
 name = "ime-observation-logger"
 version = "0.1.0"
 edition = "2021"
-description = "IME 観測の単体ロガー（GSE の変換セッション状態機械を逐語コピーして使う・content-free）"
+description = "Standalone logger that reuses a reference conversion-session state machine to produce content-free input-method observations"
 publish = false
 
-# ★ 依存は src-tauri/Cargo.toml と同じ crate・同じ版に限る（判断 22）。
-#   ドライバ（driver_macos / driver_windows）が要る分もここで宣言しておく —— 後続の issue は Cargo.toml を触らない。
+# Dependencies are pinned to the same crates and versions as the reference implementation's manifest.
+# The drivers (driver_macos / driver_windows) declare their dependencies here as well, so that later
+# work does not need to touch this file.
 
-# ★ このパッケージ単体を workspace root にする。
-#   ⚠️ これが無いと、祖先ディレクトリに別の Cargo workspace ができたときに巻き込まれ、
-#   cargo が「どの workspace に属するか」を親方向へ探索してしまう（issue 011 merge ゲートレビュー item 9）。
+# Makes this package its own workspace root. Without this, an ancestor directory that later gains its
+# own Cargo workspace would pull this package in, and cargo would search upward to decide which
+# workspace it belongs to.
 [workspace]
 
 [[bin]]
@@ -20,11 +21,12 @@ path = "src/main.rs"
 [dependencies]
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
-# `meta` 行の manifest_sha256 用。src-tauri も `sha2 = "0.10"` を使っている（同じ crate・同じ版）。
+# Used to compute the `manifest_sha256` field of the `meta` line.
 sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
-# ★ features は src-tauri/Cargo.toml の `windows` の features をそのまま写した（一部は本ロガーでは使わない）。
+# The feature list is carried over verbatim from the reference implementation's manifest (some
+# features are unused by this logger).
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",

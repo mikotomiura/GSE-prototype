@@ -1,2 +1,2 @@
-//! GSE の `analysis/mod.rs` の代わり: 逐語コピーした `key_gate.rs` だけを宣言する（011 の追補）。
+//! Declares the single verbatim copy this module tree carries.
 pub mod key_gate;

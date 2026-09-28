@@ -1,8 +1,11 @@
-//! `KeyCategory`: VK コードをキー種別（14 種）に畳む。GSE の `src-tauri/src/analysis/anonymize.rs` の**抜粋の逐語コピー**。
+//! `KeyCategory`: folds a virtual-key code into one of fourteen key kinds. Verbatim excerpt of the
+//! reference implementation's key-anonymization logic.
 //!
-//! ⚠️ 目印 `// @excerpt-begin key_category` と `// @excerpt-end key_category` の**間**が GSE と 1 バイトも違わない
-//!    （`manifest.json` の `key_category` エントリ・`check_manifest.py` が照合する）。範囲には
-//!    `ABSOLUTE_TIME_FIELDS`（ロガーでは使わない）も入る —— GSE の抜粋範囲の決め方（issue 011）のため。
+//! Everything between the `// @excerpt-begin key_category` and `// @excerpt-end key_category` markers
+//! is byte-identical to the reference source (the `key_category` entry of `manifest.json`, checked by
+//! `check_manifest.py`, pins this). The excerpted range also carries `ABSOLUTE_TIME_FIELDS`, which this
+//! logger does not use, because the excerpt boundary follows the reference source's own layout rather
+//! than being trimmed to only what is used here.
 // @excerpt-begin key_category
 /// VK コードをプライバシーセーフなキー種別カテゴリに変換する (anonymization.md 準拠)。
 /// 「どのキーか」を失い「どんな種類か」だけ残す。特徴量再計算に必要な

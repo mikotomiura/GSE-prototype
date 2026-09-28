@@ -20,7 +20,7 @@ run_ok "AC1 cargo test が緑（コピーした状態機械のテストを含む
 
 # AC2-4
 run_ok "AC2 check_manifest.py --self が緑" "${PY}" "${C}" --self
-run_ok "AC3 check_manifest.py --against-gse が緑" "${PY}" "${C}" --against-gse
+run_ok "AC3 check_manifest.py --against-upstream が緑" "${PY}" "${C}" --against-upstream
 selftest_ok "${C}"
 
 # AC5
