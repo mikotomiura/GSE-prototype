@@ -1,0 +1,9 @@
+**/target/
+**/.build/
+**/__pycache__/
+*.jsonl
+*.ndjson
+runs/
+sealed/
+experiment/raw/
+!kit/corpus/data/*.jsonl
