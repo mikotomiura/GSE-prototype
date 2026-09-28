@@ -36,7 +36,7 @@ Exit: 0 = 成功 ／ 1 = `--validate` が違反を見つけた ／ 2 = 使い方
 |---|---|---|---|
 | `n_per_cell_scenario_speed` | 整数 ≥ 1 | 75 | シナリオ × 速さごとの試行数 |
 | `block_size` | 整数 ≥ 1 | 25 | 1 ブロックの試行数（最後のブロックは端数） |
-| `scenarios` | 配列 | recipes の既定で有効なもの | 有効なシナリオ（`S1`〜`S15`）。OS に手順が無いもの（例: windows の `S11`）は飛ばす |
+| `scenarios` | 配列 | recipes の既定で有効なもの | 有効なシナリオ（`S1`〜`S15`）。OS に手順が無いもの（例: windows の `S11`）は飛ばす。★ `S11` はライブ変換 ON の前提の手順なので、**ライブ変換 OFF のセルでは `scenarios` から `S11` を明示的に外す**（既定の `scenarios`（未指定）は macOS で `S11` を含めてしまう） |
 | `speeds` | オブジェクト | 必須 | `slow` / `mid` / `fast` それぞれ `iki_median_ms`（> 0）と `iki_sigma`（≥ 0）。キー間隔は対数正規 |
 | `key_hold_ms` | 整数 ≥ 1 | 必須 | 押してから離すまで |
 | `think_ms` | `{min, max}` | 必須 | 思考の間（対数一様）。手順の `pause: think` に使う |
@@ -47,7 +47,9 @@ Exit: 0 = 成功 ／ 1 = `--validate` が違反を見つけた ／ 2 = 使い方
 | `assumed_reading_len` | 整数 ≥ 2 | 12 | `--estimate` で `--corpus` が無いときの読みの長さ |
 | `kana_len_min` / `kana_len_max` | 整数 | 4 / 8 | S12 の合成かな列の長さ |
 
-`plan/1` のヘッダの `config_sha256` は、設定ファイルの**バイト列**の SHA-256（CLI が計算する）。
+`plan/1` のヘッダの `config_sha256` / `recipes_sha256` / `corpus_sha256` は、それぞれ設定・`--recipes`・`--corpus`
+ファイルの**バイト列**の SHA-256（CLI が計算する）。計画ごとに、どの版の手順と刺激で作ったかを束ねるためのもの
+（パイロットの後に recipes を直す前提のため）。
 
 ## 生成の規則
 
@@ -62,7 +64,19 @@ Exit: 0 = 成功 ／ 1 = `--validate` が違反を見つけた ／ 2 = 使い方
   試行の最初と最後にある間は無視する。`think_ms` は試行行に、使った値（使わない手順は 0）を書く。
 - **句の選び方**: シナリオごとに句を並べ替えて順に使い、尽きたら並べ直す。S12 は、かな配列だけで読みが書ける句を優先して
   使い、足りなければ seed 固定の**合成かな列**（`phrase_id` が `kana-` で始まる）で埋める。合成かな列の読みは
-  `kana_layout` の逆引きで `steps` から復元できる。
+  `kana_layout` の逆引きで `steps` から復元できる（`typed_reading` を使う）。
+  ⚠️ **`kana-N` の番号はその計画ファイルの中だけで通し番号**（`plan_rows` の呼び出しごとに 1 から数え直す）。
+  別の計画（別の seed・別の corpus）の `kana-3` と同じ句とは限らないので、**計画をまたいで `phrase_id` で突き合わせない**。
+  実際に打った読みは常に `typed_reading(trial, recipes)` でその試行から取り直す。
+  ⚠️ `--corpus` の入力（`corpus/1`）自体に `kana-` で始まる `phrase_id` を書くことはできない
+  （`load_corpus` が拒否する。生成器が作る合成かな列の ID と衝突させないため）。
+- **`reading_len` と実際に打った読みは別**: 試行行の `reading_len` は**句の読みの長さ**（`corpus/1` の `reading` の
+  文字数）で、実際にキーで打った長さではない（S10 は前半だけ・S12 は合成かな列）。打った読み（ひらがな）を
+  取りたいときは `typed_reading(trial, recipes)` を使う。
+- **`GENERATOR_VERSION` を上げる規則**: `romaji.py` の表（綴りの意味）や `recipes.json` の意味（手順・`intent` の
+  既定値・`kana_layout` の対応）を変えたら、`generate_plan.py` の `GENERATOR_VERSION` を上げる。ヘッダの
+  `generator_version` はその計画がどの版の生成器の解釈で作られたかを示す（recipes / corpus 自体の版は
+  `recipes_sha256` / `corpus_sha256` が別途束ねる）。
 - **乱数**: `random.Random` の `random()` だけを使う（版で変わりうる `shuffle` / `choice` は使わない）。
   試行ごとの乱数は `(seed, trial_id)` から決まる（`trial_rng`）。だから `build_trial` に同じ句・同じ `trial_rng` を渡すと、
   CLI が書いた計画の該当行と一致する。
@@ -74,7 +88,14 @@ Exit: 0 = 成功 ／ 1 = `--validate` が違反を見つけた ／ 2 = 使い方
 ```python
 build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id, block_id) -> dict   # plan/1 の試行行 1 つ
 load_recipes(path) -> dict
+typed_reading(trial, recipes) -> str   # その試行行で実際に打った読み（ひらがな）
 ```
+
+`typed_reading` は `plan/1` の試行行 1 つ（`build_trial` の戻り値、または計画ファイルから読んだ行）と `load_recipes`
+の戻り値を受け取り、`steps` の `down: true` のキーだけを見て、読みを打った部分を逆に写す（ローマ字入力は
+`romaji.from_keys`、S12（かな入力）は `recipes.kana_layout` の逆引き）。読みの打鍵は、そのシナリオで最初に
+「読みの打鍵に使わないキー」が来た所で終わる。通常のシナリオは句の読み全体、S10 は前半だけ、S12 は合成かな列を
+そのまま返す。`reading_len`（句の読みの長さ）とは別物なので混同しない。
 
 ほかに `trial_rng(seed, trial_id)`・`load_corpus(path)`・`normalize_config(config)`・`plan_rows(...)`・
 `render_plan(rows)`・`validate_plan(data)` がある。`phrase` は `corpus/1` の句の行（`phrase_id`・`reading` が要る）。

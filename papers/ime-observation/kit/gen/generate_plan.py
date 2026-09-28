@@ -16,10 +16,12 @@ Exit: 0 = 成功 / 1 = --validate が違反を見つけた / 2 = 使い方の誤
   ⚠️ 浮動小数点の演算（log / exp / cos）は OS の数学ライブラリに依るので、バイト一致を保証するのは
   「同じ機械・同じ Python」での再生成まで。別の OS で作った計画は作り直さず、ファイルを配る。
 公開する関数: build_trial(...)・load_recipes(path)・trial_rng(seed, trial_id)・load_corpus(path)・
-  normalize_config(config)・plan_rows(...)・render_plan(rows)・validate_plan(data)。
+  normalize_config(config)・plan_rows(...)・render_plan(rows)・validate_plan(data)・typed_reading(trial, recipes)。
 """
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import math
 import os
@@ -34,7 +36,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import romaji  # noqa: E402
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.1.0"
 SPEEDS = ("slow", "mid", "fast")
 SCENARIOS = tuple("S%d" % i for i in range(1, 16))
 OS_NAMES = ("macos", "windows")
@@ -51,7 +53,8 @@ INTENT_BOOLS = ("abandon", "predictive", "ime_toggle_mid", "focus_switch_mid", "
 TRIAL_KEYS = ("kind", "trial_id", "block_id", "scenario", "speed", "gap_before_ms", "think_ms", "phrase_id",
               "reading_len", "steps", "intent")
 BLOCK_KEYS = ("kind", "block_id", "speed", "reset_ime", "marker", "marker_gap_ms")
-HEADER_KEYS = ("kind", "format", "os", "seed", "generator_version", "config_sha256")
+HEADER_KEYS = ("kind", "format", "os", "seed", "generator_version", "config_sha256", "recipes_sha256",
+               "corpus_sha256")
 
 VERSION_RE = re.compile(r"^[0-9A-Za-z.+-]{1,32}$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -233,7 +236,7 @@ def check_recipes(data):
     if not isinstance(layout, dict) or not layout:
         raise ValueError("recipes.kana_layout が無い")
     for k, v in layout.items():
-        if k not in KEYNAMES or not isinstance(v, str) or len(v) != 1 or not READING_RE.match(v):
+        if k not in KEYNAMES or not isinstance(v, str) or len(v) != 1 or not READING_RE.fullmatch(v):
             raise ValueError("recipes.kana_layout の項目が不正")
     if len(set(layout.values())) != len(layout):
         raise ValueError("recipes.kana_layout に同じかなが 2 つのキーにある")
@@ -265,8 +268,29 @@ def check_recipes(data):
                 if isinstance(v, dict):
                     if set(v) != {"$param"} or v["$param"] not in params:
                         raise ValueError("%s: intent.%s の $param" % (where, k))
+                    continue
+                if k == "commit":
+                    if v not in COMMITS:
+                        raise ValueError("%s: intent.commit が列挙外" % where)
+                elif k == "cand_index":
+                    if v is not None and not (_is_int(v) and v >= 0):
+                        raise ValueError("%s: intent.cand_index が 0 以上の整数か null でない" % where)
+                elif k == "nav_count":
+                    if not (_is_int(v) and v >= 0):
+                        raise ValueError("%s: intent.nav_count が 0 以上の整数でない" % where)
+                elif k in INTENT_BOOLS:
+                    if not isinstance(v, bool):
+                        raise ValueError("%s: intent.%s が真偽値でない" % (where, k))
             if "default_enabled" in entry and not isinstance(entry["default_enabled"], bool):
                 raise ValueError("%s: default_enabled は真偽値" % where)
+            rl = entry.get("reading_len")
+            if rl is not None:
+                rl_bad = not isinstance(rl, dict) or not rl or set(rl) - {"min", "max"} \
+                    or ("min" in rl and not (_is_int(rl["min"]) and rl["min"] >= 1)) \
+                    or ("max" in rl and not (_is_int(rl["max"]) and rl["max"] >= 1)) \
+                    or ("min" in rl and "max" in rl and rl["min"] > rl["max"])
+                if rl_bad:
+                    raise ValueError("%s: reading_len は {min?, max?}（1 以上の整数・min<=max）" % where)
     return data
 
 
@@ -304,7 +328,7 @@ def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id
         raise ValueError("speed は slow / mid / fast")
     entry = _entry(recipes, os_name, scenario)
     reading = phrase["reading"]
-    if not reading or not READING_RE.match(reading):
+    if not reading or not READING_RE.fullmatch(reading):
         raise ValueError("phrase.reading はひらがなだけ")
     if phrase.get("reading_len", len(reading)) != len(reading):
         raise ValueError("phrase.reading_len が reading の長さと違う")
@@ -380,6 +404,41 @@ def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id
             "phrase_id": phrase["phrase_id"], "reading_len": len(reading), "steps": steps, "intent": intent}
 
 
+_ROMAJI_READING_KEYS = frozenset("abcdefghijklmnopqrstuvwxyz") | {"minus"}
+
+
+def _trial_uses_kana(scenario, recipes):
+    """そのシナリオが（どちらかの OS で）かな入力かを recipes から見る。os_name を trial は持たない。"""
+    for os_name in OS_NAMES:
+        entry = recipes["os"].get(os_name, {}).get(scenario)
+        if entry is not None:
+            return _uses_kana(entry)
+    return False
+
+
+def typed_reading(trial, recipes):
+    """plan/1 の試行行 1 つから、実際に打った読みをひらがなで返す（steps の down だけを見る）。
+    ローマ字入力は romaji.from_keys の逆写像、かな入力（S12）は recipes.kana_layout の逆引き。
+    読みの打鍵は、そのシナリオで読みの打鍵に使わないキーが最初に来た所で終わる
+    （ローマ字は a-z / minus 以外、かな入力は kana_layout のキー以外）。通常は句の読み全体、
+    S10 は前半だけ、S12 は合成かな列を含めそのまま返る。"""
+    downs = [s["key"] for s in trial["steps"] if s["down"]]
+    if _trial_uses_kana(trial["scenario"], recipes):
+        layout = recipes["kana_layout"]
+        keys = []
+        for k in downs:
+            if k not in layout:
+                break
+            keys.append(k)
+        return "".join(layout[k] for k in keys)
+    keys = []
+    for k in downs:
+        if k not in _ROMAJI_READING_KEYS:
+            break
+        keys.append(k)
+    return romaji.from_keys(keys)
+
+
 # ---------------------------------------------------------------- コーパス
 
 def load_corpus(path):
@@ -403,17 +462,17 @@ def load_corpus(path):
             raise ValueError("コーパス %d 行目: JSON として読めない" % ln)
         if ln == 1:
             if not isinstance(obj, dict) or obj.get("kind") != "header" or obj.get("format") != "corpus/1" \
-                    or not isinstance(obj.get("tokenizer"), str) or not DICT_RE.match(obj["tokenizer"]) \
-                    or not isinstance(obj.get("dict"), str) or not DICT_RE.match(obj["dict"]):
+                    or not isinstance(obj.get("tokenizer"), str) or not DICT_RE.fullmatch(obj["tokenizer"]) \
+                    or not isinstance(obj.get("dict"), str) or not DICT_RE.fullmatch(obj["dict"]):
                 raise ValueError("コーパスのヘッダが corpus/1 でない")
             continue
         ok = isinstance(obj, dict) and obj.get("kind") == "phrase" and isinstance(obj.get("phrase_id"), str) \
             and isinstance(obj.get("work_id"), str) and isinstance(obj.get("reading"), str)
         if ok:
-            ok = PHRASE_ID_RE.match(obj["phrase_id"]) and WORK_ID_RE.match(obj["work_id"]) \
-                and obj["phrase_id"].startswith(obj["work_id"] + "-") and READING_RE.match(obj["reading"]) \
+            ok = PHRASE_ID_RE.fullmatch(obj["phrase_id"]) and WORK_ID_RE.fullmatch(obj["work_id"]) \
+                and obj["phrase_id"].startswith(obj["work_id"] + "-") and READING_RE.fullmatch(obj["reading"]) \
                 and _is_int(obj.get("reading_len")) and obj["reading_len"] == len(obj["reading"]) \
-                and isinstance(obj.get("text"), str)
+                and isinstance(obj.get("text"), str) and not obj["phrase_id"].startswith("kana-")
         if not ok:
             raise ValueError("コーパス %d 行目: 句の行が corpus/1 の型に合わない" % ln)
         if obj["phrase_id"] in seen:
@@ -454,26 +513,31 @@ class _Pool(object):
 
 
 def enabled_scenarios(recipes, cfg, os_name):
+    """有効なシナリオの一覧と警告の列を返す（stderr には出さない。呼び出し側が出す）。"""
     table = recipes["os"][os_name]
+    warnings = []
     if cfg.get("scenarios") is None:
-        return [s for s in SCENARIOS if s in table and table[s].get("default_enabled", True)]
+        return [s for s in SCENARIOS if s in table and table[s].get("default_enabled", True)], warnings
     out = []
     for s in cfg["scenarios"]:
         if s in table:
             out.append(s)
         else:
-            print("generate_plan.py: %s に %s の手順が無いので飛ばす" % (os_name, s), file=sys.stderr)
-    return out
+            warnings.append("%s に %s の手順が無いので飛ばす" % (os_name, s))
+    return out, warnings
 
 
-def plan_rows(corpus, recipes, config, os_name, seed, config_sha256):
-    """計画の行（dict の列）と {trial_id: 句} を返す。"""
+def plan_rows(corpus, recipes, config, os_name, seed, config_sha256, recipes_sha256, corpus_sha256, warnings=None):
+    """計画の行（dict の列）と {trial_id: 句} を返す。stderr には出さない。
+    `warnings` にリストを渡すと、飛ばしたシナリオなどの注意を追記する（呼び出し側が出す）。"""
     cfg = normalize_config(config)
     if os_name not in OS_NAMES:
         raise ValueError("os は macos か windows")
     if not _is_int(seed) or not 0 <= seed <= SEED_MAX:
         raise ValueError("seed は 0〜2^63-1 の整数")
-    scen = enabled_scenarios(recipes, cfg, os_name)
+    scen, scen_warnings = enabled_scenarios(recipes, cfg, os_name)
+    if warnings is not None:
+        warnings.extend(scen_warnings)
     if not scen:
         raise ValueError("有効なシナリオが 1 つも無い")
     for s in scen:
@@ -519,7 +583,8 @@ def plan_rows(corpus, recipes, config, os_name, seed, config_sha256):
     _shuffle(prng, blocks)
 
     rows = [{"kind": "header", "format": "plan/1", "os": os_name, "seed": seed,
-             "generator_version": GENERATOR_VERSION, "config_sha256": config_sha256}]
+             "generator_version": GENERATOR_VERSION, "config_sha256": config_sha256,
+             "recipes_sha256": recipes_sha256, "corpus_sha256": corpus_sha256}]
     phrases = {}
     n_trial = 0
     for bid, (sp, items) in enumerate(blocks):
@@ -550,7 +615,7 @@ def estimate(config, recipes, os_name, corpus=None):
         corpus = [{"phrase_id": "est-1-1", "work_id": "est", "text": "", "reading": reading, "reading_len": assumed}]
         cfg = dict(cfg, kana_len_min=assumed, kana_len_max=assumed)
         note = "読みの長さ: %d 字と仮定（設定 assumed_reading_len）" % assumed
-    rows, _ = plan_rows(corpus, recipes, cfg, os_name, 0, "0" * 64)
+    rows, _ = plan_rows(corpus, recipes, cfg, os_name, 0, "0" * 64, "0" * 64, "0" * 64)
     trial_ms = gap_ms = marker_ms = n_trial = n_block = 0
     for r in rows:
         if r["kind"] == "trial":
@@ -626,6 +691,9 @@ def validate_plan(data):
         if not line:
             bad(ln, "blank", "空行がある")
             continue
+        if chr(92) in line:
+            bad(ln, "escape", "行にバックスラッシュがある（エスケープは使わない）")
+            continue
         try:
             obj = json.loads(line, object_pairs_hook=_no_dups, parse_float=_reject_number,
                              parse_constant=_reject_number)
@@ -649,10 +717,14 @@ def validate_plan(data):
                 bad(ln, "header", "os が列挙外")
             if not _is_int(obj["seed"]) or not 0 <= obj["seed"] <= SEED_MAX:
                 bad(ln, "header", "seed が 0〜2^63-1 の整数でない")
-            if not isinstance(obj["generator_version"], str) or not VERSION_RE.match(obj["generator_version"]):
+            if not isinstance(obj["generator_version"], str) or not VERSION_RE.fullmatch(obj["generator_version"]):
                 bad(ln, "header", "generator_version の書式")
-            if not isinstance(obj["config_sha256"], str) or not SHA_RE.match(obj["config_sha256"]):
+            if not isinstance(obj["config_sha256"], str) or not SHA_RE.fullmatch(obj["config_sha256"]):
                 bad(ln, "header", "config_sha256 が小文字 16 進 64 桁でない")
+            if not isinstance(obj["recipes_sha256"], str) or not SHA_RE.fullmatch(obj["recipes_sha256"]):
+                bad(ln, "header", "recipes_sha256 が小文字 16 進 64 桁でない")
+            if not isinstance(obj["corpus_sha256"], str) or not SHA_RE.fullmatch(obj["corpus_sha256"]):
+                bad(ln, "header", "corpus_sha256 が小文字 16 進 64 桁でない")
             continue
         kind = obj.get("kind")
         if kind == "block":
@@ -674,15 +746,15 @@ def validate_plan(data):
             n_trials += 1
             if not keys_ok(ln, obj, TRIAL_KEYS, "試行"):
                 continue
-            if not isinstance(obj["trial_id"], str) or not TRIAL_ID_RE.match(obj["trial_id"]) \
+            if not isinstance(obj["trial_id"], str) or not TRIAL_ID_RE.fullmatch(obj["trial_id"]) \
                     or obj["trial_id"] != "t%05d" % n_trials:
                 bad(ln, "trial_id", "trial_id が t＋5 桁以上の 1 からの連番でない")
             blk = None
-            if _is_int(obj["block_id"]) and 0 <= obj["block_id"] < len(blocks):
-                blk = blocks[obj["block_id"]]
+            if blocks and _is_int(obj["block_id"]) and obj["block_id"] == blocks[-1][0]:
+                blk = blocks[-1]
                 blk[3] += 1
             else:
-                bad(ln, "block_ref", "block_id がそれより前のブロック行を指さない")
+                bad(ln, "block_ref", "block_id が直前のブロック行の block_id と一致しない")
             if obj["scenario"] not in SCENARIOS:
                 bad(ln, "scenario", "scenario が S1〜S15 でない")
             if obj["speed"] not in SPEEDS:
@@ -692,7 +764,7 @@ def validate_plan(data):
             for k in ("gap_before_ms", "think_ms"):
                 if not _is_int(obj[k]) or obj[k] < 0:
                     bad(ln, "type", "%s が 0 以上の整数でない" % k)
-            if not isinstance(obj["phrase_id"], str) or not PHRASE_ID_RE.match(obj["phrase_id"]):
+            if not isinstance(obj["phrase_id"], str) or not PHRASE_ID_RE.fullmatch(obj["phrase_id"]):
                 bad(ln, "phrase_id", "phrase_id の書式")
             if not _is_int(obj["reading_len"]) or obj["reading_len"] < 1:
                 bad(ln, "type", "reading_len が 1 以上の整数でない")
@@ -866,10 +938,13 @@ def selftest():
         corpus_path, cfg, cfg_path = _selftest_env(tmp)
         corpus = load_corpus(corpus_path)
         sha = _sha_file(cfg_path)
+        rsha = _sha_file(recipes_path)
+        csha = _sha_file(corpus_path)
         ncfg = normalize_config(cfg)
 
         def gen(os_name="macos", seed=7, config=None):
-            rows, ph = plan_rows(corpus, recipes, config if config is not None else cfg, os_name, seed, sha)
+            rows, ph = plan_rows(corpus, recipes, config if config is not None else cfg, os_name, seed, sha,
+                                  rsha, csha)
             return rows, ph
 
         rows1, ph1 = gen()
@@ -895,7 +970,7 @@ def selftest():
               len(blocks) == 3 * -(-per_speed // ncfg["block_size"]), "%d" % len(blocks))
         check("割り切れるとき ceil(件数 / block_size) と一致",
               per_speed % ncfg["block_size"] != 0 or len(blocks) == -(-len(trials) // ncfg["block_size"]))
-        rows_w, _ = gen("windows")
+        rows_w, ph_w = gen("windows")
         blocks_w = [r for r in rows_w if r["kind"] == "block"]
         trials_w = [r for r in rows_w if r["kind"] == "trial"]
         check("windows のブロック数（割り切れない場合も式どおり）",
@@ -952,6 +1027,89 @@ def selftest():
               all(len(t["steps"]) % 2 == 0 and all(s["key"] in KEYNAMES for s in t["steps"]) for t in trials))
         check("at_ms は試行の先頭から（最初は 0）", all(t["steps"][0]["at_ms"] == 0 for t in trials))
 
+        # --- typed_reading（判断 29）: 全シナリオ・両 OS で「打った読み」が期待どおり
+        def _typed_mismatches(rows, phrases):
+            bad = []
+            for t in rows:
+                if t["kind"] != "trial":
+                    continue
+                rd = phrases[t["trial_id"]]["reading"]
+                want = rd[:max(1, len(rd) // 2)] if t["scenario"] == "S10" else rd
+                got = typed_reading(t, recipes)
+                if got != want:
+                    bad.append((t["trial_id"], t["scenario"], want, got))
+            return bad
+
+        bad_mac = _typed_mismatches(rows1, ph1)
+        check("typed_reading が全シナリオで期待どおり（macos・通常は全体・S10 は前半・S12 は合成かな列）",
+              not bad_mac, str(bad_mac[:3]))
+        bad_win = _typed_mismatches(rows_w, ph_w)
+        check("typed_reading が全シナリオで期待どおり（windows）", not bad_win, str(bad_win[:3]))
+
+        # --- 公開関数は stderr に出さない（項目7）。警告は戻り値で返す
+        _buf = io.StringIO()
+        with contextlib.redirect_stderr(_buf):
+            _warns = []
+            plan_rows(corpus, recipes, dict(cfg, scenarios=["S1", "S11"]), "windows", 1, sha, rsha, csha,
+                      warnings=_warns)
+        check("plan_rows / enabled_scenarios は stderr に出さず、警告は戻り値で返す（windows に無い S11）",
+              _buf.getvalue() == "" and any("S11" in w for w in _warns), repr(_buf.getvalue()))
+
+        # --- check_recipes: intent の値の型・reading_len の指定の型（項目5）
+        def _bad_recipes(mutate_fn):
+            data = json.loads(json.dumps(recipes))
+            mutate_fn(data)
+            return data
+
+        for name, fn in [
+            ("intent.commit が列挙外", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("commit", "click")),
+            ("intent.cand_index が負", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("cand_index", -1)),
+            ("intent.nav_count が負", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("nav_count", -1)),
+            ("intent の真偽値の欄が整数", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("abandon", 0)),
+            ("reading_len.min が 0", lambda d: d["os"]["macos"]["S10"].__setitem__("reading_len", {"min": 0})),
+            ("reading_len に未知のキー", lambda d: d["os"]["macos"]["S10"].__setitem__("reading_len", {"min": 2, "zz": 1})),
+        ]:
+            try:
+                check_recipes(_bad_recipes(fn))
+                check("check_recipes が拒否する（型）: %s" % name, False, "拒否されなかった")
+            except ValueError:
+                check("check_recipes が拒否する（型）: %s" % name, True)
+
+        # --- load_corpus: phrase_id が kana- で始まる行を拒否する（項目6）
+        kana_corpus = os.path.join(tmp, "kana_corpus.jsonl")
+        with open(kana_corpus, "wb") as f:
+            f.write(('{"kind":"header","format":"corpus/1","source":"aozora","tokenizer":"table","dict":"none"}\n'
+                     + dumps({"kind": "phrase", "phrase_id": "kana-1", "work_id": "kana", "text": "x",
+                              "reading": "あい", "reading_len": 2}) + "\n").encode("utf-8"))
+        try:
+            load_corpus(kana_corpus)
+            check("load_corpus が kana- 始まりの phrase_id を拒否する", False, "拒否されなかった")
+        except ValueError:
+            check("load_corpus が kana- 始まりの phrase_id を拒否する", True)
+
+        # --- fullmatch の直接確認（項目4・末尾に改行が付いた値は re.match の $ だと通ってしまう）
+        check("正規表現が末尾の改行を拒否する（fullmatch・陰性対照）",
+              PHRASE_ID_RE.fullmatch("w1-1-1\n") is None and VERSION_RE.fullmatch("1.0.0\n") is None
+              and SHA_RE.fullmatch("0" * 64 + "\n") is None and TRIAL_ID_RE.fullmatch("t00001\n") is None)
+        check("正規表現は末尾の改行が無ければ通る（陽性対照）",
+              PHRASE_ID_RE.fullmatch("w1-1-1") is not None and VERSION_RE.fullmatch("1.0.0") is not None)
+
+        # --- fullmatch の実地確認（項目4）: load_corpus はバックスラッシュを禁止しないので、
+        #     ヘッダの tokenizer に「末尾に改行の付いた値」（\n エスケープで JSON としては合法）を仕込むと、
+        #     .match のままなら $ が改行の直前で一致して通ってしまう。fullmatch なら拒否する。
+        bad_tok_corpus = os.path.join(tmp, "bad_tokenizer_corpus.jsonl")
+        with open(bad_tok_corpus, "wb") as f:
+            bad_header = dumps({"kind": "header", "format": "corpus/1", "source": "aozora",
+                                 "tokenizer": "table" + chr(10), "dict": "none"})
+            f.write((bad_header + "\n" + dumps({"kind": "phrase", "phrase_id": "w1-1-1", "work_id": "w1",
+                                                "text": "x", "reading": "あい", "reading_len": 2}) + "\n")
+                    .encode("utf-8"))
+        try:
+            load_corpus(bad_tok_corpus)
+            check("load_corpus が末尾に改行の付いた tokenizer を拒否する（fullmatch・項目4）", False, "拒否されなかった")
+        except ValueError:
+            check("load_corpus が末尾に改行の付いた tokenizer を拒否する（fullmatch・項目4）", True)
+
         # --- 検査器: 陽性対照
         check("生成した計画（macos）を --validate が通す", validate_plan(bytes1) == [], str(validate_plan(bytes1)[:2]))
         check("生成した計画（windows）を --validate が通す", validate_plan(render_plan(rows_w)) == [])
@@ -994,11 +1152,21 @@ def selftest():
             ("ヘッダの seed が負", mutate("header", lambda r, rs: (r.__setitem__("seed", -1), True)[1]), "header"),
             ("ヘッダの config_sha256 が大文字", mutate("header", lambda r, rs: (r.__setitem__("config_sha256", "A" * 64), True)[1]),
              "header"),
+            ("ヘッダの recipes_sha256 が短い", mutate("header", lambda r, rs: (r.__setitem__("recipes_sha256", "ab"), True)[1]),
+             "header"),
+            ("ヘッダの corpus_sha256 が大文字", mutate("header", lambda r, rs: (r.__setitem__("corpus_sha256", "B" * 64), True)[1]),
+             "header"),
+            ("ヘッダに recipes_sha256 が無い", mutate("header", lambda r, rs: (r.pop("recipes_sha256"), True)[1]),
+             "missing_key"),
+            ("block_id が直前でなく前のブロックを指す（判断 29）",
+             mutate("trial", lambda r, rs: (r.__setitem__("block_id", 0), True)[1] if r["block_id"] > 0 else False),
+             "block_ref"),
         ]
         text = bytes1.decode("utf-8")
         muts += [
             ("区切りに空白", text.replace('"kind":"block"', '"kind": "block"', 1).encode("utf-8"), "format"),
-            ("エスケープ", text.replace('"kind":"block"', '"kind":"bl' + chr(92) + 'u006fck"', 1).encode("utf-8"), "format"),
+            ("エスケープ（バックスラッシュを含む行）",
+             text.replace('"kind":"block"', '"kind":"bl' + chr(92) + 'u006fck"', 1).encode("utf-8"), "escape"),
             ("BOM", b"\xef\xbb\xbf" + bytes1, "bom"),
             ("空行", text.replace("\n", "\n\n", 1).encode("utf-8"), "blank"),
             ("小数", text.replace('"at_ms":0,', '"at_ms":0.0,', 1).encode("utf-8"), "float"),
@@ -1083,7 +1251,7 @@ def selftest():
         check("--estimate（コーパスあり）が正の数", secs2 > 0)
         rc, msg = run("--estimate", "--config", cfg_path, "--recipes", recipes_path, "--os", "macos")
         last = msg.strip().split("\n")[-1]
-        check("--estimate の最後の行が正の数 1 つだけ", rc == 0 and re.match(r"^[0-9]+(\.[0-9]+)?$", last) is not None
+        check("--estimate の最後の行が正の数 1 つだけ", rc == 0 and re.fullmatch(r"[0-9]+(\.[0-9]+)?", last) is not None
               and float(last) > 0, "exit %d・最後の行 %s" % (rc, last))
     finally:
         for name in os.listdir(tmp):
@@ -1156,6 +1324,7 @@ def main(argv):
         if not args.recipes or not args.config or not args.os_name:
             raise ValueError("--recipes・--config・--os が要る")
         recipes = load_recipes(args.recipes)
+        recipes_sha256 = _sha_file(args.recipes)
         raw_cfg, config = _read_json(args.config, "設定")
         normalize_config(config)
         unknown = unknown_config_keys(config)
@@ -1163,6 +1332,7 @@ def main(argv):
             print("generate_plan.py: 設定の未知のキーは無視する: %s" % ", ".join(str(k) for k in unknown),
                   file=sys.stderr)
         corpus = load_corpus(args.corpus) if args.corpus else None
+        corpus_sha256 = _sha_file(args.corpus) if args.corpus else None
         if args.estimate:
             secs, lines = estimate(config, recipes, args.os_name, corpus)
             for line in lines:
@@ -1174,7 +1344,11 @@ def main(argv):
             raise ValueError("生成には --corpus・--seed・--out が要る")
         if not 0 <= args.seed <= SEED_MAX:
             raise ValueError("--seed は 0〜2^63-1 の整数")
-        rows, _ = plan_rows(corpus, recipes, config, args.os_name, args.seed, hashlib.sha256(raw_cfg).hexdigest())
+        gen_warnings = []
+        rows, _ = plan_rows(corpus, recipes, config, args.os_name, args.seed, hashlib.sha256(raw_cfg).hexdigest(),
+                             recipes_sha256, corpus_sha256, warnings=gen_warnings)
+        for w in gen_warnings:
+            print("generate_plan.py: %s" % w, file=sys.stderr)
     except (ValueError, OSError) as e:
         print("generate_plan.py: %s" % e, file=sys.stderr)
         return 2
