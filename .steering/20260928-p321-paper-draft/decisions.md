@@ -111,3 +111,14 @@
 - **誤検知**: Codex P1（生成物の更新が差分に無い）→ 範囲から外したのはメイン（`results/`・`results.tex` は `1db0cab` に入っている）。Codex 自身も条件付きと書いていた。
 - **3 巡目は回さない**: Codex の今日の残りは約 16,000 で 1 回分（30,000）に足りない。2 巡目の HIGH は一次資料で確かめて直し、検査の側は `--selftest`（21 本・理由まで照合）で効きを確かめた。
 - ★ 論文用リポジトリ `be754be`: `bash run.sh`（許可フラグなし）exit 0・`bash paper/build.sh` exit 0・21 頁・要旨 239 語（pypdf で R′ を 2 語と数えた値）。
+
+## 判断 12: 著者情報と、研究者が選んだ残りの決定（2026-09-28・研究者の回答）
+
+- **著者**: Mikoto Miura・mmiura.network@gmail.com・Hiroshima, Japan（研究者が指定）。★ 所属は無く、EMSE の規程（前タスク判断 17: 所属の無い著者は都市と国だけ）どおり `\affil` は都市と国だけにした。
+- **Statements and Declarations**: すべて該当なし（研究者の選択）→ Funding「組織からの支援なし」／ Competing interests「開示すべき利害なし」／ Ethics「該当なし（公開・オープンライセンスのデータと論文の二次分析で、人からの新しいデータ収集はない）」／ Author contributions「単著・着想・解析・執筆に責任を負う。LLM の使用は Sect. 5.5」。
+- **LLM の使用の開示**: 今の文面（4 項目＋「The author is responsible for the content」）のまま（研究者の選択）。
+- **題**: 仮題のまま確定 —— *When "no help" is not "solved": outcome-agnostic self-resolution measures in two public debugging datasets*。
+- **原稿のライセンス**: 投稿時に決める（README の「未定」のまま。arXiv に出すときに出版社の規程を一次で確かめる）。
+- **論文用リポジトリのコミット著者**: 過去のコミットは書き換えない（凍結の順序を示すハッシュを保つ）。以後のコミットはリポジトリ固有の設定で Mikoto Miura <mmiura.network@gmail.com>（`git config --local`・最初のコミットは `4a81a43`）。⚠️ 公開すると、それ以前のコミットの著者（John Do <johndo.mik.080@gmail.com>）も公開される。
+- **main の CI**: PR #254 の merge 後、macOS の self-hosted runner が「Complete job」で通信を失って failure（検査ステップはすべて緑）→ 研究者の選択で失敗したジョブを 1 回だけ再実行した。
+- ★ 論文用リポジトリ `4a81a43`: `bash paper/build.sh` exit 0・21 頁・仮置きは Data availability の DOI だけになった。

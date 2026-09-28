@@ -34,9 +34,9 @@
 
 ## 5. 完了
 - [x] `/cross-review` 2 巡 ＋ security-checker（判断 9–11・論文用リポジトリ `1db0cab` / `be754be`）
-- [ ] 研究者への確認（著者情報・Statements・題・LLM の開示の文言）
-- [ ] 論文用リポジトリを push（`be754be`）
-- [ ] GSE 側: `/finish-task` の出荷フロー（PR → CI 緑なら merge）
+- [x] 研究者への確認（著者情報・Statements・題・LLM の開示の文言・ライセンス・コミット著者＝判断 12・論文用リポジトリ `4a81a43`）
+- [x] 論文用リポジトリを push（`be754be` → `4a81a43`）
+- [x] GSE 側: `/finish-task` の出荷フロー（PR #254 → merge `f03cbe32`。判断 12 の記録は別 PR）
 
 ## 残課題（本タスクの外）
 - 投稿前に pdfLaTeX（Overleaf か投稿システム）で一度組む（判断 2）
