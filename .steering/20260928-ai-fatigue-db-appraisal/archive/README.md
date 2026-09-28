@@ -1,0 +1,58 @@
+# AI 疲労 文献 DB の Claude 再評価 — アーカイブ
+
+研究者の依頼（2026-09-28）で、外部の AI 疲労文献 DB（34 件）を
+適格性 → 方法論 → 領域別 / 照合 → スクリーニングの順に、一次資料に当たり直して評価した記録。
+判断の経緯は同じ steering の `requirement.md` / `design.md`（プロトコル v1.0）/ `decisions.md` にある。
+
+⚠️ **AI の予備判定であり、人間 2 名の独立判定の代わりにならない。** 元ワークブックの人間用の判定欄は変更していない。
+⚠️ **GSE との照合は別シートにあり、採否には使っていない**（プロトコル §7）。
+⚠️ `GSE照合` シートを含むので、公開用の `papers/` には置かない。
+
+## 中身
+
+| パス | 何か |
+|---|---|
+| `input/AI_fatigue_database_with_AI_appraisal_2026-09-18.xlsx` | 研究者から受け取った元ファイル（入力のスナップショット・16 シート・既存 AI 評価＝GPT を含む） |
+| `AI_fatigue_database_with_AI_appraisal_2026-09-28_claude.xlsx` | ★ 評価版。元の 16 シートはそのまま、`Claude…` など 10 シートを追加 |
+| `evidence/input-G1〜G6.md`・`db-dois.txt` | 抽出担当に渡した入力（題名・DOI・URL のみ。元 DB の値と既存評価の結論は渡していない） |
+| `evidence/extract-brief.md` | 抽出の規則（記載なし／未確認の区別・JBI の項目文・締切・禁止事項） |
+| `evidence/extract-G1〜G6.md` | 一次資料からの抽出ノート（サブエージェント・Sonnet） |
+| `evidence/searchgap-brief.md`・`searchgap.md`・`searchgap-analysis.json` | 学術 API による検索漏れ点検（11 クエリ・見た 933 件・予備ふるい） |
+| `evidence/verify.md` | 反証役による 10 主張の再照合（偽の主張 1 件を混入し、否定されたことを確認） |
+| `scripts/data_a.py`・`data_b.py`・`data_c.py` | ★ 判定の本体（34 件の評価文・照合事項・検索漏れ候補の判定） |
+| `scripts/assemble.py`・`build_xlsx.py` | シート定義を組み立て、元ワークブックに追加して保存し、元シートの不変を検算する |
+
+⚠️ 論文の本文・PDF は入れていない（著作権。元 DB の方針「全文 PDF や尺度の全設問は同梱しない」と同じ）。
+抽出ノートの逐語は 1 引用 40 語以内。
+
+## SHA-256
+
+```
+48ba8b908413fc8112ec35852d4317389500f577092e7be47384628b5f7ce8b0  input/AI_fatigue_database_with_AI_appraisal_2026-09-18.xlsx
+cda1ace7deb71e7994eb33be1982d86e6960c7d233d3f0a4a8977cd12cf3e2a5  AI_fatigue_database_with_AI_appraisal_2026-09-28_claude.xlsx
+```
+
+★ 研究者の Downloads にある 2 ファイルと一致することを確認済み（2026-09-28）。
+その他のファイルのハッシュは `sha256sum` で取り直せる。
+
+## 再生成
+
+```bash
+cd .steering/20260928-ai-fatigue-db-appraisal/archive/scripts
+python assemble.py                      # scripts/claude_eval.json を作る
+python build_xlsx.py claude_eval.json   # ../AI_fatigue_database_with_AI_appraisal_2026-09-28_claude.xlsx を上書き
+```
+
+- 依存: `openpyxl`（本評価では 3.1.5）。
+- `build_xlsx.py` は保存後に、元 16 シートの全セルが変わっていないこと・`スクリーニング!D5:F38` が全件「未判定」のまま・元のテーブル 14 個が残っていることを確かめ、崩れていれば終了コード 1 で止まる（★ 人間の判定欄へ書き込む変異を入れて、赤になることを確認済み）。
+- ★ アーカイブ内のスクリプトだけで再生成したファイルが、納品物とセル単位で一致することを確認済み（2026-09-28）。
+- ⚠️ 保存は openpyxl なので数式の計算済みの値を持たない（`fullCalcOnLoad=True` で Excel が開くときに再計算する）。
+  LibreOffice でコピーを再計算し、数式 110 個に予期しない空・エラーがないことを確認した（空は元の `AI判定比較!E5:E38` が人間の判定欄の空に `""` を返すもののみ）。
+
+## 評価の限界（詳細は xlsx の `Claude評価基準` シート）
+
+- 盲検ではない（メインは既存 AI 評価を読んでから判定した。緩和策は design.md §0）。
+- 全文に届かなかった件: AF002・AF003・AF009・AF015・AF021・AF025・AF027・AF028・AF031。
+- 抽出の一部は WebFetch の要約経由（AF005 の項目文は言い換えだったので、メインが逐語を取り直した）。
+- 検索漏れ候補は題名と機械抽出の根拠語だけで判定（抄録は未読）。Europe PMC と日本語文献は未検索。
+- 正式な JBI・RoB・COSMIN・GRADE の判定ではない。
