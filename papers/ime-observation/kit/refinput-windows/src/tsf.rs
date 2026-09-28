@@ -1,15 +1,21 @@
-//! 参照入力欄 Windows (b) TSF 直受け（Windows のみ・**自分のスレッドの TSF だけ**）。
+//! Reference input field for Windows, direct-TSF capture path (Windows only, and only the TSF
+//! of this component's own thread).
 //!
-//! ⚠️★★★ 文字列を取得しない。composition の長さは `ITfRangeACP::GetExtent` の `cch`（UTF-16 のコード単位数）だけで、
-//! 範囲の本文を読む API は呼ばない。他プロセス・他スレッドの TSF は見ない（`ITfThreadMgr::Activate` は
-//! 呼んだスレッドの TSF だけを起こす）。グローバルフック・WinEvent も使わない。
+//! No text is ever captured. The length of a composition is read only from
+//! `ITfRangeACP::GetExtent`'s `cch` (a count of UTF-16 code units); no API that reads a range's
+//! text is called. TSF belonging to another process or another thread is never observed:
+//! `ITfThreadMgr::Activate` only activates TSF for the calling thread. No global hook and no
+//! `WinEvent` hook is used either.
 //!
-//! ★ TSF の道: 道 1（RichEdit を載せ、フォーカス中のコンテキストの `ITfTextEditSink::OnEndEdit` で
-//! `ITfContextComposition::EnumCompositions` を見て開始・更新・終了を判定する）。
-//! 候補窓などは `ITfUIElementSink`。
+//! TSF capture strategy: this component hosts a RichEdit control and, on
+//! `ITfTextEditSink::OnEndEdit` for the focused context, inspects
+//! `ITfContextComposition::EnumCompositions` to derive composition start, update, and end.
+//! Candidate windows and similar UI elements are observed through `ITfUIElementSink`.
 //!
-//! 構成: 純粋な状態遷移（`CompTracker` / `FocusTrackers` / `UiKinds`・COM を使わないので単体テストできる）と、
-//! COM のシンク・登録（`Tsf`）。⚠️ 通ったこと ≠ 実 IME で通知が届くこと（M5 で確かめる）。
+//! Structure: a pure state machine (`CompTracker`, `FocusTrackers`, `UiKinds`), which uses no
+//! COM types and is unit tested directly, and the COM sinks and their registration (`Tsf`).
+//! Passing these tests does not by itself establish that a real input method engine delivers
+//! the expected notifications; that is confirmed separately, in a calibration pilot.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,10 +34,11 @@ use windows::Win32::UI::TextServices::{
     ITfThreadMgrEventSink_Impl, ITfUIElementMgr, ITfUIElementSink, ITfUIElementSink_Impl,
 };
 
-/// 記録の出口（bin が渡す。事象を時刻つきで書く）。シンクは自分のスレッド（STA）でしか呼ばれない。
+/// The recording sink, supplied by the binary, which writes a timestamped event. Sinks are
+/// invoked only on this component's own thread (a single-threaded apartment).
 pub type Recorder = Rc<dyn Fn(Ev)>;
 
-// ---- 純粋な状態遷移 ----------------------------------------------------------------------------
+// ---- pure state machine -------------------------------------------------------------------
 
 /// A single composition observation: (total length across all ranges, start offset of the
 /// first range, number of ranges). Offsets are opaque integers, never text.
@@ -184,12 +191,13 @@ impl<Id: Copy + Eq> FocusTrackers<Id> {
     }
 }
 
-/// UI 要素 ID → 種類（`BeginUIElement` で決め、`Update` / `End` で引く）。
+/// Maps a UI element ID to its kind (decided at `BeginUIElement`, looked up at `Update` and
+/// `End`).
 #[derive(Debug, Default)]
 pub struct UiKinds(Vec<(u32, UiKind)>);
 
 impl UiKinds {
-    /// `End` が来ないまま溜まっても増え続けないための上限。
+    /// A cap on growth in case `End` never arrives for some element.
     const CAP: usize = 64;
 
     pub fn begin(&mut self, id: u32, kind: UiKind) {
@@ -211,7 +219,7 @@ impl UiKinds {
     }
 }
 
-// ---- TSF の呼び出し（unsafe はここに閉じる）----------------------------------------------------
+// ---- TSF calls (unsafe is confined to this section) ----------------------------------------
 
 /// A stable identity for a context, derived from `IUnknown` per COM identity rules (querying
 /// the same object for `IUnknown` always yields the same pointer). Used to route callbacks to
@@ -228,7 +236,7 @@ fn extent_of(range: &ITfRange) -> (i64, u32) {
         return (0, 0);
     };
     let (mut start, mut cch) = (0i32, 0i32);
-    // SAFETY: 出力先は有効な i32 へのポインタ。
+    // SAFETY: the output pointers are valid i32 locations.
     match unsafe { acp.GetExtent(&mut start, &mut cch) } {
         Ok(()) => (i64::from(start), u32::try_from(cch).unwrap_or(0)),
         Err(_) => (0, 0),
@@ -239,14 +247,14 @@ fn extent_of(range: &ITfRange) -> (i64, u32) {
 /// of the first range, and the number of ranges. `None` if no composition is present.
 fn composition_info(ctx: &ITfContext) -> Option<CompObs> {
     let comps = ctx.cast::<ITfContextComposition>().ok()?;
-    // SAFETY: 引数なしの列挙の取得。
+    // SAFETY: enumeration takes no arguments.
     let views = unsafe { comps.EnumCompositions() }.ok()?;
     let (mut total, mut count, mut first_start) = (0u32, 0usize, None::<i64>);
     // Bound the loop in case the enumerator misbehaves.
     for _ in 0..16 {
         let mut view = [None];
         let mut got = 0u32;
-        // SAFETY: 長さ 1 のバッファと有効な u32 へのポインタ。
+        // SAFETY: a length-1 buffer and a valid u32 output pointer.
         if unsafe { views.Next(&mut view, &mut got) }.is_err() || got == 0 {
             break;
         }
@@ -262,20 +270,23 @@ fn composition_info(ctx: &ITfContext) -> Option<CompObs> {
     (count > 0).then(|| (total, first_start.unwrap_or(0), count))
 }
 
-/// 文書末の位置（末尾で潰れた範囲の開始位置）。`ec` は `OnEndEdit` が渡す読み取り専用の cookie。
+/// The document-end offset (the start of the collapsed range at the end of the document). `ec`
+/// is the read-only edit cookie supplied by `OnEndEdit`.
 fn doc_end(ctx: &ITfContext, ec: u32) -> Option<i64> {
-    // SAFETY: `ec` は `OnEndEdit` の呼び出しの間だけ有効で、その中でだけ使う。
+    // SAFETY: `ec` is valid only for the duration of the `OnEndEdit` call, and is used only
+    // within it.
     let range = unsafe { ctx.GetEnd(ec) }.ok()?;
     let acp = range.cast::<ITfRangeACP>().ok()?;
     let (mut start, mut cch) = (0i32, 0i32);
-    // SAFETY: 出力先は有効な i32 へのポインタ。
+    // SAFETY: the output pointers are valid i32 locations.
     unsafe { acp.GetExtent(&mut start, &mut cch) }.ok()?;
     Some(i64::from(start) + i64::from(cch))
 }
 
-/// UI 要素の種類。`ITfCandidateListUIElement` なら候補、`ITfReadingInformationUIElement` なら読み、他は other。
+/// The kind of a UI element: candidate for `ITfCandidateListUIElement`, reading for
+/// `ITfReadingInformationUIElement`, other otherwise.
 fn ui_kind_of(mgr: &ITfUIElementMgr, id: u32) -> UiKind {
-    // SAFETY: 要素の取得（ID は TSF が渡したもの）。
+    // SAFETY: retrieving an element by an ID supplied by TSF.
     let Ok(element) = (unsafe { mgr.GetUIElement(id) }) else {
         return UiKind::Other;
     };
@@ -288,7 +299,7 @@ fn ui_kind_of(mgr: &ITfUIElementMgr, id: u32) -> UiKind {
     }
 }
 
-// ---- シンク ------------------------------------------------------------------------------------
+// ---- sinks -----------------------------------------------------------------------------------
 
 /// State shared by the sinks: the recording sink, the per-context composition trackers keyed by
 /// `ctx_id`, and the registrations backing them. A registration is kept alive until the
@@ -316,7 +327,8 @@ impl Shared {
         let Ok(source) = ctx.cast::<ITfSource>() else {
             return;
         };
-        // SAFETY: `edit` は生きているシンク。cookie は `unadvise` で同じ `source` に返す。
+        // SAFETY: `edit` is a live sink; the cookie is returned to the same `source` in
+        // `unadvise`.
         if let Ok(cookie) = unsafe { source.AdviseSink(&ITfTextEditSink::IID, edit) } {
             self.sources.borrow_mut().push((id, source, cookie));
         }
@@ -331,7 +343,7 @@ impl Shared {
                 .map(|pos| sources.remove(pos))
         };
         if let Some((_, source, cookie)) = entry {
-            // SAFETY: `attach` が受け取った cookie を同じ `ITfSource` に返す。
+            // SAFETY: returns the cookie received in `attach` to the same `ITfSource`.
             let _ = unsafe { source.UnadviseSink(cookie) };
         }
     }
@@ -383,7 +395,8 @@ impl Shared {
     }
 }
 
-/// コンテキストの編集の終わり（`OnEndEdit`）で composition の有無と長さを見る。
+/// On a context's end-of-edit notification (`OnEndEdit`), inspects whether a composition is
+/// present and, if so, its length.
 #[implement(ITfTextEditSink)]
 struct EditSink {
     sh: Rc<Shared>,
@@ -403,7 +416,7 @@ impl ITfTextEditSink_Impl for EditSink_Impl {
     }
 }
 
-/// フォーカス中のドキュメントが変わったら、`OnEndEdit` を受けるコンテキストを付け替える。
+/// When the focused document changes, re-targets the context that receives `OnEndEdit`.
 #[implement(ITfThreadMgrEventSink)]
 struct ThreadSink {
     sh: Rc<Shared>,
@@ -423,7 +436,7 @@ impl ITfThreadMgrEventSink_Impl for ThreadSink_Impl {
         _pdimprevfocus: Option<&ITfDocumentMgr>,
     ) -> Result<()> {
         let ctx = match pdimfocus {
-            // SAFETY: フォーカスを得たドキュメントの最上位のコンテキストを取る。
+            // SAFETY: retrieves the top context of the document that gained focus.
             Some(dim) => unsafe { dim.GetTop() }.ok(),
             None => None,
         };
@@ -443,7 +456,8 @@ impl ITfThreadMgrEventSink_Impl for ThreadSink_Impl {
     }
 }
 
-/// 候補窓・読み窓などの UI 要素の表示（`Begin` / `Update` / `End`）。
+/// Display of a UI element, such as a candidate window or a reading window (`Begin` / `Update`
+/// / `End`).
 #[implement(ITfUIElementSink)]
 struct UiSink {
     rec: Recorder,
@@ -453,9 +467,10 @@ struct UiSink {
 
 impl ITfUIElementSink_Impl for UiSink_Impl {
     fn BeginUIElement(&self, dwuielementid: u32, pbshow: *mut BOOL) -> Result<()> {
-        // ★ 表示を奪わない: IME 自身の窓を出したままにする（TRUE = 出す）。
+        // Display is never suppressed: the input method's own window is left visible (TRUE =
+        // show).
         if !pbshow.is_null() {
-            // SAFETY: TSF が渡した BOOL の出力先（非 NULL を確かめた）。
+            // SAFETY: the output pointer for the BOOL supplied by TSF, confirmed non-null.
             unsafe { *pbshow = BOOL(1) };
         }
         let kind = ui_kind_of(&self.mgr, dwuielementid);
@@ -471,7 +486,8 @@ impl ITfUIElementSink_Impl for UiSink_Impl {
     }
     fn EndUIElement(&self, dwuielementid: u32) -> Result<()> {
         let known = self.kinds.borrow_mut().end(dwuielementid);
-        // ⚠️ 終わった要素は問い合わせられないことがあるので、`Begin` で決めた種類を使う（知らなければ other）
+        // An element that has already ended cannot always be queried, so the kind decided at
+        // `Begin` is used instead (other, if it was never recorded).
         (self.rec)(Ev::UiEnd {
             kind: known.unwrap_or(UiKind::Other),
         });
@@ -479,9 +495,10 @@ impl ITfUIElementSink_Impl for UiSink_Impl {
     }
 }
 
-// ---- 登録 --------------------------------------------------------------------------------------
+// ---- registration ----------------------------------------------------------------------------
 
-/// このスレッドの TSF の登録一式。`start` で COM（STA）を起こしてシンクを登録し、`stop` で外す。
+/// The full set of TSF registrations for this thread. `start` initializes COM (as a
+/// single-threaded apartment), activates TSF, and registers the sinks; `stop` removes them.
 pub struct Tsf {
     mgr: ITfThreadMgr,
     source: ITfSource,
@@ -491,10 +508,11 @@ pub struct Tsf {
 }
 
 impl Tsf {
-    /// ⚠️ 窓（RichEdit）を作る**前**に呼ぶ（フォーカスの通知を取りこぼさないため）。呼んだスレッドで
-    /// メッセージループを回すこと。
+    /// Must be called before the window (RichEdit control) is created, so that no focus
+    /// notification is missed. The calling thread must run a message loop.
     pub fn start(rec: Recorder) -> Result<Tsf> {
-        // SAFETY: このスレッドを STA にして、このスレッドの TSF を起こし、シンクを登録する。
+        // SAFETY: makes this thread a single-threaded apartment, activates TSF for it, and
+        // registers the sinks.
         unsafe {
             CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
             let mgr: ITfThreadMgr =
@@ -535,18 +553,20 @@ impl Tsf {
         }
     }
 
-    /// シンクを外し、TSF を止め、COM を閉じる（窓を壊した後に呼ぶ）。
+    /// Removes the sinks, deactivates TSF, and uninitializes COM. Call after the window has
+    /// been destroyed.
     pub fn stop(self) {
         self.sh.detach_all();
-        // SAFETY: `start` で得た cookie を同じ `ITfSource` に返し、`Activate` と対に `Deactivate` する。
+        // SAFETY: returns the cookies obtained in `start` to the same `ITfSource`, and pairs
+        // `Deactivate` with `Activate`.
         unsafe {
             let _ = self.source.UnadviseSink(self.ui_cookie);
             let _ = self.source.UnadviseSink(self.thread_cookie);
             let _ = self.mgr.Deactivate();
         }
-        // ★ COM のインターフェースを全部手放してから閉じる。
+        // All COM interfaces are released before COM itself is uninitialized.
         drop(self);
-        // SAFETY: `start` の `CoInitializeEx` と対。
+        // SAFETY: pairs with `CoInitializeEx` in `start`.
         unsafe { CoUninitialize() };
     }
 }
@@ -813,7 +833,7 @@ mod tests {
         assert_eq!(k.get(7), None);
         assert_eq!(k.end(7), None);
         assert_eq!(k.get(8), Some(UiKind::Reading));
-        // 同じ ID の Begin は種類を置き換える（重複しない）
+        // A second `begin` for the same ID replaces its kind rather than duplicating the entry.
         k.begin(8, UiKind::Other);
         assert_eq!(k.get(8), Some(UiKind::Other));
         assert_eq!(k.0.len(), 1);
@@ -826,7 +846,7 @@ mod tests {
             k.begin(id, UiKind::Other);
         }
         assert_eq!(k.0.len(), UiKinds::CAP);
-        // 古いものから捨てる
+        // The oldest entries are discarded first.
         assert_eq!(k.get(0), None);
         assert_eq!(k.get(999), Some(UiKind::Other));
     }

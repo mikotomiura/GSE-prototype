@@ -6,7 +6,8 @@ description = "Windows reference input field: records IME messages as content-fr
 license = "Apache-2.0"
 publish = false
 
-# ⚠️ このパッケージは GSE 本体（src-tauri/）の workspace に入れない（独立した論文キット）。
+# This package is deliberately excluded from any enclosing Cargo workspace; it is
+# self-contained and builds independently of the rest of the evaluation kit.
 [workspace]
 
 [lib]
@@ -21,9 +22,12 @@ path = "src/bin/refinput_imm.rs"
 name = "refinput_tsf"
 path = "src/bin/refinput_tsf.rs"
 
-# ⚠️ 依存は `windows` 系列だけ（src-tauri と同じ 0.58 系）。JSON は手書きなので serde は要らない。
-# `windows-core` は TSF のシンクを書く `#[implement]` の展開結果が `::windows_core::…` を名指しするために要る
-# （`windows` の依存として Cargo.lock に元からある同じ 0.58 系。新しい crate は増えない）。
+# Dependencies are limited to the `windows` crate family, version 0.58. JSON output is
+# hand-written (only integers and enumerated names appear), so serde is not required.
+# `windows-core` is added as a direct dependency because the expansion of the `#[implement]`
+# macro used for the TSF sink types refers to `::windows_core::...` by name; it is already
+# present in Cargo.lock at the same 0.58 line as a transitive dependency of `windows`, so this
+# does not add a new crate.
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.58"
 windows = { version = "0.58", features = [
