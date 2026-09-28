@@ -273,6 +273,21 @@ mutate "登録ログ: registered を素のオブジェクトに戻す（辞書�
 mutate "途絶タブ: 桁あふれの日番号（Infinity）を弾かない（無限ループの回帰）" \
   's/!Number\.isSafeInteger\(day\)/false/'
 
+# ★ 2026-09-28 受け口が `<P-ID>/` に保存する版（受け口 V-3）に合わせた走査
+mutate "台帳の走査: 直下しか読まない（受け口の変更後に全員を未受領と誤報する）" \
+  's/var it = o1LedgerAllFiles_\(folder, t0 \+ O1_LEDGER_TIME_BUDGET_MS\);(\n  var truncated = false;)/var it = (function (f) { var i = f.getFiles(); i.timedOut = function () { return false; }; return i; })(folder);$1/'
+mutate "点検の走査: 直下しか読まない" \
+  's/var it = o1LedgerAllFiles_\(folder, t0 \+ O1_LEDGER_TIME_BUDGET_MS\);(\n  var ok = 0;)/var it = (function (f) { var i = f.getFiles(); i.timedOut = function () { return false; }; return i; })(folder);$1/'
+mutate "走査: ごみ箱のサブフォルダも読む" \
+  's/      if \(d\.isTrashed\(\)\) continue;\n//'
+# ⚠️ security-checker MEDIUM（2026-09-28）: 空フォルダの大量列挙で実行ごと落ちない
+mutate "走査: サブフォルダ列挙の期限を見ない（大量の空フォルダで実行ごと落ちる）" \
+  's/if \(new Date\(\)\.getTime\(\) > deadlineMs\) \{/if (false) {/'
+mutate "台帳の走査: 期限切れを打ち切りとして扱わない" \
+  's/  if \(it\.timedOut\(\)\) truncated = true;[^\n]*\n(\n)/$1/'
+mutate "点検の走査: 期限切れを打ち切りとして扱わない" \
+  's/  if \(it\.timedOut\(\)\) truncated = true;[^\n]*\n(  var elapsed)/$1/'
+
 echo
 echo "壊すと赤: $PASS / 穴: $FAIL"
 if [ "$FAIL" -ne 0 ]; then

@@ -209,15 +209,31 @@ function makeEnv(o) {
     DriveApp: {
       getFolderById(id) {
         if (id !== "FOLDER") throw new Error("no such folder");
+        // ★ `opt.subfolders` = [{ trashed?, files: [...] }]（受け口が作る `<P-ID>/`・2026-09-28）。
+        const iterOf = (list) => {
+          let i = 0;
+          return {
+            hasNext: () => i < list.length,
+            next: () => {
+              if (opt.tickPerFile) NOW += opt.tickPerFile;
+              return list[i++];
+            },
+          };
+        };
+        const subs = (opt.subfolders || []).map((d) => ({
+          isTrashed: () => !!d.trashed,
+          getFiles: () => iterOf(d.files),
+        }));
         return {
           getName: () => "STUB-FOLDER",
-          getFiles() {
+          getFiles: () => iterOf(files),
+          getFolders() {
             let i = 0;
             return {
-              hasNext: () => i < files.length,
+              hasNext: () => i < subs.length,
               next: () => {
-                if (opt.tickPerFile) NOW += opt.tickPerFile;
-                return files[i++];
+                if (opt.tickPerFolder) NOW += opt.tickPerFolder;
+                return subs[i++];
               },
             };
           },
@@ -987,6 +1003,9 @@ const sharedProps = (extra) =>
   call(env, "o1LedgerCheck");
   const log = env.logs.join("\n");
   check("§8★ o1LedgerCheck も時間予算で打ち切り、打ち切ったことと件数を出す", [/時間予算で打ち切り/.test(log), /O1 の形: \d+ 件 ／ 対象外: \d+ 件/.test(log)], [true, true]);
+  // ★ 件数まで固定する（2026-09-28）: 走査の期限はイテレータ側にもあるので、ループの予算検査を外しても
+  //   「打ち切り」の文言だけは出てしまう（変異が素通りした）。★ 予算内に読めたのは 3 本（100 秒 × 3 > 240 秒）。
+  check("§8★ o1LedgerCheck は予算を超えた時点で止まる（6 本中 3 本だけ読む）", /O1 の形: 2 件 ／ 対象外: 1 件/.test(log), true);
   check("§8 o1LedgerCheck はタイムゾーンを出す", /タイムゾーン: Asia\/Tokyo/.test(log), true);
   check("§8 o1LedgerCheck は実行ログに P-ID が残りうる注意を出す", /A-10/.test(log), true);
   NOW = startNow;
@@ -1143,6 +1162,81 @@ const sharedProps = (extra) =>
 }
 
 // ---------------------------------------------------------------------------
+// §10 2026-09-28 受け口が `<受け取りフォルダ>/<P-ID>/` に保存する版になった（受け口 V-3）
+//   ⚠️★★★ 直下しか読まない台帳だと、全員が「未受領・途絶」と誤報される。その陰性対照を含む。
+// ---------------------------------------------------------------------------
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  const d9 = new Date(ago(9));
+  const p2 = (n) => String(n).padStart(2, "0");
+  const reg9 = `${d9.getFullYear()}-${p2(d9.getMonth() + 1)}-${p2(d9.getDate())} 09:00:00`;
+  regTab(ss, [
+    [reg9, "register", "P070", "ok", "", ""],
+    [reg9, "register", "P071", "ok", "", ""],
+    [reg9, "register", "P072", "ok", "", ""],
+  ]);
+  const env = makeEnv({
+    spreadsheet: ss,
+    // 直下 = 旧形式の P071 ＋ 対象外 1 本
+    files: [makeFile("r1", goodName("P071", 1, stamp(26)), 10, ago(1)), makeFile("r2", "memo.txt", 3, ago(1))],
+    subfolders: [
+      { files: [] }, // 空のサブフォルダでも壊れない
+      { files: [makeFile("s1", goodName("P070", 1, stamp(26)), 10, ago(2)), makeFile("s2", goodName("P070", 2, stamp(27)), 10, ago(1))] },
+      // ⚠️ ごみ箱のサブフォルダ（削除要求で捨てた P072）は受領に数えない
+      { trashed: true, files: [makeFile("t1", goodName("P072", 1, stamp(26)), 10, ago(1))] },
+    ],
+  });
+  call(env, "o1LedgerRun");
+  const ids = ss.sheets[LEDGER].rows.slice(2).map((r) => r[0]).sort();
+  check("§10★ サブフォルダ内のファイルも台帳に載る（直下の旧形式・対象外も載る）", ids, ["r1", "r2", "s1", "s2"]);
+  const dash = Object.fromEntries(ss.sheets[DASH].rows.slice(2).map((r) => [r[0], r[1]]));
+  check("§10★ サブフォルダにだけ届いた P070 は未受領にならない", dash.P070, "正常");
+  check("§10 直下の旧形式の P071 も正常", dash.P071, "正常");
+  check("§10★ ごみ箱のサブフォルダにしか無い P072 は受領に数えない（未受領）", dash.P072, "未受領");
+  call(env, "o1LedgerRun");
+  check("§10 サブフォルダを含めても 2 回目で行が増えない（冪等）", ss.sheets[LEDGER].rows.length - 2, 4);
+
+  const env2 = makeEnv({
+    spreadsheet: makeSpreadsheet(["O1 登録ログ"]),
+    files: [],
+    subfolders: [{ files: [makeFile("s1", goodName("P070", 1, stamp(26)), 10, ago(2))] }, { files: [makeFile("s9", "x.bin", 1, ago(2))] }],
+  });
+  call(env2, "o1LedgerCheck");
+  check("§10★ o1LedgerCheck もサブフォルダを数える", env2.logs.some((l) => /O1 の形: 1 件 ／ 対象外: 1 件/.test(l)), true);
+}
+
+{
+  // ⚠️★★ 空のサブフォルダが大量にある（シークレット保持者が P-ID を変えて作れる）→
+  //   列挙も時間予算の中で打ち切り、実行ごと落ちない（2026-09-28 security-checker MEDIUM）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const empties = Array.from({ length: 50 }, () => ({ files: [] }));
+  const env = makeEnv({
+    spreadsheet: ss,
+    files: [makeFile("r1", goodName("P080", 1, stamp(26)), 10, ago(1))],
+    subfolders: empties.concat([{ files: [makeFile("s1", goodName("P081", 1, stamp(26)), 10, ago(1))] }]),
+    tickPerFolder: 10000, // 50 × 10 秒 = 500 秒 > 予算 240 秒
+  });
+  let threw = null;
+  try {
+    call(env, "o1LedgerRun");
+  } catch (e) {
+    threw = String(e);
+  }
+  check("§10★ 空フォルダの列挙が予算を超えても例外で落ちない", threw, null);
+  check("§10★ その場合は「打ち切り」としてバナーに出る（完走と偽らない）", /打ち切り/.test(ss.sheets[DASH].rows[0][0]), true);
+  check("§10 打ち切りの前に読めた直下のファイルは台帳に載る", ss.sheets[LEDGER].rows.slice(2).map((r) => r[0]), ["r1"]);
+  const env2 = makeEnv({
+    spreadsheet: makeSpreadsheet(["O1 登録ログ"]),
+    files: [],
+    subfolders: empties,
+    tickPerFolder: 10000,
+  });
+  call(env2, "o1LedgerCheck");
+  check("§10★ o1LedgerCheck も空フォルダの列挙で打ち切りを出す", env2.logs.some((l) => /時間予算で打ち切り/.test(l)), true);
+}
+
+// ---------------------------------------------------------------------------
 // §7 ソースの性質（★ 歯止め）
 // ---------------------------------------------------------------------------
 {
@@ -1162,7 +1256,7 @@ const sharedProps = (extra) =>
     const m = /var O1_MGMT_TAB = "([^"]+)"/.exec(b);
     return m ? m[1] : null;
   })(), E.ctx.O1_LEDGER_REG_TAB);
-  check("§7 受け口のソースに台帳の語が無い（doPost を触っていない）", /O1_LEDGER|o1Ledger/.test(submitSrc), false);
+  check("§7 受け口のソースに台帳の語が無い（受け口は台帳の関数・状態に依存しない）", /O1_LEDGER|o1Ledger/.test(submitSrc), false);
 }
 
 // ---------------------------------------------------------------------------
