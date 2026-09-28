@@ -13,8 +13,8 @@
 - [x] code-reviewer + security-checker（並列）
 - [x] /finish-task（/cross-review 必須）→ PR → CI 緑 → merge
 - [x] 版上げ v0.1.38（PR #247・`afe6b0d7`）→ タグ push（研究者承認）→ Release 検証 → zip → `docs/o1-distribution-tag.md` v0.1.38 節
-- [ ] Drive の zip 差し替え（研究者）→ コネクタでバイト数照合
-- [ ] O1 同意フォームの再配備（研究者: `migrateO1ConsentForm()`）
+- [x] Drive の zip 差し替え（研究者・2026-09-28）→ コネクタで照合: `O1_実施用_macOS.zip` 10,434,926 B（id `1eeFtGS-…`）／`O1_実施用_Windows.zip` 5,983,577 B（id `1RDeKfvh…`）= ローカルと一致。同名の古い版は Drive 検索で 0 件
+- [x] O1 同意フォームの再配備（研究者が `migrateO1ConsentForm()` を実行・「追加する同意項目はありません」。★ 説明文の新しい 1 文は**研究者が実物を目で確認**・2026-09-28）
 - [ ] 段階 B（新ビルドで本当のログイン・研究者）
 
 ## 記録
