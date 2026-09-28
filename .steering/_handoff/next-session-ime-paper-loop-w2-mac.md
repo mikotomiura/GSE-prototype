@@ -20,6 +20,8 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 - ★ base `feature/ime-eval-kit` に W1（001）が merge 済み（`32b3fdc2`）。レビューを受けて契約を変えた（判断 23〜26）: `capabilities` は `{key, ime_shadow}` の列挙・`gt` / `obs` の行のバックスラッシュを拒否・`plan/1` / `oracle/1` / `corpus/1` の型を `FORMATS.md` に追加（判断 25）・`papers/.gitignore`。
 - ★ **004 / 007 が従う契約は `papers/ime-observation/kit/formats/FORMATS.md` の最新版**。とくに 004 は「`oracle/1` の型」節（全行が 2 つの時刻を持つ・`trial_begin` は `gap_before_ms` の待ちの**後**・`marker` は押下ごとに 1 行・`reset` は `block_begin` の前）、007 は「エスケープを使わない」（⚠️ Swift の `JSONEncoder` は既定で `/` をエスケープする → `.withoutEscapingSlashes`）と「BOM を付けない」。
 - G-GEAR では W2 の 7 本（002 003 010 016 → 008 011 015）を回している最中。Mac の 004 / 007 とは Allowed Files が交差しない（`_issue-plan.md` §3）。
+- ★ **追記（同日・G-GEAR）**: 002 003 008 010 016 は base に merge 済み。判断 29 で `plan/1` のヘッダに `recipes_sha256` / `corpus_sha256` が増え、「試行は直前のブロック行を指す」になった（004 の実行器は計画を読むので、この形を受け入れること）。判断 34 で **004 / 007 は `verify_level: parse`** になった（watchdog は起動しない。合否はメインの clean な checkout の acceptance とレビューで決める）。
+- ★ W2 の実測: 1 本あたり約 600 万トークン・$2.3〜2.7（1 attempt）。レビューで毎回 MEDIUM 以上が出て、直しにもう 1 回ずつ手がかかった。
 
 ## §2 手順
 
@@ -28,7 +30,7 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 3. `bash scripts/loop-run.sh .steering/20260927-ime-observation-paper-eval-design --issues 004,007`
    - ⚠️ main checkout に未コミット・未追跡の変更があると spawn が止まる（B1）。★ 他トラックの未追跡物なら触らずに `LOOP_FORCE=1` を付ける（dirty 検査だけを外す）。
 4. merge ゲート（issue ごと）:
-   - ⚠️ `issue_done` は自己申告に近い: watchdog は `bash` / `python` / `swiftc` を実行できず**読んで OK を出すだけ**（B3）。
+   - ⚠️ `issue_done` は verify（`kit/check.sh` 3 本）と acceptance の緑で出る（`parse`・watchdog なし）。★ 最終の合否はメインの clean な checkout の acceptance。
    - worktree の `git status` が空・`git log feature/ime-eval-kit..loop/<id>-issue` にコミットがあることを見る。
    - `loop/<id>-issue` を detached で clean な worktree に出し、そこを cwd にして main checkout 側の `issues/<id>-acceptance.sh` を回す（★ 終了コードはパイプの後ろで取らない）。変異を 1 本入れて赤になることも見る。
    - `code-reviewer` と `security-checker` を 1 メッセージで並列に（範囲 = `feature/ime-eval-kit..loop/<id>-issue`・read-only・締切 12 分・実行してよいコマンドを名指し）。

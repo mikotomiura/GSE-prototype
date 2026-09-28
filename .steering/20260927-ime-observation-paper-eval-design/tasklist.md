@@ -16,6 +16,12 @@
   - [x] **W1（001）**: モード C・attempt 1 で `issue_done`（6.17M トークン・$2.68）。merge ゲート（clean な checkout で acceptance 失敗 0 件・verify 3 本・変異・code-reviewer ∥ security-checker）→ 契約の指摘を研究者に問い判断 23〜26 → メインが直して `32b3fdc2` で base へ merge。`papers/.gitignore` を base に追加。詰まりは `blockers.md` B1〜B4
   - [x] **判断 25**: `plan/1` / `oracle/1` / `corpus/1` の型をメインが `FORMATS.md` に足し、研究者が差分を承認して base へ（2026-09-28）
   - [ ] W2（G-GEAR: 002 003 008 010 011 015 016 ／ Mac: 004 007）。⚠️ token_ceiling は run ごと（B4）→ 2〜3 回の run に分ける
+    - [x] G-GEAR の 7 本をループで実行（2 run・parallel=1・計 $20）。`issue_done` 4 本（002 003 016 015）・watchdog の空応答で `blocked` 3 本（010 008 011）。7 本とも clean な checkout で acceptance 失敗 0 件（B5）
+    - [x] レビュー 6 本（code-reviewer 4・security-checker 2）→ 判断 27〜34 を研究者に問い確定。002 / 003 / 010 は作業用エージェント（Sonnet）が直し、016 はメインが直した
+    - [x] 002 003 008 010 016 を base へ merge（`c968670b`）・merge 後の base で 6 本の acceptance が緑・push
+    - [x] 判断 34: 未実行の recheck 14 本を parse に・009 / 020 の依存から 008 / 010 を外す（`1ab259b2`）
+    - [ ] 011 / 015 の直し（HIGH あり）→ 検証 → merge。011 の merge 後に 012 / 013 / 023 / 024 の依存から 011 を外す
+    - [ ] Mac: 004 / 007（`.steering/_handoff/next-session-ime-paper-loop-w2-mac.md`）
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
