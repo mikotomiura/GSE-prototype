@@ -7,9 +7,11 @@
   build_corpus.py --validate FILE      corpus/1 の検査（違反があれば exit 1）
   build_corpus.py --selftest           辞書なしの陽性・陰性対照（速い既定）
 
-処理: cp932 で読む → 題・記号の説明の枠・底本情報・注記・ルビ記法を除く → 文（。！？）に分ける →
-節（読点・空白）に分ける → 読みを付ける → 読みの長さが min〜max に入る句にまとめる →
-読みがひらがなだけの句を残す → 作品ごとに seed で K 句まで抽出する。
+処理: cp932 で読む → 題・記号の説明の枠・底本情報・注記・ルビ記法を除く（枠が見つからない作品は
+先頭の空行までを捨て、stderr に警告を出す）→ 文（。！？）に分ける → 節（読点・空白）に分ける →
+読みを付ける → 読みの長さが min〜max に入る句にまとめる → 読みがひらがなだけ・旧仮名（ゐ・ゑ・ゕ・ゖ）を
+含まない句のうち、text（読点・空白を除く）が漢字・ひらがな・カタカナ・長音・々 だけの句を残す →
+作品ごとに seed で K 句まで抽出する。
 
 ★ 読みの付与は SudachiPy（判断 19）だが、トークナイザは差し替えられる。`sudachipy` は
    SudachiTokenizer の中だけで import する（ファイル先頭に置かない）。辞書の無い機械でも
@@ -21,6 +23,7 @@ exit 0 = 成功 / 1 = 不合格（検査の違反・句が 1 件も残らない�
 （使い方の誤り・ファイルが読めない・トークナイザが使えない）。★ 0 以外はすべて不合格として扱うこと。
 """
 import argparse
+import builtins
 import hashlib
 import json
 import os
@@ -35,6 +38,16 @@ FORMAT = "corpus/1"
 SOURCE = "aozora"
 # corpus/1 の型（kit/formats/FORMATS.md）
 READING_RE = re.compile(r"[ぁ-ゖー]+")
+# 旧仮名（研究者判断 30）: ゐ・ゑ・ゕ・ゖ を含む読みは捨てる。範囲の端点は chr() から組み立てる
+# （バックスラッシュ + u + 16 進 4 桁の並びを文書・コードに書かない規約のため）。
+OLD_KANA_RE = re.compile("[" + chr(0x3090) + chr(0x3091) + chr(0x3095) + chr(0x3096) + "]")
+# text 側の字種判定（研究者指摘 1）: 漢字・ひらがな・カタカナ・長音・々 だけを許す。実物の Sudachi は
+# 数字・英字にもカナの読みを付けうるため、読みだけの判定では残ってしまう句を text 側で捨てる。
+TEXT_OK_RE = re.compile(
+    "[" + chr(0x4E00) + "-" + chr(0x9FFF) + chr(0x3400) + "-" + chr(0x4DBF)
+    + chr(0x3041) + "-" + chr(0x3096) + chr(0x30A1) + "-" + chr(0x30FA)
+    + chr(0x30FC) + chr(0x3005) + "]+")
+TEXT_STRIP_RE = re.compile(r"[、\s]")  # text 側の判定の前に読点・空白を除く（節の区切りと同じ扱い）
 NAME_RE = re.compile(r"[0-9A-Za-z._+-]{1,64}")
 WORK_ID_RE = re.compile(r"[a-z0-9][a-z0-9_]{0,31}")
 PHRASE_ID_RE = re.compile(r"([a-z0-9][a-z0-9_]{0,31})-[0-9]+-[0-9]+")
@@ -147,7 +160,7 @@ def load_table(path):
         raise BuildError("表を開けない: %s（%s）" % (path, type(e).__name__), 2)
     try:
         mapping = json.loads(raw.decode("utf-8"))
-    except ValueError:
+    except (ValueError, RecursionError):
         raise BuildError("表が JSON（UTF-8）として読めない: %s" % path, 2)
     if not isinstance(mapping, dict) or not mapping or not all(
             isinstance(k, str) and k and isinstance(v, str) and v for k, v in mapping.items()):
@@ -166,16 +179,26 @@ def make_tokenizer(spec):
 # ---------------------------------------------------------------- 本文の整形・句の切り出し
 
 def body_lines(text):
-    """本文の行を返す。題・著者と記号の説明の枠（点線 2 本）・底本情報を除き、注記とルビ記法を除く。
+    """本文の行を返す: (行の列, no_dash)。題・著者と記号の説明の枠（点線 2 本）・底本情報を除き、
+    注記とルビ記法を除く。no_dash は点線 2 本の枠が見つからなかった印（呼び出し側が警告を出す）。
 
-    ★ ルビは原文の漢字を残して読みを捨てる（読みはトークナイザが付ける）。"""
+    ★ ルビは原文の漢字を残して読みを捨てる（読みはトークナイザが付ける）。
+    ★ 点線 2 本が見つからない（片方だけ・全く無い）ときは、代わりに先頭の最初の空行までを捨てる
+    （題・著者の行は空行の前にあるのが青空文庫の通例）。"""
     lines = re.split(r"\r\n|\r|\n", text)
     first = next((i for i, ln in enumerate(lines[:HEAD_SCAN]) if DASH_RE.fullmatch(ln.strip())), None)
+    second = None
     if first is not None:
         second = next((i for i in range(first + 1, min(len(lines), first + 1 + HEAD_SPAN))
                        if DASH_RE.fullmatch(lines[i].strip())), None)
-        if second is not None:
-            lines = lines[second + 1:]
+    no_dash = second is None
+    if second is not None:
+        lines = lines[second + 1:]
+    else:
+        blank = next((i for i, ln in enumerate(lines[:HEAD_SCAN]) if ln.strip() == ""), None)
+        # 空行の後に中身が無ければ切り詰めない（末尾の改行が作る空行で全体が消えるのを防ぐ）
+        if blank is not None and any(ln.strip() for ln in lines[blank + 1:]):
+            lines = lines[blank + 1:]
     for i, ln in enumerate(lines):
         if FOOT_RE.match(ln):
             lines = lines[:i]
@@ -184,7 +207,7 @@ def body_lines(text):
     for ln in lines:
         ln = ANNOT_RE.sub("", ln)
         out.append(RUBY_RE.sub("", ln).replace("｜", ""))
-    return out
+    return out, no_dash
 
 
 def sentences(lines):
@@ -207,13 +230,17 @@ def sentences(lines):
 def phrases_of(sentence, tok, min_r, max_r):
     """1 文を句にまとめる: [(text, reading), ...]。
 
-    節（読点・空白で区切った単位）ごとに読みを付け、読みがひらがなだけの節を、合計が min に届くまで
-    隣と束ねて 1 句にする（届いた時点で止める・max を超える束ねはしない）。読みが不正な節・max を超える節は
-    どの句にも入らない。text は原文の切れ端（束ねた節のあいだの読点はそのまま残る）。"""
+    節（読点・空白で区切った単位）ごとに読みを付け、読みがひらがなだけ・**旧仮名（ゐ・ゑ・ゕ・ゖ）を
+    含まない**節を、合計が min に届くまで隣と束ねて 1 句にする（届いた時点で止める・max を超える束ねは
+    しない）。読みが不正な節・max を超える節はどの句にも入らない。text は原文の切れ端（束ねた節のあいだの
+    読点はそのまま残る）。★ 束ねた text（読点・空白を除く）が漢字・ひらがな・カタカナ・長音・々 だけで
+    なければ、その句は捨てる（研究者指摘 1: 読みだけの判定では、数字・英字にカナの読みが付く実物の
+    Sudachi の出力を捨てきれない）。"""
     spans = []
     for m in CLAUSE_RE.finditer(sentence):
         r = tok.read(m.group(0))
-        spans.append((m.start(), m.end(), r if READING_RE.fullmatch(r) else None))
+        ok = READING_RE.fullmatch(r) and not OLD_KANA_RE.search(r)
+        spans.append((m.start(), m.end(), r if ok else None))
     out = []
     i = 0
     while i < len(spans):
@@ -225,21 +252,27 @@ def phrases_of(sentence, tok, min_r, max_r):
             if total >= min_r:
                 break
         if total >= min_r:
-            out.append((sentence[spans[i][0]:spans[j - 1][1]], "".join(s[2] for s in spans[i:j])))
-            i = j
-        else:
-            i += 1
+            text = sentence[spans[i][0]:spans[j - 1][1]]
+            if TEXT_OK_RE.fullmatch(TEXT_STRIP_RE.sub("", text)):
+                out.append((text, "".join(s[2] for s in spans[i:j])))
+                i = j
+                continue
+        i += 1
     return out
 
 
 def work_candidates(work_id, text, tok, min_r, max_r):
-    """1 作品の候補句（本文の順）。phrase_id は <work_id>-<文番号>-<句番号>（入力から決まる・1 始まり）。"""
+    """1 作品の候補句（本文の順）: (候補の列, no_dash)。
+
+    phrase_id は <work_id>-<文番号>-<句番号>（入力から決まる・1 始まり）。no_dash は
+    body_lines() が点線 2 本の枠を見つけられなかった印（呼び出し側が警告を出す）。"""
+    lines, no_dash = body_lines(text)
     cands = []
-    for sno, sent in enumerate(sentences(body_lines(text)), 1):
+    for sno, sent in enumerate(sentences(lines), 1):
         for pno, (surface, reading) in enumerate(phrases_of(sent, tok, min_r, max_r), 1):
             cands.append({"kind": "phrase", "phrase_id": "%s-%d-%d" % (work_id, sno, pno), "work_id": work_id,
                           "text": surface, "reading": reading, "reading_len": len(reading)})
-    return cands
+    return cands, no_dash
 
 
 def pick(cands, seed, k):
@@ -276,8 +309,11 @@ def read_works(src):
         if wid in seen:
             raise BuildError("work_id が衝突する: %s と %s（どちらも %s）" % (seen[wid], n, wid), 2)
         seen[wid] = n
-        with open(os.path.join(src, n), "rb") as f:
-            raw = f.read()
+        try:
+            with open(os.path.join(src, n), "rb") as f:
+                raw = f.read()
+        except OSError as e:
+            raise BuildError("読めない: %s（%s）" % (n, type(e).__name__), 2)
         try:
             works.append((wid, raw.decode("cp932")))
         except UnicodeDecodeError:
@@ -291,9 +327,11 @@ def build_bytes(works, seed, tok, min_r, max_r, per_work, log=None):
                      "tokenizer": tok.name, "dict": tok.dict_name})]
     total = 0
     for wid, text in works:
-        cands = work_candidates(wid, text, tok, min_r, max_r)
+        cands, no_dash = work_candidates(wid, text, tok, min_r, max_r)
         chosen = pick(cands, seed, per_work)
         if log is not None:
+            if no_dash:
+                log("%s: 記号について枠の点線が見つからない。先頭の空行までを捨てた" % wid)
             log("%s: 候補 %d 句 → 抽出 %d 句" % (wid, len(cands), len(chosen)))
         lines.extend(_dumps(c) for c in chosen)
         total += len(chosen)
@@ -489,6 +527,7 @@ def _tst_text():
         "朝です。",                                              # 8: 短い（あさです = 4 字）
         "あ" * 31 + "。",                                       # 9: 長い（31 字）
         "ここではないところへいきたいなあ。",                       # 10: かなだけ
+        "わたしは※［＃２行アキ、丸1、1-88-95］行きます。",           # 11: 外字注記の跡（※）は句にならない
         "", "底本：「テスト」", "これはていほんのぶんです。",
     ]
     return "\r\n".join(lines) + "\r\n"
@@ -624,6 +663,46 @@ def _t_header():
     rows = _rows(_build_fx())
     want = {"kind": "header", "format": "corpus/1", "source": "aozora", "tokenizer": "table", "dict": "0" * 64}
     return None if rows[0] == want else "ヘッダが違う: %s" % rows[0]
+
+
+def _t_gaiji_trace():
+    """README の主張「※（外字注記の跡）の節は捨てられる」が実装で成り立つかを確かめる（研究者指摘 1）。"""
+    got = _by_id(_build_fx())
+    if any(k.startswith("tst-11-") for k in got):
+        return "※（外字注記の跡）を含む節が句として残った"
+    for r in got.values():
+        if "※" in r["text"] or "※" in r["reading"]:
+            return "※ が句に混ざった: %s" % r["phrase_id"]
+    return None
+
+
+def _t_text_charclass():
+    """text 側の字種判定（研究者指摘 1）: 表トークナイザが全角数字に読みを付けても、text に残っていれば
+    句を捨てる。陰性対照は同じ構造で全角数字を漢字に変えると句として残る（text 側の判定が理由であること）。"""
+    tok = TableTokenizer({"３": "さん"}, "0" * 64)
+    dropped = phrases_of("いまは３じです", tok, DEFAULT_MIN, DEFAULT_MAX)
+    if dropped:
+        return "全角数字（３）が読みを持つのに text 側の字種判定で捨てられなかった: %s" % (dropped,)
+    tok2 = TableTokenizer({"並": "なみ"}, "0" * 64)
+    kept = phrases_of("いまは並じです", tok2, DEFAULT_MIN, DEFAULT_MAX)
+    if not kept:
+        return "陰性対照（漢字だけの text）が句として残らない（範囲が理由でないことを確かめられない）"
+    if kept[0][0] != "いまは並じです":
+        return "陰性対照の text が変わった: %s" % (kept,)
+    return None
+
+
+def _t_old_kana():
+    """旧仮名 ゐ・ゑ・ゕ・ゖ を含む読みの句は捨てる（研究者判断 30）。陰性対照は同じ構造で普通の読みなら残る。"""
+    tok = TableTokenizer({"旧": "ゐ"}, "0" * 64)
+    dropped = phrases_of("これはとても旧いはなしです", tok, DEFAULT_MIN, DEFAULT_MAX)
+    if dropped:
+        return "旧仮名（ゐ）を含む読みの句が残った: %s" % (dropped,)
+    tok2 = TableTokenizer({"旧": "きゅう"}, "0" * 64)
+    kept = phrases_of("これはとても旧いはなしです", tok2, DEFAULT_MIN, DEFAULT_MAX)
+    if not kept:
+        return "陰性対照（旧仮名を含まない読み）が句として残らない"
+    return None
 
 
 def _t_self_valid():
@@ -776,6 +855,131 @@ def _t_no_sudachi():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _t_no_dash_warns():
+    """点線 2 本の枠が無い作品は、先頭の空行までを捨て、CLI が stderr に警告を出す（研究者指摘 6）。
+    陰性対照: 枠がある通常の作品では、この警告は出ない。"""
+    tmp = tempfile.mkdtemp(prefix="build_corpus_selftest_")
+    try:
+        src = os.path.join(tmp, "src")
+        os.mkdir(src)
+        table = os.path.join(tmp, "table.json")
+        with open(table, "wb") as f:
+            f.write(_dumps(_TABLE).encode("utf-8"))
+        text = "\r\n".join(["だいめい", "さくしゃ", "", "ここではないところへいきたいなあ。"]) + "\r\n"
+        with open(os.path.join(src, "nodash.txt"), "wb") as f:
+            f.write(text.encode("cp932"))
+        out = os.path.join(tmp, "out.jsonl")
+        rc, log_text = _run_self(["--src", src, "--out", out, "--seed", "1", "--tokenizer", "table:" + table])
+        if rc != 0:
+            return "点線の無い作品の書き出しが exit 0 でない（%d）: %s" % (rc, log_text.strip()[-200:])
+        with open(out, "rb") as f:
+            got = f.read()
+        for r in _rows(got)[1:]:
+            if "だいめい" in r["reading"] or "さくしゃ" in r["reading"]:
+                return "点線が無いのに題・著者が句に混ざった: %s" % r["phrase_id"]
+        if "点線" not in log_text:
+            return "点線が見つからない警告が stderr に出ていない: %s" % log_text.strip()[-200:]
+        src2 = os.path.join(tmp, "src2")
+        os.mkdir(src2)
+        with open(os.path.join(src2, "tst.txt"), "wb") as f:
+            f.write(_tst_text().encode("cp932"))
+        rc, log_text2 = _run_self(["--src", src2, "--out", out, "--seed", "1", "--tokenizer", "table:" + table])
+        if rc != 0:
+            return "枠がある通常の作品の書き出しが exit 0 でない（陰性対照・%d）: %s" % (rc, log_text2.strip()[-200:])
+        if "点線" in log_text2:
+            return "枠がある通常の作品なのに警告が出た（陰性対照）: %s" % log_text2.strip()[-200:]
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _t_out_dir_missing():
+    """--out の置き場所が作れないとき、Traceback ではなく exit 2 にする（研究者指摘 5）。
+    陰性対照: 普通の --out は変わらず exit 0。"""
+    tmp = tempfile.mkdtemp(prefix="build_corpus_selftest_")
+    try:
+        src = os.path.join(tmp, "src")
+        os.mkdir(src)
+        with open(os.path.join(src, "tst.txt"), "wb") as f:
+            f.write(_tst_text().encode("cp932"))
+        table = os.path.join(tmp, "table.json")
+        with open(table, "wb") as f:
+            f.write(_dumps(_TABLE).encode("utf-8"))
+        bad_out = os.path.join(tmp, "no_such_dir", "out.jsonl")
+        rc, text = _run_self(["--src", src, "--out", bad_out, "--seed", "1", "--tokenizer", "table:" + table])
+        if rc != 2 or "Traceback" in text:
+            return "--out の親ディレクトリが無いのに exit 2 で止まらない（%d）: %s" % (rc, text.strip()[-300:])
+        good_out = os.path.join(tmp, "out.jsonl")
+        rc, text = _run_self(["--src", src, "--out", good_out, "--seed", "1", "--tokenizer", "table:" + table])
+        if rc != 0:
+            return "普通の --out が exit 0 でない（陰性対照・%d）: %s" % (rc, text.strip()[-200:])
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _t_table_recursion():
+    """深すぎる（壊れた）JSON の表は RecursionError も他の読めない入力と同じ exit 2 にする（研究者指摘 4）。
+    陰性対照: 普通の表なら exit 0。"""
+    tmp = tempfile.mkdtemp(prefix="build_corpus_selftest_")
+    try:
+        src = os.path.join(tmp, "src")
+        os.mkdir(src)
+        with open(os.path.join(src, "tst.txt"), "wb") as f:
+            f.write(_tst_text().encode("cp932"))
+        deep = os.path.join(tmp, "deep.json")
+        with open(deep, "wb") as f:
+            f.write(("[" * 5000).encode("utf-8"))
+        out = os.path.join(tmp, "out.jsonl")
+        rc, text = _run_self(["--src", src, "--out", out, "--seed", "1", "--tokenizer", "table:" + deep])
+        if rc != 2 or "Traceback" in text:
+            return "深すぎる JSON の表が exit 2 で止まらない（%d）: %s" % (rc, text.strip()[-300:])
+        table = os.path.join(tmp, "table.json")
+        with open(table, "wb") as f:
+            f.write(_dumps(_TABLE).encode("utf-8"))
+        rc, text = _run_self(["--src", src, "--out", out, "--seed", "1", "--tokenizer", "table:" + table])
+        if rc != 0:
+            return "普通の表が exit 0 でない（陰性対照・%d）: %s" % (rc, text.strip()[-200:])
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _t_src_read_oserror():
+    """--src のファイルが読めない（OSError）ときは Traceback ではなく BuildError(exit 2) にする（研究者指摘 5）。
+    陰性対照: パッチを戻せば同じディレクトリが普通に読める。"""
+    tmp = tempfile.mkdtemp(prefix="build_corpus_selftest_")
+    try:
+        src = os.path.join(tmp, "src")
+        os.mkdir(src)
+        with open(os.path.join(src, "tst.txt"), "wb") as f:
+            f.write(_tst_text().encode("cp932"))
+        real_open = builtins.open
+
+        def fake_open(path, *a, **kw):
+            if os.path.basename(str(path)) == "tst.txt":
+                raise PermissionError("simulated: %s" % path)
+            return real_open(path, *a, **kw)
+
+        globals()["open"] = fake_open
+        try:
+            read_works(src)
+            return "OSError を起こしても例外が飛ばなかった"
+        except BuildError as e:
+            if e.code != 2:
+                return "BuildError の code が 2 でない: %s" % e.code
+        except OSError:
+            return "OSError が BuildError に変換されずそのまま飛んだ"
+        finally:
+            globals()["open"] = real_open
+        works = read_works(src)
+        if not works or works[0][0] != "tst":
+            return "パッチを戻した後、普通に読めない（陰性対照）: %s" % (works,)
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _dump_lines(*objs):
     return "\n".join(_dumps(o) if isinstance(o, dict) else o for o in objs) + "\n"
 
@@ -810,7 +1014,7 @@ def _validate_cases():
         ("reading_len が小数", _dump_lines(_hdr(), '{"kind":"phrase","phrase_id":"w1-1-1","work_id":"w1","text":"青空",'
                                           '"reading":"あおぞら","reading_len":4.0}'), "float"),
         ("phrase_id の重複", _dump_lines(_hdr(), _ph("w1-1-1"), _ph("w1-1-1")), "dup_id"),
-        ("phrase_id の形（大文字）", _dump_lines(_hdr(), _ph("P001-1-1", work_id="P001")), "phrase_id"),
+        ("phrase_id の形（大文字）", _dump_lines(_hdr(), _ph("X001-1-1", work_id="X001")), "phrase_id"),
         ("phrase_id の形（番号なし）", _dump_lines(_hdr(), _ph("w1")), "phrase_id"),
         ("phrase_id の作品名が work_id と違う", _dump_lines(_hdr(), _ph("w2-1-1")), "work_id_mismatch"),
         ("work_id が大文字", _dump_lines(_hdr(), _ph("W1-1-1", work_id="W1")), "work_id"),
@@ -874,10 +1078,17 @@ def _cases():
         ("phrase_id は入力から決まる", _t_ids),
         ("作品ごとに K 句まで・本文の順", _t_per_work),
         ("ヘッダに tokenizer と dict を書く", _t_header),
+        ("※（外字注記の跡）が残る節は句にならない", _t_gaiji_trace),
+        ("text 側の字種判定: 全角数字に読みが付いても句を捨てる", _t_text_charclass),
+        ("旧仮名（ゐ・ゑ・ゕ・ゖ）を含む読みの句は捨てる", _t_old_kana),
         ("書き出したものを --validate が通す", _t_self_valid),
         ("sudachi の読みをひらがなにする（偽の sudachipy）", _t_sudachi_fake),
         ("cp932 のファイルを CLI で書き出す", _t_cli),
         ("sudachipy が無ければ exit 2 で止まる", _t_no_sudachi),
+        ("点線の枠が無い作品は先頭の空行までを捨て警告する", _t_no_dash_warns),
+        ("--out の置き場所が作れないとき exit 2 で止まる", _t_out_dir_missing),
+        ("深すぎる表の JSON（RecursionError）は exit 2 で止まる", _t_table_recursion),
+        ("--src のファイルが読めない（OSError）とき exit 2 で止まる", _t_src_read_oserror),
     ]
 
 
@@ -940,8 +1151,12 @@ def main(argv):
     except BuildError as e:
         print("build_corpus.py: %s" % e, file=sys.stderr)
         return e.code
-    with open(args.out, "wb") as f:
-        f.write(data)
+    try:
+        with open(args.out, "wb") as f:
+            f.write(data)
+    except OSError as e:
+        print("build_corpus.py: --out に書き出せない: %s（%s）" % (args.out, type(e).__name__), file=sys.stderr)
+        return 2
     print("書き出した: %s（tokenizer=%s dict=%s）" % (args.out, tok.name, tok.dict_name))
     return 0
 
