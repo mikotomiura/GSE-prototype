@@ -228,13 +228,22 @@ def _gt_population(n, seed, len_lo=1500, len_hi=6000, gap_lo=500, gap_hi=5000):
 
 
 def _recovery_failures(m, truth):
-    """指標 m（detection_metrics の 1 層）が注入した値を回復しているか。回復していない項目の説明の配列。"""
+    """指標 m（detection_metrics の 1 層）が注入した値を回復しているか。回復していない項目の説明の配列。
+
+    f1 (decision 38 follow-up) intentionally has no Wilson interval (its doubled pair count is not an
+    independent-trials proportion — see match._f1_prop), so it is checked on its count/value only, not on
+    interval containment.
+    """
     out = []
     for name, e in sorted(truth["expected"].items()):
         g = m[name]
         if (g["x"], g["n"]) != (e["x"], e["n"]):
             out.append("%s: 件数 %s/%s が注入した %s/%s と違う" % (name, g["x"], g["n"], e["x"], e["n"]))
         p = e["x"] / float(e["n"])
+        if name == "f1":
+            if g["value"] is None or abs(g["value"] - p) > 1e-9:
+                out.append("%s: 値 %r が注入した率 %.4f と違う" % (name, g["value"], p))
+            continue
         if g["lo"] is None or not (g["lo"] <= p <= g["hi"]):
             out.append("%s: Wilson 95%% 区間 [%s, %s] が注入した率 %.4f を含まない" % (name, g["lo"], g["hi"], p))
     return out
@@ -434,12 +443,91 @@ def _case_validation():
     return f
 
 
+def _case_realistic_fragmentation():
+    """Definitional-bias report (decision 38 follow-up), not a recovery test: random-cut two-fragment
+    splits, imbalanced merges, and short (200-600 ms) sessions are exactly the shapes that match()'s own
+    partition cannot see as split / merge (item 1's HIGH finding). A fragment made by an interior cut always
+    covers a fraction fracA of its own ground-truth session with fracA + fracB == 1, so one side always wins
+    the primary 1:1 pairing and match() reports the other as a plain false_pos, never as result["split"].
+    This case does not use inject()'s calibrated rates/timing (those are chosen so every injected error stays
+    inside the type the matcher can already detect); instead it builds fragmentation directly and measures,
+    then prints, how large the resulting bias is and how much of it the theta recount (decision 38) recovers.
+    """
+    f = []
+    rng = random.Random(701)
+    gts = _gt_population(400, 501, len_lo=200, len_hi=600, gap_lo=50, gap_hi=300)
+
+    def cut_row(t, dwell, nav=0, abandon=False):
+        return _row(t, dwell, nav, abandon)
+
+    rows = []
+    n_split_made = n_merge_made = n_exact = 0
+    i = 0
+    while i < len(gts):
+        lo, hi = match.gt_interval(gts[i])
+        length = hi - lo
+        u = rng.random()
+        if u < 0.3 and length >= 20:
+            cut = lo + 1 + int(rng.random() * (length - 2))  # uniformly random interior cut, not a midpoint
+            rows.append(cut_row(cut, cut - lo, _nav(gts[i])))
+            rows.append(cut_row(hi, hi - cut, 0, gts[i].get("outcome") == "cancel"))
+            n_split_made += 1
+            i += 1
+            continue
+        if u < 0.5 and i + 1 < len(gts):
+            lo2, hi2 = match.gt_interval(gts[i + 1])
+            rows.append(cut_row(hi2, hi2 - lo, _nav(gts[i]) + _nav(gts[i + 1]), gts[i + 1].get("outcome") == "cancel"))
+            n_merge_made += 1
+            i += 2
+            continue
+        rows.append(cut_row(hi, length, _nav(gts[i]), gts[i].get("outcome") == "cancel"))
+        n_exact += 1
+        i += 1
+    rows.sort(key=lambda r: (r["t"], r["dwell_ms"], r["nav"], r["abandon"]))
+
+    r = match.match(gts, rows)
+    raw = {"n_pairs": len(r["pairs"]), "n_split_gt": len(r["split"]), "n_merge_obs": len(r["merge"]),
+           "n_miss": len(r["miss"]), "n_false_pos": len(r["false_pos"])}
+    m = match.detection_metrics(r)[0]
+    print("     [realistic fragmentation] made split=%d merge=%d exact=%d -- raw match(): %r" % (
+        n_split_made, n_merge_made, n_exact, raw))
+    print("     [realistic fragmentation] recount: n_split_gt_recount=%d n_fp_as_split=%d "
+          "n_merge_obs_recount=%d n_miss_as_merge=%d split_rate=%r merge_rate=%r" % (
+              m["n_split_gt_recount"], m["n_fp_as_split"], m["n_merge_obs_recount"], m["n_miss_as_merge"],
+              m["split_rate"]["value"], m["merge_rate"]["value"]))
+
+    # sanity, not exact recovery: raw match() must hide essentially all of these (the whole point of item 1's
+    # HIGH finding), and the theta recount must surface most of them back as split / merge evidence.
+    if raw["n_split_gt"] != 0:
+        f.append("raw match() が乱数の 2 断片分割を split として見えてしまっている（想定外）: %r" % raw)
+    if m["n_split_gt_recount"] < int(0.9 * n_split_made):
+        f.append("theta の数え直しが乱数の 2 断片分割の大半を拾えていない: recount=%d made=%d" % (
+            m["n_split_gt_recount"], n_split_made))
+    if m["n_merge_obs_recount"] + raw["n_merge_obs"] < int(0.5 * n_merge_made):
+        f.append("theta の数え直し + genuine な併合を合わせても偏った併合の半分に届かない: recount=%d genuine=%d made=%d" % (
+            m["n_merge_obs_recount"], raw["n_merge_obs"], n_merge_made))
+
+    # merge の注入が公称の率を下回っている（見送りがある）ことも件数で出す: 200 ms 一定のセッションでは
+    # inject() 自身の前提（どちらの IoU も iou_min 未満で、最悪のずれでも和集合が iou_min 以上）を満たせない。
+    short = _gt_population(500, 9, len_lo=200, len_hi=200, gap_lo=3000, gap_hi=3000)
+    _o, sk = inject(short, dict(RATES, merge=0.5, split=0.0), TIMING, 3)
+    print("     [merge skip report] nominal merge rate 0.5 on 200 ms sessions -> n_merge=%d skipped.merge=%d (n_gt=%d)"
+          % (sk["n_merge"], sk["skipped"]["merge"], sk["n_gt"]))
+    if sk["skipped"]["merge"] <= 0:
+        f.append("短いセッションでも併合の見送りが 0 件（見送りが起きる前提が崩れている）: %r" % sk)
+    if sk["n_merge"] != 0:
+        f.append("200 ms セッションで均衡な併合の前提が崩れているのに merge が注入されている: %r" % sk)
+    return f
+
+
 CASES = [
     ("パラメータ回復（5 seed・取り逃し 5% / 分割 3% / 併合 3% / 偽検出 2%・偏り +20 ms・σ 50 ms・終端の遅れ 0〜100 ms）",
      _case_parameter_recovery),
     ("パラメータ回復の陰性対照（壊した照合器・誤った補正・歪めた truth・1 行消しは回復に失敗する）",
      _case_recovery_negative_control),
     ("IoU 定義の感度（短いセッション・risk・offset での回復・見送り）", _case_sensitivity_of_definition),
+    ("現実的な割れ方の偏りの報告（乱数の 2 断片・偏った併合・短いセッション・decision 38）",
+     _case_realistic_fragmentation),
     ("誤りなしの写し・極端な率・件数の会計", _case_identity_and_accounting),
     ("決定性（seed・グローバル乱数・入力の不変・並び）", _case_determinism),
     ("入力の検証", _case_validation),
