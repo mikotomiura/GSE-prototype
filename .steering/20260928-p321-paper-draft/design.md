@@ -65,7 +65,8 @@
 
 ## テスト戦略
 
-- `make_results.py` の自己検査: 陰性対照（キーを 1 つ消した `results.tex` でビルドが止まる）・陽性対照（`metrics.json` の値を 1 つ変えると `cmp` が赤）。
+- 対照（実施した手順・論文用リポジトリの複製で）: ① `main.tex` の `\R{...}` を 1 か所だけ存在しないキーに書き換える → LaTeX が `unknown key` で exit 1（Step 2 の `cmp` は `results.tex` を変えていないので通る＝`\errmessage` を切り分けて確かめた）／ ② `metrics.json` の値を 1 つ変える → Step 2 の `cmp` が赤 ／ ③ 主張を偽にする値 → `claims()` が止める ／ ④ 無変更 → exit 0 ／ ⑤（1 巡目の後）ログを出さない偽の Tectonic → 古いログを消したうえで「main.log was not produced」で exit 1。
+- ★ 1 巡目の後、③ の型を `python paper/make_results.py --selftest` に移した（10 通りの改変がすべて止まり、無変更は通る）。`build.sh` Step 2 が毎回これを回す。
 - レビュー: `/cross-review` 2 巡（Codex ＋ code-reviewer）＋ security-checker（`finish-task` Step 3）。
 
 ## ロールバック計画

@@ -62,7 +62,8 @@
 - **採用**:
   1. 本文の解析由来の数値はすべて `\R{<key>}`（`paper/make_results.py` が `results/metrics.json` から `paper/results.tex` を生成）。未定義のキーはビルドを止める。`build.sh` は `results.tex` を生成し直して `cmp` する。
   2. ★ 本文の**定性的な主張**（「条件づけの効果の点推定は 10 セルすべてで負・区間はすべて 0 を含む」「分母だけの効果の区間はすべて 0 未満」「D1 の分子の効果の区間はすべて 0 を含まない・D2 は 0 から始まる」「DF1 の最小値 = fresh の成分で 4 定義とも同じ」「committed は未解決も参照も多い」「表＋本文で分子の効果が半分」「strict 以外の 3 定義は再現数が同じ」「D2 の k」）は `make_results.py` の `claims()` が数値から確かめ、偽になれば生成を止める。
-- **検査の効き目（対照・論文用リポジトリの複製で実施）**: ① 未定義キー → LaTeX が `unknown key` で exit 1 ／ ② `metrics.json` の値を 1 つ変える → `build.sh` Step 2 が赤 ／ ③ 条件づけの効果を正にする → `claims()` が止める ／ ④ 無変更 → exit 0。
+- ★ `claims()` が確かめる主張（1 巡目の後の全量）: 条件づけの効果（点推定が負・区間が 0 を含む・表示値で判定）／ 分母だけの効果の区間が 0 未満 ／ D1 の分子の効果の区間が 0 を含まない・D2 は 0.0 から ／ fresh の成分が 4 定義で同じで DF1 の最小値に一致（整数で比較・層が全 episode を分割）／ 未解決かつ参照なしの大半が DF3 ／ 全体・committed（逆向き・差は 1 episode）・fresh（全体と同じ向き）の参照の偏り ／ committed は未解決も参照も多い ／ [P433] の再現の内訳（strict が最多・他 3 定義は同数・時間の割合と短い episode は全定義で再現・「committed は全部」は issue tracker を含むときだけ・fresh と開発者は含まないときだけ・活動数と全体と長い episode はどれでも再現しない）／ D2 の表＋本文で分子の効果が半分（同じ n・b > 0）／ D2 の table+text で分母だけの効果が分子の効果の 2 倍超 ／ D2 の k が 1..b で一意に決まる。
+- **検査の効き目（対照・論文用リポジトリの複製で実施）**: ① `main.tex` のキーを 1 か所だけ未定義のものに書き換え → LaTeX が `unknown key` で exit 1 ／ ② `metrics.json` の値を 1 つ変える → `build.sh` Step 2 が赤 ／ ③ 条件づけの効果を正にする → `claims()` が止める ／ ④ 無変更 → exit 0。★ 1 巡目の後、③ の型は `make_results.py --selftest`（10 通り）に移した。
 - ★ 実際に拾ったもの: 初稿で手計算の「1.1 points」を書いていた → マクロ経由の文に直した。「R0 が数える参照なしの episode の約 9 分の 1」は誤り（10/89 は全 episode に対する割合。参照なしの 70 件に対しては 10/70）→ 直した。
 
 ## 判断 7: 分解の読み替え（R0 − R0′ = u·q、R0 − R1 = u·(q − R1)）を Measures に置く
@@ -79,3 +80,25 @@
 - **探索**: subagent（Sonnet・20 分・入れ子禁止・scratch 以外に書かない）。★ メインが戻り値を一次で照合した: Cameron et al. 2008（NBER の WP 版）・Cameron & Miller 2015（著者ページの原稿版）・Hesterberg 2015（arXiv 版）は pypdf で逐語一致。Brown et al. 2001 は要旨を OpenAlex から取って一致（本文はスキャンで未読）。Wilson 1927 は書誌のみ（本文はスキャンで未読）。書誌は 5 本とも Crossref。
 - ⚠️ **限界**: 少数クラスタの証拠（[V181] [V182]）は**回帰係数の検定**についてで、割合の区間についての研究は見つからなかった → 原稿は "this evidence is indirect" と書き、区間を「不確かさの下限」と読むにとどめた。
 - **影響範囲**: `docs/references.md` に [V179]–[V183] を append（`check_citations.py` 違反なし）。[V178] の行に本文を読んだことを追記。
+
+## 判断 9: /cross-review の Codex 系統は原稿（論文用リポジトリ）に当て、GSE 側の文書は Claude 系統で見る
+
+- **判断日時**: 2026-09-28
+- **背景**: 主成果物は論文用リポジトリの原稿で、`scripts/run-codex-review.sh` は実行した場所の git の差分しか取れない。前タスクの Codex は GSE 側の文書だけを見ていた（1 巡目の出力逐語「解析コードは含まれていないため」）。
+- **採用**: 論文用リポジトリのコミットを GSE の作業用 worktree に `git fetch`（ブランチも作業ツリーも変えない・オブジェクトだけ入る）し、ラッパーをそのまま `9c73181..e9c8e2b -- paper/main.tex paper/make_results.py paper/build.sh .gitignore README.md` で呼んだ。★ 機密フィルタ（rc=0）・予算ガード・`-C` の一時ディレクトリ・記帳はラッパーのものがそのまま効く。`paper/refs.bib`（書誌だけ）と `paper/results.tex`（生成物）は入力から外した。
+- **予算**: ⚠️ 台帳がブランチごとに分かれていた（メインの checkout = IME ブランチは 96,246・origin/main は 198,283）。★ 一次で確かめると IME ブランチの 96,246 は o1-resilience の記帳 `07554770` で、origin/main の 198,283 に**含まれている**（重複ではない）→ 今日の実使用 = 198,283・残り約 101,700。1 巡の実績（33k〜77k）から、**Codex は原稿に 2 巡**、GSE 側の文書（references.md・作業記録）は code-reviewer と security-checker で見ると決めた。
+- **1 巡目の実消費**: 41,889（198,283 → 240,172・invocations 5 → 6）。記帳は worktree の `.codex/budget.json`（本ブランチでコミットする）。
+- ⚠️ `SHA-256` の全桁（L10 の指摘）: [V178] の PDF = `457858d6af60ccdef5f457a0e477e9773c55a25aa6af8f612bb532c994d0fc29`（IEEE の OA 版・841,101 B）。
+
+## 判断 10: /cross-review 1 巡目の裁定（2026-09-28）
+
+- **レビュー**: Codex（原稿の差分・判断 9）／ code-reviewer ×2（原稿の主張・ツールと GSE 側文書）／ security-checker。★ 入れ子を避けるため `cross-reviewer` エージェントは使わず、メインから 4 本を並列に起動した。CRITICAL なし。
+- ★ **採用（HIGH）**:
+  1. ⚠️★★★ **凍結の開示が足りなかった**（code-reviewer）。★ 一次（`experiments/20260906-p321-resumption-baseline/notes.md` §2.2・§3）で確認: strict/DF1 の R0 = 70/89・R1 = 60/73・R0′ = 60/89 と分子の効果 +11.2pt は **2026-09-06 に既に計算していた**。→ 原稿の Method に 3 つ目の例外として「主推定値は凍結前から既知・凍結が守るのは追加の定義と区間の手続きと D2」と書き、統計的結論妥当性の節にも移した。論文用リポジトリの `NOTES.md`（Freeze）にも同じ事実を書いた。
+  2. 結論節で C1 の限定（区間・D2 の打ち切り）が落ちていた・「打ち消し合う」は D2 の table+text に当たらない → 直した。
+  3. 未解決かつ参照なしの 10 件の終端コードを数えていなかった（提言 3 と矛盾）→ ★ 解析の出力に `unresolved_no_consult_by_code` を追加（記述のみ・既存の値は 1 つも変わらない・`NOTES.md` Deviations 7）。★ **10 件のうち 8 件が DF3（後で戻る）**だった → 「未解決」は「観察された単位の中で解決しなかった」であって「諦めた」ではない、と原稿の複数箇所に入れた。
+  4. `build.sh` がログの無いとき黙って成功する（Codex と code-reviewer が独立に指摘）→ 古いログを消し、ログを必須にした。偽の Tectonic で対照を取った。
+- ★ **採用（MEDIUM / LOW）**: RQ4 の「省略で半分」は向きが逆（Codex・code-reviewer）／ 本文の直書きの数値をマクロに（Codex）／ `make_results.py` の値の許可リスト・n/a で停止・表示値での判定・整数比較・空のゲート・k の一意性・`--selftest`（Codex と code-reviewer）／ `curl -f` と照合してから mv・`.gitignore`・`.gitattributes`（security-checker・code-reviewer）／ LLM の使用の開示を D2 のコーディングと文献探索に広げた（security-checker・code-reviewer）／ README のライセンス（`paper/` のスクリプトは Apache-2.0・原稿は未定）／ RQ3 を「起点で違うか」に・fresh で向きが残ることを明記／ 再現の言い過ぎ（公表された定義 ≈ +OT2 で 3/8）と原著者の手落ちの推測を削除／ Shepperd の reproduction は RQ4 だけ／ ICH の対句をそのまま引き直した／ G1 の表に検討対象の概念の行／ P1TA の非対称／ p0 は確率と書く／ Hellas は q の補数に対応／ q の定義に N > S > 0／ [V178] の出典欄・カードに [V179]–[V183] の使用箇所。
+- **採用しない**: GitHub の URL にアカウント名（security-checker LOW 6）→ EMSE は single-blind（判断 17・前タスク）なので不要。figshare の `/s/` リンク（LOW 7）→ DOI が存在しない（`DATA.md`・private link でしか配っていない）ので現状のまま。
+- **研究者に確認すること（報告に載せる）**: コミットの著者メールが公開時に出る（security-checker MEDIUM 3）・原稿のライセンス・LLM の開示の文面。
+- ★ 論文用リポジトリ `1db0cab`: `bash run.sh`（許可フラグなし）exit 0・`bash paper/build.sh` exit 0（`--selftest` を含む）・21 頁・要旨 239 語。
