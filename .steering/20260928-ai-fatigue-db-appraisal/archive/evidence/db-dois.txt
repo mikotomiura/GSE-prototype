@@ -1,0 +1,34 @@
+AF001	10.1016/j.chbr.2026.101186	AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement
+AF002	10.1016/j.ijinfomgt.2025.103010	Fatigued by uncertainties: Exploring the cognitive and emotional costs of generative AI usage
+AF003	10.1016/j.chb.2026.109097	Trust erodes, fatigue builds: How prompt uncertainty traps users in recrafting loops
+AF004	10.1016/j.actpsy.2025.105725	Learners' AI dependence and critical thinking: The psychological mechanism of fatigue and the social buffering role of AI literacy
+AF005	10.3389/fpsyg.2026.1879080	Risk perception and generative AI discontinuance intention: mediating effect of cognitive fatigue and moderating effect of AI dependence
+AF006	10.26803/ijlter.25.3.29	How do College Students Express AI Fatigue? A Content and Keyword-in-Context Analysis of Academic AI Use
+AF007	10.26803/ijlter.25.5.5	Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory
+AF008	10.11591/ijai.v15.i2.pp1963-1971	AI-induced fatigue among students in higher education: a latent profile analysis
+AF009	10.1109/SCOReD68498.2025.11399092	Dimensions of AI-Induced Fatigue Among Filipino Students: An Exploratory Study
+AF010	10.47772/IJRISS.2025.910000615	Between Cognitive Overload and Dehumanization: Exploring the Dimensions of Consumer Fatigue with Artificial Intelligence
+AF011	10.1177/09727531251359872	The Cognitive Cost of AI: How AI Anxiety and Attitudes Influence Decision Fatigue in Daily Technology Use
+AF012	10.3390/technologies13110486	Generative AI and Cognitive Challenges in Research: Balancing Cognitive Load, Fatigue, and Human Resilience
+AF013	10.56734/ijahss.v6n8a7	Too Much, Too Fast: Understanding AI Fatigue in the Digital Acceleration Era
+AF014	10.12775/QS.2026.54.70890	AI Fatigue and Mental Health Implications: A Comprehensive Literature Review
+AF015	10.1007/s44163-026-01855-3	A systematic review of AI induced technostress and human resource development interventions
+AF016	10.3389/fpsyg.2026.1921504	Generative AI and cognitive load in education: a systematic review of WoS/SSCI-indexed studies through the lens of cognitive load theory
+AF017	DOI未確認（URNあり）	From Technostressors to AI-Stressors: A Systematic Literature Review of Stressors Associated with AI Systems
+AF018	10.1186/s40561-024-00316-7	The effects of over-reliance on AI dialogue systems on students' cognitive abilities: a systematic review
+AF019	10.1016/j.ijinfomgt.2025.102887	Insights from the Job Demands–Resources Model: AI's dual impact on employees’ work and life well-being
+AF020	10.1145/3449287	To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making
+AF021	10.1016/j.nepr.2026.104949	Comparing individual and peer-supported ChatGPT use in nursing case analysis: Effects on nursing diagnostic skills and cognitive load in a randomized controlled trial
+AF022	10.1186/s41239-024-00444-7	Is it harmful or helpful? Examining the causes and consequences of generative AI usage among university students
+AF023	10.1145/3706598.3713778	The Impact of Generative AI on Critical Thinking: Self-Reported Reductions in Cognitive Effort and Confidence Effects From a Survey of Knowledge Workers
+AF024	10.3390/informatics12020051	Mitigating Learning Burnout Caused by Generative Artificial Intelligence Misuse in Higher Education: A Case Study in Programming Language Teaching
+AF025	10.1080/10494820.2019.1674887	Development and validation of an artificial intelligence anxiety scale: an initial application in predicting motivated learning behavior
+AF026	10.1016/j.chbr.2021.100119	Zoom Exhaustion & Fatigue Scale
+AF027	10.1287/isre.1070.0165	The Consequences of Technostress for End Users in Organizations: Conceptual Development and Empirical Validation
+AF028	10.1016/S0022-3999(02)00392-6	Psychometric qualities of a brief self-rated fatigue measure: The Fatigue Assessment Scale
+AF029	10.3758/s13428-013-0334-1	Development of an instrument for measuring different types of cognitive load
+AF030	10.7326/M18-0850	PRISMA Extension for Scoping Reviews (PRISMA-ScR): Checklist and Explanation
+AF031	10.11124/JBIES-20-00167	Updated methodological guidance for the conduct of scoping reviews
+AF032	10.1007/s11136-018-1798-3	COSMIN guideline for systematic reviews of patient-reported outcome measures
+AF033	10.1016/j.jclinepi.2026.112314	Updating the PRISMA reporting guideline for scoping reviews: a scoping review
+AF034	10.1016/j.actpsy.2026.107179	Corrigendum to "Learners’ AI dependence and critical thinking: The psychological mechanism of fatigue and the social buffering role of AI literacy" [Acta Psychologica 260 (2025) 105725]
