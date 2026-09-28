@@ -4,7 +4,8 @@
 
   open_set.py --obs OBS... --plan PLAN... --corpus CORPUS --split-seed N --out OUT.json
               [--recipes JSON] [--eval-fraction 0.2] [--n 3] [--smoothing wb|add] [--beam 8]
-              [--length-info count|true] [--bootstrap 1000] [--seed 0]
+              [--length-info count|true|both] [--split work|phrase|both] [--bootstrap 1000] [--seed 0]
+              [--markers-in-obs] [--ime-toggle-in-obs]
   open_set.py --selftest        artificial-corpus checks, including a negative control (fast)
 
 Attack A1 (open set). The attacker sees only the published form of the log: for every key press, its category
@@ -15,12 +16,16 @@ romanisation table of the stimulus generator and (ii) maximises the probability 
 model. The ground truth is the reading that was typed (not the original sentence).
 
 Knowledge levels (fixed here, frozen with the evaluation protocol).
-  K0  no knowledge of the genre: a character unigram model estimated from the training phrases.
-  K1  knowledge of the genre: a character n-gram model (default n = 3, Witten-Bell smoothing) estimated from
-      the same corpus. The phrases used for evaluation are held out of the training set (`split_phrases`):
-      the corpus is split by a seeded shuffle, and any training phrase whose reading equals the reading of an
-      evaluation phrase is dropped as well. Phrases of the same work may be on both sides of the split; this
-      is the intended genre knowledge and is not a leak of evaluation phrases.
+  K0   no knowledge of the genre: a character unigram model estimated from the training phrases.
+  K1   knowledge of the genre, not of the individual work (the default, `--split work`): a character n-gram
+       model (default n = 3, Witten-Bell smoothing) estimated from the same corpus, with the evaluation
+       phrases' whole works held out of training (`split_phrases`, `unit="work"`). No training phrase shares
+       a work with an evaluation phrase, and a training phrase whose reading equals an evaluation phrase's
+       reading is removed as well (a work can repeat a sentence).
+  K1+  a stronger, optional attacker (`--split phrase`): the corpus is split phrase by phrase instead of work
+       by work, so training phrases of the same work as an evaluation phrase are kept; only exact reading
+       duplicates are removed. This over-states what an attacker without knowledge of the individual work
+       could achieve, and is reported alongside K1, not in place of it (`--split both` reports both).
 
 Decoding. The observed runs are segments; a segment is a string over `a` (alphabetic key), `p` (punctuation key)
 and `s` (sentence-punctuation key). A beam search (stack decoding by consumed key count, hypotheses with the
@@ -34,28 +39,43 @@ The token table is built from `romaji` (imported, not re-implemented), so the at
 romanisation as the stimulus. The timing of the key presses is not used by this attack.
 
 Baseline. The same language model without the log. A string is drawn from the model prior (`baseline`).
-The attacker's knowledge of the length is a choice, fixed by `--length-info`:
-  count (default)  the attacker knows only the number of observed segments; the length of each segment is drawn
-                   from the empirical distribution of the training-phrase lengths;
-  true             the attacker is given the true length of the reading (a stronger prior-only attacker).
+The attacker's knowledge of the length is a choice, fixed by `--length-info` (both are reported by default):
+  count  the attacker knows only the number of observed segments; the length of each segment is drawn
+         from the empirical distribution of the training-phrase lengths;
+  true   the attacker is given the true length of the reading (a stronger prior-only attacker).
 The baseline of each level uses the prior of that level's model.
 
 Metric. Character error rate (CER): edit distance (insertion, deletion, substitution) divided by the length
 of the typed reading, per trial; it can exceed 1. Reported values are means over trials. Intervals are
-percentile intervals from `stats.cluster_bootstrap` with the plan block as the cluster. `gain` is the paired
-per-trial difference (baseline CER minus attack CER): how much the log improves on the prior.
+percentile intervals from `stats.cluster_bootstrap` with the plan block as the cluster (a trial's cluster is
+`(observation index, block_id)`: trials of the same phrase that recur in different blocks are not pooled into
+one cluster, so dependence across blocks that share a phrase is not modelled by the interval; the plan does
+not currently cluster by phrase). `gain` is the paired per-trial difference (baseline CER minus attack CER):
+how much the log improves on the prior. `gain` conflates two things: the log carrying information, and the
+attack decoder being maximum-a-posteriori while the baseline is a single draw from the prior. `gain_vs_shuffled`
+(below) isolates the first.
 
 Negative control (`shuffled`). Every trial is paired with the decoded reading of another trial whose reading
 differs (a seeded draw), and scored against its own typed reading, so the observation carries no information
-about the trial. Its gain is the level that arises without any information in the log (for example the
-advantage of a most-probable string over a random draw).
+about the trial. Its `gain` (paired against the baseline) is the level that arises without any information in
+the log. `gain_vs_shuffled` is the paired difference between the shuffled decode's CER and the attack's own
+CER on the same trial: both are produced by the same maximum-a-posteriori decoder, so this isolates how much
+of the advantage comes from the trial's own observation, without the MAP-versus-draw difference that `gain`
+carries.
 
-Inputs of the command line. Each `--obs` file (obs/1) is paired with the `--plan` file (plan/1) at the same
-position. The key presses of the observation are assigned to the plan in order (block markers first, then the
-keys of each trial); the assignment is refused when the counts or the number of alphabetic keys differ,
-never guessed. The typed reading of a trial comes from the plan (`typed_reading`) and is used only for scoring.
+Inputs of the command line. Each `--obs` file (obs/1) and `--plan` file (plan/1) is checked against its format
+(`validate_logs.validate` for obs/1, `generate_plan.validate_plan` for plan/1, both imported, not
+re-implemented) before it is read; an unknown key, a category outside the fourteen-value enum, a header whose
+format is not obs/1, a repeated key on one line and JSON nested past the recursion limit are all refused as
+input errors, not read. The key presses of the observation are assigned to the plan in order (block markers
+first, then the keys of each trial); the assignment is refused when the counts or the number of alphabetic
+keys differ, never guessed. The block marker keys and the mid-conversion IME toggle keys are not typing keys;
+by default no row is expected for them in the observation (`--markers-in-obs` / `--ime-toggle-in-obs` opt in
+to an observation that does record them). The typed reading of a trial comes from the plan (`typed_reading`)
+and is used only for scoring; a trial without a typed reading is dropped and counted (`n_no_typed_reading`).
 Trials whose scenario types the reading with the kana layout are outside the attack model (the key count does
-not follow the romanisation) and are excluded. Only trials of evaluation phrases are scored.
+not follow the romanisation) and are excluded. Only trials of evaluation phrases are scored. The output file
+is created, never overwritten (`--out` must not already exist).
 
 The strength of this attack is not claimed to be an upper bound: results hold for this attacker only.
 Exit: 0 = success / 1 = selftest failed / 2 = usage error or unreadable / inconsistent input.
@@ -72,23 +92,31 @@ import tempfile
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _KIT = os.path.dirname(_HERE)
-for _d in (_HERE, os.path.join(_KIT, "gen"), os.path.join(_KIT, "analysis")):
+for _d in (_HERE, os.path.join(_KIT, "gen"), os.path.join(_KIT, "analysis"), os.path.join(_KIT, "formats")):
     if _d not in sys.path:
         sys.path.insert(0, _d)
 import charlm  # noqa: E402
 import generate_plan  # noqa: E402
 import romaji  # noqa: E402
 import stats  # noqa: E402
+import validate_logs  # noqa: E402
 
 DEFAULT_BEAM = 8
 DEFAULT_BOOTSTRAP = 1000
 LENGTH_INFO = ("count", "true")
+SPLIT_UNITS = ("work", "phrase")
+# heuristic only: below this many distinct works, a work-level split may put almost all phrases of a small
+# corpus on one side of the split (a warning, not a refusal)
+_MIN_WORKS_FOR_SPLIT = 5
 _SMALL = "ぁぃぅぇぉゃゅょ"
 _PATTERN_RE = re.compile(r"[aps]+")
 # categories that make up a run of romanised reading keys, and their symbol in a segment
 _RUN_SYMBOL = {"alphabetic": "a", "punctuation": "p", "sentence_punctuation": "s"}
 # plan keys that are not keyboard presses (they switch the foreground application or click)
 _PSEUDO_KEYS = frozenset(["mouse_click", "focus_away", "focus_back"])
+# mid-conversion IME toggle keys: not typing keys either, kept separate from _PSEUDO_KEYS because whether they
+# reach the observation is a modelling choice (`--ime-toggle-in-obs`), not a structural fact of the plan
+_IME_TOGGLE_KEYS = frozenset(["ime_on", "ime_off"])
 
 
 class InputError(Exception):
@@ -289,12 +317,21 @@ def _derive(seed, tag, i):
     return int.from_bytes(h[:8], "big")
 
 
-def split_phrases(phrases, seed, eval_fraction=0.2):
-    """Split phrases (dicts with `phrase_id` and `reading`) into (train, evaluation, n_dropped).
+def split_phrases(phrases, seed, eval_fraction=0.2, unit="work", warnings=None):
+    """Split phrases (dicts with `phrase_id`, `work_id` and `reading`) into (train, evaluation, n_dropped).
 
-    A seeded shuffle of the phrases sorted by id; the first ceil(eval_fraction * N) phrases (at least one, and
-    leaving at least one) are the evaluation set. Any training phrase whose reading equals the reading of an
-    evaluation phrase is removed from the training set (`n_dropped` counts them)."""
+    unit="work" (default, the K1 attacker): phrases are grouped by `work_id`, and whole works are assigned to
+    the evaluation set by a seeded shuffle over the works, so no evaluation phrase's work contributes a
+    training phrase.
+    unit="phrase" (the stronger K1+ attacker): phrases are shuffled and split individually; phrases of the
+    same work can fall on both sides.
+    Either way, the evaluation set holds ceil(eval_fraction * N) phrases (at least one, and at least one whole
+    unit is left for training), and a training phrase whose reading equals an evaluation phrase's reading is
+    removed afterwards (`n_dropped` counts them; a work can repeat a sentence).
+    `warnings`, if a list, receives a message when unit="work" and fewer than `_MIN_WORKS_FOR_SPLIT` distinct
+    works are available (the split still runs; this is a warning, not a refusal)."""
+    if unit not in SPLIT_UNITS:
+        raise ValueError("unit must be one of %s" % ", ".join(SPLIT_UNITS))
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise ValueError("seed must be an integer")
     if isinstance(eval_fraction, bool) or not isinstance(eval_fraction, (int, float)) or not 0.0 < eval_fraction < 1.0:
@@ -302,12 +339,39 @@ def split_phrases(phrases, seed, eval_fraction=0.2):
     ordered = sorted(phrases, key=lambda ph: ph["phrase_id"])
     if len(ordered) < 2:
         raise ValueError("at least two phrases are needed to split")
+    if unit == "phrase":
+        units = [[ph] for ph in ordered]
+    else:
+        groups, order = {}, []
+        for ph in ordered:
+            wid = ph["work_id"]
+            if wid not in groups:
+                groups[wid] = []
+                order.append(wid)
+            groups[wid].append(ph)
+        units = [groups[w] for w in order]
+        if len(units) < 2:
+            raise ValueError("at least two works are needed for a work-level split")
+        if warnings is not None and len(units) < _MIN_WORKS_FOR_SPLIT:
+            warnings.append("only %d distinct works are available for a work-level split (fewer than %d)"
+                            % (len(units), _MIN_WORKS_FOR_SPLIT))
+    n_eval_phrases = min(len(ordered) - 1, max(1, int(math.ceil(eval_fraction * len(ordered)))))
+    idx = list(range(len(units)))
     rng = random.Random(_derive(seed, "split", 0))
-    for i in range(len(ordered) - 1, 0, -1):
+    for i in range(len(idx) - 1, 0, -1):
         j = min(i, int(rng.random() * (i + 1)))
-        ordered[i], ordered[j] = ordered[j], ordered[i]
-    n_eval = min(len(ordered) - 1, max(1, int(math.ceil(eval_fraction * len(ordered)))))
-    evaluation, rest = ordered[:n_eval], ordered[n_eval:]
+        idx[i], idx[j] = idx[j], idx[i]
+    eval_idx, count = [], 0
+    for pos, k in enumerate(idx):
+        if count >= n_eval_phrases or pos == len(idx) - 1:
+            break
+        eval_idx.append(k)
+        count += len(units[k])
+    if not eval_idx:
+        eval_idx.append(idx[0])
+    eval_set = set(eval_idx)
+    evaluation = [ph for k in eval_idx for ph in units[k]]
+    rest = [ph for k in idx if k not in eval_set for ph in units[k]]
     held = set(ph["reading"] for ph in evaluation)
     train = [ph for ph in rest if ph["reading"] not in held]
     if not train:
@@ -354,7 +418,10 @@ def evaluate(trials, lm_k0, lm_k1, beam=DEFAULT_BEAM, B=DEFAULT_BOOTSTRAP, seed=
     Returns {"n", "params", "K0": {"cer", "cer_ci", "n_undecodable"}, "K1": {...},
              "baseline": {"K0": {"cer", "cer_ci"}, "K1": {...}},
              "gain": {"K0": {"gain", "gain_ci"}, "K1": {...}},
-             "shuffled": {"K0": {"cer", "cer_ci", "gain", "gain_ci"}, "K1": {...}} or None}.
+             "shuffled": {"K0": {"cer", "cer_ci", "gain", "gain_ci", "gain_vs_shuffled", "gain_vs_shuffled_ci"},
+                          "K1": {...}} or None}.
+    `gain_vs_shuffled` is the paired difference (shuffled CER minus attack CER), both decoded the same way;
+    see the module docstring for why this differs from `gain`.
     Intervals are [None, None] when there are fewer than two clusters."""
     if length_info not in LENGTH_INFO:
         raise ValueError("length_info must be one of %s" % ", ".join(LENGTH_INFO))
@@ -389,32 +456,63 @@ def evaluate(trials, lm_k0, lm_k1, beam=DEFAULT_BEAM, B=DEFAULT_BOOTSTRAP, seed=
         if pair is not None:
             sh = [cer(decoded[pair[i]], truths[i]) for i in range(len(trials))]
             sh_gain = [b - s for s, b in zip(sh, base)]
+            vs_shuffled = [s - a for s, a in zip(sh, attack)]
             entry = {}
             entry["cer"], entry["cer_ci"] = _summary(sh, clusters, B, _derive(seed, "ci:sh:" + level, 0), conf)
             entry["gain"], entry["gain_ci"] = _summary(sh_gain, clusters, B, _derive(seed, "ci:shg:" + level, 0), conf)
+            entry["gain_vs_shuffled"], entry["gain_vs_shuffled_ci"] = _summary(
+                vs_shuffled, clusters, B, _derive(seed, "ci:vsh:" + level, 0), conf)
             out["shuffled"][level] = entry
     return out
 
 
 # ---------------------------------------------------------------- files
 
-def _read_lines(path, what):
+def _parse_json_lines(raw, what):
+    """bytes (already format-checked) -> [dict, ...] (blank lines skipped). Deep nesting is refused rather
+    than crashing, though a format check ahead of this call is expected to have caught it already."""
     try:
-        with open(path, "rb") as f:
-            raw = f.read()
-        lines = raw.decode("utf-8").split("\n")
-    except (OSError, UnicodeDecodeError):
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
         raise InputError("cannot read %s" % what)
     rows = []
-    for ln, line in enumerate(lines, start=1):
+    for line in text.split("\n"):
         line = line.rstrip("\r")
         if not line:
             continue
         try:
             rows.append(json.loads(line))
-        except ValueError:
-            raise InputError("%s line %d is not JSON" % (what, ln))
+        except (ValueError, RecursionError):
+            raise InputError("%s is not well-formed JSON" % what)
     return rows
+
+
+def _read_obs(path):
+    """An obs/1 file, checked against the format (`validate_logs.validate`) before it is parsed."""
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+    except OSError:
+        raise InputError("cannot read observation file")
+    violations = validate_logs.validate("obs", raw)
+    if violations:
+        ln, code, _msg = violations[0]
+        raise InputError("observation file is not a well-formed obs/1 file (line %d, %s)" % (ln, code))
+    return _parse_json_lines(raw, "observation file")
+
+
+def _read_plan(path):
+    """A plan/1 file, checked against the format (`generate_plan.validate_plan`) before it is parsed."""
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+    except OSError:
+        raise InputError("cannot read plan file")
+    violations = generate_plan.validate_plan(raw)
+    if violations:
+        ln, code, _msg = violations[0]
+        raise InputError("plan file is not a well-formed plan/1 file (line %d, %s)" % (ln, code))
+    return _parse_json_lines(raw, "plan file")
 
 
 def _kana_scenarios(recipes):
@@ -427,18 +525,24 @@ def _kana_scenarios(recipes):
     return out
 
 
-def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None):
-    """Trials from obs/1 + plan/1 pairs. Returns (trials, n_excluded_kana, n_other_phrases).
+def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None, markers_in_obs=False, ime_toggle_in_obs=False):
+    """Trials from obs/1 + plan/1 pairs. Returns (trials, n_excluded_kana, n_other_phrases, n_no_typed_reading).
 
-    phrase_ids: if given, only trials of these phrases are kept (the others count in n_other_phrases)."""
+    phrase_ids: if given, only trials of these phrases are kept (the others count in n_other_phrases).
+    markers_in_obs / ime_toggle_in_obs: whether the block marker keys (function keys used only to mark block
+    boundaries) and the mid-conversion IME toggle keys are expected to appear as key rows in the observation.
+    Both default to False (neither is a typing key, and by default no row is consumed for them); passing a
+    flag expects an observation that does record the matching keys, and the assignment is refused when the
+    observation and this expectation disagree."""
     if len(obs_paths) != len(plan_paths) or not obs_paths:
         raise InputError("--obs and --plan must be given the same (non-zero) number of files")
     kana = _kana_scenarios(recipes)
-    trials, n_kana, n_other = [], 0, 0
+    exclude = _PSEUDO_KEYS if ime_toggle_in_obs else (_PSEUDO_KEYS | _IME_TOGGLE_KEYS)
+    trials, n_kana, n_other, n_no_truth = [], 0, 0, 0
     for idx, (obs_path, plan_path) in enumerate(zip(obs_paths, plan_paths)):
-        obs = _read_lines(obs_path, "observation file")
+        obs = _read_obs(obs_path)
         cats = [r.get("category") for r in obs[1:] if isinstance(r, dict) and r.get("type") == "key" and r.get("press") is True]
-        plan = _read_lines(plan_path, "plan file")
+        plan = _read_plan(plan_path)
         cursor = 0
 
         def take(n, what):
@@ -452,9 +556,10 @@ def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None):
         for row in plan[1:]:
             kind = row.get("kind") if isinstance(row, dict) else None
             if kind == "block":
-                take(len(row["marker"]), "block %s marker" % row["block_id"])
+                if markers_in_obs:
+                    take(len(row["marker"]), "block %s marker" % row["block_id"])
             elif kind == "trial":
-                keys = [s["key"] for s in row["steps"] if s["down"] and s["key"] not in _PSEUDO_KEYS]
+                keys = [s["key"] for s in row["steps"] if s["down"] and s["key"] not in exclude]
                 chunk = take(len(keys), "trial %s" % row["trial_id"])
                 letters = sum(1 for k in keys if len(k) == 1 and "a" <= k <= "z")
                 if chunk.count("alphabetic") != letters:
@@ -467,12 +572,13 @@ def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None):
                     continue
                 truth = generate_plan.typed_reading(row, recipes)
                 if not truth:
+                    n_no_truth += 1
                     continue
                 trials.append({"segments": segment_categories(chunk), "truth": truth,
                                "cluster": (idx, row["block_id"]), "trial_id": row["trial_id"]})
         if cursor != len(cats):
             raise InputError("the observation has more key presses than the plan")
-    return trials, n_kana, n_other
+    return trials, n_kana, n_other, n_no_truth
 
 
 def _dumps_report(obj):
@@ -485,29 +591,47 @@ def run(args):
         recipes = generate_plan.load_recipes(args.recipes)
     except (OSError, ValueError) as e:
         raise InputError("cannot use the corpus or the recipes: %s" % e)
-    train, evaluation, dropped = split_phrases(corpus, args.split_seed, args.eval_fraction)
+    units = SPLIT_UNITS if args.split == "both" else (args.split,)
+    length_infos = LENGTH_INFO if args.length_info == "both" else (args.length_info,)
+    splits, data = {}, {}
+    for unit in units:
+        split_warnings = []
+        train, evaluation, dropped = split_phrases(corpus, args.split_seed, args.eval_fraction, unit=unit,
+                                                    warnings=split_warnings)
+        try:
+            trials, n_kana, n_other, n_no_truth = load_trials(
+                args.obs, args.plan, recipes, set(ph["phrase_id"] for ph in evaluation),
+                markers_in_obs=args.markers_in_obs, ime_toggle_in_obs=args.ime_toggle_in_obs)
+        except (KeyError, TypeError, AttributeError):
+            raise InputError("a plan file is not a well-formed plan/1 file")
+        if not trials:
+            raise InputError("no trial of an evaluation phrase can be scored (split=%s)" % unit)
+        texts = [ph["reading"] for ph in train]
+        lm_k0 = charlm.CharLM(1, args.smoothing).fit(texts)
+        lm_k1 = charlm.CharLM(args.n, args.smoothing).fit(texts)
+        splits[unit] = dict(
+            (li, evaluate(trials, lm_k0, lm_k1, beam=args.beam, B=args.bootstrap, seed=args.seed, length_info=li))
+            for li in length_infos)
+        data[unit] = {"n_train_phrases": len(train), "n_eval_phrases": len(evaluation),
+                      "n_dropped_duplicate_readings": dropped, "n_excluded_kana_layout": n_kana,
+                      "n_other_phrases": n_other, "n_no_typed_reading": n_no_truth,
+                      "split_warnings": split_warnings}
+    report = {"splits": splits, "data": data,
+             "params": {"split_seed": args.split_seed, "eval_fraction": args.eval_fraction, "n": args.n,
+                        "smoothing": args.smoothing, "markers_in_obs": args.markers_in_obs,
+                        "ime_toggle_in_obs": args.ime_toggle_in_obs}}
     try:
-        trials, n_kana, n_other = load_trials(args.obs, args.plan, recipes, set(ph["phrase_id"] for ph in evaluation))
-    except (KeyError, TypeError, AttributeError):
-        raise InputError("a plan file is not a well-formed plan/1 file")
-    if not trials:
-        raise InputError("no trial of an evaluation phrase can be scored")
-    texts = [ph["reading"] for ph in train]
-    lm_k0 = charlm.CharLM(1, args.smoothing).fit(texts)
-    lm_k1 = charlm.CharLM(args.n, args.smoothing).fit(texts)
-    report = evaluate(trials, lm_k0, lm_k1, beam=args.beam, B=args.bootstrap, seed=args.seed,
-                      length_info=args.length_info)
-    report["data"] = {"n_train_phrases": len(train), "n_eval_phrases": len(evaluation), "n_dropped_duplicates": dropped,
-                      "n_excluded_kana_layout": n_kana, "n_other_phrases": n_other, "split_seed": args.split_seed,
-                      "eval_fraction": args.eval_fraction, "n": args.n, "smoothing": args.smoothing}
-    try:
-        with open(args.out, "wb") as f:
+        with open(args.out, "xb") as f:
             f.write(_dumps_report(report))
+    except FileExistsError:
+        raise InputError("the output file already exists")
     except OSError:
         raise InputError("cannot write the output file")
-    for level in ("K0", "K1"):
-        print("%s: CER %.3f, baseline %.3f, gain %.3f (n = %d)" % (
-            level, report[level]["cer"], report["baseline"][level]["cer"], report["gain"][level]["gain"], report["n"]))
+    for unit in units:
+        for li in length_infos:
+            r = splits[unit][li]
+            print("split=%s length_info=%s K0 CER %.3f gain %.3f | K1 CER %.3f gain %.3f (n = %d)" % (
+                unit, li, r["K0"]["cer"], r["gain"]["K0"]["gain"], r["K1"]["cer"], r["gain"]["K1"]["gain"], r["n"]))
     return 0
 
 
@@ -522,20 +646,24 @@ _SYNTH_CATEGORY = dict(
        ("left", "navigation"), ("right", "navigation"), ("up", "navigation"), ("down", "navigation"),
        ("minus", "punctuation"), ("comma", "sentence_punctuation"), ("period", "sentence_punctuation"),
        ("shift", "modifier"), ("ime_on", "other"), ("ime_off", "other")]
-    + [("f%d" % i, "function") for i in range(13, 20)])
+    # F13-F19 (0x7C and above) fall outside the function-key range of the key-category mapping (0x70-0x7B,
+    # F1-F12) and are categorised "other", not "function"
+    + [("f%d" % i, "other") for i in range(13, 20)])
 
 
-def _artificial_corpus(n_phrases, seed):
+def _artificial_corpus(n_phrases, seed, n_works=8):
     """Short repetitive sentences (word, particle, word) from a small vocabulary: 64 distinct sentences at most,
-    drawn with replacement, so duplicates occur on purpose."""
+    drawn with replacement, so duplicates occur on purpose. Phrases are spread over `n_works` works (round
+    robin over the generation order) so that a work-level split has something to hold out."""
     rng = random.Random(seed)
     phrases = []
     for i in range(n_phrases):
         w1 = _WORDS[int(rng.random() * len(_WORDS))]
         w2 = _WORDS[int(rng.random() * len(_WORDS))]
         reading = w1 + "は" + w2
-        phrases.append({"phrase_id": "w1-%d-1" % (i + 1), "work_id": "w1", "text": "x", "reading": reading,
-                        "reading_len": len(reading)})
+        work_id = "w%d" % (i % n_works + 1)
+        phrases.append({"phrase_id": "%s-%d-1" % (work_id, i + 1), "work_id": work_id, "text": "x",
+                        "reading": reading, "reading_len": len(reading)})
     return phrases
 
 
@@ -544,8 +672,10 @@ def _reading_segments(reading):
     return ["".join(_key_symbol(k) for k in romaji.to_keys(reading))]
 
 
-def _synth_obs(rows, os_name):
-    """obs/1 lines for a plan: every key of the plan as a press and a release."""
+def _synth_obs(rows, os_name, markers_in_obs=False, ime_toggle_in_obs=False):
+    """obs/1 lines for a plan: every plan key inside the key-observation gate, as a press and a release.
+    Block markers and the mid-conversion IME toggle keys are included only when the matching flag is set (by
+    default the published log carries no row for them; see `load_trials`)."""
     out = [generate_plan.dumps({"type": "meta", "format": "obs/1", "os": os_name, "logger_version": "selftest",
                                 "manifest_sha256": "0" * 64,
                                 "capabilities": {"unconditional": ["key", "ime_shadow"], "threshold_gated": [],
@@ -559,13 +689,17 @@ def _synth_obs(rows, os_name):
 
     for r in rows[1:]:
         if r["kind"] == "block":
-            for name in r["marker"]:
-                key(name, True)
-                key(name, False)
+            if markers_in_obs:
+                for name in r["marker"]:
+                    key(name, True)
+                    key(name, False)
         else:
             for s in r["steps"]:
-                if s["key"] not in _PSEUDO_KEYS:
-                    key(s["key"], s["down"])
+                if s["key"] in _PSEUDO_KEYS:
+                    continue
+                if s["key"] in _IME_TOGGLE_KEYS and not ime_toggle_in_obs:
+                    continue
+                key(s["key"], s["down"])
     return "\n".join(out) + "\n"
 
 
@@ -600,6 +734,11 @@ def selftest():
     bad = [t.text for t in table.tokens if t.text != "っ" and t.length != len(romaji.to_romaji(t.text))]
     check("token key counts equal the romaji spelling", not bad, repr(bad))
 
+    # --- the marker keys F13-F19 fall outside the function-key range (0x70-0x7B, F1-F12) of the key-category
+    # mapping, and are categorised "other" in a real observation
+    check("F13 is categorised other, not function", _SYNTH_CATEGORY["f13"] == "other")
+    check("F19 is categorised other, not function", _SYNTH_CATEGORY["f19"] == "other")
+
     # --- decoding honours the key-count constraint, including doubled consonants and punctuation keys
     tricky = ["がっこう", "あっ", "っな", "っっか", "きょう", "ふぁんたじー", "ちょっと", "しゃしん", "てぃ", "んな",
               "らーめん", "いっしょ", "っ", "ちっち"]
@@ -632,13 +771,15 @@ def selftest():
     near("cer against a longer reference", cer("", "あいう"), 1.0)
     raises("cer with an empty reference", lambda: cer("あ", ""))
 
-    # --- split: the evaluation phrases are not in the training set
+    # --- split: the evaluation phrases are not in the training set (unit="work" is the default, K1)
     corpus = _artificial_corpus(90, 3)
     train, held, dropped = split_phrases(corpus, 11, 0.25)
     train_readings = set(p["reading"] for p in train)
     held_readings = set(p["reading"] for p in held)
     check("学習と評価が重ならない", not (set(p["phrase_id"] for p in train) & set(p["phrase_id"] for p in held))
           and not (train_readings & held_readings) and len(held) == 23, "ids or readings overlap")
+    check("work-level split: no evaluation phrase's work contributes a training phrase (K1)",
+          not (set(p["work_id"] for p in train) & set(p["work_id"] for p in held)), "works overlap")
     check("split: duplicated readings of held-out phrases were dropped from training (the check has teeth)",
           dropped > 0, "dropped %d" % dropped)
     check("split: nothing is lost except the dropped duplicates", len(train) + len(held) + dropped == len(corpus))
@@ -647,6 +788,29 @@ def selftest():
           [p["phrase_id"] for p in held] != [p["phrase_id"] for p in split_phrases(corpus, 12, 0.25)[1]])
     raises("split: eval_fraction = 1", lambda: split_phrases(corpus, 1, 1.0))
     raises("split: a single phrase", lambda: split_phrases(corpus[:1], 1))
+    raises("split: an unknown unit", lambda: split_phrases(corpus, 1, 0.25, unit="bogus"))
+    raises("split: a single-work corpus cannot be split by work",
+          lambda: split_phrases(_artificial_corpus(20, 1, n_works=1), 1, 0.25, unit="work"))
+
+    # --- split: unit="phrase" is the stronger, optional K1+ attacker, and is not the default
+    train_p, held_p, dropped_p = split_phrases(corpus, 11, 0.25, unit="phrase")
+    check("phrase-level split: nothing is lost except the dropped duplicates",
+          len(train_p) + len(held_p) + dropped_p == len(corpus))
+    check("phrase-level split: evaluation and training readings still do not overlap",
+          not (set(p["reading"] for p in train_p) & set(p["reading"] for p in held_p)))
+    check("phrase-level split can share a work between evaluation and training (K1+, unlike K1)",
+          bool(set(p["work_id"] for p in train_p) & set(p["work_id"] for p in held_p)))
+    check("phrase-level split gives a different evaluation set than the work-level split (same seed)",
+          [p["phrase_id"] for p in held_p] != [p["phrase_id"] for p in held])
+
+    # --- split: too few distinct works only warns (the split still runs); enough works, no warning
+    few_warnings = []
+    split_phrases(_artificial_corpus(20, 21, n_works=2), 1, 0.25, unit="work", warnings=few_warnings)
+    check("too few works for a stable work-level split: a warning is recorded",
+          len(few_warnings) == 1 and "work" in few_warnings[0], repr(few_warnings))
+    enough_warnings = []
+    split_phrases(corpus, 11, 0.25, unit="work", warnings=enough_warnings)
+    check("enough distinct works: no warning", enough_warnings == [], repr(enough_warnings))
 
     # --- the log carries information: decoding beats the prior-only baseline
     texts = [p["reading"] for p in train]
@@ -673,6 +837,18 @@ def selftest():
     check("入れ替えると差が消える", sh1["gain"] < 0.35 * g1["gain"] and abs(sh1["gain"]) < 0.15
           and sh1["gain_ci"][0] is not None and sh1["gain_ci"][0] <= 0.0
           and sh1["cer"] > res["K1"]["cer"] + 0.25, "shuffled %r real gain %r" % (sh1, g1["gain"]))
+    # gain_vs_shuffled (paired against the shuffled decode, not the prior baseline) isolates the trial's own
+    # observation from the MAP-versus-draw difference that `gain` conflates, and so is unaffected by shuffling
+    # having removed most of `gain` above
+    check("gain_vs_shuffled: K1's own observation carries information beyond MAP-versus-draw",
+          sh1["gain_vs_shuffled"] > 0.25 and sh1["gain_vs_shuffled_ci"][0] is not None
+          and sh1["gain_vs_shuffled_ci"][0] > 0.0, "shuffled %r" % (sh1,))
+    sh0 = res["shuffled"]["K0"]
+    check("gain_vs_shuffled: K0's own observation (key count) also carries information",
+          sh0["gain_vs_shuffled"] > 0.05 and sh0["gain_vs_shuffled_ci"][0] is not None
+          and sh0["gain_vs_shuffled_ci"][0] > 0.0, "shuffled %r" % (sh0,))
+    check("gain_vs_shuffled differs from gain (they measure different things)",
+          abs(sh1["gain_vs_shuffled"] - sh1["gain"]) > 0.1, "shuffled %r" % (sh1,))
     # a second control: the same observation for every trial carries no information either
     const = evaluate([dict(t, segments=["aaaaaaaa"]) for t in ev], lm0, lm1, beam=6, B=100, seed=5)
     check("the same observation for every trial gives little gain",
@@ -720,7 +896,7 @@ def selftest():
                 seen.add(ph["reading"])
                 phrases.append(dict(ph, kind="phrase"))
         for ph in phrases:
-            lines.append(generate_plan.dumps({"kind": "phrase", "phrase_id": ph["phrase_id"], "work_id": "w1",
+            lines.append(generate_plan.dumps({"kind": "phrase", "phrase_id": ph["phrase_id"], "work_id": ph["work_id"],
                                               "text": "x", "reading": ph["reading"], "reading_len": len(ph["reading"])}))
         with open(corpus_path, "wb") as f:
             f.write(("\n".join(lines) + "\n").encode("utf-8"))
@@ -736,6 +912,7 @@ def selftest():
         obs_path = os.path.join(tmp, "obs.jsonl")
         with open(plan_path, "wb") as f:
             f.write(generate_plan.render_plan(rows))
+        # the default observation carries no row for block markers or mid-conversion IME toggles
         obs_text = _synth_obs(rows, "macos")
         with open(obs_path, "wb") as f:
             f.write(obs_text.encode("utf-8"))
@@ -750,19 +927,78 @@ def selftest():
                 b1, b2 = f1.read(), f2.read()
             check("the command line output is byte-identical for the same seed", b1 == b2)
             rep = json.loads(b1.decode("utf-8"))
-            train2, held2, _d = split_phrases(generate_plan.load_corpus(corpus_path), 3, 0.3)
+            check("the default split is work and the default length_info is both",
+                  sorted(rep["splits"].keys()) == ["work"] and sorted(rep["splits"]["work"].keys()) == ["count", "true"])
+            train2, held2, _d = split_phrases(generate_plan.load_corpus(corpus_path), 3, 0.3, unit="work")
             ids = set(p["phrase_id"] for p in held2)
             kana = _kana_scenarios(recipes)
             want = sum(1 for r in rows[1:] if r["kind"] == "trial" and r["scenario"] not in kana and r["phrase_id"] in ids)
-            check("only trials of evaluation phrases outside the kana layout are scored", rep["n"] == want and want > 0,
-                  "n %r want %r" % (rep["n"], want))
-            check("the report records the data used", rep["data"]["n_eval_phrases"] == len(held2)
-                  and rep["data"]["n_train_phrases"] == len(train2) and rep["data"]["n_excluded_kana_layout"] > 0)
-        # the assignment is refused, not guessed, when the counts differ
+            n_count = rep["splits"]["work"]["count"]["n"]
+            check("only trials of evaluation phrases outside the kana layout are scored",
+                  n_count == want and want > 0, "n %r want %r" % (n_count, want))
+            check("count and true length_info score the same trials",
+                  rep["splits"]["work"]["true"]["n"] == n_count)
+            wdata = rep["data"]["work"]
+            check("the report records the data used", wdata["n_eval_phrases"] == len(held2)
+                  and wdata["n_train_phrases"] == len(train2) and wdata["n_excluded_kana_layout"] > 0)
+            check("the report counts trials without a typed reading (even when zero)",
+                  isinstance(wdata["n_no_typed_reading"], int) and wdata["n_no_typed_reading"] >= 0)
+            # the output file is created, never overwritten
+            rc1_again = main(common + ["--out", out1])
+            with open(out1, "rb") as f1:
+                b1_again = f1.read()
+            check("--out does not overwrite an existing file", rc1_again == 2 and b1_again == b1,
+                  "exit %r" % rc1_again)
+
+        # --- --split both and --length-info true report both splits / the requested length_info only
+        out_both = os.path.join(tmp, "both.json")
+        rc_both = main(common + ["--out", out_both, "--split", "both", "--length-info", "true"])
+        check("--split both reports the work and phrase splits together", rc_both == 0, "exit %r" % rc_both)
+        if rc_both == 0:
+            with open(out_both, "rb") as f:
+                rep_both = json.loads(f.read().decode("utf-8"))
+            check("--split both: both splits are present, only the requested length_info",
+                  sorted(rep_both["splits"].keys()) == ["phrase", "work"]
+                  and all(sorted(rep_both["splits"][u].keys()) == ["true"] for u in ("phrase", "work")))
+            check("--split both: the two splits score a different, non-empty set of trials"
+                  " (the coarser work-level grouping need not match the phrase-level target size)",
+                  rep_both["splits"]["phrase"]["true"]["n"] > 0 and rep_both["splits"]["work"]["true"]["n"] > 0
+                  and rep_both["splits"]["phrase"]["true"]["n"] != rep_both["splits"]["work"]["true"]["n"])
+
+        # --- markers-in-obs / ime-toggle-in-obs: the assignment is refused when the flag and the observation
+        # disagree, and succeeds (with the same result as the default) when they agree
+        has_ime_toggle_trial = any(any(s["key"] in ("ime_on", "ime_off") for s in r["steps"])
+                                   for r in rows[1:] if r["kind"] == "trial")
+        check("the artificial plan includes a mid-conversion IME toggle trial (a precondition below)",
+              has_ime_toggle_trial)
+        obs_markers_path = os.path.join(tmp, "obs_markers.jsonl")
+        with open(obs_markers_path, "wb") as f:
+            f.write(_synth_obs(rows, "macos", markers_in_obs=True).encode("utf-8"))
+        obs_ime_path = os.path.join(tmp, "obs_ime.jsonl")
+        with open(obs_ime_path, "wb") as f:
+            f.write(_synth_obs(rows, "macos", ime_toggle_in_obs=True).encode("utf-8"))
+        bad_out = os.path.join(tmp, "bad.json")
+        check("markers in the observation but --markers-in-obs not given is refused",
+              main(["--obs", obs_markers_path] + common[2:] + ["--out", bad_out]) == 2)
+        check("IME toggle keys in the observation but --ime-toggle-in-obs not given is refused",
+              main(["--obs", obs_ime_path] + common[2:] + ["--out", bad_out]) == 2)
+        out_markers = os.path.join(tmp, "markers_ok.json")
+        rc_markers = main(["--obs", obs_markers_path] + common[2:] + ["--out", out_markers, "--markers-in-obs"])
+        out_ime = os.path.join(tmp, "ime_ok.json")
+        rc_ime = main(["--obs", obs_ime_path] + common[2:] + ["--out", out_ime, "--ime-toggle-in-obs"])
+        check("markers-in-obs / ime-toggle-in-obs, given consistently, succeed",
+              rc_markers == 0 and rc_ime == 0, "exit %r %r" % (rc_markers, rc_ime))
+        if rc_markers == 0 and rc_ime == 0 and rc1 == 0:
+            with open(out_markers, "rb") as fm, open(out_ime, "rb") as fi:
+                rep_m, rep_i = json.loads(fm.read().decode("utf-8")), json.loads(fi.read().decode("utf-8"))
+            check("marker / IME-toggle rows do not change the scored result (they are not reading keys)",
+                  rep_m["splits"] == rep["splits"] and rep_m["data"] == rep["data"]
+                  and rep_i["splits"] == rep["splits"] and rep_i["data"] == rep["data"])
+
+        # --- the assignment is refused, not guessed, when the counts differ
         short = os.path.join(tmp, "short.jsonl")
         with open(short, "wb") as f:
             f.write("\n".join(obs_text.split("\n")[:-4]).encode("utf-8") + b"\n")
-        bad_out = os.path.join(tmp, "bad.json")
         check("an observation with missing key presses is refused", main(common[:1] + [short] + common[2:] + ["--out", bad_out]) == 2
               and not os.path.exists(bad_out))
         extra = os.path.join(tmp, "extra.jsonl")
@@ -775,10 +1011,43 @@ def selftest():
         broken = os.path.join(tmp, "broken_plan.jsonl")
         with open(broken, "wb") as f:
             f.write(b'{"kind":"header"}\n{"kind":"trial"}\n')
-        check("a plan without the plan/1 fields is refused, not a crash",
+        check("a plan without the plan/1 fields is refused (generate_plan.validate_plan), not a crash",
               main(common[:2] + ["--plan", broken] + common[4:] + ["--out", bad_out]) == 2)
         check("a different number of --obs and --plan files is refused",
               main(["--obs", obs_path, obs_path] + common[2:] + ["--out", bad_out]) == 2)
+
+        # --- the observation is checked against obs/1 (validate_logs.validate) before it is read
+        def _obs_header(**over):
+            h = {"type": "meta", "format": "obs/1", "os": "macos", "logger_version": "x",
+                 "manifest_sha256": "0" * 64,
+                 "capabilities": {"unconditional": [], "threshold_gated": [], "config_gated": []}}
+            h.update(over)
+            return h
+
+        bad_format = os.path.join(tmp, "bad_format.jsonl")
+        with open(bad_format, "wb") as f:
+            f.write((generate_plan.dumps(_obs_header(format="obs/2")) + "\n").encode("utf-8"))
+        check("an observation whose header is not obs/1 is refused",
+              main(common[:1] + [bad_format] + common[2:] + ["--out", bad_out]) == 2)
+        bad_category = os.path.join(tmp, "bad_category.jsonl")
+        with open(bad_category, "wb") as f:
+            f.write((generate_plan.dumps(_obs_header()) + "\n"
+                     + '{"type":"key","t":1,"category":"bogus","press":true}\n').encode("utf-8"))
+        check("an observation key row with a category outside the fourteen-value enum is refused",
+              main(common[:1] + [bad_category] + common[2:] + ["--out", bad_out]) == 2)
+        dup_key = os.path.join(tmp, "dup_key.jsonl")
+        with open(dup_key, "wb") as f:
+            f.write((generate_plan.dumps(_obs_header()) + "\n"
+                     + '{"type":"key","t":1,"t":2,"category":"alphabetic","press":true}\n').encode("utf-8"))
+        check("an observation line with a repeated key is refused, not silently taking the last value",
+              main(common[:1] + [dup_key] + common[2:] + ["--out", bad_out]) == 2)
+        deep = os.path.join(tmp, "deep.jsonl")
+        with open(deep, "wb") as f:
+            f.write((generate_plan.dumps(_obs_header()) + "\n"
+                     + '{"type":"key","t":1,"category":"alphabetic","press":' + "[" * 5000
+                     + '}\n').encode("utf-8"))
+        check("an observation with JSON nested past the recursion limit is refused (exit 2), not a crash",
+              main(common[:1] + [deep] + common[2:] + ["--out", bad_out]) == 2)
 
     if fails:
         for f in fails:
@@ -803,10 +1072,13 @@ def main(argv):
     ap.add_argument("--recipes", default=os.path.join(_KIT, "gen", "recipes.json"))
     ap.add_argument("--split-seed", type=int)
     ap.add_argument("--eval-fraction", type=float, default=0.2)
+    ap.add_argument("--split", choices=SPLIT_UNITS + ("both",), default="work")
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--smoothing", choices=charlm.SMOOTHINGS, default="wb")
     ap.add_argument("--beam", type=int, default=DEFAULT_BEAM)
-    ap.add_argument("--length-info", choices=LENGTH_INFO, default="count")
+    ap.add_argument("--length-info", choices=LENGTH_INFO + ("both",), default="both")
+    ap.add_argument("--markers-in-obs", action="store_true")
+    ap.add_argument("--ime-toggle-in-obs", action="store_true")
     ap.add_argument("--bootstrap", type=int, default=DEFAULT_BOOTSTRAP)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out")
