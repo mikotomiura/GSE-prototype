@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 # kit: selftest
-"""シナリオ生成器: corpus/1 と recipes（OS ごとのキーの手順）から plan/1 を出す（Python 標準ライブラリだけ）。
+"""Scenario generator: builds plan/1 from corpus/1 and recipes (OS-specific key procedures). Python
+standard library only.
 
   generate_plan.py --corpus F --recipes F --config F --os macos|windows --seed N --out F
-  generate_plan.py --validate PLAN                                    plan/1 の検査（違反で exit 1）
-  generate_plan.py --estimate --config F --recipes F --os OS [--corpus F]   1 セルの所要時間（秒）
-  generate_plan.py --selftest                                         陽性・陰性対照（速い既定）
+  generate_plan.py --validate PLAN                                    validate against plan/1 (exit 1 on violation)
+  generate_plan.py --estimate --config F --recipes F --os OS [--corpus F]   duration (seconds) for one cell
+  generate_plan.py --selftest                                         positive and negative cases (fast default)
 
-Exit: 0 = 成功 / 1 = --validate が違反を見つけた / 2 = 使い方の誤り・入力（設定・コーパス・recipes）が読めない。
+Exit codes: 0 = success / 1 = --validate found a violation / 2 = usage error, or an input (config, corpus,
+or recipes) could not be read.
 
-★ 手順（どのキーをどの順に打つか）はコードではなく recipes.json のデータ。較正パイロットの後に直すのはデータだけ。
-★ 速さ（キー間隔の分布）・思考の間・n の値は設定から読むだけで、ここでは決めない。
-★ 決定性: 乱数は random() だけを使う（Python の版で変わりうる shuffle / choice / lognormvariate を使わない）。
-  試行ごとの乱数は (seed, trial_id) から導く（trial_rng）ので、build_trial を同じ引数で直接呼ぶと計画の該当行と一致する。
-  ⚠️ 浮動小数点の演算（log / exp / cos）は OS の数学ライブラリに依るので、バイト一致を保証するのは
-  「同じ機械・同じ Python」での再生成まで。別の OS で作った計画は作り直さず、ファイルを配る。
-公開する関数: build_trial(...)・load_recipes(path)・trial_rng(seed, trial_id)・load_corpus(path)・
-  normalize_config(config)・plan_rows(...)・render_plan(rows)・validate_plan(data)・typed_reading(trial, recipes)。
+The procedure (which keys are pressed, in what order) lives in recipes.json as data, not code; only that
+data should be edited after a calibration pilot.
+Duration (key-interval distribution), think time, and n are read from the config; this module only reads
+them, it does not decide their values.
+Determinism: randomness uses only random() (never shuffle / choice / lognormvariate, whose behavior can
+change across Python versions). Each trial's random state is derived from (seed, trial_id) (trial_rng), so
+calling build_trial directly with the same arguments reproduces the matching row of a generated plan.
+Floating-point arithmetic (log / exp / cos) depends on the platform's math library, so byte-identical
+output is only guaranteed when regenerating on the same machine and the same Python version. A plan built
+on one OS is distributed as a file rather than rebuilt on another.
+Public functions: build_trial(...), load_recipes(path), trial_rng(seed, trial_id), load_corpus(path),
+  normalize_config(config), plan_rows(...), render_plan(rows), validate_plan(data), typed_reading(trial, recipes).
 """
 import argparse
 import contextlib
@@ -65,7 +71,7 @@ DICT_RE = re.compile(r"^[0-9A-Za-z._+-]{1,64}$")
 READING_RE = re.compile(r"^[ぁ-ゖー]+$")
 SEED_MAX = 2 ** 63 - 1
 
-# 時間の式（eval は使わない・この 3 つと整数リテラルだけ）
+# Time expressions (eval is not used; only these three and integer literals are allowed)
 TIMES = {
     "cand_index+1": lambda v: v["cand_index"] + 1,
     "nav_count": lambda v: v["nav_count"],
@@ -91,7 +97,7 @@ def dumps(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 
-# ---------------------------------------------------------------- 乱数（random() だけ）
+# ---------------------------------------------------------------- randomness (random() only)
 
 def _derive(seed, tag):
     h = hashlib.sha256(("%d:%s" % (seed, tag)).encode("utf-8")).digest()
@@ -99,7 +105,8 @@ def _derive(seed, tag):
 
 
 def trial_rng(seed, trial_id):
-    """試行ごとの乱数。(seed, trial_id) から決まるので、build_trial を直接呼んで計画の該当行を再現できる。"""
+    """Per-trial random state, derived from (seed, trial_id) so that calling build_trial directly
+    reproduces the matching row of a generated plan."""
     return random.Random(_derive(seed, trial_id))
 
 
@@ -124,37 +131,37 @@ def _normal(rng):
 
 
 def _draw_iki(rng, speed_cfg):
-    """キー間隔（対数正規・中央値 iki_median_ms）を整数 ms で。"""
+    """Draws a key interval (log-normal, median iki_median_ms), in whole milliseconds."""
     v = speed_cfg["iki_median_ms"] * math.exp(speed_cfg["iki_sigma"] * _normal(rng))
     return max(1, int(round(v)))
 
 
 def _draw_think(rng, think):
-    """思考の間（対数一様）。"""
+    """Draws a think-time pause (log-uniform)."""
     lo, hi = think["min"], think["max"]
     v = math.exp(math.log(lo) + rng.random() * (math.log(hi) - math.log(lo)))
     return min(hi, max(lo, int(round(v))))
 
 
-# ---------------------------------------------------------------- 設定
+# ---------------------------------------------------------------- configuration
 
 def unknown_config_keys(config):
     return sorted(k for k in config if k not in CONFIG_KNOWN and not str(k).startswith("_"))
 
 
 def normalize_config(config):
-    """既定値を補い、型と範囲を検査する（冪等）。不正は ValueError。"""
+    """Fills in defaults and checks types and ranges (idempotent). Raises ValueError on anything invalid."""
     if not isinstance(config, dict):
-        raise ValueError("設定がオブジェクトではない")
+        raise ValueError("config is not an object")
     cfg = dict(CONFIG_DEFAULTS)
     cfg.update(config)
     missing = [k for k in CONFIG_REQUIRED if k not in cfg]
     if missing:
-        raise ValueError("設定に無いキー: " + ", ".join(missing))
+        raise ValueError("config is missing keys: " + ", ".join(missing))
 
     def need_int(key, lo):
         if not _is_int(cfg[key]) or cfg[key] < lo:
-            raise ValueError("設定 %s は %d 以上の整数" % (key, lo))
+            raise ValueError("config %s must be an integer >= %d" % (key, lo))
 
     need_int("n_per_cell_scenario_speed", 1)
     need_int("block_size", 1)
@@ -167,26 +174,26 @@ def normalize_config(config):
     need_int("inter_trial_ms", 0)
     need_int("marker_gap_ms", 0)
     if not isinstance(cfg["reset_ime_every_block"], bool):
-        raise ValueError("設定 reset_ime_every_block は真偽値")
+        raise ValueError("config reset_ime_every_block must be a boolean")
     sp = cfg["speeds"]
     if not isinstance(sp, dict):
-        raise ValueError("設定 speeds はオブジェクト")
+        raise ValueError("config speeds must be an object")
     for name in SPEEDS:
         s = sp.get(name)
         if not isinstance(s, dict) or not _is_num(s.get("iki_median_ms")) or s["iki_median_ms"] <= 0 \
                 or not _is_num(s.get("iki_sigma")) or s["iki_sigma"] < 0:
-            raise ValueError("設定 speeds.%s は iki_median_ms（> 0）と iki_sigma（>= 0）を持つ" % name)
+            raise ValueError("config speeds.%s must have iki_median_ms (> 0) and iki_sigma (>= 0)" % name)
     th = cfg["think_ms"]
     if not isinstance(th, dict) or not _is_int(th.get("min")) or not _is_int(th.get("max")) \
             or th["min"] < 1 or th["max"] < th["min"]:
-        raise ValueError("設定 think_ms は 1 <= min <= max の整数")
+        raise ValueError("config think_ms must be integers with 1 <= min <= max")
     mk = cfg["marker"]
     if not isinstance(mk, list) or any(k not in KEYNAMES for k in mk):
-        raise ValueError("設定 marker は keyname の配列")
+        raise ValueError("config marker must be an array of keynames")
     if cfg.get("scenarios") is not None:
         sc = cfg["scenarios"]
         if not isinstance(sc, list) or not sc or len(set(sc)) != len(sc) or any(s not in SCENARIOS for s in sc):
-            raise ValueError("設定 scenarios は S1〜S15 の重複しない空でない配列")
+            raise ValueError("config scenarios must be a non-empty array of distinct values from S1-S15")
     return cfg
 
 
@@ -194,95 +201,95 @@ def normalize_config(config):
 
 def _check_step_element(where, el, params):
     if not isinstance(el, dict):
-        raise ValueError("%s: 手順の要素がオブジェクトではない" % where)
+        raise ValueError("%s: a step element is not an object" % where)
     if "type_reading" in el:
         extra = set(el) - {"type_reading", "part", "input"}
         if el["type_reading"] is not True or extra:
-            raise ValueError("%s: type_reading の書式" % where)
+            raise ValueError("%s: malformed type_reading" % where)
         if el.get("part", "all") not in ("all", "first_half"):
-            raise ValueError("%s: part は all か first_half" % where)
+            raise ValueError("%s: part must be all or first_half" % where)
         if el.get("input", "romaji") not in ("romaji", "kana"):
-            raise ValueError("%s: input は romaji か kana" % where)
+            raise ValueError("%s: input must be romaji or kana" % where)
     elif "key" in el:
         if set(el) != {"key"} or el["key"] not in KEYNAMES:
-            raise ValueError("%s: key の書式・keyname" % where)
+            raise ValueError("%s: malformed key, or an unknown keyname" % where)
     elif "repeat" in el:
         if set(el) != {"repeat", "times"} or el["repeat"] not in KEYNAMES:
-            raise ValueError("%s: repeat の書式・keyname" % where)
+            raise ValueError("%s: malformed repeat, or an unknown keyname" % where)
         t = el["times"]
         if not (_is_int(t) and t >= 0) and t not in TIMES:
-            raise ValueError("%s: times は 0 以上の整数か %s" % (where, "/".join(sorted(TIMES))))
+            raise ValueError("%s: times must be an integer >= 0 or one of %s" % (where, "/".join(sorted(TIMES))))
         for need in ("cand_index", "nav_count"):
             if t == need or t == need + "+1":
                 if need not in params:
-                    raise ValueError("%s: times が params に無い %s を使う" % (where, need))
+                    raise ValueError("%s: times refers to %s, which is not in params" % (where, need))
     elif "digit" in el:
         if set(el) != {"digit"} or el["digit"] != "cand_index+1" or "cand_index" not in params:
-            raise ValueError("%s: digit は cand_index+1 だけ（params に cand_index が要る）" % where)
+            raise ValueError("%s: digit must be cand_index+1 only (params must define cand_index)" % where)
     elif "pause" in el:
         if set(el) != {"pause"} or el["pause"] != "think":
-            raise ValueError("%s: pause は think だけ" % where)
+            raise ValueError("%s: pause must be think only" % where)
     elif "pause_ms" in el:
         if set(el) != {"pause_ms"} or not _is_int(el["pause_ms"]) or el["pause_ms"] < 0:
-            raise ValueError("%s: pause_ms は 0 以上の整数" % where)
+            raise ValueError("%s: pause_ms must be an integer >= 0" % where)
     else:
-        raise ValueError("%s: 未知の手順の要素" % where)
+        raise ValueError("%s: unknown step element" % where)
 
 
 def check_recipes(data):
     if not isinstance(data, dict):
-        raise ValueError("recipes がオブジェクトではない")
+        raise ValueError("recipes is not an object")
     layout = data.get("kana_layout")
     if not isinstance(layout, dict) or not layout:
-        raise ValueError("recipes.kana_layout が無い")
+        raise ValueError("recipes.kana_layout is missing")
     for k, v in layout.items():
         if k not in KEYNAMES or not isinstance(v, str) or len(v) != 1 or not READING_RE.fullmatch(v):
-            raise ValueError("recipes.kana_layout の項目が不正")
+            raise ValueError("an entry in recipes.kana_layout is malformed")
     if len(set(layout.values())) != len(layout):
-        raise ValueError("recipes.kana_layout に同じかなが 2 つのキーにある")
+        raise ValueError("recipes.kana_layout maps the same kana from two different keys")
     table = data.get("os")
     if not isinstance(table, dict) or set(table) != set(OS_NAMES):
-        raise ValueError("recipes.os は macos と windows の両方を持つ")
+        raise ValueError("recipes.os must have entries for both macos and windows")
     for os_name in OS_NAMES:
         for sc, entry in table[os_name].items():
             where = "recipes.os.%s.%s" % (os_name, sc)
             if sc not in SCENARIOS or not isinstance(entry, dict):
-                raise ValueError("%s: シナリオ名・書式" % where)
+                raise ValueError("%s: bad scenario name or malformed entry" % where)
             extra = set(entry) - {"steps", "intent", "params", "default_enabled", "reading_len"}
             if extra or "steps" not in entry or "intent" not in entry:
-                raise ValueError("%s: キー（steps・intent が要る／未知のキー）" % where)
+                raise ValueError("%s: bad keys (steps and intent are required; no unknown keys allowed)" % where)
             params = entry.get("params", {})
             for name, spec in params.items():
                 if name not in ("cand_index", "nav_count") or not isinstance(spec, dict) \
                         or not _is_int(spec.get("min")) or set(spec) - {"min", "max", "cap"} \
                         or not (_is_int(spec.get("max")) or spec.get("max") in ("cand_index_max", "nav_count_max")):
-                    raise ValueError("%s: params の書式" % where)
+                    raise ValueError("%s: malformed params" % where)
             if not isinstance(entry["steps"], list):
-                raise ValueError("%s: steps が配列でない" % where)
+                raise ValueError("%s: steps is not an array" % where)
             for i, el in enumerate(entry["steps"]):
                 _check_step_element("%s.steps[%d]" % (where, i), el, params)
             it = entry["intent"]
             if not isinstance(it, dict) or set(it) != set(INTENT_KEYS):
-                raise ValueError("%s: intent は 8 キーをすべて持つ" % where)
+                raise ValueError("%s: intent must set all 8 keys" % where)
             for k, v in it.items():
                 if isinstance(v, dict):
                     if set(v) != {"$param"} or v["$param"] not in params:
-                        raise ValueError("%s: intent.%s の $param" % (where, k))
+                        raise ValueError("%s: malformed $param in intent.%s" % (where, k))
                     continue
                 if k == "commit":
                     if v not in COMMITS:
-                        raise ValueError("%s: intent.commit が列挙外" % where)
+                        raise ValueError("%s: intent.commit is not one of the allowed values" % where)
                 elif k == "cand_index":
                     if v is not None and not (_is_int(v) and v >= 0):
-                        raise ValueError("%s: intent.cand_index が 0 以上の整数か null でない" % where)
+                        raise ValueError("%s: intent.cand_index must be an integer >= 0 or null" % where)
                 elif k == "nav_count":
                     if not (_is_int(v) and v >= 0):
-                        raise ValueError("%s: intent.nav_count が 0 以上の整数でない" % where)
+                        raise ValueError("%s: intent.nav_count must be an integer >= 0" % where)
                 elif k in INTENT_BOOLS:
                     if not isinstance(v, bool):
-                        raise ValueError("%s: intent.%s が真偽値でない" % (where, k))
+                        raise ValueError("%s: intent.%s must be a boolean" % (where, k))
             if "default_enabled" in entry and not isinstance(entry["default_enabled"], bool):
-                raise ValueError("%s: default_enabled は真偽値" % where)
+                raise ValueError("%s: default_enabled must be a boolean" % where)
             rl = entry.get("reading_len")
             if rl is not None:
                 rl_bad = not isinstance(rl, dict) or not rl or set(rl) - {"min", "max"} \
@@ -290,7 +297,7 @@ def check_recipes(data):
                     or ("max" in rl and not (_is_int(rl["max"]) and rl["max"] >= 1)) \
                     or ("min" in rl and "max" in rl and rl["min"] > rl["max"])
                 if rl_bad:
-                    raise ValueError("%s: reading_len は {min?, max?}（1 以上の整数・min<=max）" % where)
+                    raise ValueError("%s: reading_len must be {min?, max?} (integers >= 1, min<=max)" % where)
     return data
 
 
@@ -302,12 +309,12 @@ def load_recipes(path):
 
 def _entry(recipes, os_name, scenario):
     if os_name not in OS_NAMES:
-        raise ValueError("os は macos か windows")
+        raise ValueError("os must be macos or windows")
     entry = recipes["os"][os_name].get(scenario)
     if entry is None:
-        raise ValueError("%s に %s の手順が無い" % (os_name, scenario))
+        raise ValueError("%s has no procedure for %s" % (os_name, scenario))
     if not entry["steps"]:
-        raise ValueError("%s の手順が未定義（recipes の steps が空）" % scenario)
+        raise ValueError("%s has no defined procedure (recipes' steps is empty)" % scenario)
     return entry
 
 
@@ -319,19 +326,19 @@ def _uses_think(entry):
     return any(el.get("pause") == "think" for el in entry["steps"])
 
 
-# ---------------------------------------------------------------- 1 試行
+# ---------------------------------------------------------------- one trial
 
 def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id, block_id):
-    """plan/1 の試行行 1 つ（dict）を返す。乱数は rng.random() だけを使う。"""
+    """Returns one plan/1 trial row (dict). Uses only rng.random()."""
     cfg = normalize_config(config)
     if speed not in SPEEDS:
-        raise ValueError("speed は slow / mid / fast")
+        raise ValueError("speed must be slow / mid / fast")
     entry = _entry(recipes, os_name, scenario)
     reading = phrase["reading"]
     if not reading or not READING_RE.fullmatch(reading):
-        raise ValueError("phrase.reading はひらがなだけ")
+        raise ValueError("phrase.reading must be hiragana only")
     if phrase.get("reading_len", len(reading)) != len(reading):
-        raise ValueError("phrase.reading_len が reading の長さと違う")
+        raise ValueError("phrase.reading_len does not match the length of reading")
     speed_cfg = cfg["speeds"][speed]
     hold = cfg["key_hold_ms"]
     v = {"reading_len": len(reading)}
@@ -341,11 +348,11 @@ def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id
         if "cap" in spec:
             hi = min(hi, spec["cap"])
         if hi < spec["min"]:
-            raise ValueError("%s の %s の範囲が空（設定の上限が小さい）" % (scenario, name))
+            raise ValueError("the range for %s's %s is empty (the config's upper bound is too low)" % (scenario, name))
         v[name] = _randint(rng, spec["min"], hi)
     think = _draw_think(rng, cfg["think_ms"]) if _uses_think(entry) else 0
 
-    # 手順を「キー」と「次のキーまでの間」に展開する
+    # Expand the procedure into "keys" and "the pause before the next key"
     seq = []
     for el in entry["steps"]:
         if "type_reading" in el:
@@ -355,7 +362,7 @@ def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id
             if el.get("input") == "kana":
                 inv = dict((c, k) for k, c in recipes["kana_layout"].items())
                 if any(c not in inv for c in part):
-                    raise ValueError("かな配列で打てない文字がある（phrase %s）" % phrase.get("phrase_id"))
+                    raise ValueError("a character in the phrase cannot be typed on the kana layout (phrase %s)" % phrase.get("phrase_id"))
                 keys = [inv[c] for c in part]
             else:
                 keys = romaji.to_keys(part)
@@ -369,7 +376,7 @@ def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id
         elif "digit" in el:
             d = TIMES[el["digit"]](v)
             if not 1 <= d <= 9:
-                raise ValueError("数字キーで選べる候補は 1〜9 番")
+                raise ValueError("a digit key can only select candidate 1-9")
             seq.append(("key", str(d)))
         elif el.get("pause") == "think":
             seq.append(("pause", think))
@@ -393,7 +400,7 @@ def build_trial(phrase, scenario, speed, os_name, recipes, config, rng, trial_id
         steps.append({"key": val, "at_ms": t, "down": True})
         steps.append({"key": val, "at_ms": t + hold, "down": False})
     if not steps:
-        raise ValueError("手順から送るキーが 1 つも出ない")
+        raise ValueError("the procedure sends no keys at all")
 
     intent = {}
     for k in INTENT_KEYS:
@@ -408,7 +415,8 @@ _ROMAJI_READING_KEYS = frozenset("abcdefghijklmnopqrstuvwxyz") | {"minus"}
 
 
 def _trial_uses_kana(scenario, recipes):
-    """そのシナリオが（どちらかの OS で）かな入力かを recipes から見る。os_name を trial は持たない。"""
+    """Whether the given scenario is kana input (on either OS), read from recipes. A trial row itself
+    does not carry os_name."""
     for os_name in OS_NAMES:
         entry = recipes["os"].get(os_name, {}).get(scenario)
         if entry is not None:
@@ -417,11 +425,12 @@ def _trial_uses_kana(scenario, recipes):
 
 
 def typed_reading(trial, recipes):
-    """plan/1 の試行行 1 つから、実際に打った読みをひらがなで返す（steps の down だけを見る）。
-    ローマ字入力は romaji.from_keys の逆写像、かな入力（S12）は recipes.kana_layout の逆引き。
-    読みの打鍵は、そのシナリオで読みの打鍵に使わないキーが最初に来た所で終わる
-    （ローマ字は a-z / minus 以外、かな入力は kana_layout のキー以外）。通常は句の読み全体、
-    S10 は前半だけ、S12 は合成かな列を含めそのまま返る。"""
+    """Returns, in hiragana, the reading actually typed for one plan/1 trial row (reading only the down
+    steps). Romaji input is reconstructed through the inverse of romaji.from_keys; kana input (one
+    scenario) through the inverse of recipes.kana_layout. The typed reading ends at the first key that
+    scenario does not use for typing the reading (for romaji input, anything outside a-z / minus; for
+    kana input, anything outside the kana_layout keys). Ordinarily this is the phrase's full reading; one
+    scenario types only the first half, and another returns its synthetic kana string as-is."""
     downs = [s["key"] for s in trial["steps"] if s["down"]]
     if _trial_uses_kana(trial["scenario"], recipes):
         layout = recipes["kana_layout"]
@@ -439,14 +448,14 @@ def typed_reading(trial, recipes):
     return romaji.from_keys(keys)
 
 
-# ---------------------------------------------------------------- コーパス
+# ---------------------------------------------------------------- corpus
 
 def load_corpus(path):
-    """corpus/1 を読む（違反は ValueError・値は出さない）。"""
+    """Reads corpus/1 (violations raise ValueError without echoing the offending value)."""
     with open(path, "rb") as f:
         raw = f.read()
     if raw[:3] == b"\xef\xbb\xbf":
-        raise ValueError("コーパスに BOM がある")
+        raise ValueError("corpus has a BOM")
     lines = raw.decode("utf-8").split("\n")
     phrases = []
     seen = set()
@@ -455,16 +464,16 @@ def load_corpus(path):
         if not line:
             if ln == len(lines):
                 continue
-            raise ValueError("コーパス %d 行目: 空行" % ln)
+            raise ValueError("corpus line %d: blank line" % ln)
         try:
             obj = json.loads(line)
         except ValueError:
-            raise ValueError("コーパス %d 行目: JSON として読めない" % ln)
+            raise ValueError("corpus line %d: not readable as JSON" % ln)
         if ln == 1:
             if not isinstance(obj, dict) or obj.get("kind") != "header" or obj.get("format") != "corpus/1" \
                     or not isinstance(obj.get("tokenizer"), str) or not DICT_RE.fullmatch(obj["tokenizer"]) \
                     or not isinstance(obj.get("dict"), str) or not DICT_RE.fullmatch(obj["dict"]):
-                raise ValueError("コーパスのヘッダが corpus/1 でない")
+                raise ValueError("corpus header does not match corpus/1")
             continue
         ok = isinstance(obj, dict) and obj.get("kind") == "phrase" and isinstance(obj.get("phrase_id"), str) \
             and isinstance(obj.get("work_id"), str) and isinstance(obj.get("reading"), str)
@@ -474,20 +483,21 @@ def load_corpus(path):
                 and _is_int(obj.get("reading_len")) and obj["reading_len"] == len(obj["reading"]) \
                 and isinstance(obj.get("text"), str) and not obj["phrase_id"].startswith("kana-")
         if not ok:
-            raise ValueError("コーパス %d 行目: 句の行が corpus/1 の型に合わない" % ln)
+            raise ValueError("corpus line %d: phrase row does not match the corpus/1 schema" % ln)
         if obj["phrase_id"] in seen:
-            raise ValueError("コーパス %d 行目: phrase_id の重複" % ln)
+            raise ValueError("corpus line %d: duplicate phrase_id" % ln)
         seen.add(obj["phrase_id"])
         phrases.append(obj)
     if not phrases:
-        raise ValueError("コーパスに句が無い")
+        raise ValueError("corpus has no phrases")
     return phrases
 
 
-# ---------------------------------------------------------------- 計画
+# ---------------------------------------------------------------- plan
 
 class _Pool(object):
-    """句の取り出し口。cycle なら尽きたら並べ直して繰り返す。cycle でなければ尽きたら None。"""
+    """A draw pool of phrases. When cycle is set, the pool reshuffles and repeats once exhausted;
+    otherwise it returns None once exhausted."""
 
     def __init__(self, phrases, rng, cycle):
         self.phrases = list(phrases)
@@ -513,7 +523,8 @@ class _Pool(object):
 
 
 def enabled_scenarios(recipes, cfg, os_name):
-    """有効なシナリオの一覧と警告の列を返す（stderr には出さない。呼び出し側が出す）。"""
+    """Returns the list of enabled scenarios and a list of warnings (not printed here; the caller prints
+    them)."""
     table = recipes["os"][os_name]
     warnings = []
     if cfg.get("scenarios") is None:
@@ -523,23 +534,24 @@ def enabled_scenarios(recipes, cfg, os_name):
         if s in table:
             out.append(s)
         else:
-            warnings.append("%s に %s の手順が無いので飛ばす" % (os_name, s))
+            warnings.append("%s has no procedure for %s; skipping" % (os_name, s))
     return out, warnings
 
 
 def plan_rows(corpus, recipes, config, os_name, seed, config_sha256, recipes_sha256, corpus_sha256, warnings=None):
-    """計画の行（dict の列）と {trial_id: 句} を返す。stderr には出さない。
-    `warnings` にリストを渡すと、飛ばしたシナリオなどの注意を追記する（呼び出し側が出す）。"""
+    """Returns the plan rows (a list of dicts) and {trial_id: phrase}. Nothing is printed to standard
+    error here. Passing a list as `warnings` appends notices such as skipped scenarios (the caller prints
+    them)."""
     cfg = normalize_config(config)
     if os_name not in OS_NAMES:
-        raise ValueError("os は macos か windows")
+        raise ValueError("os must be macos or windows")
     if not _is_int(seed) or not 0 <= seed <= SEED_MAX:
-        raise ValueError("seed は 0〜2^63-1 の整数")
+        raise ValueError("seed must be an integer in 0..2^63-1")
     scen, scen_warnings = enabled_scenarios(recipes, cfg, os_name)
     if warnings is not None:
         warnings.extend(scen_warnings)
     if not scen:
-        raise ValueError("有効なシナリオが 1 つも無い")
+        raise ValueError("no scenario is enabled")
     for s in scen:
         _entry(recipes, os_name, s)
     layout = recipes["kana_layout"]
@@ -566,7 +578,7 @@ def plan_rows(corpus, recipes, config, os_name, seed, config_sha256, recipes_sha
         lo, hi = rl.get("min", 1), rl.get("max", 10 ** 9)
         eligible = [p for p in (typable if kana else corpus) if lo <= p["reading_len"] <= hi]
         if not eligible and not kana:
-            raise ValueError("%s の要求（読みの長さ）に合う句がコーパスに無い" % s)
+            raise ValueError("no phrase in the corpus matches %s's reading-length requirement" % s)
         pool = _Pool(eligible, prng, cycle=not kana)
         for sp in SPEEDS:
             for _ in range(n):
@@ -599,22 +611,23 @@ def plan_rows(corpus, recipes, config, os_name, seed, config_sha256, recipes_sha
 
 
 def render_plan(rows):
-    """計画のバイト列（UTF-8・LF・BOM なし）。"""
+    """The plan's byte string (UTF-8, LF, no BOM)."""
     return ("\n".join(dumps(r) for r in rows) + "\n").encode("utf-8")
 
 
-# ---------------------------------------------------------------- 見積もり
+# ---------------------------------------------------------------- estimate
 
 def estimate(config, recipes, os_name, corpus=None):
-    """1 セルの所要時間（全ステップ ＋ 試行間 ＋ マーカー）を (秒, 説明の行) で返す。"""
+    """Returns the duration of one cell (every step, plus inter-trial gaps, plus markers) as
+    (seconds, description lines)."""
     cfg = normalize_config(config)
     assumed = cfg["assumed_reading_len"]
-    note = "読みの長さ: コーパスの句"
+    note = "reading length: corpus phrases"
     if corpus is None:
         reading = (ESTIMATE_BASE * (assumed // len(ESTIMATE_BASE) + 1))[:assumed]
         corpus = [{"phrase_id": "est-1-1", "work_id": "est", "text": "", "reading": reading, "reading_len": assumed}]
         cfg = dict(cfg, kana_len_min=assumed, kana_len_max=assumed)
-        note = "読みの長さ: %d 字と仮定（設定 assumed_reading_len）" % assumed
+        note = "reading length: assumed %d characters (config assumed_reading_len)" % assumed
     rows, _ = plan_rows(corpus, recipes, cfg, os_name, 0, "0" * 64, "0" * 64, "0" * 64)
     trial_ms = gap_ms = marker_ms = n_trial = n_block = 0
     for r in rows:
@@ -626,15 +639,15 @@ def estimate(config, recipes, os_name, corpus=None):
             n_block += 1
             marker_ms += len(r["marker"]) * r["marker_gap_ms"]
     total = (trial_ms + gap_ms + marker_ms) / 1000.0
-    lines = ["試行 %d 件・ブロック %d 個（%s）" % (n_trial, n_block, note),
-             "試行の中 %.1f 秒 ＋ 試行間 %.1f 秒 ＋ マーカー %.1f 秒（IME のリセット・起動は含まない）"
+    lines = ["%d trial(s), %d block(s) (%s)" % (n_trial, n_block, note),
+             "%.1fs of trial steps + %.1fs of inter-trial gaps + %.1fs of markers (IME reset and window activation are not included)"
              % (trial_ms / 1000.0, gap_ms / 1000.0, marker_ms / 1000.0),
-             "1 試行あたり %.2f 秒" % (total / n_trial if n_trial else 0.0),
-             "合計（秒）："]
+             "%.2fs per trial" % (total / n_trial if n_trial else 0.0),
+             "Total (seconds):"]
     return total, lines
 
 
-# ---------------------------------------------------------------- 検査
+# ---------------------------------------------------------------- validation
 
 class _Reject(ValueError):
     pass
@@ -654,22 +667,23 @@ def _reject_number(_s):
 
 
 def validate_plan(data):
-    """plan/1 の検査。[(行番号, コード, 説明)] を返す（空なら違反なし）。説明に値は出さない。"""
+    """Validates plan/1. Returns [(line number, code, description)] (empty if valid). The description
+    never echoes a value."""
     found = []
 
     def bad(ln, code, msg):
         found.append((ln, code, msg))
 
     if data[:3] == b"\xef\xbb\xbf":
-        bad(1, "bom", "UTF-8 の BOM がある")
+        bad(1, "bom", "UTF-8 BOM present")
         return found
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
-        bad(1, "encoding", "UTF-8 として読めない")
+        bad(1, "encoding", "not readable as UTF-8")
         return found
     if not text:
-        bad(1, "empty", "空のファイル")
+        bad(1, "empty", "empty file")
         return found
     lines = text.split("\n")
     if lines[-1] == "":
@@ -679,110 +693,110 @@ def validate_plan(data):
         miss = [k for k in expected if k not in obj]
         extra = [k for k in obj if k not in expected]
         if miss:
-            bad(ln, "missing_key", "%s に足りないキー: %s" % (what, ",".join(miss)))
+            bad(ln, "missing_key", "%s is missing keys: %s" % (what, ",".join(miss)))
         if extra:
-            bad(ln, "extra_key", "%s に未知のキーがある（%d 個）" % (what, len(extra)))
+            bad(ln, "extra_key", "%s has unknown keys (%d)" % (what, len(extra)))
         return not miss and not extra
 
-    blocks = []          # (block_id の値, speed, 行番号, 試行数の入れ物)
+    blocks = []          # (block_id value, speed, line number, trial-count holder)
     n_trials = 0
     for ln, raw in enumerate(lines, start=1):
         line = raw[:-1] if raw.endswith("\r") else raw
         if not line:
-            bad(ln, "blank", "空行がある")
+            bad(ln, "blank", "blank line present")
             continue
         if chr(92) in line:
-            bad(ln, "escape", "行にバックスラッシュがある（エスケープは使わない）")
+            bad(ln, "escape", "line contains a backslash (escaping is not used)")
             continue
         try:
             obj = json.loads(line, object_pairs_hook=_no_dups, parse_float=_reject_number,
                              parse_constant=_reject_number)
         except _Reject as e:
-            bad(ln, str(e), "重複キーまたは整数でない数がある")
+            bad(ln, str(e), "duplicate key, or a non-integer number")
             continue
         except (ValueError, RecursionError):
-            bad(ln, "json", "JSON として読めない")
+            bad(ln, "json", "not readable as JSON")
             continue
         if not isinstance(obj, dict):
-            bad(ln, "type", "オブジェクトではない")
+            bad(ln, "type", "not an object")
             continue
         if dumps(obj) != line:
-            bad(ln, "format", "区切りの空白・エスケープ・数の書式が正規形（空白なし・エスケープなし）でない")
+            bad(ln, "format", "separators, escaping, or number formatting is not canonical (no whitespace, no escaping)")
         if ln == 1:
-            if not keys_ok(ln, obj, HEADER_KEYS, "ヘッダ"):
+            if not keys_ok(ln, obj, HEADER_KEYS, "header"):
                 continue
             if obj["kind"] != "header" or obj["format"] != "plan/1":
-                bad(ln, "header", "1 行目が plan/1 のヘッダでない")
+                bad(ln, "header", "line 1 is not a plan/1 header")
             if obj["os"] not in OS_NAMES:
-                bad(ln, "header", "os が列挙外")
+                bad(ln, "header", "os is not one of the allowed values")
             if not _is_int(obj["seed"]) or not 0 <= obj["seed"] <= SEED_MAX:
-                bad(ln, "header", "seed が 0〜2^63-1 の整数でない")
+                bad(ln, "header", "seed is not an integer in 0..2^63-1")
             if not isinstance(obj["generator_version"], str) or not VERSION_RE.fullmatch(obj["generator_version"]):
-                bad(ln, "header", "generator_version の書式")
+                bad(ln, "header", "generator_version has a malformed value")
             if not isinstance(obj["config_sha256"], str) or not SHA_RE.fullmatch(obj["config_sha256"]):
-                bad(ln, "header", "config_sha256 が小文字 16 進 64 桁でない")
+                bad(ln, "header", "config_sha256 is not 64 lowercase hex digits")
             if not isinstance(obj["recipes_sha256"], str) or not SHA_RE.fullmatch(obj["recipes_sha256"]):
-                bad(ln, "header", "recipes_sha256 が小文字 16 進 64 桁でない")
+                bad(ln, "header", "recipes_sha256 is not 64 lowercase hex digits")
             if not isinstance(obj["corpus_sha256"], str) or not SHA_RE.fullmatch(obj["corpus_sha256"]):
-                bad(ln, "header", "corpus_sha256 が小文字 16 進 64 桁でない")
+                bad(ln, "header", "corpus_sha256 is not 64 lowercase hex digits")
             continue
         kind = obj.get("kind")
         if kind == "block":
-            if not keys_ok(ln, obj, BLOCK_KEYS, "ブロック"):
+            if not keys_ok(ln, obj, BLOCK_KEYS, "block"):
                 continue
             if obj["block_id"] != len(blocks) or not _is_int(obj["block_id"]):
-                bad(ln, "block_id", "block_id が 0 からの連番でない")
+                bad(ln, "block_id", "block_id is not a 0-based running count")
             if obj["speed"] not in SPEEDS:
-                bad(ln, "speed", "ブロックの speed が列挙外")
+                bad(ln, "speed", "block speed is not one of the allowed values")
             if not isinstance(obj["reset_ime"], bool):
-                bad(ln, "type", "reset_ime が真偽値でない")
+                bad(ln, "type", "reset_ime is not a boolean")
             if not isinstance(obj["marker"], list) or any(
                     not isinstance(k, str) or k not in KEYNAMES for k in obj["marker"]):
-                bad(ln, "keyname", "marker に keyname でない要素がある")
+                bad(ln, "keyname", "marker has an element that is not a keyname")
             if not _is_int(obj["marker_gap_ms"]) or obj["marker_gap_ms"] < 0:
-                bad(ln, "type", "marker_gap_ms が 0 以上の整数でない")
+                bad(ln, "type", "marker_gap_ms is not an integer >= 0")
             blocks.append([obj["block_id"], obj["speed"], ln, 0])
         elif kind == "trial":
             n_trials += 1
-            if not keys_ok(ln, obj, TRIAL_KEYS, "試行"):
+            if not keys_ok(ln, obj, TRIAL_KEYS, "trial"):
                 continue
             if not isinstance(obj["trial_id"], str) or not TRIAL_ID_RE.fullmatch(obj["trial_id"]) \
                     or obj["trial_id"] != "t%05d" % n_trials:
-                bad(ln, "trial_id", "trial_id が t＋5 桁以上の 1 からの連番でない")
+                bad(ln, "trial_id", "trial_id is not t followed by a 1-based running count of at least 5 digits")
             blk = None
             if blocks and _is_int(obj["block_id"]) and obj["block_id"] == blocks[-1][0]:
                 blk = blocks[-1]
                 blk[3] += 1
             else:
-                bad(ln, "block_ref", "block_id が直前のブロック行の block_id と一致しない")
+                bad(ln, "block_ref", "block_id does not match the immediately preceding block row's block_id")
             if obj["scenario"] not in SCENARIOS:
-                bad(ln, "scenario", "scenario が S1〜S15 でない")
+                bad(ln, "scenario", "scenario is not one of S1-S15")
             if obj["speed"] not in SPEEDS:
-                bad(ln, "speed", "speed が列挙外")
+                bad(ln, "speed", "speed is not one of the allowed values")
             elif blk is not None and obj["speed"] != blk[1]:
-                bad(ln, "speed_mismatch", "試行の speed がブロックの speed と違う")
+                bad(ln, "speed_mismatch", "trial speed does not match the block's speed")
             for k in ("gap_before_ms", "think_ms"):
                 if not _is_int(obj[k]) or obj[k] < 0:
-                    bad(ln, "type", "%s が 0 以上の整数でない" % k)
+                    bad(ln, "type", "%s is not an integer >= 0" % k)
             if not isinstance(obj["phrase_id"], str) or not PHRASE_ID_RE.fullmatch(obj["phrase_id"]):
-                bad(ln, "phrase_id", "phrase_id の書式")
+                bad(ln, "phrase_id", "phrase_id is malformed")
             if not _is_int(obj["reading_len"]) or obj["reading_len"] < 1:
-                bad(ln, "type", "reading_len が 1 以上の整数でない")
+                bad(ln, "type", "reading_len is not an integer >= 1")
             _check_steps(ln, obj["steps"], bad)
             _check_intent(ln, obj["intent"], bad)
         else:
-            bad(ln, "kind", "kind が header / block / trial のどれでもない（または 2 行目以降がヘッダ）")
+            bad(ln, "kind", "kind is none of header / block / trial (or a header appears after line 1)")
     if n_trials == 0:
-        bad(1, "no_trial", "試行が 1 つも無い")
+        bad(1, "no_trial", "no trial is present")
     for blk in blocks:
         if blk[3] == 0:
-            bad(blk[2], "empty_block", "試行の無いブロックがある")
+            bad(blk[2], "empty_block", "a block has no trial")
     return found
 
 
 def _check_steps(ln, steps, bad):
     if not isinstance(steps, list) or not steps:
-        bad(ln, "steps", "steps が空でない配列でない")
+        bad(ln, "steps", "steps is not a non-empty array")
         return
     held = set()
     prev = -1
@@ -811,29 +825,29 @@ def _check_steps(ln, steps, bad):
     if held:
         pair_bad = True
     if shape_bad:
-        bad(ln, "step_shape", "steps の要素が {key, at_ms（0 以上の整数）, down（真偽値）} でない")
+        bad(ln, "step_shape", "a steps element is not {key, at_ms (integer >= 0), down (boolean)}")
     if key_bad:
-        bad(ln, "keyname", "steps に keyname の列挙に無いキーがある")
+        bad(ln, "keyname", "steps has a key outside the keyname enumeration")
     if order_bad:
-        bad(ln, "at_ms_order", "at_ms が単調非減少でない")
+        bad(ln, "at_ms_order", "at_ms is not monotonically non-decreasing")
     if pair_bad:
-        bad(ln, "pair", "down と up が対になっていない")
+        bad(ln, "pair", "a down and an up are not paired")
 
 
 def _check_intent(ln, intent, bad):
     if not isinstance(intent, dict) or set(intent) != set(INTENT_KEYS):
-        bad(ln, "intent_keys", "intent が 8 キーを過不足なく持たない")
+        bad(ln, "intent_keys", "intent does not have exactly the 8 required keys")
         return
     if intent["commit"] not in COMMITS:
-        bad(ln, "intent_type", "intent.commit が列挙外")
+        bad(ln, "intent_type", "intent.commit is not one of the allowed values")
     ci = intent["cand_index"]
     if ci is not None and (not _is_int(ci) or ci < 0):
-        bad(ln, "intent_type", "intent.cand_index が 0 以上の整数か null でない")
+        bad(ln, "intent_type", "intent.cand_index is not an integer >= 0 or null")
     if not _is_int(intent["nav_count"]) or intent["nav_count"] < 0:
-        bad(ln, "intent_type", "intent.nav_count が 0 以上の整数でない")
+        bad(ln, "intent_type", "intent.nav_count is not an integer >= 0")
     for k in INTENT_BOOLS:
         if not isinstance(intent[k], bool):
-            bad(ln, "intent_type", "intent.%s が真偽値でない" % k)
+            bad(ln, "intent_type", "intent.%s is not a boolean" % k)
 
 
 # ---------------------------------------------------------------- selftest
@@ -865,7 +879,7 @@ def _sha_file(path):
 
 
 def _scenario_checks(rows, phrases, recipes, cfg, fails):
-    """シナリオごとの手順が recipes の意図どおりに出ているか（陽性の内容検査）。"""
+    """Checks that each scenario's procedure matches recipes' intent (a positive content check)."""
     inv = dict((c, k) for k, c in recipes["kana_layout"].items())
     seen = set()
     for r in rows:
@@ -911,7 +925,7 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails):
             i = downs.index("focus_away")
             ok = downs[i:] == ["focus_away", "focus_back", "enter"] and at[i + 1] - at[i] == 1000
         if not ok:
-            fails.append("シナリオ %s の手順が recipes の意図と違う（%s）" % (sc, r["trial_id"]))
+            fails.append("scenario %s's procedure does not match recipes' intent (%s)" % (sc, r["trial_id"]))
             return
     return seen
 
@@ -949,57 +963,57 @@ def selftest():
 
         rows1, ph1 = gen()
         bytes1 = render_plan(rows1)
-        check("recipes.json が検査を通る", True)
+        check("recipes.json passes validation", True)
 
-        # --- 決定性と seed の効き（acceptance がケース名を検査する）
-        check("同じ seed でバイト一致", render_plan(gen()[0]) == bytes1)
+        # --- determinism and the effect of the seed (case names checked by the acceptance script)
+        check("same seed yields byte-identical output", render_plan(gen()[0]) == bytes1)
         rows2, _ = gen(seed=8)
         order = lambda rs: [(r["scenario"], r["phrase_id"]) for r in rs if r["kind"] == "trial"]
-        check("seed を変えると順が変わる（陰性対照）", order(rows1) != order(rows2) and render_plan(rows2) != bytes1)
-        check("BOM なし・LF だけ・最後は改行", not bytes1.startswith(b"\xef\xbb\xbf") and b"\r" not in bytes1
+        check("a different seed changes the trial order (negative control)", order(rows1) != order(rows2) and render_plan(rows2) != bytes1)
+        check("no BOM, LF only, ends with a newline", not bytes1.startswith(b"\xef\xbb\xbf") and b"\r" not in bytes1
               and bytes1.endswith(b"\n"))
 
-        # --- 件数とブロック
+        # --- counts and blocks
         trials = [r for r in rows1 if r["kind"] == "trial"]
         blocks = [r for r in rows1 if r["kind"] == "block"]
         scen_mac = [s for s in SCENARIOS if s in recipes["os"]["macos"] and recipes["os"]["macos"][s].get("default_enabled", True)]
         n_cell = ncfg["n_per_cell_scenario_speed"]
-        check("件数 = シナリオ数 × 3 × n", len(trials) == len(scen_mac) * 3 * n_cell, "%d" % len(trials))
+        check("trial count = number of scenarios x 3 x n", len(trials) == len(scen_mac) * 3 * n_cell, "%d" % len(trials))
         per_speed = len(scen_mac) * n_cell
-        check("ブロック数 = 速さごとの ceil(件数/block_size) の合計",
+        check("block count = sum over speeds of ceil(trial count/block_size)",
               len(blocks) == 3 * -(-per_speed // ncfg["block_size"]), "%d" % len(blocks))
-        check("割り切れるとき ceil(件数 / block_size) と一致",
+        check("matches ceil(trial count / block_size) when it divides evenly",
               per_speed % ncfg["block_size"] != 0 or len(blocks) == -(-len(trials) // ncfg["block_size"]))
         rows_w, ph_w = gen("windows")
         blocks_w = [r for r in rows_w if r["kind"] == "block"]
         trials_w = [r for r in rows_w if r["kind"] == "trial"]
-        check("windows のブロック数（割り切れない場合も式どおり）",
+        check("windows block count (matches the formula even when it does not divide evenly)",
               len(blocks_w) == 3 * -(-((len(scen_mac) - 1) * n_cell) // ncfg["block_size"]), "%d" % len(blocks_w))
-        check("ブロックは速さで揃う（試行の speed = ブロック行の speed）",
+        check("blocks are homogeneous in speed (trial speed = its block row's speed)",
               all(t["speed"] == blocks[t["block_id"]]["speed"] for t in trials))
-        check("ブロック行に marker・marker_gap_ms・reset_ime を設定から書く",
+        check("block rows carry marker, marker_gap_ms, and reset_ime from the config",
               all(b["marker"] == cfg["marker"] and b["marker_gap_ms"] == 150 and b["reset_ime"] is True for b in blocks))
-        check("試行行に gap_before_ms を設定から書く", all(t["gap_before_ms"] == 1000 for t in trials))
-        check("trial_id と block_id が連番", [t["trial_id"] for t in trials] == ["t%05d" % i for i in range(1, len(trials) + 1)]
+        check("trial rows carry gap_before_ms from the config", all(t["gap_before_ms"] == 1000 for t in trials))
+        check("trial_id and block_id are running counts", [t["trial_id"] for t in trials] == ["t%05d" % i for i in range(1, len(trials) + 1)]
               and [b["block_id"] for b in blocks] == list(range(len(blocks))))
-        check("ブロックの並びが seed で並べ替わっている（速さが 3 つ固まっていない）",
+        check("block order is permuted by the seed (the three speeds are not grouped together)",
               [b["speed"] for b in blocks] != sorted(b["speed"] for b in blocks))
 
-        # --- S9 / S11
-        check("S9 が既定で出ない", "S9" not in set(t["scenario"] for t in trials))
-        check("S11 が macos では出る", "S11" in set(t["scenario"] for t in trials))
-        check("S11 が windows で出ない", "S11" not in set(t["scenario"] for t in trials_w))
+        # --- two scenarios with OS-conditional behavior
+        check("one scenario does not appear by default", "S9" not in set(t["scenario"] for t in trials))
+        check("one live-conversion scenario appears on macos", "S11" in set(t["scenario"] for t in trials))
+        check("that scenario does not appear on windows", "S11" not in set(t["scenario"] for t in trials_w))
         for os_name in OS_NAMES:
             try:
                 gen(os_name, config=dict(cfg, scenarios=["S9"]))
-                check("S9 を明示しても手順が未定義なら止まる (%s)" % os_name, False, "止まらなかった")
+                check("naming an undefined scenario explicitly still stops the run (%s)" % os_name, False, "did not stop")
             except ValueError:
-                check("S9 を明示しても手順が未定義なら止まる (%s)" % os_name, True)
+                check("naming an undefined scenario explicitly still stops the run (%s)" % os_name, True)
         rows_s11, _ = gen("windows", config=dict(cfg, scenarios=["S1", "S11"]))
-        check("windows で S11 を明示しても飛ばして残りを作る",
+        check("naming the unsupported scenario explicitly on windows still builds the rest, skipping it",
               set(t["scenario"] for t in rows_s11 if t["kind"] == "trial") == {"S1"})
 
-        # --- 速さの中央値が順に並ぶ
+        # --- speed medians are ordered
         rows_s3, _ = gen(config=dict(cfg, scenarios=["S3"], n_per_cell_scenario_speed=40, block_size=40))
         med = {}
         for sp in SPEEDS:
@@ -1009,25 +1023,25 @@ def selftest():
                     ds = [s["at_ms"] for s in t["steps"] if s["down"]]
                     gaps.extend(b - a for a, b in zip(ds, ds[1:]))
             med[sp] = _median(gaps)
-        check("キー間隔の中央値が slow > mid > fast", med["slow"] > med["mid"] > med["fast"], str(med))
-        check("キー間隔の中央値が設定の中央値に近い（±10%）",
+        check("key-interval medians order as slow > mid > fast", med["slow"] > med["mid"] > med["fast"], str(med))
+        check("key-interval medians are close to the configured medians (within 10%)",
               all(abs(med[sp] - cfg["speeds"][sp]["iki_median_ms"]) <= 0.1 * cfg["speeds"][sp]["iki_median_ms"]
                   for sp in SPEEDS), str(med))
 
-        # --- シナリオごとの手順（recipes の意図）
+        # --- per-scenario procedures (recipes' intent)
         seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails)
         n[0] += 1
-        check("macos の既定で 14 シナリオすべてが出る", seen == set(scen_mac), str(sorted(seen or [])))
+        check("all 14 scenarios appear under the macos default", seen == set(scen_mac), str(sorted(seen or [])))
         _scenario_checks(rows_w, gen("windows")[1], recipes, ncfg, fails)
-        check("S12 で合成かな列（kana-）が使われる（打てる句が足りない）",
+        check("one scenario falls back to a synthetic kana string (kana-) when typable phrases run out",
               any(t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] == "S12"))
-        check("S12 以外は kana- を使わない", all(not t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] != "S12"))
-        check("S10 は読みの長さが 2 以上の句だけ", all(t["reading_len"] >= 2 for t in trials if t["scenario"] == "S10"))
-        check("steps の各キーは down と up が対で、キーは列挙内",
+        check("no other scenario uses a kana- phrase_id", all(not t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] != "S12"))
+        check("one scenario only draws phrases with a reading length of 2 or more", all(t["reading_len"] >= 2 for t in trials if t["scenario"] == "S10"))
+        check("every key in steps has a paired down and up, and each key is in the enumeration",
               all(len(t["steps"]) % 2 == 0 and all(s["key"] in KEYNAMES for s in t["steps"]) for t in trials))
-        check("at_ms は試行の先頭から（最初は 0）", all(t["steps"][0]["at_ms"] == 0 for t in trials))
+        check("at_ms is relative to the start of the trial (the first is 0)", all(t["steps"][0]["at_ms"] == 0 for t in trials))
 
-        # --- typed_reading（判断 29）: 全シナリオ・両 OS で「打った読み」が期待どおり
+        # --- typed_reading: matches expectations across every scenario and both operating systems
         def _typed_mismatches(rows, phrases):
             bad = []
             for t in rows:
@@ -1041,41 +1055,41 @@ def selftest():
             return bad
 
         bad_mac = _typed_mismatches(rows1, ph1)
-        check("typed_reading が全シナリオで期待どおり（macos・通常は全体・S10 は前半・S12 は合成かな列）",
+        check("typed_reading matches expectations for every scenario (macos: ordinarily the full reading, one scenario the first half, one scenario the synthetic kana string)",
               not bad_mac, str(bad_mac[:3]))
         bad_win = _typed_mismatches(rows_w, ph_w)
-        check("typed_reading が全シナリオで期待どおり（windows）", not bad_win, str(bad_win[:3]))
+        check("typed_reading matches expectations for every scenario (windows)", not bad_win, str(bad_win[:3]))
 
-        # --- 公開関数は stderr に出さない（項目7）。警告は戻り値で返す
+        # --- public functions do not write to standard error; warnings are returned instead
         _buf = io.StringIO()
         with contextlib.redirect_stderr(_buf):
             _warns = []
             plan_rows(corpus, recipes, dict(cfg, scenarios=["S1", "S11"]), "windows", 1, sha, rsha, csha,
                       warnings=_warns)
-        check("plan_rows / enabled_scenarios は stderr に出さず、警告は戻り値で返す（windows に無い S11）",
+        check("plan_rows / enabled_scenarios do not write to standard error; a warning about the windows-unsupported scenario is returned instead",
               _buf.getvalue() == "" and any("S11" in w for w in _warns), repr(_buf.getvalue()))
 
-        # --- check_recipes: intent の値の型・reading_len の指定の型（項目5）
+        # --- check_recipes: type checks on intent values and on the reading_len specification
         def _bad_recipes(mutate_fn):
             data = json.loads(json.dumps(recipes))
             mutate_fn(data)
             return data
 
         for name, fn in [
-            ("intent.commit が列挙外", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("commit", "click")),
-            ("intent.cand_index が負", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("cand_index", -1)),
-            ("intent.nav_count が負", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("nav_count", -1)),
-            ("intent の真偽値の欄が整数", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("abandon", 0)),
-            ("reading_len.min が 0", lambda d: d["os"]["macos"]["S10"].__setitem__("reading_len", {"min": 0})),
-            ("reading_len に未知のキー", lambda d: d["os"]["macos"]["S10"].__setitem__("reading_len", {"min": 2, "zz": 1})),
+            ("intent.commit outside the enumeration", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("commit", "click")),
+            ("intent.cand_index negative", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("cand_index", -1)),
+            ("intent.nav_count negative", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("nav_count", -1)),
+            ("a boolean intent field holding an integer", lambda d: d["os"]["macos"]["S1"]["intent"].__setitem__("abandon", 0)),
+            ("reading_len.min is 0", lambda d: d["os"]["macos"]["S10"].__setitem__("reading_len", {"min": 0})),
+            ("reading_len has an unknown key", lambda d: d["os"]["macos"]["S10"].__setitem__("reading_len", {"min": 2, "zz": 1})),
         ]:
             try:
                 check_recipes(_bad_recipes(fn))
-                check("check_recipes が拒否する（型）: %s" % name, False, "拒否されなかった")
+                check("check_recipes rejects (type): %s" % name, False, "was not rejected")
             except ValueError:
-                check("check_recipes が拒否する（型）: %s" % name, True)
+                check("check_recipes rejects (type): %s" % name, True)
 
-        # --- load_corpus: phrase_id が kana- で始まる行を拒否する（項目6）
+        # --- load_corpus: rejects a row whose phrase_id starts with kana-
         kana_corpus = os.path.join(tmp, "kana_corpus.jsonl")
         with open(kana_corpus, "wb") as f:
             f.write(('{"kind":"header","format":"corpus/1","source":"aozora","tokenizer":"table","dict":"none"}\n'
@@ -1083,20 +1097,20 @@ def selftest():
                               "reading": "あい", "reading_len": 2}) + "\n").encode("utf-8"))
         try:
             load_corpus(kana_corpus)
-            check("load_corpus が kana- 始まりの phrase_id を拒否する", False, "拒否されなかった")
+            check("load_corpus rejects a phrase_id starting with kana-", False, "was not rejected")
         except ValueError:
-            check("load_corpus が kana- 始まりの phrase_id を拒否する", True)
+            check("load_corpus rejects a phrase_id starting with kana-", True)
 
-        # --- fullmatch の直接確認（項目4・末尾に改行が付いた値は re.match の $ だと通ってしまう）
-        check("正規表現が末尾の改行を拒否する（fullmatch・陰性対照）",
+        # --- direct confirmation of fullmatch (a value with a trailing newline would pass re.match's $)
+        check("the patterns reject a trailing newline (fullmatch, negative control)",
               PHRASE_ID_RE.fullmatch("w1-1-1\n") is None and VERSION_RE.fullmatch("1.0.0\n") is None
               and SHA_RE.fullmatch("0" * 64 + "\n") is None and TRIAL_ID_RE.fullmatch("t00001\n") is None)
-        check("正規表現は末尾の改行が無ければ通る（陽性対照）",
+        check("the patterns accept a value with no trailing newline (positive control)",
               PHRASE_ID_RE.fullmatch("w1-1-1") is not None and VERSION_RE.fullmatch("1.0.0") is not None)
 
-        # --- fullmatch の実地確認（項目4）: load_corpus はバックスラッシュを禁止しないので、
-        #     ヘッダの tokenizer に「末尾に改行の付いた値」（\n エスケープで JSON としては合法）を仕込むと、
-        #     .match のままなら $ が改行の直前で一致して通ってしまう。fullmatch なら拒否する。
+        # --- an end-to-end confirmation: load_corpus does not reject a backslash outright, so a header
+        #     tokenizer value with a trailing newline (legal JSON via a \n escape) would pass a .match
+        #     whose $ matches right before the newline. fullmatch rejects it.
         bad_tok_corpus = os.path.join(tmp, "bad_tokenizer_corpus.jsonl")
         with open(bad_tok_corpus, "wb") as f:
             bad_header = dumps({"kind": "header", "format": "corpus/1", "source": "aozora",
@@ -1106,88 +1120,88 @@ def selftest():
                     .encode("utf-8"))
         try:
             load_corpus(bad_tok_corpus)
-            check("load_corpus が末尾に改行の付いた tokenizer を拒否する（fullmatch・項目4）", False, "拒否されなかった")
+            check("load_corpus rejects a tokenizer value with a trailing newline (fullmatch)", False, "was not rejected")
         except ValueError:
-            check("load_corpus が末尾に改行の付いた tokenizer を拒否する（fullmatch・項目4）", True)
+            check("load_corpus rejects a tokenizer value with a trailing newline (fullmatch)", True)
 
-        # --- 検査器: 陽性対照
-        check("生成した計画（macos）を --validate が通す", validate_plan(bytes1) == [], str(validate_plan(bytes1)[:2]))
-        check("生成した計画（windows）を --validate が通す", validate_plan(render_plan(rows_w)) == [])
-        check("CRLF の計画も通す", validate_plan(bytes1.replace(b"\n", b"\r\n")) == [])
+        # --- validator: positive controls
+        check("the generated plan (macos) passes --validate", validate_plan(bytes1) == [], str(validate_plan(bytes1)[:2]))
+        check("the generated plan (windows) passes --validate", validate_plan(render_plan(rows_w)) == [])
+        check("a CRLF plan also passes", validate_plan(bytes1.replace(b"\n", b"\r\n")) == [])
 
-        # --- 検査器: 陰性対照（1 か所ずつ壊す・理由まで確かめる）
+        # --- validator: negative controls (break one thing at a time, and check the specific reason)
         def mutate(kind_row, fn, block_kind=None):
             rs = json.loads(json.dumps(rows1))
             for r in rs:
                 if r["kind"] == kind_row and fn(r, rs):
                     return render_plan(rs)
-            raise AssertionError("変異を入れられない")
+            raise AssertionError("could not inject the mutation")
 
         def first_trial(fn):
             return mutate("trial", lambda r, rs: (fn(r), True)[1])
 
         muts = [
-            ("未知の keyname", first_trial(lambda r: r["steps"][0].__setitem__("key", "hyper")), "keyname"),
-            ("at_ms の逆行", first_trial(lambda r: r["steps"][0].__setitem__("at_ms", r["steps"][-1]["at_ms"] + 1000)),
+            ("unknown keyname", first_trial(lambda r: r["steps"][0].__setitem__("key", "hyper")), "keyname"),
+            ("at_ms goes backward", first_trial(lambda r: r["steps"][0].__setitem__("at_ms", r["steps"][-1]["at_ms"] + 1000)),
              "at_ms_order"),
-            ("ブロックと速さの不一致", first_trial(lambda r: r.__setitem__(
+            ("block and speed mismatch", first_trial(lambda r: r.__setitem__(
                 "speed", {"slow": "fast", "mid": "slow", "fast": "mid"}[r["speed"]])), "speed_mismatch"),
-            ("down が 2 回続く", first_trial(lambda r: r["steps"].__setitem__(1, dict(r["steps"][1], down=True))), "pair"),
-            ("up が無い", first_trial(lambda r: r["steps"].pop()), "pair"),
-            ("trial_id が飛ぶ", first_trial(lambda r: r.__setitem__("trial_id", "t99999")), "trial_id"),
-            ("block_id が存在しない", first_trial(lambda r: r.__setitem__("block_id", 9999)), "block_ref"),
-            ("scenario が S99", first_trial(lambda r: r.__setitem__("scenario", "S99")), "scenario"),
-            ("intent のキーが足りない", first_trial(lambda r: r["intent"].pop("commit")), "intent_keys"),
-            ("intent に未知のキー", first_trial(lambda r: r["intent"].__setitem__("zz", 1)), "intent_keys"),
-            ("intent.commit が列挙外", first_trial(lambda r: r["intent"].__setitem__("commit", "click")), "intent_type"),
-            ("intent の真偽値が整数", first_trial(lambda r: r["intent"].__setitem__("abandon", 0)), "intent_type"),
-            ("試行に未知のキー", first_trial(lambda r: r.__setitem__("zz", 1)), "extra_key"),
-            ("試行のキーが足りない", first_trial(lambda r: r.pop("think_ms")), "missing_key"),
-            ("phrase_id の書式（大文字）", first_trial(lambda r: r.__setitem__("phrase_id", "Xray1")), "phrase_id"),
-            ("reading_len が 0", first_trial(lambda r: r.__setitem__("reading_len", 0)), "type"),
-            ("at_ms が真偽値", first_trial(lambda r: r["steps"][0].__setitem__("at_ms", True)), "step_shape"),
-            ("ブロックの marker に未知のキー", mutate("block", lambda r, rs: (r["marker"].append("hyper"), True)[1]), "keyname"),
-            ("ブロックの speed が列挙外", mutate("block", lambda r, rs: (r.__setitem__("speed", "warp"), True)[1]), "speed"),
-            ("ヘッダの format", mutate("header", lambda r, rs: (r.__setitem__("format", "plan/2"), True)[1]), "header"),
-            ("ヘッダの seed が負", mutate("header", lambda r, rs: (r.__setitem__("seed", -1), True)[1]), "header"),
-            ("ヘッダの config_sha256 が大文字", mutate("header", lambda r, rs: (r.__setitem__("config_sha256", "A" * 64), True)[1]),
+            ("down appears twice in a row", first_trial(lambda r: r["steps"].__setitem__(1, dict(r["steps"][1], down=True))), "pair"),
+            ("up is missing", first_trial(lambda r: r["steps"].pop()), "pair"),
+            ("trial_id skips a number", first_trial(lambda r: r.__setitem__("trial_id", "t99999")), "trial_id"),
+            ("block_id does not exist", first_trial(lambda r: r.__setitem__("block_id", 9999)), "block_ref"),
+            ("scenario is S99", first_trial(lambda r: r.__setitem__("scenario", "S99")), "scenario"),
+            ("intent is missing a key", first_trial(lambda r: r["intent"].pop("commit")), "intent_keys"),
+            ("intent has an unknown key", first_trial(lambda r: r["intent"].__setitem__("zz", 1)), "intent_keys"),
+            ("intent.commit outside the enumeration", first_trial(lambda r: r["intent"].__setitem__("commit", "click")), "intent_type"),
+            ("a boolean intent field holding an integer", first_trial(lambda r: r["intent"].__setitem__("abandon", 0)), "intent_type"),
+            ("trial has an unknown key", first_trial(lambda r: r.__setitem__("zz", 1)), "extra_key"),
+            ("trial is missing a key", first_trial(lambda r: r.pop("think_ms")), "missing_key"),
+            ("malformed phrase_id (uppercase)", first_trial(lambda r: r.__setitem__("phrase_id", "Xray1")), "phrase_id"),
+            ("reading_len is 0", first_trial(lambda r: r.__setitem__("reading_len", 0)), "type"),
+            ("at_ms is a boolean", first_trial(lambda r: r["steps"][0].__setitem__("at_ms", True)), "step_shape"),
+            ("block marker has an unknown keyname", mutate("block", lambda r, rs: (r["marker"].append("hyper"), True)[1]), "keyname"),
+            ("block speed outside the enumeration", mutate("block", lambda r, rs: (r.__setitem__("speed", "warp"), True)[1]), "speed"),
+            ("header format", mutate("header", lambda r, rs: (r.__setitem__("format", "plan/2"), True)[1]), "header"),
+            ("header seed is negative", mutate("header", lambda r, rs: (r.__setitem__("seed", -1), True)[1]), "header"),
+            ("header config_sha256 is uppercase", mutate("header", lambda r, rs: (r.__setitem__("config_sha256", "A" * 64), True)[1]),
              "header"),
-            ("ヘッダの recipes_sha256 が短い", mutate("header", lambda r, rs: (r.__setitem__("recipes_sha256", "ab"), True)[1]),
+            ("header recipes_sha256 is too short", mutate("header", lambda r, rs: (r.__setitem__("recipes_sha256", "ab"), True)[1]),
              "header"),
-            ("ヘッダの corpus_sha256 が大文字", mutate("header", lambda r, rs: (r.__setitem__("corpus_sha256", "B" * 64), True)[1]),
+            ("header corpus_sha256 is uppercase", mutate("header", lambda r, rs: (r.__setitem__("corpus_sha256", "B" * 64), True)[1]),
              "header"),
-            ("ヘッダに recipes_sha256 が無い", mutate("header", lambda r, rs: (r.pop("recipes_sha256"), True)[1]),
+            ("header is missing recipes_sha256", mutate("header", lambda r, rs: (r.pop("recipes_sha256"), True)[1]),
              "missing_key"),
-            ("block_id が直前でなく前のブロックを指す（判断 29）",
+            ("block_id refers to an earlier block rather than the immediately preceding one",
              mutate("trial", lambda r, rs: (r.__setitem__("block_id", 0), True)[1] if r["block_id"] > 0 else False),
              "block_ref"),
         ]
         text = bytes1.decode("utf-8")
         muts += [
-            ("区切りに空白", text.replace('"kind":"block"', '"kind": "block"', 1).encode("utf-8"), "format"),
-            ("エスケープ（バックスラッシュを含む行）",
+            ("extra whitespace in a separator", text.replace('"kind":"block"', '"kind": "block"', 1).encode("utf-8"), "format"),
+            ("escaping (a line containing a backslash)",
              text.replace('"kind":"block"', '"kind":"bl' + chr(92) + 'u006fck"', 1).encode("utf-8"), "escape"),
             ("BOM", b"\xef\xbb\xbf" + bytes1, "bom"),
-            ("空行", text.replace("\n", "\n\n", 1).encode("utf-8"), "blank"),
-            ("小数", text.replace('"at_ms":0,', '"at_ms":0.0,', 1).encode("utf-8"), "float"),
-            ("重複キー", text.replace('"kind":"trial"', '"kind":"trial","kind":"trial"', 1).encode("utf-8"), "dup_key"),
-            ("試行が無い", "\n".join(text.split("\n")[:2]).encode("utf-8") + b"\n", "no_trial"),
-            ("空のファイル", b"", "empty"),
+            ("blank line", text.replace("\n", "\n\n", 1).encode("utf-8"), "blank"),
+            ("a decimal number", text.replace('"at_ms":0,', '"at_ms":0.0,', 1).encode("utf-8"), "float"),
+            ("duplicate key", text.replace('"kind":"trial"', '"kind":"trial","kind":"trial"', 1).encode("utf-8"), "dup_key"),
+            ("no trial present", "\n".join(text.split("\n")[:2]).encode("utf-8") + b"\n", "no_trial"),
+            ("empty file", b"", "empty"),
         ]
         for name, body, want in muts:
             found = validate_plan(body)
             codes = set(c for _, c, _ in found)
-            check("検査器が拒否する: %s" % name, want in codes, "期待 %s・実際 %s" % (want, sorted(codes)))
+            check("the validator rejects: %s" % name, want in codes, "expected %s, got %s" % (want, sorted(codes)))
         leak_found = []
         for leak_fn in (lambda r: r["steps"][0].__setitem__("key", "leakykey9"),
                         lambda r: r.__setitem__("phrase_id", "leakyvalue1"),
                         lambda r: r.__setitem__("leakyextra", 1)):
             one = validate_plan(first_trial(leak_fn))
-            check("陰性対照の材料が拒否される（漏れの検査の前提）", len(one) >= 1)
+            check("the negative-control material is rejected (a precondition for the leak check)", len(one) >= 1)
             leak_found.extend(one)
-        check("検査器の説明に値もキー名も出ない", all("leaky" not in m for _, _, m in leak_found))
+        check("the validator's description echoes neither the value nor the key name", all("leaky" not in m for _, _, m in leak_found))
 
-        # --- 公開関数と CLI の一致
+        # --- agreement between the public functions and the CLI
         out1 = os.path.join(tmp, "plan1.jsonl")
         out2 = os.path.join(tmp, "plan2.jsonl")
         me = os.path.abspath(__file__)
@@ -1200,13 +1214,13 @@ def selftest():
 
         base_args = ["--corpus", corpus_path, "--recipes", recipes_path, "--config", cfg_path, "--os", "macos"]
         rc, msg = run(*(base_args + ["--seed", "7", "--out", out1]))
-        check("CLI が計画を作る", rc == 0, msg[-200:])
+        check("the CLI builds a plan", rc == 0, msg[-200:])
         rc, msg = run(*(base_args + ["--seed", "7", "--out", out2]))
         with open(out1, "rb") as f1, open(out2, "rb") as f2:
             cli1, cli2 = f1.read(), f2.read()
-        check("CLI を 2 回回すとバイト一致（同じ seed でバイト一致）", cli1 == cli2 and len(cli1) > 100)
-        check("CLI の出力 = 関数の出力（config_sha256 は設定ファイルのバイト列の SHA-256）", cli1 == bytes1)
-        check("CLI の出力を --validate が通す", run("--validate", out1)[0] == 0)
+        check("running the CLI twice yields byte-identical output (same seed)", cli1 == cli2 and len(cli1) > 100)
+        check("the CLI output equals the function output (config_sha256 is the SHA-256 of the config file's bytes)", cli1 == bytes1)
+        check("the CLI output passes --validate", run("--validate", out1)[0] == 0)
         by_id = dict((p["phrase_id"], p) for p in corpus)
         mism = 0
         checked = 0
@@ -1221,38 +1235,38 @@ def selftest():
             checked += 1
             if dumps(got) != line:
                 mism += 1
-        check("build_trial を直接呼んだ結果と CLI の該当行が一致する", checked > 100 and mism == 0,
-              "確かめた %d 行・不一致 %d" % (checked, mism))
-        check("load_recipes / build_trial が公開されている", callable(load_recipes) and callable(build_trial))
+        check("calling build_trial directly matches the corresponding CLI row", checked > 100 and mism == 0,
+              "checked %d rows, %d mismatched" % (checked, mism))
+        check("load_recipes / build_trial are exported", callable(load_recipes) and callable(build_trial))
 
-        # --- CLI の入口
+        # --- CLI entry point
         bad_cfg = os.path.join(tmp, "bad_cfg.json")
         with open(bad_cfg, "wb") as f:
             f.write(json.dumps({"key_hold_ms": 60}).encode("utf-8"))
         rc, msg = run("--corpus", corpus_path, "--recipes", recipes_path, "--config", bad_cfg, "--os", "macos",
                       "--seed", "1", "--out", os.path.join(tmp, "x.jsonl"))
-        check("設定にキーが足りなければ exit 2", rc == 2, "exit %d" % rc)
+        check("a config missing keys exits 2", rc == 2, "exit %d" % rc)
         rc, msg = run("--validate", os.path.join(tmp, "no-such-file.jsonl"))
-        check("存在しない計画の --validate は exit 2", rc == 2, "exit %d" % rc)
+        check("--validate on a nonexistent plan exits 2", rc == 2, "exit %d" % rc)
         mut_path = os.path.join(tmp, "mut.jsonl")
         with open(mut_path, "wb") as f:
             f.write(muts[0][1])
         rc, msg = run("--validate", mut_path)
-        check("違反のある計画の --validate は exit 1（行番号つき）", rc == 1 and ":" in msg, "exit %d" % rc)
+        check("--validate on an invalid plan exits 1 (with a line number)", rc == 1 and ":" in msg, "exit %d" % rc)
         rc, msg = run("--seed", "1")
-        check("モードが無ければ exit 2", rc == 2, "exit %d" % rc)
+        check("no mode selected exits 2", rc == 2, "exit %d" % rc)
         rc, msg = run(*(base_args + ["--seed", "-3", "--out", os.path.join(tmp, "y.jsonl")]))
-        check("seed が負なら exit 2", rc == 2, "exit %d" % rc)
+        check("a negative seed exits 2", rc == 2, "exit %d" % rc)
 
-        # --- 見積もり
+        # --- estimate
         secs, lines = estimate(cfg, recipes, "macos")
-        check("--estimate（コーパス無し）が正の数", secs > 0 and lines[-1].endswith("："))
+        check("--estimate (no corpus) is positive", secs > 0 and lines[-1].endswith(":"))
         secs2, _ = estimate(cfg, recipes, "macos", corpus)
-        check("--estimate（コーパスあり）が正の数", secs2 > 0)
+        check("--estimate (with a corpus) is positive", secs2 > 0)
         rc, msg = run("--estimate", "--config", cfg_path, "--recipes", recipes_path, "--os", "macos")
         last = msg.strip().split("\n")[-1]
-        check("--estimate の最後の行が正の数 1 つだけ", rc == 0 and re.fullmatch(r"[0-9]+(\.[0-9]+)?", last) is not None
-              and float(last) > 0, "exit %d・最後の行 %s" % (rc, last))
+        check("the last line of --estimate is a single positive number", rc == 0 and re.fullmatch(r"[0-9]+(\.[0-9]+)?", last) is not None
+              and float(last) > 0, "exit %d, last line %s" % (rc, last))
     finally:
         for name in os.listdir(tmp):
             os.remove(os.path.join(tmp, name))
@@ -1261,9 +1275,9 @@ def selftest():
     if fails:
         for m in fails:
             print("FAIL " + m)
-        print("selftest 失敗 %d 件 / %d 件" % (len(fails), n[0]))
+        print("selftest failed: %d / %d" % (len(fails), n[0]))
         return 1
-    print("selftest OK（%d 件）" % n[0])
+    print("selftest OK (%d cases)" % n[0])
     return 0
 
 
@@ -1274,11 +1288,11 @@ def _read_json(path, what):
         with open(path, "rb") as f:
             raw = f.read()
     except OSError as e:
-        raise ValueError("%s を開けない（%s）" % (what, type(e).__name__))
+        raise ValueError("could not open %s (%s)" % (what, type(e).__name__))
     try:
         return raw, json.loads(raw.decode("utf-8"))
     except ValueError:
-        raise ValueError("%s が JSON として読めない" % what)
+        raise ValueError("%s is not readable as JSON" % what)
 
 
 def main(argv):
@@ -1287,7 +1301,7 @@ def main(argv):
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
         except Exception:
             pass
-    ap = argparse.ArgumentParser(description="plan/1 の生成器・検査器・見積もり")
+    ap = argparse.ArgumentParser(description="plan/1 generator, validator, and duration estimator")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--validate", metavar="PLAN")
     ap.add_argument("--estimate", action="store_true")
@@ -1306,30 +1320,30 @@ def main(argv):
             with open(args.validate, "rb") as f:
                 data = f.read()
         except OSError as e:
-            print("%s: 開けない（%s）" % (args.validate, type(e).__name__), file=sys.stderr)
+            print("%s: could not open (%s)" % (args.validate, type(e).__name__), file=sys.stderr)
             return 2
         found = validate_plan(data)
         for ln, code, msg in found[:50]:
             print("%s:%d: [%s] %s" % (args.validate, ln, code, msg), file=sys.stderr)
         if len(found) > 50:
-            print("%s: …ほか %d 件" % (args.validate, len(found) - 50), file=sys.stderr)
+            print("%s: ...and %d more" % (args.validate, len(found) - 50), file=sys.stderr)
         return 1 if found else 0
 
     generating = args.out is not None or args.seed is not None or args.corpus is not None
     if not args.estimate and not generating:
-        print("generate_plan.py: --selftest / --validate PLAN / --estimate / 生成（--corpus --recipes --config --os --seed --out）"
-              "のどれかを指定する", file=sys.stderr)
+        print("generate_plan.py: specify one of --selftest / --validate PLAN / --estimate / "
+              "generation (--corpus --recipes --config --os --seed --out)", file=sys.stderr)
         return 2
     try:
         if not args.recipes or not args.config or not args.os_name:
-            raise ValueError("--recipes・--config・--os が要る")
+            raise ValueError("--recipes, --config, and --os are required")
         recipes = load_recipes(args.recipes)
         recipes_sha256 = _sha_file(args.recipes)
-        raw_cfg, config = _read_json(args.config, "設定")
+        raw_cfg, config = _read_json(args.config, "config")
         normalize_config(config)
         unknown = unknown_config_keys(config)
         if unknown:
-            print("generate_plan.py: 設定の未知のキーは無視する: %s" % ", ".join(str(k) for k in unknown),
+            print("generate_plan.py: ignoring unknown config keys: %s" % ", ".join(str(k) for k in unknown),
                   file=sys.stderr)
         corpus = load_corpus(args.corpus) if args.corpus else None
         corpus_sha256 = _sha_file(args.corpus) if args.corpus else None
@@ -1341,9 +1355,9 @@ def main(argv):
             sys.stdout.flush()
             return 0
         if corpus is None or args.seed is None or not args.out:
-            raise ValueError("生成には --corpus・--seed・--out が要る")
+            raise ValueError("generation requires --corpus, --seed, and --out")
         if not 0 <= args.seed <= SEED_MAX:
-            raise ValueError("--seed は 0〜2^63-1 の整数")
+            raise ValueError("--seed must be an integer in 0..2^63-1")
         gen_warnings = []
         rows, _ = plan_rows(corpus, recipes, config, args.os_name, args.seed, hashlib.sha256(raw_cfg).hexdigest(),
                              recipes_sha256, corpus_sha256, warnings=gen_warnings)
@@ -1354,15 +1368,15 @@ def main(argv):
         return 2
     body = render_plan(rows)
     problems = validate_plan(body)
-    if problems:  # 自分の出力が自分の検査を通らないのは生成器の不具合
+    if problems:  # the generator's own output failing its own validation is an implementation defect
         for ln, code, msg in problems[:10]:
-            print("generate_plan.py: 生成した計画が検査に通らない %d 行目 [%s] %s" % (ln, code, msg), file=sys.stderr)
+            print("generate_plan.py: the generated plan fails validation at line %d [%s] %s" % (ln, code, msg), file=sys.stderr)
         return 2
     with open(args.out, "wb") as f:
         f.write(body)
     n_trial = sum(1 for r in rows if r["kind"] == "trial")
     n_block = sum(1 for r in rows if r["kind"] == "block")
-    print("計画を書いた: 試行 %d 件・ブロック %d 個（os=%s・seed=%d）" % (n_trial, n_block, args.os_name, args.seed))
+    print("wrote plan: %d trial(s), %d block(s) (os=%s, seed=%d)" % (n_trial, n_block, args.os_name, args.seed))
     return 0
 
 

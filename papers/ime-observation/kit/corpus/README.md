@@ -1,109 +1,139 @@
-# corpus — 青空文庫の句と読み
+# corpus — Aozora Bunko phrases and readings
 
-青空文庫（著作権切れ）のテキストから、シナリオが要求する長さの**句**を切り出し、**ひらがなの読み**を付けて
-`corpus/1`（[`../formats/FORMATS.md`](../formats/FORMATS.md)）で書き出す前処理。E1 は読みを打鍵列に、E2 は
-読みを「打った読み」（正解）にする。
+Preprocessing step that extracts **phrases** of the length each scenario requires from public-domain
+Aozora Bunko texts, attaches a **hiragana reading** to each phrase, and writes the result as `corpus/1`
+(see [`../formats/FORMATS.md`](../formats/FORMATS.md)). One accuracy experiment turns the reading into a
+key sequence; another treats the reading as the "typed reading" (ground truth).
 
-| ファイル | 役割 |
+| File | Role |
 |---|---|
-| `build_corpus.py` | 前処理の本体（`--src`〜書き出し / `--validate` / `--selftest`）。Python 標準ライブラリだけ（読みの付与に使う `sudachipy` を除く） |
-| `data/phrases.jsonl` | 本番の実行結果（**M0** でメインが置く。この issue では作らない） |
+| `build_corpus.py` | The preprocessing tool (`--src` through the write-out step / `--validate` / `--selftest`). Python standard library only (except `sudachipy`, used to assign readings) |
+| `data/phrases.jsonl` | The output of the production run (placed separately; not produced by this step) |
 
-## 使い方
+## Usage
 
 ```bash
-# 書き出し（本番は M0。既定のトークナイザは sudachi）
-python3 build_corpus.py --src <青空文庫の .txt を置いたディレクトリ> --out data/phrases.jsonl --seed 1 \
+# Write out the corpus (production runs use the default sudachi tokenizer).
+python3 build_corpus.py --src <directory of Aozora Bunko .txt files> --out data/phrases.jsonl --seed 1 \
     [--tokenizer sudachi|table:<json>] [--min-reading 6] [--max-reading 30] [--per-work 100]
 
-python3 build_corpus.py --validate data/phrases.jsonl   # corpus/1 の検査（違反で exit 1）
-python3 build_corpus.py --selftest                      # 辞書なしで回る（check.sh も回す）
+python3 build_corpus.py --validate data/phrases.jsonl   # check against corpus/1 (exit 1 on violation)
+python3 build_corpus.py --selftest                      # runs without a dictionary (check.sh runs this too)
 ```
 
-- `--src` は `*.txt`（**cp932**）を名前順に読む（サブディレクトリは見ない）。`work_id` は**ファイル名から**決める
-  （小文字化・英数字と `_` 以外を `_` に・32 字まで）。ASCII の英数字を含まない名前・同じ `work_id` になる 2 本は止まる。
-- 終了コード: 0 = 成功 / 1 = 不合格（検査の違反・句が 1 件も残らない） / 2 = 作れなかった・検査できなかった
-  （使い方の誤り・読めないファイル・`sudachipy` が無い）。★ 0 以外はすべて不合格。
+- `--src` reads `*.txt` files (**cp932**) in name order (subdirectories are not scanned). `work_id` is
+  derived **from the file name** (lowercased; non-alphanumeric characters other than `_` are replaced;
+  truncated to 32 characters). A name with no ASCII alphanumeric characters, or two files that collide on
+  the same `work_id`, stops the run.
+- Exit codes: 0 = success / 1 = rejected (a validation violation, or no phrase survived) / 2 = could not
+  build or validate (usage error, unreadable file, `sudachipy` unavailable). Any non-zero code counts as
+  rejection.
 
-## 処理の順序
+## Processing order
 
-1. **除く**: 冒頭の題・著者と「記号について」の枠（点線 2 本）／作品末尾の底本情報（`底本：` の行から後ろ）／
-   注記 `［＃…］`／ルビ `《…》` と `｜`。★ ルビは**原文の漢字を残して読みを捨てる**（読みはトークナイザが付ける）。
-   ⚠️ 点線 2 本の枠が見つからない作品（片方だけ・全く無い）は、代わりに**先頭の最初の空行までを捨て**、
-   stderr に警告を 1 行出す。
-2. **文に分ける**: `。` `！` `？`（続く `」` `』` `）` を含む）と行末で切る。終止記号と引用符 `「」『』` は外す。
-3. **節に分ける**: 読点 `、` と空白（全角を含む）で切る。節ごとに読みを付ける。
-4. **句にまとめる**: 読みがひらがなだけ・**旧仮名（ゐ・ゑ・ゕ・ゖ）を含まない**節を、読みの合計が
-   `--min-reading` に届くまで隣と束ねて 1 句にする（届いた時点で止める・`--max-reading` を超える束ねはしない）。
-   読みが不正な節・`--max-reading` を超える節はどの句にも入らない。`text` は原文の切れ端（束ねた節のあいだの
-   読点は残る）。
-5. **残す**: 読みが `^[ぁ-ゖー]+$` かつ旧仮名を含まない句のうち、**`text`（読点・空白を除く）が漢字
-   （`U+4E00`–`U+9FFF`・`U+3400`–`U+4DBF`）・ひらがな・カタカナ・長音 `ー`・`々` だけの句**。数字・英字・記号が
-   読みまたは `text` のどちらかに残る句は捨てる（実物の Sudachi は数字・英字にもカナの読みを付けうるため、
-   読みだけの判定では残ってしまう）。
-6. **抽出**: 作品ごとに `--per-work` 句まで。候補がそれ以下なら全部残る。
+1. **Strip**: the leading title and author lines and the "about these symbols" frame (two dashed rules) /
+   the colophon at the end of the work (from the `底本：` line onward) / annotation markers `［＃…］` /
+   ruby markers `《…》` and `｜`. Ruby is **discarded, keeping the underlying kanji** (the reading is
+   assigned by the tokenizer instead). Works where the frame of two dashed rules is not found (only one
+   rule, or none) fall back to discarding everything up to the first blank line and print a warning to
+   standard error.
+2. **Split into sentences**: on `。` `！` `？` (including any trailing `」` `』` `）`) and at line breaks.
+   Terminal punctuation and quotation marks `「」『』` are stripped.
+3. **Split into clauses**: on the reading-point `、` and whitespace (including full-width). Each clause is
+   assigned a reading.
+4. **Group into phrases**: clauses whose reading is hiragana-only and **does not contain a historical kana
+   character (`ゐ・ゑ・ゕ・ゖ`)** are merged with the following clause until the combined reading reaches
+   `--min-reading` (merging stops as soon as the minimum is reached; a merge is never allowed to exceed
+   `--max-reading`). A clause with an invalid reading, or one that alone exceeds `--max-reading`, joins no
+   phrase. `text` keeps the original substring (a reading-point between merged clauses is retained).
+5. **Retain**: phrases whose reading matches `^[ぁ-ゖー]+$` and contains no historical kana, and whose
+   `text` (with reading-points and whitespace stripped) consists only of kanji (`U+4E00`–`U+9FFF`,
+   `U+3400`–`U+4DBF`), hiragana, katakana, the long-vowel mark `ー`, or `々`. A phrase whose reading or
+   `text` still contains a digit, a Latin letter, or another symbol is dropped (a real Sudachi installation
+   can assign a katakana reading to digits and Latin letters, so relying on the reading alone would let such
+   phrases through).
+6. **Sample**: up to `--per-work` phrases per work. If fewer candidates remain, all of them are kept.
 
-`phrase_id` は `<work_id>-<文番号>-<句番号>`（**入力から決まる**。文番号は整形後の文の通し番号・句番号は
-その文の中の番号。どちらも 1 始まり）。
+`phrase_id` is `<work_id>-<sentence index>-<phrase index>` (**determined entirely by the input**: the
+sentence index is the running number of the sentence after normalization, the phrase index is the number
+within that sentence; both are 1-based).
 
-### seed の使い方
+### How the seed is used
 
-抽出は PRNG ではなく **`SHA-256("<seed>:<phrase_id>")` の小さい順に K 句**を選び、本文の順に戻す。
-Python の版や OS に依らず同じ結果になる。同じ入力・同じ `--seed` で出力は**バイト一致**し、`--seed` を変えると
-（候補が K を超える作品では）抽出が変わる。出力は UTF-8・LF・BOM なし・区切りに空白なし。
+Selection is not driven by a PRNG: it ranks candidates by the smallest `SHA-256("<seed>:<phrase_id>")` and
+keeps the top K, then restores the original order. The result is the same regardless of the Python version
+or operating system. For the same input and the same `--seed`, the output is **byte-identical**; changing
+`--seed` changes the selection whenever a work has more candidates than K. Output is UTF-8, LF line
+endings, no BOM, and no separators between fields.
 
-## トークナイザ
+## Tokenizers
 
-| `--tokenizer` | 中身 | ヘッダ |
+| `--tokenizer` | Behavior | Header |
 |---|---|---|
-| `sudachi`（既定） | SudachiPy（分割モード C）。読みのカタカナをひらがなに直す。読みが空の語は表記を使う | `tokenizer` = `sudachipy-<版>`・`dict` = `sudachidict_core-<版>`（どちらも `importlib.metadata` から） |
-| `table:<json>` | `{"表記": "ひらがなの読み"}` の最長一致。表に無い文字はそのまま残る（＝その節は捨てられる）。**辞書なしのテスト用** | `tokenizer` = `table`・`dict` = JSON のバイト列の SHA-256 |
+| `sudachi` (default) | SudachiPy (split mode C). Converts katakana readings to hiragana. Words with an empty reading fall back to their surface form | `tokenizer` = `sudachipy-<version>`, `dict` = `sudachidict_core-<version>` (both read via `importlib.metadata`) |
+| `table:<json>` | Longest-match substitution using `{"surface form": "hiragana reading"}`. Characters missing from the table are left unchanged (so that clause is dropped). **Used for dictionary-free testing** | `tokenizer` = `table`, `dict` = SHA-256 of the JSON file's bytes |
 
-⚠️ `sudachipy` は `SudachiTokenizer` の**中でだけ** import する（ファイル先頭に置かない）。入っていない機械で
-`--tokenizer sudachi` を選ぶと、Traceback ではなく exit 2 と説明で止まる。
+`sudachipy` is imported **only inside** `SudachiTokenizer` (never at module scope). On a machine without it
+installed, selecting `--tokenizer sudachi` stops with exit code 2 and an explanation rather than a
+traceback.
 
-## M0 の手順（コーパスの確定・メインと研究者）
+## Producing the corpus (finalizing the data set)
 
-⚠️ ループの worker はネットワークにも pip にも触れない。辞書の導入と本番の実行は M0 で人が行う。
+The loop workers used to build this tool have neither network nor `pip` access. Installing the dictionary
+and running the production build is done separately by a human.
 
-1. 作品を選ぶ・青空文庫から取得する（★ 研究者の承認）。`.txt`（cp932）を 1 つのディレクトリに置く。
-   ファイル名は ASCII の英数字にする（`work_id` になる）。
-2. venv を作る: `python3 -m venv .venv`（`.venv/` は git に入れない）。
-3. `pip install sudachipy sudachidict_core` → **版を記録**する（`pip freeze` の該当 2 行）→ `kit/corpus/requirements.txt` に pin する。
-4. 本番の実行: `python3 build_corpus.py --src <dir> --out data/phrases.jsonl --seed <N> --per-work <K>
-   [--min-reading <N> --max-reading <M>]`。
-5. `python3 build_corpus.py --validate data/phrases.jsonl` が exit 0 であること。
-6. **`experiment/data.md` に記録するもの（M0 で必須の 6 点）**: ① `--seed` ② `--per-work`
-   ③ `--min-reading`（既定を使うときもその値） ④ `--max-reading`（同上） ⑤ `data/phrases.jsonl` の **SHA-256**
-   ⑥ 3. の tokenizer・辞書の版。記録したら `data/phrases.jsonl` をコミットする。
-   以降の実行（E1 / E2）はこのファイルを読むだけで、辞書に依存しない。
+1. Select the source works and obtain them from Aozora Bunko (subject to approval). Place the `.txt` files
+   (cp932) in a single directory. File names should use ASCII alphanumeric characters (they become
+   `work_id`).
+2. Create a virtual environment: `python3 -m venv .venv` (`.venv/` is not committed).
+3. `pip install sudachipy sudachidict_core` → record the installed **versions** (the two matching lines
+   from `pip freeze`) → pin them in `kit/corpus/requirements.txt`.
+4. Run the production build: `python3 build_corpus.py --src <dir> --out data/phrases.jsonl --seed <N>
+   --per-work <K> [--min-reading <N> --max-reading <M>]`.
+5. Confirm `python3 build_corpus.py --validate data/phrases.jsonl` exits 0.
+6. **Record the following six items in the experiment data log**: (1) `--seed` (2) `--per-work`
+   (3) `--min-reading` (including the default value, if used) (4) `--max-reading` (same) (5) the
+   **SHA-256** of `data/phrases.jsonl` (6) the tokenizer and dictionary versions from step 3. Once recorded,
+   commit `data/phrases.jsonl`. Later runs (of the accuracy or reconstruction experiments) only read this
+   file and no longer depend on the dictionary.
 
-## 読みの誤りの扱い
+## Handling reading errors
 
-形態素解析の読みは誤りうる（固有名詞・同形異音の語など）。
+Morphological analysis can assign an incorrect reading (proper nouns, homographs, and similar cases).
 
-- **E1**（変換事象を測る）: 読みが原文と違っても、打鍵列として妥当なかなであれば足りる。
-- **E2**（漏洩の評価）: 正解は**打った読み**であって原文ではない。`text` は出所の記録で、正解には使わない。
+- **Accuracy evaluation** (which measures conversion events): a reading that differs from the source text
+  is acceptable as long as it is a valid key sequence for hiragana input.
+- **Reconstruction evaluation** (which measures leakage): the ground truth is the **typed reading**, not
+  the source text. `text` is kept only for provenance and is never used as ground truth.
 
-## 既知の限界
+## Known limitations
 
-- ⚠️ **同じ読みの句が複数ありうる**（別の `phrase_id`・同じ `reading`）。重複の除去はしていない。E2 の閉集合で
-  問題になるかは、使う側（issue 021）で確かめること。
-- `，`（全角コンマ）・`（`・`〔`・`※`（外字の注記を除いた跡）・`…` などの記号は節の中に残り、その節は捨てられる。
-  節の区切りは `、` と空白だけ。
-- 句は節の並びなので、節で区切れない長い 1 文（`--max-reading` 超え）は句にならない。
-- 旧字体・歴史的仮名遣いの**原文の表記は**変えない（トークナイザにそのまま渡す）。ただし**読みに旧仮名
-  （`ゐ`・`ゑ`・`ゕ`・`ゖ`）が付いた句は捨てる**（研究者判断 30）。旧字体・歴史的仮名遣いの作品で読みが
-  どうなるかは本物の辞書で確かめていない（M0 の作品選びで、出力の読みを目で見ること）。
+- **Duplicate readings across phrases are possible** (different `phrase_id`, same `reading`). Duplicates
+  are not removed; whether this matters depends on the downstream use of the closed-set attack.
+- Symbols such as `，` (full-width comma), `（`, `〔`, `※` (the trace left after stripping an external-glyph
+  annotation), and `…` remain inside a clause, so that clause is dropped. Clauses are only split on `、`
+  and whitespace.
+- Because a phrase is a run of clauses, a single long sentence with no clause break (exceeding
+  `--max-reading`) never becomes a phrase.
+- The **surface text** of archaic orthography and historical kana usage is left unchanged (passed through
+  to the tokenizer as-is). However, **a phrase whose reading contains a historical kana character** (`ゐ`,
+  `ゑ`, `ゕ`, `ゖ`) **is dropped**. How the reading comes out for works using archaic orthography has not
+  been verified against a real dictionary (inspect the readings by eye when selecting works for the
+  production run).
 
-## 検査
+## Checks
 
-- `bash ../check.sh` は `build_corpus.py --selftest` を回す（辞書なし・1 秒前後）。
-- selftest は表トークナイザで、注記・ルビ・題・枠・底本情報の除去、読みにカタカナ・数字・英字が残る句と長さが範囲外の句の
-  除外、節の束ね、同じ seed でのバイト一致、seed を変えたときの抽出の変化、`--validate` の陽性・陰性を確かめる。
-  ★ 加えて、`text` 側の字種判定（全角数字に読みが付いても捨てる）・旧仮名（ゐ・ゑ・ゕ・ゖ）を含む読みの除外・
-  ※（外字注記の跡）が句にならないこと・点線の枠が無い作品の空行までの切り詰めと警告・`--out` の置き場所が
-  作れない／`--src` のファイルが読めない（`OSError`）／表の JSON が深すぎる（`RecursionError`）ときに
-  Traceback ではなく exit 2 で止まることも確かめる（それぞれ陽性・陰性の対照つき）。
-- ⚠️ Sudachi の経路は**偽の `sudachipy`**（`sys.modules` に差す）でしか確かめていない（呼び出しの形・カタカナ→ひらがな・
-  版の記録）。本物の辞書での動作は M0 の実行で初めて確かめられる。
+- `bash ../check.sh` runs `build_corpus.py --selftest` (no dictionary needed; about one second).
+- The selftest covers: removal of annotations, ruby, the title, the frame, and the colophon; exclusion of
+  phrases whose reading still contains katakana, a digit, or a Latin letter, and of phrases outside the
+  length range; clause merging; byte-identical output for the same seed; a change in the selection when the
+  seed changes; and the positive and negative cases of `--validate`.
+  It also checks: character-class filtering on the `text` side (a phrase is dropped even if a full-width
+  digit is assigned a reading); exclusion of readings containing historical kana (`ゐ・ゑ・ゕ・ゖ`); that the
+  trace of an external-glyph annotation (※) never becomes part of a phrase; truncation to the first blank
+  line (with a warning) for a work with no frame; and that exit code 2 (rather than a traceback) is used
+  when `--out` cannot be created, when a `--src` file cannot be read (`OSError`), or when the table JSON is
+  too deeply nested (`RecursionError`) — each with a matching positive and negative case.
+- The Sudachi code path has been exercised only against a **fake `sudachipy`** module (injected into
+  `sys.modules`), covering the call shape, katakana-to-hiragana conversion, and version recording. Its
+  behavior against the real dictionary can only be confirmed during the production run.
