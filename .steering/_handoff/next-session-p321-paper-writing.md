@@ -33,6 +33,7 @@ Skill: verify-before-claiming・citation-ssot・reproducibility-discipline（論
 
 ## §2 次にやること（順番）
 
+0. ★ **研究者の照合結果を確認する**（判断 16）: `.steering/20260928-p321-reanalysis-paper/p434-human-check.md` の末尾が記入済みなら、論文用リポジトリの `data/li-coblenz-2026/README.md` に「著者が PDF と照合した」と追記する。未記入なら研究者に照合を依頼する。
 1. **EMSE の査読方式**（single / double-anonymous）・分量の規定・AI 利用の開示規程と、プレプリント・再現一式の扱いを公式ページで一次確認（⚠️ 出版社のページは curl / WebFetch が 403 → 実ブラウザで）。⚠️ 論文用リポジトリの git 履歴には著者のメールアドレスが入っている → 匿名査読なら GitHub を直接リンクせず、`git archive` で作った匿名の保存先を使う
 2. **[V178] の本文**（OA）を読む → 妥当性の節の書き方（7 つのガイドライン）。
 3. 原稿の骨組み（`outline.md` の構成）→ Results（表 1: R0 / R1 / R0′ / 差 / 区間）から書く。
