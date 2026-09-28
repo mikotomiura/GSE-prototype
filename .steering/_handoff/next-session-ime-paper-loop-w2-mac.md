@@ -1,5 +1,7 @@
 # 次セッション（Mac）— IME 論文: W2 の Mac 分（issue 004 / 007）をループで実行する
 
+> ⚠️★★★ **2026-09-29: この handoff は `next-session-ime-paper-mac.md` に置き換えた。そちらを読む。**
+
 > 作成: 2026-09-28（G-GEAR で W1 を merge し、W2 の G-GEAR 分を回し始めた時点）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/_issue-plan.md`（§2 波・§4 機械の割り当て・§7 config の注意）と `issues/004.md` / `issues/007.md`、詰まりは `blockers.md` B1〜B4、判断は `decisions.md` 判断 23〜26。状態は着手時に測り直す。
 
