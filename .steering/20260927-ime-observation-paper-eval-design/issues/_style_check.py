@@ -30,12 +30,14 @@ import tokenize
 
 FORBIDDEN = [
     ("gse", re.compile(r"(?<![A-Za-z0-9])gse(?![A-Za-z0-9])", re.IGNORECASE)),
+    # 識別子の頭に大文字で続く形（例 GseRefInput・gseFoo・GSEState）も拾う
+    ("gse", re.compile(r"(?<![A-Za-z0-9])(?:[Gg]se|GSE)(?=[A-Z])")),
     ("src-tauri", re.compile(r"src-tauri")),
     (".steering", re.compile(r"\.steering")),
     ("star", re.compile("★")),
     ("warning-sign", re.compile("⚠")),
     # 内部の番号（判断・issue・マイルストーン）は公開の読者に意味が無い
-    ("internal-ref", re.compile(r"(?<![A-Za-z0-9])(decision|issue)s?\s+#?\d{1,3}(?![0-9])", re.IGNORECASE)),
+    ("internal-ref", re.compile(r"(?<![A-Za-z0-9])(decision|issue|judge?ment)s?\s+#?\d{1,3}(?![0-9])", re.IGNORECASE)),
     ("internal-ref", re.compile(r"(?<![A-Za-z0-9_])M(1[0-3]|[0-9])(?![A-Za-z0-9_])")),
 ]
 CJK = re.compile("[　-〿぀-ヿ㐀-䶿一-鿿！-｠]")
@@ -349,9 +351,12 @@ def selftest():
     expect("py 禁止語 GSE は赤", "a.py", "# derived from the GSE logger\n", ["forbidden:gse"])
     expect("py 識別子の gse も赤", "a.py", "against_gse = 1\n", ["forbidden:gse"])
     expect("py gsettings のような語の一部は通る", "a.py", "# gsettings and diagnose\n", [])
+    expect("rs 語の頭の Gse＋大文字は赤", "a.rs", 'fn f() { let c = "GseRefInputImm"; }\n', ["forbidden:gse"])
+    expect("rs Gsettings のような語は通る", "a.rs", "// Gsettings and Gseq\n", [])
     expect("py 星印は赤", "a.py", "# ★ note\n", ["forbidden:star"])
     expect("py 内部の判断の番号は赤", "a.py", "# see decision 38\n", ["forbidden:internal-ref"])
     expect("py 内部の issue の番号は赤", "a.py", "# imported by issue 021\n", ["forbidden:internal-ref"])
+    expect("py judgment の番号も赤", "a.py", "# see judgment 39/2\n", ["forbidden:internal-ref"])
     expect("py マイルストーンの番号は赤", "a.py", "# confirmed in the M5 pilot\n", ["forbidden:internal-ref"])
     expect("py M を含む普通の語は通る", "a.py", "# MAP decoding and M-estimators\nx_M1a = 1\n", [])
     expect("rs 日本語のコメントは赤", "a.rs", "// " + J + "\nfn f() {}\n", ["japanese-prose"])
