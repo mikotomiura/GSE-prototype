@@ -74,7 +74,7 @@ GSE の NDJSON 行と**同じ名前・同じ形**（GSE 側の一次は `schema_
 
 ## `plan/1` — 生成器の出力
 
-- ヘッダ: `{"kind":"header","format":"plan/1","os":…,"seed":int,"generator_version":str,"config_sha256":<64 hex>}`
+- ヘッダ: `{"kind":"header","format":"plan/1","os":…,"seed":int,"generator_version":str,"config_sha256":<64 hex>,"recipes_sha256":<64 hex>,"corpus_sha256":<64 hex>}`
 - ブロック: `{"kind":"block","block_id":int,"speed":"slow"|"mid"|"fast","reset_ime":bool,"marker":[<keyname>…],"marker_gap_ms":int}`
 - 試行: `{"kind":"trial","trial_id":str,"block_id":int,"scenario":"S1"…"S15","speed":"slow"|"mid"|"fast","gap_before_ms":int,"think_ms":int,"phrase_id":str,"reading_len":int,"steps":[{"key":<keyname>,"at_ms":int,"down":bool}…],"intent":{…}}`
 - `gap_before_ms` = 前の試行の終わりからこの試行の先頭までの待ち、`marker_gap_ms` = マーカーのキーの間隔。
@@ -87,12 +87,15 @@ GSE の NDJSON 行と**同じ名前・同じ形**（GSE 側の一次は `schema_
 ### `plan/1` の型
 
 - ヘッダ: `os` ∈ {`macos`, `windows`} ／ `seed` は 0〜2^63−1 の整数 ／ `generator_version` は `^[0-9A-Za-z.+-]{1,32}$` ／
-  `config_sha256` は設定ファイルの**バイト列**の SHA-256（小文字の 16 進 64 桁）。
+  `config_sha256` / `recipes_sha256` / `corpus_sha256` はそれぞれ設定・recipes・コーパスのファイルの**バイト列**の
+  SHA-256（小文字の 16 進 64 桁）。★ 計画ごとに、どの版の手順と刺激で作ったかを束ねる（パイロットの後に recipes を
+  直す前提のため）。
 - ブロック: `block_id` は 0 から始まる連番（ファイル中の出現順）／ `reset_ime` は真偽値 ／ `marker` は `keyname` の配列
   （空でよい＝マーカーを送らない）／ `marker_gap_ms` は 0 以上の整数。
-- 試行: `trial_id` は `^t[0-9]{5,}$`（ファイル全体で 1 から始まる連番を 0 埋め。例 `t00001`）／ `block_id` はそれより前に
-  出たブロック行の `block_id` ／ `gap_before_ms`・`think_ms` は 0 以上の整数 ／ `phrase_id` は `corpus/1` の書式 ／
-  `reading_len` は読みの文字数（1 以上。ひらがなは BMP なので UTF-16 のコード単位数と同じ）。
+- 試行: `trial_id` は `^t[0-9]{5,}$`（ファイル全体で 1 から始まる連番を 0 埋め。例 `t00001`）／ `block_id` は**直前の
+  ブロック行**の `block_id`（試行はそのブロック行の後に続き、次のブロック行までがそのブロックの試行）／ `gap_before_ms`・`think_ms` は 0 以上の整数 ／ `phrase_id` は `corpus/1` の書式 ／
+  `reading_len` は**句の**読みの文字数（1 以上。ひらがなは BMP なので UTF-16 のコード単位数と同じ）。⚠️ 実際に打つ
+  読みとは限らない（S10 は前半だけ打つ・S12 は合成かな列）→ 打った読みは生成器の `typed_reading(...)` で取る。
 - `steps` の要素: `key` は `keyname` ／ `at_ms` は**試行の先頭からの相対**の 0 以上の整数で、配列の順に単調非減少 ／
   `down` は真偽値（押下 = `true`・離し = `false`。同じキーの押下と離しは対になる）。
 - `intent` は次の 8 キーを**すべて持つ**オブジェクト（未知のキーは持たない）。シナリオごとの値は `kit/gen/recipes.json` が決める。
@@ -100,7 +103,7 @@ GSE の NDJSON 行と**同じ名前・同じ形**（GSE 側の一次は `schema_
   | キー | 型 | 意味 |
   |---|---|---|
   | `commit` | `enter` / `digit` / `mouse` / `none` | 変換を確定する手段。確定しない試行（取消・全消去など）は `none` |
-  | `cand_index` | 0 以上の整数 または `null` | 確定する候補の 0 始まりの番号。候補を選ばずに確定する・確定しない試行は `null` |
+  | `cand_index` | 0 以上の整数 または `null` | 確定する候補の 0 始まりの番号。候補を選ばずに確定する・確定しない試行は `null`。予測候補を選ぶ試行（`predictive` が真）も `null`（予測候補の番号は数えない） |
   | `nav_count` | 0 以上の整数 | 変換中に送る矢印キーの数（使わない試行は 0） |
   | `abandon` | 真偽値 | 確定せずに変換を捨てる意図 |
   | `predictive` | 真偽値 | 予測候補を使う意図 |
