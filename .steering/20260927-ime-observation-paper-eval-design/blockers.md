@@ -30,3 +30,12 @@
 - W1 の実測: issue 001 の 1 attempt（worker ＋ watchdog 2 回）で **6,172,416 トークン**（キャッシュ込み）・**$2.68**。→ W2（G-GEAR 7 本）を 1 run に入れると、1 attempt ずつでも約 4,300 万 ＞ 4,000 万で**途中で止まりうる**。
 - G-GEAR に `flock` が無い（`command -v flock` が空）。`add_usage`（`loop-run.sh:617-624`）は flock が無いとロックなしで読み書きするので、`parallel` ≥ 2 では積算が**競合で少なく数えられ**、`token_ceiling` の停止が遅れうる（判定の合否には影響しない）。
 - 対応案: W2 を 2〜3 回の run に分ける（同じ波の issue どうしは独立なので分けてよい）・`parallel` は 1 のまま、または積算の不正確さを承知で上げる。
+- ★ 研究者の判断（2026-09-28）: W2 の G-GEAR 分は 2 run（002,003,010,016 → 008,011,015）・`parallel=1` で回す。
+
+## B5（2026-09-28・W2）010 は成果物が合格なのに、watchdog の空応答で `blocked` になった
+
+- 事象: 010 の attempt 1 で verify が緑になった後、watchdog が 2 回とも**空の応答**を返し、`loop-run.sh` が fail-closed で `blocked`（`watchdog の verdict を解釈できず`）にした。`issue_done` は出ていない。
+- 確認: worktree はクリーン・コミット 2 件。clean な checkout（`loop/010-issue` を detached）で `010-acceptance.sh` 失敗 0 件（✅ 14 件）・`check.sh` 緑。→ ★ **成果物は合格**。B3 のとおり watchdog はもともと何も再実行できないので、判定の材料は失われていない。
+- 影響: ⚠️ `deps_met` は events の `issue_done` だけを見るので、**010 に依存する 020（W5）は「依存 issue が未完」で起動しない**。⚠️ `issue_done` を手で書かない（events の writer は `loop-run.sh` だけ）。
+- 対応: 010 はメインの merge ゲート（clean な checkout の acceptance ＋ レビュー）を通して base へ merge する。W5 の前に、020 の起動の扱い（依存の書き方を変えるか、010 を `parse` に落として再実行するか）を研究者に問う。
+- ⚠️ **同じ形が W2b でも 2 本続いた**: 008（03:34）・011（03:46）も attempt 1 の verify の後に watchdog が空応答で `blocked`。→ W2 の `recheck` 5 本のうち 3 本（010 / 008 / 011）が watchdog で止まった。★ watchdog は B3 のとおり何も再実行できないので、止まるたびにメインの独立検証で置き換えている。残りの `recheck` の issue の `verify_level` をどうするかは研究者に問う。
