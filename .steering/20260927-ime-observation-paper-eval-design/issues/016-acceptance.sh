@@ -7,7 +7,7 @@ S="${K}/analysis/stats.py"
 
 echo "[016] 統計の部品"
 selftest_ok "${S}"
-need_grep "${S}" "クラスタ内相関で区間が広がる" "AC4 selftest ケース: クラスタ内相関で区間が広がる（陽性対照）"
+need_grep "${S}" "within-cluster correlation widens the interval" "AC4 selftest ケース: クラスタ内相関で区間が広がる（陽性対照）"
 
 cat > "${TMP}/known.py" <<'EOF'
 import importlib.util, sys
