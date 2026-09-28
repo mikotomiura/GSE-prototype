@@ -1,33 +1,46 @@
 #!/usr/bin/env python3
 # kit: selftest
-"""照合器と検出の指標: 正解側の変換セッション（gt_sessions.py の出力）と観測側の ime_shadow 行（obs/1）を
-時間区間の重なりで照合し、検出の適合率・再現率・F1・分割率・併合率を Wilson 95% CI つきで出す。
-Python 標準ライブラリだけ（統計は stats.py を import する。再実装しない）。
+"""Matching and detection metrics: pair the ground-truth composition sessions (gt_sessions.py's
+output) against the observation-side ime_shadow rows (obs/1) by the overlap of their time
+intervals, and report detection precision, recall, F1, split rate, and merge rate, each with a
+Wilson 95% confidence interval. Uses only the Python standard library (statistics are imported from
+stats.py and are not reimplemented here).
 
   match.py --sessions S.json --definition all|macos_def|windows_def --obs OBS --plan PLAN --oracle ORACLE
            [--config CFG.json] --out OUT.json
-  match.py --selftest      速い既定（数秒）
+  match.py --selftest      fast default (a few seconds)
 
-区間と照合（design.md §1.2 / §1.3）:
-  ・正解の区間 = [start_wall_ms, end_wall_ms]（壁時計 ms・両端を含む）。観測の区間 = [end - dwell_ms, end]、
-    end = t + obs_end_offset_ms（★ 判断 22: ime_shadow の t は drain した時刻で、変換の終端ではない。
-    既定 obs_end_offset_ms = 0 で [t - dwell_ms, t]。offset は区間全体を平行移動する（dwell_ms は長さ）。
-    終端の遅れの平均を打ち消すなら負の値: 遅れが 0〜100 ms の一様分布なら -50）。
-  ・IoU = 重なり / 和。1 対 1 = IoU >= iou_min（既定 0.5）を IoU の降順で貪欲に割り当てる。
-    同点は 正解の開始時刻 → 観測の開始時刻 → 内容 の昇順（★ 入力の並びに依らない: 出力も内容で整列する）。
-    長さ 0 の区間は、同じ点の長さ 0 の区間とだけ対になる。
-  ・分割 = 1 対 1 で対にならなかった正解 1 件に、未使用の観測 2 件以上が重なり、その観測の和集合（区間の集合として測る）
-    との IoU が iou_min 以上。併合 = その逆（観測 1 件に正解 2 件以上）。分割と併合の候補は、重なりで繋がる
-    未使用の項目ごとに、IoU の高い候補から 1 つずつ確定する（確定したら使った項目を外して候補を作り直す）。
-    残りの正解が取り逃し、残りの観測が偽検出。
-  ⚠️ **この定義の性質**（研究者が M3 で凍結する定義に関わる・直さない）: 各断片が単独で IoU >= iou_min にならない
-    ときだけ「分割」と数えられる。隣り合う 2 断片への分割は、大きい方（>= 50%）が 1 対 1 になり、残りは偽検出になる
-    （selftest「定義の性質」で固定）。併合も同様（一方が併合区間の >= 50% を占めると、その正解が対になり、
-    もう一方は取り逃しになる）。また観測の時刻がずれると、短いセッションほど対にならなくなる（長さ L の
-    セッションが対になるのは平行移動が L/3 以下のとき）。→ 数字が動く型なので、報告では層ごとに読むこと。
+Interval geometry and matching (see the design document):
+  - A ground-truth interval is [start_wall_ms, end_wall_ms] (wall-clock ms, inclusive of both ends).
+    An observation interval is [end - dwell_ms, end], where end = t + obs_end_offset_ms. The
+    ime_shadow row's t is the time the entry was drained, not necessarily the moment the composition
+    ended, so an offset may be needed; the default obs_end_offset_ms = 0 gives [t - dwell_ms, t]. The
+    offset translates the whole interval (dwell_ms remains the length); to cancel out an average
+    end-of-session lag, use a negative value (for a lag uniformly distributed over 0-100 ms, -50).
+  - IoU = overlap / union. A 1:1 pair requires IoU >= iou_min (default 0.5), assigned greedily in
+    descending order of IoU. Ties are broken by ground-truth start time, then observation start time,
+    then content, in ascending order, so the result does not depend on input order and the output is
+    itself sorted by content. A zero-length interval pairs only with another zero-length interval at
+    the same point.
+  - A split occurs when one ground-truth session that did not receive a 1:1 pair overlaps two or more
+    unused observations whose union (measured as a set of intervals) reaches IoU >= iou_min against
+    it. A merge is the mirror case (one observation, two or more ground-truth sessions). Split and
+    merge candidates are resolved one at a time, within each connected component of unused items
+    joined by overlap, always taking the candidate with the highest IoU first (each resolution
+    removes the items it used and the remaining candidates are recomputed). Whatever ground truth
+    remains is a miss; whatever observation remains is a false positive.
+  This definition has a fixed, documented property that is not treated as a defect: a fragment
+  counts toward a split only when no individual fragment on its own reaches IoU >= iou_min. Splitting
+  a session into two adjacent fragments therefore makes the larger fragment (>= 50%) a 1:1 pair and
+  leaves the other as a false positive (checked by the "definitional properties" selftest case). The
+  same holds for merges: when one side occupies >= 50% of the merged interval, that ground-truth
+  session becomes a 1:1 pair and the other side becomes a miss. Likewise, a timing offset makes
+  shorter sessions progressively less likely to pair (a session of length L pairs only while the
+  offset stays at or below L/3). Because these counts move with session length and offset, read them
+  per stratum in any report.
 
-Recount for split_rate / merge_rate (decision 38): the primary pairing above (used for "pairs", precision,
-recall and F1) is never changed. Separately, detection_metrics() takes a second pass over the leftover
+Recount for split_rate / merge_rate: the primary pairing above (used for "pairs", precision, recall
+and F1) is never changed. Separately, detection_metrics() takes a second pass over the leftover
 false_pos / miss items and reclassifies, for the purpose of split_rate / merge_rate only:
   (a) a false_pos row whose own length has a fraction >= theta covered by an already-paired ground-truth
       session's interval is counted as extra evidence that session was split;
@@ -40,48 +53,62 @@ n_split_gt_recount / n_merge_obs_recount / n_fp_as_split / n_miss_as_merge field
 item between match()'s pairs / split / merge / miss / false_pos buckets, so n_gt, n_obs, precision, recall
 and F1 are unaffected. See recount_split_merge() for the underlying computation.
 
-戻り値の形（★ 018 / 019 / 020 がこの形に依存する）:
-  match(...) = {"pairs": [{"gt", "obs", "iou"}], "split": [{"gt", "obs": [行…]}], "merge": [{"obs", "gt": [セッション…]}],
-                "miss": [セッション…], "false_pos": [行…]}
-  detection_metrics(result, strata, theta, obs_end_offset_ms) = 層ごとの [{"stratum", "n_gt", "n_obs", "n_pairs",
+Shape of the return value (downstream analyses depend on this shape):
+  match(...) = {"pairs": [{"gt", "obs", "iou"}], "split": [{"gt", "obs": [rows...]}], "merge": [{"obs", "gt": [sessions...]}],
+                "miss": [sessions...], "false_pos": [rows...]}
+  detection_metrics(result, strata, theta, obs_end_offset_ms) = per stratum, [{"stratum", "n_gt", "n_obs", "n_pairs",
     "n_split_gt", "n_split_obs", "n_merge_obs", "n_merge_gt", "n_miss", "n_false_pos", "n_split_gt_recount",
     "n_merge_obs_recount", "n_fp_as_split", "n_miss_as_merge", "precision", "recall", "f1", "split_rate",
-    "merge_rate", "miss_rate", "false_pos_rate"}]。各指標 = {"x", "n", "value", "lo", "hi"}（Wilson 95%・n = 0 は
-    値も区間も None）: 適合率 = 対 / 観測  再現率 = 対 / 正解
-      F1 = 2 x 対 / (正解 + 観測)（= 対に入った項目の割合。Wilson は近似だが、1 つの対が正解側と観測側の 2 つの
-      「成功」として数えられており独立でない。区間は目安として扱うこと — see decision 38's follow-up note below)
-      分割率 = (分割になった正解 + n_split_gt_recount) / 正解  併合率 = (併合になった観測 + n_merge_obs_recount) / 観測
-      取り逃し率 = 取り逃し / 正解  偽検出率 = 偽検出 / 観測。
-      n_gt = 対 + 分割の正解 + 併合の正解 + 取り逃し、 n_obs = 対 + 分割の観測 + 併合の観測 + 偽検出（this identity
-      partitions gt / obs into disjoint buckets and is unaffected by the theta recount above; n_fp_as_split and
-      n_miss_as_merge are informational breakdowns of n_false_pos / n_miss, not separate buckets).
+    "merge_rate", "miss_rate", "false_pos_rate"}]. Each metric is {"x", "n", "value", "lo", "hi"} (Wilson 95%;
+    n = 0 gives both value and interval as None): precision = pairs / observations  recall = pairs / ground truth
+      F1 = 2 x pairs / (ground truth + observations) (the fraction of items that ended up in a pair; the
+      Wilson approximation is inexact here because one pair counts as two "successes" (one on the
+      ground-truth side, one on the observation side) that are not independent, so its interval should
+      be read only as a rough guide -- see the note below)
+      split rate = (ground truth counted as split + n_split_gt_recount) / ground truth
+      merge rate = (observations counted as merge + n_merge_obs_recount) / observations
+      miss rate = misses / ground truth  false-positive rate = false positives / observations.
+      n_gt = pairs + split ground truth + merge ground truth + misses, n_obs = pairs + split
+      observations + merge observations + false positives (this identity partitions gt / obs into
+      disjoint buckets and is unaffected by the theta recount above; n_fp_as_split and n_miss_as_merge
+      are informational breakdowns of n_false_pos / n_miss, not separate buckets).
 
-CLI（--sessions は gt_sessions.py の出力・--definition でその中の 1 つを選ぶ）:
-  ・層 = (cell, scenario, speed)。scenario / speed は plan の試行から、cell は設定の "cell"（既定 = plan の os）。
-    試行に帰属できない項目（試行の外の偽検出など）は (cell, null, null)。併合は各正解を自分の層に数える
-    （merge_obs は先頭の正解の層・merge_gt は各正解それぞれの層。decision 38 follow-up）。
-  ・設定 CFG（JSON）: {"iou_min": 0.5, "obs_end_offset_ms": 0, "theta": 0.5, "clock_offsets_ms": {"<block_id>": ms},
-    "cell": "<ラベル>", "drop_start_while_open": false}。
-    Assumption: the ground-truth session timestamps (sessions.json) come from the same wall clock as the oracle
-    log (gt_sessions.py builds both from one t_wall_ms series); clock_offsets_ms corrects only for the gap
-    between that shared clock and the observation side's clock.
-    clock_offsets_ms は「観測側の時計 - 正解側の時計」（kit/pilot/clock_sync.py の obs - gt と同じ符号）。観測行の
-    "t" は常に元の値のまま変更せず、補正した時刻を常に別の欄 "t_gt_clock" に付ける（block が clock_offsets_ms に
-    無ければ補正 0 の t_gt_clock を付け、その block_id を出力の config.uncorrected_blocks に列挙する）。照合は
-    "t_gt_clock" があればそれを使う（obs_interval() を参照）。観測がどのブロックかは、補正後の時刻が oracle の
-    block_begin〜block_end に最も近いブロックで決める（補正がブロックの間隔より十分小さい前提）。
-  ・除外は**試行単位**（判断 28・区間では外さない）: excluded_by が空でないセッション、終わりの無いセッション
-    （open_at_end）、drop_start_while_open が true のとき n_start_while_open > 0 のセッション、および excluded の
-    要素の trial_ids に挙がった試行の正解と、その試行（oracle の trial_begin〜trial_end との最大の重なり）に入る
-    観測を照合から外す。理由ごとの件数を出力に残す（除外は全部報告する）。Note: a session with trial_id == null
-    (for example one dropped only via the open_at_end reason) can never appear in excluded[].trial_ids, so
-    observations that fall in that time window are not excluded by trial membership alone; only the ground-truth
-    session itself is dropped, and any nearby observation is still matched normally (it may end up false_pos).
-    n_start_while_open (diagnostic, judgment 28) is not used to exclude anything by default; kept-session counts
-    with n_start_while_open > 0 are reported per stratum in the output under "diagnostics.start_while_open".
-  ・出力は path を含まず、同じ入力なら同じバイト列（sort_keys・LF・UTF-8・BOM なし）。入力の SHA-256 を残す。
+CLI (--sessions is gt_sessions.py's output; --definition selects one of its definitions):
+  - A stratum is (cell, scenario, speed). scenario and speed come from the plan's trials; cell comes
+    from the configuration's "cell" (default: the plan's os). An item that cannot be attributed to a
+    trial (for example a false positive outside any trial) falls into (cell, null, null). A merge
+    counts each of its ground-truth sessions in its own stratum (merge_obs is counted only in the
+    stratum of the first ground-truth session; merge_gt is counted once per ground-truth session, in
+    each of their own strata).
+  - Configuration CFG (JSON): {"iou_min": 0.5, "obs_end_offset_ms": 0, "theta": 0.5,
+    "clock_offsets_ms": {"<block_id>": ms}, "cell": "<label>", "drop_start_while_open": false}.
+    Assumption: the ground-truth session timestamps (sessions.json) come from the same wall clock as
+    the oracle log (gt_sessions.py builds both from one t_wall_ms series); clock_offsets_ms corrects
+    only for the gap between that shared clock and the observation side's clock.
+    clock_offsets_ms is "observation-side clock minus ground-truth-side clock" (the same sign
+    convention as kit/pilot/clock_sync.py's obs minus gt). An observation row's "t" is never
+    rewritten; the corrected time is always attached in a separate field, "t_gt_clock" (a block
+    missing from clock_offsets_ms gets a zero-offset t_gt_clock, and its block_id is listed in the
+    output's config.uncorrected_blocks). Matching uses "t_gt_clock" whenever it is present (see
+    obs_interval()). Which block an observation belongs to is decided by which block's oracle
+    block_begin..block_end window the corrected time is closest to (assuming the correction is
+    comfortably smaller than the gap between blocks).
+  - Exclusion operates at the level of a trial, never an interval: a session is dropped, and any
+    observation assigned to the same trial (by greatest overlap with the oracle's
+    trial_begin..trial_end) is also dropped, whenever the session has a non-empty excluded_by, never
+    closed (open_at_end), or (when drop_start_while_open is true) has n_start_while_open > 0, or
+    belongs to a trial listed in one of the excluded entries' trial_ids. The output retains the count
+    for each reason (every exclusion is reported). Note: a session with trial_id == null (for example
+    one dropped only via the open_at_end reason) can never appear in excluded[].trial_ids, so
+    observations that fall in that time window are not excluded by trial membership alone; only the
+    ground-truth session itself is dropped, and any nearby observation is still matched normally (it
+    may end up false_pos). n_start_while_open (a diagnostic field) is not used to exclude anything by
+    default; kept-session counts with n_start_while_open > 0 are reported per stratum in the output
+    under "diagnostics.start_while_open".
+  - The output never includes a path, and identical input always yields identical output bytes
+    (sort_keys, LF, UTF-8, no BOM). The input files' SHA-256 hashes are retained.
 
-exit: 0 = 出力した / 2 = 入力が読めない・使い方の誤り。
+Exit status: 0 on success; 2 if an input cannot be read or usage is incorrect.
 """
 import argparse
 import hashlib
@@ -95,8 +122,8 @@ from bisect import bisect_left, bisect_right
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
-import gt_sessions  # noqa: E402  oracle の読み取りと InputError を流用する
-import stats  # noqa: E402  ★ Wilson は stats.wilson を使う（再実装しない）
+import gt_sessions  # noqa: E402  reuses its oracle parser and InputError
+import stats  # noqa: E402  the Wilson interval is provided by stats.wilson and is not reimplemented here
 
 InputError = gt_sessions.InputError
 SCENARIO_RE = re.compile(r"^S([1-9]|1[0-5])$")
@@ -105,7 +132,7 @@ CELL_RE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
 DEFINITIONS = ("all", "macos_def", "windows_def")
 
 
-# ---------------------------------------------------------------- 区間の幾何
+# ---------------------------------------------------------------- interval geometry
 
 def _is_int(v):
     return type(v) is int
@@ -113,18 +140,19 @@ def _is_int(v):
 
 def _check_iou_min(v):
     if isinstance(v, bool) or not isinstance(v, (int, float)) or not (0.0 < v <= 1.0):
-        raise ValueError("iou_min は 0 より大きく 1 以下の数")
+        raise ValueError("iou_min must be a number greater than 0 and at most 1")
 
 
 def gt_interval(s, where="gt"):
-    """正解セッションの区間 (lo, hi)。整数でない・終わりが無い（open_at_end）・逆順は ValueError。"""
+    """The interval (lo, hi) of a ground-truth session. Raises ValueError if either bound is not an
+    integer, the session has no end (open_at_end), or the bounds are reversed."""
     if not isinstance(s, dict):
-        raise ValueError("%s: セッションはオブジェクト" % where)
+        raise ValueError("%s: a session must be an object" % where)
     lo, hi = s.get("start_wall_ms"), s.get("end_wall_ms")
     if not (_is_int(lo) and _is_int(hi)):
-        raise ValueError("%s: start_wall_ms / end_wall_ms が整数でない（終わりの無い open_at_end は呼び出し側で外す）" % where)
+        raise ValueError("%s: start_wall_ms / end_wall_ms is not an integer (the caller must filter out an unclosed open_at_end session)" % where)
     if hi < lo:
-        raise ValueError("%s: end_wall_ms が start_wall_ms より前" % where)
+        raise ValueError("%s: end_wall_ms precedes start_wall_ms" % where)
     return (lo, hi)
 
 
@@ -133,22 +161,22 @@ def obs_interval(row, obs_end_offset_ms=0, where="obs"):
     translates the whole interval; dwell_ms is the length). t_ref is row["t_gt_clock"] when present (the
     observation clock translated into the ground-truth clock; the CLI always attaches it) and row["t"]
     otherwise. Note: "t" itself is always the raw, uncorrected value; any clock correction only ever
-    appears in t_gt_clock (decision 38 follow-up)."""
+    appears in t_gt_clock."""
     if not isinstance(row, dict):
-        raise ValueError("%s: 観測行はオブジェクト" % where)
+        raise ValueError("%s: an observation row must be an object" % where)
     t = row.get("t_gt_clock")
     if t is None:
         t = row.get("t")
     d = row.get("dwell_ms")
     if not (_is_int(t) and _is_int(d)) or d < 0:
-        raise ValueError("%s: t / dwell_ms が整数でない（dwell_ms は 0 以上）" % where)
+        raise ValueError("%s: t / dwell_ms is not an integer (dwell_ms must be non-negative)" % where)
     end = t + obs_end_offset_ms
     return (end - d, end)
 
 
 def _check_theta(v):
     if isinstance(v, bool) or not isinstance(v, (int, float)) or not (0.0 < v <= 1.0):
-        raise ValueError("theta は 0 より大きく 1 以下の数")
+        raise ValueError("theta must be a number greater than 0 and at most 1")
 
 
 def _covered_frac(inner, outer):
@@ -162,7 +190,8 @@ def _covered_frac(inner, outer):
 
 
 def _iou(a, b):
-    """閉区間 a, b の IoU（重なり / 和）。離れていれば 0。長さ 0 同士が同じ点なら 1。"""
+    """The IoU (overlap / union) of two closed intervals a and b. 0 when they do not overlap; 1 when
+    both have zero length at the same point."""
     inter = min(a[1], b[1]) - max(a[0], b[0])
     if inter < 0:
         return 0.0
@@ -173,13 +202,15 @@ def _iou(a, b):
 
 
 def _overlaps(a, b):
-    """1 対 1 の候補にも分割 / 併合の候補にも入る「重なり」: 正の長さで重なる、または同じ点の長さ 0 同士。"""
+    """The notion of "overlap" used for both 1:1 candidates and split / merge candidates: a
+    positive-length overlap, or two zero-length intervals at the same point."""
     inter = min(a[1], b[1]) - max(a[0], b[0])
     return inter > 0 or (a[0] == a[1] == b[0] == b[1])
 
 
 def _segments(ivs):
-    """区間の列 → 互いに素な区間の列（重なる・接する区間は 1 つにまとめる）。"""
+    """Turn a list of intervals into a list of disjoint intervals (overlapping or touching intervals
+    are merged into one)."""
     out = []
     for lo, hi in sorted(ivs):
         if out and lo <= out[-1][1]:
@@ -191,7 +222,8 @@ def _segments(ivs):
 
 
 def _group_iou(segs, iv):
-    """区間の集合 segs（互いに素）と区間 iv の IoU（集合の測度で測る: 隙間は数えない）。"""
+    """The IoU between a set of disjoint intervals segs and a single interval iv, measured by set
+    measure (gaps between the segments are not counted)."""
     a = sum(hi - lo for lo, hi in segs)
     b = iv[1] - iv[0]
     inter = sum(max(0, min(hi, iv[1]) - max(lo, iv[0])) for lo, hi in segs)
@@ -203,11 +235,12 @@ def _dump(x):
     return json.dumps(x, sort_keys=True, ensure_ascii=False, default=str)
 
 
-# ---------------------------------------------------------------- 照合
+# ---------------------------------------------------------------- matching
 
 def _resolve_groups(unpaired_g, unpaired_o, adj_g, adj_o, g_iv, o_iv, gkey, okey, iou_min):
-    """対にならなかった正解 / 観測を、重なりで繋がる成分ごとに分割・併合へ振り分ける。
-    戻り値: (splits = [(gi, [oi…])], merges = [(oi, [gi…])])。"""
+    """Assign unpaired ground truth / observations to splits and merges, one connected component
+    (joined by overlap) at a time.
+    Returns (splits = [(gi, [oi, ...])], merges = [(oi, [gi, ...])])."""
     ug, uo = set(unpaired_g), set(unpaired_o)
     seen_g = set()
     splits, merges = [], []
@@ -262,14 +295,16 @@ def _resolve_groups(unpaired_g, unpaired_o, adj_g, adj_o, g_iv, o_iv, gkey, okey
 
 
 def match(gt_sessions, obs_rows, iou_min=0.5, obs_end_offset_ms=0):
-    """正解セッションの配列と ime_shadow 行の配列を照合する（決定的・入力の並びに依らない）。
+    """Match an array of ground-truth sessions against an array of ime_shadow rows (deterministic;
+    independent of input order).
 
-    gt_sessions: sessions.json の definitions[<定義>] の中身（配列）。obs_rows: ime_shadow 行の配列。
-    戻り値は {"pairs", "split", "merge", "miss", "false_pos"}（モジュールの docstring を参照）。
+    gt_sessions: the contents of one of sessions.json's definitions[<definition>] entries (an
+    array). obs_rows: an array of ime_shadow rows. Returns {"pairs", "split", "merge", "miss",
+    "false_pos"}; see the module docstring.
     """
     _check_iou_min(iou_min)
     if not _is_int(obs_end_offset_ms):
-        raise ValueError("obs_end_offset_ms は整数（ms）")
+        raise ValueError("obs_end_offset_ms must be an integer (ms)")
     gts, obs = list(gt_sessions), list(obs_rows)
     g_iv = [gt_interval(s, "gt_sessions[%d]" % i) for i, s in enumerate(gts)]
     o_iv = [obs_interval(r, obs_end_offset_ms, "obs_rows[%d]" % i) for i, r in enumerate(obs)]
@@ -324,7 +359,7 @@ def match(gt_sessions, obs_rows, iou_min=0.5, obs_end_offset_ms=0):
 
 
 def recount_split_merge(result, theta=0.5, obs_end_offset_ms=0):
-    """Second pass over match()'s leftover items for split_rate / merge_rate (decision 38 follow-up).
+    """Second pass over match()'s leftover items for split_rate / merge_rate.
 
     The primary 1:1 pairing in match() is never revisited here. This function only looks for extra
     evidence among the items match() already left in "false_pos" / "miss":
@@ -376,7 +411,7 @@ def recount_split_merge(result, theta=0.5, obs_end_offset_ms=0):
     return {"split": split, "merge": merge}
 
 
-# ---------------------------------------------------------------- 検出の指標
+# ---------------------------------------------------------------- detection metrics
 
 def _prop(x, n):
     lo, hi = stats.wilson(x, n)
@@ -388,7 +423,7 @@ def _f1_prop(pairs, n_gt, n_obs):
     twice (once toward the ground-truth side, once toward the observation side), so its two "successes" are
     perfectly correlated rather than independent Bernoulli trials. Feeding stats.wilson(2*pairs, n_gt+n_obs)
     would treat them as independent and understate the true uncertainty, so lo/hi are left None here
-    (decision 38 follow-up) instead of being reported as a Wilson interval that is not one."""
+    instead of being reported as a Wilson interval that is not one."""
     n = n_gt + n_obs
     return {"x": 2 * pairs, "n": n, "value": (2.0 * pairs / n if n else None), "lo": None, "hi": None,
             "note": "interval intentionally omitted: the doubled pair count is not an independent-trials proportion"}
@@ -421,12 +456,14 @@ def _metrics_row(label, c, names):
 
 
 def detection_metrics(result, strata=None, theta=0.5, obs_end_offset_ms=0):
-    """match() の戻り値 → 層ごとの検出の指標（モジュールの docstring を参照）。
+    """Turn match()'s return value into per-stratum detection metrics; see the module docstring.
 
-    strata: None（全部で 1 層 "all"）または {"gt": セッション → ラベル, "obs": 観測行 → ラベル,
-    "names": [ラベルの各要素の名前]（任意）}。ラベルはハッシュできる値（タプル可）か None。
-    対・分割・取り逃しは正解の層、併合は observed 行が先頭（最も早い）正解の層に数え、併合の各正解は
-    それぞれ自分自身の層に数える（decision 38 follow-up）。偽検出は観測の層に数える。
+    strata: None (everything in a single stratum, "all") or {"gt": session -> label, "obs":
+    observation row -> label, "names": [a name for each element of the label] (optional)}. A label
+    is any hashable value (a tuple is fine) or None. Pairs, splits, and misses are counted in the
+    ground-truth session's stratum; a merge is counted (as merge_obs) in the stratum of its earliest
+    ground-truth session, while each of its ground-truth sessions is also counted (as merge_gt) in
+    its own stratum. False positives are counted in the observation row's stratum.
 
     theta / obs_end_offset_ms: passed straight through to recount_split_merge() to compute the
     n_split_gt_recount / n_merge_obs_recount / n_fp_as_split / n_miss_as_merge fields and split_rate /
@@ -484,21 +521,21 @@ def detection_metrics(result, strata=None, theta=0.5, obs_end_offset_ms=0):
     return [_metrics_row(L, counts[L], names) for L in labels]
 
 
-# ---------------------------------------------------------------- 入力の読み取り（CLI）
+# ---------------------------------------------------------------- input parsing (CLI)
 
 def _no_float(_s):
-    raise InputError("小数・指数表記の数は読まない")
+    raise InputError("fractional or exponential numbers are not accepted")
 
 
 def _no_constant(_s):
-    raise InputError("NaN / Infinity は読まない")
+    raise InputError("NaN and Infinity are not accepted")
 
 
 def _no_dup(pairs, where):
     out = {}
     for k, v in pairs:
         if k in out:
-            raise InputError("%s: 同じキーが 2 回ある" % where)
+            raise InputError("%s: the same key appears twice" % where)
         out[k] = v
     return out
 
@@ -510,14 +547,14 @@ def _json_loads(text, where, allow_float):
     except InputError:
         raise
     except (ValueError, RecursionError):
-        raise InputError("%s: JSON として読めない" % where)
+        raise InputError("%s: not valid JSON" % where)
 
 
 def _decode(data, what):
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError:
-        raise InputError("%s: UTF-8 として読めない" % what)
+        raise InputError("%s: not valid UTF-8" % what)
 
 
 def _jsonl(data, what):
@@ -530,89 +567,93 @@ def _jsonl(data, what):
 
 
 def parse_obs(data):
-    """obs/1 → ime_shadow 行の配列（{"type","t","dwell_ms","nav","abandon"} だけ。key 行は読まない）。"""
+    """Parse obs/1 into an array of ime_shadow rows ({"type", "t", "dwell_ms", "nav", "abandon"}
+    only; key rows are not read)."""
     lines = _jsonl(data, "obs")
     if not lines:
-        raise InputError("obs: 空のファイル")
+        raise InputError("obs: empty file")
     hdr = lines[0][1]
     if not (isinstance(hdr, dict) and hdr.get("type") == "meta" and hdr.get("format") == "obs/1"):
-        raise InputError("obs: 1 行目が obs/1 のヘッダでない")
+        raise InputError("obs: line 1 is not an obs/1 header")
     rows = []
     for n, row in lines[1:]:
         if not isinstance(row, dict):
-            raise InputError("obs:%d: オブジェクトでない" % n)
+            raise InputError("obs:%d: not an object" % n)
         if row.get("type") != "ime_shadow":
             continue
         t, d, nav, ab = row.get("t"), row.get("dwell_ms"), row.get("nav"), row.get("abandon")
         if not (_is_int(t) and _is_int(d) and _is_int(nav) and type(ab) is bool) or t < 0 or d < 0 or nav < 0:
-            raise InputError("obs:%d: ime_shadow の t / dwell_ms / nav / abandon の型が違う" % n)
+            raise InputError("obs:%d: ime_shadow's t / dwell_ms / nav / abandon has the wrong type" % n)
         rows.append({"type": "ime_shadow", "t": t, "dwell_ms": d, "nav": nav, "abandon": ab})
     return rows
 
 
 def parse_plan_strata(data):
-    """plan/1 → {"os", "sha256", "trials": {trial_id: {"block_id", "scenario", "speed"}}}（層の決定に要る欄だけ）。"""
+    """Parse plan/1 into {"os", "sha256", "trials": {trial_id: {"block_id", "scenario", "speed"}}},
+    keeping only the fields needed to determine strata."""
     lines = _jsonl(data, "plan")
     if not lines:
-        raise InputError("plan: 空のファイル")
+        raise InputError("plan: empty file")
     hdr = lines[0][1]
     if not (isinstance(hdr, dict) and hdr.get("kind") == "header" and hdr.get("format") == "plan/1"):
-        raise InputError("plan: 1 行目が plan/1 のヘッダでない")
+        raise InputError("plan: line 1 is not a plan/1 header")
     if hdr.get("os") not in ("macos", "windows"):
-        raise InputError("plan: ヘッダの os が macos / windows でない")
+        raise InputError("plan: the header's os is neither macos nor windows")
     trials = {}
     for n, row in lines[1:]:
         if not isinstance(row, dict) or row.get("kind") != "trial":
             continue
         tid, bid, sc, sp = row.get("trial_id"), row.get("block_id"), row.get("scenario"), row.get("speed")
         if not isinstance(tid, str) or not gt_sessions.TRIAL_ID_RE.fullmatch(tid):
-            raise InputError("plan:%d: trial_id の形が違う" % n)
+            raise InputError("plan:%d: trial_id has the wrong shape" % n)
         if tid in trials:
-            raise InputError("plan:%d: trial_id が重複している" % n)
+            raise InputError("plan:%d: duplicate trial_id" % n)
         if not _is_int(bid) or not isinstance(sc, str) or not SCENARIO_RE.fullmatch(sc) or sp not in SPEEDS:
-            raise InputError("plan:%d: block_id / scenario / speed の形が違う" % n)
+            raise InputError("plan:%d: block_id / scenario / speed has the wrong shape" % n)
         trials[tid] = {"block_id": bid, "scenario": sc, "speed": sp}
     return {"os": hdr["os"], "sha256": hashlib.sha256(data).hexdigest(), "trials": trials}
 
 
 def parse_sessions(data, definition):
-    """sessions.json → (src, definition のセッションの配列, excluded の配列)。★ 判断 28 の欄が無ければ拒否する。"""
+    """Parse sessions.json into (src, the sessions array for the given definition, the excluded
+    array). Rejects input whose sessions are missing the fields introduced for trial-level exclusion
+    tracking."""
     obj = _json_loads(_decode(data, "sessions"), "sessions", True)
     if not isinstance(obj, dict) or not isinstance(obj.get("definitions"), dict):
-        raise InputError("sessions: definitions が無い（gt_sessions.py の出力でない）")
+        raise InputError("sessions: missing definitions (not gt_sessions.py's output)")
     if definition not in DEFINITIONS:
-        raise InputError("definition は all / macos_def / windows_def")
+        raise InputError("definition must be all, macos_def, or windows_def")
     sess = obj["definitions"].get(definition)
     if sess is None:
-        raise InputError("sessions: definitions.%s が null（この src では作れない定義）" % definition)
+        raise InputError("sessions: definitions.%s is null (this definition cannot be built for this src)" % definition)
     if not isinstance(sess, list):
-        raise InputError("sessions: definitions.%s が配列でない" % definition)
+        raise InputError("sessions: definitions.%s is not an array" % definition)
     for i, s in enumerate(sess):
         if not isinstance(s, dict) or not isinstance(s.get("excluded_by"), list):
-            raise InputError("sessions: definitions.%s[%d] に excluded_by が無い（古い出力・gt_sessions.py で作り直す）" % (definition, i))
+            raise InputError("sessions: definitions.%s[%d] is missing excluded_by (a stale output; rebuild it with gt_sessions.py)" % (definition, i))
         if not _is_int(s.get("start_wall_ms")) or not (s.get("end_wall_ms") is None or _is_int(s.get("end_wall_ms"))):
-            raise InputError("sessions: definitions.%s[%d] の start_wall_ms / end_wall_ms の型が違う" % (definition, i))
+            raise InputError("sessions: definitions.%s[%d] has the wrong type for start_wall_ms / end_wall_ms" % (definition, i))
         nswo = s.get("n_start_while_open")
         if not (_is_int(nswo) and nswo >= 0):
-            raise InputError("sessions: definitions.%s[%d] に n_start_while_open (0 以上の整数) が無い（古い出力・gt_sessions.py で作り直す）" % (definition, i))
+            raise InputError("sessions: definitions.%s[%d] is missing n_start_while_open (a non-negative integer; a stale output, rebuild it with gt_sessions.py)" % (definition, i))
     exc = obj.get("excluded")
     if not isinstance(exc, list) or any(
             not isinstance(e, dict) or not isinstance(e.get("type"), str) or not isinstance(e.get("trial_ids"), list)
             for e in exc):
-        raise InputError("sessions: excluded の各要素に type と trial_ids が要る（古い出力・gt_sessions.py で作り直す）")
+        raise InputError("sessions: every excluded entry must have type and trial_ids (a stale output; rebuild it with gt_sessions.py)")
     return obj.get("src"), sess, exc
 
 
 def parse_config(data):
-    """設定 JSON（None なら既定）→ {"iou_min", "obs_end_offset_ms", "theta", "clock_offsets_ms": {int: int},
-    "cell", "drop_start_while_open"}。"""
+    """Parse the configuration JSON (defaults if None) into {"iou_min", "obs_end_offset_ms", "theta",
+    "clock_offsets_ms": {int: int}, "cell", "drop_start_while_open"}."""
     cfg = {"iou_min": 0.5, "obs_end_offset_ms": 0, "theta": 0.5, "clock_offsets_ms": {}, "cell": None,
            "drop_start_while_open": False}
     if data is None:
         return cfg
     obj = _json_loads(_decode(data, "config"), "config", True)
     if not isinstance(obj, dict):
-        raise InputError("config: 最上位はオブジェクト")
+        raise InputError("config: the top level must be an object")
     for k, v in obj.items():
         if k.startswith("_"):
             continue
@@ -624,7 +665,7 @@ def parse_config(data):
             cfg[k] = v
         elif k == "obs_end_offset_ms":
             if not _is_int(v):
-                raise InputError("config: obs_end_offset_ms は整数")
+                raise InputError("config: obs_end_offset_ms must be an integer")
             cfg[k] = v
         elif k == "theta":
             try:
@@ -634,21 +675,21 @@ def parse_config(data):
             cfg[k] = v
         elif k == "clock_offsets_ms":
             if not isinstance(v, dict):
-                raise InputError("config: clock_offsets_ms はオブジェクト（block_id → ms）")
+                raise InputError("config: clock_offsets_ms must be an object (block_id to ms)")
             for bk, bv in v.items():
                 if not re.fullmatch(r"[0-9]{1,9}", bk) or not _is_int(bv):
-                    raise InputError("config: clock_offsets_ms は 10 進の block_id → 整数 ms")
+                    raise InputError("config: clock_offsets_ms keys must be decimal block_ids mapping to integer ms")
                 cfg[k][int(bk)] = bv
         elif k == "cell":
             if not isinstance(v, str) or not CELL_RE.fullmatch(v):
-                raise InputError("config: cell は ^[A-Za-z0-9_.+-]{1,64}$")
+                raise InputError("config: cell must match ^[A-Za-z0-9_.+-]{1,64}$")
             cfg[k] = v
         elif k == "drop_start_while_open":
             if type(v) is not bool:
-                raise InputError("config: drop_start_while_open は真偽値")
+                raise InputError("config: drop_start_while_open must be a boolean")
             cfg[k] = v
         else:
-            raise InputError("config: 未知のキー '%s'" % k)
+            raise InputError("config: unknown key '%s'" % k)
     return cfg
 
 
@@ -668,7 +709,8 @@ def _block_windows(oracle):
 
 
 def _assign_block(t, wins, offsets):
-    """補正後の t が最も近い（区間の中なら距離 0）ブロック。同じ距離なら block_id の小さい方。"""
+    """The block whose window the corrected t is closest to (distance 0 when inside the window);
+    ties go to the smaller block_id."""
     best = None
     for b in sorted(wins):
         tc = t - offsets.get(b, 0)
@@ -680,7 +722,9 @@ def _assign_block(t, wins, offsets):
 
 
 def _assign_trial(lo, hi, trials, begins):
-    """区間と最大の重なりを持つ試行の trial_id（同点は先の試行）。無ければ None。trials は開始の昇順・互いに素。"""
+    """The trial_id of the trial with the greatest overlap with the given interval (ties go to the
+    earlier trial); None if no trial overlaps. trials must be sorted by start time and pairwise
+    disjoint."""
     best, best_ov = None, 0
     i = bisect_right(begins, hi) - 1
     while i >= 0:
@@ -696,14 +740,15 @@ def _assign_trial(lo, hi, trials, begins):
 
 
 def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, config_bytes=None):
-    """CLI の中身（バイト列 → 出力の辞書）。同じ入力なら同じ辞書。"""
+    """The CLI's core logic (bytes in, an output dict out). Identical input always yields an
+    identical dict."""
     src, sess, excluded = parse_sessions(sessions_bytes, definition)
     cfg = parse_config(config_bytes)
     plan = parse_plan_strata(plan_bytes)
     oracle = gt_sessions.parse_oracle(oracle_bytes)
     want = oracle["plan_sha256"]
     if not isinstance(want, str) or want.lower() != plan["sha256"]:
-        raise InputError("plan: SHA-256 が oracle のヘッダの plan_sha256 と違う（対応しない計画）")
+        raise InputError("plan: SHA-256 does not match the oracle header's plan_sha256 (unrelated plan)")
     rows = parse_obs(obs_bytes)
     cell = cfg["cell"] if cfg["cell"] is not None else plan["os"]
     off_end = cfg["obs_end_offset_ms"]
@@ -712,9 +757,9 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
     wins = _block_windows(oracle)
     for b in offsets:
         if b not in wins:
-            raise InputError("config: clock_offsets_ms の block_id %d が oracle に無い" % b)
-    # "t" is never rewritten (always the raw observation time); the ground-truth-clock time always goes into
-    # the new "t_gt_clock" field, whether or not that block had a configured offset (decision 38 follow-up).
+            raise InputError("config: clock_offsets_ms's block_id %d is not present in oracle" % b)
+    # "t" is never rewritten (always the raw observation time); the ground-truth-clock time always
+    # goes into the new "t_gt_clock" field, whether or not that block had a configured offset.
     uncorrected_blocks = sorted(b for b in wins if b not in offsets)
     corrected = [dict(r, t_gt_clock=r["t"] - offsets.get(_assign_block(r["t"], wins, offsets), 0)) for r in rows]
 
@@ -762,8 +807,8 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
     strata = {"gt": lambda s: label(s.get("trial_id")), "obs": lambda r: label(obs_tid.get(id(r))),
               "names": ["cell", "scenario", "speed"]}
 
-    # Diagnostic only (decision 28 / 38 follow-up): counts, per stratum, of kept ground-truth sessions with
-    # n_start_while_open > 0. Not used to exclude anything unless config.drop_start_while_open is true.
+    # Diagnostic only: counts, per stratum, of kept ground-truth sessions with n_start_while_open > 0.
+    # Not used to exclude anything unless config.drop_start_while_open is true.
     swo_counts = {}
     for s in kept_gt:
         if s["n_start_while_open"] > 0:
@@ -792,7 +837,8 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
         "diagnostics": {"start_while_open": {"n": sum(swo_counts.values()), "by_stratum": swo_by_stratum}},
         "metrics": {"by_stratum": detection_metrics(result, strata, theta, off_end),
                     "pooled": detection_metrics(result, None, theta, off_end)[0] if (kept_gt or kept_obs) else None,
-                    "note": "pooled は層の重みを付けない件数の合計（合成入力に自然な混合比は無い）。主推定値は層別"},
+                    "note": "pooled sums counts across strata without weighting them (a synthetic input has no "
+                            "natural mixing proportion); treat the per-stratum figures as the primary estimates"},
         "matching": result,
     }
 
@@ -805,7 +851,7 @@ def _count_types(excluded):
 
 
 def render(out):
-    """出力のバイト列（LF・UTF-8・BOM なし・キー順固定）。"""
+    """Render the output bytes (LF line endings, UTF-8, no BOM, keys in a fixed sorted order)."""
     return (json.dumps(out, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
@@ -814,7 +860,7 @@ def _read(path, what):
         with open(path, "rb") as f:
             return f.read()
     except OSError as e:
-        raise InputError("%s: 開けない（%s）" % (what, type(e).__name__))
+        raise InputError("%s: cannot be opened (%s)" % (what, type(e).__name__))
 
 
 def _same_file(a, b):
@@ -851,12 +897,13 @@ def _gt(tid, lo, hi, **kw):
 
 
 def _ob(lo, hi, nav=0, abandon=False):
-    """区間 [lo, hi] を既定（offset 0）で返す観測行。"""
+    """An observation row for the interval [lo, hi] at the default offset (0)."""
     return {"type": "ime_shadow", "t": hi, "dwell_ms": hi - lo, "nav": nav, "abandon": abandon}
 
 
 def _world(n, seed):
-    """疎な合成の正解: 長さ 800〜2500 ms・間隔 30〜120 s（偶然の一致が起きにくい）。"""
+    """Sparse synthetic ground truth: lengths of 800-2500 ms, gaps of 30-120 s (chosen so
+    coincidental matches are unlikely)."""
     import random
     rng = random.Random(seed)
     t, out = 1700000000000, []
@@ -890,101 +937,105 @@ def _case_five_types():
            _ob(40000, 41000)]
     r = match(gts, obs)
     if _sizes(r) != (1, 1, 1, 1, 1):
-        f.append("5 型の件数が (対, 分割, 併合, 取り逃し, 偽検出) = (1,1,1,1,1) でない: %r" % (_sizes(r),))
+        f.append("the five-type counts (pairs, split, merge, miss, false_pos) are not (1,1,1,1,1): %r" % (_sizes(r),))
         return f
     if r["pairs"][0]["gt"] is not gts[0] or r["pairs"][0]["obs"] is not obs[0] or r["pairs"][0]["iou"] != 1.0:
-        f.append("完全一致の対が違う: %r" % (r["pairs"][0],))
+        f.append("the exact-match pair is wrong: %r" % (r["pairs"][0],))
     if r["split"][0]["gt"] is not gts[1] or r["split"][0]["obs"] != obs[1:4]:
-        f.append("分割（3 断片・時刻順）が違う: %r" % (r["split"][0],))
+        f.append("the split (3 fragments, in time order) is wrong: %r" % (r["split"][0],))
     if r["merge"][0]["obs"] is not obs[4] or r["merge"][0]["gt"] != [gts[2], gts[3]]:
-        f.append("併合（観測 1 件に正解 2 件・時刻順）が違う: %r" % (r["merge"][0],))
+        f.append("the merge (one observation to two ground-truth sessions, in time order) is wrong: %r" % (r["merge"][0],))
     if r["miss"] != [gts[4]]:
-        f.append("取り逃しが違う: %r" % (r["miss"],))
+        f.append("the miss is wrong: %r" % (r["miss"],))
     if r["false_pos"] != [obs[5]]:
-        f.append("偽検出が違う: %r" % (r["false_pos"],))
-    # 部分的な重なり: IoU = 800 / 1200
+        f.append("the false positive is wrong: %r" % (r["false_pos"],))
+    # a partial overlap: IoU = 800 / 1200
     r2 = match([_gt("t1", 50000, 51000)], [_ob(50200, 51200)])
     if _sizes(r2) != (1, 0, 0, 0, 0) or abs(r2["pairs"][0]["iou"] - 800.0 / 1200.0) > 1e-12:
-        f.append("部分的な重なりの IoU が 800/1200 でない: %r" % (r2,))
+        f.append("a partial overlap's IoU is not 800/1200: %r" % (r2,))
     if _sizes(match([], [])) != (0, 0, 0, 0, 0):
-        f.append("空の入力が空の結果にならない")
+        f.append("empty input does not yield an empty result")
     return f
 
 
 def _case_definition_properties():
-    """定義の性質（docstring の ⚠️）: 直さず固定する。2 断片の隣接した分割は 対 + 偽検出、隙間のある 2 断片は分割。"""
+    """Definitional properties (documented in the module docstring): fixed behavior, not to be
+    changed. Two adjacent fragments become a pair plus a false positive; two fragments with a gap
+    between them become a split."""
     f = []
     r = match([_gt("t1", 0, 1000)], [_ob(0, 600), _ob(600, 1000)])
     if _sizes(r) != (1, 0, 0, 0, 1):
-        f.append("隣り合う 2 断片（60% + 40%）が 対 1 + 偽検出 1 にならない: %r" % (_sizes(r),))
+        f.append("two adjacent fragments (60% + 40%) do not become 1 pair + 1 false positive: %r" % (_sizes(r),))
     r = match([_gt("t1", 0, 1000)], [_ob(0, 400), _ob(600, 1000)])
     if _sizes(r) != (0, 1, 0, 0, 0):
-        f.append("隙間のある 2 断片（各 40%・和集合 80%）が分割にならない: %r" % (_sizes(r),))
+        f.append("two fragments with a gap (40% each, union 80%) do not become a split: %r" % (_sizes(r),))
     r = match([_gt("t1", 0, 3000), _gt("t2", 3000, 4000)], [_ob(0, 4000)])
     if _sizes(r) != (1, 0, 0, 1, 0):
-        f.append("不均衡な併合（一方が 75%）が 対 1 + 取り逃し 1 にならない: %r" % (_sizes(r),))
-    # 和集合の IoU は、区間の外へはみ出す分を「和」に数える（内側に収まる断片だけを試すと交わりを測り損ねる）
-    #   断片 [-600,300] + [300,600]: 和集合 [-600,600]（1200）・交わり 600・和 1600 → 0.375 < 0.5 → 分割にならない
+        f.append("an imbalanced merge (one side 75%) does not become 1 pair + 1 miss: %r" % (_sizes(r),))
+    # The union's IoU counts the portion that overshoots the ground-truth interval as part of the union
+    #   (testing only the fragments that fit inside it would mis-measure the intersection).
+    #   Fragments [-600,300] + [300,600]: union [-600,600] (1200), intersection 600, sum 1600 -> 0.375 < 0.5, not a split
     r = match([_gt("t1", 0, 1000)], [_ob(-600, 300), _ob(300, 600)])
     if _sizes(r) != (0, 0, 0, 1, 2):
-        f.append("はみ出す 2 断片（和集合の IoU 0.375）が 取り逃し 1 + 偽検出 2 にならない: %r" % (_sizes(r),))
-    #   断片 [-100,300] + [300,600] + [600,1100]: 交わり 1000・和 1200 → 0.833 ≥ 0.5 → 分割（はみ出しは許容）
+        f.append("two fragments that overshoot the session (union IoU 0.375) do not become 1 miss + 2 false positives: %r" % (_sizes(r),))
+    #   Fragments [-100,300] + [300,600] + [600,1100]: intersection 1000, sum 1200 -> 0.833 >= 0.5, a split (some overshoot is tolerated)
     r = match([_gt("t1", 0, 1000)], [_ob(-100, 300), _ob(300, 600), _ob(600, 1100)])
     if _sizes(r) != (0, 1, 0, 0, 0):
-        f.append("少しはみ出す 3 断片（和集合の IoU 0.833）が分割にならない: %r" % (_sizes(r),))
-    #   併合でも同じ: 観測 [0,1000] に 正解 [-800,300] + [300,600]: 交わり 600・和 1800 → 0.333 < 0.5 → 併合にならない
+        f.append("three slightly overshooting fragments (union IoU 0.833) do not become a split: %r" % (_sizes(r),))
+    #   The same holds for merges: observation [0,1000] against ground truth [-800,300] + [300,600]: intersection 600, sum 1800 -> 0.333 < 0.5, not a merge
     r = match([_gt("t1", -800, 300), _gt("t2", 300, 600)], [_ob(0, 1000)])
     if _sizes(r) != (0, 0, 0, 2, 1):
-        f.append("はみ出す正解 2 件（和集合の IoU 0.333）が 取り逃し 2 + 偽検出 1 にならない: %r" % (_sizes(r),))
-    # 断片が多いほど、1 つが対になる余地が減る（3 断片は各 1/3 で単独では対にならない）
+        f.append("two overshooting ground-truth sessions (union IoU 0.333) do not become 2 misses + 1 false positive: %r" % (_sizes(r),))
+    # more fragments leave less room for any one of them to pair alone (three fragments of 1/3 each cannot individually pair)
     r = match([_gt("t1", 0, 1200)], [_ob(0, 400), _ob(400, 800), _ob(800, 1200)])
     if _sizes(r) != (0, 1, 0, 0, 0):
-        f.append("3 断片が分割にならない: %r" % (_sizes(r),))
-    # 短いセッションは時刻のずれで対にならなくなる（長さ L が対になるのは平行移動が L/3 以下）
+        f.append("three fragments do not become a split: %r" % (_sizes(r),))
+    # a short session stops pairing once the timing offset is large enough (a session of length L pairs only while the offset stays at or below L/3)
     r = match([_gt("t1", 0, 150)], [_ob(60, 210)])
     if _sizes(r) != (0, 0, 0, 1, 1):
-        f.append("150 ms のセッションを 60 ms ずらしたら 取り逃し + 偽検出になるはず（L/3 = 50）: %r" % (_sizes(r),))
+        f.append("shifting a 150 ms session by 60 ms should yield a miss + a false positive (L/3 = 50): %r" % (_sizes(r),))
     return f
 
 
 def _case_iou_boundary():
     f = []
     if _sizes(match([_gt("t1", 0, 300)], [_ob(100, 400)])) != (1, 0, 0, 0, 0):
-        f.append("IoU ちょうど 0.5（200/400）は対になる（>=）")
+        f.append("an IoU of exactly 0.5 (200/400) should pair (>=)")
     if _sizes(match([_gt("t1", 0, 300)], [_ob(101, 401)])) != (0, 0, 0, 1, 1):
-        f.append("IoU 199/401 < 0.5 は対にならない")
+        f.append("an IoU of 199/401 < 0.5 should not pair")
     if _sizes(match([_gt("t1", 0, 300)], [_ob(50, 350)], iou_min=0.7)) != (1, 0, 0, 0, 0):
-        f.append("iou_min = 0.7 で IoU 250/350 = 0.714 が対にならない")
+        f.append("with iou_min = 0.7, an IoU of 250/350 = 0.714 should pair")
     if _sizes(match([_gt("t1", 0, 300)], [_ob(60, 360)], iou_min=0.7)) != (0, 0, 0, 1, 1):
-        f.append("iou_min = 0.7 で IoU 240/360 = 0.667 が対になった")
-    # 長さ 0 は同じ点の長さ 0 とだけ対になる
+        f.append("with iou_min = 0.7, an IoU of 240/360 = 0.667 paired unexpectedly")
+    # a zero-length interval pairs only with a zero-length interval at the same point
     if _sizes(match([_gt("t1", 500, 500)], [_ob(500, 500)])) != (1, 0, 0, 0, 0):
-        f.append("同じ点の長さ 0 同士が対にならない")
+        f.append("two zero-length intervals at the same point do not pair")
     if _sizes(match([_gt("t1", 500, 500)], [_ob(0, 1000)])) != (0, 0, 0, 1, 1):
-        f.append("長さ 0 の正解が長い観測の中の点で対になった")
+        f.append("a zero-length ground truth paired at a point inside a longer observation")
     return f
 
 
 def _case_tie_determinism():
     f = []
-    # 同じ区間・同じ IoU の観測 2 件: 並びを逆にしても同じ結果（内容の昇順で先に対になる）
+    # two observations at the same interval with the same IoU: reversing the order gives the same
+    # result (the one that sorts first by content pairs first)
     g = [_gt("t1", 0, 1000)]
     a, b = _ob(0, 1000, nav=1), _ob(0, 1000, nav=2)
     r1, r2 = match(g, [a, b]), match(g, [b, a])
     if _dump(r1) != _dump(r2) or r1["pairs"][0]["obs"]["nav"] != 1 or r1["false_pos"] != [b]:
-        f.append("同点（同じ区間の観測 2 件）が入力の並びに依存する / 先に対になるのが内容の昇順でない")
-    # 同じ区間の正解 2 件・観測 1 件
+        f.append("a tie (two observations at the same interval) depends on input order, or the one that pairs first is not the one that sorts first by content")
+    # two ground-truth sessions at the same interval with one observation
     g2 = [_gt("t1", 0, 1000), _gt("t2", 0, 1000)]
     r1, r2 = match(g2, [_ob(0, 1000)]), match(list(reversed(g2)), [_ob(0, 1000)])
     if _dump(r1) != _dump(r2) or r1["pairs"][0]["gt"]["trial_id"] != "t1":
-        f.append("同点（同じ区間の正解 2 件）が入力の並びに依存する")
-    # IoU が同点（1/3 ずつ）で開始時刻が違う 2 件の正解: 開始の早い方が先に対になる
+        f.append("a tie (two ground-truth sessions at the same interval) depends on input order")
+    # two ground-truth sessions with a tied IoU (1/3 each) but different start times: the earlier one pairs first
     o = [_ob(1000, 2000)]
     g3 = [_gt("t2", 1500, 2500), _gt("t1", 500, 1500)]
     r = match(g3, o, iou_min=0.3)
     if _sizes(r) != (1, 0, 0, 1, 0) or r["pairs"][0]["gt"]["trial_id"] != "t1":
-        f.append("IoU 同点のとき開始時刻の昇順で対にならない: %r" % (r["pairs"],))
-    # 並べ替えても結果が変わらない（対・分割・併合・取り逃し・偽検出が混ざった入力）
+        f.append("a tied IoU does not pair in ascending order of start time: %r" % (r["pairs"],))
+    # reordering the input does not change the result (a mix of pairs, splits, merges, misses, and false positives)
     gts = _world(40, 3)
     obs = [_ob(g["start_wall_ms"] + 30, g["end_wall_ms"] + 30) for g in gts[:30]]
     obs += [_ob(gts[30]["start_wall_ms"], gts[30]["start_wall_ms"] + 300), _ob(gts[30]["start_wall_ms"] + 400, gts[30]["end_wall_ms"])]
@@ -992,61 +1043,63 @@ def _case_tie_determinism():
     base = _dump(match(gts, obs))
     for seed in range(1, 6):
         if _dump(match(_shuffled(gts, seed), _shuffled(obs, seed + 100))) != base:
-            f.append("入力の並びを変えると結果が変わる（seed %d）" % seed)
+            f.append("reordering the input changes the result (seed %d)" % seed)
             break
     return f
 
 
 def _case_positive_control():
-    """★ 陽性対照: 観測を 1 行消す・1 行をずらすと指標が悪化する。"""
+    """Positive control: removing one observation row, or shifting one row, degrades the metrics."""
     f = []
     gts = _world(60, 7)
     obs = [_ob(g["start_wall_ms"] + (i % 7) * 20 - 60, g["end_wall_ms"] + (i % 7) * 20 - 60) for i, g in enumerate(gts)]
     base = detection_metrics(match(gts, obs))[0]
     if base["recall"]["x"] != 60 or base["precision"]["x"] != 60 or base["n_miss"] or base["n_false_pos"]:
-        f.append("基準（小さなずれだけ）が全部対にならない: %r" % (base,))
+        f.append("the baseline (small offsets only) does not pair everything: %r" % (base,))
     dropped = detection_metrics(match(gts, obs[:20] + obs[21:]))[0]
     if not (dropped["recall"]["x"] == 59 and dropped["n_miss"] == 1 and dropped["recall"]["value"] < base["recall"]["value"]):
-        f.append("観測を 1 行消しても再現率が下がらない: %r" % (dropped["recall"],))
+        f.append("recall does not drop after removing one observation row: %r" % (dropped["recall"],))
     if dropped["precision"]["value"] != 1.0:
-        f.append("観測を 1 行消しても適合率は 1 のはず（偽検出は増えない）")
+        f.append("precision should remain 1 after removing one observation row (no new false positives)")
     moved = list(obs)
     moved[20] = _ob(obs[20]["t"] - obs[20]["dwell_ms"] + 2000, obs[20]["t"] + 2000)
     r = match(gts, moved)
     m = detection_metrics(r)[0]
     if not (m["n_pairs"] == 59 and m["n_miss"] == 1 and m["n_false_pos"] == 1):
-        f.append("1 行を 2 s ずらしたら 対が 1 つ減り 取り逃し 1・偽検出 1 になるはず: %r" % (_sizes(r),))
+        f.append("shifting one row by 2 s should reduce pairs by one and yield 1 miss + 1 false positive: %r" % (_sizes(r),))
     if not (m["recall"]["value"] < base["recall"]["value"] and m["precision"]["value"] < base["precision"]["value"]
             and m["f1"]["value"] < base["f1"]["value"]):
-        f.append("ずらしても 再現率・適合率・F1 が下がらない")
+        f.append("recall, precision, and F1 do not drop after the shift")
     if not (m["recall"]["hi"] < 1.0 or m["recall"]["lo"] < base["recall"]["lo"]):
-        f.append("区間が悪化を反映しない")
+        f.append("the interval does not reflect the degradation")
     return f
 
 
 def _case_negative_control():
-    """★ 陰性対照: 観測を 60 s ずらす・時刻をシャッフルすると、対の数が偶然水準（ほぼ 0）になる。"""
+    """Negative control: shifting the observations by 60 s, or shuffling their times, drives the
+    pair count down to chance level (near zero)."""
     f = []
     n = 300
     gts = _world(n, 11)
     obs = [_ob(g["start_wall_ms"], g["end_wall_ms"]) for g in gts]
     if detection_metrics(match(gts, obs))[0]["n_pairs"] != n:
-        f.append("基準（ずれなし）が全部対にならない")
+        f.append("the baseline (no offset) does not pair everything")
     shifted = [dict(o, t=o["t"] + 60000) for o in obs]
     ms = detection_metrics(match(gts, shifted))[0]
     if ms["n_pairs"] > 0.05 * n:
-        f.append("60 s ずらしても対が偶然水準（<= 5%%）に落ちない: %d / %d" % (ms["n_pairs"], n))
-    # ⚠️ 時刻を行の間で並べ替えるだけでは、終端の時刻の集合が正解と揃ったままで対が残る（実測: 86%）。
-    # 偶然水準を見るには、観測の時刻を記録の全区間へ一様に置き直す。
+        f.append("shifting by 60 s does not drive pairs down to chance level (<= 5%%): %d / %d" % (ms["n_pairs"], n))
+    # Merely permuting the times among rows leaves the set of end times aligned with the ground truth,
+    # so pairs still remain (86% in practice). To see chance level, the observation times must instead
+    # be redrawn uniformly over the whole recording span.
     import random
     rng = random.Random(5)
     lo_span, hi_span = gts[0]["start_wall_ms"], gts[-1]["end_wall_ms"]
     scrambled = [dict(o, t=lo_span + o["dwell_ms"] + int(rng.random() * (hi_span - lo_span))) for o in obs]
     mz = detection_metrics(match(gts, scrambled))[0]
     if mz["n_pairs"] > 0.05 * n:
-        f.append("時刻をシャッフルしても対が偶然水準（<= 5%%）に落ちない: %d / %d" % (mz["n_pairs"], n))
+        f.append("shuffling the times does not drive pairs down to chance level (<= 5%%): %d / %d" % (mz["n_pairs"], n))
     if not (ms["recall"]["hi"] < 0.15 and mz["recall"]["hi"] < 0.15):
-        f.append("陰性対照の再現率の区間の上限が偶然水準を示さない: %r %r" % (ms["recall"], mz["recall"]))
+        f.append("the negative control's recall interval upper bound does not indicate chance level: %r %r" % (ms["recall"], mz["recall"]))
     return f
 
 
@@ -1060,7 +1113,7 @@ def _case_byte_identical():
         blob = json.dumps({"r": r, "m": detection_metrics(r)}, sort_keys=True, ensure_ascii=False)
         outs.append(hashlib.sha256(blob.encode("utf-8")).hexdigest())
     if outs[0] != outs[1]:
-        f.append("同じ入力で結果がバイト一致しない")
+        f.append("identical input does not yield byte-identical results")
     return f
 
 
@@ -1073,63 +1126,63 @@ def _case_metrics():
     r = match(gts, obs)
     m = detection_metrics(r)
     if len(m) != 1 or m[0]["stratum"] != "all":
-        f.append("層を渡さないと 1 層 'all' になるはず")
+        f.append("without strata, everything should fall into a single stratum, 'all'")
         return f
     m = m[0]
     want = {"precision": (1, 6), "recall": (1, 5), "split_rate": (1, 5), "merge_rate": (1, 6),
             "miss_rate": (1, 5), "false_pos_rate": (1, 6)}
     for k, (x, n) in want.items():
         if (m[k]["x"], m[k]["n"]) != (x, n) or abs(m[k]["value"] - x / n) > 1e-12:
-            f.append("%s が %d/%d でない: %r" % (k, x, n, m[k]))
+            f.append("%s is not %d/%d: %r" % (k, x, n, m[k]))
         if (m[k]["lo"], m[k]["hi"]) != stats.wilson(x, n):
-            f.append("%s の区間が stats.wilson(%d, %d) でない" % (k, x, n))
-    # F1 (decision 38 follow-up): the count is still 2*pairs/(n_gt+n_obs), but lo/hi are intentionally None
-    # (the doubled pair count is not an independent-trials proportion; see _f1_prop's docstring).
+            f.append("%s's interval is not stats.wilson(%d, %d)" % (k, x, n))
+    # F1: the count is still 2*pairs/(n_gt+n_obs), but lo/hi are intentionally None (the doubled pair
+    # count is not an independent-trials proportion; see _f1_prop's docstring).
     if (m["f1"]["x"], m["f1"]["n"]) != (2, 11) or abs(m["f1"]["value"] - 2.0 / 11.0) > 1e-12:
-        f.append("f1 が 2/11 でない: %r" % (m["f1"],))
+        f.append("f1 is not 2/11: %r" % (m["f1"],))
     if (m["f1"]["lo"], m["f1"]["hi"]) != (None, None):
-        f.append("f1 の区間は意図的に None のはず（相関した成功を Wilson で扱わない）: %r" % (m["f1"],))
+        f.append("f1's interval should intentionally be None (correlated successes are not handled by a Wilson interval): %r" % (m["f1"],))
     if (m["n_gt"], m["n_obs"], m["n_split_obs"], m["n_merge_gt"]) != (5, 6, 3, 2):
-        f.append("件数（n_gt / n_obs / n_split_obs / n_merge_gt）が違う: %r" % m)
+        f.append("the counts (n_gt / n_obs / n_split_obs / n_merge_gt) are wrong: %r" % m)
     if (m["n_split_gt_recount"], m["n_fp_as_split"], m["n_merge_obs_recount"], m["n_miss_as_merge"]) != (0, 0, 0, 0):
-        f.append("この例では θ の数え直しが何も足さないはず: %r" % (
+        f.append("the theta recount should add nothing in this example: %r" % (
             (m["n_split_gt_recount"], m["n_fp_as_split"], m["n_merge_obs_recount"], m["n_miss_as_merge"]),))
-    # 層: 正解は trial_id、観測は時刻で決める
+    # strata: ground truth determined by trial_id, observations by time
     strata = {"gt": lambda s: "A" if s["trial_id"] in ("t1", "t2") else "B",
               "obs": lambda o: "A" if o["t"] < 15000 else "B"}
     by = dict((x["stratum"], x) for x in detection_metrics(r, strata))
     a, b = by["A"], by["B"]
     if (a["n_pairs"], a["n_split_gt"], a["n_split_obs"], a["n_gt"], a["n_obs"]) != (1, 1, 3, 2, 4):
-        f.append("層 A の件数が違う: %r" % a)
+        f.append("stratum A's counts are wrong: %r" % a)
     if (b["n_merge_obs"], b["n_merge_gt"], b["n_miss"], b["n_false_pos"], b["n_gt"], b["n_obs"]) != (1, 2, 1, 1, 3, 2):
-        f.append("層 B の件数が違う（併合は先頭の正解の層・偽検出は観測の層）: %r" % b)
-    # 空 / 端
+        f.append("stratum B's counts are wrong (a merge is counted in the first ground truth's stratum; a false positive in the observation's stratum): %r" % b)
+    # empty input / edge cases
     if detection_metrics({"pairs": [], "split": [], "merge": [], "miss": [], "false_pos": []}) != []:
-        f.append("空の結果が空にならない")
+        f.append("an empty result does not stay empty")
     only_fp = detection_metrics(match([], [_ob(0, 10)]))[0]
     if only_fp["recall"] != {"x": 0, "n": 0, "value": None, "lo": None, "hi": None}:
-        f.append("正解 0 件の再現率は None（0 に丸めない）のはず: %r" % (only_fp["recall"],))
+        f.append("recall with zero ground truth should be None (not rounded to 0): %r" % (only_fp["recall"],))
     only_miss = detection_metrics(match([_gt("t1", 0, 10)], []))[0]
     if only_miss["recall"]["value"] != 0.0 or only_miss["precision"]["value"] is not None:
-        f.append("観測 0 件の適合率は None・再現率は 0 のはず")
+        f.append("precision with zero observations should be None, and recall should be 0")
     return f
 
 
 def _case_offset():
     f = []
-    # 終端の遅れ 100 ms（t が変換の終端より 100 ms 遅い）: 区間全体が 100 ms ずれる
+    # an end-of-session lag of 100 ms (t is 100 ms later than the composition's actual end): the whole interval shifts by 100 ms
     g = [_gt("t1", 0, 1000)]
     late = [{"type": "ime_shadow", "t": 1100, "dwell_ms": 1000, "nav": 0, "abandon": False}]
     if obs_interval(late[0]) != (100, 1100) or obs_interval(late[0], -100) != (0, 1000):
-        f.append("obs_interval が [t + offset - dwell_ms, t + offset] でない")
+        f.append("obs_interval is not [t + offset - dwell_ms, t + offset]")
     r0, r1, r2 = match(g, late), match(g, late, obs_end_offset_ms=-100), match(g, late, obs_end_offset_ms=100)
     if abs(r0["pairs"][0]["iou"] - 900.0 / 1100.0) > 1e-12 or r1["pairs"][0]["iou"] != 1.0 \
             or abs(r2["pairs"][0]["iou"] - 800.0 / 1200.0) > 1e-12:
-        f.append("obs_end_offset_ms で IoU が 900/1100 → 1.0（-100）/ 800/1200（+100）にならない")
-    # 短いセッション（200 ms）は遅れ 100 ms で対にならない（L/3 = 66）→ offset で救える
+        f.append("obs_end_offset_ms does not move the IoU from 900/1100 to 1.0 (-100) or 800/1200 (+100)")
+    # a short session (200 ms) fails to pair under a 100 ms lag (L/3 = 66); the offset recovers it
     gs, ls = [_gt("t1", 0, 200)], [{"type": "ime_shadow", "t": 300, "dwell_ms": 200, "nav": 0, "abandon": False}]
     if _sizes(match(gs, ls)) != (0, 0, 0, 1, 1) or _sizes(match(gs, ls, obs_end_offset_ms=-100)) != (1, 0, 0, 0, 0):
-        f.append("短いセッションの遅れが offset で補正できない")
+        f.append("a short session's lag is not recovered by the offset")
     return f
 
 
@@ -1142,66 +1195,68 @@ def _case_validation():
         except ValueError:
             return
         except Exception as e:
-            f.append("%s: ValueError でなく %r" % (name, e))
+            f.append("%s: raised %r instead of ValueError" % (name, e))
             return
-        f.append("%s: 例外が出なかった" % name)
+        f.append("%s: no exception was raised" % name)
 
     g, o = [_gt("t1", 0, 100)], [_ob(0, 100)]
-    raises("終わりが null", lambda: match([_gt("t1", 0, 100, end_wall_ms=None)], o))
-    raises("start が小数", lambda: match([_gt("t1", 0, 100, start_wall_ms=0.5)], o))
-    raises("start が真偽値", lambda: match([_gt("t1", 0, 100, start_wall_ms=True)], o))
-    raises("終わりが開始より前", lambda: match([_gt("t1", 100, 50)], o))
-    raises("セッションがオブジェクトでない", lambda: match([1], o))
-    raises("dwell_ms が負", lambda: match(g, [dict(o[0], dwell_ms=-1)]))
-    raises("t が無い", lambda: match(g, [{"dwell_ms": 1}]))
-    raises("t が文字列", lambda: match(g, [dict(o[0], t="1")]))
+    raises("a null end", lambda: match([_gt("t1", 0, 100, end_wall_ms=None)], o))
+    raises("a fractional start", lambda: match([_gt("t1", 0, 100, start_wall_ms=0.5)], o))
+    raises("a boolean start", lambda: match([_gt("t1", 0, 100, start_wall_ms=True)], o))
+    raises("an end before the start", lambda: match([_gt("t1", 100, 50)], o))
+    raises("a session that is not an object", lambda: match([1], o))
+    raises("a negative dwell_ms", lambda: match(g, [dict(o[0], dwell_ms=-1)]))
+    raises("a missing t", lambda: match(g, [{"dwell_ms": 1}]))
+    raises("a string t", lambda: match(g, [dict(o[0], t="1")]))
     raises("iou_min = 0", lambda: match(g, o, iou_min=0))
     raises("iou_min = 1.5", lambda: match(g, o, iou_min=1.5))
-    raises("iou_min が真偽値", lambda: match(g, o, iou_min=True))
-    raises("obs_end_offset_ms が小数", lambda: match(g, o, obs_end_offset_ms=1.5))
+    raises("a boolean iou_min", lambda: match(g, o, iou_min=True))
+    raises("a fractional obs_end_offset_ms", lambda: match(g, o, obs_end_offset_ms=1.5))
     return f
 
 
 def _case_recount():
-    """theta の数え直し（decision 38 follow-up）。match() 自体の分割・併合・偽検出・取り逃しは変わらず、
-    split_rate / merge_rate と n_split_gt_recount / n_fp_as_split / n_merge_obs_recount / n_miss_as_merge
-    だけがこの数え直しで動く。"""
+    """The theta recount. match()'s own split, merge, false-positive, and miss buckets never
+    change; only split_rate / merge_rate and n_split_gt_recount / n_fp_as_split /
+    n_merge_obs_recount / n_miss_as_merge move under this recount."""
     f = []
-    # 陽性対照: gt(0,1000) は ob(0,600) と対になり（IoU 0.6）、leftover の ob(600,1400)（長さ 800）は
-    # 自分の長さのうち 400/800 = 0.5 が対になった正解の区間に入る（match() では対 1 + 偽検出 1 のまま）。
+    # positive control: gt(0,1000) pairs with ob(0,600) (IoU 0.6); the leftover ob(600,1400) (length
+    # 800) has 400/800 = 0.5 of its own length inside the paired ground-truth interval (match()
+    # itself still reports 1 pair + 1 false positive).
     r = match([_gt("t1", 0, 1000)], [_ob(0, 600), _ob(600, 1400)])
     if _sizes(r) != (1, 0, 0, 0, 1):
-        f.append("match() 自体の分割が変わった（数え直しは match() を変えないはず）: %r" % (_sizes(r),))
+        f.append("match()'s own split changed (the recount should never change match() itself): %r" % (_sizes(r),))
     m = detection_metrics(r)[0]
     if (m["n_split_gt_recount"], m["n_fp_as_split"], m["split_rate"]["x"], m["split_rate"]["n"]) != (1, 1, 1, 1):
-        f.append("leftover（frac 0.5）の分割が theta = 0.5 の既定で数え直されない: %r" % m)
+        f.append("a leftover item with frac 0.5 is not recounted as a split under the default theta = 0.5: %r" % m)
     if m["n_split_gt"] != 0 or m["n_pairs"] != 1 or m["n_false_pos"] != 1:
-        f.append("元の n_split_gt / n_pairs / n_false_pos が数え直しで動いている: %r" % m)
-    # 陰性対照: theta = 0.6 まで上げると frac 0.5 では届かず、数え直されない
+        f.append("the original n_split_gt / n_pairs / n_false_pos moved under the recount: %r" % m)
+    # negative control: raising theta to 0.6 puts frac 0.5 out of reach, so nothing is recounted
     m_strict = detection_metrics(r, theta=0.6)[0]
     if (m_strict["n_split_gt_recount"], m_strict["n_fp_as_split"], m_strict["split_rate"]["x"]) != (0, 0, 0):
-        f.append("theta = 0.6 でも frac 0.5 の leftover が数え直された（閾値が効いていない）: %r" % m_strict)
+        f.append("a frac-0.5 leftover was still recounted at theta = 0.6 (the threshold has no effect): %r" % m_strict)
 
-    # 併合: gt1(0,3000) は ob(0,4000)（長さ 4000）と対になり（IoU 0.75）、gt2(3000,5000)（長さ 2000）は
-    # 自分の長さのうち 1000/2000 = 0.5 が対になった観測の区間に入る（match() では対 1 + 取り逃し 1 のまま）。
+    # merge: gt1(0,3000) pairs with ob(0,4000) (length 4000, IoU 0.75); gt2(3000,5000) (length 2000)
+    # has 1000/2000 = 0.5 of its own length inside the paired observation's interval (match() itself
+    # still reports 1 pair + 1 miss).
     r2 = match([_gt("t1", 0, 3000), _gt("t2", 3000, 5000)], [_ob(0, 4000)])
     if _sizes(r2) != (1, 0, 0, 1, 0):
-        f.append("match() 自体の併合が変わった: %r" % (_sizes(r2),))
+        f.append("match()'s own merge changed: %r" % (_sizes(r2),))
     m2 = detection_metrics(r2)[0]
     if (m2["n_merge_obs_recount"], m2["n_miss_as_merge"], m2["merge_rate"]["x"], m2["merge_rate"]["n"]) != (1, 1, 1, 1):
-        f.append("gt2（frac 0.5）の併合が theta = 0.5 の既定で数え直されない: %r" % m2)
+        f.append("gt2 (frac 0.5) is not recounted as a merge under the default theta = 0.5: %r" % m2)
     if m2["n_merge_obs"] != 0 or m2["n_miss"] != 1:
-        f.append("元の n_merge_obs / n_miss が数え直しで動いている: %r" % m2)
-    # 陰性対照: theta = 0.6 では frac 0.5 の gt2 は届かない
+        f.append("the original n_merge_obs / n_miss moved under the recount: %r" % m2)
+    # negative control: at theta = 0.6, gt2's frac of 0.5 does not reach the threshold
     m2_strict = detection_metrics(r2, theta=0.6)[0]
     if (m2_strict["n_merge_obs_recount"], m2_strict["n_miss_as_merge"]) != (0, 0):
-        f.append("theta = 0.6 でも frac 0.5 の取り逃しが数え直された: %r" % m2_strict)
+        f.append("a frac-0.5 miss was still recounted at theta = 0.6: %r" % m2_strict)
 
-    # precision / recall / n_gt / n_obs は theta に依らない
+    # precision / recall / n_gt / n_obs do not depend on theta
     for th in (0.3, 0.5, 0.7, 0.9, 1.0):
         mm = detection_metrics(r, theta=th)[0]
         if (mm["n_pairs"], mm["n_gt"], mm["n_obs"], mm["precision"]["x"], mm["recall"]["x"]) != (1, 1, 2, 1, 1):
-            f.append("theta = %r で n_pairs / n_gt / n_obs / precision / recall が変わった: %r" % (th, mm))
+            f.append("n_pairs / n_gt / n_obs / precision / recall changed at theta = %r: %r" % (th, mm))
 
     def raises(name, fn):
         try:
@@ -1209,51 +1264,53 @@ def _case_recount():
         except ValueError:
             return
         except Exception as e:
-            f.append("%s: ValueError でなく %r" % (name, e))
+            f.append("%s: raised %r instead of ValueError" % (name, e))
             return
-        f.append("%s: 例外が出なかった" % name)
+        f.append("%s: no exception was raised" % name)
 
     raises("theta = 0", lambda: detection_metrics(r, theta=0))
     raises("theta = 1.5", lambda: detection_metrics(r, theta=1.5))
-    raises("theta が真偽値", lambda: detection_metrics(r, theta=True))
-    raises("recount_split_merge の theta = 0", lambda: recount_split_merge(r, theta=0))
+    raises("a boolean theta", lambda: detection_metrics(r, theta=True))
+    raises("recount_split_merge's theta = 0", lambda: recount_split_merge(r, theta=0))
 
-    # 並びに依らない: result の各リストを逆順にしても同じ答え
+    # order-independent: reversing each of result's lists gives the same answer
     r4 = match([_gt("t1", 0, 1000), _gt("t2", 2000, 2200), _gt("t3", 3000, 3200)],
                [_ob(0, 600), _ob(600, 1000), _ob(9000, 9200)])
     base = _dump(recount_split_merge(r4))
     shuffled = {"pairs": list(reversed(r4["pairs"])), "split": list(r4["split"]), "merge": list(r4["merge"]),
                 "miss": list(reversed(r4["miss"])), "false_pos": list(reversed(r4["false_pos"]))}
     if _dump(recount_split_merge(shuffled)) != base:
-        f.append("recount_split_merge が result の並びに依る")
+        f.append("recount_split_merge depends on result's ordering")
     return f
 
 
 def _case_merge_gt_per_stratum():
-    """decision 38 follow-up: 併合の各正解は（先頭だけでなく）それぞれ自分の層に merge_gt を数える。
-    merge_obs（観測 1 件）は従来どおり先頭の正解の層だけに数える。"""
+    """Each of a merge's ground-truth sessions (not only the first) counts merge_gt in its own
+    stratum. merge_obs (the single observation) is still counted only in the first ground-truth
+    session's stratum, as before."""
     f = []
-    # gt1 / gt2 は単独ではどちらも IoU < 0.5（0.4）なので、これは _resolve_groups の genuine な併合
-    # （decision 38 が扱う「対 + 取り逃し」になる不均衡な併合ではない）。
+    # gt1 and gt2 each individually have IoU < 0.5 (0.4), so this is a genuine merge from
+    # _resolve_groups (not the imbalanced-merge case that instead becomes a pair + a miss).
     g1, g2 = _gt("t1", 20000, 21000), _gt("t2", 21500, 22500)
     r = match([g1, g2], [_ob(20000, 22500)])
     if _sizes(r) != (0, 0, 1, 0, 0):
-        f.append("併合の基準の件数が違う: %r" % (_sizes(r),))
+        f.append("the merge baseline counts are wrong: %r" % (_sizes(r),))
         return f
     strata = {"gt": lambda s: "A" if s["trial_id"] == "t1" else "B", "obs": lambda _o: "A"}
     by = dict((x["stratum"], x) for x in detection_metrics(r, strata))
     if by.get("A", {}).get("n_merge_gt") != 1 or by.get("B", {}).get("n_merge_gt") != 1:
-        f.append("併合の 2 件目の正解が自分の層に数えられていない: %r" % (by,))
+        f.append("the merge's second ground-truth session is not counted in its own stratum: %r" % (by,))
     if by["A"]["n_merge_obs"] != 1 or by.get("B", {}).get("n_merge_obs") != 0:
-        f.append("併合の観測（1 件）は先頭の正解の層だけに数えるはず: %r" % (by,))
+        f.append("the merge's single observation should be counted only in the first ground truth's stratum: %r" % (by,))
     if by["A"]["n_gt"] != 1 or by["B"]["n_gt"] != 1:
-        f.append("層ごとの n_gt が違う（各 1 のはず）: %r" % (by,))
+        f.append("the per-stratum n_gt is wrong (each should be 1): %r" % (by,))
     return f
 
 
 def _case_f1_interval():
-    """decision 38 follow-up: F1 の lo/hi は常に None（相関した成功を Wilson で扱わない）。件数 0 件・全部対
-    でも例外なく None で、value はそのまま点推定として使える。"""
+    """F1's lo/hi are always None (correlated successes are not handled by a Wilson interval),
+    without exception even at zero counts or when everything pairs; value remains usable as a point
+    estimate."""
     f = []
     gts = _world(20, 31)
     obs_full = [_ob(g["start_wall_ms"], g["end_wall_ms"]) for g in gts]
@@ -1262,34 +1319,36 @@ def _case_f1_interval():
     for r in results:
         for row in detection_metrics(r):
             if (row["f1"]["lo"], row["f1"]["hi"]) != (None, None):
-                f.append("f1 の区間が None でない: %r" % (row["f1"],))
+                f.append("f1's interval is not None: %r" % (row["f1"],))
             if "note" not in row["f1"]:
-                f.append("f1 に区間を出さない理由の note が無い: %r" % (row["f1"],))
+                f.append("f1 is missing the note explaining why no interval is reported: %r" % (row["f1"],))
     m = detection_metrics(match(gts, obs_full))[0]
     if abs(m["f1"]["value"] - 1.0) > 1e-12 or (m["f1"]["x"], m["f1"]["n"]) != (40, 40):
-        f.append("全部対になった場合の f1 の値が 1.0 (40/40) でない: %r" % (m["f1"],))
+        f.append("f1's value when everything pairs is not 1.0 (40/40): %r" % (m["f1"],))
     return f
 
 
 def _case_t_gt_clock():
-    """decision 38 follow-up: obs_interval() は行に t_gt_clock があればそれを使い、無ければ t を使う
-    （直接 match() / inject() を呼ぶ既存の呼び出し側は t_gt_clock を持たず、挙動は変わらない）。"""
+    """obs_interval() uses a row's t_gt_clock when present and falls back to t otherwise (existing
+    callers that invoke match() / inject() directly never set t_gt_clock, so their behavior is
+    unaffected)."""
     f = []
     plain = {"type": "ime_shadow", "t": 1000, "dwell_ms": 500, "nav": 0, "abandon": False}
     if obs_interval(plain) != (500, 1000):
-        f.append("t_gt_clock が無いとき obs_interval が t を使わない: %r" % (obs_interval(plain),))
+        f.append("obs_interval does not use t when t_gt_clock is absent: %r" % (obs_interval(plain),))
     corrected = dict(plain, t_gt_clock=1300)
     if obs_interval(corrected) != (800, 1300):
-        f.append("t_gt_clock があるとき obs_interval がそれを使わない: %r" % (obs_interval(corrected),))
+        f.append("obs_interval does not use t_gt_clock when it is present: %r" % (obs_interval(corrected),))
     r = match([_gt("t1", 800, 1300)], [corrected])
     if not r["pairs"] or r["pairs"][0]["obs"]["t"] != 1000 or r["pairs"][0]["obs"]["t_gt_clock"] != 1300:
-        f.append("match() の出力で t / t_gt_clock が保たれていない: %r" % (r["pairs"],))
+        f.append("match()'s output does not preserve t / t_gt_clock: %r" % (r["pairs"],))
     return f
 
 
 def _case_start_while_open():
-    """decision 28 / 38 follow-up: n_start_while_open は既定では診断だけ（層ごとの件数を出す・除外しない）。
-    config.drop_start_while_open = true のときだけ試行単位の除外理由になる。"""
+    """By default, n_start_while_open is diagnostic only (reported per stratum, never used to
+    exclude anything). It becomes a trial-level exclusion reason only when
+    config.drop_start_while_open is true."""
     f = []
     fx = _cli_fixture()
     obj = json.loads(fx["sessions"].decode("utf-8"))
@@ -1299,27 +1358,27 @@ def _case_start_while_open():
             s["n_start_while_open"] = 1
             marked += 1
     if marked != 2:
-        f.append("フィクスチャの前提が崩れている（t00001 / t00002 が見つからない）")
+        f.append("the fixture's precondition no longer holds (t00001 / t00002 not found)")
         return f
     sessions_bytes = json.dumps(obj).encode("utf-8")
 
     default_out = evaluate(sessions_bytes, "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"])
     if default_out["diagnostics"]["start_while_open"]["n"] != 2:
-        f.append("既定（drop しない）で診断の件数が 2 でない: %r" % default_out["diagnostics"]["start_while_open"])
+        f.append("the diagnostic count is not 2 under the default (no dropping): %r" % default_out["diagnostics"]["start_while_open"])
     if "start_while_open" in default_out["excluded"]["gt"]["by_reason"]:
-        f.append("既定で n_start_while_open による除外理由が出ている（出さないはず）")
+        f.append("an n_start_while_open exclusion reason appears under the default (it should not)")
     if default_out["used"]["n_gt"] != 88:
-        f.append("既定で n_start_while_open のセッションが照合から外れている: %r" % default_out["used"])
+        f.append("sessions with n_start_while_open are excluded from matching under the default: %r" % default_out["used"])
 
     cfg = json.loads(fx["config"].decode("utf-8"))
     cfg["drop_start_while_open"] = True
     drop_out = evaluate(sessions_bytes, "all", fx["obs"], fx["plan"], fx["oracle"], json.dumps(cfg).encode("utf-8"))
     if drop_out["excluded"]["gt"]["by_reason"].get("start_while_open") != 2:
-        f.append("drop_start_while_open = true で除外理由に出ない: %r" % drop_out["excluded"])
+        f.append("the exclusion reason does not appear when drop_start_while_open = true: %r" % drop_out["excluded"])
     if drop_out["used"]["n_gt"] != 86:
-        f.append("drop_start_while_open = true でも照合対象が減らない: %r" % drop_out["used"])
+        f.append("the matched set does not shrink even when drop_start_while_open = true: %r" % drop_out["used"])
     if drop_out["diagnostics"]["start_while_open"]["n"] != 0:
-        f.append("drop した後の診断は 0（kept_gt だけを数えるはず）: %r" % drop_out["diagnostics"])
+        f.append("the diagnostic count is not 0 after dropping (it should count only kept_gt): %r" % drop_out["diagnostics"])
     return f
 
 
@@ -1328,7 +1387,8 @@ def _jl(rows):
 
 
 def _cli_fixture():
-    """3 ブロック x 30 試行の合成の計画・oracle・正解・観測。特殊な試行の位置は _case_cli の期待に対応する。"""
+    """A synthetic plan, oracle, ground truth, and observation set spanning 3 blocks x 30 trials
+    each. The placement of special trials corresponds to what _case_cli expects."""
     T0 = 1700000000000
     plan_rows = [{"kind": "header", "format": "plan/1", "os": "macos", "seed": 1, "generator_version": "0",
                   "config_sha256": "0" * 64, "recipes_sha256": "0" * 64, "corpus_sha256": "0" * 64}]
@@ -1361,29 +1421,29 @@ def _cli_fixture():
 
     sessions, obs = [], []
     for idx, (tid, b, k, begin, _end) in enumerate(trials):
-        shift = 700 if b == 1 else 0            # ブロック 1 は観測側の時計が 700 ms 進んでいる
+        shift = 700 if b == 1 else 0            # block 1's observation-side clock runs 700 ms ahead
         length = 900 + (idx * 137) % 1500
         lo = begin + 500
-        if tid == "t00016":                      # 1 試行に 2 セッション → 観測は 1 行に併合
+        if tid == "t00016":                      # two sessions in one trial -> observed as a single merged row
             sessions += [_gt(tid, lo, lo + 1000), _gt(tid, lo + 1200, lo + 2200)]
             obs.append(_ob(lo + shift, lo + 2200 + shift))
-        elif tid == "t00021":                    # 3 断片に分割
+        elif tid == "t00021":                    # split into 3 fragments
             sessions.append(_gt(tid, lo, lo + 3000))
             obs += [_ob(lo + i * 1000 + shift, lo + (i + 1) * 1000 + shift) for i in range(3)]
-        elif tid == "t00011":                    # 取り逃し
+        elif tid == "t00011":                    # a miss
             sessions.append(_gt(tid, lo, lo + length))
-        elif tid == "t00090":                    # ログが閉じないまま終わった
+        elif tid == "t00090":                    # the log ends before the session closes
             sessions.append(_gt(tid, lo, None, outcome="open_at_end", excluded_by=["log_truncated"]))
             obs.append(_ob(lo + shift, lo + 400 + shift))
-        elif tid in ("t00006", "t00007"):        # 時計の跳びで除外
+        elif tid in ("t00006", "t00007"):        # excluded by a clock jump
             sessions.append(_gt(tid, lo, lo + length, excluded_by=["clock_jump"]))
             obs.append(_ob(lo + shift, lo + length + shift))
         else:
             sessions.append(_gt(tid, lo, lo + length))
             obs.append(_ob(lo + shift, lo + length + shift))
-        if tid == "t00045":                      # 試行の中の偽検出（層は試行から決まる）
+        if tid == "t00045":                      # a false positive inside a trial (its stratum comes from the trial)
             obs.append(_ob(begin + 4500 + shift, begin + 5000 + shift))
-    obs.append(_ob(T0 - 3000, T0 - 2000))        # ブロックの前の偽検出（試行に帰属しない）
+    obs.append(_ob(T0 - 3000, T0 - 2000))        # a false positive before any block (attributable to no trial)
     obs_rows = [{"type": "meta", "format": "obs/1", "os": "macos", "logger_version": "0", "manifest_sha256": "0" * 64,
                  "capabilities": {"unconditional": ["key", "ime_shadow"], "threshold_gated": [], "config_gated": []}},
                 {"type": "key", "t": T0, "category": "alphabetic", "press": True}] + obs
@@ -1408,54 +1468,54 @@ def _case_cli():
     p = out["metrics"]["pooled"]
     if (p["n_pairs"], p["n_split_gt"], p["n_split_obs"], p["n_merge_obs"], p["n_merge_gt"], p["n_miss"], p["n_false_pos"]) \
             != (84, 1, 3, 1, 2, 1, 2) or (p["n_gt"], p["n_obs"]) != (88, 90):
-        f.append("全体の件数が (84,1,3,1,2,1,2)・n_gt 88・n_obs 90 でない（クロック補正・除外・層の合算）: %r" % p)
+        f.append("the overall counts are not (84,1,3,1,2,1,2) with n_gt 88 and n_obs 90 (clock correction, exclusion, and pooling across strata): %r" % p)
     if any(x["iou"] != 1.0 for x in out["matching"]["pairs"]):
-        f.append("クロック補正後は対が全部 IoU 1.0 のはず")
-    # decision 38 follow-up: "t" never changes; the corrected time always lives in "t_gt_clock".
+        f.append("after clock correction, every pair should reach IoU 1.0")
+    # "t" never changes; the corrected time always lives in "t_gt_clock".
     moved = [p["obs"] for p in out["matching"]["pairs"] if p["obs"]["t"] != p["obs"]["t_gt_clock"]]
     all_obs_rows = [p["obs"] for p in out["matching"]["pairs"]] + \
         [o for sp in out["matching"]["split"] for o in sp["obs"]] + \
         [mg["obs"] for mg in out["matching"]["merge"]] + out["matching"]["false_pos"]
     if not all("t_gt_clock" in r for r in all_obs_rows) or len(moved) != 30 or \
             any(r["t"] - r["t_gt_clock"] != 700 for r in moved):
-        f.append("補正した観測（ブロック 1 の対 30 件）が t_gt_clock = t - 700 で t を書き換えていない: %d 件" % len(moved))
+        f.append("the corrected observations (30 pairs in block 1) do not have t_gt_clock = t - 700 without rewriting t: %d rows" % len(moved))
     if out["config"]["uncorrected_blocks"] != [0, 2]:
-        f.append("uncorrected_blocks が [0, 2] でない（ブロック 1 だけ clock_offsets_ms にある）: %r" % out["config"]["uncorrected_blocks"])
+        f.append("uncorrected_blocks is not [0, 2] (only block 1 is present in clock_offsets_ms): %r" % out["config"]["uncorrected_blocks"])
     if out["config"]["theta"] != 0.5 or out["config"]["drop_start_while_open"] is not False:
-        f.append("theta / drop_start_while_open の既定が違う: %r" % out["config"])
+        f.append("the defaults for theta / drop_start_while_open are wrong: %r" % out["config"])
     if out["diagnostics"]["start_while_open"] != {"n": 0, "by_stratum": []}:
-        f.append("n_start_while_open が全部 0 の入力で診断が空でない: %r" % out["diagnostics"])
+        f.append("the diagnostic is not empty when every n_start_while_open is 0: %r" % out["diagnostics"])
     if out["excluded"] != {"gt": {"n": 3, "by_reason": {"clock_jump": 2, "log_truncated": 1, "open_at_end": 1}},
                            "obs": {"n": 3, "by_reason": {"clock_jump": 2, "log_truncated": 1}},
                            "trials": {"n": 3, "by_type": {"clock_jump": 2, "log_truncated": 1}}}:
-        f.append("除外の件数が理由ごとに出ない: %r" % (out["excluded"],))
+        f.append("the exclusion counts do not break down by reason: %r" % (out["excluded"],))
     if (out["input"], out["used"]) != ({"n_gt": 91, "n_obs": 93}, {"n_gt": 88, "n_obs": 90}):
-        f.append("入力・使用した件数が違う: %r %r" % (out["input"], out["used"]))
+        f.append("the input / used counts are wrong: %r %r" % (out["input"], out["used"]))
     strata = out["metrics"]["by_stratum"]
     if len(strata) != 10 or sum(s["n_pairs"] for s in strata) != 84:
-        f.append("層が 3 シナリオ x 3 速さ + 試行外 の 10 個で、対の合計が 84 になるはず: %d 層" % len(strata))
+        f.append("there should be 10 strata (3 scenarios x 3 speeds, plus outside-any-trial) with pairs summing to 84: %d strata" % len(strata))
     s1 = [s for s in strata if s["stratum"] == {"cell": "mac-std", "scenario": "S1", "speed": "slow"}]
     if len(s1) != 1 or (s1[0]["n_pairs"], s1[0]["n_merge_obs"], s1[0]["n_merge_gt"], s1[0]["n_gt"], s1[0]["n_obs"]) != (8, 1, 2, 10, 9):
-        f.append("層 (mac-std, S1, slow) の件数が違う: %r" % (s1,))
+        f.append("the (mac-std, S1, slow) stratum's counts are wrong: %r" % (s1,))
     outside = [s for s in strata if s["stratum"] == {"cell": "mac-std", "scenario": None, "speed": None}]
     if len(outside) != 1 or outside[0]["n_false_pos"] != 1:
-        f.append("試行に帰属しない偽検出が (cell, null, null) 層に 1 件出ない")
-    # t00045 はブロック 1（mid）の k = 14 → シナリオ S3
+        f.append("the false positive that belongs to no trial is not the single entry in the (cell, null, null) stratum")
+    # t00045 is trial k=14 of block 1 (mid), which is scenario S3
     mid = [s for s in strata if s["stratum"] == {"cell": "mac-std", "scenario": "S3", "speed": "mid"}]
     if len(mid) != 1 or mid[0]["n_false_pos"] != 1:
-        f.append("t00045 の中の偽検出が (S3, mid) 層に出ない: %r" % (mid,))
+        f.append("the false positive inside t00045 does not appear in the (S3, mid) stratum: %r" % (mid,))
     if sum(s["n_false_pos"] for s in strata) != 2:
-        f.append("偽検出が全層で 2 件（試行の外 1・t00045 の中 1）でない")
-    # 補正なしだとブロック 1 が対にならない（補正が効いている証拠）
+        f.append("there are not 2 false positives across all strata (1 outside any trial, 1 inside t00045)")
+    # without the correction, block 1 fails to pair (evidence that the correction matters)
     no_cfg = ev(config=json.dumps({"cell": "mac-std"}).encode("utf-8"))
     if no_cfg["metrics"]["pooled"]["n_pairs"] >= 84:
-        f.append("clock_offsets_ms を外しても対が減らない（補正が効いていない）")
-    # 既定の設定でも動く（cell は plan の os）
+        f.append("removing clock_offsets_ms does not reduce pairs (the correction has no effect)")
+    # also works with no configuration at all (cell defaults to the plan's os)
     default = evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], None)
     if default["config"]["cell"] != "macos" or default["config"]["iou_min"] != 0.5:
-        f.append("設定なしの既定（cell = plan の os・iou_min 0.5）が違う")
+        f.append("the defaults with no configuration (cell = the plan's os, iou_min 0.5) are wrong")
 
-    # バイト一致（同じ入力で 2 回・別の出力先・サブプロセス経由でも）
+    # byte-identical output (twice on the same input, to different output paths, and via a subprocess)
     with tempfile.TemporaryDirectory() as d:
         paths = {}
         for k in ("sessions", "obs", "plan", "oracle", "config"):
@@ -1485,25 +1545,25 @@ def _case_cli():
         rc1, _ = run("o1.json")
         rc2, _ = run("o2.json")
         if rc1 != 0 or rc2 != 0:
-            f.append("CLI が exit 0 で終わらない: %r %r" % (rc1, rc2))
+            f.append("the CLI does not exit 0: %r %r" % (rc1, rc2))
         else:
             b1, b2 = open(os.path.join(d, "o1.json"), "rb").read(), open(os.path.join(d, "o2.json"), "rb").read()
             if b1 != b2 or b1 != render(out):
-                f.append("CLI の出力が 2 回でバイト一致しない / evaluate と違う")
+                f.append("the CLI's output is not byte-identical across two runs, or differs from evaluate's")
             if b"\r" in b1 or b1.startswith(b"\xef\xbb\xbf") or d.encode("utf-8") in b1:
-                f.append("出力に CR・BOM・入力の path が入っている")
+                f.append("the output contains a CR, a BOM, or an input path")
             sub = subprocess.run([sys.executable, os.path.abspath(__file__), "--sessions", paths["sessions"],
                                   "--definition", "all", "--obs", paths["obs"], "--plan", paths["plan"],
                                   "--oracle", paths["oracle"], "--config", cfg_path, "--out", os.path.join(d, "o3.json")],
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if sub.returncode != 0 or open(os.path.join(d, "o3.json"), "rb").read() != b1:
-                f.append("サブプロセスで走らせた CLI が exit 0 でない / バイト一致しない: %r" % sub.stderr[-200:])
+                f.append("the CLI run as a subprocess does not exit 0, or is not byte-identical: %r" % sub.stderr[-200:])
 
-        # 入力の誤りは exit 2（拒否であって異常終了ではない）
+        # a malformed input exits 2 (a rejection, not a crash)
         def rc_of(name, want, **over):
             rc, err = run(name, **over)
             if rc != want or "Traceback" in err:
-                f.append("%s: exit %r（期待 %d）%s" % (name, rc, want, err[-120:]))
+                f.append("%s: exit %r (expected %d) %s" % (name, rc, want, err[-120:]))
 
         rc_of("e1.json", 2, definition="windows_def")
         rc_of("e2.json", 2, out=paths["obs"])
@@ -1515,7 +1575,7 @@ def _case_cli():
         bad_cfg = os.path.join(d, "bad_cfg.json")
         for name, body in (("unknown key", {"iou": 0.5}), ("unknown block", {"clock_offsets_ms": {"9": 1}}),
                            ("float offset", {"obs_end_offset_ms": 1.5}), ("iou 0", {"iou_min": 0}),
-                           ("theta 0", {"theta": 0}), ("drop_start_while_open が真偽値でない", {"drop_start_while_open": 1})):
+                           ("theta 0", {"theta": 0}), ("a non-boolean drop_start_while_open", {"drop_start_while_open": 1})):
             with open(bad_cfg, "wb") as fh:
                 fh.write(json.dumps(body).encode("utf-8"))
             rc_of("e5.json", 2, config=bad_cfg)
@@ -1539,22 +1599,22 @@ def _case_cli():
 
 
 CASES = [
-    ("5 型（完全一致 / 分割 / 併合 / 取り逃し / 偽検出）", _case_five_types),
-    ("定義の性質（隣接 2 断片・不均衡な併合・短いセッション）", _case_definition_properties),
-    ("IoU の境界（>= 0.5・iou_min・長さ 0）", _case_iou_boundary),
-    ("同点の決定性（入力の並びに依らない）", _case_tie_determinism),
-    ("陽性対照（観測を 1 行消す・1 行をずらすと悪化）", _case_positive_control),
-    ("陰性対照（60 s ずらす・シャッフルで偶然水準）", _case_negative_control),
-    ("バイト一致（同じ入力で 2 回）", _case_byte_identical),
-    ("検出の指標（件数・Wilson・層）", _case_metrics),
-    ("obs_end_offset_ms（終端の遅れの補正）", _case_offset),
-    ("入力の検証", _case_validation),
-    ("theta の数え直し（分割・併合の陽性 / 陰性対照・decision 38）", _case_recount),
-    ("併合の各正解を自分の層に数える（decision 38）", _case_merge_gt_per_stratum),
-    ("F1 の区間は常に None（decision 38）", _case_f1_interval),
-    ("t_gt_clock の優先・t は書き換えない（decision 38）", _case_t_gt_clock),
-    ("n_start_while_open の診断・drop_start_while_open（decision 28 / 38）", _case_start_while_open),
-    ("CLI（除外・層・クロック補正・バイト一致・exit 2）", _case_cli),
+    ("five types (exact match, split, merge, miss, false positive)", _case_five_types),
+    ("definitional properties (adjacent fragments, imbalanced merges, short sessions)", _case_definition_properties),
+    ("IoU boundaries (>= 0.5, iou_min, zero length)", _case_iou_boundary),
+    ("tie-breaking determinism (independent of input order)", _case_tie_determinism),
+    ("positive control (removing or shifting one observation row degrades the metrics)", _case_positive_control),
+    ("negative control (a 60 s shift or shuffling reaches chance level)", _case_negative_control),
+    ("byte-identical output (two runs on the same input)", _case_byte_identical),
+    ("detection metrics (counts, Wilson intervals, strata)", _case_metrics),
+    ("obs_end_offset_ms (correcting for the end-of-session lag)", _case_offset),
+    ("input validation", _case_validation),
+    ("the theta recount (positive / negative controls for split and merge)", _case_recount),
+    ("each merged ground truth is counted in its own stratum", _case_merge_gt_per_stratum),
+    ("F1's interval is always None", _case_f1_interval),
+    ("t_gt_clock takes priority; t is never rewritten", _case_t_gt_clock),
+    ("n_start_while_open's diagnostic role and drop_start_while_open", _case_start_while_open),
+    ("CLI (exclusion, strata, clock correction, byte-identical output, exit 2)", _case_cli),
 ]
 
 
@@ -1563,8 +1623,8 @@ def selftest():
     for name, fn in CASES:
         try:
             fails = fn()
-        except Exception as e:  # 想定外の例外は失敗
-            fails = ["例外 %s: %s" % (type(e).__name__, e)]
+        except Exception as e:  # an unexpected exception counts as a failure
+            fails = ["exception %s: %s" % (type(e).__name__, e)]
         if fails:
             bad += 1
             print("  ❌ " + name)
@@ -1573,9 +1633,9 @@ def selftest():
         else:
             print("  ✅ " + name)
     if bad:
-        print("selftest 失敗 %d 件 / %d 件" % (bad, len(CASES)))
+        print("selftest failed %d / %d" % (bad, len(CASES)))
         return 1
-    print("selftest OK（%d 件）" % len(CASES))
+    print("selftest OK (%d cases)" % len(CASES))
     return 0
 
 
@@ -1587,7 +1647,7 @@ def main(argv):
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
         except Exception:
             pass
-    ap = argparse.ArgumentParser(description="照合器と検出の指標（正解のセッション × 観測の ime_shadow 行）")
+    ap = argparse.ArgumentParser(description="Matching and detection metrics (ground-truth sessions against observed ime_shadow rows)")
     ap.add_argument("--sessions")
     ap.add_argument("--definition", choices=DEFINITIONS)
     ap.add_argument("--obs")
@@ -1600,10 +1660,10 @@ def main(argv):
     if args.selftest:
         return selftest()
     if not (args.sessions and args.definition and args.obs and args.plan and args.oracle and args.out):
-        ap.error("--sessions / --definition / --obs / --plan / --oracle / --out が要る（--config は任意）")
+        ap.error("--sessions / --definition / --obs / --plan / --oracle / --out are required (--config is optional)")
     for inp in (args.sessions, args.obs, args.plan, args.oracle, args.config):
         if inp and _same_file(inp, args.out):
-            print("match: --out が入力ファイルと同じ（%s）" % inp, file=sys.stderr)
+            print("match: --out names the same file as an input (%s)" % inp, file=sys.stderr)
             return 2
     try:
         out = evaluate(_read(args.sessions, "sessions"), args.definition, _read(args.obs, "obs"),
@@ -1614,11 +1674,11 @@ def main(argv):
         print("match: %s" % e, file=sys.stderr)
         return 2
     except OSError as e:
-        print("match: 出力できない（%s）" % type(e).__name__, file=sys.stderr)
+        print("match: could not write output (%s)" % type(e).__name__, file=sys.stderr)
         return 2
     p = out["metrics"]["pooled"]
     if p is not None:
-        print("match: 正解 %d 件・観測 %d 件 → 対 %d（再現率 %s・適合率 %s）除外 正解 %d / 観測 %d" % (
+        print("match: %d ground truth, %d observations -> %d pairs (recall %s, precision %s); excluded %d ground truth / %d observations" % (
             p["n_gt"], p["n_obs"], p["n_pairs"], _fmt(p["recall"]["value"]), _fmt(p["precision"]["value"]),
             out["excluded"]["gt"]["n"], out["excluded"]["obs"]["n"]))
     return 0

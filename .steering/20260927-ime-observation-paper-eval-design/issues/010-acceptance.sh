@@ -10,9 +10,9 @@ need_file "${G}"; need_file "${R}"
 
 # AC1-3
 selftest_ok "${G}"
-need_grep "${G}" "5 型" "AC2 selftest ケース: 5 型"
-need_grep "${G}" "区間外の矢印を数えない" "AC2 selftest ケース: 区間外の矢印を数えない"
-need_grep "${G}" "規則を変えると結果が変わる" "AC3 selftest ケース: 規則を変えると結果が変わる（陰性対照）"
+need_grep "${G}" "five session types" "AC2 selftest ケース: 5 型"
+need_grep "${G}" "arrows outside the interval are not counted" "AC2 selftest ケース: 区間外の矢印を数えない"
+need_grep "${G}" "changing the rules changes the result" "AC3 selftest ケース: 規則を変えると結果が変わる（陰性対照）"
 
 # AC4: ⚠️ 観測側を読まない
 forbid_grep "${G}" 'ime_shadow|obs/1|dwell_ms' "AC4 観測側（ime_shadow / obs/1）を読んでいない"
