@@ -5,20 +5,28 @@
   check_manifest.py --self                           コピーが manifest と一致（GSE を読まない・公開 repo でも回る）
   check_manifest.py --against-gse [--repo DIR]       GSE の現在のファイルと一致（ずれの検出）
   check_manifest.py --update --manifest FILE --entries SPEC.json [--repo DIR]
-                                                     指定した 1 つの manifest だけを書き直す（他の manifest*.json は書かない）
+                                                     指定した 1 つの manifest だけを **id 単位でマージ**して書く
+                                                     （同じ id は置き換え・他の id は残す。他の manifest*.json は書かない）
   check_manifest.py --selftest                       陰性対照（速い既定・数秒）
 
 対象は kit/logger/（このファイルのあるディレクトリ・--logger-dir で変えられる）の manifest*.json を**すべて**。
-exit 0 = 一致 / 1 = 不一致（または manifest が 0 本・エントリが 0 件の空振り） / 2 = 使い方の誤り・読めない。
+exit 0 = 一致 / 1 = 不一致 / 2 = 使い方の誤り・読めない・manifest が 0 本・エントリが 0 件の空振り・
+パスの安全性違反（NUL・絶対パス・base の外）・壊れた JSON。
 
 エントリの kind:
   file    ファイル全体が GSE の gse_path と同じ（逐語コピー）
   excerpt 範囲が GSE の gse_path の範囲と同じ。GSE 側 = 開始アンカーの行を含み終了アンカーの行を含まない範囲
           （行全体の一致・行末の空白を除く・アンカーはファイル中にちょうど 1 回）。
           コピー側 = `// @excerpt-begin <id>` と `// @excerpt-end <id>` の**間**。
-  new     新規に書いたファイル（reason が要る）。gse_path があれば、そのファイルの `pub const|static NAME: T = V;` と
-          型・値が同じことを --against-gse が確かめる（シムの値の照合）。
-SHA-256 は CRLF を LF に揃えてから取る。path は logger ディレクトリからの相対・gse_path は repo のルートからの相対。
+  new     新規に書いたファイル（reason が要る）。2 つの独立した照合を、明示の欄があるときだけ行う
+          （★ 判断 33・issue 011 merge ゲートレビュー item 5 / 6。`gse_path` があるだけでは何も照合しない）:
+          - `check_decls: true` なら、コピー側ファイルの `pub const|static NAME: T = V;` の型・値が
+            GSE の `gse_path` と同じことを --against-gse が確かめる（シムの値の照合）。
+          - `start_anchor` / `end_anchor` / `gse_range_sha256` があれば、GSE の `gse_path` の
+            その範囲（excerpt と同じ切り出し方）の SHA-256 が `gse_range_sha256` と一致することを
+            --against-gse が確かめる（GSE 側の判断が変わっていないかの照合。コピー自体は逐語ではなくてよい）。
+SHA-256 は CRLF を LF に揃えてから取る。path は logger ディレクトリからの相対・gse_path は repo のルートからの相対
+（先頭の `/` `\\`・NUL・base の外を指すパスは拒否する）。
 """
 import argparse
 import glob
@@ -37,12 +45,24 @@ for _s in (sys.stdout, sys.stderr):  # cp932 の端末でも日本語の出力�
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KINDS = ("file", "excerpt", "new")
-FIELDS = ("kind", "id", "path", "gse_path", "gse_last_commit", "start_anchor", "end_anchor", "symbol", "sha256", "reason")
+FIELDS = (
+    "kind", "id", "path", "gse_path", "gse_last_commit", "start_anchor", "end_anchor", "symbol",
+    "sha256", "gse_range_sha256", "check_decls", "reason",
+)
 DECL = re.compile(r"^\s*pub\s+(const|static)\s+(\w+)\s*:\s*([^=]+?)\s*=\s*(.+?)\s*;")
 
 
 class Bad(Exception):
     pass
+
+
+class Unsafe(Bad):
+    """パスの安全性違反（NUL・絶対パス・base の外・シンボリックリンク等）。
+
+    ⚠️ 通常の Bad（SHA-256 不一致等の「内容の不一致」）とは区別する: `each_entry` はこれを
+    エントリ単位のエラー文字列に丸めず、呼び出し元まで伝播させて exit 2（使い方の誤り）にする
+    （issue 011 merge ゲートレビュー item 8）。
+    """
 
 
 def norm(b):
@@ -115,23 +135,54 @@ def manifests(ldir):
             m = json.loads(read_bytes(p).decode("utf-8"))
         except ValueError:
             raise Bad("JSON として読めない: " + os.path.basename(p))
-        if not isinstance(m, dict) or not m.get("entries"):
-            raise Bad("エントリが 0 件（空振りの緑を出さない）: " + os.path.basename(p))
+        if not isinstance(m, dict) or not isinstance(m.get("entries"), list) or not m.get("entries"):
+            raise Bad("entries が配列でない、または 0 件（空振りの緑を出さない）: " + os.path.basename(p))
         out.append((os.path.basename(p), m))
     return out
 
 
 def safe_rel(p, what):
-    if not isinstance(p, str) or not p or os.path.isabs(p) or ".." in p.replace("\\", "/").split("/") or ":" in p:
-        raise Bad("%s が相対パスでない: %r" % (what, p))
+    """相対パスとしての形を確かめる（`os.path.isabs` は Windows で `/foo` を絶対パスと**認めない**
+    抜け道があるので、先頭の `/` `\\` は別途拒否する。issue 011 merge ゲートレビュー item 8）。"""
+    if not isinstance(p, str) or not p:
+        raise Unsafe("%s が無い" % what)
+    if "\x00" in p:
+        raise Unsafe("%s に NUL を含む: %r" % (what, p))
+    if p.startswith("/") or p.startswith("\\"):
+        raise Unsafe("%s が / または \\ で始まる: %r" % (what, p))
+    if os.path.isabs(p) or ":" in p or ".." in p.replace("\\", "/").split("/"):
+        raise Unsafe("%s が相対パスでない: %r" % (what, p))
     return p
+
+
+def safe_join(base, rel, what):
+    """`base` の中に必ず収まる絶対パスを返す（realpath を取って commonpath で確かめる。
+    シンボリックリンクで base の外へ抜けるのも拒否する。issue 011 merge ゲートレビュー item 8）。"""
+    rel = safe_rel(rel, what)
+    base_real = os.path.realpath(base)
+    p = os.path.realpath(os.path.join(base, rel))
+    try:
+        common = os.path.commonpath([base_real, p])
+    except ValueError:  # Windows で別ドライブだと commonpath が ValueError を投げる
+        raise Unsafe("%s が base の外を指す（別ドライブ）: %r" % (what, rel))
+    if common != base_real:
+        raise Unsafe("%s が base の外を指す: %r" % (what, rel))
+    return p
+
+
+def read_copy_lines(ldir, ent):
+    return to_lines(read_bytes(safe_join(ldir, ent.get("path"), "path")))
+
+
+def read_gse_lines(repo, ent):
+    return to_lines(read_bytes(safe_join(repo, ent.get("gse_path"), "gse_path")))
 
 
 def copy_bytes(ldir, ent):
     """コピー側の照合対象のバイト列。"""
     if ent.get("kind") not in KINDS:
         raise Bad("kind が不正: %r" % ent.get("kind"))
-    lines = to_lines(read_bytes(os.path.join(ldir, safe_rel(ent.get("path"), "path"))))
+    lines = read_copy_lines(ldir, ent)
     if ent["kind"] == "excerpt":
         return join(copy_range(lines, ent.get("id")))
     if ent["kind"] == "new" and not ent.get("reason"):
@@ -145,6 +196,8 @@ def each_entry(ldir, check):
         for ent in m["entries"]:
             try:
                 check(ent)
+            except Unsafe:
+                raise  # ★ パスの安全性違反は個別の不一致に丸めず、呼び出し元まで伝播させる
             except (Bad, UnicodeDecodeError) as e:
                 errs.append("%s: %s: %s" % (name, ent.get("id"), e))
     return errs
@@ -157,18 +210,42 @@ def check_self(ldir):
     return each_entry(ldir, one)
 
 
-def check_gse_entry(repo, ldir, ent):
-    kind = ent.get("kind")
-    if kind == "new" and not ent.get("gse_path"):
-        return
-    lines = to_lines(read_bytes(os.path.join(repo, safe_rel(ent.get("gse_path"), "gse_path"))))
-    if kind == "new":  # シム: pub const / static の型と値が GSE と同じ
-        mine = decls(to_lines(read_bytes(os.path.join(ldir, safe_rel(ent.get("path"), "path")))))
-        theirs = decls(lines)
+def check_new_entry(repo, ldir, ent):
+    """`kind: "new"` の照合。2 つの独立した照合を、明示の欄があるときだけ行う
+    （判断 33・issue 011 merge ゲートレビュー item 5 / 6。`gse_path` があるだけでは何もしない）。"""
+    did_check = False
+    if ent.get("check_decls"):
+        if not ent.get("gse_path"):
+            raise Bad("check_decls: true だが gse_path が無い")
+        mine = decls(read_copy_lines(ldir, ent))
+        theirs = decls(read_gse_lines(repo, ent))
         for name, d in sorted(mine.items()):
             if theirs.get(name) != d:
                 raise Bad("シムの %s が GSE と違う（型か値・GSE 側に無い場合も含む）" % name)
+        did_check = True
+    if ent.get("start_anchor") or ent.get("end_anchor"):
+        if not ent.get("gse_path"):
+            raise Bad("start_anchor/end_anchor があるが gse_path が無い")
+        want = ent.get("gse_range_sha256")
+        if not want:
+            raise Bad("new にアンカーがあるのに gse_range_sha256 が無い")
+        body = gse_range(read_gse_lines(repo, ent), ent)
+        if sha(join(body)) != want:
+            raise Bad("GSE の判断の範囲が変わった（gse_range_sha256 が一致しない・%s）" % ent.get("gse_path"))
+        sym = ent.get("symbol")
+        if sym and not re.search(r"\b(?:fn|enum|struct)\s+" + re.escape(sym) + r"\b", "\n".join(body)):
+            raise Bad("symbol %s が範囲の中に無い" % sym)
+        did_check = True
+    if not did_check:
+        return  # check_decls も anchor も無ければ --against-gse では何も照合しない（--self だけの対象）
+
+
+def check_gse_entry(repo, ldir, ent):
+    kind = ent.get("kind")
+    if kind == "new":
+        check_new_entry(repo, ldir, ent)
         return
+    lines = read_gse_lines(repo, ent)
     body = gse_range(lines, ent) if kind == "excerpt" else lines
     if sha(join(body)) != ent.get("sha256"):
         raise Bad("GSE の現在のファイルと SHA-256 が一致しない（%s）" % ent.get("gse_path"))
@@ -198,17 +275,46 @@ def update(ldir, repo, manifest, spec_path):
     here = os.path.normcase(os.path.dirname(os.path.abspath(manifest)))
     if not (base.startswith("manifest") and base.endswith(".json")) or here != os.path.normcase(os.path.abspath(ldir)):
         raise Bad("--manifest は logger ディレクトリの manifest*.json であること: " + manifest)
-    spec = json.loads(read_bytes(spec_path).decode("utf-8"))
-    entries = []
+    if os.path.islink(manifest):
+        raise Unsafe("--manifest がシンボリックリンク: " + manifest)
+    try:
+        spec = json.loads(read_bytes(spec_path).decode("utf-8"))
+    except ValueError:
+        raise Bad("--entries を JSON として読めない: " + spec_path)
+    if not isinstance(spec, list):
+        raise Bad("--entries は配列であること: " + spec_path)
+
+    # ★ 既存の manifest を id 単位でマージする（同じ id は置き換え、他は残す。
+    #   issue 011 merge ゲートレビュー item 5b）。他の manifest*.json はここでは一切開かない。
+    existing = []
+    if os.path.exists(manifest):
+        try:
+            prev = json.loads(read_bytes(manifest).decode("utf-8"))
+        except ValueError:
+            raise Bad("既存の manifest を JSON として読めない: " + manifest)
+        if isinstance(prev, dict) and isinstance(prev.get("entries"), list):
+            existing = prev["entries"]
+    order = [e.get("id") for e in existing if isinstance(e, dict)]
+    by_id = {e.get("id"): e for e in existing if isinstance(e, dict)}
+
     for s in spec:
+        if not isinstance(s, dict) or not s.get("id"):
+            raise Bad("--entries の要素に id が無い: %r" % (s,))
         ent = {k: s.get(k) for k in FIELDS}
         ent["sha256"] = sha(copy_bytes(ldir, ent))
+        if ent.get("kind") == "new" and ent.get("gse_path") and ent.get("start_anchor") and ent.get("end_anchor"):
+            ent["gse_range_sha256"] = sha(join(gse_range(read_gse_lines(repo, ent), ent)))
+        else:
+            ent["gse_range_sha256"] = None
         ent["gse_last_commit"] = (git(repo, "log", "-1", "--format=%H", "--", ent["gse_path"]) or None) if ent["gse_path"] else None
         if ent["gse_path"] and not ent["gse_last_commit"]:
             print("WARN: gse_last_commit を取れない（未コミット？）: " + ent["gse_path"], file=sys.stderr)
-        entries.append(ent)
-    for ent in entries:  # ★ コピーが GSE と逐語でない manifest は書かない
-        check_gse_entry(repo, ldir, ent)
+        check_gse_entry(repo, ldir, ent)  # ★ コピーが GSE と逐語（または判断の範囲が一致）でなければ書かない
+        if ent["id"] not in by_id:
+            order.append(ent["id"])
+        by_id[ent["id"]] = ent
+
+    entries = [by_id[i] for i in order]
     head = git(repo, "rev-parse", "HEAD")
     if not head:
         print("WARN: gse_repo_commit を取れない", file=sys.stderr)
@@ -225,9 +331,17 @@ EXCERPT = "use std::io;\n// @excerpt-begin ex1\n/// START\npub fn beta() -> u32 
 SPEC = [
     {"kind": "file", "id": "a", "path": "src/a_copy.rs", "gse_path": "src-tauri/src/a.rs"},
     {"kind": "excerpt", "id": "ex1", "path": "src/ex.rs", "gse_path": "src-tauri/src/a.rs", "start_anchor": "/// START", "end_anchor": "/// END", "symbol": "beta"},
-    {"kind": "new", "id": "shim", "path": "src/shim.rs", "gse_path": "src-tauri/src/a.rs", "reason": "シム"},
+    {"kind": "new", "id": "shim", "path": "src/shim.rs", "gse_path": "src-tauri/src/a.rs", "check_decls": True, "reason": "シム"},
 ]
 SPEC_B = [{"kind": "new", "id": "other", "path": "src/other.rs", "reason": "別の manifest の持ち物"}]
+# ★ 判断 33: new でも GSE 側のずれを検出できるエントリ（アンカー + gse_range_sha256）。
+SPEC_JUDGMENT = [
+    {
+        "kind": "new", "id": "judgment", "path": "src/judgment.rs", "gse_path": "src-tauri/src/a.rs",
+        "start_anchor": "/// START", "end_anchor": "/// END", "symbol": "beta",
+        "reason": "GSE の beta と同じ判断の写し（コードは別）",
+    }
+]
 
 
 def selftest():
@@ -270,11 +384,13 @@ def selftest():
     ex = put(ldir, "src/ex.rs", EXCERPT)
     shim = put(ldir, "src/shim.rs", "pub const K: u32 = 0x19;\n")
     other = put(ldir, "src/other.rs", "// 別\n")
+    put(ldir, "src/judgment.rs", "// GSE の beta と同じ判断の写し（コードは別）。\n")
     spec = put(tmp, "spec.json", json.dumps(SPEC, ensure_ascii=False))
     spec_b = put(tmp, "spec_b.json", json.dumps(SPEC_B, ensure_ascii=False))
+    spec_judgment = put(tmp, "spec_judgment.json", json.dumps(SPEC_JUDGMENT, ensure_ascii=False))
     mf, mf_b = os.path.join(ldir, "manifest.json"), os.path.join(ldir, "manifest.other.json")
 
-    expect("manifest が 0 本なら赤", ["--self"], 1, "manifest")
+    expect("manifest が 0 本なら使い方の誤り（exit 2）", ["--self"], 2, "manifest")
     expect("--update (B)", ["--update", "--manifest", mf_b, "--entries", spec_b], 0)
     expect("--update (A)", ["--update", "--manifest", mf, "--entries", spec], 0)
     expect("陽性対照 --self", ["--self"], 0)
@@ -287,8 +403,45 @@ def selftest():
     mutated(gse, "alpha", "alphb", "陰性 2: GSE 側を 1 バイト変えると --against-gse が赤", ["--against-gse"], "GSE")
     mutated(gse, "/// START\n", "/// STARt\n", "陰性 3: アンカーが見つからないと赤", ["--against-gse"], "アンカー")
     mutated(gse, "/// END\n", "/// END\n/// START\n", "陰性 4: アンカーが 2 回現れると赤", ["--against-gse"], "アンカー")
-    mutated(gse, "pub const K: u32 = 0x19;", "pub const K: u32 = 0x1A;", "陰性 7: シムの値が GSE と違うと赤", ["--against-gse"], "シム")
+    mutated(gse, "pub const K: u32 = 0x19;", "pub const K: u32 = 0x1A;", "陰性 7: check_decls の値が GSE と違うと赤", ["--against-gse"], "シム")
     mutated(mf, '"symbol": "beta"', '"symbol": "gamma"', "陰性 5: symbol が範囲に無いと赤", ["--against-gse"], "symbol")
+
+    # ★ item 5a: check_decls が無ければシムの値照合をしない（gse_path があるだけでは照合しない）。
+    #   ⚠️ 既存の manifest（"shim" は check_decls: true 付きで登録済み）と混ざると、同じ GSE の
+    #   ミューテーションでそちら側が正しく赤くなってしまい判定できないので、独立した
+    #   logger-dir / repo で確かめる。
+    nd = os.path.join(tmp, "nodecls")
+    nd_ldir, nd_repo = os.path.join(nd, "logger"), os.path.join(nd, "repo")
+    nd_gse = put(nd_repo, "src-tauri/src/a.rs", GSE_A)
+    put(nd_ldir, "src/shim.rs", "pub const K: u32 = 0x19;\n")
+    nd_spec = put(nd, "spec.json", json.dumps(
+        [{"kind": "new", "id": "shim2", "path": "src/shim.rs", "gse_path": "src-tauri/src/a.rs", "reason": "シム（check_decls 無し）"}],
+        ensure_ascii=False,
+    ))
+
+    def nd_run(*args):
+        return subprocess.run(
+            [sys.executable, script, "--logger-dir", nd_ldir, "--repo", nd_repo] + list(args),
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            env=dict(os.environ, PYTHONUTF8="1"), timeout=60,
+        )
+
+    def nd_expect(name, args, rc_want):
+        r = nd_run(*args)
+        out = r.stdout + r.stderr
+        if r.returncode != rc_want or "Traceback" in out:
+            fails.append("%s: exit %d（期待 %d）%s" % (name, r.returncode, rc_want, out.strip()[-160:]))
+
+    nd_expect("item 5a 準備: check_decls 無しの new を登録", ["--update", "--manifest", os.path.join(nd_ldir, "manifest.json"), "--entries", nd_spec], 0)
+    with open(nd_gse, "rb") as f:
+        nd_orig = f.read()
+    try:
+        with open(nd_gse, "wb") as f:
+            f.write(nd_orig.replace(b"pub const K: u32 = 0x19;", b"pub const K: u32 = 0x1A;", 1))
+        nd_expect("item 5a 陰性対照: check_decls 無しなら値がずれても against-gse は緑のまま", ["--against-gse"], 0)
+    finally:
+        with open(nd_gse, "wb") as f:
+            f.write(nd_orig)
 
     before = read_bytes(mf_b)
     expect("陰性 6: --update --manifest A が B を書き換えない（実行）", ["--update", "--manifest", mf, "--entries", spec], 0)
@@ -296,6 +449,84 @@ def selftest():
         fails.append("陰性 6: --update --manifest A が manifest.other.json を書き換えた")
     expect("陰性 6b: --manifest が別のディレクトリなら拒否", ["--update", "--manifest", os.path.join(tmp, "manifest.json"), "--entries", spec], 2)
     expect("更新後も陽性", ["--self"], 0)
+
+    # ★ item 5b: --update は id 単位でマージする（同じ manifest に judgment を後から足しても
+    #   既存の a / ex1 / shim は残る）。
+    expect("item 5b: judgment を後から追加", ["--update", "--manifest", mf, "--entries", spec_judgment], 0)
+    try:
+        ids = sorted(e.get("id") for e in json.loads(read_bytes(mf).decode("utf-8"))["entries"])
+    except (ValueError, KeyError):
+        ids = None
+    if ids != ["a", "ex1", "judgment", "shim"]:
+        fails.append("item 5b: マージ後の id 集合が期待と違う: %r" % (ids,))
+    expect("item 5b 後も陽性 --self", ["--self"], 0)
+    expect("item 5b 後も陽性 --against-gse", ["--against-gse"], 0)
+
+    # ★ item 6: new (アンカー付き) の GSE 側範囲が変わると against-gse が赤になる
+    #   （コピー自体は逐語でなくてよい・GSE の「判断」が変わったことを検出する）。
+    mutated(gse, "2\n}\n", "9\n}\n", "陰性 8: new (アンカー付き) の GSE 側範囲が変わると against-gse が赤",
+            ["--against-gse"], "judgment")
+
+    # ★ item 6: アンカーがあるのに gse_range_sha256 が無いと赤。
+    m = re.search(r'"id": "judgment".*?"gse_range_sha256": "([0-9a-f]{64})"', read_bytes(mf).decode("utf-8"), re.S)
+    if m is None:
+        fails.append("item 6: manifest に judgment の gse_range_sha256 が無い")
+    else:
+        mutated(mf, '"gse_range_sha256": "%s"' % m.group(1), '"gse_range_sha256": null',
+                "陰性 9: new にアンカーがあるのに gse_range_sha256 が無いと赤", ["--against-gse"], "gse_range_sha256")
+
+    # --- item 8: パスの安全性・壊れた入力（Traceback ではなく exit 2） ---------------------
+    sec = os.path.join(tmp, "sec")
+    sec_ldir, sec_repo = os.path.join(sec, "logger"), os.path.join(sec, "repo")
+    os.makedirs(sec_repo, exist_ok=True)
+
+    def sec_run(*args):
+        return subprocess.run(
+            [sys.executable, script, "--logger-dir", sec_ldir, "--repo", sec_repo] + list(args),
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            env=dict(os.environ, PYTHONUTF8="1"), timeout=60,
+        )
+
+    def sec_expect(name, args, rc_want, needle=None):
+        r = sec_run(*args)
+        out = r.stdout + r.stderr
+        if r.returncode != rc_want or "Traceback" in out or (needle and needle not in out):
+            fails.append("%s: exit %d（期待 %d）%s" % (name, r.returncode, rc_want, out.strip()[-160:]))
+
+    put(sec_ldir, "manifest.json", json.dumps({"gse_repo_commit": "x", "entries": "abc"}, ensure_ascii=False))
+    sec_expect("陰性 10: entries が配列でないと exit 2（Traceback ではない）", ["--self"], 2)
+
+    put(sec_ldir, "manifest.json", json.dumps(
+        {"gse_repo_commit": "x", "entries": [{"kind": "file", "id": "n", "path": "a\x00b", "gse_path": "x", "sha256": "0" * 64}]},
+        ensure_ascii=False,
+    ))
+    sec_expect("陰性 11: path に NUL があると exit 2（Traceback ではない）", ["--self"], 2)
+
+    put(sec_ldir, "manifest.json", json.dumps(
+        {"gse_repo_commit": "x", "entries": [{"kind": "file", "id": "n", "path": "/etc/passwd", "gse_path": "x", "sha256": "0" * 64}]},
+        ensure_ascii=False,
+    ))
+    sec_expect("陰性 12: path が / で始まると exit 2", ["--self"], 2)
+
+    sec_spec_not_json = put(sec, "spec_not_json.txt", "not json {{{")
+    put(sec_ldir, "manifest.json", json.dumps({"gse_repo_commit": "x", "entries": [{"kind": "new", "id": "z", "path": "z.rs", "reason": "z"}]}, ensure_ascii=False))
+    put(sec_ldir, "z.rs", "// z\n")
+    sec_expect(
+        "陰性 13: --entries が JSON でないと exit 2（Traceback ではない）",
+        ["--update", "--manifest", os.path.join(sec_ldir, "manifest.json"), "--entries", sec_spec_not_json],
+        2,
+    )
+
+    try:
+        link_target = put(sec, "manifest_target.json", json.dumps({"gse_repo_commit": "x", "entries": [{"kind": "new", "id": "z", "path": "z.rs", "reason": "z"}]}))
+        link_path = os.path.join(sec_ldir, "manifest.link.json")
+        if os.path.exists(link_path) or os.path.islink(link_path):
+            os.remove(link_path)
+        os.symlink(link_target, link_path)
+        sec_spec_empty = put(sec, "spec_empty.json", "[]")
+        sec_expect("陰性 14: --update はシンボリックリンクの manifest を拒否する", ["--update", "--manifest", link_path, "--entries", sec_spec_empty], 2)
+    except OSError:
+        pass  # ⚠️ シンボリックリンク作成に権限が要る環境がある（Windows）。作れなければこの陰性対照は飛ばす。
 
     shutil.rmtree(tmp, ignore_errors=True)
     for f in fails:
@@ -330,9 +561,12 @@ def main():
             update(ldir, repo, a.manifest, a.entries)
             return 0
         errs = check_self(ldir) if a.self else check_against_gse(ldir, repo)
-    except Bad as e:
+    except (Bad, ValueError) as e:
+        # ⚠️ ここに来るのは常に構造的な誤り（JSON が壊れている・manifest が 0 本・
+        #   パスの安全性違反等）であり、個別の不一致（`errs`）とは別枠。exit 2
+        #   （issue 011 merge ゲートレビュー item 8: Traceback ではなく制御された終了）。
         print("NG:", e)
-        return 2 if a.update else 1
+        return 2
     for e in errs:
         print("NG:", e)
     print("%s: %s" % ("--self" if a.self else "--against-gse", "不一致 %d 件" % len(errs) if errs else "一致"))

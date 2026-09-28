@@ -8,6 +8,11 @@ publish = false
 # ★ 依存は src-tauri/Cargo.toml と同じ crate・同じ版に限る（判断 22）。
 #   ドライバ（driver_macos / driver_windows）が要る分もここで宣言しておく —— 後続の issue は Cargo.toml を触らない。
 
+# ★ このパッケージ単体を workspace root にする。
+#   ⚠️ これが無いと、祖先ディレクトリに別の Cargo workspace ができたときに巻き込まれ、
+#   cargo が「どの workspace に属するか」を親方向へ探索してしまう（issue 011 merge ゲートレビュー item 9）。
+[workspace]
+
 [[bin]]
 name = "ime-observation-logger"
 path = "src/main.rs"

@@ -1,5 +1,5 @@
 {
-  "gse_repo_commit": "70ddfa84f81a6efe5a323bb46083ca03adfad026",
+  "gse_repo_commit": "dcb90a1c83d7886ba920ed19286d2bdf8c0cece1",
   "entries": [
     {
       "kind": "file",
@@ -59,7 +59,9 @@
       "end_anchor": null,
       "symbol": null,
       "sha256": "c9a9fb0fdda59795ae956dae0a77da61cea591838ef8fd55cb7067f03b87f279",
-      "reason": "シム: 逐語コピーした 3 ファイルが super::hook から参照する pub const 6 個と Atomic 8 個だけ（値と型は --against-gse が GSE の hook.rs と照合する）"
+      "gse_range_sha256": null,
+      "check_decls": true,
+      "reason": "シム: 逐語コピーした 3 ファイルが super::hook から参照する pub const 6 個と Atomic 8 個だけ（値と型は check_decls: true により --against-gse が GSE の hook.rs と照合する。issue 011 merge ゲートレビュー item 5a: 照合は明示の欄があるときだけ行う）"
     },
     {
       "kind": "new",
@@ -82,8 +84,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "f8310b6d7c71d190bf1865049f900d3b1a1c500726e3bfeaa247842904b7fb00",
-      "reason": "lib.rs の emit_ime_shadow と IME Monitor スレッドの、G1（g1_mode）を除いた写し（t は drain した時刻・stale 経路と active→false 遷移経路は Windows 限定）＋ meta 行・key 行の書き出し（obs/1）・selftest（新規）"
+      "sha256": "8b3e08b2c57113d1cffc4766e21086aafa85c920fb1cd3fdcbd34bfe2f8850d3",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": "lib.rs の emit_ime_shadow と IME Monitor スレッドの、G1（g1_mode）を除いた写し（t は drain した時刻・stale 経路と active→false 遷移経路は Windows 限定）＋ meta 行・key 行の書き出し（obs/1）・selftest（新規）。候補窓が開いているかの観測は既定で IME_ACTIVE を直接読むが、ドライバは driver_api.rs の契約に従って is_candidate_window_open() 相当の観測関数を差し込める（issue 011 merge ゲートレビュー item 1）。GSE 側の判断そのものの照合は main_emit_ime_shadow_judgment / main_ime_monitor_loop_judgment（判断 33）が持つ"
     },
     {
       "kind": "new",
@@ -94,8 +98,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "6ea0b1f3e1429eb10c2b755ca37565d7e6940030a8c1497bc1f6812b6cce2c4d",
-      "reason": "ドライバと核の境界の型（KeyEvent / DriverCtx）。GSE には無い新規のファイル"
+      "sha256": "7b7255eb4c591571e20bac397169dc4e9f4a3021d8a238c935fce9b2fc745c12",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": "ドライバと核の境界の型（KeyEvent / DriverCtx / DriverHandle）。GSE には無い新規のファイル。候補窓の観測関数の差し込み口（issue 011 merge ゲートレビュー item 1）とドライバの停止の契約（item 4）を持つ"
     },
     {
       "kind": "new",
@@ -106,8 +112,38 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "6b7624c45c6752a2870f6d5a988cca43f1c9479fb3439a988e507f605abaa14d",
-      "reason": "依存は src-tauri/Cargo.toml と同じ crate・同じ版に限る（windows の features は写し）。ドライバの分もここで宣言済み"
+      "sha256": "569cdc24a10de8cfe35f204229b4ab348bba70b80d22fc5f15287a0f475e7dbd",
+      "gse_range_sha256": null,
+      "check_decls": null,
+      "reason": "依存は src-tauri/Cargo.toml と同じ crate・同じ版に限る（windows の features は写し）。ドライバの分もここで宣言済み。[workspace] で親の workspace に巻き込まれないようにした（issue 011 merge ゲートレビュー item 9）"
+    },
+    {
+      "kind": "new",
+      "id": "main_emit_ime_shadow_judgment",
+      "path": "src/main.rs",
+      "gse_path": "src-tauri/src/lib.rs",
+      "gse_last_commit": "6851e5afa4f138463e9511a2fb1a481b7b5793a3",
+      "start_anchor": "fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {",
+      "end_anchor": "// アプリ起動",
+      "symbol": "emit_ime_shadow",
+      "sha256": "8b3e08b2c57113d1cffc4766e21086aafa85c920fb1cd3fdcbd34bfe2f8850d3",
+      "gse_range_sha256": "bbd0fcf76c30845444753c1323afa8998d1d928b53bf16dece1f1493e866308b",
+      "check_decls": null,
+      "reason": "判断 33: emit_ime_shadow が GSE 側で変わっていないかを --against-gse で検出する（写し自体は main.rs の emit_ime_shadow・逐語ではなく Atomic の受け渡しを ShadowAtomics に差し替えた同じ判断の移植）"
+    },
+    {
+      "kind": "new",
+      "id": "main_ime_monitor_loop_judgment",
+      "path": "src/main.rs",
+      "gse_path": "src-tauri/src/lib.rs",
+      "gse_last_commit": "6851e5afa4f138463e9511a2fb1a481b7b5793a3",
+      "start_anchor": "    // IME モニタースレッド",
+      "end_anchor": "    // キーボードフック・IME ポーリングの Sender を setup() に渡すために保持。",
+      "symbol": null,
+      "sha256": "8b3e08b2c57113d1cffc4766e21086aafa85c920fb1cd3fdcbd34bfe2f8850d3",
+      "gse_range_sha256": "c806eabc302eeb38dadb6b1dd3e45d4691cdadcc643781c4a8012e444d4564f4",
+      "check_decls": null,
+      "reason": "判断 33: IME Monitor スレッドの 1 周（safety valve → active→false 遷移 → READY 直接ポーリングの順序）が GSE 側で変わっていないかを --against-gse で検出する（写しは main.rs の Monitor::run_cycle・G1 を除く）"
     }
   ]
 }
