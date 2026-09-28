@@ -1,0 +1,113 @@
+{
+  "gse_repo_commit": "70ddfa84f81a6efe5a323bb46083ca03adfad026",
+  "entries": [
+    {
+      "kind": "file",
+      "id": "ime_compose",
+      "path": "src/input/ime_compose.rs",
+      "gse_path": "src-tauri/src/input/ime_compose.rs",
+      "gse_last_commit": "80859ed1692366715d49500eb29d66d71f3080f3",
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "244e10021b652d832b07c26e28c606bfb3ea952b178cc035676593e0b9fe81d8",
+      "reason": null
+    },
+    {
+      "kind": "file",
+      "id": "ime_cloak",
+      "path": "src/input/ime_cloak.rs",
+      "gse_path": "src-tauri/src/input/ime_cloak.rs",
+      "gse_last_commit": "efee77df73a023fde17d34e843fcaf713c92f804",
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "ac0541a7f482d16089df61cd90f265c738afa0604ce8e5f858de00743c57ee62",
+      "reason": null
+    },
+    {
+      "kind": "file",
+      "id": "ime_mode",
+      "path": "src/input/ime_mode.rs",
+      "gse_path": "src-tauri/src/input/ime_mode.rs",
+      "gse_last_commit": "9a900bf5ce4f02c539e1b85d6d514e1c12e2ca95",
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "3310e9fe527afd9c0e02c25f38e224cc9861fa283d17cb4ae38b96ea8db1eaf7",
+      "reason": null
+    },
+    {
+      "kind": "excerpt",
+      "id": "key_category",
+      "path": "src/key_category.rs",
+      "gse_path": "src-tauri/src/analysis/anonymize.rs",
+      "gse_last_commit": "9eb1384c37d2cb2f2c54f029a9053398ac2ea31e",
+      "start_anchor": "/// VK コードをプライバシーセーフなキー種別カテゴリに変換する (anonymization.md 準拠)。",
+      "end_anchor": "/// NDJSON 1 行を匿名化する。`session_start_ms` は当該セッションの絶対開始時刻。",
+      "symbol": "KeyCategory",
+      "sha256": "a7f2a358d8e136c454f770b7ddb67b098a4692f78ac2de89b54e07ab1e266ff8",
+      "reason": "anonymize.rs はファイルごとだとテストが crate::schema_dto に依存するため、KeyCategory とその直後の ABSOLUTE_TIME_FIELDS（ロガーでは未使用）までを抜粋する"
+    },
+    {
+      "kind": "new",
+      "id": "hook_shim",
+      "path": "src/input/hook.rs",
+      "gse_path": "src-tauri/src/input/hook.rs",
+      "gse_last_commit": "58e18f359ebd4eec645821e7031b5ec3f0706e01",
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "c9a9fb0fdda59795ae956dae0a77da61cea591838ef8fd55cb7067f03b87f279",
+      "reason": "シム: 逐語コピーした 3 ファイルが super::hook から参照する pub const 6 個と Atomic 8 個だけ（値と型は --against-gse が GSE の hook.rs と照合する）"
+    },
+    {
+      "kind": "new",
+      "id": "input_mod",
+      "path": "src/input/mod.rs",
+      "gse_path": null,
+      "gse_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "f8b54536dbe341ee2215003bc6f18196e97794c482f54767808562989f2f2ea4",
+      "reason": "GSE の input/mod.rs の代わり: 4 モジュール（hook シム・逐語コピー 3 本）だけを宣言する"
+    },
+    {
+      "kind": "new",
+      "id": "main",
+      "path": "src/main.rs",
+      "gse_path": "src-tauri/src/lib.rs",
+      "gse_last_commit": "6851e5afa4f138463e9511a2fb1a481b7b5793a3",
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "f8310b6d7c71d190bf1865049f900d3b1a1c500726e3bfeaa247842904b7fb00",
+      "reason": "lib.rs の emit_ime_shadow と IME Monitor スレッドの、G1（g1_mode）を除いた写し（t は drain した時刻・stale 経路と active→false 遷移経路は Windows 限定）＋ meta 行・key 行の書き出し（obs/1）・selftest（新規）"
+    },
+    {
+      "kind": "new",
+      "id": "driver_api",
+      "path": "src/driver_api.rs",
+      "gse_path": null,
+      "gse_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "6ea0b1f3e1429eb10c2b755ca37565d7e6940030a8c1497bc1f6812b6cce2c4d",
+      "reason": "ドライバと核の境界の型（KeyEvent / DriverCtx）。GSE には無い新規のファイル"
+    },
+    {
+      "kind": "new",
+      "id": "cargo_toml",
+      "path": "Cargo.toml",
+      "gse_path": null,
+      "gse_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "6b7624c45c6752a2870f6d5a988cca43f1c9479fb3439a988e507f605abaa14d",
+      "reason": "依存は src-tauri/Cargo.toml と同じ crate・同じ版に限る（windows の features は写し）。ドライバの分もここで宣言済み"
+    }
+  ]
+}
