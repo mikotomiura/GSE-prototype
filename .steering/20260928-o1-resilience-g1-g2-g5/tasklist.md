@@ -14,7 +14,7 @@
 - [x] /finish-task（/cross-review 必須）→ PR → CI 緑 → merge
 - [x] 版上げ v0.1.38（PR #247・`afe6b0d7`）→ タグ push（研究者承認）→ Release 検証 → zip → `docs/o1-distribution-tag.md` v0.1.38 節
 - [ ] Drive の zip 差し替え（研究者）→ コネクタでバイト数照合
-- [ ] O1 同意フォームの再配備（研究者: `migrateO1ConsentForm()`） → 研究者承認でタグ → Release 検証 → zip → o1-distribution-tag.md → Drive 照合
+- [ ] O1 同意フォームの再配備（研究者: `migrateO1ConsentForm()`）
 - [ ] 段階 B（新ビルドで本当のログイン・研究者）
 
 ## 記録
