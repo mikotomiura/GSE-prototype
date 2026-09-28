@@ -16,14 +16,22 @@ const src = fs.readFileSync(
   "utf8"
 );
 
-/** Drive の代わり。作られたファイルを配列に貯める（★ 消す操作は持たせない）。 */
-function makeFolder(preexisting) {
-  const files = (preexisting || []).map((f) => ({ ...f }));
-  return {
-    files,
-    getName: () => "STUB",
-    getFilesByName(name) {
-      const hits = files.filter((f) => f.name === name);
+/**
+ * ★ ロックの保持状態（Codex 指摘 2026-09-28）: フォルダの検索・作成が**ロックを持った状態で**行われたかを見る。
+ *   ⚠️ 偽のロックが固定値を返すだけだと、「検索の前にロックを返す」回帰が緑のまま通る。
+ */
+const LOCK = { held: false, violations: 0 };
+/** Drive の 1 フォルダの代わり。作られたファイルを配列に貯める（★ 消す操作は持たせない）。 */
+function makeDir(name, created, trashed) {
+  const dir = {
+    name,
+    files: [],
+    subs: [],
+    getName: () => name,
+    getDateCreated: () => new Date(created || 0),
+    isTrashed: () => !!trashed,
+    getFilesByName(n) {
+      const hits = dir.files.filter((f) => f.name === n);
       let i = 0;
       return {
         hasNext: () => i < hits.length,
@@ -33,15 +41,53 @@ function makeFolder(preexisting) {
         },
       };
     },
+    getFoldersByName(n) {
+      if (!LOCK.held) LOCK.violations++;
+      // ⚠️ 実 Drive が大文字小文字を区別するかは未確認 → 偽物は**区別しない**側（厳しい側）に倒す。
+      const hits = dir.subs.filter((d) => d.name.toLowerCase() === n.toLowerCase());
+      let i = 0;
+      return { hasNext: () => i < hits.length, next: () => hits[i++] };
+    },
+    createFolder(n) {
+      if (!LOCK.held) LOCK.violations++;
+      const d = makeDir(n, 1e12 + dir.subs.length);
+      dir.subs.push(d);
+      dir.createdFolders = (dir.createdFolders || 0) + 1;
+      return d;
+    },
     createFile(blob) {
-      files.push({ name: blob.__name, size: blob.__bytes.length });
+      dir.files.push({ name: blob.__name, size: blob.__bytes.length });
       return { setTrashed: () => {} };
     },
   };
+  return dir;
 }
 
-function makeCtx(folder, secret) {
+/**
+ * 受け取りフォルダ（ルート）の代わり。
+ * ★ `preexisting` の要素に `dir` があれば、その名前の P-ID サブフォルダに置く（無ければ直下）。
+ * ★ `all()` = 直下 ＋ サブフォルダの全ファイル（どこに入ったかを問わない件数検査用）。
+ */
+function makeFolder(preexisting) {
+  const root = makeDir("STUB", 0);
+  (preexisting || []).forEach((f) => {
+    if (!f.dir) return root.files.push({ name: f.name, size: f.size });
+    let d = root.subs.find((x) => x.name === f.dir);
+    if (!d) {
+      d = makeDir(f.dir, 0);
+      root.subs.push(d);
+    }
+    d.files.push({ name: f.name, size: f.size });
+  });
+  root.all = () => root.files.concat(...root.subs.map((d) => d.files));
+  root.sub = (n) => root.subs.filter((d) => d.name === n);
+  return root;
+}
+
+function makeCtx(folder, secret, opt) {
   const logs = [];
+  const lockOk = !(opt && opt.lockFails);
+  let released = 0;
   // ★ 設定は **スクリプト プロパティ**から読む（ソースに秘密を置かないため）。
   const props = {
     FOLDER_ID: "FOLDER",
@@ -52,6 +98,18 @@ function makeCtx(folder, secret) {
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k) => (k in props ? props[k] : null),
+      }),
+    },
+    LockService: {
+      getScriptLock: () => ({
+        tryLock: () => {
+          if (lockOk) LOCK.held = true;
+          return lockOk;
+        },
+        releaseLock: () => {
+          LOCK.held = false;
+          released++;
+        },
       }),
     },
     DriveApp: {
@@ -70,6 +128,7 @@ function makeCtx(folder, secret) {
     },
     __logs: logs,
   };
+  ctx.__released = () => released;
   ctx.__setProp = (k, v) => {
     props[k] = v;
   };
@@ -114,9 +173,9 @@ function check(name, fn, expectOk) {
   );
   cases.push({
     name: "  └ Drive に 1 本作られている",
-    ok: folder.files.length === 1,
+    ok: folder.all().length === 1,
     expectOk: true,
-    got: { files: folder.files.length },
+    got: { files: folder.all().length },
   });
 }
 
@@ -184,9 +243,9 @@ function check(name, fn, expectOk) {
     const res = post(ctx, { secret: SECRET, name, b64: b64(100) });
     cases.push({
       name: `端末が作る名前は通る: ${name}`,
-      ok: res.ok === true && folder.files.length === 1,
+      ok: res.ok === true && folder.all().length === 1,
       expectOk: true,
-      got: { error: res.error, files: folder.files.length },
+      got: { error: res.error, files: folder.all().length },
     });
   });
 }
@@ -210,9 +269,9 @@ function check(name, fn, expectOk) {
     const res = post(ctx, { secret: SECRET, name, b64: b64(100) });
     cases.push({
       name: `⚠️ G1 / 紛らわしい名前は落とす: ${name}`,
-      ok: res.ok === false && res.error === "bad name" && folder.files.length === 0,
+      ok: res.ok === false && res.error === "bad name" && folder.all().length === 0,
       expectOk: true,
-      got: { error: res.error, files: folder.files.length },
+      got: { error: res.error, files: folder.all().length },
     });
   });
 }
@@ -232,9 +291,9 @@ function check(name, fn, expectOk) {
     const res = post(ctx, { secret: SECRET, name, b64: b64(100) });
     cases.push({
       name: `連番を許しても形が崩れた名前は落とす: ${name}`,
-      ok: res.ok === false && res.error === "bad name" && folder.files.length === 0,
+      ok: res.ok === false && res.error === "bad name" && folder.all().length === 0,
       expectOk: true,
-      got: { error: res.error, files: folder.files.length },
+      got: { error: res.error, files: folder.all().length },
     });
   });
 }
@@ -256,9 +315,9 @@ function check(name, fn, expectOk) {
   });
   cases.push({
     name: "上限を超える大きさは 'too large' で断り、保存しない",
-    ok: res.ok === false && res.error === "too large" && folder.files.length === 0,
+    ok: res.ok === false && res.error === "too large" && folder.all().length === 0,
     expectOk: true,
-    got: { error: res.error, files: folder.files.length },
+    got: { error: res.error, files: folder.all().length },
   });
 }
 {
@@ -431,7 +490,7 @@ function check(name, fn, expectOk) {
 // --- 9. ★★ 同名でも握り潰さず保存する ----------------------------------------
 {
   const NAME = "P012_o1day01_gse_o1_20260828_012103.age";
-  const folder = makeFolder([{ name: NAME, size: 1000 }]);
+  const folder = makeFolder([{ name: NAME, size: 1000, dir: "P012" }]);
   const ctx = makeCtx(folder, SECRET);
   const res = post(ctx, { secret: SECRET, name: NAME, b64: b64(1000) });
   cases.push({
@@ -439,18 +498,152 @@ function check(name, fn, expectOk) {
     ok:
       res.ok === true &&
       res.duplicate === true &&
-      folder.files.length === 2 &&
+      folder.all().length === 2 &&
       res.saved !== NAME,
     expectOk: true,
-    got: { saved: res.saved, duplicate: res.duplicate, files: folder.files.length },
+    got: { saved: res.saved, duplicate: res.duplicate, files: folder.all().length },
   });
   cases.push({
     name: "  └ 既にあったほうを消していない",
-    ok: folder.files.some((f) => f.name === NAME),
+    ok: folder.all().some((f) => f.name === NAME),
     expectOk: true,
-    got: { names: folder.files.map((f) => f.name) },
+    got: { names: folder.all().map((f) => f.name) },
   });
 }
+
+// --- 11. ★★ P-ID ごとのサブフォルダに保存する（2026-09-28・V-3） ---------------
+//   ⚠️ 陰性対照を必ず並べる: 直下に置かない／ロックが取れなければ保存しない。
+{
+  const N1 = "P012_o1day01_gse_o1_20260828_012103.age";
+  const N2 = "P012_o1day02_gse_o1_20260829_012103.age";
+  const M1 = "P013_o1day01_gse_o1_20260828_012103.age";
+  const folder = makeFolder();
+  const ctx = makeCtx(folder, SECRET);
+  const r1 = post(ctx, { secret: SECRET, name: N1, b64: b64(10) });
+  const r2 = post(ctx, { secret: SECRET, name: N2, b64: b64(10) });
+  const r3 = post(ctx, { secret: SECRET, name: M1, b64: b64(10) });
+  const p12 = folder.sub("P012");
+  const p13 = folder.sub("P013");
+  cases.push({
+    name: "★ P-ID のサブフォルダに保存し、直下には置かない",
+    ok: r1.ok === true && folder.files.length === 0 && p12.length === 1 && p12[0].files.some((f) => f.name === N1),
+    expectOk: true,
+    got: { ok: r1.ok, root: folder.files.length, p12: p12.map((d) => d.files.map((f) => f.name)) },
+  });
+  cases.push({
+    name: "  └ 同じ P-ID の 2 本目はフォルダを作らず同じフォルダへ",
+    ok: r2.ok === true && p12.length === 1 && p12[0].files.length === 2,
+    expectOk: true,
+    got: { ok: r2.ok, p12Folders: p12.length, p12Files: p12.length ? p12[0].files.length : 0 },
+  });
+  cases.push({
+    name: "  └ 別の P-ID は別のフォルダへ（混ざらない）",
+    ok: r3.ok === true && p13.length === 1 && p13[0].files.length === 1 && folder.createdFolders === 2,
+    expectOk: true,
+    got: { ok: r3.ok, p13: p13.length, created: folder.createdFolders },
+  });
+  cases.push({
+    name: "  └ 保存のたびにロックを返している",
+    ok: ctx.__released() === 3,
+    expectOk: true,
+    got: { released: ctx.__released() },
+  });
+}
+{
+  // 同名の P-ID フォルダが複数ある → 最古に入れる。⚠️ ごみ箱のフォルダは最古でも使わない。
+  const NAME = "P012_o1day01_gse_o1_20260828_012103.age";
+  const folder = makeFolder();
+  const trashedOldest = makeDir("P012", 100, true);
+  const newer = makeDir("P012", 300);
+  const older = makeDir("P012", 200);
+  folder.subs.push(trashedOldest, newer, older);
+  const ctx = makeCtx(folder, SECRET);
+  const res = post(ctx, { secret: SECRET, name: NAME, b64: b64(10) });
+  cases.push({
+    name: "★ 同名の P-ID フォルダが複数あれば最古（ごみ箱を除く）に入れ、新たに作らない",
+    ok: res.ok === true && older.files.length === 1 && newer.files.length === 0 && trashedOldest.files.length === 0 && !folder.createdFolders,
+    expectOk: true,
+    got: { ok: res.ok, older: older.files.length, newer: newer.files.length, trashed: trashedOldest.files.length, created: folder.createdFolders || 0 },
+  });
+}
+{
+  // ごみ箱のフォルダしか無い → 新しく作る（捨てたフォルダへ入れない）
+  const NAME = "P012_o1day01_gse_o1_20260828_012103.age";
+  const folder = makeFolder();
+  const trashed = makeDir("P012", 100, true);
+  folder.subs.push(trashed);
+  const ctx = makeCtx(folder, SECRET);
+  const res = post(ctx, { secret: SECRET, name: NAME, b64: b64(10) });
+  cases.push({
+    name: "★ ごみ箱の P-ID フォルダしか無ければ新しく作る",
+    ok: res.ok === true && trashed.files.length === 0 && folder.createdFolders === 1,
+    expectOk: true,
+    got: { ok: res.ok, trashed: trashed.files.length, created: folder.createdFolders || 0 },
+  });
+}
+{
+  // 重複の判定は P-ID フォルダの中で行う（別の P-ID の同名は重複ではない・直下の旧形式も見ない）
+  const NAME = "P012_o1day01_gse_o1_20260828_012103.age";
+  const folder = makeFolder([{ name: NAME, size: 10 }]);
+  const ctx = makeCtx(folder, SECRET);
+  const res = post(ctx, { secret: SECRET, name: NAME, b64: b64(10) });
+  cases.push({
+    name: "  └ 直下の旧形式と同名でも P-ID フォルダ内に無ければ重複扱いしない",
+    ok: res.ok === true && res.duplicate === false && res.saved === NAME,
+    expectOk: true,
+    got: { ok: res.ok, duplicate: res.duplicate, saved: res.saved },
+  });
+}
+{
+  // ⚠️ ロックが取れない → 保存しない・フォルダも作らない・ok:false（★ 端末は未送信のまま再送する）
+  const folder = makeFolder();
+  const ctx = makeCtx(folder, SECRET, { lockFails: true });
+  const res = post(ctx, { secret: SECRET, name: "P012_o1day01_gse_o1_20260828_012103.age", b64: b64(10) });
+  cases.push({
+    name: "⚠️ ロックが取れなければ保存せず busy を返す",
+    ok: res.ok === false && res.error === "busy" && folder.all().length === 0 && !folder.createdFolders,
+    expectOk: true,
+    got: { res, files: folder.all().length, created: folder.createdFolders || 0 },
+  });
+}
+
+{
+  // フォルダ作成が例外 → server error（★ 端末は再送する）・ロックは返している（finally）
+  const folder = makeFolder();
+  folder.createFolder = () => {
+    throw new Error("Drive quota");
+  };
+  const ctx = makeCtx(folder, SECRET);
+  const res = post(ctx, { secret: SECRET, name: "P012_o1day01_gse_o1_20260828_012103.age", b64: b64(10) });
+  cases.push({
+    name: "  └ フォルダ作成が例外でも server error を返し、ロックを返している",
+    ok: res.ok === false && res.error === "server error" && ctx.__released() === 1 && folder.all().length === 0,
+    expectOk: true,
+    got: { res, released: ctx.__released(), files: folder.all().length },
+  });
+}
+
+{
+  // 大文字小文字だけ違う P-ID は別フォルダ（名前の検索が区別しなくても混ぜない）
+  const folder = makeFolder([{ name: "P012_o1day01_gse_o1_20260828_012103.age", size: 1, dir: "P012" }]);
+  const ctx = makeCtx(folder, SECRET);
+  const res = post(ctx, { secret: SECRET, name: "p012_o1day01_gse_o1_20260828_012103.age", b64: b64(10) });
+  const upper = folder.sub("P012")[0];
+  const lower = folder.subs.filter((d) => d.name === "p012");
+  cases.push({
+    name: "★ 大文字小文字だけ違う P-ID を既存フォルダに混ぜない",
+    ok: res.ok === true && upper.files.length === 1 && lower.length === 1 && lower[0].files.length === 1,
+    expectOk: true,
+    got: { ok: res.ok, upper: upper.files.length, lower: lower.map((d) => d.files.length) },
+  });
+}
+
+cases.push({
+  name: "★ P-ID フォルダの検索・作成はすべてロックを持った状態で行われた（全ケース通算）",
+  ok: LOCK.violations === 0 && LOCK.held === false,
+  expectOk: true,
+  got: { violations: LOCK.violations, heldAtEnd: LOCK.held },
+});
 
 // --- 10. ⚠️ このファイルは **秘密を含まない** --------------------------------
 //   ★ repo は一時 public にする運用がある。`.gs` に FOLDER_ID / SHARED_SECRET を
