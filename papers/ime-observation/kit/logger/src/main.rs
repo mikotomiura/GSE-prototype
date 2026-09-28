@@ -1,18 +1,18 @@
 //! ime-observation-logger — the core of the standalone input-method observation logger.
 //!
-//! Reuses a reference conversion-session state machine (`input/ime_compose.rs`, `ime_cloak.rs`,
-//! `ime_mode.rs`), copied verbatim, to read the atomics it exposes and write `ime_shadow` lines, and
-//! writes `key` lines from the key transitions a driver sends. Output follows format `obs/1`. The
-//! observation is content-free: a `key` line carries only one of fourteen categories, and an
-//! `ime_shadow` line carries only counts (`dwell_ms`, `nav`, `abandon`).
+//! Reads the atomics exposed by the conversion-session state machine (`input/ime_compose.rs`,
+//! `ime_cloak.rs`, `ime_mode.rs`) to write `ime_shadow` lines, and writes `key` lines from the key
+//! transitions a driver sends. Output follows format `obs/1`. The observation is content-free: a
+//! `key` line carries only one of fourteen categories, and an `ime_shadow` line carries only counts
+//! (`dwell_ms`, `nav`, `abandon`).
 //!
 //! Usage: `ime-observation-logger --out <path> [--duration-s <n>]` or
 //! `ime-observation-logger --selftest [--out <path>]`. The operating-system driver that captures key
 //! events lives in `driver_macos.rs` / `driver_windows.rs`.
 
 // The Windows driver's low-level keyboard hook calls into the feature-key classifier at the top of its
-// callback. `key_gate.rs` is carried as a whole-file verbatim copy so that the driver can call it from
-// its own verbatim excerpt. It is unused on macOS, so dead code is allowed here.
+// callback. `key_gate.rs` is carried as a whole file so that the driver can call it from its own
+// excerpted range. It is unused on macOS, so dead code is allowed here.
 #[allow(dead_code)]
 mod analysis;
 mod driver_api;
@@ -56,7 +56,7 @@ const OS_NAME: &str = if cfg!(target_os = "macos") {
 /// Source of the `manifest_sha256` field of the `meta` line. Covers only the core manifest, not a
 /// driver's own manifest.
 const MANIFEST: &[u8] = include_bytes!("../manifest.json");
-/// Polling interval of the monitoring loop, matching the reference implementation's polling thread.
+/// Polling interval of the monitoring loop: 100 ms.
 const POLL_MS: u64 = 100;
 
 // ---------------------------------------------------------------------------
@@ -68,8 +68,7 @@ fn meta_line() -> String {
     for b in Sha256::digest(MANIFEST) {
         hex.push_str(&format!("{b:02x}"));
     }
-    // The capability groups mirror the reference implementation's declaration: `key` is unconditional
-    // and `ime_shadow` is config-gated.
+    // `key` is unconditional and `ime_shadow` is config-gated.
     format!(
         r#"{{"type":"meta","format":"obs/1","os":"{OS_NAME}","logger_version":"{LOGGER_VERSION}","manifest_sha256":"{hex}","capabilities":{{"unconditional":["key"],"threshold_gated":[],"config_gated":["ime_shadow"]}}}}"#
     )
@@ -163,14 +162,13 @@ fn default_candidate_observer() -> Box<dyn FnMut() -> bool + Send> {
 // ---------------------------------------------------------------------------
 // Monitoring loop (`ime_shadow` lines).
 //
-// A transcription, omitting an unrelated experiment-mode branch, of the reference implementation's
-// summary emission and its monitoring thread (including the ordering of the drain condition it uses).
-// `t` is the time the summary was drained. The stale path and the active-to-false transition path are
-// Windows-only.
+// Summary emission and the monitoring thread, omitting an unrelated experiment-mode branch (including
+// the ordering of the drain condition used). `t` is the time the summary was drained. The stale path
+// and the active-to-false transition path are Windows-only.
 //
-// One difference from the reference implementation: whether a candidate window is open is judged by
-// reading `IME_ACTIVE` directly by default, but a driver may plug in a stronger judgment through
-// `DriverHandle.candidate_window_observer` (see the contract in `driver_api.rs`).
+// Whether a candidate window is open is judged by reading `IME_ACTIVE` directly by default, but a
+// driver may plug in a stronger judgment through `DriverHandle.candidate_window_observer` (see the
+// contract in `driver_api.rs`).
 // ---------------------------------------------------------------------------
 
 fn emit_ime_shadow<W: Write>(
@@ -244,8 +242,7 @@ impl Monitor {
         }
     }
 
-    /// One cycle of the monitoring loop, following the same judgment and ordering as the reference
-    /// implementation's polling thread. Runs at most once per `POLL_MS`. `now` measures elapsed time;
+    /// One cycle of the monitoring loop. Runs at most once per `POLL_MS`. `now` measures elapsed time;
     /// `ts_ms` is the wall-clock time of the drain, used as the `t` of an `ime_shadow` line.
     fn poll<W: Write>(&mut self, now: Instant, ts_ms: u64, out: &mut W) -> Result<(), String> {
         if now < self.next_poll {

@@ -2,10 +2,10 @@
 name = "ime-observation-logger"
 version = "0.1.0"
 edition = "2021"
-description = "Standalone logger that reuses a reference conversion-session state machine to produce content-free input-method observations"
+description = "Standalone logger producing content-free input-method observations"
 publish = false
 
-# Dependencies are pinned to the same crates and versions as the reference implementation's manifest.
+# Every dependency version is pinned.
 # The drivers (driver_macos / driver_windows) declare their dependencies here as well, so that later
 # work does not need to touch this file.
 
@@ -25,8 +25,7 @@ tracing-subscriber = "0.3.22"
 sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
-# The feature list is carried over verbatim from the reference implementation's manifest (some
-# features are unused by this logger).
+# Some of the listed features are unused by this logger.
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",

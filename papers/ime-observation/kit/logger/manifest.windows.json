@@ -41,7 +41,7 @@
       "sha256": "77c927d55f93fb9eabcaa126220e91178155927376c8c1b8d2dae0f8227ae73f",
       "upstream_range_sha256": "b16063ff8e7cdbec771f45487811246c411b5308c7b64f49dc84ed3ffdc0dec3",
       "check_decls": null,
-      "reason": "Low-level keyboard hook of the Windows driver: the callback, its installation and the two excerpted pure functions. The callback is newly written (it sends to the core channel and omits the reference implementation's statistics and mode tracking); the anchored range pins the reference callback so that a change of its judgment is detected."
+      "reason": "Low-level keyboard hook of the Windows driver: the callback, its installation and the two excerpted pure functions. The callback sends observed key transitions to the core channel and omits per-session statistics and mode tracking."
     },
     {
       "kind": "new",
@@ -55,7 +55,7 @@
       "sha256": "003b17ccf13b28f576be88f9f9862bd0d51228f9050f5932f85d34c567cac863",
       "upstream_range_sha256": "5916aff63ec59728fe46c98e81174c273b5991741b63afb85f7990261ede02bf",
       "check_decls": null,
-      "reason": "Out-of-context WinEvent hook for the input-method window events. The event handling is a re-implementation over injectable cells; the anchored range pins the reference callback so that a change of its judgment is detected."
+      "reason": "Out-of-context WinEvent hook for the input-method window events. The event handling runs over injectable cells."
     },
     {
       "kind": "new",

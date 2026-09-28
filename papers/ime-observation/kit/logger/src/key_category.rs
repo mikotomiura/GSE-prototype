@@ -1,11 +1,10 @@
-//! `KeyCategory`: folds a virtual-key code into one of fourteen key kinds. Verbatim excerpt of the
-//! reference implementation's key-anonymization logic.
+//! `KeyCategory`: folds a virtual-key code into one of fourteen key kinds.
 //!
 //! Everything between the `// @excerpt-begin key_category` and `// @excerpt-end key_category` markers
-//! is byte-identical to the reference source (the `key_category` entry of `manifest.json`, checked by
-//! `check_manifest.py`, pins this). The excerpted range also carries `ABSOLUTE_TIME_FIELDS`, which this
-//! logger does not use, because the excerpt boundary follows the reference source's own layout rather
-//! than being trimmed to only what is used here.
+//! is pinned to a recorded SHA-256 (the `key_category` entry of `manifest.json`, checked by
+//! `check_manifest.py --self`). The excerpted range also carries `ABSOLUTE_TIME_FIELDS`, which this
+//! logger does not use, because the excerpt keeps the enclosing file's own layout rather than being
+//! trimmed to only what is used here.
 // @excerpt-begin key_category
 /// VK コードをプライバシーセーフなキー種別カテゴリに変換する (anonymization.md 準拠)。
 /// 「どのキーか」を失い「どんな種類か」だけ残す。特徴量再計算に必要な
