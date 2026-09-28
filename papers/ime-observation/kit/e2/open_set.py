@@ -480,15 +480,16 @@ def _dumps_report(obj):
 
 
 def run(args):
-    if args.eval_fraction is None:
-        args.eval_fraction = 0.2
     try:
         corpus = generate_plan.load_corpus(args.corpus)
         recipes = generate_plan.load_recipes(args.recipes)
     except (OSError, ValueError) as e:
         raise InputError("cannot use the corpus or the recipes: %s" % e)
     train, evaluation, dropped = split_phrases(corpus, args.split_seed, args.eval_fraction)
-    trials, n_kana, n_other = load_trials(args.obs, args.plan, recipes, set(ph["phrase_id"] for ph in evaluation))
+    try:
+        trials, n_kana, n_other = load_trials(args.obs, args.plan, recipes, set(ph["phrase_id"] for ph in evaluation))
+    except (KeyError, TypeError, AttributeError):
+        raise InputError("a plan file is not a well-formed plan/1 file")
     if not trials:
         raise InputError("no trial of an evaluation phrase can be scored")
     texts = [ph["reading"] for ph in train]
@@ -771,6 +772,11 @@ def selftest():
         check("an observation with extra key presses is refused", main(common[:1] + [extra] + common[2:] + ["--out", bad_out]) == 2)
         check("a missing input file is refused", main(common[:1] + [os.path.join(tmp, "none.jsonl")] + common[2:]
                                                       + ["--out", bad_out]) == 2)
+        broken = os.path.join(tmp, "broken_plan.jsonl")
+        with open(broken, "wb") as f:
+            f.write(b'{"kind":"header"}\n{"kind":"trial"}\n')
+        check("a plan without the plan/1 fields is refused, not a crash",
+              main(common[:2] + ["--plan", broken] + common[4:] + ["--out", bad_out]) == 2)
         check("a different number of --obs and --plan files is refused",
               main(["--obs", obs_path, obs_path] + common[2:] + ["--out", bad_out]) == 2)
 
