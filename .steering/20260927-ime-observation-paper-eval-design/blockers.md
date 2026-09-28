@@ -38,4 +38,17 @@
 - 確認: worktree はクリーン・コミット 2 件。clean な checkout（`loop/010-issue` を detached）で `010-acceptance.sh` 失敗 0 件（✅ 14 件）・`check.sh` 緑。→ ★ **成果物は合格**。B3 のとおり watchdog はもともと何も再実行できないので、判定の材料は失われていない。
 - 影響: ⚠️ `deps_met` は events の `issue_done` だけを見るので、**010 に依存する 020（W5）は「依存 issue が未完」で起動しない**。⚠️ `issue_done` を手で書かない（events の writer は `loop-run.sh` だけ）。
 - 対応: 010 はメインの merge ゲート（clean な checkout の acceptance ＋ レビュー）を通して base へ merge する。W5 の前に、020 の起動の扱い（依存の書き方を変えるか、010 を `parse` に落として再実行するか）を研究者に問う。
+- ★ 研究者の判断 34（2026-09-28）: 未実行の `recheck` 14 本を `parse` に落とし、`blocked` のまま merge した 008 / 010 / 011 を後続の依存から外した。
 - ⚠️ **同じ形が W2b でも 2 本続いた**: 008（03:34）・011（03:46）も attempt 1 の verify の後に watchdog が空応答で `blocked`。→ W2 の `recheck` 5 本のうち 3 本（010 / 008 / 011）が watchdog で止まった。★ watchdog は B3 のとおり何も再実行できないので、止まるたびにメインの独立検証で置き換えている。残りの `recheck` の issue の `verify_level` をどうするかは研究者に問う。
+
+## B6（2026-09-28・W2 の直し）作業用エージェントが main checkout の issue ファイルを一度書き換えた
+
+- 事象: 015 の直しを渡した作業用エージェント（general-purpose・Sonnet）が、worktree ではなく main checkout（`C:/GSE-prototype`）側の `issues/015.md` を誤って編集し、自分で `git checkout --` で戻したと報告した。
+- 確認: メインが直後に `git status` と `git diff HEAD` を見て、main checkout が HEAD（`da69335e`）と一致し、別トラックの未追跡物も残っていることを確かめた（失われたものは無い）。
+- ⚠️ 危うさ: main checkout に未コミットの変更があった場合、`git checkout --` はそれを消す。今回は main 側の 015.md に未コミットの変更が無かったので無害だった。
+- 次から: 作業用エージェントへの指示に「main checkout（`C:/GSE-prototype`）のファイルを編集しない・`git checkout -- <path>` で戻さない（間違えたら報告して止まる）」を明記する。
+
+## B7（2026-09-28）Rust のビルド生成物を含む clean な checkout は `git worktree remove` で消せない
+
+- 事象: `target/` の中のパスが長すぎ（Filename too long）、`git worktree remove --force` が失敗する。git 側の登録は外れ、ディレクトリが scratchpad に残る。
+- 対応: bash の `rm -rf` で消してから `git worktree prune`。

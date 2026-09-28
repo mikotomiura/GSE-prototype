@@ -20,7 +20,7 @@
     - [x] レビュー 6 本（code-reviewer 4・security-checker 2）→ 判断 27〜34 を研究者に問い確定。002 / 003 / 010 は作業用エージェント（Sonnet）が直し、016 はメインが直した
     - [x] 002 003 008 010 016 を base へ merge（`c968670b`）・merge 後の base で 6 本の acceptance が緑・push
     - [x] 判断 34: 未実行の recheck 14 本を parse に・009 / 020 の依存から 008 / 010 を外す（`1ab259b2`）
-    - [ ] 011 / 015 の直し（HIGH あり）→ 検証 → merge。011 の merge 後に 012 / 013 / 023 / 024 の依存から 011 を外す
+    - [x] 011 / 015 の直し（HIGH あり・判断 31〜33）→ メインが独立に検証（015: 封印の大きさが行数によらず 1 MiB・開封で元の SHA-256 ／ 011: 逐語コピーが GSE と一致・lock の共通 53 crate の版の差 0）→ merge。012 / 013 / 023 / 024 の依存から 011 を外した。merge 後の base（`7ed5e6c0`）で 8 本の acceptance・selftest 11 本・compile・lint・`--against-gse` が緑 → push（2026-09-28）
     - [ ] Mac: 004 / 007（`.steering/_handoff/next-session-ime-paper-loop-w2-mac.md`）
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
