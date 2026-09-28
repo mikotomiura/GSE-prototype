@@ -1,5 +1,5 @@
 {
-  "upstream_repo_commit": "0f9fad4125779d5465cd59a88b7154e37294bc49",
+  "upstream_repo_commit": "bfa4329e39838dccda9704e9651a0c70655cb994",
   "entries": [
     {
       "kind": "file",
@@ -45,7 +45,7 @@
       "end_anchor": "/// NDJSON 1 行を匿名化する。`session_start_ms` は当該セッションの絶対開始時刻。",
       "symbol": "KeyCategory",
       "sha256": "a7f2a358d8e136c454f770b7ddb67b098a4692f78ac2de89b54e07ab1e266ff8",
-      "reason": "The whole reference source file could not be copied verbatim because its unit tests depend on another module; this excerpt keeps KeyCategory and the immediately following ABSOLUTE_TIME_FIELDS declaration, the latter unused by this logger.",
+      "reason": "The enclosing file's unit tests depend on a module this logger does not carry, so only this excerpt (KeyCategory and the immediately following ABSOLUTE_TIME_FIELDS declaration, the latter unused by this logger) is included.",
       "upstream_path": "src-tauri/src/analysis/anonymize.rs",
       "upstream_last_commit": "9eb1384c37d2cb2f2c54f029a9053398ac2ea31e"
     },
@@ -58,10 +58,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "49016e23fb05c5d54c371799cbb11c9d56b0bb8a72009a1f0c84b836e8289422",
+      "sha256": "0ea18dbee0c2d1f47a910d79b9d1e2d1b511b7030e465409b600bb15079a014e",
       "upstream_range_sha256": null,
       "check_decls": true,
-      "reason": "Shim exposing only the six pub const declarations and eight atomics that the three verbatim-copied modules reference; check_decls verifies their type and value against the reference implementation."
+      "reason": "Exposes only the six pub const declarations and eight atomics that the three copied state-machine modules reference."
     },
     {
       "kind": "new",
@@ -72,10 +72,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "3d53bf47430978dfad3dfd26c6963276d53063d875e7ab8a22a2a2060044682a",
+      "sha256": "d8f838193f5aa031a838901f9c2525ca5d79f4b48831b6b7e2cb8a98916f7a6a",
       "upstream_range_sha256": null,
       "check_decls": null,
-      "reason": "Declares only the four modules this logger's input layer carries: the hook shim and the three verbatim copies."
+      "reason": "Declares only the four modules this logger's input layer carries: the hook shim and the three state-machine modules."
     },
     {
       "kind": "new",
@@ -86,10 +86,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "746990e6004149061087598240f80e4cd8792b8714f5220c409955f3c1ab2250",
+      "sha256": "098863ba05a1d37f0dc4837023e67000c5187de80dac43769ec481b660971e31",
       "upstream_range_sha256": null,
       "check_decls": null,
-      "reason": "A transcription of the reference implementation's summary emission and its monitoring thread, omitting an unrelated experiment-mode branch (t is the time a summary was drained; the stale path and the active-to-false transition path are Windows-only), plus this logger's own meta/key line writers and a selftest. Whether a candidate window is open is read directly from an atomic flag by default, but a driver may plug in a stronger observation function through the contract in driver_api.rs. Two further entries (main_emit_ime_shadow_judgment / main_ime_monitor_loop_judgment) pin the ranges transcribed from the reference implementation so that a later change to its own logic is detected. Declares the module carrying the verbatim key-gate copy."
+      "reason": "Summary emission and the monitoring thread, omitting an unrelated experiment-mode branch (t is the time a summary was drained; the stale path and the active-to-false transition path are Windows-only), plus this logger's own meta/key line writers and a selftest. Whether a candidate window is open is read directly from an atomic flag by default, but a driver may plug in a stronger observation function through the contract in driver_api.rs. Declares the module carrying the key-gate copy."
     },
     {
       "kind": "new",
@@ -103,7 +103,7 @@
       "sha256": "224d2c035120a9364c10ee86ba4fbfcfdbbc171ec615261854f004ef1922c751",
       "upstream_range_sha256": null,
       "check_decls": null,
-      "reason": "Boundary types between a driver and the core (KeyEvent / DriverCtx / DriverHandle), written independently of the reference implementation. Defines the candidate-window observation hook and the driver stop contract."
+      "reason": "Boundary types between a driver and the core (KeyEvent / DriverCtx / DriverHandle). Defines the candidate-window observation hook and the driver stop contract."
     },
     {
       "kind": "new",
@@ -114,10 +114,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "86ffdecdc5557c08d82de3bf555540c1609430b28ad6939f8ff0348ea1859cbb",
+      "sha256": "baae9686d61acff5ca7ef627591dfedd181f875b64b6b16c22dcd5a435caefce",
       "upstream_range_sha256": null,
       "check_decls": null,
-      "reason": "Dependencies are pinned to the same crates and versions as the reference implementation's manifest (the windows crate's feature list is carried over verbatim). Declares the drivers' dependencies as well. Marked as its own workspace root so that an ancestor directory's Cargo workspace cannot pull it in."
+      "reason": "Dependency versions are pinned crate-by-crate (the windows crate's feature list covers the full set needed across drivers). Declares the drivers' dependencies as well. Marked as its own workspace root so that an ancestor directory's Cargo workspace cannot pull it in."
     },
     {
       "kind": "new",
@@ -128,10 +128,10 @@
       "start_anchor": "fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {",
       "end_anchor": "// アプリ起動",
       "symbol": "emit_ime_shadow",
-      "sha256": "746990e6004149061087598240f80e4cd8792b8714f5220c409955f3c1ab2250",
+      "sha256": "098863ba05a1d37f0dc4837023e67000c5187de80dac43769ec481b660971e31",
       "upstream_range_sha256": "bbd0fcf76c30845444753c1323afa8998d1d928b53bf16dece1f1493e866308b",
       "check_decls": null,
-      "reason": "Detects, through --against-upstream, whether the reference implementation's summary-emission logic has changed. The copy itself (main.rs's summary emission function) is not verbatim: it substitutes an injectable set of atomics for direct static access while carrying over the same logic."
+      "reason": "Pins the ordering and branching of the summary-emission function that writes ime_shadow lines. The copy substitutes an injectable set of atomics for direct static access while carrying over the same branching."
     },
     {
       "kind": "new",
@@ -142,10 +142,10 @@
       "start_anchor": "    // IME モニタースレッド",
       "end_anchor": "    // キーボードフック・IME ポーリングの Sender を setup() に渡すために保持。",
       "symbol": null,
-      "sha256": "746990e6004149061087598240f80e4cd8792b8714f5220c409955f3c1ab2250",
+      "sha256": "098863ba05a1d37f0dc4837023e67000c5187de80dac43769ec481b660971e31",
       "upstream_range_sha256": "c806eabc302eeb38dadb6b1dd3e45d4691cdadcc643781c4a8012e444d4564f4",
       "check_decls": null,
-      "reason": "Detects, through --against-upstream, whether the ordering of the reference monitoring thread's one cycle (safety valve, then the active-to-false transition, then direct polling of the ready flag) has changed. The copy is main.rs's monitoring-loop cycle function, omitting an unrelated experiment-mode branch."
+      "reason": "Pins the ordering of one monitoring-loop cycle (safety valve, then the active-to-false transition, then direct polling of the ready flag), as implemented by main.rs's monitoring-loop cycle function, omitting an unrelated experiment-mode branch."
     },
     {
       "kind": "file",
@@ -156,7 +156,7 @@
       "symbol": null,
       "sha256": "80f1aa57c96aefeff47daa86bb8901ccbbda1cde7eb29b2fd4657a74f1b20557",
       "check_decls": null,
-      "reason": "The Windows driver's low-level keyboard hook calls this module's feature-key classifier at the top of its callback; because the module has no external dependencies, it is carried as a whole-file verbatim copy, including its own tests.",
+      "reason": "The Windows driver's low-level keyboard hook calls this module's feature-key classifier at the top of its callback. The module has no external dependencies, so the whole file is included, including its own tests.",
       "upstream_path": "src-tauri/src/analysis/key_gate.rs",
       "upstream_last_commit": "9eb1384c37d2cb2f2c54f029a9053398ac2ea31e",
       "upstream_range_sha256": null
@@ -170,10 +170,10 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "60f661354fc648be9474f57f312abe537e2dc43f402a58c30c72ba818009154f",
+      "sha256": "85436ca560142a375cca271f547934d5409ae9e921e0156eb8f72fef1546b251",
       "upstream_range_sha256": null,
       "check_decls": null,
-      "reason": "Declares only the verbatim-copied key-gate module."
+      "reason": "Declares only the key-gate module."
     }
   ]
 }

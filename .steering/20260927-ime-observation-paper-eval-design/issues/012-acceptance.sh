@@ -3,7 +3,7 @@
 set -u
 . "$(dirname "$0")/_acceptance-lib.sh"
 require_os macos
-L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; DM="${L}/src/driver_macos.rs"
+L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; CU="${L}/check_manifest_upstream.internal.py"; DM="${L}/src/driver_macos.rs"
 
 echo "[012] 単体ロガーの macOS ドライバ"
 for f in "${DM}" "${L}/src/driver_macos/keymap.rs" "${L}/src/driver_macos/ime_source.rs" "${L}/manifest.macos.json"; do need_file "${f}"; done
@@ -14,7 +14,7 @@ run_ok "AC2 cargo build --release が緑（macOS）" cargo build --release --man
 
 # AC3
 run_ok "AC3 check_manifest.py --self が緑" "${PY}" "${C}" --self
-run_ok "AC3 check_manifest.py --against-upstream が緑" "${PY}" "${C}" --against-upstream
+run_ok "AC3 check_manifest_upstream.internal.py --against-upstream が緑" "${PY}" "${CU}" --against-upstream
 
 # AC4: hook_macos.rs の抜粋が 2 件で、2 つの関数を含む
 cat > "${TMP}/m4.py" <<'EOF'

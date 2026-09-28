@@ -11,7 +11,7 @@ run_ok "AC2 kit/check.sh が緑" bash "${K}/check.sh"
 run_ok "AC2 kit/check.sh --compile が緑" bash "${K}/check.sh" --compile
 run_ok "AC2 check-shell-portability が緑" bash scripts/check-shell-portability.sh
 run_ok "AC3 check_manifest.py --self が緑" "${PY}" "${L}/check_manifest.py" --self
-run_ok "AC3 check_manifest.py --against-upstream が緑" "${PY}" "${L}/check_manifest.py" --against-upstream
+run_ok "AC3 check_manifest_upstream.internal.py --against-upstream が緑" "${PY}" "${L}/check_manifest_upstream.internal.py" --against-upstream
 if grep -rqF -- "--against-gse" papers/ 2>/dev/null; then ng "AC3 旧名 --against-gse が papers/ に残っている"; else ok "AC3 旧名 --against-gse が papers/ に無い"; fi
 if grep -rqE '"gse_(path|last_commit|repo_commit|range_sha256)"' "${L}" 2>/dev/null; then ng "AC3 manifest に旧名の gse_* の欄が残っている"; else ok "AC3 manifest の欄は upstream_* に改名済み"; fi
 forbid_gse_changes

@@ -29,7 +29,7 @@
 気付けない。そこで `main_emit_ime_shadow_judgment` / `main_ime_monitor_loop_judgment` の 2 エントリが
 `lib.rs` の該当範囲（アンカーで切り出す・excerpt と同じ決め方）の SHA-256 を `upstream_range_sha256`
 として持ち、`--against-upstream` が照合する。GSE 側がこの範囲を変えると赤くなる（コピー自体は逐語で
-ある必要はない）。詳しくは公開の README「manifest の書き直し」を参照。
+ある必要はない）。詳しくは `check_manifest_upstream.internal.py` の docstring（`--update`）を参照。
 
 ## 名前の改名（判断 42）
 
@@ -38,3 +38,23 @@ GSE 照合フラグ（ハイフン 2 つ + against + ハイフン + gse）→ `-
 `gse_path` / `gse_last_commit` / `gse_repo_commit` / `gse_range_sha256` →
 `upstream_path` / `upstream_last_commit` / `upstream_repo_commit` / `upstream_range_sha256`。
 公開の書き出し（issue 024）は `upstream_*` と `start_anchor` / `end_anchor` / `check_decls` を落とす。
+
+## 照合の道具を公開用と内部用に分ける（判断 43）
+
+2026-09-28 の判断 43 により、写した元との関係の説明を公開物から一切除いた。これに伴い、照合の道具も
+2 つに分けた:
+
+- `check_manifest.py`（公開）: 自己照合（`--self`）と `--selftest` だけを持つ。manifest の
+  `upstream_*` の欄・`start_anchor` / `end_anchor` / `check_decls` は読まない（公開の書き出しでこれらの
+  欄が manifest から落ちても `--self` は動く）。
+- `check_manifest_upstream.internal.py`（本ファイル）: 写した元との照合（`--against-upstream`）と
+  manifest の書き直し（`--update`）を持つ。公開用の `check_manifest.py` を `import` して自己照合まわりの
+  共通処理（`sha` / `to_lines` / `copy_range` / `safe_join` / `manifests` / `each_entry` / `check_self` 等）
+  を再利用し、写した元の読み出し（`read_upstream_lines` / `upstream_range`）・`check_decls` の型と値の
+  比較・`--update` の manifest 書き直しだけをここに持つ。
+
+以前の `check_manifest.py --against-upstream --selftest` が一体で持っていた陰性対照は、この分割後も
+どちらかの selftest に全て残る: 1 バイト違い・アンカーの 0 回 / 2 回・symbol・シムの値・別の manifest を
+変えない・別ディレクトリの拒否・判断 33 の範囲のずれは `check_manifest_upstream.internal.py --selftest`
+に、コピー側の 1 バイト違い・excerpt の目印欠落・path の安全性（NUL・絶対パス・entries が配列でない）は
+`check_manifest.py --selftest` に、それぞれ残した。

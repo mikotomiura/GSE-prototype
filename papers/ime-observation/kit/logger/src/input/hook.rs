@@ -1,9 +1,8 @@
-//! Shim exposing only the constants and atomics that the three verbatim-copied state-machine modules
+//! Shim exposing only the constants and atomics that the three state-machine modules
 //! (`ime_compose.rs`, `ime_cloak.rs`, `ime_mode.rs`) reference.
 //!
-//! The type and value of each item here must match the reference implementation
-//! (`check_manifest.py --against-upstream` verifies this). Hook callbacks, channels and other
-//! operating-system interfaces are not part of this shim; they live in the `driver_*.rs` modules.
+//! Hook callbacks, channels and other operating-system interfaces are not part of this shim; they
+//! live in the `driver_*.rs` modules.
 //!
 //! The conversion-session state is carried from the driver to the monitoring loop (`main.rs`) through
 //! the atomics declared here.
