@@ -13,14 +13,13 @@
 Skill: verify-before-claiming・citation-ssot・subagent-delegation。応答は日本語。GSE 側は専用ブランチで git add はパス指定（-A 禁止）。
 ```
 
-## §1 研究者の入力が要るもの（★ 推測で埋めない）
+## §1 研究者の決定（★ 2026-09-28 にすべて決まった＝判断 12）
 
-1. 著者名・連絡先メール・所属（無ければ居住する都市と国）→ `main.tex` の `\author` / `\affil`
-2. Statements and Declarations: Funding・Competing interests・Ethics（「公開データの二次分析・人を対象とする新しいデータ収集なし」の文面でよいか）・Author contributions
-3. LLM の使用の開示（`main.tex` Sect. 5.5）の文面でよいか（⚠️ 「The author is responsible for the content」は、研究者が原稿全体を読んだ後に確定する）
-4. 題（仮題: *When "no help" is not "solved": outcome-agnostic self-resolution measures in two public debugging datasets*）
-5. 原稿（`main.tex` / `refs.bib`）のライセンス（README は「未定」と書いてある。arXiv に出すときに決める＝前タスク判断 10）
-6. ⚠️ 論文用リポジトリを公開すると、コミットの著者メール（`git log` の author）も公開される。そのまま公開するか、noreply に書き換えて書き換えた事実を NOTES に残すかを決める（⚠️ 書き換えるとハッシュが変わり、Method の「コミットの順序が凍結を示す」の根拠が弱まる）
+- 著者: Mikoto Miura・mmiura.network@gmail.com・Hiroshima, Japan（`4a81a43` で原稿に反映済み）
+- Statements and Declarations: すべて該当なしで記入済み ／ LLM の開示: 今の文面で確定 ／ 題: 仮題で確定
+- ⚠️ 原稿のライセンスは**投稿時に決める**（arXiv に出すときに出版社の規程を一次で確かめる）
+- 論文用リポジトリのコミット著者: 過去は書き換えない・以後は Mikoto Miura（⚠️ 公開すると過去の John Do <johndo.mik.080@gmail.com> も出る）
+- ⚠️ 研究者が原稿全体を通読して内容を確認するのはこれから（「The author is responsible for the content」の前提）
 
 ## §2 投稿前の残り作業
 
