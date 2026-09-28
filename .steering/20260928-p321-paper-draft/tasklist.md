@@ -33,9 +33,9 @@
 - [x] 論文用リポジトリにコミット（`e9c8e2b`・push はレビュー後）
 
 ## 5. 完了
-- [ ] `/cross-review` 2 巡 ＋ security-checker
+- [x] `/cross-review` 2 巡 ＋ security-checker（判断 9–11・論文用リポジトリ `1db0cab` / `be754be`）
 - [ ] 研究者への確認（著者情報・Statements・題・LLM の開示の文言）
-- [ ] 論文用リポジトリを push
+- [ ] 論文用リポジトリを push（`be754be`）
 - [ ] GSE 側: `/finish-task` の出荷フロー（PR → CI 緑なら merge）
 
 ## 残課題（本タスクの外）

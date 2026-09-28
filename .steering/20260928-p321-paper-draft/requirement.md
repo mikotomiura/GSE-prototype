@@ -34,12 +34,12 @@ EMSE の研究論文として**全節の初稿**を論文用リポジトリに�
 
 ## 受け入れ条件
 
-- [ ] 論文用リポジトリに原稿（`paper/`・サブフォルダなし）があり、`bash paper/build.sh` が exit 0 で PDF を出す
-- [ ] 原稿の数値はすべて `results/report.md`（または `results/metrics.json`）と一致する（検算スクリプトで確かめる）
-- [ ] 前タスク `outline.md`「書いてはいけないこと」の各項目に原稿が触れていない（grep で確かめる）
-- [ ] 要旨 150–250 語・キーワード 4–6・Statements and Declarations・Data availability・Methods に LLM の使用の記述がある
-- [ ] 本文の引用はすべて `.bib` にあり、`.bib` の各項目は `docs/references.md` の `[Pn]`/`[Vn]` に対応づけてある（design.md の対応表）
-- [ ] `/cross-review` 2 巡と security-checker の CRITICAL / HIGH がすべて対応済み
+- [x] 論文用リポジトリに原稿（`paper/`・サブフォルダなし）があり、`bash paper/build.sh` が exit 0 で PDF を出す
+- [x] 原稿の数値はすべて `results/report.md`（または `results/metrics.json`）と一致する（検算スクリプトで確かめる）
+- [x] 前タスク `outline.md`「書いてはいけないこと」の各項目に原稿が触れていない（grep で確かめる）
+- [x] 要旨 150–250 語・キーワード 4–6・Statements and Declarations・Data availability・Methods に LLM の使用の記述がある
+- [x] 本文の引用はすべて `.bib` にあり、`.bib` の各項目は `docs/references.md` の `[Pn]`/`[Vn]` に対応づけてある（design.md の対応表）
+- [x] `/cross-review` 2 巡と security-checker の CRITICAL / HIGH がすべて対応済み
 
 ## 関連ドキュメント
 

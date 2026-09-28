@@ -1,5 +1,6 @@
 # 次セッション — 2 本目の論文: [P321] ＋ [P434] 再解析の原稿を書く（EMSE 研究論文）
 
+> ✅ **2026-09-28 に実施済み**（`.steering/20260928-p321-paper-draft/`・全節の初稿と /cross-review 2 巡）。→ 次は `next-session-p321-paper-finalize.md`。
 > 作成: 2026-09-28（`.steering/20260928-p321-reanalysis-paper/` の完了時）。
 > ⚠️ **このメモを一次資料にしない。** 数値は論文用リポジトリの `results/report.md`、判断は `decisions.md` を開き直す。
 > ★ IME 論文（`next-session-ime-paper-issues.md`）とは触るファイルが別なので並行可能。
