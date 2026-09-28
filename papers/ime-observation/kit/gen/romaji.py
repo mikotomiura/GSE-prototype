@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 # kit: selftest
-"""ひらがな → ローマ字のキー列（keyname の列）。Python 標準ライブラリだけ。
+"""Hiragana-to-key-sequence conversion (a list of keynames). Python standard library only.
 
-  romaji.py --keys 'がっこう'     キー列を空白区切りで出す（g a k k o u）
-  romaji.py --selftest            表の網羅・一意性（逆写像で元に戻る）・既知例（速い既定・1 秒未満）
+  romaji.py --keys 'HIRAGANA'   print the key sequence, space-separated (e.g. `がっこう` -> `g a k k o u`)
+  romaji.py --selftest            table coverage, uniqueness (round-trips through the inverse mapping),
+                                   and known examples (fast default, under a second)
 
-決定的な 1 つの表（ヘボン式寄り）。方針:
-  - `ん` は常に `nn`。
-  - 促音 `っ` は次の子音を重ねる。次が母音・`ん`・小書き（`x` で始まる）・記号・語末なら `xtu`。
-    ⚠️ `n` は重ねない（`nna` は「んあ」になるので「っな」にならない）。
-  - 小書き（ぁぃぅぇぉゃゅょゎゕゖ）は、拗音（きゃ・しゃ・ふぁ など下の表にあるもの）でなければ `x` 接頭の 1 字。
-  - `ー` は minus、`、` は comma、`。` は period。
-  - ⚠️ 実際の IME がこの綴りをどう解釈するかは OS・IME で違いうる。手順は較正パイロットで確かめて直す
-    （この表を直せば逆写像の一意性 selftest がすぐ赤で教える）。
+A single deterministic table (close to Hepburn romanization). Conventions:
+  - `ん` is always `nn`.
+  - The geminate consonant `っ` doubles the following consonant. When the next sound is a vowel, `ん`, a
+    small kana (spelled with an `x` prefix), a symbol, or the end of the phrase, it becomes `xtu` instead.
+    `n` is never doubled (`nna` would spell `んあ`, not `っな`).
+  - A small kana (`ぁぃぅぇぉゃゅょゎゕゖ`) is spelled with an `x` prefix as a single character, unless it
+    forms a contracted sound (such as `きゃ` or `しゃ`, or one of the `ふ`-row combinations listed below).
+  - `ー` maps to minus, `、` to comma, `。` to period.
+  - How a real IME interprets this spelling can vary by OS and IME; the procedures are checked and revised
+    against real hardware during a calibration pilot (editing this table immediately shows up as a failure
+    in the reverse-mapping uniqueness selftest).
 """
 import argparse
 import random
 import sys
 
-# 1 字（ぁ〜ゖ の 86 字 ＋ ー ＋ 、。）。記号は内部表記の 1 文字（ー はハイフン・、 はカンマ・。 はピリオド）
+# Single characters (the 86 characters from `ぁ` to `ゖ`, plus `ー` and `、。`). Symbols map to a single
+# internal character (`ー` to a hyphen, `、` to a comma, `。` to a period).
 _SINGLE = {
     "ぁ": "xa", "あ": "a", "ぃ": "xi", "い": "i", "ぅ": "xu", "う": "u", "ぇ": "xe", "え": "e", "ぉ": "xo", "お": "o",
     "か": "ka", "が": "ga", "き": "ki", "ぎ": "gi", "く": "ku", "ぐ": "gu", "け": "ke", "げ": "ge", "こ": "ko", "ご": "go",
@@ -36,7 +41,8 @@ _SINGLE = {
     "ー": "-", "、": ",", "。": ".",
 }
 
-# 2 字（拗音と ふぁ 行）。ここに無い「かな＋小書き」は 1 字ずつ（小書きは x 接頭）に落ちる。
+# Two-character combinations (contracted sounds and the `ふ` row). A "kana + small kana" pair not listed
+# here falls back to being spelled one character at a time (the small kana with its x prefix).
 _DIGRAPH = {}
 for _base, _cons in (("き", "ky"), ("ぎ", "gy"), ("に", "ny"), ("ひ", "hy"), ("び", "by"), ("ぴ", "py"),
                      ("み", "my"), ("り", "ry"), ("ぢ", "dy"), ("し", "sh"), ("ち", "ch"), ("じ", "j")):
@@ -50,18 +56,19 @@ for _k, _r in list(_SINGLE.items()) + list(_DIGRAPH.items()):
     _REV[_r] = _k
 _MAXLEN = max(len(r) for r in _REV)
 
-# 促音で重ねてよい先頭の文字（母音・n・x・記号は重ねない）
+# Leading characters the geminate consonant may double (vowels, n, x, and symbols are never doubled)
 _DOUBLABLE = frozenset("bcdfghjklmpqrstvwyz")
 
 _SYMBOL_TO_KEY = {"-": "minus", ",": "comma", ".": "period"}
 _KEY_TO_SYMBOL = dict((v, k) for k, v in _SYMBOL_TO_KEY.items())
 
-# ひらがなの範囲（ぁ U+3041 〜 ゖ U+3096）
+# The hiragana range (`ぁ` U+3041 to `ゖ` U+3096)
 HIRAGANA_RANGE = (0x3041, 0x3096)
 
 
 def _tokens(hira):
-    """ひらがな列 → [(かな, 内部ローマ字)]。表に無い文字は ValueError。"""
+    """Hiragana string -> [(kana, internal romanization)]. A character missing from the table raises
+    ValueError."""
     out = []
     i = 0
     while i < len(hira):
@@ -72,14 +79,14 @@ def _tokens(hira):
             continue
         c = hira[i]
         if c not in _SINGLE:
-            raise ValueError("表に無い文字（U+%04X）" % ord(c))
+            raise ValueError("character not in the table (U+%04X)" % ord(c))
         out.append((c, _SINGLE[c]))
         i += 1
     return out
 
 
 def to_romaji(hira):
-    """ひらがな → 内部ローマ字（記号は - , .）。"""
+    """Hiragana -> internal romanization (symbols become - , .)."""
     toks = _tokens(hira)
     parts = []
     for idx, (kana, rom) in enumerate(toks):
@@ -92,7 +99,7 @@ def to_romaji(hira):
 
 
 def to_keys(hira):
-    """ひらがな → keyname の列（a-z と minus / comma / period だけが出る）。"""
+    """Hiragana -> a list of keynames (only a-z and minus / comma / period ever appear)."""
     return [_SYMBOL_TO_KEY.get(ch, ch) for ch in to_romaji(hira)]
 
 
@@ -105,7 +112,8 @@ def _match(s, i):
 
 
 def from_romaji(s):
-    """内部ローマ字 → ひらがな（逆写像・最長一致）。表で書けない列は ValueError。"""
+    """Internal romanization -> hiragana (the inverse mapping, longest match). A sequence that cannot be
+    spelled from the table raises ValueError."""
     out = []
     i = 0
     while i < len(s):
@@ -115,14 +123,14 @@ def from_romaji(s):
             continue
         tok = _match(s, i)
         if tok is None:
-            raise ValueError("ローマ字として読めない（位置 %d）" % i)
+            raise ValueError("not readable as the romanization (position %d)" % i)
         out.append(_REV[tok])
         i += len(tok)
     return "".join(out)
 
 
 def from_keys(keys):
-    """keyname の列 → ひらがな。"""
+    """A list of keynames -> hiragana."""
     chars = []
     for k in keys:
         if k in _KEY_TO_SYMBOL:
@@ -130,7 +138,7 @@ def from_keys(keys):
         elif len(k) == 1 and "a" <= k <= "z":
             chars.append(k)
         else:
-            raise ValueError("かなのキーではない keyname")
+            raise ValueError("not a keyname used for typing a reading")
     return from_romaji("".join(chars))
 
 
@@ -149,22 +157,22 @@ def selftest():
         if not cond:
             fails.append(name + (": " + detail if detail else ""))
 
-    # 1. 網羅: ぁ〜ゖ のすべてと ー、。に写像がある
+    # 1. Coverage: every character from `ぁ` to `ゖ`, plus `ー、。`, has a mapping
     for ch in ALPHABET:
-        check("網羅 U+%04X" % ord(ch), ch in _SINGLE)
-    check("表に余計な 1 字が無い", set(_SINGLE) == set(ALPHABET), str(sorted(set(_SINGLE) ^ set(ALPHABET))))
+        check("coverage U+%04X" % ord(ch), ch in _SINGLE)
+    check("the table has no extra single character", set(_SINGLE) == set(ALPHABET), str(sorted(set(_SINGLE) ^ set(ALPHABET))))
 
-    # 2. 表の一意性: 同じ綴りが 2 つの項目に割り当たっていない
+    # 2. Table uniqueness: no spelling is assigned to two different entries
     values = list(_SINGLE.values()) + list(_DIGRAPH.values())
-    check("綴りが重複していない", len(values) == len(set(values)))
+    check("no duplicate spellings", len(values) == len(set(values)))
     for kana, rom in list(_SINGLE.items()) + list(_DIGRAPH.items()):
-        check("逆表が元に戻る %s" % kana, _REV[rom] == kana)
-    # 出るキーは a-z と minus / comma / period だけ
+        check("the inverse table round-trips %s" % kana, _REV[rom] == kana)
+    # Only a-z and minus / comma / period ever appear as keys
     allowed = set("abcdefghijklmnopqrstuvwxyz") | {"minus", "comma", "period"}
     for ch in ALPHABET:
-        check("キーが範囲内 U+%04X" % ord(ch), set(to_keys(ch)) <= allowed)
+        check("keys stay within range U+%04X" % ord(ch), set(to_keys(ch)) <= allowed)
 
-    # 3. 既知例（決定的な表の固定）
+    # 3. Known examples (pins the deterministic table)
     known = [
         ("がっこう", "g a k k o u"), ("しゃしん", "s h a s h i n n"), ("きょう", "k y o u"),
         ("ん", "n n"), ("あっ", "a x t u"), ("いっしょ", "i s s h o"), ("らーめん", "r a minus m e n n"),
@@ -175,9 +183,9 @@ def selftest():
     ]
     for hira, want in known:
         got = " ".join(to_keys(hira))
-        check("既知例 %s" % hira, got == want, "期待 %s・実際 %s" % (want, got))
+        check("known example %s" % hira, got == want, "expected %s, got %s" % (want, got))
 
-    # 4. 全ペア往復（隣り合う 2 字のすべての組で、ローマ字から元のひらがなに戻る）
+    # 4. All-pairs round trip (every pair of adjacent characters maps back to the original hiragana)
     bad = 0
     for a in ALPHABET:
         for b in ALPHABET:
@@ -189,9 +197,9 @@ def selftest():
             if back != s:
                 bad += 1
                 if bad <= 5:
-                    fails.append("ペア往復 %s → %s" % (s, back))
+                    fails.append("pair round trip %s -> %s" % (s, back))
     n += len(ALPHABET) ** 2
-    # 5. 乱択の 3〜8 字の往復（seed 固定・random() だけを使う）
+    # 5. Random round trips of 3-8 characters (fixed seed, using only random())
     rng = random.Random(1)
     for _ in range(3000):
         k = 3 + int(rng.random() * 6)
@@ -202,26 +210,26 @@ def selftest():
             back = None
         n += 1
         if back != s:
-            fails.append("乱択往復 %s → %s" % (s, back))
+            fails.append("random round trip %s -> %s" % (s, back))
             break
 
-    # 6. 表に無い文字・ローマ字として読めない列は例外
-    for name, fn in (("漢字", lambda: to_keys("漢")), ("カタカナ", lambda: to_keys("ア")),
-                     ("ラテン文字", lambda: to_keys("a")), ("孤立した子音", lambda: from_romaji("k")),
-                     ("かなのキーでない keyname", lambda: from_keys(["space"])), ("未知の綴り", lambda: from_romaji("qa"))):
+    # 6. A character missing from the table, or a sequence unreadable as the romanization, raises
+    for name, fn in (("kanji", lambda: to_keys("漢")), ("katakana", lambda: to_keys("ア")),
+                     ("a Latin character", lambda: to_keys("a")), ("an isolated consonant", lambda: from_romaji("k")),
+                     ("a keyname not used for typing a reading", lambda: from_keys(["space"])), ("an unknown spelling", lambda: from_romaji("qa"))):
         n += 1
         try:
             fn()
-            fails.append("例外にならない: " + name)
+            fails.append("did not raise: " + name)
         except ValueError:
             pass
 
     if fails:
         for m in fails:
             print("FAIL " + m)
-        print("selftest 失敗 %d 件 / %d 件" % (len(fails), n))
+        print("selftest failed: %d / %d" % (len(fails), n))
         return 1
-    print("selftest OK（%d 件）" % n)
+    print("selftest OK (%d cases)" % n)
     return 0
 
 
@@ -231,14 +239,14 @@ def main(argv):
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
         except Exception:
             pass
-    ap = argparse.ArgumentParser(description="ひらがな → ローマ字のキー列")
+    ap = argparse.ArgumentParser(description="hiragana to romanized key sequence")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--keys", metavar="HIRAGANA")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
     if args.keys is None:
-        ap.error("--keys HIRAGANA か --selftest が要る")
+        ap.error("either --keys HIRAGANA or --selftest is required")
     try:
         print(" ".join(to_keys(args.keys)))
     except ValueError as e:

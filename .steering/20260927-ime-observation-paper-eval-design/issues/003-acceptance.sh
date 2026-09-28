@@ -14,8 +14,8 @@ selftest_ok "${G}"
 run_ok "recipes.json が JSON として読める" "${PY}" -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "${J}"
 
 # AC3
-need_grep "${G}" "同じ seed でバイト一致" "AC3 selftest ケース: 同じ seed でバイト一致"
-need_grep "${G}" "seed を変えると順が変わる" "AC3 selftest ケース: seed を変えると順が変わる（陰性対照）"
+need_grep "${G}" "same seed yields byte-identical output" "AC3 selftest ケース: same seed yields byte-identical output"
+need_grep "${G}" "a different seed changes the trial order" "AC3 selftest ケース: a different seed changes the trial order（陰性対照）"
 
 # 小さな設定とコーパスをここで作る
 cat > "${TMP}/cfg.json" <<'EOF'
