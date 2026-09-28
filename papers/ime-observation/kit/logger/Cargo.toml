@@ -1,0 +1,49 @@
+[package]
+name = "ime-observation-logger"
+version = "0.1.0"
+edition = "2021"
+description = "IME 観測の単体ロガー（GSE の変換セッション状態機械を逐語コピーして使う・content-free）"
+publish = false
+
+# ★ 依存は src-tauri/Cargo.toml と同じ crate・同じ版に限る（判断 22）。
+#   ドライバ（driver_macos / driver_windows）が要る分もここで宣言しておく —— 後続の issue は Cargo.toml を触らない。
+
+# ★ このパッケージ単体を workspace root にする。
+#   ⚠️ これが無いと、祖先ディレクトリに別の Cargo workspace ができたときに巻き込まれ、
+#   cargo が「どの workspace に属するか」を親方向へ探索してしまう（issue 011 merge ゲートレビュー item 9）。
+[workspace]
+
+[[bin]]
+name = "ime-observation-logger"
+path = "src/main.rs"
+
+[dependencies]
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
+# `meta` 行の manifest_sha256 用。src-tauri も `sha2 = "0.10"` を使っている（同じ crate・同じ版）。
+sha2 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+# ★ features は src-tauri/Cargo.toml の `windows` の features をそのまま写した（一部は本ロガーでは使わない）。
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Input",
+    "Win32_UI_Input_Ime",
+    "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Accessibility",
+    "Win32_System_Com",
+    "Win32_System_Variant",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Registry",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = { version = "0.24", features = ["highsierra"] }
+core-foundation = "0.10"
+
+[profile.release]
+opt-level = 2
