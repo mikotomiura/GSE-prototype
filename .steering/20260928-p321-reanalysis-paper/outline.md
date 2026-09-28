@@ -61,6 +61,7 @@
 ## 未決（原稿執筆タスクへ）
 
 - 題の確定
-- EMSE の査読方式（single / double-anonymous）・分量の規定・AI 利用の開示規程の一次確認 → 匿名化の要否・プレプリントとの両立（判断 10）
-- 再現一式の保存先（Zenodo の DOI 付きアーカイブ・GitHub は公開時に public へ）
+- ~~EMSE の査読方式・分量・AI 利用の開示規程の一次確認~~ → ★ 判断 17 で確認済み: single-blind（匿名化不要）・要旨 150–250 語・キーワード 4–6・著者名と年の引用・Statements and Declarations と Data availability が必須・LLM の使用は Methods に書く・頁数の上限は見当たらない
+- テンプレートの選択（規程ページの LaTeX マクロ zip〔2021 年版〕か Springer Nature の LaTeX テンプレートか・Word も可）と、zip のダウンロード（研究者の承認後）
+- 再現一式の保存先（Zenodo の DOI 付きアーカイブ・GitHub は公開時に public へ）。★ single-blind なので匿名の保存先は不要（判断 17）
 - [V178] 本文の 7 つのガイドラインを読んでから妥当性の節を書く

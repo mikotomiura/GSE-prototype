@@ -31,4 +31,9 @@
 
 ## 6. 完了
 - [x] `/cross-review` 2 巡（Codex ＋ Claude code-reviewer ×2 ＋ security-checker・判断 12 / 13）→ 指摘はすべて対応（論文用リポジトリ `ae39be6` / `098b01a`）
-- [ ] `/finish-task` の出荷フロー（push → PR → CI 緑なら merge → main の CI 確認）
+- [x] `/finish-task` の出荷フロー（PR #248 → merge `2aa3f8e1`・main の run 発火を確認）
+
+## 7. 完了後の研究者判断（判断 14–16）
+- [x] ADR-024 D7 の根拠は次の関連 ADR で訂正（判断 14）
+- [x] CHI 2027 Posters は取り下げ（判断 15）→ IME 論文のタスクで判断 8・13 に追記すること
+- [ ] 研究者が [P434] の転記を PDF と照合する（判断 16・`p434-human-check.md`）

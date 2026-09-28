@@ -33,7 +33,8 @@ Skill: verify-before-claiming・citation-ssot・reproducibility-discipline（論
 
 ## §2 次にやること（順番）
 
-1. **EMSE の査読方式**（single / double-anonymous）・分量の規定・AI 利用の開示規程と、プレプリント・再現一式の扱いを公式ページで一次確認（⚠️ 出版社のページは curl / WebFetch が 403 → 実ブラウザで）。⚠️ 論文用リポジトリの git 履歴には著者のメールアドレスが入っている → 匿名査読なら GitHub を直接リンクせず、`git archive` で作った匿名の保存先を使う
+0. ★ **研究者の照合結果を確認する**（判断 16）: `.steering/20260928-p321-reanalysis-paper/p434-human-check.md` の末尾が記入済みなら、論文用リポジトリの `data/li-coblenz-2026/README.md` に「著者が PDF と照合した」と追記する。未記入なら研究者に照合を依頼する。
+1. ★ **EMSE の書式は判断 17 で確認済み**（single-blind＝匿名化不要・要旨 150–250 語・キーワード 4–6・著者名と年の引用・Statements and Declarations と Data availability 必須・LLM の使用は Methods に書く・頁数の上限は見当たらない）。→ **テンプレートを選ぶ**（規程ページの LaTeX マクロ zip〔2021 年版・190 kB〕か Springer Nature の LaTeX テンプレートか。Word も可）。⚠️ zip のダウンロードは研究者の承認を取ってから。⚠️ LaTeX はサブフォルダを使わない（図・bib も同じ階層）
 2. **[V178] の本文**（OA）を読む → 妥当性の節の書き方（7 つのガイドライン）。
 3. 原稿の骨組み（`outline.md` の構成）→ Results（表 1: R0 / R1 / R0′ / 差 / 区間）から書く。
 4. 再現一式の保存先（Zenodo の DOI 付きアーカイブ）と Data availability 節。

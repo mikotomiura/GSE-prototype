@@ -217,3 +217,39 @@
 - ★ **採用（MEDIUM / LOW・Codex P2 を含む）**: 丸めた値の足し算（2 桁で書く）／ D2 の区間の説明を行ごとの ((K−k)/K)^K に（table5 11.2%・本文込み 35.2%）／ 自己検査の数え違い（24 → 実数 20、2 巡目の修正後は 23）／ `check_config` をコードの定数と結び付けた／ [P321] の「新しいのは…」・[P433] の「数え直されており」・[P434] の +11.8pt だけの記述に追記／ D2 の「未解決」は観察期間内の打ち切りを含む → 主張の文に入れる／ 用語集に N > 0・S > 0 の条件と分解の順序。
 - ★ 論文用リポジトリ `098b01a`: `bash run.sh`（許可フラグなし）exit 0・自己検査 23 項目緑・既存の値は不変。
 - **3 巡目は回さない**: 2 巡目の指摘は 1 巡目の修正の境界に限られ、HIGH 2 件は変異テストで効きを確かめた。
+
+## 判断 14: ADR-024 D7 の根拠文の誤りは「次の関連 ADR で訂正」する（2026-09-28・研究者の選択）
+
+- **背景**: 判断 12。ADR-024 の Context §3 と D7 の根拠文「分母より分子のほうが 3 倍効く」は誤り（R₀ − R₁ は分子と分母を同時に変える差。分子の効果 +11.24pt ＋ 分母だけの効果 −14.78pt ＝ −3.54pt）。D7 の決定（分子が成果を要求しているかも書く）は有効。
+- **選択肢**: A: 次の関連 ADR で訂正 ／ B: 今すぐ小さな ADR（ADR-037）を起こす ／ C: ADR 一覧に注記だけ
+- **採用**: A
+- **理由**: ADR 本文は書き換えない規約。決定そのものは変わらないので、受領なし再開の指標を次に扱う ADR で根拠を分解の形に差し替えれば足りる。それまでは `docs/references.md` [P321]・`experiments/20260906-p321-resumption-baseline/notes.md` §9.4・本判断 12 の訂正で参照できる。
+- **見直しタイミング**: 受領なし再開（`receipt_free_resumption` / `pflow_exit_without_receipt`）の指標を扱う次の ADR を書くとき。⚠️ そこで D7 の根拠を引き直すこと。
+
+## 判断 15: IME 論文の CHI 2027 Posters への併願は取り下げる（2026-09-28・研究者の選択）
+
+- **背景**: 判断 8（登壇なし・費用ゼロ）。IME 論文の判断 8（`.steering/20260927-ime-observation-paper-eval-design/decisions.md`）は、BRM 投稿後に「余裕があれば」CHI 2027 Posters にも出すとしていた。ポスターは通常、参加登録費と会場での発表が要る。
+- **選択肢**: A: 取り下げる ／ B: 規程を一次で確かめてから ／ C: 例外として残す
+- **採用**: A（IME 論文は BRM だけにする）
+- **影響範囲**: ⚠️ IME 論文の判断 8・13（カバーレターでの併願の開示）は不要になる。★ **IME 論文のタスクの decisions.md は本タスクでは書き換えない**（並行セッションが作業中）→ IME 論文のタスクに戻ったときに、判断 8・13 に「判断 15（p321 タスク）で取り下げ」と追記する。
+
+## 判断 16: [P434] の転記は研究者が PDF と目で照合する（2026-09-28・研究者の選択）
+
+- **背景**: 転記 A・B はどちらも LLM（同じモデルの独立な 2 インスタンス）で、一致しても共通の読み違いは防げない（判断 12-4）。
+- **採用**: 研究者が照合する。照合表 = `p434-human-check.md`（17 行・Table 5 の 3 行・本文の 3 文）。
+- **終わったら**: 照合の日付と結果を `p434-human-check.md` の末尾に書き、論文用リポジトリの `data/li-coblenz-2026/README.md`（How the transcriptions were made）に「著者が PDF と照合した」と追記する。⚠️ 一致しない行があれば転記 A・B を直し、`run.sh` を回し直す（`ALLOW_RESULT_CHANGE=1` は結果が変わる場合だけ）。
+
+## 判断 17: EMSE の原稿の書式・査読方式を一次で確認した（2026-09-28・研究者の問い「テンプレートやフォーマットの確認は済んでいるか」を受けて）
+
+- ⚠️ それまで確認していたのは費用・Aims and scope・審査期間だけで、**書式は未確認だった**（引き継ぎにも書式の確認が明記されていなかった）。
+- ★ 一次（`https://link.springer.com/journal/10664/submission-guidelines` ・実ブラウザで取得）の逐語:
+  - 査読: "This journal follows a single-blind reviewing procedure." → ★ **匿名化は不要**（著者名を書く・論文用リポジトリを直接リンクしてよい）。→ 判断 6 の「匿名の保存先」は不要になり、判断 10（プレプリントを投稿と同時）とも衝突しない。
+  - テンプレート: "LaTeX macro package (Download zip, 190 kB)"（`https://media.springer.com/full/springer-instructions-for-authors-assets/zip/468198_LaTeX_DL_468198_01072021.zip` ・⚠️ ファイル名の日付は 2021）と、"Springer Nature's LaTeX template"（`https://www.springernature.com/gp/authors/campaigns/latex-author-support` ）の 2 系統。⚠️ 同じページの Text Formatting には "Manuscripts should be submitted in Word." ともある（Word / LaTeX のどちらも受け付ける）。逐語 "Please do not use subfolders for your LaTeX submission, e.g. for figures or bibliographic files."
+  - 要旨: "Please provide an abstract of 150 to 250 words." ／ キーワード: "Please provide 4 to 6 keywords"
+  - 引用: "Cite references in the text by name and year in parentheses."（著者名・年）・文献リストは第一著者の姓のアルファベット順
+  - 必須の節: "The following statements should be included under the heading 'Statements and Declarations' …（原文の二重引用符を一重に置き換えた） submissions that do not include relevant declarations will be returned as incomplete."（Competing Interests など）／ "All original research must include a data availability statement."
+  - LLM: "Large Language Models (LLMs), such as ChatGPT, do not currently satisfy our authorship criteria. … Use of an LLM should be properly documented in the Methods section" ／ "AI assisted copy editing" は申告不要。→ ★ **[P434] の転記と解析・執筆の支援に LLM を使ったことを Methods に書く**（判断 12-4・16）。
+  - 所属: "For authors that are (temporarily) unaffiliated we will only capture their city and country of residence" → 個人研究者でも投稿できる。
+  - 分量: ⚠️ **このページに頁数・語数の上限は見当たらなかった**（要旨の 150–250 語だけ）。
+- ⚠️ テンプレートの zip は**まだダウンロードしていない**（ダウンロードは研究者の承認を取ってから・どちらのテンプレートを使うかも執筆タスクで決める）。
+- **影響範囲**: `outline.md` の未決（査読方式は解決）・引き継ぎ §2。
