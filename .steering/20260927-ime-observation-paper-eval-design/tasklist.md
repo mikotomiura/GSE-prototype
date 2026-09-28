@@ -25,8 +25,10 @@
   - [ ] W3（G-GEAR: 009 013 017 021 022 ／ Mac: 012・005 / 006 は 004 の後）
     - [x] 009: `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16）
     - [x] 013: attempt 1 で worker が Stop（`is_observed_key` の抜粋が `crate::analysis::key_gate` を呼ぶ）→ 判断 35 でメインが 011 の追補（`key_gate.rs` の逐語コピー）を base に入れた（`dd58dd9d`）
-    - [ ] 013 を回し直す（`loop-spawn.sh --cleanup 013` の後）
-    - [ ] 017 / 021 / 022（W3b・実行中）
+    - [x] 013 を回し直す（止まったときの記録は `archive/ime-013-attempt1-stop` に残した）→ `issue_done`
+    - [x] 017 / 021 / 022（W3b）→ `issue_done`（3 本で $12.3）
+    - [x] レビュー 5 本（code-reviewer 3・security-checker 2）→ 判断 37〜41 を研究者に問い確定。014 の仕様と acceptance を判断 41 に合わせて直した（`d2f596b1`）
+    - [x] 5 本の直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回して確かめてから merge（013 `a63b5976` / 009 `32d40022` / 017 `f6cf6fcb` / 022 `c5309fd5` / 021 `3fef7971`）
   - [ ] ★ **判断 36 の整理の issue**（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）

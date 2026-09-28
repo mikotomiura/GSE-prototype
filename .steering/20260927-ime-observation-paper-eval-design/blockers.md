@@ -52,3 +52,14 @@
 
 - 事象: `target/` の中のパスが長すぎ（Filename too long）、`git worktree remove --force` が失敗する。git 側の登録は外れ、ディレクトリが scratchpad に残る。
 - 対応: bash の `rm -rf` で消してから `git worktree prune`。
+
+## B8（2026-09-28・W3 の直し）`closed_set.py` の selftest が 22 秒になった（入口の警告の目安 30 秒に近い）
+
+- 事象: 021 の直し（判断 39 の位相の探索・シナリオ別の囮）で、`kit/check.sh` の `e2/closed_set.py` の selftest が約 22 秒（G-GEAR）。入口は 1 本 30 秒を超えると警告を出す（止めない）。
+- 影響: 遅い機械（Mac）では警告が出うる。verify と各 acceptance で毎回回るので、W4 以降の所要時間が延びる。
+- 対応の候補: 重い検査を `--selftest --full` に分けて既定を速くする（入口の規則どおり）。★ 判断 36 の整理の issue で一緒に行う。
+
+## B9（2026-09-28・W3）作業用エージェントが「自分のバックグラウンドの処理が残ったまま止まった」と通知された
+
+- 事象: 013 / 009 の直しのエージェントが、完了報告の後に「background work of its own still running」と通知された（cargo の実行が残っていた可能性）。
+- 対応: merge の前に、worktree の `git status` が空で HEAD が報告のコミットのままであることを確かめてから merge した（どちらも一致）。★ 次からも、報告の後で worktree が動いていないことを merge の直前に確かめる。
