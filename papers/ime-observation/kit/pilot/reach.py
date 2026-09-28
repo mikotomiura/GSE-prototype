@@ -11,8 +11,11 @@
     取りこぼしが隠れないように min を取る。多かった分は excess_rows に別に数える。
   * diff_distribution = 試行ごとの（届いた − 送った）の分布。0 なら全部届いた・負ならその数だけ取りこぼした。
   * 区間 = oracle の trial_begin から trial_end まで（壁時計）。観測側の行は送出の後に出るので、区間の前に
-    --pre-ms（既定 20）・後ろに --tail-ms（既定 300）の余裕を取る。どの試行の区間にも入らない行は
-    outside_trials_rows に数える（ブロック頭のマーカーのキーがここに入る）。
+    --pre-ms（既定 20）・後ろに --tail-ms（既定 300）の余裕を取る。
+    ⚠️ 区間の後ろは、**次の oracle 行**（reset / block_begin / marker / 次の trial_begin）でも切る
+    （--tail-ms との min）。切らないと、次のブロックの先頭のマーカーの押下が前のブロックの最後の試行に
+    数えられ、その試行の取りこぼしが隠れる。どの試行の区間にも入らない行は outside_trials_rows に数える
+    （ブロック頭のマーカーのキーがここに入る）。
 
 ⚠️ 観測側は keys-only（seal_obs.py の keys-out）だけを受ける。meta と key の行以外が 1 行でもあれば、内容に触れず拒否する。
    このファイルは ImeShadow の行を読まない・数えない・突き合わせない。
@@ -26,6 +29,12 @@ import subprocess
 import sys
 import tempfile
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 DEFAULT_IGNORE = ("mouse_click", "focus_away", "focus_back")  # 実キーではない擬似キー（key 行を作らない）
 
 
@@ -35,6 +44,15 @@ class InputError(Exception):
 
 def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _no_dup_pairs(pairs):
+    out = {}
+    for k, v in pairs:
+        if k in out:
+            raise ValueError("同じキーが 2 回ある行がある")
+        out[k] = v
+    return out
 
 
 def read_jsonl(path):
@@ -49,20 +67,28 @@ def read_jsonl(path):
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                rows.append(json.loads(line, object_pairs_hook=_no_dup_pairs))
             except ValueError:
                 raise InputError("%s の %d 行目が JSON として読めない" % (path, n))
     return rows
 
 
 def load_oracle(path):
-    """試行の一覧 [{trial_id, begin, end, sent}] を返す（begin / end は t_wall_ms・sent は押下の keyname の列）。"""
+    """試行の一覧 [{trial_id, begin, end, sent}]（begin / end は t_wall_ms・sent は押下の keyname の列）と、
+    区間を切るための「次の oracle 行」の時刻の昇順の列（reset / block_begin / marker / trial_begin）を返す。
+    """
     trials = {}
     order = []
+    cuts = []
     for row in read_jsonl(path):
         if not isinstance(row, dict):
             continue
         kind = row.get("kind")
+        if kind in ("reset", "block_begin", "marker"):
+            wall = row.get("t_wall_ms")
+            if _is_int(wall):
+                cuts.append(wall)
+            continue
         if kind not in ("trial_begin", "trial_end", "sent"):
             continue
         tid = row.get("trial_id")
@@ -83,12 +109,15 @@ def load_oracle(path):
         if t[field] is not None:
             raise InputError("%s: 同じ trial_id に %s が 2 つある" % (path, kind))
         t[field] = wall
-    return [trials[k] for k in order]
+        if kind == "trial_begin":
+            cuts.append(wall)
+    cuts.sort()
+    return [trials[k] for k in order], cuts
 
 
 def load_keys_only(path):
-    """keys-only の観測を読み、press=true の key 行の時刻（t・Unix ms）を昇順で返す。"""
-    times = []
+    """keys-only の観測を読み、press=true の key 行の (t・Unix ms, category) を時刻の昇順で返す。"""
+    items = []
     for row in read_jsonl(path):
         kind = row.get("type") if isinstance(row, dict) else None
         if kind == "meta":
@@ -98,27 +127,38 @@ def load_keys_only(path):
         if not _is_int(row.get("t")):
             raise InputError("%s: key 行に整数の t が無い" % path)
         if row.get("press") is True:
-            times.append(row["t"])
-    return sorted(times)
+            items.append((row["t"], row.get("category")))
+    items.sort(key=lambda x: x[0])
+    return items
 
 
-def analyze(trials, presses, pre_ms, tail_ms, ignore):
+def analyze(trials, cuts, presses, pre_ms, tail_ms, ignore):
     done = sorted((t for t in trials if t["begin"] is not None and t["end"] is not None), key=lambda t: t["begin"])
     starts = [t["begin"] - pre_ms for t in done]
+    ends = []
+    for t in done:
+        end_i = t["end"] + tail_ms
+        i = bisect.bisect_right(cuts, t["end"])
+        if i < len(cuts):
+            end_i = min(end_i, cuts[i] - 1)
+        ends.append(end_i)
     counts = [0] * len(done)
+    obs_cats = [[] for _ in done]
     outside = 0
-    for ts in presses:
+    for ts, cat in presses:
         i = bisect.bisect_right(starts, ts) - 1
-        if i >= 0 and ts <= done[i]["end"] + tail_ms:
+        if i >= 0 and ts <= ends[i]:
             counts[i] += 1
+            obs_cats[i].append(cat)
         else:
             outside += 1
     per_trial = []
     dist = {}
     sent_total = reached = excess = full = lossy = 0
-    for t, got in zip(done, counts):
-        sent = len([k for k in t["sent"] if k not in ignore])
-        per_trial.append({"trial_id": t["trial_id"], "sent": sent, "obs": got})
+    for t, got, cats in zip(done, counts, obs_cats):
+        sent_keys = [k for k in t["sent"] if k not in ignore]
+        sent = len(sent_keys)
+        per_trial.append({"trial_id": t["trial_id"], "sent": sent, "obs": got, "sent_keys": sent_keys, "obs_categories": cats})
         sent_total += sent
         reached += min(sent, got)
         excess += max(0, got - sent)
@@ -149,7 +189,7 @@ def _selftest():
     fails = []
 
     def check(ok, what):
-        print("  %s %s" % ("✅" if ok else "❌", what))
+        print("  %s %s" % ("OK" if ok else "NG", what))
         if not ok:
             fails.append(what)
 
@@ -164,7 +204,7 @@ def _selftest():
     for s in range(3):
         oracle.append({"kind": "marker", "block_id": 0, "seq": s, "t_wall_ms": t0 - 800 + s * 100, "t_mono_ns": 0})
     obs_full = [{"type": "meta", "format": "obs/1"}]
-    for s in range(3):  # マーカーのキーの観測（どの試行の区間にも入らない）
+    for s in range(3):  # マーカーのキーの観測(どの試行の区間にも入らない)
         obs_full.append({"type": "key", "t": t0 - 800 + s * 100 + 3, "category": "function", "press": True})
     for n in range(6):
         tid = "t%05d" % (n + 1)
@@ -185,20 +225,22 @@ def _selftest():
     with tempfile.TemporaryDirectory() as tmp:
         op = os.path.join(tmp, "oracle.jsonl")
         dump(op, oracle)
-        trials = load_oracle(op)
+        trials, cuts = load_oracle(op)
         check(len(trials) == 6 and all(len(t["sent"]) == 4 + (1 if i == 1 else 0) for i, t in enumerate(trials)),
               "oracle: 6 試行・押下だけを数える（離しは数えない）")
 
         def measure(rows, **kw):
             kp = os.path.join(tmp, "keys.jsonl")
             dump(kp, rows)
-            return analyze(trials, load_keys_only(kp), kw.get("pre", 20), kw.get("tail", 300), set(kw.get("ignore", DEFAULT_IGNORE)))
+            return analyze(trials, cuts, load_keys_only(kp), kw.get("pre", 20), kw.get("tail", 300), set(kw.get("ignore", DEFAULT_IGNORE)))
 
         r = measure(obs_full)
         check(r["reach_rate"] == 1.0 and r["sent_presses"] == 24 and r["diff_distribution"] == {"0": 6},
               "全部届くと到達率 100%%（送った押下 %d・擬似キーは数えない）" % r["sent_presses"])
         check(r["outside_trials_rows"] == 3, "マーカーのキーは試行の外の行に数える（%d 行）" % r["outside_trials_rows"])
         check(measure(obs_full, ignore=())["sent_presses"] == 25, "擬似キーを無視しない指定なら送った押下が 1 つ増える")
+        check(r["per_trial"][0]["sent_keys"] == ["a", "a", "a", "a"] and r["per_trial"][0]["obs_categories"] == ["alphabetic"] * 4,
+              "per_trial に送った keyname の並びと届いた category の並びが出る（%s）" % r["per_trial"][0])
 
         # ⚠️ 陽性対照: 押下の key 行を 1 つおきに消すと 50%
         press_rows = [r_ for r_ in obs_full if r_.get("press") is True and r_["t"] >= t0]
@@ -216,6 +258,50 @@ def _selftest():
               "重複の行は到達率を上げず、excess_rows に数える")
         check(measure(obs_full, tail=0)["reach_rate"] < 1.0, "区間の後ろの余裕（tail）が無いと、遅れて届く行を取りこぼす")
 
+        # ★ 2 ブロック・block_end の 5 ms 後にマーカーが来る陽性対照。
+        #   区間を「次の oracle 行」で切らないと、このマーカーの押下が前ブロックの最後の試行に
+        #   数えられ、その試行の取りこぼし（2 送って 1 しか届かない）が隠れる（reach_rate が 1 になってしまう）。
+        base2 = t0 + 100_000
+        oracle2 = [
+            {"kind": "header", "format": "oracle/1"},
+            {"kind": "block_begin", "block_id": 0, "t_wall_ms": base2 - 50, "t_mono_ns": 0},
+            {"kind": "trial_begin", "trial_id": "b0t1", "t_wall_ms": base2, "t_mono_ns": 0},
+            {"kind": "sent", "trial_id": "b0t1", "step": 0, "key": "a", "down": True, "t_wall_ms": base2, "t_mono_ns": 0},
+            {"kind": "sent", "trial_id": "b0t1", "step": 1, "key": "a", "down": False, "t_wall_ms": base2 + 20, "t_mono_ns": 0},
+            {"kind": "sent", "trial_id": "b0t1", "step": 2, "key": "a", "down": True, "t_wall_ms": base2 + 100, "t_mono_ns": 0},
+            {"kind": "sent", "trial_id": "b0t1", "step": 3, "key": "a", "down": False, "t_wall_ms": base2 + 120, "t_mono_ns": 0},
+            {"kind": "trial_end", "trial_id": "b0t1", "t_wall_ms": base2 + 150, "t_mono_ns": 0},
+            {"kind": "block_end", "block_id": 0, "t_wall_ms": base2 + 200, "t_mono_ns": 0},
+            {"kind": "block_begin", "block_id": 1, "t_wall_ms": base2 + 205, "t_mono_ns": 0},
+        ]
+        marker_t = base2 + 200 + 5  # block_end の 5 ms 後
+        oracle2.append({"kind": "marker", "block_id": 1, "seq": 0, "t_wall_ms": marker_t, "t_mono_ns": 0})
+        oracle2 += [
+            {"kind": "trial_begin", "trial_id": "b1t1", "t_wall_ms": base2 + 400, "t_mono_ns": 0},
+            {"kind": "sent", "trial_id": "b1t1", "step": 0, "key": "a", "down": True, "t_wall_ms": base2 + 400, "t_mono_ns": 0},
+            {"kind": "sent", "trial_id": "b1t1", "step": 1, "key": "a", "down": False, "t_wall_ms": base2 + 420, "t_mono_ns": 0},
+            {"kind": "trial_end", "trial_id": "b1t1", "t_wall_ms": base2 + 450, "t_mono_ns": 0},
+            {"kind": "block_end", "block_id": 1, "t_wall_ms": base2 + 500, "t_mono_ns": 0},
+        ]
+        # 観測: b0t1 は 2 個送って 1 個しか届かない（本物の取りこぼし）。マーカーの押下は marker_t + 3 ms で届く。
+        obs2 = [
+            {"type": "meta", "format": "obs/1"},
+            {"type": "key", "t": base2 + 3, "category": "alphabetic", "press": True},
+            {"type": "key", "t": marker_t + 3, "category": "function", "press": True},
+            {"type": "key", "t": base2 + 403, "category": "alphabetic", "press": True},
+            {"type": "key", "t": base2 + 423, "category": "alphabetic", "press": False},
+        ]
+        op2 = os.path.join(tmp, "oracle2.jsonl")
+        kp2 = os.path.join(tmp, "keys2b.jsonl")
+        dump(op2, oracle2)
+        dump(kp2, obs2)
+        trials2, cuts2 = load_oracle(op2)
+        r2 = analyze(trials2, cuts2, load_keys_only(kp2), 20, 300, set(DEFAULT_IGNORE))
+        b0 = next(p for p in r2["per_trial"] if p["trial_id"] == "b0t1")
+        check(b0["obs"] == 1 and b0["sent"] == 2, "次ブロックのマーカーの押下は前ブロックの最後の試行に数えない（b0t1: 送った %d・届いた %d）" % (b0["sent"], b0["obs"]))
+        check(r2["reach_rate"] < 1.0, "区間を次の oracle 行で切ると、隠れていた取りこぼしが到達率に出る（%.2f）" % r2["reach_rate"])
+        check(r2["outside_trials_rows"] == 1, "マーカーの押下はどの試行の区間にも入らない行に数える")
+
         # 入力の契約と終了コード。
         me = os.path.abspath(__file__)
         kp = os.path.join(tmp, "k.jsonl")
@@ -229,6 +315,10 @@ def _selftest():
         p = subprocess.run([sys.executable, me, "--oracle", op, "--obs-keys", kp, "--out", out + "2"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         text = p.stdout.decode("utf-8", "replace")
         check(p.returncode == 2 and not os.path.exists(out + "2") and "keys-only" in text, "keys-only でない行があれば拒否する（exit %d・出力を書かない）" % p.returncode)
+        with open(kp, "w", encoding="utf-8", newline="\n") as f:
+            f.write('{"type":"meta","type":"meta2"}\n')
+        p = subprocess.run([sys.executable, me, "--oracle", op, "--obs-keys", kp, "--out", out + "5"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        check(p.returncode == 2, "obs-keys に同じキーが 2 回ある行があれば拒否する（exit %d）" % p.returncode)
         dump(kp, obs_full)
         dump(op + "0", [{"kind": "header", "format": "oracle/1"}])
         p = subprocess.run([sys.executable, me, "--oracle", op + "0", "--obs-keys", kp, "--out", out + "3"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -262,7 +352,8 @@ def main(argv=None):
         ap.error("--pre-ms / --tail-ms は 0 以上")
     ignore = set(k for k in args.ignore_keys.split(",") if k)
     try:
-        result = analyze(load_oracle(args.oracle), load_keys_only(args.obs_keys), args.pre_ms, args.tail_ms, ignore)
+        trials, cuts = load_oracle(args.oracle)
+        result = analyze(trials, cuts, load_keys_only(args.obs_keys), args.pre_ms, args.tail_ms, ignore)
     except InputError as e:
         print("reach: %s" % e, file=sys.stderr)
         return 2

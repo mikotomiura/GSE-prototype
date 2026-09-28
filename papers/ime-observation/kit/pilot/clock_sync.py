@@ -34,6 +34,12 @@ import subprocess
 import sys
 import tempfile
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 MS_PER_HOUR = 3_600_000.0
 
 
@@ -43,6 +49,15 @@ class InputError(Exception):
 
 def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _no_dup_pairs(pairs):
+    out = {}
+    for k, v in pairs:
+        if k in out:
+            raise ValueError("同じキーが 2 回ある行がある")
+        out[k] = v
+    return out
 
 
 def read_jsonl(path):
@@ -57,7 +72,7 @@ def read_jsonl(path):
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                rows.append(json.loads(line, object_pairs_hook=_no_dup_pairs))
             except ValueError:
                 raise InputError("%s の %d 行目が JSON として読めない" % (path, n))
     return rows
@@ -402,6 +417,16 @@ def _selftest():
         dump(kp, build()[2] + [{"type": "x", "t": 1}])
         rc, text = cli("--obs-keys", kp, o=out + "2")
         check(rc == 2 and not os.path.exists(out + "2") and "keys-only" in text, "keys-only でない行があれば拒否する（exit %d・出力を書かない）" % rc)
+        with open(kp, "w", encoding="utf-8", newline="\n") as f:
+            f.write('{"type":"meta","type":"meta2"}\n')
+        rc, text = cli("--obs-keys", kp, o=out + "2b")
+        check(rc == 2 and not os.path.exists(out + "2b"), "obs-keys に同じキーが 2 回ある行があれば拒否する（今は後の値を採らない・exit %d）" % rc)
+        with open(gp, "w", encoding="utf-8", newline="\n") as f:
+            f.write('{"kind":"header","format":"gt/1","src":"mac_nstic"}\n')
+            f.write('{"kind":"ev","kind":"ev2","t_wall_ms":1,"t_mono_ns":1,"ev":"key_down","vk":105}\n')
+        rc, text = cli("--gt", gp, o=out + "2c")
+        check(rc == 2 and not os.path.exists(out + "2c"), "gt に同じキーが 2 回ある行があれば拒否する（exit %d）" % rc)
+        dump(gp, build()[1])
         dump(kp, build(obs_skip=range(6))[2])
         rc, _ = cli("--obs-keys", kp, o=out + "3")
         check(rc == 1, "指定した側で 1 ブロックも見つからなければ exit 1（exit %d）" % rc)
