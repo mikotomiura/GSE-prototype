@@ -15,12 +15,21 @@ the prediction as well.
 Feature transforms used by the removal experiments:
   timing "exact"  times are kept as they are
          "none"   times are removed (all set to 0)
-         "bin1s"  times are coarsened to 1-second bins (each time becomes the start of its bin)
+         "bin1s"  times are coarsened to 1-second bins (each time becomes the start of its bin, optionally shifted
+                  by phase; see below)
   runs   "exact"  runs of alphabetic keys are kept (one row per key press)
-         "count"  the length of alphabetic runs is removed: only the number of alphabetic keys per window is kept,
-                  where a window is 1 second when times are shown and the whole trial otherwise. The alphabetic keys
-                  of a window are moved to the position of the first alphabetic key of that window and stamped with
-                  the start of the window. Rows of other categories keep their order and times.
+         "count"  the length of a run of alphabetic keys is removed: every maximal run of consecutive alphabetic
+                  rows (a run ends at the next row of a different category, for example space or punctuation) is
+                  stamped with the time of its first row, so that the run collapses to a single token further down
+                  the pipeline. A run is not split at a 1-second boundary that happens to fall inside it: the
+                  boundary is an artefact of the time grid, not a break in typing. Rows of other categories keep
+                  their order and times.
+
+phase (bin1s only) shifts the 1-second grid used to compute a bin, from the default of 0 up to just under one
+window. Two logs of the same events can disagree on which second a time near a grid line falls into, because the
+grid of an observed log is anchored to the (unknown) time its first row was written at, not to any candidate's
+simulated log. The closed-set attack searches candidate phases and keeps the closest match; see PHASES in
+closed_set.py.
 """
 import argparse
 import os
@@ -71,8 +80,12 @@ VK_OF.update({"space": 0x20, "enter": 0x0D, "esc": 0x1B, "backspace": 0x08, "tab
               "minus": 0xBD, "comma": 0xBC, "period": 0xBE, "shift": 0xA0})
 
 
-def apply_features(events, timing="exact", runs="exact"):
-    """Apply a feature transform to [(t, category)] (t in ms, ascending) and return [(t, category)]."""
+def apply_features(events, timing="exact", runs="exact", phase=0):
+    """Apply a feature transform to [(t, category)] (t in ms, ascending) and return [(t, category)].
+
+    phase (0 <= phase < WINDOW_MS) shifts the grid used by timing="bin1s"; it has no effect for the other two
+    timing values. See the module docstring.
+    """
     if timing not in TIMINGS:
         raise ValueError("timing must be exact, none or bin1s")
     if runs not in RUNS:
@@ -82,36 +95,28 @@ def apply_features(events, timing="exact", runs="exact"):
         if timing == "none":
             t = 0
         elif timing == "bin1s":
-            t = (t // WINDOW_MS) * WINDOW_MS
+            t = ((t + phase) // WINDOW_MS) * WINDOW_MS - phase
         ev.append((t, c))
     if runs == "exact":
         return ev
     out = []
-    last = {}   # window -> index in out of the last alphabetic row placed for that window
-    for t, c in events:
-        if c != "alphabetic":
-            out.append((0 if timing == "none" else ((t // WINDOW_MS) * WINDOW_MS if timing == "bin1s" else t), c))
-            continue
-        w = 0 if timing == "none" else t // WINDOW_MS
-        ts = 0 if timing == "none" else w * WINDOW_MS
-        if w in last:
-            idx = last[w] + 1
-            out.insert(idx, (ts, c))
-            for w2 in last:
-                if last[w2] >= idx:
-                    last[w2] += 1
-            last[w] = idx
+    run_t = None   # the (already timing-transformed) time stamped on the run of alphabetic rows in progress
+    for t, c in ev:
+        if c == "alphabetic":
+            if run_t is None:
+                run_t = t
+            out.append((run_t, c))
         else:
-            out.append((ts, c))
-            last[w] = len(out) - 1
+            run_t = None
+            out.append((t, c))
     return out
 
 
-def simulate(plan_trial, keycat, timing="exact", runs="exact", t0=0):
+def simulate(plan_trial, keycat, timing="exact", runs="exact", t0=0, phase=0):
     """Return the predicted [(t, category)] of one planned trial (a trial row of a plan).
 
     t is t0 plus the step time, where t0 is the start time of the trial (default 0). Only key presses are mapped, and
-    keys whose category is None are omitted.
+    keys whose category is None are omitted. phase is passed to apply_features (see its docstring).
     """
     ev = []
     for st in plan_trial["steps"]:
@@ -124,7 +129,7 @@ def simulate(plan_trial, keycat, timing="exact", runs="exact", t0=0):
         if cat is None:
             continue
         ev.append((t0 + st["at_ms"], cat))
-    return apply_features(ev, timing, runs)
+    return apply_features(ev, timing, runs, phase)
 
 
 # ---------------------------------------------------------------- selftest
@@ -230,19 +235,38 @@ def selftest():
     s8 = trial("S8")
     check("S8: the candidate digit key is numeric", simulate(s8, KEYCAT)[-1][1] == "numeric")
 
+    # runs="count" groups by delimiter (a row of a different category), not by a 1-second window (judgment 39/2):
+    # a run of alphabetic rows that spans a window boundary is kept as one token.
     ev2 = [(0, "alphabetic"), (100, "alphabetic"), (900, "alphabetic"), (1100, "alphabetic"), (1500, "space"),
            (1700, "alphabetic"), (2500, "enter")]
     cnt = apply_features(ev2, "exact", "count")
-    check("runs count: alphabetic keys are gathered per window (3 in window 0, 2 in window 1, before the space)",
-          cnt == [(0, "alphabetic")] * 3 + [(1000, "alphabetic")] * 2 + [(1500, "space"), (2500, "enter")], repr(cnt))
+    check("positive: a run that spans a 1-second boundary (times 0, 100, 900, 1100) is one token, "
+          "stamped with the time of its first row",
+          cnt == [(0, "alphabetic")] * 4 + [(1500, "space"), (1700, "alphabetic"), (2500, "enter")], repr(cnt))
     check("runs count keeps the number of alphabetic keys",
           sum(1 for _, c in cnt if c == "alphabetic") == sum(1 for _, c in ev2 if c == "alphabetic"))
     cn = apply_features(ev2, "none", "count")
-    check("timing none with runs count: every alphabetic key moves to the front and all times are 0",
-          cn == [(0, "alphabetic")] * 5 + [(0, "space"), (0, "enter")], repr(cn))
+    check("timing none with runs count: every alphabetic key gets time 0, and a delimiter still starts a new run "
+          "(the run after the space is not merged with the run before it)",
+          cn == [(0, "alphabetic")] * 4 + [(0, "space"), (0, "alphabetic"), (0, "enter")], repr(cn))
     cb = apply_features(ev2, "bin1s", "count")
-    check("timing bin1s with runs count: other rows are also stamped with the start of their bin",
-          cb == [(0, "alphabetic")] * 3 + [(1000, "alphabetic")] * 2 + [(1000, "space"), (2000, "enter")], repr(cb))
+    check("timing bin1s with runs count: the run across the boundary stays one token (time of its first row, "
+          "bin 0), and the row after the space starts a new token at its own bin",
+          cb == [(0, "alphabetic")] * 4 + [(1000, "space"), (1000, "alphabetic"), (2000, "enter")], repr(cb))
+
+    ev3 = [(0, "alphabetic"), (100, "space"), (200, "alphabetic")]
+    check("negative: two runs separated by a delimiter inside the same nominal window are not merged into one",
+          apply_features(ev3, "exact", "count") == ev3)
+
+    # positive: phase moves which bin a time near a boundary falls into (judgment 39/2, used by the attack to
+    # search the candidate log's grid alignment against the observed log)
+    near = [(950, "alphabetic"), (1050, "alphabetic")]
+    check("positive: with phase=0 a pair of times either side of a bin edge fall in different bins",
+          [t for t, _ in apply_features(near, "bin1s")] == [0, 1000])
+    check("positive: shifting the grid by phase=100 puts both times in the same bin",
+          [t for t, _ in apply_features(near, "bin1s", phase=100)] == [900, 900])
+    check("negative: phase has no effect when timing is not bin1s",
+          apply_features(near, "exact", phase=100) == near and apply_features(near, "none", phase=100) == [(0, "alphabetic")] * 2)
 
     for label, fn in (("unknown timing", lambda: apply_features(ev2, "fine", "exact")),
                       ("unknown runs", lambda: apply_features(ev2, "exact", "none")),
