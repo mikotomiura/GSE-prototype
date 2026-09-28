@@ -8,9 +8,14 @@
 //!
 //! Start-up is synchronous: `start` returns only after the hooks are installed, and reports a failed
 //! installation as an error instead of running silently without observing.
+//!
+//! Known limits. A hook that the operating system removes after installation is not re-installed:
+//! the thread stays alive and the log then contains no key rows, which is indistinguishable from an
+//! idle session. Timestamps are taken when a callback runs, and a callback runs when the thread next
+//! polls its queue, so a timestamp can trail the physical event by up to the polling interval.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{sync_channel, RecvTimeoutError, SyncSender};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -53,9 +58,13 @@ pub fn start(ctx: DriverCtx) -> Result<DriverHandle, String> {
             let _ = thread.join();
             Err(e)
         }
-        Err(_) => {
+        Err(RecvTimeoutError::Timeout) => {
             ctx.stop.store(true, Ordering::Release);
             Err("the hook thread did not report its start within 5 seconds".to_string())
+        }
+        Err(RecvTimeoutError::Disconnected) => {
+            let _ = thread.join();
+            Err("the hook thread ended before reporting its start".to_string())
         }
     }
 }

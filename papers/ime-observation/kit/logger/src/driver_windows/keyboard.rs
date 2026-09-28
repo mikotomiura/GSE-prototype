@@ -22,7 +22,9 @@ use crate::driver_api::KeyEvent;
 use crate::input::hook::{IME_ACTIVE, IME_CANDIDATE_NAV_COUNT, IME_SHADOW_ABANDON};
 
 /// Channel to the core. A hook callback is a bare function and cannot capture state, so the sender is
-/// published once, before the hook is installed.
+/// published once, before the hook is installed. The sender is never dropped: the core detects a
+/// terminated driver thread through the thread handle rather than through channel disconnection. The
+/// channel is unbounded, so the callback never blocks on a slow consumer.
 static KEY_TX: OnceLock<Sender<KeyEvent>> = OnceLock::new();
 
 // @excerpt-begin is_observed_key
@@ -78,12 +80,18 @@ fn key_transition(message: u32) -> Option<bool> {
 }
 
 /// Updates the navigation counter and the abandonment flag of the open conversion session for one key
-/// press. Nothing is recorded while no session is open.
+/// transition. Only presses are recorded, and nothing is recorded while no session is open.
 ///
 /// The hook is system-wide, so an arrow key or Escape pressed in an unrelated window while a session
 /// is open is counted as well; the session summary is therefore an upper bound on candidate navigation.
-fn record_ime_nav(vk_code: u32, active: &AtomicBool, nav: &AtomicU32, abandon: &AtomicBool) {
-    if !active.load(Ordering::Acquire) {
+fn record_ime_nav(
+    vk_code: u32,
+    press: bool,
+    active: &AtomicBool,
+    nav: &AtomicU32,
+    abandon: &AtomicBool,
+) {
+    if !press || !active.load(Ordering::Acquire) {
         return;
     }
     match classify_ime_nav_key(vk_code) {
@@ -127,14 +135,13 @@ unsafe extern "system" fn keyboard_hook_callback(
         if let Some(press) = key_transition(wparam.0 as u32) {
             let vk_code = (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode;
             let t = super::wall_ms();
-            if press {
-                record_ime_nav(
-                    vk_code,
-                    &IME_ACTIVE,
-                    &IME_CANDIDATE_NAV_COUNT,
-                    &IME_SHADOW_ABANDON,
-                );
-            }
+            record_ime_nav(
+                vk_code,
+                press,
+                &IME_ACTIVE,
+                &IME_CANDIDATE_NAV_COUNT,
+                &IME_SHADOW_ABANDON,
+            );
             if is_observed_key(vk_code) {
                 if let Some(tx) = KEY_TX.get() {
                     let _ = tx.send(KeyEvent {
@@ -213,7 +220,7 @@ mod tests {
     fn nothing_is_recorded_while_no_session_is_open() {
         let (active, nav, abandon) = cells(false);
         for vk in [0x25, 0x26, 0x1B] {
-            record_ime_nav(vk, &active, &nav, &abandon);
+            record_ime_nav(vk, true, &active, &nav, &abandon);
         }
         assert_eq!(nav.load(Ordering::Relaxed), 0);
         assert!(!abandon.load(Ordering::Relaxed));
@@ -223,19 +230,30 @@ mod tests {
     fn arrows_are_counted_and_escape_marks_abandonment_while_a_session_is_open() {
         let (active, nav, abandon) = cells(true);
         for vk in [0x25, 0x26, 0x27, 0x28, 0x28] {
-            record_ime_nav(vk, &active, &nav, &abandon);
+            record_ime_nav(vk, true, &active, &nav, &abandon);
         }
         assert_eq!(nav.load(Ordering::Relaxed), 5);
         assert!(!abandon.load(Ordering::Relaxed));
-        record_ime_nav(0x1B, &active, &nav, &abandon);
+        record_ime_nav(0x1B, true, &active, &nav, &abandon);
         assert!(abandon.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn releases_are_never_recorded() {
+        // A key release must not be counted a second time, nor mark abandonment.
+        let (active, nav, abandon) = cells(true);
+        for vk in [0x25, 0x26, 0x27, 0x28, 0x1B] {
+            record_ime_nav(vk, false, &active, &nav, &abandon);
+        }
+        assert_eq!(nav.load(Ordering::Relaxed), 0);
+        assert!(!abandon.load(Ordering::Relaxed));
     }
 
     #[test]
     fn other_keys_do_not_touch_the_session_summary() {
         let (active, nav, abandon) = cells(true);
         for vk in [0x41, 0x20, 0x0D, 0x08, 0x24] {
-            record_ime_nav(vk, &active, &nav, &abandon);
+            record_ime_nav(vk, true, &active, &nav, &abandon);
         }
         assert_eq!(nav.load(Ordering::Relaxed), 0);
         assert!(!abandon.load(Ordering::Relaxed));

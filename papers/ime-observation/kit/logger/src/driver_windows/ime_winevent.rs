@@ -6,6 +6,9 @@
 //! through its message queue, no code is injected into any other process, and the callback arguments
 //! carry no text, so the observation is content-free by construction.
 //!
+//! The callback ignores the window and the process that raised an event, so the session summary is a
+//! system-wide observation rather than one attributed to an application.
+//!
 //! A display event opens a conversion session and a dismissal closes it. The session state lives in
 //! the shared atomics of the core: the start time, the dwell time and the ready flag written here are
 //! read by the monitoring loop, and the navigation counter and abandonment flag are updated by the
@@ -102,19 +105,24 @@ unsafe extern "system" fn ime_winevent_callback(
     apply_ime_event(event, super::wall_ms(), &Session::shared());
 }
 
-/// Registers the hook on the calling thread, which must pump its message queue.
-///
-/// The event range is a single contiguous interval `[min, max]`. With the correct values
-/// `EVENT_OBJECT_IME_SHOW < EVENT_OBJECT_IME_HIDE < EVENT_OBJECT_IME_CHANGE`, so display is the minimum
-/// and change the maximum; swapping the bounds yields an empty range that delivers nothing. The
+/// Bounds of the registered event interval. A registration takes a single contiguous interval
+/// `[min, max]`. With the correct values `EVENT_OBJECT_IME_SHOW < EVENT_OBJECT_IME_HIDE <
+/// EVENT_OBJECT_IME_CHANGE`, so display is the minimum and change the maximum; swapping the bounds
+/// yields an empty interval that delivers nothing.
+const EVENT_MIN: u32 = EVENT_OBJECT_IME_SHOW;
+const EVENT_MAX: u32 = EVENT_OBJECT_IME_CHANGE;
+// Compile-time guard against an inverted, hence empty, interval.
+const _: () = assert!(EVENT_MIN < EVENT_MAX);
+
+/// Registers the hook on the calling thread, which must pump its message queue. The events of the
 /// process's own windows are skipped.
 pub(super) fn install() -> Result<HWINEVENTHOOK, String> {
     // SAFETY: `ime_winevent_callback` matches the `WINEVENTPROC` signature and stays valid for the
     // lifetime of the process; the hook is removed by `uninstall` on the same thread.
     let hook = unsafe {
         SetWinEventHook(
-            EVENT_OBJECT_IME_SHOW,
-            EVENT_OBJECT_IME_CHANGE,
+            EVENT_MIN,
+            EVENT_MAX,
             HMODULE::default(),
             Some(ime_winevent_callback),
             0,
@@ -178,10 +186,21 @@ mod tests {
 
     #[test]
     fn event_range_is_show_then_hide_then_change() {
-        // The registration uses [SHOW, CHANGE] as one interval; an inverted order would be empty.
         assert_eq!(EVENT_OBJECT_IME_SHOW, 0x8027);
         assert_eq!(EVENT_OBJECT_IME_HIDE, 0x8028);
         assert_eq!(EVENT_OBJECT_IME_CHANGE, 0x8029);
+    }
+
+    #[test]
+    fn registered_interval_covers_all_three_events() {
+        // The bounds are the values `install` passes to the registration.
+        for event in [
+            EVENT_OBJECT_IME_SHOW,
+            EVENT_OBJECT_IME_HIDE,
+            EVENT_OBJECT_IME_CHANGE,
+        ] {
+            assert!((EVENT_MIN..=EVENT_MAX).contains(&event), "{event:#x}");
+        }
     }
 
     #[test]

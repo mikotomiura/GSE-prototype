@@ -1,5 +1,5 @@
 {
-  "gse_repo_commit": "20c24f317ac4a7119e7c926393c2f23cd3229cea",
+  "gse_repo_commit": "5deaba1cab4304acc467434d7779d5efee6882df",
   "entries": [
     {
       "kind": "excerpt",
@@ -38,7 +38,7 @@
       "start_anchor": "unsafe extern \"system\" fn hook_callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {",
       "end_anchor": "// Tests",
       "symbol": "hook_callback",
-      "sha256": "2677a19975226e2c442b3de11c7dac3e73df27710ba282bf0083cc6302a3da7f",
+      "sha256": "2ffa43ad0e1fde79bd0944e0a2c9089baaa9189dea0445d1bede169b644c604b",
       "gse_range_sha256": "b16063ff8e7cdbec771f45487811246c411b5308c7b64f49dc84ed3ffdc0dec3",
       "check_decls": null,
       "reason": "Low-level keyboard hook of the Windows driver: the callback, its installation and the two excerpted pure functions. The callback is newly written (it sends to the core channel and omits the reference implementation's statistics and mode tracking); the anchored range pins the reference callback so that a change of its judgment is detected."
@@ -52,7 +52,7 @@
       "start_anchor": "/// WinEvent callback for cross-process IME composition detection.",
       "end_anchor": "/// ⚠️★★★ **cloak/uncloak 用の 2 本目の WinEvent コールバック。**",
       "symbol": "win_event_callback",
-      "sha256": "354049c01752c026c8cb0b62ec53661eabce0636be2edab26091662a61c13719",
+      "sha256": "003b17ccf13b28f576be88f9f9862bd0d51228f9050f5932f85d34c567cac863",
       "gse_range_sha256": "5916aff63ec59728fe46c98e81174c273b5991741b63afb85f7990261ede02bf",
       "check_decls": null,
       "reason": "Out-of-context WinEvent hook for the input-method window events. The event handling is a re-implementation over injectable cells; the anchored range pins the reference callback so that a change of its judgment is detected."
@@ -66,7 +66,7 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "717ca04019cb707ca99897bd689fdd39b35f7a233eb0354a42cdea58e34b7c39",
+      "sha256": "5fd12e9b48ad699dbbfeb6ec73b95e1c63cd27bec2d9e103699468aae9eaad4d",
       "gse_range_sha256": null,
       "check_decls": null,
       "reason": "Entry point of the Windows driver: synchronous start-up, the hook thread and its message pump. Newly written; the hooks it installs live in the two submodules."
