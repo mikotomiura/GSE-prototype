@@ -39,17 +39,37 @@ def snapshot(wb):
     return out
 
 
+def dxf_content(wb, dxf_id):
+    """条件付き書式が指す差分書式の中身。★ openpyxl は保存時に差分書式の一覧を詰め直すので、dxfId の番号ではなく中身で比べる。"""
+    if dxf_id is None:
+        return None
+    d = wb._differential_styles.dxf[dxf_id]
+    return tuple(repr(getattr(d, a)) for a in ("font", "fill", "border", "numFmt", "alignment", "protection"))
+
+
 def structure(wb, titles=None):
-    """元シートの入力規則・条件付き書式・結合セル・定義名の構成（openpyxl の再保存で失われうるもの）。"""
+    """元シートの構成を内容レベルで写す（openpyxl の再保存で失われる・変わるもの）。
+    入力規則（範囲・種類・式）、条件付き書式（範囲とルールの中身）、結合セル、テーブル（名前・範囲・スタイル）、定義名（名前と値）。"""
     titles = titles or [ws.title for ws in wb.worksheets]
     out = {}
     for t in titles:
         ws = wb[t]
-        out[t] = (sorted((str(dv.sqref), dv.type, dv.formula1) for dv in ws.data_validations.dataValidation),
-                  sorted(str(r.sqref) for r in ws.conditional_formatting),
-                  sorted(str(m) for m in ws.merged_cells.ranges))
-    out["__defined_names__"] = sorted(wb.defined_names.keys()) if hasattr(wb.defined_names, "keys") else len(wb.defined_names)
+        dv = sorted((str(d.sqref), d.type, d.operator, d.formula1, d.formula2, d.allow_blank) for d in ws.data_validations.dataValidation)
+        cf = sorted((str(rng.sqref), tuple(sorted((r.type, r.operator, tuple(r.formula or ()), r.priority, dxf_content(wb, r.dxfId), r.text) for r in rules)))
+                    for rng, rules in ws.conditional_formatting._cf_rules.items())
+        merged = sorted(str(m) for m in ws.merged_cells.ranges)
+        tables = sorted((tb.name, tb.ref, tb.tableStyleInfo.name if tb.tableStyleInfo else None) for tb in ws.tables.values())
+        names = sorted((n, d.attr_text) for n, d in ws.defined_names.items())
+        out[t] = (dv, cf, merged, tables, names)
+    out["__defined_names__"] = sorted((n, d.attr_text) for n, d in wb.defined_names.items())
     return out
+
+
+def same_file(a, b):
+    """別表記・大文字小文字違い・リンク経由でも同じファイルかを判定する（Codex 指摘）。"""
+    if os.path.exists(a) and os.path.exists(b):
+        return os.path.samefile(a, b)
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
 def add_sheet(wb, spec, table_idx):
@@ -80,8 +100,8 @@ def add_sheet(wb, spec, table_idx):
             raise ValueError(f"{spec['name']} row {i}: {len(row)} cols != {ncol}")
         for j, v in enumerate(row, 1):
             c = ws.cell(i, j, v)
-            # 数式は formula_ok のシートだけに許す（外部 API の題名などが '=' で始まっても文字列として保存する）
-            if isinstance(v, str) and v.startswith("=") and not spec.get("formula_ok"):
+            # 数式は spec の formula_cols（1 始まりの列番号）のセルだけに許す。題名など他の列が '=' で始まっても文字列として保存する
+            if isinstance(v, str) and v.startswith("=") and j not in spec.get("formula_cols", ()):
                 c.data_type = "s"
             c.font = Font(name=FONT, size=11, color=TEXT)
             c.alignment = WRAP_TOP
@@ -101,39 +121,42 @@ def main():
     spec_path = sys.argv[1] if len(sys.argv) > 1 else f"{SP}/claude_eval.json"
     if len(sys.argv) > 2:
         DST = sys.argv[2]
-    if os.path.abspath(DST) == os.path.abspath(SRC):
+    if same_file(DST, SRC):
         sys.exit("出力先が入力 xlsx と同じパスです（入力のスナップショットを上書きしない）")
     sheets = json.load(open(spec_path, encoding="utf-8"))
     wb = openpyxl.load_workbook(SRC)
     before = snapshot(wb)
-    n_tables_before = sum(len(ws.tables) for ws in wb.worksheets)
     struct_before = structure(wb)
     orig_titles = [ws.title for ws in wb.worksheets]
     for k, spec in enumerate(sheets, 1):
         add_sheet(wb, spec, k)
     wb.calculation = CalcProperties(fullCalcOnLoad=True)
-    wb.save(DST)
+    # 一時ファイルに保存して検算し、通ったときだけ出力先を置き換える（失敗時に既存の正常版を失わない）
+    tmp = os.path.join(os.path.dirname(os.path.abspath(DST)), ".tmp-" + os.path.basename(DST))  # openpyxl は拡張子 .xlsx を要求する
+    wb.save(tmp)
 
-    # 検算: 元シートの値が 1 つも変わっていない・判定欄が未判定のまま
-    wb2 = openpyxl.load_workbook(DST)
+    # 検算: 元シートの値が 1 つも変わっていない・判定欄が未判定のまま・構成が内容レベルで同じ
+    wb2 = openpyxl.load_workbook(tmp)
     after = {k: v for k, v in snapshot(wb2).items() if k[0] in orig_titles}
     diff = [k for k in set(before) | set(after) if before.get(k) != after.get(k)]
     scr = wb2["スクリーニング"]
     undecided = all(scr.cell(r, c).value == "未判定" for r in range(5, 39) for c in (4, 5, 6))
-    n_tables_after = sum(len(wb2[t].tables) for t in orig_titles)
     struct_after = structure(wb2, orig_titles)
     print(json.dumps({
-        "saved": DST,
+        "target": DST,
         "orig_sheets": len(orig_titles),
         "added_sheets": [s["name"] for s in sheets],
         "orig_cells_changed": len(diff),
         "diff_sample": [list(d) for d in diff[:5]],
         "screening_D5_F38_all_undecided": undecided,
-        "orig_tables_before_after": [n_tables_before, n_tables_after],
         "orig_structure_same": struct_before == struct_after,
     }, ensure_ascii=False, indent=1))
-    if diff or not undecided or n_tables_before != n_tables_after or struct_before != struct_after:
-        sys.exit(1)
+    wb2.close()
+    if diff or not undecided or struct_before != struct_after:
+        os.remove(tmp)
+        sys.exit("検算に失敗したので出力先を置き換えなかった")
+    os.replace(tmp, DST)
+    print("saved:", DST)
 
 
 if __name__ == "__main__":

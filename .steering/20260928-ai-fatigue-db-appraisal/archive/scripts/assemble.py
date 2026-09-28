@@ -2,7 +2,7 @@
 import json
 import openpyxl
 from data_b import R
-from data_c import CHECKS, GSE_EXTRA, SG, CHASE
+from data_c import CHECKS, GSE_EXTRA, SG_BY_DOI, CHASE
 
 import os
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -78,7 +78,7 @@ for k, i in enumerate(IDS, 5):
 S.append(dict(name="Claude×GPT比較", title="Claude×GPT比較｜用途判定と一次で食い違った点",
     subtitle="GPT（元ファイルの『AI適格性評価』）と Claude の用途判定の一致は、分類の一致だけを示す（品質評価の一致や κ ではない）。★ 2 つの AI の比較であり、人間の独立判定との比較（元の『AI判定比較』シート）は研究者が別に行う。",
     headers=["ID", "論文タイトル", "GPTの用途判定", "Claudeの用途判定", "Claudeの中心範囲の段", "用途判定の一致", "既存評価の記載で一次と食い違った点・補ったこと", "Claude の確認経路"],
-    widths=[9, 40, 14, 14, 16, 12, 70, 34], rows=rows, formula_ok=True))
+    widths=[9, 40, 14, 14, 16, 12, 70, 34], rows=rows, formula_cols=[6]))
 
 # ---------- GSE照合 ----------
 rows = []
@@ -95,10 +95,10 @@ S.append(dict(name="GSE照合", title="GSE照合｜GSE の既存調査・理論�
 # ---------- 検索漏れ候補 ----------
 an = json.load(open(os.path.join(ARCH, "evidence", "searchgap-analysis.json"), encoding="utf-8"))
 hits = [c for c in an["candidates"] if c.get("prelim_hit") and not c.get("exclude_terms")]
-assert len(hits) == 141 and set(SG) == set(range(1, 142))
+assert {c['doi'] for c in hits} == set(SG_BY_DOI) and len(hits) == len(SG_BY_DOI), 'DOI の集合が判定と一致しない'
 rows = []
 for k, c in enumerate(hits, 1):
-    j, code, cls, memo = SG[k]
+    j, code, cls, memo = SG_BY_DOI[c['doi']]
     q = ",".join(str(v) for v in c.get("queries", []))
     rows.append([k, f"API 検索（クエリ {q}）", c["doi"], c["title"], c.get("year") or "", c.get("type") or "", c.get("venue") or "", j, code, f"{cls}｜{memo}"])
 for n, (doi, t, v, j, memo) in enumerate(CHASE, len(hits) + 1):
@@ -175,7 +175,7 @@ ov = [
 ]
 S.insert(0, dict(name="Claude評価概要", title="AI 疲労 文献 DB｜Claude による再評価（2026-09-28）",
     subtitle="元の 16 シートは変更せず、Claude の評価を追加した。★ 人間の独立判定の代わりではない（AI の予備判定）。数字の列は各シートを数える数式で、シートを編集すると更新される。",
-    headers=["項目", "値", "説明"], widths=[34, 34, 100], rows=ov, subtitle_height=40, formula_ok=True))
+    headers=["項目", "値", "説明"], widths=[34, 34, 100], rows=ov, subtitle_height=40, formula_cols=[2]))
 
 # design §9 の検査（空欄なし・E コードの値域・件数の整合）
 import re as _re
